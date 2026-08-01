@@ -1,14 +1,15 @@
 # IGNITE RALLY — 3D Top-Down Racing Shooter
 
 A bright, cartoon toy-car combat racer in the spirit of the classic *Ignition*
-(1997), playable entirely in the browser. Race 3 laps against 5 armed AI rivals
-on a dirt circuit through a sunny pine valley — shoot them down with your cannon
-and homing missiles while fighting for first place.
+(1997), playable entirely in the browser — on desktop **and phones** (full
+touch controls). Race 3 laps against 5 armed AI rivals on a dirt circuit
+through a rolling pine valley — cannon, homing missiles, mines, a shockwave
+blast, nitro, boost pads and launch ramps.
 
 **Every asset is procedural and designed in code by Claude** — the circuit, the
-painted pole fences, the huts and pine forest, the chunky toy trucks, and all
-textures (painted on canvases at load time). There are no image, model, or
-audio files. The game is intentionally silent.
+rolling terrain, the pine forest and grass, the grandstand and sponsor boards,
+the chunky toy trucks, and all textures (painted on canvases at load time).
+There are no image, model, or audio files. The game is intentionally silent.
 
 ## Play
 
@@ -39,18 +40,26 @@ via `file://` won't work.)
 | `A` `D` / `←` `→` | Steer |
 | `SPACE` | Cannon (watch the heat gauge) |
 | `E` | Homing missile |
+| `X` | Drop mine |
+| `Q` | Shockwave blast |
+| `F` | Fire nitro (charged by drifting & kills) |
 | `SHIFT` | Drift |
 | `C` | Toggle camera (top-down / chase) |
 | `P` | Pause |
+
+On touch devices, on-screen controls appear automatically: steering arrows,
+GAS/brake, FIRE, and buttons for missile 🚀, mine 💣, shockwave 💥 and nitro ⚡.
 
 ## Gameplay
 
 - **3 laps, 6 racers.** Finish position, kills, laps and pickups all feed your score.
 - **Cannon** overheats if you hold the trigger too long.
-- **Missiles** lock onto the nearest rival ahead of you; grab amber pickups for more.
-- **Green pickups** repair your hull; rivals shoot back, and getting wrecked
-  costs you 300 points and a respawn delay.
-- **Boost pads** (yellow chevrons) fling you down the straights.
+- **Missiles** lock onto the nearest rival ahead; **mines** blow up whoever
+  drives over them; the **shockwave** hurls nearby rivals away (12 s cooldown).
+- **Nitro** charges from drifting, kills and blue pickups — dump it for a long boost.
+- **Launch ramps** on the straights throw you airborne; **boost pads**
+  (yellow chevrons) fling you forward at ground level.
+- Pickups: green = hull repair, amber = missiles, blue = nitro, red = mines.
 - The traffic lights on the start gantry run the red–yellow–green countdown.
 - Grind the pole fences and you'll shed speed in a shower of sparks.
 
@@ -58,6 +67,9 @@ via `file://` won't work.)
 
 - [Three.js](https://threejs.org/) (vendored in `lib/`, no CDN or build step)
 - Procedural canvas textures, procedural track geometry from a Catmull-Rom circuit
-- Instanced pine forest, huts, and hills; soft-shadowed summer lighting
+- Vertex-colored rolling-terrain heightfield; instanced forest, grass tufts,
+  rocks, tire walls and huts; animated checkered flags and drifting clouds
 - Custom GPU particle pool (one draw call for all explosions/dust/sparks/trails)
+- Canvas-drawn circular speedometer + live standings HUD
+- Touch input layer that maps on-screen buttons to the key bindings
 - Light UnrealBloom post-processing for lamps, tracers and explosions

@@ -31,13 +31,21 @@ export function roadTexture() {
       g.fillStyle = 'rgba(70,50,30,0.35)';
       g.fillRect(cx - 12, 0, 24, h);
     }
-    // pebbles
-    for (let i = 0; i < 380; i++) {
+    // pebbles and scattered stones
+    for (let i = 0; i < 520; i++) {
       const s = 1 + Math.random() * 3;
       g.fillStyle = Math.random() < 0.5 ? 'rgba(190,170,140,0.7)' : 'rgba(100,80,55,0.7)';
       g.beginPath();
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
+    }
+    for (let i = 0; i < 46; i++) {
+      const s = 3 + Math.random() * 5;
+      const x = Math.random() * w, y = Math.random() * h;
+      g.fillStyle = 'rgba(60,45,30,0.5)';
+      g.beginPath(); g.ellipse(x + 1.5, y + 1.5, s, s * 0.7, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = `rgba(${150 + Math.random() * 50 | 0},${135 + Math.random() * 40 | 0},${110 + Math.random() * 30 | 0},0.9)`;
+      g.beginPath(); g.ellipse(x, y, s, s * 0.7, Math.random() * 3, 0, Math.PI * 2); g.fill();
     }
     // grassy fringe creeping in from both edges
     for (const [x0, dir] of [[0, 1], [w, -1]]) {
@@ -201,6 +209,122 @@ export function checkerTexture() {
   });
   t.wrapS = THREE.RepeatWrapping;
   return t;
+}
+
+/** Grandstand crowd: rows of colorful spectator dots. */
+export function crowdTexture() {
+  return make(256, 128, (g, w, h) => {
+    g.fillStyle = '#2e2318';
+    g.fillRect(0, 0, w, h);
+    const cols = ['#e84a3a', '#3a7ae8', '#e8d43a', '#3ae87a', '#e88a3a', '#e83ab8', '#f2f2f2'];
+    for (let y = 8; y < h; y += 16) {
+      for (let x = 6; x < w; x += 11) {
+        if (Math.random() < 0.12) continue;
+        const c = cols[(Math.random() * cols.length) | 0];
+        g.fillStyle = c;
+        g.beginPath();
+        g.arc(x + Math.random() * 3, y + Math.random() * 3, 3.6, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = 'rgba(0,0,0,0.25)';
+        g.fillRect(x - 3, y + 4, 8, 6);
+      }
+    }
+  });
+}
+
+/** Red/white awning stripes. */
+export function awningTexture() {
+  const t = make(128, 64, (g, w, h) => {
+    for (let x = 0, i = 0; x < w; x += 16, i++) {
+      g.fillStyle = i % 2 === 0 ? '#d8342a' : '#f2ede0';
+      g.fillRect(x, 0, 16, h);
+    }
+    g.fillStyle = 'rgba(0,0,0,0.12)';
+    g.fillRect(0, h - 8, w, 8);
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
+/** Yellow/black hazard stripes for ramp sides. */
+export function hazardTexture() {
+  const t = make(128, 64, (g, w, h) => {
+    g.fillStyle = '#e8b83a';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#1c1812';
+    for (let x = -h; x < w + h; x += 32) {
+      g.beginPath();
+      g.moveTo(x, h); g.lineTo(x + h, 0); g.lineTo(x + h + 16, 0); g.lineTo(x + 16, h);
+      g.closePath(); g.fill();
+    }
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
+/** Vertical candy stripes for hot-air balloons. */
+export function balloonTexture(variant = 0) {
+  const palettes = [
+    ['#e84a3a', '#f2ede0'], ['#3a7ae8', '#e8d43a'], ['#3ae87a', '#f2ede0', '#e83ab8'],
+  ];
+  const cols = palettes[variant % palettes.length];
+  const t = make(256, 128, (g, w, h) => {
+    const sw = 20;
+    for (let x = 0, i = 0; x < w; x += sw, i++) {
+      g.fillStyle = cols[i % cols.length];
+      g.fillRect(x, 0, sw, h);
+    }
+    // soft shading top/bottom
+    const grd = g.createLinearGradient(0, 0, 0, h);
+    grd.addColorStop(0, 'rgba(255,255,255,0.25)');
+    grd.addColorStop(0.5, 'rgba(0,0,0,0)');
+    grd.addColorStop(1, 'rgba(0,0,0,0.28)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
+/** Alpha-cut grass blades for instanced tufts. */
+export function grassTexture() {
+  return make(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    for (let i = 0; i < 15; i++) {
+      const x = 10 + Math.random() * (w - 20);
+      const bh = 45 + Math.random() * 70;
+      const lean = (Math.random() - 0.5) * 26;
+      const shade = 90 + Math.random() * 70;
+      g.fillStyle = `rgb(${shade * 0.55 | 0},${shade + 40 | 0},${shade * 0.4 | 0})`;
+      g.beginPath();
+      g.moveTo(x - 5, h);
+      g.quadraticCurveTo(x - 2 + lean * 0.4, h - bh * 0.6, x + lean, h - bh);
+      g.quadraticCurveTo(x + 2 + lean * 0.4, h - bh * 0.6, x + 5, h);
+      g.closePath();
+      g.fill();
+    }
+  });
+}
+
+/** Trackside sponsor board (fictional brands). */
+export function bannerTexture(text, bg, fg) {
+  return make(512, 128, (g, w, h) => {
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = 'rgba(255,255,255,0.55)';
+    g.lineWidth = 8;
+    g.strokeRect(8, 8, w - 16, h - 16);
+    g.fillStyle = fg;
+    g.font = '900 64px "Arial Black", Arial, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, w / 2, h / 2 + 4);
+    // weathering
+    for (let i = 0; i < 120; i++) {
+      g.fillStyle = 'rgba(0,0,0,0.08)';
+      g.fillRect(Math.random() * w, Math.random() * h, 4, 4);
+    }
+  });
 }
 
 /** Fluffy cartoon cloud sprite. */

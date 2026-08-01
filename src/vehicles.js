@@ -106,6 +106,14 @@ export class Car {
     this.boostTimer = 0;
     this.fireCooldown = 0;
 
+    // vertical state for ramps/jumps
+    this.y = 0;
+    this.vy = 0;
+    this.airborne = false;
+    this.jumpPitch = 0;
+    this._lastGY = 0;
+    this._climbRate = 0;
+
     // race state
     this.trackIndex = 0;
     this.lap = 1;
@@ -125,6 +133,8 @@ export class Car {
     this.vel.set(0, 0, 0);
     this.trackIndex = index;
     this.lateral = lateral;
+    this.y = 0; this.vy = 0; this.airborne = false;
+    this._lastGY = 0; this._climbRate = 0; this.jumpPitch = 0;
     this.syncMesh(0);
   }
 
@@ -183,9 +193,53 @@ export class Car {
       }
     }
 
+    // ---- vertical motion (ramps & jumps) ----
+    const gY = t.groundHeightAt(this.trackIndex, this.lateral);
+    if (this.airborne) {
+      this.vy -= 26 * dt;
+      this.y += this.vy * dt;
+      if (this.y <= gY + 0.01) {
+        this.y = gY;
+        this.vy = 0;
+        this.airborne = false;
+        this._lastGY = gY;
+        this.onLand();
+      }
+    } else {
+      const drop = this._lastGY - gY;
+      if (drop > 0.6 && this._climbRate > 1) {
+        // launched off a ramp lip
+        this.airborne = true;
+        this.vy = this._climbRate;
+        this.y += this.vy * dt;
+      } else {
+        this._climbRate = dt > 0 ? (gY - this._lastGY) / dt : 0;
+        this.y = gY;
+        this._lastGY = gY;
+      }
+    }
+    this.pos.y = this.y;
+    // nose up while climbing/launching, nose down while falling
+    const pitchTarget = this.airborne || this._climbRate > 0.5
+      ? THREE.MathUtils.clamp((this.airborne ? this.vy : this._climbRate) * 0.05, -0.4, 0.42)
+      : 0;
+    this.jumpPitch += (pitchTarget - this.jumpPitch) * Math.min(1, 8 * dt);
+
     if (this.fireCooldown > 0) this.fireCooldown -= dt;
     if (this.invuln > 0) this.invuln -= dt;
     this.syncMesh(dt, vl, inputs);
+  }
+
+  onLand() {
+    if (Math.abs(this.speedAlong) > 12) {
+      const side = new THREE.Vector3(this.forward.z, 0, -this.forward.x);
+      for (const s of [-1, 1]) {
+        const wp = this.pos.clone().addScaledVector(side, s * 1.2);
+        this.game.particles.driftSmoke(wp);
+        this.game.particles.driftSmoke(wp);
+      }
+      if (this === this.game.player) this.game.shake = Math.min(1, this.game.shake + 0.22);
+    }
   }
 
   syncMesh(dt, vl = 0, inputs = null) {
@@ -195,7 +249,7 @@ export class Car {
     const roll = THREE.MathUtils.clamp(-vl * 0.02, -0.16, 0.16);
     const pitch = THREE.MathUtils.clamp(-this.speedAlong * 0.0012, -0.05, 0.05);
     this.mesh.rotation.z = roll;
-    this.mesh.rotation.x = pitch;
+    this.mesh.rotation.x = pitch + this.jumpPitch;
     // spin wheels
     if (dt > 0 && this.mesh.userData.wheels) {
       const spin = this.speedAlong * dt / 0.78;
@@ -352,6 +406,10 @@ export class PlayerCar extends Car {
     this.overheated = false;
     this.missiles = 3;
     this.maxMissiles = 5;
+    this.mines = 2;
+    this.maxMines = 4;
+    this.nitro = 0.3;       // 0..1, charged by drifting, kills and pickups
+    this.shockCooldown = 0; // seconds until the shockwave is ready
     this.glowColor = new THREE.Color(0x9a938a); // exhaust smoke tint
     this.bestLap = Infinity;
     this.lapStart = 0;
@@ -393,6 +451,32 @@ export class PlayerCar extends Car {
         g.audio.missile();
       } else g.hud.feed('NO MISSILES', 'bad');
     }
+    // mine
+    if (controlsLive && input.justPressed('KeyX')) {
+      if (this.mines > 0) {
+        this.mines--;
+        g.weapons.dropMine(this);
+        g.hud.feed('MINE DEPLOYED', 'info');
+      } else g.hud.feed('NO MINES', 'bad');
+    }
+    // shockwave
+    if (controlsLive && input.justPressed('KeyQ')) {
+      if (this.shockCooldown <= 0) {
+        this.shockCooldown = 12;
+        g.weapons.fireShockwave(this);
+      } else g.hud.feed(`SHOCK IN ${Math.ceil(this.shockCooldown)}s`, 'bad');
+    }
+    if (this.shockCooldown > 0) this.shockCooldown -= dt;
+    // nitro: passive trickle + fire on demand
+    this.nitro = Math.min(1, this.nitro + dt * 0.02);
+    if (controlsLive && input.justPressed('KeyF')) {
+      if (this.nitro >= 0.25) {
+        this.boostTimer = Math.max(this.boostTimer, this.nitro * 3.2);
+        this.nitro = 0;
+        g.hud.feed('NITRO!', 'info');
+        g.audio.boost();
+      } else g.hud.feed('NITRO LOW', 'bad');
+    }
 
     // exhaust + drift smoke
     const back = this.forward.multiplyScalar(-1);
@@ -401,7 +485,8 @@ export class PlayerCar extends Car {
       g.particles.exhaust(tail, back, this.glowColor, this.boostTimer > 0);
     const side = new THREE.Vector3(this.forward.z, 0, -this.forward.x);
     const slide = Math.abs(this.vel.dot(side));
-    if (slide > 7) {
+    if (slide > 7 && !this.airborne) {
+      this.nitro = Math.min(1, this.nitro + dt * 0.1); // drifting builds nitro
       for (const s of [-1, 1]) {
         const wp = this.pos.clone().addScaledVector(back, 1.6).addScaledVector(side, s * 1.1);
         if (Math.random() < 0.7) g.particles.driftSmoke(wp);

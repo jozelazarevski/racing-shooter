@@ -19,9 +19,14 @@ const LAPS = 3;
 
 class Game {
   constructor() {
+    this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+    if (this.isTouch) document.body.classList.add('touch');
+
     this.canvas = document.getElementById('game-canvas');
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas, antialias: true, powerPreference: 'high-performance',
+    });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.isTouch ? 1.75 : 2));
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -36,7 +41,7 @@ class Game {
     this.scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x5a8a3c, 0.85));
     const sun = new THREE.DirectionalLight(0xfff3d6, 2.0);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(this.isTouch ? 1024 : 2048, this.isTouch ? 1024 : 2048);
     const sc = sun.shadow.camera;
     sc.left = -120; sc.right = 120; sc.top = 120; sc.bottom = -120;
     sc.near = 10; sc.far = 400;
@@ -73,12 +78,16 @@ class Game {
     this.state = 'title';
     this.resetRace();
 
-    addEventListener('resize', () => {
+    this.input.bindTouchButtons();
+    const applyViewport = () => {
       this.camera.aspect = innerWidth / innerHeight;
+      this.camera.fov = innerHeight > innerWidth ? 68 : 56; // widen for portrait phones
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(innerWidth, innerHeight);
       this.composer.setSize(innerWidth, innerHeight);
-    });
+    };
+    applyViewport();
+    addEventListener('resize', applyViewport);
     document.getElementById('start-btn').addEventListener('click', () => this.startRace());
     document.getElementById('restart-btn').addEventListener('click', () => {
       document.getElementById('results').classList.add('hidden');
@@ -94,17 +103,19 @@ class Game {
   _buildPickups() {
     this.pickups = [];
     const t = this.track;
+    const TYPES = ['health', 'missile', 'nitro', 'mine'];
+    const COLORS = { health: 0x4dff88, missile: 0xffb52e, nitro: 0x7fd4ff, mine: 0xff5b3d };
     const defs = [];
-    for (let k = 0; k < 9; k++) {
+    for (let k = 0; k < 12; k++) {
       defs.push({
-        type: k % 3 === 2 ? 'missile' : (k % 3 === 1 ? 'health' : (k % 2 ? 'missile' : 'health')),
-        index: Math.floor((k + 0.5) * t.N / 9),
+        type: TYPES[k % TYPES.length],
+        index: Math.floor((k + 0.5) * t.N / 12),
         lateral: (k % 2 === 0 ? -1 : 1) * (2 + (k % 3) * 1.8),
       });
     }
     const glow = glowTexture();
     for (const d of defs) {
-      const color = d.type === 'health' ? 0x4dff88 : 0xffb52e;
+      const color = COLORS[d.type];
       const group = new THREE.Group();
       const core = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.85, 0),
@@ -127,7 +138,10 @@ class Game {
       const p = t.pointAt(d.index, d.lateral);
       group.position.copy(p);
       this.scene.add(group);
-      this.pickups.push({ ...d, pos: p, mesh: group, core, active: true, respawn: 0 });
+      this.pickups.push({
+        ...d, pos: p, mesh: group, core, active: true, respawn: 0,
+        color: '#' + color.toString(16).padStart(6, '0'),
+      });
     }
   }
 
@@ -145,14 +159,21 @@ class Game {
         p.mesh.visible = false;
         p.respawn = 14;
         this.audio.pickup();
-        this.particles.pickupBurst(p.pos, new THREE.Color(p.type === 'health' ? '#4dff88' : '#ffb52e'));
+        this.particles.pickupBurst(p.pos, new THREE.Color(p.color));
         this.score += 50;
+        const pl = this.player;
         if (p.type === 'health') {
-          this.player.health = Math.min(this.player.maxHealth, this.player.health + 35);
+          pl.health = Math.min(pl.maxHealth, pl.health + 35);
           this.hud.feed('+35 HULL', 'good');
-        } else {
-          this.player.missiles = Math.min(this.player.maxMissiles, this.player.missiles + 2);
+        } else if (p.type === 'missile') {
+          pl.missiles = Math.min(pl.maxMissiles, pl.missiles + 2);
           this.hud.feed('+2 MISSILES', 'good');
+        } else if (p.type === 'nitro') {
+          pl.nitro = Math.min(1, pl.nitro + 0.45);
+          this.hud.feed('+NITRO CHARGE', 'good');
+        } else {
+          pl.mines = Math.min(pl.maxMines, pl.mines + 2);
+          this.hud.feed('+2 MINES', 'good');
         }
       }
     }
@@ -205,6 +226,9 @@ class Game {
     this.player.alive = true;
     this.player.mesh.visible = true;
     this.player.missiles = 3;
+    this.player.mines = 2;
+    this.player.nitro = 0.3;
+    this.player.shockCooldown = 0;
     this.player.heat = 0;
     this.player.overheated = false;
     this.player.bestLap = Infinity;
@@ -230,6 +254,7 @@ class Game {
     this.audio.start();
     document.getElementById('title-screen').classList.add('hidden');
     this.hud.show();
+    document.getElementById('touch-ui').classList.add('on');
     this.state = 'countdown';
     this.countdown = 3.6;
     this._lastCount = 4;
@@ -256,6 +281,7 @@ class Game {
     if (killed) {
       this.kills++;
       this.score += 250;
+      this.player.nitro = Math.min(1, this.player.nitro + 0.25);
       this.hud.centerMsg('DESTROYED');
       this.hud.feed(`${enemy.name} DESTROYED  +250`, 'good');
       this.shake = Math.min(1, this.shake + 0.5);
@@ -296,6 +322,7 @@ class Game {
     setTimeout(() => {
       document.getElementById('results').classList.remove('hidden');
       this.hud.hide();
+      document.getElementById('touch-ui').classList.remove('on');
     }, 1600);
   }
 
@@ -338,10 +365,10 @@ class Game {
     if (this.camMode === 0) {
       // top-down with a hint of tilt so the 3D reads
       targetPos = p.pos.clone().addScaledVector(fwd, -20 - speedZoom * 6).add(new THREE.Vector3(0, 52 + speedZoom * 10, 0));
-      targetLook = p.pos.clone().addScaledVector(fwd, 12);
+      targetLook = p.pos.clone().addScaledVector(fwd, 7); // keep the car clear of the speedo
     } else {
       targetPos = p.pos.clone().addScaledVector(fwd, -13).add(new THREE.Vector3(0, 7.5, 0));
-      targetLook = p.pos.clone().addScaledVector(fwd, 14).add(new THREE.Vector3(0, 2.5, 0));
+      targetLook = p.pos.clone().addScaledVector(fwd, 10).add(new THREE.Vector3(0, 2.8, 0));
     }
     const k = 1 - Math.exp(-5.5 * dt);
     this.camPos.lerp(targetPos, k);
@@ -362,6 +389,7 @@ class Game {
   frame() {
     const dt = Math.min(this.clock.getDelta(), 0.05);
     const time = this.clock.elapsedTime;
+    this.track.update(dt, time);
 
     if (this.input.justPressed('KeyC')) this.camMode = 1 - this.camMode;
     if (this.input.justPressed('KeyP') && (this.state === 'race' || this.state === 'paused')) {
