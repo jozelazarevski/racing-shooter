@@ -1,5 +1,7 @@
 // Procedural textures — every asset in the game is painted in code, no image files.
 // Art direction: bright cartoon off-road racing in the style of late-90s toy-car racers.
+// Most painters accept an optional palette object so track.js can re-skin them per
+// level theme (forest / desert / snow); calling with no arguments keeps the classic look.
 import * as THREE from 'three';
 
 function make(w, h, draw) {
@@ -11,30 +13,79 @@ function make(w, h, draw) {
   return t;
 }
 
-/** Dirt road: sandy base, twin wheel ruts, stones, grassy fringe at the edges. */
-export function roadTexture() {
+/** '#rrggbb' -> [r, g, b] (0-255). Local helper, avoids THREE.Color's colorspace conversion. */
+function hexRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Dirt road: rich earth base, twin compacted wheel ruts with tire-tread chevrons,
+ *  stones, and an irregular grassy fringe creeping in from both edges. */
+export function roadTexture(palette = {}) {
+  const P = {
+    base: '#a8814d',            // slightly darker/richer than the old sandy tan
+    mottleA: [116, 84, 48],     // dark dirt blotches (rgb base, jittered)
+    mottleB: [178, 140, 88],    // light dust blotches
+    rut: 'rgba(72,50,28,0.55)', // outer compacted band
+    rutCore: 'rgba(50,34,18,0.45)',
+    tread: 'rgba(32,20,10,0.5)',// chevron tire-tread stamps inside the ruts
+    stoneA: 'rgba(198,178,148,0.7)',
+    stoneB: 'rgba(96,74,50,0.7)',
+    fringe: [64, 124, 40],      // edge grass rgb base
+    fringeVar: [34, 46, 20],    // per-blade jitter
+    ...palette,
+  };
   const t = make(512, 512, (g, w, h) => {
-    g.fillStyle = '#b38c5c';
+    g.fillStyle = P.base;
     g.fillRect(0, 0, w, h);
-    // mottled dirt
-    for (let i = 0; i < 2600; i++) {
-      const s = 3 + Math.random() * 9;
-      g.fillStyle = `rgba(${140 + Math.random() * 60 | 0},${105 + Math.random() * 45 | 0},${60 + Math.random() * 35 | 0},0.25)`;
+    // large soft dirt patches, then finer mottled grain
+    for (let i = 0; i < 850; i++) {
+      const [r, gr, b] = Math.random() < 0.5 ? P.mottleA : P.mottleB;
+      const s = 7 + Math.random() * 17;
+      g.fillStyle = `rgba(${r + Math.random() * 24 | 0},${gr + Math.random() * 20 | 0},${b + Math.random() * 14 | 0},${0.07 + Math.random() * 0.13})`;
       g.beginPath();
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
     }
-    // twin wheel ruts (darker, compacted)
+    for (let i = 0; i < 2400; i++) {
+      const [r, gr, b] = Math.random() < 0.5 ? P.mottleA : P.mottleB;
+      const s = 2 + Math.random() * 6;
+      g.fillStyle = `rgba(${r + Math.random() * 30 | 0},${gr + Math.random() * 26 | 0},${b + Math.random() * 18 | 0},0.20)`;
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
+      g.fill();
+    }
+    // twin wheel ruts: dark compacted bands with tread chevrons stamped in
     for (const cx of [w * 0.32, w * 0.68]) {
-      g.fillStyle = 'rgba(90,66,40,0.5)';
-      g.fillRect(cx - 26, 0, 52, h);
-      g.fillStyle = 'rgba(70,50,30,0.35)';
-      g.fillRect(cx - 12, 0, 24, h);
+      g.fillStyle = P.rut;
+      g.fillRect(cx - 27, 0, 54, h);
+      g.fillStyle = P.rutCore;
+      g.fillRect(cx - 15, 0, 30, h);
+      // longitudinal compaction streaks
+      g.fillStyle = 'rgba(0,0,0,0.10)';
+      for (let k = -2; k <= 2; k++) g.fillRect(cx + k * 7 - 1, 0, 2, h);
+      // repeating V tire-tread marks along the rut
+      g.strokeStyle = P.tread;
+      g.lineWidth = 4.5;
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      for (let y = 5; y < h + 10; y += 19) {
+        const j = (Math.random() - 0.5) * 4;
+        g.beginPath();
+        g.moveTo(cx - 10 + j, y);
+        g.lineTo(cx + j, y + 9);
+        g.lineTo(cx + 10 + j, y);
+        g.stroke();
+      }
+      // sun-catching rut shoulders
+      g.fillStyle = 'rgba(255,235,200,0.07)';
+      g.fillRect(cx - 31, 0, 4, h);
+      g.fillRect(cx + 27, 0, 4, h);
     }
     // pebbles and scattered stones
     for (let i = 0; i < 520; i++) {
       const s = 1 + Math.random() * 3;
-      g.fillStyle = Math.random() < 0.5 ? 'rgba(190,170,140,0.7)' : 'rgba(100,80,55,0.7)';
+      g.fillStyle = Math.random() < 0.5 ? P.stoneA : P.stoneB;
       g.beginPath();
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
@@ -42,17 +93,27 @@ export function roadTexture() {
     for (let i = 0; i < 46; i++) {
       const s = 3 + Math.random() * 5;
       const x = Math.random() * w, y = Math.random() * h;
-      g.fillStyle = 'rgba(60,45,30,0.5)';
+      g.fillStyle = 'rgba(40,28,16,0.5)';
       g.beginPath(); g.ellipse(x + 1.5, y + 1.5, s, s * 0.7, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = `rgba(${150 + Math.random() * 50 | 0},${135 + Math.random() * 40 | 0},${110 + Math.random() * 30 | 0},0.9)`;
+      const [r, gr, b] = P.mottleB;
+      g.fillStyle = `rgba(${r + Math.random() * 40 | 0},${gr + Math.random() * 34 | 0},${b + Math.random() * 26 | 0},0.9)`;
       g.beginPath(); g.ellipse(x, y, s, s * 0.7, Math.random() * 3, 0, Math.PI * 2); g.fill();
     }
-    // grassy fringe creeping in from both edges
+    // irregular grassy fringe creeping in from both edges
     for (const [x0, dir] of [[0, 1], [w, -1]]) {
-      for (let y = 0; y < h; y += 4) {
-        const reach = 14 + Math.random() * 22;
-        g.fillStyle = `rgba(${70 + Math.random() * 30 | 0},${130 + Math.random() * 40 | 0},50,0.8)`;
-        g.fillRect(x0 + (dir < 0 ? -reach : 0), y, reach, 4);
+      for (let y = 0; y < h; y += 3) {
+        const reach = 10 + Math.sin(y * 0.045 + x0) * 7 + Math.random() * 20;
+        const [r, gr, b] = P.fringe, [vr, vg, vb] = P.fringeVar;
+        g.fillStyle = `rgba(${r + Math.random() * vr | 0},${gr + Math.random() * vg | 0},${b + Math.random() * vb | 0},0.85)`;
+        g.fillRect(x0 + (dir < 0 ? -reach : 0), y, reach, 3);
+      }
+      // occasional clumps bulging further onto the road
+      for (let i = 0; i < 24; i++) {
+        const [r, gr, b] = P.fringe;
+        g.fillStyle = `rgba(${r | 0},${gr | 0},${b | 0},0.7)`;
+        g.beginPath();
+        g.arc(x0 + dir * (8 + Math.random() * 26), Math.random() * h, 5 + Math.random() * 10, 0, Math.PI * 2);
+        g.fill();
       }
     }
   });
@@ -88,27 +149,38 @@ export function wallTexture() {
   return t;
 }
 
-/** Meadow grass with mowed banding and clover patches. */
-export function groundTexture() {
+/** Ground cover: banded meadow (or sand / snowfield) with growth patches and speckles. */
+export function groundTexture(palette = {}) {
+  const P = {
+    base: '#5f9c3e',                    // deeper, less neon than the old spring green
+    bandLight: 'rgba(255,255,255,0.05)',
+    bandDark: 'rgba(0,0,0,0.05)',
+    patchA: 'rgba(50,104,34,0.16)',     // darker growth
+    patchB: 'rgba(128,178,72,0.14)',    // lighter growth
+    speckA: 'rgba(255,240,180,0.85)',   // tiny flowers / stones / ice glints
+    speckB: 'rgba(255,255,255,0.8)',
+    speckCount: 60,
+    ...palette,
+  };
   const t = make(512, 512, (g, w, h) => {
-    g.fillStyle = '#69a844';
+    g.fillStyle = P.base;
     g.fillRect(0, 0, w, h);
     // subtle mow bands
     for (let x = 0; x < w; x += 64) {
-      g.fillStyle = (x / 64) % 2 === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+      g.fillStyle = (x / 64) % 2 === 0 ? P.bandLight : P.bandDark;
       g.fillRect(x, 0, 64, h);
     }
     // patches of darker/lighter growth (kept subtle so they don't read as dots)
     for (let i = 0; i < 420; i++) {
       const s = 4 + Math.random() * 12;
-      g.fillStyle = Math.random() < 0.5 ? 'rgba(60,120,40,0.14)' : 'rgba(140,190,80,0.13)';
+      g.fillStyle = Math.random() < 0.5 ? P.patchA : P.patchB;
       g.beginPath();
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
     }
-    // tiny flowers
-    for (let i = 0; i < 60; i++) {
-      g.fillStyle = Math.random() < 0.5 ? 'rgba(255,240,180,0.85)' : 'rgba(255,255,255,0.8)';
+    // tiny speckles
+    for (let i = 0; i < P.speckCount; i++) {
+      g.fillStyle = Math.random() < 0.5 ? P.speckA : P.speckB;
       g.fillRect(Math.random() * w, Math.random() * h, 3, 3);
     }
   });
@@ -211,6 +283,41 @@ export function checkerTexture() {
   return t;
 }
 
+/** Big "FINISH" banner: white lettering on dark red, checkered ribbons top and bottom. */
+export function finishBannerTexture() {
+  return make(1024, 128, (g, w, h) => {
+    const grd = g.createLinearGradient(0, 0, 0, h);
+    grd.addColorStop(0, '#b02a1e');
+    grd.addColorStop(0.5, '#9c1f16');
+    grd.addColorStop(1, '#7e150e');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    // checkered ribbons
+    const s = 16;
+    for (const y0 of [0, h - s * 2]) {
+      for (let ry = 0; ry < 2; ry++)
+        for (let cx = 0; cx < w / s; cx++) {
+          g.fillStyle = (cx + ry + y0 / s) % 2 === 0 ? '#f2f0e8' : '#1c1812';
+          g.fillRect(cx * s, y0 + ry * s, s, s);
+        }
+    }
+    // FINISH lettering with a soft drop shadow
+    g.font = '900 74px "Arial Black", Arial, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.letterSpacing = '14px';
+    g.fillStyle = 'rgba(0,0,0,0.45)';
+    g.fillText('FINISH', w / 2 + 4, h / 2 + 7);
+    g.fillStyle = '#f6f3ea';
+    g.fillText('FINISH', w / 2, h / 2 + 2);
+    // weathering
+    for (let i = 0; i < 160; i++) {
+      g.fillStyle = 'rgba(0,0,0,0.07)';
+      g.fillRect(Math.random() * w, Math.random() * h, 4, 4);
+    }
+  });
+}
+
 /** Grandstand crowd: rows of colorful spectator dots. */
 export function crowdTexture() {
   return make(256, 128, (g, w, h) => {
@@ -286,16 +393,21 @@ export function balloonTexture(variant = 0) {
   return t;
 }
 
-/** Alpha-cut grass blades for instanced tufts. */
-export function grassTexture() {
+/** Alpha-cut grass blades for instanced tufts. Palette lets themes dry out or frost the blades. */
+export function grassTexture(palette = {}) {
+  const P = { bladeA: '#2f7a22', bladeB: '#63c243', ...palette };
+  const a = hexRgb(P.bladeA), b = hexRgb(P.bladeB);
   return make(128, 128, (g, w, h) => {
     g.clearRect(0, 0, w, h);
     for (let i = 0; i < 15; i++) {
       const x = 10 + Math.random() * (w - 20);
       const bh = 45 + Math.random() * 70;
       const lean = (Math.random() - 0.5) * 26;
-      const shade = 90 + Math.random() * 70;
-      g.fillStyle = `rgb(${shade * 0.55 | 0},${shade + 40 | 0},${shade * 0.4 | 0})`;
+      const t = Math.random();
+      const r = a[0] + (b[0] - a[0]) * t;
+      const gr = a[1] + (b[1] - a[1]) * t;
+      const bl = a[2] + (b[2] - a[2]) * t;
+      g.fillStyle = `rgb(${r | 0},${gr | 0},${bl | 0})`;
       g.beginPath();
       g.moveTo(x - 5, h);
       g.quadraticCurveTo(x - 2 + lean * 0.4, h - bh * 0.6, x + lean, h - bh);

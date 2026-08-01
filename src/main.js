@@ -5,7 +5,7 @@ import { RenderPass } from '../lib/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from '../lib/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 
-import { Track } from './track.js';
+import { Track, LEVELS } from './track.js';
 import { PlayerCar, EnemyCar } from './vehicles.js';
 import { Weapons } from './weapons.js';
 import { Particles } from './particles.js';
@@ -22,6 +22,12 @@ class Game {
     this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
     if (this.isTouch) document.body.classList.add('touch');
 
+    // level selection via URL (?level=N), with ?go=1 for seamless chained starts
+    const params = new URLSearchParams(location.search);
+    this.levelIndex = Math.min(Math.max((parseInt(params.get('level')) || 1) - 1, 0), LEVELS.length - 1);
+    this.level = LEVELS[this.levelIndex];
+    this.autoStart = params.get('go') === '1';
+
     this.canvas = document.getElementById('game-canvas');
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas, antialias: true, powerPreference: 'high-performance',
@@ -37,8 +43,9 @@ class Game {
     this.scene.fog = new THREE.Fog(0xcfe8f5, 320, 1500);
     this.camera = new THREE.PerspectiveCamera(56, innerWidth / innerHeight, 0.5, 3200);
 
-    // lighting: bright summer sun + sky bounce
-    this.scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x5a8a3c, 0.85));
+    // lighting: bright summer sun + sky bounce (theme may recolor below)
+    this.hemi = new THREE.HemisphereLight(0xbfe0ff, 0x5a8a3c, 0.85);
+    this.scene.add(this.hemi);
     const sun = new THREE.DirectionalLight(0xfff3d6, 2.0);
     sun.castShadow = true;
     sun.shadow.mapSize.set(this.isTouch ? 1024 : 2048, this.isTouch ? 1024 : 2048);
@@ -56,7 +63,15 @@ class Game {
     this.composer.addPass(new OutputPass());
 
     // world + systems
-    this.track = new Track(this.scene);
+    this.track = new Track(this.scene, this.level);
+    const th = this.track.theme;
+    if (th) {
+      if (th.fogColor !== undefined) this.scene.fog = new THREE.Fog(th.fogColor, th.fogNear ?? 320, th.fogFar ?? 1500);
+      if (th.hemiSky !== undefined) this.hemi.color.setHex(th.hemiSky);
+      if (th.hemiGround !== undefined) this.hemi.groundColor.setHex(th.hemiGround);
+      if (th.sunColor !== undefined) this.moon.color.setHex(th.sunColor);
+      if (th.sunIntensity !== undefined) this.moon.intensity = th.sunIntensity;
+    }
     this.particles = new Particles(this.scene);
     this.audio = new AudioEngine();
     this.input = new Input();
@@ -119,8 +134,59 @@ class Game {
       this.startRace();
     });
 
+    // camera + pause buttons (work with mouse and touch)
+    document.getElementById('cam-btn').addEventListener('click', () => { this.camMode = 1 - this.camMode; });
+    document.getElementById('pause-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.state === 'race') { this.state = 'paused'; this.hud.centerMsg('PAUSED'); }
+      else if (this.state === 'paused') { this.state = 'race'; this.hud.centerMsg('GO'); }
+    });
+
+    // level select chips on the title screen
+    const sel = document.getElementById('level-select');
+    LEVELS.forEach((lv, i) => {
+      const chip = document.createElement('button');
+      chip.className = 'level-chip' + (i === this.levelIndex ? ' current' : '');
+      chip.textContent = lv.name;
+      chip.addEventListener('click', () => {
+        if (i === this.levelIndex) return;
+        this.fadeTo(`?level=${lv.id}`);
+      });
+      sel.appendChild(chip);
+    });
+
+    // next-level chaining from the results screen
+    document.getElementById('next-level-btn').addEventListener('click', () => {
+      sessionStorage.setItem('ir-score', String(this.score));
+      this.fadeTo(`?level=${LEVELS[this.levelIndex + 1].id}&go=1`);
+    });
+
+    // fade in on load (covers level-to-level transitions)
+    const fade = document.getElementById('fade');
+    fade.style.transition = 'none';
+    fade.classList.add('dark');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      fade.style.transition = '';
+      fade.classList.remove('dark');
+    }));
+
     this.clock = new THREE.Clock();
     this.renderer.setAnimationLoop(() => this.frame());
+
+    if (this.autoStart) {
+      // arriving from a level transition: skip the title, keep the running score
+      document.getElementById('title-screen').classList.add('hidden');
+      this.startRace();
+      const carried = parseInt(sessionStorage.getItem('ir-score') || '0');
+      if (carried > 0) this.score = carried;
+      sessionStorage.removeItem('ir-score');
+    }
+  }
+
+  /** Fade to black, then navigate — used for level changes. */
+  fadeTo(url) {
+    document.getElementById('fade').classList.add('dark');
+    setTimeout(() => { location.href = url; }, 480);
   }
 
   // ---------- pickups ----------
@@ -284,6 +350,7 @@ class Game {
     this.countdown = 3.6;
     this._lastCount = 4;
     this.player.lapStart = 0;
+    this.hud.feed(`${this.level.name} — LEVEL ${this.level.id}`, 'info');
   }
 
   onPlayerLap() {
@@ -352,6 +419,9 @@ class Game {
     document.getElementById('r-best').textContent = fmtTime(this.player.bestLap);
     this.hud.centerMsg('FINISH');
     this.audio.lap();
+    document.querySelector('#results .game-sub').textContent = `${this.level.name} COMPLETE`;
+    document.getElementById('next-level-btn').style.display =
+      this.levelIndex < LEVELS.length - 1 ? '' : 'none';
     setTimeout(() => {
       document.getElementById('results').classList.remove('hidden');
       this.hud.hide();

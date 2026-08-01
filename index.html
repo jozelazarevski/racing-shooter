@@ -97,6 +97,20 @@
 
   #damage-vignette{position:fixed;inset:0;pointer-events:none;opacity:0;
     background:radial-gradient(ellipse at center, transparent 55%, rgba(255,25,60,.55) 100%)}
+  #polish-vignette{position:fixed;inset:0;pointer-events:none;z-index:2;
+    background:radial-gradient(ellipse at center, transparent 62%, rgba(20,12,4,.28) 100%)}
+  #fade{position:fixed;inset:0;background:#0d0805;z-index:40;pointer-events:none;
+    opacity:0;transition:opacity .45s ease}
+  #fade.dark{opacity:1;pointer-events:auto}
+
+  /* camera + pause buttons */
+  .icon-btn{pointer-events:auto;position:absolute;width:46px;height:46px;border-radius:12px;
+    border:2px solid var(--edge);background:var(--panel);color:#ffe9a8;font-size:22px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 3px 0 rgba(0,0,0,.25);-webkit-tap-highlight-color:transparent}
+  .icon-btn:active{transform:scale(.93);background:rgba(255,212,0,.4)}
+  #cam-btn{top:70px;right:12px}
+  #pause-btn{top:124px;right:12px}
   #wrong-way{position:absolute;top:18%;left:50%;transform:translateX(-50%);
     font-family:'Luckiest Guy';font-size:26px;color:#ff4a2e;
     text-shadow:2px 2px 0 var(--ink);letter-spacing:4px;display:none;
@@ -185,6 +199,14 @@
     filter:drop-shadow(0 10px 24px rgba(0,0,0,.5))}
   .game-sub{margin-top:12px;font-size:clamp(12px,2vw,18px);letter-spacing:8px;color:#ffe9a8;text-transform:uppercase;
     text-shadow:1px 1px 0 var(--ink);text-align:center}
+  #level-select{margin-top:26px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .level-chip{pointer-events:auto;cursor:pointer;padding:10px 20px;font-family:'Luckiest Guy';
+    font-size:15px;letter-spacing:2px;color:#ffe9a8;border-radius:10px;
+    border:2px solid rgba(255,233,168,.35);background:rgba(38,26,12,.6);
+    transition:transform .1s;-webkit-tap-highlight-color:transparent}
+  .level-chip:active{transform:scale(.95)}
+  .level-chip.current{color:var(--ink);background:var(--yellow);border-color:var(--ink);
+    box-shadow:0 3px 0 var(--ink)}
   .btn{pointer-events:auto;cursor:pointer;margin-top:36px;padding:16px 64px;font-family:'Luckiest Guy';
     font-size:22px;letter-spacing:3px;color:#fff8e0;border:3px solid var(--ink);border-radius:14px;
     background:linear-gradient(180deg,#ff9d2e,#e8402a);
@@ -251,8 +273,12 @@
   <div id="feed"></div>
   <div id="center-msg" class="titlefont"></div>
   <div id="wrong-way">▼ WRONG WAY ▼</div>
+  <button id="cam-btn" class="icon-btn" title="Camera view">📷</button>
+  <button id="pause-btn" class="icon-btn" title="Pause">⏸</button>
 </div>
 <div id="damage-vignette"></div>
+<div id="polish-vignette"></div>
+<div id="fade"></div>
 
 <div id="touch-ui">
   <div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
@@ -266,6 +292,7 @@
 <div id="title-screen" class="screen">
   <div class="game-title">IGNITE&nbsp;RALLY</div>
   <div class="game-sub">Dirt &nbsp;//&nbsp; Firepower &nbsp;//&nbsp; First Place</div>
+  <div id="level-select"></div>
   <button id="start-btn" class="btn">START ENGINES</button>
   <div class="controls">
     <b>W / ↑</b><span>Throttle</span>
@@ -294,7 +321,8 @@
     <b id="r-time">0:00.0</b><span>RACE TIME</span>
     <b id="r-best">0:00.0</b><span>BEST LAP</span>
   </div>
-  <button id="restart-btn" class="btn">RACE AGAIN</button>
+  <button id="next-level-btn" class="btn" style="display:none">NEXT LEVEL ▶</button>
+  <button id="restart-btn" class="btn" style="margin-top:18px">RACE AGAIN</button>
 </div>
 
 <script type="importmap">

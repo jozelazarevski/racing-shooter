@@ -1,18 +1,141 @@
-// Procedural race circuit + a rich forest-rally world around it.
+// Procedural race circuits + rich themed worlds around them.
+// Three levels share one Track class: the level's theme picks the circuit layout
+// and every color in the world (terrain, sky, vegetation, road tint, lighting).
 import * as THREE from 'three';
 import {
   roadTexture, wallTexture, groundTexture, buildingTexture,
   chevronTexture, checkerTexture, glowTexture, cloudTexture,
   grassTexture, bannerTexture, hazardTexture, crowdTexture, awningTexture,
+  finishBannerTexture,
 } from './textures.js';
 
-// Hand-designed circuit control points (x, z)
-const CONTROL_POINTS = [
-  [0, -180], [90, -170], [150, -120], [215, -130], [252, -70],
-  [230, 10], [160, 42], [152, 112], [205, 172], [140, 232],
-  [40, 202], [-42, 238], [-132, 212], [-162, 130], [-120, 62],
-  [-192, 12], [-252, -62], [-212, -142], [-120, -122], [-62, -172],
+export const LEVELS = [
+  { id: 1, name: 'PINE VALLEY',  theme: 'forest' },
+  { id: 2, name: 'DUST CANYON',  theme: 'desert' },
+  { id: 3, name: 'FROST PEAK',   theme: 'snow' },
 ];
+
+// Hand-designed circuit control points (x, z) per theme.
+const CIRCUITS = {
+  // classic forest rally loop
+  forest: [
+    [0, -180], [90, -170], [150, -120], [215, -130], [252, -70],
+    [230, 10], [160, 42], [152, 112], [205, 172], [140, 232],
+    [40, 202], [-42, 238], [-132, 212], [-162, 130], [-120, 62],
+    [-192, 12], [-252, -62], [-212, -142], [-120, -122], [-62, -172],
+  ],
+  // wide, fast sweepers with one lazy esses section through the dunes
+  desert: [
+    [0, -235], [100, -225], [185, -185], [245, -110], [255, -15],
+    [230, 80], [160, 150], [70, 180], [-10, 150], [-70, 90],
+    [-140, 70], [-215, 125], [-255, 40], [-245, -55], [-200, -135],
+    [-120, -190], [-40, -220],
+  ],
+  // tight, twisty mountain switchbacks
+  snow: [
+    [0, -215], [85, -210], [160, -185], [150, -110], [215, -125],
+    [255, -60], [215, -5], [250, 55], [205, 115], [235, 180],
+    [150, 205], [75, 160], [0, 205], [-85, 225], [-145, 165],
+    [-105, 100], [-180, 70], [-245, 110], [-255, 25], [-190, -30],
+    [-245, -105], [-180, -170], [-90, -145], [-55, -210],
+  ],
+};
+
+// Every color and density knob per theme. `fogColor…sunIntensity` are exposed
+// to main.js via `track.theme`; the rest is internal art direction.
+const THEMES = {
+  forest: {
+    // lighting / fog (plain numbers; also applied to scene.fog by Track itself)
+    fogColor: 0xcfe8f5, fogNear: 320, fogFar: 1500,
+    hemiSky: 0xbfe0ff, hemiGround: 0x5a8a3c,
+    sunColor: 0xfff3d6, sunIntensity: 2.0,
+    // sky dome + sun sprite + clouds
+    skyTop: '#3f8de0', skyHorizon: '#e8f0d8', sunGlow: 0xfff2b8,
+    cloudCount: 12, cloudOpacity: 0.9,
+    // terrain vertex colors + ground texture
+    terrainLow: '#4f8a35', terrainHigh: '#83b455', terrainDirt: '#9c7a48',
+    ground: {},  // groundTexture defaults are the forest palette
+    road: {},    // roadTexture defaults are the forest palette
+    // horizon silhouettes
+    hillColor: 0x4e8a3c, peakColor: 0x8d8578,
+    // trees (material color multiplies per-instance HSL variation)
+    treeCount: 260, trunkColor: 0x6b4423,
+    foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
+    foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.32, lVar: 0.14 },
+    treeSnowCap: false,
+    // ground cover
+    tuftCount: 1100, grass: {},
+    bushCount: 160, bushColor: 0x2f7a30,
+    bush: { h: 0.30, hVar: 0.05, s: 0.5, sVar: 0, l: 0.30, lVar: 0.12 },
+    rockCount: 130, pebbleCount: 160, rockColor: 0x8d8578, rockSnowCap: false,
+    flowerCount: 340, flowerColors: ['#ffe234', '#ff6a8a', '#ffffff', '#ff8a3a', '#c27aff'],
+    hutRoof: 0xc9a24d, hayColor: 0xd8b95e,
+    // per-level gameplay-placement tuning
+    rampMaxCurv: 0.014, padMaxCurv: 0.004, boardMaxCurv: 0.012,
+  },
+  desert: {
+    fogColor: 0xf2ddb6, fogNear: 280, fogFar: 1350,
+    hemiSky: 0xffe9c4, hemiGround: 0xc9a86a,
+    sunColor: 0xffe6b0, sunIntensity: 2.2,
+    skyTop: '#6fa8d8', skyHorizon: '#ffd9a0', sunGlow: 0xffdca0,
+    cloudCount: 5, cloudOpacity: 0.55,
+    terrainLow: '#c9a86a', terrainHigh: '#e2c78e', terrainDirt: '#b06e3c',
+    ground: {
+      base: '#c9a86a', bandLight: 'rgba(255,255,255,0.04)', bandDark: 'rgba(0,0,0,0.04)',
+      patchA: 'rgba(160,110,60,0.18)', patchB: 'rgba(235,205,140,0.16)',
+      speckA: 'rgba(140,90,50,0.7)', speckB: 'rgba(240,225,190,0.8)', speckCount: 90,
+    },
+    road: {
+      base: '#c2a06b', mottleA: [150, 112, 66], mottleB: [214, 180, 126],
+      rut: 'rgba(122,86,48,0.55)', rutCore: 'rgba(96,64,34,0.45)', tread: 'rgba(66,42,22,0.5)',
+      stoneA: 'rgba(230,210,175,0.7)', stoneB: 'rgba(140,100,62,0.7)',
+      fringe: [168, 140, 66], fringeVar: [40, 34, 26],
+    },
+    hillColor: 0xa85a32, peakColor: 0xc27a4a,
+    treeCount: 90, trunkColor: 0x7a5230,
+    foliageLow: 0x8a7444, foliageTop: 0x967e4a,
+    foliage: { h: 0.10, hVar: 0.05, s: 0.40, sVar: 0.15, l: 0.45, lVar: 0.15 },
+    treeSnowCap: false,
+    tuftCount: 520, grass: { bladeA: '#8a7a30', bladeB: '#c8b45e' },
+    bushCount: 120, bushColor: 0x8a8050,
+    bush: { h: 0.12, hVar: 0.04, s: 0.35, sVar: 0.1, l: 0.42, lVar: 0.12 },
+    rockCount: 300, pebbleCount: 240, rockColor: 0xb07a52, rockSnowCap: false,
+    flowerCount: 90, flowerColors: ['#ffd45e', '#ff8a3a', '#e86a8a'],
+    hutRoof: 0xb0794a, hayColor: 0xd8b95e,
+    rampMaxCurv: 0.014, padMaxCurv: 0.004, boardMaxCurv: 0.012,
+  },
+  snow: {
+    fogColor: 0xe2edf6, fogNear: 240, fogFar: 1250,
+    hemiSky: 0xdfeaf8, hemiGround: 0xb8c6d2,
+    sunColor: 0xeaf2ff, sunIntensity: 1.7,
+    skyTop: '#7ba8cc', skyHorizon: '#eaf3fa', sunGlow: 0xffffff,
+    cloudCount: 9, cloudOpacity: 0.95,
+    terrainLow: '#dde8ee', terrainHigh: '#ffffff', terrainDirt: '#b7c4cd',
+    ground: {
+      base: '#e6edf2', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(120,150,175,0.06)',
+      patchA: 'rgba(165,190,210,0.20)', patchB: 'rgba(255,255,255,0.22)',
+      speckA: 'rgba(200,220,235,0.8)', speckB: 'rgba(255,255,255,0.9)', speckCount: 80,
+    },
+    road: {
+      base: '#6f5638', mottleA: [82, 60, 38], mottleB: [130, 102, 70],
+      rut: 'rgba(46,32,20,0.6)', rutCore: 'rgba(30,20,12,0.5)', tread: 'rgba(14,9,5,0.55)',
+      stoneA: 'rgba(190,200,210,0.7)', stoneB: 'rgba(70,55,40,0.7)',
+      fringe: [228, 238, 246], fringeVar: [24, 16, 10],   // snow creeping onto the road
+    },
+    hillColor: 0xcfdce4, peakColor: 0xeef4f8,
+    treeCount: 240, trunkColor: 0x5a4028,
+    foliageLow: 0x5a7a62, foliageTop: 0x668a70,
+    foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
+    treeSnowCap: true,
+    tuftCount: 360, grass: { bladeA: '#5a7a58', bladeB: '#b8d0c0' },
+    bushCount: 90, bushColor: 0x9ab8a0,
+    bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.52, lVar: 0.12 },
+    rockCount: 150, pebbleCount: 140, rockColor: 0x9aa6b0, rockSnowCap: true,
+    flowerCount: 60, flowerColors: ['#ffffff', '#cfe0ff', '#ffd0e0'],
+    hutRoof: 0xe8eef4, hayColor: 0xd8c07a,
+    rampMaxCurv: 0.022, padMaxCurv: 0.0075, boardMaxCurv: 0.02,
+  },
+};
 
 const N = 900;              // centerline samples
 export const ROAD_HALF = 9; // drivable half-width
@@ -27,13 +150,26 @@ const SPONSORS = [
 ];
 
 export class Track {
-  constructor(scene) {
+  constructor(scene, level = LEVELS[0]) {
     this.scene = scene;
+    this.level = level;
+    const T = THEMES[level && level.theme] || THEMES.forest;
+    this.T = T;
+    // plain-number lighting/fog summary for main.js
+    this.theme = {
+      fogColor: T.fogColor, fogNear: T.fogNear, fogFar: T.fogFar,
+      hemiSky: T.hemiSky, hemiGround: T.hemiGround,
+      sunColor: T.sunColor, sunIntensity: T.sunIntensity,
+    };
+    // levels are self-contained: fog is set here (main.js may re-apply from theme)
+    scene.fog = new THREE.Fog(T.fogColor, T.fogNear, T.fogFar);
+
     this.group = new THREE.Group();
     scene.add(this.group);
 
+    const pts = CIRCUITS[level && level.theme] || CIRCUITS.forest;
     this.curve = new THREE.CatmullRomCurve3(
-      CONTROL_POINTS.map(([x, z]) => new THREE.Vector3(x, 0, z)),
+      pts.map(([x, z]) => new THREE.Vector3(x, 0, z)),
       true, 'centripetal'
     );
     this.N = N;
@@ -59,6 +195,8 @@ export class Track {
       this.curvature[i] = Math.acos(THREE.MathUtils.clamp(a.dot(b), -1, 1)) / (16 * this.segLen);
     }
 
+    this._checkLayout();
+
     this.animated = { flags: [], clouds: [] };
     this._buildRoad();
     this._buildWalls();
@@ -66,6 +204,29 @@ export class Track {
     this._buildRamps();      // ramps claim the straightest sections…
     this._buildBoostPads();  // …then pads fill in around them
     this._buildEnvironment();
+  }
+
+  /** Dev sanity check: warn if the centerline passes too close to itself
+   *  (any two non-adjacent samples nearer than the full road ribbon width). */
+  _checkLayout() {
+    const minGap = (WALL_OFF + 0.6) * 2;
+    let worst = Infinity, wi = -1, wj = -1;
+    for (let i = 0; i < N; i += 2) {
+      const jMax = Math.min(N - 1, i + N - 40);
+      for (let j = i + 40; j <= jMax; j += 2) {
+        const dx = this.center[i].x - this.center[j].x;
+        const dz = this.center[i].z - this.center[j].z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < worst) { worst = d2; wi = i; wj = j; }
+      }
+    }
+    const d = Math.sqrt(worst);
+    if (d < minGap) {
+      console.warn(
+        `Track layout "${this.level && this.level.name}": centerline self-approach ` +
+        `${d.toFixed(1)}u between samples ${wi} and ${wj} (< ${minGap.toFixed(1)}u road width)`
+      );
+    }
   }
 
   // ---------- queries ----------
@@ -165,7 +326,7 @@ export class Track {
     geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     geo.setIndex(idx);
     geo.computeVertexNormals();
-    const tex = roadTexture();
+    const tex = roadTexture(this.T.road);
     tex.anisotropy = 8;
     const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 1, metalness: 0 });
     const mesh = new THREE.Mesh(geo, mat);
@@ -278,6 +439,19 @@ export class Track {
     banner.castShadow = true;
     this.group.add(banner);
 
+    // FINISH banner hung on the crossbar, visible from both directions
+    const finTex = finishBannerTexture();
+    for (const flip of [0, Math.PI]) {
+      const fin = new THREE.Mesh(
+        new THREE.PlaneGeometry(24, 2.15),
+        new THREE.MeshStandardMaterial({ map: finTex, roughness: 0.85 })
+      );
+      fin.position.set(c.x, 9, c.z);
+      fin.rotation.y = heading + flip;
+      fin.translateZ(0.32);
+      this.group.add(fin);
+    }
+
     // traffic-light box hanging from the banner
     const housing = new THREE.Mesh(
       new THREE.BoxGeometry(7.4, 2.6, 1.2),
@@ -317,7 +491,7 @@ export class Track {
   _buildBoostPads() {
     this.boostPads = [];
     const tex = chevronTexture();
-    const min = 0.004;
+    const min = this.T.padMaxCurv;
     let last = -999;
     for (let i = 40; i < N && this.boostPads.length < 5; i += 10) {
       if (this.ramps.some((r) => this._circDist(i, r.index) < 50)) continue;
@@ -356,7 +530,7 @@ export class Track {
     const chosen = [];
     for (const w of windows) {
       if (chosen.length >= 3) break;
-      if (w.maxCurv > 0.014) break;
+      if (w.maxCurv > this.T.rampMaxCurv) break;
       if (chosen.some((c) => this._circDist(w.i, c) < 180)) continue;
       chosen.push(w.i);
     }
@@ -417,14 +591,15 @@ export class Track {
   }
 
   _buildTerrain() {
+    const T = this.T;
     const SIZE = 4200, SEG = 150;
     const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
-    const cLow = new THREE.Color('#5d9c3e');
-    const cHigh = new THREE.Color('#8fbf5e');
-    const cDirt = new THREE.Color('#a08050');
+    const cLow = new THREE.Color(T.terrainLow);
+    const cHigh = new THREE.Color(T.terrainHigh);
+    const cDirt = new THREE.Color(T.terrainDirt);
     const tmp = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
@@ -442,7 +617,7 @@ export class Track {
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
-    const gtex = groundTexture();
+    const gtex = groundTexture(T.ground);
     gtex.repeat.set(48, 48);
     gtex.anisotropy = 4;
     const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
@@ -453,6 +628,7 @@ export class Track {
   }
 
   _buildSky() {
+    const T = this.T;
     const sky = new THREE.Mesh(
       new THREE.SphereGeometry(1500, 24, 12),
       new THREE.ShaderMaterial({
@@ -460,8 +636,8 @@ export class Track {
         depthWrite: false,
         fog: false,
         uniforms: {
-          top: { value: new THREE.Color('#3f8de0') },
-          horizon: { value: new THREE.Color('#e8f0d8') },
+          top: { value: new THREE.Color(T.skyTop) },
+          horizon: { value: new THREE.Color(T.skyHorizon) },
         },
         vertexShader: `varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
         fragmentShader: `uniform vec3 top; uniform vec3 horizon; varying float vY;
@@ -473,7 +649,7 @@ export class Track {
     const sun = new THREE.Mesh(
       new THREE.PlaneGeometry(400, 400),
       new THREE.MeshBasicMaterial({
-        map: glowTexture(), color: 0xfff2b8, transparent: true, fog: false,
+        map: glowTexture(), color: T.sunGlow, transparent: true, fog: false,
         depthWrite: false, blending: THREE.AdditiveBlending,
       })
     );
@@ -482,11 +658,11 @@ export class Track {
     this.scene.add(sun);
 
     const ctex = cloudTexture();
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < T.cloudCount; i++) {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: ctex, transparent: true, opacity: 0.9, fog: false, depthWrite: false,
+        map: ctex, transparent: true, opacity: T.cloudOpacity, fog: false, depthWrite: false,
       }));
-      const a = (i / 12) * Math.PI * 2 + Math.random();
+      const a = (i / T.cloudCount) * Math.PI * 2 + Math.random();
       const r = 550 + Math.random() * 500;
       sp.position.set(Math.cos(a) * r, 190 + Math.random() * 160, Math.sin(a) * r);
       const s = 160 + Math.random() * 180;
@@ -497,14 +673,15 @@ export class Track {
   }
 
   _buildHorizon(m4) {
+    const T = this.T;
     const hills = new THREE.InstancedMesh(
       new THREE.ConeGeometry(1, 1, 7),
-      new THREE.MeshStandardMaterial({ color: 0x4e8a3c, flatShading: true, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: T.hillColor, flatShading: true, roughness: 1 }),
       40
     );
     const peaks = new THREE.InstancedMesh(
       new THREE.ConeGeometry(1, 1, 5),
-      new THREE.MeshStandardMaterial({ color: 0x8d8578, flatShading: true, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: T.peakColor, flatShading: true, roughness: 1 }),
       30
     );
     for (let i = 0; i < 40; i++) {
@@ -550,21 +727,34 @@ export class Track {
   }
 
   _buildForest(m4) {
-    const COUNT = 260;
+    const T = this.T;
+    const COUNT = T.treeCount;
     const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 7);
     trunkGeo.translate(0, 1.2, 0);
     const lowGeo = new THREE.ConeGeometry(2.6, 4.2, 8);
     lowGeo.translate(0, 4.0, 0);
     const topGeo = new THREE.ConeGeometry(1.8, 3.4, 8);
     topGeo.translate(0, 6.6, 0);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 1 });
-    const lowMat = new THREE.MeshStandardMaterial({ color: 0x2c6e2a, flatShading: true, roughness: 1 });
-    const topMat = new THREE.MeshStandardMaterial({ color: 0x3c8a34, flatShading: true, roughness: 1 });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
+    const lowMat = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
+    const topMat = new THREE.MeshStandardMaterial({ color: T.foliageTop, flatShading: true, roughness: 1 });
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, COUNT);
     const lows = new THREE.InstancedMesh(lowGeo, lowMat, COUNT);
     const tops = new THREE.InstancedMesh(topGeo, topMat, COUNT);
     lows.castShadow = tops.castShadow = true;
+    // snowy pines get a white cap cone over the upper foliage
+    let caps = null;
+    if (T.treeSnowCap) {
+      const capGeo = new THREE.ConeGeometry(1.35, 2.0, 8);
+      capGeo.translate(0, 7.35, 0);
+      caps = new THREE.InstancedMesh(
+        capGeo,
+        new THREE.MeshStandardMaterial({ color: 0xf2f6fa, flatShading: true, roughness: 0.9 }),
+        COUNT
+      );
+    }
     const color = new THREE.Color();
+    const F = T.foliage;
 
     const placed = this._scatter(COUNT,
       () => {
@@ -582,90 +772,161 @@ export class Track {
         trunks.setMatrixAt(k, m4);
         lows.setMatrixAt(k, m4);
         tops.setMatrixAt(k, m4);
-        // per-tree green variation
-        color.setHSL(0.29 + Math.random() * 0.06, 0.5 + Math.random() * 0.2, 0.32 + Math.random() * 0.14);
+        if (caps) caps.setMatrixAt(k, m4);
+        // per-tree foliage variation (themed hue band)
+        color.setHSL(
+          F.h + Math.random() * F.hVar,
+          F.s + Math.random() * F.sVar,
+          F.l + Math.random() * F.lVar
+        );
         lows.setColorAt(k, color);
         tops.setColorAt(k, color.clone().multiplyScalar(1.2));
       });
     trunks.count = lows.count = tops.count = placed;
     this.scene.add(trunks, lows, tops);
+    if (caps) { caps.count = placed; this.scene.add(caps); }
   }
 
   _buildGroundCover(m4) {
+    const T = this.T;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-    // grass tufts: two crossed alpha-cut planes
-    const gtex = grassTexture();
+    // grass tufts: two crossed alpha-cut planes, dense right beside the road
+    const gtex = grassTexture(T.grass);
     const tuftGeo = new THREE.PlaneGeometry(1.6, 1.3);
     tuftGeo.translate(0, 0.6, 0);
     const tuftMat = new THREE.MeshStandardMaterial({
       map: gtex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1,
     });
-    const tufts = new THREE.InstancedMesh(tuftGeo, tuftMat, 1500);
+    const tufts = new THREE.InstancedMesh(tuftGeo, tuftMat, T.tuftCount * 2);
     let k = 0;
-    this._scatter(750, () => this._trackSidePos(11.5, 60), (p) => {
-      const y = this.terrainHeight(p.x, p.z) - 0.05;
-      const s = 0.7 + Math.random() * 1.1;
-      const rot = Math.random() * Math.PI;
-      for (const dr of [0, Math.PI / 2]) {
-        q.setFromAxisAngle(up, rot + dr);
-        m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(s, s, s));
-        tufts.setMatrixAt(k++, m4);
-      }
-    });
+    this._scatter(T.tuftCount,
+      () => (Math.random() < 0.7 ? this._trackSidePos(11.2, 32) : this._trackSidePos(26, 62)),
+      (p) => {
+        const y = this.terrainHeight(p.x, p.z) - 0.05;
+        const s = 0.7 + Math.random() * 1.1;
+        const rot = Math.random() * Math.PI;
+        for (const dr of [0, Math.PI / 2]) {
+          q.setFromAxisAngle(up, rot + dr);
+          m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(s, s, s));
+          tufts.setMatrixAt(k++, m4);
+        }
+      });
     tufts.count = k;
     this.scene.add(tufts);
 
-    // bushes
+    // bushes (lush, dry or frosted depending on theme)
     const bushGeo = new THREE.IcosahedronGeometry(1, 0);
     bushGeo.scale(1, 0.62, 1);
     const bushes = new THREE.InstancedMesh(
       bushGeo,
-      new THREE.MeshStandardMaterial({ color: 0x2f7a30, flatShading: true, roughness: 1 }),
-      160
+      new THREE.MeshStandardMaterial({ color: T.bushColor, flatShading: true, roughness: 1 }),
+      T.bushCount
     );
+    const B = T.bush;
     const bcolor = new THREE.Color();
     let bk = 0;
-    this._scatter(160, () => this._trackSidePos(13, 70), (p) => {
+    this._scatter(T.bushCount, () => this._trackSidePos(13, 70), (p) => {
       const s = 0.7 + Math.random() * 1.5;
       m4.makeScale(s, s, s);
       m4.setPosition(p.x, this.terrainHeight(p.x, p.z) + s * 0.3, p.z);
       bushes.setMatrixAt(bk, m4);
-      bcolor.setHSL(0.30 + Math.random() * 0.05, 0.5, 0.3 + Math.random() * 0.12);
+      bcolor.setHSL(
+        B.h + Math.random() * B.hVar,
+        B.s + Math.random() * B.sVar,
+        B.l + Math.random() * B.lVar
+      );
       bushes.setColorAt(bk++, bcolor);
     });
     bushes.count = bk;
     this.scene.add(bushes);
 
-    // boulders
+    // boulders (snow theme gets white caps on top)
     const rocks = new THREE.InstancedMesh(
       new THREE.DodecahedronGeometry(1, 0),
-      new THREE.MeshStandardMaterial({ color: 0x8d8578, flatShading: true, roughness: 1 }),
-      110
+      new THREE.MeshStandardMaterial({ color: T.rockColor, flatShading: true, roughness: 1 }),
+      T.rockCount
     );
     rocks.castShadow = true;
+    const caps = T.rockSnowCap
+      ? new THREE.InstancedMesh(
+          new THREE.DodecahedronGeometry(1, 0),
+          new THREE.MeshStandardMaterial({ color: 0xf2f6fa, flatShading: true, roughness: 0.9 }),
+          T.rockCount
+        )
+      : null;
     let rk = 0;
-    this._scatter(110, () => this._trackSidePos(12.5, 90), (p) => {
+    this._scatter(T.rockCount, () => this._trackSidePos(12.5, 90), (p) => {
       const s = 0.5 + Math.random() * 2.2;
+      const sy = s * (0.6 + Math.random() * 0.5);
+      const y = this.terrainHeight(p.x, p.z) + s * 0.25;
       q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
-      m4.compose(
-        new THREE.Vector3(p.x, this.terrainHeight(p.x, p.z) + s * 0.25, p.z),
-        q, new THREE.Vector3(s, s * (0.6 + Math.random() * 0.5), s)
-      );
-      rocks.setMatrixAt(rk++, m4);
+      m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(s, sy, s));
+      rocks.setMatrixAt(rk, m4);
+      if (caps) {
+        m4.compose(
+          new THREE.Vector3(p.x, y + sy * 0.55, p.z),
+          q, new THREE.Vector3(s * 0.8, sy * 0.4, s * 0.8)
+        );
+        caps.setMatrixAt(rk, m4);
+      }
+      rk++;
     });
     rocks.count = rk;
     this.scene.add(rocks);
+    if (caps) { caps.count = rk; this.scene.add(caps); }
 
-    // flowers
+    // small stones scattered right off the road edge
+    const pebbles = new THREE.InstancedMesh(
+      new THREE.DodecahedronGeometry(1, 0),
+      new THREE.MeshStandardMaterial({ color: T.rockColor, flatShading: true, roughness: 1 }),
+      T.pebbleCount
+    );
+    let pk = 0;
+    this._scatter(T.pebbleCount, () => this._trackSidePos(11.3, 16), (p) => {
+      const s = 0.12 + Math.random() * 0.32;
+      q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
+      m4.compose(
+        new THREE.Vector3(p.x, this.terrainHeight(p.x, p.z) + s * 0.3, p.z),
+        q, new THREE.Vector3(s, s * 0.7, s)
+      );
+      pebbles.setMatrixAt(pk++, m4);
+    });
+    pebbles.count = pk;
+    this.scene.add(pebbles);
+
+    // one big hero boulder close to the racing line
+    const fallbackP = this.pointAt((N * 0.42) | 0, WALL_OFF + 7);
+    const hp = this._trackSidePos(14, 18) || { x: fallbackP.x, z: fallbackP.z };
+    const hero = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(1, 1),
+      new THREE.MeshStandardMaterial({ color: T.rockColor, flatShading: true, roughness: 1 })
+    );
+    hero.scale.set(4.6, 3.3, 4.1);
+    hero.rotation.y = 1.3;
+    hero.position.set(hp.x, this.terrainHeight(hp.x, hp.z) + 0.9, hp.z);
+    hero.castShadow = true;
+    this.scene.add(hero);
+    if (T.rockSnowCap) {
+      const heroCap = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(1, 1),
+        new THREE.MeshStandardMaterial({ color: 0xf2f6fa, flatShading: true, roughness: 0.9 })
+      );
+      heroCap.scale.set(3.8, 1.4, 3.4);
+      heroCap.rotation.y = 1.3;
+      heroCap.position.set(hp.x, hero.position.y + 2.2, hp.z);
+      this.scene.add(heroCap);
+    }
+
+    // flowers sprinkled close to the road
     const flowers = new THREE.InstancedMesh(
       new THREE.SphereGeometry(0.22, 6, 5),
       new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }),
-      220
+      T.flowerCount
     );
-    const fcolors = ['#ffe234', '#ff6a8a', '#ffffff', '#ff8a3a', '#c27aff'];
+    const fcolors = T.flowerColors;
     const fc = new THREE.Color();
     let fk = 0;
-    this._scatter(220, () => this._trackSidePos(12, 55), (p) => {
+    this._scatter(T.flowerCount, () => this._trackSidePos(11.8, 42), (p) => {
       m4.makeScale(1, 1, 1);
       m4.setPosition(p.x, this.terrainHeight(p.x, p.z) + 0.22, p.z);
       flowers.setMatrixAt(fk, m4);
@@ -683,7 +944,7 @@ export class Track {
     const roofGeo = new THREE.ConeGeometry(0.85, 0.55, 4);
     roofGeo.rotateY(Math.PI / 4);
     const wallMat = new THREE.MeshStandardMaterial({ map: buildingTexture(), roughness: 1 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0xc9a24d, flatShading: true, roughness: 1 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: this.T.hutRoof, flatShading: true, roughness: 1 });
     const walls = new THREE.InstancedMesh(wallGeo, wallMat, COUNT);
     const roofs = new THREE.InstancedMesh(roofGeo, roofMat, COUNT);
     walls.castShadow = roofs.castShadow = true;
@@ -706,23 +967,23 @@ export class Track {
 
   _buildTrackside(m4) {
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-    // tire stacks guarding the sharpest corners
+    // tire stacks guarding the sharpest corners (2 or 3 tires high)
     const tireGeo = new THREE.TorusGeometry(0.62, 0.3, 8, 14);
     tireGeo.rotateX(Math.PI / 2);
     const tires = new THREE.InstancedMesh(
-      tireGeo, new THREE.MeshStandardMaterial({ color: 0x22201c, roughness: 0.95 }), 140
+      tireGeo, new THREE.MeshStandardMaterial({ color: 0x22201c, roughness: 0.95 }), 190
     );
     tires.castShadow = true;
     const tcolor = new THREE.Color();
     let tk = 0;
-    for (let i = 0; i < N && tk < 130; i += 6) {
+    for (let i = 0; i < N && tk < 180; i += 6) {
       if (this.curvature[i] > 0.017) {
         // outside of the corner: opposite the direction the tangent is turning
         const a = this.tan[i], b = this.tan[(i + 12) % N];
         const side = (a.x * b.z - a.z * b.x) > 0 ? -1 : 1;
         const p = this.pointAt(i, (WALL_OFF + 2.2) * side);
-        const stack = 2 + ((Math.random() * 2) | 0);
-        for (let s = 0; s < stack && tk < 130; s++) {
+        const stack = Math.random() < 0.5 ? 3 : 2;
+        for (let s = 0; s < stack && tk < 180; s++) {
           m4.makeTranslation(p.x + (Math.random() - 0.5) * 0.4, 0.32 + s * 0.62, p.z + (Math.random() - 0.5) * 0.4);
           tires.setMatrixAt(tk, m4);
           tcolor.set(s === stack - 1 && Math.random() < 0.5 ? 0xd8d2c2 : 0x22201c);
@@ -737,7 +998,7 @@ export class Track {
     const hayGeo = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 10);
     hayGeo.rotateZ(Math.PI / 2);
     const hay = new THREE.InstancedMesh(
-      hayGeo, new THREE.MeshStandardMaterial({ color: 0xd8b95e, roughness: 1 }), 50
+      hayGeo, new THREE.MeshStandardMaterial({ color: this.T.hayColor, roughness: 1 }), 50
     );
     hay.castShadow = true;
     let hk = 0;
@@ -759,7 +1020,7 @@ export class Track {
       new THREE.MeshStandardMaterial({ map: bannerTexture(text, bg, fg), roughness: 0.8, side: THREE.DoubleSide }));
     for (let b = 0; b < 10; b++) {
       const i = ((b + 0.5) * N / 10) | 0;
-      if (this.curvature[i] > 0.012) continue; // keep boards off tight corners
+      if (this.curvature[i] > this.T.boardMaxCurv) continue; // keep boards off tight corners
       const side = b % 2 === 0 ? 1 : -1;
       const p = this.pointAt(i, (WALL_OFF + 3.6) * side);
       const g = new THREE.Group();

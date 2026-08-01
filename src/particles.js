@@ -3,7 +3,20 @@
 import * as THREE from 'three';
 import { particleTexture } from './textures.js';
 
-const MAX = 4000;
+const MAX = 6000;
+
+// cached colors for per-frame recipes (avoid GC churn)
+const DUST_A = new THREE.Color('#a8905f');
+const DUST_B = new THREE.Color('#bda87a');
+const DRIFT_A = new THREE.Color('#b39a6e');
+const DRIFT_B = new THREE.Color('#c9b489');
+const SMOKE_GRAY = new THREE.Color('#8a8378');
+const SMOKE_DARK = new THREE.Color('#332e29');
+const FIRE_A = new THREE.Color('#ff8c1a');
+const FIRE_B = new THREE.Color('#ffc23e');
+const DEBRIS_A = new THREE.Color('#2a2521');
+const DEBRIS_B = new THREE.Color('#4a4038');
+const EXHAUST_BOOST = new THREE.Color('#ffb32e');
 
 const VERT = /* glsl */ `
   attribute float aSize;
@@ -132,16 +145,23 @@ export class Particles {
     const c1 = new THREE.Color('#ffe86b'), c2 = new THREE.Color('#2ef7ff');
     for (let i = 0; i < count; i++) {
       const a = Math.random() * Math.PI * 2;
-      const sp = 4 + Math.random() * 10;
+      const sp = 5 + Math.random() * 13;
       this.spawn(p.x, p.y + 0.3, p.z,
-        normal.x * sp + Math.cos(a) * 3, 2 + Math.random() * 5, normal.z * sp + Math.sin(a) * 3,
-        Math.random() < 0.6 ? c1 : c2, 1.4 + Math.random(), 0.25 + Math.random() * 0.3,
-        { grav: 22, shrink: 0.4 });
+        normal.x * sp + Math.cos(a) * 4, 2.5 + Math.random() * 6, normal.z * sp + Math.sin(a) * 4,
+        Math.random() < 0.6 ? c1 : c2, 1.6 + Math.random() * 1.2, 0.28 + Math.random() * 0.35,
+        { grav: 24, shrink: 0.35 });
+    }
+    // a couple of white-hot core pops for punch
+    const hot = new THREE.Color('#fffbe8');
+    for (let i = 0, n = Math.max(1, count >> 2); i < n; i++) {
+      this.spawn(p.x, p.y + 0.35, p.z,
+        normal.x * 6 + (Math.random() - 0.5) * 5, 3 + Math.random() * 4, normal.z * 6 + (Math.random() - 0.5) * 5,
+        hot, 2.4 + Math.random() * 1.4, 0.14 + Math.random() * 0.12, { grav: 14, shrink: 0.7 });
     }
   }
 
   exhaust(p, back, color, boost = false) {
-    const c = boost ? new THREE.Color('#ffb32e') : color;
+    const c = boost ? EXHAUST_BOOST : color;
     this.spawn(
       p.x + (Math.random() - 0.5) * 0.5, p.y + 0.35, p.z + (Math.random() - 0.5) * 0.5,
       back.x * (boost ? 26 : 9) + (Math.random() - 0.5) * 2, 0.6, back.z * (boost ? 26 : 9) + (Math.random() - 0.5) * 2,
@@ -149,11 +169,51 @@ export class Particles {
   }
 
   driftSmoke(p) {
-    // dust kicked up from the dirt
-    this.spawn(p.x, p.y + 0.2, p.z,
-      (Math.random() - 0.5) * 3, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 3,
-      new THREE.Color('#b39a6e'), 2.6 + Math.random() * 2, 0.7 + Math.random() * 0.4,
-      { drag: 2, shrink: 0.2 });
+    // big soft dust cloud kicked up while sliding on the dirt
+    this.spawn(p.x + (Math.random() - 0.5) * 0.6, p.y + 0.2, p.z + (Math.random() - 0.5) * 0.6,
+      (Math.random() - 0.5) * 3.6, 1.8 + Math.random() * 2.4, (Math.random() - 0.5) * 3.6,
+      Math.random() < 0.5 ? DRIFT_A : DRIFT_B, 3.6 + Math.random() * 2.6, 0.85 + Math.random() * 0.5,
+      { drag: 1.8, shrink: 0.15 });
+  }
+
+  /** Constant rolling dust from wheels on dirt. intensity 0..1 scales size/loft. */
+  dust(p, intensity = 0.5) {
+    this.spawn(p.x + (Math.random() - 0.5) * 0.6, p.y + 0.15, p.z + (Math.random() - 0.5) * 0.6,
+      (Math.random() - 0.5) * 2.5, 1.2 + Math.random() * 1.6 + intensity * 1.5, (Math.random() - 0.5) * 2.5,
+      Math.random() < 0.5 ? DUST_A : DUST_B,
+      1.7 + Math.random() * 1.4 + intensity * 1.8,
+      0.45 + Math.random() * 0.35 + intensity * 0.25,
+      { drag: 2.2, shrink: 0.15 });
+  }
+
+  /** Engine-bay damage smoke. severity 0..1: gray puffs -> thick dark smoke + fire flickers. */
+  damageSmoke(p, severity = 0.5) {
+    const dark = severity > 0.5;
+    this.spawn(p.x + (Math.random() - 0.5) * 0.5, p.y, p.z + (Math.random() - 0.5) * 0.5,
+      (Math.random() - 0.5) * 1.5, 2.2 + severity * 2.5 + Math.random() * 1.5, (Math.random() - 0.5) * 1.5,
+      dark ? SMOKE_DARK : SMOKE_GRAY,
+      2.2 + severity * 2.4 + Math.random() * 1.2,
+      0.7 + severity * 0.5 + Math.random() * 0.3,
+      { drag: 1.6, shrink: 0.2 });
+    if (dark && Math.random() < 0.45) {
+      // orange fire flicker licking out of the engine bay
+      this.spawn(p.x + (Math.random() - 0.5) * 0.7, p.y - 0.15, p.z + (Math.random() - 0.5) * 0.7,
+        (Math.random() - 0.5) * 1.2, 2.5 + Math.random() * 2.5, (Math.random() - 0.5) * 1.2,
+        Math.random() < 0.6 ? FIRE_A : FIRE_B, 1.5 + Math.random() * 1.3, 0.22 + Math.random() * 0.15,
+        { drag: 1, shrink: 0.5 });
+    }
+  }
+
+  /** Dark chunks thrown off a car by a heavy hit. */
+  debris(p, count = 3) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 5 + Math.random() * 8;
+      this.spawn(p.x, p.y + 0.9, p.z,
+        Math.cos(a) * sp, 6 + Math.random() * 7, Math.sin(a) * sp,
+        Math.random() < 0.5 ? DEBRIS_A : DEBRIS_B, 1.6 + Math.random() * 1.1,
+        0.6 + Math.random() * 0.5, { grav: 30, drag: 0.4, shrink: 0.85 });
+    }
   }
 
   trail(p, color) {
