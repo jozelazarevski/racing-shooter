@@ -4,11 +4,14 @@ A bright, cartoon toy-car combat racer in the spirit of the classic *Ignition*
 (1997), playable entirely in the browser — on desktop **and phones** (full
 touch controls). Race 3 laps against the **Voxel Racers** — CROWN, SLEEK,
 DUNE, ALPINE and PIT-99, each a distinct liveried block-built machine — on a
-championship of three themed circuits — PINE VALLEY (forest), DUST CANYON
-(desert) and FROST PEAK (snow) — armed with cannon, homing missiles, mines,
-a shockwave blast, nitro, boost pads and launch ramps. Drift-happy arcade
-physics, visible car damage (smoke, fire, scorched paint), and rolling dust
-trails behind every truck.
+championship of five themed worlds — PINE VALLEY (forest), DUST CANYON
+(desert), FROST PEAK (snow), CANYON RUN (a slot canyon with hoodoo rock
+obstacles, mud puddles and overhead bridges) and EMBER PASS (volcanic
+badlands) — armed with cannon, homing missiles, mines, a shockwave blast,
+nitro, boost pads and launch ramps. Drift-happy arcade physics, visible car
+damage, rolling dust trails, smart racing-line AI with three difficulty
+levels, and a persistent career: finishing a world unlocks the next, races
+pay credits, and the garage sells engine/armor/cannon/nitro upgrades.
 
 **Every asset is procedural and designed in code by Claude** — the circuit, the
 rolling terrain, the pine forest and grass, the grandstand and sponsor boards,
@@ -59,8 +62,16 @@ nitro ⚡, with live ammo badges on the buttons. Works in portrait and landscape
 
 ## Gameplay
 
-- **3 levels, 3 laps each, 6 racers.** Pick a circuit on the title screen; the
-  results screen chains you into the next level and your score carries over.
+- **5 worlds, 3 laps each, 6 racers.** Finish a world to unlock the next; the
+  results screen chains you onward and your score carries over.
+- **Difficulty**: EASY / NORMAL / HARD on the title screen — scales AI speed,
+  aggression (mines, blocking, boost bursts) and rubber-banding.
+- **Career & garage**: every race pays credits equal to the score you earned;
+  spend them on ENGINE, ARMOR, CANNON and NITRO upgrades (5 levels each).
+- **Smart rivals** race a real line — outside-apex-outside, braking models,
+  overtaking, blocking, dodging obstacles — and fight back with mines.
+- **Canyon hazards**: hoodoo rock towers to dodge and mud puddles that slow
+  you down in CANYON RUN; basalt boulders on EMBER PASS.
 - **Drifting** is the fast line: hard cornering breaks the rear loose, slides
   charge your nitro, and SHIFT forces a full drift.
 - **Damage shows**: hurt cars trail smoke, badly hurt ones catch fire and
