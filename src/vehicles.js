@@ -5,6 +5,9 @@ import { numberPlateTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
 const SCORCH = new THREE.Color(0x1c1a18); // damage tint target
+const _hitNormal = new THREE.Vector3(); // scratch: obstacle bounce normal
+const _splash = new THREE.Vector3();    // scratch: puddle splash spawn point
+const _obPos = new THREE.Vector3();     // scratch: obstacle/puddle track projection (AI)
 
 // ---------- roof sponsor decals ----------
 // Small canvas-drawn sponsor plates (white rounded rect + fictional brand word),
@@ -275,6 +278,7 @@ export class Car {
     this._dustSide = 1;
     this._smokeClock = 0;
     this._tintFrac = -1;    // last health fraction the scorch tint was computed for
+    this._wetT = 0;         // short timer set while driving through a puddle
   }
 
   get forward() { return new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading)); }
@@ -321,14 +325,27 @@ export class Car {
         this.reverseTimer = 0;
       }
       if (inputs.brake > 0.05) {
-        if (vf > 0.5) {
-          vf -= this.accel * 1.6 * inputs.brake * dt;
+        const decel = this.accel * 1.6 * inputs.brake * dt;
+        if (vf > 1) {
+          vf = Math.max(0, vf - decel); // braking can stop the car, never push it backwards
           this.reverseTimer = 0;
         } else {
-          // reverse only engages from a deliberate, sustained brake near standstill
-          if (inputs.brake >= 0.35 && Math.abs(vf) < 1) this.reverseTimer += dt;
-          if (this.reverseTimer >= 0.25) vf -= this.accel * 0.5 * inputs.brake * dt;
-          else vf -= vf * Math.min(1, 6 * dt); // settle to a stop instead of creeping
+          // Reverse gear only from a DELIBERATE input: hard brake (>= 0.6) held
+          // for 0.45s at standstill with the throttle fully released. A thumb
+          // resting slightly low on the touch pad (light analog brake) does nothing.
+          // |vf| < 1 gates ARMING only — once engaged, reverse stays in gear
+          // while the hard brake is held, even as reverse speed builds past 1.
+          const reverseActive = this.reverseTimer >= 0.45;
+          const deliberate = inputs.brake >= 0.6 && !(inputs.throttle > 0)
+            && (reverseActive || Math.abs(vf) < 1);
+          this.reverseTimer = deliberate ? this.reverseTimer + dt : 0;
+          if (this.reverseTimer >= 0.45) {
+            vf -= this.accel * 0.5 * inputs.brake * dt; // reverse gear engaged
+          } else if (vf > 0) {
+            vf = Math.max(0, vf - decel); // settle to exactly 0 — no sign flip, ever
+          } else if (vf < 0) {
+            vf = Math.min(0, vf + decel); // rolling backwards + brake: also settle to 0
+          }
         }
       } else {
         this.reverseTimer = 0;
@@ -348,6 +365,7 @@ export class Car {
     let grip = this.grip * (1 - 0.78 * this.slip);
     if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
     if (this.landGrip > 0) { this.landGrip -= dt; grip *= 0.4; } // loose for ~0.4s after landing
+    if (this._wetT > 0) { this._wetT -= dt; grip *= 0.75; }      // slick tires through puddles
     const vlBefore = vl;
     vl -= vl * Math.min(1, grip * dt);
     // drift reward: convert a slice of the scrubbed-off slide back into forward speed
@@ -434,6 +452,62 @@ export class Car {
       if (this.wallGrind <= 0) {
         this.wallGrind = 0.18;
         this.onWallHit(n, Math.abs(vn));
+      }
+    }
+
+    // ---- world obstacles: solid circles {x,z,r} — push out + bounce ----
+    // (track.obstacles / track.puddles may not exist on every level build yet)
+    const obstacles = t.obstacles ?? [];
+    for (const ob of obstacles) {
+      const dx = this.pos.x - ob.x, dz = this.pos.z - ob.z;
+      const rr = ob.r + 2.5; // obstacle radius + car body radius
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= rr * rr || d2 < 1e-8) continue;
+      const d = Math.sqrt(d2);
+      const nx = dx / d, nz = dz / d;
+      this.pos.x = ob.x + nx * rr; // push out along the radial
+      this.pos.z = ob.z + nz * rr;
+      const vn = this.vel.x * nx + this.vel.z * nz;
+      if (vn < 0) {
+        this.vel.x -= nx * vn * 1.35; // reflect, like the wall bounce
+        this.vel.z -= nz * vn * 1.35;
+        this.vel.multiplyScalar(0.9);
+        if (this.wallGrind <= 0) {
+          this.wallGrind = 0.18;
+          _hitNormal.set(nx, 0, nz);
+          this.onWallHit(_hitNormal, Math.abs(vn));
+          if (this === gm.player) gm.shake = Math.min(1, gm.shake + 0.2);
+        }
+      }
+    }
+
+    // ---- puddles: heavy drag + slick grip + brown splash while inside ----
+    const puddles = t.puddles ?? [];
+    if (puddles.length && !this.airborne) {
+      for (const pd of puddles) {
+        const dx = this.pos.x - pd.x, dz = this.pos.z - pd.z;
+        if (dx * dx + dz * dz >= pd.r * pd.r) continue;
+        const f = Math.max(0, 1 - 0.9 * dt); // water drag on the hull
+        this.vel.x *= f;
+        this.vel.z *= f;
+        this._wetT = 0.14; // grip reduction picked up next frame (see grip section)
+        const spd2 = this.vel.lengthSq();
+        if (spd2 > 36 && gm.player
+            && (this === gm.player || this.pos.distanceToSquared(gm.player.pos) < 14400)) {
+          const nSplash = this === gm.player ? 2 : 1;
+          for (let s = 0; s < nSplash; s++) {
+            _splash.set(
+              this.pos.x + (Math.random() - 0.5) * 1.8, this.y + 0.12,
+              this.pos.z + (Math.random() - 0.5) * 1.8
+            );
+            gm.particles.dust(_splash, 1.15);
+          }
+          if (Math.random() < 0.35) {
+            _splash.set(this.pos.x, this.y + 0.15, this.pos.z);
+            gm.particles.driftSmoke(_splash);
+          }
+        }
+        break; // one puddle per frame is plenty
       }
     }
 
@@ -572,6 +646,59 @@ export class Car {
   }
 }
 
+// ---------- AI racing brain ----------
+// Precomputed racing line: one lateral offset per centerline sample, following
+// an outside-apex-outside path through corners, heavily smoothed. Cached once
+// per track object (track._raceLine).
+const APEX_LAT = 5.5;    // how far inside the apex sits
+const ENTRY_LAT = 4.5;   // how far outside the entry/exit swing goes
+const CORNER_CURV = 0.013; // curvature above this counts as a real corner
+
+function computeRaceLine(track) {
+  const n = track.N;
+  const raw = new Float32Array(n);
+  // corners: hug the inside. dir > 0 = left turn (heading increasing).
+  for (let i = 0; i < n; i++) {
+    if (track.curvature[i] < CORNER_CURV) continue;
+    const a = track.tan[(i - 8 + n) % n], b = track.tan[(i + 8) % n];
+    const dir = a.z * b.x - a.x * b.z; // (a x b).y — sin of the heading change
+    raw[i] = Math.sign(dir) * APEX_LAT; // +lateral = left = inside of a left turn
+  }
+  // entry/exit: ~25 samples on both sides of a corner swing to the outside
+  const line = Float32Array.from(raw);
+  for (let i = 0; i < n; i++) {
+    if (raw[i] !== 0) continue;
+    for (let k = 1; k <= 25; k++) {
+      const near = raw[(i + k) % n] || raw[(i - k + n) % n];
+      if (near !== 0) { line[i] = -Math.sign(near) * ENTRY_LAT; break; }
+    }
+  }
+  // heavy smoothing: circular moving average, window ~31, three passes
+  let cur = line;
+  for (let pass = 0; pass < 3; pass++) {
+    const next = new Float32Array(n);
+    const W = 15;
+    let sum = 0;
+    for (let k = -W; k <= W; k++) sum += cur[(k + n) % n];
+    for (let i = 0; i < n; i++) {
+      next[i] = sum / (2 * W + 1);
+      sum += cur[(i + W + 1) % n] - cur[(i - W + n) % n];
+    }
+    cur = next;
+  }
+  return cur;
+}
+
+/** 1/sqrt(curvature) per sample — corner speed is sqrt(aLat) * this. Cached per track. */
+function computeSpeedInv(track) {
+  const n = track.N;
+  const inv = new Float32Array(n);
+  for (let i = 0; i < n; i++) inv[i] = 1 / Math.sqrt(Math.max(track.curvature[i], 1e-4));
+  return inv;
+}
+
+const DEFAULT_DIFFICULTY = { aiSpeed: 1, aiAggression: 1, rubberBand: 1 };
+
 // ---------- AI rival ----------
 // The Voxel Racers collection — rival lineup
 const AI_COLORS = [
@@ -586,19 +713,23 @@ export class EnemyCar extends Car {
   constructor(game, slot) {
     const spec = AI_COLORS[slot % AI_COLORS.length];
     super(game, buildCarMesh(spec), {
-      maxSpeed: 50 + slot * 1.4 + Math.random() * 1.6, // ~50..57 across the grid
-      accel: 34 + slot * 1.1 + Math.random() * 2,      // ~34..40
-      grip: 5.6,
-      steerRate: 2.85,
-      driftLag: 0.15, // they slide a little, but hold the racing line
+      maxSpeed: 53 + slot * 1.1 + Math.random() * 1.4, // ~53..60 across the grid (player: 58)
+      accel: 36 + slot * 1.2 + Math.random() * 2,      // ~36..43
+      grip: 5.8,
+      steerRate: 3.0,
+      driftLag: 0.12, // planted enough to hold the racing line
     });
     this.spec = spec;
     this.name = spec.name;
     this.maxHealth = this.health = 70;
     this.respawnDelay = 5;
-    this.lane = THREE.MathUtils.randFloatSpread(8);
+    this.baseMaxSpeed = this.maxSpeed;   // difficulty/rubber-band scale on top of this
+    this.cornerSkill = Math.random();    // 0..1 — how hard this driver leans on the tires
+    this.lane = THREE.MathUtils.randFloatSpread(2.5); // small personal offset off the ideal line
     this.laneTimer = 3 + Math.random() * 4;
     this.aggression = 0.5 + Math.random() * 0.5;
+    this.mineCooldown = 4 + Math.random() * 5;  // stagger the first drops
+    this.boostCooldown = 4 + Math.random() * 6; // stagger the first bursts
     this.glowColor = new THREE.Color(0x9a938a); // exhaust smoke tint
   }
 
@@ -611,47 +742,145 @@ export class EnemyCar extends Car {
     }
     const t = g.track;
     const prevIndex = this.trackIndex;
+    const D = g.difficulty ?? DEFAULT_DIFFICULTY;
 
-    // wander between lanes occasionally
+    // lazily cache per-track AI data (shared by every rival)
+    if (!t._raceLine) t._raceLine = computeRaceLine(t);
+    if (!t._speedInv) t._speedInv = computeSpeedInv(t);
+
+    // ---- rubber band: help when behind, cap when far ahead (both scale with D.rubberBand)
+    const gap = g.player.progress - this.progress; // > 0: this car is behind the player
+    let band = 1;
+    if (gap > 0.02) band = 1 + 0.30 * D.rubberBand * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1);
+    else if (gap < -0.06) band = 1 - 0.12 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1);
+    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * Math.max(0.7, band);
+
+    // ---- refresh the small personal lane bias occasionally
     this.laneTimer -= dt;
     if (this.laneTimer <= 0) {
-      this.laneTimer = 3 + Math.random() * 5;
-      this.lane = THREE.MathUtils.randFloatSpread(9);
+      this.laneTimer = 4 + Math.random() * 4;
+      this.lane = THREE.MathUtils.randFloatSpread(2.5);
     }
 
-    // deliberately line up for a boost pad when one is coming up in reach
-    let lane = this.lane;
+    const fwd = this.forward;
+    const v = this.speedAlong;
+
+    // ---- steering target: racing line at a speed-scaled lookahead + situational biases
+    // Lookahead shrinks with local curvature: a long chord across a tight arc
+    // cuts the corner straight into the inside wall (pure-pursuit artifact).
+    const curvHere = t.curvature[this.trackIndex];
+    const look = Math.max(5, Math.floor((6 + Math.abs(v) * 0.35) / (1 + 45 * curvHere)));
+    const li = (this.trackIndex + look) % t.N;
+    let targetLat = t._raceLine[li] + this.lane;
+
+    // line up for a boost pad when one is coming up in reach
     if (this.boostTimer <= 0.3 && t.boostPads) {
       for (const pad of t.boostPads) {
         const di = (pad.index - this.trackIndex + t.N) % t.N;
-        if (di > 4 && di < 60) {
-          lane = THREE.MathUtils.lerp(this.lane, pad.lateral, 0.85);
+        if (di > 4 && di < 55) {
+          targetLat = THREE.MathUtils.lerp(targetLat, pad.lateral, 0.9);
           break;
         }
       }
     }
 
-    // steer toward a lookahead point on the centerline
-    const look = Math.floor(10 + Math.abs(this.speedAlong) * 0.55);
-    const ti = (this.trackIndex + look) % t.N;
-    const target = t.pointAt(ti, lane);
+    // overtake: car ahead within 12 and closing -> swing to the emptier side
+    let blockedAhead = false;
+    for (const other of [g.player, ...g.enemies]) {
+      if (other === this || !other.alive) continue;
+      const dx = other.pos.x - this.pos.x, dz = other.pos.z - this.pos.z;
+      const along = dx * fwd.x + dz * fwd.z;
+      if (along < 1 || along > 12) continue;
+      const across = dx * fwd.z - dz * fwd.x;
+      if (Math.abs(across) > 3.2) continue;
+      if (v > other.speedAlong - 0.5) {
+        targetLat += other.lateral > this.lateral ? -3.5 : 3.5;
+        blockedAhead = true;
+        break;
+      }
+    }
+    // blocking: when leading the player and they're right behind, mirror their lane
+    if (!blockedAhead && gap < 0 && g.player.alive) {
+      const dx = g.player.pos.x - this.pos.x, dz = g.player.pos.z - this.pos.z;
+      const along = dx * fwd.x + dz * fwd.z;
+      if (along < -2 && along > -16) {
+        const w = Math.min(0.85, 0.5 * this.aggression * D.aiAggression);
+        targetLat = THREE.MathUtils.lerp(targetLat, g.player.lateral, w);
+      }
+    }
+
+    // obstacle (and high-speed puddle) avoidance in the ~25-unit lookahead cone
+    const hazards = t.obstacles ?? [];
+    for (const ob of hazards) {
+      const dx = ob.x - this.pos.x, dz = ob.z - this.pos.z;
+      const along = dx * fwd.x + dz * fwd.z;
+      if (along < 2 || along > 25) continue;
+      _obPos.set(ob.x, 0, ob.z);
+      const obLat = t.lateralOffset(_obPos, t.nearestIndex(_obPos, this.trackIndex));
+      if (Math.abs(obLat - targetLat) < ob.r + 2.6) {
+        // slide the target just past the obstacle, toward the side with more road
+        const side = Math.sign(targetLat - obLat) || (obLat >= 0 ? -1 : 1);
+        targetLat = obLat + side * (ob.r + 2.9);
+      }
+    }
+    if (Math.abs(v) > this.maxSpeed * 0.65) {
+      for (const pd of t.puddles ?? []) {
+        const dx = pd.x - this.pos.x, dz = pd.z - this.pos.z;
+        const along = dx * fwd.x + dz * fwd.z;
+        if (along < 2 || along > 22) continue;
+        _obPos.set(pd.x, 0, pd.z);
+        const pdLat = t.lateralOffset(_obPos, t.nearestIndex(_obPos, this.trackIndex));
+        if (Math.abs(pdLat - targetLat) < pd.r + 1.6) {
+          const side = Math.sign(targetLat - pdLat) || (pdLat >= 0 ? -1 : 1);
+          targetLat = pdLat + side * (pd.r + 1.9);
+        }
+      }
+    }
+    targetLat = THREE.MathUtils.clamp(targetLat, -7.4, 7.4);
+
+    const target = t.pointAt(li, targetLat);
     const desired = Math.atan2(target.x - this.pos.x, target.z - this.pos.z);
     let dh = desired - this.heading;
     while (dh > Math.PI) dh -= Math.PI * 2;
     while (dh < -Math.PI) dh += Math.PI * 2;
-    const steer = THREE.MathUtils.clamp(dh * 2.6, -1, 1);
+    // Cap steering at speed so corner load stays under the slip threshold —
+    // full-lock at race pace breaks the rear loose and washes the car wide
+    // into the wall. Big heading errors (spun/facing a wall) still get full lock.
+    const speedN = Math.min(1, Math.abs(v) / this.maxSpeed);
+    const steerCap = Math.abs(dh) > 0.9 ? 1 : 0.6 + 0.4 * (1 - speedN);
+    const steer = THREE.MathUtils.clamp(dh * 3.0, -steerCap, steerCap);
 
-    // slow down for corners ahead — but carry real speed and let the tail slide
-    let maxCurv = 0;
-    for (let k = 0; k < 60; k += 6) maxCurv = Math.max(maxCurv, t.curvature[(this.trackIndex + k) % t.N]);
-    let targetSpeed = Math.min(this.maxSpeed, 18 / Math.max(0.06, maxCurv * 15));
-    // rubber-banding vs player: ramp to +25% when far behind, -10% when far ahead
-    const gap = g.player.progress - this.progress;
-    if (gap > 0.02) targetSpeed *= 1 + 0.25 * THREE.MathUtils.clamp((gap - 0.02) / 0.08, 0, 1);
-    else if (gap < -0.12) targetSpeed *= 0.90;
+    // ---- braking model: physics corner speeds + late-but-correct brake points
+    // vMax(j) = sqrt(aLat / curvature); brake so that v <= sqrt(vMax^2 + 2*decel*dist)
+    const aLat = (30 + 8 * this.cornerSkill) * D.aiSpeed;
+    const sqA = Math.sqrt(aLat);
+    const DECEL = 26;
+    let vAllowed = this.maxSpeed;
+    for (let k = 0; k <= 90; k += 5) {
+      const j = (this.trackIndex + k) % t.N;
+      const vMax = sqA * t._speedInv[j];
+      if (vMax >= vAllowed) continue;
+      const vNow = k === 0 ? vMax : Math.sqrt(vMax * vMax + 2 * DECEL * k * t.segLen);
+      if (vNow < vAllowed) vAllowed = vNow;
+    }
+    vAllowed = Math.max(vAllowed, 14); // never crawl
 
-    const throttle = this.speedAlong < targetSpeed ? 1 : 0;
-    const brake = this.speedAlong > targetSpeed * 1.15 ? 0.7 : 0;
+    let throttle = 0, brake = 0;
+    if (v < vAllowed - 1.5) throttle = 1;
+    else if (v > vAllowed + 1.5) brake = THREE.MathUtils.clamp((v - vAllowed) / 8, 0.35, 1);
+    else throttle = 0.6; // hold speed through the corner
+
+    // ---- nitro-ish bursts: behind the player, on a straight, off cooldown
+    this.boostCooldown -= dt;
+    if (this.boostCooldown <= 0 && this.boostTimer <= 0 && gap > 0.004 && v > this.maxSpeed * 0.55) {
+      let curvAhead = 0;
+      for (let k = 0; k < 45; k += 5) curvAhead = Math.max(curvAhead, t.curvature[(this.trackIndex + k) % t.N]);
+      if (curvAhead < 0.012) {
+        this.boostTimer = 1.2;
+        this.boostCooldown = 9 / Math.max(0.45, this.aggression * D.aiAggression);
+      }
+    }
+
     this.step(dt, { throttle, brake, steer, drift: false });
     if (this.checkLap(prevIndex) === true && this.lap > g.lapsTotal && !this.finished) this.finished = true;
 
@@ -670,15 +899,28 @@ export class EnemyCar extends Car {
       g.particles.exhaust(tail, back, this.glowColor, this.boostTimer > 0);
     }
 
-    // take shots at the player when lined up
+    // take shots at the player when lined up (rate scales with aggression + difficulty)
     const toPlayer = g.player.pos.clone().sub(this.pos);
     const dist = toPlayer.length();
     if (g.player.alive && dist < 55 && this.fireCooldown <= 0) {
       const angle = Math.abs(Math.atan2(toPlayer.x, toPlayer.z) - this.heading);
       const norm = Math.min(angle, Math.PI * 2 - angle);
       if (norm < 0.32) {
-        this.fireCooldown = 0.75 / this.aggression;
+        this.fireCooldown = Math.max(0.3, 0.75 / (this.aggression * D.aiAggression));
         g.weapons.fireBullet(this, 4.5, 0.05);
+      }
+    }
+
+    // drop a mine in the player's path: player 6..18 behind and roughly in-line
+    this.mineCooldown -= dt;
+    if (this.mineCooldown <= 0 && g.player.alive) {
+      const nf = this.forward;
+      const along = toPlayer.x * nf.x + toPlayer.z * nf.z;   // negative: player is behind
+      const across = toPlayer.x * nf.z - toPlayer.z * nf.x;
+      if (along < -6 && along > -18 && Math.abs(across) < 3.5
+          && Math.random() < dt * 1.5 * this.aggression * D.aiAggression) {
+        this.mineCooldown = 6 + Math.random() * 4;
+        g.weapons.dropMine(this);
       }
     }
   }
@@ -702,6 +944,8 @@ export class PlayerCar extends Car {
     this.maxMines = 4;
     this.nitro = 0.3;       // 0..1, charged by drifting, kills and pickups
     this.shockCooldown = 0; // seconds until the shockwave is ready
+    this.cannonDamage = 7;  // upgrade hook — garage sets this after resetRace
+    this.nitroRate = 1;     // upgrade hook — multiplies all nitro gains here
     this.glowColor = new THREE.Color(0x9a938a); // exhaust smoke tint
     this.bestLap = Infinity;
     this.lapStart = 0;
@@ -732,7 +976,7 @@ export class PlayerCar extends Car {
       this.fireCooldown = 0.085;
       this.heat += 0.045;
       if (this.heat >= 1) { this.overheated = true; g.hud.feed('CANNON OVERHEAT', 'bad'); }
-      g.weapons.fireBullet(this, 7, 0.022);
+      g.weapons.fireBullet(this, this.cannonDamage, 0.022);
       g.audio.shoot();
     }
     // missile
@@ -760,7 +1004,7 @@ export class PlayerCar extends Car {
     }
     if (this.shockCooldown > 0) this.shockCooldown -= dt;
     // nitro: passive trickle + fire on demand
-    this.nitro = Math.min(1, this.nitro + dt * 0.02);
+    this.nitro = Math.min(1, this.nitro + dt * 0.02 * this.nitroRate);
     if (controlsLive && input.justPressed('KeyF')) {
       if (this.nitro >= 0.25) {
         this.boostTimer = Math.max(this.boostTimer, this.nitro * 3.2);
@@ -779,7 +1023,7 @@ export class PlayerCar extends Car {
     const slide = Math.abs(this.vel.dot(side));
     if (slide > 6 && !this.airborne) {
       // drifting is the fast way to bank nitro
-      this.nitro = Math.min(1, this.nitro + dt * 0.22 * Math.min(1, slide / 14));
+      this.nitro = Math.min(1, this.nitro + dt * 0.22 * this.nitroRate * Math.min(1, slide / 14));
       for (const s of [-1, 1]) {
         const wp = this.pos.clone().addScaledVector(back, 1.6).addScaledVector(side, s * 1.1);
         g.particles.driftSmoke(wp);

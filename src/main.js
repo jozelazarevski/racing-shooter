@@ -17,6 +17,26 @@ import { glowTexture } from './textures.js';
 const ENEMY_COUNT = 5;
 const LAPS = 3;
 
+const DIFFS = {
+  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.88, aiAggression: 0.65, rubberBand: 1.25 },
+  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 1.0,  aiAggression: 1.0,  rubberBand: 1.0 },
+  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.1,  aiAggression: 1.4,  rubberBand: 0.75 },
+};
+
+const UPGRADES = [
+  { key: 'engine', name: 'ENGINE',  icon: '🔧', desc: '+4% top speed / lvl',      max: 5 },
+  { key: 'armor',  name: 'ARMOR',   icon: '🛡️', desc: '+15 max hull / lvl',       max: 5 },
+  { key: 'cannon', name: 'CANNON',  icon: '🔥', desc: '+18% cannon damage / lvl', max: 5 },
+  { key: 'nitro',  name: 'NITRO',   icon: '⚡', desc: '+22% nitro charge / lvl',  max: 5 },
+];
+const upgradeCost = (lvl) => 400 + lvl * 350;
+
+const loadJSON = (key, fallback) => {
+  try { return { ...fallback, ...JSON.parse(localStorage.getItem(key) || '{}') }; }
+  catch { return { ...fallback }; }
+};
+const saveJSON = (key, obj) => { try { localStorage.setItem(key, JSON.stringify(obj)); } catch { /* private mode */ } };
+
 class Game {
   constructor() {
     this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -27,6 +47,19 @@ class Game {
     this.levelIndex = Math.min(Math.max((parseInt(params.get('level')) || 1) - 1, 0), LEVELS.length - 1);
     this.level = LEVELS[this.levelIndex];
     this.autoStart = params.get('go') === '1';
+
+    // progression + difficulty + garage (persisted)
+    this.career = loadJSON('ir-career', { finished: {} });
+    this.garage = loadJSON('ir-garage', { credits: 0, engine: 0, armor: 0, cannon: 0, nitro: 0 });
+    this.unlockAll = params.get('unlockall') === '1';
+    const diffId = localStorage.getItem('ir-diff') || 'normal';
+    this.difficulty = DIFFS[diffId] || DIFFS.normal;
+    // guard: don't start a locked level via URL tampering
+    if (!this.isLevelUnlocked(this.level.id)) {
+      this.levelIndex = 0;
+      this.level = LEVELS[0];
+      this.autoStart = false;
+    }
 
     this.canvas = document.getElementById('game-canvas');
     this.renderer = new THREE.WebGLRenderer({
@@ -146,14 +179,39 @@ class Game {
     const sel = document.getElementById('level-select');
     LEVELS.forEach((lv, i) => {
       const chip = document.createElement('button');
-      chip.className = 'level-chip' + (i === this.levelIndex ? ' current' : '');
-      chip.textContent = lv.name;
+      const unlocked = this.isLevelUnlocked(lv.id);
+      chip.className = 'level-chip'
+        + (i === this.levelIndex ? ' current' : '')
+        + (unlocked ? '' : ' locked');
+      chip.textContent = unlocked ? lv.name : `🔒 ${lv.name}`;
       chip.addEventListener('click', () => {
         if (i === this.levelIndex) return;
+        if (!this.isLevelUnlocked(lv.id)) {
+          chip.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
+            { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
+          return;
+        }
         this.fadeTo(`?level=${lv.id}`);
       });
       sel.appendChild(chip);
     });
+
+    // difficulty chips
+    const dsel = document.getElementById('diff-select');
+    for (const d of Object.values(DIFFS)) {
+      const chip = document.createElement('button');
+      chip.className = 'diff-chip' + (d.id === this.difficulty.id ? ` current ${d.id}` : '');
+      chip.textContent = d.label;
+      chip.addEventListener('click', () => {
+        this.difficulty = d;
+        localStorage.setItem('ir-diff', d.id);
+        for (const c of dsel.children) c.className = 'diff-chip';
+        chip.className = `diff-chip current ${d.id}`;
+      });
+      dsel.appendChild(chip);
+    }
+
+    this.renderGarage();
 
     // next-level chaining from the results screen
     document.getElementById('next-level-btn').addEventListener('click', () => {
@@ -187,6 +245,58 @@ class Game {
   fadeTo(url) {
     document.getElementById('fade').classList.add('dark');
     setTimeout(() => { location.href = url; }, 480);
+  }
+
+  isLevelUnlocked(id) {
+    return this.unlockAll || id === 1 || !!this.career.finished[id - 1];
+  }
+
+  /** Apply purchased upgrades to the player (base stats captured once). */
+  applyUpgrades() {
+    const p = this.player;
+    if (!this._base) this._base = { maxSpeed: p.maxSpeed, maxHealth: p.maxHealth };
+    const g = this.garage;
+    p.maxSpeed = this._base.maxSpeed * (1 + 0.04 * g.engine);
+    p.maxHealth = this._base.maxHealth + 15 * g.armor;
+    p.health = p.maxHealth;
+    p.cannonDamage = 7 * (1 + 0.18 * g.cannon);
+    p.nitroRate = 1 + 0.22 * g.nitro;
+  }
+
+  renderGarage() {
+    document.getElementById('credits').textContent = this.garage.credits.toLocaleString();
+    const rows = document.getElementById('garage-rows');
+    rows.innerHTML = '';
+    for (const u of UPGRADES) {
+      const lvl = this.garage[u.key];
+      const row = document.createElement('div');
+      row.className = 'up-row';
+      const pips = Array.from({ length: u.max },
+        (_, i) => `<span class="${i < lvl ? '' : 'off'}">●</span>`).join('');
+      row.innerHTML = `<div class="ic">${u.icon}</div>
+        <div class="nm">${u.name}<small>${u.desc}</small></div>
+        <div class="pips">${pips}</div>`;
+      const btn = document.createElement('button');
+      btn.className = 'up-buy' + (lvl >= u.max ? ' maxed' : '');
+      if (lvl >= u.max) {
+        btn.textContent = 'MAX';
+        btn.disabled = true;
+      } else {
+        const cost = upgradeCost(lvl);
+        btn.textContent = `${cost} CR`;
+        btn.disabled = this.garage.credits < cost;
+        btn.addEventListener('click', () => {
+          if (this.garage.credits < cost) return;
+          this.garage.credits -= cost;
+          this.garage[u.key]++;
+          saveJSON('ir-garage', this.garage);
+          this.applyUpgrades();
+          this.renderGarage();
+        });
+      }
+      row.appendChild(btn);
+      rows.appendChild(row);
+    }
   }
 
   // ---------- pickups ----------
@@ -259,7 +369,7 @@ class Game {
           pl.missiles = Math.min(pl.maxMissiles, pl.missiles + 2);
           this.hud.feed('+2 MISSILES', 'good');
         } else if (p.type === 'nitro') {
-          pl.nitro = Math.min(1, pl.nitro + 0.45);
+          pl.nitro = Math.min(1, pl.nitro + 0.45 * (pl.nitroRate || 1));
           this.hud.feed('+NITRO CHARGE', 'good');
         } else {
           pl.mines = Math.min(pl.maxMines, pl.mines + 2);
@@ -323,6 +433,7 @@ class Game {
     this.player.overheated = false;
     this.player.bestLap = Infinity;
     this.player.boostTimer = 0;
+    this.applyUpgrades();
     const slot = this.track.gridSlot(0);
     this.player.placeAt(slot.index, slot.lateral);
 
@@ -373,7 +484,7 @@ class Game {
     if (killed) {
       this.kills++;
       this.score += 250;
-      this.player.nitro = Math.min(1, this.player.nitro + 0.25);
+      this.player.nitro = Math.min(1, this.player.nitro + 0.25 * (this.player.nitroRate || 1));
       this.buzz(45);
       this.hud.centerMsg('DESTROYED');
       this.hud.feed(`${enemy.name} DESTROYED  +250`, 'good');
@@ -417,11 +528,32 @@ class Game {
     document.getElementById('r-kills').textContent = this.kills;
     document.getElementById('r-time').textContent = fmtTime(this.raceTime);
     document.getElementById('r-best').textContent = fmtTime(this.player.bestLap);
+
+    // career progress + credits
+    const earned = Math.max(0, this.score - (this.startScore ?? 0));
+    document.getElementById('r-credits').textContent = `+${earned.toLocaleString()}`;
+    this.garage.credits += earned;
+    saveJSON('ir-garage', this.garage);
+    const prev = this.career.finished[this.level.id];
+    this.career.finished[this.level.id] = {
+      place: Math.min(rank, prev?.place ?? 99),
+      bestScore: Math.max(earned, prev?.bestScore ?? 0),
+    };
+    saveJSON('ir-career', this.career);
+    this.renderGarage();
+    if (!prev && this.levelIndex < LEVELS.length - 1) {
+      this.hud.feed(`${LEVELS[this.levelIndex + 1].name} UNLOCKED`, 'good');
+    }
     this.hud.centerMsg('FINISH');
     this.audio.lap();
     document.querySelector('#results .game-sub').textContent = `${this.level.name} COMPLETE`;
-    document.getElementById('next-level-btn').style.display =
-      this.levelIndex < LEVELS.length - 1 ? '' : 'none';
+    const nextBtn = document.getElementById('next-level-btn');
+    if (this.levelIndex < LEVELS.length - 1) {
+      nextBtn.style.display = '';
+      nextBtn.textContent = `NEXT: ${LEVELS[this.levelIndex + 1].name} ▶`;
+    } else {
+      nextBtn.style.display = 'none';
+    }
     setTimeout(() => {
       document.getElementById('results').classList.remove('hidden');
       this.hud.hide();
@@ -514,6 +646,7 @@ class Game {
       }
       if (this.countdown <= 0) {
         this.state = 'race';
+        this.startScore = this.score; // credits are earned on top of any carried score
         this.hud.centerMsg('GO!');
         this.track.setLights('green');
       }

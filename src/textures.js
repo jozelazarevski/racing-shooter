@@ -1,7 +1,8 @@
 // Procedural textures — every asset in the game is painted in code, no image files.
 // Art direction: bright cartoon off-road racing in the style of late-90s toy-car racers.
 // Most painters accept an optional palette object so track.js can re-skin them per
-// level theme (forest / desert / snow); calling with no arguments keeps the classic look.
+// level theme (forest / desert / snow / canyon / volcano); calling with no
+// arguments keeps the classic look.
 import * as THREE from 'three';
 
 function make(w, h, draw) {
@@ -177,6 +178,32 @@ export function groundTexture(palette = {}) {
       g.beginPath();
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
+    }
+    // optional glowing crack veins (volcano theme: ember-orange fissures)
+    if (P.veins) {
+      const V = { color: '#ff7a22', glow: 'rgba(255,96,20,0.30)', count: 7, ...P.veins };
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      for (let i = 0; i < V.count; i++) {
+        let x = Math.random() * w, y = Math.random() * h;
+        let ang = Math.random() * Math.PI * 2;
+        g.beginPath();
+        g.moveTo(x, y);
+        const steps = 12 + (Math.random() * 16 | 0);
+        for (let s = 0; s < steps; s++) {
+          ang += (Math.random() - 0.5) * 1.15;
+          x += Math.cos(ang) * (6 + Math.random() * 10);
+          y += Math.sin(ang) * (6 + Math.random() * 10);
+          g.lineTo(x, y);
+        }
+        // soft glow pass, then the bright molten core (same path re-stroked)
+        g.strokeStyle = V.glow;
+        g.lineWidth = 7;
+        g.stroke();
+        g.strokeStyle = V.color;
+        g.lineWidth = 2.2;
+        g.stroke();
+      }
     }
     // tiny speckles
     for (let i = 0; i < P.speckCount; i++) {
@@ -479,4 +506,148 @@ export function cloudTexture() {
       g.fill();
     }
   });
+}
+
+/** Stratified sandstone cliff face: horizontal rock bands, noise, and darker
+ *  crack lines. v=0 is the wall base, v=1 the sun-bleached rim (wrapT clamps). */
+export function cliffTexture(palette = {}) {
+  const P = {
+    bands: ['#c9a06a', '#b8845a', '#a06844', '#bf8f5e', '#96603c'],
+    seam: 'rgba(70,42,24,0.45)',
+    crack: 'rgba(60,34,18,',       // alpha appended per crack
+    bleach: 'rgba(255,225,175,0.16)',
+    talus: 'rgba(46,28,16,0.28)',
+    ...palette,
+  };
+  const t = make(512, 512, (g, w, h) => {
+    // strata painted from the canvas bottom (wall base) upward
+    let y = h, bi = 0;
+    while (y > 0) {
+      const bh = 28 + Math.random() * 34;
+      g.fillStyle = P.bands[bi % P.bands.length];
+      g.fillRect(0, y - bh, w, bh);
+      // mottled weathering inside the band
+      for (let i = 0; i < 60; i++) {
+        g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,235,200' : '80,50,28'},${0.05 + Math.random() * 0.08})`;
+        g.beginPath();
+        g.arc(Math.random() * w, y - Math.random() * bh, 3 + Math.random() * 11, 0, Math.PI * 2);
+        g.fill();
+      }
+      // horizontal deposition streaks
+      for (let i = 0; i < 5; i++) {
+        g.fillStyle = `rgba(${Math.random() < 0.5 ? '60,36,20' : '235,205,160'},0.10)`;
+        g.fillRect(0, y - Math.random() * bh, w, 2 + Math.random() * 3);
+      }
+      // dark seam between layers
+      g.fillStyle = P.seam;
+      g.fillRect(0, y - 2.5, w, 2.5);
+      y -= bh; bi++;
+    }
+    // vertical crack lines wandering down the face
+    for (let i = 0; i < 30; i++) {
+      let x = Math.random() * w, cy = Math.random() * h * 0.55;
+      const len = 60 + Math.random() * 170;
+      g.strokeStyle = P.crack + (0.22 + Math.random() * 0.3) + ')';
+      g.lineWidth = 1.4 + Math.random() * 2;
+      g.beginPath();
+      g.moveTo(x, cy);
+      const end = cy + len;
+      while (cy < end && cy < h) {
+        cy += 10 + Math.random() * 14;
+        x += (Math.random() - 0.5) * 9;
+        g.lineTo(x, cy);
+      }
+      g.stroke();
+    }
+    // sun-bleached rim on top, talus shadow at the base
+    g.fillStyle = P.bleach;
+    g.fillRect(0, 0, w, 46);
+    g.fillStyle = P.talus;
+    g.fillRect(0, h - 34, w, 34);
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/** Irregular mud puddle decal: wet brown rim, dark water, blue-gray sky sheen.
+ *  Alpha outside the blob so it can be laid straight onto the road. */
+export function puddleTexture(palette = {}) {
+  const P = {
+    rim: '#5c4830', mud: '#2c2016',
+    sheen: 'rgba(150,170,195,0.34)', gleam: 'rgba(220,235,250,0.5)',
+    ...palette,
+  };
+  return make(256, 256, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    const cx = w / 2, cy = h / 2, M = 12;
+    const lobe = [];
+    for (let i = 0; i < M; i++) lobe.push(0.72 + Math.random() * 0.26);
+    const blob = (scale) => {
+      g.beginPath();
+      for (let i = 0; i <= M; i++) {
+        const a1 = ((i % M) / M) * Math.PI * 2;
+        const a2 = (((i + 1) % M) / M) * Math.PI * 2;
+        const r1 = 118 * lobe[i % M] * scale;
+        const r2 = 118 * lobe[(i + 1) % M] * scale;
+        const x1 = cx + Math.cos(a1) * r1, y1 = cy + Math.sin(a1) * r1;
+        const mx = (x1 + cx + Math.cos(a2) * r2) / 2;
+        const my = (y1 + cy + Math.sin(a2) * r2) / 2;
+        if (i === 0) g.moveTo(mx, my);
+        else g.quadraticCurveTo(x1, y1, mx, my);
+      }
+      g.closePath();
+    };
+    blob(1);
+    g.fillStyle = P.rim;
+    g.fill();
+    blob(0.86);
+    g.fillStyle = P.mud;
+    g.fill();
+    // slight water sheen + sky gleam, clipped to the water surface
+    blob(0.86);
+    g.save();
+    g.clip();
+    const grd = g.createLinearGradient(0, 0, w, h);
+    grd.addColorStop(0, P.sheen);
+    grd.addColorStop(0.55, 'rgba(90,105,125,0.12)');
+    grd.addColorStop(1, 'rgba(30,24,18,0.25)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = P.gleam;
+    g.beginPath();
+    g.ellipse(cx - 34, cy - 30, 46, 22, -0.5, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  });
+}
+
+/** Wooden plank deck (canyon foot-bridges): planks run across the strip. */
+export function plankTexture() {
+  const t = make(256, 128, (g, w, h) => {
+    g.fillStyle = '#8a6238';
+    g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 26) {
+      g.fillStyle = `rgba(${118 + Math.random() * 46 | 0},${78 + Math.random() * 30 | 0},${38 + Math.random() * 16 | 0},0.85)`;
+      g.fillRect(x, 0, 23, h);
+      g.fillStyle = 'rgba(34,20,8,0.8)';
+      g.fillRect(x + 23, 0, 3, h);
+      // grain
+      for (let i = 0; i < 6; i++) {
+        g.fillStyle = 'rgba(52,32,14,0.5)';
+        g.fillRect(x + 2 + Math.random() * 16, Math.random() * h, 2, 8 + Math.random() * 26);
+      }
+      // nail heads near the plank ends
+      g.fillStyle = 'rgba(30,26,22,0.9)';
+      g.beginPath();
+      g.arc(x + 6 + Math.random() * 10, 8, 2.2, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.arc(x + 6 + Math.random() * 10, h - 8, 2.2, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
 }
