@@ -79,15 +79,39 @@ class Game {
     this.resetRace();
 
     this.input.bindTouchButtons();
+    const joyZone = document.getElementById('joy-zone');
+    if (joyZone) {
+      this.input.bindJoystick(joyZone, document.getElementById('joy-base'), document.getElementById('joy-knob'));
+    }
     const applyViewport = () => {
       this.camera.aspect = innerWidth / innerHeight;
       this.camera.fov = innerHeight > innerWidth ? 68 : 56; // widen for portrait phones
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(innerWidth, innerHeight);
       this.composer.setSize(innerWidth, innerHeight);
+      if (this.input.resetJoystick) this.input.resetJoystick();
     };
     applyViewport();
     addEventListener('resize', applyViewport);
+    // orientation flips: some mobile browsers report stale sizes for a beat
+    addEventListener('orientationchange', () => {
+      applyViewport();
+      setTimeout(applyViewport, 300);
+      setTimeout(applyViewport, 800);
+    });
+    // auto-pause when the app is backgrounded mid-race; tap anywhere to resume
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.state === 'race') {
+        this.state = 'paused';
+        this.hud.centerMsg('PAUSED');
+      }
+    });
+    addEventListener('pointerdown', () => {
+      if (this.state === 'paused') {
+        this.state = 'race';
+        this.hud.centerMsg('GO');
+      }
+    }, true);
     document.getElementById('start-btn').addEventListener('click', () => this.startRace());
     document.getElementById('restart-btn').addEventListener('click', () => {
       document.getElementById('results').classList.add('hidden');
@@ -255,6 +279,7 @@ class Game {
     document.getElementById('title-screen').classList.add('hidden');
     this.hud.show();
     document.getElementById('touch-ui').classList.add('on');
+    if (this.input.resetJoystick) this.input.resetJoystick(); // zone has real bounds only once visible
     this.state = 'countdown';
     this.countdown = 3.6;
     this._lastCount = 4;
@@ -282,6 +307,7 @@ class Game {
       this.kills++;
       this.score += 250;
       this.player.nitro = Math.min(1, this.player.nitro + 0.25);
+      this.buzz(45);
       this.hud.centerMsg('DESTROYED');
       this.hud.feed(`${enemy.name} DESTROYED  +250`, 'good');
       this.shake = Math.min(1, this.shake + 0.5);
@@ -294,11 +320,18 @@ class Game {
     this.player.damage(dmg, attacker);
     this.hud.damageFlash(0.45);
     this.audio.hit();
+    this.buzz(25);
+  }
+
+  /** Haptic tick on supported touch devices. */
+  buzz(pattern) {
+    if (this.isTouch && navigator.vibrate) navigator.vibrate(pattern);
   }
 
   onPlayerDestroyed(attacker) {
     this.deaths++;
     this.score = Math.max(0, this.score - 300);
+    this.buzz([70, 40, 70]);
     this.shake = 1;
     this.hud.damageFlash(1.2);
     this.hud.centerMsg('WRECKED');
@@ -380,6 +413,10 @@ class Game {
       (Math.random() - 0.5) * s * 1.6, (Math.random() - 0.5) * s * 1.2, (Math.random() - 0.5) * s * 1.6
     ));
     this.camera.lookAt(this.camLook);
+    // lean into corners
+    const rollTarget = this.state === 'race' ? -this.input.steer * speedZoom * 0.045 : 0;
+    this._camRoll = (this._camRoll ?? 0) + (rollTarget - (this._camRoll ?? 0)) * Math.min(1, 4 * dt);
+    this.camera.rotation.z += this._camRoll;
     // keep the shadow light rig centered on the player
     this.moon.position.copy(p.pos).add(new THREE.Vector3(70, 130, 50));
     this.moon.target.position.copy(p.pos);

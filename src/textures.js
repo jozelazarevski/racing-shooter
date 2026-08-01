@@ -327,6 +327,26 @@ export function bannerTexture(text, bg, fg) {
   });
 }
 
+/** Racing number plate decal for car doors. */
+export function numberPlateTexture(num, bg = '#f2f0e8', fg = '#1c1812') {
+  return make(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    const r = 18;
+    g.fillStyle = bg;
+    g.beginPath();
+    g.roundRect(8, 8, w - 16, h - 16, r);
+    g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.35)';
+    g.lineWidth = 5;
+    g.stroke();
+    g.fillStyle = fg;
+    g.font = '900 78px "Arial Black", Arial, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(String(num), w / 2, h / 2 + 6);
+  });
+}
+
 /** Fluffy cartoon cloud sprite. */
 export function cloudTexture() {
   return make(256, 128, (g, w, h) => {

@@ -1,88 +1,161 @@
 // Car meshes (built from primitives), arcade physics, and rival AI.
 import * as THREE from 'three';
 import { ROAD_HALF } from './track.js';
+import { numberPlateTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
 
-// ---------- mesh factory: chunky toy trucks with oversized wheels ----------
-export function buildCarMesh({ body, accent }) {
+// ---------- mesh factory: the Voxel Racers collection ----------
+// Blocky toy racers with liveries: brawler (off-road hero), crown (low-slung
+// racer), sleek (compact hatch), dune (rally wagon), alpine (striped rally
+// coupe), pit (black stock car).
+export function buildVoxelRacer(spec) {
+  const { body, accent, stripe = null, number = null, style = 'crown' } = spec;
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: body, metalness: 0.15, roughness: 0.55 });
-  const accentMat = new THREE.MeshStandardMaterial({ color: accent, metalness: 0.1, roughness: 0.6 });
-  const tireMat = new THREE.MeshStandardMaterial({ color: 0x1c1a18, roughness: 0.95 });
-  const glassMat = new THREE.MeshStandardMaterial({ color: 0x9fd4e8, metalness: 0.4, roughness: 0.15 });
+  const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.05, ...opts });
+  const bodyMat = mat(body);
+  const accentMat = mat(accent);
+  const darkMat = mat(0x24201c);
+  const glassMat = mat(0x121a22, { roughness: 0.15, metalness: 0.6 });
+  const rimMat = mat(0xd8d2c2, { roughness: 0.4, metalness: 0.3 });
+  const tireMat = mat(0x181614, { roughness: 0.95 });
+  const headMat = new THREE.MeshBasicMaterial({ color: 0xfff6d8 });
+  const tailMat = new THREE.MeshBasicMaterial({ color: 0xd82222 });
 
-  // fat hull, sitting high like a toy monster truck
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.95, 4.3), bodyMat);
-  hull.position.y = 1.05;
-  hull.castShadow = true;
-  g.add(hull);
-  // hood step (lower nose)
-  const nose = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.55, 1.1), bodyMat);
-  nose.position.set(0, 0.95, 2.55);
-  nose.castShadow = true;
-  g.add(nose);
-  // cabin with windows
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.85, 1.9), accentMat);
-  cabin.position.set(0, 1.9, -0.15);
-  cabin.castShadow = true;
-  g.add(cabin);
-  const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.55, 0.1), glassMat);
-  windshield.position.set(0, 1.95, 0.85);
-  windshield.rotation.x = -0.18;
-  g.add(windshield);
+  const tall = style === 'brawler' || style === 'dune';
+  const low = style === 'crown' || style === 'alpine' || style === 'pit';
+  const wheelR = style === 'brawler' ? 0.85 : tall ? 0.76 : 0.62;
+  const wheelY = wheelR;
+  const baseY = wheelY + (low ? 0.18 : 0.34); // chassis floor height
+
+  const box = (w, h, d, m, x, y, z, shadow = false) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+    mesh.position.set(x, y, z);
+    if (shadow) mesh.castShadow = true;
+    g.add(mesh);
+    return mesh;
+  };
+
+  // ---- chassis + body block ----
+  const bodyLen = style === 'crown' || style === 'pit' ? 4.7 : style === 'sleek' ? 4.0 : 4.4;
+  const bodyH = low ? 0.62 : 0.78;
+  box(2.5, 0.4, bodyLen - 0.3, darkMat, 0, baseY, 0);                    // chassis
+  const hull = box(2.6, bodyH, bodyLen, bodyMat, 0, baseY + bodyH / 2 + 0.12, 0, true);
+
+  // ---- cabin with inset windows ----
+  const cabW = 2.15, cabH = low ? 0.6 : 0.78;
+  const cabZ = style === 'sleek' ? -0.55 : -0.15;
+  const cabL = style === 'sleek' ? 1.7 : 2.0;
+  const cabY = baseY + bodyH + 0.12 + cabH / 2;
+  box(cabW, cabH, cabL, style === 'pit' ? bodyMat : accentMat, 0, cabY, cabZ, true);
+  const windshield = box(cabW - 0.25, cabH - 0.14, 0.1, glassMat, 0, cabY + 0.02, cabZ + cabL / 2 + 0.01);
+  windshield.rotation.x = low ? -0.30 : -0.16;
+  windshield.position.z += low ? 0.16 : 0.08;
+  box(cabW - 0.25, cabH - 0.18, 0.08, glassMat, 0, cabY, cabZ - cabL / 2 - 0.02);
+  for (const s of [-1, 1]) box(0.06, cabH - 0.2, cabL - 0.5, glassMat, (cabW / 2) * s + 0.02 * s, cabY, cabZ);
+
+  // ---- style-specific silhouettes ----
+  if (style === 'brawler') {
+    // roof rack with spare + twin rocket tubes, bull bar
+    box(1.9, 0.12, 1.7, darkMat, 0, cabY + cabH / 2 + 0.1, cabZ);
+    const spare = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.34, 10), tireMat);
+    spare.position.set(-0.45, cabY + cabH / 2 + 0.42, cabZ - 0.2);
+    g.add(spare);
+    const tubeGeo = new THREE.CylinderGeometry(0.14, 0.14, 1.1, 8);
+    tubeGeo.rotateX(Math.PI / 2);
+    for (const s of [0.35, 0.75]) {
+      const t = new THREE.Mesh(tubeGeo, darkMat);
+      t.position.set(s, cabY + cabH / 2 + 0.35, cabZ + 0.1);
+      g.add(t);
+      const tip = new THREE.Mesh(new THREE.CircleGeometry(0.1, 8), new THREE.MeshBasicMaterial({ color: 0xffb52e }));
+      tip.position.set(s, cabY + cabH / 2 + 0.35, cabZ + 0.66);
+      g.add(tip);
+    }
+    box(2.2, 0.5, 0.16, darkMat, 0, baseY + 0.35, bodyLen / 2 + 0.12); // bull bar
+  }
+  if (style === 'crown') {
+    box(2.3, 0.16, 0.6, accentMat, 0, baseY + bodyH + 0.2, -bodyLen / 2 + 0.35); // ducktail
+  }
+  if (style === 'pit') {
+    box(2.45, 0.12, 0.55, darkMat, 0, baseY + bodyH + 0.26, -bodyLen / 2 + 0.3);
+    for (const s of [-1, 1]) box(0.12, 0.3, 0.3, darkMat, 1.0 * s, baseY + bodyH + 0.1, -bodyLen / 2 + 0.3);
+  }
+  if (style === 'alpine') {
+    // rally lamp pod on the nose
+    for (const s of [-0.55, -0.2, 0.2, 0.55]) box(0.26, 0.26, 0.12, headMat, s, baseY + bodyH * 0.5 + 0.12, bodyLen / 2 - 0.1);
+  }
+  if (style === 'dune') {
+    box(1.5, 0.22, 0.5, darkMat, 0, cabY + cabH / 2 + 0.11, cabZ + 0.55); // roof light pod
+    for (const s of [-0.45, -0.15, 0.15, 0.45]) box(0.2, 0.14, 0.08, headMat, s, cabY + cabH / 2 + 0.13, cabZ + 0.82);
+    for (const s of [-1, 1]) box(0.1, 0.24, bodyLen - 1.2, darkMat, 1.32 * s, baseY - 0.06, 0); // mud skirts
+  }
+  if (style === 'sleek') {
+    box(2.0, 0.14, 0.5, accentMat, 0, cabY + cabH / 2 + 0.06, cabZ - cabL / 2 + 0.2); // hatch lip
+  }
+
+  // ---- livery: center stripes + door numbers ----
+  if (stripe) {
+    const sm = mat(stripe[0]);
+    box(0.62, 0.05, bodyLen - 0.2, sm, 0, baseY + bodyH + 0.16, 0);
+    box(0.62, 0.05, cabL - 0.2, sm, 0, cabY + cabH / 2 + 0.04, cabZ);
+    if (stripe[1]) {
+      const sm2 = mat(stripe[1]);
+      for (const s of [-1, 1]) {
+        box(0.2, 0.05, bodyLen - 0.2, sm2, 0.5 * s, baseY + bodyH + 0.16, 0);
+        box(0.2, 0.05, cabL - 0.2, sm2, 0.5 * s, cabY + cabH / 2 + 0.04, cabZ);
+      }
+    }
+  }
+  if (number !== null) {
+    const plateTex = numberPlateTexture(number);
+    const plateMat = new THREE.MeshBasicMaterial({ map: plateTex, transparent: true });
+    const plateGeo = new THREE.PlaneGeometry(0.78, 0.78);
+    for (const s of [-1, 1]) {
+      const p = new THREE.Mesh(plateGeo, plateMat);
+      p.position.set((1.31) * s, baseY + bodyH / 2 + 0.14, 0.55);
+      p.rotation.y = s * Math.PI / 2;
+      g.add(p);
+    }
+  }
+
+  // ---- bumpers, lights, grille ----
+  box(2.55, 0.32, 0.35, darkMat, 0, baseY + 0.02, bodyLen / 2 + 0.05);
+  box(2.55, 0.32, 0.35, darkMat, 0, baseY + 0.02, -bodyLen / 2 - 0.05);
+  box(1.5, 0.24, 0.08, darkMat, 0, baseY + bodyH * 0.5 + 0.1, bodyLen / 2 + 0.02); // grille
   for (const s of [-1, 1]) {
-    const win = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 1.4), glassMat);
-    win.position.set(1.06 * s, 1.95, -0.15);
-    g.add(win);
+    box(0.4, 0.24, 0.08, headMat, 0.92 * s, baseY + bodyH * 0.5 + 0.1, bodyLen / 2 + 0.04);
+    box(0.4, 0.22, 0.08, tailMat, 0.92 * s, baseY + bodyH * 0.5 + 0.1, -bodyLen / 2 - 0.04);
   }
-  // chunky bumpers
-  for (const z of [2.25, -2.25]) {
-    const bumper = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.4, 0.5), accentMat);
-    bumper.position.set(0, 0.62, z);
-    g.add(bumper);
+
+  // ---- fender flares on the tall cars ----
+  if (tall) {
+    for (const [x, z] of [[-1.3, 1.5], [1.3, 1.5], [-1.3, -1.5], [1.3, -1.5]]) {
+      box(0.45, 0.26, wheelR * 2 + 0.4, darkMat, x, wheelY + wheelR * 0.72, z);
+    }
   }
-  // side accent stripe
-  for (const s of [-1, 1]) {
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 3.4), accentMat);
-    stripe.position.set(1.32 * s, 1.1, 0);
-    g.add(stripe);
-  }
-  // headlights / taillights
-  for (const s of [-1, 1]) {
-    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.28, 0.1),
-      new THREE.MeshBasicMaterial({ color: 0xfff6d8 }));
-    hl.position.set(0.85 * s, 1.05, 3.12);
-    g.add(hl);
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.22, 0.08),
-      new THREE.MeshBasicMaterial({ color: 0xd82222 }));
-    tl.position.set(0.9 * s, 1.05, -2.52);
-    g.add(tl);
-  }
-  // exhaust stack
-  const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.8, 8),
-    new THREE.MeshStandardMaterial({ color: 0x8a8a8a, metalness: 0.8, roughness: 0.3 }));
-  stack.position.set(-1.05, 1.85, -1.6);
-  g.add(stack);
-  // big knobby wheels
-  const wheelGeo = new THREE.CylinderGeometry(0.78, 0.78, 0.62, 12);
-  wheelGeo.rotateZ(Math.PI / 2);
-  const hubGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.66, 8);
-  hubGeo.rotateZ(Math.PI / 2);
-  const hubMat = new THREE.MeshStandardMaterial({ color: 0xd8d2c2, roughness: 0.5 });
+
+  // ---- wheels ----
+  const tireGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.55, 10);
+  tireGeo.rotateZ(Math.PI / 2);
+  const rimGeo = new THREE.CylinderGeometry(wheelR * 0.5, wheelR * 0.5, 0.57, 8);
+  rimGeo.rotateZ(Math.PI / 2);
   g.userData.wheels = [];
-  for (const [x, z] of [[-1.35, 1.5], [1.35, 1.5], [-1.35, -1.5], [1.35, -1.5]]) {
-    const w = new THREE.Mesh(wheelGeo, tireMat);
-    w.position.set(x, 0.78, z);
-    w.castShadow = true;
-    g.add(w);
-    const hub = new THREE.Mesh(hubGeo, hubMat);
-    hub.position.copy(w.position);
-    g.add(hub);
-    g.userData.wheels.push(w, hub);
+  for (const [x, z] of [[-1.3, 1.5], [1.3, 1.5], [-1.3, -1.5], [1.3, -1.5]]) {
+    const tire = new THREE.Mesh(tireGeo, tireMat);
+    tire.position.set(x, wheelY, z);
+    tire.castShadow = true;
+    g.add(tire);
+    const rim = new THREE.Mesh(rimGeo, rimMat);
+    rim.position.copy(tire.position);
+    g.add(rim);
+    g.userData.wheels.push(tire, rim);
   }
   return g;
 }
+
+// kept as a thin wrapper so older call sites keep working
+export function buildCarMesh(spec) { return buildVoxelRacer(spec); }
+
 
 // ---------- physics base ----------
 export class Car {
@@ -306,12 +379,13 @@ export class Car {
 }
 
 // ---------- AI rival ----------
+// The Voxel Racers collection — rival lineup
 const AI_COLORS = [
-  { body: 0xd23a2a, accent: 0xffd400, name: 'BIGFOOT' },
-  { body: 0xf2f2ee, accent: 0x1a1a1a, name: 'SHERIFF' },
-  { body: 0xffc21a, accent: 0x222222, name: 'TAXI' },
-  { body: 0xe8f0e6, accent: 0x2f9e44, name: 'MEDIC' },
-  { body: 0x2a52d2, accent: 0xeeeeee, name: 'BANDIT' },
+  { name: 'CROWN', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [0xf2f0e8, 0xd8342a], number: 77 },
+  { name: 'SLEEK', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, number: 3 },
+  { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [0x4a9ad8], number: 12 },
+  { name: 'ALPINE', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [0x2f9e44, 0xd8342a], number: 4 },
+  { name: 'PIT-99', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [0xe8b83a], number: 99 },
 ];
 
 export class EnemyCar extends Car {
@@ -397,7 +471,10 @@ export class EnemyCar extends Car {
 
 export class PlayerCar extends Car {
   constructor(game) {
-    super(game, buildCarMesh({ body: 0xff8c1a, accent: 0x241d16 }), {
+    super(game, buildCarMesh({
+      name: 'BRAWLER', style: 'brawler',
+      body: 0xff8c1a, accent: 0xe86a10, stripe: [0x241d16], number: 1,
+    }), {
       maxSpeed: 54, accel: 38, grip: 5.4, steerRate: 2.7,
     });
     this.name = 'YOU';
