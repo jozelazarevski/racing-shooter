@@ -4,8 +4,11 @@ A bright, cartoon toy-car combat racer in the spirit of the classic *Ignition*
 (1997), playable entirely in the browser — on desktop **and phones** (full
 touch controls). Race 3 laps against the **Voxel Racers** — CROWN, SLEEK,
 DUNE, ALPINE and PIT-99, each a distinct liveried block-built machine — on a
-dirt circuit through a rolling pine valley, armed with cannon, homing
-missiles, mines, a shockwave blast, nitro, boost pads and launch ramps.
+championship of three themed circuits — PINE VALLEY (forest), DUST CANYON
+(desert) and FROST PEAK (snow) — armed with cannon, homing missiles, mines,
+a shockwave blast, nitro, boost pads and launch ramps. Drift-happy arcade
+physics, visible car damage (smoke, fire, scorched paint), and rolling dust
+trails behind every truck.
 
 **Every asset is procedural and designed in code by Claude** — the circuit, the
 rolling terrain, the pine forest and grass, the grandstand and sponsor boards,
@@ -45,8 +48,8 @@ via `file://` won't work.)
 | `Q` | Shockwave blast |
 | `F` | Fire nitro (charged by drifting & kills) |
 | `SHIFT` | Drift |
-| `C` | Toggle camera (top-down / chase) |
-| `P` | Pause |
+| `C` or 📷 button | Toggle camera (top-down / chase) |
+| `P` or ⏸ button | Pause |
 
 On touch devices the controls appear automatically and are built for two
 thumbs: the **left thumb drives** on a single analog pad (drag left/right to
@@ -56,7 +59,13 @@ nitro ⚡, with live ammo badges on the buttons. Works in portrait and landscape
 
 ## Gameplay
 
-- **3 laps, 6 racers.** Finish position, kills, laps and pickups all feed your score.
+- **3 levels, 3 laps each, 6 racers.** Pick a circuit on the title screen; the
+  results screen chains you into the next level and your score carries over.
+- **Drifting** is the fast line: hard cornering breaks the rear loose, slides
+  charge your nitro, and SHIFT forces a full drift.
+- **Damage shows**: hurt cars trail smoke, badly hurt ones catch fire and
+  their paint scorches until they're repaired or wrecked.
+- Finish position, kills, laps and pickups all feed your score.
 - **Cannon** overheats if you hold the trigger too long.
 - **Missiles** lock onto the nearest rival ahead; **mines** blow up whoever
   drives over them; the **shockwave** hurls nearby rivals away (12 s cooldown).
