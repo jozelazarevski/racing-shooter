@@ -3,80 +3,82 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>NEON STRIKE — Racing Shooter</title>
+<title>IGNITE RALLY — Racing Shooter</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --cyan:#2ef7ff; --magenta:#ff2fd6; --amber:#ffb52e; --green:#4dff88; --red:#ff3b5b;
-    --panel:rgba(10,6,24,.72); --edge:rgba(46,247,255,.35);
+    --yellow:#ffd400; --orange:#ff8c1a; --amber:#ffb52e; --green:#4dd06a; --red:#e8402a;
+    --ink:#2b1c0e;
+    --panel:rgba(38,26,12,.72); --edge:rgba(255,212,0,.5);
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{width:100%;height:100%;overflow:hidden;background:#05030e;
-    font-family:'Rajdhani','Segoe UI',system-ui,sans-serif;color:#dfe6ff;
+  html,body{width:100%;height:100%;overflow:hidden;background:#7fb85c;
+    font-family:'Baloo 2','Segoe UI',system-ui,sans-serif;color:#fff3d0;
     -webkit-user-select:none;user-select:none}
   #game-canvas{position:fixed;inset:0;display:block}
-  .titlefont{font-family:'Orbitron','Rajdhani',sans-serif}
+  .titlefont{font-family:'Luckiest Guy','Baloo 2',sans-serif}
 
   /* ---------- HUD ---------- */
   #hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .5s}
   #hud.on{opacity:1}
-  .panel{background:var(--panel);border:1px solid var(--edge);border-radius:10px;
-    backdrop-filter:blur(6px);box-shadow:0 0 18px rgba(46,247,255,.12), inset 0 0 24px rgba(46,247,255,.05)}
+  .panel{background:var(--panel);border:2px solid var(--edge);border-radius:12px;
+    backdrop-filter:blur(6px);box-shadow:0 3px 0 rgba(0,0,0,.25)}
 
   #race-info{position:absolute;top:16px;left:16px;padding:10px 16px;min-width:150px}
-  #race-info .pos{font-family:'Orbitron';font-size:30px;font-weight:900;color:var(--cyan);
-    text-shadow:0 0 14px rgba(46,247,255,.8);line-height:1}
-  #race-info .pos small{font-size:14px;color:#9fb0e8;font-weight:500}
-  #race-info .lap{font-size:17px;font-weight:700;letter-spacing:1px;color:#e8ecff;margin-top:4px}
-  #race-info .time{font-size:14px;color:#8f9cc9;letter-spacing:2px}
+  #race-info .pos{font-family:'Luckiest Guy';font-size:32px;color:var(--yellow);
+    text-shadow:2px 2px 0 var(--ink);line-height:1}
+  #race-info .pos small{font-size:15px;color:#ffe9a8;font-weight:500}
+  #race-info .lap{font-size:17px;font-weight:800;letter-spacing:1px;color:#fff3d0;margin-top:4px}
+  #race-info .time{font-size:14px;color:#e8c987;letter-spacing:2px}
 
   #score-box{position:absolute;top:16px;right:16px;padding:10px 18px;text-align:right}
-  #score-box .label{font-size:11px;letter-spacing:3px;color:#8f9cc9}
-  #score-box .val{font-family:'Orbitron';font-size:24px;font-weight:700;color:var(--amber);
-    text-shadow:0 0 12px rgba(255,181,46,.7)}
+  #score-box .label{font-size:11px;letter-spacing:3px;color:#e8c987}
+  #score-box .val{font-family:'Luckiest Guy';font-size:24px;color:var(--yellow);
+    text-shadow:2px 2px 0 var(--ink)}
 
   #minimap-wrap{position:absolute;top:16px;left:50%;transform:translateX(-50%);padding:8px}
   #minimap{display:block;width:170px;height:150px}
 
   #speed-box{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);
     text-align:center;padding:6px 30px 10px}
-  #speed{font-family:'Orbitron';font-size:44px;font-weight:900;line-height:1;color:#fff;
-    text-shadow:0 0 16px rgba(46,247,255,.9)}
-  #speed-box .unit{font-size:12px;letter-spacing:4px;color:#8f9cc9}
-  #boost-bar{width:100%;height:4px;background:#1a1433;border-radius:2px;margin-top:6px;overflow:hidden}
-  #boost-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--magenta));
-    box-shadow:0 0 8px var(--cyan);transition:width .1s}
+  #speed{font-family:'Luckiest Guy';font-size:44px;line-height:1;color:var(--yellow);
+    text-shadow:3px 3px 0 var(--ink)}
+  #speed-box .unit{font-size:12px;letter-spacing:4px;color:#e8c987}
+  #boost-bar{width:100%;height:5px;background:#20160a;border-radius:3px;margin-top:6px;overflow:hidden}
+  #boost-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--yellow),var(--orange));
+    transition:width .1s}
 
   #health-box{position:absolute;bottom:22px;left:16px;padding:12px 16px;width:230px}
-  .bar-label{display:flex;justify-content:space-between;font-size:11px;letter-spacing:2px;color:#8f9cc9;margin-bottom:4px}
-  .bar{height:10px;background:#160f2e;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
-  #health-fill{height:100%;width:100%;border-radius:5px;
-    background:linear-gradient(90deg,#22ff9a,#7dffca);box-shadow:0 0 10px rgba(77,255,136,.8);
+  .bar-label{display:flex;justify-content:space-between;font-size:11px;letter-spacing:2px;color:#e8c987;margin-bottom:4px}
+  .bar{height:11px;background:#20160a;border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.14)}
+  #health-fill{height:100%;width:100%;border-radius:6px;
+    background:linear-gradient(90deg,#2fb84a,#7de08a);
     transition:width .15s, background .3s}
-  #shield-hits{margin-top:8px;font-size:12px;letter-spacing:2px;color:#8f9cc9}
+  #shield-hits{margin-top:8px;font-size:12px;letter-spacing:2px;color:#e8c987}
 
   #weapon-box{position:absolute;bottom:22px;right:16px;padding:12px 16px;width:230px;text-align:left}
-  #heat-fill{height:100%;width:0%;border-radius:5px;background:linear-gradient(90deg,#2ef7ff,#ffb52e);
-    box-shadow:0 0 10px rgba(46,247,255,.7);transition:width .08s}
-  #heat-fill.overheat{background:linear-gradient(90deg,#ff3b5b,#ff8b3b);box-shadow:0 0 12px rgba(255,59,91,.9)}
-  #missiles{margin-top:8px;font-size:15px;font-weight:700;letter-spacing:1px;color:var(--amber)}
-  #missiles .icons{color:var(--amber);text-shadow:0 0 8px rgba(255,181,46,.9);font-size:13px}
+  #heat-fill{height:100%;width:0%;border-radius:6px;background:linear-gradient(90deg,var(--yellow),var(--orange));
+    transition:width .08s}
+  #heat-fill.overheat{background:linear-gradient(90deg,#e8402a,#ff8b3b)}
+  #missiles{margin-top:8px;font-size:15px;font-weight:800;letter-spacing:1px;color:var(--amber)}
+  #missiles .icons{color:var(--amber);text-shadow:1px 1px 0 var(--ink);font-size:13px}
 
   #feed{position:absolute;top:110px;right:16px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
-  .feed-msg{padding:5px 14px;font-weight:700;letter-spacing:1px;font-size:14px;border-radius:6px;
-    background:rgba(10,6,24,.8);border:1px solid rgba(255,255,255,.12);
+  .feed-msg{padding:5px 14px;font-weight:800;letter-spacing:1px;font-size:14px;border-radius:8px;
+    background:rgba(38,26,12,.85);border:2px solid rgba(255,255,255,.15);
     animation:feedin .25s ease-out, feedout .5s ease-in 2.6s forwards}
-  .feed-msg.good{color:var(--green);border-color:rgba(77,255,136,.4)}
-  .feed-msg.bad{color:var(--red);border-color:rgba(255,59,91,.4)}
-  .feed-msg.info{color:var(--cyan);border-color:var(--edge)}
+  .feed-msg.good{color:#8de89a;border-color:rgba(77,208,106,.5)}
+  .feed-msg.bad{color:#ff8a75;border-color:rgba(232,64,42,.5)}
+  .feed-msg.info{color:var(--yellow);border-color:var(--edge)}
   @keyframes feedin{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
   @keyframes feedout{to{opacity:0;transform:translateX(20px)}}
 
   #center-msg{position:absolute;top:34%;left:50%;transform:translate(-50%,-50%);
-    font-family:'Orbitron';font-size:96px;font-weight:900;color:#fff;text-align:center;
-    text-shadow:0 0 30px var(--cyan),0 0 90px var(--magenta);opacity:0;pointer-events:none}
+    font-family:'Luckiest Guy';font-size:96px;color:var(--yellow);text-align:center;
+    text-shadow:5px 5px 0 var(--ink), -2px -2px 0 var(--ink), 2px -2px 0 var(--ink), -2px 2px 0 var(--ink);
+    opacity:0;pointer-events:none}
   #center-msg.pop{animation:msgpop .9s ease-out}
   @keyframes msgpop{0%{opacity:0;transform:translate(-50%,-50%) scale(1.8)}
     18%{opacity:1;transform:translate(-50%,-50%) scale(1)}
@@ -85,39 +87,40 @@
   #damage-vignette{position:fixed;inset:0;pointer-events:none;opacity:0;
     background:radial-gradient(ellipse at center, transparent 55%, rgba(255,25,60,.55) 100%)}
   #wrong-way{position:absolute;top:20%;left:50%;transform:translateX(-50%);
-    font-family:'Orbitron';font-size:28px;font-weight:900;color:var(--red);
-    text-shadow:0 0 18px rgba(255,59,91,.9);letter-spacing:4px;display:none;
+    font-family:'Luckiest Guy';font-size:28px;color:#ff4a2e;
+    text-shadow:2px 2px 0 var(--ink);letter-spacing:4px;display:none;
     animation:blink .6s steps(2) infinite}
   @keyframes blink{50%{opacity:.25}}
 
   /* ---------- SCREENS ---------- */
   .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    background:radial-gradient(ellipse at 50% 120%, rgba(80,10,90,.5), rgba(5,3,14,.86) 65%);
+    background:radial-gradient(ellipse at 50% 120%, rgba(90,60,10,.45), rgba(24,16,6,.82) 68%);
     z-index:10;transition:opacity .45s}
   .screen.hidden{opacity:0;pointer-events:none}
-  .game-title{font-family:'Orbitron';font-weight:900;font-size:clamp(40px,8vw,84px);line-height:.95;
-    text-align:center;letter-spacing:6px;
-    background:linear-gradient(180deg,#fff 15%,var(--cyan) 45%,var(--magenta) 90%);
-    -webkit-background-clip:text;background-clip:text;color:transparent;
-    filter:drop-shadow(0 0 22px rgba(46,247,255,.55)) drop-shadow(0 6px 30px rgba(255,47,214,.35))}
-  .game-sub{margin-top:10px;font-size:clamp(13px,2vw,18px);letter-spacing:10px;color:#9fb0e8;text-transform:uppercase}
-  .btn{pointer-events:auto;cursor:pointer;margin-top:44px;padding:16px 64px;font-family:'Orbitron';
-    font-size:20px;font-weight:700;letter-spacing:4px;color:#04121a;border:none;border-radius:8px;
-    background:linear-gradient(90deg,var(--cyan),#7dffd4);
-    box-shadow:0 0 24px rgba(46,247,255,.6),0 0 70px rgba(46,247,255,.25);
+  .game-title{font-family:'Luckiest Guy';font-size:clamp(44px,9vw,96px);line-height:.95;
+    text-align:center;letter-spacing:4px;color:var(--yellow);
+    text-shadow:6px 6px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink);
+    filter:drop-shadow(0 10px 24px rgba(0,0,0,.5))}
+  .game-sub{margin-top:12px;font-size:clamp(13px,2vw,18px);letter-spacing:8px;color:#ffe9a8;text-transform:uppercase;
+    text-shadow:1px 1px 0 var(--ink)}
+  .btn{pointer-events:auto;cursor:pointer;margin-top:44px;padding:16px 64px;font-family:'Luckiest Guy';
+    font-size:22px;letter-spacing:3px;color:#fff8e0;border:3px solid var(--ink);border-radius:14px;
+    background:linear-gradient(180deg,#ff9d2e,#e8402a);
+    box-shadow:0 6px 0 var(--ink), 0 14px 30px rgba(0,0,0,.45);
+    text-shadow:2px 2px 0 rgba(0,0,0,.4);
     transition:transform .12s, box-shadow .12s}
-  .btn:hover{transform:scale(1.05);box-shadow:0 0 34px rgba(46,247,255,.9),0 0 100px rgba(46,247,255,.4)}
+  .btn:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 8px 0 var(--ink), 0 18px 36px rgba(0,0,0,.5)}
   .controls{margin-top:40px;display:grid;grid-template-columns:auto auto;gap:8px 26px;
-    font-size:15px;letter-spacing:1px;color:#c9d4ff}
-  .controls b{color:var(--cyan);font-weight:700;text-align:right;text-shadow:0 0 8px rgba(46,247,255,.5)}
+    font-size:15px;letter-spacing:1px;color:#ffe9c9}
+  .controls b{color:var(--yellow);font-weight:800;text-align:right;text-shadow:1px 1px 0 var(--ink)}
   #results{display:none}
-  .result-place{font-family:'Orbitron';font-size:clamp(50px,9vw,110px);font-weight:900;color:var(--amber);
-    text-shadow:0 0 30px rgba(255,181,46,.8)}
+  .result-place{font-family:'Luckiest Guy';font-size:clamp(56px,10vw,120px);color:var(--yellow);
+    text-shadow:6px 6px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink)}
   .result-stats{margin-top:26px;display:grid;grid-template-columns:auto auto;gap:10px 34px;
-    font-size:18px;letter-spacing:1px;color:#c9d4ff}
-  .result-stats b{color:#fff;text-align:right;font-family:'Orbitron';font-size:18px}
-  .footnote{position:absolute;bottom:18px;font-size:12px;letter-spacing:2px;color:#5b6693}
-  #loading-note{margin-top:30px;font-size:13px;letter-spacing:3px;color:#5b6693}
+    font-size:18px;letter-spacing:1px;color:#ffe9c9}
+  .result-stats b{color:#fff;text-align:right;font-family:'Luckiest Guy';font-size:19px;text-shadow:2px 2px 0 var(--ink)}
+  .footnote{position:absolute;bottom:18px;font-size:12px;letter-spacing:2px;color:#c9a86a}
+  #loading-note{margin-top:30px;font-size:13px;letter-spacing:3px;color:#c9a86a}
 </style>
 </head>
 <body>
@@ -150,7 +153,7 @@
   </div>
 
   <div id="weapon-box" class="panel">
-    <div class="bar-label"><span>PULSE CANNON HEAT</span><span id="heat-num">0%</span></div>
+    <div class="bar-label"><span>CANNON HEAT</span><span id="heat-num">0%</span></div>
     <div class="bar"><div id="heat-fill"></div></div>
     <div id="missiles">MISSILES <span class="icons" id="missile-icons">▲ ▲ ▲</span></div>
   </div>
@@ -162,21 +165,21 @@
 <div id="damage-vignette"></div>
 
 <div id="title-screen" class="screen">
-  <div class="game-title">NEON&nbsp;STRIKE</div>
-  <div class="game-sub">Velocity &nbsp;//&nbsp; Firepower &nbsp;//&nbsp; Survival</div>
-  <button id="start-btn" class="btn">IGNITE ENGINES</button>
+  <div class="game-title">IGNITE&nbsp;RALLY</div>
+  <div class="game-sub">Dirt &nbsp;//&nbsp; Firepower &nbsp;//&nbsp; First Place</div>
+  <button id="start-btn" class="btn">START ENGINES</button>
   <div class="controls">
     <b>W / ↑</b><span>Throttle</span>
     <b>S / ↓</b><span>Brake / Reverse</span>
     <b>A D / ← →</b><span>Steer</span>
-    <b>SPACE</b><span>Pulse cannon</span>
+    <b>SPACE</b><span>Cannon</span>
     <b>E</b><span>Homing missile</span>
     <b>SHIFT</b><span>Drift</span>
-    <b>C</b><span>Camera &nbsp;·&nbsp; <b style="display:inline">M</b> Music &nbsp;·&nbsp; <b style="display:inline">P</b> Pause</span>
+    <b>C</b><span>Camera &nbsp;·&nbsp; <b style="display:inline">P</b> Pause</span>
     <span></span><span></span>
   </div>
   <div id="loading-note">3 LAPS · 5 RIVALS · DESTROY OR BE DESTROYED</div>
-  <div class="footnote">A NEON CIRCUIT DESIGNED ENTIRELY BY CLAUDE</div>
+  <div class="footnote">A TOY-BOX CIRCUIT DESIGNED ENTIRELY BY CLAUDE</div>
 </div>
 
 <div id="results" class="screen hidden">

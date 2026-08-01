@@ -1,88 +1,86 @@
 // Car meshes (built from primitives), arcade physics, and rival AI.
 import * as THREE from 'three';
-import { glowTexture } from './textures.js';
 import { ROAD_HALF } from './track.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
 
-// ---------- mesh factory ----------
-let _glowTex = null;
-
-export function buildCarMesh({ body, glow, accent }) {
-  if (!_glowTex) _glowTex = glowTexture();
+// ---------- mesh factory: chunky toy trucks with oversized wheels ----------
+export function buildCarMesh({ body, accent }) {
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: body, metalness: 0.8, roughness: 0.28 });
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x0d0a1a, metalness: 0.6, roughness: 0.5 });
-  const glassMat = new THREE.MeshStandardMaterial({ color: 0x0a1420, metalness: 0.95, roughness: 0.12 });
-  const glowMat = new THREE.MeshBasicMaterial({ color: glow });
-  const accentMat = new THREE.MeshBasicMaterial({ color: accent });
+  const bodyMat = new THREE.MeshStandardMaterial({ color: body, metalness: 0.15, roughness: 0.55 });
+  const accentMat = new THREE.MeshStandardMaterial({ color: accent, metalness: 0.1, roughness: 0.6 });
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x1c1a18, roughness: 0.95 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x9fd4e8, metalness: 0.4, roughness: 0.15 });
 
-  // hull
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.55, 4.6), bodyMat);
-  hull.position.y = 0.62;
+  // fat hull, sitting high like a toy monster truck
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.95, 4.3), bodyMat);
+  hull.position.y = 1.05;
   hull.castShadow = true;
   g.add(hull);
-  // nose wedge
-  const nose = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.36, 1.5), bodyMat);
-  nose.position.set(0, 0.52, 2.75);
-  nose.rotation.x = 0.09;
+  // hood step (lower nose)
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.55, 1.1), bodyMat);
+  nose.position.set(0, 0.95, 2.55);
   nose.castShadow = true;
   g.add(nose);
-  // cabin
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.5, 1.9), glassMat);
-  cabin.position.set(0, 1.1, -0.25);
+  // cabin with windows
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.85, 1.9), accentMat);
+  cabin.position.set(0, 1.9, -0.15);
   cabin.castShadow = true;
   g.add(cabin);
-  // spoiler
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.12, 0.7), bodyMat);
-  wing.position.set(0, 1.28, -2.25);
-  g.add(wing);
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.55, 0.1), glassMat);
+  windshield.position.set(0, 1.95, 0.85);
+  windshield.rotation.x = -0.18;
+  g.add(windshield);
   for (const s of [-1, 1]) {
-    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.5, 0.3), darkMat);
-    strut.position.set(0.9 * s, 1.0, -2.25);
-    g.add(strut);
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 1.4), glassMat);
+    win.position.set(1.06 * s, 1.95, -0.15);
+    g.add(win);
   }
-  // side accent stripes
+  // chunky bumpers
+  for (const z of [2.25, -2.25]) {
+    const bumper = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.4, 0.5), accentMat);
+    bumper.position.set(0, 0.62, z);
+    g.add(bumper);
+  }
+  // side accent stripe
   for (const s of [-1, 1]) {
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 3.6), accentMat);
-    stripe.position.set(1.18 * s, 0.72, 0.1);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 3.4), accentMat);
+    stripe.position.set(1.32 * s, 1.1, 0);
     g.add(stripe);
   }
-  // headlights / tail bar
+  // headlights / taillights
   for (const s of [-1, 1]) {
-    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.1), new THREE.MeshBasicMaterial({ color: 0xeaffff }));
-    hl.position.set(0.72 * s, 0.62, 3.42);
+    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.28, 0.1),
+      new THREE.MeshBasicMaterial({ color: 0xfff6d8 }));
+    hl.position.set(0.85 * s, 1.05, 3.12);
     g.add(hl);
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.22, 0.08),
+      new THREE.MeshBasicMaterial({ color: 0xd82222 }));
+    tl.position.set(0.9 * s, 1.05, -2.52);
+    g.add(tl);
   }
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.16, 0.1), glowMat);
-  tail.position.set(0, 0.78, -2.32);
-  g.add(tail);
-  // wheels
-  const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.4, 14);
+  // exhaust stack
+  const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.8, 8),
+    new THREE.MeshStandardMaterial({ color: 0x8a8a8a, metalness: 0.8, roughness: 0.3 }));
+  stack.position.set(-1.05, 1.85, -1.6);
+  g.add(stack);
+  // big knobby wheels
+  const wheelGeo = new THREE.CylinderGeometry(0.78, 0.78, 0.62, 12);
   wheelGeo.rotateZ(Math.PI / 2);
-  const rimGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.42, 8);
-  rimGeo.rotateZ(Math.PI / 2);
+  const hubGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.66, 8);
+  hubGeo.rotateZ(Math.PI / 2);
+  const hubMat = new THREE.MeshStandardMaterial({ color: 0xd8d2c2, roughness: 0.5 });
   g.userData.wheels = [];
-  for (const [x, z] of [[-1.15, 1.55], [1.15, 1.55], [-1.15, -1.55], [1.15, -1.55]]) {
-    const w = new THREE.Mesh(wheelGeo, darkMat);
-    w.position.set(x, 0.55, z);
+  for (const [x, z] of [[-1.35, 1.5], [1.35, 1.5], [-1.35, -1.5], [1.35, -1.5]]) {
+    const w = new THREE.Mesh(wheelGeo, tireMat);
+    w.position.set(x, 0.78, z);
+    w.castShadow = true;
     g.add(w);
-    const rim = new THREE.Mesh(rimGeo, accentMat);
-    rim.position.copy(w.position);
-    g.add(rim);
-    g.userData.wheels.push(w, rim);
+    const hub = new THREE.Mesh(hubGeo, hubMat);
+    hub.position.copy(w.position);
+    g.add(hub);
+    g.userData.wheels.push(w, hub);
   }
-  // underglow
-  const under = new THREE.Mesh(
-    new THREE.PlaneGeometry(5.2, 7.6),
-    new THREE.MeshBasicMaterial({
-      map: _glowTex, color: glow, transparent: true, opacity: 0.5,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    })
-  );
-  under.rotation.x = -Math.PI / 2;
-  under.position.y = 0.08;
-  g.add(under);
   return g;
 }
 
@@ -200,7 +198,7 @@ export class Car {
     this.mesh.rotation.x = pitch;
     // spin wheels
     if (dt > 0 && this.mesh.userData.wheels) {
-      const spin = this.speedAlong * dt / 0.55;
+      const spin = this.speedAlong * dt / 0.78;
       for (const w of this.mesh.userData.wheels) w.rotation.x += spin;
     }
     // invulnerability flicker
@@ -255,11 +253,11 @@ export class Car {
 
 // ---------- AI rival ----------
 const AI_COLORS = [
-  { body: 0xd6303f, glow: 0xff3b5b, accent: 0xffb52e, name: 'VIPER' },
-  { body: 0x8b2fd6, glow: 0xb85bff, accent: 0x2ef7ff, name: 'RAZOR' },
-  { body: 0xd67a2f, glow: 0xffb52e, accent: 0xff2fd6, name: 'HAVOC' },
-  { body: 0x2fd68f, glow: 0x4dff88, accent: 0xffffff, name: 'GHOST' },
-  { body: 0x3057d6, glow: 0x5b8cff, accent: 0xff2fd6, name: 'NOVA' },
+  { body: 0xd23a2a, accent: 0xffd400, name: 'BIGFOOT' },
+  { body: 0xf2f2ee, accent: 0x1a1a1a, name: 'SHERIFF' },
+  { body: 0xffc21a, accent: 0x222222, name: 'TAXI' },
+  { body: 0xe8f0e6, accent: 0x2f9e44, name: 'MEDIC' },
+  { body: 0x2a52d2, accent: 0xeeeeee, name: 'BANDIT' },
 ];
 
 export class EnemyCar extends Car {
@@ -278,7 +276,7 @@ export class EnemyCar extends Car {
     this.lane = THREE.MathUtils.randFloatSpread(8);
     this.laneTimer = 3 + Math.random() * 4;
     this.aggression = 0.5 + Math.random() * 0.5;
-    this.glowColor = new THREE.Color(spec.glow);
+    this.glowColor = new THREE.Color(0x9a938a); // exhaust smoke tint
   }
 
   update(dt) {
@@ -345,7 +343,7 @@ export class EnemyCar extends Car {
 
 export class PlayerCar extends Car {
   constructor(game) {
-    super(game, buildCarMesh({ body: 0x18c8d8, glow: 0x2ef7ff, accent: 0xff2fd6 }), {
+    super(game, buildCarMesh({ body: 0xff8c1a, accent: 0x241d16 }), {
       maxSpeed: 54, accel: 38, grip: 5.4, steerRate: 2.7,
     });
     this.name = 'YOU';
@@ -354,7 +352,7 @@ export class PlayerCar extends Car {
     this.overheated = false;
     this.missiles = 3;
     this.maxMissiles = 5;
-    this.glowColor = new THREE.Color('#2ef7ff');
+    this.glowColor = new THREE.Color(0x9a938a); // exhaust smoke tint
     this.bestLap = Infinity;
     this.lapStart = 0;
   }

@@ -25,7 +25,7 @@ const FRAG = /* glsl */ `
   varying vec3 vColor;
   void main() {
     vec4 tex = texture2D(uMap, gl_PointCoord);
-    gl_FragColor = vec4(vColor, 1.0) * tex * vAlpha;
+    gl_FragColor = vec4(vColor, tex.a * vAlpha);
   }
 `;
 
@@ -57,7 +57,7 @@ export class Particles {
       fragmentShader: FRAG,
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
     });
     this.points = new THREE.Points(this.geo, mat);
     this.points.frustumCulled = false;
@@ -103,7 +103,7 @@ export class Particles {
   // ---- effect recipes ----
   explosion(p, big = false) {
     const n = big ? 90 : 45;
-    const colors = [new THREE.Color('#fff3b0'), new THREE.Color('#ffb52e'), new THREE.Color('#ff5e2e'), new THREE.Color('#ff2fd6')];
+    const colors = [new THREE.Color('#fff3b0'), new THREE.Color('#ffb52e'), new THREE.Color('#ff5e2e'), new THREE.Color('#d43a1a')];
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
       const r = (Math.random() ** 0.6) * (big ? 26 : 15);
@@ -124,7 +124,7 @@ export class Particles {
       const a = Math.random() * Math.PI * 2, r = Math.random() * 5;
       this.spawn(p.x + Math.cos(a) * 2, p.y + 1, p.z + Math.sin(a) * 2,
         Math.cos(a) * r, 4 + Math.random() * 5, Math.sin(a) * r,
-        new THREE.Color('#3a2f55'), 6 + Math.random() * 5, 1.2 + Math.random(), { drag: 1.5, shrink: 0.2 });
+        new THREE.Color('#4a443c'), 6 + Math.random() * 5, 1.2 + Math.random(), { drag: 1.5, shrink: 0.2 });
     }
   }
 
@@ -141,7 +141,7 @@ export class Particles {
   }
 
   exhaust(p, back, color, boost = false) {
-    const c = boost ? new THREE.Color('#8effff') : color;
+    const c = boost ? new THREE.Color('#ffb32e') : color;
     this.spawn(
       p.x + (Math.random() - 0.5) * 0.5, p.y + 0.35, p.z + (Math.random() - 0.5) * 0.5,
       back.x * (boost ? 26 : 9) + (Math.random() - 0.5) * 2, 0.6, back.z * (boost ? 26 : 9) + (Math.random() - 0.5) * 2,
@@ -149,9 +149,10 @@ export class Particles {
   }
 
   driftSmoke(p) {
+    // dust kicked up from the dirt
     this.spawn(p.x, p.y + 0.2, p.z,
       (Math.random() - 0.5) * 3, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 3,
-      new THREE.Color('#5a4d86'), 2.6 + Math.random() * 2, 0.7 + Math.random() * 0.4,
+      new THREE.Color('#b39a6e'), 2.6 + Math.random() * 2, 0.7 + Math.random() * 0.4,
       { drag: 2, shrink: 0.2 });
   }
 

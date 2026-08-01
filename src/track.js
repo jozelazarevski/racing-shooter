@@ -1,8 +1,8 @@
-// Procedural race circuit + the whole neon world around it.
+// Procedural race circuit + the sunny off-road world around it.
 import * as THREE from 'three';
 import {
   roadTexture, wallTexture, groundTexture, buildingTexture,
-  chevronTexture, checkerTexture, sunTexture, glowTexture,
+  chevronTexture, checkerTexture, glowTexture, cloudTexture,
 } from './textures.js';
 
 // Hand-designed circuit control points (x, z)
@@ -98,6 +98,17 @@ export class Track {
     return { index: i, lateral };
   }
 
+  /** Distance from (x,z) to the nearest centerline sample (coarse). */
+  _distToTrack(x, z) {
+    let best = Infinity;
+    for (let i = 0; i < N; i += 5) {
+      const dx = x - this.center[i].x, dz = z - this.center[i].z;
+      const d = dx * dx + dz * dz;
+      if (d < best) best = d;
+    }
+    return Math.sqrt(best);
+  }
+
   // ---------- construction ----------
   _buildRoad() {
     const geo = new THREE.BufferGeometry();
@@ -125,18 +136,18 @@ export class Track {
     geo.computeVertexNormals();
     const tex = roadTexture();
     tex.anisotropy = 8;
-    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92, metalness: 0.1 });
+    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 1, metalness: 0 });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     this.group.add(mesh);
   }
 
-  _wallRibbon(side, hex) {
+  _wallRibbon(side) {
     const geo = new THREE.BufferGeometry();
     const verts = new Float32Array((N + 1) * 2 * 3);
     const uvs = new Float32Array((N + 1) * 2 * 2);
     const idx = [];
-    const h = 1.15;
+    const h = 1.35;
     for (let i = 0; i <= N; i++) {
       const j = i % N;
       const c = this.center[j], n = this.nrm[j];
@@ -144,7 +155,7 @@ export class Track {
       const o = i * 6;
       verts[o] = x; verts[o + 1] = 0; verts[o + 2] = z;
       verts[o + 3] = x; verts[o + 4] = h; verts[o + 5] = z;
-      const u = (i * this.segLen) / 6;
+      const u = (i * this.segLen) / 8;
       uvs[i * 4] = u; uvs[i * 4 + 1] = 0;
       uvs[i * 4 + 2] = u; uvs[i * 4 + 3] = 1;
     }
@@ -155,33 +166,16 @@ export class Track {
     geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     geo.setIndex(idx);
-    const mat = new THREE.MeshBasicMaterial({ map: wallTexture(hex), side: THREE.DoubleSide });
-    this.group.add(new THREE.Mesh(geo, mat));
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ map: wallTexture(), roughness: 0.9, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true;
+    this.group.add(mesh);
   }
 
   _buildWalls() {
-    this._wallRibbon(1, '#2ef7ff');   // left rail cyan
-    this._wallRibbon(-1, '#ff2fd6');  // right rail magenta
-    // support posts
-    const count = Math.floor(N / 12);
-    const postGeo = new THREE.BoxGeometry(0.55, 2.4, 0.55);
-    const postMat = new THREE.MeshStandardMaterial({ color: 0x1a1433, roughness: 0.6, metalness: 0.7 });
-    const tipGeo = new THREE.BoxGeometry(0.65, 0.3, 0.65);
-    const tipMat = new THREE.MeshBasicMaterial({ color: 0x9d8bff });
-    const posts = new THREE.InstancedMesh(postGeo, postMat, count * 2);
-    const tips = new THREE.InstancedMesh(tipGeo, tipMat, count * 2);
-    const m = new THREE.Matrix4();
-    let k = 0;
-    for (let i = 0; i < N; i += 12) {
-      for (const side of [1, -1]) {
-        const c = this.center[i], n = this.nrm[i];
-        const x = c.x + n.x * (WALL_OFF + 0.9) * side, z = c.z + n.z * (WALL_OFF + 0.9) * side;
-        m.makeTranslation(x, 1.2, z); posts.setMatrixAt(k, m);
-        m.makeTranslation(x, 2.55, z); tips.setMatrixAt(k, m);
-        k++;
-      }
-    }
-    this.group.add(posts, tips);
+    this._wallRibbon(1);
+    this._wallRibbon(-1);
   }
 
   _buildStartGate() {
@@ -191,7 +185,7 @@ export class Track {
     // checkered strip on the road
     const strip = new THREE.Mesh(
       new THREE.PlaneGeometry(ROAD_HALF * 2 + 2, 4),
-      new THREE.MeshBasicMaterial({ map: checkerTexture(), transparent: true, opacity: 0.9 })
+      new THREE.MeshBasicMaterial({ map: checkerTexture(), transparent: true, opacity: 0.92 })
     );
     strip.material.map.repeat.set(5, 1);
     strip.rotation.order = 'YXZ';
@@ -199,36 +193,54 @@ export class Track {
     strip.rotation.x = -Math.PI / 2;
     strip.position.set(c.x, 0.04, c.z);
     this.group.add(strip);
-    // pylons + banner
-    const pylonGeo = new THREE.BoxGeometry(1.2, 9, 1.2);
-    const pylonMat = new THREE.MeshStandardMaterial({ color: 0x141026, metalness: 0.8, roughness: 0.35 });
-    const glowMat = new THREE.MeshBasicMaterial({ color: 0x2ef7ff });
+    // wooden gate posts + colorful pole banner
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.85 });
     for (const side of [1, -1]) {
-      const p = new THREE.Mesh(pylonGeo, pylonMat);
-      p.position.set(c.x + n.x * 12.5 * side, 4.5, c.z + n.z * 12.5 * side);
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.75, 9.5, 10), wood);
+      p.position.set(c.x + n.x * 12.5 * side, 4.75, c.z + n.z * 12.5 * side);
       p.castShadow = true;
       this.group.add(p);
-      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.25, 9, 0.25), glowMat);
-      edge.position.copy(p.position).add(new THREE.Vector3(0, 0, 0));
-      edge.translateX(0.5); // small offset so it reads as a lit edge
-      this.group.add(edge);
     }
     const banner = new THREE.Mesh(
-      new THREE.BoxGeometry(26, 1.6, 0.8),
-      new THREE.MeshStandardMaterial({ color: 0x141026, metalness: 0.7, roughness: 0.4 })
+      new THREE.BoxGeometry(26, 2.4, 0.5),
+      new THREE.MeshStandardMaterial({ map: wallTexture(), roughness: 0.85 })
     );
-    banner.position.set(c.x, 9.3, c.z);
+    banner.material.map = wallTexture();
+    banner.material.map.repeat.set(6, 1);
+    banner.position.set(c.x, 9, c.z);
     banner.rotation.y = heading;
+    banner.castShadow = true;
     this.group.add(banner);
-    const bannerGlow = new THREE.Mesh(
-      new THREE.PlaneGeometry(24, 1.1),
-      new THREE.MeshBasicMaterial({ map: checkerTexture(), color: 0x767e96, side: THREE.DoubleSide })
+
+    // traffic-light box hanging from the banner
+    const housing = new THREE.Mesh(
+      new THREE.BoxGeometry(7.4, 2.6, 1.2),
+      new THREE.MeshStandardMaterial({ color: 0x24211c, roughness: 0.6, metalness: 0.4 })
     );
-    bannerGlow.material.map.repeat.set(10, 1);
-    bannerGlow.position.set(c.x, 9.3, c.z);
-    bannerGlow.rotation.y = heading;
-    bannerGlow.translateZ(0.45);
-    this.group.add(bannerGlow);
+    housing.position.set(c.x, 6.6, c.z);
+    housing.rotation.y = heading;
+    this.group.add(housing);
+    this.lampMats = {};
+    const lampSpecs = [['red', -2.3, 0xff3222], ['yellow', 0, 0xffd022], ['green', 2.3, 0x35e04a]];
+    for (const [name, off, lit] of lampSpecs) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0x2a2622 });
+      mat.userData = { lit: new THREE.Color(lit), dim: new THREE.Color(lit).multiplyScalar(0.12) };
+      mat.color.copy(mat.userData.dim);
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.85, 14, 10), mat);
+      lamp.position.set(c.x, 6.6, c.z);
+      lamp.rotation.y = heading;
+      lamp.translateX(off);
+      this.group.add(lamp);
+      this.lampMats[name] = mat;
+    }
+    this.setLights('red');
+  }
+
+  /** phase: 'red' | 'yellow' | 'green' | 'off' */
+  setLights(phase) {
+    for (const [name, mat] of Object.entries(this.lampMats)) {
+      mat.color.copy(name === phase ? mat.userData.lit : mat.userData.dim);
+    }
   }
 
   _buildBoostPads() {
@@ -245,7 +257,7 @@ export class Track {
         const p = this.pointAt(i, lateral);
         const pad = new THREE.Mesh(
           new THREE.PlaneGeometry(5.4, 8.5),
-          new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
+          new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
         );
         pad.rotation.order = 'YXZ';
         pad.rotation.y = this.headingAt(i);
@@ -257,19 +269,20 @@ export class Track {
   }
 
   _buildEnvironment() {
-    // ground grid
+    // grass everywhere
     const gtex = groundTexture();
-    gtex.repeat.set(60, 60);
+    gtex.repeat.set(48, 48);
     gtex.anisotropy = 4;
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(4200, 4200),
-      new THREE.MeshBasicMaterial({ map: gtex })
+      new THREE.MeshStandardMaterial({ map: gtex, roughness: 1, metalness: 0 })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.15;
+    ground.receiveShadow = true;
     this.scene.add(ground);
 
-    // sky dome gradient
+    // sky dome gradient — bright summer day
     const sky = new THREE.Mesh(
       new THREE.SphereGeometry(1500, 24, 12),
       new THREE.ShaderMaterial({
@@ -277,108 +290,158 @@ export class Track {
         depthWrite: false,
         fog: false,
         uniforms: {
-          top: { value: new THREE.Color('#040211') },
-          horizon: { value: new THREE.Color('#2b0b40') },
+          top: { value: new THREE.Color('#3f8de0') },
+          horizon: { value: new THREE.Color('#cfeaf7') },
         },
         vertexShader: `varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
         fragmentShader: `uniform vec3 top; uniform vec3 horizon; varying float vY;
-          void main(){ float t = smoothstep(0.0, 0.42, max(vY, 0.0)); gl_FragColor = vec4(mix(horizon, top, t), 1.0); }`,
+          void main(){ float t = smoothstep(0.0, 0.5, max(vY, 0.0)); gl_FragColor = vec4(mix(horizon, top, t), 1.0); }`,
       })
     );
     this.scene.add(sky);
 
-    // stars
-    const starGeo = new THREE.BufferGeometry();
-    const sPos = new Float32Array(1300 * 3);
-    const sCol = new Float32Array(1300 * 3);
-    const tints = [new THREE.Color('#ffffff'), new THREE.Color('#bfe9ff'), new THREE.Color('#ffd9f4')];
-    for (let i = 0; i < 1300; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const el = Math.random() * Math.PI * 0.46 + 0.06;
-      const r = 1350;
-      sPos[i * 3] = Math.cos(a) * Math.cos(el) * r;
-      sPos[i * 3 + 1] = Math.sin(el) * r;
-      sPos[i * 3 + 2] = Math.sin(a) * Math.cos(el) * r;
-      const c = tints[(Math.random() * 3) | 0].clone().multiplyScalar(0.4 + Math.random() * 0.6);
-      sCol[i * 3] = c.r; sCol[i * 3 + 1] = c.g; sCol[i * 3 + 2] = c.b;
-    }
-    starGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
-    starGeo.setAttribute('color', new THREE.BufferAttribute(sCol, 3));
-    this.scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
-      size: 2.6, sizeAttenuation: false, vertexColors: true, fog: false,
-      transparent: true, opacity: 0.9, depthWrite: false,
-    })));
-
-    // synthwave sun
+    // sun glow
     const sun = new THREE.Mesh(
-      new THREE.PlaneGeometry(620, 620),
+      new THREE.PlaneGeometry(400, 400),
       new THREE.MeshBasicMaterial({
-        map: sunTexture(), transparent: true, fog: false,
+        map: glowTexture(), color: 0xfff6c8, transparent: true, fog: false,
         depthWrite: false, blending: THREE.AdditiveBlending,
       })
     );
-    sun.position.set(60, 150, -1380);
+    sun.position.set(500, 900, 400);
+    sun.lookAt(0, 0, 0);
     this.scene.add(sun);
-    const halo = new THREE.Mesh(
-      new THREE.PlaneGeometry(1100, 1100),
-      new THREE.MeshBasicMaterial({
-        map: glowTexture(), transparent: true, fog: false, opacity: 0.35,
-        color: 0xff4fc0, depthWrite: false, blending: THREE.AdditiveBlending,
-      })
-    );
-    halo.position.set(60, 130, -1381);
-    this.scene.add(halo);
 
-    // mountain rings
-    const mountains = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(1, 1, 5),
-      new THREE.MeshStandardMaterial({ color: 0x150b28, emissive: 0x1c0f3a, emissiveIntensity: 0.35, flatShading: true }),
-      70
-    );
+    // drifting clouds (billboard sprites)
+    const ctex = cloudTexture();
+    for (let i = 0; i < 12; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: ctex, transparent: true, opacity: 0.9, fog: false, depthWrite: false,
+      }));
+      const a = (i / 12) * Math.PI * 2 + Math.random();
+      const r = 550 + Math.random() * 500;
+      sp.position.set(Math.cos(a) * r, 190 + Math.random() * 160, Math.sin(a) * r);
+      const s = 160 + Math.random() * 180;
+      sp.scale.set(s, s * 0.5, 1);
+      this.scene.add(sp);
+    }
+
+    // rolling hills + rocky peaks on the horizon
     const m4 = new THREE.Matrix4();
-    for (let i = 0; i < 70; i++) {
-      const ring = i < 40 ? 0 : 1;
-      const a = (i / (ring === 0 ? 40 : 30)) * Math.PI * 2 + ring * 0.11;
-      const r = ring === 0 ? 780 + Math.random() * 90 : 980 + Math.random() * 120;
-      const h = (ring === 0 ? 90 : 150) + Math.random() * 110;
-      const w = 90 + Math.random() * 130;
+    const hills = new THREE.InstancedMesh(
+      new THREE.ConeGeometry(1, 1, 7),
+      new THREE.MeshStandardMaterial({ color: 0x4e8a3c, flatShading: true, roughness: 1 }),
+      40
+    );
+    const peaks = new THREE.InstancedMesh(
+      new THREE.ConeGeometry(1, 1, 5),
+      new THREE.MeshStandardMaterial({ color: 0x8d8578, flatShading: true, roughness: 1 }),
+      30
+    );
+    for (let i = 0; i < 40; i++) {
+      const a = (i / 40) * Math.PI * 2;
+      const r = 760 + Math.random() * 110;
+      const h = 70 + Math.random() * 90;
+      const w = 130 + Math.random() * 150;
       m4.makeScale(w, h, w);
-      m4.setPosition(Math.cos(a) * r, h / 2 - 6, Math.sin(a) * r);
-      mountains.setMatrixAt(i, m4);
+      m4.setPosition(Math.cos(a) * r, h / 2 - 8, Math.sin(a) * r);
+      hills.setMatrixAt(i, m4);
     }
-    this.scene.add(mountains);
+    for (let i = 0; i < 30; i++) {
+      const a = (i / 30) * Math.PI * 2 + 0.1;
+      const r = 980 + Math.random() * 140;
+      const h = 160 + Math.random() * 140;
+      const w = 120 + Math.random() * 140;
+      m4.makeScale(w, h, w);
+      m4.setPosition(Math.cos(a) * r, h / 2 - 8, Math.sin(a) * r);
+      peaks.setMatrixAt(i, m4);
+    }
+    this.scene.add(hills, peaks);
 
-    // neon towers scattered around (kept off the track)
-    const isNearTrack = (x, z, margin) => {
-      for (let i = 0; i < N; i += 6) {
-        const dx = x - this.center[i].x, dz = z - this.center[i].z;
-        if (dx * dx + dz * dz < margin * margin) return true;
-      }
-      return false;
-    };
-    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-    boxGeo.translate(0, 0.5, 0);
-    for (let batch = 0; batch < 3; batch++) {
-      const mat = new THREE.MeshStandardMaterial({
-        map: buildingTexture(batch), emissiveMap: buildingTexture(batch),
-        emissive: 0xffffff, emissiveIntensity: 0.55,
-        color: 0x2a2444, roughness: 0.7, metalness: 0.35,
-      });
-      const inst = new THREE.InstancedMesh(boxGeo, mat, 34);
-      let placed = 0, guard = 0;
-      while (placed < 34 && guard++ < 700) {
+    this._buildTrees(m4);
+    this._buildHuts(m4);
+  }
+
+  _buildTrees(m4) {
+    // pine trees: instanced trunk + two foliage cones
+    const COUNT = 150;
+    const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 7);
+    trunkGeo.translate(0, 1.2, 0);
+    const lowGeo = new THREE.ConeGeometry(2.6, 4.2, 8);
+    lowGeo.translate(0, 4.0, 0);
+    const topGeo = new THREE.ConeGeometry(1.8, 3.4, 8);
+    topGeo.translate(0, 6.6, 0);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 1 });
+    const lowMat = new THREE.MeshStandardMaterial({ color: 0x2c6e2a, flatShading: true, roughness: 1 });
+    const topMat = new THREE.MeshStandardMaterial({ color: 0x3c8a34, flatShading: true, roughness: 1 });
+    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, COUNT);
+    const lows = new THREE.InstancedMesh(lowGeo, lowMat, COUNT);
+    const tops = new THREE.InstancedMesh(topGeo, topMat, COUNT);
+    lows.castShadow = tops.castShadow = true;
+
+    let placed = 0, guard = 0;
+    while (placed < COUNT && guard++ < 4000) {
+      let x, z;
+      if (placed < COUNT * 0.6) {
+        // trackside clusters just beyond the fence
+        const i = (Math.random() * N) | 0;
+        const side = Math.random() < 0.5 ? 1 : -1;
+        const dist = 15 + Math.random() * 24;
+        x = this.center[i].x + this.nrm[i].x * side * dist;
+        z = this.center[i].z + this.nrm[i].z * side * dist;
+      } else {
+        // scattered through the valley
         const a = Math.random() * Math.PI * 2;
-        const r = 120 + Math.random() * 520;
-        const x = Math.cos(a) * r, z = Math.sin(a) * r;
-        if (isNearTrack(x, z, 42)) continue;
-        const w = 12 + Math.random() * 20;
-        const h = 26 + Math.random() * 110;
-        m4.makeScale(w, h, w);
-        m4.setPosition(x, 0, z);
-        inst.setMatrixAt(placed++, m4);
+        const r = 80 + Math.random() * 520;
+        x = Math.cos(a) * r;
+        z = Math.sin(a) * r;
       }
-      inst.count = placed;
-      this.scene.add(inst);
+      if (this._distToTrack(x, z) < 14.5) continue;
+      const s = 0.8 + Math.random() * 1.1;
+      m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
+      m4.setPosition(x, 0, z);
+      trunks.setMatrixAt(placed, m4);
+      lows.setMatrixAt(placed, m4);
+      tops.setMatrixAt(placed, m4);
+      placed++;
     }
+    trunks.count = lows.count = tops.count = placed;
+    this.scene.add(trunks, lows, tops);
+  }
+
+  _buildHuts(m4) {
+    // little wooden huts with pyramid straw roofs
+    const COUNT = 14;
+    const wallGeo = new THREE.BoxGeometry(1, 1, 1);
+    wallGeo.translate(0, 0.5, 0);
+    const roofGeo = new THREE.ConeGeometry(0.85, 0.55, 4);
+    roofGeo.rotateY(Math.PI / 4);
+    const wallMat = new THREE.MeshStandardMaterial({ map: buildingTexture(), roughness: 1 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0xc9a24d, flatShading: true, roughness: 1 });
+    const walls = new THREE.InstancedMesh(wallGeo, wallMat, COUNT);
+    const roofs = new THREE.InstancedMesh(roofGeo, roofMat, COUNT);
+    walls.castShadow = roofs.castShadow = true;
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+
+    let placed = 0, guard = 0;
+    while (placed < COUNT && guard++ < 800) {
+      const i = (Math.random() * N) | 0;
+      const side = Math.random() < 0.5 ? 1 : -1;
+      const dist = 22 + Math.random() * 40;
+      const x = this.center[i].x + this.nrm[i].x * side * dist;
+      const z = this.center[i].z + this.nrm[i].z * side * dist;
+      if (this._distToTrack(x, z) < 19) continue;
+      const w = 9 + Math.random() * 6;
+      const h = 5 + Math.random() * 2.5;
+      const rot = Math.random() * Math.PI * 2;
+      q.setFromAxisAngle(up, rot);
+      m4.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(w, h, w));
+      walls.setMatrixAt(placed, m4);
+      m4.compose(new THREE.Vector3(x, h, z), q, new THREE.Vector3(w * 1.6, h * 1.1, w * 1.6));
+      roofs.setMatrixAt(placed, m4);
+      placed++;
+    }
+    walls.count = roofs.count = placed;
+    this.scene.add(walls, roofs);
   }
 }

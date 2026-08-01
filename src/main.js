@@ -26,27 +26,27 @@ class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.05;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x0b0518, 260, 1150);
+    this.scene.fog = new THREE.Fog(0xcfe8f5, 320, 1500);
     this.camera = new THREE.PerspectiveCamera(56, innerWidth / innerHeight, 0.5, 3200);
 
-    // lighting: cool moonlight + warm bounce
-    this.scene.add(new THREE.HemisphereLight(0x6a5bd8, 0x1a0c2e, 0.55));
-    const moon = new THREE.DirectionalLight(0xbfd4ff, 1.05);
-    moon.castShadow = true;
-    moon.shadow.mapSize.set(2048, 2048);
-    const sc = moon.shadow.camera;
+    // lighting: bright summer sun + sky bounce
+    this.scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x5a8a3c, 0.85));
+    const sun = new THREE.DirectionalLight(0xfff3d6, 2.0);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const sc = sun.shadow.camera;
     sc.left = -120; sc.right = 120; sc.top = 120; sc.bottom = -120;
     sc.near = 10; sc.far = 400;
-    this.scene.add(moon, moon.target);
-    this.moon = moon;
+    this.scene.add(sun, sun.target);
+    this.moon = sun; // shadow rig follows the player (name kept for the camera code)
 
-    // post-processing: bloom sells the neon
+    // post-processing: a whisper of bloom for lamps, tracers and explosions
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.85, 0.55, 0.62);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.3, 0.4, 0.9);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
 
@@ -223,6 +223,7 @@ class Game {
       e.placeAt(s.index, s.lateral);
     });
     for (const p of this.pickups) { p.active = true; p.mesh.visible = true; }
+    this.track.setLights('red');
   }
 
   startRace() {
@@ -363,10 +364,6 @@ class Game {
     const time = this.clock.elapsedTime;
 
     if (this.input.justPressed('KeyC')) this.camMode = 1 - this.camMode;
-    if (this.input.justPressed('KeyM')) {
-      const on = this.audio.toggleMusic();
-      if (this.state !== 'title') this.hud.feed(on ? 'MUSIC ON' : 'MUSIC OFF', 'info');
-    }
     if (this.input.justPressed('KeyP') && (this.state === 'race' || this.state === 'paused')) {
       this.state = this.state === 'paused' ? 'race' : 'paused';
       this.hud.centerMsg(this.state === 'paused' ? 'PAUSED' : 'GO');
@@ -375,11 +372,15 @@ class Game {
     if (this.state === 'countdown') {
       this.countdown -= dt;
       const n = Math.ceil(this.countdown);
-      if (n < this._lastCount && n >= 1) { this.hud.centerMsg(String(n)); this.audio.countdown(); this._lastCount = n; }
+      if (n < this._lastCount && n >= 1) {
+        this.hud.centerMsg(String(n));
+        this.track.setLights(n === 3 ? 'red' : 'yellow');
+        this._lastCount = n;
+      }
       if (this.countdown <= 0) {
         this.state = 'race';
         this.hud.centerMsg('GO!');
-        this.audio.countdown(true);
+        this.track.setLights('green');
       }
     }
 

@@ -58,10 +58,10 @@ export class Hud {
       i === 0 ? c.moveTo(x, y) : c.lineTo(x, y);
     }
     c.closePath();
-    c.strokeStyle = 'rgba(46,247,255,0.28)';
+    c.strokeStyle = 'rgba(179,140,92,0.85)';
     c.lineWidth = 9;
     c.stroke();
-    c.strokeStyle = 'rgba(220,230,255,0.55)';
+    c.strokeStyle = 'rgba(58,36,16,0.7)';
     c.lineWidth = 2;
     c.stroke();
     // start line
@@ -79,7 +79,7 @@ export class Hud {
     for (const e of g.enemies) {
       if (!e.alive) continue;
       const [x, y] = this._mapPt(e.pos);
-      c.fillStyle = '#ff2fd6';
+      c.fillStyle = '#e8402a';
       c.beginPath(); c.arc(x, y, 4, 0, Math.PI * 2); c.fill();
     }
     // player (arrow showing heading)
@@ -88,8 +88,8 @@ export class Hud {
     c.save();
     c.translate(px, py);
     c.rotate(Math.PI - p.heading);
-    c.fillStyle = '#2ef7ff';
-    c.shadowColor = '#2ef7ff'; c.shadowBlur = 8;
+    c.fillStyle = '#ffd400';
+    c.shadowColor = '#3a2410'; c.shadowBlur = 4;
     c.beginPath();
     c.moveTo(0, -8); c.lineTo(5.5, 6); c.lineTo(-5.5, 6);
     c.closePath(); c.fill();

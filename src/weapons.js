@@ -22,8 +22,8 @@ export class Weapons {
     this._m = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
     this._zero = new THREE.Matrix4().makeScale(0, 0, 0);
-    this._colorPlayer = new THREE.Color('#7dfbff');
-    this._colorEnemy = new THREE.Color('#ff5b7d');
+    this._colorPlayer = new THREE.Color('#ffe27d');
+    this._colorEnemy = new THREE.Color('#ff5b3d');
     if (this.mesh.instanceColor === null) {
       // force allocation of the color buffer
       for (let i = 0; i < MAX_BULLETS; i++) this.mesh.setColorAt(i, this._colorPlayer);
@@ -66,7 +66,7 @@ export class Weapons {
     tip.position.z = 1.1;
     g.add(tip);
     const flame = new THREE.Mesh(new THREE.ConeGeometry(0.3, 1.1, 8), new THREE.MeshBasicMaterial({
-      color: 0x8effff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false,
+      color: 0xffb32e, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false,
     }));
     flame.rotation.x = -Math.PI / 2;
     flame.position.z = -1.3;
