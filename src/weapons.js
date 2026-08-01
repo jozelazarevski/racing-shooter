@@ -29,6 +29,55 @@ export class Weapons {
       for (let i = 0; i < MAX_BULLETS; i++) this.mesh.setColorAt(i, this._colorPlayer);
     }
     this.missiles = [];
+    this.mines = [];
+    this.shocks = [];
+  }
+
+  dropMine(car) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5, 10, 8),
+      new THREE.MeshStandardMaterial({ color: 0x2a2622, metalness: 0.6, roughness: 0.4 })
+    );
+    body.scale.y = 0.6;
+    g.add(body);
+    const lampMat = new THREE.MeshBasicMaterial({ color: 0x661111 });
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), lampMat);
+    lamp.position.y = 0.35;
+    g.add(lamp);
+    const back = car.forward.multiplyScalar(-1);
+    g.position.copy(car.pos).addScaledVector(back, 3.4).setY(0.3);
+    this.game.scene.add(g);
+    this.mines.push({ mesh: g, pos: g.position, lampMat, owner: car, armTime: 1.1, life: 30, blink: 0 });
+  }
+
+  fireShockwave(car) {
+    const g = this.game;
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1, 0.35, 8, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0xffe8a8, transparent: true, opacity: 0.95,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.copy(car.pos).setY(car.pos.y + 0.6);
+    g.scene.add(ring);
+    this.shocks.push({ mesh: ring, t: 0 });
+    g.hud.feed('SHOCKWAVE', 'info');
+    g.audio.explosion(false);
+    g.shake = Math.min(1, g.shake + 0.35);
+    // damage + knockback
+    for (const e of g.enemies) {
+      if (!e.alive || e.invuln > 0) continue;
+      const to = e.pos.clone().sub(car.pos);
+      const d = to.length();
+      if (d < 16) {
+        to.normalize();
+        e.vel.addScaledVector(to, 30 * (1 - d / 18));
+        g.onEnemyHit(e, THREE.MathUtils.lerp(26, 10, d / 16), 'shock');
+      }
+    }
   }
 
   fireBullet(car, dmg, spread) {
@@ -41,7 +90,7 @@ export class Weapons {
     const fwd = car.forward;
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
     const muzzleSide = (this.head % 2 === 0 ? 0.7 : -0.7);
-    b.pos.copy(car.pos).addScaledVector(fwd, 2.6).addScaledVector(side, muzzleSide).setY(0.8);
+    b.pos.copy(car.pos).addScaledVector(fwd, 2.6).addScaledVector(side, muzzleSide).setY(car.pos.y + 0.85);
     const a = (Math.random() - 0.5) * 2 * spread;
     const dir = new THREE.Vector3(
       fwd.x * Math.cos(a) + fwd.z * Math.sin(a), 0,
@@ -73,7 +122,7 @@ export class Weapons {
     g.add(flame);
 
     const fwd = car.forward;
-    g.position.copy(car.pos).addScaledVector(fwd, 3).setY(1.1);
+    g.position.copy(car.pos).addScaledVector(fwd, 3).setY(car.pos.y + 1.1);
     this.game.scene.add(g);
 
     // lock the closest living enemy roughly ahead
@@ -179,11 +228,64 @@ export class Weapons {
         this.missiles.splice(mi, 1);
       }
     }
+
+    // ---- mines ----
+    for (let i = this.mines.length - 1; i >= 0; i--) {
+      const m = this.mines[i];
+      m.life -= dt;
+      let boom = m.life <= 0;
+      if (m.armTime > 0) {
+        m.armTime -= dt;
+      } else {
+        m.blink += dt;
+        m.lampMat.color.setHex(Math.floor(m.blink * 5) % 2 === 0 ? 0xff2222 : 0x661111);
+        for (const car of [g.player, ...g.enemies]) {
+          if (!car.alive || car === m.owner || car.invuln > 0 || car.airborne) continue;
+          if (m.pos.distanceToSquared(car.pos) < 8.5) { boom = true; break; }
+        }
+      }
+      if (boom) {
+        g.particles.explosion(m.pos, false);
+        g.audio.explosion(false);
+        g.flashLight(m.pos);
+        for (const car of [g.player, ...g.enemies]) {
+          if (!car.alive || car.invuln > 0) continue;
+          const d = m.pos.distanceTo(car.pos);
+          if (d < 8) {
+            const dmg = THREE.MathUtils.lerp(48, 14, d / 8);
+            if (car === g.player) g.onPlayerHit(dmg, null);
+            else g.onEnemyHit(car, dmg, 'mine');
+            const push = car.pos.clone().sub(m.pos).normalize();
+            car.vel.addScaledVector(push, 20 * (1 - d / 9));
+          }
+        }
+        g.scene.remove(m.mesh);
+        this.mines.splice(i, 1);
+      }
+    }
+
+    // ---- shockwave rings ----
+    for (let i = this.shocks.length - 1; i >= 0; i--) {
+      const s = this.shocks[i];
+      s.t += dt;
+      const f = s.t / 0.55;
+      const r = 1 + f * 15;
+      s.mesh.scale.set(r, r, 1);
+      s.mesh.material.opacity = Math.max(0, 0.95 * (1 - f));
+      if (f >= 1) {
+        g.scene.remove(s.mesh);
+        this.shocks.splice(i, 1);
+      }
+    }
   }
 
   reset() {
     for (const b of this.bullets) b.active = false;
     for (const m of this.missiles) this.game.scene.remove(m.mesh);
+    for (const m of this.mines) this.game.scene.remove(m.mesh);
+    for (const s of this.shocks) this.game.scene.remove(s.mesh);
     this.missiles = [];
+    this.mines = [];
+    this.shocks = [];
   }
 }
