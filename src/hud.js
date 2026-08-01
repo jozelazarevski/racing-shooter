@@ -21,6 +21,9 @@ export class Hud {
       missiles: $('missile-icons'), mines: $('mine-icons'), shock: $('shock-status'),
       nitro: $('nitro-fill'), feed: $('feed'), center: $('center-msg'),
       wrongWay: $('wrong-way'), vignette: $('damage-vignette'),
+      // touch button badges
+      bMissile: $('b-missile'), bMine: $('b-mine'), bShock: $('b-shock'),
+      tFire: $('t-fire'), tShock: $('t-shock'), tNitro: $('t-nitro'),
     };
     this.map = $('minimap');
     this.mapCtx = this.map.getContext('2d');
@@ -219,6 +222,21 @@ export class Hud {
     }
     this.el.nitro.style.width = Math.round(p.nitro * 100) + '%';
     this.el.nitro.classList.toggle('boosting', p.boostTimer > 0);
+
+    // touch buttons double as ammo/status readouts
+    if (this.game.isTouch) {
+      this.el.bMissile.textContent = p.missiles;
+      this.el.bMine.textContent = p.mines;
+      const shockReady = p.shockCooldown <= 0;
+      this.el.tShock.classList.toggle('cooling', !shockReady);
+      this.el.bShock.style.display = shockReady ? 'none' : 'flex';
+      if (!shockReady) this.el.bShock.textContent = Math.ceil(p.shockCooldown);
+      const nf = Math.round(p.nitro * 100);
+      this.el.tNitro.style.background =
+        `conic-gradient(rgba(127,212,255,${p.boostTimer > 0 ? 1 : 0.8}) ${nf}%, rgba(38,26,12,.6) 0)`;
+      this.el.tFire.classList.toggle('hot', p.overheated);
+      this.el.tFire.textContent = p.overheated ? 'HOT!' : 'FIRE';
+    }
 
     // wrong-way detection
     const t = g.track;

@@ -2,9 +2,10 @@
 
 A bright, cartoon toy-car combat racer in the spirit of the classic *Ignition*
 (1997), playable entirely in the browser — on desktop **and phones** (full
-touch controls). Race 3 laps against 5 armed AI rivals on a dirt circuit
-through a rolling pine valley — cannon, homing missiles, mines, a shockwave
-blast, nitro, boost pads and launch ramps.
+touch controls). Race 3 laps against the **Voxel Racers** — CROWN, SLEEK,
+DUNE, ALPINE and PIT-99, each a distinct liveried block-built machine — on a
+dirt circuit through a rolling pine valley, armed with cannon, homing
+missiles, mines, a shockwave blast, nitro, boost pads and launch ramps.
 
 **Every asset is procedural and designed in code by Claude** — the circuit, the
 rolling terrain, the pine forest and grass, the grandstand and sponsor boards,
@@ -47,8 +48,11 @@ via `file://` won't work.)
 | `C` | Toggle camera (top-down / chase) |
 | `P` | Pause |
 
-On touch devices, on-screen controls appear automatically: steering arrows,
-GAS/brake, FIRE, and buttons for missile 🚀, mine 💣, shockwave 💥 and nitro ⚡.
+On touch devices the controls appear automatically and are built for two
+thumbs: the **left thumb drives** on a single analog pad (drag left/right to
+steer, up for gas, down for brake — the pad re-centers wherever you touch),
+while the **right thumb shoots**: FIRE, missile 🚀, mine 💣, shockwave 💥 and
+nitro ⚡, with live ammo badges on the buttons. Works in portrait and landscape.
 
 ## Gameplay
 
