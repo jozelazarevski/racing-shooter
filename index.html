@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>IGNITE RALLY — Racing Shooter</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --yellow:#ffd400; --orange:#ff8c1a; --amber:#ffb52e; --green:#4dd06a; --red:#e8402a;
+    --ink:#2b1c0e;
+    --panel:rgba(38,26,12,.72); --edge:rgba(255,212,0,.5);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#7fb85c;
+    font-family:'Baloo 2','Segoe UI',system-ui,sans-serif;color:#fff3d0;
+    -webkit-user-select:none;user-select:none}
+  #game-canvas{position:fixed;inset:0;display:block}
+  .titlefont{font-family:'Luckiest Guy','Baloo 2',sans-serif}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .5s}
+  #hud.on{opacity:1}
+  .panel{background:var(--panel);border:2px solid var(--edge);border-radius:12px;
+    backdrop-filter:blur(6px);box-shadow:0 3px 0 rgba(0,0,0,.25)}
+
+  #race-info{position:absolute;top:16px;left:16px;padding:10px 16px;min-width:150px}
+  #race-info .pos{font-family:'Luckiest Guy';font-size:32px;color:var(--yellow);
+    text-shadow:2px 2px 0 var(--ink);line-height:1}
+  #race-info .pos small{font-size:15px;color:#ffe9a8;font-weight:500}
+  #race-info .lap{font-size:17px;font-weight:800;letter-spacing:1px;color:#fff3d0;margin-top:4px}
+  #race-info .time{font-size:14px;color:#e8c987;letter-spacing:2px}
+
+  #score-box{position:absolute;top:16px;right:16px;padding:10px 18px;text-align:right}
+  #score-box .label{font-size:11px;letter-spacing:3px;color:#e8c987}
+  #score-box .val{font-family:'Luckiest Guy';font-size:24px;color:var(--yellow);
+    text-shadow:2px 2px 0 var(--ink)}
+
+  #minimap-wrap{position:absolute;top:16px;left:50%;transform:translateX(-50%);padding:8px}
+  #minimap{display:block;width:170px;height:150px}
+
+  #speed-box{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);
+    text-align:center;padding:6px 30px 10px}
+  #speed{font-family:'Luckiest Guy';font-size:44px;line-height:1;color:var(--yellow);
+    text-shadow:3px 3px 0 var(--ink)}
+  #speed-box .unit{font-size:12px;letter-spacing:4px;color:#e8c987}
+  #boost-bar{width:100%;height:5px;background:#20160a;border-radius:3px;margin-top:6px;overflow:hidden}
+  #boost-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--yellow),var(--orange));
+    transition:width .1s}
+
+  #health-box{position:absolute;bottom:22px;left:16px;padding:12px 16px;width:230px}
+  .bar-label{display:flex;justify-content:space-between;font-size:11px;letter-spacing:2px;color:#e8c987;margin-bottom:4px}
+  .bar{height:11px;background:#20160a;border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.14)}
+  #health-fill{height:100%;width:100%;border-radius:6px;
+    background:linear-gradient(90deg,#2fb84a,#7de08a);
+    transition:width .15s, background .3s}
+  #shield-hits{margin-top:8px;font-size:12px;letter-spacing:2px;color:#e8c987}
+
+  #weapon-box{position:absolute;bottom:22px;right:16px;padding:12px 16px;width:230px;text-align:left}
+  #heat-fill{height:100%;width:0%;border-radius:6px;background:linear-gradient(90deg,var(--yellow),var(--orange));
+    transition:width .08s}
+  #heat-fill.overheat{background:linear-gradient(90deg,#e8402a,#ff8b3b)}
+  #missiles{margin-top:8px;font-size:15px;font-weight:800;letter-spacing:1px;color:var(--amber)}
+  #missiles .icons{color:var(--amber);text-shadow:1px 1px 0 var(--ink);font-size:13px}
+
+  #feed{position:absolute;top:110px;right:16px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  .feed-msg{padding:5px 14px;font-weight:800;letter-spacing:1px;font-size:14px;border-radius:8px;
+    background:rgba(38,26,12,.85);border:2px solid rgba(255,255,255,.15);
+    animation:feedin .25s ease-out, feedout .5s ease-in 2.6s forwards}
+  .feed-msg.good{color:#8de89a;border-color:rgba(77,208,106,.5)}
+  .feed-msg.bad{color:#ff8a75;border-color:rgba(232,64,42,.5)}
+  .feed-msg.info{color:var(--yellow);border-color:var(--edge)}
+  @keyframes feedin{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+  @keyframes feedout{to{opacity:0;transform:translateX(20px)}}
+
+  #center-msg{position:absolute;top:34%;left:50%;transform:translate(-50%,-50%);
+    font-family:'Luckiest Guy';font-size:96px;color:var(--yellow);text-align:center;
+    text-shadow:5px 5px 0 var(--ink), -2px -2px 0 var(--ink), 2px -2px 0 var(--ink), -2px 2px 0 var(--ink);
+    opacity:0;pointer-events:none}
+  #center-msg.pop{animation:msgpop .9s ease-out}
+  @keyframes msgpop{0%{opacity:0;transform:translate(-50%,-50%) scale(1.8)}
+    18%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    75%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(.92)}}
+
+  #damage-vignette{position:fixed;inset:0;pointer-events:none;opacity:0;
+    background:radial-gradient(ellipse at center, transparent 55%, rgba(255,25,60,.55) 100%)}
+  #wrong-way{position:absolute;top:20%;left:50%;transform:translateX(-50%);
+    font-family:'Luckiest Guy';font-size:28px;color:#ff4a2e;
+    text-shadow:2px 2px 0 var(--ink);letter-spacing:4px;display:none;
+    animation:blink .6s steps(2) infinite}
+  @keyframes blink{50%{opacity:.25}}
+
+  /* ---------- SCREENS ---------- */
+  .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 120%, rgba(90,60,10,.45), rgba(24,16,6,.82) 68%);
+    z-index:10;transition:opacity .45s}
+  .screen.hidden{opacity:0;pointer-events:none}
+  .game-title{font-family:'Luckiest Guy';font-size:clamp(44px,9vw,96px);line-height:.95;
+    text-align:center;letter-spacing:4px;color:var(--yellow);
+    text-shadow:6px 6px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink);
+    filter:drop-shadow(0 10px 24px rgba(0,0,0,.5))}
+  .game-sub{margin-top:12px;font-size:clamp(13px,2vw,18px);letter-spacing:8px;color:#ffe9a8;text-transform:uppercase;
+    text-shadow:1px 1px 0 var(--ink)}
+  .btn{pointer-events:auto;cursor:pointer;margin-top:44px;padding:16px 64px;font-family:'Luckiest Guy';
+    font-size:22px;letter-spacing:3px;color:#fff8e0;border:3px solid var(--ink);border-radius:14px;
+    background:linear-gradient(180deg,#ff9d2e,#e8402a);
+    box-shadow:0 6px 0 var(--ink), 0 14px 30px rgba(0,0,0,.45);
+    text-shadow:2px 2px 0 rgba(0,0,0,.4);
+    transition:transform .12s, box-shadow .12s}
+  .btn:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 8px 0 var(--ink), 0 18px 36px rgba(0,0,0,.5)}
+  .controls{margin-top:40px;display:grid;grid-template-columns:auto auto;gap:8px 26px;
+    font-size:15px;letter-spacing:1px;color:#ffe9c9}
+  .controls b{color:var(--yellow);font-weight:800;text-align:right;text-shadow:1px 1px 0 var(--ink)}
+  #results{display:none}
+  .result-place{font-family:'Luckiest Guy';font-size:clamp(56px,10vw,120px);color:var(--yellow);
+    text-shadow:6px 6px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink)}
+  .result-stats{margin-top:26px;display:grid;grid-template-columns:auto auto;gap:10px 34px;
+    font-size:18px;letter-spacing:1px;color:#ffe9c9}
+  .result-stats b{color:#fff;text-align:right;font-family:'Luckiest Guy';font-size:19px;text-shadow:2px 2px 0 var(--ink)}
+  .footnote{position:absolute;bottom:18px;font-size:12px;letter-spacing:2px;color:#c9a86a}
+  #loading-note{margin-top:30px;font-size:13px;letter-spacing:3px;color:#c9a86a}
+</style>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+
+<div id="hud">
+  <div id="race-info" class="panel">
+    <div class="pos"><span id="position">–</span><small id="position-suffix"></small> <small>/ <span id="racer-count">6</span></small></div>
+    <div class="lap">LAP <span id="lap">1</span>/<span id="laps-total">3</span></div>
+    <div class="time" id="race-time">0:00.0</div>
+  </div>
+
+  <div id="score-box" class="panel">
+    <div class="label">SCORE</div>
+    <div class="val" id="score">0</div>
+  </div>
+
+  <div id="minimap-wrap" class="panel"><canvas id="minimap" width="340" height="300"></canvas></div>
+
+  <div id="health-box" class="panel">
+    <div class="bar-label"><span>HULL INTEGRITY</span><span id="health-num">100</span></div>
+    <div class="bar"><div id="health-fill"></div></div>
+    <div id="shield-hits">WRECKS: <span id="deaths">0</span></div>
+  </div>
+
+  <div id="speed-box" class="panel">
+    <div id="speed">0</div>
+    <div class="unit">KM/H</div>
+    <div id="boost-bar"><div id="boost-fill"></div></div>
+  </div>
+
+  <div id="weapon-box" class="panel">
+    <div class="bar-label"><span>CANNON HEAT</span><span id="heat-num">0%</span></div>
+    <div class="bar"><div id="heat-fill"></div></div>
+    <div id="missiles">MISSILES <span class="icons" id="missile-icons">▲ ▲ ▲</span></div>
+  </div>
+
+  <div id="feed"></div>
+  <div id="center-msg" class="titlefont"></div>
+  <div id="wrong-way">▼ WRONG WAY ▼</div>
+</div>
+<div id="damage-vignette"></div>
+
+<div id="title-screen" class="screen">
+  <div class="game-title">IGNITE&nbsp;RALLY</div>
+  <div class="game-sub">Dirt &nbsp;//&nbsp; Firepower &nbsp;//&nbsp; First Place</div>
+  <button id="start-btn" class="btn">START ENGINES</button>
+  <div class="controls">
+    <b>W / ↑</b><span>Throttle</span>
+    <b>S / ↓</b><span>Brake / Reverse</span>
+    <b>A D / ← →</b><span>Steer</span>
+    <b>SPACE</b><span>Cannon</span>
+    <b>E</b><span>Homing missile</span>
+    <b>SHIFT</b><span>Drift</span>
+    <b>C</b><span>Camera &nbsp;·&nbsp; <b style="display:inline">P</b> Pause</span>
+    <span></span><span></span>
+  </div>
+  <div id="loading-note">3 LAPS · 5 RIVALS · DESTROY OR BE DESTROYED</div>
+  <div class="footnote">A TOY-BOX CIRCUIT DESIGNED ENTIRELY BY CLAUDE</div>
+</div>
+
+<div id="results" class="screen hidden">
+  <div class="game-sub" style="letter-spacing:14px">RACE COMPLETE</div>
+  <div class="result-place titlefont" id="result-place">1ST</div>
+  <div class="result-stats">
+    <b id="r-score">0</b><span>FINAL SCORE</span>
+    <b id="r-kills">0</b><span>RIVALS DESTROYED</span>
+    <b id="r-time">0:00.0</b><span>RACE TIME</span>
+    <b id="r-best">0:00.0</b><span>BEST LAP</span>
+  </div>
+  <button id="restart-btn" class="btn">RACE AGAIN</button>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.min.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
