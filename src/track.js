@@ -67,24 +67,24 @@ const CIRCUITS = {
   // (THEMES.alpine.elev) climbs steadily through the leg stack.
   alpine: [
     // valley run at the mountain base
-    [0, -210], [70, -218], [140, -205], [195, -172], [218, -140],
+    [0, -210], [70, -218], [140, -205], [195, -172], [218, -142],
     // leg 1 (west-bound)
-    [215, -122], [160, -125], [112, -121],
-    [93, -108],                                   // hairpin W
+    [215, -124], [160, -127], [112, -123],
+    [92, -108],                                   // hairpin W
     // leg 2 (east-bound)
-    [112, -95], [160, -98], [206, -94],
-    [225, -81],                                   // hairpin E
+    [112, -93], [160, -96], [206, -92],
+    [226, -77],                                   // hairpin E
     // leg 3 (west-bound)
-    [206, -68], [158, -71], [112, -67],
-    [93, -54],                                    // hairpin W
+    [206, -62], [158, -65], [112, -61],
+    [92, -46],                                    // hairpin W
     // leg 4 (east-bound)
-    [112, -41], [160, -44], [206, -40],
-    [225, -27],                                   // hairpin E
+    [112, -31], [160, -34], [206, -30],
+    [226, -15],                                   // hairpin E
     // leg 5 (west-bound) → summit shelf
-    [206, -14], [150, -16], [100, -12],
-    [40, -5], [-15, 8],
+    [206, 0], [150, -2], [100, 2],
+    [40, 10], [-15, 20],
     // fast sweeping descent down the far side
-    [-90, 25], [-160, 45], [-225, 10], [-240, -60], [-205, -130],
+    [-90, 34], [-160, 48], [-225, 10], [-240, -60], [-205, -130],
     [-140, -175], [-70, -195],
   ],
   // GLACIAL PASS: winding ice-canyon course, medium technicality
@@ -606,6 +606,7 @@ export class Track {
     // once they wander past it.
     this.worldBounds = 1400;
     this._buildRoad();
+    if (T.elev && T.elev.profile === 'ascent') this._buildRoadSkirts();
     this._buildWalls();
     this._buildStartGate();
     this._buildRamps();      // ramps claim the straightest sections…
@@ -840,6 +841,57 @@ export class Track {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     this.group.add(mesh);
+  }
+
+  /** Mountain-pass embankments (ascent-profile levels): a dirt apron drops
+   *  from each road edge down the slope, so from below every switchback leg
+   *  reads as a chunky stacked band on the face instead of an edge-on sliver.
+   *  On the uphill side the apron simply buries itself inside the hill. */
+  _buildRoadSkirts() {
+    const dirt = new THREE.Color(this.T.terrainDirt).lerp(new THREE.Color(0x8a5a32), 0.45);
+    const dark = dirt.clone().multiplyScalar(0.7);
+    for (const side of [1, -1]) {
+      const rows = 3;
+      const verts = new Float32Array((N + 1) * rows * 3);
+      const colors = new Float32Array((N + 1) * rows * 3);
+      const idx = [];
+      for (let i = 0; i <= N; i++) {
+        const j = i % N;
+        const c = this.center[j], n = this.nrm[j];
+        const t = j * (Math.PI * 2 / N);
+        // [lateral, drop, color] — a shoulder lip, a steep face, a buried toe
+        const face = 2.6 + Math.sin(9 * t + side) * 0.4;
+        const rowSpec = [
+          [WALL_OFF + 0.55, 0.06, dirt],
+          [WALL_OFF + face, 2.1 + Math.sin(17 * t - side) * 0.35, dirt],
+          [WALL_OFF + face + 2.8, 4.6, dark],
+        ];
+        for (let r = 0; r < rows; r++) {
+          const [lat, drop, col] = rowSpec[r];
+          const o = (i * rows + r) * 3;
+          verts[o] = c.x + n.x * lat * side;
+          verts[o + 1] = c.y - drop;
+          verts[o + 2] = c.z + n.z * lat * side;
+          colors[o] = col.r; colors[o + 1] = col.g; colors[o + 2] = col.b;
+        }
+      }
+      for (let i = 0; i < N; i++) {
+        for (let r = 0; r < rows - 1; r++) {
+          const a = i * rows + r, b = a + 1, c = (i + 1) * rows + r, d = c + 1;
+          idx.push(a, c, b, b, c, d);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        vertexColors: true, roughness: 1, side: THREE.DoubleSide,
+      }));
+      mesh.receiveShadow = true;
+      this.group.add(mesh);
+    }
   }
 
   _buildWalls() {
