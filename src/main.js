@@ -55,6 +55,10 @@ const CAM_MODES = [
 ];
 const upgradeCost = (lvl) => 400 + lvl * 350;
 
+// hazard particle tints (hoisted — per-frame spawns must not allocate)
+const AVA_WHITE = new THREE.Color(0xf4faff);
+const GEYSER_SAND = new THREE.Color(0xd8b878);
+
 const loadJSON = (key, fallback) => {
   try { return { ...fallback, ...JSON.parse(localStorage.getItem(key) || '{}') }; }
   catch { return { ...fallback }; }
@@ -866,7 +870,7 @@ class Game {
 
   _updateWorldHazards(dt, time) {
     const t = this.track, T = t?.T || {};
-    const cars = [this.player, ...this.enemies];
+    const cars = (this._carsAll ??= [this.player, ...this.enemies]);
 
     // ---- falling hazards ----
     if (T.fallHazard && this.state === 'race') {
@@ -934,7 +938,7 @@ class Game {
         for (let s = 0; s < 2; s++) {
           this.particles.spawn(gy.x + (Math.random() - 0.5), gy.y + 0.3, gy.z + (Math.random() - 0.5),
             (Math.random() - 0.5) * 3, 14 + Math.random() * 6, (Math.random() - 0.5) * 3,
-            new THREE.Color(0xd8b878), 2.4, 0.8, { drag: 0.2, grav: 12, shrink: 1.1, alpha: 0.7 });
+            GEYSER_SAND, 2.4, 0.8, { drag: 0.2, grav: 12, shrink: 1.1, alpha: 0.7 });
         }
         for (const car of cars) {
           if (!car.alive) continue;
@@ -958,7 +962,9 @@ class Game {
         for (const st of this.strips) {
           const rel = (car.trackIndex - st.i0 + t.N) % t.N;
           if (rel <= st.len && Math.abs(car.lateral) < 6) {
-            car.stripLock = { vmin: car.maxSpeed * 1.22, steerMul: 0.45 };
+            const lock = (car._stripLockObj ??= { vmin: 0, steerMul: 0.45 });
+            lock.vmin = car.maxSpeed * 1.22;
+            car.stripLock = lock;
             // reel the car onto the lane center
             const n = t.nrm[car.trackIndex];
             const pull = Math.min(1, 2.5 * dt) * car.lateral;
@@ -981,7 +987,11 @@ class Game {
       cr.z += Math.cos(cr.ang) * 1.4 * dt;
       const wanderD = Math.hypot(cr.x - cr.baseX, cr.z - cr.baseZ);
       if (wanderD > 6) cr.ang += Math.PI * 0.5 * dt * 4; // turn back home
-      cr.mesh.position.set(cr.x, t.terrainHeight?.(cr.x, cr.z) ?? 0, cr.z);
+      // terrain height only every ~0.2s per critter — the exact-scan sampler
+      // is too pricey to run 12x per frame
+      cr._yT = (cr._yT ?? 0) - dt;
+      if (cr._yT <= 0) { cr._yT = 0.2; cr._y = t.terrainHeight?.(cr.x, cr.z) ?? 0; }
+      cr.mesh.position.set(cr.x, cr._y ?? 0, cr.z);
       cr.mesh.rotation.y = cr.ang;
       for (const car of cars) {
         if (!car.alive) continue;
@@ -1020,13 +1030,14 @@ class Game {
         w.speed = Math.min(58, w.speed + dt * 1.4); // it keeps picking up pace
         w.prog = (w.prog + (w.speed * dt) / t.segLen) % t.N;
         const wp = t.pointAt(Math.floor(w.prog), 0);
-        // billowing white front across the whole road width
-        for (let s = 0; s < 3; s++) {
+        // billowing white front across the whole road width (kept lean:
+        // these are the biggest sprites in the game)
+        for (let s = 0; s < 2; s++) {
           const latr = (Math.random() - 0.5) * 16;
           const bp = t.pointAt(Math.floor(w.prog), latr);
           this.particles.spawn(bp.x, bp.y + Math.random() * 3, bp.z,
             (Math.random() - 0.5) * 4, 2 + Math.random() * 4, (Math.random() - 0.5) * 4,
-            new THREE.Color(0xf4faff), 4.5, 1.1, { drag: 0.2, shrink: 1.6, alpha: 0.8 });
+            AVA_WHITE, 3.6, 1.1, { drag: 0.2, shrink: 1.6, alpha: 0.8 });
         }
         const gap = (p.trackIndex - Math.floor(w.prog) + t.N) % t.N;
         if (gap < 55 && gap > 4 && (this._avaCd ?? 0) < this.raceTime) {
@@ -1910,7 +1921,37 @@ class Game {
 
     if (this.state !== 'title') this._updateCamera(dt);
     this.input.endFrame();
+    this._autoQuality();
     this.composer.render();
+  }
+
+  /** Adaptive quality governor: if sustained fps sags mid-race, step down —
+   *  render scale first, then shadows, then bloom — so weak phones self-tune
+   *  instead of freezing. Never steps back up mid-session (no flip-flop). */
+  _autoQuality() {
+    // wall-clock window — the physics dt is clamped and lies at low fps
+    const now = performance.now();
+    if (this.state !== 'race') { this._fpsWin = now; this._fpsN = 0; return; }
+    this._fpsWin ??= now;
+    this._fpsN = (this._fpsN ?? 0) + 1;
+    const span = now - this._fpsWin;
+    if (span < 2500) return;
+    const fps = this._fpsN / (span / 1000);
+    this._fpsWin = now; this._fpsN = 0;
+    if (fps >= 26 || (this._quality ?? 0) >= 3) return;
+    const q = this._quality = (this._quality ?? 0) + 1;
+    const baseDpr = Math.min(devicePixelRatio, this.isTouch ? 1.75 : 2);
+    if (q === 1) {
+      this.renderer.setPixelRatio(baseDpr * 0.75);
+      this.composer.setSize(innerWidth, innerHeight);
+    } else if (q === 2) {
+      this.moon.castShadow = false;
+    } else {
+      this.bloom.enabled = false;
+      this.renderer.setPixelRatio(Math.min(baseDpr, 1));
+      this.composer.setSize(innerWidth, innerHeight);
+    }
+    this.hud?.feed?.(`AUTO QUALITY ${q}/3 — smoothing frame rate`, 'info');
   }
 }
 

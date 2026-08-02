@@ -25,7 +25,9 @@ const _splB = new THREE.Color();
 // ---- ambient weather (cached colors + per-type spawn rates, spawns/second) ----
 const LEAF_ALT = new THREE.Color('#c9a83a');   // dry-yellow leaf variant
 const EMBER_HOT = new THREE.Color('#ffc94e');  // bright flicker variant
-const AMBIENT_RATES = { snow: 150, leaves: 14, sand: 70, dust: 70, embers: 45, rain: 320 };
+const AMBIENT_RATES = { snow: 150, leaves: 14, sand: 70, dust: 70, embers: 45, rain: 230 };
+// phones get a leaner ambient budget — same look, less overdraw
+const MOBILE_AMBIENT = (matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in globalThis) ? 0.5 : 1;
 const _amb = new THREE.Color();                // scratch: per-spawn tint mix
 
 const VERT = /* glsl */ `
@@ -38,7 +40,9 @@ const VERT = /* glsl */ `
     vAlpha = aAlpha;
     vColor = aColor;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aSize * (280.0 / -mv.z);
+    // clamp: huge near-camera additive points are pure fill-rate murder on
+    // phone GPUs (the "freezing" report) — 46px is visually identical
+    gl_PointSize = min(aSize * (280.0 / -mv.z), 46.0);
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -273,7 +277,7 @@ export class Particles {
    *  per call; a fractional accumulator keeps rates frame-rate independent. */
   ambient(center, weather, dt) {
     if (!weather || !weather.type || !(dt > 0)) return;
-    const rate = weather.rate ?? AMBIENT_RATES[weather.type] ?? 0;
+    const rate = (weather.rate ?? AMBIENT_RATES[weather.type] ?? 0) * MOBILE_AMBIENT;
     if (!rate) return;
     if (this._ambHex !== weather.color) { // theme tint, cached across frames
       this._ambHex = weather.color;
@@ -282,8 +286,8 @@ export class Particles {
     }
     if (this._windA === undefined) this._windA = Math.random() * Math.PI * 2; // prevailing wind
     this._ambAcc = (this._ambAcc ?? 0) + rate * dt;
-    // rain needs a higher per-frame budget: a 320/s downpour is ~6 per frame
-    let n = Math.min(weather.type === 'rain' ? 6 : 3, Math.floor(this._ambAcc));
+    // rain needs a higher per-frame budget than other weather
+    let n = Math.min(weather.type === 'rain' ? 5 : 3, Math.floor(this._ambAcc));
     if (n <= 0) return;
     this._ambAcc -= n;
     const base = this._ambColor;
