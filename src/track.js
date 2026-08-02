@@ -260,8 +260,10 @@ const THEMES = {
       fringe: [168, 140, 66], fringeVar: [40, 34, 26],
     },
     hillColor: 0xa85a32, peakColor: 0xc27a4a,
-    treeCount: 90, trunkColor: 0x7a5230,
-    foliageLow: 0x8a7444, foliageTop: 0x967e4a,
+    // saguaros, not pine scrub: a desert should never grow SOLID trees that
+    // stop a car dead — cacti all yield and burst on impact
+    vegetation: 'cactus', treeCount: 90, trunkColor: 0x4a8a4c,
+    foliageLow: 0x3f7a34, foliageTop: 0x4c8a3e,
     foliage: { h: 0.10, hVar: 0.05, s: 0.40, sVar: 0.15, l: 0.45, lVar: 0.15 },
     treeSnowCap: false,
     tuftCount: 520, grass: { bladeA: '#8a7a30', bladeB: '#c8b45e' },

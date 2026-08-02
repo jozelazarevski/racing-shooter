@@ -906,8 +906,9 @@ export class Car {
     // a couple of mistakes shouldn't end the race
     if (this === this.game.player) {
       const id = this.game.difficulty?.id;
-      amount *= id === 'easy' ? 0.55 : id === 'hard' ? 0.95 : 0.75;
+      amount *= id === 'easy' ? 0.45 : id === 'hard' ? 0.85 : 0.62;
     }
+    this._lastHurt = this.game.raceTime;
     const before = this.health / this.maxHealth;
     this.health -= amount;
     if (amount >= 15) this.game.particles.debris(this.pos, 2 + (Math.random() < 0.5 ? 1 : 0));
@@ -937,7 +938,7 @@ export class Car {
   respawn() {
     this.alive = true;
     this.health = this.maxHealth;
-    this.invuln = 2.2;
+    this.invuln = 3.0;
     this._tintFrac = 1;
     this.game.restoreCarParts?.(this);
     this._applyScorch(1); // fresh paint job with the fresh hull

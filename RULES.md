@@ -155,7 +155,7 @@ walls.
 | Object | Class | Threshold | Cost | Pays | Notes |
 |---|---|---|---|---|---|
 | Pine tree | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | "TIMBER!" — felled trunk flies with topple spin. 30 hp vs cannon (~3 hits fells it); blasts fell instantly |
-| Saguaro cactus | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | Includes roadside cacti at canyon wall base; 30 hp vs cannon |
+| Saguaro cactus | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | BURSTS in place — pulp splinters and a slump, never the pine topple-roll. Includes roadside cacti at canyon wall base; 30 hp vs cannon |
 | Burnt snag | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | Trunk only, no foliage; 30 hp vs cannon |
 | Bush | SOFT | — | 15 % speed once per pass (2 s cooldown) | +5 | Leaf burst + dust; bush stays rooted |
 | Grass tufts / flowers / pebbles | DECOR | — | — | — | All < 0.5 u, legal decor |
@@ -178,7 +178,7 @@ walls.
 | Object | Class | Behavior |
 |---|---|---|
 | Rival cars | ACTOR | Real impacts (> 9 u/s relative) dent BOTH hulls `min(20, (impact−9)×0.6)`, rate-limited 0.5 s per car; rubs are free; restitution 0.12; sparks scale with impact |
-| Player car | ACTOR | Same rules; also takes wall/tree/ram/weapon damage; wreck at 0 hull → respawn with brief invulnerability. Hull intake scales by difficulty: EASY ×0.55, NORMAL ×0.75, HARD ×0.95 (events/drama unchanged) |
+| Player car | ACTOR | Same rules; also takes wall/tree/ram/weapon damage; wreck at 0 hull → respawn with 3 s invulnerability. Hull intake scales by difficulty: EASY ×0.45, NORMAL ×0.62, HARD ×0.85 (events/drama unchanged). **Pit-crew recovery**: 5 s without taking damage → hull regenerates 3/s up to 60% of max |
 | Choppers | ACTOR | 80 hp; killed by cannon (flak — altitude ignored), missiles, shockwave; +500 on kill |
 | Pickups | trigger | Collected on touch: green hull / amber missiles / blue nitro / red mines |
 | Slow-field orb (violet) | trigger | GLACIAL PASS / AMAZON RAPIDS only (2 per lap). On touch: **FREEZE STRIKE! / JUNGLE FURY!** — every rival is hard-capped at `maxSpeed × 0.5` for 6 s. The cap is physical: it stomps in-flight boosts and boost pads grant rivals nothing while the field is live. +100 score |
