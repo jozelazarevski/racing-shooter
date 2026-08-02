@@ -4,13 +4,13 @@ A bright, cartoon toy-car combat racer in the spirit of the classic *Ignition*
 (1997), playable entirely in the browser — on desktop **and phones** (full
 touch controls). Race 3 laps against the **Voxel Racers** — CROWN, SLEEK,
 DUNE, ALPINE and PIT-99, each a distinct liveried block-built machine — on a
-championship of eight themed worlds — PINE VALLEY (forest), DUST CANYON
-(desert), FROST PEAK (snow), CANYON RUN (a slot canyon with hoodoo rock
-obstacles, mud puddles and overhead bridges), EMBER PASS (volcanic
-badlands), SUMMIT CLIMB (a mountain-ascent stack of switchback hairpins),
-GLACIAL PASS (an ice canyon with igloos, penguins and frozen slicks) and
-AMAZON RAPIDS (a jungle run through river fords under a banana-tree
-canopy) — armed with cannon, homing missiles, mines, a shockwave blast,
+championship of **eighteen themed worlds across six regions** — from PINE
+VALLEY and the SUMMIT CLIMB switchbacks, through DUST CANYON's dune
+sweeps, live-rockfall ravine and scorpion-guarded oasis, FROST PEAK's
+glacier sheet ice and avalanche-chased mountain pass, the burning FOREST
+FIRE ESCAPE, giant-redwood and log-flume runs, AMAZON RAPIDS' river
+fords, to NEO-KYOTO's neon maglev expressway and rat-infested undercity
+tunnels — armed with cannon, homing missiles, mines, a shockwave blast,
 nitro, boost pads and launch ramps. Every circuit **climbs and descends
 real elevation**: grades sap or feed your speed, the car pitches with the
 road, and each world has its own hill profile. Drift-happy arcade physics,
@@ -69,8 +69,13 @@ on the buttons. Works in portrait and landscape.
 
 ## Gameplay
 
-- **8 worlds, 3 laps each, 6 racers.** Finish a world to unlock the next; the
-  results screen chains you onward and your score carries over.
+- **18 worlds in 6 regions, 3 laps each, 6 racers.** Finish a world to unlock
+  the next; the results screen chains you onward and your score carries over.
+- **Dynamic hazards** (per world, spec in `RULES.md`): live rockfall, falling
+  burning trees and shattering icicles; sand-geyser launch pads; water-flume
+  and maglev speed lanes; scorpions and rats that sting slow cars (squash
+  them at speed for +25); and an accelerating avalanche that chases you down
+  AVALANCHE ALLEY's final descent.
 - **SUMMIT CLIMB** is a true mountain ascent: five stacked switchback legs
   connected by 180° hairpins climb ~33 m from the valley floor to the summit,
   with embanked road shoulders and loose boulders on the downhill runs.
