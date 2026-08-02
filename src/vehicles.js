@@ -62,6 +62,23 @@ function roofDecalTexture(text) {
 // Blocky toy racers with liveries: brawler (off-road hero), crown (low-slung
 // racer), sleek (compact hatch), dune (rally wagon), alpine (striped rally
 // coupe), pit (black stock car).
+let _carAoTex = null;
+/** Soft radial shadow blob shared by every car's underside. */
+function _carAoTexture() {
+  if (_carAoTex) return _carAoTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const x = c.getContext('2d');
+  const gr = x.createRadialGradient(32, 32, 4, 32, 32, 31);
+  gr.addColorStop(0, 'rgba(0,0,0,0.95)');
+  gr.addColorStop(0.65, 'rgba(0,0,0,0.55)');
+  gr.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = gr;
+  x.fillRect(0, 0, 64, 64);
+  _carAoTex = new THREE.CanvasTexture(c);
+  return _carAoTex;
+}
+
 export function buildVoxelRacer(spec) {
   const { body, accent, stripe = null, number = null, style = 'crown', rims = null } = spec;
   const g = new THREE.Group();
@@ -186,6 +203,53 @@ export function buildVoxelRacer(spec) {
     for (const [x, z] of [[-1.3, 1.5], [1.3, 1.5], [-1.3, -1.5], [1.3, -1.5]]) {
       box(0.45, 0.26, wheelR * 2 + 0.4, darkMat, x, wheelY + wheelR * 0.72, z);
     }
+  }
+
+  // ---- realism detail pass (all styles, ~14 tiny boxes per car) ----
+  {
+    // side mirrors on the cabin's leading corners
+    for (const s of [-1, 1]) {
+      box(0.09, 0.05, 0.16, darkMat, (cabW / 2 + 0.16) * s, cabY + 0.14, cabZ + cabL / 2 - 0.12);
+      box(0.16, 0.14, 0.05, accentMat, (cabW / 2 + 0.24) * s, cabY + 0.14, cabZ + cabL / 2 - 0.12);
+    }
+    // exhaust pipes under the rear bumper (twin on the fast cars)
+    const exGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.42, 8);
+    exGeo.rotateX(Math.PI / 2);
+    const pipes = (style === 'crown' || style === 'pit' || style === 'alpine') ? [-0.62, -0.4] : [-0.5];
+    for (const x of pipes) {
+      const ex = new THREE.Mesh(exGeo, rimMat);
+      ex.position.set(x, baseY - 0.1, -bodyLen / 2 - 0.16);
+      g.add(ex);
+    }
+    // whip antenna on the rear deck (the brawler's rack already carries gear)
+    if (style !== 'brawler') {
+      box(0.035, 0.6, 0.035, darkMat, -0.95, baseY + bodyH + 0.4, -bodyLen / 2 + 0.5);
+    }
+    // wheel-arch brows on the low cars (tall ones wear full flares)
+    if (!tall) {
+      for (const [x, z] of [[-1.3, 1.5], [1.3, 1.5], [-1.3, -1.5], [1.3, -1.5]]) {
+        box(0.34, 0.1, wheelR * 2 + 0.3, darkMat, x, wheelY + wheelR + 0.06, z);
+      }
+    }
+    // door sills + front splitter: dark trim lines ground the silhouette
+    for (const s of [-1, 1]) box(0.08, 0.12, bodyLen - 1.0, darkMat, 1.28 * s, baseY - 0.12, 0);
+    box(2.3, 0.1, 0.2, darkMat, 0, baseY - 0.14, bodyLen / 2 - 0.05);
+    // fuel cap + side vent flavor on the rear quarter
+    box(0.16, 0.16, 0.04, rimMat, -1.31, baseY + bodyH * 0.55, -bodyLen / 2 + 0.75);
+    box(0.04, 0.14, 0.4, darkMat, 1.31, baseY + bodyH * 0.45, bodyLen / 2 - 1.1);
+    // baked under-body shadow: grounds the car even when real-time shadows
+    // are stepped off by the quality governor
+    const ao = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.6, bodyLen + 1.6),
+      new THREE.MeshBasicMaterial({
+        map: _carAoTexture(), transparent: true, opacity: 0.42,
+        depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
+      })
+    );
+    ao.rotation.x = -Math.PI / 2;
+    ao.position.y = 0.03;
+    ao.renderOrder = 1;
+    g.add(ao);
   }
 
   // ---- roof sponsor decal (hood on the brawler — its roof carries the rack) ----
