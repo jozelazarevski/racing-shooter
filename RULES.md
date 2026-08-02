@@ -94,6 +94,8 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 | Object | Class | Threshold | Cost | Pays | Notes |
 |---|---|---|---|---|---|
 | Road | TERRAIN | — | — | — | Full grip; elevation grades apply (GRADE 16) |
+| Snow surface (FROST PEAK, GLACIAL PASS) | TERRAIN | — | grip ×0.55, traction ×0.72, brakes ×0.58 | — | Whole-world condition (`theme.surface:'snow'`): slides start earlier and run ~2× longer, brakes need ~1.6× distance; AI corner speed ×0.86; powder rooster tails off the tires |
+| Wet surface (PINE VALLEY, AMAZON RAPIDS) | TERRAIN | — | grip ×0.78, traction ×0.88, brakes ×0.80 | — | Rain-glossed roads (`theme.surface:'wet'`): slick under braking; AI corner speed ×0.94; water spray off the tires; rain ambient weather |
 | Off-road terrain (roam) | TERRAIN | — | speed cap by car's off-road stat | — | Dust plumes while churning |
 | Mud puddles | SOFT | — | heavy drag + slick grip inside | — | Brown splash while inside |
 | Boost pads | TERRAIN | — | — | — | Forward impulse, yellow chevrons |

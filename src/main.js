@@ -4,6 +4,7 @@ import { EffectComposer } from '../lib/postprocessing/EffectComposer.js';
 import { RenderPass } from '../lib/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from '../lib/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../lib/postprocessing/OutputPass.js';
+import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
 import { Track, LEVELS } from './track.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG } from './vehicles.js';
@@ -108,6 +109,26 @@ class Game {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.38, 0.45, 0.88);
     this.composer.addPass(this.bloom);
+    // film grade: gentle saturation + contrast lift and a soft vignette —
+    // runs pre-OutputPass (linear space), so it grades under the tone map
+    this.grade = new ShaderPass({
+      uniforms: { tDiffuse: { value: null }, uVig: { value: 0.30 }, uSat: { value: 1.07 }, uCon: { value: 1.05 } },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tDiffuse; uniform float uVig, uSat, uCon; varying vec2 vUv;
+        void main() {
+          vec4 c = texture2D(tDiffuse, vUv);
+          float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+          c.rgb = mix(vec3(l), c.rgb, uSat);
+          c.rgb = (c.rgb - 0.5) * uCon + 0.5;
+          vec2 q = vUv - 0.5;
+          c.rgb *= 1.0 - uVig * smoothstep(0.35, 0.95, dot(q, q) * 2.6);
+          gl_FragColor = c;
+        }`,
+    });
+    this.composer.addPass(this.grade);
     this.composer.addPass(new OutputPass());
 
     // world + systems
@@ -120,6 +141,32 @@ class Game {
       if (th.hemiIntensity !== undefined) this.hemi.intensity = th.hemiIntensity;
       if (th.sunColor !== undefined) this.moon.color.setHex(th.sunColor);
       if (th.sunIntensity !== undefined) this.moon.intensity = th.sunIntensity;
+    }
+    // image-based lighting: a tiny theme-tinted gradient dome through PMREM.
+    // Standard materials pick up soft sky reflections (glossy wet roads, car
+    // paint sheen). Dimmed at bake time — r160 has no scene.environmentIntensity.
+    {
+      const top = new THREE.Color(th?.skyTop ?? '#68b7e8').multiplyScalar(0.55);
+      const hor = new THREE.Color(th?.skyHorizon ?? '#dff0fa').multiplyScalar(0.50);
+      const gnd = new THREE.Color(th?.hemiGround !== undefined ? th.hemiGround : 0x5a8a3c).multiplyScalar(0.35);
+      const cnv = document.createElement('canvas'); cnv.width = 2; cnv.height = 64;
+      const cx = cnv.getContext('2d');
+      const gr = cx.createLinearGradient(0, 0, 0, 64);
+      gr.addColorStop(0, '#' + top.getHexString());
+      gr.addColorStop(0.5, '#' + hor.getHexString());
+      gr.addColorStop(0.56, '#' + gnd.getHexString());
+      gr.addColorStop(1, '#' + gnd.multiplyScalar(0.6).getHexString());
+      cx.fillStyle = gr; cx.fillRect(0, 0, 2, 64);
+      const envTex = new THREE.CanvasTexture(cnv);
+      envTex.colorSpace = THREE.SRGBColorSpace;
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      const dome = new THREE.Mesh(
+        new THREE.SphereGeometry(10, 16, 12),
+        new THREE.MeshBasicMaterial({ map: envTex, side: THREE.BackSide }));
+      const envScene = new THREE.Scene();
+      envScene.add(dome);
+      this.scene.environment = pmrem.fromScene(envScene, 0.06).texture;
+      pmrem.dispose(); dome.geometry.dispose(); dome.material.dispose(); envTex.dispose();
     }
     this.particles = new Particles(this.scene);
     this.skids = new SkidMarks(this.scene);
@@ -1273,6 +1320,9 @@ class Game {
         this.startScore = this.score; // credits are earned on top of any carried score
         this.hud.centerMsg('GO!');
         this.track.setLights('green');
+        const surf = this.track.T?.surface;
+        if (surf === 'snow') this.hud.feed('SNOW ROAD — LOW GRIP, LONG SLIDES', 'info');
+        else if (surf === 'wet') this.hud.feed('WET ROAD — SLICK UNDER BRAKING', 'info');
       }
     }
 

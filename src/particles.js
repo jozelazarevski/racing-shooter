@@ -25,7 +25,7 @@ const _splB = new THREE.Color();
 // ---- ambient weather (cached colors + per-type spawn rates, spawns/second) ----
 const LEAF_ALT = new THREE.Color('#c9a83a');   // dry-yellow leaf variant
 const EMBER_HOT = new THREE.Color('#ffc94e');  // bright flicker variant
-const AMBIENT_RATES = { snow: 150, leaves: 14, sand: 70, dust: 70, embers: 45 };
+const AMBIENT_RATES = { snow: 150, leaves: 14, sand: 70, dust: 70, embers: 45, rain: 320 };
 const _amb = new THREE.Color();                // scratch: per-spawn tint mix
 
 const VERT = /* glsl */ `
@@ -273,7 +273,7 @@ export class Particles {
    *  per call; a fractional accumulator keeps rates frame-rate independent. */
   ambient(center, weather, dt) {
     if (!weather || !weather.type || !(dt > 0)) return;
-    const rate = AMBIENT_RATES[weather.type] ?? 0;
+    const rate = weather.rate ?? AMBIENT_RATES[weather.type] ?? 0;
     if (!rate) return;
     if (this._ambHex !== weather.color) { // theme tint, cached across frames
       this._ambHex = weather.color;
@@ -282,7 +282,8 @@ export class Particles {
     }
     if (this._windA === undefined) this._windA = Math.random() * Math.PI * 2; // prevailing wind
     this._ambAcc = (this._ambAcc ?? 0) + rate * dt;
-    let n = Math.min(3, Math.floor(this._ambAcc));
+    // rain needs a higher per-frame budget: a 320/s downpour is ~6 per frame
+    let n = Math.min(weather.type === 'rain' ? 6 : 3, Math.floor(this._ambAcc));
     if (n <= 0) return;
     this._ambAcc -= n;
     const base = this._ambColor;
@@ -321,6 +322,17 @@ export class Particles {
             wz * (9 + Math.random() * 7) + (Math.random() - 0.5) * 3,
             base, 4.5 + Math.random() * 3, 1.8 + Math.random() * 1.4,
             { drag: 0.15, shrink: 1.5, alpha: 0.3 }); // shrink>1: wisps grow as they fade
+          break;
+        }
+        case 'rain': {
+          // fast thin streaks slanting with the wind, short lives — the eye
+          // reads the motion, not the individual drop
+          const r = 55 * Math.sqrt(Math.random());
+          this.spawn(
+            center.x + Math.cos(a) * r, center.y + 14 + Math.random() * 10, center.z + Math.sin(a) * r,
+            wx * 4 + (Math.random() - 0.5) * 2, -34 - Math.random() * 8, wz * 4 + (Math.random() - 0.5) * 2,
+            base, 0.55 + Math.random() * 0.3, 0.7 + Math.random() * 0.25,
+            { shrink: 1, alpha: 0.34 });
           break;
         }
         case 'embers': {

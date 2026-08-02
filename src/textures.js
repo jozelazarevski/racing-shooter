@@ -20,8 +20,145 @@ function hexRgb(hex) {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
+/** Rain-soaked overlay for the road canvas: darkens the surface toward wet
+ *  asphalt/mud, pools sheen in the wheel ruts, lays long soft gleam streaks
+ *  down the direction of travel and a few standing-water film patches.
+ *  Used by the forest (drizzle) and jungle (downpour) roads. */
+function applyWetRoad(g, w, h, spec) {
+  const S = { darken: 0.32, gleam: 12, pools: 4, ...(spec === true ? {} : spec) };
+  // waterlogged darkening — multiply keeps all the grain underneath
+  const dk = 255 - Math.round(S.darken * 255);
+  g.globalCompositeOperation = 'multiply';
+  g.fillStyle = `rgb(${dk},${Math.max(0, dk - 5)},${Math.max(0, dk - 9)})`;
+  g.fillRect(0, 0, w, h);
+  g.globalCompositeOperation = 'source-over';
+  // sheen collecting in the compacted wheel ruts
+  for (const cx of [w * 0.32, w * 0.68]) {
+    const grd = g.createLinearGradient(cx - 30, 0, cx + 30, 0);
+    grd.addColorStop(0, 'rgba(170,190,210,0)');
+    grd.addColorStop(0.5, 'rgba(170,190,210,0.14)');
+    grd.addColorStop(1, 'rgba(170,190,210,0)');
+    g.fillStyle = grd;
+    g.fillRect(cx - 30, 0, 60, h);
+  }
+  // long soft gleam streaks running with the road (full height → tiles along v)
+  for (let i = 0; i < S.gleam; i++) {
+    const x = Math.random() * w;
+    const bw = 5 + Math.random() * 16;
+    const a = 0.05 + Math.random() * 0.07;
+    const grd = g.createLinearGradient(x - bw, 0, x + bw, 0);
+    grd.addColorStop(0, 'rgba(185,205,225,0)');
+    grd.addColorStop(0.5, `rgba(185,205,225,${a})`);
+    grd.addColorStop(1, 'rgba(185,205,225,0)');
+    g.fillStyle = grd;
+    g.fillRect(x - bw, 0, bw * 2, h);
+  }
+  // standing-water film patches (kept off the v seam so the tile stays clean)
+  for (let i = 0; i < S.pools; i++) {
+    const px = w * (0.16 + Math.random() * 0.68);
+    const py = h * (0.16 + Math.random() * 0.68);
+    const pr = 26 + Math.random() * 34;
+    const grd = g.createRadialGradient(px, py, pr * 0.15, px, py, pr);
+    grd.addColorStop(0, 'rgba(122,142,166,0.36)');
+    grd.addColorStop(0.7, 'rgba(105,125,150,0.20)');
+    grd.addColorStop(1, 'rgba(105,125,150,0)');
+    g.fillStyle = grd;
+    g.beginPath();
+    g.ellipse(px, py, pr, pr * (0.55 + Math.random() * 0.35), Math.random() * 3, 0, Math.PI * 2);
+    g.fill();
+    // sky gleam riding on the film
+    g.fillStyle = 'rgba(205,225,245,0.22)';
+    g.beginPath();
+    g.ellipse(px - pr * 0.2, py - pr * 0.18, pr * 0.42, pr * 0.15, -0.4, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+/** Snow-driven overlay for the road canvas: white cover creeping in from both
+ *  edges, two darker carved tire channels down the lap (the rut/tread painting
+ *  underneath stays visible so they read driven-in), pushed-up berm highlights,
+ *  soft drift lobes and ice sparkle. FROST PEAK + GLACIAL PASS. */
+function applySnowRoad(g, w, h, spec) {
+  const S = {
+    snow: [244, 249, 254], shade: [198, 214, 232], slush: [210, 222, 234],
+    slushAlpha: 0.4, sparkle: 150, ...(spec === true ? {} : spec),
+  };
+  const [sr, sg, sb] = S.snow;
+  const TWO = Math.PI * 2;
+  const chans = [w * 0.32, w * 0.68];      // channels carve along the old ruts
+  const chHalf = 29;
+  // channel edge wobble — integer cycles over h so the texture still tiles
+  const wob = (y, ci) =>
+    Math.sin((y / h) * TWO * 4 + ci * 4) * 5 + Math.sin((y / h) * TWO * 9 + ci) * 3;
+  // cold veil first: mutes the dirt toward winter light
+  g.fillStyle = `rgba(${sr},${sg},${sb},0.16)`;
+  g.fillRect(0, 0, w, h);
+  // snow blanket drawn row-by-row with wavy holes over the two channels
+  for (let y = 0; y < h; y += 3) {
+    const edges = chans.map((cx, ci) => cx + wob(y, ci));
+    const spans = [
+      [0, edges[0] - chHalf],
+      [edges[0] + chHalf, edges[1] - chHalf],
+      [edges[1] + chHalf, w],
+    ];
+    g.fillStyle = `rgba(${sr},${sg},${sb},0.88)`;
+    for (const [x0, x1] of spans) {
+      if (x1 > x0) g.fillRect(x0, y, x1 - x0, 3);
+    }
+    // pushed-up berms hugging each channel edge
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    for (const e of edges) {
+      g.fillRect(e - chHalf - 3.2, y, 3.4, 3);
+      g.fillRect(e + chHalf - 0.2, y, 3.4, 3);
+    }
+    // compacted slush film inside the channels — treads ghost through
+    const [lr, lg, lb] = S.slush;
+    g.fillStyle = `rgba(${lr},${lg},${lb},${S.slushAlpha})`;
+    for (const e of edges) g.fillRect(e - chHalf + 3, y, chHalf * 2 - 6, 3);
+  }
+  // mottled depth in the cover (soft shade + bright re-frozen patches)
+  for (let i = 0; i < 240; i++) {
+    const x = Math.random() * w, y = Math.random() * h;
+    if (chans.some((c) => Math.abs(x - c) < chHalf + 5)) continue;
+    const r = 3 + Math.random() * 10;
+    const shade = Math.random() < 0.45;
+    const [cr, cg, cb] = shade ? S.shade : [255, 255, 255];
+    g.fillStyle = `rgba(${cr},${cg},${cb},${shade ? 0.10 + Math.random() * 0.08 : 0.12 + Math.random() * 0.12})`;
+    g.beginPath();
+    g.arc(x, y, r, 0, TWO);
+    g.fill();
+  }
+  // soft drift lobes bulging in from both road edges (drawn thrice so they
+  // wrap across the v seam)
+  for (const [x0, dir] of [[0, 1], [w, -1]]) {
+    for (let i = 0; i < 7; i++) {
+      const y = Math.random() * h;
+      const rx = 24 + Math.random() * 30, ry = 14 + Math.random() * 22;
+      const cx = x0 + dir * (4 + Math.random() * 18);
+      for (const yy of [y - h, y, y + h]) {
+        const grd = g.createRadialGradient(cx, yy, 2, cx, yy, rx);
+        grd.addColorStop(0, 'rgba(255,255,255,0.9)');
+        grd.addColorStop(0.62, `rgba(${sr},${sg},${sb},0.5)`);
+        grd.addColorStop(1, `rgba(${sr},${sg},${sb},0)`);
+        g.fillStyle = grd;
+        g.beginPath();
+        g.ellipse(cx, yy, rx, ry, 0, 0, TWO);
+        g.fill();
+      }
+    }
+  }
+  // ice sparkle flecks
+  for (let i = 0; i < S.sparkle; i++) {
+    g.fillStyle = Math.random() < 0.7 ? 'rgba(255,255,255,0.9)' : 'rgba(190,225,255,0.8)';
+    const s = Math.random() < 0.85 ? 1.4 : 2.2;
+    g.fillRect(Math.random() * w, Math.random() * h, s, s);
+  }
+}
+
 /** Dirt road: rich earth base, twin compacted wheel ruts with tire-tread chevrons,
- *  stones, and an irregular grassy fringe creeping in from both edges. */
+ *  stones, and an irregular grassy fringe creeping in from both edges.
+ *  Optional palette.wet / palette.snowCover specs layer 2026-style surface
+ *  conditions (rain-slicked gloss / driven-in snow cover) on top. */
 export function roadTexture(palette = {}) {
   const P = {
     base: '#a8814d',            // slightly darker/richer than the old sandy tan
@@ -117,6 +254,9 @@ export function roadTexture(palette = {}) {
         g.fill();
       }
     }
+    // surface-condition overlays (wet gloss / driven-in snow) on top of it all
+    if (P.wet) applyWetRoad(g, w, h, P.wet);
+    if (P.snowCover) applySnowRoad(g, w, h, P.snowCover);
   });
   t.wrapS = THREE.ClampToEdgeWrapping;
   t.wrapT = THREE.RepeatWrapping;
@@ -266,6 +406,48 @@ export function glowTexture() {
     g.fillStyle = grd;
     g.fillRect(0, 0, w, h);
   });
+}
+
+/** Sun disc: a hot solid core with a tight soft rim — the wide halo behind it
+ *  reuses glowTexture. Tinted per-theme with sunGlow. */
+export function sunTexture() {
+  return make(256, 256, (g, w, h) => {
+    const grd = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.17, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.24, 'rgba(255,252,238,0.85)');
+    grd.addColorStop(0.44, 'rgba(255,244,214,0.22)');
+    grd.addColorStop(1, 'rgba(255,240,200,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+  });
+}
+
+/** Layered horizon haze: a white vertical strip (tinted by material color)
+ *  wrapped onto a big cylinder around the horizon — three soft stacked bands
+ *  so the skyline reads as atmosphere instead of a flat 90s gradient.
+ *  Canvas top = upper sky (thin veil), canvas bottom = dense ground layer. */
+export function hazeTexture() {
+  const t = make(32, 256, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    // [bandCenter (0=top), halfWidth, peakAlpha]
+    const bands = [
+      [0.52, 0.34, 0.28],
+      [0.70, 0.22, 0.5],
+      [0.88, 0.30, 0.75],
+    ];
+    for (const [cy, half, a] of bands) {
+      const grd = g.createLinearGradient(0, (cy - half) * h, 0, (cy + half) * h);
+      grd.addColorStop(0, 'rgba(255,255,255,0)');
+      grd.addColorStop(0.55, `rgba(255,255,255,${a})`);
+      grd.addColorStop(1, `rgba(255,255,255,${a * 0.9})`);
+      g.fillStyle = grd;
+      g.fillRect(0, 0, w, h);
+    }
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
 }
 
 /** Boost pad chevrons painted on the dirt. */

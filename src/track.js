@@ -8,6 +8,7 @@ import {
   grassTexture, bannerTexture, hazardTexture, crowdTexture, awningTexture,
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
   crateTexture, coneTexture, barrelTexture, riverTexture, iglooTexture,
+  sunTexture, hazeTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -109,17 +110,21 @@ const CIRCUITS = {
 // to main.js via `track.theme`; the rest is internal art direction.
 const THEMES = {
   forest: {
+    // drizzle-soaked rally stage: physics reads `surface`
+    surface: 'wet',
     // lighting / fog (plain numbers; also applied to scene.fog by Track itself)
     fogColor: 0xcfe8f5, fogNear: 320, fogFar: 1500,
     hemiSky: 0xbfe0ff, hemiGround: 0x5a8a3c,
     sunColor: 0xfff3d6, sunIntensity: 2.0,
     // sky dome + sun sprite + clouds
     skyTop: '#3f8de0', skyHorizon: '#e8f0d8', sunGlow: 0xfff2b8,
+    sunAz: 0.7, sunEl: 0.55,
     cloudCount: 12, cloudOpacity: 0.9,
     // terrain vertex colors + ground texture
     terrainLow: '#4f8a35', terrainHigh: '#83b455', terrainDirt: '#9c7a48',
     ground: {},  // groundTexture defaults are the forest palette
-    road: {},    // roadTexture defaults are the forest palette
+    // rain-darkened forest dirt: gentle wet overlay on the default palette
+    road: { wet: { darken: 0.26, gleam: 10, pools: 3 } },
     // horizon silhouettes
     hillColor: 0x4e8a3c, peakColor: 0x8d8578,
     // trees (material color multiplies per-instance HSL variation)
@@ -136,8 +141,8 @@ const THEMES = {
     hutRoof: 0xc9a24d, hayColor: 0xd8b95e,
     // debris chip colors when a fence/wall is scraped (painted pole red/cream)
     splinter: [0xc23b2a, 0xe8e2d4],
-    // ambient drifting weather particles (recipe implemented by particles.js)
-    weather: { type: 'leaves', color: 0x9ab84a },
+    // light drizzle drifting through the pines (rate overrides the default)
+    weather: { type: 'rain', color: 0xcfe0ee, rate: 130 },
     // elevation profile: amplitude + deterministic per-octave phases
     elev: { amp: 8, ph: [0.9, 2.6, 4.2] },
     // per-level gameplay-placement tuning
@@ -148,6 +153,7 @@ const THEMES = {
     hemiSky: 0xffe9c4, hemiGround: 0xc9a86a,
     sunColor: 0xffe6b0, sunIntensity: 2.2,
     skyTop: '#6fa8d8', skyHorizon: '#ffd9a0', sunGlow: 0xffdca0,
+    sunAz: 0.55, sunEl: 0.34,                           // low golden desert sun
     cloudCount: 5, cloudOpacity: 0.55,
     terrainLow: '#c9a86a', terrainHigh: '#e2c78e', terrainDirt: '#b06e3c',
     ground: {
@@ -178,10 +184,12 @@ const THEMES = {
     rampMaxCurv: 0.014, padMaxCurv: 0.004, boardMaxCurv: 0.012,
   },
   snow: {
+    surface: 'snow',                                    // physics reads this
     fogColor: 0xe2edf6, fogNear: 240, fogFar: 1250,
     hemiSky: 0xdfeaf8, hemiGround: 0xb8c6d2,
     sunColor: 0xeaf2ff, sunIntensity: 1.7,
     skyTop: '#639fd8', skyHorizon: '#eaf3fa', sunGlow: 0xffffff,
+    sunAz: 0.82, sunEl: 0.46,
     cloudCount: 9, cloudOpacity: 0.95,
     terrainLow: '#dde8ee', terrainHigh: '#ffffff', terrainDirt: '#b7c4cd',
     ground: {
@@ -194,6 +202,8 @@ const THEMES = {
       rut: 'rgba(46,32,20,0.6)', rutCore: 'rgba(30,20,12,0.5)', tread: 'rgba(14,9,5,0.55)',
       stoneA: 'rgba(190,200,210,0.7)', stoneB: 'rgba(70,55,40,0.7)',
       fringe: [228, 238, 246], fringeVar: [24, 16, 10],   // snow creeping onto the road
+      // white cover with two carved channels down the churned mud beneath
+      snowCover: { slush: [206, 216, 226], slushAlpha: 0.38 },
     },
     hillColor: 0xcfdce4, peakColor: 0xeef4f8,
     treeCount: 240, trunkColor: 0x5a4028,
@@ -220,6 +230,7 @@ const THEMES = {
     hemiSky: 0xffd9a8, hemiGround: 0xb5764a,
     sunColor: 0xffc98a, sunIntensity: 2.1,
     skyTop: '#6f95c0', skyHorizon: '#ffcf96', sunGlow: 0xffc070,
+    sunAz: 0.5, sunEl: 0.3,                             // late sun raking the walls
     cloudCount: 4, cloudOpacity: 0.5,
     terrainLow: '#c08050', terrainHigh: '#e0a870', terrainDirt: '#8f5430',
     ground: {
@@ -258,6 +269,7 @@ const THEMES = {
     hemiSky: 0xc98a66, hemiGround: 0x4a3a32, hemiIntensity: 1.05,  // ember dusk, but readable
     sunColor: 0xff8a4a, sunIntensity: 2.0,
     skyTop: '#341a28', skyHorizon: '#dd541c', sunGlow: 0xff6a28, skyCurve: 0.72,
+    sunAz: 0.6, sunEl: 0.2,                             // ember sun low on the haze
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
     terrainLow: '#322c28', terrainHigh: '#564a40', terrainDirt: '#6a3c2c',
     ground: {
@@ -299,6 +311,7 @@ const THEMES = {
     hemiSky: 0xcfe4ff, hemiGround: 0x628a4c,
     sunColor: 0xfff6e0, sunIntensity: 2.0,
     skyTop: '#2f6fc8', skyHorizon: '#dceef8', sunGlow: 0xfff4cc,
+    sunAz: 0.9, sunEl: 0.5,
     cloudCount: 10, cloudOpacity: 0.92,
     terrainLow: '#4c8a3c', terrainHigh: '#9ab87a', terrainDirt: '#8a7a5a',
     ground: {},   // lush meadow defaults read right at altitude too
@@ -331,10 +344,12 @@ const THEMES = {
   // GLACIAL PASS: blue-white ice canyon — glacial cliff ribbons, packed-snow
   // road with frozen slicks, igloos, penguins and driving snow.
   glacial: {
+    surface: 'snow',                                    // physics reads this
     fogColor: 0xd8e8f4, fogNear: 210, fogFar: 1200,
     hemiSky: 0xd8ecff, hemiGround: 0xa8c2d8,
     sunColor: 0xe8f4ff, sunIntensity: 1.8,
     skyTop: '#4c8ecf', skyHorizon: '#dff0fa', sunGlow: 0xeafaff,
+    sunAz: 0.7, sunEl: 0.38,                            // low polar sun
     cloudCount: 8, cloudOpacity: 0.9,
     terrainLow: '#cfe0ec', terrainHigh: '#ffffff', terrainDirt: '#9fb8c8',
     ground: {
@@ -348,6 +363,11 @@ const THEMES = {
       rut: 'rgba(96,120,142,0.55)', rutCore: 'rgba(74,96,118,0.5)', tread: 'rgba(52,68,86,0.5)',
       stoneA: 'rgba(235,245,252,0.8)', stoneB: 'rgba(120,148,170,0.7)',
       fringe: [226, 238, 248], fringeVar: [24, 14, 8],  // snowbanks creeping in
+      // bluer glacial cover: icier slush carved over the packed-snow base
+      snowCover: {
+        snow: [240, 247, 253], shade: [178, 200, 224],
+        slush: [186, 206, 224], slushAlpha: 0.44, sparkle: 190,
+      },
     },
     hillColor: 0xbdd2e0, peakColor: 0xeef6fc,
     treeCount: 140, trunkColor: 0x5a4028,
@@ -385,10 +405,12 @@ const THEMES = {
   // AMAZON RAPIDS: dense deep-green jungle — layered canopies close over a
   // dark mud road, rivers cross beneath it, humid haze hangs low.
   jungle: {
+    surface: 'wet',                                    // downpour — physics reads this
     fogColor: 0xb8d8b0, fogNear: 170, fogFar: 950,     // humid green haze, dense
     hemiSky: 0xd8f0d0, hemiGround: 0x3c6a34,
     sunColor: 0xfff2c8, sunIntensity: 1.9,
     skyTop: '#5a9ac8', skyHorizon: '#cfe8b8', sunGlow: 0xf8ffd0,
+    sunAz: 1.0, sunEl: 0.62,                           // high tropical sun
     cloudCount: 10, cloudOpacity: 0.85,
     terrainLow: '#2e6a28', terrainHigh: '#5a9440', terrainDirt: '#6a4a2c',
     ground: {
@@ -402,6 +424,8 @@ const THEMES = {
       rut: 'rgba(38,26,14,0.6)', rutCore: 'rgba(24,16,8,0.55)', tread: 'rgba(12,8,4,0.6)',
       stoneA: 'rgba(150,140,110,0.6)', stoneB: 'rgba(52,40,26,0.7)',
       fringe: [46, 110, 38], fringeVar: [30, 50, 22],   // jungle green creeping in
+      // rain-hammered mud: heavy darkening, lots of gleam + standing water
+      wet: { darken: 0.38, gleam: 15, pools: 6 },
     },
     hillColor: 0x2e6a34, peakColor: 0x4a8a4c,
     vegetation: 'jungle', treeCount: 320, trunkColor: 0x7a5c3a,
@@ -415,7 +439,7 @@ const THEMES = {
     flowerCount: 420, flowerColors: ['#ff4a6a', '#ffd45e', '#ff8a3a', '#e86aff', '#ffffff'],
     hutRoof: 0x7a9a3c, hayColor: 0xc8b45e, hutCount: 6, hayCount: 30,
     splinter: [0x4a9a3c, 0x8a6a42],                     // shredded fronds + wet wood
-    weather: { type: 'leaves', color: 0x4aae4a },
+    weather: { type: 'rain', color: 0xbfd8ea },         // full tropical downpour
     elev: { amp: 7, ph: [2.2, 0.9, 4.4] },
     rampMaxCurv: 0.016, padMaxCurv: 0.005, boardMaxCurv: 0.014,
     // fallen log piles on the road (SOLID circle colliders like all obstacles)
@@ -524,8 +548,10 @@ export class Track {
       sunColor: T.sunColor, sunIntensity: T.sunIntensity,
       // [hexA, hexB] debris chip colors for fence/cliff scrape particles
       splinter: T.splinter,
-      // ambient weather particle recipe for this level: { type, color }
+      // ambient weather particle recipe for this level: { type, color, rate? }
       weather: T.weather,
+      // surface condition tag: 'snow' | 'wet' | undefined (dry)
+      surface: T.surface,
     };
     // levels are self-contained: fog is set here (main.js may re-apply from theme)
     scene.fog = new THREE.Fog(T.fogColor, T.fogNear, T.fogFar);
@@ -929,7 +955,16 @@ export class Track {
     geo.computeVertexNormals();
     const tex = roadTexture(this.T.road);
     tex.anisotropy = 8;
-    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 1, metalness: 0 });
+    // surface condition drives the material response: wet roads go glossy and
+    // catch the scene environment (main.js supplies a PMREM env), snow stays
+    // soft with a faint icy sheen, dry dirt is fully rough as before.
+    // envMapIntensity is a standard-material property, safe before env exists.
+    const surf = this.T.surface;
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex, metalness: 0,
+      roughness: surf === 'wet' ? 0.3 : surf === 'snow' ? 0.55 : 1,
+      envMapIntensity: surf === 'wet' ? 1.3 : surf === 'snow' ? 0.6 : 1,
+    });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     this.group.add(mesh);
@@ -1121,8 +1156,12 @@ export class Track {
     this.group.add(strip);
 
     // scaffold towers + banner
-    const wood = new THREE.MeshStandardMaterial({ color: 0x5d4426, roughness: 0.85 });
-    const steel = new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.5, metalness: 0.6 });
+    const wood = new THREE.MeshStandardMaterial({
+      color: 0x5d4426, roughness: 0.8, envMapIntensity: 0.5,
+    });
+    const steel = new THREE.MeshStandardMaterial({
+      color: 0x4a4640, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
+    });
     for (const side of [1, -1]) {
       const bx = c.x + n.x * 12.5 * side, bz = c.z + n.z * 12.5 * side;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
@@ -1135,6 +1174,7 @@ export class Track {
       for (let ly = 2.5; ly <= 8.5; ly += 3) {
         const brace = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.22, 2.1), wood);
         brace.position.set(bx, ly, bz);
+        brace.castShadow = true;
         this.group.add(brace);
       }
       const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.7, 2.6), wood);
@@ -1171,10 +1211,13 @@ export class Track {
     // traffic-light box hanging from the banner
     const housing = new THREE.Mesh(
       new THREE.BoxGeometry(7.4, 2.6, 1.2),
-      new THREE.MeshStandardMaterial({ color: 0x24211c, roughness: 0.6, metalness: 0.4 })
+      new THREE.MeshStandardMaterial({
+        color: 0x24211c, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
+      })
     );
     housing.position.set(c.x, 6.6, c.z);
     housing.rotation.y = heading;
+    housing.castShadow = true;
     this.group.add(housing);
     this.lampMats = {};
     const lampSpecs = [['red', -2.3, 0xff3222], ['yellow', 0, 0xffd022], ['green', 2.3, 0x35e04a]];
@@ -1718,16 +1761,49 @@ export class Track {
     );
     this.scene.add(sky);
 
-    const sun = new THREE.Mesh(
-      new THREE.PlaneGeometry(400, 400),
+    // sun: a hot disc inside a wide soft halo, placed per-theme (azimuth /
+    // elevation in radians) so every level's light reads from somewhere real
+    const az = T.sunAz !== undefined ? T.sunAz : 0.68;
+    const el = T.sunEl !== undefined ? T.sunEl : 0.45;
+    const sunDir = new THREE.Vector3(
+      Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)
+    );
+    const halo = new THREE.Mesh(
+      new THREE.PlaneGeometry(560, 560),
       new THREE.MeshBasicMaterial({
         map: glowTexture(), color: T.sunGlow, transparent: true, fog: false,
         depthWrite: false, blending: THREE.AdditiveBlending,
       })
     );
-    sun.position.set(500, 900, 400);
-    sun.lookAt(0, 0, 0);
-    this.scene.add(sun);
+    halo.position.copy(sunDir).multiplyScalar(1330);
+    halo.lookAt(0, 0, 0);
+    this.scene.add(halo);
+    const disc = new THREE.Mesh(
+      new THREE.PlaneGeometry(150, 150),
+      new THREE.MeshBasicMaterial({
+        map: sunTexture(),
+        color: new THREE.Color(T.sunGlow).lerp(new THREE.Color(0xffffff), 0.45),
+        transparent: true, fog: false, depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    disc.position.copy(sunDir).multiplyScalar(1310);
+    disc.lookAt(0, 0, 0);
+    this.scene.add(disc);
+
+    // layered horizon haze band: a tinted translucent cylinder ringing the
+    // world between the near hill ring and the far peaks, so the skyline
+    // stacks (hills → haze → peaks → sky) instead of reading as one gradient
+    const hazeMat = new THREE.MeshBasicMaterial({
+      map: hazeTexture(), color: T.hazeColor !== undefined ? T.hazeColor : T.fogColor,
+      transparent: true, opacity: T.hazeOpacity !== undefined ? T.hazeOpacity : 0.9,
+      side: THREE.BackSide, fog: false, depthWrite: false,
+    });
+    const haze = new THREE.Mesh(
+      new THREE.CylinderGeometry(940, 940, 300, 48, 1, true), hazeMat
+    );
+    haze.position.y = 95;                 // dense band hugs the horizon line
+    this.scene.add(haze);
 
     const ctex = cloudTexture();
     for (let i = 0; i < T.cloudCount; i++) {
@@ -1868,9 +1944,10 @@ export class Track {
     segGeo.translate(0, 0.5, 0);
     const hoodoos = new THREE.InstancedMesh(
       segGeo,
-      new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 }),
       COUNT * SEGS
     );
+    hoodoos.castShadow = true;
     const strata = ['#cf9a5e', '#a06844', '#b8845a', '#96603c'].map((c) => new THREE.Color(c));
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const col = new THREE.Color();
@@ -1944,7 +2021,7 @@ export class Track {
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, COUNT);
     const lows = new THREE.InstancedMesh(lowGeo, lowMat, COUNT);
     const tops = new THREE.InstancedMesh(topGeo, topMat, COUNT);
-    lows.castShadow = tops.castShadow = true;
+    trunks.castShadow = lows.castShadow = tops.castShadow = true;
     // snowy pines get a white cap cone over the upper foliage
     let caps = null;
     if (T.treeSnowCap) {
@@ -2013,7 +2090,7 @@ export class Track {
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 });
     const parts = [trunkGeo, armUpA, armElbowA, armUpB, armElbowB]
       .map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
-    parts[0].castShadow = true;
+    for (const part of parts) part.castShadow = true;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
     const placed = this._scatter(COUNT,
@@ -2074,7 +2151,7 @@ export class Track {
     b3.translate(0, 3.7, 0.5);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 });
     const parts = [trunkGeo, b1, b2, b3].map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
-    parts[0].castShadow = true;
+    for (const part of parts) part.castShadow = true;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
     const placed = this._scatter(COUNT,
@@ -2129,7 +2206,7 @@ export class Track {
     const lows = new THREE.InstancedMesh(can1, canMatLow, COUNT);
     const mids = new THREE.InstancedMesh(can2, canMatLow, COUNT);
     const tops = new THREE.InstancedMesh(can3, canMatTop, COUNT);
-    lows.castShadow = tops.castShadow = true;
+    trunks.castShadow = lows.castShadow = mids.castShadow = tops.castShadow = true;
     const treeParts = [trunks, lows, mids, tops];
     const color = new THREE.Color();
     const F = T.foliage;
@@ -2252,11 +2329,12 @@ export class Track {
     this.scene.add(bushes);
 
     // boulders (snow theme gets white caps on top; volcano gets glossy obsidian)
-    const rockRough = T.rockRoughness !== undefined ? T.rockRoughness : 1;
+    const rockRough = T.rockRoughness !== undefined ? T.rockRoughness : 0.9;
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: T.rockColor, flatShading: true, roughness: rockRough, envMapIntensity: 0.5,
+    });
     const rocks = new THREE.InstancedMesh(
-      new THREE.DodecahedronGeometry(1, 0),
-      new THREE.MeshStandardMaterial({ color: T.rockColor, flatShading: true, roughness: rockRough }),
-      T.rockCount
+      new THREE.DodecahedronGeometry(1, 0), rockMat, T.rockCount
     );
     rocks.castShadow = true;
     const caps = T.rockSnowCap
@@ -2266,6 +2344,7 @@ export class Track {
           T.rockCount
         )
       : null;
+    if (caps) caps.castShadow = true;
     let rk = 0;
     this._scatter(T.rockCount, () => this._trackSidePos(12.5, 90), (p) => {
       const s = 0.5 + Math.random() * 2.2;
@@ -2291,9 +2370,7 @@ export class Track {
 
     // small stones scattered right off the road edge
     const pebbles = new THREE.InstancedMesh(
-      new THREE.DodecahedronGeometry(1, 0),
-      new THREE.MeshStandardMaterial({ color: T.rockColor, flatShading: true, roughness: rockRough }),
-      T.pebbleCount
+      new THREE.DodecahedronGeometry(1, 0), rockMat, T.pebbleCount
     );
     let pk = 0;
     this._scatter(T.pebbleCount, () => this._trackSidePos(11.3, 16), (p) => {
@@ -2315,10 +2392,7 @@ export class Track {
     const hp = heroP
       ? { x: heroP.x, z: heroP.z }
       : (this._trackSidePos(14, 18) || { x: fallbackP.x, z: fallbackP.z });
-    const hero = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(1, 1),
-      new THREE.MeshStandardMaterial({ color: T.rockColor, flatShading: true, roughness: rockRough })
-    );
+    const hero = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), rockMat);
     hero.scale.set(4.6, 3.3, 4.1);
     hero.rotation.y = 1.3;
     hero.position.set(hp.x, this.terrainHeight(hp.x, hp.z) + 0.9, hp.z);
@@ -2364,8 +2438,12 @@ export class Track {
     wallGeo.translate(0, 0.5, 0);
     const roofGeo = new THREE.ConeGeometry(0.85, 0.55, 4);
     roofGeo.rotateY(Math.PI / 4);
-    const wallMat = new THREE.MeshStandardMaterial({ map: buildingTexture(), roughness: 1 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: this.T.hutRoof, flatShading: true, roughness: 1 });
+    const wallMat = new THREE.MeshStandardMaterial({
+      map: buildingTexture(), roughness: 0.8, envMapIntensity: 0.5,
+    });
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: this.T.hutRoof, flatShading: true, roughness: 0.8, envMapIntensity: 0.5,
+    });
     const walls = new THREE.InstancedMesh(wallGeo, wallMat, COUNT);
     const roofs = new THREE.InstancedMesh(roofGeo, roofMat, COUNT);
     walls.castShadow = roofs.castShadow = true;
@@ -2396,7 +2474,9 @@ export class Track {
     const domeGeo = new THREE.SphereGeometry(1, 16, 10);
     const tunnelGeo = new THREE.CylinderGeometry(1, 1, 1, 10, 1, false);
     tunnelGeo.rotateX(Math.PI / 2);                 // axis along local Z
-    const iceMat = new THREE.MeshStandardMaterial({ map: iglooTexture(), roughness: 0.85 });
+    const iceMat = new THREE.MeshStandardMaterial({
+      map: iglooTexture(), roughness: 0.75, envMapIntensity: 0.55,
+    });
     const doorMat = new THREE.MeshStandardMaterial({ color: 0x22303c, roughness: 1 });
     const domes = new THREE.InstancedMesh(domeGeo, iceMat, COUNT);
     const tunnels = new THREE.InstancedMesh(tunnelGeo, iceMat, COUNT);
@@ -2497,7 +2577,9 @@ export class Track {
   _buildBanners() {
     // sponsor boards facing the track
     const post = new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7);
-    const postMat = new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.6, metalness: 0.5 });
+    const postMat = new THREE.MeshStandardMaterial({
+      color: 0x4a4640, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
+    });
     const boardGeo = new THREE.PlaneGeometry(9, 2.2);
     const mats = SPONSORS.map(([text, bg, fg]) =>
       new THREE.MeshStandardMaterial({ map: bannerTexture(text, bg, fg), roughness: 0.8, side: THREE.DoubleSide }));
@@ -2631,15 +2713,19 @@ export class Track {
     const span = (WALL_OFF + 4.5) * 2;                          // ends embed into the cliffs
     const deckTex = plankTexture();
     deckTex.repeat.set(9, 1);
-    const deckMat = new THREE.MeshStandardMaterial({ map: deckTex, roughness: 0.95 });
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0x6a4a2c, roughness: 0.95 });
+    const deckMat = new THREE.MeshStandardMaterial({
+      map: deckTex, roughness: 0.8, envMapIntensity: 0.5,
+    });
+    const woodMat = new THREE.MeshStandardMaterial({
+      color: 0x6a4a2c, roughness: 0.8, envMapIntensity: 0.5,
+    });
     const ropeMat = new THREE.MeshStandardMaterial({ color: 0x8a7048, roughness: 1 });
     for (const i of chosen) {
       const c = this.center[i];
       const g = new THREE.Group();
       const deck = new THREE.Mesh(new THREE.BoxGeometry(span, 0.35, 3.2), deckMat);
       deck.position.y = 9;
-      deck.castShadow = true;
+      deck.castShadow = deck.receiveShadow = true;
       g.add(deck);
       // under-beams
       for (const s of [-1, 1]) {

@@ -85,8 +85,16 @@ on the buttons. Works in portrait and landscape.
   HARD the rivals fire homing missiles back at you.
 - **Steering feel**: RELAXED / NORMAL / SHARP selector on the title screen and
   in the pause menu — tune sensitivity to your taste (saved between sessions).
-- **Weather**: falling snow on FROST PEAK, drifting embers on EMBER PASS,
+- **Weather**: falling snow on FROST PEAK and GLACIAL PASS, tropical rain on
+  AMAZON RAPIDS, drizzle in PINE VALLEY, drifting embers on EMBER PASS,
   blowing dust in the canyons — ambient particles per world.
+- **Surface conditions — the drive changes**: snow worlds (FROST PEAK,
+  GLACIAL PASS) have snow-covered roads with carved tire channels — brakes
+  take ~1.6× the distance, throttle spins up slower, and slides run almost
+  twice as long; rain worlds (PINE VALLEY, AMAZON RAPIDS) are rain-glossed
+  and slick under braking. Rivals respect the same corner speeds, tires
+  throw rooster tails of powder or water, and the HUD calls the surface at
+  lights-out.
 - **Career & garage**: every race pays credits equal to the score you earned;
   spend them on ENGINE, ARMOR, CANNON and NITRO upgrades (5 levels each).
 - **Smart rivals** race a real line — outside-apex-outside, braking models,
