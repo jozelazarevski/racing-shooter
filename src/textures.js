@@ -20,6 +20,102 @@ function hexRgb(hex) {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
+// ---------- shared fidelity helpers ----------
+
+/** Lazily-built 256px tiling grayscale canvas of 3-octave value noise centered
+ *  on mid-gray, with a light per-pixel dither so flat fills never band. Painted
+ *  once per page load, then composited into any painter via noiseOverlay(). */
+let _noiseTile = null;
+function noiseTile() {
+  if (_noiseTile) return _noiseTile;
+  const size = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rand = (ix, iy, seed) => {
+    const s = Math.sin(ix * 127.1 + iy * 311.7 + seed * 74.7) * 43758.5453;
+    return s - Math.floor(s);
+  };
+  const fade = (t) => t * t * (3 - 2 * t);
+  // lattice value noise; cell counts divide the tile so every octave wraps
+  const octave = (x, y, cells, seed) => {
+    const gx = (x / size) * cells, gy = (y / size) * cells;
+    const x0 = Math.floor(gx), y0 = Math.floor(gy);
+    const fx = fade(gx - x0), fy = fade(gy - y0);
+    const xa = x0 % cells, ya = y0 % cells;
+    const xb = (x0 + 1) % cells, yb = (y0 + 1) % cells;
+    const a = rand(xa, ya, seed), b = rand(xb, ya, seed);
+    const d = rand(xa, yb, seed), e = rand(xb, yb, seed);
+    return (a * (1 - fx) + b * fx) * (1 - fy) + (d * (1 - fx) + e * fx) * fy;
+  };
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const v =
+        octave(x, y, 4, 11) * 0.48 +
+        octave(x, y, 16, 23) * 0.34 +
+        octave(x, y, 64, 37) * 0.18;
+      const n = Math.round(v * 255 + (Math.random() - 0.5) * 16);   // dither
+      const o = (y * size + x) * 4;
+      img.data[o] = img.data[o + 1] = img.data[o + 2] = Math.max(0, Math.min(255, n));
+      img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  _noiseTile = c;
+  return c;
+}
+
+/** Composite the shared noise tile over the whole canvas. 'overlay' keeps the
+ *  palette (mid-gray is neutral; darks deepen, lights lift) — this is texture
+ *  fidelity, not recolor. */
+function noiseOverlay(g, w, h, alpha = 0.12, op = 'overlay') {
+  const tile = noiseTile();
+  g.save();
+  g.globalCompositeOperation = op;
+  g.globalAlpha = alpha;
+  for (let y = 0; y < h; y += 256) {
+    for (let x = 0; x < w; x += 256) g.drawImage(tile, x, y);
+  }
+  g.restore();
+}
+
+/** Soft round contact-shadow decal (black core fading to transparent) shared
+ *  by every fake-AO quad laid under trees / rocks / huts / props. */
+let _contactShadowTex = null;
+export function contactShadowTexture() {
+  if (_contactShadowTex) return _contactShadowTex;
+  _contactShadowTex = make(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    const grd = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    grd.addColorStop(0, 'rgba(0,0,0,0.85)');
+    grd.addColorStop(0.45, 'rgba(0,0,0,0.55)');
+    grd.addColorStop(0.75, 'rgba(0,0,0,0.2)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+  });
+  return _contactShadowTex;
+}
+
+/** Vertical atmospheric-perspective gradient for horizon hill/peak cones:
+ *  full color at the summit fading to a paler fog-mixed tone at the base
+ *  (canvas bottom = v0 = cone base). Track.js computes both hex stops. */
+export function horizonTexture(topHex, baseHex) {
+  const t = make(16, 128, (g, w, h) => {
+    const grd = g.createLinearGradient(0, 0, 0, h);
+    grd.addColorStop(0, topHex);
+    grd.addColorStop(0.55, topHex);
+    grd.addColorStop(1, baseHex);
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    noiseOverlay(g, w, h, 0.06);
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
 /** Rain-soaked overlay for the road canvas: darkens the surface toward wet
  *  asphalt/mud, pools sheen in the wheel ruts, lays long soft gleam streaks
  *  down the direction of travel and a few standing-water film patches.
@@ -470,6 +566,22 @@ export function groundTexture(palette = {}) {
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
     }
+    // large-scale drift: a few very soft wide blotches so the tiled ground
+    // reads patchy at gameplay distance instead of uniformly stippled
+    for (let i = 0; i < 26; i++) {
+      const x = Math.random() * w, y = Math.random() * h;
+      const r = 40 + Math.random() * 70;
+      const dark = Math.random() < 0.5;
+      const grd = g.createRadialGradient(x, y, r * 0.2, x, y, r);
+      grd.addColorStop(0, dark ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.045)');
+      grd.addColorStop(1, dark ? 'rgba(0,0,0,0)' : 'rgba(255,255,255,0)');
+      g.fillStyle = grd;
+      g.beginPath();
+      g.arc(x, y, r, 0, Math.PI * 2);
+      g.fill();
+    }
+    // multi-octave value noise breaks the flat fill + dithers the mow banding
+    noiseOverlay(g, w, h, 0.13);
     // optional glowing crack veins (volcano theme: ember-orange fissures)
     if (P.veins) {
       const V = { color: '#ff7a22', glow: 'rgba(255,96,20,0.30)', count: 7, ...P.veins };
