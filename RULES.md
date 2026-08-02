@@ -180,7 +180,8 @@ walls.
 | Rival cars | ACTOR | Real impacts (> 9 u/s relative) dent BOTH hulls `min(20, (impact−9)×0.6)`, rate-limited 0.5 s per car; rubs are free; restitution 0.12; sparks scale with impact |
 | Player car | ACTOR | Same rules; also takes wall/tree/ram/weapon damage; wreck at 0 hull → respawn with 3 s invulnerability. Hull intake scales by difficulty: EASY ×0.45, NORMAL ×0.62, HARD ×0.85 (events/drama unchanged). **Pit-crew recovery**: 5 s without taking damage → hull regenerates 3/s up to 60% of max |
 | Choppers | ACTOR | 80 hp; killed by cannon (flak — altitude ignored), missiles, shockwave; +500 on kill |
-| Pickups | trigger | Collected on touch: green hull / amber missiles / blue nitro / red mines |
+| Pickups | trigger | Collected on touch: green hull / amber missiles / blue nitro / red mines / mint **shield** (4 s invulnerability, 2 per lap) |
+| Style combo | meta | Smash/kill/overtake/BIG AIR (>0.7 s airtime)/CLOSE CALL (within 1.9 u of a rock at >22 u/s, 4 s cooldown)/SLIPSTREAM (1.1 s tucked behind a rival → +12% top speed) all extend one 5 s chain; multiplier `min(4, 1 + 0.25×chain)` on style points; chain ≥4 adds +0.03 nitro per event |
 | Slow-field orb (violet) | trigger | GLACIAL PASS / AMAZON RAPIDS only (2 per lap). On touch: **FREEZE STRIKE! / JUNGLE FURY!** — every rival is hard-capped at `maxSpeed × 0.5` for 6 s. The cap is physical: it stomps in-flight boosts and boost pads grant rivals nothing while the field is live. +100 score |
 | Mines (dropped) | trigger | Dropped ON the road surface, snapped toward the racing lane (a fixed drop height once buried them under elevated roads). Arm 0.8 s, live 45 s, trigger 4.2 u, blast 9.5 u: up to 52 dmg + knockback, levels props in 7 u |
 

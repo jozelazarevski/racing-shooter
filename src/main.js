@@ -59,10 +59,6 @@ const upgradeCost = (lvl) => 350 + lvl * 250;
 const AVA_WHITE = new THREE.Color(0xf4faff);
 const GEYSER_SAND = new THREE.Color(0xd8b878);
 
-// hazard particle tints (hoisted — per-frame spawns must not allocate)
-const AVA_WHITE = new THREE.Color(0xf4faff);
-const GEYSER_SAND = new THREE.Color(0xd8b878);
-
 const loadJSON = (key, fallback) => {
   try { return { ...fallback, ...JSON.parse(localStorage.getItem(key) || '{}') }; }
   catch { return { ...fallback }; }
@@ -220,6 +216,7 @@ class Game {
 
     this._buildPickups();
     this._initWorldHazards();
+    this._buildRoamStars();
     this._flashes = [];
     this.camMode = 0; // 0 = top-down, 1 = low chase
     this.camPos = new THREE.Vector3();
@@ -650,7 +647,7 @@ class Game {
     this.pickups = [];
     const t = this.track;
     const TYPES = ['health', 'missile', 'nitro', 'mine'];
-    const COLORS = { health: 0x4dff88, missile: 0xffb52e, nitro: 0x7fd4ff, mine: 0xff5b3d, slowfield: 0x8e7bff };
+    const COLORS = { health: 0x4dff88, missile: 0xffb52e, nitro: 0x7fd4ff, mine: 0xff5b3d, slowfield: 0x8e7bff, shield: 0x7dffd8 };
     const defs = [];
     for (let k = 0; k < 12; k++) {
       defs.push({
@@ -666,6 +663,9 @@ class Game {
       defs.push({ type: 'slowfield', index: Math.floor(t.N * 0.55), lateral: 0 });
       defs.push({ type: 'slowfield', index: Math.floor(t.N * 0.05), lateral: 0 });
     }
+    // shield orbs: brief invulnerability, two per lap
+    defs.push({ type: 'shield', index: Math.floor(t.N * 0.30), lateral: 2.5 });
+    defs.push({ type: 'shield', index: Math.floor(t.N * 0.80), lateral: -2.5 });
     const glow = glowTexture();
     for (const d of defs) {
       const color = COLORS[d.type];
@@ -726,6 +726,10 @@ class Game {
         } else if (p.type === 'nitro') {
           pl.nitro = Math.min(1, pl.nitro + 0.45 * (pl.nitroRate || 1));
           this.hud.feed('+NITRO CHARGE', 'good');
+        } else if (p.type === 'shield') {
+          pl.invuln = Math.max(pl.invuln, 4);
+          this.hud.feed('SHIELD — 4s INVULNERABLE', 'good');
+          this.buzz([20, 30, 20]);
         } else if (p.type === 'slowfield') {
           // world special: every rival crawls at half pace for 6 seconds
           this.enemySlowUntil = this.raceTime + 6;
@@ -753,6 +757,119 @@ class Game {
           car.boostTimer = 1.6;
           if (car === this.player) { this.audio.boost(); this.hud.feed('BOOST', 'info'); }
         }
+      }
+    }
+  }
+
+  // ---------- style & combo (the fun engine) ----------
+  // Every stylish act — smash, kill, drift, big air, close call, slipstream —
+  // feeds one chain. Each event extends a 5s window and raises the multiplier
+  // (×1.0 → ×4.0); points scored through style() are multiplied. HUD chip
+  // shows the chain and its remaining time.
+  style(basePts, label) {
+    if (this.state !== 'race') return;
+    this.comboN = Math.min(12, (this.comboN ?? 0) + 1);
+    this.comboT = 5;
+    const mult = Math.min(4, 1 + this.comboN * 0.25);
+    const pts = Math.round(basePts * mult);
+    this.score += pts;
+    if (label) this.hud.feed(`${label}  +${pts}${mult > 1.9 ? `  (×${mult.toFixed(2).replace(/\.?0+$/, '')})` : ''}`, 'good');
+    // hot chains feed the nitro too
+    if (this.comboN >= 4) this.player.nitro = Math.min(1, this.player.nitro + 0.03);
+  }
+
+  /** Cheap combo bump for events that already pay their own score. */
+  styleBump() {
+    if (this.state !== 'race') return;
+    this.comboN = Math.min(12, (this.comboN ?? 0) + 1);
+    this.comboT = 5;
+  }
+
+  _updateCombo(dt) {
+    const el = this._comboEl ??= {
+      root: document.getElementById('combo'),
+      x: document.getElementById('combo-x'),
+      bar: document.querySelector('#combo-bar b'),
+    };
+    if (!el.root) return;
+    if ((this.comboT ?? 0) > 0 && this.state === 'race') {
+      this.comboT -= dt;
+      if (this.comboT <= 0) { this.comboN = 0; el.root.classList.remove('on', 'hot'); return; }
+      const mult = Math.min(4, 1 + this.comboN * 0.25);
+      if (this.comboN >= 2) {
+        el.root.classList.add('on');
+        el.root.classList.toggle('hot', mult >= 2.5);
+        el.x.textContent = `×${mult.toFixed(2).replace(/\.?0+$/, '')}`;
+        el.bar.style.width = `${Math.round((this.comboT / 5) * 100)}%`;
+      }
+    } else if (el.root.classList.contains('on')) {
+      el.root.classList.remove('on', 'hot');
+    }
+  }
+
+  // rivals have opinions: short barks when the position changes hands
+  _updateTaunts() {
+    const r = this.playerRank;
+    if (this._lastRank === undefined) { this._lastRank = r; return; }
+    if (r === this._lastRank) return;
+    const now = this.raceTime;
+    if (now - (this._tauntT ?? -9) > 6 && this.state === 'race') {
+      this._tauntT = now;
+      if (r > this._lastRank) {
+        // someone got past us — find who sits directly ahead now
+        const ahead = this.enemies.filter(e => e.alive && e.progress > this.player.progress)
+          .sort((a, b) => a.progress - b.progress)[0];
+        if (ahead) {
+          const lines = ['eat dust!', 'too slow!', 'see ya!', 'nice try, rookie', 'was that it?'];
+          this.hud.feed(`${ahead.name}: “${lines[(Math.random() * lines.length) | 0]}”`, 'bad');
+        }
+      } else {
+        const lines = ['CLEAN PASS', 'OVERTAKE!', 'THROUGH THE GAP'];
+        this.style(30, lines[(Math.random() * lines.length) | 0]);
+      }
+    }
+    this._lastRank = r;
+  }
+
+  // ---------- free-roam treasure stars ----------
+  _buildRoamStars() {
+    this.roamStars = [];
+    if (!this.freeRoam) return;
+    const t = this.track;
+    const glow = glowTexture();
+    for (let k = 0; k < 12; k++) {
+      const idx = Math.floor(t.N * (k + 0.5) / 12);
+      const lat = (k % 2 ? -1 : 1) * (16 + (k * 7) % 26); // properly off-road
+      const c = t.pointAt(idx, 0), n = t.nrm[idx];
+      const x = c.x + n.x * lat, z = c.z + n.z * lat;
+      const y = t.terrainHeight(x, z);
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glow, color: 0xffd400, transparent: true, opacity: 0.95,
+        blending: THREE.AdditiveBlending, depthWrite: false }));
+      spr.scale.set(4.5, 4.5, 1);
+      spr.position.set(x, y + 2.2, z);
+      this.scene.add(spr);
+      this.roamStars.push({ x, z, y, spr, got: false });
+    }
+  }
+
+  _updateRoamStars(time) {
+    if (!this.roamStars?.length) return;
+    const p = this.player;
+    for (const s of this.roamStars) {
+      if (s.got) continue;
+      s.spr.position.y = s.y + 2.2 + Math.sin(time * 2 + s.x) * 0.5;
+      const dx = p.pos.x - s.x, dz = p.pos.z - s.z;
+      if (dx * dx + dz * dz < 16) {
+        s.got = true;
+        this.scene.remove(s.spr);
+        this.score += 150;
+        this.hud.feed('⭐ TREASURE STAR  +150', 'good');
+        this.buzz([25, 30, 45]);
+        this.particles.pickupBurst(new THREE.Vector3(s.x, s.y + 1.5, s.z), new THREE.Color(0xffd400));
+        const left = this.roamStars.filter(x => !x.got).length;
+        if (left > 0) this.hud.feed(`${left} STARS LEFT OUT THERE`, 'info');
+        else this.hud.centerMsg('ALL STARS!');
       }
     }
   }
@@ -1018,7 +1135,7 @@ class Game {
           cr.alive = false;
           cr.mesh.scale.set(1.4, 0.12, 1.4);
           this.particles.debris(cr.mesh.position, 2);
-          if (car === this.player) { this.score += 25; this.hud.feed('+25 PEST CONTROL', 'good'); }
+          if (car === this.player) this.style(25, 'PEST CONTROL');
         } else if (this.raceTime - cr.lastSting > 3) { // sting/bite
           cr.lastSting = this.raceTime;
           car.stungUntil = this.raceTime + 1.6;
@@ -1126,6 +1243,7 @@ class Game {
 
   onChopperKill() {
     this.kills++;
+    this.style?.(0, null); // kill extends the chain
     this.score += 500;
     this.player.nitro = Math.min(1, this.player.nitro + 0.3 * (this.player.nitroRate || 1));
     this.hud.centerMsg('CHOPPER DOWN');
@@ -1252,6 +1370,7 @@ class Game {
       this.shake = Math.min(1, this.shake + 0.15);
     }
     this.score += 15;
+    if (car === this.player) this.styleBump();
     if (Math.random() < 0.3) this.hud.feed(cactus ? 'CACTUS SHREDDED  +15' : 'TIMBER!  +15', 'good');
   }
 
@@ -1528,6 +1647,7 @@ class Game {
     this.hitStop = 0;
     this.fovKick = 0;
     this.enemySlowUntil = 0;
+    this.comboN = 0; this.comboT = 0; this._lastRank = undefined; this._tauntT = -9;
     this._clearWorldHazards?.();
     for (const h of this.husks) this.scene.remove(h.mesh);
     this.husks.length = 0;
@@ -1631,6 +1751,7 @@ class Game {
     this.audio.hit();
     if (killed) {
       this.kills++;
+      this.style?.(0, null); // kill extends the chain
       this.score += 250;
       this.player.nitro = Math.min(1, this.player.nitro + 0.25 * (this.player.nitroRate || 1));
       this.buzz(45);
@@ -1919,6 +2040,9 @@ class Game {
         this._updateChoppers(dt);
         this._updateProps(dt);
         this._updateWorldHazards(dt, time);
+        this._updateCombo(dt);
+        this._updateTaunts();
+        this._updateRoamStars(time);
       }
       if (this.freeRoam) this.playerRank = 1;
       else this._updateRank();

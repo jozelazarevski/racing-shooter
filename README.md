@@ -138,6 +138,18 @@ on the buttons. Works in portrait and landscape.
   ALPINE (drift machine), PIT-99 (armored bruiser).
 - **Cameras**: four views (top-down, top far, chase, chase far) via 📷 or C.
 - **Pause menu** (⏸ or P): resume, camera, restart, exit to menu.
+- **Style combo**: smashes, kills, overtakes, BIG AIR off ramps, CLOSE CALLS
+  past boulders and SLIPSTREAM runs all feed one chain — each event extends a
+  5-second window and raises the multiplier (up to ×4) on style points, and a
+  hot chain (4+) trickle-charges your nitro. The combo chip under the center
+  line shows the chain burning down.
+- **Slipstream**: tuck in close behind a rival at pace for a second and the
+  draft opens a +12% top-speed window to make the pass.
+- **Rivals talk back**: lose a place and the racer ahead taunts you in the
+  feed; take one back and it pays CLEAN PASS style.
+- **Shield orbs** (mint green): 4 seconds of invulnerability, two per lap.
+- **Treasure stars** (free roam): a dozen golden stars are scattered far off
+  the road — every one is +150, find them all for the ALL STARS banner.
 - **Drifting** is the fast line: hard cornering breaks the rear loose, slides
   charge your nitro, and SHIFT forces a full drift.
 - **Damage shows**: hurt cars trail smoke, badly hurt ones catch fire and
