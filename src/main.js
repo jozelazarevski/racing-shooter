@@ -545,6 +545,8 @@ class Game {
     for (const pad of this.track.boostPads) {
       for (const car of [this.player, ...this.enemies]) {
         if (!car.alive) continue;
+        // slow-field rule: pads give no boost to rivals while the field is live
+        if (car !== this.player && this.enemySlowUntil && this.raceTime < this.enemySlowUntil) continue;
         const di = (car.trackIndex - pad.index + this.track.N) % this.track.N;
         if ((di < 6 || di > this.track.N - 6) && Math.abs(car.lateral - pad.lateral) < 3.4 && car.boostTimer <= 0.2) {
           car.boostTimer = 1.6;

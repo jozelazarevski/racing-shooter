@@ -157,6 +157,7 @@ walls.
 | Player car | ACTOR | Same rules; also takes wall/tree/ram/weapon damage; wreck at 0 hull → respawn with brief invulnerability |
 | Choppers | ACTOR | 80 hp; killed by cannon (flak — altitude ignored), missiles, shockwave; +500 on kill |
 | Pickups | trigger | Collected on touch: green hull / amber missiles / blue nitro / red mines |
+| Slow-field orb (violet) | trigger | GLACIAL PASS / AMAZON RAPIDS only (2 per lap). On touch: **FREEZE STRIKE! / JUNGLE FURY!** — every rival is hard-capped at `maxSpeed × 0.5` for 6 s. The cap is physical: it stomps in-flight boosts and boost pads grant rivals nothing while the field is live. +100 score |
 | Mines (dropped) | trigger | Arm 1.1 s, blast 8 u: up to 48 dmg + knockback, levels props in 7 u |
 
 ---

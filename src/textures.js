@@ -761,19 +761,19 @@ export function riverTexture() {
       g.fillStyle = `rgba(225,245,255,${0.18 + Math.random() * 0.25})`;
       g.fillRect(Math.random() * w, Math.random() * h, 6 + Math.random() * 16, 1.4);
     }
-    // white edge foam: wavy band hugging each bank (v = 0 and v = 1)
-    for (const [y0, dir] of [[3, 1], [h - 3, -1]]) {
-      g.fillStyle = 'rgba(245,252,255,0.9)';
+    // white edge foam: slim wavy band hugging each bank (v = 0 and v = 1)
+    for (const dir of [1, -1]) {
+      g.fillStyle = 'rgba(245,252,255,0.85)';
       for (let x = 0; x < w; x += 4) {
-        const reach = 4 + Math.sin(x * 0.11 + y0) * 2.4 + Math.random() * 4;
-        g.fillRect(x, dir > 0 ? 0 : h - y0 - reach + 3, 4, y0 + reach);
+        const band = 4 + Math.sin(x * 0.11 + dir) * 1.4 + Math.random() * 2.5;
+        g.fillRect(x, dir > 0 ? 0 : h - band, 4, band);
       }
       // stray foam bubbles drifting off the bank
-      for (let i = 0; i < 24; i++) {
-        g.fillStyle = `rgba(240,250,255,${0.35 + Math.random() * 0.4})`;
+      for (let i = 0; i < 16; i++) {
+        g.fillStyle = `rgba(240,250,255,${0.3 + Math.random() * 0.35})`;
         g.beginPath();
-        g.arc(Math.random() * w, dir > 0 ? 6 + Math.random() * 16 : h - 6 - Math.random() * 16,
-          1 + Math.random() * 2.4, 0, Math.PI * 2);
+        g.arc(Math.random() * w, dir > 0 ? 4 + Math.random() * 9 : h - 4 - Math.random() * 9,
+          1 + Math.random() * 1.8, 0, Math.PI * 2);
         g.fill();
       }
     }

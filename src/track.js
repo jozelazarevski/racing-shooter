@@ -606,7 +606,11 @@ export class Track {
     // once they wander past it.
     this.worldBounds = 1400;
     this._buildRoad();
-    if (T.elev && T.elev.profile === 'ascent') this._buildRoadSkirts();
+    // dirt shoulder aprons under the road edges: they bury themselves where
+    // the ground meets the road, and skin the cut face where it falls away
+    // (switchback faces, hill folds). Cliff-walled levels are skinned by the
+    // cliff ribbons instead.
+    if (!T.cliffWalls) this._buildRoadSkirts();
     this._buildWalls();
     this._buildStartGate();
     this._buildRamps();      // ramps claim the straightest sections…
@@ -793,21 +797,109 @@ export class Track {
     return this._roadFieldCoarse(x, z).d;
   }
 
-  /** Rolling-hill height used by the terrain mesh, scenery placement and the
-   *  free-roam mode's per-frame ground queries (track distance is cached).
-   *  Near the road it blends to the ROAD's elevation at the nearest centerline
-   *  sample, so the meadow rises to meet the climbing road. */
-  terrainHeight(x, z) {
-    const fld = this._roadFieldCoarse(x, z);
-    const d = fld.d;
-    if (d <= 15) return fld.y;                 // flattened corridor along the road
-    const n =
+  /** Open-country rolling hills (no road influence). */
+  _hillNoise(x, z) {
+    return (
       Math.sin(x * 0.012) * Math.cos(z * 0.010) * 3.4 +
       Math.sin(x * 0.030 + 1.7) * Math.cos(z * 0.026 + 0.6) * 1.7 +
-      Math.sin(x * 0.070 + 3.1) * Math.cos(z * 0.062 + 2.2) * 0.7;
+      Math.sin(x * 0.070 + 3.1) * Math.cos(z * 0.062 + 2.2) * 0.7
+    );
+  }
+
+  /** Terrain cap from OTHER road strands passing near (x,z): the lowest road y
+   *  among samples 11–25.2u away in XZ that fold back much closer than their path
+   *  distance from the nearest sample (hairpins, S-folds, stacked legs). Where two strands at
+   *  different heights run close (frost S-folds, the alpine switchback stack),
+   *  ground near the lower ribbon must never rise above it — un-capped blends
+   *  poke sawtooth wedges up through the road. Infinity when no strand near. */
+  _roadClampY(x, z) {
+    let best = Infinity, bi = 0;
+    for (let i = 0; i < N; i += 4) {
+      const dx = x - this.center[i].x, dz = z - this.center[i].z;
+      const d = dx * dx + dz * dz;
+      if (d < best) { best = d; bi = i; }
+    }
+    if (best > 25.2 * 25.2) return Infinity;   // no strand in capping range
+    let clamp = Infinity;
+    for (let i = 0; i < N; i += 4) {
+      const di = Math.abs(i - bi);
+      const gap = Math.min(di, N - di);
+      if (gap <= 12) continue;                              // own path neighbours
+      const dx = x - this.center[i].x, dz = z - this.center[i].z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < 11 * 11 || d2 > 25.2 * 25.2 || this.center[i].y >= clamp) continue;
+      // an ordinary along-road sample sits nearly its path-distance away in
+      // XZ; only genuine fold-backs (hairpins, S-folds, stacked legs) come
+      // much closer than their path distance — those are what get capped
+      if (Math.sqrt(d2) > 0.72 * gap * this.segLen) continue;
+      clamp = this.center[i].y;
+    }
+    return clamp;
+  }
+
+  /** Shared road→hills height blend. `tuck` eases the corridor slightly UNDER
+   *  the ribbon (full 0.45 by d=14, zero at the drivable edge) so residual
+   *  mesh interpolation error stays hidden below the road surface. */
+  _blendHeight(d, roadY, x, z) {
+    const tuck = 0.45 * THREE.MathUtils.smoothstep(d, 10.8, 14);
+    if (d <= 15) return roadY - tuck;
+    const n = this._hillNoise(x, z);
     if (d >= 70) return n;
     const f = THREE.MathUtils.smoothstep(d, 15, 70);
-    return fld.y * (1 - f) + n * f;
+    return (roadY - tuck) * (1 - f) + n * f;
+  }
+
+  /** Rolling-hill height used by scenery placement and the free-roam mode's
+   *  per-frame ground queries (track distance is cached). Near the road it
+   *  blends to the ROAD's elevation at the nearest centerline sample, so the
+   *  meadow rises to meet the climbing road; the strand cap (_roadClampY)
+   *  keeps it under any OTHER ribbon passing close by. */
+  terrainHeight(x, z) {
+    const fld = this._roadFieldCoarse(x, z);
+    let h = this._blendHeight(fld.d, fld.y, x, z);
+    if (fld.d <= 27) {
+      const clamp = this._roadClampY(x, z);
+      if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
+    }
+    return h;
+  }
+
+  /** Terrain-MESH vertex height: same blend as terrainHeight but with an
+   *  EXACT full-resolution nearest scan (build-time only) — the coarse
+   *  bilinear field mixes y values of different strands where two road
+   *  strands at different elevations pass near each other, which is what
+   *  tore the terrain into sawtooth wedges through the ribbon. */
+  _terrainMeshHeight(x, z) {
+    let best = Infinity, bi = 0;
+    for (let i = 0; i < N; i += 3) {
+      const dx = x - this.center[i].x, dz = z - this.center[i].z;
+      const d = dx * dx + dz * dz;
+      if (d < best) { best = d; bi = i; }
+    }
+    for (let k = -2; k <= 2; k++) {
+      const i = (bi + k + N) % N;
+      const dx = x - this.center[i].x, dz = z - this.center[i].z;
+      const d = dx * dx + dz * dz;
+      if (d < best) { best = d; bi = i; }
+    }
+    const d = Math.sqrt(best);
+    let h = this._blendHeight(d, this.center[bi].y, x, z);
+    if (d <= 27) {
+      // exact strand cap (window/exclusion mirror _roadClampY)
+      let clamp = Infinity;
+      for (let i = 0; i < N; i += 2) {
+        const di = Math.abs(i - bi);
+        const gap = Math.min(di, N - di);
+        if (gap <= 12) continue;
+        const dx = x - this.center[i].x, dz = z - this.center[i].z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < 11 * 11 || d2 > 25.2 * 25.2 || this.center[i].y >= clamp) continue;
+        if (Math.sqrt(d2) > 0.72 * gap * this.segLen) continue;
+        clamp = this.center[i].y;
+      }
+      if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
+    }
+    return h;
   }
 
   // ---------- track construction ----------
@@ -848,7 +940,7 @@ export class Track {
    *  reads as a chunky stacked band on the face instead of an edge-on sliver.
    *  On the uphill side the apron simply buries itself inside the hill. */
   _buildRoadSkirts() {
-    const dirt = new THREE.Color(this.T.terrainDirt).lerp(new THREE.Color(0x8a5a32), 0.45);
+    const dirt = new THREE.Color(this.T.terrainDirt).lerp(new THREE.Color(0x8a5a32), 0.4);
     const dark = dirt.clone().multiplyScalar(0.7);
     for (const side of [1, -1]) {
       const rows = 3;
@@ -859,18 +951,31 @@ export class Track {
         const j = i % N;
         const c = this.center[j], n = this.nrm[j];
         const t = j * (Math.PI * 2 / N);
-        // [lateral, drop, color] — a shoulder lip, a steep face, a buried toe
+        // On the INSIDE of tight turns the apron may not reach past the turn
+        // radius, or the ribbon folds over itself and sweeps up across the
+        // road (visible as pale shards on hairpins/S-folds). Clamp reach.
+        const a = this.tan[j], b = this.tan[(j + 8) % N];
+        const insideSign = (a.x * b.z - a.z * b.x) > 0 ? 1 : -1;
+        const maxLat = side === insideSign
+          ? Math.max(WALL_OFF + 0.6, 0.85 / Math.max(this.curvature[j], 1e-4))
+          : Infinity;
+        // [lateral, y, color] — a shoulder lip, a steep face, and a toe that
+        // reaches down to the LOCAL terrain (strand-capped folds drop far
+        // below the road; a fixed-depth toe would hang in the air there)
         const face = 2.6 + Math.sin(9 * t + side) * 0.4;
+        const latToe = Math.min(WALL_OFF + face + 2.8, maxLat);
+        const ground = this._terrainMeshHeight(c.x + n.x * latToe * side, c.z + n.z * latToe * side);
+        const toeY = Math.min(c.y - 2.9, ground - 0.6);
         const rowSpec = [
-          [WALL_OFF + 0.55, 0.06, dirt],
-          [WALL_OFF + face, 2.1 + Math.sin(17 * t - side) * 0.35, dirt],
-          [WALL_OFF + face + 2.8, 4.6, dark],
+          [Math.min(WALL_OFF + 0.55, maxLat), c.y - 0.06, dirt],
+          [Math.min(WALL_OFF + face, maxLat), c.y - 2.1 - Math.sin(17 * t - side) * 0.35, dirt],
+          [latToe, toeY, dark],
         ];
         for (let r = 0; r < rows; r++) {
-          const [lat, drop, col] = rowSpec[r];
+          const [lat, y, col] = rowSpec[r];
           const o = (i * rows + r) * 3;
           verts[o] = c.x + n.x * lat * side;
-          verts[o + 1] = c.y - drop;
+          verts[o + 1] = y;
           verts[o + 2] = c.z + n.z * lat * side;
           colors[o] = col.r; colors[o + 1] = col.g; colors[o + 2] = col.b;
         }
@@ -889,6 +994,7 @@ export class Track {
       const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
         vertexColors: true, roughness: 1, side: THREE.DoubleSide,
       }));
+      mesh.name = 'road-skirt';
       mesh.receiveShadow = true;
       this.group.add(mesh);
     }
@@ -1553,7 +1659,10 @@ export class Track {
 
   _buildTerrain() {
     const T = this.T;
-    const SIZE = 4200, SEG = 150;
+    // 10u cells near the track: fine enough that road corridors (and the
+    // strand cap around them) are always sampled — no triangle can span a
+    // ribbon and rise through it (cap window 25.2 ≥ 11 + cell diagonal)
+    const SIZE = 4200, SEG = 420;
     const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
@@ -1567,7 +1676,7 @@ export class Track {
       const far = Math.max(Math.abs(x), Math.abs(z)) > 900;
       const h = far
         ? Math.sin(x * 0.012) * Math.cos(z * 0.010) * 3.4 // skip track-distance falloff far away
-        : this.terrainHeight(x, z);
+        : this._terrainMeshHeight(x, z);
       pos.setY(i, h - 0.12);
       const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
       tmp.copy(cLow).lerp(cHigh, t);
@@ -2694,7 +2803,11 @@ export class Track {
         const t = s / SEGS;
         const p = curve.getPointAt(t);
         const tn = curve.getTangentAt(t);
-        const y = this.terrainHeight(p.x, p.z) - 0.06;  // just under the road deck
+        // floats above the (coarsely tessellated) terrain in the open, and
+        // dips just below the road deck through the crossing
+        const df = this._distToTrackCoarse(p.x, p.z);
+        const y = this.terrainHeight(p.x, p.z) - 0.12
+          + 0.45 * THREE.MathUtils.smoothstep(df, 11, 17);
         // banks taper into the undergrowth at both ends
         const wv = HALF * (0.3 + 0.7 * Math.sqrt(Math.sin(Math.PI * t)));
         const o = s * 6;

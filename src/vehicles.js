@@ -409,6 +409,13 @@ export class Car {
     else if (slope < 0) vCap = Math.min(topSpeed * DOWNHILL_CAP, topSpeed + (GRADE * -slope) / 0.55);
     vf = THREE.MathUtils.clamp(vf, -this.maxSpeed * 0.35, vCap);
     if (boosting) vf = Math.max(vf, this.maxSpeed * 1.05 * offMult);
+    // FREEZE STRIKE / JUNGLE FURY: the slow field is physical — it stomps
+    // in-flight boosts too, so rivals really do crawl at half pace
+    if (this !== this.game.player && this.game.enemySlowUntil
+        && this.game.raceTime < this.game.enemySlowUntil) {
+      vf = Math.min(vf, this.maxSpeed * 0.5);
+      this.boostTimer = 0;
+    }
 
     // ---- lateral grip: cornering load breaks the rear loose ----
     const speedN = THREE.MathUtils.clamp(Math.abs(vf) / this.maxSpeed, 0, 1);
