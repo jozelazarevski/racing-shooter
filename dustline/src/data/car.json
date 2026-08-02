@@ -51,7 +51,8 @@
     "antiFlipRollDeg": 60,
     "antiFlipTorque": 5200,
     "autoFlipAfterSec": 2.0,
-    "magneticLandingSec": 0.4
+    "magneticLandingSec": 0.4,
+    "magneticTorque": 2800
   },
   "nitro": {
     "engineForceScale": 1.4,

@@ -9,6 +9,8 @@ import { VehicleController } from './physics/vehicleController';
 import { buildRenderer, buildWorld, buildCarVisual } from './render/scene';
 import { ChaseCamera } from './render/camera';
 import { Telemetry } from './ui/telemetry';
+import { Terrain } from './tracks/terrain';
+import { WheelFX } from './render/particles';
 import carData from './data/car.json';
 
 async function boot() {
@@ -22,15 +24,17 @@ async function boot() {
   const chase = new ChaseCamera();
   addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
 
-  // physics world: flat ground collider (M1)
+  // physics world + M2 heightmap terrain (render mesh and trimesh collider
+  // share the exact same grid, so what you see is what you drive)
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = FIXED_DT;
-  const groundBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-  world.createCollider(RAPIER.ColliderDesc.cuboid(600, 1, 600).setTranslation(0, -1, 0).setFriction(1), groundBody);
+  const terrain = new Terrain();
+  terrain.build(scene, world, RAPIER);
 
-  const car = new VehicleController(RAPIER, world, new THREE.Vector3(0, 1.2, -24));
+  const car = new VehicleController(RAPIER, world, terrain.spawn, terrain);
   const input = new Input();
   const telemetry = new Telemetry();
+  const fx = new WheelFX(scene, chase.camera);
 
   // interpolation scratch
   const iPos = new THREE.Vector3();
@@ -65,6 +69,17 @@ async function boot() {
 
       const lv = car.body.linvel();
       vel.set(lv.x, lv.y, lv.z);
+
+      // per-surface wheel FX (§1.2 table)
+      for (let i = 0; i < 4; i++) {
+        const w = car.wheels[i];
+        if (w.grounded) {
+          fx.wheelKick(w.surface, w.slipping, w.worldContact.x, w.worldContact.y, w.worldContact.z,
+            vel.x, vel.z, car.speedKmh / 3.6);
+        }
+      }
+      fx.update(frameDt);
+
       chase.update(frameDt, iPos, iQuat, vel, car.speedKmh, car.nitroActive, input.state.lookBack);
       telemetry.update(frameDt, loop, car);
       renderer.render(scene, chase.camera);
@@ -75,7 +90,7 @@ async function boot() {
   loop.start();
 
   // headless-test + tuning hook
-  (window as unknown as { __dust: object }).__dust = { car, world, loop, input };
+  (window as unknown as { __dust: object }).__dust = { car, world, loop, input, terrain, fx };
 }
 
 boot();

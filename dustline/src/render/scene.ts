@@ -17,7 +17,7 @@ export function buildRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
 
 export function buildWorld(scene: THREE.Scene) {
   scene.background = new THREE.Color(0x9ec8e8);
-  scene.fog = new THREE.Fog(0x9ec8e8, 220, 900);
+  scene.fog = new THREE.Fog(0x9ec8e8, 260, 1000);
 
   const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x5f7748, 0.9);
   scene.add(hemi);
@@ -29,56 +29,15 @@ export function buildWorld(scene: THREE.Scene) {
   sc.left = -90; sc.right = 90; sc.top = 90; sc.bottom = -90;
   scene.add(sun);
 
-  // ground
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(1200, 1200),
-    new THREE.MeshStandardMaterial({ color: 0x77995a, roughness: 1 }),
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  // figure-8 tarmac: two flat rings + a crossing strip
-  const asphalt = new THREE.MeshStandardMaterial({ color: 0x494b4f, roughness: 0.92 });
-  const edgePaint = new THREE.MeshStandardMaterial({ color: 0xe8e2d4, roughness: 0.9 });
-  const R_IN = 18, R_OUT = 30, CX = 34;
+  // spawn-pad figure-8 painted on the flat tarmac apron: the M1 tuning
+  // playground lives on inside the M2 rally world
+  const asphaltPaint = new THREE.MeshStandardMaterial({ color: 0x3c3e42, roughness: 0.92 });
   for (const sx of [-1, 1]) {
-    const ring = new THREE.Mesh(new THREE.RingGeometry(R_IN, R_OUT, 64), asphalt);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(9, 15, 48), asphaltPaint);
     ring.rotation.x = -Math.PI / 2;
-    ring.position.set(sx * CX, 0.02, 0);
-    ring.receiveShadow = true;
+    ring.position.set(sx * 17, 0.04, -24);
     scene.add(ring);
-    for (const r of [R_IN, R_OUT]) {
-      const stripe = new THREE.Mesh(new THREE.RingGeometry(r - 0.35, r + 0.35, 64), edgePaint);
-      stripe.rotation.x = -Math.PI / 2;
-      stripe.position.set(sx * CX, 0.03, 0);
-      scene.add(stripe);
-    }
   }
-  const cross = new THREE.Mesh(new THREE.PlaneGeometry(2 * CX, R_OUT - R_IN + 4), asphalt);
-  cross.rotation.x = -Math.PI / 2;
-  cross.position.set(0, 0.025, 0);
-  cross.receiveShadow = true;
-  scene.add(cross);
-
-  // reference cones so speed & drift read against something
-  const coneGeo = new THREE.ConeGeometry(0.4, 1.0, 8);
-  const coneMat = new THREE.MeshStandardMaterial({ color: 0xff7a2e, roughness: 0.8 });
-  const cones = new THREE.InstancedMesh(coneGeo, coneMat, 40);
-  const m4 = new THREE.Matrix4();
-  let ci = 0;
-  for (const sx of [-1, 1]) {
-    for (let a = 0; a < 20; a++) {
-      const ang = (a / 20) * Math.PI * 2;
-      const r = (R_IN + R_OUT) / 2;
-      m4.setPosition(sx * CX + Math.cos(ang) * (R_OUT + 3), 0.5, Math.sin(ang) * (R_OUT + 3));
-      cones.setMatrixAt(ci++, m4);
-      if (ci >= 40) break;
-    }
-    if (ci >= 40) break;
-  }
-  cones.castShadow = true;
-  scene.add(cones);
 }
 
 export interface CarVisual {
