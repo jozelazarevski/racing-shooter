@@ -89,6 +89,20 @@
     text-shadow:5px 5px 0 var(--ink), -2px -2px 0 var(--ink), 2px -2px 0 var(--ink), -2px 2px 0 var(--ink);
     opacity:0;pointer-events:none;white-space:nowrap}
   #center-msg.pop{animation:msgpop .9s ease-out}
+  /* style-combo chip: appears under the center line while a chain is alive */
+  #combo{position:absolute;top:44%;left:50%;transform:translate(-50%,-50%);text-align:center;
+    opacity:0;transition:opacity .25s;pointer-events:none}
+  #combo.on{opacity:1}
+  #combo #combo-x{display:block;font-family:'Luckiest Guy';font-size:clamp(30px,6vw,44px);
+    color:#7fd4ff;text-shadow:3px 3px 0 var(--ink), -2px 2px 0 var(--ink)}
+  #combo #combo-lbl{display:block;font-size:11px;letter-spacing:5px;font-weight:800;color:#ffe9a8;
+    text-shadow:1px 1px 0 var(--ink)}
+  #combo #combo-bar{display:block;width:110px;height:5px;margin:4px auto 0;border-radius:3px;
+    background:rgba(0,0,0,.45);overflow:hidden}
+  #combo #combo-bar b{display:block;height:100%;background:linear-gradient(90deg,#7fd4ff,#ffd400);
+    border-radius:3px;transform-origin:left;width:100%}
+  #combo.hot #combo-x{color:var(--yellow);animation:combopulse .5s infinite alternate}
+  @keyframes combopulse{from{transform:scale(1)}to{transform:scale(1.12)}}
   @keyframes msgpop{0%{opacity:0;transform:translate(-50%,-50%) scale(1.8)}
     18%{opacity:1;transform:translate(-50%,-50%) scale(1)}
     75%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(.92)}}
@@ -400,6 +414,7 @@
 
   <div id="feed"></div>
   <div id="center-msg" class="titlefont"></div>
+  <div id="combo"><span id="combo-x">×2</span><span id="combo-lbl">COMBO</span><i id="combo-bar"><b></b></i></div>
   <div id="wrong-way">▼ WRONG WAY ▼</div>
   <button id="cam-btn" class="icon-btn" title="Camera view">📷</button>
   <button id="pause-btn" class="icon-btn" title="Pause">⏸</button>

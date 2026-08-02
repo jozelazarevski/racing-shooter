@@ -359,7 +359,27 @@ export class Car {
 
     const boosting = this.boostTimer > 0;
     if (boosting) this.boostTimer -= dt;
-    const topSpeed = this.maxSpeed * (boosting ? 1.4 : 1) * offMult;
+    // slipstream: tuck in close behind a rival at pace for ~1.1s and the
+    // draft opens a +12% speed window (and feeds the style chain)
+    if (this === this.game.player && this.game.state === 'race') {
+      let drafting = false;
+      for (const e of this.game.enemies) {
+        if (!e.alive) continue;
+        const dx = e.pos.x - this.pos.x, dz = e.pos.z - this.pos.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > 196 || d2 < 9) continue;
+        const d = Math.sqrt(d2), f = this.forward;
+        if ((dx * f.x + dz * f.z) / d > 0.88 && Math.abs(this.speedAlong) > this.maxSpeed * 0.5) {
+          drafting = true;
+          break;
+        }
+      }
+      this._draftT = drafting ? (this._draftT || 0) + dt : Math.max(0, (this._draftT || 0) - dt * 2);
+      const on = this._draftT > 1.1;
+      if (on && !this._draftOn) this.game.style?.(25, 'SLIPSTREAM');
+      this._draftOn = on;
+    }
+    const topSpeed = this.maxSpeed * (boosting ? 1.4 : 1) * offMult * (this._draftOn ? 1.12 : 1);
 
     // ---- longitudinal ----
     if (inputs.hold) {
@@ -619,6 +639,14 @@ export class Car {
       const dx = this.pos.x - ob.x, dz = this.pos.z - ob.z;
       const rr = ob.r + 2.5; // obstacle radius + car body radius
       const d2 = dx * dx + dz * dz;
+      // threading the needle: shaving past a rock at speed without touching
+      // it pays CLOSE CALL style (4s per-obstacle cooldown)
+      if (this === gm.player && d2 >= rr * rr && d2 < (rr + 1.9) * (rr + 1.9)
+          && Math.abs(this.speedAlong) > 22
+          && gm.raceTime - (ob._ccT ?? -9) > 4) {
+        ob._ccT = gm.raceTime;
+        gm.style?.(25, 'CLOSE CALL');
+      }
       if (d2 >= rr * rr || d2 < 1e-8) continue;
       const d = Math.sqrt(d2);
       const nx = dx / d, nz = dz / d;
@@ -789,6 +817,7 @@ export class Car {
     if (this.airborne) {
       this.vy -= 26 * dt;
       this.y += this.vy * dt;
+      this._airT = (this._airT || 0) + dt;
       // light air drag reins in flight distance without killing the jump feel
       this.vel.multiplyScalar(Math.max(0, 1 - 0.10 * dt));
       if (this.y <= gY + 0.01) {
@@ -838,6 +867,11 @@ export class Car {
   }
 
   onLand() {
+    // hang time pays style: a real jump (not a curb hop) scores BIG AIR
+    if (this === this.game.player && (this._airT || 0) > 0.7) {
+      this.game.style?.(40, 'BIG AIR');
+    }
+    this._airT = 0;
     this.landGrip = 0.4; // brief loose grip for a nice slidey landing
     if (Math.abs(this.speedAlong) > 12) {
       const side = new THREE.Vector3(this.forward.z, 0, -this.forward.x);
