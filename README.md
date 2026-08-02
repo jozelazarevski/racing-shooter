@@ -158,4 +158,8 @@ on the buttons. Works in portrait and landscape.
 - Custom GPU particle pool (one draw call for all explosions/dust/sparks/trails)
 - Canvas-drawn circular speedometer + live standings HUD
 - Touch input layer that maps on-screen buttons to the key bindings
-- Light UnrealBloom post-processing for lamps, tracers and explosions
+- Modern render pipeline: ACES filmic tone mapping, PCF-soft real-time sun
+  shadows that follow the car, a PMREM image-based environment (glossy wet
+  roads and car-paint sheen), per-theme sun disc + layered horizon haze,
+  and a film-grade post pass (saturation/contrast lift + soft vignette)
+  on top of UnrealBloom for lamps, tracers and explosions

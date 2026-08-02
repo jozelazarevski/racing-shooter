@@ -118,7 +118,7 @@ const THEMES = {
     sunColor: 0xfff3d6, sunIntensity: 2.0,
     // sky dome + sun sprite + clouds
     skyTop: '#3f8de0', skyHorizon: '#e8f0d8', sunGlow: 0xfff2b8,
-    sunAz: 0.7, sunEl: 0.55,
+    sunAz: 0.7, sunEl: 0.30,
     cloudCount: 12, cloudOpacity: 0.9,
     // terrain vertex colors + ground texture
     terrainLow: '#4f8a35', terrainHigh: '#83b455', terrainDirt: '#9c7a48',
@@ -153,7 +153,7 @@ const THEMES = {
     hemiSky: 0xffe9c4, hemiGround: 0xc9a86a,
     sunColor: 0xffe6b0, sunIntensity: 2.2,
     skyTop: '#6fa8d8', skyHorizon: '#ffd9a0', sunGlow: 0xffdca0,
-    sunAz: 0.55, sunEl: 0.34,                           // low golden desert sun
+    sunAz: 0.55, sunEl: 0.20,                           // low golden desert sun
     cloudCount: 5, cloudOpacity: 0.55,
     terrainLow: '#c9a86a', terrainHigh: '#e2c78e', terrainDirt: '#b06e3c',
     ground: {
@@ -189,7 +189,7 @@ const THEMES = {
     hemiSky: 0xdfeaf8, hemiGround: 0xb8c6d2,
     sunColor: 0xeaf2ff, sunIntensity: 1.7,
     skyTop: '#639fd8', skyHorizon: '#eaf3fa', sunGlow: 0xffffff,
-    sunAz: 0.82, sunEl: 0.46,
+    sunAz: 0.82, sunEl: 0.28,
     cloudCount: 9, cloudOpacity: 0.95,
     terrainLow: '#dde8ee', terrainHigh: '#ffffff', terrainDirt: '#b7c4cd',
     ground: {
@@ -230,7 +230,7 @@ const THEMES = {
     hemiSky: 0xffd9a8, hemiGround: 0xb5764a,
     sunColor: 0xffc98a, sunIntensity: 2.1,
     skyTop: '#6f95c0', skyHorizon: '#ffcf96', sunGlow: 0xffc070,
-    sunAz: 0.5, sunEl: 0.3,                             // late sun raking the walls
+    sunAz: 0.5, sunEl: 0.22,                             // late sun raking the walls
     cloudCount: 4, cloudOpacity: 0.5,
     terrainLow: '#c08050', terrainHigh: '#e0a870', terrainDirt: '#8f5430',
     ground: {
@@ -269,7 +269,7 @@ const THEMES = {
     hemiSky: 0xc98a66, hemiGround: 0x4a3a32, hemiIntensity: 1.05,  // ember dusk, but readable
     sunColor: 0xff8a4a, sunIntensity: 2.0,
     skyTop: '#341a28', skyHorizon: '#dd541c', sunGlow: 0xff6a28, skyCurve: 0.72,
-    sunAz: 0.6, sunEl: 0.2,                             // ember sun low on the haze
+    sunAz: 0.6, sunEl: 0.17,                             // ember sun low on the haze
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
     terrainLow: '#322c28', terrainHigh: '#564a40', terrainDirt: '#6a3c2c',
     ground: {
@@ -311,7 +311,7 @@ const THEMES = {
     hemiSky: 0xcfe4ff, hemiGround: 0x628a4c,
     sunColor: 0xfff6e0, sunIntensity: 2.0,
     skyTop: '#2f6fc8', skyHorizon: '#dceef8', sunGlow: 0xfff4cc,
-    sunAz: 0.9, sunEl: 0.5,
+    sunAz: 0.9, sunEl: 0.32,
     cloudCount: 10, cloudOpacity: 0.92,
     terrainLow: '#4c8a3c', terrainHigh: '#9ab87a', terrainDirt: '#8a7a5a',
     ground: {},   // lush meadow defaults read right at altitude too
@@ -349,7 +349,7 @@ const THEMES = {
     hemiSky: 0xd8ecff, hemiGround: 0xa8c2d8,
     sunColor: 0xe8f4ff, sunIntensity: 1.8,
     skyTop: '#4c8ecf', skyHorizon: '#dff0fa', sunGlow: 0xeafaff,
-    sunAz: 0.7, sunEl: 0.38,                            // low polar sun
+    sunAz: 0.7, sunEl: 0.24,                            // low polar sun
     cloudCount: 8, cloudOpacity: 0.9,
     terrainLow: '#cfe0ec', terrainHigh: '#ffffff', terrainDirt: '#9fb8c8',
     ground: {
@@ -410,7 +410,7 @@ const THEMES = {
     hemiSky: 0xd8f0d0, hemiGround: 0x3c6a34,
     sunColor: 0xfff2c8, sunIntensity: 1.9,
     skyTop: '#5a9ac8', skyHorizon: '#cfe8b8', sunGlow: 0xf8ffd0,
-    sunAz: 1.0, sunEl: 0.62,                           // high tropical sun
+    sunAz: 1.0, sunEl: 0.34,                           // high tropical sun
     cloudCount: 10, cloudOpacity: 0.85,
     terrainLow: '#2e6a28', terrainHigh: '#5a9440', terrainDirt: '#6a4a2c',
     ground: {
@@ -1764,7 +1764,7 @@ export class Track {
     // sun: a hot disc inside a wide soft halo, placed per-theme (azimuth /
     // elevation in radians) so every level's light reads from somewhere real
     const az = T.sunAz !== undefined ? T.sunAz : 0.68;
-    const el = T.sunEl !== undefined ? T.sunEl : 0.45;
+    const el = T.sunEl !== undefined ? T.sunEl : 0.3;
     const sunDir = new THREE.Vector3(
       Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)
     );
@@ -1778,13 +1778,13 @@ export class Track {
     halo.position.copy(sunDir).multiplyScalar(1330);
     halo.lookAt(0, 0, 0);
     this.scene.add(halo);
+    // normal-blended core (an additive disc washes out against bright skies)
     const disc = new THREE.Mesh(
-      new THREE.PlaneGeometry(150, 150),
+      new THREE.PlaneGeometry(170, 170),
       new THREE.MeshBasicMaterial({
         map: sunTexture(),
         color: new THREE.Color(T.sunGlow).lerp(new THREE.Color(0xffffff), 0.45),
         transparent: true, fog: false, depthWrite: false,
-        blending: THREE.AdditiveBlending,
       })
     );
     disc.position.copy(sunDir).multiplyScalar(1310);
