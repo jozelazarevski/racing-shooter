@@ -113,8 +113,10 @@ class Game {
     sun.castShadow = true;
     sun.shadow.mapSize.set(this.isTouch ? 1024 : 2048, this.isTouch ? 1024 : 2048);
     const sc = sun.shadow.camera;
-    sc.left = -120; sc.right = 120; sc.top = 120; sc.bottom = -120;
+    // tight frustum around the player (the rig follows them) = crisp shadows
+    sc.left = -72; sc.right = 72; sc.top = 72; sc.bottom = -72;
     sc.near = 10; sc.far = 400;
+    sun.shadow.bias = -0.0004;
     this.scene.add(sun, sun.target);
     this.moon = sun; // shadow rig follows the player (name kept for the camera code)
 
@@ -126,19 +128,24 @@ class Game {
     // film grade: gentle saturation + contrast lift and a soft vignette —
     // runs pre-OutputPass (linear space), so it grades under the tone map
     this.grade = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, uVig: { value: 0.30 }, uSat: { value: 1.07 }, uCon: { value: 1.05 } },
+      uniforms: { tDiffuse: { value: null }, uVig: { value: 0.30 }, uSat: { value: 1.07 }, uCon: { value: 1.05 }, uAber: { value: 0.0017 } },
       vertexShader: /* glsl */ `
         varying vec2 vUv;
         void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: /* glsl */ `
-        uniform sampler2D tDiffuse; uniform float uVig, uSat, uCon; varying vec2 vUv;
+        uniform sampler2D tDiffuse; uniform float uVig, uSat, uCon, uAber; varying vec2 vUv;
         void main() {
+          vec2 q = vUv - 0.5;
+          float r2 = dot(q, q);
+          // subtle radial chromatic fringe, only toward the frame edges
+          vec2 off = q * r2 * uAber * 12.0;
           vec4 c = texture2D(tDiffuse, vUv);
+          c.r = texture2D(tDiffuse, vUv - off).r;
+          c.b = texture2D(tDiffuse, vUv + off).b;
           float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
           c.rgb = mix(vec3(l), c.rgb, uSat);
           c.rgb = (c.rgb - 0.5) * uCon + 0.5;
-          vec2 q = vUv - 0.5;
-          c.rgb *= 1.0 - uVig * smoothstep(0.35, 0.95, dot(q, q) * 2.6);
+          c.rgb *= 1.0 - uVig * smoothstep(0.35, 0.95, r2 * 2.6);
           gl_FragColor = c;
         }`,
     });
@@ -1746,6 +1753,31 @@ class Game {
     this.camPos.lerp(targetPos, k);
     this.camLook.lerp(targetLook, k);
     clampCam(this.camPos);
+    // a solid pine on the camera->player sightline fills the whole frame —
+    // slide the camera sideways off the trunk instead
+    if (tk?.trees) {
+      const cp = this.camPos, pp = p.pos;
+      const dx = pp.x - cp.x, dz = pp.z - cp.z;
+      const L2 = dx * dx + dz * dz;
+      if (L2 > 1) {
+        for (const tr of tk.trees) {
+          if (tr.dead || tr.kind !== 'pine' || tr.s < 1.0) continue;
+          const t01 = ((tr.x - cp.x) * dx + (tr.z - cp.z) * dz) / L2;
+          if (t01 < 0 || t01 > 0.9) continue;
+          const qx = cp.x + dx * t01, qz = cp.z + dz * t01;
+          const dTr = Math.hypot(tr.x - qx, tr.z - qz);
+          const rr = (tr.r ?? 1) + 1.7;
+          if (dTr < rr) {
+            const pl = Math.sqrt(L2);
+            const px = -dz / pl, pz = dx / pl;                  // sightline perpendicular
+            const side = Math.sign((tr.x - qx) * px + (tr.z - qz) * pz) || 1;
+            const push = (rr - dTr) * 1.15;
+            cp.x -= px * side * push;
+            cp.z -= pz * side * push;
+          }
+        }
+      }
+    }
     // screen shake
     this.shake = Math.max(0, this.shake - dt * 2.2);
     const s = this.shake * this.shake;
@@ -1771,11 +1803,19 @@ class Game {
       this.hitStop = Math.max(0, this.hitStop - dt);
       dt *= 0.3;
     }
-    // camera punch: fov widens on the hit and eases home
-    if (this.fovKick > 0) {
-      this.fovKick = Math.max(0, this.fovKick - dt * 2.6);
-      this.camera.fov = (this.baseFov ?? 56) + this.fovKick * 8;
-      this.camera.updateProjectionMatrix();
+    // speed stretch + crash punch: fov widens smoothly with pace (modern
+    // racer feel — the world rushes at you near top speed) and kicks on hits
+    {
+      if (this.fovKick > 0) this.fovKick = Math.max(0, this.fovKick - dt * 2.6);
+      const p = this.player;
+      const speedN = this.state === 'race'
+        ? Math.min(1, Math.hypot(p.vel.x, p.vel.z) / (p.maxSpeed * 1.2)) : 0;
+      this._fovSpeed = (this._fovSpeed ?? 0) + (speedN - (this._fovSpeed ?? 0)) * Math.min(1, 3 * dt);
+      const fov = (this.baseFov ?? 56) + this.fovKick * 8 + this._fovSpeed * 6;
+      if (Math.abs(fov - this.camera.fov) > 0.01) {
+        this.camera.fov = fov;
+        this.camera.updateProjectionMatrix();
+      }
     }
     this.track.update(dt, time);
 

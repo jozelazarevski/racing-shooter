@@ -66,14 +66,15 @@ export function buildVoxelRacer(spec) {
   const { body, accent, stripe = null, number = null, style = 'crown', rims = null } = spec;
   const g = new THREE.Group();
   const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.05, ...opts });
-  const bodyMat = mat(body);
-  const accentMat = mat(accent);
+  // glossy toy-car paint: picks up the PMREM sky for real specular sheen
+  const bodyMat = mat(body, { roughness: 0.32, metalness: 0.22, envMapIntensity: 1.15 });
+  const accentMat = mat(accent, { roughness: 0.34, metalness: 0.2, envMapIntensity: 1.1 });
   const darkMat = mat(0x24201c);
-  const glassMat = mat(0x121a22, { roughness: 0.15, metalness: 0.6 });
-  const rimMat = mat(rims ?? 0xd8d2c2, { roughness: 0.4, metalness: 0.3 });
+  const glassMat = mat(0x121a22, { roughness: 0.12, metalness: 0.7, envMapIntensity: 1.6 });
+  const rimMat = mat(rims ?? 0xd8d2c2, { roughness: 0.28, metalness: 0.75, envMapIntensity: 1.1 });
   const tireMat = mat(0x181614, { roughness: 0.95 });
-  const headMat = new THREE.MeshBasicMaterial({ color: 0xfff6d8 });
-  const tailMat = new THREE.MeshBasicMaterial({ color: 0xd82222 });
+  const headMat = new THREE.MeshBasicMaterial({ color: 0xfff9e2 });
+  const tailMat = new THREE.MeshBasicMaterial({ color: 0xff2418 });
 
   const tall = style === 'brawler' || style === 'dune';
   const low = style === 'crown' || style === 'alpine' || style === 'pit';
