@@ -306,7 +306,9 @@ class Game {
       const bestTxt = best
         ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
         : (unlocked ? '★ UNRACED' : '');
-      card.innerHTML = `<canvas class="wc-map" width="150" height="104"></canvas>
+      card.innerHTML = `<div class="wc-shot" style="background-image:url('assets/previews/w${lv.id}.jpg')">
+          <canvas class="wc-map" width="72" height="52"></canvas>
+        </div>
         <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
         <div class="wc-tags">${WORLD_TAGS[lv.theme] || ''}</div>
         <div class="wc-best${best ? '' : ' new'}">${bestTxt}</div>`;
@@ -491,7 +493,8 @@ class Game {
   _drawCircuitMap(cnv, themeKey, locked, current) {
     const pts = circuitPoints(themeKey);
     const ctx = cnv.getContext('2d');
-    const W = cnv.width, H = cnv.height, pad = 12;
+    const W = cnv.width, H = cnv.height, pad = Math.max(5, W * 0.08);
+    const lw = W / 150; // stroke scale — the badge canvas is small
     let nx = Infinity, xx = -Infinity, nz = Infinity, xz = -Infinity;
     for (const [x, z] of pts) {
       nx = Math.min(nx, x); xx = Math.max(xx, x);
@@ -512,14 +515,14 @@ class Game {
       }
       ctx.closePath();
     };
-    path(); ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 7; ctx.stroke();
+    path(); ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 7 * lw; ctx.stroke();
     path();
-    ctx.strokeStyle = locked ? 'rgba(255,233,168,.35)' : current ? '#ffd400' : '#e8c887';
-    ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = locked ? 'rgba(255,233,168,.35)' : current ? '#ffd400' : '#f4e2b8';
+    ctx.lineWidth = 3 * lw; ctx.stroke();
     if (!locked) { // start-line dot
       ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(P[0][0], P[0][1], 3, 0, 7); ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.beginPath(); ctx.arc(P[0][0], P[0][1], 3 * lw, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1.5 * lw; ctx.stroke();
     }
   }
 
