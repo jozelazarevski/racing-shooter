@@ -476,6 +476,20 @@ export class Car {
       }
     }
 
+    // ---- rubber on the road: skid marks while sliding hard ----
+    if (this.alive && !this.airborne && Math.abs(vl) > 6 && sp > 12 && gm.skids) {
+      this._skidClock = (this._skidClock ?? 0) - dt;
+      if (this._skidClock <= 0) {
+        this._skidClock = 0.028;
+        const skidH = Math.atan2(this.vel.x, this.vel.z); // streak along travel dir
+        for (const s of [-1, 1]) {
+          const wx = this.pos.x + nf.x * -1.45 + ns.x * s * 1.05;
+          const wz = this.pos.z + nf.z * -1.45 + ns.z * s * 1.05;
+          gm.skids.add(wx, this.y + 0.07, wz, skidH, Math.min(1, Math.abs(vl) / 16));
+        }
+      }
+    }
+
     // ---- damage smoke + scorch tint ----
     const frac = this.health / this.maxHealth;
     if (this.alive && frac < 0.55) {
@@ -500,10 +514,15 @@ export class Car {
       const over = this.lateral - Math.sign(this.lateral) * WALL_LIMIT;
       this.pos.addScaledVector(n, -over);
       const vn = this.vel.dot(n);
-      this.vel.addScaledVector(n, -vn * 1.35); // soft bounce
+      // absorb, don't bounce: kill the into-wall velocity (tiny 5% rebound so
+      // the car peels off) and let the car scrape along the fence instead
+      this.vel.addScaledVector(n, -vn * 1.05);
       // grinding the wall stings (handling upgrade shaves the speed loss)
-      this.vel.multiplyScalar(1 - 0.04 * (1 - 0.2 * hnd));
+      this.vel.multiplyScalar(1 - 0.03 * (1 - 0.2 * hnd));
       this.lateral = Math.sign(this.lateral) * WALL_LIMIT;
+      // spark stream while scraping at speed (cheap, every few frames)
+      if (this === gm.player && Math.abs(this.speedAlong) > 12 && Math.random() < 0.4)
+        gm.particles.sparks(this.pos, n, 2);
       if (this.wallGrind <= 0) {
         this.wallGrind = 0.18;
         this.onWallHit(n, Math.abs(vn));
@@ -524,9 +543,9 @@ export class Car {
       this.pos.z = ob.z + nz * rr;
       const vn = this.vel.x * nx + this.vel.z * nz;
       if (vn < 0) {
-        this.vel.x -= nx * vn * 1.35; // reflect, like the wall bounce
-        this.vel.z -= nz * vn * 1.35;
-        this.vel.multiplyScalar(0.9);
+        this.vel.x -= nx * vn * 1.05; // absorb, like the wall scrape
+        this.vel.z -= nz * vn * 1.05;
+        this.vel.multiplyScalar(0.93);
         if (this.wallGrind <= 0) {
           this.wallGrind = 0.18;
           _hitNormal.set(nx, 0, nz);
@@ -676,8 +695,14 @@ export class Car {
       const cols = g.track?.theme?.splinter ?? [0xc23b2a, 0xe8e2d4];
       g.particles.splinters(this.pos, normal, cols, THREE.MathUtils.clamp((impact - 6) / 12, 0, 1));
     }
+    // slamming the fence hurts the hull; glancing scrapes stay free
+    if (impact > 8) {
+      const dmg = Math.min(24, (impact - 8) * 0.9);
+      this.damage(dmg, null);
+      if (this === g.player && dmg >= 5) g.hud?.feed(`WALL SLAM −${Math.round(dmg)} HULL`, 'bad');
+    }
     if (this === g.player && impact > 12) {
-      g.shake = Math.min(1, g.shake + 0.3);
+      g.shake = Math.min(1, g.shake + 0.15 + impact * 0.015);
       g.buzz(30);
     }
   }

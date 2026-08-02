@@ -109,7 +109,10 @@ nitro ⚡, with live ammo badges on the buttons. Works in portrait and landscape
   (yellow chevrons) fling you forward at ground level.
 - Pickups: green = hull repair, amber = missiles, blue = nitro, red = mines.
 - The traffic lights on the start gantry run the red–yellow–green countdown.
-- Grind the pole fences and you'll shed speed in a shower of sparks.
+- **Real crash physics**: fences absorb the hit — you scrape along them in a
+  spark shower instead of bouncing off, and slamming one hard costs hull.
+  Car-on-car collisions dent BOTH hulls; glancing rubs just trade paint.
+- **Skid marks**: hard slides lay dark rubber on the road that fades away.
 
 ## Tech
 

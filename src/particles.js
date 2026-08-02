@@ -338,3 +338,72 @@ export class Particles {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Fading tire-skid decals: one InstancedMesh of road-hugging dark quads.
+// Cars call add() while sliding; marks sit for a few seconds then shrink away.
+const _SK_UP = new THREE.Vector3(0, 1, 0);
+const _skM = new THREE.Matrix4();
+const _skQ = new THREE.Quaternion();
+const _skS = new THREE.Vector3();
+const _skP = new THREE.Vector3();
+
+export class SkidMarks {
+  constructor(scene, max = 800) {
+    this.max = max;
+    const geo = new THREE.PlaneGeometry(0.42, 1.55);
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x141009, transparent: true, opacity: 0.42, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    });
+    this.mesh = new THREE.InstancedMesh(geo, mat, max);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 1; // above the road, below particles
+    this.life = new Float32Array(max);       // seconds remaining (0 = free slot)
+    this.data = new Float32Array(max * 5);   // x, y, z, heading, width-scale
+    this.head = 0;
+    _skM.makeScale(0, 0, 0);
+    for (let i = 0; i < max; i++) this.mesh.setMatrixAt(i, _skM);
+    scene.add(this.mesh);
+  }
+
+  add(x, y, z, heading, intensity = 1) {
+    const i = this.head;
+    this.head = (this.head + 1) % this.max;
+    this.life[i] = 7;
+    const o = i * 5;
+    this.data[o] = x; this.data[o + 1] = y; this.data[o + 2] = z;
+    this.data[o + 3] = heading;
+    this.data[o + 4] = 0.75 + intensity * 0.5;
+    this._compose(i, 1);
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  _compose(i, fade) {
+    const o = i * 5;
+    _skQ.setFromAxisAngle(_SK_UP, this.data[o + 3]);
+    _skS.set(this.data[o + 4] * fade, 1, fade);
+    _skP.set(this.data[o], this.data[o + 1], this.data[o + 2]);
+    _skM.compose(_skP, _skQ, _skS);
+    this.mesh.setMatrixAt(i, _skM);
+  }
+
+  update(dt) {
+    let dirty = false;
+    for (let i = 0; i < this.max; i++) {
+      if (this.life[i] <= 0) continue;
+      this.life[i] -= dt;
+      if (this.life[i] <= 0) {
+        _skM.makeScale(0, 0, 0);
+        this.mesh.setMatrixAt(i, _skM);
+        dirty = true;
+      } else if (this.life[i] < 1.4) {
+        this._compose(i, this.life[i] / 1.4); // shrink out at end of life
+        dirty = true;
+      }
+    }
+    if (dirty) this.mesh.instanceMatrix.needsUpdate = true;
+  }
+}

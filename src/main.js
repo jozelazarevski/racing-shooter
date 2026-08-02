@@ -9,7 +9,7 @@ import { Track, LEVELS } from './track.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { Weapons } from './weapons.js';
-import { Particles } from './particles.js';
+import { Particles, SkidMarks } from './particles.js';
 import { Hud, fmtTime } from './hud.js';
 import { AudioEngine } from './audio.js';
 import { Input } from './input.js';
@@ -122,6 +122,7 @@ class Game {
       if (th.sunIntensity !== undefined) this.moon.intensity = th.sunIntensity;
     }
     this.particles = new Particles(this.scene);
+    this.skids = new SkidMarks(this.scene);
     this.audio = new AudioEngine();
     this.input = new Input();
     this.lapsTotal = LAPS;
@@ -610,9 +611,11 @@ class Game {
       spin: new THREE.Vector3((Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11),
       life: 1.5,
     });
-    const at = new THREE.Vector3(pr.x, 0.6, pr.z);
-    if (this.particles.debris) this.particles.debris(at, 4);
+    const at = new THREE.Vector3(pr.x, (pr.y ?? 0) + 0.6, pr.z);
+    if (this.particles.debris) this.particles.debris(at, 6);
     this.particles.driftSmoke(at);
+    this.particles.dust?.(at, 1);
+    this.shake = Math.min(1, this.shake + (car === this.player ? 0.12 : 0.05));
     if (car === this.player) {
       this.score += pr.scoreValue || 25;
       this.buzz(15);
@@ -849,11 +852,27 @@ class Game {
           const impact = rel.length();
           if (impact > 8) {
             const mid = a.pos.clone().add(b.pos).multiplyScalar(0.5);
-            this.particles.sparks(mid, push.normalize(), 8);
+            this.particles.sparks(mid, push.normalize(), Math.min(18, 4 + impact | 0));
             if (a === this.player || b === this.player) this.audio.scrape();
           }
-          a.vel.addScaledVector(rel, -0.18);
-          b.vel.addScaledVector(rel, 0.18);
+          // trading paint is free; real collisions dent BOTH hulls
+          // (rate-limited per car so a lingering rub isn't a damage hose)
+          if (impact > 9 && (a._crashT ?? -9) < this.raceTime - 0.5
+                         && (b._crashT ?? -9) < this.raceTime - 0.5) {
+            a._crashT = b._crashT = this.raceTime;
+            const dmg = Math.min(20, (impact - 9) * 0.6);
+            a.damage(dmg, b);
+            b.damage(dmg, a);
+            const mid = a.pos.clone().add(b.pos).multiplyScalar(0.5);
+            this.particles.debris(mid, 3);
+            if (a === this.player || b === this.player) {
+              this.shake = Math.min(1, this.shake + 0.2 + impact * 0.01);
+              this.buzz(25);
+              if (dmg >= 4) this.hud.feed(`CRASH −${Math.round(dmg)} HULL`, 'bad');
+            }
+          }
+          a.vel.addScaledVector(rel, -0.12);
+          b.vel.addScaledVector(rel, 0.12);
         }
       }
   }
@@ -940,6 +959,7 @@ class Game {
         this.particles.ambient(this.player.pos, this.track.theme.weather, dt);
       }
       this.particles.update(dt);
+      this.skids.update(dt);
       this._updateFlashes(dt);
       this.hud.update(dt);
       this.audio.engine(
