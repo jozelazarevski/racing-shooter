@@ -17,6 +17,10 @@ const FIRE_B = new THREE.Color('#ffc23e');
 const DEBRIS_A = new THREE.Color('#2a2521');
 const DEBRIS_B = new THREE.Color('#4a4038');
 const EXHAUST_BOOST = new THREE.Color('#ffb32e');
+const SPLINTER_DEF = [0xc23b2a, 0xe8e2d4]; // fallback fence colors (theme may override)
+const SPLINTER_WHITE = new THREE.Color('#fff8ec');
+const _splA = new THREE.Color();
+const _splB = new THREE.Color();
 
 const VERT = /* glsl */ `
   attribute float aSize;
@@ -201,6 +205,32 @@ export class Particles {
         (Math.random() - 0.5) * 1.2, 2.5 + Math.random() * 2.5, (Math.random() - 0.5) * 1.2,
         Math.random() < 0.6 ? FIRE_A : FIRE_B, 1.5 + Math.random() * 1.3, 0.22 + Math.random() * 0.15,
         { drag: 1, shrink: 0.5 });
+    }
+  }
+
+  /** Fence-post splinters: 8-14 chunky theme-colored shards thrown out and up
+   *  off a barrier hit, plus a white flash pop. colors: [hexA, hexB] (theme
+   *  splinter pair); intensity 0..1 scales count and throw speed. */
+  splinters(p, normal, colors = null, intensity = 0.6) {
+    _splA.set(colors?.[0] ?? SPLINTER_DEF[0]);
+    _splB.set(colors?.[1] ?? SPLINTER_DEF[1]);
+    const k = THREE.MathUtils.clamp(intensity, 0, 1);
+    const n = 8 + Math.round(6 * k);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const out = 7 + Math.random() * 8 + k * 7; // strong outward throw off the fence
+      this.spawn(p.x, p.y + 0.5, p.z,
+        normal.x * out + Math.cos(a) * 5.5, 5 + Math.random() * 6 + k * 4, normal.z * out + Math.sin(a) * 5.5,
+        Math.random() < 0.55 ? _splA : _splB,
+        2.3 + Math.random() * 1.7,          // big chunks — reads as broken planks
+        0.28 + Math.random() * 0.3,         // short life, they tumble and die fast
+        { grav: 34, drag: 0.6, shrink: 0.85 });
+    }
+    // white flash pop right at the break point
+    for (let i = 0; i < 3; i++) {
+      this.spawn(p.x, p.y + 0.6, p.z,
+        (Math.random() - 0.5) * 4, 2 + Math.random() * 3, (Math.random() - 0.5) * 4,
+        SPLINTER_WHITE, 4.2 + Math.random() * 2.2, 0.12 + Math.random() * 0.08, { shrink: 1 });
     }
   }
 

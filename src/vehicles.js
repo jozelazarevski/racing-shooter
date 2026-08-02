@@ -58,14 +58,14 @@ function roofDecalTexture(text) {
 // racer), sleek (compact hatch), dune (rally wagon), alpine (striped rally
 // coupe), pit (black stock car).
 export function buildVoxelRacer(spec) {
-  const { body, accent, stripe = null, number = null, style = 'crown' } = spec;
+  const { body, accent, stripe = null, number = null, style = 'crown', rims = null } = spec;
   const g = new THREE.Group();
   const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.05, ...opts });
   const bodyMat = mat(body);
   const accentMat = mat(accent);
   const darkMat = mat(0x24201c);
   const glassMat = mat(0x121a22, { roughness: 0.15, metalness: 0.6 });
-  const rimMat = mat(0xd8d2c2, { roughness: 0.4, metalness: 0.3 });
+  const rimMat = mat(rims ?? 0xd8d2c2, { roughness: 0.4, metalness: 0.3 });
   const tireMat = mat(0x181614, { roughness: 0.95 });
   const headMat = new THREE.MeshBasicMaterial({ color: 0xfff6d8 });
   const tailMat = new THREE.MeshBasicMaterial({ color: 0xd82222 });
@@ -233,7 +233,7 @@ export function buildCarMesh(spec) { return buildVoxelRacer(spec); }
 
 // ---------- physics base ----------
 export class Car {
-  constructor(game, mesh, { maxSpeed = 52, accel = 34, grip = 5.2, steerRate = 2.5, driftLag = 0.22 } = {}) {
+  constructor(game, mesh, { maxSpeed = 52, accel = 34, grip = 5.2, steerRate = 2.5, driftLag = 0.22, steerTaper = 0.18 } = {}) {
     this.game = game;
     this.mesh = mesh;
     game.scene.add(mesh);
@@ -245,6 +245,14 @@ export class Car {
     this.grip = grip;
     this.steerRate = steerRate;
     this.driftLag = driftLag; // how much velocity lags the yaw at full slip (drift depth)
+    this.steerTaper = steerTaper; // high-speed steering authority falloff strength
+
+    // input smoothing: 0 = raw (AI); player sets a finite rate so quick stick
+    // flicks land as a smooth ramp instead of an instant snap of the wheel
+    this.steerSmooth = 0;
+    this.steerSmoothRate = 0;
+    this.handling = 0;       // 0..1 garage upgrade (player) — crisper + grippier
+    this.offroadSkill = 0.8; // 0..1 off-road pace retention in free roam
 
     this.health = 100;
     this.maxHealth = 100;
@@ -295,12 +303,30 @@ export class Car {
     this.y = 0; this.vy = 0; this.airborne = false;
     this._lastGY = 0; this._climbRate = 0; this.jumpPitch = 0;
     this.slip = 0; this.landGrip = 0; this.reverseTimer = 0;
-    this.visYaw = 0; this.steerVis = 0;
+    this.visYaw = 0; this.steerVis = 0; this.steerSmooth = 0;
     this.syncMesh(0);
   }
 
   /** Core integrator. inputs: {throttle, brake, steer 1=left, drift, hold} */
   step(dt, inputs) {
+    // ---- steering input smoothing (player) — raw flicks ramp in at a finite
+    // rate; recentering runs a touch faster so the car settles quickly.
+    const hnd = this.handling ?? 0;
+    let steer = inputs.steer;
+    if (this.steerSmoothRate > 0) {
+      const centering = steer * this.steerSmooth < 0 || Math.abs(steer) < Math.abs(this.steerSmooth);
+      const rate = this.steerSmoothRate * (1 + hnd) * (centering ? 1.4 : 1);
+      this.steerSmooth += (steer - this.steerSmooth) * Math.min(1, rate * dt);
+      steer = this.steerSmooth;
+    } else {
+      this.steerSmooth = steer; // AI: raw passthrough, state kept for inspection
+    }
+
+    // ---- free roam (player only): no walls, terrain driving off the road ----
+    const freeRoam = !!(this.game.freeRoam && this === this.game.player);
+    const offRoad = freeRoam && Math.abs(this.lateral) > ROAD_HALF + 1;
+    const offMult = offRoad ? 0.55 + 0.45 * this.offroadSkill : 1;
+
     const fwd = this.forward;
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
     let vf = this.vel.dot(fwd);
@@ -309,7 +335,7 @@ export class Car {
 
     const boosting = this.boostTimer > 0;
     if (boosting) this.boostTimer -= dt;
-    const topSpeed = this.maxSpeed * (boosting ? 1.4 : 1);
+    const topSpeed = this.maxSpeed * (boosting ? 1.4 : 1) * offMult;
 
     // ---- longitudinal ----
     if (inputs.hold) {
@@ -351,18 +377,21 @@ export class Car {
         this.reverseTimer = 0;
       }
     }
-    vf -= vf * (sliding ? 0.40 : 0.55) * dt; // drag (eased while drifting: slides keep speed)
+    // drag (eased while drifting: slides keep speed; rough going adds a bit off-road)
+    vf -= vf * ((sliding ? 0.40 : 0.55) + (offRoad ? 0.35 : 0)) * dt;
     vf = THREE.MathUtils.clamp(vf, -this.maxSpeed * 0.35, topSpeed);
-    if (boosting) vf = Math.max(vf, this.maxSpeed * 1.05);
+    if (boosting) vf = Math.max(vf, this.maxSpeed * 1.05 * offMult);
 
     // ---- lateral grip: cornering load breaks the rear loose ----
     const speedN = THREE.MathUtils.clamp(Math.abs(vf) / this.maxSpeed, 0, 1);
-    const cornerLoad = Math.abs(inputs.steer) * speedN;
-    let slipTarget = THREE.MathUtils.clamp((cornerLoad - 0.28) * 1.7, 0, 1);
+    const cornerLoad = Math.abs(steer) * speedN;
+    // handling raises the slip onset slightly — fewer accidental breakaways,
+    // but the threshold stays low enough that committed cornering still drifts
+    let slipTarget = THREE.MathUtils.clamp((cornerLoad - (0.28 + 0.05 * hnd)) * 1.7, 0, 1);
     if (inputs.drift) slipTarget = 1; // handbrake forces a full slide
     const slipRate = slipTarget > this.slip ? 7 : 3.2; // break loose fast, recover smoothly
     this.slip += (slipTarget - this.slip) * Math.min(1, slipRate * dt);
-    let grip = this.grip * (1 - 0.78 * this.slip);
+    let grip = this.grip * (1 + 0.08 * hnd) * (1 - 0.78 * this.slip);
     if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
     if (this.landGrip > 0) { this.landGrip -= dt; grip *= 0.4; } // loose for ~0.4s after landing
     if (this._wetT > 0) { this._wetT -= dt; grip *= 0.75; }      // slick tires through puddles
@@ -374,10 +403,10 @@ export class Car {
     // ---- steering: quick to come in, gentle taper at very high speed ----
     const sp = Math.abs(vf);
     const rise = THREE.MathUtils.clamp(sp / 13, 0, 1);
-    const taper = 1 - 0.18 * THREE.MathUtils.clamp((sp - this.maxSpeed * 0.6) / (this.maxSpeed * 0.55), 0, 1);
+    const taper = 1 - this.steerTaper * THREE.MathUtils.clamp((sp - this.maxSpeed * 0.6) / (this.maxSpeed * 0.55), 0, 1);
     const authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
     const dir = vf >= 0 ? 1 : -1;
-    const dTheta = inputs.steer * this.steerRate * authority * dir * dt;
+    const dTheta = steer * this.steerRate * authority * dir * dt;
     this.heading += dTheta;
     // While gripped the velocity turns with the car (arcade rails). While slipping
     // it lags the yaw: part of the turn spills forward speed into lateral slide,
@@ -407,12 +436,13 @@ export class Car {
     if (this.alive && !this.airborne && sp > 11 && gm.player) {
       const isPlayer = this === gm.player;
       if (isPlayer || this.pos.distanceToSquared(gm.player.pos) < 14400) {
-        const density = isPlayer ? 0.5 + 0.45 * speedN : 0.28 + 0.25 * speedN;
+        let density = isPlayer ? 0.5 + 0.45 * speedN : 0.28 + 0.25 * speedN;
+        if (offRoad) density = Math.min(1, density * 1.9); // churning up the wild
         if (Math.random() < density) {
           this._dustSide = -this._dustSide;
           const wp = this.pos.clone().addScaledVector(nf, -1.55).addScaledVector(ns, this._dustSide * 1.25);
           wp.y = this.y + 0.1;
-          gm.particles.dust(wp, speedN);
+          gm.particles.dust(wp, offRoad ? Math.min(1.2, speedN * 1.35 + 0.15) : speedN);
           if (isPlayer && speedN > 0.75 && Math.random() < 0.5) {
             const wp2 = this.pos.clone().addScaledVector(nf, -1.55).addScaledVector(ns, -this._dustSide * 1.25);
             wp2.y = this.y + 0.1;
@@ -436,18 +466,19 @@ export class Car {
     }
     if (frac !== this._tintFrac) { this._tintFrac = frac; this._applyScorch(frac); }
 
-    // track constraint
+    // track constraint (free roam: no walls — the whole world is drivable)
     const t = this.game.track;
     this.trackIndex = t.nearestIndex(this.pos, this.trackIndex);
     this.lateral = t.lateralOffset(this.pos, this.trackIndex);
     this.wallGrind = Math.max(0, this.wallGrind - dt);
-    if (Math.abs(this.lateral) > WALL_LIMIT) {
+    if (!freeRoam && Math.abs(this.lateral) > WALL_LIMIT) {
       const n = t.nrm[this.trackIndex];
       const over = this.lateral - Math.sign(this.lateral) * WALL_LIMIT;
       this.pos.addScaledVector(n, -over);
       const vn = this.vel.dot(n);
       this.vel.addScaledVector(n, -vn * 1.35); // soft bounce
-      this.vel.multiplyScalar(0.96); // grinding the wall stings, but doesn't end the race
+      // grinding the wall stings (handling upgrade shaves the speed loss)
+      this.vel.multiplyScalar(1 - 0.04 * (1 - 0.2 * hnd));
       this.lateral = Math.sign(this.lateral) * WALL_LIMIT;
       if (this.wallGrind <= 0) {
         this.wallGrind = 0.18;
@@ -511,8 +542,10 @@ export class Car {
       }
     }
 
-    // ---- vertical motion (ramps & jumps) ----
-    const gY = t.groundHeightAt(this.trackIndex, this.lateral);
+    // ---- vertical motion (ramps & jumps; rolling terrain off-road in roam) ----
+    const gY = offRoad
+      ? t.terrainHeight(this.pos.x, this.pos.z)
+      : t.groundHeightAt(this.trackIndex, this.lateral);
     if (this.airborne) {
       this.vy -= 26 * dt;
       this.y += this.vy * dt;
@@ -523,6 +556,11 @@ export class Car {
         this._lastGY = gY;
         this.onLand();
       }
+    } else if (offRoad) {
+      // grounded on open terrain: ease onto the rolling hills, no ramp launches
+      this.y += (gY - this.y) * Math.min(1, 12 * dt);
+      this._climbRate = 0;
+      this._lastGY = this.y;
     } else {
       const drop = this._lastGY - gY;
       if (drop > 0.6 && this._climbRate > 1) {
@@ -598,9 +636,19 @@ export class Car {
   }
 
   onWallHit(normal, impact) {
+    const g = this.game;
     if (impact > 3) {
-      this.game.particles.sparks(this.pos, normal, Math.min(20, 4 + impact));
-      if (this === this.game.player) this.game.audio.scrape();
+      g.particles.sparks(this.pos, normal, Math.min(20, 4 + impact));
+      if (this === g.player) g.audio.scrape();
+    }
+    if (impact > 6) {
+      // hard hits shatter fence planks — theme-tinted splinters + white pop
+      const cols = g.track?.theme?.splinter ?? [0xc23b2a, 0xe8e2d4];
+      g.particles.splinters(this.pos, normal, cols, THREE.MathUtils.clamp((impact - 6) / 12, 0, 1));
+    }
+    if (this === g.player && impact > 12) {
+      g.shake = Math.min(1, g.shake + 0.3);
+      g.buzz(30);
     }
   }
 
@@ -926,14 +974,57 @@ export class EnemyCar extends Car {
   }
 }
 
+// ---------- player car catalog ----------
+// Purchasable rides for the garage. Looks reuse the rival liveries, but every
+// player version wears gold rims (and gold stripe accents) + plate number 1 so
+// it reads as "yours" on the grid. The lead reads this for the shop UI and
+// passes the chosen entry into new PlayerCar(game, entry).
+const GOLD = 0xe8b83a;
+export const CAR_CATALOG = [
+  {
+    key: 'brawler', name: 'BRAWLER', price: 0, desc: 'All-rounder',
+    spec: { name: 'BRAWLER', style: 'brawler', body: 0xff8c1a, accent: 0xe86a10, stripe: [0x241d16], number: 1, brand: 'APEX' },
+    stats: { maxSpeed: 58, accel: 38, grip: 5.0, health: 100, offroad: 0.80 },
+  },
+  {
+    key: 'sleek', name: 'SLEEK', price: 2000, desc: 'Nimble hatch',
+    spec: { name: 'SLEEK', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, stripe: [0x241d16], number: 1, brand: 'APEX', rims: GOLD },
+    stats: { maxSpeed: 56, accel: 40, grip: 5.6, health: 90, offroad: 0.60 },
+  },
+  {
+    key: 'crown', name: 'CROWN', price: 3500, desc: 'Fast on tarmac',
+    spec: { name: 'CROWN', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [GOLD, 0xf2f0e8], number: 1, brand: 'APEX', rims: GOLD },
+    stats: { maxSpeed: 63, accel: 37, grip: 4.8, health: 85, offroad: 0.45 },
+  },
+  {
+    key: 'dune', name: 'DUNE', price: 4500, desc: 'Off-road king',
+    spec: { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
+    stats: { maxSpeed: 57, accel: 38, grip: 5.2, health: 105, offroad: 1.0 },
+  },
+  {
+    key: 'alpine', name: 'ALPINE', price: 6000, desc: 'Drift machine',
+    spec: { name: 'ALPINE', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [GOLD, 0xd8342a], number: 1, brand: 'APEX', rims: GOLD },
+    stats: { maxSpeed: 59, accel: 39, grip: 4.4, health: 95, offroad: 0.65 },
+  },
+  {
+    key: 'pit', name: 'PIT-99', price: 8000, desc: 'Armored bruiser',
+    spec: { name: 'PIT-99', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
+    stats: { maxSpeed: 60, accel: 36, grip: 5.0, health: 130, offroad: 0.55 },
+  },
+];
+
 export class PlayerCar extends Car {
-  constructor(game) {
-    super(game, buildCarMesh({
-      name: 'BRAWLER', style: 'brawler',
-      body: 0xff8c1a, accent: 0xe86a10, stripe: [0x241d16], number: 1, brand: 'APEX',
-    }), {
-      maxSpeed: 58, accel: 38, grip: 5.0, steerRate: 3.0, driftLag: 0.25,
+  constructor(game, catalogEntry = null) {
+    const entry = catalogEntry ?? CAR_CATALOG[0]; // default ride: the brawler
+    super(game, buildCarMesh(entry.spec), {
+      maxSpeed: entry.stats.maxSpeed, accel: entry.stats.accel, grip: entry.stats.grip,
+      steerRate: 2.7, driftLag: 0.25, steerTaper: 0.26,
     });
+    this.catalogKey = entry.key;
+    this.maxHealth = this.health = entry.stats.health;
+    this.offroadSkill = entry.stats.offroad;
+    this.steerSmoothRate = 6; // input smoothing on (handling upgrade sharpens it)
+    this.handling = 0;        // 0..1 — the lead sets this from the garage (0.2/level)
     this.name = 'YOU';
     this.respawnDelay = 2.5;
     this.heat = 0;        // 0..1

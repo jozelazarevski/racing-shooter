@@ -72,6 +72,19 @@ nitro ⚡, with live ammo badges on the buttons. Works in portrait and landscape
   overtaking, blocking, dodging obstacles — and fight back with mines.
 - **Canyon hazards**: hoodoo rock towers to dodge and mud puddles that slow
   you down in CANYON RUN; basalt boulders on EMBER PASS.
+- **Destruction**: smash crates, cones, barrels, hay bales and snowmen for
+  credits — some crates hide pickups. Fences burst into painted splinters.
+- **Attack choppers** chase you with chin guns on the final lap (normal/hard)
+  and in waves during free roam — shoot them down for +500 (cannon, missiles
+  and the shockwave all work against them).
+- **FREE ROAM** mode: no laps, no rivals — explore the whole map off-road
+  (terrain-following, off-road speed depends on your car), smash everything,
+  survive the choppers, and bank your destruction score as credits on exit.
+- **Car shop**: six buyable machines with real stat differences — BRAWLER
+  (all-rounder), SLEEK (nimble), CROWN (tarmac speed), DUNE (off-road king),
+  ALPINE (drift machine), PIT-99 (armored bruiser).
+- **Cameras**: four views (top-down, top far, chase, chase far) via 📷 or C.
+- **Pause menu** (⏸ or P): resume, camera, restart, exit to menu.
 - **Drifting** is the fast line: hard cornering breaks the rear loose, slides
   charge your nitro, and SHIFT forces a full drift.
 - **Damage shows**: hurt cars trail smoke, badly hurt ones catch fire and
