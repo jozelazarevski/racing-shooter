@@ -11,6 +11,7 @@ import { ChaseCamera } from './render/camera';
 import { Telemetry } from './ui/telemetry';
 import { Terrain } from './tracks/terrain';
 import { WheelFX } from './render/particles';
+import { buildSky, buildClouds, buildMountains, buildVegetation } from './render/scenery';
 import carData from './data/car.json';
 
 async function boot() {
@@ -30,6 +31,10 @@ async function boot() {
   world.timestep = FIXED_DT;
   const terrain = new Terrain();
   terrain.build(scene, world, RAPIER);
+  buildSky(scene);
+  const clouds = buildClouds(scene);
+  buildMountains(scene);
+  buildVegetation(scene, terrain, world, RAPIER);
 
   const car = new VehicleController(RAPIER, world, terrain.spawn, terrain);
   const input = new Input();
@@ -79,6 +84,7 @@ async function boot() {
         }
       }
       fx.update(frameDt);
+      clouds.rotation.y += frameDt * 0.004;
 
       chase.update(frameDt, iPos, iQuat, vel, car.speedKmh, car.nitroActive, input.state.lookBack);
       telemetry.update(frameDt, loop, car);
