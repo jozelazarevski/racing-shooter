@@ -7,6 +7,7 @@ import type RAPIER_API from '@dimforge/rapier3d-compat';
 import carData from '../data/car.json';
 import surfaces from '../data/surfaces.json';
 import type { InputState } from '../core/input';
+import type { Terrain, SurfaceId } from '../tracks/terrain';
 
 type Rapier = typeof RAPIER_API;
 
@@ -21,6 +22,8 @@ export interface WheelState {
   steer: number;            // current steer angle (rad), fronts only
   worldContact: THREE.Vector3;
   spin: number;             // visual wheel roll angle
+  surface: SurfaceId;       // what this wheel is touching (M2 splat lookup)
+  slipping: boolean;        // beyond the FX slip threshold
 }
 
 export class VehicleController {
@@ -64,6 +67,7 @@ export class VehicleController {
     private RAPIER: Rapier,
     private world: RAPIER_API.World,
     spawn: THREE.Vector3,
+    private terrain: Terrain | null = null,
   ) {
     this.spawn = spawn.clone();
     const c = carData.chassis;
@@ -91,6 +95,7 @@ export class VehicleController {
       this.wheels.push({
         grounded: false, compression: 0, compressionM: 0, slipAngleDeg: 0,
         suspForce: 0, steer: 0, worldContact: new THREE.Vector3(), spin: 0,
+        surface: 'tarmac', slipping: false,
       });
     }
     this._ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
@@ -164,7 +169,6 @@ export class VehicleController {
     // ---- per-wheel raycast + forces (§1.1 / §1.2) ----
     const susp = carData.suspension;
     const tire = carData.tire;
-    const surf = surfaces.tarmac; // M1 test track is all tarmac; splatmap in M2
     const rayLen = susp.restLength + susp.maxTravel + tire.wheelRadius;
     let groundedCount = 0;
     this.drifting = false;
@@ -181,7 +185,7 @@ export class VehicleController {
 
       this._ray.origin.x = this._mount.x; this._ray.origin.y = this._mount.y; this._ray.origin.z = this._mount.z;
       this._ray.dir.x = this._rayDir.x; this._ray.dir.y = this._rayDir.y; this._ray.dir.z = this._rayDir.z;
-      const hit = this.world.castRay(this._ray, rayLen, true, undefined, undefined, undefined, this.body);
+      const hit = this.world.castRayAndGetNormal(this._ray, rayLen, true, undefined, undefined, undefined, this.body);
 
       w.steer = isFront ? this.steerCurrent : 0;
 
@@ -191,6 +195,7 @@ export class VehicleController {
         w.compressionM = 0;
         w.suspForce = 0;
         w.slipAngleDeg = 0;
+        w.slipping = false;
         this.prevCompression[i] = 0;
         continue;
       }
@@ -198,6 +203,9 @@ export class VehicleController {
       w.grounded = true;
       const toi = hit.toi;
       w.worldContact.copy(this._mount).addScaledVector(this._rayDir, toi);
+      // per-wheel surface from the terrain zone lookup (splatmap role, §1.2)
+      const surf = this.terrain ? this.terrain.surfaceAt(w.worldContact.x, w.worldContact.z) : surfaces.tarmac;
+      w.surface = this.terrain ? this.terrain.surfaceIdAt(w.worldContact.x, w.worldContact.z) : 'tarmac';
 
       // -- suspension spring-damper --
       const compression = rayLen - toi;
@@ -211,8 +219,9 @@ export class VehicleController {
       this._force.copy(this._up).multiplyScalar(fz * dt);
       this.body.applyImpulseAtPoint(this._force, this._mount, true);
 
-      // -- contact patch frame (steered on fronts) --
-      this._n.set(0, 1, 0); // flat test world; M2 reads the hit normal
+      // -- contact patch frame from the REAL hit normal (M2) --
+      this._n.set(hit.normal.x, hit.normal.y, hit.normal.z);
+      if (this._n.y < 0.3) this._n.set(0, 1, 0); // wall-ish contact: keep sane
       this._tFwd.copy(this._fwd);
       if (isFront && w.steer !== 0) this._tFwd.applyAxisAngle(this._up, w.steer);
       this._tFwd.addScaledVector(this._n, -this._tFwd.dot(this._n)).normalize();
@@ -264,6 +273,7 @@ export class VehicleController {
       // visual spin
       w.spin += (vF / tire.wheelRadius) * dt;
 
+      w.slipping = Math.abs(w.slipAngleDeg) > 9 && speed > 6;
       if (Math.abs(w.slipAngleDeg) > carData.assists.driftSlipAngleDeg && speed > 6) this.drifting = true;
     }
 
@@ -303,6 +313,26 @@ export class VehicleController {
         y: input.steer * A.airYawTorque * dt,
         z: this._right.z * pitchIn * A.airPitchTorque * dt,
       }, true);
+
+      // magnetic landing (§1.3): in the last 0.4s of airtime, gently align
+      // the chassis to the slope it's about to meet
+      if (this._vel.y < -0.5) {
+        this._ray.origin.x = pos.x; this._ray.origin.y = pos.y; this._ray.origin.z = pos.z;
+        this._ray.dir.x = 0; this._ray.dir.y = -1; this._ray.dir.z = 0;
+        const ahead = this.world.castRayAndGetNormal(this._ray, 40, true, undefined, undefined, undefined, this.body);
+        if (ahead) {
+          const tta = ahead.toi / -this._vel.y;
+          if (tta < A.magneticLandingSec) {
+            this._n.set(ahead.normal.x, ahead.normal.y, ahead.normal.z);
+            this._tmp.crossVectors(this._up, this._n);
+            this.body.applyTorqueImpulse({
+              x: this._tmp.x * A.magneticTorque * dt,
+              y: 0,
+              z: this._tmp.z * A.magneticTorque * dt,
+            }, true);
+          }
+        }
+      }
     }
 
     // anti-flip: soft righting torque past 60° roll, auto-flip after 2s inverted

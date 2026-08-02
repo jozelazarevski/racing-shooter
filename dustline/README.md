@@ -1,7 +1,27 @@
 # DUSTLINE — Rally Combat Racer
 
 Arcade rally racing + vehicular combat. Full end-to-end spec lives in
-`CLAUDE.md` (milestones M1–M8). **Current status: M1 complete.**
+`CLAUDE.md` (milestones M1–M8). **Current status: M2 complete.**
+
+## M2 — rally feel (done)
+
+- **Heightmap terrain**: procedural rolling hills with a carved 480-sample
+  rally loop (one jump crest at t=0.62); the render mesh and the Rapier
+  trimesh collider share the exact same 160x160 grid
+- **Surface zones** (`tracks/terrain.ts`): tarmac start leg, long gravel
+  rally leg, a mud river-crossing west, snow + ice patches north, sand
+  east — sampled per wheel contact each tick (the splatmap role), feeding
+  the spec 1.2 mu table from `data/surfaces.json`
+- **Real contact normals**: `castRayAndGetNormal` drives the contact-patch
+  frame, so the chassis rides and tilts with the slope
+- **Per-surface wheel FX**: soft-billboard pool (700, zero allocs) — dust
+  plumes on gravel, mud spray, snow spray, sand clouds, tire smoke only on
+  tarmac slip, nothing on ice (per the spec table)
+- **Magnetic landing** assist: last 0.4 s of airtime aligns the chassis to
+  the slope it is about to meet
+- Spawn stays a flat tarmac pad, so every M1 acceptance test still passes
+  (measured: mud caps the same 2.5 s full-throttle run at 52.5 km/h vs
+  62.5 on tarmac; determinism holds on terrain)
 
 ## M1 — driving prototype (done)
 

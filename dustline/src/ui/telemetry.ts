@@ -37,7 +37,7 @@ export class Telemetry {
     for (let i = 0; i < 4; i++) {
       const w = car.wheels[i];
       this.rows[2 + i].textContent =
-        `${names[i]} ${w.grounded ? '●' : '○'} slip ${w.slipAngleDeg.toFixed(1).padStart(6)}°  susp ${bar(w.compression)}`;
+        `${names[i]} ${w.grounded ? '●' : '○'} ${(w.surface ?? '').padEnd(6)} slip ${w.slipAngleDeg.toFixed(1).padStart(6)}°  susp ${bar(w.compression)}`;
     }
     this.rows[6].textContent = 'WASD drive · SPACE handbrake · SHIFT nitro · R reset · C look back';
     this.rows[7].textContent = 'gamepad: sticks + triggers · X handbrake · A nitro';

@@ -6,18 +6,18 @@
 **Stack:** TypeScript, Three.js (rendering), Rapier.js (physics, WASM), Zustand (state), Howler.js (audio), Vite (build)
 **Target:** 60 FPS on mid-range hardware, single-player campaign first, ghost multiplayer second
 
-> Implementation status: **M1 complete** (driving prototype — raycast vehicle,
-> fixed 120 Hz sim + interpolation, drift assists tuned on the figure-8,
-> telemetry, keyboard+gamepad). Next: M2 rally feel (surfaces, heightmap
-> terrain, splatmap grip).
+> Implementation status: **M2 complete** (rally feel — heightmap terrain with
+> shared render/collider grid, six surface zones sampled per wheel contact,
+> real contact normals, per-surface particle FX, magnetic landing). Next:
+> M3 race loop (AI on racing line, laps, checkpoints, results).
 
 ## Build order
 
 | Milestone | Deliverable | Status |
 |---|---|---|
 | M1 | Driving prototype: raycast car, camera, input, 60 FPS | DONE |
-| M2 | Rally feel: surface types, drift model, handbrake, heightmap terrain | next |
-| M3 | Race loop: 3 AI on racing line, laps, checkpoints, results | |
+| M2 | Rally feel: surface types, drift model, handbrake, heightmap terrain | DONE |
+| M3 | Race loop: 3 AI on racing line, laps, checkpoints, results | next |
 | M4 | Combat: 4 weapons, pickups, damage, destruction, kill/respawn | |
 | M5 | Campaign shell: stage select, 1 biome (5 tracks), economy, garage, saves | |
 | M6 | Full content: 5 biomes, 25 tracks, 12 cars, weapon tree, bosses | |
