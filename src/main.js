@@ -647,19 +647,21 @@ class Game {
     }
   }
 
-  /** A car ploughed through tree `tr` at speed: fell it, fling it, slow the car. */
-  onTreeSmash(tr, car) {
+  /** Tree `tr` goes down: fell it, fling it. `car` rammed it (slowed + hurt);
+   *  a null car means a weapon did it — `ox/oz` is then the blast/shot origin. */
+  onTreeSmash(tr, car, ox, oz) {
     const mesh = this.track.smashTree(tr);
     if (!mesh) return;
     this.scene.add(mesh);
-    const dir = new THREE.Vector3(tr.x - car.pos.x, 0, tr.z - car.pos.z).normalize();
-    const sp = Math.abs(car.speedAlong);
+    const fx = car ? car.pos.x : (ox ?? tr.x - 1), fz = car ? car.pos.z : (oz ?? tr.z - 1);
+    const dir = new THREE.Vector3(tr.x - fx, 0, tr.z - fz).normalize();
+    const sp = car ? Math.abs(car.speedAlong) : 22;
     this.flyingProps.push({
       mesh,
       vel: new THREE.Vector3(
-        dir.x * sp * 0.35 + car.vel.x * 0.35, 5 + sp * 0.12,
-        dir.z * sp * 0.35 + car.vel.z * 0.35),
-      // topple away from the car plus a bit of chaos
+        dir.x * sp * 0.35 + (car ? car.vel.x * 0.35 : 0), 5 + sp * 0.12,
+        dir.z * sp * 0.35 + (car ? car.vel.z * 0.35 : 0)),
+      // topple away from the impact plus a bit of chaos
       spin: new THREE.Vector3(dir.z * 3.5 + (Math.random() - 0.5) * 2,
         (Math.random() - 0.5) * 4, -dir.x * 3.5 + (Math.random() - 0.5) * 2),
       life: 2.2,
@@ -668,13 +670,135 @@ class Game {
     this.particles.debris(at, 4);
     this.particles.driftSmoke(at);
     this.particles.splinters(at, dir, [0x6a4a2a, 0x3e5e30], 0.6);
-    car.vel.multiplyScalar(0.82); // trees don't stop you, but they cost real speed
+    if (car) car.vel.multiplyScalar(0.82); // trees don't stop you, but they cost real speed
     if (car === this.player) {
       this.player.damage(4, null);
-      this.score += 15;
       this.buzz(18);
       this.shake = Math.min(1, this.shake + 0.15);
-      if (Math.random() < 0.3) this.hud.feed('TIMBER!  +15', 'good');
+    }
+    this.score += 15;
+    if (Math.random() < 0.3) this.hud.feed('TIMBER!  +15', 'good');
+  }
+
+  /** Player smashed fence section (side, index): punch the hole, fling planks.
+   *  Returns true if the fence actually broke (the car may pass through). */
+  onFenceBreak(side, index, car) {
+    if (!this.track.breakFence) return false;
+    const planks = this.track.breakFence(side, index, 6);
+    if (!planks.length) return this.track.fenceBrokenAt?.(side, index) ?? false;
+    const n = this.track.nrm[index];
+    for (const pm of planks) {
+      this.scene.add(pm);
+      this.flyingProps.push({
+        mesh: pm,
+        vel: new THREE.Vector3(
+          n.x * side * 9 + car.vel.x * 0.5 + (Math.random() - 0.5) * 4,
+          7 + Math.random() * 4,
+          n.z * side * 9 + car.vel.z * 0.5 + (Math.random() - 0.5) * 4),
+        spin: new THREE.Vector3((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9),
+        life: 2,
+      });
+    }
+    const cols = this.track.theme?.splinter ?? [0xc23b2a, 0xe8e2d4];
+    this.particles.splinters(car.pos, n, cols, 1);
+    this.particles.sparks(car.pos, n, 8);
+    car.vel.multiplyScalar(0.75); // smashing planks costs real speed
+    if (car === this.player) {
+      this.player.damage(6, null);
+      this.score += 30;
+      this.buzz(35);
+      this.shake = Math.min(1, this.shake + 0.35);
+      this.hud.feed('CRASHED THROUGH THE FENCE!  +30', 'good');
+    }
+    return true;
+  }
+
+  onTireSmash(st, car, ox, oz) {
+    const tires = this.track.smashTireStack?.(st);
+    if (!tires) return;
+    const fx = car ? car.pos.x : (ox ?? st.x - 1), fz = car ? car.pos.z : (oz ?? st.z - 1);
+    const dir = new THREE.Vector3(st.x - fx, 0, st.z - fz).normalize();
+    const sp = car ? Math.abs(car.speedAlong) : 20;
+    for (const tm of tires) {
+      this.scene.add(tm);
+      this.flyingProps.push({
+        mesh: tm,
+        vel: new THREE.Vector3(
+          dir.x * sp * 0.4 + (Math.random() - 0.5) * 6, 5 + Math.random() * 5,
+          dir.z * sp * 0.4 + (Math.random() - 0.5) * 6),
+        spin: new THREE.Vector3((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10),
+        life: 1.8,
+      });
+    }
+    const at = new THREE.Vector3(st.x, (st.y ?? 0) + 0.6, st.z);
+    this.particles.driftSmoke(at);
+    this.particles.debris(at, 3);
+    if (car) car.vel.multiplyScalar(0.9);
+    if (car === this.player) { this.buzz(15); this.shake = Math.min(1, this.shake + 0.1); }
+    this.score += 10;
+  }
+
+  onBannerSmash(bn, car, ox, oz) {
+    const mesh = this.track.smashBanner?.(bn);
+    if (!mesh) return;
+    this.scene.add(mesh);
+    const fx = car ? car.pos.x : (ox ?? bn.x - 1), fz = car ? car.pos.z : (oz ?? bn.z - 1);
+    const dir = new THREE.Vector3(bn.x - fx, 0, bn.z - fz).normalize();
+    const sp = car ? Math.abs(car.speedAlong) : 20;
+    this.flyingProps.push({
+      mesh,
+      vel: new THREE.Vector3(dir.x * sp * 0.4, 6 + sp * 0.1, dir.z * sp * 0.4),
+      spin: new THREE.Vector3(dir.z * 4, (Math.random() - 0.5) * 5, -dir.x * 4),
+      life: 2,
+    });
+    const at = new THREE.Vector3(bn.x, (bn.y ?? 0) + 1.5, bn.z);
+    this.particles.debris(at, 3);
+    this.particles.splinters(at, dir, [0x8a8378, 0xe8e2d4], 0.5);
+    if (car) {
+      car.vel.multiplyScalar(0.85);
+      if (car === this.player) {
+        this.player.damage(2, null);
+        this.buzz(20);
+        this.shake = Math.min(1, this.shake + 0.15);
+      }
+    }
+    this.score += 20;
+    if (Math.random() < 0.5) this.hud.feed('BILLBOARD DOWN  +20', 'good');
+  }
+
+  onBushBrush(bu, car) {
+    // once per pass — `|| -9` so the track's lastHit:0 init means "never hit",
+    // not "hit at t=0" (which silenced every bush for the first 2s of a race)
+    if (this.raceTime - (bu.lastHit || -9) < 2) return;
+    bu.lastHit = Math.max(0.001, this.raceTime);
+    car.vel.multiplyScalar(0.85); // soft, but it drags
+    const at = new THREE.Vector3(bu.x, (bu.y ?? 0) + 0.7, bu.z);
+    const col = this.track.bushColor ?? 0x3e6a30;
+    this.particles.splinters(at, new THREE.Vector3(0, 1, 0), [col, col], 0.45);
+    this.particles.driftSmoke(at);
+    if (car === this.player) this.buzz(8);
+    this.score += 5;
+  }
+
+  /** One blast levels everything breakable in radius: props, trees, tire
+   *  stacks, sponsor boards. Used by missiles, mines and the shockwave. */
+  blastWorld(x, z, radius, credit = null) {
+    this.smashPropsNear(x, z, radius, credit, 22);
+    const t = this.track;
+    for (const tr of t.trees ?? []) {
+      if (tr.dead) continue;
+      const dx = tr.x - x, dz = tr.z - z;
+      if (dx * dx + dz * dz < (radius + tr.r) * (radius + tr.r)) this.onTreeSmash(tr, null, x, z);
+    }
+    for (const st of t.tireStacks ?? []) {
+      if (st.dead) continue;
+      const dx = st.x - x, dz = st.z - z;
+      if (dx * dx + dz * dz < (radius + st.r) * (radius + st.r)) this.onTireSmash(st, null, x, z);
+    }
+    for (const bn of t.banners ?? []) {
+      if (bn.dead) continue;
+      const dx = bn.x - x, dz = bn.z - z;
+      if (dx * dx + dz * dz < (radius + bn.r) * (radius + bn.r)) this.onBannerSmash(bn, null, x, z);
     }
   }
 

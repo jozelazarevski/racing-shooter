@@ -10,6 +10,7 @@ const _aim = new THREE.Vector3();  // scratch: chopper gun aim point
 const _dir = new THREE.Vector3();  // scratch: bullet orientation
 const _puff = new THREE.Vector3(); // scratch: ground-impact dust
 const _FWD = new THREE.Vector3(0, 0, 1);
+const _UP = new THREE.Vector3(0, 1, 0);
 
 export class Weapons {
   constructor(game) {
@@ -73,8 +74,9 @@ export class Weapons {
     g.hud.feed('SHOCKWAVE', 'info');
     g.audio.explosion(false);
     g.shake = Math.min(1, g.shake + 0.35);
-    // the pressure wave flattens every prop in radius
-    g.smashPropsNear?.(car.pos.x, car.pos.z, 16, car, 26);
+    // the pressure wave flattens everything breakable in radius
+    if (g.blastWorld) g.blastWorld(car.pos.x, car.pos.z, 16, car);
+    else g.smashPropsNear?.(car.pos.x, car.pos.z, 16, car, 26);
     // damage + knockback
     for (const e of g.enemies) {
       if (!e.alive || e.invuln > 0) continue;
@@ -260,6 +262,36 @@ export class Weapons {
           && g.smashPropsNear(b.pos.x, b.pos.z, 1.4, b.owner, 18) > 0) {
         hit = true;
       }
+      // ...chip trees down (3-ish hits fells one), burst tire stacks, drop
+      // boards. Bullets cover several units per frame, so hit-test the whole
+      // segment flown this frame — a point check tunnels through thin trunks.
+      if (!hit && b.owner === g.player) {
+        const sx = b.pos.x - b.vel.x * dt, sz = b.pos.z - b.vel.z * dt;
+        const segX = b.pos.x - sx, segZ = b.pos.z - sz;
+        const segLen2 = segX * segX + segZ * segZ || 1e-9;
+        const segHits = (cx, cz, r) => {
+          const u = Math.max(0, Math.min(1, ((cx - sx) * segX + (cz - sz) * segZ) / segLen2));
+          const dx = sx + segX * u - cx, dz = sz + segZ * u - cz;
+          return dx * dx + dz * dz < r * r;
+        };
+        for (const tr of g.track.trees ?? []) {
+          if (tr.dead) continue;
+          if (!segHits(tr.x, tr.z, tr.r + 1.1)) continue;
+          tr.hp = (tr.hp ?? 30) - b.dmg;
+          g.particles.splinters(b.pos, _UP, [0x6a4a2a, 0x3e5e30], 0.3);
+          if (tr.hp <= 0) g.onTreeSmash?.(tr, null, b.owner.pos.x, b.owner.pos.z);
+          hit = true;
+          break;
+        }
+        if (!hit) for (const st of g.track.tireStacks ?? []) {
+          if (st.dead) continue;
+          if (segHits(st.x, st.z, st.r + 1.1)) { g.onTireSmash?.(st, null, b.owner.pos.x, b.owner.pos.z); hit = true; break; }
+        }
+        if (!hit) for (const bn of g.track.banners ?? []) {
+          if (bn.dead) continue;
+          if (segHits(bn.x, bn.z, bn.r + 1.1)) { g.onBannerSmash?.(bn, null, b.owner.pos.x, b.owner.pos.z); hit = true; break; }
+        }
+      }
       if (hit) {
         g.particles.sparks(b.pos, new THREE.Vector3(0, 1, 0), 6);
         b.active = false;
@@ -340,8 +372,9 @@ export class Weapons {
         g.particles.explosion(m.pos, false);
         g.audio.explosion(false);
         g.flashLight(m.pos);
-        // the blast levels any props in range (score to the player's missiles)
-        g.smashPropsNear?.(m.pos.x, m.pos.z, 6, fromPlayer ? m.owner : null, 22);
+        // the blast levels everything breakable in range (props, trees, tires, boards)
+        if (g.blastWorld) g.blastWorld(m.pos.x, m.pos.z, 6, fromPlayer ? m.owner : null);
+        else g.smashPropsNear?.(m.pos.x, m.pos.z, 6, fromPlayer ? m.owner : null, 22);
         // splash damage
         if (fromPlayer) {
           for (const e of g.enemies) {
@@ -391,7 +424,8 @@ export class Weapons {
         g.particles.explosion(m.pos, false);
         g.audio.explosion(false);
         g.flashLight(m.pos);
-        g.smashPropsNear?.(m.pos.x, m.pos.z, 7, m.owner === g.player ? m.owner : null, 22);
+        if (g.blastWorld) g.blastWorld(m.pos.x, m.pos.z, 7, m.owner === g.player ? m.owner : null);
+        else g.smashPropsNear?.(m.pos.x, m.pos.z, 7, m.owner === g.player ? m.owner : null, 22);
         for (const car of [g.player, ...g.enemies]) {
           if (!car.alive || car.invuln > 0) continue;
           const d = m.pos.distanceTo(car.pos);
