@@ -487,12 +487,18 @@ export class Car {
     this.vel.copy(nf).multiplyScalar(vf).addScaledVector(ns, vl);
     this.pos.addScaledVector(this.vel, dt);
 
-    // surface spray: rooster tails of powder snow or water off the tires
-    if (surf && !this.airborne && this.alive) {
+    // surface spray: rooster tails of powder snow or water off the tires.
+    // Distance-culled for AI and hard-capped per frame — spray must never be
+    // the reason a phone drops frames.
+    if (surf && !this.airborne && this.alive
+        && (this === this.game.player || this.pos.distanceToSquared(this.game.player.pos) < 6400)) {
       const spd = Math.hypot(this.vel.x, this.vel.z);
       if (spd > 9) {
-        this._sprayAcc = (this._sprayAcc || 0) + dt * (8 + spd * 0.5) * (this.slip > 0.35 ? 1.9 : 1);
-        while (this._sprayAcc >= 1) {
+        const mobile = this.game.isTouch ? 0.55 : 1;
+        this._sprayAcc = Math.min(3, (this._sprayAcc || 0)
+          + dt * (8 + spd * 0.5) * (this.slip > 0.35 ? 1.9 : 1) * mobile);
+        let burst = 2; // per-frame cap
+        while (this._sprayAcc >= 1 && burst-- > 0) {
           this._sprayAcc -= 1;
           const col = surf === 'snow' ? SPRAY_SNOW : SPRAY_WET;
           this.game.particles.spawn(

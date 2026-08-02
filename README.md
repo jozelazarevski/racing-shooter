@@ -22,7 +22,9 @@ and the garage sells engine/armor/cannon/nitro upgrades.
 **Every asset is procedural and designed in code by Claude** — the circuit, the
 rolling terrain, the pine forest and grass, the grandstand and sponsor boards,
 the chunky toy trucks, and all textures (painted on canvases at load time).
-There are no image, model, or audio files. The game is intentionally silent.
+There are no hand-made image, model, or audio files — the only images in the
+repo are the menu's world-preview cards, which are auto-captured screenshots
+of the procedural worlds themselves. The game is intentionally silent.
 
 ## Play
 

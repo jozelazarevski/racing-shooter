@@ -241,8 +241,14 @@
   .level-chip.current{background:rgba(255,212,0,.16);border-color:var(--yellow);
     box-shadow:0 3px 0 var(--ink), 0 0 18px rgba(255,212,0,.25)}
   .level-chip.locked{opacity:.45;cursor:not-allowed}
-  .wc-map{width:100%;max-width:150px;border-radius:8px;background:rgba(12,8,3,.65);
+  .wc-shot{position:relative;width:100%;aspect-ratio:16/10;border-radius:8px;overflow:hidden;
+    background-size:cover;background-position:center;background-color:rgba(12,8,3,.65);
     border:1px solid rgba(255,233,168,.18)}
+  .wc-shot::after{content:'';position:absolute;inset:0;
+    background:linear-gradient(180deg,transparent 55%,rgba(12,8,3,.5));pointer-events:none}
+  .wc-map{position:absolute;top:4px;right:4px;width:64px;height:46px;border-radius:6px;
+    background:rgba(12,8,3,.55);border:1px solid rgba(255,233,168,.25);z-index:1}
+  .level-chip.locked .wc-shot{filter:grayscale(.75) brightness(.7)}
   .wc-name{font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.5px;line-height:1.1}
   .level-chip.current .wc-name{color:var(--yellow)}
   .wc-tags{font-size:9.5px;letter-spacing:.6px;color:#c9a86a;line-height:1.25}
