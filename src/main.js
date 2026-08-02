@@ -1193,20 +1193,28 @@ class Game {
     const fx = car ? car.pos.x : (ox ?? tr.x - 1), fz = car ? car.pos.z : (oz ?? tr.z - 1);
     const dir = new THREE.Vector3(tr.x - fx, 0, tr.z - fz).normalize();
     const sp = car ? Math.abs(car.speedAlong) : 22;
+    // a cactus is pulp, not timber: it bursts and slumps on the spot instead
+    // of toppling and rolling away like a felled pine
+    const cactus = tr.kind === 'cactus';
     this.flyingProps.push({
       mesh,
-      vel: new THREE.Vector3(
-        dir.x * sp * 0.35 + (car ? car.vel.x * 0.35 : 0), 5 + sp * 0.12,
-        dir.z * sp * 0.35 + (car ? car.vel.z * 0.35 : 0)),
-      // topple away from the impact plus a bit of chaos
-      spin: new THREE.Vector3(dir.z * 3.5 + (Math.random() - 0.5) * 2,
-        (Math.random() - 0.5) * 4, -dir.x * 3.5 + (Math.random() - 0.5) * 2),
-      life: 2.2,
+      vel: cactus
+        ? new THREE.Vector3(dir.x * sp * 0.12, 2.5 + sp * 0.04, dir.z * sp * 0.12)
+        : new THREE.Vector3(
+          dir.x * sp * 0.35 + (car ? car.vel.x * 0.35 : 0), 5 + sp * 0.12,
+          dir.z * sp * 0.35 + (car ? car.vel.z * 0.35 : 0)),
+      // pines topple away from the impact with a bit of chaos; cacti barely tip
+      spin: cactus
+        ? new THREE.Vector3(dir.z * 0.9, (Math.random() - 0.5) * 0.8, -dir.x * 0.9)
+        : new THREE.Vector3(dir.z * 3.5 + (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 4, -dir.x * 3.5 + (Math.random() - 0.5) * 2),
+      life: cactus ? 0.85 : 2.2,
     });
     const at = new THREE.Vector3(tr.x, (tr.y ?? 0) + 1, tr.z);
-    this.particles.debris(at, 4);
+    this.particles.debris(at, cactus ? 2 : 4);
     this.particles.driftSmoke(at);
-    this.particles.splinters(at, dir, [0x6a4a2a, 0x3e5e30], 0.6);
+    this.particles.splinters(at, dir,
+      cactus ? [0x4a7a3c, 0x9ac878] : [0x6a4a2a, 0x3e5e30], cactus ? 0.95 : 0.6);
     if (car) car.vel.multiplyScalar(0.82); // trees don't stop you, but they cost real speed
     if (car === this.player) {
       this.player.damage(4, null);
@@ -1214,7 +1222,7 @@ class Game {
       this.shake = Math.min(1, this.shake + 0.15);
     }
     this.score += 15;
-    if (Math.random() < 0.3) this.hud.feed('TIMBER!  +15', 'good');
+    if (Math.random() < 0.3) this.hud.feed(cactus ? 'CACTUS SHREDDED  +15' : 'TIMBER!  +15', 'good');
   }
 
   /** Material-aware SOLID crash (RULES.md §impact model). `ob.mat`:
@@ -1845,6 +1853,14 @@ class Game {
 
     if (this.state !== 'paused' && this.state !== 'title') {
       if (this.state === 'race') this.raceTime += dt;
+      // pit-crew recovery: leave the wall alone for 5s and the hull patches
+      // itself back up to 60% — mistakes cost position, not the whole race
+      const pl = this.player;
+      if (this.state === 'race' && pl.alive
+          && this.raceTime - (pl._lastHurt ?? -9) > 5
+          && pl.health < pl.maxHealth * 0.6) {
+        pl.health = Math.min(pl.maxHealth * 0.6, pl.health + 3 * dt);
+      }
       this.player.update(dt, this.input);
       if (!this.freeRoam && (this.state === 'race' || this.state === 'finished' || this.state === 'countdown')) {
         for (const e of this.enemies) {
