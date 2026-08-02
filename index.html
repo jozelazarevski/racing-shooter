@@ -152,6 +152,8 @@
   #t-missile{right:calc(118px + env(safe-area-inset-right));bottom:calc(38px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
   #t-mine {right:calc(112px + env(safe-area-inset-right));bottom:calc(112px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
   #t-shock{right:calc(34px + env(safe-area-inset-right));bottom:calc(134px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
+  #t-drift{right:calc(24px + env(safe-area-inset-right));bottom:calc(214px + env(safe-area-inset-bottom));
+    width:64px;height:64px;font-size:13px;letter-spacing:1px;background:rgba(30,70,130,.55)}
   #t-nitro{right:calc(96px + env(safe-area-inset-right));bottom:calc(190px + env(safe-area-inset-bottom));width:62px;height:62px;font-size:25px;
     background:conic-gradient(rgba(127,212,255,.8) 0%, rgba(38,26,12,.6) 0)}
 
@@ -370,6 +372,7 @@
 
 <div id="touch-ui">
   <div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
+  <button class="tbtn" id="t-drift" data-key="ShiftLeft">DRIFT</button>
   <button class="tbtn" id="t-nitro" data-key="KeyF">⚡</button>
   <button class="tbtn" id="t-shock" data-key="KeyQ">💥<span class="badge" id="b-shock" style="display:none">0</span></button>
   <button class="tbtn" id="t-mine"  data-key="KeyX">💣<span class="badge" id="b-mine">2</span></button>
@@ -403,7 +406,8 @@
     <b>C</b><span>Camera &nbsp;·&nbsp; <b style="display:inline">P</b> Pause</span>
   </div>
   <div id="touch-note">LEFT THUMB — driving pad: drag to steer, up for gas, down for brake<br>
-    RIGHT THUMB — FIRE cannon &nbsp;·&nbsp; 🚀 missile &nbsp;·&nbsp; 💣 mine &nbsp;·&nbsp; 💥 shockwave &nbsp;·&nbsp; ⚡ nitro</div>
+    RIGHT THUMB — FIRE cannon &nbsp;·&nbsp; 🚀 missile &nbsp;·&nbsp; 💣 mine &nbsp;·&nbsp; 💥 shockwave &nbsp;·&nbsp; ⚡ nitro
+    &nbsp;·&nbsp; hold DRIFT to slide</div>
   <div id="loading-note">3 LAPS · 5 RIVALS · RAMPS · MINES · DESTROY OR BE DESTROYED</div>
   <div class="footnote">A TOY-BOX CIRCUIT DESIGNED ENTIRELY BY CLAUDE</div>
 </div>

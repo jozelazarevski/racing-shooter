@@ -577,8 +577,8 @@ class Game {
       const pr = this.props[i];
       for (const car of cars) {
         const dx = car.pos.x - pr.x, dz = car.pos.z - pr.z;
-        const rr = pr.r + 2;
-        if (dx * dx + dz * dz < rr * rr && Math.abs(car.speedAlong) > 6) {
+        const rr = pr.r + 2.3;
+        if (dx * dx + dz * dz < rr * rr && Math.abs(car.speedAlong) > 2) {
           this.props.splice(i, 1);
           this._smashProp(pr, car);
           break;
@@ -594,20 +594,39 @@ class Game {
       f.mesh.rotation.y += f.spin.y * dt;
       f.mesh.rotation.z += f.spin.z * dt;
       if (f.life <= 0 || f.mesh.position.y < -3) {
-        this.scene.remove(f.mesh);
+        (f.mesh.parent ?? this.scene).remove(f.mesh);
         this.flyingProps.splice(i, 1);
       }
     }
   }
 
-  _smashProp(pr, car) {
-    const dir = new THREE.Vector3(pr.x - car.pos.x, 0, pr.z - car.pos.z).normalize();
-    const speed = Math.abs(car.speedAlong);
+  /** Destroy every prop within `radius` of (x,z). `credit` gets score/pickups
+   *  (weapons pass their owner; explosions with no owner pass null). */
+  smashPropsNear(x, z, radius, credit = null, minFling = 16) {
+    let n = 0;
+    for (let i = this.props.length - 1; i >= 0; i--) {
+      const pr = this.props[i];
+      const dx = pr.x - x, dz = pr.z - z;
+      const rr = radius + pr.r;
+      if (dx * dx + dz * dz < rr * rr) {
+        this.props.splice(i, 1);
+        this._smashProp(pr, credit, minFling);
+        n++;
+      }
+    }
+    return n;
+  }
+
+  _smashProp(pr, car, minFling = 0) {
+    const dir = car
+      ? new THREE.Vector3(pr.x - car.pos.x, 0, pr.z - car.pos.z).normalize()
+      : new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
+    const speed = Math.max(minFling, car ? Math.abs(car.speedAlong) : 0);
     this.flyingProps.push({
       mesh: pr.mesh,
       vel: new THREE.Vector3(
-        dir.x * speed * 0.45 + car.vel.x * 0.4, 6 + speed * 0.15,
-        dir.z * speed * 0.45 + car.vel.z * 0.4),
+        dir.x * speed * 0.45 + (car ? car.vel.x * 0.4 : 0), 6 + speed * 0.15,
+        dir.z * speed * 0.45 + (car ? car.vel.z * 0.4 : 0)),
       spin: new THREE.Vector3((Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11),
       life: 1.5,
     });
@@ -625,6 +644,37 @@ class Game {
       else if (pr.pickup === 'nitro') { pl.nitro = Math.min(1, pl.nitro + 0.35 * (pl.nitroRate || 1)); this.hud.feed('CRATE: NITRO CHARGE', 'good'); }
       else if (pr.pickup === 'mine') { pl.mines = Math.min(pl.maxMines, pl.mines + 1); this.hud.feed('CRATE: +1 MINE', 'good'); }
       else if (Math.random() < 0.35) this.hud.feed(`SMASHED  +${pr.scoreValue || 25}`, 'good');
+    }
+  }
+
+  /** A car ploughed through tree `tr` at speed: fell it, fling it, slow the car. */
+  onTreeSmash(tr, car) {
+    const mesh = this.track.smashTree(tr);
+    if (!mesh) return;
+    this.scene.add(mesh);
+    const dir = new THREE.Vector3(tr.x - car.pos.x, 0, tr.z - car.pos.z).normalize();
+    const sp = Math.abs(car.speedAlong);
+    this.flyingProps.push({
+      mesh,
+      vel: new THREE.Vector3(
+        dir.x * sp * 0.35 + car.vel.x * 0.35, 5 + sp * 0.12,
+        dir.z * sp * 0.35 + car.vel.z * 0.35),
+      // topple away from the car plus a bit of chaos
+      spin: new THREE.Vector3(dir.z * 3.5 + (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 4, -dir.x * 3.5 + (Math.random() - 0.5) * 2),
+      life: 2.2,
+    });
+    const at = new THREE.Vector3(tr.x, (tr.y ?? 0) + 1, tr.z);
+    this.particles.debris(at, 4);
+    this.particles.driftSmoke(at);
+    this.particles.splinters(at, dir, [0x6a4a2a, 0x3e5e30], 0.6);
+    car.vel.multiplyScalar(0.82); // trees don't stop you, but they cost real speed
+    if (car === this.player) {
+      this.player.damage(4, null);
+      this.score += 15;
+      this.buzz(18);
+      this.shake = Math.min(1, this.shake + 0.15);
+      if (Math.random() < 0.3) this.hud.feed('TIMBER!  +15', 'good');
     }
   }
 

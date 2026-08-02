@@ -555,6 +555,48 @@ export class Car {
       }
     }
 
+    // ---- smashable trees: plow through at speed, nudge off at a crawl ----
+    if (this === gm.player && t.trees && t.trees.length) {
+      for (const tr of t.trees) {
+        if (tr.dead) continue;
+        const dx = this.pos.x - tr.x, dz = this.pos.z - tr.z;
+        const rr = tr.r + 1.7;
+        if (dx * dx + dz * dz >= rr * rr) continue;
+        if (Math.abs(this.pos.y - (tr.y ?? 0)) > 4) continue; // rim cacti, cliff snags
+        if (Math.abs(this.speedAlong) > 7) {
+          gm.onTreeSmash?.(tr, this);
+        } else {
+          const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
+          this.pos.x = tr.x + (dx / d) * rr;
+          this.pos.z = tr.z + (dz / d) * rr;
+          const vn = this.vel.x * (dx / d) + this.vel.z * (dz / d);
+          if (vn < 0) { this.vel.x -= (dx / d) * vn; this.vel.z -= (dz / d) * vn; }
+        }
+        break;
+      }
+    }
+
+    // ---- free roam: crashing THROUGH the fence line splinters it ----
+    if (freeRoam && !this.airborne) {
+      const inside = Math.abs(this.lateral) < WALL_LIMIT;
+      if (this._fenceIn !== undefined && inside !== this._fenceIn
+          && Math.abs(this.speedAlong) > 8 && !t.T?.cliffWalls
+          && Math.abs(this.pos.y - (t.pointAt(this.trackIndex, 0).y ?? 0)) < 4) {
+        const fn = t.nrm[this.trackIndex];
+        const cols = t.theme?.splinter ?? [0xc23b2a, 0xe8e2d4];
+        gm.particles.splinters(this.pos, fn, cols, 0.9);
+        gm.particles.sparks(this.pos, fn, 6);
+        this.vel.multiplyScalar(0.8); // planks don't stop you, but they cost speed
+        if (this === gm.player) {
+          gm.shake = Math.min(1, gm.shake + 0.25);
+          gm.buzz?.(20);
+          gm.score += 15;
+          if (Math.random() < 0.4) gm.hud?.feed('THROUGH THE FENCE! +15', 'good');
+        }
+      }
+      this._fenceIn = inside;
+    }
+
     // ---- puddles: heavy drag + slick grip + brown splash while inside ----
     const puddles = t.puddles ?? [];
     if (puddles.length && !this.airborne) {

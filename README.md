@@ -60,8 +60,9 @@ via `file://` won't work.)
 On touch devices the controls appear automatically and are built for two
 thumbs: the **left thumb drives** on a single analog pad (drag left/right to
 steer, up for gas, down for brake — the pad re-centers wherever you touch),
-while the **right thumb shoots**: FIRE, missile 🚀, mine 💣, shockwave 💥 and
-nitro ⚡, with live ammo badges on the buttons. Works in portrait and landscape.
+while the **right thumb shoots**: FIRE, missile 🚀, mine 💣, shockwave 💥,
+nitro ⚡ and a hold-to-slide **DRIFT** hand-brake button, with live ammo badges
+on the buttons. Works in portrait and landscape.
 
 ## Gameplay
 
@@ -85,6 +86,11 @@ nitro ⚡, with live ammo badges on the buttons. Works in portrait and landscape
   you down in CANYON RUN; basalt boulders on EMBER PASS.
 - **Destruction**: smash crates, cones, barrels, hay bales and snowmen for
   credits — some crates hide pickups. Fences burst into painted splinters.
+  Everything smashable dies to **weapons too**: cannon rounds pop crates,
+  missiles detonate on them, mines and the shockwave flatten whole clusters.
+- **Trees fall**: plow into a pine, cactus or burnt snag at speed and it
+  goes flying — costs you some speed and a little hull, pays score. In free
+  roam, bursting through the trackside fence splinters it (and pays too).
 - **Attack choppers** chase you with chin guns on the final lap (normal/hard)
   and in waves during free roam — shoot them down for +500 (cannon, missiles
   and the shockwave all work against them).

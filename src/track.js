@@ -265,13 +265,14 @@ const SPONSORS = [
 // are shared module-wide — each prop is still its own cheap Mesh/Group so the
 // game code can knock it flying individually.
 const PROP_SPECS = {
-  forest: [['hay', 18], ['crate', 12], ['cone', 10]],
-  desert: [['crate', 12], ['cone', 10], ['barrel', 14]],
-  snow: [['snowman', 12], ['crate', 12], ['cone', 10]],
-  canyon: [['crate', 12], ['barrel', 10], ['cone', 10], ['rock', 6]],
-  volcano: [['barrel', 14], ['crate', 12], ['cone', 10]],
+  forest: [['hay', 22], ['crate', 16], ['cone', 14]],
+  desert: [['crate', 16], ['cone', 14], ['barrel', 18]],
+  snow: [['snowman', 16], ['crate', 16], ['cone', 14]],
+  canyon: [['crate', 16], ['barrel', 13], ['cone', 13], ['rock', 8]],
+  volcano: [['barrel', 18], ['crate', 16], ['cone', 14]],
 };
 const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20 };
+const _m4 = new THREE.Matrix4(); // scratch (smashTree instance-zeroing)
 const PROP_PICKUPS = ['health', 'missile', 'nitro', 'mine'];
 // theme tints for the barrel drum texture
 const BARREL_PALETTES = {
@@ -392,6 +393,9 @@ export class Track {
     // animates the mesh flying away itself; `pickup` is a type string on the
     // crates that carry a reward (else null).
     this.props = [];
+    // Smashable trees: [{x, z, y, r, id, parts, kind, s, dead}] — every tree /
+    // cactus / snag instance, so cars can fell them (mostly a free-roam thing).
+    this.trees = [];
     // Soft world radius for free-roam driving; the game turns players around
     // once they wander past it.
     this.worldBounds = 1400;
@@ -1185,6 +1189,37 @@ export class Track {
     }
   }
 
+  /** Fell tree `tr`: hide its instanced parts and hand back a one-off
+   *  stand-in mesh the game can send flying. Returns null if already dead. */
+  smashTree(tr) {
+    if (tr.dead) return null;
+    tr.dead = true;
+    _m4.makeScale(0, 0, 0);
+    for (const part of tr.parts) {
+      part.setMatrixAt(tr.id, _m4);
+      part.instanceMatrix.needsUpdate = true;
+    }
+    const g = new THREE.Group();
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.28, 0.44, tr.kind === 'snag' ? 4.4 : 3.2, 6),
+      new THREE.MeshStandardMaterial({ color: this.T.trunkColor ?? 0x5a4028, roughness: 1 }));
+    trunk.position.y = 1.6;
+    g.add(trunk);
+    if (tr.kind !== 'snag') {
+      const fol = new THREE.Mesh(
+        new THREE.ConeGeometry(1.9, 3.6, 7),
+        new THREE.MeshStandardMaterial({
+          color: tr.kind === 'cactus' ? 0x4a7a3c : (this.T.foliageLow ?? 0x2a5a30),
+          flatShading: true, roughness: 1,
+        }));
+      fol.position.y = 4.1;
+      g.add(fol);
+    }
+    g.position.set(tr.x, tr.y ?? this.terrainHeight(tr.x, tr.z), tr.z);
+    g.scale.setScalar(tr.s ?? 1);
+    return g;
+  }
+
   // ---------- environment ----------
   _buildEnvironment() {
     this._buildTerrain();
@@ -1492,6 +1527,7 @@ export class Track {
     }
     const color = new THREE.Color();
     const F = T.foliage;
+    const treeParts = caps ? [trunks, lows, tops, caps] : [trunks, lows, tops];
 
     const placed = this._scatter(COUNT,
       () => {
@@ -1504,12 +1540,14 @@ export class Track {
       },
       (p, k) => {
         const s = 0.75 + Math.random() * 1.25;
+        const ty = this.terrainHeight(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.45), s);
-        m4.setPosition(p.x, this.terrainHeight(p.x, p.z) - 0.25, p.z);
+        m4.setPosition(p.x, ty, p.z);
         trunks.setMatrixAt(k, m4);
         lows.setMatrixAt(k, m4);
         tops.setMatrixAt(k, m4);
         if (caps) caps.setMatrixAt(k, m4);
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 1.0 * s, id: k, parts: treeParts, kind: 'pine', s });
         // per-tree foliage variation (themed hue band)
         color.setHSL(
           F.h + Math.random() * F.hVar,
@@ -1583,6 +1621,7 @@ export class Track {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
+        this.trees.push({ x: p.x, z: p.z, y: y - 0.15, r: 0.75 * spot.s, id: k, parts, kind: 'cactus', s: spot.s });
       });
     for (const part of parts) { part.count = placed; this.scene.add(part); }
   }
@@ -1618,9 +1657,10 @@ export class Track {
       },
       (p, k) => {
         const s = 0.7 + Math.random() * 1.1;
+        const ty = this.terrainHeight(p.x, p.z) - 0.2;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
-          new THREE.Vector3(p.x, this.terrainHeight(p.x, p.z) - 0.2, p.z),
+          new THREE.Vector3(p.x, ty, p.z),
           q, new THREE.Vector3(s, s * (0.8 + Math.random() * 0.5), s)
         );
         color.setHSL(0.06 + Math.random() * 0.03, 0.12 + Math.random() * 0.1, 0.08 + Math.random() * 0.06);
@@ -1628,6 +1668,7 @@ export class Track {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.45 * s, id: k, parts, kind: 'snag', s });
       });
     for (const part of parts) { part.count = placed; this.scene.add(part); }
   }
