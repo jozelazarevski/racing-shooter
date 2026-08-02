@@ -189,13 +189,20 @@
   }
 
   /* ---------- SCREENS ---------- */
-  .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
     background:radial-gradient(ellipse at 50% 120%, rgba(90,60,10,.45), rgba(24,16,6,.82) 68%);
-    z-index:10;transition:opacity .45s;padding:16px;overflow-y:auto;
-    justify-content:safe center} /* falls back to plain center where unsupported */
+    z-index:10;transition:opacity .45s, visibility 0s;padding:16px;overflow-y:auto;
+    touch-action:pan-y;overscroll-behavior:contain}
+  /* auto-margin spacers center short content but, unlike justify-content:center,
+     never push overflowing content out of the scrollable area on either end */
+  .screen::before,.screen::after{content:'';flex:0 0 auto;margin:auto}
   .screen::-webkit-scrollbar{display:none}
   .screen > *{flex-shrink:0} /* children keep natural size; the screen scrolls instead */
-  .screen.hidden{opacity:0;pointer-events:none}
+  /* visibility (not just pointer-events) — child buttons set pointer-events:auto,
+     which would otherwise keep swallowing taps while the screen is invisible */
+  .screen.hidden{opacity:0;visibility:hidden;
+    transition:opacity .45s, visibility 0s .45s}
+  .screen.hidden, .screen.hidden *{pointer-events:none!important}
   .game-title{font-family:'Luckiest Guy';font-size:clamp(44px,9vw,96px);line-height:.95;
     text-align:center;letter-spacing:4px;color:var(--yellow);
     text-shadow:6px 6px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink);
@@ -218,7 +225,8 @@
     -webkit-tap-highlight-color:transparent}
   .mode-chip.current{color:var(--ink);background:#7fd4ff;border-color:var(--ink);box-shadow:0 3px 0 var(--ink)}
   #diff-select{margin-top:14px;display:flex;gap:8px;justify-content:center}
-  #steer-select{margin-top:10px;display:flex;gap:8px;justify-content:center;align-items:center}
+  #steer-select{margin-top:10px;display:flex;gap:8px;justify-content:center;align-items:center;
+    flex-wrap:wrap;max-width:92vw}
   #steer-select .lbl{font-size:11px;letter-spacing:2px;color:#c9a86a;font-weight:800}
   .diff-chip{pointer-events:auto;cursor:pointer;padding:6px 16px;font-family:'Baloo 2';font-weight:800;
     font-size:13px;letter-spacing:2px;color:#d8c090;border-radius:8px;
@@ -286,8 +294,28 @@
   .result-stats{margin-top:24px;display:grid;grid-template-columns:auto auto;gap:9px 30px;
     font-size:17px;letter-spacing:1px;color:#ffe9c9}
   .result-stats b{color:#fff;text-align:right;font-family:'Luckiest Guy';font-size:18px;text-shadow:2px 2px 0 var(--ink)}
-  .footnote{position:absolute;bottom:14px;font-size:11px;letter-spacing:2px;color:#c9a86a;text-align:center;width:100%}
+  .footnote{margin-top:16px;font-size:11px;letter-spacing:2px;color:#c9a86a;text-align:center;width:100%}
   #loading-note{margin-top:24px;font-size:12px;letter-spacing:3px;color:#c9a86a;text-align:center}
+  /* START is the one action that must never be out of reach: pin it to the
+     bottom of the scrollport whenever its natural spot is below the fold */
+  #start-btn{position:sticky;bottom:10px;z-index:6;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+  #car-shop{touch-action:pan-x pan-y}
+  /* compact menu on short viewports (phones, small laptops) */
+  @media (max-height:1000px){
+    .game-title{font-size:clamp(34px,7vw,64px)}
+    .game-sub{margin-top:6px;letter-spacing:5px}
+    #level-select{margin-top:12px;gap:8px}
+    .level-chip{padding:7px 12px;font-size:12px}
+    #mode-select{margin-top:10px}
+    #diff-select{margin-top:10px}
+    #steer-select{margin-top:8px}
+    #car-shop{margin-top:6px}
+    #garage{margin-top:12px;padding:8px 12px 10px}
+    .up-row{padding:4px 0}
+    .controls{margin-top:16px;font-size:12px;gap:4px 16px}
+    #touch-note{margin-top:14px;font-size:12px;line-height:1.6}
+    #loading-note{margin-top:12px}
+  }
 </style>
 </head>
 <body>
