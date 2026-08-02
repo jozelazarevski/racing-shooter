@@ -480,8 +480,41 @@ export function roadTexture(palette = {}) {
       g.fillStyle = `rgba(${r + Math.random() * 40 | 0},${gr + Math.random() * 34 | 0},${b + Math.random() * 26 | 0},0.9)`;
       g.beginPath(); g.ellipse(x, y, s, s * 0.7, Math.random() * 3, 0, Math.PI * 2); g.fill();
     }
+    // fine multi-octave grain over the whole surface (build-time, palette-safe)
+    noiseOverlay(g, w, h, 0.11);
+    // dry surfaces pick up faint oily wear sheen down the driving lines —
+    // long dark streaks with a cool gleam core (skipped under wet/snow/ice
+    // overlays, which paint their own surface films)
+    if (!P.wet && !P.snowCover && !P.ice) {
+      for (const cx of [w * 0.32, w * 0.5, w * 0.68]) {
+        const nStreaks = cx === w * 0.5 ? 2 : 4;
+        for (let i = 0; i < nStreaks; i++) {
+          const x = cx + (Math.random() - 0.5) * 34;
+          const bw = 4 + Math.random() * 9;
+          const a = 0.05 + Math.random() * 0.06;
+          const grd = g.createLinearGradient(x - bw, 0, x + bw, 0);
+          grd.addColorStop(0, 'rgba(20,14,10,0)');
+          grd.addColorStop(0.5, `rgba(20,14,10,${a})`);
+          grd.addColorStop(1, 'rgba(20,14,10,0)');
+          g.fillStyle = grd;
+          g.fillRect(x - bw, 0, bw * 2, h);
+        }
+        // a couple of thin cool gleam lines riding the polished wear
+        for (let i = 0; i < 2; i++) {
+          const x = cx + (Math.random() - 0.5) * 26;
+          g.fillStyle = `rgba(200,210,225,${0.035 + Math.random() * 0.035})`;
+          g.fillRect(x, 0, 1.6 + Math.random() * 1.6, h);
+        }
+      }
+    }
     // irregular grassy fringe creeping in from both edges
     for (const [x0, dir] of [[0, 1], [w, -1]]) {
+      // compacted wear band just inside the fringe — the verge reads driven-on
+      const wearGrd = g.createLinearGradient(x0, 0, x0 + dir * 52, 0);
+      wearGrd.addColorStop(0, 'rgba(45,32,18,0.16)');
+      wearGrd.addColorStop(1, 'rgba(45,32,18,0)');
+      g.fillStyle = wearGrd;
+      g.fillRect(dir > 0 ? x0 : x0 - 52, 0, 52, h);
       for (let y = 0; y < h; y += 3) {
         const reach = 10 + Math.sin(y * 0.045 + x0) * 7 + Math.random() * 20;
         const [r, gr, b] = P.fringe, [vr, vg, vb] = P.fringeVar;
@@ -495,6 +528,16 @@ export function roadTexture(palette = {}) {
         g.beginPath();
         g.arc(x0 + dir * (8 + Math.random() * 26), Math.random() * h, 5 + Math.random() * 10, 0, Math.PI * 2);
         g.fill();
+      }
+      // loose fringe blend: scattered verge-colored crumbs thinning inward,
+      // so the grass edge feathers into the dirt instead of ending in a line
+      for (let i = 0; i < 150; i++) {
+        const t = Math.random() * Math.random();          // biased to the edge
+        const x = x0 + dir * (4 + t * 46);
+        const [r, gr, b] = P.fringe, [vr, vg, vb] = P.fringeVar;
+        g.fillStyle = `rgba(${r + Math.random() * vr | 0},${gr + Math.random() * vg | 0},${b + Math.random() * vb | 0},${0.25 + Math.random() * 0.35})`;
+        const s = 1 + Math.random() * 2.6;
+        g.fillRect(x, Math.random() * h, s, s);
       }
     }
     // surface-condition overlays (wet gloss / driven-in snow / dune ripples /
@@ -1008,6 +1051,33 @@ export function cliffTexture(palette = {}) {
       }
       g.stroke();
     }
+    // fine fracture web: short hairline cracks + tiny chip pits, so the face
+    // reads rock (not wallpaper) at racing distance
+    for (let i = 0; i < 90; i++) {
+      let x = Math.random() * w, cy = Math.random() * h;
+      const len = 10 + Math.random() * 34;
+      g.strokeStyle = P.crack + (0.10 + Math.random() * 0.14) + ')';
+      g.lineWidth = 0.7 + Math.random() * 0.7;
+      g.beginPath();
+      g.moveTo(x, cy);
+      const end = cy + len;
+      while (cy < end) {
+        cy += 4 + Math.random() * 7;
+        x += (Math.random() - 0.5) * 7;
+        g.lineTo(x, cy);
+      }
+      g.stroke();
+    }
+    for (let i = 0; i < 130; i++) {
+      const s = 1 + Math.random() * 2.4;
+      const x = Math.random() * w, y2 = Math.random() * h;
+      g.fillStyle = P.crack + (0.10 + Math.random() * 0.12) + ')';
+      g.fillRect(x, y2, s, s * 0.7);
+      g.fillStyle = `rgba(${P.mottleLight},${0.08 + Math.random() * 0.08})`;
+      g.fillRect(x, y2 - 1, s, 1);
+    }
+    // grain pass keeps the strata palette but kills the flat band fills
+    noiseOverlay(g, w, h, 0.12);
     // sun-bleached rim on top, talus shadow at the base
     g.fillStyle = P.bleach;
     g.fillRect(0, 0, w, 46);
