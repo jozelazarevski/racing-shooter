@@ -1169,6 +1169,8 @@ export class EnemyCar extends Car {
     const slopeHere = t.slopeAt?.(this.trackIndex) ?? 0;
     if (slopeHere < -0.02) vAllowed *= Math.max(0.85, 1 + slopeHere * 1.2);
     vAllowed = Math.max(vAllowed, 14); // never crawl
+    // world-special slow field (FREEZE STRIKE / JUNGLE FURY): rivals at half pace
+    if (g.enemySlowUntil && g.raceTime < g.enemySlowUntil) vAllowed = Math.min(vAllowed, this.maxSpeed * 0.5);
 
     let throttle = 0, brake = 0;
     if (v < vAllowed - 1.5) throttle = 1;
@@ -1177,7 +1179,8 @@ export class EnemyCar extends Car {
 
     // ---- nitro-ish bursts: behind the player, on a straight, off cooldown
     this.boostCooldown -= dt;
-    if (this.boostCooldown <= 0 && this.boostTimer <= 0 && gap > 0.004 && v > this.maxSpeed * 0.55) {
+    const slowed = g.enemySlowUntil && g.raceTime < g.enemySlowUntil;
+    if (!slowed && this.boostCooldown <= 0 && this.boostTimer <= 0 && gap > 0.004 && v > this.maxSpeed * 0.55) {
       let curvAhead = 0;
       for (let k = 0; k < 45; k += 5) curvAhead = Math.max(curvAhead, t.curvature[(this.trackIndex + k) % t.N]);
       if (curvAhead < 0.012) {
