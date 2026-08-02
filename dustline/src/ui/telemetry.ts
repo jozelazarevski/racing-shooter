@@ -12,7 +12,7 @@ export class Telemetry {
   constructor() {
     this.el = document.createElement('div');
     this.el.id = 'telemetry';
-    this.el.innerHTML = '<div class="t-head">DUSTLINE M1 — telemetry</div>';
+    this.el.innerHTML = '<div class="t-head">DUSTLINE — telemetry</div>';
     for (let i = 0; i < 8; i++) {
       const r = document.createElement('div');
       r.className = 't-row';

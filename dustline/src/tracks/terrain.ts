@@ -109,6 +109,11 @@ export class Terrain {
     return out.set(-hx, 2 * e, -hz).normalize();
   }
 
+  /** Distance to the road centerline (scenery keeps clear of the route). */
+  distToRoad(x: number, z: number): number {
+    return this.sdf(x, z).d;
+  }
+
   surfaceIdAt(x: number, z: number): SurfaceId {
     const pad = Math.hypot(x - this.spawn.x, z - this.spawn.z);
     if (pad < PAD_R) return 'tarmac';
@@ -144,9 +149,16 @@ export class Terrain {
     }
     // off-road: blend zone tint over grass so the map reads
     out.copy(GRASS).lerp(SURF_COLORS[id], id === 'gravel' ? 0.25 : 0.75);
-    // subtle noise so big fields aren't flat
-    const n = Math.sin(x * 0.13) * Math.sin(z * 0.17) * 0.06;
-    return out.offsetHSL(0, 0, n);
+    // slope shading: steep faces read as exposed rock/dirt
+    const e = 2.5;
+    const gx = (this.heightAt(x + e, z) - this.heightAt(x - e, z)) / (2 * e);
+    const gz = (this.heightAt(x, z + e) - this.heightAt(x, z - e)) / (2 * e);
+    const slope = Math.hypot(gx, gz);
+    if (slope > 0.28) out.lerp(new THREE.Color(0x7d7466), Math.min(0.75, (slope - 0.28) * 2.6));
+    // valleys sit a touch darker (cheap baked-AO feel), crests a touch lighter
+    const h = this.heightAt(x, z);
+    const n = Math.sin(x * 0.13) * Math.sin(z * 0.17) * 0.05 + Math.sin(x * 0.041 + z * 0.037) * 0.035;
+    return out.offsetHSL(0, 0, n + THREE.MathUtils.clamp(h * 0.006, -0.045, 0.05));
   }
 
   /** Shared grid: render mesh (vertex-colored) + Rapier trimesh collider. */
@@ -187,6 +199,80 @@ export class Terrain {
 
     const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     world.createCollider(RAPIER.ColliderDesc.trimesh(verts, new Uint32Array(idx)).setFriction(1), body);
+
+    // ---- textured road ribbon swept along the loop (visual only — the
+    // trimesh below it is the drivable surface). Crowned profile with edge
+    // skirts that tuck into the terrain, per-vertex surface tint. ----
+    const rcv = document.createElement('canvas');
+    rcv.width = 128; rcv.height = 128;
+    const rctx = rcv.getContext('2d')!;
+    rctx.fillStyle = '#a6a6a4';
+    rctx.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 700; i++) { // asphalt speckle
+      const g = 120 + Math.random() * 60 | 0;
+      rctx.fillStyle = `rgba(${g},${g},${g},0.5)`;
+      rctx.fillRect(Math.random() * 128, Math.random() * 128, 2, 2);
+    }
+    rctx.fillStyle = '#f2ede0';                 // edge lines run along v edges
+    rctx.fillRect(0, 3, 128, 4);
+    rctx.fillRect(0, 121, 128, 4);
+    const rtex = new THREE.CanvasTexture(rcv);
+    rtex.wrapS = rtex.wrapT = THREE.RepeatWrapping;
+    rtex.colorSpace = THREE.SRGBColorSpace;
+    const NPTS = this.roadPts.length;
+    const COLS = 4;
+    const H = ROAD_HALF + 0.6;
+    const lats = [-(H + 1.7), -(H - 0.15), H - 0.15, H + 1.7];
+    const lifts = [-0.3, 0.14, 0.14, -0.3];
+    const vvs = [0, 0.06, 0.94, 1];
+    const rVerts = new Float32Array((NPTS + 1) * COLS * 3);
+    const rCols = new Float32Array((NPTS + 1) * COLS * 3);
+    const rUvs = new Float32Array((NPTS + 1) * COLS * 2);
+    const rIdx: number[] = [];
+    const tint = new THREE.Color();
+    for (let i = 0; i <= NPTS; i++) {
+      const j = i % NPTS;
+      const p = this.roadPts[j];
+      const p2 = this.roadPts[(j + 1) % NPTS];
+      let nx = p2.z - p.z, nz = -(p2.x - p.x);
+      const nl = Math.hypot(nx, nz) || 1;
+      nx /= nl; nz /= nl;
+      const id = this.surfaceIdAt(p.x, p.z);
+      tint.copy(SURF_COLORS[id]).multiplyScalar(1.7).offsetHSL(0, 0, 0.06);
+      for (let cIdx = 0; cIdx < COLS; cIdx++) {
+        const px = p.x + nx * lats[cIdx];
+        const pz = p.z + nz * lats[cIdx];
+        const o = (i * COLS + cIdx) * 3;
+        rVerts[o] = px;
+        rVerts[o + 1] = this.heightAt(px, pz) + lifts[cIdx] + 0.1;
+        rVerts[o + 2] = pz;
+        rCols[o] = tint.r; rCols[o + 1] = tint.g; rCols[o + 2] = tint.b;
+        const uo = (i * COLS + cIdx) * 2;
+        rUvs[uo] = i * 0.55;
+        rUvs[uo + 1] = vvs[cIdx];
+      }
+      if (i < NPTS) {
+        for (let cIdx = 0; cIdx < COLS - 1; cIdx++) {
+          const a = i * COLS + cIdx;
+          const b2 = a + 1;
+          const c2 = a + COLS;
+          const d3 = c2 + 1;
+          rIdx.push(a, c2, b2, b2, c2, d3);
+        }
+      }
+    }
+    const rGeo = new THREE.BufferGeometry();
+    rGeo.setAttribute('position', new THREE.BufferAttribute(rVerts, 3));
+    rGeo.setAttribute('color', new THREE.BufferAttribute(rCols, 3));
+    rGeo.setAttribute('uv', new THREE.BufferAttribute(rUvs, 2));
+    rGeo.setIndex(rIdx);
+    rGeo.computeVertexNormals();
+    const road = new THREE.Mesh(rGeo, new THREE.MeshStandardMaterial({
+      map: rtex, vertexColors: true, roughness: 0.93,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+    }));
+    road.receiveShadow = true;
+    scene.add(road);
 
     // road edge posts every ~20 samples so the route reads at speed
     const postGeo = new THREE.BoxGeometry(0.22, 1.0, 0.22);
