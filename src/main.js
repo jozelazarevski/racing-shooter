@@ -62,7 +62,10 @@ class Game {
     this.garage = loadJSON('ir-garage', { credits: 0, engine: 0, armor: 0, cannon: 0, nitro: 0, handling: 0 });
     this.cars = loadJSON('ir-cars', { owned: ['brawler'], selected: 'brawler' });
     if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = 'brawler';
-    this.freeRoam = (params.get('mode') || localStorage.getItem('ir-mode')) === 'roam';
+    // mode comes from the URL only — a fresh visit ALWAYS starts in RACE mode
+    // (persisting roam silently made races "never finish" for returning players)
+    this.freeRoam = params.get('mode') === 'roam';
+    this.steerSetting = localStorage.getItem('ir-steer') || 'normal';
     this.unlockAll = params.get('unlockall') === '1';
     const diffId = localStorage.getItem('ir-diff') || 'normal';
     this.difficulty = DIFFS[diffId] || DIFFS.normal;
@@ -82,7 +85,7 @@ class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.12;
 
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0xcfe8f5, 320, 1500);
@@ -103,7 +106,7 @@ class Game {
     // post-processing: a whisper of bloom for lamps, tracers and explosions
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.3, 0.4, 0.9);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.38, 0.45, 0.88);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
 
@@ -114,6 +117,7 @@ class Game {
       if (th.fogColor !== undefined) this.scene.fog = new THREE.Fog(th.fogColor, th.fogNear ?? 320, th.fogFar ?? 1500);
       if (th.hemiSky !== undefined) this.hemi.color.setHex(th.hemiSky);
       if (th.hemiGround !== undefined) this.hemi.groundColor.setHex(th.hemiGround);
+      if (th.hemiIntensity !== undefined) this.hemi.intensity = th.hemiIntensity;
       if (th.sunColor !== undefined) this.moon.color.setHex(th.sunColor);
       if (th.sunIntensity !== undefined) this.moon.intensity = th.sunIntensity;
     }
@@ -213,7 +217,6 @@ class Game {
       chip.textContent = label;
       chip.addEventListener('click', () => {
         if ((id === 'roam') === this.freeRoam) return;
-        localStorage.setItem('ir-mode', id);
         this.fadeTo(`?level=${this.level.id}&mode=${id}`);
       });
       msel.appendChild(chip);
@@ -234,6 +237,40 @@ class Game {
       });
       dsel.appendChild(chip);
     }
+
+    // steering sensitivity chips (also cycled from the pause menu)
+    const ssel = document.getElementById('steer-select');
+    ssel.innerHTML = '<span class="lbl">STEERING</span>';
+    const STEERS = [['relaxed', 'RELAXED'], ['normal', 'NORMAL'], ['sharp', 'SHARP']];
+    const applySteerChips = () => {
+      for (const c of ssel.querySelectorAll('.diff-chip')) {
+        c.className = 'diff-chip' + (c.dataset.id === this.steerSetting ? ' current normal' : '');
+      }
+      const pmBtn = document.getElementById('pm-steer');
+      pmBtn.textContent = `STEERING: ${this.steerSetting.toUpperCase()}`;
+    };
+    for (const [id, label] of STEERS) {
+      const chip = document.createElement('button');
+      chip.className = 'diff-chip';
+      chip.dataset.id = id;
+      chip.textContent = label;
+      chip.addEventListener('click', () => {
+        this.steerSetting = id;
+        localStorage.setItem('ir-steer', id);
+        this.applyUpgrades();
+        applySteerChips();
+      });
+      ssel.appendChild(chip);
+    }
+    document.getElementById('pm-steer').addEventListener('click', () => {
+      const ids = STEERS.map(([i]) => i);
+      this.steerSetting = ids[(ids.indexOf(this.steerSetting) + 1) % ids.length];
+      localStorage.setItem('ir-steer', this.steerSetting);
+      this.applyUpgrades();
+      applySteerChips();
+      this.hud.feed(`STEERING: ${this.steerSetting.toUpperCase()}`, 'info');
+    });
+    applySteerChips();
 
     this.renderGarage();
     this.renderCarShop();
@@ -331,6 +368,7 @@ class Game {
     p.cannonDamage = 7 * (1 + 0.18 * g.cannon);
     p.nitroRate = 1 + 0.22 * g.nitro;
     p.handling = 0.2 * (g.handling || 0);
+    p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
   }
 
   renderCarShop() {
@@ -698,7 +736,12 @@ class Game {
     }
     this.score += 500;
     this.audio.lap();
-    this.hud.centerMsg(`LAP ${p.lap}`);
+    if (p.lap === this.lapsTotal) {
+      this.hud.centerMsg('FINAL LAP!');
+      if (this.difficulty.id !== 'easy') this.hud.feed('⚠ AIR SUPPORT EXPECTED', 'bad');
+    } else {
+      this.hud.centerMsg(`LAP ${p.lap}`);
+    }
     this.hud.feed(`LAP ${p.lap - 1} — ${fmtTime(lapTime)}  +500`, 'good');
   }
 
@@ -893,6 +936,9 @@ class Game {
       }
       if (this.freeRoam) this.playerRank = 1;
       else this._updateRank();
+      if (this.particles.ambient && this.track.theme?.weather) {
+        this.particles.ambient(this.player.pos, this.track.theme.weather, dt);
+      }
       this.particles.update(dt);
       this._updateFlashes(dt);
       this.hud.update(dt);
@@ -906,6 +952,9 @@ class Game {
       const c = this.track.center[0];
       this.camera.position.set(c.x + Math.cos(a) * 55, 34, c.z + Math.sin(a) * 55);
       this.camera.lookAt(c.x, 0, c.z);
+      if (this.particles.ambient && this.track.theme?.weather) {
+        this.particles.ambient(new THREE.Vector3(c.x, 0, c.z), this.track.theme.weather, dt);
+      }
       this.particles.update(dt);
       for (const p of this.pickups) { p.core.rotation.y += dt * 2.2; }
     }

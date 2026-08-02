@@ -90,6 +90,10 @@ const THEMES = {
     hutRoof: 0xc9a24d, hayColor: 0xd8b95e,
     // debris chip colors when a fence/wall is scraped (painted pole red/cream)
     splinter: [0xc23b2a, 0xe8e2d4],
+    // ambient drifting weather particles (recipe implemented by particles.js)
+    weather: { type: 'leaves', color: 0x9ab84a },
+    // elevation profile: amplitude + deterministic per-octave phases
+    elev: { amp: 8, ph: [0.9, 2.6, 4.2] },
     // per-level gameplay-placement tuning
     rampMaxCurv: 0.014, padMaxCurv: 0.004, boardMaxCurv: 0.012,
   },
@@ -123,13 +127,15 @@ const THEMES = {
     flowerCount: 90, flowerColors: ['#ffd45e', '#ff8a3a', '#e86a8a'],
     hutRoof: 0xb0794a, hayColor: 0xd8b95e,
     splinter: [0xe8b83a, 0xe8e2d4],                     // sun-bleached painted fence
+    weather: { type: 'sand', color: 0xd8b878 },
+    elev: { amp: 10, ph: [1.7, 0.4, 3.3] },             // long dune rollers
     rampMaxCurv: 0.014, padMaxCurv: 0.004, boardMaxCurv: 0.012,
   },
   snow: {
     fogColor: 0xe2edf6, fogNear: 240, fogFar: 1250,
     hemiSky: 0xdfeaf8, hemiGround: 0xb8c6d2,
     sunColor: 0xeaf2ff, sunIntensity: 1.7,
-    skyTop: '#7ba8cc', skyHorizon: '#eaf3fa', sunGlow: 0xffffff,
+    skyTop: '#639fd8', skyHorizon: '#eaf3fa', sunGlow: 0xffffff,
     cloudCount: 9, cloudOpacity: 0.95,
     terrainLow: '#dde8ee', terrainHigh: '#ffffff', terrainDirt: '#b7c4cd',
     ground: {
@@ -155,6 +161,8 @@ const THEMES = {
     flowerCount: 60, flowerColors: ['#ffffff', '#cfe0ff', '#ffd0e0'],
     hutRoof: 0xe8eef4, hayColor: 0xd8c07a,
     splinter: [0xdce8f0, 0x9fc4d8],                     // icy chips
+    weather: { type: 'snow', color: 0xffffff },
+    elev: { amp: 14, ph: [2.6, 1.2, 5.1] },             // proper mountain climb
     rampMaxCurv: 0.022, padMaxCurv: 0.0075, boardMaxCurv: 0.02,
   },
   // CANYON RUN: the road snakes between tall stratified sandstone cliffs.
@@ -191,6 +199,8 @@ const THEMES = {
     flowerCount: 60, flowerColors: ['#ffd45e', '#ff7a3a', '#e86a8a'],
     hutRoof: 0xb0794a, hayColor: 0xd8b95e, hutCount: 3, hayCount: 22,
     splinter: [0xc9a06a, 0xa06844],                     // sandstone chips
+    weather: { type: 'dust', color: 0xc9a06a },
+    elev: { amp: 6, ph: [0.3, 3.7, 1.9] },              // gentle canyon-floor undulation
     rampMaxCurv: 0.02, padMaxCurv: 0.0075, boardMaxCurv: 0.018,
     cliffWalls: true, horizon: 'mesa', bridgeCount: 3, oasis: true,
     obstacleSpec: { count: 6, style: 'hoodoo' }, puddleCount: 5,
@@ -199,11 +209,11 @@ const THEMES = {
   // obsidian rocks, bare burnt trees, red-black mountains, dim ember light.
   volcano: {
     fogColor: 0x4a322a, fogNear: 230, fogFar: 1050,
-    hemiSky: 0x9a5f48, hemiGround: 0x2e2420,            // dim, ember-tinted hemisphere
-    sunColor: 0xff8a4a, sunIntensity: 1.6,
-    skyTop: '#3a2030', skyHorizon: '#d86a2a', sunGlow: 0xff6a28,
+    hemiSky: 0xc98a66, hemiGround: 0x4a3a32, hemiIntensity: 1.05,  // ember dusk, but readable
+    sunColor: 0xff8a4a, sunIntensity: 2.0,
+    skyTop: '#341a28', skyHorizon: '#dd541c', sunGlow: 0xff6a28, skyCurve: 0.72,
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
-    terrainLow: '#262220', terrainHigh: '#453b34', terrainDirt: '#5a3226',
+    terrainLow: '#322c28', terrainHigh: '#564a40', terrainDirt: '#6a3c2c',
     ground: {
       base: '#332e2a', bandLight: 'rgba(255,255,255,0.03)', bandDark: 'rgba(0,0,0,0.06)',
       patchA: 'rgba(18,14,12,0.22)', patchB: 'rgba(96,74,58,0.14)',
@@ -230,6 +240,8 @@ const THEMES = {
     flowerCount: 0, flowerColors: ['#ff7a22'],
     hutRoof: 0x4a3a30, hayColor: 0x8a6a3a, hutCount: 4, hayCount: 0,
     splinter: [0x3a3634, 0xff5e2e],                     // basalt + ember chips
+    weather: { type: 'embers', color: 0xff7a2e },
+    elev: { amp: 12, ph: [4.1, 2.8, 0.7] },             // heaving lava-field climbs
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.016,
     obstacleSpec: { count: 4, style: 'basalt' }, puddleCount: 0,
   },
@@ -315,10 +327,12 @@ export class Track {
     // plain-number lighting/fog summary for main.js
     this.theme = {
       fogColor: T.fogColor, fogNear: T.fogNear, fogFar: T.fogFar,
-      hemiSky: T.hemiSky, hemiGround: T.hemiGround,
+      hemiSky: T.hemiSky, hemiGround: T.hemiGround, hemiIntensity: T.hemiIntensity,
       sunColor: T.sunColor, sunIntensity: T.sunIntensity,
       // [hexA, hexB] debris chip colors for fence/cliff scrape particles
       splinter: T.splinter,
+      // ambient weather particle recipe for this level: { type, color }
+      weather: T.weather,
     };
     // levels are self-contained: fog is set here (main.js may re-apply from theme)
     scene.fog = new THREE.Fog(T.fogColor, T.fogNear, T.fogFar);
@@ -343,8 +357,18 @@ export class Track {
       this.tan.push(tg);
       this.nrm.push(new THREE.Vector3(tg.z, 0, -tg.x));
     }
+    // Elevation profile: the road climbs and descends over the lap (tan/nrm and
+    // curvature stay XZ-based — heading math is unaffected by the y channel).
+    for (let i = 0; i < N; i++) this.center[i].y = this._elevProfile(i);
     this.length = this.curve.getLength();
     this.segLen = this.length / N;
+
+    // grade (dY/ds along travel) per sample, for slope forces + mesh pitching
+    this._slope = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      this._slope[i] =
+        (this.center[(i + 2) % N].y - this.center[(i - 2 + N) % N].y) / (4 * this.segLen);
+    }
 
     // curvature per sample (radians of heading change per world unit)
     this.curvature = new Float32Array(N);
@@ -405,19 +429,43 @@ export class Track {
     }
   }
 
+  /** Road elevation at sample i: 2–3 smooth sine octaves over the lap, forced
+   *  flat around the start line so the grid/gate/grandstand sit at y=0. All
+   *  phases are fixed per theme — layouts stay deterministic across loads. */
+  _elevProfile(i) {
+    const E = this.T.elev || { amp: 0, ph: [0, 0, 0] };
+    const t = (i / N) * Math.PI * 2;
+    const raw =
+      0.52 * Math.sin(2 * t + E.ph[0]) +      // period ~N/2
+      0.34 * Math.sin(3.3 * t + E.ph[1]) +    // period ~N/3.3
+      0.14 * Math.sin(7 * t + E.ph[2]);       // period ~N/7
+    // dead-flat within ±45 samples of the start, easing up to full amplitude
+    return E.amp * raw * THREE.MathUtils.smoothstep(this._circDist(i, 0), 45, 130);
+  }
+
+  /** Grade dY/ds (rise per unit of travel) at sample i. Positive = climbing. */
+  slopeAt(i) {
+    return this._slope[((i % N) + N) % N];
+  }
+
   // ---------- queries ----------
   nearestIndex(pos, hint = null) {
+    // XZ distance only — the elevated centerline must not bias index tracking
+    const d2 = (i) => {
+      const dx = pos.x - this.center[i].x, dz = pos.z - this.center[i].z;
+      return dx * dx + dz * dz;
+    };
     let best = -1, bd = Infinity;
     if (hint === null) {
       for (let i = 0; i < N; i += 4) {
-        const d = pos.distanceToSquared(this.center[i]);
+        const d = d2(i);
         if (d < bd) { bd = d; best = i; }
       }
       hint = best; bd = Infinity;
     }
     for (let k = -30; k <= 30; k++) {
       const i = (hint + k + N) % N;
-      const d = pos.distanceToSquared(this.center[i]);
+      const d = d2(i);
       if (d < bd) { bd = d; best = i; }
     }
     return best;
@@ -429,8 +477,10 @@ export class Track {
   }
 
   pointAt(i, lateral) {
+    // road surface is flat across its width — y comes straight from the profile
     return new THREE.Vector3(
-      this.center[i].x + this.nrm[i].x * lateral, 0,
+      this.center[i].x + this.nrm[i].x * lateral,
+      this.center[i].y,
       this.center[i].z + this.nrm[i].z * lateral
     );
   }
@@ -444,63 +494,91 @@ export class Track {
     return { index: i, lateral };
   }
 
-  /** Road surface height at a track position — non-zero on ramps. */
+  /** Road surface height at a track position: the elevation profile, plus the
+   *  ramp wedge height when inside a ramp zone (ramps ADD to road height). */
   groundHeightAt(i, lateral) {
+    const roadY = this.center[i].y;
     for (const r of this.ramps) {
       const di = (i - r.index + N) % N;
       if (di < r.len && Math.abs(lateral - r.lateral) < r.halfW) {
-        return r.height * (di / r.len);
+        return roadY + r.height * (di / r.len);
       }
     }
-    return 0;
+    return roadY;
+  }
+
+  /** Distance from (x,z) to the nearest centerline sample (coarse), plus that
+   *  sample's road elevation. Returns [dist, roadY]. */
+  _nearRoad(x, z) {
+    let best = Infinity, bi = 0;
+    for (let i = 0; i < N; i += 5) {
+      const dx = x - this.center[i].x, dz = z - this.center[i].z;
+      const d = dx * dx + dz * dz;
+      if (d < best) { best = d; bi = i; }
+    }
+    return [Math.sqrt(best), this.center[bi].y];
   }
 
   /** Distance from (x,z) to the nearest centerline sample (coarse). */
   _distToTrack(x, z) {
-    let best = Infinity;
-    for (let i = 0; i < N; i += 5) {
-      const dx = x - this.center[i].x, dz = z - this.center[i].z;
-      const d = dx * dx + dz * dz;
-      if (d < best) best = d;
-    }
-    return Math.sqrt(best);
+    return this._nearRoad(x, z)[0];
   }
 
-  /** Track distance on a lazy 8-unit grid, bilinearly blended between the four
-   *  surrounding corners. Each corner runs _distToTrack once, then is memoized,
-   *  so warm calls are a handful of ops — cheap enough for per-frame use. */
-  _distToTrackCoarse(x, z) {
+  /** Track distance + nearest-sample road y on a lazy 8-unit grid, bilinearly
+   *  blended between the four surrounding corners. Each corner runs _nearRoad
+   *  once, then is memoized, so warm calls are a handful of ops — cheap enough
+   *  for per-frame use. Writes {d, y} into this._fieldTmp and returns it. */
+  _roadFieldCoarse(x, z) {
+    const out = this._fieldTmp || (this._fieldTmp = { d: 0, y: 0 });
     const CS = 8, HALF = 2048, CELLS = (HALF * 2) / CS;
     const gx = (x + HALF) / CS, gz = (z + HALF) / CS;
     const x0 = Math.floor(gx), z0 = Math.floor(gz);
-    if (x0 < 0 || z0 < 0 || x0 >= CELLS || z0 >= CELLS) return this._distToTrack(x, z);
+    if (x0 < 0 || z0 < 0 || x0 >= CELLS || z0 >= CELLS) {
+      const v = this._nearRoad(x, z);
+      out.d = v[0]; out.y = v[1];
+      return out;
+    }
     const cache = this._distCache || (this._distCache = new Map());
     const corner = (cx, cz) => {
       const key = cx * 1024 + cz;
       let v = cache.get(key);
       if (v === undefined) {
-        v = this._distToTrack(cx * CS - HALF, cz * CS - HALF);
+        v = this._nearRoad(cx * CS - HALF, cz * CS - HALF);
         cache.set(key, v);
       }
       return v;
     };
     const fx = gx - x0, fz = gz - z0;
-    const a = corner(x0, z0) * (1 - fx) + corner(x0 + 1, z0) * fx;
-    const b = corner(x0, z0 + 1) * (1 - fx) + corner(x0 + 1, z0 + 1) * fx;
-    return a * (1 - fz) + b * fz;
+    const c00 = corner(x0, z0), c10 = corner(x0 + 1, z0);
+    const c01 = corner(x0, z0 + 1), c11 = corner(x0 + 1, z0 + 1);
+    const a = c00[0] * (1 - fx) + c10[0] * fx;
+    const b = c01[0] * (1 - fx) + c11[0] * fx;
+    out.d = a * (1 - fz) + b * fz;
+    const ya = c00[1] * (1 - fx) + c10[1] * fx;
+    const yb = c01[1] * (1 - fx) + c11[1] * fx;
+    out.y = ya * (1 - fz) + yb * fz;
+    return out;
+  }
+
+  _distToTrackCoarse(x, z) {
+    return this._roadFieldCoarse(x, z).d;
   }
 
   /** Rolling-hill height used by the terrain mesh, scenery placement and the
-   *  free-roam mode's per-frame ground queries (track distance is cached). */
+   *  free-roam mode's per-frame ground queries (track distance is cached).
+   *  Near the road it blends to the ROAD's elevation at the nearest centerline
+   *  sample, so the meadow rises to meet the climbing road. */
   terrainHeight(x, z) {
-    const d = this._distToTrackCoarse(x, z);
-    if (d <= 15) return 0;                     // flattened corridor along the road
+    const fld = this._roadFieldCoarse(x, z);
+    const d = fld.d;
+    if (d <= 15) return fld.y;                 // flattened corridor along the road
     const n =
       Math.sin(x * 0.012) * Math.cos(z * 0.010) * 3.4 +
       Math.sin(x * 0.030 + 1.7) * Math.cos(z * 0.026 + 0.6) * 1.7 +
       Math.sin(x * 0.070 + 3.1) * Math.cos(z * 0.062 + 2.2) * 0.7;
     if (d >= 70) return n;
-    return n * THREE.MathUtils.smoothstep(d, 15, 70);
+    const f = THREE.MathUtils.smoothstep(d, 15, 70);
+    return fld.y * (1 - f) + n * f;
   }
 
   // ---------- track construction ----------
@@ -514,8 +592,8 @@ export class Track {
       const j = i % N;
       const c = this.center[j], n = this.nrm[j];
       const o = i * 6;
-      verts[o] = c.x + n.x * w; verts[o + 1] = 0; verts[o + 2] = c.z + n.z * w;
-      verts[o + 3] = c.x - n.x * w; verts[o + 4] = 0; verts[o + 5] = c.z - n.z * w;
+      verts[o] = c.x + n.x * w; verts[o + 1] = c.y; verts[o + 2] = c.z + n.z * w;
+      verts[o + 3] = c.x - n.x * w; verts[o + 4] = c.y; verts[o + 5] = c.z - n.z * w;
       const v = (i * this.segLen) / 10;
       uvs[i * 4] = 0; uvs[i * 4 + 1] = v;
       uvs[i * 4 + 2] = 1; uvs[i * 4 + 3] = v;
@@ -547,8 +625,8 @@ export class Track {
       const c = this.center[j], n = this.nrm[j];
       const x = c.x + n.x * WALL_OFF * side, z = c.z + n.z * WALL_OFF * side;
       const o = i * 6;
-      verts[o] = x; verts[o + 1] = 0; verts[o + 2] = z;
-      verts[o + 3] = x; verts[o + 4] = h; verts[o + 5] = z;
+      verts[o] = x; verts[o + 1] = c.y; verts[o + 2] = z;
+      verts[o + 3] = x; verts[o + 4] = c.y + h; verts[o + 5] = z;
       const u = (i * this.segLen) / 8;
       uvs[i * 4] = u; uvs[i * 4 + 1] = 0;
       uvs[i * 4 + 2] = u; uvs[i * 4 + 3] = 1;
@@ -626,7 +704,7 @@ export class Track {
         const [lat, y, v] = rowSpec[r];
         const o = (i * rows + r) * 3;
         verts[o] = c.x + n.x * lat * side;
-        verts[o + 1] = y;
+        verts[o + 1] = c.y + y;                // cliffs base at (and ride) the road y
         verts[o + 2] = c.z + n.z * lat * side;
         uvs[(i * rows + r) * 2] = u;
         uvs[(i * rows + r) * 2 + 1] = v;
@@ -682,7 +760,7 @@ export class Track {
     strip.rotation.order = 'YXZ';
     strip.rotation.y = heading;
     strip.rotation.x = -Math.PI / 2;
-    strip.position.set(c.x, 0.04, c.z);
+    strip.position.set(c.x, c.y + 0.04, c.z);  // start area is flat (c.y = 0)
     this.group.add(strip);
 
     // scaffold towers + banner
@@ -786,8 +864,9 @@ export class Track {
         );
         pad.rotation.order = 'YXZ';
         pad.rotation.y = this.headingAt(i);
-        pad.rotation.x = -Math.PI / 2;
-        pad.position.set(p.x, 0.06, p.z);
+        // pitch the decal to hug the sloped road (tilt back on climbs)
+        pad.rotation.x = -Math.PI / 2 - Math.atan(this.slopeAt(i));
+        pad.position.set(p.x, p.y + 0.06, p.z);
         this.group.add(pad);
       }
     }
@@ -849,8 +928,12 @@ export class Track {
         );
         back.position.set(0, height / 2, L / 2 - 0.2);
         g.add(back);
-        g.position.set(p.x, 0, p.z);
+        // sit the wedge on the elevated road at its mid index and pitch the
+        // whole group with the road grade so both ends meet the surface
+        g.position.set(p.x, p.y, p.z);
+        g.rotation.order = 'YXZ';
         g.rotation.y = this.headingAt(mid);
+        g.rotation.x = -Math.atan(this.slopeAt(mid));
         this.group.add(g);
       }
     }
@@ -900,14 +983,14 @@ export class Track {
         top.rotation.y = Math.random() * Math.PI * 2;
         top.castShadow = true;
         g.add(top);
-        g.position.set(p.x, 0, p.z);
+        g.position.set(p.x, p.y, p.z);
         this.group.add(g);
       } else {
         // hoodoo: 4–5 stacked tapered sandstone drums with a wider cap stone
         const g = new THREE.Group();
         const nSeg = 4 + (Math.random() < 0.4 ? 1 : 0);
         const wr = [1, 0.8, 0.64, 0.78, 0.55];
-        let y = 0;
+        let y = p.y;                                     // stack up from the road surface
         for (let s = 0; s < nSeg; s++) {
           const rad = r * wr[Math.min(s, wr.length - 1)] * (0.92 + Math.random() * 0.16);
           const hh = (2.5 - s * 0.25) * (0.85 + Math.random() * 0.35);
@@ -926,7 +1009,8 @@ export class Track {
         }
         this.group.add(g);
       }
-      this.obstacles.push({ x: p.x, z: p.z, r });
+      // collision stays horizontal ({x, z, r}); y is the road height for visuals
+      this.obstacles.push({ x: p.x, z: p.z, r, y: p.y });
     });
   }
 
@@ -956,13 +1040,16 @@ export class Track {
         })
       );
       m.rotation.order = 'YXZ';
-      m.rotation.y = Math.random() * Math.PI * 2;
-      m.rotation.x = -Math.PI / 2;
+      m.rotation.y = this.headingAt(i);
+      // pitch with the road grade so the decal hugs the slope; the in-plane
+      // spin variety moves to rotation.z (applied first in YXZ order)
+      m.rotation.x = -Math.PI / 2 - Math.atan(this.slopeAt(i));
+      m.rotation.z = Math.random() * Math.PI * 2;
       m.scale.set(rad, rad * (0.72 + Math.random() * 0.25), 1);
-      m.position.set(p.x, 0.04, p.z);
+      m.position.set(p.x, p.y + 0.04, p.z);
       m.renderOrder = 1;
       this.group.add(m);
-      this.puddles.push({ x: p.x, z: p.z, r: rad });
+      this.puddles.push({ x: p.x, z: p.z, r: rad, y: p.y });
     }
   }
 
@@ -1054,7 +1141,8 @@ export class Track {
             : side * (10.5 + Math.random() * 11.5);
         usedI.push(i);
         const p = this.pointAt(i, lateral);
-        const y = Math.abs(lateral) <= 9.5 ? 0 : this.terrainHeight(p.x, p.z);
+        // shoulder props sit on the road surface; trackside ones on the terrain
+        const y = Math.abs(lateral) <= 9.5 ? p.y : this.terrainHeight(p.x, p.z);
         return { x: p.x, y, z: p.z };
       }
       return null;
@@ -1081,7 +1169,7 @@ export class Track {
         mesh.scale.setScalar(s);
         this.group.add(mesh);
         this.props.push({
-          mesh, x: spot.x, z: spot.z, r: r * s, type,
+          mesh, x: spot.x, y: spot.y, z: spot.z, r: r * s, type,
           scoreValue: PROP_SCORE[type],
           pickup: pickupSet && pickupSet.has(k)
             ? PROP_PICKUPS[(Math.random() * PROP_PICKUPS.length) | 0]
@@ -1161,10 +1249,12 @@ export class Track {
         uniforms: {
           top: { value: new THREE.Color(T.skyTop) },
           horizon: { value: new THREE.Color(T.skyHorizon) },
+          // < 1 lets the horizon glow reach higher (volcano's deep red haze)
+          curve: { value: T.skyCurve !== undefined ? T.skyCurve : 1.0 },
         },
         vertexShader: `varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-        fragmentShader: `uniform vec3 top; uniform vec3 horizon; varying float vY;
-          void main(){ float t = smoothstep(0.0, 0.5, max(vY, 0.0)); gl_FragColor = vec4(mix(horizon, top, t), 1.0); }`,
+        fragmentShader: `uniform vec3 top; uniform vec3 horizon; uniform float curve; varying float vY;
+          void main(){ float t = pow(smoothstep(0.0, 0.5, max(vY, 0.0)), curve); gl_FragColor = vec4(mix(horizon, top, t), 1.0); }`,
       })
     );
     this.scene.add(sky);
@@ -1462,29 +1552,29 @@ export class Track {
         const i = (Math.random() * N) | 0;
         const side = Math.random() < 0.5 ? 1 : -1;
         if (roll < 0.5) {
-          // roadside, hugging the cliff base (small ones)
-          return { i, lateral: side * (10.55 + Math.random() * 0.35), y: 0, s: 0.5 + Math.random() * 0.35 };
+          // roadside, hugging the cliff base (small ones); dy is relative to road y
+          return { i, lateral: side * (10.55 + Math.random() * 0.35), dy: 0, s: 0.5 + Math.random() * 0.35 };
         }
         if (roll < 0.8 && this.T.cliffWalls) {
-          // silhouetted on the canyon rim
+          // silhouetted on the canyon rim (cliff heights are relative to road y)
           const prof = this._cliffProfile(i, side);
           if (prof.h < 7) return null;
           return {
             i, lateral: side * (prof.base + prof.l2 + 1 + Math.random() * 3.5),
-            y: prof.h * 0.97 - 0.35, s: 0.7 + Math.random() * 0.6,
+            dy: prof.h * 0.97 - 0.35, s: 0.7 + Math.random() * 0.6,
           };
         }
-        // open bowl around the start line
+        // open bowl around the start line — absolute terrain height
         const gi = ((Math.random() * 140 - 70 | 0) + N) % N;
         const lat = side * (13 + Math.random() * 22);
-        const p = this.pointAt(gi, lat);
-        return { i: gi, lateral: lat, y: this.terrainHeight(p.x, p.z), s: 0.8 + Math.random() * 0.7 };
+        return { i: gi, lateral: lat, terrain: true, s: 0.8 + Math.random() * 0.7 };
       },
       (spot, k) => {
         const p = this.pointAt(spot.i, spot.lateral);
+        const y = spot.terrain ? this.terrainHeight(p.x, p.z) : p.y + spot.dy;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
-          new THREE.Vector3(p.x, spot.y - 0.15, p.z),
+          new THREE.Vector3(p.x, y - 0.15, p.z),
           q, new THREE.Vector3(spot.s, spot.s * (0.9 + Math.random() * 0.3), spot.s)
         );
         color.setHSL(0.30 + Math.random() * 0.06, 0.35 + Math.random() * 0.15, 0.22 + Math.random() * 0.12);
@@ -1745,7 +1835,7 @@ export class Track {
         const p = this.pointAt(i, tireOff * side);
         const stack = Math.random() < 0.5 ? 3 : 2;
         for (let s = 0; s < stack && tk < 180; s++) {
-          m4.makeTranslation(p.x + (Math.random() - 0.5) * 0.4, 0.32 + s * 0.62, p.z + (Math.random() - 0.5) * 0.4);
+          m4.makeTranslation(p.x + (Math.random() - 0.5) * 0.4, p.y + 0.32 + s * 0.62, p.z + (Math.random() - 0.5) * 0.4);
           tires.setMatrixAt(tk, m4);
           tcolor.set(s === stack - 1 && Math.random() < 0.5 ? 0xd8d2c2 : 0x22201c);
           tires.setColorAt(tk++, tcolor);
@@ -1886,7 +1976,7 @@ export class Track {
           g.add(post);
         }
       }
-      g.position.set(c.x, 0, c.z);
+      g.position.set(c.x, c.y, c.z);      // deck rides at road y + 9, above any jump
       g.rotation.y = this.headingAt(i);   // local X = road normal → deck spans the canyon
       this.group.add(g);
     }
