@@ -118,6 +118,12 @@ on the buttons. Works in portrait and landscape.
 - **Real crash physics**: fences absorb the hit — you scrape along them in a
   spark shower instead of bouncing off, and slamming one hard costs hull.
   Car-on-car collisions dent BOTH hulls; glancing rubs just trade paint.
+- **Crashable fences**: the plank fences obey the material law — slam one
+  hard enough (even mid-race) and you smash a visible hole through it,
+  planks flying, and punch out into the off-road. Drive back in through any
+  gap. Rock cliffs, boulders, huts and mesas are truly solid; tire stacks
+  burst, sponsor boards topple, bushes drag, and the whole world honours
+  the rules in `RULES.md`.
 - **Skid marks**: hard slides lay dark rubber on the road that fades away.
 
 ## Tech

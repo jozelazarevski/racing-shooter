@@ -26,6 +26,12 @@ is a bug. The conformance table at the bottom tracks the honest current state.
    the world costs speed (and sometimes a little hull) but pays score. Solid
    hits can hurt badly, but no single scenery collision may wreck a healthy
    car outright.
+6. **The material law: if it's crushable material, it can be crashed.**
+   Wood, straw, snow, cardboard, tires and sheet-metal boards are crushable —
+   including the plank fences around the track. Only rock and masonry
+   (cliffs, boulders, hoodoos, buildings, mesas) are truly immovable. A
+   material may never be breakable in one place and magically solid in
+   another.
 
 ---
 
@@ -72,9 +78,10 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 
 | Object | Class | Threshold | Cost | Pays | Notes |
 |---|---|---|---|---|---|
-| Pole fence (race) | SOLID | — | hull on slams > 8 u/s; ≤ 3 %/frame grind | — | Spark stream while scraping; splinter burst on hard hits |
-| Pole fence (roam crossing) | BREAKABLE | 8 u/s | 20 % speed | +15 | Splinters + sparks; fence ribbon itself stays (visual gap, see §6) |
-| Canyon cliffs | SOLID | — | same as fence | — | Sandstone chip particles; never breakable |
+| Wooden pole fence | BREAKABLE (hard) / SOLID (soft) | 14 u/s normal impact | 25 % speed + 6 hull | +30 | Below 14 u/s it scrapes like SOLID (sparks, grind, slam damage). At/above it the section **shatters**: planks fly, a visible hole opens, and the car punches through into off-road. Broken holes stay open for the rest of the session; cars re-enter freely. The start/finish stretch (gate + grandstand) is never breakable. AI never leaves the track |
+| Pole fence (roam crossing) | BREAKABLE | 8 u/s | 20 % speed | +15 | Splinters + sparks + a hole in the ribbon |
+| Off-road beyond a hole (race) | TERRAIN | — | off-road speed cap by car's off-road stat | — | Same physics as free-roam off-road; drive back in through any gap |
+| Canyon cliffs | SOLID | — | SOLID class damage | — | Rock: never breakable (material law) |
 
 ### Destructibles (props — 52 per world)
 
@@ -91,23 +98,24 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 
 | Object | Class | Threshold | Cost | Pays | Notes |
 |---|---|---|---|---|---|
-| Pine tree | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | "TIMBER!" — felled trunk flies with topple spin |
-| Saguaro cactus | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | Includes roadside cacti at canyon wall base |
-| Burnt snag | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | Trunk only, no foliage |
-| Bush | SOFT *(target)* | — | 15 % speed, leaf burst | +5 | **Currently DECOR-sized ghost — see §6** |
+| Pine tree | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | "TIMBER!" — felled trunk flies with topple spin. 30 hp vs cannon (~3 hits fells it); blasts fell instantly |
+| Saguaro cactus | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | Includes roadside cacti at canyon wall base; 30 hp vs cannon |
+| Burnt snag | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | Trunk only, no foliage; 30 hp vs cannon |
+| Bush | SOFT | — | 15 % speed once per pass (2 s cooldown) | +5 | Leaf burst + dust; bush stays rooted |
 | Grass tufts / flowers / pebbles | DECOR | — | — | — | All < 0.5 u, legal decor |
 
 ### Structures & trackside
 
 | Object | Class | Threshold | Cost | Pays | Notes |
 |---|---|---|---|---|---|
-| Rock obstacles on road (hoodoos, basalt boulders) | SOLID | — | class SOLID damage | — | AI dodges them; never breakable |
-| Scenery boulders / outcrops | SOLID *(target)* | — | class SOLID damage | — | **Currently ghost — see §6** |
-| Huts | SOLID *(target)* | — | class SOLID damage | — | **Currently ghost — see §6** |
-| Tire stacks | BREAKABLE *(target)* | 6 u/s | 10 % speed | +10 | Tires scatter & bounce. **Currently ghost — see §6** |
-| Sponsor boards | BREAKABLE *(target)* | 8 u/s | 15 % speed + 2 hull | +20 | Board pops off its posts. **Currently ghost — see §6** |
-| Start gantry legs / grandstand | SOLID *(target)* | — | class SOLID damage | — | **Currently ghost — see §6** |
-| Canyon foot-bridges (overhead) | DECOR | — | — | — | Deck is above car height; posts should be SOLID (§6) |
+| Rock obstacles on road (hoodoos, basalt boulders) | SOLID | — | class SOLID damage | — | AI dodges them; never breakable (material law) |
+| Scenery boulders / outcrops | SOLID | — | class SOLID damage | — | Every boulder with footprint > ~0.9 u is solid |
+| Huts | SOLID | — | class SOLID damage | — | One collider per hut |
+| Tire stacks | BREAKABLE | 6 u/s | 10 % speed | +10 | Tires scatter, tumble and bounce |
+| Sponsor boards | BREAKABLE | 8 u/s | 15 % speed + 2 hull | +20 | "BILLBOARD DOWN" — the whole board rig topples and flies |
+| Start gantry legs / grandstand | SOLID | — | class SOLID damage | — | Static colliders; fence near them is unbreakable |
+| Mesa outcrops (desert horizon) | SOLID | — | class SOLID damage | — | Reachable in free roam; rock (material law) |
+| Canyon foot-bridges (overhead) | DECOR | — | — | — | Deck is above car height; ground posts (if any) SOLID |
 
 ### Actors & pickups
 
@@ -123,13 +131,13 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 
 ## 4. Weapons interaction matrix
 
-| Weapon | Cars | Choppers | Props | Trees | Fences/cliffs | Terrain |
-|---|---|---|---|---|---|---|
-| Cannon | dmg by car's cannon stat, overheats | flak, altitude-blind | **destroys on hit** | sparks only *(target: fell at 3 hits — §6)* | sparks | dust puff |
-| Missile | 55→18 splash 9 u | detonates at airframe | **detonates on contact; blast levels 6 u** | — | detonates on walls | hugs road profile |
-| Mine | 48→14 blast 8 u + shove | — | **levels 7 u** | — | — | sits on road |
-| Shockwave | 26→10, 16 u + knockback | hit regardless of altitude | **flattens 16 u ring** | — | — | — |
-| Ramming | mutual crash damage (ACTOR rules) | — | smashes (BREAKABLE) | fells (BREAKABLE) | SOLID rules | — |
+| Weapon | Cars | Choppers | Props | Trees | Tires/boards | Fences/cliffs | Terrain |
+|---|---|---|---|---|---|---|---|
+| Cannon | dmg by car's cannon stat, overheats | flak, altitude-blind | **destroys on hit** | **chips 30 hp, ~3 hits fells** | **destroys on hit** | sparks | dust puff |
+| Missile | 55→18 splash 9 u | detonates at airframe | **detonates on contact; blast levels 6 u** | **felled in blast** | **leveled in blast** | detonates on walls | hugs road profile |
+| Mine | 48→14 blast 8 u + shove | — | **levels 7 u** | **felled in 7 u** | **leveled in 7 u** | — | sits on road |
+| Shockwave | 26→10, 16 u + knockback | hit regardless of altitude | **flattens 16 u ring** | **felled in 16 u** | **leveled in 16 u** | — | — |
+| Ramming | mutual crash damage (ACTOR rules) | — | smashes (BREAKABLE) | fells (BREAKABLE) | smashes (BREAKABLE) | breaks wooden fence > 14 u/s; cliffs SOLID | — |
 
 ---
 
@@ -146,7 +154,11 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 | Prop contact smash | dist < r+2.3 ∧ speed > 2 | main.js `_updateProps` |
 | Tree smash | dist < r+1.7 ∧ speed > 7, else solid push-out | vehicles.js |
 | Tree cost / score | ×0.82 speed, −4 hull, +15 | main.js `onTreeSmash` |
-| Roam fence burst | crossing ±9.55 at > 8 u/s: ×0.8 speed, +15 | vehicles.js |
+| Roam fence burst | crossing ±9.55 at > 8 u/s: ×0.8 speed, +15 | vehicles.js
+| Race fence break-through | normal impact > 14 u/s: hole punched, ×0.75 speed, −6 hull, +30 | vehicles.js / main.js `onFenceBreak`
+| Tree hp vs cannon | 30 (≈3 hits) | weapons.js
+| Tire stack / banner smash | speed > 6 / > 8, else solid push-out | vehicles.js
+| Bush brush | ×0.85 speed once per 2 s, +5 | main.js `onBushBrush` |
 | Grade force / downhill cap | GRADE 16 / ×1.12 top speed | vehicles.js |
 | Ramp launch rule | ground drop > 0.9 ∧ climb rate > 2.5 | vehicles.js |
 | Reverse gate | brake ≥ 0.6 held 0.45 s at standstill | vehicles.js |
@@ -155,28 +167,27 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 
 ---
 
-## 6. Conformance gaps (the honest list)
+## 6. Conformance status
 
-These objects currently **violate the Law of Solidity** — they are ghost
-geometry you can drive through. This is the priority order for the next
-implementation round:
+All ten gaps from the original audit are now **implemented**:
 
-| # | Object | Required class | Today | Fix sketch |
-|---|---|---|---|---|
-| 1 | Scenery boulders (rockCount ~200+/level, the big ones) | SOLID | ghost | Colliders for instances with scale above ~1.2 u; reuse obstacle push-out |
-| 2 | Huts | SOLID | ghost | One circle collider per hut (4–14/level) |
-| 3 | Tire stacks | BREAKABLE 6 u/s | ghost | Collider per stack; scatter 2–3 tire meshes on smash |
-| 4 | Bushes | SOFT | ghost | Radius check → drag ×0.85 + leaf burst + +5 once |
-| 5 | Sponsor boards | BREAKABLE 8 u/s | ghost | Post pair SOLID, board flies on hard hit |
-| 6 | Start gantry legs, grandstand front | SOLID | ghost | Static circle colliders |
-| 7 | Bridge posts (canyon) | SOLID | ghost | Circle collider per post |
-| 8 | Fence ribbon visual after roam burst | show a hole | intact | Scale-zero the crossed fence segment range in the ribbon geometry |
-| 9 | Trees vs cannon | fell at ~3 hits | sparks only | Per-tree hp 30; reuse `smashTree` |
-| 10 | Mesa outcrops (distant) | SOLID (roam reachable) | ghost | Large-radius colliders |
+| # | Object | Class | Status |
+|---|---|---|---|
+| 1 | Scenery boulders | SOLID | ✅ colliders for every boulder with footprint > ~0.9 u |
+| 2 | Huts | SOLID | ✅ one collider per hut |
+| 3 | Tire stacks | BREAKABLE 6 u/s | ✅ stacks burst into tumbling tires |
+| 4 | Bushes | SOFT | ✅ leaf burst + drag, once per pass |
+| 5 | Sponsor boards | BREAKABLE 8 u/s | ✅ whole rig topples and flies |
+| 6 | Start gantry legs, grandstand | SOLID | ✅ static colliders; fence unbreakable there |
+| 7 | Bridge posts (canyon) | SOLID | ✅ where posts reach the ground |
+| 8 | Fence holes (visual) | hole in ribbon | ✅ breakFence collapses the ribbon verts |
+| 9 | Trees vs cannon | 30 hp, ~3 hits | ✅ chips then fells; blasts fell instantly |
+| 10 | Mesa outcrops | SOLID | ✅ large-radius colliders |
+| — | **Wooden fence crashable in races** (material law) | BREAKABLE > 14 u/s | ✅ hole + planks + off-road escape |
 
-Everything NOT in this table is believed conformant and is covered by the
-headless test suites (`test-destruction.mjs`, `test-roam.mjs`,
-`test-crash-physics.mjs`, `test-final-integration.mjs`).
+Conformance is enforced by the headless suites (`test-destruction.mjs`,
+`test-roam.mjs`, `test-crash-physics.mjs`, `test-rules.mjs`,
+`test-final-integration.mjs`).
 
 > **If the live game seems to ignore rules marked conformant:** the deploy
 > may be cache-stale — GitHub Pages caches for up to 10 minutes and the
