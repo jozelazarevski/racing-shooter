@@ -1118,10 +1118,11 @@ export class Track {
     }
   }
 
-  /** Scatter this level's destructible props near the road: most sit trackside
-   *  (|lateral| 10.5–22, hugging the cliff base on canyon), a handful right on
-   *  the road shoulder (|lateral| 7–9) so they get clipped naturally. Keeps
-   *  clear of the start, ramps, boost pads and rock obstacles. */
+  /** Scatter this level's destructible props near the road: MOST sit inside
+   *  the fences on the drivable surface (|lateral| 3.5–8.5) so racing actually
+   *  smashes them; the rest dress the trackside (|lateral| 10.5–22, hugging
+   *  the cliff base on canyon). Keeps clear of the start, ramps, boost pads
+   *  and rock obstacles. */
   _buildProps() {
     const themeKey = PROP_SPECS[this.level && this.level.theme] ? this.level.theme : 'forest';
     const usedI = [];
@@ -1135,7 +1136,7 @@ export class Track {
         if (usedI.some((u) => this._circDist(i, u) < 4)) continue;                // no piles
         const side = Math.random() < 0.5 ? -1 : 1;
         const lateral = shoulder
-          ? side * (7 + Math.random() * 2)
+          ? side * (3.5 + Math.random() * 5)           // in the drivable lane
           : this.T.cliffWalls
             ? side * (10.5 + Math.random() * 0.8)      // hug the canyon walls
             : side * (10.5 + Math.random() * 11.5);
@@ -1160,7 +1161,7 @@ export class Track {
         for (let k = 0; k < Math.max(1, Math.round(count * 0.25)); k++) pickupSet.add(order[k]);
       }
       for (let k = 0; k < count; k++) {
-        const spot = spotFor(Math.random() < 0.22);
+        const spot = spotFor(Math.random() < 0.62);
         if (!spot) continue;
         const { mesh, r } = this._makeProp(type);
         mesh.position.set(spot.x, spot.y, spot.z);
