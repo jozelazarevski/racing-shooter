@@ -4,6 +4,8 @@ import { ROAD_HALF } from './track.js';
 import { numberPlateTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
+const SPRAY_SNOW = new THREE.Color(0xf4faff); // tire spray tints (snow / wet)
+const SPRAY_WET = new THREE.Color(0x9dbcd2);
 const GRADE = 16;   // grade force: vf -= GRADE * slope * dt while grounded on-road
 const DOWNHILL_CAP = 1.12; // downhill overspeed ceiling (× topSpeed)
 const SCORCH = new THREE.Color(0x1c1a18); // damage tint target
@@ -64,14 +66,15 @@ export function buildVoxelRacer(spec) {
   const { body, accent, stripe = null, number = null, style = 'crown', rims = null } = spec;
   const g = new THREE.Group();
   const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.05, ...opts });
-  const bodyMat = mat(body);
-  const accentMat = mat(accent);
+  // glossy toy-car paint: picks up the PMREM sky for real specular sheen
+  const bodyMat = mat(body, { roughness: 0.32, metalness: 0.22, envMapIntensity: 1.15 });
+  const accentMat = mat(accent, { roughness: 0.34, metalness: 0.2, envMapIntensity: 1.1 });
   const darkMat = mat(0x24201c);
-  const glassMat = mat(0x121a22, { roughness: 0.15, metalness: 0.6 });
-  const rimMat = mat(rims ?? 0xd8d2c2, { roughness: 0.4, metalness: 0.3 });
+  const glassMat = mat(0x121a22, { roughness: 0.12, metalness: 0.7, envMapIntensity: 1.6 });
+  const rimMat = mat(rims ?? 0xd8d2c2, { roughness: 0.28, metalness: 0.75, envMapIntensity: 1.1 });
   const tireMat = mat(0x181614, { roughness: 0.95 });
-  const headMat = new THREE.MeshBasicMaterial({ color: 0xfff6d8 });
-  const tailMat = new THREE.MeshBasicMaterial({ color: 0xd82222 });
+  const headMat = new THREE.MeshBasicMaterial({ color: 0xfff9e2 });
+  const tailMat = new THREE.MeshBasicMaterial({ color: 0xff2418 });
 
   const tall = style === 'brawler' || style === 'dune';
   const low = style === 'crown' || style === 'alpine' || style === 'pit';
@@ -341,6 +344,13 @@ export class Car {
     const offRoad = this === this.game.player && Math.abs(this.lateral) > ROAD_HALF + 1;
     const offMult = offRoad ? 0.55 + 0.45 * this.offroadSkill : 1;
 
+    // surface conditions: snow and rain-wet worlds drive differently — less
+    // brake bite, wheelspin on throttle, and a much earlier, longer slide
+    const surf = this.game.track?.T?.surface;
+    const sGrip = surf === 'snow' ? 0.55 : surf === 'wet' ? 0.78 : 1;
+    const sTract = surf === 'snow' ? 0.72 : surf === 'wet' ? 0.88 : 1;
+    const sBrake = surf === 'snow' ? 0.58 : surf === 'wet' ? 0.80 : 1;
+
     const fwd = this.forward;
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
     let vf = this.vel.dot(fwd);
@@ -361,11 +371,11 @@ export class Car {
       if (inputs.throttle > 0) {
         // punchier launch: up to +55% thrust below half speed, fading to 1x
         const punch = 1 + 0.55 * (1 - THREE.MathUtils.clamp(Math.abs(vf) / (this.maxSpeed * 0.5), 0, 1));
-        vf += this.accel * punch * inputs.throttle * dt;
+        vf += this.accel * punch * sTract * inputs.throttle * dt;
         this.reverseTimer = 0;
       }
       if (inputs.brake > 0.05) {
-        const decel = this.accel * 1.6 * inputs.brake * dt;
+        const decel = this.accel * 1.6 * sBrake * inputs.brake * dt;
         if (vf > 1) {
           vf = Math.max(0, vf - decel); // braking can stop the car, never push it backwards
           this.reverseTimer = 0;
@@ -416,17 +426,27 @@ export class Car {
       vf = Math.min(vf, this.maxSpeed * 0.5);
       this.boostTimer = 0;
     }
+    // speed strips (log flume / maglev): the lane carries the car — fast,
+    // centered, and hard to steer out of. Set per-frame by the game.
+    if (this.stripLock) {
+      vf = Math.max(vf, this.stripLock.vmin);
+      vl -= vl * Math.min(1, 3.5 * dt); // sucked toward the lane center
+    }
+    // critter sting (scorpions / rats): brief speed cut
+    if (this.stungUntil && this.game.raceTime < this.stungUntil) {
+      vf = Math.min(vf, this.maxSpeed * 0.6);
+    }
 
     // ---- lateral grip: cornering load breaks the rear loose ----
     const speedN = THREE.MathUtils.clamp(Math.abs(vf) / this.maxSpeed, 0, 1);
     const cornerLoad = Math.abs(steer) * speedN;
     // handling raises the slip onset slightly — fewer accidental breakaways,
     // but the threshold stays low enough that committed cornering still drifts
-    let slipTarget = THREE.MathUtils.clamp((cornerLoad - (0.28 + 0.05 * hnd)) * 1.7, 0, 1);
+    let slipTarget = THREE.MathUtils.clamp((cornerLoad - (0.28 + 0.05 * hnd) * sGrip) * 1.7, 0, 1);
     if (inputs.drift) slipTarget = 1; // handbrake forces a full slide
     const slipRate = slipTarget > this.slip ? 7 : 3.2; // break loose fast, recover smoothly
     this.slip += (slipTarget - this.slip) * Math.min(1, slipRate * dt);
-    let grip = this.grip * (1 + 0.08 * hnd) * (1 - 0.78 * this.slip);
+    let grip = this.grip * (1 + 0.08 * hnd) * (1 - 0.78 * this.slip) * sGrip * (this.gripBoost || 1);
     if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
     if (this.landGrip > 0) { this.landGrip -= dt; grip *= 0.4; } // loose for ~0.4s after landing
     if (this._wetT > 0) { this._wetT -= dt; grip *= 0.75; }      // slick tires through puddles
@@ -441,7 +461,8 @@ export class Car {
     const taper = 1 - this.steerTaper * THREE.MathUtils.clamp((sp - this.maxSpeed * 0.6) / (this.maxSpeed * 0.55), 0, 1);
     const authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
     const dir = vf >= 0 ? 1 : -1;
-    const dTheta = steer * this.steerRate * sense * authority * dir * dt;
+    const stripSteer = this.stripLock ? this.stripLock.steerMul : 1;
+    const dTheta = steer * this.steerRate * sense * authority * stripSteer * dir * dt;
     this.heading += dTheta;
     // While gripped the velocity turns with the car (arcade rails). While slipping
     // it lags the yaw: part of the turn spills forward speed into lateral slide,
@@ -465,6 +486,27 @@ export class Car {
     const ns = new THREE.Vector3(nf.z, 0, -nf.x);
     this.vel.copy(nf).multiplyScalar(vf).addScaledVector(ns, vl);
     this.pos.addScaledVector(this.vel, dt);
+
+    // surface spray: rooster tails of powder snow or water off the tires
+    if (surf && !this.airborne && this.alive) {
+      const spd = Math.hypot(this.vel.x, this.vel.z);
+      if (spd > 9) {
+        this._sprayAcc = (this._sprayAcc || 0) + dt * (8 + spd * 0.5) * (this.slip > 0.35 ? 1.9 : 1);
+        while (this._sprayAcc >= 1) {
+          this._sprayAcc -= 1;
+          const col = surf === 'snow' ? SPRAY_SNOW : SPRAY_WET;
+          this.game.particles.spawn(
+            this.pos.x - nf.x * 1.1 + (Math.random() - 0.5) * 1.5, this.pos.y + 0.25,
+            this.pos.z - nf.z * 1.1 + (Math.random() - 0.5) * 1.5,
+            -nf.x * spd * 0.22 + (Math.random() - 0.5) * 3, 1.8 + Math.random() * 2.4,
+            -nf.z * spd * 0.22 + (Math.random() - 0.5) * 3,
+            col, surf === 'snow' ? 1.7 : 1.1, 0.45 + Math.random() * 0.35,
+            surf === 'snow'
+              ? { drag: 1.2, grav: 5, shrink: 1.3, alpha: 0.55 }
+              : { drag: 1.2, grav: 9, shrink: 0.7, alpha: 0.45 });
+        }
+      }
+    }
 
     // ---- rolling dust from the rear wheels (cheap, distance-culled for AI) ----
     const gm = this.game;
@@ -551,8 +593,16 @@ export class Car {
         gm.particles.sparks(this.pos, n, 2);
       if (this.wallGrind <= 0) {
         this.wallGrind = 0.18;
-        if (this === gm.player && cliffy) gm.onSolidCrash?.({ mat: 'stone' }, this, Math.abs(vn), n.x * fside, n.z * fside);
-        else this.onWallHit(n, Math.abs(vn));
+        const vnAbs = Math.abs(vn);
+        // cliff rock hurts like STONE, but only on a real hit (glancing
+        // scrapes are free) and at most ~once a second — the old per-grind
+        // ticks could wreck a car in one long scrape along the canyon wall
+        if (this === gm.player && cliffy) {
+          if (vnAbs > 7 && (this._cliffHurt ?? 0) <= 0) {
+            this._cliffHurt = 1.1;
+            gm.onSolidCrash?.({ mat: 'stone' }, this, vnAbs, n.x * fside, n.z * fside);
+          } // else: scrape sparks only — no hull cost while the cooldown runs
+        } else this.onWallHit(n, vnAbs);
       }
     }
 
@@ -773,6 +823,7 @@ export class Car {
 
     if (this.fireCooldown > 0) this.fireCooldown -= dt;
     if (this.invuln > 0) this.invuln -= dt;
+    if (this._cliffHurt > 0) this._cliffHurt -= dt;
     this.syncMesh(dt, vl, inputs);
   }
 
@@ -850,6 +901,13 @@ export class Car {
 
   damage(amount, attacker = null) {
     if (!this.alive || this.invuln > 0) return false;
+    // survivability: the player's hull takes reduced damage below HARD —
+    // crashes still cost (feeds/parts/drama fire off the same events), but
+    // a couple of mistakes shouldn't end the race
+    if (this === this.game.player) {
+      const id = this.game.difficulty?.id;
+      amount *= id === 'easy' ? 0.55 : id === 'hard' ? 0.95 : 0.75;
+    }
     const before = this.health / this.maxHealth;
     this.health -= amount;
     if (amount >= 15) this.game.particles.debris(this.pos, 2 + (Math.random() < 0.5 ? 1 : 0));
@@ -1176,6 +1234,10 @@ export class EnemyCar extends Car {
     const slopeHere = t.slopeAt?.(this.trackIndex) ?? 0;
     if (slopeHere < -0.02) vAllowed *= Math.max(0.85, 1 + slopeHere * 1.2);
     vAllowed = Math.max(vAllowed, 14); // never crawl
+    // surface conditions: rivals also respect snow/wet corner speeds
+    const aiSurf = t.T?.surface;
+    if (aiSurf === 'snow') vAllowed *= 0.86;
+    else if (aiSurf === 'wet') vAllowed *= 0.94;
     // world-special slow field (FREEZE STRIKE / JUNGLE FURY): rivals at half pace
     if (g.enemySlowUntil && g.raceTime < g.enemySlowUntil) vAllowed = Math.min(vAllowed, this.maxSpeed * 0.5);
 

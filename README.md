@@ -4,13 +4,13 @@ A bright, cartoon toy-car combat racer in the spirit of the classic *Ignition*
 (1997), playable entirely in the browser — on desktop **and phones** (full
 touch controls). Race 3 laps against the **Voxel Racers** — CROWN, SLEEK,
 DUNE, ALPINE and PIT-99, each a distinct liveried block-built machine — on a
-championship of eight themed worlds — PINE VALLEY (forest), DUST CANYON
-(desert), FROST PEAK (snow), CANYON RUN (a slot canyon with hoodoo rock
-obstacles, mud puddles and overhead bridges), EMBER PASS (volcanic
-badlands), SUMMIT CLIMB (a mountain-ascent stack of switchback hairpins),
-GLACIAL PASS (an ice canyon with igloos, penguins and frozen slicks) and
-AMAZON RAPIDS (a jungle run through river fords under a banana-tree
-canopy) — armed with cannon, homing missiles, mines, a shockwave blast,
+championship of **eighteen themed worlds across six regions** — from PINE
+VALLEY and the SUMMIT CLIMB switchbacks, through DUST CANYON's dune
+sweeps, live-rockfall ravine and scorpion-guarded oasis, FROST PEAK's
+glacier sheet ice and avalanche-chased mountain pass, the burning FOREST
+FIRE ESCAPE, giant-redwood and log-flume runs, AMAZON RAPIDS' river
+fords, to NEO-KYOTO's neon maglev expressway and rat-infested undercity
+tunnels — armed with cannon, homing missiles, mines, a shockwave blast,
 nitro, boost pads and launch ramps. Every circuit **climbs and descends
 real elevation**: grades sap or feed your speed, the car pitches with the
 road, and each world has its own hill profile. Drift-happy arcade physics,
@@ -69,8 +69,13 @@ on the buttons. Works in portrait and landscape.
 
 ## Gameplay
 
-- **8 worlds, 3 laps each, 6 racers.** Finish a world to unlock the next; the
-  results screen chains you onward and your score carries over.
+- **18 worlds in 6 regions, 3 laps each, 6 racers.** Finish a world to unlock
+  the next; the results screen chains you onward and your score carries over.
+- **Dynamic hazards** (per world, spec in `RULES.md`): live rockfall, falling
+  burning trees and shattering icicles; sand-geyser launch pads; water-flume
+  and maglev speed lanes; scorpions and rats that sting slow cars (squash
+  them at speed for +25); and an accelerating avalanche that chases you down
+  AVALANCHE ALLEY's final descent.
 - **SUMMIT CLIMB** is a true mountain ascent: five stacked switchback legs
   connected by 180° hairpins climb ~33 m from the valley floor to the summit,
   with embanked road shoulders and loose boulders on the downhill runs.
@@ -85,10 +90,23 @@ on the buttons. Works in portrait and landscape.
   HARD the rivals fire homing missiles back at you.
 - **Steering feel**: RELAXED / NORMAL / SHARP selector on the title screen and
   in the pause menu — tune sensitivity to your taste (saved between sessions).
-- **Weather**: falling snow on FROST PEAK, drifting embers on EMBER PASS,
+- **Weather**: falling snow on FROST PEAK and GLACIAL PASS, tropical rain on
+  AMAZON RAPIDS, drizzle in PINE VALLEY, drifting embers on EMBER PASS,
   blowing dust in the canyons — ambient particles per world.
+- **Surface conditions — the drive changes**: snow worlds (FROST PEAK,
+  GLACIAL PASS) have snow-covered roads with carved tire channels — brakes
+  take ~1.6× the distance, throttle spins up slower, and slides run almost
+  twice as long; rain worlds (PINE VALLEY, AMAZON RAPIDS) are rain-glossed
+  and slick under braking. Rivals respect the same corner speeds, tires
+  throw rooster tails of powder or water, and the HUD calls the surface at
+  lights-out.
 - **Career & garage**: every race pays credits equal to the score you earned;
-  spend them on ENGINE, ARMOR, CANNON and NITRO upgrades (5 levels each).
+  spend them in the tabbed title menu — **PRE-RACE** shows a map-and-track
+  selection of world cards, each with its real circuit outline drawn in
+  miniature, surface/hazard tags and your career best; **GARAGE** holds the
+  car dealership and six detailed upgrade lines (ENGINE WRENCH, SUSPENSION
+  SPRING, TIRES STACK, BOOST NITRO CAN, ARMOR SHIELD, CANNON CORE — 5
+  levels each, with level readouts and prices).
 - **Smart rivals** race a real line — outside-apex-outside, braking models,
   overtaking, blocking, dodging obstacles — and fight back with mines.
 - **Canyon hazards**: hoodoo rock towers to dodge and mud puddles that slow
@@ -150,4 +168,8 @@ on the buttons. Works in portrait and landscape.
 - Custom GPU particle pool (one draw call for all explosions/dust/sparks/trails)
 - Canvas-drawn circular speedometer + live standings HUD
 - Touch input layer that maps on-screen buttons to the key bindings
-- Light UnrealBloom post-processing for lamps, tracers and explosions
+- Modern render pipeline: ACES filmic tone mapping, PCF-soft real-time sun
+  shadows that follow the car, a PMREM image-based environment (glossy wet
+  roads and car-paint sheen), per-theme sun disc + layered horizon haze,
+  and a film-grade post pass (saturation/contrast lift + soft vignette)
+  on top of UnrealBloom for lamps, tracers and explosions

@@ -8,17 +8,28 @@ import {
   grassTexture, bannerTexture, hazardTexture, crowdTexture, awningTexture,
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
   crateTexture, coneTexture, barrelTexture, riverTexture, iglooTexture,
+  sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
 } from './textures.js';
 
 export const LEVELS = [
-  { id: 1, name: 'PINE VALLEY',  theme: 'forest' },
-  { id: 2, name: 'DUST CANYON',  theme: 'desert' },
-  { id: 3, name: 'FROST PEAK',   theme: 'snow' },
-  { id: 4, name: 'CANYON RUN',   theme: 'canyon' },
-  { id: 5, name: 'EMBER PASS',   theme: 'volcano' },
-  { id: 6, name: 'SUMMIT CLIMB', theme: 'alpine' },
-  { id: 7, name: 'GLACIAL PASS', theme: 'glacial' },
-  { id: 8, name: 'AMAZON RAPIDS', theme: 'jungle' },
+  { id: 1, name: 'PINE VALLEY',  theme: 'forest',  region: 'PINE VALLEY' },
+  { id: 2, name: 'DUST CANYON',  theme: 'desert',  region: 'DUST CANYON' },
+  { id: 3, name: 'FROST PEAK',   theme: 'snow',    region: 'FROST PEAK' },
+  { id: 4, name: 'CANYON RUN',   theme: 'canyon',  region: 'DUST CANYON' },
+  { id: 5, name: 'EMBER PASS',   theme: 'volcano', region: 'EMBER RIDGE' },
+  { id: 6, name: 'SUMMIT CLIMB', theme: 'alpine',  region: 'PINE VALLEY' },
+  { id: 7, name: 'GLACIAL PASS', theme: 'glacial', region: 'FROST PEAK' },
+  { id: 8, name: 'AMAZON RAPIDS', theme: 'jungle', region: 'AMAZON' },
+  { id: 9, name: 'THE DUNE SERPENT', theme: 'dunes', region: 'DUST CANYON' },
+  { id: 10, name: 'ROCKFALL RAVINE', theme: 'ravine', region: 'DUST CANYON' },
+  { id: 11, name: 'OASIS AMBUSH', theme: 'oasis', region: 'DUST CANYON' },
+  { id: 12, name: 'REDWOOD RAMPAGE', theme: 'redwood', region: 'PINE VALLEY' },
+  { id: 13, name: 'LOG FLUME FURY', theme: 'flume', region: 'PINE VALLEY' },
+  { id: 14, name: 'FOREST FIRE ESCAPE', theme: 'wildfire', region: 'PINE VALLEY' },
+  { id: 15, name: "GLACIER'S GRIND", theme: 'sheetice', region: 'FROST PEAK' },
+  { id: 16, name: 'AVALANCHE ALLEY', theme: 'avalanche', region: 'FROST PEAK' },
+  { id: 17, name: 'NEON GRID EXPRESSWAY', theme: 'neon', region: 'NEO-KYOTO' },
+  { id: 18, name: 'UNDERCITY SLIPSTREAM', theme: 'undercity', region: 'NEO-KYOTO' },
 ];
 
 // Hand-designed circuit control points (x, z) per theme.
@@ -103,23 +114,109 @@ const CIRCUITS = {
     [-230, 120], [-250, 40], [-205, -20], [-245, -90], [-195, -155],
     [-120, -120], [-80, -185], [-30, -225],
   ],
+  // THE DUNE SERPENT: high-speed flow over the dune backs — long sweepers and
+  // one lazy esses section, nothing tighter than a fast sweep
+  dunes: [
+    [0, -235], [110, -240], [200, -200], [250, -120], [240, -30],
+    [190, 50], [212, 140], [150, 210], [55, 235], [-30, 200],
+    [-60, 120], [-130, 92], [-210, 130], [-252, 55], [-230, -30],
+    [-160, -80], [-205, -160], [-130, -218], [-55, -238],
+  ],
+  // ROCKFALL RAVINE: tight technical slot-canyon zigzag — short walls of
+  // corners split by hazard straights
+  ravine: [
+    [0, -230], [70, -245], [125, -205], [185, -240], [240, -200],
+    [250, -130], [196, -95], [245, -45], [200, 5], [250, 60],
+    [215, 120], [250, 175], [185, 215], [115, 180], [60, 225],
+    [-15, 190], [-80, 230], [-150, 195], [-122, 130], [-188, 96],
+    [-250, 130], [-245, 45], [-186, 8], [-240, -42], [-190, -90],
+    [-245, -140], [-185, -196], [-110, -160], [-60, -215],
+  ],
+  // OASIS AMBUSH: rolling desert approach that dives through the palm grove
+  // on the west half of the lap
+  oasis: [
+    [0, -225], [95, -235], [175, -200], [235, -140], [250, -55],
+    [215, 25], [245, 105], [195, 175], [110, 210], [25, 180],
+    [-55, 215], [-140, 235], [-215, 185], [-245, 110], [-200, 50],
+    [-250, -20], [-215, -95], [-235, -170], [-155, -205], [-75, -170],
+    [-30, -220],
+  ],
+  // REDWOOD RAMPAGE: broad rolling forest lap — fast crests between the giants
+  redwood: [
+    [0, -220], [90, -235], [170, -210], [230, -155], [250, -75],
+    [220, 0], [250, 80], [215, 155], [140, 195], [65, 165],
+    [0, 210], [-85, 235], [-165, 200], [-230, 145], [-250, 65],
+    [-215, -10], [-245, -90], [-195, -160], [-110, -195], [-45, -230],
+  ],
+  // LOG FLUME FURY: three long haul-road straights for the flume lanes,
+  // joined by mid-speed corners around the timber yards
+  flume: [
+    [-30, -230], [80, -235], [190, -235], [245, -175], [250, -70],
+    [245, 40], [195, 120], [110, 150], [20, 185], [-70, 220],
+    [-170, 230], [-240, 175], [-250, 75], [-245, -30], [-235, -135],
+    [-180, -200], [-90, -182],
+  ],
+  // FOREST FIRE ESCAPE: flowing escape run with rhythmic esses through the burn
+  wildfire: [
+    [0, -235], [100, -230], [180, -195], [240, -130], [250, -45],
+    [215, 35], [245, 115], [195, 185], [105, 215], [15, 185],
+    [-70, 215], [-160, 230], [-230, 175], [-250, 90], [-215, 15],
+    [-245, -65], [-205, -140], [-135, -105], [-75, -152], [-25, -192],
+  ],
+  // GLACIER'S GRIND: winding sheet-ice canyon, medium sweeps with two folds
+  sheetice: [
+    [0, -230], [90, -240], [170, -215], [225, -160], [250, -85],
+    [230, -5], [250, 70], [210, 140], [225, 200], [145, 230],
+    [65, 195], [-20, 230], [-105, 200], [-150, 140], [-215, 172],
+    [-255, 100], [-225, 30], [-250, -45], [-205, -110], [-235, -180],
+    [-160, -220], [-80, -190], [-35, -235],
+  ],
+  // AVALANCHE ALLEY: narrow pass — the climb winds up the east and north
+  // sides, then the final third is one long sweeping western descent
+  avalanche: [
+    [0, -225], [85, -240], [160, -210], [210, -155], [245, -90],
+    [235, -15], [250, 60], [220, 130], [235, 195], [160, 230],
+    [80, 200], [10, 235], [-80, 230], [-150, 190], [-192, 235],
+    [-250, 190], [-235, 110], [-250, 30], [-230, -55], [-245, -135],
+    [-190, -195], [-110, -230], [-55, -190],
+  ],
+  // NEON GRID EXPRESSWAY: huge fast expressway sweeps, minimum corner count
+  neon: [
+    [0, -240], [120, -225], [215, -175], [252, -70], [235, 40],
+    [250, 145], [180, 215], [70, 240], [-40, 215], [-140, 240],
+    [-230, 190], [-252, 85], [-225, -20], [-250, -125], [-195, -200],
+    [-90, -240],
+  ],
+  // UNDERCITY SLIPSTREAM: cramped service-tunnel twists — hairpin folds and
+  // short bursts, nothing opens up for long
+  undercity: [
+    [0, -215], [75, -230], [140, -195], [130, -125], [195, -140],
+    [245, -85], [205, -25], [245, 35], [200, 95], [230, 155],
+    [165, 195], [95, 160], [30, 205], [-50, 230], [-120, 190],
+    [-92, 122], [-160, 90], [-225, 125], [-250, 45], [-195, -5],
+    [-240, -70], [-250, -150], [-180, -195], [-95, -160], [-50, -215],
+  ],
 };
 
 // Every color and density knob per theme. `fogColor…sunIntensity` are exposed
 // to main.js via `track.theme`; the rest is internal art direction.
 const THEMES = {
   forest: {
+    // drizzle-soaked rally stage: physics reads `surface`
+    surface: 'wet',
     // lighting / fog (plain numbers; also applied to scene.fog by Track itself)
     fogColor: 0xcfe8f5, fogNear: 320, fogFar: 1500,
     hemiSky: 0xbfe0ff, hemiGround: 0x5a8a3c,
     sunColor: 0xfff3d6, sunIntensity: 2.0,
     // sky dome + sun sprite + clouds
     skyTop: '#3f8de0', skyHorizon: '#e8f0d8', sunGlow: 0xfff2b8,
+    sunAz: 0.7, sunEl: 0.30,
     cloudCount: 12, cloudOpacity: 0.9,
     // terrain vertex colors + ground texture
     terrainLow: '#4f8a35', terrainHigh: '#83b455', terrainDirt: '#9c7a48',
     ground: {},  // groundTexture defaults are the forest palette
-    road: {},    // roadTexture defaults are the forest palette
+    // rain-darkened forest dirt: gentle wet overlay on the default palette
+    road: { wet: { darken: 0.26, gleam: 10, pools: 3 } },
     // horizon silhouettes
     hillColor: 0x4e8a3c, peakColor: 0x8d8578,
     // trees (material color multiplies per-instance HSL variation)
@@ -136,8 +233,8 @@ const THEMES = {
     hutRoof: 0xc9a24d, hayColor: 0xd8b95e,
     // debris chip colors when a fence/wall is scraped (painted pole red/cream)
     splinter: [0xc23b2a, 0xe8e2d4],
-    // ambient drifting weather particles (recipe implemented by particles.js)
-    weather: { type: 'leaves', color: 0x9ab84a },
+    // light drizzle drifting through the pines (rate overrides the default)
+    weather: { type: 'rain', color: 0xcfe0ee, rate: 130 },
     // elevation profile: amplitude + deterministic per-octave phases
     elev: { amp: 8, ph: [0.9, 2.6, 4.2] },
     // per-level gameplay-placement tuning
@@ -148,6 +245,7 @@ const THEMES = {
     hemiSky: 0xffe9c4, hemiGround: 0xc9a86a,
     sunColor: 0xffe6b0, sunIntensity: 2.2,
     skyTop: '#6fa8d8', skyHorizon: '#ffd9a0', sunGlow: 0xffdca0,
+    sunAz: 0.55, sunEl: 0.20,                           // low golden desert sun
     cloudCount: 5, cloudOpacity: 0.55,
     terrainLow: '#c9a86a', terrainHigh: '#e2c78e', terrainDirt: '#b06e3c',
     ground: {
@@ -178,10 +276,12 @@ const THEMES = {
     rampMaxCurv: 0.014, padMaxCurv: 0.004, boardMaxCurv: 0.012,
   },
   snow: {
+    surface: 'snow',                                    // physics reads this
     fogColor: 0xe2edf6, fogNear: 240, fogFar: 1250,
     hemiSky: 0xdfeaf8, hemiGround: 0xb8c6d2,
     sunColor: 0xeaf2ff, sunIntensity: 1.7,
     skyTop: '#639fd8', skyHorizon: '#eaf3fa', sunGlow: 0xffffff,
+    sunAz: 0.82, sunEl: 0.28,
     cloudCount: 9, cloudOpacity: 0.95,
     terrainLow: '#dde8ee', terrainHigh: '#ffffff', terrainDirt: '#b7c4cd',
     ground: {
@@ -194,6 +294,8 @@ const THEMES = {
       rut: 'rgba(46,32,20,0.6)', rutCore: 'rgba(30,20,12,0.5)', tread: 'rgba(14,9,5,0.55)',
       stoneA: 'rgba(190,200,210,0.7)', stoneB: 'rgba(70,55,40,0.7)',
       fringe: [228, 238, 246], fringeVar: [24, 16, 10],   // snow creeping onto the road
+      // white cover with two carved channels down the churned mud beneath
+      snowCover: { slush: [206, 216, 226], slushAlpha: 0.38 },
     },
     hillColor: 0xcfdce4, peakColor: 0xeef4f8,
     treeCount: 240, trunkColor: 0x5a4028,
@@ -220,6 +322,7 @@ const THEMES = {
     hemiSky: 0xffd9a8, hemiGround: 0xb5764a,
     sunColor: 0xffc98a, sunIntensity: 2.1,
     skyTop: '#6f95c0', skyHorizon: '#ffcf96', sunGlow: 0xffc070,
+    sunAz: 0.5, sunEl: 0.22,                             // late sun raking the walls
     cloudCount: 4, cloudOpacity: 0.5,
     terrainLow: '#c08050', terrainHigh: '#e0a870', terrainDirt: '#8f5430',
     ground: {
@@ -258,6 +361,7 @@ const THEMES = {
     hemiSky: 0xc98a66, hemiGround: 0x4a3a32, hemiIntensity: 1.05,  // ember dusk, but readable
     sunColor: 0xff8a4a, sunIntensity: 2.0,
     skyTop: '#341a28', skyHorizon: '#dd541c', sunGlow: 0xff6a28, skyCurve: 0.72,
+    sunAz: 0.6, sunEl: 0.17,                             // ember sun low on the haze
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
     terrainLow: '#322c28', terrainHigh: '#564a40', terrainDirt: '#6a3c2c',
     ground: {
@@ -299,6 +403,7 @@ const THEMES = {
     hemiSky: 0xcfe4ff, hemiGround: 0x628a4c,
     sunColor: 0xfff6e0, sunIntensity: 2.0,
     skyTop: '#2f6fc8', skyHorizon: '#dceef8', sunGlow: 0xfff4cc,
+    sunAz: 0.9, sunEl: 0.32,
     cloudCount: 10, cloudOpacity: 0.92,
     terrainLow: '#4c8a3c', terrainHigh: '#9ab87a', terrainDirt: '#8a7a5a',
     ground: {},   // lush meadow defaults read right at altitude too
@@ -331,10 +436,12 @@ const THEMES = {
   // GLACIAL PASS: blue-white ice canyon — glacial cliff ribbons, packed-snow
   // road with frozen slicks, igloos, penguins and driving snow.
   glacial: {
+    surface: 'snow',                                    // physics reads this
     fogColor: 0xd8e8f4, fogNear: 210, fogFar: 1200,
     hemiSky: 0xd8ecff, hemiGround: 0xa8c2d8,
     sunColor: 0xe8f4ff, sunIntensity: 1.8,
     skyTop: '#4c8ecf', skyHorizon: '#dff0fa', sunGlow: 0xeafaff,
+    sunAz: 0.7, sunEl: 0.24,                            // low polar sun
     cloudCount: 8, cloudOpacity: 0.9,
     terrainLow: '#cfe0ec', terrainHigh: '#ffffff', terrainDirt: '#9fb8c8',
     ground: {
@@ -348,6 +455,11 @@ const THEMES = {
       rut: 'rgba(96,120,142,0.55)', rutCore: 'rgba(74,96,118,0.5)', tread: 'rgba(52,68,86,0.5)',
       stoneA: 'rgba(235,245,252,0.8)', stoneB: 'rgba(120,148,170,0.7)',
       fringe: [226, 238, 248], fringeVar: [24, 14, 8],  // snowbanks creeping in
+      // bluer glacial cover: icier slush carved over the packed-snow base
+      snowCover: {
+        snow: [240, 247, 253], shade: [178, 200, 224],
+        slush: [186, 206, 224], slushAlpha: 0.44, sparkle: 190,
+      },
     },
     hillColor: 0xbdd2e0, peakColor: 0xeef6fc,
     treeCount: 140, trunkColor: 0x5a4028,
@@ -385,10 +497,12 @@ const THEMES = {
   // AMAZON RAPIDS: dense deep-green jungle — layered canopies close over a
   // dark mud road, rivers cross beneath it, humid haze hangs low.
   jungle: {
+    surface: 'wet',                                    // downpour — physics reads this
     fogColor: 0xb8d8b0, fogNear: 170, fogFar: 950,     // humid green haze, dense
     hemiSky: 0xd8f0d0, hemiGround: 0x3c6a34,
     sunColor: 0xfff2c8, sunIntensity: 1.9,
     skyTop: '#5a9ac8', skyHorizon: '#cfe8b8', sunGlow: 0xf8ffd0,
+    sunAz: 1.0, sunEl: 0.34,                           // high tropical sun
     cloudCount: 10, cloudOpacity: 0.85,
     terrainLow: '#2e6a28', terrainHigh: '#5a9440', terrainDirt: '#6a4a2c',
     ground: {
@@ -402,6 +516,8 @@ const THEMES = {
       rut: 'rgba(38,26,14,0.6)', rutCore: 'rgba(24,16,8,0.55)', tread: 'rgba(12,8,4,0.6)',
       stoneA: 'rgba(150,140,110,0.6)', stoneB: 'rgba(52,40,26,0.7)',
       fringe: [46, 110, 38], fringeVar: [30, 50, 22],   // jungle green creeping in
+      // rain-hammered mud: heavy darkening, lots of gleam + standing water
+      wet: { darken: 0.38, gleam: 15, pools: 6 },
     },
     hillColor: 0x2e6a34, peakColor: 0x4a8a4c,
     vegetation: 'jungle', treeCount: 320, trunkColor: 0x7a5c3a,
@@ -415,16 +531,476 @@ const THEMES = {
     flowerCount: 420, flowerColors: ['#ff4a6a', '#ffd45e', '#ff8a3a', '#e86aff', '#ffffff'],
     hutRoof: 0x7a9a3c, hayColor: 0xc8b45e, hutCount: 6, hayCount: 30,
     splinter: [0x4a9a3c, 0x8a6a42],                     // shredded fronds + wet wood
-    weather: { type: 'leaves', color: 0x4aae4a },
+    weather: { type: 'rain', color: 0xbfd8ea },         // full tropical downpour
     elev: { amp: 7, ph: [2.2, 0.9, 4.4] },
     rampMaxCurv: 0.016, padMaxCurv: 0.005, boardMaxCurv: 0.014,
     // fallen log piles on the road (SOLID circle colliders like all obstacles)
     obstacleSpec: { count: 3, style: 'logs' }, puddleCount: 8,
     riverCount: 3,                                      // streams crossing under the road
   },
+  // THE DUNE SERPENT: deep-desert dune sea — golden ridged horizon, rippled
+  // sand road, sparse palms. Hazard contract: geysers (lead implements).
+  dunes: {
+    fogColor: 0xf5dfae, fogNear: 300, fogFar: 1400,
+    hemiSky: 0xffedc8, hemiGround: 0xd8b070,
+    sunColor: 0xffe2a0, sunIntensity: 2.3,
+    skyTop: '#77aede', skyHorizon: '#ffe0a8', sunGlow: 0xffd890,
+    sunAz: 0.5, sunEl: 0.18,
+    cloudCount: 3, cloudOpacity: 0.5,
+    terrainLow: '#d4ac6a', terrainHigh: '#f0d492', terrainDirt: '#b8823f',
+    ground: {
+      base: '#d8b273', bandLight: 'rgba(255,240,200,0.07)', bandDark: 'rgba(150,100,50,0.06)',
+      patchA: 'rgba(170,120,60,0.16)', patchB: 'rgba(245,220,160,0.18)',
+      speckA: 'rgba(150,100,55,0.7)', speckB: 'rgba(250,235,200,0.8)', speckCount: 80,
+    },
+    road: {
+      base: '#d0a865', mottleA: [166, 126, 74], mottleB: [226, 194, 138],
+      rut: 'rgba(150,108,58,0.45)', rutCore: 'rgba(122,84,42,0.4)', tread: 'rgba(92,60,30,0.45)',
+      stoneA: 'rgba(244,224,184,0.7)', stoneB: 'rgba(150,106,62,0.7)',
+      fringe: [190, 156, 84], fringeVar: [40, 34, 26],
+      ripples: true,                                    // wind-carved sand crests
+    },
+    hillColor: 0xd8a95e, peakColor: 0xf2d492, horizon: 'dunes',
+    vegetation: 'palm', treeCount: 36, trunkColor: 0x8a6242,
+    foliageLow: 0x3f7a34, foliageTop: 0x4c8a3e,
+    foliage: { h: 0.26, hVar: 0.05, s: 0.42, sVar: 0.15, l: 0.30, lVar: 0.10 },
+    treeSnowCap: false,
+    tuftCount: 260, grass: { bladeA: '#a08a3a', bladeB: '#d8c070' },
+    bushCount: 44, bushColor: 0x9a8a50,
+    bush: { h: 0.12, hVar: 0.04, s: 0.32, sVar: 0.1, l: 0.44, lVar: 0.12 },
+    rockCount: 60, pebbleCount: 150, rockColor: 0xc09058, rockSnowCap: false,
+    flowerCount: 0, flowerColors: ['#ffd45e'],
+    hutRoof: 0xc09a5c, hayColor: 0xd8b95e, hutCount: 3, hayCount: 8,
+    splinter: [0xe8c87a, 0xb8905a],
+    weather: { type: 'sand', color: 0xe0c080 },
+    elev: { amp: 12, ph: [0.6, 2.9, 1.8] },             // serpent-back rollers
+    rampMaxCurv: 0.012, padMaxCurv: 0.005, boardMaxCurv: 0.012,
+    geysers: { count: 6 },                              // hazard spec (lead implements)
+  },
+  // ROCKFALL RAVINE: narrow treacherous slot canyon — deep red-brown strata
+  // walls, tight corners, rockfall straights. Hazard contract: fallHazard.
+  ravine: {
+    fogColor: 0xdba87c, fogNear: 170, fogFar: 1000,
+    hemiSky: 0xffd2a0, hemiGround: 0xa06844,
+    sunColor: 0xffbe7e, sunIntensity: 2.0,
+    skyTop: '#6f92ba', skyHorizon: '#f8c088', sunGlow: 0xffb868,
+    sunAz: 0.45, sunEl: 0.2,
+    cloudCount: 3, cloudOpacity: 0.45,
+    terrainLow: '#b06a3e', terrainHigh: '#d29057', terrainDirt: '#7e4426',
+    ground: {
+      base: '#b57a48', bandLight: 'rgba(255,225,190,0.05)', bandDark: 'rgba(80,40,20,0.06)',
+      patchA: 'rgba(130,70,35,0.22)', patchB: 'rgba(220,170,110,0.16)',
+      speckA: 'rgba(105,58,28,0.7)', speckB: 'rgba(235,205,160,0.8)', speckCount: 90,
+    },
+    road: {
+      base: '#b07a48', mottleA: [132, 82, 44], mottleB: [200, 148, 94],
+      rut: 'rgba(105,60,30,0.55)', rutCore: 'rgba(80,44,20,0.45)', tread: 'rgba(52,30,14,0.5)',
+      stoneA: 'rgba(230,192,148,0.7)', stoneB: 'rgba(115,70,38,0.7)',
+      fringe: [155, 105, 52], fringeVar: [42, 32, 22],
+    },
+    hillColor: 0x9c4f28, peakColor: 0xc27848,
+    vegetation: 'cactus', treeCount: 70, trunkColor: 0x4a8a4c,
+    foliageLow: 0x3f7a34, foliageTop: 0x4c8a3e,
+    foliage: { h: 0.30, hVar: 0.05, s: 0.40, sVar: 0.15, l: 0.30, lVar: 0.10 },
+    treeSnowCap: false,
+    tuftCount: 200, grass: { bladeA: '#96702c', bladeB: '#c8a054' },
+    bushCount: 36, bushColor: 0x8a6e3e,
+    bush: { h: 0.10, hVar: 0.04, s: 0.32, sVar: 0.1, l: 0.38, lVar: 0.12 },
+    rockCount: 170, pebbleCount: 200, rockColor: 0xa5602f, rockSnowCap: false,
+    flowerCount: 30, flowerColors: ['#ffd45e', '#ff7a3a'],
+    hutRoof: 0xa06844, hayColor: 0xd8b95e, hutCount: 2, hayCount: 10,
+    splinter: [0xb87848, 0x8a4a26],                     // red sandstone chips
+    weather: { type: 'dust', color: 0xc08a5a },
+    elev: { amp: 7, ph: [3.1, 1.2, 4.6] },
+    rampMaxCurv: 0.022, padMaxCurv: 0.007, boardMaxCurv: 0.02,
+    cliffWalls: true, horizon: 'mesa', outcrops: true,
+    cliffPalette: {                                     // deep red-brown strata
+      bands: ['#b06a3c', '#8f4d28', '#7a3e1f', '#c07e48', '#9a5830'],
+      seam: 'rgba(52,26,14,0.5)',
+      crack: 'rgba(48,22,10,',
+      bleach: 'rgba(255,205,155,0.14)',
+      talus: 'rgba(40,20,10,0.3)',
+      mottleLight: '245,200,150', mottleDark: '70,36,18',
+      streakLight: '225,170,120', streakDark: '52,26,12',
+    },
+    obstacleSpec: { count: 5, style: 'hoodoo' }, puddleCount: 2,
+    fallHazard: { kind: 'rock', period: 6, dmg: 24 },   // hazard spec (lead implements)
+  },
+  // OASIS AMBUSH: a hidden lush pocket in the desert — dense palm grove, three
+  // ponds, mud everywhere. Hazard contract: critters (scorpions).
+  oasis: {
+    fogColor: 0xead9a8, fogNear: 260, fogFar: 1300,
+    hemiSky: 0xfff0c8, hemiGround: 0x7a9a4c,
+    sunColor: 0xffecb0, sunIntensity: 2.1,
+    skyTop: '#5aa2d8', skyHorizon: '#ffe4a8', sunGlow: 0xffe0a0,
+    sunAz: 0.62, sunEl: 0.26,
+    cloudCount: 6, cloudOpacity: 0.7,
+    terrainLow: '#8faa52', terrainHigh: '#e0c488', terrainDirt: '#b08648',
+    ground: {
+      base: '#b0a266', bandLight: 'rgba(255,245,200,0.05)', bandDark: 'rgba(60,70,20,0.05)',
+      patchA: 'rgba(80,120,40,0.20)', patchB: 'rgba(235,215,150,0.16)',
+      speckA: 'rgba(120,150,60,0.7)', speckB: 'rgba(250,240,200,0.8)', speckCount: 80,
+    },
+    road: {
+      base: '#b4915c', mottleA: [140, 106, 62], mottleB: [206, 174, 118],
+      rut: 'rgba(115,82,44,0.55)', rutCore: 'rgba(90,60,30,0.45)', tread: 'rgba(60,38,18,0.5)',
+      stoneA: 'rgba(235,214,172,0.7)', stoneB: 'rgba(130,94,54,0.7)',
+      fringe: [95, 130, 45], fringeVar: [36, 46, 24],   // green creeping in
+    },
+    hillColor: 0xc89858, peakColor: 0xe8cc90,
+    vegetation: 'palm', treeCount: 250, trunkColor: 0x8a6242,
+    foliageLow: 0x2f8a3c, foliageTop: 0x45a04a,
+    foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.18, l: 0.30, lVar: 0.12 },
+    treeSnowCap: false, palmGrove: [0.32, 0.58],        // grove section of the lap
+    tuftCount: 700, grass: { bladeA: '#5a8a2c', bladeB: '#a8c85e' },
+    bushCount: 180, bushColor: 0x4a8a34,
+    bush: { h: 0.27, hVar: 0.05, s: 0.45, sVar: 0.12, l: 0.30, lVar: 0.12 },
+    rockCount: 90, pebbleCount: 120, rockColor: 0xb08a58, rockSnowCap: false,
+    flowerCount: 260, flowerColors: ['#ffd45e', '#ff6a8a', '#ffffff', '#e86aff'],
+    hutRoof: 0xc9a24d, hayColor: 0xd8b95e, hutCount: 5, hayCount: 16,
+    splinter: [0x4a9a3c, 0xc9a06a],                     // shredded fronds + dry wood
+    weather: { type: 'leaves', color: 0x7ac84a },
+    elev: { amp: 6, ph: [1.9, 4.2, 0.8] },
+    rampMaxCurv: 0.016, padMaxCurv: 0.005, boardMaxCurv: 0.014,
+    oasis: true, oasisCount: 3, bridgeCount: 2, puddleCount: 9,
+    critters: { kind: 'scorpion', count: 10 },          // hazard spec (lead implements)
+  },
+  // REDWOOD RAMPAGE: gargantuan redwood forest — the giants are SOLID and kept
+  // off the road, exposed roots bump the shoulders, one hollow trunk arches
+  // over the road. Strong rolling elevation, extra ramps.
+  redwood: {
+    fogColor: 0xd8e4cf, fogNear: 240, fogFar: 1300,
+    hemiSky: 0xcfe4d8, hemiGround: 0x4a6a38,
+    sunColor: 0xffeec8, sunIntensity: 1.9,
+    skyTop: '#4e8ecf', skyHorizon: '#e0ecd0', sunGlow: 0xfff0b8,
+    sunAz: 0.75, sunEl: 0.3,
+    cloudCount: 8, cloudOpacity: 0.85,
+    terrainLow: '#3f7a2e', terrainHigh: '#6fa04a', terrainDirt: '#7a5638',
+    ground: {
+      base: '#4f8636', bandLight: 'rgba(255,255,255,0.04)', bandDark: 'rgba(0,20,0,0.06)',
+      patchA: 'rgba(40,80,28,0.20)', patchB: 'rgba(140,180,90,0.14)',
+      speckA: 'rgba(190,140,80,0.7)', speckB: 'rgba(230,240,190,0.8)', speckCount: 70,
+    },
+    road: {
+      base: '#8a5f3c', mottleA: [96, 64, 38], mottleB: [156, 118, 76],
+      rut: 'rgba(62,42,22,0.55)', rutCore: 'rgba(44,28,14,0.45)', tread: 'rgba(26,16,8,0.5)',
+      stoneA: 'rgba(196,176,146,0.7)', stoneB: 'rgba(84,58,34,0.7)',
+      fringe: [48, 110, 36], fringeVar: [30, 46, 22],
+    },
+    hillColor: 0x3f6e34, peakColor: 0x8a8578,
+    vegetation: 'redwood', treeCount: 190, trunkColor: 0x7a3f24,
+    foliageLow: 0x2a5e28, foliageTop: 0x3a7a32,
+    foliage: { h: 0.30, hVar: 0.05, s: 0.45, sVar: 0.18, l: 0.26, lVar: 0.10 },
+    treeSnowCap: false,
+    tuftCount: 800, grass: { bladeA: '#2f6a22', bladeB: '#63b243' },
+    bushCount: 170, bushColor: 0x2f7a30,
+    bush: { h: 0.30, hVar: 0.05, s: 0.5, sVar: 0, l: 0.28, lVar: 0.12 },
+    rockCount: 120, pebbleCount: 150, rockColor: 0x8a8072, rockSnowCap: false,
+    flowerCount: 160, flowerColors: ['#ffe234', '#ffffff', '#c27aff'],
+    hutRoof: 0x8a5a2c, hayColor: 0xc8a468,
+    splinter: [0x8a4a2a, 0xe8e2d4],                     // red bark chips
+    weather: { type: 'leaves', color: 0x8a6a3a },       // drifting needle litter
+    elev: { amp: 14, ph: [1.1, 3.5, 2.4] },             // strong rolling crests
+    rampCount: 5, rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.016,
+    obstacleSpec: { count: 5, style: 'roots' },         // exposed-root speed bumps
+    hollowArch: true, puddleCount: 3,
+  },
+  // LOG FLUME FURY: old logging operation — sawmill camp, log-pile obstacles,
+  // plank bridges. Hazard contract: strips (water-flume speed lanes).
+  flume: {
+    fogColor: 0xd6e2d0, fogNear: 280, fogFar: 1400,
+    hemiSky: 0xd8e8f0, hemiGround: 0x5a7a44,
+    sunColor: 0xfff2d0, sunIntensity: 2.0,
+    skyTop: '#4a90d0', skyHorizon: '#e8f0d8', sunGlow: 0xfff0c0,
+    sunAz: 0.8, sunEl: 0.32,
+    cloudCount: 10, cloudOpacity: 0.9,
+    terrainLow: '#4c8434', terrainHigh: '#7cae52', terrainDirt: '#96703f',
+    ground: {},
+    road: {
+      base: '#9b7444', mottleA: [110, 78, 44], mottleB: [172, 134, 86],
+      rut: 'rgba(70,48,26,0.55)', rutCore: 'rgba(50,32,16,0.45)', tread: 'rgba(30,18,8,0.5)',
+      stoneA: 'rgba(200,180,150,0.7)', stoneB: 'rgba(92,66,40,0.7)',
+      fringe: [64, 124, 40], fringeVar: [34, 46, 20],
+    },
+    hillColor: 0x4e7a3c, peakColor: 0x8d8578,
+    treeCount: 240, trunkColor: 0x6b4423,
+    foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
+    foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.30, lVar: 0.14 },
+    treeSnowCap: false,
+    tuftCount: 850, grass: {},
+    bushCount: 140, bushColor: 0x2f7a30,
+    bush: { h: 0.30, hVar: 0.05, s: 0.5, sVar: 0, l: 0.30, lVar: 0.12 },
+    rockCount: 110, pebbleCount: 150, rockColor: 0x8d8578, rockSnowCap: false,
+    flowerCount: 200, flowerColors: ['#ffe234', '#ff6a8a', '#ffffff'],
+    hutRoof: 0x8a5a2c, hayColor: 0x8a6238,              // hay recolored to cut-log rounds
+    hutCount: 6, hayCount: 34,
+    splinter: [0x8a5a32, 0xd8c89a],                     // fresh-cut timber
+    weather: { type: 'leaves', color: 0xc8a468 },       // sawdust drift
+    elev: { amp: 9, ph: [2.4, 0.6, 3.8] },
+    rampMaxCurv: 0.014, padMaxCurv: 0.005, boardMaxCurv: 0.012,
+    obstacleSpec: { count: 5, style: 'logs' }, bridgeCount: 3, puddleCount: 4,
+    logYards: 12,                                       // trackside timber stacks
+    strips: { kind: 'flume', count: 3 },                // hazard spec (lead implements)
+  },
+  // FOREST FIRE ESCAPE: the forest is burning — ember dusk, smoke sky, glowing
+  // ground fissures, scorched + burning trees. Hazard contract: fallHazard.
+  wildfire: {
+    fogColor: 0x6a3e28, fogNear: 190, fogFar: 900,
+    hemiSky: 0xe89a64, hemiGround: 0x5c4434, hemiIntensity: 1.3,
+    sunColor: 0xff8a48, sunIntensity: 2.2,
+    skyTop: '#2c1a1e', skyHorizon: '#e8601e', sunGlow: 0xff6a20, skyCurve: 0.66,
+    sunAz: 0.55, sunEl: 0.15,
+    cloudCount: 9, cloudOpacity: 0.5, cloudTint: 0x5a4238,   // smoke columns
+    terrainLow: '#5c4630', terrainHigh: '#7e6244', terrainDirt: '#96522c',
+    ground: {
+      base: '#5c4a36', bandLight: 'rgba(255,255,255,0.03)', bandDark: 'rgba(0,0,0,0.07)',
+      patchA: 'rgba(30,20,14,0.24)', patchB: 'rgba(130,100,68,0.14)',
+      speckA: 'rgba(255,150,60,0.9)', speckB: 'rgba(190,170,150,0.7)', speckCount: 90,
+      veins: { color: '#ff8a26', glow: 'rgba(255,110,20,0.4)', count: 10 },  // burning fissures
+    },
+    road: {
+      base: '#655349', mottleA: [72, 56, 46], mottleB: [124, 104, 88],
+      rut: 'rgba(140,132,128,0.3)', rutCore: 'rgba(168,158,152,0.26)',
+      tread: 'rgba(22,16,12,0.55)',
+      stoneA: 'rgba(185,175,165,0.7)', stoneB: 'rgba(34,26,22,0.8)',
+      fringe: [90, 70, 50], fringeVar: [34, 26, 18],    // ash-choked verge
+    },
+    hillColor: 0x54291c, peakColor: 0x2e1812,
+    vegetation: 'burnt', treeCount: 220, trunkColor: 0x241d18,
+    foliageLow: 0x4a2814, foliageTop: 0x6a3a1a,         // ember-lit scorched canopy
+    foliage: { h: 0.05, hVar: 0.03, s: 0.45, sVar: 0.15, l: 0.16, lVar: 0.08 },
+    treeSnowCap: false,
+    tuftCount: 80, grass: { bladeA: '#4a4038', bladeB: '#6a5a48' },
+    bushCount: 30, bushColor: 0x3a302a,
+    bush: { h: 0.08, hVar: 0.03, s: 0.15, sVar: 0.08, l: 0.16, lVar: 0.08 },
+    rockCount: 160, pebbleCount: 220, rockColor: 0x3a322c, rockSnowCap: false,
+    flowerCount: 0, flowerColors: ['#ff7a22'],
+    hutRoof: 0x4a3a30, hayColor: 0x8a6a3a, hutCount: 2, hayCount: 0,
+    splinter: [0x2c2420, 0xff6a2e],                     // charcoal + ember chips
+    weather: { type: 'embers', color: 0xff8a2e },
+    elev: { amp: 10, ph: [3.7, 1.5, 5.3] },
+    rampMaxCurv: 0.018, padMaxCurv: 0.006, boardMaxCurv: 0.016,
+    puddleCount: 0,
+    fallHazard: { kind: 'burningTree', period: 7, dmg: 20 },  // hazard spec (lead implements)
+  },
+  // GLACIER'S GRIND: racing ON the glacier — bare blue-white sheet ice with
+  // crevasse cracks, frozen slicks, pale ice canyon walls. Hazard: icicles.
+  sheetice: {
+    surface: 'snow',                                    // physics reads this
+    fogColor: 0xdceef8, fogNear: 230, fogFar: 1250,
+    hemiSky: 0xe0f0ff, hemiGround: 0xa8c4d8,
+    sunColor: 0xf0f8ff, sunIntensity: 1.8,
+    skyTop: '#3d84c8', skyHorizon: '#e4f4fc', sunGlow: 0xf0fbff,
+    sunAz: 0.75, sunEl: 0.22,
+    cloudCount: 6, cloudOpacity: 0.8,
+    terrainLow: '#d8e8f2', terrainHigh: '#ffffff', terrainDirt: '#a4c0d2',
+    ground: {
+      base: '#e2edf4', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(110,150,180,0.07)',
+      patchA: 'rgba(140,180,215,0.22)', patchB: 'rgba(255,255,255,0.22)',
+      speckA: 'rgba(180,215,240,0.8)', speckB: 'rgba(255,255,255,0.9)', speckCount: 100,
+    },
+    road: {
+      // near-white blue glacier ice, crevasse-cracked by the overlay
+      base: '#d5e6f2', mottleA: [168, 194, 216], mottleB: [230, 242, 250],
+      rut: 'rgba(140,168,192,0.4)', rutCore: 'rgba(120,148,176,0.35)', tread: 'rgba(96,122,150,0.4)',
+      stoneA: 'rgba(245,250,255,0.8)', stoneB: 'rgba(150,180,205,0.7)',
+      fringe: [232, 242, 250], fringeVar: [20, 12, 6],
+      ice: true,                                        // sheet-ice glaze + crevasse cracks
+    },
+    hillColor: 0xc2d8e6, peakColor: 0xf0f8fc,
+    treeCount: 60, trunkColor: 0x5a4028,
+    foliageLow: 0x5a7a62, foliageTop: 0x668a70,
+    foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
+    treeSnowCap: true,
+    tuftCount: 120, grass: { bladeA: '#6a8a78', bladeB: '#c8dcd0' },
+    bushCount: 40, bushColor: 0x9ab8a0,
+    bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.55, lVar: 0.12 },
+    rockCount: 140, pebbleCount: 110, rockColor: 0x9ab4c4, rockSnowCap: true,
+    flowerCount: 0, flowerColors: ['#ffffff'],
+    hutRoof: 0xe8f2f8, hutStyle: 'igloo', hutCount: 6, hayColor: 0xd8c07a, hayCount: 6,
+    splinter: [0xdff2fc, 0x9fd8f0],                     // shattered ice chips
+    weather: { type: 'snow', color: 0xffffff },
+    elev: { amp: 8, ph: [2.1, 0.8, 3.9] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    // pale blue-white ice walls — tighter/taller than glacial for a tunnel feel
+    cliffWalls: true,
+    cliffPalette: {
+      bands: ['#e6f4fb', '#cfe6f4', '#b4d6ec', '#dcedf8', '#c0dcf0'],
+      seam: 'rgba(130,170,200,0.4)',
+      crack: 'rgba(30,140,190,',
+      bleach: 'rgba(255,255,255,0.26)',
+      talus: 'rgba(100,130,160,0.26)',
+      mottleLight: '255,255,255', mottleDark: '130,170,210',
+      streakLight: '245,252,255', streakDark: '140,180,215',
+    },
+    // frozen slicks: puddle mechanic re-skinned as clear blue ice
+    puddle: {
+      rim: '#d8ecf6', mud: '#a8d2ea',
+      sheen: 'rgba(240,252,255,0.5)', gleam: 'rgba(255,255,255,0.8)',
+    },
+    puddleCount: 8,
+    fallHazard: { kind: 'icicle', period: 6, dmg: 16 }, // hazard spec (lead implements)
+  },
+  // AVALANCHE ALLEY: narrow high pass — dramatic hand-shaped climb with a long
+  // downhill final third, multi-ramp jumps. Hazard contract: chase wall.
+  avalanche: {
+    surface: 'snow',                                    // physics reads this
+    fogColor: 0xe6eef6, fogNear: 250, fogFar: 1300,
+    hemiSky: 0xdfeaf8, hemiGround: 0xb0c0ce,
+    sunColor: 0xeef4ff, sunIntensity: 1.8,
+    skyTop: '#5590cc', skyHorizon: '#eef6fc', sunGlow: 0xffffff,
+    sunAz: 0.85, sunEl: 0.3,
+    cloudCount: 10, cloudOpacity: 0.95,
+    terrainLow: '#e2eaf0', terrainHigh: '#ffffff', terrainDirt: '#b0bec8',
+    ground: {
+      base: '#e6edf2', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(120,150,175,0.06)',
+      patchA: 'rgba(165,190,210,0.20)', patchB: 'rgba(255,255,255,0.22)',
+      speckA: 'rgba(200,220,235,0.8)', speckB: 'rgba(255,255,255,0.9)', speckCount: 80,
+    },
+    road: {
+      base: '#6f5638', mottleA: [82, 60, 38], mottleB: [130, 102, 70],
+      rut: 'rgba(46,32,20,0.6)', rutCore: 'rgba(30,20,12,0.5)', tread: 'rgba(14,9,5,0.55)',
+      stoneA: 'rgba(190,200,210,0.7)', stoneB: 'rgba(70,55,40,0.7)',
+      fringe: [228, 238, 246], fringeVar: [24, 16, 10],
+      snowCover: { slush: [206, 216, 226], slushAlpha: 0.38 },
+    },
+    hillColor: 0xcfdce4, peakColor: 0xf4f8fc,
+    treeCount: 190, trunkColor: 0x5a4028,
+    foliageLow: 0x5a7a62, foliageTop: 0x668a70,
+    foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
+    treeSnowCap: true,
+    tuftCount: 260, grass: { bladeA: '#5a7a58', bladeB: '#b8d0c0' },
+    bushCount: 60, bushColor: 0x9ab8a0,
+    bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.52, lVar: 0.12 },
+    rockCount: 220, pebbleCount: 160, rockColor: 0x9aa6b0, rockSnowCap: true,
+    flowerCount: 30, flowerColors: ['#ffffff', '#cfe0ff'],
+    hutRoof: 0xe8eef4, hayColor: 0xd8c07a, hutCount: 3, hayCount: 8,
+    splinter: [0xdce8f0, 0x9fc4d8],
+    weather: { type: 'snow', color: 0xffffff },
+    // hand-shaped pass: climb through the lap's middle, hold the crest, then
+    // one long committed descent through the final third — chase-wall country
+    elev: {
+      amp: 16, profile: 'ascent', ph: [0, 0, 0],
+      keys: [[0, 0], [0.05, 0], [0.16, 5], [0.44, 14], [0.60, 16], [0.70, 15], [0.95, 0], [1, 0]],
+    },
+    rampCount: 5, rampMaxCurv: 0.024, padMaxCurv: 0.008, boardMaxCurv: 0.02,
+    puddleCount: 3,
+    chase: { kind: 'avalanche' },                       // hazard spec (lead implements)
+  },
+  // NEON GRID EXPRESSWAY: cyberpunk night city — near-black sky, glowing road
+  // edge lines, skyscraper light-grid horizon, holo boards. Hazard: maglev strips.
+  neon: {
+    surface: 'wet',                                     // glossy glass-asphalt
+    fogColor: 0x0a0a18, fogNear: 260, fogFar: 1400,
+    hemiSky: 0x36406a, hemiGround: 0x1c1430, hemiIntensity: 1.2,
+    sunColor: 0x8a9aff, sunIntensity: 0.9,              // cold moonlight
+    skyTop: '#03030a', skyHorizon: '#461e6e', sunGlow: 0xff40c0, skyCurve: 0.8,
+    sunAz: 0.6, sunEl: 0.5, sunSprite: false, stars: true,
+    hazeColor: 0xb93ee8, hazeOpacity: 0.4,              // city glow ringing the horizon
+    cloudCount: 0, cloudOpacity: 0,
+    terrainLow: '#101018', terrainHigh: '#1e1e2c', terrainDirt: '#28203a',
+    ground: {
+      base: '#14141c', bandLight: 'rgba(80,240,255,0.04)', bandDark: 'rgba(0,0,0,0.12)',
+      patchA: 'rgba(40,20,80,0.25)', patchB: 'rgba(30,60,90,0.18)',
+      speckA: 'rgba(120,220,255,0.7)', speckB: 'rgba(255,80,220,0.6)', speckCount: 150,
+    },
+    road: {
+      base: '#101318', mottleA: [14, 16, 22], mottleB: [34, 38, 48],
+      rut: 'rgba(8,10,14,0.5)', rutCore: 'rgba(4,6,10,0.45)', tread: 'rgba(0,0,0,0.5)',
+      stoneA: 'rgba(70,80,100,0.5)', stoneB: 'rgba(10,12,18,0.7)',
+      fringe: [24, 26, 40], fringeVar: [12, 12, 20],
+      wet: { darken: 0.2, gleam: 14, pools: 4 },
+      neon: { edgeA: '#2af6ff', edgeB: '#ff3af0', dash: '#9a6cff' },
+    },
+    roadNeon: { edgeA: '#2af6ff', edgeB: '#ff3af0', dash: '#9a6cff' },  // emissive line-work
+    hillColor: 0x0e1420, peakColor: 0x141b2c, horizon: 'city',
+    vegetation: 'none', treeCount: 0, trunkColor: 0x333344,
+    foliageLow: 0x223344, foliageTop: 0x334455,
+    foliage: { h: 0.6, hVar: 0.05, s: 0.2, sVar: 0.1, l: 0.2, lVar: 0.1 },
+    treeSnowCap: false,
+    tuftCount: 0, grass: {},
+    bushCount: 0, bushColor: 0x223322,
+    bush: { h: 0.3, hVar: 0.05, s: 0.2, sVar: 0.1, l: 0.2, lVar: 0.1 },
+    rockCount: 0, pebbleCount: 0, rockColor: 0x2a2e3a, rockSnowCap: false,
+    heroRock: false,
+    flowerCount: 0, flowerColors: ['#26f6ff'],
+    hutRoof: 0x22262e, hutCount: 0, hayColor: 0x33363e, hayCount: 0,
+    splinter: [0x26f6ff, 0xff3af0],                     // shattered neon shards
+    weather: { type: 'rain', color: 0x9ab8e8, rate: 90 },
+    elev: { amp: 7, ph: [1.3, 4.4, 2.7] },              // gentle overpass swells
+    rampMaxCurv: 0.012, padMaxCurv: 0.005, boardMaxCurv: 0.014,
+    bannerStyle: 'neon',                                // holographic sponsor boards
+    lamps: { color: 0x6af6ff, every: 38, height: 6.4 }, // cyan expressway lamps
+    puddle: {
+      rim: '#101018', mud: '#05070c',
+      sheen: 'rgba(120,220,255,0.30)', gleam: 'rgba(255,80,220,0.35)',
+    },
+    puddleCount: 4,
+    strips: { kind: 'maglev', count: 4 },               // hazard spec (lead implements)
+  },
+  // UNDERCITY SLIPSTREAM: the sewer underbelly — crushing dark fog, grimy
+  // concrete tunnel walls, sickly lamp light, debris. Hazard: rats.
+  undercity: {
+    fogColor: 0x1c2418, fogNear: 60, fogFar: 460,       // very close, very dark
+    hemiSky: 0x8a9a5c, hemiGround: 0x2a2c1e, hemiIntensity: 1.7,
+    sunColor: 0xd8e87a, sunIntensity: 1.5,              // sickly grate-light shafts
+    skyTop: '#05070a', skyHorizon: '#182014', sunGlow: 0x9aa858, skyCurve: 0.8,
+    sunAz: 0.4, sunEl: 0.6, sunSprite: false,
+    hazeColor: 0x2a301c, hazeOpacity: 0.6,
+    cloudCount: 0, cloudOpacity: 0,
+    terrainLow: '#23261e', terrainHigh: '#34382c', terrainDirt: '#2c2418',
+    ground: {
+      base: '#262a20', bandLight: 'rgba(255,255,255,0.02)', bandDark: 'rgba(0,0,0,0.08)',
+      patchA: 'rgba(14,18,10,0.24)', patchB: 'rgba(70,78,54,0.14)',
+      speckA: 'rgba(150,170,90,0.5)', speckB: 'rgba(90,100,110,0.6)', speckCount: 60,
+    },
+    road: {
+      // grimy stained concrete
+      base: '#4a4e44', mottleA: [54, 58, 50], mottleB: [98, 102, 92],
+      rut: 'rgba(20,24,18,0.55)', rutCore: 'rgba(12,15,10,0.5)', tread: 'rgba(5,7,4,0.55)',
+      stoneA: 'rgba(140,146,134,0.6)', stoneB: 'rgba(24,28,20,0.7)',
+      fringe: [42, 50, 32], fringeVar: [18, 22, 14],    // slime creeping from the walls
+      wet: { darken: 0.3, gleam: 10, pools: 5 },        // permanently damp
+    },
+    hillColor: 0x1c2018, peakColor: 0x282e22,
+    vegetation: 'none', treeCount: 0, trunkColor: 0x33362c,
+    foliageLow: 0x2a3020, foliageTop: 0x3a4030,
+    foliage: { h: 0.2, hVar: 0.05, s: 0.2, sVar: 0.1, l: 0.2, lVar: 0.1 },
+    treeSnowCap: false,
+    tuftCount: 90, grass: { bladeA: '#5a6a30', bladeB: '#8a9a48' },
+    bushCount: 40, bushColor: 0x3a4a28,
+    bush: { h: 0.22, hVar: 0.04, s: 0.3, sVar: 0.1, l: 0.18, lVar: 0.08 },
+    rockCount: 130, pebbleCount: 260, rockColor: 0x4a4e44, rockSnowCap: false,
+    flowerCount: 0, flowerColors: ['#8a9a48'],
+    hutRoof: 0x3a3e34, hutCount: 0, hayColor: 0x5a5e50, hayCount: 0,
+    splinter: [0x4a4e44, 0x8a9a48],                     // concrete + slime chips
+    weather: { type: 'dust', color: 0x6a7048 },         // drifting spore motes
+    elev: { amp: 5, ph: [0.8, 2.3, 4.9] },
+    rampMaxCurv: 0.022, padMaxCurv: 0.0075, boardMaxCurv: 0.02,
+    cliffWalls: true,
+    cliffPalette: {                                     // stained tunnel concrete
+      bands: ['#4a4e46', '#3c4038', '#565a50', '#34382e', '#44483e'],
+      seam: 'rgba(20,24,18,0.6)',
+      crack: 'rgba(100,120,55,',                        // moss-choked cracks
+      bleach: 'rgba(160,170,140,0.1)',
+      talus: 'rgba(10,12,8,0.35)',
+      mottleLight: '140,150,120', mottleDark: '20,24,16',
+      streakLight: '120,130,100', streakDark: '15,18,10',
+    },
+    lamps: { color: 0xd8e87a, every: 22, height: 4.6 }, // sickly service lamps
+    puddle: {
+      rim: '#20241c', mud: '#0a0e08',
+      sheen: 'rgba(140,160,90,0.25)', gleam: 'rgba(190,210,120,0.3)',
+    },
+    puddleCount: 7,
+    critters: { kind: 'rat', count: 12 },               // hazard spec (lead implements)
+  },
 };
 
 const N = 900;              // centerline samples
+/** Title-screen minimaps: the raw circuit control polygon for a theme. */
+export function circuitPoints(themeKey) { return CIRCUITS[themeKey] || CIRCUITS.forest; }
+
 export const ROAD_HALF = 9; // drivable half-width
 export const WALL_OFF = 10.4;
 
@@ -434,6 +1010,14 @@ const SPONSORS = [
   ['CLAW TIRES', '#1c1812', '#e8b83a'],
   ['VOLT FUEL', '#26300f', '#d4ff5e'],
   ['RALLY CO.', '#3a1414', '#ffd4c2'],
+];
+// NEO-KYOTO holo sponsors: near-black panels, searing neon lettering
+const NEON_SPONSORS = [
+  ['KIRIN CYBER', '#050510', '#2af6ff'],
+  ['LOTUS-9', '#0a0514', '#ff3af0'],
+  ['HYPER-FLUX', '#02101a', '#7fd4ff'],
+  ['ONI RAMEN', '#140505', '#ffd23a'],
+  ['VOLT', '#0a1405', '#d4ff5e'],
 ];
 
 // ---------- destructible prop catalog ----------
@@ -450,6 +1034,16 @@ const PROP_SPECS = {
   alpine: [['hay', 20], ['crate', 16], ['cone', 14]],
   glacial: [['penguin', 10], ['snowman', 10], ['crate', 14], ['barrel', 10]],
   jungle: [['crate', 14], ['barrel', 12], ['cone', 12], ['hay', 14]],
+  dunes: [['barrel', 16], ['crate', 16], ['cone', 14]],
+  ravine: [['crate', 14], ['barrel', 14], ['cone', 12], ['rock', 8]],
+  oasis: [['crate', 16], ['barrel', 12], ['hay', 14], ['cone', 10]],
+  redwood: [['hay', 18], ['crate', 16], ['cone', 12]],
+  flume: [['hay', 26], ['crate', 16], ['barrel', 12]],   // hay = cut-log rounds here
+  wildfire: [['barrel', 18], ['crate', 14], ['cone', 12]],
+  sheetice: [['penguin', 10], ['snowman', 10], ['crate', 14], ['barrel', 10]],
+  avalanche: [['snowman', 14], ['crate', 16], ['cone', 12], ['hay', 10]],
+  neon: [['barrel', 18], ['crate', 16], ['cone', 14]],
+  undercity: [['crate', 18], ['barrel', 18], ['cone', 12]],
 };
 const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20, penguin: 40 };
 const _m4 = new THREE.Matrix4(); // scratch (smashTree instance-zeroing)
@@ -461,6 +1055,13 @@ const BARREL_PALETTES = {
   volcano: { base: '#37322e', hoop: '#191512', stripe: '#e8381e' },
   glacial: { base: '#7aa8c4', hoop: '#2c4456', stripe: '#e8f2f8' },
   jungle: { base: '#5a7a34', hoop: '#2c3a1a', stripe: '#c8b45e' },
+  dunes: { base: '#c9a05e', hoop: '#4a3620' },
+  ravine: { base: '#8f5434', hoop: '#2e2016' },
+  wildfire: { base: '#2e2a26', hoop: '#141210', stripe: '#e8481e' },
+  sheetice: { base: '#8ab4d0', hoop: '#2c4456', stripe: '#eef6fc' },
+  avalanche: { base: '#7aa8c4', hoop: '#2c4456', stripe: '#e8f2f8' },
+  neon: { base: '#22262e', hoop: '#101318', stripe: '#26f6ff' },
+  undercity: { base: '#3a4034', hoop: '#181c14', stripe: '#8a9a3c' },
 };
 
 let PROP_ASSETS = null;
@@ -524,8 +1125,17 @@ export class Track {
       sunColor: T.sunColor, sunIntensity: T.sunIntensity,
       // [hexA, hexB] debris chip colors for fence/cliff scrape particles
       splinter: T.splinter,
-      // ambient weather particle recipe for this level: { type, color }
+      // ambient weather particle recipe for this level: { type, color, rate? }
       weather: T.weather,
+      // surface condition tag: 'snow' | 'wet' | undefined (dry)
+      surface: T.surface,
+      // hazard-system spec contract (data only — runtime systems live in the
+      // game code): each is undefined on levels without that hazard.
+      geysers: T.geysers,        // { count }
+      fallHazard: T.fallHazard,  // { kind: 'rock'|'burningTree'|'icicle', period, dmg }
+      chase: T.chase,            // { kind: 'avalanche' }
+      strips: T.strips,          // { kind: 'flume'|'maglev', count }
+      critters: T.critters,      // { kind: 'scorpion'|'rat', count }
     };
     // levels are self-contained: fog is set here (main.js may re-apply from theme)
     scene.fog = new THREE.Fog(T.fogColor, T.fogNear, T.fogFar);
@@ -929,7 +1539,24 @@ export class Track {
     geo.computeVertexNormals();
     const tex = roadTexture(this.T.road);
     tex.anisotropy = 8;
-    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 1, metalness: 0 });
+    // surface condition drives the material response: wet roads go glossy and
+    // catch the scene environment (main.js supplies a PMREM env), snow stays
+    // soft with a faint icy sheen, dry dirt is fully rough as before.
+    // envMapIntensity is a standard-material property, safe before env exists.
+    const surf = this.T.surface;
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex, metalness: 0,
+      roughness: surf === 'wet' ? 0.3 : surf === 'snow' ? 0.55 : 1,
+      envMapIntensity: surf === 'wet' ? 1.3 : surf === 'snow' ? 0.6 : 1,
+    });
+    // NEO-KYOTO: the edge line-work glows through an emissive companion map
+    // (black except the lines) so bloom catches it against the night
+    if (this.T.roadNeon) {
+      mat.emissive = new THREE.Color(0xffffff);
+      mat.emissiveMap = roadNeonEmissiveTexture(this.T.roadNeon);
+      mat.emissiveMap.anisotropy = 8;
+      mat.emissiveIntensity = 1.7;
+    }
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     this.group.add(mesh);
@@ -1121,8 +1748,12 @@ export class Track {
     this.group.add(strip);
 
     // scaffold towers + banner
-    const wood = new THREE.MeshStandardMaterial({ color: 0x5d4426, roughness: 0.85 });
-    const steel = new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.5, metalness: 0.6 });
+    const wood = new THREE.MeshStandardMaterial({
+      color: 0x5d4426, roughness: 0.8, envMapIntensity: 0.5,
+    });
+    const steel = new THREE.MeshStandardMaterial({
+      color: 0x4a4640, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
+    });
     for (const side of [1, -1]) {
       const bx = c.x + n.x * 12.5 * side, bz = c.z + n.z * 12.5 * side;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
@@ -1135,6 +1766,7 @@ export class Track {
       for (let ly = 2.5; ly <= 8.5; ly += 3) {
         const brace = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.22, 2.1), wood);
         brace.position.set(bx, ly, bz);
+        brace.castShadow = true;
         this.group.add(brace);
       }
       const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.7, 2.6), wood);
@@ -1171,10 +1803,13 @@ export class Track {
     // traffic-light box hanging from the banner
     const housing = new THREE.Mesh(
       new THREE.BoxGeometry(7.4, 2.6, 1.2),
-      new THREE.MeshStandardMaterial({ color: 0x24211c, roughness: 0.6, metalness: 0.4 })
+      new THREE.MeshStandardMaterial({
+        color: 0x24211c, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
+      })
     );
     housing.position.set(c.x, 6.6, c.z);
     housing.rotation.y = heading;
+    housing.castShadow = true;
     this.group.add(housing);
     this.lampMats = {};
     const lampSpecs = [['red', -2.3, 0xff3222], ['yellow', 0, 0xffd022], ['green', 2.3, 0x35e04a]];
@@ -1244,16 +1879,19 @@ export class Track {
       windows.push({ i, maxCurv });
     }
     windows.sort((a, b) => a.maxCurv - b.maxCurv);
+    // jump-heavy levels (redwood crests, the avalanche pass) place extra ramps
+    const want = this.T.rampCount || 3;
+    const gap = Math.min(180, ((N - 150) / want) | 0);
     const chosen = [];
     for (const w of windows) {
-      if (chosen.length >= 3) break;
+      if (chosen.length >= want) break;
       if (w.maxCurv > this.T.rampMaxCurv) break;
-      if (chosen.some((c) => this._circDist(w.i, c) < 180)) continue;
+      if (chosen.some((c) => this._circDist(w.i, c) < gap)) continue;
       chosen.push(w.i);
     }
     for (const i of chosen) {
       {
-        const lateral = [-3.4, 3.4, 0][this.ramps.length];
+        const lateral = [-3.4, 3.4, 0, 3.4, -3.4, 0][this.ramps.length];
         const len = 16, height = 3.1, halfW = 3.3;
         this.ramps.push({ index: i, lateral, len, height, halfW });
         // wedge mesh: an inclined deck with hazard-striped sides
@@ -1331,12 +1969,35 @@ export class Track {
     });
     const logMat = new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 0.95 });
     const logCapMat = new THREE.MeshStandardMaterial({ color: 0xc8a468, roughness: 0.9 });
+    const rootMat = new THREE.MeshStandardMaterial({ color: 0x5e3820, roughness: 1 });
     chosen.forEach((i, k) => {
-      const r = 2.2 + Math.random();                       // collider radius 2.2–3.2
+      // exposed-root bumps are small and hug the road EDGE; everything else is
+      // a big mid-lane blocker
+      const roots = spec.style === 'roots';
+      const r = roots ? 1.2 + Math.random() * 0.5 : 2.2 + Math.random();
       const side = k % 2 === 0 ? -1 : 1;
-      const lateral = side * (1.2 + Math.random() * 3.3);  // within ±4.5 of centerline
+      const lateral = roots
+        ? side * (5.6 + Math.random() * 2.2)               // near the shoulder
+        : side * (1.2 + Math.random() * 3.3);              // within ±4.5 of centerline
       const p = this.pointAt(i, lateral);
-      if (spec.style === 'logs') {
+      if (spec.style === 'roots') {
+        // gnarled redwood roots breaking the surface: 3 low half-buried ridges
+        const g = new THREE.Group();
+        for (let s = 0; s < 3; s++) {
+          const seg = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.2 + Math.random() * 0.12, 0.32, r * (1.4 + Math.random() * 0.7), 6),
+            rootMat
+          );
+          seg.rotation.z = Math.PI / 2 + (Math.random() - 0.5) * 0.3;  // lie low
+          seg.rotation.y = (Math.random() - 0.5) * 1.4;
+          seg.position.set((Math.random() - 0.5) * r, 0.12 + s * 0.14, (Math.random() - 0.5) * r);
+          seg.castShadow = true;
+          g.add(seg);
+        }
+        g.position.set(p.x, p.y, p.z);
+        g.rotation.y = this.headingAt(i) + Math.PI / 2;    // roots reach across the lane
+        this.group.add(g);
+      } else if (spec.style === 'logs') {
         // jungle log pile: 2-3 stacked horizontal trunks lying across the lane
         const g = new THREE.Group();
         const nLogs = 2 + (Math.random() < 0.5 ? 1 : 0);
@@ -1653,8 +2314,153 @@ export class Track {
     this._buildGrandstand();
     if (this.T.outcrops) this._buildOutcrops(m4);    // mesas + hoodoos beyond the canyon
     if (this.T.bridgeCount) this._buildBridges();
-    if (this.T.oasis) this._buildOasis();
+    if (this.T.oasis) {
+      // oasisCount ponds (OASIS AMBUSH scatters three; canyon keeps its one)
+      for (let k = 0, n = this.T.oasisCount || 1; k < n; k++) this._buildOasis();
+    }
     if (this.T.riverCount) this._buildRivers();      // jungle streams under the road
+    if (this.T.hollowArch) this._buildHollowArch();  // redwood drive-through trunk
+    if (this.T.lamps) this._buildLamps();            // neon / undercity road lamps
+    if (this.T.logYards) this._buildLogYards();      // flume timber stacks
+  }
+
+  /** LOG FLUME FURY: trackside timber yards — pyramid stacks of cut logs
+   *  (6 per stack) close enough to the road to sell the logging operation.
+   *  Each stack gets one SOLID collider (stacked timber does not yield). */
+  _buildLogYards() {
+    const count = this.T.logYards | 0;
+    const logGeo = new THREE.CylinderGeometry(0.55, 0.55, 1, 9);
+    logGeo.rotateZ(Math.PI / 2);                        // axis → local x
+    const logMat = new THREE.MeshStandardMaterial({ color: 0x8a6238, roughness: 0.95 });
+    const logs = new THREE.InstancedMesh(logGeo, logMat, count * 6);
+    logs.castShadow = true;
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const col = new THREE.Color();
+    let k = 0;
+    // half the yards cluster in the start bowl (visible from the grid), the
+    // rest scatter down the lap
+    const makePos = () => {
+      if (Math.random() < 0.5) {
+        const gi = (((Math.random() * 160 - 80) | 0) + N) % N;
+        const side = Math.random() < 0.5 ? 1 : -1;
+        const p = this.pointAt(gi, side * (13.5 + Math.random() * 9));
+        if (this._distToTrack(p.x, p.z) < 12.5) return null;
+        return { x: p.x, z: p.z };
+      }
+      return this._trackSidePos(13, 26);
+    };
+    this._scatter(count, makePos, (p) => {
+      const y = this.terrainHeight(p.x, p.z);
+      const rot = Math.random() * Math.PI;
+      const len = 4 + Math.random() * 2;
+      q.setFromAxisAngle(up, rot);
+      const dx = Math.sin(rot + Math.PI / 2), dz = Math.cos(rot + Math.PI / 2);
+      // 3 + 2 + 1 pyramid across the stack's local z
+      const rows = [[-1.15, 0, 1.15], [-0.58, 0.58], [0]];
+      rows.forEach((offs, tier) => {
+        for (const off of offs) {
+          m4.compose(
+            new THREE.Vector3(p.x + dx * off, y + 0.55 + tier * 0.95, p.z + dz * off),
+            q, new THREE.Vector3(len * (0.9 + Math.random() * 0.2), 1, 1)
+          );
+          logs.setMatrixAt(k, m4);
+          col.setHSL(0.07 + Math.random() * 0.03, 0.4, 0.3 + Math.random() * 0.12);
+          logs.setColorAt(k++, col);
+        }
+      });
+      this.solids.push({ x: p.x, z: p.z, r: 2.4, y, mat: 'hut' });
+    });
+    logs.count = k;
+    this.scene.add(logs);
+  }
+
+  /** REDWOOD RAMPAGE: one fallen giant straddles the road — cars drive under
+   *  it. Decorative beam (≥ 6u clearance over the deck); collision comes ONLY
+   *  from the two trunk-half SOLIDS standing at the road edges. */
+  _buildHollowArch() {
+    // straightest window well away from the start and any ramp
+    let best = -1, bc = Infinity;
+    for (let i = 90; i < N - 90; i += 5) {
+      if (this.ramps.some((r) => this._circDist(i, r.index) < 60)) continue;
+      let mc = 0;
+      for (let k = -6; k <= 6; k++) mc = Math.max(mc, this.curvature[(i + k + N) % N]);
+      if (mc < bc) { bc = mc; best = i; }
+    }
+    if (best < 0) return;
+    const i = best;
+    const c = this.center[i];
+    const bark = new THREE.MeshStandardMaterial({ color: 0x6a3922, roughness: 1 });
+    const barkDark = new THREE.MeshStandardMaterial({ color: 0x4a2716, roughness: 1 });
+    const cut = new THREE.MeshStandardMaterial({ color: 0xb88a54, roughness: 0.9 });
+    const g = new THREE.Group();
+    for (const side of [1, -1]) {
+      // shattered trunk halves the fallen giant rests on
+      const stump = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3.3, 12, 10), bark);
+      stump.position.set(side * 12.4, 6, 0);
+      stump.castShadow = true;
+      g.add(stump);
+      // root flare at the base
+      const flare = new THREE.Mesh(new THREE.ConeGeometry(4.4, 3.4, 8), barkDark);
+      flare.position.set(side * 12.4, 1.4, 0);
+      flare.castShadow = true;
+      g.add(flare);
+    }
+    // the fallen trunk itself, lying across the road (bottom ≈ y 9 — well
+    // clear of the 6u minimum and of any nearby ramp apex)
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.3, 33, 12), [bark, cut, cut]);
+    beam.rotation.z = Math.PI / 2;
+    beam.position.y = 12.2;
+    beam.castShadow = true;
+    g.add(beam);
+    // a couple of snapped branch stubs on top
+    for (const [bx, ba] of [[-4, 0.5], [5.5, -0.4]]) {
+      const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.75, 4.5, 7), barkDark);
+      stub.position.set(bx, 14.6, 0.6);
+      stub.rotation.z = ba;
+      g.add(stub);
+    }
+    g.position.set(c.x, c.y, c.z);
+    g.rotation.order = 'YXZ';
+    g.rotation.y = this.headingAt(i);                 // local +x = road normal
+    g.rotation.x = -Math.atan(this.slopeAt(i));
+    this.group.add(g);
+    // collision: ONLY the two trunk halves, at the road edges
+    const n = this.nrm[i];
+    for (const side of [1, -1]) {
+      this.solids.push({
+        x: c.x + n.x * 12.4 * side, z: c.z + n.z * 12.4 * side,
+        r: 3.4, y: c.y, mat: 'hut',
+      });
+    }
+  }
+
+  /** Trackside lamps (NEO-KYOTO / undercity): unlit emissive heads on dark
+   *  posts down both road edges — pure set dressing, bloom does the glowing. */
+  _buildLamps() {
+    const L = { color: 0xffffff, every: 38, height: 6.4, ...this.T.lamps };
+    const specs = [];
+    for (let i = 10; i < N; i += L.every) {
+      specs.push({ i, side: (specs.length % 2 === 0) ? 1 : -1 });
+    }
+    const postGeo = new THREE.CylinderGeometry(0.09, 0.13, L.height, 6);
+    postGeo.translate(0, L.height / 2, 0);
+    const headGeo = new THREE.SphereGeometry(0.3, 8, 6);
+    headGeo.translate(0, L.height + 0.15, 0);
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x1c1e24, roughness: 0.6, metalness: 0.5 });
+    const headMat = new THREE.MeshBasicMaterial({ color: L.color });
+    const posts = new THREE.InstancedMesh(postGeo, postMat, specs.length);
+    const heads = new THREE.InstancedMesh(headGeo, headMat, specs.length);
+    const m4 = new THREE.Matrix4();
+    let k = 0;
+    for (const s of specs) {
+      const p = this.pointAt(s.i, (WALL_OFF + 0.9) * s.side);
+      m4.makeTranslation(p.x, p.y, p.z);
+      posts.setMatrixAt(k, m4);
+      heads.setMatrixAt(k++, m4);
+    }
+    posts.count = heads.count = k;
+    this.group.add(posts, heads);
   }
 
   _buildTerrain() {
@@ -1718,16 +2524,73 @@ export class Track {
     );
     this.scene.add(sky);
 
-    const sun = new THREE.Mesh(
-      new THREE.PlaneGeometry(400, 400),
-      new THREE.MeshBasicMaterial({
-        map: glowTexture(), color: T.sunGlow, transparent: true, fog: false,
-        depthWrite: false, blending: THREE.AdditiveBlending,
-      })
+    // night skies (NEO-KYOTO): a field of star points well above the horizon
+    if (T.stars) {
+      const starPos = new Float32Array(340 * 3);
+      for (let i = 0; i < 340; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const el = 0.08 + Math.random() * 1.35;           // keep off the glow band
+        const r = 1400;
+        starPos[i * 3] = Math.cos(a) * Math.cos(el) * r;
+        starPos[i * 3 + 1] = Math.sin(el) * r;
+        starPos[i * 3 + 2] = Math.sin(a) * Math.cos(el) * r;
+      }
+      const starGeo = new THREE.BufferGeometry();
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+      const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+        color: 0xcfd8ff, size: 2.4, sizeAttenuation: false,
+        fog: false, transparent: true, opacity: 0.85, depthWrite: false,
+      }));
+      this.scene.add(stars);
+    }
+
+    // sun: a hot disc inside a wide soft halo, placed per-theme (azimuth /
+    // elevation in radians) so every level's light reads from somewhere real.
+    // Night themes (sunSprite: false) skip the sprite — the light still comes
+    // from sunAz/sunEl, it just has no visible source.
+    const az = T.sunAz !== undefined ? T.sunAz : 0.68;
+    const el = T.sunEl !== undefined ? T.sunEl : 0.3;
+    const sunDir = new THREE.Vector3(
+      Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)
     );
-    sun.position.set(500, 900, 400);
-    sun.lookAt(0, 0, 0);
-    this.scene.add(sun);
+    if (T.sunSprite !== false) {
+      const halo = new THREE.Mesh(
+        new THREE.PlaneGeometry(560, 560),
+        new THREE.MeshBasicMaterial({
+          map: glowTexture(), color: T.sunGlow, transparent: true, fog: false,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        })
+      );
+      halo.position.copy(sunDir).multiplyScalar(1330);
+      halo.lookAt(0, 0, 0);
+      this.scene.add(halo);
+      // normal-blended core (an additive disc washes out against bright skies)
+      const disc = new THREE.Mesh(
+        new THREE.PlaneGeometry(170, 170),
+        new THREE.MeshBasicMaterial({
+          map: sunTexture(),
+          color: new THREE.Color(T.sunGlow).lerp(new THREE.Color(0xffffff), 0.45),
+          transparent: true, fog: false, depthWrite: false,
+        })
+      );
+      disc.position.copy(sunDir).multiplyScalar(1310);
+      disc.lookAt(0, 0, 0);
+      this.scene.add(disc);
+    }
+
+    // layered horizon haze band: a tinted translucent cylinder ringing the
+    // world between the near hill ring and the far peaks, so the skyline
+    // stacks (hills → haze → peaks → sky) instead of reading as one gradient
+    const hazeMat = new THREE.MeshBasicMaterial({
+      map: hazeTexture(), color: T.hazeColor !== undefined ? T.hazeColor : T.fogColor,
+      transparent: true, opacity: T.hazeOpacity !== undefined ? T.hazeOpacity : 0.9,
+      side: THREE.BackSide, fog: false, depthWrite: false,
+    });
+    const haze = new THREE.Mesh(
+      new THREE.CylinderGeometry(940, 940, 300, 48, 1, true), hazeMat
+    );
+    haze.position.y = 95;                 // dense band hugs the horizon line
+    this.scene.add(haze);
 
     const ctex = cloudTexture();
     for (let i = 0; i < T.cloudCount; i++) {
@@ -1748,6 +2611,8 @@ export class Track {
   _buildHorizon(m4) {
     const T = this.T;
     if (T.horizon === 'mesa') return this._buildMesaHorizon(m4);
+    if (T.horizon === 'dunes') return this._buildDuneHorizon(m4);
+    if (T.horizon === 'city') return this._buildCityHorizon(m4);
     const hills = new THREE.InstancedMesh(
       new THREE.ConeGeometry(1, 1, 7),
       new THREE.MeshStandardMaterial({ color: T.hillColor, flatShading: true, roughness: 1 }),
@@ -1819,6 +2684,88 @@ export class Track {
     this.scene.add(mesh);
   }
 
+  /** Dune-sea horizon: two rings of huge, low, smooth elongated golden ridges
+   *  instead of pointy cone hills — the serpent-back dune skyline. */
+  _buildDuneHorizon(m4) {
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const rings = [
+      { count: 28, r0: 720, rv: 130, w0: 240, wv: 190, h0: 34, hv: 32, color: this.T.hillColor },
+      { count: 20, r0: 950, rv: 170, w0: 320, wv: 220, h0: 62, hv: 52, color: this.T.peakColor },
+    ];
+    for (const R of rings) {
+      const mesh = new THREE.InstancedMesh(
+        new THREE.ConeGeometry(1, 1, 10),
+        new THREE.MeshStandardMaterial({ color: R.color, flatShading: true, roughness: 1 }),
+        R.count
+      );
+      for (let i = 0; i < R.count; i++) {
+        const a = (i / R.count) * Math.PI * 2 + Math.random() * 0.2;
+        const r = R.r0 + Math.random() * R.rv;
+        const w = R.w0 + Math.random() * R.wv;
+        const h = R.h0 + Math.random() * R.hv;
+        q.setFromAxisAngle(up, Math.random() * Math.PI);
+        m4.compose(
+          new THREE.Vector3(Math.cos(a) * r, h / 2 - 6, Math.sin(a) * r),
+          q,
+          new THREE.Vector3(w, h, w * (0.4 + Math.random() * 0.3))  // long wind-carved ridges
+        );
+        mesh.setMatrixAt(i, m4);
+      }
+      this.scene.add(mesh);
+    }
+  }
+
+  /** NEO-KYOTO horizon: rings of dark skyscrapers with lit window grids —
+   *  towerTexture doubles as its own emissive map so the windows glow, plus a
+   *  handful of reachable mid-distance towers (SOLID) for parallax. */
+  _buildCityHorizon(m4) {
+    const tex = towerTexture();
+    tex.anisotropy = 4;
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex, emissive: 0xbfccff, emissiveMap: tex, emissiveIntensity: 0.85,
+      roughness: 0.85,
+    });
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    geo.translate(0, 0.5, 0);
+    const midSpecs = [];
+    let guard = 0;
+    while (midSpecs.length < 14 && guard++ < 300) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 260 + Math.random() * 280;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (this._distToTrack(x, z) < 90) continue;
+      midSpecs.push({ x, z, w: 22 + Math.random() * 26, h: 60 + Math.random() * 110 });
+    }
+    const COUNT = 42 + 30 + midSpecs.length;
+    const towers = new THREE.InstancedMesh(geo, mat, COUNT);
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    let k = 0;
+    const put = (x, z, w, h) => {
+      q.setFromAxisAngle(up, Math.random() * Math.PI);
+      m4.compose(
+        new THREE.Vector3(x, -4, z), q,
+        new THREE.Vector3(w, h, w * (0.6 + Math.random() * 0.8))
+      );
+      towers.setMatrixAt(k++, m4);
+    };
+    for (let i = 0; i < 42; i++) {
+      const a = (i / 42) * Math.PI * 2 + Math.random() * 0.12;
+      const r = 680 + Math.random() * 130;
+      put(Math.cos(a) * r, Math.sin(a) * r, 36 + Math.random() * 48, 90 + Math.random() * 140);
+    }
+    for (let i = 0; i < 30; i++) {
+      const a = (i / 30) * Math.PI * 2 + 0.11;
+      const r = 890 + Math.random() * 160;
+      put(Math.cos(a) * r, Math.sin(a) * r, 60 + Math.random() * 60, 160 + Math.random() * 160);
+    }
+    for (const s of midSpecs) {
+      put(s.x, s.z, s.w, s.h);
+      this.solids.push({ x: s.x, z: s.z, r: s.w * 0.7, y: this.terrainHeight(s.x, s.z), mat: 'metal' });
+    }
+    towers.count = k;
+    this.scene.add(towers);
+  }
+
   /** Canyon horizon: rings of big flat-topped mesas instead of cone hills. */
   _buildMesaHorizon(m4) {
     const specs = [];
@@ -1868,9 +2815,10 @@ export class Track {
     segGeo.translate(0, 0.5, 0);
     const hoodoos = new THREE.InstancedMesh(
       segGeo,
-      new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 }),
       COUNT * SEGS
     );
+    hoodoos.castShadow = true;
     const strata = ['#cf9a5e', '#a06844', '#b8845a', '#96603c'].map((c) => new THREE.Color(c));
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const col = new THREE.Color();
@@ -1928,9 +2876,13 @@ export class Track {
 
   _buildForest(m4) {
     const T = this.T;
+    if (T.vegetation === 'none' || !T.treeCount) return;
     if (T.vegetation === 'cactus') return this._buildCacti(m4);
     if (T.vegetation === 'charred') return this._buildCharredTrees(m4);
     if (T.vegetation === 'jungle') return this._buildJungleTrees(m4);
+    if (T.vegetation === 'palm') return this._buildPalms(m4);
+    if (T.vegetation === 'redwood') return this._buildRedwoods(m4);
+    if (T.vegetation === 'burnt') return this._buildBurntForest(m4);
     const COUNT = T.treeCount;
     const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 7);
     trunkGeo.translate(0, 1.2, 0);
@@ -1944,7 +2896,7 @@ export class Track {
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, COUNT);
     const lows = new THREE.InstancedMesh(lowGeo, lowMat, COUNT);
     const tops = new THREE.InstancedMesh(topGeo, topMat, COUNT);
-    lows.castShadow = tops.castShadow = true;
+    trunks.castShadow = lows.castShadow = tops.castShadow = true;
     // snowy pines get a white cap cone over the upper foliage
     let caps = null;
     if (T.treeSnowCap) {
@@ -2013,7 +2965,7 @@ export class Track {
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 });
     const parts = [trunkGeo, armUpA, armElbowA, armUpB, armElbowB]
       .map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
-    parts[0].castShadow = true;
+    for (const part of parts) part.castShadow = true;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
     const placed = this._scatter(COUNT,
@@ -2074,7 +3026,7 @@ export class Track {
     b3.translate(0, 3.7, 0.5);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 });
     const parts = [trunkGeo, b1, b2, b3].map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
-    parts[0].castShadow = true;
+    for (const part of parts) part.castShadow = true;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
     const placed = this._scatter(COUNT,
@@ -2129,7 +3081,7 @@ export class Track {
     const lows = new THREE.InstancedMesh(can1, canMatLow, COUNT);
     const mids = new THREE.InstancedMesh(can2, canMatLow, COUNT);
     const tops = new THREE.InstancedMesh(can3, canMatTop, COUNT);
-    lows.castShadow = tops.castShadow = true;
+    trunks.castShadow = lows.castShadow = mids.castShadow = tops.castShadow = true;
     const treeParts = [trunks, lows, mids, tops];
     const color = new THREE.Color();
     const F = T.foliage;
@@ -2195,6 +3147,254 @@ export class Track {
     for (const part of leafParts) { part.count = pPlaced; this.scene.add(part); }
   }
 
+  /** Desert palms: tall bare trunk under a fan crown of drooping fronds and a
+   *  coconut cluster. kind 'palm' (NOT 'pine') so cars always fell them. The
+   *  oasis level packs most of its palms into one dense grove section of the
+   *  lap (T.palmGrove = [fracA, fracB]); the dune level scatters them thin. */
+  _buildPalms(m4) {
+    const T = this.T;
+    const COUNT = T.treeCount;
+    const trunkGeo = new THREE.CylinderGeometry(0.16, 0.32, 5.4, 7);
+    trunkGeo.translate(0, 2.7, 0);
+    const partGeos = [trunkGeo];
+    for (let li = 0; li < 6; li++) {
+      const fr = new THREE.ConeGeometry(0.5, 3.1, 4);
+      fr.rotateZ(-Math.PI / 2);                     // axis → +x
+      fr.translate(1.5, 0, 0);
+      fr.scale(1, 0.22, 0.72);                      // flattened frond
+      fr.rotateZ(-0.36 - (li % 2) * 0.22);          // droop, alternating
+      fr.rotateY(li * (Math.PI * 2 / 6) + 0.35);
+      fr.translate(0, 5.35, 0);
+      partGeos.push(fr);
+    }
+    const nutGeo = new THREE.SphereGeometry(0.22, 6, 5);
+    nutGeo.translate(0.28, 5.05, 0.18);
+    partGeos.push(nutGeo);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
+    const frondMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 });
+    const nutMat = new THREE.MeshStandardMaterial({ color: 0x6a4a26, roughness: 1 });
+    const parts = partGeos.map((geoPart, gi) => new THREE.InstancedMesh(
+      geoPart, gi === 0 ? trunkMat : gi === partGeos.length - 1 ? nutMat : frondMat, COUNT
+    ));
+    for (const part of parts) part.castShadow = true;
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const color = new THREE.Color();
+    const F = T.foliage;
+    const grove = T.palmGrove;
+    const placed = this._scatter(COUNT,
+      () => {
+        if (grove && Math.random() < 0.6) {
+          // the hidden grove: dense stand along one stretch of the lap
+          const i = ((grove[0] + Math.random() * (grove[1] - grove[0])) * N) | 0;
+          const side = Math.random() < 0.5 ? 1 : -1;
+          const p = this.pointAt(i % N, side * (12 + Math.random() * 26));
+          if (this._distToTrack(p.x, p.z) < 11.5) return null;
+          return { x: p.x, z: p.z };
+        }
+        if (Math.random() < 0.55) return this._trackSidePos(12, 42);
+        const a = Math.random() * Math.PI * 2;
+        const r = 70 + Math.random() * 480;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        if (this._distToTrack(x, z) < 11.5) return null;
+        return { x, z };
+      },
+      (p, k) => {
+        const s = 0.8 + Math.random() * 0.75;
+        const ty = this.terrainHeight(p.x, p.z) - 0.2;
+        q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
+        m4.compose(
+          new THREE.Vector3(p.x, ty, p.z),
+          q, new THREE.Vector3(s, s * (0.9 + Math.random() * 0.35), s)
+        );
+        color.setHSL(
+          F.h + Math.random() * F.hVar,
+          F.s + Math.random() * F.sVar,
+          F.l + Math.random() * F.lVar
+        );
+        for (const part of parts) {
+          part.setMatrixAt(k, m4);
+          part.setColorAt(k, color);
+        }
+        // NOT 'pine' → the material law lets any car snap a palm
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.55 * s, id: k, parts, kind: 'palm', s });
+      });
+    for (const part of parts) { part.count = placed; this.scene.add(part); }
+  }
+
+  /** Gargantuan redwoods: scale 2.2–3.2 → the s ≥ 1.0 'pine' rule makes every
+   *  one SOLID, so they are all placed OFF the road. A second set of small
+   *  (smashable) understory pines dresses the verges. */
+  _buildRedwoods(m4) {
+    const T = this.T;
+    const COUNT = T.treeCount;
+    const trunkGeo = new THREE.CylinderGeometry(0.5, 0.9, 9, 8);
+    trunkGeo.translate(0, 4.5, 0);
+    const lowGeo = new THREE.ConeGeometry(3.0, 6.5, 8);
+    lowGeo.translate(0, 11.4, 0);
+    const midGeo = new THREE.ConeGeometry(2.3, 5.5, 8);
+    midGeo.translate(0, 15.1, 0);
+    const topGeo = new THREE.ConeGeometry(1.5, 4.6, 8);
+    topGeo.translate(0, 18.6, 0);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
+    const lowMat = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
+    const topMat = new THREE.MeshStandardMaterial({ color: T.foliageTop, flatShading: true, roughness: 1 });
+    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, COUNT);
+    const lows = new THREE.InstancedMesh(lowGeo, lowMat, COUNT);
+    const mids = new THREE.InstancedMesh(midGeo, lowMat, COUNT);
+    const tops = new THREE.InstancedMesh(topGeo, topMat, COUNT);
+    trunks.castShadow = lows.castShadow = mids.castShadow = tops.castShadow = true;
+    const giantParts = [trunks, lows, mids, tops];
+    const color = new THREE.Color();
+    const F = T.foliage;
+    const placed = this._scatter(COUNT,
+      () => {
+        // giants never crowd the ribbon: min 17u from the centerline
+        if (Math.random() < 0.6) return this._trackSidePos(17, 60);
+        const a = Math.random() * Math.PI * 2;
+        const r = 80 + Math.random() * 540;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        if (this._distToTrack(x, z) < 17) return null;
+        return { x, z };
+      },
+      (p, k) => {
+        const s = 2.2 + Math.random() * 1.0;             // 46–67u tall — gargantuan
+        const ty = this.terrainHeight(p.x, p.z) - 0.4;
+        m4.makeScale(s, s * (0.9 + Math.random() * 0.25), s);
+        m4.setPosition(p.x, ty, p.z);
+        for (const part of giantParts) part.setMatrixAt(k, m4);
+        // kind 'pine' at s ≥ 1.0 → SOLID: hitting a giant stops a car dead
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.85 * s, id: k, parts: giantParts, kind: 'pine', s });
+        color.setHSL(
+          F.h + Math.random() * F.hVar,
+          F.s + Math.random() * F.sVar,
+          F.l + Math.random() * F.lVar
+        );
+        lows.setColorAt(k, color);
+        mids.setColorAt(k, color.clone().multiplyScalar(0.88));
+        tops.setColorAt(k, color.clone().multiplyScalar(1.22));
+      });
+    trunks.count = lows.count = mids.count = tops.count = placed;
+    this.scene.add(trunks, lows, mids, tops);
+
+    // smashable understory: the same geometry at sapling scale near the road
+    const SAPS = 110;
+    const sTrunks = new THREE.InstancedMesh(trunkGeo, trunkMat, SAPS);
+    const sLows = new THREE.InstancedMesh(lowGeo, lowMat, SAPS);
+    const sTops = new THREE.InstancedMesh(topGeo, topMat, SAPS);
+    sTrunks.castShadow = sLows.castShadow = sTops.castShadow = true;
+    const sapParts = [sTrunks, sLows, sTops];
+    const sapPlaced = this._scatter(SAPS,
+      () => this._trackSidePos(12.5, 26),
+      (p, k) => {
+        const s = 0.22 + Math.random() * 0.2;            // 4.5–9u saplings
+        const ty = this.terrainHeight(p.x, p.z) - 0.15;
+        m4.makeScale(s, s * (0.9 + Math.random() * 0.3), s);
+        m4.setPosition(p.x, ty, p.z);
+        for (const part of sapParts) part.setMatrixAt(k, m4);
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.85 * s, id: k, parts: sapParts, kind: 'pine', s });
+        color.setHSL(F.h + Math.random() * F.hVar, F.s, F.l + 0.06 + Math.random() * 0.1);
+        sLows.setColorAt(k, color);
+        sTops.setColorAt(k, color.clone().multiplyScalar(1.2));
+      });
+    for (const part of sapParts) { part.count = sapPlaced; this.scene.add(part); }
+  }
+
+  /** Burning forest: a mix of bare charred snags (ember-rim emissive) and
+   *  still-standing pines whose canopies are scorched to ember-lit browns. */
+  _buildBurntForest(m4) {
+    const T = this.T;
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const color = new THREE.Color();
+    // --- charred snags (60%) ---
+    const SNAGS = Math.round(T.treeCount * 0.6);
+    const trunkGeo = new THREE.CylinderGeometry(0.13, 0.34, 4.8, 6);
+    trunkGeo.translate(0, 2.4, 0);
+    const b1 = new THREE.ConeGeometry(0.1, 2.0, 5);
+    b1.rotateZ(-0.95);
+    b1.translate(0.62, 3.2, 0);
+    const b2 = new THREE.ConeGeometry(0.09, 1.6, 5);
+    b2.rotateZ(0.85);
+    b2.translate(-0.55, 2.6, 0.1);
+    const snagMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, flatShading: true, roughness: 1,
+      emissive: 0x341000, emissiveIntensity: 0.55,       // ember rim
+    });
+    const snagParts = [trunkGeo, b1, b2].map((g0) => new THREE.InstancedMesh(g0, snagMat, SNAGS));
+    for (const part of snagParts) part.castShadow = true;
+    const snagPlaced = this._scatter(SNAGS,
+      () => {
+        if (Math.random() < 0.6) return this._trackSidePos(14, 44);
+        const a = Math.random() * Math.PI * 2;
+        const r = 80 + Math.random() * 520;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        if (this._distToTrack(x, z) < 14) return null;
+        return { x, z };
+      },
+      (p, k) => {
+        const s = 0.7 + Math.random() * 1.1;
+        const ty = this.terrainHeight(p.x, p.z) - 0.2;
+        q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
+        m4.compose(new THREE.Vector3(p.x, ty, p.z), q, new THREE.Vector3(s, s * (0.8 + Math.random() * 0.5), s));
+        color.setHSL(0.05 + Math.random() * 0.03, 0.14 + Math.random() * 0.1, 0.07 + Math.random() * 0.05);
+        for (const part of snagParts) {
+          part.setMatrixAt(k, m4);
+          part.setColorAt(k, color);
+        }
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.45 * s, id: k, parts: snagParts, kind: 'snag', s });
+      });
+    for (const part of snagParts) { part.count = snagPlaced; this.scene.add(part); }
+
+    // --- scorched standing pines (40%), canopies glowing from within ---
+    const PINES = T.treeCount - SNAGS;
+    const pTrunk = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 7);
+    pTrunk.translate(0, 1.2, 0);
+    const pLow = new THREE.ConeGeometry(2.6, 4.2, 8);
+    pLow.translate(0, 4.0, 0);
+    const pTop = new THREE.ConeGeometry(1.8, 3.4, 8);
+    pTop.translate(0, 6.6, 0);
+    const pTrunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
+    const scorchMat = new THREE.MeshStandardMaterial({
+      color: T.foliageLow, flatShading: true, roughness: 1,
+      emissive: 0x552008, emissiveIntensity: 0.6,        // fire smouldering inside
+    });
+    const scorchTopMat = new THREE.MeshStandardMaterial({
+      color: T.foliageTop, flatShading: true, roughness: 1,
+      emissive: 0x6a2408, emissiveIntensity: 0.55,
+    });
+    const pTrunks = new THREE.InstancedMesh(pTrunk, pTrunkMat, PINES);
+    const pLows = new THREE.InstancedMesh(pLow, scorchMat, PINES);
+    const pTops = new THREE.InstancedMesh(pTop, scorchTopMat, PINES);
+    pTrunks.castShadow = pLows.castShadow = pTops.castShadow = true;
+    const pineParts = [pTrunks, pLows, pTops];
+    const F = T.foliage;
+    const pinePlaced = this._scatter(PINES,
+      () => {
+        if (Math.random() < 0.62) return this._trackSidePos(15, 46);
+        const a = Math.random() * Math.PI * 2;
+        const r = 80 + Math.random() * 560;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        if (this._distToTrack(x, z) < 14.5) return null;
+        return { x, z };
+      },
+      (p, k) => {
+        const s = 0.75 + Math.random() * 1.1;
+        const ty = this.terrainHeight(p.x, p.z) - 0.25;
+        m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
+        m4.setPosition(p.x, ty, p.z);
+        for (const part of pineParts) part.setMatrixAt(k, m4);
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 1.0 * s, id: k, parts: pineParts, kind: 'pine', s });
+        color.setHSL(
+          F.h + Math.random() * F.hVar,
+          F.s + Math.random() * F.sVar,
+          F.l + Math.random() * F.lVar
+        );
+        pLows.setColorAt(k, color);
+        pTops.setColorAt(k, color.clone().multiplyScalar(1.25));
+      });
+    pTrunks.count = pLows.count = pTops.count = pinePlaced;
+    this.scene.add(pTrunks, pLows, pTops);
+  }
+
   _buildGroundCover(m4) {
     const T = this.T;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
@@ -2252,11 +3452,12 @@ export class Track {
     this.scene.add(bushes);
 
     // boulders (snow theme gets white caps on top; volcano gets glossy obsidian)
-    const rockRough = T.rockRoughness !== undefined ? T.rockRoughness : 1;
+    const rockRough = T.rockRoughness !== undefined ? T.rockRoughness : 0.9;
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: T.rockColor, flatShading: true, roughness: rockRough, envMapIntensity: 0.5,
+    });
     const rocks = new THREE.InstancedMesh(
-      new THREE.DodecahedronGeometry(1, 0),
-      new THREE.MeshStandardMaterial({ color: T.rockColor, flatShading: true, roughness: rockRough }),
-      T.rockCount
+      new THREE.DodecahedronGeometry(1, 0), rockMat, T.rockCount
     );
     rocks.castShadow = true;
     const caps = T.rockSnowCap
@@ -2266,6 +3467,7 @@ export class Track {
           T.rockCount
         )
       : null;
+    if (caps) caps.castShadow = true;
     let rk = 0;
     this._scatter(T.rockCount, () => this._trackSidePos(12.5, 90), (p) => {
       const s = 0.5 + Math.random() * 2.2;
@@ -2291,9 +3493,7 @@ export class Track {
 
     // small stones scattered right off the road edge
     const pebbles = new THREE.InstancedMesh(
-      new THREE.DodecahedronGeometry(1, 0),
-      new THREE.MeshStandardMaterial({ color: T.rockColor, flatShading: true, roughness: rockRough }),
-      T.pebbleCount
+      new THREE.DodecahedronGeometry(1, 0), rockMat, T.pebbleCount
     );
     let pk = 0;
     this._scatter(T.pebbleCount, () => this._trackSidePos(11.3, 16), (p) => {
@@ -2309,16 +3509,15 @@ export class Track {
     this.scene.add(pebbles);
 
     // one big hero boulder close to the racing line (in the open start bowl on
-    // cliff-walled levels, where trackside ground is actually visible)
+    // cliff-walled levels, where trackside ground is actually visible).
+    // heroRock: false skips it (the neon expressway has no boulders).
+    if (T.heroRock === false) return;
     const fallbackP = this.pointAt((N * 0.42) | 0, WALL_OFF + 7);
     const heroP = T.cliffWalls ? this.pointAt(48, -(WALL_OFF + 5.5)) : null;
     const hp = heroP
       ? { x: heroP.x, z: heroP.z }
       : (this._trackSidePos(14, 18) || { x: fallbackP.x, z: fallbackP.z });
-    const hero = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(1, 1),
-      new THREE.MeshStandardMaterial({ color: T.rockColor, flatShading: true, roughness: rockRough })
-    );
+    const hero = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), rockMat);
     hero.scale.set(4.6, 3.3, 4.1);
     hero.rotation.y = 1.3;
     hero.position.set(hp.x, this.terrainHeight(hp.x, hp.z) + 0.9, hp.z);
@@ -2364,8 +3563,12 @@ export class Track {
     wallGeo.translate(0, 0.5, 0);
     const roofGeo = new THREE.ConeGeometry(0.85, 0.55, 4);
     roofGeo.rotateY(Math.PI / 4);
-    const wallMat = new THREE.MeshStandardMaterial({ map: buildingTexture(), roughness: 1 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: this.T.hutRoof, flatShading: true, roughness: 1 });
+    const wallMat = new THREE.MeshStandardMaterial({
+      map: buildingTexture(), roughness: 0.8, envMapIntensity: 0.5,
+    });
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: this.T.hutRoof, flatShading: true, roughness: 0.8, envMapIntensity: 0.5,
+    });
     const walls = new THREE.InstancedMesh(wallGeo, wallMat, COUNT);
     const roofs = new THREE.InstancedMesh(roofGeo, roofMat, COUNT);
     walls.castShadow = roofs.castShadow = true;
@@ -2396,7 +3599,9 @@ export class Track {
     const domeGeo = new THREE.SphereGeometry(1, 16, 10);
     const tunnelGeo = new THREE.CylinderGeometry(1, 1, 1, 10, 1, false);
     tunnelGeo.rotateX(Math.PI / 2);                 // axis along local Z
-    const iceMat = new THREE.MeshStandardMaterial({ map: iglooTexture(), roughness: 0.85 });
+    const iceMat = new THREE.MeshStandardMaterial({
+      map: iglooTexture(), roughness: 0.75, envMapIntensity: 0.55,
+    });
     const doorMat = new THREE.MeshStandardMaterial({ color: 0x22303c, roughness: 1 });
     const domes = new THREE.InstancedMesh(domeGeo, iceMat, COUNT);
     const tunnels = new THREE.InstancedMesh(tunnelGeo, iceMat, COUNT);
@@ -2495,12 +3700,19 @@ export class Track {
   }
 
   _buildBanners() {
-    // sponsor boards facing the track
+    // sponsor boards facing the track. NEO-KYOTO swaps in holographic boards:
+    // neon sponsor palettes on unlit (MeshBasic) panels so they burn through
+    // the night and bloom picks up the lettering.
+    const neonStyle = this.T.bannerStyle === 'neon';
     const post = new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7);
-    const postMat = new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.6, metalness: 0.5 });
+    const postMat = new THREE.MeshStandardMaterial({
+      color: 0x4a4640, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
+    });
     const boardGeo = new THREE.PlaneGeometry(9, 2.2);
-    const mats = SPONSORS.map(([text, bg, fg]) =>
-      new THREE.MeshStandardMaterial({ map: bannerTexture(text, bg, fg), roughness: 0.8, side: THREE.DoubleSide }));
+    const sponsors = neonStyle ? NEON_SPONSORS : SPONSORS;
+    const mats = sponsors.map(([text, bg, fg]) => neonStyle
+      ? new THREE.MeshBasicMaterial({ map: bannerTexture(text, bg, fg), side: THREE.DoubleSide })
+      : new THREE.MeshStandardMaterial({ map: bannerTexture(text, bg, fg), roughness: 0.8, side: THREE.DoubleSide }));
     // cliff-walled levels stand the boards right at the rock face so they stay
     // inside the canyon instead of vanishing behind it
     const boardOff = this.T.cliffWalls ? WALL_OFF + 0.75 : WALL_OFF + 3.6;
@@ -2631,15 +3843,19 @@ export class Track {
     const span = (WALL_OFF + 4.5) * 2;                          // ends embed into the cliffs
     const deckTex = plankTexture();
     deckTex.repeat.set(9, 1);
-    const deckMat = new THREE.MeshStandardMaterial({ map: deckTex, roughness: 0.95 });
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0x6a4a2c, roughness: 0.95 });
+    const deckMat = new THREE.MeshStandardMaterial({
+      map: deckTex, roughness: 0.8, envMapIntensity: 0.5,
+    });
+    const woodMat = new THREE.MeshStandardMaterial({
+      color: 0x6a4a2c, roughness: 0.8, envMapIntensity: 0.5,
+    });
     const ropeMat = new THREE.MeshStandardMaterial({ color: 0x8a7048, roughness: 1 });
     for (const i of chosen) {
       const c = this.center[i];
       const g = new THREE.Group();
       const deck = new THREE.Mesh(new THREE.BoxGeometry(span, 0.35, 3.2), deckMat);
       deck.position.y = 9;
-      deck.castShadow = true;
+      deck.castShadow = deck.receiveShadow = true;
       g.add(deck);
       // under-beams
       for (const s of [-1, 1]) {

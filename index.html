@@ -207,15 +207,47 @@
     filter:drop-shadow(0 10px 24px rgba(0,0,0,.5))}
   .game-sub{margin-top:12px;font-size:clamp(12px,2vw,18px);letter-spacing:8px;color:#ffe9a8;text-transform:uppercase;
     text-shadow:1px 1px 0 var(--ink);text-align:center}
-  #level-select{margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:640px}
-  .level-chip{pointer-events:auto;cursor:pointer;padding:9px 16px;font-family:'Luckiest Guy';
-    font-size:14px;letter-spacing:2px;color:#ffe9a8;border-radius:10px;
+  /* ---------- MENU TABS + PANELS ---------- */
+  #menu-tabs{margin-top:20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .menu-tab{pointer-events:auto;cursor:pointer;padding:10px 26px;font-family:'Luckiest Guy';
+    font-size:15px;letter-spacing:3px;color:#c9a86a;border-radius:12px 12px 0 0;
+    border:2px solid rgba(255,233,168,.3);border-bottom:none;background:rgba(24,16,6,.55);
+    -webkit-tap-highlight-color:transparent}
+  .menu-tab.current{color:var(--ink);background:var(--yellow);border-color:var(--ink);
+    box-shadow:0 -3px 0 rgba(0,0,0,.15) inset}
+  #credits-chip{margin-left:10px;padding:7px 16px;font-size:12px;letter-spacing:2px;font-weight:800;
+    color:#ffe9a8;border:2px solid rgba(255,233,168,.35);border-radius:20px;background:rgba(24,16,6,.7)}
+  #credits-chip b{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
+  .menu-panel{margin-top:0;width:min(94vw,660px);background:rgba(24,16,6,.66);
+    border:2px solid rgba(255,233,168,.3);border-radius:0 14px 14px 14px;
+    padding:12px 14px 16px;display:flex;flex-direction:column;align-items:center}
+  .menu-panel.off{display:none}
+  .panel-head{align-self:stretch;text-align:center;font-family:'Luckiest Guy';font-size:14px;
+    letter-spacing:4px;color:#ffe9a8;margin:8px 0 4px;text-shadow:1px 1px 0 var(--ink)}
+  .panel-head::before,.panel-head::after{content:'—';color:rgba(255,233,168,.35);margin:0 10px}
+
+  /* ---------- WORLD CARDS (track selection) ---------- */
+  #level-select{margin-top:10px;width:100%}
+  .region-head{margin:14px 0 6px;font-family:'Luckiest Guy';font-size:12px;letter-spacing:5px;
+    color:#c9a86a;text-align:center;text-shadow:1px 1px 0 var(--ink)}
+  .region-head:first-child{margin-top:2px}
+  .region-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;width:100%}
+  .level-chip{pointer-events:auto;cursor:pointer;padding:8px 8px 10px;font-family:'Baloo 2';
+    color:#ffe9a8;border-radius:12px;text-align:center;
     border:2px solid rgba(255,233,168,.35);background:rgba(38,26,12,.6);
-    transition:transform .1s;-webkit-tap-highlight-color:transparent}
-  .level-chip:active{transform:scale(.95)}
-  .level-chip.current{color:var(--ink);background:var(--yellow);border-color:var(--ink);
-    box-shadow:0 3px 0 var(--ink)}
+    transition:transform .1s;-webkit-tap-highlight-color:transparent;display:flex;
+    flex-direction:column;align-items:center;gap:3px}
+  .level-chip:active{transform:scale(.96)}
+  .level-chip.current{background:rgba(255,212,0,.16);border-color:var(--yellow);
+    box-shadow:0 3px 0 var(--ink), 0 0 18px rgba(255,212,0,.25)}
   .level-chip.locked{opacity:.45;cursor:not-allowed}
+  .wc-map{width:100%;max-width:150px;border-radius:8px;background:rgba(12,8,3,.65);
+    border:1px solid rgba(255,233,168,.18)}
+  .wc-name{font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.5px;line-height:1.1}
+  .level-chip.current .wc-name{color:var(--yellow)}
+  .wc-tags{font-size:9.5px;letter-spacing:.6px;color:#c9a86a;line-height:1.25}
+  .wc-best{font-size:10px;font-weight:800;letter-spacing:1px;color:#8de89a}
+  .wc-best.new{color:var(--amber)}
   #mode-select{margin-top:16px;display:flex;gap:8px;justify-content:center}
   .mode-chip{pointer-events:auto;cursor:pointer;padding:8px 22px;font-family:'Luckiest Guy';
     font-size:14px;letter-spacing:2px;color:#ffe9a8;border-radius:10px;
@@ -241,7 +273,9 @@
   .car-card{pointer-events:auto;cursor:pointer;flex:0 0 auto;min-width:96px;text-align:center;
     padding:8px 10px;border-radius:10px;border:2px solid rgba(255,233,168,.25);
     background:rgba(38,26,12,.6);-webkit-tap-highlight-color:transparent}
-  .car-card .swatch{width:34px;height:18px;border-radius:4px;margin:0 auto 5px;border:2px solid rgba(0,0,0,.4)}
+  .car-card .car-icon{width:96px;height:62px;object-fit:contain;display:block;margin:0 auto 4px;
+    filter:drop-shadow(0 4px 6px rgba(0,0,0,.45))}
+  .car-card.locked .car-icon{filter:grayscale(.85) brightness(.75)}
   .car-card .cname{font-family:'Luckiest Guy';font-size:12px;letter-spacing:1px;color:#ffe9a8}
   .car-card .cdesc{font-size:9px;color:#c9a86a;letter-spacing:.5px}
   .car-card .cprice{font-size:11px;font-weight:800;color:var(--amber);margin-top:3px}
@@ -254,14 +288,13 @@
   #pause-menu .btn{margin-top:14px;padding:13px 54px;font-size:17px}
   #pause-menu .btn.secondary{background:linear-gradient(180deg,#8a6a42,#5d4426)}
 
-  /* ---------- GARAGE ---------- */
-  #garage{margin-top:20px;width:min(92vw,460px);background:rgba(24,16,6,.72);
-    border:2px solid rgba(255,233,168,.3);border-radius:14px;padding:10px 14px 12px}
-  #garage-head{display:flex;justify-content:space-between;align-items:baseline;
-    font-family:'Luckiest Guy';font-size:15px;letter-spacing:2px;color:#ffe9a8;margin-bottom:8px}
-  #garage-head b{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
-  .up-row{display:grid;grid-template-columns:30px 1fr auto auto;gap:8px;align-items:center;
-    padding:5px 0;border-top:1px solid rgba(255,233,168,.12)}
+  /* ---------- GARAGE (detailed upgrades) ---------- */
+  #garage-rows{margin-top:6px;width:min(92vw,460px)}
+  .up-row{display:grid;grid-template-columns:38px 1fr auto auto;gap:10px;align-items:center;
+    padding:7px 0;border-top:1px solid rgba(255,233,168,.12)}
+  .up-row .ic{font-size:20px;text-align:center;background:rgba(255,233,168,.08);
+    border:1px solid rgba(255,233,168,.2);border-radius:9px;padding:5px 0}
+  .up-row .up-lvl{display:block;font-size:9.5px;font-weight:800;color:var(--yellow);letter-spacing:1px}
   .up-row .ic{font-size:18px;text-align:center}
   .up-row .nm{font-size:13px;font-weight:800;letter-spacing:1px;color:#ffe9c9;line-height:1.15}
   .up-row .nm small{display:block;font-size:10px;font-weight:600;color:#c9a86a;letter-spacing:.5px}
@@ -286,7 +319,6 @@
   body.touch .controls{display:none}
   #touch-note{display:none;margin-top:26px;font-size:14px;letter-spacing:2px;color:#ffe9c9;text-align:center;line-height:1.8}
   body.touch #touch-note{display:block}
-  #results{display:none}
   .result-place{font-family:'Luckiest Guy';font-size:clamp(56px,10vw,120px);color:var(--yellow);
     text-shadow:6px 6px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink)}
   .result-stats{margin-top:24px;display:grid;grid-template-columns:auto auto;gap:9px 30px;
@@ -378,16 +410,25 @@
 <div id="title-screen" class="screen">
   <div class="game-title">IGNITE&nbsp;RALLY</div>
   <div class="game-sub">Dirt &nbsp;//&nbsp; Firepower &nbsp;//&nbsp; First Place</div>
-  <div id="level-select"></div>
-  <div id="mode-select"></div>
-  <div id="diff-select"></div>
-  <div id="steer-select"></div>
-  <div id="car-shop"></div>
-  <div id="garage">
-    <div id="garage-head"><span>GARAGE</span><span>CREDITS&nbsp;<b id="credits">0</b></span></div>
+  <div id="menu-tabs">
+    <button id="tab-btn-race" class="menu-tab current">PRE-RACE</button>
+    <button id="tab-btn-garage" class="menu-tab">GARAGE</button>
+    <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
+  </div>
+  <div id="tab-race" class="menu-panel">
+    <div class="panel-head">MAP &amp; TRACK SELECTION</div>
+    <div id="level-select"></div>
+    <div id="mode-select"></div>
+    <div id="diff-select"></div>
+    <div id="steer-select"></div>
+  </div>
+  <div id="tab-garage" class="menu-panel off">
+    <div class="panel-head">YOUR MACHINES</div>
+    <div id="car-shop"></div>
+    <div class="panel-head">DETAILED UPGRADES</div>
     <div id="garage-rows"></div>
   </div>
-  <button id="start-btn" class="btn" style="margin-top:24px">START ENGINES</button>
+  <button id="start-btn" class="btn" style="margin-top:24px">START RACE</button>
   <div class="controls">
     <b>W / ↑</b><span>Throttle</span>
     <b>S / ↓</b><span>Brake / Reverse</span>
