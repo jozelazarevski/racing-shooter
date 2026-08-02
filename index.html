@@ -194,6 +194,7 @@
     z-index:10;transition:opacity .45s;padding:16px;overflow-y:auto;
     justify-content:safe center} /* falls back to plain center where unsupported */
   .screen::-webkit-scrollbar{display:none}
+  .screen > *{flex-shrink:0} /* children keep natural size; the screen scrolls instead */
   .screen.hidden{opacity:0;pointer-events:none}
   .game-title{font-family:'Luckiest Guy';font-size:clamp(44px,9vw,96px);line-height:.95;
     text-align:center;letter-spacing:4px;color:var(--yellow);
@@ -210,6 +211,12 @@
   .level-chip.current{color:var(--ink);background:var(--yellow);border-color:var(--ink);
     box-shadow:0 3px 0 var(--ink)}
   .level-chip.locked{opacity:.45;cursor:not-allowed}
+  #mode-select{margin-top:16px;display:flex;gap:8px;justify-content:center}
+  .mode-chip{pointer-events:auto;cursor:pointer;padding:8px 22px;font-family:'Luckiest Guy';
+    font-size:14px;letter-spacing:2px;color:#ffe9a8;border-radius:10px;
+    border:2px solid rgba(255,233,168,.3);background:rgba(38,26,12,.55);
+    -webkit-tap-highlight-color:transparent}
+  .mode-chip.current{color:var(--ink);background:#7fd4ff;border-color:var(--ink);box-shadow:0 3px 0 var(--ink)}
   #diff-select{margin-top:14px;display:flex;gap:8px;justify-content:center}
   .diff-chip{pointer-events:auto;cursor:pointer;padding:6px 16px;font-family:'Baloo 2';font-weight:800;
     font-size:13px;letter-spacing:2px;color:#d8c090;border-radius:8px;
@@ -218,6 +225,26 @@
   .diff-chip.current{color:var(--ink);background:#8de89a;border-color:var(--ink)}
   .diff-chip.current.hard{background:#ff8a75}
   .diff-chip.current.normal{background:var(--yellow)}
+
+  /* ---------- CAR SHOP ---------- */
+  #car-shop{margin-top:8px;display:flex;gap:8px;overflow-x:auto;max-width:min(92vw,460px);
+    padding:4px 2px;scrollbar-width:none}
+  #car-shop::-webkit-scrollbar{display:none}
+  .car-card{pointer-events:auto;cursor:pointer;flex:0 0 auto;min-width:96px;text-align:center;
+    padding:8px 10px;border-radius:10px;border:2px solid rgba(255,233,168,.25);
+    background:rgba(38,26,12,.6);-webkit-tap-highlight-color:transparent}
+  .car-card .swatch{width:34px;height:18px;border-radius:4px;margin:0 auto 5px;border:2px solid rgba(0,0,0,.4)}
+  .car-card .cname{font-family:'Luckiest Guy';font-size:12px;letter-spacing:1px;color:#ffe9a8}
+  .car-card .cdesc{font-size:9px;color:#c9a86a;letter-spacing:.5px}
+  .car-card .cprice{font-size:11px;font-weight:800;color:var(--amber);margin-top:3px}
+  .car-card.owned .cprice{color:#8de89a}
+  .car-card.selected{border-color:var(--yellow);background:rgba(255,212,0,.18);box-shadow:0 3px 0 var(--ink)}
+  .car-card.locked{opacity:.7}
+
+  /* ---------- PAUSE MENU ---------- */
+  #pause-menu{z-index:30}
+  #pause-menu .btn{margin-top:14px;padding:13px 54px;font-size:17px}
+  #pause-menu .btn.secondary{background:linear-gradient(180deg,#8a6a42,#5d4426)}
 
   /* ---------- GARAGE ---------- */
   #garage{margin-top:20px;width:min(92vw,460px);background:rgba(24,16,6,.72);
@@ -324,7 +351,9 @@
   <div class="game-title">IGNITE&nbsp;RALLY</div>
   <div class="game-sub">Dirt &nbsp;//&nbsp; Firepower &nbsp;//&nbsp; First Place</div>
   <div id="level-select"></div>
+  <div id="mode-select"></div>
   <div id="diff-select"></div>
+  <div id="car-shop"></div>
   <div id="garage">
     <div id="garage-head"><span>GARAGE</span><span>CREDITS&nbsp;<b id="credits">0</b></span></div>
     <div id="garage-rows"></div>
@@ -346,6 +375,14 @@
     RIGHT THUMB — FIRE cannon &nbsp;·&nbsp; 🚀 missile &nbsp;·&nbsp; 💣 mine &nbsp;·&nbsp; 💥 shockwave &nbsp;·&nbsp; ⚡ nitro</div>
   <div id="loading-note">3 LAPS · 5 RIVALS · RAMPS · MINES · DESTROY OR BE DESTROYED</div>
   <div class="footnote">A TOY-BOX CIRCUIT DESIGNED ENTIRELY BY CLAUDE</div>
+</div>
+
+<div id="pause-menu" class="screen hidden">
+  <div class="game-sub" style="letter-spacing:12px">PAUSED</div>
+  <button id="pm-resume" class="btn">RESUME</button>
+  <button id="pm-camera" class="btn secondary">CAMERA VIEW 📷</button>
+  <button id="pm-restart" class="btn secondary">RESTART</button>
+  <button id="pm-exit" class="btn secondary">EXIT TO MENU</button>
 </div>
 
 <div id="results" class="screen hidden">

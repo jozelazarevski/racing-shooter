@@ -6,7 +6,8 @@ import { UnrealBloomPass } from '../lib/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 
 import { Track, LEVELS } from './track.js';
-import { PlayerCar, EnemyCar } from './vehicles.js';
+import { PlayerCar, EnemyCar, CAR_CATALOG } from './vehicles.js';
+import { Chopper } from './choppers.js';
 import { Weapons } from './weapons.js';
 import { Particles } from './particles.js';
 import { Hud, fmtTime } from './hud.js';
@@ -24,10 +25,18 @@ const DIFFS = {
 };
 
 const UPGRADES = [
-  { key: 'engine', name: 'ENGINE',  icon: '🔧', desc: '+4% top speed / lvl',      max: 5 },
-  { key: 'armor',  name: 'ARMOR',   icon: '🛡️', desc: '+15 max hull / lvl',       max: 5 },
-  { key: 'cannon', name: 'CANNON',  icon: '🔥', desc: '+18% cannon damage / lvl', max: 5 },
-  { key: 'nitro',  name: 'NITRO',   icon: '⚡', desc: '+22% nitro charge / lvl',  max: 5 },
+  { key: 'engine',   name: 'ENGINE',   icon: '🔧', desc: '+4% top speed / lvl',       max: 5 },
+  { key: 'armor',    name: 'ARMOR',    icon: '🛡️', desc: '+15 max hull / lvl',        max: 5 },
+  { key: 'cannon',   name: 'CANNON',   icon: '🔥', desc: '+18% cannon damage / lvl',  max: 5 },
+  { key: 'nitro',    name: 'NITRO',    icon: '⚡', desc: '+22% nitro charge / lvl',   max: 5 },
+  { key: 'handling', name: 'HANDLING', icon: '🎯', desc: 'smoother steering / lvl',   max: 5 },
+];
+
+const CAM_MODES = [
+  { name: 'TOP-DOWN',  back: 20, h: 52, look: 7,  lookH: 0,   spdBack: 6, spdH: 10 },
+  { name: 'TOP FAR',   back: 24, h: 84, look: 1,  lookH: 0,   spdBack: 4, spdH: 10 },
+  { name: 'CHASE',     back: 13, h: 7.5, look: 10, lookH: 2.8, spdBack: 2, spdH: 1 },
+  { name: 'CHASE FAR', back: 24, h: 15, look: 13, lookH: 3,   spdBack: 3, spdH: 2 },
 ];
 const upgradeCost = (lvl) => 400 + lvl * 350;
 
@@ -50,7 +59,10 @@ class Game {
 
     // progression + difficulty + garage (persisted)
     this.career = loadJSON('ir-career', { finished: {} });
-    this.garage = loadJSON('ir-garage', { credits: 0, engine: 0, armor: 0, cannon: 0, nitro: 0 });
+    this.garage = loadJSON('ir-garage', { credits: 0, engine: 0, armor: 0, cannon: 0, nitro: 0, handling: 0 });
+    this.cars = loadJSON('ir-cars', { owned: ['brawler'], selected: 'brawler' });
+    if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = 'brawler';
+    this.freeRoam = (params.get('mode') || localStorage.getItem('ir-mode')) === 'roam';
     this.unlockAll = params.get('unlockall') === '1';
     const diffId = localStorage.getItem('ir-diff') || 'normal';
     this.difficulty = DIFFS[diffId] || DIFFS.normal;
@@ -110,11 +122,17 @@ class Game {
     this.input = new Input();
     this.lapsTotal = LAPS;
 
-    this.player = new PlayerCar(this);
+    const carEntry = CAR_CATALOG.find((c) => c.key === this.cars.selected) || CAR_CATALOG[0];
+    this.player = new PlayerCar(this, carEntry);
     this.enemies = [];
     for (let i = 0; i < ENEMY_COUNT; i++) this.enemies.push(new EnemyCar(this, i));
     this.weapons = new Weapons(this);
     this.hud = new Hud(this);
+    this.choppers = [];
+    this.props = this.track.props ? [...this.track.props] : [];
+    this.flyingProps = [];
+    this.chopperTimer = 0;
+    this.chopperWave = 0;
 
     this._buildPickups();
     this._flashes = [];
@@ -147,19 +165,10 @@ class Game {
       setTimeout(applyViewport, 300);
       setTimeout(applyViewport, 800);
     });
-    // auto-pause when the app is backgrounded mid-race; tap anywhere to resume
+    // auto-pause into the menu when the app is backgrounded mid-race
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.state === 'race') {
-        this.state = 'paused';
-        this.hud.centerMsg('PAUSED');
-      }
+      if (document.hidden && this.state === 'race') this.togglePause();
     });
-    addEventListener('pointerdown', () => {
-      if (this.state === 'paused') {
-        this.state = 'race';
-        this.hud.centerMsg('GO');
-      }
-    }, true);
     document.getElementById('start-btn').addEventListener('click', () => this.startRace());
     document.getElementById('restart-btn').addEventListener('click', () => {
       document.getElementById('results').classList.add('hidden');
@@ -168,11 +177,10 @@ class Game {
     });
 
     // camera + pause buttons (work with mouse and touch)
-    document.getElementById('cam-btn').addEventListener('click', () => { this.camMode = 1 - this.camMode; });
+    document.getElementById('cam-btn').addEventListener('click', () => this.cycleCamera());
     document.getElementById('pause-btn').addEventListener('click', (e) => {
       e.stopPropagation();
-      if (this.state === 'race') { this.state = 'paused'; this.hud.centerMsg('PAUSED'); }
-      else if (this.state === 'paused') { this.state = 'race'; this.hud.centerMsg('GO'); }
+      this.togglePause();
     });
 
     // level select chips on the title screen
@@ -196,6 +204,22 @@ class Game {
       sel.appendChild(chip);
     });
 
+    // mode chips: RACE | FREE ROAM
+    const msel = document.getElementById('mode-select');
+    for (const [id, label] of [['race', '🏁 RACE'], ['roam', '🌍 FREE ROAM']]) {
+      const chip = document.createElement('button');
+      const active = (id === 'roam') === this.freeRoam;
+      chip.className = 'mode-chip' + (active ? ' current' : '');
+      chip.textContent = label;
+      chip.addEventListener('click', () => {
+        if ((id === 'roam') === this.freeRoam) return;
+        localStorage.setItem('ir-mode', id);
+        this.fadeTo(`?level=${this.level.id}&mode=${id}`);
+      });
+      msel.appendChild(chip);
+    }
+    if (this.freeRoam) document.getElementById('start-btn').textContent = 'START EXPLORING';
+
     // difficulty chips
     const dsel = document.getElementById('diff-select');
     for (const d of Object.values(DIFFS)) {
@@ -212,6 +236,26 @@ class Game {
     }
 
     this.renderGarage();
+    this.renderCarShop();
+
+    // pause menu
+    const pm = document.getElementById('pause-menu');
+    this._openPauseMenu = () => pm.classList.remove('hidden');
+    const closeMenu = () => pm.classList.add('hidden');
+    document.getElementById('pm-resume').addEventListener('click', () => {
+      closeMenu();
+      if (this.state === 'paused') { this.state = 'race'; this.hud.centerMsg('GO'); }
+    });
+    document.getElementById('pm-camera').addEventListener('click', () => this.cycleCamera());
+    document.getElementById('pm-restart').addEventListener('click', () => {
+      closeMenu();
+      this.resetRace();
+      this.startRace();
+    });
+    document.getElementById('pm-exit').addEventListener('click', () => {
+      if (this.freeRoam) this.bankRoamCredits();
+      this.fadeTo(`?level=${this.level.id}${this.freeRoam ? '&mode=roam' : ''}`);
+    });
 
     // next-level chaining from the results screen
     document.getElementById('next-level-btn').addEventListener('click', () => {
@@ -241,6 +285,31 @@ class Game {
     }
   }
 
+  togglePause() {
+    if (this.state === 'race') {
+      this.state = 'paused';
+      this._openPauseMenu();
+    } else if (this.state === 'paused') {
+      document.getElementById('pause-menu').classList.add('hidden');
+      this.state = 'race';
+      this.hud.centerMsg('GO');
+    }
+  }
+
+  cycleCamera() {
+    this.camMode = (this.camMode + 1) % CAM_MODES.length;
+    if (this.state !== 'title') this.hud.feed(`CAMERA: ${CAM_MODES[this.camMode].name}`, 'info');
+  }
+
+  /** In roam mode, exiting banks the destruction score as credits. */
+  bankRoamCredits() {
+    const earned = Math.max(0, this.score - (this.startScore ?? 0));
+    if (earned > 0) {
+      this.garage.credits += earned;
+      saveJSON('ir-garage', this.garage);
+    }
+  }
+
   /** Fade to black, then navigate — used for level changes. */
   fadeTo(url) {
     document.getElementById('fade').classList.add('dark');
@@ -261,6 +330,39 @@ class Game {
     p.health = p.maxHealth;
     p.cannonDamage = 7 * (1 + 0.18 * g.cannon);
     p.nitroRate = 1 + 0.22 * g.nitro;
+    p.handling = 0.2 * (g.handling || 0);
+  }
+
+  renderCarShop() {
+    const shop = document.getElementById('car-shop');
+    shop.innerHTML = '';
+    for (const car of CAR_CATALOG) {
+      const owned = this.cars.owned.includes(car.key);
+      const selected = this.cars.selected === car.key;
+      const card = document.createElement('button');
+      card.className = 'car-card' + (owned ? ' owned' : ' locked') + (selected ? ' selected' : '');
+      const bodyHex = '#' + (car.spec.body ?? 0x888888).toString(16).padStart(6, '0');
+      card.innerHTML = `<div class="swatch" style="background:${bodyHex}"></div>
+        <div class="cname">${car.name}</div><div class="cdesc">${car.desc}</div>
+        <div class="cprice">${selected ? 'DRIVING' : owned ? 'DRIVE' : car.price.toLocaleString() + ' CR'}</div>`;
+      card.addEventListener('click', () => {
+        if (!owned) {
+          if (this.garage.credits < car.price) {
+            card.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' },
+              { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }], { duration: 180 });
+            return;
+          }
+          this.garage.credits -= car.price;
+          this.cars.owned.push(car.key);
+          saveJSON('ir-garage', this.garage);
+        }
+        this.cars.selected = car.key;
+        saveJSON('ir-cars', this.cars);
+        // swap requires a rebuild of the player mesh — cleanest via reload
+        this.fadeTo(`?level=${this.level.id}`);
+      });
+      shop.appendChild(card);
+    }
   }
 
   renderGarage() {
@@ -392,6 +494,99 @@ class Game {
     }
   }
 
+  // ---------- choppers ----------
+  _spawnChopper() {
+    const p = this.player.pos;
+    const a = Math.random() * Math.PI * 2;
+    const pos = new THREE.Vector3(p.x + Math.cos(a) * 80, 9, p.z + Math.sin(a) * 80);
+    this.choppers.push(new Chopper(this, pos));
+    this.hud.feed('⚠ ATTACK CHOPPER INBOUND', 'bad');
+    this.buzz([40, 30, 40]);
+  }
+
+  _updateChoppers(dt) {
+    if (this.state === 'race') {
+      if (this.freeRoam) {
+        this.chopperTimer -= dt;
+        if (this.chopperTimer <= 0 && this.choppers.filter((c) => c.alive).length < 3) {
+          this._spawnChopper();
+          this.chopperTimer = 40;
+        }
+      } else if (!this._raceChopper && this.difficulty.id !== 'easy' && this.player.lap >= this.lapsTotal) {
+        // final-lap air support keeps the leaders honest
+        this._raceChopper = true;
+        this._spawnChopper();
+      }
+    }
+    for (const c of this.choppers) if (c.alive) c.update(dt);
+    this.choppers = this.choppers.filter((c) => c.alive);
+  }
+
+  onChopperKill() {
+    this.kills++;
+    this.score += 500;
+    this.player.nitro = Math.min(1, this.player.nitro + 0.3 * (this.player.nitroRate || 1));
+    this.hud.centerMsg('CHOPPER DOWN');
+    this.hud.feed('CHOPPER DESTROYED  +500', 'good');
+    this.buzz(60);
+  }
+
+  // ---------- destructible props ----------
+  _updateProps(dt) {
+    const cars = [this.player, ...(this.freeRoam ? [] : this.enemies)].filter((c) => c.alive);
+    for (let i = this.props.length - 1; i >= 0; i--) {
+      const pr = this.props[i];
+      for (const car of cars) {
+        const dx = car.pos.x - pr.x, dz = car.pos.z - pr.z;
+        const rr = pr.r + 2;
+        if (dx * dx + dz * dz < rr * rr && Math.abs(car.speedAlong) > 6) {
+          this.props.splice(i, 1);
+          this._smashProp(pr, car);
+          break;
+        }
+      }
+    }
+    for (let i = this.flyingProps.length - 1; i >= 0; i--) {
+      const f = this.flyingProps[i];
+      f.life -= dt;
+      f.vel.y -= 24 * dt;
+      f.mesh.position.addScaledVector(f.vel, dt);
+      f.mesh.rotation.x += f.spin.x * dt;
+      f.mesh.rotation.y += f.spin.y * dt;
+      f.mesh.rotation.z += f.spin.z * dt;
+      if (f.life <= 0 || f.mesh.position.y < -3) {
+        this.scene.remove(f.mesh);
+        this.flyingProps.splice(i, 1);
+      }
+    }
+  }
+
+  _smashProp(pr, car) {
+    const dir = new THREE.Vector3(pr.x - car.pos.x, 0, pr.z - car.pos.z).normalize();
+    const speed = Math.abs(car.speedAlong);
+    this.flyingProps.push({
+      mesh: pr.mesh,
+      vel: new THREE.Vector3(
+        dir.x * speed * 0.45 + car.vel.x * 0.4, 6 + speed * 0.15,
+        dir.z * speed * 0.45 + car.vel.z * 0.4),
+      spin: new THREE.Vector3((Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11),
+      life: 1.5,
+    });
+    const at = new THREE.Vector3(pr.x, 0.6, pr.z);
+    if (this.particles.debris) this.particles.debris(at, 4);
+    this.particles.driftSmoke(at);
+    if (car === this.player) {
+      this.score += pr.scoreValue || 25;
+      this.buzz(15);
+      const pl = this.player;
+      if (pr.pickup === 'health') { pl.health = Math.min(pl.maxHealth, pl.health + 25); this.hud.feed('CRATE: +25 HULL', 'good'); }
+      else if (pr.pickup === 'missile') { pl.missiles = Math.min(pl.maxMissiles, pl.missiles + 1); this.hud.feed('CRATE: +1 MISSILE', 'good'); }
+      else if (pr.pickup === 'nitro') { pl.nitro = Math.min(1, pl.nitro + 0.35 * (pl.nitroRate || 1)); this.hud.feed('CRATE: NITRO CHARGE', 'good'); }
+      else if (pr.pickup === 'mine') { pl.mines = Math.min(pl.maxMines, pl.mines + 1); this.hud.feed('CRATE: +1 MINE', 'good'); }
+      else if (Math.random() < 0.35) this.hud.feed(`SMASHED  +${pr.scoreValue || 25}`, 'good');
+    }
+  }
+
   // ---------- transient explosion lights ----------
   flashLight(pos) {
     if (this._flashes.length > 4) return;
@@ -449,6 +644,24 @@ class Game {
     });
     for (const p of this.pickups) { p.active = true; p.mesh.visible = true; }
     this.track.setLights('red');
+
+    // choppers + destructible props back to pristine
+    for (const c of this.choppers) if (c.alive && c.mesh) this.scene.remove(c.mesh);
+    this.choppers = [];
+    this._raceChopper = false;
+    this.chopperTimer = 15;
+    for (const f of this.flyingProps) this.scene.remove(f.mesh);
+    this.flyingProps = [];
+    if (this.track.props) {
+      this.props = [...this.track.props];
+      for (const p of this.props) {
+        if (!p._orig) p._orig = { pos: p.mesh.position.clone(), rot: p.mesh.rotation.clone(), scale: p.mesh.scale.clone() };
+        p.mesh.position.copy(p._orig.pos);
+        p.mesh.rotation.copy(p._orig.rot);
+        p.mesh.scale.copy(p._orig.scale);
+        if (!p.mesh.parent) this.scene.add(p.mesh);
+      }
+    }
   }
 
   startRace() {
@@ -462,9 +675,20 @@ class Game {
     this._lastCount = 4;
     this.player.lapStart = 0;
     this.hud.feed(`${this.level.name} — LEVEL ${this.level.id}`, 'info');
+    if (this.freeRoam) {
+      // no grid, no countdown — the world is yours (and the choppers')
+      this.state = 'race';
+      this.startScore = this.score;
+      this.track.setLights('green');
+      this.hud.centerMsg('EXPLORE!');
+      this.hud.feed('SMASH EVERYTHING · WATCH THE SKIES', 'info');
+      for (const e of this.enemies) { e.alive = false; e.mesh.visible = false; }
+      this.chopperTimer = 15;
+    }
   }
 
   onPlayerLap() {
+    if (this.freeRoam) { this.score += 100; return; }
     const p = this.player;
     if (p.lap > this.lapsTotal) { this.finishRace(); return; }
     const lapTime = this.raceTime - p.lapStart;
@@ -596,15 +820,13 @@ class Game {
     const p = this.player;
     const fwd = p.forward;
     const speedZoom = Math.min(1, Math.abs(p.speedAlong) / p.maxSpeed);
-    let targetPos, targetLook;
-    if (this.camMode === 0) {
-      // top-down with a hint of tilt so the 3D reads
-      targetPos = p.pos.clone().addScaledVector(fwd, -20 - speedZoom * 6).add(new THREE.Vector3(0, 52 + speedZoom * 10, 0));
-      targetLook = p.pos.clone().addScaledVector(fwd, 7); // keep the car clear of the speedo
-    } else {
-      targetPos = p.pos.clone().addScaledVector(fwd, -13).add(new THREE.Vector3(0, 7.5, 0));
-      targetLook = p.pos.clone().addScaledVector(fwd, 10).add(new THREE.Vector3(0, 2.8, 0));
-    }
+    const M = CAM_MODES[this.camMode] || CAM_MODES[0];
+    const targetPos = p.pos.clone()
+      .addScaledVector(fwd, -(M.back + speedZoom * (M.spdBack || 0)))
+      .add(new THREE.Vector3(0, M.h + speedZoom * (M.spdH || 0), 0));
+    const targetLook = p.pos.clone()
+      .addScaledVector(fwd, M.look)
+      .add(new THREE.Vector3(0, M.lookH || 0, 0));
     const k = 1 - Math.exp(-5.5 * dt);
     this.camPos.lerp(targetPos, k);
     this.camLook.lerp(targetLook, k);
@@ -630,10 +852,9 @@ class Game {
     const time = this.clock.elapsedTime;
     this.track.update(dt, time);
 
-    if (this.input.justPressed('KeyC')) this.camMode = 1 - this.camMode;
+    if (this.input.justPressed('KeyC')) this.cycleCamera();
     if (this.input.justPressed('KeyP') && (this.state === 'race' || this.state === 'paused')) {
-      this.state = this.state === 'paused' ? 'race' : 'paused';
-      this.hud.centerMsg(this.state === 'paused' ? 'PAUSED' : 'GO');
+      this.togglePause();
     }
 
     if (this.state === 'countdown') {
@@ -655,7 +876,7 @@ class Game {
     if (this.state !== 'paused' && this.state !== 'title') {
       if (this.state === 'race') this.raceTime += dt;
       this.player.update(dt, this.input);
-      if (this.state === 'race' || this.state === 'finished' || this.state === 'countdown') {
+      if (!this.freeRoam && (this.state === 'race' || this.state === 'finished' || this.state === 'countdown')) {
         for (const e of this.enemies) {
           // rivals hold on the grid during countdown
           if (this.state === 'countdown') e.syncMesh(0);
@@ -667,8 +888,11 @@ class Game {
         this._carCollisions();
         this._updateBoostPads();
         this._updatePickups(dt, time);
+        this._updateChoppers(dt);
+        this._updateProps(dt);
       }
-      this._updateRank();
+      if (this.freeRoam) this.playerRank = 1;
+      else this._updateRank();
       this.particles.update(dt);
       this._updateFlashes(dt);
       this.hud.update(dt);

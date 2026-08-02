@@ -7,6 +7,7 @@ import {
   chevronTexture, checkerTexture, glowTexture, cloudTexture,
   grassTexture, bannerTexture, hazardTexture, crowdTexture, awningTexture,
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
+  crateTexture, coneTexture, barrelTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -87,6 +88,8 @@ const THEMES = {
     rockCount: 130, pebbleCount: 160, rockColor: 0x8d8578, rockSnowCap: false,
     flowerCount: 340, flowerColors: ['#ffe234', '#ff6a8a', '#ffffff', '#ff8a3a', '#c27aff'],
     hutRoof: 0xc9a24d, hayColor: 0xd8b95e,
+    // debris chip colors when a fence/wall is scraped (painted pole red/cream)
+    splinter: [0xc23b2a, 0xe8e2d4],
     // per-level gameplay-placement tuning
     rampMaxCurv: 0.014, padMaxCurv: 0.004, boardMaxCurv: 0.012,
   },
@@ -119,6 +122,7 @@ const THEMES = {
     rockCount: 300, pebbleCount: 240, rockColor: 0xb07a52, rockSnowCap: false,
     flowerCount: 90, flowerColors: ['#ffd45e', '#ff8a3a', '#e86a8a'],
     hutRoof: 0xb0794a, hayColor: 0xd8b95e,
+    splinter: [0xe8b83a, 0xe8e2d4],                     // sun-bleached painted fence
     rampMaxCurv: 0.014, padMaxCurv: 0.004, boardMaxCurv: 0.012,
   },
   snow: {
@@ -150,6 +154,7 @@ const THEMES = {
     rockCount: 150, pebbleCount: 140, rockColor: 0x9aa6b0, rockSnowCap: true,
     flowerCount: 60, flowerColors: ['#ffffff', '#cfe0ff', '#ffd0e0'],
     hutRoof: 0xe8eef4, hayColor: 0xd8c07a,
+    splinter: [0xdce8f0, 0x9fc4d8],                     // icy chips
     rampMaxCurv: 0.022, padMaxCurv: 0.0075, boardMaxCurv: 0.02,
   },
   // CANYON RUN: the road snakes between tall stratified sandstone cliffs.
@@ -185,6 +190,7 @@ const THEMES = {
     rockCount: 150, pebbleCount: 130, rockColor: 0xb5744a, rockSnowCap: false,
     flowerCount: 60, flowerColors: ['#ffd45e', '#ff7a3a', '#e86a8a'],
     hutRoof: 0xb0794a, hayColor: 0xd8b95e, hutCount: 3, hayCount: 22,
+    splinter: [0xc9a06a, 0xa06844],                     // sandstone chips
     rampMaxCurv: 0.02, padMaxCurv: 0.0075, boardMaxCurv: 0.018,
     cliffWalls: true, horizon: 'mesa', bridgeCount: 3, oasis: true,
     obstacleSpec: { count: 6, style: 'hoodoo' }, puddleCount: 5,
@@ -223,6 +229,7 @@ const THEMES = {
     rockColor: 0x201c22, rockSnowCap: false, rockRoughness: 0.4,  // glossy obsidian
     flowerCount: 0, flowerColors: ['#ff7a22'],
     hutRoof: 0x4a3a30, hayColor: 0x8a6a3a, hutCount: 4, hayCount: 0,
+    splinter: [0x3a3634, 0xff5e2e],                     // basalt + ember chips
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.016,
     obstacleSpec: { count: 4, style: 'basalt' }, puddleCount: 0,
   },
@@ -240,6 +247,65 @@ const SPONSORS = [
   ['RALLY CO.', '#3a1414', '#ffd4c2'],
 ];
 
+// ---------- destructible prop catalog ----------
+// Per-theme mix of smashable roadside props ([type, count]); every level totals
+// well under 60 individual meshes. Geometry (and theme-independent materials)
+// are shared module-wide — each prop is still its own cheap Mesh/Group so the
+// game code can knock it flying individually.
+const PROP_SPECS = {
+  forest: [['hay', 18], ['crate', 12], ['cone', 10]],
+  desert: [['crate', 12], ['cone', 10], ['barrel', 14]],
+  snow: [['snowman', 12], ['crate', 12], ['cone', 10]],
+  canyon: [['crate', 12], ['barrel', 10], ['cone', 10], ['rock', 6]],
+  volcano: [['barrel', 14], ['crate', 12], ['cone', 10]],
+};
+const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20 };
+const PROP_PICKUPS = ['health', 'missile', 'nitro', 'mine'];
+// theme tints for the barrel drum texture
+const BARREL_PALETTES = {
+  desert: { base: '#c29a5c', hoop: '#4a3620' },
+  canyon: { base: '#9a6440', hoop: '#33291e' },
+  volcano: { base: '#37322e', hoop: '#191512', stripe: '#e8381e' },
+};
+
+let PROP_ASSETS = null;
+function propAssets() {
+  if (PROP_ASSETS) return PROP_ASSETS;
+  const hay = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 10);
+  hay.rotateZ(Math.PI / 2);
+  hay.translate(0, 0.8, 0);
+  const crate = new THREE.BoxGeometry(1.55, 1.55, 1.55);
+  crate.translate(0, 0.78, 0);
+  const cone = new THREE.ConeGeometry(0.55, 1.35, 10);
+  cone.translate(0, 0.74, 0);
+  const coneBase = new THREE.BoxGeometry(1.05, 0.14, 1.05);
+  coneBase.translate(0, 0.07, 0);
+  const barrel = new THREE.CylinderGeometry(0.62, 0.66, 1.5, 12);
+  barrel.translate(0, 0.75, 0);
+  const rock = new THREE.DodecahedronGeometry(0.7, 0);
+  rock.translate(0, 0.32, 0);
+  PROP_ASSETS = {
+    geo: {
+      hay, crate, cone, coneBase, barrel, rock,
+      ballBody: new THREE.SphereGeometry(0.8, 12, 9),
+      ballHead: new THREE.SphereGeometry(0.52, 12, 9),
+      eye: new THREE.SphereGeometry(0.07, 6, 5),
+      carrot: new THREE.ConeGeometry(0.1, 0.5, 6),
+    },
+    mat: {
+      crate: new THREE.MeshStandardMaterial({ map: crateTexture(), roughness: 0.9 }),
+      cone: new THREE.MeshStandardMaterial({ map: coneTexture(), roughness: 0.75 }),
+      coneBase: new THREE.MeshStandardMaterial({ color: 0xd85f10, roughness: 0.9 }),
+      barrelCap: new THREE.MeshStandardMaterial({ color: 0x3a2c1a, roughness: 0.95 }),
+      snow: new THREE.MeshStandardMaterial({ color: 0xf4f8fc, roughness: 0.85 }),
+      coal: new THREE.MeshStandardMaterial({ color: 0x201c18, roughness: 0.8 }),
+      carrot: new THREE.MeshStandardMaterial({ color: 0xe8641e, roughness: 0.8 }),
+      rock: new THREE.MeshStandardMaterial({ color: 0xb5744a, flatShading: true, roughness: 1 }),
+    },
+  };
+  return PROP_ASSETS;
+}
+
 export class Track {
   constructor(scene, level = LEVELS[0]) {
     this.scene = scene;
@@ -251,6 +317,8 @@ export class Track {
       fogColor: T.fogColor, fogNear: T.fogNear, fogFar: T.fogFar,
       hemiSky: T.hemiSky, hemiGround: T.hemiGround,
       sunColor: T.sunColor, sunIntensity: T.sunIntensity,
+      // [hexA, hexB] debris chip colors for fence/cliff scrape particles
+      splinter: T.splinter,
     };
     // levels are self-contained: fog is set here (main.js may re-apply from theme)
     scene.fog = new THREE.Fog(T.fogColor, T.fogNear, T.fogFar);
@@ -295,6 +363,14 @@ export class Track {
     // World-space mud puddles on the road: [{x, z, r}]. Always present; [] on
     // levels without them. Visual decals here — driving effects live elsewhere.
     this.puddles = [];
+    // Destructible roadside props: [{mesh, x, z, r, type, scoreValue, pickup}].
+    // Always present. The game code detects car contact, removes the entry and
+    // animates the mesh flying away itself; `pickup` is a type string on the
+    // crates that carry a reward (else null).
+    this.props = [];
+    // Soft world radius for free-roam driving; the game turns players around
+    // once they wander past it.
+    this.worldBounds = 1400;
     this._buildRoad();
     this._buildWalls();
     this._buildStartGate();
@@ -302,6 +378,7 @@ export class Track {
     this._buildBoostPads();  // …then pads fill in around them
     this._buildObstacles();  // …then rock towers block straights between them
     this._buildPuddles();
+    this._buildProps();      // …and smashable props fill the roadsides
     this._buildEnvironment();
   }
 
@@ -389,15 +466,41 @@ export class Track {
     return Math.sqrt(best);
   }
 
-  /** Rolling-hill height used by the terrain mesh and scenery placement. */
+  /** Track distance on a lazy 8-unit grid, bilinearly blended between the four
+   *  surrounding corners. Each corner runs _distToTrack once, then is memoized,
+   *  so warm calls are a handful of ops — cheap enough for per-frame use. */
+  _distToTrackCoarse(x, z) {
+    const CS = 8, HALF = 2048, CELLS = (HALF * 2) / CS;
+    const gx = (x + HALF) / CS, gz = (z + HALF) / CS;
+    const x0 = Math.floor(gx), z0 = Math.floor(gz);
+    if (x0 < 0 || z0 < 0 || x0 >= CELLS || z0 >= CELLS) return this._distToTrack(x, z);
+    const cache = this._distCache || (this._distCache = new Map());
+    const corner = (cx, cz) => {
+      const key = cx * 1024 + cz;
+      let v = cache.get(key);
+      if (v === undefined) {
+        v = this._distToTrack(cx * CS - HALF, cz * CS - HALF);
+        cache.set(key, v);
+      }
+      return v;
+    };
+    const fx = gx - x0, fz = gz - z0;
+    const a = corner(x0, z0) * (1 - fx) + corner(x0 + 1, z0) * fx;
+    const b = corner(x0, z0 + 1) * (1 - fx) + corner(x0 + 1, z0 + 1) * fx;
+    return a * (1 - fz) + b * fz;
+  }
+
+  /** Rolling-hill height used by the terrain mesh, scenery placement and the
+   *  free-roam mode's per-frame ground queries (track distance is cached). */
   terrainHeight(x, z) {
+    const d = this._distToTrackCoarse(x, z);
+    if (d <= 15) return 0;                     // flattened corridor along the road
     const n =
       Math.sin(x * 0.012) * Math.cos(z * 0.010) * 3.4 +
       Math.sin(x * 0.030 + 1.7) * Math.cos(z * 0.026 + 0.6) * 1.7 +
       Math.sin(x * 0.070 + 3.1) * Math.cos(z * 0.062 + 2.2) * 0.7;
-    const d = this._distToTrack(x, z);
-    const f = THREE.MathUtils.smoothstep(d, 15, 70);
-    return n * f;
+    if (d >= 70) return n;
+    return n * THREE.MathUtils.smoothstep(d, 15, 70);
   }
 
   // ---------- track construction ----------
@@ -860,6 +963,136 @@ export class Track {
       m.renderOrder = 1;
       this.group.add(m);
       this.puddles.push({ x: p.x, z: p.z, r: rad });
+    }
+  }
+
+  /** Build one prop mesh (origin at its base). Returns {mesh, r} — geometry and
+   *  most materials are shared; only theme tints (hay color, barrel wrap) vary. */
+  _makeProp(type) {
+    const A = propAssets();
+    switch (type) {
+      case 'hay': {
+        if (!this._hayPropMat) {
+          this._hayPropMat = new THREE.MeshStandardMaterial({ color: this.T.hayColor, roughness: 1 });
+        }
+        const m = new THREE.Mesh(A.geo.hay, this._hayPropMat);
+        m.castShadow = true;
+        return { mesh: m, r: 1.5 };
+      }
+      case 'crate': {
+        const m = new THREE.Mesh(A.geo.crate, A.mat.crate);
+        m.castShadow = true;
+        return { mesh: m, r: 1.6 };
+      }
+      case 'cone': {
+        const g = new THREE.Group();
+        g.add(new THREE.Mesh(A.geo.coneBase, A.mat.coneBase));
+        const c = new THREE.Mesh(A.geo.cone, A.mat.cone);
+        c.castShadow = true;
+        g.add(c);
+        return { mesh: g, r: 1.0 };
+      }
+      case 'barrel': {
+        if (!this._barrelPropMat) {
+          const pal = BARREL_PALETTES[this.level && this.level.theme] || {};
+          this._barrelPropMat = new THREE.MeshStandardMaterial({
+            map: barrelTexture(pal), roughness: 0.9,
+          });
+        }
+        const m = new THREE.Mesh(A.geo.barrel, [this._barrelPropMat, A.mat.barrelCap, A.mat.barrelCap]);
+        m.castShadow = true;
+        return { mesh: m, r: 1.3 };
+      }
+      case 'snowman': {
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(A.geo.ballBody, A.mat.snow);
+        body.position.y = 0.68;
+        body.castShadow = true;
+        g.add(body);
+        const head = new THREE.Mesh(A.geo.ballHead, A.mat.snow);
+        head.position.y = 1.75;
+        g.add(head);
+        const nose = new THREE.Mesh(A.geo.carrot, A.mat.carrot);
+        nose.rotation.x = Math.PI / 2;                   // carrot points +z
+        nose.position.set(0, 1.8, 0.62);
+        g.add(nose);
+        for (const s of [-1, 1]) {
+          const eye = new THREE.Mesh(A.geo.eye, A.mat.coal);
+          eye.position.set(s * 0.18, 1.95, 0.44);
+          g.add(eye);
+        }
+        return { mesh: g, r: 1.4 };
+      }
+      default: {                                         // 'rock' — small pebble
+        const m = new THREE.Mesh(A.geo.rock, A.mat.rock);
+        m.castShadow = true;
+        return { mesh: m, r: 1.0 };
+      }
+    }
+  }
+
+  /** Scatter this level's destructible props near the road: most sit trackside
+   *  (|lateral| 10.5–22, hugging the cliff base on canyon), a handful right on
+   *  the road shoulder (|lateral| 7–9) so they get clipped naturally. Keeps
+   *  clear of the start, ramps, boost pads and rock obstacles. */
+  _buildProps() {
+    const themeKey = PROP_SPECS[this.level && this.level.theme] ? this.level.theme : 'forest';
+    const usedI = [];
+    const spotFor = (shoulder) => {
+      for (let tries = 0; tries < 40; tries++) {
+        const i = (Math.random() * N) | 0;
+        if (this._circDist(i, 0) < 30) continue;                                  // start grid + gate
+        if (this.ramps.some((r) => this._circDist(i, r.index) < 36)) continue;    // 20 + ramp len
+        if (this.boostPads.some((p) => this._circDist(i, p.index) < 20)) continue;
+        if (this._obstacleIdx.some((o) => this._circDist(i, o) < 20)) continue;
+        if (usedI.some((u) => this._circDist(i, u) < 4)) continue;                // no piles
+        const side = Math.random() < 0.5 ? -1 : 1;
+        const lateral = shoulder
+          ? side * (7 + Math.random() * 2)
+          : this.T.cliffWalls
+            ? side * (10.5 + Math.random() * 0.8)      // hug the canyon walls
+            : side * (10.5 + Math.random() * 11.5);
+        usedI.push(i);
+        const p = this.pointAt(i, lateral);
+        const y = Math.abs(lateral) <= 9.5 ? 0 : this.terrainHeight(p.x, p.z);
+        return { x: p.x, y, z: p.z };
+      }
+      return null;
+    };
+    for (const [type, count] of PROP_SPECS[themeKey]) {
+      // ~25% of crates carry a random pickup (always at least one per level)
+      let pickupSet = null;
+      if (type === 'crate') {
+        pickupSet = new Set();
+        const order = Array.from({ length: count }, (_, k) => k);
+        for (let k = order.length - 1; k > 0; k--) {
+          const j = (Math.random() * (k + 1)) | 0;
+          [order[k], order[j]] = [order[j], order[k]];
+        }
+        for (let k = 0; k < Math.max(1, Math.round(count * 0.25)); k++) pickupSet.add(order[k]);
+      }
+      for (let k = 0; k < count; k++) {
+        const spot = spotFor(Math.random() < 0.22);
+        if (!spot) continue;
+        const { mesh, r } = this._makeProp(type);
+        mesh.position.set(spot.x, spot.y, spot.z);
+        mesh.rotation.y = Math.random() * Math.PI * 2;
+        const s = 0.9 + Math.random() * 0.25;
+        mesh.scale.setScalar(s);
+        this.group.add(mesh);
+        this.props.push({
+          mesh, x: spot.x, z: spot.z, r: r * s, type,
+          scoreValue: PROP_SCORE[type],
+          pickup: pickupSet && pickupSet.has(k)
+            ? PROP_PICKUPS[(Math.random() * PROP_PICKUPS.length) | 0]
+            : null,
+        });
+      }
+    }
+    // placement is randomized — make absolutely sure a pickup crate survived
+    if (!this.props.some((p) => p.type === 'crate' && p.pickup)) {
+      const c = this.props.find((p) => p.type === 'crate');
+      if (c) c.pickup = PROP_PICKUPS[(Math.random() * PROP_PICKUPS.length) | 0];
     }
   }
 

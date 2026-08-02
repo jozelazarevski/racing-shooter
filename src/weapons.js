@@ -4,6 +4,12 @@ import * as THREE from 'three';
 const MAX_BULLETS = 220;
 const BULLET_SPEED = 130;
 const MISSILE_SPEED = 82;
+const CHOPPER_HIT_R2 = 3.4 * 3.4; // horizontal hit/detonate radius vs choppers
+
+const _aim = new THREE.Vector3();  // scratch: chopper gun aim point
+const _dir = new THREE.Vector3();  // scratch: bullet orientation
+const _puff = new THREE.Vector3(); // scratch: ground-impact dust
+const _FWD = new THREE.Vector3(0, 0, 1);
 
 export class Weapons {
   constructor(game) {
@@ -78,6 +84,19 @@ export class Weapons {
         g.onEnemyHit(e, THREE.MathUtils.lerp(26, 10, d / 16), 'shock');
       }
     }
+    // the pressure wave doesn't care about altitude — choppers in radius get hit
+    for (const c of g.choppers ?? []) {
+      if (!c.alive) continue;
+      const dx = c.pos.x - car.pos.x, dz = c.pos.z - car.pos.z;
+      const d = Math.sqrt(dx * dx + dz * dz);
+      if (d < 16) {
+        if (c.vel && d > 1e-3) {
+          c.vel.x += (dx / d) * 24 * (1 - d / 18);
+          c.vel.z += (dz / d) * 24 * (1 - d / 18);
+        }
+        c.damage(THREE.MathUtils.lerp(26, 10, d / 16));
+      }
+    }
   }
 
   fireBullet(car, dmg, spread) {
@@ -99,6 +118,29 @@ export class Weapons {
     b.vel.copy(dir).multiplyScalar(BULLET_SPEED).addScaledVector(car.vel, 0.6);
     const idx = this.bullets.indexOf(b);
     this.mesh.setColorAt(idx, car === this.game.player ? this._colorPlayer : this._colorEnemy);
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+  }
+
+  /** Chopper chin gun: a tracer from the airframe angled down at targetPos.
+   *  Pooled with the car bullets — these are the only rounds with a vy. */
+  fireChopperBullet(chopper, targetPos) {
+    const b = this.bullets[this.head];
+    this.head = (this.head + 1) % MAX_BULLETS;
+    b.active = true;
+    b.owner = chopper;
+    b.dmg = 5;
+    b.life = 1.4;
+    b.pos.copy(chopper.pos);
+    b.pos.y -= 0.7; // muzzle under the nose
+    // moderate spread on the aim point — dodgeable at speed
+    _aim.set(
+      targetPos.x + (Math.random() - 0.5) * 4.2,
+      targetPos.y,
+      targetPos.z + (Math.random() - 0.5) * 4.2
+    );
+    b.vel.copy(_aim).sub(b.pos).normalize().multiplyScalar(BULLET_SPEED * 0.8);
+    const idx = this.bullets.indexOf(b);
+    this.mesh.setColorAt(idx, this._colorEnemy);
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 
@@ -125,16 +167,19 @@ export class Weapons {
     g.position.copy(car.pos).addScaledVector(fwd, 3).setY(car.pos.y + 1.1);
     this.game.scene.add(g);
 
-    // lock the closest living enemy roughly ahead
+    // lock the closest living enemy (or chopper) roughly ahead — the seeker
+    // works in XZ, so choppers are ranked by horizontal distance and favored
     let target = null, best = Infinity;
-    for (const e of this.game.enemies) {
+    for (const e of [...this.game.enemies, ...(this.game.choppers ?? [])]) {
       if (!e.alive) continue;
       const to = e.pos.clone().sub(car.pos);
+      to.y = 0;
       const d = to.length();
-      if (d > 160) continue;
+      if (d > 160 || d < 1e-3) continue;
       to.normalize();
       if (to.dot(fwd) < 0.25) continue;
-      if (d < best) { best = d; target = e; }
+      const score = e.isChopper ? d * 0.8 : d; // prefer choppers slightly
+      if (score < best) { best = score; target = e; }
     }
     this.missiles.push({
       mesh: g, pos: g.position, heading: car.heading,
@@ -151,12 +196,21 @@ export class Weapons {
       const b = this.bullets[i];
       if (!b.active) { this.mesh.setMatrixAt(i, this._zero); continue; }
       b.life -= dt;
-      b.pos.addScaledVector(b.vel, dt);
+      b.pos.addScaledVector(b.vel, dt); // integrates y too (chopper rounds descend)
       if (b.life <= 0) { b.active = false; this.mesh.setMatrixAt(i, this._zero); continue; }
+      // descending rounds bury into the dirt with a small puff
+      if (b.pos.y < 0) {
+        _puff.set(b.pos.x, 0.1, b.pos.z);
+        g.particles.dust(_puff, 0.6);
+        b.active = false;
+        this.mesh.setMatrixAt(i, this._zero);
+        continue;
+      }
 
       // hit tests
       let hit = false;
       if (b.owner !== g.player) {
+        // 3D distance — a chopper round has to actually reach car height
         if (g.player.alive && b.pos.distanceToSquared(g.player.pos) < 7.3) {
           g.onPlayerHit(b.dmg, b.owner);
           hit = true;
@@ -170,6 +224,21 @@ export class Weapons {
             break;
           }
         }
+        if (!hit) {
+          // cannon fire vs choppers: horizontal distance only — arcade flak
+          // handwave, the burst converges on the airframe whatever its altitude
+          for (const c of g.choppers ?? []) {
+            if (!c.alive) continue;
+            const dx = b.pos.x - c.pos.x, dz = b.pos.z - c.pos.z;
+            if (dx * dx + dz * dz < CHOPPER_HIT_R2) {
+              b.pos.copy(c.pos); // impact sparks read at the airframe
+              g.audio.hit();
+              c.damage(b.dmg);
+              hit = true;
+              break;
+            }
+          }
+        }
       }
       if (hit) {
         g.particles.sparks(b.pos, new THREE.Vector3(0, 1, 0), 6);
@@ -177,7 +246,8 @@ export class Weapons {
         this.mesh.setMatrixAt(i, this._zero);
         continue;
       }
-      this._q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(b.vel.x, b.vel.z));
+      _dir.copy(b.vel).normalize();
+      this._q.setFromUnitVectors(_FWD, _dir); // full 3D aim so diving tracers read
       this._m.compose(b.pos, this._q, new THREE.Vector3(1, 1, 1));
       this.mesh.setMatrixAt(i, this._m);
     }
@@ -210,9 +280,21 @@ export class Weapons {
         if (!e.alive || e.invuln > 0) continue;
         if (m.pos.distanceToSquared(e.pos) < 10) { detonate = true; break; }
       }
-      // missiles can also clip walls
+      // chopper proximity fuse: horizontal distance only (seeker homes in XZ)
+      if (!detonate) {
+        for (const c of g.choppers ?? []) {
+          if (!c.alive) continue;
+          const dx = m.pos.x - c.pos.x, dz = m.pos.z - c.pos.z;
+          if (dx * dx + dz * dz < CHOPPER_HIT_R2) {
+            detonate = true;
+            m.pos.y = c.pos.y; // burst up at the airframe, not on the deck
+            break;
+          }
+        }
+      }
+      // missiles can also clip walls (never in free roam — no walls out there)
       m.ti = g.track.nearestIndex(m.pos, m.ti);
-      if (Math.abs(g.track.lateralOffset(m.pos, m.ti)) > 10.2) detonate = true;
+      if (!g.freeRoam && Math.abs(g.track.lateralOffset(m.pos, m.ti)) > 10.2) detonate = true;
 
       if (detonate) {
         g.particles.explosion(m.pos, false);
@@ -223,6 +305,12 @@ export class Weapons {
           if (!e.alive || e.invuln > 0) continue;
           const d = m.pos.distanceTo(e.pos);
           if (d < 9) g.onEnemyHit(e, THREE.MathUtils.lerp(55, 18, d / 9), 'missile');
+        }
+        for (const c of g.choppers ?? []) {
+          if (!c.alive) continue;
+          const dx = m.pos.x - c.pos.x, dz = m.pos.z - c.pos.z;
+          const d = Math.sqrt(dx * dx + dz * dz);
+          if (d < 9) c.damage(THREE.MathUtils.lerp(55, 18, d / 9)); // altitude ignored
         }
         g.scene.remove(m.mesh);
         this.missiles.splice(mi, 1);

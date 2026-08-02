@@ -87,6 +87,15 @@ export class Hud {
       c.fillStyle = '#e8402a';
       c.beginPath(); c.arc(x, y, 4, 0, Math.PI * 2); c.fill();
     }
+    // choppers blink orange
+    for (const ch of (g.choppers ?? [])) {
+      if (!ch.alive) continue;
+      const [x, y] = this._mapPt(ch.pos);
+      c.fillStyle = Math.floor(performance.now() / 250) % 2 ? '#ff8a2a' : '#ffd400';
+      c.beginPath();
+      c.moveTo(x, y - 5); c.lineTo(x + 4.5, y + 4); c.lineTo(x - 4.5, y + 4);
+      c.closePath(); c.fill();
+    }
     const p = this.game.player;
     const [px, py] = this._mapPt(p.pos);
     c.save();
@@ -181,14 +190,26 @@ export class Hud {
     this.el.lapsTotal.textContent = g.lapsTotal;
     this.el.time.textContent = fmtTime(g.raceTime);
     this.el.score.textContent = g.score.toLocaleString();
-    const rank = g.playerRank;
-    this.el.position.textContent = rank;
-    this.el.posSuffix.textContent = SUFFIX[rank - 1] || 'TH';
-    this.el.racerCount.textContent = 1 + g.enemies.length;
+    if (g.freeRoam) {
+      this.el.position.textContent = '🌍';
+      this.el.posSuffix.textContent = '';
+      this.el.racerCount.textContent = 'ROAM';
+      this.el.lap.textContent = '∞';
+      if (this._standingsHtml !== 'roam') {
+        this._standingsHtml = 'roam';
+        this.el.standings.innerHTML =
+          '<div class="srow">SMASH PROPS FOR CREDITS</div><div class="srow">SHOOT DOWN CHOPPERS</div>';
+      }
+    } else {
+      const rank = g.playerRank;
+      this.el.position.textContent = rank;
+      this.el.posSuffix.textContent = SUFFIX[rank - 1] || 'TH';
+      this.el.racerCount.textContent = 1 + g.enemies.length;
+    }
 
     // standings (rebuilt at 2 Hz)
     this._standingsTimer -= dt;
-    if (this._standingsTimer <= 0) {
+    if (!g.freeRoam && this._standingsTimer <= 0) {
       this._standingsTimer = 0.5;
       const order = [g.player, ...g.enemies].sort((a, b) => b.progress - a.progress);
       const html = order.map((c, i) =>
@@ -241,7 +262,7 @@ export class Hud {
     // wrong-way detection
     const t = g.track;
     const tangent = t.tan[p.trackIndex];
-    const wrongWay = g.state === 'race' && p.alive &&
+    const wrongWay = g.state === 'race' && p.alive && !g.freeRoam &&
       p.speedAlong > 6 && (p.forward.dot(tangent) < -0.35);
     this.el.wrongWay.style.display = wrongWay ? 'block' : 'none';
 

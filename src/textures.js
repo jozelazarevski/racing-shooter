@@ -622,6 +622,119 @@ export function puddleTexture(palette = {}) {
   });
 }
 
+/** Wooden shipping-crate face: planked boards inside a nailed frame with an
+ *  X of diagonal cross braces. Shared by every destructible crate prop. */
+export function crateTexture() {
+  return make(128, 128, (g, w, h) => {
+    // horizontal planks
+    g.fillStyle = '#a3763f';
+    g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 26) {
+      g.fillStyle = `rgba(${140 + Math.random() * 40 | 0},${95 + Math.random() * 28 | 0},${44 + Math.random() * 14 | 0},0.55)`;
+      g.fillRect(0, y, w, 24);
+      g.fillStyle = 'rgba(46,28,10,0.75)';
+      g.fillRect(0, y + 24, w, 2);
+      // wood grain flecks
+      for (let i = 0; i < 5; i++) {
+        g.fillStyle = 'rgba(66,42,18,0.4)';
+        g.fillRect(Math.random() * w, y + 4 + Math.random() * 16, 8 + Math.random() * 22, 2);
+      }
+    }
+    // diagonal cross braces (shadow pass, board, lit top edge)
+    g.lineCap = 'butt';
+    for (const [x0, y0, x1, y1] of [[2, 6, w - 2, h - 6], [2, h - 6, w - 2, 6]]) {
+      g.strokeStyle = 'rgba(40,22,8,0.4)';
+      g.lineWidth = 20;
+      g.beginPath(); g.moveTo(x0, y0 + 4); g.lineTo(x1, y1 + 4); g.stroke();
+      g.strokeStyle = '#8f6434';
+      g.lineWidth = 15;
+      g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+      g.strokeStyle = 'rgba(255,225,170,0.28)';
+      g.lineWidth = 3;
+      g.beginPath(); g.moveTo(x0, y0 - 6); g.lineTo(x1, y1 - 6); g.stroke();
+    }
+    // outer frame
+    g.strokeStyle = '#7d5628';
+    g.lineWidth = 14;
+    g.strokeRect(4, 4, w - 8, h - 8);
+    g.strokeStyle = 'rgba(255,230,180,0.18)';
+    g.lineWidth = 3;
+    g.strokeRect(10, 10, w - 20, h - 20);
+    // corner nail heads
+    g.fillStyle = '#2e2318';
+    for (const [nx, ny] of [[10, 10], [w - 10, 10], [10, h - 10], [w - 10, h - 10]]) {
+      g.beginPath(); g.arc(nx, ny, 3, 0, Math.PI * 2); g.fill();
+    }
+  });
+}
+
+/** Traffic-cone wrap: safety orange with a reflective white band. Canvas top is
+ *  the cone base (v=1 maps to the tip on ConeGeometry), so the band paints at
+ *  canvas y ≈ 0.3–0.54h to sit upper-middle on the cone. */
+export function coneTexture() {
+  const t = make(64, 64, (g, w, h) => {
+    g.fillStyle = '#ff7a1a';
+    g.fillRect(0, 0, w, h);
+    // reflective white band with thin shading edges
+    g.fillStyle = '#f2f0e8';
+    g.fillRect(0, h * 0.30, w, h * 0.24);
+    g.fillStyle = 'rgba(0,0,0,0.12)';
+    g.fillRect(0, h * 0.30, w, 3);
+    g.fillRect(0, h * 0.54 - 3, w, 3);
+    // grime + scuffs
+    for (let i = 0; i < 40; i++) {
+      g.fillStyle = `rgba(${Math.random() < 0.5 ? '60,30,10' : '255,255,255'},${0.05 + Math.random() * 0.1})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 4, 2 + Math.random() * 5);
+    }
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
+/** Barrel side wrap: stave-lined drum with two dark hoop stripes; the palette
+ *  tints it per theme (dry desert oak, canyon oak, dark volcano fuel drum with
+ *  an optional accent stripe around the waist). */
+export function barrelTexture(palette = {}) {
+  const P = {
+    base: '#a5713d', stave: 'rgba(60,36,14,0.5)',
+    hoop: '#33291e', stripe: null,
+    ...palette,
+  };
+  const t = make(128, 128, (g, w, h) => {
+    g.fillStyle = P.base;
+    g.fillRect(0, 0, w, h);
+    // vertical staves
+    for (let x = 0; x < w; x += 18) {
+      g.fillStyle = `rgba(255,235,190,${0.04 + Math.random() * 0.05})`;
+      g.fillRect(x, 0, 9, h);
+      g.fillStyle = P.stave;
+      g.fillRect(x + 16, 0, 2, h);
+    }
+    // grain / wear streaks
+    for (let i = 0; i < 50; i++) {
+      g.fillStyle = `rgba(${Math.random() < 0.5 ? '50,30,12' : '255,230,180'},${0.06 + Math.random() * 0.1})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 2, 4 + Math.random() * 14);
+    }
+    // optional accent stripe around the waist
+    if (P.stripe) {
+      g.fillStyle = P.stripe;
+      g.fillRect(0, h * 0.42, w, h * 0.16);
+    }
+    // two dark hoops with a lit upper edge
+    for (const y of [h * 0.14, h * 0.76]) {
+      g.fillStyle = P.hoop;
+      g.fillRect(0, y, w, h * 0.09);
+      g.fillStyle = 'rgba(255,255,255,0.22)';
+      g.fillRect(0, y + 1, w, 2);
+      g.fillStyle = 'rgba(0,0,0,0.3)';
+      g.fillRect(0, y + h * 0.09 - 2, w, 2);
+    }
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
 /** Wooden plank deck (canyon foot-bridges): planks run across the strip. */
 export function plankTexture() {
   const t = make(256, 128, (g, w, h) => {
