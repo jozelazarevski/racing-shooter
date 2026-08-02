@@ -408,10 +408,8 @@ export class Track {
     this.bushColor = this.T.bushColor;   // leaf-particle tint for the consumer
     // Knockable sponsor boards: [{x, z, y, r, dead, group, board, heading}].
     this.banners = [];
-    // Breakable wooden fence: per-sample hole flags, [0]=side +1, [1]=side -1.
-    // Always present (all zero + no-op methods on cliff-walled levels).
-    this.fenceHole = [new Uint8Array(N), new Uint8Array(N)];
-    this._fenceGeo = [null, null];  // per-side ribbon geometry refs for breakFence
+    // (fences were removed from the game entirely — the world is open and
+    // off-road slowness is the boundary; see RULES.md)
     // Soft world radius for free-roam driving; the game turns players around
     // once they wander past it.
     this.worldBounds = 1400;
@@ -634,41 +632,6 @@ export class Track {
     this.group.add(mesh);
   }
 
-  _wallRibbon(side) {
-    const geo = new THREE.BufferGeometry();
-    const verts = new Float32Array((N + 1) * 2 * 3);
-    const uvs = new Float32Array((N + 1) * 2 * 2);
-    const idx = [];
-    const h = 1.35;
-    for (let i = 0; i <= N; i++) {
-      const j = i % N;
-      const c = this.center[j], n = this.nrm[j];
-      const x = c.x + n.x * WALL_OFF * side, z = c.z + n.z * WALL_OFF * side;
-      const o = i * 6;
-      verts[o] = x; verts[o + 1] = c.y; verts[o + 2] = z;
-      verts[o + 3] = x; verts[o + 4] = c.y + h; verts[o + 5] = z;
-      const u = (i * this.segLen) / 8;
-      uvs[i * 4] = u; uvs[i * 4 + 1] = 0;
-      uvs[i * 4 + 2] = u; uvs[i * 4 + 3] = 1;
-    }
-    for (let i = 0; i < N; i++) {
-      const a = i * 2, b = i * 2 + 1, c = i * 2 + 2, d = i * 2 + 3;
-      idx.push(a, b, c, b, d, c);
-    }
-    geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-    geo.setIndex(idx);
-    geo.computeVertexNormals();
-    const mat = new THREE.MeshStandardMaterial({ map: wallTexture(), roughness: 0.9, side: THREE.DoubleSide });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.castShadow = true;
-    this.group.add(mesh);
-    // Keep the ribbon geometry so breakFence can collapse it later. Vertex
-    // layout: 2 rows per sample — vertex i*2 is the ground row (y = road y),
-    // vertex i*2+1 is the top rail row (y = road y + h).
-    this._fenceGeo[side > 0 ? 0 : 1] = { geo, h, rowsPerSample: 2 };
-  }
-
   _buildWalls() {
     if (this.T.cliffWalls) {
       // Slot-canyon look: tall stratified cliff ribbons just outside the road.
@@ -679,8 +642,9 @@ export class Track {
       this._cliffRibbon(-1, tex);
       return;
     }
-    this._wallRibbon(1);
-    this._wallRibbon(-1);
+    // Open-world tracks: no fences anywhere. The road is fastest; drifting
+    // wide just puts you on slow rough ground (see RULES.md — off-road IS
+    // the boundary). Canyon keeps its rock walls above because stone is real.
   }
 
   /** Deterministic canyon-wall profile at sample j (independent of Math.random
@@ -797,7 +761,7 @@ export class Track {
         leg.position.set(bx + ox, 5, bz + oz);
         leg.castShadow = true;
         this.group.add(leg);
-        this.solids.push({ x: bx + ox, z: bz + oz, r: 0.6, y: c.y });
+        this.solids.push({ x: bx + ox, z: bz + oz, r: 0.6, y: c.y, mat: 'metal' });
       }
       for (let ly = 2.5; ly <= 8.5; ly += 3) {
         const brace = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.22, 2.1), wood);
@@ -1456,7 +1420,7 @@ export class Track {
     // box scaled to w wide, so base footprint radius ≈ w/2)
     for (const s of mesaSpecs) {
       this.solids.push({
-        x: s.x, z: s.z, r: s.w * 0.5 * 0.85, y: this.terrainHeight(s.x, s.z),
+        x: s.x, z: s.z, r: s.w * 0.5 * 0.85, y: this.terrainHeight(s.x, s.z), mat: 'stone',
       });
     }
 
@@ -1778,7 +1742,7 @@ export class Track {
       const sy = s * (0.6 + Math.random() * 0.5);
       const y = this.terrainHeight(p.x, p.z) + s * 0.25;
       // big boulders are SOLID (geometry base radius 1 × instance scale s)
-      if (s > 0.9) this.solids.push({ x: p.x, z: p.z, r: s * 0.9, y: y - s * 0.25 });
+      if (s > 0.9) this.solids.push({ x: p.x, z: p.z, r: s * 0.9, y: y - s * 0.25, mat: 'stone' });
       q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(s, sy, s));
       rocks.setMatrixAt(rk, m4);
@@ -1831,7 +1795,7 @@ export class Track {
     hero.castShadow = true;
     this.scene.add(hero);
     // hero boulder is solid too: footprint radius ≈ (4.6 + 4.1) / 2 = 4.35
-    this.solids.push({ x: hp.x, z: hp.z, r: 4.35 * 0.9, y: this.terrainHeight(hp.x, hp.z) });
+    this.solids.push({ x: hp.x, z: hp.z, r: 4.35 * 0.9, y: this.terrainHeight(hp.x, hp.z), mat: 'stone' });
     if (T.rockSnowCap) {
       const heroCap = new THREE.Mesh(
         new THREE.DodecahedronGeometry(1, 1),
@@ -1888,7 +1852,7 @@ export class Track {
       roofs.setMatrixAt(placed++, m4);
       // solid hut: walls are a unit box scaled w×w, so half the world-space
       // diagonal of the footprint is w·√2/2
-      this.solids.push({ x: p.x, z: p.z, r: (w * Math.SQRT2) / 2, y: y + 0.6 });
+      this.solids.push({ x: p.x, z: p.z, r: (w * Math.SQRT2) / 2, y: y + 0.6, mat: 'hut' });
     });
     walls.count = roofs.count = placed;
     this.scene.add(walls, roofs);
@@ -2025,53 +1989,6 @@ export class Track {
     });
   }
 
-  /** True if the wooden fence on `side` (+1 left / -1 right) has been punched
-   *  out at sample i. Always false on cliff-walled levels. */
-  fenceBrokenAt(side, i) {
-    return !!this.fenceHole[side > 0 ? 0 : 1][((i % N) + N) % N];
-  }
-
-  /** Punch a hole in the wooden fence around sample i (`span` samples wide):
-   *  flags the samples and collapses the ribbon's top-rail vertices to ground
-   *  level so a visible gap opens. Idempotent per sample. Returns 2-4 loose
-   *  painted plank meshes to fling, or [] if nothing new broke (already
-   *  broken, cliff-walled level, or inside the protected start area). */
-  breakFence(side, i, span = 5) {
-    const si = side > 0 ? 0 : 1;
-    const ref = this._fenceGeo[si];
-    if (!ref) return [];                          // canyon cliffs stay solid
-    const flags = this.fenceHole[si];
-    const pos = ref.geo.attributes.position;
-    const half = Math.max(0, span >> 1);
-    const broken = [];
-    for (let k = -half; k <= half; k++) {
-      const j = (((i + k) % N) + N) % N;
-      if (this._circDist(j, 0) < 25) continue;    // gate + grandstand: unbreakable
-      if (flags[j]) continue;
-      flags[j] = 1;
-      // drop this sample's top-rail vertex onto the ground row → visible gap
-      pos.setY(j * ref.rowsPerSample + 1, this.center[j].y + 0.02);
-      broken.push(j);
-    }
-    if (!broken.length) return [];
-    pos.needsUpdate = true;
-    const cols = this.T.splinter || [0xc23b2a, 0xe8e2d4];
-    const nPl = Math.min(4, Math.max(2, broken.length - 1));
-    const planks = [];
-    for (let k = 0; k < nPl; k++) {
-      const j = broken[((k * (broken.length - 1)) / Math.max(1, nPl - 1)) | 0];
-      const p = this.pointAt(j, WALL_OFF * side);
-      const m = new THREE.Mesh(
-        new THREE.BoxGeometry(1.8, 0.35, 0.08),
-        new THREE.MeshStandardMaterial({ color: cols[k % cols.length], roughness: 0.9 })
-      );
-      m.position.set(p.x, p.y + 0.55 + Math.random() * 0.6, p.z);
-      m.rotation.y = this.headingAt(j) + (Math.random() - 0.5) * 0.6;
-      planks.push(m);
-    }
-    return planks;
-  }
-
   _buildGrandstand() {
     // stepped stand full of spectators near the start line
     const i = (N - 40 + N) % N;
@@ -2111,7 +2028,7 @@ export class Track {
       this.solids.push({
         x: p.x + this.tan[i].x * off,
         z: p.z + this.tan[i].z * off,
-        r: 2.5, y: p.y,
+        r: 2.5, y: p.y, mat: 'metal',
       });
     }
   }

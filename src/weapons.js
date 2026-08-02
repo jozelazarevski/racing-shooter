@@ -277,7 +277,8 @@ export class Weapons {
         for (const tr of g.track.trees ?? []) {
           if (tr.dead) continue;
           if (!segHits(tr.x, tr.z, tr.r + 1.1)) continue;
-          tr.hp = (tr.hp ?? 30) - b.dmg;
+          // bigger trunks soak more rounds (~3 hits for a sapling, ~5 for a giant)
+          tr.hp = (tr.hp ?? (24 + (tr.s ?? 1) * 16)) - b.dmg;
           g.particles.splinters(b.pos, _UP, [0x6a4a2a, 0x3e5e30], 0.3);
           if (tr.hp <= 0) g.onTreeSmash?.(tr, null, b.owner.pos.x, b.owner.pos.z);
           hit = true;

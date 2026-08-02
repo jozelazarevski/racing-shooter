@@ -680,37 +680,84 @@ class Game {
     if (Math.random() < 0.3) this.hud.feed('TIMBER!  +15', 'good');
   }
 
-  /** Player smashed fence section (side, index): punch the hole, fling planks.
-   *  Returns true if the fence actually broke (the car may pass through). */
-  onFenceBreak(side, index, car) {
-    if (!this.track.breakFence) return false;
-    const planks = this.track.breakFence(side, index, 6);
-    if (!planks.length) return this.track.fenceBrokenAt?.(side, index) ?? false;
-    const n = this.track.nrm[index];
-    for (const pm of planks) {
-      this.scene.add(pm);
-      this.flyingProps.push({
-        mesh: pm,
-        vel: new THREE.Vector3(
-          n.x * side * 9 + car.vel.x * 0.5 + (Math.random() - 0.5) * 4,
-          7 + Math.random() * 4,
-          n.z * side * 9 + car.vel.z * 0.5 + (Math.random() - 0.5) * 4),
-        spin: new THREE.Vector3((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9),
-        life: 2,
-      });
+  /** Material-aware SOLID crash (RULES.md §impact model). `ob.mat`:
+   *  'stone' — brutal: rock does not care about toy trucks. A full-speed
+   *            head-on all but wrecks you.
+   *  'hut'   — heavy: the building shrugs, sheds planks/dust, hurts a lot.
+   *  'metal' — firm: the old fence-post feel — sparks and moderate damage. */
+  onSolidCrash(ob, car, impact, nx, nz) {
+    const n = new THREE.Vector3(nx, 0, nz);
+    if (impact > 3) this.particles.sparks(car.pos, n, Math.min(20, 4 + impact));
+    const mat = ob.mat ?? 'metal';
+    let dmg = 0;
+    if (mat === 'stone') {
+      dmg = impact > 6 ? Math.min(85, (impact - 6) * 3.5) : 0;
+      if (dmg > 0) {
+        this.particles.splinters(car.pos, n, [0x8a8378, 0x55504a], Math.min(1, impact / 20));
+        this.particles.debris(car.pos, Math.min(8, 2 + (impact / 4 | 0)));
+        this.particles.driftSmoke(car.pos);
+      }
+      if (car === this.player && dmg >= 10) {
+        this.hud.feed(`HIT ROCK  −${Math.round(dmg)} HULL`, 'bad');
+        this.shake = Math.min(1, this.shake + 0.3 + impact * 0.02);
+        this.buzz(60);
+      }
+    } else if (mat === 'hut') {
+      dmg = impact > 6 ? Math.min(50, (impact - 6) * 2.2) : 0;
+      if (dmg > 0) {
+        // the building crashes big: planks burst off the wall + a dust cloud
+        const cols = [0x8a6a42, this.track.T?.hutRoof ?? 0x6a4a2a];
+        this.particles.splinters(car.pos, n, cols, Math.min(1, impact / 16));
+        this.particles.debris(car.pos, Math.min(8, 3 + (impact / 5 | 0)));
+        this.particles.dust?.(car.pos, 1.2);
+        for (let k = 0; k < Math.min(3, 1 + (impact / 10 | 0)); k++) {
+          const plank = new THREE.Mesh(
+            new THREE.BoxGeometry(1.4, 0.3, 0.1),
+            new THREE.MeshStandardMaterial({ color: cols[k % 2], roughness: 0.9 }));
+          plank.position.set(car.pos.x + nx * 2, car.pos.y + 1 + k * 0.4, car.pos.z + nz * 2);
+          this.scene.add(plank);
+          this.flyingProps.push({
+            mesh: plank,
+            vel: new THREE.Vector3(nx * 8 + (Math.random() - 0.5) * 5, 6 + Math.random() * 3,
+              nz * 8 + (Math.random() - 0.5) * 5),
+            spin: new THREE.Vector3((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9),
+            life: 1.8,
+          });
+        }
+      }
+      if (car === this.player && dmg >= 8) {
+        this.hud.feed(`CRASHED INTO THE HUT  −${Math.round(dmg)} HULL`, 'bad');
+        this.shake = Math.min(1, this.shake + 0.25 + impact * 0.015);
+        this.buzz(45);
+      }
+    } else {
+      dmg = impact > 8 ? Math.min(24, (impact - 8) * 0.9) : 0;
+      if (car === this.player && dmg >= 5) this.hud.feed(`WALL SLAM  −${Math.round(dmg)} HULL`, 'bad');
+      if (car === this.player && impact > 12) {
+        this.shake = Math.min(1, this.shake + 0.15 + impact * 0.015);
+        this.buzz(30);
+      }
     }
-    const cols = this.track.theme?.splinter ?? [0xc23b2a, 0xe8e2d4];
-    this.particles.splinters(car.pos, n, cols, 1);
-    this.particles.sparks(car.pos, n, 8);
-    car.vel.multiplyScalar(0.75); // smashing planks costs real speed
+    if (dmg > 0) car.damage(dmg, null);
+    if (car === this.player) this.audio.scrape();
+  }
+
+  /** Rammed a BIG tree: the tree wins. Needle shower, real trunk damage. */
+  onTreeCrash(tr, car, impact, nx, nz) {
+    const n = new THREE.Vector3(nx, 0, nz);
+    const at = new THREE.Vector3(tr.x, (tr.y ?? 0) + 2.2, tr.z);
+    // canopy sheds needles + a couple of cones/branches
+    this.particles.splinters(at, n, [0x2a5a30, 0x6a4a2a], Math.min(1, impact / 14));
+    this.particles.debris(at, Math.min(5, 2 + (impact / 6 | 0)));
+    this.particles.driftSmoke(car.pos);
+    const dmg = impact > 5 ? Math.min(35, (impact - 5) * 1.8) : 0;
+    if (dmg > 0) car.damage(dmg, null);
     if (car === this.player) {
-      this.player.damage(6, null);
-      this.score += 30;
-      this.buzz(35);
-      this.shake = Math.min(1, this.shake + 0.35);
-      this.hud.feed('CRASHED THROUGH THE FENCE!  +30', 'good');
+      this.audio.scrape();
+      if (dmg >= 8) this.hud.feed(`HIT A TREE  −${Math.round(dmg)} HULL`, 'bad');
+      this.shake = Math.min(1, this.shake + 0.2 + impact * 0.015);
+      this.buzz(40);
     }
-    return true;
   }
 
   onTireSmash(st, car, ox, oz) {

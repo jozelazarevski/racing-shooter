@@ -313,7 +313,9 @@ export class Car {
     this._lastGY = gy; this._climbRate = 0; this._climbSm = 0; this.jumpPitch = 0;
     this.slip = 0; this.landGrip = 0; this.reverseTimer = 0;
     this.visYaw = 0; this.steerVis = 0; this.steerSmooth = 0;
-    this._outside = false; // respawns land on the road, inside the fences
+    // lap checkpoint state matches where we spawned: a respawn past the far
+    // checkpoint keeps credit for it, a grid spawn must earn it fresh
+    this._midCP = index > this.game.track.N * 0.4;
     this.syncMesh(0);
   }
 
@@ -333,11 +335,10 @@ export class Car {
       this.steerSmooth = steer; // AI: raw passthrough, state kept for inspection
     }
 
-    // ---- free roam (player only): no walls, terrain driving off the road ----
-    // In RACE mode the player can also be outside — through a smashed fence
-    // hole (this._outside) — and gets the same off-road physics out there.
+    // ---- open world (player only): terrain driving off the road, any mode.
+    // The road is fastest; rough ground is the natural boundary (no fences).
     const freeRoam = !!(this.game.freeRoam && this === this.game.player);
-    const offRoad = (freeRoam || this._outside) && Math.abs(this.lateral) > ROAD_HALF + 1;
+    const offRoad = this === this.game.player && Math.abs(this.lateral) > ROAD_HALF + 1;
     const offMult = offRoad ? 0.55 + 0.45 * this.offroadSkill : 1;
 
     const fwd = this.forward;
@@ -512,44 +513,40 @@ export class Car {
     this.trackIndex = t.nearestIndex(this.pos, this.trackIndex);
     this.lateral = t.lateralOffset(this.pos, this.trackIndex);
     this.wallGrind = Math.max(0, this.wallGrind - dt);
-    if (!freeRoam && Math.abs(this.lateral) > WALL_LIMIT) {
-      const n = t.nrm[this.trackIndex];
-      const fside = Math.sign(this.lateral) || 1;
-      const vn = this.vel.dot(n);
-      // RULES.md material law: the wooden fence is crushable. A section that's
-      // already broken lets the car straight through; a hard enough hit
-      // (player only) smashes a new hole and the car punches out into off-road.
-      const holed = t.fenceBrokenAt?.(fside, this.trackIndex) ?? false;
-      if (holed && this === gm.player) { // AI never leaves the track
-        this._outside = true;
-      } else if (this === gm.player && !this._outside && Math.abs(vn) > 14
-          && gm.onFenceBreak?.(fside, this.trackIndex, this)) {
-        this._outside = true;
-      } else if (this._outside && this === gm.player) {
-        // roaming outside in race mode: intact fence doesn't snap-teleport the
-        // car back — it stays off-road until it drives back through the line
-        // (arcade kindness: re-entry is always allowed, with a splinter pop)
-        // nothing to do here; the offRoad physics up top already slow it
-      } else {
-        const over = this.lateral - fside * WALL_LIMIT;
-        this.pos.addScaledVector(n, -over);
-        // absorb, don't bounce: kill the into-wall velocity (tiny 5% rebound so
-        // the car peels off) and let the car scrape along the fence instead
-        this.vel.addScaledVector(n, -vn * 1.05);
-        // grinding the wall stings (handling upgrade shaves the speed loss)
-        this.vel.multiplyScalar(1 - 0.03 * (1 - 0.2 * hnd));
-        this.lateral = fside * WALL_LIMIT;
-        // spark stream while scraping at speed (cheap, every few frames)
-        if (this === gm.player && Math.abs(this.speedAlong) > 12 && Math.random() < 0.4)
-          gm.particles.sparks(this.pos, n, 2);
-        if (this.wallGrind <= 0) {
-          this.wallGrind = 0.18;
-          this.onWallHit(n, Math.abs(vn));
-        }
+    // There are no fences any more — the world is open and off-road slowness
+    // is the boundary. Two exceptions still clamp at the road edge:
+    //  - AI cars always (they race the line and never wander), soft absorb
+    //  - everyone on cliff-walled levels: canyon rock is real STONE — heavy
+    //    damage on hard hits (RULES.md material law)
+    const cliffy = !!t.T?.cliffWalls;
+    let wallHere = false;
+    const fside = Math.sign(this.lateral) || 1;
+    if (Math.abs(this.lateral) > WALL_LIMIT) {
+      if (this !== gm.player) wallHere = true; // AI safety net, all levels
+      else if (cliffy) {
+        // canyon: rock walls are solid — except the low berm near the start
+        // bowl, where the cliffs open up and free-roamers can drive out
+        const prof = t._cliffProfile ? t._cliffProfile(this.trackIndex, fside) : null;
+        wallHere = !prof || prof.h > 2.5;
       }
-    } else if (!freeRoam && this._outside && Math.abs(this.lateral) < WALL_LIMIT - 0.5) {
-      // back on the road through a hole (or over the line) — regular racing resumes
-      this._outside = false;
+    }
+    if (wallHere) {
+      const n = t.nrm[this.trackIndex];
+      const vn = this.vel.dot(n);
+      const over = this.lateral - fside * WALL_LIMIT;
+      this.pos.addScaledVector(n, -over);
+      // absorb, don't bounce: kill the into-wall velocity (5% rebound) and
+      // let the car scrape along the rock instead
+      this.vel.addScaledVector(n, -vn * 1.05);
+      this.vel.multiplyScalar(1 - 0.03 * (1 - 0.2 * hnd));
+      this.lateral = fside * WALL_LIMIT;
+      if (this === gm.player && Math.abs(this.speedAlong) > 12 && Math.random() < 0.4)
+        gm.particles.sparks(this.pos, n, 2);
+      if (this.wallGrind <= 0) {
+        this.wallGrind = 0.18;
+        if (this === gm.player && cliffy) gm.onSolidCrash?.({ mat: 'stone' }, this, Math.abs(vn), n.x * fside, n.z * fside);
+        else this.onWallHit(n, Math.abs(vn));
+      }
     }
 
     // ---- world obstacles: solid circles {x,z,r} — push out + bounce ----
@@ -571,14 +568,20 @@ export class Car {
         this.vel.multiplyScalar(0.93);
         if (this.wallGrind <= 0) {
           this.wallGrind = 0.18;
-          _hitNormal.set(nx, 0, nz);
-          this.onWallHit(_hitNormal, Math.abs(vn));
-          if (this === gm.player) gm.shake = Math.min(1, gm.shake + 0.2);
+          // road obstacles are ROCK (hoodoos, basalt) — stone crash rules
+          if (this === gm.player && gm.onSolidCrash) {
+            gm.onSolidCrash({ mat: 'stone' }, this, Math.abs(vn), nx, nz);
+          } else {
+            _hitNormal.set(nx, 0, nz);
+            this.onWallHit(_hitNormal, Math.abs(vn));
+            if (this === gm.player) gm.shake = Math.min(1, gm.shake + 0.2);
+          }
         }
       }
     }
 
-    // ---- solid scenery (boulders, huts, gantry, grandstand, mesas) ----
+    // ---- solid scenery (boulders/mesas = stone, huts, gantry/stand = metal):
+    // material-aware crashes — stone wrecks you, buildings crash big
     if (this === gm.player && t.solids && t.solids.length) {
       for (const ob of t.solids) {
         const dx = this.pos.x - ob.x, dz = this.pos.z - ob.z;
@@ -595,9 +598,7 @@ export class Car {
           this.vel.z -= nz * vn * 1.05;
           if (this.wallGrind <= 0) {
             this.wallGrind = 0.18;
-            _hitNormal.set(nx, 0, nz);
-            this.onWallHit(_hitNormal, Math.abs(vn));
-            gm.shake = Math.min(1, gm.shake + 0.15);
+            gm.onSolidCrash?.(ob, this, Math.abs(vn), nx, nz);
           }
         }
         break;
@@ -656,7 +657,9 @@ export class Car {
       }
     }
 
-    // ---- smashable trees: plow through at speed, nudge off at a crawl ----
+    // ---- trees (material law): a toy truck does not fell a grown pine.
+    // Saplings/cacti/snags yield at speed; BIG pines are SOLID — the car
+    // stops, sheds needles, and takes real trunk damage instead.
     if (this === gm.player && t.trees && t.trees.length) {
       for (const tr of t.trees) {
         if (tr.dead) continue;
@@ -664,38 +667,26 @@ export class Car {
         const rr = tr.r + 1.7;
         if (dx * dx + dz * dz >= rr * rr) continue;
         if (Math.abs(this.pos.y - (tr.y ?? 0)) > 4) continue; // rim cacti, cliff snags
-        if (Math.abs(this.speedAlong) > 7) {
+        const yields = tr.kind !== 'pine' || tr.s < 1.0;
+        if (yields && Math.abs(this.speedAlong) > 7) {
           gm.onTreeSmash?.(tr, this);
         } else {
           const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
-          this.pos.x = tr.x + (dx / d) * rr;
-          this.pos.z = tr.z + (dz / d) * rr;
-          const vn = this.vel.x * (dx / d) + this.vel.z * (dz / d);
-          if (vn < 0) { this.vel.x -= (dx / d) * vn; this.vel.z -= (dz / d) * vn; }
+          const nx = dx / d, nz = dz / d;
+          this.pos.x = tr.x + nx * rr;
+          this.pos.z = tr.z + nz * rr;
+          const vn = this.vel.x * nx + this.vel.z * nz;
+          if (vn < 0) {
+            this.vel.x -= nx * vn * 1.05;
+            this.vel.z -= nz * vn * 1.05;
+            if (!yields && this.wallGrind <= 0) {
+              this.wallGrind = 0.18;
+              gm.onTreeCrash?.(tr, this, Math.abs(vn), nx, nz);
+            }
+          }
         }
         break;
       }
-    }
-
-    // ---- free roam: crashing THROUGH the fence line splinters it ----
-    if (freeRoam && !this.airborne) {
-      const inside = Math.abs(this.lateral) < WALL_LIMIT;
-      if (this._fenceIn !== undefined && inside !== this._fenceIn
-          && Math.abs(this.speedAlong) > 8 && !t.T?.cliffWalls
-          && Math.abs(this.pos.y - (t.pointAt(this.trackIndex, 0).y ?? 0)) < 4) {
-        const fn = t.nrm[this.trackIndex];
-        const cols = t.theme?.splinter ?? [0xc23b2a, 0xe8e2d4];
-        gm.particles.splinters(this.pos, fn, cols, 0.9);
-        gm.particles.sparks(this.pos, fn, 6);
-        this.vel.multiplyScalar(0.8); // planks don't stop you, but they cost speed
-        if (this === gm.player) {
-          gm.shake = Math.min(1, gm.shake + 0.25);
-          gm.buzz?.(20);
-          gm.score += 15;
-          if (Math.random() < 0.4) gm.hud?.feed('THROUGH THE FENCE! +15', 'good');
-        }
-      }
-      this._fenceIn = inside;
     }
 
     // ---- puddles: heavy drag + slick grip + brown splash while inside ----
@@ -880,10 +871,16 @@ export class Car {
     this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6));
   }
 
-  /** Lap bookkeeping — call with previous index before this frame's update. */
+  /** Lap bookkeeping — call with previous index before this frame's update.
+   *  With no fences the infield is drivable, so a lap only counts if the car
+   *  passed the far-side checkpoint (mid-track) since the last line crossing —
+   *  cutting straight across the map earns nothing. */
   checkLap(prevIndex) {
     const n = this.game.track.N;
+    if (this.trackIndex > n * 0.4 && this.trackIndex < n * 0.6) this._midCP = true;
     if (prevIndex > n * 0.85 && this.trackIndex < n * 0.15) {
+      if (this._midCP === false) return false; // cut the infield — no lap
+      this._midCP = false;
       this.lap++;
       return true;
     }
