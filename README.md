@@ -4,10 +4,13 @@ A bright, cartoon toy-car combat racer in the spirit of the classic *Ignition*
 (1997), playable entirely in the browser — on desktop **and phones** (full
 touch controls). Race 3 laps against the **Voxel Racers** — CROWN, SLEEK,
 DUNE, ALPINE and PIT-99, each a distinct liveried block-built machine — on a
-championship of five themed worlds — PINE VALLEY (forest), DUST CANYON
+championship of eight themed worlds — PINE VALLEY (forest), DUST CANYON
 (desert), FROST PEAK (snow), CANYON RUN (a slot canyon with hoodoo rock
-obstacles, mud puddles and overhead bridges) and EMBER PASS (volcanic
-badlands) — armed with cannon, homing missiles, mines, a shockwave blast,
+obstacles, mud puddles and overhead bridges), EMBER PASS (volcanic
+badlands), SUMMIT CLIMB (a mountain-ascent stack of switchback hairpins),
+GLACIAL PASS (an ice canyon with igloos, penguins and frozen slicks) and
+AMAZON RAPIDS (a jungle run through river fords under a banana-tree
+canopy) — armed with cannon, homing missiles, mines, a shockwave blast,
 nitro, boost pads and launch ramps. Every circuit **climbs and descends
 real elevation**: grades sap or feed your speed, the car pitches with the
 road, and each world has its own hill profile. Drift-happy arcade physics,
@@ -66,8 +69,14 @@ on the buttons. Works in portrait and landscape.
 
 ## Gameplay
 
-- **5 worlds, 3 laps each, 6 racers.** Finish a world to unlock the next; the
+- **8 worlds, 3 laps each, 6 racers.** Finish a world to unlock the next; the
   results screen chains you onward and your score carries over.
+- **SUMMIT CLIMB** is a true mountain ascent: five stacked switchback legs
+  connected by 180° hairpins climb ~33 m from the valley floor to the summit,
+  with embanked road shoulders and loose boulders on the downhill runs.
+- **Slow-field orbs**: on GLACIAL PASS and AMAZON RAPIDS a violet orb triggers
+  **FREEZE STRIKE! / JUNGLE FURY!** — every rival is pinned at half speed for
+  6 seconds (boosts included — pads won't save them).
 - **Hills**: every circuit has a real elevation profile — long climbs bleed
   your top speed, descents let you overspeed past the limiter, and each
   world's terrain, props and obstacles all sit on the graded road.
@@ -83,7 +92,9 @@ on the buttons. Works in portrait and landscape.
 - **Smart rivals** race a real line — outside-apex-outside, braking models,
   overtaking, blocking, dodging obstacles — and fight back with mines.
 - **Canyon hazards**: hoodoo rock towers to dodge and mud puddles that slow
-  you down in CANYON RUN; basalt boulders on EMBER PASS.
+  you down in CANYON RUN; basalt boulders on EMBER PASS; frozen slicks
+  between glacial cliff walls on GLACIAL PASS; mud, fallen logs and three
+  real river fords on AMAZON RAPIDS.
 - **Destruction**: smash crates, cones, barrels, hay bales and snowmen for
   credits — some crates hide pickups. Everything smashable dies to
   **weapons too**: cannon rounds pop crates, missiles detonate on them,

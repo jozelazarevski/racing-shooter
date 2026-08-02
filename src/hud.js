@@ -25,89 +25,18 @@ export class Hud {
       bMissile: $('b-missile'), bMine: $('b-mine'), bShock: $('b-shock'),
       tFire: $('t-fire'), tShock: $('t-shock'), tNitro: $('t-nitro'),
     };
-    this.map = $('minimap');
-    this.mapCtx = this.map.getContext('2d');
     this.speedo = $('speedo');
     this.spCtx = this.speedo.getContext('2d');
     this.vignetteLevel = 0;
     this._standingsHtml = '';
     this._standingsTimer = 0;
-    this._computeMapTransform();
   }
 
   show() { this.el.hud.classList.add('on'); }
   hide() { this.el.hud.classList.remove('on'); }
 
-  // ---------- minimap ----------
-  _computeMapTransform() {
-    const t = this.game.track;
-    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
-    for (const p of t.center) {
-      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-      minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
-    }
-    const w = this.map.width - 40, h = this.map.height - 40;
-    const s = Math.min(w / (maxX - minX), h / (maxZ - minZ));
-    this.mapScale = s;
-    this.mapOff = {
-      x: 20 + (w - (maxX - minX) * s) / 2 - minX * s,
-      y: 20 + (h - (maxZ - minZ) * s) / 2 - minZ * s,
-    };
-  }
-
-  _mapPt(p) { return [p.x * this.mapScale + this.mapOff.x, p.z * this.mapScale + this.mapOff.y]; }
-
-  drawMinimap() {
-    const g = this.game, c = this.mapCtx;
-    c.clearRect(0, 0, this.map.width, this.map.height);
-    c.beginPath();
-    for (let i = 0; i <= g.track.N; i += 6) {
-      const [x, y] = this._mapPt(g.track.center[i % g.track.N]);
-      i === 0 ? c.moveTo(x, y) : c.lineTo(x, y);
-    }
-    c.closePath();
-    c.strokeStyle = 'rgba(179,140,92,0.85)';
-    c.lineWidth = 9;
-    c.stroke();
-    c.strokeStyle = 'rgba(58,36,16,0.7)';
-    c.lineWidth = 2;
-    c.stroke();
-    const s = this._mapPt(g.track.center[0]);
-    c.fillStyle = '#fff';
-    c.fillRect(s[0] - 3, s[1] - 3, 6, 6);
-    for (const p of g.pickups) {
-      if (!p.active) continue;
-      const [x, y] = this._mapPt(p.pos);
-      c.fillStyle = p.color;
-      c.beginPath(); c.arc(x, y, 3, 0, Math.PI * 2); c.fill();
-    }
-    for (const e of g.enemies) {
-      if (!e.alive) continue;
-      const [x, y] = this._mapPt(e.pos);
-      c.fillStyle = '#e8402a';
-      c.beginPath(); c.arc(x, y, 4, 0, Math.PI * 2); c.fill();
-    }
-    // choppers blink orange
-    for (const ch of (g.choppers ?? [])) {
-      if (!ch.alive) continue;
-      const [x, y] = this._mapPt(ch.pos);
-      c.fillStyle = Math.floor(performance.now() / 250) % 2 ? '#ff8a2a' : '#ffd400';
-      c.beginPath();
-      c.moveTo(x, y - 5); c.lineTo(x + 4.5, y + 4); c.lineTo(x - 4.5, y + 4);
-      c.closePath(); c.fill();
-    }
-    const p = this.game.player;
-    const [px, py] = this._mapPt(p.pos);
-    c.save();
-    c.translate(px, py);
-    c.rotate(Math.PI - p.heading);
-    c.fillStyle = '#ffd400';
-    c.shadowColor = '#3a2410'; c.shadowBlur = 4;
-    c.beginPath();
-    c.moveTo(0, -8); c.lineTo(5.5, 6); c.lineTo(-5.5, 6);
-    c.closePath(); c.fill();
-    c.restore();
-  }
+  // (minimap removed by request — the road, HUD arrows and standings carry
+  // the information; the top of the screen stays clear for the view)
 
   // ---------- circular speedometer ----------
   drawSpeedo(kmh, boosting) {
@@ -269,7 +198,6 @@ export class Hud {
     this.vignetteLevel = Math.max(0, this.vignetteLevel - dt * 1.8);
     this.el.vignette.style.opacity = Math.min(1, this.vignetteLevel);
 
-    this.drawMinimap();
   }
 
   damageFlash(strength = 0.7) { this.vignetteLevel = Math.min(1.2, this.vignetteLevel + strength); }

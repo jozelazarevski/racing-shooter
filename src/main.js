@@ -449,7 +449,7 @@ class Game {
     this.pickups = [];
     const t = this.track;
     const TYPES = ['health', 'missile', 'nitro', 'mine'];
-    const COLORS = { health: 0x4dff88, missile: 0xffb52e, nitro: 0x7fd4ff, mine: 0xff5b3d };
+    const COLORS = { health: 0x4dff88, missile: 0xffb52e, nitro: 0x7fd4ff, mine: 0xff5b3d, slowfield: 0x8e7bff };
     const defs = [];
     for (let k = 0; k < 12; k++) {
       defs.push({
@@ -457,6 +457,13 @@ class Game {
         index: Math.floor((k + 0.5) * t.N / 12),
         lateral: (k % 2 === 0 ? -1 : 1) * (2 + (k % 3) * 1.8),
       });
+    }
+    // world special (concept screens): FREEZE STRIKE on GLACIAL PASS,
+    // JUNGLE FURY on AMAZON RAPIDS — one violet orb that slows every rival
+    const themeKey = this.level?.theme;
+    if (themeKey === 'glacial' || themeKey === 'jungle') {
+      defs.push({ type: 'slowfield', index: Math.floor(t.N * 0.55), lateral: 0 });
+      defs.push({ type: 'slowfield', index: Math.floor(t.N * 0.05), lateral: 0 });
     }
     const glow = glowTexture();
     for (const d of defs) {
@@ -518,6 +525,14 @@ class Game {
         } else if (p.type === 'nitro') {
           pl.nitro = Math.min(1, pl.nitro + 0.45 * (pl.nitroRate || 1));
           this.hud.feed('+NITRO CHARGE', 'good');
+        } else if (p.type === 'slowfield') {
+          // world special: every rival crawls at half pace for 6 seconds
+          this.enemySlowUntil = this.raceTime + 6;
+          const jungle = this.level?.theme === 'jungle';
+          this.hud.centerMsg(jungle ? 'JUNGLE FURY!' : 'FREEZE STRIKE!');
+          this.hud.feed(jungle ? 'MUD SLOW ×2.0 — RIVALS BOGGED' : 'ICE SLOW ×2.0 — RIVALS FROZEN', 'good');
+          this.buzz([30, 40, 60]);
+          this.score += 100;
         } else {
           pl.mines = Math.min(pl.maxMines, pl.mines + 2);
           this.hud.feed('+2 MINES', 'good');
@@ -530,6 +545,8 @@ class Game {
     for (const pad of this.track.boostPads) {
       for (const car of [this.player, ...this.enemies]) {
         if (!car.alive) continue;
+        // slow-field rule: pads give no boost to rivals while the field is live
+        if (car !== this.player && this.enemySlowUntil && this.raceTime < this.enemySlowUntil) continue;
         const di = (car.trackIndex - pad.index + this.track.N) % this.track.N;
         if ((di < 6 || di > this.track.N - 6) && Math.abs(car.lateral - pad.lateral) < 3.4 && car.boostTimer <= 0.2) {
           car.boostTimer = 1.6;
@@ -962,6 +979,7 @@ class Game {
     this.weapons.reset();
     this.hitStop = 0;
     this.fovKick = 0;
+    this.enemySlowUntil = 0;
     for (const h of this.husks) this.scene.remove(h.mesh);
     this.husks.length = 0;
     this.restoreCarParts(this.player);
