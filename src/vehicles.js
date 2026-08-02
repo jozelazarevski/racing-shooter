@@ -425,6 +425,16 @@ export class Car {
       vf = Math.min(vf, this.maxSpeed * 0.5);
       this.boostTimer = 0;
     }
+    // speed strips (log flume / maglev): the lane carries the car — fast,
+    // centered, and hard to steer out of. Set per-frame by the game.
+    if (this.stripLock) {
+      vf = Math.max(vf, this.stripLock.vmin);
+      vl -= vl * Math.min(1, 3.5 * dt); // sucked toward the lane center
+    }
+    // critter sting (scorpions / rats): brief speed cut
+    if (this.stungUntil && this.game.raceTime < this.stungUntil) {
+      vf = Math.min(vf, this.maxSpeed * 0.6);
+    }
 
     // ---- lateral grip: cornering load breaks the rear loose ----
     const speedN = THREE.MathUtils.clamp(Math.abs(vf) / this.maxSpeed, 0, 1);
@@ -450,7 +460,8 @@ export class Car {
     const taper = 1 - this.steerTaper * THREE.MathUtils.clamp((sp - this.maxSpeed * 0.6) / (this.maxSpeed * 0.55), 0, 1);
     const authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
     const dir = vf >= 0 ? 1 : -1;
-    const dTheta = steer * this.steerRate * sense * authority * dir * dt;
+    const stripSteer = this.stripLock ? this.stripLock.steerMul : 1;
+    const dTheta = steer * this.steerRate * sense * authority * stripSteer * dir * dt;
     this.heading += dTheta;
     // While gripped the velocity turns with the car (arcade rails). While slipping
     // it lags the yaw: part of the turn spills forward speed into lateral slide,

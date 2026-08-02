@@ -227,8 +227,11 @@
   .panel-head::before,.panel-head::after{content:'—';color:rgba(255,233,168,.35);margin:0 10px}
 
   /* ---------- WORLD CARDS (track selection) ---------- */
-  #level-select{margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-    gap:10px;width:100%}
+  #level-select{margin-top:10px;width:100%}
+  .region-head{margin:14px 0 6px;font-family:'Luckiest Guy';font-size:12px;letter-spacing:5px;
+    color:#c9a86a;text-align:center;text-shadow:1px 1px 0 var(--ink)}
+  .region-head:first-child{margin-top:2px}
+  .region-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;width:100%}
   .level-chip{pointer-events:auto;cursor:pointer;padding:8px 8px 10px;font-family:'Baloo 2';
     color:#ffe9a8;border-radius:12px;text-align:center;
     border:2px solid rgba(255,233,168,.35);background:rgba(38,26,12,.6);

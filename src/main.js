@@ -40,6 +40,11 @@ const WORLD_TAGS = {
   snow: '❄ snow road · low grip', canyon: 'cliff walls · bridges',
   volcano: 'embers · boulders', alpine: 'switchback mountain climb',
   glacial: '❄ ice canyon · igloos', jungle: '🌧 river fords · rain',
+  dunes: 'sand geysers · dune sweeps', ravine: '⚠ live rockfall',
+  oasis: 'mud · 🦂 scorpions', redwood: 'giant redwoods · root jumps',
+  flume: '💧 flume runs · log yard', wildfire: '🔥 burning treefall',
+  sheetice: '❄ sheet ice · icicles', avalanche: '❄ avalanche chase',
+  neon: 'maglev lanes · night city', undercity: '🐀 rats · tunnels',
 };
 
 const CAM_MODES = [
@@ -199,6 +204,7 @@ class Game {
     this.chopperWave = 0;
 
     this._buildPickups();
+    this._initWorldHazards();
     this._flashes = [];
     this.camMode = 0; // 0 = top-down, 1 = low chase
     this.camPos = new THREE.Vector3();
@@ -264,8 +270,25 @@ class Game {
       }
     }
 
-    // world cards: track-shape minimap + flavor + career best per level
+    // world cards: track-shape minimap + flavor + career best per level,
+    // grouped under region headers (region order = first appearance)
     const sel = document.getElementById('level-select');
+    const regionRows = new Map();
+    const rowFor = (lv) => {
+      const rg = lv.region || 'CHAMPIONSHIP';
+      let row = regionRows.get(rg);
+      if (!row) {
+        const head = document.createElement('div');
+        head.className = 'region-head';
+        head.textContent = rg;
+        sel.appendChild(head);
+        row = document.createElement('div');
+        row.className = 'region-row';
+        sel.appendChild(row);
+        regionRows.set(rg, row);
+      }
+      return row;
+    };
     LEVELS.forEach((lv, i) => {
       const card = document.createElement('button');
       const unlocked = this.isLevelUnlocked(lv.id);
@@ -290,7 +313,7 @@ class Game {
         }
         this.fadeTo(`?level=${lv.id}`);
       });
-      sel.appendChild(card);
+      rowFor(lv).appendChild(card);
     });
 
     // mode chips: RACE | FREE ROAM
@@ -701,6 +724,338 @@ class Game {
           if (car === this.player) { this.audio.boost(); this.hud.feed('BOOST', 'info'); }
         }
       }
+    }
+  }
+
+  // ---------- dynamic world hazards (theme-declared; see RULES.md) ----------
+  // Themes opt in with data only: geysers {count}, fallHazard {kind,period,dmg},
+  // chase {kind}, strips {kind,count}, critters {kind,count}. All systems are
+  // defensive no-ops when the theme declares nothing.
+  _initWorldHazards() {
+    const t = this.track, T = t?.T || {};
+    this.fallers = [];
+    this._fallT = 5;
+    this.chaseWall = null;
+    this.geysers = [];
+    this.strips = [];
+    this.critters = [];
+
+    if (T.geysers?.count) {
+      const n = T.geysers.count;
+      for (let k = 0; k < n; k++) {
+        const idx = Math.floor(t.N * (k + 0.5) / n);
+        const latr = (k % 2 === 0 ? -1 : 1) * 3.5;
+        const p = t.pointAt(idx, latr);
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(1.6, 3.0, 20),
+          new THREE.MeshBasicMaterial({ color: 0xc9a06a, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(p.x, p.y + 0.06, p.z);
+        this.scene.add(ring);
+        this.geysers.push({ x: p.x, y: p.y, z: p.z, phase: k * 1.9, ring });
+      }
+    }
+
+    if (T.strips?.count) {
+      // claim the straightest non-overlapping runs of ~36 samples
+      const LEN = 36, used = new Set();
+      const runs = [];
+      for (let i = 0; i < t.N; i += 4) {
+        let c = 0;
+        for (let k = 0; k < LEN; k += 4) c = Math.max(c, t.curvature[(i + k) % t.N]);
+        runs.push([c, i]);
+      }
+      runs.sort((a, b) => a[0] - b[0]);
+      const color = T.strips.kind === 'maglev' ? 0x37f6ff : 0x66c8ff;
+      for (const [, i0] of runs) {
+        if (this.strips.length >= T.strips.count) break;
+        let clash = false;
+        for (let k = -LEN; k < LEN * 2; k++) if (used.has((i0 + k + t.N) % t.N)) { clash = true; break; }
+        if (clash) continue;
+        for (let k = 0; k < LEN; k++) used.add((i0 + k) % t.N);
+        // glowing lane ribbon down the road center
+        const verts = [], idxs = [];
+        for (let k = 0; k <= LEN; k++) {
+          const j = (i0 + k) % t.N;
+          const c = t.pointAt(j, 0), nrm = t.nrm[j];
+          verts.push(c.x - nrm.x * 2.2, c.y + 0.09, c.z - nrm.z * 2.2,
+                     c.x + nrm.x * 2.2, c.y + 0.09, c.z + nrm.z * 2.2);
+          if (k) { const b = k * 2; idxs.push(b - 2, b - 1, b, b - 1, b + 1, b); }
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+        g.setIndex(idxs);
+        const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+          color, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false }));
+        this.scene.add(mesh);
+        this.strips.push({ i0, i1: (i0 + LEN) % t.N, len: LEN, mesh });
+      }
+    }
+
+    if (T.critters?.count) {
+      const rat = T.critters.kind === 'rat';
+      for (let k = 0; k < T.critters.count; k++) {
+        const idx = Math.floor(t.N * (k + 0.35) / T.critters.count);
+        const lat = (k % 2 === 0 ? -1 : 1) * (7 + (k % 3) * 2);
+        const p = t.pointAt(idx, lat);
+        const m = new THREE.Group();
+        const bodyC = rat ? 0x8a8580 : 0x7a2f1d;
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.32, 1.0),
+          new THREE.MeshStandardMaterial({ color: bodyC, roughness: 0.9 }));
+        body.position.y = 0.18;
+        m.add(body);
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.7),
+          new THREE.MeshStandardMaterial({ color: bodyC, roughness: 0.9 }));
+        tail.position.set(0, rat ? 0.15 : 0.55, -0.75);
+        if (!rat) tail.rotation.x = -0.9; // scorpion tail curls up
+        m.add(tail);
+        m.position.set(p.x, t.terrainHeight?.(p.x, p.z) ?? p.y, p.z);
+        this.scene.add(m);
+        this.critters.push({ baseX: p.x, baseZ: p.z, x: p.x, z: p.z, ang: k * 1.3, alive: true, mesh: m, lastSting: -9 });
+      }
+    }
+  }
+
+  _spawnFaller(T) {
+    const t = this.track;
+    const idx = (this.player.trackIndex + 40 + Math.floor(Math.random() * 45)) % t.N;
+    const lat = (Math.random() - 0.5) * 13;
+    const p = t.pointAt(idx, lat);
+    const kind = T.fallHazard.kind;
+    let mesh;
+    if (kind === 'icicle') {
+      mesh = new THREE.Mesh(new THREE.ConeGeometry(0.55, 2.6, 6),
+        new THREE.MeshStandardMaterial({ color: 0xcfeaf8, roughness: 0.25, envMapIntensity: 1.2 }));
+      mesh.rotation.x = Math.PI; // point down
+    } else if (kind === 'burningTree') {
+      mesh = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.9, 5.4, 0.9),
+        new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 0.9 }));
+      trunk.position.y = 2.7;
+      const glow = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.6, 1.1),
+        new THREE.MeshStandardMaterial({ color: 0xff7a2a, emissive: 0xff5a1a, emissiveIntensity: 1.6 }));
+      glow.position.y = 4.6;
+      mesh.add(trunk, glow);
+    } else {
+      mesh = new THREE.Group();
+      for (let i = 0; i < 3; i++) {
+        const s = 1.0 + Math.random() * 0.8;
+        const b = new THREE.Mesh(new THREE.BoxGeometry(s, s, s),
+          new THREE.MeshStandardMaterial({ color: 0x8a6a4c, roughness: 0.95 }));
+        b.position.set((Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.7, (Math.random() - 0.5) * 0.9);
+        b.rotation.y = Math.random() * 1.5;
+        mesh.add(b);
+      }
+    }
+    const startY = p.y + (kind === 'icicle' ? 16 : 30);
+    mesh.position.set(p.x, startY, p.z);
+    this.scene.add(mesh);
+    this.fallers.push({ kind, x: p.x, z: p.z, y: startY, groundY: p.y, vy: 0,
+      dmg: T.fallHazard.dmg ?? 20, mesh, landed: false, ttl: 18, solid: null });
+  }
+
+  _updateWorldHazards(dt, time) {
+    const t = this.track, T = t?.T || {};
+    const cars = [this.player, ...this.enemies];
+
+    // ---- falling hazards ----
+    if (T.fallHazard && this.state === 'race') {
+      this._fallT -= dt;
+      if (this._fallT <= 0 && this.fallers.filter(f => !f.landed).length < 4) {
+        this._fallT = (T.fallHazard.period ?? 6) * (0.7 + Math.random() * 0.6);
+        this._spawnFaller(T);
+      }
+    }
+    for (let i = this.fallers.length - 1; i >= 0; i--) {
+      const f = this.fallers[i];
+      if (!f.landed) {
+        f.vy += 26 * dt;
+        f.y -= f.vy * dt;
+        f.mesh.position.y = f.y;
+        // clobber anything under it on the way down
+        for (const car of cars) {
+          if (!car.alive || car.invuln > 0) continue;
+          const d = Math.hypot(car.pos.x - f.x, car.pos.z - f.z);
+          if (d < 2.3 && Math.abs(car.pos.y - f.y) < 3.2) {
+            car.damage(f.dmg, null);
+            car.vel.x += (car.pos.x - f.x) * 3; car.vel.z += (car.pos.z - f.z) * 3;
+            if (car === this.player) {
+              this.crashDrama?.();
+              this.hud.feed(f.kind === 'icicle' ? 'ICICLE STRIKE!' : f.kind === 'burningTree' ? 'CRUSHED BY BURNING TREE!' : 'ROCKFALL HIT!', 'bad');
+            }
+          }
+        }
+        if (f.y <= f.groundY + (f.kind === 'burningTree' ? 0 : 0.6)) {
+          f.landed = true;
+          const near = Math.hypot(this.player.pos.x - f.x, this.player.pos.z - f.z);
+          if (near < 40) this.shake = Math.min(1, this.shake + 0.3);
+          this.particles.debris({ x: f.x, y: f.groundY + 0.5, z: f.z }, 4);
+          if (f.kind === 'icicle') { // shatters — no lasting obstacle
+            this.particles.splinters(f.mesh.position, new THREE.Vector3(0, 1, 0), [0xcfe8f4, 0x8fd0e8], 0.7);
+            this.scene.remove(f.mesh);
+            this.fallers.splice(i, 1);
+            continue;
+          }
+          f.mesh.position.y = f.groundY + (f.kind === 'burningTree' ? 0 : 0.6);
+          f.solid = { x: f.x, z: f.z, r: 1.5, y: f.groundY, mat: 'stone', _faller: true };
+          t.solids?.push(f.solid);
+        }
+      } else {
+        f.ttl -= dt;
+        if (f.ttl <= 0) {
+          this.scene.remove(f.mesh);
+          if (f.solid && t.solids) {
+            const si = t.solids.indexOf(f.solid);
+            if (si >= 0) t.solids.splice(si, 1);
+          }
+          this.fallers.splice(i, 1);
+        }
+      }
+    }
+
+    // ---- geysers ----
+    for (const gy of this.geysers) {
+      const ph = (this.raceTime + gy.phase) % 7.5;
+      if (ph > 5.6 && ph < 6.4) { // pre-blow rumble
+        if (Math.random() < 0.3) this.particles.spawnDust?.(gy.x, gy.y, gy.z);
+        gy.ring.material.opacity = 0.85;
+      } else if (ph >= 6.4) {     // eruption
+        gy.ring.material.opacity = 0.55;
+        for (let s = 0; s < 2; s++) {
+          this.particles.spawn(gy.x + (Math.random() - 0.5), gy.y + 0.3, gy.z + (Math.random() - 0.5),
+            (Math.random() - 0.5) * 3, 14 + Math.random() * 6, (Math.random() - 0.5) * 3,
+            new THREE.Color(0xd8b878), 2.4, 0.8, { drag: 0.2, grav: 12, shrink: 1.1, alpha: 0.7 });
+        }
+        for (const car of cars) {
+          if (!car.alive) continue;
+          if ((car._geyserCd ?? 0) > this.raceTime) continue;
+          if (Math.hypot(car.pos.x - gy.x, car.pos.z - gy.z) < 3.2) {
+            car._geyserCd = this.raceTime + 2.5;
+            car.vy = Math.max(car.vy, 15);
+            car.airborne = true;
+            car.damage(3, null);
+            if (car === this.player) { this.hud.feed('SAND GEYSER LAUNCH!', 'info'); this.buzz(40); }
+          }
+        }
+      } else gy.ring.material.opacity = 0.55;
+    }
+
+    // ---- speed strips (flume / maglev) ----
+    if (this.strips.length) {
+      for (const car of cars) {
+        car.stripLock = null;
+        if (!car.alive) continue;
+        for (const st of this.strips) {
+          const rel = (car.trackIndex - st.i0 + t.N) % t.N;
+          if (rel <= st.len && Math.abs(car.lateral) < 6) {
+            car.stripLock = { vmin: car.maxSpeed * 1.22, steerMul: 0.45 };
+            // reel the car onto the lane center
+            const n = t.nrm[car.trackIndex];
+            const pull = Math.min(1, 2.5 * dt) * car.lateral;
+            car.pos.x -= n.x * pull; car.pos.z -= n.z * pull;
+            if (car === this.player && (this._stripCd ?? 0) < this.raceTime) {
+              this._stripCd = this.raceTime + 4;
+              this.hud.feed(t.T.strips.kind === 'maglev' ? 'MAGLEV LANE ENGAGED' : 'FLUME RUN!', 'info');
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // ---- critters (scorpions / rats) ----
+    for (const cr of this.critters) {
+      if (!cr.alive) continue;
+      cr.ang += Math.sin(time * 0.7 + cr.baseX) * 0.9 * dt;
+      cr.x += Math.sin(cr.ang) * 1.4 * dt;
+      cr.z += Math.cos(cr.ang) * 1.4 * dt;
+      const wanderD = Math.hypot(cr.x - cr.baseX, cr.z - cr.baseZ);
+      if (wanderD > 6) cr.ang += Math.PI * 0.5 * dt * 4; // turn back home
+      cr.mesh.position.set(cr.x, t.terrainHeight?.(cr.x, cr.z) ?? 0, cr.z);
+      cr.mesh.rotation.y = cr.ang;
+      for (const car of cars) {
+        if (!car.alive) continue;
+        const d = Math.hypot(car.pos.x - cr.x, car.pos.z - cr.z);
+        if (d > 1.7) continue;
+        const spd = Math.hypot(car.vel.x, car.vel.z);
+        if (spd > 7) { // squashed flat
+          cr.alive = false;
+          cr.mesh.scale.set(1.4, 0.12, 1.4);
+          this.particles.debris(cr.mesh.position, 2);
+          if (car === this.player) { this.score += 25; this.hud.feed('+25 PEST CONTROL', 'good'); }
+        } else if (this.raceTime - cr.lastSting > 3) { // sting/bite
+          cr.lastSting = this.raceTime;
+          car.stungUntil = this.raceTime + 1.6;
+          car.damage(2, null);
+          if (car === this.player) {
+            this.hud.feed(t.T.critters.kind === 'rat' ? 'RAT BITE — SPEED CUT!' : 'SCORPION STING — SPEED CUT!', 'bad');
+            this.buzz(30);
+          }
+        }
+        break;
+      }
+    }
+
+    // ---- avalanche chase wall (final lap) ----
+    if (T.chase && this.state === 'race' && !this.freeRoam) {
+      const p = this.player;
+      if (!this.chaseWall && p.lap >= this.lapsTotal && p.alive) {
+        this.chaseWall = { prog: (p.trackIndex - 170 + t.N) % t.N, speed: 30, warned: false };
+        this.hud.centerMsg('⚠ AVALANCHE!');
+        this.hud.feed('AVALANCHE RELEASED — OUTRUN IT!', 'bad');
+        this.buzz([60, 40, 80]);
+      }
+      const w = this.chaseWall;
+      if (w) {
+        w.speed = Math.min(58, w.speed + dt * 1.4); // it keeps picking up pace
+        w.prog = (w.prog + (w.speed * dt) / t.segLen) % t.N;
+        const wp = t.pointAt(Math.floor(w.prog), 0);
+        // billowing white front across the whole road width
+        for (let s = 0; s < 3; s++) {
+          const latr = (Math.random() - 0.5) * 16;
+          const bp = t.pointAt(Math.floor(w.prog), latr);
+          this.particles.spawn(bp.x, bp.y + Math.random() * 3, bp.z,
+            (Math.random() - 0.5) * 4, 2 + Math.random() * 4, (Math.random() - 0.5) * 4,
+            new THREE.Color(0xf4faff), 4.5, 1.1, { drag: 0.2, shrink: 1.6, alpha: 0.8 });
+        }
+        const gap = (p.trackIndex - Math.floor(w.prog) + t.N) % t.N;
+        if (gap < 55 && gap > 4 && (this._avaCd ?? 0) < this.raceTime) {
+          this._avaCd = this.raceTime + 3;
+          this.hud.feed(`AVALANCHE ${Math.round(gap * t.segLen)}m BEHIND!`, 'bad');
+          this.shake = Math.min(1, this.shake + 0.2);
+        }
+        if (gap <= 4 && p.alive && p.invuln <= 0) { // caught
+          p.damage(40, null);
+          p.vel.copy(p.forward).multiplyScalar(Math.max(30, Math.hypot(p.vel.x, p.vel.z) + 14));
+          p.vy = 8; p.airborne = true;
+          this.crashDrama?.();
+          this.hud.feed('SWALLOWED BY THE AVALANCHE −40', 'bad');
+          w.prog = (p.trackIndex - 120 + t.N) % t.N; // resets behind for another run
+        }
+        if (this.state !== 'race' || !p.alive) { /* keep rolling; resets clear it */ }
+      }
+    }
+  }
+
+  _clearWorldHazards() {
+    for (const f of this.fallers ?? []) {
+      this.scene.remove(f.mesh);
+      if (f.solid && this.track.solids) {
+        const si = this.track.solids.indexOf(f.solid);
+        if (si >= 0) this.track.solids.splice(si, 1);
+      }
+    }
+    this.fallers = [];
+    this._fallT = 5;
+    this.chaseWall = null;
+    for (const cr of this.critters ?? []) {
+      cr.alive = true;
+      cr.mesh.scale.set(1, 1, 1);
+      cr.x = cr.baseX; cr.z = cr.baseZ;
+    }
+    for (const car of [this.player, ...this.enemies]) {
+      car.stripLock = null;
+      car.stungUntil = 0;
     }
   }
 
@@ -1128,6 +1483,7 @@ class Game {
     this.hitStop = 0;
     this.fovKick = 0;
     this.enemySlowUntil = 0;
+    this._clearWorldHazards?.();
     for (const h of this.husks) this.scene.remove(h.mesh);
     this.husks.length = 0;
     this.restoreCarParts(this.player);
@@ -1464,6 +1820,7 @@ class Game {
         this._updatePickups(dt, time);
         this._updateChoppers(dt);
         this._updateProps(dt);
+        this._updateWorldHazards(dt, time);
       }
       if (this.freeRoam) this.playerRank = 1;
       else this._updateRank();
@@ -1499,3 +1856,4 @@ class Game {
 }
 
 window.__game = new Game();
+window.__LEVELS = LEVELS; // headless test harness reads the roster

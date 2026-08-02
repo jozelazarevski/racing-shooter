@@ -110,6 +110,19 @@ but sparks — a long wall grind must never wreck a car on its own. The chase
 camera is also clamped inside the walls (lateral ≤ 8.4) so the view never
 passes through rock.
 
+### Dynamic hazards (theme-declared)
+
+Worlds opt into live hazards with data on their theme; the runtime systems are
+shared. All damage numbers pass through the player's difficulty intake scale.
+
+| Hazard | Declared as | Law |
+|---|---|---|
+| Falling objects | `fallHazard {kind: rock/burningTree/icicle, period, dmg}` | Spawn ahead of the player every ~period s (≤4 airborne at once). A falling hit deals `dmg` + fling + crash drama. Rocks and burning trees land as temporary STONE solids for 18 s; icicles shatter on landing. |
+| Sand geysers | `geysers {count}` | Fixed pads on a 7.5 s cycle: rumble warning, then a 1.1 s eruption that launches any car in 3.2 u (vy 15, −3 hull, 2.5 s per-car cooldown). |
+| Speed strips | `strips {kind: flume/maglev, count}` | Glowing lanes on the straightest sections: any car on one is reeled to the lane center, floored at maxSpeed ×1.22, steering authority ×0.45. Works for rivals too. |
+| Critters | `critters {kind: scorpion/rat, count}` | Wandering roadside pests. Drive over at >7 u/s → squashed (+25). Touch one slowly → sting: speed capped ×0.6 for 1.6 s, −2 hull (3 s per-critter cooldown). |
+| Chase wall | `chase {kind: avalanche}` | Releases on the FINAL lap ~170 samples behind the player, accelerating +1.4 u/s² up to 58 u/s with distance callouts. Caught → −40 hull, hurled forward, wall resets 120 samples back. Race mode only. |
+
 ### Boundaries — there are none
 
 **Fences are gone from the game.** Every world is open: leave the road
