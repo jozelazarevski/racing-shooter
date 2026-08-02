@@ -262,13 +262,21 @@ export class Weapons {
           && g.smashPropsNear(b.pos.x, b.pos.z, 1.4, b.owner, 18) > 0) {
         hit = true;
       }
-      // ...chip trees down (3-ish hits fells one), burst tire stacks, drop boards
+      // ...chip trees down (3-ish hits fells one), burst tire stacks, drop
+      // boards. Bullets cover several units per frame, so hit-test the whole
+      // segment flown this frame — a point check tunnels through thin trunks.
       if (!hit && b.owner === g.player) {
+        const sx = b.pos.x - b.vel.x * dt, sz = b.pos.z - b.vel.z * dt;
+        const segX = b.pos.x - sx, segZ = b.pos.z - sz;
+        const segLen2 = segX * segX + segZ * segZ || 1e-9;
+        const segHits = (cx, cz, r) => {
+          const u = Math.max(0, Math.min(1, ((cx - sx) * segX + (cz - sz) * segZ) / segLen2));
+          const dx = sx + segX * u - cx, dz = sz + segZ * u - cz;
+          return dx * dx + dz * dz < r * r;
+        };
         for (const tr of g.track.trees ?? []) {
           if (tr.dead) continue;
-          const dx = b.pos.x - tr.x, dz = b.pos.z - tr.z;
-          const rr = tr.r + 1.1;
-          if (dx * dx + dz * dz >= rr * rr) continue;
+          if (!segHits(tr.x, tr.z, tr.r + 1.1)) continue;
           tr.hp = (tr.hp ?? 30) - b.dmg;
           g.particles.splinters(b.pos, _UP, [0x6a4a2a, 0x3e5e30], 0.3);
           if (tr.hp <= 0) g.onTreeSmash?.(tr, null, b.owner.pos.x, b.owner.pos.z);
@@ -277,15 +285,11 @@ export class Weapons {
         }
         if (!hit) for (const st of g.track.tireStacks ?? []) {
           if (st.dead) continue;
-          const dx = b.pos.x - st.x, dz = b.pos.z - st.z;
-          const rr = st.r + 1.1;
-          if (dx * dx + dz * dz < rr * rr) { g.onTireSmash?.(st, null, b.owner.pos.x, b.owner.pos.z); hit = true; break; }
+          if (segHits(st.x, st.z, st.r + 1.1)) { g.onTireSmash?.(st, null, b.owner.pos.x, b.owner.pos.z); hit = true; break; }
         }
         if (!hit) for (const bn of g.track.banners ?? []) {
           if (bn.dead) continue;
-          const dx = b.pos.x - bn.x, dz = b.pos.z - bn.z;
-          const rr = bn.r + 1.1;
-          if (dx * dx + dz * dz < rr * rr) { g.onBannerSmash?.(bn, null, b.owner.pos.x, b.owner.pos.z); hit = true; break; }
+          if (segHits(bn.x, bn.z, bn.r + 1.1)) { g.onBannerSmash?.(bn, null, b.owner.pos.x, b.owner.pos.z); hit = true; break; }
         }
       }
       if (hit) {

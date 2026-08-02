@@ -767,8 +767,10 @@ class Game {
   }
 
   onBushBrush(bu, car) {
-    if (this.raceTime - (bu.lastHit ?? -9) < 2) return; // once per pass
-    bu.lastHit = this.raceTime;
+    // once per pass — `|| -9` so the track's lastHit:0 init means "never hit",
+    // not "hit at t=0" (which silenced every bush for the first 2s of a race)
+    if (this.raceTime - (bu.lastHit || -9) < 2) return;
+    bu.lastHit = Math.max(0.001, this.raceTime);
     car.vel.multiplyScalar(0.85); // soft, but it drags
     const at = new THREE.Vector3(bu.x, (bu.y ?? 0) + 0.7, bu.z);
     const col = this.track.bushColor ?? 0x3e6a30;

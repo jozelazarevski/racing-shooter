@@ -396,6 +396,22 @@ export class Track {
     // Smashable trees: [{x, z, y, r, id, parts, kind, s, dead}] — every tree /
     // cactus / snag instance, so cars can fell them (mostly a free-roam thing).
     this.trees = [];
+    // SOLID scenery circle colliders (Law of Solidity — no ghost scenery):
+    // [{x, z, r, y}] for big boulders, huts, gantry legs, the grandstand
+    // front and distant mesas. Car physics treats them like this.obstacles.
+    this.solids = [];
+    // Smashable trackside tire stacks: [{x, z, y, r, ids, dead}] — one entry
+    // per STACK; ids are the instance indices inside the tire InstancedMesh.
+    this.tireStacks = [];
+    // Soft bushes cars brush through: [{x, z, y, r, id, lastHit}].
+    this.bushes = [];
+    this.bushColor = this.T.bushColor;   // leaf-particle tint for the consumer
+    // Knockable sponsor boards: [{x, z, y, r, dead, group, board, heading}].
+    this.banners = [];
+    // Breakable wooden fence: per-sample hole flags, [0]=side +1, [1]=side -1.
+    // Always present (all zero + no-op methods on cliff-walled levels).
+    this.fenceHole = [new Uint8Array(N), new Uint8Array(N)];
+    this._fenceGeo = [null, null];  // per-side ribbon geometry refs for breakFence
     // Soft world radius for free-roam driving; the game turns players around
     // once they wander past it.
     this.worldBounds = 1400;
@@ -647,6 +663,10 @@ export class Track {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow = true;
     this.group.add(mesh);
+    // Keep the ribbon geometry so breakFence can collapse it later. Vertex
+    // layout: 2 rows per sample — vertex i*2 is the ground row (y = road y),
+    // vertex i*2+1 is the top rail row (y = road y + h).
+    this._fenceGeo[side > 0 ? 0 : 1] = { geo, h, rowsPerSample: 2 };
   }
 
   _buildWalls() {
@@ -777,6 +797,7 @@ export class Track {
         leg.position.set(bx + ox, 5, bz + oz);
         leg.castShadow = true;
         this.group.add(leg);
+        this.solids.push({ x: bx + ox, z: bz + oz, r: 0.6, y: c.y });
       }
       for (let ly = 2.5; ly <= 8.5; ly += 3) {
         const brace = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.22, 2.1), wood);
@@ -1431,6 +1452,13 @@ export class Track {
       mesaSpecs.push({ x, z, w: 20 + Math.random() * 40, h: 14 + Math.random() * 20 });
     }
     this._addMesaTiers(m4, mesaSpecs);
+    // free-roamers can reach these — one solid per mesa (base tier is a unit
+    // box scaled to w wide, so base footprint radius ≈ w/2)
+    for (const s of mesaSpecs) {
+      this.solids.push({
+        x: s.x, z: s.z, r: s.w * 0.5 * 0.85, y: this.terrainHeight(s.x, s.z),
+      });
+    }
 
     // freestanding hoodoos: 4 stacked drums per tower, wider cap stone
     const COUNT = 40, SEGS = 4;
@@ -1713,14 +1741,17 @@ export class Track {
     let bk = 0;
     this._scatter(T.bushCount, () => this._trackSidePos(13, 70), (p) => {
       const s = 0.7 + Math.random() * 1.5;
+      const by = this.terrainHeight(p.x, p.z) + s * 0.3;
       m4.makeScale(s, s, s);
-      m4.setPosition(p.x, this.terrainHeight(p.x, p.z) + s * 0.3, p.z);
+      m4.setPosition(p.x, by, p.z);
       bushes.setMatrixAt(bk, m4);
       bcolor.setHSL(
         B.h + Math.random() * B.hVar,
         B.s + Math.random() * B.sVar,
         B.l + Math.random() * B.lVar
       );
+      // SOFT scenery: cars brush through, spraying leaves — no removal needed
+      this.bushes.push({ x: p.x, z: p.z, y: by, r: 1.0 * s, id: bk, lastHit: 0 });
       bushes.setColorAt(bk++, bcolor);
     });
     bushes.count = bk;
@@ -1746,6 +1777,8 @@ export class Track {
       const s = 0.5 + Math.random() * 2.2;
       const sy = s * (0.6 + Math.random() * 0.5);
       const y = this.terrainHeight(p.x, p.z) + s * 0.25;
+      // big boulders are SOLID (geometry base radius 1 × instance scale s)
+      if (s > 0.9) this.solids.push({ x: p.x, z: p.z, r: s * 0.9, y: y - s * 0.25 });
       q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(s, sy, s));
       rocks.setMatrixAt(rk, m4);
@@ -1797,6 +1830,8 @@ export class Track {
     hero.position.set(hp.x, this.terrainHeight(hp.x, hp.z) + 0.9, hp.z);
     hero.castShadow = true;
     this.scene.add(hero);
+    // hero boulder is solid too: footprint radius ≈ (4.6 + 4.1) / 2 = 4.35
+    this.solids.push({ x: hp.x, z: hp.z, r: 4.35 * 0.9, y: this.terrainHeight(hp.x, hp.z) });
     if (T.rockSnowCap) {
       const heroCap = new THREE.Mesh(
         new THREE.DodecahedronGeometry(1, 1),
@@ -1851,6 +1886,9 @@ export class Track {
       walls.setMatrixAt(placed, m4);
       m4.compose(new THREE.Vector3(p.x, y + h, p.z), q, new THREE.Vector3(w * 1.6, h * 1.1, w * 1.6));
       roofs.setMatrixAt(placed++, m4);
+      // solid hut: walls are a unit box scaled w×w, so half the world-space
+      // diagonal of the footprint is w·√2/2
+      this.solids.push({ x: p.x, z: p.z, r: (w * Math.SQRT2) / 2, y: y + 0.6 });
     });
     walls.count = roofs.count = placed;
     this.scene.add(walls, roofs);
@@ -1876,15 +1914,20 @@ export class Track {
         const tireOff = this.T.cliffWalls ? WALL_OFF + 0.8 : WALL_OFF + 2.2;
         const p = this.pointAt(i, tireOff * side);
         const stack = Math.random() < 0.5 ? 3 : 2;
+        const ids = [];
         for (let s = 0; s < stack && tk < 180; s++) {
           m4.makeTranslation(p.x + (Math.random() - 0.5) * 0.4, p.y + 0.32 + s * 0.62, p.z + (Math.random() - 0.5) * 0.4);
           tires.setMatrixAt(tk, m4);
           tcolor.set(s === stack - 1 && Math.random() < 0.5 ? 0xd8d2c2 : 0x22201c);
+          ids.push(tk);
           tires.setColorAt(tk++, tcolor);
         }
+        // one smashable entry per STACK (see smashTireStack)
+        if (ids.length) this.tireStacks.push({ x: p.x, z: p.z, y: p.y, r: 1.1, ids, dead: false });
       }
     }
     tires.count = tk;
+    this._tireMesh = tires;
     this.scene.add(tires);
 
     // hay bales
@@ -1933,7 +1976,100 @@ export class Track {
       g.position.set(p.x, this.terrainHeight(p.x, p.z), p.z);
       g.rotation.y = this.headingAt(i) + (side > 0 ? Math.PI : 0);
       this.group.add(g);
+      this.banners.push({
+        x: p.x, z: p.z, y: g.position.y, r: 1.3, dead: false,
+        group: g, board, heading: g.rotation.y,
+      });
     }
+  }
+
+  /** Knock sponsor board `b` down: hide the standing group and hand back one
+   *  standalone board+post group for the game to fling. Null if already dead. */
+  smashBanner(b) {
+    if (!b || b.dead) return null;
+    b.dead = true;
+    b.group.visible = false;
+    const g = new THREE.Group();
+    const board = new THREE.Mesh(b.board.geometry, b.board.material);
+    board.position.y = 2.6;
+    g.add(board);
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7),
+      new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.6, metalness: 0.5 })
+    );
+    post.position.set(0, 1.7, -0.1);
+    g.add(post);
+    g.position.set(b.x, b.y, b.z);
+    g.rotation.y = b.heading;
+    return g;
+  }
+
+  /** Smash tire stack `st`: zero its instances and hand back 2-3 loose tire
+   *  meshes (NOT added to the scene) for the game to fling. Null if dead. */
+  smashTireStack(st) {
+    if (!st || st.dead || !this._tireMesh) return null;
+    st.dead = true;
+    _m4.makeScale(0, 0, 0);
+    for (const id of st.ids) this._tireMesh.setMatrixAt(id, _m4);
+    this._tireMesh.instanceMatrix.needsUpdate = true;
+    if (!this._looseTireGeo) {
+      this._looseTireGeo = new THREE.TorusGeometry(0.62, 0.3, 6, 10);
+      this._looseTireGeo.rotateX(Math.PI / 2);
+      this._looseTireMat = new THREE.MeshStandardMaterial({ color: 0x22201c, roughness: 0.95 });
+    }
+    return st.ids.map((id, k) => {
+      const m = new THREE.Mesh(this._looseTireGeo, this._looseTireMat);
+      m.castShadow = true;
+      m.position.set(st.x, st.y + 0.32 + k * 0.62, st.z);
+      return m;
+    });
+  }
+
+  /** True if the wooden fence on `side` (+1 left / -1 right) has been punched
+   *  out at sample i. Always false on cliff-walled levels. */
+  fenceBrokenAt(side, i) {
+    return !!this.fenceHole[side > 0 ? 0 : 1][((i % N) + N) % N];
+  }
+
+  /** Punch a hole in the wooden fence around sample i (`span` samples wide):
+   *  flags the samples and collapses the ribbon's top-rail vertices to ground
+   *  level so a visible gap opens. Idempotent per sample. Returns 2-4 loose
+   *  painted plank meshes to fling, or [] if nothing new broke (already
+   *  broken, cliff-walled level, or inside the protected start area). */
+  breakFence(side, i, span = 5) {
+    const si = side > 0 ? 0 : 1;
+    const ref = this._fenceGeo[si];
+    if (!ref) return [];                          // canyon cliffs stay solid
+    const flags = this.fenceHole[si];
+    const pos = ref.geo.attributes.position;
+    const half = Math.max(0, span >> 1);
+    const broken = [];
+    for (let k = -half; k <= half; k++) {
+      const j = (((i + k) % N) + N) % N;
+      if (this._circDist(j, 0) < 25) continue;    // gate + grandstand: unbreakable
+      if (flags[j]) continue;
+      flags[j] = 1;
+      // drop this sample's top-rail vertex onto the ground row → visible gap
+      pos.setY(j * ref.rowsPerSample + 1, this.center[j].y + 0.02);
+      broken.push(j);
+    }
+    if (!broken.length) return [];
+    pos.needsUpdate = true;
+    const cols = this.T.splinter || [0xc23b2a, 0xe8e2d4];
+    const nPl = Math.min(4, Math.max(2, broken.length - 1));
+    const planks = [];
+    for (let k = 0; k < nPl; k++) {
+      const j = broken[((k * (broken.length - 1)) / Math.max(1, nPl - 1)) | 0];
+      const p = this.pointAt(j, WALL_OFF * side);
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(1.8, 0.35, 0.08),
+        new THREE.MeshStandardMaterial({ color: cols[k % cols.length], roughness: 0.9 })
+      );
+      m.position.set(p.x, p.y + 0.55 + Math.random() * 0.6, p.z);
+      m.rotation.y = this.headingAt(j) + (Math.random() - 0.5) * 0.6;
+      planks.push(m);
+    }
+    return planks;
   }
 
   _buildGrandstand() {
@@ -1970,6 +2106,14 @@ export class Track {
     // width runs along the track; step rows climb away from it
     g.rotation.y = this.headingAt(i) + Math.PI / 2;
     this.group.add(g);
+    // 3 solid colliders along the 20-unit front face (which runs with the track)
+    for (const off of [-7, 0, 7]) {
+      this.solids.push({
+        x: p.x + this.tan[i].x * off,
+        z: p.z + this.tan[i].z * off,
+        r: 2.5, y: p.y,
+      });
+    }
   }
 
   /** Wooden plank foot-bridges spanning the canyon overhead. Deck sits at
