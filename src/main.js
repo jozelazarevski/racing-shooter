@@ -7,7 +7,7 @@ import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
 import { Track, LEVELS, circuitPoints } from './track.js';
-import { PlayerCar, EnemyCar, CAR_CATALOG } from './vehicles.js';
+import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { Weapons } from './weapons.js';
 import { Particles, SkidMarks } from './particles.js';
@@ -493,16 +493,47 @@ class Game {
     }
   }
 
+  /** Render each catalog car's real voxel mesh to a 3/4-view icon (cached). */
+  _carIcons() {
+    if (this.__carIcons) return this.__carIcons;
+    const W = 148, H = 96;
+    const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    r.setSize(W, H);
+    r.setPixelRatio(2);
+    r.toneMapping = THREE.ACESFilmicToneMapping;
+    r.toneMappingExposure = 1.12;
+    const scene = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 60);
+    cam.position.set(5.2, 3.2, 6.2);
+    cam.lookAt(0, 0.55, 0);
+    scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x6a5a44, 1.15));
+    const sun = new THREE.DirectionalLight(0xfff3d6, 2.2);
+    sun.position.set(4, 7, 5);
+    scene.add(sun);
+    const icons = {};
+    for (const car of CAR_CATALOG) {
+      const mesh = buildCarMesh(car.spec);
+      mesh.rotation.y = Math.PI * 0.82; // 3/4 front view
+      scene.add(mesh);
+      r.render(scene, cam);
+      icons[car.key] = r.domElement.toDataURL();
+      scene.remove(mesh);
+    }
+    r.dispose();
+    this.__carIcons = icons;
+    return icons;
+  }
+
   renderCarShop() {
     const shop = document.getElementById('car-shop');
     shop.innerHTML = '';
+    const icons = this._carIcons();
     for (const car of CAR_CATALOG) {
       const owned = this.cars.owned.includes(car.key);
       const selected = this.cars.selected === car.key;
       const card = document.createElement('button');
       card.className = 'car-card' + (owned ? ' owned' : ' locked') + (selected ? ' selected' : '');
-      const bodyHex = '#' + (car.spec.body ?? 0x888888).toString(16).padStart(6, '0');
-      card.innerHTML = `<div class="swatch" style="background:${bodyHex}"></div>
+      card.innerHTML = `<img class="car-icon" src="${icons[car.key]}" alt="${car.name}">
         <div class="cname">${car.name}</div><div class="cdesc">${car.desc}</div>
         <div class="cprice">${selected ? 'DRIVING' : owned ? 'DRIVE' : car.price.toLocaleString() + ' CR'}</div>`;
       card.addEventListener('click', () => {
