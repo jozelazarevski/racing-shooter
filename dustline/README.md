@@ -1,7 +1,27 @@
 # DUSTLINE — Rally Combat Racer
 
 Arcade rally racing + vehicular combat. Full end-to-end spec lives in
-`CLAUDE.md` (milestones M1–M8). **Current status: M2 complete.**
+`CLAUDE.md` (milestones M1–M8). **Current status: M3 complete.**
+
+## M3 — race loop (done)
+
+- **Racing line bake** (`ai/racingLine.ts`, spec 2.1/2.4-lite): per-node
+  target speeds from Menger curvature + per-surface muLat
+  (v = sqrt(mu*g*R)), backward braking pass + forward acceleration pass —
+  runs once at boot, deterministic
+- **3 AI drivers** (`ai/driver.ts`): spec look-ahead clamp(speed*0.35, 6,
+  30), P-steer + yaw damping, braking-distance speed control against the
+  baked profile, lateral avoid layer, stuck-recovery. Named liveries
+  (KESKI / MORROW / ONYX) with per-driver pace + lane
+- **Race director** (`race/director.ts`): countdown, ordered sector
+  checkpoints (cutting earns nothing), 3 laps, best-lap tracking, live
+  positions from gate-relative progress, finish + results
+- **Race HUD** (`ui/hud.ts`): position + lap + timer, standings ticker,
+  countdown, results screen with single-input NEXT RACE (pillar 3)
+- Found & fixed in acceptance: countdown "hold brake" made the whole grid
+  reverse at 40 km/h (brake at standstill = reverse) — grids now pin with
+  the handbrake; standings progress is gate-relative so grid cars no
+  longer rank as nearly a lap ahead
 
 ## M2 — rally feel (done)
 

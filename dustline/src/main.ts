@@ -1,18 +1,32 @@
-// DUSTLINE M1 — driving prototype entry point.
-// Fixed-timestep Rapier sim (120 Hz) + interpolated Three.js rendering.
+// DUSTLINE — M3: full race loop. Fixed-timestep Rapier sim (120 Hz) with
+// interpolated rendering; 4 racers (player + 3 AI on the baked line),
+// countdown, sectors, laps, positions, results.
 
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { GameLoop, FIXED_DT } from './core/loop';
-import { Input } from './core/input';
+import { Input, InputState } from './core/input';
 import { VehicleController } from './physics/vehicleController';
-import { buildRenderer, buildWorld, buildCarVisual } from './render/scene';
+import { buildRenderer, buildWorld, buildCarVisual, CarVisual } from './render/scene';
 import { ChaseCamera } from './render/camera';
 import { Telemetry } from './ui/telemetry';
+import { RaceHUD } from './ui/hud';
 import { Terrain } from './tracks/terrain';
 import { WheelFX } from './render/particles';
 import { buildSky, buildClouds, buildMountains, buildVegetation } from './render/scenery';
+import { bakeRacingLine } from './ai/racingLine';
+import { AIDriver, DriverSpec } from './ai/driver';
+import { RaceDirector } from './race/director';
 import carData from './data/car.json';
+import aiData from './data/ai.json';
+
+// Countdown hold: NO brake — in this control scheme brake at standstill
+// means reverse, and a braking grid would quietly drive itself backwards.
+// The handbrake pins the rears instead.
+const IDLE: InputState = {
+  throttle: 0, brake: 0, steer: 0, handbrake: true, nitro: false,
+  fire: false, rearFire: false, lookBack: false, reset: false, usingGamepad: false,
+};
 
 async function boot() {
   await RAPIER.init();
@@ -21,12 +35,9 @@ async function boot() {
   const renderer = buildRenderer(canvas);
   const scene = new THREE.Scene();
   buildWorld(scene);
-  const carVisual = buildCarVisual(scene);
   const chase = new ChaseCamera();
   addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
 
-  // physics world + M2 heightmap terrain (render mesh and trimesh collider
-  // share the exact same grid, so what you see is what you drive)
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = FIXED_DT;
   const terrain = new Terrain();
@@ -36,10 +47,65 @@ async function boot() {
   buildMountains(scene);
   buildVegetation(scene, terrain, world, RAPIER);
 
-  const car = new VehicleController(RAPIER, world, terrain.spawn, terrain);
+  const line = bakeRacingLine(terrain);
+  const director = new RaceDirector(line);
+
+  // ---- racers: player + 3 AI ----
+  interface Racer { ctrl: VehicleController; visual: CarVisual; driver: AIDriver | null; }
+  const racers: Racer[] = [];
+
+  const playerCtrl = new VehicleController(RAPIER, world, terrain.spawn, terrain);
+  racers.push({ ctrl: playerCtrl, visual: buildCarVisual(scene), driver: null });
+  director.addRacer(playerCtrl, 'YOU', true);
+
+  for (const spec of aiData.drivers as DriverSpec[]) {
+    const ctrl = new VehicleController(RAPIER, world, terrain.spawn, terrain);
+    const driver = new AIDriver(ctrl, line, spec);
+    racers.push({ ctrl, visual: buildCarVisual(scene, spec.color, spec.accent), driver });
+    director.addRacer(ctrl, spec.name, false);
+  }
+
+  const placeAll = () => {
+    director.racers.forEach((entry, i) => {
+      const slot = director.gridSlot(i);
+      const c = entry.ctrl;
+      c.body.setTranslation({ x: slot.x, y: terrain.heightAt(slot.x, slot.z) + 1.0, z: slot.z }, true);
+      c.body.setRotation({ x: 0, y: Math.sin(slot.heading / 2), z: 0, w: Math.cos(slot.heading / 2) }, true);
+      c.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      c.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      const r = racers[i];
+      if (r.driver) r.driver.lineIdx = entry.lineIdx;
+    });
+  };
+  director.restart(() => {});
+  placeAll();
+
   const input = new Input();
   const telemetry = new Telemetry();
+  const hud = new RaceHUD();
+  hud.onRestart = () => { director.restart(() => {}); placeAll(); };
   const fx = new WheelFX(scene, chase.camera);
+
+  const ctrls = racers.map((r) => r.ctrl);
+
+  // ---- fixed pipeline (also driven by tests via fastForward) ----
+  const fixedStep = (dt: number) => {
+    input.poll();
+    const racing = director.state !== 'countdown';
+    for (let i = 0; i < racers.length; i++) {
+      const r = racers[i];
+      let inp: InputState;
+      if (r.driver) {
+        inp = r.driver.update(dt, ctrls, racing);
+        if (director.racers[i].finished) inp.throttle = Math.min(inp.throttle, 0.4); // cool-down lap
+      } else {
+        inp = racing ? input.state : IDLE;
+      }
+      r.ctrl.fixedUpdate(dt, inp);
+    }
+    world.step();
+    director.update(dt);
+  };
 
   // interpolation scratch
   const iPos = new THREE.Vector3();
@@ -49,45 +115,44 @@ async function boot() {
   const wheelR = carData.tire.wheelRadius;
 
   const loop = new GameLoop({
-    fixedUpdate: (dt) => {
-      input.poll();
-      car.fixedUpdate(dt, input.state);
-      world.step();
-    },
+    fixedUpdate: fixedStep,
     render: (alpha, frameDt) => {
-      iPos.lerpVectors(car.prevPos, car.currPos, alpha);
-      iQuat.slerpQuaternions(car.prevQuat, car.currQuat, alpha);
-      carVisual.root.position.copy(iPos);
-      carVisual.root.quaternion.copy(iQuat);
-
-      // wheels: seat at suspension length, steer fronts, spin all
-      for (let i = 0; i < 4; i++) {
-        const w = car.wheels[i];
-        const m = susp.mounts[i];
-        const drop = w.grounded
-          ? Math.max(0.05, (susp.restLength + susp.maxTravel) - w.compressionM)
-          : susp.restLength + susp.maxTravel;
-        carVisual.wheels[i].position.set(m[0], m[1] - drop + wheelR, m[2]);
-        carVisual.wheels[i].rotation.set(0, w.steer, 0);
-        carVisual.wheels[i].rotateX(w.spin);
-      }
-
-      const lv = car.body.linvel();
-      vel.set(lv.x, lv.y, lv.z);
-
-      // per-surface wheel FX (§1.2 table)
-      for (let i = 0; i < 4; i++) {
-        const w = car.wheels[i];
-        if (w.grounded) {
-          fx.wheelKick(w.surface, w.slipping, w.worldContact.x, w.worldContact.y, w.worldContact.z,
-            vel.x, vel.z, car.speedKmh / 3.6);
+      for (const r of racers) {
+        const c = r.ctrl;
+        iPos.lerpVectors(c.prevPos, c.currPos, alpha);
+        iQuat.slerpQuaternions(c.prevQuat, c.currQuat, alpha);
+        r.visual.root.position.copy(iPos);
+        r.visual.root.quaternion.copy(iQuat);
+        for (let i = 0; i < 4; i++) {
+          const w = c.wheels[i];
+          const m = susp.mounts[i];
+          const drop = w.grounded
+            ? Math.max(0.05, (susp.restLength + susp.maxTravel) - w.compressionM)
+            : susp.restLength + susp.maxTravel;
+          r.visual.wheels[i].position.set(m[0], m[1] - drop + wheelR, m[2]);
+          r.visual.wheels[i].rotation.set(0, w.steer, 0);
+          r.visual.wheels[i].rotateX(w.spin);
+        }
+        // wheel FX for every racer (they all kick dust)
+        const lv = c.body.linvel();
+        for (let i = 0; i < 4; i++) {
+          const w = c.wheels[i];
+          if (w.grounded) {
+            fx.wheelKick(w.surface, w.slipping, w.worldContact.x, w.worldContact.y, w.worldContact.z,
+              lv.x, lv.z, c.speedKmh / 3.6);
+          }
         }
       }
       fx.update(frameDt);
       clouds.rotation.y += frameDt * 0.004;
 
-      chase.update(frameDt, iPos, iQuat, vel, car.speedKmh, car.nitroActive, input.state.lookBack);
-      telemetry.update(frameDt, loop, car);
+      const plv = playerCtrl.body.linvel();
+      vel.set(plv.x, plv.y, plv.z);
+      iPos.lerpVectors(playerCtrl.prevPos, playerCtrl.currPos, alpha);
+      iQuat.slerpQuaternions(playerCtrl.prevQuat, playerCtrl.currQuat, alpha);
+      chase.update(frameDt, iPos, iQuat, vel, playerCtrl.speedKmh, playerCtrl.nitroActive, input.state.lookBack);
+      telemetry.update(frameDt, loop, playerCtrl);
+      hud.update(director);
       renderer.render(scene, chase.camera);
     },
   });
@@ -96,7 +161,10 @@ async function boot() {
   loop.start();
 
   // headless-test + tuning hook
-  (window as unknown as { __dust: object }).__dust = { car, world, loop, input, terrain, fx };
+  (window as unknown as { __dust: object }).__dust = {
+    car: playerCtrl, world, loop, input, terrain, fx, line, director, racers,
+    fastForward: (ticks: number) => { for (let i = 0; i < ticks; i++) fixedStep(FIXED_DT); },
+  };
 }
 
 boot();
