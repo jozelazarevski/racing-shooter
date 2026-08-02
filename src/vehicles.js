@@ -435,7 +435,7 @@ export class Car {
     if (inputs.drift) slipTarget = 1; // handbrake forces a full slide
     const slipRate = slipTarget > this.slip ? 7 : 3.2; // break loose fast, recover smoothly
     this.slip += (slipTarget - this.slip) * Math.min(1, slipRate * dt);
-    let grip = this.grip * (1 + 0.08 * hnd) * (1 - 0.78 * this.slip) * sGrip;
+    let grip = this.grip * (1 + 0.08 * hnd) * (1 - 0.78 * this.slip) * sGrip * (this.gripBoost || 1);
     if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
     if (this.landGrip > 0) { this.landGrip -= dt; grip *= 0.4; } // loose for ~0.4s after landing
     if (this._wetT > 0) { this._wetT -= dt; grip *= 0.75; }      // slick tires through puddles
@@ -581,8 +581,16 @@ export class Car {
         gm.particles.sparks(this.pos, n, 2);
       if (this.wallGrind <= 0) {
         this.wallGrind = 0.18;
-        if (this === gm.player && cliffy) gm.onSolidCrash?.({ mat: 'stone' }, this, Math.abs(vn), n.x * fside, n.z * fside);
-        else this.onWallHit(n, Math.abs(vn));
+        const vnAbs = Math.abs(vn);
+        // cliff rock hurts like STONE, but only on a real hit (glancing
+        // scrapes are free) and at most ~once a second — the old per-grind
+        // ticks could wreck a car in one long scrape along the canyon wall
+        if (this === gm.player && cliffy) {
+          if (vnAbs > 7 && (this._cliffHurt ?? 0) <= 0) {
+            this._cliffHurt = 1.1;
+            gm.onSolidCrash?.({ mat: 'stone' }, this, vnAbs, n.x * fside, n.z * fside);
+          } // else: scrape sparks only — no hull cost while the cooldown runs
+        } else this.onWallHit(n, vnAbs);
       }
     }
 
@@ -803,6 +811,7 @@ export class Car {
 
     if (this.fireCooldown > 0) this.fireCooldown -= dt;
     if (this.invuln > 0) this.invuln -= dt;
+    if (this._cliffHurt > 0) this._cliffHurt -= dt;
     this.syncMesh(dt, vl, inputs);
   }
 
@@ -880,6 +889,13 @@ export class Car {
 
   damage(amount, attacker = null) {
     if (!this.alive || this.invuln > 0) return false;
+    // survivability: the player's hull takes reduced damage below HARD —
+    // crashes still cost (feeds/parts/drama fire off the same events), but
+    // a couple of mistakes shouldn't end the race
+    if (this === this.game.player) {
+      const id = this.game.difficulty?.id;
+      amount *= id === 'easy' ? 0.55 : id === 'hard' ? 0.95 : 0.75;
+    }
     const before = this.health / this.maxHealth;
     this.health -= amount;
     if (amount >= 15) this.game.particles.debris(this.pos, 2 + (Math.random() < 0.5 ? 1 : 0));

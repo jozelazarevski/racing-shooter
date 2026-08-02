@@ -101,6 +101,15 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 | Boost pads | TERRAIN | — | — | — | Forward impulse, yellow chevrons |
 | Launch ramps | TERRAIN | — | — | — | Airborne launch; landing puff + brief loose grip |
 
+### Cliff walls (canyon-type worlds)
+
+Cliff rock is STONE for a real hit: impact `> 7` u/s into the face runs the
+stone damage formula, rate-limited to one damage event per **1.1 s** per car.
+Glancing scrapes and grinding along the wall between cooldowns cost nothing
+but sparks — a long wall grind must never wreck a car on its own. The chase
+camera is also clamped inside the walls (lateral ≤ 8.4) so the view never
+passes through rock.
+
 ### Boundaries — there are none
 
 **Fences are gone from the game.** Every world is open: leave the road
@@ -156,7 +165,7 @@ walls.
 | Object | Class | Behavior |
 |---|---|---|
 | Rival cars | ACTOR | Real impacts (> 9 u/s relative) dent BOTH hulls `min(20, (impact−9)×0.6)`, rate-limited 0.5 s per car; rubs are free; restitution 0.12; sparks scale with impact |
-| Player car | ACTOR | Same rules; also takes wall/tree/ram/weapon damage; wreck at 0 hull → respawn with brief invulnerability |
+| Player car | ACTOR | Same rules; also takes wall/tree/ram/weapon damage; wreck at 0 hull → respawn with brief invulnerability. Hull intake scales by difficulty: EASY ×0.55, NORMAL ×0.75, HARD ×0.95 (events/drama unchanged) |
 | Choppers | ACTOR | 80 hp; killed by cannon (flak — altitude ignored), missiles, shockwave; +500 on kill |
 | Pickups | trigger | Collected on touch: green hull / amber missiles / blue nitro / red mines |
 | Slow-field orb (violet) | trigger | GLACIAL PASS / AMAZON RAPIDS only (2 per lap). On touch: **FREEZE STRIKE! / JUNGLE FURY!** — every rival is hard-capped at `maxSpeed × 0.5` for 6 s. The cap is physical: it stomps in-flight boosts and boost pads grant rivals nothing while the field is live. +100 score |

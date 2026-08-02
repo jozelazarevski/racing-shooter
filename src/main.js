@@ -6,7 +6,7 @@ import { UnrealBloomPass } from '../lib/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
-import { Track, LEVELS } from './track.js';
+import { Track, LEVELS, circuitPoints } from './track.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { Weapons } from './weapons.js';
@@ -26,12 +26,21 @@ const DIFFS = {
 };
 
 const UPGRADES = [
-  { key: 'engine',   name: 'ENGINE',   icon: '🔧', desc: '+4% top speed / lvl',       max: 5 },
-  { key: 'armor',    name: 'ARMOR',    icon: '🛡️', desc: '+15 max hull / lvl',        max: 5 },
-  { key: 'cannon',   name: 'CANNON',   icon: '🔥', desc: '+18% cannon damage / lvl',  max: 5 },
-  { key: 'nitro',    name: 'NITRO',    icon: '⚡', desc: '+22% nitro charge / lvl',   max: 5 },
-  { key: 'handling', name: 'HANDLING', icon: '🎯', desc: 'smoother steering / lvl',   max: 5 },
+  { key: 'engine',   name: 'ENGINE WRENCH',     icon: '🔧', desc: '+4% top speed / lvl',       max: 5 },
+  { key: 'handling', name: 'SUSPENSION SPRING', icon: '⚙️', desc: 'smoother steering / lvl',   max: 5 },
+  { key: 'tires',    name: 'TIRES STACK',       icon: '🛞', desc: '+4% grip / lvl',            max: 5 },
+  { key: 'nitro',    name: 'BOOST NITRO CAN',   icon: '⚡', desc: '+22% nitro charge / lvl',   max: 5 },
+  { key: 'armor',    name: 'ARMOR SHIELD',      icon: '🛡️', desc: '+15 max hull / lvl',        max: 5 },
+  { key: 'cannon',   name: 'CANNON CORE',       icon: '🔥', desc: '+18% cannon damage / lvl',  max: 5 },
 ];
+
+// world-card flavor lines (surface + signature hazards per theme)
+const WORLD_TAGS = {
+  forest: '🌧 wet road · drizzle', desert: 'fast sweepers · dust',
+  snow: '❄ snow road · low grip', canyon: 'cliff walls · bridges',
+  volcano: 'embers · boulders', alpine: 'switchback mountain climb',
+  glacial: '❄ ice canyon · igloos', jungle: '🌧 river fords · rain',
+};
 
 const CAM_MODES = [
   { name: 'TOP-DOWN',  back: 20, h: 52, look: 7,  lookH: 0,   spdBack: 6, spdH: 10 },
@@ -60,7 +69,7 @@ class Game {
 
     // progression + difficulty + garage (persisted)
     this.career = loadJSON('ir-career', { finished: {} });
-    this.garage = loadJSON('ir-garage', { credits: 0, engine: 0, armor: 0, cannon: 0, nitro: 0, handling: 0 });
+    this.garage = loadJSON('ir-garage', { credits: 0, engine: 0, armor: 0, cannon: 0, nitro: 0, handling: 0, tires: 0 });
     this.cars = loadJSON('ir-cars', { owned: ['brawler'], selected: 'brawler' });
     if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = 'brawler';
     // mode comes from the URL only — a fresh visit ALWAYS starts in RACE mode
@@ -239,25 +248,49 @@ class Game {
       this.togglePause();
     });
 
-    // level select chips on the title screen
+    // menu tabs: PRE-RACE (tracks + settings) | GARAGE (cars + upgrades)
+    {
+      const tabs = [
+        [document.getElementById('tab-btn-race'), document.getElementById('tab-race')],
+        [document.getElementById('tab-btn-garage'), document.getElementById('tab-garage')],
+      ];
+      for (const [btn, panel] of tabs) {
+        btn.addEventListener('click', () => {
+          for (const [b, p2] of tabs) {
+            b.classList.toggle('current', b === btn);
+            p2.classList.toggle('off', p2 !== panel);
+          }
+        });
+      }
+    }
+
+    // world cards: track-shape minimap + flavor + career best per level
     const sel = document.getElementById('level-select');
     LEVELS.forEach((lv, i) => {
-      const chip = document.createElement('button');
+      const card = document.createElement('button');
       const unlocked = this.isLevelUnlocked(lv.id);
-      chip.className = 'level-chip'
+      card.className = 'level-chip'
         + (i === this.levelIndex ? ' current' : '')
         + (unlocked ? '' : ' locked');
-      chip.textContent = unlocked ? lv.name : `🔒 ${lv.name}`;
-      chip.addEventListener('click', () => {
+      const best = this.career.finished[lv.id];
+      const bestTxt = best
+        ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
+        : (unlocked ? '★ UNRACED' : '');
+      card.innerHTML = `<canvas class="wc-map" width="150" height="104"></canvas>
+        <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
+        <div class="wc-tags">${WORLD_TAGS[lv.theme] || ''}</div>
+        <div class="wc-best${best ? '' : ' new'}">${bestTxt}</div>`;
+      this._drawCircuitMap(card.querySelector('.wc-map'), lv.theme, !unlocked, i === this.levelIndex);
+      card.addEventListener('click', () => {
         if (i === this.levelIndex) return;
         if (!this.isLevelUnlocked(lv.id)) {
-          chip.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
+          card.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
             { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
           return;
         }
         this.fadeTo(`?level=${lv.id}`);
       });
-      sel.appendChild(chip);
+      sel.appendChild(card);
     });
 
     // mode chips: RACE | FREE ROAM
@@ -420,7 +453,44 @@ class Game {
     p.cannonDamage = 7 * (1 + 0.18 * g.cannon);
     p.nitroRate = 1 + 0.22 * g.nitro;
     p.handling = 0.2 * (g.handling || 0);
+    p.gripBoost = 1 + 0.04 * (g.tires || 0);
     p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
+  }
+
+  /** Draw a smoothed closed track outline on a world-card canvas. */
+  _drawCircuitMap(cnv, themeKey, locked, current) {
+    const pts = circuitPoints(themeKey);
+    const ctx = cnv.getContext('2d');
+    const W = cnv.width, H = cnv.height, pad = 12;
+    let nx = Infinity, xx = -Infinity, nz = Infinity, xz = -Infinity;
+    for (const [x, z] of pts) {
+      nx = Math.min(nx, x); xx = Math.max(xx, x);
+      nz = Math.min(nz, z); xz = Math.max(xz, z);
+    }
+    const s = Math.min((W - pad * 2) / (xx - nx), (H - pad * 2) / (xz - nz));
+    const ox = (W - (xx - nx) * s) / 2 - nx * s;
+    const oz = (H - (xz - nz) * s) / 2 - nz * s;
+    const P = pts.map(([x, z]) => [x * s + ox, z * s + oz]);
+    const n = P.length;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    const path = () => {
+      ctx.beginPath();
+      ctx.moveTo((P[0][0] + P[n - 1][0]) / 2, (P[0][1] + P[n - 1][1]) / 2);
+      for (let i = 0; i < n; i++) {
+        const a = P[i], b = P[(i + 1) % n];
+        ctx.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+      }
+      ctx.closePath();
+    };
+    path(); ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 7; ctx.stroke();
+    path();
+    ctx.strokeStyle = locked ? 'rgba(255,233,168,.35)' : current ? '#ffd400' : '#e8c887';
+    ctx.lineWidth = 3; ctx.stroke();
+    if (!locked) { // start-line dot
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(P[0][0], P[0][1], 3, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
   }
 
   renderCarShop() {
@@ -466,7 +536,7 @@ class Game {
       const pips = Array.from({ length: u.max },
         (_, i) => `<span class="${i < lvl ? '' : 'off'}">●</span>`).join('');
       row.innerHTML = `<div class="ic">${u.icon}</div>
-        <div class="nm">${u.name}<small>${u.desc}</small></div>
+        <div class="nm">${u.name}<small class="up-lvl">LEVEL ${lvl}/${u.max}</small><small>${u.desc}</small></div>
         <div class="pips">${pips}</div>`;
       const btn = document.createElement('button');
       btn.className = 'up-buy' + (lvl >= u.max ? ' maxed' : '');
@@ -1266,9 +1336,29 @@ class Game {
     const targetLook = p.pos.clone()
       .addScaledVector(fwd, M.look)
       .add(new THREE.Vector3(0, M.lookH || 0, 0));
+    // cliff-walled worlds: never let the camera swing through the rock face.
+    // Clamp lateral track offset just inside the walls and rise instead —
+    // applied to the TARGET and to the LERPED position (the smoothing path
+    // cuts corners on hairpins and would otherwise trail through the cliff).
+    const tk = this.track;
+    const clampCam = (v) => {
+      if (!tk?.T?.cliffWalls || !tk.nearestIndex) return;
+      const ci = tk.nearestIndex(v, p.trackIndex);
+      const lat = tk.lateralOffset(v, ci);
+      const lim = 8.4;
+      if (Math.abs(lat) > lim) {
+        const n = tk.nrm[ci];
+        const over = lat - Math.sign(lat) * lim;
+        v.x -= n.x * over;
+        v.z -= n.z * over;
+        v.y += Math.min(4, Math.abs(over) * 0.5);
+      }
+    };
+    clampCam(targetPos);
     const k = 1 - Math.exp(-5.5 * dt);
     this.camPos.lerp(targetPos, k);
     this.camLook.lerp(targetLook, k);
+    clampCam(this.camPos);
     // screen shake
     this.shake = Math.max(0, this.shake - dt * 2.2);
     const s = this.shake * this.shake;

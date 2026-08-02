@@ -96,7 +96,12 @@ on the buttons. Works in portrait and landscape.
   throw rooster tails of powder or water, and the HUD calls the surface at
   lights-out.
 - **Career & garage**: every race pays credits equal to the score you earned;
-  spend them on ENGINE, ARMOR, CANNON and NITRO upgrades (5 levels each).
+  spend them in the tabbed title menu — **PRE-RACE** shows a map-and-track
+  selection of world cards, each with its real circuit outline drawn in
+  miniature, surface/hazard tags and your career best; **GARAGE** holds the
+  car dealership and six detailed upgrade lines (ENGINE WRENCH, SUSPENSION
+  SPRING, TIRES STACK, BOOST NITRO CAN, ARMOR SHIELD, CANNON CORE — 5
+  levels each, with level readouts and prices).
 - **Smart rivals** race a real line — outside-apex-outside, braking models,
   overtaking, blocking, dodging obstacles — and fight back with mines.
 - **Canyon hazards**: hoodoo rock towers to dodge and mud puddles that slow

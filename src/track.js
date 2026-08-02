@@ -449,6 +449,9 @@ const THEMES = {
 };
 
 const N = 900;              // centerline samples
+/** Title-screen minimaps: the raw circuit control polygon for a theme. */
+export function circuitPoints(themeKey) { return CIRCUITS[themeKey] || CIRCUITS.forest; }
+
 export const ROAD_HALF = 9; // drivable half-width
 export const WALL_OFF = 10.4;
 
