@@ -8,10 +8,13 @@ championship of five themed worlds — PINE VALLEY (forest), DUST CANYON
 (desert), FROST PEAK (snow), CANYON RUN (a slot canyon with hoodoo rock
 obstacles, mud puddles and overhead bridges) and EMBER PASS (volcanic
 badlands) — armed with cannon, homing missiles, mines, a shockwave blast,
-nitro, boost pads and launch ramps. Drift-happy arcade physics, visible car
-damage, rolling dust trails, smart racing-line AI with three difficulty
-levels, and a persistent career: finishing a world unlocks the next, races
-pay credits, and the garage sells engine/armor/cannon/nitro upgrades.
+nitro, boost pads and launch ramps. Every circuit **climbs and descends
+real elevation**: grades sap or feed your speed, the car pitches with the
+road, and each world has its own hill profile. Drift-happy arcade physics,
+visible car damage, rolling dust trails, aggressive racing-line AI (it rams,
+and on hard it fires missiles back) with three difficulty levels, and a
+persistent career: finishing a world unlocks the next, races pay credits,
+and the garage sells engine/armor/cannon/nitro upgrades.
 
 **Every asset is procedural and designed in code by Claude** — the circuit, the
 rolling terrain, the pine forest and grass, the grandstand and sponsor boards,
@@ -64,8 +67,16 @@ nitro ⚡, with live ammo badges on the buttons. Works in portrait and landscape
 
 - **5 worlds, 3 laps each, 6 racers.** Finish a world to unlock the next; the
   results screen chains you onward and your score carries over.
+- **Hills**: every circuit has a real elevation profile — long climbs bleed
+  your top speed, descents let you overspeed past the limiter, and each
+  world's terrain, props and obstacles all sit on the graded road.
 - **Difficulty**: EASY / NORMAL / HARD on the title screen — scales AI speed,
-  aggression (mines, blocking, boost bursts) and rubber-banding.
+  aggression (ramming, mines, blocking, boost bursts) and rubber-banding; on
+  HARD the rivals fire homing missiles back at you.
+- **Steering feel**: RELAXED / NORMAL / SHARP selector on the title screen and
+  in the pause menu — tune sensitivity to your taste (saved between sessions).
+- **Weather**: falling snow on FROST PEAK, drifting embers on EMBER PASS,
+  blowing dust in the canyons — ambient particles per world.
 - **Career & garage**: every race pays credits equal to the score you earned;
   spend them on ENGINE, ARMOR, CANNON and NITRO upgrades (5 levels each).
 - **Smart rivals** race a real line — outside-apex-outside, braking models,

@@ -4,10 +4,13 @@ import { ROAD_HALF } from './track.js';
 import { numberPlateTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
+const GRADE = 16;   // grade force: vf -= GRADE * slope * dt while grounded on-road
+const DOWNHILL_CAP = 1.12; // downhill overspeed ceiling (× topSpeed)
 const SCORCH = new THREE.Color(0x1c1a18); // damage tint target
 const _hitNormal = new THREE.Vector3(); // scratch: obstacle bounce normal
 const _splash = new THREE.Vector3();    // scratch: puddle splash spawn point
 const _obPos = new THREE.Vector3();     // scratch: obstacle/puddle track projection (AI)
+const _shove = new THREE.Vector3();     // scratch: ram-contact push direction
 
 // ---------- roof sponsor decals ----------
 // Small canvas-drawn sponsor plates (white rounded rect + fictional brand word),
@@ -236,6 +239,8 @@ export class Car {
   constructor(game, mesh, { maxSpeed = 52, accel = 34, grip = 5.2, steerRate = 2.5, driftLag = 0.22, steerTaper = 0.18 } = {}) {
     this.game = game;
     this.mesh = mesh;
+    // yaw -> pitch -> roll so body pitch/roll read correctly at every heading
+    mesh.rotation.order = 'YXZ';
     game.scene.add(mesh);
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector3();
@@ -269,6 +274,7 @@ export class Car {
     this.jumpPitch = 0;
     this._lastGY = 0;
     this._climbRate = 0;
+    this._climbSm = 0; // smoothed climb rate for stable slope/ramp pitch visuals
 
     // race state
     this.trackIndex = 0;
@@ -300,8 +306,11 @@ export class Car {
     this.vel.set(0, 0, 0);
     this.trackIndex = index;
     this.lateral = lateral;
-    this.y = 0; this.vy = 0; this.airborne = false;
-    this._lastGY = 0; this._climbRate = 0; this.jumpPitch = 0;
+    // sync vertical state to the (possibly elevated) road — no spawn-drop
+    const gy = t.groundHeightAt?.(index, lateral) ?? 0;
+    this.y = gy; this.vy = 0; this.airborne = false;
+    this.pos.y = gy;
+    this._lastGY = gy; this._climbRate = 0; this._climbSm = 0; this.jumpPitch = 0;
     this.slip = 0; this.landGrip = 0; this.reverseTimer = 0;
     this.visYaw = 0; this.steerVis = 0; this.steerSmooth = 0;
     this.syncMesh(0);
@@ -312,10 +321,11 @@ export class Car {
     // ---- steering input smoothing (player) — raw flicks ramp in at a finite
     // rate; recentering runs a touch faster so the car settles quickly.
     const hnd = this.handling ?? 0;
+    const sense = this.steerSense ?? 1; // player sensitivity setting (0.8/1/1.25)
     let steer = inputs.steer;
     if (this.steerSmoothRate > 0) {
       const centering = steer * this.steerSmooth < 0 || Math.abs(steer) < Math.abs(this.steerSmooth);
-      const rate = this.steerSmoothRate * (1 + hnd) * (centering ? 1.4 : 1);
+      const rate = this.steerSmoothRate * (1 + hnd) * (0.9 + 0.1 * sense) * (centering ? 1.4 : 1);
       this.steerSmooth += (steer - this.steerSmooth) * Math.min(1, rate * dt);
       steer = this.steerSmooth;
     } else {
@@ -377,9 +387,23 @@ export class Car {
         this.reverseTimer = 0;
       }
     }
+    // ---- grade force: uphill saps speed, downhill feeds it (elevated roads).
+    // Guarded — flat tracks / older track builds simply report slope 0.
+    let slope = 0;
+    if (!inputs.hold && !this.airborne && !offRoad) {
+      slope = this.game.track.slopeAt?.(this.trackIndex) ?? 0;
+      if (slope !== 0) vf -= GRADE * slope * dt;
+    }
     // drag (eased while drifting: slides keep speed; rough going adds a bit off-road)
     vf -= vf * ((sliding ? 0.40 : 0.55) + (offRoad ? 0.35 : 0)) * dt;
-    vf = THREE.MathUtils.clamp(vf, -this.maxSpeed * 0.35, topSpeed);
+    // Slope-aware speed ceiling, matched to the grade/drag equilibrium: a
+    // downhill grade EXTENDS top speed proportionally (never past topSpeed *
+    // DOWNHILL_CAP) and an uphill grade lowers it, so the engine's surplus
+    // thrust can't quietly cancel the climb penalty at the clamp.
+    let vCap = topSpeed;
+    if (slope > 0) vCap = Math.max(topSpeed * 0.55, topSpeed - (GRADE * slope) / 0.55);
+    else if (slope < 0) vCap = Math.min(topSpeed * DOWNHILL_CAP, topSpeed + (GRADE * -slope) / 0.55);
+    vf = THREE.MathUtils.clamp(vf, -this.maxSpeed * 0.35, vCap);
     if (boosting) vf = Math.max(vf, this.maxSpeed * 1.05 * offMult);
 
     // ---- lateral grip: cornering load breaks the rear loose ----
@@ -406,7 +430,7 @@ export class Car {
     const taper = 1 - this.steerTaper * THREE.MathUtils.clamp((sp - this.maxSpeed * 0.6) / (this.maxSpeed * 0.55), 0, 1);
     const authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
     const dir = vf >= 0 ? 1 : -1;
-    const dTheta = steer * this.steerRate * authority * dir * dt;
+    const dTheta = steer * this.steerRate * sense * authority * dir * dt;
     this.heading += dTheta;
     // While gripped the velocity turns with the car (arcade rails). While slipping
     // it lags the yaw: part of the turn spills forward speed into lateral slide,
@@ -563,8 +587,11 @@ export class Car {
       this._lastGY = this.y;
     } else {
       const drop = this._lastGY - gY;
-      if (drop > 0.6 && this._climbRate > 1) {
-        // launched off a ramp lip
+      // Launch only off real lips: a big single-frame drop while climbing fast.
+      // Thresholds sit above anything ordinary rolling hills produce (their
+      // per-frame deltas stay well under 0.9), so smooth elevated roads stay
+      // glued while ramp edges and sharp crests at speed still throw the car.
+      if (drop > 0.9 && this._climbRate > 2.5) {
         this.airborne = true;
         this.vy = this._climbRate;
         this.y += this.vy * dt;
@@ -575,9 +602,12 @@ export class Car {
       }
     }
     this.pos.y = this.y;
-    // nose up while climbing/launching, nose down while falling
-    const pitchTarget = this.airborne || this._climbRate > 0.5
-      ? THREE.MathUtils.clamp((this.airborne ? this.vy : this._climbRate) * 0.05, -0.4, 0.42)
+    // nose up while climbing/launching, nose down while falling/descending.
+    // The raw climb rate steps frame-to-frame (ground height is sampled), so
+    // pitch reads the smoothed value; airborne keeps tracking vy directly.
+    this._climbSm += ((this.airborne ? this.vy : this._climbRate) - this._climbSm) * Math.min(1, 6 * dt);
+    const pitchTarget = this.airborne || Math.abs(this._climbSm) > 0.4
+      ? THREE.MathUtils.clamp((this.airborne ? this.vy : this._climbSm) * 0.06, -0.35, 0.35)
       : 0;
     this.jumpPitch += (pitchTarget - this.jumpPitch) * Math.min(1, 8 * dt);
 
@@ -609,11 +639,11 @@ export class Car {
       this.steerVis += (steerT - this.steerVis) * Math.min(1, 10 * dt);
     }
     this.mesh.rotation.set(0, this.heading + this.visYaw, 0);
-    // body lean
+    // body lean ('YXZ' order: +x pitches the nose down, so climb is subtracted)
     const roll = THREE.MathUtils.clamp(-vl * 0.02, -0.18, 0.18);
     const pitch = THREE.MathUtils.clamp(-this.speedAlong * 0.0012, -0.05, 0.05);
     this.mesh.rotation.z = roll;
-    this.mesh.rotation.x = pitch + this.jumpPitch;
+    this.mesh.rotation.x = pitch - this.jumpPitch;
     // spin wheels + steer the front pair
     if (dt > 0 && this.mesh.userData.wheels) {
       const spin = this.speedAlong * dt / 0.78;
@@ -775,9 +805,12 @@ export class EnemyCar extends Car {
     this.cornerSkill = Math.random();    // 0..1 — how hard this driver leans on the tires
     this.lane = THREE.MathUtils.randFloatSpread(2.5); // small personal offset off the ideal line
     this.laneTimer = 3 + Math.random() * 4;
-    this.aggression = 0.5 + Math.random() * 0.5;
+    this.aggression = 0.7 + Math.random() * 0.7; // angry grid: ~40% above the old 0.5..1.0
     this.mineCooldown = 4 + Math.random() * 5;  // stagger the first drops
     this.boostCooldown = 4 + Math.random() * 6; // stagger the first bursts
+    this.ramCooldown = 6 + Math.random() * 4;   // deliberate side-slam timer (stagger + skip the start scrum)
+    this.ramTimer = 0;                          // >0: actively steering into the player
+    this._missileFired = false;                 // one missile per race on high aggression
     this.glowColor = new THREE.Color(0x9a938a); // exhaust smoke tint
   }
 
@@ -857,6 +890,53 @@ export class EnemyCar extends Car {
       }
     }
 
+    // ---- deliberate ramming: alongside the player at speed -> swing INTO them
+    this.ramCooldown -= dt;
+    if (this.ramTimer > 0) {
+      this.ramTimer -= dt;
+      const p = g.player;
+      if (p.alive) {
+        const diF = (p.trackIndex - this.trackIndex + t.N) % t.N;
+        const di = Math.min(diF, t.N - diF);
+        if (di < 10) {
+          // aim just PAST the player's lane so the swing seeks contact
+          targetLat = p.lateral + Math.sign(p.lateral - this.lateral || 1) * 1.2;
+        } else {
+          this.ramTimer = 0; // lost them — break off
+        }
+        // hard contact mid-ram: extra shove + sparks + callout (main.js's
+        // car-collision does the base push; this is the slam on top)
+        const ddx = p.pos.x - this.pos.x, ddz = p.pos.z - this.pos.z;
+        if (ddx * ddx + ddz * ddz < 22) {
+          _shove.set(ddx, 0, ddz).normalize();
+          const rel = Math.hypot(this.vel.x - p.vel.x, this.vel.z - p.vel.z);
+          p.vel.addScaledVector(_shove, 9 + Math.min(6, rel * 0.35));
+          _splash.copy(p.pos).lerp(this.pos, 0.5);
+          g.particles.sparks(_splash, _shove, 10);
+          g.shake = Math.min(1, g.shake + 0.25);
+          g.buzz?.(35);
+          if ((g.raceTime ?? 0) - (g._ramFeedAt ?? -9) > 3) {
+            g._ramFeedAt = g.raceTime ?? 0;
+            g.hud.feed(`${this.name} SLAMS YOU!`, 'bad');
+          }
+          this.ramTimer = 0; // hit landed — break off
+        }
+      } else {
+        this.ramTimer = 0;
+      }
+    } else if (this.ramCooldown <= 0 && g.player.alive) {
+      const p = g.player;
+      const diF = (p.trackIndex - this.trackIndex + t.N) % t.N;
+      const di = Math.min(diF, t.N - diF);
+      const latGap = Math.abs(p.lateral - this.lateral);
+      if (di < 6 && latGap < 6 && Math.abs(v) > this.maxSpeed * 0.5 && Math.abs(p.speedAlong) > 8) {
+        this.ramTimer = 0.7;
+        // angrier drivers (and harder difficulty) wind up again sooner
+        this.ramCooldown = (4 + Math.random() * 2)
+          / THREE.MathUtils.clamp(this.aggression * D.aiAggression, 0.6, 2);
+      }
+    }
+
     // obstacle (and high-speed puddle) avoidance in the ~25-unit lookahead cone
     const hazards = t.obstacles ?? [];
     for (const ob of hazards) {
@@ -911,6 +991,10 @@ export class EnemyCar extends Car {
       const vNow = k === 0 ? vMax : Math.sqrt(vMax * vMax + 2 * DECEL * k * t.segLen);
       if (vNow < vAllowed) vAllowed = vNow;
     }
+    // downhill the grade force fights the brakes — trim corner speed mildly so
+    // they still make the apex (guarded: flat tracks report slope 0)
+    const slopeHere = t.slopeAt?.(this.trackIndex) ?? 0;
+    if (slopeHere < -0.02) vAllowed *= Math.max(0.85, 1 + slopeHere * 1.2);
     vAllowed = Math.max(vAllowed, 14); // never crawl
 
     let throttle = 0, brake = 0;
@@ -950,11 +1034,11 @@ export class EnemyCar extends Car {
     // take shots at the player when lined up (rate scales with aggression + difficulty)
     const toPlayer = g.player.pos.clone().sub(this.pos);
     const dist = toPlayer.length();
-    if (g.player.alive && dist < 55 && this.fireCooldown <= 0) {
+    if (g.player.alive && dist < 70 && this.fireCooldown <= 0) {
       const angle = Math.abs(Math.atan2(toPlayer.x, toPlayer.z) - this.heading);
       const norm = Math.min(angle, Math.PI * 2 - angle);
       if (norm < 0.32) {
-        this.fireCooldown = Math.max(0.3, 0.75 / (this.aggression * D.aiAggression));
+        this.fireCooldown = Math.max(0.22, 0.75 / (this.aggression * D.aiAggression));
         g.weapons.fireBullet(this, 4.5, 0.05);
       }
     }
@@ -969,6 +1053,22 @@ export class EnemyCar extends Car {
           && Math.random() < dt * 1.5 * this.aggression * D.aiAggression) {
         this.mineCooldown = 6 + Math.random() * 4;
         g.weapons.dropMine(this);
+      }
+    }
+
+    // ---- one saved missile per race on high aggression (hard difficulty):
+    // fired up the player's tailpipe when they're 15..60 ahead and in-line
+    if (g.raceTime < 1) this._missileFired = false; // fresh race re-arms it
+    if (!this._missileFired && D.aiAggression > 1.1 && g.player.alive) {
+      const nfm = this.forward;
+      const alongP = toPlayer.x * nfm.x + toPlayer.z * nfm.z;
+      const acrossP = toPlayer.x * nfm.z - toPlayer.z * nfm.x;
+      if (alongP > 15 && alongP < 60 && Math.abs(acrossP) < 5) {
+        this._missileFired = true;
+        g.weapons.fireMissile(this); // enemy-owned missiles home on the player
+        g.audio.missile();
+        g.hud.feed('MISSILE INCOMING!', 'bad');
+        g.buzz([50, 35, 50]);
       }
     }
   }
@@ -1025,6 +1125,8 @@ export class PlayerCar extends Car {
     this.offroadSkill = entry.stats.offroad;
     this.steerSmoothRate = 6; // input smoothing on (handling upgrade sharpens it)
     this.handling = 0;        // 0..1 — the lead sets this from the garage (0.2/level)
+    this.steerSense = 1;      // settings-menu sensitivity (lead sets 0.8/1.0/1.25);
+                              // scales steerRate + smoothing, independent of HANDLING
     this.name = 'YOU';
     this.respawnDelay = 2.5;
     this.heat = 0;        // 0..1

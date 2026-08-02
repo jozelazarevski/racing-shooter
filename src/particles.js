@@ -22,6 +22,12 @@ const SPLINTER_WHITE = new THREE.Color('#fff8ec');
 const _splA = new THREE.Color();
 const _splB = new THREE.Color();
 
+// ---- ambient weather (cached colors + per-type spawn rates, spawns/second) ----
+const LEAF_ALT = new THREE.Color('#c9a83a');   // dry-yellow leaf variant
+const EMBER_HOT = new THREE.Color('#ffc94e');  // bright flicker variant
+const AMBIENT_RATES = { snow: 150, leaves: 14, sand: 70, dust: 70, embers: 45 };
+const _amb = new THREE.Color();                // scratch: per-spawn tint mix
+
 const VERT = /* glsl */ `
   attribute float aSize;
   attribute float aAlpha;
@@ -66,6 +72,7 @@ export class Particles {
     this.grav = new Float32Array(MAX);
     this.shrink = new Float32Array(MAX);
     this.baseSize = new Float32Array(MAX);
+    this.balpha = new Float32Array(MAX).fill(1); // per-particle peak alpha
     this.head = 0;
 
     const mat = new THREE.ShaderMaterial({
@@ -83,7 +90,7 @@ export class Particles {
     for (let i = 0; i < MAX; i++) this.pos[i * 3 + 1] = -9999;
   }
 
-  spawn(x, y, z, vx, vy, vz, color, size, life, { drag = 0, grav = 0, shrink = 0.8 } = {}) {
+  spawn(x, y, z, vx, vy, vz, color, size, life, { drag = 0, grav = 0, shrink = 0.8, alpha = 1 } = {}) {
     const i = this.head;
     this.head = (this.head + 1) % MAX;
     this.pos[i * 3] = x; this.pos[i * 3 + 1] = y; this.pos[i * 3 + 2] = z;
@@ -91,7 +98,7 @@ export class Particles {
     this.col[i * 3] = color.r; this.col[i * 3 + 1] = color.g; this.col[i * 3 + 2] = color.b;
     this.life[i] = life; this.maxLife[i] = life;
     this.baseSize[i] = size; this.size[i] = size;
-    this.alpha[i] = 1;
+    this.alpha[i] = alpha; this.balpha[i] = alpha;
     this.drag[i] = drag; this.grav[i] = grav; this.shrink[i] = shrink;
   }
 
@@ -108,7 +115,7 @@ export class Particles {
       this.pos[i * 3 + 1] += this.vel[i * 3 + 1] * dt;
       this.pos[i * 3 + 2] += this.vel[i * 3 + 2] * dt;
       const f = this.life[i] / this.maxLife[i];
-      this.alpha[i] = f * f;
+      this.alpha[i] = this.balpha[i] * f * f;
       this.size[i] = this.baseSize[i] * (this.shrink[i] + (1 - this.shrink[i]) * f);
     }
     this.geo.attributes.position.needsUpdate = true;
@@ -257,6 +264,77 @@ export class Particles {
       const a = (i / 22) * Math.PI * 2;
       this.spawn(p.x, p.y, p.z, Math.cos(a) * 9, 5 + Math.random() * 4, Math.sin(a) * 9,
         color, 2.2, 0.5, { drag: 2, grav: 6, shrink: 0.4 });
+    }
+  }
+
+  /** Ambient weather around `center` (the player), called every frame by the
+   *  lead with track.theme.weather ({type, color}) — no-op when undefined.
+   *  Types: 'snow' | 'leaves' | 'sand' | 'dust' | 'embers'. Budget ≤3 spawns
+   *  per call; a fractional accumulator keeps rates frame-rate independent. */
+  ambient(center, weather, dt) {
+    if (!weather || !weather.type || !(dt > 0)) return;
+    const rate = AMBIENT_RATES[weather.type] ?? 0;
+    if (!rate) return;
+    if (this._ambHex !== weather.color) { // theme tint, cached across frames
+      this._ambHex = weather.color;
+      this._ambColor = this._ambColor || new THREE.Color();
+      this._ambColor.set(weather.color ?? 0xffffff);
+    }
+    if (this._windA === undefined) this._windA = Math.random() * Math.PI * 2; // prevailing wind
+    this._ambAcc = (this._ambAcc ?? 0) + rate * dt;
+    let n = Math.min(3, Math.floor(this._ambAcc));
+    if (n <= 0) return;
+    this._ambAcc -= n;
+    const base = this._ambColor;
+    const wx = Math.cos(this._windA), wz = Math.sin(this._windA);
+    for (; n > 0; n--) {
+      const a = Math.random() * Math.PI * 2;
+      switch (weather.type) {
+        case 'snow': {
+          // slow flakes drifting down through a wide column over the player
+          const r = 70 * Math.sqrt(Math.random());
+          this.spawn(
+            center.x + Math.cos(a) * r, center.y + 20 + Math.random() * 10, center.z + Math.sin(a) * r,
+            (Math.random() - 0.5) * 3, -6 + (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 3,
+            base, 1.0 + Math.random() * 0.5, 4.2 + Math.random() * 1.6,
+            { shrink: 1, alpha: 0.9 });
+          break;
+        }
+        case 'leaves': {
+          // occasional leaves: slow fall, strong sideways flutter
+          const r = 45 * Math.sqrt(Math.random());
+          _amb.copy(base).lerp(LEAF_ALT, Math.random() * 0.7);
+          this.spawn(
+            center.x + Math.cos(a) * r, center.y + 6 + Math.random() * 8, center.z + Math.sin(a) * r,
+            (Math.random() - 0.5) * 9, -1.6 - Math.random() * 1.4, (Math.random() - 0.5) * 9,
+            _amb, 1.0 + Math.random() * 0.6, 2.8 + Math.random() * 1.6,
+            { drag: 0.45, grav: 1.2, shrink: 0.9, alpha: 0.95 });
+          break;
+        }
+        case 'sand':
+        case 'dust': {
+          // low soft wisps blowing along one prevailing wind direction
+          const r = 60 * Math.sqrt(Math.random());
+          this.spawn(
+            center.x + Math.cos(a) * r, center.y + 0.4 + Math.random() * 1.8, center.z + Math.sin(a) * r,
+            wx * (9 + Math.random() * 7) + (Math.random() - 0.5) * 3, 0.5,
+            wz * (9 + Math.random() * 7) + (Math.random() - 0.5) * 3,
+            base, 4.5 + Math.random() * 3, 1.8 + Math.random() * 1.4,
+            { drag: 0.15, shrink: 1.5, alpha: 0.3 }); // shrink>1: wisps grow as they fade
+          break;
+        }
+        case 'embers': {
+          // glowing motes rising off the ground, short flickery lives
+          const r = 40 * Math.sqrt(Math.random());
+          _amb.copy(base).lerp(EMBER_HOT, Math.random() < 0.4 ? 0.8 : 0.1);
+          this.spawn(
+            center.x + Math.cos(a) * r, center.y + 0.2 + Math.random() * 1.2, center.z + Math.sin(a) * r,
+            (Math.random() - 0.5) * 3, 3 + Math.random() * 3, (Math.random() - 0.5) * 3,
+            _amb, 0.8 + Math.random() * 0.6, 1.5 + Math.random(),
+            { drag: 0.3, shrink: 0.4 });
+          break;
+        }
+      }
     }
   }
 }

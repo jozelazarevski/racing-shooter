@@ -167,26 +167,37 @@ export class Weapons {
     g.position.copy(car.pos).addScaledVector(fwd, 3).setY(car.pos.y + 1.1);
     this.game.scene.add(g);
 
-    // lock the closest living enemy (or chopper) roughly ahead — the seeker
-    // works in XZ, so choppers are ranked by horizontal distance and favored
     let target = null, best = Infinity;
-    for (const e of [...this.game.enemies, ...(this.game.choppers ?? [])]) {
-      if (!e.alive) continue;
-      const to = e.pos.clone().sub(car.pos);
-      to.y = 0;
-      const d = to.length();
-      if (d > 160 || d < 1e-3) continue;
-      to.normalize();
-      if (to.dot(fwd) < 0.25) continue;
-      const score = e.isChopper ? d * 0.8 : d; // prefer choppers slightly
-      if (score < best) { best = score; target = e; }
+    if (car === this.game.player) {
+      // lock the closest living enemy (or chopper) roughly ahead — the seeker
+      // works in XZ, so choppers are ranked by horizontal distance and favored
+      for (const e of [...this.game.enemies, ...(this.game.choppers ?? [])]) {
+        if (!e.alive) continue;
+        const to = e.pos.clone().sub(car.pos);
+        to.y = 0;
+        const d = to.length();
+        if (d > 160 || d < 1e-3) continue;
+        to.normalize();
+        if (to.dot(fwd) < 0.25) continue;
+        const score = e.isChopper ? d * 0.8 : d; // prefer choppers slightly
+        if (score < best) { best = score; target = e; }
+      }
+      if (target) this.game.hud.feed(`LOCKED: ${target.name}`, 'info');
+    } else {
+      // enemy-owned missiles hunt THE PLAYER (rival cars never shoot each other)
+      const p = this.game.player;
+      if (p.alive) {
+        const to = p.pos.clone().sub(car.pos);
+        to.y = 0;
+        const d = to.length();
+        if (d < 160 && d > 1e-3 && to.normalize().dot(fwd) > 0.25) target = p;
+      }
     }
     this.missiles.push({
       mesh: g, pos: g.position, heading: car.heading,
       speed: Math.max(MISSILE_SPEED, car.speedAlong + 30),
       target, life: 5, owner: car, trailClock: 0, ti: car.trackIndex,
     });
-    if (target) this.game.hud.feed(`LOCKED: ${target.name}`, 'info');
   }
 
   update(dt) {
@@ -198,9 +209,11 @@ export class Weapons {
       b.life -= dt;
       b.pos.addScaledVector(b.vel, dt); // integrates y too (chopper rounds descend)
       if (b.life <= 0) { b.active = false; this.mesh.setMatrixAt(i, this._zero); continue; }
-      // descending rounds bury into the dirt with a small puff
-      if (b.pos.y < 0) {
-        _puff.set(b.pos.x, 0.1, b.pos.z);
+      // descending rounds bury into the dirt with a small puff (terrain-aware
+      // so tracers die on hillsides instead of tunneling to y=0)
+      const gy = b.vel.y < 0 && g.track.terrainHeight ? g.track.terrainHeight(b.pos.x, b.pos.z) : 0;
+      if (b.pos.y < gy) {
+        _puff.set(b.pos.x, gy + 0.1, b.pos.z);
         g.particles.dust(_puff, 0.6);
         b.active = false;
         this.mesh.setMatrixAt(i, this._zero);
@@ -268,6 +281,17 @@ export class Weapons {
       m.speed = Math.min(m.speed + 60 * dt, 120);
       m.pos.x += Math.sin(m.heading) * m.speed * dt;
       m.pos.z += Math.cos(m.heading) * m.speed * dt;
+      m.ti = g.track.nearestIndex(m.pos, m.ti);
+      // altitude: ease toward the target's height (or hug the road profile when
+      // unguided) so missiles neither clip hills nor fly under their targets
+      let wantY;
+      if (m.target) {
+        wantY = m.target.pos.y + 1;
+      } else {
+        const lat = THREE.MathUtils.clamp(g.track.lateralOffset(m.pos, m.ti), -9, 9);
+        wantY = (g.track.groundHeightAt?.(m.ti, lat) ?? 0) + 1.1;
+      }
+      m.pos.y += (wantY - m.pos.y) * Math.min(1, 6 * dt);
       m.mesh.rotation.y = m.heading;
       m.trailClock -= dt;
       if (m.trailClock <= 0) {
@@ -275,25 +299,30 @@ export class Weapons {
         g.particles.trail(m.pos, new THREE.Color('#ffb52e'));
       }
 
+      const fromPlayer = m.owner === g.player;
       let detonate = m.life <= 0;
-      for (const e of g.enemies) {
-        if (!e.alive || e.invuln > 0) continue;
-        if (m.pos.distanceToSquared(e.pos) < 10) { detonate = true; break; }
-      }
-      // chopper proximity fuse: horizontal distance only (seeker homes in XZ)
-      if (!detonate) {
-        for (const c of g.choppers ?? []) {
-          if (!c.alive) continue;
-          const dx = m.pos.x - c.pos.x, dz = m.pos.z - c.pos.z;
-          if (dx * dx + dz * dz < CHOPPER_HIT_R2) {
-            detonate = true;
-            m.pos.y = c.pos.y; // burst up at the airframe, not on the deck
-            break;
+      if (fromPlayer) {
+        for (const e of g.enemies) {
+          if (!e.alive || e.invuln > 0) continue;
+          if (m.pos.distanceToSquared(e.pos) < 10) { detonate = true; break; }
+        }
+        // chopper proximity fuse: horizontal distance only (seeker homes in XZ)
+        if (!detonate) {
+          for (const c of g.choppers ?? []) {
+            if (!c.alive) continue;
+            const dx = m.pos.x - c.pos.x, dz = m.pos.z - c.pos.z;
+            if (dx * dx + dz * dz < CHOPPER_HIT_R2) {
+              detonate = true;
+              m.pos.y = c.pos.y; // burst up at the airframe, not on the deck
+              break;
+            }
           }
         }
+      } else if (g.player.alive && g.player.invuln <= 0
+          && m.pos.distanceToSquared(g.player.pos) < 10) {
+        detonate = true; // enemy-owned: proximity fuse against the player only
       }
       // missiles can also clip walls (never in free roam — no walls out there)
-      m.ti = g.track.nearestIndex(m.pos, m.ti);
       if (!g.freeRoam && Math.abs(g.track.lateralOffset(m.pos, m.ti)) > 10.2) detonate = true;
 
       if (detonate) {
@@ -301,16 +330,29 @@ export class Weapons {
         g.audio.explosion(false);
         g.flashLight(m.pos);
         // splash damage
-        for (const e of g.enemies) {
-          if (!e.alive || e.invuln > 0) continue;
-          const d = m.pos.distanceTo(e.pos);
-          if (d < 9) g.onEnemyHit(e, THREE.MathUtils.lerp(55, 18, d / 9), 'missile');
-        }
-        for (const c of g.choppers ?? []) {
-          if (!c.alive) continue;
-          const dx = m.pos.x - c.pos.x, dz = m.pos.z - c.pos.z;
-          const d = Math.sqrt(dx * dx + dz * dz);
-          if (d < 9) c.damage(THREE.MathUtils.lerp(55, 18, d / 9)); // altitude ignored
+        if (fromPlayer) {
+          for (const e of g.enemies) {
+            if (!e.alive || e.invuln > 0) continue;
+            const d = m.pos.distanceTo(e.pos);
+            if (d < 9) g.onEnemyHit(e, THREE.MathUtils.lerp(55, 18, d / 9), 'missile');
+          }
+          for (const c of g.choppers ?? []) {
+            if (!c.alive) continue;
+            const dx = m.pos.x - c.pos.x, dz = m.pos.z - c.pos.z;
+            const d = Math.sqrt(dx * dx + dz * dz);
+            if (d < 9) c.damage(THREE.MathUtils.lerp(55, 18, d / 9)); // altitude ignored
+          }
+        } else {
+          // enemy-owned splash: hurts + shoves the player, routed through onPlayerHit
+          const p = g.player;
+          const d = m.pos.distanceTo(p.pos);
+          if (p.alive && d < 9) {
+            g.onPlayerHit(THREE.MathUtils.lerp(38, 12, d / 9), m.owner);
+            _dir.copy(p.pos).sub(m.pos);
+            _dir.y = 0;
+            if (_dir.lengthSq() > 1e-6) p.vel.addScaledVector(_dir.normalize(), 14 * (1 - d / 9));
+            g.shake = Math.min(1, g.shake + 0.35);
+          }
         }
         g.scene.remove(m.mesh);
         this.missiles.splice(mi, 1);
