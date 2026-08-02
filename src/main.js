@@ -59,6 +59,10 @@ const upgradeCost = (lvl) => 350 + lvl * 250;
 const AVA_WHITE = new THREE.Color(0xf4faff);
 const GEYSER_SAND = new THREE.Color(0xd8b878);
 
+// hazard particle tints (hoisted — per-frame spawns must not allocate)
+const AVA_WHITE = new THREE.Color(0xf4faff);
+const GEYSER_SAND = new THREE.Color(0xd8b878);
+
 const loadJSON = (key, fallback) => {
   try { return { ...fallback, ...JSON.parse(localStorage.getItem(key) || '{}') }; }
   catch { return { ...fallback }; }
