@@ -53,7 +53,7 @@ const CAM_MODES = [
   { name: 'CHASE',     back: 13, h: 7.5, look: 10, lookH: 2.8, spdBack: 2, spdH: 1 },
   { name: 'CHASE FAR', back: 24, h: 15, look: 13, lookH: 3,   spdBack: 3, spdH: 2 },
 ];
-const upgradeCost = (lvl) => 400 + lvl * 350;
+const upgradeCost = (lvl) => 350 + lvl * 250;
 
 // hazard particle tints (hoisted — per-frame spawns must not allocate)
 const AVA_WHITE = new THREE.Color(0xf4faff);
@@ -475,7 +475,9 @@ class Game {
   }
 
   isLevelUnlocked(id) {
-    return this.unlockAll || id === 1 || !!this.career.finished[id - 1];
+    // a world unlocks only after a PODIUM (top 3) finish on the one before
+    const prev = this.career.finished[id - 1];
+    return this.unlockAll || id === 1 || (!!prev && prev.place <= 3);
   }
 
   /** Apply purchased upgrades to the player (base stats captured once). */
@@ -570,8 +572,18 @@ class Game {
       const selected = this.cars.selected === car.key;
       const card = document.createElement('button');
       card.className = 'car-card' + (owned ? ' owned' : ' locked') + (selected ? ' selected' : '');
+      const S = car.stats;
+      const bar = (lbl, v, lo, hi) => {
+        const pct = Math.round(THREE.MathUtils.clamp((v - lo) / (hi - lo), 0.06, 1) * 100);
+        return `<div class="cs-row"><span>${lbl}</span><i><b style="width:${pct}%"></b></i></div>`;
+      };
       card.innerHTML = `<img class="car-icon" src="${icons[car.key]}" alt="${car.name}">
         <div class="cname">${car.name}</div><div class="cdesc">${car.desc}</div>
+        <div class="cstats">
+          ${bar('SPD', S.maxSpeed, 54, 63)}${bar('ACC', S.accel, 34, 40)}
+          ${bar('GRP', S.grip, 4.2, 5.6)}${bar('ARM', S.health / (S.plating ?? 1), 80, 170)}
+          ${bar('OFF', S.offroad, 0.4, 1)}${bar('NTR', S.nitroPower ?? 1, 0.85, 1.2)}
+        </div>
         <div class="cprice">${selected ? 'DRIVING' : owned ? 'DRIVE' : car.price.toLocaleString() + ' CR'}</div>`;
       card.addEventListener('click', () => {
         if (!owned) {
@@ -1661,26 +1673,38 @@ class Game {
     document.getElementById('r-time').textContent = fmtTime(this.raceTime);
     document.getElementById('r-best').textContent = fmtTime(this.player.bestLap);
 
-    // career progress + credits
-    const earned = Math.max(0, this.score - (this.startScore ?? 0));
+    // career progress + credits — the economy pays for risk and results:
+    // race score scaled by difficulty, plus podium and first-conquest bonuses
+    const prev = this.career.finished[this.level.id];
+    const diffMult = { easy: 0.8, normal: 1.0, hard: 1.4 }[this.difficulty.id] ?? 1;
+    const podium = rank <= 3 ? [1200, 700, 400][rank - 1] : 0;
+    const firstClear = (!prev || prev.place > 3) && rank <= 3 ? 1500 : 0;
+    const earned = Math.round(Math.max(0, this.score - (this.startScore ?? 0)) * diffMult)
+      + podium + firstClear;
     document.getElementById('r-credits').textContent = `+${earned.toLocaleString()}`;
+    if (podium) this.hud.feed(`PODIUM BONUS  +${podium} CR`, 'good');
+    if (firstClear) this.hud.feed('WORLD CONQUERED  +1500 CR', 'good');
+    if (diffMult > 1) this.hud.feed('HARD PAYS ×1.4 CREDITS', 'good');
     this.garage.credits += earned;
     saveJSON('ir-garage', this.garage);
-    const prev = this.career.finished[this.level.id];
     this.career.finished[this.level.id] = {
       place: Math.min(rank, prev?.place ?? 99),
       bestScore: Math.max(earned, prev?.bestScore ?? 0),
     };
     saveJSON('ir-career', this.career);
     this.renderGarage();
-    if (!prev && this.levelIndex < LEVELS.length - 1) {
+    const hasNext = this.levelIndex < LEVELS.length - 1;
+    const nextUnlocked = hasNext && this.isLevelUnlocked(LEVELS[this.levelIndex + 1].id);
+    if ((!prev || prev.place > 3) && rank <= 3 && hasNext) {
       this.hud.feed(`${LEVELS[this.levelIndex + 1].name} UNLOCKED`, 'good');
     }
     this.hud.centerMsg('FINISH');
     this.audio.lap();
-    document.querySelector('#results .game-sub').textContent = `${this.level.name} COMPLETE`;
+    document.querySelector('#results .game-sub').textContent = rank <= 3 || !hasNext
+      ? `${this.level.name} COMPLETE`
+      : `${this.level.name} — FINISH TOP 3 TO UNLOCK THE NEXT WORLD`;
     const nextBtn = document.getElementById('next-level-btn');
-    if (this.levelIndex < LEVELS.length - 1) {
+    if (nextUnlocked) {
       nextBtn.style.display = '';
       nextBtn.textContent = `NEXT: ${LEVELS[this.levelIndex + 1].name} ▶`;
     } else {

@@ -789,6 +789,8 @@ export class Car {
     if (this.airborne) {
       this.vy -= 26 * dt;
       this.y += this.vy * dt;
+      // light air drag reins in flight distance without killing the jump feel
+      this.vel.multiplyScalar(Math.max(0, 1 - 0.10 * dt));
       if (this.y <= gY + 0.01) {
         this.y = gY;
         this.vy = 0;
@@ -809,7 +811,9 @@ export class Car {
       // glued while ramp edges and sharp crests at speed still throw the car.
       if (drop > 0.9 && this._climbRate > 2.5) {
         this.airborne = true;
-        this.vy = this._climbRate;
+        // capped: an uncapped climb rate off a steep ramp at nitro speed sent
+        // cars sailing 100+ u into the infield (user bug report)
+        this.vy = Math.min(this._climbRate, 11);
         this.y += this.vy * dt;
       } else {
         this._climbRate = dt > 0 ? (gY - this._lastGY) / dt : 0;
@@ -913,6 +917,7 @@ export class Car {
     if (this === this.game.player) {
       const id = this.game.difficulty?.id;
       amount *= id === 'easy' ? 0.45 : id === 'hard' ? 0.85 : 0.62;
+      amount *= this.plating ?? 1; // hull plating is a car property
     }
     this._lastHurt = this.game.raceTime;
     const before = this.health / this.maxHealth;
@@ -1336,32 +1341,32 @@ export const CAR_CATALOG = [
   {
     key: 'brawler', name: 'BRAWLER', price: 0, desc: 'All-rounder',
     spec: { name: 'BRAWLER', style: 'brawler', body: 0xff8c1a, accent: 0xe86a10, stripe: [0x241d16], number: 1, brand: 'APEX' },
-    stats: { maxSpeed: 58, accel: 38, grip: 5.0, health: 100, offroad: 0.80 },
+    stats: { maxSpeed: 58, accel: 38, grip: 5.0, health: 100, offroad: 0.80, nitroPower: 1.0, plating: 1.0 },
   },
   {
     key: 'sleek', name: 'SLEEK', price: 2000, desc: 'Nimble hatch',
     spec: { name: 'SLEEK', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, stripe: [0x241d16], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 56, accel: 40, grip: 5.6, health: 90, offroad: 0.60 },
+    stats: { maxSpeed: 56, accel: 40, grip: 5.6, health: 90, offroad: 0.60, nitroPower: 1.15, plating: 1.10 },
   },
   {
     key: 'crown', name: 'CROWN', price: 3500, desc: 'Fast on tarmac',
     spec: { name: 'CROWN', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [GOLD, 0xf2f0e8], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 63, accel: 37, grip: 4.8, health: 85, offroad: 0.45 },
+    stats: { maxSpeed: 63, accel: 37, grip: 4.8, health: 85, offroad: 0.45, nitroPower: 1.05, plating: 1.05 },
   },
   {
     key: 'dune', name: 'DUNE', price: 4500, desc: 'Off-road king',
     spec: { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 57, accel: 38, grip: 5.2, health: 105, offroad: 1.0 },
+    stats: { maxSpeed: 57, accel: 38, grip: 5.2, health: 105, offroad: 1.0, nitroPower: 0.95, plating: 0.95 },
   },
   {
     key: 'alpine', name: 'ALPINE', price: 6000, desc: 'Drift machine',
     spec: { name: 'ALPINE', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [GOLD, 0xd8342a], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 59, accel: 39, grip: 4.4, health: 95, offroad: 0.65 },
+    stats: { maxSpeed: 59, accel: 39, grip: 4.4, health: 95, offroad: 0.65, nitroPower: 1.20, plating: 1.05 },
   },
   {
     key: 'pit', name: 'PIT-99', price: 8000, desc: 'Armored bruiser',
     spec: { name: 'PIT-99', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 60, accel: 36, grip: 5.0, health: 130, offroad: 0.55 },
+    stats: { maxSpeed: 60, accel: 36, grip: 5.0, health: 130, offroad: 0.55, nitroPower: 0.90, plating: 0.78 },
   },
 ];
 
@@ -1375,6 +1380,8 @@ export class PlayerCar extends Car {
     this.catalogKey = entry.key;
     this.maxHealth = this.health = entry.stats.health;
     this.offroadSkill = entry.stats.offroad;
+    this.nitroPower = entry.stats.nitroPower ?? 1;  // nitro burst strength
+    this.plating = entry.stats.plating ?? 1;        // damage intake multiplier
     this.steerSmoothRate = 6; // input smoothing on (handling upgrade sharpens it)
     this.handling = 0;        // 0..1 — the lead sets this from the garage (0.2/level)
     this.steerSense = 1;      // settings-menu sensitivity (lead sets 0.8/1.0/1.25);
@@ -1452,7 +1459,7 @@ export class PlayerCar extends Car {
     this.nitro = Math.min(1, this.nitro + dt * 0.02 * this.nitroRate);
     if (controlsLive && input.justPressed('KeyF')) {
       if (this.nitro >= 0.25) {
-        this.boostTimer = Math.max(this.boostTimer, this.nitro * 3.2);
+        this.boostTimer = Math.max(this.boostTimer, this.nitro * 3.2 * (this.nitroPower ?? 1));
         this.nitro = 0;
         g.hud.feed('NITRO!', 'info');
         g.audio.boost();
