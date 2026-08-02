@@ -99,7 +99,7 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 | Off-road terrain (roam) | TERRAIN | — | speed cap by car's off-road stat | — | Dust plumes while churning |
 | Mud puddles | SOFT | — | heavy drag + slick grip inside | — | Brown splash while inside |
 | Boost pads | TERRAIN | — | — | — | Forward impulse, yellow chevrons |
-| Launch ramps | TERRAIN | — | — | — | Airborne launch; landing puff + brief loose grip |
+| Launch ramps | TERRAIN | — | — | — | Airborne launch — vy capped at 11 u/s and light air drag (×0.10/s) while flying, so no nitro launch ever throws a car out of the world; landing puff + brief loose grip |
 
 ### Cliff walls (canyon-type worlds)
 
@@ -182,7 +182,7 @@ walls.
 | Choppers | ACTOR | 80 hp; killed by cannon (flak — altitude ignored), missiles, shockwave; +500 on kill |
 | Pickups | trigger | Collected on touch: green hull / amber missiles / blue nitro / red mines |
 | Slow-field orb (violet) | trigger | GLACIAL PASS / AMAZON RAPIDS only (2 per lap). On touch: **FREEZE STRIKE! / JUNGLE FURY!** — every rival is hard-capped at `maxSpeed × 0.5` for 6 s. The cap is physical: it stomps in-flight boosts and boost pads grant rivals nothing while the field is live. +100 score |
-| Mines (dropped) | trigger | Arm 1.1 s, blast 8 u: up to 48 dmg + knockback, levels props in 7 u |
+| Mines (dropped) | trigger | Dropped ON the road surface, snapped toward the racing lane (a fixed drop height once buried them under elevated roads). Arm 0.8 s, live 45 s, trigger 4.2 u, blast 9.5 u: up to 52 dmg + knockback, levels props in 7 u |
 
 ---
 

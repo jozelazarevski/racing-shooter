@@ -53,9 +53,21 @@ export class Weapons {
     lamp.position.y = 0.35;
     g.add(lamp);
     const back = car.forward.multiplyScalar(-1);
-    g.position.copy(car.pos).addScaledVector(back, 3.4).setY(0.3);
+    const gm = this.game, t = gm.track;
+    const p = car.pos.clone().addScaledVector(back, 3.4);
+    // sit the mine ON the road surface (a fixed y=0.3 left mines buried far
+    // beneath elevated roads, where the 3D trigger could never fire) and
+    // snap it toward the racing lane so pursuers actually meet it
+    p.y = 0.3;
+    if (t?.nearestIndex) {
+      const idx = t.nearestIndex(p, car.trackIndex);
+      const lat = THREE.MathUtils.clamp(t.lateralOffset(p, idx), -5.5, 5.5);
+      const c = t.pointAt(idx, lat);
+      p.set(c.x, c.y + 0.3, c.z);
+    }
+    g.position.copy(p);
     this.game.scene.add(g);
-    this.mines.push({ mesh: g, pos: g.position, lampMat, owner: car, armTime: 1.1, life: 30, blink: 0 });
+    this.mines.push({ mesh: g, pos: g.position, lampMat, owner: car, armTime: 0.8, life: 45, blink: 0 });
   }
 
   fireShockwave(car) {
@@ -418,7 +430,7 @@ export class Weapons {
         m.lampMat.color.setHex(Math.floor(m.blink * 5) % 2 === 0 ? 0xff2222 : 0x661111);
         for (const car of [g.player, ...g.enemies]) {
           if (!car.alive || car === m.owner || car.invuln > 0 || car.airborne) continue;
-          if (m.pos.distanceToSquared(car.pos) < 8.5) { boom = true; break; }
+          if (m.pos.distanceToSquared(car.pos) < 17.5) { boom = true; break; }
         }
       }
       if (boom) {
@@ -430,12 +442,12 @@ export class Weapons {
         for (const car of [g.player, ...g.enemies]) {
           if (!car.alive || car.invuln > 0) continue;
           const d = m.pos.distanceTo(car.pos);
-          if (d < 8) {
-            const dmg = THREE.MathUtils.lerp(48, 14, d / 8);
+          if (d < 9.5) {
+            const dmg = THREE.MathUtils.lerp(52, 16, d / 9.5);
             if (car === g.player) g.onPlayerHit(dmg, null);
             else g.onEnemyHit(car, dmg, 'mine');
             const push = car.pos.clone().sub(m.pos).normalize();
-            car.vel.addScaledVector(push, 20 * (1 - d / 9));
+            car.vel.addScaledVector(push, 22 * (1 - d / 10.5));
           }
         }
         g.scene.remove(m.mesh);
