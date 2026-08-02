@@ -46,16 +46,32 @@ is a bug. The conformance table at the bottom tracks the honest current state.
 | **SOLID** | Push-out + velocity absorbed along the normal (≤ 5 % rebound — never pinball); hard hits cost hull, scrapes shower sparks | Impact sparks only (indestructible) | Fences, cliffs, rock obstacles, buildings |
 | **ACTOR** | Car-vs-car / chopper rules: mutual damage on real impacts, positional separation, soft restitution | Full weapon damage model | Cars, choppers |
 
-**SOLID mechanics (exact):** kill the into-surface velocity with factor
-**1.05** (5 % rebound), tangential grind loss ≤ 3 %/contact-frame, damage
-`min(24, (impact − 8) × 0.9)` hull when normal impact > 8 u/s, sparks always,
-splinters/chips when impact > 6, shake + haptics for the player above 12.
-
 **BREAKABLE mechanics (exact):** smash when |speed| > threshold (2 u/s for
-props, 7 u/s for trees); the object's mesh is flung as a physical piece
-(gravity −24 u/s², tumble spin, ~2 s life), debris + smoke + splinter burst,
-car keeps ≥ 80 % of its velocity, score awarded, haptic buzz. Below the
-threshold the object is SOLID (push-out, no destruction).
+props, 7 u/s for small vegetation); the object's mesh is flung as a physical
+piece (gravity −24 u/s², tumble spin, ~2 s life), debris + smoke + splinter
+burst, car keeps ≥ 80 % of its velocity, score awarded, haptic buzz. Below
+the threshold the object is SOLID (push-out, no destruction).
+
+### The impact & material model (SOLID mechanics, expanded)
+
+Every SOLID collision shares the same motion response — push-out along the
+contact normal, into-surface velocity killed with factor **1.05** (5 %
+rebound, never pinball), tangential grind loss ≤ 3 %/contact-frame, sparks
+always — but **what it does to your hull depends on what the object is made
+of**. `impact` = your normal (into-surface) speed in u/s:
+
+| Material | Hardness | Damage formula | Max hit | Feel & FX |
+|---|---|---|---|---|
+| **STONE** (boulders, hoodoos, cliffs, mesas, hero rocks) | brutal | `min(85, (impact − 6) × 3.5)` | −85 hull | Rock does not care about toy trucks. A full-speed head-on (~28 u/s) all but **wrecks a healthy car**; even a 15 u/s clip costs ~31 hull. Stone-chip splinters, debris shower, smoke, hard shake, long haptic |
+| **BUILDING** (huts) | heavy | `min(50, (impact − 6) × 2.2)` | −50 hull | The house wins and it *shows*: wall planks burst off and tumble, roof-color splinters, a dust cloud rolls out, big shake — "CRASHED INTO THE HUT" |
+| **BIG TREE** (pine with trunk scale ≥ 1.0) | firm-alive | `min(35, (impact − 5) × 1.8)` | −35 hull | The trunk stops you dead; the canopy sheds a needle-and-branch shower — "HIT A TREE". The tree itself never falls to a bumper |
+| **METAL** (gantry legs, grandstand frame) | firm | `min(24, (impact − 8) × 0.9)` | −24 hull | Clang + spark shower, moderate hull cost — "WALL SLAM" |
+
+Rules of thumb encoded above — the **mass law**: the heavier, harder thing
+always wins, and the damage YOU take scales with how unforgiving it is.
+Stone > building > living wood > steel post, and every one of them beats a
+car. Glancing scrapes below each formula's threshold cost nothing but paint
+and sparks.
 
 ---
 
@@ -74,14 +90,21 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 | Boost pads | TERRAIN | — | — | — | Forward impulse, yellow chevrons |
 | Launch ramps | TERRAIN | — | — | — | Airborne launch; landing puff + brief loose grip |
 
-### Barriers
+### Boundaries — there are none
 
-| Object | Class | Threshold | Cost | Pays | Notes |
-|---|---|---|---|---|---|
-| Wooden pole fence | BREAKABLE (hard) / SOLID (soft) | 14 u/s normal impact | 25 % speed + 6 hull | +30 | Below 14 u/s it scrapes like SOLID (sparks, grind, slam damage). At/above it the section **shatters**: planks fly, a visible hole opens, and the car punches through into off-road. Broken holes stay open for the rest of the session; cars re-enter freely. The start/finish stretch (gate + grandstand) is never breakable. AI never leaves the track |
-| Pole fence (roam crossing) | BREAKABLE | 8 u/s | 20 % speed | +15 | Splinters + sparks + a hole in the ribbon |
-| Off-road beyond a hole (race) | TERRAIN | — | off-road speed cap by car's off-road stat | — | Same physics as free-roam off-road; drive back in through any gap |
-| Canyon cliffs | SOLID | — | SOLID class damage | — | Rock: never breakable (material law) |
+**Fences are gone from the game.** Every world is open: leave the road
+anywhere, in race or roam, and you're simply on rough ground — the off-road
+speed cap (scaled by your car's off-road stat), extra drag and bumpy terrain
+ARE the boundary. The racing line stays the fastest path by physics, not by
+walls.
+
+| Rule | Behavior |
+|---|---|
+| Off-road (any mode) | Speed capped at 55–100 % by the car's off-road stat, heavy dust, terrain-following suspension |
+| Lap integrity | A lap only counts after passing the **far-side checkpoint** (mid-track). Cutting straight across the infield earns nothing |
+| AI | Rivals race the line and never leave the road (safety clamp at the road edge) |
+| Canyon cliffs | The one hard edge in the game — real STONE walls (see material model: heavy damage on hard hits). They open at the start bowl, where free-roamers can drive out |
+| Respawns | Always back on the road, checkpoint credit preserved |
 
 ### Destructibles (props — 52 per world)
 
@@ -108,13 +131,13 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 
 | Object | Class | Threshold | Cost | Pays | Notes |
 |---|---|---|---|---|---|
-| Rock obstacles on road (hoodoos, basalt boulders) | SOLID | — | class SOLID damage | — | AI dodges them; never breakable (material law) |
-| Scenery boulders / outcrops | SOLID | — | class SOLID damage | — | Every boulder with footprint > ~0.9 u is solid |
-| Huts | SOLID | — | class SOLID damage | — | One collider per hut |
+| Rock obstacles on road (hoodoos, basalt boulders) | SOLID **stone** | — | up to −85 hull | — | AI dodges them; a full-speed head-on nearly wrecks you |
+| Scenery boulders / outcrops | SOLID **stone** | — | up to −85 hull | — | Every boulder with footprint > ~0.9 u; stone formula |
+| Huts | SOLID **building** | — | up to −50 hull | — | Planks burst off the wall + dust cloud — "CRASHED INTO THE HUT" |
 | Tire stacks | BREAKABLE | 6 u/s | 10 % speed | +10 | Tires scatter, tumble and bounce |
 | Sponsor boards | BREAKABLE | 8 u/s | 15 % speed + 2 hull | +20 | "BILLBOARD DOWN" — the whole board rig topples and flies |
-| Start gantry legs / grandstand | SOLID | — | class SOLID damage | — | Static colliders; fence near them is unbreakable |
-| Mesa outcrops (desert horizon) | SOLID | — | class SOLID damage | — | Reachable in free roam; rock (material law) |
+| Start gantry legs / grandstand | SOLID **metal** | — | up to −24 hull | — | Static colliders, clang + sparks |
+| Mesa outcrops (canyon horizon) | SOLID **stone** | — | up to −85 hull | — | Reachable in free roam |
 | Canyon foot-bridges (overhead) | DECOR | — | — | — | Deck is above car height; ground posts (if any) SOLID |
 
 ### Actors & pickups
@@ -131,13 +154,13 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 
 ## 4. Weapons interaction matrix
 
-| Weapon | Cars | Choppers | Props | Trees | Tires/boards | Fences/cliffs | Terrain |
+| Weapon | Cars | Choppers | Props | Trees | Tires/boards | Stone/cliffs | Terrain |
 |---|---|---|---|---|---|---|---|
-| Cannon | dmg by car's cannon stat, overheats | flak, altitude-blind | **destroys on hit** | **chips 30 hp, ~3 hits fells** | **destroys on hit** | sparks | dust puff |
+| Cannon | dmg by car's cannon stat, overheats | flak, altitude-blind | **destroys on hit** | **chips hp 24+16·size (~3–5 hits fells)** | **destroys on hit** | sparks | dust puff |
 | Missile | 55→18 splash 9 u | detonates at airframe | **detonates on contact; blast levels 6 u** | **felled in blast** | **leveled in blast** | detonates on walls | hugs road profile |
 | Mine | 48→14 blast 8 u + shove | — | **levels 7 u** | **felled in 7 u** | **leveled in 7 u** | — | sits on road |
 | Shockwave | 26→10, 16 u + knockback | hit regardless of altitude | **flattens 16 u ring** | **felled in 16 u** | **leveled in 16 u** | — | — |
-| Ramming | mutual crash damage (ACTOR rules) | — | smashes (BREAKABLE) | fells (BREAKABLE) | smashes (BREAKABLE) | breaks wooden fence > 14 u/s; cliffs SOLID | — |
+| Ramming | mutual crash damage (ACTOR rules) | — | smashes (BREAKABLE) | small: fells · **big pine: the TREE wins (−35)** | smashes (BREAKABLE) | stone wins, up to **−85 hull** | — |
 
 ---
 
@@ -145,19 +168,23 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 
 | Constant | Value | Where |
 |---|---|---|
-| Road half-width / wall clamp | 9 / ±9.55 | track.js / vehicles.js |
-| Wall & obstacle velocity absorb | ×1.05 (5 % rebound) | vehicles.js |
-| Wall grind tangential loss | 3 %/contact-frame (−20 % per handling lvl) | vehicles.js |
-| Wall damage | impact > 8 → min(24, (i−8)×0.9) | vehicles.js `onWallHit` |
+| Road half-width / road-edge line | 9 / ±9.55 | track.js / vehicles.js |
+| Boundaries | NONE — open world; AI-only clamp at road edge; canyon cliffs stone-clamp (open at the start bowl, cliff height ≤ 2.5) | vehicles.js |
+| Off-road speed factor | ×(0.55 + 0.45 × car off-road stat), any mode | vehicles.js |
+| Lap checkpoint | must touch samples 0.4N–0.6N before the line crossing counts | vehicles.js `checkLap` |
+| SOLID velocity absorb | ×1.05 (5 % rebound), all materials | vehicles.js |
+| Grind tangential loss | 3 %/contact-frame (−20 % per handling lvl) | vehicles.js |
+| STONE damage | impact > 6 → min(85, (i−6)×3.5) | main.js `onSolidCrash` |
+| BUILDING damage | impact > 6 → min(50, (i−6)×2.2) + plank/dust burst | main.js `onSolidCrash` |
+| BIG-TREE damage | impact > 5 → min(35, (i−5)×1.8); tree never falls to a car | main.js `onTreeCrash` |
+| METAL damage | impact > 8 → min(24, (i−8)×0.9) | main.js `onSolidCrash` |
+| Big tree threshold | pine with scale ≥ 1.0 is SOLID; smaller pines, cacti, snags yield at > 7 u/s | vehicles.js |
 | Car-crash damage | impact > 9 → min(20, (i−9)×0.6), both cars, 0.5 s rate limit | main.js `_carCollisions` |
 | Car-crash restitution | ±0.12 × relative velocity | main.js |
 | Prop contact smash | dist < r+2.3 ∧ speed > 2 | main.js `_updateProps` |
-| Tree smash | dist < r+1.7 ∧ speed > 7, else solid push-out | vehicles.js |
-| Tree cost / score | ×0.82 speed, −4 hull, +15 | main.js `onTreeSmash` |
-| Roam fence burst | crossing ±9.55 at > 8 u/s: ×0.8 speed, +15 | vehicles.js
-| Race fence break-through | normal impact > 14 u/s: hole punched, ×0.75 speed, −6 hull, +30 | vehicles.js / main.js `onFenceBreak`
-| Tree hp vs cannon | 30 (≈3 hits) | weapons.js
-| Tire stack / banner smash | speed > 6 / > 8, else solid push-out | vehicles.js
+| Small-tree smash cost / score | ×0.82 speed, −4 hull, +15 | main.js `onTreeSmash` |
+| Tree hp vs cannon | 24 + 16 × trunk scale (~3–5 hits) | weapons.js |
+| Tire stack / banner smash | speed > 6 / > 8, else solid push-out | vehicles.js |
 | Bush brush | ×0.85 speed once per 2 s, +5 | main.js `onBushBrush` |
 | Grade force / downhill cap | GRADE 16 / ×1.12 top speed | vehicles.js |
 | Ramp launch rule | ground drop > 0.9 ∧ climb rate > 2.5 | vehicles.js |
@@ -169,21 +196,20 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 
 ## 6. Conformance status
 
-All ten gaps from the original audit are now **implemented**:
+The full material/impact model is **implemented**:
 
-| # | Object | Class | Status |
-|---|---|---|---|
-| 1 | Scenery boulders | SOLID | ✅ colliders for every boulder with footprint > ~0.9 u |
-| 2 | Huts | SOLID | ✅ one collider per hut |
-| 3 | Tire stacks | BREAKABLE 6 u/s | ✅ stacks burst into tumbling tires |
-| 4 | Bushes | SOFT | ✅ leaf burst + drag, once per pass |
-| 5 | Sponsor boards | BREAKABLE 8 u/s | ✅ whole rig topples and flies |
-| 6 | Start gantry legs, grandstand | SOLID | ✅ static colliders; fence unbreakable there |
-| 7 | Bridge posts (canyon) | SOLID | ✅ where posts reach the ground |
-| 8 | Fence holes (visual) | hole in ribbon | ✅ breakFence collapses the ribbon verts |
-| 9 | Trees vs cannon | 30 hp, ~3 hits | ✅ chips then fells; blasts fell instantly |
-| 10 | Mesa outcrops | SOLID | ✅ large-radius colliders |
-| — | **Wooden fence crashable in races** (material law) | BREAKABLE > 14 u/s | ✅ hole + planks + off-road escape |
+| Rule | Status |
+|---|---|
+| Fences removed everywhere; world open in race + roam | ✅ |
+| Off-road physics as the boundary, any mode | ✅ |
+| Lap far-checkpoint (no infield shortcut laps) | ✅ |
+| STONE crashes (boulders/hoodoos/cliffs/mesas) near-wreck the car | ✅ up to −85 hull |
+| BUILDING crashes burst planks + dust with heavy damage | ✅ up to −50 hull |
+| BIG pines are solid — the tree wins, needle shower, −35 max | ✅ |
+| Small vegetation / props / tires / boards stay breakable | ✅ |
+| Cannon still fells any tree (3–5 hits by size); blasts fell instantly | ✅ |
+| Canyon cliffs stone-solid, open only at the start bowl | ✅ |
+| AI never leaves the road | ✅ |
 
 Conformance is enforced by the headless suites (`test-destruction.mjs`,
 `test-roam.mjs`, `test-crash-physics.mjs`, `test-rules.mjs`,

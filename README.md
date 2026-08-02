@@ -85,12 +85,17 @@ on the buttons. Works in portrait and landscape.
 - **Canyon hazards**: hoodoo rock towers to dodge and mud puddles that slow
   you down in CANYON RUN; basalt boulders on EMBER PASS.
 - **Destruction**: smash crates, cones, barrels, hay bales and snowmen for
-  credits — some crates hide pickups. Fences burst into painted splinters.
-  Everything smashable dies to **weapons too**: cannon rounds pop crates,
-  missiles detonate on them, mines and the shockwave flatten whole clusters.
-- **Trees fall**: plow into a pine, cactus or burnt snag at speed and it
-  goes flying — costs you some speed and a little hull, pays score. In free
-  roam, bursting through the trackside fence splinters it (and pays too).
+  credits — some crates hide pickups. Everything smashable dies to
+  **weapons too**: cannon rounds pop crates, missiles detonate on them,
+  mines and the shockwave flatten whole clusters.
+- **Open world, no fences**: every track is unfenced — run wide anywhere
+  and you're just on slow rough ground. The racing line wins by physics,
+  not walls, and laps only count past the far-side checkpoint (no infield
+  shortcuts).
+- **Saplings fall, big trees win**: small pines, cacti and burnt snags go
+  flying when you hit them at speed — but a grown pine stops a toy truck
+  dead in a shower of needles and costs real hull. Cannon fire still fells
+  any tree in 3–5 hits.
 - **Attack choppers** chase you with chin guns on the final lap (normal/hard)
   and in waves during free roam — shoot them down for +500 (cannon, missiles
   and the shockwave all work against them).
@@ -115,15 +120,14 @@ on the buttons. Works in portrait and landscape.
   (yellow chevrons) fling you forward at ground level.
 - Pickups: green = hull repair, amber = missiles, blue = nitro, red = mines.
 - The traffic lights on the start gantry run the red–yellow–green countdown.
-- **Real crash physics**: fences absorb the hit — you scrape along them in a
-  spark shower instead of bouncing off, and slamming one hard costs hull.
-  Car-on-car collisions dent BOTH hulls; glancing rubs just trade paint.
-- **Crashable fences**: the plank fences obey the material law — slam one
-  hard enough (even mid-race) and you smash a visible hole through it,
-  planks flying, and punch out into the off-road. Drive back in through any
-  gap. Rock cliffs, boulders, huts and mesas are truly solid; tire stacks
-  burst, sponsor boards topple, bushes drag, and the whole world honours
-  the rules in `RULES.md`.
+- **Materials matter** (full spec in `RULES.md`): **stone is brutal** — a
+  full-speed head-on into a boulder, hoodoo, cliff or mesa all but wrecks
+  you (up to −85 hull) in a shower of rock chips; **buildings crash big** —
+  hit a hut and planks burst off the wall in a dust cloud (up to −50);
+  steel gantry legs clang for moderate damage. Tire stacks burst, sponsor
+  boards topple, bushes drag. Car-on-car collisions dent BOTH hulls;
+  glancing rubs just trade paint, and nothing ever bounces you like a
+  pinball.
 - **Skid marks**: hard slides lay dark rubber on the road that fades away.
 
 ## Tech
