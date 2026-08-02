@@ -114,6 +114,11 @@ export class Terrain {
     return this.sdf(x, z).d;
   }
 
+  /** The 480 baked centerline samples (read-only — the racing line bakes from these). */
+  get roadPoints(): readonly THREE.Vector3[] {
+    return this.roadPts;
+  }
+
   surfaceIdAt(x: number, z: number): SurfaceId {
     const pad = Math.hypot(x - this.spawn.x, z - this.spawn.z);
     if (pad < PAD_R) return 'tarmac';

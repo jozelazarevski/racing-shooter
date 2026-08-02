@@ -44,16 +44,16 @@ export interface CarVisual {
   wheels: THREE.Mesh[];
 }
 
-export function buildCarVisual(scene: THREE.Scene): CarVisual {
+export function buildCarVisual(scene: THREE.Scene, paintColor = 0xff5c2e, accentColor = 0xf2ede0): CarVisual {
   // Group-B silhouette rally striker in the voxel style: layered hull,
   // inset glass, rally lamp pod, livery stripes, bumpers, lights, mirrors.
   const c = carData.chassis;
   const hw = c.halfExtents[0], hl = c.halfExtents[2];
   const root = new THREE.Group();
-  const paint = new THREE.MeshStandardMaterial({ color: 0xff5c2e, roughness: 0.42, metalness: 0.12 });
+  const paint = new THREE.MeshStandardMaterial({ color: paintColor, roughness: 0.42, metalness: 0.12 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x24262a, roughness: 0.8 });
   const glass = new THREE.MeshStandardMaterial({ color: 0x101821, roughness: 0.15, metalness: 0.4 });
-  const white = new THREE.MeshStandardMaterial({ color: 0xf2ede0, roughness: 0.6 });
+  const white = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.6 });
   const lampOn = new THREE.MeshBasicMaterial({ color: 0xfff2c0 });
   const tailOn = new THREE.MeshBasicMaterial({ color: 0xff3524 });
   const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, shadow = true) => {
