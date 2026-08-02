@@ -73,6 +73,15 @@ Stone > building > living wood > steel post, and every one of them beats a
 car. Glancing scrapes below each formula's threshold cost nothing but paint
 and sparks.
 
+**Impact presentation (crash drama):** any single hit that costs the player
+≥ 18 hull (≥ 13 for car-on-car) triggers a slow-motion beat (~0.32 s at 30 %
+speed), a camera FOV punch (+8°, easing home), and a red vignette flash — on
+top of the shake/haptics. **Damage shows on the car**: crossing 66 % and
+33 % hull knocks a visible accessory (bumper, pod, rack…) flying off the
+car; parts bolt back on when repaired above 66 % or on respawn. **Wrecks
+leave husks**: a destroyed car leaves a charred, smoking shell where it died
+(~9 s, then sinks away; max 6 at once).
+
 ---
 
 ## 3. Master object table

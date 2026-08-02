@@ -123,6 +123,9 @@ class Game {
     }
     this.particles = new Particles(this.scene);
     this.skids = new SkidMarks(this.scene);
+    this.husks = [];      // charred wreck shells left where cars died
+    this.hitStop = 0;     // slow-motion timer after a brutal impact
+    this.fovKick = 0;     // camera punch on the same impacts
     this.audio = new AudioEngine();
     this.input = new Input();
     this.lapsTotal = LAPS;
@@ -156,7 +159,8 @@ class Game {
     }
     const applyViewport = () => {
       this.camera.aspect = innerWidth / innerHeight;
-      this.camera.fov = innerHeight > innerWidth ? 68 : 56; // widen for portrait phones
+      this.baseFov = innerHeight > innerWidth ? 68 : 56; // widen for portrait phones
+      this.camera.fov = this.baseFov;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(innerWidth, innerHeight);
       this.composer.setSize(innerWidth, innerHeight);
@@ -506,6 +510,8 @@ class Game {
         if (p.type === 'health') {
           pl.health = Math.min(pl.maxHealth, pl.health + 35);
           this.hud.feed('+35 HULL', 'good');
+          // patched up enough? bolt the shed parts back on
+          if (pl.health / pl.maxHealth > 0.66) this.restoreCarParts(pl);
         } else if (p.type === 'missile') {
           pl.missiles = Math.min(pl.maxMissiles, pl.missiles + 2);
           this.hud.feed('+2 MISSILES', 'good');
@@ -639,7 +645,11 @@ class Game {
       this.score += pr.scoreValue || 25;
       this.buzz(15);
       const pl = this.player;
-      if (pr.pickup === 'health') { pl.health = Math.min(pl.maxHealth, pl.health + 25); this.hud.feed('CRATE: +25 HULL', 'good'); }
+      if (pr.pickup === 'health') {
+        pl.health = Math.min(pl.maxHealth, pl.health + 25);
+        this.hud.feed('CRATE: +25 HULL', 'good');
+        if (pl.health / pl.maxHealth > 0.66) this.restoreCarParts(pl);
+      }
       else if (pr.pickup === 'missile') { pl.missiles = Math.min(pl.maxMissiles, pl.missiles + 1); this.hud.feed('CRATE: +1 MISSILE', 'good'); }
       else if (pr.pickup === 'nitro') { pl.nitro = Math.min(1, pl.nitro + 0.35 * (pl.nitroRate || 1)); this.hud.feed('CRATE: NITRO CHARGE', 'good'); }
       else if (pr.pickup === 'mine') { pl.mines = Math.min(pl.maxMines, pl.mines + 1); this.hud.feed('CRATE: +1 MINE', 'good'); }
@@ -701,6 +711,7 @@ class Game {
         this.hud.feed(`HIT ROCK  −${Math.round(dmg)} HULL`, 'bad');
         this.shake = Math.min(1, this.shake + 0.3 + impact * 0.02);
         this.buzz(60);
+        if (dmg >= 18) this.crashDrama();
       }
     } else if (mat === 'hut') {
       dmg = impact > 6 ? Math.min(50, (impact - 6) * 2.2) : 0;
@@ -729,6 +740,7 @@ class Game {
         this.hud.feed(`CRASHED INTO THE HUT  −${Math.round(dmg)} HULL`, 'bad');
         this.shake = Math.min(1, this.shake + 0.25 + impact * 0.015);
         this.buzz(45);
+        if (dmg >= 18) this.crashDrama();
       }
     } else {
       dmg = impact > 8 ? Math.min(24, (impact - 8) * 0.9) : 0;
@@ -740,6 +752,77 @@ class Game {
     }
     if (dmg > 0) car.damage(dmg, null);
     if (car === this.player) this.audio.scrape();
+  }
+
+  /** Big-impact presentation: slow-mo beat + fov punch + red flash. */
+  crashDrama() {
+    this.hitStop = 0.32;
+    this.fovKick = 1;
+    this.hud.damageFlash?.(0.9);
+  }
+
+  /** Knock a small accessory (bumper, pod, rack…) off `car` — called when its
+   *  hull crosses a damage threshold. The piece flies; the car looks beaten. */
+  popCarPart(car) {
+    const ud = car.mesh.userData;
+    const excluded = new Set([...(ud.wheels ?? []), ...(ud.frontWheels ?? [])]);
+    const candidates = car.mesh.children.filter((c) => {
+      if (!c.visible || !c.isMesh || !c.geometry || excluded.has(c)) return false;
+      if (c.material === ud.bodyMat) return false; // never shed the hull itself
+      if (c.userData.vol === undefined) {
+        c.geometry.computeBoundingBox();
+        const s = c.geometry.boundingBox.getSize(new THREE.Vector3());
+        c.userData.vol = s.x * s.y * s.z * (c.scale.x * c.scale.y * c.scale.z || 1);
+      }
+      return c.userData.vol > 0.001 && c.userData.vol < 0.9;
+    });
+    if (!candidates.length) return;
+    const part = candidates[(Math.random() * candidates.length) | 0];
+    part.visible = false;
+    (car._popped ??= []).push(part);
+    const fly = part.clone();
+    part.getWorldPosition(fly.position);
+    part.getWorldQuaternion(fly.quaternion);
+    this.scene.add(fly);
+    this.flyingProps.push({
+      mesh: fly,
+      vel: new THREE.Vector3(car.vel.x * 0.5 + (Math.random() - 0.5) * 6, 6 + Math.random() * 3,
+        car.vel.z * 0.5 + (Math.random() - 0.5) * 6),
+      spin: new THREE.Vector3((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12),
+      life: 1.6,
+    });
+    this.particles.sparks(car.pos, new THREE.Vector3(0, 1, 0), 8);
+  }
+
+  restoreCarParts(car) {
+    for (const c of car._popped ?? []) c.visible = true;
+    car._popped = [];
+  }
+
+  /** Leave a charred, smoking husk where a car was wrecked (fades out ~9s). */
+  spawnHusk(car) {
+    if (this.husks.length >= 6) return;
+    const husk = car.mesh.clone(true);
+    this._huskMat ??= new THREE.MeshStandardMaterial({ color: 0x1d1a16, roughness: 1 });
+    husk.traverse((o) => { if (o.isMesh) o.material = this._huskMat; });
+    husk.position.copy(car.mesh.position);
+    husk.rotation.copy(car.mesh.rotation);
+    husk.rotation.z += (Math.random() - 0.5) * 0.45; // slumped where it died
+    husk.visible = true;
+    this.scene.add(husk);
+    this.husks.push({ mesh: husk, life: 9, pos: car.pos.clone() });
+  }
+
+  _updateHusks(dt) {
+    for (let i = this.husks.length - 1; i >= 0; i--) {
+      const h = this.husks[i];
+      h.life -= dt;
+      if (h.life > 3 && Math.random() < 0.25) {
+        this.particles.damageSmoke?.(new THREE.Vector3(h.pos.x, h.pos.y + 1, h.pos.z), 0.7);
+      }
+      if (h.life < 1.5) h.mesh.position.y -= dt * 1.4; // sink away
+      if (h.life <= 0) { this.scene.remove(h.mesh); this.husks.splice(i, 1); }
+    }
   }
 
   /** Rammed a BIG tree: the tree wins. Needle shower, real trunk damage. */
@@ -757,6 +840,7 @@ class Game {
       if (dmg >= 8) this.hud.feed(`HIT A TREE  −${Math.round(dmg)} HULL`, 'bad');
       this.shake = Math.min(1, this.shake + 0.2 + impact * 0.015);
       this.buzz(40);
+      if (dmg >= 18) this.crashDrama();
     }
   }
 
@@ -876,6 +960,12 @@ class Game {
     this.countdown = 0;
     this.playerRank = ENEMY_COUNT + 1;
     this.weapons.reset();
+    this.hitStop = 0;
+    this.fovKick = 0;
+    for (const h of this.husks) this.scene.remove(h.mesh);
+    this.husks.length = 0;
+    this.restoreCarParts(this.player);
+    for (const e of this.enemies) this.restoreCarParts(e);
 
     this.player.lap = 1;
     this.player.finished = false;
@@ -1090,6 +1180,7 @@ class Game {
               this.shake = Math.min(1, this.shake + 0.2 + impact * 0.01);
               this.buzz(25);
               if (dmg >= 4) this.hud.feed(`CRASH −${Math.round(dmg)} HULL`, 'bad');
+              if (dmg >= 13) this.crashDrama();
             }
           }
           a.vel.addScaledVector(rel, -0.12);
@@ -1131,8 +1222,19 @@ class Game {
 
   // ---------- main loop ----------
   frame() {
-    const dt = Math.min(this.clock.getDelta(), 0.05);
+    let dt = Math.min(this.clock.getDelta(), 0.05);
     const time = this.clock.elapsedTime;
+    // brutal-impact slow motion: time crawls for a beat, then snaps back
+    if (this.hitStop > 0) {
+      this.hitStop = Math.max(0, this.hitStop - dt);
+      dt *= 0.3;
+    }
+    // camera punch: fov widens on the hit and eases home
+    if (this.fovKick > 0) {
+      this.fovKick = Math.max(0, this.fovKick - dt * 2.6);
+      this.camera.fov = (this.baseFov ?? 56) + this.fovKick * 8;
+      this.camera.updateProjectionMatrix();
+    }
     this.track.update(dt, time);
 
     if (this.input.justPressed('KeyC')) this.cycleCamera();
@@ -1182,6 +1284,7 @@ class Game {
       this.particles.update(dt);
       this.skids.update(dt);
       this._updateFlashes(dt);
+      this._updateHusks(dt);
       this.hud.update(dt);
       this.audio.engine(
         Math.abs(this.player.speedAlong) / this.player.maxSpeed,
