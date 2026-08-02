@@ -7,7 +7,7 @@ import {
   chevronTexture, checkerTexture, glowTexture, cloudTexture,
   grassTexture, bannerTexture, hazardTexture, crowdTexture, awningTexture,
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
-  crateTexture, coneTexture, barrelTexture,
+  crateTexture, coneTexture, barrelTexture, riverTexture, iglooTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -16,6 +16,9 @@ export const LEVELS = [
   { id: 3, name: 'FROST PEAK',   theme: 'snow' },
   { id: 4, name: 'CANYON RUN',   theme: 'canyon' },
   { id: 5, name: 'EMBER PASS',   theme: 'volcano' },
+  { id: 6, name: 'SUMMIT CLIMB', theme: 'alpine' },
+  { id: 7, name: 'GLACIAL PASS', theme: 'glacial' },
+  { id: 8, name: 'AMAZON RAPIDS', theme: 'jungle' },
 ];
 
 // Hand-designed circuit control points (x, z) per theme.
@@ -56,6 +59,49 @@ const CIRCUITS = {
     [225, 20], [250, 100], [200, 170], [110, 205], [30, 170],
     [-50, 205], [-140, 225], [-220, 180], [-250, 100], [-215, 30],
     [-250, -45], [-210, -120], [-150, -90], [-90, -140], [-30, -180],
+  ],
+  // SUMMIT CLIMB: valley run along the mountain base, then FIVE stacked
+  // switchback legs (east-west, ~26u apart in z, joined by 180° hairpins)
+  // climbing the east face, a short summit shelf, and a wide fast descent
+  // down the west side back to the valley. The ascent elevation profile
+  // (THEMES.alpine.elev) climbs steadily through the leg stack.
+  alpine: [
+    // valley run at the mountain base
+    [0, -210], [70, -218], [140, -205], [195, -172], [218, -140],
+    // leg 1 (west-bound)
+    [215, -122], [160, -125], [112, -121],
+    [93, -108],                                   // hairpin W
+    // leg 2 (east-bound)
+    [112, -95], [160, -98], [206, -94],
+    [225, -81],                                   // hairpin E
+    // leg 3 (west-bound)
+    [206, -68], [158, -71], [112, -67],
+    [93, -54],                                    // hairpin W
+    // leg 4 (east-bound)
+    [112, -41], [160, -44], [206, -40],
+    [225, -27],                                   // hairpin E
+    // leg 5 (west-bound) → summit shelf
+    [206, -14], [150, -16], [100, -12],
+    [40, -5], [-15, 8],
+    // fast sweeping descent down the far side
+    [-90, 25], [-160, 45], [-225, 10], [-240, -60], [-205, -130],
+    [-140, -175], [-70, -195],
+  ],
+  // GLACIAL PASS: winding ice-canyon course, medium technicality
+  glacial: [
+    [0, -225], [85, -235], [160, -210], [210, -160], [250, -100],
+    [225, -35], [250, 30], [205, 90], [215, 155], [150, 195],
+    [75, 165], [10, 200], [-70, 225], [-150, 200], [-190, 140],
+    [-155, 80], [-215, 45], [-245, -25], [-200, -85], [-235, -150],
+    [-165, -190], [-90, -160], [-45, -215],
+  ],
+  // AMAZON RAPIDS: snaking jungle lap threading between the river crossings
+  jungle: [
+    [0, -220], [90, -230], [165, -195], [230, -150], [245, -70],
+    [200, -20], [235, 50], [190, 120], [215, 185], [130, 220],
+    [50, 185], [-30, 225], [-110, 190], [-95, 120], [-160, 85],
+    [-230, 120], [-250, 40], [-205, -20], [-245, -90], [-195, -155],
+    [-120, -120], [-80, -185], [-30, -225],
   ],
 };
 
@@ -202,7 +248,7 @@ const THEMES = {
     weather: { type: 'dust', color: 0xc9a06a },
     elev: { amp: 6, ph: [0.3, 3.7, 1.9] },              // gentle canyon-floor undulation
     rampMaxCurv: 0.02, padMaxCurv: 0.0075, boardMaxCurv: 0.018,
-    cliffWalls: true, horizon: 'mesa', bridgeCount: 3, oasis: true,
+    cliffWalls: true, horizon: 'mesa', bridgeCount: 3, oasis: true, outcrops: true,
     obstacleSpec: { count: 6, style: 'hoodoo' }, puddleCount: 5,
   },
   // EMBER PASS: charred basalt world — dark ash road, glowing ground fissures,
@@ -245,6 +291,137 @@ const THEMES = {
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.016,
     obstacleSpec: { count: 4, style: 'basalt' }, puddleCount: 0,
   },
+  // SUMMIT CLIMB: bright alpine pass — stacked switchback legs climb the
+  // mountain face (hand-shaped 'ascent' elevation profile, summit ≈ 33u),
+  // mossy green boulders, crisp cold sky, snow drifting near the summit.
+  alpine: {
+    fogColor: 0xdcecf8, fogNear: 300, fogFar: 1500,
+    hemiSky: 0xcfe4ff, hemiGround: 0x628a4c,
+    sunColor: 0xfff6e0, sunIntensity: 2.0,
+    skyTop: '#2f6fc8', skyHorizon: '#dceef8', sunGlow: 0xfff4cc,
+    cloudCount: 10, cloudOpacity: 0.92,
+    terrainLow: '#4c8a3c', terrainHigh: '#9ab87a', terrainDirt: '#8a7a5a',
+    ground: {},   // lush meadow defaults read right at altitude too
+    road: {},     // classic dirt rally surface
+    hillColor: 0x54804a, peakColor: 0xdde8f0,           // snow-dusted horizon peaks
+    treeCount: 280, trunkColor: 0x6b4423,
+    foliageLow: 0x2a6e34, foliageTop: 0x3f9a44,         // bright alpine pines
+    foliage: { h: 0.30, hVar: 0.06, s: 0.55, sVar: 0.2, l: 0.30, lVar: 0.14 },
+    treeSnowCap: false,
+    tuftCount: 900, grass: {},
+    bushCount: 140, bushColor: 0x2f7a30,
+    bush: { h: 0.30, hVar: 0.05, s: 0.5, sVar: 0, l: 0.30, lVar: 0.12 },
+    // the slopes are strewn with mossy green granite
+    rockCount: 340, pebbleCount: 220, rockColor: 0x7a9a6c, rockSnowCap: false,
+    flowerCount: 260, flowerColors: ['#ffffff', '#ffe234', '#7a9aff', '#ff6a8a'],
+    hutRoof: 0x8a4a2a, hayColor: 0xd8b95e,
+    splinter: [0x8a5a32, 0xe8e2d4],                     // pale mountain timber
+    weather: { type: 'snow', color: 0xffffff },         // gentle snow off the summit
+    // hand-shaped monotonic climb: flat valley → steady rise through the
+    // switchback stack → summit shelf ≈ 33u → fast descent back to 0.
+    // keys are [lapFraction, roadY]; see _elevProfile's 'ascent' branch.
+    elev: {
+      amp: 33, profile: 'ascent', ph: [0, 0, 0],
+      keys: [[0, 0], [0.05, 0], [0.15, 3], [0.57, 33], [0.65, 32], [0.94, 0], [1, 0]],
+    },
+    rampMaxCurv: 0.014, padMaxCurv: 0.004, boardMaxCurv: 0.012,
+    // loose granite boulders block the fast descent (downhill sections only)
+    obstacleSpec: { count: 4, style: 'boulder', downhill: true }, puddleCount: 2,
+  },
+  // GLACIAL PASS: blue-white ice canyon — glacial cliff ribbons, packed-snow
+  // road with frozen slicks, igloos, penguins and driving snow.
+  glacial: {
+    fogColor: 0xd8e8f4, fogNear: 210, fogFar: 1200,
+    hemiSky: 0xd8ecff, hemiGround: 0xa8c2d8,
+    sunColor: 0xe8f4ff, sunIntensity: 1.8,
+    skyTop: '#4c8ecf', skyHorizon: '#dff0fa', sunGlow: 0xeafaff,
+    cloudCount: 8, cloudOpacity: 0.9,
+    terrainLow: '#cfe0ec', terrainHigh: '#ffffff', terrainDirt: '#9fb8c8',
+    ground: {
+      base: '#dfeaf2', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(110,145,175,0.07)',
+      patchA: 'rgba(150,185,215,0.22)', patchB: 'rgba(255,255,255,0.22)',
+      speckA: 'rgba(190,220,240,0.8)', speckB: 'rgba(255,255,255,0.9)', speckCount: 90,
+    },
+    road: {
+      // packed snow, bluer than FROST PEAK's churned mud
+      base: '#b6c9d6', mottleA: [140, 162, 180], mottleB: [214, 228, 238],
+      rut: 'rgba(96,120,142,0.55)', rutCore: 'rgba(74,96,118,0.5)', tread: 'rgba(52,68,86,0.5)',
+      stoneA: 'rgba(235,245,252,0.8)', stoneB: 'rgba(120,148,170,0.7)',
+      fringe: [226, 238, 248], fringeVar: [24, 14, 8],  // snowbanks creeping in
+    },
+    hillColor: 0xbdd2e0, peakColor: 0xeef6fc,
+    treeCount: 140, trunkColor: 0x5a4028,
+    foliageLow: 0x5a7a62, foliageTop: 0x668a70,
+    foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
+    treeSnowCap: true,
+    tuftCount: 240, grass: { bladeA: '#6a8a78', bladeB: '#c8dcd0' },
+    bushCount: 60, bushColor: 0x9ab8a0,
+    bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.55, lVar: 0.12 },
+    rockCount: 160, pebbleCount: 120, rockColor: 0x9ab4c4, rockSnowCap: true,
+    flowerCount: 40, flowerColors: ['#ffffff', '#cfe0ff', '#aef0ff'],
+    hutRoof: 0xe8f2f8, hutStyle: 'igloo', hutCount: 8, hayColor: 0xd8c07a, hayCount: 10,
+    splinter: [0xcfe8f4, 0x8fd0e8],                     // shattered ice chips
+    weather: { type: 'snow', color: 0xffffff },
+    elev: { amp: 9, ph: [1.4, 3.1, 0.6] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    // glacial cliff ribbons: pale blue-white strata split by cyan cracks
+    cliffWalls: true,
+    cliffPalette: {
+      bands: ['#dceef8', '#c2dcee', '#a8cce4', '#d4e8f4', '#b4d4e8'],
+      seam: 'rgba(120,160,190,0.45)',
+      crack: 'rgba(40,150,190,',                        // cyan crevasses
+      bleach: 'rgba(255,255,255,0.22)',
+      talus: 'rgba(90,120,150,0.28)',
+      mottleLight: '255,255,255', mottleDark: '120,160,200',
+      streakLight: '240,250,255', streakDark: '130,170,205',
+    },
+    // frozen slicks: the puddle mechanic re-skinned icy blue-white
+    puddle: {
+      rim: '#cfe4f0', mud: '#9cc8e0',
+      sheen: 'rgba(235,250,255,0.5)', gleam: 'rgba(255,255,255,0.75)',
+    },
+    puddleCount: 5,
+  },
+  // AMAZON RAPIDS: dense deep-green jungle — layered canopies close over a
+  // dark mud road, rivers cross beneath it, humid haze hangs low.
+  jungle: {
+    fogColor: 0xb8d8b0, fogNear: 170, fogFar: 950,     // humid green haze, dense
+    hemiSky: 0xd8f0d0, hemiGround: 0x3c6a34,
+    sunColor: 0xfff2c8, sunIntensity: 1.9,
+    skyTop: '#5a9ac8', skyHorizon: '#cfe8b8', sunGlow: 0xf8ffd0,
+    cloudCount: 10, cloudOpacity: 0.85,
+    terrainLow: '#2e6a28', terrainHigh: '#5a9440', terrainDirt: '#6a4a2c',
+    ground: {
+      base: '#3e7a30', bandLight: 'rgba(255,255,255,0.04)', bandDark: 'rgba(0,40,0,0.06)',
+      patchA: 'rgba(20,70,24,0.22)', patchB: 'rgba(120,180,70,0.16)',
+      speckA: 'rgba(255,220,120,0.8)', speckB: 'rgba(190,240,150,0.8)', speckCount: 70,
+    },
+    road: {
+      // wet, dark rainforest mud — deeper and slicker than canyon dirt
+      base: '#5c4128', mottleA: [58, 40, 24], mottleB: [110, 82, 52],
+      rut: 'rgba(38,26,14,0.6)', rutCore: 'rgba(24,16,8,0.55)', tread: 'rgba(12,8,4,0.6)',
+      stoneA: 'rgba(150,140,110,0.6)', stoneB: 'rgba(52,40,26,0.7)',
+      fringe: [46, 110, 38], fringeVar: [30, 50, 22],   // jungle green creeping in
+    },
+    hillColor: 0x2e6a34, peakColor: 0x4a8a4c,
+    vegetation: 'jungle', treeCount: 320, trunkColor: 0x7a5c3a,
+    foliageLow: 0x1f6e2c, foliageTop: 0x35a03c,
+    foliage: { h: 0.31, hVar: 0.08, s: 0.55, sVar: 0.2, l: 0.26, lVar: 0.16 },
+    treeSnowCap: false,
+    tuftCount: 900, grass: { bladeA: '#2f7a22', bladeB: '#63c243' },
+    bushCount: 220, bushColor: 0x2c7a2e,
+    bush: { h: 0.31, hVar: 0.06, s: 0.55, sVar: 0.15, l: 0.26, lVar: 0.14 },
+    rockCount: 90, pebbleCount: 120, rockColor: 0x6a7a5a, rockSnowCap: false,
+    flowerCount: 420, flowerColors: ['#ff4a6a', '#ffd45e', '#ff8a3a', '#e86aff', '#ffffff'],
+    hutRoof: 0x7a9a3c, hayColor: 0xc8b45e, hutCount: 6, hayCount: 30,
+    splinter: [0x4a9a3c, 0x8a6a42],                     // shredded fronds + wet wood
+    weather: { type: 'leaves', color: 0x4aae4a },
+    elev: { amp: 7, ph: [2.2, 0.9, 4.4] },
+    rampMaxCurv: 0.016, padMaxCurv: 0.005, boardMaxCurv: 0.014,
+    // fallen log piles on the road (SOLID circle colliders like all obstacles)
+    obstacleSpec: { count: 3, style: 'logs' }, puddleCount: 8,
+    riverCount: 3,                                      // streams crossing under the road
+  },
 };
 
 const N = 900;              // centerline samples
@@ -270,8 +447,11 @@ const PROP_SPECS = {
   snow: [['snowman', 16], ['crate', 16], ['cone', 14]],
   canyon: [['crate', 16], ['barrel', 13], ['cone', 13], ['rock', 8]],
   volcano: [['barrel', 18], ['crate', 16], ['cone', 14]],
+  alpine: [['hay', 20], ['crate', 16], ['cone', 14]],
+  glacial: [['penguin', 10], ['snowman', 10], ['crate', 14], ['barrel', 10]],
+  jungle: [['crate', 14], ['barrel', 12], ['cone', 12], ['hay', 14]],
 };
-const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20 };
+const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20, penguin: 40 };
 const _m4 = new THREE.Matrix4(); // scratch (smashTree instance-zeroing)
 const PROP_PICKUPS = ['health', 'missile', 'nitro', 'mine'];
 // theme tints for the barrel drum texture
@@ -279,6 +459,8 @@ const BARREL_PALETTES = {
   desert: { base: '#c29a5c', hoop: '#4a3620' },
   canyon: { base: '#9a6440', hoop: '#33291e' },
   volcano: { base: '#37322e', hoop: '#191512', stripe: '#e8381e' },
+  glacial: { base: '#7aa8c4', hoop: '#2c4456', stripe: '#e8f2f8' },
+  jungle: { base: '#5a7a34', hoop: '#2c3a1a', stripe: '#c8b45e' },
 };
 
 let PROP_ASSETS = null;
@@ -304,6 +486,13 @@ function propAssets() {
       ballHead: new THREE.SphereGeometry(0.52, 12, 9),
       eye: new THREE.SphereGeometry(0.07, 6, 5),
       carrot: new THREE.ConeGeometry(0.1, 0.5, 6),
+      // voxel penguin parts (glacial): boxes only, r ≈ 0.6
+      pengBody: new THREE.BoxGeometry(0.62, 0.9, 0.54),
+      pengBelly: new THREE.BoxGeometry(0.44, 0.66, 0.1),
+      pengHead: new THREE.BoxGeometry(0.46, 0.36, 0.42),
+      pengWing: new THREE.BoxGeometry(0.1, 0.5, 0.3),
+      pengBeak: new THREE.BoxGeometry(0.14, 0.1, 0.22),
+      pengFoot: new THREE.BoxGeometry(0.2, 0.08, 0.3),
     },
     mat: {
       crate: new THREE.MeshStandardMaterial({ map: crateTexture(), roughness: 0.9 }),
@@ -314,6 +503,9 @@ function propAssets() {
       coal: new THREE.MeshStandardMaterial({ color: 0x201c18, roughness: 0.8 }),
       carrot: new THREE.MeshStandardMaterial({ color: 0xe8641e, roughness: 0.8 }),
       rock: new THREE.MeshStandardMaterial({ color: 0xb5744a, flatShading: true, roughness: 1 }),
+      pengBlack: new THREE.MeshStandardMaterial({ color: 0x1c2026, roughness: 0.8 }),
+      pengWhite: new THREE.MeshStandardMaterial({ color: 0xf4f8fc, roughness: 0.75 }),
+      pengOrange: new THREE.MeshStandardMaterial({ color: 0xe8862e, roughness: 0.8 }),
     },
   };
   return PROP_ASSETS;
@@ -452,13 +644,31 @@ export class Track {
    *  phases are fixed per theme — layouts stay deterministic across loads. */
   _elevProfile(i) {
     const E = this.T.elev || { amp: 0, ph: [0, 0, 0] };
+    const flat = THREE.MathUtils.smoothstep(this._circDist(i, 0), 45, 130);
+    if (E.profile === 'ascent') {
+      // Hand-shaped mountain-pass profile: E.keys is a monotone-in-t list of
+      // [lapFraction, roadY] pairs, smoothstepped between neighbours (the sine
+      // octaves can't produce a sustained climb). The zigzag switchback layout
+      // makes path length >> height gain, so road grades stay drivable.
+      const f = i / N;
+      const K = E.keys;
+      let y = K[K.length - 1][1];
+      for (let k = 0; k < K.length - 1; k++) {
+        if (f <= K[k + 1][0]) {
+          y = K[k][1] + (K[k + 1][1] - K[k][1])
+            * THREE.MathUtils.smoothstep(f, K[k][0], K[k + 1][0]);
+          break;
+        }
+      }
+      return y * flat;
+    }
     const t = (i / N) * Math.PI * 2;
     const raw =
       0.52 * Math.sin(2 * t + E.ph[0]) +      // period ~N/2
       0.34 * Math.sin(3.3 * t + E.ph[1]) +    // period ~N/3.3
       0.14 * Math.sin(7 * t + E.ph[2]);       // period ~N/7
     // dead-flat within ±45 samples of the start, easing up to full amplitude
-    return E.amp * raw * THREE.MathUtils.smoothstep(this._circDist(i, 0), 45, 130);
+    return E.amp * raw * flat;
   }
 
   /** Grade dY/ds (rise per unit of travel) at sample i. Positive = climbing. */
@@ -636,7 +846,8 @@ export class Track {
     if (this.T.cliffWalls) {
       // Slot-canyon look: tall stratified cliff ribbons just outside the road.
       // Purely visual — the physics clamp stays at WALL_OFF like every level.
-      const tex = cliffTexture();
+      // T.cliffPalette re-skins the face per theme (glacial blue-white ice).
+      const tex = cliffTexture(this.T.cliffPalette);
       tex.anisotropy = 4;
       this._cliffRibbon(1, tex);
       this._cliffRibbon(-1, tex);
@@ -939,10 +1150,14 @@ export class Track {
     const chosen = [];
     for (let i = 0; i < N && chosen.length < spec.count; i += 7) {
       if (this._circDist(i, 0) < 60) continue;
-      if (this.curvature[i] > 0.012) continue;
+      // alpine: loose boulders litter the fast DESCENT only (the downhill
+      // window is short, so they pack tighter, and rockfall on a sweeper is
+      // fair game — elsewhere obstacles keep to straights)
+      if (this.curvature[i] > (spec.downhill ? 0.02 : 0.012)) continue;
+      if (spec.downhill && this.slopeAt(i) > -0.02) continue;
       if (this.ramps.some((r) => this._circDist(i, r.index) < 41)) continue;  // 25 + ramp len
       if (this.boostPads.some((p) => this._circDist(i, p.index) < 25)) continue;
-      if (chosen.some((c) => this._circDist(i, c) < 120)) continue;
+      if (chosen.some((c) => this._circDist(i, c) < (spec.downhill ? 38 : 120))) continue;
       chosen.push(i);
     }
     this._obstacleIdx = chosen;
@@ -952,21 +1167,50 @@ export class Track {
     const basaltMat = new THREE.MeshStandardMaterial({
       color: 0x25212a, flatShading: true, roughness: 0.45, metalness: 0.1, emissive: 0x1c0a04,
     });
+    // alpine rockfall: mossy granite, matching the trackside boulder palette
+    const graniteMat = new THREE.MeshStandardMaterial({
+      color: 0x7a9a6c, flatShading: true, roughness: 1,
+    });
+    const logMat = new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 0.95 });
+    const logCapMat = new THREE.MeshStandardMaterial({ color: 0xc8a468, roughness: 0.9 });
     chosen.forEach((i, k) => {
       const r = 2.2 + Math.random();                       // collider radius 2.2–3.2
       const side = k % 2 === 0 ? -1 : 1;
       const lateral = side * (1.2 + Math.random() * 3.3);  // within ±4.5 of centerline
       const p = this.pointAt(i, lateral);
-      if (spec.style === 'basalt') {
-        // two-lump obsidian boulder
+      if (spec.style === 'logs') {
+        // jungle log pile: 2-3 stacked horizontal trunks lying across the lane
         const g = new THREE.Group();
-        const low = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), basaltMat);
+        const nLogs = 2 + (Math.random() < 0.5 ? 1 : 0);
+        const len = r * 2.1;
+        const lr = 0.62;
+        const spots = [[-lr * 1.05, lr], [lr * 1.05, lr], [0, lr * 2.7]];
+        for (let s = 0; s < nLogs; s++) {
+          const log = new THREE.Mesh(
+            new THREE.CylinderGeometry(lr * (0.9 + Math.random() * 0.2), lr, len, 9),
+            [logMat, logCapMat, logCapMat]
+          );
+          log.rotation.z = Math.PI / 2;                    // lie flat, axis along local X
+          log.rotation.y = (Math.random() - 0.5) * 0.16;
+          log.position.set(spots[s][0] + (Math.random() - 0.5) * 0.3, spots[s][1], (Math.random() - 0.5) * 0.3);
+          log.castShadow = true;
+          g.add(log);
+        }
+        g.position.set(p.x, p.y, p.z);
+        // logs run across the road (local X = world road-normal direction)
+        g.rotation.y = this.headingAt(i) + Math.PI / 2 + (Math.random() - 0.5) * 0.4;
+        this.group.add(g);
+      } else if (spec.style === 'basalt' || spec.style === 'boulder') {
+        // two-lump boulder: glossy obsidian (volcano) or mossy granite (alpine)
+        const rockMat = spec.style === 'boulder' ? graniteMat : basaltMat;
+        const g = new THREE.Group();
+        const low = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), rockMat);
         low.scale.set(r, r * 0.72, r * 0.9);
         low.position.y = r * 0.42;
         low.rotation.y = Math.random() * Math.PI * 2;
         low.castShadow = true;
         g.add(low);
-        const top = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), basaltMat);
+        const top = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), rockMat);
         top.scale.set(r * 0.55, r * 0.5, r * 0.55);
         top.position.y = r * 0.95;
         top.rotation.y = Math.random() * Math.PI * 2;
@@ -1008,14 +1252,16 @@ export class Track {
   _buildPuddles() {
     const count = this.T.puddleCount | 0;
     if (!count) return;
-    const tex = puddleTexture();
+    // theme knob T.puddle re-tints the decal (glacial's icy frozen slicks)
+    const tex = puddleTexture(this.T.puddle);
     const chosen = [];
     for (let i = 3; i < N && chosen.length < count; i += 5) {
       if (this._circDist(i, 0) < 50) continue;
       if (this.ramps.some((r) => this._circDist(i, r.index) < 41)) continue;
       if (this.boostPads.some((p) => this._circDist(i, p.index) < 25)) continue;
       if (this._obstacleIdx.some((o) => this._circDist(i, o) < 25)) continue;
-      if (chosen.some((c) => this._circDist(i, c) < 80)) continue;
+      // high-count levels (jungle's 8 river-fed pools) pack a little tighter
+      if (chosen.some((c) => this._circDist(i, c) < (count > 6 ? 55 : 80))) continue;
       chosen.push(i);
     }
     for (const i of chosen) {
@@ -1098,6 +1344,36 @@ export class Track {
           g.add(eye);
         }
         return { mesh: g, r: 1.4 };
+      }
+      case 'penguin': {
+        // little voxel penguin waddling near the road (glacial)
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(A.geo.pengBody, A.mat.pengBlack);
+        body.position.y = 0.53;
+        body.castShadow = true;
+        g.add(body);
+        const belly = new THREE.Mesh(A.geo.pengBelly, A.mat.pengWhite);
+        belly.position.set(0, 0.5, 0.25);
+        g.add(belly);
+        const head = new THREE.Mesh(A.geo.pengHead, A.mat.pengBlack);
+        head.position.y = 1.14;
+        g.add(head);
+        const beak = new THREE.Mesh(A.geo.pengBeak, A.mat.pengOrange);
+        beak.position.set(0, 1.1, 0.3);
+        g.add(beak);
+        for (const s of [-1, 1]) {
+          const eye = new THREE.Mesh(A.geo.eye, A.mat.pengWhite);
+          eye.position.set(s * 0.13, 1.2, 0.21);
+          g.add(eye);
+          const wing = new THREE.Mesh(A.geo.pengWing, A.mat.pengBlack);
+          wing.position.set(s * 0.38, 0.6, 0);
+          wing.rotation.z = s * 0.22;
+          g.add(wing);
+          const foot = new THREE.Mesh(A.geo.pengFoot, A.mat.pengOrange);
+          foot.position.set(s * 0.16, 0.04, 0.08);
+          g.add(foot);
+        }
+        return { mesh: g, r: 0.6 };
       }
       default: {                                         // 'rock' — small pebble
         const m = new THREE.Mesh(A.geo.rock, A.mat.rock);
@@ -1217,9 +1493,10 @@ export class Track {
     this._buildTrackside(m4);
     this._buildBanners();
     this._buildGrandstand();
-    if (this.T.cliffWalls) this._buildOutcrops(m4);  // mesas + hoodoos beyond the canyon
+    if (this.T.outcrops) this._buildOutcrops(m4);    // mesas + hoodoos beyond the canyon
     if (this.T.bridgeCount) this._buildBridges();
     if (this.T.oasis) this._buildOasis();
+    if (this.T.riverCount) this._buildRivers();      // jungle streams under the road
   }
 
   _buildTerrain() {
@@ -1492,6 +1769,7 @@ export class Track {
     const T = this.T;
     if (T.vegetation === 'cactus') return this._buildCacti(m4);
     if (T.vegetation === 'charred') return this._buildCharredTrees(m4);
+    if (T.vegetation === 'jungle') return this._buildJungleTrees(m4);
     const COUNT = T.treeCount;
     const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 7);
     trunkGeo.translate(0, 1.2, 0);
@@ -1665,6 +1943,97 @@ export class Track {
     for (const part of parts) { part.count = placed; this.scene.add(part); }
   }
 
+  /** Jungle canopy: tall thin trunks under 2-3 stacked wide flattened crowns
+   *  (varied greens), packed dense for a closed-canopy feel, plus banana-ish
+   *  giant-leaf plants fanning out near the road. The big canopy trees carry
+   *  kind 'pine' so the material law's big-tree-SOLID rule applies to them
+   *  (most spawn at scale ≥ 1.0); the leaf plants are small and smashable. */
+  _buildJungleTrees(m4) {
+    const T = this.T;
+    const COUNT = T.treeCount;
+    // trunk: tall and thin
+    const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 6.4, 7);
+    trunkGeo.translate(0, 3.2, 0);
+    // three stacked broad, squashed crowns
+    const can1 = new THREE.ConeGeometry(3.4, 2.1, 8);
+    can1.translate(0, 6.3, 0);
+    const can2 = new THREE.ConeGeometry(2.6, 1.8, 8);
+    can2.translate(0, 7.7, 0);
+    const can3 = new THREE.ConeGeometry(1.7, 1.5, 7);
+    can3.translate(0, 8.9, 0);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
+    const canMatLow = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
+    const canMatTop = new THREE.MeshStandardMaterial({ color: T.foliageTop, flatShading: true, roughness: 1 });
+    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, COUNT);
+    const lows = new THREE.InstancedMesh(can1, canMatLow, COUNT);
+    const mids = new THREE.InstancedMesh(can2, canMatLow, COUNT);
+    const tops = new THREE.InstancedMesh(can3, canMatTop, COUNT);
+    lows.castShadow = tops.castShadow = true;
+    const treeParts = [trunks, lows, mids, tops];
+    const color = new THREE.Color();
+    const F = T.foliage;
+    const placed = this._scatter(COUNT,
+      () => {
+        // denser and closer than the pine forests: a real green wall
+        if (Math.random() < 0.7) return this._trackSidePos(13.5, 40);
+        const a = Math.random() * Math.PI * 2;
+        const r = 60 + Math.random() * 480;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        if (this._distToTrack(x, z) < 13) return null;
+        return { x, z };
+      },
+      (p, k) => {
+        const s = 0.9 + Math.random() * 1.1;             // mostly ≥ 1.0 → SOLID trunks
+        const ty = this.terrainHeight(p.x, p.z) - 0.25;
+        m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
+        m4.setPosition(p.x, ty, p.z);
+        for (const part of treeParts) part.setMatrixAt(k, m4);
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 1.0 * s, id: k, parts: treeParts, kind: 'pine', s });
+        color.setHSL(
+          F.h + Math.random() * F.hVar,
+          F.s + Math.random() * F.sVar,
+          F.l + Math.random() * F.lVar
+        );
+        lows.setColorAt(k, color);
+        mids.setColorAt(k, color.clone().multiplyScalar(0.85));
+        tops.setColorAt(k, color.clone().multiplyScalar(1.25));
+      });
+    trunks.count = lows.count = mids.count = tops.count = placed;
+    this.scene.add(trunks, lows, mids, tops);
+
+    // giant-leaf plants near the road: 5 flat stretched leaves fanned from a base
+    const PLANTS = 90;
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.85 });
+    const leafParts = [];
+    for (let li = 0; li < 5; li++) {
+      const leaf = new THREE.BoxGeometry(0.55, 0.07, 2.3);
+      leaf.translate(0, 0, 1.35);
+      leaf.rotateX(-0.42 - (li % 2) * 0.16);             // tips lifted, alternating droop
+      leaf.rotateY(li * (Math.PI * 2 / 5) + 0.3);
+      leaf.translate(0, 0.5, 0);
+      leafParts.push(new THREE.InstancedMesh(leaf, leafMat, PLANTS));
+    }
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const pPlaced = this._scatter(PLANTS,
+      () => this._trackSidePos(11.2, 17),
+      (p, k) => {
+        const s = 0.55 + Math.random() * 0.4;            // small → always smashable
+        const py = this.terrainHeight(p.x, p.z) - 0.05;
+        q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
+        m4.compose(
+          new THREE.Vector3(p.x, py, p.z),
+          q, new THREE.Vector3(s, s * (0.9 + Math.random() * 0.3), s)
+        );
+        color.setHSL(0.30 + Math.random() * 0.07, 0.5 + Math.random() * 0.2, 0.26 + Math.random() * 0.12);
+        for (const part of leafParts) {
+          part.setMatrixAt(k, m4);
+          part.setColorAt(k, color);
+        }
+        this.trees.push({ x: p.x, z: p.z, y: py, r: 0.65 * s, id: k, parts: leafParts, kind: 'jungle', s });
+      });
+    for (const part of leafParts) { part.count = pPlaced; this.scene.add(part); }
+  }
+
   _buildGroundCover(m4) {
     const T = this.T;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
@@ -1828,6 +2197,7 @@ export class Track {
   }
 
   _buildHuts(m4) {
+    if (this.T.hutStyle === 'igloo') return this._buildIgloos(m4);
     const COUNT = this.T.hutCount !== undefined ? this.T.hutCount : 14;
     const wallGeo = new THREE.BoxGeometry(1, 1, 1);
     wallGeo.translate(0, 0.5, 0);
@@ -1856,6 +2226,57 @@ export class Track {
     });
     walls.count = roofs.count = placed;
     this.scene.add(walls, roofs);
+  }
+
+  /** Glacial dwellings: white ice-block domes (half-sunk spheres) with a short
+   *  entrance tunnel. Same trackside placement + SOLID 'hut' collider as huts. */
+  _buildIgloos(m4) {
+    const COUNT = this.T.hutCount !== undefined ? this.T.hutCount : 8;
+    const domeGeo = new THREE.SphereGeometry(1, 16, 10);
+    const tunnelGeo = new THREE.CylinderGeometry(1, 1, 1, 10, 1, false);
+    tunnelGeo.rotateX(Math.PI / 2);                 // axis along local Z
+    const iceMat = new THREE.MeshStandardMaterial({ map: iglooTexture(), roughness: 0.85 });
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x22303c, roughness: 1 });
+    const domes = new THREE.InstancedMesh(domeGeo, iceMat, COUNT);
+    const tunnels = new THREE.InstancedMesh(tunnelGeo, iceMat, COUNT);
+    const doors = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 10), doorMat, COUNT);
+    domes.castShadow = tunnels.castShadow = true;
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    let placed = 0;
+    // cliff-walled levels: the canyon walls open up around the start line, so
+    // the village sits in that bowl where racers actually see it
+    const makePos = this.T.cliffWalls
+      ? () => {
+          const gi = (((Math.random() * 150 - 75) | 0) + N) % N;
+          const side = Math.random() < 0.5 ? 1 : -1;
+          const p = this.pointAt(gi, side * (15 + Math.random() * 22));
+          if (this._distToTrack(p.x, p.z) < 14) return null;
+          return { x: p.x, z: p.z };
+        }
+      : () => this._trackSidePos(18, 52);
+    this._scatter(COUNT, makePos, (p) => {
+      const R = 3.2 + Math.random() * 1.6;          // dome radius
+      const rot = Math.random() * Math.PI * 2;      // entrance direction
+      const y = this.terrainHeight(p.x, p.z) - R * 0.35;   // half-sunk into the snow
+      q.setFromAxisAngle(up, rot);
+      m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(R, R * 0.92, R));
+      domes.setMatrixAt(placed, m4);
+      // entrance tunnel pokes out of the dome along the rotated +Z
+      const dx = Math.sin(rot), dz = Math.cos(rot);
+      const tr = R * 0.34;
+      const tx = p.x + dx * R * 0.92, tz = p.z + dz * R * 0.92;
+      m4.compose(new THREE.Vector3(tx, y + R * 0.35 + tr * 0.4, tz), q, new THREE.Vector3(tr, tr, R * 0.7));
+      tunnels.setMatrixAt(placed, m4);
+      // dark doorway disc capping the tunnel mouth
+      m4.compose(
+        new THREE.Vector3(tx + dx * R * 0.36, y + R * 0.35 + tr * 0.4, tz + dz * R * 0.36),
+        q, new THREE.Vector3(tr * 0.82, tr * 0.82, 1)
+      );
+      doors.setMatrixAt(placed++, m4);
+      this.solids.push({ x: p.x, z: p.z, r: R * 0.95, y: y + R * 0.35, mat: 'hut' });
+    });
+    domes.count = tunnels.count = doors.count = placed;
+    this.scene.add(domes, tunnels, doors);
   }
 
   _buildTrackside(m4) {
@@ -2179,6 +2600,69 @@ export class Track {
       g.scale.setScalar(s);
       g.position.set(px, spot.y + 0.25, pz);
       this.scene.add(g);
+    }
+  }
+
+  /** Jungle streams: blue water ribbons with foam-painted banks, meandering
+   *  across the circuit slightly BELOW road level (the road bridges over).
+   *  Each river threads through one of the road's mud puddles — that puddle
+   *  IS the crossing hazard, so the existing puddle mechanic covers it. */
+  _buildRivers() {
+    const count = Math.min(this.T.riverCount | 0, this.puddles.length);
+    if (!count) return;
+    // pick well-separated puddles as crossing points
+    const cross = [];
+    for (const pd of this.puddles) {
+      if (cross.length >= count) break;
+      if (cross.some((c) => Math.hypot(c.x - pd.x, c.z - pd.z) < 140)) continue;
+      cross.push(pd);
+    }
+    const tex = riverTexture();
+    tex.anisotropy = 4;
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex, roughness: 0.2, metalness: 0.05, side: THREE.DoubleSide,
+    });
+    const tmp = new THREE.Vector3();
+    for (const pd of cross) {
+      const ci = this.nearestIndex(tmp.set(pd.x, 0, pd.z));
+      const n = this.nrm[ci], tg = this.tan[ci];
+      // meandering path perpendicular to the road; dead straight at the crossing
+      const pts = [];
+      for (let s = -5; s <= 5; s++) {
+        const d = s * 15;
+        const sway = Math.sin(s * 1.25 + ci * 0.7) * 9 * Math.min(1, Math.abs(s) / 2.2);
+        pts.push(new THREE.Vector3(pd.x + n.x * d + tg.x * sway, 0, pd.z + n.z * d + tg.z * sway));
+      }
+      const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+      const SEGS = 64, HALF = 3.2;
+      const verts = new Float32Array((SEGS + 1) * 2 * 3);
+      const uvs = new Float32Array((SEGS + 1) * 2 * 2);
+      const idx = [];
+      for (let s = 0; s <= SEGS; s++) {
+        const t = s / SEGS;
+        const p = curve.getPointAt(t);
+        const tn = curve.getTangentAt(t);
+        const y = this.terrainHeight(p.x, p.z) - 0.06;  // just under the road deck
+        // banks taper into the undergrowth at both ends
+        const wv = HALF * (0.3 + 0.7 * Math.sqrt(Math.sin(Math.PI * t)));
+        const o = s * 6;
+        verts[o] = p.x + tn.z * wv; verts[o + 1] = y; verts[o + 2] = p.z - tn.x * wv;
+        verts[o + 3] = p.x - tn.z * wv; verts[o + 4] = y; verts[o + 5] = p.z + tn.x * wv;
+        uvs[s * 4] = t * 6; uvs[s * 4 + 1] = 0;
+        uvs[s * 4 + 2] = t * 6; uvs[s * 4 + 3] = 1;
+      }
+      for (let s = 0; s < SEGS; s++) {
+        const a = s * 2, b = s * 2 + 1, c = s * 2 + 2, d2 = s * 2 + 3;
+        idx.push(a, b, c, b, d2, c);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.receiveShadow = true;
+      this.group.add(mesh);
     }
   }
 

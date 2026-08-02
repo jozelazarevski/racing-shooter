@@ -517,6 +517,10 @@ export function cliffTexture(palette = {}) {
     crack: 'rgba(60,34,18,',       // alpha appended per crack
     bleach: 'rgba(255,225,175,0.16)',
     talus: 'rgba(46,28,16,0.28)',
+    // 'r,g,b' strings for in-band weathering + deposition streaks, so themed
+    // palettes (the glacial ice walls) can re-tint every stroke of the face
+    mottleLight: '255,235,200', mottleDark: '80,50,28',
+    streakLight: '235,205,160', streakDark: '60,36,20',
     ...palette,
   };
   const t = make(512, 512, (g, w, h) => {
@@ -528,14 +532,14 @@ export function cliffTexture(palette = {}) {
       g.fillRect(0, y - bh, w, bh);
       // mottled weathering inside the band
       for (let i = 0; i < 60; i++) {
-        g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,235,200' : '80,50,28'},${0.05 + Math.random() * 0.08})`;
+        g.fillStyle = `rgba(${Math.random() < 0.5 ? P.mottleLight : P.mottleDark},${0.05 + Math.random() * 0.08})`;
         g.beginPath();
         g.arc(Math.random() * w, y - Math.random() * bh, 3 + Math.random() * 11, 0, Math.PI * 2);
         g.fill();
       }
       // horizontal deposition streaks
       for (let i = 0; i < 5; i++) {
-        g.fillStyle = `rgba(${Math.random() < 0.5 ? '60,36,20' : '235,205,160'},0.10)`;
+        g.fillStyle = `rgba(${Math.random() < 0.5 ? P.streakDark : P.streakLight},0.10)`;
         g.fillRect(0, y - Math.random() * bh, w, 2 + Math.random() * 3);
       }
       // dark seam between layers
@@ -728,6 +732,84 @@ export function barrelTexture(palette = {}) {
       g.fillRect(0, y + 1, w, 2);
       g.fillStyle = 'rgba(0,0,0,0.3)';
       g.fillRect(0, y + h * 0.09 - 2, w, 2);
+    }
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/** Jungle stream ribbon: cyan-blue water running along u, white foam lines at
+ *  both v edges plus drifting foam flecks. u repeats down the river's length. */
+export function riverTexture() {
+  const t = make(256, 128, (g, w, h) => {
+    // deep-to-shallow blue across the width
+    const grd = g.createLinearGradient(0, 0, 0, h);
+    grd.addColorStop(0, '#2e7ab8');
+    grd.addColorStop(0.5, '#1f5f9e');
+    grd.addColorStop(1, '#2e7ab8');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    // cyan current streaks along the flow
+    for (let i = 0; i < 60; i++) {
+      const y = Math.random() * h;
+      g.fillStyle = `rgba(120,215,235,${0.10 + Math.random() * 0.16})`;
+      g.fillRect(Math.random() * w, y, 20 + Math.random() * 60, 1.6 + Math.random() * 2.4);
+    }
+    // sky glints
+    for (let i = 0; i < 26; i++) {
+      g.fillStyle = `rgba(225,245,255,${0.18 + Math.random() * 0.25})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 6 + Math.random() * 16, 1.4);
+    }
+    // white edge foam: wavy band hugging each bank (v = 0 and v = 1)
+    for (const [y0, dir] of [[3, 1], [h - 3, -1]]) {
+      g.fillStyle = 'rgba(245,252,255,0.9)';
+      for (let x = 0; x < w; x += 4) {
+        const reach = 4 + Math.sin(x * 0.11 + y0) * 2.4 + Math.random() * 4;
+        g.fillRect(x, dir > 0 ? 0 : h - y0 - reach + 3, 4, y0 + reach);
+      }
+      // stray foam bubbles drifting off the bank
+      for (let i = 0; i < 24; i++) {
+        g.fillStyle = `rgba(240,250,255,${0.35 + Math.random() * 0.4})`;
+        g.beginPath();
+        g.arc(Math.random() * w, dir > 0 ? 6 + Math.random() * 16 : h - 6 - Math.random() * 16,
+          1 + Math.random() * 2.4, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/** Igloo shell: bright snow-white with pale blue ice-block seams laid in
+ *  offset courses (rows shrink toward the top of the dome via wrapT clamp). */
+export function iglooTexture() {
+  const t = make(256, 128, (g, w, h) => {
+    g.fillStyle = '#eef6fb';
+    g.fillRect(0, 0, w, h);
+    // subtle cool shading per block course
+    const rows = 6;
+    for (let r = 0; r < rows; r++) {
+      const y = h - (r + 1) * (h / rows);
+      const bw = 34 - r * 3;                       // upper courses use smaller blocks
+      const off = (r % 2) * (bw / 2);
+      for (let x = -bw; x < w + bw; x += bw) {
+        g.fillStyle = `rgba(${190 + Math.random() * 30 | 0},${215 + Math.random() * 20 | 0},235,${0.14 + Math.random() * 0.12})`;
+        g.fillRect(x + off + 1.5, y + 1.5, bw - 3, h / rows - 3);
+        // vertical joint
+        g.fillStyle = 'rgba(150,185,215,0.55)';
+        g.fillRect(x + off, y, 2, h / rows);
+      }
+      // horizontal course seam
+      g.fillStyle = 'rgba(150,185,215,0.65)';
+      g.fillRect(0, y, w, 2.2);
+    }
+    // sparkle
+    for (let i = 0; i < 40; i++) {
+      g.fillStyle = 'rgba(255,255,255,0.7)';
+      g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
     }
   });
   t.wrapS = THREE.RepeatWrapping;
