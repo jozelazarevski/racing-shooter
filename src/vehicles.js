@@ -843,8 +843,14 @@ export class Car {
 
   damage(amount, attacker = null) {
     if (!this.alive || this.invuln > 0) return false;
+    const before = this.health / this.maxHealth;
     this.health -= amount;
     if (amount >= 15) this.game.particles.debris(this.pos, 2 + (Math.random() < 0.5 ? 1 : 0));
+    // crossing a damage threshold knocks a visible part off the car
+    const after = Math.max(0, this.health) / this.maxHealth;
+    for (const th of [0.66, 0.33]) {
+      if (before > th && after <= th) this.game.popCarPart?.(this);
+    }
     if (this.health <= 0) {
       this.health = 0;
       this.destroy(attacker);
@@ -854,6 +860,7 @@ export class Car {
   }
 
   destroy() {
+    this.game.spawnHusk?.(this); // leave a charred shell where it died
     this.alive = false;
     this.mesh.visible = false;
     this.respawnTimer = this.respawnDelay ?? 5;
@@ -867,6 +874,7 @@ export class Car {
     this.health = this.maxHealth;
     this.invuln = 2.2;
     this._tintFrac = 1;
+    this.game.restoreCarParts?.(this);
     this._applyScorch(1); // fresh paint job with the fresh hull
     this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6));
   }
