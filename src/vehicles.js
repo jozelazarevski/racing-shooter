@@ -1140,9 +1140,11 @@ export class Car {
       }
     }
 
-    // ---- trees (material law): a toy truck does not fell a grown pine.
-    // Saplings/cacti/snags yield at speed; BIG pines are SOLID — the car
-    // stops, sheds needles, and takes real trunk damage instead.
+    // ---- trees (material law): a toy truck does not fell a grown tree.
+    // Saplings/cacti/snags yield at speed; BIG trunks are SOLID — the car
+    // stops, sheds needles, and takes real trunk damage instead. Tree records
+    // may carry an explicit `solid` flag (kapok/redwood giants); older builds
+    // only mark big pines by kind+scale, so that stays as the fallback.
     if (this === gm.player && t.trees && t.trees.length) {
       for (const tr of t.trees) {
         if (tr.dead) continue;
@@ -1150,7 +1152,7 @@ export class Car {
         const rr = tr.r + 1.7;
         if (dx * dx + dz * dz >= rr * rr) continue;
         if (Math.abs(this.pos.y - (tr.y ?? 0)) > 4) continue; // rim cacti, cliff snags
-        const yields = tr.kind !== 'pine' || tr.s < 1.0;
+        const yields = tr.solid !== undefined ? !tr.solid : (tr.kind !== 'pine' || tr.s < 1.0);
         if (yields && Math.abs(this.speedAlong) > 7) {
           gm.onTreeSmash?.(tr, this);
         } else {
@@ -1932,8 +1934,9 @@ export class EnemyCar extends Car {
     this.step(dt, { throttle, brake, steer, drift: errSlide });
     if (this.checkLap(prevIndex) === true && this.lap > g.lapsTotal && !this.finished) this.finished = true;
 
-    // slide smoke when the AI breaks loose (only near the player, keep it cheap)
-    const sideV = Math.abs(this.vel.dot(new THREE.Vector3(this.forward.z, 0, -this.forward.x)));
+    // slide smoke when the AI breaks loose (only near the player, keep it cheap
+    // — and allocation-free: this line runs every frame for every rival)
+    const sideV = Math.abs(this.vel.x * Math.cos(this.heading) - this.vel.z * Math.sin(this.heading));
     if (sideV > 7 && !this.airborne && Math.random() < 0.35
         && this.pos.distanceToSquared(g.player.pos) < 14400) {
       const back2 = this.forward.multiplyScalar(-1);

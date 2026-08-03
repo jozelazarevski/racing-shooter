@@ -1373,6 +1373,12 @@ const ELEMENT_KITS = {
     dress: ['logpile'], fenceColor: 0x4a3c30, stoneWalls: 3,
   },
 };
+// How many decorative side-road junctions each RURAL world gets (city, ice
+// and cliff-walled worlds get none). A theme can override via T.crossroads.
+const THEME_CROSSROADS = {
+  forest: 3, desert: 2, snow: 2, alpine: 3, oasis: 2, redwood: 2, flume: 2,
+  wildfire: 2, pass: 3, tremola: 2, furka: 2,
+};
 const ELEMENT_KIT_BY_THEME = {
   forest: 'farm', desert: 'desert', snow: 'alpine', canyon: 'desert', volcano: 'burnt',
   alpine: 'alpine', glacial: 'ice', jungle: 'jungle', dunes: 'desert', ravine: 'desert',
@@ -1594,6 +1600,9 @@ export class Track {
     // Open grazing ground for the animal system: [{x, z, r}] — flat, road-free
     // circles out in the country. Data only; behaviour lives in the game code.
     this.pastures = [];
+    // decorative side-road junctions: [{index, side, angle, len}] — the
+    // traffic system reads these; geometry is scenery only
+    this.crossroads = [];
     // (fences were removed from the game entirely — the world is open and
     // off-road slowness is the boundary; see RULES.md)
     // Soft world radius for free-roam driving; the game turns players around
@@ -2827,7 +2836,7 @@ export class Track {
     if (this.T.snowPatches) this._buildSnowPatches(m4);       // old snow at altitude
     this._buildWorldElements(m4);                    // farms, chapels, fences, dressing
     this._buildPastures();                           // grazing spots for the animal system
-    if (this.T.crossroads) this._buildCrossroads();  // dirt side-road junctions
+    this._buildCrossroads();                         // dirt side-road junctions (rural worlds)
     this._buildRoadsideDetail(m4);                   // corner markers + gravel
     this._buildContactShadows();                     // baked AO under everything
   }
@@ -3727,7 +3736,8 @@ export class Track {
    *  the traffic agent: this.crossroads = [{index, side, angle, len}]
    *  (index = main-road centerline sample at the junction). */
   _buildCrossroads() {
-    const want = Math.min(4, this.T.crossroads | 0);
+    const want = Math.min(4,
+      (this.T.crossroads ?? THEME_CROSSROADS[this.level && this.level.theme] ?? 0) | 0);
     if (!want) return;
     // spurs lead somewhere: pastures and farm buildings, nearest-road first
     const targets = [
