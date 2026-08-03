@@ -179,9 +179,19 @@ class Game {
     this.profile = this.profiles.list.find((p) => p.id === this.profiles.active) ?? this.profiles.list[0];
     this._pkey = (base) => profileKey(this.profile.id, base);
     this.career = loadJSON(this._pkey('career'), { finished: {} });
-    this.garage = loadJSON(this._pkey('garage'), { credits: 0, engine: 0, armor: 0, cannon: 0, nitro: 0, handling: 0, tires: 0 });
+    this.garage = loadJSON(this._pkey('garage'), { credits: 0 });
     this.cars = loadJSON(this._pkey('cars'), { owned: ['brawler'], selected: 'brawler' });
     if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = 'brawler';
+    // upgrades are PER-CAR (`garage.upgrades[carKey]`) — a newly bought
+    // machine arrives stock. Old saves kept one flat global level set: those
+    // levels migrate once onto the car the player had selected, so the main
+    // ride visibly keeps its build; every other car starts at level 0.
+    if (!this.garage.upgrades) {
+      const flat = {};
+      for (const u of UPGRADES) { flat[u.key] = this.garage[u.key] ?? 0; delete this.garage[u.key]; }
+      this.garage.upgrades = { [this.cars.selected]: flat };
+      saveJSON(this._pkey('garage'), this.garage);
+    }
     // mode comes from the URL only — a fresh visit ALWAYS starts in RACE mode
     // (persisting roam silently made races "never finish" for returning players)
     this.freeRoam = params.get('mode') === 'roam';
@@ -662,11 +672,21 @@ class Game {
     return this.unlockAll || id === 1 || (!!prev && prev.place <= 3);
   }
 
-  /** Apply purchased upgrades to the player (base stats captured once). */
+  /** The named car's own upgrade levels — upgrades belong to one machine. */
+  carUpgrades(carKey = this.cars.selected) {
+    const g = this.garage;
+    g.upgrades ??= {};
+    const up = g.upgrades[carKey] ??= {};
+    for (const u of UPGRADES) up[u.key] ??= 0;
+    return up;
+  }
+
+  /** Apply the SELECTED car's purchased upgrades to the player (base stats
+   *  captured once per machine — swapPlayerCar clears the capture). */
   applyUpgrades() {
     const p = this.player;
     if (!this._base) this._base = { maxSpeed: p.maxSpeed, maxHealth: p.maxHealth };
-    const g = this.garage;
+    const g = this.carUpgrades();
     p.maxSpeed = this._base.maxSpeed * (1 + 0.04 * g.engine);
     p.maxHealth = this._base.maxHealth + 15 * g.armor;
     p.health = p.maxHealth;
@@ -793,10 +813,15 @@ class Game {
 
   renderGarage() {
     document.getElementById('credits').textContent = this.garage.credits.toLocaleString();
+    // the panel shows and edits the SELECTED car's own levels
+    const up = this.carUpgrades();
+    const carName = CAR_CATALOG.find((c) => c.key === this.cars.selected)?.name ?? '';
+    const head = document.getElementById('garage-up-head');
+    if (head) head.textContent = `DETAILED UPGRADES — ${carName}`;
     const rows = document.getElementById('garage-rows');
     rows.innerHTML = '';
     for (const u of UPGRADES) {
-      const lvl = this.garage[u.key];
+      const lvl = up[u.key];
       const row = document.createElement('div');
       row.className = 'up-row';
       const pips = Array.from({ length: u.max },
@@ -816,7 +841,7 @@ class Game {
         btn.addEventListener('click', () => {
           if (this.garage.credits < cost) return;
           this.garage.credits -= cost;
-          this.garage[u.key]++;
+          up[u.key]++; // this car only — every other machine keeps its own build
           saveJSON(this._pkey('garage'), this.garage);
           this.applyUpgrades();
           this.renderGarage();

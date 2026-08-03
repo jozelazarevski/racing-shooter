@@ -2004,7 +2004,10 @@ export class EnemyCar extends Car {
       const nfm = this.forward;
       const alongP = toPlayer.x * nfm.x + toPlayer.z * nfm.z;
       const acrossP = toPlayer.x * nfm.z - toPlayer.z * nfm.x;
-      if (alongP > 15 && alongP < 60 && Math.abs(acrossP) < 5) {
+      // launch cone: the missile homes, so rough alignment is enough. The old
+      // flat ±5u gate was why rockets never flew — a rival on its racing line
+      // holds the player's exact wake for well under half a second.
+      if (alongP > 15 && alongP < 60 && Math.abs(acrossP) < Math.min(12, 4 + alongP * 0.25)) {
         this.missileCd = diffId2 === 'hard' ? 10 + Math.random() * 4 : 20 + Math.random() * 10;
         g.weapons.fireMissile(this); // enemy-owned missiles home on the player
         g.audio.missile();
