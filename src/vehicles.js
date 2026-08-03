@@ -1398,7 +1398,12 @@ export class Car {
       //    slowly and the curvature you experience never beats gravity, so you
       //    simply roll over it.
       const climbAccel = dt > 0 ? (newClimb - this._climbRate) / dt : 0;
-      const crested = this._climbRate > 1.5 && climbAccel < -26; // -26 = gravity
+      //    The speed gate on top is a game-feel decision, not physics: a crest
+      //    is something you JUMP by committing to it. Below ~26 u/s you ride
+      //    over the brow instead of skipping off it, so ambling around never
+      //    produces little uncommanded hops that steal your steering.
+      const crested = this._climbRate > 1.5 && climbAccel < -26  // -26 = gravity
+        && Math.abs(this.speedAlong) > 26;
       if ((drop > 0.9 && this._climbRate > 2.5) || crested) {
         this.airborne = true;
         // capped: an uncapped climb rate off a steep ramp at nitro speed sent
