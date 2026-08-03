@@ -1975,15 +1975,22 @@ export class EnemyCar extends Car {
       }
     }
 
-    // ---- one saved missile per race on high aggression (hard difficulty):
-    // fired up the player's tailpipe when they're 15..60 ahead and in-line
-    if (g.raceTime < 1) this._missileFired = false; // fresh race re-arms it
-    if (!this._missileFired && D.aiAggression > 1.1 && g.player.alive) {
+    // ---- homing missiles up the leader's tailpipe (player 15..60 ahead,
+    // roughly in-line). The old design was ONE missile per rival per race and
+    // only on HARD — in practice players never saw a rocket (user report).
+    // Now: EASY never; NORMAL an occasional reminder — only the top-2 rivals
+    // carry rockets, ~20-30s between launches; HARD everyone carries them,
+    // ~10-14s — the pack genuinely shoots back.
+    if (g.raceTime < 1) this.missileCd = 6 + Math.random() * 6; // grid stagger
+    this.missileCd = (this.missileCd ?? (6 + Math.random() * 6)) - dt;
+    const diffId2 = g.difficulty?.id ?? 'normal';
+    if (this.missileCd <= 0 && diffId2 !== 'easy' && g.player.alive
+        && (diffId2 === 'hard' || (this._aiRank ?? 9) < 2)) {
       const nfm = this.forward;
       const alongP = toPlayer.x * nfm.x + toPlayer.z * nfm.z;
       const acrossP = toPlayer.x * nfm.z - toPlayer.z * nfm.x;
       if (alongP > 15 && alongP < 60 && Math.abs(acrossP) < 5) {
-        this._missileFired = true;
+        this.missileCd = diffId2 === 'hard' ? 10 + Math.random() * 4 : 20 + Math.random() * 10;
         g.weapons.fireMissile(this); // enemy-owned missiles home on the player
         g.audio.missile();
         g.hud.feed('MISSILE INCOMING!', 'bad');

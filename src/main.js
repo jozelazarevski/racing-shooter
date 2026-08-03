@@ -96,22 +96,26 @@ const CONTRACT_POOL = [
     check: (g, ct) => ct.closeCalls >= 3, prog: (ct) => `${Math.min(ct.closeCalls, 3)}/3` },
 ];
 
-// which animals graze in which biome (a theme can override with T.livestock)
+// which animals graze in which biome (a theme can override with T.livestock).
+// Each pasture hosts one species; the roster cycles across a world's pastures,
+// so biomes read mixed (alpine roads pass cows, sheep AND goats).
 const LIVESTOCK_BY_THEME = {
-  forest:   { kinds: ['cow', 'sheep'], perHerd: 4 },
-  alpine:   { kinds: ['cow', 'sheep'], perHerd: 4 },
-  pass:     { kinds: ['cow', 'sheep'], perHerd: 5 },
-  tremola:  { kinds: ['sheep', 'cow'], perHerd: 4 },
-  furka:    { kinds: ['sheep'],        perHerd: 3 },
-  redwood:  { kinds: ['deer'],         perHerd: 3 },
-  wildfire: { kinds: ['deer'],         perHerd: 2 },
-  snow:     { kinds: ['deer'],         perHerd: 3 },
-  glacial:  { kinds: ['deer'],         perHerd: 2 },
-  sheetice: { kinds: ['deer'],         perHerd: 2 },
-  avalanche:{ kinds: ['deer'],         perHerd: 2 },
-  oasis:    { kinds: ['cow'],          perHerd: 3 },
-  jungle:   { kinds: ['deer'],         perHerd: 3 },
-  flume:    { kinds: ['deer', 'cow'],  perHerd: 3 },
+  forest:   { kinds: ['cow', 'sheep', 'boar'], perHerd: 4 },
+  alpine:   { kinds: ['cow', 'sheep', 'goat'], perHerd: 4 },
+  pass:     { kinds: ['cow', 'goat', 'sheep'], perHerd: 5 },
+  tremola:  { kinds: ['sheep', 'goat', 'cow'], perHerd: 4 },
+  furka:    { kinds: ['goat', 'sheep'],        perHerd: 3 },
+  redwood:  { kinds: ['deer', 'boar'],         perHerd: 3 },
+  wildfire: { kinds: ['deer', 'boar'],         perHerd: 2 },
+  snow:     { kinds: ['deer'],                 perHerd: 3 },
+  glacial:  { kinds: ['deer'],                 perHerd: 2 },
+  sheetice: { kinds: ['deer'],                 perHerd: 2 },
+  avalanche:{ kinds: ['deer'],                 perHerd: 2 },
+  desert:   { kinds: ['camel'],                perHerd: 3 },
+  dunes:    { kinds: ['camel'],                perHerd: 3 },
+  oasis:    { kinds: ['camel', 'cow'],         perHerd: 3 },
+  jungle:   { kinds: ['capybara', 'deer'],     perHerd: 3 },
+  flume:    { kinds: ['deer', 'cow', 'boar'],  perHerd: 3 },
 };
 
 // hazard particle tints (hoisted — per-frame spawns must not allocate)
@@ -1261,10 +1265,17 @@ class Game {
         const c = t.pointAt(idx, 0), n = t.nrm[idx];
         return { x: c.x + n.x * lat, z: c.z + n.z * lat, r: 12 };
       });
+    // per-species stats: `flee` = sprint speed when spooked (default 11),
+    // `spookR` = how close a car gets before they run (default 18),
+    // `amble` = grazing walk speed (default 0.9). Damage stays 10+22×mass.
     const KINDS = {
-      cow:   { body: 0xf2efe6, spot: 0x2b2521, w: 1.5, h: 1.5, d: 2.6, mass: 1.0, pts: 60 },
-      sheep: { body: 0xe8e4d8, spot: 0x3a3128, w: 1.0, h: 1.0, d: 1.6, mass: 0.5, pts: 40 },
-      deer:  { body: 0xa9764a, spot: 0x6b4526, w: 1.0, h: 1.3, d: 2.0, mass: 0.6, pts: 80 },
+      cow:      { body: 0xf2efe6, spot: 0x2b2521, w: 1.5,  h: 1.5,  d: 2.6, mass: 1.0,  pts: 60 },
+      sheep:    { body: 0xe8e4d8, spot: 0x3a3128, w: 1.0,  h: 1.0,  d: 1.6, mass: 0.5,  pts: 40 },
+      deer:     { body: 0xa9764a, spot: 0x6b4526, w: 1.0,  h: 1.3,  d: 2.0, mass: 0.6,  pts: 80 },
+      goat:     { body: 0xd9d5c9, spot: 0x77705f, w: 0.85, h: 1.0,  d: 1.5, mass: 0.45, pts: 50, flee: 13 },
+      camel:    { body: 0xcfa05f, spot: 0x8a6a3c, w: 1.3,  h: 2.2,  d: 2.9, mass: 0.9,  pts: 70, flee: 9, amble: 0.55 },
+      boar:     { body: 0x4a3222, spot: 0x2e2014, w: 0.95, h: 0.75, d: 1.6, mass: 0.55, pts: 55, flee: 12 },
+      capybara: { body: 0x9a6f42, spot: 0x6e4e2c, w: 0.9,  h: 0.7,  d: 1.4, mass: 0.5,  pts: 90, flee: 8, spookR: 10 },
     };
     for (let s = 0; s < spots.length; s++) {
       const spot = spots[s];
@@ -1295,14 +1306,40 @@ class Game {
           const patch = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.5, K.h * 0.3, K.d * 0.35), darkMat);
           patch.position.set(K.w * 0.28, K.h * 0.85, -K.d * 0.12);
           g.add(patch);
+        } else if (kind === 'goat') { // little swept-back horns
+          for (const sx of [-1, 1]) {
+            const horn = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.3, 0.07), darkMat);
+            horn.position.set(sx * 0.14, K.h * 1.28, K.d * 0.46);
+            horn.rotation.x = -0.55;
+            g.add(horn);
+          }
+        } else if (kind === 'camel') { // neck block up to a raised head + hump
+          head.position.y = K.h * 1.34; // the default head sits at cow height
+          const neck = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.34, K.h * 0.6, K.w * 0.36), bodyMat);
+          neck.position.set(0, K.h * 1.02, K.d * 0.44);
+          g.add(neck);
+          const hump = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.62, K.h * 0.26, K.d * 0.34), darkMat);
+          hump.position.set(0, K.h * 1.18, -K.d * 0.08);
+          g.add(hump);
+        } else if (kind === 'boar') { // low snout
+          const snout = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.3, K.h * 0.3, K.d * 0.2), darkMat);
+          snout.position.set(0, K.h * 0.8, K.d * 0.7);
+          g.add(snout);
+        } else if (kind === 'capybara') { // blunt rounded muzzle, sits low
+          head.position.set(0, K.h * 0.86, K.d * 0.5);
+          head.scale.set(1.15, 0.9, 1.2);
         }
+        // camels carry their bulk on long legs; everyone else is knee-high
+        const legH = kind === 'camel' ? K.h * 0.68 : K.h * 0.55;
+        const legY = kind === 'camel' ? K.h * 0.36 : K.h * 0.28;
         for (const [lx, lz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
-          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, K.h * 0.55, 0.16), darkMat);
-          leg.position.set(lx * K.w * 0.32, K.h * 0.28, lz * K.d * 0.3);
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, legH, 0.16), darkMat);
+          leg.position.set(lx * K.w * 0.32, legY, lz * K.d * 0.3);
           g.add(leg);
         }
         g.position.set(x, t.terrainHeight?.(x, z) ?? 0, z);
         g.rotation.y = a;
+        g.scale.setScalar(0.85 + Math.random() * 0.3); // ±15% so herds aren't clones
         this.scene.add(g);
         this.herds.push({ kind, K, x, z, homeX: spot.x, homeZ: spot.z, homeR: spot.r ?? 12,
           ang: a, mesh: g, alive: true, spooked: 0, y: g.position.y, _yT: 0, bob: k * 1.7 });
@@ -1316,28 +1353,30 @@ class Game {
     const cars = (this._carsAll ??= [this.player, ...this.enemies]);
     for (const a of this.herds) {
       if (!a.alive) continue;
-      // spook: any car inside 18u sends them running directly away from it
+      // spook: a car inside the species' comfort radius (18u default; calm
+      // capybaras let cars within 10u) sends them running directly away
+      const sr = a.K.spookR ?? 18;
       let flee = null;
       for (const car of cars) {
         if (!car.alive) continue;
         const dx = a.x - car.pos.x, dz = a.z - car.pos.z;
         const d2 = dx * dx + dz * dz;
-        if (d2 < 324) { flee = { dx, dz, d: Math.sqrt(d2) || 0.01 }; break; }
+        if (d2 < sr * sr) { flee = { dx, dz, d: Math.sqrt(d2) || 0.01 }; break; }
       }
       let speed;
       if (flee) {
         a.spooked = 1.6;
         a.ang = Math.atan2(flee.dx, flee.dz);
-        speed = 11;
+        speed = a.K.flee ?? 11; // nimble goats bolt, camels lope
       } else if (a.spooked > 0) {
         a.spooked -= dt;
-        speed = 7;
+        speed = (a.K.flee ?? 11) * 0.62;
       } else {
         // graze: amble slowly, drifting back toward the middle of the pasture
         a.ang += Math.sin(time * 0.4 + a.bob) * 0.5 * dt;
         if (Math.hypot(a.x - a.homeX, a.z - a.homeZ) > a.homeR)
           a.ang = Math.atan2(a.homeX - a.x, a.homeZ - a.z);
-        speed = 0.9;
+        speed = a.K.amble ?? 0.9;
       }
       a.x += Math.sin(a.ang) * speed * dt;
       a.z += Math.cos(a.ang) * speed * dt;
