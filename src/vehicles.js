@@ -62,6 +62,143 @@ function roofDecalTexture(text) {
 // Blocky toy racers with liveries: brawler (off-road hero), crown (low-slung
 // racer), sleek (compact hatch), dune (rally wagon), alpine (striped rally
 // coupe), pit (black stock car).
+let _carAoTex = null;
+/** Soft radial shadow blob shared by every car's underside. */
+function _carAoTexture() {
+  if (_carAoTex) return _carAoTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const x = c.getContext('2d');
+  const gr = x.createRadialGradient(32, 32, 4, 32, 32, 31);
+  gr.addColorStop(0, 'rgba(0,0,0,0.95)');
+  gr.addColorStop(0.65, 'rgba(0,0,0,0.55)');
+  gr.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = gr;
+  x.fillRect(0, 0, 64, 64);
+  _carAoTex = new THREE.CanvasTexture(c);
+  return _carAoTex;
+}
+
+// ---------- inline livery painters (canvas textures, cached) ----------
+let _solarTex = null;
+/** Solar-panel roof: deep blue cells in a light alloy frame. */
+function _solarRoofTexture() {
+  if (_solarTex) return _solarTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = '#0e1a2e';
+  x.fillRect(0, 0, 128, 128);
+  const gr = x.createLinearGradient(0, 0, 128, 128); // cell sheen
+  gr.addColorStop(0, 'rgba(110,160,255,0.30)');
+  gr.addColorStop(0.5, 'rgba(110,160,255,0.05)');
+  gr.addColorStop(1, 'rgba(110,160,255,0.24)');
+  x.fillStyle = gr;
+  x.fillRect(0, 0, 128, 128);
+  x.strokeStyle = '#33507e';
+  x.lineWidth = 3;
+  for (let i = 1; i < 4; i++) {
+    x.beginPath(); x.moveTo(i * 32, 0); x.lineTo(i * 32, 128); x.stroke();
+    x.beginPath(); x.moveTo(0, i * 32); x.lineTo(128, i * 32); x.stroke();
+  }
+  x.strokeStyle = '#d8d2c2';
+  x.lineWidth = 6;
+  x.strokeRect(3, 3, 122, 122);
+  _solarTex = new THREE.CanvasTexture(c);
+  return _solarTex;
+}
+
+const _roundelCache = new Map();
+/** Rally door roundel: white disc, red pin-ring, bold black number. */
+function _roundelTexture(num) {
+  const key = String(num);
+  if (_roundelCache.has(key)) return _roundelCache.get(key);
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.beginPath(); x.arc(64, 64, 58, 0, Math.PI * 2);
+  x.fillStyle = '#f4f1e8'; x.fill();
+  x.lineWidth = 7; x.strokeStyle = '#1c1a18'; x.stroke();
+  x.beginPath(); x.arc(64, 64, 47, 0, Math.PI * 2);
+  x.lineWidth = 3; x.strokeStyle = '#d8342a'; x.stroke();
+  x.fillStyle = '#1c1a18';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.font = `900 ${key.length > 1 ? 54 : 66}px Arial, sans-serif`;
+  x.fillText(key, 64, 68);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  _roundelCache.set(key, tex);
+  return tex;
+}
+
+const _sponsorCache = new Map();
+/** Painted sponsor strip for the doors: colored chevron blocks + brand words. */
+function _sponsorPanelTexture(brand, c1, c2) {
+  const key = `${brand}|${c1}|${c2}`;
+  if (_sponsorCache.has(key)) return _sponsorCache.get(key);
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = '#f4f1e8';
+  x.fillRect(0, 0, 512, 128);
+  x.strokeStyle = '#1c1a18';
+  x.lineWidth = 6;
+  x.strokeRect(3, 3, 506, 122);
+  // leading chevron block in c1 carrying the brand word
+  x.fillStyle = c1;
+  x.beginPath();
+  x.moveTo(6, 6); x.lineTo(232, 6); x.lineTo(196, 122); x.lineTo(6, 122);
+  x.closePath(); x.fill();
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  let size = 50;
+  x.font = `900 ${size}px Arial, sans-serif`;
+  while (x.measureText(brand).width > 186 && size > 20) {
+    size -= 4;
+    x.font = `900 ${size}px Arial, sans-serif`;
+  }
+  x.fillStyle = '#f4f1e8';
+  x.fillText(brand, 110, 66);
+  // trailing chevron block in c2
+  x.fillStyle = c2;
+  x.beginPath();
+  x.moveTo(404, 6); x.lineTo(506, 6); x.lineTo(506, 122); x.lineTo(368, 122);
+  x.closePath(); x.fill();
+  x.fillStyle = '#f4f1e8';
+  x.font = '900 34px Arial, sans-serif';
+  x.fillText('PRO', 448, 66);
+  // middle small words
+  x.fillStyle = '#1c1a18';
+  x.font = '900 30px Arial, sans-serif';
+  x.fillText('RALLY', 295, 46);
+  x.font = '700 22px Arial, sans-serif';
+  x.fillText('MOTOR OIL', 295, 86);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  _sponsorCache.set(key, tex);
+  return tex;
+}
+
+/** BoxGeometry with shifted top edges: drop/pull the top-front and top-rear
+ *  edges to carve sloped hoods, raked windshields and fastback tails. */
+function _wedgeGeo(w, h, d, { frontDrop = 0, frontBack = 0, backDrop = 0, backFwd = 0 } = {}) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    if (p.getY(i) <= 0) continue;
+    if (p.getZ(i) > 0) {
+      p.setY(i, p.getY(i) - frontDrop);
+      p.setZ(i, p.getZ(i) - frontBack);
+    } else {
+      p.setY(i, p.getY(i) - backDrop);
+      p.setZ(i, p.getZ(i) + backFwd);
+    }
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
 export function buildVoxelRacer(spec) {
   const { body, accent, stripe = null, number = null, style = 'crown', rims = null } = spec;
   const g = new THREE.Group();
@@ -89,119 +226,305 @@ export function buildVoxelRacer(spec) {
     g.add(mesh);
     return mesh;
   };
+  /** Round lamp disc, parented so pods carry their lights when they pop off. */
+  const lampDisc = (r, x, y, z, parent = g) => {
+    const d = new THREE.Mesh(new THREE.CircleGeometry(r, 10), headMat);
+    d.position.set(x, y, z);
+    parent.add(d);
+    return d;
+  };
+  /** Spare wheel (tire + rim child). upright = facing fore/aft on a tailgate. */
+  const spareWheel = (r, w, x, y, z, upright = false) => {
+    const geoT = new THREE.CylinderGeometry(r, r, w, 10);
+    const geoR = new THREE.CylinderGeometry(r * 0.48, r * 0.48, w + 0.04, 8);
+    if (upright) { geoT.rotateX(Math.PI / 2); geoR.rotateX(Math.PI / 2); }
+    const t = new THREE.Mesh(geoT, tireMat);
+    t.position.set(x, y, z);
+    t.add(new THREE.Mesh(geoR, rimMat));
+    g.add(t);
+    return t;
+  };
 
-  // ---- chassis + body block ----
+  // ---- proportions: every car is a wedge now ----
   const bodyLen = style === 'crown' || style === 'pit' ? 4.7 : style === 'sleek' ? 4.0 : 4.4;
   const bodyH = low ? 0.62 : 0.78;
-  box(2.5, 0.4, bodyLen - 0.3, darkMat, 0, baseY, 0);                    // chassis
-  const hull = box(2.6, bodyH, bodyLen, bodyMat, 0, baseY + bodyH / 2 + 0.12, 0, true);
+  const noseLen = tall ? 1.2 : style === 'sleek' ? 1.3 : 1.5; // sloped hood length
+  const frontDrop = tall ? 0.26 : style === 'sleek' ? 0.3 : 0.34;
+  const hoodAng = Math.atan2(frontDrop, noseLen);
+  const noseZ0 = bodyLen / 2 - noseLen; // where the flat deck ends
+  const topY = baseY + 0.12 + bodyH;    // flat deck height
 
-  // ---- cabin with inset windows ----
-  const cabW = 2.15, cabH = low ? 0.6 : 0.78;
-  const cabZ = style === 'sleek' ? -0.55 : -0.15;
-  const cabL = style === 'sleek' ? 1.7 : 2.0;
-  const cabY = baseY + bodyH + 0.12 + cabH / 2;
-  box(cabW, cabH, cabL, style === 'pit' ? bodyMat : accentMat, 0, cabY, cabZ, true);
-  const windshield = box(cabW - 0.25, cabH - 0.14, 0.1, glassMat, 0, cabY + 0.02, cabZ + cabL / 2 + 0.01);
-  windshield.rotation.x = low ? -0.30 : -0.16;
-  windshield.position.z += low ? 0.16 : 0.08;
-  box(cabW - 0.25, cabH - 0.18, 0.08, glassMat, 0, cabY, cabZ - cabL / 2 - 0.02);
-  for (const s of [-1, 1]) box(0.06, cabH - 0.2, cabL - 0.5, glassMat, (cabW / 2) * s + 0.02 * s, cabY, cabZ);
+  // ---- chassis + wedge hull (flat deck aft, hood sloping to the nose) ----
+  box(2.5, 0.4, bodyLen - 0.3, darkMat, 0, baseY, 0); // chassis
+  box(2.6, bodyH, bodyLen - noseLen, bodyMat, 0, baseY + bodyH / 2 + 0.12, -noseLen / 2, true);
+  const nose = new THREE.Mesh(_wedgeGeo(2.6, bodyH, noseLen, { frontDrop, frontBack: 0.14 }), bodyMat);
+  nose.position.set(0, baseY + bodyH / 2 + 0.12, (bodyLen - noseLen) / 2);
+  nose.castShadow = true;
+  g.add(nose);
 
-  // ---- style-specific silhouettes ----
-  if (style === 'brawler') {
-    // roof rack with spare + twin rocket tubes, bull bar
-    box(1.9, 0.12, 1.7, darkMat, 0, cabY + cabH / 2 + 0.1, cabZ);
-    const spare = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.34, 10), tireMat);
-    spare.position.set(-0.45, cabY + cabH / 2 + 0.42, cabZ - 0.2);
-    g.add(spare);
-    const tubeGeo = new THREE.CylinderGeometry(0.14, 0.14, 1.1, 8);
-    tubeGeo.rotateX(Math.PI / 2);
-    for (const s of [0.35, 0.75]) {
-      const t = new THREE.Mesh(tubeGeo, darkMat);
-      t.position.set(s, cabY + cabH / 2 + 0.35, cabZ + 0.1);
-      g.add(t);
-      const tip = new THREE.Mesh(new THREE.CircleGeometry(0.1, 8), new THREE.MeshBasicMaterial({ color: 0xffb52e }));
-      tip.position.set(s, cabY + cabH / 2 + 0.35, cabZ + 0.66);
-      g.add(tip);
-    }
-    box(2.2, 0.5, 0.16, darkMat, 0, baseY + 0.35, bodyLen / 2 + 0.12); // bull bar
-  }
-  if (style === 'crown') {
-    box(2.3, 0.16, 0.6, accentMat, 0, baseY + bodyH + 0.2, -bodyLen / 2 + 0.35); // ducktail
-  }
-  if (style === 'pit') {
-    box(2.45, 0.12, 0.55, darkMat, 0, baseY + bodyH + 0.26, -bodyLen / 2 + 0.3);
-    for (const s of [-1, 1]) box(0.12, 0.3, 0.3, darkMat, 1.0 * s, baseY + bodyH + 0.1, -bodyLen / 2 + 0.3);
-  }
-  if (style === 'alpine') {
-    // rally lamp pod on the nose
-    for (const s of [-0.55, -0.2, 0.2, 0.55]) box(0.26, 0.26, 0.12, headMat, s, baseY + bodyH * 0.5 + 0.12, bodyLen / 2 - 0.1);
-  }
-  if (style === 'dune') {
-    box(1.5, 0.22, 0.5, darkMat, 0, cabY + cabH / 2 + 0.11, cabZ + 0.55); // roof light pod
-    for (const s of [-0.45, -0.15, 0.15, 0.45]) box(0.2, 0.14, 0.08, headMat, s, cabY + cabH / 2 + 0.13, cabZ + 0.82);
-    for (const s of [-1, 1]) box(0.1, 0.24, bodyLen - 1.2, darkMat, 1.32 * s, baseY - 0.06, 0); // mud skirts
-  }
-  if (style === 'sleek') {
-    box(2.0, 0.14, 0.5, accentMat, 0, cabY + cabH / 2 + 0.06, cabZ - cabL / 2 + 0.2); // hatch lip
-  }
+  // ---- greenhouse: raked glass trapezoid under a painted roof cap ----
+  const cabW = 2.15, cabH = low ? 0.6 : 0.74;
+  const cabZ = style === 'sleek' ? -0.45 : style === 'dune' ? 0.1 : -0.15;
+  const cabL = style === 'sleek' ? 1.9 : style === 'dune' ? 1.7 : 2.0;
+  const fRake = tall ? 0.42 : style === 'sleek' ? 0.55 : 0.62; // windshield rake
+  const bRake = style === 'sleek' ? 0.5 : style === 'crown' ? 0.45
+    : style === 'alpine' ? 0.35 : style === 'pit' ? 0.3 : 0.2; // tail rake
+  const cabY = topY + cabH / 2;
+  const glassHouse = new THREE.Mesh(
+    _wedgeGeo(cabW, cabH, cabL, { frontBack: fRake, backFwd: bRake }), glassMat);
+  glassHouse.position.set(0, cabY, cabZ);
+  glassHouse.castShadow = true;
+  g.add(glassHouse);
+  const capL = cabL - fRake - bRake;
+  const capZ = cabZ + (bRake - fRake) / 2;
+  const capMat = style === 'pit' || style === 'sleek' ? bodyMat : accentMat;
+  box(cabW - 0.15, 0.1, capL + 0.1, capMat, 0, cabY + cabH / 2 + 0.05, capZ);
+  const capTop = cabY + cabH / 2 + 0.1;
 
-  // ---- livery: center stripes + door numbers ----
+  // ---- livery: stripes running deck -> hood slope -> roof cap ----
   if (stripe) {
     const sm = mat(stripe[0]);
-    box(0.62, 0.05, bodyLen - 0.2, sm, 0, baseY + bodyH + 0.16, 0);
-    box(0.62, 0.05, cabL - 0.2, sm, 0, cabY + cabH / 2 + 0.04, cabZ);
+    const hoodL = noseLen / Math.cos(hoodAng) - 0.1;
+    box(0.62, 0.05, bodyLen - noseLen - 0.15, sm, 0, topY + 0.028, -noseLen / 2);
+    const hs = box(0.62, 0.04, hoodL, sm, 0, topY - frontDrop / 2 + 0.02, (bodyLen - noseLen) / 2 + 0.02);
+    hs.rotation.x = hoodAng;
+    if (style !== 'sleek') box(0.62, 0.04, capL, sm, 0, capTop + 0.02, capZ);
     if (stripe[1]) {
       const sm2 = mat(stripe[1]);
       for (const s of [-1, 1]) {
-        box(0.2, 0.05, bodyLen - 0.2, sm2, 0.5 * s, baseY + bodyH + 0.16, 0);
-        box(0.2, 0.05, cabL - 0.2, sm2, 0.5 * s, cabY + cabH / 2 + 0.04, cabZ);
+        box(0.2, 0.05, bodyLen - noseLen - 0.15, sm2, 0.52 * s, topY + 0.028, -noseLen / 2);
+        const h2 = box(0.2, 0.04, hoodL, sm2, 0.52 * s, topY - frontDrop / 2 + 0.02, (bodyLen - noseLen) / 2 + 0.02);
+        h2.rotation.x = hoodAng;
       }
     }
   }
+
+  // ---- door roundels + painted sponsor panels ----
   if (number !== null) {
-    const plateTex = numberPlateTexture(number);
-    const plateMat = new THREE.MeshBasicMaterial({ map: plateTex, transparent: true });
-    const plateGeo = new THREE.PlaneGeometry(0.78, 0.78);
+    const rMat = new THREE.MeshBasicMaterial({
+      map: _roundelTexture(number), transparent: true,
+      polygonOffset: true, polygonOffsetFactor: -1,
+    });
+    const rGeo = new THREE.PlaneGeometry(bodyH + 0.16, bodyH + 0.16);
     for (const s of [-1, 1]) {
-      const p = new THREE.Mesh(plateGeo, plateMat);
-      p.position.set((1.31) * s, baseY + bodyH / 2 + 0.14, 0.55);
+      const p = new THREE.Mesh(rGeo, rMat);
+      p.position.set(1.315 * s, baseY + 0.12 + bodyH / 2 + 0.03, 0.55);
+      p.rotation.y = s * Math.PI / 2;
+      g.add(p);
+    }
+  }
+  if (style === 'crown' || style === 'alpine') {
+    const c1 = style === 'crown' ? '#d8342a' : '#2f9e44';
+    const c2 = style === 'crown' ? '#2f9e44' : '#d8342a';
+    const spMat = new THREE.MeshBasicMaterial({
+      map: _sponsorPanelTexture(spec.brand ?? 'APEX', c1, c2), transparent: true,
+      polygonOffset: true, polygonOffsetFactor: -1,
+    });
+    const spGeo = new THREE.PlaneGeometry(1.7, 0.44);
+    for (const s of [-1, 1]) {
+      const p = new THREE.Mesh(spGeo, spMat);
+      p.position.set(1.315 * s, baseY + 0.12 + bodyH / 2 + 0.02, -0.75);
       p.rotation.y = s * Math.PI / 2;
       g.add(p);
     }
   }
 
-  // ---- bumpers, lights, grille ----
-  box(2.55, 0.32, 0.35, darkMat, 0, baseY + 0.02, bodyLen / 2 + 0.05);
-  box(2.55, 0.32, 0.35, darkMat, 0, baseY + 0.02, -bodyLen / 2 - 0.05);
-  box(1.5, 0.24, 0.08, darkMat, 0, baseY + bodyH * 0.5 + 0.1, bodyLen / 2 + 0.02); // grille
+  // ---- chunky bumpers, grille, round headlamps, tail bar ----
+  box(2.6, 0.34, 0.38, darkMat, 0, baseY + 0.02, bodyLen / 2 + 0.06);
+  box(2.6, 0.34, 0.38, darkMat, 0, baseY + 0.02, -bodyLen / 2 - 0.06);
+  const faceY = baseY + 0.12 + (bodyH - frontDrop) * 0.55; // nose face midline
+  box(1.1, 0.2, 0.07, darkMat, 0, faceY, bodyLen / 2 + 0.01); // grille
   for (const s of [-1, 1]) {
-    box(0.4, 0.24, 0.08, headMat, 0.92 * s, baseY + bodyH * 0.5 + 0.1, bodyLen / 2 + 0.04);
-    box(0.4, 0.22, 0.08, tailMat, 0.92 * s, baseY + bodyH * 0.5 + 0.1, -bodyLen / 2 - 0.04);
+    lampDisc(0.17, 0.9 * s, faceY, bodyLen / 2 + 0.02);
+    box(0.44, 0.2, 0.07, tailMat, 0.88 * s, baseY + bodyH * 0.55 + 0.12, -bodyLen / 2 - 0.03);
+  }
+  box(0.9, 0.09, 0.06, darkMat, 0, baseY + bodyH * 0.55 + 0.12, -bodyLen / 2 - 0.02);
+
+  // ---- style signatures ----
+  if (style === 'brawler') {
+    // expedition roof rack: rails, crate, gear box, rolled tarp
+    const rkY = capTop + 0.1;
+    for (const s of [-1, 1]) box(0.09, 0.14, capL + 0.5, darkMat, 0.82 * s, rkY, capZ);
+    for (const e of [-1, 1]) box(1.72, 0.12, 0.09, darkMat, 0, rkY, capZ + e * (capL / 2 + 0.2));
+    box(0.62, 0.34, 0.6, mat(0x8a6a42, { roughness: 0.9 }), -0.38, rkY + 0.26, capZ - 0.22);
+    box(0.52, 0.26, 0.48, accentMat, 0.42, rkY + 0.22, capZ - 0.26);
+    const tarp = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.5, 8), mat(0xb8452e, { roughness: 0.85 }));
+    tarp.rotation.z = Math.PI / 2;
+    tarp.position.set(0, rkY + 0.16, capZ + 0.42);
+    g.add(tarp);
+    // tailgate spare on a mount plate, proud of the rear bumper
+    box(0.5, 0.5, 0.16, darkMat, 0, baseY + bodyH * 0.6, -bodyLen / 2 - 0.3);
+    spareWheel(0.55, 0.3, 0, baseY + bodyH * 0.6, -bodyLen / 2 - 0.5, true);
+    // side ladder up to the rack (rear left)
+    for (const zz of [-0.95, -1.5]) box(0.06, 1.05, 0.09, rimMat, -1.36, topY - 0.35, zz);
+    for (let i = 0; i < 3; i++) box(0.06, 0.07, 0.62, rimMat, -1.36, topY - 0.7 + i * 0.32, -1.225);
+    // twin-bar bull bar
+    for (const yy of [0.3, 0.62]) box(2.2, 0.15, 0.15, darkMat, 0, baseY + yy, bodyLen / 2 + 0.34);
+    for (const s of [-1, 1]) box(0.13, 0.55, 0.13, darkMat, 0.72 * s, baseY + 0.46, bodyLen / 2 + 0.34);
+  }
+  if (style === 'pit') {
+    // front winch drum + fairlead + gold tow hook
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.85, 10), rimMat);
+    drum.rotation.z = Math.PI / 2;
+    drum.position.set(0, baseY + 0.36, bodyLen / 2 + 0.32);
+    g.add(drum);
+    for (const s of [-1, 1]) box(0.14, 0.4, 0.26, darkMat, 0.52 * s, baseY + 0.3, bodyLen / 2 + 0.3);
+    box(0.34, 0.1, 0.12, rimMat, 0, baseY + 0.14, bodyLen / 2 + 0.46);
+    box(0.1, 0.2, 0.09, mat(0xe8b83a), 0, baseY + 0.02, bodyLen / 2 + 0.46);
+    // roof spot bar: four forward lamps
+    const bar = box(1.7, 0.17, 0.24, darkMat, 0, capTop + 0.12, capZ + capL / 2 - 0.1);
+    for (const s of [-0.6, -0.2, 0.2, 0.6]) lampDisc(0.075, s, 0, 0.125, bar);
+    // vertical exhaust stacks behind the cab
+    for (const s of [-1, 1]) {
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.2, 8), rimMat);
+      st.position.set(0.98 * s, topY + 0.44, cabZ - cabL / 2 - 0.16);
+      g.add(st);
+    }
+    box(0.16, 0.22, 0.16, rimMat, 0, baseY + 0.08, -bodyLen / 2 - 0.3); // rear tow hitch
+    box(2.45, 0.12, 0.5, darkMat, 0, topY + 0.16, -bodyLen / 2 + 0.32); // rear deck spoiler
+  }
+  if (style === 'sleek') {
+    // solar-panel roof
+    const solar = new THREE.Mesh(
+      new THREE.PlaneGeometry(cabW - 0.4, capL - 0.05),
+      new THREE.MeshBasicMaterial({ map: _solarRoofTexture(), polygonOffset: true, polygonOffsetFactor: -1 }));
+    solar.rotation.x = -Math.PI / 2;
+    solar.position.set(0, capTop + 0.006, capZ);
+    g.add(solar);
+    // roof light pod riding the windshield header
+    const pod = box(1.3, 0.24, 0.42, mat(0xf4f1e8, { roughness: 0.4 }), 0, capTop + 0.12, capZ + capL / 2 - 0.18);
+    for (const s of [-0.38, 0.38]) lampDisc(0.085, s, 0, 0.215, pod);
+    // hatch spoiler + side skirts
+    box(2.0, 0.1, 0.5, accentMat, 0, cabY + cabH / 2 - 0.02, cabZ - cabL / 2 + 0.1);
+    for (const s of [-1, 1]) box(0.12, 0.16, bodyLen - 1.7, accentMat, 1.33 * s, baseY - 0.06, 0);
+  }
+  if (style === 'dune') {
+    // exposed roll cage over the rear bed
+    const postH = 0.8;
+    for (const zz of [-1.0, -1.75]) {
+      for (const s of [-1, 1]) box(0.09, postH, 0.09, darkMat, 0.92 * s, topY + postH / 2, zz);
+      box(1.93, 0.09, 0.09, darkMat, 0, topY + postH + 0.04, zz);
+    }
+    for (const s of [-1, 1]) box(0.09, 0.09, 0.95, darkMat, 0.92 * s, topY + postH + 0.04, -1.375);
+    spareWheel(0.52, 0.28, 0, topY + 0.15, -1.38); // spare flat on the bed
+    box(0.34, 0.44, 0.18, mat(0xd8342a), -0.62, topY + 0.22, -2.0); // jerry cans
+    box(0.34, 0.44, 0.18, mat(0x5a6b3a), 0.62, topY + 0.22, -2.0);
+    // roof light pod with quad lamps
+    const pod = box(1.4, 0.2, 0.4, darkMat, 0, capTop + 0.1, capZ + capL / 2 - 0.16);
+    for (const s of [-0.45, -0.15, 0.15, 0.45]) lampDisc(0.07, s, 0, 0.205, pod);
+    for (const s of [-1, 1]) box(0.1, 0.24, bodyLen - 1.2, darkMat, 1.32 * s, baseY - 0.06, 0); // mud skirts
+  }
+  if (style === 'crown') {
+    // LARGE two-tier rear wing on posts, with endplates
+    const wZ = -bodyLen / 2 + 0.45;
+    for (const s of [-1, 1]) box(0.1, 0.5, 0.16, darkMat, 0.82 * s, topY + 0.25, wZ);
+    const wing1 = box(2.55, 0.07, 0.62, accentMat, 0, topY + 0.53, wZ, true);
+    wing1.rotation.x = -0.13;
+    for (const s of [-1, 1]) box(0.07, 0.26, 0.07, darkMat, 0.62 * s, topY + 0.68, wZ - 0.06);
+    const wing2 = box(2.3, 0.06, 0.46, mat(stripe?.[0] ?? 0xf2f0e8), 0, topY + 0.84, wZ - 0.06, true);
+    wing2.rotation.x = -0.15;
+    for (const s of [-1, 1]) box(0.05, 0.44, 0.72, darkMat, 1.29 * s, topY + 0.66, wZ - 0.03);
+    // tarmac kit: side skirts + accent splitter
+    for (const s of [-1, 1]) box(0.13, 0.18, bodyLen - 1.9, accentMat, 1.33 * s, baseY - 0.05, 0);
+    box(2.5, 0.09, 0.34, accentMat, 0, baseY - 0.12, bodyLen / 2 + 0.16);
+  }
+  if (style === 'alpine') {
+    // quad-lamp rally pod riding the hood slope
+    const podZ = bodyLen / 2 - 0.55;
+    const podY = topY - frontDrop * ((podZ - noseZ0) / noseLen) + 0.09;
+    const pod = box(1.25, 0.2, 0.42, darkMat, 0, podY, podZ);
+    pod.rotation.x = hoodAng;
+    for (const s of [-0.45, -0.15, 0.15, 0.45]) lampDisc(0.075, s, 0.02, 0.215, pod);
+    spareWheel(0.5, 0.26, 0, capTop + 0.14, capZ - 0.08); // roof spare
+    // mid rear wing perched at the tail
+    for (const s of [-1, 1]) box(0.09, 0.36, 0.14, darkMat, 0.78 * s, topY + 0.18, -bodyLen / 2 + 0.24);
+    const w = box(2.2, 0.07, 0.42, mat(0xd8342a), 0, topY + 0.42, -bodyLen / 2 + 0.22, true);
+    w.rotation.x = -0.1;
   }
 
-  // ---- fender flares on the tall cars ----
+  // ---- fender flares on the tall cars, mudflaps on the dirt crowd ----
   if (tall) {
     for (const [x, z] of [[-1.3, 1.5], [1.3, 1.5], [-1.3, -1.5], [1.3, -1.5]]) {
       box(0.45, 0.26, wheelR * 2 + 0.4, darkMat, x, wheelY + wheelR * 0.72, z);
     }
   }
+  if (tall) {
+    // long flaps hanging off the rear fender flares
+    const flapTop = wheelY + wheelR * 0.72 - 0.1;
+    for (const s of [-1, 1]) box(0.4, 0.72, 0.06, darkMat, 1.3 * s, flapTop - 0.36, -1.5 - wheelR - 0.14);
+  } else if (style === 'alpine') {
+    for (const s of [-1, 1]) box(0.38, 0.5, 0.05, darkMat, 1.3 * s, baseY - 0.1, -1.5 - wheelR - 0.1);
+  }
 
-  // ---- roof sponsor decal (hood on the brawler — its roof carries the rack) ----
-  const brand = spec.brand ?? BRANDS[Math.abs(number ?? 0) % BRANDS.length];
-  const decal = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.7, 0.85),
-    new THREE.MeshBasicMaterial({
-      map: roofDecalTexture(brand), transparent: true,
-      polygonOffset: true, polygonOffsetFactor: -2,
-    })
-  );
-  decal.rotation.set(-Math.PI / 2, 0, Math.PI); // lie flat, word reads toward the nose
-  if (style === 'brawler') decal.position.set(0, baseY + bodyH + 0.21, bodyLen / 2 - 1.05);
-  else if (style === 'dune') decal.position.set(0, cabY + cabH / 2 + 0.075, cabZ - 0.3);
-  else decal.position.set(0, cabY + cabH / 2 + 0.075, cabZ);
-  g.add(decal);
+  // ---- realism detail pass (all styles, ~14 tiny boxes per car) ----
+  {
+    // door mirrors at the A-pillar base, arms rooted in the body shoulder
+    for (const s of [-1, 1]) {
+      box(0.2, 0.05, 0.09, darkMat, 1.36 * s, topY + 0.08, cabZ + cabL / 2 - 0.02);
+      box(0.14, 0.17, 0.06, accentMat, 1.44 * s, topY + 0.19, cabZ + cabL / 2 - 0.02);
+    }
+    // exhaust pipes under the rear bumper (twin on the fast cars)
+    const exGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.42, 8);
+    exGeo.rotateX(Math.PI / 2);
+    const pipes = (style === 'crown' || style === 'pit' || style === 'alpine') ? [-0.62, -0.4] : [-0.5];
+    for (const x of pipes) {
+      const ex = new THREE.Mesh(exGeo, rimMat);
+      ex.position.set(x, baseY - 0.1, -bodyLen / 2 - 0.16);
+      g.add(ex);
+    }
+    // whip antenna on the rear deck (brawler's rack / dune's cage carry gear)
+    if (style !== 'brawler' && style !== 'dune') {
+      box(0.035, 0.6, 0.035, darkMat, -0.95, topY + 0.28, -bodyLen / 2 + 0.5);
+    }
+    // wheel-arch brows on the low cars (tall ones wear full flares)
+    if (!tall) {
+      for (const [x, z] of [[-1.3, 1.5], [1.3, 1.5], [-1.3, -1.5], [1.3, -1.5]]) {
+        box(0.34, 0.1, wheelR * 2 + 0.3, darkMat, x, wheelY + wheelR + 0.06, z);
+      }
+    }
+    // door sills + front splitter: dark trim lines ground the silhouette
+    for (const s of [-1, 1]) box(0.08, 0.12, bodyLen - 1.0, darkMat, 1.28 * s, baseY - 0.12, 0);
+    box(2.3, 0.1, 0.2, darkMat, 0, baseY - 0.14, bodyLen / 2 - 0.05);
+    // fuel cap + side vent flavor on the rear quarter
+    box(0.16, 0.16, 0.04, rimMat, -1.31, baseY + bodyH * 0.55, -bodyLen / 2 + 0.75);
+    box(0.04, 0.14, 0.4, darkMat, 1.31, baseY + bodyH * 0.45, bodyLen / 2 - 1.1);
+    // baked under-body shadow: grounds the car even when real-time shadows
+    // are stepped off by the quality governor
+    const ao = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.6, bodyLen + 1.6),
+      new THREE.MeshBasicMaterial({
+        map: _carAoTexture(), transparent: true, opacity: 0.42,
+        depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
+      })
+    );
+    ao.rotation.x = -Math.PI / 2;
+    ao.position.y = 0.03;
+    ao.renderOrder = 1;
+    g.add(ao);
+  }
+
+  // ---- sponsor decal: sloped hood on the trucks/hatch, roof cap otherwise.
+  // (alpine skips it — its roof carries the spare and its doors the sponsors)
+  if (style !== 'alpine') {
+    const brand = spec.brand ?? BRANDS[Math.abs(number ?? 0) % BRANDS.length];
+    const decal = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.45, 0.72),
+      new THREE.MeshBasicMaterial({
+        map: roofDecalTexture(brand), transparent: true,
+        polygonOffset: true, polygonOffsetFactor: -2,
+      })
+    );
+    if (style === 'brawler' || style === 'sleek') {
+      // laid onto the hood slope, reading right-side-up from the car's front
+      decal.rotation.set(-Math.PI / 2 + hoodAng, 0, 0);
+      decal.position.set(0, topY - frontDrop / 2 + 0.055, (bodyLen - noseLen) / 2 + 0.01);
+    } else {
+      decal.rotation.set(-Math.PI / 2, 0, Math.PI);
+      decal.position.set(0, capTop + 0.045, style === 'dune' ? capZ - 0.2 : capZ);
+      if (style === 'dune') decal.scale.set(0.85, 0.85, 1);
+    }
+    g.add(decal);
+  }
 
   // ---- wheels ----
   const tireGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.55, 10);

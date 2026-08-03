@@ -325,7 +325,7 @@ class Game {
             { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
           return;
         }
-        this.fadeTo(`?level=${lv.id}`);
+        this.fadeTo(`?level=${lv.id}${this.unlockAll ? '&unlockall=1' : ''}`);
       });
       rowFor(lv).appendChild(card);
     });
@@ -441,6 +441,8 @@ class Game {
       const carried = parseInt(sessionStorage.getItem('ir-score') || '0');
       if (carried > 0) this.score = carried;
       sessionStorage.removeItem('ir-score');
+    } else {
+      this._restoreMenuState(); // picked a track from the menu: come back to the same spot
     }
   }
 
@@ -469,10 +471,54 @@ class Game {
     }
   }
 
-  /** Fade to black, then navigate — used for level changes. */
+  /** Fade to black, then navigate — used for level changes. Saves the menu's
+   *  tab + scroll so the title screen comes back exactly where you left it
+   *  instead of resetting to the top. */
   fadeTo(url) {
+    try {
+      sessionStorage.setItem('ir-menu-state', JSON.stringify({
+        tab: document.getElementById('tab-btn-garage')?.classList.contains('current') ? 'garage' : 'race',
+        scroll: document.getElementById('title-screen')?.scrollTop ?? 0,
+      }));
+    } catch { /* private mode */ }
     document.getElementById('fade').classList.add('dark');
     setTimeout(() => { location.href = url; }, 480);
+  }
+
+  /** Restore the saved menu tab + scroll after a selection reload. */
+  _restoreMenuState() {
+    try {
+      const raw = sessionStorage.getItem('ir-menu-state');
+      if (!raw) return;
+      sessionStorage.removeItem('ir-menu-state');
+      const st = JSON.parse(raw);
+      if (st.tab === 'garage') document.getElementById('tab-btn-garage')?.click();
+      const ts = document.getElementById('title-screen');
+      if (ts && st.scroll) requestAnimationFrame(() => { ts.scrollTop = st.scroll; });
+    } catch { /* ignore */ }
+  }
+
+  /** Swap the player's machine in place — no reload, no menu reset. */
+  swapPlayerCar(entry) {
+    const p = this.player;
+    this.scene.remove(p.mesh);
+    const mesh = buildCarMesh(entry.spec);
+    mesh.position.copy(p.mesh.position);
+    mesh.rotation.copy(p.mesh.rotation);
+    this.scene.add(mesh);
+    p.mesh = mesh;
+    p.catalogKey = entry.key;
+    p._popped = [];
+    p.maxSpeed = entry.stats.maxSpeed;
+    p.accel = entry.stats.accel;
+    p.grip = entry.stats.grip;
+    p.maxHealth = entry.stats.health;
+    p.offroadSkill = entry.stats.offroad;
+    p.nitroPower = entry.stats.nitroPower ?? 1;
+    p.plating = entry.stats.plating ?? 1;
+    this._base = null; // applyUpgrades recaptures the new machine's baseline
+    this.applyUpgrades();
+    p.health = p.maxHealth;
   }
 
   isLevelUnlocked(id) {
@@ -599,8 +645,11 @@ class Game {
         }
         this.cars.selected = car.key;
         saveJSON('ir-cars', this.cars);
-        // swap requires a rebuild of the player mesh — cleanest via reload
-        this.fadeTo(`?level=${this.level.id}`);
+        // live swap — no reload, the menu stays exactly where you are
+        this.swapPlayerCar(car);
+        this.renderCarShop();
+        this.renderGarage();
+        this.hud.feed?.(`NOW DRIVING: ${car.name}`, 'good');
       });
       shop.appendChild(card);
     }

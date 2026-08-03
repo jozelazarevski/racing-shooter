@@ -177,6 +177,12 @@ on the buttons. Works in portrait and landscape.
 
 - [Three.js](https://threejs.org/) (vendored in `lib/`, no CDN or build step)
 - Procedural canvas textures, procedural track geometry from a Catmull-Rom circuit
+- Wedge-silhouette voxel racers: sloped hoods, raked-glass greenhouses,
+  painted roundel/sponsor liveries, and per-machine signature gear (winch,
+  roof racks, roll cages, two-tier wings) that pops off as damage
+- Baked contact-shadow decals ground every tree, rock and building; an
+  adaptive quality governor trims render scale/shadows/bloom if a device
+  can't hold frame rate
 - Vertex-colored rolling-terrain heightfield; instanced forest, grass tufts,
   rocks, tire walls and huts; animated checkered flags and drifting clouds
 - Custom GPU particle pool (one draw call for all explosions/dust/sparks/trails)
