@@ -443,6 +443,11 @@ class Game {
       this.resetRace();
       this.startRace();
     });
+    // leave the results screen for the garage — the credits you just banked are
+    // only useful somewhere else, so the podium must never be the only exit
+    document.getElementById('garage-btn')?.addEventListener('click', () => {
+      this.fadeTo(`?level=${this.level.id}`, 'garage');
+    });
 
     // camera + pause buttons (work with mouse and touch)
     document.getElementById('cam-btn').addEventListener('click', () => this.cycleCamera());
@@ -651,10 +656,11 @@ class Game {
   /** Fade to black, then navigate — used for level changes. Saves the menu's
    *  tab + scroll so the title screen comes back exactly where you left it
    *  instead of resetting to the top. */
-  fadeTo(url) {
+  fadeTo(url, forceTab = null) {
     try {
       sessionStorage.setItem('ir-menu-state', JSON.stringify({
-        tab: document.getElementById('tab-btn-garage')?.classList.contains('current') ? 'garage' : 'race',
+        tab: forceTab
+          ?? (document.getElementById('tab-btn-garage')?.classList.contains('current') ? 'garage' : 'race'),
         scroll: document.getElementById('title-screen')?.scrollTop ?? 0,
       }));
     } catch { /* private mode */ }
