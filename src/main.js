@@ -141,7 +141,30 @@ const saveJSON = (key, obj) => { try { localStorage.setItem(key, JSON.stringify(
 const PROFILE_KEYS = ['career', 'garage', 'cars'];
 const PROFILE_COLORS = ['#ff8c1a', '#f2c81e', '#2440b8', '#4a9ad8', '#2f9e44', '#1c1a18']; // car livery hexes
 const MAX_PROFILES = 6;
+const CONFIRM_MS = 3000;          // how long a two-tap destructive button stays armed
+const STARTER_CAR = 'brawler';    // the free machine every career begins with
 const profileKey = (id, base) => `ir-p${id}-${base}`;
+// PROFILE_KEYS is only the LEGACY adoption list (the un-namespaced keys an old
+// build wrote). Wiping a profile must never use it: whatever key a future
+// feature parks under the namespace has to die with the career too, so both
+// reset and delete enumerate localStorage BY PREFIX instead of by name.
+const profilePrefix = (id) => `ir-p${id}-`;
+function profileStorageKeys(id) {
+  const pre = profilePrefix(id), out = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(pre)) out.push(k);
+    }
+  } catch { /* private mode */ }
+  return out;
+}
+/** Erase every stored byte belonging to one profile. The single wipe path. */
+function wipeProfileData(id) {
+  const keys = profileStorageKeys(id);
+  try { for (const k of keys) localStorage.removeItem(k); } catch { /* private mode */ }
+  return keys;
+}
 const sanitizeProfileName = (raw) =>
   String(raw ?? '').toUpperCase().replace(/[^A-Z0-9 \-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 10);
 
@@ -186,8 +209,9 @@ class Game {
     this._pkey = (base) => profileKey(this.profile.id, base);
     this.career = loadJSON(this._pkey('career'), { finished: {} });
     this.garage = loadJSON(this._pkey('garage'), { credits: 0 });
-    this.cars = loadJSON(this._pkey('cars'), { owned: ['brawler'], selected: 'brawler' });
-    if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = 'brawler';
+    this.cars = loadJSON(this._pkey('cars'), { owned: [STARTER_CAR], selected: STARTER_CAR });
+    if (!this.cars.owned.length) this.cars.owned = [STARTER_CAR];
+    if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = STARTER_CAR;
     // upgrades are PER-CAR (`garage.upgrades[carKey]`) — a newly bought
     // machine arrives stock. Old saves kept one flat global level set: those
     // levels migrate once onto the car the player had selected, so the main
@@ -404,54 +428,7 @@ class Game {
       }
     }
 
-    // world cards: static circuit-outline badge + flavor + career best per level,
-    // grouped under region headers (region order = first appearance).
-    // The .wc-map badge is card decoration ONLY — never a HUD map. (RULES §0)
-    const sel = document.getElementById('level-select');
-    const regionRows = new Map();
-    const rowFor = (lv) => {
-      const rg = lv.region || 'CHAMPIONSHIP';
-      let row = regionRows.get(rg);
-      if (!row) {
-        const head = document.createElement('div');
-        head.className = 'region-head';
-        head.textContent = rg;
-        sel.appendChild(head);
-        row = document.createElement('div');
-        row.className = 'region-row';
-        sel.appendChild(row);
-        regionRows.set(rg, row);
-      }
-      return row;
-    };
-    LEVELS.forEach((lv, i) => {
-      const card = document.createElement('button');
-      const unlocked = this.isLevelUnlocked(lv.id);
-      card.className = 'level-chip'
-        + (i === this.levelIndex ? ' current' : '')
-        + (unlocked ? '' : ' locked');
-      const best = this.career.finished[lv.id];
-      const bestTxt = best
-        ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
-        : (unlocked ? '★ UNRACED' : '');
-      card.innerHTML = `<div class="wc-shot" style="background-image:url('assets/previews/w${lv.id}.jpg')">
-          <canvas class="wc-map" width="72" height="52"></canvas>
-        </div>
-        <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
-        <div class="wc-tags">${WORLD_TAGS[lv.theme] || ''}</div>
-        <div class="wc-best${best ? '' : ' new'}">${bestTxt}</div>`;
-      this._drawCircuitMap(card.querySelector('.wc-map'), lv.theme, !unlocked, i === this.levelIndex);
-      card.addEventListener('click', () => {
-        if (i === this.levelIndex) return;
-        if (!this.isLevelUnlocked(lv.id)) {
-          card.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
-            { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
-          return;
-        }
-        this.fadeTo(`?level=${lv.id}${this.unlockAll ? '&unlockall=1' : ''}`);
-      });
-      rowFor(lv).appendChild(card);
-    });
+    this._renderLevelCards();
 
     // mode chips: RACE | FREE ROAM
     const msel = document.getElementById('mode-select');
@@ -677,6 +654,60 @@ class Game {
     // a world unlocks only after a PODIUM (top 3) finish on the one before
     const prev = this.career.finished[id - 1];
     return this.unlockAll || id === 1 || (!!prev && prev.place <= 3);
+  }
+
+  /** World cards: static circuit-outline badge + flavor + career best per
+   *  level, grouped under region headers (region order = first appearance).
+   *  The .wc-map badge is card decoration ONLY — never a HUD map (RULES §0).
+   *  Rebuildable, because a career reset changes every lock and every best. */
+  _renderLevelCards() {
+    const sel = document.getElementById('level-select');
+    if (!sel) return;
+    sel.innerHTML = '';
+    const regionRows = new Map();
+    const rowFor = (lv) => {
+      const rg = lv.region || 'CHAMPIONSHIP';
+      let row = regionRows.get(rg);
+      if (!row) {
+        const head = document.createElement('div');
+        head.className = 'region-head';
+        head.textContent = rg;
+        sel.appendChild(head);
+        row = document.createElement('div');
+        row.className = 'region-row';
+        sel.appendChild(row);
+        regionRows.set(rg, row);
+      }
+      return row;
+    };
+    LEVELS.forEach((lv, i) => {
+      const card = document.createElement('button');
+      const unlocked = this.isLevelUnlocked(lv.id);
+      card.className = 'level-chip'
+        + (i === this.levelIndex ? ' current' : '')
+        + (unlocked ? '' : ' locked');
+      const best = this.career.finished[lv.id];
+      const bestTxt = best
+        ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
+        : (unlocked ? '★ UNRACED' : '');
+      card.innerHTML = `<div class="wc-shot" style="background-image:url('assets/previews/w${lv.id}.jpg')">
+          <canvas class="wc-map" width="72" height="52"></canvas>
+        </div>
+        <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
+        <div class="wc-tags">${WORLD_TAGS[lv.theme] || ''}</div>
+        <div class="wc-best${best ? '' : ' new'}">${bestTxt}</div>`;
+      this._drawCircuitMap(card.querySelector('.wc-map'), lv.theme, !unlocked, i === this.levelIndex);
+      card.addEventListener('click', () => {
+        if (i === this.levelIndex) return;
+        if (!this.isLevelUnlocked(lv.id)) {
+          card.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
+            { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
+          return;
+        }
+        this.fadeTo(`?level=${lv.id}${this.unlockAll ? '&unlockall=1' : ''}`);
+      });
+      rowFor(lv).appendChild(card);
+    });
   }
 
   /** The named car's own upgrade levels — upgrades belong to one machine. */
@@ -922,26 +953,95 @@ class Game {
       ren.title = 'Rename profile';
       ren.addEventListener('click', () => this._editProfileName(row, p));
       row.appendChild(ren);
-      if (reg.list.length > 1) {
-        // two-tap confirm; the arm state relaxes by itself
-        const del = document.createElement('button');
-        del.className = 'up-buy prof-btn danger';
-        del.textContent = '✕';
-        del.title = 'Delete profile';
-        del.addEventListener('click', () => {
-          if (del.dataset.arm) { this._deleteProfile(p.id); return; }
-          del.dataset.arm = '1';
-          del.textContent = 'SURE?';
-          setTimeout(() => { delete del.dataset.arm; del.textContent = '✕'; }, 2600);
-        });
-        row.appendChild(del);
-      }
+      // DELETE removes the driver entirely (RESET, below, keeps them and
+      // empties them). Always offered — deleting the last profile hands the
+      // device to a fresh PLAYER 01 rather than leaving an empty registry.
+      const del = document.createElement('button');
+      del.className = 'up-buy prof-btn danger';
+      del.id = active ? 'profile-del-btn' : '';
+      del.textContent = '✕';
+      del.title = 'Delete profile';
+      this._armConfirm(del, '✕', 'DELETE?', () => this._deleteProfile(p.id));
+      row.appendChild(del);
       listEl.appendChild(row);
     }
+    this._renderResetBlock();
     const cap = reg.list.length >= MAX_PROFILES;
     document.getElementById('profile-create').style.display = cap ? 'none' : '';
     document.getElementById('profile-cap-note').style.display = cap ? '' : 'none';
     this._renderSwatches();
+  }
+
+  /** Two-tap confirm. The first tap ARMS the button (it says `armed` and goes
+   *  hot); only a second tap inside CONFIRM_MS runs the action, and the arm
+   *  relaxes by itself. Careers are not something a fat thumb may delete. */
+  _armConfirm(btn, idle, armed, run) {
+    const relax = () => {
+      clearTimeout(btn._armT);
+      delete btn.dataset.arm;
+      btn.classList.remove('armed');
+      btn.textContent = idle;
+    };
+    btn.addEventListener('click', () => {
+      if (btn.dataset.arm) { relax(); run(); return; }
+      btn.dataset.arm = '1';
+      btn.classList.add('armed');
+      btn.textContent = armed;
+      btn._armT = setTimeout(relax, CONFIRM_MS);
+    });
+    return btn;
+  }
+
+  /** DANGER ZONE: wipe the ACTIVE driver's career but keep the driver. The
+   *  loss line spells out exactly what dies so the confirm is informed. */
+  _renderResetBlock() {
+    const box = document.getElementById('profile-reset');
+    if (!box) return;
+    const p = this.profile;
+    const worlds = Object.values(this.career.finished ?? {}).filter((f) => f && f.place <= 3).length;
+    const cars = this.cars.owned.length;
+    const ups = Object.values(this.garage.upgrades ?? {})
+      .reduce((n, set) => n + Object.values(set).reduce((a, b) => a + (b || 0), 0), 0);
+    const loss = document.getElementById('profile-reset-loss');
+    if (loss) {
+      loss.textContent = `${p.name}: ${(this.garage.credits ?? 0).toLocaleString()} CR · `
+        + `${worlds} WORLD${worlds === 1 ? '' : 'S'} · ${cars} CAR${cars === 1 ? '' : 'S'} · `
+        + `${ups} UPGRADE${ups === 1 ? '' : 'S'} — ALL LOST`;
+    }
+    const old = document.getElementById('profile-reset-btn');
+    if (!old) return;
+    // rebuild the button so a stale armed state never survives a re-render
+    const btn = old.cloneNode(false);
+    btn.textContent = 'RESET CAREER';
+    this._armConfirm(btn, 'RESET CAREER', 'CONFIRM RESET?', () => this._resetCareer(this.profile.id));
+    old.replaceWith(btn);
+  }
+
+  /** Erase one profile's whole career and re-seed factory defaults. Storage
+   *  is cleared BY PREFIX (see wipeProfileData) so nothing a later feature
+   *  parks in the namespace survives. The active driver's menu re-renders
+   *  live — no reload — unless the world they're sitting on just relocked. */
+  _resetCareer(id) {
+    const keys = wipeProfileData(id);
+    if (id !== this.profile.id) { this._renderProfiles(); return keys; }
+    this.career = { finished: {} };
+    this.garage = { credits: 0, upgrades: {} };
+    this.cars = { owned: [STARTER_CAR], selected: STARTER_CAR };
+    saveJSON(this._pkey('career'), this.career);
+    saveJSON(this._pkey('garage'), this.garage);
+    saveJSON(this._pkey('cars'), this.cars);
+    // back to the stock starter machine, live
+    const starter = CAR_CATALOG.find((c) => c.key === STARTER_CAR) ?? CAR_CATALOG[0];
+    this.swapPlayerCar(starter);
+    this.renderCarShop();
+    this.renderGarage();
+    this._renderLevelCards();
+    this._renderProfiles();
+    this.hud?.feed?.('CAREER RESET — BACK TO THE STARTING GRID', 'info');
+    // sitting on a world the fresh career hasn't unlocked? that world is no
+    // longer legally raceable, and only a reload can rebuild the track.
+    if (!this.isLevelUnlocked(this.level.id)) this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+    return keys;
   }
 
   _renderSwatches() {
@@ -1037,11 +1137,20 @@ class Game {
 
   _deleteProfile(id) {
     const reg = this.profiles;
-    if (reg.list.length <= 1) return; // the last profile can never be deleted
     const i = reg.list.findIndex((p) => p.id === id);
     if (i < 0) return;
     reg.list.splice(i, 1);
-    try { for (const base of PROFILE_KEYS) localStorage.removeItem(profileKey(id, base)); } catch { /* private mode */ }
+    wipeProfileData(id); // by prefix — the same one path a reset uses
+    if (!reg.list.length) {
+      // the registry may never be empty: the device falls back to a brand-new
+      // driver instead of booting into a profile-less void
+      reg.list.push({ id: 1, name: 'PLAYER 01', color: PROFILE_COLORS[0], created: Date.now() });
+      reg.active = 1;
+      wipeProfileData(1);
+      saveJSON('ir-profiles', reg);
+      this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+      return;
+    }
     if (reg.active === id) {
       // deleted the active driver: hand the wheel to the first remaining one
       reg.active = reg.list[0].id;

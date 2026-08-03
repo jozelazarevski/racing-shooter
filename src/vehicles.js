@@ -605,6 +605,12 @@ export class Car {
     // race state
     this.trackIndex = 0;
     this.lap = 1;
+    // Distance travelled, counted in line crossings. Kept SEPARATE from `lap`
+    // because the two answer different questions: `lap` is the validated race
+    // lap (an infield cut earns none, and the start crossing off the grid
+    // earns none either), while `_wraps` must rise on every crossing so
+    // `progress` — which orders the standings — never goes backwards.
+    this._wraps = 0;
     this.lateral = 0;
     this.finished = false;
     this.wallGrind = 0;
@@ -623,7 +629,7 @@ export class Car {
 
   get forward() { return new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading)); }
   get speedAlong() { return this.vel.dot(this.forward); }
-  get progress() { return this.lap + this.trackIndex / this.game.track.N; }
+  get progress() { return this._wraps + this.trackIndex / this.game.track.N; }
 
   placeAt(index, lateral, keepCP = false) {
     const t = this.game.track;
@@ -647,6 +653,11 @@ export class Car {
     this._midCP = keepCP
       ? (this._midCP ?? false)
       : (index > this.game.track.N * 0.4 && index < this.game.track.N * 0.85);
+    // A fresh placement re-bases the distance counter on the displayed lap. A
+    // car on the grid sits BEHIND the line, so it has not yet made the
+    // crossing its lap number implies — start it one wrap short, or its
+    // progress would fall by a full lap the moment it crosses.
+    if (!keepCP) this._wraps = this.lap - (index > this.game.track.N * 0.85 ? 1 : 0);
     this.syncMesh(0);
   }
 
@@ -1419,12 +1430,16 @@ export class Car {
     const n = this.game.track.N;
     if (this.trackIndex > n * 0.4 && this.trackIndex < n * 0.6) this._midCP = true;
     if (prevIndex > n * 0.85 && this.trackIndex < n * 0.15) {
-      if (this._midCP === false) return false; // cut the infield — no lap
+      this._wraps++;                           // distance always counts...
+      if (this._midCP === false) return false; // ...but a cut earns no lap
       this._midCP = false;
       this.lap++;
       return true;
     }
-    if (prevIndex < n * 0.15 && this.trackIndex > n * 0.85) this.lap--; // went backwards over the line
+    if (prevIndex < n * 0.15 && this.trackIndex > n * 0.85) { // backwards over the line
+      this._wraps--;
+      this.lap--;
+    }
     return false;
   }
 }

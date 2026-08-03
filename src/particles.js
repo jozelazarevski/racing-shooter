@@ -125,6 +125,9 @@ export class Particles {
     this.baseSize = new Float32Array(MAX);
     this.balpha = new Float32Array(MAX).fill(1); // per-particle peak alpha
     this.head = 0;
+    // global cut for the burst recipes — the adaptive quality governor can
+    // dial this down (0..1) on a struggling device without touching call sites
+    this.fxScale = 1;
 
     const mat = new THREE.ShaderMaterial({
       uniforms: { uMap: { value: particleTexture() } },
@@ -312,7 +315,7 @@ export class Particles {
     };
     // count helper: mobile scale + the per-frame burst budget, and it books
     // what it hands out so a multi-prop blast thins itself instead of the pool
-    const thin = (this._burstSpent ?? 0) > BURST_BUDGET ? 0.4 : 1;
+    const thin = ((this._burstSpent ?? 0) > BURST_BUDGET ? 0.4 : 1) * (this.fxScale ?? 1);
     const n = (base, spread) => {
       const c = Math.max(1, Math.round((base + Math.random() * spread) * MOBILE_BURST * thin));
       this._burstSpent = (this._burstSpent ?? 0) + c;

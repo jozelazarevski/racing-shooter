@@ -6,9 +6,17 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>IGNITE RALLY — Racing Shooter</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#ffd400">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
+  /* Fonts are VENDORED, not fetched from Google. The game must boot with the
+     radio off (see sw.js) — one remote stylesheet would leave a phone at
+     30,000 ft staring at fallback type while it waited for a timeout. */
+  @font-face{font-family:'Luckiest Guy';font-style:normal;font-weight:400;font-display:swap;
+    src:url('./assets/fonts/luckiestguy-latin.woff2') format('woff2')}
+  @font-face{font-family:'Baloo 2';font-style:normal;font-weight:500 800;font-display:swap;
+    src:url('./assets/fonts/baloo2-latin.woff2') format('woff2')}
   :root{
     --yellow:#ffd400; --orange:#ff8c1a; --amber:#ffb52e; --green:#4dd06a; --red:#e8402a;
     --ink:#2b1c0e;
@@ -475,6 +483,12 @@
     border-radius:var(--r-md)}
   #results .game-sub{letter-spacing:6px}
   .footnote{margin-top:16px;font-size:11px;letter-spacing:2px;color:var(--gold-dim);text-align:center;width:100%}
+  /* flight badge: says plainly whether the game is safe to take on a plane */
+  #offline-badge{margin-top:10px;font-size:10px;font-weight:800;letter-spacing:2px;text-align:center;
+    padding:4px 12px;border-radius:20px;border:2px solid var(--line-soft);color:var(--gold-dim);
+    background:rgba(12,8,3,.4)}
+  #offline-badge.ready{color:#8de89a;border-color:rgba(141,232,154,.45)}
+  #offline-badge.partial{color:var(--amber);border-color:rgba(255,181,46,.4)}
   #loading-note{margin-top:24px;font-size:12px;letter-spacing:3px;color:var(--gold-dim);text-align:center}
   /* START is the one action that must never be out of reach: pin it to the
      bottom of the scrollport whenever its natural spot is below the fold */
@@ -619,6 +633,7 @@
     RIGHT THUMB — FIRE cannon &nbsp;·&nbsp; 🚀 missile &nbsp;·&nbsp; 💣 mine &nbsp;·&nbsp; 💥 shockwave &nbsp;·&nbsp; ⚡ nitro
     &nbsp;·&nbsp; hold DRIFT to slide</div>
   <div id="loading-note">3 LAPS · 5 RIVALS · RAMPS · MINES · DESTROY OR BE DESTROYED</div>
+  <div id="offline-badge" class="arming">✈ STORING…</div>
   <div class="footnote">A TOY-BOX CIRCUIT DESIGNED ENTIRELY BY CLAUDE</div>
 </div>
 
@@ -634,6 +649,12 @@
       <button id="profile-create-btn" class="up-buy">CREATE</button>
     </div>
     <div id="profile-cap-note" class="footnote" style="display:none">PROFILE LIMIT REACHED — DELETE ONE TO ADD ANOTHER</div>
+    <div class="panel-head danger-head">DANGER ZONE</div>
+    <div id="profile-reset">
+      <div id="profile-reset-loss"></div>
+      <button id="profile-reset-btn" class="up-buy danger">RESET CAREER</button>
+      <div class="reset-note">RESET EMPTIES THIS DRIVER · ✕ DELETES THEM</div>
+    </div>
   </div>
   <button id="profile-close" class="btn" style="margin-top:22px;padding:13px 54px;font-size:17px">CLOSE</button>
 </div>
@@ -680,5 +701,7 @@
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
 <script type="module" src="./src/main.js?v=r30"></script>
+<!-- offline arming: registers sw.js and drives the flight badge -->
+<script src="./src/offline.js?v=r30"></script>
 </body>
 </html>
