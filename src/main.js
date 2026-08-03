@@ -404,8 +404,9 @@ class Game {
       }
     }
 
-    // world cards: track-shape minimap + flavor + career best per level,
-    // grouped under region headers (region order = first appearance)
+    // world cards: static circuit-outline badge + flavor + career best per level,
+    // grouped under region headers (region order = first appearance).
+    // The .wc-map badge is card decoration ONLY — never a HUD map. (RULES §0)
     const sel = document.getElementById('level-select');
     const regionRows = new Map();
     const rowFor = (lv) => {
@@ -484,7 +485,7 @@ class Game {
 
     // steering sensitivity chips (also cycled from the pause menu)
     const ssel = document.getElementById('steer-select');
-    ssel.innerHTML = '<span class="lbl">STEERING</span>';
+    ssel.innerHTML = ''; // the STEERING label lives in the settings row markup now
     const STEERS = [['relaxed', 'RELAXED'], ['normal', 'NORMAL'], ['sharp', 'SHARP']];
     const applySteerChips = () => {
       for (const c of ssel.querySelectorAll('.diff-chip')) {
