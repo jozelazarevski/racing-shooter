@@ -382,6 +382,34 @@
     border-radius:var(--r-sm);border:2px solid var(--line);background:rgba(38,26,12,.5);
     -webkit-tap-highlight-color:transparent}
   .mode-chip.current{color:var(--ink);background:#7fd4ff;border-color:var(--ink);box-shadow:0 3px 0 var(--ink)}
+  /* ---------- ARENA MISSIONS picker (missions agent) ----------
+     A full-width card list under RACE SETTINGS, shown only in missions mode.
+     Uses the same tokens as the settings rows so it reads as one panel. */
+  #mission-select{display:none;margin-top:16px;width:100%;flex-direction:column;gap:8px;
+    background:rgba(12,8,3,.35);border:1px solid var(--line-soft);
+    border-radius:var(--r-md);padding:2px 14px 14px}
+  #mission-select.on{display:flex}
+  #mission-select .panel-head{margin:10px 0 4px}
+  .mission-chip{pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:10px;
+    width:100%;text-align:left;padding:9px 12px;min-height:40px;font-family:'Baloo 2';color:var(--cream);
+    border-radius:var(--r-sm);border:2px solid var(--line);background:rgba(38,26,12,.5);
+    transition:transform .1s;-webkit-tap-highlight-color:transparent}
+  .mission-chip:active{transform:scale(.98)}
+  .mission-chip.current{background:rgba(255,140,26,.18);border-color:var(--orange);
+    box-shadow:0 3px 0 var(--ink), 0 0 14px rgba(255,140,26,.25)}
+  .mission-chip .mi{font-size:22px;flex:0 0 auto;width:34px;text-align:center;
+    filter:drop-shadow(1px 1px 0 rgba(0,0,0,.5))}
+  .mission-chip .mtext{flex:1 1 auto;min-width:0}
+  .mission-chip .mname{display:block;font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.5px;
+    color:var(--cream);line-height:1.15}
+  .mission-chip.current .mname{color:var(--yellow)}
+  .mission-chip .mdesc{display:block;font-size:10px;color:var(--gold-dim);letter-spacing:.4px;line-height:1.3}
+  .mission-chip .mmedal{flex:0 0 auto;font-size:16px;font-weight:800;letter-spacing:1px;
+    color:var(--green);text-align:right}
+  .mission-chip .mmedal.none{color:var(--line);font-size:11px}
+  /* medal row on the results card — a .rrow like every other results stat */
+  #r-medal{font-family:'Luckiest Guy';color:var(--yellow)}
+  /* ---------- end ARENA MISSIONS ---------- */
   .diff-chip.current{color:var(--ink);background:#8de89a;border-color:var(--ink)}
   .diff-chip.current.hard{background:#ff8a75}
   .diff-chip.current.normal{background:var(--yellow)}
@@ -630,6 +658,7 @@
       <div class="set-row"><span class="set-lbl">STEERING</span><div id="steer-select"></div></div>
       <div class="set-row"><span class="set-lbl">DRIVING AID</span><div id="assist-select"></div></div>
     </div>
+    <div id="mission-select"></div>
   </div>
   <div id="tab-garage" class="menu-panel off">
     <div class="panel-head">YOUR MACHINES</div>
@@ -704,6 +733,8 @@
       <div class="rrow"><span>RIVALS DESTROYED</span><b id="r-kills">0</b></div>
       <div class="rrow"><span>RACE TIME</span><b id="r-time">0:00.0</b></div>
       <div class="rrow"><span>BEST LAP</span><b id="r-best">0:00.0</b></div>
+      <!-- MEDAL is an arena-missions row; hidden for races (missions agent) -->
+      <div class="rrow" id="rrow-medal" style="display:none"><span>MEDAL</span><b id="r-medal">—</b></div>
       <div class="rrow credits"><span>CREDITS EARNED</span><b id="r-credits">+0</b></div>
     </div>
   </div>
