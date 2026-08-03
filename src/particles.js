@@ -325,14 +325,19 @@ export class Particles {
       case 'crate': {
         // chunky two-tone planks out+up, pale fast slivers, a tan dust puff
         for (let i = n(12, 6 * k); i > 0; i--)
-          shard(Math.random() < 0.55 ? CRATE_A : CRATE_B, 2 + Math.random() * 1.4,
+          shard(Math.random() < 0.55 ? CRATE_A : CRATE_B, 2.2 + Math.random() * 1.8,
             (8 + Math.random() * 8) * (0.5 + k * 0.5), 4 + Math.random() * 5 + k * 3,
-            0.3 + Math.random() * 0.3, 30);
+            0.35 + Math.random() * 0.4, 30);
         for (let i = n(4, 2); i > 0; i--)
-          shard(SPLINTER_WHITE, 1.2 + Math.random() * 0.6,
-            14 + Math.random() * 8, 3 + Math.random() * 4, 0.1 + Math.random() * 0.1, 20, 0.3, 1);
+          shard(SPLINTER_WHITE, 1.8 + Math.random() * 1,
+            14 + Math.random() * 8, 3 + Math.random() * 4, 0.16 + Math.random() * 0.18, 20, 0.3, 1);
+        // white snap-flash at the break point — two sprites, and the whole
+        // burst suddenly reads as WOOD BREAKING instead of brown-on-brown
+        for (let i = n(2, 0); i > 0; i--)
+          shard(SPLINTER_WHITE, 4.4 + Math.random() * 2.2, 1.5 + Math.random() * 2,
+            1.5 + Math.random() * 2, 0.1 + Math.random() * 0.06, 0, 0, 1);
         for (let i = n(3, 0); i > 0; i--)
-          shard(Math.random() < 0.5 ? DUST_A : DUST_B, 3 + Math.random() * 2,
+          shard(Math.random() < 0.5 ? DUST_A : DUST_B, 3.4 + Math.random() * 2.4,
             2 + Math.random() * 2, 1.5 + Math.random() * 1.5, 0.5 + Math.random() * 0.3, 2, 1.5, 1.4, 0.5);
         break;
       }
@@ -341,12 +346,12 @@ export class Particles {
         _pbA.set(colors?.[0] ?? this.barrelTint?.[0] ?? BARREL_DEF_A);
         _pbB.set(colors?.[1] ?? this.barrelTint?.[1] ?? BARREL_DEF_B);
         for (let i = n(10, 6 * k); i > 0; i--)
-          shard(Math.random() < 0.7 ? _pbA : _pbB, 1.9 + Math.random() * 1.3,
+          shard(Math.random() < 0.7 ? _pbA : _pbB, 2.1 + Math.random() * 1.6,
             (9 + Math.random() * 8) * (0.5 + k * 0.5), 2.5 + Math.random() * 3.5 + k * 2,
-            0.3 + Math.random() * 0.3, 32);
+            0.35 + Math.random() * 0.35, 32);
         for (let i = n(2, 1); i > 0; i--) // hoop rings skipping out low and fast
-          shard(_pbB, 2.4 + Math.random() * 0.8,
-            13 + Math.random() * 7, 2 + Math.random() * 2, 0.35 + Math.random() * 0.2, 34, 0.4);
+          shard(_pbB, 2.6 + Math.random() * 1,
+            13 + Math.random() * 7, 2 + Math.random() * 2, 0.4 + Math.random() * 0.25, 34, 0.4);
         break;
       }
       case 'hay': {
@@ -357,7 +362,7 @@ export class Particles {
             dx * (4 + Math.random() * 5) + Math.cos(a) * 5 + (Math.random() - 0.5) * 4,
             3 + Math.random() * 4.5 + k * 2,
             dz * (4 + Math.random() * 5) + Math.sin(a) * 5 + (Math.random() - 0.5) * 4,
-            Math.random() < 0.55 ? HAY_A : HAY_B, 1.2 + Math.random(),
+            Math.random() < 0.55 ? HAY_A : HAY_B, 1.5 + Math.random() * 1.2,
             1 + Math.random() * 0.6, { grav: 6, drag: 0.8, shrink: 0.6, alpha: 0.95 });
         }
         for (let i = n(4, 0); i > 0; i--) // chaff dust cloud hanging where the bale was
@@ -368,9 +373,9 @@ export class Particles {
       case 'snowman': {
         // white/pale-blue chunks + a growing powder puff
         for (let i = n(10, 4 * k); i > 0; i--)
-          shard(Math.random() < 0.6 ? SNOW_A : SNOW_B, 1.8 + Math.random() * 1.2,
+          shard(Math.random() < 0.6 ? SNOW_A : SNOW_B, 2 + Math.random() * 1.5,
             (7 + Math.random() * 7) * (0.5 + k * 0.5), 3.5 + Math.random() * 4,
-            0.4 + Math.random() * 0.3, 26);
+            0.45 + Math.random() * 0.35, 26);
         // powder puff: starts fat and shrinks away as it fades (shrink < 1),
         // the opposite of the tan dust clouds — reads as settling snow
         for (let i = n(5, 0); i > 0; i--)
@@ -380,30 +385,30 @@ export class Particles {
       }
       case 'cone': {
         for (let i = n(6, 2); i > 0; i--)
-          shard(CONE_ORANGE, 1.1 + Math.random() * 0.6,
+          shard(CONE_ORANGE, 1.5 + Math.random() * 0.9,
             12 + Math.random() * 8 * (0.5 + k), 3 + Math.random() * 4,
-            0.25 + Math.random() * 0.2, 30, 0.5);
+            0.3 + Math.random() * 0.25, 30, 0.5);
         for (let i = n(2, 0); i > 0; i--)
-          shard(CONE_WHITE, 1.1 + Math.random() * 0.5,
-            13 + Math.random() * 7, 3 + Math.random() * 3, 0.2 + Math.random() * 0.15, 30, 0.5);
+          shard(CONE_WHITE, 1.5 + Math.random() * 0.8,
+            13 + Math.random() * 7, 3 + Math.random() * 3, 0.24 + Math.random() * 0.18, 30, 0.5);
         break;
       }
       case 'rock': {
         // hard low grey chips + brief grey dust
         for (let i = n(8, 2); i > 0; i--)
-          shard(Math.random() < 0.5 ? ROCK_A : ROCK_B, 1.5 + Math.random(),
+          shard(Math.random() < 0.5 ? ROCK_A : ROCK_B, 1.8 + Math.random() * 1.3,
             (10 + Math.random() * 8) * (0.5 + k * 0.5), 1.5 + Math.random() * 2.5,
-            0.3 + Math.random() * 0.2, 36, 0.4);
+            0.35 + Math.random() * 0.25, 36, 0.4);
         for (let i = n(3, 0); i > 0; i--)
-          shard(SMOKE_GRAY, 3 + Math.random() * 2, 2 + Math.random() * 2,
+          shard(SMOKE_GRAY, 3.2 + Math.random() * 2.2, 2 + Math.random() * 2,
             1 + Math.random() * 1.5, 0.4 + Math.random() * 0.2, 2, 1.6, 1.4, 0.4);
         break;
       }
       case 'penguin': {
         // comedic: a few dark+white flecks and a feathery flutter
         for (let i = n(6, 2); i > 0; i--)
-          shard(Math.random() < 0.5 ? PENG_DARK : PENG_WHITE, 1.3 + Math.random() * 0.7,
-            6 + Math.random() * 6, 4 + Math.random() * 4, 0.5 + Math.random() * 0.3, 22);
+          shard(Math.random() < 0.5 ? PENG_DARK : PENG_WHITE, 1.6 + Math.random() * 1,
+            6 + Math.random() * 6, 4 + Math.random() * 4, 0.55 + Math.random() * 0.35, 22);
         for (let i = n(5, 3); i > 0; i--) { // feathers — hay physics, monochrome
           const a = Math.random() * Math.PI * 2;
           this.spawn(at.x, at.y + 0.7, at.z,
@@ -419,9 +424,9 @@ export class Particles {
         _pbA.set(colors?.[0] ?? DEBRIS_A);
         _pbB.set(colors?.[1] ?? DEBRIS_B);
         for (let i = n(8, 2 + 2 * k); i > 0; i--)
-          shard(Math.random() < 0.5 ? _pbA : _pbB, 1.6 + Math.random() * 1.1,
+          shard(Math.random() < 0.5 ? _pbA : _pbB, 1.9 + Math.random() * 1.4,
             (6 + Math.random() * 7) * (0.5 + k * 0.5), 4 + Math.random() * 5,
-            0.4 + Math.random() * 0.35, 30, 0.4);
+            0.45 + Math.random() * 0.4, 30, 0.4);
       }
     }
   }
