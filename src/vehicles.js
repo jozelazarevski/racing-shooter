@@ -1382,20 +1382,24 @@ export class Car {
       this._lastGY = this.y;
     } else {
       const drop = this._lastGY - gY;
-      // Two ways to leave the ground, and the second one is what makes a
-      // natural crest jumpable.
+      const newClimb = dt > 0 ? (gY - this._lastGY) / dt : 0;
+      // Two ways to leave the ground, and the second is what makes a natural
+      // crest jumpable.
       //
       // 1. A real lip — a big single-frame drop while climbing fast. Kept for
       //    any hard edge left in the world.
-      // 2. Going light over a BROW. Climbing the near side of a crest gives the
-      //    car real upward speed; if the road then starts falling away while it
-      //    still carries that speed, the wheels leave. This is speed-gated by
-      //    physics rather than by a rule: crawl over the same hump and the
-      //    climb rate never reaches the threshold, so you simply roll across.
-      //    Without this, a smooth hump can never launch anything — the old
-      //    plywood ramps only worked because of the cliff at their far edge.
-      const wentLight = this._climbRate > 3.5 && gY < this._lastGY - 0.02;
-      if ((drop > 0.9 && this._climbRate > 2.5) || wentLight) {
+      // 2. Cresting a BROW, done the way it actually works: a car flies when
+      //    the road curves away downward faster than gravity can hold it down.
+      //    So the test is on the ground's vertical ACCELERATION, not on its
+      //    slope. That matters — over a smooth hump the climb rate peaks
+      //    mid-ascent and is ZERO at the crown, so any rule waiting for the
+      //    ground to start dropping fires too late to ever launch anything.
+      //    Being physical also speed-gates it for free: take the same crest
+      //    slowly and the curvature you experience never beats gravity, so you
+      //    simply roll over it.
+      const climbAccel = dt > 0 ? (newClimb - this._climbRate) / dt : 0;
+      const crested = this._climbRate > 1.5 && climbAccel < -26; // -26 = gravity
+      if ((drop > 0.9 && this._climbRate > 2.5) || crested) {
         this.airborne = true;
         // capped: an uncapped climb rate off a steep ramp at nitro speed sent
         // cars sailing 100+ u into the infield (user bug report)

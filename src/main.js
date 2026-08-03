@@ -228,6 +228,11 @@ const MISSION_MEDAL_WORD = ['NO MEDAL', '🥉 BRONZE', '🥈 SILVER', '🥇 GOLD
 const missionTargetLine = (d) => (d.survive
   ? `🥇 ${fmtTime(d.gold)}+ · 🥈 ${fmtTime(d.silver)}+ · 🥉 ${fmtTime(d.bronze)}+ SURVIVED`
   : `🥇 ${fmtTime(d.gold)} · 🥈 ${fmtTime(d.silver)} · 🥉 ANY FINISH`);
+// Same targets, but as separate chunks the card can lay out without breaking a
+// time in half or orphaning "CR" onto its own line.
+const missionTargetChips = (d) => (d.survive
+  ? [`🥇 ${fmtTime(d.gold)}+`, `🥈 ${fmtTime(d.silver)}+`, `🥉 ${fmtTime(d.bronze)}+`]
+  : [`🥇 ${fmtTime(d.gold)}`, `🥈 ${fmtTime(d.silver)}`, `🥉 FINISH`]);
 // ===== end [MISSIONS] constants =====
 
 class Game {
@@ -1924,10 +1929,14 @@ class Game {
       const b = best[`${this.level.id}:${d.id}`] | 0;
       const chip = document.createElement('button');
       chip.className = 'mission-chip' + (d.id === this.missionSel ? ' current' : '');
+      const chips = missionTargetChips(d).map((c) => `<span class="mstat">${c}</span>`).join('');
       chip.innerHTML = `<span class="mi">${d.icon}</span>
-        <span class="mtext"><span class="mname">${d.name}</span><span class="mdesc">${d.desc}</span>
-        <span class="mdesc">${missionTargetLine(d)} · 🎖 ${MISSION_CR[1]}–${MISSION_CR[3]} CR</span></span>
-        <span class="mmedal${b ? '' : ' none'}">${b ? MISSION_MEDAL[b] : 'NEW'}</span>`;
+        <span class="mtext">
+          <span class="mhead"><span class="mname">${d.name}</span>
+            <span class="mmedal${b ? '' : ' none'}">${b ? MISSION_MEDAL[b] : 'NEW'}</span></span>
+          <span class="mdesc">${d.desc}</span>
+          <span class="mstats">${chips}<span class="mstat mpay">🎖 ${MISSION_CR[1]}–${MISSION_CR[3]} CR</span></span>
+        </span>`;
       chip.addEventListener('click', () => {
         this.missionSel = d.id;
         try { sessionStorage.setItem('ir-mission-sel', d.id); } catch { /* private mode */ }
