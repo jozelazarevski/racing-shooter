@@ -27,6 +27,9 @@ export class Hud {
     };
     this.speedo = $('speedo');
     this.spCtx = this.speedo.getContext('2d');
+    this.mapCv = $('minimap-cv');
+    this.mapCtx = this.mapCv ? this.mapCv.getContext('2d') : null;
+    this._mapBase = null;
     this.vignetteLevel = 0;
     this._standingsHtml = '';
     this._standingsTimer = 0;
@@ -35,8 +38,72 @@ export class Hud {
   show() { this.el.hud.classList.add('on'); }
   hide() { this.el.hud.classList.remove('on'); }
 
-  // (minimap removed by request — the road, HUD arrows and standings carry
-  // the information; the top of the screen stays clear for the view)
+  // ---------- circuit minimap (top-center panel, per the reference) ----------
+  // The circuit outline is baked once to an offscreen canvas from the track's
+  // real centerline; per frame we blit it and plot live car dots.
+  _buildMinimap() {
+    const t = this.game.track, cv = this.mapCv;
+    if (!t?.center?.length || !cv) return;
+    const W = cv.width, H = cv.height, pad = 30;
+    let nx = Infinity, xx = -Infinity, nz = Infinity, xz = -Infinity;
+    for (const c of t.center) {
+      nx = Math.min(nx, c.x); xx = Math.max(xx, c.x);
+      nz = Math.min(nz, c.z); xz = Math.max(xz, c.z);
+    }
+    const s = Math.min((W - pad * 2) / (xx - nx), (H - pad * 2) / (xz - nz));
+    this._mapT = {
+      s,
+      ox: (W - (xx - nx) * s) / 2 - nx * s,
+      oz: (H - (xz - nz) * s) / 2 - nz * s,
+    };
+    const base = document.createElement('canvas');
+    base.width = W; base.height = H;
+    const c2 = base.getContext('2d');
+    const { ox, oz } = this._mapT;
+    c2.lineJoin = 'round'; c2.lineCap = 'round';
+    const path = () => {
+      c2.beginPath();
+      for (let i = 0; i <= t.N; i += 3) {
+        const c = t.center[i % t.N];
+        const x = c.x * s + ox, y = c.z * s + oz;
+        i === 0 ? c2.moveTo(x, y) : c2.lineTo(x, y);
+      }
+      c2.closePath();
+    };
+    path(); c2.strokeStyle = 'rgba(0,0,0,.6)'; c2.lineWidth = 11; c2.stroke();
+    path(); c2.strokeStyle = '#d8b878'; c2.lineWidth = 5; c2.stroke();
+    // start line tick
+    const c0 = t.center[0], n0 = t.nrm[0];
+    c2.strokeStyle = '#fff3d0'; c2.lineWidth = 3;
+    c2.beginPath();
+    c2.moveTo((c0.x - n0.x * 9) * s + ox, (c0.z - n0.z * 9) * s + oz);
+    c2.lineTo((c0.x + n0.x * 9) * s + ox, (c0.z + n0.z * 9) * s + oz);
+    c2.stroke();
+    this._mapBase = base;
+    this._mapN = t.N;
+  }
+
+  drawMinimap() {
+    const g = this.game, c = this.mapCtx;
+    if (!c) return;
+    if (!this._mapBase || this._mapN !== g.track?.N) this._buildMinimap();
+    if (!this._mapBase) return;
+    const cv = this.mapCv;
+    c.clearRect(0, 0, cv.width, cv.height);
+    c.drawImage(this._mapBase, 0, 0);
+    const { s, ox, oz } = this._mapT;
+    const dot = (x, z, color, r, rim) => {
+      c.beginPath();
+      c.arc(x * s + ox, z * s + oz, r, 0, Math.PI * 2);
+      c.fillStyle = color; c.fill();
+      c.lineWidth = 2; c.strokeStyle = rim; c.stroke();
+    };
+    for (const e of g.enemies) {
+      if (e.alive) dot(e.pos.x, e.pos.z, '#ff5b3d', 4.5, 'rgba(0,0,0,.55)');
+    }
+    const p = g.player;
+    if (p?.alive) dot(p.pos.x, p.pos.z, '#ffd400', 6, '#fff');
+  }
 
   // ---------- circular speedometer ----------
   drawSpeedo(kmh, boosting) {
@@ -115,6 +182,7 @@ export class Hud {
     const g = this.game, p = g.player;
     const kmh = Math.round(Math.abs(p.speedAlong) * 3.1);
     this.drawSpeedo(kmh, p.boostTimer > 0);
+    this.drawMinimap();
     this.el.lap.textContent = Math.min(p.lap, g.lapsTotal);
     this.el.lapsTotal.textContent = g.lapsTotal;
     this.el.time.textContent = fmtTime(g.raceTime);

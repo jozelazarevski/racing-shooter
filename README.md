@@ -105,6 +105,8 @@ on the buttons. Works in portrait and landscape.
 - **Livestock**: cows, sheep and deer graze in herds out in the fields. They
   scatter when you come at them — and hitting one at speed is a real event
   (heavy hull damage and a big speed loss, so it's worth lifting off).
+- **Circuit minimap**: a top-center panel shows the full circuit outline with
+  live positions — rivals in red, you in gold.
 - **Driving aid**: PRO / STANDARD / ASSIST on the title screen — a gentle
   auto-straightening that stops the car wandering when you're not steering,
   on by default for touch. The chase cameras also damp their yaw, so drifts
