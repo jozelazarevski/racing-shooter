@@ -278,6 +278,68 @@ function applySandRipples(g, w, h, spec) {
   }
 }
 
+/** Cobbled stone setts for the road canvas (TREMOLA DESCENT). Staggered rows
+ *  of rounded granite blocks with mortar joints, laid across the direction of
+ *  travel exactly like the Tremola's paved hairpins, then worn smooth and
+ *  polished down the two wheel tracks. Painted OVER the dirt base so the ruts
+ *  still darken the stone beneath. */
+function applyCobbleRoad(g, w, h, spec) {
+  const S = {
+    stones: ['#8f8b84', '#7d7a75', '#9a958c', '#6f6d69', '#a29c92', '#85837e'],
+    mortar: 'rgba(48,46,43,0.85)', lip: 'rgba(255,250,235,0.20)',
+    rows: 22, per: 15,
+    ...(spec === true ? {} : spec),
+  };
+  const rh = h / S.rows;
+  g.fillStyle = S.mortar;
+  g.fillRect(0, 0, w, h);
+  for (let r = 0; r < S.rows; r++) {
+    const y = r * rh;
+    const stagger = (r % 2) * 0.5;
+    const cw = w / S.per;
+    for (let c = -1; c <= S.per; c++) {
+      const x = (c + stagger) * cw;
+      const px = x + 0.9 + Math.random() * 0.7;
+      const py = y + 0.9 + Math.random() * 0.7;
+      const pw = cw - 2.0 - Math.random() * 1.2;
+      const ph = rh - 2.0 - Math.random() * 1.2;
+      // slight barrel to each sett: base stone, then a lit crown
+      g.fillStyle = S.stones[(Math.random() * S.stones.length) | 0];
+      g.beginPath();
+      g.ellipse(px + pw / 2, py + ph / 2, pw / 2, ph / 2, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = S.lip;
+      g.beginPath();
+      g.ellipse(px + pw / 2, py + ph * 0.38, pw * 0.36, ph * 0.24, 0, 0, Math.PI * 2);
+      g.fill();
+      // a few speckled grains per stone
+      for (let k = 0; k < 3; k++) {
+        g.fillStyle = `rgba(${30 + Math.random() * 90 | 0},${30 + Math.random() * 90 | 0},${28 + Math.random() * 80 | 0},0.35)`;
+        g.fillRect(px + Math.random() * pw, py + Math.random() * ph, 1.6, 1.6);
+      }
+    }
+  }
+  // polished wheel tracks: centuries of iron tyres have worn two dark bands
+  for (const cx of [w * 0.32, w * 0.68]) {
+    const grd = g.createLinearGradient(cx - 34, 0, cx + 34, 0);
+    grd.addColorStop(0, 'rgba(28,26,24,0)');
+    grd.addColorStop(0.5, 'rgba(28,26,24,0.30)');
+    grd.addColorStop(1, 'rgba(28,26,24,0)');
+    g.fillStyle = grd;
+    g.fillRect(cx - 34, 0, 68, h);
+    g.fillStyle = 'rgba(225,230,235,0.07)';
+    g.fillRect(cx - 7, 0, 14, h);
+  }
+  // damp moss creeping into the joints near the verges
+  for (let i = 0; i < 90; i++) {
+    const edge = Math.random() < 0.5 ? Math.random() * 90 : w - Math.random() * 90;
+    g.fillStyle = `rgba(${50 + Math.random() * 40 | 0},${70 + Math.random() * 50 | 0},40,${0.10 + Math.random() * 0.16})`;
+    g.beginPath();
+    g.arc(edge, Math.random() * h, 3 + Math.random() * 7, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
 /** Glacier sheet-ice overlay for the road canvas: a cold blue-white glaze,
  *  glassy sheen streaks down the travel direction, and long jagged crevasse
  *  cracks with pale pressure halos (GLACIER'S GRIND). */
@@ -480,12 +542,15 @@ export function roadTexture(palette = {}) {
       g.fillStyle = `rgba(${r + Math.random() * 40 | 0},${gr + Math.random() * 34 | 0},${b + Math.random() * 26 | 0},0.9)`;
       g.beginPath(); g.ellipse(x, y, s, s * 0.7, Math.random() * 3, 0, Math.PI * 2); g.fill();
     }
+    // cobbled setts are laid ON TOP of the dirt/rut base (the ruts still read
+    // through as worn wheel tracks) but UNDER the verge fringe below
+    if (P.cobbles) applyCobbleRoad(g, w, h, P.cobbles);
     // fine multi-octave grain over the whole surface (build-time, palette-safe)
     noiseOverlay(g, w, h, 0.11);
     // dry surfaces pick up faint oily wear sheen down the driving lines —
     // long dark streaks with a cool gleam core (skipped under wet/snow/ice
     // overlays, which paint their own surface films)
-    if (!P.wet && !P.snowCover && !P.ice) {
+    if (!P.wet && !P.snowCover && !P.ice && !P.cobbles) {
       for (const cx of [w * 0.32, w * 0.5, w * 0.68]) {
         const nStreaks = cx === w * 0.5 ? 2 : 4;
         for (let i = 0; i < nStreaks; i++) {
@@ -1371,6 +1436,62 @@ export function towerTexture() {
   });
   t.wrapS = THREE.RepeatWrapping;
   t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/** Dry-stone masonry (alpine-pass retaining walls, field walls, chapel bases):
+ *  irregular courses of rough-hewn blocks with deep shadowed joints. Palette
+ *  keys re-skin it per world (grey granite, warm sandstone, cold slate). */
+export function stoneTexture(palette = {}) {
+  const P = {
+    mortar: '#3a3833',
+    blocks: ['#8e8a80', '#7b776f', '#9c968a', '#6d6a64', '#a49d90'],
+    lip: 'rgba(255,250,238,0.22)', shade: 'rgba(20,18,16,0.35)',
+    moss: 'rgba(90,120,60,0.20)', mossCount: 26,
+    ...palette,
+  };
+  const t = make(256, 256, (g, w, h) => {
+    g.fillStyle = P.mortar;
+    g.fillRect(0, 0, w, h);
+    const rows = 7;
+    const rh = h / rows;
+    for (let r = 0; r < rows; r++) {
+      const y = r * rh;
+      let x = -10 - Math.random() * 20;
+      while (x < w) {
+        const bw = 22 + Math.random() * 40;
+        const bh = rh - 2.5 - Math.random() * 2;
+        g.fillStyle = P.blocks[(Math.random() * P.blocks.length) | 0];
+        g.beginPath();
+        // rough-hewn: a slightly irregular quad with clipped corners
+        const x0 = x + 1.5, y0 = y + 1.6, x1 = x + bw - 1.5, y1 = y0 + bh;
+        g.moveTo(x0 + Math.random() * 3, y0 + Math.random() * 2);
+        g.lineTo(x1 - Math.random() * 3, y0 + Math.random() * 2.5);
+        g.lineTo(x1 - Math.random() * 2, y1 - Math.random() * 2.5);
+        g.lineTo(x0 + Math.random() * 2, y1 - Math.random() * 2);
+        g.closePath();
+        g.fill();
+        // top lip catches the light, underside sits in joint shadow
+        g.fillStyle = P.lip;
+        g.fillRect(x0 + 2, y0 + 1, bw - 6, 2);
+        g.fillStyle = P.shade;
+        g.fillRect(x0 + 2, y1 - 3, bw - 6, 3);
+        for (let k = 0; k < 5; k++) {
+          g.fillStyle = `rgba(${40 + Math.random() * 110 | 0},${40 + Math.random() * 105 | 0},${38 + Math.random() * 95 | 0},0.28)`;
+          g.fillRect(x0 + Math.random() * bw, y0 + Math.random() * bh, 2, 2);
+        }
+        x += bw + 1.5 + Math.random() * 2;
+      }
+    }
+    for (let i = 0; i < P.mossCount; i++) {
+      g.fillStyle = P.moss;
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, 4 + Math.random() * 12, 0, Math.PI * 2);
+      g.fill();
+    }
+    noiseOverlay(g, w, h, 0.10);
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return t;
 }
 

@@ -50,10 +50,35 @@ const WORLD_TAGS = {
 const CAM_MODES = [
   { name: 'TOP-DOWN',  back: 20, h: 52, look: 7,  lookH: 0,   spdBack: 6, spdH: 10 },
   { name: 'TOP FAR',   back: 24, h: 84, look: 1,  lookH: 0,   spdBack: 4, spdH: 10 },
-  { name: 'CHASE',     back: 13, h: 7.5, look: 10, lookH: 2.8, spdBack: 2, spdH: 1 },
-  { name: 'CHASE FAR', back: 24, h: 15, look: 13, lookH: 3,   spdBack: 3, spdH: 2 },
+  { name: 'CHASE',     back: 13, h: 7.5, look: 10, lookH: 2.8, spdBack: 2, spdH: 1, chase: true },
+  { name: 'CHASE FAR', back: 24, h: 15, look: 13, lookH: 3,   spdBack: 3, spdH: 2, chase: true },
 ];
-const upgradeCost = (lvl) => 350 + lvl * 250;
+// ---- economy ----
+// Score is the arcade number (it inflates fast: 500/lap, big rank bonus,
+// points for every smashed crate). Credits are DELIBERATELY a small slice of
+// it, so a good race funds real progress but never buys the garage outright.
+const CREDIT_RATE = 1 / 12;                // score -> credits
+const PODIUM_CR = [200, 120, 60];          // 1st / 2nd / 3rd
+const FIRST_CLEAR_CR = 500;                // once per world, on your first podium
+const upgradeCost = (lvl) => 500 + lvl * 400;   // 500/900/1300/1700/2100 per line
+
+// which animals graze in which biome (a theme can override with T.livestock)
+const LIVESTOCK_BY_THEME = {
+  forest:   { kinds: ['cow', 'sheep'], perHerd: 4 },
+  alpine:   { kinds: ['cow', 'sheep'], perHerd: 4 },
+  pass:     { kinds: ['cow', 'sheep'], perHerd: 5 },
+  tremola:  { kinds: ['sheep', 'cow'], perHerd: 4 },
+  furka:    { kinds: ['sheep'],        perHerd: 3 },
+  redwood:  { kinds: ['deer'],         perHerd: 3 },
+  wildfire: { kinds: ['deer'],         perHerd: 2 },
+  snow:     { kinds: ['deer'],         perHerd: 3 },
+  glacial:  { kinds: ['deer'],         perHerd: 2 },
+  sheetice: { kinds: ['deer'],         perHerd: 2 },
+  avalanche:{ kinds: ['deer'],         perHerd: 2 },
+  oasis:    { kinds: ['cow'],          perHerd: 3 },
+  jungle:   { kinds: ['deer'],         perHerd: 3 },
+  flume:    { kinds: ['deer', 'cow'],  perHerd: 3 },
+};
 
 // hazard particle tints (hoisted — per-frame spawns must not allocate)
 const AVA_WHITE = new THREE.Color(0xf4faff);
@@ -85,6 +110,9 @@ class Game {
     // (persisting roam silently made races "never finish" for returning players)
     this.freeRoam = params.get('mode') === 'roam';
     this.steerSetting = localStorage.getItem('ir-steer') || 'normal';
+    // touch players get the aid by default — thumbs are coarser than keys
+    this.assistSetting = localStorage.getItem('ir-assist')
+      || (matchMedia('(pointer: coarse)').matches ? 'assist' : 'standard');
     this.unlockAll = params.get('unlockall') === '1';
     const diffId = localStorage.getItem('ir-diff') || 'normal';
     this.difficulty = DIFFS[diffId] || DIFFS.normal;
@@ -217,6 +245,7 @@ class Game {
     this._buildPickups();
     this._initWorldHazards();
     this._buildRoamStars();
+    this._buildLivestock();
     this._flashes = [];
     this.camMode = 0; // 0 = top-down, 1 = low chase
     this.camPos = new THREE.Vector3();
@@ -394,6 +423,31 @@ class Game {
     });
     applySteerChips();
 
+    // driving aid: gentle auto-straightening, the fix for "hard to control in
+    // 3D view". Defaults ON for touch devices, STANDARD on desktop.
+    const asel = document.getElementById('assist-select');
+    asel.innerHTML = '<span class="lbl">DRIVING AID</span>';
+    const AIDS = [['pro', 'PRO', 0], ['standard', 'STANDARD', 0.5], ['assist', 'ASSIST', 1]];
+    const applyAidChips = () => {
+      for (const c of asel.querySelectorAll('.diff-chip')) {
+        c.className = 'diff-chip' + (c.dataset.id === this.assistSetting ? ' current normal' : '');
+      }
+    };
+    for (const [id, label] of AIDS) {
+      const chip = document.createElement('button');
+      chip.className = 'diff-chip';
+      chip.dataset.id = id;
+      chip.textContent = label;
+      chip.addEventListener('click', () => {
+        this.assistSetting = id;
+        localStorage.setItem('ir-assist', id);
+        this.applyUpgrades();
+        applyAidChips();
+      });
+      asel.appendChild(chip);
+    }
+    applyAidChips();
+
     this.renderGarage();
     this.renderCarShop();
 
@@ -464,7 +518,10 @@ class Game {
 
   /** In roam mode, exiting banks the destruction score as credits. */
   bankRoamCredits() {
-    const earned = Math.max(0, this.score - (this.startScore ?? 0));
+    // roam pays the same rate as racing — otherwise farming props off the
+    // clock is strictly better money than actually competing
+    const raw = Math.max(0, this.score - (this.startScore ?? 0));
+    const earned = Math.round(raw * CREDIT_RATE);
     if (earned > 0) {
       this.garage.credits += earned;
       saveJSON('ir-garage', this.garage);
@@ -540,6 +597,7 @@ class Game {
     p.handling = 0.2 * (g.handling || 0);
     p.gripBoost = 1 + 0.04 * (g.tires || 0);
     p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
+    p.assist = { pro: 0, standard: 0.5, assist: 1 }[this.assistSetting] ?? 0.5;
   }
 
   /** Draw a smoothed closed track outline on a world-card canvas. */
@@ -878,6 +936,144 @@ class Game {
       }
     }
     this._lastRank = r;
+  }
+
+  // ---------- livestock: cows, sheep, deer that live in the world ----------
+  // They graze in herds out in the pastures, scatter when a car comes at them,
+  // and a full-speed collision is a real event: heavy for you, fatal for them.
+  _buildLivestock() {
+    this.herds = [];
+    const t = this.track;
+    // a theme may declare its own; otherwise pick what belongs in that biome
+    // (deserts, lava fields and city tunnels simply have no grazing herds)
+    const spec = t.T?.livestock ?? LIVESTOCK_BY_THEME[this.level?.theme];
+    if (!spec) return;
+    const spots = (t.pastures?.length ? t.pastures : null)
+      ?? Array.from({ length: 5 }, (_, k) => {
+        const idx = Math.floor(t.N * (k + 0.5) / 5);
+        const lat = (k % 2 ? -1 : 1) * (26 + (k * 9) % 20);
+        const c = t.pointAt(idx, 0), n = t.nrm[idx];
+        return { x: c.x + n.x * lat, z: c.z + n.z * lat, r: 12 };
+      });
+    const KINDS = {
+      cow:   { body: 0xf2efe6, spot: 0x2b2521, w: 1.5, h: 1.5, d: 2.6, mass: 1.0, pts: 60 },
+      sheep: { body: 0xe8e4d8, spot: 0x3a3128, w: 1.0, h: 1.0, d: 1.6, mass: 0.5, pts: 40 },
+      deer:  { body: 0xa9764a, spot: 0x6b4526, w: 1.0, h: 1.3, d: 2.0, mass: 0.6, pts: 80 },
+    };
+    for (let s = 0; s < spots.length; s++) {
+      const spot = spots[s];
+      const kind = spec.kinds[s % spec.kinds.length];
+      const K = KINDS[kind] || KINDS.cow;
+      const n = spec.perHerd ?? 4;
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * Math.PI * 2;
+        const rr = (spot.r ?? 12) * 0.55;
+        const x = spot.x + Math.cos(a) * rr, z = spot.z + Math.sin(a) * rr;
+        const g = new THREE.Group();
+        const bodyMat = new THREE.MeshStandardMaterial({ color: K.body, roughness: 0.92 });
+        const darkMat = new THREE.MeshStandardMaterial({ color: K.spot, roughness: 0.95 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(K.w, K.h * 0.75, K.d), bodyMat);
+        body.position.y = K.h * 0.75;
+        body.castShadow = true;
+        g.add(body);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.62, K.h * 0.5, K.d * 0.34), bodyMat);
+        head.position.set(0, K.h * 0.98, K.d * 0.56);
+        g.add(head);
+        if (kind === 'deer') { // antlers
+          for (const sx of [-1, 1]) {
+            const ant = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.08), darkMat);
+            ant.position.set(sx * 0.22, K.h * 1.34, K.d * 0.5);
+            g.add(ant);
+          }
+        } else if (kind === 'cow') { // patches
+          const patch = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.5, K.h * 0.3, K.d * 0.35), darkMat);
+          patch.position.set(K.w * 0.28, K.h * 0.85, -K.d * 0.12);
+          g.add(patch);
+        }
+        for (const [lx, lz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, K.h * 0.55, 0.16), darkMat);
+          leg.position.set(lx * K.w * 0.32, K.h * 0.28, lz * K.d * 0.3);
+          g.add(leg);
+        }
+        g.position.set(x, t.terrainHeight?.(x, z) ?? 0, z);
+        g.rotation.y = a;
+        this.scene.add(g);
+        this.herds.push({ kind, K, x, z, homeX: spot.x, homeZ: spot.z, homeR: spot.r ?? 12,
+          ang: a, mesh: g, alive: true, spooked: 0, y: g.position.y, _yT: 0, bob: k * 1.7 });
+      }
+    }
+  }
+
+  _updateLivestock(dt, time) {
+    if (!this.herds?.length) return;
+    const t = this.track;
+    const cars = (this._carsAll ??= [this.player, ...this.enemies]);
+    for (const a of this.herds) {
+      if (!a.alive) continue;
+      // spook: any car inside 18u sends them running directly away from it
+      let flee = null;
+      for (const car of cars) {
+        if (!car.alive) continue;
+        const dx = a.x - car.pos.x, dz = a.z - car.pos.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < 324) { flee = { dx, dz, d: Math.sqrt(d2) || 0.01 }; break; }
+      }
+      let speed;
+      if (flee) {
+        a.spooked = 1.6;
+        a.ang = Math.atan2(flee.dx, flee.dz);
+        speed = 11;
+      } else if (a.spooked > 0) {
+        a.spooked -= dt;
+        speed = 7;
+      } else {
+        // graze: amble slowly, drifting back toward the middle of the pasture
+        a.ang += Math.sin(time * 0.4 + a.bob) * 0.5 * dt;
+        if (Math.hypot(a.x - a.homeX, a.z - a.homeZ) > a.homeR)
+          a.ang = Math.atan2(a.homeX - a.x, a.homeZ - a.z);
+        speed = 0.9;
+      }
+      a.x += Math.sin(a.ang) * speed * dt;
+      a.z += Math.cos(a.ang) * speed * dt;
+      a._yT -= dt;
+      if (a._yT <= 0) { a._yT = 0.25; a.y = t.terrainHeight?.(a.x, a.z) ?? 0; }
+      a.mesh.position.set(a.x, a.y, a.z);
+      a.mesh.rotation.y = a.ang;
+      // running animation: a little vertical bounce while spooked
+      if (a.spooked > 0) a.mesh.position.y += Math.abs(Math.sin(time * 11 + a.bob)) * 0.16;
+
+      // collision — a cow is a lot of animal to hit at speed
+      for (const car of cars) {
+        if (!car.alive) continue;
+        const d = Math.hypot(car.pos.x - a.x, car.pos.z - a.z);
+        if (d > 1.6 + a.K.w * 0.5) continue;
+        const sp = Math.hypot(car.vel.x, car.vel.z);
+        if (sp < 4) { // nudging — they just get out of the way
+          a.ang = Math.atan2(a.x - car.pos.x, a.z - car.pos.z);
+          a.spooked = 1.6;
+          break;
+        }
+        a.alive = false;
+        a.mesh.visible = false;
+        const at = new THREE.Vector3(a.x, a.y + 0.8, a.z);
+        this.particles.debris(at, 4);
+        this.particles.splinters(at, new THREE.Vector3(0, 1, 0), [a.K.body, a.K.spot], 0.8);
+        car.vel.multiplyScalar(1 - 0.30 * a.K.mass);          // big animal, big drag
+        if (car === this.player) {
+          // rate-limited: ploughing a whole herd should be costly and
+          // memorable, not an instant wreck from four hits in one second
+          if (this.raceTime - (this._stockHurt ?? -9) > 0.8) {
+            this._stockHurt = this.raceTime;
+            car.damage(10 + 22 * a.K.mass, null);
+            this.crashDrama?.();
+            this.hud.feed(`HIT A ${a.kind.toUpperCase()}!  −${Math.round(10 + 22 * a.K.mass)} HULL`, 'bad');
+            this.buzz([50, 30, 50]);
+          }
+          this.style?.(a.K.pts, 'LIVESTOCK'); // grim, but it is a combat racer
+        }
+        break;
+      }
+    }
   }
 
   // ---------- free-roam treasure stars ----------
@@ -1700,6 +1896,7 @@ class Game {
     this.fovKick = 0;
     this.enemySlowUntil = 0;
     this.comboN = 0; this.comboT = 0; this._lastRank = undefined; this._tauntT = -9;
+    for (const a2 of this.herds ?? []) { a2.alive = true; a2.mesh.visible = true; a2.x = a2.homeX; a2.z = a2.homeZ; }
     this._clearWorldHazards?.();
     for (const h of this.husks) this.scene.remove(h.mesh);
     this.husks.length = 0;
@@ -1853,15 +2050,15 @@ class Game {
     // career progress + credits — the economy pays for risk and results:
     // race score scaled by difficulty, plus podium and first-conquest bonuses
     const prev = this.career.finished[this.level.id];
-    const diffMult = { easy: 0.8, normal: 1.0, hard: 1.4 }[this.difficulty.id] ?? 1;
-    const podium = rank <= 3 ? [1200, 700, 400][rank - 1] : 0;
-    const firstClear = (!prev || prev.place > 3) && rank <= 3 ? 1500 : 0;
-    const earned = Math.round(Math.max(0, this.score - (this.startScore ?? 0)) * diffMult)
-      + podium + firstClear;
+    const diffMult = { easy: 0.7, normal: 1.0, hard: 1.5 }[this.difficulty.id] ?? 1;
+    const podium = rank <= 3 ? PODIUM_CR[rank - 1] : 0;
+    const firstClear = (!prev || prev.place > 3) && rank <= 3 ? FIRST_CLEAR_CR : 0;
+    const raceScore = Math.max(0, this.score - (this.startScore ?? 0));
+    const earned = Math.round(raceScore * CREDIT_RATE * diffMult) + podium + firstClear;
     document.getElementById('r-credits').textContent = `+${earned.toLocaleString()}`;
     if (podium) this.hud.feed(`PODIUM BONUS  +${podium} CR`, 'good');
-    if (firstClear) this.hud.feed('WORLD CONQUERED  +1500 CR', 'good');
-    if (diffMult > 1) this.hud.feed('HARD PAYS ×1.4 CREDITS', 'good');
+    if (firstClear) this.hud.feed(`WORLD CONQUERED  +${FIRST_CLEAR_CR} CR`, 'good');
+    if (diffMult !== 1) this.hud.feed(`${this.difficulty.id.toUpperCase()} PAYS ×${diffMult} CREDITS`, 'info');
     this.garage.credits += earned;
     saveJSON('ir-garage', this.garage);
     this.career.finished[this.level.id] = {
@@ -1944,9 +2141,23 @@ class Game {
   // ---------- camera ----------
   _updateCamera(dt) {
     const p = this.player;
-    const fwd = p.forward;
     const speedZoom = Math.min(1, Math.abs(p.speedAlong) / p.maxSpeed);
     const M = CAM_MODES[this.camMode] || CAM_MODES[0];
+    // Chase views used to sit rigidly behind the car's RAW heading, so every
+    // steering flick and every drift whipped the whole view sideways — that
+    // is what made driving in 3D so hard. The chase yaw now follows a blend
+    // of heading and actual travel direction, damped over time, so the view
+    // stays settled and the road reads straight ahead.
+    let fwd = p.forward;
+    if (M.chase) {
+      const wrap = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+      let yaw = Math.atan2(fwd.x, fwd.z);
+      const sp = Math.hypot(p.vel.x, p.vel.z);
+      if (sp > 5) yaw += wrap(Math.atan2(p.vel.x, p.vel.z) - yaw) * 0.4; // look where you're going
+      const cur = this._camYaw ?? yaw;
+      this._camYaw = cur + wrap(yaw - cur) * Math.min(1, 4.5 * dt);
+      fwd = new THREE.Vector3(Math.sin(this._camYaw), 0, Math.cos(this._camYaw));
+    }
     const targetPos = p.pos.clone()
       .addScaledVector(fwd, -(M.back + speedZoom * (M.spdBack || 0)))
       .add(new THREE.Vector3(0, M.h + speedZoom * (M.spdH || 0), 0));
@@ -2095,6 +2306,7 @@ class Game {
         this._updateCombo(dt);
         this._updateTaunts();
         this._updateRoamStars(time);
+        this._updateLivestock(dt, time);
       }
       if (this.freeRoam) this.playerRank = 1;
       else this._updateRank();

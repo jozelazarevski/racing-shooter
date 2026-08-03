@@ -805,7 +805,22 @@ export class Car {
     const authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
     const dir = vf >= 0 ? 1 : -1;
     const stripSteer = this.stripLock ? this.stripLock.steerMul : 1;
-    const dTheta = steer * this.steerRate * sense * authority * stripSteer * dir * dt;
+    let dTheta = steer * this.steerRate * sense * authority * stripSteer * dir * dt;
+    // DRIVING AID: a gentle nudge back toward the road's direction when the
+    // player isn't actively steering. It never fights your input and never
+    // steers for you — it just stops the car wandering, which is what makes
+    // the chase view hard to hold. Strength is a player setting.
+    if (this.assist > 0 && this === this.game.player && !inputs.drift
+        && Math.abs(steer) < 0.25 && vf > 6 && !this.airborne) {
+      const t2 = this.game.track;
+      const road = t2.headingAt?.(this.trackIndex);
+      if (road !== undefined && Math.abs(this.lateral) < 12) {
+        let d = road - this.heading;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        if (Math.abs(d) < 1.0) dTheta += d * this.assist * 2.2 * dt;
+      }
+    }
     this.heading += dTheta;
     // While gripped the velocity turns with the car (arcade rails). While slipping
     // it lags the yaw: part of the turn spills forward speed into lateral slide,
@@ -942,10 +957,20 @@ export class Car {
       const vn = this.vel.dot(n);
       const over = this.lateral - fside * WALL_LIMIT;
       this.pos.addScaledVector(n, -over);
-      // absorb, don't bounce: kill the into-wall velocity (5% rebound) and
-      // let the car scrape along the rock instead
+      // absorb, don't bounce: kill the into-wall velocity (5% rebound)
       this.vel.addScaledVector(n, -vn * 1.05);
-      this.vel.multiplyScalar(1 - 0.03 * (1 - 0.2 * hnd));
+      // GRIND, don't glide. The old flat 3% scrub let a car lean on the rock
+      // and ride it like a rail all the way round a bend. Speed loss now
+      // scales with how hard the car is leaning in: a feather graze still
+      // costs almost nothing, a committed hit bleeds a lot of speed.
+      const lean = THREE.MathUtils.clamp(Math.abs(vn) / 14, 0, 1);
+      this.vel.multiplyScalar(1 - (0.03 + 0.5 * lean) * (1 - 0.2 * hnd));
+      // …and peel the nose off the rock so the car separates instead of
+      // sticking. Sets a minimum outward rate rather than adding every frame,
+      // so it never compounds into a pinball launch.
+      const outward = -fside * this.vel.dot(n);
+      const wantOut = 1.2 + 4 * lean;
+      if (outward < wantOut) this.vel.addScaledVector(n, -fside * (wantOut - outward));
       this.lateral = fside * WALL_LIMIT;
       if (this === gm.player && Math.abs(this.speedAlong) > 12 && Math.random() < 0.4)
         gm.particles.sparks(this.pos, n, 2);
@@ -1750,6 +1775,7 @@ export class PlayerCar extends Car {
     this.plating = entry.stats.plating ?? 1;        // damage intake multiplier
     this.steerSmoothRate = 6; // input smoothing on (handling upgrade sharpens it)
     this.handling = 0;        // 0..1 — the lead sets this from the garage (0.2/level)
+    this.assist = 0;          // driving aid strength (settings menu: 0 / 0.5 / 1)
     this.steerSense = 1;      // settings-menu sensitivity (lead sets 0.8/1.0/1.25);
                               // scales steerRate + smoothing, independent of HANDLING
     this.name = 'YOU';

@@ -275,9 +275,9 @@
     -webkit-tap-highlight-color:transparent}
   .mode-chip.current{color:var(--ink);background:#7fd4ff;border-color:var(--ink);box-shadow:0 3px 0 var(--ink)}
   #diff-select{margin-top:14px;display:flex;gap:8px;justify-content:center}
-  #steer-select{margin-top:10px;display:flex;gap:8px;justify-content:center;align-items:center;
+  #steer-select,#assist-select{margin-top:10px;display:flex;gap:8px;justify-content:center;align-items:center;
     flex-wrap:wrap;max-width:92vw}
-  #steer-select .lbl{font-size:11px;letter-spacing:2px;color:#c9a86a;font-weight:800}
+  #steer-select .lbl,#assist-select .lbl{font-size:11px;letter-spacing:2px;color:#c9a86a;font-weight:800}
   .diff-chip{pointer-events:auto;cursor:pointer;padding:6px 16px;font-family:'Baloo 2';font-weight:800;
     font-size:13px;letter-spacing:2px;color:#d8c090;border-radius:8px;
     border:2px solid rgba(255,233,168,.25);background:rgba(38,26,12,.5);
@@ -447,6 +447,7 @@
     <div id="mode-select"></div>
     <div id="diff-select"></div>
     <div id="steer-select"></div>
+    <div id="assist-select"></div>
   </div>
   <div id="tab-garage" class="menu-panel off">
     <div class="panel-head">YOUR MACHINES</div>
@@ -501,6 +502,6 @@
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
-<script type="module" src="./src/main.js?v=r27"></script>
+<script type="module" src="./src/main.js?v=r28"></script>
 </body>
 </html>

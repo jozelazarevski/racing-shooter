@@ -56,9 +56,13 @@ the threshold the object is SOLID (push-out, no destruction).
 
 Every SOLID collision shares the same motion response — push-out along the
 contact normal, into-surface velocity killed with factor **1.05** (5 %
-rebound, never pinball), tangential grind loss ≤ 3 %/contact-frame, sparks
+rebound, never pinball), tangential grind scaled by lean (below), sparks
 always — but **what it does to your hull depends on what the object is made
-of**. `impact` = your normal (into-surface) speed in u/s:
+of**. Tangential scrub along a face is **not** flat: it scales with how hard
+the car leans in (`0.03 + 0.5 x lean`, lean = |normal speed| / 14), and contact
+sets a minimum peel-off rate (`1.2 + 4 x lean` u/s) away from the surface. A
+feather graze costs almost nothing and keeps speed; leaning on the rock grinds
+you to a crawl instead of letting you ride it round the bend. `impact` = your normal (into-surface) speed in u/s:
 
 | Material | Hardness | Damage formula | Max hit | Feel & FX |
 |---|---|---|---|---|
@@ -187,6 +191,7 @@ walls.
 
 | Object | Class | Behavior |
 |---|---|---|
+| Livestock (cows, sheep, deer) | ACTOR | Graze in herds out in the pastures, well off the racing line. Any car within 18 u spooks the herd and it scatters away from the car. Contact under 4 u/s just shoves them aside; at speed the animal is killed and the car loses `10 + 22 x mass` hull (cow 1.0, deer 0.6, sheep 0.5) and 30% x mass of its speed — rate-limited to one hit per 0.8 s so ploughing a herd is expensive, not instantly fatal. Pays style points |
 | Rival cars | ACTOR | Real impacts (> 9 u/s relative) dent BOTH hulls `min(20, (impact−9)×0.6)`, rate-limited 0.5 s per car; rubs are free; restitution 0.12; sparks scale with impact |
 | Player car | ACTOR | Same rules; also takes wall/tree/ram/weapon damage; wreck at 0 hull → respawn with 3 s invulnerability. Hull intake scales by difficulty: EASY ×0.45, NORMAL ×0.62, HARD ×0.85 (events/drama unchanged). **Pit-crew recovery**: 5 s without taking damage → hull regenerates 3/s up to 60% of max |
 | Choppers | ACTOR | 80 hp; killed by cannon (flak — altitude ignored), missiles, shockwave; +500 on kill |
@@ -279,3 +284,37 @@ Conformance is enforced by the headless suites (`test-destruction.mjs`,
 | Credits | race: score = credits banked; roam: destruction score banked on exit |
 | Upgrades | ENGINE/ARMOR/CANNON/NITRO/HANDLING, 5 lvls, 400 CR base, cost scales per lvl |
 | Cars | BRAWLER free · SLEEK 2000 · CROWN 3500 · DUNE 4500 · ALPINE 6000 · PIT-99 8000 |
+
+---
+
+## 8. Economy reference
+
+Score is the arcade number and inflates fast (500/lap, a large finishing
+bonus, points for every crate). **Credits are a deliberately small slice of
+it** so a strong race funds real progress without buying out the garage.
+
+| Rule | Value |
+|---|---|
+| Conversion | `credits = round(raceScore × 1/12 × difficulty)` |
+| Difficulty multiplier | EASY ×0.7 · NORMAL ×1.0 · HARD ×1.5 |
+| Podium bonus | 1st 200 · 2nd 120 · 3rd 60 CR |
+| First conquest | +500 CR, once per world, on your first podium there |
+| Free roam | banks at the same ×1/12 rate — farming off the clock must never beat racing |
+| Upgrade cost | `500 + 400 × level` → 500/900/1300/1700/2100 (6,500 per line) |
+| Cars | 2,000 → 8,000 CR |
+
+Yardstick: a repeat win on NORMAL pays ≈700 CR, so a second car is ~3 races
+of work and a fully maxed upgrade line is ~9.
+
+## 9. Driving aid
+
+`DRIVING AID` (title screen): **PRO** 0 · **STANDARD** 0.5 · **ASSIST** 1.0,
+defaulting to ASSIST on touch devices and STANDARD on desktop. While the
+player is *not* actively steering (|steer| < 0.25), is on the ground, above
+6 u/s, within 12 u of the centreline and not hand-braking, heading is nudged
+toward the road direction at `delta × assist × 2.2` rad/s. It never fights
+input and never corners for you — it only stops the car wandering.
+
+The chase cameras additionally damp their own yaw (4.5/s) toward a blend of
+heading and travel direction, so flicks and drifts no longer whip the view —
+that whip was what made the 3D views hard to drive.
