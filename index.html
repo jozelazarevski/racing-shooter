@@ -185,7 +185,11 @@
     #race-info .lap{font-size:13px}
     #race-info .time{font-size:11px}
     #standings{display:none}
-    #contracts{display:none}
+    /* the standings list is too tall for a phone, but the three contract rows
+       are the money game — they stay, just tighter */
+    #contracts{margin-top:4px;padding-top:4px}
+    #contracts .clabel{font-size:8px;letter-spacing:2px}
+    #contracts .crow{font-size:9.5px;gap:6px}
     #score-box{padding:5px 10px}
     #score-box .val{font-size:16px}
     #feed{top:88px}
@@ -264,6 +268,10 @@
   .prof-info small{display:block;font-size:9.5px;font-weight:700;letter-spacing:1px;color:#c9a86a}
   .prof-active{font-size:10px;font-weight:800;letter-spacing:2px;color:#8de89a;white-space:nowrap}
   .prof-btn.danger{background:linear-gradient(180deg,#ff8a75,#e8402a);color:#fff8e0}
+  .prof-rename{pointer-events:auto;width:100%;padding:3px 7px;border-radius:7px;
+    font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.5px;color:var(--yellow);
+    background:rgba(12,8,3,.7);border:2px solid var(--yellow);outline:none;
+    text-transform:uppercase;-webkit-user-select:text;user-select:text}
   #profile-list{align-self:stretch}
   #profile-create{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;
     align-self:stretch;padding-top:4px}

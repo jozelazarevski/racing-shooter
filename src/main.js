@@ -97,8 +97,12 @@ const CONTRACT_POOL = [
 ];
 
 // which animals graze in which biome (a theme can override with T.livestock).
-// Each pasture hosts one species; the roster cycles across a world's pastures,
-// so biomes read mixed (alpine roads pass cows, sheep AND goats).
+// Each pasture takes a LEAD species from its roster and the roster shifts from
+// world to world; roughly a quarter of each herd is the next species along, so
+// neither a field nor a world reads as a monoculture. Rosters are
+// biome-plausible only — camels in the dunes, capybaras (never cows) in the
+// Amazon, goats on the canyon ledges. Themes with no entry (volcano, neon,
+// undercity) simply have no grazing herds.
 const LIVESTOCK_BY_THEME = {
   forest:   { kinds: ['cow', 'sheep', 'boar'], perHerd: 4 },
   alpine:   { kinds: ['cow', 'sheep', 'goat'], perHerd: 4 },
@@ -111,10 +115,12 @@ const LIVESTOCK_BY_THEME = {
   glacial:  { kinds: ['deer'],                 perHerd: 2 },
   sheetice: { kinds: ['deer'],                 perHerd: 2 },
   avalanche:{ kinds: ['deer'],                 perHerd: 2 },
-  desert:   { kinds: ['camel'],                perHerd: 3 },
+  desert:   { kinds: ['camel', 'goat'],        perHerd: 3 },
   dunes:    { kinds: ['camel'],                perHerd: 3 },
-  oasis:    { kinds: ['camel', 'cow'],         perHerd: 3 },
-  jungle:   { kinds: ['capybara', 'deer'],     perHerd: 3 },
+  canyon:   { kinds: ['goat', 'camel'],        perHerd: 3 },
+  ravine:   { kinds: ['goat'],                 perHerd: 2 },
+  oasis:    { kinds: ['camel', 'goat', 'cow'], perHerd: 3 },
+  jungle:   { kinds: ['capybara', 'boar', 'deer'], perHerd: 3 },
   flume:    { kinds: ['deer', 'cow', 'boar'],  perHerd: 3 },
 };
 
@@ -909,6 +915,12 @@ class Game {
         sw.addEventListener('click', () => this._switchProfile(p.id));
         row.appendChild(sw);
       }
+      const ren = document.createElement('button');
+      ren.className = 'up-buy prof-btn';
+      ren.textContent = '✎';
+      ren.title = 'Rename profile';
+      ren.addEventListener('click', () => this._editProfileName(row, p));
+      row.appendChild(ren);
       if (reg.list.length > 1) {
         // two-tap confirm; the arm state relaxes by itself
         const del = document.createElement('button');
@@ -942,6 +954,55 @@ class Game {
       b.addEventListener('click', () => { this._newColor = c; this._renderSwatches(); });
       sw.appendChild(b);
     }
+  }
+
+  /** Inline rename: the row's name becomes a text field until Enter or blur.
+   *  Esc abandons the edit. Names sanitize exactly like a new profile's. */
+  _editProfileName(row, p) {
+    const info = row.querySelector('.prof-info');
+    if (!info || info.querySelector('input')) return;
+    const b = info.querySelector('b');
+    const inp = document.createElement('input');
+    inp.className = 'prof-rename';
+    inp.maxLength = 10;
+    inp.value = p.name;
+    inp.autocomplete = 'off';
+    inp.spellcheck = false;
+    b.replaceWith(inp);
+    // keystrokes must stop here — the game's key handlers are window-level
+    for (const ev of ['keydown', 'keyup', 'keypress']) {
+      inp.addEventListener(ev, (e) => {
+        e.stopPropagation();
+        if (ev !== 'keydown') return;
+        if (e.key === 'Enter') inp.blur();
+        else if (e.key === 'Escape') { inp.dataset.cancel = '1'; inp.blur(); }
+      });
+    }
+    inp.addEventListener('input', () => {
+      const clean = inp.value.toUpperCase().replace(/[^A-Z0-9 \-]/g, '').slice(0, 10);
+      if (inp.value !== clean) inp.value = clean;
+    });
+    inp.addEventListener('blur', () => {
+      if (!inp.dataset.cancel) this._renameProfile(p.id, inp.value);
+      this._renderProfiles();
+    });
+    inp.focus();
+    inp.select();
+  }
+
+  /** Rename in the registry (careers live under the id, so nothing moves). */
+  _renameProfile(id, raw) {
+    const p = this.profiles.list.find((x) => x.id === id);
+    const name = sanitizeProfileName(raw);
+    if (!p || !name || name === p.name) return false;
+    p.name = name;
+    saveJSON('ir-profiles', this.profiles);
+    if (id === this.profile.id) {
+      this.profile.name = name;
+      const chip = document.getElementById('profile-name');
+      if (chip) chip.textContent = name;
+    }
+    return true;
   }
 
   _createProfile() {
@@ -1302,12 +1363,19 @@ class Game {
       boar:     { body: 0x4a3222, spot: 0x2e2014, w: 0.95, h: 0.75, d: 1.6, mass: 0.55, pts: 55, flee: 12 },
       capybara: { body: 0x9a6f42, spot: 0x6e4e2c, w: 0.9,  h: 0.7,  d: 1.4, mass: 0.5,  pts: 90, flee: 8, spookR: 10 },
     };
+    // roster shifts per world so two worlds on the same roster don't open with
+    // the same species, and one animal in four is the NEXT species along —
+    // herds read mixed instead of cloned
+    const roster = spec.kinds.filter((k) => KINDS[k]);
+    if (!roster.length) return;
+    const shift = (this.level?.id ?? 0) % roster.length;
     for (let s = 0; s < spots.length; s++) {
       const spot = spots[s];
-      const kind = spec.kinds[s % spec.kinds.length];
-      const K = KINDS[kind] || KINDS.cow;
+      const lead = (s + shift) % roster.length;
       const n = spec.perHerd ?? 4;
       for (let k = 0; k < n; k++) {
+        const kind = roster[(lead + (Math.random() < 0.26 ? 1 : 0)) % roster.length];
+        const K = KINDS[kind];
         const a = (k / n) * Math.PI * 2;
         const rr = (spot.r ?? 12) * 0.55;
         const x = spot.x + Math.cos(a) * rr, z = spot.z + Math.sin(a) * rr;
@@ -1938,6 +2006,7 @@ class Game {
     if (car === this.player) {
       this.score += pr.scoreValue || 25;
       if (this._ct) this._ct.props++; // DEMOLITION contract
+      this.styleBump();               // RULES §3: a smash extends the chain
       this.buzz(15);
       const pl = this.player;
       if (pr.pickup === 'health') {
