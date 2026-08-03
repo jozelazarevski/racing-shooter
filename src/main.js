@@ -296,7 +296,11 @@ class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    // Lifted from 1.12 after the lighting retune measured 35 % darker overall
+    // (mean scene luminance 71 -> 46 on PINE VALLEY). The retune's fill/key
+    // RATIO is what buys the shadow contrast, so exposure is the right lever to
+    // put the brightness back without flattening it again.
+    this.renderer.toneMappingExposure = 1.46;
 
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0xcfe8f5, 320, 1500);
