@@ -2763,30 +2763,31 @@ export class Track {
   }
 
   /** Fell tree `tr`: hide its instanced parts and hand back a one-off
-   *  stand-in mesh the game can send flying. Returns null if already dead. */
+   *  stand-in mesh the game can send flying. Returns null if already dead.
+   *  The stand-in is rebuilt from the tree's OWN instanced part geometry and
+   *  per-instance tint, so a felled cactus flies away as a cactus, a snag as
+   *  a snag, a palm as a palm — never as a generic pine. */
   smashTree(tr) {
     if (tr.dead) return null;
     tr.dead = true;
-    _m4.makeScale(0, 0, 0);
+    const g = new THREE.Group();
+    const tint = new THREE.Color();
     for (const part of tr.parts) {
+      // capture the per-instance color BEFORE zeroing the instance out
+      if (part.instanceColor) part.getColorAt(tr.id, tint);
+      else tint.setScalar(1);
+      const src = part.material;
+      const m = new THREE.Mesh(part.geometry, new THREE.MeshStandardMaterial({
+        color: (src.color ? src.color.clone() : new THREE.Color(1, 1, 1)).multiply(tint),
+        map: src.map ?? null,
+        flatShading: !!src.flatShading,
+        roughness: src.roughness ?? 1,
+      }));
+      m.castShadow = true;
+      g.add(m);
+      _m4.makeScale(0, 0, 0);
       part.setMatrixAt(tr.id, _m4);
       part.instanceMatrix.needsUpdate = true;
-    }
-    const g = new THREE.Group();
-    const trunk = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.28, 0.44, tr.kind === 'snag' ? 4.4 : 3.2, 6),
-      new THREE.MeshStandardMaterial({ color: this.T.trunkColor ?? 0x5a4028, roughness: 1 }));
-    trunk.position.y = 1.6;
-    g.add(trunk);
-    if (tr.kind !== 'snag') {
-      const fol = new THREE.Mesh(
-        new THREE.ConeGeometry(1.9, 3.6, 7),
-        new THREE.MeshStandardMaterial({
-          color: tr.kind === 'cactus' ? 0x4a7a3c : (this.T.foliageLow ?? 0x2a5a30),
-          flatShading: true, roughness: 1,
-        }));
-      fol.position.y = 4.1;
-      g.add(fol);
     }
     g.position.set(tr.x, tr.y ?? this.terrainHeight(tr.x, tr.z), tr.z);
     g.scale.setScalar(tr.s ?? 1);

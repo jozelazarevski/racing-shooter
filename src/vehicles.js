@@ -967,9 +967,14 @@ export class Car {
       this.vel.multiplyScalar(1 - (0.03 + 0.5 * lean) * (1 - 0.2 * hnd));
       // …and peel the nose off the rock so the car separates instead of
       // sticking. Sets a minimum outward rate rather than adding every frame,
-      // so it never compounds into a pinball launch.
+      // and the rate is deliberately GENTLE: the old lean-scaled shove (up to
+      // ~5 u/s) fired the car across narrow dual-wall canyons into the
+      // opposite rock face, which shoved it straight back — a ping-pong
+      // "bounding ball" (user bug, CANYON RUN). 1.4 u/s is enough to separate
+      // without ever reaching the far wall; the anti-glide fix above (grind
+      // scrub scaling with lean) is what stops wall-riding, and it stays.
       const outward = -fside * this.vel.dot(n);
-      const wantOut = 1.2 + 4 * lean;
+      const wantOut = 1.4;
       if (outward < wantOut) this.vel.addScaledVector(n, -fside * (wantOut - outward));
       this.lateral = fside * WALL_LIMIT;
       if (this === gm.player && Math.abs(this.speedAlong) > 12 && Math.random() < 0.4)

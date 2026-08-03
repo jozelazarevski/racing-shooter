@@ -73,13 +73,15 @@ const CONTRACT_POOL = [
   { id: 'cleanlap', label: 'CLEAN LAP',      pay: 100, desc: 'a full lap without hull damage', lap: true },
   { id: 'untouch',  label: 'UNTOUCHABLE',    pay: 120, desc: 'finish without wrecking',
     atFinish: true, check: (g) => g.deaths === 0 },
-  { id: 'demo',     label: 'DEMOLITION',     pay: 60,  desc: 'smash 12 props',
+  // `sure: true` marks contracts any driver can complete by active play in any
+  // world, whatever the race outcome — the offer always includes at least one.
+  { id: 'demo',     label: 'DEMOLITION',     pay: 60,  desc: 'smash 12 props', sure: true,
     check: (g, ct) => ct.props >= 12, prog: (ct) => `${Math.min(ct.props, 12)}/12` },
   { id: 'head',     label: 'HEADHUNTER',     pay: 90,  desc: 'destroy 2 rivals',
     check: (g, ct) => ct.rivalKills >= 2, prog: (ct) => `${Math.min(ct.rivalKills, 2)}/2` },
-  { id: 'combo',    label: 'COMBO ARTIST',   pay: 70,  desc: 'reach a ×2.5 style combo',
+  { id: 'combo',    label: 'COMBO ARTIST',   pay: 70,  desc: 'reach a ×2.5 style combo', sure: true,
     check: (g, ct) => ct.comboMax >= 2.5 },
-  { id: 'draft',    label: 'DRAFT KING',     pay: 60,  desc: '3 slipstream tucks',
+  { id: 'draft',    label: 'DRAFT KING',     pay: 60,  desc: '3 slipstream tucks', sure: true,
     check: (g, ct) => ct.drafts >= 3, prog: (ct) => `${Math.min(ct.drafts, 3)}/3` },
   { id: 'air',      label: 'AIRBORNE',       pay: 60,  desc: '2 BIG AIR jumps',
     check: (g, ct) => ct.bigAirs >= 2, prog: (ct) => `${Math.min(ct.bigAirs, 2)}/2` },
@@ -122,6 +124,40 @@ const loadJSON = (key, fallback) => {
 };
 const saveJSON = (key, obj) => { try { localStorage.setItem(key, JSON.stringify(obj)); } catch { /* private mode */ } };
 
+// ---- player profiles (local careers — several people share one device) ----
+// Registry `ir-profiles`: { list: [{id, name, color, created}], active }.
+// Per-player state (career / garage / cars) lives under ir-p<id>-* keys;
+// device-wide settings (ir-steer / ir-assist / ir-diff) stay shared.
+const PROFILE_KEYS = ['career', 'garage', 'cars'];
+const PROFILE_COLORS = ['#ff8c1a', '#f2c81e', '#2440b8', '#4a9ad8', '#2f9e44', '#1c1a18']; // car livery hexes
+const MAX_PROFILES = 6;
+const profileKey = (id, base) => `ir-p${id}-${base}`;
+const sanitizeProfileName = (raw) =>
+  String(raw ?? '').toUpperCase().replace(/[^A-Z0-9 \-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 10);
+
+function loadProfiles() {
+  let reg = null;
+  try { reg = JSON.parse(localStorage.getItem('ir-profiles') || 'null'); } catch { /* corrupt */ }
+  if (!reg || !Array.isArray(reg.list) || !reg.list.length) {
+    // first run on this device: profile 1 adopts whatever career already exists
+    reg = { list: [{ id: 1, name: 'PLAYER 01', color: PROFILE_COLORS[0], created: Date.now() }], active: 1 };
+  }
+  if (!reg.list.some((p) => p.id === reg.active)) reg.active = reg.list[0].id;
+  // adopt any un-namespaced legacy keys into the ACTIVE profile (first boot,
+  // or data written by an old build) — nobody loses their career, ever
+  try {
+    for (const base of PROFILE_KEYS) {
+      const legacy = localStorage.getItem(`ir-${base}`);
+      if (legacy !== null) {
+        localStorage.setItem(profileKey(reg.active, base), legacy);
+        localStorage.removeItem(`ir-${base}`);
+      }
+    }
+    saveJSON('ir-profiles', reg);
+  } catch { /* private mode */ }
+  return reg;
+}
+
 class Game {
   constructor() {
     this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -133,10 +169,14 @@ class Game {
     this.level = LEVELS[this.levelIndex];
     this.autoStart = params.get('go') === '1';
 
-    // progression + difficulty + garage (persisted)
-    this.career = loadJSON('ir-career', { finished: {} });
-    this.garage = loadJSON('ir-garage', { credits: 0, engine: 0, armor: 0, cannon: 0, nitro: 0, handling: 0, tires: 0 });
-    this.cars = loadJSON('ir-cars', { owned: ['brawler'], selected: 'brawler' });
+    // progression + difficulty + garage (persisted PER PROFILE — several
+    // players keep separate careers on one device; settings stay shared)
+    this.profiles = loadProfiles();
+    this.profile = this.profiles.list.find((p) => p.id === this.profiles.active) ?? this.profiles.list[0];
+    this._pkey = (base) => profileKey(this.profile.id, base);
+    this.career = loadJSON(this._pkey('career'), { finished: {} });
+    this.garage = loadJSON(this._pkey('garage'), { credits: 0, engine: 0, armor: 0, cannon: 0, nitro: 0, handling: 0, tires: 0 });
+    this.cars = loadJSON(this._pkey('cars'), { owned: ['brawler'], selected: 'brawler' });
     if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = 'brawler';
     // mode comes from the URL only — a fresh visit ALWAYS starts in RACE mode
     // (persisting roam silently made races "never finish" for returning players)
@@ -557,7 +597,7 @@ class Game {
     const earned = Math.round(raw * CREDIT_RATE);
     if (earned > 0) {
       this.garage.credits += earned;
-      saveJSON('ir-garage', this.garage);
+      saveJSON(this._pkey('garage'), this.garage);
     }
   }
 
@@ -732,10 +772,10 @@ class Game {
           }
           this.garage.credits -= car.price;
           this.cars.owned.push(car.key);
-          saveJSON('ir-garage', this.garage);
+          saveJSON(this._pkey('garage'), this.garage);
         }
         this.cars.selected = car.key;
-        saveJSON('ir-cars', this.cars);
+        saveJSON(this._pkey('cars'), this.cars);
         // live swap — no reload, the menu stays exactly where you are
         this.swapPlayerCar(car);
         this.renderCarShop();
@@ -772,7 +812,7 @@ class Game {
           if (this.garage.credits < cost) return;
           this.garage.credits -= cost;
           this.garage[u.key]++;
-          saveJSON('ir-garage', this.garage);
+          saveJSON(this._pkey('garage'), this.garage);
           this.applyUpgrades();
           this.renderGarage();
         });
@@ -970,7 +1010,14 @@ class Game {
       const j = (rnd() * (i + 1)) | 0;
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
-    return arr.slice(0, 3).map((c) => ({ ...c, done: false }));
+    const picks = arr.slice(0, 3);
+    // never deal three long-shots: at least one slot is a `sure` contract any
+    // driver can actively complete regardless of world or finishing position
+    if (!picks.some((c) => c.sure)) {
+      const sure = arr.slice(3).filter((c) => c.sure);
+      if (sure.length) picks[2] = sure[(rnd() * sure.length) | 0];
+    }
+    return picks.map((c) => ({ ...c, done: false }));
   }
 
   /** Per-frame contract bookkeeping. Only ever OBSERVES state other systems
@@ -2220,12 +2267,12 @@ class Game {
       }
     }
     this.garage.credits += earned;
-    saveJSON('ir-garage', this.garage);
+    saveJSON(this._pkey('garage'), this.garage);
     this.career.finished[this.level.id] = {
       place: Math.min(rank, prev?.place ?? 99),
       bestScore: Math.max(earned, prev?.bestScore ?? 0),
     };
-    saveJSON('ir-career', this.career);
+    saveJSON(this._pkey('career'), this.career);
     this.renderGarage();
     const hasNext = this.levelIndex < LEVELS.length - 1;
     const nextUnlocked = hasNext && this.isLevelUnlocked(LEVELS[this.levelIndex + 1].id);
