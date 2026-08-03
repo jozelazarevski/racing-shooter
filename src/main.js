@@ -523,6 +523,7 @@ class Game {
 
     this.renderGarage();
     this.renderCarShop();
+    this._initProfileUI();
 
     // pause menu
     const pm = document.getElementById('pause-menu');
@@ -820,6 +821,145 @@ class Game {
       row.appendChild(btn);
       rows.appendChild(row);
     }
+  }
+
+  // ---------- player profiles (menu header chip + panel) ----------
+  _initProfileUI() {
+    const chip = document.getElementById('profile-chip');
+    const screenEl = document.getElementById('profile-screen');
+    if (!chip || !screenEl) return;
+    document.getElementById('profile-name').textContent = this.profile.name;
+    chip.addEventListener('click', () => {
+      this._renderProfiles();
+      screenEl.classList.remove('hidden');
+    });
+    document.getElementById('profile-close').addEventListener('click', () => screenEl.classList.add('hidden'));
+    // the name input must never fight the game's window-level key handlers
+    // (it only exists on the title screen, but keys are captured globally):
+    // keystrokes stop at the field while typing
+    const input = document.getElementById('profile-name-input');
+    for (const ev of ['keydown', 'keyup', 'keypress']) {
+      input.addEventListener(ev, (e) => {
+        e.stopPropagation();
+        if (ev === 'keydown' && e.key === 'Enter') document.getElementById('profile-create-btn').click();
+      });
+    }
+    input.addEventListener('input', () => {
+      // live cleanup (uppercase A-Z 0-9 space dash, ≤10) without eating the
+      // caret on every keystroke — only rewrite when something was illegal
+      const clean = input.value.toUpperCase().replace(/[^A-Z0-9 \-]/g, '').slice(0, 10);
+      if (input.value !== clean) input.value = clean;
+    });
+    document.getElementById('profile-create-btn').addEventListener('click', () => this._createProfile());
+  }
+
+  _renderProfiles() {
+    const reg = this.profiles;
+    const listEl = document.getElementById('profile-list');
+    listEl.innerHTML = '';
+    for (const p of reg.list) {
+      // per-profile career summary read straight from its namespaced keys
+      const career = loadJSON(profileKey(p.id, 'career'), { finished: {} });
+      const garage = loadJSON(profileKey(p.id, 'garage'), { credits: 0 });
+      const worlds = Object.values(career.finished).filter((f) => f && f.place <= 3).length;
+      const active = p.id === reg.active;
+      const row = document.createElement('div');
+      row.className = 'prof-row' + (active ? ' active' : '');
+      row.innerHTML = `<span class="prof-dot" style="background:${p.color}"></span>
+        <span class="prof-info"><b>${p.name}</b>
+          <small>${worlds} WORLD${worlds === 1 ? '' : 'S'} CONQUERED · ${(garage.credits ?? 0).toLocaleString()} CR</small></span>`;
+      if (active) {
+        const tag = document.createElement('span');
+        tag.className = 'prof-active';
+        tag.textContent = '● DRIVING';
+        row.appendChild(tag);
+      } else {
+        const sw = document.createElement('button');
+        sw.className = 'up-buy prof-btn';
+        sw.textContent = 'SWITCH';
+        sw.addEventListener('click', () => this._switchProfile(p.id));
+        row.appendChild(sw);
+      }
+      if (reg.list.length > 1) {
+        // two-tap confirm; the arm state relaxes by itself
+        const del = document.createElement('button');
+        del.className = 'up-buy prof-btn danger';
+        del.textContent = '✕';
+        del.title = 'Delete profile';
+        del.addEventListener('click', () => {
+          if (del.dataset.arm) { this._deleteProfile(p.id); return; }
+          del.dataset.arm = '1';
+          del.textContent = 'SURE?';
+          setTimeout(() => { delete del.dataset.arm; del.textContent = '✕'; }, 2600);
+        });
+        row.appendChild(del);
+      }
+      listEl.appendChild(row);
+    }
+    const cap = reg.list.length >= MAX_PROFILES;
+    document.getElementById('profile-create').style.display = cap ? 'none' : '';
+    document.getElementById('profile-cap-note').style.display = cap ? '' : 'none';
+    this._renderSwatches();
+  }
+
+  _renderSwatches() {
+    const sw = document.getElementById('profile-swatches');
+    sw.innerHTML = '';
+    this._newColor ??= PROFILE_COLORS[this.profiles.list.length % PROFILE_COLORS.length];
+    for (const c of PROFILE_COLORS) {
+      const b = document.createElement('button');
+      b.className = 'prof-swatch' + (c === this._newColor ? ' sel' : '');
+      b.style.background = c;
+      b.addEventListener('click', () => { this._newColor = c; this._renderSwatches(); });
+      sw.appendChild(b);
+    }
+  }
+
+  _createProfile() {
+    const reg = this.profiles;
+    if (reg.list.length >= MAX_PROFILES) return;
+    const input = document.getElementById('profile-name-input');
+    const name = sanitizeProfileName(input.value);
+    if (!name) {
+      input.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
+        { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
+      input.focus();
+      return;
+    }
+    const id = Math.max(0, ...reg.list.map((p) => p.id)) + 1;
+    reg.list.push({ id, name, color: this._newColor ?? PROFILE_COLORS[0], created: Date.now() });
+    reg.active = id;
+    saveJSON('ir-profiles', reg);
+    // fresh careers start at world 1 — reload through the standard fade
+    this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+  }
+
+  _switchProfile(id) {
+    const reg = this.profiles;
+    if (id === reg.active || !reg.list.some((p) => p.id === id)) return;
+    reg.active = id;
+    saveJSON('ir-profiles', reg);
+    // reload via the standard fade; the constructor's locked-level guard drops
+    // the new driver back to world 1 if this track isn't unlocked for them
+    this.fadeTo(`?level=${this.level.id}${this.unlockAll ? '&unlockall=1' : ''}`);
+  }
+
+  _deleteProfile(id) {
+    const reg = this.profiles;
+    if (reg.list.length <= 1) return; // the last profile can never be deleted
+    const i = reg.list.findIndex((p) => p.id === id);
+    if (i < 0) return;
+    reg.list.splice(i, 1);
+    try { for (const base of PROFILE_KEYS) localStorage.removeItem(profileKey(id, base)); } catch { /* private mode */ }
+    if (reg.active === id) {
+      // deleted the active driver: hand the wheel to the first remaining one
+      reg.active = reg.list[0].id;
+      saveJSON('ir-profiles', reg);
+      this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+      return;
+    }
+    saveJSON('ir-profiles', reg);
+    this._renderProfiles();
   }
 
   // ---------- pickups ----------

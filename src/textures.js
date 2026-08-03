@@ -116,6 +116,12 @@ export function horizonTexture(topHex, baseHex) {
   return t;
 }
 
+/** Where the wheel ruts sit across the road canvas: the ribbon is ~22u wide,
+ *  a car tracks ~2.6u, so the rut pair straddles the middle at ±0.046w. Shared
+ *  by the dirt ruts, the wet-road rut sheen and the cobble polish bands so
+ *  every wear mark agrees on where the wheels actually run. */
+const RUT_CX = (w) => [w * 0.4537, w * 0.5463];
+
 /** Rain-soaked overlay for the road canvas: darkens the surface toward wet
  *  asphalt/mud, pools sheen in the wheel ruts, lays long soft gleam streaks
  *  down the direction of travel and a few standing-water film patches.
@@ -129,13 +135,13 @@ function applyWetRoad(g, w, h, spec) {
   g.fillRect(0, 0, w, h);
   g.globalCompositeOperation = 'source-over';
   // sheen collecting in the compacted wheel ruts
-  for (const cx of [w * 0.32, w * 0.68]) {
-    const grd = g.createLinearGradient(cx - 30, 0, cx + 30, 0);
+  for (const cx of RUT_CX(w)) {
+    const grd = g.createLinearGradient(cx - 11, 0, cx + 11, 0);
     grd.addColorStop(0, 'rgba(170,190,210,0)');
     grd.addColorStop(0.5, 'rgba(170,190,210,0.14)');
     grd.addColorStop(1, 'rgba(170,190,210,0)');
     g.fillStyle = grd;
-    g.fillRect(cx - 30, 0, 60, h);
+    g.fillRect(cx - 11, 0, 22, h);
   }
   // long soft gleam streaks running with the road (full height → tiles along v)
   for (let i = 0; i < S.gleam; i++) {
@@ -319,16 +325,17 @@ function applyCobbleRoad(g, w, h, spec) {
       }
     }
   }
-  // polished wheel tracks: centuries of iron tyres have worn two dark bands
-  for (const cx of [w * 0.32, w * 0.68]) {
-    const grd = g.createLinearGradient(cx - 34, 0, cx + 34, 0);
+  // polished wheel tracks: iron tyres and car wheels have worn two dark bands,
+  // car-width apart like the dirt ruts (not the old road-wide sweep)
+  for (const cx of RUT_CX(w)) {
+    const grd = g.createLinearGradient(cx - 13, 0, cx + 13, 0);
     grd.addColorStop(0, 'rgba(28,26,24,0)');
     grd.addColorStop(0.5, 'rgba(28,26,24,0.30)');
     grd.addColorStop(1, 'rgba(28,26,24,0)');
     g.fillStyle = grd;
-    g.fillRect(cx - 34, 0, 68, h);
+    g.fillRect(cx - 13, 0, 26, h);
     g.fillStyle = 'rgba(225,230,235,0.07)';
-    g.fillRect(cx - 7, 0, 14, h);
+    g.fillRect(cx - 4, 0, 8, h);
   }
   // damp moss creeping into the joints near the verges
   for (let i = 0; i < 90; i++) {
@@ -498,32 +505,39 @@ export function roadTexture(palette = {}) {
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
     }
-    // twin wheel ruts: dark compacted bands with tread chevrons stamped in
-    for (const cx of [w * 0.32, w * 0.68]) {
+    // twin wheel ruts: dark compacted bands with tread chevrons stamped in.
+    // Sized to a CAR: the road ribbon is ~22u across mapped to `w`, a car body
+    // is 2.6u wide, so the pair of ruts spans ~2.6u (centers ±1.02u ≈ ±0.046w)
+    // and each rut is ~0.6u (≈0.027w) wide. P.ruts === false skips them
+    // entirely — hard surfaces (cobbles, ice, glass-asphalt, concrete) don't
+    // rut the way soft dirt does.
+    // snow-covered roads carve their traffic channels at the legacy lane
+    // positions — keep the ghost-through ruts underneath aligned with them
+    if (P.ruts !== false) for (const cx of (P.snowCover ? [w * 0.32, w * 0.68] : RUT_CX(w))) {
       g.fillStyle = P.rut;
-      g.fillRect(cx - 27, 0, 54, h);
+      g.fillRect(cx - 7, 0, 14, h);
       g.fillStyle = P.rutCore;
-      g.fillRect(cx - 15, 0, 30, h);
+      g.fillRect(cx - 4, 0, 8, h);
       // longitudinal compaction streaks
       g.fillStyle = 'rgba(0,0,0,0.10)';
-      for (let k = -2; k <= 2; k++) g.fillRect(cx + k * 7 - 1, 0, 2, h);
+      for (let k = -1; k <= 1; k++) g.fillRect(cx + k * 4 - 0.8, 0, 1.6, h);
       // repeating V tire-tread marks along the rut
       g.strokeStyle = P.tread;
-      g.lineWidth = 4.5;
+      g.lineWidth = 2.8;
       g.lineCap = 'round';
       g.lineJoin = 'round';
       for (let y = 5; y < h + 10; y += 19) {
-        const j = (Math.random() - 0.5) * 4;
+        const j = (Math.random() - 0.5) * 2.4;
         g.beginPath();
-        g.moveTo(cx - 10 + j, y);
-        g.lineTo(cx + j, y + 9);
-        g.lineTo(cx + 10 + j, y);
+        g.moveTo(cx - 5.5 + j, y);
+        g.lineTo(cx + j, y + 8);
+        g.lineTo(cx + 5.5 + j, y);
         g.stroke();
       }
       // sun-catching rut shoulders
       g.fillStyle = 'rgba(255,235,200,0.07)';
-      g.fillRect(cx - 31, 0, 4, h);
-      g.fillRect(cx + 27, 0, 4, h);
+      g.fillRect(cx - 9.6, 0, 2.4, h);
+      g.fillRect(cx + 7.2, 0, 2.4, h);
     }
     // pebbles and scattered stones
     for (let i = 0; i < 520; i++) {
@@ -551,10 +565,10 @@ export function roadTexture(palette = {}) {
     // long dark streaks with a cool gleam core (skipped under wet/snow/ice
     // overlays, which paint their own surface films)
     if (!P.wet && !P.snowCover && !P.ice && !P.cobbles) {
-      for (const cx of [w * 0.32, w * 0.5, w * 0.68]) {
+      for (const cx of [...RUT_CX(w), w * 0.5]) {
         const nStreaks = cx === w * 0.5 ? 2 : 4;
         for (let i = 0; i < nStreaks; i++) {
-          const x = cx + (Math.random() - 0.5) * 34;
+          const x = cx + (Math.random() - 0.5) * 16;
           const bw = 4 + Math.random() * 9;
           const a = 0.05 + Math.random() * 0.06;
           const grd = g.createLinearGradient(x - bw, 0, x + bw, 0);
@@ -566,7 +580,7 @@ export function roadTexture(palette = {}) {
         }
         // a couple of thin cool gleam lines riding the polished wear
         for (let i = 0; i < 2; i++) {
-          const x = cx + (Math.random() - 0.5) * 26;
+          const x = cx + (Math.random() - 0.5) * 13;
           g.fillStyle = `rgba(200,210,225,${0.035 + Math.random() * 0.035})`;
           g.fillRect(x, 0, 1.6 + Math.random() * 1.6, h);
         }

@@ -885,6 +885,7 @@ const THEMES = {
       stoneA: 'rgba(245,250,255,0.8)', stoneB: 'rgba(150,180,205,0.7)',
       fringe: [232, 242, 250], fringeVar: [20, 12, 6],
       ice: true,                                        // sheet-ice glaze + crevasse cracks
+      ruts: false,                                      // glazed ice never ruts
     },
     hillColor: 0xc2d8e6, peakColor: 0xf0f8fc,
     treeCount: 60, trunkColor: 0x5a4028,
@@ -990,6 +991,7 @@ const THEMES = {
       fringe: [24, 26, 40], fringeVar: [12, 12, 20],
       wet: { darken: 0.2, gleam: 14, pools: 4 },
       neon: { edgeA: '#2af6ff', edgeB: '#ff3af0', dash: '#9a6cff' },
+      ruts: false,                                      // glass-asphalt doesn't rut
     },
     roadNeon: { edgeA: '#2af6ff', edgeB: '#ff3af0', dash: '#9a6cff' },  // emissive line-work
     hillColor: 0x0e1420, peakColor: 0x141b2c, horizon: 'city',
@@ -1040,6 +1042,7 @@ const THEMES = {
       stoneA: 'rgba(140,146,134,0.6)', stoneB: 'rgba(24,28,20,0.7)',
       fringe: [42, 50, 32], fringeVar: [18, 22, 14],    // slime creeping from the walls
       wet: { darken: 0.3, gleam: 10, pools: 5 },        // permanently damp
+      ruts: false,                                      // poured concrete doesn't rut
     },
     hillColor: 0x1c2018, peakColor: 0x282e22,
     vegetation: 'none', treeCount: 0, trunkColor: 0x33362c,
@@ -1149,6 +1152,7 @@ const THEMES = {
       rut: 'rgba(44,42,38,0.5)', rutCore: 'rgba(30,29,26,0.45)', tread: 'rgba(16,15,13,0.4)',
       stoneA: 'rgba(186,182,172,0.6)', stoneB: 'rgba(62,59,54,0.7)',
       fringe: [78, 112, 54], fringeVar: [32, 44, 24],
+      ruts: false,          // stone setts don't rut — polish bands come from the cobble pass
       cobbles: {                                        // Tremola stone setts
         stones: ['#7d7a73', '#6c6963', '#87817a', '#5e5c58', '#8e887e', '#74726d'],
         mortar: 'rgba(38,36,33,0.9)', lip: 'rgba(255,250,235,0.13)',

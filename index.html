@@ -242,6 +242,41 @@
   #credits-chip{margin-left:10px;padding:7px 16px;font-size:12px;letter-spacing:2px;font-weight:800;
     color:#ffe9a8;border:2px solid rgba(255,233,168,.35);border-radius:20px;background:rgba(24,16,6,.7)}
   #credits-chip b{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
+
+  /* ---------- PLAYER PROFILES (local careers on one device) ---------- */
+  #profile-chip{pointer-events:auto;cursor:pointer;margin-left:6px;padding:7px 16px;font-size:12px;
+    letter-spacing:2px;font-weight:800;font-family:'Baloo 2';color:#ffe9a8;
+    border:2px solid rgba(255,233,168,.35);border-radius:20px;background:rgba(24,16,6,.7);
+    -webkit-tap-highlight-color:transparent;transition:transform .1s}
+  #profile-chip b{color:#7fd4ff;text-shadow:1px 1px 0 var(--ink)}
+  #profile-chip:active{transform:scale(.95)}
+  #profile-screen{z-index:30}
+  #profile-panel{border-radius:14px;margin-top:16px;width:min(94vw,430px)}
+  .prof-row{display:flex;align-items:center;gap:10px;align-self:stretch;
+    padding:8px 4px;border-top:1px solid rgba(255,233,168,.12)}
+  #profile-list .prof-row:first-child{border-top:none}
+  .prof-dot{flex:0 0 auto;width:16px;height:16px;border-radius:50%;border:2px solid var(--ink);
+    box-shadow:0 0 0 1px rgba(255,233,168,.35)}
+  .prof-info{flex:1;min-width:0;text-align:left}
+  .prof-info b{display:block;font-family:'Luckiest Guy';font-size:14px;letter-spacing:1.5px;
+    color:#ffe9c9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prof-row.active .prof-info b{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
+  .prof-info small{display:block;font-size:9.5px;font-weight:700;letter-spacing:1px;color:#c9a86a}
+  .prof-active{font-size:10px;font-weight:800;letter-spacing:2px;color:#8de89a;white-space:nowrap}
+  .prof-btn.danger{background:linear-gradient(180deg,#ff8a75,#e8402a);color:#fff8e0}
+  #profile-list{align-self:stretch}
+  #profile-create{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;
+    align-self:stretch;padding-top:4px}
+  #profile-name-input{pointer-events:auto;width:150px;padding:7px 10px;border-radius:8px;
+    font-family:'Baloo 2';font-weight:800;font-size:13px;letter-spacing:2px;color:#fff3d0;
+    background:rgba(12,8,3,.6);border:2px solid rgba(255,233,168,.35);outline:none;
+    text-transform:uppercase;-webkit-user-select:text;user-select:text}
+  #profile-name-input:focus{border-color:var(--yellow)}
+  #profile-name-input::placeholder{color:rgba(255,233,168,.4)}
+  #profile-swatches{display:flex;gap:6px}
+  .prof-swatch{pointer-events:auto;cursor:pointer;width:24px;height:24px;border-radius:50%;
+    border:2px solid rgba(255,233,168,.3);-webkit-tap-highlight-color:transparent}
+  .prof-swatch.sel{border-color:var(--yellow);box-shadow:0 0 8px rgba(255,212,0,.6)}
   .menu-panel{margin-top:0;width:min(94vw,660px);background:rgba(24,16,6,.66);
     border:2px solid rgba(255,233,168,.3);border-radius:0 14px 14px 14px;
     padding:12px 14px 16px;display:flex;flex-direction:column;align-items:center}
@@ -463,6 +498,7 @@
     <button id="tab-btn-race" class="menu-tab current">PRE-RACE</button>
     <button id="tab-btn-garage" class="menu-tab">GARAGE</button>
     <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
+    <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
   </div>
   <div id="tab-race" class="menu-panel">
     <div class="panel-head">MAP &amp; TRACK SELECTION</div>
@@ -496,6 +532,22 @@
     &nbsp;·&nbsp; hold DRIFT to slide</div>
   <div id="loading-note">3 LAPS · 5 RIVALS · RAMPS · MINES · DESTROY OR BE DESTROYED</div>
   <div class="footnote">A TOY-BOX CIRCUIT DESIGNED ENTIRELY BY CLAUDE</div>
+</div>
+
+<div id="profile-screen" class="screen hidden">
+  <div class="game-sub" style="letter-spacing:10px">DRIVER PROFILES</div>
+  <div id="profile-panel" class="menu-panel">
+    <div class="panel-head">WHO'S DRIVING</div>
+    <div id="profile-list"></div>
+    <div class="panel-head">NEW PROFILE</div>
+    <div id="profile-create">
+      <input id="profile-name-input" maxlength="10" placeholder="NAME" autocomplete="off" spellcheck="false">
+      <div id="profile-swatches"></div>
+      <button id="profile-create-btn" class="up-buy">CREATE</button>
+    </div>
+    <div id="profile-cap-note" class="footnote" style="display:none">PROFILE LIMIT REACHED — DELETE ONE TO ADD ANOTHER</div>
+  </div>
+  <button id="profile-close" class="btn" style="margin-top:22px;padding:13px 54px;font-size:17px">CLOSE</button>
 </div>
 
 <div id="pause-menu" class="screen hidden">
