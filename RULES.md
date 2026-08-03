@@ -14,6 +14,14 @@ is a bug. The conformance table at the bottom tracks the honest current state.
    and the position panel carry all navigation information. Any future request
    that seems to imply a map must be re-checked against this rule first.
 
+2. **THE GAME MUST RUN OFFLINE.** It is played on a phone, on a plane. No
+   feature may add a request to a third-party origin — not a font, not a CDN
+   script, not an analytics ping. Everything ships in the repo and is
+   precached by `sw.js`; a remote asset does not merely fail without a
+   network, it stalls the boot behind a connection timeout. Any new asset
+   must be added to the `ASSETS` list in `sw.js`, and `CACHE` must be bumped
+   with the `?v=` release version or phones keep serving the old build.
+
 ## 1. The Law of Solidity
 
 1. **Nothing readable as an object may be intangible.** If the player can see
@@ -249,6 +257,7 @@ no livestock dressing (troughs, hay racks) on a city world.
 | Lap checkpoint | must touch samples 0.4N–0.6N before the line crossing counts | vehicles.js `checkLap` |
 | Grid spawn checkpoint credit | a fresh `placeAt` credits the far checkpoint only inside 0.4N–0.85N. The grid sits at ~0.99N, so cars start uncredited and the first line crossing after GO banks nothing — without the upper bound every "3 lap" race ran as two, with a ~1.2 s BEST LAP | vehicles.js `placeAt` |
 | Respawn checkpoint credit | `placeAt(i, lat, keepCP=true)` preserves credit already earned; used by wreck-respawn and the AI pit-lift so recovery never costs a lap | vehicles.js |
+| Distance vs laps | `progress = _wraps + index/N` orders the standings and must never fall; `lap` is the validated race lap and rises only on a checkpointed crossing. Sharing one counter inverted the running order the moment cars crossed the line, because the start crossing deliberately banks no lap | vehicles.js `checkLap` |
 | Cliff peel-off rate | 1.4 u/s flat (was `1.2 + 4×lean`, which ping-ponged cars between dual canyon walls) | vehicles.js |
 | Launch punch | +55 % thrust below 0.5 × **showroom** top speed (referencing live `maxSpeed` let difficulty and the rubber band widen the rivals' punch window) | vehicles.js |
 | Wheel-rut spacing | 2.6 u — the car's own track (wheels at ±1.3) | textures.js `RUT_CX` |
