@@ -56,7 +56,10 @@ const boot = async (q) => {
     g.weapons.dropMine(p);
     const m = g.weapons.mines[g.weapons.mines.length - 1];
     await new Promise(r2 => setTimeout(r2, 1200));
-    for (let w = 0; w < 25 && e.health > 99; w++) {
+    // Hold the rival on the mine until the BLAST lands, not merely until its
+    // health first moves: a smashed prop's debris can clip it for a few hull
+    // first, and stopping there reports the shrapnel instead of the mine.
+    for (let w = 0; w < 25 && e.health > 60; w++) {
       e.pos.set(m.pos.x, m.pos.y, m.pos.z);
       await new Promise(r2 => setTimeout(r2, 200));
     }
