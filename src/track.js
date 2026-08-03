@@ -4692,30 +4692,13 @@ export class Track {
     const sunDir = new THREE.Vector3(
       Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)
     );
-    if (T.sunSprite !== false) {
-      const halo = new THREE.Mesh(
-        new THREE.PlaneGeometry(560, 560),
-        new THREE.MeshBasicMaterial({
-          map: glowTexture(), color: T.sunGlow, transparent: true, fog: false,
-          depthWrite: false, blending: THREE.AdditiveBlending,
-        })
-      );
-      halo.position.copy(sunDir).multiplyScalar(1330);
-      halo.lookAt(0, 0, 0);
-      this.scene.add(halo);
-      // normal-blended core (an additive disc washes out against bright skies)
-      const disc = new THREE.Mesh(
-        new THREE.PlaneGeometry(170, 170),
-        new THREE.MeshBasicMaterial({
-          map: sunTexture(),
-          color: new THREE.Color(T.sunGlow).lerp(new THREE.Color(0xffffff), 0.45),
-          transparent: true, fog: false, depthWrite: false,
-        })
-      );
-      disc.position.copy(sunDir).multiplyScalar(1310);
-      disc.lookAt(0, 0, 0);
-      this.scene.add(disc);
-    }
+    // NO SUN SPRITE. A 560-unit additive halo with depthWrite off washed a hot
+    // white smear across the road and grass — the default camera looks DOWN,
+    // so a sky billboard ends up laid over the play surface rather than sitting
+    // on the horizon, and the bloom pass then amplified it. The light itself
+    // still comes from sunAz/sunEl; it simply has no drawn source.
+    // Do not reintroduce a sun disc, halo or lens flare without checking it
+    // from the top-down camera first.
 
     // layered horizon haze band: a tinted translucent cylinder ringing the
     // world between the near hill ring and the far peaks, so the skyline
