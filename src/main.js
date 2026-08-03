@@ -206,6 +206,25 @@ function loadProfiles() {
   return reg;
 }
 
+// ===== [MISSIONS] arena-mission constants (missions-design) =====
+// Payouts sit in the SAME BAND as a race contract (40–150 CR) and never above
+// it: a gold medal (130) is worth a bit more than a 3rd-place podium (60) and
+// a bit less than a win (200). Missions are two-minute skill snacks, not a
+// credit farm — no score→credit conversion, medal money only, and a repeat run
+// pays the same flat medal price so grinding one mission beats nothing.
+// Medal index: 0 none, 1 bronze, 2 silver, 3 gold.
+const MISSION_CR = [0, 40, 80, 130];
+// seconds out of contact before a SURVIVOR gunship repositions into your path
+const REDEPLOY_T = 2.5;
+const MISSION_MEDAL = ['—', '🥉', '🥈', '🥇'];
+const MISSION_MEDAL_WORD = ['NO MEDAL', '🥉 BRONZE', '🥈 SILVER', '🥇 GOLD'];
+/** One line of medal targets, phrased for the mission's shape: race missions
+ *  want a time BELOW the target, endurance missions want one ABOVE it. */
+const missionTargetLine = (d) => (d.survive
+  ? `🥇 ${fmtTime(d.gold)}+ · 🥈 ${fmtTime(d.silver)}+ · 🥉 ${fmtTime(d.bronze)}+ SURVIVED`
+  : `🥇 ${fmtTime(d.gold)} · 🥈 ${fmtTime(d.silver)} · 🥉 ANY FINISH`);
+// ===== end [MISSIONS] constants =====
+
 class Game {
   constructor() {
     this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -240,6 +259,10 @@ class Game {
     // mode comes from the URL only — a fresh visit ALWAYS starts in RACE mode
     // (persisting roam silently made races "never finish" for returning players)
     this.freeRoam = params.get('mode') === 'roam';
+    // [MISSIONS] mode=missions rides on the roam machinery (open world, no
+    // rivals) but layers structured objectives on top — see the MISSIONS block.
+    this.missionMode = params.get('mode') === 'missions';
+    if (this.missionMode) this.freeRoam = true;
     this.steerSetting = localStorage.getItem('ir-steer') || 'normal';
     // touch players get the aid by default — thumbs are coarser than keys
     this.assistSetting = localStorage.getItem('ir-assist')
@@ -446,20 +469,21 @@ class Game {
 
     this._renderLevelCards();
 
-    // mode chips: RACE | FREE ROAM
+    // mode chips: RACE | FREE ROAM | MISSIONS
     const msel = document.getElementById('mode-select');
-    for (const [id, label] of [['race', '🏁 RACE'], ['roam', '🌍 FREE ROAM']]) {
+    const curMode = this.missionMode ? 'missions' : this.freeRoam ? 'roam' : 'race';
+    for (const [id, label] of [['race', '🏁 RACE'], ['roam', '🌍 FREE ROAM'], ['missions', '🎯 MISSIONS']]) {
       const chip = document.createElement('button');
-      const active = (id === 'roam') === this.freeRoam;
-      chip.className = 'mode-chip' + (active ? ' current' : '');
+      chip.className = 'mode-chip' + (id === curMode ? ' current' : '');
       chip.textContent = label;
       chip.addEventListener('click', () => {
-        if ((id === 'roam') === this.freeRoam) return;
+        if (id === curMode) return;
         this.fadeTo(`?level=${this.level.id}&mode=${id}`);
       });
       msel.appendChild(chip);
     }
     if (this.freeRoam) document.getElementById('start-btn').textContent = 'START EXPLORING';
+    if (this.missionMode) this._buildMissionPicker(); // [MISSIONS] also sets the start label
 
     // difficulty chips
     const dsel = document.getElementById('diff-select');
@@ -513,7 +537,9 @@ class Game {
     // driving aid: gentle auto-straightening, the fix for "hard to control in
     // 3D view". Defaults ON for touch devices, STANDARD on desktop.
     const asel = document.getElementById('assist-select');
-    asel.innerHTML = '<span class="lbl">DRIVING AID</span>';
+    // the label is markup now (.set-lbl in the RACE SETTINGS row) — writing one
+    // here too rendered "DRIVING AID DRIVING AID"
+    asel.innerHTML = '';
     const AIDS = [['pro', 'PRO', 0], ['standard', 'STANDARD', 0.5], ['assist', 'ASSIST', 1]];
     const applyAidChips = () => {
       for (const c of asel.querySelectorAll('.diff-chip')) {
@@ -555,11 +581,16 @@ class Game {
     });
     document.getElementById('pm-exit').addEventListener('click', () => {
       if (this.freeRoam) this.bankRoamCredits();
-      this.fadeTo(`?level=${this.level.id}${this.freeRoam ? '&mode=roam' : ''}`);
+      const modeArg = this.missionMode ? '&mode=missions' : this.freeRoam ? '&mode=roam' : '';
+      this.fadeTo(`?level=${this.level.id}${modeArg}`);
     });
 
     // next-level chaining from the results screen
     document.getElementById('next-level-btn').addEventListener('click', () => {
+      if (this.missionMode) { // [MISSIONS] the button doubles as "back to mission select"
+        this.fadeTo(`?level=${this.level.id}&mode=missions`);
+        return;
+      }
       sessionStorage.setItem('ir-score', String(this.score));
       this.fadeTo(`?level=${LEVELS[this.levelIndex + 1].id}&go=1`);
     });
@@ -606,6 +637,7 @@ class Game {
 
   /** In roam mode, exiting banks the destruction score as credits. */
   bankRoamCredits() {
+    if (this.missionMode) return; // [MISSIONS] missions pay by medal only
     // roam pays the same rate as racing — otherwise farming props off the
     // clock is strictly better money than actually competing
     const raw = Math.max(0, this.score - (this.startScore ?? 0));
@@ -1642,20 +1674,31 @@ class Game {
   }
 
   // ---------- free-roam treasure stars ----------
-  _buildRoamStars() {
+  // [MISSIONS] pass 'mission' to rebuild the field on demand for STAR RUSH;
+  // plain mission launches keep the world star-free so objectives stay clean.
+  // Roam scatters stars far out in the wild (exploration is the point). STAR
+  // RUSH is on a clock, so its stars sit in a tighter band that is genuinely
+  // reachable at speed — and INSIDE the cliff walls on canyon worlds, which
+  // start at |lateral| ≈ 10.5, so no star is ever behind a rock face.
+  _buildRoamStars(mode) {
     this.roamStars = [];
-    if (!this.freeRoam) return;
+    if (!mode && (!this.freeRoam || this.missionMode)) return;
     const t = this.track;
     const glow = glowTexture();
     // canyon worlds: clear the rock band (~15u) so no star spawns inside a
     // cliff face — roamers reach these by driving out through the start berm
-    const minLat = t.T?.cliffWalls ? 24 : 16;
+    const walled = !!t.T?.cliffWalls;
+    const mission = mode === 'mission';
+    const minLat = mission ? (walled ? 5 : 7) : walled ? 24 : 16;
+    const span = mission ? (walled ? 4 : 12) : 26;
     for (let k = 0; k < 12; k++) {
       const idx = Math.floor(t.N * (k + 0.5) / 12);
-      const lat = (k % 2 ? -1 : 1) * (minLat + (k * 7) % 26); // properly off-road
+      const lat = (k % 2 ? -1 : 1) * (minLat + (k * 7) % span); // properly off-road
       const c = t.pointAt(idx, 0), n = t.nrm[idx];
       const x = c.x + n.x * lat, z = c.z + n.z * lat;
-      const y = t.terrainHeight(x, z);
+      // close-in mission stars ride the road surface, far ones the terrain
+      // (same split the prop scatter uses, so nothing floats or sinks)
+      const y = Math.abs(lat) <= 9.5 ? t.pointAt(idx, lat).y : t.terrainHeight(x, z);
       const spr = new THREE.Sprite(new THREE.SpriteMaterial({
         map: glow, color: 0xffd400, transparent: true, opacity: 0.95,
         blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -1666,16 +1709,41 @@ class Game {
     }
   }
 
+  /** Squared distance from (px,pz) to the segment (ax,az)–(bx,bz). Pickups use
+   *  this instead of a point test: at 60 fps the car moves ~0.7 u per frame,
+   *  but on a hitch (or a slow device) it can move 4+ u in one step and skip
+   *  clean THROUGH a pickup radius. A swept test can't be tunnelled. */
+  static _segDist2(ax, az, bx, bz, px, pz) {
+    const vx = bx - ax, vz = bz - az;
+    const len2 = vx * vx + vz * vz;
+    let t = len2 > 1e-6 ? ((px - ax) * vx + (pz - az) * vz) / len2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const dx = px - (ax + vx * t), dz = pz - (az + vz * t);
+    return dx * dx + dz * dz;
+  }
+
+  /** Advance the one-per-frame pickup sweep: where the player was last frame
+   *  → where it is now. Every pickup test this frame shares this segment. */
+  _beginSweep() {
+    const p = this.player.pos;
+    const prev = this._sweepPrev;
+    // a respawn / placeAt must not sweep a pickup line across the whole map
+    const jumped = !prev || (p.x - prev.x) ** 2 + (p.z - prev.z) ** 2 > 900;
+    this._sweep = jumped ? { x: p.x, z: p.z } : prev;
+    this._sweepPrev = { x: p.x, z: p.z };
+  }
+
   _updateRoamStars(time) {
     if (!this.roamStars?.length) return;
     const p = this.player;
+    const from = this._sweep ?? p.pos;
     for (const s of this.roamStars) {
       if (s.got) continue;
       s.spr.position.y = s.y + 2.2 + Math.sin(time * 2 + s.x) * 0.5;
-      const dx = p.pos.x - s.x, dz = p.pos.z - s.z;
-      if (dx * dx + dz * dz < 16) {
+      if (Game._segDist2(from.x, from.z, p.pos.x, p.pos.z, s.x, s.z) < 16) {
         s.got = true;
         this.scene.remove(s.spr);
+        if (this.missionMode) { this._missionEvent('star', s); continue; } // [MISSIONS]
         this.score += 150;
         this.hud.feed('⭐ TREASURE STAR  +150', 'good');
         this.buzz([25, 30, 45]);
@@ -1686,6 +1754,510 @@ class Game {
       }
     }
   }
+
+  // ======================================================================
+  // [MISSIONS] — structured arena challenges layered on the roam machinery.
+  // Everything mission-scoped lives between these banners (missions-design).
+  //
+  //   RAMPAGE   timed destruction — every smash feeds the clock back
+  //   STAR RUSH 12 stars scattered off the racing line, against the clock
+  //   BLITZ     beacon-to-beacon sprint around the circuit
+  //   SURVIVOR  outlast an escalating chopper assault — no timer, one life
+  //   HOT LAP   one flying lap, no rivals, vs the medal times
+  //
+  // Two medal shapes. Most missions are RACES: finish fast, `elapsed` is
+  // compared UP to gold/silver. SURVIVOR is an ENDURANCE mission (def.survive)
+  // and inverts that — you are medalled for how long you LAST, so its
+  // thresholds are compared DOWN, and reaching gold ends the run as a win.
+  // Payouts are flat per medal (MISSION_CR) and never scale with score.
+  // NOTE (RULES.md §0): no minimap, ever. Objectives are found with the HUD
+  // arrow, the distance readout and the world itself — never a map overlay.
+  // ======================================================================
+
+  /** Medal book storage key. Medals are a CAREER record, so they live under
+   *  the active driver profile (ir-p<id>-missions) exactly like career/garage/
+   *  cars — two people sharing a device do not share each other's golds. */
+  _missionStoreKey() {
+    return this._pkey ? this._pkey('missions') : 'ir-missions';
+  }
+
+  _missionBest() { return loadJSON(this._missionStoreKey(), {}); }
+
+  /** REFERENCE LAP: what a clean, flat-out lap of this circuit costs — walk the
+   *  centreline and integrate segment time at a curvature-limited speed. Every
+   *  race-mission target is a multiple of this, so a long technical world and a
+   *  short open one both get honest medals instead of one hand-tuned number.
+   *
+   *  Calibration: an instrumented flat-out lap of PINE VALLEY (N=900, 1699 u)
+   *  measured 30.7 s. The raw integral came out at 38.7 s, so it carries a
+   *  0.79 correction — the integral is pessimistic because it never lets the
+   *  car carry speed through a corner sequence. Snow/wet keep their handicap.
+   */
+  _missionLapEstimate() {
+    const t = this.track;
+    let est = 0;
+    for (let i = 0; i < t.N; i++) {
+      const v = Math.max(24, 58 * Math.min(1, 1 - t.curvature[i] * 14));
+      est += t.segLen / v;
+    }
+    const surf = t.T?.surface;
+    return est * 0.79 * (surf === 'snow' ? 1.15 : surf === 'wet' ? 1.06 : 1);
+  }
+
+  /** The mission roster for the current world (5, tuned per circuit).
+   *  For race missions gold/silver are ELAPSED-time targets and `time` is the
+   *  fail clock (0 = none). For a `survive` mission they are SURVIVAL targets
+   *  and bigger is better. Every world gets all five — a mission that only
+   *  exists on some tracks reads as a bug, not as variety. */
+  _missionDefs() {
+    if (this.__missionDefs) return this.__missionDefs;
+    const t = this.track;
+    const surf = t.T?.surface;
+    const slow = surf === 'snow' ? 1.2 : surf === 'wet' ? 1.08 : 1;
+    const lapT = this._missionLapEstimate(); // already carries the surface handicap
+    const defs = [];
+    {
+      // 25 props out of the ~85 the world carries, most of them on the
+      // drivable shoulder — a lap and a bit of committed weaving. The clock
+      // starts short and mean and is REFILLED by smashing, so the mission
+      // rewards never lifting: stop hitting things and it kills you.
+      // Measured: the first handful come at ~0.8 s each, but the field thins
+      // as you clear it and the back half costs ~1.7 s a prop, so a full set
+      // is worth about 1.3 laps of driving — which is what the targets say.
+      // 2.2 s back per smash keeps a committed run ahead of the clock (it
+      // hovered 20–50 s in the probe) and lets a hesitant one drown.
+      const goal = 25;
+      defs.push({
+        id: 'rampage', icon: '💥', name: 'RAMPAGE', tip: `SMASH ${goal} PROPS`,
+        goal, time: Math.round(26 * slow), bonus: 2.2, chainBonus: 1.5, circuit: false,
+        gold: lapT * 1.3 + 2, silver: lapT * 1.9 + 2,
+        desc: 'Timed destruction — every smash +2.2s, a hot combo chain +3.7s. Keep the wrecking going or the clock dies.',
+      });
+    }
+    {
+      // Par run = one lap plus ~4 s of detour per star. The fail clock only
+      // hands you a third of that up front; the rest has to be EARNED back
+      // star by star, and the per-star bonus is set just above the par cost
+      // of reaching the next one, so a tidy run gains and a sloppy one bleeds.
+      const T = lapT + 12 * 4;
+      defs.push({
+        id: 'starrush', icon: '⭐', name: 'STAR RUSH', tip: 'GRAB ALL 12 STARS',
+        // Measured: a car that never lifts and always takes the nearest star
+        // collects one every ~4.9 s, i.e. ~59 s for the set on PINE VALLEY —
+        // so GOLD sits exactly on that near-optimal route and SILVER forgives
+        // a couple of missed lines.
+        // circuit:false — the stars ring the world but the ROUTE is yours, so
+        // the wrong-way banner must not fire at someone cutting to a star.
+        goal: 12, time: Math.round(T * 0.32), bonus: Math.max(5, Math.round(T * 0.09)), circuit: false,
+        gold: T * 0.75, silver: T * 0.98,
+        desc: '12 stars strung around the world, off the racing line. Each one buys seconds — chain them or run dry.',
+      });
+    }
+    {
+      // `par` is the reference cost of one beacon-to-beacon leg (a tenth of a
+      // lap). The clock hands you three legs up front and each beacon buys
+      // 1.7 legs back — enough headroom to swing wide onto a beacon, not
+      // enough to cruise.
+      const par = lapT / 10;
+      defs.push({
+        id: 'blitz', icon: '🚩', name: 'CHECKPOINT BLITZ', tip: 'HIT 10 BEACONS',
+        goal: 10, time: Math.round(par * 3 + 2), bonus: Math.round(par * 1.7 * 10) / 10, circuit: true,
+        gold: lapT * 1.22 + 3, silver: lapT * 1.5 + 3,
+        desc: 'Sprint beacon to beacon around the circuit — each gate buys seconds. Miss the pace and the clock wins.',
+      });
+    }
+    {
+      // ENDURANCE: no objective count, no fail clock — just you, one hull and
+      // an assault that thickens. Medals are survival times; reaching gold is
+      // extraction and ends the run a winner.
+      // ~70 s is the whole run: one chopper, two from bronze, three from
+      // silver, and the gaps between spawns shorten with each tier. Any
+      // longer and the last tier is just attrition, not escalation.
+      const g = 70, s = 45, b = 25;
+      defs.push({
+        id: 'survivor', icon: '🚁', name: 'SURVIVOR', tip: 'STAY ALIVE',
+        goal: 0, time: 0, bonus: 0, survive: true, circuit: false,
+        gold: g, silver: s, bronze: b,
+        desc: `Waves thicken until the sky is full. The clock only runs while they can reach you — ${fmtTime(b)} pays, ${fmtTime(g)} is extraction. One hull, no respawn.`,
+      });
+    }
+    defs.push({
+      id: 'hotlap', icon: '⏱', name: 'HOT LAP', tip: 'ONE LAP VS THE CLOCK',
+      // Standing start off the grid, so the targets carry a ~2s launch tax on
+      // top of the reference lap. GOLD is a clean flat-out lap with almost
+      // nothing given away; SILVER absorbs one scruffy corner. The fail clock
+      // is deliberately loose — a spin still lets you limp home for bronze,
+      // it just costs the medal.
+      goal: 1, time: Math.round(lapT * 2.4 + 12), bonus: 0, circuit: true,
+      gold: lapT * 1.06 + 2, silver: lapT * 1.32 + 2,
+      desc: 'The circuit, your machine, no rivals. One lap from a standing start — beat the gold time.',
+    });
+    return (this.__missionDefs = defs);
+  }
+
+  /** Build the mission picker into #mission-select (missions mode only). */
+  _buildMissionPicker() {
+    const sel = document.getElementById('mission-select');
+    if (!sel) return;
+    sel.classList.add('on');
+    const defs = this._missionDefs();
+    const best = this._missionBest();
+    let saved = null;
+    try { saved = sessionStorage.getItem('ir-mission-sel'); } catch { /* private mode */ }
+    this.missionSel = defs.some((d) => d.id === saved) ? saved : defs[0].id;
+    sel.innerHTML = '<div class="panel-head">ARENA MISSIONS</div>';
+    for (const d of defs) {
+      const b = best[`${this.level.id}:${d.id}`] | 0;
+      const chip = document.createElement('button');
+      chip.className = 'mission-chip' + (d.id === this.missionSel ? ' current' : '');
+      chip.innerHTML = `<span class="mi">${d.icon}</span>
+        <span class="mtext"><span class="mname">${d.name}</span><span class="mdesc">${d.desc}</span>
+        <span class="mdesc">${missionTargetLine(d)} · 🎖 ${MISSION_CR[1]}–${MISSION_CR[3]} CR</span></span>
+        <span class="mmedal${b ? '' : ' none'}">${b ? MISSION_MEDAL[b] : 'NEW'}</span>`;
+      chip.addEventListener('click', () => {
+        this.missionSel = d.id;
+        try { sessionStorage.setItem('ir-mission-sel', d.id); } catch { /* private mode */ }
+        for (const c of sel.querySelectorAll('.mission-chip')) c.classList.toggle('current', c === chip);
+      });
+      sel.appendChild(chip);
+    }
+    document.getElementById('start-btn').textContent = 'START MISSION';
+  }
+
+  /** Launch the selected mission (called from startRace instead of the roam path). */
+  _missionLaunch() {
+    const defs = this._missionDefs();
+    const def = defs.find((d) => d.id === this.missionSel) || defs[0];
+    this.state = 'race';
+    this.startScore = this.score;
+    this.track.setLights('green');
+    for (const e of this.enemies) { e.alive = false; e.mesh.visible = false; }
+    this._raceChopper = true; // blocks the final-lap race-chopper path
+    this.mission = {
+      def, count: 0, elapsed: 0, started: false, over: false,
+      timed: def.time > 0, tLeft: def.time, warn10: false, spawnT: 0, tier: 0,
+    };
+    if (def.id === 'starrush') this._buildRoamStars('mission');
+    if (def.id === 'blitz') this._missionBuildGates(def);
+    // objective counter borrows the LAP row: "💥 4/18" instead of "LAP 1/3"
+    const lapEl = document.getElementById('lap');
+    if (lapEl?.parentElement?.firstChild?.nodeType === 3) {
+      lapEl.parentElement.firstChild.textContent = def.icon + ' ';
+    }
+    this.hud.centerMsg(def.name);
+    this.hud.feed(`🎯 ${def.tip}`, 'info');
+    this.hud.feed(missionTargetLine(def), 'info');
+    if (def.survive) this.hud.feed('ONE HULL — NO RESPAWN', 'bad');
+    else if (def.time > 0) this.hud.feed('CLOCK STARTS WHEN YOU MOVE', 'info');
+    this.buzz([20, 30, 20]);
+  }
+
+  /** CHECKPOINT BLITZ: glowing beacon pillars around the circuit; only the
+   *  next one is lit. Lateral offsets alternate to force real lines. */
+  _missionBuildGates(def) {
+    const t = this.track, slot = t.gridSlot(0);
+    const glow = glowTexture();
+    this.missionGates = [];
+    for (let k = 1; k <= def.goal; k++) {
+      const idx = (slot.index + Math.round(t.N * k / def.goal)) % t.N;
+      const lat = k === def.goal ? 0 : [-3.5, 3.5, 0][k % 3];
+      const p = t.pointAt(idx, lat);
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glow, color: 0x37f6ff, transparent: true, opacity: 0.9,
+        blending: THREE.AdditiveBlending, depthWrite: false }));
+      spr.scale.set(5.5, 24, 1);
+      spr.position.set(p.x, p.y + 9, p.z);
+      spr.visible = k === 1;
+      this.scene.add(spr);
+      this.missionGates.push({ x: p.x, y: p.y, z: p.z, spr });
+    }
+  }
+
+  /** Mission event bus — the tiny hooks in shared code all land here. */
+  _missionEvent(kind, data) {
+    const M = this.mission;
+    if (!M || M.over || this.state !== 'race') return;
+    const def = M.def;
+    if (kind === 'wrecked') {
+      // ENDURANCE ends here and you keep whatever time you bought; every other
+      // mission just eats the respawn wait, which the clock punishes already.
+      if (def.survive) this._missionFinish(true, 'SHOT DOWN');
+      return;
+    }
+    if (kind === 'prop' && def.id === 'rampage') {
+      M.count++;
+      this.styleBump(); // smashes feed the style chain…
+      let add = def.bonus;
+      if ((this.comboN ?? 0) >= 3) add += def.chainBonus; // …and hot chains pay extra time
+      M.tLeft = Math.min(def.time + M.count * 1.2, M.tLeft + add);
+      this.hud.feed(`💥 ${M.count}/${def.goal}  +${add}s`, 'good');
+      if (M.count === (def.goal >> 1)) this.hud.centerMsg('HALFWAY!');
+      if (M.count >= def.goal) this._missionFinish(true);
+    } else if (kind === 'star' && def.id === 'starrush') {
+      M.count++;
+      M.tLeft += def.bonus;
+      this.score += 150;
+      this.particles.pickupBurst(new THREE.Vector3(data.x, data.y + 1.5, data.z), new THREE.Color(0xffd400));
+      this.buzz([25, 30, 45]);
+      this.hud.feed(`⭐ ${M.count}/${def.goal}  +${def.bonus}s`, 'good');
+      if (M.count >= def.goal) this._missionFinish(true);
+    } else if (kind === 'chopper' && def.survive) {
+      // kills don't end an endurance run — they buy breathing room (and a
+      // hull patch), which is the only healing SURVIVOR offers.
+      M.count++;
+      const p = this.player;
+      p.health = Math.min(p.maxHealth, p.health + p.maxHealth * 0.15);
+      M.spawnT = Math.max(M.spawnT, 2.5);
+      this.hud.feed(`🚁 ${M.count} DOWN — HULL PATCHED`, 'good');
+    } else if (kind === 'lap' && def.id === 'hotlap') {
+      // Standing start from the grid, exactly one lap. We never re-place the
+      // car, so `placeAt(slot.index, slot.lateral)` (keepCP defaulting to
+      // false) is doing the right thing: the grid sits at ~0.99N, OUTSIDE the
+      // 0.4N–0.85N credit window, so the mid-track checkpoint starts unearned
+      // and only a genuine full lap can fire onPlayerLap. There is no "arming"
+      // crossing to swallow — the FIRST event here is the finished lap, and
+      // the targets are calibrated for a standing start.
+      M.count++;
+      this._missionFinish(true);
+    }
+  }
+
+  /** Objective guidance WITHOUT a map (RULES.md §0 forbids minimaps in every
+   *  form, objective overlays included): the nearest live objective becomes a
+   *  compass arrow relative to where the car is pointing, plus a distance in
+   *  metres. Everything else is finding it with your eyes. */
+  _missionNav(M) {
+    let tx = 0, tz = 0, best = Infinity, icon = '';
+    if (M.def.id === 'starrush') {
+      for (const s of this.roamStars ?? []) {
+        if (s.got) continue;
+        const dx = s.x - this.player.pos.x, dz = s.z - this.player.pos.z;
+        const d = dx * dx + dz * dz;
+        if (d < best) { best = d; tx = s.x; tz = s.z; icon = '⭐'; }
+      }
+    } else if (M.def.id === 'blitz') {
+      const gate = this.missionGates?.[M.count];
+      if (gate) { tx = gate.x; tz = gate.z; icon = '🚩'; best = 0; }
+    }
+    if (!icon) { M.nav = null; return; }
+    const dx = tx - this.player.pos.x, dz = tz - this.player.pos.z;
+    const f = this.player.forward;
+    // signed bearing: +ve = target is to the left of the nose
+    const ang = Math.atan2(f.z * dx - f.x * dz, f.x * dx + f.z * dz);
+    const sector = ((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8;
+    M.nav = {
+      icon,
+      dist: Math.round(Math.hypot(dx, dz)),
+      arrow: ['↑', '↖', '←', '↙', '↓', '↘', '→', '↗'][sector],
+    };
+  }
+
+  /** Per-frame mission logic: clock, warnings, gates, survivor waves. */
+  _updateMission(dt) {
+    const M = this.mission;
+    if (!this.missionMode || !M || M.over || this.state !== 'race') return;
+    const p = this.player;
+    if (!M.started) { // the clock arms on the first real input — read the card in peace
+      if (Math.abs(p.speedAlong) > 1.5 || this.input.throttle > 0.2) {
+        M.started = true;
+        if (M.timed) this.hud.centerMsg('GO!');
+      } else return;
+    }
+    if (M.def.survive) {
+      // The assault thickens on the CLOCK, not on kills — surviving longer is
+      // the only thing that makes it harder, which is the whole mission.
+      // 2 airborne → 3 at bronze → 4 at silver, and the gaps shorten too.
+      // They spawn as INTERCEPTORS (see _spawnChopper) because a car at full
+      // throttle simply outruns anything dropped behind it.
+      const d = M.def;
+      // THE ENGAGEMENT RULE: you are only SURVIVING while something is
+      // actually shooting at you. A gunship tops out at 46 u/s and a flat-out
+      // car does ~55, so without this the mission is "drive a circle for 70 s"
+      // and never take a scratch — measured, hull untouched the whole run.
+      // Bank time by staying in the fight; run and the clock simply stops.
+      M.engaged = this.choppers.some((c) => c.alive
+        && (c.pos.x - p.pos.x) ** 2 + (c.pos.z - p.pos.z) ** 2 < 80 * 80);
+      if (M.engaged) { M.elapsed += dt; M.redeployT = REDEPLOY_T; } else {
+        if (this.raceTime - (M.hintT ?? -9) > 5) {
+          M.hintT = this.raceTime;
+          this.hud.feed('⚠ OUT OF THE FIGHT — CLOCK PAUSED', 'bad');
+        }
+        // …but a stalemate is not an outcome either. Break contact and the
+        // farthest gunship peels off and redeploys into your path, so the
+        // fight always comes back. You can shake them; you cannot escape them.
+        M.redeployT = (M.redeployT ?? REDEPLOY_T) - dt;
+        if (M.redeployT <= 0) {
+          M.redeployT = REDEPLOY_T;
+          let far = null, fd = -1;
+          for (const c of this.choppers) {
+            if (!c.alive) continue;
+            const d2 = (c.pos.x - p.pos.x) ** 2 + (c.pos.z - p.pos.z) ** 2;
+            if (d2 > fd) { fd = d2; far = c; }
+          }
+          // silent removal, NOT a kill — no score, no hull patch, no feed line
+          if (far) { far.alive = false; this.scene.remove(far.mesh); }
+          this._spawnChopper(true);
+        }
+      }
+      const tier = M.elapsed >= d.silver ? 2 : M.elapsed >= d.bronze ? 1 : 0;
+      if (tier > M.tier) {
+        M.tier = tier;
+        this.hud.centerMsg(tier === 2 ? 'THEY KEEP COMING' : 'WAVE 2');
+        this.hud.feed('⚠ ASSAULT ESCALATING', 'bad');
+      }
+      const cap = 2 + tier;
+      const alive = this.choppers.filter((c) => c.alive).length;
+      M.spawnT -= dt;
+      if (alive < cap && M.spawnT <= 0) { M.spawnT = 4.5 - tier * 1.2; this._spawnChopper(true); }
+      if (M.elapsed >= d.gold) { // extraction — you outlasted the whole thing
+        this.hud.feed('🚁 EXTRACTION — YOU OUTLASTED THEM', 'good');
+        this._missionFinish(true, 'EXTRACTED');
+        return;
+      }
+    } else {
+      M.elapsed += dt;
+    }
+    if (M.def.id === 'blitz' && this.missionGates) {
+      const gate = this.missionGates[M.count];
+      if (gate) {
+        // swept, like the stars — a beacon you drove through at 200 km/h must
+        // never be missed because the frame was long
+        const s = this._sweep ?? p.pos;
+        if (Game._segDist2(s.x, s.z, p.pos.x, p.pos.z, gate.x, gate.z) < 55) { // ~7.4u
+          gate.spr.visible = false;
+          M.count++;
+          M.tLeft += M.def.bonus;
+          this.score += 100;
+          this.styleBump();
+          this.particles.pickupBurst(new THREE.Vector3(gate.x, gate.y + 1.5, gate.z), new THREE.Color(0x37f6ff));
+          this.buzz(25);
+          const next = this.missionGates[M.count];
+          if (next) next.spr.visible = true;
+          this.hud.feed(`🚩 GATE ${M.count}/${M.def.goal}  +${M.def.bonus}s`, 'good');
+          if (M.count >= M.def.goal) this._missionFinish(true);
+        }
+      }
+    }
+    this._missionNav(M);
+    if (M.timed && !M.over) {
+      M.tLeft -= dt;
+      if (M.tLeft <= 10.2 && M.tLeft > 0 && !M.warn10) {
+        M.warn10 = true;
+        this.hud.feed('⏱ 10 SECONDS!', 'bad');
+        this.buzz(40);
+      }
+      if (M.tLeft > 10.2) M.warn10 = false; // bonus time pushed the clock back up
+      if (M.tLeft <= 0) { M.tLeft = 0; this._missionFinish(false, 'OUT OF TIME'); }
+    }
+  }
+
+  /** Medal for a finished run. Race missions are graded DOWN from gold (fast
+   *  wins); endurance missions are graded UP (lasting wins) and can still take
+   *  a medal home from a run that ended in a wreck. */
+  _missionMedal(win, M) {
+    const d = M.def;
+    if (d.survive) {
+      const t = M.elapsed;
+      return t >= d.gold ? 3 : t >= d.silver ? 2 : t >= d.bronze ? 1 : 0;
+    }
+    if (!win) return 0; // a race mission that ran out of clock earns nothing
+    return M.elapsed <= d.gold ? 3 : M.elapsed <= d.silver ? 2 : 1;
+  }
+
+  /** Win/fail: medal by time, modest CR payout, best-medal persistence,
+   *  and the shared results card dressed as a mission debrief. */
+  _missionFinish(win, reason) {
+    const M = this.mission;
+    if (!M || M.over) return;
+    M.over = true;
+    this.state = 'finished';
+    const def = M.def;
+    // survivor stragglers stop shooting the debrief screen
+    for (const c of this.choppers) if (c.alive) { c.alive = false; this.scene.remove(c.mesh); }
+    const medal = this._missionMedal(win, M);
+    if (def.survive) win = medal > 0; // outlasted nothing = failed the run
+    const cr = MISSION_CR[medal] | 0;
+    if (cr > 0) {
+      this.garage.credits += cr;
+      saveJSON(this._pkey('garage'), this.garage); // per-profile purse (economy agent)
+      this.renderGarage();
+    }
+    if (medal > 0) {
+      const best = this._missionBest();
+      const key = `${this.level.id}:${def.id}`;
+      if (medal > (best[key] | 0)) {
+        best[key] = medal;
+        saveJSON(this._missionStoreKey(), best);
+      }
+    }
+    this.hud.centerMsg(win ? ['', 'BRONZE!', 'SILVER!', 'GOLD!'][medal] : 'MISSION FAILED');
+    if (win) { this.audio.lap(); this.buzz([40, 40, 80]); }
+    else { this.hud.damageFlash?.(0.6); this.buzz(60); }
+    // Results card, re-dressed as a debrief. The card is `.results-card >
+    // .result-stats > .rrow`, each row `<span>LABEL</span><b id=…>value</b>`,
+    // so a label is the value node's PREVIOUS sibling. Labels are only ever
+    // rewritten in-memory; a reload restores the race wording from the markup.
+    const setRow = (id, label, value) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = value;
+      if (el.previousElementSibling) el.previousElementSibling.textContent = label;
+    };
+    document.querySelector('#results .game-sub').textContent = win
+      ? `MISSION COMPLETE${reason ? ' — ' + reason : ''}`
+      : `MISSION FAILED${reason ? ' — ' + reason : ''}`;
+    document.getElementById('result-place').textContent = win ? MISSION_MEDAL_WORD[medal] : 'FAILED';
+    setRow('r-score', 'MISSION SCORE', Math.max(0, this.score - (this.startScore ?? 0)).toLocaleString());
+    setRow('r-kills', def.survive ? 'CHOPPERS DOWN' : 'OBJECTIVE',
+      def.survive ? `${M.count}` : `${M.count}/${def.goal}`);
+    setRow('r-time', def.survive ? 'SURVIVED' : 'MISSION TIME', fmtTime(M.elapsed));
+    setRow('r-best', 'GOLD / SILVER', def.survive
+      ? `${fmtTime(def.gold)}+ / ${fmtTime(def.silver)}+`
+      : `${fmtTime(def.gold)} / ${fmtTime(def.silver)}`);
+    // the medal itself gets its own .rrow, revealed for missions only
+    const medalRow = document.getElementById('rrow-medal');
+    if (medalRow) medalRow.style.display = '';
+    setRow('r-medal', 'MEDAL', MISSION_MEDAL_WORD[medal]);
+    document.getElementById('r-credits').textContent = `+${cr}`;
+    // itemized breakdown, same box the race payout uses — one line, so the
+    // player can see at a glance that a mission is medal money and nothing else
+    {
+      const box = document.getElementById('credit-breakdown');
+      const rowsEl = document.getElementById('cb-rows');
+      if (box && rowsEl) {
+        rowsEl.innerHTML =
+          `<div class="cb-row${medal ? '' : ' missed'}"><span>${medal ? '✓' : '✗'} ${def.name} — ${MISSION_MEDAL_WORD[medal]}</span><b>+${cr}</b></div>`
+          + '<div class="cb-row missed"><span>MISSION SCORE — NO CREDIT RATE</span><b>—</b></div>'
+          + `<div class="cb-row total"><span>TOTAL CREDITS</span><b>+${cr}</b></div>`;
+        box.style.display = '';
+      }
+    }
+    if (cr > 0) this.hud.feed(`MEDAL PAYOUT  +${cr} CR`, 'good');
+    const nextBtn = document.getElementById('next-level-btn');
+    nextBtn.style.display = '';
+    nextBtn.textContent = '🎯 MISSION SELECT';
+    document.getElementById('restart-btn').textContent = win ? 'RUN IT AGAIN' : 'RETRY MISSION';
+    setTimeout(() => {
+      if (this.state !== 'finished') return; // player already restarted
+      document.getElementById('results').classList.remove('hidden');
+      this.hud.hide();
+      document.getElementById('touch-ui').classList.remove('on');
+    }, 1400);
+  }
+
+  /** Called from resetRace: mission state never survives into the next run. */
+  _missionReset() {
+    if (!this.missionMode) return;
+    this.mission = null;
+    for (const gsp of this.missionGates ?? []) this.scene.remove(gsp.spr);
+    this.missionGates = null;
+    for (const s of this.roamStars ?? []) if (!s.got) this.scene.remove(s.spr);
+    this.roamStars = [];
+  }
+
+  // ======================================================================
+  // [MISSIONS] end
+  // ======================================================================
 
   // ---------- dynamic world hazards (theme-declared; see RULES.md) ----------
   // Themes opt in with data only: geysers {count}, fallHazard {kind,period,dmg},
@@ -2027,18 +2599,36 @@ class Game {
   }
 
   // ---------- choppers ----------
-  _spawnChopper() {
+  /** `intercept` drops the gunship in the player's PATH instead of on a random
+   *  bearing. [MISSIONS] SURVIVOR needs it: a chopper tops out at 46 u/s and a
+   *  flat-out car does ~55, so one spawned 80 u away on a random bearing can
+   *  never close and the whole assault turns into scenery you outrun. An
+   *  interceptor lands ahead and off to one side, so the player drives into
+   *  gun range and has to actually fight or break the line. */
+  _spawnChopper(intercept = false) {
     const p = this.player.pos;
-    const a = Math.random() * Math.PI * 2;
-    const pos = new THREE.Vector3(p.x + Math.cos(a) * 80, 9, p.z + Math.sin(a) * 80);
-    this.choppers.push(new Chopper(this, pos));
+    let pos;
+    if (intercept) {
+      const f = this.player.forward;
+      const s = Math.random() < 0.5 ? -1 : 1;   // alternate shoulders, never head-on
+      pos = new THREE.Vector3(p.x + f.x * 46 + f.z * s * 18, 9, p.z + f.z * 46 - f.x * s * 18);
+    } else {
+      const a = Math.random() * Math.PI * 2;
+      pos = new THREE.Vector3(p.x + Math.cos(a) * 80, 9, p.z + Math.sin(a) * 80);
+    }
+    const ch = new Chopper(this, pos);
+    // An interceptor arrives HOT: a fresh gunship idles 2–3 s before its first
+    // burst, by which time a flat-out car is 150 u past it and out of range,
+    // so an unarmed interceptor is just scenery. Roam spawns keep the wind-up.
+    if (intercept) ch.fireTimer = 0.35;
+    this.choppers.push(ch);
     this.hud.feed('⚠ ATTACK CHOPPER INBOUND', 'bad');
     this.buzz([40, 30, 40]);
   }
 
   _updateChoppers(dt) {
     if (this.state === 'race') {
-      if (this.freeRoam) {
+      if (this.freeRoam && !this.missionMode) { // [MISSIONS] missions run their own spawner
         this.chopperTimer -= dt;
         if (this.chopperTimer <= 0 && this.choppers.filter((c) => c.alive).length < 3) {
           this._spawnChopper();
@@ -2062,6 +2652,7 @@ class Game {
     this.hud.centerMsg('CHOPPER DOWN');
     this.hud.feed('CHOPPER DESTROYED  +500', 'good');
     this.buzz(60);
+    if (this.missionMode) this._missionEvent('chopper'); // [MISSIONS]
   }
 
   // ---------- destructible props ----------
@@ -2178,6 +2769,7 @@ class Game {
       if (this._ct) this._ct.props++; // DEMOLITION contract
       this.styleBump();               // RULES §3: a smash extends the chain
       this.buzz(15);
+      if (this.missionMode) this._missionEvent('prop', pr); // [MISSIONS]
       const pl = this.player;
       if (pr.pickup === 'health') {
         pl.health = Math.min(pl.maxHealth, pl.health + 25);
@@ -2515,6 +3107,7 @@ class Game {
       prevHealth: null, prevHeat: 0, prevMissiles: null, prevMines: null, prevShock: 0 };
     this.hud?.setContracts?.([]);
     for (const a2 of this.herds ?? []) { a2.alive = true; a2.mesh.visible = true; a2.x = a2.homeX; a2.z = a2.homeZ; }
+    this._missionReset?.(); // [MISSIONS] mission state never survives a reset
     this._clearWorldHazards?.();
     for (const h of this.husks) this.scene.remove(h.mesh);
     this.husks.length = 0;
@@ -2586,7 +3179,9 @@ class Game {
       this.contracts = this._pickContracts();
       this.hud.setContracts?.(this.contracts, this._ct);
     }
-    if (this.freeRoam) {
+    if (this.missionMode) { // [MISSIONS] structured arena challenge, no grid
+      this._missionLaunch();
+    } else if (this.freeRoam) {
       // no grid, no countdown — the world is yours (and the choppers')
       this.state = 'race';
       this.startScore = this.score;
@@ -2599,6 +3194,7 @@ class Game {
   }
 
   onPlayerLap() {
+    if (this.missionMode) { this._missionEvent('lap'); return; } // [MISSIONS]
     if (this.freeRoam) { this.score += 100; return; }
     const p = this.player;
     // contracts that resolve at lap boundaries (lap p.lap-1 just completed) —
@@ -2659,6 +3255,7 @@ class Game {
     this.hud.damageFlash(1.2);
     this.hud.centerMsg('WRECKED');
     this.hud.feed(attacker ? `WRECKED BY ${attacker.name}  −300` : 'WRECKED  −300', 'bad');
+    if (this.missionMode) this._missionEvent('wrecked'); // [MISSIONS]
   }
 
   finishRace() {
@@ -2960,8 +3557,10 @@ class Game {
         this._updateCombo(dt);
         this._updateContracts();
         this._updateTaunts();
+        this._beginSweep(); // [MISSIONS] shared swept-pickup segment for this frame
         this._updateRoamStars(time);
         this._updateLivestock(dt, time);
+        this._updateMission(dt); // [MISSIONS]
       }
       if (this.freeRoam) this.playerRank = 1;
       else this._updateRank();

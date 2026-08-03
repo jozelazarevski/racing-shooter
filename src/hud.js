@@ -119,7 +119,51 @@ export class Hud {
     this.el.lapsTotal.textContent = g.lapsTotal;
     this.el.time.textContent = fmtTime(g.raceTime);
     this.el.score.textContent = g.score.toLocaleString();
-    if (g.freeRoam) {
+    if (g.missionMode) {
+      // [MISSIONS] compact objective HUD: counter in the LAP row, mission
+      // clock in the time row, objective + medal targets in the standings slot
+      const M = g.mission;
+      this.el.position.textContent = '🎯';
+      this.el.posSuffix.textContent = '';
+      this.el.racerCount.textContent = 'MISSION';
+      if (M) {
+        const d = M.def;
+        // endurance runs count kills against no target and time UP toward the
+        // medal marks; race missions count objectives and time DOWN
+        this.el.lap.textContent = M.count;
+        this.el.lapsTotal.textContent = d.survive ? '🚁' : d.goal;
+        this.el.time.textContent = M.timed ? fmtTime(Math.max(0, M.tLeft)) : fmtTime(M.elapsed);
+        // An endurance clock that has stopped must SAY so — the player has
+        // outrun the fight and is banking nothing (see the engagement rule).
+        const stalled = d.survive && M.started && !M.over && M.engaged === false;
+        const urgent = d.survive
+          ? M.started && !M.over && M.elapsed < d.bronze   // no medal banked yet
+          : M.timed && M.started && !M.over && M.tLeft < 10;
+        this.el.time.style.color = stalled ? '#8a8a8a' : urgent ? '#ff8a75' : d.survive ? '#8de89a' : '';
+        // next medal mark, so the endurance clock always has something to chase
+        const nextMark = d.survive
+          ? (M.elapsed < d.bronze ? `🥉 ${fmtTime(d.bronze)}`
+            : M.elapsed < d.silver ? `🥈 ${fmtTime(d.silver)}`
+              : `🥇 ${fmtTime(d.gold)}`)
+          : '';
+        const key = `m|${d.id}|${M.started}|${nextMark}|${!!M.nav}|${stalled}`;
+        if (this._standingsHtml !== key) {
+          this._standingsHtml = key;
+          this.el.standings.innerHTML =
+            `<div class="srow me">${d.tip}</div>`
+            + (d.survive
+              ? `<div class="srow">${stalled ? '⏸ OUT OF THE FIGHT' : `NEXT MEDAL ${nextMark}`}</div>`
+              : `<div class="srow">🥇 ${fmtTime(d.gold)} · 🥈 ${fmtTime(d.silver)}</div>`)
+            + (M.nav ? '<div class="srow" id="m-nav"></div>' : '')
+            + (M.started || !M.timed ? '' : '<div class="srow">MOVE TO START THE CLOCK</div>');
+          this._navEl = M.nav ? this.el.standings.querySelector('#m-nav') : null;
+        }
+        // objective compass — an arrow + a distance, never a map (RULES §0)
+        if (M.nav && this._navEl) {
+          this._navEl.textContent = `${M.nav.arrow} ${M.nav.icon} ${M.nav.dist}m`;
+        }
+      }
+    } else if (g.freeRoam) {
       this.el.position.textContent = '🌍';
       this.el.posSuffix.textContent = '';
       this.el.racerCount.textContent = 'ROAM';
@@ -191,7 +235,8 @@ export class Hud {
     // wrong-way detection
     const t = g.track;
     const tangent = t.tan[p.trackIndex];
-    const wrongWay = g.state === 'race' && p.alive && !g.freeRoam &&
+    const onCircuit = !g.freeRoam || !!g.mission?.def.circuit; // [MISSIONS] some missions race the circuit
+    const wrongWay = g.state === 'race' && p.alive && onCircuit &&
       p.speedAlong > 6 && (p.forward.dot(tangent) < -0.35);
     this.el.wrongWay.style.display = wrongWay ? 'block' : 'none';
 
