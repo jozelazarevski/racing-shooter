@@ -6,7 +6,9 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', a
 const bugs = [];
 const note = (lvl, name, detail) => { bugs.push({ lvl, name, detail }); console.log(`  BUG  L${lvl} ${name}: ${detail}`); };
 
-for (let lvl = 1; lvl <= 18; lvl++) {
+// 21 worlds now — the three ALPINE PASSES were added after this loop was written
+// and were quietly going unswept.
+for (let lvl = 1; lvl <= 21; lvl++) {
   const page = await b.newPage({ viewport: { width: 800, height: 520 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   let name = `L${lvl}`;
