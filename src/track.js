@@ -3,11 +3,11 @@
 // and every color in the world (terrain, sky, vegetation, road tint, lighting).
 import * as THREE from 'three';
 import {
-  roadTexture, wallTexture, groundTexture, buildingTexture,
+  roadTexture, wallTexture, groundTexture, buildingTexture, buildingGlowTexture,
   chevronTexture, checkerTexture, glowTexture, cloudTexture,
   grassTexture, bannerTexture, hazardTexture, crowdTexture, awningTexture,
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
-  crateTexture, coneTexture, barrelTexture, riverTexture, iglooTexture,
+  crateTexture, coneTexture, barrelTexture, riverTexture, riverBankTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
 } from './textures.js';
@@ -283,14 +283,16 @@ const THEMES = {
     surface: 'wet',
     // lighting / fog (plain numbers; also applied to scene.fog by Track itself)
     fogColor: 0xcfe8f5, fogNear: 320, fogFar: 1500,
-    hemiSky: 0xbfe0ff, hemiGround: 0x5a8a3c,
-    sunColor: 0xfff3d6, sunIntensity: 2.0,
+    hemiSky: 0xa8ccff, hemiGround: 0x4a7a34, hemiIntensity: 0.76,
+    sunColor: 0xfff0cc, sunIntensity: 2.75,
     // sky dome + sun sprite + clouds
     skyTop: '#3f8de0', skyHorizon: '#e8f0d8', sunGlow: 0xfff2b8,
     sunAz: 0.7, sunEl: 0.30,
     cloudCount: 12, cloudOpacity: 0.9,
     // terrain vertex colors + ground texture
     terrainLow: '#4f8a35', terrainHigh: '#83b455', terrainDirt: '#9c7a48',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#7a6242', hutGlow: 0.45,
     ground: {},  // groundTexture defaults are the forest palette
     // rain-darkened forest dirt: gentle wet overlay on the default palette
     road: { wet: { darken: 0.26, gleam: 10, pools: 3 } },
@@ -319,12 +321,14 @@ const THEMES = {
   },
   desert: {
     fogColor: 0xf2ddb6, fogNear: 280, fogFar: 1350,
-    hemiSky: 0xffe9c4, hemiGround: 0xc9a86a,
-    sunColor: 0xffe6b0, sunIntensity: 2.2,
+    hemiSky: 0xd6dcf2, hemiGround: 0xd8ac66, hemiIntensity: 0.72,
+    sunColor: 0xffe2a4, sunIntensity: 3,
     skyTop: '#6fa8d8', skyHorizon: '#ffd9a0', sunGlow: 0xffdca0,
     sunAz: 0.55, sunEl: 0.20,                           // low golden desert sun
     cloudCount: 5, cloudOpacity: 0.55,
     terrainLow: '#c9a86a', terrainHigh: '#e2c78e', terrainDirt: '#b06e3c',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#b8814c', hutGlow: 0.45,
     ground: {
       base: '#c9a86a', bandLight: 'rgba(255,255,255,0.04)', bandDark: 'rgba(0,0,0,0.04)',
       patchA: 'rgba(160,110,60,0.18)', patchB: 'rgba(235,205,140,0.16)',
@@ -357,12 +361,14 @@ const THEMES = {
   snow: {
     surface: 'snow',                                    // physics reads this
     fogColor: 0xe2edf6, fogNear: 240, fogFar: 1250,
-    hemiSky: 0xdfeaf8, hemiGround: 0xb8c6d2,
-    sunColor: 0xeaf2ff, sunIntensity: 1.7,
+    hemiSky: 0x9ec4f2, hemiGround: 0x8fa0c8, hemiIntensity: 0.8,
+    sunColor: 0xfff2dc, sunIntensity: 2.25,
     skyTop: '#639fd8', skyHorizon: '#eaf3fa', sunGlow: 0xffffff,
     sunAz: 0.82, sunEl: 0.28,
     cloudCount: 9, cloudOpacity: 0.95,
     terrainLow: '#dde8ee', terrainHigh: '#ffffff', terrainDirt: '#b7c4cd',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#9fb2c8', hutGlow: 0.7,
     ground: {
       base: '#e6edf2', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(120,150,175,0.06)',
       patchA: 'rgba(165,190,210,0.20)', patchB: 'rgba(255,255,255,0.22)',
@@ -398,12 +404,14 @@ const THEMES = {
   // oasis pond, on-road hoodoo obstacles and mud puddles.
   canyon: {
     fogColor: 0xe8bd8a, fogNear: 200, fogFar: 1150,   // warm haze, close for canyon tightness
-    hemiSky: 0xffd9a8, hemiGround: 0xb5764a,
-    sunColor: 0xffc98a, sunIntensity: 2.1,
+    hemiSky: 0xcfd8f0, hemiGround: 0xc07a48, hemiIntensity: 0.72,
+    sunColor: 0xffc98a, sunIntensity: 2.85,
     skyTop: '#6f95c0', skyHorizon: '#ffcf96', sunGlow: 0xffc070,
     sunAz: 0.5, sunEl: 0.22,                             // late sun raking the walls
     cloudCount: 4, cloudOpacity: 0.5,
     terrainLow: '#c08050', terrainHigh: '#e0a870', terrainDirt: '#8f5430',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#9a5c34', hutGlow: 0.45,
     ground: {
       base: '#c68d58', bandLight: 'rgba(255,235,205,0.05)', bandDark: 'rgba(90,50,25,0.05)',
       patchA: 'rgba(150,90,45,0.20)', patchB: 'rgba(235,190,130,0.16)',
@@ -437,12 +445,14 @@ const THEMES = {
   // obsidian rocks, bare burnt trees, red-black mountains, dim ember light.
   volcano: {
     fogColor: 0x4a322a, fogNear: 230, fogFar: 1050,
-    hemiSky: 0xc98a66, hemiGround: 0x4a3a32, hemiIntensity: 1.05,  // ember dusk, but readable
-    sunColor: 0xff8a4a, sunIntensity: 2.0,
+    hemiSky: 0xc98a66, hemiGround: 0x4a3a32, hemiIntensity: 1,  // ember dusk, but readable
+    sunColor: 0xff8a4a, sunIntensity: 2.45,
     skyTop: '#341a28', skyHorizon: '#dd541c', sunGlow: 0xff6a28, skyCurve: 0.72,
     sunAz: 0.6, sunEl: 0.17,                             // ember sun low on the haze
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
     terrainLow: '#322c28', terrainHigh: '#564a40', terrainDirt: '#6a3c2c',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#4a3b33', hutGlow: 1.3,
     ground: {
       base: '#332e2a', bandLight: 'rgba(255,255,255,0.03)', bandDark: 'rgba(0,0,0,0.06)',
       patchA: 'rgba(18,14,12,0.22)', patchB: 'rgba(96,74,58,0.14)',
@@ -479,12 +489,14 @@ const THEMES = {
   // mossy green boulders, crisp cold sky, snow drifting near the summit.
   alpine: {
     fogColor: 0xdcecf8, fogNear: 300, fogFar: 1500,
-    hemiSky: 0xcfe4ff, hemiGround: 0x628a4c,
-    sunColor: 0xfff6e0, sunIntensity: 2.0,
+    hemiSky: 0xa8ccff, hemiGround: 0x5c8a46, hemiIntensity: 0.76,
+    sunColor: 0xfff2d2, sunIntensity: 2.8,
     skyTop: '#2f6fc8', skyHorizon: '#dceef8', sunGlow: 0xfff4cc,
     sunAz: 0.9, sunEl: 0.32,
     cloudCount: 10, cloudOpacity: 0.92,
     terrainLow: '#4c8a3c', terrainHigh: '#9ab87a', terrainDirt: '#8a7a5a',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#8f8163', hutGlow: 0.45,
     ground: {},   // lush meadow defaults read right at altitude too
     road: {},     // classic dirt rally surface
     hillColor: 0x54804a, peakColor: 0xdde8f0,           // snow-dusted horizon peaks
@@ -517,12 +529,14 @@ const THEMES = {
   glacial: {
     surface: 'snow',                                    // physics reads this
     fogColor: 0xd8e8f4, fogNear: 210, fogFar: 1200,
-    hemiSky: 0xd8ecff, hemiGround: 0xa8c2d8,
-    sunColor: 0xe8f4ff, sunIntensity: 1.8,
+    hemiSky: 0xa2c8f6, hemiGround: 0x8ea6cc, hemiIntensity: 0.8,
+    sunColor: 0xfff0dc, sunIntensity: 2.3,
     skyTop: '#4c8ecf', skyHorizon: '#dff0fa', sunGlow: 0xeafaff,
     sunAz: 0.7, sunEl: 0.24,                            // low polar sun
     cloudCount: 8, cloudOpacity: 0.9,
     terrainLow: '#cfe0ec', terrainHigh: '#ffffff', terrainDirt: '#9fb8c8',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#93aec4', hutGlow: 0.7,
     ground: {
       base: '#dfeaf2', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(110,145,175,0.07)',
       patchA: 'rgba(150,185,215,0.22)', patchB: 'rgba(255,255,255,0.22)',
@@ -578,12 +592,14 @@ const THEMES = {
   jungle: {
     surface: 'wet',                                    // downpour — physics reads this
     fogColor: 0xb8d8b0, fogNear: 170, fogFar: 950,     // humid green haze, dense
-    hemiSky: 0xd8f0d0, hemiGround: 0x3c6a34,
-    sunColor: 0xfff2c8, sunIntensity: 1.9,
+    hemiSky: 0xc8e8ff, hemiGround: 0x2e6a2a, hemiIntensity: 0.78,
+    sunColor: 0xfff2c8, sunIntensity: 2.55,
     skyTop: '#5a9ac8', skyHorizon: '#cfe8b8', sunGlow: 0xf8ffd0,
     sunAz: 1.0, sunEl: 0.34,                           // high tropical sun
     cloudCount: 10, cloudOpacity: 0.85,
     terrainLow: '#2e6a28', terrainHigh: '#5a9440', terrainDirt: '#6a4a2c',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#6a4a2c', hutGlow: 0.6,
     ground: {
       base: '#3e7a30', bandLight: 'rgba(255,255,255,0.04)', bandDark: 'rgba(0,40,0,0.06)',
       patchA: 'rgba(20,70,24,0.22)', patchB: 'rgba(120,180,70,0.16)',
@@ -621,12 +637,14 @@ const THEMES = {
   // sand road, sparse palms. Hazard contract: geysers (lead implements).
   dunes: {
     fogColor: 0xf5dfae, fogNear: 300, fogFar: 1400,
-    hemiSky: 0xffedc8, hemiGround: 0xd8b070,
-    sunColor: 0xffe2a0, sunIntensity: 2.3,
+    hemiSky: 0xd2dcf4, hemiGround: 0xd8ac66, hemiIntensity: 0.72,
+    sunColor: 0xffe0a0, sunIntensity: 3.05,
     skyTop: '#77aede', skyHorizon: '#ffe0a8', sunGlow: 0xffd890,
     sunAz: 0.5, sunEl: 0.18,
     cloudCount: 3, cloudOpacity: 0.5,
     terrainLow: '#d4ac6a', terrainHigh: '#f0d492', terrainDirt: '#b8823f',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#c08d50', hutGlow: 0.45,
     ground: {
       base: '#d8b273', bandLight: 'rgba(255,240,200,0.07)', bandDark: 'rgba(150,100,50,0.06)',
       patchA: 'rgba(170,120,60,0.16)', patchB: 'rgba(245,220,160,0.18)',
@@ -660,12 +678,14 @@ const THEMES = {
   // walls, tight corners, rockfall straights. Hazard contract: fallHazard.
   ravine: {
     fogColor: 0xdba87c, fogNear: 170, fogFar: 1000,
-    hemiSky: 0xffd2a0, hemiGround: 0xa06844,
-    sunColor: 0xffbe7e, sunIntensity: 2.0,
+    hemiSky: 0xd8d4e8, hemiGround: 0xa8663c, hemiIntensity: 0.72,
+    sunColor: 0xffbe7e, sunIntensity: 2.75,
     skyTop: '#6f92ba', skyHorizon: '#f8c088', sunGlow: 0xffb868,
     sunAz: 0.45, sunEl: 0.2,
     cloudCount: 3, cloudOpacity: 0.45,
     terrainLow: '#b06a3e', terrainHigh: '#d29057', terrainDirt: '#7e4426',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#7e4426', hutGlow: 0.45,
     ground: {
       base: '#b57a48', bandLight: 'rgba(255,225,190,0.05)', bandDark: 'rgba(80,40,20,0.06)',
       patchA: 'rgba(130,70,35,0.22)', patchB: 'rgba(220,170,110,0.16)',
@@ -709,12 +729,14 @@ const THEMES = {
   // ponds, mud everywhere. Hazard contract: critters (scorpions).
   oasis: {
     fogColor: 0xead9a8, fogNear: 260, fogFar: 1300,
-    hemiSky: 0xfff0c8, hemiGround: 0x7a9a4c,
-    sunColor: 0xffecb0, sunIntensity: 2.1,
+    hemiSky: 0xcfdcf8, hemiGround: 0x86a04c, hemiIntensity: 0.72,
+    sunColor: 0xffeaa8, sunIntensity: 2.85,
     skyTop: '#5aa2d8', skyHorizon: '#ffe4a8', sunGlow: 0xffe0a0,
     sunAz: 0.62, sunEl: 0.26,
     cloudCount: 6, cloudOpacity: 0.7,
     terrainLow: '#8faa52', terrainHigh: '#e0c488', terrainDirt: '#b08648',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#a8813f', hutGlow: 0.45,
     ground: {
       base: '#b0a266', bandLight: 'rgba(255,245,200,0.05)', bandDark: 'rgba(60,70,20,0.05)',
       patchA: 'rgba(80,120,40,0.20)', patchB: 'rgba(235,215,150,0.16)',
@@ -749,12 +771,14 @@ const THEMES = {
   // over the road. Strong rolling elevation, extra ramps.
   redwood: {
     fogColor: 0xd8e4cf, fogNear: 240, fogFar: 1300,
-    hemiSky: 0xcfe4d8, hemiGround: 0x4a6a38,
-    sunColor: 0xffeec8, sunIntensity: 1.9,
+    hemiSky: 0xb4d4ec, hemiGround: 0x40603a, hemiIntensity: 0.76,
+    sunColor: 0xffeec8, sunIntensity: 2.6,
     skyTop: '#4e8ecf', skyHorizon: '#e0ecd0', sunGlow: 0xfff0b8,
     sunAz: 0.75, sunEl: 0.3,
     cloudCount: 8, cloudOpacity: 0.85,
     terrainLow: '#3f7a2e', terrainHigh: '#6fa04a', terrainDirt: '#7a5638',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#6f5236', hutGlow: 0.5,
     ground: {
       base: '#4f8636', bandLight: 'rgba(255,255,255,0.04)', bandDark: 'rgba(0,20,0,0.06)',
       patchA: 'rgba(40,80,28,0.20)', patchB: 'rgba(140,180,90,0.14)',
@@ -788,12 +812,14 @@ const THEMES = {
   // plank bridges. Hazard contract: strips (water-flume speed lanes).
   flume: {
     fogColor: 0xd6e2d0, fogNear: 280, fogFar: 1400,
-    hemiSky: 0xd8e8f0, hemiGround: 0x5a7a44,
-    sunColor: 0xfff2d0, sunIntensity: 2.0,
+    hemiSky: 0xb8d8f4, hemiGround: 0x527a44, hemiIntensity: 0.76,
+    sunColor: 0xfff2d0, sunIntensity: 2.7,
     skyTop: '#4a90d0', skyHorizon: '#e8f0d8', sunGlow: 0xfff0c0,
     sunAz: 0.8, sunEl: 0.32,
     cloudCount: 10, cloudOpacity: 0.9,
     terrainLow: '#4c8434', terrainHigh: '#7cae52', terrainDirt: '#96703f',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#8a6a40', hutGlow: 0.5,
     ground: {},
     road: {
       base: '#9b7444', mottleA: [110, 78, 44], mottleB: [172, 134, 86],
@@ -825,12 +851,14 @@ const THEMES = {
   // ground fissures, scorched + burning trees. Hazard contract: fallHazard.
   wildfire: {
     fogColor: 0x6a3e28, fogNear: 190, fogFar: 900,
-    hemiSky: 0xe89a64, hemiGround: 0x5c4434, hemiIntensity: 1.3,
-    sunColor: 0xff8a48, sunIntensity: 2.2,
+    hemiSky: 0xe89a64, hemiGround: 0x5c4434, hemiIntensity: 1.22,
+    sunColor: 0xff8a48, sunIntensity: 2.6,
     skyTop: '#2c1a1e', skyHorizon: '#e8601e', sunGlow: 0xff6a20, skyCurve: 0.66,
     sunAz: 0.55, sunEl: 0.15,
     cloudCount: 9, cloudOpacity: 0.5, cloudTint: 0x5a4238,   // smoke columns
     terrainLow: '#5c4630', terrainHigh: '#7e6244', terrainDirt: '#96522c',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#7a4a28', hutGlow: 1.2,
     ground: {
       base: '#5c4a36', bandLight: 'rgba(255,255,255,0.03)', bandDark: 'rgba(0,0,0,0.07)',
       patchA: 'rgba(30,20,14,0.24)', patchB: 'rgba(130,100,68,0.14)',
@@ -867,12 +895,14 @@ const THEMES = {
   sheetice: {
     surface: 'snow',                                    // physics reads this
     fogColor: 0xdceef8, fogNear: 230, fogFar: 1250,
-    hemiSky: 0xe0f0ff, hemiGround: 0xa8c4d8,
-    sunColor: 0xf0f8ff, sunIntensity: 1.8,
+    hemiSky: 0xa6ccf8, hemiGround: 0x92a8cc, hemiIntensity: 0.78,
+    sunColor: 0xfff2e0, sunIntensity: 2.3,
     skyTop: '#3d84c8', skyHorizon: '#e4f4fc', sunGlow: 0xf0fbff,
     sunAz: 0.75, sunEl: 0.22,
     cloudCount: 6, cloudOpacity: 0.8,
     terrainLow: '#d8e8f2', terrainHigh: '#ffffff', terrainDirt: '#a4c0d2',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#a8bccc', hutGlow: 0.7,
     ground: {
       base: '#e2edf4', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(110,150,180,0.07)',
       patchA: 'rgba(140,180,215,0.22)', patchB: 'rgba(255,255,255,0.22)',
@@ -926,12 +956,14 @@ const THEMES = {
   avalanche: {
     surface: 'snow',                                    // physics reads this
     fogColor: 0xe6eef6, fogNear: 250, fogFar: 1300,
-    hemiSky: 0xdfeaf8, hemiGround: 0xb0c0ce,
-    sunColor: 0xeef4ff, sunIntensity: 1.8,
+    hemiSky: 0x9ec4f2, hemiGround: 0x8fa2c8, hemiIntensity: 0.8,
+    sunColor: 0xfff0dc, sunIntensity: 2.3,
     skyTop: '#5590cc', skyHorizon: '#eef6fc', sunGlow: 0xffffff,
     sunAz: 0.85, sunEl: 0.3,
     cloudCount: 10, cloudOpacity: 0.95,
     terrainLow: '#e2eaf0', terrainHigh: '#ffffff', terrainDirt: '#b0bec8',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#a2b4c4', hutGlow: 0.7,
     ground: {
       base: '#e6edf2', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(120,150,175,0.06)',
       patchA: 'rgba(165,190,210,0.20)', patchB: 'rgba(255,255,255,0.22)',
@@ -972,13 +1004,15 @@ const THEMES = {
   neon: {
     surface: 'wet',                                     // glossy glass-asphalt
     fogColor: 0x0a0a18, fogNear: 260, fogFar: 1400,
-    hemiSky: 0x36406a, hemiGround: 0x1c1430, hemiIntensity: 1.2,
-    sunColor: 0x8a9aff, sunIntensity: 0.9,              // cold moonlight
+    hemiSky: 0x36406a, hemiGround: 0x1c1430, hemiIntensity: 1.15,
+    sunColor: 0x8a9aff, sunIntensity: 1.15,              // cold moonlight
     skyTop: '#03030a', skyHorizon: '#461e6e', sunGlow: 0xff40c0, skyCurve: 0.8,
     sunAz: 0.6, sunEl: 0.5, sunSprite: false, stars: true,
     hazeColor: 0xb93ee8, hazeOpacity: 0.4,              // city glow ringing the horizon
     cloudCount: 0, cloudOpacity: 0,
     terrainLow: '#101018', terrainHigh: '#1e1e2c', terrainDirt: '#28203a',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#2a2440', hutGlow: 1,
     ground: {
       base: '#14141c', bandLight: 'rgba(80,240,255,0.04)', bandDark: 'rgba(0,0,0,0.12)',
       patchA: 'rgba(40,20,80,0.25)', patchB: 'rgba(30,60,90,0.18)',
@@ -1023,13 +1057,15 @@ const THEMES = {
   // concrete tunnel walls, sickly lamp light, debris. Hazard: rats.
   undercity: {
     fogColor: 0x1c2418, fogNear: 60, fogFar: 460,       // very close, very dark
-    hemiSky: 0x8a9a5c, hemiGround: 0x2a2c1e, hemiIntensity: 1.7,
-    sunColor: 0xd8e87a, sunIntensity: 1.5,              // sickly grate-light shafts
+    hemiSky: 0x8a9a5c, hemiGround: 0x2a2c1e, hemiIntensity: 1.62,
+    sunColor: 0xd8e87a, sunIntensity: 1.85,              // sickly grate-light shafts
     skyTop: '#05070a', skyHorizon: '#182014', sunGlow: 0x9aa858, skyCurve: 0.8,
     sunAz: 0.4, sunEl: 0.6, sunSprite: false,
     hazeColor: 0x2a301c, hazeOpacity: 0.6,
     cloudCount: 0, cloudOpacity: 0,
     terrainLow: '#23261e', terrainHigh: '#34382c', terrainDirt: '#2c2418',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#2c2a1e', hutGlow: 1,
     ground: {
       base: '#262a20', bandLight: 'rgba(255,255,255,0.02)', bandDark: 'rgba(0,0,0,0.08)',
       patchA: 'rgba(14,18,10,0.24)', patchB: 'rgba(70,78,54,0.14)',
@@ -1083,12 +1119,14 @@ const THEMES = {
   // thins to bare rock as the road gains altitude.
   pass: {
     fogColor: 0xd6eaf8, fogNear: 330, fogFar: 1600,
-    hemiSky: 0xcce2ff, hemiGround: 0x5e8248,
-    sunColor: 0xfff6e2, sunIntensity: 2.05,
+    hemiSky: 0xa8ccff, hemiGround: 0x548044, hemiIntensity: 0.76,
+    sunColor: 0xfff4dc, sunIntensity: 2.8,
     skyTop: '#2a68c4', skyHorizon: '#dceffa', sunGlow: 0xfff4cc,
     sunAz: 0.95, sunEl: 0.34,
     cloudCount: 12, cloudOpacity: 0.9,
     terrainLow: '#4e8a3e', terrainHigh: '#94a888', terrainDirt: '#8a8074',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#8a8074', hutGlow: 0.5,
     skirtColor: '#948f85',                              // grey masonry cut face
     ground: {},
     road: {
@@ -1139,12 +1177,14 @@ const THEMES = {
   // modern climb back up the east flank.
   tremola: {
     fogColor: 0xcfdfec, fogNear: 300, fogFar: 1500,
-    hemiSky: 0xc4dcf4, hemiGround: 0x60764e,
-    sunColor: 0xfff0dc, sunIntensity: 1.95,
+    hemiSky: 0xa8cbf0, hemiGround: 0x58724a, hemiIntensity: 0.76,
+    sunColor: 0xffeed4, sunIntensity: 2.7,
     skyTop: '#3570bc', skyHorizon: '#dae8f2', sunGlow: 0xffeec8,
     sunAz: 0.42, sunEl: 0.26,                           // low afternoon sun down the valley
     cloudCount: 13, cloudOpacity: 0.95,
     terrainLow: '#4a7c3e', terrainHigh: '#8f9a84', terrainDirt: '#7d766a',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#837a6e', hutGlow: 0.5,
     skirtColor: '#8b8579',
     ground: {},
     road: {
@@ -1198,14 +1238,16 @@ const THEMES = {
   furka: {
     surface: 'snow',                                    // physics reads this
     fogColor: 0xdfeaf4, fogNear: 300, fogFar: 1600,
-    hemiSky: 0xd6e8ff, hemiGround: 0xa8b4bc,
-    sunColor: 0xfff4e4, sunIntensity: 1.95,
+    hemiSky: 0xb0d0ff, hemiGround: 0x94a6c4, hemiIntensity: 0.78,
+    sunColor: 0xfff2e0, sunIntensity: 2.45,
     skyTop: '#3f7fc8', skyHorizon: '#e6f1f8', sunGlow: 0xfffbe8,
     // high sun: a low winter sun threw car/tower shadows the length of the
     // bridge deck and read as a black stripe down the middle of the crossing
     sunAz: 0.72, sunEl: 0.62,
     cloudCount: 10, cloudOpacity: 0.9,
     terrainLow: '#dfe7ec', terrainHigh: '#ffffff', terrainDirt: '#9a8a72',
+    // steep-face colour for the faceted ground + warmth in the hut windows
+    terrainScree: '#9a8a72', hutGlow: 0.65,
     skirtColor: '#8e8a80',                              // rock cut below the shelf
     ground: {
       base: '#e8eef3', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(120,150,175,0.05)',
@@ -1568,6 +1610,11 @@ export class Track {
       fogColor: T.fogColor, fogNear: T.fogNear, fogFar: T.fogFar,
       hemiSky: T.hemiSky, hemiGround: T.hemiGround, hemiIntensity: T.hemiIntensity,
       sunColor: T.sunColor, sunIntensity: T.sunIntensity,
+      // compass bearing / height of the sun this level DRAWS in its sky — the
+      // directional key is aimed from the same bearing so shadows point the way
+      // the visible sun says they should
+      sunAz: T.sunAz, sunEl: T.sunEl,
+      skyTop: T.skyTop, skyHorizon: T.skyHorizon,
       // [hexA, hexB] debris chip colors for fence/cliff scrape particles
       splinter: T.splinter,
       // ambient weather particle recipe for this level: { type, color, rate? }
@@ -2010,10 +2057,19 @@ export class Track {
    *  open field below the road datum — FURKA RIDGE uses it so the ridge road
    *  stands well proud of everything around it. */
   _hillNoise(x, z) {
+    // Fourth octave (λ ≈ 55 u, ≈ 5 terrain cells) exists purely so the FACETS
+    // read: with only the three long octaves every 10 u quad was very nearly
+    // coplanar with its neighbours, so flat shading had no tone to give and the
+    // open field rendered as one smooth green sheet. Max grade added is
+    // 1.4 × 0.114 ≈ 9°, well inside what the car drives over in free roam, and
+    // the SAME function feeds prop placement (terrainHeight) and the mesh, so
+    // nothing floats. `relief` lets a theme dial it out (neon grid, salt flats).
+    const rel = this.T.relief !== undefined ? this.T.relief : 1;
     return (
       Math.sin(x * 0.012) * Math.cos(z * 0.010) * 3.4 +
       Math.sin(x * 0.030 + 1.7) * Math.cos(z * 0.026 + 0.6) * 1.7 +
-      Math.sin(x * 0.070 + 3.1) * Math.cos(z * 0.062 + 2.2) * 0.7
+      Math.sin(x * 0.070 + 3.1) * Math.cos(z * 0.062 + 2.2) * 0.7 +
+      Math.sin(x * 0.114 + 5.3) * Math.cos(z * 0.101 + 1.4) * 2.2 * rel
       - (this.T.hillDrop || 0)
     );
   }
@@ -2074,8 +2130,153 @@ export class Track {
     }
     // the hero gorge is carved out of whatever the ground would otherwise be,
     // road corridor included — that is the hole the suspension bridge spans
-    return this._gorge ? h - this._gorgeCut(x, z) : h;
+    if (this._gorge) h -= this._gorgeCut(x, z);
+    // the river runs in a real bed, not on top of the field — but the channel
+    // is flattened out again as it nears the road so the FORD stays a shallow
+    // wash across the carriageway instead of a trench (and so the road skirts,
+    // which were built before the river was planned, still meet the ground)
+    if (this._river) {
+      h -= this._riverCut(x, z) * THREE.MathUtils.smoothstep(d, 15, 30);
+    }
+    return h;
   }
+
+  // ---- continuous river ------------------------------------------------------
+  /** Plan ONE waterway that spans the whole world and threads every ford.
+   *
+   *  What shipped before was a 130 u meander built independently at each ford,
+   *  so from above you saw two disconnected flat quads with hard straight ends
+   *  whose banks did not even line up across the road. This builds a single
+   *  centripetal spline: it enters at one world edge, passes through each ford
+   *  crossing perpendicular to the road at that point, and leaves at the far
+   *  edge. Everything downstream (bed carve, water ribbon, banks, reeds, ford
+   *  wash) reads this one curve, so the crossing cannot mismatch.
+   *
+   *  `chosen` = the ford samples picked by _buildFords, ascending by index. */
+  _planRiver(chosen) {
+    if (!chosen.length) return;
+    const pts = [];
+    const lead = 34;                       // straight run either side of a ford
+    const order = chosen.slice().sort((a, b) => a.i - b.i);
+    const P = (x, z, lock) => { const v = new THREE.Vector3(x, 0, z); v.lock = !!lock; return v; };
+    // The circuit is a CLOSED loop, so `nrm` points to the same hand all the
+    // way round. Entering every ford from the same side would force the reach
+    // between two crossings back over the carriageway — which is exactly the
+    // stray second water band the first build produced. Alternate instead: come
+    // out of ford k on one side, and enter ford k+1 from that same side.
+    let enter = -1;
+    for (let k = 0; k < order.length; k++) {
+      const fd = order[k];
+      const c = this.center[fd.i], n = this.nrm[fd.i];
+      const exit = -enter;
+      // the crossing itself: dead straight and square to the road, and LOCKED
+      // (the road-avoidance pass below must never move a crossing point)
+      pts.push(P(c.x + n.x * lead * enter, c.z + n.z * lead * enter, true));
+      pts.push(P(c.x, c.z, true));
+      pts.push(P(c.x + n.x * lead * exit, c.z + n.z * lead * exit, true));
+      // Reach to the next crossing. A straight line between two fords cuts
+      // straight back over the carriageway wherever the circuit bends between
+      // them (the track is a loop, so "the far side of ford k" and "the near
+      // side of ford k+1" are only connected without crossing if you go the way
+      // the ROAD goes). So the reach is generated FROM THE CENTERLINE, held out
+      // at a wandering 48-78 u offset on the side the river is currently on —
+      // it parallels the circuit and can never re-cross it.
+      if (k + 1 < order.length) {
+        const from = fd.i, to = order[k + 1].i;
+        const span = ((to - from) + N) % N;
+        const steps = Math.max(3, Math.round(span / 14));
+        for (let s = 1; s < steps; s++) {
+          const t = s / steps;
+          const gi = (from + Math.round(span * t)) % N;
+          const off = 62 + Math.sin(t * Math.PI * 2.4 + fd.i * 0.31) * 16;
+          const q = this.pointAt(gi, exit * off);
+          pts.push(P(q.x, q.z));
+        }
+      }
+      enter = exit;
+    }
+    // run both ends out past the visible world so the river never "starts"
+    const extend = (from, to, sign) => {
+      let dx = to.x - from.x, dz = to.z - from.z;
+      const l = Math.hypot(dx, dz) || 1;
+      dx /= l; dz /= l;
+      for (let k = 1; k <= 7; k++) {
+        const step = 150 * k;
+        const sway = Math.sin(k * 0.75 + (sign > 0 ? 1.3 : 4.1)) * 40;
+        pts[sign > 0 ? 'push' : 'unshift'](P(
+          to.x + dx * step - dz * sway, to.z + dz * step + dx * sway
+        ));
+      }
+    };
+    extend(pts[1], pts[0], -1);
+    extend(pts[pts.length - 2], pts[pts.length - 1], 1);
+    // ROAD AVOIDANCE. Between the locked crossings the spline is free to wander,
+    // and left alone it happily loops back over the carriageway — which is what
+    // put a second, ford-less water band across the road in the first build.
+    // Any unlocked control point that strays inside the corridor is pushed back
+    // out along the road normal at its nearest sample.
+    const KEEP = 46;
+    const tmpv = new THREE.Vector3();
+    for (const p of pts) {
+      if (p.lock) continue;
+      for (let pass = 0; pass < 5; pass++) {
+        const i = this.nearestIndex(tmpv.set(p.x, 0, p.z), null);
+        const c = this.center[i];
+        const d = Math.hypot(p.x - c.x, p.z - c.z);
+        if (d >= KEEP) break;
+        const n = this.nrm[i];
+        const sgn = (p.x - c.x) * n.x + (p.z - c.z) * n.z >= 0 ? 1 : -1;
+        p.x = c.x + n.x * KEEP * sgn;
+        p.z = c.z + n.z * KEEP * sgn;
+      }
+    }
+
+    const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+    const half = 4.0, bank = 6.0;
+    // dense polyline for distance queries + a uniform hash grid over it
+    const SAMP = Math.max(64, Math.ceil(curve.getLength() / 11));
+    const line = [];
+    for (let s = 0; s <= SAMP; s++) line.push(curve.getPointAt(s / SAMP));
+    const CELL = 42;                        // > half + bank, so a 3×3 lookup is exact
+    const grid = new Map();
+    for (let k = 0; k < line.length; k++) {
+      const key = `${Math.floor(line[k].x / CELL)},${Math.floor(line[k].z / CELL)}`;
+      let a = grid.get(key);
+      if (!a) grid.set(key, a = []);
+      a.push(k);
+    }
+    this._river = { curve, line, grid, CELL, half, bank, depth: 1.5, fords: order };
+  }
+
+  /** Distance from (x, z) to the river centreline, or Infinity past the bed. */
+  _riverDist(x, z) {
+    const R = this._river;
+    const cx = Math.floor(x / R.CELL), cz = Math.floor(z / R.CELL);
+    let best = Infinity;
+    for (let a = -1; a <= 1; a++) {
+      for (let b = -1; b <= 1; b++) {
+        const arr = R.grid.get(`${cx + a},${cz + b}`);
+        if (!arr) continue;
+        for (const k of arr) {
+          const p = R.line[k];
+          const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
+          if (d < best) best = d;
+        }
+      }
+    }
+    return best === Infinity ? Infinity : Math.sqrt(best);
+  }
+
+  /** Depth of the river bed at (x, z): a U-shaped channel that eases back to
+   *  grade at the top of the bank. Mirrors _gorgeCut's contract. */
+  _riverCut(x, z) {
+    const R = this._river;
+    const outer = R.half + R.bank;
+    const d = this._riverDist(x, z);
+    if (!(d < outer)) return 0;
+    return R.depth * Math.pow(Math.cos((d / outer) * Math.PI * 0.5), 1.4);
+  }
+  // ---- end continuous river --------------------------------------------------
 
   /** Depth of the river gorge at (x, z): 0 everywhere outside it, easing to
    *  the full depth along the channel. Applied inside _blendHeight so the
@@ -2222,10 +2423,16 @@ export class Track {
     // soft with a faint icy sheen, dry dirt is fully rough as before.
     // envMapIntensity is a standard-material property, safe before env exists.
     const surf = this.T.surface;
+    // Roughness pulled UP and env pulled DOWN from 0.30/1.3 and 0.55/0.6: with
+    // the key light now ~35 % stronger and raked lower, a 0.30-rough road threw
+    // a broad white specular smear straight down the carriageway that the bloom
+    // pass then blew out — the same failure mode as the sun billboard. Wet road
+    // still reads wet (sheen + the roadTexture's own gleam), it just no longer
+    // mirrors the sun into the player's eyes.
     const mat = new THREE.MeshStandardMaterial({
       map: tex, metalness: 0,
-      roughness: surf === 'wet' ? 0.3 : surf === 'snow' ? 0.55 : 1,
-      envMapIntensity: surf === 'wet' ? 1.3 : surf === 'snow' ? 0.6 : 1,
+      roughness: surf === 'wet' ? 0.52 : surf === 'snow' ? 0.7 : 1,
+      envMapIntensity: surf === 'wet' ? 0.75 : surf === 'snow' ? 0.45 : 1,
     });
     // NEO-KYOTO: the edge line-work glows through an emissive companion map
     // (black except the lines) so bloom catches it against the night
@@ -2925,61 +3132,17 @@ export class Track {
       chosen.push({ i, half: 3 + rnd() * 2 });                 // 6–10u wide band
     }
     if (!chosen.length) return;
-    const tex = riverTexture();
-    tex.anisotropy = 4;
-    const waterMat = new THREE.MeshStandardMaterial({
-      map: tex, roughness: 0.16, metalness: 0.06, side: THREE.DoubleSide,
-      transparent: true, opacity: 0.9,
-    });
+    // ONE river through all of them (see _planRiver): the water ribbon itself
+    // is built later, in _buildRiver, from that single curve — this loop now
+    // only registers the physics bands and paints the foam lines on the road.
+    this._planRiver(chosen);
     const foamMat = new THREE.MeshBasicMaterial({
       color: 0xf2fbff, transparent: true, opacity: 0.4, depthWrite: false,
     });
     for (const fd of chosen) {
-      const c = this.center[fd.i], n = this.nrm[fd.i], tg = this.tan[fd.i];
+      const c = this.center[fd.i];
       const roadW = this.widthAt(fd.i);
       this.fords.push({ i: fd.i, x: c.x, z: c.z, y: c.y, half: fd.half });
-      // meandering stream ribbon crossing the road along the local normal
-      const pts = [];
-      for (let s = -5; s <= 5; s++) {
-        const d = s * 13;
-        const sway = Math.sin(s * 1.35 + fd.i * 0.6) * 8 * Math.min(1, Math.abs(s) / 2.2);
-        pts.push(new THREE.Vector3(c.x + n.x * d + tg.x * sway, 0, c.z + n.z * d + tg.z * sway));
-      }
-      const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
-      const SEGS = 64;
-      const verts = new Float32Array((SEGS + 1) * 2 * 3);
-      const uvs = new Float32Array((SEGS + 1) * 2 * 2);
-      const idx = [];
-      for (let s = 0; s <= SEGS; s++) {
-        const t = s / SEGS;
-        const p = curve.getPointAt(t);
-        const tn = curve.getTangentAt(t);
-        // shallow sheet OVER the road through the crossing, easing down to
-        // sit on (just under) the open terrain past the road corridor
-        const df = this._distToTrackCoarse(p.x, p.z);
-        const lift = 1 - THREE.MathUtils.smoothstep(df, roadW, roadW + 7);
-        const y = this.terrainHeight(p.x, p.z) + 0.055 * lift - 0.12 * (1 - lift);
-        // stream width: fat through the ford, tapering into the banks
-        const wv = fd.half * (0.5 + 0.6 * Math.sqrt(Math.sin(Math.PI * t)));
-        const o = s * 6;
-        verts[o] = p.x + tn.z * wv; verts[o + 1] = y; verts[o + 2] = p.z - tn.x * wv;
-        verts[o + 3] = p.x - tn.z * wv; verts[o + 4] = y; verts[o + 5] = p.z + tn.x * wv;
-        uvs[s * 4] = t * 6; uvs[s * 4 + 1] = 0;
-        uvs[s * 4 + 2] = t * 6; uvs[s * 4 + 3] = 1;
-      }
-      for (let s = 0; s < SEGS; s++) {
-        const a = s * 2, b = s * 2 + 1, cc = s * 2 + 2, d2 = s * 2 + 3;
-        idx.push(a, b, cc, b, d2, cc);
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-      geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-      geo.setIndex(idx);
-      geo.computeVertexNormals();
-      const mesh = new THREE.Mesh(geo, waterMat);
-      mesh.receiveShadow = true;
-      mesh.renderOrder = 1;                       // above the road ribbon
-      this.group.add(mesh);
       // foam lines where the water meets the road at both edges of the band
       const heading = this.headingAt(fd.i);
       for (const s of [-1, 1]) {
@@ -3374,6 +3537,7 @@ export class Track {
       // oasisCount ponds (OASIS AMBUSH scatters three; canyon keeps its one)
       for (let k = 0, n = this.T.oasisCount || 1; k < n; k++) this._buildOasis();
     }
+    if (this._river) this._buildRiver();             // the one world-spanning waterway
     if (this.T.riverCount) this._buildRivers();      // jungle streams under the road
     if (this.T.hollowArch) this._buildHollowArch();  // redwood drive-through trunk
     if (this.T.lamps) this._buildLamps();            // neon / undercity road lamps
@@ -4317,7 +4481,18 @@ export class Track {
       ...this.T.road, wet: null, snowCover: null, ice: null, cobbles: null, neon: null, ruts: true,
     });
     spurTex.anisotropy = 8;
-    const spurMat = new THREE.MeshStandardMaterial({ map: spurTex, roughness: 1 });
+    // RGBA vertex colours drive the feather: the ribbon used to be a blunt
+    // rectangle that stopped dead in open grass (and from the default TOP-DOWN
+    // camera that straight cut is the first thing you see). Alpha now runs to 0
+    // along an outer skirt column on each side and over the last third of the
+    // run, so the surface dissolves into the field instead of being cut off.
+    const spurMat = new THREE.MeshStandardMaterial({
+      map: spurTex, roughness: 1, vertexColors: true,
+      transparent: true, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
+    });
+    // junction + destination dressing, all instanced across every spur
+    const dress = this._spurDressing(want);
     const patchMat = new THREE.MeshStandardMaterial({
       map: junctionTexture(this.T.road), roughness: 1, transparent: true,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
@@ -4352,6 +4527,17 @@ export class Track {
         uz = t.z * sa * MAXC + n.z * side * sn2;
       }
       const len = Math.min(30, Math.max(12, dl - (tg.r || 10)));
+      // never lay a spur (or its farmstead) into the river: the reach runs
+      // parallel to the circuit at ~62 u, which is exactly the band the
+      // pastures and huts these spurs aim at live in
+      const mouth = this.pointAt(i, side * 8);
+      if (this._river) {
+        let wet = false;
+        for (let f = 0; f <= len + 18 && !wet; f += 5) {
+          if (this._riverDist(mouth.x + ux * f, mouth.z + uz * f) < 17) wet = true;
+        }
+        if (wet) continue;
+      }
       // --- spur ribbon: starts under the road edge, conforms to the terrain ---
       const S = Math.max(4, Math.ceil(len / 3));
       const p0 = this.pointAt(i, side * 8);
@@ -4363,32 +4549,53 @@ export class Track {
       // upside-down and back-face-culled away, invisible from the car and from
       // straight above even though the mesh sat correctly on the terrain.
       const px = uz, pz = -ux;
-      const verts = new Float32Array((S + 1) * 2 * 3);
-      const uvs = new Float32Array((S + 1) * 2 * 2);
+      // FOUR columns per row, not two: an outer skirt at alpha 0 on each side
+      // feathers the spur into the grass, and the far end tapers AND fades.
+      const COLS = 4;
+      const verts = new Float32Array((S + 1) * COLS * 3);
+      const uvs = new Float32Array((S + 1) * COLS * 2);
+      const cols = new Float32Array((S + 1) * COLS * 4);
       const idx = [];
+      const base = new THREE.Color(1, 1, 1);
       for (let s = 0; s <= S; s++) {
         const f = s / S;
-        const half = 5.4 - 2.0 * f;                          // junction flare → lane
+        // junction flare → lane → nothing: the last third narrows to a track
+        const half = (5.4 - 2.0 * f) * (1 - 0.62 * THREE.MathUtils.smoothstep(f, 0.55, 1));
+        const feather = 1.1 + 0.9 * (1 - f);
         const qx = p0.x + ux * f * len, qz = p0.z + uz * f * len;
         const blend = THREE.MathUtils.smoothstep(f, 0, 0.4);
-        const o = s * 6;
-        for (const [sl, k] of [[1, 0], [-1, 3]]) {
-          const vx = qx + px * half * sl, vz = qz + pz * half * sl;
-          const ty = this._terrainMeshHeight(vx, vz) + 0.22;
-          verts[o + k] = vx;
-          verts[o + k + 1] = y0 * (1 - blend) + ty * blend;
-          verts[o + k + 2] = vz;
+        // opaque up the graded run, gone by the end
+        const aLong = 1 - THREE.MathUtils.smoothstep(f, 0.62, 1);
+        for (let cI = 0; cI < COLS; cI++) {
+          // columns: outer-left, left, right, outer-right
+          const sl = cI < 2 ? 1 : -1;
+          const outer = (cI === 0 || cI === 3);
+          const off = half + (outer ? feather : 0);
+          const vx = qx + px * off * sl, vz = qz + pz * off * sl;
+          const ty = this._terrainMeshHeight(vx, vz) + (outer ? 0.13 : 0.22);
+          const o = (s * COLS + cI) * 3;
+          verts[o] = vx;
+          verts[o + 1] = y0 * (1 - blend) + ty * blend;
+          verts[o + 2] = vz;
+          const u = (s * COLS + cI) * 2;
+          uvs[u] = outer ? (sl > 0 ? -0.12 : 1.12) : (sl > 0 ? 0 : 1);
+          uvs[u + 1] = (f * len) / 10;
+          const cq = (s * COLS + cI) * 4;
+          cols[cq] = base.r; cols[cq + 1] = base.g; cols[cq + 2] = base.b;
+          cols[cq + 3] = aLong * (outer ? 0 : 1);
         }
-        uvs[s * 4] = 0; uvs[s * 4 + 1] = (f * len) / 10;
-        uvs[s * 4 + 2] = 1; uvs[s * 4 + 3] = (f * len) / 10;
       }
       for (let s = 0; s < S; s++) {
-        const a = s * 2, b = s * 2 + 1, d = s * 2 + 2, e = s * 2 + 3;
-        idx.push(a, b, d, b, e, d);
+        for (let cI = 0; cI < COLS - 1; cI++) {
+          const a = s * COLS + cI, b = a + 1;
+          const d = (s + 1) * COLS + cI, e = d + 1;
+          idx.push(a, b, d, b, e, d);
+        }
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
       geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      geo.setAttribute('color', new THREE.BufferAttribute(cols, 4));
       geo.setIndex(idx);
       geo.computeVertexNormals();
       const spur = new THREE.Mesh(geo, spurMat);
@@ -4409,6 +4616,7 @@ export class Track {
       patch.receiveShadow = true;
       this.group.add(patch);
       used.push(i);
+      dress.place(p0, ux, uz, px, pz, len, c.y, tg);
       // Traffic-agent contract (see the doc comment above): the four required
       // fields plus a ready-made world-space ray so a router never has to redo
       // the cone maths. u = tan*cos(angle) + nrm*side*sin(angle) reconstructs
@@ -4422,6 +4630,136 @@ export class Track {
         y: c.y,                                              // road height at the junction
       });
     }
+    dress.finish();
+  }
+
+  /** Junction + destination dressing for the crossroad spurs.
+   *
+   *  A graded strip running into empty grass reads as unfinished geometry, so
+   *  every spur now gets (a) a mouth you can recognise as a gateway — two gate
+   *  posts, an open five-bar gate leaf and a short post-and-rail fence flanking
+   *  the first stretch — and (b) a VISIBLE DESTINATION at the far end: a
+   *  farmstead of barn + silo + feed trough, so from the junction it is obvious
+   *  the track goes somewhere.
+   *
+   *  COST: eight InstancedMeshes total for the whole level regardless of how
+   *  many junctions there are (`want` ≤ 4), i.e. 8 extra draw calls and ~1.4 k
+   *  triangles. Everything reuses box/cylinder/cone primitives that are already
+   *  in the level's geometry set.
+   *
+   *  SOLIDITY (RULES §1): the barn and silo push out as 'hut'; gate posts and
+   *  fence rails join the SOLID fence family. Nothing here is ghost scenery. */
+  _spurDressing(want) {
+    const T = this.T;
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v3 = new THREE.Vector3();
+    const m4 = new THREE.Matrix4();
+    const mk = (geo, mat, n, cast = true) => {
+      const im = new THREE.InstancedMesh(geo, mat, Math.max(1, n));
+      im.castShadow = cast; im.receiveShadow = true; im.count = 0;
+      return im;
+    };
+    const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0);
+    const cyl = new THREE.CylinderGeometry(1, 1, 1, 8); cyl.translate(0, 0.5, 0);
+    const cone = new THREE.ConeGeometry(1, 1, 8); cone.translate(0, 0.5, 0);
+    const roof = new THREE.ConeGeometry(0.86, 0.5, 4); roof.rotateY(Math.PI / 4);
+    const timber = new THREE.MeshStandardMaterial({
+      color: 0x6b4a2a, flatShading: true, roughness: 0.95,
+    });
+    const wallMat = new THREE.MeshStandardMaterial({
+      map: buildingTexture(), roughness: 0.85, envMapIntensity: 0.4,
+      emissive: 0xffffff, emissiveMap: buildingGlowTexture(),
+      emissiveIntensity: T.hutGlow !== undefined ? T.hutGlow : 0.45,
+    });
+    const roofMat = new THREE.MeshStandardMaterial({
+      // a shade deeper than the cottage roofs so the barn reads as its own
+      // building rather than a bright plate dropped on the field
+      color: new THREE.Color(T.hutRoof).multiplyScalar(0.78),
+      flatShading: true, roughness: 0.85,
+    });
+    const siloMat = new THREE.MeshStandardMaterial({
+      color: 0xc8c2b4, flatShading: true, roughness: 0.7, metalness: 0.15,
+    });
+    const M = {
+      posts: mk(box, timber, want * 10),          // gate posts + fence posts
+      rails: mk(box, timber, want * 8),           // gate leaf + post-and-rail
+      barn: mk(box, wallMat, want),
+      barnRoof: mk(roof, roofMat, want),
+      silo: mk(cyl, siloMat, want),
+      siloCap: mk(cone, roofMat, want),
+      trough: mk(box, timber, want * 2),
+      grid: mk(box, timber, want * 5),            // cattle-grid bars at the mouth
+    };
+    const push = (im, x, y, z, rot, sx, sy, sz) => {
+      if (im.count >= im.instanceMatrix.count) return;
+      q.setFromAxisAngle(up, rot);
+      m4.compose(v3.set(x, y, z), q, new THREE.Vector3(sx, sy, sz));
+      im.setMatrixAt(im.count++, m4);
+    };
+    return {
+      /** p0 = spur mouth, (ux,uz) = along the spur, (px,pz) = across it. */
+      place: (p0, ux, uz, px, pz, len, roadY, tan) => {
+        const rot = Math.atan2(ux, uz);
+        const gy = (x, z) => this.terrainHeight(x, z);
+        // --- cattle grid: five bars laid across the mouth ---
+        for (let k = 0; k < 5; k++) {
+          const f = 2.0 + k * 0.85;
+          const x = p0.x + ux * f, z = p0.z + uz * f;
+          push(M.grid, x, roadY - 0.02, z, rot, 9.4, 0.18, 0.34);
+        }
+        // --- gate posts + open leaf, 6 u up the spur ---
+        const gx = p0.x + ux * 6.5, gz = p0.z + uz * 6.5;
+        for (const sl of [1, -1]) {
+          const x = gx + px * 5.0 * sl, z = gz + pz * 5.0 * sl;
+          const y = gy(x, z);
+          push(M.posts, x, y - 0.2, z, rot, 0.55, 2.6, 0.55);
+          this.solids.push({ x, z, r: 0.5, y, mat: 'fence' });
+        }
+        // the leaf swung open along the fence line, so the way in reads OPEN
+        for (let k = 0; k < 3; k++) {
+          const x = gx + px * 5.0 + ux * (1.4 + k * 0.0), z = gz + pz * 5.0 + uz * 1.4;
+          push(M.rails, x, gy(x, z) + 0.6 + k * 0.62, z, rot + 1.15, 3.0, 0.16, 0.14);
+        }
+        // --- post-and-rail fence flanking the first stretch ---
+        for (const sl of [1, -1]) {
+          for (let k = 0; k < 3; k++) {
+            const f = 10 + k * 5.5;
+            const off = 5.0 + f * 0.06;
+            const x = p0.x + ux * f + px * off * sl, z = p0.z + uz * f + pz * off * sl;
+            const y = gy(x, z);
+            push(M.posts, x, y - 0.15, z, rot, 0.36, 1.9, 0.36);
+            this.solids.push({ x, z, r: 0.34, y, mat: 'fence' });
+            if (k < 2) {
+              const f2 = f + 2.75, off2 = 5.0 + f2 * 0.06;
+              const rx = p0.x + ux * f2 + px * off2 * sl, rz = p0.z + uz * f2 + pz * off2 * sl;
+              push(M.rails, rx, gy(rx, rz) + 1.15, rz, rot, 0.13, 0.16, 5.6);
+            }
+          }
+        }
+        // --- destination: barn + silo + trough, squared up at the far end ---
+        const ex = p0.x + ux * (len + 15), ez = p0.z + uz * (len + 15);
+        const ey = gy(ex, ez);
+        const bw = 8.0, bh = 5.0;
+        push(M.barn, ex, ey - 0.5, ez, rot + 0.22, bw, bh, bw * 0.78);
+        push(M.barnRoof, ex, ey - 0.5 + bh, ez, rot + 0.22, bw * 1.22, bh * 0.8, bw * 1.02);
+        this.solids.push({ x: ex, z: ez, r: bw * 0.62, y: ey, mat: 'hut' });
+        this._addShadow(ex, ez, bw * 0.8);
+        const sx2 = ex + px * 7.5, sz2 = ez + pz * 7.5;
+        const sy2 = gy(sx2, sz2);
+        push(M.silo, sx2, sy2 - 0.4, sz2, rot, 1.9, 7.6, 1.9);
+        push(M.siloCap, sx2, sy2 - 0.4 + 7.6, sz2, rot, 2.2, 1.5, 2.2);
+        this.solids.push({ x: sx2, z: sz2, r: 2.0, y: sy2, mat: 'hut' });
+        this._addShadow(sx2, sz2, 2.5);
+        const tx = ex - px * 6.5 - ux * 3, tz = ez - pz * 6.5 - uz * 3;
+        push(M.trough, tx, gy(tx, tz) - 0.1, tz, rot + 0.5, 1.1, 0.75, 4.2);
+      },
+      finish: () => {
+        for (const im of Object.values(M)) {
+          if (!im.count) continue;
+          im.instanceMatrix.needsUpdate = true;
+          this.group.add(im);
+        }
+      },
+    };
   }
 
   /** Open grazing ground for the animal system: 4-8 flat, road-free circles.
@@ -4683,9 +5021,10 @@ export class Track {
       const x = pos.getX(i), z = pos.getZ(i);
       const far = Math.max(Math.abs(x), Math.abs(z)) > 900;
       const h = far
-        // skip the track-distance falloff far away (hillDrop still applies so
-        // the open field meets the near terrain without a step)
-        ? Math.sin(x * 0.012) * Math.cos(z * 0.010) * 3.4 - (T.hillDrop || 0)
+        // skip the track-distance falloff far away, but keep the FULL hill
+        // noise: dropping octaves here left a visible ±2.4 u step at the 900 u
+        // ring where the two height functions disagreed
+        ? this._hillNoise(x, z)
         : this._terrainMeshHeight(x, z);
       pos.setY(i, h - 0.12);
       const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
@@ -4693,6 +5032,9 @@ export class Track {
       // sprinkle dirt patches
       const dirt = Math.max(0, Math.sin(x * 0.045 + 2) * Math.sin(z * 0.05) - 0.72) * 3;
       tmp.lerp(cDirt, THREE.MathUtils.clamp(dirt, 0, 0.55));
+      // valley shading: hollows sit a little deeper in tone than the crests, so
+      // the rolling ground reads as form instead of a flat wash
+      tmp.multiplyScalar(0.84 + 0.16 * t);
       // the hero gorge is cut through red-rock strata: banded ochre/rust walls
       // fading back to the snowfield at the rim
       if (this._gorge) {
@@ -4706,14 +5048,83 @@ export class Track {
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
+    const REPEAT = 48;
     const gtex = groundTexture(T.ground);
-    gtex.repeat.set(48, 48);
-    gtex.anisotropy = 4;
-    const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-      map: gtex, vertexColors: true, roughness: 1, metalness: 0,
-    }));
+    gtex.repeat.set(REPEAT, REPEAT);
+    // 2×, not 4×: the ground is by far the largest surface on screen and the
+    // facet mosaic now carries the detail the anisotropic filtering used to be
+    // paying for. Buys back part of what flat shading + the facet maths cost.
+    gtex.anisotropy = 2;
+    const mat = new THREE.MeshStandardMaterial({
+      // FLAT SHADING IS THE WHOLE LOOK and it is free: three derives the face
+      // normal from screen-space derivatives of vViewPosition, so every
+      // triangle gets one constant tone with no extra geometry, no extra
+      // attribute and no extra draw call.
+      map: gtex, vertexColors: true, roughness: 1, metalness: 0, flatShading: true,
+    });
+    this._facetGround(mat, SEG / REPEAT);
+    const ground = new THREE.Mesh(geo, mat);
     ground.receiveShadow = true;
     this.scene.add(ground);
+  }
+
+  /** Per-facet ground tone + slope tint, injected into the standard shader.
+   *
+   *  Flat shading alone gives each triangle a constant *light* response; the
+   *  reference art also gives each one a slightly different *albedo*, which is
+   *  what makes low-poly ground read as a hand-placed mosaic. Two additions,
+   *  together about a dozen fragment ALU ops and zero new varyings/attributes:
+   *
+   *   1. a hash keyed on the terrain quad index (derived from the map uv, which
+   *      is already a varying) — deterministic in world space, so it never
+   *      shimmers as the camera moves, and aligned to the 10 u grid so tone
+   *      steps land exactly on quad edges;
+   *   2. a slope tint toward the theme's scree colour, using the world-space
+   *      geometric normal (`normal` under FLAT_SHADED, rotated back out of view
+   *      space by the always-declared `viewMatrix` uniform). Steep faces turn to
+   *      bare rock/earth the way a real hillside does; flat ground is untouched.
+   */
+  _facetGround(mat, cellScale) {
+    const T = this.T;
+    const scree = new THREE.Color(T.terrainScree !== undefined ? T.terrainScree : T.terrainDirt);
+    // NOTE ON UNITS: `slope` below is 1 − |n·up|, not an angle. The open field
+    // only reaches ~20° (slope ≈ 0.06), so the useful band is TINY — an
+    // innocent-looking [0.16, 0.55] range never fires at all. Road cuts, gorge
+    // walls and the sunk-field rims are the only places that reach 0.2+.
+    const amp = T.facetAmp !== undefined ? T.facetAmp : 0.34;
+    const range = T.screeSlope || [0.018, 0.115];
+    mat.onBeforeCompile = (sh) => {
+      mat.userData.shader = sh;             // live-tunable from the gfx harness
+      sh.uniforms.uFacetCell = { value: cellScale };
+      sh.uniforms.uFacetAmp = { value: amp };
+      sh.uniforms.uScree = { value: scree };
+      sh.uniforms.uScreeRange = { value: new THREE.Vector2(range[0], range[1]) };
+      sh.uniforms.uScreeMax = { value: T.screeMax !== undefined ? T.screeMax : 0.45 };
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', `#include <common>
+          uniform float uFacetCell, uFacetAmp, uScreeMax;
+          uniform vec3 uScree;
+          uniform vec2 uScreeRange;`)
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+          {
+            // sine-free hash: the classic fract(sin(dot(..))*43758) DEGENERATES
+            // here — the cell index runs to ~420, and sin() of an argument that
+            // large is near-constant on SwiftShader and on plenty of mobile
+            // GPUs, so the whole field came out one flat tone. This one is
+            // exact in float and costs less.
+            vec2 fcell = floor(vMapUv * uFacetCell);
+            vec3 fp = fract(vec3(fcell.xyx) * 0.1031);
+            fp += dot(fp, fp.yzx + 33.33);
+            float fh = fract((fp.x + fp.y) * fp.z);
+            diffuseColor.rgb *= 1.0 + (fh - 0.5) * uFacetAmp;
+            vec3 wN = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
+            float slope = 1.0 - clamp(abs(wN.y), 0.0, 1.0);
+            diffuseColor.rgb = mix(diffuseColor.rgb, uScree,
+              uScreeMax * smoothstep(uScreeRange.x, uScreeRange.y, slope));
+          }`);
+    };
+    // distinct key so this program is not shared with plain ground materials
+    mat.customProgramCacheKey = () => 'facetGround';
   }
 
   _buildSky() {
@@ -6240,8 +6651,14 @@ export class Track {
     wallGeo.translate(0, 0.5, 0);
     const roofGeo = new THREE.ConeGeometry(0.85, 0.55, 4);
     roofGeo.rotateY(Math.PI / 4);
+    // warm lit windows: the emissive map is black except the panes, so this is
+    // one extra texture fetch on ~14 instanced boxes and the huts stop reading
+    // as empty crates. `hutGlow` per theme — brightest at dusk (volcano,
+    // wildfire, neon) and in snow, where the reference art leans hardest on it.
     const wallMat = new THREE.MeshStandardMaterial({
       map: buildingTexture(), roughness: 0.8, envMapIntensity: 0.5,
+      emissive: 0xffffff, emissiveMap: buildingGlowTexture(),
+      emissiveIntensity: this.T.hutGlow !== undefined ? this.T.hutGlow : 0.5,
     });
     const roofMat = new THREE.MeshStandardMaterial({
       color: this.T.hutRoof, flatShading: true, roughness: 0.8, envMapIntensity: 0.5,
@@ -6689,6 +7106,164 @@ export class Track {
    *  across the circuit slightly BELOW road level (the road bridges over).
    *  Each river threads through one of the road's mud puddles — that puddle
    *  IS the crossing hazard, so the existing puddle mechanic covers it. */
+  /** Build the one continuous waterway planned by _planRiver: a shoreline band
+   *  laid in the carved bed, the water ribbon inside it (lifting to a shallow
+   *  sheet where it washes across the road at a ford), reeds along the margin
+   *  and a scatter of rocks breaking the surface.
+   *
+   *  BUDGET — four extra draw calls and roughly 5 k triangles for the whole
+   *  world, which is less than the two throwaway 64-segment ford quads this
+   *  replaces plus the reeds. Everything is one mesh or one InstancedMesh; the
+   *  water is a single strip, not a per-crossing patch. */
+  _buildRiver() {
+    const R = this._river;
+    const curve = R.curve;
+    const total = curve.getLength();
+    const SEGS = Math.max(90, Math.min(230, Math.round(total / 13)));
+    const waterTex = riverTexture();
+    waterTex.anisotropy = 4;
+    const bankTex = riverBankTexture(this.T.riverBank);
+    bankTex.anisotropy = 4;
+    bankTex.repeat.set(1, 1);
+
+    // sample once; both ribbons and all the dressing reuse these frames
+    const F = [];
+    for (let s = 0; s <= SEGS; s++) {
+      const t = s / SEGS;
+      const p = curve.getPointAt(t);
+      const tn = curve.getTangentAt(t);
+      const nx = tn.z, nz = -tn.x;
+      // width breathes a little so the reach never reads as a canal
+      const wob = 1 + 0.24 * Math.sin(t * 41 + 0.7) + 0.12 * Math.sin(t * 17.3);
+      const df = this._distToTrackCoarse(p.x, p.z);
+      F.push({ t, x: p.x, z: p.z, nx, nz, w: R.half * wob, df });
+    }
+
+    const strip = (cols, yFor, uvFor, alphaFor) => {
+      const C = cols.length;
+      const verts = new Float32Array((SEGS + 1) * C * 3);
+      const uvs = new Float32Array((SEGS + 1) * C * 2);
+      const colA = new Float32Array((SEGS + 1) * C * 4);
+      const idx = [];
+      for (let s = 0; s <= SEGS; s++) {
+        const f = F[s];
+        for (let c = 0; c < C; c++) {
+          const off = cols[c] * f.w;
+          const vx = f.x + f.nx * off, vz = f.z + f.nz * off;
+          const o = (s * C + c) * 3;
+          verts[o] = vx; verts[o + 1] = yFor(f, off, vx, vz); verts[o + 2] = vz;
+          const u = (s * C + c) * 2;
+          const uv = uvFor(f, c, C);
+          uvs[u] = uv[0]; uvs[u + 1] = uv[1];
+          const q = (s * C + c) * 4;
+          colA[q] = colA[q + 1] = colA[q + 2] = 1;
+          colA[q + 3] = alphaFor(f, c, C);
+        }
+      }
+      for (let s = 0; s < SEGS; s++) {
+        for (let c = 0; c < C - 1; c++) {
+          const a = s * C + c, b = a + 1, d = (s + 1) * C + c, e = d + 1;
+          // WINDING: columns run along +normal and rows along +tangent, and
+          // n × t points DOWN — so the naive (a,b,d) order builds the ribbon
+          // face-down and FrontSide materials cull it away entirely. Reversed.
+          idx.push(a, d, b, b, d, e);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      geo.setAttribute('color', new THREE.BufferAttribute(colA, 4));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      return geo;
+    };
+
+    // --- shoreline: pebbles/mud from the waterline out over the bank top ---
+    const BANK = (R.half + R.bank) / R.half;
+    const bankGeo = strip(
+      [-BANK, -1.02, 1.02, BANK],
+      (f, off, vx, vz) => this.terrainHeight(vx, vz) + 0.05,
+      (f, c) => [f.t * (total / 26), c === 0 ? 0 : c === 1 ? 0.42 : c === 2 ? 0.58 : 1],
+      // outer columns feather into the grass; the whole band also fades out
+      // across the road so the ford stays clean water on the carriageway
+      (f, c, C) => (c === 0 || c === C - 1 ? 0 : 1)
+        * THREE.MathUtils.smoothstep(f.df, 9, 20)
+    );
+    const bank = new THREE.Mesh(bankGeo, new THREE.MeshStandardMaterial({
+      map: bankTex, roughness: 1, vertexColors: true, transparent: true,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    }));
+    bank.name = 'river-bank';
+    bank.receiveShadow = true;
+    this.group.add(bank);
+
+    // --- water: sits IN the bed, rises to a shallow sheet over the ford ---
+    const waterY = (f, off, vx, vz) => {
+      const lift = 1 - THREE.MathUtils.smoothstep(f.df, 10, 26);
+      const bed = this.terrainHeight(vx, vz);
+      // in the open the surface sits partway up the carved channel; across the
+      // road it becomes a thin wash sitting just proud of the deck
+      return bed + (1 - lift) * (R.depth * 0.42) + lift * 0.06;
+    };
+    const waterGeo = strip(
+      [-1, -0.35, 0.35, 1],
+      waterY,
+      (f, c, C) => [f.t * (total / 18), c / (C - 1)],
+      () => 1
+    );
+    const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({
+      map: waterTex, roughness: 0.18, metalness: 0.06, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.9, vertexColors: true, depthWrite: false,
+    }));
+    water.name = 'river-water';
+    water.renderOrder = 1;
+    water.receiveShadow = true;
+    this.group.add(water);
+
+    // --- margin dressing: reeds along the bank, boulders in the stream ---
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const m4 = new THREE.Matrix4(), v3 = new THREE.Vector3();
+    const reedGeo = new THREE.ConeGeometry(0.5, 1, 4);
+    reedGeo.translate(0, 0.5, 0);
+    const reeds = new THREE.InstancedMesh(reedGeo, new THREE.MeshStandardMaterial({
+      color: this.T.reedColor !== undefined ? this.T.reedColor : 0x6f8a3e,
+      flatShading: true, roughness: 1,
+    }), 160);
+    reeds.count = 0;
+    const rockGeo = this._rockGeo || (this._rockGeo = this._topLitRockGeo(0));
+    const rocks = new THREE.InstancedMesh(rockGeo, new THREE.MeshStandardMaterial({
+      color: this.T.rockColor, flatShading: true, roughness: 0.9, vertexColors: true,
+    }), 40);
+    rocks.count = 0;
+    rocks.castShadow = true;
+    const put = (im, x, y, z, rot, sx, sy, sz) => {
+      if (im.count >= im.instanceMatrix.count) return;
+      q.setFromAxisAngle(up, rot);
+      m4.compose(v3.set(x, y, z), q, new THREE.Vector3(sx, sy, sz));
+      im.setMatrixAt(im.count++, m4);
+    };
+    for (let s = 2; s < SEGS - 2; s += 2) {
+      const f = F[s];
+      if (f.df < 22) continue;                       // keep the ford approach clear
+      for (const sl of [1, -1]) {
+        if (Math.random() > 0.5) continue;
+        const off = f.w * (1.05 + Math.random() * 0.5);
+        const x = f.x + f.nx * off * sl, z = f.z + f.nz * off * sl;
+        const y = this.terrainHeight(x, z);
+        const h = 0.9 + Math.random() * 1.5;
+        put(reeds, x, y - 0.1, z, Math.random() * 3.14, 0.5 + Math.random() * 0.3, h, 0.5);
+      }
+      if (Math.random() < 0.16) {
+        const off = f.w * (Math.random() - 0.5) * 1.2;
+        const x = f.x + f.nx * off, z = f.z + f.nz * off;
+        const sc = 0.5 + Math.random() * 0.7;
+        put(rocks, x, this.terrainHeight(x, z) + sc * 0.3, z, Math.random() * 3.14, sc, sc * 0.8, sc);
+      }
+    }
+    if (reeds.count) { reeds.instanceMatrix.needsUpdate = true; this.group.add(reeds); }
+    if (rocks.count) { rocks.instanceMatrix.needsUpdate = true; this.group.add(rocks); }
+  }
+
   _buildRivers() {
     const count = Math.min(this.T.riverCount | 0, this.puddles.length);
     if (!count) return;
