@@ -111,6 +111,13 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 | Mud puddles | SOFT | — | heavy drag + slick grip inside | — | Brown splash while inside |
 | Boost pads | TERRAIN | — | — | — | Forward impulse, yellow chevrons |
 | Launch ramps | TERRAIN | — | — | — | Airborne launch — vy capped at 11 u/s and light air drag (×0.10/s) while flying, so no nitro launch ever throws a car out of the world; landing puff + brief loose grip |
+| Crossroad spur | TERRAIN | — | — | — | Graded dirt side-road leaving the carriageway on rural worlds; no colliders, normal off-road rules. The junction patch itself is DECOR. Exported as `track.crossroads` (index, side, angle, len, mouth x/z, direction dx/dz, endX/endZ, halfWidth 3.4 flaring to 5.4, y) so traffic can route across |
+
+**Wheel ruts are a soft-ground-only mark.** Dirt, sand, snow and ash record
+ruts; sealed asphalt (GOTTHARD CLIMB), stone setts (TREMOLA), sheet ice,
+glass-asphalt (NEON GRID) and poured concrete (UNDERCITY) never do. Declared
+per theme as `theme.road.ruts`. Ruts are always the car's own track width
+(2.6 u), never a lane pair.
 
 ### Cliff walls (canyon-type worlds)
 
@@ -178,8 +185,19 @@ walls.
 | Pine tree | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | "TIMBER!" — felled trunk flies with topple spin. 30 hp vs cannon (~3 hits fells it); blasts fell instantly |
 | Saguaro cactus | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | BURSTS in place — pulp splinters and a slump, never the pine topple-roll. Includes roadside cacti at canyon wall base; 30 hp vs cannon |
 | Burnt snag | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | Trunk only, no foliage; 30 hp vs cannon |
+| Palm · doum palm · kapok (s < 1.0) · broadleaf · tree fern · tanoak · burnt stump | BREAKABLE | 7 u/s | 18 % speed + 4 hull | +15 | Tropical and understory species; all yield |
+| Kapok emergent (s ≥ 1.0) | SOLID **big tree** | — | up to −35 hull | — | AMAZON RAPIDS — the tree wins |
 | Bush | SOFT | — | 15 % speed once per pass (2 s cooldown) | +5 | Leaf burst + dust; bush stays rooted |
 | Grass tufts / flowers / pebbles | DECOR | — | — | — | All < 0.5 u, legal decor |
+
+Solidity is read from the tree record itself:
+`yields = tr.solid !== undefined ? !tr.solid : (tr.kind !== 'pine' || tr.s < 1.0)`.
+Every tree carries an explicit `solid` flag, so a tropical world never inherits
+pine behaviour by shape.
+
+**Biome plausibility.** Every world carries 2–4 plausible flora species with
+scale and colour jitter — no monocultures, no conifer on a tropical world, and
+no livestock dressing (troughs, hay racks) on a city world.
 
 ### Structures & trackside
 
@@ -229,6 +247,12 @@ walls.
 | Boundaries | NONE — open world; AI-only clamp at road edge; canyon cliffs stone-clamp (open at the start bowl, cliff height ≤ 2.5) | vehicles.js |
 | Off-road speed factor | ×(0.55 + 0.45 × car off-road stat), any mode | vehicles.js |
 | Lap checkpoint | must touch samples 0.4N–0.6N before the line crossing counts | vehicles.js `checkLap` |
+| Grid spawn checkpoint credit | a fresh `placeAt` credits the far checkpoint only inside 0.4N–0.85N. The grid sits at ~0.99N, so cars start uncredited and the first line crossing after GO banks nothing — without the upper bound every "3 lap" race ran as two, with a ~1.2 s BEST LAP | vehicles.js `placeAt` |
+| Respawn checkpoint credit | `placeAt(i, lat, keepCP=true)` preserves credit already earned; used by wreck-respawn and the AI pit-lift so recovery never costs a lap | vehicles.js |
+| Cliff peel-off rate | 1.4 u/s flat (was `1.2 + 4×lean`, which ping-ponged cars between dual canyon walls) | vehicles.js |
+| Launch punch | +55 % thrust below 0.5 × **showroom** top speed (referencing live `maxSpeed` let difficulty and the rubber band widen the rivals' punch window) | vehicles.js |
+| Wheel-rut spacing | 2.6 u — the car's own track (wheels at ±1.3) | textures.js `RUT_CX` |
+| Snow ploughed swath | ±5.2 u banked berms with car-width polished wheel tracks inside | textures.js `applySnowRoad` |
 | SOLID velocity absorb | ×1.05 (5 % rebound), all materials | vehicles.js |
 | Grind tangential loss | 3 %/contact-frame (−20 % per handling lvl) | vehicles.js |
 | STONE damage | impact > 6 → min(85, (i−6)×3.5) | main.js `onSolidCrash` |
@@ -325,3 +349,40 @@ input and never corners for you — it only stops the car wandering.
 The chase cameras additionally damp their own yaw (4.5/s) toward a blend of
 heading and travel direction, so flicks and drifts no longer whip the view —
 that whip was what made the 3D views hard to drive.
+
+## 10. Difficulty & rival balance
+
+The three difficulties differ in pace, aggression, how hard the rubber band
+pulls, whether rivals carry rockets, and how much hull damage the player
+actually absorbs.
+
+| Difficulty | aiSpeed | aiAggression | rubberBand | Rockets fired at the player | Player hull intake |
+|---|---|---|---|---|---|
+| EASY | ×0.88 | ×0.65 | ×1.25 | **never** | ×0.45 |
+| NORMAL | ×1.00 | ×1.00 | ×1.00 | **~0.7/min** — first at 24 s, budget 1 per 85 s | ×0.62 |
+| HARD | ×1.10 | ×1.40 | ×0.75 | **~2–3.3/min** — first at 8 s, budget 1 per 20 s | ×0.85 |
+
+Rival grid stats: `maxSpeed` 53–60 (× aiSpeed × engine parity × rubber band,
+floor ×0.7), `accel` **34.5–39.2** — deliberately inside the garage's 36–40 so
+no rival out-accelerates every purchasable car, `grip` 5.8, `steerRate` 3.0.
+
+**Engine parity.** Rival top speed rises **+2 % per player ENGINE level, capped
+at +10 %**, on NORMAL and HARD only. It reads the *selected car's* upgrade
+levels — upgrades are stored per car, so a global lookup silently reads zero.
+
+**Rocket pacing is budgeted, not cooldown-gated.** Launches are metered against
+race time (`fired < min(1 + floor((raceTime − first)/period), fired + 2)`, with
+6 s minimum spacing), so a quiet stretch is repaid at the next real opportunity
+instead of being thrown away. Rivals fire at a player 10–75 u ahead, inside a
+`min(14, 4 + 0.25 × distance)` cone. Rank sets reload speed only — it must never
+gate *whether* a rival can fire, because a leading rival is by definition in
+front of a mid-pack player and the two conditions cancel out.
+
+**Balance targets** (verified by probe, not by feel):
+
+| Target | Limit | Measured |
+|---|---|---|
+| Launch parity, player vs pack time-to-40 u/s | ≤ 10 % advantage | −1.3 % … +1.7 % |
+| Median P1–P2 gap, NORMAL | < 6 s | 0.09–0.52 s |
+| Rank volatility, NORMAL | lead must change hands | player finishes P1–P3, rank swings 1↔5 |
+| EASY stays casual-winnable | yes | a 0.85-pace driver still wins, gap 0.93 s |

@@ -75,9 +75,12 @@ for (let lvl = 1; lvl <= 18; lvl++) {
     // every AI must make real progress over 30s
     const stuck = r.aiDelta.filter(a => a.moved < 0.05);
     if (stuck.length) note(lvl, 'AI made no progress', JSON.stringify(stuck));
-    // AI should complete at least one lap in 30s of racing
-    const noLap = r.aiDelta.filter(a => a.lap < 2);
-    if (noLap.length === r.aiDelta.length) note(lvl, 'no AI completed a lap in 30s', JSON.stringify(r.aiDelta.map(a => a.lap)));
+    // Lap-counter sanity. A lap takes ~34s of game time and this probe covers
+    // roughly 7s of it, so nobody can legitimately have banked one. A car
+    // sitting on lap 2 here means the start line is gifting a lap — the grid
+    // spawn used to do exactly that, making every 3-lap race a 2-lap race.
+    const freeLap = r.aiDelta.filter(a => a.lap > 1);
+    if (freeLap.length) note(lvl, 'AI banked an impossible lap (free lap at the grid?)', JSON.stringify(freeLap));
     // AI falling off the world
     const lowAI = r.samples.some(s => s.ai.some(a => a.alive && a.y < -50));
     if (lowAI) note(lvl, 'AI fell out of the world', '');

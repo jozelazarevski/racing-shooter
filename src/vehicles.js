@@ -625,7 +625,7 @@ export class Car {
   get speedAlong() { return this.vel.dot(this.forward); }
   get progress() { return this.lap + this.trackIndex / this.game.track.N; }
 
-  placeAt(index, lateral) {
+  placeAt(index, lateral, keepCP = false) {
     const t = this.game.track;
     this.pos.copy(t.pointAt(index, lateral));
     this.heading = t.headingAt(index);
@@ -639,9 +639,14 @@ export class Car {
     this._lastGY = gy; this._climbRate = 0; this._climbSm = 0; this.jumpPitch = 0;
     this.slip = 0; this.landGrip = 0; this.reverseTimer = 0;
     this.visYaw = 0; this.steerVis = 0; this.steerSmooth = 0;
-    // lap checkpoint state matches where we spawned: a respawn past the far
-    // checkpoint keeps credit for it, a grid spawn must earn it fresh
-    this._midCP = index > this.game.track.N * 0.4;
+    // Lap checkpoint state matches where we spawned. A respawn keeps whatever
+    // far-checkpoint credit the car had already earned (keepCP); a fresh place
+    // must earn it. The grid sits just BEFORE the line at ~0.99N, so the window
+    // stops at 0.85N — without that upper bound the first line crossing after
+    // GO banks a free lap and a "3 lap" race is really two.
+    this._midCP = keepCP
+      ? (this._midCP ?? false)
+      : (index > this.game.track.N * 0.4 && index < this.game.track.N * 0.85);
     this.syncMesh(0);
   }
 
@@ -1403,7 +1408,7 @@ export class Car {
     this._tintFrac = 1;
     this.game.restoreCarParts?.(this);
     this._applyScorch(1); // fresh paint job with the fresh hull
-    this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6));
+    this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6), true);
   }
 
   /** Lap bookkeeping — call with previous index before this frame's update.
@@ -1963,7 +1968,7 @@ export class EnemyCar extends Car {
         && dxp * Math.sin(g.player.heading) + dzp * Math.cos(g.player.heading) > 0;
       if (!seen || this._deepStuckT > 9) {
         this._deepStuckT = 0; this._stuckT = 0; this._revT = 0;
-        this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6));
+        this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6), true);
         return;
       }
     }

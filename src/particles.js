@@ -49,6 +49,24 @@ const BARREL_DEF_A = new THREE.Color('#c29a5c'); // default stave (desert palett
 const BARREL_DEF_B = new THREE.Color('#4a3620'); // default hoop
 const _pbA = new THREE.Color();               // scratch: propBurst tint pair
 const _pbB = new THREE.Color();
+// stave/hoop pairs mirroring track.js BARREL_PALETTES, so a smashed barrel
+// sheds ITS colour. setTheme(levelTheme) selects one; unknown themes fall back
+// to the wooden default. (Kept here rather than imported: particles.js must
+// stay free of track/theme imports.)
+const BARREL_TINTS = {
+  desert: ['#c29a5c', '#4a3620'], canyon: ['#9a6440', '#33291e'],
+  volcano: ['#37322e', '#e8381e'], glacial: ['#7aa8c4', '#2c4456'],
+  jungle: ['#5a7a34', '#2c3a1a'], dunes: ['#c9a05e', '#4a3620'],
+  ravine: ['#8f5434', '#2e2016'], wildfire: ['#2e2a26', '#e8481e'],
+  sheetice: ['#8ab4d0', '#2c4456'], avalanche: ['#7aa8c4', '#2c4456'],
+  neon: ['#22262e', '#26f6ff'], undercity: ['#3a4034', '#8a9a3c'],
+};
+// Per-frame prop-burst budget (sprites). A shockwave levels a dozen props in
+// ONE frame; uncapped that is a four-figure spawn spike in a single tick —
+// exactly the pressure that used to freeze the game. Over budget, later
+// bursts in the same frame thin to 40 % instead of being dropped, so every
+// prop still visibly crushes.
+const BURST_BUDGET = 620;
 
 // ---- ambient weather (cached colors + per-type spawn rates, spawns/second) ----
 const LEAF_ALT = new THREE.Color('#c9a83a');   // dry-yellow leaf variant
@@ -136,6 +154,7 @@ export class Particles {
   }
 
   update(dt) {
+    this._burstSpent = 0; // prop-burst budget resets every frame
     for (let i = 0; i < MAX; i++) {
       if (this.life[i] <= 0) continue;
       this.life[i] -= dt;
@@ -266,6 +285,13 @@ export class Particles {
     }
   }
 
+  /** Point the prop-crush recipes at a world: currently just the barrel
+   *  stave/hoop pair, so a smashed drum sheds the theme's own colours.
+   *  Safe to call with anything (unknown/undefined → wooden default). */
+  setTheme(themeId) {
+    this.barrelTint = BARREL_TINTS[themeId] ?? null;
+  }
+
   /** Material-aware crush burst for smashed props. `type` is the prop's
    *  `pr.type` string; `dir` a horizontal unit vector away from the impactor
    *  (null → radial); `energy` 0..1 from impact speed (call sites pass
@@ -284,7 +310,14 @@ export class Particles {
         dx * out + Math.cos(a) * out * 0.55, up, dz * out + Math.sin(a) * out * 0.55,
         c, size, life, { grav, drag, shrink, alpha });
     };
-    const n = (base, spread) => Math.round((base + Math.random() * spread) * MOBILE_BURST);
+    // count helper: mobile scale + the per-frame burst budget, and it books
+    // what it hands out so a multi-prop blast thins itself instead of the pool
+    const thin = (this._burstSpent ?? 0) > BURST_BUDGET ? 0.4 : 1;
+    const n = (base, spread) => {
+      const c = Math.max(1, Math.round((base + Math.random() * spread) * MOBILE_BURST * thin));
+      this._burstSpent = (this._burstSpent ?? 0) + c;
+      return c;
+    };
     switch (type) {
       case 'crate': {
         // chunky two-tone planks out+up, pale fast slivers, a tan dust puff
@@ -295,7 +328,7 @@ export class Particles {
         for (let i = n(4, 2); i > 0; i--)
           shard(SPLINTER_WHITE, 1.2 + Math.random() * 0.6,
             14 + Math.random() * 8, 3 + Math.random() * 4, 0.1 + Math.random() * 0.1, 20, 0.3, 1);
-        for (let i = 3; i > 0; i--)
+        for (let i = n(3, 0); i > 0; i--)
           shard(Math.random() < 0.5 ? DUST_A : DUST_B, 3 + Math.random() * 2,
             2 + Math.random() * 2, 1.5 + Math.random() * 1.5, 0.5 + Math.random() * 0.3, 2, 1.5, 1.4, 0.5);
         break;
@@ -324,7 +357,7 @@ export class Particles {
             Math.random() < 0.55 ? HAY_A : HAY_B, 1.2 + Math.random(),
             1 + Math.random() * 0.6, { grav: 6, drag: 0.8, shrink: 0.6, alpha: 0.95 });
         }
-        for (let i = 4; i > 0; i--) // chaff dust cloud hanging where the bale was
+        for (let i = n(4, 0); i > 0; i--) // chaff dust cloud hanging where the bale was
           shard(HAY_B, 3.5 + Math.random() * 2.5, 1.5 + Math.random() * 2,
             1.5 + Math.random() * 2, 0.9 + Math.random() * 0.5, 1, 1.2, 1.5, 0.35);
         break;
@@ -335,9 +368,11 @@ export class Particles {
           shard(Math.random() < 0.6 ? SNOW_A : SNOW_B, 1.8 + Math.random() * 1.2,
             (7 + Math.random() * 7) * (0.5 + k * 0.5), 3.5 + Math.random() * 4,
             0.4 + Math.random() * 0.3, 26);
-        for (let i = 5; i > 0; i--)
-          shard(SNOW_A, 3.2 + Math.random() * 2.4, 2 + Math.random() * 2.5,
-            1.5 + Math.random() * 2, 0.6 + Math.random() * 0.35, 2, 1.4, 1.6, 0.5);
+        // powder puff: starts fat and shrinks away as it fades (shrink < 1),
+        // the opposite of the tan dust clouds — reads as settling snow
+        for (let i = n(5, 0); i > 0; i--)
+          shard(SNOW_A, 4.4 + Math.random() * 2.6, 2 + Math.random() * 2.5,
+            1.5 + Math.random() * 2, 0.6 + Math.random() * 0.35, 2, 1.4, 0.4, 0.55);
         break;
       }
       case 'cone': {
@@ -345,7 +380,7 @@ export class Particles {
           shard(CONE_ORANGE, 1.1 + Math.random() * 0.6,
             12 + Math.random() * 8 * (0.5 + k), 3 + Math.random() * 4,
             0.25 + Math.random() * 0.2, 30, 0.5);
-        for (let i = 2; i > 0; i--)
+        for (let i = n(2, 0); i > 0; i--)
           shard(CONE_WHITE, 1.1 + Math.random() * 0.5,
             13 + Math.random() * 7, 3 + Math.random() * 3, 0.2 + Math.random() * 0.15, 30, 0.5);
         break;
@@ -356,7 +391,7 @@ export class Particles {
           shard(Math.random() < 0.5 ? ROCK_A : ROCK_B, 1.5 + Math.random(),
             (10 + Math.random() * 8) * (0.5 + k * 0.5), 1.5 + Math.random() * 2.5,
             0.3 + Math.random() * 0.2, 36, 0.4);
-        for (let i = 3; i > 0; i--)
+        for (let i = n(3, 0); i > 0; i--)
           shard(SMOKE_GRAY, 3 + Math.random() * 2, 2 + Math.random() * 2,
             1 + Math.random() * 1.5, 0.4 + Math.random() * 0.2, 2, 1.6, 1.4, 0.4);
         break;
