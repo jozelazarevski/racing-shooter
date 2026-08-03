@@ -32,12 +32,31 @@ const RICO_A = new THREE.Color('#ffe86b');
 const RICO_B = new THREE.Color('#ffab3d');
 const MISSILE_SMOKE = new THREE.Color('#9a938a');
 
+// ---- prop-crush palette (cached; propBurst fires on every smashed prop) ----
+const CRATE_A = new THREE.Color('#8a5a2a');   // dark plank (crateTexture grain)
+const CRATE_B = new THREE.Color('#c9a25e');   // lit plank face
+const HAY_A = new THREE.Color('#e0c25a');     // bright straw
+const HAY_B = new THREE.Color('#b89232');     // dry straw
+const SNOW_A = new THREE.Color('#f4f8fc');    // snow chunk
+const SNOW_B = new THREE.Color('#c8ddef');    // pale-blue shadowed snow
+const CONE_ORANGE = new THREE.Color('#e8641a');
+const CONE_WHITE = new THREE.Color('#f2f2ee');
+const ROCK_A = new THREE.Color('#8a8378');    // grey chip (matches stone crash)
+const ROCK_B = new THREE.Color('#55504a');
+const PENG_DARK = new THREE.Color('#20242a');
+const PENG_WHITE = new THREE.Color('#e8eef2');
+const BARREL_DEF_A = new THREE.Color('#c29a5c'); // default stave (desert palette)
+const BARREL_DEF_B = new THREE.Color('#4a3620'); // default hoop
+const _pbA = new THREE.Color();               // scratch: propBurst tint pair
+const _pbB = new THREE.Color();
+
 // ---- ambient weather (cached colors + per-type spawn rates, spawns/second) ----
 const LEAF_ALT = new THREE.Color('#c9a83a');   // dry-yellow leaf variant
 const EMBER_HOT = new THREE.Color('#ffc94e');  // bright flicker variant
 const AMBIENT_RATES = { snow: 150, leaves: 14, sand: 70, dust: 70, embers: 45, rain: 230 };
 // phones get a leaner ambient budget — same look, less overdraw
 const MOBILE_AMBIENT = (matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in globalThis) ? 0.5 : 1;
+const MOBILE_BURST = MOBILE_AMBIENT < 1 ? 0.6 : 1; // prop-burst count scale on phones
 const _amb = new THREE.Color();                // scratch: per-spawn tint mix
 
 const VERT = /* glsl */ `
@@ -245,6 +264,142 @@ export class Particles {
         3 + Math.random() * 2.2, 0.55 + Math.random() * 0.3,
         { drag: 2.6, shrink: 1.5, alpha: 0.6 });
     }
+  }
+
+  /** Material-aware crush burst for smashed props. `type` is the prop's
+   *  `pr.type` string; `dir` a horizontal unit vector away from the impactor
+   *  (null → radial); `energy` 0..1 from impact speed (call sites pass
+   *  min(1, |speedAlong|/30), weapons ~0.8); `colors` optionally overrides the
+   *  two-tone tint (e.g. theme BARREL_PALETTES [base, hoop]). Pure pooled
+   *  sprites — obeys the shared MAX pool + point-size clamp, ×0.6 on mobile.
+   *  Set `particles.barrelTint = [hexA, hexB]` once per level as an alternate
+   *  way to plumb the theme barrel palette without touching call sites. */
+  propBurst(at, type, dir = null, energy = 0.6, colors = null) {
+    const k = THREE.MathUtils.clamp(energy, 0, 1);
+    const dx = dir?.x ?? 0, dz = dir?.z ?? 0;
+    // one shard, thrown out+up biased along dir: shared by the hard recipes
+    const shard = (c, size, out, up, life, grav, drag = 0.7, shrink = 0.85, alpha = 1) => {
+      const a = Math.random() * Math.PI * 2;
+      this.spawn(at.x, at.y + 0.4, at.z,
+        dx * out + Math.cos(a) * out * 0.55, up, dz * out + Math.sin(a) * out * 0.55,
+        c, size, life, { grav, drag, shrink, alpha });
+    };
+    const n = (base, spread) => Math.round((base + Math.random() * spread) * MOBILE_BURST);
+    switch (type) {
+      case 'crate': {
+        // chunky two-tone planks out+up, pale fast slivers, a tan dust puff
+        for (let i = n(12, 6 * k); i > 0; i--)
+          shard(Math.random() < 0.55 ? CRATE_A : CRATE_B, 2 + Math.random() * 1.4,
+            (8 + Math.random() * 8) * (0.5 + k * 0.5), 4 + Math.random() * 5 + k * 3,
+            0.3 + Math.random() * 0.3, 30);
+        for (let i = n(4, 2); i > 0; i--)
+          shard(SPLINTER_WHITE, 1.2 + Math.random() * 0.6,
+            14 + Math.random() * 8, 3 + Math.random() * 4, 0.1 + Math.random() * 0.1, 20, 0.3, 1);
+        for (let i = 3; i > 0; i--)
+          shard(Math.random() < 0.5 ? DUST_A : DUST_B, 3 + Math.random() * 2,
+            2 + Math.random() * 2, 1.5 + Math.random() * 1.5, 0.5 + Math.random() * 0.3, 2, 1.5, 1.4, 0.5);
+        break;
+      }
+      case 'barrel': {
+        // stave shards in the theme palette + dark hoop glints, flatter arc
+        _pbA.set(colors?.[0] ?? this.barrelTint?.[0] ?? BARREL_DEF_A);
+        _pbB.set(colors?.[1] ?? this.barrelTint?.[1] ?? BARREL_DEF_B);
+        for (let i = n(10, 6 * k); i > 0; i--)
+          shard(Math.random() < 0.7 ? _pbA : _pbB, 1.9 + Math.random() * 1.3,
+            (9 + Math.random() * 8) * (0.5 + k * 0.5), 2.5 + Math.random() * 3.5 + k * 2,
+            0.3 + Math.random() * 0.3, 32);
+        for (let i = n(2, 1); i > 0; i--) // hoop rings skipping out low and fast
+          shard(_pbB, 2.4 + Math.random() * 0.8,
+            13 + Math.random() * 7, 2 + Math.random() * 2, 0.35 + Math.random() * 0.2, 34, 0.4);
+        break;
+      }
+      case 'hay': {
+        // soft golden straw — floats and flutters, no hard chunks, plus chaff
+        for (let i = n(16, 8 * k); i > 0; i--) {
+          const a = Math.random() * Math.PI * 2;
+          this.spawn(at.x, at.y + 0.5, at.z,
+            dx * (4 + Math.random() * 5) + Math.cos(a) * 5 + (Math.random() - 0.5) * 4,
+            3 + Math.random() * 4.5 + k * 2,
+            dz * (4 + Math.random() * 5) + Math.sin(a) * 5 + (Math.random() - 0.5) * 4,
+            Math.random() < 0.55 ? HAY_A : HAY_B, 1.2 + Math.random(),
+            1 + Math.random() * 0.6, { grav: 6, drag: 0.8, shrink: 0.6, alpha: 0.95 });
+        }
+        for (let i = 4; i > 0; i--) // chaff dust cloud hanging where the bale was
+          shard(HAY_B, 3.5 + Math.random() * 2.5, 1.5 + Math.random() * 2,
+            1.5 + Math.random() * 2, 0.9 + Math.random() * 0.5, 1, 1.2, 1.5, 0.35);
+        break;
+      }
+      case 'snowman': {
+        // white/pale-blue chunks + a growing powder puff
+        for (let i = n(10, 4 * k); i > 0; i--)
+          shard(Math.random() < 0.6 ? SNOW_A : SNOW_B, 1.8 + Math.random() * 1.2,
+            (7 + Math.random() * 7) * (0.5 + k * 0.5), 3.5 + Math.random() * 4,
+            0.4 + Math.random() * 0.3, 26);
+        for (let i = 5; i > 0; i--)
+          shard(SNOW_A, 3.2 + Math.random() * 2.4, 2 + Math.random() * 2.5,
+            1.5 + Math.random() * 2, 0.6 + Math.random() * 0.35, 2, 1.4, 1.6, 0.5);
+        break;
+      }
+      case 'cone': {
+        for (let i = n(6, 2); i > 0; i--)
+          shard(CONE_ORANGE, 1.1 + Math.random() * 0.6,
+            12 + Math.random() * 8 * (0.5 + k), 3 + Math.random() * 4,
+            0.25 + Math.random() * 0.2, 30, 0.5);
+        for (let i = 2; i > 0; i--)
+          shard(CONE_WHITE, 1.1 + Math.random() * 0.5,
+            13 + Math.random() * 7, 3 + Math.random() * 3, 0.2 + Math.random() * 0.15, 30, 0.5);
+        break;
+      }
+      case 'rock': {
+        // hard low grey chips + brief grey dust
+        for (let i = n(8, 2); i > 0; i--)
+          shard(Math.random() < 0.5 ? ROCK_A : ROCK_B, 1.5 + Math.random(),
+            (10 + Math.random() * 8) * (0.5 + k * 0.5), 1.5 + Math.random() * 2.5,
+            0.3 + Math.random() * 0.2, 36, 0.4);
+        for (let i = 3; i > 0; i--)
+          shard(SMOKE_GRAY, 3 + Math.random() * 2, 2 + Math.random() * 2,
+            1 + Math.random() * 1.5, 0.4 + Math.random() * 0.2, 2, 1.6, 1.4, 0.4);
+        break;
+      }
+      case 'penguin': {
+        // comedic: a few dark+white flecks and a feathery flutter
+        for (let i = n(6, 2); i > 0; i--)
+          shard(Math.random() < 0.5 ? PENG_DARK : PENG_WHITE, 1.3 + Math.random() * 0.7,
+            6 + Math.random() * 6, 4 + Math.random() * 4, 0.5 + Math.random() * 0.3, 22);
+        for (let i = n(5, 3); i > 0; i--) { // feathers — hay physics, monochrome
+          const a = Math.random() * Math.PI * 2;
+          this.spawn(at.x, at.y + 0.7, at.z,
+            Math.cos(a) * 4 + (Math.random() - 0.5) * 4, 2.5 + Math.random() * 3.5,
+            Math.sin(a) * 4 + (Math.random() - 0.5) * 4,
+            PENG_WHITE, 1 + Math.random() * 0.7, 1 + Math.random() * 0.5,
+            { grav: 5, drag: 0.9, shrink: 0.6, alpha: 0.9 });
+        }
+        break;
+      }
+      default: {
+        // unknown props (fences, troughs, feed bins): debris look, tintable
+        _pbA.set(colors?.[0] ?? DEBRIS_A);
+        _pbB.set(colors?.[1] ?? DEBRIS_B);
+        for (let i = n(8, 2 + 2 * k); i > 0; i--)
+          shard(Math.random() < 0.5 ? _pbA : _pbB, 1.6 + Math.random() * 1.1,
+            (6 + Math.random() * 7) * (0.5 + k * 0.5), 4 + Math.random() * 5,
+            0.4 + Math.random() * 0.35, 30, 0.4);
+      }
+    }
+  }
+
+  /** Debris-shrapnel contact pop: a small hot spark burst where a flying
+   *  chunk clips a car. Cheap — flying debris can land several of these/s. */
+  debrisHit(p) {
+    for (let i = 0, c = Math.round(5 * MOBILE_BURST); i < c; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 3 + Math.random() * 8;
+      this.spawn(p.x, p.y + 0.6, p.z,
+        Math.cos(a) * sp, 2 + Math.random() * 5, Math.sin(a) * sp,
+        Math.random() < 0.5 ? RICO_A : RICO_B, 1.2 + Math.random(),
+        0.15 + Math.random() * 0.2, { grav: 22, shrink: 0.4 });
+    }
+    this.spawn(p.x, p.y + 0.7, p.z, 0, 1.2, 0, RICO_HOT, 2.6 + Math.random() * 1.4, 0.08, { shrink: 1 });
   }
 
   sparks(p, normal, count = 10) {
