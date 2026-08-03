@@ -57,6 +57,21 @@ const CAM_MODES = [
 // Score is the arcade number (it inflates fast: 500/lap, big rank bonus,
 // points for every smashed crate). Credits are DELIBERATELY a small slice of
 // it, so a good race funds real progress but never buys the garage outright.
+// Heavy debris: which smashed things throw chunks that can hurt another car,
+// and how hard (RULES: debris is shrapnel). Straw, cones, penguins and cacti
+// are pulp — they carry no entry here and so never bite.
+const DEBRIS_DMG = { crate: 6, snowman: 6, barrel: 9, rock: 10, tree: 14 };
+
+// Hut planks are spawned per crash; building the geometry and material inline
+// leaked one of each per plank, since the mesh is dropped without disposing.
+const PLANK_GEO = new THREE.BoxGeometry(1.4, 0.3, 0.1);
+const PLANK_MATS = new Map(); // colour -> shared material
+const plankMat = (col) => {
+  let m = PLANK_MATS.get(col);
+  if (!m) { m = new THREE.MeshStandardMaterial({ color: col, roughness: 0.9 }); PLANK_MATS.set(col, m); }
+  return m;
+};
+
 const CREDIT_RATE = 1 / 12;                // score -> credits
 const PODIUM_CR = [200, 120, 60];          // 1st / 2nd / 3rd
 const FIRST_CLEAR_CR = 500;                // once per world, on your first podium
@@ -338,6 +353,7 @@ class Game {
       pmrem.dispose(); dome.geometry.dispose(); dome.material.dispose(); envTex.dispose();
     }
     this.particles = new Particles(this.scene);
+    this.particles.setTheme?.(this.level?.theme); // smashed barrels shed the theme's own stave/hoop colours
     this.skids = new SkidMarks(this.scene);
     this.husks = [];      // charred wreck shells left where cars died
     this.hitStop = 0;     // slow-motion timer after a brutal impact
@@ -2066,6 +2082,46 @@ class Game {
     for (let i = this.flyingProps.length - 1; i >= 0; i--) {
       const f = this.flyingProps[i];
       f.life -= dt;
+      f.age = (f.age ?? 0) + dt;
+      // Heavy chunks are shrapnel: a crate plank or a felled trunk still
+      // carrying real speed hurts whatever it lands on (RULES: debris is
+      // shrapnel). Straw and cones carry no dmg tag and so never bite.
+      if (f.dmg && !f.hit) {
+        const v = Math.hypot(f.vel.x, f.vel.y, f.vel.z);
+        if (v > 8) {
+          const fp = f.mesh.position;
+          for (const car of cars) {
+            if (car.invuln > 0) continue;
+            if (car === f.owner && f.age < 0.45) continue;      // not off your own bumper
+            if (this.raceTime < (car._debrisCd ?? 0)) continue; // 0.5s per-car throttle
+            const dx = car.pos.x - fp.x, dy = car.pos.y - fp.y, dz = car.pos.z - fp.z;
+            if (dx * dx + dy * dy + dz * dz > 4.84) continue;   // 2.2u
+            const dmg = f.dmg * THREE.MathUtils.clamp(v / 25, 0.5, 1.2);
+            car._debrisCd = this.raceTime + 0.5;
+            f.hit = true;
+            this.particles.debrisHit?.(car.pos);
+            if (car === this.player) {
+              // null attacker, not a string: destroy() prints the attacker's
+              // name, and 'debris' would read as "WRECKED BY undefined"
+              car.damage(dmg, null);
+              this.hud.damageFlash(0.35);
+              this.buzz(18);
+              if (this.raceTime - (this._debrisFeedAt ?? -9) > 2) {
+                this._debrisFeedAt = this.raceTime;
+                this.hud.feed('DEBRIS HIT', 'bad');
+              }
+            } else if (f.owner === this.player) {
+              this.onEnemyHit(car, dmg, 'debris'); // keeps kill credit
+              this.score += 40;
+              this.styleBump?.();
+              this.hud.feed('DEBRIS STRIKE  +40', 'good');
+            } else {
+              car.damage(dmg, null);
+            }
+            break;
+          }
+        }
+      }
       f.vel.y -= 24 * dt;
       f.mesh.position.addScaledVector(f.vel, dt);
       f.mesh.rotation.x += f.spin.x * dt;
@@ -2107,11 +2163,15 @@ class Game {
         dir.z * speed * 0.45 + (car ? car.vel.z * 0.4 : 0)),
       spin: new THREE.Vector3((Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11),
       life: 1.5,
+      dmg: DEBRIS_DMG[pr.type] ?? 0, owner: car, age: 0, // shrapnel tag
     });
     const at = new THREE.Vector3(pr.x, (pr.y ?? 0) + 0.6, pr.z);
-    if (this.particles.debris) this.particles.debris(at, 6);
+    // Crush it in its own material — planks, staves, straw, snow or chips in
+    // the prop's own colours. The old generic debris puff made every prop
+    // look identical (RULES: crush bursts).
+    this.particles.propBurst(at, pr.type, dir, Math.min(1, speed / 30),
+      pr.type === 'barrel' ? null : this.track.T?.splinter);
     this.particles.driftSmoke(at);
-    this.particles.dust?.(at, 1);
     this.shake = Math.min(1, this.shake + (car === this.player ? 0.12 : 0.05));
     if (car === this.player) {
       this.score += pr.scoreValue || 25;
@@ -2156,6 +2216,8 @@ class Game {
         : new THREE.Vector3(dir.z * 3.5 + (Math.random() - 0.5) * 2,
           (Math.random() - 0.5) * 4, -dir.x * 3.5 + (Math.random() - 0.5) * 2),
       life: cactus ? 0.85 : 2.2,
+      // a felled trunk is the heaviest thing in flight; a cactus is pulp
+      dmg: cactus ? 0 : DEBRIS_DMG.tree, owner: car, age: 0,
     });
     const at = new THREE.Vector3(tr.x, (tr.y ?? 0) + 1, tr.z);
     this.particles.debris(at, cactus ? 2 : 4);
@@ -2205,9 +2267,7 @@ class Game {
         this.particles.debris(car.pos, Math.min(8, 3 + (impact / 5 | 0)));
         this.particles.dust?.(car.pos, 1.2);
         for (let k = 0; k < Math.min(3, 1 + (impact / 10 | 0)); k++) {
-          const plank = new THREE.Mesh(
-            new THREE.BoxGeometry(1.4, 0.3, 0.1),
-            new THREE.MeshStandardMaterial({ color: cols[k % 2], roughness: 0.9 }));
+          const plank = new THREE.Mesh(PLANK_GEO, plankMat(cols[k % 2]));
           plank.position.set(car.pos.x + nx * 2, car.pos.y + 1 + k * 0.4, car.pos.z + nz * 2);
           this.scene.add(plank);
           this.flyingProps.push({
