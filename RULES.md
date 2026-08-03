@@ -430,3 +430,27 @@ front of a mid-pack player and the two conditions cancel out.
 | Median P1–P2 gap, NORMAL | < 6 s | 0.09–0.52 s |
 | Rank volatility, NORMAL | lead must change hands | player finishes P1–P3, rank swings 1↔5 |
 | EASY stays casual-winnable | yes | a 0.85-pace driver still wins, gap 0.93 s |
+
+## 11. Rural traffic
+
+Twelve rural worlds carry civilian farm traffic. It is not scenery: it is
+heavy, hittable, destructible, and it obeys the same laws everything else does.
+
+| Object | Class | Threshold | Cost | Pays | Notes |
+|---|---|---|---|---|---|
+| Farm traffic (tractor, hay wagon, farm truck) | ACTOR (heavy) | destroyed by weapons (70 hp), a sustained bumper, or outright by a blast | `min(28, (impact − 6) × 1.4)`, −28 max, 0.9 s rate limit | +150, style-chained | Three rigs trundle with the race direction at 6.5–9.5 u/s hugging the lane edge; up to two more shuttle across the carriageway at `track.crossroads` junctions at 4.6–5.4 u/s, pausing at the edge to look both ways with a `TRACTOR/TRUCK CROSSING!` warning. Standard SOLID response (push-out, ×1.05 absorb) — the rig lurches, stops ~1 s and the driver wobbles. Wreck leaves a charred husk ~10 s; a fresh rig returns 6 s later. Resets pristine on race restart |
+
+**`impact` is RELATIVE closing speed, not absolute.** Overtaking a 6.5 u/s
+tractor at 12 u/s is a 5.5 u/s nudge and costs nothing; catching one at 26 is a
+19.5 u/s hit. Anything else would punish you for driving fast on an empty road.
+
+| Constant | Value | Where |
+|---|---|---|
+| Traffic hp / wreck life / respawn | 70 / 10 s / +6 s | traffic.js |
+| Traffic collision radii | tractor & truck 2.4, wagon 2.0 | traffic.js |
+| Traffic AI avoidance | ghost `{x,z,r:2.9,y:−9999}` proxies pushed into `track.solids` — seen by `Car._sense` (which reads only x/z/r), skipped by the player's y-gated solid loop | traffic.js `registerProxy` |
+
+That proxy trick is the rule worth keeping: **a new actor can teach the AI to
+avoid it without touching `vehicles.js`**, by publishing itself into the same
+list mid-race rockfall already uses. Traffic keeps ownership of its own
+collision response; the AI just needs to know where it is.
