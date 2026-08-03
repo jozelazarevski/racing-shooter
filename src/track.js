@@ -9,7 +9,7 @@ import {
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
   crateTexture, coneTexture, barrelTexture, riverTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
-  contactShadowTexture, horizonTexture,
+  contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -31,7 +31,31 @@ export const LEVELS = [
   { id: 16, name: 'AVALANCHE ALLEY', theme: 'avalanche', region: 'FROST PEAK' },
   { id: 17, name: 'NEON GRID EXPRESSWAY', theme: 'neon', region: 'NEO-KYOTO' },
   { id: 18, name: 'UNDERCITY SLIPSTREAM', theme: 'undercity', region: 'NEO-KYOTO' },
+  { id: 19, name: 'GOTTHARD CLIMB', theme: 'pass', region: 'ALPINE PASSES' },
+  { id: 20, name: 'TREMOLA DESCENT', theme: 'tremola', region: 'ALPINE PASSES' },
+  { id: 21, name: 'FURKA RIDGE', theme: 'furka', region: 'ALPINE PASSES' },
 ];
+
+/** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
+ *  Tremola signature. Every leg runs east-west at a fixed z, the next leg sits
+ *  `dz` further along, and a single control point `hp` beyond the leg end folds
+ *  the road back through a 180°. Legs stay exactly parallel (a wobble in z eats
+ *  the gap between ribbons and trips the self-approach check); the variety
+ *  comes from `jag`, which lengthens/shortens each leg instead.
+ *  `dir` +1 = the first leg runs east, -1 = west. An ODD leg count exits on the
+ *  opposite side of the face from the entry. */
+function switchbackStack({ legs, z0, dz, halfX, hp, dir = 1,
+  jag = [0, 4, -3, 2, -5, 3, -2, 5, -4, 1] }) {
+  const out = [];
+  for (let k = 0; k < legs; k++) {
+    const s = (k % 2 === 0 ? 1 : -1) * dir;
+    const z = z0 + k * dz;
+    const hx = halfX + jag[k % jag.length];
+    out.push([-s * hx, z], [0, z], [s * hx, z]);
+    if (k < legs - 1) out.push([s * (hx + hp), z + dz / 2]);
+  }
+  return out;
+}
 
 // Hand-designed circuit control points (x, z) per theme.
 const CIRCUITS = {
@@ -196,6 +220,58 @@ const CIRCUITS = {
     [165, 195], [95, 160], [30, 205], [-50, 230], [-120, 190],
     [-92, 122], [-160, 90], [-225, 125], [-250, 45], [-195, -5],
     [-240, -70], [-250, -150], [-180, -195], [-95, -160], [-50, -215],
+  ],
+  // GOTTHARD CLIMB: alpine village in the valley, a run along the mountain
+  // base, then NINE stacked switchback legs (29u apart) hairpinning up the
+  // granite face to a summit shelf, and three wide sweeps down the east side
+  // back to the valley. Elevation: THEMES.pass.elev climbs ~45u through it.
+  pass: [
+    // valley floor: start line, village, run west along the base
+    [-60, -244], [-140, -232], [-196, -192], [-224, -142], [-218, -98],
+    [-176, -72], [-118, -64],
+    // the face: 9 legs, 8 hairpins, ~70u legs
+    ...switchbackStack({ legs: 9, z0: -64, dz: 29, halfX: 35, hp: 15 }),
+    // summit shelf running east along the crest
+    [96, 176], [158, 168], [214, 146],
+    // three wide switchback sweeps down the east face
+    [244, 104], [204, 72], [140, 62],
+    [104, 22], [162, -4], [226, -12],
+    [250, -70], [206, -102], [140, -114],
+    // valley run-in back to the line
+    [116, -164], [140, -210], [86, -242], [16, -250],
+  ],
+  // TREMOLA DESCENT: the mirror. The line sits on the summit plateau; the lap
+  // drops straight into NINE tighter cobbled hairpins (28u apart) down the
+  // face, runs out along the gorge floor, then climbs the long modern road up
+  // the east flank back to the plateau.
+  tremola: [
+    // summit plateau + start line
+    [170, 206], [104, 196], [52, 182],
+    // the cobbled face, descending
+    ...switchbackStack({ legs: 9, z0: 176, dz: -28, halfX: 35, hp: 15, dir: -1 }),
+    // out of the last hairpin into the gorge
+    [-78, -74], [-124, -112], [-152, -164],
+    // valley run-out east along the gorge floor
+    [-116, -216], [-46, -244], [34, -250], [110, -234], [176, -200],
+    // the long climb back up the east flank to the plateau
+    [224, -148], [246, -78], [230, -4], [248, 72], [224, 140], [232, 192],
+  ],
+  // FURKA RIDGE: a deep-winter pass. The valley floor is under snow; the dirt
+  // road climbs a jagged grey-rock face in ONE long serpentine of seven legs,
+  // so from the upper legs the whole pass is visible snaking down the valley
+  // below you. A traverse along the top, then wide sweeps back down.
+  furka: [
+    // snowbound valley floor: start line + log cabins
+    [-40, -244], [-124, -232], [-192, -198], [-230, -148], [-224, -100],
+    [-182, -74], [-122, -66],
+    // the serpentine: 7 legs, 6 hairpins, cut into the face
+    ...switchbackStack({ legs: 7, z0: -66, dz: 30, halfX: 38, hp: 16 }),
+    // high traverse along the shoulder, looking back down the whole pass
+    [100, 118], [166, 110], [220, 86],
+    // wide sweeps back down the east side to the valley
+    [250, 40], [214, 2], [152, -8],
+    [118, -58], [170, -92], [234, -104],
+    [250, -160], [214, -206], [150, -232], [70, -246],
   ],
 };
 
@@ -809,6 +885,7 @@ const THEMES = {
       stoneA: 'rgba(245,250,255,0.8)', stoneB: 'rgba(150,180,205,0.7)',
       fringe: [232, 242, 250], fringeVar: [20, 12, 6],
       ice: true,                                        // sheet-ice glaze + crevasse cracks
+      ruts: false,                                      // glazed ice never ruts
     },
     hillColor: 0xc2d8e6, peakColor: 0xf0f8fc,
     treeCount: 60, trunkColor: 0x5a4028,
@@ -914,6 +991,7 @@ const THEMES = {
       fringe: [24, 26, 40], fringeVar: [12, 12, 20],
       wet: { darken: 0.2, gleam: 14, pools: 4 },
       neon: { edgeA: '#2af6ff', edgeB: '#ff3af0', dash: '#9a6cff' },
+      ruts: false,                                      // glass-asphalt doesn't rut
     },
     roadNeon: { edgeA: '#2af6ff', edgeB: '#ff3af0', dash: '#9a6cff' },  // emissive line-work
     hillColor: 0x0e1420, peakColor: 0x141b2c, horizon: 'city',
@@ -964,6 +1042,7 @@ const THEMES = {
       stoneA: 'rgba(140,146,134,0.6)', stoneB: 'rgba(24,28,20,0.7)',
       fringe: [42, 50, 32], fringeVar: [18, 22, 14],    // slime creeping from the walls
       wet: { darken: 0.3, gleam: 10, pools: 5 },        // permanently damp
+      ruts: false,                                      // poured concrete doesn't rut
     },
     hillColor: 0x1c2018, peakColor: 0x282e22,
     vegetation: 'none', treeCount: 0, trunkColor: 0x33362c,
@@ -998,6 +1077,188 @@ const THEMES = {
     puddleCount: 7,
     critters: { kind: 'rat', count: 12 },               // hazard spec (lead implements)
   },
+  // GOTTHARD CLIMB: the flagship pass. Eight stacked hairpins climb a granite
+  // face; dry-stone retaining walls line every outside edge, the alpine
+  // village sits in the valley around the start line, and the pine forest
+  // thins to bare rock as the road gains altitude.
+  pass: {
+    fogColor: 0xd6eaf8, fogNear: 330, fogFar: 1600,
+    hemiSky: 0xcce2ff, hemiGround: 0x5e8248,
+    sunColor: 0xfff6e2, sunIntensity: 2.05,
+    skyTop: '#2a68c4', skyHorizon: '#dceffa', sunGlow: 0xfff4cc,
+    sunAz: 0.95, sunEl: 0.34,
+    cloudCount: 12, cloudOpacity: 0.9,
+    terrainLow: '#4e8a3e', terrainHigh: '#94a888', terrainDirt: '#8a8074',
+    skirtColor: '#948f85',                              // grey masonry cut face
+    ground: {},
+    road: {
+      // weathered grey mountain asphalt over a gravel base
+      base: '#6f6a63', mottleA: [82, 78, 72], mottleB: [136, 132, 124],
+      ruts: false,          // sealed asphalt — hard ground never takes a rut
+      rut: 'rgba(52,50,46,0.45)', rutCore: 'rgba(38,36,34,0.4)', tread: 'rgba(20,18,16,0.45)',
+      stoneA: 'rgba(200,196,186,0.65)', stoneB: 'rgba(68,64,58,0.7)',
+      fringe: [70, 118, 50], fringeVar: [34, 46, 24],
+    },
+    hillColor: 0x557a4e, peakColor: 0xe4edf4,
+    treeCount: 320, trunkColor: 0x6b4423,
+    foliageLow: 0x276634, foliageTop: 0x3d9444,
+    foliage: { h: 0.31, hVar: 0.06, s: 0.52, sVar: 0.2, l: 0.28, lVar: 0.13 },
+    treeSnowCap: false,
+    treeAltFade: [14, 34],                              // pines thin out with altitude
+    tuftCount: 900, grass: {},
+    bushCount: 150, bushColor: 0x2f7a30,
+    bush: { h: 0.30, hVar: 0.05, s: 0.5, sVar: 0, l: 0.30, lVar: 0.12 },
+    rockCount: 420, pebbleCount: 300, rockColor: 0x8b8a82, rockSnowCap: false,
+    flowerCount: 240, flowerColors: ['#ffffff', '#ffe234', '#7a9aff', '#ff6a8a'],
+    hutRoof: 0x7a4630, hayColor: 0xd8b95e,
+    hutCount: 13, hutZone: [0.84, 0.16],                // village clustered in the valley
+    hayCount: 34,
+    splinter: [0x8a5a32, 0xe8e2d4],
+    weather: { type: 'snow', color: 0xffffff, rate: 60 },
+    // hand-shaped monotone climb through the switchback stack: valley → face
+    // → summit shelf ≈ 45u → three sweeps back down to the valley floor.
+    elev: {
+      amp: 45, profile: 'ascent', ph: [0, 0, 0],
+      keys: [[0, 0], [0.05, 0], [0.145, 4], [0.25, 14], [0.35, 24], [0.45, 34],
+        [0.545, 44], [0.58, 45], [0.64, 36.6], [0.70, 28.2], [0.76, 19.8],
+        [0.82, 11.4], [0.90, 0], [1, 0]],
+    },
+    rampMaxCurv: 0.012, padMaxCurv: 0.0035, boardMaxCurv: 0.010,
+    // dry-stone parapets on every edge that drops away
+    retainingWalls: { drop: 2.0, lateral: 12.7, height: 1.5, max: 460 },
+    obstacleSpec: { count: 3, style: 'boulder', downhill: true }, puddleCount: 2,
+    elements: 'alpine',
+    snowPatches: { count: 70, minY: 28 },                // altitude snowfields
+    // the mountain the road climbs into, standing beyond the summit shelf
+    massif: { az: 1.45, spread: 1.7, count: 9, r0: 380, r1: 620,
+      h0: 130, h1: 260, w0: 190, w1: 340 },
+  },
+  // TREMOLA DESCENT: the old cobbled road. The lap starts on the summit
+  // plateau and falls straight into nine tighter hairpins of stone setts,
+  // stone parapets on the outside of each, then a gorge run-out and the long
+  // modern climb back up the east flank.
+  tremola: {
+    fogColor: 0xcfdfec, fogNear: 300, fogFar: 1500,
+    hemiSky: 0xc4dcf4, hemiGround: 0x60764e,
+    sunColor: 0xfff0dc, sunIntensity: 1.95,
+    skyTop: '#3570bc', skyHorizon: '#dae8f2', sunGlow: 0xffeec8,
+    sunAz: 0.42, sunEl: 0.26,                           // low afternoon sun down the valley
+    cloudCount: 13, cloudOpacity: 0.95,
+    terrainLow: '#4a7c3e', terrainHigh: '#8f9a84', terrainDirt: '#7d766a',
+    skirtColor: '#8b8579',
+    ground: {},
+    road: {
+      // dark granite base — the setts are painted over it by `cobbles`
+      base: '#5f5b54', mottleA: [70, 67, 62], mottleB: [118, 114, 106],
+      rut: 'rgba(44,42,38,0.5)', rutCore: 'rgba(30,29,26,0.45)', tread: 'rgba(16,15,13,0.4)',
+      stoneA: 'rgba(186,182,172,0.6)', stoneB: 'rgba(62,59,54,0.7)',
+      fringe: [78, 112, 54], fringeVar: [32, 44, 24],
+      ruts: false,          // stone setts don't rut — polish bands come from the cobble pass
+      cobbles: {                                        // Tremola stone setts
+        stones: ['#7d7a73', '#6c6963', '#87817a', '#5e5c58', '#8e887e', '#74726d'],
+        mortar: 'rgba(38,36,33,0.9)', lip: 'rgba(255,250,235,0.13)',
+        rows: 32, per: 21,                              // small hand-laid setts
+      },
+    },
+    hillColor: 0x4e7248, peakColor: 0xdde8f0,
+    treeCount: 220, trunkColor: 0x6b4423,
+    foliageLow: 0x2a6636, foliageTop: 0x428a48,
+    foliage: { h: 0.29, hVar: 0.07, s: 0.45, sVar: 0.2, l: 0.28, lVar: 0.14 },
+    treeSnowCap: false,
+    treeAltFade: [-26, -4],                             // larch only low in the gorge
+    tuftCount: 780, grass: {},
+    bushCount: 130, bushColor: 0x357a34,
+    bush: { h: 0.30, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.28, lVar: 0.12 },
+    rockCount: 460, pebbleCount: 340, rockColor: 0x847f76, rockSnowCap: false,
+    flowerCount: 200, flowerColors: ['#ffffff', '#ffe234', '#c27aff', '#ff6a8a'],
+    hutRoof: 0x6a5b4a, hayColor: 0xd0b46a,
+    hutCount: 12, hutZone: [0.62, 0.84],                // hamlet on the gorge floor
+    hayCount: 26,
+    splinter: [0x8a8378, 0xe8e2d4],
+    weather: { type: 'leaves', color: 0x9aa878 },
+    // starts on the plateau (the start line is always y=0), falls 40u through
+    // the cobbled stack to the gorge floor, then climbs the far flank back
+    elev: {
+      amp: 40, profile: 'ascent', ph: [0, 0, 0],
+      keys: [[0, 0], [0.05, 0], [0.145, -4], [0.24, -13], [0.33, -22], [0.42, -30],
+        [0.515, -39], [0.56, -40], [0.64, -32], [0.72, -24], [0.80, -16],
+        [0.88, -7], [0.95, 0], [1, 0]],
+    },
+    rampMaxCurv: 0.012, padMaxCurv: 0.0035, boardMaxCurv: 0.010,
+    retainingWalls: { drop: 2.0, lateral: 12.7, height: 1.35, max: 460 },
+    obstacleSpec: { count: 3, style: 'boulder', downhill: true }, puddleCount: 0,
+    elements: 'alpine',
+    massif: { az: 1.45, spread: 1.8, count: 9, r0: 400, r1: 640,
+      h0: 140, h1: 270, w0: 200, w1: 350 },
+  },
+  // FURKA RIDGE: deep-winter alpine pass — snow-white valley, jagged grey rock
+  // with snow on every ledge, snow-capped pines, log cabins on the shelves and
+  // a reddish wooden guard fence running the downhill edge of the serpentine.
+  // The road itself stays brown rutted dirt, ploughed clear of the snow.
+  furka: {
+    surface: 'snow',                                    // physics reads this
+    fogColor: 0xdfeaf4, fogNear: 300, fogFar: 1600,
+    hemiSky: 0xd6e8ff, hemiGround: 0xa8b4bc,
+    sunColor: 0xfff4e4, sunIntensity: 1.95,
+    skyTop: '#3f7fc8', skyHorizon: '#e6f1f8', sunGlow: 0xfffbe8,
+    // high sun: a low winter sun threw car/tower shadows the length of the
+    // bridge deck and read as a black stripe down the middle of the crossing
+    sunAz: 0.72, sunEl: 0.62,
+    cloudCount: 10, cloudOpacity: 0.9,
+    terrainLow: '#dfe7ec', terrainHigh: '#ffffff', terrainDirt: '#9a8a72',
+    skirtColor: '#8e8a80',                              // rock cut below the shelf
+    ground: {
+      base: '#e8eef3', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(120,150,175,0.05)',
+      patchA: 'rgba(150,140,120,0.16)', patchB: 'rgba(255,255,255,0.24)',
+      speckA: 'rgba(190,200,210,0.7)', speckB: 'rgba(255,255,255,0.9)', speckCount: 80,
+    },
+    road: {
+      // classic brown rutted dirt, ploughed clear — but the verge is snow,
+      // not grass, and the ruts run a little darker in the wet cold
+      base: '#8a6a44', mottleA: [104, 78, 48], mottleB: [166, 132, 88],
+      rut: 'rgba(62,44,26,0.55)', rutCore: 'rgba(44,30,16,0.45)', tread: 'rgba(24,16,8,0.5)',
+      stoneA: 'rgba(214,206,190,0.7)', stoneB: 'rgba(88,66,42,0.7)',
+      fringe: [222, 232, 240], fringeVar: [24, 16, 10],
+    },
+    hillColor: 0x9aa4ac, peakColor: 0xf2f7fb,           // grey rock, snow crowns
+    treeCount: 320, trunkColor: 0x5a4028,
+    foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,         // deep winter green
+    foliage: { h: 0.35, hVar: 0.04, s: 0.42, sVar: 0.12, l: 0.30, lVar: 0.08 },
+    treeSnowCap: true,                                  // white tips on every tier
+    treeAltFade: [22, 40],                              // thinning towards the top
+    tuftCount: 300, grass: { bladeA: '#5a7a58', bladeB: '#c8d8d0' },
+    bushCount: 70, bushColor: 0x9ab8a0,
+    bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.52, lVar: 0.12 },
+    rockCount: 520, pebbleCount: 380, rockColor: 0x9aa4ac, rockSnowCap: true,
+    flowerCount: 0, flowerColors: ['#ffffff'],
+    hutRoof: 0x6a4028, hayColor: 0xc8bc94,
+    hutCount: 8, hutZone: [0.86, 0.14], hayCount: 12,   // cabins in the valley
+    splinter: [0x8a5a32, 0xdce8f0],
+    weather: { type: 'snow', color: 0xffffff },
+    // climb the face through the serpentine, traverse the shoulder, drop back
+    elev: {
+      amp: 34, profile: 'ascent', ph: [0, 0, 0],
+      keys: [[0, 0], [0.05, 0], [0.145, 4], [0.25, 12], [0.35, 20], [0.45, 28],
+        [0.575, 34], [0.61, 34], [0.69, 26], [0.77, 18], [0.85, 9], [0.93, 0], [1, 0]],
+    },
+    // the shelf: ground leaves the road close in and the open valley sits well
+    // below the road datum, so every leg stands proud of the one beneath it
+    blend: { near: 14, far: 62 }, hillDrop: 8,
+    shelfRoad: true,                                    // steep cut face, no apron
+    rampMaxCurv: 0.012, padMaxCurv: 0.0035, boardMaxCurv: 0.010,
+    // reddish-brown BREAKABLE rail fence down the outside edge of the pass
+    guardFence: { lateral: 12.8, color: 0x8a4a2e, max: 190 },
+    roadCabins: 5,                                      // log cabins on the shelves
+    obstacleSpec: { count: 3, style: 'boulder', downhill: true }, puddleCount: 0,
+    elements: 'alpine',
+    snowPatches: { count: 60, minY: 20 },
+    glacier: true,
+    // hero crossing: a rope suspension bridge over a red-rock river gorge on
+    // the valley run-in (the straightest window in that stretch of the lap)
+    heroBridge: { at: [0.82, 0.92], half: 26, len: 230, depth: 30, skew: 0 },
+    massif: { az: 1.5, spread: 2.1, count: 11, r0: 380, r1: 660,
+      h0: 150, h1: 300, w0: 200, w1: 360 },
+  },
 };
 
 const N = 900;              // centerline samples
@@ -1006,6 +1267,46 @@ export function circuitPoints(themeKey) { return CIRCUITS[themeKey] || CIRCUITS.
 
 export const ROAD_HALF = 9; // drivable half-width
 export const WALL_OFF = 10.4;
+
+// ---- width-variation ----
+// Per-theme narrow-section tuning: {count, min} — `min` is the pinch floor as
+// a fraction of ROAD_HALF. Themes may also declare `narrows` directly on their
+// THEMES entry (it wins). Cliff-walled corridors (canyon/glacial/ravine/
+// sheetice/undercity) are auto-off — those roads are already the constraint.
+// Everything else defaults to { count: 3, min: 0.6 }.
+const NARROW_TUNE = {
+  avalanche: { count: 4, min: 0.55 },  // the pass squeezes hardest
+  alpine: { count: 2, min: 0.62 },     // switchback stack is left alone
+  dunes: { count: 2, min: 0.65 },      // fast flow world — gentler pinches
+  neon: { count: 2, min: 0.65 },       // expressway keeps its speed
+};
+// ---- river-fords ----
+// Worlds with shallow watercourses crossing the road (visible stream + splash
+// + wet-tire traction loss; consumed by the vehicle code via track.fords).
+// Themes may declare `fords: {count}` on their THEMES entry (it wins).
+const FORD_TUNE = {
+  forest: { count: 2 }, alpine: { count: 2 }, jungle: { count: 3 },
+  oasis: { count: 2 }, flume: { count: 2 }, redwood: { count: 2 },
+};
+// ---- viz-zones ----
+// Sectional visibility hazards, per theme: [kind, count] pairs.
+//   'forest'  — thick tree corridor pressed against both road edges + gloom
+//   'fogbank' — localized dense fog (pure zone data; runtime pulls fog in)
+//   'squall'  — rain burst + fog pull on wet worlds
+// Exposed as track.vizZones [{i0, i1, len, mid, half, kind, strength}];
+// the game lead lerps scene fog from it, rivals slow inside.
+const VIZ_TUNE = {
+  forest: [['forest', 2], ['squall', 1]],
+  alpine: [['forest', 2], ['fogbank', 1]],
+  redwood: [['forest', 2]],
+  flume: [['forest', 2]],
+  wildfire: [['forest', 1]],
+  jungle: [['forest', 2], ['squall', 1]],
+  avalanche: [['forest', 1], ['fogbank', 2]],
+  snow: [['fogbank', 2]],
+  glacial: [['fogbank', 1]],
+  sheetice: [['fogbank', 1]],
+};
 
 const SPONSORS = [
   ['AETHER', '#14243a', '#7fd4ff'],
@@ -1047,6 +1348,9 @@ const PROP_SPECS = {
   avalanche: [['snowman', 14], ['crate', 16], ['cone', 12], ['hay', 10]],
   neon: [['barrel', 18], ['crate', 16], ['cone', 14]],
   undercity: [['crate', 18], ['barrel', 18], ['cone', 12]],
+  pass: [['hay', 20], ['crate', 16], ['cone', 14], ['rock', 8]],
+  tremola: [['hay', 16], ['crate', 16], ['cone', 14], ['rock', 10]],
+  furka: [['snowman', 10], ['crate', 16], ['cone', 14], ['rock', 12]],
 };
 const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20, penguin: 40 };
 const _m4 = new THREE.Matrix4(); // scratch (smashTree instance-zeroing)
@@ -1066,6 +1370,144 @@ const BARREL_PALETTES = {
   neon: { base: '#22262e', hoop: '#101318', stripe: '#26f6ff' },
   undercity: { base: '#3a4034', hoop: '#181c14', stripe: '#8a9a3c' },
 };
+
+// ---------- world elements: farms, chapels, outposts, field walls ----------
+// Every world gets lived-in structures out in the country: places to go and
+// smash. A "kit" is one theme family's palette + which archetypes it builds.
+// Buildings are SOLID ('hut' → they crash big); field walls are SOLID stone;
+// rail fences, troughs, feed bins and hay racks are BREAKABLE props (they go
+// through this.props, so cars AND weapons destroy them).
+const ELEMENT_KITS = {
+  alpine: {
+    wall: 0xe2d6bc, wall2: 0x9c6c40, roof: 0x7a4630, trim: 0x5d4426, stone: 0x9a978e,
+    builds: ['barn', 'house', 'house', 'shed'], landmarks: ['chapel', 'silo'],
+    dress: ['logpile', 'well'], fenceColor: 0xc4a87c, stoneWalls: 5,
+  },
+  farm: {
+    wall: 0xdac9a4, wall2: 0xa8442e, roof: 0x8a3a2a, trim: 0x5d4426, stone: 0x8d8578,
+    builds: ['barn', 'house', 'shed', 'house'], landmarks: ['silo', 'windmill'],
+    dress: ['logpile', 'well'], fenceColor: 0xc8b48a, stoneWalls: 3,
+  },
+  desert: {
+    wall: 0xdcbd90, wall2: 0xc09a68, roof: 0xa8794a, trim: 0x6a4a2c, stone: 0xb08a5c,
+    builds: ['adobe', 'adobe', 'shed'], landmarks: ['watchtower', 'well'],
+    dress: ['well', 'logpile'], fenceColor: 0xc9a06a, stoneWalls: 4,
+  },
+  jungle: {
+    wall: 0xac9660, wall2: 0x8a7a44, roof: 0x6f8a38, trim: 0x5a4a28, stone: 0x6a7a5a,
+    builds: ['stilt', 'stilt', 'shed'], landmarks: ['watchtower'],
+    dress: ['logpile'], fenceColor: 0x9a8a54, stoneWalls: 1,
+  },
+  ice: {
+    wall: 0xd2dae2, wall2: 0x8a9aa8, roof: 0x56646f, trim: 0x3a4650, stone: 0x9ab0c0,
+    builds: ['signalhut', 'shed', 'shed'], landmarks: ['watchtower'],
+    dress: ['logpile'], fenceColor: 0xb8c4cc, stoneWalls: 2,
+  },
+  city: {
+    wall: 0x3c424a, wall2: 0x2a3038, roof: 0x22262c, trim: 0x6a7280, stone: 0x4a4e54,
+    builds: ['kiosk', 'shed', 'kiosk'], landmarks: ['watchtower'],
+    dress: ['logpile'], fenceColor: 0x5a6068, stoneWalls: 2,
+    // no cattle under the expressway: the livestock dressing (water trough,
+    // feed bin, hay rack) is dropped and the budget goes into more grey
+    // barrier runs, which read as crowd/works hoarding in a city
+    field: [], fenceRuns: 5,
+  },
+  burnt: {
+    wall: 0x4c4038, wall2: 0x3a3028, roof: 0x2e2620, trim: 0x241d18, stone: 0x4a4238,
+    builds: ['shed', 'house', 'barn'], landmarks: ['watchtower'],
+    dress: ['logpile'], fenceColor: 0x4a3c30, stoneWalls: 3,
+  },
+};
+// Species mix for the default (conifer-family) forest builder, per theme:
+// [[species, weight]...]. Species live in _buildForest. Themes not listed
+// fall back to the classic two-pine stand; a theme can override the whole
+// mix via T.floraMix.
+const FLORA_MIX = {
+  forest: [['pineA', 0.34], ['pineB', 0.22], ['birch', 0.24], ['oak', 0.20]],
+  flume: [['pineA', 0.38], ['pineB', 0.20], ['birch', 0.20], ['oak', 0.22]],
+  snow: [['pineA', 0.42], ['pineB', 0.23], ['birchBare', 0.35]],
+  glacial: [['pineA', 0.45], ['pineB', 0.25], ['birchBare', 0.30]],
+  sheetice: [['pineA', 0.5], ['birchBare', 0.5]],
+  avalanche: [['pineA', 0.35], ['pineB', 0.20], ['larch', 0.25], ['birchBare', 0.20]],
+  alpine: [['pineA', 0.40], ['pineB', 0.25], ['larch', 0.35]],
+  pass: [['pineA', 0.34], ['pineB', 0.22], ['larch', 0.28], ['birch', 0.16]],
+  tremola: [['pineA', 0.36], ['pineB', 0.22], ['larch', 0.42]],
+  furka: [['pineA', 0.40], ['pineB', 0.22], ['larch', 0.38]],
+};
+
+// How many decorative side-road junctions each RURAL world gets (city, ice
+// and cliff-walled worlds get none). A theme can override via T.crossroads.
+const THEME_CROSSROADS = {
+  forest: 3, desert: 2, snow: 2, alpine: 3, oasis: 2, redwood: 2, flume: 2,
+  wildfire: 2, pass: 3, tremola: 2, furka: 2,
+};
+const ELEMENT_KIT_BY_THEME = {
+  forest: 'farm', desert: 'desert', snow: 'alpine', canyon: 'desert', volcano: 'burnt',
+  alpine: 'alpine', glacial: 'ice', jungle: 'jungle', dunes: 'desert', ravine: 'desert',
+  oasis: 'desert', redwood: 'farm', flume: 'farm', wildfire: 'burnt', sheetice: 'ice',
+  avalanche: 'alpine', neon: 'city', undercity: 'city',
+  pass: 'alpine', tremola: 'alpine', furka: 'alpine',
+};
+
+/** Unit gable-roof prism: 1×1×1, base at y=0, ridge running along local X at
+ *  (y=1, z=0). Eight triangles, shared by every pitched roof in the game. */
+let PRISM_GEO = null;
+function gablePrismGeo() {
+  if (PRISM_GEO) return PRISM_GEO;
+  const A = [-0.5, 0, -0.5], Bv = [0.5, 0, -0.5], C = [0.5, 0, 0.5], D = [-0.5, 0, 0.5];
+  const E = [-0.5, 1, 0], F = [0.5, 1, 0];
+  const tris = [
+    [A, Bv, C], [A, C, D],            // floor
+    [A, F, Bv], [A, E, F],            // back pitch
+    [D, C, F], [D, F, E],             // front pitch
+    [A, D, E], [Bv, F, C],            // gable ends
+  ];
+  const pos = new Float32Array(tris.length * 9);
+  const uv = new Float32Array(tris.length * 6);
+  let o = 0, u = 0;
+  for (const t of tris) {
+    for (const v of t) {
+      pos[o++] = v[0]; pos[o++] = v[1]; pos[o++] = v[2];
+      uv[u++] = v[0] + 0.5; uv[u++] = v[1];
+    }
+  }
+  PRISM_GEO = new THREE.BufferGeometry();
+  PRISM_GEO.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  PRISM_GEO.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  PRISM_GEO.computeVertexNormals();
+  return PRISM_GEO;
+}
+
+/** Merge a list of box specs {w,h,d,x,y,z,ry?} into ONE BufferGeometry so a
+ *  multi-part smashable (a fence bay, a trough, a hay rack) costs a single
+ *  mesh. Build-time only. */
+function mergeBoxes(specs) {
+  const geos = specs.map((s) => {
+    const g = new THREE.BoxGeometry(s.w, s.h, s.d).toNonIndexed();
+    const m = new THREE.Matrix4().makeRotationY(s.ry || 0);
+    m.setPosition(s.x, s.y, s.z);
+    g.applyMatrix4(m);
+    return g;
+  });
+  let total = 0;
+  for (const g of geos) total += g.attributes.position.count;
+  const pos = new Float32Array(total * 3), nrm = new Float32Array(total * 3);
+  const uv = new Float32Array(total * 2);
+  let o = 0;
+  for (const g of geos) {
+    const n = g.attributes.position.count;
+    pos.set(g.attributes.position.array, o * 3);
+    nrm.set(g.attributes.normal.array, o * 3);
+    uv.set(g.attributes.uv.array, o * 2);
+    o += n;
+    g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return out;
+}
 
 let PROP_ASSETS = null;
 function propAssets() {
@@ -1184,7 +1626,14 @@ export class Track {
       this.curvature[i] = Math.acos(THREE.MathUtils.clamp(a.dot(b), -1, 1)) / (16 * this.segLen);
     }
 
+    // ---- width-variation: per-sample drivable half-width (pinch sections) ----
+    this._buildWidthProfile();
+
     this._checkLayout();
+
+    // the hero gorge must exist before ANY height is sampled (terrain mesh,
+    // road skirts and every scenery placement read it through _blendHeight)
+    if (this.T.heroBridge) this._planGorge();
 
     this.animated = { flags: [], clouds: [] };
     // World-space circle colliders for on-road obstacles: [{x, z, r}].
@@ -1193,6 +1642,15 @@ export class Track {
     // World-space mud puddles on the road: [{x, z, r}]. Always present; [] on
     // levels without them. Visual decals here — driving effects live elsewhere.
     this.puddles = [];
+    // ---- river-fords: shallow water bands crossing the road. [{i, x, z, y,
+    // half}] where `half` is the half-width of the band in world units along
+    // the track. Always present; [] on dry levels. Splash/wet-tire physics
+    // lives in the vehicle code.
+    this.fords = [];
+    // ---- viz-zones: sectional visibility hazards [{i0, i1, len, mid, half,
+    // kind, strength}]. Always present; [] on clear worlds. The game lead
+    // reads this to pull scene fog in while the player is inside.
+    this.vizZones = [];
     // Destructible roadside props: [{mesh, x, z, r, type, scoreValue, pickup}].
     // Always present. The game code detects car contact, removes the entry and
     // animates the mesh flying away itself; `pickup` is a type string on the
@@ -1213,6 +1671,12 @@ export class Track {
     this.bushColor = this.T.bushColor;   // leaf-particle tint for the consumer
     // Knockable sponsor boards: [{x, z, y, r, dead, group, board, heading}].
     this.banners = [];
+    // Open grazing ground for the animal system: [{x, z, r}] — flat, road-free
+    // circles out in the country. Data only; behaviour lives in the game code.
+    this.pastures = [];
+    // decorative side-road junctions: [{index, side, angle, len}] — the
+    // traffic system reads these; geometry is scenery only
+    this.crossroads = [];
     // (fences were removed from the game entirely — the world is open and
     // off-road slowness is the boundary; see RULES.md)
     // Soft world radius for free-roam driving; the game turns players around
@@ -1233,6 +1697,9 @@ export class Track {
     this._buildBoostPads();  // …then pads fill in around them
     this._buildObstacles();  // …then rock towers block straights between them
     this._buildPuddles();
+    this._buildFords();      // ---- river-fords: streams wash over the road
+    this._buildVizZones();   // ---- viz-zones: forest tunnels / fog banks / squalls
+    this._buildNarrowDressing(); // ---- width-variation: pinch edge markers
     this._buildProps();      // …and smashable props fill the roadsides
     this._buildEnvironment();
   }
@@ -1296,6 +1763,127 @@ export class Track {
   slopeAt(i) {
     return this._slope[((i % N) + N) % N];
   }
+
+  // ---- width-variation ----------------------------------------------------
+  /** Drivable half-width at sample i. ROAD_HALF everywhere except inside a
+   *  narrow section, where it smoothly pinches to ~55–65% and back. Physics
+   *  callers use `t.widthAt?.(i) ?? ROAD_HALF` so either side of a merge
+   *  degrades gracefully. */
+  widthAt(i) {
+    const w = this._width;
+    return w ? w[((i % N) + N) % N] : ROAD_HALF;
+  }
+
+  /** True when sample i lies within `pad` samples of a narrow section
+   *  (used by ramp/pad/obstacle/prop placement so nothing big lands in, or
+   *  hangs off, a pinched stretch of road). */
+  _nearNarrow(i, pad = 0) {
+    return (this._narrowSecs ?? []).some((s) => this._circDist(i, s.mid) < s.half + pad);
+  }
+
+  /** Deterministic per-theme narrow sections: 2–4 stretches of 34–68 samples
+   *  on straights/mild curves where the road pinches to `min`×ROAD_HALF with
+   *  smooth cosine shoulders. Off for cliff-walled corridors (already tight). */
+  _buildWidthProfile() {
+    this._width = new Float32Array(N).fill(ROAD_HALF);
+    this._narrowSecs = [];
+    const T = this.T;
+    const themeKey = (this.level && this.level.theme) || 'forest';
+    const spec = T.narrows !== undefined
+      ? T.narrows
+      : T.cliffWalls ? false : (NARROW_TUNE[themeKey] ?? { count: 3, min: 0.6 });
+    if (!spec || !(spec.count > 0)) return;
+    // seeded LCG from the theme name — layouts stay deterministic across loads
+    let seed = 2166136261 >>> 0;
+    for (let k = 0; k < themeKey.length; k++) {
+      seed = ((seed ^ themeKey.charCodeAt(k)) * 16777619) >>> 0;
+    }
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    for (let tries = 0; tries < 500 && this._narrowSecs.length < spec.count; tries++) {
+      const len = 34 + Math.floor(rnd() * 34);            // 34–68 samples
+      const i0 = Math.floor(rnd() * N);
+      // clear of the start/grid both ends
+      if (this._circDist(i0, 0) < 90 || this._circDist((i0 + len) % N, 0) < 90) continue;
+      // straights / mild curves only — never mid-hairpin
+      let ok = true;
+      for (let k = -8; ok && k <= len + 8; k++) {
+        if (this.curvature[(i0 + k + N) % N] > 0.016) ok = false;
+      }
+      if (!ok) continue;
+      const mid = (i0 + (len >> 1)) % N;
+      const half = len / 2;
+      if (this._narrowSecs.some((s) => this._circDist(mid, s.mid) < s.half + half + 110)) continue;
+      // pinch floor ≈ 55–65% of ROAD_HALF (never below 5u half-width)
+      const minW = Math.max(5, ROAD_HALF * (spec.min ?? 0.6) * (0.95 + rnd() * 0.12));
+      this._narrowSecs.push({ i0, len, mid, half, minW });
+      for (let k = 0; k <= len; k++) {
+        // cosine shoulders over the outer 35% each side, flat floor between
+        const edge = Math.min(k, len - k) / (len * 0.35);
+        const f = THREE.MathUtils.smoothstep(Math.min(1, edge), 0, 1);
+        const j = (i0 + k) % N;
+        this._width[j] = Math.min(this._width[j], ROAD_HALF + (minW - ROAD_HALF) * f);
+      }
+    }
+  }
+
+  /** Pinch dressing: the squeeze must read as intentional — stone markers and
+   *  a hazard-striped post pair at each pinch entry/exit, plus rocks tracing
+   *  the narrowed edges. Markers are SOLID stone (Law of Solidity).
+   *
+   *  A pinch is a SQUEEZE, never a trap: every marker is pushed out far enough
+   *  that its collision face clears the declared drivable width. The car body
+   *  collides as a CAR_R-radius disc against `solids` (see vehicles.js), so a
+   *  marker of radius r must sit at |lateral| ≥ widthAt + r + CAR_R for the
+   *  full width to stay honestly free. Clip one and you were already off the
+   *  road — running wide is punished, threading the gap is not. */
+  _buildNarrowDressing() {
+    if (!this._narrowSecs || !this._narrowSecs.length) return;
+    const CAR_R = 1.8; // car collision radius used by the solids sweep
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: this.T.rockColor ?? 0x8d8578, flatShading: true, roughness: 1,
+    });
+    const postMat = new THREE.MeshStandardMaterial({ map: hazardTexture(), roughness: 0.85 });
+    const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+    const postGeo = new THREE.CylinderGeometry(0.16, 0.22, 2.2, 6);
+    const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
+    for (const sec of this._narrowSecs) {
+      for (const side of [1, -1]) {
+        // striped posts flag the entry and the exit of the squeeze
+        for (const k of [2, sec.len - 2]) {
+          const j = (sec.i0 + k) % N;
+          const lat = (this.widthAt(j) + 0.45 + CAR_R + 0.2) * side;
+          const p = this.pointAt(j, lat);
+          const post = new THREE.Mesh(postGeo, postMat);
+          post.position.set(p.x, p.y + 1.05, p.z);
+          post.castShadow = true;
+          this.group.add(post);
+          this.solids.push({ x: p.x, z: p.z, r: 0.45, y: p.y, mat: 'metal' });
+          this._addShadow(p.x, p.z, 0.8, p.y);
+        }
+        // low stone teeth trace the pinched edge so it reads as built, not broken
+        for (let k = 6; k < sec.len - 4; k += 7) {
+          const j = (sec.i0 + k) % N;
+          const w = this.widthAt(j);
+          if (w > ROAD_HALF - 0.8) continue;             // only along the squeeze
+          const s = 0.55 + hash(j * 7.7 - side) * 0.5;
+          const lat = (w + s * 0.95 + CAR_R + 0.2 + hash(j * 3.1 + side) * 0.7) * side;
+          const p = this.pointAt(j, lat);
+          const rock = new THREE.Mesh(rockGeo, rockMat);
+          rock.scale.set(s, s * 0.75, s * 0.9);
+          rock.rotation.y = hash(j * 1.3) * Math.PI * 2;
+          rock.position.set(p.x, p.y + s * 0.3, p.z);
+          rock.castShadow = true;
+          this.group.add(rock);
+          this.solids.push({ x: p.x, z: p.z, r: s * 0.95, y: p.y, mat: 'stone' });
+          this._addShadow(p.x, p.z, s * 1.3, p.y);
+        }
+      }
+    }
+  }
+  // ---- end width-variation -------------------------------------------------
 
   // ---------- queries ----------
   nearestIndex(pos, hint = null) {
@@ -1413,12 +2001,15 @@ export class Track {
     return this._roadFieldCoarse(x, z).d;
   }
 
-  /** Open-country rolling hills (no road influence). */
+  /** Open-country rolling hills (no road influence). `hillDrop` sinks the whole
+   *  open field below the road datum — FURKA RIDGE uses it so the ridge road
+   *  stands well proud of everything around it. */
   _hillNoise(x, z) {
     return (
       Math.sin(x * 0.012) * Math.cos(z * 0.010) * 3.4 +
       Math.sin(x * 0.030 + 1.7) * Math.cos(z * 0.026 + 0.6) * 1.7 +
       Math.sin(x * 0.070 + 3.1) * Math.cos(z * 0.062 + 2.2) * 0.7
+      - (this.T.hillDrop || 0)
     );
   }
 
@@ -1457,12 +2048,81 @@ export class Track {
    *  the ribbon (full 0.45 by d=14, zero at the drivable edge) so residual
    *  mesh interpolation error stays hidden below the road surface. */
   _blendHeight(d, roadY, x, z) {
-    const tuck = 0.45 * THREE.MathUtils.smoothstep(d, 10.8, 14);
-    if (d <= 15) return roadY - tuck;
-    const n = this._hillNoise(x, z);
-    if (d >= 70) return n;
-    const f = THREE.MathUtils.smoothstep(d, 15, 70);
-    return (roadY - tuck) * (1 - f) + n * f;
+    const B = this.T.blend;
+    const near = B ? B.near : 15, far = B ? B.far : 70;
+    // Pass worlds stack road strands 26-30u apart at different heights, so the
+    // nearest-sample blend can hand a point under one leg the height of the
+    // NEXT leg up and poke a lip through the ribbon. An extra tuck under the
+    // whole corridor (hidden by the skirt) keeps the ground below the road.
+    const tuck = 0.45 * THREE.MathUtils.smoothstep(d, 10.8, 14)
+      + (this.T.retainingWalls || this.T.shelfRoad
+        ? 0.75 * THREE.MathUtils.smoothstep(d, 2, 11) : 0);
+    let h;
+    if (d <= near) h = roadY - tuck;
+    else {
+      const n = this._hillNoise(x, z);
+      if (d >= far) h = n;
+      else {
+        const f = THREE.MathUtils.smoothstep(d, near, far);
+        h = (roadY - tuck) * (1 - f) + n * f;
+      }
+    }
+    // the hero gorge is carved out of whatever the ground would otherwise be,
+    // road corridor included — that is the hole the suspension bridge spans
+    return this._gorge ? h - this._gorgeCut(x, z) : h;
+  }
+
+  /** Depth of the river gorge at (x, z): 0 everywhere outside it, easing to
+   *  the full depth along the channel. Applied inside _blendHeight so the
+   *  scenery field, the terrain mesh and the free-roam ground all agree. */
+  _gorgeCut(x, z) {
+    const G = this._gorge;
+    const dx = x - G.x, dz = z - G.z;
+    const u = dx * G.ax + dz * G.az;          // along the gorge
+    const v = dx * G.vx + dz * G.vz;          // across it (= along the road)
+    const au = Math.abs(u), av = Math.abs(v);
+    if (au > G.len || av >= G.half) return 0;
+    const along = 1 - THREE.MathUtils.smoothstep(au, G.len * 0.55, G.len);
+    // U-shaped channel: full depth down the middle, rims easing back to grade
+    const prof = Math.pow(Math.cos((av / G.half) * Math.PI * 0.5), 1.5);
+    return G.depth * prof * along;
+  }
+
+  /** True when sample i lies within `pad` samples of the bridge span (so
+   *  ramps, pads, obstacles, puddles and props keep off the crossing). */
+  _nearGorge(i, pad) {
+    return !!this._gorge && this._circDist(i, this._gorge.i) < pad;
+  }
+
+  /** Pick where the gorge crosses the road. Runs BEFORE any geometry is built
+   *  (the terrain, the skirts and the scenery all read _gorgeCut). */
+  _planGorge() {
+    const H = this.T.heroBridge;
+    const [f0, f1] = H.at;
+    let best = -1, bc = Infinity;
+    for (let i = (f0 * N) | 0; i < (f1 * N) | 0; i += 2) {
+      if (this._circDist(i, 0) < 70) continue;
+      let mc = 0;
+      for (let k = -14; k <= 14; k++) mc = Math.max(mc, this.curvature[(i + k + N) % N]);
+      if (mc < bc) { bc = mc; best = i; }
+    }
+    if (best < 0) return;
+    const c = this.center[best], t = this.tan[best], n = this.nrm[best];
+    // the gorge crosses the road at a slant, not square on: from the deck the
+    // chasm and its river then run away diagonally into the distance instead
+    // of hiding directly beneath you
+    const th = H.skew !== undefined ? H.skew : 0.72;
+    const cs = Math.cos(th), sn = Math.sin(th);
+    const ax = n.x * cs + t.x * sn, az = n.z * cs + t.z * sn;   // along the gorge
+    const vx = -n.x * sn + t.x * cs, vz = -n.z * sn + t.z * cs; // across it
+    this._gorge = {
+      i: best, x: c.x, z: c.z,
+      ax, az, vx, vz,
+      half: H.half, len: H.len, depth: H.depth,
+      // how far along the ROAD the channel reaches, given the slant
+      spanU: H.half / Math.max(0.35, Math.abs(t.x * vx + t.z * vz)),
+      floorY: c.y - H.depth,
+    };
   }
 
   /** Rolling-hill height used by scenery placement and the free-roam mode's
@@ -1524,13 +2184,20 @@ export class Track {
     const verts = new Float32Array((N + 1) * 2 * 3);
     const uvs = new Float32Array((N + 1) * 2 * 2);
     const idx = [];
-    const w = WALL_OFF + 0.6;
     for (let i = 0; i <= N; i++) {
       const j = i % N;
       const c = this.center[j], n = this.nrm[j];
+      // ---- width-variation: the ribbon follows the drivable width profile
+      // (fringe margin beyond ROAD_HALF is preserved, so edges converge) ----
+      const w = this.widthAt(j) + (WALL_OFF + 0.6 - ROAD_HALF);
       const o = i * 6;
-      verts[o] = c.x + n.x * w; verts[o + 1] = c.y; verts[o + 2] = c.z + n.z * w;
-      verts[o + 3] = c.x - n.x * w; verts[o + 4] = c.y; verts[o + 5] = c.z - n.z * w;
+      // under a hero bridge the ribbon drops away so the plank deck laid on
+      // top of it is never coplanar (coplanar strips z-fight into dark bands
+      // at grazing angles). Physics still reads center[j].y — the DECK is the
+      // surface the car drives on there.
+      const y = c.y - this._deckDip(j);
+      verts[o] = c.x + n.x * w; verts[o + 1] = y; verts[o + 2] = c.z + n.z * w;
+      verts[o + 3] = c.x - n.x * w; verts[o + 4] = y; verts[o + 5] = c.z - n.z * w;
       const v = (i * this.segLen) / 10;
       uvs[i * 4] = 0; uvs[i * 4 + 1] = v;
       uvs[i * 4 + 2] = 1; uvs[i * 4 + 3] = v;
@@ -1564,8 +2231,20 @@ export class Track {
       mat.emissiveIntensity = 1.7;
     }
     const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'road';
     mesh.receiveShadow = true;
     this.group.add(mesh);
+  }
+
+  /** How far the road ribbon drops below the centerline at sample j so a hero
+   *  bridge deck can sit on top of it (0 everywhere else). Feathered over a
+   *  few samples at each end so the ribbon has no hard step. */
+  _deckDip(j) {
+    if (!this._gorge) return 0;
+    const d = this._circDist(j, this._gorge.i);
+    const span = this._spanSamples();
+    if (d > span + 4) return 0;
+    return 0.34 * (1 - THREE.MathUtils.smoothstep(d, span - 1, span + 4));
   }
 
   /** Mountain-pass embankments (ascent-profile levels): a dirt apron drops
@@ -1573,8 +2252,14 @@ export class Track {
    *  reads as a chunky stacked band on the face instead of an edge-on sliver.
    *  On the uphill side the apron simply buries itself inside the hill. */
   _buildRoadSkirts() {
-    const dirt = new THREE.Color(this.T.terrainDirt).lerp(new THREE.Color(0x8a5a32), 0.4);
-    const dark = dirt.clone().multiplyScalar(0.7);
+    // Pass worlds are built as a shelf cut into the face: instead of a broad
+    // dirt apron the edge falls almost vertically, so each switchback leg
+    // reads as its own stone-faced terrace with the parapet on its lip.
+    const steep = !!(this.T.retainingWalls || this.T.shelfRoad);
+    const dirt = this.T.skirtColor
+      ? new THREE.Color(this.T.skirtColor)
+      : new THREE.Color(this.T.terrainDirt).lerp(new THREE.Color(0x8a5a32), 0.4);
+    const dark = dirt.clone().multiplyScalar(steep ? 0.86 : 0.7);
     for (const side of [1, -1]) {
       const rows = 3;
       const verts = new Float32Array((N + 1) * rows * 3);
@@ -1595,13 +2280,22 @@ export class Track {
         // [lateral, y, color] — a shoulder lip, a steep face, and a toe that
         // reaches down to the LOCAL terrain (strand-capped folds drop far
         // below the road; a fixed-depth toe would hang in the air there)
-        const face = 2.6 + Math.sin(9 * t + side) * 0.4;
-        const latToe = Math.min(WALL_OFF + face + 2.8, maxLat);
+        // over the gorge the road is a bridge deck: the apron collapses to a
+        // thin lip instead of hanging a curtain down into the chasm
+        const onSpan = this._gorge && this._circDist(j, this._gorge.i) < this._spanSamples() + 4;
+        // ---- width-variation: skirts hug the (possibly pinched) road edge ----
+        const wOff = WALL_OFF + this.widthAt(j) - ROAD_HALF;
+        const face = onSpan ? 0.5 : steep
+          ? 1.35 + Math.sin(9 * t + side) * 0.18
+          : 2.6 + Math.sin(9 * t + side) * 0.4;
+        const latToe = Math.min(wOff + face + (onSpan ? 0.3 : steep ? 1.1 : 2.8), maxLat);
         const ground = this._terrainMeshHeight(c.x + n.x * latToe * side, c.z + n.z * latToe * side);
-        const toeY = Math.min(c.y - 2.9, ground - 0.6);
+        // on a bridge span the apron collapses to a hair under the deck edge
+        const toeY = onSpan ? c.y - 1.6 : Math.min(c.y - 2.9, ground - 0.6);
         const rowSpec = [
-          [Math.min(WALL_OFF + 0.55, maxLat), c.y - 0.06, dirt],
-          [Math.min(WALL_OFF + face, maxLat), c.y - 2.1 - Math.sin(17 * t - side) * 0.35, dirt],
+          [Math.min(wOff + 0.55, maxLat), c.y - (onSpan ? 0.34 : 0.06), dirt],
+          [Math.min(wOff + face, maxLat),
+            c.y - (steep ? 1.5 : 2.1) - Math.sin(17 * t - side) * 0.35, dirt],
           [latToe, toeY, dark],
         ];
         for (let r = 0; r < rows; r++) {
@@ -1852,7 +2546,9 @@ export class Track {
     const min = this.T.padMaxCurv;
     let last = -999;
     for (let i = 40; i < N && this.boostPads.length < 5; i += 10) {
+      if (this._nearNarrow(i, 14)) continue; // ---- width-variation: pads clear of pinches
       if (this.ramps.some((r) => this._circDist(i, r.index) < 50)) continue;
+      if (this._nearGorge(i, 50)) continue;
       if (this.curvature[i] < min && i - last > 140) {
         last = i;
         const lateral = (this.boostPads.length % 2 === 0) ? -3.2 : 3.2;
@@ -1881,6 +2577,7 @@ export class Track {
     const windows = [];
     for (let i = 0; i < N; i += 5) {
       if (i < 60 || i > N - 90) continue; // keep clear of the start gate
+      if (this._nearNarrow(i, 30)) continue; // ---- width-variation: no ramps in pinches
       let maxCurv = 0;
       for (let k = -4; k < 22; k++) maxCurv = Math.max(maxCurv, this.curvature[(i + k + N) % N]);
       windows.push({ i, maxCurv });
@@ -1893,6 +2590,7 @@ export class Track {
     for (const w of windows) {
       if (chosen.length >= want) break;
       if (w.maxCurv > this.T.rampMaxCurv) break;
+      if (this._nearGorge(w.i, 60)) continue;
       if (chosen.some((c) => this._circDist(w.i, c) < gap)) continue;
       chosen.push(w.i);
     }
@@ -1953,6 +2651,8 @@ export class Track {
     const chosen = [];
     for (let i = 0; i < N && chosen.length < spec.count; i += 7) {
       if (this._circDist(i, 0) < 60) continue;
+      if (this._nearGorge(i, 45)) continue;
+      if (this._nearNarrow(i, 25)) continue; // ---- width-variation: keep blockers out of pinches
       // alpine: loose boulders litter the fast DESCENT only (the downhill
       // window is short, so they pack tighter, and rockfall on a sweeper is
       // fair game — elsewhere obstacles keep to straights)
@@ -2084,6 +2784,8 @@ export class Track {
     const chosen = [];
     for (let i = 3; i < N && chosen.length < count; i += 5) {
       if (this._circDist(i, 0) < 50) continue;
+      if (this._nearGorge(i, 40)) continue;
+      if (this._nearNarrow(i, 6)) continue; // ---- width-variation: puddles clear of pinches
       if (this.ramps.some((r) => this._circDist(i, r.index) < 41)) continue;
       if (this.boostPads.some((p) => this._circDist(i, p.index) < 25)) continue;
       if (this._obstacleIdx.some((o) => this._circDist(i, o) < 25)) continue;
@@ -2114,6 +2816,274 @@ export class Track {
       this.puddles.push({ x: p.x, z: p.z, r: rad, y: p.y });
     }
   }
+
+  // ---- river-fords ---------------------------------------------------------
+  /** River fords: a visible watercourse crossing the ROAD perpendicular-ish,
+   *  4–8u wide, with shallow water OVER the road surface (the jungle's
+   *  _buildRivers streams pass UNDER the deck — these wash across it). The
+   *  stream ribbon meanders off into the landscape on both sides; foam lines
+   *  mark the water's edge across the road. Physics (splash, drag, wet tires)
+   *  is consumed from track.fords by the vehicle code. */
+  _buildFords() {
+    const themeKey = (this.level && this.level.theme) || 'forest';
+    const spec = this.T.fords !== undefined ? this.T.fords : FORD_TUNE[themeKey];
+    const count = spec && spec.count | 0;
+    if (!count) return;
+    // deterministic per theme (offset seed so fords never mirror the narrows)
+    let seed = 374761393 >>> 0;
+    for (let k = 0; k < themeKey.length; k++) {
+      seed = ((seed ^ themeKey.charCodeAt(k)) * 2246822519) >>> 0;
+    }
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    const chosen = [];
+    for (let tries = 0; tries < 400 && chosen.length < count; tries++) {
+      const i = 60 + Math.floor(rnd() * (N - 120));
+      if (this.curvature[i] > 0.013) continue;                 // straight-ish crossings
+      if (this._circDist(i, 0) < 70) continue;
+      if (this._nearNarrow(i, 20)) continue;
+      if (this.ramps.some((r) => this._circDist(i, r.index) < 45)) continue;
+      if (this.boostPads.some((p) => this._circDist(i, p.index) < 25)) continue;
+      if (this._obstacleIdx.some((o) => this._circDist(i, o) < 25)) continue;
+      if (chosen.some((c) => this._circDist(i, c.i) < 150)) continue;
+      chosen.push({ i, half: 3 + rnd() * 2 });                 // 6–10u wide band
+    }
+    if (!chosen.length) return;
+    const tex = riverTexture();
+    tex.anisotropy = 4;
+    const waterMat = new THREE.MeshStandardMaterial({
+      map: tex, roughness: 0.16, metalness: 0.06, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.9,
+    });
+    const foamMat = new THREE.MeshBasicMaterial({
+      color: 0xf2fbff, transparent: true, opacity: 0.4, depthWrite: false,
+    });
+    for (const fd of chosen) {
+      const c = this.center[fd.i], n = this.nrm[fd.i], tg = this.tan[fd.i];
+      const roadW = this.widthAt(fd.i);
+      this.fords.push({ i: fd.i, x: c.x, z: c.z, y: c.y, half: fd.half });
+      // meandering stream ribbon crossing the road along the local normal
+      const pts = [];
+      for (let s = -5; s <= 5; s++) {
+        const d = s * 13;
+        const sway = Math.sin(s * 1.35 + fd.i * 0.6) * 8 * Math.min(1, Math.abs(s) / 2.2);
+        pts.push(new THREE.Vector3(c.x + n.x * d + tg.x * sway, 0, c.z + n.z * d + tg.z * sway));
+      }
+      const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+      const SEGS = 64;
+      const verts = new Float32Array((SEGS + 1) * 2 * 3);
+      const uvs = new Float32Array((SEGS + 1) * 2 * 2);
+      const idx = [];
+      for (let s = 0; s <= SEGS; s++) {
+        const t = s / SEGS;
+        const p = curve.getPointAt(t);
+        const tn = curve.getTangentAt(t);
+        // shallow sheet OVER the road through the crossing, easing down to
+        // sit on (just under) the open terrain past the road corridor
+        const df = this._distToTrackCoarse(p.x, p.z);
+        const lift = 1 - THREE.MathUtils.smoothstep(df, roadW, roadW + 7);
+        const y = this.terrainHeight(p.x, p.z) + 0.055 * lift - 0.12 * (1 - lift);
+        // stream width: fat through the ford, tapering into the banks
+        const wv = fd.half * (0.5 + 0.6 * Math.sqrt(Math.sin(Math.PI * t)));
+        const o = s * 6;
+        verts[o] = p.x + tn.z * wv; verts[o + 1] = y; verts[o + 2] = p.z - tn.x * wv;
+        verts[o + 3] = p.x - tn.z * wv; verts[o + 4] = y; verts[o + 5] = p.z + tn.x * wv;
+        uvs[s * 4] = t * 6; uvs[s * 4 + 1] = 0;
+        uvs[s * 4 + 2] = t * 6; uvs[s * 4 + 3] = 1;
+      }
+      for (let s = 0; s < SEGS; s++) {
+        const a = s * 2, b = s * 2 + 1, cc = s * 2 + 2, d2 = s * 2 + 3;
+        idx.push(a, b, cc, b, d2, cc);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, waterMat);
+      mesh.receiveShadow = true;
+      mesh.renderOrder = 1;                       // above the road ribbon
+      this.group.add(mesh);
+      // foam lines where the water meets the road at both edges of the band
+      const heading = this.headingAt(fd.i);
+      for (const s of [-1, 1]) {
+        const foam = new THREE.Mesh(new THREE.PlaneGeometry(roadW * 2 + 2.5, 0.55), foamMat);
+        foam.rotation.order = 'YXZ';
+        foam.rotation.y = heading;
+        foam.rotation.x = -Math.PI / 2 - Math.atan(this.slopeAt(fd.i));
+        const fp = this.pointAt(fd.i, 0);
+        foam.position.set(
+          fp.x + this.tan[fd.i].x * fd.half * s * 0.9,
+          fp.y + 0.09,
+          fp.z + this.tan[fd.i].z * fd.half * s * 0.9
+        );
+        foam.renderOrder = 2;
+        this.group.add(foam);
+      }
+    }
+  }
+  // ---- end river-fords -----------------------------------------------------
+
+  // ---- viz-zones -----------------------------------------------------------
+  /** Deterministic per-theme visibility zones: 40–90-sample sections where
+   *  sight is impaired — 'forest' (dense tree corridor + canopy gloom),
+   *  'fogbank' (pure data; runtime pulls fog in) and 'squall' (rain burst).
+   *  The runtime fog response lives in the game lead; rivals read the zones
+   *  through their corner-speed planner. */
+  _buildVizZones() {
+    const themeKey = (this.level && this.level.theme) || 'forest';
+    const spec = this.T.viz !== undefined ? this.T.viz : VIZ_TUNE[themeKey];
+    if (!spec || !spec.length) return;
+    let seed = 668265263 >>> 0;
+    for (let k = 0; k < themeKey.length; k++) {
+      seed = ((seed ^ themeKey.charCodeAt(k)) * 374761393) >>> 0;
+    }
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    for (const [kind, count] of spec) {
+      for (let want = 0, tries = 0; want < count && tries < 400; tries++) {
+        // corridors run a bit shorter than fog banks (their tree walls need a
+        // gentle stretch of road); fog/squalls take 40–90 samples anywhere
+        const len = kind === 'forest' ? 40 + Math.floor(rnd() * 26) : 40 + Math.floor(rnd() * 50);
+        const i0 = Math.floor(rnd() * N);
+        if (this._circDist(i0, 0) < 80 || this._circDist((i0 + len) % N, 0) < 80) continue;
+        const mid = (i0 + (len >> 1)) % N, half = len / 2;
+        if (this._nearNarrow(mid, half + 8)) continue;        // keep clear of pinches
+        if (this.vizZones.some((z) => this._circDist(mid, z.mid) < z.half + half + 50)) continue;
+        // forest corridors want gentle road (trees at the edge of a hairpin
+        // block the sight line the driver NEEDS); fog can sit anywhere
+        if (kind === 'forest') {
+          let ok = true;
+          for (let k2 = -4; ok && k2 <= len + 4; k2++) {
+            if (this.curvature[(i0 + k2 + N) % N] > 0.024) ok = false;
+          }
+          if (!ok) continue;
+          // …and never over a ford: the canopy gloom decal would swallow the
+          // white bow-wave that sells the crossing (fords are built first)
+          if (this.fords.some((f) => this._circDist(mid, f.i) < half + 10)) continue;
+        }
+        this.vizZones.push({ i0, i1: (i0 + len) % N, len, mid, half, kind, strength: 1 });
+        want++;
+      }
+    }
+    if (this.vizZones.some((z) => z.kind === 'forest')) this._buildVizCorridors();
+  }
+
+  /** Thick-forest corridors: big canopy pines planted DENSE along both road
+   *  edges of every 'forest' viz zone, leaning inward so the road reads as a
+   *  tunnel through the woods, plus a translucent canopy-shadow ribbon over
+   *  the road for under-canopy gloom. Trees register in this.trees (kind
+   *  'pine', s ≥ 1.0 ⇒ SOLID trunks per the material law), kept ~1.5–2u off
+   *  the drivable edge so wide lines are punished, never blocked. */
+  _buildVizCorridors() {
+    const T = this.T;
+    const zones = this.vizZones.filter((z) => z.kind === 'forest');
+    // shared instanced pine (theme-tinted): trunk + two canopy tiers (+ cap)
+    let cap = 0;
+    for (const z of zones) cap += Math.ceil(z.len / 2) * 2 + 4;
+    const trunkGeo = new THREE.CylinderGeometry(0.42, 0.6, 3.2, 7);
+    trunkGeo.translate(0, 1.6, 0);
+    const lowGeo = new THREE.ConeGeometry(3.1, 4.8, 8);
+    lowGeo.translate(0, 5.1, 0);
+    const topGeo = new THREE.ConeGeometry(2.1, 3.9, 8);
+    topGeo.translate(0, 8.1, 0);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor ?? 0x5a4028, roughness: 1 });
+    const lowMat = new THREE.MeshStandardMaterial({ color: T.foliageLow ?? 0x2c6e2a, flatShading: true, roughness: 1 });
+    const topMat = new THREE.MeshStandardMaterial({ color: T.foliageTop ?? 0x3c8a34, flatShading: true, roughness: 1 });
+    const parts = [
+      new THREE.InstancedMesh(trunkGeo, trunkMat, cap),
+      new THREE.InstancedMesh(lowGeo, lowMat, cap),
+      new THREE.InstancedMesh(topGeo, topMat, cap),
+    ];
+    if (T.treeSnowCap) {
+      const capGeo = new THREE.ConeGeometry(1.5, 2.1, 8);
+      capGeo.translate(0, 8.9, 0);
+      parts.push(new THREE.InstancedMesh(
+        capGeo, new THREE.MeshStandardMaterial({ color: 0xf2f6fa, flatShading: true, roughness: 0.9 }), cap));
+    }
+    for (const part of parts) part.castShadow = true;
+    const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
+    const color = new THREE.Color();
+    const F = T.foliage || { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.32, lVar: 0.14 };
+    let k = 0;
+    for (const z of zones) {
+      for (let s = 0; s < z.len && k < cap; s += 2) {   // a pair every ~3.8u: thick
+        const j = (z.i0 + s) % N;
+        for (const side of [1, -1]) {
+          if (k >= cap) break;
+          const h1 = hash(j * 5.7 + side * 2.3);
+          // two staggered rows pressed near the road edge. The trunks are
+          // SOLID, so like the pinch markers they are pushed out until the
+          // collision face (trunk r + the 1.8u car radius) clears the drivable
+          // width — the canopy leans in over the road, the trunks never do.
+          const row = h1 < 0.55 ? 0 : 1;
+          const sc = 1.15 + hash(j * 9.1 - side) * 0.75;      // big canopy pines
+          const lat = (this.widthAt(j) + 0.75 * sc + 2.0 + row * 3.2 + h1 * 1.4) * side;
+          const p = this.pointAt(j, lat);
+          const ty = this.terrainHeight(p.x, p.z) - 0.2;
+          // lean the whole tree inward over the road (rotation about the tangent)
+          const lean = (0.10 + hash(j * 3.3 + side) * 0.12) * side;
+          q.setFromAxisAngle(this.tan[j], lean);
+          pos.set(p.x, ty, p.z);
+          scl.set(sc, sc * (0.95 + hash(j * 1.9) * 0.35), sc);
+          m4.compose(pos, q, scl);
+          for (const part of parts) part.setMatrixAt(k, m4);
+          color.setHSL(
+            F.h + hash(j * 2.2 + side) * F.hVar,
+            F.s + hash(j * 4.4 - side) * F.sVar,
+            Math.max(0.1, (F.l + hash(j * 6.6) * F.lVar) * 0.82)  // corridor reads darker
+          );
+          parts[1].setColorAt(k, color);
+          parts[2].setColorAt(k, color.clone().multiplyScalar(1.15));
+          parts[0].setColorAt(k, color.clone().setScalar(0.85));
+          // collision r tracks the TRUNK, not the canopy (the canopy overhangs
+          // the road; only the trunk is solid) — see the clearance note above
+          this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.75 * sc, id: k, parts, kind: 'pine', s: sc });
+          this._addShadow(p.x, p.z, 2.6 * sc, ty + 0.2);
+          k++;
+        }
+      }
+      // under-canopy gloom: a dark translucent ribbon over the road, tapering
+      // out at both ends (same decal spirit as the baked contact shadows)
+      const rows = 2;
+      const gv = new Float32Array((z.len + 1) * rows * 3);
+      const gidx = [];
+      for (let s2 = 0; s2 <= z.len; s2++) {
+        const j = (z.i0 + s2) % N;
+        const c = this.center[j], n = this.nrm[j];
+        const taper = Math.min(1, Math.min(s2, z.len - s2) / 7);
+        const w = (this.widthAt(j) + 2.2) * taper;
+        const o = s2 * rows * 3;
+        gv[o] = c.x + n.x * w; gv[o + 1] = c.y + 0.05; gv[o + 2] = c.z + n.z * w;
+        gv[o + 3] = c.x - n.x * w; gv[o + 4] = c.y + 0.05; gv[o + 5] = c.z - n.z * w;
+      }
+      for (let s2 = 0; s2 < z.len; s2++) {
+        const a = s2 * 2, b = a + 1, c2 = a + 2, d2 = a + 3;
+        gidx.push(a, b, c2, b, d2, c2);
+      }
+      const ggeo = new THREE.BufferGeometry();
+      ggeo.setAttribute('position', new THREE.BufferAttribute(gv, 3));
+      ggeo.setIndex(gidx);
+      const gloom = new THREE.Mesh(ggeo, new THREE.MeshBasicMaterial({
+        color: 0x03130a, transparent: true, opacity: 0.34, depthWrite: false,
+      }));
+      gloom.renderOrder = 1;
+      this.group.add(gloom);
+    }
+    for (const part of parts) {
+      part.count = k;
+      if (part.instanceColor) part.instanceColor.needsUpdate = true;
+    }
+    this.scene.add(...parts);
+  }
+  // ---- end viz-zones -------------------------------------------------------
 
   /** Build one prop mesh (origin at its base). Returns {mesh, r} — geometry and
    *  most materials are shared; only theme tints (hay color, barrel wrap) vary. */
@@ -2222,10 +3192,12 @@ export class Track {
       for (let tries = 0; tries < 40; tries++) {
         const i = (Math.random() * N) | 0;
         if (this._circDist(i, 0) < 30) continue;                                  // start grid + gate
+        if (this._nearGorge(i, 40)) continue;                                     // the bridge span
         if (this.ramps.some((r) => this._circDist(i, r.index) < 36)) continue;    // 20 + ramp len
         if (this.boostPads.some((p) => this._circDist(i, p.index) < 20)) continue;
         if (this._obstacleIdx.some((o) => this._circDist(i, o) < 20)) continue;
         if (usedI.some((u) => this._circDist(i, u) < 4)) continue;                // no piles
+        if (shoulder && this._nearNarrow(i, 6)) continue; // ---- width-variation: keep the pinch lane clear
         const side = Math.random() < 0.5 ? -1 : 1;
         const lateral = shoulder
           ? side * (3.5 + Math.random() * 5)           // in the drivable lane
@@ -2279,30 +3251,31 @@ export class Track {
   }
 
   /** Fell tree `tr`: hide its instanced parts and hand back a one-off
-   *  stand-in mesh the game can send flying. Returns null if already dead. */
+   *  stand-in mesh the game can send flying. Returns null if already dead.
+   *  The stand-in is rebuilt from the tree's OWN instanced part geometry and
+   *  per-instance tint, so a felled cactus flies away as a cactus, a snag as
+   *  a snag, a palm as a palm — never as a generic pine. */
   smashTree(tr) {
     if (tr.dead) return null;
     tr.dead = true;
-    _m4.makeScale(0, 0, 0);
+    const g = new THREE.Group();
+    const tint = new THREE.Color();
     for (const part of tr.parts) {
+      // capture the per-instance color BEFORE zeroing the instance out
+      if (part.instanceColor) part.getColorAt(tr.id, tint);
+      else tint.setScalar(1);
+      const src = part.material;
+      const m = new THREE.Mesh(part.geometry, new THREE.MeshStandardMaterial({
+        color: (src.color ? src.color.clone() : new THREE.Color(1, 1, 1)).multiply(tint),
+        map: src.map ?? null,
+        flatShading: !!src.flatShading,
+        roughness: src.roughness ?? 1,
+      }));
+      m.castShadow = true;
+      g.add(m);
+      _m4.makeScale(0, 0, 0);
       part.setMatrixAt(tr.id, _m4);
       part.instanceMatrix.needsUpdate = true;
-    }
-    const g = new THREE.Group();
-    const trunk = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.28, 0.44, tr.kind === 'snag' ? 4.4 : 3.2, 6),
-      new THREE.MeshStandardMaterial({ color: this.T.trunkColor ?? 0x5a4028, roughness: 1 }));
-    trunk.position.y = 1.6;
-    g.add(trunk);
-    if (tr.kind !== 'snag') {
-      const fol = new THREE.Mesh(
-        new THREE.ConeGeometry(1.9, 3.6, 7),
-        new THREE.MeshStandardMaterial({
-          color: tr.kind === 'cactus' ? 0x4a7a3c : (this.T.foliageLow ?? 0x2a5a30),
-          flatShading: true, roughness: 1,
-        }));
-      fol.position.y = 4.1;
-      g.add(fol);
     }
     g.position.set(tr.x, tr.y ?? this.terrainHeight(tr.x, tr.z), tr.z);
     g.scale.setScalar(tr.s ?? 1);
@@ -2331,8 +3304,482 @@ export class Track {
     if (this.T.hollowArch) this._buildHollowArch();  // redwood drive-through trunk
     if (this.T.lamps) this._buildLamps();            // neon / undercity road lamps
     if (this.T.logYards) this._buildLogYards();      // flume timber stacks
+    if (this.T.retainingWalls) this._buildRetainingWalls();   // alpine-pass parapets
+    if (this.T.heroBridge) this._buildHeroBridge();           // hero rope crossing
+    if (this.T.guardFence) this._buildGuardFence();           // breakable mountain rail fence
+    if (this.T.roadCabins) this._buildRoadCabins();           // log cabins on the shelves
+    if (this.T.snowPatches) this._buildSnowPatches(m4);       // old snow at altitude
+    this._buildWorldElements(m4);                    // farms, chapels, fences, dressing
+    this._buildPastures();                           // grazing spots for the animal system
+    this._buildCrossroads();                         // dirt side-road junctions (rural worlds)
     this._buildRoadsideDetail(m4);                   // corner markers + gravel
     this._buildContactShadows();                     // baked AO under everything
+  }
+
+  /** ALPINE PASSES: dry-stone retaining parapets. A pass is built as a shelf
+   *  cut into the face — every edge that falls away is held up by masonry, and
+   *  the outside of every hairpin is walled. Instanced blocks with one small
+   *  SOLID collider each, sitting far enough out (T.retainingWalls.lateral)
+   *  that they never eat into the racing line: you only meet the stone if you
+   *  have already left the road. */
+  _buildRetainingWalls() {
+    const S = this.T.retainingWalls;
+    const LAT = S.lateral, H = S.height, MAX = S.max || 380;
+    const geo = new THREE.BoxGeometry(3.4, H, 0.9);
+    geo.translate(0, H / 2, 0);
+    const mesh = new THREE.InstancedMesh(
+      geo,
+      new THREE.MeshStandardMaterial({
+        map: stoneTexture(), roughness: 1, envMapIntensity: 0.4, vertexColors: false,
+      }),
+      MAX
+    );
+    mesh.castShadow = mesh.receiveShadow = true;
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    let k = 0;
+    for (let i = 0; i < N && k < MAX; i++) {
+      if (this._circDist(i, 0) < 26) continue;              // keep the start gate clear
+      const tight = this.curvature[i] > 0.028;
+      // outside of the corner (the hairpin's exposed edge)
+      const a = this.tan[i], b = this.tan[(i + 12) % N];
+      const outside = (a.x * b.z - a.z * b.x) > 0 ? -1 : 1;
+      for (const side of [1, -1]) {
+        if (k >= MAX) break;
+        const p = this.pointAt(i, LAT * side);
+        const ground = this._terrainMeshHeight(p.x, p.z);
+        // wall it where the shelf falls away, and always around tight bends
+        if (p.y - ground < S.drop && !(tight && side === outside)) continue;
+        q.setFromAxisAngle(up, this.headingAt(i));
+        m4.compose(new THREE.Vector3(p.x, p.y - 0.55, p.z), q, new THREE.Vector3(1, 1, 1));
+        mesh.setMatrixAt(k, m4);
+        col.setScalar(0.86 + Math.random() * 0.28);
+        mesh.setColorAt(k++, col);
+        this.solids.push({ x: p.x, z: p.z, r: 1.2, y: p.y, mat: 'stone' });
+      }
+    }
+    mesh.count = k;
+    mesh.name = 'retaining-wall';
+    if (k) this.scene.add(mesh);
+  }
+
+  /** How many samples the bridge deck covers each way from the gorge centre. */
+  _spanSamples() {
+    return Math.ceil((this._gorge.spanU + 3.5) / this.segLen);
+  }
+
+  /** HERO CROSSING: a rope suspension bridge over the red-rock river gorge.
+   *  Plank deck laid on the road, chunky timber towers at both ends, hemp main
+   *  cables sagging in a catenary between them, vertical hangers down to rope
+   *  railings along both edges — and a CHECKPOINT gate arch on the far bank
+   *  with a log pile and fallen timber beside it. Collision comes only from
+   *  the four tower posts and the two gate posts; the deck is just road. */
+  _buildHeroBridge() {
+    const G = this._gorge;
+    if (!G) return;
+    const span = this._spanSamples();
+    const i0 = (G.i - span + N) % N, i1 = (G.i + span) % N;
+    const deckW = WALL_OFF + 0.6;
+    const wood = new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.95 });
+    const darkWood = new THREE.MeshStandardMaterial({ color: 0x3e2716, roughness: 1 });
+    const rope = new THREE.MeshStandardMaterial({ color: 0xc7a271, roughness: 1 });
+    const g = new THREE.Group();
+
+    // --- plank deck: individual timber baulks laid across the roadway ---
+    // (discrete boxes, not one flat ribbon — a ribbon laid a few centimetres
+    // over the road ribbon z-fights into black bands at grazing angles)
+    {
+      const rows = span * 2;
+      const plankGeo = new THREE.BoxGeometry(deckW * 2, 0.22, 1.15);
+      const tex = plankTexture();
+      tex.anisotropy = 8;
+      const planks = new THREE.InstancedMesh(
+        plankGeo,
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }),
+        rows * 3
+      );
+      planks.name = 'bridge-deck';
+      planks.receiveShadow = planks.castShadow = true;
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+      const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+      let k = 0;
+      const step = 1.5 / this.segLen;                 // a baulk every ~1.5u
+      for (let f = 0; f <= rows; f += step) {
+        const j = (i0 + Math.round(f) + N) % N;
+        const c = this.center[j];
+        q.setFromAxisAngle(up, this.headingAt(j));
+        m4.compose(new THREE.Vector3(c.x, c.y - 0.02, c.z), q, new THREE.Vector3(1, 1, 1));
+        planks.setMatrixAt(k, m4);
+        col.setScalar(0.86 + Math.random() * 0.28);
+        planks.setColorAt(k++, col);
+        if (k >= rows * 3) break;
+      }
+      planks.count = k;
+      g.add(planks);
+    }
+
+    // --- towers at both ends ---
+    const towerH = 7.4;
+    const towerTop = [];
+    for (const end of [i0, i1]) {
+      const c = this.center[end], n = this.nrm[end];
+      const pair = [];
+      for (const side of [1, -1]) {
+        const px = c.x + n.x * (deckW - 0.5) * side, pz = c.z + n.z * (deckW - 0.5) * side;
+        const post = new THREE.Mesh(new THREE.BoxGeometry(1.5, towerH, 1.5), darkWood);
+        post.position.set(px, c.y + towerH / 2 - 0.4, pz);
+        post.rotation.y = this.headingAt(end);
+        post.castShadow = true;
+        g.add(post);
+        pair.push(new THREE.Vector3(px, c.y + towerH - 0.6, pz));
+        this.solids.push({ x: px, z: pz, r: 1.5, y: c.y + 1, mat: 'hut' });
+        this._addShadow(px, pz, 2.4, c.y);
+      }
+      // cross beam over the roadway
+      const beam = new THREE.Mesh(
+        new THREE.BoxGeometry((deckW - 0.5) * 2 + 1.5, 0.7, 0.9), darkWood);
+      beam.position.set(c.x, c.y + towerH - 0.9, c.z);
+      beam.rotation.y = this.headingAt(end) + Math.PI / 2;
+      beam.castShadow = true;
+      g.add(beam);
+      towerTop.push(pair);
+    }
+
+    // --- main cables (catenary) + hangers + rope railings ---
+    const SEG = 22;
+    for (let s = 0; s < 2; s++) {
+      const side = s === 0 ? 1 : -1;
+      const cable = [], railTop = [], railMid = [];
+      for (let k = 0; k <= SEG; k++) {
+        const t = k / SEG;
+        const j = (i0 + Math.round(t * span * 2)) % N;
+        const c = this.center[j], n = this.nrm[j];
+        const x = c.x + n.x * (deckW - 0.5) * side, z = c.z + n.z * (deckW - 0.5) * side;
+        // catenary: full tower height at the ends, sagging near the deck mid-span
+        const sag = Math.cosh((t - 0.5) * 3.4) / Math.cosh(1.7);
+        const y = c.y + 1.5 + (towerH - 2.1) * sag;
+        cable.push(new THREE.Vector3(x, y, z));
+        const dip = 0.55 * Math.sin(t * Math.PI);      // rope rails dip slightly
+        railTop.push(new THREE.Vector3(x, c.y + 1.25 - dip * 0.35, z));
+        railMid.push(new THREE.Vector3(x, c.y + 0.62 - dip * 0.3, z));
+      }
+      const tube = (pts, r, seg, mat) => {
+        const m = new THREE.Mesh(
+          new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), seg, r, 5, false), mat);
+        m.castShadow = true;
+        g.add(m);
+      };
+      tube(cable, 0.22, 30, rope);
+      tube(railTop, 0.11, 26, rope);
+      tube(railMid, 0.09, 26, rope);
+      // vertical hangers from the cable down to the rail
+      for (let k = 2; k < SEG - 1; k += 2) {
+        const a = cable[k], b = railTop[k];
+        const hang = new THREE.Mesh(new THREE.BoxGeometry(0.11, a.y - b.y, 0.11), rope);
+        hang.position.set(a.x, (a.y + b.y) / 2, a.z);
+        g.add(hang);
+      }
+      // deck-edge kerb rail the hangers land on
+      for (let k = 0; k < SEG; k += 1) {
+        const a = railMid[k], b = railMid[k + 1];
+        if (!b) break;
+        const len = a.distanceTo(b);
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.35, 0.16), wood);
+        post.position.set(a.x, a.y - 0.35, a.z);
+        g.add(post);
+        if (len <= 0) break;
+      }
+    }
+    this.group.add(g);
+
+    // --- CHECKPOINT gate arch on the far bank ---
+    const gi = (i1 + Math.round(11 / this.segLen)) % N;
+    {
+      const c = this.center[gi], n = this.nrm[gi];
+      const arch = new THREE.Group();
+      for (const side of [1, -1]) {
+        const px = c.x + n.x * (deckW + 0.9) * side, pz = c.z + n.z * (deckW + 0.9) * side;
+        const post = new THREE.Mesh(new THREE.BoxGeometry(1.3, 8.6, 1.3), darkWood);
+        post.position.set(px, c.y + 4.3, pz);
+        post.rotation.y = this.headingAt(gi);
+        post.castShadow = true;
+        arch.add(post);
+        this.solids.push({ x: px, z: pz, r: 1.3, y: c.y + 1, mat: 'hut' });
+        this._addShadow(px, pz, 2.2, c.y);
+      }
+      const w = (deckW + 0.9) * 2 + 1.3;
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, 1.0), darkWood);
+      beam.position.set(c.x, c.y + 8.1, c.z);
+      beam.rotation.y = this.headingAt(gi) + Math.PI / 2;
+      beam.castShadow = true;
+      arch.add(beam);
+      // plank sign reading CHECKPOINT, visible from both approaches
+      const signTex = bannerTexture('CHECKPOINT', '#3a2414', '#f0cf94');
+      for (const flip of [0, Math.PI]) {
+        const sign = new THREE.Mesh(
+          new THREE.PlaneGeometry(w * 0.62, 2.2),
+          new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.9 }));
+        sign.position.set(c.x, c.y + 6.6, c.z);
+        sign.rotation.y = this.headingAt(gi) + Math.PI / 2 + flip;
+        sign.translateZ(0.56);
+        arch.add(sign);
+      }
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 0.66, 0.34, 1.6), wood);
+      cap.position.set(c.x, c.y + 8.75, c.z);
+      cap.rotation.y = this.headingAt(gi) + Math.PI / 2;
+      arch.add(cap);
+      this.group.add(arch);
+    }
+
+    // --- log pile + fallen timber on the far bank ---
+    {
+      const K = ELEMENT_KITS[this.T.elements || 'alpine'];
+      const B = { wall: [], box: [], cyl: [], cone: [], prism: [] };
+      const c = this.center[(gi + Math.round(16 / this.segLen)) % N], n = this.nrm[gi];
+      for (const [off, side] of [[15, 1], [19, -1]]) {
+        const px = c.x + n.x * off * side, pz = c.z + n.z * off * side;
+        if (!this._buildableSpot(px, pz, 4, 3.2)) continue;
+        this._element(B, 'logpile', px, pz, this.headingAt(gi) + (Math.random() - 0.5), K);
+      }
+      if (B.cyl.length) this._realizeElements(B, new THREE.Matrix4());
+      // a couple of loose fallen logs
+      const logGeo = new THREE.CylinderGeometry(0.55, 0.62, 6.5, 8);
+      logGeo.rotateZ(Math.PI / 2);
+      for (let k = 0; k < 3; k++) {
+        const off = (13 + Math.random() * 9) * (k % 2 ? 1 : -1);
+        const px = c.x + n.x * off, pz = c.z + n.z * off;
+        const log = new THREE.Mesh(logGeo, wood);
+        log.position.set(px, this.terrainHeight(px, pz) + 0.5, pz);
+        log.rotation.y = Math.random() * Math.PI;
+        log.castShadow = true;
+        this.group.add(log);
+        this._addShadow(px, pz, 3.4);
+      }
+    }
+
+    this._buildGorgeRiver();
+  }
+
+  /** The pale turquoise river winding along the bottom of the hero gorge. */
+  _buildGorgeRiver() {
+    const G = this._gorge;
+    const SEG = 26, HALF = 7.5;
+    const verts = new Float32Array((SEG + 1) * 2 * 3);
+    const uvs = new Float32Array((SEG + 1) * 2 * 2);
+    const idx = [];
+    for (let k = 0; k <= SEG; k++) {
+      const t = (k / SEG - 0.5) * 2 * G.len;
+      // the channel meanders a little as it runs down the gorge
+      const wob = Math.sin(t * 0.035) * 4.5 + Math.sin(t * 0.011 + 1.3) * 3;
+      const x = G.x + G.ax * t + G.vx * wob;
+      const z = G.z + G.az * t + G.vz * wob;
+      const y = G.floorY + 0.55 + Math.abs(t) * 0.02;
+      const o = k * 6;
+      verts[o] = x + G.vx * HALF; verts[o + 1] = y; verts[o + 2] = z + G.vz * HALF;
+      verts[o + 3] = x - G.vx * HALF; verts[o + 4] = y; verts[o + 5] = z - G.vz * HALF;
+      uvs[k * 4] = 0; uvs[k * 4 + 1] = t / 26;
+      uvs[k * 4 + 2] = 1; uvs[k * 4 + 3] = t / 26;
+    }
+    for (let k = 0; k < SEG; k++) {
+      const a = k * 2, b = a + 1, c = a + 2, d = a + 3;
+      idx.push(a, b, c, b, d, c);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const tex = riverTexture();
+    tex.wrapT = THREE.RepeatWrapping;
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      map: tex, roughness: 0.25, metalness: 0.05,
+      color: 0x9fe4e0,                                  // pale glacial turquoise
+      envMapIntensity: 1.2, transparent: true, opacity: 0.94,
+    }));
+    mesh.name = 'gorge-river';
+    this.scene.add(mesh);
+  }
+
+  /** FURKA RIDGE: the reddish wooden guard fence that runs the DOWNHILL edge
+   *  of a mountain pass — posts and two rails, following the road all the way
+   *  down the serpentine, with gaps through the hairpins.
+   *
+   *  It is BREAKABLE, never a wall: every bay is one instance of a single
+   *  InstancedMesh (one draw call for the whole pass) plus an entry in the
+   *  existing knockable-board array, so a car bursts through it at speed and
+   *  missiles/blasts level it, exactly like a sponsor board. `smashBanner`
+   *  below zeroes the instance and hands back a loose bay to fling. */
+  _buildGuardFence() {
+    const S = this.T.guardFence;
+    const LAT = S.lateral, MAX = S.max || 190;
+    const geo = mergeBoxes([
+      { w: 0.24, h: 1.5, d: 0.24, x: -2.5, y: 0.75, z: 0 },
+      { w: 0.24, h: 1.5, d: 0.24, x: 2.5, y: 0.75, z: 0 },
+      { w: 5.4, h: 0.2, d: 0.14, x: 0, y: 1.28, z: 0 },
+      { w: 5.4, h: 0.2, d: 0.14, x: 0, y: 0.78, z: 0 },
+    ]);
+    const mat = new THREE.MeshStandardMaterial({ color: S.color, roughness: 0.95 });
+    const mesh = new THREE.InstancedMesh(geo, mat, MAX);
+    mesh.castShadow = true;
+    mesh.name = 'guard-fence';
+    this._guardFenceMesh = mesh;
+    this._guardFenceGeo = geo;
+    this._guardFenceMat = mat;
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    const step = Math.max(2, Math.round(5.6 / this.segLen));   // one bay ≈ 5.6u
+    let k = 0;
+    for (let i = 0; i < N && k < MAX; i += step) {
+      if (this._circDist(i, 0) < 30) continue;                 // clear of the gate
+      if (this._nearGorge(i, 42)) continue;                    // the bridge has its own rails
+      if (this.curvature[i] > 0.045) continue;                 // gap through hairpins
+      // downhill side: the edge that falls away
+      let side = 0, drop = 0;
+      for (const sd of [1, -1]) {
+        const p = this.pointAt(i, LAT * sd);
+        const d = p.y - this._terrainMeshHeight(p.x, p.z);
+        if (d > drop) { drop = d; side = sd; }
+      }
+      if (!side || drop < 1.4) continue;
+      const p = this.pointAt(i, LAT * side);
+      q.setFromAxisAngle(up, this.headingAt(i));
+      m4.compose(new THREE.Vector3(p.x, p.y - 0.35, p.z), q, new THREE.Vector3(1, 1, 1));
+      mesh.setMatrixAt(k, m4);
+      this.banners.push({
+        x: p.x, z: p.z, y: p.y - 0.35, r: 1.2, dead: false,
+        kind: 'fence', id: k, heading: this.headingAt(i),
+      });
+      k++;
+    }
+    mesh.count = k;
+    if (k) this.group.add(mesh);
+  }
+
+  /** Log cabins standing on the shelves right beside the pass, the way real
+   *  mountain huts do. Uses the world-element archetypes so they are SOLID
+   *  'hut' colliders with plank-burst crashes like every other building. */
+  _buildRoadCabins() {
+    const K = ELEMENT_KITS[this.T.elements || 'alpine'];
+    const B = { wall: [], box: [], cyl: [], cone: [], prism: [] };
+    let placed = 0;
+    for (let tries = 0; tries < 220 && placed < this.T.roadCabins; tries++) {
+      const i = (Math.random() * N) | 0;
+      if (this._circDist(i, 0) < 40) continue;
+      const side = Math.random() < 0.5 ? 1 : -1;
+      const p = this.pointAt(i, side * (20 + Math.random() * 14));
+      if (!this._buildableSpot(p.x, p.z, 7, 2.4)) continue;
+      // face the road
+      const rot = this.headingAt(i) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      this._element(B, Math.random() < 0.7 ? 'house' : 'shed', p.x, p.z, rot, K);
+      placed++;
+    }
+    if (placed) this._realizeElements(B, new THREE.Matrix4());
+  }
+
+  /** Old snow lying in the hollows above `minY`: flat white decals conformed
+   *  to the ground, one instanced draw call. Pure decoration. */
+  _buildSnowPatches(m4) {
+    const S = this.T.snowPatches;
+    const geo = new THREE.CircleGeometry(1, 9);
+    geo.rotateX(-Math.PI / 2);
+    const mesh = new THREE.InstancedMesh(
+      geo,
+      new THREE.MeshStandardMaterial({
+        color: 0xd8e2ea, roughness: 1, polygonOffset: true,
+        polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+      }),
+      S.count
+    );
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const nrm = new THREE.Vector3();
+    let k = 0;
+    this._scatter(S.count, () => {
+      const p = Math.random() < 0.5
+        ? this._trackSidePos(20, 70)
+        : (() => {
+            const a = Math.random() * Math.PI * 2, r = 70 + Math.random() * 420;
+            const x = Math.cos(a) * r, z = Math.sin(a) * r;
+            return this._distToTrack(x, z) < 20 ? null : { x, z };
+          })();
+      if (!p) return null;
+      return this.terrainHeight(p.x, p.z) >= S.minY ? p : null;
+    }, (p) => {
+      const r = 2.2 + Math.random() * 5.5;
+      const y = this.terrainHeight(p.x, p.z);
+      const e = r * 0.7;
+      const hx = this.terrainHeight(p.x + e, p.z) - this.terrainHeight(p.x - e, p.z);
+      const hz = this.terrainHeight(p.x, p.z + e) - this.terrainHeight(p.x, p.z - e);
+      nrm.set(-hx / (2 * e), 1, -hz / (2 * e)).normalize();
+      q.setFromUnitVectors(up, nrm);
+      m4.compose(new THREE.Vector3(p.x, y + 0.09, p.z), q,
+        new THREE.Vector3(r, 1, r * (0.6 + Math.random() * 0.7)));
+      mesh.setMatrixAt(k++, m4);
+    });
+    mesh.count = k;
+    mesh.name = 'snow-patches';
+    if (k) this.scene.add(mesh);
+  }
+
+  /** A near massif: the mountain the pass actually climbs into. A fan of big
+   *  rock peaks standing a few hundred units beyond the summit, so from the
+   *  valley the road visibly disappears into a wall of mountain instead of a
+   *  flat green horizon. SOLID (free roamers can reach them). */
+  _buildMassif(m4) {
+    const M = this.T.massif;
+    const rock = new THREE.InstancedMesh(
+      new THREE.ConeGeometry(1, 1, 6),
+      new THREE.MeshStandardMaterial({
+        map: this._horizonGrad(this.T.peakColor, 0.34, 0.04), flatShading: true, roughness: 1,
+      }),
+      M.count
+    );
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    for (let k = 0; k < M.count; k++) {
+      const t = M.count > 1 ? k / (M.count - 1) : 0.5;
+      const a = M.az + (t - 0.5) * M.spread + (Math.random() - 0.5) * 0.1;
+      const r = M.r0 + Math.random() * (M.r1 - M.r0);
+      const h = M.h0 + Math.random() * (M.h1 - M.h0);
+      const w = M.w0 + Math.random() * (M.w1 - M.w0);
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      q.setFromAxisAngle(up, Math.random() * Math.PI);
+      const y = -12 - (this.T.hillDrop || 0);
+      m4.compose(new THREE.Vector3(x, y + h / 2, z), q, new THREE.Vector3(w, h, w * 0.85));
+      rock.setMatrixAt(k, m4);
+      this.solids.push({ x, z, r: w * 0.3, y: y + 4, mat: 'stone' });
+    }
+    rock.name = 'massif';
+    this.scene.add(rock);
+  }
+
+  /** FURKA RIDGE: the Rhône glacier tongue spilling off the skyline — a
+   *  stepped ice field of big pale slabs, well outside the drivable world. */
+  _buildGlacier(m4) {
+    const ice = new THREE.MeshStandardMaterial({
+      color: 0xdff0fb, roughness: 0.55, flatShading: true, envMapIntensity: 0.7,
+    });
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    geo.translate(0, 0.5, 0);
+    const slabs = new THREE.InstancedMesh(geo, ice, 14);
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const col = new THREE.Color();
+    // the tongue pours down a north-west flank towards the road
+    const a0 = -2.25;
+    for (let k = 0; k < 14; k++) {
+      const t = k / 13;
+      const r = 560 + t * 320;
+      const a = a0 + (t - 0.5) * 0.34 + (k % 2 ? 0.05 : -0.05);
+      const w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
+      q.setFromAxisAngle(up, a + 1.2);
+      m4.compose(
+        new THREE.Vector3(Math.cos(a) * r, -18 - (this.T.hillDrop || 0) + t * 4, Math.sin(a) * r),
+        q, new THREE.Vector3(w, h, d)
+      );
+      slabs.setMatrixAt(k, m4);
+      col.setRGB(0.86 + t * 0.12, 0.93 + t * 0.06, 1.0).multiplyScalar(0.92 + Math.random() * 0.14);
+      slabs.setColorAt(k, col);
+    }
+    slabs.name = 'glacier';
+    this.scene.add(slabs);
   }
 
   /** Queue a baked contact shadow under an object. r is the DECAL radius in
@@ -2379,7 +3826,544 @@ export class Track {
       mesh.setMatrixAt(k++, m4);
     }
     mesh.renderOrder = 1;
+    mesh.name = 'contact-shadows';
     this.scene.add(mesh);
+  }
+
+  // ---------- world elements (farms, chapels, outposts, fences) ----------
+
+  /** Is (x, z) flat enough (± `tol` over a `r` radius) to build on, and clear
+   *  of everything already standing there? */
+  _buildableSpot(x, z, r, tol = 2.2) {
+    const h = this.terrainHeight(x, z);
+    for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r],
+      [r * 0.7, r * 0.7], [-r * 0.7, -r * 0.7], [r * 0.7, -r * 0.7], [-r * 0.7, r * 0.7]]) {
+      if (Math.abs(this.terrainHeight(x + dx, z + dz) - h) > tol) return false;
+    }
+    for (const s of this.solids) {
+      const dx = s.x - x, dz = s.z - z, rr = r + s.r + 2;
+      if (dx * dx + dz * dz < rr * rr) return false;
+    }
+    for (const t of this.trees) {
+      const dx = t.x - x, dz = t.z - z, rr = r + 2.5;
+      if (dx * dx + dz * dz < rr * rr) return false;
+    }
+    return true;
+  }
+
+  /** One structure. Pushes its parts into the instancing buckets `B`, adds the
+   *  SOLID collider + contact shadow, and returns its footprint radius. */
+  _element(B, type, x, z, rot, K) {
+    const y = this.terrainHeight(x, z) - 0.25;
+    const cs = Math.cos(rot), sn = Math.sin(rot);
+    const put = (kind, dx, dy, dz, sx, sy, sz, color, roll = 0) => {
+      B[kind].push({
+        x: x + dx * cs - dz * sn, y: y + dy, z: z + dx * sn + dz * cs,
+        sx, sy, sz, rot, roll, color,
+      });
+    };
+    let r = 4, mat = 'hut';
+    switch (type) {
+      case 'barn':
+        put('wall', 0, 0, 0, 12, 6.0, 8.4, K.wall2);
+        put('prism', 0, 6.0, 0, 12.8, 3.4, 9.1, K.roof);
+        put('box', 0, 0.1, 4.3, 3.4, 4.6, 0.35, K.trim);           // big door
+        put('box', 0, 4.9, 4.35, 1.6, 1.4, 0.3, K.trim);           // hay loft hatch
+        put('box', -6.05, 0, 0, 0.4, 6.0, 8.4, K.trim);
+        put('box', 6.05, 0, 0, 0.4, 6.0, 8.4, K.trim);
+        r = 7.4;
+        break;
+      case 'house':
+        put('wall', 0, 0, 0, 7.6, 5.0, 6.6, K.wall);
+        put('prism', 0, 5.0, 0, 8.4, 2.9, 7.4, K.roof);
+        put('box', 0, 0.1, 3.4, 1.5, 3.0, 0.3, K.trim);            // door
+        put('box', 2.2, 2.6, 0, 0.3, 5.6, 0.9, K.trim, 0);         // corner post
+        put('cyl', -2.2, 5.6, -1.6, 1.0, 2.6, 1.0, K.trim);        // chimney
+        r = 5.0;
+        break;
+      case 'chapel':
+        put('wall', 0, 0, 0, 5.6, 5.4, 8.0, K.wall);
+        put('prism', 0, 5.4, 0, 6.2, 3.0, 8.6, K.roof);
+        put('wall', 0, 0, -4.6, 3.6, 9.6, 3.6, K.wall);            // bell tower
+        put('cone', 0, 9.6, -4.6, 4.6, 3.8, 4.6, K.roof);
+        put('box', 0, 13.4, -4.6, 0.22, 1.6, 0.22, 0xf0e6c8);      // cross
+        put('box', 0, 14.2, -4.6, 1.0, 0.22, 0.22, 0xf0e6c8);
+        put('box', 0, 0.1, 4.1, 1.4, 3.0, 0.3, K.trim);
+        r = 4.8;
+        break;
+      case 'shed':
+        put('wall', 0, 0, 0, 5.2, 3.2, 4.2, K.wall2);
+        put('box', 0, 3.2, 0.35, 5.8, 0.35, 4.9, K.roof);          // lean-to roof
+        put('box', 0, 0.1, 2.2, 1.3, 2.4, 0.28, K.trim);
+        r = 3.4;
+        break;
+      case 'adobe':
+        put('wall', 0, 0, 0, 8.6, 4.2, 7.2, K.wall);
+        put('box', 0, 4.2, 0, 9.1, 0.7, 7.7, K.wall);              // parapet
+        put('box', 0, 0.1, 3.7, 1.5, 2.9, 0.3, K.trim);
+        for (const d of [-2.2, 0, 2.2]) put('cyl', d, 3.6, 4.1, 0.35, 1.4, 0.35, K.trim, Math.PI / 2);
+        r = 5.7;
+        break;
+      case 'watchtower':
+        put('wall', 0, 0, 0, 3.6, 9.5, 3.6, K.wall2);
+        put('box', 0, 9.5, 0, 5.4, 0.5, 5.4, K.trim);              // platform
+        for (const [dx, dz] of [[-2.4, -2.4], [2.4, -2.4], [-2.4, 2.4], [2.4, 2.4]]) {
+          put('box', dx, 10.0, dz, 0.28, 1.7, 0.28, K.trim);
+        }
+        put('cone', 0, 11.7, 0, 6.0, 2.2, 6.0, K.roof);
+        r = 2.7;
+        break;
+      case 'stilt':
+        for (const [dx, dz] of [[-2.4, -1.9], [2.4, -1.9], [-2.4, 1.9], [2.4, 1.9], [0, -1.9], [0, 1.9]]) {
+          put('cyl', dx, 0, dz, 0.5, 3.0, 0.5, K.trim);
+        }
+        put('wall', 0, 3.0, 0, 6.2, 3.0, 5.2, K.wall);
+        put('prism', 0, 6.0, 0, 7.2, 2.6, 6.2, K.roof);
+        put('box', 1.2, 0, 3.4, 3.0, 0.25, 2.4, K.trim);           // ramp/deck
+        r = 3.8;
+        break;
+      case 'kiosk':
+        put('wall', 0, 0, 0, 4.4, 3.2, 3.4, K.wall);
+        put('box', 0, 3.2, 0, 4.8, 0.4, 3.8, K.roof);
+        put('box', 0, 2.0, 2.1, 4.8, 0.2, 1.6, K.trim);            // awning
+        put('box', 0, 3.7, 0, 3.2, 1.1, 0.24, K.trim);             // sign board
+        put('box', -1.7, 1.9, 1.75, 0.2, 0.2, 1.5, K.trim);
+        r = 3.0;
+        break;
+      case 'signalhut':
+        put('wall', 0, 0, 0, 4.6, 3.4, 4.2, K.wall);
+        put('prism', 0, 3.4, 0, 5.2, 1.8, 4.8, K.roof);
+        put('cyl', 1.9, 3.4, -1.7, 0.24, 6.4, 0.24, K.trim);       // antenna mast
+        put('box', 1.9, 9.4, -1.7, 1.8, 0.16, 0.16, K.trim);
+        put('box', 0, 0.1, 2.2, 1.2, 2.4, 0.28, K.trim);
+        r = 3.2;
+        break;
+      case 'silo':
+        put('cyl', 0, 0, 0, 4.4, 9.0, 4.4, K.wall);
+        put('cone', 0, 9.0, 0, 4.9, 2.4, 4.9, K.roof);
+        for (let b = 1; b <= 3; b++) put('cyl', 0, b * 2.2, 0, 4.6, 0.3, 4.6, K.trim);
+        r = 2.4; mat = 'stone';
+        break;
+      case 'windmill':
+        put('cyl', 0, 0, 0, 3.0, 8.4, 2.4, K.wall);
+        put('cone', 0, 8.4, 0, 3.6, 1.8, 3.0, K.roof);
+        put('cyl', 0, 7.6, 1.6, 0.7, 0.9, 0.7, K.trim, Math.PI / 2);
+        for (let b = 0; b < 4; b++) {
+          put('box', 0, 7.6, 2.0, 0.5, 7.0, 0.22, K.trim, b * Math.PI / 4 + 0.4);
+        }
+        r = 2.0; mat = 'stone';
+        break;
+      case 'well':
+        put('cyl', 0, 0, 0, 3.2, 1.3, 3.2, K.stone);
+        for (const d of [-1.3, 1.3]) put('box', d, 1.3, 0, 0.3, 2.4, 0.3, K.trim);
+        put('prism', 0, 3.7, 0, 3.4, 0.9, 2.8, K.roof);
+        put('cyl', 0, 3.5, 0, 0.28, 2.6, 0.28, K.trim, Math.PI / 2);
+        r = 1.8; mat = 'stone';
+        break;
+      default: {                                                   // 'logpile'
+        for (let t = 0; t < 3; t++) {
+          const row = [[-1.1, 0, 1.1], [-0.55, 0.55], [0]][t];
+          for (const off of row) put('cyl', 0, 0.55 + t * 0.95, off, 1.05, 4.6, 1.05, K.trim, Math.PI / 2);
+        }
+        r = 2.4; mat = 'stone';
+        break;
+      }
+    }
+    this.solids.push({ x, z, r, y: y + 0.6, mat });
+    this._addShadow(x, z, r * 1.35);
+    return r;
+  }
+
+  /** Everything the world is dressed with beyond the road: farmsteads and
+   *  outposts (SOLID), field walls (SOLID stone), and BREAKABLE rail fences,
+   *  troughs, feed bins and hay racks out in the fields. All the rigid parts
+   *  land in five InstancedMeshes; the breakables become this.props entries so
+   *  the existing smash/weapon paths handle them with no new systems. */
+  _buildWorldElements(m4) {
+    const kitName = this.T.elements
+      || ELEMENT_KIT_BY_THEME[this.level && this.level.theme] || 'farm';
+    const K = ELEMENT_KITS[kitName];
+    if (!K) return;
+    // breakable field dressing this kit uses (livestock gear by default)
+    const FIELD = K.field ?? ['trough', 'feedbin', 'hayrack'];
+    const B = { wall: [], box: [], cyl: [], cone: [], prism: [] };
+
+    // --- pick 3 farmstead / outpost sites well off the racing line ---
+    const sites = [];
+    for (let s = 0; s < 3; s++) {
+      for (let tries = 0; tries < 40; tries++) {
+        const p = this._trackSidePos(34, 108);
+        if (!p) continue;
+        if (sites.some((q) => (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < 90 * 90)) continue;
+        if (!this._buildableSpot(p.x, p.z, 16, 2.6)) continue;
+        sites.push({ x: p.x, z: p.z, rot: Math.random() * Math.PI * 2 });
+        break;
+      }
+    }
+    const pastures = [];
+    for (const site of sites) {
+      const cs = Math.cos(site.rot), sn = Math.sin(site.rot);
+      const at = (dx, dz) => ({ x: site.x + dx * cs - dz * sn, z: site.z + dx * sn + dz * cs });
+      // main building + two outbuildings around a yard
+      const layout = [[0, 0, K.builds[0]], [-17, 9, K.builds[1 % K.builds.length]],
+        [13, 13, K.builds[2 % K.builds.length]]];
+      for (const [dx, dz, type] of layout) {
+        const p = at(dx, dz);
+        if (!this._buildableSpot(p.x, p.z, 8, 3.2)) continue;
+        this._element(B, type, p.x, p.z, site.rot + (Math.random() - 0.5) * 0.7, K);
+      }
+      const dp = at(-4, 16);
+      if (this._buildableSpot(dp.x, dp.z, 4, 3.0)) {
+        this._element(B, K.dress[(Math.random() * K.dress.length) | 0], dp.x, dp.z,
+          Math.random() * Math.PI * 2, K);
+      }
+      // paddock: a rail fence run along the open side, with the grazing ground
+      // it encloses handed to the animal system as a pasture
+      const pd = at(-6, 34);
+      this._fenceRun(pd.x, pd.z, site.rot + Math.PI / 2, 6, K);
+      if (this._buildableSpot(pd.x, pd.z, 12, 3.0)) pastures.push({ x: pd.x, z: pd.z, r: 13 });
+      // trough / feed bin / hay rack in the paddock (kits without livestock —
+      // the city — declare `field: []` and get none)
+      const fp = at(-14, 30);
+      if (FIELD.length) {
+        this._fieldProp(fp.x, fp.z, Math.random() * Math.PI * 2,
+          FIELD[(Math.random() * FIELD.length) | 0], K);
+      }
+    }
+
+    // --- two landmarks somewhere else on the lap (chapel / silo / tower) ---
+    for (const type of K.landmarks) {
+      for (let tries = 0; tries < 30; tries++) {
+        const p = this._trackSidePos(30, 130);
+        if (!p || !this._buildableSpot(p.x, p.z, 9, 2.6)) continue;
+        this._element(B, type, p.x, p.z, Math.random() * Math.PI * 2, K);
+        break;
+      }
+    }
+
+    // --- field walls: dry-stone boundaries running across open country ---
+    for (let w = 0; w < (K.stoneWalls || 0); w++) {
+      for (let tries = 0; tries < 24; tries++) {
+        const p = this._trackSidePos(30, 130);
+        if (!p || !this._buildableSpot(p.x, p.z, 8, 3.0)) continue;
+        this._stoneWallRun(B, p.x, p.z, Math.random() * Math.PI * 2, 6 + ((Math.random() * 5) | 0), K);
+        break;
+      }
+    }
+
+    // --- standalone fence runs + field dressing out in the open ---
+    for (let f = 0, nf = K.fenceRuns ?? 2; f < nf; f++) {
+      const p = this._trackSidePos(26, 120);
+      if (p && this._buildableSpot(p.x, p.z, 10, 3.2)) {
+        this._fenceRun(p.x, p.z, Math.random() * Math.PI * 2, 5, K);
+      }
+    }
+    for (let d = 0; d < 3 && FIELD.length; d++) {
+      const p = this._trackSidePos(22, 110);
+      if (p) {
+        this._fieldProp(p.x, p.z, Math.random() * Math.PI * 2,
+          FIELD[(Math.random() * FIELD.length) | 0], K);
+      }
+    }
+
+    this._sitePastures = pastures;
+    this._realizeElements(B, m4);
+  }
+
+  /** Turn the five part buckets into five InstancedMeshes (one draw call each
+   *  for every building in the world). */
+  _realizeElements(B, m4) {
+    const gWall = new THREE.BoxGeometry(1, 1, 1); gWall.translate(0, 0.5, 0);
+    const gBox = new THREE.BoxGeometry(1, 1, 1); gBox.translate(0, 0.5, 0);
+    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); gCyl.translate(0, 0.5, 0);
+    const gCone = new THREE.ConeGeometry(0.5, 1, 10); gCone.translate(0, 0.5, 0);
+    const specs = [
+      ['wall', gWall, new THREE.MeshStandardMaterial({
+        map: buildingTexture(), roughness: 0.85, envMapIntensity: 0.45,
+      })],
+      ['box', gBox, new THREE.MeshStandardMaterial({ roughness: 0.9, envMapIntensity: 0.4 })],
+      ['cyl', gCyl, new THREE.MeshStandardMaterial({ roughness: 0.9, envMapIntensity: 0.4 })],
+      ['cone', gCone, new THREE.MeshStandardMaterial({
+        flatShading: true, roughness: 0.9, envMapIntensity: 0.4,
+      })],
+      ['prism', gablePrismGeo(), new THREE.MeshStandardMaterial({
+        flatShading: true, roughness: 0.9, envMapIntensity: 0.4,
+      })],
+    ];
+    const q = new THREE.Quaternion(), qr = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), fwd = new THREE.Vector3(0, 0, 1);
+    const col = new THREE.Color();
+    for (const [key, geo, mat] of specs) {
+      const list = B[key];
+      if (!list.length) continue;
+      const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+      mesh.name = 'element-' + key;
+      mesh.castShadow = mesh.receiveShadow = true;
+      list.forEach((p, k) => {
+        q.setFromAxisAngle(up, p.rot);
+        if (p.roll) q.multiply(qr.setFromAxisAngle(fwd, p.roll));
+        m4.compose(new THREE.Vector3(p.x, p.y, p.z), q, new THREE.Vector3(p.sx, p.sy, p.sz));
+        mesh.setMatrixAt(k, m4);
+        col.set(p.color).multiplyScalar(0.92 + Math.random() * 0.16);
+        mesh.setColorAt(k, col);
+      });
+      this.scene.add(mesh);
+    }
+  }
+
+  /** A dry-stone field wall: `n` instanced blocks in a line, each a small
+   *  SOLID stone collider. Runs out in the fields, never along the road. */
+  _stoneWallRun(B, x, z, rot, n, K) {
+    const cs = Math.cos(rot), sn = Math.sin(rot);
+    for (let k = 0; k < n; k++) {
+      const d = (k - (n - 1) / 2) * 3.1;
+      const wx = x + cs * d, wz = z + sn * d;
+      const wy = this.terrainHeight(wx, wz) - 0.3;
+      B.box.push({
+        x: wx, y: wy, z: wz, sx: 3.2, sy: 1.15 + Math.random() * 0.3, sz: 0.85,
+        rot: rot + Math.PI / 2, roll: 0, color: K.stone,
+      });
+      this.solids.push({ x: wx, z: wz, r: 1.3, y: wy + 0.6, mat: 'stone' });
+    }
+    this._addShadow(x, z, n * 1.7);
+  }
+
+  /** BREAKABLE wooden rail fence: `n` bays in a line, each its own prop entry
+   *  (a car smashes through it, a missile blows it apart). Scenery only — it
+   *  encloses fields and paddocks, it never lines the road. */
+  _fenceRun(x, z, rot, n, K) {
+    if (!this._fenceGeo) {
+      this._fenceGeo = mergeBoxes([
+        { w: 0.26, h: 1.6, d: 0.26, x: -2.0, y: 0.8, z: 0 },
+        { w: 0.26, h: 1.6, d: 0.26, x: 2.0, y: 0.8, z: 0 },
+        { w: 4.2, h: 0.18, d: 0.14, x: 0, y: 1.32, z: 0 },
+        { w: 4.2, h: 0.18, d: 0.14, x: 0, y: 0.78, z: 0 },
+      ]);
+    }
+    if (!this._fenceMat) {
+      this._fenceMat = new THREE.MeshStandardMaterial({ color: K.fenceColor, roughness: 0.95 });
+    }
+    const cs = Math.cos(rot), sn = Math.sin(rot);
+    for (let k = 0; k < n; k++) {
+      const d = (k - (n - 1) / 2) * 4.2;
+      const fx = x + cs * d, fz = z + sn * d;
+      if (this._distToTrack(fx, fz) < 20) continue;          // never near the road
+      const fy = this.terrainHeight(fx, fz) - 0.15;
+      const mesh = new THREE.Mesh(this._fenceGeo, this._fenceMat);
+      mesh.name = 'fence';
+      mesh.position.set(fx, fy, fz);
+      mesh.rotation.y = rot + Math.PI / 2;
+      mesh.castShadow = true;
+      this.group.add(mesh);
+      this.props.push({
+        mesh, x: fx, y: fy, z: fz, r: 2.1, type: 'fence', scoreValue: 30, pickup: null,
+      });
+      this._addShadow(fx, fz, 2.4);
+    }
+  }
+
+  /** BREAKABLE farm dressing: water trough / feed bin / hay rack. One merged
+   *  mesh each, registered as a prop. */
+  _fieldProp(x, z, rot, type, K) {
+    if (this._distToTrack(x, z) < 18) return;
+    const cache = this._fieldGeos || (this._fieldGeos = {});
+    if (!cache[type]) {
+      cache[type] = type === 'trough'
+        ? mergeBoxes([
+            { w: 4.0, h: 0.25, d: 1.4, x: 0, y: 0.62, z: 0 },
+            { w: 4.0, h: 0.7, d: 0.16, x: 0, y: 0.9, z: 0.62 },
+            { w: 4.0, h: 0.7, d: 0.16, x: 0, y: 0.9, z: -0.62 },
+            { w: 0.3, h: 0.6, d: 1.4, x: -1.7, y: 0.3, z: 0 },
+            { w: 0.3, h: 0.6, d: 1.4, x: 1.7, y: 0.3, z: 0 },
+          ])
+        : type === 'feedbin'
+          ? mergeBoxes([
+              { w: 1.8, h: 1.7, d: 1.8, x: 0, y: 0.85, z: 0 },
+              { w: 2.1, h: 0.22, d: 2.1, x: 0, y: 1.8, z: 0 },
+              { w: 0.9, h: 0.5, d: 0.2, x: 0, y: 0.5, z: 0.9 },
+            ])
+          : mergeBoxes([                                       // hay rack
+              { w: 0.24, h: 2.0, d: 0.24, x: -1.4, y: 1.0, z: -0.7 },
+              { w: 0.24, h: 2.0, d: 0.24, x: 1.4, y: 1.0, z: -0.7 },
+              { w: 0.24, h: 1.4, d: 0.24, x: -1.4, y: 0.7, z: 0.7 },
+              { w: 0.24, h: 1.4, d: 0.24, x: 1.4, y: 0.7, z: 0.7 },
+              { w: 3.0, h: 0.18, d: 1.7, x: 0, y: 1.5, z: 0 },
+              { w: 3.0, h: 0.9, d: 0.16, x: 0, y: 1.0, z: -0.7 },
+            ]);
+    }
+    if (!this._fieldMat) {
+      this._fieldMat = new THREE.MeshStandardMaterial({ color: K.trim, roughness: 0.95 });
+    }
+    const y = this.terrainHeight(x, z) - 0.1;
+    const mesh = new THREE.Mesh(cache[type], this._fieldMat);
+    mesh.name = 'field-prop';
+    mesh.position.set(x, y, z);
+    mesh.rotation.y = rot;
+    mesh.castShadow = true;
+    this.group.add(mesh);
+    this.props.push({
+      mesh, x, y, z, r: type === 'trough' ? 2.2 : 1.5, type,
+      scoreValue: 35, pickup: null,
+    });
+    this._addShadow(x, z, 2.4);
+  }
+
+  /** Decorative crossroads: short dirt side-roads that join the circuit at
+   *  plausible angles (60-120°) and head off toward the farms, pastures and
+   *  cabins the world is dressed with. They are TERRAIN, not track — drivable
+   *  under the normal off-road rules, no colliders. Each junction gets a
+   *  widened, radially-faded intersection patch over the road edge.
+   *
+   *  Data for the traffic agent — `track.crossroads` is an array of:
+   *    index    main-road centerline sample at the junction (0..N-1)
+   *    side     +1 / -1, which side of the road the spur leaves on
+   *             (matches the `lateral` sign used by pointAt/nearestIndex)
+   *    angle    radians between the spur and the road tangent, 0..PI
+   *    len      graded length of the spur in world units (12..30)
+   *    x, z     world position of the spur mouth (on the road edge)
+   *    dx, dz   unit direction of the spur, pointing away from the road
+   *    endX,endZ far end of the graded surface
+   *    halfWidth lane half-width at the far end (the mouth flares to 5.4)
+   *    y        road centerline height at the junction
+   *  The first four are the canonical schema; the rest are derived
+   *  conveniences (dx,dz === tan*cos(angle) + nrm*side*sin(angle)). */
+  _buildCrossroads() {
+    const want = Math.min(4,
+      (this.T.crossroads ?? THEME_CROSSROADS[this.level && this.level.theme] ?? 0) | 0);
+    if (!want) return;
+    // spurs lead somewhere: pastures and farm buildings, nearest-road first
+    const targets = [
+      ...(this.pastures || []).map((p) => ({ x: p.x, z: p.z, r: p.r })),
+      ...this.solids.filter((s) => s.mat === 'hut').map((s) => ({ x: s.x, z: s.z, r: s.r + 8 })),
+    ];
+    if (!targets.length) return;
+    // one shared surface: the theme's own dirt palette, overlays stripped
+    // (a spur is bare graded dirt whatever dresses the main carriageway)
+    const spurTex = roadTexture({
+      ...this.T.road, wet: null, snowCover: null, ice: null, cobbles: null, neon: null, ruts: true,
+    });
+    spurTex.anisotropy = 8;
+    const spurMat = new THREE.MeshStandardMaterial({ map: spurTex, roughness: 1 });
+    const patchMat = new THREE.MeshStandardMaterial({
+      map: junctionTexture(this.T.road), roughness: 1, transparent: true,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+    });
+    const tmp = new THREE.Vector3();
+    const MAXC = 0.5;                                  // cos 60° — junction angle cone
+    const used = [];
+    for (const tg of targets) {
+      if (this.crossroads.length >= want) break;
+      const i = this.nearestIndex(tmp.set(tg.x, 0, tg.z), null);
+      if (this._circDist(i, 0) < 45) continue;               // clear of the gate
+      if (this._gorge && this._nearGorge(i, this._spanSamples() + 14)) continue;
+      if (used.some((u) => this._circDist(i, u) < 70)) continue;
+      let mc = 0;
+      for (let k = -6; k <= 6; k++) mc = Math.max(mc, this.curvature[(i + k + N) % N]);
+      if (mc > 0.022) continue;                              // junctions live on straights
+      const c = this.center[i], n = this.nrm[i], t = this.tan[i];
+      const side = (tg.x - c.x) * n.x + (tg.z - c.z) * n.z >= 0 ? 1 : -1;
+      // the approach must sit near road grade — no spurs off a shelf edge or
+      // through a retaining wall / guard fence drop
+      const e1 = this.pointAt(i, side * 15);
+      if (Math.abs(c.y - this.terrainHeight(e1.x, e1.z)) > 2.2) continue;
+      // direction toward the target, clamped into the 60-120° cone
+      let dx = tg.x - c.x, dz = tg.z - c.z;
+      const dl = Math.hypot(dx, dz) || 1;
+      dx /= dl; dz /= dl;
+      const along = dx * t.x + dz * t.z;
+      let ux = dx, uz = dz;
+      if (Math.abs(along) > MAXC) {
+        const sa = Math.sign(along) || 1, sn2 = Math.sqrt(1 - MAXC * MAXC);
+        ux = t.x * sa * MAXC + n.x * side * sn2;
+        uz = t.z * sa * MAXC + n.z * side * sn2;
+      }
+      const len = Math.min(30, Math.max(12, dl - (tg.r || 10)));
+      // --- spur ribbon: starts under the road edge, conforms to the terrain ---
+      const S = Math.max(4, Math.ceil(len / 3));
+      const p0 = this.pointAt(i, side * 8);
+      const y0 = c.y - 0.06;
+      // Across the spur. This MUST match the handedness the road ribbon uses
+      // (nrm = (tan.z, 0, -tan.x)) — the triangle winding below is copied from
+      // _buildRoad, so flipping this normal flips the face. It was `(-uz, ux)`,
+      // which made computeVertexNormals emit ny = -1: every spur was built
+      // upside-down and back-face-culled away, invisible from the car and from
+      // straight above even though the mesh sat correctly on the terrain.
+      const px = uz, pz = -ux;
+      const verts = new Float32Array((S + 1) * 2 * 3);
+      const uvs = new Float32Array((S + 1) * 2 * 2);
+      const idx = [];
+      for (let s = 0; s <= S; s++) {
+        const f = s / S;
+        const half = 5.4 - 2.0 * f;                          // junction flare → lane
+        const qx = p0.x + ux * f * len, qz = p0.z + uz * f * len;
+        const blend = THREE.MathUtils.smoothstep(f, 0, 0.4);
+        const o = s * 6;
+        for (const [sl, k] of [[1, 0], [-1, 3]]) {
+          const vx = qx + px * half * sl, vz = qz + pz * half * sl;
+          const ty = this._terrainMeshHeight(vx, vz) + 0.22;
+          verts[o + k] = vx;
+          verts[o + k + 1] = y0 * (1 - blend) + ty * blend;
+          verts[o + k + 2] = vz;
+        }
+        uvs[s * 4] = 0; uvs[s * 4 + 1] = (f * len) / 10;
+        uvs[s * 4 + 2] = 1; uvs[s * 4 + 3] = (f * len) / 10;
+      }
+      for (let s = 0; s < S; s++) {
+        const a = s * 2, b = s * 2 + 1, d = s * 2 + 2, e = s * 2 + 3;
+        idx.push(a, b, d, b, e, d);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      const spur = new THREE.Mesh(geo, spurMat);
+      spur.name = 'crossroad-spur';
+      spur.receiveShadow = true;
+      this.group.add(spur);
+      // --- widened intersection patch straddling the road edge ---
+      const pc = this.pointAt(i, side * 9.5);
+      const patch = new THREE.Mesh(this._patchGeo || (this._patchGeo = (() => {
+        const pg = new THREE.PlaneGeometry(17, 17);
+        pg.rotateX(-Math.PI / 2);
+        return pg;
+      })()), patchMat);
+      patch.name = 'crossroad-patch';
+      patch.position.set(pc.x, c.y + 0.05, pc.z);
+      patch.rotation.y = Math.atan2(ux, uz);
+      patch.renderOrder = 2;
+      patch.receiveShadow = true;
+      this.group.add(patch);
+      used.push(i);
+      // Traffic-agent contract (see the doc comment above): the four required
+      // fields plus a ready-made world-space ray so a router never has to redo
+      // the cone maths. u = tan*cos(angle) + nrm*side*sin(angle) reconstructs
+      // (dx, dz) exactly from {index, side, angle} if only those are wanted.
+      this.crossroads.push({
+        index: i, side, angle: Math.acos(THREE.MathUtils.clamp(ux * t.x + uz * t.z, -1, 1)), len,
+        x: p0.x, z: p0.z,                                    // mouth, on the road edge
+        dx: ux, dz: uz,                                      // unit direction away from the road
+        endX: p0.x + ux * len, endZ: p0.z + uz * len,        // far end of the graded spur
+        halfWidth: 3.4,                                      // lane half-width at the far end
+        y: c.y,                                              // road height at the junction
+      });
+    }
+  }
+
+  /** Open grazing ground for the animal system: 4-8 flat, road-free circles.
+   *  Data only — behaviour lives in the game code. */
+  _buildPastures() {
+    const out = (this._sitePastures || []).slice(0, 4);
+    for (let tries = 0; tries < 160 && out.length < 7; tries++) {
+      const p = this._trackSidePos(30, 150);
+      if (!p) continue;
+      const r = 12 + Math.random() * 8;
+      if (out.some((q) => (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < (r + q.r + 14) ** 2)) continue;
+      if (!this._buildableSpot(p.x, p.z, r * 0.75, 2.4)) continue;
+      out.push({ x: p.x, z: p.z, r });
+    }
+    // world-space grazing spots: [{x, z, r}]
+    this.pastures = out;
   }
 
   /** DECOR micro-detail along the road fringes (no collision): gravel spill
@@ -2417,7 +4401,8 @@ export class Track {
       this.scene.add(gravel);
     }
     // --- reflector marker posts on corner outsides ---
-    if (T.cliffWalls) return;                        // walls already line the road
+    // (skipped where stone already lines the road: canyon cliffs, pass parapets)
+    if (T.cliffWalls || T.retainingWalls || T.guardFence) return;
     const postGeo = new THREE.BoxGeometry(0.15, 0.85, 0.15);
     postGeo.translate(0, 0.43, 0);
     const bandGeo = new THREE.BoxGeometry(0.18, 0.22, 0.18);
@@ -2606,6 +4591,8 @@ export class Track {
 
   _buildTerrain() {
     const T = this.T;
+    const STRATA = ['#c98b52', '#a45f34', '#b5764a', '#8d4c2a', '#cfa06a', '#96552f']
+      .map((c) => new THREE.Color(c));
     // 10u cells near the track: fine enough that road corridors (and the
     // strand cap around them) are always sampled — no triangle can span a
     // ribbon and rise through it (cap window 25.2 ≥ 11 + cell diagonal)
@@ -2622,7 +4609,9 @@ export class Track {
       const x = pos.getX(i), z = pos.getZ(i);
       const far = Math.max(Math.abs(x), Math.abs(z)) > 900;
       const h = far
-        ? Math.sin(x * 0.012) * Math.cos(z * 0.010) * 3.4 // skip track-distance falloff far away
+        // skip the track-distance falloff far away (hillDrop still applies so
+        // the open field meets the near terrain without a step)
+        ? Math.sin(x * 0.012) * Math.cos(z * 0.010) * 3.4 - (T.hillDrop || 0)
         : this._terrainMeshHeight(x, z);
       pos.setY(i, h - 0.12);
       const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
@@ -2630,6 +4619,15 @@ export class Track {
       // sprinkle dirt patches
       const dirt = Math.max(0, Math.sin(x * 0.045 + 2) * Math.sin(z * 0.05) - 0.72) * 3;
       tmp.lerp(cDirt, THREE.MathUtils.clamp(dirt, 0, 0.55));
+      // the hero gorge is cut through red-rock strata: banded ochre/rust walls
+      // fading back to the snowfield at the rim
+      if (this._gorge) {
+        const cut = this._gorgeCut(x, z);
+        if (cut > 0.6) {
+          const band = STRATA[((Math.floor(h * 0.42) % STRATA.length) + STRATA.length) % STRATA.length];
+          tmp.lerp(band, THREE.MathUtils.clamp(cut / 6, 0, 1) * 0.94);
+        }
+      }
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -2787,13 +4785,14 @@ export class Track {
       }),
       30
     );
+    const base = -8 - (T.hillDrop || 0);      // sit on the (possibly sunk) field
     for (let i = 0; i < 40; i++) {
       const a = (i / 40) * Math.PI * 2;
       const r = 760 + Math.random() * 110;
       const h = 70 + Math.random() * 90;
       const w = 130 + Math.random() * 150;
       m4.makeScale(w, h, w);
-      m4.setPosition(Math.cos(a) * r, h / 2 - 8, Math.sin(a) * r);
+      m4.setPosition(Math.cos(a) * r, h / 2 + base, Math.sin(a) * r);
       hills.setMatrixAt(i, m4);
     }
     for (let i = 0; i < 30; i++) {
@@ -2802,10 +4801,12 @@ export class Track {
       const h = 160 + Math.random() * 140;
       const w = 120 + Math.random() * 140;
       m4.makeScale(w, h, w);
-      m4.setPosition(Math.cos(a) * r, h / 2 - 8, Math.sin(a) * r);
+      m4.setPosition(Math.cos(a) * r, h / 2 + base, Math.sin(a) * r);
       peaks.setMatrixAt(i, m4);
     }
     this.scene.add(hills, peaks);
+    if (T.massif) this._buildMassif(m4);
+    if (T.glacier) this._buildGlacier(m4);
   }
 
   /** Add flat-topped stratified mesas (3 stacked shrinking slabs each) for
@@ -3041,6 +5042,30 @@ export class Track {
     return { x, z };
   }
 
+  /** Trackside position restricted to one stretch of the lap. `zone` is a pair
+   *  of lap fractions; f0 > f1 wraps through the start line. */
+  _zonePos(zone, minD, maxD) {
+    const [f0, f1] = zone;
+    const span = (f1 - f0 + 1) % 1 || 1;
+    const i = (((f0 + Math.random() * span) % 1) * N) | 0;
+    const side = Math.random() < 0.5 ? 1 : -1;
+    const dist = minD + Math.random() * (maxD - minD);
+    const x = this.center[i].x + this.nrm[i].x * side * dist;
+    const z = this.center[i].z + this.nrm[i].z * side * dist;
+    if (this._distToTrack(x, z) < minD - 1) return null;
+    return { x, z };
+  }
+
+  /** treeAltFade [y0, y1]: roll a trunk against the local ground height so a
+   *  stand thins out with altitude — a mountain pass climbs out of its forest
+   *  into bare rock exactly the way a real one does. True when there is no
+   *  fade configured for the theme. */
+  _altOK(x, z) {
+    const fade = this.T.treeAltFade;
+    if (!fade) return true;
+    return Math.random() > THREE.MathUtils.smoothstep(this.terrainHeight(x, z), fade[0], fade[1]);
+  }
+
   _buildForest(m4) {
     const T = this.T;
     if (T.vegetation === 'none' || !T.treeCount) return;
@@ -3059,22 +5084,26 @@ export class Track {
     const capMat = T.treeSnowCap
       ? new THREE.MeshStandardMaterial({ color: 0xf2f6fa, flatShading: true, roughness: 0.9 })
       : null;
-    // TWO canopy silhouettes so a stand never reads copy-pasted:
-    //   A — the classic broad two-tier pine
-    //   B — a taller, narrower three-tier pine with slightly offset crowns
-    const mkVariant = (tiers, capY) => {
-      const parts = [new THREE.InstancedMesh(trunkGeo, trunkMat, COUNT)];
-      for (const [geoSpec, mat] of tiers) {
-        parts.push(new THREE.InstancedMesh(geoSpec, mat, COUNT));
-      }
-      if (capMat) {
-        const capGeo = new THREE.ConeGeometry(1.3, 1.9, 8);
-        capGeo.translate(0, capY, 0);
-        parts.push(new THREE.InstancedMesh(capGeo, capMat, COUNT));
-      }
+    // A REAL MIXED STAND: several visually distinct species per world, not one
+    // silhouette with hue jitter. Which species and in what ratio comes from
+    // T.floraMix (or the per-theme FLORA_MIX default): conifers (two pine
+    // silhouettes + sparse-tiered larch), deciduous (pale-trunked birch,
+    // round-crowned oak) and winter bare birches. Every species is its own
+    // set of InstancedMeshes — one draw call per part regardless of count.
+    const capFor = (parts, capY) => {
+      if (!capMat || capY == null) return;
+      const capGeo = new THREE.ConeGeometry(1.3, 1.9, 8);
+      capGeo.translate(0, capY, 0);
+      parts.push(new THREE.InstancedMesh(capGeo, capMat, COUNT));
+    };
+    const mkParts = (trunk, tiers, capY) => {
+      const parts = [new THREE.InstancedMesh(trunk[0], trunk[1], COUNT)];
+      for (const [geoSpec, mat] of tiers) parts.push(new THREE.InstancedMesh(geoSpec, mat, COUNT));
+      capFor(parts, capY);
       for (const part of parts) part.castShadow = true;
       return parts;
     };
+    // --- conifers ---
     const lowA = new THREE.ConeGeometry(2.6, 4.2, 8);
     lowA.translate(0, 4.0, 0);
     const topA = new THREE.ConeGeometry(1.8, 3.4, 8);
@@ -3085,49 +5114,124 @@ export class Track {
     midB.translate(-0.16, 5.6, 0.12);
     const topB = new THREE.ConeGeometry(1.15, 2.6, 7);
     topB.translate(0.05, 7.4, -0.05);
-    const variants = [
-      mkVariant([[lowA, lowMat], [topA, topMat]], 7.35),
-      mkVariant([[lowB, lowMat], [midB, lowMat], [topB, topMat]], 8.15),
-    ];
-    const ks = [0, 0];
+    const larchTiers = [];
+    for (const [r, y] of [[1.55, 3.3], [1.25, 4.9], [0.95, 6.3], [0.6, 7.6]]) {
+      const tg = new THREE.ConeGeometry(r, 1.5, 7);      // sparse gappy tiers
+      tg.translate(0, y, 0);
+      larchTiers.push([tg, lowMat]);
+    }
+    // --- deciduous ---
+    const birchTrunk = new THREE.CylinderGeometry(0.2, 0.28, 3.6, 6);
+    birchTrunk.translate(0, 1.8, 0);
+    const birchBark = new THREE.MeshStandardMaterial({ color: 0xe6e8e0, roughness: 0.9 });
+    const birchCrown = new THREE.SphereGeometry(1.45, 7, 5);
+    birchCrown.scale(1, 1.3, 1);
+    birchCrown.translate(0, 4.7, 0);
+    const birchTop = new THREE.SphereGeometry(0.85, 6, 5);
+    birchTop.translate(0.15, 6.1, -0.1);
+    const bareBranch = (rz, tx, ty2, tz) => {
+      const bg = new THREE.ConeGeometry(0.09, 1.9, 5);
+      bg.rotateZ(rz);
+      bg.translate(tx, ty2, tz);
+      return [bg, trunkMat];
+    };
+    const oakTrunk = new THREE.CylinderGeometry(0.42, 0.6, 2.7, 7);
+    oakTrunk.translate(0, 1.35, 0);
+    const oakDome = new THREE.SphereGeometry(2.35, 8, 6);
+    oakDome.scale(1, 0.78, 1);
+    oakDome.translate(0, 4.0, 0);
+    const oakTop = new THREE.SphereGeometry(1.4, 7, 5);
+    oakTop.translate(0.35, 5.5, 0.2);
+    const SPECIES = {
+      pineA: { parts: mkParts([trunkGeo, trunkMat], [[lowA, lowMat], [topA, topMat]], 7.35),
+        kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 2 },
+      pineB: { parts: mkParts([trunkGeo, trunkMat], [[lowB, lowMat], [midB, lowMat], [topB, topMat]], 8.15),
+        kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 3 },
+      larch: { parts: mkParts([trunkGeo, trunkMat], larchTiers, 8.3),
+        kind: 'larch', rFac: 0.85, solidAt: null, tint: 'larch', tiers: 4 },
+      birch: { parts: mkParts([birchTrunk, birchBark], [[birchCrown, lowMat], [birchTop, topMat]], null),
+        kind: 'birch', rFac: 0.7, solidAt: null, tint: 'birch', tiers: 2 },
+      birchBare: { parts: mkParts([birchTrunk, birchBark],
+        [bareBranch(-0.85, 0.7, 3.4, 0), bareBranch(0.8, -0.6, 2.9, 0.1), bareBranch(-0.3, 0.15, 4.3, -0.4)], null),
+        kind: 'birch', rFac: 0.55, solidAt: null, tint: 'bare', tiers: 3 },
+      oak: { parts: mkParts([oakTrunk, trunkMat], [[oakDome, lowMat], [oakTop, topMat]], null),
+        kind: 'oak', rFac: 1.15, solidAt: 1.35, tint: 'oak', tiers: 2 },
+    };
+    const mix = T.floraMix
+      || FLORA_MIX[this.level && this.level.theme]
+      || [['pineA', 0.55], ['pineB', 0.45]];
+    const ks = {};
+    for (const [name] of mix) ks[name] = 0;
+    const pick = () => {
+      let roll = Math.random(), acc = 0;
+      for (const [name, wt] of mix) { acc += wt; if (roll < acc) return name; }
+      return mix[mix.length - 1][0];
+    };
     const color = new THREE.Color();
     const F = T.foliage;
 
     const placed = this._scatter(COUNT,
       () => {
-        if (Math.random() < 0.62) return this._trackSidePos(15, 46);
-        const a = Math.random() * Math.PI * 2;
-        const r = 80 + Math.random() * 560;
-        const x = Math.cos(a) * r, z = Math.sin(a) * r;
-        if (this._distToTrack(x, z) < 14.5) return null;
-        return { x, z };
+        let p;
+        if (Math.random() < 0.62) p = this._trackSidePos(15, 46);
+        else {
+          const a = Math.random() * Math.PI * 2;
+          const r = 80 + Math.random() * 560;
+          const x = Math.cos(a) * r, z = Math.sin(a) * r;
+          p = this._distToTrack(x, z) < 14.5 ? null : { x, z };
+        }
+        return p && this._altOK(p.x, p.z) ? p : null;
       },
       (p) => {
-        const vi = Math.random() < 0.45 ? 1 : 0;
-        const parts = variants[vi];
-        const k = ks[vi]++;
+        const name = pick();
+        const spec = SPECIES[name];
+        const parts = spec.parts;
+        const k = ks[name]++;
         const s = 0.75 + Math.random() * 1.25;
         const ty = this.terrainHeight(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.45), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of parts) part.setMatrixAt(k, m4);
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 1.0 * s, id: k, parts, kind: 'pine', s });
-        // per-tree foliage variation (themed hue band)
-        color.setHSL(
-          F.h + Math.random() * F.hVar,
-          F.s + Math.random() * F.sVar,
-          F.l + Math.random() * F.lVar
-        );
-        const trunkTone = Math.random() < 0.5 ? 1.0 : 0.78;   // two trunk tones
-        parts[0].setColorAt(k, new THREE.Color(trunkTone, trunkTone * 0.96, trunkTone * 0.9));
-        parts[1].setColorAt(k, color);
-        if (vi === 1) parts[2].setColorAt(k, color.clone().multiplyScalar(0.9));
-        parts[vi === 1 ? 3 : 2].setColorAt(k, color.clone().multiplyScalar(1.2));
-        this._addShadow(p.x, p.z, 2.4 * s);
+        this.trees.push({
+          x: p.x, z: p.z, y: ty, r: spec.rFac * s, id: k, parts, kind: spec.kind, s,
+          // explicit material law: true stops a car dead, false always yields
+          solid: spec.solidAt != null && s >= spec.solidAt,
+        });
+        // per-tree foliage variation (themed hue band, shifted per species)
+        switch (spec.tint) {
+          case 'larch':   // paler, yellow-shifted soft needles
+            color.setHSL(F.h - 0.045 + Math.random() * F.hVar, F.s * 0.85,
+              Math.min(0.6, F.l + 0.10 + Math.random() * F.lVar)); break;
+          case 'birch':   // light airy crown
+            color.setHSL(F.h + 0.02 + Math.random() * F.hVar, F.s * 0.8,
+              Math.min(0.62, F.l + 0.16 + Math.random() * F.lVar)); break;
+          case 'oak':     // deep saturated dome
+            color.setHSL(F.h + Math.random() * F.hVar, Math.min(1, F.s + 0.12),
+              Math.max(0.16, F.l - 0.03 + Math.random() * F.lVar)); break;
+          case 'bare':    // dark winter branches
+            color.setHSL(0.07, 0.18, 0.16 + Math.random() * 0.08); break;
+          default:
+            color.setHSL(F.h + Math.random() * F.hVar, F.s + Math.random() * F.sVar,
+              F.l + Math.random() * F.lVar);
+        }
+        // trunk: two wood tones, or near-white bark for the birches
+        if (spec.tint === 'birch' || spec.tint === 'bare') {
+          const bt = 0.92 + Math.random() * 0.14;
+          parts[0].setColorAt(k, new THREE.Color(bt, bt, bt * 0.97));
+        } else {
+          const trunkTone = Math.random() < 0.5 ? 1.0 : 0.78;
+          parts[0].setColorAt(k, new THREE.Color(trunkTone, trunkTone * 0.96, trunkTone * 0.9));
+        }
+        // crown tiers darken downward, brighten at the top (bare: branches)
+        for (let ti = 1; ti <= spec.tiers; ti++) {
+          const f = spec.tiers === 1 ? 1.2 : 0.85 + (ti - 1) / (spec.tiers - 1) * 0.45;
+          parts[ti].setColorAt(k, color.clone().multiplyScalar(spec.tint === 'bare' ? 1 : f));
+        }
+        this._addShadow(p.x, p.z, 2.4 * spec.rFac * s);
       });
-    for (let vi = 0; vi < variants.length; vi++) {
-      for (const part of variants[vi]) part.count = ks[vi];
-      this.scene.add(...variants[vi]);
+    for (const name of Object.keys(ks)) {
+      for (const part of SPECIES[name].parts) part.count = ks[name];
+      this.scene.add(...SPECIES[name].parts);
     }
     // DECOR (no collision, < 0.5u tall): fallen logs and cut stumps scattered
     // through the stand so the forest floor reads lived-in
@@ -3203,10 +5307,38 @@ export class Track {
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 });
     const parts = [trunkGeo, armUpA, armElbowA, armUpB, armElbowB]
       .map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
-    for (const part of parts) part.castShadow = true;
+    // DESERT FLORA MIX: saguaros plus two more species so the desert never
+    // reads copy-pasted — squat ribbed BARREL cacti with a blossom crown, and
+    // dry flat-topped ACACIA scrub. All of them yield to a car.
+    const barrelBody = new THREE.CylinderGeometry(0.62, 0.78, 1.05, 9);
+    barrelBody.translate(0, 0.55, 0);
+    const barrelCrown = new THREE.SphereGeometry(0.3, 6, 5);
+    barrelCrown.translate(0, 1.15, 0);
+    const barrelParts = [
+      new THREE.InstancedMesh(barrelBody, mat, COUNT),
+      new THREE.InstancedMesh(barrelCrown,
+        new THREE.MeshStandardMaterial({ color: 0xe89a4a, flatShading: true, roughness: 0.9 }), COUNT),
+    ];
+    const acTrunk = new THREE.CylinderGeometry(0.12, 0.22, 2.6, 6);
+    acTrunk.rotateZ(0.16);
+    acTrunk.translate(0, 1.3, 0);
+    const acBough = new THREE.CylinderGeometry(0.08, 0.12, 1.4, 5);
+    acBough.rotateZ(-0.8);
+    acBough.translate(0.75, 2.2, 0);
+    const acCrown = new THREE.SphereGeometry(1.9, 8, 4);
+    acCrown.scale(1, 0.22, 1);
+    acCrown.translate(0.35, 3.0, 0);
+    const acaciaParts = [
+      new THREE.InstancedMesh(acTrunk, new THREE.MeshStandardMaterial({ color: 0x6a5138, roughness: 1 }), COUNT),
+      new THREE.InstancedMesh(acBough, new THREE.MeshStandardMaterial({ color: 0x6a5138, roughness: 1 }), COUNT),
+      new THREE.InstancedMesh(acCrown,
+        new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 }), COUNT),
+    ];
+    for (const part of [...parts, ...barrelParts, ...acaciaParts]) part.castShadow = true;
+    const ks = { saguaro: 0, barrel: 0, acacia: 0 };
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
-    const placed = this._scatter(COUNT,
+    this._scatter(COUNT,
       () => {
         const roll = Math.random();
         const i = (Math.random() * N) | 0;
@@ -3232,24 +5364,45 @@ export class Track {
       (spot, k) => {
         const p = this.pointAt(spot.i, spot.lateral);
         const y = spot.terrain ? this.terrainHeight(p.x, p.z) : p.y + spot.dy;
+        // rim spots stay saguaro (their silhouette carries the skyline);
+        // ground spots mix in barrels and dry acacia
+        const roll = spot.dy ? 0 : Math.random();
+        const species = roll < 0.55 ? 'saguaro' : roll < 0.8 ? 'barrel' : 'acacia';
+        const sp = species === 'saguaro' ? parts : species === 'barrel' ? barrelParts : acaciaParts;
+        const k2 = ks[species]++;
+        const s = species === 'acacia' ? spot.s * 1.35 : spot.s;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
           new THREE.Vector3(p.x, y - 0.15, p.z),
-          q, new THREE.Vector3(spot.s, spot.s * (0.9 + Math.random() * 0.3), spot.s)
+          q, new THREE.Vector3(s, s * (0.9 + Math.random() * 0.3), s)
         );
-        color.setHSL(0.30 + Math.random() * 0.06, 0.35 + Math.random() * 0.15, 0.22 + Math.random() * 0.12);
-        for (const part of parts) {
-          part.setMatrixAt(k, m4);
-          part.setColorAt(k, color);
+        if (species === 'acacia') {
+          color.setHSL(0.155 + Math.random() * 0.04, 0.32 + Math.random() * 0.12, 0.3 + Math.random() * 0.1);
+        } else {
+          color.setHSL(0.30 + Math.random() * 0.06, 0.35 + Math.random() * 0.15, 0.22 + Math.random() * 0.12);
         }
-        this.trees.push({ x: p.x, z: p.z, y: y - 0.15, r: 0.75 * spot.s, id: k, parts, kind: 'cactus', s: spot.s });
-        this._addShadow(p.x, p.z, 1.6 * spot.s, spot.terrain ? null : y - 0.15);
+        for (const part of sp) {
+          part.setMatrixAt(k2, m4);
+          part.setColorAt(k2, color);
+        }
+        this.trees.push({
+          x: p.x, z: p.z, y: y - 0.15, id: k2, parts: sp, s,
+          r: (species === 'barrel' ? 0.6 : 0.75) * s,
+          kind: species === 'acacia' ? 'acacia' : 'cactus',
+          solid: false,                                  // desert scrub always yields
+        });
+        this._addShadow(p.x, p.z, 1.6 * s, spot.terrain ? null : y - 0.15);
       });
-    for (const part of parts) { part.count = placed; this.scene.add(part); }
+    for (const part of parts) { part.count = ks.saguaro; this.scene.add(part); }
+    for (const part of barrelParts) { part.count = ks.barrel; this.scene.add(part); }
+    for (const part of acaciaParts) { part.count = ks.acacia; this.scene.add(part); }
   }
 
-  /** Volcano vegetation: sparse burnt snags — bare trunk + a few thin dark
-   *  branch cones, scattered like the pines are on the other levels. */
+  /** Volcano vegetation: nothing green survives a lava field, so the "flora"
+   *  is two stages of the same death — tall bare SNAGS with a few thin dark
+   *  branches still attached, and squat broken STUMPS the ash has buried to
+   *  the shoulder. Both are BREAKABLE (kind 'snag'), both jitter in scale and
+   *  in how far the char has bleached them. */
   _buildCharredTrees(m4) {
     const COUNT = this.T.treeCount;
     const trunkGeo = new THREE.CylinderGeometry(0.13, 0.34, 4.8, 6);
@@ -3265,10 +5418,21 @@ export class Track {
     b3.translate(0, 3.7, 0.5);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 });
     const parts = [trunkGeo, b1, b2, b3].map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
-    for (const part of parts) part.castShadow = true;
+    // stump: a snapped-off trunk with a jagged shoulder, half-buried in ash
+    const stTrunk = new THREE.CylinderGeometry(0.34, 0.6, 1.5, 6);
+    stTrunk.translate(0, 0.75, 0);
+    const stShard = new THREE.ConeGeometry(0.2, 0.9, 4);
+    stShard.rotateZ(0.22);
+    stShard.translate(0.16, 1.7, 0);
+    const stRoot = new THREE.CylinderGeometry(0.62, 0.95, 0.36, 6);
+    stRoot.translate(0, 0.18, 0);
+    const stumpParts = [stTrunk, stShard, stRoot]
+      .map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
+    for (const part of [...parts, ...stumpParts]) part.castShadow = true;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
-    const placed = this._scatter(COUNT,
+    let snags = 0, stumps = 0;
+    this._scatter(COUNT,
       () => {
         if (Math.random() < 0.62) return this._trackSidePos(15, 46);
         const a = Math.random() * Math.PI * 2;
@@ -3277,55 +5441,151 @@ export class Track {
         if (this._distToTrack(x, z) < 14.5) return null;
         return { x, z };
       },
-      (p, k) => {
-        const s = 0.7 + Math.random() * 1.1;
+      (p) => {
+        // 70 % standing snags, 30 % snapped stumps
+        const stump = Math.random() < 0.3;
+        const sp = stump ? stumpParts : parts;
+        const k = stump ? stumps++ : snags++;
+        const s = stump ? 0.8 + Math.random() * 0.9 : 0.7 + Math.random() * 1.1;
         const ty = this.terrainHeight(p.x, p.z) - 0.2;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
           new THREE.Vector3(p.x, ty, p.z),
           q, new THREE.Vector3(s, s * (0.8 + Math.random() * 0.5), s)
         );
-        color.setHSL(0.06 + Math.random() * 0.03, 0.12 + Math.random() * 0.1, 0.08 + Math.random() * 0.06);
-        for (const part of parts) {
+        // char jitter: from soot-black to ash-dusted grey (stumps sit in the
+        // fallout so they run a touch greyer, never brighter than the field)
+        color.setHSL(0.06 + Math.random() * 0.03,
+          (0.12 + Math.random() * 0.1) * (stump ? 0.6 : 1),
+          (stump ? 0.06 : 0.08) + Math.random() * 0.06);
+        for (const part of sp) {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.45 * s, id: k, parts, kind: 'snag', s });
-        this._addShadow(p.x, p.z, 1.2 * s);
+        this.trees.push({
+          x: p.x, z: p.z, y: ty, r: (stump ? 0.6 : 0.45) * s, id: k, parts: sp,
+          kind: 'snag', s, solid: false,
+        });
+        this._addShadow(p.x, p.z, (stump ? 1.0 : 1.2) * s);
       });
-    for (const part of parts) { part.count = placed; this.scene.add(part); }
+    for (const part of parts) { part.count = snags; this.scene.add(part); }
+    for (const part of stumpParts) { part.count = stumps; this.scene.add(part); }
   }
 
-  /** Jungle canopy: tall thin trunks under 2-3 stacked wide flattened crowns
-   *  (varied greens), packed dense for a closed-canopy feel, plus banana-ish
-   *  giant-leaf plants fanning out near the road. The big canopy trees carry
-   *  kind 'pine' so the material law's big-tree-SOLID rule applies to them
-   *  (most spawn at scale ≥ 1.0); the leaf plants are small and smashable. */
+  /** Jungle canopy — TROPICAL SPECIES ONLY. There is not one conifer anywhere
+   *  on a jungle world: no cone-and-trunk pine geometry is built here and the
+   *  theme never reaches the default `_buildForest` stand.
+   *
+   *  Four canopy species plus undergrowth, each with scale and colour jitter:
+   *    KAPOK      emergent — pale buttressed trunk, broad flat plate crown,
+   *               liana strands hanging off it. SOLID at full scale.
+   *    BROADLEAF  mid-story — short trunk, rounded stacked crowns. Yields.
+   *    PALM       tall bare stem under a fan of drooping fronds. Yields.
+   *    TREEFERN   squat fibrous trunk under an arching frond rosette. Yields.
+   *  plus banana-ish giant-leaf plants fanning out along the verges.
+   *  Everything except the full-grown kapoks sets solid:false, which is what
+   *  vehicles.js reads (`tr.solid`) to decide whether a car fells it. */
   _buildJungleTrees(m4) {
     const T = this.T;
     const COUNT = T.treeCount;
-    // trunk: tall and thin
-    const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 6.4, 7);
-    trunkGeo.translate(0, 3.2, 0);
-    // three stacked broad, squashed crowns
-    const can1 = new THREE.ConeGeometry(3.4, 2.1, 8);
-    can1.translate(0, 6.3, 0);
-    const can2 = new THREE.ConeGeometry(2.6, 1.8, 8);
-    can2.translate(0, 7.7, 0);
-    const can3 = new THREE.ConeGeometry(1.7, 1.5, 7);
-    can3.translate(0, 8.9, 0);
     const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const canMatLow = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
     const canMatTop = new THREE.MeshStandardMaterial({ color: T.foliageTop, flatShading: true, roughness: 1 });
-    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, COUNT);
-    const lows = new THREE.InstancedMesh(can1, canMatLow, COUNT);
-    const mids = new THREE.InstancedMesh(can2, canMatLow, COUNT);
-    const tops = new THREE.InstancedMesh(can3, canMatTop, COUNT);
-    trunks.castShadow = lows.castShadow = mids.castShadow = tops.castShadow = true;
-    const treeParts = [trunks, lows, mids, tops];
+    // kapok: tall trunk, flared buttress base, wide plate crown + side domes
+    const kTrunk = new THREE.CylinderGeometry(0.26, 0.4, 7.0, 7);
+    kTrunk.translate(0, 3.5, 0);
+    const kButtress = new THREE.CylinderGeometry(0.62, 1.05, 1.5, 7);
+    kButtress.translate(0, 0.75, 0);
+    const kCrown = new THREE.SphereGeometry(3.6, 8, 5);
+    kCrown.scale(1, 0.34, 1);
+    kCrown.translate(0, 7.3, 0);
+    const kDomeA = new THREE.SphereGeometry(2.0, 7, 5);
+    kDomeA.scale(1, 0.42, 1);
+    kDomeA.translate(1.9, 6.8, 0.6);
+    const kDomeB = new THREE.SphereGeometry(1.7, 7, 5);
+    kDomeB.scale(1, 0.45, 1);
+    kDomeB.translate(-1.8, 6.9, -0.5);
+    // lianas: three thin strands dangling from the kapok crown — the single
+    // most tropical read there is, and free (they ride the same instance)
+    const vineMat = new THREE.MeshStandardMaterial({ color: 0x3e6b2c, roughness: 1 });
+    // every strand must hang from somewhere: keep them inside the crown plate
+    // footprint (radius 3.6) or they read as sticks floating in mid-air
+    const vineGeos = [[2.4, 3.4, 1.2], [-2.2, 2.6, -1.0], [0.9, 3.0, -2.4]]
+      .map(([vx, vlen, vz]) => {
+        const v = new THREE.CylinderGeometry(0.055, 0.045, vlen, 4);
+        v.translate(vx, 6.9 - vlen / 2, vz);
+        return v;
+      });
+    const kapokParts = [
+      new THREE.InstancedMesh(kTrunk, trunkMat, COUNT),
+      new THREE.InstancedMesh(kButtress, trunkMat, COUNT),
+      new THREE.InstancedMesh(kCrown, canMatLow, COUNT),
+      new THREE.InstancedMesh(kDomeA, canMatLow, COUNT),
+      new THREE.InstancedMesh(kDomeB, canMatTop, COUNT),
+      ...vineGeos.map((v) => new THREE.InstancedMesh(v, vineMat, COUNT)),
+    ];
+    // broadleaf: short trunk, two rounded stacked crowns
+    const bTrunk = new THREE.CylinderGeometry(0.24, 0.36, 4.2, 7);
+    bTrunk.translate(0, 2.1, 0);
+    const bCrown = new THREE.SphereGeometry(2.45, 8, 6);
+    bCrown.scale(1, 0.72, 1);
+    bCrown.translate(0, 4.7, 0);
+    const bTop = new THREE.SphereGeometry(1.5, 7, 5);
+    bTop.scale(1, 0.75, 1);
+    bTop.translate(0.4, 6.0, 0.3);
+    const broadParts = [
+      new THREE.InstancedMesh(bTrunk, trunkMat, COUNT),
+      new THREE.InstancedMesh(bCrown, canMatLow, COUNT),
+      new THREE.InstancedMesh(bTop, canMatTop, COUNT),
+    ];
+    // rainforest palm: slim bare stem, 7 drooping fronds, a nut cluster
+    const pTrunk = new THREE.CylinderGeometry(0.15, 0.28, 6.2, 6);
+    pTrunk.translate(0, 3.1, 0);
+    const palmGeos = [pTrunk];
+    for (let li = 0; li < 7; li++) {
+      const fr = new THREE.ConeGeometry(0.46, 3.3, 4);
+      fr.rotateZ(-Math.PI / 2);                          // axis → +x
+      fr.translate(1.6, 0, 0);
+      fr.scale(1, 0.2, 0.68);                            // flattened frond
+      fr.rotateZ(-0.30 - (li % 2) * 0.26);               // droop, alternating
+      fr.rotateY(li * (Math.PI * 2 / 7) + 0.4);
+      fr.translate(0, 6.15, 0);
+      palmGeos.push(fr);
+    }
+    const pNut = new THREE.SphereGeometry(0.2, 6, 5);
+    pNut.translate(0.26, 5.85, 0.16);
+    const palmParts = [
+      new THREE.InstancedMesh(pTrunk, trunkMat, COUNT),
+      ...palmGeos.slice(1).map((fr) => new THREE.InstancedMesh(fr, canMatTop, COUNT)),
+      new THREE.InstancedMesh(pNut, new THREE.MeshStandardMaterial({ color: 0x6a4a26, roughness: 1 }), COUNT),
+    ];
+    // tree fern: squat fibrous trunk under an arching frond rosette
+    const fTrunk = new THREE.CylinderGeometry(0.2, 0.34, 2.0, 6);
+    fTrunk.translate(0, 1.0, 0);
+    const fernParts = [new THREE.InstancedMesh(fTrunk, trunkMat, COUNT)];
+    for (let li = 0; li < 6; li++) {
+      const fr = new THREE.BoxGeometry(0.34, 0.06, 2.2);
+      fr.translate(0, 0, 1.25);
+      fr.rotateX(-0.5 - (li % 2) * 0.2);                 // arch up then over
+      fr.rotateY(li * (Math.PI * 2 / 6) + 0.25);
+      fr.translate(0, 2.05, 0);
+      fernParts.push(new THREE.InstancedMesh(fr, canMatLow, COUNT));
+    }
+    for (const part of [...kapokParts, ...broadParts, ...palmParts, ...fernParts]) {
+      part.castShadow = true;
+    }
     const color = new THREE.Color();
     const F = T.foliage;
-    const placed = this._scatter(COUNT,
+    const ks = { kapok: 0, broad: 0, palm: 0, fern: 0 };
+    // species table: [name, parts, colour-tinted part indices, radius, scale range]
+    const SPECIES = [
+      ['kapok', kapokParts, [2, 3, 4], 1.0, [0.9, 1.1]],
+      ['broadleaf', broadParts, [1, 2], 0.8, [0.7, 0.8]],
+      ['palm', palmParts, palmParts.map((_, pi) => pi).slice(1, -1), 0.55, [0.85, 0.6]],
+      ['treefern', fernParts, fernParts.map((_, pi) => pi).slice(1), 0.5, [0.6, 0.5]],
+    ];
+    const SLOT = { kapok: 'kapok', broadleaf: 'broad', palm: 'palm', treefern: 'fern' };
+    this._scatter(COUNT,
       () => {
         // denser and closer than the pine forests: a real green wall
         if (Math.random() < 0.7) return this._trackSidePos(13.5, 40);
@@ -3335,25 +5595,36 @@ export class Track {
         if (this._distToTrack(x, z) < 13) return null;
         return { x, z };
       },
-      (p, k) => {
-        const s = 0.9 + Math.random() * 1.1;             // mostly ≥ 1.0 → SOLID trunks
+      (p) => {
+        // 40 % emergent kapok, 25 % broadleaf, 20 % palm, 15 % tree fern
+        const roll = Math.random();
+        const sp = SPECIES[roll < 0.40 ? 0 : roll < 0.65 ? 1 : roll < 0.85 ? 2 : 3];
+        const [kind, parts, tintIdx, rad, [s0, sVar]] = sp;
+        const k = ks[SLOT[kind]]++;
+        const s = s0 + Math.random() * sVar;
         const ty = this.terrainHeight(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
         m4.setPosition(p.x, ty, p.z);
-        for (const part of treeParts) part.setMatrixAt(k, m4);
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 1.0 * s, id: k, parts: treeParts, kind: 'pine', s });
+        for (const part of parts) part.setMatrixAt(k, m4);
+        this.trees.push({
+          x: p.x, z: p.z, y: ty, r: rad * s, id: k, parts, kind, s,
+          // kapok emergents at full growth stop a car; everything else yields
+          solid: kind === 'kapok' && s >= 1.0,
+        });
         color.setHSL(
           F.h + Math.random() * F.hVar,
           F.s + Math.random() * F.sVar,
           F.l + Math.random() * F.lVar
         );
-        lows.setColorAt(k, color);
-        mids.setColorAt(k, color.clone().multiplyScalar(0.85));
-        tops.setColorAt(k, color.clone().multiplyScalar(1.25));
-        this._addShadow(p.x, p.z, 3.0 * s);
+        // per-instance tint, brightening toward the top of the canopy
+        for (let ti = 0; ti < tintIdx.length; ti++) {
+          parts[tintIdx[ti]].setColorAt(k,
+            color.clone().multiplyScalar(0.85 + (ti / Math.max(1, tintIdx.length - 1)) * 0.4));
+        }
+        this._addShadow(p.x, p.z, (kind === 'kapok' ? 3.0 : kind === 'broadleaf' ? 2.4 : 1.8) * s);
       });
-    trunks.count = lows.count = mids.count = tops.count = placed;
-    this.scene.add(trunks, lows, mids, tops);
+    for (const [kind, parts] of SPECIES) for (const part of parts) part.count = ks[SLOT[kind]];
+    this.scene.add(...kapokParts, ...broadParts, ...palmParts, ...fernParts);
 
     // giant-leaf plants near the road: 5 flat stretched leaves fanned from a base
     const PLANTS = 90;
@@ -3383,15 +5654,20 @@ export class Track {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
-        this.trees.push({ x: p.x, z: p.z, y: py, r: 0.65 * s, id: k, parts: leafParts, kind: 'jungle', s });
+        this.trees.push({ x: p.x, z: p.z, y: py, r: 0.65 * s, id: k, parts: leafParts, kind: 'jungle', s, solid: false });
       });
     for (const part of leafParts) { part.count = pPlaced; this.scene.add(part); }
   }
 
-  /** Desert palms: tall bare trunk under a fan crown of drooping fronds and a
-   *  coconut cluster. kind 'palm' (NOT 'pine') so cars always fell them. The
-   *  oasis level packs most of its palms into one dense grove section of the
-   *  lap (T.palmGrove = [fracA, fracB]); the dune level scatters them thin. */
+  /** Desert palms — TWO species so an oasis never reads copy-pasted:
+   *    DATE PALM  tall bare trunk under a fan crown of drooping fronds plus a
+   *               fruit cluster (the skyline shape).
+   *    DOUM PALM  squat, thicker, wider stiff fan with no fruit — the scrubby
+   *               understory palm that grows in clumps at the water's edge.
+   *  Both carry kind 'palm' (NOT 'pine') and solid:false, so cars always fell
+   *  them. The oasis level packs most of its palms into one dense grove
+   *  section of the lap (T.palmGrove = [fracA, fracB]); the dune level
+   *  scatters them thin. */
   _buildPalms(m4) {
     const T = this.T;
     const COUNT = T.treeCount;
@@ -3417,12 +5693,30 @@ export class Track {
     const parts = partGeos.map((geoPart, gi) => new THREE.InstancedMesh(
       geoPart, gi === 0 ? trunkMat : gi === partGeos.length - 1 ? nutMat : frondMat, COUNT
     ));
-    for (const part of parts) part.castShadow = true;
+    // --- doum palm: short thick trunk, 8 stiff wide fans, no fruit ---
+    const dTrunk = new THREE.CylinderGeometry(0.3, 0.46, 2.5, 7);
+    dTrunk.translate(0, 1.25, 0);
+    const doumGeos = [dTrunk];
+    for (let li = 0; li < 8; li++) {
+      const fr = new THREE.ConeGeometry(0.72, 2.4, 4);
+      fr.rotateZ(-Math.PI / 2);
+      fr.translate(1.15, 0, 0);
+      fr.scale(1, 0.16, 0.9);                       // broad flat fan
+      fr.rotateZ(-0.02 - (li % 3) * 0.2);           // near-horizontal, uneven
+      fr.rotateY(li * (Math.PI * 2 / 8) + 0.2);
+      fr.translate(0, 2.55, 0);
+      doumGeos.push(fr);
+    }
+    const doumParts = doumGeos.map((geoPart, gi) => new THREE.InstancedMesh(
+      geoPart, gi === 0 ? trunkMat : frondMat, COUNT
+    ));
+    for (const part of [...parts, ...doumParts]) part.castShadow = true;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
     const F = T.foliage;
     const grove = T.palmGrove;
-    const placed = this._scatter(COUNT,
+    let doums = 0, dates = 0;
+    this._scatter(COUNT,
       () => {
         if (grove && Math.random() < 0.6) {
           // the hidden grove: dense stand along one stretch of the lap
@@ -3439,8 +5733,12 @@ export class Track {
         if (this._distToTrack(x, z) < 11.5) return null;
         return { x, z };
       },
-      (p, k) => {
-        const s = 0.8 + Math.random() * 0.75;
+      (p) => {
+        // 68 % date palms (the skyline), 32 % squat doum clumps
+        const doum = Math.random() < 0.32;
+        const sp = doum ? doumParts : parts;
+        const k = doum ? doums++ : dates++;
+        const s = doum ? 0.75 + Math.random() * 0.6 : 0.8 + Math.random() * 0.75;
         const ty = this.terrainHeight(p.x, p.z) - 0.2;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
@@ -3449,23 +5747,30 @@ export class Track {
         );
         color.setHSL(
           F.h + Math.random() * F.hVar,
-          F.s + Math.random() * F.sVar,
+          // the doums run drier and duller than the fruiting date palms
+          (F.s + Math.random() * F.sVar) * (doum ? 0.78 : 1),
           F.l + Math.random() * F.lVar
         );
-        for (const part of parts) {
+        for (const part of sp) {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
         // NOT 'pine' → the material law lets any car snap a palm
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.55 * s, id: k, parts, kind: 'palm', s });
-        this._addShadow(p.x, p.z, 1.9 * s);
+        this.trees.push({
+          x: p.x, z: p.z, y: ty, r: (doum ? 0.7 : 0.55) * s, id: k, parts: sp,
+          kind: doum ? 'doum' : 'palm', s, solid: false,
+        });
+        this._addShadow(p.x, p.z, (doum ? 1.5 : 1.9) * s);
       });
-    for (const part of parts) { part.count = placed; this.scene.add(part); }
+    for (const part of parts) { part.count = dates; this.scene.add(part); }
+    for (const part of doumParts) { part.count = doums; this.scene.add(part); }
   }
 
   /** Gargantuan redwoods: scale 2.2–3.2 → the s ≥ 1.0 'pine' rule makes every
-   *  one SOLID, so they are all placed OFF the road. A second set of small
-   *  (smashable) understory pines dresses the verges. */
+   *  one SOLID, so they are all placed OFF the road. Two more species dress
+   *  the floor and keep the stand from reading as one repeated tree: small
+   *  (smashable) redwood saplings on the verges, and TANOAK broadleaves in a
+   *  lighter yellow-green — the real coast-redwood understory. */
   _buildRedwoods(m4) {
     const T = this.T;
     const COUNT = T.treeCount;
@@ -3505,7 +5810,7 @@ export class Track {
         m4.setPosition(p.x, ty, p.z);
         for (const part of giantParts) part.setMatrixAt(k, m4);
         // kind 'pine' at s ≥ 1.0 → SOLID: hitting a giant stops a car dead
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.85 * s, id: k, parts: giantParts, kind: 'pine', s });
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.85 * s, id: k, parts: giantParts, kind: 'pine', s, solid: true });
         this._addShadow(p.x, p.z, 1.6 * s);
         color.setHSL(
           F.h + Math.random() * F.hVar,
@@ -3534,12 +5839,56 @@ export class Track {
         m4.makeScale(s, s * (0.9 + Math.random() * 0.3), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of sapParts) part.setMatrixAt(k, m4);
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.85 * s, id: k, parts: sapParts, kind: 'pine', s });
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.85 * s, id: k, parts: sapParts, kind: 'pine', s, solid: false });
         color.setHSL(F.h + Math.random() * F.hVar, F.s, F.l + 0.06 + Math.random() * 0.1);
         sLows.setColorAt(k, color);
         sTops.setColorAt(k, color.clone().multiplyScalar(1.2));
       });
     for (const part of sapParts) { part.count = sapPlaced; this.scene.add(part); }
+
+    // --- TANOAK: the broadleaf that actually grows under coast redwoods.
+    // Short crooked trunk under two rounded crowns in a lighter, yellower
+    // green than the conifers, so the stand never reads as one repeated tree.
+    const OAKS = 120;
+    const oTrunk = new THREE.CylinderGeometry(0.26, 0.42, 4.4, 6);
+    oTrunk.rotateZ(0.06);
+    oTrunk.translate(0, 2.2, 0);
+    const oCrown = new THREE.SphereGeometry(2.3, 8, 6);
+    oCrown.scale(1, 0.82, 1);
+    oCrown.translate(0, 5.1, 0);
+    const oTop = new THREE.SphereGeometry(1.4, 7, 5);
+    oTop.scale(1, 0.85, 1);
+    oTop.translate(0.45, 6.3, 0.3);
+    // reuse the theme's canopy materials so the tanoaks sit in the same
+    // brightness family as the conifers — the per-instance tint below only
+    // shifts them yellower and a shade lighter
+    const oakParts = [
+      new THREE.InstancedMesh(oTrunk, trunkMat, OAKS),
+      new THREE.InstancedMesh(oCrown, lowMat, OAKS),
+      new THREE.InstancedMesh(oTop, topMat, OAKS),
+    ];
+    for (const part of oakParts) part.castShadow = true;
+    const oakPlaced = this._scatter(OAKS,
+      () => (Math.random() < 0.7 ? this._trackSidePos(13, 45) : this._trackSidePos(45, 130)),
+      (p, k) => {
+        const s = 0.7 + Math.random() * 0.7;
+        const ty = this.terrainHeight(p.x, p.z) - 0.2;
+        m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
+        m4.setPosition(p.x, ty, p.z);
+        for (const part of oakParts) part.setMatrixAt(k, m4);
+        // broadleaf, never a giant → always yields to a bumper
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.75 * s, id: k, parts: oakParts, kind: 'oak', s, solid: false });
+        // yellower and a shade lighter than the conifers, same brightness band
+        color.setHSL(
+          F.h - 0.035 + Math.random() * F.hVar,
+          Math.min(1, F.s + 0.08),
+          Math.min(0.55, F.l + 0.05 + Math.random() * F.lVar)
+        );
+        oakParts[1].setColorAt(k, color);
+        oakParts[2].setColorAt(k, color.clone().multiplyScalar(1.2));
+        this._addShadow(p.x, p.z, 2.2 * s);
+      });
+    for (const part of oakParts) { part.count = oakPlaced; this.scene.add(part); }
   }
 
   /** Burning forest: a mix of bare charred snags (ember-rim emissive) and
@@ -3583,7 +5932,7 @@ export class Track {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.45 * s, id: k, parts: snagParts, kind: 'snag', s });
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.45 * s, id: k, parts: snagParts, kind: 'snag', s, solid: false });
         this._addShadow(p.x, p.z, 1.2 * s);
       });
     for (const part of snagParts) { part.count = snagPlaced; this.scene.add(part); }
@@ -3626,7 +5975,7 @@ export class Track {
         m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of pineParts) part.setMatrixAt(k, m4);
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 1.0 * s, id: k, parts: pineParts, kind: 'pine', s });
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 1.0 * s, id: k, parts: pineParts, kind: 'pine', s, solid: s >= 1.0 });
         color.setHSL(
           F.h + Math.random() * F.hVar,
           F.s + Math.random() * F.sVar,
@@ -3845,7 +6194,12 @@ export class Track {
     walls.castShadow = roofs.castShadow = true;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     let placed = 0;
-    this._scatter(COUNT, () => this._trackSidePos(24, 64), (p) => {
+    // hutZone [f0, f1] clusters the dwellings into one stretch of the lap (the
+    // valley village at the foot of a pass); f0 > f1 wraps through the line
+    const makePos = this.T.hutZone
+      ? () => this._zonePos(this.T.hutZone, 20, 62)
+      : () => this._trackSidePos(24, 64);
+    this._scatter(COUNT, makePos, (p) => {
       const w = 9 + Math.random() * 6;
       const h = 5 + Math.random() * 2.5;
       const rot = Math.random() * Math.PI * 2;
@@ -3934,8 +6288,10 @@ export class Track {
         // outside of the corner: opposite the direction the tangent is turning
         const a = this.tan[i], b = this.tan[(i + 12) % N];
         const side = (a.x * b.z - a.z * b.x) > 0 ? -1 : 1;
-        // cliff-walled levels stack the tires right against the rock face
-        const tireOff = this.T.cliffWalls ? WALL_OFF + 0.8 : WALL_OFF + 2.2;
+        // cliff-walled levels stack the tires right against the rock face;
+        // pass levels tuck them inside the stone parapet
+        const tireOff = this.T.cliffWalls ? WALL_OFF + 0.8
+          : (this.T.retainingWalls || this.T.guardFence) ? WALL_OFF + 1.2 : WALL_OFF + 2.2;
         const p = this.pointAt(i, tireOff * side);
         const stack = Math.random() < 0.5 ? 3 : 2;
         const ids = [];
@@ -3991,8 +6347,10 @@ export class Track {
       ? new THREE.MeshBasicMaterial({ map: bannerTexture(text, bg, fg), side: THREE.DoubleSide })
       : new THREE.MeshStandardMaterial({ map: bannerTexture(text, bg, fg), roughness: 0.8, side: THREE.DoubleSide }));
     // cliff-walled levels stand the boards right at the rock face so they stay
-    // inside the canyon instead of vanishing behind it
-    const boardOff = this.T.cliffWalls ? WALL_OFF + 0.75 : WALL_OFF + 3.6;
+    // inside the canyon instead of vanishing behind it; pass levels stand them
+    // clear of the stone parapet
+    const boardOff = this.T.cliffWalls ? WALL_OFF + 0.75
+      : (this.T.retainingWalls || this.T.guardFence) ? WALL_OFF + 6.4 : WALL_OFF + 3.6;
     for (let b = 0; b < 10; b++) {
       const i = ((b + 0.5) * N / 10) | 0;
       if (this.curvature[i] > this.T.boardMaxCurv) continue; // keep boards off tight corners
@@ -4024,6 +6382,18 @@ export class Track {
   smashBanner(b) {
     if (!b || b.dead) return null;
     b.dead = true;
+    // guard-fence bay: zero its instance and hand back a loose bay to fling
+    if (b.kind === 'fence') {
+      if (!this._guardFenceMesh) return null;
+      _m4.makeScale(0, 0, 0);
+      this._guardFenceMesh.setMatrixAt(b.id, _m4);
+      this._guardFenceMesh.instanceMatrix.needsUpdate = true;
+      const bay = new THREE.Mesh(this._guardFenceGeo, this._guardFenceMat);
+      bay.castShadow = true;
+      bay.position.set(b.x, b.y, b.z);
+      bay.rotation.y = b.heading;
+      return bay;
+    }
     b.group.visible = false;
     const g = new THREE.Group();
     const board = new THREE.Mesh(b.board.geometry, b.board.material);

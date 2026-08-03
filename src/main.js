@@ -50,10 +50,94 @@ const WORLD_TAGS = {
 const CAM_MODES = [
   { name: 'TOP-DOWN',  back: 20, h: 52, look: 7,  lookH: 0,   spdBack: 6, spdH: 10 },
   { name: 'TOP FAR',   back: 24, h: 84, look: 1,  lookH: 0,   spdBack: 4, spdH: 10 },
-  { name: 'CHASE',     back: 13, h: 7.5, look: 10, lookH: 2.8, spdBack: 2, spdH: 1 },
-  { name: 'CHASE FAR', back: 24, h: 15, look: 13, lookH: 3,   spdBack: 3, spdH: 2 },
+  { name: 'CHASE',     back: 13, h: 7.5, look: 10, lookH: 2.8, spdBack: 2, spdH: 1, chase: true },
+  { name: 'CHASE FAR', back: 24, h: 15, look: 13, lookH: 3,   spdBack: 3, spdH: 2, chase: true },
 ];
-const upgradeCost = (lvl) => 350 + lvl * 250;
+// ---- economy ----
+// Score is the arcade number (it inflates fast: 500/lap, big rank bonus,
+// points for every smashed crate). Credits are DELIBERATELY a small slice of
+// it, so a good race funds real progress but never buys the garage outright.
+// Heavy debris: which smashed things throw chunks that can hurt another car,
+// and how hard (RULES: debris is shrapnel). Straw, cones, penguins and cacti
+// are pulp — they carry no entry here and so never bite.
+const DEBRIS_DMG = { crate: 6, snowman: 6, barrel: 9, rock: 10, tree: 14 };
+
+// Hut planks are spawned per crash; building the geometry and material inline
+// leaked one of each per plank, since the mesh is dropped without disposing.
+const PLANK_GEO = new THREE.BoxGeometry(1.4, 0.3, 0.1);
+const PLANK_MATS = new Map(); // colour -> shared material
+const plankMat = (col) => {
+  let m = PLANK_MATS.get(col);
+  if (!m) { m = new THREE.MeshStandardMaterial({ color: col, roughness: 0.9 }); PLANK_MATS.set(col, m); }
+  return m;
+};
+
+const CREDIT_RATE = 1 / 12;                // score -> credits
+const PODIUM_CR = [200, 120, 60];          // 1st / 2nd / 3rd
+const FIRST_CLEAR_CR = 500;                // once per world, on your first podium
+const upgradeCost = (lvl) => 500 + lvl * 400;   // 500/900/1300/1700/2100 per line
+
+// ---- race contracts ----
+// Every race offers 3 side objectives that pay flat credits on completion, so
+// income has texture and skilled play earns a margin — WITHOUT retuning the
+// settled rates above. All checks read existing signals only: the style()
+// event labels, this.deaths/kills, per-race counters accumulated in this._ct.
+// `gate` filters offers that a world/difficulty can't honor; `lap: true`
+// contracts resolve at lap boundaries; `atFinish` ones resolve in finishRace.
+const CONTRACT_POOL = [
+  { id: 'cleanlap', label: 'CLEAN LAP',      pay: 100, desc: 'a full lap without hull damage', lap: true },
+  { id: 'untouch',  label: 'UNTOUCHABLE',    pay: 120, desc: 'finish without wrecking',
+    atFinish: true, check: (g) => g.deaths === 0 },
+  // `sure: true` marks contracts any driver can complete by active play in any
+  // world, whatever the race outcome — the offer always includes at least one.
+  { id: 'demo',     label: 'DEMOLITION',     pay: 60,  desc: 'smash 12 props', sure: true,
+    check: (g, ct) => ct.props >= 12, prog: (ct) => `${Math.min(ct.props, 12)}/12` },
+  { id: 'head',     label: 'HEADHUNTER',     pay: 90,  desc: 'destroy 2 rivals',
+    check: (g, ct) => ct.rivalKills >= 2, prog: (ct) => `${Math.min(ct.rivalKills, 2)}/2` },
+  { id: 'combo',    label: 'COMBO ARTIST',   pay: 70,  desc: 'reach a ×2.5 style combo', sure: true,
+    check: (g, ct) => ct.comboMax >= 2.5 },
+  { id: 'draft',    label: 'DRAFT KING',     pay: 60,  desc: '3 slipstream tucks', sure: true,
+    check: (g, ct) => ct.drafts >= 3, prog: (ct) => `${Math.min(ct.drafts, 3)}/3` },
+  { id: 'air',      label: 'AIRBORNE',       pay: 60,  desc: '2 BIG AIR jumps',
+    check: (g, ct) => ct.bigAirs >= 2, prog: (ct) => `${Math.min(ct.bigAirs, 2)}/2` },
+  { id: 'hardpod',  label: 'PODIUM ON HARD', pay: 150, desc: 'top 3 on HARD',
+    gate: (g) => g.difficulty.id === 'hard', atFinish: true, check: (g, ct, rank) => rank <= 3 },
+  { id: 'pacifist', label: 'PACIFIST',       pay: 130, desc: 'podium with zero weapon fire',
+    atFinish: true, check: (g, ct, rank) => rank <= 3 && !ct.weaponFired },
+  { id: 'start',    label: 'FLAWLESS START', pay: 80,  desc: 'lead at the end of lap 1', lap: true },
+  { id: 'herd',     label: 'HERDSMAN',       pay: 50,  desc: 'never hit livestock',
+    gate: (g) => (g.herds?.length ?? 0) > 0, atFinish: true, check: (g, ct) => ct.livestock === 0 },
+  { id: 'shave',    label: 'CLOSE SHAVE',    pay: 60,  desc: '3 CLOSE CALL passes',
+    check: (g, ct) => ct.closeCalls >= 3, prog: (ct) => `${Math.min(ct.closeCalls, 3)}/3` },
+];
+
+// which animals graze in which biome (a theme can override with T.livestock).
+// Each pasture takes a LEAD species from its roster and the roster shifts from
+// world to world; roughly a quarter of each herd is the next species along, so
+// neither a field nor a world reads as a monoculture. Rosters are
+// biome-plausible only — camels in the dunes, capybaras (never cows) in the
+// Amazon, goats on the canyon ledges. Themes with no entry (volcano, neon,
+// undercity) simply have no grazing herds.
+const LIVESTOCK_BY_THEME = {
+  forest:   { kinds: ['cow', 'sheep', 'boar'], perHerd: 4 },
+  alpine:   { kinds: ['cow', 'sheep', 'goat'], perHerd: 4 },
+  pass:     { kinds: ['cow', 'goat', 'sheep'], perHerd: 5 },
+  tremola:  { kinds: ['sheep', 'goat', 'cow'], perHerd: 4 },
+  furka:    { kinds: ['goat', 'sheep'],        perHerd: 3 },
+  redwood:  { kinds: ['deer', 'boar'],         perHerd: 3 },
+  wildfire: { kinds: ['deer', 'boar'],         perHerd: 2 },
+  snow:     { kinds: ['deer'],                 perHerd: 3 },
+  glacial:  { kinds: ['deer'],                 perHerd: 2 },
+  sheetice: { kinds: ['deer'],                 perHerd: 2 },
+  avalanche:{ kinds: ['deer'],                 perHerd: 2 },
+  desert:   { kinds: ['camel', 'goat'],        perHerd: 3 },
+  dunes:    { kinds: ['camel'],                perHerd: 3 },
+  canyon:   { kinds: ['goat', 'camel'],        perHerd: 3 },
+  ravine:   { kinds: ['goat'],                 perHerd: 2 },
+  oasis:    { kinds: ['camel', 'goat', 'cow'], perHerd: 3 },
+  jungle:   { kinds: ['capybara', 'boar', 'deer'], perHerd: 3 },
+  flume:    { kinds: ['deer', 'cow', 'boar'],  perHerd: 3 },
+};
 
 // hazard particle tints (hoisted — per-frame spawns must not allocate)
 const AVA_WHITE = new THREE.Color(0xf4faff);
@@ -64,6 +148,63 @@ const loadJSON = (key, fallback) => {
   catch { return { ...fallback }; }
 };
 const saveJSON = (key, obj) => { try { localStorage.setItem(key, JSON.stringify(obj)); } catch { /* private mode */ } };
+
+// ---- player profiles (local careers — several people share one device) ----
+// Registry `ir-profiles`: { list: [{id, name, color, created}], active }.
+// Per-player state (career / garage / cars) lives under ir-p<id>-* keys;
+// device-wide settings (ir-steer / ir-assist / ir-diff) stay shared.
+const PROFILE_KEYS = ['career', 'garage', 'cars'];
+const PROFILE_COLORS = ['#ff8c1a', '#f2c81e', '#2440b8', '#4a9ad8', '#2f9e44', '#1c1a18']; // car livery hexes
+const MAX_PROFILES = 6;
+const CONFIRM_MS = 3000;          // how long a two-tap destructive button stays armed
+const STARTER_CAR = 'brawler';    // the free machine every career begins with
+const profileKey = (id, base) => `ir-p${id}-${base}`;
+// PROFILE_KEYS is only the LEGACY adoption list (the un-namespaced keys an old
+// build wrote). Wiping a profile must never use it: whatever key a future
+// feature parks under the namespace has to die with the career too, so both
+// reset and delete enumerate localStorage BY PREFIX instead of by name.
+const profilePrefix = (id) => `ir-p${id}-`;
+function profileStorageKeys(id) {
+  const pre = profilePrefix(id), out = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(pre)) out.push(k);
+    }
+  } catch { /* private mode */ }
+  return out;
+}
+/** Erase every stored byte belonging to one profile. The single wipe path. */
+function wipeProfileData(id) {
+  const keys = profileStorageKeys(id);
+  try { for (const k of keys) localStorage.removeItem(k); } catch { /* private mode */ }
+  return keys;
+}
+const sanitizeProfileName = (raw) =>
+  String(raw ?? '').toUpperCase().replace(/[^A-Z0-9 \-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 10);
+
+function loadProfiles() {
+  let reg = null;
+  try { reg = JSON.parse(localStorage.getItem('ir-profiles') || 'null'); } catch { /* corrupt */ }
+  if (!reg || !Array.isArray(reg.list) || !reg.list.length) {
+    // first run on this device: profile 1 adopts whatever career already exists
+    reg = { list: [{ id: 1, name: 'PLAYER 01', color: PROFILE_COLORS[0], created: Date.now() }], active: 1 };
+  }
+  if (!reg.list.some((p) => p.id === reg.active)) reg.active = reg.list[0].id;
+  // adopt any un-namespaced legacy keys into the ACTIVE profile (first boot,
+  // or data written by an old build) — nobody loses their career, ever
+  try {
+    for (const base of PROFILE_KEYS) {
+      const legacy = localStorage.getItem(`ir-${base}`);
+      if (legacy !== null) {
+        localStorage.setItem(profileKey(reg.active, base), legacy);
+        localStorage.removeItem(`ir-${base}`);
+      }
+    }
+    saveJSON('ir-profiles', reg);
+  } catch { /* private mode */ }
+  return reg;
+}
 
 class Game {
   constructor() {
@@ -76,15 +217,33 @@ class Game {
     this.level = LEVELS[this.levelIndex];
     this.autoStart = params.get('go') === '1';
 
-    // progression + difficulty + garage (persisted)
-    this.career = loadJSON('ir-career', { finished: {} });
-    this.garage = loadJSON('ir-garage', { credits: 0, engine: 0, armor: 0, cannon: 0, nitro: 0, handling: 0, tires: 0 });
-    this.cars = loadJSON('ir-cars', { owned: ['brawler'], selected: 'brawler' });
-    if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = 'brawler';
+    // progression + difficulty + garage (persisted PER PROFILE — several
+    // players keep separate careers on one device; settings stay shared)
+    this.profiles = loadProfiles();
+    this.profile = this.profiles.list.find((p) => p.id === this.profiles.active) ?? this.profiles.list[0];
+    this._pkey = (base) => profileKey(this.profile.id, base);
+    this.career = loadJSON(this._pkey('career'), { finished: {} });
+    this.garage = loadJSON(this._pkey('garage'), { credits: 0 });
+    this.cars = loadJSON(this._pkey('cars'), { owned: [STARTER_CAR], selected: STARTER_CAR });
+    if (!this.cars.owned.length) this.cars.owned = [STARTER_CAR];
+    if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = STARTER_CAR;
+    // upgrades are PER-CAR (`garage.upgrades[carKey]`) — a newly bought
+    // machine arrives stock. Old saves kept one flat global level set: those
+    // levels migrate once onto the car the player had selected, so the main
+    // ride visibly keeps its build; every other car starts at level 0.
+    if (!this.garage.upgrades) {
+      const flat = {};
+      for (const u of UPGRADES) { flat[u.key] = this.garage[u.key] ?? 0; delete this.garage[u.key]; }
+      this.garage.upgrades = { [this.cars.selected]: flat };
+      saveJSON(this._pkey('garage'), this.garage);
+    }
     // mode comes from the URL only — a fresh visit ALWAYS starts in RACE mode
     // (persisting roam silently made races "never finish" for returning players)
     this.freeRoam = params.get('mode') === 'roam';
     this.steerSetting = localStorage.getItem('ir-steer') || 'normal';
+    // touch players get the aid by default — thumbs are coarser than keys
+    this.assistSetting = localStorage.getItem('ir-assist')
+      || (matchMedia('(pointer: coarse)').matches ? 'assist' : 'standard');
     this.unlockAll = params.get('unlockall') === '1';
     const diffId = localStorage.getItem('ir-diff') || 'normal';
     this.difficulty = DIFFS[diffId] || DIFFS.normal;
@@ -194,6 +353,7 @@ class Game {
       pmrem.dispose(); dome.geometry.dispose(); dome.material.dispose(); envTex.dispose();
     }
     this.particles = new Particles(this.scene);
+    this.particles.setTheme?.(this.level?.theme); // smashed barrels shed the theme's own stave/hoop colours
     this.skids = new SkidMarks(this.scene);
     this.husks = [];      // charred wreck shells left where cars died
     this.hitStop = 0;     // slow-motion timer after a brutal impact
@@ -201,6 +361,7 @@ class Game {
     this.audio = new AudioEngine();
     this.input = new Input();
     this.lapsTotal = LAPS;
+    this.contractPool = CONTRACT_POOL; // exposed for the headless suites
 
     const carEntry = CAR_CATALOG.find((c) => c.key === this.cars.selected) || CAR_CATALOG[0];
     this.player = new PlayerCar(this, carEntry);
@@ -217,6 +378,7 @@ class Game {
     this._buildPickups();
     this._initWorldHazards();
     this._buildRoamStars();
+    this._buildLivestock();
     this._flashes = [];
     this.camMode = 0; // 0 = top-down, 1 = low chase
     this.camPos = new THREE.Vector3();
@@ -282,53 +444,7 @@ class Game {
       }
     }
 
-    // world cards: track-shape minimap + flavor + career best per level,
-    // grouped under region headers (region order = first appearance)
-    const sel = document.getElementById('level-select');
-    const regionRows = new Map();
-    const rowFor = (lv) => {
-      const rg = lv.region || 'CHAMPIONSHIP';
-      let row = regionRows.get(rg);
-      if (!row) {
-        const head = document.createElement('div');
-        head.className = 'region-head';
-        head.textContent = rg;
-        sel.appendChild(head);
-        row = document.createElement('div');
-        row.className = 'region-row';
-        sel.appendChild(row);
-        regionRows.set(rg, row);
-      }
-      return row;
-    };
-    LEVELS.forEach((lv, i) => {
-      const card = document.createElement('button');
-      const unlocked = this.isLevelUnlocked(lv.id);
-      card.className = 'level-chip'
-        + (i === this.levelIndex ? ' current' : '')
-        + (unlocked ? '' : ' locked');
-      const best = this.career.finished[lv.id];
-      const bestTxt = best
-        ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
-        : (unlocked ? '★ UNRACED' : '');
-      card.innerHTML = `<div class="wc-shot" style="background-image:url('assets/previews/w${lv.id}.jpg')">
-          <canvas class="wc-map" width="72" height="52"></canvas>
-        </div>
-        <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
-        <div class="wc-tags">${WORLD_TAGS[lv.theme] || ''}</div>
-        <div class="wc-best${best ? '' : ' new'}">${bestTxt}</div>`;
-      this._drawCircuitMap(card.querySelector('.wc-map'), lv.theme, !unlocked, i === this.levelIndex);
-      card.addEventListener('click', () => {
-        if (i === this.levelIndex) return;
-        if (!this.isLevelUnlocked(lv.id)) {
-          card.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
-            { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
-          return;
-        }
-        this.fadeTo(`?level=${lv.id}${this.unlockAll ? '&unlockall=1' : ''}`);
-      });
-      rowFor(lv).appendChild(card);
-    });
+    this._renderLevelCards();
 
     // mode chips: RACE | FREE ROAM
     const msel = document.getElementById('mode-select');
@@ -362,7 +478,7 @@ class Game {
 
     // steering sensitivity chips (also cycled from the pause menu)
     const ssel = document.getElementById('steer-select');
-    ssel.innerHTML = '<span class="lbl">STEERING</span>';
+    ssel.innerHTML = ''; // the STEERING label lives in the settings row markup now
     const STEERS = [['relaxed', 'RELAXED'], ['normal', 'NORMAL'], ['sharp', 'SHARP']];
     const applySteerChips = () => {
       for (const c of ssel.querySelectorAll('.diff-chip')) {
@@ -394,8 +510,34 @@ class Game {
     });
     applySteerChips();
 
+    // driving aid: gentle auto-straightening, the fix for "hard to control in
+    // 3D view". Defaults ON for touch devices, STANDARD on desktop.
+    const asel = document.getElementById('assist-select');
+    asel.innerHTML = '<span class="lbl">DRIVING AID</span>';
+    const AIDS = [['pro', 'PRO', 0], ['standard', 'STANDARD', 0.5], ['assist', 'ASSIST', 1]];
+    const applyAidChips = () => {
+      for (const c of asel.querySelectorAll('.diff-chip')) {
+        c.className = 'diff-chip' + (c.dataset.id === this.assistSetting ? ' current normal' : '');
+      }
+    };
+    for (const [id, label] of AIDS) {
+      const chip = document.createElement('button');
+      chip.className = 'diff-chip';
+      chip.dataset.id = id;
+      chip.textContent = label;
+      chip.addEventListener('click', () => {
+        this.assistSetting = id;
+        localStorage.setItem('ir-assist', id);
+        this.applyUpgrades();
+        applyAidChips();
+      });
+      asel.appendChild(chip);
+    }
+    applyAidChips();
+
     this.renderGarage();
     this.renderCarShop();
+    this._initProfileUI();
 
     // pause menu
     const pm = document.getElementById('pause-menu');
@@ -464,10 +606,13 @@ class Game {
 
   /** In roam mode, exiting banks the destruction score as credits. */
   bankRoamCredits() {
-    const earned = Math.max(0, this.score - (this.startScore ?? 0));
+    // roam pays the same rate as racing — otherwise farming props off the
+    // clock is strictly better money than actually competing
+    const raw = Math.max(0, this.score - (this.startScore ?? 0));
+    const earned = Math.round(raw * CREDIT_RATE);
     if (earned > 0) {
       this.garage.credits += earned;
-      saveJSON('ir-garage', this.garage);
+      saveJSON(this._pkey('garage'), this.garage);
     }
   }
 
@@ -527,11 +672,75 @@ class Game {
     return this.unlockAll || id === 1 || (!!prev && prev.place <= 3);
   }
 
-  /** Apply purchased upgrades to the player (base stats captured once). */
+  /** World cards: static circuit-outline badge + flavor + career best per
+   *  level, grouped under region headers (region order = first appearance).
+   *  The .wc-map badge is card decoration ONLY — never a HUD map (RULES §0).
+   *  Rebuildable, because a career reset changes every lock and every best. */
+  _renderLevelCards() {
+    const sel = document.getElementById('level-select');
+    if (!sel) return;
+    sel.innerHTML = '';
+    const regionRows = new Map();
+    const rowFor = (lv) => {
+      const rg = lv.region || 'CHAMPIONSHIP';
+      let row = regionRows.get(rg);
+      if (!row) {
+        const head = document.createElement('div');
+        head.className = 'region-head';
+        head.textContent = rg;
+        sel.appendChild(head);
+        row = document.createElement('div');
+        row.className = 'region-row';
+        sel.appendChild(row);
+        regionRows.set(rg, row);
+      }
+      return row;
+    };
+    LEVELS.forEach((lv, i) => {
+      const card = document.createElement('button');
+      const unlocked = this.isLevelUnlocked(lv.id);
+      card.className = 'level-chip'
+        + (i === this.levelIndex ? ' current' : '')
+        + (unlocked ? '' : ' locked');
+      const best = this.career.finished[lv.id];
+      const bestTxt = best
+        ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
+        : (unlocked ? '★ UNRACED' : '');
+      card.innerHTML = `<div class="wc-shot" style="background-image:url('assets/previews/w${lv.id}.jpg')">
+          <canvas class="wc-map" width="72" height="52"></canvas>
+        </div>
+        <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
+        <div class="wc-tags">${WORLD_TAGS[lv.theme] || ''}</div>
+        <div class="wc-best${best ? '' : ' new'}">${bestTxt}</div>`;
+      this._drawCircuitMap(card.querySelector('.wc-map'), lv.theme, !unlocked, i === this.levelIndex);
+      card.addEventListener('click', () => {
+        if (i === this.levelIndex) return;
+        if (!this.isLevelUnlocked(lv.id)) {
+          card.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
+            { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
+          return;
+        }
+        this.fadeTo(`?level=${lv.id}${this.unlockAll ? '&unlockall=1' : ''}`);
+      });
+      rowFor(lv).appendChild(card);
+    });
+  }
+
+  /** The named car's own upgrade levels — upgrades belong to one machine. */
+  carUpgrades(carKey = this.cars.selected) {
+    const g = this.garage;
+    g.upgrades ??= {};
+    const up = g.upgrades[carKey] ??= {};
+    for (const u of UPGRADES) up[u.key] ??= 0;
+    return up;
+  }
+
+  /** Apply the SELECTED car's purchased upgrades to the player (base stats
+   *  captured once per machine — swapPlayerCar clears the capture). */
   applyUpgrades() {
     const p = this.player;
     if (!this._base) this._base = { maxSpeed: p.maxSpeed, maxHealth: p.maxHealth };
-    const g = this.garage;
+    const g = this.carUpgrades();
     p.maxSpeed = this._base.maxSpeed * (1 + 0.04 * g.engine);
     p.maxHealth = this._base.maxHealth + 15 * g.armor;
     p.health = p.maxHealth;
@@ -540,6 +749,7 @@ class Game {
     p.handling = 0.2 * (g.handling || 0);
     p.gripBoost = 1 + 0.04 * (g.tires || 0);
     p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
+    p.assist = { pro: 0, standard: 0.5, assist: 1 }[this.assistSetting] ?? 0.5;
   }
 
   /** Draw a smoothed closed track outline on a world-card canvas. */
@@ -641,10 +851,10 @@ class Game {
           }
           this.garage.credits -= car.price;
           this.cars.owned.push(car.key);
-          saveJSON('ir-garage', this.garage);
+          saveJSON(this._pkey('garage'), this.garage);
         }
         this.cars.selected = car.key;
-        saveJSON('ir-cars', this.cars);
+        saveJSON(this._pkey('cars'), this.cars);
         // live swap — no reload, the menu stays exactly where you are
         this.swapPlayerCar(car);
         this.renderCarShop();
@@ -657,10 +867,15 @@ class Game {
 
   renderGarage() {
     document.getElementById('credits').textContent = this.garage.credits.toLocaleString();
+    // the panel shows and edits the SELECTED car's own levels
+    const up = this.carUpgrades();
+    const carName = CAR_CATALOG.find((c) => c.key === this.cars.selected)?.name ?? '';
+    const head = document.getElementById('garage-up-head');
+    if (head) head.textContent = `DETAILED UPGRADES — ${carName}`;
     const rows = document.getElementById('garage-rows');
     rows.innerHTML = '';
     for (const u of UPGRADES) {
-      const lvl = this.garage[u.key];
+      const lvl = up[u.key];
       const row = document.createElement('div');
       row.className = 'up-row';
       const pips = Array.from({ length: u.max },
@@ -680,8 +895,8 @@ class Game {
         btn.addEventListener('click', () => {
           if (this.garage.credits < cost) return;
           this.garage.credits -= cost;
-          this.garage[u.key]++;
-          saveJSON('ir-garage', this.garage);
+          up[u.key]++; // this car only — every other machine keeps its own build
+          saveJSON(this._pkey('garage'), this.garage);
           this.applyUpgrades();
           this.renderGarage();
         });
@@ -689,6 +904,278 @@ class Game {
       row.appendChild(btn);
       rows.appendChild(row);
     }
+  }
+
+  // ---------- player profiles (menu header chip + panel) ----------
+  _initProfileUI() {
+    const chip = document.getElementById('profile-chip');
+    const screenEl = document.getElementById('profile-screen');
+    if (!chip || !screenEl) return;
+    document.getElementById('profile-name').textContent = this.profile.name;
+    chip.addEventListener('click', () => {
+      this._renderProfiles();
+      screenEl.classList.remove('hidden');
+    });
+    document.getElementById('profile-close').addEventListener('click', () => screenEl.classList.add('hidden'));
+    // the name input must never fight the game's window-level key handlers
+    // (it only exists on the title screen, but keys are captured globally):
+    // keystrokes stop at the field while typing
+    const input = document.getElementById('profile-name-input');
+    for (const ev of ['keydown', 'keyup', 'keypress']) {
+      input.addEventListener(ev, (e) => {
+        e.stopPropagation();
+        if (ev === 'keydown' && e.key === 'Enter') document.getElementById('profile-create-btn').click();
+      });
+    }
+    input.addEventListener('input', () => {
+      // live cleanup (uppercase A-Z 0-9 space dash, ≤10) without eating the
+      // caret on every keystroke — only rewrite when something was illegal
+      const clean = input.value.toUpperCase().replace(/[^A-Z0-9 \-]/g, '').slice(0, 10);
+      if (input.value !== clean) input.value = clean;
+    });
+    document.getElementById('profile-create-btn').addEventListener('click', () => this._createProfile());
+  }
+
+  _renderProfiles() {
+    const reg = this.profiles;
+    const listEl = document.getElementById('profile-list');
+    listEl.innerHTML = '';
+    for (const p of reg.list) {
+      // per-profile career summary read straight from its namespaced keys
+      const career = loadJSON(profileKey(p.id, 'career'), { finished: {} });
+      const garage = loadJSON(profileKey(p.id, 'garage'), { credits: 0 });
+      const worlds = Object.values(career.finished).filter((f) => f && f.place <= 3).length;
+      const active = p.id === reg.active;
+      const row = document.createElement('div');
+      row.className = 'prof-row' + (active ? ' active' : '');
+      row.innerHTML = `<span class="prof-dot" style="background:${p.color}"></span>
+        <span class="prof-info"><b>${p.name}</b>
+          <small>${worlds} WORLD${worlds === 1 ? '' : 'S'} · ${(garage.credits ?? 0).toLocaleString()} CR</small></span>`;
+      if (active) {
+        const tag = document.createElement('span');
+        tag.className = 'prof-active';
+        tag.textContent = '● DRIVING';
+        row.appendChild(tag);
+      } else {
+        const sw = document.createElement('button');
+        sw.className = 'up-buy prof-btn';
+        sw.textContent = 'SWITCH';
+        sw.addEventListener('click', () => this._switchProfile(p.id));
+        row.appendChild(sw);
+      }
+      const ren = document.createElement('button');
+      ren.className = 'up-buy prof-btn';
+      ren.textContent = '✎';
+      ren.title = 'Rename profile';
+      ren.addEventListener('click', () => this._editProfileName(row, p));
+      row.appendChild(ren);
+      // DELETE removes the driver entirely (RESET, below, keeps them and
+      // empties them). Always offered — deleting the last profile hands the
+      // device to a fresh PLAYER 01 rather than leaving an empty registry.
+      const del = document.createElement('button');
+      del.className = 'up-buy prof-btn danger';
+      del.id = active ? 'profile-del-btn' : '';
+      del.textContent = '✕';
+      del.title = 'Delete profile';
+      this._armConfirm(del, '✕', 'DELETE?', () => this._deleteProfile(p.id));
+      row.appendChild(del);
+      listEl.appendChild(row);
+    }
+    this._renderResetBlock();
+    const cap = reg.list.length >= MAX_PROFILES;
+    document.getElementById('profile-create').style.display = cap ? 'none' : '';
+    document.getElementById('profile-cap-note').style.display = cap ? '' : 'none';
+    this._renderSwatches();
+  }
+
+  /** Two-tap confirm. The first tap ARMS the button (it says `armed` and goes
+   *  hot); only a second tap inside CONFIRM_MS runs the action, and the arm
+   *  relaxes by itself. Careers are not something a fat thumb may delete. */
+  _armConfirm(btn, idle, armed, run) {
+    const relax = () => {
+      clearTimeout(btn._armT);
+      delete btn.dataset.arm;
+      btn.classList.remove('armed');
+      btn.textContent = idle;
+    };
+    btn.addEventListener('click', () => {
+      if (btn.dataset.arm) { relax(); run(); return; }
+      btn.dataset.arm = '1';
+      btn.classList.add('armed');
+      btn.textContent = armed;
+      btn._armT = setTimeout(relax, CONFIRM_MS);
+    });
+    return btn;
+  }
+
+  /** DANGER ZONE: wipe the ACTIVE driver's career but keep the driver. The
+   *  loss line spells out exactly what dies so the confirm is informed. */
+  _renderResetBlock() {
+    const box = document.getElementById('profile-reset');
+    if (!box) return;
+    const p = this.profile;
+    const worlds = Object.values(this.career.finished ?? {}).filter((f) => f && f.place <= 3).length;
+    const cars = this.cars.owned.length;
+    const ups = Object.values(this.garage.upgrades ?? {})
+      .reduce((n, set) => n + Object.values(set).reduce((a, b) => a + (b || 0), 0), 0);
+    const loss = document.getElementById('profile-reset-loss');
+    if (loss) {
+      loss.textContent = `${p.name}: ${(this.garage.credits ?? 0).toLocaleString()} CR · `
+        + `${worlds} WORLD${worlds === 1 ? '' : 'S'} · ${cars} CAR${cars === 1 ? '' : 'S'} · `
+        + `${ups} UPGRADE${ups === 1 ? '' : 'S'} — ALL LOST`;
+    }
+    const old = document.getElementById('profile-reset-btn');
+    if (!old) return;
+    // rebuild the button so a stale armed state never survives a re-render
+    const btn = old.cloneNode(false);
+    btn.textContent = 'RESET CAREER';
+    this._armConfirm(btn, 'RESET CAREER', 'CONFIRM RESET?', () => this._resetCareer(this.profile.id));
+    old.replaceWith(btn);
+  }
+
+  /** Erase one profile's whole career and re-seed factory defaults. Storage
+   *  is cleared BY PREFIX (see wipeProfileData) so nothing a later feature
+   *  parks in the namespace survives. The active driver's menu re-renders
+   *  live — no reload — unless the world they're sitting on just relocked. */
+  _resetCareer(id) {
+    const keys = wipeProfileData(id);
+    if (id !== this.profile.id) { this._renderProfiles(); return keys; }
+    this.career = { finished: {} };
+    this.garage = { credits: 0, upgrades: {} };
+    this.cars = { owned: [STARTER_CAR], selected: STARTER_CAR };
+    saveJSON(this._pkey('career'), this.career);
+    saveJSON(this._pkey('garage'), this.garage);
+    saveJSON(this._pkey('cars'), this.cars);
+    // back to the stock starter machine, live
+    const starter = CAR_CATALOG.find((c) => c.key === STARTER_CAR) ?? CAR_CATALOG[0];
+    this.swapPlayerCar(starter);
+    this.renderCarShop();
+    this.renderGarage();
+    this._renderLevelCards();
+    this._renderProfiles();
+    this.hud?.feed?.('CAREER RESET — BACK TO THE STARTING GRID', 'info');
+    // sitting on a world the fresh career hasn't unlocked? that world is no
+    // longer legally raceable, and only a reload can rebuild the track.
+    if (!this.isLevelUnlocked(this.level.id)) this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+    return keys;
+  }
+
+  _renderSwatches() {
+    const sw = document.getElementById('profile-swatches');
+    sw.innerHTML = '';
+    this._newColor ??= PROFILE_COLORS[this.profiles.list.length % PROFILE_COLORS.length];
+    for (const c of PROFILE_COLORS) {
+      const b = document.createElement('button');
+      b.className = 'prof-swatch' + (c === this._newColor ? ' sel' : '');
+      b.style.background = c;
+      b.addEventListener('click', () => { this._newColor = c; this._renderSwatches(); });
+      sw.appendChild(b);
+    }
+  }
+
+  /** Inline rename: the row's name becomes a text field until Enter or blur.
+   *  Esc abandons the edit. Names sanitize exactly like a new profile's. */
+  _editProfileName(row, p) {
+    const info = row.querySelector('.prof-info');
+    if (!info || info.querySelector('input')) return;
+    const b = info.querySelector('b');
+    const inp = document.createElement('input');
+    inp.className = 'prof-rename';
+    inp.maxLength = 10;
+    inp.value = p.name;
+    inp.autocomplete = 'off';
+    inp.spellcheck = false;
+    b.replaceWith(inp);
+    // keystrokes must stop here — the game's key handlers are window-level
+    for (const ev of ['keydown', 'keyup', 'keypress']) {
+      inp.addEventListener(ev, (e) => {
+        e.stopPropagation();
+        if (ev !== 'keydown') return;
+        if (e.key === 'Enter') inp.blur();
+        else if (e.key === 'Escape') { inp.dataset.cancel = '1'; inp.blur(); }
+      });
+    }
+    inp.addEventListener('input', () => {
+      const clean = inp.value.toUpperCase().replace(/[^A-Z0-9 \-]/g, '').slice(0, 10);
+      if (inp.value !== clean) inp.value = clean;
+    });
+    inp.addEventListener('blur', () => {
+      if (!inp.dataset.cancel) this._renameProfile(p.id, inp.value);
+      this._renderProfiles();
+    });
+    inp.focus();
+    inp.select();
+  }
+
+  /** Rename in the registry (careers live under the id, so nothing moves). */
+  _renameProfile(id, raw) {
+    const p = this.profiles.list.find((x) => x.id === id);
+    const name = sanitizeProfileName(raw);
+    if (!p || !name || name === p.name) return false;
+    p.name = name;
+    saveJSON('ir-profiles', this.profiles);
+    if (id === this.profile.id) {
+      this.profile.name = name;
+      const chip = document.getElementById('profile-name');
+      if (chip) chip.textContent = name;
+    }
+    return true;
+  }
+
+  _createProfile() {
+    const reg = this.profiles;
+    if (reg.list.length >= MAX_PROFILES) return;
+    const input = document.getElementById('profile-name-input');
+    const name = sanitizeProfileName(input.value);
+    if (!name) {
+      input.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
+        { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
+      input.focus();
+      return;
+    }
+    const id = Math.max(0, ...reg.list.map((p) => p.id)) + 1;
+    reg.list.push({ id, name, color: this._newColor ?? PROFILE_COLORS[0], created: Date.now() });
+    reg.active = id;
+    saveJSON('ir-profiles', reg);
+    // fresh careers start at world 1 — reload through the standard fade
+    this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+  }
+
+  _switchProfile(id) {
+    const reg = this.profiles;
+    if (id === reg.active || !reg.list.some((p) => p.id === id)) return;
+    reg.active = id;
+    saveJSON('ir-profiles', reg);
+    // reload via the standard fade; the constructor's locked-level guard drops
+    // the new driver back to world 1 if this track isn't unlocked for them
+    this.fadeTo(`?level=${this.level.id}${this.unlockAll ? '&unlockall=1' : ''}`);
+  }
+
+  _deleteProfile(id) {
+    const reg = this.profiles;
+    const i = reg.list.findIndex((p) => p.id === id);
+    if (i < 0) return;
+    reg.list.splice(i, 1);
+    wipeProfileData(id); // by prefix — the same one path a reset uses
+    if (!reg.list.length) {
+      // the registry may never be empty: the device falls back to a brand-new
+      // driver instead of booting into a profile-less void
+      reg.list.push({ id: 1, name: 'PLAYER 01', color: PROFILE_COLORS[0], created: Date.now() });
+      reg.active = 1;
+      wipeProfileData(1);
+      saveJSON('ir-profiles', reg);
+      this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+      return;
+    }
+    if (reg.active === id) {
+      // deleted the active driver: hand the wheel to the first remaining one
+      reg.active = reg.list[0].id;
+      saveJSON('ir-profiles', reg);
+      this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+      return;
+    }
+    saveJSON('ir-profiles', reg);
+    this._renderProfiles();
   }
 
   // ---------- pickups ----------
@@ -817,6 +1304,14 @@ class Game {
   // shows the chain and its remaining time.
   style(basePts, label) {
     if (this.state !== 'race') return;
+    // contract counters ride the existing style events (labels are the
+    // activation signals vehicles.js already emits — no hooks added there)
+    const ct = this._ct;
+    if (ct) {
+      if (label === 'SLIPSTREAM') ct.drafts++;
+      else if (label === 'BIG AIR') ct.bigAirs++;
+      else if (label === 'CLOSE CALL') ct.closeCalls++;
+    }
     this.comboN = Math.min(12, (this.comboN ?? 0) + 1);
     this.comboT = 5;
     const mult = Math.min(4, 1 + this.comboN * 0.25);
@@ -856,6 +1351,91 @@ class Game {
     }
   }
 
+  // ---------- race contracts (the money game) ----------
+  // 3 side objectives per race, seeded per level+day+difficulty so a given
+  // world offers the same slate all day. Completions pay into contractCredits,
+  // folded into `earned` at finishRace. Never offered in free roam.
+  _pickContracts() {
+    const pool = CONTRACT_POOL.filter((c) => !c.gate || c.gate(this));
+    const day = Math.floor(Date.now() / 864e5);
+    let s = ((this.level.id * 73856093) ^ (day * 19349663)
+      ^ (this.difficulty.id.charCodeAt(0) * 83492791)) >>> 0;
+    const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+    const arr = [...pool];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = (rnd() * (i + 1)) | 0;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    const picks = arr.slice(0, 3);
+    // never deal three long-shots: at least one slot is a `sure` contract any
+    // driver can actively complete regardless of world or finishing position
+    if (!picks.some((c) => c.sure)) {
+      const sure = arr.slice(3).filter((c) => c.sure);
+      if (sure.length) picks[2] = sure[(rnd() * sure.length) | 0];
+    }
+    return picks.map((c) => ({ ...c, done: false }));
+  }
+
+  /** Per-frame contract bookkeeping. Only ever OBSERVES state other systems
+   *  already expose (heat/ammo/health deltas, _draftOn is counted via the
+   *  style() labels) — no hooks into files owned by the other agents. */
+  _updateContracts() {
+    if (this.freeRoam || this.state !== 'race' || !this.contracts?.length) return;
+    const ct = this._ct, p = this.player;
+    if (!ct) return;
+    // weapon-fire detection by state transition (cannon heats, ammo drops,
+    // shock cooldown jumps) — input alone would count dry-fires
+    if (p.heat > (ct.prevHeat ?? 0) + 1e-4) ct.weaponFired = true;
+    if (ct.prevMissiles !== null && p.missiles < ct.prevMissiles) ct.weaponFired = true;
+    if (ct.prevMines !== null && p.mines < ct.prevMines) ct.weaponFired = true;
+    if (p.shockCooldown > (ct.prevShock ?? 0) + 1) ct.weaponFired = true;
+    ct.prevHeat = p.heat; ct.prevMissiles = p.missiles;
+    ct.prevMines = p.mines; ct.prevShock = p.shockCooldown;
+    // hull-damage detection for CLEAN LAP: any health drop marks the lap
+    // (regen/pickups only ever raise it, so a drop is always damage)
+    if (ct.prevHealth !== null && p.alive && p.health < ct.prevHealth - 1e-3) ct.lapDamaged = true;
+    ct.prevHealth = p.alive ? p.health : null;
+    // style-combo high-water mark
+    if ((this.comboT ?? 0) > 0) {
+      ct.comboMax = Math.max(ct.comboMax, Math.min(4, 1 + (this.comboN ?? 0) * 0.25));
+    }
+    for (const c of this.contracts) {
+      if (!c.done && !c.atFinish && c.check && c.check(this, ct)) this._completeContract(c);
+    }
+    this.hud.setContracts?.(this.contracts, ct); // diffed inside — cheap
+  }
+
+  _completeContract(c) {
+    if (c.done) return;
+    c.done = true;
+    this.contractCredits = (this.contractCredits ?? 0) + c.pay;
+    this.hud.feed(`CONTRACT: ${c.label}  +${c.pay} CR`, 'good');
+    this.hud.setContracts?.(this.contracts, this._ct);
+    this.audio.pickup?.();
+    this.buzz([20, 30, 20]);
+  }
+
+  _tryContract(id) {
+    const c = this.contracts?.find((x) => x.id === id && !x.done);
+    if (c) this._completeContract(c);
+  }
+
+  /** Lap `lapNo` just completed — resolve the lap-boundary contracts. */
+  _lapContracts(lapNo) {
+    const ct = this._ct;
+    if (!this.contracts?.length || !ct) return;
+    if (!ct.lapDamaged) this._tryContract('cleanlap');
+    ct.lapDamaged = false;
+    if (lapNo === 1 && this.playerRank === 1) this._tryContract('start');
+  }
+
+  _checkFinishContracts(rank) {
+    if (!this.contracts?.length || !this._ct) return;
+    for (const c of this.contracts) {
+      if (!c.done && c.atFinish && c.check(this, this._ct, rank)) this._completeContract(c);
+    }
+  }
+
   // rivals have opinions: short barks when the position changes hands
   _updateTaunts() {
     const r = this.playerRank;
@@ -878,6 +1458,187 @@ class Game {
       }
     }
     this._lastRank = r;
+  }
+
+  // ---------- livestock: cows, sheep, deer that live in the world ----------
+  // They graze in herds out in the pastures, scatter when a car comes at them,
+  // and a full-speed collision is a real event: heavy for you, fatal for them.
+  _buildLivestock() {
+    this.herds = [];
+    const t = this.track;
+    // a theme may declare its own; otherwise pick what belongs in that biome
+    // (deserts, lava fields and city tunnels simply have no grazing herds)
+    const spec = t.T?.livestock ?? LIVESTOCK_BY_THEME[this.level?.theme];
+    if (!spec) return;
+    const spots = (t.pastures?.length ? t.pastures : null)
+      ?? Array.from({ length: 5 }, (_, k) => {
+        const idx = Math.floor(t.N * (k + 0.5) / 5);
+        const lat = (k % 2 ? -1 : 1) * (26 + (k * 9) % 20);
+        const c = t.pointAt(idx, 0), n = t.nrm[idx];
+        return { x: c.x + n.x * lat, z: c.z + n.z * lat, r: 12 };
+      });
+    // per-species stats: `flee` = sprint speed when spooked (default 11),
+    // `spookR` = how close a car gets before they run (default 18),
+    // `amble` = grazing walk speed (default 0.9). Damage stays 10+22×mass.
+    const KINDS = {
+      cow:      { body: 0xf2efe6, spot: 0x2b2521, w: 1.5,  h: 1.5,  d: 2.6, mass: 1.0,  pts: 60 },
+      sheep:    { body: 0xe8e4d8, spot: 0x3a3128, w: 1.0,  h: 1.0,  d: 1.6, mass: 0.5,  pts: 40 },
+      deer:     { body: 0xa9764a, spot: 0x6b4526, w: 1.0,  h: 1.3,  d: 2.0, mass: 0.6,  pts: 80 },
+      goat:     { body: 0xd9d5c9, spot: 0x77705f, w: 0.85, h: 1.0,  d: 1.5, mass: 0.45, pts: 50, flee: 13 },
+      camel:    { body: 0xcfa05f, spot: 0x8a6a3c, w: 1.3,  h: 2.2,  d: 2.9, mass: 0.9,  pts: 70, flee: 9, amble: 0.55 },
+      boar:     { body: 0x4a3222, spot: 0x2e2014, w: 0.95, h: 0.75, d: 1.6, mass: 0.55, pts: 55, flee: 12 },
+      capybara: { body: 0x9a6f42, spot: 0x6e4e2c, w: 0.9,  h: 0.7,  d: 1.4, mass: 0.5,  pts: 90, flee: 8, spookR: 10 },
+    };
+    // roster shifts per world so two worlds on the same roster don't open with
+    // the same species, and one animal in four is the NEXT species along —
+    // herds read mixed instead of cloned
+    const roster = spec.kinds.filter((k) => KINDS[k]);
+    if (!roster.length) return;
+    const shift = (this.level?.id ?? 0) % roster.length;
+    for (let s = 0; s < spots.length; s++) {
+      const spot = spots[s];
+      const lead = (s + shift) % roster.length;
+      const n = spec.perHerd ?? 4;
+      for (let k = 0; k < n; k++) {
+        const kind = roster[(lead + (Math.random() < 0.26 ? 1 : 0)) % roster.length];
+        const K = KINDS[kind];
+        const a = (k / n) * Math.PI * 2;
+        const rr = (spot.r ?? 12) * 0.55;
+        const x = spot.x + Math.cos(a) * rr, z = spot.z + Math.sin(a) * rr;
+        const g = new THREE.Group();
+        const bodyMat = new THREE.MeshStandardMaterial({ color: K.body, roughness: 0.92 });
+        const darkMat = new THREE.MeshStandardMaterial({ color: K.spot, roughness: 0.95 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(K.w, K.h * 0.75, K.d), bodyMat);
+        body.position.y = K.h * 0.75;
+        body.castShadow = true;
+        g.add(body);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.62, K.h * 0.5, K.d * 0.34), bodyMat);
+        head.position.set(0, K.h * 0.98, K.d * 0.56);
+        g.add(head);
+        if (kind === 'deer') { // antlers
+          for (const sx of [-1, 1]) {
+            const ant = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.08), darkMat);
+            ant.position.set(sx * 0.22, K.h * 1.34, K.d * 0.5);
+            g.add(ant);
+          }
+        } else if (kind === 'cow') { // patches
+          const patch = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.5, K.h * 0.3, K.d * 0.35), darkMat);
+          patch.position.set(K.w * 0.28, K.h * 0.85, -K.d * 0.12);
+          g.add(patch);
+        } else if (kind === 'goat') { // little swept-back horns
+          for (const sx of [-1, 1]) {
+            const horn = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.3, 0.07), darkMat);
+            horn.position.set(sx * 0.14, K.h * 1.28, K.d * 0.46);
+            horn.rotation.x = -0.55;
+            g.add(horn);
+          }
+        } else if (kind === 'camel') { // neck block up to a raised head + hump
+          head.position.y = K.h * 1.34; // the default head sits at cow height
+          const neck = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.34, K.h * 0.6, K.w * 0.36), bodyMat);
+          neck.position.set(0, K.h * 1.02, K.d * 0.44);
+          g.add(neck);
+          const hump = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.62, K.h * 0.26, K.d * 0.34), darkMat);
+          hump.position.set(0, K.h * 1.18, -K.d * 0.08);
+          g.add(hump);
+        } else if (kind === 'boar') { // low snout
+          const snout = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.3, K.h * 0.3, K.d * 0.2), darkMat);
+          snout.position.set(0, K.h * 0.8, K.d * 0.7);
+          g.add(snout);
+        } else if (kind === 'capybara') { // blunt rounded muzzle, sits low
+          head.position.set(0, K.h * 0.86, K.d * 0.5);
+          head.scale.set(1.15, 0.9, 1.2);
+        }
+        // camels carry their bulk on long legs; everyone else is knee-high
+        const legH = kind === 'camel' ? K.h * 0.68 : K.h * 0.55;
+        const legY = kind === 'camel' ? K.h * 0.36 : K.h * 0.28;
+        for (const [lx, lz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, legH, 0.16), darkMat);
+          leg.position.set(lx * K.w * 0.32, legY, lz * K.d * 0.3);
+          g.add(leg);
+        }
+        g.position.set(x, t.terrainHeight?.(x, z) ?? 0, z);
+        g.rotation.y = a;
+        g.scale.setScalar(0.85 + Math.random() * 0.3); // ±15% so herds aren't clones
+        this.scene.add(g);
+        this.herds.push({ kind, K, x, z, homeX: spot.x, homeZ: spot.z, homeR: spot.r ?? 12,
+          ang: a, mesh: g, alive: true, spooked: 0, y: g.position.y, _yT: 0, bob: k * 1.7 });
+      }
+    }
+  }
+
+  _updateLivestock(dt, time) {
+    if (!this.herds?.length) return;
+    const t = this.track;
+    const cars = (this._carsAll ??= [this.player, ...this.enemies]);
+    for (const a of this.herds) {
+      if (!a.alive) continue;
+      // spook: a car inside the species' comfort radius (18u default; calm
+      // capybaras let cars within 10u) sends them running directly away
+      const sr = a.K.spookR ?? 18;
+      let flee = null;
+      for (const car of cars) {
+        if (!car.alive) continue;
+        const dx = a.x - car.pos.x, dz = a.z - car.pos.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < sr * sr) { flee = { dx, dz, d: Math.sqrt(d2) || 0.01 }; break; }
+      }
+      let speed;
+      if (flee) {
+        a.spooked = 1.6;
+        a.ang = Math.atan2(flee.dx, flee.dz);
+        speed = a.K.flee ?? 11; // nimble goats bolt, camels lope
+      } else if (a.spooked > 0) {
+        a.spooked -= dt;
+        speed = (a.K.flee ?? 11) * 0.62;
+      } else {
+        // graze: amble slowly, drifting back toward the middle of the pasture
+        a.ang += Math.sin(time * 0.4 + a.bob) * 0.5 * dt;
+        if (Math.hypot(a.x - a.homeX, a.z - a.homeZ) > a.homeR)
+          a.ang = Math.atan2(a.homeX - a.x, a.homeZ - a.z);
+        speed = a.K.amble ?? 0.9;
+      }
+      a.x += Math.sin(a.ang) * speed * dt;
+      a.z += Math.cos(a.ang) * speed * dt;
+      a._yT -= dt;
+      if (a._yT <= 0) { a._yT = 0.25; a.y = t.terrainHeight?.(a.x, a.z) ?? 0; }
+      a.mesh.position.set(a.x, a.y, a.z);
+      a.mesh.rotation.y = a.ang;
+      // running animation: a little vertical bounce while spooked
+      if (a.spooked > 0) a.mesh.position.y += Math.abs(Math.sin(time * 11 + a.bob)) * 0.16;
+
+      // collision — a cow is a lot of animal to hit at speed
+      for (const car of cars) {
+        if (!car.alive) continue;
+        const d = Math.hypot(car.pos.x - a.x, car.pos.z - a.z);
+        if (d > 1.6 + a.K.w * 0.5) continue;
+        const sp = Math.hypot(car.vel.x, car.vel.z);
+        if (sp < 4) { // nudging — they just get out of the way
+          a.ang = Math.atan2(a.x - car.pos.x, a.z - car.pos.z);
+          a.spooked = 1.6;
+          break;
+        }
+        a.alive = false;
+        a.mesh.visible = false;
+        const at = new THREE.Vector3(a.x, a.y + 0.8, a.z);
+        this.particles.debris(at, 4);
+        this.particles.splinters(at, new THREE.Vector3(0, 1, 0), [a.K.body, a.K.spot], 0.8);
+        car.vel.multiplyScalar(1 - 0.30 * a.K.mass);          // big animal, big drag
+        if (car === this.player) {
+          // rate-limited: ploughing a whole herd should be costly and
+          // memorable, not an instant wreck from four hits in one second
+          if (this.raceTime - (this._stockHurt ?? -9) > 0.8) {
+            this._stockHurt = this.raceTime;
+            car.damage(10 + 22 * a.K.mass, null);
+            this.crashDrama?.();
+            this.hud.feed(`HIT A ${a.kind.toUpperCase()}!  −${Math.round(10 + 22 * a.K.mass)} HULL`, 'bad');
+            this.buzz([50, 30, 50]);
+          }
+          this.style?.(a.K.pts, 'LIVESTOCK'); // grim, but it is a combat racer
+          if (this._ct) this._ct.livestock++; // HERDSMAN contract is now lost
+        }
+        break;
+      }
+    }
   }
 
   // ---------- free-roam treasure stars ----------
@@ -1321,6 +2082,46 @@ class Game {
     for (let i = this.flyingProps.length - 1; i >= 0; i--) {
       const f = this.flyingProps[i];
       f.life -= dt;
+      f.age = (f.age ?? 0) + dt;
+      // Heavy chunks are shrapnel: a crate plank or a felled trunk still
+      // carrying real speed hurts whatever it lands on (RULES: debris is
+      // shrapnel). Straw and cones carry no dmg tag and so never bite.
+      if (f.dmg && !f.hit) {
+        const v = Math.hypot(f.vel.x, f.vel.y, f.vel.z);
+        if (v > 8) {
+          const fp = f.mesh.position;
+          for (const car of cars) {
+            if (car.invuln > 0) continue;
+            if (car === f.owner && f.age < 0.45) continue;      // not off your own bumper
+            if (this.raceTime < (car._debrisCd ?? 0)) continue; // 0.5s per-car throttle
+            const dx = car.pos.x - fp.x, dy = car.pos.y - fp.y, dz = car.pos.z - fp.z;
+            if (dx * dx + dy * dy + dz * dz > 4.84) continue;   // 2.2u
+            const dmg = f.dmg * THREE.MathUtils.clamp(v / 25, 0.5, 1.2);
+            car._debrisCd = this.raceTime + 0.5;
+            f.hit = true;
+            this.particles.debrisHit?.(car.pos);
+            if (car === this.player) {
+              // null attacker, not a string: destroy() prints the attacker's
+              // name, and 'debris' would read as "WRECKED BY undefined"
+              car.damage(dmg, null);
+              this.hud.damageFlash(0.35);
+              this.buzz(18);
+              if (this.raceTime - (this._debrisFeedAt ?? -9) > 2) {
+                this._debrisFeedAt = this.raceTime;
+                this.hud.feed('DEBRIS HIT', 'bad');
+              }
+            } else if (f.owner === this.player) {
+              this.onEnemyHit(car, dmg, 'debris'); // keeps kill credit
+              this.score += 40;
+              this.styleBump?.();
+              this.hud.feed('DEBRIS STRIKE  +40', 'good');
+            } else {
+              car.damage(dmg, null);
+            }
+            break;
+          }
+        }
+      }
       f.vel.y -= 24 * dt;
       f.mesh.position.addScaledVector(f.vel, dt);
       f.mesh.rotation.x += f.spin.x * dt;
@@ -1362,14 +2163,20 @@ class Game {
         dir.z * speed * 0.45 + (car ? car.vel.z * 0.4 : 0)),
       spin: new THREE.Vector3((Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11),
       life: 1.5,
+      dmg: DEBRIS_DMG[pr.type] ?? 0, owner: car, age: 0, // shrapnel tag
     });
     const at = new THREE.Vector3(pr.x, (pr.y ?? 0) + 0.6, pr.z);
-    if (this.particles.debris) this.particles.debris(at, 6);
+    // Crush it in its own material — planks, staves, straw, snow or chips in
+    // the prop's own colours. The old generic debris puff made every prop
+    // look identical (RULES: crush bursts).
+    this.particles.propBurst(at, pr.type, dir, Math.min(1, speed / 30),
+      pr.type === 'barrel' ? null : this.track.T?.splinter);
     this.particles.driftSmoke(at);
-    this.particles.dust?.(at, 1);
     this.shake = Math.min(1, this.shake + (car === this.player ? 0.12 : 0.05));
     if (car === this.player) {
       this.score += pr.scoreValue || 25;
+      if (this._ct) this._ct.props++; // DEMOLITION contract
+      this.styleBump();               // RULES §3: a smash extends the chain
       this.buzz(15);
       const pl = this.player;
       if (pr.pickup === 'health') {
@@ -1409,6 +2216,8 @@ class Game {
         : new THREE.Vector3(dir.z * 3.5 + (Math.random() - 0.5) * 2,
           (Math.random() - 0.5) * 4, -dir.x * 3.5 + (Math.random() - 0.5) * 2),
       life: cactus ? 0.85 : 2.2,
+      // a felled trunk is the heaviest thing in flight; a cactus is pulp
+      dmg: cactus ? 0 : DEBRIS_DMG.tree, owner: car, age: 0,
     });
     const at = new THREE.Vector3(tr.x, (tr.y ?? 0) + 1, tr.z);
     this.particles.debris(at, cactus ? 2 : 4);
@@ -1458,9 +2267,7 @@ class Game {
         this.particles.debris(car.pos, Math.min(8, 3 + (impact / 5 | 0)));
         this.particles.dust?.(car.pos, 1.2);
         for (let k = 0; k < Math.min(3, 1 + (impact / 10 | 0)); k++) {
-          const plank = new THREE.Mesh(
-            new THREE.BoxGeometry(1.4, 0.3, 0.1),
-            new THREE.MeshStandardMaterial({ color: cols[k % 2], roughness: 0.9 }));
+          const plank = new THREE.Mesh(PLANK_GEO, plankMat(cols[k % 2]));
           plank.position.set(car.pos.x + nx * 2, car.pos.y + 1 + k * 0.4, car.pos.z + nz * 2);
           this.scene.add(plank);
           this.flyingProps.push({
@@ -1700,6 +2507,14 @@ class Game {
     this.fovKick = 0;
     this.enemySlowUntil = 0;
     this.comboN = 0; this.comboT = 0; this._lastRank = undefined; this._tauntT = -9;
+    // race contracts: fresh slate + counters every race (picked in startRace)
+    this.contracts = [];
+    this.contractCredits = 0;
+    this._ct = { props: 0, rivalKills: 0, drafts: 0, bigAirs: 0, closeCalls: 0,
+      livestock: 0, comboMax: 1, weaponFired: false, lapDamaged: false,
+      prevHealth: null, prevHeat: 0, prevMissiles: null, prevMines: null, prevShock: 0 };
+    this.hud?.setContracts?.([]);
+    for (const a2 of this.herds ?? []) { a2.alive = true; a2.mesh.visible = true; a2.x = a2.homeX; a2.z = a2.homeZ; }
     this._clearWorldHazards?.();
     for (const h of this.husks) this.scene.remove(h.mesh);
     this.husks.length = 0;
@@ -1766,6 +2581,11 @@ class Game {
     this._lastCount = 4;
     this.player.lapStart = 0;
     this.hud.feed(`${this.level.name} — LEVEL ${this.level.id}`, 'info');
+    if (!this.freeRoam) {
+      // contracts run in RACE only — roam money stays pure destruction rate
+      this.contracts = this._pickContracts();
+      this.hud.setContracts?.(this.contracts, this._ct);
+    }
     if (this.freeRoam) {
       // no grid, no countdown — the world is yours (and the choppers')
       this.state = 'race';
@@ -1781,6 +2601,9 @@ class Game {
   onPlayerLap() {
     if (this.freeRoam) { this.score += 100; return; }
     const p = this.player;
+    // contracts that resolve at lap boundaries (lap p.lap-1 just completed) —
+    // BEFORE the finish branch so a clean final lap still counts
+    this._lapContracts(p.lap - 1);
     if (p.lap > this.lapsTotal) { this.finishRace(); return; }
     const lapTime = this.raceTime - p.lapStart;
     p.lapStart = this.raceTime;
@@ -1803,6 +2626,7 @@ class Game {
     this.audio.hit();
     if (killed) {
       this.kills++;
+      if (this._ct) this._ct.rivalKills++; // HEADHUNTER contract
       this.style?.(0, null); // kill extends the chain
       this.score += 250;
       this.player.nitro = Math.min(1, this.player.nitro + 0.25 * (this.player.nitroRate || 1));
@@ -1853,22 +2677,45 @@ class Game {
     // career progress + credits — the economy pays for risk and results:
     // race score scaled by difficulty, plus podium and first-conquest bonuses
     const prev = this.career.finished[this.level.id];
-    const diffMult = { easy: 0.8, normal: 1.0, hard: 1.4 }[this.difficulty.id] ?? 1;
-    const podium = rank <= 3 ? [1200, 700, 400][rank - 1] : 0;
-    const firstClear = (!prev || prev.place > 3) && rank <= 3 ? 1500 : 0;
-    const earned = Math.round(Math.max(0, this.score - (this.startScore ?? 0)) * diffMult)
-      + podium + firstClear;
+    const diffMult = { easy: 0.7, normal: 1.0, hard: 1.5 }[this.difficulty.id] ?? 1;
+    const podium = rank <= 3 ? PODIUM_CR[rank - 1] : 0;
+    const firstClear = (!prev || prev.place > 3) && rank <= 3 ? FIRST_CLEAR_CR : 0;
+    const raceScore = Math.max(0, this.score - (this.startScore ?? 0));
+    // finish-line contracts resolve now (UNTOUCHABLE / PACIFIST / HERDSMAN /
+    // PODIUM ON HARD), then the whole contract pot rides into `earned`
+    this._checkFinishContracts(rank);
+    const contractCr = this.contractCredits ?? 0;
+    const raceCr = Math.round(raceScore * CREDIT_RATE * diffMult);
+    const earned = raceCr + podium + firstClear + contractCr;
     document.getElementById('r-credits').textContent = `+${earned.toLocaleString()}`;
     if (podium) this.hud.feed(`PODIUM BONUS  +${podium} CR`, 'good');
-    if (firstClear) this.hud.feed('WORLD CONQUERED  +1500 CR', 'good');
-    if (diffMult > 1) this.hud.feed('HARD PAYS ×1.4 CREDITS', 'good');
+    if (firstClear) this.hud.feed(`WORLD CONQUERED  +${FIRST_CLEAR_CR} CR`, 'good');
+    if (diffMult !== 1) this.hud.feed(`${this.difficulty.id.toUpperCase()} PAYS ×${diffMult} CREDITS`, 'info');
+    // itemized credits breakdown on the results screen
+    {
+      const box = document.getElementById('credit-breakdown');
+      const rowsEl = document.getElementById('cb-rows');
+      if (box && rowsEl) {
+        let html = `<div class="cb-row"><span>RACE SCORE${diffMult !== 1 ? ` ×${diffMult}` : ''}</span><b>+${raceCr.toLocaleString()}</b></div>`;
+        if (podium) html += `<div class="cb-row"><span>PODIUM — ${sfx}</span><b>+${podium}</b></div>`;
+        if (firstClear) html += `<div class="cb-row"><span>FIRST CONQUEST</span><b>+${firstClear}</b></div>`;
+        for (const c of this.contracts ?? []) {
+          html += c.done
+            ? `<div class="cb-row contract"><span>✓ ${c.label}</span><b>+${c.pay}</b></div>`
+            : `<div class="cb-row missed"><span>✗ ${c.label}</span><b>—</b></div>`;
+        }
+        html += `<div class="cb-row total"><span>TOTAL CREDITS</span><b>+${earned.toLocaleString()}</b></div>`;
+        rowsEl.innerHTML = html;
+        box.style.display = '';
+      }
+    }
     this.garage.credits += earned;
-    saveJSON('ir-garage', this.garage);
+    saveJSON(this._pkey('garage'), this.garage);
     this.career.finished[this.level.id] = {
       place: Math.min(rank, prev?.place ?? 99),
       bestScore: Math.max(earned, prev?.bestScore ?? 0),
     };
-    saveJSON('ir-career', this.career);
+    saveJSON(this._pkey('career'), this.career);
     this.renderGarage();
     const hasNext = this.levelIndex < LEVELS.length - 1;
     const nextUnlocked = hasNext && this.isLevelUnlocked(LEVELS[this.levelIndex + 1].id);
@@ -1944,9 +2791,23 @@ class Game {
   // ---------- camera ----------
   _updateCamera(dt) {
     const p = this.player;
-    const fwd = p.forward;
     const speedZoom = Math.min(1, Math.abs(p.speedAlong) / p.maxSpeed);
     const M = CAM_MODES[this.camMode] || CAM_MODES[0];
+    // Chase views used to sit rigidly behind the car's RAW heading, so every
+    // steering flick and every drift whipped the whole view sideways — that
+    // is what made driving in 3D so hard. The chase yaw now follows a blend
+    // of heading and actual travel direction, damped over time, so the view
+    // stays settled and the road reads straight ahead.
+    let fwd = p.forward;
+    if (M.chase) {
+      const wrap = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+      let yaw = Math.atan2(fwd.x, fwd.z);
+      const sp = Math.hypot(p.vel.x, p.vel.z);
+      if (sp > 5) yaw += wrap(Math.atan2(p.vel.x, p.vel.z) - yaw) * 0.4; // look where you're going
+      const cur = this._camYaw ?? yaw;
+      this._camYaw = cur + wrap(yaw - cur) * Math.min(1, 4.5 * dt);
+      fwd = new THREE.Vector3(Math.sin(this._camYaw), 0, Math.cos(this._camYaw));
+    }
     const targetPos = p.pos.clone()
       .addScaledVector(fwd, -(M.back + speedZoom * (M.spdBack || 0)))
       .add(new THREE.Vector3(0, M.h + speedZoom * (M.spdH || 0), 0));
@@ -2041,6 +2902,7 @@ class Game {
       }
     }
     this.track.update(dt, time);
+    this._updateVizZones(dt); // ---- viz-zones: sectional fog / gloom / squall
 
     if (this.input.justPressed('KeyC')) this.cycleCamera();
     if (this.input.justPressed('KeyP') && (this.state === 'race' || this.state === 'paused')) {
@@ -2063,6 +2925,9 @@ class Game {
         const surf = this.track.T?.surface;
         if (surf === 'snow') this.hud.feed('SNOW ROAD — LOW GRIP, LONG SLIDES', 'info');
         else if (surf === 'wet') this.hud.feed('WET ROAD — SLICK UNDER BRAKING', 'info');
+        for (const c of this.contracts ?? []) {
+          this.hud.feed(`◇ ${c.label}: ${c.desc}  +${c.pay} CR`, 'info');
+        }
       }
     }
 
@@ -2093,8 +2958,10 @@ class Game {
         this._updateProps(dt);
         this._updateWorldHazards(dt, time);
         this._updateCombo(dt);
+        this._updateContracts();
         this._updateTaunts();
         this._updateRoamStars(time);
+        this._updateLivestock(dt, time);
       }
       if (this.freeRoam) this.playerRank = 1;
       else this._updateRank();
@@ -2128,6 +2995,65 @@ class Game {
     this._autoQuality();
     this.composer.render();
   }
+
+  // ---- viz-zones -----------------------------------------------------------
+  /** Sectional visibility: while the player's trackIndex is inside one of
+   *  track.vizZones ('forest' tree tunnel / 'fogbank' / 'squall'), smoothly
+   *  pull scene.fog in toward the zone's impaired values and back out again
+   *  on exit (~1.5s each way, far floored at 110 so it stays playable).
+   *  Squalls also double the ambient rain rate while inside. Defensive:
+   *  no-ops entirely when the track build predates the feature. */
+  _updateVizZones(dt) {
+    const t = this.track, fog = this.scene?.fog;
+    if (!t || !fog || !(dt > 0)) return;
+    if (this._vizTrack !== t) {           // fresh world: reset all zone state
+      // theme.weather is a SHARED module constant — hand back any squall
+      // multiplier before letting go of it, or the x2 compounds next race
+      if (this._vizRainW && this._vizBaseRain !== undefined) this._vizRainW.rate = this._vizBaseRain;
+      this._vizTrack = t;
+      this._vizRainW = null;
+      this._vizBaseRain = undefined;
+      this._vizZoneLast = null;
+    }
+    const p = this.player;
+    let zone = null;
+    if (t.vizZones && t.vizZones.length && p
+        && (this.state === 'race' || this.state === 'finished' || this.state === 'paused')) {
+      for (const z of t.vizZones) {
+        const d = (p.trackIndex - z.i0 + t.N) % t.N;
+        if (d <= z.len) { zone = z; break; }
+      }
+    }
+    const baseNear = t.theme?.fogNear ?? 320;
+    const baseFar = t.theme?.fogFar ?? 1500;
+    let wantNear = baseNear, wantFar = baseFar;
+    if (zone) {
+      const s = zone.strength ?? 1;
+      if (zone.kind === 'fogbank') { wantNear = 20; wantFar = 140 / s; }
+      else if (zone.kind === 'squall') { wantNear = 40; wantFar = 180; }
+      else { wantNear = 45; wantFar = 200; }   // forest: the gloom decal + trees do the rest
+      wantFar = Math.min(baseFar, Math.max(110, wantFar));
+      wantNear = Math.min(baseNear, wantNear);
+      if (this._vizZoneLast !== zone
+          && (this.raceTime ?? 0) - (this._vizFeedAt ?? -99) > 4) {
+        this._vizFeedAt = this.raceTime ?? 0;
+        this.hud?.feed?.(zone.kind === 'fogbank' ? 'FOG BANK'
+          : zone.kind === 'squall' ? 'DOWNPOUR' : 'INTO THE TREES', 'info');
+      }
+    }
+    this._vizZoneLast = zone;
+    const k = Math.min(1, 2.2 * dt);      // ≈96% of the way in 1.5s, both directions
+    fog.near += (wantNear - fog.near) * k;
+    fog.far += (wantFar - fog.far) * k;
+    // squalls double the downpour on top of the fog pull (rain worlds only —
+    // that is why track.js only ever places 'squall' on a wet theme)
+    const w = t.theme?.weather;
+    if (w && w.type === 'rain') {
+      if (this._vizRainW !== w) { this._vizRainW = w; this._vizBaseRain = w.rate ?? 230; }
+      w.rate = this._vizBaseRain * (zone && zone.kind === 'squall' ? 2 : 1);
+    }
+  }
+  // ---- end viz-zones -------------------------------------------------------
 
   /** Adaptive quality governor: if sustained fps sags mid-race, step down —
    *  render scale first, then shadows, then bloom — so weak phones self-tune

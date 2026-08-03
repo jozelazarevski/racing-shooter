@@ -56,7 +56,10 @@ const boot = async (q) => {
     g.weapons.dropMine(p);
     const m = g.weapons.mines[g.weapons.mines.length - 1];
     await new Promise(r2 => setTimeout(r2, 1200));
-    for (let w = 0; w < 25 && e.health > 99; w++) {
+    // Hold the rival on the mine until the BLAST lands, not merely until its
+    // health first moves: a smashed prop's debris can clip it for a few hull
+    // first, and stopping there reports the shrapnel instead of the mine.
+    for (let w = 0; w < 25 && e.health > 60; w++) {
       e.pos.set(m.pos.x, m.pos.y, m.pos.z);
       await new Promise(r2 => setTimeout(r2, 200));
     }
@@ -119,7 +122,10 @@ const boot = async (q) => {
     }, 25);
   });
   let shown = false;
-  for (let i = 0; i < 300 && !shown; i++) {
+  // 5 minutes of wall clock. A race is a genuine 3 laps since the grid stopped
+  // gifting a free one, and headless game time runs several times slower than
+  // wall — on a loaded box the old 150s budget expired around lap 3.
+  for (let i = 0; i < 600 && !shown; i++) {
     await page.waitForTimeout(500);
     shown = await page.evaluate(() => {
       const el = document.getElementById('results');

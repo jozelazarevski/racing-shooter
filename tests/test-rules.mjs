@@ -4,14 +4,25 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', a
 const results = [];
 const check = (name, ok, detail = '') => { results.push({ name, ok }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  ${detail}`); };
 
+// NOTE ON TIMEOUTS: waitForFunction is (fn, ARG, options) — passing the
+// options object second silently makes it the *argument* and leaves the
+// timeout at its default. That, plus page.click's 30s default, used to let a
+// loaded box drop us here with the game still on the TITLE screen, where
+// physics is deliberately frozen. Every "the wall did no damage" test then
+// failed for the wrong reason. Boot now waits properly and REFUSES to hand
+// back a page that never started racing.
 const boot = async (url) => {
   const page = await b.newPage({ viewport: { width: 900, height: 600 } });
+  page.setDefaultTimeout(180000);
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto(url, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__game, { timeout: 15000 });
-  await page.click('#start-btn');
+  await page.goto(url, { waitUntil: 'load', timeout: 180000 });
+  await page.waitForFunction(() => window.__game, null, { timeout: 180000 });
+  await page.evaluate(() => document.fonts.ready);
+  await page.click('#start-btn', { timeout: 180000 });
   await page.evaluate(() => { window.__game.countdown = 0.01; });
-  await page.waitForFunction(() => window.__game.state === 'race', { timeout: 12000 });
+  await page.waitForFunction(() => window.__game.state === 'race', null, { timeout: 180000 });
+  const racing = await page.evaluate(() => window.__game.state === 'race');
+  if (!racing) throw new Error(`boot(${url}): never reached race state — results would be meaningless`);
   await page.evaluate(() => { for (const e of window.__game.enemies) { e.update = () => {}; e.vel.set(0, 0, 0); e.pos.y = -400; e.alive = false; } });
   return { page, errors };
 };
@@ -105,7 +116,9 @@ const boot = async (url) => {
     const f = g.hud.feed.bind(g.hud);
     g.hud.feed = (m, k) => { feed.push(m); f(m, k); };
     const iv = setInterval(() => { p.vel.set(24, 0, 0); }, 80);
-    await new Promise(res => setTimeout(res, 3000));
+    // condition-driven: drive until the hut actually bites
+    for (let w = 0; w < 120 && p.health > 99; w++) await new Promise(res => setTimeout(res, 200));
+    await new Promise(res => setTimeout(res, 300)); // let the planks spawn
     clearInterval(iv);
     return { hpLoss: +(100 - p.health).toFixed(0), planksFlew: g.flyingProps.length > fly0,
       feed: feed.filter(m => /HUT/.test(m)).slice(0, 1) };
@@ -165,7 +178,11 @@ const boot = async (url) => {
     const n = t.nrm[p.trackIndex];
     p.heading = Math.atan2(n.x, n.z);
     const iv = setInterval(() => { if (Math.abs(p.lateral) < 9.2) p.vel.copy(p.forward).multiplyScalar(30); }, 80);
-    await new Promise(res => setTimeout(res, 2500));
+    // condition-driven: wait for the car to REACH the wall, not for a wall-clock
+    // guess. Headless game time runs several times slower than real time.
+    for (let w = 0; w < 120 && Math.abs(p.lateral) < 9.0 && p.health > 74; w++) {
+      await new Promise(res => setTimeout(res, 200));
+    }
     clearInterval(iv);
     return { lat: +p.lateral.toFixed(1), inside: Math.abs(p.lateral) <= 9.7, hpLoss: +(100 - p.health).toFixed(0) };
   });

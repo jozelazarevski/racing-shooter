@@ -1,4 +1,4 @@
-// DOM HUD: circular speedometer, standings, minimap, weapon status.
+// DOM HUD: circular speedometer, standings, weapon status. (NO minimap — hard rule.)
 const $ = (id) => document.getElementById(id);
 const SUFFIX = ['ST', 'ND', 'RD', 'TH', 'TH', 'TH', 'TH', 'TH'];
 
@@ -35,8 +35,8 @@ export class Hud {
   show() { this.el.hud.classList.add('on'); }
   hide() { this.el.hud.classList.remove('on'); }
 
-  // (minimap removed by request — the road, HUD arrows and standings carry
-  // the information; the top of the screen stays clear for the view)
+  // HARD RULE (user): NO MINIMAPS — ever. Do not reintroduce a map overlay
+  // in any form; the road, the HUD arrows and the standings carry the info.
 
   // ---------- circular speedometer ----------
   drawSpeedo(kmh, boosting) {
@@ -198,6 +198,25 @@ export class Hud {
     this.vignetteLevel = Math.max(0, this.vignetteLevel - dt * 1.8);
     this.el.vignette.style.opacity = Math.min(1, this.vignetteLevel);
 
+  }
+
+  /** Race-contracts readout under the standings: three compact rows, ✓ when
+   *  done, live progress on counter contracts. Safe to call per-frame — it
+   *  only touches the DOM when a row actually changes. Empty list hides it. */
+  setContracts(list, ct) {
+    const el = document.getElementById('contracts');
+    if (!el) return;
+    if (!list || !list.length) {
+      if (this._contractsKey !== '') { this._contractsKey = ''; el.innerHTML = ''; }
+      return;
+    }
+    const rows = list.map((c) => {
+      const prog = !c.done && c.prog && ct ? ` ${c.prog(ct)}` : '';
+      return `<div class="crow${c.done ? ' done' : ''}"><span>${c.done ? '✓' : '◇'} ${c.label}${prog}</span><span class="cpay">${c.pay} CR</span></div>`;
+    }).join('');
+    if (rows === this._contractsKey) return;
+    this._contractsKey = rows;
+    el.innerHTML = '<div class="clabel">CONTRACTS</div>' + rows;
   }
 
   damageFlash(strength = 0.7) { this.vignetteLevel = Math.min(1.2, this.vignetteLevel + strength); }

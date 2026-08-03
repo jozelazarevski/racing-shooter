@@ -6,6 +6,7 @@ import { numberPlateTexture } from './textures.js';
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
 const SPRAY_SNOW = new THREE.Color(0xf4faff); // tire spray tints (snow / wet)
 const SPRAY_WET = new THREE.Color(0x9dbcd2);
+const FORD_FOAM = new THREE.Color(0xeef7fb); // ---- river-fords: bow-wave white
 const GRADE = 16;   // grade force: vf -= GRADE * slope * dt while grounded on-road
 const DOWNHILL_CAP = 1.12; // downhill overspeed ceiling (× topSpeed)
 const SCORCH = new THREE.Color(0x1c1a18); // damage tint target
@@ -605,6 +606,12 @@ export class Car {
     // race state
     this.trackIndex = 0;
     this.lap = 1;
+    // Distance travelled, counted in line crossings. Kept SEPARATE from `lap`
+    // because the two answer different questions: `lap` is the validated race
+    // lap (an infield cut earns none, and the start crossing off the grid
+    // earns none either), while `_wraps` must rise on every crossing so
+    // `progress` — which orders the standings — never goes backwards.
+    this._wraps = 0;
     this.lateral = 0;
     this.finished = false;
     this.wallGrind = 0;
@@ -623,9 +630,9 @@ export class Car {
 
   get forward() { return new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading)); }
   get speedAlong() { return this.vel.dot(this.forward); }
-  get progress() { return this.lap + this.trackIndex / this.game.track.N; }
+  get progress() { return this._wraps + this.trackIndex / this.game.track.N; }
 
-  placeAt(index, lateral) {
+  placeAt(index, lateral, keepCP = false) {
     const t = this.game.track;
     this.pos.copy(t.pointAt(index, lateral));
     this.heading = t.headingAt(index);
@@ -639,9 +646,19 @@ export class Car {
     this._lastGY = gy; this._climbRate = 0; this._climbSm = 0; this.jumpPitch = 0;
     this.slip = 0; this.landGrip = 0; this.reverseTimer = 0;
     this.visYaw = 0; this.steerVis = 0; this.steerSmooth = 0;
-    // lap checkpoint state matches where we spawned: a respawn past the far
-    // checkpoint keeps credit for it, a grid spawn must earn it fresh
-    this._midCP = index > this.game.track.N * 0.4;
+    // Lap checkpoint state matches where we spawned. A respawn keeps whatever
+    // far-checkpoint credit the car had already earned (keepCP); a fresh place
+    // must earn it. The grid sits just BEFORE the line at ~0.99N, so the window
+    // stops at 0.85N — without that upper bound the first line crossing after
+    // GO banks a free lap and a "3 lap" race is really two.
+    this._midCP = keepCP
+      ? (this._midCP ?? false)
+      : (index > this.game.track.N * 0.4 && index < this.game.track.N * 0.85);
+    // A fresh placement re-bases the distance counter on the displayed lap. A
+    // car on the grid sits BEHIND the line, so it has not yet made the
+    // crossing its lap number implies — start it one wrap short, or its
+    // progress would fall by a full lap the moment it crosses.
+    if (!keepCP) this._wraps = this.lap - (index > this.game.track.N * 0.85 ? 1 : 0);
     this.syncMesh(0);
   }
 
@@ -664,7 +681,10 @@ export class Car {
     // ---- open world (player only): terrain driving off the road, any mode.
     // The road is fastest; rough ground is the natural boundary (no fences).
     const freeRoam = !!(this.game.freeRoam && this === this.game.player);
-    const offRoad = this === this.game.player && Math.abs(this.lateral) > ROAD_HALF + 1;
+    // ---- width-variation: the road edge follows the (possibly pinched)
+    // per-sample width profile; defensive — old track builds report ROAD_HALF
+    const roadHalfHere = this.game.track?.widthAt?.(this.trackIndex) ?? ROAD_HALF;
+    const offRoad = this === this.game.player && Math.abs(this.lateral) > roadHalfHere + 1;
     const offMult = offRoad ? 0.55 + 0.45 * this.offroadSkill : 1;
 
     // surface conditions: snow and rain-wet worlds drive differently — less
@@ -712,8 +732,14 @@ export class Car {
       this.reverseTimer = 0;
     } else {
       if (inputs.throttle > 0) {
-        // punchier launch: up to +55% thrust below half speed, fading to 1x
-        const punch = 1 + 0.55 * (1 - THREE.MathUtils.clamp(Math.abs(vf) / (this.maxSpeed * 0.5), 0, 1));
+        // Punchier launch: up to +55% thrust below half speed, fading to 1x.
+        // The reference is the car's SHOWROOM top speed (rivals: baseMaxSpeed),
+        // never the live one — otherwise difficulty aiSpeed and the rubber band
+        // silently widened the rivals' punch window and they out-launched the
+        // player off the grid on HARD. Pace advantages belong in the speed cap,
+        // not in the standing start.
+        const ref = (this.baseMaxSpeed ?? this.maxSpeed) * 0.5;
+        const punch = 1 + 0.55 * (1 - THREE.MathUtils.clamp(Math.abs(vf) / ref, 0, 1));
         vf += this.accel * punch * sTract * inputs.throttle * dt;
         this.reverseTimer = 0;
       }
@@ -792,7 +818,19 @@ export class Car {
     let grip = this.grip * (1 + 0.08 * hnd) * (1 - 0.78 * this.slip) * sGrip * (this.gripBoost || 1);
     if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
     if (this.landGrip > 0) { this.landGrip -= dt; grip *= 0.4; } // loose for ~0.4s after landing
-    if (this._wetT > 0) { this._wetT -= dt; grip *= 0.75; }      // slick tires through puddles
+    // ---- river-fords: wet tires. Ford crossings set _wetT=3.5 with a gentle
+    // ≈0.8 grip factor fading linearly back to 1; plain puddles keep their
+    // short sharp 0.75 slick (_wetMax stays 0 for those).
+    if (this._wetT > 0) {
+      this._wetT -= dt;
+      grip *= (this._wetMax ?? 0) > 1
+        ? 1 - 0.2 * Math.max(0, this._wetT) / this._wetMax
+        : 0.75;
+      if (this._wetT <= 0) this._wetMax = 0;
+    }
+    // opt-in grip instrument (headless): set __game.__gripProbe = {} to read
+    // the lateral grip the player is actually running (wet-tire verification)
+    if (this.game.__gripProbe && this === this.game.player) this.game.__gripProbe.grip = grip;
     const vlBefore = vl;
     vl -= vl * Math.min(1, grip * dt);
     // drift reward: convert a slice of the scrubbed-off slide back into forward speed
@@ -805,7 +843,22 @@ export class Car {
     const authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
     const dir = vf >= 0 ? 1 : -1;
     const stripSteer = this.stripLock ? this.stripLock.steerMul : 1;
-    const dTheta = steer * this.steerRate * sense * authority * stripSteer * dir * dt;
+    let dTheta = steer * this.steerRate * sense * authority * stripSteer * dir * dt;
+    // DRIVING AID: a gentle nudge back toward the road's direction when the
+    // player isn't actively steering. It never fights your input and never
+    // steers for you — it just stops the car wandering, which is what makes
+    // the chase view hard to hold. Strength is a player setting.
+    if (this.assist > 0 && this === this.game.player && !inputs.drift
+        && Math.abs(steer) < 0.25 && vf > 6 && !this.airborne) {
+      const t2 = this.game.track;
+      const road = t2.headingAt?.(this.trackIndex);
+      if (road !== undefined && Math.abs(this.lateral) < 12) {
+        let d = road - this.heading;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        if (Math.abs(d) < 1.0) dTheta += d * this.assist * 2.2 * dt;
+      }
+    }
     this.heading += dTheta;
     // While gripped the velocity turns with the car (arcade rails). While slipping
     // it lags the yaw: part of the turn spills forward speed into lateral slide,
@@ -919,7 +972,10 @@ export class Car {
     const cliffy = !!t.T?.cliffWalls;
     let wallHere = false;
     const fside = Math.sign(this.lateral) || 1;
-    if (Math.abs(this.lateral) > WALL_LIMIT) {
+    // ---- width-variation: the clamp line follows the pinched road width
+    // (cliff worlds have no narrows, so this equals WALL_LIMIT there)
+    const wallLim = (t.widthAt?.(this.trackIndex) ?? ROAD_HALF) + 0.55;
+    if (Math.abs(this.lateral) > wallLim) {
       if (this !== gm.player) wallHere = true; // AI safety net, all levels
       else if (cliffy) {
         // canyon: rock walls are solid — except the low berm near the start
@@ -940,13 +996,44 @@ export class Car {
     if (wallHere) {
       const n = t.nrm[this.trackIndex];
       const vn = this.vel.dot(n);
-      const over = this.lateral - fside * WALL_LIMIT;
+      const over = this.lateral - fside * wallLim; // ---- width-variation
       this.pos.addScaledVector(n, -over);
-      // absorb, don't bounce: kill the into-wall velocity (5% rebound) and
-      // let the car scrape along the rock instead
+      // absorb, don't bounce: kill the into-wall velocity (5% rebound)
       this.vel.addScaledVector(n, -vn * 1.05);
-      this.vel.multiplyScalar(1 - 0.03 * (1 - 0.2 * hnd));
-      this.lateral = fside * WALL_LIMIT;
+      // GRIND, don't glide. The old flat 3% scrub let a car lean on the rock
+      // and ride it like a rail all the way round a bend. Speed loss now
+      // scales with how hard the car is leaning in: a feather graze still
+      // costs almost nothing, a committed hit bleeds a lot of speed.
+      const lean = THREE.MathUtils.clamp(Math.abs(vn) / 14, 0, 1);
+      this.vel.multiplyScalar(1 - (0.03 + 0.5 * lean) * (1 - 0.2 * hnd));
+      // …and peel the nose off the rock so the car separates instead of
+      // sticking. Sets a minimum outward rate rather than adding every frame,
+      // and the rate is deliberately GENTLE: the old lean-scaled shove (up to
+      // ~5 u/s) fired the car across narrow dual-wall canyons into the
+      // opposite rock face, which shoved it straight back — a ping-pong
+      // "bounding ball" (user bug, CANYON RUN). 1.4 u/s is enough to separate
+      // without ever reaching the far wall; the anti-glide fix above (grind
+      // scrub scaling with lean) is what stops wall-riding, and it stays.
+      const outward = -fside * this.vel.dot(n);
+      const wantOut = 1.4;
+      if (outward < wantOut) this.vel.addScaledVector(n, -fside * (wantOut - outward));
+      this.lateral = fside * wallLim; // ---- width-variation
+      // opt-in wall instrument (headless): set __game.__wallProbe = {} and every
+      // contact records what the peel-off actually did — `inward` and
+      // `pingPong` must both stay 0 (no shove back into the rock, and no
+      // contact bouncing to the opposite wall inside 3s).
+      const wp = gm.__wallProbe;
+      if (wp && this === gm.player) {
+        const after = -fside * this.vel.dot(n);
+        wp.contacts = (wp.contacts ?? 0) + 1;
+        if (after < 0) wp.inward = (wp.inward ?? 0) + 1;
+        if (after > 2.5) wp.hotPeel = (wp.hotPeel ?? 0) + 1;
+        wp.maxOut = Math.max(wp.maxOut ?? 0, +after.toFixed(2));
+        if (wp.lastSide && wp.lastSide !== fside && gm.raceTime - wp.lastT < 3) {
+          wp.pingPong = (wp.pingPong ?? 0) + 1;
+        }
+        wp.lastSide = fside; wp.lastT = gm.raceTime;
+      }
       if (this === gm.player && Math.abs(this.speedAlong) > 12 && Math.random() < 0.4)
         gm.particles.sparks(this.pos, n, 2);
       if (this.wallGrind <= 0) {
@@ -956,8 +1043,12 @@ export class Car {
         // scrapes are free) and at most ~once a second — the old per-grind
         // ticks could wreck a car in one long scrape along the canyon wall
         if (this === gm.player && cliffy) {
+          // 2.8s hurt cooldown: one STONE hit per deliberate ram. The old 1.1s
+          // let a sustained head-on push land a second full hit before the
+          // player could even react — two ~50-hull stone hits back-to-back
+          // wrecked the car outright (the CANYON RUN "bounding ball" death).
           if (vnAbs > 7 && (this._cliffHurt ?? 0) <= 0) {
-            this._cliffHurt = 1.1;
+            this._cliffHurt = 2.8;
             gm.onSolidCrash?.({ mat: 'stone' }, this, vnAbs, n.x * fside, n.z * fside);
           } // else: scrape sparks only — no hull cost while the cooldown runs
         } else this.onWallHit(n, vnAbs);
@@ -1028,6 +1119,32 @@ export class Car {
       }
     }
 
+    // ---- landed fall-hazards are STONE for rivals too. The full t.solids
+    // sweep above is player-only (AI never leaves the road, so static scenery
+    // can't touch it), but rocks/burning trees LAND ON the road mid-race —
+    // without this an AI ghosts through the boulder the player just dodged.
+    // The runtime faller list is tiny (≤4 airborne + a few landed), so this
+    // stays O(few) per rival.
+    if (this !== gm.player && gm.fallers && gm.fallers.length) {
+      for (const f of gm.fallers) {
+        const ob = f.solid;
+        if (!ob) continue; // still airborne (or an icicle that shattered)
+        const dx = this.pos.x - ob.x, dz = this.pos.z - ob.z;
+        const rr = ob.r + 1.8;
+        if (dx * dx + dz * dz >= rr * rr) continue;
+        const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
+        const nx = dx / d, nz = dz / d;
+        this.pos.x = ob.x + nx * rr;
+        this.pos.z = ob.z + nz * rr;
+        const vn = this.vel.x * nx + this.vel.z * nz;
+        if (vn < 0) {
+          this.vel.x -= nx * vn * 1.05; // same absorb-don't-bounce as all SOLIDs
+          this.vel.z -= nz * vn * 1.05;
+        }
+        break;
+      }
+    }
+
     // ---- tire stacks: burst apart at speed, solid at a crawl ----
     if (this === gm.player && t.tireStacks && t.tireStacks.length) {
       for (const st of t.tireStacks) {
@@ -1080,9 +1197,11 @@ export class Car {
       }
     }
 
-    // ---- trees (material law): a toy truck does not fell a grown pine.
-    // Saplings/cacti/snags yield at speed; BIG pines are SOLID — the car
-    // stops, sheds needles, and takes real trunk damage instead.
+    // ---- trees (material law): a toy truck does not fell a grown tree.
+    // Saplings/cacti/snags yield at speed; BIG trunks are SOLID — the car
+    // stops, sheds needles, and takes real trunk damage instead. Tree records
+    // may carry an explicit `solid` flag (kapok/redwood giants); older builds
+    // only mark big pines by kind+scale, so that stays as the fallback.
     if (this === gm.player && t.trees && t.trees.length) {
       for (const tr of t.trees) {
         if (tr.dead) continue;
@@ -1090,7 +1209,7 @@ export class Car {
         const rr = tr.r + 1.7;
         if (dx * dx + dz * dz >= rr * rr) continue;
         if (Math.abs(this.pos.y - (tr.y ?? 0)) > 4) continue; // rim cacti, cliff snags
-        const yields = tr.kind !== 'pine' || tr.s < 1.0;
+        const yields = tr.solid !== undefined ? !tr.solid : (tr.kind !== 'pine' || tr.s < 1.0);
         if (yields && Math.abs(this.speedAlong) > 7) {
           gm.onTreeSmash?.(tr, this);
         } else {
@@ -1121,7 +1240,9 @@ export class Car {
         const f = Math.max(0, 1 - 0.9 * dt); // water drag on the hull
         this.vel.x *= f;
         this.vel.z *= f;
-        this._wetT = 0.14; // grip reduction picked up next frame (see grip section)
+        // grip reduction picked up next frame (see grip section); never cut a
+        // ford's longer wet-tire fade short ---- river-fords
+        if (this._wetT < 0.14) this._wetT = 0.14;
         const spd2 = this.vel.lengthSq();
         if (spd2 > 36 && gm.player
             && (this === gm.player || this.pos.distanceToSquared(gm.player.pos) < 14400)) {
@@ -1141,6 +1262,101 @@ export class Car {
         break; // one puddle per frame is plenty
       }
     }
+
+    // ---- river-fords: shallow water washing over the road — bow-wave spray,
+    // hull drag, and a WET TIRES traction fade for a few seconds after ----
+    const fords = t.fords ?? [];
+    if (fords.length && !this.airborne && this.alive) {
+      const now = gm.raceTime ?? 0;
+      for (const fd of fords) {
+        const diF = Math.abs(this.trackIndex - fd.i);
+        const di = Math.min(diF, t.N - diF) * (t.segLen ?? 2);   // u along the track
+        if (di > fd.half) continue;
+        const spdF = Math.hypot(this.vel.x, this.vel.z);
+        const fDrag = Math.max(0, 1 - 0.5 * dt);                 // shallow-water drag
+        this.vel.x *= fDrag;
+        this.vel.z *= fDrag;
+        this._wetT = 3.5;                                        // long fade — see grip section
+        this._wetMax = 3.5;
+        const entering = now - (this._inFordT ?? -99) > 1;
+        this._inFordT = now;
+        const nearCam = gm.player
+          && (this === gm.player || this.pos.distanceToSquared(gm.player.pos) < 10000);
+        if (entering) {
+          if (this === gm.player && now - (this._fordFeedAt ?? -99) > 6) {
+            this._fordFeedAt = now;
+            gm.hud?.feed?.('WET TIRES', 'info');
+            gm.buzz?.(20);
+          }
+          // entry splash: a foam ring bursting low around the bumper PLUS a
+          // curtain of water thrown up and forward, so the chase cam sees a
+          // real wall of white open past the car instead of a few wisps
+          if (spdF > 5 && nearCam) {
+            const pl = this === gm.player;
+            const nRing = pl ? 26 : 10;
+            for (let s = 0; s < nRing; s++) {
+              const a = (s / nRing) * Math.PI * 2;
+              gm.particles.spawn(
+                this.pos.x + nf.x * 1.0 + Math.cos(a) * 1.9, this.y + 0.15,
+                this.pos.z + nf.z * 1.0 + Math.sin(a) * 1.9,
+                Math.cos(a) * (5 + spdF * 0.24) + nf.x * spdF * 0.18,
+                3.0 + Math.random() * 3.4,
+                Math.sin(a) * (5 + spdF * 0.24) + nf.z * spdF * 0.18,
+                FORD_FOAM, 4.2 + Math.random() * 1.6, 0.6 + Math.random() * 0.45,
+                { drag: 1.5, grav: 8, shrink: 0.35, alpha: 0.9 });
+            }
+            // the curtain: a fan of big slow droplets lofted off the bumper
+            for (let s = 0, n = pl ? 14 : 5; s < n; s++) {
+              const ws = (s / n) * 2 - 1;                        // −1..1 across the nose
+              gm.particles.spawn(
+                this.pos.x + nf.x * 1.9 + ns.x * ws * 1.7, this.y + 0.3,
+                this.pos.z + nf.z * 1.9 + ns.z * ws * 1.7,
+                nf.x * spdF * 0.22 + ns.x * ws * (7 + spdF * 0.2),
+                6.5 + Math.random() * 5 + spdF * 0.1,
+                nf.z * spdF * 0.22 + ns.z * ws * (7 + spdF * 0.2),
+                Math.random() < 0.7 ? FORD_FOAM : SPRAY_WET,
+                3.4 + Math.random() * 2.2, 0.75 + Math.random() * 0.5,
+                { drag: 0.9, grav: 13, shrink: 0.45, alpha: 0.95 });
+            }
+          }
+        }
+        // bow wave while inside: sheets of white spray fan off all four wheels,
+        // speed-scaled, pooled + budget-capped, distance-culled for AI
+        if (spdF > 5 && nearCam) {
+          const pl = this === gm.player;
+          this._fordAcc = Math.min(12, (this._fordAcc ?? 0)
+            + dt * (70 + spdF * 4.5) * (pl ? 1 : 0.35));
+          let burst = pl ? 9 : 3;                                // per-frame cap
+          while (this._fordAcc >= 1 && burst-- > 0) {
+            this._fordAcc -= 1;
+            const ws = Math.random() < 0.5 ? -1 : 1;             // L/R wheel
+            const rear = Math.random() < 0.4;                    // rooster tail behind
+            const alongOff = rear ? -1.5 : 1.5;
+            gm.particles.spawn(
+              this.pos.x + nf.x * alongOff + ns.x * ws * 1.35, this.y + 0.18,
+              this.pos.z + nf.z * alongOff + ns.z * ws * 1.35,
+              nf.x * spdF * (rear ? -0.22 : 0.35) + ns.x * ws * (5.5 + spdF * 0.3) + (Math.random() - 0.5) * 3,
+              3.0 + spdF * 0.14 + Math.random() * 2.6,
+              nf.z * spdF * (rear ? -0.22 : 0.35) + ns.z * ws * (5.5 + spdF * 0.3) + (Math.random() - 0.5) * 3,
+              Math.random() < 0.65 ? FORD_FOAM : SPRAY_WET,
+              3.0 + spdF * 0.09 + Math.random() * 1.2, 0.6 + Math.random() * 0.5,
+              { drag: 1.0, grav: 12, shrink: 0.5, alpha: 0.92 });
+          }
+        }
+        break; // one ford at a time
+      }
+      // faint water-drip spray trailing off the tires while WET TIRES lasts
+      if ((this._wetMax ?? 0) > 1 && this._wetT > 0 && sp > 10 && Math.random() < 0.3
+          && gm.player
+          && (this === gm.player || this.pos.distanceToSquared(gm.player.pos) < 6400)) {
+        gm.particles.spawn(
+          this.pos.x - nf.x * 1.6 + (Math.random() - 0.5) * 1.2, this.y + 0.2,
+          this.pos.z - nf.z * 1.6 + (Math.random() - 0.5) * 1.2,
+          (Math.random() - 0.5) * 2, 1 + Math.random() * 1.5, (Math.random() - 0.5) * 2,
+          SPRAY_WET, 0.9, 0.4, { drag: 1, grav: 14, shrink: 0.8, alpha: 0.5 });
+      }
+    }
+    // ---- end river-fords ----
 
     // ---- vertical motion (ramps & jumps; rolling terrain off-road in roam) ----
     const gY = offRoad
@@ -1319,7 +1535,7 @@ export class Car {
     this._tintFrac = 1;
     this.game.restoreCarParts?.(this);
     this._applyScorch(1); // fresh paint job with the fresh hull
-    this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6));
+    this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6), true);
   }
 
   /** Lap bookkeeping — call with previous index before this frame's update.
@@ -1330,12 +1546,16 @@ export class Car {
     const n = this.game.track.N;
     if (this.trackIndex > n * 0.4 && this.trackIndex < n * 0.6) this._midCP = true;
     if (prevIndex > n * 0.85 && this.trackIndex < n * 0.15) {
-      if (this._midCP === false) return false; // cut the infield — no lap
+      this._wraps++;                           // distance always counts...
+      if (this._midCP === false) return false; // ...but a cut earns no lap
       this._midCP = false;
       this.lap++;
       return true;
     }
-    if (prevIndex < n * 0.15 && this.trackIndex > n * 0.85) this.lap--; // went backwards over the line
+    if (prevIndex < n * 0.15 && this.trackIndex > n * 0.85) { // backwards over the line
+      this._wraps--;
+      this.lap--;
+    }
     return false;
   }
 }
@@ -1407,8 +1627,12 @@ export class EnemyCar extends Car {
   constructor(game, slot) {
     const spec = AI_COLORS[slot % AI_COLORS.length];
     super(game, buildCarMesh(spec), {
-      maxSpeed: 53 + slot * 1.1 + Math.random() * 1.4, // ~53..60 across the grid (player: 58)
-      accel: 36 + slot * 1.2 + Math.random() * 2,      // ~36..43
+      maxSpeed: 53 + slot * 1.1 + Math.random() * 1.4, // ~53..60 across the grid (player: 56..63)
+      // ~34.5..39.2 — deliberately INSIDE the garage's range (player cars are
+      // 36..40). The old 36..43 spread put the two quickest rivals above every
+      // car you can buy, and they out-dragged the starter BRAWLER off the line
+      // by 0.27s to 40 u/s (18%) — the grid must never beat the showroom.
+      accel: 34.5 + slot * 0.85 + Math.random() * 1.3,
       grip: 5.8,
       steerRate: 3.0,
       driftLag: 0.12, // planted enough to hold the racing line
@@ -1426,8 +1650,155 @@ export class EnemyCar extends Car {
     this.boostCooldown = 4 + Math.random() * 6; // stagger the first bursts
     this.ramCooldown = 6 + Math.random() * 4;   // deliberate side-slam timer (stagger + skip the start scrum)
     this.ramTimer = 0;                          // >0: actively steering into the player
-    this._missileFired = false;                 // one missile per race on high aggression
+    this.missileCd = 6 + Math.random() * 6;     // rocket timer (EASY never fires; see update)
+    this._aiRank = slot;                        // race rank among rivals (refreshed by _sense)
     this.glowColor = new THREE.Color(0x9a938a); // exhaust smoke tint
+
+    // ---- driver-feel state (all refreshed by _sense at ~6 Hz, zero allocs) ----
+    this._senseT = Math.random() * 0.16; // staggered so the grid never senses in lockstep
+    this._drafting = false;              // tucked behind a car ahead (cone check)
+    this._draftT = 0;                    // draft dwell timer -> _draftOn (+12% window)
+    this._avoidSolid = { on: false, lat: 0, r: 0 };            // landed rockfall etc.
+    this._avoidHerd = { on: false, lat: 0, r: 0, panic: false }; // livestock in the road
+    this._geyserLift = false;            // erupting geyser dead ahead -> ease off
+    this._blockT = 0;                    // active deliberate block (defense) timer
+    this._blockLat = 0;                  // lane committed to for that one move
+    this._blockUsed = false;             // one block per straight; corners re-arm it
+    this._errT = 0;                      // human error: overshoot phase timer
+    this._errRec = 0;                    // human error: gather-it-up phase timer
+    this._errWideDir = 1;                // which side "wide" is for the flubbed corner
+    this._errArmed = true;               // one roll per corner approach
+    this._wobPhase = Math.random() * 6.3;// personal wobble phase for corrections
+    this._mistakeCd = 5;                 // min seconds between mistakes
+    this._mistakes = 0;                  // probe counter: mistakes committed this race
+    this._stuckT = 0;                    // low-speed dwell -> reverse-turn recovery
+    this._deepStuckT = 0;                // long-stuck dwell -> pit-lift (placeAt)
+    this._revT = 0;                      // active reverse-turn maneuver timer
+  }
+
+  /** True when `other` sits in the draft cone directly ahead (3..14u, ~28°). */
+  _draftBehind(other, fwd) {
+    if (!other || other === this || !other.alive) return false;
+    const dx = other.pos.x - this.pos.x, dz = other.pos.z - this.pos.z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 > 196 || d2 < 9) return false;
+    return (dx * fwd.x + dz * fwd.z) / Math.sqrt(d2) > 0.88;
+  }
+
+  /** Low-frequency situational awareness (~6 Hz): runtime hazards (landed
+   *  fallers, livestock, geysers), mutual slipstream, block re-arm and the
+   *  difficulty-scaled human-error roll. No allocations — scratch vectors +
+   *  reused result objects only. */
+  _sense(g, t, fwd, v) {
+    const N = t.N;
+    // -- runtime solids on the road (landed rockfall / burning trees): the
+    // per-frame avoidance loop reads t.obstacles, which is built once — the
+    // fall-hazard system pushes new STONE solids into t.solids mid-race, so
+    // those are scanned here and dodged like any other rock.
+    const avS = this._avoidSolid;
+    avS.on = false;
+    const solids = t.solids;
+    if (solids && solids.length) {
+      let best = 32;
+      for (let i = 0; i < solids.length; i++) {
+        const ob = solids[i];
+        const dx = ob.x - this.pos.x, dz = ob.z - this.pos.z;
+        if (dx * dx + dz * dz > 1600) continue;             // 40u broadphase
+        const along = dx * fwd.x + dz * fwd.z;
+        if (along < 2 || along >= best) continue;
+        if (Math.abs(dx * fwd.z - dz * fwd.x) > ob.r + 4) continue;
+        _obPos.set(ob.x, 0, ob.z);
+        const lat = t.lateralOffset(_obPos, t.nearestIndex(_obPos, this.trackIndex));
+        if (Math.abs(lat) > ROAD_HALF + 2) continue;        // off-road scenery
+        best = along;
+        avS.on = true; avS.lat = lat; avS.r = ob.r;
+      }
+    }
+    // -- livestock in the road corridor: swerve, and scrub speed if one is
+    // dead ahead — rivals shoo the herd, they never plough it
+    const avH = this._avoidHerd;
+    avH.on = false; avH.panic = false;
+    const herds = g.herds;
+    if (herds && herds.length) {
+      let best = 30;
+      for (let i = 0; i < herds.length; i++) {
+        const a = herds[i];
+        if (!a.alive) continue;
+        const dx = a.x - this.pos.x, dz = a.z - this.pos.z;
+        if (dx * dx + dz * dz > 1370) continue;
+        const along = dx * fwd.x + dz * fwd.z;
+        if (along < 1 || along >= best) continue;
+        const across = dx * fwd.z - dz * fwd.x;
+        if (Math.abs(across) > 7) continue;
+        _obPos.set(a.x, 0, a.z);
+        const lat = t.lateralOffset(_obPos, t.nearestIndex(_obPos, this.trackIndex));
+        if (Math.abs(lat) > ROAD_HALF + 3) continue;        // grazing in the pasture
+        best = along;
+        avH.on = true; avH.lat = lat; avH.r = 1.9;
+        avH.panic = along < 13 && Math.abs(across) < 3.2;
+      }
+    }
+    // -- geysers: one rumbling or erupting inside ~15u dead ahead -> lift
+    this._geyserLift = false;
+    const gys = g.geysers;
+    if (gys && gys.length) {
+      for (let i = 0; i < gys.length; i++) {
+        const gy = gys[i];
+        const dx = gy.x - this.pos.x, dz = gy.z - this.pos.z;
+        if (dx * dx + dz * dz > 324) continue;
+        const along = dx * fwd.x + dz * fwd.z;
+        if (along < 1 || along > 15) continue;
+        if (Math.abs(dx * fwd.z - dz * fwd.x) > 4.5) continue;
+        // 7.5s pad cycle (main.js): rumble >5.6, eruption >=6.4 — lift from ~5.2
+        if (((g.raceTime + gy.phase) % 7.5) > 5.2) { this._geyserLift = true; break; }
+      }
+    }
+    // -- mutual slipstream: the same +12% draft window the player earns.
+    // Cheap: one cone check against the car directly ahead, at sense rate.
+    let drafting = false;
+    if (Math.abs(v) > this.maxSpeed * 0.5) {
+      drafting = this._draftBehind(g.player, fwd);
+      for (let i = 0; i < g.enemies.length && !drafting; i++) {
+        drafting = this._draftBehind(g.enemies[i], fwd);
+      }
+    }
+    this._drafting = drafting;
+    // -- race rank among rivals (0 = leading AI): O(rivals) at sense rate.
+    // Gates who carries rockets on NORMAL (front-runners only).
+    let rank = 0;
+    for (let i = 0; i < g.enemies.length; i++) {
+      const o = g.enemies[i];
+      if (o !== this && o.alive && o.progress > this.progress) rank++;
+    }
+    this._aiRank = rank;
+    // -- defense re-arm: passing through a real corner grants one new block
+    if (t.curvature[this.trackIndex] > CORNER_CURV) this._blockUsed = false;
+    // -- human error roll: heavily on EASY, rarely on NORMAL, never on HARD.
+    // One roll per corner approach (armed on the preceding straight).
+    const diffId = g.difficulty?.id;
+    const errP = diffId === 'easy' ? 0.25 : diffId === 'normal' ? 0.05 : 0;
+    if (errP > 0 && g.raceTime > 5) {
+      let curvNear = 0;
+      for (let k = 10; k <= 40; k += 6) curvNear = Math.max(curvNear, t.curvature[(this.trackIndex + k) % N]);
+      const approaching = t.curvature[this.trackIndex] < 0.012 && curvNear > 0.022
+        && Math.abs(v) > this.maxSpeed * 0.5;
+      if (approaching && this._errArmed) {
+        this._errArmed = false;
+        if (this._mistakeCd <= 0 && this._errT <= 0 && this._errRec <= 0
+            && this.ramTimer <= 0 && this._revT <= 0 && Math.random() < errP) {
+          // misjudged it: brake a touch late, carry too much speed in,
+          // then wobble/slide wide while gathering it back up
+          this._errT = 0.55 + Math.random() * 0.3;
+          this._mistakeCd = 6 + Math.random() * 3;
+          this._mistakes++;
+          let dirSum = 0; // "wide" = outside of the corner being flubbed
+          for (let k = 10; k <= 40; k += 6) dirSum += t._raceLine[(this.trackIndex + k) % N];
+          this._errWideDir = dirSum > 0 ? -1 : 1;
+        }
+      } else if (!approaching && curvNear < 0.02) {
+        this._errArmed = true; // clean straight: armed for the next corner
+      }
+    }
   }
 
   update(dt) {
@@ -1450,7 +1821,17 @@ export class EnemyCar extends Car {
     let band = 1;
     if (gap > 0.02) band = 1 + 0.30 * D.rubberBand * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1);
     else if (gap < -0.06) band = 1 - 0.12 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1);
-    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * Math.max(0.7, band);
+    // pace parity vs the garage: a maxed ENGINE (+20% player top speed) turned
+    // NORMAL into a parade. Rivals bring +2% per player engine level (cap
+    // +10%) on NORMAL/HARD; EASY keeps its gentler pack untouched so a casual
+    // still gets to win with upgrades. NOTE: upgrades went PER-CAR
+    // (`garage.upgrades[carKey]`) and the old flat `garage.engine` key is
+    // deleted by the save migration — reading it always returned 0, so this
+    // whole parity rule was dead. Ask the game for the selected car's levels.
+    const engLvl = g.carUpgrades?.().engine ?? g.garage?.engine ?? 0;
+    const engUp = (g.difficulty?.id ?? 'normal') === 'easy'
+      ? 1 : 1 + Math.min(0.10, 0.02 * engLvl);
+    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * engUp * Math.max(0.7, band);
 
     // ---- refresh the small personal lane bias occasionally
     this.laneTimer -= dt;
@@ -1461,6 +1842,23 @@ export class EnemyCar extends Car {
 
     const fwd = this.forward;
     const v = this.speedAlong;
+
+    // ---- low-frequency situational sense (~6 Hz): hazards, draft, defense, error
+    this._senseT -= dt;
+    if (this._senseT <= 0) {
+      this._senseT = 0.16;
+      this._sense(g, t, fwd, v);
+    }
+    if (this._mistakeCd > 0) this._mistakeCd -= dt;
+    // mutual slipstream: same 1.1s-tuck -> +12% window the player gets
+    // (step() reads _draftOn when computing topSpeed for any car)
+    this._draftT = this._drafting ? this._draftT + dt : Math.max(0, this._draftT - dt * 2);
+    this._draftOn = this._draftT > 1.1;
+    // human error phases: overshoot runs out -> the gather-it-up phase begins
+    if (this._errT > 0) {
+      this._errT -= dt;
+      if (this._errT <= 0) this._errRec = 0.9;
+    } else if (this._errRec > 0) this._errRec -= dt;
 
     // ---- steering target: racing line at a speed-scaled lookahead + situational biases
     // Lookahead shrinks with local curvature: a long chord across a tight arc
@@ -1496,13 +1894,26 @@ export class EnemyCar extends Car {
         break;
       }
     }
-    // blocking: when leading the player and they're right behind, mirror their lane
-    if (!blockedAhead && gap < 0 && g.player.alive) {
+    // defense: leading the player with them tucked within ~10u at pace ->
+    // ONE deliberate line move onto their side. Committed once, held ~1.4s,
+    // and not re-armed until a corner passes — readable blocking, never
+    // weaving, and only at speed (never engaged below 70% pace).
+    if (this._blockT > 0) {
+      this._blockT -= dt;
+      targetLat = THREE.MathUtils.lerp(targetLat, this._blockLat, 0.85);
+    } else if (!blockedAhead && !this._blockUsed && gap < 0 && g.player.alive
+        && Math.abs(v) > this.maxSpeed * 0.7
+        && this.aggression * D.aiAggression > 0.55) {
       const dx = g.player.pos.x - this.pos.x, dz = g.player.pos.z - this.pos.z;
       const along = dx * fwd.x + dz * fwd.z;
-      if (along < -2 && along > -16) {
-        const w = Math.min(0.85, 0.5 * this.aggression * D.aiAggression);
-        targetLat = THREE.MathUtils.lerp(targetLat, g.player.lateral, w);
+      if (along < -2 && along > -11 && Math.abs(g.player.speedAlong) > Math.abs(v) * 0.7) {
+        let c = 0; // only on a straight — blocking into a corner reads as a swerve
+        for (let k = 0; k < 25; k += 5) c = Math.max(c, t.curvature[(this.trackIndex + k) % t.N]);
+        if (c < CORNER_CURV) {
+          this._blockUsed = true;
+          this._blockT = 1.4;
+          this._blockLat = THREE.MathUtils.clamp(g.player.lateral, -7, 7);
+        }
       }
     }
 
@@ -1580,7 +1991,27 @@ export class EnemyCar extends Car {
         }
       }
     }
-    targetLat = THREE.MathUtils.clamp(targetLat, -7.4, 7.4);
+    // runtime hazards (sensed at ~6 Hz): dodge landed rockfall and livestock
+    // exactly like static rocks — slide the target just past them
+    const avS = this._avoidSolid;
+    if (avS.on && Math.abs(avS.lat - targetLat) < avS.r + 2.6) {
+      const side = Math.sign(targetLat - avS.lat) || (avS.lat >= 0 ? -1 : 1);
+      targetLat = avS.lat + side * (avS.r + 2.9);
+    }
+    const avH = this._avoidHerd;
+    if (avH.on && Math.abs(avH.lat - targetLat) < avH.r + 2.8) {
+      const side = Math.sign(targetLat - avH.lat) || (avH.lat >= 0 ? -1 : 1);
+      targetLat = avH.lat + side * (avH.r + 3.1);
+    }
+    // running wide while gathering up a flubbed corner
+    if (this._errRec > 0) targetLat += this._errWideDir * 3 * this._errRec;
+    // ---- width-variation: the lateral clamp follows the pinched road width
+    // (both here and at the lookahead point) so rivals aim through the gap
+    // instead of grinding the narrowed edge; defensive on older track builds
+    const wNow = t.widthAt?.(this.trackIndex) ?? ROAD_HALF;
+    const wAhead = t.widthAt?.(li) ?? ROAD_HALF;
+    const latLim = Math.min(7.4, Math.min(wNow, wAhead) - 1.6);
+    targetLat = THREE.MathUtils.clamp(targetLat, -latLim, latLim);
 
     const target = t.pointAt(li, targetLat);
     const desired = Math.atan2(target.x - this.pos.x, target.z - this.pos.z);
@@ -1592,17 +2023,34 @@ export class EnemyCar extends Car {
     // into the wall. Big heading errors (spun/facing a wall) still get full lock.
     const speedN = Math.min(1, Math.abs(v) / this.maxSpeed);
     const steerCap = Math.abs(dh) > 0.9 ? 1 : 0.6 + 0.4 * (1 - speedN);
-    const steer = THREE.MathUtils.clamp(dh * 3.0, -steerCap, steerCap);
+    let steer = THREE.MathUtils.clamp(dh * 3.0, -steerCap, steerCap);
+    // correction wobble: sawing at the wheel while gathering up a mistake —
+    // decays with the recovery timer so it visibly settles
+    if (this._errRec > 0) {
+      steer = THREE.MathUtils.clamp(
+        steer + Math.sin(g.raceTime * 13 + this._wobPhase) * 0.5 * this._errRec, -1, 1);
+    }
 
     // ---- braking model: physics corner speeds + late-but-correct brake points
     // vMax(j) = sqrt(aLat / curvature); brake so that v <= sqrt(vMax^2 + 2*decel*dist)
     const aLat = (30 + 8 * this.cornerSkill) * D.aiSpeed;
     const sqA = Math.sqrt(aLat);
     const DECEL = 26;
-    let vAllowed = this.maxSpeed;
+    let vAllowed = this.maxSpeed * (this._draftOn ? 1.12 : 1); // draft window open
     for (let k = 0; k <= 90; k += 5) {
       const j = (this.trackIndex + k) % t.N;
-      const vMax = sqA * t._speedInv[j];
+      let vMax = sqA * t._speedInv[j];
+      // ---- width-variation: a pinch caps corner speed like a real corner,
+      // so rivals brake in and thread it instead of wall-grinding through
+      const wj = t.widthAt ? t.widthAt(j) : ROAD_HALF;
+      if (wj < ROAD_HALF - 0.2) vMax = Math.min(vMax, 16 + 3.6 * wj);
+      // ---- viz-zones: rivals can't see through fog/trees either
+      if (t.vizZones && t.vizZones.length) {
+        for (const z of t.vizZones) {
+          const dz = (j - z.i0 + t.N) % t.N;
+          if (dz <= z.len) { vMax = Math.min(vMax, this.maxSpeed * 0.82); break; }
+        }
+      }
       if (vMax >= vAllowed) continue;
       const vNow = k === 0 ? vMax : Math.sqrt(vMax * vMax + 2 * DECEL * k * t.segLen);
       if (vNow < vAllowed) vAllowed = vNow;
@@ -1618,11 +2066,20 @@ export class EnemyCar extends Car {
     else if (aiSurf === 'wet') vAllowed *= 0.94;
     // world-special slow field (FREEZE STRIKE / JUNGLE FURY): rivals at half pace
     if (g.enemySlowUntil && g.raceTime < g.enemySlowUntil) vAllowed = Math.min(vAllowed, this.maxSpeed * 0.5);
+    // human error: braking a touch late — carry too much speed in (overshoot),
+    // then brake harder than clean driving would while gathering it back up
+    if (this._errT > 0) vAllowed = Math.min(this.maxSpeed, vAllowed * 1.35);
+    else if (this._errRec > 0) vAllowed *= 0.78;
+    // livestock dead ahead: the swerve is already set — scrub to below the
+    // herd's own flee speed so contact can't happen. Swerve, never plough.
+    if (this._avoidHerd.panic) vAllowed = Math.min(vAllowed, 9);
 
     let throttle = 0, brake = 0;
     if (v < vAllowed - 1.5) throttle = 1;
     else if (v > vAllowed + 1.5) brake = THREE.MathUtils.clamp((v - vAllowed) / 8, 0.35, 1);
     else throttle = 0.6; // hold speed through the corner
+    // erupting geyser just ahead: lift off the throttle — a lift, not a stab
+    if (this._geyserLift && brake === 0) throttle = Math.min(throttle, 0.15);
 
     // ---- nitro-ish bursts: behind the player, on a straight, off cooldown
     this.boostCooldown -= dt;
@@ -1636,11 +2093,48 @@ export class EnemyCar extends Car {
       }
     }
 
-    this.step(dt, { throttle, brake, steer, drift: false });
+    // ---- recovery: a rival parked nose-first against something backs out
+    // deliberately (hard brake -> reverse gear -> swing the nose), and only a
+    // genuine long stuck earns the pit-lift — deferred while the player is
+    // close and looking, so the teleport pop stays off camera when possible.
+    const spdAbs = Math.abs(v);
+    if (this._revT > 0) this._revT -= dt;
+    if (spdAbs < 2.2 && this.boostTimer <= 0) {
+      this._stuckT += dt;
+      this._deepStuckT += dt;
+    } else if (spdAbs > 5) {
+      this._stuckT = 0;
+      this._deepStuckT = 0;
+    }
+    if (this._revT <= 0 && this._stuckT > 1.5) {
+      this._stuckT = 0;
+      this._revT = 2.0; // brake gate (0.45s) + ~1.5s of reverse-turn
+    }
+    if (this._deepStuckT > 6) {
+      const dxp = this.pos.x - g.player.pos.x, dzp = this.pos.z - g.player.pos.z;
+      const seen = dxp * dxp + dzp * dzp < 8100
+        && dxp * Math.sin(g.player.heading) + dzp * Math.cos(g.player.heading) > 0;
+      if (!seen || this._deepStuckT > 9) {
+        this._deepStuckT = 0; this._stuckT = 0; this._revT = 0;
+        this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6), true);
+        return;
+      }
+    }
+    if (this._revT > 0) {
+      // reverse-turn: sustained hard brake engages reverse; mirrored steer
+      // while rolling backwards swings the nose toward the road target
+      throttle = 0; brake = 1;
+      steer = v < -0.5 ? -Math.sign(dh) : 0;
+    }
+    // a brief slide moment at the start of a mistake correction reads as a car
+    // caught sideways, not a scripted wiggle
+    const errSlide = this._errRec > 0.62 && this._revT <= 0;
+    this.step(dt, { throttle, brake, steer, drift: errSlide });
     if (this.checkLap(prevIndex) === true && this.lap > g.lapsTotal && !this.finished) this.finished = true;
 
-    // slide smoke when the AI breaks loose (only near the player, keep it cheap)
-    const sideV = Math.abs(this.vel.dot(new THREE.Vector3(this.forward.z, 0, -this.forward.x)));
+    // slide smoke when the AI breaks loose (only near the player, keep it cheap
+    // — and allocation-free: this line runs every frame for every rival)
+    const sideV = Math.abs(this.vel.x * Math.cos(this.heading) - this.vel.z * Math.sin(this.heading));
     if (sideV > 7 && !this.airborne && Math.random() < 0.35
         && this.pos.distanceToSquared(g.player.pos) < 14400) {
       const back2 = this.forward.multiplyScalar(-1);
@@ -1666,33 +2160,103 @@ export class EnemyCar extends Car {
       }
     }
 
+    // one forward vector for both weapon gates below (allocation-free per frame)
+    const nf = this.forward;
+    const alongP = toPlayer.x * nf.x + toPlayer.z * nf.z;  // >0: player is AHEAD of us
+    const acrossP = toPlayer.x * nf.z - toPlayer.z * nf.x; // lateral offset in our frame
+
     // drop a mine in the player's path: player 6..18 behind and roughly in-line
     this.mineCooldown -= dt;
     if (this.mineCooldown <= 0 && g.player.alive) {
-      const nf = this.forward;
-      const along = toPlayer.x * nf.x + toPlayer.z * nf.z;   // negative: player is behind
-      const across = toPlayer.x * nf.z - toPlayer.z * nf.x;
-      if (along < -6 && along > -18 && Math.abs(across) < 3.5
+      if (alongP < -6 && alongP > -18 && Math.abs(acrossP) < 3.5
           && Math.random() < dt * 1.5 * this.aggression * D.aiAggression) {
         this.mineCooldown = 6 + Math.random() * 4;
         g.weapons.dropMine(this);
       }
     }
 
-    // ---- one saved missile per race on high aggression (hard difficulty):
-    // fired up the player's tailpipe when they're 15..60 ahead and in-line
-    if (g.raceTime < 1) this._missileFired = false; // fresh race re-arms it
-    if (!this._missileFired && D.aiAggression > 1.1 && g.player.alive) {
-      const nfm = this.forward;
-      const alongP = toPlayer.x * nfm.x + toPlayer.z * nfm.z;
-      const acrossP = toPlayer.x * nfm.z - toPlayer.z * nfm.x;
-      if (alongP > 15 && alongP < 60 && Math.abs(acrossP) < 5) {
-        this._missileFired = true;
-        g.weapons.fireMissile(this); // enemy-owned missiles home on the player
-        g.audio.missile();
-        g.hud.feed('MISSILE INCOMING!', 'bad');
-        g.buzz([50, 35, 50]);
-      }
+    // ---- homing missiles up the leader's tailpipe (player 10..75u ahead,
+    // roughly in-line). The old design was ONE missile per rival per race and
+    // only on HARD — in practice players never saw a rocket (user report).
+    // Now: EASY never; NORMAL an occasional reminder (~one a minute); HARD the
+    // pack genuinely shoots back (~three a minute). Rate is owned by the
+    // pack-wide gate below, never by who is allowed to carry a rocket:
+    // the old NORMAL clause `_aiRank < 2` (front-runners only) was DEAD, because
+    // a launch also needs the player 15..60u AHEAD of the shooter — a rival
+    // running 1st or 2nd is by definition in front of a mid-pack player, so the
+    // two clauses could almost never be true at the same time. Rank now only
+    // decides how quickly a driver reloads.
+    const diffId2 = g.difficulty?.id ?? 'normal';
+    // grid stagger: nobody is armed off the line (per-rival reload), and the
+    // pack's rocket budget only opens after the first-launch delay below.
+    if (g.raceTime < 1) {
+      this.missileCd = 6 + Math.random() * 6;
+      g._aiRocketN = 0; g._aiRocketMin = 0;
+    }
+    this.missileCd = (this.missileCd ?? (6 + Math.random() * 6)) - dt;
+    // Pack-wide RATE GOVERNOR. With 5 rivals all holding a window, per-rival
+    // cooldowns alone produced a rocket every ~4s; a fixed pack cooldown then
+    // swung the other way — every window that opened while the cooldown ran was
+    // simply lost, so a player who was being beaten (nobody behind them to
+    // shoot) saw almost nothing. Launches are budgeted against race time
+    // instead: HARD one per 20s after 8s (~3/min), NORMAL one per 85s after 24s
+    // (~0.7/min). A quiet stretch banks up to 2 rockets so the pace is repaid
+    // at the next real opportunity, and 6s of minimum spacing stops a backlog
+    // arriving as a salvo.
+    const mFirst = diffId2 === 'hard' ? 8 : 24;
+    const mPeriod = diffId2 === 'hard' ? 20 : 85;
+    const mFired = g._aiRocketN ?? 0;
+    const mBudget = g.raceTime < mFirst ? 0
+      : Math.min(1 + Math.floor((g.raceTime - mFirst) / mPeriod), mFired + 2);
+    const mCdOk = this.missileCd <= 0;
+    const mDiffOk = diffId2 !== 'easy' && g.player.alive;
+    const mPackOk = mFired < mBudget && g.raceTime >= (g._aiRocketMin ?? 0);
+    // launch cone: the missile homes, so rough alignment is enough. The old
+    // flat ±5u gate was why rockets never flew — a rival on its racing line
+    // holds the player's exact wake for well under half a second. weapons.js
+    // only locks the player when they are inside the ±75° nose cone, so the
+    // "player ahead" test is not optional — it is what makes the rocket home.
+    // 10..75u: wide enough that a real chase converts into a launch. The old
+    // 15..60 window opened for barely 20 rival-seconds in a 90s race, so most
+    // of the pack's budget expired unused while a rival sat 12u off the player's
+    // bumper with a perfect shot.
+    const mRangeOk = alongP > 10 && alongP < 75;
+    const mConeOk = Math.abs(acrossP) < Math.min(14, 4 + alongP * 0.25);
+    // opt-in probe counters (headless): set __game.__fireProbe = {} before a run
+    // and every sub-condition of this gate is counted, so a clause that never
+    // goes true shows up as a zero instead of being guessed at.
+    const fp = g.__fireProbe;
+    if (fp) {
+      fp.frames = (fp.frames ?? 0) + 1;
+      if (mCdOk) fp.cdOk = (fp.cdOk ?? 0) + 1;
+      if (mDiffOk) fp.diffOk = (fp.diffOk ?? 0) + 1;
+      if (mPackOk) fp.packOk = (fp.packOk ?? 0) + 1;
+      if (mRangeOk) fp.rangeOk = (fp.rangeOk ?? 0) + 1;
+      if (mRangeOk && mConeOk) fp.coneOk = (fp.coneOk ?? 0) + 1;
+      if (mCdOk && mDiffOk && mPackOk) fp.armed = (fp.armed ?? 0) + 1;
+      if (mCdOk && mDiffOk && mPackOk && mRangeOk && mConeOk) fp.all = (fp.all ?? 0) + 1;
+      // A/B against the retired gate: `rank < 2` on NORMAL, window 15..60u.
+      // `oldShot` counts the frames that gate would ever have fired in.
+      const oldCarrier = diffId2 === 'hard' || (this._aiRank ?? 9) < 2;
+      const oldWindow = alongP > 15 && alongP < 60
+        && Math.abs(acrossP) < Math.min(12, 4 + alongP * 0.25);
+      if (oldCarrier) fp.rankOk = (fp.rankOk ?? 0) + 1;
+      if (oldWindow) fp.oldWindow = (fp.oldWindow ?? 0) + 1;
+      if (oldCarrier && oldWindow) fp.oldShot = (fp.oldShot ?? 0) + 1;
+      if (mRangeOk && mConeOk) fp.newShot = (fp.newShot ?? 0) + 1;
+    }
+    if (mCdOk && mDiffOk && mPackOk && mRangeOk && mConeOk) {
+      // front-runners reload faster; everyone can pull the trigger. Kept short
+      // (the pack budget is the real rate limit) so a long reload can't swallow
+      // the one window a chaser gets.
+      this.missileCd = ((this._aiRank ?? 9) < 2 ? 4 : 6) + Math.random() * 3;
+      g._aiRocketN = mFired + 1;
+      g._aiRocketMin = g.raceTime + 6;
+      g.weapons.fireMissile(this); // enemy-owned missiles home on the player
+      g.audio.missile();
+      g.hud.feed('MISSILE INCOMING!', 'bad');
+      g.buzz([50, 35, 50]);
+      if (fp) fp.fired = (fp.fired ?? 0) + 1;
     }
   }
 }
@@ -1750,6 +2314,7 @@ export class PlayerCar extends Car {
     this.plating = entry.stats.plating ?? 1;        // damage intake multiplier
     this.steerSmoothRate = 6; // input smoothing on (handling upgrade sharpens it)
     this.handling = 0;        // 0..1 — the lead sets this from the garage (0.2/level)
+    this.assist = 0;          // driving aid strength (settings menu: 0 / 0.5 / 1)
     this.steerSense = 1;      // settings-menu sensitivity (lead sets 0.8/1.0/1.25);
                               // scales steerRate + smoothing, independent of HANDLING
     this.name = 'YOU';

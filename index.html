@@ -6,13 +6,28 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>IGNITE RALLY — Racing Shooter</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#ffd400">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
+  /* Fonts are VENDORED, not fetched from Google. The game must boot with the
+     radio off (see sw.js) — one remote stylesheet would leave a phone at
+     30,000 ft staring at fallback type while it waited for a timeout. */
+  @font-face{font-family:'Luckiest Guy';font-style:normal;font-weight:400;font-display:swap;
+    src:url('./assets/fonts/luckiestguy-latin.woff2') format('woff2')}
+  @font-face{font-family:'Baloo 2';font-style:normal;font-weight:500 800;font-display:swap;
+    src:url('./assets/fonts/baloo2-latin.woff2') format('woff2')}
   :root{
     --yellow:#ffd400; --orange:#ff8c1a; --amber:#ffb52e; --green:#4dd06a; --red:#e8402a;
     --ink:#2b1c0e;
     --panel:rgba(38,26,12,.72); --edge:rgba(255,212,0,.5);
+    /* menu design tokens: one radius scale + shared hairline/label colors.
+       three border weights only: strong = pickable card, line = panel/chip,
+       soft = hairline rule inside a panel. */
+    --r-lg:16px; --r-md:12px; --r-sm:8px;
+    --line-strong:rgba(255,233,168,.38); --line:rgba(255,233,168,.3);
+    --line-soft:rgba(255,233,168,.14);
+    --gold-dim:#c9a86a; --cream:#ffe9a8;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{width:100%;height:100%;overflow:hidden;background:#7fb85c;
@@ -37,6 +52,15 @@
   #standings .srow{font-size:12px;font-weight:700;letter-spacing:1px;color:#d8c090;line-height:1.5}
   #standings .srow.me{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
   #standings .srow.dead{opacity:.45;text-decoration:line-through}
+  /* race contracts: compact readout under the standings (no map — ever) */
+  #contracts{margin-top:6px;border-top:1px solid rgba(255,212,0,.25);padding-top:5px}
+  #contracts:empty{display:none}
+  #contracts .clabel{font-size:9px;letter-spacing:3px;color:#e8c987;margin-bottom:1px}
+  #contracts .crow{display:flex;justify-content:space-between;gap:10px;font-size:10.5px;
+    font-weight:700;letter-spacing:.6px;color:#d8c090;line-height:1.55;white-space:nowrap}
+  #contracts .crow .cpay{color:#c9a86a}
+  #contracts .crow.done{color:#8de89a}
+  #contracts .crow.done .cpay{color:#8de89a}
 
   #score-box{position:absolute;top:12px;right:12px;padding:8px 16px;text-align:right}
   #score-box .label{font-size:10px;letter-spacing:3px;color:#e8c987}
@@ -176,6 +200,11 @@
     #race-info .lap{font-size:13px}
     #race-info .time{font-size:11px}
     #standings{display:none}
+    /* the standings list is too tall for a phone, but the three contract rows
+       are the money game — they stay, just tighter */
+    #contracts{margin-top:4px;padding-top:4px}
+    #contracts .clabel{font-size:8px;letter-spacing:2px}
+    #contracts .crow{font-size:9.5px;gap:6px}
     #score-box{padding:5px 10px}
     #score-box .val{font-size:16px}
     #feed{top:88px}
@@ -222,85 +251,164 @@
   .game-sub{margin-top:12px;font-size:clamp(12px,2vw,18px);letter-spacing:8px;color:#ffe9a8;text-transform:uppercase;
     text-shadow:1px 1px 0 var(--ink);text-align:center}
   /* ---------- MENU TABS + PANELS ---------- */
-  #menu-tabs{margin-top:20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}
-  .menu-tab{pointer-events:auto;cursor:pointer;padding:10px 26px;font-family:'Luckiest Guy';
-    font-size:15px;letter-spacing:3px;color:#c9a86a;border-radius:12px 12px 0 0;
-    border:2px solid rgba(255,233,168,.3);border-bottom:none;background:rgba(24,16,6,.55);
+  #menu-tabs{margin-top:20px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;justify-content:center}
+  .menu-tab{pointer-events:auto;cursor:pointer;min-height:42px;padding:11px 26px;font-family:'Luckiest Guy';
+    font-size:15px;letter-spacing:3px;color:var(--gold-dim);border-radius:var(--r-md) var(--r-md) 0 0;
+    border:2px solid var(--line);border-bottom:none;background:rgba(24,16,6,.55);
     -webkit-tap-highlight-color:transparent}
   .menu-tab.current{color:var(--ink);background:var(--yellow);border-color:var(--ink);
     box-shadow:0 -3px 0 rgba(0,0,0,.15) inset}
-  #credits-chip{margin-left:10px;padding:7px 16px;font-size:12px;letter-spacing:2px;font-weight:800;
-    color:#ffe9a8;border:2px solid rgba(255,233,168,.35);border-radius:20px;background:rgba(24,16,6,.7)}
+  /* the credits read-out is a chip, not a tab — same row, same height, pill shape */
+  #credits-chip{display:inline-flex;align-items:center;min-height:36px;margin-bottom:3px;
+    padding:0 16px;font-size:12px;letter-spacing:2px;font-weight:800;
+    color:var(--cream);border:2px solid var(--line-strong);border-radius:20px;background:rgba(24,16,6,.7)}
   #credits-chip b{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
-  .menu-panel{margin-top:0;width:min(94vw,660px);background:rgba(24,16,6,.66);
-    border:2px solid rgba(255,233,168,.3);border-radius:0 14px 14px 14px;
-    padding:12px 14px 16px;display:flex;flex-direction:column;align-items:center}
+
+  /* ---------- PLAYER PROFILES (local careers on one device) ---------- */
+  #profile-chip{pointer-events:auto;cursor:pointer;margin-left:6px;padding:7px 16px;font-size:12px;
+    letter-spacing:2px;font-weight:800;font-family:'Baloo 2';color:#ffe9a8;
+    border:2px solid rgba(255,233,168,.35);border-radius:20px;background:rgba(24,16,6,.7);
+    -webkit-tap-highlight-color:transparent;transition:transform .1s}
+  #profile-chip b{color:#7fd4ff;text-shadow:1px 1px 0 var(--ink)}
+  #profile-chip:active{transform:scale(.95)}
+  #profile-screen{z-index:30}
+  #profile-panel{border-radius:14px;margin-top:16px;width:min(94vw,430px)}
+  .prof-row{display:flex;align-items:center;gap:10px;align-self:stretch;
+    padding:8px 4px;border-top:1px solid rgba(255,233,168,.12)}
+  #profile-list .prof-row:first-child{border-top:none}
+  .prof-dot{flex:0 0 auto;width:16px;height:16px;border-radius:50%;border:2px solid var(--ink);
+    box-shadow:0 0 0 1px rgba(255,233,168,.35)}
+  .prof-info{flex:1;min-width:0;text-align:left}
+  .prof-info b{display:block;font-family:'Luckiest Guy';font-size:14px;letter-spacing:1.5px;
+    color:#ffe9c9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prof-row.active .prof-info b{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
+  .prof-info small{display:block;font-size:9.5px;font-weight:700;letter-spacing:1px;color:#c9a86a}
+  .prof-active{font-size:10px;font-weight:800;letter-spacing:2px;color:#8de89a;white-space:nowrap}
+  .prof-btn.danger{background:linear-gradient(180deg,#ff8a75,#e8402a);color:#fff8e0}
+  .prof-rename{pointer-events:auto;width:100%;padding:3px 7px;border-radius:7px;
+    font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.5px;color:var(--yellow);
+    background:rgba(12,8,3,.7);border:2px solid var(--yellow);outline:none;
+    text-transform:uppercase;-webkit-user-select:text;user-select:text}
+  #profile-list{align-self:stretch}
+  #profile-create{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;
+    align-self:stretch;padding-top:4px}
+  #profile-name-input{pointer-events:auto;width:150px;padding:7px 10px;border-radius:8px;
+    font-family:'Baloo 2';font-weight:800;font-size:13px;letter-spacing:2px;color:#fff3d0;
+    background:rgba(12,8,3,.6);border:2px solid rgba(255,233,168,.35);outline:none;
+    text-transform:uppercase;-webkit-user-select:text;user-select:text}
+  #profile-name-input:focus{border-color:var(--yellow)}
+  #profile-name-input::placeholder{color:rgba(255,233,168,.4)}
+  #profile-swatches{display:flex;gap:6px}
+  .prof-swatch{pointer-events:auto;cursor:pointer;width:24px;height:24px;border-radius:50%;
+    border:2px solid rgba(255,233,168,.3);-webkit-tap-highlight-color:transparent}
+  .prof-swatch.sel{border-color:var(--yellow);box-shadow:0 0 8px rgba(255,212,0,.6)}
+  /* row buttons must NOT inherit .up-buy's width:100% — that stole the whole
+     row and squeezed the driver's name into a four-line sliver */
+  .prof-row .prof-btn{width:auto;flex:0 0 auto;min-width:42px;min-height:34px;
+    padding:0 11px;font-size:11px;letter-spacing:1px}
+  .prof-row{overflow:hidden}
+  .prof-row .prof-info{flex:1 1 auto;min-width:0}
+  .prof-info small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* danger zone: reset (empties this driver) sits apart from ✕ (deletes them) */
+  .danger-head{color:#ff9d86 !important}
+  #profile-reset{display:flex;flex-direction:column;align-items:center;gap:7px;align-self:stretch}
+  #profile-reset-loss{font-size:10px;font-weight:800;letter-spacing:1.4px;color:#e8a08c;
+    text-align:center;line-height:1.5}
+  #profile-reset .reset-note{font-size:9px;font-weight:700;letter-spacing:1.6px;
+    color:var(--gold-dim);text-align:center}
+  .up-buy.danger{background:linear-gradient(180deg,#ff8a75,#e8402a);color:#fff8e0}
+  #profile-reset-btn{padding:9px 22px;font-size:13px;letter-spacing:2px}
+  /* armed = one tap away from destroying something; it must look like it */
+  .up-buy.armed{background:linear-gradient(180deg,#ffd400,#e8402a);color:#2b1c0e;
+    animation:armpulse .7s ease-in-out infinite alternate}
+  @keyframes armpulse{from{box-shadow:0 0 0 0 rgba(232,64,42,.6)}
+    to{box-shadow:0 0 0 7px rgba(232,64,42,0)}}
+  .menu-panel{margin-top:0;width:min(100%,660px);background:rgba(24,16,6,.66);
+    border:2px solid var(--line);border-radius:0 var(--r-lg) var(--r-lg) var(--r-lg);
+    padding:12px 16px 16px;display:flex;flex-direction:column;align-items:center}
   .menu-panel.off{display:none}
-  .panel-head{align-self:stretch;text-align:center;font-family:'Luckiest Guy';font-size:14px;
-    letter-spacing:4px;color:#ffe9a8;margin:8px 0 4px;text-shadow:1px 1px 0 var(--ink)}
-  .panel-head::before,.panel-head::after{content:'—';color:rgba(255,233,168,.35);margin:0 10px}
+  .panel-head{align-self:stretch;display:flex;align-items:center;gap:12px;
+    font-family:'Luckiest Guy';font-size:14px;letter-spacing:4px;color:var(--cream);
+    margin:8px 0 6px;text-shadow:1px 1px 0 var(--ink);white-space:nowrap}
+  .panel-head::before,.panel-head::after{content:'';flex:1;height:1px;background:var(--line-soft)}
 
   /* ---------- WORLD CARDS (track selection) ---------- */
-  #level-select{margin-top:10px;width:100%}
-  .region-head{margin:14px 0 6px;font-family:'Luckiest Guy';font-size:12px;letter-spacing:5px;
-    color:#c9a86a;text-align:center;text-shadow:1px 1px 0 var(--ink)}
+  #level-select{margin-top:8px;width:100%}
+  .region-head{display:flex;align-items:center;gap:10px;margin:16px 0 8px;
+    font-family:'Luckiest Guy';font-size:12px;letter-spacing:5px;
+    color:var(--gold-dim);text-shadow:1px 1px 0 var(--ink);white-space:nowrap}
+  .region-head::before,.region-head::after{content:'';flex:1;height:1px;background:var(--line-soft)}
   .region-head:first-child{margin-top:2px}
-  .region-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;width:100%}
+  /* auto-FILL (not -fit): regions with fewer worlds keep the same card width,
+     so every region shares one grid rhythm */
+  .region-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%}
   .level-chip{pointer-events:auto;cursor:pointer;padding:8px 8px 10px;font-family:'Baloo 2';
-    color:#ffe9a8;border-radius:12px;text-align:center;
-    border:2px solid rgba(255,233,168,.35);background:rgba(38,26,12,.6);
+    color:var(--cream);border-radius:var(--r-md);text-align:center;
+    border:2px solid var(--line-strong);background:rgba(38,26,12,.6);
     transition:transform .1s;-webkit-tap-highlight-color:transparent;display:flex;
     flex-direction:column;align-items:center;gap:3px}
   .level-chip:active{transform:scale(.96)}
   .level-chip.current{background:rgba(255,212,0,.16);border-color:var(--yellow);
     box-shadow:0 3px 0 var(--ink), 0 0 18px rgba(255,212,0,.25)}
   .level-chip.locked{opacity:.45;cursor:not-allowed}
-  .wc-shot{position:relative;width:100%;aspect-ratio:16/10;border-radius:8px;overflow:hidden;
+  .wc-shot{position:relative;width:100%;aspect-ratio:16/10;border-radius:var(--r-sm);overflow:hidden;
     background-size:cover;background-position:center;background-color:rgba(12,8,3,.65);
-    border:1px solid rgba(255,233,168,.18)}
+    border:1px solid var(--line-soft)}
   .wc-shot::after{content:'';position:absolute;inset:0;
     background:linear-gradient(180deg,transparent 55%,rgba(12,8,3,.5));pointer-events:none}
   .wc-map{position:absolute;top:4px;right:4px;width:64px;height:46px;border-radius:6px;
-    background:rgba(12,8,3,.55);border:1px solid rgba(255,233,168,.25);z-index:1}
+    background:rgba(12,8,3,.55);border:1px solid var(--line);z-index:1}
   .level-chip.locked .wc-shot{filter:grayscale(.75) brightness(.7)}
-  .wc-name{font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.5px;line-height:1.1}
+  /* reserve two lines for the name and pin the best-time line to the card
+     foot, so one- and two-line worlds still line up across a region row */
+  .wc-name{font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.5px;line-height:1.1;
+    min-height:2.2em;display:flex;align-items:center;justify-content:center}
   .level-chip.current .wc-name{color:var(--yellow)}
-  .wc-tags{font-size:9.5px;letter-spacing:.6px;color:#c9a86a;line-height:1.25}
-  .wc-best{font-size:10px;font-weight:800;letter-spacing:1px;color:#8de89a}
+  .wc-tags{font-size:9.5px;letter-spacing:.6px;color:var(--gold-dim);line-height:1.25}
+  .wc-best{margin-top:auto;padding-top:2px;font-size:10px;font-weight:800;letter-spacing:1px;color:#8de89a}
   .wc-best.new{color:var(--amber)}
-  #mode-select{margin-top:16px;display:flex;gap:8px;justify-content:center}
-  .mode-chip{pointer-events:auto;cursor:pointer;padding:8px 22px;font-family:'Luckiest Guy';
-    font-size:14px;letter-spacing:2px;color:#ffe9a8;border-radius:10px;
-    border:2px solid rgba(255,233,168,.3);background:rgba(38,26,12,.55);
+  /* ---------- SETTINGS SUB-PANEL (mode / difficulty / steering as labeled rows) ---------- */
+  #race-settings{margin-top:16px;width:100%;background:rgba(12,8,3,.35);
+    border:1px solid var(--line-soft);border-radius:var(--r-md);padding:2px 14px 12px}
+  #race-settings .panel-head{margin:10px 0 4px}
+  .set-row{display:grid;grid-template-columns:96px 1fr;gap:6px 12px;align-items:center;padding:6px 0}
+  .set-row + .set-row{border-top:1px solid var(--line-soft)}
+  .set-lbl{font-size:10px;font-weight:800;letter-spacing:2px;color:var(--gold-dim)}
+  #mode-select,#diff-select,#steer-select,#assist-select{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  /* one chip size across all settings rows: 40px tall (touch target), one radius */
+  .mode-chip,.diff-chip{pointer-events:auto;cursor:pointer;min-height:40px;padding:0 16px;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-family:'Baloo 2';font-weight:800;font-size:13px;letter-spacing:2px;color:#d8c090;
+    border-radius:var(--r-sm);border:2px solid var(--line);background:rgba(38,26,12,.5);
     -webkit-tap-highlight-color:transparent}
   .mode-chip.current{color:var(--ink);background:#7fd4ff;border-color:var(--ink);box-shadow:0 3px 0 var(--ink)}
-  #diff-select{margin-top:14px;display:flex;gap:8px;justify-content:center}
-  #steer-select{margin-top:10px;display:flex;gap:8px;justify-content:center;align-items:center;
-    flex-wrap:wrap;max-width:92vw}
-  #steer-select .lbl{font-size:11px;letter-spacing:2px;color:#c9a86a;font-weight:800}
-  .diff-chip{pointer-events:auto;cursor:pointer;padding:6px 16px;font-family:'Baloo 2';font-weight:800;
-    font-size:13px;letter-spacing:2px;color:#d8c090;border-radius:8px;
-    border:2px solid rgba(255,233,168,.25);background:rgba(38,26,12,.5);
-    -webkit-tap-highlight-color:transparent}
   .diff-chip.current{color:var(--ink);background:#8de89a;border-color:var(--ink)}
   .diff-chip.current.hard{background:#ff8a75}
   .diff-chip.current.normal{background:var(--yellow)}
 
-  /* ---------- CAR SHOP ---------- */
-  #car-shop{margin-top:8px;display:flex;gap:8px;overflow-x:auto;max-width:min(92vw,460px);
-    padding:4px 2px;scrollbar-width:none}
-  #car-shop::-webkit-scrollbar{display:none}
-  .car-card{pointer-events:auto;cursor:pointer;flex:0 0 auto;min-width:96px;text-align:center;
-    padding:8px 10px;border-radius:10px;border:2px solid rgba(255,233,168,.25);
+  /* ---------- CAR SHOP (horizontal shelf with visible scroll affordance) ---------- */
+  .shelf-wrap{position:relative;width:100%;margin-top:4px}
+  .shelf-wrap::before,.shelf-wrap::after{content:'';position:absolute;top:0;bottom:10px;width:22px;
+    z-index:1;pointer-events:none}
+  .shelf-wrap::before{left:0;background:linear-gradient(90deg,rgba(24,16,6,.85),transparent)}
+  .shelf-wrap::after{right:0;background:linear-gradient(270deg,rgba(24,16,6,.85),transparent)}
+  #car-shop{display:flex;gap:10px;overflow-x:auto;width:100%;
+    padding:4px 4px 10px;scrollbar-width:thin;scrollbar-color:rgba(255,212,0,.45) rgba(255,233,168,.08)}
+  #car-shop::-webkit-scrollbar{height:7px}
+  #car-shop::-webkit-scrollbar-thumb{background:rgba(255,212,0,.55);border-radius:4px}
+  #car-shop::-webkit-scrollbar-track{background:rgba(255,233,168,.1);border-radius:4px}
+  /* every card the same width + padding — the shelf reads as one row of equal tiles */
+  .car-card{pointer-events:auto;cursor:pointer;flex:0 0 140px;width:140px;text-align:center;
+    padding:10px;border-radius:var(--r-md);border:2px solid var(--line);
     background:rgba(38,26,12,.6);-webkit-tap-highlight-color:transparent}
   .car-card .car-icon{width:96px;height:62px;object-fit:contain;display:block;margin:0 auto 4px;
     filter:drop-shadow(0 4px 6px rgba(0,0,0,.45))}
   .car-card.locked .car-icon{filter:grayscale(.85) brightness(.75)}
-  .car-card .cname{font-family:'Luckiest Guy';font-size:12px;letter-spacing:1px;color:#ffe9a8}
-  .car-card .cdesc{font-size:9px;color:#c9a86a;letter-spacing:.5px}
+  .car-card .cname{font-family:'Luckiest Guy';font-size:12px;letter-spacing:1px;color:var(--cream)}
+  .car-card .cdesc{font-size:9px;color:var(--gold-dim);letter-spacing:.5px}
   .car-card .cstats{margin:5px 2px 0;display:grid;gap:2px}
   .car-card .cs-row{display:grid;grid-template-columns:26px 1fr;gap:5px;align-items:center}
-  .car-card .cs-row span{font-size:8px;font-weight:800;letter-spacing:1px;color:#c9a86a;text-align:left}
+  .car-card .cs-row span{font-size:8px;font-weight:800;letter-spacing:1px;color:var(--gold-dim);text-align:left}
   .car-card .cs-row i{display:block;height:5px;border-radius:3px;background:rgba(255,233,168,.14);overflow:hidden}
   .car-card .cs-row b{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#ffd400,#ff9d2e)}
   .car-card .cprice{font-size:11px;font-weight:800;color:var(--amber);margin-top:3px}
@@ -308,26 +416,43 @@
   .car-card.selected{border-color:var(--yellow);background:rgba(255,212,0,.18);box-shadow:0 3px 0 var(--ink)}
   .car-card.locked{opacity:.7}
 
-  /* ---------- PAUSE MENU ---------- */
+  /* ---------- PAUSE MENU (proper panel: title + grouped, uniform buttons) ---------- */
   #pause-menu{z-index:30}
-  #pause-menu .btn{margin-top:14px;padding:13px 54px;font-size:17px}
-  #pause-menu .btn.secondary{background:linear-gradient(180deg,#8a6a42,#5d4426)}
+  .pm-panel{width:min(92vw,340px);background:rgba(24,16,6,.82);border:2px solid var(--line);
+    border-radius:var(--r-lg);padding:18px 18px 20px;display:flex;flex-direction:column;gap:10px;
+    box-shadow:0 18px 40px rgba(0,0,0,.5);backdrop-filter:blur(6px)}
+  .pm-title{font-family:'Luckiest Guy';font-size:24px;letter-spacing:8px;color:var(--yellow);
+    text-align:center;text-shadow:3px 3px 0 var(--ink);margin-bottom:4px}
+  .pm-group{display:flex;flex-direction:column;gap:10px;padding-top:12px;
+    border-top:1px solid var(--line-soft)}
+  #pause-menu .btn{margin:0;width:100%;padding:12px 0;font-size:16px;letter-spacing:2px;
+    border-radius:var(--r-md)}
+  .btn.secondary{background:linear-gradient(180deg,#8a6a42,#5d4426)}
+  /* full-bleed buttons lift but never scale — scaling a 100%-wide button
+     inside a fixed panel pushes it past the panel edge on hover */
+  #pause-menu .btn:hover,.results-actions .btn:hover{transform:translateY(-2px)}
+  @media (max-height:480px){
+    .pm-panel{padding:12px 14px 14px;gap:7px}
+    .pm-title{font-size:19px;margin-bottom:0}
+    .pm-group{gap:7px;padding-top:8px}
+    #pause-menu .btn{padding:9px 0;font-size:14px}
+  }
 
-  /* ---------- GARAGE (detailed upgrades) ---------- */
-  #garage-rows{margin-top:6px;width:min(92vw,460px)}
-  .up-row{display:grid;grid-template-columns:38px 1fr auto auto;gap:10px;align-items:center;
-    padding:7px 0;border-top:1px solid rgba(255,233,168,.12)}
-  .up-row .ic{font-size:20px;text-align:center;background:rgba(255,233,168,.08);
-    border:1px solid rgba(255,233,168,.2);border-radius:9px;padding:5px 0}
+  /* ---------- GARAGE (detailed upgrades — fixed columns keep every row aligned) ---------- */
+  #garage-rows{margin-top:2px;width:100%}
+  .up-row{display:grid;grid-template-columns:40px 1fr 66px 88px;gap:10px;align-items:center;
+    padding:7px 0;border-top:1px solid var(--line-soft)}
+  .up-row:first-child{border-top:none}
+  .up-row .ic{font-size:18px;text-align:center;background:rgba(255,233,168,.08);
+    border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:7px 0}
   .up-row .up-lvl{display:block;font-size:9.5px;font-weight:800;color:var(--yellow);letter-spacing:1px}
-  .up-row .ic{font-size:18px;text-align:center}
   .up-row .nm{font-size:13px;font-weight:800;letter-spacing:1px;color:#ffe9c9;line-height:1.15}
-  .up-row .nm small{display:block;font-size:10px;font-weight:600;color:#c9a86a;letter-spacing:.5px}
-  .up-row .pips{font-size:11px;letter-spacing:2px;color:var(--yellow)}
+  .up-row .nm small{display:block;font-size:10px;font-weight:600;color:var(--gold-dim);letter-spacing:.5px}
+  .up-row .pips{font-size:11px;letter-spacing:2px;color:var(--yellow);text-align:center}
   .up-row .pips .off{color:rgba(255,233,168,.25)}
   .up-buy{pointer-events:auto;cursor:pointer;font-family:'Baloo 2';font-weight:800;font-size:12px;
-    padding:5px 10px;border-radius:8px;border:2px solid var(--ink);color:var(--ink);
-    background:linear-gradient(180deg,#ffd400,#ff9d2e);box-shadow:0 2px 0 var(--ink);
+    min-height:40px;width:100%;padding:0 8px;border-radius:var(--r-sm);border:2px solid var(--ink);
+    color:var(--ink);background:linear-gradient(180deg,#ffd400,#ff9d2e);box-shadow:0 2px 0 var(--ink);
     -webkit-tap-highlight-color:transparent;white-space:nowrap}
   .up-buy:disabled{opacity:.4;cursor:not-allowed}
   .up-buy.maxed{background:#4dd06a}
@@ -344,32 +469,84 @@
   body.touch .controls{display:none}
   #touch-note{display:none;margin-top:26px;font-size:14px;letter-spacing:2px;color:#ffe9c9;text-align:center;line-height:1.8}
   body.touch #touch-note{display:block}
-  .result-place{font-family:'Luckiest Guy';font-size:clamp(56px,10vw,120px);color:var(--yellow);
+  .result-place{font-family:'Luckiest Guy';font-size:clamp(56px,10vw,110px);color:var(--yellow);
     text-shadow:6px 6px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink)}
-  .result-stats{margin-top:24px;display:grid;grid-template-columns:auto auto;gap:9px 30px;
-    font-size:17px;letter-spacing:1px;color:#ffe9c9}
-  .result-stats b{color:#fff;text-align:right;font-family:'Luckiest Guy';font-size:18px;text-shadow:2px 2px 0 var(--ink)}
-  .footnote{margin-top:16px;font-size:11px;letter-spacing:2px;color:#c9a86a;text-align:center;width:100%}
-  #loading-note{margin-top:24px;font-size:12px;letter-spacing:3px;color:#c9a86a;text-align:center}
+  /* itemized credits breakdown on the results screen */
+  /* shares the results card's 380px edge so card, breakdown and buttons line up */
+  #credit-breakdown{margin-top:14px;width:min(92vw,380px);background:rgba(24,16,6,.55);
+    border:2px solid var(--line);border-radius:var(--r-lg);padding:10px 20px 12px}
+  #credit-breakdown .cb-head{font-family:'Luckiest Guy';font-size:12px;letter-spacing:4px;color:#ffe9a8;
+    text-align:center;margin-bottom:6px;text-shadow:1px 1px 0 var(--ink)}
+  #credit-breakdown .cb-row{display:flex;justify-content:space-between;gap:18px;font-size:12.5px;
+    font-weight:700;letter-spacing:1px;color:#d8c090;line-height:1.75}
+  #credit-breakdown .cb-row b{color:var(--amber);font-weight:800}
+  #credit-breakdown .cb-row.contract b{color:#8de89a}
+  #credit-breakdown .cb-row.missed{opacity:.45}
+  #credit-breakdown .cb-row.total{border-top:1px solid rgba(255,233,168,.25);margin-top:5px;padding-top:5px;color:#ffe9a8}
+  #credit-breakdown .cb-row.total b{color:var(--yellow)}
+  /* results: one stats card, label left / value right, ruled rows.
+     (a credits-breakdown block can slot into .results-card after .result-stats) */
+  .results-card{margin-top:18px;width:min(92vw,380px);background:rgba(24,16,6,.72);
+    border:2px solid var(--line);border-radius:var(--r-lg);padding:8px 20px;
+    backdrop-filter:blur(4px)}
+  .result-stats{display:flex;flex-direction:column;width:100%}
+  .result-stats .rrow{display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+    padding:9px 0;border-top:1px solid var(--line-soft)}
+  .result-stats .rrow:first-child{border-top:none}
+  .result-stats .rrow span{font-size:11px;font-weight:800;letter-spacing:2px;color:var(--gold-dim)}
+  .result-stats .rrow b{font-family:'Luckiest Guy';font-size:18px;color:#fff;
+    text-shadow:2px 2px 0 var(--ink);white-space:nowrap}
+  .result-stats .rrow.credits b{color:var(--amber)}
+  /* actions track the stats card width so the card + both buttons share one edge */
+  .results-actions{width:min(92vw,380px);display:flex;flex-direction:column;align-items:stretch;gap:12px;
+    margin-top:18px}
+  .results-actions .btn{margin:0;width:100%;padding:14px 20px;font-size:18px;letter-spacing:2px;
+    border-radius:var(--r-md)}
+  #results .game-sub{letter-spacing:6px}
+  .footnote{margin-top:16px;font-size:11px;letter-spacing:2px;color:var(--gold-dim);text-align:center;width:100%}
+  /* flight badge: says plainly whether the game is safe to take on a plane */
+  #offline-badge{margin-top:10px;font-size:10px;font-weight:800;letter-spacing:2px;text-align:center;
+    padding:4px 12px;border-radius:20px;border:2px solid var(--line-soft);color:var(--gold-dim);
+    background:rgba(12,8,3,.4)}
+  #offline-badge.ready{color:#8de89a;border-color:rgba(141,232,154,.45)}
+  #offline-badge.partial{color:var(--amber);border-color:rgba(255,181,46,.4)}
+  #loading-note{margin-top:24px;font-size:12px;letter-spacing:3px;color:var(--gold-dim);text-align:center}
   /* START is the one action that must never be out of reach: pin it to the
      bottom of the scrollport whenever its natural spot is below the fold */
-  #start-btn{position:sticky;bottom:10px;z-index:6;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+  #start-btn{margin-top:24px;position:sticky;bottom:10px;z-index:6;box-shadow:0 6px 18px rgba(0,0,0,.5)}
   #car-shop{touch-action:pan-x pan-y}
   /* compact menu on short viewports (phones, small laptops) */
   @media (max-height:1000px){
     .game-title{font-size:clamp(34px,7vw,64px)}
     .game-sub{margin-top:6px;letter-spacing:5px}
-    #level-select{margin-top:12px;gap:8px}
-    .level-chip{padding:7px 12px;font-size:12px}
-    #mode-select{margin-top:10px}
-    #diff-select{margin-top:10px}
-    #steer-select{margin-top:8px}
-    #car-shop{margin-top:6px}
-    #garage{margin-top:12px;padding:8px 12px 10px}
-    .up-row{padding:4px 0}
+    #level-select{margin-top:6px}
+    .level-chip{padding:7px 8px 9px}
+    #race-settings{margin-top:12px}
+    .up-row{padding:5px 0}
     .controls{margin-top:16px;font-size:12px;gap:4px 16px}
     #touch-note{margin-top:14px;font-size:12px;line-height:1.6}
     #loading-note{margin-top:12px}
+  }
+  /* narrow phones: settings labels stack above their chips; tighter columns */
+  @media (max-width:460px){
+    .game-sub{letter-spacing:3px}
+    #menu-tabs{margin-top:14px;gap:6px}
+    .menu-tab{padding:11px 18px;font-size:14px;letter-spacing:2px}
+    .set-row{grid-template-columns:1fr;padding:8px 0 9px}
+    /* chips share the row evenly instead of wrapping unevenly */
+    .mode-chip,.diff-chip{padding:0 8px;letter-spacing:1px;flex:1 1 0;min-width:0}
+    /* phone: pips drop under the name instead of stealing a column, so every
+       upgrade description fits on one line and all six rows are the same height */
+    .up-row{grid-template-columns:36px 1fr 76px;gap:2px 8px;
+      grid-template-areas:'ic nm buy' 'ic pips buy'}
+    .up-row .ic{grid-area:ic;align-self:stretch;display:flex;align-items:center;
+      justify-content:center;padding:0}
+    .up-row .nm{grid-area:nm;font-size:12px}
+    .up-row .pips{grid-area:pips;font-size:10px;letter-spacing:1px;text-align:left}
+    .up-buy{grid-area:buy}
+    .results-card,.results-actions{width:100%}
+    .results-card{padding:6px 16px}
+    .results-actions .btn{font-size:16px;letter-spacing:1px}
   }
 </style>
 </head>
@@ -382,6 +559,7 @@
     <div class="lap">LAP <span id="lap">1</span>/<span id="laps-total">3</span></div>
     <div class="time" id="race-time">0:00.0</div>
     <div id="standings"></div>
+    <div id="contracts"></div>
   </div>
 
   <div id="score-box" class="panel">
@@ -440,21 +618,26 @@
     <button id="tab-btn-race" class="menu-tab current">PRE-RACE</button>
     <button id="tab-btn-garage" class="menu-tab">GARAGE</button>
     <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
+    <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
   </div>
   <div id="tab-race" class="menu-panel">
     <div class="panel-head">MAP &amp; TRACK SELECTION</div>
     <div id="level-select"></div>
-    <div id="mode-select"></div>
-    <div id="diff-select"></div>
-    <div id="steer-select"></div>
+    <div id="race-settings">
+      <div class="panel-head">RACE SETTINGS</div>
+      <div class="set-row"><span class="set-lbl">MODE</span><div id="mode-select"></div></div>
+      <div class="set-row"><span class="set-lbl">DIFFICULTY</span><div id="diff-select"></div></div>
+      <div class="set-row"><span class="set-lbl">STEERING</span><div id="steer-select"></div></div>
+      <div class="set-row"><span class="set-lbl">DRIVING AID</span><div id="assist-select"></div></div>
+    </div>
   </div>
   <div id="tab-garage" class="menu-panel off">
     <div class="panel-head">YOUR MACHINES</div>
-    <div id="car-shop"></div>
-    <div class="panel-head">DETAILED UPGRADES</div>
+    <div class="shelf-wrap"><div id="car-shop"></div></div>
+    <div class="panel-head" id="garage-up-head">DETAILED UPGRADES</div>
     <div id="garage-rows"></div>
   </div>
-  <button id="start-btn" class="btn" style="margin-top:24px">START RACE</button>
+  <button id="start-btn" class="btn">START RACE</button>
   <div class="controls">
     <b>W / ↑</b><span>Throttle</span>
     <b>S / ↓</b><span>Brake / Reverse</span>
@@ -471,36 +654,77 @@
     RIGHT THUMB — FIRE cannon &nbsp;·&nbsp; 🚀 missile &nbsp;·&nbsp; 💣 mine &nbsp;·&nbsp; 💥 shockwave &nbsp;·&nbsp; ⚡ nitro
     &nbsp;·&nbsp; hold DRIFT to slide</div>
   <div id="loading-note">3 LAPS · 5 RIVALS · RAMPS · MINES · DESTROY OR BE DESTROYED</div>
+  <div id="offline-badge" class="arming">✈ STORING…</div>
   <div class="footnote">A TOY-BOX CIRCUIT DESIGNED ENTIRELY BY CLAUDE</div>
 </div>
 
+<div id="profile-screen" class="screen hidden">
+  <div class="game-sub" style="letter-spacing:10px">DRIVER PROFILES</div>
+  <div id="profile-panel" class="menu-panel">
+    <div class="panel-head">WHO'S DRIVING</div>
+    <div id="profile-list"></div>
+    <div class="panel-head">NEW PROFILE</div>
+    <div id="profile-create">
+      <input id="profile-name-input" maxlength="10" placeholder="NAME" autocomplete="off" spellcheck="false">
+      <div id="profile-swatches"></div>
+      <button id="profile-create-btn" class="up-buy">CREATE</button>
+    </div>
+    <div id="profile-cap-note" class="footnote" style="display:none">PROFILE LIMIT REACHED — DELETE ONE TO ADD ANOTHER</div>
+    <div class="panel-head danger-head">DANGER ZONE</div>
+    <div id="profile-reset">
+      <div id="profile-reset-loss"></div>
+      <button id="profile-reset-btn" class="up-buy danger">RESET CAREER</button>
+      <div class="reset-note">RESET EMPTIES THIS DRIVER · ✕ DELETES THEM</div>
+    </div>
+  </div>
+  <button id="profile-close" class="btn" style="margin-top:22px;padding:13px 54px;font-size:17px">CLOSE</button>
+</div>
+
 <div id="pause-menu" class="screen hidden">
-  <div class="game-sub" style="letter-spacing:12px">PAUSED</div>
-  <button id="pm-resume" class="btn">RESUME</button>
-  <button id="pm-camera" class="btn secondary">CAMERA VIEW 📷</button>
-  <button id="pm-steer" class="btn secondary">STEERING: NORMAL</button>
-  <button id="pm-restart" class="btn secondary">RESTART</button>
-  <button id="pm-exit" class="btn secondary">EXIT TO MENU</button>
+  <div class="pm-panel">
+    <div class="pm-title">PAUSED</div>
+    <button id="pm-resume" class="btn">RESUME</button>
+    <div class="pm-group">
+      <button id="pm-camera" class="btn secondary">CAMERA VIEW 📷</button>
+      <button id="pm-steer" class="btn secondary">STEERING: NORMAL</button>
+    </div>
+    <div class="pm-group">
+      <button id="pm-restart" class="btn secondary">RESTART</button>
+      <button id="pm-exit" class="btn secondary">EXIT TO MENU</button>
+    </div>
+  </div>
 </div>
 
 <div id="results" class="screen hidden">
-  <div class="game-sub" style="letter-spacing:14px">RACE COMPLETE</div>
+  <div class="game-sub">RACE COMPLETE</div>
   <div class="result-place titlefont" id="result-place">1ST</div>
-  <div class="result-stats">
-    <b id="r-score">0</b><span>FINAL SCORE</span>
-    <b id="r-kills">0</b><span>RIVALS DESTROYED</span>
-    <b id="r-time">0:00.0</b><span>RACE TIME</span>
-    <b id="r-best">0:00.0</b><span>BEST LAP</span>
-    <b id="r-credits" style="color:var(--amber)">+0</b><span>CREDITS EARNED</span>
+  <div class="results-card">
+    <div class="result-stats">
+      <div class="rrow"><span>FINAL SCORE</span><b id="r-score">0</b></div>
+      <div class="rrow"><span>RIVALS DESTROYED</span><b id="r-kills">0</b></div>
+      <div class="rrow"><span>RACE TIME</span><b id="r-time">0:00.0</b></div>
+      <div class="rrow"><span>BEST LAP</span><b id="r-best">0:00.0</b></div>
+      <div class="rrow credits"><span>CREDITS EARNED</span><b id="r-credits">+0</b></div>
+    </div>
   </div>
-  <button id="next-level-btn" class="btn" style="display:none">NEXT LEVEL ▶</button>
-  <button id="restart-btn" class="btn" style="margin-top:18px">RACE AGAIN</button>
+  <div id="credit-breakdown" style="display:none">
+    <div class="cb-head">CREDITS BREAKDOWN</div>
+    <div id="cb-rows"></div>
+  </div>
+  <div class="results-actions">
+    <button id="next-level-btn" class="btn" style="display:none">NEXT LEVEL ▶</button>
+    <button id="restart-btn" class="btn">RACE AGAIN</button>
+  </div>
 </div>
 
 <script type="importmap">
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
-<script type="module" src="./src/main.js?v=r27"></script>
+<script type="module" src="./src/main.js?v=r30"></script>
+<!-- offline arming: registers sw.js and drives the flight badge -->
+<script src="./src/offline.js?v=r30"></script>
+<!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
+<script type="module" src="./src/traffic.js?v=r30"></script>
 </body>
 </html>

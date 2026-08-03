@@ -6,7 +6,9 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', a
 const bugs = [];
 const note = (lvl, name, detail) => { bugs.push({ lvl, name, detail }); console.log(`  BUG  L${lvl} ${name}: ${detail}`); };
 
-for (let lvl = 1; lvl <= 18; lvl++) {
+// 21 worlds now — the three ALPINE PASSES were added after this loop was written
+// and were quietly going unswept.
+for (let lvl = 1; lvl <= 21; lvl++) {
   const page = await b.newPage({ viewport: { width: 800, height: 520 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   let name = `L${lvl}`;
@@ -75,9 +77,12 @@ for (let lvl = 1; lvl <= 18; lvl++) {
     // every AI must make real progress over 30s
     const stuck = r.aiDelta.filter(a => a.moved < 0.05);
     if (stuck.length) note(lvl, 'AI made no progress', JSON.stringify(stuck));
-    // AI should complete at least one lap in 30s of racing
-    const noLap = r.aiDelta.filter(a => a.lap < 2);
-    if (noLap.length === r.aiDelta.length) note(lvl, 'no AI completed a lap in 30s', JSON.stringify(r.aiDelta.map(a => a.lap)));
+    // Lap-counter sanity. A lap takes ~34s of game time and this probe covers
+    // roughly 7s of it, so nobody can legitimately have banked one. A car
+    // sitting on lap 2 here means the start line is gifting a lap — the grid
+    // spawn used to do exactly that, making every 3-lap race a 2-lap race.
+    const freeLap = r.aiDelta.filter(a => a.lap > 1);
+    if (freeLap.length) note(lvl, 'AI banked an impossible lap (free lap at the grid?)', JSON.stringify(freeLap));
     // AI falling off the world
     const lowAI = r.samples.some(s => s.ai.some(a => a.alive && a.y < -50));
     if (lowAI) note(lvl, 'AI fell out of the world', '');
