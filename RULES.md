@@ -110,6 +110,16 @@ but sparks — a long wall grind must never wreck a car on its own. The chase
 camera is also clamped inside the walls (lateral ≤ 8.4) so the view never
 passes through rock.
 
+**In RACE mode the canyon is closed**: the player and all AI are held inside
+the walls (the low berm by the start bowl is the only opening).
+
+**In FREE ROAM the canyon is a door, not a fence** (Law of Solidity #3 — roam
+differs only in REACH). The rock stays solid, but once a roamer has driven out
+through the low start berm and is past the wall's outer face
+(`base + l1 + l2 + 1.5`), the clamp releases and they stay on the open ground
+beyond. Without this the clamp yanked escapees back *through* the cliff, which
+stranded all 12 treasure stars on every canyon world.
+
 ### Dynamic hazards (theme-declared)
 
 Worlds opt into live hazards with data on their theme; the runtime systems are
