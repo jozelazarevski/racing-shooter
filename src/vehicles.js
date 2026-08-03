@@ -926,6 +926,15 @@ export class Car {
         // bowl, where the cliffs open up and free-roamers can drive out
         const prof = t._cliffProfile ? t._cliffProfile(this.trackIndex, fside) : null;
         wallHere = !prof || prof.h > 2.5;
+        // FREE ROAM law (RULES.md: roam differs only in REACH): the rock is
+        // solid, but it is not an infinite fence. Once a roamer is past the
+        // outer face — having driven out through the low berm — they are on
+        // open ground and must stay there. Without this the clamp yanked them
+        // back THROUGH the cliff, stranding every off-road treasure star.
+        if (wallHere && freeRoam && prof) {
+          const outer = prof.base + prof.l1 + prof.l2 + 1.5;
+          if (Math.abs(this.lateral) > outer) wallHere = false;
+        }
       }
     }
     if (wallHere) {

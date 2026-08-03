@@ -886,9 +886,12 @@ class Game {
     if (!this.freeRoam) return;
     const t = this.track;
     const glow = glowTexture();
+    // canyon worlds: clear the rock band (~15u) so no star spawns inside a
+    // cliff face — roamers reach these by driving out through the start berm
+    const minLat = t.T?.cliffWalls ? 24 : 16;
     for (let k = 0; k < 12; k++) {
       const idx = Math.floor(t.N * (k + 0.5) / 12);
-      const lat = (k % 2 ? -1 : 1) * (16 + (k * 7) % 26); // properly off-road
+      const lat = (k % 2 ? -1 : 1) * (minLat + (k * 7) % 26); // properly off-road
       const c = t.pointAt(idx, 0), n = t.nrm[idx];
       const x = c.x + n.x * lat, z = c.z + n.z * lat;
       const y = t.terrainHeight(x, z);
