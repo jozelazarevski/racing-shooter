@@ -1941,7 +1941,7 @@ export class Track {
     // Pass worlds are built as a shelf cut into the face: instead of a broad
     // dirt apron the edge falls almost vertically, so each switchback leg
     // reads as its own stone-faced terrace with the parapet on its lip.
-    const steep = !!this.T.retainingWalls;
+    const steep = !!(this.T.retainingWalls || this.T.shelfRoad);
     const dirt = this.T.skirtColor
       ? new THREE.Color(this.T.skirtColor)
       : new THREE.Color(this.T.terrainDirt).lerp(new THREE.Color(0x8a5a32), 0.4);
@@ -2706,6 +2706,8 @@ export class Track {
     if (this.T.lamps) this._buildLamps();            // neon / undercity road lamps
     if (this.T.logYards) this._buildLogYards();      // flume timber stacks
     if (this.T.retainingWalls) this._buildRetainingWalls();   // alpine-pass parapets
+    if (this.T.guardFence) this._buildGuardFence();           // breakable mountain rail fence
+    if (this.T.roadCabins) this._buildRoadCabins();           // log cabins on the shelves
     if (this.T.snowPatches) this._buildSnowPatches(m4);       // old snow at altitude
     this._buildWorldElements(m4);                    // farms, chapels, fences, dressing
     this._buildPastures();                           // grazing spots for the animal system
@@ -2758,6 +2760,81 @@ export class Track {
     mesh.count = k;
     mesh.name = 'retaining-wall';
     if (k) this.scene.add(mesh);
+  }
+
+  /** FURKA RIDGE: the reddish wooden guard fence that runs the DOWNHILL edge
+   *  of a mountain pass — posts and two rails, following the road all the way
+   *  down the serpentine, with gaps through the hairpins.
+   *
+   *  It is BREAKABLE, never a wall: every bay is one instance of a single
+   *  InstancedMesh (one draw call for the whole pass) plus an entry in the
+   *  existing knockable-board array, so a car bursts through it at speed and
+   *  missiles/blasts level it, exactly like a sponsor board. `smashBanner`
+   *  below zeroes the instance and hands back a loose bay to fling. */
+  _buildGuardFence() {
+    const S = this.T.guardFence;
+    const LAT = S.lateral, MAX = S.max || 190;
+    const geo = mergeBoxes([
+      { w: 0.24, h: 1.5, d: 0.24, x: -2.5, y: 0.75, z: 0 },
+      { w: 0.24, h: 1.5, d: 0.24, x: 2.5, y: 0.75, z: 0 },
+      { w: 5.4, h: 0.2, d: 0.14, x: 0, y: 1.28, z: 0 },
+      { w: 5.4, h: 0.2, d: 0.14, x: 0, y: 0.78, z: 0 },
+    ]);
+    const mat = new THREE.MeshStandardMaterial({ color: S.color, roughness: 0.95 });
+    const mesh = new THREE.InstancedMesh(geo, mat, MAX);
+    mesh.castShadow = true;
+    mesh.name = 'guard-fence';
+    this._guardFenceMesh = mesh;
+    this._guardFenceGeo = geo;
+    this._guardFenceMat = mat;
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    const step = Math.max(2, Math.round(5.6 / this.segLen));   // one bay ≈ 5.6u
+    let k = 0;
+    for (let i = 0; i < N && k < MAX; i += step) {
+      if (this._circDist(i, 0) < 30) continue;                 // clear of the gate
+      if (this.curvature[i] > 0.045) continue;                 // gap through hairpins
+      // downhill side: the edge that falls away
+      let side = 0, drop = 0;
+      for (const sd of [1, -1]) {
+        const p = this.pointAt(i, LAT * sd);
+        const d = p.y - this._terrainMeshHeight(p.x, p.z);
+        if (d > drop) { drop = d; side = sd; }
+      }
+      if (!side || drop < 1.4) continue;
+      const p = this.pointAt(i, LAT * side);
+      q.setFromAxisAngle(up, this.headingAt(i));
+      m4.compose(new THREE.Vector3(p.x, p.y - 0.35, p.z), q, new THREE.Vector3(1, 1, 1));
+      mesh.setMatrixAt(k, m4);
+      this.banners.push({
+        x: p.x, z: p.z, y: p.y - 0.35, r: 1.2, dead: false,
+        kind: 'fence', id: k, heading: this.headingAt(i),
+      });
+      k++;
+    }
+    mesh.count = k;
+    if (k) this.group.add(mesh);
+  }
+
+  /** Log cabins standing on the shelves right beside the pass, the way real
+   *  mountain huts do. Uses the world-element archetypes so they are SOLID
+   *  'hut' colliders with plank-burst crashes like every other building. */
+  _buildRoadCabins() {
+    const K = ELEMENT_KITS[this.T.elements || 'alpine'];
+    const B = { wall: [], box: [], cyl: [], cone: [], prism: [] };
+    let placed = 0;
+    for (let tries = 0; tries < 220 && placed < this.T.roadCabins; tries++) {
+      const i = (Math.random() * N) | 0;
+      if (this._circDist(i, 0) < 40) continue;
+      const side = Math.random() < 0.5 ? 1 : -1;
+      const p = this.pointAt(i, side * (20 + Math.random() * 14));
+      if (!this._buildableSpot(p.x, p.z, 7, 2.4)) continue;
+      // face the road
+      const rot = this.headingAt(i) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      this._element(B, Math.random() < 0.7 ? 'house' : 'shed', p.x, p.z, rot, K);
+      placed++;
+    }
+    if (placed) this._realizeElements(B, new THREE.Matrix4());
   }
 
   /** Old snow lying in the hollows above `minY`: flat white decals conformed
@@ -3338,7 +3415,7 @@ export class Track {
     }
     // --- reflector marker posts on corner outsides ---
     // (skipped where stone already lines the road: canyon cliffs, pass parapets)
-    if (T.cliffWalls || T.retainingWalls) return;
+    if (T.cliffWalls || T.retainingWalls || T.guardFence) return;
     const postGeo = new THREE.BoxGeometry(0.15, 0.85, 0.15);
     postGeo.translate(0, 0.43, 0);
     const bandGeo = new THREE.BoxGeometry(0.18, 0.22, 0.18);
@@ -4895,7 +4972,7 @@ export class Track {
         // cliff-walled levels stack the tires right against the rock face;
         // pass levels tuck them inside the stone parapet
         const tireOff = this.T.cliffWalls ? WALL_OFF + 0.8
-          : this.T.retainingWalls ? WALL_OFF + 1.2 : WALL_OFF + 2.2;
+          : (this.T.retainingWalls || this.T.guardFence) ? WALL_OFF + 1.2 : WALL_OFF + 2.2;
         const p = this.pointAt(i, tireOff * side);
         const stack = Math.random() < 0.5 ? 3 : 2;
         const ids = [];
@@ -4954,7 +5031,7 @@ export class Track {
     // inside the canyon instead of vanishing behind it; pass levels stand them
     // clear of the stone parapet
     const boardOff = this.T.cliffWalls ? WALL_OFF + 0.75
-      : this.T.retainingWalls ? WALL_OFF + 6.4 : WALL_OFF + 3.6;
+      : (this.T.retainingWalls || this.T.guardFence) ? WALL_OFF + 6.4 : WALL_OFF + 3.6;
     for (let b = 0; b < 10; b++) {
       const i = ((b + 0.5) * N / 10) | 0;
       if (this.curvature[i] > this.T.boardMaxCurv) continue; // keep boards off tight corners
@@ -4986,6 +5063,18 @@ export class Track {
   smashBanner(b) {
     if (!b || b.dead) return null;
     b.dead = true;
+    // guard-fence bay: zero its instance and hand back a loose bay to fling
+    if (b.kind === 'fence') {
+      if (!this._guardFenceMesh) return null;
+      _m4.makeScale(0, 0, 0);
+      this._guardFenceMesh.setMatrixAt(b.id, _m4);
+      this._guardFenceMesh.instanceMatrix.needsUpdate = true;
+      const bay = new THREE.Mesh(this._guardFenceGeo, this._guardFenceMat);
+      bay.castShadow = true;
+      bay.position.set(b.x, b.y, b.z);
+      bay.rotation.y = b.heading;
+      return bay;
+    }
     b.group.visible = false;
     const g = new THREE.Group();
     const board = new THREE.Mesh(b.board.geometry, b.board.material);

@@ -7,6 +7,13 @@ is a bug. The conformance table at the bottom tracks the honest current state.
 
 ---
 
+## 0. Hard UI rules
+
+1. **NO MINIMAPS. Ever.** No map overlay of any kind, in any corner, in any
+   mode — the user has removed one twice. The road itself, the HUD standings
+   and the position panel carry all navigation information. Any future request
+   that seems to imply a map must be re-checked against this rule first.
+
 ## 1. The Law of Solidity
 
 1. **Nothing readable as an object may be intangible.** If the player can see
