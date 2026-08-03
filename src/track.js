@@ -1268,6 +1268,46 @@ export function circuitPoints(themeKey) { return CIRCUITS[themeKey] || CIRCUITS.
 export const ROAD_HALF = 9; // drivable half-width
 export const WALL_OFF = 10.4;
 
+// ---- width-variation ----
+// Per-theme narrow-section tuning: {count, min} — `min` is the pinch floor as
+// a fraction of ROAD_HALF. Themes may also declare `narrows` directly on their
+// THEMES entry (it wins). Cliff-walled corridors (canyon/glacial/ravine/
+// sheetice/undercity) are auto-off — those roads are already the constraint.
+// Everything else defaults to { count: 3, min: 0.6 }.
+const NARROW_TUNE = {
+  avalanche: { count: 4, min: 0.55 },  // the pass squeezes hardest
+  alpine: { count: 2, min: 0.62 },     // switchback stack is left alone
+  dunes: { count: 2, min: 0.65 },      // fast flow world — gentler pinches
+  neon: { count: 2, min: 0.65 },       // expressway keeps its speed
+};
+// ---- river-fords ----
+// Worlds with shallow watercourses crossing the road (visible stream + splash
+// + wet-tire traction loss; consumed by the vehicle code via track.fords).
+// Themes may declare `fords: {count}` on their THEMES entry (it wins).
+const FORD_TUNE = {
+  forest: { count: 2 }, alpine: { count: 2 }, jungle: { count: 3 },
+  oasis: { count: 2 }, flume: { count: 2 }, redwood: { count: 2 },
+};
+// ---- viz-zones ----
+// Sectional visibility hazards, per theme: [kind, count] pairs.
+//   'forest'  — thick tree corridor pressed against both road edges + gloom
+//   'fogbank' — localized dense fog (pure zone data; runtime pulls fog in)
+//   'squall'  — rain burst + fog pull on wet worlds
+// Exposed as track.vizZones [{i0, i1, len, mid, half, kind, strength}];
+// the game lead lerps scene fog from it, rivals slow inside.
+const VIZ_TUNE = {
+  forest: [['forest', 2], ['squall', 1]],
+  alpine: [['forest', 2], ['fogbank', 1]],
+  redwood: [['forest', 2]],
+  flume: [['forest', 2]],
+  wildfire: [['forest', 1]],
+  jungle: [['forest', 2], ['squall', 1]],
+  avalanche: [['forest', 1], ['fogbank', 2]],
+  snow: [['fogbank', 2]],
+  glacial: [['fogbank', 1]],
+  sheetice: [['fogbank', 1]],
+};
+
 const SPONSORS = [
   ['AETHER', '#14243a', '#7fd4ff'],
   ['HYPER-FLUX', '#2a1436', '#ff7fd4'],
@@ -1586,6 +1626,9 @@ export class Track {
       this.curvature[i] = Math.acos(THREE.MathUtils.clamp(a.dot(b), -1, 1)) / (16 * this.segLen);
     }
 
+    // ---- width-variation: per-sample drivable half-width (pinch sections) ----
+    this._buildWidthProfile();
+
     this._checkLayout();
 
     // the hero gorge must exist before ANY height is sampled (terrain mesh,
@@ -1599,6 +1642,15 @@ export class Track {
     // World-space mud puddles on the road: [{x, z, r}]. Always present; [] on
     // levels without them. Visual decals here — driving effects live elsewhere.
     this.puddles = [];
+    // ---- river-fords: shallow water bands crossing the road. [{i, x, z, y,
+    // half}] where `half` is the half-width of the band in world units along
+    // the track. Always present; [] on dry levels. Splash/wet-tire physics
+    // lives in the vehicle code.
+    this.fords = [];
+    // ---- viz-zones: sectional visibility hazards [{i0, i1, len, mid, half,
+    // kind, strength}]. Always present; [] on clear worlds. The game lead
+    // reads this to pull scene fog in while the player is inside.
+    this.vizZones = [];
     // Destructible roadside props: [{mesh, x, z, r, type, scoreValue, pickup}].
     // Always present. The game code detects car contact, removes the entry and
     // animates the mesh flying away itself; `pickup` is a type string on the
@@ -1645,6 +1697,9 @@ export class Track {
     this._buildBoostPads();  // …then pads fill in around them
     this._buildObstacles();  // …then rock towers block straights between them
     this._buildPuddles();
+    this._buildFords();      // ---- river-fords: streams wash over the road
+    this._buildVizZones();   // ---- viz-zones: forest tunnels / fog banks / squalls
+    this._buildNarrowDressing(); // ---- width-variation: pinch edge markers
     this._buildProps();      // …and smashable props fill the roadsides
     this._buildEnvironment();
   }
@@ -1708,6 +1763,127 @@ export class Track {
   slopeAt(i) {
     return this._slope[((i % N) + N) % N];
   }
+
+  // ---- width-variation ----------------------------------------------------
+  /** Drivable half-width at sample i. ROAD_HALF everywhere except inside a
+   *  narrow section, where it smoothly pinches to ~55–65% and back. Physics
+   *  callers use `t.widthAt?.(i) ?? ROAD_HALF` so either side of a merge
+   *  degrades gracefully. */
+  widthAt(i) {
+    const w = this._width;
+    return w ? w[((i % N) + N) % N] : ROAD_HALF;
+  }
+
+  /** True when sample i lies within `pad` samples of a narrow section
+   *  (used by ramp/pad/obstacle/prop placement so nothing big lands in, or
+   *  hangs off, a pinched stretch of road). */
+  _nearNarrow(i, pad = 0) {
+    return (this._narrowSecs ?? []).some((s) => this._circDist(i, s.mid) < s.half + pad);
+  }
+
+  /** Deterministic per-theme narrow sections: 2–4 stretches of 34–68 samples
+   *  on straights/mild curves where the road pinches to `min`×ROAD_HALF with
+   *  smooth cosine shoulders. Off for cliff-walled corridors (already tight). */
+  _buildWidthProfile() {
+    this._width = new Float32Array(N).fill(ROAD_HALF);
+    this._narrowSecs = [];
+    const T = this.T;
+    const themeKey = (this.level && this.level.theme) || 'forest';
+    const spec = T.narrows !== undefined
+      ? T.narrows
+      : T.cliffWalls ? false : (NARROW_TUNE[themeKey] ?? { count: 3, min: 0.6 });
+    if (!spec || !(spec.count > 0)) return;
+    // seeded LCG from the theme name — layouts stay deterministic across loads
+    let seed = 2166136261 >>> 0;
+    for (let k = 0; k < themeKey.length; k++) {
+      seed = ((seed ^ themeKey.charCodeAt(k)) * 16777619) >>> 0;
+    }
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    for (let tries = 0; tries < 500 && this._narrowSecs.length < spec.count; tries++) {
+      const len = 34 + Math.floor(rnd() * 34);            // 34–68 samples
+      const i0 = Math.floor(rnd() * N);
+      // clear of the start/grid both ends
+      if (this._circDist(i0, 0) < 90 || this._circDist((i0 + len) % N, 0) < 90) continue;
+      // straights / mild curves only — never mid-hairpin
+      let ok = true;
+      for (let k = -8; ok && k <= len + 8; k++) {
+        if (this.curvature[(i0 + k + N) % N] > 0.016) ok = false;
+      }
+      if (!ok) continue;
+      const mid = (i0 + (len >> 1)) % N;
+      const half = len / 2;
+      if (this._narrowSecs.some((s) => this._circDist(mid, s.mid) < s.half + half + 110)) continue;
+      // pinch floor ≈ 55–65% of ROAD_HALF (never below 5u half-width)
+      const minW = Math.max(5, ROAD_HALF * (spec.min ?? 0.6) * (0.95 + rnd() * 0.12));
+      this._narrowSecs.push({ i0, len, mid, half, minW });
+      for (let k = 0; k <= len; k++) {
+        // cosine shoulders over the outer 35% each side, flat floor between
+        const edge = Math.min(k, len - k) / (len * 0.35);
+        const f = THREE.MathUtils.smoothstep(Math.min(1, edge), 0, 1);
+        const j = (i0 + k) % N;
+        this._width[j] = Math.min(this._width[j], ROAD_HALF + (minW - ROAD_HALF) * f);
+      }
+    }
+  }
+
+  /** Pinch dressing: the squeeze must read as intentional — stone markers and
+   *  a hazard-striped post pair at each pinch entry/exit, plus rocks tracing
+   *  the narrowed edges. Markers are SOLID stone (Law of Solidity).
+   *
+   *  A pinch is a SQUEEZE, never a trap: every marker is pushed out far enough
+   *  that its collision face clears the declared drivable width. The car body
+   *  collides as a CAR_R-radius disc against `solids` (see vehicles.js), so a
+   *  marker of radius r must sit at |lateral| ≥ widthAt + r + CAR_R for the
+   *  full width to stay honestly free. Clip one and you were already off the
+   *  road — running wide is punished, threading the gap is not. */
+  _buildNarrowDressing() {
+    if (!this._narrowSecs || !this._narrowSecs.length) return;
+    const CAR_R = 1.8; // car collision radius used by the solids sweep
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: this.T.rockColor ?? 0x8d8578, flatShading: true, roughness: 1,
+    });
+    const postMat = new THREE.MeshStandardMaterial({ map: hazardTexture(), roughness: 0.85 });
+    const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+    const postGeo = new THREE.CylinderGeometry(0.16, 0.22, 2.2, 6);
+    const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
+    for (const sec of this._narrowSecs) {
+      for (const side of [1, -1]) {
+        // striped posts flag the entry and the exit of the squeeze
+        for (const k of [2, sec.len - 2]) {
+          const j = (sec.i0 + k) % N;
+          const lat = (this.widthAt(j) + 0.45 + CAR_R + 0.2) * side;
+          const p = this.pointAt(j, lat);
+          const post = new THREE.Mesh(postGeo, postMat);
+          post.position.set(p.x, p.y + 1.05, p.z);
+          post.castShadow = true;
+          this.group.add(post);
+          this.solids.push({ x: p.x, z: p.z, r: 0.45, y: p.y, mat: 'metal' });
+          this._addShadow(p.x, p.z, 0.8, p.y);
+        }
+        // low stone teeth trace the pinched edge so it reads as built, not broken
+        for (let k = 6; k < sec.len - 4; k += 7) {
+          const j = (sec.i0 + k) % N;
+          const w = this.widthAt(j);
+          if (w > ROAD_HALF - 0.8) continue;             // only along the squeeze
+          const s = 0.55 + hash(j * 7.7 - side) * 0.5;
+          const lat = (w + s * 0.95 + CAR_R + 0.2 + hash(j * 3.1 + side) * 0.7) * side;
+          const p = this.pointAt(j, lat);
+          const rock = new THREE.Mesh(rockGeo, rockMat);
+          rock.scale.set(s, s * 0.75, s * 0.9);
+          rock.rotation.y = hash(j * 1.3) * Math.PI * 2;
+          rock.position.set(p.x, p.y + s * 0.3, p.z);
+          rock.castShadow = true;
+          this.group.add(rock);
+          this.solids.push({ x: p.x, z: p.z, r: s * 0.95, y: p.y, mat: 'stone' });
+          this._addShadow(p.x, p.z, s * 1.3, p.y);
+        }
+      }
+    }
+  }
+  // ---- end width-variation -------------------------------------------------
 
   // ---------- queries ----------
   nearestIndex(pos, hint = null) {
@@ -2008,10 +2184,12 @@ export class Track {
     const verts = new Float32Array((N + 1) * 2 * 3);
     const uvs = new Float32Array((N + 1) * 2 * 2);
     const idx = [];
-    const w = WALL_OFF + 0.6;
     for (let i = 0; i <= N; i++) {
       const j = i % N;
       const c = this.center[j], n = this.nrm[j];
+      // ---- width-variation: the ribbon follows the drivable width profile
+      // (fringe margin beyond ROAD_HALF is preserved, so edges converge) ----
+      const w = this.widthAt(j) + (WALL_OFF + 0.6 - ROAD_HALF);
       const o = i * 6;
       // under a hero bridge the ribbon drops away so the plank deck laid on
       // top of it is never coplanar (coplanar strips z-fight into dark bands
@@ -2105,16 +2283,18 @@ export class Track {
         // over the gorge the road is a bridge deck: the apron collapses to a
         // thin lip instead of hanging a curtain down into the chasm
         const onSpan = this._gorge && this._circDist(j, this._gorge.i) < this._spanSamples() + 4;
+        // ---- width-variation: skirts hug the (possibly pinched) road edge ----
+        const wOff = WALL_OFF + this.widthAt(j) - ROAD_HALF;
         const face = onSpan ? 0.5 : steep
           ? 1.35 + Math.sin(9 * t + side) * 0.18
           : 2.6 + Math.sin(9 * t + side) * 0.4;
-        const latToe = Math.min(WALL_OFF + face + (onSpan ? 0.3 : steep ? 1.1 : 2.8), maxLat);
+        const latToe = Math.min(wOff + face + (onSpan ? 0.3 : steep ? 1.1 : 2.8), maxLat);
         const ground = this._terrainMeshHeight(c.x + n.x * latToe * side, c.z + n.z * latToe * side);
         // on a bridge span the apron collapses to a hair under the deck edge
         const toeY = onSpan ? c.y - 1.6 : Math.min(c.y - 2.9, ground - 0.6);
         const rowSpec = [
-          [Math.min(WALL_OFF + 0.55, maxLat), c.y - (onSpan ? 0.34 : 0.06), dirt],
-          [Math.min(WALL_OFF + face, maxLat),
+          [Math.min(wOff + 0.55, maxLat), c.y - (onSpan ? 0.34 : 0.06), dirt],
+          [Math.min(wOff + face, maxLat),
             c.y - (steep ? 1.5 : 2.1) - Math.sin(17 * t - side) * 0.35, dirt],
           [latToe, toeY, dark],
         ];
@@ -2366,6 +2546,7 @@ export class Track {
     const min = this.T.padMaxCurv;
     let last = -999;
     for (let i = 40; i < N && this.boostPads.length < 5; i += 10) {
+      if (this._nearNarrow(i, 14)) continue; // ---- width-variation: pads clear of pinches
       if (this.ramps.some((r) => this._circDist(i, r.index) < 50)) continue;
       if (this._nearGorge(i, 50)) continue;
       if (this.curvature[i] < min && i - last > 140) {
@@ -2396,6 +2577,7 @@ export class Track {
     const windows = [];
     for (let i = 0; i < N; i += 5) {
       if (i < 60 || i > N - 90) continue; // keep clear of the start gate
+      if (this._nearNarrow(i, 30)) continue; // ---- width-variation: no ramps in pinches
       let maxCurv = 0;
       for (let k = -4; k < 22; k++) maxCurv = Math.max(maxCurv, this.curvature[(i + k + N) % N]);
       windows.push({ i, maxCurv });
@@ -2470,6 +2652,7 @@ export class Track {
     for (let i = 0; i < N && chosen.length < spec.count; i += 7) {
       if (this._circDist(i, 0) < 60) continue;
       if (this._nearGorge(i, 45)) continue;
+      if (this._nearNarrow(i, 25)) continue; // ---- width-variation: keep blockers out of pinches
       // alpine: loose boulders litter the fast DESCENT only (the downhill
       // window is short, so they pack tighter, and rockfall on a sweeper is
       // fair game — elsewhere obstacles keep to straights)
@@ -2602,6 +2785,7 @@ export class Track {
     for (let i = 3; i < N && chosen.length < count; i += 5) {
       if (this._circDist(i, 0) < 50) continue;
       if (this._nearGorge(i, 40)) continue;
+      if (this._nearNarrow(i, 6)) continue; // ---- width-variation: puddles clear of pinches
       if (this.ramps.some((r) => this._circDist(i, r.index) < 41)) continue;
       if (this.boostPads.some((p) => this._circDist(i, p.index) < 25)) continue;
       if (this._obstacleIdx.some((o) => this._circDist(i, o) < 25)) continue;
@@ -2632,6 +2816,274 @@ export class Track {
       this.puddles.push({ x: p.x, z: p.z, r: rad, y: p.y });
     }
   }
+
+  // ---- river-fords ---------------------------------------------------------
+  /** River fords: a visible watercourse crossing the ROAD perpendicular-ish,
+   *  4–8u wide, with shallow water OVER the road surface (the jungle's
+   *  _buildRivers streams pass UNDER the deck — these wash across it). The
+   *  stream ribbon meanders off into the landscape on both sides; foam lines
+   *  mark the water's edge across the road. Physics (splash, drag, wet tires)
+   *  is consumed from track.fords by the vehicle code. */
+  _buildFords() {
+    const themeKey = (this.level && this.level.theme) || 'forest';
+    const spec = this.T.fords !== undefined ? this.T.fords : FORD_TUNE[themeKey];
+    const count = spec && spec.count | 0;
+    if (!count) return;
+    // deterministic per theme (offset seed so fords never mirror the narrows)
+    let seed = 374761393 >>> 0;
+    for (let k = 0; k < themeKey.length; k++) {
+      seed = ((seed ^ themeKey.charCodeAt(k)) * 2246822519) >>> 0;
+    }
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    const chosen = [];
+    for (let tries = 0; tries < 400 && chosen.length < count; tries++) {
+      const i = 60 + Math.floor(rnd() * (N - 120));
+      if (this.curvature[i] > 0.013) continue;                 // straight-ish crossings
+      if (this._circDist(i, 0) < 70) continue;
+      if (this._nearNarrow(i, 20)) continue;
+      if (this.ramps.some((r) => this._circDist(i, r.index) < 45)) continue;
+      if (this.boostPads.some((p) => this._circDist(i, p.index) < 25)) continue;
+      if (this._obstacleIdx.some((o) => this._circDist(i, o) < 25)) continue;
+      if (chosen.some((c) => this._circDist(i, c.i) < 150)) continue;
+      chosen.push({ i, half: 3 + rnd() * 2 });                 // 6–10u wide band
+    }
+    if (!chosen.length) return;
+    const tex = riverTexture();
+    tex.anisotropy = 4;
+    const waterMat = new THREE.MeshStandardMaterial({
+      map: tex, roughness: 0.16, metalness: 0.06, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.9,
+    });
+    const foamMat = new THREE.MeshBasicMaterial({
+      color: 0xf2fbff, transparent: true, opacity: 0.4, depthWrite: false,
+    });
+    for (const fd of chosen) {
+      const c = this.center[fd.i], n = this.nrm[fd.i], tg = this.tan[fd.i];
+      const roadW = this.widthAt(fd.i);
+      this.fords.push({ i: fd.i, x: c.x, z: c.z, y: c.y, half: fd.half });
+      // meandering stream ribbon crossing the road along the local normal
+      const pts = [];
+      for (let s = -5; s <= 5; s++) {
+        const d = s * 13;
+        const sway = Math.sin(s * 1.35 + fd.i * 0.6) * 8 * Math.min(1, Math.abs(s) / 2.2);
+        pts.push(new THREE.Vector3(c.x + n.x * d + tg.x * sway, 0, c.z + n.z * d + tg.z * sway));
+      }
+      const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+      const SEGS = 64;
+      const verts = new Float32Array((SEGS + 1) * 2 * 3);
+      const uvs = new Float32Array((SEGS + 1) * 2 * 2);
+      const idx = [];
+      for (let s = 0; s <= SEGS; s++) {
+        const t = s / SEGS;
+        const p = curve.getPointAt(t);
+        const tn = curve.getTangentAt(t);
+        // shallow sheet OVER the road through the crossing, easing down to
+        // sit on (just under) the open terrain past the road corridor
+        const df = this._distToTrackCoarse(p.x, p.z);
+        const lift = 1 - THREE.MathUtils.smoothstep(df, roadW, roadW + 7);
+        const y = this.terrainHeight(p.x, p.z) + 0.055 * lift - 0.12 * (1 - lift);
+        // stream width: fat through the ford, tapering into the banks
+        const wv = fd.half * (0.5 + 0.6 * Math.sqrt(Math.sin(Math.PI * t)));
+        const o = s * 6;
+        verts[o] = p.x + tn.z * wv; verts[o + 1] = y; verts[o + 2] = p.z - tn.x * wv;
+        verts[o + 3] = p.x - tn.z * wv; verts[o + 4] = y; verts[o + 5] = p.z + tn.x * wv;
+        uvs[s * 4] = t * 6; uvs[s * 4 + 1] = 0;
+        uvs[s * 4 + 2] = t * 6; uvs[s * 4 + 3] = 1;
+      }
+      for (let s = 0; s < SEGS; s++) {
+        const a = s * 2, b = s * 2 + 1, cc = s * 2 + 2, d2 = s * 2 + 3;
+        idx.push(a, b, cc, b, d2, cc);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, waterMat);
+      mesh.receiveShadow = true;
+      mesh.renderOrder = 1;                       // above the road ribbon
+      this.group.add(mesh);
+      // foam lines where the water meets the road at both edges of the band
+      const heading = this.headingAt(fd.i);
+      for (const s of [-1, 1]) {
+        const foam = new THREE.Mesh(new THREE.PlaneGeometry(roadW * 2 + 2.5, 0.55), foamMat);
+        foam.rotation.order = 'YXZ';
+        foam.rotation.y = heading;
+        foam.rotation.x = -Math.PI / 2 - Math.atan(this.slopeAt(fd.i));
+        const fp = this.pointAt(fd.i, 0);
+        foam.position.set(
+          fp.x + this.tan[fd.i].x * fd.half * s * 0.9,
+          fp.y + 0.09,
+          fp.z + this.tan[fd.i].z * fd.half * s * 0.9
+        );
+        foam.renderOrder = 2;
+        this.group.add(foam);
+      }
+    }
+  }
+  // ---- end river-fords -----------------------------------------------------
+
+  // ---- viz-zones -----------------------------------------------------------
+  /** Deterministic per-theme visibility zones: 40–90-sample sections where
+   *  sight is impaired — 'forest' (dense tree corridor + canopy gloom),
+   *  'fogbank' (pure data; runtime pulls fog in) and 'squall' (rain burst).
+   *  The runtime fog response lives in the game lead; rivals read the zones
+   *  through their corner-speed planner. */
+  _buildVizZones() {
+    const themeKey = (this.level && this.level.theme) || 'forest';
+    const spec = this.T.viz !== undefined ? this.T.viz : VIZ_TUNE[themeKey];
+    if (!spec || !spec.length) return;
+    let seed = 668265263 >>> 0;
+    for (let k = 0; k < themeKey.length; k++) {
+      seed = ((seed ^ themeKey.charCodeAt(k)) * 374761393) >>> 0;
+    }
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    for (const [kind, count] of spec) {
+      for (let want = 0, tries = 0; want < count && tries < 400; tries++) {
+        // corridors run a bit shorter than fog banks (their tree walls need a
+        // gentle stretch of road); fog/squalls take 40–90 samples anywhere
+        const len = kind === 'forest' ? 40 + Math.floor(rnd() * 26) : 40 + Math.floor(rnd() * 50);
+        const i0 = Math.floor(rnd() * N);
+        if (this._circDist(i0, 0) < 80 || this._circDist((i0 + len) % N, 0) < 80) continue;
+        const mid = (i0 + (len >> 1)) % N, half = len / 2;
+        if (this._nearNarrow(mid, half + 8)) continue;        // keep clear of pinches
+        if (this.vizZones.some((z) => this._circDist(mid, z.mid) < z.half + half + 50)) continue;
+        // forest corridors want gentle road (trees at the edge of a hairpin
+        // block the sight line the driver NEEDS); fog can sit anywhere
+        if (kind === 'forest') {
+          let ok = true;
+          for (let k2 = -4; ok && k2 <= len + 4; k2++) {
+            if (this.curvature[(i0 + k2 + N) % N] > 0.024) ok = false;
+          }
+          if (!ok) continue;
+          // …and never over a ford: the canopy gloom decal would swallow the
+          // white bow-wave that sells the crossing (fords are built first)
+          if (this.fords.some((f) => this._circDist(mid, f.i) < half + 10)) continue;
+        }
+        this.vizZones.push({ i0, i1: (i0 + len) % N, len, mid, half, kind, strength: 1 });
+        want++;
+      }
+    }
+    if (this.vizZones.some((z) => z.kind === 'forest')) this._buildVizCorridors();
+  }
+
+  /** Thick-forest corridors: big canopy pines planted DENSE along both road
+   *  edges of every 'forest' viz zone, leaning inward so the road reads as a
+   *  tunnel through the woods, plus a translucent canopy-shadow ribbon over
+   *  the road for under-canopy gloom. Trees register in this.trees (kind
+   *  'pine', s ≥ 1.0 ⇒ SOLID trunks per the material law), kept ~1.5–2u off
+   *  the drivable edge so wide lines are punished, never blocked. */
+  _buildVizCorridors() {
+    const T = this.T;
+    const zones = this.vizZones.filter((z) => z.kind === 'forest');
+    // shared instanced pine (theme-tinted): trunk + two canopy tiers (+ cap)
+    let cap = 0;
+    for (const z of zones) cap += Math.ceil(z.len / 2) * 2 + 4;
+    const trunkGeo = new THREE.CylinderGeometry(0.42, 0.6, 3.2, 7);
+    trunkGeo.translate(0, 1.6, 0);
+    const lowGeo = new THREE.ConeGeometry(3.1, 4.8, 8);
+    lowGeo.translate(0, 5.1, 0);
+    const topGeo = new THREE.ConeGeometry(2.1, 3.9, 8);
+    topGeo.translate(0, 8.1, 0);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor ?? 0x5a4028, roughness: 1 });
+    const lowMat = new THREE.MeshStandardMaterial({ color: T.foliageLow ?? 0x2c6e2a, flatShading: true, roughness: 1 });
+    const topMat = new THREE.MeshStandardMaterial({ color: T.foliageTop ?? 0x3c8a34, flatShading: true, roughness: 1 });
+    const parts = [
+      new THREE.InstancedMesh(trunkGeo, trunkMat, cap),
+      new THREE.InstancedMesh(lowGeo, lowMat, cap),
+      new THREE.InstancedMesh(topGeo, topMat, cap),
+    ];
+    if (T.treeSnowCap) {
+      const capGeo = new THREE.ConeGeometry(1.5, 2.1, 8);
+      capGeo.translate(0, 8.9, 0);
+      parts.push(new THREE.InstancedMesh(
+        capGeo, new THREE.MeshStandardMaterial({ color: 0xf2f6fa, flatShading: true, roughness: 0.9 }), cap));
+    }
+    for (const part of parts) part.castShadow = true;
+    const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
+    const color = new THREE.Color();
+    const F = T.foliage || { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.32, lVar: 0.14 };
+    let k = 0;
+    for (const z of zones) {
+      for (let s = 0; s < z.len && k < cap; s += 2) {   // a pair every ~3.8u: thick
+        const j = (z.i0 + s) % N;
+        for (const side of [1, -1]) {
+          if (k >= cap) break;
+          const h1 = hash(j * 5.7 + side * 2.3);
+          // two staggered rows pressed near the road edge. The trunks are
+          // SOLID, so like the pinch markers they are pushed out until the
+          // collision face (trunk r + the 1.8u car radius) clears the drivable
+          // width — the canopy leans in over the road, the trunks never do.
+          const row = h1 < 0.55 ? 0 : 1;
+          const sc = 1.15 + hash(j * 9.1 - side) * 0.75;      // big canopy pines
+          const lat = (this.widthAt(j) + 0.75 * sc + 2.0 + row * 3.2 + h1 * 1.4) * side;
+          const p = this.pointAt(j, lat);
+          const ty = this.terrainHeight(p.x, p.z) - 0.2;
+          // lean the whole tree inward over the road (rotation about the tangent)
+          const lean = (0.10 + hash(j * 3.3 + side) * 0.12) * side;
+          q.setFromAxisAngle(this.tan[j], lean);
+          pos.set(p.x, ty, p.z);
+          scl.set(sc, sc * (0.95 + hash(j * 1.9) * 0.35), sc);
+          m4.compose(pos, q, scl);
+          for (const part of parts) part.setMatrixAt(k, m4);
+          color.setHSL(
+            F.h + hash(j * 2.2 + side) * F.hVar,
+            F.s + hash(j * 4.4 - side) * F.sVar,
+            Math.max(0.1, (F.l + hash(j * 6.6) * F.lVar) * 0.82)  // corridor reads darker
+          );
+          parts[1].setColorAt(k, color);
+          parts[2].setColorAt(k, color.clone().multiplyScalar(1.15));
+          parts[0].setColorAt(k, color.clone().setScalar(0.85));
+          // collision r tracks the TRUNK, not the canopy (the canopy overhangs
+          // the road; only the trunk is solid) — see the clearance note above
+          this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.75 * sc, id: k, parts, kind: 'pine', s: sc });
+          this._addShadow(p.x, p.z, 2.6 * sc, ty + 0.2);
+          k++;
+        }
+      }
+      // under-canopy gloom: a dark translucent ribbon over the road, tapering
+      // out at both ends (same decal spirit as the baked contact shadows)
+      const rows = 2;
+      const gv = new Float32Array((z.len + 1) * rows * 3);
+      const gidx = [];
+      for (let s2 = 0; s2 <= z.len; s2++) {
+        const j = (z.i0 + s2) % N;
+        const c = this.center[j], n = this.nrm[j];
+        const taper = Math.min(1, Math.min(s2, z.len - s2) / 7);
+        const w = (this.widthAt(j) + 2.2) * taper;
+        const o = s2 * rows * 3;
+        gv[o] = c.x + n.x * w; gv[o + 1] = c.y + 0.05; gv[o + 2] = c.z + n.z * w;
+        gv[o + 3] = c.x - n.x * w; gv[o + 4] = c.y + 0.05; gv[o + 5] = c.z - n.z * w;
+      }
+      for (let s2 = 0; s2 < z.len; s2++) {
+        const a = s2 * 2, b = a + 1, c2 = a + 2, d2 = a + 3;
+        gidx.push(a, b, c2, b, d2, c2);
+      }
+      const ggeo = new THREE.BufferGeometry();
+      ggeo.setAttribute('position', new THREE.BufferAttribute(gv, 3));
+      ggeo.setIndex(gidx);
+      const gloom = new THREE.Mesh(ggeo, new THREE.MeshBasicMaterial({
+        color: 0x03130a, transparent: true, opacity: 0.34, depthWrite: false,
+      }));
+      gloom.renderOrder = 1;
+      this.group.add(gloom);
+    }
+    for (const part of parts) {
+      part.count = k;
+      if (part.instanceColor) part.instanceColor.needsUpdate = true;
+    }
+    this.scene.add(...parts);
+  }
+  // ---- end viz-zones -------------------------------------------------------
 
   /** Build one prop mesh (origin at its base). Returns {mesh, r} — geometry and
    *  most materials are shared; only theme tints (hay color, barrel wrap) vary. */
@@ -2745,6 +3197,7 @@ export class Track {
         if (this.boostPads.some((p) => this._circDist(i, p.index) < 20)) continue;
         if (this._obstacleIdx.some((o) => this._circDist(i, o) < 20)) continue;
         if (usedI.some((u) => this._circDist(i, u) < 4)) continue;                // no piles
+        if (shoulder && this._nearNarrow(i, 6)) continue; // ---- width-variation: keep the pinch lane clear
         const side = Math.random() < 0.5 ? -1 : 1;
         const lateral = shoulder
           ? side * (3.5 + Math.random() * 5)           // in the drivable lane

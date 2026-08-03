@@ -2902,6 +2902,7 @@ class Game {
       }
     }
     this.track.update(dt, time);
+    this._updateVizZones(dt); // ---- viz-zones: sectional fog / gloom / squall
 
     if (this.input.justPressed('KeyC')) this.cycleCamera();
     if (this.input.justPressed('KeyP') && (this.state === 'race' || this.state === 'paused')) {
@@ -2994,6 +2995,65 @@ class Game {
     this._autoQuality();
     this.composer.render();
   }
+
+  // ---- viz-zones -----------------------------------------------------------
+  /** Sectional visibility: while the player's trackIndex is inside one of
+   *  track.vizZones ('forest' tree tunnel / 'fogbank' / 'squall'), smoothly
+   *  pull scene.fog in toward the zone's impaired values and back out again
+   *  on exit (~1.5s each way, far floored at 110 so it stays playable).
+   *  Squalls also double the ambient rain rate while inside. Defensive:
+   *  no-ops entirely when the track build predates the feature. */
+  _updateVizZones(dt) {
+    const t = this.track, fog = this.scene?.fog;
+    if (!t || !fog || !(dt > 0)) return;
+    if (this._vizTrack !== t) {           // fresh world: reset all zone state
+      // theme.weather is a SHARED module constant — hand back any squall
+      // multiplier before letting go of it, or the x2 compounds next race
+      if (this._vizRainW && this._vizBaseRain !== undefined) this._vizRainW.rate = this._vizBaseRain;
+      this._vizTrack = t;
+      this._vizRainW = null;
+      this._vizBaseRain = undefined;
+      this._vizZoneLast = null;
+    }
+    const p = this.player;
+    let zone = null;
+    if (t.vizZones && t.vizZones.length && p
+        && (this.state === 'race' || this.state === 'finished' || this.state === 'paused')) {
+      for (const z of t.vizZones) {
+        const d = (p.trackIndex - z.i0 + t.N) % t.N;
+        if (d <= z.len) { zone = z; break; }
+      }
+    }
+    const baseNear = t.theme?.fogNear ?? 320;
+    const baseFar = t.theme?.fogFar ?? 1500;
+    let wantNear = baseNear, wantFar = baseFar;
+    if (zone) {
+      const s = zone.strength ?? 1;
+      if (zone.kind === 'fogbank') { wantNear = 20; wantFar = 140 / s; }
+      else if (zone.kind === 'squall') { wantNear = 40; wantFar = 180; }
+      else { wantNear = 45; wantFar = 200; }   // forest: the gloom decal + trees do the rest
+      wantFar = Math.min(baseFar, Math.max(110, wantFar));
+      wantNear = Math.min(baseNear, wantNear);
+      if (this._vizZoneLast !== zone
+          && (this.raceTime ?? 0) - (this._vizFeedAt ?? -99) > 4) {
+        this._vizFeedAt = this.raceTime ?? 0;
+        this.hud?.feed?.(zone.kind === 'fogbank' ? 'FOG BANK'
+          : zone.kind === 'squall' ? 'DOWNPOUR' : 'INTO THE TREES', 'info');
+      }
+    }
+    this._vizZoneLast = zone;
+    const k = Math.min(1, 2.2 * dt);      // ≈96% of the way in 1.5s, both directions
+    fog.near += (wantNear - fog.near) * k;
+    fog.far += (wantFar - fog.far) * k;
+    // squalls double the downpour on top of the fog pull (rain worlds only —
+    // that is why track.js only ever places 'squall' on a wet theme)
+    const w = t.theme?.weather;
+    if (w && w.type === 'rain') {
+      if (this._vizRainW !== w) { this._vizRainW = w; this._vizBaseRain = w.rate ?? 230; }
+      w.rate = this._vizBaseRain * (zone && zone.kind === 'squall' ? 2 : 1);
+    }
+  }
+  // ---- end viz-zones -------------------------------------------------------
 
   /** Adaptive quality governor: if sustained fps sags mid-race, step down —
    *  render scale first, then shadows, then bloom — so weak phones self-tune

@@ -155,6 +155,21 @@ pays; "Pays" = score. All objects also obey their class mechanics above.
 | Boost pads | TERRAIN | — | — | — | Forward impulse, yellow chevrons |
 | Launch ramps | TERRAIN | — | — | — | Airborne launch — vy capped at 11 u/s and light air drag (×0.10/s) while flying, so no nitro launch ever throws a car out of the world; landing puff + brief loose grip |
 | Crossroad spur | TERRAIN | — | — | — | Graded dirt side-road leaving the carriageway on rural worlds; no colliders, normal off-road rules. The junction patch itself is DECOR. Exported as `track.crossroads` (index, side, angle, len, mouth x/z, direction dx/dz, endX/endZ, halfWidth 3.4 flaring to 5.4, y) so traffic can route across |
+| Narrow section (pinch) | TERRAIN | — | drivable half-width falls 9 → 5.0–5.7 u and back, cosine shoulders over the outer 35 % | — | 1–4 per world on straights / mild curves (curvature ≤ 0.016), never within 90 samples of the grid and never on a cliff-walled world. Ramps, boost pads, obstacles, puddles and in-lane props are all kept out of the squeeze. Exported as `track.widthAt(i)`; road ribbon, skirts, AI clamp and off-road line all follow it |
+| River ford | SOFT | — | hull drag ×(1 − 0.5·dt) inside; WET TIRES for 3.5 s after (see §5) | — | A 6–10 u shallow water band washing **over** the road, with the stream meandering off into the landscape both sides and foam lines at the water's edge. Bow-wave + entry-curtain spray while crossing, `WET TIRES` feed + haptic. Exported as `track.fords` `[{i, x, z, y, half}]` |
+| Visibility zone | — (data) | — | sight distance cut for the length of the zone | — | `track.vizZones` `[{i0, i1, len, mid, half, kind, strength}]`, kind `'forest'` (dense pine corridor + canopy-gloom decal) / `'fogbank'` / `'squall'`. main.js lerps `scene.fog` in and back out; rivals slow to 0.82 × top speed inside |
+
+**A pinch is a squeeze, never a trap.** Every marker beside a narrow section —
+striped posts, stone teeth — and every trunk in a forest corridor is pushed out
+until its *collision face* clears the declared drivable width: `lateral ≥
+widthAt + r + carRadius` (1.8 u for `solids`, 1.7 u for `trees`). The width the
+road advertises is always genuinely free at racing speed; clipping a marker
+means you were already off the road.
+
+**Nothing may roof the road.** The default camera is TOP-DOWN, so a solid
+canopy, tunnel ceiling or overhead decal above the carriageway blacks out the
+play view. Forest tunnels are sold with dense edge trees, an inward lean, a
+translucent gloom decal *on the ground* and a fog pull — never a lid.
 
 **Wheel ruts are a soft-ground-only mark.** Dirt, sand, snow and ash record
 ruts; sealed asphalt (GOTTHARD CLIMB), stone setts (TREMOLA), sheet ice,
@@ -286,7 +301,17 @@ no livestock dressing (troughs, hay racks) on a city world.
 
 | Constant | Value | Where |
 |---|---|---|
-| Road half-width / road-edge line | 9 / ±9.55 | track.js / vehicles.js |
+| Road half-width / road-edge line | 9 / ±9.55 (open road); inside a pinch both follow `track.widthAt(i)` | track.js / vehicles.js |
+| Pinch floor / length / spacing | 0.55–0.65 × ROAD_HALF (≥ 5 u), 34–68 samples, ≥ 110 samples apart; per-theme count in `NARROW_TUNE`, or `theme.narrows` | track.js `_buildWidthProfile` |
+| Pinch marker clearance | marker lateral ≥ widthAt + r + car radius (1.8 solids / 1.7 trees) | track.js `_buildNarrowDressing`, `_buildVizCorridors` |
+| AI through a pinch | corner-speed cap `min(vMax, 16 + 3.6 × widthAt)` (≈ 36 u/s at a 5.5 u pinch); lateral target clamped to `min(widthAt now, widthAt ahead) − 1.6` | vehicles.js `EnemyCar` |
+| Ford placement | 2–3 per water world (forest, alpine, jungle, oasis, flume, redwood), curvature ≤ 0.013, ≥ 150 samples apart, clear of grid / ramps / pads / obstacles / pinches | track.js `_buildFords`, `FORD_TUNE` |
+| Ford WET TIRES | `_wetT = 3.5 s`, `_wetMax = 3.5`; grip × (1 − 0.2 × _wetT/_wetMax) → **×0.80** leaving the water, fading linearly to ×1.00 | vehicles.js |
+| Puddle wet tires | `_wetT = 0.14 s`, flat grip ×0.75 — a puddle never cuts a ford's longer fade short | vehicles.js |
+| Viz-zone fog targets (near/far) | forest 45/200, fogbank 20/140, squall 40/180 — each clamped to ≤ the theme's own fog and **far ≥ 110** so it never goes blind-black | main.js `_updateVizZones` |
+| Viz-zone fog lerp | k = min(1, 2.2 × dt) — ~96 % of the way in 1.5 s, in and out alike | main.js |
+| Squall rain | ×2 on the theme's ambient rain rate; only placed on `weather.type === 'rain'` worlds, and the shared THEMES object is handed back unmodified when the world changes | main.js / track.js `VIZ_TUNE` |
+| AI in a viz zone | corner-speed cap ×0.82 top speed while the lookahead sample is inside a zone | vehicles.js `EnemyCar` |
 | Boundaries | NONE — open world; AI-only clamp at road edge; canyon cliffs stone-clamp (open at the start bowl, cliff height ≤ 2.5) | vehicles.js |
 | Off-road speed factor | ×(0.55 + 0.45 × car off-road stat), any mode | vehicles.js |
 | Lap checkpoint | must touch samples 0.4N–0.6N before the line crossing counts | vehicles.js `checkLap` |
@@ -335,6 +360,10 @@ The full material/impact model is **implemented**:
 | Cannon still fells any tree (3–5 hits by size); blasts fell instantly | ✅ |
 | Canyon cliffs stone-solid, open only at the start bowl | ✅ |
 | AI never leaves the road | ✅ |
+| Track width varies, and a pinch stays passable at racing speed | ✅ player through a 5.5 u pinch at 197 km/h, no hull lost, max lateral 1.46 |
+| Rivals thread a pinch instead of pile up | ✅ 5 rivals entered abreast (±6 u), all cleared, 0 edge-grind frames, min speed 32–34 u/s |
+| River fords: visible water, splash on the way through, wet tires after | ✅ measured grip ×0.816 at wetT 3.2 s → ×0.956 at 0.75 s → ×1.00 (dry 3.900) |
+| Visibility zones dim and restore without collapsing the far plane | ✅ fogbank 26/170, forest 45/200, squall ×2 rain; fog returns to the theme base on exit |
 
 Conformance is enforced by the headless suites (`test-destruction.mjs`,
 `test-roam.mjs`, `test-crash-physics.mjs`, `test-rules.mjs`,

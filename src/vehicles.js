@@ -6,6 +6,7 @@ import { numberPlateTexture } from './textures.js';
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
 const SPRAY_SNOW = new THREE.Color(0xf4faff); // tire spray tints (snow / wet)
 const SPRAY_WET = new THREE.Color(0x9dbcd2);
+const FORD_FOAM = new THREE.Color(0xeef7fb); // ---- river-fords: bow-wave white
 const GRADE = 16;   // grade force: vf -= GRADE * slope * dt while grounded on-road
 const DOWNHILL_CAP = 1.12; // downhill overspeed ceiling (× topSpeed)
 const SCORCH = new THREE.Color(0x1c1a18); // damage tint target
@@ -680,7 +681,10 @@ export class Car {
     // ---- open world (player only): terrain driving off the road, any mode.
     // The road is fastest; rough ground is the natural boundary (no fences).
     const freeRoam = !!(this.game.freeRoam && this === this.game.player);
-    const offRoad = this === this.game.player && Math.abs(this.lateral) > ROAD_HALF + 1;
+    // ---- width-variation: the road edge follows the (possibly pinched)
+    // per-sample width profile; defensive — old track builds report ROAD_HALF
+    const roadHalfHere = this.game.track?.widthAt?.(this.trackIndex) ?? ROAD_HALF;
+    const offRoad = this === this.game.player && Math.abs(this.lateral) > roadHalfHere + 1;
     const offMult = offRoad ? 0.55 + 0.45 * this.offroadSkill : 1;
 
     // surface conditions: snow and rain-wet worlds drive differently — less
@@ -814,7 +818,19 @@ export class Car {
     let grip = this.grip * (1 + 0.08 * hnd) * (1 - 0.78 * this.slip) * sGrip * (this.gripBoost || 1);
     if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
     if (this.landGrip > 0) { this.landGrip -= dt; grip *= 0.4; } // loose for ~0.4s after landing
-    if (this._wetT > 0) { this._wetT -= dt; grip *= 0.75; }      // slick tires through puddles
+    // ---- river-fords: wet tires. Ford crossings set _wetT=3.5 with a gentle
+    // ≈0.8 grip factor fading linearly back to 1; plain puddles keep their
+    // short sharp 0.75 slick (_wetMax stays 0 for those).
+    if (this._wetT > 0) {
+      this._wetT -= dt;
+      grip *= (this._wetMax ?? 0) > 1
+        ? 1 - 0.2 * Math.max(0, this._wetT) / this._wetMax
+        : 0.75;
+      if (this._wetT <= 0) this._wetMax = 0;
+    }
+    // opt-in grip instrument (headless): set __game.__gripProbe = {} to read
+    // the lateral grip the player is actually running (wet-tire verification)
+    if (this.game.__gripProbe && this === this.game.player) this.game.__gripProbe.grip = grip;
     const vlBefore = vl;
     vl -= vl * Math.min(1, grip * dt);
     // drift reward: convert a slice of the scrubbed-off slide back into forward speed
@@ -956,7 +972,10 @@ export class Car {
     const cliffy = !!t.T?.cliffWalls;
     let wallHere = false;
     const fside = Math.sign(this.lateral) || 1;
-    if (Math.abs(this.lateral) > WALL_LIMIT) {
+    // ---- width-variation: the clamp line follows the pinched road width
+    // (cliff worlds have no narrows, so this equals WALL_LIMIT there)
+    const wallLim = (t.widthAt?.(this.trackIndex) ?? ROAD_HALF) + 0.55;
+    if (Math.abs(this.lateral) > wallLim) {
       if (this !== gm.player) wallHere = true; // AI safety net, all levels
       else if (cliffy) {
         // canyon: rock walls are solid — except the low berm near the start
@@ -977,7 +996,7 @@ export class Car {
     if (wallHere) {
       const n = t.nrm[this.trackIndex];
       const vn = this.vel.dot(n);
-      const over = this.lateral - fside * WALL_LIMIT;
+      const over = this.lateral - fside * wallLim; // ---- width-variation
       this.pos.addScaledVector(n, -over);
       // absorb, don't bounce: kill the into-wall velocity (5% rebound)
       this.vel.addScaledVector(n, -vn * 1.05);
@@ -998,7 +1017,7 @@ export class Car {
       const outward = -fside * this.vel.dot(n);
       const wantOut = 1.4;
       if (outward < wantOut) this.vel.addScaledVector(n, -fside * (wantOut - outward));
-      this.lateral = fside * WALL_LIMIT;
+      this.lateral = fside * wallLim; // ---- width-variation
       // opt-in wall instrument (headless): set __game.__wallProbe = {} and every
       // contact records what the peel-off actually did — `inward` and
       // `pingPong` must both stay 0 (no shove back into the rock, and no
@@ -1221,7 +1240,9 @@ export class Car {
         const f = Math.max(0, 1 - 0.9 * dt); // water drag on the hull
         this.vel.x *= f;
         this.vel.z *= f;
-        this._wetT = 0.14; // grip reduction picked up next frame (see grip section)
+        // grip reduction picked up next frame (see grip section); never cut a
+        // ford's longer wet-tire fade short ---- river-fords
+        if (this._wetT < 0.14) this._wetT = 0.14;
         const spd2 = this.vel.lengthSq();
         if (spd2 > 36 && gm.player
             && (this === gm.player || this.pos.distanceToSquared(gm.player.pos) < 14400)) {
@@ -1241,6 +1262,101 @@ export class Car {
         break; // one puddle per frame is plenty
       }
     }
+
+    // ---- river-fords: shallow water washing over the road — bow-wave spray,
+    // hull drag, and a WET TIRES traction fade for a few seconds after ----
+    const fords = t.fords ?? [];
+    if (fords.length && !this.airborne && this.alive) {
+      const now = gm.raceTime ?? 0;
+      for (const fd of fords) {
+        const diF = Math.abs(this.trackIndex - fd.i);
+        const di = Math.min(diF, t.N - diF) * (t.segLen ?? 2);   // u along the track
+        if (di > fd.half) continue;
+        const spdF = Math.hypot(this.vel.x, this.vel.z);
+        const fDrag = Math.max(0, 1 - 0.5 * dt);                 // shallow-water drag
+        this.vel.x *= fDrag;
+        this.vel.z *= fDrag;
+        this._wetT = 3.5;                                        // long fade — see grip section
+        this._wetMax = 3.5;
+        const entering = now - (this._inFordT ?? -99) > 1;
+        this._inFordT = now;
+        const nearCam = gm.player
+          && (this === gm.player || this.pos.distanceToSquared(gm.player.pos) < 10000);
+        if (entering) {
+          if (this === gm.player && now - (this._fordFeedAt ?? -99) > 6) {
+            this._fordFeedAt = now;
+            gm.hud?.feed?.('WET TIRES', 'info');
+            gm.buzz?.(20);
+          }
+          // entry splash: a foam ring bursting low around the bumper PLUS a
+          // curtain of water thrown up and forward, so the chase cam sees a
+          // real wall of white open past the car instead of a few wisps
+          if (spdF > 5 && nearCam) {
+            const pl = this === gm.player;
+            const nRing = pl ? 26 : 10;
+            for (let s = 0; s < nRing; s++) {
+              const a = (s / nRing) * Math.PI * 2;
+              gm.particles.spawn(
+                this.pos.x + nf.x * 1.0 + Math.cos(a) * 1.9, this.y + 0.15,
+                this.pos.z + nf.z * 1.0 + Math.sin(a) * 1.9,
+                Math.cos(a) * (5 + spdF * 0.24) + nf.x * spdF * 0.18,
+                3.0 + Math.random() * 3.4,
+                Math.sin(a) * (5 + spdF * 0.24) + nf.z * spdF * 0.18,
+                FORD_FOAM, 4.2 + Math.random() * 1.6, 0.6 + Math.random() * 0.45,
+                { drag: 1.5, grav: 8, shrink: 0.35, alpha: 0.9 });
+            }
+            // the curtain: a fan of big slow droplets lofted off the bumper
+            for (let s = 0, n = pl ? 14 : 5; s < n; s++) {
+              const ws = (s / n) * 2 - 1;                        // −1..1 across the nose
+              gm.particles.spawn(
+                this.pos.x + nf.x * 1.9 + ns.x * ws * 1.7, this.y + 0.3,
+                this.pos.z + nf.z * 1.9 + ns.z * ws * 1.7,
+                nf.x * spdF * 0.22 + ns.x * ws * (7 + spdF * 0.2),
+                6.5 + Math.random() * 5 + spdF * 0.1,
+                nf.z * spdF * 0.22 + ns.z * ws * (7 + spdF * 0.2),
+                Math.random() < 0.7 ? FORD_FOAM : SPRAY_WET,
+                3.4 + Math.random() * 2.2, 0.75 + Math.random() * 0.5,
+                { drag: 0.9, grav: 13, shrink: 0.45, alpha: 0.95 });
+            }
+          }
+        }
+        // bow wave while inside: sheets of white spray fan off all four wheels,
+        // speed-scaled, pooled + budget-capped, distance-culled for AI
+        if (spdF > 5 && nearCam) {
+          const pl = this === gm.player;
+          this._fordAcc = Math.min(12, (this._fordAcc ?? 0)
+            + dt * (70 + spdF * 4.5) * (pl ? 1 : 0.35));
+          let burst = pl ? 9 : 3;                                // per-frame cap
+          while (this._fordAcc >= 1 && burst-- > 0) {
+            this._fordAcc -= 1;
+            const ws = Math.random() < 0.5 ? -1 : 1;             // L/R wheel
+            const rear = Math.random() < 0.4;                    // rooster tail behind
+            const alongOff = rear ? -1.5 : 1.5;
+            gm.particles.spawn(
+              this.pos.x + nf.x * alongOff + ns.x * ws * 1.35, this.y + 0.18,
+              this.pos.z + nf.z * alongOff + ns.z * ws * 1.35,
+              nf.x * spdF * (rear ? -0.22 : 0.35) + ns.x * ws * (5.5 + spdF * 0.3) + (Math.random() - 0.5) * 3,
+              3.0 + spdF * 0.14 + Math.random() * 2.6,
+              nf.z * spdF * (rear ? -0.22 : 0.35) + ns.z * ws * (5.5 + spdF * 0.3) + (Math.random() - 0.5) * 3,
+              Math.random() < 0.65 ? FORD_FOAM : SPRAY_WET,
+              3.0 + spdF * 0.09 + Math.random() * 1.2, 0.6 + Math.random() * 0.5,
+              { drag: 1.0, grav: 12, shrink: 0.5, alpha: 0.92 });
+          }
+        }
+        break; // one ford at a time
+      }
+      // faint water-drip spray trailing off the tires while WET TIRES lasts
+      if ((this._wetMax ?? 0) > 1 && this._wetT > 0 && sp > 10 && Math.random() < 0.3
+          && gm.player
+          && (this === gm.player || this.pos.distanceToSquared(gm.player.pos) < 6400)) {
+        gm.particles.spawn(
+          this.pos.x - nf.x * 1.6 + (Math.random() - 0.5) * 1.2, this.y + 0.2,
+          this.pos.z - nf.z * 1.6 + (Math.random() - 0.5) * 1.2,
+          (Math.random() - 0.5) * 2, 1 + Math.random() * 1.5, (Math.random() - 0.5) * 2,
+          SPRAY_WET, 0.9, 0.4, { drag: 1, grav: 14, shrink: 0.8, alpha: 0.5 });
+      }
+    }
+    // ---- end river-fords ----
 
     // ---- vertical motion (ramps & jumps; rolling terrain off-road in roam) ----
     const gY = offRoad
@@ -1889,7 +2005,13 @@ export class EnemyCar extends Car {
     }
     // running wide while gathering up a flubbed corner
     if (this._errRec > 0) targetLat += this._errWideDir * 3 * this._errRec;
-    targetLat = THREE.MathUtils.clamp(targetLat, -7.4, 7.4);
+    // ---- width-variation: the lateral clamp follows the pinched road width
+    // (both here and at the lookahead point) so rivals aim through the gap
+    // instead of grinding the narrowed edge; defensive on older track builds
+    const wNow = t.widthAt?.(this.trackIndex) ?? ROAD_HALF;
+    const wAhead = t.widthAt?.(li) ?? ROAD_HALF;
+    const latLim = Math.min(7.4, Math.min(wNow, wAhead) - 1.6);
+    targetLat = THREE.MathUtils.clamp(targetLat, -latLim, latLim);
 
     const target = t.pointAt(li, targetLat);
     const desired = Math.atan2(target.x - this.pos.x, target.z - this.pos.z);
@@ -1917,7 +2039,18 @@ export class EnemyCar extends Car {
     let vAllowed = this.maxSpeed * (this._draftOn ? 1.12 : 1); // draft window open
     for (let k = 0; k <= 90; k += 5) {
       const j = (this.trackIndex + k) % t.N;
-      const vMax = sqA * t._speedInv[j];
+      let vMax = sqA * t._speedInv[j];
+      // ---- width-variation: a pinch caps corner speed like a real corner,
+      // so rivals brake in and thread it instead of wall-grinding through
+      const wj = t.widthAt ? t.widthAt(j) : ROAD_HALF;
+      if (wj < ROAD_HALF - 0.2) vMax = Math.min(vMax, 16 + 3.6 * wj);
+      // ---- viz-zones: rivals can't see through fog/trees either
+      if (t.vizZones && t.vizZones.length) {
+        for (const z of t.vizZones) {
+          const dz = (j - z.i0 + t.N) % t.N;
+          if (dz <= z.len) { vMax = Math.min(vMax, this.maxSpeed * 0.82); break; }
+        }
+      }
       if (vMax >= vAllowed) continue;
       const vNow = k === 0 ? vMax : Math.sqrt(vMax * vMax + 2 * DECEL * k * t.segLen);
       if (vNow < vAllowed) vAllowed = vNow;
