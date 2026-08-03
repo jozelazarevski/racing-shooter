@@ -1185,63 +1185,61 @@ const THEMES = {
     massif: { az: 1.45, spread: 1.8, count: 9, r0: 400, r1: 640,
       h0: 140, h1: 270, w0: 200, w1: 350 },
   },
-  // FURKA RIDGE: bare high country. The road rides a knife-edge ridge (a
-  // steep road→hills blend plus a dropped hill field put real air on both
-  // sides), with a glacier tongue on the skyline and old snow in the hollows.
+  // FURKA RIDGE: deep-winter alpine pass — snow-white valley, jagged grey rock
+  // with snow on every ledge, snow-capped pines, log cabins on the shelves and
+  // a reddish wooden guard fence running the downhill edge of the serpentine.
+  // The road itself stays brown rutted dirt, ploughed clear of the snow.
   furka: {
-    fogColor: 0xdae9f6, fogNear: 340, fogFar: 1700,
-    hemiSky: 0xd2e6ff, hemiGround: 0x7b7f78,
-    sunColor: 0xfff8ec, sunIntensity: 2.1,
-    skyTop: '#1f5cbe', skyHorizon: '#e2f0fa', sunGlow: 0xfffae0,
-    sunAz: 0.7, sunEl: 0.38,                            // thin high-altitude light
-    cloudCount: 8, cloudOpacity: 0.8,
-    terrainLow: '#6f7168', terrainHigh: '#a8ac9e', terrainDirt: '#8b8377',
-    skirtColor: '#97917f',
+    surface: 'snow',                                    // physics reads this
+    fogColor: 0xdfeaf4, fogNear: 300, fogFar: 1600,
+    hemiSky: 0xd6e8ff, hemiGround: 0xa8b4bc,
+    sunColor: 0xfff4e4, sunIntensity: 1.95,
+    skyTop: '#3f7fc8', skyHorizon: '#e6f1f8', sunGlow: 0xfffbe8,
+    sunAz: 0.72, sunEl: 0.34,
+    cloudCount: 10, cloudOpacity: 0.9,
+    terrainLow: '#dfe7ec', terrainHigh: '#ffffff', terrainDirt: '#9a8a72',
+    skirtColor: '#8e8a80',                              // rock cut below the shelf
     ground: {
-      base: '#83857c', bandLight: 'rgba(255,255,255,0.05)', bandDark: 'rgba(40,44,40,0.06)',
-      patchA: 'rgba(70,76,66,0.20)', patchB: 'rgba(210,214,204,0.18)',
-      speckA: 'rgba(60,64,56,0.7)', speckB: 'rgba(238,242,236,0.8)', speckCount: 110,
+      base: '#e8eef3', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(120,150,175,0.05)',
+      patchA: 'rgba(150,140,120,0.16)', patchB: 'rgba(255,255,255,0.24)',
+      speckA: 'rgba(190,200,210,0.7)', speckB: 'rgba(255,255,255,0.9)', speckCount: 80,
     },
-    road: {
-      // pale crushed-granite mountain road
-      base: '#857f74', mottleA: [98, 93, 85], mottleB: [156, 150, 140],
-      rut: 'rgba(62,58,52,0.45)', rutCore: 'rgba(46,43,38,0.4)', tread: 'rgba(24,22,18,0.45)',
-      stoneA: 'rgba(216,212,202,0.7)', stoneB: 'rgba(78,74,66,0.7)',
-      fringe: [126, 126, 110], fringeVar: [30, 30, 26],  // scree, not grass
-    },
-    hillColor: 0x6f7468, peakColor: 0xeef4fa,
-    treeCount: 60, trunkColor: 0x5f4a30,
-    foliageLow: 0x3d6a44, foliageTop: 0x4e7c52,
-    foliage: { h: 0.33, hVar: 0.04, s: 0.30, sVar: 0.12, l: 0.30, lVar: 0.10 },
-    treeSnowCap: true,
-    treeAltFade: [4, 14],                               // krummholz only in the saddles
-    tuftCount: 380, grass: { bladeA: '#6a7a4a', bladeB: '#a8b088' },
-    bushCount: 70, bushColor: 0x6a7a58,
-    bush: { h: 0.25, hVar: 0.05, s: 0.22, sVar: 0.08, l: 0.32, lVar: 0.10 },
-    rockCount: 520, pebbleCount: 420, rockColor: 0x8e8f86, rockSnowCap: true,
-    flowerCount: 90, flowerColors: ['#ffffff', '#cfe0ff', '#ffe234'],
-    hutRoof: 0x8a3a2a, hayColor: 0xc8bc94,
-    hutCount: 7, hayCount: 10,
-    splinter: [0x8a8378, 0xdce8f0],
-    weather: { type: 'snow', color: 0xffffff, rate: 70 },
-    // ridge line: climb onto the crest, ride it with three swells, drop off
+    road: {},                                           // classic brown rutted dirt
+    hillColor: 0x9aa4ac, peakColor: 0xf2f7fb,           // grey rock, snow crowns
+    treeCount: 300, trunkColor: 0x5a4028,
+    foliageLow: 0x1f4a2c, foliageTop: 0x2a6236,         // deep winter green
+    foliage: { h: 0.36, hVar: 0.04, s: 0.45, sVar: 0.12, l: 0.20, lVar: 0.08 },
+    treeSnowCap: true,                                  // white tips on every tier
+    treeAltFade: [22, 40],                              // thinning towards the top
+    tuftCount: 300, grass: { bladeA: '#5a7a58', bladeB: '#c8d8d0' },
+    bushCount: 70, bushColor: 0x9ab8a0,
+    bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.52, lVar: 0.12 },
+    rockCount: 520, pebbleCount: 380, rockColor: 0x9aa4ac, rockSnowCap: true,
+    flowerCount: 0, flowerColors: ['#ffffff'],
+    hutRoof: 0x6a4028, hayColor: 0xc8bc94,
+    hutCount: 8, hutZone: [0.86, 0.14], hayCount: 12,   // cabins in the valley
+    splinter: [0x8a5a32, 0xdce8f0],
+    weather: { type: 'snow', color: 0xffffff },
+    // climb the face through the serpentine, traverse the shoulder, drop back
     elev: {
-      amp: 20, profile: 'ascent', ph: [0, 0, 0],
-      keys: [[0, 0], [0.05, 0], [0.15, 3], [0.26, 10], [0.36, 17], [0.42, 20],
-        [0.48, 16], [0.54, 20], [0.60, 17], [0.64, 20], [0.73, 13], [0.82, 7],
-        [0.90, 2], [0.97, 0], [1, 0]],
+      amp: 34, profile: 'ascent', ph: [0, 0, 0],
+      keys: [[0, 0], [0.05, 0], [0.145, 4], [0.25, 12], [0.35, 20], [0.45, 28],
+        [0.575, 34], [0.61, 34], [0.69, 26], [0.77, 18], [0.85, 9], [0.93, 0], [1, 0]],
     },
-    // the knife edge: the ground leaves the road almost at the ribbon and is
-    // 16u below the road datum out in the open — big air on both sides
-    blend: { near: 12, far: 46 }, hillDrop: 16,
-    rampMaxCurv: 0.014, padMaxCurv: 0.004, boardMaxCurv: 0.012,
-    retainingWalls: { drop: 3.0, lateral: 12.7, height: 1.2, max: 320 },
-    obstacleSpec: { count: 3, style: 'boulder' }, puddleCount: 2,
+    // the shelf: ground leaves the road close in and the open valley sits well
+    // below the road datum, so every leg stands proud of the one beneath it
+    blend: { near: 14, far: 58 }, hillDrop: 12,
+    shelfRoad: true,                                    // steep cut face, no apron
+    rampMaxCurv: 0.012, padMaxCurv: 0.0035, boardMaxCurv: 0.010,
+    // reddish-brown BREAKABLE rail fence down the outside edge of the pass
+    guardFence: { lateral: 12.8, color: 0x8a4a2e, max: 190 },
+    roadCabins: 5,                                      // log cabins on the shelves
+    obstacleSpec: { count: 3, style: 'boulder', downhill: true }, puddleCount: 0,
     elements: 'alpine',
-    snowPatches: { count: 120, minY: 6 },
+    snowPatches: { count: 60, minY: 20 },
     glacier: true,
-    massif: { az: -2.25, spread: 1.5, count: 8, r0: 620, r1: 900,
-      h0: 180, h1: 320, w0: 230, w1: 380 },
+    massif: { az: 1.5, spread: 2.1, count: 11, r0: 380, r1: 660,
+      h0: 150, h1: 300, w0: 200, w1: 360 },
   },
 };
 
