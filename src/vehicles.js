@@ -712,8 +712,14 @@ export class Car {
       this.reverseTimer = 0;
     } else {
       if (inputs.throttle > 0) {
-        // punchier launch: up to +55% thrust below half speed, fading to 1x
-        const punch = 1 + 0.55 * (1 - THREE.MathUtils.clamp(Math.abs(vf) / (this.maxSpeed * 0.5), 0, 1));
+        // Punchier launch: up to +55% thrust below half speed, fading to 1x.
+        // The reference is the car's SHOWROOM top speed (rivals: baseMaxSpeed),
+        // never the live one — otherwise difficulty aiSpeed and the rubber band
+        // silently widened the rivals' punch window and they out-launched the
+        // player off the grid on HARD. Pace advantages belong in the speed cap,
+        // not in the standing start.
+        const ref = (this.baseMaxSpeed ?? this.maxSpeed) * 0.5;
+        const punch = 1 + 0.55 * (1 - THREE.MathUtils.clamp(Math.abs(vf) / ref, 0, 1));
         vf += this.accel * punch * sTract * inputs.throttle * dt;
         this.reverseTimer = 0;
       }
@@ -977,6 +983,22 @@ export class Car {
       const wantOut = 1.4;
       if (outward < wantOut) this.vel.addScaledVector(n, -fside * (wantOut - outward));
       this.lateral = fside * WALL_LIMIT;
+      // opt-in wall instrument (headless): set __game.__wallProbe = {} and every
+      // contact records what the peel-off actually did — `inward` and
+      // `pingPong` must both stay 0 (no shove back into the rock, and no
+      // contact bouncing to the opposite wall inside 3s).
+      const wp = gm.__wallProbe;
+      if (wp && this === gm.player) {
+        const after = -fside * this.vel.dot(n);
+        wp.contacts = (wp.contacts ?? 0) + 1;
+        if (after < 0) wp.inward = (wp.inward ?? 0) + 1;
+        if (after > 2.5) wp.hotPeel = (wp.hotPeel ?? 0) + 1;
+        wp.maxOut = Math.max(wp.maxOut ?? 0, +after.toFixed(2));
+        if (wp.lastSide && wp.lastSide !== fside && gm.raceTime - wp.lastT < 3) {
+          wp.pingPong = (wp.pingPong ?? 0) + 1;
+        }
+        wp.lastSide = fside; wp.lastT = gm.raceTime;
+      }
       if (this === gm.player && Math.abs(this.speedAlong) > 12 && Math.random() < 0.4)
         gm.particles.sparks(this.pos, n, 2);
       if (this.wallGrind <= 0) {
@@ -1469,8 +1491,12 @@ export class EnemyCar extends Car {
   constructor(game, slot) {
     const spec = AI_COLORS[slot % AI_COLORS.length];
     super(game, buildCarMesh(spec), {
-      maxSpeed: 53 + slot * 1.1 + Math.random() * 1.4, // ~53..60 across the grid (player: 58)
-      accel: 36 + slot * 1.2 + Math.random() * 2,      // ~36..43
+      maxSpeed: 53 + slot * 1.1 + Math.random() * 1.4, // ~53..60 across the grid (player: 56..63)
+      // ~34.5..39.2 — deliberately INSIDE the garage's range (player cars are
+      // 36..40). The old 36..43 spread put the two quickest rivals above every
+      // car you can buy, and they out-dragged the starter BRAWLER off the line
+      // by 0.27s to 40 u/s (18%) — the grid must never beat the showroom.
+      accel: 34.5 + slot * 0.85 + Math.random() * 1.3,
       grip: 5.8,
       steerRate: 3.0,
       driftLag: 0.12, // planted enough to hold the racing line
@@ -1662,9 +1688,13 @@ export class EnemyCar extends Car {
     // pace parity vs the garage: a maxed ENGINE (+20% player top speed) turned
     // NORMAL into a parade. Rivals bring +2% per player engine level (cap
     // +10%) on NORMAL/HARD; EASY keeps its gentler pack untouched so a casual
-    // still gets to win with upgrades.
+    // still gets to win with upgrades. NOTE: upgrades went PER-CAR
+    // (`garage.upgrades[carKey]`) and the old flat `garage.engine` key is
+    // deleted by the save migration — reading it always returned 0, so this
+    // whole parity rule was dead. Ask the game for the selected car's levels.
+    const engLvl = g.carUpgrades?.().engine ?? g.garage?.engine ?? 0;
     const engUp = (g.difficulty?.id ?? 'normal') === 'easy'
-      ? 1 : 1 + Math.min(0.10, 0.02 * (g.garage?.engine ?? 0));
+      ? 1 : 1 + Math.min(0.10, 0.02 * engLvl);
     this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * engUp * Math.max(0.7, band);
 
     // ---- refresh the small personal lane bias occasionally
@@ -1977,43 +2007,103 @@ export class EnemyCar extends Car {
       }
     }
 
+    // one forward vector for both weapon gates below (allocation-free per frame)
+    const nf = this.forward;
+    const alongP = toPlayer.x * nf.x + toPlayer.z * nf.z;  // >0: player is AHEAD of us
+    const acrossP = toPlayer.x * nf.z - toPlayer.z * nf.x; // lateral offset in our frame
+
     // drop a mine in the player's path: player 6..18 behind and roughly in-line
     this.mineCooldown -= dt;
     if (this.mineCooldown <= 0 && g.player.alive) {
-      const nf = this.forward;
-      const along = toPlayer.x * nf.x + toPlayer.z * nf.z;   // negative: player is behind
-      const across = toPlayer.x * nf.z - toPlayer.z * nf.x;
-      if (along < -6 && along > -18 && Math.abs(across) < 3.5
+      if (alongP < -6 && alongP > -18 && Math.abs(acrossP) < 3.5
           && Math.random() < dt * 1.5 * this.aggression * D.aiAggression) {
         this.mineCooldown = 6 + Math.random() * 4;
         g.weapons.dropMine(this);
       }
     }
 
-    // ---- homing missiles up the leader's tailpipe (player 15..60 ahead,
+    // ---- homing missiles up the leader's tailpipe (player 10..75u ahead,
     // roughly in-line). The old design was ONE missile per rival per race and
     // only on HARD — in practice players never saw a rocket (user report).
-    // Now: EASY never; NORMAL an occasional reminder — only the top-2 rivals
-    // carry rockets, ~20-30s between launches; HARD everyone carries them,
-    // ~10-14s — the pack genuinely shoots back.
-    if (g.raceTime < 1) this.missileCd = 6 + Math.random() * 6; // grid stagger
-    this.missileCd = (this.missileCd ?? (6 + Math.random() * 6)) - dt;
+    // Now: EASY never; NORMAL an occasional reminder (~one a minute); HARD the
+    // pack genuinely shoots back (~three a minute). Rate is owned by the
+    // pack-wide gate below, never by who is allowed to carry a rocket:
+    // the old NORMAL clause `_aiRank < 2` (front-runners only) was DEAD, because
+    // a launch also needs the player 15..60u AHEAD of the shooter — a rival
+    // running 1st or 2nd is by definition in front of a mid-pack player, so the
+    // two clauses could almost never be true at the same time. Rank now only
+    // decides how quickly a driver reloads.
     const diffId2 = g.difficulty?.id ?? 'normal';
-    if (this.missileCd <= 0 && diffId2 !== 'easy' && g.player.alive
-        && (diffId2 === 'hard' || (this._aiRank ?? 9) < 2)) {
-      const nfm = this.forward;
-      const alongP = toPlayer.x * nfm.x + toPlayer.z * nfm.z;
-      const acrossP = toPlayer.x * nfm.z - toPlayer.z * nfm.x;
-      // launch cone: the missile homes, so rough alignment is enough. The old
-      // flat ±5u gate was why rockets never flew — a rival on its racing line
-      // holds the player's exact wake for well under half a second.
-      if (alongP > 15 && alongP < 60 && Math.abs(acrossP) < Math.min(12, 4 + alongP * 0.25)) {
-        this.missileCd = diffId2 === 'hard' ? 10 + Math.random() * 4 : 20 + Math.random() * 10;
-        g.weapons.fireMissile(this); // enemy-owned missiles home on the player
-        g.audio.missile();
-        g.hud.feed('MISSILE INCOMING!', 'bad');
-        g.buzz([50, 35, 50]);
-      }
+    // grid stagger: nobody is armed off the line (per-rival reload), and the
+    // pack's rocket budget only opens after the first-launch delay below.
+    if (g.raceTime < 1) {
+      this.missileCd = 6 + Math.random() * 6;
+      g._aiRocketN = 0; g._aiRocketMin = 0;
+    }
+    this.missileCd = (this.missileCd ?? (6 + Math.random() * 6)) - dt;
+    // Pack-wide RATE GOVERNOR. With 5 rivals all holding a window, per-rival
+    // cooldowns alone produced a rocket every ~4s; a fixed pack cooldown then
+    // swung the other way — every window that opened while the cooldown ran was
+    // simply lost, so a player who was being beaten (nobody behind them to
+    // shoot) saw almost nothing. Launches are budgeted against race time
+    // instead: HARD one per 20s after 8s (~3/min), NORMAL one per 85s after 24s
+    // (~0.7/min). A quiet stretch banks up to 2 rockets so the pace is repaid
+    // at the next real opportunity, and 6s of minimum spacing stops a backlog
+    // arriving as a salvo.
+    const mFirst = diffId2 === 'hard' ? 8 : 24;
+    const mPeriod = diffId2 === 'hard' ? 20 : 85;
+    const mFired = g._aiRocketN ?? 0;
+    const mBudget = g.raceTime < mFirst ? 0
+      : Math.min(1 + Math.floor((g.raceTime - mFirst) / mPeriod), mFired + 2);
+    const mCdOk = this.missileCd <= 0;
+    const mDiffOk = diffId2 !== 'easy' && g.player.alive;
+    const mPackOk = mFired < mBudget && g.raceTime >= (g._aiRocketMin ?? 0);
+    // launch cone: the missile homes, so rough alignment is enough. The old
+    // flat ±5u gate was why rockets never flew — a rival on its racing line
+    // holds the player's exact wake for well under half a second. weapons.js
+    // only locks the player when they are inside the ±75° nose cone, so the
+    // "player ahead" test is not optional — it is what makes the rocket home.
+    // 10..75u: wide enough that a real chase converts into a launch. The old
+    // 15..60 window opened for barely 20 rival-seconds in a 90s race, so most
+    // of the pack's budget expired unused while a rival sat 12u off the player's
+    // bumper with a perfect shot.
+    const mRangeOk = alongP > 10 && alongP < 75;
+    const mConeOk = Math.abs(acrossP) < Math.min(14, 4 + alongP * 0.25);
+    // opt-in probe counters (headless): set __game.__fireProbe = {} before a run
+    // and every sub-condition of this gate is counted, so a clause that never
+    // goes true shows up as a zero instead of being guessed at.
+    const fp = g.__fireProbe;
+    if (fp) {
+      fp.frames = (fp.frames ?? 0) + 1;
+      if (mCdOk) fp.cdOk = (fp.cdOk ?? 0) + 1;
+      if (mDiffOk) fp.diffOk = (fp.diffOk ?? 0) + 1;
+      if (mPackOk) fp.packOk = (fp.packOk ?? 0) + 1;
+      if (mRangeOk) fp.rangeOk = (fp.rangeOk ?? 0) + 1;
+      if (mRangeOk && mConeOk) fp.coneOk = (fp.coneOk ?? 0) + 1;
+      if (mCdOk && mDiffOk && mPackOk) fp.armed = (fp.armed ?? 0) + 1;
+      if (mCdOk && mDiffOk && mPackOk && mRangeOk && mConeOk) fp.all = (fp.all ?? 0) + 1;
+      // A/B against the retired gate: `rank < 2` on NORMAL, window 15..60u.
+      // `oldShot` counts the frames that gate would ever have fired in.
+      const oldCarrier = diffId2 === 'hard' || (this._aiRank ?? 9) < 2;
+      const oldWindow = alongP > 15 && alongP < 60
+        && Math.abs(acrossP) < Math.min(12, 4 + alongP * 0.25);
+      if (oldCarrier) fp.rankOk = (fp.rankOk ?? 0) + 1;
+      if (oldWindow) fp.oldWindow = (fp.oldWindow ?? 0) + 1;
+      if (oldCarrier && oldWindow) fp.oldShot = (fp.oldShot ?? 0) + 1;
+      if (mRangeOk && mConeOk) fp.newShot = (fp.newShot ?? 0) + 1;
+    }
+    if (mCdOk && mDiffOk && mPackOk && mRangeOk && mConeOk) {
+      // front-runners reload faster; everyone can pull the trigger. Kept short
+      // (the pack budget is the real rate limit) so a long reload can't swallow
+      // the one window a chaser gets.
+      this.missileCd = ((this._aiRank ?? 9) < 2 ? 4 : 6) + Math.random() * 3;
+      g._aiRocketN = mFired + 1;
+      g._aiRocketMin = g.raceTime + 6;
+      g.weapons.fireMissile(this); // enemy-owned missiles home on the player
+      g.audio.missile();
+      g.hud.feed('MISSILE INCOMING!', 'bad');
+      g.buzz([50, 35, 50]);
+      if (fp) fp.fired = (fp.fired ?? 0) + 1;
     }
   }
 }

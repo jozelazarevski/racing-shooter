@@ -116,11 +116,14 @@ export function horizonTexture(topHex, baseHex) {
   return t;
 }
 
-/** Where the wheel ruts sit across the road canvas: the ribbon is ~22u wide,
- *  a car tracks ~2.6u, so the rut pair straddles the middle at ±0.046w. Shared
- *  by the dirt ruts, the wet-road rut sheen and the cobble polish bands so
- *  every wear mark agrees on where the wheels actually run. */
-const RUT_CX = (w) => [w * 0.4537, w * 0.5463];
+/** Where the wheel ruts sit across the road canvas. The road ribbon is
+ *  2*(WALL_OFF+0.6) = 22 u wide mapped across the canvas width `w`, and a car
+ *  tracks 2.6 u (wheels at x = ±1.3 in vehicles.js), so the rut pair sits at
+ *  ±1.3/22 = ±0.0591 w — i.e. one car's wheels, not a lane pair. Shared by the
+ *  dirt ruts, the snow traffic channels, the wet-road rut sheen and the cobble
+ *  polish bands so every wear mark agrees on where the wheels actually run. */
+const RUT_HALF_W = 1.3 / 22;                  // ±0.05909 of the canvas width
+const RUT_CX = (w) => [w * (0.5 - RUT_HALF_W), w * (0.5 + RUT_HALF_W)];
 
 /** Rain-soaked overlay for the road canvas: darkens the surface toward wet
  *  asphalt/mud, pools sheen in the wheel ruts, lays long soft gleam streaks
@@ -176,10 +179,16 @@ function applyWetRoad(g, w, h, spec) {
   }
 }
 
-/** Snow-driven overlay for the road canvas: white cover creeping in from both
- *  edges, two darker carved tire channels down the lap (the rut/tread painting
- *  underneath stays visible so they read driven-in), pushed-up berm highlights,
- *  soft drift lobes and ice sparkle. FROST PEAK + GLACIAL PASS. */
+/** Snow-driven overlay for the road canvas. Two separate marks, because they
+ *  are made by two different things:
+ *    1. the PLOUGH clears one wavy swath (~10 u) down the middle of the 22 u
+ *       ribbon and banks the spoil up as berms along its edges — that swath is
+ *       what makes the road still legible as a road under the snow;
+ *    2. TRAFFIC then polishes the two CAR-WIDTH wheel tracks inside it, at the
+ *       same ±1.3 u centres as the dirt ruts underneath (RUT_CX), so the rut
+ *       and tread painting from roadTexture ghosts through them.
+ *  Plus soft drift lobes off the untouched edges and ice sparkle.
+ *  FROST PEAK / GLACIAL PASS / AVALANCHE ALLEY. */
 function applySnowRoad(g, w, h, spec) {
   const S = {
     snow: [244, 249, 254], shade: [198, 214, 232], slush: [210, 222, 234],
@@ -187,41 +196,37 @@ function applySnowRoad(g, w, h, spec) {
   };
   const [sr, sg, sb] = S.snow;
   const TWO = Math.PI * 2;
-  const chans = [w * 0.32, w * 0.68];      // channels carve along the old ruts
-  const chHalf = 29;
-  // channel edge wobble — integer cycles over h so the texture still tiles
+  const swath = w * 0.235;                 // ploughed half-width ≈ 5.2 u
+  const ruts = RUT_CX(w);
+  const rutHalf = w * 0.030;               // polished track ≈ 1.3 u wide
+  // swath edge wobble — integer cycles over h so the texture still tiles
   const wob = (y, ci) =>
     Math.sin((y / h) * TWO * 4 + ci * 4) * 5 + Math.sin((y / h) * TWO * 9 + ci) * 3;
   // cold veil first: mutes the dirt toward winter light
   g.fillStyle = `rgba(${sr},${sg},${sb},0.16)`;
   g.fillRect(0, 0, w, h);
-  // snow blanket drawn row-by-row with wavy holes over the two channels
+  // snow blanket drawn row-by-row, with the ploughed swath cut out of it
+  const [lr, lg, lb] = S.slush;
   for (let y = 0; y < h; y += 3) {
-    const edges = chans.map((cx, ci) => cx + wob(y, ci));
-    const spans = [
-      [0, edges[0] - chHalf],
-      [edges[0] + chHalf, edges[1] - chHalf],
-      [edges[1] + chHalf, w],
-    ];
+    const eL = w / 2 - swath + wob(y, 0), eR = w / 2 + swath + wob(y, 1);
     g.fillStyle = `rgba(${sr},${sg},${sb},0.88)`;
-    for (const [x0, x1] of spans) {
-      if (x1 > x0) g.fillRect(x0, y, x1 - x0, 3);
-    }
-    // pushed-up berms hugging each channel edge
+    if (eL > 0) g.fillRect(0, y, eL, 3);
+    if (eR < w) g.fillRect(eR, y, w - eR, 3);
+    // pushed-up berms where the blade threw the spoil
     g.fillStyle = 'rgba(255,255,255,0.85)';
-    for (const e of edges) {
-      g.fillRect(e - chHalf - 3.2, y, 3.4, 3);
-      g.fillRect(e + chHalf - 0.2, y, 3.4, 3);
-    }
-    // compacted slush film inside the channels — treads ghost through
-    const [lr, lg, lb] = S.slush;
+    g.fillRect(eL - 3.4, y, 3.6, 3);
+    g.fillRect(eR - 0.2, y, 3.6, 3);
+    // residual packed snow still lying across the cleared swath
+    g.fillStyle = `rgba(${sr},${sg},${sb},0.44)`;
+    g.fillRect(eL + 3, y, Math.max(0, eR - eL - 6), 3);
+    // compacted slush polished into the two wheel tracks — treads ghost through
     g.fillStyle = `rgba(${lr},${lg},${lb},${S.slushAlpha})`;
-    for (const e of edges) g.fillRect(e - chHalf + 3, y, chHalf * 2 - 6, 3);
+    for (const cx of ruts) g.fillRect(cx - rutHalf, y, rutHalf * 2, 3);
   }
   // mottled depth in the cover (soft shade + bright re-frozen patches)
   for (let i = 0; i < 240; i++) {
     const x = Math.random() * w, y = Math.random() * h;
-    if (chans.some((c) => Math.abs(x - c) < chHalf + 5)) continue;
+    if (Math.abs(x - w / 2) < swath + 5) continue;
     const r = 3 + Math.random() * 10;
     const shade = Math.random() < 0.45;
     const [cr, cg, cb] = shade ? S.shade : [255, 255, 255];
@@ -505,15 +510,17 @@ export function roadTexture(palette = {}) {
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
     }
-    // twin wheel ruts: dark compacted bands with tread chevrons stamped in.
-    // Sized to a CAR: the road ribbon is ~22u across mapped to `w`, a car body
-    // is 2.6u wide, so the pair of ruts spans ~2.6u (centers ±1.02u ≈ ±0.046w)
-    // and each rut is ~0.6u (≈0.027w) wide. P.ruts === false skips them
-    // entirely — hard surfaces (cobbles, ice, glass-asphalt, concrete) don't
-    // rut the way soft dirt does.
-    // snow-covered roads carve their traffic channels at the legacy lane
-    // positions — keep the ghost-through ruts underneath aligned with them
-    if (P.ruts !== false) for (const cx of (P.snowCover ? [w * 0.32, w * 0.68] : RUT_CX(w))) {
+    // Twin wheel ruts: dark compacted bands with tread chevrons stamped in.
+    // Sized to a CAR — the ribbon is 22u across mapped to `w` and the wheels
+    // track 2.6u, so the pair sits at ±1.3u (±0.0591w, see RUT_CX) and each
+    // rut is ~0.6u (≈0.027w) wide. Snow roads reuse the SAME centres so the
+    // ploughed channels in applySnowRoad sit right on top of them.
+    //
+    // `ruts: false` on a theme's road spec skips them entirely: only SOFT
+    // ground (dirt, sand, snow, ash) records wheel tracks. Hard surfaces —
+    // mountain asphalt (GOTTHARD CLIMB), stone setts (TREMOLA), sheet ice,
+    // glass-asphalt (NEON GRID) and poured concrete (UNDERCITY) — get none.
+    if (P.ruts !== false) for (const cx of RUT_CX(w)) {
       g.fillStyle = P.rut;
       g.fillRect(cx - 7, 0, 14, h);
       g.fillStyle = P.rutCore;
@@ -762,9 +769,9 @@ export function junctionTexture(palette = {}) {
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
     }
-    // faded ruts continuing through the crossing: the patch spans ~17u, so a
-    // 2.6u car pair sits at ±1.02u ≈ ±15px of center, each rut ~9px
-    for (const cx of [w / 2 - 15.4, w / 2 + 15.4]) {
+    // faded ruts continuing through the crossing: the patch spans 17u, so the
+    // 2.6u car track sits at ±1.3u ≈ ±19.6px of center, each rut ~9px (0.6u)
+    for (const cx of [w / 2 - 19.6, w / 2 + 19.6]) {
       const grd = g.createLinearGradient(0, 0, 0, h);
       grd.addColorStop(0, 'rgba(0,0,0,0)');
       grd.addColorStop(0.32, P.rut);

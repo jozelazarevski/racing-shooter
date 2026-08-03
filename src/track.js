@@ -1094,6 +1094,7 @@ const THEMES = {
     road: {
       // weathered grey mountain asphalt over a gravel base
       base: '#6f6a63', mottleA: [82, 78, 72], mottleB: [136, 132, 124],
+      ruts: false,          // sealed asphalt — hard ground never takes a rut
       rut: 'rgba(52,50,46,0.45)', rutCore: 'rgba(38,36,34,0.4)', tread: 'rgba(20,18,16,0.45)',
       stoneA: 'rgba(200,196,186,0.65)', stoneB: 'rgba(68,64,58,0.7)',
       fringe: [70, 118, 50], fringeVar: [34, 46, 24],
@@ -1366,6 +1367,10 @@ const ELEMENT_KITS = {
     wall: 0x3c424a, wall2: 0x2a3038, roof: 0x22262c, trim: 0x6a7280, stone: 0x4a4e54,
     builds: ['kiosk', 'shed', 'kiosk'], landmarks: ['watchtower'],
     dress: ['logpile'], fenceColor: 0x5a6068, stoneWalls: 2,
+    // no cattle under the expressway: the livestock dressing (water trough,
+    // feed bin, hay rack) is dropped and the budget goes into more grey
+    // barrier runs, which read as crowd/works hoarding in a city
+    field: [], fenceRuns: 5,
   },
   burnt: {
     wall: 0x4c4038, wall2: 0x3a3028, roof: 0x2e2620, trim: 0x241d18, stone: 0x4a4238,
@@ -3526,6 +3531,8 @@ export class Track {
       || ELEMENT_KIT_BY_THEME[this.level && this.level.theme] || 'farm';
     const K = ELEMENT_KITS[kitName];
     if (!K) return;
+    // breakable field dressing this kit uses (livestock gear by default)
+    const FIELD = K.field ?? ['trough', 'feedbin', 'hayrack'];
     const B = { wall: [], box: [], cyl: [], cone: [], prism: [] };
 
     // --- pick 3 farmstead / outpost sites well off the racing line ---
@@ -3562,10 +3569,13 @@ export class Track {
       const pd = at(-6, 34);
       this._fenceRun(pd.x, pd.z, site.rot + Math.PI / 2, 6, K);
       if (this._buildableSpot(pd.x, pd.z, 12, 3.0)) pastures.push({ x: pd.x, z: pd.z, r: 13 });
-      // trough / feed bin / hay rack in the paddock
+      // trough / feed bin / hay rack in the paddock (kits without livestock —
+      // the city — declare `field: []` and get none)
       const fp = at(-14, 30);
-      this._fieldProp(fp.x, fp.z, Math.random() * Math.PI * 2,
-        ['trough', 'feedbin', 'hayrack'][(Math.random() * 3) | 0], K);
+      if (FIELD.length) {
+        this._fieldProp(fp.x, fp.z, Math.random() * Math.PI * 2,
+          FIELD[(Math.random() * FIELD.length) | 0], K);
+      }
     }
 
     // --- two landmarks somewhere else on the lap (chapel / silo / tower) ---
@@ -3588,18 +3598,18 @@ export class Track {
       }
     }
 
-    // --- a couple of standalone fence runs + field dressing out in the open ---
-    for (let f = 0; f < 2; f++) {
+    // --- standalone fence runs + field dressing out in the open ---
+    for (let f = 0, nf = K.fenceRuns ?? 2; f < nf; f++) {
       const p = this._trackSidePos(26, 120);
       if (p && this._buildableSpot(p.x, p.z, 10, 3.2)) {
         this._fenceRun(p.x, p.z, Math.random() * Math.PI * 2, 5, K);
       }
     }
-    for (let d = 0; d < 3; d++) {
+    for (let d = 0; d < 3 && FIELD.length; d++) {
       const p = this._trackSidePos(22, 110);
       if (p) {
         this._fieldProp(p.x, p.z, Math.random() * Math.PI * 2,
-          ['trough', 'feedbin', 'hayrack'][(Math.random() * 3) | 0], K);
+          FIELD[(Math.random() * FIELD.length) | 0], K);
       }
     }
 
@@ -3749,9 +3759,21 @@ export class Track {
    *  plausible angles (60-120°) and head off toward the farms, pastures and
    *  cabins the world is dressed with. They are TERRAIN, not track — drivable
    *  under the normal off-road rules, no colliders. Each junction gets a
-   *  widened, radially-faded intersection patch over the road edge. Data for
-   *  the traffic agent: this.crossroads = [{index, side, angle, len}]
-   *  (index = main-road centerline sample at the junction). */
+   *  widened, radially-faded intersection patch over the road edge.
+   *
+   *  Data for the traffic agent — `track.crossroads` is an array of:
+   *    index    main-road centerline sample at the junction (0..N-1)
+   *    side     +1 / -1, which side of the road the spur leaves on
+   *             (matches the `lateral` sign used by pointAt/nearestIndex)
+   *    angle    radians between the spur and the road tangent, 0..PI
+   *    len      graded length of the spur in world units (12..30)
+   *    x, z     world position of the spur mouth (on the road edge)
+   *    dx, dz   unit direction of the spur, pointing away from the road
+   *    endX,endZ far end of the graded surface
+   *    halfWidth lane half-width at the far end (the mouth flares to 5.4)
+   *    y        road centerline height at the junction
+   *  The first four are the canonical schema; the rest are derived
+   *  conveniences (dx,dz === tan*cos(angle) + nrm*side*sin(angle)). */
   _buildCrossroads() {
     const want = Math.min(4,
       (this.T.crossroads ?? THEME_CROSSROADS[this.level && this.level.theme] ?? 0) | 0);
@@ -3807,7 +3829,13 @@ export class Track {
       const S = Math.max(4, Math.ceil(len / 3));
       const p0 = this.pointAt(i, side * 8);
       const y0 = c.y - 0.06;
-      const px = -uz, pz = ux;                               // across the spur
+      // Across the spur. This MUST match the handedness the road ribbon uses
+      // (nrm = (tan.z, 0, -tan.x)) — the triangle winding below is copied from
+      // _buildRoad, so flipping this normal flips the face. It was `(-uz, ux)`,
+      // which made computeVertexNormals emit ny = -1: every spur was built
+      // upside-down and back-face-culled away, invisible from the car and from
+      // straight above even though the mesh sat correctly on the terrain.
+      const px = uz, pz = -ux;
       const verts = new Float32Array((S + 1) * 2 * 3);
       const uvs = new Float32Array((S + 1) * 2 * 2);
       const idx = [];
@@ -3854,8 +3882,17 @@ export class Track {
       patch.receiveShadow = true;
       this.group.add(patch);
       used.push(i);
+      // Traffic-agent contract (see the doc comment above): the four required
+      // fields plus a ready-made world-space ray so a router never has to redo
+      // the cone maths. u = tan*cos(angle) + nrm*side*sin(angle) reconstructs
+      // (dx, dz) exactly from {index, side, angle} if only those are wanted.
       this.crossroads.push({
         index: i, side, angle: Math.acos(THREE.MathUtils.clamp(ux * t.x + uz * t.z, -1, 1)), len,
+        x: p0.x, z: p0.z,                                    // mouth, on the road edge
+        dx: ux, dz: uz,                                      // unit direction away from the road
+        endX: p0.x + ux * len, endZ: p0.z + uz * len,        // far end of the graded spur
+        halfWidth: 3.4,                                      // lane half-width at the far end
+        y: c.y,                                              // road height at the junction
       });
     }
   }
@@ -4908,8 +4945,11 @@ export class Track {
     for (const part of acaciaParts) { part.count = ks.acacia; this.scene.add(part); }
   }
 
-  /** Volcano vegetation: sparse burnt snags — bare trunk + a few thin dark
-   *  branch cones, scattered like the pines are on the other levels. */
+  /** Volcano vegetation: nothing green survives a lava field, so the "flora"
+   *  is two stages of the same death — tall bare SNAGS with a few thin dark
+   *  branches still attached, and squat broken STUMPS the ash has buried to
+   *  the shoulder. Both are BREAKABLE (kind 'snag'), both jitter in scale and
+   *  in how far the char has bleached them. */
   _buildCharredTrees(m4) {
     const COUNT = this.T.treeCount;
     const trunkGeo = new THREE.CylinderGeometry(0.13, 0.34, 4.8, 6);
@@ -4925,10 +4965,21 @@ export class Track {
     b3.translate(0, 3.7, 0.5);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 });
     const parts = [trunkGeo, b1, b2, b3].map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
-    for (const part of parts) part.castShadow = true;
+    // stump: a snapped-off trunk with a jagged shoulder, half-buried in ash
+    const stTrunk = new THREE.CylinderGeometry(0.34, 0.6, 1.5, 6);
+    stTrunk.translate(0, 0.75, 0);
+    const stShard = new THREE.ConeGeometry(0.2, 0.9, 4);
+    stShard.rotateZ(0.22);
+    stShard.translate(0.16, 1.7, 0);
+    const stRoot = new THREE.CylinderGeometry(0.62, 0.95, 0.36, 6);
+    stRoot.translate(0, 0.18, 0);
+    const stumpParts = [stTrunk, stShard, stRoot]
+      .map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
+    for (const part of [...parts, ...stumpParts]) part.castShadow = true;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
-    const placed = this._scatter(COUNT,
+    let snags = 0, stumps = 0;
+    this._scatter(COUNT,
       () => {
         if (Math.random() < 0.62) return this._trackSidePos(15, 46);
         const a = Math.random() * Math.PI * 2;
@@ -4937,38 +4988,53 @@ export class Track {
         if (this._distToTrack(x, z) < 14.5) return null;
         return { x, z };
       },
-      (p, k) => {
-        const s = 0.7 + Math.random() * 1.1;
+      (p) => {
+        // 70 % standing snags, 30 % snapped stumps
+        const stump = Math.random() < 0.3;
+        const sp = stump ? stumpParts : parts;
+        const k = stump ? stumps++ : snags++;
+        const s = stump ? 0.8 + Math.random() * 0.9 : 0.7 + Math.random() * 1.1;
         const ty = this.terrainHeight(p.x, p.z) - 0.2;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
           new THREE.Vector3(p.x, ty, p.z),
           q, new THREE.Vector3(s, s * (0.8 + Math.random() * 0.5), s)
         );
-        color.setHSL(0.06 + Math.random() * 0.03, 0.12 + Math.random() * 0.1, 0.08 + Math.random() * 0.06);
-        for (const part of parts) {
+        // char jitter: from soot-black to ash-dusted grey (stumps sit in the
+        // fallout so they run a touch greyer, never brighter than the field)
+        color.setHSL(0.06 + Math.random() * 0.03,
+          (0.12 + Math.random() * 0.1) * (stump ? 0.6 : 1),
+          (stump ? 0.06 : 0.08) + Math.random() * 0.06);
+        for (const part of sp) {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.45 * s, id: k, parts, kind: 'snag', s, solid: false });
-        this._addShadow(p.x, p.z, 1.2 * s);
+        this.trees.push({
+          x: p.x, z: p.z, y: ty, r: (stump ? 0.6 : 0.45) * s, id: k, parts: sp,
+          kind: 'snag', s, solid: false,
+        });
+        this._addShadow(p.x, p.z, (stump ? 1.0 : 1.2) * s);
       });
-    for (const part of parts) { part.count = placed; this.scene.add(part); }
+    for (const part of parts) { part.count = snags; this.scene.add(part); }
+    for (const part of stumpParts) { part.count = stumps; this.scene.add(part); }
   }
 
-  /** Jungle canopy: tall thin trunks under 2-3 stacked wide flattened crowns
-   *  (varied greens), packed dense for a closed-canopy feel, plus banana-ish
-   *  giant-leaf plants fanning out near the road. The big canopy trees carry
-   *  kind 'pine' so the material law's big-tree-SOLID rule applies to them
-   *  (most spawn at scale ≥ 1.0); the leaf plants are small and smashable. */
+  /** Jungle canopy — TROPICAL SPECIES ONLY. There is not one conifer anywhere
+   *  on a jungle world: no cone-and-trunk pine geometry is built here and the
+   *  theme never reaches the default `_buildForest` stand.
+   *
+   *  Four canopy species plus undergrowth, each with scale and colour jitter:
+   *    KAPOK      emergent — pale buttressed trunk, broad flat plate crown,
+   *               liana strands hanging off it. SOLID at full scale.
+   *    BROADLEAF  mid-story — short trunk, rounded stacked crowns. Yields.
+   *    PALM       tall bare stem under a fan of drooping fronds. Yields.
+   *    TREEFERN   squat fibrous trunk under an arching frond rosette. Yields.
+   *  plus banana-ish giant-leaf plants fanning out along the verges.
+   *  Everything except the full-grown kapoks sets solid:false, which is what
+   *  vehicles.js reads (`tr.solid`) to decide whether a car fells it. */
   _buildJungleTrees(m4) {
     const T = this.T;
     const COUNT = T.treeCount;
-    // TROPICAL canopy only — no conifer silhouettes anywhere on this world.
-    // Two species: KAPOK emergents (tall pale trunk under a broad, flat,
-    // spreading crown of squashed domes — the classic rainforest skyline) and
-    // BROADLEAF mid-story (shorter, rounded layered crowns). Kapoks at full
-    // scale are SOLID; the mid-story always yields.
     const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const canMatLow = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
     const canMatTop = new THREE.MeshStandardMaterial({ color: T.foliageTop, flatShading: true, roughness: 1 });
@@ -4986,12 +5052,24 @@ export class Track {
     const kDomeB = new THREE.SphereGeometry(1.7, 7, 5);
     kDomeB.scale(1, 0.45, 1);
     kDomeB.translate(-1.8, 6.9, -0.5);
+    // lianas: three thin strands dangling from the kapok crown — the single
+    // most tropical read there is, and free (they ride the same instance)
+    const vineMat = new THREE.MeshStandardMaterial({ color: 0x3e6b2c, roughness: 1 });
+    // every strand must hang from somewhere: keep them inside the crown plate
+    // footprint (radius 3.6) or they read as sticks floating in mid-air
+    const vineGeos = [[2.4, 3.4, 1.2], [-2.2, 2.6, -1.0], [0.9, 3.0, -2.4]]
+      .map(([vx, vlen, vz]) => {
+        const v = new THREE.CylinderGeometry(0.055, 0.045, vlen, 4);
+        v.translate(vx, 6.9 - vlen / 2, vz);
+        return v;
+      });
     const kapokParts = [
       new THREE.InstancedMesh(kTrunk, trunkMat, COUNT),
       new THREE.InstancedMesh(kButtress, trunkMat, COUNT),
       new THREE.InstancedMesh(kCrown, canMatLow, COUNT),
       new THREE.InstancedMesh(kDomeA, canMatLow, COUNT),
       new THREE.InstancedMesh(kDomeB, canMatTop, COUNT),
+      ...vineGeos.map((v) => new THREE.InstancedMesh(v, vineMat, COUNT)),
     ];
     // broadleaf: short trunk, two rounded stacked crowns
     const bTrunk = new THREE.CylinderGeometry(0.24, 0.36, 4.2, 7);
@@ -5007,10 +5085,53 @@ export class Track {
       new THREE.InstancedMesh(bCrown, canMatLow, COUNT),
       new THREE.InstancedMesh(bTop, canMatTop, COUNT),
     ];
-    for (const part of [...kapokParts, ...broadParts]) part.castShadow = true;
+    // rainforest palm: slim bare stem, 7 drooping fronds, a nut cluster
+    const pTrunk = new THREE.CylinderGeometry(0.15, 0.28, 6.2, 6);
+    pTrunk.translate(0, 3.1, 0);
+    const palmGeos = [pTrunk];
+    for (let li = 0; li < 7; li++) {
+      const fr = new THREE.ConeGeometry(0.46, 3.3, 4);
+      fr.rotateZ(-Math.PI / 2);                          // axis → +x
+      fr.translate(1.6, 0, 0);
+      fr.scale(1, 0.2, 0.68);                            // flattened frond
+      fr.rotateZ(-0.30 - (li % 2) * 0.26);               // droop, alternating
+      fr.rotateY(li * (Math.PI * 2 / 7) + 0.4);
+      fr.translate(0, 6.15, 0);
+      palmGeos.push(fr);
+    }
+    const pNut = new THREE.SphereGeometry(0.2, 6, 5);
+    pNut.translate(0.26, 5.85, 0.16);
+    const palmParts = [
+      new THREE.InstancedMesh(pTrunk, trunkMat, COUNT),
+      ...palmGeos.slice(1).map((fr) => new THREE.InstancedMesh(fr, canMatTop, COUNT)),
+      new THREE.InstancedMesh(pNut, new THREE.MeshStandardMaterial({ color: 0x6a4a26, roughness: 1 }), COUNT),
+    ];
+    // tree fern: squat fibrous trunk under an arching frond rosette
+    const fTrunk = new THREE.CylinderGeometry(0.2, 0.34, 2.0, 6);
+    fTrunk.translate(0, 1.0, 0);
+    const fernParts = [new THREE.InstancedMesh(fTrunk, trunkMat, COUNT)];
+    for (let li = 0; li < 6; li++) {
+      const fr = new THREE.BoxGeometry(0.34, 0.06, 2.2);
+      fr.translate(0, 0, 1.25);
+      fr.rotateX(-0.5 - (li % 2) * 0.2);                 // arch up then over
+      fr.rotateY(li * (Math.PI * 2 / 6) + 0.25);
+      fr.translate(0, 2.05, 0);
+      fernParts.push(new THREE.InstancedMesh(fr, canMatLow, COUNT));
+    }
+    for (const part of [...kapokParts, ...broadParts, ...palmParts, ...fernParts]) {
+      part.castShadow = true;
+    }
     const color = new THREE.Color();
     const F = T.foliage;
-    const ks = { kapok: 0, broad: 0 };
+    const ks = { kapok: 0, broad: 0, palm: 0, fern: 0 };
+    // species table: [name, parts, colour-tinted part indices, radius, scale range]
+    const SPECIES = [
+      ['kapok', kapokParts, [2, 3, 4], 1.0, [0.9, 1.1]],
+      ['broadleaf', broadParts, [1, 2], 0.8, [0.7, 0.8]],
+      ['palm', palmParts, palmParts.map((_, pi) => pi).slice(1, -1), 0.55, [0.85, 0.6]],
+      ['treefern', fernParts, fernParts.map((_, pi) => pi).slice(1), 0.5, [0.6, 0.5]],
+    ];
+    const SLOT = { kapok: 'kapok', broadleaf: 'broad', palm: 'palm', treefern: 'fern' };
     this._scatter(COUNT,
       () => {
         // denser and closer than the pine forests: a real green wall
@@ -5022,38 +5143,35 @@ export class Track {
         return { x, z };
       },
       (p) => {
-        const kapok = Math.random() < 0.55;
-        const parts = kapok ? kapokParts : broadParts;
-        const k = kapok ? ks.kapok++ : ks.broad++;
-        const s = kapok ? 0.9 + Math.random() * 1.1 : 0.7 + Math.random() * 0.8;
+        // 40 % emergent kapok, 25 % broadleaf, 20 % palm, 15 % tree fern
+        const roll = Math.random();
+        const sp = SPECIES[roll < 0.40 ? 0 : roll < 0.65 ? 1 : roll < 0.85 ? 2 : 3];
+        const [kind, parts, tintIdx, rad, [s0, sVar]] = sp;
+        const k = ks[SLOT[kind]]++;
+        const s = s0 + Math.random() * sVar;
         const ty = this.terrainHeight(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of parts) part.setMatrixAt(k, m4);
         this.trees.push({
-          x: p.x, z: p.z, y: ty, r: (kapok ? 1.0 : 0.8) * s, id: k, parts,
-          kind: kapok ? 'kapok' : 'broadleaf', s,
+          x: p.x, z: p.z, y: ty, r: rad * s, id: k, parts, kind, s,
           // kapok emergents at full growth stop a car; everything else yields
-          solid: kapok && s >= 1.0,
+          solid: kind === 'kapok' && s >= 1.0,
         });
         color.setHSL(
           F.h + Math.random() * F.hVar,
           F.s + Math.random() * F.sVar,
           F.l + Math.random() * F.lVar
         );
-        if (kapok) {
-          parts[2].setColorAt(k, color);
-          parts[3].setColorAt(k, color.clone().multiplyScalar(0.85));
-          parts[4].setColorAt(k, color.clone().multiplyScalar(1.25));
-        } else {
-          parts[1].setColorAt(k, color);
-          parts[2].setColorAt(k, color.clone().multiplyScalar(1.22));
+        // per-instance tint, brightening toward the top of the canopy
+        for (let ti = 0; ti < tintIdx.length; ti++) {
+          parts[tintIdx[ti]].setColorAt(k,
+            color.clone().multiplyScalar(0.85 + (ti / Math.max(1, tintIdx.length - 1)) * 0.4));
         }
-        this._addShadow(p.x, p.z, 3.0 * s);
+        this._addShadow(p.x, p.z, (kind === 'kapok' ? 3.0 : kind === 'broadleaf' ? 2.4 : 1.8) * s);
       });
-    for (const part of kapokParts) part.count = ks.kapok;
-    for (const part of broadParts) part.count = ks.broad;
-    this.scene.add(...kapokParts, ...broadParts);
+    for (const [kind, parts] of SPECIES) for (const part of parts) part.count = ks[SLOT[kind]];
+    this.scene.add(...kapokParts, ...broadParts, ...palmParts, ...fernParts);
 
     // giant-leaf plants near the road: 5 flat stretched leaves fanned from a base
     const PLANTS = 90;
@@ -5088,10 +5206,15 @@ export class Track {
     for (const part of leafParts) { part.count = pPlaced; this.scene.add(part); }
   }
 
-  /** Desert palms: tall bare trunk under a fan crown of drooping fronds and a
-   *  coconut cluster. kind 'palm' (NOT 'pine') so cars always fell them. The
-   *  oasis level packs most of its palms into one dense grove section of the
-   *  lap (T.palmGrove = [fracA, fracB]); the dune level scatters them thin. */
+  /** Desert palms — TWO species so an oasis never reads copy-pasted:
+   *    DATE PALM  tall bare trunk under a fan crown of drooping fronds plus a
+   *               fruit cluster (the skyline shape).
+   *    DOUM PALM  squat, thicker, wider stiff fan with no fruit — the scrubby
+   *               understory palm that grows in clumps at the water's edge.
+   *  Both carry kind 'palm' (NOT 'pine') and solid:false, so cars always fell
+   *  them. The oasis level packs most of its palms into one dense grove
+   *  section of the lap (T.palmGrove = [fracA, fracB]); the dune level
+   *  scatters them thin. */
   _buildPalms(m4) {
     const T = this.T;
     const COUNT = T.treeCount;
@@ -5117,12 +5240,30 @@ export class Track {
     const parts = partGeos.map((geoPart, gi) => new THREE.InstancedMesh(
       geoPart, gi === 0 ? trunkMat : gi === partGeos.length - 1 ? nutMat : frondMat, COUNT
     ));
-    for (const part of parts) part.castShadow = true;
+    // --- doum palm: short thick trunk, 8 stiff wide fans, no fruit ---
+    const dTrunk = new THREE.CylinderGeometry(0.3, 0.46, 2.5, 7);
+    dTrunk.translate(0, 1.25, 0);
+    const doumGeos = [dTrunk];
+    for (let li = 0; li < 8; li++) {
+      const fr = new THREE.ConeGeometry(0.72, 2.4, 4);
+      fr.rotateZ(-Math.PI / 2);
+      fr.translate(1.15, 0, 0);
+      fr.scale(1, 0.16, 0.9);                       // broad flat fan
+      fr.rotateZ(-0.02 - (li % 3) * 0.2);           // near-horizontal, uneven
+      fr.rotateY(li * (Math.PI * 2 / 8) + 0.2);
+      fr.translate(0, 2.55, 0);
+      doumGeos.push(fr);
+    }
+    const doumParts = doumGeos.map((geoPart, gi) => new THREE.InstancedMesh(
+      geoPart, gi === 0 ? trunkMat : frondMat, COUNT
+    ));
+    for (const part of [...parts, ...doumParts]) part.castShadow = true;
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
     const F = T.foliage;
     const grove = T.palmGrove;
-    const placed = this._scatter(COUNT,
+    let doums = 0, dates = 0;
+    this._scatter(COUNT,
       () => {
         if (grove && Math.random() < 0.6) {
           // the hidden grove: dense stand along one stretch of the lap
@@ -5139,8 +5280,12 @@ export class Track {
         if (this._distToTrack(x, z) < 11.5) return null;
         return { x, z };
       },
-      (p, k) => {
-        const s = 0.8 + Math.random() * 0.75;
+      (p) => {
+        // 68 % date palms (the skyline), 32 % squat doum clumps
+        const doum = Math.random() < 0.32;
+        const sp = doum ? doumParts : parts;
+        const k = doum ? doums++ : dates++;
+        const s = doum ? 0.75 + Math.random() * 0.6 : 0.8 + Math.random() * 0.75;
         const ty = this.terrainHeight(p.x, p.z) - 0.2;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
@@ -5149,23 +5294,30 @@ export class Track {
         );
         color.setHSL(
           F.h + Math.random() * F.hVar,
-          F.s + Math.random() * F.sVar,
+          // the doums run drier and duller than the fruiting date palms
+          (F.s + Math.random() * F.sVar) * (doum ? 0.78 : 1),
           F.l + Math.random() * F.lVar
         );
-        for (const part of parts) {
+        for (const part of sp) {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
         // NOT 'pine' → the material law lets any car snap a palm
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.55 * s, id: k, parts, kind: 'palm', s, solid: false });
-        this._addShadow(p.x, p.z, 1.9 * s);
+        this.trees.push({
+          x: p.x, z: p.z, y: ty, r: (doum ? 0.7 : 0.55) * s, id: k, parts: sp,
+          kind: doum ? 'doum' : 'palm', s, solid: false,
+        });
+        this._addShadow(p.x, p.z, (doum ? 1.5 : 1.9) * s);
       });
-    for (const part of parts) { part.count = placed; this.scene.add(part); }
+    for (const part of parts) { part.count = dates; this.scene.add(part); }
+    for (const part of doumParts) { part.count = doums; this.scene.add(part); }
   }
 
   /** Gargantuan redwoods: scale 2.2–3.2 → the s ≥ 1.0 'pine' rule makes every
-   *  one SOLID, so they are all placed OFF the road. A second set of small
-   *  (smashable) understory pines dresses the verges. */
+   *  one SOLID, so they are all placed OFF the road. Two more species dress
+   *  the floor and keep the stand from reading as one repeated tree: small
+   *  (smashable) redwood saplings on the verges, and TANOAK broadleaves in a
+   *  lighter yellow-green — the real coast-redwood understory. */
   _buildRedwoods(m4) {
     const T = this.T;
     const COUNT = T.treeCount;
@@ -5240,6 +5392,50 @@ export class Track {
         sTops.setColorAt(k, color.clone().multiplyScalar(1.2));
       });
     for (const part of sapParts) { part.count = sapPlaced; this.scene.add(part); }
+
+    // --- TANOAK: the broadleaf that actually grows under coast redwoods.
+    // Short crooked trunk under two rounded crowns in a lighter, yellower
+    // green than the conifers, so the stand never reads as one repeated tree.
+    const OAKS = 120;
+    const oTrunk = new THREE.CylinderGeometry(0.26, 0.42, 4.4, 6);
+    oTrunk.rotateZ(0.06);
+    oTrunk.translate(0, 2.2, 0);
+    const oCrown = new THREE.SphereGeometry(2.3, 8, 6);
+    oCrown.scale(1, 0.82, 1);
+    oCrown.translate(0, 5.1, 0);
+    const oTop = new THREE.SphereGeometry(1.4, 7, 5);
+    oTop.scale(1, 0.85, 1);
+    oTop.translate(0.45, 6.3, 0.3);
+    // reuse the theme's canopy materials so the tanoaks sit in the same
+    // brightness family as the conifers — the per-instance tint below only
+    // shifts them yellower and a shade lighter
+    const oakParts = [
+      new THREE.InstancedMesh(oTrunk, trunkMat, OAKS),
+      new THREE.InstancedMesh(oCrown, lowMat, OAKS),
+      new THREE.InstancedMesh(oTop, topMat, OAKS),
+    ];
+    for (const part of oakParts) part.castShadow = true;
+    const oakPlaced = this._scatter(OAKS,
+      () => (Math.random() < 0.7 ? this._trackSidePos(13, 45) : this._trackSidePos(45, 130)),
+      (p, k) => {
+        const s = 0.7 + Math.random() * 0.7;
+        const ty = this.terrainHeight(p.x, p.z) - 0.2;
+        m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
+        m4.setPosition(p.x, ty, p.z);
+        for (const part of oakParts) part.setMatrixAt(k, m4);
+        // broadleaf, never a giant → always yields to a bumper
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.75 * s, id: k, parts: oakParts, kind: 'oak', s, solid: false });
+        // yellower and a shade lighter than the conifers, same brightness band
+        color.setHSL(
+          F.h - 0.035 + Math.random() * F.hVar,
+          Math.min(1, F.s + 0.08),
+          Math.min(0.55, F.l + 0.05 + Math.random() * F.lVar)
+        );
+        oakParts[1].setColorAt(k, color);
+        oakParts[2].setColorAt(k, color.clone().multiplyScalar(1.2));
+        this._addShadow(p.x, p.z, 2.2 * s);
+      });
+    for (const part of oakParts) { part.count = oakPlaced; this.scene.add(part); }
   }
 
   /** Burning forest: a mix of bare charred snags (ember-rim emissive) and
