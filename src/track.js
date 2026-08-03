@@ -9,7 +9,7 @@ import {
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
   crateTexture, coneTexture, barrelTexture, riverTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
-  contactShadowTexture, horizonTexture, stoneTexture,
+  contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -2827,6 +2827,7 @@ export class Track {
     if (this.T.snowPatches) this._buildSnowPatches(m4);       // old snow at altitude
     this._buildWorldElements(m4);                    // farms, chapels, fences, dressing
     this._buildPastures();                           // grazing spots for the animal system
+    if (this.T.crossroads) this._buildCrossroads();  // dirt side-road junctions
     this._buildRoadsideDetail(m4);                   // corner markers + gravel
     this._buildContactShadows();                     // baked AO under everything
   }
@@ -3716,6 +3717,120 @@ export class Track {
       scoreValue: 35, pickup: null,
     });
     this._addShadow(x, z, 2.4);
+  }
+
+  /** Decorative crossroads: short dirt side-roads that join the circuit at
+   *  plausible angles (60-120°) and head off toward the farms, pastures and
+   *  cabins the world is dressed with. They are TERRAIN, not track — drivable
+   *  under the normal off-road rules, no colliders. Each junction gets a
+   *  widened, radially-faded intersection patch over the road edge. Data for
+   *  the traffic agent: this.crossroads = [{index, side, angle, len}]
+   *  (index = main-road centerline sample at the junction). */
+  _buildCrossroads() {
+    const want = Math.min(4, this.T.crossroads | 0);
+    if (!want) return;
+    // spurs lead somewhere: pastures and farm buildings, nearest-road first
+    const targets = [
+      ...(this.pastures || []).map((p) => ({ x: p.x, z: p.z, r: p.r })),
+      ...this.solids.filter((s) => s.mat === 'hut').map((s) => ({ x: s.x, z: s.z, r: s.r + 8 })),
+    ];
+    if (!targets.length) return;
+    // one shared surface: the theme's own dirt palette, overlays stripped
+    // (a spur is bare graded dirt whatever dresses the main carriageway)
+    const spurTex = roadTexture({
+      ...this.T.road, wet: null, snowCover: null, ice: null, cobbles: null, neon: null, ruts: true,
+    });
+    spurTex.anisotropy = 8;
+    const spurMat = new THREE.MeshStandardMaterial({ map: spurTex, roughness: 1 });
+    const patchMat = new THREE.MeshStandardMaterial({
+      map: junctionTexture(this.T.road), roughness: 1, transparent: true,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+    });
+    const tmp = new THREE.Vector3();
+    const MAXC = 0.5;                                  // cos 60° — junction angle cone
+    const used = [];
+    for (const tg of targets) {
+      if (this.crossroads.length >= want) break;
+      const i = this.nearestIndex(tmp.set(tg.x, 0, tg.z), null);
+      if (this._circDist(i, 0) < 45) continue;               // clear of the gate
+      if (this._gorge && this._nearGorge(i, this._spanSamples() + 14)) continue;
+      if (used.some((u) => this._circDist(i, u) < 70)) continue;
+      let mc = 0;
+      for (let k = -6; k <= 6; k++) mc = Math.max(mc, this.curvature[(i + k + N) % N]);
+      if (mc > 0.022) continue;                              // junctions live on straights
+      const c = this.center[i], n = this.nrm[i], t = this.tan[i];
+      const side = (tg.x - c.x) * n.x + (tg.z - c.z) * n.z >= 0 ? 1 : -1;
+      // the approach must sit near road grade — no spurs off a shelf edge or
+      // through a retaining wall / guard fence drop
+      const e1 = this.pointAt(i, side * 15);
+      if (Math.abs(c.y - this.terrainHeight(e1.x, e1.z)) > 2.2) continue;
+      // direction toward the target, clamped into the 60-120° cone
+      let dx = tg.x - c.x, dz = tg.z - c.z;
+      const dl = Math.hypot(dx, dz) || 1;
+      dx /= dl; dz /= dl;
+      const along = dx * t.x + dz * t.z;
+      let ux = dx, uz = dz;
+      if (Math.abs(along) > MAXC) {
+        const sa = Math.sign(along) || 1, sn2 = Math.sqrt(1 - MAXC * MAXC);
+        ux = t.x * sa * MAXC + n.x * side * sn2;
+        uz = t.z * sa * MAXC + n.z * side * sn2;
+      }
+      const len = Math.min(30, Math.max(12, dl - (tg.r || 10)));
+      // --- spur ribbon: starts under the road edge, conforms to the terrain ---
+      const S = Math.max(4, Math.ceil(len / 3));
+      const p0 = this.pointAt(i, side * 8);
+      const y0 = c.y - 0.06;
+      const px = -uz, pz = ux;                               // across the spur
+      const verts = new Float32Array((S + 1) * 2 * 3);
+      const uvs = new Float32Array((S + 1) * 2 * 2);
+      const idx = [];
+      for (let s = 0; s <= S; s++) {
+        const f = s / S;
+        const half = 5.4 - 2.0 * f;                          // junction flare → lane
+        const qx = p0.x + ux * f * len, qz = p0.z + uz * f * len;
+        const blend = THREE.MathUtils.smoothstep(f, 0, 0.4);
+        const o = s * 6;
+        for (const [sl, k] of [[1, 0], [-1, 3]]) {
+          const vx = qx + px * half * sl, vz = qz + pz * half * sl;
+          const ty = this._terrainMeshHeight(vx, vz) + 0.22;
+          verts[o + k] = vx;
+          verts[o + k + 1] = y0 * (1 - blend) + ty * blend;
+          verts[o + k + 2] = vz;
+        }
+        uvs[s * 4] = 0; uvs[s * 4 + 1] = (f * len) / 10;
+        uvs[s * 4 + 2] = 1; uvs[s * 4 + 3] = (f * len) / 10;
+      }
+      for (let s = 0; s < S; s++) {
+        const a = s * 2, b = s * 2 + 1, d = s * 2 + 2, e = s * 2 + 3;
+        idx.push(a, b, d, b, e, d);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      const spur = new THREE.Mesh(geo, spurMat);
+      spur.name = 'crossroad-spur';
+      spur.receiveShadow = true;
+      this.group.add(spur);
+      // --- widened intersection patch straddling the road edge ---
+      const pc = this.pointAt(i, side * 9.5);
+      const patch = new THREE.Mesh(this._patchGeo || (this._patchGeo = (() => {
+        const pg = new THREE.PlaneGeometry(17, 17);
+        pg.rotateX(-Math.PI / 2);
+        return pg;
+      })()), patchMat);
+      patch.name = 'crossroad-patch';
+      patch.position.set(pc.x, c.y + 0.05, pc.z);
+      patch.rotation.y = Math.atan2(ux, uz);
+      patch.renderOrder = 2;
+      patch.receiveShadow = true;
+      this.group.add(patch);
+      used.push(i);
+      this.crossroads.push({
+        index: i, side, angle: Math.acos(THREE.MathUtils.clamp(ux * t.x + uz * t.z, -1, 1)), len,
+      });
+    }
   }
 
   /** Open grazing ground for the animal system: 4-8 flat, road-free circles.

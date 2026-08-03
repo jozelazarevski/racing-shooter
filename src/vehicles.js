@@ -986,8 +986,12 @@ export class Car {
         // scrapes are free) and at most ~once a second — the old per-grind
         // ticks could wreck a car in one long scrape along the canyon wall
         if (this === gm.player && cliffy) {
+          // 2.8s hurt cooldown: one STONE hit per deliberate ram. The old 1.1s
+          // let a sustained head-on push land a second full hit before the
+          // player could even react — two ~50-hull stone hits back-to-back
+          // wrecked the car outright (the CANYON RUN "bounding ball" death).
           if (vnAbs > 7 && (this._cliffHurt ?? 0) <= 0) {
-            this._cliffHurt = 1.1;
+            this._cliffHurt = 2.8;
             gm.onSolidCrash?.({ mat: 'stone' }, this, vnAbs, n.x * fside, n.z * fside);
           } // else: scrape sparks only — no hull cost while the cooldown runs
         } else this.onWallHit(n, vnAbs);

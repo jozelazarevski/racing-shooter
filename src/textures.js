@@ -740,6 +740,63 @@ export function groundTexture(palette = {}) {
   return t;
 }
 
+/** Junction patch where a dirt side-road meets the circuit: a radially-faded
+ *  splat of the same earth palette, with FAINT car-width ruts running through
+ *  the crossing (the texture's v axis is aligned with the spur). Drawn over
+ *  the main road edge so the intersection reads widened and worn-in. */
+export function junctionTexture(palette = {}) {
+  const P = {
+    base: '#a8814d', mottleA: [116, 84, 48], mottleB: [178, 140, 88],
+    rut: 'rgba(72,50,28,0.55)',
+    stoneA: 'rgba(198,178,148,0.7)', stoneB: 'rgba(96,74,50,0.7)',
+    ...palette,
+  };
+  const t = make(256, 256, (g, w, h) => {
+    g.fillStyle = P.base;
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 380; i++) {
+      const [r, gr, b] = Math.random() < 0.5 ? P.mottleA : P.mottleB;
+      const s = 4 + Math.random() * 12;
+      g.fillStyle = `rgba(${r + Math.random() * 24 | 0},${gr + Math.random() * 20 | 0},${b + Math.random() * 14 | 0},${0.08 + Math.random() * 0.12})`;
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
+      g.fill();
+    }
+    // faded ruts continuing through the crossing: the patch spans ~17u, so a
+    // 2.6u car pair sits at ±1.02u ≈ ±15px of center, each rut ~9px
+    for (const cx of [w / 2 - 15.4, w / 2 + 15.4]) {
+      const grd = g.createLinearGradient(0, 0, 0, h);
+      grd.addColorStop(0, 'rgba(0,0,0,0)');
+      grd.addColorStop(0.32, P.rut);
+      grd.addColorStop(0.68, P.rut);
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grd;
+      g.globalAlpha = 0.6;
+      g.fillRect(cx - 4.5, 0, 9, h);
+      g.globalAlpha = 1;
+    }
+    for (let i = 0; i < 130; i++) {
+      const s = 0.8 + Math.random() * 2.2;
+      g.fillStyle = Math.random() < 0.5 ? P.stoneA : P.stoneB;
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
+      g.fill();
+    }
+    noiseOverlay(g, w, h, 0.10);
+    // radial alpha falloff so the patch feathers out over road and verge
+    const grd = g.createRadialGradient(w / 2, h / 2, w * 0.26, w / 2, h / 2, w * 0.5);
+    grd.addColorStop(0, 'rgba(0,0,0,1)');
+    grd.addColorStop(0.72, 'rgba(0,0,0,0.75)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.globalCompositeOperation = 'destination-in';
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = 'source-over';
+  });
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
 /** Hut wall: horizontal wooden planks with a door. */
 export function buildingTexture() {
   return make(256, 256, (g, w, h) => {
