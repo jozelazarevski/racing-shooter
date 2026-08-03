@@ -1195,7 +1195,9 @@ const THEMES = {
     hemiSky: 0xd6e8ff, hemiGround: 0xa8b4bc,
     sunColor: 0xfff4e4, sunIntensity: 1.95,
     skyTop: '#3f7fc8', skyHorizon: '#e6f1f8', sunGlow: 0xfffbe8,
-    sunAz: 0.72, sunEl: 0.34,
+    // high sun: a low winter sun threw car/tower shadows the length of the
+    // bridge deck and read as a black stripe down the middle of the crossing
+    sunAz: 0.72, sunEl: 0.62,
     cloudCount: 10, cloudOpacity: 0.9,
     terrainLow: '#dfe7ec', terrainHigh: '#ffffff', terrainDirt: '#9a8a72',
     skirtColor: '#8e8a80',                              // rock cut below the shelf
@@ -1204,11 +1206,18 @@ const THEMES = {
       patchA: 'rgba(150,140,120,0.16)', patchB: 'rgba(255,255,255,0.24)',
       speckA: 'rgba(190,200,210,0.7)', speckB: 'rgba(255,255,255,0.9)', speckCount: 80,
     },
-    road: {},                                           // classic brown rutted dirt
+    road: {
+      // classic brown rutted dirt, ploughed clear — but the verge is snow,
+      // not grass, and the ruts run a little darker in the wet cold
+      base: '#8a6a44', mottleA: [104, 78, 48], mottleB: [166, 132, 88],
+      rut: 'rgba(62,44,26,0.55)', rutCore: 'rgba(44,30,16,0.45)', tread: 'rgba(24,16,8,0.5)',
+      stoneA: 'rgba(214,206,190,0.7)', stoneB: 'rgba(88,66,42,0.7)',
+      fringe: [222, 232, 240], fringeVar: [24, 16, 10],
+    },
     hillColor: 0x9aa4ac, peakColor: 0xf2f7fb,           // grey rock, snow crowns
-    treeCount: 300, trunkColor: 0x5a4028,
-    foliageLow: 0x1f4a2c, foliageTop: 0x2a6236,         // deep winter green
-    foliage: { h: 0.36, hVar: 0.04, s: 0.45, sVar: 0.12, l: 0.20, lVar: 0.08 },
+    treeCount: 320, trunkColor: 0x5a4028,
+    foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,         // deep winter green
+    foliage: { h: 0.35, hVar: 0.04, s: 0.42, sVar: 0.12, l: 0.30, lVar: 0.08 },
     treeSnowCap: true,                                  // white tips on every tier
     treeAltFade: [22, 40],                              // thinning towards the top
     tuftCount: 300, grass: { bladeA: '#5a7a58', bladeB: '#c8d8d0' },
@@ -1228,7 +1237,7 @@ const THEMES = {
     },
     // the shelf: ground leaves the road close in and the open valley sits well
     // below the road datum, so every leg stands proud of the one beneath it
-    blend: { near: 14, far: 58 }, hillDrop: 12,
+    blend: { near: 14, far: 62 }, hillDrop: 8,
     shelfRoad: true,                                    // steep cut face, no apron
     rampMaxCurv: 0.012, padMaxCurv: 0.0035, boardMaxCurv: 0.010,
     // reddish-brown BREAKABLE rail fence down the outside edge of the pass
@@ -1238,6 +1247,9 @@ const THEMES = {
     elements: 'alpine',
     snowPatches: { count: 60, minY: 20 },
     glacier: true,
+    // hero crossing: a rope suspension bridge over a red-rock river gorge on
+    // the valley run-in (the straightest window in that stretch of the lap)
+    heroBridge: { at: [0.82, 0.92], half: 26, len: 230, depth: 30, skew: 0 },
     massif: { az: 1.5, spread: 2.1, count: 11, r0: 380, r1: 660,
       h0: 150, h1: 300, w0: 200, w1: 360 },
   },
@@ -1543,6 +1555,10 @@ export class Track {
 
     this._checkLayout();
 
+    // the hero gorge must exist before ANY height is sampled (terrain mesh,
+    // road skirts and every scenery placement read it through _blendHeight)
+    if (this.T.heroBridge) this._planGorge();
+
     this.animated = { flags: [], clouds: [] };
     // World-space circle colliders for on-road obstacles: [{x, z, r}].
     // Always present; [] on levels without obstacles. Consumed by car physics.
@@ -1822,12 +1838,79 @@ export class Track {
   _blendHeight(d, roadY, x, z) {
     const B = this.T.blend;
     const near = B ? B.near : 15, far = B ? B.far : 70;
-    const tuck = 0.45 * THREE.MathUtils.smoothstep(d, 10.8, 14);
-    if (d <= near) return roadY - tuck;
-    const n = this._hillNoise(x, z);
-    if (d >= far) return n;
-    const f = THREE.MathUtils.smoothstep(d, near, far);
-    return (roadY - tuck) * (1 - f) + n * f;
+    // Pass worlds stack road strands 26-30u apart at different heights, so the
+    // nearest-sample blend can hand a point under one leg the height of the
+    // NEXT leg up and poke a lip through the ribbon. An extra tuck under the
+    // whole corridor (hidden by the skirt) keeps the ground below the road.
+    const tuck = 0.45 * THREE.MathUtils.smoothstep(d, 10.8, 14)
+      + (this.T.retainingWalls || this.T.shelfRoad
+        ? 0.75 * THREE.MathUtils.smoothstep(d, 2, 11) : 0);
+    let h;
+    if (d <= near) h = roadY - tuck;
+    else {
+      const n = this._hillNoise(x, z);
+      if (d >= far) h = n;
+      else {
+        const f = THREE.MathUtils.smoothstep(d, near, far);
+        h = (roadY - tuck) * (1 - f) + n * f;
+      }
+    }
+    // the hero gorge is carved out of whatever the ground would otherwise be,
+    // road corridor included — that is the hole the suspension bridge spans
+    return this._gorge ? h - this._gorgeCut(x, z) : h;
+  }
+
+  /** Depth of the river gorge at (x, z): 0 everywhere outside it, easing to
+   *  the full depth along the channel. Applied inside _blendHeight so the
+   *  scenery field, the terrain mesh and the free-roam ground all agree. */
+  _gorgeCut(x, z) {
+    const G = this._gorge;
+    const dx = x - G.x, dz = z - G.z;
+    const u = dx * G.ax + dz * G.az;          // along the gorge
+    const v = dx * G.vx + dz * G.vz;          // across it (= along the road)
+    const au = Math.abs(u), av = Math.abs(v);
+    if (au > G.len || av >= G.half) return 0;
+    const along = 1 - THREE.MathUtils.smoothstep(au, G.len * 0.55, G.len);
+    // U-shaped channel: full depth down the middle, rims easing back to grade
+    const prof = Math.pow(Math.cos((av / G.half) * Math.PI * 0.5), 1.5);
+    return G.depth * prof * along;
+  }
+
+  /** True when sample i lies within `pad` samples of the bridge span (so
+   *  ramps, pads, obstacles, puddles and props keep off the crossing). */
+  _nearGorge(i, pad) {
+    return !!this._gorge && this._circDist(i, this._gorge.i) < pad;
+  }
+
+  /** Pick where the gorge crosses the road. Runs BEFORE any geometry is built
+   *  (the terrain, the skirts and the scenery all read _gorgeCut). */
+  _planGorge() {
+    const H = this.T.heroBridge;
+    const [f0, f1] = H.at;
+    let best = -1, bc = Infinity;
+    for (let i = (f0 * N) | 0; i < (f1 * N) | 0; i += 2) {
+      if (this._circDist(i, 0) < 70) continue;
+      let mc = 0;
+      for (let k = -14; k <= 14; k++) mc = Math.max(mc, this.curvature[(i + k + N) % N]);
+      if (mc < bc) { bc = mc; best = i; }
+    }
+    if (best < 0) return;
+    const c = this.center[best], t = this.tan[best], n = this.nrm[best];
+    // the gorge crosses the road at a slant, not square on: from the deck the
+    // chasm and its river then run away diagonally into the distance instead
+    // of hiding directly beneath you
+    const th = H.skew !== undefined ? H.skew : 0.72;
+    const cs = Math.cos(th), sn = Math.sin(th);
+    const ax = n.x * cs + t.x * sn, az = n.z * cs + t.z * sn;   // along the gorge
+    const vx = -n.x * sn + t.x * cs, vz = -n.z * sn + t.z * cs; // across it
+    this._gorge = {
+      i: best, x: c.x, z: c.z,
+      ax, az, vx, vz,
+      half: H.half, len: H.len, depth: H.depth,
+      // how far along the ROAD the channel reaches, given the slant
+      spanU: H.half / Math.max(0.35, Math.abs(t.x * vx + t.z * vz)),
+      floorY: c.y - H.depth,
+    };
   }
 
   /** Rolling-hill height used by scenery placement and the free-roam mode's
@@ -1894,8 +1977,13 @@ export class Track {
       const j = i % N;
       const c = this.center[j], n = this.nrm[j];
       const o = i * 6;
-      verts[o] = c.x + n.x * w; verts[o + 1] = c.y; verts[o + 2] = c.z + n.z * w;
-      verts[o + 3] = c.x - n.x * w; verts[o + 4] = c.y; verts[o + 5] = c.z - n.z * w;
+      // under a hero bridge the ribbon drops away so the plank deck laid on
+      // top of it is never coplanar (coplanar strips z-fight into dark bands
+      // at grazing angles). Physics still reads center[j].y — the DECK is the
+      // surface the car drives on there.
+      const y = c.y - this._deckDip(j);
+      verts[o] = c.x + n.x * w; verts[o + 1] = y; verts[o + 2] = c.z + n.z * w;
+      verts[o + 3] = c.x - n.x * w; verts[o + 4] = y; verts[o + 5] = c.z - n.z * w;
       const v = (i * this.segLen) / 10;
       uvs[i * 4] = 0; uvs[i * 4 + 1] = v;
       uvs[i * 4 + 2] = 1; uvs[i * 4 + 3] = v;
@@ -1929,8 +2017,20 @@ export class Track {
       mat.emissiveIntensity = 1.7;
     }
     const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'road';
     mesh.receiveShadow = true;
     this.group.add(mesh);
+  }
+
+  /** How far the road ribbon drops below the centerline at sample j so a hero
+   *  bridge deck can sit on top of it (0 everywhere else). Feathered over a
+   *  few samples at each end so the ribbon has no hard step. */
+  _deckDip(j) {
+    if (!this._gorge) return 0;
+    const d = this._circDist(j, this._gorge.i);
+    const span = this._spanSamples();
+    if (d > span + 4) return 0;
+    return 0.34 * (1 - THREE.MathUtils.smoothstep(d, span - 1, span + 4));
   }
 
   /** Mountain-pass embankments (ascent-profile levels): a dirt apron drops
@@ -1966,14 +2066,18 @@ export class Track {
         // [lateral, y, color] — a shoulder lip, a steep face, and a toe that
         // reaches down to the LOCAL terrain (strand-capped folds drop far
         // below the road; a fixed-depth toe would hang in the air there)
-        const face = steep
+        // over the gorge the road is a bridge deck: the apron collapses to a
+        // thin lip instead of hanging a curtain down into the chasm
+        const onSpan = this._gorge && this._circDist(j, this._gorge.i) < this._spanSamples() + 4;
+        const face = onSpan ? 0.5 : steep
           ? 1.35 + Math.sin(9 * t + side) * 0.18
           : 2.6 + Math.sin(9 * t + side) * 0.4;
-        const latToe = Math.min(WALL_OFF + face + (steep ? 1.1 : 2.8), maxLat);
+        const latToe = Math.min(WALL_OFF + face + (onSpan ? 0.3 : steep ? 1.1 : 2.8), maxLat);
         const ground = this._terrainMeshHeight(c.x + n.x * latToe * side, c.z + n.z * latToe * side);
-        const toeY = Math.min(c.y - 2.9, ground - 0.6);
+        // on a bridge span the apron collapses to a hair under the deck edge
+        const toeY = onSpan ? c.y - 1.6 : Math.min(c.y - 2.9, ground - 0.6);
         const rowSpec = [
-          [Math.min(WALL_OFF + 0.55, maxLat), c.y - 0.06, dirt],
+          [Math.min(WALL_OFF + 0.55, maxLat), c.y - (onSpan ? 0.34 : 0.06), dirt],
           [Math.min(WALL_OFF + face, maxLat),
             c.y - (steep ? 1.5 : 2.1) - Math.sin(17 * t - side) * 0.35, dirt],
           [latToe, toeY, dark],
@@ -2227,6 +2331,7 @@ export class Track {
     let last = -999;
     for (let i = 40; i < N && this.boostPads.length < 5; i += 10) {
       if (this.ramps.some((r) => this._circDist(i, r.index) < 50)) continue;
+      if (this._nearGorge(i, 50)) continue;
       if (this.curvature[i] < min && i - last > 140) {
         last = i;
         const lateral = (this.boostPads.length % 2 === 0) ? -3.2 : 3.2;
@@ -2267,6 +2372,7 @@ export class Track {
     for (const w of windows) {
       if (chosen.length >= want) break;
       if (w.maxCurv > this.T.rampMaxCurv) break;
+      if (this._nearGorge(w.i, 60)) continue;
       if (chosen.some((c) => this._circDist(w.i, c) < gap)) continue;
       chosen.push(w.i);
     }
@@ -2327,6 +2433,7 @@ export class Track {
     const chosen = [];
     for (let i = 0; i < N && chosen.length < spec.count; i += 7) {
       if (this._circDist(i, 0) < 60) continue;
+      if (this._nearGorge(i, 45)) continue;
       // alpine: loose boulders litter the fast DESCENT only (the downhill
       // window is short, so they pack tighter, and rockfall on a sweeper is
       // fair game — elsewhere obstacles keep to straights)
@@ -2458,6 +2565,7 @@ export class Track {
     const chosen = [];
     for (let i = 3; i < N && chosen.length < count; i += 5) {
       if (this._circDist(i, 0) < 50) continue;
+      if (this._nearGorge(i, 40)) continue;
       if (this.ramps.some((r) => this._circDist(i, r.index) < 41)) continue;
       if (this.boostPads.some((p) => this._circDist(i, p.index) < 25)) continue;
       if (this._obstacleIdx.some((o) => this._circDist(i, o) < 25)) continue;
@@ -2596,6 +2704,7 @@ export class Track {
       for (let tries = 0; tries < 40; tries++) {
         const i = (Math.random() * N) | 0;
         if (this._circDist(i, 0) < 30) continue;                                  // start grid + gate
+        if (this._nearGorge(i, 40)) continue;                                     // the bridge span
         if (this.ramps.some((r) => this._circDist(i, r.index) < 36)) continue;    // 20 + ramp len
         if (this.boostPads.some((p) => this._circDist(i, p.index) < 20)) continue;
         if (this._obstacleIdx.some((o) => this._circDist(i, o) < 20)) continue;
@@ -2706,6 +2815,7 @@ export class Track {
     if (this.T.lamps) this._buildLamps();            // neon / undercity road lamps
     if (this.T.logYards) this._buildLogYards();      // flume timber stacks
     if (this.T.retainingWalls) this._buildRetainingWalls();   // alpine-pass parapets
+    if (this.T.heroBridge) this._buildHeroBridge();           // hero rope crossing
     if (this.T.guardFence) this._buildGuardFence();           // breakable mountain rail fence
     if (this.T.roadCabins) this._buildRoadCabins();           // log cabins on the shelves
     if (this.T.snowPatches) this._buildSnowPatches(m4);       // old snow at altitude
@@ -2762,6 +2872,243 @@ export class Track {
     if (k) this.scene.add(mesh);
   }
 
+  /** How many samples the bridge deck covers each way from the gorge centre. */
+  _spanSamples() {
+    return Math.ceil((this._gorge.spanU + 3.5) / this.segLen);
+  }
+
+  /** HERO CROSSING: a rope suspension bridge over the red-rock river gorge.
+   *  Plank deck laid on the road, chunky timber towers at both ends, hemp main
+   *  cables sagging in a catenary between them, vertical hangers down to rope
+   *  railings along both edges — and a CHECKPOINT gate arch on the far bank
+   *  with a log pile and fallen timber beside it. Collision comes only from
+   *  the four tower posts and the two gate posts; the deck is just road. */
+  _buildHeroBridge() {
+    const G = this._gorge;
+    if (!G) return;
+    const span = this._spanSamples();
+    const i0 = (G.i - span + N) % N, i1 = (G.i + span) % N;
+    const deckW = WALL_OFF + 0.6;
+    const wood = new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.95 });
+    const darkWood = new THREE.MeshStandardMaterial({ color: 0x3e2716, roughness: 1 });
+    const rope = new THREE.MeshStandardMaterial({ color: 0xc7a271, roughness: 1 });
+    const g = new THREE.Group();
+
+    // --- plank deck: individual timber baulks laid across the roadway ---
+    // (discrete boxes, not one flat ribbon — a ribbon laid a few centimetres
+    // over the road ribbon z-fights into black bands at grazing angles)
+    {
+      const rows = span * 2;
+      const plankGeo = new THREE.BoxGeometry(deckW * 2, 0.22, 1.15);
+      const tex = plankTexture();
+      tex.anisotropy = 8;
+      const planks = new THREE.InstancedMesh(
+        plankGeo,
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }),
+        rows * 3
+      );
+      planks.name = 'bridge-deck';
+      planks.receiveShadow = planks.castShadow = true;
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+      const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+      let k = 0;
+      const step = 1.5 / this.segLen;                 // a baulk every ~1.5u
+      for (let f = 0; f <= rows; f += step) {
+        const j = (i0 + Math.round(f) + N) % N;
+        const c = this.center[j];
+        q.setFromAxisAngle(up, this.headingAt(j));
+        m4.compose(new THREE.Vector3(c.x, c.y - 0.02, c.z), q, new THREE.Vector3(1, 1, 1));
+        planks.setMatrixAt(k, m4);
+        col.setScalar(0.86 + Math.random() * 0.28);
+        planks.setColorAt(k++, col);
+        if (k >= rows * 3) break;
+      }
+      planks.count = k;
+      g.add(planks);
+    }
+
+    // --- towers at both ends ---
+    const towerH = 7.4;
+    const towerTop = [];
+    for (const end of [i0, i1]) {
+      const c = this.center[end], n = this.nrm[end];
+      const pair = [];
+      for (const side of [1, -1]) {
+        const px = c.x + n.x * (deckW - 0.5) * side, pz = c.z + n.z * (deckW - 0.5) * side;
+        const post = new THREE.Mesh(new THREE.BoxGeometry(1.5, towerH, 1.5), darkWood);
+        post.position.set(px, c.y + towerH / 2 - 0.4, pz);
+        post.rotation.y = this.headingAt(end);
+        post.castShadow = true;
+        g.add(post);
+        pair.push(new THREE.Vector3(px, c.y + towerH - 0.6, pz));
+        this.solids.push({ x: px, z: pz, r: 1.5, y: c.y + 1, mat: 'hut' });
+        this._addShadow(px, pz, 2.4, c.y);
+      }
+      // cross beam over the roadway
+      const beam = new THREE.Mesh(
+        new THREE.BoxGeometry((deckW - 0.5) * 2 + 1.5, 0.7, 0.9), darkWood);
+      beam.position.set(c.x, c.y + towerH - 0.9, c.z);
+      beam.rotation.y = this.headingAt(end) + Math.PI / 2;
+      beam.castShadow = true;
+      g.add(beam);
+      towerTop.push(pair);
+    }
+
+    // --- main cables (catenary) + hangers + rope railings ---
+    const SEG = 22;
+    for (let s = 0; s < 2; s++) {
+      const side = s === 0 ? 1 : -1;
+      const cable = [], railTop = [], railMid = [];
+      for (let k = 0; k <= SEG; k++) {
+        const t = k / SEG;
+        const j = (i0 + Math.round(t * span * 2)) % N;
+        const c = this.center[j], n = this.nrm[j];
+        const x = c.x + n.x * (deckW - 0.5) * side, z = c.z + n.z * (deckW - 0.5) * side;
+        // catenary: full tower height at the ends, sagging near the deck mid-span
+        const sag = Math.cosh((t - 0.5) * 3.4) / Math.cosh(1.7);
+        const y = c.y + 1.5 + (towerH - 2.1) * sag;
+        cable.push(new THREE.Vector3(x, y, z));
+        const dip = 0.55 * Math.sin(t * Math.PI);      // rope rails dip slightly
+        railTop.push(new THREE.Vector3(x, c.y + 1.25 - dip * 0.35, z));
+        railMid.push(new THREE.Vector3(x, c.y + 0.62 - dip * 0.3, z));
+      }
+      const tube = (pts, r, seg, mat) => {
+        const m = new THREE.Mesh(
+          new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), seg, r, 5, false), mat);
+        m.castShadow = true;
+        g.add(m);
+      };
+      tube(cable, 0.22, 30, rope);
+      tube(railTop, 0.11, 26, rope);
+      tube(railMid, 0.09, 26, rope);
+      // vertical hangers from the cable down to the rail
+      for (let k = 2; k < SEG - 1; k += 2) {
+        const a = cable[k], b = railTop[k];
+        const hang = new THREE.Mesh(new THREE.BoxGeometry(0.11, a.y - b.y, 0.11), rope);
+        hang.position.set(a.x, (a.y + b.y) / 2, a.z);
+        g.add(hang);
+      }
+      // deck-edge kerb rail the hangers land on
+      for (let k = 0; k < SEG; k += 1) {
+        const a = railMid[k], b = railMid[k + 1];
+        if (!b) break;
+        const len = a.distanceTo(b);
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.35, 0.16), wood);
+        post.position.set(a.x, a.y - 0.35, a.z);
+        g.add(post);
+        if (len <= 0) break;
+      }
+    }
+    this.group.add(g);
+
+    // --- CHECKPOINT gate arch on the far bank ---
+    const gi = (i1 + Math.round(11 / this.segLen)) % N;
+    {
+      const c = this.center[gi], n = this.nrm[gi];
+      const arch = new THREE.Group();
+      for (const side of [1, -1]) {
+        const px = c.x + n.x * (deckW + 0.9) * side, pz = c.z + n.z * (deckW + 0.9) * side;
+        const post = new THREE.Mesh(new THREE.BoxGeometry(1.3, 8.6, 1.3), darkWood);
+        post.position.set(px, c.y + 4.3, pz);
+        post.rotation.y = this.headingAt(gi);
+        post.castShadow = true;
+        arch.add(post);
+        this.solids.push({ x: px, z: pz, r: 1.3, y: c.y + 1, mat: 'hut' });
+        this._addShadow(px, pz, 2.2, c.y);
+      }
+      const w = (deckW + 0.9) * 2 + 1.3;
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, 1.0), darkWood);
+      beam.position.set(c.x, c.y + 8.1, c.z);
+      beam.rotation.y = this.headingAt(gi) + Math.PI / 2;
+      beam.castShadow = true;
+      arch.add(beam);
+      // plank sign reading CHECKPOINT, visible from both approaches
+      const signTex = bannerTexture('CHECKPOINT', '#3a2414', '#f0cf94');
+      for (const flip of [0, Math.PI]) {
+        const sign = new THREE.Mesh(
+          new THREE.PlaneGeometry(w * 0.62, 2.2),
+          new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.9 }));
+        sign.position.set(c.x, c.y + 6.6, c.z);
+        sign.rotation.y = this.headingAt(gi) + Math.PI / 2 + flip;
+        sign.translateZ(0.56);
+        arch.add(sign);
+      }
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(w * 0.66, 0.34, 1.6), wood);
+      cap.position.set(c.x, c.y + 8.75, c.z);
+      cap.rotation.y = this.headingAt(gi) + Math.PI / 2;
+      arch.add(cap);
+      this.group.add(arch);
+    }
+
+    // --- log pile + fallen timber on the far bank ---
+    {
+      const K = ELEMENT_KITS[this.T.elements || 'alpine'];
+      const B = { wall: [], box: [], cyl: [], cone: [], prism: [] };
+      const c = this.center[(gi + Math.round(16 / this.segLen)) % N], n = this.nrm[gi];
+      for (const [off, side] of [[15, 1], [19, -1]]) {
+        const px = c.x + n.x * off * side, pz = c.z + n.z * off * side;
+        if (!this._buildableSpot(px, pz, 4, 3.2)) continue;
+        this._element(B, 'logpile', px, pz, this.headingAt(gi) + (Math.random() - 0.5), K);
+      }
+      if (B.cyl.length) this._realizeElements(B, new THREE.Matrix4());
+      // a couple of loose fallen logs
+      const logGeo = new THREE.CylinderGeometry(0.55, 0.62, 6.5, 8);
+      logGeo.rotateZ(Math.PI / 2);
+      for (let k = 0; k < 3; k++) {
+        const off = (13 + Math.random() * 9) * (k % 2 ? 1 : -1);
+        const px = c.x + n.x * off, pz = c.z + n.z * off;
+        const log = new THREE.Mesh(logGeo, wood);
+        log.position.set(px, this.terrainHeight(px, pz) + 0.5, pz);
+        log.rotation.y = Math.random() * Math.PI;
+        log.castShadow = true;
+        this.group.add(log);
+        this._addShadow(px, pz, 3.4);
+      }
+    }
+
+    this._buildGorgeRiver();
+  }
+
+  /** The pale turquoise river winding along the bottom of the hero gorge. */
+  _buildGorgeRiver() {
+    const G = this._gorge;
+    const SEG = 26, HALF = 7.5;
+    const verts = new Float32Array((SEG + 1) * 2 * 3);
+    const uvs = new Float32Array((SEG + 1) * 2 * 2);
+    const idx = [];
+    for (let k = 0; k <= SEG; k++) {
+      const t = (k / SEG - 0.5) * 2 * G.len;
+      // the channel meanders a little as it runs down the gorge
+      const wob = Math.sin(t * 0.035) * 4.5 + Math.sin(t * 0.011 + 1.3) * 3;
+      const x = G.x + G.ax * t + G.vx * wob;
+      const z = G.z + G.az * t + G.vz * wob;
+      const y = G.floorY + 0.55 + Math.abs(t) * 0.02;
+      const o = k * 6;
+      verts[o] = x + G.vx * HALF; verts[o + 1] = y; verts[o + 2] = z + G.vz * HALF;
+      verts[o + 3] = x - G.vx * HALF; verts[o + 4] = y; verts[o + 5] = z - G.vz * HALF;
+      uvs[k * 4] = 0; uvs[k * 4 + 1] = t / 26;
+      uvs[k * 4 + 2] = 1; uvs[k * 4 + 3] = t / 26;
+    }
+    for (let k = 0; k < SEG; k++) {
+      const a = k * 2, b = a + 1, c = a + 2, d = a + 3;
+      idx.push(a, b, c, b, d, c);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const tex = riverTexture();
+    tex.wrapT = THREE.RepeatWrapping;
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      map: tex, roughness: 0.25, metalness: 0.05,
+      color: 0x9fe4e0,                                  // pale glacial turquoise
+      envMapIntensity: 1.2, transparent: true, opacity: 0.94,
+    }));
+    mesh.name = 'gorge-river';
+    this.scene.add(mesh);
+  }
+
   /** FURKA RIDGE: the reddish wooden guard fence that runs the DOWNHILL edge
    *  of a mountain pass — posts and two rails, following the road all the way
    *  down the serpentine, with gaps through the hairpins.
@@ -2793,6 +3140,7 @@ export class Track {
     let k = 0;
     for (let i = 0; i < N && k < MAX; i += step) {
       if (this._circDist(i, 0) < 30) continue;                 // clear of the gate
+      if (this._nearGorge(i, 42)) continue;                    // the bridge has its own rails
       if (this.curvature[i] > 0.045) continue;                 // gap through hairpins
       // downhill side: the edge that falls away
       let side = 0, drop = 0;
@@ -2987,6 +3335,7 @@ export class Track {
       mesh.setMatrixAt(k++, m4);
     }
     mesh.renderOrder = 1;
+    mesh.name = 'contact-shadows';
     this.scene.add(mesh);
   }
 
@@ -3604,6 +3953,8 @@ export class Track {
 
   _buildTerrain() {
     const T = this.T;
+    const STRATA = ['#c98b52', '#a45f34', '#b5764a', '#8d4c2a', '#cfa06a', '#96552f']
+      .map((c) => new THREE.Color(c));
     // 10u cells near the track: fine enough that road corridors (and the
     // strand cap around them) are always sampled — no triangle can span a
     // ribbon and rise through it (cap window 25.2 ≥ 11 + cell diagonal)
@@ -3630,6 +3981,15 @@ export class Track {
       // sprinkle dirt patches
       const dirt = Math.max(0, Math.sin(x * 0.045 + 2) * Math.sin(z * 0.05) - 0.72) * 3;
       tmp.lerp(cDirt, THREE.MathUtils.clamp(dirt, 0, 0.55));
+      // the hero gorge is cut through red-rock strata: banded ochre/rust walls
+      // fading back to the snowfield at the rim
+      if (this._gorge) {
+        const cut = this._gorgeCut(x, z);
+        if (cut > 0.6) {
+          const band = STRATA[((Math.floor(h * 0.42) % STRATA.length) + STRATA.length) % STRATA.length];
+          tmp.lerp(band, THREE.MathUtils.clamp(cut / 6, 0, 1) * 0.94);
+        }
+      }
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
