@@ -23,6 +23,7 @@ const ASSETS = [
   './index.html',
   './manifest.webmanifest',
   './src/offline.js',
+  './src/traffic.js',
   './src/main.js',
   './src/audio.js',
   './src/choppers.js',
