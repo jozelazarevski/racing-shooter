@@ -4817,10 +4817,38 @@ export class Track {
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 });
     const parts = [trunkGeo, armUpA, armElbowA, armUpB, armElbowB]
       .map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
-    for (const part of parts) part.castShadow = true;
+    // DESERT FLORA MIX: saguaros plus two more species so the desert never
+    // reads copy-pasted — squat ribbed BARREL cacti with a blossom crown, and
+    // dry flat-topped ACACIA scrub. All of them yield to a car.
+    const barrelBody = new THREE.CylinderGeometry(0.62, 0.78, 1.05, 9);
+    barrelBody.translate(0, 0.55, 0);
+    const barrelCrown = new THREE.SphereGeometry(0.3, 6, 5);
+    barrelCrown.translate(0, 1.15, 0);
+    const barrelParts = [
+      new THREE.InstancedMesh(barrelBody, mat, COUNT),
+      new THREE.InstancedMesh(barrelCrown,
+        new THREE.MeshStandardMaterial({ color: 0xe89a4a, flatShading: true, roughness: 0.9 }), COUNT),
+    ];
+    const acTrunk = new THREE.CylinderGeometry(0.12, 0.22, 2.6, 6);
+    acTrunk.rotateZ(0.16);
+    acTrunk.translate(0, 1.3, 0);
+    const acBough = new THREE.CylinderGeometry(0.08, 0.12, 1.4, 5);
+    acBough.rotateZ(-0.8);
+    acBough.translate(0.75, 2.2, 0);
+    const acCrown = new THREE.SphereGeometry(1.9, 8, 4);
+    acCrown.scale(1, 0.22, 1);
+    acCrown.translate(0.35, 3.0, 0);
+    const acaciaParts = [
+      new THREE.InstancedMesh(acTrunk, new THREE.MeshStandardMaterial({ color: 0x6a5138, roughness: 1 }), COUNT),
+      new THREE.InstancedMesh(acBough, new THREE.MeshStandardMaterial({ color: 0x6a5138, roughness: 1 }), COUNT),
+      new THREE.InstancedMesh(acCrown,
+        new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 }), COUNT),
+    ];
+    for (const part of [...parts, ...barrelParts, ...acaciaParts]) part.castShadow = true;
+    const ks = { saguaro: 0, barrel: 0, acacia: 0 };
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
-    const placed = this._scatter(COUNT,
+    this._scatter(COUNT,
       () => {
         const roll = Math.random();
         const i = (Math.random() * N) | 0;
@@ -4846,20 +4874,38 @@ export class Track {
       (spot, k) => {
         const p = this.pointAt(spot.i, spot.lateral);
         const y = spot.terrain ? this.terrainHeight(p.x, p.z) : p.y + spot.dy;
+        // rim spots stay saguaro (their silhouette carries the skyline);
+        // ground spots mix in barrels and dry acacia
+        const roll = spot.dy ? 0 : Math.random();
+        const species = roll < 0.55 ? 'saguaro' : roll < 0.8 ? 'barrel' : 'acacia';
+        const sp = species === 'saguaro' ? parts : species === 'barrel' ? barrelParts : acaciaParts;
+        const k2 = ks[species]++;
+        const s = species === 'acacia' ? spot.s * 1.35 : spot.s;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
           new THREE.Vector3(p.x, y - 0.15, p.z),
-          q, new THREE.Vector3(spot.s, spot.s * (0.9 + Math.random() * 0.3), spot.s)
+          q, new THREE.Vector3(s, s * (0.9 + Math.random() * 0.3), s)
         );
-        color.setHSL(0.30 + Math.random() * 0.06, 0.35 + Math.random() * 0.15, 0.22 + Math.random() * 0.12);
-        for (const part of parts) {
-          part.setMatrixAt(k, m4);
-          part.setColorAt(k, color);
+        if (species === 'acacia') {
+          color.setHSL(0.155 + Math.random() * 0.04, 0.32 + Math.random() * 0.12, 0.3 + Math.random() * 0.1);
+        } else {
+          color.setHSL(0.30 + Math.random() * 0.06, 0.35 + Math.random() * 0.15, 0.22 + Math.random() * 0.12);
         }
-        this.trees.push({ x: p.x, z: p.z, y: y - 0.15, r: 0.75 * spot.s, id: k, parts, kind: 'cactus', s: spot.s });
-        this._addShadow(p.x, p.z, 1.6 * spot.s, spot.terrain ? null : y - 0.15);
+        for (const part of sp) {
+          part.setMatrixAt(k2, m4);
+          part.setColorAt(k2, color);
+        }
+        this.trees.push({
+          x: p.x, z: p.z, y: y - 0.15, id: k2, parts: sp, s,
+          r: (species === 'barrel' ? 0.6 : 0.75) * s,
+          kind: species === 'acacia' ? 'acacia' : 'cactus',
+          solid: false,                                  // desert scrub always yields
+        });
+        this._addShadow(p.x, p.z, 1.6 * s, spot.terrain ? null : y - 0.15);
       });
-    for (const part of parts) { part.count = placed; this.scene.add(part); }
+    for (const part of parts) { part.count = ks.saguaro; this.scene.add(part); }
+    for (const part of barrelParts) { part.count = ks.barrel; this.scene.add(part); }
+    for (const part of acaciaParts) { part.count = ks.acacia; this.scene.add(part); }
   }
 
   /** Volcano vegetation: sparse burnt snags — bare trunk + a few thin dark
@@ -4904,7 +4950,7 @@ export class Track {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.45 * s, id: k, parts, kind: 'snag', s });
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.45 * s, id: k, parts, kind: 'snag', s, solid: false });
         this._addShadow(p.x, p.z, 1.2 * s);
       });
     for (const part of parts) { part.count = placed; this.scene.add(part); }
@@ -5037,7 +5083,7 @@ export class Track {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
-        this.trees.push({ x: p.x, z: p.z, y: py, r: 0.65 * s, id: k, parts: leafParts, kind: 'jungle', s });
+        this.trees.push({ x: p.x, z: p.z, y: py, r: 0.65 * s, id: k, parts: leafParts, kind: 'jungle', s, solid: false });
       });
     for (const part of leafParts) { part.count = pPlaced; this.scene.add(part); }
   }
@@ -5111,7 +5157,7 @@ export class Track {
           part.setColorAt(k, color);
         }
         // NOT 'pine' → the material law lets any car snap a palm
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.55 * s, id: k, parts, kind: 'palm', s });
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.55 * s, id: k, parts, kind: 'palm', s, solid: false });
         this._addShadow(p.x, p.z, 1.9 * s);
       });
     for (const part of parts) { part.count = placed; this.scene.add(part); }
@@ -5159,7 +5205,7 @@ export class Track {
         m4.setPosition(p.x, ty, p.z);
         for (const part of giantParts) part.setMatrixAt(k, m4);
         // kind 'pine' at s ≥ 1.0 → SOLID: hitting a giant stops a car dead
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.85 * s, id: k, parts: giantParts, kind: 'pine', s });
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.85 * s, id: k, parts: giantParts, kind: 'pine', s, solid: true });
         this._addShadow(p.x, p.z, 1.6 * s);
         color.setHSL(
           F.h + Math.random() * F.hVar,
@@ -5188,7 +5234,7 @@ export class Track {
         m4.makeScale(s, s * (0.9 + Math.random() * 0.3), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of sapParts) part.setMatrixAt(k, m4);
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.85 * s, id: k, parts: sapParts, kind: 'pine', s });
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.85 * s, id: k, parts: sapParts, kind: 'pine', s, solid: false });
         color.setHSL(F.h + Math.random() * F.hVar, F.s, F.l + 0.06 + Math.random() * 0.1);
         sLows.setColorAt(k, color);
         sTops.setColorAt(k, color.clone().multiplyScalar(1.2));
@@ -5237,7 +5283,7 @@ export class Track {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.45 * s, id: k, parts: snagParts, kind: 'snag', s });
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.45 * s, id: k, parts: snagParts, kind: 'snag', s, solid: false });
         this._addShadow(p.x, p.z, 1.2 * s);
       });
     for (const part of snagParts) { part.count = snagPlaced; this.scene.add(part); }
@@ -5280,7 +5326,7 @@ export class Track {
         m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of pineParts) part.setMatrixAt(k, m4);
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 1.0 * s, id: k, parts: pineParts, kind: 'pine', s });
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 1.0 * s, id: k, parts: pineParts, kind: 'pine', s, solid: s >= 1.0 });
         color.setHSL(
           F.h + Math.random() * F.hVar,
           F.s + Math.random() * F.sVar,
