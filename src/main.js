@@ -934,7 +934,7 @@ class Game {
       row.className = 'prof-row' + (active ? ' active' : '');
       row.innerHTML = `<span class="prof-dot" style="background:${p.color}"></span>
         <span class="prof-info"><b>${p.name}</b>
-          <small>${worlds} WORLD${worlds === 1 ? '' : 'S'} CONQUERED · ${(garage.credits ?? 0).toLocaleString()} CR</small></span>`;
+          <small>${worlds} WORLD${worlds === 1 ? '' : 'S'} · ${(garage.credits ?? 0).toLocaleString()} CR</small></span>`;
       if (active) {
         const tag = document.createElement('span');
         tag.className = 'prof-active';

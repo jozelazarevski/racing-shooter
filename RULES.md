@@ -67,6 +67,28 @@ piece (gravity −24 u/s², tumble spin, ~2 s life), debris + smoke + splinter
 burst, car keeps ≥ 80 % of its velocity, score awarded, haptic buzz. Below
 the threshold the object is SOLID (push-out, no destruction).
 
+**Crush bursts (`particles.propBurst`).** Every prop breaks in its own
+material — a generic grey puff for all of them reads as broken, not as
+destruction. Energy comes from impact speed (`min(1, |speed|/30)`).
+
+| Prop | What flies | Feel |
+|---|---|---|
+| **Crate** | 12–18 two-tone plank splinters + 4–6 pale slivers + a white snap-flash + tan dust | wood *breaking* — chunky, fast, gone in ⅔ s |
+| **Barrel** | 10–16 stave shards + 2–3 dark hoop glints, in the theme's own stave/hoop colours | flatter, harder arc; hoops skip out low |
+| **Hay** | 16–24 straw flecks + a hanging chaff cloud, **no hard chunks** | low gravity, long life — it floats and flutters |
+| **Snowman** | 10–14 snow chunks + a powder puff that shrinks as it fades | soft, settling |
+| **Cone** | 6–8 orange + 2 white shards | quick, light, flicked away |
+| **Rock** | 8–10 grey chips + grey dust, in the stone-crash palette | hard, low, fast — chips, not lumps |
+| **Penguin** | 6–8 dark/white flecks + feather flutter | comedic |
+| **Anything else** (fence, trough, feed bin, hay rack) | 8–12 debris in the theme's splinter pair | generic but never colourless |
+
+**Bursts may never cost a frame.** Budget is **620 sprites per frame** across
+all bursts; past it later bursts thin to 40 % rather than being dropped, so
+every prop still visibly crushes. ×0.6 on phones, ×`particles.fxScale` under
+the quality governor, pooled sprites only (6000 cap, 46 px point-size clamp).
+Crushing all 81 props of a level in a single frame costs 913 sprites — 15 % of
+the pool.
+
 ### The impact & material model (SOLID mechanics, expanded)
 
 Every SOLID collision shares the same motion response — push-out along the
@@ -91,6 +113,19 @@ always wins, and the damage YOU take scales with how unforgiving it is.
 Stone > building > living wood > steel post, and every one of them beats a
 car. Glancing scrapes below each formula's threshold cost nothing but paint
 and sparks.
+
+**Debris is shrapnel.** A smashed prop's flung chunk is not decoration: while
+it is still moving faster than **8 u/s**, any car whose centre comes within
+**2.2 u** of it takes a hit. Only heavy material throws shrapnel — **crate 6,
+snowman 6, barrel 9, rock 10, felled tree 14** hull, scaled by
+`clamp(|chunk vel| / 25, 0.5, 1.2)`. Straw, cones, penguins and cacti are pulp
+and never bite. Each chunk hits **once**, the car that flung it is immune for
+the chunk's first **0.45 s** (you cannot shrapnel yourself off your own
+bumper), and any one car can be hit at most once per **0.5 s** — a mine-flung
+cluster stings without shredding. A hit on the player costs a damage flash, a
+spark burst and a throttled "DEBRIS HIT"; a player-flung chunk that clips a
+rival pays **+40**, "DEBRIS STRIKE" and extends the style chain. This is
+§1.2 applied to debris: what you can see flying, you must also be able to feel.
 
 **Impact presentation (crash drama):** any single hit that costs the player
 ≥ 18 hull (≥ 13 for car-on-car) triggers a slow-motion beat (~0.32 s at 30 %

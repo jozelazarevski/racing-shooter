@@ -5,6 +5,11 @@ const MAX_BULLETS = 220;
 const BULLET_SPEED = 130;
 const MISSILE_SPEED = 82;
 const CHOPPER_HIT_R2 = 3.4 * 3.4; // horizontal hit/detonate radius vs choppers
+// Hard ceiling on live mines. Each one is a Group + two cloned materials that
+// sits for 45 s; ammo normally bounds it, but a long free-roam session with
+// every car laying mines must never grow the scene without limit — over the
+// cap the oldest mine is quietly retired (meshes removed, materials disposed).
+const MAX_LIVE_MINES = 24;
 
 const _aim = new THREE.Vector3();  // scratch: chopper gun aim point
 const _dir = new THREE.Vector3();  // scratch: bullet orientation
@@ -68,6 +73,12 @@ export class Weapons {
   }
 
   dropMine(car) {
+    while (this.mines.length >= MAX_LIVE_MINES) {
+      const old = this.mines.shift();
+      this.game.scene.remove(old.mesh);
+      old.lampMat.dispose();
+      old.ringMat.dispose();
+    }
     const g = new THREE.Group();
     const body = new THREE.Mesh(MINE_BODY_GEO, MINE_BODY_MAT);
     body.scale.y = 0.6;
@@ -163,7 +174,8 @@ export class Weapons {
   }
 
   fireBullet(car, dmg, spread) {
-    const b = this.bullets[this.head];
+    const idx = this.head;
+    const b = this.bullets[idx];
     this.head = (this.head + 1) % MAX_BULLETS;
     b.active = true;
     b.owner = car;
@@ -182,7 +194,6 @@ export class Weapons {
     const player = car === this.game.player;
     b.base = player ? this._colorPlayer : this._colorEnemy;
     b.hotK = player ? 0.85 : 0.45; // how white-hot the fresh tracer runs
-    const idx = this.bullets.indexOf(b);
     this.mesh.setColorAt(idx, b.base);
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
     // muzzle punch: bright core pop + flares thrown along the shot line
@@ -192,7 +203,8 @@ export class Weapons {
   /** Chopper chin gun: a tracer from the airframe angled down at targetPos.
    *  Pooled with the car bullets — these are the only rounds with a vy. */
   fireChopperBullet(chopper, targetPos) {
-    const b = this.bullets[this.head];
+    const idx = this.head;
+    const b = this.bullets[idx];
     this.head = (this.head + 1) % MAX_BULLETS;
     b.active = true;
     b.owner = chopper;
@@ -209,7 +221,6 @@ export class Weapons {
       targetPos.z + (Math.random() - 0.5) * 4.2
     );
     b.vel.copy(_aim).sub(b.pos).normalize().multiplyScalar(BULLET_SPEED * 0.8);
-    const idx = this.bullets.indexOf(b);
     this.mesh.setColorAt(idx, this._colorEnemy);
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
