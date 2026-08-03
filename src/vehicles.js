@@ -1488,7 +1488,8 @@ export class EnemyCar extends Car {
     this.boostCooldown = 4 + Math.random() * 6; // stagger the first bursts
     this.ramCooldown = 6 + Math.random() * 4;   // deliberate side-slam timer (stagger + skip the start scrum)
     this.ramTimer = 0;                          // >0: actively steering into the player
-    this._missileFired = false;                 // one missile per race on high aggression
+    this.missileCd = 6 + Math.random() * 6;     // rocket timer (EASY never fires; see update)
+    this._aiRank = slot;                        // race rank among rivals (refreshed by _sense)
     this.glowColor = new THREE.Color(0x9a938a); // exhaust smoke tint
 
     // ---- driver-feel state (all refreshed by _sense at ~6 Hz, zero allocs) ----
@@ -1600,6 +1601,14 @@ export class EnemyCar extends Car {
       }
     }
     this._drafting = drafting;
+    // -- race rank among rivals (0 = leading AI): O(rivals) at sense rate.
+    // Gates who carries rockets on NORMAL (front-runners only).
+    let rank = 0;
+    for (let i = 0; i < g.enemies.length; i++) {
+      const o = g.enemies[i];
+      if (o !== this && o.alive && o.progress > this.progress) rank++;
+    }
+    this._aiRank = rank;
     // -- defense re-arm: passing through a real corner grants one new block
     if (t.curvature[this.trackIndex] > CORNER_CURV) this._blockUsed = false;
     // -- human error roll: heavily on EASY, rarely on NORMAL, never on HARD.
@@ -1650,7 +1659,13 @@ export class EnemyCar extends Car {
     let band = 1;
     if (gap > 0.02) band = 1 + 0.30 * D.rubberBand * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1);
     else if (gap < -0.06) band = 1 - 0.12 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1);
-    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * Math.max(0.7, band);
+    // pace parity vs the garage: a maxed ENGINE (+20% player top speed) turned
+    // NORMAL into a parade. Rivals bring +2% per player engine level (cap
+    // +10%) on NORMAL/HARD; EASY keeps its gentler pack untouched so a casual
+    // still gets to win with upgrades.
+    const engUp = (g.difficulty?.id ?? 'normal') === 'easy'
+      ? 1 : 1 + Math.min(0.10, 0.02 * (g.garage?.engine ?? 0));
+    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * engUp * Math.max(0.7, band);
 
     // ---- refresh the small personal lane bias occasionally
     this.laneTimer -= dt;

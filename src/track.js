@@ -1373,6 +1373,23 @@ const ELEMENT_KITS = {
     dress: ['logpile'], fenceColor: 0x4a3c30, stoneWalls: 3,
   },
 };
+// Species mix for the default (conifer-family) forest builder, per theme:
+// [[species, weight]...]. Species live in _buildForest. Themes not listed
+// fall back to the classic two-pine stand; a theme can override the whole
+// mix via T.floraMix.
+const FLORA_MIX = {
+  forest: [['pineA', 0.34], ['pineB', 0.22], ['birch', 0.24], ['oak', 0.20]],
+  flume: [['pineA', 0.38], ['pineB', 0.20], ['birch', 0.20], ['oak', 0.22]],
+  snow: [['pineA', 0.42], ['pineB', 0.23], ['birchBare', 0.35]],
+  glacial: [['pineA', 0.45], ['pineB', 0.25], ['birchBare', 0.30]],
+  sheetice: [['pineA', 0.5], ['birchBare', 0.5]],
+  avalanche: [['pineA', 0.35], ['pineB', 0.20], ['larch', 0.25], ['birchBare', 0.20]],
+  alpine: [['pineA', 0.40], ['pineB', 0.25], ['larch', 0.35]],
+  pass: [['pineA', 0.34], ['pineB', 0.22], ['larch', 0.28], ['birch', 0.16]],
+  tremola: [['pineA', 0.36], ['pineB', 0.22], ['larch', 0.42]],
+  furka: [['pineA', 0.40], ['pineB', 0.22], ['larch', 0.38]],
+};
+
 // How many decorative side-road junctions each RURAL world gets (city, ice
 // and cliff-walled worlds get none). A theme can override via T.crossroads.
 const THEME_CROSSROADS = {
@@ -4577,22 +4594,26 @@ export class Track {
     const capMat = T.treeSnowCap
       ? new THREE.MeshStandardMaterial({ color: 0xf2f6fa, flatShading: true, roughness: 0.9 })
       : null;
-    // TWO canopy silhouettes so a stand never reads copy-pasted:
-    //   A — the classic broad two-tier pine
-    //   B — a taller, narrower three-tier pine with slightly offset crowns
-    const mkVariant = (tiers, capY) => {
-      const parts = [new THREE.InstancedMesh(trunkGeo, trunkMat, COUNT)];
-      for (const [geoSpec, mat] of tiers) {
-        parts.push(new THREE.InstancedMesh(geoSpec, mat, COUNT));
-      }
-      if (capMat) {
-        const capGeo = new THREE.ConeGeometry(1.3, 1.9, 8);
-        capGeo.translate(0, capY, 0);
-        parts.push(new THREE.InstancedMesh(capGeo, capMat, COUNT));
-      }
+    // A REAL MIXED STAND: several visually distinct species per world, not one
+    // silhouette with hue jitter. Which species and in what ratio comes from
+    // T.floraMix (or the per-theme FLORA_MIX default): conifers (two pine
+    // silhouettes + sparse-tiered larch), deciduous (pale-trunked birch,
+    // round-crowned oak) and winter bare birches. Every species is its own
+    // set of InstancedMeshes — one draw call per part regardless of count.
+    const capFor = (parts, capY) => {
+      if (!capMat || capY == null) return;
+      const capGeo = new THREE.ConeGeometry(1.3, 1.9, 8);
+      capGeo.translate(0, capY, 0);
+      parts.push(new THREE.InstancedMesh(capGeo, capMat, COUNT));
+    };
+    const mkParts = (trunk, tiers, capY) => {
+      const parts = [new THREE.InstancedMesh(trunk[0], trunk[1], COUNT)];
+      for (const [geoSpec, mat] of tiers) parts.push(new THREE.InstancedMesh(geoSpec, mat, COUNT));
+      capFor(parts, capY);
       for (const part of parts) part.castShadow = true;
       return parts;
     };
+    // --- conifers ---
     const lowA = new THREE.ConeGeometry(2.6, 4.2, 8);
     lowA.translate(0, 4.0, 0);
     const topA = new THREE.ConeGeometry(1.8, 3.4, 8);
@@ -4603,11 +4624,59 @@ export class Track {
     midB.translate(-0.16, 5.6, 0.12);
     const topB = new THREE.ConeGeometry(1.15, 2.6, 7);
     topB.translate(0.05, 7.4, -0.05);
-    const variants = [
-      mkVariant([[lowA, lowMat], [topA, topMat]], 7.35),
-      mkVariant([[lowB, lowMat], [midB, lowMat], [topB, topMat]], 8.15),
-    ];
-    const ks = [0, 0];
+    const larchTiers = [];
+    for (const [r, y] of [[1.55, 3.3], [1.25, 4.9], [0.95, 6.3], [0.6, 7.6]]) {
+      const tg = new THREE.ConeGeometry(r, 1.5, 7);      // sparse gappy tiers
+      tg.translate(0, y, 0);
+      larchTiers.push([tg, lowMat]);
+    }
+    // --- deciduous ---
+    const birchTrunk = new THREE.CylinderGeometry(0.2, 0.28, 3.6, 6);
+    birchTrunk.translate(0, 1.8, 0);
+    const birchBark = new THREE.MeshStandardMaterial({ color: 0xe6e8e0, roughness: 0.9 });
+    const birchCrown = new THREE.SphereGeometry(1.45, 7, 5);
+    birchCrown.scale(1, 1.3, 1);
+    birchCrown.translate(0, 4.7, 0);
+    const birchTop = new THREE.SphereGeometry(0.85, 6, 5);
+    birchTop.translate(0.15, 6.1, -0.1);
+    const bareBranch = (rz, tx, ty2, tz) => {
+      const bg = new THREE.ConeGeometry(0.09, 1.9, 5);
+      bg.rotateZ(rz);
+      bg.translate(tx, ty2, tz);
+      return [bg, trunkMat];
+    };
+    const oakTrunk = new THREE.CylinderGeometry(0.42, 0.6, 2.7, 7);
+    oakTrunk.translate(0, 1.35, 0);
+    const oakDome = new THREE.SphereGeometry(2.35, 8, 6);
+    oakDome.scale(1, 0.78, 1);
+    oakDome.translate(0, 4.0, 0);
+    const oakTop = new THREE.SphereGeometry(1.4, 7, 5);
+    oakTop.translate(0.35, 5.5, 0.2);
+    const SPECIES = {
+      pineA: { parts: mkParts([trunkGeo, trunkMat], [[lowA, lowMat], [topA, topMat]], 7.35),
+        kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 2 },
+      pineB: { parts: mkParts([trunkGeo, trunkMat], [[lowB, lowMat], [midB, lowMat], [topB, topMat]], 8.15),
+        kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 3 },
+      larch: { parts: mkParts([trunkGeo, trunkMat], larchTiers, 8.3),
+        kind: 'larch', rFac: 0.85, solidAt: null, tint: 'larch', tiers: 4 },
+      birch: { parts: mkParts([birchTrunk, birchBark], [[birchCrown, lowMat], [birchTop, topMat]], null),
+        kind: 'birch', rFac: 0.7, solidAt: null, tint: 'birch', tiers: 2 },
+      birchBare: { parts: mkParts([birchTrunk, birchBark],
+        [bareBranch(-0.85, 0.7, 3.4, 0), bareBranch(0.8, -0.6, 2.9, 0.1), bareBranch(-0.3, 0.15, 4.3, -0.4)], null),
+        kind: 'birch', rFac: 0.55, solidAt: null, tint: 'bare', tiers: 3 },
+      oak: { parts: mkParts([oakTrunk, trunkMat], [[oakDome, lowMat], [oakTop, topMat]], null),
+        kind: 'oak', rFac: 1.15, solidAt: 1.35, tint: 'oak', tiers: 2 },
+    };
+    const mix = T.floraMix
+      || FLORA_MIX[this.level && this.level.theme]
+      || [['pineA', 0.55], ['pineB', 0.45]];
+    const ks = {};
+    for (const [name] of mix) ks[name] = 0;
+    const pick = () => {
+      let roll = Math.random(), acc = 0;
+      for (const [name, wt] of mix) { acc += wt; if (roll < acc) return name; }
+      return mix[mix.length - 1][0];
+    };
     const color = new THREE.Color();
     const F = T.foliage;
 
@@ -4624,31 +4693,55 @@ export class Track {
         return p && this._altOK(p.x, p.z) ? p : null;
       },
       (p) => {
-        const vi = Math.random() < 0.45 ? 1 : 0;
-        const parts = variants[vi];
-        const k = ks[vi]++;
+        const name = pick();
+        const spec = SPECIES[name];
+        const parts = spec.parts;
+        const k = ks[name]++;
         const s = 0.75 + Math.random() * 1.25;
         const ty = this.terrainHeight(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.45), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of parts) part.setMatrixAt(k, m4);
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 1.0 * s, id: k, parts, kind: 'pine', s });
-        // per-tree foliage variation (themed hue band)
-        color.setHSL(
-          F.h + Math.random() * F.hVar,
-          F.s + Math.random() * F.sVar,
-          F.l + Math.random() * F.lVar
-        );
-        const trunkTone = Math.random() < 0.5 ? 1.0 : 0.78;   // two trunk tones
-        parts[0].setColorAt(k, new THREE.Color(trunkTone, trunkTone * 0.96, trunkTone * 0.9));
-        parts[1].setColorAt(k, color);
-        if (vi === 1) parts[2].setColorAt(k, color.clone().multiplyScalar(0.9));
-        parts[vi === 1 ? 3 : 2].setColorAt(k, color.clone().multiplyScalar(1.2));
-        this._addShadow(p.x, p.z, 2.4 * s);
+        this.trees.push({
+          x: p.x, z: p.z, y: ty, r: spec.rFac * s, id: k, parts, kind: spec.kind, s,
+          // explicit material law: true stops a car dead, false always yields
+          solid: spec.solidAt != null && s >= spec.solidAt,
+        });
+        // per-tree foliage variation (themed hue band, shifted per species)
+        switch (spec.tint) {
+          case 'larch':   // paler, yellow-shifted soft needles
+            color.setHSL(F.h - 0.045 + Math.random() * F.hVar, F.s * 0.85,
+              Math.min(0.6, F.l + 0.10 + Math.random() * F.lVar)); break;
+          case 'birch':   // light airy crown
+            color.setHSL(F.h + 0.02 + Math.random() * F.hVar, F.s * 0.8,
+              Math.min(0.62, F.l + 0.16 + Math.random() * F.lVar)); break;
+          case 'oak':     // deep saturated dome
+            color.setHSL(F.h + Math.random() * F.hVar, Math.min(1, F.s + 0.12),
+              Math.max(0.16, F.l - 0.03 + Math.random() * F.lVar)); break;
+          case 'bare':    // dark winter branches
+            color.setHSL(0.07, 0.18, 0.16 + Math.random() * 0.08); break;
+          default:
+            color.setHSL(F.h + Math.random() * F.hVar, F.s + Math.random() * F.sVar,
+              F.l + Math.random() * F.lVar);
+        }
+        // trunk: two wood tones, or near-white bark for the birches
+        if (spec.tint === 'birch' || spec.tint === 'bare') {
+          const bt = 0.92 + Math.random() * 0.14;
+          parts[0].setColorAt(k, new THREE.Color(bt, bt, bt * 0.97));
+        } else {
+          const trunkTone = Math.random() < 0.5 ? 1.0 : 0.78;
+          parts[0].setColorAt(k, new THREE.Color(trunkTone, trunkTone * 0.96, trunkTone * 0.9));
+        }
+        // crown tiers darken downward, brighten at the top (bare: branches)
+        for (let ti = 1; ti <= spec.tiers; ti++) {
+          const f = spec.tiers === 1 ? 1.2 : 0.85 + (ti - 1) / (spec.tiers - 1) * 0.45;
+          parts[ti].setColorAt(k, color.clone().multiplyScalar(spec.tint === 'bare' ? 1 : f));
+        }
+        this._addShadow(p.x, p.z, 2.4 * spec.rFac * s);
       });
-    for (let vi = 0; vi < variants.length; vi++) {
-      for (const part of variants[vi]) part.count = ks[vi];
-      this.scene.add(...variants[vi]);
+    for (const name of Object.keys(ks)) {
+      for (const part of SPECIES[name].parts) part.count = ks[name];
+      this.scene.add(...SPECIES[name].parts);
     }
     // DECOR (no collision, < 0.5u tall): fallen logs and cut stumps scattered
     // through the stand so the forest floor reads lived-in
@@ -4825,28 +4918,54 @@ export class Track {
   _buildJungleTrees(m4) {
     const T = this.T;
     const COUNT = T.treeCount;
-    // trunk: tall and thin
-    const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 6.4, 7);
-    trunkGeo.translate(0, 3.2, 0);
-    // three stacked broad, squashed crowns
-    const can1 = new THREE.ConeGeometry(3.4, 2.1, 8);
-    can1.translate(0, 6.3, 0);
-    const can2 = new THREE.ConeGeometry(2.6, 1.8, 8);
-    can2.translate(0, 7.7, 0);
-    const can3 = new THREE.ConeGeometry(1.7, 1.5, 7);
-    can3.translate(0, 8.9, 0);
+    // TROPICAL canopy only — no conifer silhouettes anywhere on this world.
+    // Two species: KAPOK emergents (tall pale trunk under a broad, flat,
+    // spreading crown of squashed domes — the classic rainforest skyline) and
+    // BROADLEAF mid-story (shorter, rounded layered crowns). Kapoks at full
+    // scale are SOLID; the mid-story always yields.
     const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const canMatLow = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
     const canMatTop = new THREE.MeshStandardMaterial({ color: T.foliageTop, flatShading: true, roughness: 1 });
-    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, COUNT);
-    const lows = new THREE.InstancedMesh(can1, canMatLow, COUNT);
-    const mids = new THREE.InstancedMesh(can2, canMatLow, COUNT);
-    const tops = new THREE.InstancedMesh(can3, canMatTop, COUNT);
-    trunks.castShadow = lows.castShadow = mids.castShadow = tops.castShadow = true;
-    const treeParts = [trunks, lows, mids, tops];
+    // kapok: tall trunk, flared buttress base, wide plate crown + side domes
+    const kTrunk = new THREE.CylinderGeometry(0.26, 0.4, 7.0, 7);
+    kTrunk.translate(0, 3.5, 0);
+    const kButtress = new THREE.CylinderGeometry(0.62, 1.05, 1.5, 7);
+    kButtress.translate(0, 0.75, 0);
+    const kCrown = new THREE.SphereGeometry(3.6, 8, 5);
+    kCrown.scale(1, 0.34, 1);
+    kCrown.translate(0, 7.3, 0);
+    const kDomeA = new THREE.SphereGeometry(2.0, 7, 5);
+    kDomeA.scale(1, 0.42, 1);
+    kDomeA.translate(1.9, 6.8, 0.6);
+    const kDomeB = new THREE.SphereGeometry(1.7, 7, 5);
+    kDomeB.scale(1, 0.45, 1);
+    kDomeB.translate(-1.8, 6.9, -0.5);
+    const kapokParts = [
+      new THREE.InstancedMesh(kTrunk, trunkMat, COUNT),
+      new THREE.InstancedMesh(kButtress, trunkMat, COUNT),
+      new THREE.InstancedMesh(kCrown, canMatLow, COUNT),
+      new THREE.InstancedMesh(kDomeA, canMatLow, COUNT),
+      new THREE.InstancedMesh(kDomeB, canMatTop, COUNT),
+    ];
+    // broadleaf: short trunk, two rounded stacked crowns
+    const bTrunk = new THREE.CylinderGeometry(0.24, 0.36, 4.2, 7);
+    bTrunk.translate(0, 2.1, 0);
+    const bCrown = new THREE.SphereGeometry(2.45, 8, 6);
+    bCrown.scale(1, 0.72, 1);
+    bCrown.translate(0, 4.7, 0);
+    const bTop = new THREE.SphereGeometry(1.5, 7, 5);
+    bTop.scale(1, 0.75, 1);
+    bTop.translate(0.4, 6.0, 0.3);
+    const broadParts = [
+      new THREE.InstancedMesh(bTrunk, trunkMat, COUNT),
+      new THREE.InstancedMesh(bCrown, canMatLow, COUNT),
+      new THREE.InstancedMesh(bTop, canMatTop, COUNT),
+    ];
+    for (const part of [...kapokParts, ...broadParts]) part.castShadow = true;
     const color = new THREE.Color();
     const F = T.foliage;
-    const placed = this._scatter(COUNT,
+    const ks = { kapok: 0, broad: 0 };
+    this._scatter(COUNT,
       () => {
         // denser and closer than the pine forests: a real green wall
         if (Math.random() < 0.7) return this._trackSidePos(13.5, 40);
@@ -4856,25 +4975,39 @@ export class Track {
         if (this._distToTrack(x, z) < 13) return null;
         return { x, z };
       },
-      (p, k) => {
-        const s = 0.9 + Math.random() * 1.1;             // mostly ≥ 1.0 → SOLID trunks
+      (p) => {
+        const kapok = Math.random() < 0.55;
+        const parts = kapok ? kapokParts : broadParts;
+        const k = kapok ? ks.kapok++ : ks.broad++;
+        const s = kapok ? 0.9 + Math.random() * 1.1 : 0.7 + Math.random() * 0.8;
         const ty = this.terrainHeight(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
         m4.setPosition(p.x, ty, p.z);
-        for (const part of treeParts) part.setMatrixAt(k, m4);
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 1.0 * s, id: k, parts: treeParts, kind: 'pine', s });
+        for (const part of parts) part.setMatrixAt(k, m4);
+        this.trees.push({
+          x: p.x, z: p.z, y: ty, r: (kapok ? 1.0 : 0.8) * s, id: k, parts,
+          kind: kapok ? 'kapok' : 'broadleaf', s,
+          // kapok emergents at full growth stop a car; everything else yields
+          solid: kapok && s >= 1.0,
+        });
         color.setHSL(
           F.h + Math.random() * F.hVar,
           F.s + Math.random() * F.sVar,
           F.l + Math.random() * F.lVar
         );
-        lows.setColorAt(k, color);
-        mids.setColorAt(k, color.clone().multiplyScalar(0.85));
-        tops.setColorAt(k, color.clone().multiplyScalar(1.25));
+        if (kapok) {
+          parts[2].setColorAt(k, color);
+          parts[3].setColorAt(k, color.clone().multiplyScalar(0.85));
+          parts[4].setColorAt(k, color.clone().multiplyScalar(1.25));
+        } else {
+          parts[1].setColorAt(k, color);
+          parts[2].setColorAt(k, color.clone().multiplyScalar(1.22));
+        }
         this._addShadow(p.x, p.z, 3.0 * s);
       });
-    trunks.count = lows.count = mids.count = tops.count = placed;
-    this.scene.add(trunks, lows, mids, tops);
+    for (const part of kapokParts) part.count = ks.kapok;
+    for (const part of broadParts) part.count = ks.broad;
+    this.scene.add(...kapokParts, ...broadParts);
 
     // giant-leaf plants near the road: 5 flat stretched leaves fanned from a base
     const PLANTS = 90;
