@@ -62,6 +62,38 @@ const PODIUM_CR = [200, 120, 60];          // 1st / 2nd / 3rd
 const FIRST_CLEAR_CR = 500;                // once per world, on your first podium
 const upgradeCost = (lvl) => 500 + lvl * 400;   // 500/900/1300/1700/2100 per line
 
+// ---- race contracts ----
+// Every race offers 3 side objectives that pay flat credits on completion, so
+// income has texture and skilled play earns a margin — WITHOUT retuning the
+// settled rates above. All checks read existing signals only: the style()
+// event labels, this.deaths/kills, per-race counters accumulated in this._ct.
+// `gate` filters offers that a world/difficulty can't honor; `lap: true`
+// contracts resolve at lap boundaries; `atFinish` ones resolve in finishRace.
+const CONTRACT_POOL = [
+  { id: 'cleanlap', label: 'CLEAN LAP',      pay: 100, desc: 'a full lap without hull damage', lap: true },
+  { id: 'untouch',  label: 'UNTOUCHABLE',    pay: 120, desc: 'finish without wrecking',
+    atFinish: true, check: (g) => g.deaths === 0 },
+  { id: 'demo',     label: 'DEMOLITION',     pay: 60,  desc: 'smash 12 props',
+    check: (g, ct) => ct.props >= 12, prog: (ct) => `${Math.min(ct.props, 12)}/12` },
+  { id: 'head',     label: 'HEADHUNTER',     pay: 90,  desc: 'destroy 2 rivals',
+    check: (g, ct) => ct.rivalKills >= 2, prog: (ct) => `${Math.min(ct.rivalKills, 2)}/2` },
+  { id: 'combo',    label: 'COMBO ARTIST',   pay: 70,  desc: 'reach a ×2.5 style combo',
+    check: (g, ct) => ct.comboMax >= 2.5 },
+  { id: 'draft',    label: 'DRAFT KING',     pay: 60,  desc: '3 slipstream tucks',
+    check: (g, ct) => ct.drafts >= 3, prog: (ct) => `${Math.min(ct.drafts, 3)}/3` },
+  { id: 'air',      label: 'AIRBORNE',       pay: 60,  desc: '2 BIG AIR jumps',
+    check: (g, ct) => ct.bigAirs >= 2, prog: (ct) => `${Math.min(ct.bigAirs, 2)}/2` },
+  { id: 'hardpod',  label: 'PODIUM ON HARD', pay: 150, desc: 'top 3 on HARD',
+    gate: (g) => g.difficulty.id === 'hard', atFinish: true, check: (g, ct, rank) => rank <= 3 },
+  { id: 'pacifist', label: 'PACIFIST',       pay: 130, desc: 'podium with zero weapon fire',
+    atFinish: true, check: (g, ct, rank) => rank <= 3 && !ct.weaponFired },
+  { id: 'start',    label: 'FLAWLESS START', pay: 80,  desc: 'lead at the end of lap 1', lap: true },
+  { id: 'herd',     label: 'HERDSMAN',       pay: 50,  desc: 'never hit livestock',
+    gate: (g) => (g.herds?.length ?? 0) > 0, atFinish: true, check: (g, ct) => ct.livestock === 0 },
+  { id: 'shave',    label: 'CLOSE SHAVE',    pay: 60,  desc: '3 CLOSE CALL passes',
+    check: (g, ct) => ct.closeCalls >= 3, prog: (ct) => `${Math.min(ct.closeCalls, 3)}/3` },
+];
+
 // which animals graze in which biome (a theme can override with T.livestock)
 const LIVESTOCK_BY_THEME = {
   forest:   { kinds: ['cow', 'sheep'], perHerd: 4 },
@@ -229,6 +261,7 @@ class Game {
     this.audio = new AudioEngine();
     this.input = new Input();
     this.lapsTotal = LAPS;
+    this.contractPool = CONTRACT_POOL; // exposed for the headless suites
 
     const carEntry = CAR_CATALOG.find((c) => c.key === this.cars.selected) || CAR_CATALOG[0];
     this.player = new PlayerCar(this, carEntry);
@@ -875,6 +908,14 @@ class Game {
   // shows the chain and its remaining time.
   style(basePts, label) {
     if (this.state !== 'race') return;
+    // contract counters ride the existing style events (labels are the
+    // activation signals vehicles.js already emits — no hooks added there)
+    const ct = this._ct;
+    if (ct) {
+      if (label === 'SLIPSTREAM') ct.drafts++;
+      else if (label === 'BIG AIR') ct.bigAirs++;
+      else if (label === 'CLOSE CALL') ct.closeCalls++;
+    }
     this.comboN = Math.min(12, (this.comboN ?? 0) + 1);
     this.comboT = 5;
     const mult = Math.min(4, 1 + this.comboN * 0.25);
@@ -911,6 +952,84 @@ class Game {
       }
     } else if (el.root.classList.contains('on')) {
       el.root.classList.remove('on', 'hot');
+    }
+  }
+
+  // ---------- race contracts (the money game) ----------
+  // 3 side objectives per race, seeded per level+day+difficulty so a given
+  // world offers the same slate all day. Completions pay into contractCredits,
+  // folded into `earned` at finishRace. Never offered in free roam.
+  _pickContracts() {
+    const pool = CONTRACT_POOL.filter((c) => !c.gate || c.gate(this));
+    const day = Math.floor(Date.now() / 864e5);
+    let s = ((this.level.id * 73856093) ^ (day * 19349663)
+      ^ (this.difficulty.id.charCodeAt(0) * 83492791)) >>> 0;
+    const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+    const arr = [...pool];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = (rnd() * (i + 1)) | 0;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr.slice(0, 3).map((c) => ({ ...c, done: false }));
+  }
+
+  /** Per-frame contract bookkeeping. Only ever OBSERVES state other systems
+   *  already expose (heat/ammo/health deltas, _draftOn is counted via the
+   *  style() labels) — no hooks into files owned by the other agents. */
+  _updateContracts() {
+    if (this.freeRoam || this.state !== 'race' || !this.contracts?.length) return;
+    const ct = this._ct, p = this.player;
+    if (!ct) return;
+    // weapon-fire detection by state transition (cannon heats, ammo drops,
+    // shock cooldown jumps) — input alone would count dry-fires
+    if (p.heat > (ct.prevHeat ?? 0) + 1e-4) ct.weaponFired = true;
+    if (ct.prevMissiles !== null && p.missiles < ct.prevMissiles) ct.weaponFired = true;
+    if (ct.prevMines !== null && p.mines < ct.prevMines) ct.weaponFired = true;
+    if (p.shockCooldown > (ct.prevShock ?? 0) + 1) ct.weaponFired = true;
+    ct.prevHeat = p.heat; ct.prevMissiles = p.missiles;
+    ct.prevMines = p.mines; ct.prevShock = p.shockCooldown;
+    // hull-damage detection for CLEAN LAP: any health drop marks the lap
+    // (regen/pickups only ever raise it, so a drop is always damage)
+    if (ct.prevHealth !== null && p.alive && p.health < ct.prevHealth - 1e-3) ct.lapDamaged = true;
+    ct.prevHealth = p.alive ? p.health : null;
+    // style-combo high-water mark
+    if ((this.comboT ?? 0) > 0) {
+      ct.comboMax = Math.max(ct.comboMax, Math.min(4, 1 + (this.comboN ?? 0) * 0.25));
+    }
+    for (const c of this.contracts) {
+      if (!c.done && !c.atFinish && c.check && c.check(this, ct)) this._completeContract(c);
+    }
+    this.hud.setContracts?.(this.contracts, ct); // diffed inside — cheap
+  }
+
+  _completeContract(c) {
+    if (c.done) return;
+    c.done = true;
+    this.contractCredits = (this.contractCredits ?? 0) + c.pay;
+    this.hud.feed(`CONTRACT: ${c.label}  +${c.pay} CR`, 'good');
+    this.hud.setContracts?.(this.contracts, this._ct);
+    this.audio.pickup?.();
+    this.buzz([20, 30, 20]);
+  }
+
+  _tryContract(id) {
+    const c = this.contracts?.find((x) => x.id === id && !x.done);
+    if (c) this._completeContract(c);
+  }
+
+  /** Lap `lapNo` just completed — resolve the lap-boundary contracts. */
+  _lapContracts(lapNo) {
+    const ct = this._ct;
+    if (!this.contracts?.length || !ct) return;
+    if (!ct.lapDamaged) this._tryContract('cleanlap');
+    ct.lapDamaged = false;
+    if (lapNo === 1 && this.playerRank === 1) this._tryContract('start');
+  }
+
+  _checkFinishContracts(rank) {
+    if (!this.contracts?.length || !this._ct) return;
+    for (const c of this.contracts) {
+      if (!c.done && c.atFinish && c.check(this, this._ct, rank)) this._completeContract(c);
     }
   }
 
@@ -1070,6 +1189,7 @@ class Game {
             this.buzz([50, 30, 50]);
           }
           this.style?.(a.K.pts, 'LIVESTOCK'); // grim, but it is a combat racer
+          if (this._ct) this._ct.livestock++; // HERDSMAN contract is now lost
         }
         break;
       }
@@ -1566,6 +1686,7 @@ class Game {
     this.shake = Math.min(1, this.shake + (car === this.player ? 0.12 : 0.05));
     if (car === this.player) {
       this.score += pr.scoreValue || 25;
+      if (this._ct) this._ct.props++; // DEMOLITION contract
       this.buzz(15);
       const pl = this.player;
       if (pr.pickup === 'health') {
@@ -1896,6 +2017,13 @@ class Game {
     this.fovKick = 0;
     this.enemySlowUntil = 0;
     this.comboN = 0; this.comboT = 0; this._lastRank = undefined; this._tauntT = -9;
+    // race contracts: fresh slate + counters every race (picked in startRace)
+    this.contracts = [];
+    this.contractCredits = 0;
+    this._ct = { props: 0, rivalKills: 0, drafts: 0, bigAirs: 0, closeCalls: 0,
+      livestock: 0, comboMax: 1, weaponFired: false, lapDamaged: false,
+      prevHealth: null, prevHeat: 0, prevMissiles: null, prevMines: null, prevShock: 0 };
+    this.hud?.setContracts?.([]);
     for (const a2 of this.herds ?? []) { a2.alive = true; a2.mesh.visible = true; a2.x = a2.homeX; a2.z = a2.homeZ; }
     this._clearWorldHazards?.();
     for (const h of this.husks) this.scene.remove(h.mesh);
@@ -1963,6 +2091,11 @@ class Game {
     this._lastCount = 4;
     this.player.lapStart = 0;
     this.hud.feed(`${this.level.name} — LEVEL ${this.level.id}`, 'info');
+    if (!this.freeRoam) {
+      // contracts run in RACE only — roam money stays pure destruction rate
+      this.contracts = this._pickContracts();
+      this.hud.setContracts?.(this.contracts, this._ct);
+    }
     if (this.freeRoam) {
       // no grid, no countdown — the world is yours (and the choppers')
       this.state = 'race';
@@ -1978,6 +2111,9 @@ class Game {
   onPlayerLap() {
     if (this.freeRoam) { this.score += 100; return; }
     const p = this.player;
+    // contracts that resolve at lap boundaries (lap p.lap-1 just completed) —
+    // BEFORE the finish branch so a clean final lap still counts
+    this._lapContracts(p.lap - 1);
     if (p.lap > this.lapsTotal) { this.finishRace(); return; }
     const lapTime = this.raceTime - p.lapStart;
     p.lapStart = this.raceTime;
@@ -2000,6 +2136,7 @@ class Game {
     this.audio.hit();
     if (killed) {
       this.kills++;
+      if (this._ct) this._ct.rivalKills++; // HEADHUNTER contract
       this.style?.(0, null); // kill extends the chain
       this.score += 250;
       this.player.nitro = Math.min(1, this.player.nitro + 0.25 * (this.player.nitroRate || 1));
@@ -2054,11 +2191,34 @@ class Game {
     const podium = rank <= 3 ? PODIUM_CR[rank - 1] : 0;
     const firstClear = (!prev || prev.place > 3) && rank <= 3 ? FIRST_CLEAR_CR : 0;
     const raceScore = Math.max(0, this.score - (this.startScore ?? 0));
-    const earned = Math.round(raceScore * CREDIT_RATE * diffMult) + podium + firstClear;
+    // finish-line contracts resolve now (UNTOUCHABLE / PACIFIST / HERDSMAN /
+    // PODIUM ON HARD), then the whole contract pot rides into `earned`
+    this._checkFinishContracts(rank);
+    const contractCr = this.contractCredits ?? 0;
+    const raceCr = Math.round(raceScore * CREDIT_RATE * diffMult);
+    const earned = raceCr + podium + firstClear + contractCr;
     document.getElementById('r-credits').textContent = `+${earned.toLocaleString()}`;
     if (podium) this.hud.feed(`PODIUM BONUS  +${podium} CR`, 'good');
     if (firstClear) this.hud.feed(`WORLD CONQUERED  +${FIRST_CLEAR_CR} CR`, 'good');
     if (diffMult !== 1) this.hud.feed(`${this.difficulty.id.toUpperCase()} PAYS ×${diffMult} CREDITS`, 'info');
+    // itemized credits breakdown on the results screen
+    {
+      const box = document.getElementById('credit-breakdown');
+      const rowsEl = document.getElementById('cb-rows');
+      if (box && rowsEl) {
+        let html = `<div class="cb-row"><span>RACE SCORE${diffMult !== 1 ? ` ×${diffMult}` : ''}</span><b>+${raceCr.toLocaleString()}</b></div>`;
+        if (podium) html += `<div class="cb-row"><span>PODIUM — ${sfx}</span><b>+${podium}</b></div>`;
+        if (firstClear) html += `<div class="cb-row"><span>FIRST CONQUEST</span><b>+${firstClear}</b></div>`;
+        for (const c of this.contracts ?? []) {
+          html += c.done
+            ? `<div class="cb-row contract"><span>✓ ${c.label}</span><b>+${c.pay}</b></div>`
+            : `<div class="cb-row missed"><span>✗ ${c.label}</span><b>—</b></div>`;
+        }
+        html += `<div class="cb-row total"><span>TOTAL CREDITS</span><b>+${earned.toLocaleString()}</b></div>`;
+        rowsEl.innerHTML = html;
+        box.style.display = '';
+      }
+    }
     this.garage.credits += earned;
     saveJSON('ir-garage', this.garage);
     this.career.finished[this.level.id] = {
@@ -2274,6 +2434,9 @@ class Game {
         const surf = this.track.T?.surface;
         if (surf === 'snow') this.hud.feed('SNOW ROAD — LOW GRIP, LONG SLIDES', 'info');
         else if (surf === 'wet') this.hud.feed('WET ROAD — SLICK UNDER BRAKING', 'info');
+        for (const c of this.contracts ?? []) {
+          this.hud.feed(`◇ ${c.label}: ${c.desc}  +${c.pay} CR`, 'info');
+        }
       }
     }
 
@@ -2304,6 +2467,7 @@ class Game {
         this._updateProps(dt);
         this._updateWorldHazards(dt, time);
         this._updateCombo(dt);
+        this._updateContracts();
         this._updateTaunts();
         this._updateRoamStars(time);
         this._updateLivestock(dt, time);

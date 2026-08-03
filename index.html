@@ -37,6 +37,15 @@
   #standings .srow{font-size:12px;font-weight:700;letter-spacing:1px;color:#d8c090;line-height:1.5}
   #standings .srow.me{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
   #standings .srow.dead{opacity:.45;text-decoration:line-through}
+  /* race contracts: compact readout under the standings (no map — ever) */
+  #contracts{margin-top:6px;border-top:1px solid rgba(255,212,0,.25);padding-top:5px}
+  #contracts:empty{display:none}
+  #contracts .clabel{font-size:9px;letter-spacing:3px;color:#e8c987;margin-bottom:1px}
+  #contracts .crow{display:flex;justify-content:space-between;gap:10px;font-size:10.5px;
+    font-weight:700;letter-spacing:.6px;color:#d8c090;line-height:1.55;white-space:nowrap}
+  #contracts .crow .cpay{color:#c9a86a}
+  #contracts .crow.done{color:#8de89a}
+  #contracts .crow.done .cpay{color:#8de89a}
 
   #score-box{position:absolute;top:12px;right:12px;padding:8px 16px;text-align:right}
   #score-box .label{font-size:10px;letter-spacing:3px;color:#e8c987}
@@ -176,6 +185,7 @@
     #race-info .lap{font-size:13px}
     #race-info .time{font-size:11px}
     #standings{display:none}
+    #contracts{display:none}
     #score-box{padding:5px 10px}
     #score-box .val{font-size:16px}
     #feed{top:88px}
@@ -349,6 +359,18 @@
   .result-stats{margin-top:24px;display:grid;grid-template-columns:auto auto;gap:9px 30px;
     font-size:17px;letter-spacing:1px;color:#ffe9c9}
   .result-stats b{color:#fff;text-align:right;font-family:'Luckiest Guy';font-size:18px;text-shadow:2px 2px 0 var(--ink)}
+  /* itemized credits breakdown on the results screen */
+  #credit-breakdown{margin-top:18px;width:min(92vw,340px);background:rgba(24,16,6,.55);
+    border:2px solid rgba(255,233,168,.25);border-radius:12px;padding:10px 16px 12px}
+  #credit-breakdown .cb-head{font-family:'Luckiest Guy';font-size:12px;letter-spacing:4px;color:#ffe9a8;
+    text-align:center;margin-bottom:6px;text-shadow:1px 1px 0 var(--ink)}
+  #credit-breakdown .cb-row{display:flex;justify-content:space-between;gap:18px;font-size:12.5px;
+    font-weight:700;letter-spacing:1px;color:#d8c090;line-height:1.75}
+  #credit-breakdown .cb-row b{color:var(--amber);font-weight:800}
+  #credit-breakdown .cb-row.contract b{color:#8de89a}
+  #credit-breakdown .cb-row.missed{opacity:.45}
+  #credit-breakdown .cb-row.total{border-top:1px solid rgba(255,233,168,.25);margin-top:5px;padding-top:5px;color:#ffe9a8}
+  #credit-breakdown .cb-row.total b{color:var(--yellow)}
   .footnote{margin-top:16px;font-size:11px;letter-spacing:2px;color:#c9a86a;text-align:center;width:100%}
   #loading-note{margin-top:24px;font-size:12px;letter-spacing:3px;color:#c9a86a;text-align:center}
   /* START is the one action that must never be out of reach: pin it to the
@@ -382,6 +404,7 @@
     <div class="lap">LAP <span id="lap">1</span>/<span id="laps-total">3</span></div>
     <div class="time" id="race-time">0:00.0</div>
     <div id="standings"></div>
+    <div id="contracts"></div>
   </div>
 
   <div id="score-box" class="panel">
@@ -494,6 +517,10 @@
     <b id="r-best">0:00.0</b><span>BEST LAP</span>
     <b id="r-credits" style="color:var(--amber)">+0</b><span>CREDITS EARNED</span>
   </div>
+  <div id="credit-breakdown" style="display:none">
+    <div class="cb-head">CREDITS BREAKDOWN</div>
+    <div id="cb-rows"></div>
+  </div>
   <button id="next-level-btn" class="btn" style="display:none">NEXT LEVEL ▶</button>
   <button id="restart-btn" class="btn" style="margin-top:18px">RACE AGAIN</button>
 </div>
@@ -502,6 +529,6 @@
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
-<script type="module" src="./src/main.js?v=r28"></script>
+<script type="module" src="./src/main.js?v=r29"></script>
 </body>
 </html>

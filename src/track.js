@@ -1150,8 +1150,9 @@ const THEMES = {
       stoneA: 'rgba(186,182,172,0.6)', stoneB: 'rgba(62,59,54,0.7)',
       fringe: [78, 112, 54], fringeVar: [32, 44, 24],
       cobbles: {                                        // Tremola stone setts
-        stones: ['#8d8981', '#7a7770', '#98928a', '#6c6a66', '#a09a90', '#84827c'],
-        mortar: 'rgba(44,42,39,0.9)', rows: 24, per: 16,
+        stones: ['#7d7a73', '#6c6963', '#87817a', '#5e5c58', '#8e887e', '#74726d'],
+        mortar: 'rgba(38,36,33,0.9)', lip: 'rgba(255,250,235,0.13)',
+        rows: 32, per: 21,                              // small hand-laid setts
       },
     },
     hillColor: 0x4e7248, peakColor: 0xdde8f0,
@@ -1180,7 +1181,7 @@ const THEMES = {
     },
     rampMaxCurv: 0.012, padMaxCurv: 0.0035, boardMaxCurv: 0.010,
     retainingWalls: { drop: 2.0, lateral: 12.7, height: 1.35, max: 460 },
-    obstacleSpec: { count: 3, style: 'boulder', downhill: true }, puddleCount: 4,
+    obstacleSpec: { count: 3, style: 'boulder', downhill: true }, puddleCount: 0,
     elements: 'alpine',
     massif: { az: 1.45, spread: 1.8, count: 9, r0: 400, r1: 640,
       h0: 140, h1: 270, w0: 200, w1: 350 },

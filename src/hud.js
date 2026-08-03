@@ -200,6 +200,25 @@ export class Hud {
 
   }
 
+  /** Race-contracts readout under the standings: three compact rows, ✓ when
+   *  done, live progress on counter contracts. Safe to call per-frame — it
+   *  only touches the DOM when a row actually changes. Empty list hides it. */
+  setContracts(list, ct) {
+    const el = document.getElementById('contracts');
+    if (!el) return;
+    if (!list || !list.length) {
+      if (this._contractsKey !== '') { this._contractsKey = ''; el.innerHTML = ''; }
+      return;
+    }
+    const rows = list.map((c) => {
+      const prog = !c.done && c.prog && ct ? ` ${c.prog(ct)}` : '';
+      return `<div class="crow${c.done ? ' done' : ''}"><span>${c.done ? '✓' : '◇'} ${c.label}${prog}</span><span class="cpay">${c.pay} CR</span></div>`;
+    }).join('');
+    if (rows === this._contractsKey) return;
+    this._contractsKey = rows;
+    el.innerHTML = '<div class="clabel">CONTRACTS</div>' + rows;
+  }
+
   damageFlash(strength = 0.7) { this.vignetteLevel = Math.min(1.2, this.vignetteLevel + strength); }
 
   feed(text, kind = 'info') {

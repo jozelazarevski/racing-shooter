@@ -21,6 +21,16 @@ const SPLINTER_DEF = [0xc23b2a, 0xe8e2d4]; // fallback fence colors (theme may o
 const SPLINTER_WHITE = new THREE.Color('#fff8ec');
 const _splA = new THREE.Color();
 const _splB = new THREE.Color();
+// weapon-feel palette (cached — these recipes fire many times per second)
+const EXPL_COLS = [new THREE.Color('#fff3b0'), new THREE.Color('#ffb52e'), new THREE.Color('#ff5e2e'), new THREE.Color('#d43a1a')];
+const EXPL_WHITE = new THREE.Color('#ffffff');
+const EXPL_SMOKE = new THREE.Color('#4a443c');
+const MUZZLE_CORE = new THREE.Color('#fffdf2');
+const MUZZLE_FLARE = new THREE.Color('#ffd76a');
+const RICO_HOT = new THREE.Color('#fffbe8');
+const RICO_A = new THREE.Color('#ffe86b');
+const RICO_B = new THREE.Color('#ffab3d');
+const MISSILE_SMOKE = new THREE.Color('#9a938a');
 
 // ---- ambient weather (cached colors + per-type spawn rates, spawns/second) ----
 const LEAF_ALT = new THREE.Color('#c9a83a');   // dry-yellow leaf variant
@@ -131,14 +141,13 @@ export class Particles {
   // ---- effect recipes ----
   explosion(p, big = false) {
     const n = big ? 90 : 45;
-    const colors = [new THREE.Color('#fff3b0'), new THREE.Color('#ffb52e'), new THREE.Color('#ff5e2e'), new THREE.Color('#d43a1a')];
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
       const r = (Math.random() ** 0.6) * (big ? 26 : 15);
       const up = Math.random() * (big ? 20 : 12);
       this.spawn(p.x, p.y + 0.5, p.z,
         Math.cos(a) * r, up, Math.sin(a) * r,
-        colors[(Math.random() * colors.length) | 0],
+        EXPL_COLS[(Math.random() * EXPL_COLS.length) | 0],
         (big ? 5 : 3.4) * (0.5 + Math.random()),
         0.5 + Math.random() * (big ? 0.9 : 0.5),
         { drag: 2.2, grav: 8, shrink: 0.3 });
@@ -146,13 +155,95 @@ export class Particles {
     // white flash core
     for (let i = 0; i < 8; i++)
       this.spawn(p.x, p.y + 1, p.z, (Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4,
-        new THREE.Color('#ffffff'), big ? 14 : 9, 0.18, { shrink: 1 });
+        EXPL_WHITE, big ? 14 : 9, 0.18, { shrink: 1 });
     // smoke
     for (let i = 0; i < (big ? 20 : 10); i++) {
       const a = Math.random() * Math.PI * 2, r = Math.random() * 5;
       this.spawn(p.x + Math.cos(a) * 2, p.y + 1, p.z + Math.sin(a) * 2,
         Math.cos(a) * r, 4 + Math.random() * 5, Math.sin(a) * r,
-        new THREE.Color('#4a443c'), 6 + Math.random() * 5, 1.2 + Math.random(), { drag: 1.5, shrink: 0.2 });
+        EXPL_SMOKE, 6 + Math.random() * 5, 1.2 + Math.random(), { drag: 1.5, shrink: 0.2 });
+    }
+  }
+
+  /** Warhead detonation (missiles, mines): the big fireball PLUS a flat
+   *  debris ring skipping outward and a rolling ground-dust ring. Pure
+   *  presentation — damage/radius live in weapons.js and are untouched. */
+  detonation(p) {
+    this.explosion(p, true);
+    // debris ring — chunks hurled out flat at even angles, hard and low
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2 + Math.random() * 0.35;
+      const sp = 16 + Math.random() * 11;
+      this.spawn(p.x, p.y + 0.4, p.z,
+        Math.cos(a) * sp, 3 + Math.random() * 5, Math.sin(a) * sp,
+        Math.random() < 0.5 ? DEBRIS_A : DEBRIS_B,
+        1.8 + Math.random() * 1.4, 0.5 + Math.random() * 0.4,
+        { grav: 30, drag: 0.8, shrink: 0.85 });
+    }
+    // ground shock puffs rolling out under the fireball
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 + Math.random() * 0.5;
+      this.spawn(p.x + Math.cos(a) * 1.5, p.y + 0.3, p.z + Math.sin(a) * 1.5,
+        Math.cos(a) * 20, 1.2, Math.sin(a) * 20,
+        Math.random() < 0.5 ? DUST_A : DUST_B, 3.5 + Math.random() * 2, 0.5 + Math.random() * 0.25,
+        { drag: 3.2, shrink: 1.4, alpha: 0.5 });
+    }
+  }
+
+  /** Cannon muzzle flash: one hot core pop + two flares thrown forward.
+   *  Very short lives — reads as a punch, costs 3 pool slots per shot. */
+  muzzleFlash(p, dir) {
+    this.spawn(p.x, p.y, p.z, dir.x * 3, 0.6, dir.z * 3,
+      MUZZLE_CORE, 4.6 + Math.random() * 1.8, 0.07, { shrink: 1 });
+    for (let i = 0; i < 2; i++) {
+      this.spawn(p.x, p.y, p.z,
+        dir.x * (10 + Math.random() * 8) + (Math.random() - 0.5) * 3,
+        0.8 + Math.random() * 1.6,
+        dir.z * (10 + Math.random() * 8) + (Math.random() - 0.5) * 3,
+        MUZZLE_FLARE, 2.2 + Math.random() * 1.2, 0.09 + Math.random() * 0.06,
+        { drag: 4, shrink: 0.9 });
+    }
+  }
+
+  /** Bullet ricochet on a world hit: a varied spark burst — count, ejection
+   *  cone and heat all jitter so no two impacts read the same. */
+  ricochet(p, normal) {
+    const n = 4 + (Math.random() * 6 | 0);
+    const tiltA = Math.random() * Math.PI * 2, tilt = Math.random() * 0.7;
+    const nx = normal.x + Math.cos(tiltA) * tilt, nz = normal.z + Math.sin(tiltA) * tilt;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 4 + Math.random() * 12;
+      this.spawn(p.x, p.y + 0.2, p.z,
+        nx * sp + Math.cos(a) * 3.5, 2 + Math.random() * 7, nz * sp + Math.sin(a) * 3.5,
+        Math.random() < 0.3 ? RICO_HOT : (Math.random() < 0.6 ? RICO_A : RICO_B),
+        1.3 + Math.random() * 1.3, 0.16 + Math.random() * 0.3,
+        { grav: 26, shrink: 0.4 });
+    }
+    // hot flash pop right at the impact point
+    this.spawn(p.x, p.y + 0.25, p.z, 0, 1.5, 0, RICO_HOT, 3 + Math.random() * 2, 0.08, { shrink: 1 });
+  }
+
+  /** Thin grey puff for missile smoke trails (weapons caps at ~20/s each).
+   *  shrink > 1 makes the puff grow as it fades — a hanging smoke rope. */
+  missileSmoke(p) {
+    this.spawn(p.x + (Math.random() - 0.5) * 0.3, p.y + (Math.random() - 0.5) * 0.3, p.z + (Math.random() - 0.5) * 0.3,
+      (Math.random() - 0.5) * 1.2, 0.8 + Math.random() * 0.8, (Math.random() - 0.5) * 1.2,
+      MISSILE_SMOKE, 1.6 + Math.random() * 1.1, 0.7 + Math.random() * 0.4,
+      { drag: 1.2, shrink: 1.6, alpha: 0.55 });
+  }
+
+  /** Shockwave ground dust: a full circle kicked outward with the ring.
+   *  High drag = fast launch that eases off, matching the pressure wave. */
+  shockDust(p, count = 20) {
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + Math.random() * 0.4;
+      const sp = 22 + Math.random() * 10;
+      this.spawn(p.x + Math.cos(a) * 2, p.y + 0.25, p.z + Math.sin(a) * 2,
+        Math.cos(a) * sp, 1.5 + Math.random() * 2, Math.sin(a) * sp,
+        Math.random() < 0.5 ? DUST_A : DUST_B,
+        3 + Math.random() * 2.2, 0.55 + Math.random() * 0.3,
+        { drag: 2.6, shrink: 1.5, alpha: 0.6 });
     }
   }
 

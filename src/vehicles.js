@@ -1053,6 +1053,32 @@ export class Car {
       }
     }
 
+    // ---- landed fall-hazards are STONE for rivals too. The full t.solids
+    // sweep above is player-only (AI never leaves the road, so static scenery
+    // can't touch it), but rocks/burning trees LAND ON the road mid-race —
+    // without this an AI ghosts through the boulder the player just dodged.
+    // The runtime faller list is tiny (≤4 airborne + a few landed), so this
+    // stays O(few) per rival.
+    if (this !== gm.player && gm.fallers && gm.fallers.length) {
+      for (const f of gm.fallers) {
+        const ob = f.solid;
+        if (!ob) continue; // still airborne (or an icicle that shattered)
+        const dx = this.pos.x - ob.x, dz = this.pos.z - ob.z;
+        const rr = ob.r + 1.8;
+        if (dx * dx + dz * dz >= rr * rr) continue;
+        const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
+        const nx = dx / d, nz = dz / d;
+        this.pos.x = ob.x + nx * rr;
+        this.pos.z = ob.z + nz * rr;
+        const vn = this.vel.x * nx + this.vel.z * nz;
+        if (vn < 0) {
+          this.vel.x -= nx * vn * 1.05; // same absorb-don't-bounce as all SOLIDs
+          this.vel.z -= nz * vn * 1.05;
+        }
+        break;
+      }
+    }
+
     // ---- tire stacks: burst apart at speed, solid at a crawl ----
     if (this === gm.player && t.tireStacks && t.tireStacks.length) {
       for (const st of t.tireStacks) {
@@ -1453,6 +1479,144 @@ export class EnemyCar extends Car {
     this.ramTimer = 0;                          // >0: actively steering into the player
     this._missileFired = false;                 // one missile per race on high aggression
     this.glowColor = new THREE.Color(0x9a938a); // exhaust smoke tint
+
+    // ---- driver-feel state (all refreshed by _sense at ~6 Hz, zero allocs) ----
+    this._senseT = Math.random() * 0.16; // staggered so the grid never senses in lockstep
+    this._drafting = false;              // tucked behind a car ahead (cone check)
+    this._draftT = 0;                    // draft dwell timer -> _draftOn (+12% window)
+    this._avoidSolid = { on: false, lat: 0, r: 0 };            // landed rockfall etc.
+    this._avoidHerd = { on: false, lat: 0, r: 0, panic: false }; // livestock in the road
+    this._geyserLift = false;            // erupting geyser dead ahead -> ease off
+    this._blockT = 0;                    // active deliberate block (defense) timer
+    this._blockLat = 0;                  // lane committed to for that one move
+    this._blockUsed = false;             // one block per straight; corners re-arm it
+    this._errT = 0;                      // human error: overshoot phase timer
+    this._errRec = 0;                    // human error: gather-it-up phase timer
+    this._errWideDir = 1;                // which side "wide" is for the flubbed corner
+    this._errArmed = true;               // one roll per corner approach
+    this._wobPhase = Math.random() * 6.3;// personal wobble phase for corrections
+    this._mistakeCd = 5;                 // min seconds between mistakes
+    this._mistakes = 0;                  // probe counter: mistakes committed this race
+    this._stuckT = 0;                    // low-speed dwell -> reverse-turn recovery
+    this._deepStuckT = 0;                // long-stuck dwell -> pit-lift (placeAt)
+    this._revT = 0;                      // active reverse-turn maneuver timer
+  }
+
+  /** True when `other` sits in the draft cone directly ahead (3..14u, ~28°). */
+  _draftBehind(other, fwd) {
+    if (!other || other === this || !other.alive) return false;
+    const dx = other.pos.x - this.pos.x, dz = other.pos.z - this.pos.z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 > 196 || d2 < 9) return false;
+    return (dx * fwd.x + dz * fwd.z) / Math.sqrt(d2) > 0.88;
+  }
+
+  /** Low-frequency situational awareness (~6 Hz): runtime hazards (landed
+   *  fallers, livestock, geysers), mutual slipstream, block re-arm and the
+   *  difficulty-scaled human-error roll. No allocations — scratch vectors +
+   *  reused result objects only. */
+  _sense(g, t, fwd, v) {
+    const N = t.N;
+    // -- runtime solids on the road (landed rockfall / burning trees): the
+    // per-frame avoidance loop reads t.obstacles, which is built once — the
+    // fall-hazard system pushes new STONE solids into t.solids mid-race, so
+    // those are scanned here and dodged like any other rock.
+    const avS = this._avoidSolid;
+    avS.on = false;
+    const solids = t.solids;
+    if (solids && solids.length) {
+      let best = 32;
+      for (let i = 0; i < solids.length; i++) {
+        const ob = solids[i];
+        const dx = ob.x - this.pos.x, dz = ob.z - this.pos.z;
+        if (dx * dx + dz * dz > 1600) continue;             // 40u broadphase
+        const along = dx * fwd.x + dz * fwd.z;
+        if (along < 2 || along >= best) continue;
+        if (Math.abs(dx * fwd.z - dz * fwd.x) > ob.r + 4) continue;
+        _obPos.set(ob.x, 0, ob.z);
+        const lat = t.lateralOffset(_obPos, t.nearestIndex(_obPos, this.trackIndex));
+        if (Math.abs(lat) > ROAD_HALF + 2) continue;        // off-road scenery
+        best = along;
+        avS.on = true; avS.lat = lat; avS.r = ob.r;
+      }
+    }
+    // -- livestock in the road corridor: swerve, and scrub speed if one is
+    // dead ahead — rivals shoo the herd, they never plough it
+    const avH = this._avoidHerd;
+    avH.on = false; avH.panic = false;
+    const herds = g.herds;
+    if (herds && herds.length) {
+      let best = 30;
+      for (let i = 0; i < herds.length; i++) {
+        const a = herds[i];
+        if (!a.alive) continue;
+        const dx = a.x - this.pos.x, dz = a.z - this.pos.z;
+        if (dx * dx + dz * dz > 1370) continue;
+        const along = dx * fwd.x + dz * fwd.z;
+        if (along < 1 || along >= best) continue;
+        const across = dx * fwd.z - dz * fwd.x;
+        if (Math.abs(across) > 7) continue;
+        _obPos.set(a.x, 0, a.z);
+        const lat = t.lateralOffset(_obPos, t.nearestIndex(_obPos, this.trackIndex));
+        if (Math.abs(lat) > ROAD_HALF + 3) continue;        // grazing in the pasture
+        best = along;
+        avH.on = true; avH.lat = lat; avH.r = 1.9;
+        avH.panic = along < 13 && Math.abs(across) < 3.2;
+      }
+    }
+    // -- geysers: one rumbling or erupting inside ~15u dead ahead -> lift
+    this._geyserLift = false;
+    const gys = g.geysers;
+    if (gys && gys.length) {
+      for (let i = 0; i < gys.length; i++) {
+        const gy = gys[i];
+        const dx = gy.x - this.pos.x, dz = gy.z - this.pos.z;
+        if (dx * dx + dz * dz > 324) continue;
+        const along = dx * fwd.x + dz * fwd.z;
+        if (along < 1 || along > 15) continue;
+        if (Math.abs(dx * fwd.z - dz * fwd.x) > 4.5) continue;
+        // 7.5s pad cycle (main.js): rumble >5.6, eruption >=6.4 — lift from ~5.2
+        if (((g.raceTime + gy.phase) % 7.5) > 5.2) { this._geyserLift = true; break; }
+      }
+    }
+    // -- mutual slipstream: the same +12% draft window the player earns.
+    // Cheap: one cone check against the car directly ahead, at sense rate.
+    let drafting = false;
+    if (Math.abs(v) > this.maxSpeed * 0.5) {
+      drafting = this._draftBehind(g.player, fwd);
+      for (let i = 0; i < g.enemies.length && !drafting; i++) {
+        drafting = this._draftBehind(g.enemies[i], fwd);
+      }
+    }
+    this._drafting = drafting;
+    // -- defense re-arm: passing through a real corner grants one new block
+    if (t.curvature[this.trackIndex] > CORNER_CURV) this._blockUsed = false;
+    // -- human error roll: heavily on EASY, rarely on NORMAL, never on HARD.
+    // One roll per corner approach (armed on the preceding straight).
+    const diffId = g.difficulty?.id;
+    const errP = diffId === 'easy' ? 0.25 : diffId === 'normal' ? 0.05 : 0;
+    if (errP > 0 && g.raceTime > 5) {
+      let curvNear = 0;
+      for (let k = 10; k <= 40; k += 6) curvNear = Math.max(curvNear, t.curvature[(this.trackIndex + k) % N]);
+      const approaching = t.curvature[this.trackIndex] < 0.012 && curvNear > 0.022
+        && Math.abs(v) > this.maxSpeed * 0.5;
+      if (approaching && this._errArmed) {
+        this._errArmed = false;
+        if (this._mistakeCd <= 0 && this._errT <= 0 && this._errRec <= 0
+            && this.ramTimer <= 0 && this._revT <= 0 && Math.random() < errP) {
+          // misjudged it: brake a touch late, carry too much speed in,
+          // then wobble/slide wide while gathering it back up
+          this._errT = 0.55 + Math.random() * 0.3;
+          this._mistakeCd = 6 + Math.random() * 3;
+          this._mistakes++;
+          let dirSum = 0; // "wide" = outside of the corner being flubbed
+          for (let k = 10; k <= 40; k += 6) dirSum += t._raceLine[(this.trackIndex + k) % N];
+          this._errWideDir = dirSum > 0 ? -1 : 1;
+        }
+      } else if (!approaching && curvNear < 0.02) {
+        this._errArmed = true; // clean straight: armed for the next corner
+      }
+    }
   }
 
   update(dt) {
@@ -1486,6 +1650,23 @@ export class EnemyCar extends Car {
 
     const fwd = this.forward;
     const v = this.speedAlong;
+
+    // ---- low-frequency situational sense (~6 Hz): hazards, draft, defense, error
+    this._senseT -= dt;
+    if (this._senseT <= 0) {
+      this._senseT = 0.16;
+      this._sense(g, t, fwd, v);
+    }
+    if (this._mistakeCd > 0) this._mistakeCd -= dt;
+    // mutual slipstream: same 1.1s-tuck -> +12% window the player gets
+    // (step() reads _draftOn when computing topSpeed for any car)
+    this._draftT = this._drafting ? this._draftT + dt : Math.max(0, this._draftT - dt * 2);
+    this._draftOn = this._draftT > 1.1;
+    // human error phases: overshoot runs out -> the gather-it-up phase begins
+    if (this._errT > 0) {
+      this._errT -= dt;
+      if (this._errT <= 0) this._errRec = 0.9;
+    } else if (this._errRec > 0) this._errRec -= dt;
 
     // ---- steering target: racing line at a speed-scaled lookahead + situational biases
     // Lookahead shrinks with local curvature: a long chord across a tight arc
@@ -1521,13 +1702,26 @@ export class EnemyCar extends Car {
         break;
       }
     }
-    // blocking: when leading the player and they're right behind, mirror their lane
-    if (!blockedAhead && gap < 0 && g.player.alive) {
+    // defense: leading the player with them tucked within ~10u at pace ->
+    // ONE deliberate line move onto their side. Committed once, held ~1.4s,
+    // and not re-armed until a corner passes — readable blocking, never
+    // weaving, and only at speed (never engaged below 70% pace).
+    if (this._blockT > 0) {
+      this._blockT -= dt;
+      targetLat = THREE.MathUtils.lerp(targetLat, this._blockLat, 0.85);
+    } else if (!blockedAhead && !this._blockUsed && gap < 0 && g.player.alive
+        && Math.abs(v) > this.maxSpeed * 0.7
+        && this.aggression * D.aiAggression > 0.55) {
       const dx = g.player.pos.x - this.pos.x, dz = g.player.pos.z - this.pos.z;
       const along = dx * fwd.x + dz * fwd.z;
-      if (along < -2 && along > -16) {
-        const w = Math.min(0.85, 0.5 * this.aggression * D.aiAggression);
-        targetLat = THREE.MathUtils.lerp(targetLat, g.player.lateral, w);
+      if (along < -2 && along > -11 && Math.abs(g.player.speedAlong) > Math.abs(v) * 0.7) {
+        let c = 0; // only on a straight — blocking into a corner reads as a swerve
+        for (let k = 0; k < 25; k += 5) c = Math.max(c, t.curvature[(this.trackIndex + k) % t.N]);
+        if (c < CORNER_CURV) {
+          this._blockUsed = true;
+          this._blockT = 1.4;
+          this._blockLat = THREE.MathUtils.clamp(g.player.lateral, -7, 7);
+        }
       }
     }
 
@@ -1605,6 +1799,20 @@ export class EnemyCar extends Car {
         }
       }
     }
+    // runtime hazards (sensed at ~6 Hz): dodge landed rockfall and livestock
+    // exactly like static rocks — slide the target just past them
+    const avS = this._avoidSolid;
+    if (avS.on && Math.abs(avS.lat - targetLat) < avS.r + 2.6) {
+      const side = Math.sign(targetLat - avS.lat) || (avS.lat >= 0 ? -1 : 1);
+      targetLat = avS.lat + side * (avS.r + 2.9);
+    }
+    const avH = this._avoidHerd;
+    if (avH.on && Math.abs(avH.lat - targetLat) < avH.r + 2.8) {
+      const side = Math.sign(targetLat - avH.lat) || (avH.lat >= 0 ? -1 : 1);
+      targetLat = avH.lat + side * (avH.r + 3.1);
+    }
+    // running wide while gathering up a flubbed corner
+    if (this._errRec > 0) targetLat += this._errWideDir * 3 * this._errRec;
     targetLat = THREE.MathUtils.clamp(targetLat, -7.4, 7.4);
 
     const target = t.pointAt(li, targetLat);
@@ -1617,14 +1825,20 @@ export class EnemyCar extends Car {
     // into the wall. Big heading errors (spun/facing a wall) still get full lock.
     const speedN = Math.min(1, Math.abs(v) / this.maxSpeed);
     const steerCap = Math.abs(dh) > 0.9 ? 1 : 0.6 + 0.4 * (1 - speedN);
-    const steer = THREE.MathUtils.clamp(dh * 3.0, -steerCap, steerCap);
+    let steer = THREE.MathUtils.clamp(dh * 3.0, -steerCap, steerCap);
+    // correction wobble: sawing at the wheel while gathering up a mistake —
+    // decays with the recovery timer so it visibly settles
+    if (this._errRec > 0) {
+      steer = THREE.MathUtils.clamp(
+        steer + Math.sin(g.raceTime * 13 + this._wobPhase) * 0.5 * this._errRec, -1, 1);
+    }
 
     // ---- braking model: physics corner speeds + late-but-correct brake points
     // vMax(j) = sqrt(aLat / curvature); brake so that v <= sqrt(vMax^2 + 2*decel*dist)
     const aLat = (30 + 8 * this.cornerSkill) * D.aiSpeed;
     const sqA = Math.sqrt(aLat);
     const DECEL = 26;
-    let vAllowed = this.maxSpeed;
+    let vAllowed = this.maxSpeed * (this._draftOn ? 1.12 : 1); // draft window open
     for (let k = 0; k <= 90; k += 5) {
       const j = (this.trackIndex + k) % t.N;
       const vMax = sqA * t._speedInv[j];
@@ -1643,11 +1857,20 @@ export class EnemyCar extends Car {
     else if (aiSurf === 'wet') vAllowed *= 0.94;
     // world-special slow field (FREEZE STRIKE / JUNGLE FURY): rivals at half pace
     if (g.enemySlowUntil && g.raceTime < g.enemySlowUntil) vAllowed = Math.min(vAllowed, this.maxSpeed * 0.5);
+    // human error: braking a touch late — carry too much speed in (overshoot),
+    // then brake harder than clean driving would while gathering it back up
+    if (this._errT > 0) vAllowed = Math.min(this.maxSpeed, vAllowed * 1.35);
+    else if (this._errRec > 0) vAllowed *= 0.78;
+    // livestock dead ahead: the swerve is already set — scrub to below the
+    // herd's own flee speed so contact can't happen. Swerve, never plough.
+    if (this._avoidHerd.panic) vAllowed = Math.min(vAllowed, 9);
 
     let throttle = 0, brake = 0;
     if (v < vAllowed - 1.5) throttle = 1;
     else if (v > vAllowed + 1.5) brake = THREE.MathUtils.clamp((v - vAllowed) / 8, 0.35, 1);
     else throttle = 0.6; // hold speed through the corner
+    // erupting geyser just ahead: lift off the throttle — a lift, not a stab
+    if (this._geyserLift && brake === 0) throttle = Math.min(throttle, 0.15);
 
     // ---- nitro-ish bursts: behind the player, on a straight, off cooldown
     this.boostCooldown -= dt;
@@ -1661,7 +1884,43 @@ export class EnemyCar extends Car {
       }
     }
 
-    this.step(dt, { throttle, brake, steer, drift: false });
+    // ---- recovery: a rival parked nose-first against something backs out
+    // deliberately (hard brake -> reverse gear -> swing the nose), and only a
+    // genuine long stuck earns the pit-lift — deferred while the player is
+    // close and looking, so the teleport pop stays off camera when possible.
+    const spdAbs = Math.abs(v);
+    if (this._revT > 0) this._revT -= dt;
+    if (spdAbs < 2.2 && this.boostTimer <= 0) {
+      this._stuckT += dt;
+      this._deepStuckT += dt;
+    } else if (spdAbs > 5) {
+      this._stuckT = 0;
+      this._deepStuckT = 0;
+    }
+    if (this._revT <= 0 && this._stuckT > 1.5) {
+      this._stuckT = 0;
+      this._revT = 2.0; // brake gate (0.45s) + ~1.5s of reverse-turn
+    }
+    if (this._deepStuckT > 6) {
+      const dxp = this.pos.x - g.player.pos.x, dzp = this.pos.z - g.player.pos.z;
+      const seen = dxp * dxp + dzp * dzp < 8100
+        && dxp * Math.sin(g.player.heading) + dzp * Math.cos(g.player.heading) > 0;
+      if (!seen || this._deepStuckT > 9) {
+        this._deepStuckT = 0; this._stuckT = 0; this._revT = 0;
+        this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6));
+        return;
+      }
+    }
+    if (this._revT > 0) {
+      // reverse-turn: sustained hard brake engages reverse; mirrored steer
+      // while rolling backwards swings the nose toward the road target
+      throttle = 0; brake = 1;
+      steer = v < -0.5 ? -Math.sign(dh) : 0;
+    }
+    // a brief slide moment at the start of a mistake correction reads as a car
+    // caught sideways, not a scripted wiggle
+    const errSlide = this._errRec > 0.62 && this._revT <= 0;
+    this.step(dt, { throttle, brake, steer, drift: errSlide });
     if (this.checkLap(prevIndex) === true && this.lap > g.lapsTotal && !this.finished) this.finished = true;
 
     // slide smoke when the AI breaks loose (only near the player, keep it cheap)
