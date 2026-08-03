@@ -1382,11 +1382,29 @@ export class Car {
       this._lastGY = this.y;
     } else {
       const drop = this._lastGY - gY;
-      // Launch only off real lips: a big single-frame drop while climbing fast.
-      // Thresholds sit above anything ordinary rolling hills produce (their
-      // per-frame deltas stay well under 0.9), so smooth elevated roads stay
-      // glued while ramp edges and sharp crests at speed still throw the car.
-      if (drop > 0.9 && this._climbRate > 2.5) {
+      const newClimb = dt > 0 ? (gY - this._lastGY) / dt : 0;
+      // Two ways to leave the ground, and the second is what makes a natural
+      // crest jumpable.
+      //
+      // 1. A real lip — a big single-frame drop while climbing fast. Kept for
+      //    any hard edge left in the world.
+      // 2. Cresting a BROW, done the way it actually works: a car flies when
+      //    the road curves away downward faster than gravity can hold it down.
+      //    So the test is on the ground's vertical ACCELERATION, not on its
+      //    slope. That matters — over a smooth hump the climb rate peaks
+      //    mid-ascent and is ZERO at the crown, so any rule waiting for the
+      //    ground to start dropping fires too late to ever launch anything.
+      //    Being physical also speed-gates it for free: take the same crest
+      //    slowly and the curvature you experience never beats gravity, so you
+      //    simply roll over it.
+      const climbAccel = dt > 0 ? (newClimb - this._climbRate) / dt : 0;
+      //    The speed gate on top is a game-feel decision, not physics: a crest
+      //    is something you JUMP by committing to it. Below ~26 u/s you ride
+      //    over the brow instead of skipping off it, so ambling around never
+      //    produces little uncommanded hops that steal your steering.
+      const crested = this._climbRate > 1.5 && climbAccel < -26  // -26 = gravity
+        && Math.abs(this.speedAlong) > 26;
+      if ((drop > 0.9 && this._climbRate > 2.5) || crested) {
         this.airborne = true;
         // capped: an uncapped climb rate off a steep ramp at nitro speed sent
         // cars sailing 100+ u into the infield (user bug report)
@@ -1868,16 +1886,8 @@ export class EnemyCar extends Car {
     const li = (this.trackIndex + look) % t.N;
     let targetLat = t._raceLine[li] + this.lane;
 
-    // line up for a boost pad when one is coming up in reach
-    if (this.boostTimer <= 0.3 && t.boostPads) {
-      for (const pad of t.boostPads) {
-        const di = (pad.index - this.trackIndex + t.N) % t.N;
-        if (di > 4 && di < 55) {
-          targetLat = THREE.MathUtils.lerp(targetLat, pad.lateral, 0.9);
-          break;
-        }
-      }
-    }
+    // (boost pads are gone — rivals no longer swerve across the road to farm
+    //  chevrons, they just drive the racing line)
 
     // overtake: car ahead within 12 and closing -> swing to the emptier side
     let blockedAhead = false;

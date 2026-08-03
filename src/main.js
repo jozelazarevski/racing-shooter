@@ -50,8 +50,13 @@ const WORLD_TAGS = {
 const CAM_MODES = [
   { name: 'TOP-DOWN',  back: 20, h: 52, look: 7,  lookH: 0,   spdBack: 6, spdH: 10 },
   { name: 'TOP FAR',   back: 24, h: 84, look: 1,  lookH: 0,   spdBack: 4, spdH: 10 },
-  { name: 'CHASE',     back: 13, h: 7.5, look: 10, lookH: 2.8, spdBack: 2, spdH: 1, chase: true },
-  { name: 'CHASE FAR', back: 24, h: 15, look: 13, lookH: 3,   spdBack: 3, spdH: 2, chase: true },
+  // CHASE sat at h 7.5 / back 13 / look 10 — down at bumper height and close
+  // enough that the car filled the screen, so you could not see far enough up
+  // the road to place the next corner ("super hard to drive in this camera
+  // mode"). Lifted and pulled back, and the look-ahead point pushed well down
+  // the road: you now see the corner before you are in it.
+  { name: 'CHASE',     back: 17, h: 11.5, look: 19, lookH: 3.2, spdBack: 4, spdH: 2, chase: true },
+  { name: 'CHASE FAR', back: 26, h: 17,   look: 22, lookH: 3.4, spdBack: 4, spdH: 2, chase: true },
 ];
 // ---- economy ----
 // Score is the arcade number (it inflates fast: 500/lap, big rank bonus,
@@ -223,6 +228,11 @@ const MISSION_MEDAL_WORD = ['NO MEDAL', '🥉 BRONZE', '🥈 SILVER', '🥇 GOLD
 const missionTargetLine = (d) => (d.survive
   ? `🥇 ${fmtTime(d.gold)}+ · 🥈 ${fmtTime(d.silver)}+ · 🥉 ${fmtTime(d.bronze)}+ SURVIVED`
   : `🥇 ${fmtTime(d.gold)} · 🥈 ${fmtTime(d.silver)} · 🥉 ANY FINISH`);
+// Same targets, but as separate chunks the card can lay out without breaking a
+// time in half or orphaning "CR" onto its own line.
+const missionTargetChips = (d) => (d.survive
+  ? [`🥇 ${fmtTime(d.gold)}+`, `🥈 ${fmtTime(d.silver)}+`, `🥉 ${fmtTime(d.bronze)}+`]
+  : [`🥇 ${fmtTime(d.gold)}`, `🥈 ${fmtTime(d.silver)}`, `🥉 FINISH`]);
 // ===== end [MISSIONS] constants =====
 
 class Game {
@@ -443,6 +453,11 @@ class Game {
       this.resetRace();
       this.startRace();
     });
+    // leave the results screen for the garage — the credits you just banked are
+    // only useful somewhere else, so the podium must never be the only exit
+    document.getElementById('garage-btn')?.addEventListener('click', () => {
+      this.fadeTo(`?level=${this.level.id}`, 'garage');
+    });
 
     // camera + pause buttons (work with mouse and touch)
     document.getElementById('cam-btn').addEventListener('click', () => this.cycleCamera());
@@ -651,10 +666,11 @@ class Game {
   /** Fade to black, then navigate — used for level changes. Saves the menu's
    *  tab + scroll so the title screen comes back exactly where you left it
    *  instead of resetting to the top. */
-  fadeTo(url) {
+  fadeTo(url, forceTab = null) {
     try {
       sessionStorage.setItem('ir-menu-state', JSON.stringify({
-        tab: document.getElementById('tab-btn-garage')?.classList.contains('current') ? 'garage' : 'race',
+        tab: forceTab
+          ?? (document.getElementById('tab-btn-garage')?.classList.contains('current') ? 'garage' : 'race'),
         scroll: document.getElementById('title-screen')?.scrollTop ?? 0,
       }));
     } catch { /* private mode */ }
@@ -1314,7 +1330,10 @@ class Game {
     }
   }
 
+  // Boost pads were removed — speed comes from driving now, not from touching
+  // a stamped chevron. Kept as a no-op guard in case a track still lists any.
   _updateBoostPads() {
+    if (!this.track.boostPads || !this.track.boostPads.length) return;
     for (const pad of this.track.boostPads) {
       for (const car of [this.player, ...this.enemies]) {
         if (!car.alive) continue;
@@ -1910,10 +1929,14 @@ class Game {
       const b = best[`${this.level.id}:${d.id}`] | 0;
       const chip = document.createElement('button');
       chip.className = 'mission-chip' + (d.id === this.missionSel ? ' current' : '');
+      const chips = missionTargetChips(d).map((c) => `<span class="mstat">${c}</span>`).join('');
       chip.innerHTML = `<span class="mi">${d.icon}</span>
-        <span class="mtext"><span class="mname">${d.name}</span><span class="mdesc">${d.desc}</span>
-        <span class="mdesc">${missionTargetLine(d)} · 🎖 ${MISSION_CR[1]}–${MISSION_CR[3]} CR</span></span>
-        <span class="mmedal${b ? '' : ' none'}">${b ? MISSION_MEDAL[b] : 'NEW'}</span>`;
+        <span class="mtext">
+          <span class="mhead"><span class="mname">${d.name}</span>
+            <span class="mmedal${b ? '' : ' none'}">${b ? MISSION_MEDAL[b] : 'NEW'}</span></span>
+          <span class="mdesc">${d.desc}</span>
+          <span class="mstats">${chips}<span class="mstat mpay">🎖 ${MISSION_CR[1]}–${MISSION_CR[3]} CR</span></span>
+        </span>`;
       chip.addEventListener('click', () => {
         this.missionSel = d.id;
         try { sessionStorage.setItem('ir-mission-sel', d.id); } catch { /* private mode */ }
@@ -2620,7 +2643,10 @@ class Game {
     // An interceptor arrives HOT: a fresh gunship idles 2–3 s before its first
     // burst, by which time a flat-out car is 150 u past it and out of range,
     // so an unarmed interceptor is just scenery. Roam spawns keep the wind-up.
-    if (intercept) ch.fireTimer = 0.35;
+    // ...and it must arrive mid-attack-run, not shadowing: gunships now cycle
+    // stalk → run → break, and SURVIVOR depends on an interceptor engaging the
+    // moment it inserts.
+    if (intercept) { ch.fireTimer = 0.35; ch.phase = 'run'; ch.phaseT = 5.0; }
     this.choppers.push(ch);
     this.hud.feed('⚠ ATTACK CHOPPER INBOUND', 'bad');
     this.buzz([40, 30, 40]);
