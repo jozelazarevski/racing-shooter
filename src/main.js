@@ -296,25 +296,45 @@ class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    // Lifted from 1.12 after the lighting retune measured 35 % darker overall
+    // (mean scene luminance 71 -> 46 on PINE VALLEY). The retune's fill/key
+    // RATIO is what buys the shadow contrast, so exposure is the right lever to
+    // put the brightness back without flattening it again.
+    this.renderer.toneMappingExposure = 1.46;
 
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0xcfe8f5, 320, 1500);
     this.camera = new THREE.PerspectiveCamera(56, innerWidth / innerHeight, 0.5, 3200);
 
-    // lighting: bright summer sun + sky bounce (theme may recolor below)
-    this.hemi = new THREE.HemisphereLight(0xbfe0ff, 0x5a8a3c, 0.85);
+    // LIGHTING: warm key / cool fill.
+    // The old rig was a 0.85-intensity hemisphere against a 2.0 sun, which is
+    // close to a 1:2 fill ratio — enough ambient to erase the cast shadows
+    // entirely, so every world rendered as flat poster colour. The reference
+    // art is the opposite: one strong warm key, a weak COOL sky fill, and
+    // shadow sides that go blue-violet rather than grey. Themes now carry the
+    // ratio (hemiIntensity ~0.40-0.55 against sunIntensity ~2.4-3.0).
+    this.hemi = new THREE.HemisphereLight(0xbfe0ff, 0x5a8a3c, 0.5);
     this.scene.add(this.hemi);
-    const sun = new THREE.DirectionalLight(0xfff3d6, 2.0);
+    const sun = new THREE.DirectionalLight(0xfff3d6, 2.6);
     sun.castShadow = true;
     sun.shadow.mapSize.set(this.isTouch ? 1024 : 2048, this.isTouch ? 1024 : 2048);
     const sc = sun.shadow.camera;
     // tight frustum around the player (the rig follows them) = crisp shadows
     sc.left = -72; sc.right = 72; sc.top = 72; sc.bottom = -72;
     sc.near = 10; sc.far = 400;
+    sc.updateProjectionMatrix();
     sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.035;   // kills the acne the raked sun exposes
     this.scene.add(sun, sun.target);
     this.moon = sun; // shadow rig follows the player (name kept for the camera code)
+    // The shadow rig used to sit at a hard-coded (70,130,50) — 56° up and in a
+    // fixed compass direction — while each theme drew its sun sprite from
+    // sunAz/sunEl. Light and visible sun disagreed on every level. The offset
+    // is now derived from the theme's own azimuth, with the elevation raised
+    // out of the sprite's near-horizon range into a 33-46° key that still
+    // throws long, readable shadows. `_sunOffset` is what _updateCamera adds
+    // to the player each frame.
+    this._sunOffset = new THREE.Vector3(70, 130, 50);
 
     // post-processing: a whisper of bloom for lamps, tracers and explosions
     this.composer = new EffectComposer(this.renderer);
@@ -358,14 +378,27 @@ class Game {
       if (th.hemiIntensity !== undefined) this.hemi.intensity = th.hemiIntensity;
       if (th.sunColor !== undefined) this.moon.color.setHex(th.sunColor);
       if (th.sunIntensity !== undefined) this.moon.intensity = th.sunIntensity;
+      // key direction agrees with the sun the player can actually see
+      if (th.sunAz !== undefined) {
+        const az = th.sunAz;
+        const el = THREE.MathUtils.clamp((th.sunEl ?? 0.3) * 0.55 + 0.52, 0.58, 0.81);
+        const D = 168;
+        this._sunOffset.set(
+          Math.cos(az) * Math.cos(el) * D, Math.sin(el) * D, Math.sin(az) * Math.cos(el) * D
+        );
+      }
     }
     // image-based lighting: a tiny theme-tinted gradient dome through PMREM.
     // Standard materials pick up soft sky reflections (glossy wet roads, car
     // paint sheen). Dimmed at bake time — r160 has no scene.environmentIntensity.
     {
-      const top = new THREE.Color(th?.skyTop ?? '#68b7e8').multiplyScalar(0.55);
-      const hor = new THREE.Color(th?.skyHorizon ?? '#dff0fa').multiplyScalar(0.50);
-      const gnd = new THREE.Color(th?.hemiGround !== undefined ? th.hemiGround : 0x5a8a3c).multiplyScalar(0.35);
+      // dimmer than it was: the IBL is a THIRD ambient term on top of the
+      // hemisphere, and at the old strength it re-filled every shadow the
+      // key/fill rebalance had just opened up. It is here for sheen on paint
+      // and wet road, not for lighting the world.
+      const top = new THREE.Color(th?.skyTop ?? '#68b7e8').multiplyScalar(0.34);
+      const hor = new THREE.Color(th?.skyHorizon ?? '#dff0fa').multiplyScalar(0.30);
+      const gnd = new THREE.Color(th?.hemiGround !== undefined ? th.hemiGround : 0x5a8a3c).multiplyScalar(0.20);
       const cnv = document.createElement('canvas'); cnv.width = 2; cnv.height = 64;
       const cx = cnv.getContext('2d');
       const gr = cx.createLinearGradient(0, 0, 0, 64);
@@ -3496,8 +3529,8 @@ class Game {
     const rollTarget = this.state === 'race' ? -this.input.steer * speedZoom * 0.045 : 0;
     this._camRoll = (this._camRoll ?? 0) + (rollTarget - (this._camRoll ?? 0)) * Math.min(1, 4 * dt);
     this.camera.rotation.z += this._camRoll;
-    // keep the shadow light rig centered on the player
-    this.moon.position.copy(p.pos).add(new THREE.Vector3(70, 130, 50));
+    // keep the shadow light rig centered on the player (offset = theme sun dir)
+    this.moon.position.copy(p.pos).add(this._sunOffset);
     this.moon.target.position.copy(p.pos);
   }
 

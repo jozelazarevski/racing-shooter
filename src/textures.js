@@ -805,6 +805,13 @@ export function junctionTexture(palette = {}) {
 }
 
 /** Hut wall: horizontal wooden planks with a door. */
+/** Where the chalet windows sit in the 256×256 wall tile. Shared by the albedo
+ *  and the emissive companion so the glow lands exactly on the glass. */
+const HUT_WINDOWS = [
+  [30, 96, 44, 40], [98, 96, 44, 40], [182, 96, 44, 40],
+  [40, 26, 38, 34], [178, 26, 38, 34],
+];
+
 export function buildingTexture() {
   return make(256, 256, (g, w, h) => {
     g.fillStyle = '#96683c';
@@ -820,6 +827,24 @@ export function buildingTexture() {
         g.fillRect(Math.random() * w, y + 4 + Math.random() * 14, 10 + Math.random() * 26, 2);
       }
     }
+    // lit windows: warm pane, dark timber frame, single glazing bar. The pane
+    // colour is the ALBEDO half of the effect — the emissive map below adds the
+    // actual glow, so the huts read as inhabited at dusk without a light source.
+    for (const [x, y, ww, hh] of HUT_WINDOWS) {
+      g.fillStyle = '#ffca6e';
+      g.fillRect(x, y, ww, hh);
+      g.fillStyle = 'rgba(120,70,20,0.35)';
+      g.fillRect(x + 2, y + 2, ww - 4, hh * 0.36);
+      g.strokeStyle = '#402614';
+      g.lineWidth = 5;
+      g.strokeRect(x, y, ww, hh);
+      g.fillStyle = '#402614';
+      g.fillRect(x + ww / 2 - 2, y, 4, hh);
+      g.fillRect(x, y + hh / 2 - 2, ww, 4);
+      // sill
+      g.fillStyle = '#6a4526';
+      g.fillRect(x - 5, y + hh + 1, ww + 10, 5);
+    }
     // door
     g.fillStyle = '#5d3a1c';
     g.fillRect(w / 2 - 26, h - 84, 52, 84);
@@ -830,6 +855,27 @@ export function buildingTexture() {
     g.beginPath();
     g.arc(w / 2 + 15, h - 42, 4, 0, Math.PI * 2);
     g.fill();
+  });
+}
+
+/** Emissive companion for buildingTexture: black except the window panes, so
+ *  one extra map turns every hut into a lamp at dusk for the cost of a texture
+ *  fetch on a handful of instanced boxes. */
+export function buildingGlowTexture() {
+  return make(256, 256, (g, w, h) => {
+    g.fillStyle = '#000000';
+    g.fillRect(0, 0, w, h);
+    for (const [x, y, ww, hh] of HUT_WINDOWS) {
+      const grd = g.createLinearGradient(0, y, 0, y + hh);
+      grd.addColorStop(0, '#ffd489');
+      grd.addColorStop(1, '#ff9d33');
+      g.fillStyle = grd;
+      g.fillRect(x + 3, y + 3, ww - 6, hh - 6);
+      // glazing bars stay dark so the pane reads as four lit squares
+      g.fillStyle = '#000000';
+      g.fillRect(x + ww / 2 - 2, y, 4, hh);
+      g.fillRect(x, y + hh / 2 - 2, ww, 4);
+    }
   });
 }
 
@@ -1438,6 +1484,42 @@ export function riverTexture() {
   });
   t.wrapS = THREE.RepeatWrapping;
   t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/** Shoreline band laid either side of the river: wet mud at the waterline
+ *  (v = 0.5) grading out to dry pebbly sand at the outer edges, so the water
+ *  reads as sitting IN a bed rather than painted on the grass. The ribbon that
+ *  uses it fades its outer columns to alpha 0, hence the plain opaque fill. */
+export function riverBankTexture(palette = {}) {
+  const P = {
+    wet: '#6a5636', damp: '#8a7048', dry: '#a89068',
+    stoneA: 'rgba(226,216,192,0.85)', stoneB: 'rgba(112,94,68,0.85)',
+    ...palette,
+  };
+  const t = make(128, 128, (g, w, h) => {
+    const grd = g.createLinearGradient(0, 0, 0, h);
+    grd.addColorStop(0, P.dry);
+    grd.addColorStop(0.34, P.damp);
+    grd.addColorStop(0.5, P.wet);
+    grd.addColorStop(0.66, P.damp);
+    grd.addColorStop(1, P.dry);
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    // pebbles, densest at the waterline where the current drops them
+    for (let i = 0; i < 190; i++) {
+      const y = Math.random() * h;
+      const near = 1 - Math.abs(y / h - 0.5) * 2;
+      if (Math.random() > 0.25 + near * 0.75) continue;
+      const r = 0.8 + Math.random() * 2.4;
+      g.fillStyle = Math.random() < 0.5 ? P.stoneA : P.stoneB;
+      g.beginPath();
+      g.ellipse(Math.random() * w, y, r, r * 0.72, Math.random() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    noiseOverlay(g, w, h, 0.16);
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return t;
 }
 
