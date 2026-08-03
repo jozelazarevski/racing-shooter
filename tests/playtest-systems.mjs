@@ -119,7 +119,10 @@ const boot = async (q) => {
     }, 25);
   });
   let shown = false;
-  for (let i = 0; i < 300 && !shown; i++) {
+  // 5 minutes of wall clock. A race is a genuine 3 laps since the grid stopped
+  // gifting a free one, and headless game time runs several times slower than
+  // wall — on a loaded box the old 150s budget expired around lap 3.
+  for (let i = 0; i < 600 && !shown; i++) {
     await page.waitForTimeout(500);
     shown = await page.evaluate(() => {
       const el = document.getElementById('results');
