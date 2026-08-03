@@ -1382,11 +1382,20 @@ export class Car {
       this._lastGY = this.y;
     } else {
       const drop = this._lastGY - gY;
-      // Launch only off real lips: a big single-frame drop while climbing fast.
-      // Thresholds sit above anything ordinary rolling hills produce (their
-      // per-frame deltas stay well under 0.9), so smooth elevated roads stay
-      // glued while ramp edges and sharp crests at speed still throw the car.
-      if (drop > 0.9 && this._climbRate > 2.5) {
+      // Two ways to leave the ground, and the second one is what makes a
+      // natural crest jumpable.
+      //
+      // 1. A real lip — a big single-frame drop while climbing fast. Kept for
+      //    any hard edge left in the world.
+      // 2. Going light over a BROW. Climbing the near side of a crest gives the
+      //    car real upward speed; if the road then starts falling away while it
+      //    still carries that speed, the wheels leave. This is speed-gated by
+      //    physics rather than by a rule: crawl over the same hump and the
+      //    climb rate never reaches the threshold, so you simply roll across.
+      //    Without this, a smooth hump can never launch anything — the old
+      //    plywood ramps only worked because of the cliff at their far edge.
+      const wentLight = this._climbRate > 3.5 && gY < this._lastGY - 0.02;
+      if ((drop > 0.9 && this._climbRate > 2.5) || wentLight) {
         this.airborne = true;
         // capped: an uncapped climb rate off a steep ramp at nitro speed sent
         // cars sailing 100+ u into the infield (user bug report)
@@ -1868,16 +1877,8 @@ export class EnemyCar extends Car {
     const li = (this.trackIndex + look) % t.N;
     let targetLat = t._raceLine[li] + this.lane;
 
-    // line up for a boost pad when one is coming up in reach
-    if (this.boostTimer <= 0.3 && t.boostPads) {
-      for (const pad of t.boostPads) {
-        const di = (pad.index - this.trackIndex + t.N) % t.N;
-        if (di > 4 && di < 55) {
-          targetLat = THREE.MathUtils.lerp(targetLat, pad.lateral, 0.9);
-          break;
-        }
-      }
-    }
+    // (boost pads are gone — rivals no longer swerve across the road to farm
+    //  chevrons, they just drive the racing line)
 
     // overtake: car ahead within 12 and closing -> swing to the emptier side
     let blockedAhead = false;

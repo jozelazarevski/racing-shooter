@@ -1629,6 +1629,11 @@ export class Track {
     // ---- width-variation: per-sample drivable half-width (pinch sections) ----
     this._buildWidthProfile();
 
+    // Natural jumps. Must happen HERE — before any mesh is built — so the road
+    // ribbon, its skirts, the ruts, the terrain blend and every prop placement
+    // follow the hump for free.
+    this._buildCrests();
+
     this._checkLayout();
 
     // the hero gorge must exist before ANY height is sampled (terrain mesh,
@@ -2541,7 +2546,12 @@ export class Track {
   }
 
   _buildBoostPads() {
+    // Boost pads are GONE. Speed should come from driving — the racing line,
+    // a slipstream tow, nitro you earned — not from stamped chevrons that hand
+    // it out for touching the right patch of road. Array kept so the "clear of
+    // a pad" placement guards elsewhere still resolve.
     this.boostPads = [];
+    if (this.boostPads.length === 0) return;
     const tex = chevronTexture();
     const min = this.T.padMaxCurv;
     let last = -999;
@@ -2568,9 +2578,73 @@ export class Track {
     }
   }
 
+  /** Natural jumps: the ROAD ITSELF lifts into a smooth crest — a rise, a
+   *  brow, and a fall you can launch off if you take it fast enough. This
+   *  replaces the old prop ramps, which were plywood wedges bolted onto the
+   *  surface that launched you off a hard lip at their far edge. A crest is
+   *  landscape, not furniture: take it slowly and you simply roll over it.
+   *
+   *  Baked into the elevation profile (see the call site) rather than added by
+   *  `groundHeightAt`, so everything downstream inherits the shape.
+   *
+   *  The hump is half a cosine wave, which starts and ends with ZERO gradient —
+   *  no lip to catch a wheel, and the join into the flat road is invisible. */
+  _buildCrests() {
+    this.crests = [];
+    const want = this.T.rampCount || 3;
+    const height = this.T.crestHeight ?? 2.9;
+    const len = 22;                       // samples spanned by the whole hump
+    // rank windows by how straight they are across the crest's full length —
+    // a jump landing mid-corner is a wreck, not a thrill
+    const windows = [];
+    for (let i = 0; i < N; i += 5) {
+      if (i < 60 || i > N - 90) continue;   // clear of the start gate
+      if (this._nearNarrow(i, 30)) continue; // never inside a pinch
+      let maxCurv = 0;
+      for (let k = -4; k < len + 2; k++) maxCurv = Math.max(maxCurv, this.curvature[(i + k + N) % N]);
+      windows.push({ i, maxCurv });
+    }
+    windows.sort((a, b) => a.maxCurv - b.maxCurv);
+    const gap = Math.min(180, ((N - 150) / want) | 0);
+    const chosen = [];
+    const take = (limit) => {
+      for (const w of windows) {
+        if (chosen.length >= want) return;
+        if (w.maxCurv > limit) return;               // sorted: nothing later is straighter
+        if (this._nearGorge(w.i, 60)) continue;
+        if (chosen.some((c) => this._circDist(w.i, c) < gap)) continue;
+        chosen.push(w.i);
+      }
+    };
+    take(this.T.rampMaxCurv);
+    // A twisty circuit can have no window straight enough to clear the ramp
+    // threshold, which used to mean a track with no jumps at all. Crests are
+    // part of the terrain now, not bolted-on furniture, so every world gets
+    // some: relax the straightness limit until at least two land.
+    if (chosen.length < 2) take(this.T.rampMaxCurv * 2.2);
+    if (chosen.length < 2) take(Infinity);
+    for (const i of chosen) {
+      this.crests.push({ index: i, len, height });
+      for (let k = 0; k < len; k++) {
+        const f = k / len;                                   // 0..1 across it
+        this.center[(i + k) % N].y += height * 0.5 * (1 - Math.cos(f * Math.PI * 2));
+      }
+    }
+    // the elevation just changed under us — the grade the physics and the mesh
+    // pitching read has to be rebuilt or cars will climb a hill they can't feel
+    for (let i = 0; i < N; i++) {
+      this._slope[i] =
+        (this.center[(i + 2) % N].y - this.center[(i - 2 + N) % N].y) / (4 * this.segLen);
+    }
+  }
+
   _buildRamps() {
-    // launch ramps on the straightest sections of the circuit
+    // Prop launch ramps are GONE — replaced by natural crests baked into the
+    // road's own elevation (`_buildCrests`). The array stays so the many
+    // "keep clear of a ramp" placement guards elsewhere still resolve; they
+    // simply never match now.
     this.ramps = [];
+    if (this.ramps.length === 0) return;
     const woodTex = buildingTexture();
     const hazTex = hazardTexture();
     // rank every window by how straight it is over the ramp's whole length
