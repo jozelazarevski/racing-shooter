@@ -497,6 +497,7 @@ class Game {
 
     // mode chips: RACE | FREE ROAM | MISSIONS
     const msel = document.getElementById('mode-select');
+    msel.innerHTML = ''; // never append into a row that might already hold chips
     const curMode = this.missionMode ? 'missions' : this.freeRoam ? 'roam' : 'race';
     for (const [id, label] of [['race', '🏁 RACE'], ['roam', '🌍 FREE ROAM'], ['missions', '🎯 MISSIONS']]) {
       const chip = document.createElement('button');
@@ -513,6 +514,7 @@ class Game {
 
     // difficulty chips
     const dsel = document.getElementById('diff-select');
+    dsel.innerHTML = '';
     for (const d of Object.values(DIFFS)) {
       const chip = document.createElement('button');
       chip.className = 'diff-chip' + (d.id === this.difficulty.id ? ` current ${d.id}` : '');
@@ -737,6 +739,13 @@ class Game {
     // --- put everyone on the new grid ---
     this.resetRace();
     this.hud?.feed?.(`${this.level.name}`, 'good');
+    // Keep the address bar honest without navigating — a refresh (or a shared
+    // link) then lands on the world you actually picked.
+    try {
+      const q = new URLSearchParams(location.search);
+      q.set('level', String(this.level.id));
+      history.replaceState(null, '', `${location.pathname}?${q}`);
+    } catch { /* history is not worth failing a track swap over */ }
     return true;
   }
 
@@ -4128,7 +4137,9 @@ class Game {
   }
 }
 
-window.__game = new Game();
+// Guard: a bad release once shipped two <script> tags for this module at two
+// different ?v= URLs, so the browser loaded it twice and built two whole games
+// on top of each other (duplicated menu chips, half the frame rate). One game.
+if (!window.__game) window.__game = new Game();
 // the world table, for the headless suites (swapLevel takes a level object)
 window.__LEVELS = LEVELS;
-window.__LEVELS = LEVELS; // headless test harness reads the roster
