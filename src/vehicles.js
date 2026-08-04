@@ -2373,6 +2373,27 @@ export class PlayerCar extends Car {
       : { throttle: 0, brake: 0, steer: 0, drift: false, hold: true }; // grid hold — no reverse creep
     this.step(dt, inputs);
 
+    // RECOVERY NET. Respawn only ever triggered on a WRECK, so a car that was
+    // still alive but had ended up somewhere impossible — flung far off the
+    // world, or under the terrain — could never come back, and the player was
+    // left looking at an empty screen with the HUD still ticking. Free roam is
+    // exempt on the lateral test: going a long way from the road is the point
+    // out there. Being under the ground is never right anywhere.
+    if (this.alive && g.state === 'race') {
+      const groundY = g.track.terrainHeight(this.pos.x, this.pos.z);
+      const lost = (!g.freeRoam && Math.abs(this.lateral) > 120)
+        || this.y < groundY - 6
+        || !Number.isFinite(this.pos.x) || !Number.isFinite(this.y);
+      this._lostT = lost ? (this._lostT ?? 0) + dt : 0;
+      if (this._lostT > 2.5) {
+        this._lostT = 0;
+        this.vel.set(0, 0, 0); this.vy = 0; this.airborne = false;
+        this.placeAt(this.trackIndex, 0, true);
+        this.invuln = Math.max(this.invuln, 1.5);
+        g.hud.feed('RECOVERED', 'info');
+      }
+    }
+
     if (this.checkLap(prevIndex) && controlsLive) g.onPlayerLap();
 
     // cannon heat
