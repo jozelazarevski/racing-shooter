@@ -9,6 +9,10 @@ export class Input {
     // the same lock, above 1 it takes less. Read live on every move event, so
     // dragging the slider changes the feel without restarting anything.
     this.joySens = 1;
+    // TWO-THUMB scheme: the left pad steers and NOTHING ELSE, because the right
+    // thumb has the pedals. Without this the same drag that turns the car also
+    // lifts off, which is exactly the coupling two thumbs exist to remove.
+    this.steerOnly = false;
     addEventListener('keydown', (e) => {
       if (e.repeat) return;
       this.keys.add(e.code);
@@ -90,6 +94,14 @@ export class Input {
     };
     const move = (x, y) => {
       let dx = x - cx, dy = y - cy;
+      if (this.steerOnly) {
+        // horizontal only: the knob slides along a rail, and a thumb that
+        // wanders up or down while cornering cannot touch the throttle
+        dx = Math.max(-R, Math.min(R, dx));
+        setKnob(dx, 0);
+        this.analog.steer = -shapeSteer(dx / R);
+        return;
+      }
       const d = Math.hypot(dx, dy) || 1;
       const cl = Math.min(d, R);
       dx = (dx / d) * cl; dy = (dy / d) * cl;
