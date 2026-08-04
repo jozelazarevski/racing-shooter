@@ -1365,6 +1365,10 @@ export function disposeSubtree(root) {
   root.clear();
 }
 
+/** Where the world's border wall begins. Vehicles read this: the traction
+ *  limit that makes the wall unclimbable must apply HERE and nowhere else. */
+export const RIM_RADIUS = 1620;
+
 /** Hermite ease on an already-normalised 0..1 ramp (clamps its own ends). */
 const smoothstep01 = (t) => {
   const u = t <= 0 ? 0 : t >= 1 ? 1 : t;
@@ -2197,7 +2201,7 @@ export class Track {
    *  RIM_R sits past the far terrain patch's useful radius, well beyond the
    *  fog, so from the road it is a skyline rather than a fence. */
   _rimWall(x, z) {
-    const RIM_R = 1620, RIM_RUN = 260, RIM_H = 260;
+    const RIM_R = RIM_RADIUS, RIM_RUN = 260, RIM_H = 260;
     const r = Math.hypot(x, z);
     if (r <= RIM_R) return 0;
     // ease in so the foot of the wall meets the massif smoothly, then climb

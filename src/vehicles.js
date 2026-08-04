@@ -1,6 +1,6 @@
 // Car meshes (built from primitives), arcade physics, and rival AI.
 import * as THREE from 'three';
-import { ROAD_HALF } from './track.js';
+import { ROAD_HALF, RIM_RADIUS } from './track.js';
 import { numberPlateTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
@@ -1377,7 +1377,17 @@ export class Car {
     // back. Below the threshold nothing changes at all, so every road, every
     // ramp and the whole climbable massif (which tops out around 24%) drive
     // exactly as before — this only ever bites on the border wall.
-    if (offRoad && this.speedAlong > 0.5) {
+    // ...but ONLY at the border. Gating this on gradient alone was wrong and
+    // shipped as a regression: the mountainside between stacked switchbacks is
+    // legitimately near-vertical, so on the pass worlds 12% of the ground just
+    // off the racing line reads steeper than any threshold a car could hold
+    // (Summit Climb p99 = 227%), and players who went off-road there were
+    // braked to a crawl on ground they were entitled to drive. The border is a
+    // radius, so test the radius — then ordinary terrain, however steep, is
+    // never touched, and the wall still cannot be climbed.
+    const rimR2 = RIM_RADIUS * RIM_RADIUS;
+    const atRim = this.pos.x * this.pos.x + this.pos.z * this.pos.z > rimR2;
+    if (offRoad && atRim && this.speedAlong > 0.5) {
       const AHEAD = 6;
       const ax = this.pos.x + Math.sin(this.heading) * AHEAD;
       const az = this.pos.z + Math.cos(this.heading) * AHEAD;
@@ -1525,41 +1535,48 @@ export class Car {
       const sa = this.steerVis * 0.42;
       for (const w of this.mesh.userData.frontWheels) w.rotation.y = sa;
     }
-    // INVULNERABILITY SHIMMER. This used to hard-toggle mesh.visible at 14 Hz,
-    // which hid the car outright on every other tick. Sampled at frame rate
-    // that aliases: at invuln 3.95 the parity sticks on the hidden phase and
-    // the car simply is not on screen — you steer a machine you cannot see.
-    // A shield orb grants 4 s of it, so this was reachable at full health.
-    // Now the car always draws; invulnerability reads as a translucent pulse.
+    // INVULNERABILITY — ADD LIGHT, NEVER REMOVE THE CAR.
+    //
+    // Two goes at this now. It began as a 14 Hz toggle of mesh.visible, which
+    // hid the car outright on alternate ticks and, sampled at frame rate,
+    // could alias into being hidden every frame. Replacing that with a
+    // translucent pulse fixed the aliasing and introduced a subtler version of
+    // the same bug: the pulse bottoms out at 21% opacity, and a car at 21%
+    // over a snowfield is not a faint car, it is no car at all — which is
+    // exactly what a shield orb on an ice world looked like.
+    //
+    // So invulnerability no longer touches how much of the car you can see.
+    // The body stays fully opaque and the state is shown by ADDING something:
+    // a shield bubble around it. Adding can only ever make the car easier to
+    // pick out, on snow or on lava.
     this.mesh.visible = this.alive;
-    if (this.alive) this._setGhost(this.invuln > 0
-      ? 0.45 + 0.35 * Math.sin(this.invuln * 18)
-      : 0);
+    this._setShield(this.alive && this.invuln > 0 ? this.invuln : 0);
   }
 
-  /** Fade the whole car toward translucent. `amt` 0 = solid, 1 = barely there.
-   *  Materials are built per car in buildVoxelRacer, so mutating them here
-   *  cannot leak onto anyone else's paint. The list is cached: this runs every
-   *  frame and traversing the car's ~60 meshes each time is not free.
-   *  Never fully transparent — that is the bug this replaced. */
-  _setGhost(amt) {
-    if (amt === this._ghost) return;              // opacity rarely changes
-    this._ghost = amt;
-    if (!this._ghostMats) {
-      this._ghostMats = [];
-      this.mesh.traverse((o) => {
-        if (!o.isMesh) return;
-        for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
-          if (m && !this._ghostMats.includes(m)) this._ghostMats.push(m);
-        }
+  /** Show/hide the invulnerability bubble. `t` is the remaining invuln time,
+   *  0 for none. Built on first use — most cars never take a hit. */
+  _setShield(t) {
+    if (!t) {
+      if (this._shield) this._shield.visible = false;
+      return;
+    }
+    if (!this._shield) {
+      const geo = new THREE.SphereGeometry(2.6, 14, 10);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x62e8ff, transparent: true, opacity: 0.34,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
       });
+      this._shield = new THREE.Mesh(geo, mat);
+      this._shield.position.y = 0.9;
+      this._shield.renderOrder = 2;
+      this.mesh.add(this._shield);
     }
-    const solid = amt <= 0;
-    for (const m of this._ghostMats) {
-      m.transparent = !solid;
-      m.opacity = solid ? 1 : 1 - amt;
-      m.depthWrite = solid;
-    }
+    this._shield.visible = true;
+    // breathe, and flare as it runs out so you can time the last second
+    const pulse = 0.5 + 0.5 * Math.sin(t * 9);
+    this._shield.material.opacity = 0.20 + 0.22 * pulse;
+    const s = 1 + 0.06 * pulse;
+    this._shield.scale.set(s, s * 0.82, s);
   }
 
   /** Lerp the body paint toward charcoal as health drops (up to 55% at zero health). */
