@@ -505,6 +505,7 @@ class Game {
         [document.getElementById('tab-btn-race'), document.getElementById('tab-race')],
         [document.getElementById('tab-btn-garage'), document.getElementById('tab-garage')],
         [document.getElementById('tab-btn-settings'), document.getElementById('tab-settings')],
+        [document.getElementById('tab-btn-mode'), document.getElementById('tab-mode')],
       ].filter(([b, p]) => b && p);
       for (const [btn, panel] of tabs) {
         btn.addEventListener('click', () => {
@@ -703,7 +704,7 @@ class Game {
   fadeTo(url, forceTab = null) {
     try {
       sessionStorage.setItem('ir-menu-state', JSON.stringify({
-        tab: forceTab ?? (['garage', 'settings'].find(
+        tab: forceTab ?? (['garage', 'settings', 'mode'].find(
           (t) => document.getElementById(`tab-btn-${t}`)?.classList.contains('current')) ?? 'race'),
         scroll: document.getElementById('title-screen')?.scrollTop ?? 0,
       }));

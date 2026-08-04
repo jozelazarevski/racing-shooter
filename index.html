@@ -368,9 +368,9 @@
   .wc-best{margin-top:auto;padding-top:2px;font-size:10px;font-weight:800;letter-spacing:1px;color:#8de89a}
   .wc-best.new{color:var(--amber)}
   /* ---------- SETTINGS SUB-PANEL (mode / difficulty / steering as labeled rows) ---------- */
-  #race-settings{margin-top:16px;width:100%;background:rgba(12,8,3,.35);
+  #race-settings,#mode-settings{margin-top:16px;width:100%;background:rgba(12,8,3,.35);
     border:1px solid var(--line-soft);border-radius:var(--r-md);padding:2px 14px 12px}
-  #race-settings .panel-head{margin:10px 0 4px}
+  #race-settings .panel-head,#mode-settings .panel-head{margin:10px 0 4px}
   .set-row{display:grid;grid-template-columns:96px 1fr;gap:6px 12px;align-items:center;padding:6px 0}
   .set-row + .set-row{border-top:1px solid var(--line-soft)}
   .set-lbl{font-size:10px;font-weight:800;letter-spacing:2px;color:var(--gold-dim)}
@@ -559,7 +559,7 @@
     .game-sub{margin-top:6px;letter-spacing:5px}
     #level-select{margin-top:6px}
     .level-chip{padding:7px 8px 9px}
-    #race-settings{margin-top:12px}
+    #race-settings,#mode-settings{margin-top:12px}
     .up-row{padding:5px 0}
     .controls{margin-top:16px;font-size:12px;gap:4px 16px}
     #touch-note{margin-top:14px;font-size:12px;line-height:1.6}
@@ -654,6 +654,7 @@
   <div class="game-sub">Dirt &nbsp;//&nbsp; Firepower &nbsp;//&nbsp; First Place</div>
   <div id="menu-tabs">
     <button id="tab-btn-race" class="menu-tab current">TRACKS</button>
+    <button id="tab-btn-mode" class="menu-tab">MODE</button>
     <button id="tab-btn-garage" class="menu-tab">GARAGE</button>
     <button id="tab-btn-settings" class="menu-tab">SETTINGS</button>
     <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
@@ -662,15 +663,24 @@
   <div id="tab-race" class="menu-panel">
     <div class="panel-head">MAP &amp; TRACK SELECTION</div>
     <div id="level-select"></div>
+  </div>
+  <!-- MODE picks what you are playing — race, free roam or an arena mission —
+       so the mission cards belong here beside it rather than buried under the
+       track list. Everything on this tab answers "what am I doing"; SETTINGS
+       answers "how does it handle". -->
+  <div id="tab-mode" class="menu-panel off">
+    <div id="mode-settings">
+      <div class="panel-head">GAME MODE</div>
+      <div class="set-row"><span class="set-lbl">MODE</span><div id="mode-select"></div></div>
+    </div>
     <div id="mission-select"></div>
   </div>
-  <!-- Race settings live on their own tab: they are set once and rarely
-       changed, so they were pushing the track list — the thing you actually
-       come here to do — down the page on a phone. -->
+  <!-- Handling options are set once and rarely changed, so they were pushing
+       the track list — the thing you actually come here to do — down the page
+       on a phone. -->
   <div id="tab-settings" class="menu-panel off">
     <div id="race-settings">
       <div class="panel-head">RACE SETTINGS</div>
-      <div class="set-row"><span class="set-lbl">MODE</span><div id="mode-select"></div></div>
       <div class="set-row"><span class="set-lbl">DIFFICULTY</span><div id="diff-select"></div></div>
       <div class="set-row"><span class="set-lbl">STEERING</span><div id="steer-select"></div></div>
       <div class="set-row"><span class="set-lbl">DRIVING AID</span><div id="assist-select"></div></div>
