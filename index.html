@@ -449,7 +449,13 @@
   .car-card .cs-row span{font-size:8px;font-weight:800;letter-spacing:1px;color:var(--gold-dim);text-align:left}
   .car-card .cs-row i{display:block;height:5px;border-radius:3px;background:rgba(255,233,168,.14);overflow:hidden}
   .car-card .cs-row b{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#ffd400,#ff9d2e)}
-  .car-card .cprice{font-size:11px;font-weight:800;color:var(--amber);margin-top:3px}
+  /* the price is the whole decision on a locked card, so it reads as a chip
+     rather than a caption — green when you can afford it, padlocked when not */
+  .car-card .cprice{font-size:12px;font-weight:800;color:var(--amber);margin-top:5px;
+    padding:3px 9px;border-radius:20px;background:rgba(12,8,3,.5);
+    border:1px solid var(--line-soft);white-space:nowrap;letter-spacing:.5px}
+  .car-card .cprice.afford{color:#8de89a;border-color:rgba(141,232,154,.45)}
+  .car-card .cprice.short{color:var(--gold-dim)}
   .car-card.owned .cprice{color:#8de89a}
   .car-card.selected{border-color:var(--yellow);background:rgba(255,212,0,.18);box-shadow:0 3px 0 var(--ink)}
   .car-card.locked{opacity:.7}

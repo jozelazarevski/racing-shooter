@@ -924,7 +924,9 @@ class Game {
           ${bar('GRP', S.grip, 4.2, 5.6)}${bar('ARM', S.health / (S.plating ?? 1), 80, 170)}
           ${bar('OFF', S.offroad, 0.4, 1)}${bar('NTR', S.nitroPower ?? 1, 0.85, 1.2)}
         </div>
-        <div class="cprice">${selected ? 'DRIVING' : owned ? 'DRIVE' : car.price.toLocaleString() + ' CR'}</div>`;
+        <div class="cprice${owned || selected ? '' : (this.garage.credits >= car.price ? ' afford' : ' short')}">${
+  selected ? 'DRIVING' : owned ? 'DRIVE'
+    : `${this.garage.credits >= car.price ? '' : '🔒 '}${car.price.toLocaleString()} CR`}</div>`;
       card.addEventListener('click', () => {
         if (!owned) {
           if (this.garage.credits < car.price) {
