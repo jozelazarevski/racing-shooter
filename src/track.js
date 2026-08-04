@@ -4871,15 +4871,32 @@ export class Track {
         const ex = p0.x + ux * (len + 15), ez = p0.z + uz * (len + 15);
         const ey = gy(ex, ez);
         const bw = 8.0, bh = 5.0;
+        // instance slots have to be grabbed BEFORE the push — `push` bumps
+        // im.count itself, so afterwards the index is already gone
+        const bi = M.barn.count, bri = M.barnRoof.count;
         push(M.barn, ex, ey - 0.5, ez, rot + 0.22, bw, bh, bw * 0.78);
         push(M.barnRoof, ex, ey - 0.5 + bh, ez, rot + 0.22, bw * 1.22, bh * 0.8, bw * 1.02);
-        this.solids.push({ x: ex, z: ez, r: bw * 0.62, y: ey, mat: 'hut' });
+        const barnSolid = { x: ex, z: ez, r: bw * 0.62, y: ey, mat: 'hut' };
+        this.solids.push(barnSolid);
+        // the farm buildings are buildings too — you can shoot these down
+        this.buildings.push({
+          x: ex, z: ez, y: ey, r: bw * 0.62, w: bw, h: bh, hp: 220, solid: barnSolid,
+          parts: [{ mesh: M.barn, i: bi }, { mesh: M.barnRoof, i: bri }],
+          roofColor: this.T.hutRoof,
+        });
         this._addShadow(ex, ez, bw * 0.8);
         const sx2 = ex + px * 7.5, sz2 = ez + pz * 7.5;
         const sy2 = gy(sx2, sz2);
+        const si = M.silo.count, sci = M.siloCap.count;
         push(M.silo, sx2, sy2 - 0.4, sz2, rot, 1.9, 7.6, 1.9);
         push(M.siloCap, sx2, sy2 - 0.4 + 7.6, sz2, rot, 2.2, 1.5, 2.2);
-        this.solids.push({ x: sx2, z: sz2, r: 2.0, y: sy2, mat: 'hut' });
+        const siloSolid = { x: sx2, z: sz2, r: 2.0, y: sy2, mat: 'hut' };
+        this.solids.push(siloSolid);
+        this.buildings.push({
+          x: sx2, z: sz2, y: sy2, r: 2.2, w: 4, h: 7.6, hp: 150, solid: siloSolid,
+          parts: [{ mesh: M.silo, i: si }, { mesh: M.siloCap, i: sci }],
+          roofColor: 0xd8d2c4,
+        });
         this._addShadow(sx2, sz2, 2.5);
         const tx = ex - px * 6.5 - ux * 3, tz = ez - pz * 6.5 - uz * 3;
         push(M.trough, tx, gy(tx, tz) - 0.1, tz, rot + 0.5, 1.1, 0.75, 4.2);
