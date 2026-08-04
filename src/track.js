@@ -5417,13 +5417,29 @@ export class Track {
     const tmp = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
-      const h = this._hillNoise(x, z);
+      let h = this._hillNoise(x, z);
+      // SINK THIS MESH WHERE THE NEAR PATCH COVERS IT.
+      //
+      // This ring exists only to carry the horizon PAST the near patch, but it
+      // was built across the whole 4200 u plane — including straight under the
+      // track — out of raw hill noise, which knows nothing about the road. The
+      // near patch is cut down for the carriageway and this one is not, so
+      // wherever the road runs through a cutting this mesh sat ABOVE it and
+      // painted over it: measured up to 13.7 u proud, across ~50% of the
+      // carriageway on Pine Valley, Frost Peak and Redwood. That is the road
+      // disappearing under the hillside, and the car driving along under it.
+      //
+      // The near patch already switches to pure _hillNoise beyond 900 u (same
+      // square metric), so the two agree out there and the seam is invisible.
+      // Inside that, drop this mesh far enough that it can never show through.
+      const m = Math.max(Math.abs(x), Math.abs(z));
+      h -= 60 * (1 - smoothstep01((m - 820) / 80));
       pos.setY(i, h - 0.52);                    // 0.4 under the near patch
       const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
       tmp.copy(cLow).lerp(cHigh, t);
       const dirt = Math.max(0, Math.sin(x * 0.045 + 2) * Math.sin(z * 0.05) - 0.72) * 3;
       tmp.lerp(cDirt, THREE.MathUtils.clamp(dirt, 0, 0.55));
-      tmp.multiplyScalar(0.84 + 0.16 * t);
+      tmp.multiplyScalar(0.93 + 0.07 * t);      // matches the near patch
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
