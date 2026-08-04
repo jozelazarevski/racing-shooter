@@ -9,6 +9,11 @@ const SPRAY_WET = new THREE.Color(0x9dbcd2);
 const FORD_FOAM = new THREE.Color(0xeef7fb); // ---- river-fords: bow-wave white
 const GRADE = 16;   // grade force: vf -= GRADE * slope * dt while grounded on-road
 const DOWNHILL_CAP = 1.12; // downhill overspeed ceiling (× topSpeed)
+// Steepest ground a car can still pull itself up. The drivable massif peaks
+// near 24%, so this leaves all of it alone and only ever engages on the border
+// wall, which runs an order of magnitude steeper.
+const MAX_GRADE = 0.45;
+
 const SCORCH = new THREE.Color(0x1c1a18); // damage tint target
 const _hitNormal = new THREE.Vector3(); // scratch: obstacle bounce normal
 const _splash = new THREE.Vector3();    // scratch: puddle splash spawn point
@@ -1362,6 +1367,37 @@ export class Car {
     const gY = offRoad
       ? t.terrainHeight(this.pos.x, this.pos.z)
       : t.groundHeightAt(this.trackIndex, this.lateral);
+
+    // TOO STEEP TO CLIMB.
+    //
+    // The car's height is pinned to the ground under it, so terrain by itself
+    // has never stopped anything — it would drive up a vertical cliff at full
+    // speed, which is why the world had no edge. Look a car-length ahead: past
+    // a grade no vehicle could hold, traction goes and gravity takes the speed
+    // back. Below the threshold nothing changes at all, so every road, every
+    // ramp and the whole climbable massif (which tops out around 24%) drive
+    // exactly as before — this only ever bites on the border wall.
+    if (offRoad && this.speedAlong > 0.5) {
+      const AHEAD = 6;
+      const ax = this.pos.x + Math.sin(this.heading) * AHEAD;
+      const az = this.pos.z + Math.cos(this.heading) * AHEAD;
+      const grade = (t.terrainHeight(ax, az) - gY) / AHEAD;
+      if (grade > MAX_GRADE) {
+        const over = Math.min(1, (grade - MAX_GRADE) / 0.55);
+        // speedAlong is derived from vel, so scrub the velocity itself. Hard
+        // enough that the last of it goes too — a wall you can crawl up at
+        // 2 km/h is still a wall you get over.
+        this.vel.multiplyScalar(Math.max(0, 1 - over * 4.5 * dt));
+        if (over > 0.6 && this.speedAlong > 3) {
+          this.vel.multiplyScalar(3 / this.speedAlong);
+        }
+        if (this === this.game.player && over > 0.5 && !this._steepFed) {
+          this._steepFed = 1.5;
+          this.game.hud?.feed?.('TOO STEEP', 'bad');
+        }
+      }
+    }
+    if (this._steepFed > 0) this._steepFed = Math.max(0, this._steepFed - dt);
     if (this.airborne) {
       this.vy -= 26 * dt;
       this.y += this.vy * dt;

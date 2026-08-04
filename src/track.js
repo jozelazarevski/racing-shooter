@@ -2179,7 +2179,31 @@ export class Track {
       Math.sin(x * 0.0042 + 0.9) * Math.cos(z * 0.0039 - 0.4) * 0.55 +
       Math.sin(x * 0.0091 - 2.1) * Math.cos(z * 0.0084 + 1.3) * 0.30 +
       Math.sin(x * 0.0180 + 4.2) * Math.cos(z * 0.0165 + 2.7) * 0.15;
-    return t * scale * 68 * (0.72 + 0.28 * ridge) * this._riverValley(x, z);
+    const massif = t * 68 * (0.72 + 0.28 * ridge) * this._riverValley(x, z);
+    return scale * (massif + this._rimWall(x, z));
+  }
+
+  /** THE BORDER. Beyond the climbable massif the ground turns up into a wall
+   *  that rings the world — a headwall no car gets over, so the scenery reads
+   *  as a closed bowl end to end instead of trailing off into nothing.
+   *
+   *  This is deliberately NOT an invisible barrier. It is the same terrain the
+   *  car already drives on, just steeper than traction allows: the ramp gains
+   *  260 u over 260 u of run, which is a ~100% grade at the steepest point
+   *  against the ~20% the massif tops out at. You drive up, slow, and slide
+   *  back — the world stops you with a mountain, not with a wall you cannot
+   *  see. The river valley cuts it too, so the water still has a way out.
+   *
+   *  RIM_R sits past the far terrain patch's useful radius, well beyond the
+   *  fog, so from the road it is a skyline rather than a fence. */
+  _rimWall(x, z) {
+    const RIM_R = 1620, RIM_RUN = 260, RIM_H = 260;
+    const r = Math.hypot(x, z);
+    if (r <= RIM_R) return 0;
+    // ease in so the foot of the wall meets the massif smoothly, then climb
+    const u = Math.min(1, (r - RIM_R) / RIM_RUN);
+    const crest = 0.55 + 0.45 * Math.sin(Math.atan2(z, x) * 3.7 + 1.1);  // uneven skyline
+    return RIM_H * u * u * (0.75 + 0.25 * crest) * this._riverValley(x, z);
   }
 
   /** 0 in the river's valley floor, easing to 1 well clear of it. The river
