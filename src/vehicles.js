@@ -1373,6 +1373,14 @@ export class Car {
         this.vy = 0;
         this.airborne = false;
         this._lastGY = gY;
+        // CLEAR THE CLIMB RATE. Landing used to leave it holding the launch
+        // value (~11); the next grounded frame then measured its acceleration
+        // against that stale number, got about −690, blew straight past the
+        // crest threshold and launched again — every landing became the next
+        // take-off. That is the "bouncing like a bunny", and enough repeats
+        // could skip the car clean off the circuit.
+        this._climbRate = 0;
+        this._settleT = 0.35;   // and no relaunch until the suspension settles
         this.onLand();
       }
     } else if (offRoad) {
@@ -1408,8 +1416,9 @@ export class Car {
       // as a permanently jumpy car, and every hop costs steering. A real crest
       // produces climb ≈ 12 and accel ≈ −55, so it clears these easily while
       // the everyday lumps in the elevation profile do not.
+      this._settleT = Math.max(0, (this._settleT ?? 0) - dt);
       const crested = this._climbRate > 4.5 && climbAccel < -42
-        && Math.abs(this.speedAlong) > 26;
+        && Math.abs(this.speedAlong) > 26 && this._settleT <= 0;
       if ((drop > 0.9 && this._climbRate > 2.5) || crested) {
         this.airborne = true;
         // capped: an uncapped climb rate off a steep ramp at nitro speed sent
@@ -2290,27 +2299,27 @@ export const CAR_CATALOG = [
     stats: { maxSpeed: 58, accel: 38, grip: 5.0, health: 100, offroad: 0.80, nitroPower: 1.0, plating: 1.0 },
   },
   {
-    key: 'sleek', name: 'SLEEK', price: 2000, desc: 'Nimble hatch',
+    key: 'sleek', name: 'SLEEK', price: 5000, desc: 'Nimble hatch',
     spec: { name: 'SLEEK', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, stripe: [0x241d16], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 56, accel: 40, grip: 5.6, health: 90, offroad: 0.60, nitroPower: 1.15, plating: 1.10 },
   },
   {
-    key: 'crown', name: 'CROWN', price: 3500, desc: 'Fast on tarmac',
+    key: 'crown', name: 'CROWN', price: 10000, desc: 'Fast on tarmac',
     spec: { name: 'CROWN', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [GOLD, 0xf2f0e8], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 63, accel: 37, grip: 4.8, health: 85, offroad: 0.45, nitroPower: 1.05, plating: 1.05 },
   },
   {
-    key: 'dune', name: 'DUNE', price: 4500, desc: 'Off-road king',
+    key: 'dune', name: 'DUNE', price: 16000, desc: 'Off-road king',
     spec: { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 57, accel: 38, grip: 5.2, health: 105, offroad: 1.0, nitroPower: 0.95, plating: 0.95 },
   },
   {
-    key: 'alpine', name: 'ALPINE', price: 6000, desc: 'Drift machine',
+    key: 'alpine', name: 'ALPINE', price: 26000, desc: 'Drift machine',
     spec: { name: 'ALPINE', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [GOLD, 0xd8342a], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 59, accel: 39, grip: 4.4, health: 95, offroad: 0.65, nitroPower: 1.20, plating: 1.05 },
   },
   {
-    key: 'pit', name: 'PIT-99', price: 8000, desc: 'Armored bruiser',
+    key: 'pit', name: 'PIT-99', price: 40000, desc: 'Armored bruiser',
     spec: { name: 'PIT-99', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 60, accel: 36, grip: 5.0, health: 130, offroad: 0.55, nitroPower: 0.90, plating: 0.78 },
   },
@@ -2363,6 +2372,27 @@ export class PlayerCar extends Car {
       ? { throttle: input.throttle, brake: input.brake, steer: input.steer, drift: input.drift }
       : { throttle: 0, brake: 0, steer: 0, drift: false, hold: true }; // grid hold — no reverse creep
     this.step(dt, inputs);
+
+    // RECOVERY NET. Respawn only ever triggered on a WRECK, so a car that was
+    // still alive but had ended up somewhere impossible — flung far off the
+    // world, or under the terrain — could never come back, and the player was
+    // left looking at an empty screen with the HUD still ticking. Free roam is
+    // exempt on the lateral test: going a long way from the road is the point
+    // out there. Being under the ground is never right anywhere.
+    if (this.alive && g.state === 'race') {
+      const groundY = g.track.terrainHeight(this.pos.x, this.pos.z);
+      const lost = (!g.freeRoam && Math.abs(this.lateral) > 120)
+        || this.y < groundY - 6
+        || !Number.isFinite(this.pos.x) || !Number.isFinite(this.y);
+      this._lostT = lost ? (this._lostT ?? 0) + dt : 0;
+      if (this._lostT > 2.5) {
+        this._lostT = 0;
+        this.vel.set(0, 0, 0); this.vy = 0; this.airborne = false;
+        this.placeAt(this.trackIndex, 0, true);
+        this.invuln = Math.max(this.invuln, 1.5);
+        g.hud.feed('RECOVERED', 'info');
+      }
+    }
 
     if (this.checkLap(prevIndex) && controlsLive) g.onPlayerLap();
 
