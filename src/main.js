@@ -6,7 +6,7 @@ import { UnrealBloomPass } from '../lib/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
-import { Track, LEVELS, circuitPoints } from './track.js';
+import { Track, LEVELS, circuitPoints, disposeSubtree } from './track.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { Weapons } from './weapons.js';
@@ -376,55 +376,15 @@ class Game {
     this.composer.addPass(new OutputPass());
 
     // world + systems
+    //
+    // Everything that belongs to ONE level — pickups, livestock, stars, gates,
+    // hazards, debris, husks — goes under worldLayer, and the track keeps its
+    // own group. Between them that is the entire level, held by two nodes, so
+    // switching tracks is a teardown and a rebuild rather than a page reload.
+    this.worldLayer = new THREE.Group();
+    this.scene.add(this.worldLayer);
     this.track = new Track(this.scene, this.level);
-    const th = this.track.theme;
-    if (th) {
-      if (th.fogColor !== undefined) this.scene.fog = new THREE.Fog(th.fogColor, th.fogNear ?? 320, th.fogFar ?? 1500);
-      if (th.hemiSky !== undefined) this.hemi.color.setHex(th.hemiSky);
-      if (th.hemiGround !== undefined) this.hemi.groundColor.setHex(th.hemiGround);
-      if (th.hemiIntensity !== undefined) this.hemi.intensity = th.hemiIntensity;
-      if (th.sunColor !== undefined) this.moon.color.setHex(th.sunColor);
-      if (th.sunIntensity !== undefined) this.moon.intensity = th.sunIntensity;
-      // key direction agrees with the sun the player can actually see
-      if (th.sunAz !== undefined) {
-        const az = th.sunAz;
-        const el = THREE.MathUtils.clamp((th.sunEl ?? 0.3) * 0.55 + 0.52, 0.58, 0.81);
-        const D = 168;
-        this._sunOffset.set(
-          Math.cos(az) * Math.cos(el) * D, Math.sin(el) * D, Math.sin(az) * Math.cos(el) * D
-        );
-      }
-    }
-    // image-based lighting: a tiny theme-tinted gradient dome through PMREM.
-    // Standard materials pick up soft sky reflections (glossy wet roads, car
-    // paint sheen). Dimmed at bake time — r160 has no scene.environmentIntensity.
-    {
-      // dimmer than it was: the IBL is a THIRD ambient term on top of the
-      // hemisphere, and at the old strength it re-filled every shadow the
-      // key/fill rebalance had just opened up. It is here for sheen on paint
-      // and wet road, not for lighting the world.
-      const top = new THREE.Color(th?.skyTop ?? '#68b7e8').multiplyScalar(0.34);
-      const hor = new THREE.Color(th?.skyHorizon ?? '#dff0fa').multiplyScalar(0.30);
-      const gnd = new THREE.Color(th?.hemiGround !== undefined ? th.hemiGround : 0x5a8a3c).multiplyScalar(0.20);
-      const cnv = document.createElement('canvas'); cnv.width = 2; cnv.height = 64;
-      const cx = cnv.getContext('2d');
-      const gr = cx.createLinearGradient(0, 0, 0, 64);
-      gr.addColorStop(0, '#' + top.getHexString());
-      gr.addColorStop(0.5, '#' + hor.getHexString());
-      gr.addColorStop(0.56, '#' + gnd.getHexString());
-      gr.addColorStop(1, '#' + gnd.multiplyScalar(0.6).getHexString());
-      cx.fillStyle = gr; cx.fillRect(0, 0, 2, 64);
-      const envTex = new THREE.CanvasTexture(cnv);
-      envTex.colorSpace = THREE.SRGBColorSpace;
-      const pmrem = new THREE.PMREMGenerator(this.renderer);
-      const dome = new THREE.Mesh(
-        new THREE.SphereGeometry(10, 16, 12),
-        new THREE.MeshBasicMaterial({ map: envTex, side: THREE.BackSide }));
-      const envScene = new THREE.Scene();
-      envScene.add(dome);
-      this.scene.environment = pmrem.fromScene(envScene, 0.06).texture;
-      pmrem.dispose(); dome.geometry.dispose(); dome.material.dispose(); envTex.dispose();
-    }
+    this._applyTheme();
     this.particles = new Particles(this.scene);
     this.particles.setTheme?.(this.level?.theme); // smashed barrels shed the theme's own stave/hoop colours
     this.skids = new SkidMarks(this.scene);
@@ -705,6 +665,116 @@ class Game {
     }
   }
 
+  /** Swap to another level IN PLACE — no page reload, no losing the menu.
+   *
+   *  Picking a track used to navigate, which meant a white flash, a fresh
+   *  download of the module graph and a rebuild of everything including the
+   *  parts that had nothing to do with the track. Cars already swap live; this
+   *  makes tracks behave the same way.
+   *
+   *  Order matters. Tear the old world down FIRST — the track's group and the
+   *  worldLayer between them hold every level-scoped object — then build the
+   *  new one, then re-apply the theme, and only then put the cars on the new
+   *  grid, because placeAt reads the new track's centreline.
+   *
+   *  Returns false if the level isn't playable, leaving the current one up. */
+  swapLevel(level) {
+    if (!level || this.state === 'race' || this.state === 'countdown') return false;
+    const same = this.level && this.level.id === level.id;
+    if (same) return true;
+
+    this.level = level;
+    this.levelIndex = Math.max(0, LEVELS.findIndex((l) => l.id === level.id));
+
+    // --- tear down ---
+    for (const gsp of this.missionGates ?? []) this.worldLayer.remove(gsp.spr);
+    this.missionGates = null;
+    this.flyingProps = [];
+    this.husks = [];
+    this._flashes = [];
+    disposeSubtree(this.worldLayer);       // pickups, herds, stars, hazards, debris
+    this.track.dispose();
+    this.skids?.reset?.();
+    this.particles?.reset?.();
+
+    // --- build the new world ---
+    this.track = new Track(this.scene, this.level);
+    this._applyTheme();
+    this.particles?.setTheme?.(this.level.theme);
+
+    this.props = this.track.props ? [...this.track.props] : [];
+    this.chopperTimer = 0;
+    this.chopperWave = 0;
+    for (const c of this.choppers ?? []) this.worldLayer.remove(c.mesh);
+    this.choppers = [];
+
+    this._buildPickups();
+    this._initWorldHazards();
+    this._buildRoamStars();
+    this._buildLivestock();
+
+    // --- put everyone on the new grid ---
+    this.resetRace();
+    this.hud?.feed?.(`${this.level.name}`, 'good');
+    return true;
+  }
+
+  /** Push the current track's theme into the renderer: fog, the two lights,
+   *  the key direction and the IBL dome. Split out of the constructor because
+   *  swapping level has to redo every one of these — a new world under the old
+   *  world's fog and sun is exactly the "it still looks like the last track"
+   *  bug this would otherwise ship with. */
+  _applyTheme() {
+    const th = this.track.theme;
+    if (th) {
+      if (th.fogColor !== undefined) this.scene.fog = new THREE.Fog(th.fogColor, th.fogNear ?? 320, th.fogFar ?? 1500);
+      if (th.hemiSky !== undefined) this.hemi.color.setHex(th.hemiSky);
+      if (th.hemiGround !== undefined) this.hemi.groundColor.setHex(th.hemiGround);
+      if (th.hemiIntensity !== undefined) this.hemi.intensity = th.hemiIntensity;
+      if (th.sunColor !== undefined) this.moon.color.setHex(th.sunColor);
+      if (th.sunIntensity !== undefined) this.moon.intensity = th.sunIntensity;
+      // key direction agrees with the sun the player can actually see
+      if (th.sunAz !== undefined) {
+        const az = th.sunAz;
+        const el = THREE.MathUtils.clamp((th.sunEl ?? 0.3) * 0.55 + 0.52, 0.58, 0.81);
+        const D = 168;
+        this._sunOffset.set(
+          Math.cos(az) * Math.cos(el) * D, Math.sin(el) * D, Math.sin(az) * Math.cos(el) * D
+        );
+      }
+    }
+    // image-based lighting: a tiny theme-tinted gradient dome through PMREM.
+    // Standard materials pick up soft sky reflections (glossy wet roads, car
+    // paint sheen). Dimmed at bake time — r160 has no scene.environmentIntensity.
+    {
+      // dimmer than it was: the IBL is a THIRD ambient term on top of the
+      // hemisphere, and at the old strength it re-filled every shadow the
+      // key/fill rebalance had just opened up. It is here for sheen on paint
+      // and wet road, not for lighting the world.
+      const top = new THREE.Color(th?.skyTop ?? '#68b7e8').multiplyScalar(0.34);
+      const hor = new THREE.Color(th?.skyHorizon ?? '#dff0fa').multiplyScalar(0.30);
+      const gnd = new THREE.Color(th?.hemiGround !== undefined ? th.hemiGround : 0x5a8a3c).multiplyScalar(0.20);
+      const cnv = document.createElement('canvas'); cnv.width = 2; cnv.height = 64;
+      const cx = cnv.getContext('2d');
+      const gr = cx.createLinearGradient(0, 0, 0, 64);
+      gr.addColorStop(0, '#' + top.getHexString());
+      gr.addColorStop(0.5, '#' + hor.getHexString());
+      gr.addColorStop(0.56, '#' + gnd.getHexString());
+      gr.addColorStop(1, '#' + gnd.multiplyScalar(0.6).getHexString());
+      cx.fillStyle = gr; cx.fillRect(0, 0, 2, 64);
+      const envTex = new THREE.CanvasTexture(cnv);
+      envTex.colorSpace = THREE.SRGBColorSpace;
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      const dome = new THREE.Mesh(
+        new THREE.SphereGeometry(10, 16, 12),
+        new THREE.MeshBasicMaterial({ map: envTex, side: THREE.BackSide }));
+      const envScene = new THREE.Scene();
+      envScene.add(dome);
+      this.scene.environment = pmrem.fromScene(envScene, 0.06).texture;
+      pmrem.dispose(); dome.geometry.dispose(); dome.material.dispose(); envTex.dispose();
+    }
+  }
+
   /** Fade to black, then navigate — used for level changes. Saves the menu's
    *  tab + scroll so the title screen comes back exactly where you left it
    *  instead of resetting to the top. */
@@ -810,7 +880,15 @@ class Game {
             { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
           return;
         }
-        this.fadeTo(`?level=${lv.id}${this.unlockAll ? '&unlockall=1' : ''}`);
+        // Swap the world under the menu instead of navigating. Falls back to
+        // the old reload only if the swap declines (mid-race), so picking a
+        // track can never leave you stuck on the one you were leaving.
+        if (this.swapLevel(lv)) {
+          this._renderLevelCards();      // repaint which card is current
+          this._buildMissionPicker?.();  // missions are per-world
+        } else {
+          this.fadeTo(`?level=${lv.id}${this.unlockAll ? '&unlockall=1' : ''}`);
+        }
       });
       rowFor(lv).appendChild(card);
     });
@@ -1318,7 +1396,7 @@ class Game {
       group.add(halo);
       const p = t.pointAt(d.index, d.lateral);
       group.position.copy(p);
-      this.scene.add(group);
+      this.worldLayer.add(group);
       this.pickups.push({
         ...d, pos: p, mesh: group, core, active: true, respawn: 0,
         color: '#' + color.toString(16).padStart(6, '0'),
@@ -1654,7 +1732,7 @@ class Game {
         g.position.set(x, t.terrainHeight?.(x, z) ?? 0, z);
         g.rotation.y = a;
         g.scale.setScalar(0.85 + Math.random() * 0.3); // ±15% so herds aren't clones
-        this.scene.add(g);
+        this.worldLayer.add(g);
         this.herds.push({ kind, K, x, z, homeX: spot.x, homeZ: spot.z, homeR: spot.r ?? 12,
           ang: a, mesh: g, alive: true, spooked: 0, y: g.position.y, _yT: 0, bob: k * 1.7 });
       }
@@ -1767,7 +1845,7 @@ class Game {
         blending: THREE.AdditiveBlending, depthWrite: false }));
       spr.scale.set(4.5, 4.5, 1);
       spr.position.set(x, y + 2.2, z);
-      this.scene.add(spr);
+      this.worldLayer.add(spr);
       this.roamStars.push({ x, z, y, spr, got: false });
     }
   }
@@ -2071,7 +2149,7 @@ class Game {
       aura.position.y = 8;
       gate.add(aura);
       gate.visible = k === 1;
-      this.scene.add(gate);
+      this.worldLayer.add(gate);
       this.missionGates.push({ x: p.x, y: p.y, z: p.z, spr: gate });
     }
   }
@@ -2386,7 +2464,7 @@ class Game {
           new THREE.MeshBasicMaterial({ color: 0xc9a06a, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
         ring.rotation.x = -Math.PI / 2;
         ring.position.set(p.x, p.y + 0.06, p.z);
-        this.scene.add(ring);
+        this.worldLayer.add(ring);
         this.geysers.push({ x: p.x, y: p.y, z: p.z, phase: k * 1.9, ring });
       }
     }
@@ -2422,7 +2500,7 @@ class Game {
         g.setIndex(idxs);
         const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
           color, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false }));
-        this.scene.add(mesh);
+        this.worldLayer.add(mesh);
         this.strips.push({ i0, i1: (i0 + LEN) % t.N, len: LEN, mesh });
       }
     }
@@ -2445,7 +2523,7 @@ class Game {
         if (!rat) tail.rotation.x = -0.9; // scorpion tail curls up
         m.add(tail);
         m.position.set(p.x, t.terrainHeight?.(p.x, p.z) ?? p.y, p.z);
-        this.scene.add(m);
+        this.worldLayer.add(m);
         this.critters.push({ baseX: p.x, baseZ: p.z, x: p.x, z: p.z, ang: k * 1.3, alive: true, mesh: m, lastSting: -9 });
       }
     }
@@ -2484,7 +2562,7 @@ class Game {
     }
     const startY = p.y + (kind === 'icicle' ? 16 : 30);
     mesh.position.set(p.x, startY, p.z);
-    this.scene.add(mesh);
+    this.worldLayer.add(mesh);
     this.fallers.push({ kind, x: p.x, z: p.z, y: startY, groundY: p.y, vy: 0,
       dmg: T.fallHazard.dmg ?? 20, mesh, landed: false, ttl: 18, solid: null });
   }
@@ -2871,7 +2949,7 @@ class Game {
       piece.position.x += (Math.random() - 0.5) * pr.r * 1.2;
       piece.position.y += Math.random() * pr.r * 0.9;
       piece.position.z += (Math.random() - 0.5) * pr.r * 1.2;
-      if (k > 0) this.scene.add(piece);
+      if (k > 0) this.worldLayer.add(piece);
       const spread = 4.5 + Math.random() * 5;
       this.flyingProps.push({
         mesh: piece,
@@ -2916,7 +2994,7 @@ class Game {
   onTreeSmash(tr, car, ox, oz) {
     const mesh = this.track.smashTree(tr);
     if (!mesh) return;
-    this.scene.add(mesh);
+    this.worldLayer.add(mesh);
     const fx = car ? car.pos.x : (ox ?? tr.x - 1), fz = car ? car.pos.z : (oz ?? tr.z - 1);
     const dir = new THREE.Vector3(tr.x - fx, 0, tr.z - fz).normalize();
     const sp = car ? Math.abs(car.speedAlong) : 22;
@@ -2989,7 +3067,7 @@ class Game {
         for (let k = 0; k < Math.min(3, 1 + (impact / 10 | 0)); k++) {
           const plank = new THREE.Mesh(PLANK_GEO, plankMat(cols[k % 2]));
           plank.position.set(car.pos.x + nx * 2, car.pos.y + 1 + k * 0.4, car.pos.z + nz * 2);
-          this.scene.add(plank);
+          this.worldLayer.add(plank);
           this.flyingProps.push({
             mesh: plank,
             vel: new THREE.Vector3(nx * 8 + (Math.random() - 0.5) * 5, 6 + Math.random() * 3,
@@ -3046,7 +3124,7 @@ class Game {
     const fly = part.clone();
     part.getWorldPosition(fly.position);
     part.getWorldQuaternion(fly.quaternion);
-    this.scene.add(fly);
+    this.worldLayer.add(fly);
     this.flyingProps.push({
       mesh: fly,
       vel: new THREE.Vector3(car.vel.x * 0.5 + (Math.random() - 0.5) * 6, 6 + Math.random() * 3,
@@ -3072,7 +3150,7 @@ class Game {
     husk.rotation.copy(car.mesh.rotation);
     husk.rotation.z += (Math.random() - 0.5) * 0.45; // slumped where it died
     husk.visible = true;
-    this.scene.add(husk);
+    this.worldLayer.add(husk);
     this.husks.push({ mesh: husk, life: 9, pos: car.pos.clone() });
   }
 
@@ -3147,7 +3225,7 @@ class Game {
         b.x + (Math.random() - 0.5) * b.w * 0.8,
         b.y + 0.6 + Math.random() * b.h,
         b.z + (Math.random() - 0.5) * b.w * 0.8);
-      this.scene.add(plank);
+      this.worldLayer.add(plank);
       this.flyingProps.push({
         mesh: plank,
         vel: new THREE.Vector3((Math.random() - 0.5) * 16, 6 + Math.random() * 9,
@@ -3175,7 +3253,7 @@ class Game {
     const dir = new THREE.Vector3(st.x - fx, 0, st.z - fz).normalize();
     const sp = car ? Math.abs(car.speedAlong) : 20;
     for (const tm of tires) {
-      this.scene.add(tm);
+      this.worldLayer.add(tm);
       this.flyingProps.push({
         mesh: tm,
         vel: new THREE.Vector3(
@@ -3196,7 +3274,7 @@ class Game {
   onBannerSmash(bn, car, ox, oz) {
     const mesh = this.track.smashBanner?.(bn);
     if (!mesh) return;
-    this.scene.add(mesh);
+    this.worldLayer.add(mesh);
     const fx = car ? car.pos.x : (ox ?? bn.x - 1), fz = car ? car.pos.z : (oz ?? bn.z - 1);
     const dir = new THREE.Vector3(bn.x - fx, 0, bn.z - fz).normalize();
     const sp = car ? Math.abs(car.speedAlong) : 20;
@@ -3270,7 +3348,7 @@ class Game {
     if (this._flashes.length > 4) return;
     const l = new THREE.PointLight(0xffa040, 60, 46, 1.8);
     l.position.copy(pos).setY(3);
-    this.scene.add(l);
+    this.worldLayer.add(l);
     this._flashes.push({ light: l, life: 0.35 });
   }
 
@@ -3355,7 +3433,7 @@ class Game {
         p.mesh.position.copy(p._orig.pos);
         p.mesh.rotation.copy(p._orig.rot);
         p.mesh.scale.copy(p._orig.scale);
-        if (!p.mesh.parent) this.scene.add(p.mesh);
+        if (!p.mesh.parent) this.worldLayer.add(p.mesh);
       }
     }
   }
@@ -3882,4 +3960,6 @@ class Game {
 }
 
 window.__game = new Game();
+// the world table, for the headless suites (swapLevel takes a level object)
+window.__LEVELS = LEVELS;
 window.__LEVELS = LEVELS; // headless test harness reads the roster

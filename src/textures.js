@@ -95,6 +95,8 @@ export function contactShadowTexture() {
     g.fillStyle = grd;
     g.fillRect(0, 0, w, h);
   });
+  // memoised across levels — disposeSubtree must not free this one
+  _contactShadowTex.userData.shared = true;
   return _contactShadowTex;
 }
 

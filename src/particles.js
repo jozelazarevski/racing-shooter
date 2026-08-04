@@ -291,6 +291,14 @@ export class Particles {
   /** Point the prop-crush recipes at a world: currently just the barrel
    *  stave/hoop pair, so a smashed drum sheds the theme's own colours.
    *  Safe to call with anything (unknown/undefined → wooden default). */
+  /** Kill every live particle. Without this the old world's dust, embers and
+   *  smoke keep drifting over the new one after a level swap. */
+  reset() {
+    this.life.fill(0);
+    this.alpha.fill(0);
+    this.geo.attributes.aAlpha.needsUpdate = true;
+  }
+
   setTheme(themeId) {
     this.barrelTint = BARREL_TINTS[themeId] ?? null;
   }
@@ -653,6 +661,8 @@ const _skQ = new THREE.Quaternion();
 const _skS = new THREE.Vector3();
 const _skP = new THREE.Vector3();
 
+const _ZERO_M4 = new THREE.Matrix4().makeScale(0, 0, 0);
+
 export class SkidMarks {
   constructor(scene, max = 800) {
     this.max = max;
@@ -711,4 +721,13 @@ export class SkidMarks {
     }
     if (dirty) this.mesh.instanceMatrix.needsUpdate = true;
   }
+  /** Drop every mark on the ground. Swapping level leaves the previous
+   *  world's rubber hanging in mid-air over the new one otherwise. */
+  reset() {
+    this.life.fill(0);
+    this.head = 0;
+    for (let i = 0; i < this.max; i++) this.mesh.setMatrixAt(i, _ZERO_M4);
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
 }
