@@ -5005,10 +5005,29 @@ export class Track {
     const T = this.T;
     const STRATA = ['#c98b52', '#a45f34', '#b5764a', '#8d4c2a', '#cfa06a', '#96552f']
       .map((c) => new THREE.Color(c));
-    // 10u cells near the track: fine enough that road corridors (and the
-    // strand cap around them) are always sampled — no triangle can span a
-    // ribbon and rise through it (cap window 25.2 ≥ 11 + cell diagonal)
-    const SIZE = 4200, SEG = 420;
+    // TWO PATCHES, not one 4200 u plane at a uniform 10 u.
+    //
+    // The old single grid was 352 800 triangles — 63–72 % of every world's
+    // entire budget — spread evenly out to ±2100 u. But no circuit reaches
+    // past ~320 u from the origin and fog closes between 1150 and 1600 u, so
+    // the great majority of those triangles were drawn inside opaque fog.
+    //
+    //   near: ±1000 u at 10 u cells (80 k tris) — three times the widest
+    //         circuit, and 10 u is LOAD-BEARING: it guarantees no triangle can
+    //         span a road ribbon and rise through it (cap window 25.2 ≥ 11 +
+    //         cell diagonal). This is the only region that can touch a road.
+    //   far : the full 4200 u at 40 u cells (22 k tris) — distant hills seen
+    //         through haze, where a 40 u facet is indistinguishable.
+    //
+    // The far patch is dropped 0.4 u so the near one always wins where they
+    // overlap: no seam stitching, no T-junction cracks, and at that distance
+    // the step is well inside the fog.
+    //
+    // Physics is untouched: terrainHeight() is analytic (_blendHeight), it
+    // never samples this mesh, so nothing here can move a car.
+    const SIZE = 2000, SEG = 200;
+    const UNITS_PER_TILE = 87.5;                 // 4200/48 — keep texel density
+    this._buildFarTerrain(4200, 105, UNITS_PER_TILE);
     const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
@@ -5048,8 +5067,9 @@ export class Track {
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
-    const REPEAT = 48;
-    const gtex = groundTexture(T.ground);
+    const REPEAT = SIZE / UNITS_PER_TILE;        // same texel density as before
+    const gtex = groundTexture(T.ground).clone();
+    gtex.needsUpdate = true;
     gtex.repeat.set(REPEAT, REPEAT);
     // 2×, not 4×: the ground is by far the largest surface on screen and the
     // facet mosaic now carries the detail the anisotropic filtering used to be
@@ -5066,6 +5086,47 @@ export class Track {
     const ground = new THREE.Mesh(geo, mat);
     ground.receiveShadow = true;
     this.scene.add(ground);
+  }
+
+  /** The distant ring of the ground, at a quarter of the near patch's
+   *  resolution. Everything out here is seen through haze and fog, so it needs
+   *  height and tone but not detail. Heights come from `_hillNoise` alone,
+   *  which is what the old grid already switched to beyond 900 u — using the
+   *  full mesh height function here would only cost time for a result nothing
+   *  can resolve. No shadow receipt: nothing casts this far out. */
+  _buildFarTerrain(size, seg, unitsPerTile) {
+    const T = this.T;
+    const geo = new THREE.PlaneGeometry(size, size, seg, seg);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position;
+    const colors = new Float32Array(pos.count * 3);
+    const cLow = new THREE.Color(T.terrainLow);
+    const cHigh = new THREE.Color(T.terrainHigh);
+    const cDirt = new THREE.Color(T.terrainDirt);
+    const tmp = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      const h = this._hillNoise(x, z);
+      pos.setY(i, h - 0.52);                    // 0.4 under the near patch
+      const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
+      tmp.copy(cLow).lerp(cHigh, t);
+      const dirt = Math.max(0, Math.sin(x * 0.045 + 2) * Math.sin(z * 0.05) - 0.72) * 3;
+      tmp.lerp(cDirt, THREE.MathUtils.clamp(dirt, 0, 0.55));
+      tmp.multiplyScalar(0.84 + 0.16 * t);
+      colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    const REPEAT = size / unitsPerTile;
+    const gtex = groundTexture(T.ground).clone();
+    gtex.needsUpdate = true;
+    gtex.repeat.set(REPEAT, REPEAT);
+    gtex.anisotropy = 1;
+    const mat = new THREE.MeshStandardMaterial({
+      map: gtex, vertexColors: true, roughness: 1, metalness: 0, flatShading: true,
+    });
+    this._facetGround(mat, seg / REPEAT);
+    this.scene.add(new THREE.Mesh(geo, mat));
   }
 
   /** Per-facet ground tone + slope tint, injected into the standard shader.

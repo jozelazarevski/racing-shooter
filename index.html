@@ -653,14 +653,21 @@
   <div class="game-title">IGNITE&nbsp;RALLY</div>
   <div class="game-sub">Dirt &nbsp;//&nbsp; Firepower &nbsp;//&nbsp; First Place</div>
   <div id="menu-tabs">
-    <button id="tab-btn-race" class="menu-tab current">PRE-RACE</button>
+    <button id="tab-btn-race" class="menu-tab current">TRACKS</button>
     <button id="tab-btn-garage" class="menu-tab">GARAGE</button>
+    <button id="tab-btn-settings" class="menu-tab">SETTINGS</button>
     <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
     <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
   </div>
   <div id="tab-race" class="menu-panel">
     <div class="panel-head">MAP &amp; TRACK SELECTION</div>
     <div id="level-select"></div>
+    <div id="mission-select"></div>
+  </div>
+  <!-- Race settings live on their own tab: they are set once and rarely
+       changed, so they were pushing the track list — the thing you actually
+       come here to do — down the page on a phone. -->
+  <div id="tab-settings" class="menu-panel off">
     <div id="race-settings">
       <div class="panel-head">RACE SETTINGS</div>
       <div class="set-row"><span class="set-lbl">MODE</span><div id="mode-select"></div></div>
@@ -668,7 +675,6 @@
       <div class="set-row"><span class="set-lbl">STEERING</span><div id="steer-select"></div></div>
       <div class="set-row"><span class="set-lbl">DRIVING AID</span><div id="assist-select"></div></div>
     </div>
-    <div id="mission-select"></div>
   </div>
   <div id="tab-garage" class="menu-panel off">
     <div class="panel-head">YOUR MACHINES</div>
@@ -766,10 +772,10 @@
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
-<script type="module" src="./src/main.js?v=r33"></script>
+<script type="module" src="./src/main.js?v=r34"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r33"></script>
+<script src="./src/offline.js?v=r34"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r33"></script>
+<script type="module" src="./src/traffic.js?v=r34"></script>
 </body>
 </html>

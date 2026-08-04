@@ -219,9 +219,9 @@ function applySnowRoad(g, w, h, spec) {
     // residual packed snow still lying across the cleared swath
     g.fillStyle = `rgba(${sr},${sg},${sb},0.44)`;
     g.fillRect(eL + 3, y, Math.max(0, eR - eL - 6), 3);
-    // compacted slush polished into the two wheel tracks — treads ghost through
-    g.fillStyle = `rgba(${lr},${lg},${lb},${S.slushAlpha})`;
-    for (const cx of ruts) g.fillRect(cx - rutHalf, y, rutHalf * 2, 3);
+    // (no wheel tracks — see the rut note in the dirt pass. The ploughed swath
+    //  and its berms stay: that reads as a cleared road, not as tyre marks.)
+    void lr; void lg; void lb; void ruts; void rutHalf;
   }
   // mottled depth in the cover (soft shade + bright re-frozen patches)
   for (let i = 0; i < 240; i++) {
@@ -520,7 +520,13 @@ export function roadTexture(palette = {}) {
     // ground (dirt, sand, snow, ash) records wheel tracks. Hard surfaces —
     // mountain asphalt (GOTTHARD CLIMB), stone setts (TREMOLA), sheet ice,
     // glass-asphalt (NEON GRID) and poured concrete (UNDERCITY) — get none.
-    if (P.ruts !== false) for (const cx of RUT_CX(w)) {
+    // NO WHEEL RUTS ON ANY WORLD (user). Two dark lines running the length of
+    // every road read as permanent scenery rather than wear, and from the
+    // top-down camera they dominate the surface. The per-theme `ruts` knob and
+    // RUT_CX are kept: the snow channels, wet sheen and cobble polish bands
+    // still align to the same centres, and the dressing can be brought back by
+    // flipping this one condition.
+    if (false && P.ruts !== false) for (const cx of RUT_CX(w)) {
       g.fillStyle = P.rut;
       g.fillRect(cx - 7, 0, 14, h);
       g.fillStyle = P.rutCore;
