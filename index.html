@@ -251,9 +251,14 @@
   .game-sub{margin-top:12px;font-size:clamp(12px,2vw,18px);letter-spacing:8px;color:#ffe9a8;text-transform:uppercase;
     text-shadow:1px 1px 0 var(--ink);text-align:center}
   /* ---------- MENU TABS + PANELS ---------- */
-  #menu-tabs{margin-top:20px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;justify-content:center}
-  .menu-tab{pointer-events:auto;cursor:pointer;min-height:42px;padding:11px 26px;font-family:'Luckiest Guy';
-    font-size:15px;letter-spacing:3px;color:var(--gold-dim);border-radius:var(--r-md) var(--r-md) 0 0;
+  /* the four tabs must fit ONE line at 390px: no wrap, and they share the
+     width evenly rather than each sizing to its own label */
+  #menu-status{margin-top:16px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap}
+  #menu-tabs{margin-top:10px;display:flex;gap:5px;align-items:flex-end;flex-wrap:nowrap;
+    justify-content:center;width:min(100%,660px);margin-left:auto;margin-right:auto}
+  #menu-tabs .menu-tab{flex:1 1 0;min-width:0}
+  .menu-tab{pointer-events:auto;cursor:pointer;min-height:42px;padding:11px 10px;font-family:'Luckiest Guy';
+    font-size:clamp(11px,3.2vw,15px);letter-spacing:1.5px;white-space:nowrap;text-align:center;color:var(--gold-dim);border-radius:var(--r-md) var(--r-md) 0 0;
     border:2px solid var(--line);border-bottom:none;background:rgba(24,16,6,.55);
     -webkit-tap-highlight-color:transparent}
   .menu-tab.current{color:var(--ink);background:var(--yellow);border-color:var(--ink);
@@ -574,7 +579,8 @@
   /* narrow phones: settings labels stack above their chips; tighter columns */
   @media (max-width:460px){
     .game-sub{letter-spacing:3px}
-    #menu-tabs{margin-top:14px;gap:6px}
+    #menu-tabs{margin-top:8px;gap:4px}
+    #menu-status{margin-top:12px}
     .menu-tab{padding:11px 18px;font-size:14px;letter-spacing:2px}
     .set-row{grid-template-columns:1fr;padding:8px 0 9px}
     /* chips share the row evenly instead of wrapping unevenly */
@@ -658,13 +664,17 @@
 <div id="title-screen" class="screen">
   <div class="game-title">IGNITE&nbsp;RALLY</div>
   <div class="game-sub">Dirt &nbsp;//&nbsp; Firepower &nbsp;//&nbsp; First Place</div>
+  <!-- Status chips sit ABOVE the tabs, not in the same row. Sharing the row
+       meant a fourth tab pushed the whole strip onto two lines on a phone. -->
+  <div id="menu-status">
+    <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
+    <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
+  </div>
   <div id="menu-tabs">
     <button id="tab-btn-race" class="menu-tab current">TRACKS</button>
     <button id="tab-btn-mode" class="menu-tab">MODE</button>
     <button id="tab-btn-garage" class="menu-tab">GARAGE</button>
-    <button id="tab-btn-settings" class="menu-tab">SETTINGS</button>
-    <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
-    <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
+    <button id="tab-btn-settings" class="menu-tab">SETUP</button>
   </div>
   <div id="tab-race" class="menu-panel">
     <div class="panel-head">MAP &amp; TRACK SELECTION</div>
@@ -788,10 +798,10 @@
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
-<script type="module" src="./src/main.js?v=r36"></script>
+<script type="module" src="./src/main.js?v=r37"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r36"></script>
+<script src="./src/offline.js?v=r37"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r36"></script>
+<script type="module" src="./src/traffic.js?v=r37"></script>
 </body>
 </html>
