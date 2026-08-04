@@ -250,6 +250,222 @@ const missionTargetChips = (d) => (d.survive
   : [`🥇 ${fmtTime(d.gold)}`, `🥈 ${fmtTime(d.silver)}`, `🥉 FINISH`]);
 // ===== end [MISSIONS] constants =====
 
+// ---------------------------------------------------------------------------
+// WHICH CAR FOR WHICH WORLD
+//
+// The worlds already reward different machines — that falls out of the physics,
+// it is not a label bolted on top. Measured with a fixed autopilot at a fixed
+// timestep, one lap, every car:
+//
+//   FROST PEAK (snow)   DUNE 39.1s ... BRAWLER 47.1s   — 8 seconds
+//   LOG FLUME (dry)     CROWN 31.9s ... SLEEK   34.0s   — and DUNE is 5th
+//   AMAZON RAPIDS (wet) DUNE 34.9s ... BRAWLER 40.7s
+//
+// Six different orderings across eight worlds. What was missing was any way for
+// a player to KNOW that before buying, so the garage read as "bigger numbers are
+// better" instead of "the right tool for the stage".
+//
+// DEMANDS below are measured from each track's own geometry (mean curvature,
+// straight fraction, mean gradient) and its surface. tests/test-affinity.mjs
+// recomputes them from the live tracks and fails if this table has drifted, so
+// it cannot quietly become fiction.
+const DEMANDS = {
+  1:  { loose: 0.55, twist: 0.45, fast: 0.17, climb: 0.31 }, // PINE VALLEY
+  2:  { loose: 0.18, twist: 0.04, fast: 0.52, climb: 0.67 }, // DUST CANYON
+  3:  { loose: 1.00, twist: 0.75, fast: 0.24, climb: 0.77 }, // FROST PEAK
+  4:  { loose: 0.12, twist: 0.75, fast: 0.00, climb: 0.21 }, // CANYON RUN
+  5:  { loose: 0.12, twist: 0.30, fast: 0.18, climb: 0.79 }, // EMBER PASS
+  6:  { loose: 0.12, twist: 0.45, fast: 0.71, climb: 0.69 }, // SUMMIT CLIMB
+  7:  { loose: 1.00, twist: 0.52, fast: 0.21, climb: 0.44 }, // GLACIAL PASS
+  8:  { loose: 0.55, twist: 0.62, fast: 0.16, climb: 0.26 }, // AMAZON RAPIDS
+  9:  { loose: 0.18, twist: 0.26, fast: 0.14, climb: 0.74 }, // THE DUNE SERPENT
+  10: { loose: 0.12, twist: 1.00, fast: 0.10, climb: 0.18 }, // ROCKFALL RAVINE
+  11: { loose: 0.18, twist: 0.35, fast: 0.19, climb: 0.21 }, // OASIS AMBUSH
+  12: { loose: 0.12, twist: 0.22, fast: 0.20, climb: 1.00 }, // REDWOOD RAMPAGE
+  13: { loose: 0.12, twist: 0.00, fast: 1.00, climb: 0.54 }, // LOG FLUME FURY
+  14: { loose: 0.12, twist: 0.27, fast: 0.25, climb: 0.69 }, // FOREST FIRE ESCAPE
+  15: { loose: 1.00, twist: 0.52, fast: 0.07, climb: 0.36 }, // GLACIER'S GRIND
+  16: { loose: 1.00, twist: 0.37, fast: 0.25, climb: 0.26 }, // AVALANCHE ALLEY
+  17: { loose: 0.55, twist: 0.01, fast: 0.69, climb: 0.33 }, // NEON GRID
+  18: { loose: 0.12, twist: 0.78, fast: 0.10, climb: 0.00 }, // UNDERCITY
+  19: { loose: 0.12, twist: 0.85, fast: 0.41, climb: 0.56 }, // GOTTHARD CLIMB
+  20: { loose: 0.12, twist: 0.81, fast: 0.47, climb: 0.62 }, // TREMOLA DESCENT
+  21: { loose: 1.00, twist: 0.64, fast: 0.62, climb: 0.51 }, // FURKA RIDGE
+};
+// The short human-readable character of each world, from the same measurements.
+const WORLD_TRAITS = (id) => {
+  const d = DEMANDS[id];
+  if (!d) return [];
+  const out = [];
+  if (d.loose >= 0.9) out.push('❄ LOOSE');
+  else if (d.loose >= 0.4) out.push('💧 SLICK');
+  if (d.twist >= 0.6) out.push('↩ TWISTY');
+  else if (d.fast >= 0.6) out.push('➔ FAST');
+  if (d.climb >= 0.6) out.push('⛰ STEEP');
+  return out;
+};
+
+/** How fast this machine can theoretically get round this track.
+ *
+ *  NOT a simulated lap. I tried that first and it was worthless: two different
+ *  autopilots produced opposite rankings on the same world — one put the DUNE
+ *  first at FROST PEAK, the other put it last — because a crude driver's lap
+ *  time measures the driver, not the car. Baking either would have been baking
+ *  noise and calling it advice.
+ *
+ *  This instead walks the real centreline and, at each sample, takes the lowest
+ *  of the three limits the physics actually imposes, using that car's own
+ *  constants:
+ *
+ *    vCap    the slope-aware speed ceiling  (vehicles.js: GRADE / DOWNHILL_CAP)
+ *    vYaw    steering authority vs the corner's curvature
+ *    vGrip   the speed at which the sustained slide (v²k/grip) still fits
+ *            inside the road — this is where the car's grip and the surface,
+ *            including its OFF-ROAD recovery, actually bite
+ *
+ *  Then sums ds / v. No driver, no randomness, same answer every time, and
+ *  every term traceable to a line of the integrator. Acceleration is a
+ *  transient and is deliberately not modelled here.
+ */
+function paceEstimate(car, track) {
+  if (!car?.stats || !track?.center) return null;
+  const S = car.stats;
+  const GRADE = 16, DOWNHILL_CAP = 1.18, SLIDE = 4.0;
+  const surf = track.T?.surface;
+  const base = surf === 'snow' ? 0.55 : surf === 'wet' ? 0.78 : 1;
+  const gripEff = S.grip * (base + (1 - base) * 0.62 * S.offroad);
+  const steerRate = 2.7, steerTaper = 0.26;
+  const N = track.N;
+  let t = 0, len = 0;
+  const wrap = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+  for (let i = 0; i < N; i += 2) {
+    const a = track.center[i], c = track.center[(i + 2) % N];
+    const ds = Math.hypot(c.x - a.x, c.z - a.z) || 1;
+    const k = Math.abs(wrap(track.headingAt((i + 2) % N) - track.headingAt(i))) / ds;
+    const slope = (c.y - a.y) / ds;
+    let vCap = S.maxSpeed;
+    if (slope > 0) vCap = Math.max(S.maxSpeed * 0.55, S.maxSpeed - (GRADE * slope) / 0.55);
+    else if (slope < 0) vCap = Math.min(S.maxSpeed * DOWNHILL_CAP, S.maxSpeed + (GRADE * -slope) / 0.55);
+    // steering authority: yaw available must out-turn v*k (taper ignored here —
+    // it only bites near top speed, where the corner limit already dominates)
+    const vYaw = k > 1e-5 ? steerRate * (1 - steerTaper) / k : Infinity;
+    const vGrip = k > 1e-5 ? Math.sqrt(SLIDE * gripEff / k) : Infinity;
+    const v = Math.max(4, Math.min(vCap, vYaw, vGrip));
+    t += ds / v;
+    len += ds;
+  }
+  return { seconds: t, length: len, gripEff: +gripEff.toFixed(2) };
+}
+
+/** Rank every machine on the CURRENT track by that estimate, and phrase the
+ *  result. Relative, because the absolute number means nothing to a player. */
+function rateCarsFor(track) {
+  const rows = CAR_CATALOG.map((car) => ({ car, est: paceEstimate(car, track) }))
+    .filter((r) => r.est);
+  if (!rows.length) return new Map();
+  const best = Math.min(...rows.map((r) => r.est.seconds));
+  const worst = Math.max(...rows.map((r) => r.est.seconds));
+  const span = Math.max(1e-6, worst - best);
+  const surf = track.T?.surface;
+  const out = new Map();
+  for (const r of rows) {
+    const score = 1 - (r.est.seconds - best) / span;      // 1 = quickest here
+    const tier = score >= 0.66 ? 'strong' : score >= 0.3 ? 'fair' : 'weak';
+    const behind = r.est.seconds - best;
+    let note;
+    if (tier === 'strong') {
+      note = surf === 'snow' ? 'HOLDS THE LOOSE STUFF'
+        : surf === 'wet' ? 'SURE-FOOTED IN THE WET' : 'SUITED TO THIS CIRCUIT';
+    } else if (tier === 'weak') {
+      note = surf === 'snow' || surf === 'wet'
+        ? `SLIDES HERE — ${Math.round(behind)}s A LAP` : `OFF THE PACE — ${Math.round(behind)}s A LAP`;
+    } else {
+      note = `${behind < 0.5 ? 'ON' : `${Math.round(behind)}s OFF`} THE PACE`;
+    }
+    out.set(r.car.key, { score, tier, note, seconds: r.est.seconds,
+      stars: 1 + Math.round(score * 4), behind });
+  }
+  return out;
+}
+
+/** A pickup that LOOKS LIKE WHAT IT GIVES YOU.
+ *
+ *  Every pickup used to be the same glowing ball in a different colour, so the
+ *  only way to know what you were about to drive through was to have memorised
+ *  a palette — at 200 km/h, from behind, in a world that is itself orange or
+ *  green. Now each one is a small readable object: a missile is a missile, a
+ *  mine is a spiked ball, hull is a medical cross.
+ *
+ *  Kept deliberately chunky and low-poly to match the toy-box art, and still
+ *  fully emissive so the silhouette reads at distance exactly like the orb did.
+ */
+function buildPickupIcon(type, color) {
+  const g = new THREE.Group();
+  // An orb was one small facet, so 1.6 emissive read as "glowing". These shapes
+  // carry far more surface, and at 1.6 the bloom washed every one of them to
+  // white — a white cross and a white hexagon are not colour-coded any more.
+  // Base faces glow enough to read at distance; only accents go hot.
+  const mat = (c = color, emissive = 0.95) => new THREE.MeshStandardMaterial({
+    color: c, emissive: c, emissiveIntensity: emissive, metalness: 0.3, roughness: 0.25,
+  });
+  const dark = new THREE.Color(color).multiplyScalar(0.45).getHex();
+  const add = (geo, m, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => {
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(x, y, z);
+    mesh.rotation.set(rx, ry, rz);
+    g.add(mesh);
+    return mesh;
+  };
+
+  if (type === 'missile') {
+    // body + nose cone + three tail fins, tipped nose-up so it reads in profile
+    const body = mat();
+    add(new THREE.CylinderGeometry(0.26, 0.26, 1.15, 8), body);
+    add(new THREE.ConeGeometry(0.26, 0.5, 8), mat(0xfff0c0, 1.5), 0, 0.82, 0);
+    const fin = new THREE.BoxGeometry(0.06, 0.36, 0.34);
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      add(fin, mat(dark, 1.1), Math.cos(a) * 0.22, -0.5, Math.sin(a) * 0.22, 0, -a, 0);
+    }
+    g.rotation.z = 0.28;
+  } else if (type === 'health') {
+    // a fat medical cross — the one shape nobody has to be taught
+    const arm = new THREE.BoxGeometry(1.5, 0.5, 0.42);
+    add(arm, mat());
+    add(new THREE.BoxGeometry(0.5, 1.5, 0.42), mat());
+    add(new THREE.BoxGeometry(1.62, 0.62, 0.3), mat(0xffffff, 0.35), 0, 0, -0.09);
+  } else if (type === 'nitro') {
+    // a gas bottle: cylinder, shoulder, valve — plus a bolt down its face
+    add(new THREE.CylinderGeometry(0.42, 0.42, 1.05, 10), mat());
+    add(new THREE.SphereGeometry(0.42, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat(), 0, 0.52, 0);
+    add(new THREE.CylinderGeometry(0.13, 0.13, 0.34, 6), mat(dark, 1.0), 0, 0.95, 0);
+    const bolt = mat(0xfff6d0, 1.7);
+    add(new THREE.BoxGeometry(0.16, 0.5, 0.1), bolt, -0.08, 0.16, 0.4, 0, 0, 0.5);
+    add(new THREE.BoxGeometry(0.16, 0.5, 0.1), bolt, 0.08, -0.2, 0.4, 0, 0, 0.5);
+  } else if (type === 'mine') {
+    // spiked ball — the universal "do not touch, but also: take me"
+    add(new THREE.IcosahedronGeometry(0.5, 0), mat());
+    const spike = new THREE.ConeGeometry(0.14, 0.42, 5);
+    const dirs = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    for (const [x, y, z] of dirs) {
+      const m = add(spike, mat(dark, 1.2), x * 0.62, y * 0.62, z * 0.62);
+      m.lookAt(new THREE.Vector3(x * 3, y * 3, z * 3));
+      m.rotateX(Math.PI / 2);
+    }
+  } else if (type === 'shield') {
+    // a heater shield: a hexagonal plate with a raised boss, standing upright
+    add(new THREE.CylinderGeometry(0.78, 0.78, 0.18, 6), mat(), 0, 0, 0, Math.PI / 2, 0, 0);
+    add(new THREE.CylinderGeometry(0.5, 0.5, 0.26, 6), mat(dark, 0.55), 0, 0, 0.1, Math.PI / 2, 0, 0);
+    add(new THREE.SphereGeometry(0.2, 8, 6), mat(0xffffff, 1.4), 0, 0, 0.24);
+  } else {
+    // slowfield: a six-point frost star
+    const spar = new THREE.BoxGeometry(1.7, 0.16, 0.16);
+    for (let i = 0; i < 3; i++) add(spar, mat(), 0, 0, 0, 0, 0, (i / 3) * Math.PI);
+    add(new THREE.IcosahedronGeometry(0.3, 0), mat(0xffffff, 1.2));
+  }
+  return g;
+}
+
 class Game {
   constructor() {
     this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -273,6 +489,7 @@ class Game {
     this.missionMode = params.get('mode') === 'missions';
     if (this.missionMode) this.freeRoam = true;
     this.steerSetting = localStorage.getItem('ir-steer') || 'normal';
+    this.controlScheme = localStorage.getItem('ir-controls') === 'two' ? 'two' : 'one';
     // touch players get the aid by default — thumbs are coarser than keys
     this.assistSetting = localStorage.getItem('ir-assist')
       || (matchMedia('(pointer: coarse)').matches ? 'assist' : 'standard');
@@ -583,6 +800,50 @@ class Game {
     }
     applyAidChips();
 
+    // control scheme: one thumb doing everything, or thumbs split between
+    // steering and pedals. Touch only, and switchable mid-race from the pause
+    // menu — you discover a scheme is wrong for you while driving, not before.
+    {
+      const row = document.getElementById('scheme-row');
+      const sel = document.getElementById('scheme-select');
+      const pmBtn = document.getElementById('pm-scheme');
+      if (row && sel) {
+        if (this.isTouch) row.classList.add('on'); else if (pmBtn) pmBtn.style.display = 'none';
+        const SCHEMES = [['one', 'ONE THUMB'], ['two', 'TWO THUMB']];
+        const paint = () => {
+          for (const c of sel.querySelectorAll('.diff-chip')) {
+            c.className = 'diff-chip' + (c.dataset.id === this.controlScheme ? ' current normal' : '');
+          }
+          if (pmBtn) {
+            pmBtn.textContent = `CONTROLS: ${(SCHEMES.find(([i]) => i === this.controlScheme)?.[1]) ?? ''}`;
+          }
+        };
+        this._applyControlScheme = (id, save) => {
+          this.controlScheme = id === 'two' ? 'two' : 'one';
+          document.body.classList.toggle('two-thumb', this.controlScheme === 'two');
+          this.input.steerOnly = this.controlScheme === 'two';
+          // a scheme change mid-drag would otherwise leave the old axis stuck on
+          this.input.analog.steer = this.input.analog.throttle = this.input.analog.brake = 0;
+          this.input.resetJoystick?.();
+          if (save) localStorage.setItem('ir-controls', this.controlScheme);
+          paint();
+        };
+        for (const [id, label] of SCHEMES) {
+          const chip = document.createElement('button');
+          chip.className = 'diff-chip';
+          chip.dataset.id = id;
+          chip.textContent = label;
+          chip.addEventListener('click', () => this._applyControlScheme(id, true));
+          sel.appendChild(chip);
+        }
+        pmBtn?.addEventListener('click', () => {
+          this._applyControlScheme(this.controlScheme === 'one' ? 'two' : 'one', true);
+          this.hud.feed(`CONTROLS: ${this.controlScheme === 'two' ? 'TWO THUMB' : 'ONE THUMB'}`, 'info');
+        });
+        this._applyControlScheme(this.controlScheme, false);
+      }
+    }
+
     // joystick sensitivity — a real slider, because "a bit less than that" is
     // not something three preset chips can express. Touch only: it does
     // nothing for a keyboard, so it does not clutter a desktop settings panel.
@@ -816,6 +1077,7 @@ class Game {
     this._buildLivestock();
 
     // --- put everyone on the new grid ---
+    this.__ratingsFor = null;   // car ratings are per-world
     this.resetRace();
     this._warmShaders();   // a new world means new materials — pay for them now
     this.hud?.feed?.(`${this.level.name}`, 'good');
@@ -863,6 +1125,40 @@ class Game {
     this.applyUpgrades();
     this.showMenu('settings');
     this.hud?.feed?.(`DRIVER: ${this.profile.name}`, 'good');
+  }
+
+  /** Cached ratings for the world that is actually loaded. Every other world's
+   *  card shows its CHARACTER instead of a rating — the estimate needs the real
+   *  centreline, and inventing one for 20 unbuilt tracks would be guessing. */
+  _ratings() {
+    if (this.__ratingsFor !== this.level.id) {
+      this.__ratings = rateCarsFor(this.track);
+      this.__ratingsFor = this.level.id;
+    }
+    return this.__ratings;
+  }
+
+  /** The line on a track card: what the world is like, and — for the world you
+   *  are on — whether the machine you picked is the right one for it. */
+  _affinityChip(levelId) {
+    const traits = WORLD_TRAITS(levelId);
+    const tagLine = traits.length ? `<div class="wc-fit fair">${traits.join(' · ')}</div>` : '';
+    if (levelId !== this.level.id) return tagLine;
+    const r = this._ratings().get(this.cars.selected);
+    if (!r) return tagLine;
+    const car = CAR_CATALOG.find((c) => c.key === this.cars.selected);
+    if (r.tier === 'weak') {
+      // name a machine they ALREADY OWN — "buy something else" is not advice
+      let alt = null;
+      for (const key of this.cars.owned) {
+        const o = this._ratings().get(key);
+        if (o && (!alt || o.score > alt.r.score)) alt = { key, r: o };
+      }
+      const altName = alt && alt.key !== car.key
+        ? ` · TRY ${CAR_CATALOG.find((c) => c.key === alt.key).name}` : '';
+      return `<div class="wc-fit weak">⚠ ${car.name} ${r.note}${altName}</div>`;
+    }
+    return `<div class="wc-fit ${r.tier}">${r.tier === 'strong' ? '★' : '•'} ${car.name} — ${r.note}</div>`;
   }
 
   /** Rebuild the parts of the world that depend on WHICH MODE you are in.
@@ -1116,6 +1412,7 @@ class Game {
         </div>
         <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
         <div class="wc-tags">${WORLD_TAGS[lv.theme] || ''}</div>
+        ${unlocked ? this._affinityChip(lv.id) : ''}
         <div class="wc-best${best ? '' : ' new'}">${bestTxt}</div>`;
       this._drawCircuitMap(card.querySelector('.wc-map'), lv.theme, !unlocked, i === this.levelIndex);
       card.addEventListener('click', () => {
@@ -1130,6 +1427,7 @@ class Game {
         // track can never leave you stuck on the one you were leaving.
         if (this.swapLevel(lv)) {
           this._renderLevelCards();      // repaint which card is current
+          this.renderCarShop();          // the garage ratings are per-world
           this._buildMissionPicker?.();  // missions are per-world
         } else {
           this.fadeTo(`?level=${lv.id}${this.unlockAll ? '&unlockall=1' : ''}`);
@@ -1236,6 +1534,9 @@ class Game {
   renderCarShop() {
     const shop = document.getElementById('car-shop');
     shop.innerHTML = '';
+    // the ratings below are for the world currently selected, so say which
+    const head = document.getElementById('garage-shop-head');
+    if (head) head.textContent = `RATED FOR ${this.level.name}`;
     const icons = this._carIcons();
     for (const car of CAR_CATALOG) {
       const owned = this.cars.owned.includes(car.key);
@@ -1254,6 +1555,13 @@ class Game {
           ${bar('GRP', S.grip, 4.2, 5.6)}${bar('ARM', S.health / (S.plating ?? 1), 80, 170)}
           ${bar('OFF', S.offroad, 0.4, 1)}${bar('NTR', S.nitroPower ?? 1, 0.85, 1.2)}
         </div>
+        ${(() => {
+    // how this machine suits the world you are about to run — the whole point
+    // of owning more than one, and useless information anywhere but here
+    const a = this._ratings().get(car.key);
+    if (!a) return '';
+    return `<div class="cfit ${a.tier}">${'★'.repeat(a.stars)}${'☆'.repeat(5 - a.stars)} <span>${a.note}</span></div>`;
+  })()}
         <div class="cprice${owned || selected ? '' : (this.garage.credits >= car.price ? ' afford' : ' short')}">${
   selected ? 'DRIVING' : owned ? 'DRIVE'
     : `${this.garage.credits >= car.price ? '' : '🔒 '}${car.price.toLocaleString()} CR`}</div>`;
@@ -1274,6 +1582,7 @@ class Game {
         this.swapPlayerCar(car);
         this.renderCarShop();
         this.renderGarage();
+        this._renderLevelCards();   // every track card names your car — repaint
         this.hud.feed?.(`NOW DRIVING: ${car.name}`, 'good');
       });
       shop.appendChild(card);
@@ -1626,12 +1935,7 @@ class Game {
     for (const d of defs) {
       const color = COLORS[d.type];
       const group = new THREE.Group();
-      const core = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(0.85, 0),
-        new THREE.MeshStandardMaterial({
-          color, emissive: color, emissiveIntensity: 1.6, metalness: 0.3, roughness: 0.25,
-        })
-      );
+      const core = buildPickupIcon(d.type, color);
       core.position.y = 1.4;
       group.add(core);
       const halo = new THREE.Mesh(
@@ -4435,3 +4739,8 @@ class Game {
 if (!window.__game) window.__game = new Game();
 // the world table, for the headless suites (swapLevel takes a level object)
 window.__LEVELS = LEVELS;
+window.__CARS = CAR_CATALOG;   // headless suites drive every machine in turn
+// test-affinity.mjs re-derives these from the live tracks and fails on drift
+window.__DEMANDS = DEMANDS;
+window.__paceEstimate = paceEstimate;
+window.__rateCarsFor = rateCarsFor;

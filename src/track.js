@@ -3105,9 +3105,14 @@ export class Track {
    *  no lip to catch a wheel, and the join into the flat road is invisible. */
   _buildCrests() {
     this.crests = [];
-    const want = this.T.rampCount || 3;
-    const height = this.T.crestHeight ?? 2.9;
-    const len = 22;                       // samples spanned by the whole hump
+    // Two or three identical humps a lap is not "jumps in the road", it is a
+    // feature you meet twice and stop noticing. More of them, and no two the
+    // same size: a long shallow brow you skim, a short sharp one that throws
+    // the car, and everything between. Heights and lengths are rolled per
+    // crest, so a world is not the same set of jumps every time you load it.
+    const want = (this.T.rampCount || 3) + 3;
+    const baseH = this.T.crestHeight ?? 2.9;
+    const len = 22;                       // nominal samples spanned by the hump
     // rank windows by how straight they are across the crest's full length —
     // a jump landing mid-corner is a wreck, not a thrill
     const windows = [];
@@ -3119,7 +3124,8 @@ export class Track {
       windows.push({ i, maxCurv });
     }
     windows.sort((a, b) => a.maxCurv - b.maxCurv);
-    const gap = Math.min(180, ((N - 150) / want) | 0);
+    // tighter spacing than before, or the extra crests have nowhere to go
+    const gap = Math.min(120, ((N - 150) / want) | 0);
     const chosen = [];
     const take = (limit) => {
       for (const w of windows) {
@@ -3134,14 +3140,21 @@ export class Track {
     // A twisty circuit can have no window straight enough to clear the ramp
     // threshold, which used to mean a track with no jumps at all. Crests are
     // part of the terrain now, not bolted-on furniture, so every world gets
-    // some: relax the straightness limit until at least two land.
-    if (chosen.length < 2) take(this.T.rampMaxCurv * 2.2);
-    if (chosen.length < 2) take(Infinity);
+    // some: relax the straightness limit until the quota is filled, rather than
+    // stopping at two. PINE VALLEY was shipping a single jump a lap this way.
+    if (chosen.length < want) take(this.T.rampMaxCurv * 2.2);
+    if (chosen.length < want) take(this.T.rampMaxCurv * 4);
+    if (chosen.length < Math.min(3, want)) take(Infinity);
     for (const i of chosen) {
-      this.crests.push({ index: i, len, height });
-      for (let k = 0; k < len; k++) {
-        const f = k / len;                                   // 0..1 across it
-        this.center[(i + k) % N].y += height * 0.5 * (1 - Math.cos(f * Math.PI * 2));
+      // A SHORT crest of a given height is a launch; a LONG one of the same
+      // height is a brow you float over. Rolling the two together is what makes
+      // them feel like different jumps rather than one jump repeated.
+      const h = baseH * (0.72 + Math.random() * 0.85);       // ~2.1 .. 4.6 u
+      const L = Math.round(len * (0.7 + Math.random() * 0.7)); // ~15 .. 33 samples
+      this.crests.push({ index: i, len: L, height: +h.toFixed(2) });
+      for (let k = 0; k < L; k++) {
+        const f = k / L;                                     // 0..1 across it
+        this.center[(i + k) % N].y += h * 0.5 * (1 - Math.cos(f * Math.PI * 2));
       }
     }
     // the elevation just changed under us — the grade the physics and the mesh

@@ -450,6 +450,71 @@ slider, default 100%, stored as `ir-joysens`, multiplying the expo curve before
 the clamp. Below 100% the thumb travels further for the same lock; above it,
 less. It applies live while you drag it.
 
+### Two control schemes, and the player picks
+
+`CONTROLS` (Setup tab and the pause menu, touch only, stored as `ir-controls`):
+
+- **ONE THUMB** — the pad does everything: left/right steers, up/down is
+  throttle and brake.
+- **TWO THUMB** — the left pad steers and *nothing else* (`input.steerOnly`
+  clamps the knob to a horizontal rail), and the right thumb works GAS and
+  BRAKE pedals. The pedals ride the existing `data-key` plumbing on
+  ArrowUp/ArrowDown, so the scheme adds no new input path. `body.two-thumb`
+  moves the weapon cluster up a row to free the bottom-right corner.
+
+Both schemes are switchable mid-race, because you find out a scheme is wrong for
+you while driving, not before. `tests/test-transitions.mjs` and the HUD layout
+audit check both schemes at portrait, narrow and landscape sizes: no two touch
+controls may overlap, and none may sit off screen.
+
+### Jumps are part of the road
+
+Every world gets `rampCount + 3` crests (4–6 in practice, was 2–4), each with its
+own rolled height (~2.1–4.6 u) and length (~15–33 samples) so a short sharp
+launch and a long floating brow are different jumps rather than one repeated.
+They are baked into the elevation profile, not bolted on, so taking one slowly
+just rolls over it. If a circuit is too twisty to offer straight windows, the
+straightness limit relaxes until the quota fills — PINE VALLEY was shipping a
+single jump a lap under the old "stop at two" rule. Measured at racing speed,
+33 of 35 crests across seven worlds put the car in the air (0.1–4.5 s).
+
+## 9a. Which car for which world
+
+The worlds reward different machines, and that falls out of the physics rather
+than being a label on top of it. Two mechanisms do the work:
+
+1. **Gradient** already scales with a car's own top speed and the grade force
+   (`GRADE = 16`), so steep worlds separate the machines by themselves.
+2. **Surface** did not. The snow/wet penalty was a flat multiplier, so every car
+   in the game slid identically on ice and `OFF-ROAD` only ever meant "copes in
+   the grass". It now buys back part of the loss:
+   `keep(base) = base + (1 − base) × 0.62 × offroad`. On snow the DUNE (1.0)
+   runs 0.83 of dry grip where the CROWN (0.42) runs 0.67 — a 24% difference.
+   On dry the base is 1, so the term vanishes and nobody gains anything.
+   Rivals use a fixed 0.7; the grid is balanced by `aiSpeed` and the rubber band,
+   and giving them the player's spread would only add noise.
+
+**The rating shown in the menu is NOT a simulated lap.** That was tried first
+and thrown away: two different autopilots produced opposite rankings on the same
+world — one put the DUNE first at FROST PEAK, the other put it last, and five
+worlds failed to complete at all. A crude driver's lap time measures the driver.
+
+`paceEstimate(car, track)` instead walks the real centreline and takes the lowest
+of the three limits the integrator actually imposes, using that car's constants:
+the slope-aware speed cap, the steering-authority limit against the corner's
+curvature, and the speed at which the sustained slide (`v²k / grip`, with the
+surface term above) still fits inside the road. Deterministic, driver-free, every
+term traceable to a line of `vehicles.js`. Acceleration is a transient and is
+deliberately not modelled; the UI never claims otherwise.
+
+Catalogue stats are **orthogonal on purpose** — each machine maximal on one axis
+and clearly weak on another — because a car that is good at everything makes the
+rest of the garage pointless. Measured across all 21 worlds: PIT-99 quickest on
+8, DUNE 5, SLEEK 5, ALPINE 2, CROWN 1, BRAWLER 0. The BRAWLER never winning is
+correct: it is free, and being beaten everywhere is the reason to upgrade.
+`tests/test-affinity.mjs` fails if any car you can *buy* stops being the right
+answer somewhere, or if the world-character table drifts from the real geometry.
+
 ## 9b. Nothing may reload the page
 
 Every screen transition is IN PLACE. A reload throws away the module graph, the

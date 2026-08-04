@@ -722,11 +722,24 @@ export class Car {
     const offMult = offRoad ? 0.55 + 0.45 * this.offroadSkill : 1;
 
     // surface conditions: snow and rain-wet worlds drive differently — less
-    // brake bite, wheelspin on throttle, and a much earlier, longer slide
+    // brake bite, wheelspin on throttle, and a much earlier, longer slide.
+    //
+    // The penalty used to be flat, so every car in the game slid identically on
+    // ice and the garage's OFF-ROAD stat only ever meant "how well it copes in
+    // the grass". A snow stage is precisely a test of tyres and suspension, so
+    // the same stat now buys back part of the loss: the DUNE (1.0) keeps most
+    // of its grip on FROST PEAK where the CROWN (0.45) is a passenger. Nobody
+    // gains anything on dry — the base is 1 there, so the term vanishes.
+    //
+    // Rivals run a fixed mid figure. They are one grid of identical machines by
+    // design, and giving them the player's spread would just add noise to a
+    // field that is already balanced by aiSpeed and the rubber band.
     const surf = this.game.track?.T?.surface;
-    const sGrip = surf === 'snow' ? 0.55 : surf === 'wet' ? 0.78 : 1;
-    const sTract = surf === 'snow' ? 0.72 : surf === 'wet' ? 0.88 : 1;
-    const sBrake = surf === 'snow' ? 0.58 : surf === 'wet' ? 0.80 : 1;
+    const loose = this === this.game.player ? (this.offroadSkill ?? 0.7) : 0.7;
+    const keep = (base) => base + (1 - base) * (0.62 * loose);
+    const sGrip = keep(surf === 'snow' ? 0.55 : surf === 'wet' ? 0.78 : 1);
+    const sTract = keep(surf === 'snow' ? 0.72 : surf === 'wet' ? 0.88 : 1);
+    const sBrake = keep(surf === 'snow' ? 0.58 : surf === 'wet' ? 0.80 : 1);
 
     const fwd = this.forward;
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
@@ -2411,32 +2424,48 @@ export const CAR_CATALOG = [
   {
     key: 'brawler', name: 'BRAWLER', price: 0, desc: 'All-rounder',
     spec: { name: 'BRAWLER', style: 'brawler', body: 0xff8c1a, accent: 0xe86a10, stripe: [0x241d16], number: 1, brand: 'APEX' },
-    stats: { maxSpeed: 58, accel: 38, grip: 5.0, health: 100, offroad: 0.80, nitroPower: 1.0, plating: 1.0 },
+    stats: { maxSpeed: 58, accel: 38, grip: 5.00, health: 100, offroad: 0.80, nitroPower: 1.0, plating: 1.0 },
   },
   {
+    // Was quietly the best car in the game: the highest grip in the catalogue
+    // AND the best acceleration AND good nitro, for 5,000 CR. Rated quickest on
+    // 13 of the 21 worlds, which made every machine above it pointless. It is a
+    // road hatch now — still the sharpest thing through a dry corner, but short
+    // on top end and hopeless once the surface turns.
     key: 'sleek', name: 'SLEEK', price: 5000, desc: 'Nimble hatch',
     spec: { name: 'SLEEK', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, stripe: [0x241d16], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 56, accel: 40, grip: 5.6, health: 90, offroad: 0.60, nitroPower: 1.15, plating: 1.10 },
+    stats: { maxSpeed: 54, accel: 40, grip: 5.60, health: 90, offroad: 0.45, nitroPower: 1.15, plating: 1.10 },
   },
   {
     key: 'crown', name: 'CROWN', price: 10000, desc: 'Fast on tarmac',
     spec: { name: 'CROWN', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [GOLD, 0xf2f0e8], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 63, accel: 37, grip: 4.8, health: 85, offroad: 0.45, nitroPower: 1.05, plating: 1.05 },
+    stats: { maxSpeed: 63, accel: 37, grip: 4.60, health: 85, offroad: 0.42, nitroPower: 1.05, plating: 1.05 },
   },
   {
     key: 'dune', name: 'DUNE', price: 16000, desc: 'Off-road king',
     spec: { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 57, accel: 38, grip: 5.2, health: 105, offroad: 1.0, nitroPower: 0.95, plating: 0.95 },
+    stats: { maxSpeed: 56, accel: 38, grip: 5.15, health: 105, offroad: 1.00, nitroPower: 0.95, plating: 0.95 },
   },
   {
-    key: 'alpine', name: 'ALPINE', price: 26000, desc: 'Drift machine',
+    // The ALPINE was the one machine that was never the right answer: lowest
+    // grip in the catalogue and only mid top speed, so it rated last on every
+    // world measured. A car nobody should ever buy is a hole in the garage, not
+    // a playstyle. Retuned toward the name — a mountain and loose-surface
+    // specialist — so it owns the twisty snow stages the DUNE is too slow for
+    // and the CROWN cannot hold at all, while its top speed keeps it off the
+    // open circuits.
+    key: 'alpine', name: 'ALPINE', price: 26000, desc: 'Mountain drifter',
     spec: { name: 'ALPINE', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [GOLD, 0xd8342a], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 59, accel: 39, grip: 4.4, health: 95, offroad: 0.65, nitroPower: 1.20, plating: 1.05 },
+    stats: { maxSpeed: 57, accel: 39, grip: 5.25, health: 95, offroad: 0.85, nitroPower: 1.20, plating: 1.05 },
   },
   {
+    // The most expensive machine in the game could not win a lap anywhere — it
+    // was sold purely on hull, which makes 40,000 CR a strange ask. Heavy but
+    // planted: it now has the grip to own a fast, dry, flowing circuit, and
+    // still takes the least damage doing it.
     key: 'pit', name: 'PIT-99', price: 40000, desc: 'Armored bruiser',
     spec: { name: 'PIT-99', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 60, accel: 36, grip: 5.0, health: 130, offroad: 0.55, nitroPower: 0.90, plating: 0.78 },
+    stats: { maxSpeed: 60, accel: 36, grip: 5.05, health: 130, offroad: 0.55, nitroPower: 0.90, plating: 0.78 },
   },
 ];
 
