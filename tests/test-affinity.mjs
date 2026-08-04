@@ -45,13 +45,14 @@ for (let lvl = 1; lvl <= 21; lvl++) {
       gradeSum += Math.abs(c.y - a.y) / ds;
     }
     const surf = t.T?.surface ?? 'dry';
-    const n = (v, lo, hi) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
+    const B = window.__DEMAND_BOUNDS;   // read from the game, never re-typed here
+    const n = (v, [lo, hi]) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
     return { lvl: g.level.id, name: g.level.name,
       live: {
         loose: surf === 'snow' ? 1 : surf === 'wet' ? 0.55 : 0.12,
-        twist: n(kSum / t.N, 0.0059, 0.0206),
-        fast: n(100 * straight / t.N, 12.4, 47.4),
-        climb: n(100 * gradeSum / t.N, 1.8, 5.7),
+        twist: n(kSum / t.N, B.twist),
+        fast: n(100 * straight / t.N, B.fast),
+        climb: n(100 * gradeSum / t.N, B.climb),
       },
       baked: window.__DEMANDS?.[g.level.id] ?? null };
   });

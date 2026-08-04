@@ -269,28 +269,32 @@ const missionTargetChips = (d) => (d.survive
 // straight fraction, mean gradient) and its surface. tests/test-affinity.mjs
 // recomputes them from the live tracks and fails if this table has drifted, so
 // it cannot quietly become fiction.
+// The normalisation bounds live here, and the test reads them off `window` —
+// two copies of these numbers is exactly how a table starts lying. The gradient
+// range was re-derived after the crest work raised every world's mean grade.
+const DEMAND_BOUNDS = { twist: [0.0059, 0.0206], fast: [12.4, 47.4], climb: [2.8, 6.8] };
 const DEMANDS = {
-  1:  { loose: 0.55, twist: 0.45, fast: 0.17, climb: 0.31 }, // PINE VALLEY
-  2:  { loose: 0.18, twist: 0.04, fast: 0.52, climb: 0.67 }, // DUST CANYON
-  3:  { loose: 1.00, twist: 0.75, fast: 0.24, climb: 0.77 }, // FROST PEAK
-  4:  { loose: 0.12, twist: 0.75, fast: 0.00, climb: 0.21 }, // CANYON RUN
-  5:  { loose: 0.12, twist: 0.30, fast: 0.18, climb: 0.79 }, // EMBER PASS
-  6:  { loose: 0.12, twist: 0.45, fast: 0.71, climb: 0.69 }, // SUMMIT CLIMB
-  7:  { loose: 1.00, twist: 0.52, fast: 0.21, climb: 0.44 }, // GLACIAL PASS
-  8:  { loose: 0.55, twist: 0.62, fast: 0.16, climb: 0.26 }, // AMAZON RAPIDS
-  9:  { loose: 0.18, twist: 0.26, fast: 0.14, climb: 0.74 }, // THE DUNE SERPENT
-  10: { loose: 0.12, twist: 1.00, fast: 0.10, climb: 0.18 }, // ROCKFALL RAVINE
-  11: { loose: 0.18, twist: 0.35, fast: 0.19, climb: 0.21 }, // OASIS AMBUSH
-  12: { loose: 0.12, twist: 0.22, fast: 0.20, climb: 1.00 }, // REDWOOD RAMPAGE
-  13: { loose: 0.12, twist: 0.00, fast: 1.00, climb: 0.54 }, // LOG FLUME FURY
-  14: { loose: 0.12, twist: 0.27, fast: 0.25, climb: 0.69 }, // FOREST FIRE ESCAPE
-  15: { loose: 1.00, twist: 0.52, fast: 0.07, climb: 0.36 }, // GLACIER'S GRIND
-  16: { loose: 1.00, twist: 0.37, fast: 0.25, climb: 0.26 }, // AVALANCHE ALLEY
-  17: { loose: 0.55, twist: 0.01, fast: 0.69, climb: 0.33 }, // NEON GRID
+  1:  { loose: 0.55, twist: 0.46, fast: 0.17, climb: 0.33 }, // PINE VALLEY
+  2:  { loose: 0.12, twist: 0.04, fast: 0.53, climb: 0.62 }, // DUST CANYON
+  3:  { loose: 1.00, twist: 0.76, fast: 0.25, climb: 0.74 }, // FROST PEAK
+  4:  { loose: 0.12, twist: 0.75, fast: 0.00, climb: 0.12 }, // CANYON RUN
+  5:  { loose: 0.12, twist: 0.30, fast: 0.18, climb: 0.71 }, // EMBER PASS
+  6:  { loose: 0.12, twist: 0.46, fast: 0.71, climb: 0.59 }, // SUMMIT CLIMB
+  7:  { loose: 1.00, twist: 0.53, fast: 0.20, climb: 0.42 }, // GLACIAL PASS
+  8:  { loose: 0.55, twist: 0.64, fast: 0.16, climb: 0.29 }, // AMAZON RAPIDS
+  9:  { loose: 0.12, twist: 0.26, fast: 0.14, climb: 0.61 }, // THE DUNE SERPENT
+  10: { loose: 0.12, twist: 1.00, fast: 0.10, climb: 0.05 }, // ROCKFALL RAVINE
+  11: { loose: 0.12, twist: 0.35, fast: 0.19, climb: 0.19 }, // OASIS AMBUSH
+  12: { loose: 0.12, twist: 0.22, fast: 0.20, climb: 0.95 }, // REDWOOD RAMPAGE
+  13: { loose: 0.12, twist: 0.00, fast: 1.00, climb: 0.45 }, // LOG FLUME FURY
+  14: { loose: 0.12, twist: 0.26, fast: 0.25, climb: 0.50 }, // FOREST FIRE ESCAPE
+  15: { loose: 1.00, twist: 0.52, fast: 0.07, climb: 0.37 }, // GLACIER'S GRIND
+  16: { loose: 1.00, twist: 0.37, fast: 0.25, climb: 0.22 }, // AVALANCHE ALLEY
+  17: { loose: 0.55, twist: 0.00, fast: 0.70, climb: 0.32 }, // NEON GRID
   18: { loose: 0.12, twist: 0.78, fast: 0.10, climb: 0.00 }, // UNDERCITY
-  19: { loose: 0.12, twist: 0.85, fast: 0.41, climb: 0.56 }, // GOTTHARD CLIMB
-  20: { loose: 0.12, twist: 0.81, fast: 0.47, climb: 0.62 }, // TREMOLA DESCENT
-  21: { loose: 1.00, twist: 0.64, fast: 0.62, climb: 0.51 }, // FURKA RIDGE
+  19: { loose: 0.12, twist: 0.85, fast: 0.40, climb: 0.44 }, // GOTTHARD CLIMB
+  20: { loose: 0.12, twist: 0.81, fast: 0.46, climb: 0.56 }, // TREMOLA DESCENT
+  21: { loose: 1.00, twist: 0.64, fast: 0.62, climb: 0.35 }, // FURKA RIDGE
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {
@@ -4742,5 +4746,6 @@ window.__LEVELS = LEVELS;
 window.__CARS = CAR_CATALOG;   // headless suites drive every machine in turn
 // test-affinity.mjs re-derives these from the live tracks and fails on drift
 window.__DEMANDS = DEMANDS;
+window.__DEMAND_BOUNDS = DEMAND_BOUNDS;
 window.__paceEstimate = paceEstimate;
 window.__rateCarsFor = rateCarsFor;
