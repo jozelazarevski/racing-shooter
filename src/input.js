@@ -4,6 +4,11 @@ export class Input {
     this.keys = new Set();
     this.pressed = new Set(); // edge-triggered, consumed each frame
     this.analog = { steer: 0, throttle: 0, brake: 0 }; // virtual joystick
+    // Player-set joystick sensitivity, 0.5–1.8, 1 = the tuned default. It
+    // scales the steer axis directly: below 1 the thumb travels further for
+    // the same lock, above 1 it takes less. Read live on every move event, so
+    // dragging the slider changes the feel without restarting anything.
+    this.joySens = 1;
     addEventListener('keydown', (e) => {
       if (e.repeat) return;
       this.keys.add(e.code);
@@ -70,7 +75,10 @@ export class Input {
     const shapeSteer = (v) => {
       const s = shape(v);
       const a = Math.abs(s);
-      return Math.sign(s) * (0.42 * a + 0.58 * a * a * a);
+      const curved = 0.42 * a + 0.58 * a * a * a;
+      // sensitivity multiplies the curve, then clamps — turning it up reaches
+      // full lock sooner, turning it down stretches the travel out
+      return Math.sign(s) * Math.min(1, curved * (this.joySens ?? 1));
     };
     const start = (x, y, id) => {
       const r = zone.getBoundingClientRect();

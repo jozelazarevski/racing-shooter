@@ -445,6 +445,60 @@ the entire useful range in the first few millimetres of thumb; half travel now
 yields ~0.22 steer instead of ~0.53, and full lock still arrives at full
 deflection. A player who wants the old rate back sets `STEERING: SHARP` (×1.25).
 
+`JOYSTICK` (Setup tab, touch devices only) is the fine adjustment: a 50–180%
+slider, default 100%, stored as `ir-joysens`, multiplying the expo curve before
+the clamp. Below 100% the thumb travels further for the same lock; above it,
+less. It applies live while you drag it.
+
+## 9b. Nothing may reload the page
+
+Every screen transition is IN PLACE. A reload throws away the module graph, the
+WebGL context, every compiled shader and the whole world in order to change what
+is usually one boolean — a second of white screen on a phone, every time.
+
+| Transition | Mechanism |
+|---|---|
+| Track pick | `swapLevel()` |
+| RACE / FREE ROAM / MISSIONS | `setMode()` → `_rebuildModeWorld()` |
+| Car pick | `swapPlayerCar()` |
+| Pause → EXIT, results → GARAGE, mission debrief | `showMenu(tab)` |
+| Results → NEXT LEVEL | `swapLevel()` + `startRace()`, score carried in memory |
+| Profile create / switch / delete, career reset | `_applyProfileInPlace()` |
+
+`fadeTo()` survives only as a fallback for the cases the UI cannot reach (a swap
+declining mid-race). The address bar is kept in step with `history.replaceState`
+via `_softURL()`, so a refresh or a shared link still lands where the player is.
+
+`worldLayer` is torn down by a LEVEL swap, never by a MODE swap, so everything
+mode-scoped (gun nests, roam stars, mission gates, choppers) must be removed by
+hand in `_rebuildModeWorld()`. `tests/test-transitions.mjs` cycles the modes 36
+times and fails if the world layer or the light count has moved.
+
+## 9c. Never compile a shader during play
+
+WebGL links a shader program the first time a material is drawn, on the main
+thread, and nothing else happens until it finishes. Measured on this game: one
+render call that introduced 16 new programs blocked for **1083 ms**. Three rules
+follow, and all three were broken at once in r49:
+
+1. **Warm the cache at boot.** `_warmShaders()` unhides the whole graph for the
+   length of one `renderer.compile()` (compile does not draw) so every hidden
+   transient — bullets, sparks, smoke, husks, debris — is compiled while the
+   title screen is up. Re-run after every `swapLevel()`.
+2. **Never change the light count during play.** It is part of every material's
+   cache key, so adding one light recompiles the ENTIRE scene. Explosion flashes
+   are a fixed pool of 4 `PointLight`s created once and parented to the *scene*
+   (not `worldLayer`, which a track swap would take); a flash sets a position
+   and an intensity. They used to be constructed per explosion — and leaked,
+   because they were added to `worldLayer` and removed from `scene`.
+3. **Never toggle `castShadow` on a light during play.** Same reasoning: the
+   shadow-caster count is in the cache key. The auto-quality ladder shrinks the
+   shadow map (`mapSize` 512 + drop the map) instead, which costs one texture
+   reallocation and no shader work.
+
+Measured after: 3 minutes of continuous fire, p50 8 ms, p99 18 ms, worst frame
+45.8 ms, **zero** frames over 100 ms. Before: two frames over 1.2 s.
+
 ## 10. Difficulty & rival balance
 
 The three difficulties differ in pace, aggression, how hard the rubber band
