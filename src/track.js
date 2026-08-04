@@ -457,15 +457,19 @@ const THEMES = {
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
     terrainLow: '#5f5248', terrainHigh: '#877566', terrainDirt: '#9c5c40',
     // steep-face colour for the faceted ground + warmth in the hut windows
-    terrainScree: '#4a3b33', hutGlow: 1.3,
+    terrainScree: '#6a574d', hutGlow: 1.3,
     ground: {
-      base: '#332e2a', bandLight: 'rgba(255,255,255,0.03)', bandDark: 'rgba(0,0,0,0.06)',
-      patchA: 'rgba(18,14,12,0.22)', patchB: 'rgba(96,74,58,0.14)',
-      speckA: 'rgba(255,140,60,0.9)', speckB: 'rgba(165,155,145,0.7)', speckCount: 70,
+      // The ground texture MULTIPLIES the terrain vertex colour, so a dark
+      // base here cannot be compensated by any amount of light: at '#332e2a'
+      // the albedo landed near 15/255 and the level rendered 94% black. Ash
+      // is grey, not soot — this is what makes the ground read at all.
+      base: '#6b5f56', bandLight: 'rgba(255,255,255,0.05)', bandDark: 'rgba(0,0,0,0.05)',
+      patchA: 'rgba(48,38,32,0.20)', patchB: 'rgba(150,124,102,0.16)',
+      speckA: 'rgba(255,140,60,0.9)', speckB: 'rgba(200,192,182,0.7)', speckCount: 70,
       veins: { color: '#ff7a22', glow: 'rgba(255,96,20,0.30)', count: 7 },  // ember cracks
     },
     road: {
-      base: '#3c3835', mottleA: [40, 36, 34], mottleB: [88, 82, 78],
+      base: '#5a534e', mottleA: [66, 60, 56], mottleB: [124, 116, 110],
       rut: 'rgba(152,150,152,0.30)', rutCore: 'rgba(180,177,180,0.26)',    // lighter gray ruts
       tread: 'rgba(18,14,12,0.55)',
       stoneA: 'rgba(190,185,180,0.7)', stoneB: 'rgba(28,24,22,0.8)',
@@ -480,7 +484,10 @@ const THEMES = {
     bushCount: 36, bushColor: 0x3a302a,
     bush: { h: 0.08, hVar: 0.03, s: 0.15, sVar: 0.08, l: 0.16, lVar: 0.08 },
     rockCount: 240, pebbleCount: 380,                   // heavy dark gravel scatter
-    rockColor: 0x201c22, rockSnowCap: false, rockRoughness: 0.4,  // glossy obsidian
+    // Obsidian at 0x201c22 was invisible against the ground — you only learned
+    // a rock was there from the −85 hull. Lifted to a lit basalt that still
+    // reads volcanic but silhouettes against the ash in time to swerve.
+    rockColor: 0x574c52, rockSnowCap: false, rockRoughness: 0.4,
     flowerCount: 0, flowerColors: ['#ff7a22'],
     hutRoof: 0x4a3a30, hayColor: 0x8a6a3a, hutCount: 4, hayCount: 0,
     splinter: [0x3a3634, 0xff5e2e],                     // basalt + ember chips
