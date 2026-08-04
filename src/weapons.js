@@ -346,28 +346,47 @@ export class Weapons {
         const sx = b.pos.x - b.vel.x * dt, sz = b.pos.z - b.vel.z * dt;
         const segX = b.pos.x - sx, segZ = b.pos.z - sz;
         const segLen2 = segX * segX + segZ * segZ || 1e-9;
-        const segHits = (cx, cz, r) => {
+        // NEAREST ALONG THE SEGMENT WINS. This used to walk the target lists in
+        // order and take the first overlap found, which is not the same thing:
+        // whatever list came first shadowed everything behind it, so a tree
+        // twenty units past a house still ate the round meant for the house.
+        // `u` is how far along this frame's flight the candidate sits, so the
+        // round now stops at whatever it reaches first, as it should.
+        let bestU = Infinity, bestKind = null, bestObj = null;
+        const consider = (cx, cz, r, kind, obj) => {
           const u = Math.max(0, Math.min(1, ((cx - sx) * segX + (cz - sz) * segZ) / segLen2));
           const dx = sx + segX * u - cx, dz = sz + segZ * u - cz;
-          return dx * dx + dz * dz < r * r;
+          if (dx * dx + dz * dz >= r * r || u >= bestU) return;
+          bestU = u; bestKind = kind; bestObj = obj;
         };
         for (const tr of g.track.trees ?? []) {
-          if (tr.dead) continue;
-          if (!segHits(tr.x, tr.z, tr.r + 1.1)) continue;
+          if (!tr.dead) consider(tr.x, tr.z, tr.r + 1.1, 'tree', tr);
+        }
+        for (const st of g.track.tireStacks ?? []) {
+          if (!st.dead) consider(st.x, st.z, st.r + 1.1, 'tire', st);
+        }
+        for (const bn of g.track.banners ?? []) {
+          if (!bn.dead) consider(bn.x, bn.z, bn.r + 1.1, 'banner', bn);
+        }
+        // Buildings were the one thing in the world rounds passed straight
+        // through — you could empty the cannon into a house and nothing at all
+        // happened. Walls soak several magazines, then the place comes down.
+        for (const bd of g.track.buildings ?? []) {
+          if (!bd.dead) consider(bd.x, bd.z, bd.r, 'building', bd);
+        }
+        if (bestKind === 'tree') {
+          const tr = bestObj;
           // bigger trunks soak more rounds (~3 hits for a sapling, ~5 for a giant)
           tr.hp = (tr.hp ?? (24 + (tr.s ?? 1) * 16)) - b.dmg;
           g.particles.splinters(b.pos, _UP, [0x6a4a2a, 0x3e5e30], 0.3);
           if (tr.hp <= 0) g.onTreeSmash?.(tr, null, b.owner.pos.x, b.owner.pos.z);
           hit = true;
-          break;
-        }
-        if (!hit) for (const st of g.track.tireStacks ?? []) {
-          if (st.dead) continue;
-          if (segHits(st.x, st.z, st.r + 1.1)) { g.onTireSmash?.(st, null, b.owner.pos.x, b.owner.pos.z); hit = true; break; }
-        }
-        if (!hit) for (const bn of g.track.banners ?? []) {
-          if (bn.dead) continue;
-          if (segHits(bn.x, bn.z, bn.r + 1.1)) { g.onBannerSmash?.(bn, null, b.owner.pos.x, b.owner.pos.z); hit = true; break; }
+        } else if (bestKind === 'tire') {
+          g.onTireSmash?.(bestObj, null, b.owner.pos.x, b.owner.pos.z); hit = true;
+        } else if (bestKind === 'banner') {
+          g.onBannerSmash?.(bestObj, null, b.owner.pos.x, b.owner.pos.z); hit = true;
+        } else if (bestKind === 'building') {
+          g.hitBuilding?.(bestObj, b.dmg, b.pos.clone(), b.owner); hit = true;
         }
       }
       if (hit) {

@@ -1489,8 +1489,41 @@ export class Car {
       const sa = this.steerVis * 0.42;
       for (const w of this.mesh.userData.frontWheels) w.rotation.y = sa;
     }
-    // invulnerability flicker
-    this.mesh.visible = this.alive && (this.invuln <= 0 || Math.floor(this.invuln * 14) % 2 === 0);
+    // INVULNERABILITY SHIMMER. This used to hard-toggle mesh.visible at 14 Hz,
+    // which hid the car outright on every other tick. Sampled at frame rate
+    // that aliases: at invuln 3.95 the parity sticks on the hidden phase and
+    // the car simply is not on screen — you steer a machine you cannot see.
+    // A shield orb grants 4 s of it, so this was reachable at full health.
+    // Now the car always draws; invulnerability reads as a translucent pulse.
+    this.mesh.visible = this.alive;
+    if (this.alive) this._setGhost(this.invuln > 0
+      ? 0.45 + 0.35 * Math.sin(this.invuln * 18)
+      : 0);
+  }
+
+  /** Fade the whole car toward translucent. `amt` 0 = solid, 1 = barely there.
+   *  Materials are built per car in buildVoxelRacer, so mutating them here
+   *  cannot leak onto anyone else's paint. The list is cached: this runs every
+   *  frame and traversing the car's ~60 meshes each time is not free.
+   *  Never fully transparent — that is the bug this replaced. */
+  _setGhost(amt) {
+    if (amt === this._ghost) return;              // opacity rarely changes
+    this._ghost = amt;
+    if (!this._ghostMats) {
+      this._ghostMats = [];
+      this.mesh.traverse((o) => {
+        if (!o.isMesh) return;
+        for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+          if (m && !this._ghostMats.includes(m)) this._ghostMats.push(m);
+        }
+      });
+    }
+    const solid = amt <= 0;
+    for (const m of this._ghostMats) {
+      m.transparent = !solid;
+      m.opacity = solid ? 1 : 1 - amt;
+      m.depthWrite = solid;
+    }
   }
 
   /** Lerp the body paint toward charcoal as health drops (up to 55% at zero health). */

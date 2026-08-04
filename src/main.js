@@ -2025,18 +2025,54 @@ class Game {
     const t = this.track, slot = t.gridSlot(0);
     const glow = glowTexture();
     this.missionGates = [];
+    // A pillar of light told you roughly where to be but never where the gate
+    // was — no width, no threshold, nothing to aim at. This is a real gate:
+    // two posts the width of the opening, a beam across the top, and a lit
+    // banner between them. The glow stays as a soft aura so it still reads
+    // from a distance, but the structure is what you drive through.
+    const HALF = 7;                       // half the opening, in world units
+    const postGeo = new THREE.BoxGeometry(0.8, 7.2, 0.8);
+    postGeo.translate(0, 3.6, 0);
+    const beamGeo = new THREE.BoxGeometry(HALF * 2 + 1.6, 0.9, 0.9);
+    const bannerGeo = new THREE.PlaneGeometry(HALF * 2 - 0.6, 2.4);
     for (let k = 1; k <= def.goal; k++) {
       const idx = (slot.index + Math.round(t.N * k / def.goal)) % t.N;
       const lat = k === def.goal ? 0 : [-3.5, 3.5, 0][k % 3];
       const p = t.pointAt(idx, lat);
-      const spr = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: glow, color: 0x37f6ff, transparent: true, opacity: 0.9,
+      // square the gate to the road so you drive through it, not past it
+      const ahead = t.pointAt((idx + 4) % t.N, lat);
+      const yaw = Math.atan2(ahead.x - p.x, ahead.z - p.z);
+      const gate = new THREE.Group();
+      gate.position.set(p.x, p.y, p.z);
+      gate.rotation.y = yaw;
+      const postMat = new THREE.MeshStandardMaterial({
+        color: 0x1d2b33, emissive: 0x37f6ff, emissiveIntensity: 0.55, roughness: 0.5 });
+      const trimMat = new THREE.MeshStandardMaterial({
+        color: 0x37f6ff, emissive: 0x37f6ff, emissiveIntensity: 1.5, roughness: 0.4 });
+      for (const s of [-1, 1]) {
+        const post = new THREE.Mesh(postGeo, postMat);
+        post.position.x = s * HALF;
+        post.castShadow = true;
+        gate.add(post);
+      }
+      const beam = new THREE.Mesh(beamGeo, trimMat);
+      beam.position.y = 7.2;
+      gate.add(beam);
+      const banner = new THREE.Mesh(bannerGeo, new THREE.MeshBasicMaterial({
+        map: glow, color: 0x37f6ff, transparent: true, opacity: 0.42,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      banner.position.y = 5.4;
+      gate.add(banner);
+      // soft aura so the next gate is still findable across the valley
+      const aura = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glow, color: 0x37f6ff, transparent: true, opacity: 0.5,
         blending: THREE.AdditiveBlending, depthWrite: false }));
-      spr.scale.set(5.5, 24, 1);
-      spr.position.set(p.x, p.y + 9, p.z);
-      spr.visible = k === 1;
-      this.scene.add(spr);
-      this.missionGates.push({ x: p.x, y: p.y, z: p.z, spr });
+      aura.scale.set(5, 16, 1);
+      aura.position.y = 8;
+      gate.add(aura);
+      gate.visible = k === 1;
+      this.scene.add(gate);
+      this.missionGates.push({ x: p.x, y: p.y, z: p.z, spr: gate });
     }
   }
 
@@ -3071,6 +3107,57 @@ class Game {
     }
   }
 
+  /** Put rounds into a building. Returns true once it actually comes down, so
+   *  the caller knows to stop the projectile either way — a wall you are
+   *  chipping still has to eat the bullet. */
+  hitBuilding(b, dmg, at, credit = null) {
+    if (!b || b.dead) return false;
+    b.hp -= dmg;
+    // dust and chips off the wall on every hit, so shooting one reads as
+    // progress long before it falls over
+    this.particles.splinters(at ?? new THREE.Vector3(b.x, b.y + b.h * 0.5, b.z),
+      new THREE.Vector3(0, 1, 0), [0x9a8a78, b.roofColor ?? 0x8a5a3a], 0.34);
+    if (b.hp > 0) return false;
+    this.onBuildingSmash(b, credit);
+    return true;
+  }
+
+  /** Level a building: blank the instances, drop the collider, throw the walls
+   *  and roof out as debris. Scored like the big trackside kills. */
+  onBuildingSmash(b, credit = null) {
+    if (!this.track.smashBuilding?.(b)) return;
+    const at = new THREE.Vector3(b.x, b.y + b.h * 0.5, b.z);
+    // the roof goes up as one slab and the walls come apart into planks
+    const cols = [0x9a8a78, b.roofColor ?? 0x8a5a3a];
+    for (let k = 0; k < 9; k++) {
+      const plank = new THREE.Mesh(PLANK_GEO, plankMat(cols[k % 2]));
+      const s = 0.8 + Math.random() * 1.5;
+      plank.scale.set(s * (b.w / 8), s, s * 2.2);
+      plank.position.set(
+        b.x + (Math.random() - 0.5) * b.w * 0.8,
+        b.y + 0.6 + Math.random() * b.h,
+        b.z + (Math.random() - 0.5) * b.w * 0.8);
+      this.scene.add(plank);
+      this.flyingProps.push({
+        mesh: plank,
+        vel: new THREE.Vector3((Math.random() - 0.5) * 16, 6 + Math.random() * 9,
+          (Math.random() - 0.5) * 16),
+        spin: new THREE.Vector3((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9,
+          (Math.random() - 0.5) * 9),
+        life: 2.4,
+      });
+    }
+    this.particles.explosion(at, false);
+    this.particles.driftSmoke(at);
+    this.audio.explosion(false);
+    this.flashLight(at);
+    this.shake = Math.min(1, this.shake + 0.22);
+    this.hud.feed('BUILDING DOWN', 'good');
+    this.score += 120;
+    if (credit === this.player) this.buzz(30);
+    this._missionEvent?.('prop', { type: 'building' });
+  }
+
   onTireSmash(st, car, ox, oz) {
     const tires = this.track.smashTireStack?.(st);
     if (!tires) return;
@@ -3157,6 +3244,14 @@ class Game {
       if (bn.dead) continue;
       const dx = bn.x - x, dz = bn.z - z;
       if (dx * dx + dz * dz < (radius + bn.r) * (radius + bn.r)) this.onBannerSmash(bn, null, x, z);
+    }
+    // a direct missile hit flattens a house outright; a near miss just chips it
+    for (const bd of t.buildings ?? []) {
+      if (bd.dead) continue;
+      const dx = bd.x - x, dz = bd.z - z;
+      const reach = radius + bd.r;
+      if (dx * dx + dz * dz > reach * reach) continue;
+      this.hitBuilding(bd, 150, new THREE.Vector3(x, bd.y + bd.h * 0.5, z), credit);
     }
   }
 
