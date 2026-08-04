@@ -80,7 +80,14 @@ const plankMat = (col) => {
 const CREDIT_RATE = 1 / 12;                // score -> credits
 const PODIUM_CR = [200, 120, 60];          // 1st / 2nd / 3rd
 const FIRST_CLEAR_CR = 500;                // once per world, on your first podium
-const upgradeCost = (lvl) => 500 + lvl * 400;   // 500/900/1300/1700/2100 per line
+// Upgrades escalate QUADRATICALLY: 800 / 1,600 / 4,000 / 8,000 / 13,600 —
+// 28,000 to max one line, against ~1,300 CR for a win. The old linear
+// 500+400×lvl put a fully maxed line five races away, which made every car
+// converge on the same maxed-out feel almost immediately. Steepening the tail
+// rather than raising the entry keeps the first upgrade an easy, satisfying
+// buy while the last one is a genuine target — and it forces a real choice
+// about WHICH line to pour credits into, per car.
+const upgradeCost = (lvl) => 800 + lvl * lvl * 800;
 
 // ---- race contracts ----
 // Every race offers 3 side objectives that pay flat credits on completion, so
@@ -2810,15 +2817,37 @@ class Game {
       ? new THREE.Vector3(pr.x - car.pos.x, 0, pr.z - car.pos.z).normalize()
       : new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
     const speed = Math.max(minFling, car ? Math.abs(car.speedAlong) : 0);
-    this.flyingProps.push({
-      mesh: pr.mesh,
-      vel: new THREE.Vector3(
-        dir.x * speed * 0.45 + (car ? car.vel.x * 0.4 : 0), 6 + speed * 0.15,
-        dir.z * speed * 0.45 + (car ? car.vel.z * 0.4 : 0)),
-      spin: new THREE.Vector3((Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11, (Math.random() - 0.5) * 11),
-      life: 1.5,
-      dmg: DEBRIS_DMG[pr.type] ?? 0, owner: car, age: 0, // shrapnel tag
-    });
+    // IT MUST COME APART. Flinging the intact mesh made a crate cartwheel away
+    // as a whole box with sparks around it — the particles said "shattered"
+    // while the object itself said "shoved". So the mesh is broken into pieces
+    // that fly on their own paths: same geometry, quarter scale, scattered.
+    // Only the first piece carries the damage tag, so shrapnel rules are
+    // unchanged (a prop still lands at most one hit).
+    const PIECES = 4;
+    const base = pr.mesh;
+    base.updateMatrixWorld();
+    for (let k = 0; k < PIECES; k++) {
+      const piece = k === 0 ? base : base.clone();
+      piece.position.copy(base.position);
+      piece.scale.copy(base.scale).multiplyScalar(0.34 + Math.random() * 0.2);
+      // start each fragment offset inside the old silhouette so they read as
+      // parts of the thing rather than copies of it
+      piece.position.x += (Math.random() - 0.5) * pr.r * 1.2;
+      piece.position.y += Math.random() * pr.r * 0.9;
+      piece.position.z += (Math.random() - 0.5) * pr.r * 1.2;
+      if (k > 0) this.scene.add(piece);
+      const spread = 4.5 + Math.random() * 5;
+      this.flyingProps.push({
+        mesh: piece,
+        vel: new THREE.Vector3(
+          dir.x * speed * 0.45 + (car ? car.vel.x * 0.4 : 0) + (Math.random() - 0.5) * spread,
+          5 + speed * 0.14 + Math.random() * 3.5,
+          dir.z * speed * 0.45 + (car ? car.vel.z * 0.4 : 0) + (Math.random() - 0.5) * spread),
+        spin: new THREE.Vector3((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16),
+        life: 1.1 + Math.random() * 0.7,
+        dmg: k === 0 ? (DEBRIS_DMG[pr.type] ?? 0) : 0, owner: car, age: 0,
+      });
+    }
     const at = new THREE.Vector3(pr.x, (pr.y ?? 0) + 0.6, pr.z);
     // Crush it in its own material — planks, staves, straw, snow or chips in
     // the prop's own colours. The old generic debris puff made every prop
