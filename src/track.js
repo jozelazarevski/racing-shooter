@@ -7404,7 +7404,11 @@ export class Track {
     const R = this._river;
     const curve = R.curve;
     const total = curve.getLength();
-    const SEGS = Math.max(90, Math.min(230, Math.round(total / 13)));
+    // Density, not a fixed budget: the reach is now ~5.5 km end to end because
+    // both tails run past the world edge, and the old cap of 230 would have
+    // stretched those segments to 24 u — coarsening the water right where you
+    // drive through it to pay for geometry out in the fog.
+    const SEGS = Math.max(90, Math.min(460, Math.round(total / 13)));
     const waterTex = riverTexture();
     waterTex.anisotropy = 4;
     const bankTex = riverBankTexture(this.T.riverBank);
