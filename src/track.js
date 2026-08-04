@@ -1315,6 +1315,12 @@ const THEMES = {
   },
 };
 
+/** Hermite ease on an already-normalised 0..1 ramp (clamps its own ends). */
+const smoothstep01 = (t) => {
+  const u = t <= 0 ? 0 : t >= 1 ? 1 : t;
+  return u * u * (3 - 2 * u);
+};
+
 const N = 900;              // centerline samples
 /** Title-screen minimaps: the raw circuit control polygon for a theme. */
 export function circuitPoints(themeKey) { return CIRCUITS[themeKey] || CIRCUITS.forest; }
@@ -1727,6 +1733,10 @@ export class Track {
     // [{x, z, r, y}] for big boulders, huts, gantry legs, the grandstand
     // front and distant mesas. Car physics treats them like this.obstacles.
     this.solids = [];
+    // Shootable buildings: [{x, z, y, r, w, h, hp, solid, parts, dead}]. Huts
+    // and igloos are instanced, so `parts` names the mesh + slot to blank when
+    // one is levelled, and `solid` is the collider to pull out of this.solids.
+    this.buildings = [];
     // Smashable trackside tire stacks: [{x, z, y, r, ids, dead}] — one entry
     // per STACK; ids are the instance indices inside the tire InstancedMesh.
     this.tireStacks = [];
@@ -2083,7 +2093,61 @@ export class Track {
       Math.sin(x * 0.070 + 3.1) * Math.cos(z * 0.062 + 2.2) * 0.7 +
       Math.sin(x * 0.114 + 5.3) * Math.cos(z * 0.101 + 1.4) * 2.2 * rel
       - (this.T.hillDrop || 0)
+      + this._highland(x, z)
     );
+  }
+
+  /** THE MOUNTAINS YOU CAN ACTUALLY DRIVE UP.
+   *
+   *  The drivable world used to span barely nine units of height, top to
+   *  bottom: a pancake with painted cones sitting on the horizon behind it.
+   *  Head for the hills in free roam and you never arrived — the "mountains"
+   *  were scenery at r ≈ 800 with no collision and no slope to climb.
+   *
+   *  This raises the real ground into a massif that rings the world. No track
+   *  reaches past r = 320 in any of the 21 worlds (measured), so starting the
+   *  climb at 400 leaves every racing line untouched, and _blendHeight has
+   *  already finished its corridor blend by 70 u out.
+   *
+   *  GRADE IS THE WHOLE POINT: a mountain you cannot climb is the bug being
+   *  fixed. The radial ramp contributes ~10% and the ridge octaves ~5% on top,
+   *  so the steepest ground is around 15% — a real climb that a car pulls up
+   *  with speed in hand, rather than a wall. */
+  _highland(x, z) {
+    const scale = this.T.highland !== undefined ? this.T.highland
+      : (this.T.relief === 0 ? 0 : 1);       // flat-by-design worlds opt out
+    if (!scale) return 0;
+    const t = smoothstep01((Math.hypot(x, z) - 400) / 1050);
+    if (t <= 0) return 0;
+    // ridged octaves so the massif has spurs, saddles and side valleys to pick
+    // a line through instead of being one smooth cone
+    const ridge =
+      Math.sin(x * 0.0042 + 0.9) * Math.cos(z * 0.0039 - 0.4) * 0.55 +
+      Math.sin(x * 0.0091 - 2.1) * Math.cos(z * 0.0084 + 1.3) * 0.30 +
+      Math.sin(x * 0.0180 + 4.2) * Math.cos(z * 0.0165 + 2.7) * 0.15;
+    return t * scale * 68 * (0.72 + 0.28 * ridge) * this._riverValley(x, z);
+  }
+
+  /** 0 in the river's valley floor, easing to 1 well clear of it. The river
+   *  runs out to r ≈ 1100, straight through where the massif now stands, and
+   *  water does not climb a mountain — so the mountain opens a valley for it
+   *  to leave through. _riverDist only reaches one 42 u cell, far too short
+   *  for a valley this wide, so this walks a downsampled centreline. */
+  _riverValley(x, z) {
+    const R = this._river;
+    if (!R) return 1;
+    let best = Infinity;
+    const line = R.coarse ?? R.line;
+    for (const p of line) {
+      const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
+      if (d < best) best = d;
+    }
+    // The valley DEEPENS the ground around the river, it does not delete the
+    // massif — cutting the full 68 u either flattened the range wherever the
+    // river wandered, or (taper it sharply to avoid that) turned the valley
+    // sides into the very wall this whole change exists to remove. Taking 45%
+    // over a 240 u run leaves the river in a proper gorge with ~23% sides.
+    return 0.55 + 0.45 * smoothstep01((Math.sqrt(best) - 60) / 240);
   }
 
   /** Terrain cap from OTHER road strands passing near (x,z): the lowest road y
@@ -2147,8 +2211,20 @@ export class Track {
     // is flattened out again as it nears the road so the FORD stays a shallow
     // wash across the carriageway instead of a trench (and so the road skirts,
     // which were built before the river was planned, still meet the ground)
-    if (this._river) {
-      h -= this._riverCut(x, z) * THREE.MathUtils.smoothstep(d, 15, 30);
+    if (this._river && this._river.bed) {
+      // Blend the ground toward the smoothed bed profile rather than denting
+      // whatever noise happened to be here — see _planRiver. The ford still
+      // flattens out (the fade on `d`) so the crossing stays a shallow wash on
+      // the carriageway instead of a trench across the racing line.
+      const R = this._river;
+      const outer = R.half + R.bank;
+      const { d: rd, k } = this._riverNearest(x, z);
+      if (rd < outer) {
+        const bedY = R.bed[k]
+          - R.depth * Math.pow(Math.cos((rd / outer) * Math.PI * 0.5), 1.4);
+        const w = smoothstep01(1 - rd / outer) * THREE.MathUtils.smoothstep(d, 9, 22);
+        h = h * (1 - w) + bedY * w;
+      }
     }
     return h;
   }
@@ -2257,7 +2333,60 @@ export class Track {
       if (!a) grid.set(key, a = []);
       a.push(k);
     }
-    this._river = { curve, line, grid, CELL, half, bank, depth: 1.5, fords: order };
+    // depth 1.5 barely dented the ground; the banks need to actually rise
+    // around the water for it to read as a river rather than blue paint
+    // every 6th sample is plenty to measure a 250 u-wide valley against, and
+    // _riverValley scans this list once per terrain vertex — keep it short
+    const coarse = line.filter((_, i) => i % 6 === 0);
+    this._river = { curve, line, coarse, grid, CELL, half, bank, depth: 2.6, bed: null, fords: order };
+
+    // THE BED. Carving used to mean "subtract a bump from whatever the ground
+    // was doing", which is not a riverbed: the hill octaves vary by about as
+    // much across ten units as the whole channel was deep, so ridges pushed up
+    // through a level water surface and broke the reach into disconnected blue
+    // shards. So sample the ground the river crosses, smooth it along the
+    // flow, and force it to fall — water does not run uphill — then blend the
+    // terrain TOWARD that profile inside the channel instead of denting it.
+    // _blendHeight skips the channel entirely while `bed` is null, so these
+    // samples see the pre-river ground and this cannot feed on itself.
+    const raw = line.map((p) => this.terrainHeight(p.x, p.z));
+    const SM = 10;                                    // smoothing half-window
+    const smooth = raw.map((_, k) => {
+      let s = 0, n = 0;
+      for (let j = -SM; j <= SM; j++) {
+        const i = k + j;
+        if (i >= 0 && i < raw.length) { s += raw[i]; n++; }
+      }
+      return s / n;
+    });
+    // walk downhill from whichever end is higher so the profile never climbs
+    const flowsForward = smooth[0] >= smooth[smooth.length - 1];
+    const bed = smooth.slice();
+    if (flowsForward) {
+      for (let k = 1; k < bed.length; k++) bed[k] = Math.min(bed[k], bed[k - 1]);
+    } else {
+      for (let k = bed.length - 2; k >= 0; k--) bed[k] = Math.min(bed[k], bed[k + 1]);
+    }
+    this._river.bed = bed;
+  }
+
+  /** Nearest centreline sample to (x, z): {d, k}. d is Infinity past the bed. */
+  _riverNearest(x, z) {
+    const R = this._river;
+    const cx = Math.floor(x / R.CELL), cz = Math.floor(z / R.CELL);
+    let best = Infinity, bk = -1;
+    for (let a = -1; a <= 1; a++) {
+      for (let b = -1; b <= 1; b++) {
+        const arr = R.grid.get(`${cx + a},${cz + b}`);
+        if (!arr) continue;
+        for (const k of arr) {
+          const p = R.line[k];
+          const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
+          if (d < best) { best = d; bk = k; }
+        }
+      }
+    }
+    return { d: best === Infinity ? Infinity : Math.sqrt(best), k: bk };
   }
 
   /** Distance from (x, z) to the river centreline, or Infinity past the bed. */
@@ -2279,15 +2408,6 @@ export class Track {
     return best === Infinity ? Infinity : Math.sqrt(best);
   }
 
-  /** Depth of the river bed at (x, z): a U-shaped channel that eases back to
-   *  grade at the top of the bank. Mirrors _gorgeCut's contract. */
-  _riverCut(x, z) {
-    const R = this._river;
-    const outer = R.half + R.bank;
-    const d = this._riverDist(x, z);
-    if (!(d < outer)) return 0;
-    return R.depth * Math.pow(Math.cos((d / outer) * Math.PI * 0.5), 1.4);
-  }
   // ---- end continuous river --------------------------------------------------
 
   /** Depth of the river gorge at (x, z): 0 everywhere outside it, easing to
@@ -3992,7 +4112,7 @@ export class Track {
       const w = M.w0 + Math.random() * (M.w1 - M.w0);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       q.setFromAxisAngle(up, Math.random() * Math.PI);
-      const y = -12 - (this.T.hillDrop || 0);
+      const y = -12 - (this.T.hillDrop || 0) + this._highland(x, z);
       m4.compose(new THREE.Vector3(x, y + h / 2, z), q, new THREE.Vector3(w, h, w * 0.85));
       rock.setMatrixAt(k, m4);
       this.solids.push({ x, z, r: w * 0.3, y: y + 4, mat: 'stone' });
@@ -4020,8 +4140,9 @@ export class Track {
       const a = a0 + (t - 0.5) * 0.34 + (k % 2 ? 0.05 : -0.05);
       const w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
       q.setFromAxisAngle(up, a + 1.2);
+      const gx = Math.cos(a) * r, gz = Math.sin(a) * r;
       m4.compose(
-        new THREE.Vector3(Math.cos(a) * r, -18 - (this.T.hillDrop || 0) + t * 4, Math.sin(a) * r),
+        new THREE.Vector3(gx, -18 - (this.T.hillDrop || 0) + t * 4 + this._highland(gx, gz), gz),
         q, new THREE.Vector3(w, h, d)
       );
       slabs.setMatrixAt(k, m4);
@@ -4751,15 +4872,32 @@ export class Track {
         const ex = p0.x + ux * (len + 15), ez = p0.z + uz * (len + 15);
         const ey = gy(ex, ez);
         const bw = 8.0, bh = 5.0;
+        // instance slots have to be grabbed BEFORE the push — `push` bumps
+        // im.count itself, so afterwards the index is already gone
+        const bi = M.barn.count, bri = M.barnRoof.count;
         push(M.barn, ex, ey - 0.5, ez, rot + 0.22, bw, bh, bw * 0.78);
         push(M.barnRoof, ex, ey - 0.5 + bh, ez, rot + 0.22, bw * 1.22, bh * 0.8, bw * 1.02);
-        this.solids.push({ x: ex, z: ez, r: bw * 0.62, y: ey, mat: 'hut' });
+        const barnSolid = { x: ex, z: ez, r: bw * 0.62, y: ey, mat: 'hut' };
+        this.solids.push(barnSolid);
+        // the farm buildings are buildings too — you can shoot these down
+        this.buildings.push({
+          x: ex, z: ez, y: ey, r: bw * 0.62, w: bw, h: bh, hp: 220, solid: barnSolid,
+          parts: [{ mesh: M.barn, i: bi }, { mesh: M.barnRoof, i: bri }],
+          roofColor: this.T.hutRoof,
+        });
         this._addShadow(ex, ez, bw * 0.8);
         const sx2 = ex + px * 7.5, sz2 = ez + pz * 7.5;
         const sy2 = gy(sx2, sz2);
+        const si = M.silo.count, sci = M.siloCap.count;
         push(M.silo, sx2, sy2 - 0.4, sz2, rot, 1.9, 7.6, 1.9);
         push(M.siloCap, sx2, sy2 - 0.4 + 7.6, sz2, rot, 2.2, 1.5, 2.2);
-        this.solids.push({ x: sx2, z: sz2, r: 2.0, y: sy2, mat: 'hut' });
+        const siloSolid = { x: sx2, z: sz2, r: 2.0, y: sy2, mat: 'hut' };
+        this.solids.push(siloSolid);
+        this.buildings.push({
+          x: sx2, z: sz2, y: sy2, r: 2.2, w: 4, h: 7.6, hp: 150, solid: siloSolid,
+          parts: [{ mesh: M.silo, i: si }, { mesh: M.siloCap, i: sci }],
+          roofColor: 0xd8d2c4,
+        });
         this._addShadow(sx2, sz2, 2.5);
         const tx = ex - px * 6.5 - ux * 3, tz = ez - pz * 6.5 - uz * 3;
         push(M.trough, tx, gy(tx, tz) - 0.1, tz, rot + 0.5, 1.1, 0.75, 4.2);
@@ -5327,22 +5465,29 @@ export class Track {
       30
     );
     const base = -8 - (T.hillDrop || 0);      // sit on the (possibly sunk) field
+    // The drivable massif now rises through where these cones used to stand,
+    // so each one is seated on the real ground beneath it instead of on the
+    // old flat field — otherwise the terrain swallows them to the shoulders.
+    // They become the peaks the highland climbs toward rather than a backdrop.
+    const seat = (x, z) => base + this._highland(x, z);
     for (let i = 0; i < 40; i++) {
       const a = (i / 40) * Math.PI * 2;
-      const r = 760 + Math.random() * 110;
+      const r = 900 + Math.random() * 140;
       const h = 70 + Math.random() * 90;
       const w = 130 + Math.random() * 150;
+      const px = Math.cos(a) * r, pz = Math.sin(a) * r;
       m4.makeScale(w, h, w);
-      m4.setPosition(Math.cos(a) * r, h / 2 + base, Math.sin(a) * r);
+      m4.setPosition(px, h / 2 + seat(px, pz), pz);
       hills.setMatrixAt(i, m4);
     }
     for (let i = 0; i < 30; i++) {
       const a = (i / 30) * Math.PI * 2 + 0.1;
-      const r = 980 + Math.random() * 140;
+      const r = 1120 + Math.random() * 160;
       const h = 160 + Math.random() * 140;
       const w = 120 + Math.random() * 140;
+      const px = Math.cos(a) * r, pz = Math.sin(a) * r;
       m4.makeScale(w, h, w);
-      m4.setPosition(Math.cos(a) * r, h / 2 + base, Math.sin(a) * r);
+      m4.setPosition(px, h / 2 + seat(px, pz), pz);
       peaks.setMatrixAt(i, m4);
     }
     this.scene.add(hills, peaks);
@@ -5368,7 +5513,9 @@ export class Track {
     for (const s of specs) {
       const rot = Math.random() * Math.PI;
       const hr = [0.5, 0.32, 0.2], wr = [1, 0.74, 0.5];
-      let y = -2;
+      // seated on the real ground: the massif rises to 68 u out where the
+      // horizon mesas stand, and a fixed -2 would sink them into it
+      let y = -2 + this._highland(s.x, s.z);
       q.setFromAxisAngle(up, rot);
       for (let t = 0; t < 3; t++) {
         const w = s.w * wr[t];
@@ -5412,8 +5559,9 @@ export class Track {
         const w = R.w0 + Math.random() * R.wv;
         const h = R.h0 + Math.random() * R.hv;
         q.setFromAxisAngle(up, Math.random() * Math.PI);
+        const dx = Math.cos(a) * r, dz = Math.sin(a) * r;
         m4.compose(
-          new THREE.Vector3(Math.cos(a) * r, h / 2 - 6, Math.sin(a) * r),
+          new THREE.Vector3(dx, h / 2 - 6 + this._highland(dx, dz), dz),
           q,
           new THREE.Vector3(w, h, w * (0.4 + Math.random() * 0.3))  // long wind-carved ridges
         );
@@ -5451,7 +5599,7 @@ export class Track {
     const put = (x, z, w, h) => {
       q.setFromAxisAngle(up, Math.random() * Math.PI);
       m4.compose(
-        new THREE.Vector3(x, -4, z), q,
+        new THREE.Vector3(x, -4 + this._highland(x, z), z), q,
         new THREE.Vector3(w, h, w * (0.6 + Math.random() * 0.8))
       );
       towers.setMatrixAt(k++, m4);
@@ -6747,22 +6895,52 @@ export class Track {
       ? () => this._zonePos(this.T.hutZone, 20, 62)
       : () => this._trackSidePos(24, 64);
     this._scatter(COUNT, makePos, (p) => {
-      const w = 9 + Math.random() * 6;
-      const h = 5 + Math.random() * 2.5;
+      // SCALE. The car is 4.4 u long and 2.6 u wide, so a 9-15 u hut under a
+      // roof scaled to w·1.6 towered over it — the pyramid's flats reached
+      // 0.96 w to each side, nearly twice the wall, which is what made the
+      // houses read as giant. A cottage is a bit wider than a car is long and
+      // about as tall again; the roof gets an eave, not a marquee.
+      const w = 6 + Math.random() * 3;
+      const h = 3.6 + Math.random() * 1.4;
       const rot = Math.random() * Math.PI * 2;
       const y = this.terrainHeight(p.x, p.z) - 0.6;
       q.setFromAxisAngle(up, rot);
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(w, h, w));
       walls.setMatrixAt(placed, m4);
-      m4.compose(new THREE.Vector3(p.x, y + h, p.z), q, new THREE.Vector3(w * 1.6, h * 1.1, w * 1.6));
-      roofs.setMatrixAt(placed++, m4);
+      m4.compose(new THREE.Vector3(p.x, y + h, p.z), q, new THREE.Vector3(w * 0.88, h * 0.72, w * 0.88));
+      roofs.setMatrixAt(placed, m4);
       // solid hut: walls are a unit box scaled w×w, so half the world-space
       // diagonal of the footprint is w·√2/2
-      this.solids.push({ x: p.x, z: p.z, r: (w * Math.SQRT2) / 2, y: y + 0.6, mat: 'hut' });
+      const solid = { x: p.x, z: p.z, r: (w * Math.SQRT2) / 2, y: y + 0.6, mat: 'hut' };
+      this.solids.push(solid);
+      // A building is a target, not scenery: register it so cannon rounds and
+      // blasts can level it. `parts` carries the instanced meshes and the slot
+      // to blank when it comes down. Stone walls soak a lot more than a crate.
+      this.buildings.push({
+        x: p.x, z: p.z, y, r: w * 0.62, w, h, hp: 190, solid,
+        parts: [{ mesh: walls, i: placed }, { mesh: roofs, i: placed }],
+        roofColor: this.T.hutRoof,
+      });
       this._addShadow(p.x, p.z, w * 0.85);
+      placed++;
     });
     walls.count = roofs.count = placed;
     this.scene.add(walls, roofs);
+  }
+
+  /** Blank a destroyed building's instances and drop its collider, so you can
+   *  drive through the rubble afterwards. Returns its debris recipe. */
+  smashBuilding(b) {
+    if (b.dead) return null;
+    b.dead = true;
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (const p of b.parts) {
+      p.mesh.setMatrixAt(p.i, zero);
+      p.mesh.instanceMatrix.needsUpdate = true;
+    }
+    const si = this.solids.indexOf(b.solid);
+    if (si >= 0) this.solids.splice(si, 1);
+    return b;
   }
 
   /** Glacial dwellings: white ice-block domes (half-sunk spheres) with a short
@@ -6811,9 +6989,17 @@ export class Track {
         new THREE.Vector3(tx + dx * R * 0.36, y + R * 0.35 + tr * 0.4, tz + dz * R * 0.36),
         q, new THREE.Vector3(tr * 0.82, tr * 0.82, 1)
       );
-      doors.setMatrixAt(placed++, m4);
-      this.solids.push({ x: p.x, z: p.z, r: R * 0.95, y: y + R * 0.35, mat: 'hut' });
+      doors.setMatrixAt(placed, m4);
+      const solid = { x: p.x, z: p.z, r: R * 0.95, y: y + R * 0.35, mat: 'hut' };
+      this.solids.push(solid);
+      // ice blocks come apart easier than stone walls
+      this.buildings.push({
+        x: p.x, z: p.z, y, r: R * 0.95, w: R * 2, h: R, hp: 130, solid,
+        parts: [{ mesh: domes, i: placed }, { mesh: tunnels, i: placed }, { mesh: doors, i: placed }],
+        roofColor: 0xdfeef8,
+      });
       this._addShadow(p.x, p.z, R * 1.3);
+      placed++;
     });
     domes.count = tunnels.count = doors.count = placed;
     this.scene.add(domes, tunnels, doors);
@@ -7273,7 +7459,14 @@ export class Track {
     // --- water: sits IN the bed, rises to a shallow sheet over the ford ---
     const waterY = (f, off, vx, vz) => {
       const lift = 1 - THREE.MathUtils.smoothstep(f.df, 10, 26);
-      const bed = this.terrainHeight(vx, vz);
+      // LEVEL ACROSS THE WIDTH. Sampling the bed under each vertex made the
+      // surface follow the ground sideways, so on any slope the river banked
+      // over like a tilted tray and its edge climbed out onto the grass. Real
+      // water is level bank to bank and only falls along its length, so the
+      // height comes from the flow profile and the same value is used right
+      // across the ribbon. Reading the profile rather than the mesh also means
+      // the surface cannot be sliced up by whatever the hill noise is doing.
+      const bed = R.bed ? R.bed[this._riverNearest(f.x, f.z).k] : this.terrainHeight(f.x, f.z);
       // in the open the surface sits partway up the carved channel; across the
       // road it becomes a thin wash sitting just proud of the deck
       return bed + (1 - lift) * (R.depth * 0.42) + lift * 0.06;
