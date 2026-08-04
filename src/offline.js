@@ -52,10 +52,18 @@
   // build on screen to replace and a reload would just be a flicker.
   const hadController = !!navigator.serviceWorker.controller;
   let reloading = false;
+  // ...but never yank the world out from under someone mid-race. If a new
+  // worker lands while a lap is running, wait for the menu before reloading.
+  const reloadWhenIdle = () => {
+    const g = window.__game;
+    const racing = g && (g.state === 'race' || g.state === 'countdown');
+    if (racing) { setTimeout(reloadWhenIdle, 2000); return; }
+    location.reload();
+  };
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController || reloading) return;
     reloading = true;
-    location.reload();
+    reloadWhenIdle();
   });
 
   window.addEventListener('load', () => {
