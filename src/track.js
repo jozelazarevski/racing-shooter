@@ -4907,7 +4907,7 @@ export class Track {
         this.solids.push(barnSolid);
         // the farm buildings are buildings too — you can shoot these down
         this.buildings.push({
-          x: ex, z: ez, y: ey, r: bw * 0.62, w: bw, h: bh, hp: 220, solid: barnSolid,
+          x: ex, z: ez, y: ey, r: bw * 0.62, w: bw, h: bh, hp: 150, solid: barnSolid,
           parts: [{ mesh: M.barn, i: bi }, { mesh: M.barnRoof, i: bri }],
           roofColor: this.T.hutRoof,
         });
@@ -4920,7 +4920,7 @@ export class Track {
         const siloSolid = { x: sx2, z: sz2, r: 2.0, y: sy2, mat: 'hut' };
         this.solids.push(siloSolid);
         this.buildings.push({
-          x: sx2, z: sz2, y: sy2, r: 2.2, w: 4, h: 7.6, hp: 150, solid: siloSolid,
+          x: sx2, z: sz2, y: sy2, r: 2.2, w: 4, h: 7.6, hp: 100, solid: siloSolid,
           parts: [{ mesh: M.silo, i: si }, { mesh: M.siloCap, i: sci }],
           roofColor: 0xd8d2c4,
         });
@@ -6943,7 +6943,7 @@ export class Track {
       // blasts can level it. `parts` carries the instanced meshes and the slot
       // to blank when it comes down. Stone walls soak a lot more than a crate.
       this.buildings.push({
-        x: p.x, z: p.z, y, r: w * 0.62, w, h, hp: 190, solid,
+        x: p.x, z: p.z, y, r: w * 0.62, w, h, hp: 120, solid,
         parts: [{ mesh: walls, i: placed }, { mesh: roofs, i: placed }],
         roofColor: this.T.hutRoof,
       });
@@ -7020,7 +7020,7 @@ export class Track {
       this.solids.push(solid);
       // ice blocks come apart easier than stone walls
       this.buildings.push({
-        x: p.x, z: p.z, y, r: R * 0.95, w: R * 2, h: R, hp: 130, solid,
+        x: p.x, z: p.z, y, r: R * 0.95, w: R * 2, h: R, hp: 90, solid,
         parts: [{ mesh: domes, i: placed }, { mesh: tunnels, i: placed }, { mesh: doors, i: placed }],
         roofColor: 0xdfeef8,
       });
