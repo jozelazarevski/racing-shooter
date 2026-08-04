@@ -3784,6 +3784,36 @@ class Game {
     this.camPos.lerp(targetPos, k);
     this.camLook.lerp(targetLook, k);
     clampCam(this.camPos);
+
+    // THE GROUND MUST NEVER GET BETWEEN YOU AND YOUR CAR.
+    //
+    // There was a guard for cliff-walled worlds and a guard for pine trunks,
+    // and nothing at all for plain terrain. So on any rolling world the camera
+    // could sit inside a hillside: the frame fills with green, the car is
+    // behind it, and it reads exactly like the car has vanished — which is
+    // what it has been reported as, repeatedly, on snow and on grass alike.
+    //
+    // Two rules. Stay above the ground you are over, and clear the highest
+    // point on the sightline to the car. Lifting rather than pulling in,
+    // because pulling in far enough on a steep rise puts the camera inside
+    // the car; a slightly higher view still shows the road.
+    if (tk?.terrainHeight) {
+      const cp = this.camPos, pp = p.pos;
+      const dx = pp.x - cp.x, dz = pp.z - cp.z, dy = pp.y - cp.y;
+      let lift = 0;
+      const STEPS = 7;
+      for (let s = 1; s <= STEPS; s++) {
+        const f = s / (STEPS + 1);
+        const gh = tk.terrainHeight(cp.x + dx * f, cp.z + dz * f) + 1.1;
+        const sy = cp.y + dy * f;
+        if (gh > sy) lift = Math.max(lift, (gh - sy) / (1 - f));
+      }
+      if (lift > 0) cp.y += Math.min(lift, 18);
+      // ...and never underground wherever it ended up
+      const gCam = tk.terrainHeight(cp.x, cp.z) + 2.2;
+      if (cp.y < gCam) cp.y = gCam;
+    }
+
     // a solid pine on the camera->player sightline fills the whole frame —
     // slide the camera sideways off the trunk instead
     if (tk?.trees) {
@@ -3823,6 +3853,46 @@ class Game {
     // keep the shadow light rig centered on the player (offset = theme sun dir)
     this.moon.position.copy(p.pos).add(this._sunOffset);
     this.moon.target.position.copy(p.pos);
+  }
+
+  /** WATCHDOG: you must always be able to see your own car.
+   *
+   *  This has been reported several times — on snow, on grass, in race and in
+   *  roam — and each time the cause turned out to be different: a 14 Hz
+   *  visibility toggle, then a translucent pulse that bottomed out at 21%
+   *  opacity, then terrain drawn over the carriageway. Each was real and each
+   *  was fixed, and it came back, which says the useful thing to build is not
+   *  another guess at the cause but a check on the SYMPTOM.
+   *
+   *  So: once a second of the car being un-seeable — off screen, flagged
+   *  invisible, or under the ground — put it right and say so. The feed line
+   *  is deliberate; if this ever fires in a screenshot we know immediately
+   *  which of the three it was, instead of inferring it from the picture. */
+  _watchCarVisible(dt) {
+    const p = this.player;
+    if (this.state !== 'race' || !p || !p.alive) { this._blindT = 0; return; }
+    const v = p.mesh.position.clone().project(this.camera);
+    const onScreen = v.x > -1.05 && v.x < 1.05 && v.y > -1.05 && v.y < 1.05 && v.z < 1;
+    const gy = this.track.terrainHeight(p.pos.x, p.pos.z);
+    const buried = p.y < gy - 1.2;
+    const why = !p.mesh.visible ? 'hidden' : buried ? 'buried' : !onScreen ? 'offscreen' : null;
+    this._blindT = why ? (this._blindT ?? 0) + dt : 0;
+    if (this._blindT <= 1.0) return;
+    this._blindT = 0;
+    if (buried) { p.y = gy; p.pos.y = gy; p.vy = Math.max(0, p.vy); }
+    p.mesh.visible = true;
+    // re-seat the camera behind the car rather than letting it lerp back from
+    // wherever it had wandered to
+    const M = CAM_MODES[this.camMode] || CAM_MODES[0];
+    const f = p.forward;
+    this.camPos.set(p.pos.x - f.x * M.back, p.y + M.h, p.pos.z - f.z * M.back);
+    this.camLook.set(p.pos.x + f.x * M.look, p.y + (M.lookH || 0), p.pos.z + f.z * M.look);
+    this.hud?.feed?.(`VIEW RESET (${why})`, 'info');
+    console.warn('[watchdog] car not visible:', why, {
+      y: +p.y.toFixed(2), groundY: +gy.toFixed(2), camMode: this.camMode,
+      cam: [Math.round(this.camera.position.x), Math.round(this.camera.position.y),
+        Math.round(this.camera.position.z)],
+    });
   }
 
   // ---------- main loop ----------
@@ -3963,6 +4033,7 @@ class Game {
     }
 
     if (this.state !== 'title') this._updateCamera(dt);
+    this._watchCarVisible(dt);
     this.input.endFrame();
     this._autoQuality();
     this.composer.render();
