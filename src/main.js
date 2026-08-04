@@ -48,16 +48,23 @@ const WORLD_TAGS = {
   neon: 'maglev lanes · night city', undercity: '🐀 rats · tunnels',
 };
 
+// steer: how much of the car's steering rate the player gets in this view.
+// From above, a yaw change moves the car against a fixed world and reads as
+// exactly what it is. From behind, the camera yaws WITH the car, so the whole
+// scene swings and the same rate reads as twitchy — the correction you make is
+// always slightly too much, and you saw-saw down the road. The chase views
+// therefore drive on a calmer rack. Only the player is scaled; the AI keeps
+// its own rate so the field stays as quick as it ever was.
 const CAM_MODES = [
-  { name: 'TOP-DOWN',  back: 20, h: 52, look: 7,  lookH: 0,   spdBack: 6, spdH: 10 },
-  { name: 'TOP FAR',   back: 24, h: 84, look: 1,  lookH: 0,   spdBack: 4, spdH: 10 },
+  { name: 'TOP-DOWN',  back: 20, h: 52, look: 7,  lookH: 0,   spdBack: 6, spdH: 10, steer: 1 },
+  { name: 'TOP FAR',   back: 24, h: 84, look: 1,  lookH: 0,   spdBack: 4, spdH: 10, steer: 1 },
   // CHASE sat at h 7.5 / back 13 / look 10 — down at bumper height and close
   // enough that the car filled the screen, so you could not see far enough up
   // the road to place the next corner ("super hard to drive in this camera
   // mode"). Lifted and pulled back, and the look-ahead point pushed well down
   // the road: you now see the corner before you are in it.
-  { name: 'CHASE',     back: 17, h: 11.5, look: 19, lookH: 3.2, spdBack: 4, spdH: 2, chase: true },
-  { name: 'CHASE FAR', back: 26, h: 17,   look: 22, lookH: 3.4, spdBack: 4, spdH: 2, chase: true },
+  { name: 'CHASE',     back: 17, h: 11.5, look: 19, lookH: 3.2, spdBack: 4, spdH: 2, chase: true, steer: 0.76 },
+  { name: 'CHASE FAR', back: 26, h: 17,   look: 22, lookH: 3.4, spdBack: 4, spdH: 2, chase: true, steer: 0.84 },
 ];
 // ---- economy ----
 // Score is the arcade number (it inflates fast: 500/lap, big rank bonus,
@@ -671,6 +678,13 @@ class Game {
   cycleCamera() {
     this.camMode = (this.camMode + 1) % CAM_MODES.length;
     if (this.state !== 'title') this.hud.feed(`CAMERA: ${CAM_MODES[this.camMode].name}`, 'info');
+  }
+
+  /** Steering scale for the view currently being driven — see CAM_MODES.
+   *  A getter rather than a stored field so it stays right no matter how
+   *  camMode was set (button, keyboard, pause menu, restored preference). */
+  get camSteerMul() {
+    return (CAM_MODES[this.camMode] || CAM_MODES[0]).steer ?? 1;
   }
 
   /** In roam mode, exiting banks the destruction score as credits. */
@@ -2114,6 +2128,9 @@ class Game {
     };
     if (def.id === 'starrush') this._buildRoamStars('mission');
     if (def.id === 'blitz') this._missionBuildGates(def);
+    // SURVIVOR is the only mission that is about being shot at, so it is the
+    // only one that gets dug-in guns. The other four are driving tests.
+    if (def.survive) this._digGunNests(4);
     // objective counter borrows the LAP row: "💥 4/18" instead of "LAP 1/3"
     const lapEl = document.getElementById('lap');
     if (lapEl?.parentElement?.firstChild?.nodeType === 3) {
@@ -2850,9 +2867,22 @@ class Game {
     // is nothing to shoot at you on a stage, and being shot at by scenery you
     // cannot answer is not difficulty, it is noise.
     if (!t || !this.freeRoam) return;
-    const COUNT = this.missionMode ? 4 : 5;
-    for (let k = 0; k < COUNT; k++) {
-      const idx = Math.floor(t.N * ((k + 0.5) / COUNT + Math.random() * 0.08)) % t.N;
+    // Same argument one level down. Four of the five missions are driving
+    // tests against a clock — a HOT LAP or a RAMPAGE run does not want roadside
+    // machine guns any more than a rally stage does. Only SURVIVOR, which is
+    // explicitly an assault, gets them; they are built when it launches.
+    if (this.missionMode) return;
+    this._digGunNests(5);
+  }
+
+  /** Place n nests around the circuit, off the racing line. Bypasses the mode
+   *  gate above — SURVIVOR calls it directly when the assault mission starts. */
+  _digGunNests(count) {
+    const t = this.track;
+    if (!t) return;
+    this.hostiles = this.hostiles || [];
+    for (let k = 0; k < count; k++) {
+      const idx = Math.floor(t.N * ((k + 0.5) / count + Math.random() * 0.08)) % t.N;
       const side = Math.random() < 0.5 ? -1 : 1;
       const p = t.pointAt(idx, side * (17 + Math.random() * 9));
       const y = t.terrainHeight(p.x, p.z);
@@ -3761,7 +3791,10 @@ class Game {
       const sp = Math.hypot(p.vel.x, p.vel.z);
       if (sp > 5) yaw += wrap(Math.atan2(p.vel.x, p.vel.z) - yaw) * 0.4; // look where you're going
       const cur = this._camYaw ?? yaw;
-      this._camYaw = cur + wrap(yaw - cur) * Math.min(1, 4.5 * dt);
+      // 4.5 tracked the car closely enough that the view still whipped on a
+      // flick. Slower: the camera lags turn-in slightly, so you see the CAR
+      // rotate against a steady world instead of the world rotating around you.
+      this._camYaw = cur + wrap(yaw - cur) * Math.min(1, 3.6 * dt);
       fwd = new THREE.Vector3(Math.sin(this._camYaw), 0, Math.cos(this._camYaw));
     }
     const targetPos = p.pos.clone()

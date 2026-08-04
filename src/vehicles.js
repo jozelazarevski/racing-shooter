@@ -680,10 +680,32 @@ export class Car {
     // rate; recentering runs a touch faster so the car settles quickly.
     const hnd = this.handling ?? 0;
     const sense = this.steerSense ?? 1; // player sensitivity setting (0.8/1/1.25)
+    // View scale (player only): the chase cameras yaw the world with the car,
+    // so every correction is amplified and you saw-saw down the road. They
+    // drive on a calmer rack.
+    //
+    // But the calm is FADED IN WITH SPEED, and that part is not cosmetic. The
+    // tight worlds — GOTTHARD, FURKA, SUMMIT — have 5 m hairpins that already
+    // ask for full lock; measured, a flat 30% cut put several of them beyond
+    // what the car can physically turn. Twitchiness is a fast-road problem, so
+    // it gets a fast-road answer: below ~22 km/h you keep every degree of lock,
+    // and the rack only quietens as the speed that makes it twitchy arrives.
+    let camMul = 1;
+    if (this === this.game.player) {
+      const base = this.game.camSteerMul ?? 1;
+      const fade = THREE.MathUtils.clamp((Math.abs(this.speedAlong) - 6) / 12, 0, 1);
+      camMul = 1 - (1 - base) * fade;
+    }
     let steer = inputs.steer;
     if (this.steerSmoothRate > 0) {
       const centering = steer * this.steerSmooth < 0 || Math.abs(steer) < Math.abs(this.steerSmooth);
-      const rate = this.steerSmoothRate * (1 + hnd) * (0.9 + 0.1 * sense) * (centering ? 1.4 : 1);
+      // The ramp is softened toward the view scale, not multiplied by it —
+      // scaling both the ramp and the rate below compounds, and 0.7 × 0.7 took
+      // far more out of the car than intended. Recentering is never slowed:
+      // letting go of the stick must always settle the car promptly, which is
+      // what stops a correction turning into a tank-slapper.
+      const rate = this.steerSmoothRate * (1 + hnd) * (0.9 + 0.1 * sense)
+        * (centering ? 1.4 : 0.6 + 0.4 * camMul);
       this.steerSmooth += (steer - this.steerSmooth) * Math.min(1, rate * dt);
       steer = this.steerSmooth;
     } else {
@@ -855,7 +877,7 @@ export class Car {
     const authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
     const dir = vf >= 0 ? 1 : -1;
     const stripSteer = this.stripLock ? this.stripLock.steerMul : 1;
-    let dTheta = steer * this.steerRate * sense * authority * stripSteer * dir * dt;
+    let dTheta = steer * this.steerRate * sense * camMul * authority * stripSteer * dir * dt;
     // DRIVING AID: a gentle nudge back toward the road's direction when the
     // player isn't actively steering. It never fights your input and never
     // steers for you — it just stops the car wandering, which is what makes
