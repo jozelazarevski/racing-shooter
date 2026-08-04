@@ -278,6 +278,8 @@ no livestock dressing (troughs, hay racks) on a city world.
 | Rival cars | ACTOR | Real impacts (> 9 u/s relative) dent BOTH hulls `min(20, (impact−9)×0.6)`, rate-limited 0.5 s per car; rubs are free; restitution 0.12; sparks scale with impact |
 | Player car | ACTOR | Same rules; also takes wall/tree/ram/weapon damage; wreck at 0 hull → respawn with 3 s invulnerability. Hull intake scales by difficulty: EASY ×0.45, NORMAL ×0.62, HARD ×0.85 (events/drama unchanged). **Pit-crew recovery**: 5 s without taking damage → hull regenerates 3/s up to 60% of max |
 | Choppers | ACTOR | 80 hp; killed by cannon (flak — altitude ignored), missiles, shockwave; +500 on kill |
+| Gun nests | ACTOR (SOLID) | 70 hp, dug in 17–26 u off the racing line. **Only where combat is the point**: 5 in FREE ROAM, 4 in the SURVIVOR mission. Never in a race — a rally is a rally — and never in the other four missions, which are driving tests against a clock. Being shot at by scenery you cannot answer is not difficulty, it is noise |
+| Raiders | ACTOR | 120 hp, top speed 46; hunt the player in the combat modes with CLOSE / STAND / PUSH states and a 4.5 s ram cooldown |
 | Pickups | trigger | Collected on touch: green hull / amber missiles / blue nitro / red mines / mint **shield** (4 s invulnerability, 2 per lap) |
 | Style combo | meta | Smash/kill/overtake/BIG AIR (>0.7 s airtime)/CLOSE CALL (within 1.9 u of a rock at >22 u/s, 4 s cooldown)/SLIPSTREAM (1.1 s tucked behind a rival → +12% top speed) all extend one 5 s chain; multiplier `min(4, 1 + 0.25×chain)` on style points; chain ≥4 adds +0.03 nitro per event |
 | Slow-field orb (violet) | trigger | GLACIAL PASS / AMAZON RAPIDS only (2 per lap). On touch: **FREEZE STRIKE! / JUNGLE FURY!** — every rival is hard-capped at `maxSpeed × 0.5` for 6 s. The cap is physical: it stomps in-flight boosts and boost pads grant rivals nothing while the field is live. +100 score |
@@ -419,9 +421,29 @@ player is *not* actively steering (|steer| < 0.25), is on the ground, above
 toward the road direction at `delta × assist × 2.2` rad/s. It never fights
 input and never corners for you — it only stops the car wandering.
 
-The chase cameras additionally damp their own yaw (4.5/s) toward a blend of
+The chase cameras additionally damp their own yaw (3.6/s) toward a blend of
 heading and travel direction, so flicks and drifts no longer whip the view —
 that whip was what made the 3D views hard to drive.
+
+### Steering is scaled to the view you are driving in
+
+From above, a yaw change moves the car against a fixed world. From behind, the
+camera yaws *with* the car, so the whole scene swings and every correction
+overshoots — the reported symptom is "way too sensitive". The player's steering
+rate is therefore scaled per camera: **TOP-DOWN / TOP FAR ×1**, **CHASE ×0.76**,
+**CHASE FAR ×0.84**. The AI is never scaled.
+
+The scale **fades in with speed** (none below 6 u/s, full by 18 u/s), and that
+is load-bearing, not polish. GOTTHARD, FURKA and SUMMIT carry ~5 m hairpins that
+already ask for full lock; measured, a flat cut put several of them beyond what
+the car can physically turn. Twitchiness is a fast-road problem and gets a
+fast-road answer — at hairpin speed the chase views keep 98% of their lock.
+
+The touch joystick's steer axis runs an expo curve on top (`0.42a + 0.58a³`
+over a 62 px travel radius, throttle and brake stay linear). Linear travel spent
+the entire useful range in the first few millimetres of thumb; half travel now
+yields ~0.22 steer instead of ~0.53, and full lock still arrives at full
+deflection. A player who wants the old rate back sets `STEERING: SHARP` (×1.25).
 
 ## 10. Difficulty & rival balance
 

@@ -44,7 +44,9 @@ export class Input {
    * thumb lands, so it works blind in either orientation.
    */
   bindJoystick(zone, base, knob) {
-    const R = 52;       // knob travel radius (px)
+    // 52px of travel from centre to full lock meant a thumb twitch was half a
+    // turn of the wheel. More travel = more room to be precise.
+    const R = 62;       // knob travel radius (px)
     const DEAD = 0.14;  // deadzone fraction
     let activeId = null, cx = 0, cy = 0;
     const setKnob = (dx, dy) => { knob.style.transform = `translate(calc(${dx}px - 50%), calc(${dy}px - 50%))`; };
@@ -60,6 +62,16 @@ export class Input {
       if (a < DEAD) return 0;
       return Math.sign(v) * Math.min(1, (a - DEAD) / (1 - DEAD));
     };
+    // Steering gets an expo curve on top. Linear travel spends the whole
+    // useful range — the small corrections you actually make on a straight —
+    // in the first few millimetres of thumb, which is what "way too sensitive"
+    // feels like. Cubic blend keeps full lock at full deflection but makes the
+    // middle of the stick gentle: half travel is now ~30% steer, not 50%.
+    const shapeSteer = (v) => {
+      const s = shape(v);
+      const a = Math.abs(s);
+      return Math.sign(s) * (0.42 * a + 0.58 * a * a * a);
+    };
     const start = (x, y, id) => {
       const r = zone.getBoundingClientRect();
       activeId = id; cx = x; cy = y;
@@ -74,7 +86,7 @@ export class Input {
       const cl = Math.min(d, R);
       dx = (dx / d) * cl; dy = (dy / d) * cl;
       setKnob(dx, dy);
-      this.analog.steer = -shape(dx / R);
+      this.analog.steer = -shapeSteer(dx / R);
       this.analog.throttle = Math.max(0, shape(-dy / R));
       this.analog.brake = Math.max(0, shape(dy / R));
     };
