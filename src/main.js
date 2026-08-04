@@ -9,6 +9,7 @@ import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 import { Track, LEVELS, circuitPoints, disposeSubtree } from './track.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
 import { Chopper } from './choppers.js';
+import { GunNest, Raider } from './hostiles.js';
 import { Weapons } from './weapons.js';
 import { Particles, SkidMarks } from './particles.js';
 import { Hud, fmtTime } from './hud.js';
@@ -403,6 +404,8 @@ class Game {
     this.weapons = new Weapons(this);
     this.hud = new Hud(this);
     this.choppers = [];
+    // ground enemies — gun nests dug in beside the road, raiders that hunt
+    this.hostiles = [];
     this.props = this.track.props ? [...this.track.props] : [];
     this.flyingProps = [];
     this.chopperTimer = 0;
@@ -412,6 +415,7 @@ class Game {
     this._initWorldHazards();
     this._buildRoamStars();
     this._buildLivestock();
+    this._buildGunNests();
     this._flashes = [];
     this.camMode = 0; // 0 = top-down, 1 = low chase
     this.camPos = new THREE.Vector3();
@@ -707,6 +711,8 @@ class Game {
     this.chopperWave = 0;
     for (const c of this.choppers ?? []) this.worldLayer.remove(c.mesh);
     this.choppers = [];
+    this.hostiles = [];          // their meshes went with the worldLayer
+    this._buildGunNests();
 
     this._buildPickups();
     this._initWorldHazards();
@@ -2810,6 +2816,49 @@ class Game {
     this.buzz([40, 30, 40]);
   }
 
+  /** Dig gun nests in beside the circuit. Placed off the racing line but
+   *  inside cannon range of it, so they threaten the fast line without ever
+   *  blocking it, and spaced around the lap so you meet them one at a time. */
+  _buildGunNests() {
+    this.hostiles = this.hostiles || [];
+    const t = this.track;
+    if (!t || this.missionMode) return;
+    const COUNT = this.freeRoam ? 5 : 3;
+    for (let k = 0; k < COUNT; k++) {
+      const idx = Math.floor(t.N * ((k + 0.5) / COUNT + Math.random() * 0.08)) % t.N;
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const p = t.pointAt(idx, side * (17 + Math.random() * 9));
+      const y = t.terrainHeight(p.x, p.z);
+      this.hostiles.push(new GunNest(this, new THREE.Vector3(p.x, y, p.z)));
+    }
+  }
+
+  /** Send a raider after the player. Spawns behind and to one side so it
+   *  arrives in the mirrors rather than materialising in front of you. */
+  _spawnRaider() {
+    const p = this.player, f = p.forward;
+    const s = Math.random() < 0.5 ? -1 : 1;
+    const x = p.pos.x - f.x * 60 + f.z * s * 20;
+    const z = p.pos.z - f.z * 60 - f.x * s * 20;
+    const y = this.track.terrainHeight(x, z);
+    this.hostiles.push(new Raider(this, new THREE.Vector3(x, y, z)));
+    this.hud.feed('⚠ RAIDER ON YOUR TAIL', 'bad');
+    this.buzz([30, 25, 30]);
+  }
+
+  _updateHostiles(dt) {
+    if (this.state === 'race' && !this.missionMode) {
+      this._raiderTimer = (this._raiderTimer ?? (this.freeRoam ? 25 : 55)) - dt;
+      const live = this.hostiles.filter((h) => h.alive && h instanceof Raider).length;
+      if (this._raiderTimer <= 0 && live < (this.freeRoam ? 2 : 1)) {
+        this._raiderTimer = this.freeRoam ? 45 : 70;
+        this._spawnRaider();
+      }
+    }
+    for (const h of this.hostiles) if (h.alive) h.update(dt);
+    this.hostiles = this.hostiles.filter((h) => h.alive);
+  }
+
   _updateChoppers(dt) {
     if (this.state === 'race') {
       if (this.freeRoam && !this.missionMode) { // [MISSIONS] missions run their own spawner
@@ -3333,6 +3382,13 @@ class Game {
       const dx = bn.x - x, dz = bn.z - z;
       if (dx * dx + dz * dz < (radius + bn.r) * (radius + bn.r)) this.onBannerSmash(bn, null, x, z);
     }
+    // ground enemies caught in a blast take it like anything else
+    for (const h of this.hostiles ?? []) {
+      if (!h.alive) continue;
+      const dx = h.pos.x - x, dz = h.pos.z - z;
+      const reach = radius + (h.r ?? 2.2);
+      if (dx * dx + dz * dz < reach * reach) h.damage(70);
+    }
     // a direct missile hit flattens a house outright; a near miss just chips it
     for (const bd of t.buildings ?? []) {
       if (bd.dead) continue;
@@ -3827,6 +3883,7 @@ class Game {
         this._updateBoostPads();
         this._updatePickups(dt, time);
         this._updateChoppers(dt);
+        this._updateHostiles(dt);
         this._updateProps(dt);
         this._updateWorldHazards(dt, time);
         this._updateCombo(dt);
