@@ -3112,11 +3112,21 @@ class Game {
    *  chipping still has to eat the bullet. */
   hitBuilding(b, dmg, at, credit = null) {
     if (!b || b.dead) return false;
+    b.maxHp = b.maxHp ?? b.hp;
     b.hp -= dmg;
     // dust and chips off the wall on every hit, so shooting one reads as
     // progress long before it falls over
     this.particles.splinters(at ?? new THREE.Vector3(b.x, b.y + b.h * 0.5, b.z),
       new THREE.Vector3(0, 1, 0), [0x9a8a78, b.roofColor ?? 0x8a5a3a], 0.34);
+    // A house takes most of a magazine, so without a word of feedback the
+    // first burst reads as "bullets do nothing to buildings". Say it once,
+    // on the first hit, and again when it is nearly down.
+    if (credit === this.player && b.hp > 0) {
+      if (!b._hinted) { b._hinted = true; this.hud.feed('WALL HOLDING — KEEP FIRING', 'info'); }
+      else if (!b._hinted2 && b.hp < b.maxHp * 0.35) {
+        b._hinted2 = true; this.hud.feed('STRUCTURE FAILING', 'good');
+      }
+    }
     if (b.hp > 0) return false;
     this.onBuildingSmash(b, credit);
     return true;

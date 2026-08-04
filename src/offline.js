@@ -38,9 +38,39 @@
     }
   });
 
+  // UPDATE ON RELOAD.
+  //
+  // The worker serves cache-first and matches with ignoreSearch, so the ?v=rNN
+  // buster in index.html is deliberately ignored — a returning player is served
+  // the previous build's files no matter what the server has. The new worker
+  // does install and skipWaiting, but the page that triggered it has already
+  // loaded the old code, so a change only appears the SECOND time the game is
+  // opened. That is indistinguishable from "you didn't fix it".
+  //
+  // So: the moment a new worker takes control, reload once. `hadController`
+  // keeps this from firing on a first-ever visit, where there is no previous
+  // build on screen to replace and a reload would just be a flicker.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  // ...but never yank the world out from under someone mid-race. If a new
+  // worker lands while a lap is running, wait for the menu before reloading.
+  const reloadWhenIdle = () => {
+    const g = window.__game;
+    const racing = g && (g.state === 'race' || g.state === 'countdown');
+    if (racing) { setTimeout(reloadWhenIdle, 2000); return; }
+    location.reload();
+  };
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    reloadWhenIdle();
+  });
+
   window.addEventListener('load', () => {
     paint('arming', '✈ STORING…', 'Downloading the game for offline play');
     navigator.serviceWorker.register('./sw.js').then((reg) => {
+      // ask the browser to go and look, rather than waiting for it to decide
+      reg.update?.();
       const poll = () => ask(reg.active || navigator.serviceWorker.controller);
       poll();
       // installing on a first visit: re-ask as it progresses, then stop
