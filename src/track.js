@@ -2612,11 +2612,33 @@ export class Track {
       if (d2 < best) { best = d2; bi = i; }
     }
     const d = Math.sqrt(best);
-    const half = this.widthAt ? this.widthAt(bi) : ROAD_HALF;
-    // full clearance across the carriageway, relaxing to none by 16 u out
-    const k = 1 - smoothstep01((d - (half + 1)) / 15);
-    if (k <= 0) return h;
-    return Math.min(h, this.center[bi].y - 0.35 * k);
+    return Math.min(h, this._roadCeil(bi, d));
+  }
+
+  /** The highest the ground may be at distance `d` from road sample `bi`.
+   *
+   *  This started as a smoothstep that relaxed the clamp over 15 u, and that
+   *  is the wrong shape for the job. The RIBBON is drawn wider than the
+   *  drivable width (widthAt + WALL_OFF + 0.6 - ROAD_HALF, a fringe of about
+   *  2 u), and the terrain mesh only samples every 10 u. So a vertex just
+   *  inside the fringe was clamped hard while its neighbour a cell further out
+   *  was barely clamped at all, and the triangle BETWEEN them crossed back up
+   *  over the ribbon's outer edge — the jagged wedges of grass eating into the
+   *  carriageway. In a cutting, where the ground climbs fast, that is most of
+   *  the road edge.
+   *
+   *  A cone fixes it by construction: full clearance right across the visible
+   *  ribbon, then a straight ramp away at a bounded gradient. Because the
+   *  ceiling is linear in `d`, interpolating between two vertices that both
+   *  satisfy it cannot produce a point that violates it — which is exactly the
+   *  guarantee the smoothstep could not give. 0.5 still lets a hillside climb
+   *  10 u within 20 u of the verge, so cuttings still read as cuttings. */
+  _roadCeil(bi, d) {
+    const drivable = this.widthAt ? this.widthAt(bi) : ROAD_HALF;
+    // the ribbon as DRAWN, not as driven — the fringe is part of the road
+    const ribbon = drivable + (WALL_OFF + 0.6 - ROAD_HALF);
+    const edge = ribbon + 1.5;
+    return this.center[bi].y - 0.35 + Math.max(0, d - edge) * 0.5;
   }
 
   /** Terrain-MESH vertex height: same blend as terrainHeight but with an
@@ -2654,12 +2676,10 @@ export class Track {
       }
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
     }
-    // and the same hard floor the physics height uses — this is the function
+    // and the same hard ceiling the physics height uses — this is the function
     // that actually feeds the rendered vertices, so without it the ground can
     // still be DRAWN through the carriageway even when the car drives level
-    const half = this.widthAt ? this.widthAt(bi) : ROAD_HALF;
-    const k = 1 - smoothstep01((d - (half + 1)) / 15);
-    if (k > 0) h = Math.min(h, this.center[bi].y - 0.35 * k);
+    h = Math.min(h, this._roadCeil(bi, d));
     return h;
   }
 

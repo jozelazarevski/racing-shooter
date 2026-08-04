@@ -557,6 +557,13 @@
   #results .game-sub{letter-spacing:6px}
   .footnote{margin-top:16px;font-size:11px;letter-spacing:2px;color:var(--gold-dim);text-align:center;width:100%}
   /* flight badge: says plainly whether the game is safe to take on a plane */
+  /* BUILD STAMP. Three rounds of this were spent unable to tell whether a
+     report came from the build I had just shipped or one the service worker
+     was still serving from cache. Small, dim, always on screen: now every
+     screenshot says which build it is. */
+  #build-tag{position:fixed;left:6px;bottom:4px;z-index:35;pointer-events:none;
+    font-size:9px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,.34);
+    text-shadow:0 1px 2px rgba(0,0,0,.6)}
   #offline-badge{margin-top:10px;font-size:10px;font-weight:800;letter-spacing:2px;text-align:center;
     padding:4px 12px;border-radius:20px;border:2px solid var(--line-soft);color:var(--gold-dim);
     background:rgba(12,8,3,.4)}
@@ -652,6 +659,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
+<div id="build-tag">r47</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -801,10 +809,18 @@
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
+<<<<<<< HEAD
+<script type="module" src="./src/main.js?v=r47"></script>
+<!-- offline arming: registers sw.js and drives the flight badge -->
+<script src="./src/offline.js?v=r47"></script>
+<!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
+<script type="module" src="./src/traffic.js?v=r47"></script>
+=======
 <script type="module" src="./src/main.js?v=r46"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
 <script src="./src/offline.js?v=r46"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
 <script type="module" src="./src/traffic.js?v=r46"></script>
+>>>>>>> origin/main
 </body>
 </html>
