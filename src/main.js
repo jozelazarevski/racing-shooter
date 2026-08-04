@@ -264,23 +264,7 @@ class Game {
     // progression + difficulty + garage (persisted PER PROFILE — several
     // players keep separate careers on one device; settings stay shared)
     this.profiles = loadProfiles();
-    this.profile = this.profiles.list.find((p) => p.id === this.profiles.active) ?? this.profiles.list[0];
-    this._pkey = (base) => profileKey(this.profile.id, base);
-    this.career = loadJSON(this._pkey('career'), { finished: {} });
-    this.garage = loadJSON(this._pkey('garage'), { credits: 0 });
-    this.cars = loadJSON(this._pkey('cars'), { owned: [STARTER_CAR], selected: STARTER_CAR });
-    if (!this.cars.owned.length) this.cars.owned = [STARTER_CAR];
-    if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = STARTER_CAR;
-    // upgrades are PER-CAR (`garage.upgrades[carKey]`) — a newly bought
-    // machine arrives stock. Old saves kept one flat global level set: those
-    // levels migrate once onto the car the player had selected, so the main
-    // ride visibly keeps its build; every other car starts at level 0.
-    if (!this.garage.upgrades) {
-      const flat = {};
-      for (const u of UPGRADES) { flat[u.key] = this.garage[u.key] ?? 0; delete this.garage[u.key]; }
-      this.garage.upgrades = { [this.cars.selected]: flat };
-      saveJSON(this._pkey('garage'), this.garage);
-    }
+    this._loadProfileState();
     // mode comes from the URL only — a fresh visit ALWAYS starts in RACE mode
     // (persisting roam silently made races "never finish" for returning players)
     this.freeRoam = params.get('mode') === 'roam';
@@ -428,7 +412,7 @@ class Game {
     this._buildRoamStars();
     this._buildLivestock();
     this._buildGunNests();
-    this._flashes = [];
+    this._initFlashPool();
     this.camMode = 0; // 0 = top-down, 1 = low chase
     this.camPos = new THREE.Vector3();
     this.camLook = new THREE.Vector3();
@@ -436,6 +420,7 @@ class Game {
 
     this.state = 'title';
     this.resetRace();
+    this._warmShaders();
 
     this.input.bindTouchButtons();
     const joyZone = document.getElementById('joy-zone');
@@ -472,7 +457,7 @@ class Game {
     // leave the results screen for the garage — the credits you just banked are
     // only useful somewhere else, so the podium must never be the only exit
     document.getElementById('garage-btn')?.addEventListener('click', () => {
-      this.fadeTo(`?level=${this.level.id}`, 'garage');
+      this.showMenu('garage');
     });
 
     // camera + pause buttons (work with mouse and touch)
@@ -509,10 +494,12 @@ class Game {
     for (const [id, label] of [['race', '🏁 RACE'], ['roam', '🌍 FREE ROAM'], ['missions', '🎯 MISSIONS']]) {
       const chip = document.createElement('button');
       chip.className = 'mode-chip' + (id === curMode ? ' current' : '');
+      chip.dataset.mode = id;
       chip.textContent = label;
       chip.addEventListener('click', () => {
-        if (id === curMode) return;
-        this.fadeTo(`?level=${this.level.id}&mode=${id}`);
+        // in place; the reload is only a fallback for the mid-race case, which
+        // the menu cannot actually reach
+        if (!this.setMode(id)) this.fadeTo(`?level=${this.level.id}&mode=${id}`);
       });
       msel.appendChild(chip);
     }
@@ -596,6 +583,35 @@ class Game {
     }
     applyAidChips();
 
+    // joystick sensitivity — a real slider, because "a bit less than that" is
+    // not something three preset chips can express. Touch only: it does
+    // nothing for a keyboard, so it does not clutter a desktop settings panel.
+    {
+      const row = document.getElementById('joy-row');
+      const slider = document.getElementById('joy-sens');
+      const val = document.getElementById('joy-val');
+      if (row && slider) {
+        if (this.isTouch) row.classList.add('on');
+        const stored = parseInt(localStorage.getItem('ir-joysens') || '100', 10);
+        const apply = (pct, save) => {
+          const p = Math.max(50, Math.min(180, pct || 100));
+          slider.value = String(p);
+          if (val) val.textContent = `${p}%`;
+          this.input.joySens = p / 100;
+          if (save) localStorage.setItem('ir-joysens', String(p));
+        };
+        apply(stored, false);
+        // 'input' so it tracks the thumb live; the value is only persisted on
+        // release, so dragging does not hammer localStorage
+        slider.addEventListener('input', () => apply(+slider.value, false));
+        slider.addEventListener('change', () => apply(+slider.value, true));
+        // the slider lives inside the scrolling menu — let it own its drags
+        for (const ev of ['touchstart', 'touchmove', 'pointerdown']) {
+          slider.addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
+        }
+      }
+    }
+
     this.renderGarage();
     this.renderCarShop();
     this._initProfileUI();
@@ -616,18 +632,31 @@ class Game {
     });
     document.getElementById('pm-exit').addEventListener('click', () => {
       if (this.freeRoam) this.bankRoamCredits();
-      const modeArg = this.missionMode ? '&mode=missions' : this.freeRoam ? '&mode=roam' : '';
-      this.fadeTo(`?level=${this.level.id}${modeArg}`);
+      this.showMenu();
     });
 
     // next-level chaining from the results screen
     document.getElementById('next-level-btn').addEventListener('click', () => {
       if (this.missionMode) { // [MISSIONS] the button doubles as "back to mission select"
-        this.fadeTo(`?level=${this.level.id}&mode=missions`);
+        this.showMenu();
         return;
       }
-      sessionStorage.setItem('ir-score', String(this.score));
-      this.fadeTo(`?level=${LEVELS[this.levelIndex + 1].id}&go=1`);
+      // straight into the next world, in place: swap the track under the menu,
+      // then launch. Falls back to the old navigate only if the swap declines.
+      const next = LEVELS[this.levelIndex + 1];
+      const carried = this.score;   // swapLevel resets the race, so keep it here
+      document.getElementById('results').classList.add('hidden');
+      if (next && this.swapLevel(next)) {
+        this._renderLevelCards();
+        this._softURL();
+        this.startRace();
+        this.score = carried;       // the running total follows you up the ladder
+      } else if (next) {
+        sessionStorage.setItem('ir-score', String(this.score));
+        this.fadeTo(`?level=${next.id}&go=1`);
+      } else {
+        this.showMenu();
+      }
     });
 
     // fade in on load (covers level-to-level transitions)
@@ -680,6 +709,42 @@ class Game {
     if (this.state !== 'title') this.hud.feed(`CAMERA: ${CAM_MODES[this.camMode].name}`, 'info');
   }
 
+  /** Compile every shader the world can need BEFORE anyone is driving.
+   *
+   * THIS IS THE FREEZE. WebGL links a shader program the first time a material
+   * is actually drawn, on the main thread, and nothing else happens until it
+   * finishes. Measured: one render call that introduced 16 new programs blocked
+   * for 1083 ms. Since a material only draws when it first becomes VISIBLE,
+   * the hitch lands exactly when something new happens — the first shot, the
+   * first explosion, the first wreck. Which is what "it freezes when I'm
+   * shooting" and "it's freezing overall" both are.
+   *
+   * The cure is to pay that cost up front, on the title screen, where a pause
+   * is invisible. Everything transient — bullets, sparks, smoke, husks, flying
+   * debris — already exists in the graph from boot; it is merely hidden. So we
+   * unhide the whole graph for the length of one compile() call (compile does
+   * not draw, so nothing reaches the screen), let three build every program,
+   * and put the visibility flags back exactly as they were.
+   */
+  _warmShaders() {
+    if (!this.renderer?.compile) return;
+    const hidden = [];
+    try {
+      this.scene.traverse((o) => {
+        if (o.visible === false) { hidden.push(o); o.visible = true; }
+      });
+      const t0 = performance.now();
+      this.renderer.compile(this.scene, this.camera);
+      this.__warmMs = Math.round(performance.now() - t0);
+      this.__warmProgs = this.renderer.info.programs?.length ?? -1;
+    } catch (err) {
+      // a warm-up must never be the reason the game fails to boot
+      console.warn('[warm] shader precompile skipped:', err?.message);
+    } finally {
+      for (const o of hidden) o.visible = false;
+    }
+  }
+
   /** Steering scale for the view currently being driven — see CAM_MODES.
    *  A getter rather than a stored field so it stays right no matter how
    *  camMode was set (button, keyboard, pause menu, restored preference). */
@@ -726,7 +791,7 @@ class Game {
     this.missionGates = null;
     this.flyingProps = [];
     this.husks = [];
-    this._flashes = [];
+    this._resetFlashes();                  // pool lights live in the scene, not here
     disposeSubtree(this.worldLayer);       // pickups, herds, stars, hazards, debris
     this.track.dispose();
     this.skids?.reset?.();
@@ -752,6 +817,7 @@ class Game {
 
     // --- put everyone on the new grid ---
     this.resetRace();
+    this._warmShaders();   // a new world means new materials — pay for them now
     this.hud?.feed?.(`${this.level.name}`, 'good');
     // Keep the address bar honest without navigating — a refresh (or a shared
     // link) then lands on the world you actually picked.
@@ -761,6 +827,141 @@ class Game {
       history.replaceState(null, '', `${location.pathname}?${q}`);
     } catch { /* history is not worth failing a track swap over */ }
     return true;
+  }
+
+  /** (Re)read everything scoped to the ACTIVE PROFILE — career, purse, garage.
+   *  Lifted out of the constructor so changing driver is a state reload rather
+   *  than a page reload. */
+  _loadProfileState() {
+    this.profile = this.profiles.list.find((p) => p.id === this.profiles.active) ?? this.profiles.list[0];
+    this._pkey = (base) => profileKey(this.profile.id, base);
+    this.career = loadJSON(this._pkey('career'), { finished: {} });
+    this.garage = loadJSON(this._pkey('garage'), { credits: 0 });
+    this.cars = loadJSON(this._pkey('cars'), { owned: [STARTER_CAR], selected: STARTER_CAR });
+    if (!this.cars.owned.length) this.cars.owned = [STARTER_CAR];
+    if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = STARTER_CAR;
+    // upgrades are PER-CAR (`garage.upgrades[carKey]`) — a newly bought
+    // machine arrives stock. Old saves kept one flat global level set: those
+    // levels migrate once onto the car the player had selected, so the main
+    // ride visibly keeps its build; every other car starts at level 0.
+    if (!this.garage.upgrades) {
+      const flat = {};
+      for (const u of UPGRADES) { flat[u.key] = this.garage[u.key] ?? 0; delete this.garage[u.key]; }
+      this.garage.upgrades = { [this.cars.selected]: flat };
+      saveJSON(this._pkey('garage'), this.garage);
+    }
+  }
+
+  /** Hand the wheel to the active profile IN PLACE: their career unlocks,
+   *  their purse, their car, their upgrade levels. */
+  _applyProfileInPlace() {
+    this._loadProfileState();
+    // this driver may not have unlocked the world that is currently loaded
+    if (!this.isLevelUnlocked(this.level.id)) this.swapLevel(LEVELS[0]);
+    const entry = CAR_CATALOG.find((c) => c.key === this.cars.selected) || CAR_CATALOG[0];
+    if (entry && this.player?.catalogKey !== entry.key) this.swapPlayerCar(entry);
+    this.applyUpgrades();
+    this.showMenu('settings');
+    this.hud?.feed?.(`DRIVER: ${this.profile.name}`, 'good');
+  }
+
+  /** Rebuild the parts of the world that depend on WHICH MODE you are in.
+   *  Shared by setMode() and by anything that needs the mode furniture redone
+   *  without touching the track itself. */
+  _rebuildModeWorld() {
+    for (const gsp of this.missionGates ?? []) this.worldLayer.remove(gsp.spr);
+    this.missionGates = null;
+    this.mission = null;
+    // these all live in worldLayer, which a mode switch does NOT tear down —
+    // only a level swap does — so each one has to be taken out by hand or it
+    // haunts the next mode (roam turrets standing around a rally stage)
+    for (const h of this.hostiles ?? []) h.mesh?.parent?.remove(h.mesh);
+    this.hostiles = [];
+    for (const c of this.choppers ?? []) this.worldLayer.remove(c.mesh);
+    this.choppers = [];
+    for (const s of this.roamStars ?? []) s.spr?.parent?.remove(s.spr);
+    this.roamStars = [];
+    this.chopperTimer = 0;
+    this.chopperWave = 0;
+    this._resetFlashes();
+    this._buildGunNests();
+    this._buildRoamStars();
+    this.resetRace();
+  }
+
+  /** Switch RACE / FREE ROAM / MISSIONS in place — no page reload.
+   *
+   *  These three used to navigate, which threw away the whole module graph and
+   *  rebuilt the world from scratch to change two booleans. Everything that
+   *  actually differs between the modes is mode furniture (gun nests, roam
+   *  stars, mission gates, the start button, the picker), and all of it can be
+   *  rebuilt in a frame. Returns false mid-race, where a swap is not safe.
+   */
+  setMode(id) {
+    if (this.state === 'race' || this.state === 'countdown') return false;
+    const flags = { race: [false, false], roam: [true, false], missions: [true, true] }[id];
+    if (!flags) return false;
+    if (this.freeRoam === flags[0] && this.missionMode === flags[1]) return true;
+
+    if (this.freeRoam && this.state !== 'title') this.bankRoamCredits();
+    [this.freeRoam, this.missionMode] = flags;
+    this.__missionDefs = null;      // targets are per-mode and per-world
+    this._rebuildModeWorld();
+    this._syncModeUI();
+    this._softURL();
+    return true;
+  }
+
+  /** Repaint everything in the menu that reads the current mode. */
+  _syncModeUI() {
+    const cur = this.missionMode ? 'missions' : this.freeRoam ? 'roam' : 'race';
+    for (const chip of document.querySelectorAll('#mode-select .mode-chip')) {
+      chip.classList.toggle('current', chip.dataset.mode === cur);
+    }
+    const sel = document.getElementById('mission-select');
+    if (sel) sel.style.display = this.missionMode ? 'flex' : 'none';
+    const start = document.getElementById('start-btn');
+    if (start) {
+      start.textContent = this.missionMode ? 'START MISSION'
+        : this.freeRoam ? 'START EXPLORING' : 'START RACE';
+    }
+    if (this.missionMode) this._buildMissionPicker?.(); // also sets its own label
+  }
+
+  /** Keep the address bar in step with the live state, without navigating, so
+   *  a refresh or a shared link lands exactly where the player is. */
+  _softURL() {
+    try {
+      const q = new URLSearchParams(location.search);
+      q.set('level', String(this.level.id));
+      if (this.missionMode) q.set('mode', 'missions');
+      else if (this.freeRoam) q.set('mode', 'roam');
+      else q.delete('mode');
+      history.replaceState(null, '', `${location.pathname}?${q}`);
+    } catch { /* history is never worth failing a transition over */ }
+  }
+
+  /** Come back to the title screen IN PLACE — the counterpart to startRace().
+   *  Every exit path (pause > exit, results > garage, mission debrief, next
+   *  level) routes through here instead of reloading the page. */
+  showMenu(tab = null) {
+    document.getElementById('results')?.classList.add('hidden');
+    document.getElementById('pause-menu')?.classList.add('hidden');
+    document.getElementById('touch-ui')?.classList.remove('on');
+    this.hud.hide();
+    this.state = 'title';
+    this._rebuildModeWorld();
+    const ts = document.getElementById('title-screen');
+    ts?.classList.remove('hidden');
+    this._renderLevelCards();
+    this.renderGarage();
+    this.renderCarShop();
+    this._syncModeUI();
+    this._renderProfiles?.();
+    if (tab) document.getElementById(`tab-btn-${tab}`)?.click();
+    else document.getElementById('tab-btn-race')?.click();
+    if (ts) ts.scrollTop = 0;
+    this._softURL();
   }
 
   /** Push the current track's theme into the renderer: fog, the two lights,
@@ -1269,8 +1470,11 @@ class Game {
     this._renderProfiles();
     this.hud?.feed?.('CAREER RESET — BACK TO THE STARTING GRID', 'info');
     // sitting on a world the fresh career hasn't unlocked? that world is no
-    // longer legally raceable, and only a reload can rebuild the track.
-    if (!this.isLevelUnlocked(this.level.id)) this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+    // longer legally raceable — swap back to the first one, in place.
+    if (!this.isLevelUnlocked(this.level.id)) {
+      if (this.swapLevel(LEVELS[0])) { this._renderLevelCards(); this._softURL(); }
+      else this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+    }
     return keys;
   }
 
@@ -1351,8 +1555,9 @@ class Game {
     reg.list.push({ id, name, color: this._newColor ?? PROFILE_COLORS[0], created: Date.now() });
     reg.active = id;
     saveJSON('ir-profiles', reg);
-    // fresh careers start at world 1 — reload through the standard fade
-    this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+    // fresh careers start at world 1 — in place, no reload
+    this.swapLevel(LEVELS[0]);
+    this._applyProfileInPlace();
   }
 
   _switchProfile(id) {
@@ -1360,9 +1565,9 @@ class Game {
     if (id === reg.active || !reg.list.some((p) => p.id === id)) return;
     reg.active = id;
     saveJSON('ir-profiles', reg);
-    // reload via the standard fade; the constructor's locked-level guard drops
-    // the new driver back to world 1 if this track isn't unlocked for them
-    this.fadeTo(`?level=${this.level.id}${this.unlockAll ? '&unlockall=1' : ''}`);
+    // in place; _applyProfileInPlace drops the new driver back to world 1 if
+    // this track isn't unlocked for them
+    this._applyProfileInPlace();
   }
 
   _deleteProfile(id) {
@@ -1378,14 +1583,15 @@ class Game {
       reg.active = 1;
       wipeProfileData(1);
       saveJSON('ir-profiles', reg);
-      this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+      this.swapLevel(LEVELS[0]);
+      this._applyProfileInPlace();
       return;
     }
     if (reg.active === id) {
       // deleted the active driver: hand the wheel to the first remaining one
       reg.active = reg.list[0].id;
       saveJSON('ir-profiles', reg);
-      this.fadeTo(`?level=1${this.unlockAll ? '&unlockall=1' : ''}`);
+      this._applyProfileInPlace();
       return;
     }
     saveJSON('ir-profiles', reg);
@@ -3458,21 +3664,56 @@ class Game {
   }
 
   // ---------- transient explosion lights ----------
+  //
+  // THIS WAS THE OTHER FREEZE, and the reason it showed up "when I'm shooting".
+  // Every explosion used to construct a new PointLight and add it to the scene.
+  // Adding a light changes the light COUNT, and the light count is part of every
+  // material's shader cache key — so three threw away the whole scene's programs
+  // and recompiled them, on the main thread, mid-explosion. Measured: 18 programs
+  // in one render call, 1507 ms of dead screen.
+  //
+  // It also leaked. The light was added to `worldLayer` and removed from `scene`,
+  // and removing a child from a node that is not its parent does nothing, so the
+  // lights piled up forever — each one paying the recompile again.
+  //
+  // Now the lights are a fixed pool, created once, parented to the scene (not the
+  // world layer, so a track swap cannot take them). The count never changes, so
+  // there is nothing to recompile: a flash is a position and an intensity.
+  _initFlashPool(n = 4) {
+    this._flashPool = [];
+    for (let i = 0; i < n; i++) {
+      const l = new THREE.PointLight(0xffa040, 0, 46, 1.8);
+      l.userData.life = 0;
+      this.scene.add(l);
+      this._flashPool.push(l);
+    }
+  }
+
   flashLight(pos) {
-    if (this._flashes.length > 4) return;
-    const l = new THREE.PointLight(0xffa040, 60, 46, 1.8);
-    l.position.copy(pos).setY(3);
-    this.worldLayer.add(l);
-    this._flashes.push({ light: l, life: 0.35 });
+    const pool = this._flashPool;
+    if (!pool || !pool.length) return;
+    // a spare light if there is one, otherwise recycle the one closest to done
+    let pick = pool[0];
+    for (const l of pool) {
+      if (l.userData.life <= 0) { pick = l; break; }
+      if (l.userData.life < pick.userData.life) pick = l;
+    }
+    pick.position.copy(pos).setY(3);
+    pick.userData.life = 0.35;
+    pick.intensity = 60;
   }
 
   _updateFlashes(dt) {
-    for (let i = this._flashes.length - 1; i >= 0; i--) {
-      const f = this._flashes[i];
-      f.life -= dt;
-      f.light.intensity = Math.max(0, f.life / 0.35) * 60;
-      if (f.life <= 0) { this.scene.remove(f.light); this._flashes.splice(i, 1); }
+    for (const l of this._flashPool ?? []) {
+      if (l.userData.life <= 0) continue;
+      l.userData.life -= dt;
+      l.intensity = Math.max(0, l.userData.life / 0.35) * 60;
     }
+  }
+
+  /** Douse every flash — used when a world is torn down mid-flash. */
+  _resetFlashes() {
+    for (const l of this._flashPool ?? []) { l.userData.life = 0; l.intensity = 0; }
   }
 
   // ---------- race flow ----------
@@ -3721,6 +3962,10 @@ class Game {
       nextBtn.style.display = 'none';
     }
     setTimeout(() => {
+      // Guard like the mission debrief already does. Without it, leaving the
+      // podium inside this 1.6 s window — restart, or straight to the garage —
+      // let the results card pop back up OVER the menu you had just reached.
+      if (this.state !== 'finished') return;
       document.getElementById('results').classList.remove('hidden');
       this.hud.hide();
       document.getElementById('touch-ui').classList.remove('on');
@@ -4160,7 +4405,21 @@ class Game {
       this.renderer.setPixelRatio(baseDpr * 0.75);
       this.composer.setSize(innerWidth, innerHeight);
     } else if (q === 2) {
-      this.moon.castShadow = false;
+      // This step used to switch the sun's shadow OFF, and that was one of the
+      // two freezes. Changing the shadow-caster count rewrites every material's
+      // program cache key, so three recompiles the ENTIRE scene inside one
+      // render call — measured at 1.2 s of dead screen. Worse still, it fired
+      // precisely when the frame rate was already struggling, which is the
+      // moment a one-second stall is least affordable.
+      //
+      // Shrinking the map costs a texture reallocation and no shader work at
+      // all: same caster count, same cache keys, same programs.
+      const sh = this.moon.shadow;
+      if (sh && sh.mapSize.width > 512) {
+        sh.mapSize.set(512, 512);
+        sh.map?.dispose();
+        sh.map = null;                 // three rebuilds it at the new size
+      }
     } else {
       this.bloom.enabled = false;
       this.renderer.setPixelRatio(Math.min(baseDpr, 1));

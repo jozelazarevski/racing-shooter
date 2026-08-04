@@ -390,6 +390,23 @@
     border-radius:var(--r-sm);border:2px solid var(--line);background:rgba(38,26,12,.5);
     -webkit-tap-highlight-color:transparent}
   .mode-chip.current{color:var(--ink);background:#7fd4ff;border-color:var(--ink);box-shadow:0 3px 0 var(--ink)}
+  /* joystick sensitivity slider (touch devices only — hidden on desktop) */
+  #joy-row{display:none}
+  #joy-row.on{display:grid}
+  #joy-val{color:var(--yellow);font-size:13px;letter-spacing:1px}
+  #joy-sens-wrap{display:flex;flex-direction:column;gap:2px;width:100%;pointer-events:auto}
+  #joy-sens{-webkit-appearance:none;appearance:none;width:100%;height:26px;background:transparent;
+    pointer-events:auto;touch-action:pan-y}
+  #joy-sens::-webkit-slider-runnable-track{height:8px;border-radius:4px;
+    background:linear-gradient(90deg,#3f8fbf,#7fd4ff,var(--amber));border:2px solid var(--line)}
+  #joy-sens::-moz-range-track{height:8px;border-radius:4px;
+    background:linear-gradient(90deg,#3f8fbf,#7fd4ff,var(--amber));border:2px solid var(--line)}
+  #joy-sens::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;
+    margin-top:-11px;border-radius:50%;background:var(--yellow);border:2px solid var(--ink);
+    box-shadow:0 2px 0 rgba(0,0,0,.35)}
+  #joy-sens::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:var(--yellow);
+    border:2px solid var(--ink)}
+  .set-hint{display:flex;justify-content:space-between;font-size:9px;letter-spacing:2px;color:var(--gold-dim)}
   /* ---------- ARENA MISSIONS picker (missions agent) ----------
      A full-width card list under RACE SETTINGS, shown only in missions mode.
      Uses the same tokens as the settings rows so it reads as one panel. */
@@ -662,7 +679,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r49</div>
+<div id="build-tag">r50</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -714,6 +731,16 @@
       <div class="set-row"><span class="set-lbl">DIFFICULTY</span><div id="diff-select"></div></div>
       <div class="set-row"><span class="set-lbl">STEERING</span><div id="steer-select"></div></div>
       <div class="set-row"><span class="set-lbl">DRIVING AID</span><div id="assist-select"></div></div>
+      <!-- Touch only: how far the thumb has to travel for full lock, and how
+           gentle the middle of that travel is. The chips above are coarse
+           presets; this is the fine adjustment for a specific thumb. -->
+      <div class="set-row" id="joy-row">
+        <span class="set-lbl">JOYSTICK<br><span id="joy-val">100%</span></span>
+        <div id="joy-sens-wrap">
+          <input id="joy-sens" type="range" min="50" max="180" step="5" value="100">
+          <div class="set-hint"><span>CALM</span><span>TWITCHY</span></div>
+        </div>
+      </div>
     </div>
   </div>
   <div id="tab-garage" class="menu-panel off">
@@ -812,10 +839,10 @@
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
-<script type="module" src="./src/main.js?v=r49"></script>
+<script type="module" src="./src/main.js?v=r50"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r49"></script>
+<script src="./src/offline.js?v=r50"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r49"></script>
+<script type="module" src="./src/traffic.js?v=r50"></script>
 </body>
 </html>
