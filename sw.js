@@ -16,7 +16,7 @@
  * CACHE is bumped by the release version. Bump it whenever ?v= in index.html
  * is bumped, or phones will keep serving the previous build forever.
  */
-const CACHE = 'ignite-rally-r40';
+const CACHE = 'ignite-rally-r41';
 
 const ASSETS = [
   './',
@@ -27,6 +27,7 @@ const ASSETS = [
   './src/main.js',
   './src/audio.js',
   './src/choppers.js',
+  './src/hostiles.js',
   './src/hud.js',
   './src/input.js',
   './src/particles.js',

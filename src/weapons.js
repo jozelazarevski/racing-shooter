@@ -213,7 +213,8 @@ export class Weapons {
     b.base = this._colorEnemy;
     b.hotK = 0.45;
     b.pos.copy(chopper.pos);
-    b.pos.y -= 0.7; // muzzle under the nose
+    // a gunship's muzzle is under its nose; a ground mount's is above its base
+    b.pos.y += chopper.muzzleY ?? -0.7;
     // moderate spread on the aim point — dodgeable at speed
     _aim.set(
       targetPos.x + (Math.random() - 0.5) * 4.2,
@@ -290,9 +291,12 @@ export class Weapons {
       b.life -= dt;
       b.pos.addScaledVector(b.vel, dt); // integrates y too (chopper rounds descend)
       if (b.life <= 0) { b.active = false; this.mesh.setMatrixAt(i, this._zero); continue; }
-      // descending rounds bury into the dirt with a small puff (terrain-aware
-      // so tracers die on hillsides instead of tunneling to y=0)
-      const gy = b.vel.y < 0 && g.track.terrainHeight ? g.track.terrainHeight(b.pos.x, b.pos.z) : 0;
+      // Rounds bury into the dirt with a small puff. This used to fall back to
+      // y=0 for anything not descending, which is only the ground by accident:
+      // where the terrain sits below zero — most of it — a round fired upward
+      // from a ground-level gun was culled as "buried" on its first frame, so
+      // emplacements shot blanks. Ask the terrain, always.
+      const gy = g.track.terrainHeight ? g.track.terrainHeight(b.pos.x, b.pos.z) : 0;
       if (b.pos.y < gy) {
         _puff.set(b.pos.x, gy + 0.1, b.pos.z);
         g.particles.dust(_puff, 0.6);
@@ -304,10 +308,23 @@ export class Weapons {
       // hit tests
       let hit = false;
       if (b.owner !== g.player) {
-        // 3D distance — a chopper round has to actually reach car height
-        if (g.player.alive && b.pos.distanceToSquared(g.player.pos) < 7.3) {
-          g.onPlayerHit(b.dmg, b.owner);
-          hit = true;
+        // SEGMENT, not a point. A round covers metres per frame, and on a
+        // phone dropping frames it covers tens — a point check let enemy fire
+        // step clean over the car, so gun nests and choppers plinked away
+        // scoring nothing whenever the frame rate sagged. Test the whole path
+        // flown this frame, and keep the height requirement: a chopper round
+        // still has to come down to car level to count.
+        if (g.player.alive) {
+          const px = b.pos.x - b.vel.x * dt, pz = b.pos.z - b.vel.z * dt;
+          const sx = b.pos.x - px, sz = b.pos.z - pz;
+          const l2 = sx * sx + sz * sz || 1e-9;
+          const u = Math.max(0, Math.min(1, ((g.player.pos.x - px) * sx + (g.player.pos.z - pz) * sz) / l2));
+          const cx = px + sx * u - g.player.pos.x, cz = pz + sz * u - g.player.pos.z;
+          const cy = b.pos.y - g.player.pos.y;
+          if (cx * cx + cz * cz < 5.3 && cy * cy < 9) {
+            g.onPlayerHit(b.dmg, b.owner);
+            hit = true;
+          }
         }
       } else {
         for (const e of g.enemies) {
@@ -374,6 +391,10 @@ export class Weapons {
         for (const bd of g.track.buildings ?? []) {
           if (!bd.dead) consider(bd.x, bd.z, bd.r, 'building', bd);
         }
+        // ground enemies are shot with the same cannon as everything else
+        for (const h of g.hostiles ?? []) {
+          if (h.alive) consider(h.pos.x, h.pos.z, (h.r ?? 2.2) + 0.8, 'hostile', h);
+        }
         if (bestKind === 'tree') {
           const tr = bestObj;
           // bigger trunks soak more rounds (~3 hits for a sapling, ~5 for a giant)
@@ -387,6 +408,8 @@ export class Weapons {
           g.onBannerSmash?.(bestObj, null, b.owner.pos.x, b.owner.pos.z); hit = true;
         } else if (bestKind === 'building') {
           g.hitBuilding?.(bestObj, b.dmg, b.pos.clone(), b.owner); hit = true;
+        } else if (bestKind === 'hostile') {
+          bestObj.damage(b.dmg); g.audio.hit(); hit = true;
         }
       }
       if (hit) {

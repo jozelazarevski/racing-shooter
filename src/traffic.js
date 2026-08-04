@@ -21,6 +21,7 @@
 // pausing at the mouth to "look both ways" so the hazard is telegraphed.
 
 import * as THREE from 'three';
+import { disposeSubtree } from './track.js';
 
 // Worlds that read as farmland / mountain-pasture country. Canyon, volcano,
 // glacier, dune, ravine and the two city worlds get no civilian traffic.
@@ -289,9 +290,16 @@ function install(game) {
 
   // ---------- world (re)build ----------
   function clearWorld() {
+    // Removing the group is not enough: GPU buffers survive until dispose(),
+    // and rebuild() runs on every level change. Left as a bare remove this
+    // leaked a full set of vehicles per swap (~37 geometries a hop, measured).
     for (const e of S.ents) {
       if (e.group.parent) e.group.parent.remove(e.group);
-      if (e.wagon && e.wagon.group.parent) e.wagon.group.parent.remove(e.wagon.group);
+      disposeSubtree(e.group);
+      if (e.wagon) {
+        if (e.wagon.group.parent) e.wagon.group.parent.remove(e.wagon.group);
+        disposeSubtree(e.wagon.group);
+      }
     }
     S.ents.length = 0;
     dropProxies();
@@ -379,7 +387,7 @@ function install(game) {
     const m = kind === 'truck'
       ? buildTruckMeshes(tint, tintDark, S.mat)
       : buildTractorMeshes(tint, tintDark, S.mat);
-    game.scene.add(m.group);
+    (game.worldLayer || game.scene).add(m.group);
     return {
       ...m, kind,
       wagon: null, cross: null, proxy: registerProxy(),
@@ -395,7 +403,7 @@ function install(game) {
 
   function attachWagon(ent) {
     const w = buildWagonMeshes(S.mat);
-    game.scene.add(w.group);
+    (game.worldLayer || game.scene).add(w.group);
     ent.wagon = { ...w, hitch: 4.4, proxy: registerProxy() };
   }
 
@@ -785,7 +793,7 @@ function install(game) {
         const fly = src.clone();
         src.getWorldPosition(fly.position);
         src.getWorldQuaternion(fly.quaternion);
-        game.scene.add(fly);
+        (game.worldLayer || game.scene).add(fly);
         game.flyingProps.push({
           mesh: fly,
           vel: new THREE.Vector3((Math.random() - 0.5) * 9, 7 + Math.random() * 5, (Math.random() - 0.5) * 9),

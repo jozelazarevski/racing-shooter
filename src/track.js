@@ -1334,6 +1334,37 @@ const THEMES = {
   },
 };
 
+/** Free every geometry, material and texture under `root`, then empty it.
+ *
+ *  GPU resources are not garbage collected — dropping the last JS reference to
+ *  a mesh leaves its buffers and textures resident until dispose() is called.
+ *  Swapping level without this leaked a whole world each time (measured: ~290
+ *  geometries and ~180 textures over eight swaps, on a phone).
+ *
+ *  Everything textures.js hands out is freshly made per call, so it belongs to
+ *  the world that asked for it — the sole exception is the memoised contact
+ *  shadow, which tags itself `userData.shared` and is left alone. Geometry can
+ *  opt out the same way. */
+export function disposeSubtree(root) {
+  if (!root) return;
+  const geos = new Set(), mats = new Set();
+  const freeTex = (t) => { if (t && t.isTexture && !t.userData?.shared) t.dispose(); };
+  const freeMat = (m) => {
+    if (!m || mats.has(m) || m.userData?.shared) return;
+    mats.add(m);
+    for (const k of ['map', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap',
+      'alphaMap', 'aoMap', 'bumpMap', 'displacementMap', 'lightMap', 'envMap']) freeTex(m[k]);
+    m.dispose();
+  };
+  root.traverse((o) => {
+    const g = o.geometry;
+    if (g && !geos.has(g) && !g.userData?.shared) { geos.add(g); g.dispose(); }
+    const m = o.material;
+    if (Array.isArray(m)) m.forEach(freeMat); else freeMat(m);
+  });
+  root.clear();
+}
+
 /** Hermite ease on an already-normalised 0..1 ramp (clamps its own ends). */
 const smoothstep01 = (t) => {
   const u = t <= 0 ? 0 : t >= 1 ? 1 : t;
@@ -1669,6 +1700,10 @@ export class Track {
     // levels are self-contained: fog is set here (main.js may re-apply from theme)
     scene.fog = new THREE.Fog(T.fogColor, T.fogNear, T.fogFar);
 
+    // EVERYTHING the track builds goes in here, nothing straight into the
+    // scene. That is what makes a level swappable without reloading the page:
+    // one node to remove, one subtree to dispose. Adding to the scene direct
+    // (52 call sites, once) left orphans behind on every rebuild.
     this.group = new THREE.Group();
     scene.add(this.group);
 
@@ -2144,7 +2179,31 @@ export class Track {
       Math.sin(x * 0.0042 + 0.9) * Math.cos(z * 0.0039 - 0.4) * 0.55 +
       Math.sin(x * 0.0091 - 2.1) * Math.cos(z * 0.0084 + 1.3) * 0.30 +
       Math.sin(x * 0.0180 + 4.2) * Math.cos(z * 0.0165 + 2.7) * 0.15;
-    return t * scale * 68 * (0.72 + 0.28 * ridge) * this._riverValley(x, z);
+    const massif = t * 68 * (0.72 + 0.28 * ridge) * this._riverValley(x, z);
+    return scale * (massif + this._rimWall(x, z));
+  }
+
+  /** THE BORDER. Beyond the climbable massif the ground turns up into a wall
+   *  that rings the world — a headwall no car gets over, so the scenery reads
+   *  as a closed bowl end to end instead of trailing off into nothing.
+   *
+   *  This is deliberately NOT an invisible barrier. It is the same terrain the
+   *  car already drives on, just steeper than traction allows: the ramp gains
+   *  260 u over 260 u of run, which is a ~100% grade at the steepest point
+   *  against the ~20% the massif tops out at. You drive up, slow, and slide
+   *  back — the world stops you with a mountain, not with a wall you cannot
+   *  see. The river valley cuts it too, so the water still has a way out.
+   *
+   *  RIM_R sits past the far terrain patch's useful radius, well beyond the
+   *  fog, so from the road it is a skyline rather than a fence. */
+  _rimWall(x, z) {
+    const RIM_R = 1620, RIM_RUN = 260, RIM_H = 260;
+    const r = Math.hypot(x, z);
+    if (r <= RIM_R) return 0;
+    // ease in so the foot of the wall meets the massif smoothly, then climb
+    const u = Math.min(1, (r - RIM_R) / RIM_RUN);
+    const crest = 0.55 + 0.45 * Math.sin(Math.atan2(z, x) * 3.7 + 1.1);  // uneven skyline
+    return RIM_H * u * u * (0.75 + 0.25 * crest) * this._riverValley(x, z);
   }
 
   /** 0 in the river's valley floor, easing to 1 well clear of it. The river
@@ -3476,7 +3535,7 @@ export class Track {
       part.count = k;
       if (part.instanceColor) part.instanceColor.needsUpdate = true;
     }
-    this.scene.add(...parts);
+    this.group.add(...parts);
   }
   // ---- end viz-zones -------------------------------------------------------
 
@@ -3756,7 +3815,7 @@ export class Track {
     }
     mesh.count = k;
     mesh.name = 'retaining-wall';
-    if (k) this.scene.add(mesh);
+    if (k) this.group.add(mesh);
   }
 
   /** How many samples the bridge deck covers each way from the gorge centre. */
@@ -3993,7 +4052,7 @@ export class Track {
       envMapIntensity: 1.2, transparent: true, opacity: 0.94,
     }));
     mesh.name = 'gorge-river';
-    this.scene.add(mesh);
+    this.group.add(mesh);
   }
 
   /** FURKA RIDGE: the reddish wooden guard fence that runs the DOWNHILL edge
@@ -4113,7 +4172,7 @@ export class Track {
     });
     mesh.count = k;
     mesh.name = 'snow-patches';
-    if (k) this.scene.add(mesh);
+    if (k) this.group.add(mesh);
   }
 
   /** A near massif: the mountain the pass actually climbs into. A fan of big
@@ -4144,7 +4203,7 @@ export class Track {
       this.solids.push({ x, z, r: w * 0.3, y: y + 4, mat: 'stone' });
     }
     rock.name = 'massif';
-    this.scene.add(rock);
+    this.group.add(rock);
   }
 
   /** FURKA RIDGE: the Rhône glacier tongue spilling off the skyline — a
@@ -4176,7 +4235,7 @@ export class Track {
       slabs.setColorAt(k, col);
     }
     slabs.name = 'glacier';
-    this.scene.add(slabs);
+    this.group.add(slabs);
   }
 
   /** Queue a baked contact shadow under an object. r is the DECAL radius in
@@ -4224,7 +4283,7 @@ export class Track {
     }
     mesh.renderOrder = 1;
     mesh.name = 'contact-shadows';
-    this.scene.add(mesh);
+    this.group.add(mesh);
   }
 
   // ---------- world elements (farms, chapels, outposts, fences) ----------
@@ -4504,7 +4563,7 @@ export class Track {
         col.set(p.color).multiplyScalar(0.92 + Math.random() * 0.16);
         mesh.setColorAt(k, col);
       });
-      this.scene.add(mesh);
+      this.group.add(mesh);
     }
   }
 
@@ -4986,7 +5045,7 @@ export class Track {
         }
       });
       gravel.count = gk;
-      this.scene.add(gravel);
+      this.group.add(gravel);
     }
     // --- reflector marker posts on corner outsides ---
     // (skipped where stone already lines the road: canyon cliffs, pass parapets)
@@ -5086,7 +5145,7 @@ export class Track {
       this._addShadow(p.x, p.z, 4.0);
     });
     logs.count = k;
-    this.scene.add(logs);
+    this.group.add(logs);
   }
 
   /** REDWOOD RAMPAGE: one fallen giant straddles the road — cars drive under
@@ -5261,7 +5320,7 @@ export class Track {
     this._facetGround(mat, SEG / REPEAT);
     const ground = new THREE.Mesh(geo, mat);
     ground.receiveShadow = true;
-    this.scene.add(ground);
+    this.group.add(ground);
   }
 
   /** The distant ring of the ground, at a quarter of the near patch's
@@ -5302,7 +5361,7 @@ export class Track {
       map: gtex, vertexColors: true, roughness: 1, metalness: 0, flatShading: true,
     });
     this._facetGround(mat, seg / REPEAT);
-    this.scene.add(new THREE.Mesh(geo, mat));
+    this.group.add(new THREE.Mesh(geo, mat));
   }
 
   /** Per-facet ground tone + slope tint, injected into the standard shader.
@@ -5383,7 +5442,7 @@ export class Track {
           void main(){ float t = pow(smoothstep(0.0, 0.5, max(vY, 0.0)), curve); gl_FragColor = vec4(mix(horizon, top, t), 1.0); }`,
       })
     );
-    this.scene.add(sky);
+    this.group.add(sky);
 
     // night skies (NEO-KYOTO): a field of star points well above the horizon
     if (T.stars) {
@@ -5402,7 +5461,7 @@ export class Track {
         color: 0xcfd8ff, size: 2.4, sizeAttenuation: false,
         fog: false, transparent: true, opacity: 0.85, depthWrite: false,
       }));
-      this.scene.add(stars);
+      this.group.add(stars);
     }
 
     // sun: a hot disc inside a wide soft halo, placed per-theme (azimuth /
@@ -5434,7 +5493,7 @@ export class Track {
       new THREE.CylinderGeometry(940, 940, 300, 48, 1, true), hazeMat
     );
     haze.position.y = 95;                 // dense band hugs the horizon line
-    this.scene.add(haze);
+    this.group.add(haze);
 
     const ctex = cloudTexture();
     for (let i = 0; i < T.cloudCount; i++) {
@@ -5447,7 +5506,7 @@ export class Track {
       sp.position.set(Math.cos(a) * r, 190 + Math.random() * 160, Math.sin(a) * r);
       const s = 160 + Math.random() * 180;
       sp.scale.set(s, s * 0.5, 1);
-      this.scene.add(sp);
+      this.group.add(sp);
       this.animated.clouds.push({ sprite: sp, speed: 1.5 + Math.random() * 2.5 });
     }
   }
@@ -5516,7 +5575,7 @@ export class Track {
       m4.setPosition(px, h / 2 + seat(px, pz), pz);
       peaks.setMatrixAt(i, m4);
     }
-    this.scene.add(hills, peaks);
+    this.group.add(hills, peaks);
     if (T.massif) this._buildMassif(m4);
     if (T.glacier) this._buildGlacier(m4);
   }
@@ -5560,7 +5619,7 @@ export class Track {
         y += hh;
       }
     }
-    this.scene.add(mesh);
+    this.group.add(mesh);
   }
 
   /** Dune-sea horizon: two rings of huge, low, smooth elongated golden ridges
@@ -5593,7 +5652,7 @@ export class Track {
         );
         mesh.setMatrixAt(i, m4);
       }
-      this.scene.add(mesh);
+      this.group.add(mesh);
     }
   }
 
@@ -5645,7 +5704,7 @@ export class Track {
       this.solids.push({ x: s.x, z: s.z, r: s.w * 0.7, y: this.terrainHeight(s.x, s.z), mat: 'metal' });
     }
     towers.count = k;
-    this.scene.add(towers);
+    this.group.add(towers);
   }
 
   /** Canyon horizon: rings of big flat-topped mesas instead of cone hills. */
@@ -5733,7 +5792,7 @@ export class Track {
       placed++;
     }
     hoodoos.count = k;
-    this.scene.add(hoodoos);
+    this.group.add(hoodoos);
   }
 
   _scatter(count, makePos, place) {
@@ -5946,7 +6005,7 @@ export class Track {
       });
     for (const name of Object.keys(ks)) {
       for (const part of SPECIES[name].parts) part.count = ks[name];
-      this.scene.add(...SPECIES[name].parts);
+      this.group.add(...SPECIES[name].parts);
     }
     // DECOR (no collision, < 0.5u tall): fallen logs and cut stumps scattered
     // through the stand so the forest floor reads lived-in
@@ -5999,7 +6058,7 @@ export class Track {
       stumps.setMatrixAt(sk++, m4);
     });
     stumps.count = sk;
-    this.scene.add(logs, stumps);
+    this.group.add(logs, stumps);
   }
 
   /** Canyon vegetation: instanced saguaros (capsule trunk + two elbow arms).
@@ -6108,9 +6167,9 @@ export class Track {
         });
         this._addShadow(p.x, p.z, 1.6 * s, spot.terrain ? null : y - 0.15);
       });
-    for (const part of parts) { part.count = ks.saguaro; this.scene.add(part); }
-    for (const part of barrelParts) { part.count = ks.barrel; this.scene.add(part); }
-    for (const part of acaciaParts) { part.count = ks.acacia; this.scene.add(part); }
+    for (const part of parts) { part.count = ks.saguaro; this.group.add(part); }
+    for (const part of barrelParts) { part.count = ks.barrel; this.group.add(part); }
+    for (const part of acaciaParts) { part.count = ks.acacia; this.group.add(part); }
   }
 
   /** Volcano vegetation: nothing green survives a lava field, so the "flora"
@@ -6183,8 +6242,8 @@ export class Track {
         });
         this._addShadow(p.x, p.z, (stump ? 1.0 : 1.2) * s);
       });
-    for (const part of parts) { part.count = snags; this.scene.add(part); }
-    for (const part of stumpParts) { part.count = stumps; this.scene.add(part); }
+    for (const part of parts) { part.count = snags; this.group.add(part); }
+    for (const part of stumpParts) { part.count = stumps; this.group.add(part); }
   }
 
   /** Jungle canopy — TROPICAL SPECIES ONLY. There is not one conifer anywhere
@@ -6339,7 +6398,7 @@ export class Track {
         this._addShadow(p.x, p.z, (kind === 'kapok' ? 3.0 : kind === 'broadleaf' ? 2.4 : 1.8) * s);
       });
     for (const [kind, parts] of SPECIES) for (const part of parts) part.count = ks[SLOT[kind]];
-    this.scene.add(...kapokParts, ...broadParts, ...palmParts, ...fernParts);
+    this.group.add(...kapokParts, ...broadParts, ...palmParts, ...fernParts);
 
     // giant-leaf plants near the road: 5 flat stretched leaves fanned from a base
     const PLANTS = 90;
@@ -6371,7 +6430,7 @@ export class Track {
         }
         this.trees.push({ x: p.x, z: p.z, y: py, r: 0.65 * s, id: k, parts: leafParts, kind: 'jungle', s, solid: false });
       });
-    for (const part of leafParts) { part.count = pPlaced; this.scene.add(part); }
+    for (const part of leafParts) { part.count = pPlaced; this.group.add(part); }
   }
 
   /** Desert palms — TWO species so an oasis never reads copy-pasted:
@@ -6477,8 +6536,8 @@ export class Track {
         });
         this._addShadow(p.x, p.z, (doum ? 1.5 : 1.9) * s);
       });
-    for (const part of parts) { part.count = dates; this.scene.add(part); }
-    for (const part of doumParts) { part.count = doums; this.scene.add(part); }
+    for (const part of parts) { part.count = dates; this.group.add(part); }
+    for (const part of doumParts) { part.count = doums; this.group.add(part); }
   }
 
   /** Gargantuan redwoods: scale 2.2–3.2 → the s ≥ 1.0 'pine' rule makes every
@@ -6537,7 +6596,7 @@ export class Track {
         tops.setColorAt(k, color.clone().multiplyScalar(1.22));
       });
     trunks.count = lows.count = mids.count = tops.count = placed;
-    this.scene.add(trunks, lows, mids, tops);
+    this.group.add(trunks, lows, mids, tops);
 
     // smashable understory: the same geometry at sapling scale near the road
     const SAPS = 110;
@@ -6559,7 +6618,7 @@ export class Track {
         sLows.setColorAt(k, color);
         sTops.setColorAt(k, color.clone().multiplyScalar(1.2));
       });
-    for (const part of sapParts) { part.count = sapPlaced; this.scene.add(part); }
+    for (const part of sapParts) { part.count = sapPlaced; this.group.add(part); }
 
     // --- TANOAK: the broadleaf that actually grows under coast redwoods.
     // Short crooked trunk under two rounded crowns in a lighter, yellower
@@ -6603,7 +6662,7 @@ export class Track {
         oakParts[2].setColorAt(k, color.clone().multiplyScalar(1.2));
         this._addShadow(p.x, p.z, 2.2 * s);
       });
-    for (const part of oakParts) { part.count = oakPlaced; this.scene.add(part); }
+    for (const part of oakParts) { part.count = oakPlaced; this.group.add(part); }
   }
 
   /** Burning forest: a mix of bare charred snags (ember-rim emissive) and
@@ -6650,7 +6709,7 @@ export class Track {
         this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.45 * s, id: k, parts: snagParts, kind: 'snag', s, solid: false });
         this._addShadow(p.x, p.z, 1.2 * s);
       });
-    for (const part of snagParts) { part.count = snagPlaced; this.scene.add(part); }
+    for (const part of snagParts) { part.count = snagPlaced; this.group.add(part); }
 
     // --- scorched standing pines (40%), canopies glowing from within ---
     const PINES = T.treeCount - SNAGS;
@@ -6701,7 +6760,7 @@ export class Track {
         this._addShadow(p.x, p.z, 2.4 * s);
       });
     pTrunks.count = pLows.count = pTops.count = pinePlaced;
-    this.scene.add(pTrunks, pLows, pTops);
+    this.group.add(pTrunks, pLows, pTops);
   }
 
   _buildGroundCover(m4) {
@@ -6729,7 +6788,7 @@ export class Track {
         }
       });
     tufts.count = k;
-    this.scene.add(tufts);
+    this.group.add(tufts);
 
     // bushes (lush, dry or frosted depending on theme)
     const bushGeo = new THREE.IcosahedronGeometry(1, 0);
@@ -6758,7 +6817,7 @@ export class Track {
       bushes.setColorAt(bk++, bcolor);
     });
     bushes.count = bk;
-    this.scene.add(bushes);
+    this.group.add(bushes);
 
     // boulders (snow theme gets white caps on top; volcano gets glossy obsidian)
     // — top-lit via a baked vertex-color gradient, plus a smaller offset lump
@@ -6821,8 +6880,8 @@ export class Track {
     });
     rocks.count = rk;
     lumps.count = lk;
-    this.scene.add(rocks, lumps);
-    if (caps) { caps.count = rk; this.scene.add(caps); }
+    this.group.add(rocks, lumps);
+    if (caps) { caps.count = rk; this.group.add(caps); }
 
     // small stones scattered right off the road edge
     const pebbles = new THREE.InstancedMesh(rockGeo, rockMat, T.pebbleCount);
@@ -6840,7 +6899,7 @@ export class Track {
       pebbles.setColorAt(pk++, pcol);
     });
     pebbles.count = pk;
-    this.scene.add(pebbles);
+    this.group.add(pebbles);
 
     // one big hero boulder close to the racing line (in the open start bowl on
     // cliff-walled levels, where trackside ground is actually visible).
@@ -6856,7 +6915,7 @@ export class Track {
     hero.rotation.y = 1.3;
     hero.position.set(hp.x, this.terrainHeight(hp.x, hp.z) + 0.9, hp.z);
     hero.castShadow = true;
-    this.scene.add(hero);
+    this.group.add(hero);
     // hero boulder is solid too: footprint radius ≈ (4.6 + 4.1) / 2 = 4.35
     this.solids.push({ x: hp.x, z: hp.z, r: 4.35 * 0.9, y: this.terrainHeight(hp.x, hp.z), mat: 'stone' });
     this._addShadow(hp.x, hp.z, 5.8);
@@ -6868,7 +6927,7 @@ export class Track {
       heroCap.scale.set(3.8, 1.4, 3.4);
       heroCap.rotation.y = 1.3;
       heroCap.position.set(hp.x, hero.position.y + 2.2, hp.z);
-      this.scene.add(heroCap);
+      this.group.add(heroCap);
     }
 
     // flowers sprinkled close to the road
@@ -6888,7 +6947,7 @@ export class Track {
       flowers.setColorAt(fk++, fc);
     });
     flowers.count = fk;
-    this.scene.add(flowers);
+    this.group.add(flowers);
   }
 
   _buildHuts(m4) {
@@ -6951,7 +7010,7 @@ export class Track {
       placed++;
     });
     walls.count = roofs.count = placed;
-    this.scene.add(walls, roofs);
+    this.group.add(walls, roofs);
   }
 
   /** Blank a destroyed building's instances and drop its collider, so you can
@@ -7028,7 +7087,7 @@ export class Track {
       placed++;
     });
     domes.count = tunnels.count = doors.count = placed;
-    this.scene.add(domes, tunnels, doors);
+    this.group.add(domes, tunnels, doors);
   }
 
   _buildTrackside(m4) {
@@ -7070,7 +7129,7 @@ export class Track {
     }
     tires.count = tk;
     this._tireMesh = tires;
-    this.scene.add(tires);
+    this.group.add(tires);
 
     // hay bales
     const hayCount = this.T.hayCount !== undefined ? this.T.hayCount : 50;
@@ -7088,7 +7147,7 @@ export class Track {
       this._addShadow(p.x, p.z, 1.6);
     });
     hay.count = hk;
-    this.scene.add(hay);
+    this.group.add(hay);
   }
 
   _buildBanners() {
@@ -7316,7 +7375,7 @@ export class Track {
     rim.rotation.x = -Math.PI / 2;
     rim.scale.set(8.6, 6.4, 1);
     rim.position.set(spot.x, spot.y + 0.3, spot.z);
-    this.scene.add(rim);
+    this.group.add(rim);
     const water = new THREE.Mesh(
       new THREE.CircleGeometry(1, 26),
       new THREE.MeshStandardMaterial({ color: 0x2e86c8, roughness: 0.15, metalness: 0.1 })
@@ -7324,7 +7383,7 @@ export class Track {
     water.rotation.x = -Math.PI / 2;
     water.scale.set(7.2, 5.2, 1);
     water.position.set(spot.x, spot.y + 0.38, spot.z);
-    this.scene.add(water);
+    this.group.add(water);
     // palms leaning over the water
     const up = new THREE.Vector3(0, 1, 0);
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8a6242, roughness: 1 });
@@ -7383,7 +7442,7 @@ export class Track {
       const s = 0.9 + Math.random() * 0.5;
       g.scale.setScalar(s);
       g.position.set(px, spot.y + 0.25, pz);
-      this.scene.add(g);
+      this.group.add(g);
     }
   }
 
@@ -7637,5 +7696,25 @@ export class Track {
       c.sprite.position.x += c.speed * dt;
       if (c.sprite.position.x > 1100) c.sprite.position.x = -1100;
     }
+  }
+
+  /** Tear the whole world down so another one can be built in its place
+   *  without reloading the page. Everything the track made lives under
+   *  `this.group`, so this is one detach plus a walk to free GPU memory —
+   *  geometries and textures are NOT garbage collected on their own, and a
+   *  player hopping between tracks would otherwise leak a world each time.
+   *
+   *  Shared module-level assets (the prop geometry cache, the texture makers'
+   *  memoised canvases) are deliberately left alone: they are reused by the
+   *  next world and disposing them would cost a rebuild for nothing. */
+  dispose() {
+    disposeSubtree(this.group);
+    this.scene.remove(this.group);
+    // drop the world-sized lookup tables too — these are the big retained
+    // arrays (900 centreline samples, every collider, the river grid)
+    this.solids = []; this.buildings = []; this.trees = []; this.props = [];
+    this.tireStacks = []; this.banners = [];
+    this._river = null;
+    this.disposed = true;
   }
 }
