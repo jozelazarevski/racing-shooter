@@ -452,10 +452,10 @@ const THEMES = {
     // tone lifted so the driving surface reads while the embers still glow.
     hemiSky: 0xe8b088, hemiGround: 0x8a6c58, hemiIntensity: 3.1,
     sunColor: 0xffa060, sunIntensity: 3.2,
-    skyTop: '#341a28', skyHorizon: '#dd541c', sunGlow: 0xff6a28, skyCurve: 0.72,
+    skyTop: '#4e2a3a', skyHorizon: '#dd541c', sunGlow: 0xff6a28, skyCurve: 0.72,
     sunAz: 0.6, sunEl: 0.17,                             // ember sun low on the haze
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
-    terrainLow: '#5f5248', terrainHigh: '#877566', terrainDirt: '#9c5c40',
+    terrainLow: '#6e6055', terrainHigh: '#9a8676', terrainDirt: '#ac6a4a',
     // steep-face colour for the faceted ground + warmth in the hut windows
     terrainScree: '#6a574d', hutGlow: 1.3,
     ground: {
@@ -463,7 +463,7 @@ const THEMES = {
       // base here cannot be compensated by any amount of light: at '#332e2a'
       // the albedo landed near 15/255 and the level rendered 94% black. Ash
       // is grey, not soot — this is what makes the ground read at all.
-      base: '#6b5f56', bandLight: 'rgba(255,255,255,0.05)', bandDark: 'rgba(0,0,0,0.05)',
+      base: '#7a6c62', bandLight: 'rgba(255,255,255,0.05)', bandDark: 'rgba(0,0,0,0.05)',
       patchA: 'rgba(48,38,32,0.20)', patchB: 'rgba(150,124,102,0.16)',
       speckA: 'rgba(255,140,60,0.9)', speckB: 'rgba(200,192,182,0.7)', speckCount: 70,
       veins: { color: '#ff7a22', glow: 'rgba(255,96,20,0.30)', count: 7 },  // ember cracks
@@ -863,16 +863,18 @@ const THEMES = {
   // ground fissures, scorched + burning trees. Hazard contract: fallHazard.
   wildfire: {
     fogColor: 0x6a3e28, fogNear: 190, fogFar: 900,
-    hemiSky: 0xe89a64, hemiGround: 0x5c4434, hemiIntensity: 1.22,
+    // smoke and firelight, but measured 22.5 mean / 52% near-black — you were
+    // escaping a fire you could not see the road through
+    hemiSky: 0xe89a64, hemiGround: 0x7a5c46, hemiIntensity: 2.2,
     sunColor: 0xff8a48, sunIntensity: 2.6,
-    skyTop: '#2c1a1e', skyHorizon: '#e8601e', sunGlow: 0xff6a20, skyCurve: 0.66,
+    skyTop: '#46292c', skyHorizon: '#e8601e', sunGlow: 0xff6a20, skyCurve: 0.66,
     sunAz: 0.55, sunEl: 0.15,
     cloudCount: 9, cloudOpacity: 0.5, cloudTint: 0x5a4238,   // smoke columns
-    terrainLow: '#5c4630', terrainHigh: '#7e6244', terrainDirt: '#96522c',
+    terrainLow: '#705a42', terrainHigh: '#94785a', terrainDirt: '#a86436',
     // steep-face colour for the faceted ground + warmth in the hut windows
-    terrainScree: '#7a4a28', hutGlow: 1.2,
+    terrainScree: '#8c5a34', hutGlow: 1.2,
     ground: {
-      base: '#5c4a36', bandLight: 'rgba(255,255,255,0.03)', bandDark: 'rgba(0,0,0,0.07)',
+      base: '#7a6752', bandLight: 'rgba(255,255,255,0.04)', bandDark: 'rgba(0,0,0,0.06)',
       patchA: 'rgba(30,20,14,0.24)', patchB: 'rgba(130,100,68,0.14)',
       speckA: 'rgba(255,150,60,0.9)', speckB: 'rgba(190,170,150,0.7)', speckCount: 90,
       veins: { color: '#ff8a26', glow: 'rgba(255,110,20,0.4)', count: 10 },  // burning fissures
@@ -1016,22 +1018,25 @@ const THEMES = {
   neon: {
     surface: 'wet',                                     // glossy glass-asphalt
     fogColor: 0x0a0a18, fogNear: 260, fogFar: 1400,
-    hemiSky: 0x36406a, hemiGround: 0x1c1430, hemiIntensity: 1.15,
-    sunColor: 0x8a9aff, sunIntensity: 1.15,              // cold moonlight
-    skyTop: '#03030a', skyHorizon: '#461e6e', sunGlow: 0xff40c0, skyCurve: 0.8,
+    // a night city still has to be a road you can place a corner on: measured
+    // 20.7 mean with 39% of the frame near-black. Lifted enough to see the
+    // surface between the neon linework, without losing the after-dark mood.
+    hemiSky: 0x36406a, hemiGround: 0x3c3060, hemiIntensity: 2.8,
+    sunColor: 0x8a9aff, sunIntensity: 2.0,               // cold moonlight
+    skyTop: '#16162a', skyHorizon: '#5c2a86', sunGlow: 0xff40c0, skyCurve: 0.8,
     sunAz: 0.6, sunEl: 0.5, sunSprite: false, stars: true,
     hazeColor: 0xb93ee8, hazeOpacity: 0.4,              // city glow ringing the horizon
     cloudCount: 0, cloudOpacity: 0,
-    terrainLow: '#101018', terrainHigh: '#1e1e2c', terrainDirt: '#28203a',
+    terrainLow: '#32324a', terrainHigh: '#4a4a66', terrainDirt: '#483c66',
     // steep-face colour for the faceted ground + warmth in the hut windows
-    terrainScree: '#2a2440', hutGlow: 1,
+    terrainScree: '#3c3458', hutGlow: 1,
     ground: {
-      base: '#14141c', bandLight: 'rgba(80,240,255,0.04)', bandDark: 'rgba(0,0,0,0.12)',
+      base: '#3a3a4e', bandLight: 'rgba(80,240,255,0.06)', bandDark: 'rgba(0,0,0,0.07)',
       patchA: 'rgba(40,20,80,0.25)', patchB: 'rgba(30,60,90,0.18)',
       speckA: 'rgba(120,220,255,0.7)', speckB: 'rgba(255,80,220,0.6)', speckCount: 150,
     },
     road: {
-      base: '#101318', mottleA: [14, 16, 22], mottleB: [34, 38, 48],
+      base: '#2c3140', mottleA: [40, 45, 58], mottleB: [76, 84, 104],
       rut: 'rgba(8,10,14,0.5)', rutCore: 'rgba(4,6,10,0.45)', tread: 'rgba(0,0,0,0.5)',
       stoneA: 'rgba(70,80,100,0.5)', stoneB: 'rgba(10,12,18,0.7)',
       fringe: [24, 26, 40], fringeVar: [12, 12, 20],
@@ -1068,20 +1073,34 @@ const THEMES = {
   // UNDERCITY SLIPSTREAM: the sewer underbelly — crushing dark fog, grimy
   // concrete tunnel walls, sickly lamp light, debris. Hazard: rats.
   undercity: {
-    fogColor: 0x1c2418, fogNear: 60, fogFar: 460,       // very close, very dark
-    hemiSky: 0x8a9a5c, hemiGround: 0x2a2c1e, hemiIntensity: 1.62,
-    sunColor: 0xd8e87a, sunIntensity: 1.85,              // sickly grate-light shafts
-    skyTop: '#05070a', skyHorizon: '#182014', sunGlow: 0x9aa858, skyCurve: 0.8,
+    // MEASURED THE DARKEST WORLD IN THE GAME: mean luminance 7.6/255 with 95%
+    // of the frame below 18 — against 89 and 1.8% for Pine Valley. Grimy is a
+    // look; unlit is not. Same fault as Ember Pass: the ground texture
+    // multiplies the terrain vertex colour, and '#262a20' over '#23261e' lands
+    // at an albedo of about 6/255, which no lamp can rescue. Fog closing at
+    // 460 u finished the job. Lit like a sodium-lamp service tunnel now — the
+    // sickly green cast is intact, you can just see the road in it.
+    fogColor: 0x3a4430, fogNear: 130, fogFar: 950,
+    // Proved by experiment rather than argued: tripling the fill (2.7 -> 9)
+    // doubled frame luminance, so the walls were simply under-lit, not shadowed
+    // or mis-normalled. The slot canyon is most of what you look at here, and
+    // vertical faces get almost nothing but this term.
+    hemiSky: 0x8a9a5c, hemiGround: 0x5a5e46, hemiIntensity: 5.5,
+    sunColor: 0xd8e87a, sunIntensity: 3.0,               // sickly grate-light shafts
+    // The sky was the other half of it. Lighting the ground does nothing for
+    // the top half of a chase-camera frame, and skyTop '#05070a' is black —
+    // so roughly half the screen stayed at zero however bright the road got.
+    skyTop: '#222c1e', skyHorizon: '#3e4a2e', sunGlow: 0x9aa858, skyCurve: 0.8,
     sunAz: 0.4, sunEl: 0.6, sunSprite: false,
-    hazeColor: 0x2a301c, hazeOpacity: 0.6,
+    hazeColor: 0x4a5436, hazeOpacity: 0.32,
     cloudCount: 0, cloudOpacity: 0,
-    terrainLow: '#23261e', terrainHigh: '#34382c', terrainDirt: '#2c2418',
+    terrainLow: '#4e5442', terrainHigh: '#6e745c', terrainDirt: '#5e4e36',
     // steep-face colour for the faceted ground + warmth in the hut windows
-    terrainScree: '#2c2a1e', hutGlow: 1,
+    terrainScree: '#585648', hutGlow: 1,
     ground: {
-      base: '#262a20', bandLight: 'rgba(255,255,255,0.02)', bandDark: 'rgba(0,0,0,0.08)',
-      patchA: 'rgba(14,18,10,0.24)', patchB: 'rgba(70,78,54,0.14)',
-      speckA: 'rgba(150,170,90,0.5)', speckB: 'rgba(90,100,110,0.6)', speckCount: 60,
+      base: '#5e6550', bandLight: 'rgba(255,255,255,0.04)', bandDark: 'rgba(0,0,0,0.07)',
+      patchA: 'rgba(36,42,28,0.22)', patchB: 'rgba(120,130,96,0.16)',
+      speckA: 'rgba(150,170,90,0.5)', speckB: 'rgba(140,150,160,0.6)', speckCount: 60,
     },
     road: {
       // grimy stained concrete
@@ -1089,10 +1108,10 @@ const THEMES = {
       rut: 'rgba(20,24,18,0.55)', rutCore: 'rgba(12,15,10,0.5)', tread: 'rgba(5,7,4,0.55)',
       stoneA: 'rgba(140,146,134,0.6)', stoneB: 'rgba(24,28,20,0.7)',
       fringe: [42, 50, 32], fringeVar: [18, 22, 14],    // slime creeping from the walls
-      wet: { darken: 0.3, gleam: 10, pools: 5 },        // permanently damp
+      wet: { darken: 0.12, gleam: 10, pools: 5 },       // permanently damp
       ruts: false,                                      // poured concrete doesn't rut
     },
-    hillColor: 0x1c2018, peakColor: 0x282e22,
+    hillColor: 0x3a4030, peakColor: 0x4a5240,
     vegetation: 'none', treeCount: 0, trunkColor: 0x33362c,
     foliageLow: 0x2a3020, foliageTop: 0x3a4030,
     foliage: { h: 0.2, hVar: 0.05, s: 0.2, sVar: 0.1, l: 0.2, lVar: 0.1 },
@@ -1100,7 +1119,7 @@ const THEMES = {
     tuftCount: 90, grass: { bladeA: '#5a6a30', bladeB: '#8a9a48' },
     bushCount: 40, bushColor: 0x3a4a28,
     bush: { h: 0.22, hVar: 0.04, s: 0.3, sVar: 0.1, l: 0.18, lVar: 0.08 },
-    rockCount: 130, pebbleCount: 260, rockColor: 0x4a4e44, rockSnowCap: false,
+    rockCount: 130, pebbleCount: 260, rockColor: 0x6e7264, rockSnowCap: false,
     flowerCount: 0, flowerColors: ['#8a9a48'],
     hutRoof: 0x3a3e34, hutCount: 0, hayColor: 0x5a5e50, hayCount: 0,
     splinter: [0x4a4e44, 0x8a9a48],                     // concrete + slime chips
@@ -1109,7 +1128,7 @@ const THEMES = {
     rampMaxCurv: 0.022, padMaxCurv: 0.0075, boardMaxCurv: 0.02,
     cliffWalls: true,
     cliffPalette: {                                     // stained tunnel concrete
-      bands: ['#4a4e46', '#3c4038', '#565a50', '#34382e', '#44483e'],
+      bands: ['#6e7466', '#5c6256', '#7c8272', '#545a4c', '#666c5e'],
       seam: 'rgba(20,24,18,0.6)',
       crack: 'rgba(100,120,55,',                        // moss-choked cracks
       bleach: 'rgba(160,170,140,0.1)',
@@ -2283,17 +2302,24 @@ export class Track {
       }
       enter = exit;
     }
-    // run both ends out past the visible world so the river never "starts"
+    // Run both ends out past the visible world so the river never "starts".
+    // Seven fixed 150 u steps did not do that: the tails follow the local
+    // tangent rather than heading straight out, so they were petering out
+    // around r ≈ 1100 — inside the far terrain (r 2100) and inside the fog,
+    // which is a river that stops in the middle of a field. Keep stepping
+    // until the tail is genuinely past the world edge.
+    const OUT_R = 2600;                    // clear of the far terrain and the fog
     const extend = (from, to, sign) => {
       let dx = to.x - from.x, dz = to.z - from.z;
       const l = Math.hypot(dx, dz) || 1;
       dx /= l; dz /= l;
-      for (let k = 1; k <= 7; k++) {
+      for (let k = 1; k <= 30; k++) {
         const step = 150 * k;
         const sway = Math.sin(k * 0.75 + (sign > 0 ? 1.3 : 4.1)) * 40;
-        pts[sign > 0 ? 'push' : 'unshift'](P(
-          to.x + dx * step - dz * sway, to.z + dz * step + dx * sway
-        ));
+        const nx = to.x + dx * step - dz * sway;
+        const nz = to.z + dz * step + dx * sway;
+        pts[sign > 0 ? 'push' : 'unshift'](P(nx, nz));
+        if (Math.hypot(nx, nz) > OUT_R) break;
       }
     };
     extend(pts[1], pts[0], -1);
@@ -7447,6 +7473,8 @@ export class Track {
       // across the road so the ford stays clean water on the carriageway
       (f, c, C) => (c === 0 || c === C - 1 ? 0 : 1)
         * THREE.MathUtils.smoothstep(f.df, 9, 20)
+        // ...and the shoreline fades out with the water at the tails
+        * Math.min(smoothstep01(f.t / 0.06), smoothstep01((1 - f.t) / 0.06))
     );
     const bank = new THREE.Mesh(bankGeo, new THREE.MeshStandardMaterial({
       map: bankTex, roughness: 1, vertexColors: true, transparent: true,
@@ -7475,7 +7503,10 @@ export class Track {
       [-1, -0.35, 0.35, 1],
       waterY,
       (f, c, C) => [f.t * (total / 18), c / (C - 1)],
-      () => 1
+      // Fade the last stretch of each tail to nothing. The reach now runs well
+      // past the fog, but a hard-edged rectangle of water is the exact thing
+      // that reads as "the river stops here" if one ever does come into view.
+      (f) => Math.min(smoothstep01(f.t / 0.06), smoothstep01((1 - f.t) / 0.06))
     );
     const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({
       map: waterTex, roughness: 0.18, metalness: 0.06, side: THREE.DoubleSide,
