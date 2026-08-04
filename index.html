@@ -135,9 +135,12 @@
     background:radial-gradient(ellipse at center, transparent 55%, rgba(255,25,60,.55) 100%)}
   #polish-vignette{position:fixed;inset:0;pointer-events:none;z-index:2;
     background:radial-gradient(ellipse at center, transparent 62%, rgba(20,12,4,.28) 100%)}
+  /* The fade is DECORATION. It must never take pointer events: it used to
+     capture them while dark, so any path that left it up also silently ate
+     every touch — a dimmed screen you cannot steer, which reads as a freeze. */
   #fade{position:fixed;inset:0;background:#0d0805;z-index:40;pointer-events:none;
     opacity:0;transition:opacity .45s ease}
-  #fade.dark{opacity:1;pointer-events:auto}
+  #fade.dark{opacity:1}
 
   /* camera + pause buttons */
   .icon-btn{pointer-events:auto;position:absolute;width:46px;height:46px;border-radius:12px;

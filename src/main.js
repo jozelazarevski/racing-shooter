@@ -333,6 +333,11 @@ class Game {
     sc.updateProjectionMatrix();
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.035;   // kills the acne the raked sun exposes
+    // A 1024 map stretched over a 144 u frustum is 0.14 u per texel, so a car
+    // shadow is ~30 texels across and its edge steps visibly — a hard black
+    // wedge on the ground rather than a shadow. Widen the PCF kernel so the
+    // edge is soft at the size a car actually casts.
+    sun.shadow.radius = 3.5;
     this.scene.add(sun, sun.target);
     this.moon = sun; // shadow rig follows the player (name kept for the camera code)
     // The shadow rig used to sit at a hard-coded (70,130,50) — 56° up and in a
@@ -620,10 +625,20 @@ class Game {
     const fade = document.getElementById('fade');
     fade.style.transition = 'none';
     fade.classList.add('dark');
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+    // CLEAR IT WHATEVER HAPPENS. This used to rely on a double rAF, and rAF
+    // does not fire while the page is backgrounded — so loading with the phone
+    // locked, or switching apps mid-load, left the screen dark forever. A
+    // timer runs even when hidden, and re-clearing on visibilitychange covers
+    // a load that finishes while the tab is away.
+    const lift = () => {
       fade.style.transition = '';
       fade.classList.remove('dark');
-    }));
+    };
+    requestAnimationFrame(() => requestAnimationFrame(lift));
+    setTimeout(lift, 900);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) lift();
+    });
 
     this.clock = new THREE.Clock();
     this.renderer.setAnimationLoop(() => this.frame());
@@ -2822,8 +2837,11 @@ class Game {
   _buildGunNests() {
     this.hostiles = this.hostiles || [];
     const t = this.track;
-    if (!t || this.missionMode) return;
-    const COUNT = this.freeRoam ? 5 : 3;
+    // Combat furniture belongs in the combat modes. A rally is a rally: there
+    // is nothing to shoot at you on a stage, and being shot at by scenery you
+    // cannot answer is not difficulty, it is noise.
+    if (!t || !this.freeRoam) return;
+    const COUNT = this.missionMode ? 4 : 5;
     for (let k = 0; k < COUNT; k++) {
       const idx = Math.floor(t.N * ((k + 0.5) / COUNT + Math.random() * 0.08)) % t.N;
       const side = Math.random() < 0.5 ? -1 : 1;
@@ -2847,11 +2865,12 @@ class Game {
   }
 
   _updateHostiles(dt) {
-    if (this.state === 'race' && !this.missionMode) {
-      this._raiderTimer = (this._raiderTimer ?? (this.freeRoam ? 25 : 55)) - dt;
+    // ...and raiders likewise: they hunt in free roam, not down a rally stage
+    if (this.state === 'race' && this.freeRoam && !this.missionMode) {
+      this._raiderTimer = (this._raiderTimer ?? 25) - dt;
       const live = this.hostiles.filter((h) => h.alive && h instanceof Raider).length;
-      if (this._raiderTimer <= 0 && live < (this.freeRoam ? 2 : 1)) {
-        this._raiderTimer = this.freeRoam ? 45 : 70;
+      if (this._raiderTimer <= 0 && live < 2) {
+        this._raiderTimer = 45;
         this._spawnRaider();
       }
     }
@@ -3807,7 +3826,29 @@ class Game {
   }
 
   // ---------- main loop ----------
+  /** The animation loop, wrapped so one bad frame cannot wedge the game.
+   *
+   *  setAnimationLoop keeps calling us after a throw, but if the throw repeats
+   *  every frame nothing past it ever runs again — the picture stops updating
+   *  and input stops being read, which to a player is simply a frozen game
+   *  with no way out. Catching means the renderer still draws and the pause
+   *  button still works, so a bug becomes a glitch you can walk away from
+   *  instead of a dead session. Reported once, not once per frame. */
   frame() {
+    try {
+      this._frameBody();
+    } catch (err) {
+      if (!this._frameErr) {
+        this._frameErr = err;
+        console.error('[frame] recovered from', err);
+        this.hud?.feed?.('GLITCH RECOVERED', 'bad');
+      }
+      // keep something on screen even if the sim threw
+      try { this.composer.render(); } catch { /* renderer itself is gone */ }
+    }
+  }
+
+  _frameBody() {
     let dt = Math.min(this.clock.getDelta(), 0.05);
     const time = this.clock.elapsedTime;
     // brutal-impact slow motion: time crawls for a beat, then snaps back
