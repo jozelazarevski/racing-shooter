@@ -231,13 +231,41 @@ export class Raider extends GroundHostile {
     if (p && p.alive) {
       const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z;
       const d = Math.hypot(dx, dz) || 1;
-      const want = Math.atan2(dx, dz);
+      // PURSUE, DON'T ORBIT.
+      //
+      // This used to steer flat at the player and hold most of its speed all
+      // the way in. A pure seek with no arrival cannot settle: it overshoots,
+      // swings back through, overshoots the other way, and the result is a
+      // buggy spinning circles around you for no reason anybody can read.
+      //
+      // Three states instead, and each one looks like a decision:
+      //   CLOSE   far away — drive straight at the player, full speed
+      //   STAND   inside its gun range — hold station off one shoulder and
+      //           shoot, matching pace rather than boring in
+      //   PUSH    lined up and close — commit to a ram, then back off
+      const RANGE = 42;
+      const side = this._side ?? (this._side = Math.random() < 0.5 ? -1 : 1);
+      let aimX = p.pos.x, aimZ = p.pos.z, target = this.topSpeed;
+      if (d < RANGE && (this._ramCool ?? 0) > 0.2) {
+        // holding: aim at a point off the player's shoulder and match speed,
+        // so it sits in your mirror instead of pirouetting around you
+        const pf = p.forward;
+        aimX = p.pos.x - pf.x * 12 + pf.z * side * 9;
+        aimZ = p.pos.z - pf.z * 12 - pf.x * side * 9;
+        target = Math.min(this.topSpeed, Math.abs(p.speedAlong) + 4);
+      } else if (d < 12) {
+        target = this.topSpeed * 0.85;          // committed run-in
+      }
+      const want = Math.atan2(aimX - this.pos.x, aimZ - this.pos.z);
       let dA = want - this.heading;
       while (dA > Math.PI) dA -= Math.PI * 2;
       while (dA < -Math.PI) dA += Math.PI * 2;
-      this.heading += THREE.MathUtils.clamp(dA, -2.2 * dt, 2.2 * dt);
-      // ease off once alongside so it fights instead of nosing into your boot
-      const target = d < 14 ? this.topSpeed * 0.62 : this.topSpeed;
+      // turn rate falls off with speed, like something with actual tyres —
+      // it can no longer pivot on the spot to keep its nose on you
+      const turn = (2.4 - Math.min(1.4, this.vel.length() * 0.03)) * dt;
+      this.heading += THREE.MathUtils.clamp(dA, -turn, turn);
+      // and it does not accelerate while pointing the wrong way
+      if (Math.abs(dA) > 1.1) target *= 0.45;
       const f = this.forward;
       this.vel.x += (f.x * target - this.vel.x) * Math.min(1, 2.4 * dt);
       this.vel.z += (f.z * target - this.vel.z) * Math.min(1, 2.4 * dt);
@@ -248,7 +276,10 @@ export class Raider extends GroundHostile {
       // RAM. Contact costs hull and shoves both ways, so being caught is a
       // real event rather than a scrape.
       if (d < 4.0 && (this._ramCool ?? 0) <= 0) {
-        this._ramCool = 1.1;
+        // long cooldown, and it switches shoulder afterwards, so a ram is a
+        // discrete event you can see coming rather than a continuous grind
+        this._ramCool = 4.5;
+        this._side = -side;
         const closing = Math.abs(this.vel.length() - p.vel.length());
         g.onPlayerHit?.(Math.min(22, 8 + closing * 0.35), this);
         g.hud?.feed?.('RAMMED', 'bad');

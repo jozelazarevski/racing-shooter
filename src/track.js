@@ -556,7 +556,10 @@ const THEMES = {
     },
     road: {
       // packed snow, bluer than FROST PEAK's churned mud
-      base: '#b6c9d6', mottleA: [140, 162, 180], mottleB: [214, 228, 238],
+      // A road you cannot pick out of the snow is not a road. This was
+      // '#b6c9d6' against a '#cfe0ec'-to-white snowfield: measured 21 points
+      // of separation, i.e. none. Ploughed grit, still cold in tone.
+      base: '#7c8894', mottleA: [92, 102, 112], mottleB: [150, 165, 180],
       rut: 'rgba(96,120,142,0.55)', rutCore: 'rgba(74,96,118,0.5)', tread: 'rgba(52,68,86,0.5)',
       stoneA: 'rgba(235,245,252,0.8)', stoneB: 'rgba(120,148,170,0.7)',
       fringe: [226, 238, 248], fringeVar: [24, 14, 8],  // snowbanks creeping in
@@ -924,7 +927,9 @@ const THEMES = {
     },
     road: {
       // near-white blue glacier ice, crevasse-cracked by the overlay
-      base: '#d5e6f2', mottleA: [168, 194, 216], mottleB: [230, 242, 250],
+      // was '#d5e6f2' on white ice — 22 points of separation. Swept ice over
+      // a dark bed reads as a lane you can aim at.
+      base: '#83919e', mottleA: [98, 110, 124], mottleB: [162, 180, 198],
       rut: 'rgba(140,168,192,0.4)', rutCore: 'rgba(120,148,176,0.35)', tread: 'rgba(96,122,150,0.4)',
       stoneA: 'rgba(245,250,255,0.8)', stoneB: 'rgba(150,180,205,0.7)',
       fringe: [232, 242, 250], fringeVar: [20, 12, 6],
@@ -2273,7 +2278,16 @@ export class Track {
     // nearest-sample blend can hand a point under one leg the height of the
     // NEXT leg up and poke a lip through the ribbon. An extra tuck under the
     // whole corridor (hidden by the skirt) keeps the ground below the road.
-    const tuck = 0.45 * THREE.MathUtils.smoothstep(d, 10.8, 14)
+    // THE ROAD IS THE FLOOR. This used to ramp the tuck IN from d = 10.8, which
+    // is the drivable edge — meaning under the carriageway itself the tuck was
+    // zero and the terrain mesh sat exactly coplanar with the road ribbon.
+    // Coplanar surfaces z-fight, and the ground samples every 10 u while the
+    // road is smooth, so wherever interpolation put a terrain triangle a hair
+    // high it painted straight over the road. That is the road vanishing under
+    // the hillside. The tuck is now DEEPEST under the road and eases out to
+    // nothing at the far edge of the blend, so the ribbon always has clear air
+    // beneath it and there is nothing to fight with.
+    const tuck = 0.55 * (1 - THREE.MathUtils.smoothstep(d, 12, 30))
       + (this.T.retainingWalls || this.T.shelfRoad
         ? 0.75 * THREE.MathUtils.smoothstep(d, 2, 11) : 0);
     let h;
@@ -2564,7 +2578,43 @@ export class Track {
       const clamp = this._roadClampY(x, z);
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
     }
-    return h;
+    return this._roadFloor(x, z, h, fld.d);
+  }
+
+  /** THE ROAD IS THE FLOOR — the hard guarantee, applied last.
+   *
+   *  Everything above works off a COARSE road field, which bilinearly mixes
+   *  the heights of whatever strands are nearby. Where two legs of a pass run
+   *  close at different elevations that mix is not either of them, so the
+   *  ground beside the lower leg could still come out above its surface —
+   *  measured up to 1.9 u proud at the road edge on Gotthard, which is the
+   *  carriageway disappearing into the hillside.
+   *
+   *  So after all the blending, take the height of the ACTUAL nearest road
+   *  sample and refuse to let the ground near it exceed that. Cheap because it
+   *  only runs near the road, and exact because it scans the centreline rather
+   *  than a smoothed field. Eased out over the verge so the shoulder still
+   *  rises naturally away from the carriageway instead of ending in a step. */
+  _roadFloor(x, z, h, coarseD) {
+    if (coarseD > 34) return h;                 // nowhere near the road
+    let best = Infinity, bi = 0;
+    for (let i = 0; i < N; i += 4) {
+      const dx = x - this.center[i].x, dz = z - this.center[i].z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < best) { best = d2; bi = i; }
+    }
+    for (let k = -4; k <= 4; k++) {             // refine around the coarse pick
+      const i = (bi + k + N) % N;
+      const dx = x - this.center[i].x, dz = z - this.center[i].z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < best) { best = d2; bi = i; }
+    }
+    const d = Math.sqrt(best);
+    const half = this.widthAt ? this.widthAt(bi) : ROAD_HALF;
+    // full clearance across the carriageway, relaxing to none by 16 u out
+    const k = 1 - smoothstep01((d - (half + 1)) / 15);
+    if (k <= 0) return h;
+    return Math.min(h, this.center[bi].y - 0.35 * k);
   }
 
   /** Terrain-MESH vertex height: same blend as terrainHeight but with an
@@ -2602,6 +2652,12 @@ export class Track {
       }
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
     }
+    // and the same hard floor the physics height uses — this is the function
+    // that actually feeds the rendered vertices, so without it the ground can
+    // still be DRAWN through the carriageway even when the car drives level
+    const half = this.widthAt ? this.widthAt(bi) : ROAD_HALF;
+    const k = 1 - smoothstep01((d - (half + 1)) / 15);
+    if (k > 0) h = Math.min(h, this.center[bi].y - 0.35 * k);
     return h;
   }
 
@@ -2663,9 +2719,17 @@ export class Track {
       mat.emissiveMap.anisotropy = 8;
       mat.emissiveIntensity = 1.7;
     }
+    // ...and belt-and-braces on top of the tuck: bias the road toward the
+    // camera in the depth test so that even where a stray terrain triangle
+    // does come up level with it, the carriageway is what you see. The road is
+    // the one surface in this game that must never be occluded by the ground.
+    mat.polygonOffset = true;
+    mat.polygonOffsetFactor = -4;
+    mat.polygonOffsetUnits = -4;
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = 'road';
     mesh.receiveShadow = true;
+    mesh.renderOrder = 1;
     this.group.add(mesh);
   }
 

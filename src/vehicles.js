@@ -76,8 +76,9 @@ function _carAoTexture() {
   c.width = c.height = 64;
   const x = c.getContext('2d');
   const gr = x.createRadialGradient(32, 32, 4, 32, 32, 31);
-  gr.addColorStop(0, 'rgba(0,0,0,0.95)');
-  gr.addColorStop(0.65, 'rgba(0,0,0,0.55)');
+  gr.addColorStop(0, 'rgba(0,0,0,0.85)');
+  gr.addColorStop(0.45, 'rgba(0,0,0,0.42)');
+  gr.addColorStop(0.75, 'rgba(0,0,0,0.14)');
   gr.addColorStop(1, 'rgba(0,0,0,0)');
   x.fillStyle = gr;
   x.fillRect(0, 0, 64, 64);
@@ -499,8 +500,14 @@ export function buildVoxelRacer(spec) {
     const ao = new THREE.Mesh(
       new THREE.PlaneGeometry(3.6, bodyLen + 1.6),
       new THREE.MeshBasicMaterial({
-        map: _carAoTexture(), transparent: true, opacity: 0.42,
-        depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
+        map: _carAoTexture(), transparent: true, opacity: 0.26,
+        depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6,
+        // -6 must out-bias the road's -4, or the carriageway is pulled in
+        // front of the car's own contact shadow and it flickers away.
+        // Opacity down from 0.42: this sits UNDER the real shadow, and the two
+        // stacked read as a black slab under the car rather than contact —
+        // most obvious on snow, where a car should sit in a soft grey pool.
+        polygonOffsetUnits: -6,
       })
     );
     ao.rotation.x = -Math.PI / 2;
