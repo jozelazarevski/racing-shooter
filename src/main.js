@@ -504,7 +504,8 @@ class Game {
       const tabs = [
         [document.getElementById('tab-btn-race'), document.getElementById('tab-race')],
         [document.getElementById('tab-btn-garage'), document.getElementById('tab-garage')],
-      ];
+        [document.getElementById('tab-btn-settings'), document.getElementById('tab-settings')],
+      ].filter(([b, p]) => b && p);
       for (const [btn, panel] of tabs) {
         btn.addEventListener('click', () => {
           for (const [b, p2] of tabs) {
@@ -702,8 +703,8 @@ class Game {
   fadeTo(url, forceTab = null) {
     try {
       sessionStorage.setItem('ir-menu-state', JSON.stringify({
-        tab: forceTab
-          ?? (document.getElementById('tab-btn-garage')?.classList.contains('current') ? 'garage' : 'race'),
+        tab: forceTab ?? (['garage', 'settings'].find(
+          (t) => document.getElementById(`tab-btn-${t}`)?.classList.contains('current')) ?? 'race'),
         scroll: document.getElementById('title-screen')?.scrollTop ?? 0,
       }));
     } catch { /* private mode */ }
@@ -718,7 +719,7 @@ class Game {
       if (!raw) return;
       sessionStorage.removeItem('ir-menu-state');
       const st = JSON.parse(raw);
-      if (st.tab === 'garage') document.getElementById('tab-btn-garage')?.click();
+      if (st.tab && st.tab !== 'race') document.getElementById(`tab-btn-${st.tab}`)?.click();
       const ts = document.getElementById('title-screen');
       if (ts && st.scroll) requestAnimationFrame(() => { ts.scrollTop = st.scroll; });
     } catch { /* ignore */ }

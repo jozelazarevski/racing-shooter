@@ -1402,7 +1402,13 @@ export class Car {
       //    is something you JUMP by committing to it. Below ~26 u/s you ride
       //    over the brow instead of skipping off it, so ambling around never
       //    produces little uncommanded hops that steal your steering.
-      const crested = this._climbRate > 1.5 && climbAccel < -26  // -26 = gravity
+      // Thresholds well ABOVE the marginal case. Set at the physical minimum
+      // (climb 1.5, accel just past gravity) the car also skipped off ordinary
+      // rolling road undulations at speed — technically correct, but it read
+      // as a permanently jumpy car, and every hop costs steering. A real crest
+      // produces climb ≈ 12 and accel ≈ −55, so it clears these easily while
+      // the everyday lumps in the elevation profile do not.
+      const crested = this._climbRate > 4.5 && climbAccel < -42
         && Math.abs(this.speedAlong) > 26;
       if ((drop > 0.9 && this._climbRate > 2.5) || crested) {
         this.airborne = true;
