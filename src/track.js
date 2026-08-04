@@ -455,7 +455,7 @@ const THEMES = {
     skyTop: '#4e2a3a', skyHorizon: '#dd541c', sunGlow: 0xff6a28, skyCurve: 0.72,
     sunAz: 0.6, sunEl: 0.17,                             // ember sun low on the haze
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
-    terrainLow: '#6e6055', terrainHigh: '#9a8676', terrainDirt: '#ac6a4a',
+    terrainLow: '#877668', terrainHigh: '#9a8676', terrainDirt: '#ac6a4a',
     // steep-face colour for the faceted ground + warmth in the hut windows
     terrainScree: '#6a574d', hutGlow: 1.3,
     ground: {
@@ -469,7 +469,9 @@ const THEMES = {
       veins: { color: '#ff7a22', glow: 'rgba(255,96,20,0.30)', count: 7 },  // ember cracks
     },
     road: {
-      base: '#5a534e', mottleA: [66, 60, 56], mottleB: [124, 116, 110],
+      // the ash field around it is warm and light, so the carriageway is a
+      // cool dark basalt — clearly a different surface, not a shade of dirt
+      base: '#4a4744', mottleA: [58, 55, 52], mottleB: [112, 108, 104],
       rut: 'rgba(152,150,152,0.30)', rutCore: 'rgba(180,177,180,0.26)',    // lighter gray ruts
       tread: 'rgba(18,14,12,0.55)',
       stoneA: 'rgba(190,185,180,0.7)', stoneB: 'rgba(28,24,22,0.8)',
@@ -5354,9 +5356,15 @@ export class Track {
       // sprinkle dirt patches
       const dirt = Math.max(0, Math.sin(x * 0.045 + 2) * Math.sin(z * 0.05) - 0.72) * 3;
       tmp.lerp(cDirt, THREE.MathUtils.clamp(dirt, 0, 0.55));
-      // valley shading: hollows sit a little deeper in tone than the crests, so
-      // the rolling ground reads as form instead of a flat wash
-      tmp.multiplyScalar(0.84 + 0.16 * t);
+      // Valley shading: hollows sit a little deeper in tone than the crests, so
+      // the rolling ground reads as form instead of a flat wash. Gentler than
+      // it was (0.84) because this MULTIPLIES a colour that is already lerping
+      // down to terrainLow in the same hollows — the two stack, and on a dark
+      // world the bottom of a dip came out ~3.6x darker than the rise before
+      // it. Measured on Ember: the road and the lava field both fell to a mean
+      // of 9/255 in the low sections, so there was no way to see where to
+      // drive. Form, not a hole.
+      tmp.multiplyScalar(0.93 + 0.07 * t);
       // the hero gorge is cut through red-rock strata: banded ochre/rust walls
       // fading back to the snowfield at the rim
       if (this._gorge) {
