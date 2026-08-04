@@ -4112,7 +4112,7 @@ export class Track {
       const w = M.w0 + Math.random() * (M.w1 - M.w0);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       q.setFromAxisAngle(up, Math.random() * Math.PI);
-      const y = -12 - (this.T.hillDrop || 0);
+      const y = -12 - (this.T.hillDrop || 0) + this._highland(x, z);
       m4.compose(new THREE.Vector3(x, y + h / 2, z), q, new THREE.Vector3(w, h, w * 0.85));
       rock.setMatrixAt(k, m4);
       this.solids.push({ x, z, r: w * 0.3, y: y + 4, mat: 'stone' });
@@ -4140,8 +4140,9 @@ export class Track {
       const a = a0 + (t - 0.5) * 0.34 + (k % 2 ? 0.05 : -0.05);
       const w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
       q.setFromAxisAngle(up, a + 1.2);
+      const gx = Math.cos(a) * r, gz = Math.sin(a) * r;
       m4.compose(
-        new THREE.Vector3(Math.cos(a) * r, -18 - (this.T.hillDrop || 0) + t * 4, Math.sin(a) * r),
+        new THREE.Vector3(gx, -18 - (this.T.hillDrop || 0) + t * 4 + this._highland(gx, gz), gz),
         q, new THREE.Vector3(w, h, d)
       );
       slabs.setMatrixAt(k, m4);
@@ -5512,7 +5513,9 @@ export class Track {
     for (const s of specs) {
       const rot = Math.random() * Math.PI;
       const hr = [0.5, 0.32, 0.2], wr = [1, 0.74, 0.5];
-      let y = -2;
+      // seated on the real ground: the massif rises to 68 u out where the
+      // horizon mesas stand, and a fixed -2 would sink them into it
+      let y = -2 + this._highland(s.x, s.z);
       q.setFromAxisAngle(up, rot);
       for (let t = 0; t < 3; t++) {
         const w = s.w * wr[t];
@@ -5556,8 +5559,9 @@ export class Track {
         const w = R.w0 + Math.random() * R.wv;
         const h = R.h0 + Math.random() * R.hv;
         q.setFromAxisAngle(up, Math.random() * Math.PI);
+        const dx = Math.cos(a) * r, dz = Math.sin(a) * r;
         m4.compose(
-          new THREE.Vector3(Math.cos(a) * r, h / 2 - 6, Math.sin(a) * r),
+          new THREE.Vector3(dx, h / 2 - 6 + this._highland(dx, dz), dz),
           q,
           new THREE.Vector3(w, h, w * (0.4 + Math.random() * 0.3))  // long wind-carved ridges
         );
@@ -5595,7 +5599,7 @@ export class Track {
     const put = (x, z, w, h) => {
       q.setFromAxisAngle(up, Math.random() * Math.PI);
       m4.compose(
-        new THREE.Vector3(x, -4, z), q,
+        new THREE.Vector3(x, -4 + this._highland(x, z), z), q,
         new THREE.Vector3(w, h, w * (0.6 + Math.random() * 0.8))
       );
       towers.setMatrixAt(k++, m4);
