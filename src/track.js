@@ -445,12 +445,17 @@ const THEMES = {
   // obsidian rocks, bare burnt trees, red-black mountains, dim ember light.
   volcano: {
     fogColor: 0x4a322a, fogNear: 230, fogFar: 1050,
-    hemiSky: 0xc98a66, hemiGround: 0x4a3a32, hemiIntensity: 1,  // ember dusk, but readable
-    sunColor: 0xff8a4a, sunIntensity: 2.45,
+    // EMBER PASS was unplayable: fill 1.0 against a near-black ash albedo left
+    // the road and terrain reading as pure black — only the lava cracks and the
+    // cars were visible, so you could not see where the road went. The mood is
+    // meant to be a volcanic dusk, not an unlit one; fill raised and the ground
+    // tone lifted so the driving surface reads while the embers still glow.
+    hemiSky: 0xd89a74, hemiGround: 0x6a5548, hemiIntensity: 2.15,
+    sunColor: 0xff8a4a, sunIntensity: 2.75,
     skyTop: '#341a28', skyHorizon: '#dd541c', sunGlow: 0xff6a28, skyCurve: 0.72,
     sunAz: 0.6, sunEl: 0.17,                             // ember sun low on the haze
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
-    terrainLow: '#322c28', terrainHigh: '#564a40', terrainDirt: '#6a3c2c',
+    terrainLow: '#4c423a', terrainHigh: '#6f6053', terrainDirt: '#8a5038',
     // steep-face colour for the faceted ground + warmth in the hut windows
     terrainScree: '#4a3b33', hutGlow: 1.3,
     ground: {
