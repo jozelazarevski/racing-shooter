@@ -65,6 +65,50 @@ weight to reach the ground, it stops being a bridge and becomes a decal.
 
 ---
 
+## 4. Jump tracks — the CANYON LEAP
+
+A jump track is not a road with ramps sprinkled on it. It is a **gorge the road
+does not cross**, and the only way over is through the air. The engine already
+has every piece: `_planGorge()` cuts the ravine, `heroBridge` spans it,
+`_deckDip()` shapes the deck, and `rampCount` places launches. A leap is those
+parts rearranged — a bridge with its middle taken out.
+
+**Anatomy of a leap**, in the order the driver meets it:
+
+1. **The run-in.** Straight, and long enough to arrive committed: at least
+   `speed × 1.5 s` of clear road. Never place a corner inside the run-in —
+   under-speed on a leap is a fall, and a fall you could not have avoided is
+   unfair rather than hard.
+2. **The lip.** A ramp at the near abutment, angled to give a ballistic arc
+   that clears the gap at the *intended* speed with margin. From
+   `v² sin(2θ)/g`, a 30 u gap at 28 u/s needs about 11°; publish the design
+   speed per leap so the gap can be checked against it rather than eyeballed.
+3. **The gap.** Road surface must genuinely **stop** — no invisible deck, no
+   collider bridging the void. This is the rule the current hero bridge breaks
+   in reverse: it builds a deck where there is no gap. A leap is the opposite,
+   and both must be true together (rule 3: deck only where ground falls away).
+4. **The landing.** Flat or slightly downhill, never rising — landing into an
+   upslope stops the car dead and reads as a wall. At least `2 ×` the arc's
+   length-uncertainty of usable surface beyond the far lip.
+5. **The consequence.** Falling short is a wreck and a respawn at the near lip,
+   not a slow drift down a ravine wall.
+
+**Variants worth building**, all from the same parts:
+
+| Variant | Shape |
+|---|---|
+| **Broken bridge** | An existing span with a section missing mid-way; the towers still stand either side, so the gap is *read* long before it is reached |
+| **Stepping stones** | Two or three short leaps across mesa tops rather than one long one — landing platforms mid-gorge |
+| **Gate leap** | Ring gates in the air over the gap, scored for passing through them cleanly |
+| **Split line** | A leap that is the short route, with a longer road around the head of the gorge — the risk is optional |
+
+**Rules a leap must not break:** the landing platform is a structure and obeys
+rule 1 (it reaches the ground, or is a mesa that is part of the terrain); the
+gantries either side obey rule 8 (headroom, legs off the carriageway); and any
+waterfall down the gorge wall obeys NATURE rule 1 (plumb, not angled).
+
+---
+
 ## Known violations — open
 
 | # | Rule | Status |
