@@ -53,19 +53,19 @@ export const LEVELS = [
     tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0 } },
   { id: 23, name: 'OUNINPOHJA', theme: 'forest', route: 'ouninpohja', region: 'WORLD RALLY',
     // the fastest stage in the sport: everything is crests and yumps
-    tune: { elev: { amp: 11, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
+    tune: { elev: { amp: 7, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
   { id: 24, name: 'FAFE LEAP', theme: 'redwood', route: 'fafe', region: 'WORLD RALLY',
-    tune: { elev: { amp: 11, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
+    tune: { elev: { amp: 8, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
   { id: 25, name: 'PIKES PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
     // the tallest climb on the roster, and nothing but the climb
     tune: { elev: { amp: 27, ph: [1.7, 0.3, 2.8] }, rampCount: 0 } },
   { id: 26, name: 'SAFARI PLAINS', theme: 'dunes', route: 'safari', region: 'WORLD RALLY',
-    tune: { elev: { amp: 8, ph: [0.9, 2.6, 1.2] }, rampCount: 5 } },
+    tune: { elev: { amp: 4, ph: [0.9, 2.6, 1.2] }, rampCount: 5 } },
   { id: 27, name: 'CORNICHE', theme: 'canyon', route: 'corniche', region: 'WORLD RALLY',
-    tune: { elev: { amp: 10, ph: [2.9, 1.1, 0.5] }, rampCount: 0 } },
+    tune: { elev: { amp: 7, ph: [2.9, 1.1, 0.5] }, rampCount: 0 } },
   { id: 28, name: 'ESTONIA CRESTS', theme: 'forest', route: 'estonia', region: 'WORLD RALLY',
     // the only world besides CANYON RUN to hang a hero bridge over a gorge
-    tune: { elev: { amp: 14, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
+    tune: { elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
       heroBridge: { at: [0.55, 0.66], half: 24, len: 210, depth: 28, skew: 0 } } },
 ];
 
@@ -7434,6 +7434,17 @@ export class Track {
       // houses read as giant. A cottage is a bit wider than a car is long and
       // about as tall again; the roof gets an eave, not a marquee.
       const w = 6 + Math.random() * 3;
+      // A HOUSE MUST NEVER STAND ON THE ROAD.
+      //
+      // `_trackSidePos` / `_zonePos` measure their offset from ONE track index,
+      // so on a lap that doubles back a hut placed a clear 20 u from its own leg
+      // can be sitting on the carriageway of the NEXT one. Measured, FURKA RIDGE
+      // and ESTONIA CRESTS each had FOUR huts whose footprint overlapped the
+      // road — a 50-hull wall you cannot see coming, reported as "remove the
+      // house". `_clearsRoad` re-checks against the nearest leg anywhere on the
+      // lap, and the margin is generous because a building is the one obstacle
+      // that can end a race outright.
+      if (!this._clearsRoad(p.x, p.z, (w * Math.SQRT2) / 2, 3.5)) return;
       const h = 3.6 + Math.random() * 1.4;
       const rot = Math.random() * Math.PI * 2;
       const y = this.terrainHeight(p.x, p.z) - 0.6;
