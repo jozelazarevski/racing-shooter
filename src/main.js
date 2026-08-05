@@ -3662,6 +3662,49 @@ class Game {
     if (Math.random() < 0.3) this.hud.feed(cactus ? 'CACTUS SHREDDED  +15' : 'TIMBER!  +15', 'good');
   }
 
+  /** A small stone shunted out of the way: it costs you speed and paint, then
+   *  rolls clear and sheds chips. Reported as "rocks should not wreck the car
+   *  but damage it and roll / break apart" — before this every stone, however
+   *  small, was an immovable wall that could end a race.
+   *
+   *  The solid is retired immediately (so it cannot be hit twice) and its
+   *  instance is thrown clear of the road, tumbled and part-buried, so the rock
+   *  you hit is visibly gone from where it was. */
+  knockStone(ob, car, impact, dx, dz) {
+    ob.knocked = true;
+    const heft = THREE.MathUtils.clamp((ob.r ?? 0.8) / 1.15, 0.35, 1);
+    // damage: real, but a fraction of what the same stone cost as a wall
+    const dmg = Math.max(3, (impact - 9) * 0.9 * heft) * (this.difficulty?.hullMul ?? 0.62);
+    car.health = Math.max(0, car.health - dmg);
+    car.vel.multiplyScalar(1 - 0.12 * heft);          // it takes some speed with it
+    const at = new THREE.Vector3(ob.x, (ob.y ?? car.pos.y) + 0.4, ob.z);
+    this.particles.splinters(at, new THREE.Vector3(dx, 0.3, dz), [0x8a8378, 0x55504a], 0.7);
+    this.particles.debris(at, 4 + (impact / 6 | 0));
+    this.particles.dust?.(at, 1.1);
+    this.audio?.thud?.(0.6);
+    this.shake = Math.min(1, (this.shake ?? 0) + 0.12);
+    if (car === this.player) {
+      this.buzz(30);
+      this.score += 20;
+      this.styleBump?.();
+      this.hud.feed(`ROCK SHUNTED  −${Math.round(dmg)} HULL`, 'bad');
+    }
+    // throw the instance clear so the rock is visibly no longer where it was
+    const im = ob.im;
+    if (im && ob.inst !== undefined && im.setMatrixAt) {
+      const sc = (ob.sc ?? 1) * 0.9;
+      const q = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(Math.random(), 1, Math.random()).normalize(), Math.random() * 3.1);
+      const m = new THREE.Matrix4().compose(
+        new THREE.Vector3(ob.x + dx * (5 + Math.random() * 4), (ob.y ?? 0) - 0.35,
+          ob.z + dz * (5 + Math.random() * 4)),
+        q, new THREE.Vector3(sc, sc * 0.75, sc));
+      im.setMatrixAt(ob.inst, m);
+      im.instanceMatrix.needsUpdate = true;
+    }
+    ob.r = 0;                                          // retired from collision
+  }
+
   /** Material-aware SOLID crash (RULES.md §impact model). `ob.mat`:
    *  'stone' — brutal: rock does not care about toy trucks. A full-speed
    *            head-on all but wrecks you.

@@ -7144,7 +7144,9 @@ export class Track {
       const sy = s * (0.6 + Math.random() * 0.5);
       const y = this.terrainHeight(p.x, p.z) + s * 0.25;
       // big boulders are SOLID (geometry base radius 1 × instance scale s)
-      if (s > 0.9) this.solids.push({ x: p.x, z: p.z, r: s * 0.9, y: y - s * 0.25, mat: 'stone' });
+      // carry the instance so a knocked-loose stone can actually be SEEN to go
+      if (s > 0.9) this.solids.push({ x: p.x, z: p.z, r: s * 0.9, y: y - s * 0.25, mat: 'stone',
+        inst: rk, im: rocks, sc: s });
       const rot = Math.random() * Math.PI * 2;
       q.setFromAxisAngle(up, rot);
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(s, sy, s));
