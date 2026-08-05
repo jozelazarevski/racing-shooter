@@ -13,6 +13,9 @@ export class Input {
     // thumb has the pedals. Without this the same drag that turns the car also
     // lifts off, which is exactly the coupling two thumbs exist to remove.
     this.steerOnly = false;
+    // TWO-THUMB drives on left/right buttons with the throttle held open, so
+    // both thumbs are free to steer and the middle button is the brake.
+    this.autoThrottle = false;
     addEventListener('keydown', (e) => {
       if (e.repeat) return;
       this.keys.add(e.code);
@@ -144,7 +147,11 @@ export class Input {
   justPressed(...codes) { return codes.some((c) => this.pressed.has(c)); }
   endFrame() { this.pressed.clear(); }
 
-  get throttle() { return Math.max(this.down('KeyW', 'ArrowUp') ? 1 : 0, this.analog.throttle); }
+  get throttle() {
+    // auto-gas: full throttle unless you are actually on the brake
+    if (this.autoThrottle) return this.brake > 0 ? 0 : 1;
+    return Math.max(this.down('KeyW', 'ArrowUp') ? 1 : 0, this.analog.throttle);
+  }
   get brake() { return Math.max(this.down('KeyS', 'ArrowDown') ? 1 : 0, this.analog.brake); }
   get steer() {
     const k = (this.down('KeyA', 'ArrowLeft') ? 1 : 0) - (this.down('KeyD', 'ArrowRight') ? 1 : 0);

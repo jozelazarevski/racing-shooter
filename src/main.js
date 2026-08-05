@@ -825,7 +825,8 @@ class Game {
         this._applyControlScheme = (id, save) => {
           this.controlScheme = id === 'two' ? 'two' : 'one';
           document.body.classList.toggle('two-thumb', this.controlScheme === 'two');
-          this.input.steerOnly = this.controlScheme === 'two';
+          this.input.steerOnly = false;                       // the pad is gone in two-thumb
+          this.input.autoThrottle = this.controlScheme === 'two';
           // a scheme change mid-drag would otherwise leave the old axis stuck on
           this.input.analog.steer = this.input.analog.throttle = this.input.analog.brake = 0;
           this.input.resetJoystick?.();
