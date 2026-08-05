@@ -53,7 +53,7 @@ export const LEVELS = [
     tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0 } },
   { id: 23, name: 'OUNINPOHJA', theme: 'forest', route: 'ouninpohja', region: 'WORLD RALLY',
     // the fastest stage in the sport: everything is crests and yumps
-    tune: { elev: { amp: 7, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
+    tune: { elev: { amp: 4, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
   { id: 24, name: 'FAFE LEAP', theme: 'redwood', route: 'fafe', region: 'WORLD RALLY',
     tune: { elev: { amp: 8, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
   { id: 25, name: 'PIKES PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
@@ -341,14 +341,15 @@ const CIRCUITS = {
   // OUNINPOHJA — the fastest stage in the sport. Almost no slow corners: very
   // long straights joined by fourth-gear kinks, and the drama is entirely in
   // the CRESTS (see the tune: high ramp count, tall elevation amplitude).
+  // A LONG NARROW OVAL, and deliberately not another rounded blob. Finland's
+  // signature is the fourth-gear straight, so the silhouette is 500 u long and
+  // 145 u wide: two enormous straights joined by two fast bends, and the
+  // SHORTEST lap on the roster because the shape encloses so little.
   ouninpohja: [
-    [0, -250], [96, -252], [186, -236], [246, -196],
-    [254, -122], [232, -52], [250, 24],
-    [238, 100], [190, 162], [122, 200],
-    [44, 214], [-38, 208], [-118, 226],
-    [-196, 214], [-248, 156], [-238, 82],
-    [-254, 6], [-240, -72], [-250, -148],
-    [-198, -212], [-118, -244],
+    [-244, -16], [-186, -58], [-108, -70], [-26, -74], [56, -72],
+    [136, -66], [206, -52], [246, -18],
+    [250, 20], [212, 56], [140, 70], [58, 76], [-24, 74],
+    [-106, 68], [-184, 56], [-238, 22],
   ],
 
   // FAFE — Portugal. A tight, technical village loop that exists to set up ONE
@@ -381,12 +382,17 @@ const CIRCUITS = {
   // SAFARI — Kenya. Enormous, open, fast. The slowest corner here is faster
   // than the fastest corner on Turini; the challenge is commitment, not
   // precision. Big radii, long sight lines.
+  // A ROUNDED TRIANGLE — three enormous straight-ish edges meeting at three
+  // wide corners. Nothing else on the roster has three-fold symmetry, and
+  // running the edges out to the rim makes this the LONGEST flat lap: the
+  // opposite extreme from OUNINPOHJA's narrow oval, from the same envelope.
   safari: [
-    [0, -252], [110, -246], [206, -212], [252, -142],
-    [248, -52], [252, 42], [222, 132], [156, 200],
-    [66, 236], [-30, 244], [-124, 232], [-206, 196],
-    [-252, 122], [-246, 30], [-252, -62], [-224, -152],
-    [-160, -216], [-72, -248],
+    [-6, -250], [78, -222], [158, -192], [236, -160],
+    [254, -110], [240, -56],
+    [176, 46], [116, 138], [58, 216],
+    [4, 252], [-56, 240],
+    [-118, 152], [-178, 58], [-238, -38],
+    [-254, -96], [-228, -158], [-164, -206], [-86, -240],
   ],
 
   // CORNICHE — Corsica, the "rally of ten thousand corners". A cliff road that

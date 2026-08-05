@@ -318,10 +318,10 @@ const DEMANDS = {
   // of the lap running above a 120 u radius, which rank-orders against the
   // published values at Spearman 0.65 — directionally right, not exact.
   22: { loose: 0.12, twist: 0.73, fast: 0.35, climb: 0.66 }, // COL DE TURINI
-  23: { loose: 0.55, twist: 0.03, fast: 0.90, climb: 0.80 }, // OUNINPOHJA
+  23: { loose: 0.55, twist: 0.00, fast: 0.95, climb: 0.90 }, // OUNINPOHJA
   24: { loose: 0.12, twist: 0.52, fast: 0.34, climb: 0.80 }, // FAFE LEAP
   25: { loose: 0.12, twist: 0.77, fast: 0.32, climb: 1.00 }, // PIKES PEAK
-  26: { loose: 0.12, twist: 0.00, fast: 0.95, climb: 0.43 }, // SAFARI PLAINS
+  26: { loose: 0.12, twist: 0.00, fast: 0.88, climb: 0.35 }, // SAFARI PLAINS
   27: { loose: 0.12, twist: 0.88, fast: 0.06, climb: 0.48 }, // CORNICHE
   28: { loose: 0.55, twist: 0.09, fast: 0.78, climb: 0.69 }, // ESTONIA CRESTS
 };
