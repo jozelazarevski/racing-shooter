@@ -197,51 +197,50 @@
     background:conic-gradient(rgba(127,212,255,.8) 0%, rgba(38,26,12,.6) 0)}
 
   /* ---------- TWO-THUMB scheme ----------
-     Left thumb steers on a horizontal rail; right thumb works the pedals. The
-     bottom-right corner therefore belongs to GAS, so the whole weapon cluster
-     moves up a row and FIRE takes the drift slot. One-thumb is untouched. */
+     Both thumbs steer: a LEFT button under one and a RIGHT button under the
+     other, the throttle held open for you, and BRAKE in the middle where
+     either thumb can reach it. The joystick has no job here, so it goes. */
   .pedal{display:none}
-  body.two-thumb #joy-base::before{content:'◀ ━ ▶'}
-  body.two-thumb #joy-base::after{content:''}
+  body.two-thumb #joy-zone{display:none}
   body.two-thumb .pedal{display:flex}
-  /* Portrait: the pedals stack VERTICALLY up the right edge. Side by side they
-     reached across into the speedometer, and a thumb resting on the brake then
-     covered the one number you steer by. The weapon column shifts up to suit. */
-  body.two-thumb #t-gas{right:calc(16px + env(safe-area-inset-right));
-    bottom:calc(24px + env(safe-area-inset-bottom));width:92px;height:92px;font-size:16px;
-    background:rgba(40,120,60,.62)}
-  body.two-thumb #t-brake{right:calc(24px + env(safe-area-inset-right));
-    bottom:calc(126px + env(safe-area-inset-bottom));width:76px;height:76px;font-size:12px;
-    background:rgba(150,45,30,.6)}
-  body.two-thumb #t-fire{right:calc(20px + env(safe-area-inset-right));
-    bottom:calc(214px + env(safe-area-inset-bottom));width:78px;height:78px}
-  body.two-thumb #t-missile{right:calc(110px + env(safe-area-inset-right));
-    bottom:calc(210px + env(safe-area-inset-bottom))}
-  body.two-thumb #t-mine{right:calc(104px + env(safe-area-inset-right));
-    bottom:calc(284px + env(safe-area-inset-bottom))}
-  body.two-thumb #t-shock{right:calc(26px + env(safe-area-inset-right));
-    bottom:calc(302px + env(safe-area-inset-bottom))}
-  body.two-thumb #t-nitro{right:calc(96px + env(safe-area-inset-right));
-    bottom:calc(352px + env(safe-area-inset-bottom))}
-  body.two-thumb #t-drift{right:calc(22px + env(safe-area-inset-right));
-    bottom:calc(386px + env(safe-area-inset-bottom))}
-  /* Landscape is wide enough for the pedals to sit side by side without
-     reaching the speedo, and short enough that a vertical stack would not fit */
+  body.two-thumb #t-left{left:calc(16px + env(safe-area-inset-left));
+    bottom:calc(24px + env(safe-area-inset-bottom));width:100px;height:100px;font-size:34px;
+    background:rgba(38,26,12,.62)}
+  body.two-thumb #t-right{right:calc(16px + env(safe-area-inset-right));
+    bottom:calc(24px + env(safe-area-inset-bottom));width:100px;height:100px;font-size:34px;
+    background:rgba(38,26,12,.62)}
+  body.two-thumb #t-brake{left:calc(50% - 42px);
+    bottom:calc(20px + env(safe-area-inset-bottom));width:84px;height:84px;font-size:12px;
+    background:rgba(150,45,30,.62)}
+  /* weapons lift clear into a band above the driving row */
+  body.two-thumb #t-fire{right:calc(16px + env(safe-area-inset-right));
+    bottom:calc(140px + env(safe-area-inset-bottom));width:86px;height:86px}
+  body.two-thumb #t-missile{right:calc(112px + env(safe-area-inset-right));
+    bottom:calc(214px + env(safe-area-inset-bottom))}
+  body.two-thumb #t-mine{right:calc(26px + env(safe-area-inset-right));
+    bottom:calc(238px + env(safe-area-inset-bottom))}
+  body.two-thumb #t-nitro{right:calc(108px + env(safe-area-inset-right));
+    bottom:calc(288px + env(safe-area-inset-bottom))}
+  body.two-thumb #t-drift{left:calc(20px + env(safe-area-inset-left));right:auto;
+    bottom:calc(140px + env(safe-area-inset-bottom))}
+  body.two-thumb #t-shock{left:calc(20px + env(safe-area-inset-left));right:auto;
+    bottom:calc(216px + env(safe-area-inset-bottom))}
+  /* the speedo sits above BRAKE rather than under a thumb */
+  body.two-thumb.touch #speed-box{bottom:calc(112px + env(safe-area-inset-bottom));left:50%}
   @media (max-height:560px){
-    body.two-thumb #t-gas{width:84px;height:84px;bottom:calc(18px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-brake{right:calc(108px + env(safe-area-inset-right));width:68px;height:68px;
-      bottom:calc(20px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-fire{bottom:calc(110px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-missile{right:calc(186px + env(safe-area-inset-right));
-      bottom:calc(26px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-mine{right:calc(258px + env(safe-area-inset-right));
-      bottom:calc(26px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-shock{right:calc(112px + env(safe-area-inset-right));
-      bottom:calc(172px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-nitro{right:calc(186px + env(safe-area-inset-right));
-      bottom:calc(96px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-drift{right:calc(258px + env(safe-area-inset-right));
-      bottom:calc(100px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-left,body.two-thumb #t-right{width:86px;height:86px;
+      bottom:calc(18px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-brake{width:72px;height:72px;left:calc(50% - 36px)}
+    body.two-thumb #t-fire{bottom:calc(118px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-missile{right:calc(112px + env(safe-area-inset-right));
+      bottom:calc(126px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-mine{right:calc(186px + env(safe-area-inset-right));
+      bottom:calc(120px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-nitro{right:calc(184px + env(safe-area-inset-right));
+      bottom:calc(24px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-drift{bottom:calc(118px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-shock{bottom:calc(186px + env(safe-area-inset-bottom))}
+    body.two-thumb.touch #speed-box{bottom:calc(96px + env(safe-area-inset-bottom))}
   }
 
   /* ---------- compact / phone layout ---------- */
@@ -761,7 +760,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r59</div>
+<div id="build-tag">r60</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -775,7 +774,8 @@
   <!-- TWO-THUMB pedals. They ride the same data-key plumbing as every other
        touch button, and ArrowUp/ArrowDown are already throttle/brake, so the
        scheme needs no new input path. Hidden unless body.two-thumb. -->
-  <button class="tbtn pedal" id="t-gas"   data-key="ArrowUp">GAS</button>
+  <button class="tbtn pedal" id="t-left"  data-key="ArrowLeft">◀</button>
+  <button class="tbtn pedal" id="t-right" data-key="ArrowRight">▶</button>
   <button class="tbtn pedal" id="t-brake" data-key="ArrowDown">BRAKE</button>
 </div>
 
@@ -826,7 +826,7 @@
       <div class="set-row" id="scheme-row"><span class="set-lbl">CONTROLS</span>
         <div><div id="scheme-select"></div>
         <p class="set-help"><b>ONE THUMB</b> — the left pad does everything: sideways steers, up is gas, down is brake.<br>
-        <b>TWO THUMB</b> — the left pad only steers; GAS and BRAKE pedals go under your right thumb.</p></div></div>
+        <b>TWO THUMB</b> — steer with a button under each thumb, gas is automatic, and BRAKE sits in the middle.</p></div></div>
       <div class="set-row"><span class="set-lbl">STEERING</span>
         <div><div id="steer-select"></div>
         <p class="set-help">How quickly the car answers the wheel. <b>RELAXED</b> turns slower and is easier to hold
@@ -947,10 +947,10 @@
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
-<script type="module" src="./src/main.js?v=r59"></script>
+<script type="module" src="./src/main.js?v=r60"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r59"></script>
+<script src="./src/offline.js?v=r60"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r59"></script>
+<script type="module" src="./src/traffic.js?v=r60"></script>
 </body>
 </html>
