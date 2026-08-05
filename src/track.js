@@ -22,7 +22,6 @@ export const LEVELS = [
   { id: 7, name: 'GLACIAL PASS', theme: 'glacial', region: 'FROST PEAK' },
   { id: 8, name: 'AMAZON RAPIDS', theme: 'jungle', region: 'AMAZON' },
   { id: 9, name: 'THE DUNE SERPENT', theme: 'dunes', region: 'DUST CANYON' },
-  { id: 10, name: 'ROCKFALL RAVINE', theme: 'ravine', region: 'DUST CANYON' },
   { id: 11, name: 'OASIS AMBUSH', theme: 'oasis', region: 'DUST CANYON' },
   { id: 12, name: 'REDWOOD RAMPAGE', theme: 'redwood', region: 'PINE VALLEY' },
   { id: 13, name: 'LOG FLUME FURY', theme: 'flume', region: 'PINE VALLEY' },
@@ -31,6 +30,16 @@ export const LEVELS = [
   { id: 16, name: 'AVALANCHE ALLEY', theme: 'avalanche', region: 'FROST PEAK' },
   { id: 17, name: 'NEON GRID EXPRESSWAY', theme: 'neon', region: 'NEO-KYOTO' },
   { id: 18, name: 'UNDERCITY SLIPSTREAM', theme: 'undercity', region: 'NEO-KYOTO' },
+  // ---- CAREER ORDER IS THIS ARRAY, NOT THE ids. ROCKFALL RAVINE sat at slot
+  // 10 of 21 and measured as the HARDEST track in the game: 25.8 % of its lap
+  // under a 40 u corner radius and 14.3 % under 25 u — both the worst figures
+  // on the roster, ahead of GOTTHARD (22.9 / 11.8) and TREMOLA (21.3 / 10.8),
+  // on the tightest median radius (87 u) — and it is one of only five worlds
+  // with solid cliff walls, and the only one that ALSO drops live rockfall.
+  // Since a world opens only on a podium finish on the one before it, that put
+  // the game's hardest circuit as a hard gate across the middle of the career.
+  // It is now the technical exam immediately before the alpine finale.
+  { id: 10, name: 'ROCKFALL RAVINE', theme: 'ravine', region: 'DUST CANYON' },
   { id: 19, name: 'GOTTHARD CLIMB', theme: 'pass', region: 'ALPINE PASSES' },
   { id: 20, name: 'TREMOLA DESCENT', theme: 'tremola', region: 'ALPINE PASSES' },
   { id: 21, name: 'FURKA RIDGE', theme: 'furka', region: 'ALPINE PASSES' },
