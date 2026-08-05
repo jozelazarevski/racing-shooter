@@ -248,6 +248,11 @@ const missionTargetLine = (d) => (d.survive
 const missionTargetChips = (d) => (d.survive
   ? [`🥇 ${fmtTime(d.gold)}+`, `🥈 ${fmtTime(d.silver)}+`, `🥉 ${fmtTime(d.bronze)}+`]
   : [`🥇 ${fmtTime(d.gold)}`, `🥈 ${fmtTime(d.silver)}`, `🥉 FINISH`]);
+// scratch for the knocked-rock roller — a per-frame path must not allocate
+const _rollQ = new THREE.Quaternion();
+const _rollM = new THREE.Matrix4();
+const _rollS = new THREE.Vector3();
+
 // ===== end [MISSIONS] constants =====
 
 // ---------------------------------------------------------------------------
@@ -1058,6 +1063,7 @@ class Game {
     this.flyingProps = [];
     this.husks = [];
     this._resetFlashes();                  // pool lights live in the scene, not here
+    this._rolling = [];                    // knocked rocks belong to the old world
     disposeSubtree(this.worldLayer);       // pickups, herds, stars, hazards, debris
     this.track.dispose();
     this.skids?.reset?.();
@@ -3690,18 +3696,21 @@ class Game {
       this.styleBump?.();
       this.hud.feed(`ROCK SHUNTED  −${Math.round(dmg)} HULL`, 'bad');
     }
-    // throw the instance clear so the rock is visibly no longer where it was
+    // Hand it to the roller. Snapping the instance to its final spot in one
+    // frame was a teleport — the rock appeared to vanish and reappear, which is
+    // not what being hit by a car looks like. It tumbles now.
     const im = ob.im;
     if (im && ob.inst !== undefined && im.setMatrixAt) {
-      const sc = (ob.sc ?? 1) * 0.9;
-      const q = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(Math.random(), 1, Math.random()).normalize(), Math.random() * 3.1);
-      const m = new THREE.Matrix4().compose(
-        new THREE.Vector3(ob.x + dx * (5 + Math.random() * 4), (ob.y ?? 0) - 0.35,
-          ob.z + dz * (5 + Math.random() * 4)),
-        q, new THREE.Vector3(sc, sc * 0.75, sc));
-      im.setMatrixAt(ob.inst, m);
-      im.instanceMatrix.needsUpdate = true;
+      (this._rolling ??= []).push({
+        im, inst: ob.inst, sc: (ob.sc ?? 1) * 0.95,
+        p: new THREE.Vector3(ob.x, (ob.y ?? car.pos.y) + 0.3, ob.z),
+        v: new THREE.Vector3(dx * (5 + impact * 0.30), 2.4 + impact * 0.10,
+          dz * (5 + impact * 0.30)),
+        // spin axis square to the direction of travel, so it rolls rather than
+        // spinning on the spot like a coin
+        axis: new THREE.Vector3(-dz, 0.35, dx).normalize(),
+        ang: 0, spin: 5 + impact * 0.35, life: 3.2,
+      });
     }
     ob.r = 0;                                          // retired from collision
   }
@@ -4078,6 +4087,34 @@ class Game {
       if (l.userData.life <= 0) continue;
       l.userData.life -= dt;
       l.intensity = Math.max(0, l.userData.life / 0.35) * 60;
+    }
+  }
+
+  /** Tumble the stones that have been knocked loose: gravity, a bounce off the
+   *  ground that loses most of its energy, roll-coupled spin, and a rest. Cheap
+   *  — it only ever holds the handful of rocks you have actually hit. */
+  _updateRolledRocks(dt) {
+    const list = this._rolling;
+    if (!list || !list.length) return;
+    const t = this.track;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const r = list[i];
+      r.life -= dt;
+      r.v.y -= 26 * dt;                                   // gravity
+      r.p.addScaledVector(r.v, dt);
+      const gy = (t?.terrainHeight?.(r.p.x, r.p.z) ?? 0) + r.sc * 0.45;
+      if (r.p.y <= gy) {
+        r.p.y = gy;
+        if (r.v.y < -1.5) { r.v.y *= -0.32; r.v.x *= 0.72; r.v.z *= 0.72; }
+        else { r.v.y = 0; r.v.x *= 1 - Math.min(1, 2.6 * dt); r.v.z *= 1 - Math.min(1, 2.6 * dt); }
+      }
+      const speed = Math.hypot(r.v.x, r.v.z);
+      r.ang += (speed > 0.2 ? r.spin * (speed / 8) : 0) * dt;
+      _rollQ.setFromAxisAngle(r.axis, r.ang);
+      _rollM.compose(r.p, _rollQ, _rollS.set(r.sc, r.sc * 0.78, r.sc));
+      r.im.setMatrixAt(r.inst, _rollM);
+      r.im.instanceMatrix.needsUpdate = true;
+      if (r.life <= 0 || (speed < 0.15 && r.p.y <= gy + 0.01 && r.life < 2.6)) list.splice(i, 1);
     }
   }
 
@@ -4653,6 +4690,7 @@ class Game {
         this._updateChoppers(dt);
         this._updateHostiles(dt);
         this._updateProps(dt);
+        this._updateRolledRocks(dt);
         this._updateWorldHazards(dt, time);
         this._updateCombo(dt);
         this._updateContracts();
