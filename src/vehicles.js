@@ -1427,9 +1427,54 @@ export class Car {
     // braked to a crawl on ground they were entitled to drive. The border is a
     // radius, so test the radius — then ordinary terrain, however steep, is
     // never touched, and the wall still cannot be climbed.
+    // ...and the mountain is a border too. The massif could be driven up from
+    // the side, so a stage could be climbed rather than raced — reported with a
+    // screenshot of a car most of the way up the summit's flank. The lesson from
+    // the regression above still holds, so the bank you scramble on the way back
+    // to the road is untouched: this only engages once you are genuinely off the
+    // course (25 u from the centreline is well past any verge, ditch or
+    // switchback cut), and even then only on ground no vehicle could hold.
     const rimR2 = RIM_RADIUS * RIM_RADIUS;
     const atRim = this.pos.x * this.pos.x + this.pos.z * this.pos.z > rimR2;
-    if (offRoad && atRim && this.speedAlong > 0.5) {
+    const offPiste = Math.abs(this.lateral) > 25;
+    // Gradient alone does not describe the massif. Measured, its flank averages
+    // about 4.5% — a long gentle ramp, not a wall — so a car could simply drive
+    // up the side of the summit and look down on the stage. What actually marks
+    // "you are climbing the mountain" is ALTITUDE GAINED OFF THE COURSE: more
+    // than ~10 u above the nearest piece of road while 25 u away from it. The
+    // road's own switchbacks are exempt for free, because the nearest sample
+    // then IS the road above you and the difference collapses.
+    // In a RACE the course is the course. You may cut a verge, take to the
+    // grass, rejoin — all of that is under 25 u. Past 45 u you are not racing
+    // any more, and on a world whose road spirals a mountain (SUMMIT CLIMB) the
+    // altitude test below can never fire, because there is always a switchback
+    // near your height. This is the backstop that makes the boundary hard.
+    // FREE ROAM is exempt on purpose: out there the world is the point, and the
+    // rim wall is what bounds it.
+    if (!this.game.freeRoam && this === this.game.player && this.speedAlong > 0.5) {
+      const strayed = Math.abs(this.lateral) - 45;
+      if (strayed > 0) {
+        const over = Math.min(1, strayed / 15);
+        this.vel.multiplyScalar(Math.max(0, 1 - over * 3.5 * dt));
+        if (over > 0.3 && !this._steepFed) {
+          this._steepFed = 1.8;
+          this.game.hud?.feed?.('OFF THE COURSE — TURN BACK', 'bad');
+        }
+      }
+    }
+    if (offRoad && offPiste && this.speedAlong > 0.5) {
+      const roadY = t.center[this.trackIndex]?.y ?? gY;
+      const above = gY - roadY;
+      if (above > 10) {
+        const over = Math.min(1, (above - 10) / 12);
+        this.vel.multiplyScalar(Math.max(0, 1 - over * 3.2 * dt));
+        if (this === this.game.player && over > 0.35 && !this._steepFed) {
+          this._steepFed = 1.8;
+          this.game.hud?.feed?.('OFF THE COURSE — TURN BACK', 'bad');
+        }
+      }
+    }
+    if (offRoad && (atRim || offPiste) && this.speedAlong > 0.5) {
       const AHEAD = 6;
       const ax = this.pos.x + Math.sin(this.heading) * AHEAD;
       const az = this.pos.z + Math.cos(this.heading) * AHEAD;
