@@ -3114,10 +3114,45 @@ class Game {
     }
   }
 
+  /** Fall hazards must COME FROM SOMEWHERE.
+   *
+   * Every faller used to be spawned 30 u straight up over the middle of the
+   * road and dropped, so on screen a boulder simply materialised in clear sky
+   * — reported as "rocks are falling from the sky, which is funny and not
+   * correct". Nothing was above it, because nothing put it there.
+   *
+   * Each kind is now launched off the thing it would actually come from:
+   *
+   *   rock / icicle — the canyon RIM. `_cliffProfile` gives the wall's height
+   *     and lateral reach at that point, so the hazard starts ON the rock face
+   *     and gets exactly the horizontal velocity that carries it to the
+   *     intended landing spot. It visibly lets go and arcs onto the road.
+   *   burningTree — the VERGE. A tree does not drop, it TOPPLES: it stands at
+   *     the roadside and rotates about its base across the carriageway, at the
+   *     angular acceleration of a real falling rod (slow, then all at once).
+   *
+   * The landing point is unchanged in every case, so the hazard is exactly as
+   * dangerous as it was — it just has a cause now.
+   */
   _spawnFaller(T) {
     const t = this.track;
-    const idx = (this.player.trackIndex + 40 + Math.floor(Math.random() * 45)) % t.N;
-    const lat = (Math.random() - 0.5) * 13;
+    // Pick the side FIRST: a rock off the left wall should land on the left of
+    // the road, not be flung across it. Mostly same-side, occasionally over the
+    // centre line, so the arc stays a rockfall and never reads as a catapult.
+    const side = Math.random() < 0.5 ? 1 : -1;
+    // …and pick a spot with a WALL WORTH FALLING OFF. `_cliffProfile` drops to
+    // a 1.7 u berm where the canyon opens around the start bowl; measured, a
+    // rock launched there fell 3.4 u in 0.42 s — no origin the player can read
+    // and no time to react. Sample a few candidates for a real face first.
+    let idx = (this.player.trackIndex + 40 + Math.floor(Math.random() * 45)) % t.N;
+    if (t._cliffProfile) {
+      for (let k = 0; k < 6; k++) {
+        if (t._cliffProfile(idx, side).h >= 8) break;
+        idx = (this.player.trackIndex + 40 + Math.floor(Math.random() * 45)) % t.N;
+      }
+    }
+    const half = t.widthAt?.(idx) ?? 9;
+    const lat = side * (Math.random() * 0.95 - 0.18) * half;
     const p = t.pointAt(idx, lat);
     const kind = T.fallHazard.kind;
     let mesh;
@@ -3145,11 +3180,49 @@ class Game {
         mesh.add(b);
       }
     }
-    const startY = p.y + (kind === 'icicle' ? 16 : 30);
-    mesh.position.set(p.x, startY, p.z);
+    const f = { kind, x: p.x, z: p.z, y: p.y, groundY: p.y, vy: 0, vx: 0, vz: 0,
+      dmg: T.fallHazard.dmg ?? 20, mesh, landed: false, ttl: 18, solid: null };
+    const prof = t._cliffProfile ? t._cliffProfile(idx, side) : null;
+
+    if (kind === 'burningTree') {
+      // TOPPLE, don't drop. The trunk geometry is already built base-at-origin
+      // (trunk.position.y = 2.7 on a 5.4 tall box), so rotating the group about
+      // its own origin pivots it exactly on its stump.
+      // Stand it just off the tarmac, not out in the scrub: the trunk is 5.4
+      // long, so from `half + 3.5` its tip landed at lateral 7.1 — technically
+      // on the road and blocking nothing. From here it lies across roughly half
+      // the carriageway, which is a hazard you actually have to drive around.
+      const b = t.pointAt(idx, side * (half + 1.2));
+      const c = t.center[idx], c2 = t.center[(idx + 1) % t.N];
+      // spin axis along the road, so it comes down ACROSS the carriageway
+      f.axis = new THREE.Vector3(c2.x - c.x, 0, c2.z - c.z).normalize();
+      // …and falls inward, toward the centreline it is standing beside
+      const n = t.nrm[idx];
+      f.tipDir = new THREE.Vector3(-side * n.x, 0, -side * n.z);
+      f.x = b.x; f.z = b.z; f.y = b.y; f.groundY = b.y;
+      f.len = 5.4; f.topple = 0.14; f.toppleV = 0; f.side = side;
+      mesh.position.set(b.x, b.y, b.z);
+      mesh.quaternion.setFromAxisAngle(f.axis, f.topple * side);
+    } else if (prof) {
+      // OFF THE RIM. Start on the cliff top and solve for the horizontal speed
+      // that puts it on the intended landing spot when gravity gets it there.
+      const r = t.pointAt(idx, side * (prof.base + prof.l1 + prof.l2));
+      const startY = p.y + prof.h + 1.2;
+      const fall = Math.max(0.35, Math.sqrt(2 * (startY - p.y) / 26));
+      f.x = r.x; f.z = r.z; f.y = startY;
+      f.vx = (p.x - r.x) / fall; f.vz = (p.z - r.z) / fall;
+      mesh.position.set(r.x, startY, r.z);
+      // it lets go — dust and grit burst off the face where it broke away
+      this.particles.debris?.({ x: r.x, y: startY, z: r.z }, 5);
+      this.particles.dust?.({ x: r.x, y: startY, z: r.z }, 0.9);
+    } else {
+      // no cliff on this world: fall back to the old straight drop rather than
+      // inventing an origin that isn't there
+      f.y = p.y + (kind === 'icicle' ? 16 : 30);
+      mesh.position.set(p.x, f.y, p.z);
+    }
     this.worldLayer.add(mesh);
-    this.fallers.push({ kind, x: p.x, z: p.z, y: startY, groundY: p.y, vy: 0,
-      dmg: T.fallHazard.dmg ?? 20, mesh, landed: false, ttl: 18, solid: null });
+    this.fallers.push(f);
   }
 
   _updateWorldHazards(dt, time) {
@@ -3166,10 +3239,53 @@ class Game {
     }
     for (let i = this.fallers.length - 1; i >= 0; i--) {
       const f = this.fallers[i];
-      if (!f.landed) {
+      if (!f.landed && f.topple !== undefined) {
+        // ---- a tree comes down as a ROD PIVOTING ON ITS STUMP: angular
+        // acceleration 3g·sin(θ)/2L, so it starts almost imperceptibly and
+        // arrives all at once. That timing is the whole read — you get a beat
+        // to notice it leaning before it is across the road.
+        f.toppleV += (3 * 26 / (2 * f.len)) * Math.sin(f.topple) * dt;
+        f.topple = Math.min(Math.PI / 2, f.topple + f.toppleV * dt);
+        f.mesh.quaternion.setFromAxisAngle(f.axis, f.topple * f.side);
+        // the trunk SWEEPS: once it is past ~55° it can catch a car anywhere
+        // along its span, not just at the stump
+        if (f.topple > 0.95) {
+          const reach = f.len * Math.sin(f.topple);
+          for (const car of cars) {
+            if (!car.alive || car.invuln > 0) continue;
+            // distance from the car to the trunk segment (base -> current tip)
+            const rx = car.pos.x - f.x, rz = car.pos.z - f.z;
+            const along = THREE.MathUtils.clamp(rx * f.tipDir.x + rz * f.tipDir.z, 0, reach);
+            const d = Math.hypot(rx - f.tipDir.x * along, rz - f.tipDir.z * along);
+            if (d < 2.3 && f.groundY + f.len * Math.cos(f.topple) < car.pos.y + 3.2) {
+              car.damage(f.dmg, null);
+              car.vel.addScaledVector(f.tipDir, 6);
+              if (car === this.player) {
+                this.crashDrama?.();
+                this.hud.feed('CRUSHED BY BURNING TREE!', 'bad');
+              }
+              car.invuln = Math.max(car.invuln, 0.6); // one strike per fall
+            }
+          }
+        }
+        if (f.topple >= Math.PI / 2 - 0.02) {
+          f.landed = true;
+          const near = Math.hypot(this.player.pos.x - f.x, this.player.pos.z - f.z);
+          if (near < 40) this.shake = Math.min(1, this.shake + 0.3);
+          const mx = f.x + f.tipDir.x * f.len * 0.5, mz = f.z + f.tipDir.z * f.len * 0.5;
+          this.particles.debris({ x: mx, y: f.groundY + 0.5, z: mz }, 6);
+          this.particles.dust?.({ x: mx, y: f.groundY + 0.4, z: mz }, 1.3);
+          // the obstacle is the FALLEN TRUNK lying across the road, so the
+          // collider sits at its mid-span — not back at the stump on the verge
+          f.solid = { x: mx, z: mz, r: 2.6, y: f.groundY, mat: 'stone', _faller: true };
+          t.solids?.push(f.solid);
+        }
+      } else if (!f.landed) {
         f.vy += 26 * dt;
         f.y -= f.vy * dt;
-        f.mesh.position.y = f.y;
+        f.x += f.vx * dt;
+        f.z += f.vz * dt;
+        f.mesh.position.set(f.x, f.y, f.z);
         // clobber anything under it on the way down
         for (const car of cars) {
           if (!car.alive || car.invuln > 0) continue;
@@ -3190,7 +3306,9 @@ class Game {
           this.particles.debris({ x: f.x, y: f.groundY + 0.5, z: f.z }, 4);
           if (f.kind === 'icicle') { // shatters — no lasting obstacle
             this.particles.splinters(f.mesh.position, new THREE.Vector3(0, 1, 0), [0xcfe8f4, 0x8fd0e8], 0.7);
-            this.scene.remove(f.mesh);
+            // parent, NOT scene: fallers live on worldLayer, so scene.remove
+            // was a no-op and every shattered icicle stayed in the graph
+            f.mesh.parent?.remove(f.mesh);
             this.fallers.splice(i, 1);
             continue;
           }
@@ -3201,7 +3319,7 @@ class Game {
       } else {
         f.ttl -= dt;
         if (f.ttl <= 0) {
-          this.scene.remove(f.mesh);
+          f.mesh.parent?.remove(f.mesh);   // parent, not scene — see above
           if (f.solid && t.solids) {
             const si = t.solids.indexOf(f.solid);
             if (si >= 0) t.solids.splice(si, 1);
@@ -3344,7 +3462,7 @@ class Game {
 
   _clearWorldHazards() {
     for (const f of this.fallers ?? []) {
-      this.scene.remove(f.mesh);
+      f.mesh.parent?.remove(f.mesh);   // parent, not scene — fallers live on worldLayer
       if (f.solid && this.track.solids) {
         const si = this.track.solids.indexOf(f.solid);
         if (si >= 0) this.track.solids.splice(si, 1);

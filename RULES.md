@@ -244,7 +244,27 @@ shared. All damage numbers pass through the player's difficulty intake scale.
 
 | Hazard | Declared as | Law |
 |---|---|---|
-| Falling objects | `fallHazard {kind: rock/burningTree/icicle, period, dmg}` | Spawn ahead of the player every ~period s (≤4 airborne at once). A falling hit deals `dmg` + fling + crash drama. Rocks and burning trees land as temporary STONE solids for 18 s; icicles shatter on landing. |
+| Falling objects | `fallHazard {kind: rock/burningTree/icicle, period, dmg}` | Spawn ahead of the player every ~period s (≤4 airborne at once). A falling hit deals `dmg` + fling + crash drama. Rocks and burning trees land as temporary STONE solids for 18 s; icicles shatter on landing. **Every faller must come from somewhere** — see below. |
+
+**A hazard may never materialise in mid-air.** Fallers used to be spawned 30 u
+straight up over the middle of the road and dropped, so on screen a boulder
+simply appeared in clear sky ("rocks are falling from the sky, which is funny
+and not correct"). Nothing was above it, because nothing put it there. Each
+kind is now launched off the thing it would actually come from:
+
+| Kind | Origin | Mechanics |
+|---|---|---|
+| **rock**, **icicle** | the canyon **RIM** | `_cliffProfile(idx, side)` gives the wall's height and lateral reach; the hazard starts on the rock face and is given the horizontal velocity that carries it to the intended landing spot, so it visibly lets go and arcs down. Dust bursts off the face where it broke away. Measured on ROCKFALL RAVINE and GLACIER'S GRIND: starts ~19–20 u up at lateral 13–15 (road half is 9), **zero** spawned over the carriageway |
+| **burningTree** | the **VERGE** | it does not drop, it **TOPPLES** — standing at `roadHalf + 1.2` and rotating about its stump at the angular acceleration of a real falling rod (`3g·sin θ / 2L`), so it starts almost imperceptibly and arrives all at once. The trunk *sweeps*: past ~55° it can catch a car anywhere along its span. The fallen collider sits at the trunk's **mid-span**, lying across the road, not back at the stump |
+
+The landing point is unchanged in every case, so each hazard is exactly as
+dangerous as it was — it just has a cause now.
+
+The spawn point must also have a **wall worth falling off**: `_cliffProfile`
+drops to a 1.7 u berm where the canyon opens around the start bowl, and a rock
+launched there fell 3.4 u in 0.42 s — no readable origin and no time to react.
+Spawning samples up to 6 candidate points for a face of `h ≥ 8` first, and only
+falls back to a plain vertical drop on a world with no cliffs at all.
 | Sand geysers | `geysers {count}` | Fixed pads on a 7.5 s cycle: rumble warning, then a 1.1 s eruption that launches any car in 3.2 u (vy 15, −3 hull, 2.5 s per-car cooldown). |
 | Speed strips | `strips {kind: flume/maglev, count}` | Glowing lanes on the straightest sections: any car on one is reeled to the lane center, floored at maxSpeed ×1.22, steering authority ×0.45. Works for rivals too. |
 | Critters | `critters {kind: scorpion/rat, count}` | Wandering roadside pests. Drive over at >7 u/s → squashed (+25). Touch one slowly → sting: speed capped ×0.6 for 1.6 s, −2 hull (3 s per-critter cooldown). |
