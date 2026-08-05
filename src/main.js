@@ -491,7 +491,14 @@ class Game {
 
     // level selection via URL (?level=N), with ?go=1 for seamless chained starts
     const params = new URLSearchParams(location.search);
-    this.levelIndex = Math.min(Math.max((parseInt(params.get('level')) || 1) - 1, 0), LEVELS.length - 1);
+    // ?level= is a world ID, not a position in the array. Those were the same
+    // number until ROCKFALL RAVINE moved in the career order; resolving by id
+    // keeps every existing link, bookmark and test URL pointing at the world it
+    // has always meant. Falls back to a positional read for anything unmatched.
+    const wantLv = parseInt(params.get('level')) || 1;
+    const byId = LEVELS.findIndex((l) => l.id === wantLv);
+    this.levelIndex = byId >= 0 ? byId
+      : Math.min(Math.max(wantLv - 1, 0), LEVELS.length - 1);
     this.level = LEVELS[this.levelIndex];
     this.autoStart = params.get('go') === '1';
 
@@ -1387,10 +1394,21 @@ class Game {
     p.health = p.maxHealth;
   }
 
+  /** The world that must be podiumed to open `id` — the one BEFORE it in
+   *  career order, which is the order of the LEVELS array and NOT `id - 1`.
+   *  Those were the same thing until ROCKFALL RAVINE moved; ids stay fixed so
+   *  saved careers, preview art and the DEMANDS table all keep working. */
+  _prevLevel(id) {
+    const i = LEVELS.findIndex((l) => l.id === id);
+    return i > 0 ? LEVELS[i - 1] : null;
+  }
+
   isLevelUnlocked(id) {
     // a world unlocks only after a PODIUM (top 3) finish on the one before
-    const prev = this.career.finished[id - 1];
-    return this.unlockAll || id === 1 || (!!prev && prev.place <= 3);
+    const prevLv = this._prevLevel(id);
+    if (this.unlockAll || !prevLv) return true;
+    const prev = this.career.finished[prevLv.id];
+    return !!prev && prev.place <= 3;
   }
 
   /** World cards: static circuit-outline badge + flavor + career best per
@@ -1424,9 +1442,13 @@ class Game {
         + (i === this.levelIndex ? ' current' : '')
         + (unlocked ? '' : ' locked');
       const best = this.career.finished[lv.id];
+      // Cards are grouped by REGION, career order is the LEVELS array, and
+      // since ROCKFALL RAVINE moved those two no longer agree. A bare padlock
+      // would leave you hunting for which world opens this one — so say it.
+      const prevLv = this._prevLevel(lv.id);
       const bestTxt = best
         ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
-        : (unlocked ? '★ UNRACED' : '');
+        : (unlocked ? '★ UNRACED' : (prevLv ? `PODIUM ${prevLv.name}` : ''));
       card.innerHTML = `<div class="wc-shot" style="background-image:url('assets/previews/w${lv.id}.jpg')">
           <canvas class="wc-map" width="72" height="52"></canvas>
         </div>

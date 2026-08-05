@@ -497,6 +497,42 @@ it** so a strong race funds real progress without buying out the garage.
 | Difficulty multiplier | EASY ×0.7 · NORMAL ×1.0 · HARD ×1.5 |
 | Podium bonus | 1st 200 · 2nd 120 · 3rd 60 CR |
 | First conquest | +500 CR, once per world, on your first podium there |
+
+### Career order is the LEVELS array, not the world ids
+
+A world opens only on a **podium (top 3)** finish on the one before it in
+career order — and career order is the order of the `LEVELS` array. Those were
+the same thing as `id - 1` until ROCKFALL RAVINE moved, so `isLevelUnlocked`
+now walks the array (`_prevLevel`) instead of doing arithmetic on ids. **Ids
+stay fixed**: saved careers key off them, preview art is `w{id}.jpg`, the
+`DEMANDS` table is keyed by id, and `?level=` resolves by id so every existing
+link still lands on the world it always meant.
+
+Two consequences to keep in mind when reordering again:
+
+- Menu cards group by **region**, which no longer matches career order. A
+  locked card therefore states what opens it (`PODIUM <world>`), or the player
+  is left hunting.
+- `levelIndex` is a position in the array; `career.finished` is keyed by id.
+  Never mix them.
+
+**ROCKFALL RAVINE was moved from career slot 10 to slot 18.** Measured across
+all 21 worlds, it is the hardest circuit in the game: **25.8 %** of its lap
+sits under a 40 u corner radius and **14.3 %** under 25 u — both the worst
+figures on the roster, ahead of GOTTHARD (22.9 / 11.8) and TREMOLA
+(21.3 / 10.8) — on the tightest median radius (**87 u**). It is also one of
+only five worlds with solid cliff walls, and one of only two that combine
+walls with a live falling hazard (the other, GLACIER'S GRIND, is far more open
+at 15.1 % tight). Sitting at slot 10 of 21 behind a podium gate, the game's
+hardest circuit blocked the entire back half of the career. The track itself is
+unchanged — its difficulty is its identity, and it now sits where that
+difficulty belongs, as the technical exam before the alpine finale.
+
+Note for anyone re-measuring this: **AI attrition is not a difficulty proxy.**
+Rival cars are clamped to the road on every level (`vehicles.js`, "AI safety
+net"), so they never touch the cliff walls that punish a human. Measured over
+an identical window the AI lost 4 hull on ROCKFALL RAVINE and 17 on CANYON RUN,
+which says nothing about either track. Judge these from track geometry.
 | Free roam | banks at the same ×1/12 rate — farming off the clock must never beat racing |
 | Upgrade cost | `500 + 400 × level` → 500/900/1300/1700/2100 (6,500 per line) |
 | Cars | 2,000 → 8,000 CR |
