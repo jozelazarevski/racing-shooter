@@ -1375,6 +1375,7 @@ export function disposeSubtree(root) {
 /** Where the world's border wall begins. Vehicles read this: the traction
  *  limit that makes the wall unclimbable must apply HERE and nowhere else. */
 export const RIM_RADIUS = 1620;
+const _clearV = new THREE.Vector3();   // scratch for _clearsRoad
 
 /** Hermite ease on an already-normalised 0..1 ramp (clamps its own ends). */
 const smoothstep01 = (t) => {
@@ -2010,6 +2011,9 @@ export class Track {
           const s = 0.55 + hash(j * 7.7 - side) * 0.5;
           const lat = (w + s * 0.95 + CAR_R + 0.2 + hash(j * 3.1 + side) * 0.7) * side;
           const p = this.pointAt(j, lat);
+          // fine at this sample, inside the road two samples later where the
+          // centreline swings under it — that is the rock you cannot see coming
+          if (!this._clearsRoad(p.x, p.z, s * 0.95, 0.9)) continue;
           const rock = new THREE.Mesh(rockGeo, rockMat);
           rock.scale.set(s, s * 0.75, s * 0.9);
           rock.rotation.y = hash(j * 1.3) * Math.PI * 2;
@@ -3905,6 +3909,12 @@ export class Track {
       for (const side of [1, -1]) {
         if (k >= MAX) break;
         const p = this.pointAt(i, LAT * side);
+        // A fixed lateral offset is measured along ONE sample's normal, and on
+        // the inside of a hairpin that lands well inside the road proper. On
+        // GOTTHARD and TREMOLA the wall was sitting 5.7 u from the centreline —
+        // over 3 u inside your own lane, as an 85-hull stone. Skip any block
+        // that cannot clear the carriageway.
+        if (!this._clearsRoad(p.x, p.z, 1.2, 1.0)) continue;
         const ground = this._terrainMeshHeight(p.x, p.z);
         // wall it where the shelf falls away, and always around tight bends
         if (p.y - ground < S.drop && !(tight && side === outside)) continue;
@@ -5931,6 +5941,41 @@ export class Track {
     return placed;
   }
 
+  /** The largest a stone at (x,z) may be without reaching the carriageway.
+   *
+   *  Scatter positions are measured along the normal at one sample, but on the
+   *  inside of a bend the true distance to the road is much less than that —
+   *  and then the boulder's own radius eats further in. Measured across the 21
+   *  worlds, 313 solid stones reached onto the drivable road, the worst of them
+   *  4.5 u inside a 9 u half-width: a rock parked in your lane, at up to 85 hull
+   *  a hit. Stone is supposed to be brutal; it is not supposed to be unavoidable.
+   *
+   *  Returns 0 when the spot is too close to carry a stone at all — the caller
+   *  must then place nothing, because a boulder you can see and drive through
+   *  breaks the Law of Solidity just as badly.
+   */
+  _stoneFit(x, z, want) {
+    const room = this._distToTrack(x, z) - (ROAD_HALF + 2.4);
+    return room <= 0.4 ? 0 : Math.min(want, room);
+  }
+
+  /** Does a stone of radius r at (x,z) stay out of the road AS IT IS THERE?
+   *
+   *  `_stoneFit` measures against the nominal half-width, which is right for the
+   *  open scatter but wrong for the deliberate edge furniture — a kerb marking a
+   *  pinch is supposed to sit close. This asks the sharper question: how wide is
+   *  the road at the point nearest this stone, and does the stone clear it?
+   *
+   *  It is the difference that matters on a hairpin. A block placed along one
+   *  sample's normal is fine at that sample and inside the road two samples
+   *  later, where the centreline has swung under it. */
+  _clearsRoad(x, z, r, margin = 1.2) {
+    _clearV.set(x, 0, z);
+    const i = this.nearestIndex(_clearV);          // no hint: search the whole lap
+    const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;
+    return this._distToTrack(x, z) - r >= half + margin;
+  }
+
   _trackSidePos(minD, maxD) {
     const i = (Math.random() * N) | 0;
     const side = Math.random() < 0.5 ? 1 : -1;
@@ -6967,7 +7012,12 @@ export class Track {
     const rcol = new THREE.Color();
     let rk = 0, lk = 0;
     this._scatter(T.rockCount, () => this._trackSidePos(12.5, 90), (p) => {
-      const s = 0.5 + Math.random() * 2.2;
+      let s = 0.5 + Math.random() * 2.2;
+      // never let a boulder reach into the carriageway — shrink it to fit, and
+      // if it cannot fit, place nothing here at all
+      const fit = this._stoneFit(p.x, p.z, s * 0.9);
+      if (fit <= 0) return;
+      s = Math.min(s, fit / 0.9);
       const sy = s * (0.6 + Math.random() * 0.5);
       const y = this.terrainHeight(p.x, p.z) + s * 0.25;
       // big boulders are SOLID (geometry base radius 1 × instance scale s)
@@ -7042,7 +7092,7 @@ export class Track {
     hero.castShadow = true;
     this.group.add(hero);
     // hero boulder is solid too: footprint radius ≈ (4.6 + 4.1) / 2 = 4.35
-    this.solids.push({ x: hp.x, z: hp.z, r: 4.35 * 0.9, y: this.terrainHeight(hp.x, hp.z), mat: 'stone' });
+    this.solids.push({ x: hp.x, z: hp.z, r: Math.min(4.35 * 0.9, Math.max(0.5, this._stoneFit(hp.x, hp.z, 4.35 * 0.9))), y: this.terrainHeight(hp.x, hp.z), mat: 'stone' });
     this._addShadow(hp.x, hp.z, 5.8);
     if (T.rockSnowCap) {
       const heroCap = new THREE.Mesh(

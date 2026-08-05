@@ -141,7 +141,10 @@ export class Chopper {
 
     this.mesh = buildChopperMesh();
     this.mesh.position.copy(this.pos);
-    game.scene.add(this.mesh);
+    // worldLayer, NOT scene: a level swap or a mode switch tears down the
+    // world layer, and a chopper parented to the scene survived both — that is
+    // the helicopter sitting motionless on the grid at the start of a race.
+    (game.worldLayer || game.scene).add(this.mesh);
   }
 
   update(dt) {
@@ -279,7 +282,7 @@ export class Chopper {
     if (g.buzz) g.buzz(40);
     g.onChopperKill?.(this); // lead pays out the kill reward here
     // full mesh cleanup — the wreck doesn't linger
-    g.scene.remove(this.mesh);
+    this.mesh.parent?.remove(this.mesh);   // remove from wherever it actually is
     this.mesh.traverse((o) => {
       if (o.geometry) o.geometry.dispose();
       if (o.material) {

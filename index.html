@@ -460,7 +460,10 @@
   #race-settings .panel-head,#mode-settings .panel-head{margin:10px 0 4px}
   .set-row{display:grid;grid-template-columns:96px 1fr;gap:6px 12px;align-items:center;padding:6px 0}
   .set-row + .set-row{border-top:1px solid var(--line-soft)}
-  .set-lbl{font-size:10px;font-weight:800;letter-spacing:2px;color:var(--gold-dim)}
+  .set-lbl{font-size:10px;font-weight:800;letter-spacing:2px;color:var(--gold-dim);align-self:start;padding-top:10px}
+  .set-help{margin:5px 2px 1px;font-size:10.5px;line-height:1.45;color:#c8b48a;letter-spacing:.2px;font-weight:500}
+  .set-help b{color:var(--cream);font-weight:800;letter-spacing:.6px}
+  .set-help i{color:#c8b48a}
   #mode-select,#diff-select,#steer-select,#assist-select{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   /* one chip size across all settings rows: 40px tall (touch target), one radius */
   .mode-chip,.diff-chip{pointer-events:auto;cursor:pointer;min-height:40px;padding:0 16px;
@@ -758,7 +761,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r51</div>
+<div id="build-tag">r52</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -812,12 +815,26 @@
   <div id="tab-settings" class="menu-panel off">
     <div id="race-settings">
       <div class="panel-head">RACE SETTINGS</div>
-      <div class="set-row"><span class="set-lbl">DIFFICULTY</span><div id="diff-select"></div></div>
+      <!-- Every setting says what it actually does. "STEERING: SHARP" and
+           "DRIVING AID: PRO" meant nothing without being told, and a player who
+           does not know what a setting does will not touch it. -->
+      <div class="set-row"><span class="set-lbl">DIFFICULTY</span>
+        <div><div id="diff-select"></div>
+        <p class="set-help">Rival pace and aggression, and how hard they hit you. HARD pays ×1.5 credits.</p></div></div>
       <!-- touch only: one thumb doing everything, or thumbs split between
            steering and pedals -->
-      <div class="set-row" id="scheme-row"><span class="set-lbl">CONTROLS</span><div id="scheme-select"></div></div>
-      <div class="set-row"><span class="set-lbl">STEERING</span><div id="steer-select"></div></div>
-      <div class="set-row"><span class="set-lbl">DRIVING AID</span><div id="assist-select"></div></div>
+      <div class="set-row" id="scheme-row"><span class="set-lbl">CONTROLS</span>
+        <div><div id="scheme-select"></div>
+        <p class="set-help"><b>ONE THUMB</b> — the left pad does everything: sideways steers, up is gas, down is brake.<br>
+        <b>TWO THUMB</b> — the left pad only steers; GAS and BRAKE pedals go under your right thumb.</p></div></div>
+      <div class="set-row"><span class="set-lbl">STEERING</span>
+        <div><div id="steer-select"></div>
+        <p class="set-help">How quickly the car answers the wheel. <b>RELAXED</b> turns slower and is easier to hold
+        straight at speed; <b>SHARP</b> turns harder for the same input — quicker into a hairpin, twitchier everywhere else.</p></div></div>
+      <div class="set-row"><span class="set-lbl">DRIVING AID</span>
+        <div><div id="assist-select"></div>
+        <p class="set-help">A gentle nudge back in line when you are <i>not</i> steering, so the car stops wandering.
+        It never fights your input and never takes a corner for you. <b>PRO</b> off · <b>STANDARD</b> half · <b>ASSIST</b> full.</p></div></div>
       <!-- Touch only: how far the thumb has to travel for full lock, and how
            gentle the middle of that travel is. The chips above are coarse
            presets; this is the fine adjustment for a specific thumb. -->
@@ -826,6 +843,8 @@
         <div id="joy-sens-wrap">
           <input id="joy-sens" type="range" min="50" max="180" step="5" value="100">
           <div class="set-hint"><span>CALM</span><span>TWITCHY</span></div>
+          <p class="set-help">How far your thumb travels for full lock. Lower means more travel and finer control;
+          higher means less travel and a faster turn-in.</p>
         </div>
       </div>
     </div>
@@ -928,10 +947,10 @@
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
-<script type="module" src="./src/main.js?v=r51"></script>
+<script type="module" src="./src/main.js?v=r52"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r51"></script>
+<script src="./src/offline.js?v=r52"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r51"></script>
+<script type="module" src="./src/traffic.js?v=r52"></script>
 </body>
 </html>

@@ -1070,7 +1070,7 @@ class Game {
     this.props = this.track.props ? [...this.track.props] : [];
     this.chopperTimer = 0;
     this.chopperWave = 0;
-    for (const c of this.choppers ?? []) this.worldLayer.remove(c.mesh);
+    for (const c of this.choppers ?? []) c.mesh?.parent?.remove(c.mesh);
     this.choppers = [];
     this.hostiles = [];          // their meshes went with the worldLayer
     this._buildGunNests();
@@ -1177,7 +1177,7 @@ class Game {
     // haunts the next mode (roam turrets standing around a rally stage)
     for (const h of this.hostiles ?? []) h.mesh?.parent?.remove(h.mesh);
     this.hostiles = [];
-    for (const c of this.choppers ?? []) this.worldLayer.remove(c.mesh);
+    for (const c of this.choppers ?? []) c.mesh?.parent?.remove(c.mesh);
     this.choppers = [];
     for (const s of this.roamStars ?? []) s.spr?.parent?.remove(s.spr);
     this.roamStars = [];
@@ -3439,11 +3439,11 @@ class Game {
           this._spawnChopper();
           this.chopperTimer = 40;
         }
-      } else if (!this._raceChopper && this.difficulty.id !== 'easy' && this.player.lap >= this.lapsTotal) {
-        // final-lap air support keeps the leaders honest
-        this._raceChopper = true;
-        this._spawnChopper();
       }
+      // No air support in a plain race. A rally is a rally — the same rule the
+      // gun nests follow. "Final-lap air support keeps the leaders honest" read
+      // as being jumped by a helicopter you never asked to fight, on the lap
+      // that actually decides the race.
     }
     for (const c of this.choppers) if (c.alive) c.update(dt);
     this.choppers = this.choppers.filter((c) => c.alive);
@@ -3665,7 +3665,17 @@ class Game {
     const mat = ob.mat ?? 'metal';
     let dmg = 0;
     if (mat === 'stone') {
-      dmg = impact > 6 ? Math.min(85, (impact - 6) * 3.5) : 0;
+      // Stone is brutal — but a knee-high rock at the verge was costing the same
+      // 85 hull as a cliff face, which is what turned "clipped a stone" into
+      // "race over". Size now scales the ceiling: a 0.6 u kerb stone tops out
+      // around 30, a real boulder still all but wrecks you. Anything without a
+      // radius (cliffs, mesas, walls) keeps the full figure.
+      // 1.4 u and up is a proper boulder and keeps the full figure — the rule
+      // that a full-speed head-on all but wrecks a healthy car has to survive
+      // this. Only the small stuff at the verge is discounted.
+      const r = ob.r ?? 99;
+      const heft = THREE.MathUtils.clamp(r / 1.4, 0.34, 1);
+      dmg = impact > 6 ? Math.min(85 * heft, (impact - 6) * 3.5 * heft) : 0;
       if (dmg > 0) {
         this.particles.splinters(car.pos, n, [0x8a8378, 0x55504a], Math.min(1, impact / 20));
         this.particles.debris(car.pos, Math.min(8, 2 + (impact / 4 | 0)));
