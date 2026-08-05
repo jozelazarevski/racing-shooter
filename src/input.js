@@ -152,8 +152,22 @@ export class Input {
     if (this.autoThrottle) return this.brake > 0 ? 0 : 1;
     return Math.max(this.down('KeyW', 'ArrowUp') ? 1 : 0, this.analog.throttle);
   }
-  get brake() { return Math.max(this.down('KeyS', 'ArrowDown') ? 1 : 0, this.analog.brake); }
+  /** TWO-THUMB: both steer buttons at once IS the brake.
+   *  Squeezing both thumbs down is the natural panic gesture, and it beats
+   *  reaching for a third button mid-corner — the centre BRAKE stays for
+   *  deliberate braking, but you no longer have to find it. Scheme-gated on
+   *  autoThrottle, so a keyboard player holding both arrows is unaffected. */
+  get bothSteer() {
+    return !!this.autoThrottle && this.down('ArrowLeft') && this.down('ArrowRight');
+  }
+
+  get brake() {
+    if (this.bothSteer) return 1;
+    return Math.max(this.down('KeyS', 'ArrowDown') ? 1 : 0, this.analog.brake);
+  }
+
   get steer() {
+    if (this.bothSteer) return 0;     // squeezing both is braking, not steering
     const k = (this.down('KeyA', 'ArrowLeft') ? 1 : 0) - (this.down('KeyD', 'ArrowRight') ? 1 : 0);
     return Math.max(-1, Math.min(1, k + this.analog.steer));
   }
