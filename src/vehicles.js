@@ -1476,7 +1476,10 @@ export class Car {
     // switchback cut), and even then only on ground no vehicle could hold.
     const rimR2 = RIM_RADIUS * RIM_RADIUS;
     const atRim = this.pos.x * this.pos.x + this.pos.z * this.pos.z > rimR2;
-    const offPiste = Math.abs(this.lateral) > 25;
+    let offPiste = Math.abs(this.lateral) > 25;
+    if (offPiste && t.nearestIndex && t.lateralOffset) {          // same check
+      offPiste = Math.abs(t.lateralOffset(this.pos, t.nearestIndex(this.pos))) > 25;
+    }
     // Gradient alone does not describe the massif. Measured, its flank averages
     // about 4.5% — a long gentle ramp, not a wall — so a car could simply drive
     // up the side of the summit and look down on the stage. What actually marks
@@ -1492,7 +1495,21 @@ export class Car {
     // FREE ROAM is exempt on purpose: out there the world is the point, and the
     // rim wall is what bounds it.
     if (!this.game.freeRoam && this === this.game.player && this.speedAlong > 0.5) {
-      const strayed = Math.abs(this.lateral) - 45;
+      // `lateral` is measured against the TRACKED index, and index tracking only
+      // searches +/-30 samples around where the car was. Where the loop doubles
+      // back on itself the tracker can stay locked to the far branch, so a car
+      // sitting squarely on the road reads as 100+ u off it — and this rule then
+      // scrubbed its speed to nothing and told the player to turn back. That is
+      // the reported bug: stopped dead, on the road, "OFF THE COURSE".
+      //
+      // So a strayed reading is now only believed if a GLOBAL nearest-sample
+      // search agrees. The search costs a full sweep, but it only ever runs on
+      // the frames that already look off-course, which is nowhere on a clean lap.
+      let strayed = Math.abs(this.lateral) - 45;
+      if (strayed > 0 && t.nearestIndex && t.lateralOffset) {
+        const gi = t.nearestIndex(this.pos);          // no hint: search the lap
+        strayed = Math.abs(t.lateralOffset(this.pos, gi)) - 45;
+      }
       if (strayed > 0) {
         const over = Math.min(1, strayed / 15);
         this.vel.multiplyScalar(Math.max(0, 1 - over * 3.5 * dt));
