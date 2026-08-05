@@ -901,7 +901,14 @@ export class Car {
 
     // ---- steering: quick to come in, gentle taper at very high speed ----
     const sp = Math.abs(vf);
-    const rise = THREE.MathUtils.clamp(sp / 13, 0, 1);
+    // Steering authority used to scale from ZERO with speed, so the slower you
+    // went the less you could turn — backwards from a real car, and a trap on a
+    // tight hairpin: the corner forces you to crawl, and crawling takes your
+    // steering away. Measured, ROCKFALL RAVINE's tightest corner (5.6 m, between
+    // cliff walls) could only be held at 14 km/h, where the car had 30% of its
+    // lock. A standing floor fixes hairpins everywhere without touching a single
+    // track's geometry; the speed term still adds on top of it.
+    const rise = 0.45 + 0.55 * THREE.MathUtils.clamp(sp / 13, 0, 1);
     const taper = 1 - this.steerTaper * THREE.MathUtils.clamp((sp - this.maxSpeed * 0.6) / (this.maxSpeed * 0.55), 0, 1);
     const authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
     const dir = vf >= 0 ? 1 : -1;
