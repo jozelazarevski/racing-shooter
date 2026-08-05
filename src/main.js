@@ -3736,7 +3736,14 @@ class Game {
       // this. Only the small stuff at the verge is discounted.
       const r = ob.r ?? 99;
       const heft = THREE.MathUtils.clamp(r / 1.4, 0.34, 1);
-      dmg = impact > 6 ? Math.min(85 * heft, (impact - 6) * 3.5 * heft) : 0;
+      // QUADRATIC IN IMPACT SPEED, because that is what energy is. The old
+      // curve was linear, so brushing a wall at 10 u/s still cost a seventh of
+      // your hull — and the cliff worlds grind you down by contact rather than
+      // by crashes (measured: 53 hull a lap on ROCKFALL RAVINE, all of it wall
+      // contact). Squared, a touch costs almost nothing and a real hit is
+      // unchanged: the constant is set so a full-speed head-on lands exactly
+      // where it did before.
+      dmg = impact > 6 ? Math.min(85 * heft, (impact - 6) ** 2 * 0.175 * heft) : 0;
       if (dmg > 0) {
         this.particles.splinters(car.pos, n, [0x8a8378, 0x55504a], Math.min(1, impact / 20));
         this.particles.debris(car.pos, Math.min(8, 2 + (impact / 4 | 0)));
@@ -3749,7 +3756,7 @@ class Game {
         if (dmg >= 18) this.crashDrama();
       }
     } else if (mat === 'hut') {
-      dmg = impact > 6 ? Math.min(50, (impact - 6) * 2.2) : 0;
+      dmg = impact > 6 ? Math.min(50, (impact - 6) ** 2 * 0.11) : 0;
       if (dmg > 0) {
         // the building crashes big: planks burst off the wall + a dust cloud
         const cols = [0x8a6a42, this.track.T?.hutRoof ?? 0x6a4a2a];
