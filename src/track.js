@@ -7028,12 +7028,44 @@ export class Track {
     tufts.count = k;
     this.group.add(tufts);
 
-    // bushes (lush, dry or frosted depending on theme)
-    const bushGeo = new THREE.IcosahedronGeometry(1, 0);
-    bushGeo.scale(1, 0.62, 1);
+    // Understorey. One squashed blob stood in for every biome's ground layer —
+    // the same shape under redwoods, in the Amazon, on an ice sheet and in a
+    // wadi. It is the layer you see most of at eye height, so it is the layer
+    // that most gives away that the worlds are the same world repainted.
+    //
+    // Four silhouettes now, chosen by what actually grows there:
+    //   frond   fern / sword fern   — rainforest and redwood floor
+    //   spray   tussock / bunchgrass — alpine pasture, snow edge, ice moraine
+    //   spike   saltbush / creosote  — deserts, canyons, wadis
+    //   blob    broadleaf scrub      — everywhere else (the original)
+    const UNDER = {
+      jungle: 'frond', redwood: 'frond', flume: 'frond',
+      alpine: 'spray', pass: 'spray', tremola: 'spray', furka: 'spray',
+      snow: 'spray', glacial: 'spray', sheetice: 'spray', avalanche: 'spray',
+      desert: 'spike', dunes: 'spike', canyon: 'spike', ravine: 'spike', oasis: 'spike',
+    };
+    const underKind = T.understorey ?? UNDER[this.level?.theme] ?? 'blob';
+    let bushGeo;
+    if (underKind === 'frond') {
+      // a low rosette of fronds: wide, flat, overlapping
+      bushGeo = new THREE.SphereGeometry(1.15, 7, 3);
+      bushGeo.scale(1, 0.3, 1);
+    } else if (underKind === 'spray') {
+      // bunchgrass: narrow at the base, splaying up and out
+      bushGeo = new THREE.ConeGeometry(0.95, 1.5, 6, 1, true);
+      bushGeo.translate(0, 0.45, 0);
+    } else if (underKind === 'spike') {
+      // desert scrub: sparse, angular, twice as tall as it is wide
+      bushGeo = new THREE.OctahedronGeometry(0.85, 0);
+      bushGeo.scale(0.8, 1.35, 0.8);
+    } else {
+      bushGeo = new THREE.IcosahedronGeometry(1, 0);
+      bushGeo.scale(1, 0.62, 1);
+    }
     const bushes = new THREE.InstancedMesh(
       bushGeo,
-      new THREE.MeshStandardMaterial({ color: T.bushColor, flatShading: true, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: T.bushColor, flatShading: true, roughness: 1,
+        side: (underKind === 'spray' || underKind === 'frond') ? THREE.DoubleSide : THREE.FrontSide }),
       T.bushCount
     );
     const B = T.bush;

@@ -140,21 +140,21 @@ const CONTRACT_POOL = [
 // undercity) simply have no grazing herds.
 const LIVESTOCK_BY_THEME = {
   forest:   { kinds: ['cow', 'sheep', 'boar'], perHerd: 4 },
-  alpine:   { kinds: ['cow', 'sheep', 'goat'], perHerd: 4 },
-  pass:     { kinds: ['cow', 'goat', 'sheep'], perHerd: 5 },
-  tremola:  { kinds: ['sheep', 'goat', 'cow'], perHerd: 4 },
-  furka:    { kinds: ['goat', 'sheep'],        perHerd: 3 },
+  alpine:   { kinds: ['cow', 'sheep', 'ibex'], perHerd: 4 },
+  pass:     { kinds: ['cow', 'ibex', 'sheep'], perHerd: 5 },
+  tremola:  { kinds: ['sheep', 'ibex', 'cow'], perHerd: 4 },
+  furka:    { kinds: ['ibex', 'sheep'],        perHerd: 3 },
   redwood:  { kinds: ['deer', 'boar'],         perHerd: 3 },
   wildfire: { kinds: ['deer', 'boar'],         perHerd: 2 },
-  snow:     { kinds: ['deer'],                 perHerd: 3 },
-  glacial:  { kinds: ['deer'],                 perHerd: 2 },
-  sheetice: { kinds: ['deer'],                 perHerd: 2 },
-  avalanche:{ kinds: ['deer'],                 perHerd: 2 },
-  desert:   { kinds: ['camel', 'goat'],        perHerd: 3 },
-  dunes:    { kinds: ['camel'],                perHerd: 3 },
-  canyon:   { kinds: ['goat', 'camel'],        perHerd: 3 },
-  ravine:   { kinds: ['goat'],                 perHerd: 2 },
-  oasis:    { kinds: ['camel', 'goat', 'cow'], perHerd: 3 },
+  snow:     { kinds: ['deer', 'hare'],         perHerd: 3 },
+  glacial:  { kinds: ['seal', 'hare'],         perHerd: 2 },
+  sheetice: { kinds: ['seal'],                 perHerd: 2 },
+  avalanche:{ kinds: ['ibex', 'hare'],         perHerd: 2 },
+  desert:   { kinds: ['coyote', 'camel'],      perHerd: 3 },
+  dunes:    { kinds: ['camel', 'coyote'],      perHerd: 3 },
+  canyon:   { kinds: ['coyote', 'goat'],       perHerd: 3 },
+  ravine:   { kinds: ['coyote', 'goat'],       perHerd: 2 },
+  oasis:    { kinds: ['camel', 'goat', 'coyote'], perHerd: 3 },
   jungle:   { kinds: ['capybara', 'boar', 'deer'], perHerd: 3 },
   flume:    { kinds: ['deer', 'cow', 'boar'],  perHerd: 3 },
 };
@@ -2219,6 +2219,14 @@ class Game {
       camel:    { body: 0xcfa05f, spot: 0x8a6a3c, w: 1.3,  h: 2.2,  d: 2.9, mass: 0.9,  pts: 70, flee: 9, amble: 0.55 },
       boar:     { body: 0x4a3222, spot: 0x2e2014, w: 0.95, h: 0.75, d: 1.6, mass: 0.55, pts: 55, flee: 12 },
       capybara: { body: 0x9a6f42, spot: 0x6e4e2c, w: 0.9,  h: 0.7,  d: 1.4, mass: 0.5,  pts: 90, flee: 8, spookR: 10 },
+      // SCENES.md: the alpine passes had generic goats, the deserts had camels
+      // standing in for everything, and every ice world had DEER on it — an
+      // animal that does not live on an ice sheet. One species per biome that
+      // actually belongs there.
+      ibex:     { body: 0xa8977c, spot: 0x554a3a, w: 0.95, h: 1.25, d: 1.7, mass: 0.55, pts: 110, flee: 15, spookR: 22, amble: 0.7 },
+      coyote:   { body: 0xb08d61, spot: 0x6d5438, w: 0.7,  h: 0.85, d: 1.7, mass: 0.35, pts: 95,  flee: 17, spookR: 26, amble: 1.4 },
+      seal:     { body: 0x8f96a2, spot: 0x50565f, w: 0.9,  h: 0.6,  d: 2.0, mass: 0.6,  pts: 85,  flee: 5,  spookR: 9,  amble: 0.35 },
+      hare:     { body: 0xe6e2d8, spot: 0xb8b2a4, w: 0.42, h: 0.5,  d: 0.72, mass: 0.18, pts: 70, flee: 19, spookR: 24, amble: 1.1 },
     };
     // roster shifts per world so two worlds on the same roster don't open with
     // the same species, and one animal in four is the NEXT species along —

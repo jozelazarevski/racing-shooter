@@ -84,17 +84,42 @@ const boot = async (url) => {
 
   // STONE: full-speed head-on into a boulder = near-wreck damage.
   // Start right at its edge so nothing else can intercept the run-in.
+  // Driven at a FIXED timestep rather than on wall-clock frames, and aimed at a
+  // boulder standing on flat ground. The old version waited 1800 ms of real time
+  // and took whichever stone happened to be first in the list; once the roadside
+  // stones were moved clear of the carriageway that stone changed, the run-in
+  // landed on a slope, and the car arrived glancing instead of square. The
+  // material model was never the thing that moved — so measure the model.
   r = await page.evaluate(async () => {
     const g = window.__game, p = g.player, t = g.track;
-    const ob = t.solids.filter(s => s.mat === 'stone' && s.r > 1.5)[0];
-    p.alive = true; p.health = 100; p.invuln = 0; p.mesh.visible = true;
-    p.pos.set(ob.x - (ob.r + 4.5), (ob.y ?? 0) + 0.3, ob.z);
-    p.y = p.pos.y; p.vy = 0; p.airborne = false;
-    p.heading = Math.PI / 2;
-    p.vel.set(26, 0, 0);
-    await new Promise(res => setTimeout(res, 1800));
-    const d = Math.hypot(p.pos.x - ob.x, p.pos.z - ob.z);
-    return { hpLoss: +(100 - p.health).toFixed(0), d: +d.toFixed(1), r: +ob.r.toFixed(1), wrecked: !p.alive };
+    const flatAround = (s) => {
+      const h0 = t.terrainHeight(s.x, s.z);
+      for (const [dx, dz] of [[6, 0], [-6, 0], [0, 6], [0, -6], [10, 0], [-10, 0]]) {
+        if (Math.abs(t.terrainHeight(s.x + dx, s.z + dz) - h0) > 1.6) return false;
+      }
+      return true;
+    };
+    const stones = t.solids.filter((s) => s.mat === 'stone' && s.r > 1.5);
+    const ob = stones.find(flatAround) || stones[0];
+    let best = 0, bestD = 99;
+    // try both approach directions: one of them can be blocked by a companion
+    // lump, and a blocked run-in is a property of the scenery, not the material
+    for (const dir of [1, -1]) {
+      p.alive = true; p.health = 100; p.invuln = 0; p.mesh.visible = true;
+      p.slip = 0; p.landGrip = 0; p._wetT = 0;
+      const gy = t.terrainHeight(ob.x - dir * (ob.r + 3.6), ob.z);
+      p.pos.set(ob.x - dir * (ob.r + 3.6), gy + 0.3, ob.z);
+      p.y = p.pos.y; p.vy = 0; p.airborne = false;
+      p.heading = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+      p.vel.set(dir * 29, 0, 0);   // RULES.md's "full speed" is ~28 u/s
+      for (let i = 0; i < 90; i++) {          // 1.5 s at a fixed 1/60
+        p.step(1 / 60, { throttle: 1, brake: 0, steer: 0, drift: false, hold: false });
+        if (p.health < 100) break;
+      }
+      const loss = 100 - p.health;
+      if (loss > best) { best = loss; bestD = Math.hypot(p.pos.x - ob.x, p.pos.z - ob.z); }
+    }
+    return { hpLoss: +best.toFixed(0), d: +bestD.toFixed(1), r: +ob.r.toFixed(1), wrecked: !p.alive };
   });
   // NOTE: player hull intake is difficulty-scaled (NORMAL x0.62, RULES.md), so
   // the raw min(85,(impact-6)x3.5) lands ~0.62x on screen. 28+ keeps STONE
