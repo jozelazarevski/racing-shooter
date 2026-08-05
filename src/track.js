@@ -2490,6 +2490,29 @@ export class Track {
   }
 
   /** Nearest centreline sample to (x, z): {d, k}. d is Infinity past the bed. */
+  /** Depth of open water at (x,z), 0 when dry — ANYWHERE on the waterway, not
+   *  only at the marked crossings.
+   *
+   *  The wet-tyre and splash handling used to key off `this.fords`, a list of
+   *  two or three sample indices on the road. So the river was only wet where
+   *  it had been declared wet: drive off the road into the same river fifty
+   *  metres upstream and the car crossed it bone dry, at full grip, throwing
+   *  nothing. This asks the geometry instead.
+   *
+   *  Depth shelves to nothing at the banks, and is a thin wash where the river
+   *  washes over the road (the bed is lifted to the deck there) but a real
+   *  channel out in the open — which is why an off-road crossing should cost
+   *  you far more than a ford does. */
+  waterAt(x, z) {
+    const R = this._river;
+    if (!R) return 0;
+    const { d } = this._riverNearest(x, z);
+    if (!(d < R.half)) return 0;
+    const across = Math.cos((d / R.half) * Math.PI * 0.5);   // 1 mid-channel
+    const near = 1 - THREE.MathUtils.smoothstep(this._distToTrack(x, z), 10, 26);
+    return R.depth * across * (0.12 + 0.88 * (1 - near));
+  }
+
   _riverNearest(x, z) {
     const R = this._river;
     const cx = Math.floor(x / R.CELL), cz = Math.floor(z / R.CELL);

@@ -1328,15 +1328,19 @@ export class Car {
 
     // ---- river-fords: shallow water washing over the road — bow-wave spray,
     // hull drag, and a WET TIRES traction fade for a few seconds after ----
-    const fords = t.fords ?? [];
-    if (fords.length && !this.airborne && this.alive) {
+    // Ask the WATER, not a list of crossings. This used to loop `t.fords` — two
+    // or three declared sample indices — so the river was wet only where it had
+    // been labelled wet, and driving into the same river off-road, fifty metres
+    // upstream, crossed it bone dry at full grip throwing nothing at all.
+    const depth = (!this.airborne && this.alive && t.waterAt)
+      ? t.waterAt(this.pos.x, this.pos.z) : 0;
+    if (depth > 0.06) {
       const now = gm.raceTime ?? 0;
-      for (const fd of fords) {
-        const diF = Math.abs(this.trackIndex - fd.i);
-        const di = Math.min(diF, t.N - diF) * (t.segLen ?? 2);   // u along the track
-        if (di > fd.half) continue;
+      {
         const spdF = Math.hypot(this.vel.x, this.vel.z);
-        const fDrag = Math.max(0, 1 - 0.5 * dt);                 // shallow-water drag
+        // drag scales with how deep you are: a wash over the road barely tugs,
+        // a mid-channel plunge off-road hauls the car down hard
+        const fDrag = Math.max(0, 1 - (0.35 + 0.75 * Math.min(1, depth / 2.2)) * dt);
         this.vel.x *= fDrag;
         this.vel.z *= fDrag;
         this._wetT = 3.5;                                        // long fade — see grip section
@@ -1409,7 +1413,6 @@ export class Car {
               { drag: 1.0, grav: 12, shrink: 0.5, alpha: 0.92 });
           }
         }
-        break; // one ford at a time
       }
       // faint water-drip spray trailing off the tires while WET TIRES lasts
       if ((this._wetMax ?? 0) > 1 && this._wetT > 0 && sp > 10 && Math.random() < 0.3
