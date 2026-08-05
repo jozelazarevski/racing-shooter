@@ -43,6 +43,30 @@ export const LEVELS = [
   { id: 19, name: 'GOTTHARD CLIMB', theme: 'pass', region: 'ALPINE PASSES' },
   { id: 20, name: 'TREMOLA DESCENT', theme: 'tremola', region: 'ALPINE PASSES' },
   { id: 21, name: 'FURKA RIDGE', theme: 'furka', region: 'ALPINE PASSES' },
+
+  // ---- WORLD RALLY: real stages, each a ROUTE over a borrowed THEME with its
+  // own `tune`. `tune` is layered over the theme object, so anything a theme
+  // sets can be overridden per level — elevation, jump count, cliff walls, the
+  // hero bridge. Career order is this array; ids are stable and never reused.
+  { id: 22, name: 'COL DE TURINI', theme: 'pass', route: 'turini', region: 'WORLD RALLY',
+    // relentless short hairpins, and jumps would be absurd on a tarmac col
+    tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0 } },
+  { id: 23, name: 'OUNINPOHJA', theme: 'forest', route: 'ouninpohja', region: 'WORLD RALLY',
+    // the fastest stage in the sport: everything is crests and yumps
+    tune: { elev: { amp: 11, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
+  { id: 24, name: 'FAFE LEAP', theme: 'redwood', route: 'fafe', region: 'WORLD RALLY',
+    tune: { elev: { amp: 11, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
+  { id: 25, name: 'PIKES PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
+    // the tallest climb on the roster, and nothing but the climb
+    tune: { elev: { amp: 27, ph: [1.7, 0.3, 2.8] }, rampCount: 0 } },
+  { id: 26, name: 'SAFARI PLAINS', theme: 'dunes', route: 'safari', region: 'WORLD RALLY',
+    tune: { elev: { amp: 8, ph: [0.9, 2.6, 1.2] }, rampCount: 5 } },
+  { id: 27, name: 'CORNICHE', theme: 'canyon', route: 'corniche', region: 'WORLD RALLY',
+    tune: { elev: { amp: 10, ph: [2.9, 1.1, 0.5] }, rampCount: 0 } },
+  { id: 28, name: 'ESTONIA CRESTS', theme: 'forest', route: 'estonia', region: 'WORLD RALLY',
+    // the only world besides CANYON RUN to hang a hero bridge over a gorge
+    tune: { elev: { amp: 14, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
+      heroBridge: { at: [0.55, 0.66], half: 24, len: 210, depth: 28, skew: 0 } } },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -281,6 +305,111 @@ const CIRCUITS = {
     [250, 40], [214, 2], [152, -8],
     [118, -58], [170, -92], [234, -104],
     [250, -160], [214, -206], [150, -232], [70, -246],
+  ],
+
+  // ======================================================================
+  // REAL-RALLY ROUTES. These are SHAPES only — each names an existing theme
+  // for its look and a `tune` for its character (see LEVELS). Splitting route
+  // from theme is what makes a new circuit cheap: Monte Carlo and Sweden are
+  // both snow-and-mountain and drive nothing alike.
+  // ======================================================================
+
+  // COL DE TURINI — the Monte Carlo classic. A valley approach, then a dense
+  // stack of SHORT hairpin legs up the face (short legs = the corners come at
+  // you relentlessly, which is the whole character of Turini), a narrow col
+  // traverse, and a long fast plunge down the far side.
+  // `dir: -1` is load-bearing, not decoration. The stack's first leg has to
+  // START on the side the approach ARRIVES from, and its last leg has to hand
+  // over to the descent on the side that leg ENDS. Get it wrong and the spline
+  // whips right across the map between two adjacent control points: measured,
+  // the first cut of this route bottomed out at a ONE-UNIT corner radius, where
+  // the tightest hairpin anywhere else on the roster is four.
+  turini: [
+    [0, -238], [78, -246], [148, -224], [196, -186], [216, -150],
+    // 9 legs, entering eastward-facing (dir -1 starts on the RIGHT), so it
+    // exits on the left at z = -132 + 8*27 = 84
+    ...switchbackStack({ legs: 9, z0: -132, dz: 27, halfX: 36, hp: 16, dir: -1,
+      jag: [0, 5, -4, 3, -6, 4, -3, 6, -5] }),
+    // the col: a short shelf at the top before it tips over, picked up on the
+    // LEFT where leg 9 left off
+    [-90, 96], [-150, 112],
+    // the plunge — long, fast, opening radii all the way to the valley
+    [-212, 140], [-252, 80], [-244, 6], [-252, -70],
+    [-212, -146], [-146, -198], [-72, -230],
+  ],
+
+  // OUNINPOHJA — the fastest stage in the sport. Almost no slow corners: very
+  // long straights joined by fourth-gear kinks, and the drama is entirely in
+  // the CRESTS (see the tune: high ramp count, tall elevation amplitude).
+  ouninpohja: [
+    [0, -250], [96, -252], [186, -236], [246, -196],
+    [254, -122], [232, -52], [250, 24],
+    [238, 100], [190, 162], [122, 200],
+    [44, 214], [-38, 208], [-118, 226],
+    [-196, 214], [-248, 156], [-238, 82],
+    [-254, 6], [-240, -72], [-250, -148],
+    [-198, -212], [-118, -244],
+  ],
+
+  // FAFE — Portugal. A tight, technical village loop that exists to set up ONE
+  // enormous jump: the run-in straightens and drops away over the crest.
+  fafe: [
+    [0, -228], [64, -244], [130, -226], [166, -178], [148, -128],
+    [188, -92], [244, -104], [252, -34], [214, 22], [246, 82],
+    // the long straight run-in to the leap, dead straight on purpose
+    [214, 140], [150, 176], [72, 190], [-8, 196], [-88, 190],
+    // village hairpins on the far side
+    [-152, 210], [-214, 178], [-186, 122], [-244, 88], [-252, 14],
+    [-208, -44], [-246, -110], [-192, -172], [-108, -196], [-52, -224],
+  ],
+
+  // PIKES PEAK — one sustained climb, nothing else. A long approach across the
+  // apron, then eleven legs up the mountain with no respite, finishing on the
+  // summit shelf. The tune gives it the tallest elevation range on the roster.
+  pikes: [
+    [-30, -246], [50, -252], [130, -238], [196, -206], [230, -168],
+    // 11 legs from the RIGHT (see the note on turini), exiting left at
+    // z = -150 + 10*27 = 120
+    ...switchbackStack({ legs: 11, z0: -150, dz: 27, halfX: 37, hp: 16, dir: -1,
+      jag: [0, 6, -5, 4, -7, 5, -4, 7, -6, 3, -2] }),
+    // summit shelf, then the long run back down the shoulder to the apron
+    [-96, 134], [-166, 150],
+    [-228, 176], [-252, 108], [-240, 30], [-252, -50],
+    [-222, -130], [-164, -190], [-88, -228],
+  ],
+
+  // SAFARI — Kenya. Enormous, open, fast. The slowest corner here is faster
+  // than the fastest corner on Turini; the challenge is commitment, not
+  // precision. Big radii, long sight lines.
+  safari: [
+    [0, -252], [110, -246], [206, -212], [252, -142],
+    [248, -52], [252, 42], [222, 132], [156, 200],
+    [66, 236], [-30, 244], [-124, 232], [-206, 196],
+    [-252, 122], [-246, 30], [-252, -62], [-224, -152],
+    [-160, -216], [-72, -248],
+  ],
+
+  // CORNICHE — Corsica, the "rally of ten thousand corners". A cliff road that
+  // never has a straight: every corner runs into the next one. Paired with the
+  // canyon look, so the rock is right there on both sides.
+  corniche: [
+    [0, -240], [70, -250], [122, -216], [178, -238], [232, -206],
+    [244, -152], [204, -116], [246, -78], [212, -28], [250, 22],
+    [216, 72], [248, 124], [200, 168], [140, 152], [96, 196],
+    [30, 230], [-44, 208], [-108, 238], [-176, 220], [-232, 182],
+    [-198, 130], [-248, 96], [-238, 34], [-200, -8], [-246, -58],
+    [-214, -112], [-244, -168], [-186, -206], [-118, -186], [-58, -222],
+  ],
+
+  // ESTONIA — flat-out gravel over a river gorge. Fast open sweeps, big
+  // crests, and the tune hangs a hero bridge across the deepest cut, so the
+  // lap has one moment where the road is a span with nothing under it.
+  estonia: [
+    [0, -246], [92, -250], [178, -222], [238, -170],
+    [252, -96], [226, -26], [250, 46], [224, 118],
+    [166, 178], [88, 212], [4, 222], [-80, 214],
+    [-160, 232], [-226, 194], [-252, 124], [-232, 52],
+    [-252, -24], [-236, -104], [-250, -180], [-190, -226], [-104, -250],
   ],
 };
 
@@ -1702,7 +1831,17 @@ export class Track {
   constructor(scene, level = LEVELS[0]) {
     this.scene = scene;
     this.level = level;
-    const T = THEMES[level && level.theme] || THEMES.forest;
+    // ---- THEME = the LOOK. ROUTE = the SHAPE. They used to be the same key,
+    // which meant a new circuit cost a whole new art set and no two worlds could
+    // share a palette. Real rally does not work that way — Monte Carlo and
+    // Sweden are both snow-and-mountain and drive nothing alike.
+    //
+    // A level may now name a `route` (its control points) and a `tune` (per
+    // level overrides layered over the theme: elevation, jump count, cliff
+    // walls, gorge and bridge). Levels that name neither behave exactly as
+    // before, so every existing world is untouched.
+    const base = THEMES[level && level.theme] || THEMES.forest;
+    const T = (level && level.tune) ? { ...base, ...level.tune } : base;
     this.T = T;
     // plain-number lighting/fog summary for main.js
     this.theme = {
@@ -1738,7 +1877,7 @@ export class Track {
     this.group = new THREE.Group();
     scene.add(this.group);
 
-    const pts = CIRCUITS[level && level.theme] || CIRCUITS.forest;
+    const pts = CIRCUITS[(level && (level.route || level.theme))] || CIRCUITS.forest;
     this.curve = new THREE.CatmullRomCurve3(
       pts.map(([x, z]) => new THREE.Vector3(x, 0, z)),
       true, 'centripetal'

@@ -16,7 +16,7 @@
  * CACHE is bumped by the release version. Bump it whenever ?v= in index.html
  * is bumped, or phones will keep serving the previous build forever.
  */
-const CACHE = 'ignite-rally-r71';
+const CACHE = 'ignite-rally-r72';
 
 // ---- CORE vs EXTRA ---------------------------------------------------------
 // CORE is everything the game needs to RUN with the radio off: the shell, the
@@ -133,8 +133,11 @@ self.addEventListener('fetch', (e) => {
 // precached entries so the menu can show an honest READY / PARTIAL badge.
 self.addEventListener('message', async (e) => {
   if (e.data === 'ignite-store-extras') {
-    e.waitUntil?.(storeExtras(e.source));
-    storeExtras(e.source);
+    // ONE call, kept alive through waitUntil where the event supports it.
+    // Calling it separately as well (as the first cut did) runs the whole
+    // sequential store twice and doubles the progress messages.
+    const job = storeExtras(e.source);
+    e.waitUntil?.(job);
     return;
   }
   if (e.data !== 'ignite-offline-status') return;

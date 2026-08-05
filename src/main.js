@@ -311,6 +311,19 @@ const DEMANDS = {
   19: { loose: 0.12, twist: 0.85, fast: 0.40, climb: 0.44 }, // GOTTHARD CLIMB
   20: { loose: 0.12, twist: 0.81, fast: 0.46, climb: 0.56 }, // TREMOLA DESCENT
   21: { loose: 1.00, twist: 0.64, fast: 0.62, climb: 0.35 }, // FURKA RIDGE
+  // ---- WORLD RALLY. `twist` and `climb` are MEASURED on the same geometry
+  // formula the original table used — validated by reproducing all 21 published
+  // values above to within 0.02 twist / 0.12 climb before it was trusted here.
+  // `fast` could NOT be reproduced that way, so it is assigned from the share
+  // of the lap running above a 120 u radius, which rank-orders against the
+  // published values at Spearman 0.65 — directionally right, not exact.
+  22: { loose: 0.12, twist: 0.73, fast: 0.35, climb: 0.66 }, // COL DE TURINI
+  23: { loose: 0.55, twist: 0.03, fast: 0.90, climb: 0.80 }, // OUNINPOHJA
+  24: { loose: 0.12, twist: 0.52, fast: 0.34, climb: 0.80 }, // FAFE LEAP
+  25: { loose: 0.12, twist: 0.77, fast: 0.32, climb: 1.00 }, // PIKES PEAK
+  26: { loose: 0.12, twist: 0.00, fast: 0.95, climb: 0.43 }, // SAFARI PLAINS
+  27: { loose: 0.12, twist: 0.88, fast: 0.06, climb: 0.48 }, // CORNICHE
+  28: { loose: 0.55, twist: 0.09, fast: 0.78, climb: 0.69 }, // ESTONIA CRESTS
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {
@@ -1543,7 +1556,7 @@ class Game {
         <div class="wc-stars${got ? '' : ' none'}">${starRow}</div>
         ${unlocked ? this._affinityChip(lv.id) : ''}
         <div class="wc-best${best ? '' : ' new'}${unlocked ? '' : ' cost'}">${bestTxt}</div>`;
-      this._drawCircuitMap(card.querySelector('.wc-map'), lv.theme, !unlocked, i === this.levelIndex);
+      this._drawCircuitMap(card.querySelector(".wc-map"), lv.route || lv.theme, !unlocked, i === this.levelIndex);
       card.addEventListener('click', () => {
         if (i === this.levelIndex) return;
         if (!this.isLevelUnlocked(lv.id)) {
@@ -1578,11 +1591,18 @@ class Game {
    *  cards you scroll to". */
   _watchShot(el) {
     if (!el || !el.dataset.shot) return;
+    // Load through an Image so a MISSING preview is a known outcome rather than
+    // a broken card: worlds added after the 21 hand-shot jpgs have no art, and
+    // they fall back to a themed wash with the circuit outline the .wc-map
+    // canvas already draws on top. No placeholder jpgs to author or ship.
     const load = (node) => {
       const url = node.dataset.shot;
       if (!url) return;
-      node.style.backgroundImage = `url('${url}')`;
       delete node.dataset.shot;
+      const img = new Image();
+      img.onload = () => { node.style.backgroundImage = `url('${url}')`; };
+      img.onerror = () => { node.classList.add('no-shot'); };
+      img.src = url;
     };
     this.__lazyShots ??= new Set();
     this.__lazyShots.add(el);

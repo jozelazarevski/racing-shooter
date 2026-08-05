@@ -526,6 +526,47 @@ it** so a strong race funds real progress without buying out the garage.
 | Podium bonus | 1st 200 · 2nd 120 · 3rd 60 CR |
 | First conquest | +500 CR, once per world, on your first podium there |
 
+### A world is a ROUTE over a THEME
+
+`theme` is the **look** (fog, sky, palette, flora, props). `route` is the
+**shape** (the control-point loop). They used to be the same key, so a new
+circuit cost a whole new art set and no two worlds could share a palette. Real
+rally does not work that way — Monte Carlo and Sweden are both snow-and-mountain
+and drive nothing alike.
+
+A level may now name:
+
+- `route` — which entry of `CIRCUITS` to drive. Defaults to `theme`, so every
+  pre-existing world is untouched.
+- `tune` — an object **layered over** the theme, so anything a theme sets can be
+  overridden per level: `elev`, `rampCount` (jumps), `cliffWalls`, `heroBridge`.
+
+Two things that will bite whoever adds the next route:
+
+1. **`switchbackStack` has a direction, and the joins matter.** The first leg
+   must start on the side the approach *arrives* from (`dir: -1` starts on the
+   right), and the descent must pick up on the side the last leg *ends*. Get it
+   wrong and the spline whips across the map between two adjacent control
+   points — measured, the first cut of COL DE TURINI and PIKES PEAK bottomed out
+   at a **one-unit** corner radius, where the tightest hairpin anywhere else on
+   the roster is four. Always check `minR` on a new route.
+2. **`DEMAND_BOUNDS` caps climb at 6.8.** An `elev.amp` that pushes past it
+   clamps to 1.00 and the affinity system can no longer tell those worlds apart.
+   The first cut had five of seven new worlds pinned at 1.00.
+
+**Deriving DEMANDS for a new world.** `twist` and `climb` are measurable —
+mean curvature and mean absolute grade, normalised through `DEMAND_BOUNDS`.
+Validate the formula by reproducing the published values for the existing
+worlds *before* trusting it on a new one (it currently lands within 0.02 twist
+and 0.12 climb). `fast` could **not** be reproduced that way; for new worlds it
+is assigned from the share of lap above a 120 u radius, which rank-orders
+against the published values at Spearman **0.65** — directionally right, not
+exact. Say so rather than implying it is measured.
+
+**World card art is optional.** Only the original 21 have hand-shot previews.
+A card whose `w{id}.jpg` 404s falls back to a themed wash with the circuit
+outline drawn over it, so a new world needs no art to ship.
+
 ### Progression: RALLY STARS, not a chain
 
 A world used to open only on a **podium** finish on the one before it. One
