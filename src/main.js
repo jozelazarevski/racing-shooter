@@ -3171,10 +3171,22 @@ class Game {
       mesh.add(trunk, glow);
     } else {
       mesh = new THREE.Group();
+      // A rock that has JUST BROKEN OFF shows a fresh face — unweathered, and
+      // far paler than the wall it left. That is what real rock does, and it is
+      // also the only reason you can see the thing: measured against the cliff
+      // behind it, the old flat 0x8a6a4c box read at a max-channel contrast of
+      // 31/255 — 12 %. That is camouflage, not a hazard. Taken from the theme's
+      // own chip colour so it still belongs to the world it fell off.
+      const fresh = new THREE.Color(t.T?.splinter?.[0] ?? 0x8a6a4c)
+        .lerp(new THREE.Color(0xffffff), 0.55);
       for (let i = 0; i < 3; i++) {
         const s = 1.0 + Math.random() * 0.8;
         const b = new THREE.Mesh(new THREE.BoxGeometry(s, s, s),
-          new THREE.MeshStandardMaterial({ color: 0x8a6a4c, roughness: 0.95 }));
+          new THREE.MeshStandardMaterial({
+            // a little per-lump variation so it reads as broken rock, not a toy
+            color: fresh.clone().multiplyScalar(0.88 + Math.random() * 0.24),
+            roughness: 0.95,
+          }));
         b.position.set((Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.7, (Math.random() - 0.5) * 0.9);
         b.rotation.y = Math.random() * 1.5;
         mesh.add(b);
@@ -3286,6 +3298,18 @@ class Game {
         f.x += f.vx * dt;
         f.z += f.vz * dt;
         f.mesh.position.set(f.x, f.y, f.z);
+        // GRIT TRAIL. A rock coming off a dry face sheds dust the whole way
+        // down, and that hanging trail — not the rock — is what makes the fall
+        // readable from 100 u back, where the rock itself is a 1 u box against a
+        // cliff of the same colour. One sprite every 40 ms, so a whole flight
+        // costs ~29 of a 620/frame budget.
+        if (f.kind === 'rock') {
+          f.dustT = (f.dustT ?? 0) - dt;
+          if (f.dustT <= 0) {
+            f.dustT = 0.04;
+            this.particles.dust?.({ x: f.x, y: f.y, z: f.z }, 0.35);
+          }
+        }
         // clobber anything under it on the way down
         for (const car of cars) {
           if (!car.alive || car.invuln > 0) continue;
@@ -3303,7 +3327,15 @@ class Game {
           f.landed = true;
           const near = Math.hypot(this.player.pos.x - f.x, this.player.pos.z - f.z);
           if (near < 40) this.shake = Math.min(1, this.shake + 0.3);
-          this.particles.debris({ x: f.x, y: f.groundY + 0.5, z: f.z }, 4);
+          // The impact has to read from DOWN THE ROAD. Measured, a rock lands
+          // 111–197 u ahead of you and you are still 3.7–6.6 s of driving away
+          // when it hits — so the plume is usually the first thing you see of
+          // the hazard, and four bits of debris was not enough to notice.
+          this.particles.debris({ x: f.x, y: f.groundY + 0.5, z: f.z }, f.kind === 'icicle' ? 4 : 9);
+          if (f.kind !== 'icicle') {
+            for (let d = 0; d < 5; d++)
+              this.particles.dust?.({ x: f.x, y: f.groundY + 0.3, z: f.z }, 1.3);
+          }
           if (f.kind === 'icicle') { // shatters — no lasting obstacle
             this.particles.splinters(f.mesh.position, new THREE.Vector3(0, 1, 0), [0xcfe8f4, 0x8fd0e8], 0.7);
             // parent, NOT scene: fallers live on worldLayer, so scene.remove
