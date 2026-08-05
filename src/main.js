@@ -3677,24 +3677,30 @@ class Game {
    *  The solid is retired immediately (so it cannot be hit twice) and its
    *  instance is thrown clear of the road, tumbled and part-buried, so the rock
    *  you hit is visibly gone from where it was. */
-  knockStone(ob, car, impact, dx, dz) {
+  knockStone(ob, car, impact, dx, dz, square = 1) {
     ob.knocked = true;
     const heft = THREE.MathUtils.clamp((ob.r ?? 0.8) / 1.15, 0.35, 1);
+    // ANGLE: punting a stone square-on costs the full figure; catching one with
+    // the corner of the bumper flicks it away and barely marks you.
+    const glance = square < 0.55;
+    const angleMul = 0.45 + 0.55 * THREE.MathUtils.clamp(square, 0, 1);
     // damage: real, but a fraction of what the same stone cost as a wall
-    const dmg = Math.max(3, (impact - 9) * 0.9 * heft) * (this.difficulty?.hullMul ?? 0.62);
+    const dmg = Math.max(3, (impact - 9) * 0.9 * heft) * angleMul * (this.difficulty?.hullMul ?? 0.62);
     car.health = Math.max(0, car.health - dmg);
-    car.vel.multiplyScalar(1 - 0.12 * heft);          // it takes some speed with it
+    // …and the speed it takes with it answers the angle too
+    car.vel.multiplyScalar(1 - 0.12 * heft * (0.3 + 0.7 * square));
     const at = new THREE.Vector3(ob.x, (ob.y ?? car.pos.y) + 0.4, ob.z);
     this.particles.splinters(at, new THREE.Vector3(dx, 0.3, dz), [0x8a8378, 0x55504a], 0.7);
     this.particles.debris(at, 4 + (impact / 6 | 0));
     this.particles.dust?.(at, 1.1);
-    this.audio?.thud?.(0.6);
-    this.shake = Math.min(1, (this.shake ?? 0) + 0.12);
+    this.audio?.thud?.(glance ? 0.35 : 0.6);
+    this.shake = Math.min(1, (this.shake ?? 0) + (glance ? 0.05 : 0.12));
     if (car === this.player) {
-      this.buzz(30);
+      this.buzz(glance ? 14 : 30);
       this.score += 20;
       this.styleBump?.();
-      this.hud.feed(`ROCK SHUNTED  −${Math.round(dmg)} HULL`, 'bad');
+      this.hud.feed(glance ? `ROCK FLICKED  −${Math.round(dmg)} HULL`
+        : `ROCK SHUNTED  −${Math.round(dmg)} HULL`, 'bad');
     }
     // Hand it to the roller. Snapping the instance to its final spot in one
     // frame was a teleport — the rock appeared to vanish and reappear, which is
@@ -3720,9 +3726,28 @@ class Game {
    *            head-on all but wrecks you.
    *  'hut'   — heavy: the building shrugs, sheds planks/dust, hurts a lot.
    *  'metal' — firm: the old fence-post feel — sparks and moderate damage. */
-  onSolidCrash(ob, car, impact, nx, nz) {
+  onSolidCrash(ob, car, impact, nx, nz, square = 1) {
     const n = new THREE.Vector3(nx, 0, nz);
-    if (impact > 3) this.particles.sparks(car.pos, n, Math.min(20, 4 + impact));
+    // ---- ANGLE OF ATTACK. `square` is the share of the car's speed aimed into
+    // the surface: 1 = dead-on, 0 = running parallel to it. A sideswipe and a
+    // head-on can arrive with the SAME normal speed, and until now that made
+    // them the same event — same hull cost, same shake, same hit-stop freeze.
+    // They are not the same thing. A brush costs paint and lets you carry your
+    // speed through; a square hit stops the car.
+    const glance = square < 0.55;
+    // Hull taper. Dead-on (square = 1) is EXACTLY the old figure, so nothing at
+    // the heavy end of the model moves; a pure brush pays about half.
+    const angleMul = 0.45 + 0.55 * THREE.MathUtils.clamp(square, 0, 1);
+    // Sparks throw the way the contact actually throws them: a burst off the
+    // face for a real hit, a streak dragged ALONG the rock for a scrape.
+    const dir = n.clone();
+    if (glance) {
+      const tx = -nz, tz = nx;
+      const s = Math.sign(car.vel.x * tx + car.vel.z * tz) || 1;
+      dir.set(tx * s * 0.9 + nx * 0.3, 0.16, tz * s * 0.9 + nz * 0.3).normalize();
+    }
+    if (impact > 3 || (glance && impact > 1.5))
+      this.particles.sparks(car.pos, dir, Math.min(22, (glance ? 8 : 4) + impact));
     const mat = ob.mat ?? 'metal';
     let dmg = 0;
     if (mat === 'stone') {
@@ -3743,24 +3768,30 @@ class Game {
       // contact). Squared, a touch costs almost nothing and a real hit is
       // unchanged: the constant is set so a full-speed head-on lands exactly
       // where it did before.
-      dmg = impact > 6 ? Math.min(85 * heft, (impact - 6) ** 2 * 0.175 * heft) : 0;
+      dmg = impact > 6 ? Math.min(85 * heft, (impact - 6) ** 2 * 0.175 * heft) * angleMul : 0;
       if (dmg > 0) {
-        this.particles.splinters(car.pos, n, [0x8a8378, 0x55504a], Math.min(1, impact / 20));
+        this.particles.splinters(car.pos, dir, [0x8a8378, 0x55504a], Math.min(1, impact / 20));
         this.particles.debris(car.pos, Math.min(8, 2 + (impact / 4 | 0)));
         this.particles.driftSmoke(car.pos);
       }
-      if (car === this.player && dmg >= 10) {
-        this.hud.feed(`HIT ROCK  −${Math.round(dmg)} HULL`, 'bad');
-        this.shake = Math.min(1, this.shake + 0.3 + impact * 0.02);
-        this.buzz(60);
-        if (dmg >= 18) this.crashDrama();
+      // A scrape announces itself sooner and quieter: the player has to be able
+      // to LEARN the difference, and it can only be learned if it is labelled.
+      if (car === this.player && dmg >= (glance ? 5 : 10)) {
+        this.hud.feed(glance ? `SIDESWIPED ROCK  −${Math.round(dmg)} HULL`
+          : `HIT ROCK  −${Math.round(dmg)} HULL`, 'bad');
+        this.shake = Math.min(1, this.shake + (glance ? 0.1 + impact * 0.006 : 0.3 + impact * 0.02));
+        this.buzz(glance ? 25 : 60);
+        // NEVER hit-stop a graze. Freezing the frame for a third of a second is
+        // the single loudest thing the game does, and spending it on a brush is
+        // most of why a brush felt like a wreck.
+        if (dmg >= 18) { if (glance) this.glanceDrama(); else this.crashDrama(); }
       }
     } else if (mat === 'hut') {
-      dmg = impact > 6 ? Math.min(50, (impact - 6) ** 2 * 0.11) : 0;
+      dmg = impact > 6 ? Math.min(50, (impact - 6) ** 2 * 0.11) * angleMul : 0;
       if (dmg > 0) {
         // the building crashes big: planks burst off the wall + a dust cloud
         const cols = [0x8a6a42, this.track.T?.hutRoof ?? 0x6a4a2a];
-        this.particles.splinters(car.pos, n, cols, Math.min(1, impact / 16));
+        this.particles.splinters(car.pos, dir, cols, Math.min(1, impact / 16));
         this.particles.debris(car.pos, Math.min(8, 3 + (impact / 5 | 0)));
         this.particles.dust?.(car.pos, 1.2);
         for (let k = 0; k < Math.min(3, 1 + (impact / 10 | 0)); k++) {
@@ -3776,18 +3807,23 @@ class Game {
           });
         }
       }
-      if (car === this.player && dmg >= 8) {
-        this.hud.feed(`CRASHED INTO THE HUT  −${Math.round(dmg)} HULL`, 'bad');
-        this.shake = Math.min(1, this.shake + 0.25 + impact * 0.015);
-        this.buzz(45);
-        if (dmg >= 18) this.crashDrama();
+      if (car === this.player && dmg >= (glance ? 5 : 8)) {
+        this.hud.feed(glance ? `CLIPPED THE HUT  −${Math.round(dmg)} HULL`
+          : `CRASHED INTO THE HUT  −${Math.round(dmg)} HULL`, 'bad');
+        this.shake = Math.min(1, this.shake + (glance ? 0.1 : 0.25 + impact * 0.015));
+        this.buzz(glance ? 22 : 45);
+        if (dmg >= 18) { if (glance) this.glanceDrama(); else this.crashDrama(); }
       }
     } else {
-      dmg = impact > 8 ? Math.min(24, (impact - 8) * 0.9) : 0;
-      if (car === this.player && dmg >= 5) this.hud.feed(`WALL SLAM  −${Math.round(dmg)} HULL`, 'bad');
-      if (car === this.player && impact > 12) {
+      dmg = impact > 8 ? Math.min(24, (impact - 8) * 0.9) * angleMul : 0;
+      if (car === this.player && dmg >= 5)
+        this.hud.feed(glance ? `SCRAPED THE BARRIER  −${Math.round(dmg)} HULL`
+          : `WALL SLAM  −${Math.round(dmg)} HULL`, 'bad');
+      if (car === this.player && impact > 12 && !glance) {
         this.shake = Math.min(1, this.shake + 0.15 + impact * 0.015);
         this.buzz(30);
+      } else if (car === this.player && impact > 12) {
+        this.shake = Math.min(1, this.shake + 0.08);
       }
     }
     if (dmg > 0) car.damage(dmg, null);
@@ -3799,6 +3835,15 @@ class Game {
     this.hitStop = 0.32;
     this.fovKick = 1;
     this.hud.damageFlash?.(0.9);
+  }
+
+  /** …and the sideswipe version. A hard scrape still deserves to be felt, but
+   *  it must NOT stop time: you are still moving, and a 0.32 s freeze while
+   *  the car is carrying speed past a rock is what made a graze read as a
+   *  wreck. Fov punch and flash only — the frame keeps running. */
+  glanceDrama() {
+    this.fovKick = 0.55;
+    this.hud.damageFlash?.(0.45);
   }
 
   /** Knock a small accessory (bumper, pod, rack…) off `car` — called when its

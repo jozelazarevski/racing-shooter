@@ -95,24 +95,65 @@ Every SOLID collision shares the same motion response — push-out along the
 contact normal, into-surface velocity killed with factor **1.05** (5 %
 rebound, never pinball), tangential grind scaled by lean (below), sparks
 always — but **what it does to your hull depends on what the object is made
-of**. Tangential scrub along a face is **not** flat: it scales with how hard
-the car leans in (`0.03 + 0.5 x lean`, lean = |normal speed| / 14), and contact
-sets a minimum peel-off rate (`1.2 + 4 x lean` u/s) away from the surface. A
-feather graze costs almost nothing and keeps speed; leaning on the rock grinds
-you to a crawl instead of letting you ride it round the bend. `impact` = your normal (into-surface) speed in u/s:
+of**, **how fast you were going**, and **what angle you arrived at**.
 
-| Material | Hardness | Damage formula | Max hit | Feel & FX |
+Two numbers describe every contact:
+
+- `impact` — your **normal** (into-surface) speed in u/s. Damage goes as
+  `impact²`, because that is what energy is. A touch costs almost nothing; a
+  real hit is heavy.
+- `square` — the **angle of attack**: the share of your speed pointed into the
+  surface, `|normal speed| / total speed`. `1` = dead-on, `0` = running
+  parallel to the face. Anything below **0.55** is a GLANCE.
+
+`square` exists because a sideswipe and a head-on can arrive with the same
+normal speed, and before it they were the same event. Measured on a boulder at
+the identical normal speed, a 44 u/s brush cost **more** hull (8.5) than
+driving square into the rock at 17 (7.4) — and got the same "HIT ROCK" banner,
+the same shake, the same 0.32 s hit-stop freeze. That is what made a graze read
+as a wreck.
+
+A glance now:
+
+- pays `0.45 + 0.55 × square` of the hull figure (dead-on is **exactly**
+  unchanged, a pure brush pays about half),
+- **never hit-stops** — freezing the frame is the loudest thing the game does
+  and it must not be spent on a brush; a hard glance gets `glanceDrama()`
+  (fov punch + light flash) instead,
+- throws its sparks **along** the surface rather than off it,
+- keeps its momentum: tangential scrub on the wall path is `(0.03 + 0.5 ×
+  lean) × square`, and one graze is **one** event (0.55 s contact cooldown,
+  up from 0.18) rather than three as the car scrapes past,
+- says so — `SIDESWIPED ROCK` / `CLIPPED THE HUT` / `SCRAPED THE BARRIER` /
+  `ROCK FLICKED`, at a lower feed threshold, so the difference can be learned.
+
+Tangential scrub along a face is **not** flat: it scales with how hard the car
+leans in (`0.03 + 0.5 x lean`, lean = |normal speed| / 14, **× square**), and
+contact sets a minimum peel-off rate away from the surface. A feather graze
+costs almost nothing and keeps speed; leaning on the rock grinds you to a crawl
+instead of letting you ride it round the bend.
+
+| Material | Hardness | Damage formula (× angle) | Max hit | Feel & FX |
 |---|---|---|---|---|
-| **STONE** (boulders, hoodoos, cliffs, mesas, hero rocks) | brutal | `min(85, (impact − 6) × 3.5)` | −85 hull | Rock does not care about toy trucks. A full-speed head-on (~28 u/s) all but **wrecks a healthy car**; even a 15 u/s clip costs ~31 hull. Stone-chip splinters, debris shower, smoke, hard shake, long haptic |
-| **BUILDING** (huts) | heavy | `min(50, (impact − 6) × 2.2)` | −50 hull | The house wins and it *shows*: wall planks burst off and tumble, roof-color splinters, a dust cloud rolls out, big shake — "CRASHED INTO THE HUT" |
+| **STONE** (boulders, hoodoos, cliffs, mesas, hero rocks) | brutal | `min(85·heft, (impact − 6)² × 0.175 · heft) × (0.45 + 0.55·square)` | −85 hull | Rock does not care about toy trucks. A full-speed head-on (~28 u/s) all but **wrecks a healthy car**. `heft = clamp(r/1.4, 0.34, 1)` — a kerb stone is not a cliff. Stone-chip splinters, debris shower, smoke, hard shake, long haptic |
+| **BUILDING** (huts) | heavy | `min(50, (impact − 6)² × 0.11) × (0.45 + 0.55·square)` | −50 hull | The house wins and it *shows*: wall planks burst off and tumble, roof-color splinters, a dust cloud rolls out, big shake — "CRASHED INTO THE HUT" |
 | **BIG TREE** (pine with trunk scale ≥ 1.0) | firm-alive | `min(35, (impact − 5) × 1.8)` | −35 hull | The trunk stops you dead; the canopy sheds a needle-and-branch shower — "HIT A TREE". The tree itself never falls to a bumper |
-| **METAL** (gantry legs, grandstand frame) | firm | `min(24, (impact − 8) × 0.9)` | −24 hull | Clang + spark shower, moderate hull cost — "WALL SLAM" |
+| **METAL** (gantry legs, grandstand frame) | firm | `min(24, (impact − 8) × 0.9) × (0.45 + 0.55·square)` | −24 hull | Clang + spark shower, moderate hull cost — "WALL SLAM" |
 
 Rules of thumb encoded above — the **mass law**: the heavier, harder thing
 always wins, and the damage YOU take scales with how unforgiving it is.
 Stone > building > living wood > steel post, and every one of them beats a
 car. Glancing scrapes below each formula's threshold cost nothing but paint
 and sparks.
+
+Measured on a flat boulder at 29 u/s, sweeping the approach from square-on to
+a brush (`square` is what the physics actually reported at contact):
+
+| square | 1.00 | 0.91 | 0.80 | 0.64 | 0.49 | 0.33 | 0.18 |
+|---|---|---|---|---|---|---|---|
+| hull | 20.3 | 13.7 | 8.1 | 3.0 | 3.1 | 0 | 0 |
+| speed kept | 5 % | 41 % | 60 % | 75 % | 86 % | 93 % | 97 % |
+| hit-stop | yes | yes | — | — | — | — | — |
 
 **Debris is shrapnel.** A smashed prop's flung chunk is not decoration: while
 it is still moving faster than **8 u/s**, any car whose centre comes within
@@ -326,10 +367,11 @@ no livestock dressing (troughs, hay racks) on a city world.
 | Snow ploughed swath | ±5.2 u banked berms with car-width polished wheel tracks inside | textures.js `applySnowRoad` |
 | SOLID velocity absorb | ×1.05 (5 % rebound), all materials | vehicles.js |
 | Grind tangential loss | 3 %/contact-frame (−20 % per handling lvl) | vehicles.js |
-| STONE damage | impact > 6 → min(85, (i−6)×3.5) | main.js `onSolidCrash` |
-| BUILDING damage | impact > 6 → min(50, (i−6)×2.2) + plank/dust burst | main.js `onSolidCrash` |
+| STONE damage | impact > 6 → min(85·heft, (i−6)²×0.175·heft) × angle | main.js `onSolidCrash` |
+| BUILDING damage | impact > 6 → min(50, (i−6)²×0.11) × angle + plank/dust burst | main.js `onSolidCrash` |
 | BIG-TREE damage | impact > 5 → min(35, (i−5)×1.8); tree never falls to a car | main.js `onTreeCrash` |
-| METAL damage | impact > 8 → min(24, (i−8)×0.9) | main.js `onSolidCrash` |
+| METAL damage | impact > 8 → min(24, (i−8)×0.9) × angle | main.js `onSolidCrash` |
+| Angle of attack | `square = |normal speed| / speed`; angle factor `0.45 + 0.55·square`; glance below 0.55 — no hit-stop, sparks along the face, 0.55 s cooldown | vehicles.js + main.js `onSolidCrash` |
 | Big tree threshold | pine with scale ≥ 1.0 is SOLID; smaller pines, cacti, snags yield at > 7 u/s | vehicles.js |
 | Car-crash damage | impact > 9 → min(20, (i−9)×0.6), both cars, 0.5 s rate limit | main.js `_carCollisions` |
 | Car-crash restitution | ±0.12 × relative velocity | main.js |

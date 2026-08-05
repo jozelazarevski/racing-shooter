@@ -1066,6 +1066,15 @@ export class Car {
     if (wallHere) {
       const n = t.nrm[this.trackIndex];
       const vn = this.vel.dot(n);
+      // ---- ANGLE OF ATTACK. `square` is the share of your speed pointed INTO
+      // the rock: 1 = dead-on, 0 = running parallel to the face. It is the
+      // difference between "brushed the wall at 100" and "drove into the wall
+      // at 30" — those two arrive with the SAME normal speed, and until now
+      // they were the same event. Measured on the wall path they cost the same
+      // ~40% of total speed in a single frame, which is what made a graze read
+      // as a crash. Everything below is scaled by it.
+      const spIn = Math.hypot(this.vel.x, this.vel.z);
+      const square = THREE.MathUtils.clamp(Math.abs(vn) / Math.max(3, spIn), 0, 1);
       const over = this.lateral - fside * wallLim; // ---- width-variation
       this.pos.addScaledVector(n, -over);
       // absorb, don't bounce: kill the into-wall velocity (5% rebound)
@@ -1074,7 +1083,10 @@ export class Car {
       // and ride it like a rail all the way round a bend. Speed loss now
       // scales with how hard the car is leaning in: a feather graze still
       // costs almost nothing, a committed hit bleeds a lot of speed.
-      const lean = THREE.MathUtils.clamp(Math.abs(vn) / 14, 0, 1);
+      // …times `square`, so the scrub answers the ANGLE too. A dead-on hit
+      // (square = 1) keeps exactly the old figure; a sideswipe at the same
+      // normal speed keeps its momentum and just sheds paint.
+      const lean = THREE.MathUtils.clamp(Math.abs(vn) / 14, 0, 1) * square;
       this.vel.multiplyScalar(1 - (0.03 + 0.5 * lean) * (1 - 0.2 * hnd));
       // …and peel the nose off the rock so the car separates instead of
       // sticking. Sets a minimum outward rate rather than adding every frame,
@@ -1119,7 +1131,7 @@ export class Car {
           // wrecked the car outright (the CANYON RUN "bounding ball" death).
           if (vnAbs > 7 && (this._cliffHurt ?? 0) <= 0) {
             this._cliffHurt = 2.8;
-            gm.onSolidCrash?.({ mat: 'stone' }, this, vnAbs, n.x * fside, n.z * fside);
+            gm.onSolidCrash?.({ mat: 'stone' }, this, vnAbs, n.x * fside, n.z * fside, square);
           } // else: scrape sparks only — no hull cost while the cooldown runs
         } else this.onWallHit(n, vnAbs);
       }
@@ -1147,14 +1159,18 @@ export class Car {
       this.pos.z = ob.z + nz * rr;
       const vn = this.vel.x * nx + this.vel.z * nz;
       if (vn < 0) {
+        // angle of attack, taken BEFORE the normal component is absorbed
+        const square = THREE.MathUtils.clamp(-vn / Math.max(3, Math.hypot(this.vel.x, this.vel.z)), 0, 1);
         this.vel.x -= nx * vn * 1.05; // absorb, like the wall scrape
         this.vel.z -= nz * vn * 1.05;
-        this.vel.multiplyScalar(0.93);
+        this.vel.multiplyScalar(1 - 0.07 * square); // flat 7% used to tax brushes too
         if (this.wallGrind <= 0) {
-          this.wallGrind = 0.18;
+          // a graze scrapes along the rock over several frames — one cooldown
+          // long enough that it stays ONE event instead of three
+          this.wallGrind = square < 0.55 ? 0.55 : 0.18;
           // road obstacles are ROCK (hoodoos, basalt) — stone crash rules
           if (this === gm.player && gm.onSolidCrash) {
-            gm.onSolidCrash({ mat: 'stone' }, this, Math.abs(vn), nx, nz);
+            gm.onSolidCrash({ mat: 'stone' }, this, Math.abs(vn), nx, nz, square);
           } else {
             _hitNormal.set(nx, 0, nz);
             this.onWallHit(_hitNormal, Math.abs(vn));
@@ -1174,24 +1190,29 @@ export class Car {
         if (ob.y !== undefined && Math.abs(this.pos.y - ob.y) > 6) continue;
         const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
         const nx = dx / d, nz = dz / d;
+        // angle of attack — see the wall block above. Taken before anything
+        // touches the velocity, because it is a property of the APPROACH.
+        const vApp = this.vel.x * nx + this.vel.z * nz;
+        const square = THREE.MathUtils.clamp(-vApp / Math.max(3, Math.hypot(this.vel.x, this.vel.z)), 0, 1);
         // SMALL STONES YIELD. A knee-high rock stopping a rally truck dead is
         // the thing that reads as unfair — it should cost you paint and speed,
         // then go tumbling. Anything 1.15 u and up is a real boulder and still
         // wins, and below walking pace nothing shifts at all.
         if (ob.mat === 'stone' && !ob.knocked && (ob.r ?? 9) < 1.15
             && Math.abs(this.speedAlong) > 8 && gm.knockStone) {
-          gm.knockStone(ob, this, Math.abs(this.speedAlong), -nx, -nz);
+          gm.knockStone(ob, this, Math.abs(this.speedAlong), -nx, -nz, square);
           continue;                       // no push-out — you go through it
         }
         this.pos.x = ob.x + nx * rr;
         this.pos.z = ob.z + nz * rr;
-        const vn = this.vel.x * nx + this.vel.z * nz;
+        const vn = vApp;
         if (vn < 0) {
           this.vel.x -= nx * vn * 1.05;
           this.vel.z -= nz * vn * 1.05;
           if (this.wallGrind <= 0) {
-            this.wallGrind = 0.18;
-            gm.onSolidCrash?.(ob, this, Math.abs(vn), nx, nz);
+            // one graze = one event, not three as the car scrapes past
+            this.wallGrind = square < 0.55 ? 0.55 : 0.18;
+            gm.onSolidCrash?.(ob, this, Math.abs(vn), nx, nz, square);
           }
         }
         break;
@@ -1217,14 +1238,15 @@ export class Car {
         // the thing that reads as unfair — it should cost you paint and speed,
         // then go tumbling. Anything 1.15 u and up is a real boulder and still
         // wins, and below walking pace nothing shifts at all.
+        const vn = this.vel.x * nx + this.vel.z * nz;
+        const square = THREE.MathUtils.clamp(-vn / Math.max(3, Math.hypot(this.vel.x, this.vel.z)), 0, 1);
         if (ob.mat === 'stone' && !ob.knocked && (ob.r ?? 9) < 1.15
             && Math.abs(this.speedAlong) > 8 && gm.knockStone) {
-          gm.knockStone(ob, this, Math.abs(this.speedAlong), -nx, -nz);
+          gm.knockStone(ob, this, Math.abs(this.speedAlong), -nx, -nz, square);
           continue;                       // no push-out — you go through it
         }
         this.pos.x = ob.x + nx * rr;
         this.pos.z = ob.z + nz * rr;
-        const vn = this.vel.x * nx + this.vel.z * nz;
         if (vn < 0) {
           this.vel.x -= nx * vn * 1.05; // same absorb-don't-bounce as all SOLIDs
           this.vel.z -= nz * vn * 1.05;
