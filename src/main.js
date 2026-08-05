@@ -97,6 +97,8 @@ const plankMat = (col) => {
 const CREDIT_RATE = 1 / 12;                // score -> credits
 const PODIUM_CR = [200, 120, 60];          // 1st / 2nd / 3rd
 const FIRST_CLEAR_CR = 500;                // once per world, on your first podium
+const CLEAN_RUN_CR = 200;                  // finished without wrecking
+const SWEEP_CR = 250;                      // all three contracts in one race
 // Upgrades escalate QUADRATICALLY: 800 / 1,600 / 4,000 / 8,000 / 13,600 —
 // 28,000 to max one line, against ~1,300 CR for a win. The old linear
 // 500+400×lvl put a fully maxed line five races away, which made every car
@@ -1403,12 +1405,70 @@ class Game {
     return i > 0 ? LEVELS[i - 1] : null;
   }
 
+  /** ---- RALLY STARS ----------------------------------------------------
+   *  The career used to be a single chain: podium world N or you never see
+   *  N+1. One track you could not crack ended the game, which is exactly what
+   *  happened on ROCKFALL RAVINE.
+   *
+   *  Stars replace the chain with a bank. Every world is worth up to THREE, you
+   *  keep your best ever on each, and the total opens worlds by threshold — so
+   *  you pick what to race, anything you race pays into everything else, and a
+   *  world you have already beaten is still worth returning to for the stars
+   *  you left behind.
+   *
+   *      ★    FINISH   cross the line at all
+   *      ★★   PODIUM   top three
+   *      ★★★  WIN      first
+   *
+   *  THREE and not five, and that is a measured decision. Driving clean and
+   *  sweeping the contracts were stars in the first cut, which put a 5× spread
+   *  between what an ace and a finisher bank per race — and no single
+   *  threshold curve survives that. Simulated over the full roster, any slope
+   *  gentle enough to keep a finish-only driver moving let an ace open all 21
+   *  worlds in FOUR races. At 3 the spread is 3× and both ends work. Clean runs
+   *  and contract sweeps pay CREDITS instead, where a wide spread is harmless.
+   */
+  starsFor(rec) {
+    if (!rec) return 0;
+    if (rec.stars != null) return Math.min(3, rec.stars);
+    // careers saved before stars existed only recorded a place; grant what
+    // that place proves, so nobody is demoted by the update
+    const p = rec.place ?? 99;
+    return p <= 1 ? 3 : p <= 3 ? 2 : p < 99 ? 1 : 0;
+  }
+
+  starsIn(rank) {
+    if (rank === 1) return 3;
+    if (rank <= 3) return 2;
+    return rank > 0 ? 1 : 0;
+  }
+
+  totalStars() {
+    let n = 0;
+    for (const lv of LEVELS) n += this.starsFor(this.career.finished[lv.id]);
+    return n;
+  }
+
+  /** What `id` costs to open — by CAREER POSITION, so the roster still unrolls
+   *  in a sensible order while you choose the route through it.
+   *
+   *  The slope is the whole design: EXACTLY one star per slot. That is
+   *  load-bearing, not a round number — a driver who only ever FINISHES banks
+   *  1★ a race, so at any slope above 1 they eventually hit a wall they can
+   *  never clear. Simulated over the roster, a 1.8 slope walled them in after
+   *  three worlds and a 1.25 slope after fifteen. At 1.0 nobody is ever stuck
+   *  again, which is the entire point of replacing the podium chain.
+   *
+   *  The first three are free, so there is a real choice from the very first
+   *  race, and the last world costs 19 of a possible 63 — a third of the
+   *  roster can go unraced and the finale is still reachable. */
+  starCost(id) {
+    const i = LEVELS.findIndex((l) => l.id === id);
+    return i < 3 ? 0 : i - 2;
+  }
+
   isLevelUnlocked(id) {
-    // a world unlocks only after a PODIUM (top 3) finish on the one before
-    const prevLv = this._prevLevel(id);
-    if (this.unlockAll || !prevLv) return true;
-    const prev = this.career.finished[prevLv.id];
-    return !!prev && prev.place <= 3;
+    return this.unlockAll || this.totalStars() >= this.starCost(id);
   }
 
   /** World cards: static circuit-outline badge + flavor + career best per
@@ -1442,20 +1502,25 @@ class Game {
         + (i === this.levelIndex ? ' current' : '')
         + (unlocked ? '' : ' locked');
       const best = this.career.finished[lv.id];
-      // Cards are grouped by REGION, career order is the LEVELS array, and
-      // since ROCKFALL RAVINE moved those two no longer agree. A bare padlock
-      // would leave you hunting for which world opens this one — so say it.
-      const prevLv = this._prevLevel(lv.id);
-      const bestTxt = best
-        ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
-        : (unlocked ? '★ UNRACED' : (prevLv ? `PODIUM ${prevLv.name}` : ''));
+      // Stars carry both halves of the story: how much of this world you have
+      // taken, and — when it is shut — exactly what it costs to open. A bare
+      // padlock tells you nothing you can act on.
+      const got = this.starsFor(best);
+      const cost = this.starCost(lv.id);
+      const starRow = '★'.repeat(got) + '☆'.repeat(3 - got);
+      const bestTxt = unlocked
+        ? (best
+          ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
+          : '★ UNRACED')
+        : `NEEDS ${cost}★ — ${Math.max(0, cost - this.totalStars())} TO GO`;
       card.innerHTML = `<div class="wc-shot" style="background-image:url('assets/previews/w${lv.id}.jpg')">
           <canvas class="wc-map" width="72" height="52"></canvas>
         </div>
         <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
         <div class="wc-tags">${WORLD_TAGS[lv.theme] || ''}</div>
+        <div class="wc-stars${got ? '' : ' none'}">${starRow}</div>
         ${unlocked ? this._affinityChip(lv.id) : ''}
-        <div class="wc-best${best ? '' : ' new'}">${bestTxt}</div>`;
+        <div class="wc-best${best ? '' : ' new'}${unlocked ? '' : ' cost'}">${bestTxt}</div>`;
       this._drawCircuitMap(card.querySelector('.wc-map'), lv.theme, !unlocked, i === this.levelIndex);
       card.addEventListener('click', () => {
         if (i === this.levelIndex) return;
@@ -3005,6 +3070,10 @@ class Game {
     // the medal itself gets its own .rrow, revealed for missions only
     const medalRow = document.getElementById('rrow-medal');
     if (medalRow) medalRow.style.display = '';
+    // missions share the results screen but earn no rally stars — leaving the
+    // panel up would show the last RACE's stars against a mission debrief
+    const starBox = document.getElementById('star-panel');
+    if (starBox) starBox.style.display = 'none';
     setRow('r-medal', 'MEDAL', MISSION_MEDAL_WORD[medal]);
     document.getElementById('r-credits').textContent = `+${cr}`;
     // itemized breakdown, same box the race payout uses — one line, so the
@@ -4552,8 +4621,15 @@ class Game {
     // PODIUM ON HARD), then the whole contract pot rides into `earned`
     this._checkFinishContracts(rank);
     const contractCr = this.contractCredits ?? 0;
+    // Driving clean and sweeping all three contracts were stars in the first
+    // cut of this system; they pay CREDITS instead, because the star ladder
+    // cannot carry a 5x spread between an ace and a finisher (see starsFor).
+    // Credits can: nothing is gated on them.
+    const cleanCr = (this.deaths ?? 0) === 0 ? CLEAN_RUN_CR : 0;
+    const sweepCr = (this.contracts ?? []).length > 0
+      && (this.contracts ?? []).every((c) => c.done) ? SWEEP_CR : 0;
     const raceCr = Math.round(raceScore * CREDIT_RATE * diffMult);
-    const earned = raceCr + podium + firstClear + contractCr;
+    const earned = raceCr + podium + firstClear + contractCr + cleanCr + sweepCr;
     document.getElementById('r-credits').textContent = `+${earned.toLocaleString()}`;
     if (podium) this.hud.feed(`PODIUM BONUS  +${podium} CR`, 'good');
     if (firstClear) this.hud.feed(`WORLD CONQUERED  +${FIRST_CLEAR_CR} CR`, 'good');
@@ -4566,6 +4642,8 @@ class Game {
         let html = `<div class="cb-row"><span>RACE SCORE${diffMult !== 1 ? ` ×${diffMult}` : ''}</span><b>+${raceCr.toLocaleString()}</b></div>`;
         if (podium) html += `<div class="cb-row"><span>PODIUM — ${sfx}</span><b>+${podium}</b></div>`;
         if (firstClear) html += `<div class="cb-row"><span>FIRST CONQUEST</span><b>+${firstClear}</b></div>`;
+        if (cleanCr) html += `<div class="cb-row"><span>CLEAN RUN — NO WRECKS</span><b>+${cleanCr}</b></div>`;
+        if (sweepCr) html += `<div class="cb-row"><span>CLEAN SWEEP — ALL CONTRACTS</span><b>+${sweepCr}</b></div>`;
         for (const c of this.contracts ?? []) {
           html += c.done
             ? `<div class="cb-row contract"><span>✓ ${c.label}</span><b>+${c.pay}</b></div>`
@@ -4578,11 +4656,18 @@ class Game {
     }
     this.garage.credits += earned;
     saveJSON(this._pkey('garage'), this.garage);
+    // ---- RALLY STARS: what this run was worth, against your best here so far
+    const runStars = this.starsIn(rank);
+    const hadStars = this.starsFor(prev);
+    const bestStars = Math.max(runStars, hadStars);
+    const starsBefore = this.totalStars();
     this.career.finished[this.level.id] = {
       place: Math.min(rank, prev?.place ?? 99),
       bestScore: Math.max(earned, prev?.bestScore ?? 0),
+      stars: bestStars,
     };
     saveJSON(this._pkey('career'), this.career);
+    this._showStars(bestStars, hadStars, starsBefore, rank);
     this.renderGarage();
     const hasNext = this.levelIndex < LEVELS.length - 1;
     const nextUnlocked = hasNext && this.isLevelUnlocked(LEVELS[this.levelIndex + 1].id);
@@ -4591,9 +4676,7 @@ class Game {
     }
     this.hud.centerMsg('FINISH');
     this.audio.lap();
-    document.querySelector('#results .game-sub').textContent = rank <= 3 || !hasNext
-      ? `${this.level.name} COMPLETE`
-      : `${this.level.name} — FINISH TOP 3 TO UNLOCK THE NEXT WORLD`;
+    document.querySelector('#results .game-sub').textContent = `${this.level.name} COMPLETE`;
     const nextBtn = document.getElementById('next-level-btn');
     if (nextUnlocked) {
       nextBtn.style.display = '';
@@ -4610,6 +4693,40 @@ class Game {
       this.hud.hide();
       document.getElementById('touch-ui').classList.remove('on');
     }, 1600);
+  }
+
+  /** The star panel on the results screen: which of the five you took, what
+   *  your best on this world now is, and — the part that makes a star mean
+   *  something — exactly which worlds the new total just opened. */
+  _showStars(best, had, before, rank) {
+    const box = document.getElementById('star-panel');
+    const rowsEl = document.getElementById('sp-rows');
+    if (!box || !rowsEl) return;
+    const got = [['FINISH', rank > 0], ['PODIUM — TOP 3', rank <= 3], ['WIN', rank === 1]];
+    let html = '';
+    for (const [label, won] of got) {
+      html += `<div class="cb-row${won ? '' : ' missed'}"><span>${won ? '★' : '☆'} ${label}</span><b>${won ? '+1' : '—'}</b></div>`;
+    }
+    const now = this.totalStars();
+    const gained = now - before;
+    html += `<div class="cb-row total"><span>${best > had ? `NEW BEST HERE — ${best}/3` : `BEST HERE — ${best}/3`}</span><b>${gained > 0 ? `+${gained}★` : 'NO GAIN'}</b></div>`;
+    // what did that buy? name it — a threshold you cannot see is not a goal
+    const opened = LEVELS.filter((lv) => this.starCost(lv.id) > before && this.starCost(lv.id) <= now);
+    if (opened.length) {
+      for (const lv of opened) {
+        html += `<div class="cb-row contract"><span>✓ UNLOCKED — ${lv.name}</span><b>★${this.starCost(lv.id)}</b></div>`;
+        this.hud.feed(`${lv.name} UNLOCKED`, 'good');
+      }
+    } else {
+      const next = LEVELS.filter((lv) => this.starCost(lv.id) > now)
+        .sort((a, c) => this.starCost(a.id) - this.starCost(c.id))[0];
+      if (next) {
+        html += `<div class="cb-row"><span>NEXT UNLOCK — ${next.name}</span><b>${this.starCost(next.id) - now}★ TO GO</b></div>`;
+      }
+    }
+    document.getElementById('sp-total').textContent = `${now}★`;
+    rowsEl.innerHTML = html;
+    box.style.display = '';
   }
 
   _updateRank() {
