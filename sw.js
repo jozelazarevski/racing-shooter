@@ -16,9 +16,19 @@
  * CACHE is bumped by the release version. Bump it whenever ?v= in index.html
  * is bumped, or phones will keep serving the previous build forever.
  */
-const CACHE = 'ignite-rally-r70';
+const CACHE = 'ignite-rally-r71';
 
-const ASSETS = [
+// ---- CORE vs EXTRA ---------------------------------------------------------
+// CORE is everything the game needs to RUN with the radio off: the shell, the
+// module graph, three.js and the two fonts. The page has already downloaded all
+// of it by the time the worker installs, so caching it is nearly free — the
+// requests come back out of the HTTP cache.
+//
+// EXTRA is the 21 world-preview jpgs: 1.15 MB, 40 % of everything the game
+// ships, and pure menu decoration. Precaching those on install meant a first
+// visit paid for art the player had not looked at yet. They are now stored only
+// when asked for, in the background — see 'ignite-store-extras' below.
+const CORE = [
   './',
   './index.html',
   './manifest.webmanifest',
@@ -48,23 +58,40 @@ const ASSETS = [
   './lib/shaders/OutputShader.js',
   './assets/fonts/baloo2-latin.woff2',
   './assets/fonts/luckiestguy-latin.woff2',
-  ...Array.from({ length: 21 }, (_, i) => `./assets/previews/w${i + 1}.jpg`),
 ];
+
+const EXTRA = Array.from({ length: 21 }, (_, i) => `./assets/previews/w${i + 1}.jpg`);
+const ASSETS = [...CORE, ...EXTRA];   // the full offline set, for status counts
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     // Add individually: one 404 in addAll() rejects the whole install and
-    // leaves the player with no offline copy at all. A missing world preview
-    // must not cost us the game.
-    const results = await Promise.allSettled(ASSETS.map((u) => cache.add(u)));
+    // leaves the player with no offline copy at all. A missing file must not
+    // cost us the game.
+    const results = await Promise.allSettled(CORE.map((u) => cache.add(u)));
     const failed = results
-      .map((r, i) => (r.status === 'rejected' ? ASSETS[i] : null))
+      .map((r, i) => (r.status === 'rejected' ? CORE[i] : null))
       .filter(Boolean);
     if (failed.length) console.warn('[sw] not cached:', failed);
     self.skipWaiting();
   })());
 });
+
+/** Store the optional art, ONE FILE AT A TIME and reporting as it goes.
+ *  Sequential on purpose: 21 parallel image fetches is exactly the burst that
+ *  made a first load feel long, and nobody is waiting on this. */
+async function storeExtras(source) {
+  const cache = await caches.open(CACHE);
+  let done = 0;
+  for (const url of EXTRA) {
+    try {
+      if (!(await cache.match(url, { ignoreSearch: true }))) await cache.add(url);
+    } catch (err) { /* a missing preview must never abort the run */ }
+    done++;
+    source?.postMessage({ type: 'ignite-store-progress', done, total: EXTRA.length });
+  }
+}
 
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
@@ -105,13 +132,23 @@ self.addEventListener('fetch', (e) => {
 // The page asks "am I fully armed for a flight?" — answer with the count of
 // precached entries so the menu can show an honest READY / PARTIAL badge.
 self.addEventListener('message', async (e) => {
+  if (e.data === 'ignite-store-extras') {
+    e.waitUntil?.(storeExtras(e.source));
+    storeExtras(e.source);
+    return;
+  }
   if (e.data !== 'ignite-offline-status') return;
   const cache = await caches.open(CACHE);
   const have = await cache.keys();
+  // `playable` is the honest offline answer: the game RUNS once CORE is in.
+  // `ready` means the world art is stored too — nice to have, not required.
+  const n = have.length;
   e.source?.postMessage({
     type: 'ignite-offline-status',
-    cached: have.length,
+    cached: n,
     total: ASSETS.length,
-    ready: have.length >= ASSETS.length - 2, // tolerate a stray preview
+    core: CORE.length,
+    playable: n >= CORE.length - 1,          // tolerate one stray
+    ready: n >= ASSETS.length - 2,
   });
 });
