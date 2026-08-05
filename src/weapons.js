@@ -554,7 +554,10 @@ export class Weapons {
         // trigger check + telegraph: track the closest threat so the lamp
         // blink ramps up and the ground ring burns brighter as a car closes in
         let d2min = Infinity;
-        for (const car of [g.player, ...g.enemies]) {
+        // anything that drives over a live mine sets it off, not just the cars
+        // in the race — a raider rolling straight over one and shrugging is not
+        // what a mine is for
+        for (const car of [g.player, ...g.enemies, ...(g.hostiles ?? [])]) {
           if (!car.alive || car === m.owner || car.invuln > 0 || car.airborne) continue;
           const d2 = m.pos.distanceToSquared(car.pos);
           if (d2 < d2min) d2min = d2;
@@ -573,7 +576,10 @@ export class Weapons {
         g.flashLight(m.pos);
         if (g.blastWorld) g.blastWorld(m.pos.x, m.pos.z, 7, m.owner === g.player ? m.owner : null);
         else g.smashPropsNear?.(m.pos.x, m.pos.z, 7, m.owner === g.player ? m.owner : null, 22);
-        for (const car of [g.player, ...g.enemies]) {
+        // anything that drives over a live mine sets it off, not just the cars
+        // in the race — a raider rolling straight over one and shrugging is not
+        // what a mine is for
+        for (const car of [g.player, ...g.enemies, ...(g.hostiles ?? [])]) {
           if (!car.alive || car.invuln > 0) continue;
           const d = m.pos.distanceTo(car.pos);
           if (d < 9.5) {
