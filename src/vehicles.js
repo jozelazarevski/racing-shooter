@@ -1167,6 +1167,15 @@ export class Car {
         if (ob.y !== undefined && Math.abs(this.pos.y - ob.y) > 6) continue;
         const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
         const nx = dx / d, nz = dz / d;
+        // SMALL STONES YIELD. A knee-high rock stopping a rally truck dead is
+        // the thing that reads as unfair — it should cost you paint and speed,
+        // then go tumbling. Anything 1.15 u and up is a real boulder and still
+        // wins, and below walking pace nothing shifts at all.
+        if (ob.mat === 'stone' && !ob.knocked && (ob.r ?? 9) < 1.15
+            && Math.abs(this.speedAlong) > 8 && gm.knockStone) {
+          gm.knockStone(ob, this, Math.abs(this.speedAlong), -nx, -nz);
+          continue;                       // no push-out — you go through it
+        }
         this.pos.x = ob.x + nx * rr;
         this.pos.z = ob.z + nz * rr;
         const vn = this.vel.x * nx + this.vel.z * nz;
@@ -1197,6 +1206,15 @@ export class Car {
         if (dx * dx + dz * dz >= rr * rr) continue;
         const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
         const nx = dx / d, nz = dz / d;
+        // SMALL STONES YIELD. A knee-high rock stopping a rally truck dead is
+        // the thing that reads as unfair — it should cost you paint and speed,
+        // then go tumbling. Anything 1.15 u and up is a real boulder and still
+        // wins, and below walking pace nothing shifts at all.
+        if (ob.mat === 'stone' && !ob.knocked && (ob.r ?? 9) < 1.15
+            && Math.abs(this.speedAlong) > 8 && gm.knockStone) {
+          gm.knockStone(ob, this, Math.abs(this.speedAlong), -nx, -nz);
+          continue;                       // no push-out — you go through it
+        }
         this.pos.x = ob.x + nx * rr;
         this.pos.z = ob.z + nz * rr;
         const vn = this.vel.x * nx + this.vel.z * nz;
