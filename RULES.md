@@ -14,7 +14,35 @@ is a bug. The conformance table at the bottom tracks the honest current state.
    and the position panel carry all navigation information. Any future request
    that seems to imply a map must be re-checked against this rule first.
 
-2. **THE GAME MUST RUN OFFLINE.** It is played on a phone, on a plane. No
+2. **FIRST LOAD IS SACRED, AND OFFLINE STORING IS OPTIONAL.** The service
+   worker precaches the **CORE** only — shell, module graph, three.js, fonts —
+   all of which the page has already fetched, so caching them is nearly free.
+   The 21 world previews (**1.15 MB, 40 % of everything the game ships**) are
+   **EXTRA**: stored one at a time, in the background, and only when asked for.
+   The card art is lazy too. Measured on a cold load, before → after:
+
+   | | before | after |
+   |---|---|---|
+   | bytes at boot | 2913 KB | **2031 KB** |
+   | requests at boot | 48 | **32** |
+   | preview jpgs at boot | 21 | **5** |
+
+   Deferring is only a win if the art still **arrives**: an IntersectionObserver
+   alone left 16 of 21 cards blank even after the track list was opened, because
+   the region rows scroll horizontally inside a clipped container and never
+   tripped it. The observer stays for eagerness; opening the TRACKS tab force-
+   loads the rest. Never ship lazy loading without checking the load happens.
+
+   Boot cost is **CPU, not network**. First paint is at 156 ms; what follows is
+   ~16 s of main-thread blocking on a software renderer, dominated by the world
+   build (~3.5 s) and the shader warm (**9.4 s for 77 programs**). `_warmShaders`
+   prefers `compileAsync`, which hands the link to the driver through
+   `KHR_parallel_shader_compile` — **unverifiable in this test environment**,
+   which is SwiftShader and does not expose that extension. It should help on
+   real mobile GPUs, which do. Do not claim a win for it without a device
+   measurement.
+
+3. **THE GAME MUST RUN OFFLINE.** It is played on a phone, on a plane. No
    feature may add a request to a third-party origin — not a font, not a CDN
    script, not an analytics ping. Everything ships in the repo and is
    precached by `sw.js`; a remote asset does not merely fail without a

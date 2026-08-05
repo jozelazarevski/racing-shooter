@@ -675,6 +675,10 @@
     background:rgba(12,8,3,.4)}
   #offline-badge.ready{color:#8de89a;border-color:rgba(141,232,154,.45)}
   #offline-badge.partial{color:var(--amber);border-color:rgba(255,181,46,.4)}
+  /* the game already runs offline and the ~1 MB of world art is optional —
+     this state is a BUTTON, so it has to look like one */
+  #offline-badge.offer{color:var(--yellow);border-color:rgba(255,213,74,.55);cursor:pointer}
+  #offline-badge.offer:active{transform:scale(.96)}
   #loading-note{margin-top:24px;font-size:12px;letter-spacing:3px;color:var(--gold-dim);text-align:center}
   /* START is the one action that must never be out of reach: pin it to the
      bottom of the scrollport whenever its natural spot is below the fold */
@@ -768,7 +772,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r70</div>
+<div id="build-tag">r71</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -959,10 +963,10 @@
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
-<script type="module" src="./src/main.js?v=r70"></script>
+<script type="module" src="./src/main.js?v=r71"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r70"></script>
+<script src="./src/offline.js?v=r71"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r70"></script>
+<script type="module" src="./src/traffic.js?v=r71"></script>
 </body>
 </html>

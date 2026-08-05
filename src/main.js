@@ -725,6 +725,8 @@ class Game {
             b.classList.toggle('current', b === btn);
             p2.classList.toggle('off', p2 !== panel);
           }
+          // TRACKS is on screen: the deferred world art is wanted NOW
+          if (btn.id === 'tab-btn-race') this._loadAllShots();
         });
       }
     }
@@ -1023,9 +1025,29 @@ class Game {
         if (o.visible === false) { hidden.push(o); o.visible = true; }
       });
       const t0 = performance.now();
-      this.renderer.compile(this.scene, this.camera);
-      this.__warmMs = Math.round(performance.now() - t0);
-      this.__warmProgs = this.renderer.info.programs?.length ?? -1;
+      // PREFER compileAsync. It calls compile() synchronously — same traverse,
+      // same programs queued — and only the LINK is awaited, handed to the
+      // driver through KHR_parallel_shader_compile. Measured, the blocking warm
+      // was the single largest task in the whole boot at 5.5 s; this hands most
+      // of that to the GPU's own threads.
+      //
+      // Restoring visibility is deliberately NOT in the promise: compile() has
+      // already traversed by the time compileAsync returns, so the flags can go
+      // back before the render loop starts. Leave it to the .then() and the
+      // title screen spends the warm-up drawing bullets, husks and explosions.
+      if (this.renderer.compileAsync) {
+        const p = this.renderer.compileAsync(this.scene, this.camera);
+        for (const o of hidden) o.visible = false;
+        hidden.length = 0;
+        this.__warming = p.then(() => {
+          this.__warmMs = Math.round(performance.now() - t0);
+          this.__warmProgs = this.renderer.info.programs?.length ?? -1;
+        }).catch((err) => console.warn('[warm] async precompile failed:', err?.message));
+      } else {
+        this.renderer.compile(this.scene, this.camera);
+        this.__warmMs = Math.round(performance.now() - t0);
+        this.__warmProgs = this.renderer.info.programs?.length ?? -1;
+      }
     } catch (err) {
       // a warm-up must never be the reason the game fails to boot
       console.warn('[warm] shader precompile skipped:', err?.message);
@@ -1513,7 +1535,7 @@ class Game {
           ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
           : '★ UNRACED')
         : `NEEDS ${cost}★ — ${Math.max(0, cost - this.totalStars())} TO GO`;
-      card.innerHTML = `<div class="wc-shot" style="background-image:url('assets/previews/w${lv.id}.jpg')">
+      card.innerHTML = `<div class="wc-shot" data-shot="assets/previews/w${lv.id}.jpg">
           <canvas class="wc-map" width="72" height="52"></canvas>
         </div>
         <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
@@ -1541,7 +1563,55 @@ class Game {
         }
       });
       rowFor(lv).appendChild(card);
+      this._watchShot(card.querySelector('.wc-shot'));
     });
+  }
+
+  /** LAZY WORLD ART. The 21 preview jpgs are 1.15 MB — 40 % of everything the
+   *  game ships — and the cards are built during boot, so every one of them
+   *  used to be requested while the player was still looking at the title
+   *  screen, for a menu they had not opened. Measured on a cold load: 21
+   *  requests firing at once the moment the world finished building.
+   *
+   *  The url now waits on the element actually approaching the viewport, which
+   *  on a hidden screen means "not until you open the menu, and then only the
+   *  cards you scroll to". */
+  _watchShot(el) {
+    if (!el || !el.dataset.shot) return;
+    const load = (node) => {
+      const url = node.dataset.shot;
+      if (!url) return;
+      node.style.backgroundImage = `url('${url}')`;
+      delete node.dataset.shot;
+    };
+    this.__lazyShots ??= new Set();
+    this.__lazyShots.add(el);
+    if (typeof IntersectionObserver !== 'function') { load(el); return; }
+    this.__shotObs ??= new IntersectionObserver((entries, obs) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        load(e.target);
+        this.__lazyShots?.delete(e.target);
+        obs.unobserve(e.target);
+      }
+      // 300 px of lead time, so a card is painted before it is scrolled to
+    }, { rootMargin: '300px' });
+    this.__shotObs.observe(el);
+  }
+
+  /** Force every outstanding preview in. Deferring art is only a win if the art
+   *  still ARRIVES: measured, the observer alone left 16 of 21 cards blank even
+   *  after the track list was opened and scrolled, because the region rows
+   *  scroll horizontally inside a clipped container and never tripped it. The
+   *  observer stays for eagerness; this is the guarantee. */
+  _loadAllShots() {
+    if (!this.__lazyShots?.size) return;
+    for (const el of this.__lazyShots) {
+      const url = el.dataset?.shot;
+      if (url) { el.style.backgroundImage = `url('${url}')`; delete el.dataset.shot; }
+      this.__shotObs?.unobserve(el);
+    }
+    this.__lazyShots.clear();
   }
 
   /** The named car's own upgrade levels — upgrades belong to one machine. */
