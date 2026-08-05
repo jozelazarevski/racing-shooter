@@ -453,6 +453,14 @@
   .cfit.fair{color:var(--gold-dim)}
   .cfit.weak{color:#ffb07a}
   .wc-best.new{color:var(--amber)}
+  /* how much of a world you have taken (★★★☆☆), and on a locked card what it
+     costs — the two things you actually choose a race on */
+  .wc-stars{font-size:12px;letter-spacing:2px;line-height:1;color:var(--yellow);margin-top:2px}
+  .wc-stars.none{color:rgba(255,233,168,.28)}
+  .wc-best.cost{color:var(--amber);opacity:.9}
+  #star-panel{width:min(560px,92vw);margin:14px auto 0;background:rgba(12,8,3,.5);
+    border:1px solid var(--line-soft);border-radius:var(--r-md);padding:10px 14px 12px}
+  #star-panel .cb-head b{float:right;color:var(--yellow);font-family:'Luckiest Guy';letter-spacing:1px}
   /* ---------- SETTINGS SUB-PANEL (mode / difficulty / steering as labeled rows) ---------- */
   #race-settings,#mode-settings{margin-top:16px;width:100%;background:rgba(12,8,3,.35);
     border:1px solid var(--line-soft);border-radius:var(--r-md);padding:2px 14px 12px}
@@ -760,7 +768,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r69</div>
+<div id="build-tag">r70</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -929,6 +937,10 @@
       <div class="rrow credits"><span>CREDITS EARNED</span><b id="r-credits">+0</b></div>
     </div>
   </div>
+  <div id="star-panel" style="display:none">
+    <div class="cb-head">RALLY STARS <b id="sp-total">0★</b></div>
+    <div id="sp-rows"></div>
+  </div>
   <div id="credit-breakdown" style="display:none">
     <div class="cb-head">CREDITS BREAKDOWN</div>
     <div id="cb-rows"></div>
@@ -947,10 +959,10 @@
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
-<script type="module" src="./src/main.js?v=r69"></script>
+<script type="module" src="./src/main.js?v=r70"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r69"></script>
+<script src="./src/offline.js?v=r70"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r69"></script>
+<script type="module" src="./src/traffic.js?v=r70"></script>
 </body>
 </html>

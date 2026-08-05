@@ -498,6 +498,49 @@ it** so a strong race funds real progress without buying out the garage.
 | Podium bonus | 1st 200 · 2nd 120 · 3rd 60 CR |
 | First conquest | +500 CR, once per world, on your first podium there |
 
+### Progression: RALLY STARS, not a chain
+
+A world used to open only on a **podium** finish on the one before it. One
+track you could not crack ended the career — which is exactly what happened on
+ROCKFALL RAVINE. Stars replace the chain with a bank:
+
+| | |
+|---|---|
+| ★ | FINISH — cross the line |
+| ★★ | PODIUM — top three |
+| ★★★ | WIN |
+
+Your **best ever** is kept per world, the total is the currency, and a world
+opens when your total reaches its cost. So you pick what to race, anything you
+race pays into everything else, and a world you already beat is still worth
+returning to for the stars you left on it.
+
+**Three stars and not five.** Driving clean and sweeping all three contracts
+were stars in the first cut, and that put a **5× spread** between what an ace
+and a finisher bank per race — no single threshold curve survives that.
+Simulated across the roster, every slope gentle enough to keep a finish-only
+driver moving let an ace open all 21 worlds in **four races**. At three stars
+the spread is 3× and both ends work. Clean runs (+200 CR) and contract sweeps
+(+250 CR) pay credits instead, where a wide spread is harmless because nothing
+is gated on money.
+
+**Cost is exactly one star per career slot** (first three free). That slope is
+load-bearing, not a round number: a finish-only driver banks 1★ a race, so at
+any slope above 1 they eventually hit a wall they can never clear. Measured —
+a 1.8 slope walled them in after three worlds, 1.25 after fifteen, 1.0 never.
+
+Simulated to completion, with the natural strategy of always racing your
+weakest open world:
+
+| driver | races to open all 21 | fewest worlds open at once | ever stuck? |
+|---|---|---|---|
+| wins every race (3★) | 6 | 3 | no |
+| podiums only (2★) | 9 | 3 | no |
+| finishes only (1★) | 18 | 3 | no |
+
+The last world costs 19 of a possible 63, so a third of the roster can go
+unraced and the finale is still reachable.
+
 ### Career order is the LEVELS array, not the world ids
 
 A world opens only on a **podium (top 3)** finish on the one before it in
