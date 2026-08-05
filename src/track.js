@@ -608,17 +608,23 @@ const THEMES = {
   // dark mud road, rivers cross beneath it, humid haze hangs low.
   jungle: {
     surface: 'wet',                                    // downpour — physics reads this
-    fogColor: 0xb8d8b0, fogNear: 170, fogFar: 950,     // humid green haze, dense
-    hemiSky: 0xc8e8ff, hemiGround: 0x2e6a2a, hemiIntensity: 0.78,
-    sunColor: 0xfff2c8, sunIntensity: 2.55,
+    // Measured at 84% of the drivable frame near-black — the darkest daylight
+    // world in the game by a wide margin, and unreadable on a phone. A real
+    // rainforest under a high sun is not dim, it is HAZY: strong green bounce
+    // off wet leaves, a bright humid veil between you and the far trees. So the
+    // bounce goes up hard and the haze comes in, rather than the sun going up
+    // (which would just blow out the canopy tops and leave the floor black).
+    fogColor: 0xc4e0b4, fogNear: 210, fogFar: 1150,    // humid green haze
+    hemiSky: 0xd6f0ff, hemiGround: 0x5e8a42, hemiIntensity: 1.45,
+    sunColor: 0xfff4d2, sunIntensity: 2.95,
     skyTop: '#5a9ac8', skyHorizon: '#cfe8b8', sunGlow: 0xf8ffd0,
     sunAz: 1.0, sunEl: 0.34,                           // high tropical sun
     cloudCount: 10, cloudOpacity: 0.85,
-    terrainLow: '#2e6a28', terrainHigh: '#5a9440', terrainDirt: '#6a4a2c',
+    terrainLow: '#3f7d36', terrainHigh: '#69a44a', terrainDirt: '#7a5636',
     // steep-face colour for the faceted ground + warmth in the hut windows
     terrainScree: '#6a4a2c', hutGlow: 0.6,
     ground: {
-      base: '#3e7a30', bandLight: 'rgba(255,255,255,0.04)', bandDark: 'rgba(0,40,0,0.06)',
+      base: '#4d8c3b', bandLight: 'rgba(255,255,255,0.05)', bandDark: 'rgba(0,40,0,0.05)',
       patchA: 'rgba(20,70,24,0.22)', patchB: 'rgba(120,180,70,0.16)',
       speckA: 'rgba(255,220,120,0.8)', speckB: 'rgba(190,240,150,0.8)', speckCount: 70,
     },
@@ -788,7 +794,7 @@ const THEMES = {
   // over the road. Strong rolling elevation, extra ramps.
   redwood: {
     fogColor: 0xd8e4cf, fogNear: 240, fogFar: 1300,
-    hemiSky: 0xb4d4ec, hemiGround: 0x40603a, hemiIntensity: 0.76,
+    hemiSky: 0xc8e0f4, hemiGround: 0x5a7a4a, hemiIntensity: 1.15,
     sunColor: 0xffeec8, sunIntensity: 2.6,
     skyTop: '#4e8ecf', skyHorizon: '#e0ecd0', sunGlow: 0xfff0b8,
     sunAz: 0.75, sunEl: 0.3,
@@ -870,7 +876,7 @@ const THEMES = {
     fogColor: 0x6a3e28, fogNear: 190, fogFar: 900,
     // smoke and firelight, but measured 22.5 mean / 52% near-black — you were
     // escaping a fire you could not see the road through
-    hemiSky: 0xe89a64, hemiGround: 0x7a5c46, hemiIntensity: 2.2,
+    hemiSky: 0xf0ab74, hemiGround: 0x94705a, hemiIntensity: 2.9,
     sunColor: 0xff8a48, sunIntensity: 2.6,
     skyTop: '#46292c', skyHorizon: '#e8601e', sunGlow: 0xff6a20, skyCurve: 0.66,
     sunAz: 0.55, sunEl: 0.15,
@@ -1546,6 +1552,10 @@ const ELEMENT_KITS = {
 // mix via T.floraMix.
 const FLORA_MIX = {
   forest: [['pineA', 0.34], ['pineB', 0.22], ['birch', 0.24], ['oak', 0.20]],
+  // Amazon: emergents over a closed mid-storey over tree ferns. Weighted so the
+  // emergents are the minority they are in life — they read because they tower,
+  // not because there are many of them.
+  jungle: [['cecropia', 0.44], ['treeFern', 0.32], ['kapok', 0.24]],
   flume: [['pineA', 0.38], ['pineB', 0.20], ['birch', 0.20], ['oak', 0.22]],
   snow: [['pineA', 0.42], ['pineB', 0.23], ['birchBare', 0.35]],
   glacial: [['pineA', 0.45], ['pineB', 0.25], ['birchBare', 0.30]],
@@ -3546,12 +3556,31 @@ export class Track {
     // shared instanced pine (theme-tinted): trunk + two canopy tiers (+ cap)
     let cap = 0;
     for (const z of zones) cap += Math.ceil(z.len / 2) * 2 + 4;
-    const trunkGeo = new THREE.CylinderGeometry(0.42, 0.6, 3.2, 7);
-    trunkGeo.translate(0, 1.6, 0);
-    const lowGeo = new THREE.ConeGeometry(3.1, 4.8, 8);
-    lowGeo.translate(0, 5.1, 0);
-    const topGeo = new THREE.ConeGeometry(2.1, 3.9, 8);
-    topGeo.translate(0, 8.1, 0);
+    // Broadleaf themes get broadleaf corridors. These are the DENSE trees that
+    // form the tunnel and therefore dominate the view, so leaving them as cones
+    // meant the Amazon still read as a pine forest no matter what was planted
+    // in the scatter around it: 86 of its 486 trees were conifers, and they were
+    // the ones you actually drive between.
+    const broadleaf = (this.level?.theme === 'jungle' || this.level?.theme === 'redwood');
+    const trunkGeo = broadleaf
+      ? new THREE.CylinderGeometry(0.34, 0.66, 5.4, 7)   // clear bole, no low branches
+      : new THREE.CylinderGeometry(0.42, 0.6, 3.2, 7);
+    trunkGeo.translate(0, broadleaf ? 2.7 : 1.6, 0);
+    let lowGeo, topGeo;
+    if (broadleaf) {
+      // stacked parasols: a closed canopy seen from underneath
+      lowGeo = new THREE.SphereGeometry(3.6, 9, 5);
+      lowGeo.scale(1, 0.46, 1);
+      lowGeo.translate(0, 6.4, 0);
+      topGeo = new THREE.SphereGeometry(2.5, 8, 5);
+      topGeo.scale(1, 0.5, 1);
+      topGeo.translate(0.5, 8.3, -0.4);
+    } else {
+      lowGeo = new THREE.ConeGeometry(3.1, 4.8, 8);
+      lowGeo.translate(0, 5.1, 0);
+      topGeo = new THREE.ConeGeometry(2.1, 3.9, 8);
+      topGeo.translate(0, 8.1, 0);
+    }
     const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor ?? 0x5a4028, roughness: 1 });
     const lowMat = new THREE.MeshStandardMaterial({ color: T.foliageLow ?? 0x2c6e2a, flatShading: true, roughness: 1 });
     const topMat = new THREE.MeshStandardMaterial({ color: T.foliageTop ?? 0x3c8a34, flatShading: true, roughness: 1 });
@@ -6086,7 +6115,40 @@ export class Track {
     oakDome.translate(0, 4.0, 0);
     const oakTop = new THREE.SphereGeometry(1.4, 7, 5);
     oakTop.translate(0.35, 5.5, 0.2);
+    // --- rainforest ---
+    // AMAZON RAPIDS was falling through to the default two-pine stand, so the
+    // Amazon was planted with conifers. Three storeys instead, which is what
+    // actually reads as rainforest from a car: a buttressed emergent standing
+    // clear of everything, an umbrella-crowned mid-storey, and a low tree fern.
+    const kapokTrunk = new THREE.CylinderGeometry(0.30, 0.72, 8.6, 7);
+    kapokTrunk.translate(0, 4.3, 0);
+    const kapokButtress = new THREE.ConeGeometry(1.25, 2.4, 6);   // flared root flare
+    kapokButtress.translate(0, 1.2, 0);
+    // emergents are flat-topped: the crown spreads sideways above the canopy
+    const kapokCrown = new THREE.SphereGeometry(3.5, 9, 5);
+    kapokCrown.scale(1, 0.42, 1);
+    kapokCrown.translate(0, 9.1, 0);
+    const kapokCrown2 = new THREE.SphereGeometry(2.2, 8, 5);
+    kapokCrown2.scale(1, 0.5, 1);
+    kapokCrown2.translate(0.9, 8.2, -0.6);
+    const cecTrunk = new THREE.CylinderGeometry(0.20, 0.30, 5.4, 6);
+    cecTrunk.translate(0, 2.7, 0);
+    const cecCrown = new THREE.SphereGeometry(2.5, 8, 5);          // parasol
+    cecCrown.scale(1, 0.5, 1);
+    cecCrown.translate(0, 5.9, 0);
+    const fernTrunk = new THREE.CylinderGeometry(0.16, 0.24, 1.9, 6);
+    fernTrunk.translate(0, 0.95, 0);
+    const fernFrond = new THREE.SphereGeometry(1.55, 7, 4);
+    fernFrond.scale(1, 0.34, 1);
+    fernFrond.translate(0, 2.35, 0);
     const SPECIES = {
+      kapok: { parts: mkParts([kapokTrunk, trunkMat],
+        [[kapokButtress, trunkMat], [kapokCrown, lowMat], [kapokCrown2, topMat]], null),
+      kind: 'kapok', rFac: 1.25, solidAt: 1.0, tint: 'canopy', tiers: 3 },
+      cecropia: { parts: mkParts([cecTrunk, trunkMat], [[cecCrown, lowMat]], null),
+        kind: 'cecropia', rFac: 0.8, solidAt: 1.45, tint: 'canopy', tiers: 1 },
+      treeFern: { parts: mkParts([fernTrunk, trunkMat], [[fernFrond, topMat]], null),
+        kind: 'fern', rFac: 0.5, solidAt: null, tint: 'understorey', tiers: 1 },
       pineA: { parts: mkParts([trunkGeo, trunkMat], [[lowA, lowMat], [topA, topMat]], 7.35),
         kind: 'pine', rFac: 1.0, solidAt: 1.0, tint: 'conifer', tiers: 2 },
       pineB: { parts: mkParts([trunkGeo, trunkMat], [[lowB, lowMat], [midB, lowMat], [topB, topMat]], 8.15),
@@ -6152,6 +6214,12 @@ export class Track {
           case 'oak':     // deep saturated dome
             color.setHSL(F.h + Math.random() * F.hVar, Math.min(1, F.s + 0.12),
               Math.max(0.16, F.l - 0.03 + Math.random() * F.lVar)); break;
+          case 'canopy':  // rainforest broadleaf — deep, wet, slightly blue-green
+            color.setHSL(F.h + 0.012 + Math.random() * F.hVar, Math.min(1, F.s + 0.16),
+              Math.max(0.15, F.l - 0.01 + Math.random() * F.lVar)); break;
+          case 'understorey': // ferns in the gloom: darker and more saturated
+            color.setHSL(F.h + 0.02 + Math.random() * F.hVar, Math.min(1, F.s + 0.22),
+              Math.max(0.11, F.l - 0.07 + Math.random() * F.lVar)); break;
           case 'bare':    // dark winter branches
             color.setHSL(0.07, 0.18, 0.16 + Math.random() * 0.08); break;
           default:
