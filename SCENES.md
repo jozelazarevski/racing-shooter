@@ -120,6 +120,7 @@ light. 69 / 47%. ✅
 
 ---
 
+<<<<<<< HEAD
 ## Fauna, by biome ✅
 
 The herd system was already keyed per theme — the gap was the species list, not
@@ -162,6 +163,16 @@ A theme can override with `T.understorey`.
   new system rather than a new row in a table, so it is named here rather than
   half-done.
 - **WILDFIRE and REDWOOD sit at the dim end of their bands** (64% and 50%
+=======
+## Outstanding
+
+- **Fauna is thin everywhere.** Livestock exists as a shared herd system; it is
+  not yet keyed per region. Capybara/macaw (Amazon), ibex (alpine), coyote
+  (desert), penguin-analogue (ice) are named above and not yet built.
+- **Understorey is one bush type** across most worlds. Fern / salal / saltbush
+  should differ by region.
+- **WILDFIRE and REDWOOD sit at the dim end of their bands** (64% and 47%
+>>>>>>> origin/main
   near-black). Both are deliberately dark places; if they read as too dark in
   play, the fix is the foliage and terrain tones, not the lights — the lights
   have already been raised as far as they can go without flattening the scene.
