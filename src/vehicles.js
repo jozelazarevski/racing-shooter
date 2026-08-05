@@ -868,11 +868,27 @@ export class Car {
     // ---- river-fords: wet tires. Ford crossings set _wetT=3.5 with a gentle
     // ≈0.8 grip factor fading linearly back to 1; plain puddles keep their
     // short sharp 0.75 slick (_wetMax stays 0 for those).
+    // IN the water: aquaplaning. The tyres are riding a film, not the road, and
+    // for the fraction of a second you are actually in the ford the car should
+    // go light and drift wide if you are turning. Set by the ford pass below,
+    // so it lands one frame later — which is the right side of the boundary.
+    if (this._fordNow > 0) {
+      this._fordNow -= dt;
+      grip *= 0.42;
+    }
+    // AFTER: wet tyres, fading. Was a 20% loss at most, which nobody could feel
+    // — the HUD said WET TIRES and the car drove exactly as before. Deeper now,
+    // and the OFF-ROAD stat buys some of it back, the same way it does on snow:
+    // the DUNE gets out of a ford composed, the CROWN gets out of it sideways.
     if (this._wetT > 0) {
       this._wetT -= dt;
-      grip *= (this._wetMax ?? 0) > 1
-        ? 1 - 0.2 * Math.max(0, this._wetT) / this._wetMax
-        : 0.75;
+      if ((this._wetMax ?? 0) > 1) {
+        const skill = this === this.game.player ? (this.offroadSkill ?? 0.7) : 0.7;
+        const loss = 0.46 * (1 - 0.42 * skill);
+        grip *= 1 - loss * Math.max(0, this._wetT) / this._wetMax;
+      } else {
+        grip *= 0.75;
+      }
       if (this._wetT <= 0) this._wetMax = 0;
     }
     // opt-in grip instrument (headless): set __game.__gripProbe = {} to read
@@ -1325,6 +1341,7 @@ export class Car {
         this.vel.z *= fDrag;
         this._wetT = 3.5;                                        // long fade — see grip section
         this._wetMax = 3.5;
+        this._fordNow = 0.16;                                    // aquaplaning window
         const entering = now - (this._inFordT ?? -99) > 1;
         this._inFordT = now;
         const nearCam = gm.player
@@ -1338,7 +1355,7 @@ export class Car {
           // entry splash: a foam ring bursting low around the bumper PLUS a
           // curtain of water thrown up and forward, so the chase cam sees a
           // real wall of white open past the car instead of a few wisps
-          if (spdF > 5 && nearCam) {
+          if (spdF > 2.5 && nearCam) {
             const pl = this === gm.player;
             const nRing = pl ? 26 : 10;
             for (let s = 0; s < nRing; s++) {
@@ -1369,7 +1386,9 @@ export class Car {
         }
         // bow wave while inside: sheets of white spray fan off all four wheels,
         // speed-scaled, pooled + budget-capped, distance-culled for AI
-        if (spdF > 5 && nearCam) {
+        // 5 u/s was 18 km/h — ease through a crossing and it threw nothing at
+        // all, so a slow ford looked like driving over a painted blue stripe
+        if (spdF > 1.6 && nearCam) {
           const pl = this === gm.player;
           this._fordAcc = Math.min(12, (this._fordAcc ?? 0)
             + dt * (70 + spdF * 4.5) * (pl ? 1 : 0.35));
