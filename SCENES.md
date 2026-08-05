@@ -120,14 +120,48 @@ light. 69 / 47%. ✅
 
 ---
 
+## Fauna, by biome ✅
+
+The herd system was already keyed per theme — the gap was the species list, not
+the plumbing. Every ice world was stocked with DEER, an animal that does not
+live on an ice sheet; the passes had generic goats; the deserts had camels
+standing in for everything. Four species added, eleven now in the game.
+
+| biome | animals |
+|---|---|
+| Pacific NW forest | cow · sheep · boar |
+| redwood / logging | deer · boar · cow |
+| Amazon | **capybara** · boar · deer |
+| alpine passes | **ibex** · cow · sheep |
+| snow edge | deer · **hare** |
+| glacier / ice sheet | **seal** · hare |
+| avalanche path | **ibex** · hare |
+| desert / dunes / canyon / wadi | **coyote** · camel · goat |
+| volcano, city | none — correctly |
+
+## Understorey, by biome ✅
+
+One squashed blob stood in for every ground layer — the same shape under
+redwoods, in the Amazon, on an ice sheet and in a wadi. It is the layer you see
+most of at eye height, so it is the layer that most gave away that the worlds
+were one world repainted. Four silhouettes now:
+
+| form | plant | worlds |
+|---|---|---|
+| `frond` | fern / sword fern | jungle, redwood, flume |
+| `spray` | tussock / bunchgrass | alpine passes, snow, glacier, avalanche |
+| `spike` | saltbush / creosote | desert, dunes, canyon, ravine, oasis |
+| `blob` | broadleaf scrub | everywhere else |
+
+A theme can override with `T.understorey`.
+
 ## Outstanding
 
-- **Fauna is thin everywhere.** Livestock exists as a shared herd system; it is
-  not yet keyed per region. Capybara/macaw (Amazon), ibex (alpine), coyote
-  (desert), penguin-analogue (ice) are named above and not yet built.
-- **Understorey is one bush type** across most worlds. Fern / salal / saltbush
-  should differ by region.
-- **WILDFIRE and REDWOOD sit at the dim end of their bands** (64% and 47%
+- **Macaws over the Amazon canopy** are still not built. Every other animal in
+  the plan rides the ground-herd system; birds need a flying actor, which is a
+  new system rather than a new row in a table, so it is named here rather than
+  half-done.
+- **WILDFIRE and REDWOOD sit at the dim end of their bands** (64% and 50%
   near-black). Both are deliberately dark places; if they read as too dark in
   play, the fix is the foliage and terrain tones, not the lights — the lights
   have already been raised as far as they can go without flattening the scene.
