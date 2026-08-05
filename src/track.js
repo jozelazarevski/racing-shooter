@@ -7833,9 +7833,19 @@ export class Track {
       // across the ribbon. Reading the profile rather than the mesh also means
       // the surface cannot be sliced up by whatever the hill noise is doing.
       const bed = R.bed ? R.bed[this._riverNearest(f.x, f.z).k] : this.terrainHeight(f.x, f.z);
-      // in the open the surface sits partway up the carved channel; across the
-      // road it becomes a thin wash sitting just proud of the deck
-      return bed + (1 - lift) * (R.depth * 0.42) + lift * 0.06;
+      const open = bed + R.depth * 0.42;      // partway up the carved channel
+      if (lift <= 0) return open;
+      // ACROSS THE ROAD THE WASH SITS ON THE DECK, NOT ON THE BED.
+      //
+      // "just proud of the deck" was measured from the river bed, and the road
+      // deck is metres above the carved channel — at every ford on AMAZON
+      // RAPIDS the water surface came out 1.3 to 3.0 u BELOW the road, and 8.3 u
+      // below it on LOG FLUME. So the water was buried inside the road mesh and
+      // a crossing rendered as two white foam lines with dry dirt between them:
+      // an unexplained stripe across the carriageway rather than a stream.
+      _clearV.set(f.x, 0, f.z);
+      const deck = this.center[this.nearestIndex(_clearV)].y;
+      return open * (1 - lift) + (deck + 0.05) * lift;
     };
     const waterGeo = strip(
       [-1, -0.35, 0.35, 1],
