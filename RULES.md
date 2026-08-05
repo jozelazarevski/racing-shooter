@@ -260,6 +260,36 @@ kind is now launched off the thing it would actually come from:
 The landing point is unchanged in every case, so each hazard is exactly as
 dangerous as it was — it just has a cause now.
 
+**A hazard you cannot see is a tax, not a hazard.** Coming off the rim fixed
+where the rock is *from*; it did nothing for whether you can *pick it out*. The
+falling rock was a flat `0x8a6a4c` box against a red-brown cliff — measured, a
+max-channel contrast of **31/255 (12 %)** against the wall behind it. Three
+things now carry the read, and they are worth keeping in that order:
+
+1. **A fresh break is pale.** The rock takes the theme's own chip colour
+   (`T.splinter[0]`) lightened 55 % toward white, with ±12 % per-lump variation.
+   Unweathered rock really is much brighter than the face it left, so this is
+   physics and legibility agreeing.
+2. **A grit trail.** One dust sprite every 40 ms for the whole flight (~29 per
+   rock, against a 620/frame budget). At 50 u the rock is a 1 u box; the
+   hanging trail is what you actually see, and it points back at the wall.
+3. **A plume on impact.** 9 debris + 5 dust, because a rock lands **111–197 u
+   ahead** of you and you are still **3.7–6.6 s of driving away** when it hits
+   — the plume is usually the first thing you see of the hazard, and four bits
+   of debris was not enough to notice.
+
+Measured on one **identical** forced flight (same rim, same target, same camera,
+same sample frames), by frame-differencing the scene with and against the
+faller hidden: the fall went from **0.61 %** of the frame to **1.51 %** — 2.5×.
+
+Measuring this needs two things or the number is a lie: **pause the game**
+(`state = 'paused'`) between the two shots, or the RAF loop advances the world
+and you are differencing two different moments — the ravine sandstorm alone
+moves 3–9 % of pixels per frame; and **step `particles.update()` by hand**,
+because `spawn()` only writes CPU arrays and nothing reaches the GPU until
+`update()` flags the attributes dirty. A paused loop never calls it, so a
+naive harness cannot see particle effects at all.
+
 The spawn point must also have a **wall worth falling off**: `_cliffProfile`
 drops to a 1.7 u berm where the canyon opens around the start bowl, and a rock
 launched there fell 3.4 u in 0.42 s — no readable origin and no time to react.
