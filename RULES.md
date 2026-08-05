@@ -467,13 +467,34 @@ The chase cameras additionally damp their own yaw (3.6/s) toward a blend of
 heading and travel direction, so flicks and drifts no longer whip the view —
 that whip was what made the 3D views hard to drive.
 
+### The five camera views
+
+| View | back | height | elevation | distance | notes |
+|---|---|---|---|---|---|
+| **TOP-DOWN** | 20 | 52 | 69° | 56 u | the default |
+| **TOP FAR** | 24 | 84 | 74° | 87 u | the whole corner at once |
+| **TRAIL** | 21 | 26 | 51° | 33 u | **for spotting solids.** From overhead a boulder is a flat disc — no side face, no useful shadow, and the car is small enough that judging a gap is guesswork. At 51° every solid shows its side and its cast shadow, and the car is roughly twice the size |
+| **CHASE** | 17 | 11.5 | 34° | 21 u | bumper height |
+| **CHASE FAR** | 26 | 17 | 33° | 31 u | bumper height, further out |
+
+`chase: true` (TRAIL and both CHASE views) takes the damped travel-direction
+yaw; without it the camera sits on the RAW heading and whips on every flick,
+which is only tolerable from near-overhead.
+
+**`cliffLift`** — any low view is a poor fit for a walled canyon: `clampCam`
+stops the camera passing *through* rock, but on the outside of a bend the face
+sits in the sightline and eats the road ahead (measured on CANYON RUN: TRAIL
+saw about half the road TOP-DOWN did from the same spot). Modes carrying
+`cliffLift` rise by that much on `cliffWalls` worlds — TRAIL by 11 — so they
+stay usable everywhere instead of being unusable on a third of the roster.
+
 ### Steering is scaled to the view you are driving in
 
 From above, a yaw change moves the car against a fixed world. From behind, the
 camera yaws *with* the car, so the whole scene swings and every correction
 overshoots — the reported symptom is "way too sensitive". The player's steering
-rate is therefore scaled per camera: **TOP-DOWN / TOP FAR ×1**, **CHASE ×0.76**,
-**CHASE FAR ×0.84**. The AI is never scaled.
+rate is therefore scaled per camera: **TOP-DOWN / TOP FAR ×1**, **TRAIL ×0.9**,
+**CHASE ×0.76**, **CHASE FAR ×0.84**. The AI is never scaled.
 
 The scale **fades in with speed** (none below 6 u/s, full by 18 u/s), and that
 is load-bearing, not polish. GOTTHARD, FURKA and SUMMIT carry ~5 m hairpins that

@@ -63,6 +63,15 @@ const CAM_MODES = [
   // the road to place the next corner ("super hard to drive in this camera
   // mode"). Lifted and pulled back, and the look-ahead point pushed well down
   // the road: you now see the corner before you are in it.
+  // TRAIL sits between the overhead family and the chase family, and exists for
+  // one reason: SPOTTING ROCKS. From TOP-DOWN (52 up, 20 back = 69° elevation,
+  // 56 u away) a boulder is a flat disc against flat ground — no side face, no
+  // useful shadow, and the car is small enough that judging a gap is guesswork.
+  // Dropping to 51° elevation and 33 u away shows every solid's side and its
+  // cast shadow, and roughly doubles the car on screen. `chase: true` matters
+  // here: at this height the view is close enough that the raw-heading camera
+  // whips on every steering flick, so it takes the damped travel-direction yaw.
+  { name: 'TRAIL',     back: 21, h: 26,   look: 15, lookH: 1.6, spdBack: 5, spdH: 6, chase: true, steer: 0.9, cliffLift: 11 },
   { name: 'CHASE',     back: 17, h: 11.5, look: 19, lookH: 3.2, spdBack: 4, spdH: 2, chase: true, steer: 0.76 },
   { name: 'CHASE FAR', back: 26, h: 17,   look: 22, lookH: 3.4, spdBack: 4, spdH: 2, chase: true, steer: 0.84 },
 ];
@@ -4501,9 +4510,16 @@ class Game {
       this._camYaw = cur + wrap(yaw - cur) * Math.min(1, 3.6 * dt);
       fwd = new THREE.Vector3(Math.sin(this._camYaw), 0, Math.cos(this._camYaw));
     }
+    // Cliff worlds are a special case for any LOW view. `clampCam` below already
+    // stops the camera swinging THROUGH the rock, but on the outside of a bend
+    // the face sits squarely in the sightline and eats the road ahead — measured
+    // on CANYON RUN, TRAIL saw roughly half the road that TOP-DOWN did from the
+    // same spot. Modes that ask for it rise between the walls rather than being
+    // unusable on a third of the worlds.
+    const lift = (M.cliffLift && this.track?.T?.cliffWalls) ? M.cliffLift : 0;
     const targetPos = p.pos.clone()
       .addScaledVector(fwd, -(M.back + speedZoom * (M.spdBack || 0)))
-      .add(new THREE.Vector3(0, M.h + speedZoom * (M.spdH || 0), 0));
+      .add(new THREE.Vector3(0, M.h + lift + speedZoom * (M.spdH || 0), 0));
     const targetLook = p.pos.clone()
       .addScaledVector(fwd, M.look)
       .add(new THREE.Vector3(0, M.lookH || 0, 0));
