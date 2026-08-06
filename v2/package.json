@@ -1,0 +1,29 @@
+{
+  "name": "ignite-rally-v2",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "IGNITE RALLY v2 — the staged migration to a specified, deterministic, Rapier-backed engine. Phase 0: determinism.",
+  "scripts": {
+    "test": "vitest run",
+    "watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "gate": "npm run typecheck && npm run test",
+    "world": "tsx src/tools/dumpWorld.ts",
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "tsx src/tools/lintStages.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/three": "^0.185.4",
+    "tsx": "^4.23.9",
+    "typescript": "^5.4.5",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
+    "three": "^0.185.1"
+  }
+}

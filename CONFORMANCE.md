@@ -66,7 +66,23 @@ newtons is meaningless. They land together or not at all.
 
 ## Status
 
-**Nothing in this table is implemented yet.** The documents are vendored, the
-gap is measured, and the two contradictions are on the table for a decision.
-Adoption starts at item 1 and proceeds down the list, each shipped and verified
-the way every other change here has been.
+The documents are vendored, the gap is measured, and the two contradictions are
+resolved in `MIGRATION.md` (weapons stay; stages replace laps at Phase 3).
+
+**Landed — `v2/`, Phase 0: determinism.** N4 and §14.3 are implemented and
+gated. One seeded PRNG set per stage, four independent channels, named forks,
+state snapshots, and a `withoutMathRandom()` guard. `npm run world -- <stage>`
+prints a fingerprint that is identical on every machine and every run.
+Its first consumer, `v2/src/world/scatter.ts`, also implements §3.2 rules 1–3,
+§3.3 biome density, the §16.1 object shape and lint checks L02 and L03 — so
+item 3 of the table above (flora tiers) is partly done as a side effect.
+58 tests; see `v2/DETERMINISM.md`.
+
+**Not landed.** Everything else in both tables, including the four open v1
+bugs. v1 still ships r77 with 778 unseeded `Math.random` calls and is untouched
+by this work — deliberately, so it stays playable throughout the migration.
+Determinism now applies to v2 world generation only, not to v1 and not yet to
+physics (§14.1–14.2 arrive with Rapier in Phase 2).
+
+Adoption continues at item 1 of the "can be adopted" table, each shipped and
+verified the way every other change here has been.

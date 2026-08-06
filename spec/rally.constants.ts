@@ -257,10 +257,15 @@ export const WATER = {
 // WORLD AUTHORING
 // ---------------------------------------------------------------------------
 
+/* §1.2 has FIVE bands — roadbed, shoulder, verge, barrier band, backdrop — and
+ * this mirror carried only the first two. The verge row (gravel 2.0-6.0 m,
+ * tarmac 1.5-4.0 m, snow 2.0-6.0 m) was missing, which matters because it is
+ * what separates "Tier 1 and Tier 2 only" from "Tier 3 and Tier 4 allowed here
+ * and nowhere closer". Added per this file's own rule: the document wins. */
 export const CORRIDOR = {
-  gravel: { roadbedMin: 4.5, roadbedMax: 7.0, shoulderMin: 1.5, shoulderMax: 4.0, tier4Clearance: 2.5 },
-  tarmac: { roadbedMin: 5.5, roadbedMax: 8.0, shoulderMin: 0.8, shoulderMax: 2.5, tier4Clearance: 2.0 },
-  snow:   { roadbedMin: 5.0, roadbedMax: 7.5, shoulderMin: 2.0, shoulderMax: 5.0, tier4Clearance: 2.5 },
+  gravel: { roadbedMin: 4.5, roadbedMax: 7.0, shoulderMin: 1.5, shoulderMax: 4.0, vergeMin: 2.0, vergeMax: 6.0, tier4Clearance: 2.5 },
+  tarmac: { roadbedMin: 5.5, roadbedMax: 8.0, shoulderMin: 0.8, shoulderMax: 2.5, vergeMin: 1.5, vergeMax: 4.0, tier4Clearance: 2.0 },
+  snow:   { roadbedMin: 5.0, roadbedMax: 7.5, shoulderMin: 2.0, shoulderMax: 5.0, vergeMin: 2.0, vergeMax: 6.0, tier4Clearance: 2.5 },
   absoluteMinWidth: 3.6,
   hairpinMaxWidth: 12.0,
   sightLineSeconds: 2.6,
