@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#12161b">
+<title>IGNITE RALLY v2 — Phase 1 + 2</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2312161b'/%3E%3Cpath d='M6 21h20l-3-7H9z' fill='%23ff6b35'/%3E%3Ccircle cx='11' cy='23' r='3' fill='%23e8eef4'/%3E%3Ccircle cx='22' cy='23' r='3' fill='%23e8eef4'/%3E%3C/svg%3E">
+<style>
+  :root { --ink:#e8eef4; --dim:#8b9aa8; --hot:#ff6b35; --ok:#4ade80; --bad:#f87171; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#12161b; color:var(--ink);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; -webkit-text-size-adjust:100%; }
+  #view { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+
+  .panel { position:fixed; background:rgba(12,16,20,.74); backdrop-filter:blur(9px);
+    border:1px solid rgba(255,255,255,.09); border-radius:11px; padding:10px 13px; }
+
+  #top { top:10px; left:10px; max-width:min(430px, calc(100vw - 20px)); }
+  #stage-name { font-size:19px; font-weight:700; letter-spacing:.09em; }
+  #stage-sub { font-size:11px; color:var(--dim); margin-top:2px; letter-spacing:.04em; }
+  #build-info { font-size:10px; color:var(--dim); margin-top:7px; line-height:1.55; }
+  #build-info b { color:var(--ink); font-weight:600; }
+  .ok { color:var(--ok) !important; } .bad { color:var(--bad) !important; }
+
+  #hud { right:10px; top:10px; text-align:right; min-width:150px; }
+  #speed { font-size:44px; font-weight:800; line-height:.92; letter-spacing:-.02em; }
+  #speed::after { content:' km/h'; font-size:11px; font-weight:500; color:var(--dim); letter-spacing:.05em; }
+  #gearline { font-size:12px; color:var(--dim); margin-top:5px; }
+  #gear { color:var(--hot); font-weight:700; font-size:15px; }
+  .bar-track { height:4px; background:rgba(255,255,255,.13); border-radius:2px; overflow:hidden; margin-top:6px; }
+  .bar { height:100%; background:var(--ok); transition:width .06s linear; }
+  .bar.red { background:var(--hot); }
+  #damage-bar { background:var(--bad); }
+  #time { font-size:21px; font-weight:700; margin-top:9px; letter-spacing:.02em; }
+  #dist { font-size:10px; color:var(--dim); margin-top:3px; }
+  #surface { font-size:10px; color:var(--dim); margin-top:4px; letter-spacing:.06em; text-transform:uppercase; }
+
+  #pacenote { position:fixed; top:20%; left:50%; transform:translateX(-50%);
+    font-size:28px; font-weight:800; letter-spacing:.1em; color:var(--hot);
+    text-shadow:0 3px 18px rgba(0,0,0,.9); pointer-events:none; white-space:nowrap; }
+
+  #bottom { left:10px; bottom:10px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+    max-width:calc(100vw - 20px); }
+  #debug { font-size:10px; color:var(--dim); }
+  #cam-name { font-size:10px; color:var(--hot); letter-spacing:.08em; }
+  select { background:rgba(255,255,255,.07); color:var(--ink); border:1px solid rgba(255,255,255,.16);
+    border-radius:6px; padding:5px 7px; font:inherit; font-size:11px; }
+  #keys { font-size:10px; color:var(--dim); }
+
+  #status { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:#12161b; font-size:14px; letter-spacing:.1em; z-index:10; }
+
+  @media (max-width:640px) {
+    #build-info { display:none; }
+    #speed { font-size:34px; }
+    #keys { display:none; }
+    #pacenote { font-size:21px; top:14%; }
+  }
+</style>
+  <script type="module" crossorigin src="./assets/index-BZuoJFEo.js"></script>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="top" class="panel">
+  <div id="stage-name">—</div>
+  <div id="stage-sub"></div>
+  <div id="build-info"></div>
+</div>
+
+<div id="hud" class="panel">
+  <div id="speed">0</div>
+  <div class="bar-track"><div id="rpm-bar" class="bar" style="width:0"></div></div>
+  <div id="gearline">GEAR <span id="gear">1</span></div>
+  <div id="time">0:00.00</div>
+  <div class="bar-track"><div id="progress-bar" class="bar" style="width:0"></div></div>
+  <div id="dist">0.00 km</div>
+  <div class="bar-track"><div id="damage-bar" class="bar" style="width:0"></div></div>
+  <div id="surface"></div>
+</div>
+
+<div id="pacenote"></div>
+
+<div id="bottom" class="panel">
+  <select id="stage-select"></select>
+  <span id="cam-name">CHASE</span>
+  <span id="debug"></span>
+  <span id="keys">WASD drive · SPACE handbrake · Q/E gears · C camera · R reset</span>
+</div>
+
+<div id="status">LOADING</div>
+
+</body>
+</html>

@@ -39,17 +39,35 @@ export interface CorridorNode {
   z: number;
   /** Metres, §1.2. */
   roadbedWidth: number;
-  /** Verge width to [left, right]. Tier 3 and 4 are forbidden inside it. */
+  /** §1.2 shoulder, [left, right]. */
   shoulderWidth: [number, number];
+  /** §1.2 verge, [left, right]. Tier 1 and Tier 2 only; Tier 3 and 4 start
+   *  beyond shoulder + verge, in the barrier band. Optional so the
+   *  placement-rule tests can supply a bare corridor — a real stage always
+   *  carries it. */
+  vergeWidth?: [number, number];
+  /** Unit heading, when the node carries one. A real Segment does; deriving it
+   *  from the neighbours instead gives a slightly different normal on a curve,
+   *  and the clearance filter and the lint then disagree about which side of
+   *  the road a tree is on. */
+  hx?: number;
+  hz?: number;
 }
 
 export interface Corridor {
   surface: SurfaceKind;
   biome: Biome;
+  /** Structurally satisfied by `Segment[]` from `corridor.ts`, which is how a
+   *  real stage feeds this pass — the extra segment fields are simply unused
+   *  here. */
   nodes: CorridorNode[];
   /** How far past the verge scatter may reach, metres. Beyond this is
    *  backdrop, placed by a different pass at a different density. */
   bandDepth: number;
+  /** Ground height lookup. Omitted in tests that only care about the xz
+   *  placement rules; supplied by a real stage build so scatter sits ON the
+   *  terrain rather than at y = 0. */
+  heightAt?: (x: number, z: number) => number;
 }
 
 /** §16.1, trimmed to the fields this pass can honestly fill in. */
@@ -138,7 +156,8 @@ export function scatterCorridor(corridor: Corridor, stage: StageRng): WorldObjec
 
       for (let side = 0; side < 2; side++) {
         const sign = side === 0 ? 1 : -1;
-        const verge = a.shoulderWidth[side]!;
+        // Shoulder + verge is the soft band; the barrier band starts after it.
+        const verge = a.shoulderWidth[side]! + (a.vergeWidth?.[side] ?? 0);
         const edge = a.roadbedWidth / 2;
         const outer = edge + verge + corridor.bandDepth;
 
@@ -190,7 +209,7 @@ export function scatterCorridor(corridor: Corridor, stage: StageRng): WorldObjec
               id: `${flora.name}_${out.length.toString().padStart(5, '0')}`,
               archetype: flora.name,
               tier: flora.tier,
-              transform: { position: [px, 0, pz], rotationY: rot, scale },
+              transform: { position: [px, corridor.heightAt?.(px, pz) ?? 0, pz], rotationY: rot, scale },
               collider: { shape: SHAPE[tierIndex]!, radius: dia / 2, height },
               physics: { mass },
               hazard: tierIndex === 4,
@@ -206,7 +225,7 @@ export function scatterCorridor(corridor: Corridor, stage: StageRng): WorldObjec
               id: `${flora.name}_${out.length.toString().padStart(5, '0')}`,
               archetype: flora.name,
               tier: flora.tier,
-              transform: { position: [px, 0, pz], rotationY: rot, scale },
+              transform: { position: [px, corridor.heightAt?.(px, pz) ?? 0, pz], rotationY: rot, scale },
               collider: { shape: SHAPE[tierIndex]!, radius: dia / 2, height },
               physics: { mass },
               hazard: false,
@@ -218,7 +237,50 @@ export function scatterCorridor(corridor: Corridor, stage: StageRng): WorldObjec
     }
   }
 
-  return out;
+  // §3.2 rule 1 / lint L03, enforced against the WHOLE corridor rather than
+  // the segment an object was placed from.
+  //
+  // Placement measures laterally off one segment's chord. On the inside of a
+  // bend that is not the shortest distance to the road: a tree legally 9 m
+  // from segment 400 can be 3 m from segment 430 where the corridor doubles
+  // back. Measured on the six stages, that let 140 Tier 4 trunks into the
+  // verge — the same class of error as v1's house-on-the-road, which was also
+  // "measured from one track index on a course that doubles back".
+  //
+  // Filtering after the fact is stream-safe: every draw has already been made,
+  // so removing an object cannot shift anything placed later.
+  const nodes = corridor.nodes;
+  return out.filter((o) => {
+    if (o.tier < Tier.HeavyMovable) return true;
+    const [px, , pz] = o.transform.position;
+
+    let bi = -1;
+    let bestD2 = Infinity;
+    for (let i = 0; i < nodes.length; i++) {
+      const d2 = (nodes[i]!.x - px) ** 2 + (nodes[i]!.z - pz) ** 2;
+      if (d2 < bestD2) { bestD2 = d2; bi = i; }
+    }
+    if (bi < 0) return true;
+
+    const a = nodes[bi]!;
+    let dx: number;
+    let dz: number;
+    if (a.hx !== undefined && a.hz !== undefined) {
+      dx = a.hx;
+      dz = a.hz;
+    } else {
+      const b = nodes[bi + 1] ?? nodes[bi - 1] ?? a;
+      const fwd = nodes[bi + 1] ? 1 : -1;
+      dx = (b.x - a.x) * fwd;
+      dz = (b.z - a.z) * fwd;
+    }
+    const len = Math.hypot(dx, dz) || 1;
+    const lateral = ((px - a.x) * -dz + (pz - a.z) * dx) / len;
+    const s = lateral >= 0 ? 0 : 1;
+    const limit =
+      a.roadbedWidth / 2 + Math.max(a.shoulderWidth[s]! + (a.vergeWidth?.[s] ?? 0), tier4Clearance);
+    return Math.abs(lateral) >= limit;
+  });
 }
 
 /** Distance from a point to the corridor centreline, and the roadbed half-width
