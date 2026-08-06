@@ -2268,25 +2268,39 @@ export class Track {
    *  @param i a nearby sample index (the caller's tracked index is ideal)
    */
   groundHeightAtPos(pos, i, lateral) {
+    if (!this.center.length) return 0;
+    return this.groundHeightAtFrac(this.fracIndexAt(pos, i), lateral);
+  }
+
+  /** Where a world position sits along the centreline, measured in SAMPLES and
+   *  fractional. The integer `trackIndex` a car carries is only the nearest
+   *  sample; anything that predicts forward from it starts up to a full sample
+   *  (segLen, ~2.4 u) behind where the car really is. */
+  fracIndexAt(pos, i) {
     const n = this.center.length;
     if (!n) return 0;
-    const wrap = (k) => ((k % n) + n) % n;
-    const a = wrap(i);
-    // How far along the segment leaving sample `a` the car sits. The tangent
-    // is unit length, so this is metres; divided by the segment length it is
-    // the interpolation parameter.
+    const a = ((i % n) + n) % n;
+    // The tangent is unit length, so this projection is in metres; over the
+    // segment length it is the interpolation parameter. Clamped to one segment
+    // either side — beyond that the caller's index hint was simply wrong, and
+    // extrapolating a bad hint is worse than sitting on the sample.
     const t = this.tan[a];
-    let f = ((pos.x - this.center[a].x) * t.x + (pos.z - this.center[a].z) * t.z)
-          / (this.segLen > 0 ? this.segLen : 1);
-    // Behind the sample: interpolate over the PREVIOUS segment instead, so the
-    // result stays continuous across a sample boundary rather than clamping
-    // flat on one side of it.
-    let lo = a;
-    if (f < 0) { lo = wrap(a - 1); f += 1; }
-    f = Math.max(0, Math.min(1, f));
-    const hi = wrap(lo + 1);
-    const yLo = this.groundHeightAt(lo, lateral);
-    const yHi = this.groundHeightAt(hi, lateral);
+    const f = ((pos.x - this.center[a].x) * t.x + (pos.z - this.center[a].z) * t.z)
+            / (this.segLen > 0 ? this.segLen : 1);
+    return a + Math.max(-1, Math.min(1, f));
+  }
+
+  /** Road height at a fractional sample index — the continuous form of
+   *  `groundHeightAt`, which only accepts integers. */
+  groundHeightAtFrac(idx, lateral) {
+    const n = this.center.length;
+    if (!n) return 0;
+    const lo = Math.floor(idx);
+    const f = idx - lo;
+    const a = ((lo % n) + n) % n;
+    const b = (a + 1) % n;
+    const yLo = this.groundHeightAt(a, lateral);
+    const yHi = this.groundHeightAt(b, lateral);
     return yLo + (yHi - yLo) * f;
   }
 
@@ -3509,14 +3523,33 @@ export class Track {
     const logCapMat = new THREE.MeshStandardMaterial({ color: 0xc8a468, roughness: 0.9 });
     const rootMat = new THREE.MeshStandardMaterial({ color: 0x5e3820, roughness: 1 });
     chosen.forEach((i, k) => {
-      // exposed-root bumps are small and hug the road EDGE; everything else is
-      // a big mid-lane blocker
+      // EVERYTHING HUGS THE VERGE. These used to be deliberate mid-lane
+      // blockers: lateral ±1.2–4.5 with a collider radius up to 3.2, so a rock
+      // at 1.2 spanned −1.0 to 3.4 and physically straddled the centreline.
+      // There was no line through it — you either stopped or you took the hit,
+      // three to six times a lap, and it read as the road being unfair rather
+      // than difficult. A rally stage has rocks and fallen timber ON it; what
+      // it does not have is a boulder parked on the racing line.
+      //
+      // So the placement is now derived from the road rather than from a
+      // constant: reserve a clear corridor down the middle, and fit the
+      // obstacle into whatever shoulder is left, sitting against the outer
+      // edge. Run wide and it is still there waiting for you — which is the
+      // point of it — but the line is always open.
       const roots = spec.style === 'roots';
-      const r = roots ? 1.2 + Math.random() * 0.5 : 2.2 + Math.random();
+      const w = this.widthAt ? this.widthAt(i) : ROAD_HALF;
+      // Clear corridor: never less than ±4.5 (a car is ~2 wide, so that is
+      // room to place it rather than merely to fit), and on a wide road it
+      // scales so the verge does not swallow the stage.
+      const clear = Math.max(4.5, w * 0.55);
+      const shoulder = w - clear;
+      // No usable verge here — a rock small enough to fit would be gravel.
+      // Drop it rather than shave it down to something that reads as a bug.
+      if (shoulder < 1.4) return;
       const side = k % 2 === 0 ? -1 : 1;
-      const lateral = roots
-        ? side * (5.6 + Math.random() * 2.2)               // near the shoulder
-        : side * (1.2 + Math.random() * 3.3);              // within ±4.5 of centerline
+      const natural = roots ? 1.2 + Math.random() * 0.5 : 2.2 + Math.random();
+      const r = Math.min(natural, shoulder * 0.5);
+      const lateral = side * (clear + r);   // inner edge lands exactly on `clear`
       const p = this.pointAt(i, lateral);
       if (spec.style === 'roots') {
         // gnarled redwood roots breaking the surface: 3 low half-buried ridges
