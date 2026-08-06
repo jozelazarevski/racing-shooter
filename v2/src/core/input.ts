@@ -256,6 +256,7 @@ export class Input {
       throttle,
       brake,
       handbrake: this.keys.has('Space') || this.gamepadButton(0) > 0.5,
+      fire: this.keys.has('KeyF') || this.keys.has('ShiftLeft') || this.gamepadButton(5) > 0.3,
       shiftUp: this.shiftUpQueued,
       shiftDown: this.shiftDownQueued,
     };

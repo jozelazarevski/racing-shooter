@@ -46,6 +46,8 @@ export interface DriverInput {
   /** Gear change requests, consumed on read. */
   shiftUp?: boolean;
   shiftDown?: boolean;
+  /** Held, not edge-triggered: the cannon has its own rate of fire. */
+  fire?: boolean;
 }
 
 interface Wheel {
