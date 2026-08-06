@@ -64,8 +64,33 @@ const UNDERSTEER_RAD_PER_MS2 = 0.0035;
  *  without the sawing that starts somewhere above 3. */
 const PURSUIT_GAIN = 2.4;
 
+/**
+ * The extraction manoeuvre, in seconds.
+ *
+ * A driver whose car is nose-first into a bank reverses out of it. This one
+ * could not: the controller had exactly two responses to being stopped —
+ * more throttle, and more lock — and both of them press the car harder into
+ * whatever it is against. Two of the six reference laps ended in a loop of
+ * respawning into the same corner because the manoeuvre that would have freed
+ * the car did not exist in the car, let alone in the driver.
+ *
+ * `BACK_UP` is how long it reverses for: about 8 m at the speed reverse allows,
+ * which is enough to clear a bank and short enough not to be a second accident.
+ * `SETTLE` is the pause at the end, because changing direction under power on
+ * gravel just spins the wheels.
+ */
+const STUCK_AFTER = 1.6;
+const BACK_UP = 2.4;
+const SETTLE = 0.35;
+
 export class RoadDriver {
   readonly state: DriverState = { cursor: 0, distance: 0, lateral: 0 };
+  /** Seconds spent going nowhere, and where the extraction is up to. */
+  private stuckFor = 0;
+  private extracting = 0;
+  /** Places on the stage this driver has come to grief, and how much slower it
+   *  intends to be next time. See `beCautiousAt`. */
+  private readonly caution: { at: number; factor: number }[] = [];
   readonly line: RacingLine;
   private readonly bias: number;
   private readonly biasFade: number;
@@ -134,17 +159,51 @@ export class RoadDriver {
     return this.line.curvature[k]!;
   }
 
+  /**
+   * LEARN FROM THE CRASH.
+   *
+   * A stage is deterministic and so is this driver, which means a corner it
+   * cannot take is a corner it can never take: it arrives at the same speed on
+   * the same line and ends up in the same bank. Two of the six reference laps
+   * ended that way — reset, respawn upstream, drive the identical approach,
+   * beach in the identical place, for the rest of the clock.
+   *
+   * No reset policy fixes that, because the reset is not what is wrong. What a
+   * human does after putting it off at the same corner twice is arrive slower.
+   * So does this: each failure records a caution zone at the place it happened
+   * and takes a fifth off the target speed approaching it. The next attempt is
+   * a different attempt, which is the whole point.
+   *
+   * It converges rather than crawling: the floor is 40% of the profile, which
+   * on the slowest corner in the game is still 24 km/h.
+   */
+  beCautiousAt(distance: number): void {
+    const existing = this.caution.find((c) => Math.abs(c.at - distance) < 40);
+    if (existing) existing.factor = Math.max(0.4, existing.factor * 0.8);
+    else this.caution.push({ at: distance, factor: 0.8 });
+  }
+
   /** How fast the driver wants to be going at a segment, m/s. */
   targetSpeed(i: number): number {
     const k = Math.max(0, Math.min(this.line.speed.length - 1, i));
     // A driver at skill 1.0 aims at the profile itself; below that, at a
     // fraction of it. The floor keeps a low-skill driver moving through a
     // hairpin rather than stopping in it.
-    return Math.max(6, this.line.speed[k]! * (0.62 + 0.38 * this.skill));
+    let v = this.line.speed[k]! * (0.62 + 0.38 * this.skill);
+    // Caution applies from 90 m BEFORE a known trouble spot, because arriving
+    // slower means braking earlier, not braking at the bank.
+    const d = this.corridor.segments[k]!.distance;
+    for (const c of this.caution) {
+      if (d > c.at - 90 && d < c.at + 30) v *= c.factor;
+    }
+    return Math.max(6, v);
   }
 
   /** One control decision. */
-  drive(px: number, pz: number, headingX: number, headingZ: number, speedMs: number): DriverInput {
+  drive(
+    px: number, pz: number, headingX: number, headingZ: number, speedMs: number,
+    dt = 1 / 120,
+  ): DriverInput {
     const segs = this.corridor.segments;
     this.locate(px, pz);
     const step = this.corridor.step;
@@ -264,6 +323,44 @@ export class RoadDriver {
     // simultaneously asking for.
     const lateralUse = Math.min(1, Math.abs(delta) / Math.max(1e-6, deltaMax));
     throttle *= Math.sqrt(Math.max(0.05, 1 - lateralUse * lateralUse));
+
+    // --- stuck: reverse out of it ------------------------------------------
+    //
+    // Counted before anything else, because a car that is not moving is not a
+    // driving problem and none of the control law above applies to it.
+    this.stuckFor = speedMs < 1.0 ? this.stuckFor + dt : 0;
+    if (this.extracting <= 0 && this.stuckFor > STUCK_AFTER) {
+      this.extracting = BACK_UP + SETTLE;
+      this.stuckFor = 0;
+    }
+    if (this.extracting > 0) {
+      this.extracting -= dt;
+      // Reverse is engaged by holding the brake at a standstill, so the brake
+      // IS the reverse throttle — see the gearbox note in physics/vehicle.ts.
+      // Steering is held opposite to the lock that got the car here, which is
+      // what backs it away from the bank rather than along it.
+      if (this.extracting > SETTLE) {
+        // Two phases, and both are needed.
+        //
+        // SELECT: reverse engages on a firmly held brake at a standstill, so
+        // the first half-second is a full pedal. Feathering from the start left
+        // the car in first gear for ever — the threshold was never crossed.
+        //
+        // THEN FEATHER. Measured on Col de Turini: full reverse spun the wheels
+        // to 17 m/s of surface speed against a car doing 0.1, a slip ratio far
+        // past §8's Magic Formula peak — maximum noise, minimum force. A third
+        // of a pedal keeps the tyre near its peak and the car actually moves.
+        const selecting = this.extracting > BACK_UP + SETTLE - 0.5;
+        return {
+          steer: -Math.sign(steer || 1) * 0.35,
+          throttle: 0,
+          brake: selecting ? 1 : 0.35,
+          handbrake: false,
+        };
+      }
+      // The settle: off everything, let the car stop, then drive away.
+      return { steer: 0, throttle: 0, brake: 0, handbrake: false };
+    }
 
     // Pointing the wrong way: scrub the speed off first, then turn round.
     // Driving out of a spin on the throttle is how a spin becomes a crash, and

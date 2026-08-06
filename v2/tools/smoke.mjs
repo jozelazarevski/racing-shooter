@@ -120,6 +120,43 @@ for (const stage of STAGES) {
   check('body attitude comes from the ground at zero speed',
     settled.upY > 0.85 && settled.upY <= 1.0000001, `up.y ${settled.upY.toFixed(4)}`);
 
+  // --- reverse: the manoeuvre that did not exist ------------------------
+  //
+  // Until Phase 3 the only way out of a car nose-first into a bank was a reset,
+  // which §11.2 charges 10 s for — so a small mistake cost what a big one did,
+  // and the AI, which has no reset button of its own, sat there. This asserts
+  // the gearbox has a reverse and that it moves the car the other way.
+  const reversed = await page.evaluate(() => {
+    const g = window.__v2;
+    const before = g.car.body.translation();
+    const q = g.car.body.rotation();
+    // The car's forward, so "backwards" is measured rather than assumed.
+    const fx = 2 * (q.x * q.z + q.w * q.y);
+    const fz = 1 - 2 * (q.x * q.x + q.y * q.y);
+    // Hold the brake at a standstill to select reverse, then keep holding it —
+    // in reverse the brake IS the accelerator.
+    window.__stepFixed(300, { brake: 1 });
+    const p = g.car.body.translation();
+    return {
+      gear: g.car.telemetry.gear,
+      along: (p.x - before.x) * fx + (p.z - before.z) * fz,
+      speed: g.car.telemetry.speedKmh,
+    };
+  });
+  check('the gearbox has a reverse', reversed.gear === 0, `gear ${reversed.gear}`);
+  check('reverse moves the car backwards', reversed.along < -2,
+    `${reversed.along.toFixed(1)} m along its own heading at ${reversed.speed.toFixed(0)} km/h`);
+  // Put the car back on the start line. Reversing 12 m up the stage would
+  // otherwise cost the drive test below 12 m of the ground it measures, and it
+  // would look like the car had got slower.
+  await page.evaluate(() => {
+    const g = window.__v2;
+    const s0 = g.stage.corridor.segments[0];
+    g.car.reset(s0.x, window.__probeGround(s0.x, s0.z) + 0.62, s0.z, Math.atan2(s0.hx, s0.hz));
+    g.referenceDriver.seek(0);
+    window.__stepFixed(240);   // settle, back in first
+  });
+
   // --- drive: 12 s of simulation, following the road --------------------
   //
   // With no steering the car leaves the stage at the first real corner, which

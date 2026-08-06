@@ -154,3 +154,43 @@ describe('the speed profile never asks for more than the tyres have', () => {
     expect(line.speed[0]!).toBeLessThan(line.speed[40]!);
   });
 });
+
+describe('the driver learns from a crash', () => {
+  it('takes a fifth off the target approaching a place it came to grief', async () => {
+    const { RoadDriver } = await import('./driver.ts');
+    const corridor = corridorFor('safari');
+    const d = new RoadDriver(corridor, 1);
+    // A segment ~50 m before 2,000 m, which is inside the caution zone.
+    const at = corridor.segments.findIndex((s) => s.distance > 1960);
+    const before = d.targetSpeed(at);
+    d.beCautiousAt(2000);
+    expect(d.targetSpeed(at)).toBeCloseTo(before * 0.8, 5);
+    d.beCautiousAt(2000);
+    expect(d.targetSpeed(at)).toBeCloseTo(before * 0.64, 5);
+  });
+
+  it('leaves the rest of the stage alone', () => {
+    // A caution at one corner must not slow the whole stage down.
+    const corridor = corridorFor('safari');
+    const far = corridor.segments.findIndex((s) => s.distance > 3000);
+    return import('./driver.ts').then(({ RoadDriver }) => {
+      const d = new RoadDriver(corridor, 1);
+      const before = d.targetSpeed(far);
+      d.beCautiousAt(1000);
+      expect(d.targetSpeed(far)).toBe(before);
+    });
+  });
+
+  it('stops cutting speed once it is slow enough to be pointless', () => {
+    return import('./driver.ts').then(({ RoadDriver }) => {
+      const corridor = corridorFor('safari');
+      const d = new RoadDriver(corridor, 1);
+      const at = corridor.segments.findIndex((s) => s.distance > 1960);
+      const before = d.targetSpeed(at);
+      for (let i = 0; i < 20; i++) d.beCautiousAt(2000);
+      // The floor is 40% of the profile, so a driver that keeps failing keeps
+      // moving instead of creeping to a halt.
+      expect(d.targetSpeed(at)).toBeGreaterThanOrEqual(before * 0.4 - 1e-6);
+    });
+  });
+});

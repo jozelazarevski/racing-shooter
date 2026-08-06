@@ -7,7 +7,7 @@ whole migration, exactly as `MIGRATION.md` promised.
 
 ```
 cd v2
-npm run gate       # typecheck + 121 unit tests
+npm run gate       # typecheck + 124 unit tests
 npm run lint       # build all six stages, run §15 against each, fail loudly
 npm run build      # -> ../play-v2
 npm run smoke      # drive every stage headless (needs a server on :8902)
@@ -601,12 +601,80 @@ lines above says those panels "re-enable pointer events" — they did, and it ma
 no difference. On a phone, that panel has never responded to a touch. Found by a
 click that timed out with `#pad intercepts pointer events`.
 
+## Phase 3, part four — the car can reverse, and the driver can learn
+
+The last round ended with two stages in a reset loop and a one-line diagnosis:
+*the car arrives, understeers into the bank, and beaches with full lock on and
+the throttle open. The controller has no way out of that — a real driver would
+reverse, and there is no reverse gear.* This is that.
+
+**Reverse.** §3 specifies a five-speed box and no reverse ratio, so reverse
+takes a shade more than first, which is what a real box does. Engagement is the
+arcade convention because the game is played with two pedals and no clutch:
+hold the brake with the car stopped and reverse selects; in reverse the two
+pedals swap jobs, and the throttle brings it back to first. It is speed-limited
+and torque-cut above 8 m/s, because a car doing 90 km/h backwards is not a
+manoeuvre.
+
+Without it, the only way out of a car nose-first into a bank was a reset — and
+§11.2 correctly charges 10 s for one, so a small mistake cost exactly what a
+big one did.
+
+**The countdown now holds the car on the handbrake.** It held the foot brake,
+which at a standstill is precisely how reverse is selected — so the moment
+reverse existed, every stage started in it.
+
+**The driver reverses out, and it has to feather the pedal.** Measured on Col de
+Turini: full reverse spun the wheels to 17 m/s of surface speed against a car
+doing 0.1, a slip ratio far past §8's Magic Formula peak — maximum noise,
+minimum force. The extraction now selects on a full pedal for half a second and
+then feathers to a third.
+
+**The driver learns.** A stage is deterministic and so is this driver, so a
+corner it cannot take is a corner it can *never* take: same approach, same
+speed, same bank, for the rest of the clock. No reset policy fixes that, because
+the reset is not what is wrong. Each failure now records a caution zone at the
+place it happened and takes a fifth off the target speed approaching it, with a
+floor at 40%. The next attempt is a different attempt, which is the whole point.
+
+### And the bug underneath two of the loops
+
+**Respawns were putting the car inside the ground.** The reset height came from
+`sampleHeight`, a bilinear read of the height buffer; the collider Rapier builds
+from that same buffer is two triangles per cell, and on any slope the two
+disagree. The car spawned in the collider, where the solver held it: wheels at
+0.03 m of compression instead of 0.08, almost no load, therefore almost no tyre
+force. It looked exactly like being wedged against scenery, and no pedal or gear
+could have helped. The respawn now raycasts the world the car actually drives on
+— which cannot disagree with itself.
+
+Finding it needed one more thing that is worth writing down, because it has now
+cost two sessions: **Rapier's ray queries return nothing until the world has
+stepped once.** A probe of 233 centreline points reported that every one of them
+had no collider beneath it, including the start line the car was visibly resting
+on. One `world.step()` first, and all 233 answer.
+
+### Where the reference lap stands
+
+| | part two | part four |
+|---|---|---|
+| Stages completed | 4 of 6 | **5 of 6** |
+| Reset loops | 2 | **1** |
+| L15 clean | 1 | 1 |
+
+Monte Carlo went from looping at 2,285 m to finishing. Col de Turini still loops
+at 2,242 m and is the one remaining, and it is genuinely not understood: the
+node there is on a clear straight with the nearest collidable 5.25 m away, the
+roadbed is flat across its full width (worst deviation 0.18 m on that stage), and
+the driver arrives at a third of its normal speed by the sixth attempt and still
+stops in the same metre.
+
 ## Next
 
-1. **The two hairpins.** Col de Turini at ~1,220 m and Monte Carlo at 2,285 m.
-   The car arrives, understeers into the bank and beaches with full lock on and
-   the throttle open. The controller has no way out of that — a real driver
-   would reverse, and there is no reverse gear.
-2. **§3.2 rule 4**, apex occlusion, now that a racing line exists.
-3. **Phase 4 — the bible.** Region palettes, lighting, archetype architecture,
-   and the R01–R12 region lint.
+1. **Col de Turini at 2,242 m**, with a proper instrumented capture of the
+   moment rather than another hypothesis.
+2. **Phase 4 — the bible.** Region palettes, lighting, archetype architecture,
+   and the R01–R12 region lint. This is what makes it stop looking like a
+   prototype, and it is the largest remaining gap between v2 and something worth
+   playing.
+3. **§3.2 rule 4**, apex occlusion, now that a racing line exists.

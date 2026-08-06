@@ -223,7 +223,14 @@ class Game {
       const cmd = this.input.sample(h);
       // Held on the line until the lights go out — but steering still works, so
       // you can set the car up rather than stare at a frozen screen.
-      const player = this.race.locked ? { ...cmd, throttle: 0, brake: 1 } : cmd;
+      //
+      // Held on the HANDBRAKE, not the foot brake. A rally start is, and more
+      // to the point a foot brake held at a standstill is exactly how reverse
+      // is selected — so the old version put the car into reverse on the grid
+      // and started every stage showing R.
+      const player = this.race.locked
+        ? { ...cmd, throttle: 0, brake: 0, handbrake: true }
+        : cmd;
       this.lastSteer = cmd.steer;
       this.car.step(player, h);
 
@@ -236,8 +243,11 @@ class Game {
       const rq = this.rival.body.rotation();
       const rvx = 2 * (rq.x * rq.z + rq.w * rq.y);
       const rvz = 1 - 2 * (rq.x * rq.x + rq.y * rq.y);
-      const rivalCmd = this.rivalDriver.drive(rp.x, rp.z, rvx, rvz, this.rival.telemetry.speedMs);
-      this.rival.step(this.race.locked ? { ...rivalCmd, throttle: 0, brake: 1 } : rivalCmd, h);
+      const rivalCmd = this.rivalDriver.drive(rp.x, rp.z, rvx, rvz, this.rival.telemetry.speedMs, h);
+      this.rival.step(
+        this.race.locked ? { ...rivalCmd, throttle: 0, brake: 0, handbrake: true } : rivalCmd,
+        h,
+      );
 
       this.stepWeapons(cmd, h);
       this.phys.world.step();
@@ -441,7 +451,7 @@ class Game {
     const race = this.race;
 
     $('speed').textContent = Math.round(t.speedKmh).toString();
-    $('gear').textContent = t.gear.toString();
+    $('gear').textContent = t.gear === 0 ? 'R' : t.gear.toString();
     $('rpm-bar').style.width = `${Math.min(100, (t.rpm / 7200) * 100)}%`;
     $('rpm-bar').className = t.rpm > 6600 ? 'bar red' : 'bar';
 
@@ -647,6 +657,9 @@ class Game {
       if (!due) continue;
 
       this.resets[n] = (this.resets[n] ?? 0) + 1;
+      // Tell the driver where it went wrong BEFORE moving the car, while
+      // `driver.state.distance` still says where that was.
+      driver.beCautiousAt(driver.state.distance);
       monitor.serve();
       // The player's penalty is the one that counts; a rival's reset is a
       // rival's problem and does not touch the player's clock.
@@ -674,23 +687,34 @@ class Game {
   /** §11.2, all six rules. */
   private respawn(car: Vehicle, driver: RoadDriver): void {
     const node = nodeFor(this.stage.resetNodes, driver.state.distance);
+    // ASK THE PHYSICS WORLD WHERE THE GROUND IS, not the heightfield function.
+    //
+    // `sampleHeight` is a bilinear read of the height buffer; the collider
+    // Rapier builds from the same buffer is two triangles per cell, and on any
+    // slope the two disagree. Spawning at the sampled height put the car
+    // INSIDE the collider, where the solver holds it: wheels at 0.03 m of
+    // compression instead of 0.08, almost no load, and therefore almost no
+    // tyre force. It looked exactly like being wedged against scenery.
+    //
+    // Measured on Col de Turini: the car respawned at the node at 2,242 m —
+    // clear straight, nearest collidable 5.25 m away — and could not move.
+    // Six resets in a row at the same metre, at every speed the driver tried,
+    // including a third of the profile. Nothing the driver did could have
+    // worked, because the car was in the ground.
+    //
+    // A raycast against the world the car actually drives on cannot disagree
+    // with itself.
+    const probed = probeGround(this.phys, node.x, node.z, car.body);
+    const ground = probed ?? sampleHeight(this.stage.heightfield, node.x, node.z);
     car.reset(
       node.x,
       // 3: "ride height settled, no spawn drop". VEHICLE.cogHeight is exactly
       // where the body sits at the static compression this spring rate implies,
       // so the car appears already resting rather than falling.
       //
-      // Plus a decimetre, and that is not a fudge. `sampleHeight` is a BILINEAR
-      // sample of the heightfield; the collider Rapier builds from the same
-      // buffer is two triangles per cell. On a slope the two disagree by a few
-      // centimetres, and on the steepest ground §13 allows, by more. Spawning
-      // at the exact sampled height therefore sometimes puts the hull inside
-      // the terrain, where the solver holds it: the car sits with its wheels
-      // barely loaded and full throttle doing nothing. Measured on Fafe, the
-      // smoke autopilot stopped dead at 128 m of a straight and never moved
-      // again. 0.10 m clears the mismatch and is 0.14 s of fall — below the
-      // threshold of anything a player can see.
-      sampleHeight(this.stage.heightfield, node.x, node.z) + VEHICLE.cogHeight + 0.10,
+      // Plus a decimetre of clearance so the wheels start their probe above
+      // the surface rather than through it. 0.14 s of fall — invisible.
+      ground + VEHICLE.cogHeight + 0.10,
       node.z,
       // 2: "face the stage direction". Velocity and angular velocity are zeroed
       // inside Vehicle.reset.
@@ -768,7 +792,7 @@ class Game {
       const fx = 2 * (q.x * q.z + q.w * q.y);
       const fz = 1 - 2 * (q.x * q.x + q.y * q.y);
       const speed = this.car.telemetry.speedMs;
-      this.car.step(driver.drive(p.x, p.z, fx, fz, speed), h);
+      this.car.step(driver.drive(p.x, p.z, fx, fz, speed, h), h);
 
       const rp = this.rival.body.translation();
       const rq = this.rival.body.rotation();
@@ -778,6 +802,7 @@ class Game {
           2 * (rq.x * rq.z + rq.w * rq.y),
           1 - 2 * (rq.x * rq.x + rq.y * rq.y),
           this.rival.telemetry.speedMs,
+          h,
         ),
         h,
       );
@@ -814,7 +839,12 @@ class Game {
           // suggest the car stopped there, when what happened is that it
           // reached there thirty-three times. So the lap ends and says so.
           if (where === lastResetAt) repeats++; else { repeats = 0; lastResetAt = where; }
-          if (repeats >= 2) { loopedAt = where; break; }
+          // Five, not two. The driver takes a fifth off its target speed at a
+          // place each time it comes to grief there, so the third and fourth
+          // attempts are genuinely different from the first — 0.8, 0.64, 0.51.
+          // Calling a loop after two denied that its own learning a chance to
+          // work.
+          if (repeats >= 5) { loopedAt = where; break; }
         }
       }
       if (this.race.phase === 'finished') break;
