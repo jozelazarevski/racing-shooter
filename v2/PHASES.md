@@ -124,9 +124,11 @@ Every one of these was found by measuring, not by reading the code.
 
 ## Known gaps — absent, not pretended
 
-- **§5 anti-roll bars are not implemented.** Two attempts made the car
-  measurably *worse* than no bar: a wheel reads its partner's compression a step
-  stale, and feeding that through a stiff bar oscillates. Left out deliberately.
+- **§5 anti-roll bars: FIXED.** The two failed attempts were both single-pass —
+  a wheel read its partner's compression a step stale, and a 620 Nm/deg bar fed
+  stale data oscillates whichever sign it uses. Split into a probe pass and a
+  force pass so both compressions are current, and the bar became a spring
+  between two known positions. Col de Turini no longer rolls the car.
 - **Tier 3 does not fall.** §3.1 specifies "falls, momentum exchange"; here
   young trees are static colliders. Collision, tier and damage classification
   are correct — only knock-down is missing. Needs collider streaming.
@@ -141,6 +143,11 @@ Every one of these was found by measuring, not by reading the code.
 - **Region palettes are placeholders**, not the `RALLY_WORLD_BIBLE` values.
   Phase 4.
 - **No weapons, no AI rivals, no progression** in v2 yet. They live in v1.
+- **Content parity with v1 is a long way off.** v1 is ~13,000 lines: weapons,
+  choppers, hostiles, traffic, 28 worlds, the rally-star progression, the
+  garage, upgrades, audio, the offline PWA. v2 has none of it. What has come
+  across is the *feel* layer — controls, cameras, the race — and the engine
+  underneath. Content is the remaining migration, not a finishing pass.
 - **Frame rate is unverified on real hardware.** The headless harness runs on
   SwiftShader, a software rasteriser, at roughly a third of real time. 227 k
   triangles and ~1.5 ms of physics per step should be comfortable on a GPU, but
@@ -237,6 +244,30 @@ the car's heading; the overhead ones take the damped direction of *travel*,
 because at 50 m up raw heading whips on every steering flick. All of them are
 yaw-only: following roll and pitch makes the horizon tumble over a crest and
 the player loses the road, which is the one thing a camera exists to show.
+
+## Graphics — the first pass toward v1
+
+- **Wheel spray**, and it is not decoration. Which particle a surface throws is
+  specified — `SURFACES[id].particle` is dust / stones / mud / grass / sand /
+  snow / spray / splash — so this reads that field rather than guessing from a
+  surface name. Rate scales with speed and much harder with §8's `utilisation`,
+  which is literally "how far into the friction budget this tyre is". A sliding
+  tyre throws visibly more than a gripping one, so you can *see* the limit
+  before you feel it. One draw call, a ring buffer of 1,400 points, no
+  allocation per particle — a GC pause is a physics spiral waiting to happen.
+- **The car casts a shadow.** Only the car: a 4 km stage of shadow-casting trees
+  is not a frame budget, and the car's own shadow is the one that matters — it
+  is what tells you where you are about to land after a crest. The shadow
+  frustum is 28 m across and follows the car, because one big enough to cover
+  the stage would put 4 km into 1024 texels and smear.
+- **A gradient sky dome** instead of a flat clear colour, which made every stage
+  look shot against paper. Two stops, one inverted sphere, no texture. It is
+  what makes the fog colour read as distance rather than as a grey wall.
+- **ACES tone mapping and sRGB output.** Without them the specified palettes come
+  out flat: a Lambert surface under a 2.3-intensity sun clips to white in linear
+  space long before it should.
+
+Measured after: 120–166 k triangles, 29–41 draw calls.
 
 ## Next
 

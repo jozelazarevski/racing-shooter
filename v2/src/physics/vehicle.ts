@@ -282,17 +282,31 @@ export class Vehicle {
     const rayLen = restLength + WHEEL_RADIUS;
     let groundedCount = 0;
 
-    for (const w of this.wheels) {
+    // PASS 1 — probe every wheel before applying any force.
+    //
+    // This split is what finally made the anti-roll bars work. A bar's force
+    // depends on the compression DIFFERENCE across an axle, so a single loop
+    // has to read its partner's compression from the previous step. Feeding a
+    // step-stale value through a 620 Nm/deg bar oscillates: both earlier
+    // attempts were measurably worse than having no bar at all, whichever sign
+    // they used. With both compressions current, the bar is just a spring
+    // between two known positions.
+    const probes = this.wheels.map((w) => {
       const origin = add(pos, add(scale(right, w.ax), add(scale(up, w.ay), scale(fwd, w.az))));
       const down = scale(up, -1);
-      const ray = new RAPIER.Ray(origin, down);
-      const hit = this.phys.world.castRayAndGetNormal(ray, rayLen, true, undefined, undefined, undefined, this.body);
-
+      const hit = this.phys.world.castRayAndGetNormal(
+        new RAPIER.Ray(origin, down), rayLen, true, undefined, undefined, undefined, this.body,
+      );
       const wasGrounded = w.grounded;
       w.lastCompression = w.compression;
+      w.compression = hit ? clamp(rayLen - hit.timeOfImpact, 0, restLength) : 0;
+      return { w, origin, down, hit, wasGrounded };
+    });
+
+    // PASS 2 — forces.
+    for (const { w, origin, down, hit, wasGrounded } of probes) {
       if (!hit) {
         w.grounded = false;
-        w.compression = 0;
         w.hitDist = -1;
         w.hitGround = false;
         w.load = 0;
@@ -309,7 +323,6 @@ export class Vehicle {
       const dist = hit.timeOfImpact;
       w.hitDist = dist;
       w.hitGround = hit.collider?.handle === this.phys.ground.handle;
-      w.compression = clamp(rayLen - dist, 0, restLength);
       const contact = add(origin, scale(down, dist));
       w.contact = contact;
 
@@ -317,13 +330,23 @@ export class Vehicle {
 
       // --- suspension, §5 --------------------------------------------------
       const springRate = w.front ? susp.springFront : susp.springRear;
-      // NOTE: §5's anti-roll bars (arbFront 620, arbRear 480 Nm/deg) are NOT
-      // implemented. Two attempts made the car measurably worse than having no
-      // bar at all — the compression a wheel reads from its partner is a step
-      // stale, and feeding that back through a stiff bar oscillates. Left out
-      // rather than shipped half-working; recorded in PHASES.md. The rollover
-      // problem it was meant to solve turned out to be the centre of mass, not
-      // the roll stiffness.
+      // §5 anti-roll bar. arbFront 620, arbRear 480 Nm/deg. The bar transfers
+      // load ONTO the more-compressed side to resist the roll, so the sign is
+      // positive; taking load off that side amplifies roll instead. Both
+      // compressions come from pass 1, so neither is stale.
+      const partner = this.wheels[w.front ? (w.ax < 0 ? 1 : 0) : (w.ax < 0 ? 3 : 2)]!;
+      const arb = w.front ? susp.arbFront : susp.arbRear;
+      const rollDeg = (Math.atan2(w.compression - partner.compression, VEHICLE.trackWidth) * 180) / Math.PI;
+      // Two guards, both physical rather than fudges:
+      //
+      //  - the bar needs BOTH wheels on the ground to react against. With one
+      //    wheel in the air the compression difference is the whole travel, and
+      //    the bar drives the grounded side down hard at exactly the moment the
+      //    car is already tipping.
+      //  - clamped to a third of the static corner load. A torsion bar that can
+      //    out-push the spring it is helping is not a bar, it is a jack.
+      const arbCap = 0.33 * (VEHICLE.mass * -SIM.gravity) / 4;
+      const arbForce = partner.grounded ? clamp((arb * rollDeg) / VEHICLE.trackWidth, -arbCap, arbCap) : 0;
       // The damper must not see the step change from "not touching" to
       // "touching". On the frame a wheel lands, (compression - 0) / (1/120) is
       // a compression rate of ~24 m/s, and 4200 N.s/m of bump damping turns
@@ -341,7 +364,7 @@ export class Vehicle {
       // past equilibrium, and bounced itself off the ground within half a second.
       // Every compression figure looked plausible at the first contact, which is
       // what made it worth tracing frame by frame rather than eyeballing.
-      let force = springRate * w.compression + damping * compressionRate;
+      let force = springRate * w.compression + damping * compressionRate + arbForce;
 
       // Bump stop: the last 30 mm of travel is 6x stiffer. Without it a big
       // landing bottoms out silently and the car simply passes through.

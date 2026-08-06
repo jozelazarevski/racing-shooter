@@ -193,8 +193,10 @@ class Game {
     });
 
     this.enforceWorldBounds();
+    this.emitParticles(dt);
     this.syncCar();
     this.updateCamera(dt);
+    this.view.followSun(this.car.body.translation().x, this.car.body.translation().y, this.car.body.translation().z);
     this.updateHud();
 
     this.frames++;
@@ -208,6 +210,31 @@ class Game {
     this.view.renderer.render(this.view.scene, this.view.camera);
     requestAnimationFrame(this.frame);
   };
+
+  /** Wheel spray. Emitted per FRAME, not per physics step: particles are
+   *  cosmetic, and §14.5 forbids gameplay logic reading render delta, not
+   *  decoration. Both cars throw, because a rival trailing dust is how you see
+   *  it coming without taking your eyes off the road. */
+  private emitParticles(dt: number): void {
+    const step = Math.min(dt, 0.05);
+    for (const car of [this.car, this.rival]) {
+      const t = car.telemetry;
+      const v = car.body.linvel();
+      const speed = Math.hypot(v.x, v.z);
+      if (speed < 3) continue;
+      const nx = v.x / speed;
+      const nz = v.z / speed;
+      for (const w of t.wheels) {
+        if (!w.grounded) continue;
+        this.view.particles.emitWheel(
+          w.contact.x, w.contact.y, w.contact.z,
+          nx * speed, nz * speed,
+          car.surface, speed, w.utilisation, step,
+        );
+      }
+    }
+    this.view.particles.update(step);
+  }
 
   /** Copy the rigid body's transform to the mesh. Note what is NOT here: no
    *  height correction, no pitch derived from climb rate, no ground snapping.
