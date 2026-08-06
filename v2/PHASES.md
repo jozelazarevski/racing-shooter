@@ -7,7 +7,7 @@ whole migration, exactly as `MIGRATION.md` promised.
 
 ```
 cd v2
-npm run gate       # typecheck + 101 unit tests
+npm run gate       # typecheck + 121 unit tests
 npm run lint       # build all six stages, run §15 against each, fail loudly
 npm run build      # -> ../play-v2
 npm run smoke      # drive every stage headless (needs a server on :8902)
@@ -554,11 +554,59 @@ profile's friction fraction is not monotonic in outcome: at 0.75 Monte Carlo
 went from 15 recoveries to 3 while Col de Turini got much worse (DNF at 1.25 km
 against 2.26 km); at 0.85 both were worse than either. It stays at 0.92.
 
+## Phase 3, part three — the rally
+
+Six stages existed and each was a separate, forgetful event: drive it, see a
+time, reload. `race/rally.ts` gives them somewhere to accumulate.
+
+The design is not invented. It is **§11.2.6** — *"Damage is not repaired by a
+reset. Only a service park repairs damage"* — taken seriously. That sentence has
+no content unless damage survives the end of a stage; if it survives there must
+be somewhere it stops surviving, and the spec names it; and if it accumulates
+across an itinerary then §9's terminal band stops being an abstract ceiling and
+becomes retirement.
+
+So a rally is: six legs in order, a classification that is driving **plus every
+§11 penalty**, damage carried from leg to leg, one service park that clears it,
+and retirement at 120 kJ. Nothing here is a new mechanic — it is the ones
+already built given consequences that outlive a single stage.
+
+- The service park sits between Fafe and Monte Carlo, on the principle that the
+  two stages most likely to destroy the car — the switchback ones — should not
+  both fall on the same side of it.
+- A stage you have already reached can be re-driven, and the itinerary says
+  `practice — does not count` on the top panel while you drive it. The
+  classification only counts the leg you are on.
+- Corrupt storage starts a new rally rather than throwing, the same rule the
+  personal best follows.
+
+### Two bugs found by testing it
+
+**A progression lock silently substituted a different stage.** `?stage=` for a
+locked stage opened the current leg instead. `npm run reference` asked for six
+stages, was handed Ouninpohja six times, and reported **"every stage passes
+L15"** — a clean sweep in a run where five stages were never driven. It looked
+like the best result the project has ever produced.
+
+Two changes, and the second matters more than the first. A URL now opens any
+stage that exists, because a lock on a query parameter is not access control and
+the select already gates the UI path. And the harness now compares the stage it
+was given with the stage it asked for and fails loudly on a mismatch: *a harness
+that cannot tell it was handed the wrong subject is worse than no harness.*
+
+**The steering pad covered the bottom-left controls.** `#pad` takes the left 52%
+of the screen at `z-index: 3` so a drag can start anywhere; the panel holding the
+stage select and the CONTROLS button had no z-index at all. The CSS comment two
+lines above says those panels "re-enable pointer events" — they did, and it made
+no difference. On a phone, that panel has never responded to a touch. Found by a
+click that timed out with `#pad intercepts pointer events`.
+
 ## Next
 
-1. **The two hairpins.** Col de Turini at 2,242 m and Monte Carlo at 2,285 m.
+1. **The two hairpins.** Col de Turini at ~1,220 m and Monte Carlo at 2,285 m.
    The car arrives, understeers into the bank and beaches with full lock on and
    the throttle open. The controller has no way out of that — a real driver
    would reverse, and there is no reverse gear.
-2. **Progression across stages.**
-3. **§3.2 rule 4**, apex occlusion, now that a racing line exists.
+2. **§3.2 rule 4**, apex occlusion, now that a racing line exists.
+3. **Phase 4 — the bible.** Region palettes, lighting, archetype architecture,
+   and the R01–R12 region lint.

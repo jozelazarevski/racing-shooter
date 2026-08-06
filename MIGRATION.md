@@ -140,7 +140,13 @@ regression is the honest kind: the old recovery moved the car FORWARD past
 obstacles it could not drive past, and the specified one does not. What the AI
 cannot do is two particular hairpins, and it never could.
 
-Progression across stages is still to come. See `v2/PHASES.md`.
+Progression landed on the same principle: §11.2.6 says only a service park
+repairs damage, which is only meaningful if damage outlives a stage. A rally is
+now six legs in order, a classification of driving plus every §11 penalty,
+damage carried between legs, one service park, and retirement at §9's terminal
+band. Testing it caught a progression lock that was silently handing the
+reference-lap harness the wrong stage — six requests, one stage, and a reported
+clean sweep of L15. See `v2/PHASES.md`.
 
 **Phase 4 — the bible.** Region palettes, lighting to five decimals, archetype
 architecture, scatter densities, and the R01–R12 region lint.

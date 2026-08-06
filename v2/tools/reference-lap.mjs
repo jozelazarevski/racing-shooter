@@ -39,6 +39,21 @@ for (const stage of STAGES) {
     undefined, { timeout: 180_000 });
 
   const name = await page.evaluate(() => document.getElementById('stage-name').textContent);
+  // THE STAGE THAT LOADED MUST BE THE STAGE THAT WAS ASKED FOR.
+  //
+  // It once was not. Stage progression locked stages the player had not
+  // reached, and the boot code answered a locked ?stage= by opening the
+  // current leg instead — so this harness asked for six stages, was given
+  // Ouninpohja six times, and reported "every stage passes L15" in a run where
+  // five of them were never driven. A harness that cannot tell it was handed
+  // the wrong subject is worse than no harness.
+  const loaded = await page.evaluate(() => window.__v2.stage.def.id);
+  if (loaded !== stage) {
+    failures++;
+    console.log(`${stage.padEnd(14)} FAIL asked for "${stage}", got "${loaded}" — not measured`);
+    await page.close();
+    continue;
+  }
   const r = await page.evaluate((skill) => window.__referenceLap(skill), SKILL);
   const km = await page.evaluate(() => window.__v2.stage.length / 1000);
 

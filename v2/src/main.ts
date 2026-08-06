@@ -16,6 +16,10 @@ import { fingerprint } from './core/stageRng.ts';
 import { RaceDirector, formatTime, formatDelta } from './race/director.ts';
 import { RoadDriver } from './race/driver.ts';
 import { CutMonitor, ResetMonitor, nodeFor } from './race/reset.ts';
+import {
+  ITINERARY, classification, completeLeg, damageClass, emptyRally, isComplete,
+  legFor, loadRally, saveRally, unlocked, type RallyState,
+} from './race/rally.ts';
 import { Cannon } from './combat/weapons.ts';
 import { SIM, RESET, VEHICLE } from '../../spec/rally.constants.ts';
 
@@ -79,6 +83,12 @@ class Game {
   cannon!: Cannon;
   /** Arcade score, v1's currency: points for what you destroy. */
   score = 0;
+  /** The rally this stage belongs to. Loaded before the stage builds, because
+   *  it decides how bent the car starts. */
+  rally: RallyState = emptyRally();
+  /** True when this run counts toward the classification — you are driving the
+   *  leg you are ON, not practising one you have already passed. */
+  isCurrentLeg = false;
 
   /** Progress along the centreline. Exposed so the headless harness can drive
    *  the race without reaching into a private field. */
@@ -125,6 +135,13 @@ class Game {
     this.car.surface = first.surfaceId as typeof this.car.surface;
     this.car.compound = def.surface === 'tarmac' ? 'tarmac_slick' : def.surface === 'snow' ? 'snow_studded' : 'gravel';
 
+    // §11.2.6, the whole point of the rally: damage is not repaired by a reset,
+    // and only a service park repairs it — so it arrives with the car. A leg
+    // you are re-driving for practice starts fresh, because its result does not
+    // count toward the classification either.
+    this.isCurrentLeg = legFor(def.id) === this.rally.leg && !this.rally.retired;
+    if (this.isCurrentLeg) this.car.damageJ = this.rally.damageJ;
+
     // The rival. Same Vehicle class, same physics, same tyres — the only
     // difference is who supplies the input. A rival on a different model would
     // teach the player the wrong thing about grip.
@@ -164,9 +181,19 @@ class Game {
     addEventListener('resize', () => this.view.resize());
 
     $('stage-name').textContent = def.name;
+    const legIndex = legFor(def.id);
     $('stage-sub').textContent =
+      (legIndex >= 0 ? `SS${legIndex + 1}/${ITINERARY.length} · ` : '') +
       `${def.country} · ${def.surface} · ${(this.stage.length / 1000).toFixed(2)} km · ` +
-      `${this.stage.corners.length} corners`;
+      `${this.stage.corners.length} corners` +
+      (this.isCurrentLeg && this.rally.damageJ > 0
+        ? ` · carrying ${(this.rally.damageJ / 1000).toFixed(0)} kJ`
+        : '') +
+      // A run that does not count must say so while you are driving it, not
+      // only when you cross the line.
+      (legIndex >= 0 && !this.isCurrentLeg
+        ? this.rally.retired ? ' · RETIRED — practice only' : ' · practice — does not count'
+        : '');
     $('build-info').innerHTML =
       `built in ${buildMs.toFixed(0)} ms · ${this.stage.objects.length.toLocaleString()} objects · ` +
       `seed ${this.stage.rng.seed} · fingerprint <b>${fingerprint(this.stage.objects)}</b><br>` +
@@ -490,6 +517,23 @@ class Game {
   private showResult(): void {
     const r = this.race.result!;
     this.resultShown = true;
+
+    // Record the leg BEFORE drawing, so the panel can show where the rally
+    // stands afterwards rather than where it stood before this stage.
+    let advanced = false;
+    if (this.isCurrentLeg) {
+      const before = this.rally;
+      this.rally = completeLeg(this.rally, {
+        stageId: this.stage.def.id,
+        raw: r.raw,
+        penalty: r.penalty,
+        resets: this.resets[0]!,
+        cuts: this.cuts.cuts,
+        damageJ: this.car.telemetry.damageJ,
+      });
+      advanced = this.rally !== before;
+      saveRally(this.rally);
+    }
     const rivalGap = this.rivalDriver.state.distance - this.playerDriver.state.distance;
     const rows = this.race.splits
       .map((s) => {
@@ -511,6 +555,34 @@ class Game {
           ` — ${this.resets[0]} reset${this.resets[0] === 1 ? '' : 's'}, ${this.cuts.cuts} cut${this.cuts.cuts === 1 ? '' : 's'}`
         : '<br>Clean run: no resets, no cuts.');
     $('result-splits').innerHTML = rows;
+
+    // The rally line: where this leg leaves you.
+    const rally = $('result-rally');
+    if (!advanced) {
+      rally.innerHTML = this.rally.retired
+        ? '<span class="bad">RETIRED — the rally is over. START A NEW RALLY to run it again.</span>'
+        : '<span class="dim">Practice run — the classification counts the leg you are on.</span>';
+    } else if (this.rally.retired) {
+      rally.innerHTML =
+        `<span class="bad">RETIRED — ${(this.car.telemetry.damageJ / 1000).toFixed(0)} kJ, ${damageClass(this.car.telemetry.damageJ)}.</span>` +
+        '<br>§9 says terminal, so the car does not start the next stage.';
+    } else if (isComplete(this.rally)) {
+      rally.innerHTML =
+        `<span class="good">RALLY COMPLETE</span> — ${ITINERARY.length} stages in ` +
+        `<b>${formatTime(classification(this.rally))}</b>`;
+    } else {
+      const next = ITINERARY[this.rally.leg]!;
+      const nextName = STAGES.find((s) => s.id === next.stageId)?.name ?? next.stageId;
+      rally.innerHTML =
+        `Rally ${this.rally.leg}/${ITINERARY.length} · <b>${formatTime(classification(this.rally))}</b>` +
+        ` · damage ${(this.rally.damageJ / 1000).toFixed(0)} kJ (${damageClass(this.rally.damageJ)})` +
+        (next.service
+          ? `<br><span class="good">SERVICE PARK</span> before ${nextName} — damage repaired.`
+          : `<br>Next: ${nextName}, and the damage comes with you.`);
+      $('next-leg').textContent = `NEXT: ${nextName}`;
+      $('next-leg').style.display = 'block';
+      $('next-leg').onclick = () => { location.search = `?stage=${next.stageId}`; };
+    }
     $('result').style.display = 'flex';
   }
 
@@ -789,18 +861,92 @@ function setStatus(text: string): void {
 // --- boot -------------------------------------------------------------------
 const game = new Game();
 
+// The rally is loaded before anything is built, because it decides which stages
+// may be started and how bent the car starts.
+game.rally = loadRally();
+const open = unlocked(game.rally);
+
+/** The stage the URL asked for, if it names a real one. Read before the list is
+ *  built so a locked stage opened by URL still appears selected in it. */
+function initialId(): string {
+  const q = new URLSearchParams(location.search).get('stage');
+  return q && STAGES.some((s) => s.id === q) ? q : '';
+}
+
 const select = $('stage-select') as HTMLSelectElement;
 for (const s of STAGES) {
   const opt = document.createElement('option');
   opt.value = s.id;
-  opt.textContent = `${s.name} — ${s.country}`;
+  const n = legFor(s.id) + 1;
+  opt.textContent = `${n ? `SS${n} ` : ''}${s.name} — ${s.country}`;
+  // A stage you have not reached cannot be picked from the list. An itinerary
+  // you can skip to the end of is a stage select with extra words. A URL still
+  // opens it — see the note below.
+  opt.disabled = !open.has(s.id) && s.id !== initialId();
   select.appendChild(opt);
 }
 
-const initial = new URLSearchParams(location.search).get('stage') ?? STAGES[0]!.id;
-select.value = STAGES.some((s) => s.id === initial) ? initial : STAGES[0]!.id;
+// An explicit ?stage= opens ANY stage that exists, locked or not.
+//
+// The lock is a UI affordance — it shapes the itinerary and the select — and
+// treating it as an access control is both pointless (it is a URL) and
+// actively harmful. Silently substituting the current leg for a locked one
+// meant `npm run reference` asked for six stages, was given Ouninpohja six
+// times, and reported "every stage passes L15". A run that does not count is
+// marked as practice; it is not redirected.
+const asked = new URLSearchParams(location.search).get('stage');
+const startAt = ITINERARY[Math.min(game.rally.leg, ITINERARY.length - 1)]!.stageId;
+const initial = asked && STAGES.some((s) => s.id === asked) ? asked : startAt;
+select.value = initial;
 select.addEventListener('change', () => {
   location.search = `?stage=${select.value}`;
+});
+
+// --- the itinerary ----------------------------------------------------------
+function renderItinerary(): void {
+  const rows: string[] = [];
+  for (let i = 0; i < ITINERARY.length; i++) {
+    const legDef = ITINERARY[i]!;
+    if (legDef.service) {
+      rows.push('<tr class="service"><td colspan="4">— SERVICE PARK · DAMAGE REPAIRED —</td></tr>');
+    }
+    const def = STAGES.find((s) => s.id === legDef.stageId)!;
+    const done = game.rally.results[i];
+    const isNow = i === game.rally.leg && !game.rally.retired;
+    const locked = !open.has(legDef.stageId);
+    const time = done ? formatTime(done.raw + done.penalty) : isNow ? 'NOW' : '—';
+    const notes = done
+      ? [done.penalty ? `+${done.penalty.toFixed(0)}s` : '', done.resets ? `${done.resets}R` : '',
+         done.cuts ? `${done.cuts}C` : ''].filter(Boolean).join(' ') || 'clean'
+      : '';
+    const name = locked
+      ? def.name
+      : `<a href="?stage=${def.id}">${def.name}</a>`;
+    rows.push(
+      `<tr class="${isNow ? 'now' : locked ? 'locked' : ''}">` +
+      `<td>SS${i + 1}</td><td>${name}</td><td>${time}</td><td>${notes}</td></tr>`,
+    );
+  }
+  $('itinerary-legs').innerHTML = rows.join('');
+  $('itinerary-sub').innerHTML = game.rally.retired
+    ? '<span class="bad">RETIRED.</span> §9 calls the damage terminal, so the car does not start again. Only a new rally clears it.'
+    : isComplete(game.rally)
+      ? `<span class="good">COMPLETE</span> — ${ITINERARY.length} stages in <b>${formatTime(classification(game.rally))}</b>`
+      : `Classification <b>${formatTime(classification(game.rally))}</b> after ${game.rally.leg} of ${ITINERARY.length}` +
+        `<br>Carrying ${(game.rally.damageJ / 1000).toFixed(0)} kJ of damage (${damageClass(game.rally.damageJ)}).` +
+        ' §11.2.6: only a service park repairs it.';
+}
+renderItinerary();
+
+$('itinerary-btn').addEventListener('click', () => {
+  renderItinerary();
+  $('itinerary').classList.add('open');
+});
+$('itinerary-close').addEventListener('click', () => $('itinerary').classList.remove('open'));
+$('new-rally').addEventListener('click', () => {
+  game.rally = emptyRally();
+  saveRally(game.rally);
+  location.search = `?stage=${ITINERARY[0]!.stageId}`;
 });
 
 // Restart re-runs the same stage. The world is seeded, so it rebuilds byte for
