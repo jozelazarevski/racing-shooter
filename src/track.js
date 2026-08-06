@@ -7808,6 +7808,59 @@ export class Track {
           g.add(post);
         }
       }
+      // --- SUPPORTS -----------------------------------------------------
+      //
+      // THE BUG THIS FIXES: the deck sits at a hard-coded 9 u above the road
+      // and the original comment said the ends "embed into the cliffs" — which
+      // is true on a theme that HAS cliffs. FLUME sets bridgeCount: 3 and no
+      // cliffWalls, so its three crossings hung in mid-air with nothing holding
+      // them up. Reported as "hanging bridges are flying", and that is exactly
+      // what they were doing.
+      //
+      // Rather than dropping the bridges from cliff-less worlds, both ends now
+      // get a timber trestle down to whatever the ground actually is. A
+      // structure is either supported or it is not there — it is never floating.
+      // Where the theme does have cliff walls the trestle is short and hidden
+      // inside the rock, which costs nothing.
+      const nrm = this.nrm[i];
+      const deckY = c.y + 9;
+      let anchored = 0;
+      for (const s2 of [-1, 1]) {
+        const ex = c.x + nrm.x * s2 * (span / 2 - 0.6);
+        const ez = c.z + nrm.z * s2 * (span / 2 - 0.6);
+        // Sampled from the same terrain the car drives on, so the pier lands on
+        // the ground rather than near it.
+        const gy = this.terrainHeight(ex, ez);
+        const drop = deckY - gy;
+        if (!(drop > 0.4)) { anchored++; continue; }   // already inside solid ground
+        // Two legs per end, splayed, plus a cross-brace: a single post under a
+        // 25 u span reads as a stilt, not a trestle.
+        for (const lean of [-1, 1]) {
+          const leg = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.16, 0.26, drop, 6),
+            woodMat
+          );
+          leg.castShadow = true;
+          leg.position.set(
+            s2 * (span / 2 - 0.6) + lean * 0.1 * s2,
+            9 - drop / 2,
+            lean * 1.15
+          );
+          leg.rotation.x = lean * -0.05;
+          g.add(leg);
+        }
+        const brace = new THREE.Mesh(
+          new THREE.BoxGeometry(0.16, 0.16, 2.5),
+          woodMat
+        );
+        brace.position.set(s2 * (span / 2 - 0.6), 9 - Math.min(drop * 0.55, drop - 0.3), 0);
+        g.add(brace);
+        anchored++;
+      }
+      // A crossing that could not find ground at either end is not scenery, it
+      // is a bug with a texture on it.
+      if (!anchored) continue;
+
       g.position.set(c.x, c.y, c.z);      // deck rides at road y + 9, above any jump
       g.rotation.y = this.headingAt(i);   // local X = road normal → deck spans the canyon
       this.group.add(g);
