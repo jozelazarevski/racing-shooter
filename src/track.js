@@ -8180,30 +8180,82 @@ export class Track {
       }
       const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
       const SEGS = 64, HALF = 3.2;
-      const verts = new Float32Array((SEGS + 1) * 2 * 3);
-      const uvs = new Float32Array((SEGS + 1) * 2 * 2);
-      const idx = [];
-      for (let s = 0; s <= SEGS; s++) {
-        const t = s / SEGS;
-        const p = curve.getPointAt(t);
+
+      // ---- LEVEL REACHES, VERTICAL DROPS (NATURE rules 1 and 3) ----------
+      //
+      // THE BUG THIS FIXES: every vertex took its height from the terrain
+      // under it, so on falling ground the ribbon draped down the slope and
+      // the stream rendered as a sheet of water lying at an angle. Reported as
+      // "waterfalls should fall vertically not on an angle" — and that is
+      // precisely what it was: a fall with no vertical in it.
+      //
+      // NATURE rule 3: a water surface is either ~0 degrees (a pool, or a
+      // river running level) or ~90 degrees (a fall face), never in between.
+      // So the stream is built as a chain of LEVEL quads joined by VERTICAL
+      // ones. Each reach holds its height until the bed has dropped by more
+      // than STEP; the drop is then a separate upright quad at a single
+      // station, which is what makes it vertical rather than merely steep.
+      //
+      // Draping the profile in one strip cannot express this: a strip has one
+      // height per station, so a drop is forced to slope across a whole
+      // segment. Measured, the first attempt at quantising still left 28
+      // segments between 8 and 38 degrees. Two stations per drop removes them.
+      //
+      // This is the along-stream counterpart of the correction _buildFords
+      // already carries across the stream ("real water is level bank to bank").
+      const STEP = 1.1;
+      const path = [];
+      for (let s2 = 0; s2 <= SEGS; s2++) {
+        const t = s2 / SEGS;
+        const q = curve.getPointAt(t);
         const tn = curve.getTangentAt(t);
-        // floats above the (coarsely tessellated) terrain in the open, and
-        // dips just below the road deck through the crossing
-        const df = this._distToTrackCoarse(p.x, p.z);
-        const y = this.terrainHeight(p.x, p.z) - 0.12
-          + 0.45 * THREE.MathUtils.smoothstep(df, 11, 17);
+        const df0 = this._distToTrackCoarse(q.x, q.z);
+        const bed = this.terrainHeight(q.x, q.z) - 0.12
+          + 0.45 * THREE.MathUtils.smoothstep(df0, 11, 17);
         // banks taper into the undergrowth at both ends
         const wv = HALF * (0.3 + 0.7 * Math.sqrt(Math.sin(Math.PI * t)));
-        const o = s * 6;
-        verts[o] = p.x + tn.z * wv; verts[o + 1] = y; verts[o + 2] = p.z - tn.x * wv;
-        verts[o + 3] = p.x - tn.z * wv; verts[o + 4] = y; verts[o + 5] = p.z + tn.x * wv;
-        uvs[s * 4] = t * 6; uvs[s * 4 + 1] = 0;
-        uvs[s * 4 + 2] = t * 6; uvs[s * 4 + 3] = 1;
+        path.push({ x: q.x, z: q.z, nx: tn.z * wv, nz: -tn.x * wv, bed, t });
       }
-      for (let s = 0; s < SEGS; s++) {
-        const a = s * 2, b = s * 2 + 1, c = s * 2 + 2, d2 = s * 2 + 3;
-        idx.push(a, b, c, b, d2, c);
+      // Water never runs uphill: the held level only ever descends.
+      let hold = path[0].bed;
+      for (const pt of path) {
+        if (hold - pt.bed > STEP) hold = pt.bed;
+        pt.y = Math.min(hold, pt.bed + 0.35);
       }
+
+      const vArr = [], uArr = [], idx = [];
+      let base = 0;
+      const quad = (ax, ay, az, bx, by, bz, cx, cy, cz, dx2, dy2, dz2, u0, u1) => {
+        vArr.push(ax, ay, az, bx, by, bz, cx, cy, cz, dx2, dy2, dz2);
+        uArr.push(u0, 0, u0, 1, u1, 0, u1, 1);
+        idx.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+        base += 4;
+      };
+
+      for (let s2 = 0; s2 < SEGS; s2++) {
+        const a = path[s2], b2 = path[s2 + 1];
+        // The reach: both ends at the UPSTREAM level, so the quad is flat.
+        quad(
+          a.x + a.nx, a.y, a.z + a.nz,
+          a.x - a.nx, a.y, a.z - a.nz,
+          b2.x + b2.nx, a.y, b2.z + b2.nz,
+          b2.x - b2.nx, a.y, b2.z - b2.nz,
+          a.t * 6, b2.t * 6,
+        );
+        // The fall: an upright face at the station where the level changes.
+        if (b2.y < a.y - 0.02) {
+          quad(
+            b2.x + b2.nx, a.y, b2.z + b2.nz,
+            b2.x + b2.nx, b2.y, b2.z + b2.nz,
+            b2.x - b2.nx, a.y, b2.z - b2.nz,
+            b2.x - b2.nx, b2.y, b2.z - b2.nz,
+            b2.t * 6, b2.t * 6 + 0.35,
+          );
+        }
+      }
+      const verts = new Float32Array(vArr);
+      const uvs = new Float32Array(uArr);
+
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
       geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
