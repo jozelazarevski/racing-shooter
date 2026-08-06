@@ -146,7 +146,49 @@ Every one of these was found by measuring, not by reading the code.
   triangles and ~1.5 ms of physics per step should be comfortable on a GPU, but
   that is an expectation, not a measurement.
 
+## The race slice — landed
+
+A stage is now a race rather than a drive.
+
+- **Countdown** — 3, 2, 1, GO. Brakes held, steering live so you can set up.
+- **Clock in physics time**, not wall time, so a dropped frame or a background
+  tab cannot cost you a run.
+- **Sector splits every 500 m**, which is §1.1's definition of a sector, not
+  three arbitrary thirds. Each split shows the delta against your best for that
+  same sector, green or red.
+- **Personal best per stage**, in `localStorage`. Survives a corrupt or blocked
+  store rather than failing the race.
+- **A rival** — same `Vehicle` class, same tyres, same physics; the only
+  difference is who supplies the input. A rival on a different model would teach
+  the player the wrong thing about grip. It runs a line 2 m off the centreline
+  so it is not fighting you for the same piece of road on the start straight.
+- **Results panel** with every sector, the delta to your previous best, and
+  whether you beat the rival.
+- **Recovery** — §7's 2.5 s on the roof, plus off-world and stuck detection.
+
+`src/race/driver.ts` is the pure-pursuit controller the smoke test used to
+prove the car was drivable. It earned promotion to being the rival: one
+implementation, so the thing the tests exercise is the thing that ships.
+
+Two more things found by measuring:
+
+- **The car could drive off the edge of the world** and fall for ever. Measured
+  on Safari, it reached 575 km/h straight down — which is exactly the terminal
+  velocity the spec's own drag coefficient and 11 m/s² gravity imply, so at
+  least the aerodynamics were right. Now caught and reset.
+- **The final sector never recorded.** The finish fired at `length − 1` and
+  closed the race before the boundary at `length` could be crossed.
+
+### Known gap in the race
+
+**The AI cannot yet complete a full stage cleanly at high skill.** At skill 1.0
+it crashes and beaches itself; auto-recovery gets it moving again, but a clean
+AI run start to finish is not proven. The rival runs at 0.78, which is
+conservative enough to be a fair pacer over the early sectors. Racing it over a
+whole stage is a driver-quality problem, not a physics one, and it is the next
+thing to fix.
+
 ## Next
 
-**Phase 3 — stages.** Sectors, reset nodes, pacenotes from the grading that
-already exists, progression reworked off laps.
+**Phase 3 proper.** Reset nodes every 120 m (lint L12), a better AI line
+(racing line rather than centreline + offset), and progression across stages.

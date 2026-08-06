@@ -33,6 +33,7 @@ export interface Renderer {
   renderer: THREE.WebGLRenderer;
   car: THREE.Group;
   wheels: THREE.Mesh[];
+  rival: THREE.Group;
   resize(): void;
 }
 
@@ -55,8 +56,10 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
   scene.add(buildTerrain(stage.heightfield, pal));
   for (const m of buildProps(stage, pal)) scene.add(m);
 
-  const { car, wheels } = buildCar();
+  const { car, wheels } = buildCar(0xe8442c);
   scene.add(car);
+  const rival = buildCar(0x2f7fd4).car;
+  scene.add(rival);
 
   const camera = new THREE.PerspectiveCamera(62, 1, 0.4, 900);
 
@@ -69,7 +72,7 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
   };
   resize();
 
-  return { scene, camera, renderer, car, wheels, resize };
+  return { scene, camera, renderer, car, wheels, rival, resize };
 }
 
 /**
@@ -239,11 +242,11 @@ function buildProps(stage: Stage, pal: (typeof PALETTE)[string]): THREE.Object3D
 
 type WorldObjectLite = Stage['objects'][number];
 
-function buildCar(): { car: THREE.Group; wheels: THREE.Mesh[] } {
+function buildCar(colour: number): { car: THREE.Group; wheels: THREE.Mesh[] } {
   const car = new THREE.Group();
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(1.7, 0.62, 4.2),
-    new THREE.MeshLambertMaterial({ color: 0xe8442c }),
+    new THREE.MeshLambertMaterial({ color: colour }),
   );
   body.position.y = 0.1;
   car.add(body);

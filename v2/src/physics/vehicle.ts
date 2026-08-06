@@ -91,6 +91,8 @@ export interface VehicleTelemetry {
   damageJ: number;
   lastImpact: { klass: string; band: string; energyJ: number; angleDeg: number } | null;
   onRoof: boolean;
+  /** Seconds spent past ROLLOVER.triggerRollDeg. §7 resets at 2.5 s. */
+  roofTime: number;
 }
 
 export class Vehicle {
@@ -200,6 +202,7 @@ export class Vehicle {
       damageJ: this.damageJ,
       lastImpact: this.lastImpact,
       onRoof: this.onRoofFor > 0.2,
+      roofTime: this.onRoofFor,
     };
   }
 
