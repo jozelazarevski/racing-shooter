@@ -395,6 +395,23 @@ export class Weapons {
         for (const h of g.hostiles ?? []) {
           if (h.alive) consider(h.pos.x, h.pos.z, (h.r ?? 2.2) + 0.8, 'hostile', h);
         }
+        // STONE STOPS A BULLET. RULES.md section 4 says the cannon gets sparks
+        // off stone and cliffs, and section 2 calls SOLID indestructible —
+        // but `solids` was never in this candidate list, so boulders, hoodoos,
+        // mesas, cliff walls, gantry legs and the grandstand frame were all
+        // shoot-through. Measured: a round fired at a 2.04 u boulder from 30 u
+        // passed within 1.04 u of its centre and was still alive 7.3 u beyond
+        // it. Buildings were fixed for exactly this reason (see above); rock
+        // was left behind.
+        for (const s of g.track.solids ?? []) {
+          if ((s.y ?? -9999) < -1000) continue;      // traffic AI proxies
+          // Height window, like the tire and banner tests use. The sweep is
+          // horizontal, so without it a round is stopped by anything sharing
+          // its map position at any altitude — a gantry overhead, a bridge
+          // pier below — and the cannon stops working near raised structures.
+          if (Math.abs(b.pos.y - (s.y ?? 0)) > 6) continue;
+          consider(s.x, s.z, (s.r ?? 1) + 0.4, 'solid', s);
+        }
         if (bestKind === 'tree') {
           const tr = bestObj;
           // bigger trunks soak more rounds (~3 hits for a sapling, ~5 for a giant)
@@ -410,6 +427,12 @@ export class Weapons {
           g.hitBuilding?.(bestObj, b.dmg, b.pos.clone(), b.owner); hit = true;
         } else if (bestKind === 'hostile') {
           bestObj.damage(b.dmg); g.audio.hit(); hit = true;
+        } else if (bestKind === 'solid') {
+          // SOLID is indestructible by definition (RULES.md section 2), so the
+          // round simply stops. The shared `hit` block below throws the spark
+          // burst, which is precisely the "impact sparks only" the weapons
+          // matrix specifies for stone and cliffs.
+          hit = true;
         }
       }
       if (hit) {
@@ -499,8 +522,28 @@ export class Weapons {
           && m.pos.distanceToSquared(g.player.pos) < 10) {
         detonate = true; // enemy-owned: proximity fuse against the player only
       }
-      // missiles can also clip walls (never in free roam — no walls out there)
-      if (!g.freeRoam && Math.abs(g.track.lateralOffset(m.pos, m.ti)) > 10.2) detonate = true;
+      // Missiles clip WALLS — but only on the worlds that have one.
+      //
+      // This used to fire on every world at |lateral| > 10.2, and only 5 of 25
+      // worlds carry cliffWalls. RULES.md is explicit that fences are gone and
+      // the world is open, so on the other 20 there is nothing out there to
+      // hit. Measured on PINE VALLEY in race mode: firing from lateral 11 or
+      // beyond killed the missile in ONE frame — it detonated on the player's
+      // own bumper and burned the ammo, for going off-road, which the rules
+      // call legal.
+      if (!g.freeRoam && g.track.T?.cliffWalls
+          && Math.abs(g.track.lateralOffset(m.pos, m.ti)) > 10.2) detonate = true;
+      // ...and real world geometry stops them anywhere: boulders, hoodoos,
+      // gantry legs, the grandstand frame. `solids` was absent from this test
+      // entirely, so a missile flew through a mid-road hoodoo.
+      if (!detonate) {
+        for (const s of g.track.solids ?? []) {
+          if ((s.y ?? -9999) < -1000) continue;      // traffic AI proxies
+          if (Math.abs(m.pos.y - (s.y ?? 0)) > 6) continue;   // see the bullet sweep
+          const dx = m.pos.x - s.x, dz = m.pos.z - s.z, rr = (s.r ?? 1) + 0.8;
+          if (dx * dx + dz * dz < rr * rr) { detonate = true; break; }
+        }
+      }
       // ...and crates/cones/barrels in the flight path set them off
       if (!detonate && g.smashPropsNear?.(m.pos.x, m.pos.z, 1.3, fromPlayer ? m.owner : null, 20) > 0) {
         detonate = true;

@@ -1281,6 +1281,39 @@ export class Car {
       }
     }
 
+    // ---- props: smash at speed, SOLID at a crawl ----
+    //
+    // RULES.md section 2 defines BREAKABLE as "above a speed threshold the
+    // object is destroyed; below it, SOLID push-out", and section 1.1 says
+    // nothing readable as an object may be intangible. Tire stacks and sponsor
+    // boards (above and below) implement exactly that. Props never did: the
+    // only prop contact code is the smash branch in main.js `_updateProps`,
+    // with no else, so under 2 u/s a crate, barrel or log round was a ghost.
+    // Measured — approaching a 1.7 u crate at 1.0, 1.5 and 1.9 u/s, the car
+    // drove clean through every time, reaching 0.39 u from its centre.
+    //
+    // The smash half stays where it is; this only supplies the missing solid
+    // half, and only below the same 2 u/s threshold main.js uses, so nothing
+    // about smashing changes.
+    // NOTE: `gm.props`, not `t.props`. `track.props` is the build-time list and
+    // is never pruned; the game keeps a live copy (main.js:670) and smashing
+    // splices from THAT. Colliding against the track list would push the car
+    // off props it had already destroyed.
+    if (this === gm.player && gm.props && gm.props.length && Math.abs(this.speedAlong) <= 2) {
+      for (const pr of gm.props) {
+        const dx = this.pos.x - pr.x, dz = this.pos.z - pr.z;
+        const rr = (pr.r ?? 1.2) + 1.6;
+        if (dx * dx + dz * dz >= rr * rr) continue;
+        if (Math.abs(this.pos.y - (pr.y ?? 0)) > 4) continue;
+        const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
+        this.pos.x = pr.x + (dx / d) * rr;
+        this.pos.z = pr.z + (dz / d) * rr;
+        const vn = this.vel.x * (dx / d) + this.vel.z * (dz / d);
+        if (vn < 0) { this.vel.x -= (dx / d) * vn; this.vel.z -= (dz / d) * vn; }
+        break;
+      }
+    }
+
     // ---- sponsor boards: rip out at speed, solid at a crawl ----
     if (this === gm.player && t.banners && t.banners.length) {
       for (const bn of t.banners) {
