@@ -37,6 +37,9 @@
   .bar.red { background:var(--hot); }
   #damage-bar { background:var(--bad); }
   #time { font-size:21px; font-weight:700; margin-top:9px; letter-spacing:.02em; }
+  /* §11 penalties, under the clock. The clock already includes them; this says
+     how many of those seconds were not driving. */
+  #penalty { font-size:12px; font-weight:700; letter-spacing:.04em; min-height:14px; }
   #dist { font-size:10px; color:var(--dim); margin-top:3px; }
   #surface { font-size:10px; color:var(--dim); margin-top:4px; letter-spacing:.06em; text-transform:uppercase; }
 
@@ -138,7 +141,7 @@
     #big.good, #big.bad-split, #big.neutral { font-size:30px; }
   }
 </style>
-  <script type="module" crossorigin src="./assets/index-DpZIYTL0.js"></script>
+  <script type="module" crossorigin src="./assets/index-BETiInfR.js"></script>
 </head>
 <body>
 <canvas id="view"></canvas>
@@ -154,6 +157,7 @@
   <div class="bar-track"><div id="rpm-bar" class="bar" style="width:0"></div></div>
   <div id="gearline">GEAR <span id="gear">1</span></div>
   <div id="time">0:00.00</div>
+  <div id="penalty"></div>
   <div class="bar-track"><div id="progress-bar" class="bar" style="width:0"></div></div>
   <div id="dist">0.00 km</div>
   <div class="bar-track"><div id="damage-bar" class="bar" style="width:0"></div></div>

@@ -19,6 +19,7 @@ import {
 } from '../../../spec/rally.constants.ts';
 import type { Stage } from './stage.ts';
 import { sampleHeight, hfIndex } from './terrain.ts';
+import { NODE_SPACING_MAX, worstNodeGap } from '../race/reset.ts';
 
 export type LintStatus = 'pass' | 'fail' | 'skip';
 
@@ -167,7 +168,14 @@ export function lintStage(stage: Stage): LintResult[] {
 
   skip('L10', 'no water bodies in the v2 world model yet');
   skip('L11', 'no bridges in the v2 world model yet — §5.3 lands with structures');
-  skip('L12', 'reset nodes are Phase 3 (stages replace laps)');
+  // L12 — a reset node at least every 120 m of centreline (§11.2.1).
+  {
+    const nodes = stage.resetNodes;
+    const worst = worstNodeGap(nodes);
+    worst > NODE_SPACING_MAX + 1e-6
+      ? fail('L12', `${worst.toFixed(0)} m between reset nodes (max ${NODE_SPACING_MAX})`)
+      : pass('L12', `${nodes.length} reset nodes, widest gap ${worst.toFixed(0)} m`);
+  }
   skip('L13', 'no fauna in the v2 world model yet');
 
   // L14 — collider count within any 150 m window below budget.

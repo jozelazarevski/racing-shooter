@@ -67,10 +67,20 @@ export interface RacingLine {
  *  its edge a driver should aim. 0.25 m is a car's width of hesitation. */
 const EDGE_MARGIN = 0.25;
 
-/** How much of the friction circle the reference line spends. A real driver on
- *  a rally stage does not drive at exactly 100% of the tyre's peak, and neither
- *  does the tyre model: §8's Magic Formula peak sits at a slip angle the car
- *  only reaches while sliding. 0.92 is what measured out — see PHASES.md. */
+/**
+ * How much of the friction circle the reference line spends.
+ *
+ * A real driver does not sit at exactly 100% of the tyre's peak, and neither
+ * does the tyre model: §8's Magic Formula peak is at a slip angle the car only
+ * reaches while sliding.
+ *
+ * 0.92 measured best over six reference laps, and the measurement is worth
+ * recording because it is NOT monotonic. Dropping it to 0.75 made Monte Carlo
+ * far better (15 recoveries to 3) and Col de Turini far worse (DNF at 1.25 km
+ * against 2.26 km); 0.85 was worse than either. A slower car still beaches at a
+ * hairpin it cannot steer round, so the stages that still fail are not failing
+ * on this number.
+ */
 const LIMIT_FRACTION = 0.92;
 
 export interface LineOptions {

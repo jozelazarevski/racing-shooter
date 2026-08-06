@@ -7,7 +7,6 @@
 import * as THREE from 'three';
 import { STAGES, buildStage, type Stage } from './world/stage.ts';
 import { lintStage, lintSummary } from './world/lint.ts';
-import { locate } from './world/corridor.ts';
 import { sampleHeight } from './world/terrain.ts';
 import { initPhysics, createWorld, probeGround, FixedStepper, type PhysicsWorld } from './physics/world.ts';
 import { Vehicle, WHEEL_RADIUS, type DriverInput } from './physics/vehicle.ts';
@@ -16,8 +15,9 @@ import { createRenderer, type Renderer } from './render/scene.ts';
 import { fingerprint } from './core/stageRng.ts';
 import { RaceDirector, formatTime, formatDelta } from './race/director.ts';
 import { RoadDriver } from './race/driver.ts';
+import { CutMonitor, ResetMonitor, nodeFor } from './race/reset.ts';
 import { Cannon } from './combat/weapons.ts';
-import { SIM, ROLLOVER } from '../../spec/rally.constants.ts';
+import { SIM, RESET, VEHICLE } from '../../spec/rally.constants.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -84,6 +84,13 @@ class Game {
    *  the race without reaching into a private field. */
   playerDriverState(x: number, z: number) {
     return this.playerDriver.locate(x, z);
+  }
+
+  /** The driver that tracks the player's car — and, in a reference lap, drives
+   *  it. Exposed for the same reason: a harness that made its own would be
+   *  carrying a second cursor that no reset ever re-seats. */
+  get referenceDriver(): RoadDriver {
+    return this.playerDriver;
   }
 
   async boot(stageId: string): Promise<void> {
@@ -213,7 +220,12 @@ class Game {
       this.race.update(h, this.playerDriver.locate(pp.x, pp.z).distance);
     });
 
-    this.enforceWorldBounds();
+    // Real frame time. §11.1's delays are in seconds of stage time, so feeding
+    // this a constant meant they ran at whatever multiple of real time the
+    // constant happened to be — three times fast at 60 fps, seven times fast in
+    // the headless harness, which is how Fafe's smoke dummy came to be "stuck"
+    // 0.8 s after it stopped rather than 6 s.
+    this.enforceWorldBounds(Math.min(dt, 0.25));
     this.emitParticles(dt);
     this.syncCar();
     this.updateCamera(dt);
@@ -423,7 +435,11 @@ class Game {
       $('pacenote').textContent = '';
     }
 
-    $('time').textContent = formatTime(race.elapsed);
+    // The clock shows the time that counts: driving plus §11 penalties, with
+    // the penalty called out so it is obvious where the seconds went.
+    $('time').textContent = formatTime(race.clock);
+    $('penalty').textContent = race.penalty ? `+${race.penalty.toFixed(0)}s` : '';
+    $('penalty').className = race.penalty ? 'bad' : '';
 
     // Countdown, and the sector split that replaces it once running.
     const big = $('big');
@@ -489,31 +505,47 @@ class Game {
       (r.previous === null
         ? 'First run on this stage.'
         : `Previous best ${formatTime(r.previous)} · <span class="${r.total < r.previous ? 'good' : 'bad-split'}">${formatDelta(r.total - r.previous)}</span>`) +
-      `<br>${rivalGap < 0 ? 'Beat the rival' : 'Rival ahead'} by ${Math.abs(Math.round(rivalGap))} m`;
+      `<br>${rivalGap < 0 ? 'Beat the rival' : 'Rival ahead'} by ${Math.abs(Math.round(rivalGap))} m` +
+      (r.penalty
+        ? `<br><span class="bad">${formatTime(r.raw)} driving + ${r.penalty.toFixed(0)}s penalties</span>` +
+          ` — ${this.resets[0]} reset${this.resets[0] === 1 ? '' : 's'}, ${this.cuts.cuts} cut${this.cuts.cuts === 1 ? '' : 's'}`
+        : '<br>Clean run: no resets, no cuts.');
     $('result-splits').innerHTML = rows;
     $('result').style.display = 'flex';
   }
 
   /**
-   * Recovery. §7 gives 2.5 s on the roof before a reset; leaving the world is
-   * not in the spec because in a specified game it cannot happen, but it can
-   * here: a car that slides off the outside of a corner at speed runs past the
-   * 90 m of terrain either side of the corridor and falls for ever. Measured on
-   * Safari, it reached 575 km/h straight down — which is the terminal velocity
-   * the spec's own drag coefficient and 11 m/s² gravity imply, so at least the
-   * aerodynamics were right.
+   * §11 — RESET, PENALTIES, BOUNDARIES.
    *
-   * Phase 3 turns this into proper reset nodes every 120 m (lint L12). For now
-   * it is the difference between a bad corner and a lost run.
+   * What was here before was one hand-written rule: if the car is upside down,
+   * outside the world, or has not moved for four seconds, put it back two
+   * segments ahead of wherever it stopped. None of that is in the spec. It
+   * could gain you ground — two segments ahead of a car beached on the outside
+   * of a hairpin is past the hairpin — and it cost nothing at all.
+   *
+   * Now: §11.1's six triggers, each with its own delay and its own timer;
+   * §11.2's respawn at the nearest UPSTREAM reset node the car legitimately
+   * passed, facing the stage, settled, with immunity and a time penalty; and
+   * §11.3's cut detection on the roadbed-plus-shoulder corridor.
+   *
+   * Leaving the world is not one of the spec's triggers, because in a specified
+   * game it cannot happen. It can here: a car that slides off the outside of a
+   * corner at speed runs past the 90 m of terrain either side of the corridor
+   * and falls for ever. Measured on Safari, it reached 575 km/h straight down —
+   * which is the terminal velocity the spec's own drag coefficient and 11 m/s²
+   * gravity imply, so at least the aerodynamics were right. It is mapped onto
+   * §11.1's "outside the stage volume", which is what it is.
    */
-  /** Seconds each car has spent going nowhere. */
-  private stuckFor = [0, 0];
+  readonly monitors = [new ResetMonitor(), new ResetMonitor()];
+  readonly cuts = new CutMonitor();
   /** How many times each car has had to be put back on the road. §15 L15 asks
    *  for a reference lap with ZERO of these, so it has to be counted rather
    *  than quietly performed. */
   readonly resets = [0, 0];
 
-  enforceWorldBounds(dt = SIM.fixedTimestep * 6): void {
+  /** @param dt seconds of stage time since the last call. It is a REQUIRED
+   *  measurement, not a constant: §11.1's triggers are all times. */
+  enforceWorldBounds(dt: number): void {
     const hf = this.stage.heightfield;
     const cars = [
       [this.car, this.playerDriver],
@@ -522,36 +554,87 @@ class Game {
     for (let n = 0; n < cars.length; n++) {
       const [car, driver] = cars[n]!;
       const p = car.body.translation();
+      const monitor = this.monitors[n]!;
 
-      // Stuck: wedged against a tree, on its side in a ditch, nose into a bank.
-      // The player has R for this; a rival has nothing, and a stranded rival
-      // makes the whole race pointless. Measured on Safari, the AI beached
-      // itself at 798 m and sat there for the rest of the run.
-      this.stuckFor[n] = car.telemetry.speedMs < 1.5 && this.race.phase === 'running'
-        ? this.stuckFor[n]! + dt
-        : 0;
-      const stuck = this.stuckFor[n]! > 4;
       const outside =
         p.x < hf.x0 || p.z < hf.z0 ||
         p.x > hf.x0 + hf.nx * hf.cell || p.z > hf.z0 + hf.nz * hf.cell;
-      const fallen = p.y < hf.minY - 25;
-      const rolled = car.telemetry.roofTime > ROLLOVER.onRoofResetDelay;
-      if (!outside && !fallen && !rolled && !stuck) continue;
-      this.stuckFor[n] = 0;
-      this.resets[n] = (this.resets[n] ?? 0) + 1;
 
-      // Put it back a little way ahead, so a car that beached ON a segment does
-      // not reset straight back into the same obstacle.
-      const seg = this.stage.corridor.segments[
-        Math.min(this.stage.corridor.segments.length - 1, driver.state.cursor + 2)
-      ]!;
-      car.reset(
-        seg.x,
-        sampleHeight(hf, seg.x, seg.z) + 0.6,
-        seg.z,
-        Math.atan2(seg.hx, seg.hz),
-      );
+      const due = monitor.update(dt, {
+        // §11.1 "on roof, no input" — the vehicle already keeps the timer, so
+        // the trigger is simply that it is inverted and the monitor times it.
+        roof: car.telemetry.onRoof,
+        outOfBounds: outside,
+        // "Vertical drop with no ground contact below deck level."
+        offDeck: p.y < hf.minY - 25,
+        // "Stuck, speed under 0.5 m/s with throttle held." The spec's numbers,
+        // not the 1.5 m/s over 4 s this used to invent. A car crawling out of a
+        // ditch at 1 m/s is recovering, and used to be reset for it.
+        stuck: this.race.phase === 'running' && car.telemetry.speedMs < RESET.stuckSpeedThreshold,
+      });
+      if (!due) continue;
+
+      this.resets[n] = (this.resets[n] ?? 0) + 1;
+      monitor.serve();
+      // The player's penalty is the one that counts; a rival's reset is a
+      // rival's problem and does not touch the player's clock.
+      if (n === 0) this.race.penalty += RESET.penaltySeconds.standard;
+      this.respawn(car, driver);
     }
+
+    // §11.3 cutting, player only. A rival cutting costs the player nothing.
+    const tel = this.car.telemetry;
+    const cursor = this.stage.corridor.segments[this.playerDriver.state.cursor]!;
+    let wheelsOut = 0;
+    for (const w of tel.wheels) {
+      const lateral = (w.contact.x - cursor.x) * -cursor.hz + (w.contact.z - cursor.z) * cursor.hx;
+      const side = lateral >= 0 ? 0 : 1;
+      // §11.3: "The corridor is defined by the roadbed plus the shoulder."
+      if (Math.abs(lateral) > cursor.roadbedWidth / 2 + cursor.shoulderWidth[side]!) wheelsOut++;
+    }
+    const before = this.cuts.penaltySeconds;
+    if (this.race.phase === 'running') {
+      this.cuts.update(dt, wheelsOut, this.playerDriver.state.distance);
+      this.race.penalty += this.cuts.penaltySeconds - before;
+    }
+  }
+
+  /** §11.2, all six rules. */
+  private respawn(car: Vehicle, driver: RoadDriver): void {
+    const node = nodeFor(this.stage.resetNodes, driver.state.distance);
+    car.reset(
+      node.x,
+      // 3: "ride height settled, no spawn drop". VEHICLE.cogHeight is exactly
+      // where the body sits at the static compression this spring rate implies,
+      // so the car appears already resting rather than falling.
+      //
+      // Plus a decimetre, and that is not a fudge. `sampleHeight` is a BILINEAR
+      // sample of the heightfield; the collider Rapier builds from the same
+      // buffer is two triangles per cell. On a slope the two disagree by a few
+      // centimetres, and on the steepest ground §13 allows, by more. Spawning
+      // at the exact sampled height therefore sometimes puts the hull inside
+      // the terrain, where the solver holds it: the car sits with its wheels
+      // barely loaded and full throttle doing nothing. Measured on Fafe, the
+      // smoke autopilot stopped dead at 128 m of a straight and never moved
+      // again. 0.10 m clears the mismatch and is 0.14 s of fall — below the
+      // threshold of anything a player can see.
+      sampleHeight(this.stage.heightfield, node.x, node.z) + VEHICLE.cogHeight + 0.10,
+      node.z,
+      // 2: "face the stage direction". Velocity and angular velocity are zeroed
+      // inside Vehicle.reset.
+      node.heading,
+    );
+    // 4: 2.5 s of collision immunity, ending early on first throttle. The
+    // vehicle owns the countdown because it is the vehicle that decides whether
+    // an impact counts.
+    car.immuneFor = RESET.immunitySeconds;
+    // The driver's cursor moves with the car. It searches forward only, so
+    // without this it cannot follow a respawn that goes backwards — and a
+    // driver steering for a point it passed a hundred metres ago crashes in the
+    // same place for ever.
+    driver.seek(node.index);
+    // 6: "damage is not repaired by a reset" — nothing here touches damageJ,
+    // and that is deliberate rather than an omission.
   }
 
   /**
@@ -577,11 +660,22 @@ class Game {
     offRoadSeconds: number;
     minSpeedKmh: number;
     slowestPoint: number;
+    /** §11.3 cuts and the total §11 time penalty they and the resets cost. */
+    cuts: number;
+    penaltySeconds: number;
+    /** Metre mark where the lap gave up because the same recovery kept
+     *  repeating, or 0. See the note at the loop check below. */
+    loopedAt: number;
     /** Where each recovery happened, metres along the stage. A reference lap
      *  that fails L15 is only useful if it says WHERE. */
     resetPoints: number[];
   } {
-    const driver = new RoadDriver(this.stage.corridor, skill, { line: this.stage.line });
+    // The reference lap drives with the PLAYER's driver, not a third instance.
+    // Two RoadDrivers on one car means two cursors, and only one of them is the
+    // one a reset re-seats — so the other keeps its stale idea of where the car
+    // is and the lap measures nothing.
+    const driver = this.playerDriver;
+    driver.skill = skill;
     const h = SIM.fixedTimestep;
     const steps = Math.round(maxSeconds / h);
     // The countdown is race presentation, not part of the stage.
@@ -592,6 +686,9 @@ class Game {
     let slowestPoint = 0;
     let elapsed = 0;
     const resetPoints: number[] = [];
+    let lastResetAt = -1;
+    let repeats = 0;
+    let loopedAt = 0;
 
     for (let i = 0; i < steps; i++) {
       const p = this.car.body.translation();
@@ -617,7 +714,7 @@ class Game {
       this.phys.time += h;
       elapsed += h;
 
-      const state = this.playerDriver.locate(p.x, p.z);
+      const state = driver.state;
       this.race.update(h, state.distance);
       const seg = this.stage.corridor.segments[state.cursor]!;
       const side = state.lateral >= 0 ? 0 : 1;
@@ -632,9 +729,20 @@ class Game {
       // calls it. Each one is counted, and one is a failed reference lap.
       if (i % 6 === 0) {
         const before = this.resets[0]!;
-        this.enforceWorldBounds();
-        if (this.resets[0]! > before && resetPoints.length < 12) {
-          resetPoints.push(Math.round(state.distance));
+        this.enforceWorldBounds(h * 6);
+        if (this.resets[0]! > before) {
+          const where = Math.round(state.distance);
+          if (resetPoints.length < 12) resetPoints.push(where);
+          // A RESET LOOP, and it deserves a name rather than a timeout.
+          //
+          // §11.2 respawns at the nearest upstream node. A human then drives
+          // the corner differently; a deterministic AI drives it identically,
+          // beaches in the same place, and is respawned to the same node for
+          // the rest of the clock. Reporting that as "DNF at 2.26 km" would
+          // suggest the car stopped there, when what happened is that it
+          // reached there thirty-three times. So the lap ends and says so.
+          if (where === lastResetAt) repeats++; else { repeats = 0; lastResetAt = where; }
+          if (repeats >= 2) { loopedAt = where; break; }
         }
       }
       if (this.race.phase === 'finished') break;
@@ -649,20 +757,26 @@ class Game {
       offRoadSeconds: offRoad,
       minSpeedKmh: Number.isFinite(minSpeed) ? minSpeed : 0,
       slowestPoint,
+      cuts: this.cuts.cuts,
+      penaltySeconds: this.race.penalty,
+      loopedAt,
       resetPoints,
     };
   }
 
-  /** Put the car back on the centreline at the nearest segment. */
+  /**
+   * The R key: §11.1's "player requested" trigger.
+   *
+   * It goes through the same §11.2 respawn as every other trigger, which means
+   * it also carries the same 10 s penalty. That is the point of a penalty — a
+   * reset that is free is a teleport, and the fastest way round Col de Turini
+   * would be to press R at every hairpin.
+   */
   private resetToRoad(): void {
-    const p = this.car.body.translation();
-    const { seg } = locate(this.stage.corridor, p.x, p.z);
-    this.car.reset(
-      seg.x,
-      sampleHeight(this.stage.heightfield, seg.x, seg.z) + 0.60,
-      seg.z,
-      Math.atan2(seg.hx, seg.hz),
-    );
+    this.monitors[0]!.serve();
+    this.race.penalty += RESET.penaltySeconds.standard;
+    this.resets[0] = (this.resets[0] ?? 0) + 1;
+    this.respawn(this.car, this.playerDriver);
   }
 }
 
@@ -756,7 +870,11 @@ game.boot(select.value).then(applyControls).catch((err) => {
       // start line for ever with the clock at zero.
       const p = game.car.body.translation();
       game.race.update(SIM.fixedTimestep, game.playerDriverState(p.x, p.z).distance);
-      if (i % 30 === 0) game.enforceWorldBounds();
+      // Every step, with the step's own dt. `i % 30` looked cheaper but this
+      // function is called with n = 4 from the harness, so the modulo matched
+      // on every call and the recovery ran seven times too often, each time
+      // advancing §11.1's clocks by a quarter of a second.
+      game.enforceWorldBounds(SIM.fixedTimestep);
     }
   };
 

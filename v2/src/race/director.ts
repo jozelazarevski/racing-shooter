@@ -53,10 +53,16 @@ export class RaceDirector {
   /** Seconds remaining on the countdown. */
   countdown = 3.2;
 
+  /** §11.2.5 and §11.3 time penalties, seconds. Added to the clock rather than
+   *  subtracted from it, because a penalty you cannot see on the HUD while you
+   *  are still driving is a penalty you cannot respond to. */
+  penalty = 0;
+
   readonly splits: SectorSplit[] = [];
   readonly best: StoredBest | null;
-  /** Set when the run finishes. */
-  result: { total: number; isBest: boolean; previous: number | null } | null = null;
+  /** Set when the run finishes. `raw` is the driving; `total` includes §11
+   *  penalties and is the time that counts. */
+  result: { total: number; raw: number; penalty: number; isBest: boolean; previous: number | null } | null = null;
 
   private nextSector = 1;
   private readonly sectors: number;
@@ -148,13 +154,19 @@ export class RaceDirector {
     if (distanceMetres >= this.finishAt) this.finish();
   }
 
+  /** The time that counts: driving plus §11 penalties. */
+  get clock(): number {
+    return this.elapsed + this.penalty;
+  }
+
   private finish(): void {
     if (this.phase === 'finished') return;
     this.phase = 'finished';
-    const total = this.elapsed;
+    const raw = this.elapsed;
+    const total = raw + this.penalty;
     const previous = this.best?.total ?? null;
     const isBest = previous === null || total < previous;
-    this.result = { total, isBest, previous };
+    this.result = { total, raw, penalty: this.penalty, isBest, previous };
     if (isBest) {
       saveBest(this.stageId, { total, sectors: this.splits.map((s) => s.elapsed) });
     }

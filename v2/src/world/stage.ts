@@ -10,6 +10,7 @@ import { buildCorridor, cornerRuns, type Corridor, type StageMove, type SurfaceK
 import { buildHeightfield, sampleHeight, type Heightfield } from './terrain.ts';
 import { scatterCorridor, type WorldObject, type Biome } from './scatter.ts';
 import { buildRacingLine, type RacingLine } from '../race/line.ts';
+import { buildResetNodes, type ResetNode } from '../race/reset.ts';
 
 export interface StageDef {
   id: string;
@@ -32,6 +33,8 @@ export interface Stage {
    *  the geometry, the lint reads it, and the rival and the reference lap must
    *  be driving the same one or the reference lap measures nothing. */
   line: RacingLine;
+  /** §11.2 respawn points, at most 120 m apart (L12). */
+  resetNodes: ResetNode[];
   /** Metres. */
   length: number;
 }
@@ -69,6 +72,7 @@ export function buildStage(def: StageDef): Stage {
       objects,
       corners: cornerRuns(corridor),
       line: buildRacingLine(corridor),
+      resetNodes: buildResetNodes(corridor),
       length: corridor.length,
     };
   });

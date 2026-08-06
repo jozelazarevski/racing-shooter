@@ -130,8 +130,17 @@ not about the AI at all:
   read the same inverted index, so it agreed with the bug.
 
 The AI reference lap (§15 L15) now exists as a measurement — `npm run reference`
-— and went from **0 of 6 stages completed to 6 of 6**. Reset nodes, cutting
-penalties and progression are still to come. See `v2/PHASES.md`.
+— and went from **0 of 6 stages completed to 6 of 6**.
+
+§11 followed: reset nodes every 120 m (**L12 now passes**, 17 checks a stage
+instead of 16), the six triggers with the spec's own delays, respawn at the
+nearest upstream node, a 10 s penalty on every reset including the player's own
+R key, and §11.3 cutting. That took the reference lap back to 4 of 6, and the
+regression is the honest kind: the old recovery moved the car FORWARD past
+obstacles it could not drive past, and the specified one does not. What the AI
+cannot do is two particular hairpins, and it never could.
+
+Progression across stages is still to come. See `v2/PHASES.md`.
 
 **Phase 4 — the bible.** Region palettes, lighting to five decimals, archetype
 architecture, scatter densities, and the R01–R12 region lint.

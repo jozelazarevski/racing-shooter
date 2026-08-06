@@ -139,7 +139,12 @@ for (const stage of STAGES) {
       const q = g.car.body.rotation();
       // Advance the centreline cursor rather than searching the whole stage.
       let best = Infinity;
-      for (let i = nearest; i < Math.min(segs.length, nearest + 120); i++) {
+      // Search a little BEHIND as well. §11.2 respawns at the nearest upstream
+      // reset node, up to 120 m back, and a forward-only cursor cannot follow
+      // that — it would keep steering for a point the car no longer occupies,
+      // drive off, be reset again, and loop. Measured on Fafe: 120 m travelled
+      // in twelve seconds, parked exactly on the centreline.
+      for (let i = Math.max(0, nearest - 40); i < Math.min(segs.length, nearest + 120); i++) {
         const d = (segs[i].x - p.x) ** 2 + (segs[i].z - p.z) ** 2;
         if (d < best) { best = d; nearest = i; }
       }

@@ -7,7 +7,7 @@ whole migration, exactly as `MIGRATION.md` promised.
 
 ```
 cd v2
-npm run gate       # typecheck + 86 unit tests
+npm run gate       # typecheck + 101 unit tests
 npm run lint       # build all six stages, run §15 against each, fail loudly
 npm run build      # -> ../play-v2
 npm run smoke      # drive every stage headless (needs a server on :8902)
@@ -136,9 +136,10 @@ Every one of these was found by measuring, not by reading the code.
 - **Col de Turini rolled the test autopilot** in the switchbacks, and was
   reported as `KNOWN` by the smoke test. It was inverted steering, not the
   switchbacks; the KNOWN list is now empty. See Phase 3.
-- **§15 L07, L10–L13, L15 are SKIPPED**, each with its reason printed. They need
-  a ballistic launch model, water volumes, bridges, reset nodes and fauna. L15
-  is different in kind: it is a claim about a car driving, so the lint can never
+- **§15 L07, L10, L11, L13 and L15 are SKIPPED**, each with its reason printed.
+  They need a ballistic launch model, water volumes, bridges and fauna. L12 —
+  reset nodes — landed in Phase 3 and now passes on every stage. L15 is
+  different in kind: it is a claim about a car driving, so the lint can never
   answer it and `npm run reference` does instead. A lint that returned green for
   a check it did not run would be worse than no lint.
 - **§3.2 rules 4–5** (apex occlusion, canopy clearance) need canopy geometry.
@@ -474,17 +475,90 @@ of six stages**, with the metre mark of every recovery printed, and it stays
 that way in the output until it is fixed. The lint still reports L15 as SKIPPED,
 because the lint still cannot run a car.
 
+## Phase 3, part two — §11, and what a specified reset costs
+
+`race/reset.ts`. Reset nodes, the six triggers with their delays, the six rules
+for what a reset does, and cutting. **L12 is no longer skipped**: every stage
+now passes 17 checks instead of 16.
+
+What was there before was one hand-written rule — if the car is upside down,
+outside the world, or has not moved for four seconds, put it back two segments
+*ahead* of wherever it stopped. None of that is in the spec. It could gain you
+ground: two segments ahead of a car beached on the outside of a hairpin is past
+the hairpin. And it cost nothing at all.
+
+- **Reset nodes** every ≤120 m, placed on the straightest road the spacing
+  allows. A node in the middle of a 20 m hairpin respawns you pointing at the
+  apex with no run-up, so each node is the flattest segment in its window —
+  flatness dominates the score, position breaks ties, and the spacing limit is
+  never traded away for a nicer node. Under 20% of Col de Turini's nodes sit in
+  anything tighter than a 40 m radius.
+- **Upstream, not nearest.** A car that has just fallen off the outside of a
+  corner is often physically closest to a node it has *not* reached. The
+  respawn uses the driver's monotonic distance, which cannot be advanced by a
+  car being thrown down a mountain.
+- **Six triggers, six clocks.** Roof 2.5 s, out of bounds 2.0 s, off deck
+  2.0 s, player 0.5 s, stuck 6.0 s under 0.5 m/s. One shared timer would answer
+  "which trigger fired" with whichever was noticed first; a car on its roof at
+  the bottom of a ravine should be recovered by the 2.0 s rule, not the 2.5 s
+  one.
+- **It costs 10 s.** Including the R key. A reset that is free is a teleport,
+  and the fastest way round Col de Turini would be to press R at every hairpin.
+- **Cutting**, §11.3: three wheels outside roadbed + shoulder for 1.2 s *with a
+  forward exit*. The second half is what makes it a cut rather than a mistake —
+  a car that runs wide, stops and rejoins behind itself has gained nothing and
+  is not penalised. 2 s, escalating to 5 s on the third.
+- **§11.2.4 immunity is read as DAMAGE immunity.** Taken literally, "collision
+  immunity" would mean driving through scenery for 2.5 s after every reset,
+  which turns a reset into a shortcut through a forest. The impact still
+  happens and still slows the car; the joules do not count.
+
+### Two bugs this uncovered, both about time and place
+
+- **A backwards respawn broke the driver's cursor.** `locate` searches forward
+  only, which is what stops a hairpin teleporting the cursor onto its other leg
+  — and it made the cursor unable to follow a car legitimately moved back up to
+  120 m. The driver kept steering for a point it had passed. Measured: Col de
+  Turini reset at 2,261 m thirty-three times without moving. `seek()` now moves
+  the cursor with the car.
+- **`enforceWorldBounds` was fed a constant `dt`.** Every §11.1 trigger is a
+  time, so a constant meant they ran at whatever multiple of real time the
+  constant happened to be — three times fast at 60 fps, seven times fast in the
+  headless harness, where "stuck for six seconds" fired after eight tenths of
+  one. Fafe's smoke autopilot stopped at 128 m because of it. The parameter is
+  now required rather than defaulted, so no caller can forget to measure it.
+
+### The reference lap after §11, and an honest regression
+
+| | after part one | after part two |
+|---|---|---|
+| Stages completed | 6 of 6 | **4 of 6** |
+| Total recoveries | 21 | 12 |
+| Clean (L15 pass) | 1 | 1 |
+| Average | 80.8 km/h | 94.8 km/h |
+
+**Two stages got worse, and it is the right kind of worse.** The old recovery
+put the car *forward* of where it stopped, which walked it past obstacles it
+could not drive past. §11.2's upstream respawn does not, so Col de Turini and
+Monte Carlo now do what a deterministic car must: respawn, drive the same
+corner the same way, beach in the same place, repeat. The harness detects that
+and reports `RESET LOOP at 2,242 m` instead of a DNF that would read as though
+the car had stopped there.
+
+So the number that went down is the number that was being flattered. What the
+AI cannot do is get round two particular hairpins, and it could never do it —
+the old recovery was carrying it past.
+
+**Grip was not the cause, and this was measured rather than assumed.** The
+profile's friction fraction is not monotonic in outcome: at 0.75 Monte Carlo
+went from 15 recoveries to 3 while Col de Turini got much worse (DNF at 1.25 km
+against 2.26 km); at 0.85 both were worse than either. It stays at 0.92.
+
 ## Next
 
-Still Phase 3, and in this order:
-
-1. **Reset nodes every 120 m** — §11.2 and lint L12. Respawn at the nearest
-   upstream node the car legitimately passed, facing the stage, settled, with
-   the §11.2 immunity and time penalty. The current recovery puts the car back
-   two segments ahead of wherever it stopped, which is neither specified nor
-   fair.
-2. **§11.3 cutting** — three wheels outside roadbed + shoulder for 1.2 s with a
-   forward exit is a cut, at 2 s and then 5 s.
-3. **The five stages that still need recoveries.** All the same event, all at
-   hairpin exits on low grip.
-4. **Progression across stages.**
+1. **The two hairpins.** Col de Turini at 2,242 m and Monte Carlo at 2,285 m.
+   The car arrives, understeers into the bank and beaches with full lock on and
+   the throttle open. The controller has no way out of that — a real driver
+   would reverse, and there is no reverse gear.
+2. **Progression across stages.**
+3. **§3.2 rule 4**, apex occlusion, now that a racing line exists.

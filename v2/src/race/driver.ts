@@ -106,6 +106,28 @@ export class RoadDriver {
     return this.state;
   }
 
+  /**
+   * Put the cursor somewhere explicitly.
+   *
+   * `locate` only searches forward (and twelve segments back), which is what
+   * stops a hairpin from teleporting the cursor onto the other leg. That same
+   * property makes it unable to follow a car that is legitimately moved
+   * BACKWARDS — which is exactly what §11.2's "respawn at the nearest upstream
+   * node" does, by up to 120 m.
+   *
+   * Without this, a reset left the driver steering for a point a hundred metres
+   * ahead of where its car actually was. Measured: Col de Turini reset at
+   * 2,261 m thirty-three times in a row and never moved, because every attempt
+   * started from the same place with the same wrong idea of where it was.
+   */
+  seek(index: number): void {
+    const segs = this.corridor.segments;
+    this.state.cursor = Math.max(0, Math.min(segs.length - 1, index));
+    const s = segs[this.state.cursor]!;
+    this.state.distance = s.distance;
+    this.state.lateral = 0;
+  }
+
   /** Signed curvature of the line at a segment, 1/m. Positive turns right. */
   lineCurvature(i: number): number {
     const k = Math.max(0, Math.min(this.line.curvature.length - 1, i));

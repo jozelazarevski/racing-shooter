@@ -112,6 +112,8 @@ export class Vehicle {
   private onRoofFor = 0;
   damageJ = 0;
   lastImpact: VehicleTelemetry['lastImpact'] = null;
+  /** §11.2.4: seconds of post-reset immunity remaining. */
+  immuneFor = 0;
 
   compound: Compound = 'gravel';
   weather: WeatherId = 'clear';
@@ -223,6 +225,9 @@ export class Vehicle {
     // car was being launched — so it could not be the springs.
     this.body.resetForces(false);
     this.body.resetTorques(false);
+
+    // §11.2.4: immunity runs down with time and ends early on first throttle.
+    if (this.immuneFor > 0) this.immuneFor = input.throttle > 0.02 ? 0 : Math.max(0, this.immuneFor - dt);
 
     const susp = this.surface.startsWith('tarmac') ? SUSPENSION.tarmac : SUSPENSION.gravel;
     const rot = this.body.rotation();
@@ -519,7 +524,12 @@ export class Vehicle {
     const energyJ = 0.5 * VEHICLE.mass * normalSpeed * normalSpeed;
     const band = INCIDENCE_BANDS.find((b) => incidenceDeg <= b.maxAngleDeg) ?? INCIDENCE_BANDS[INCIDENCE_BANDS.length - 1]!;
     const klass = DAMAGE_ENERGY_BANDS_J.find((b) => energyJ <= b.max)!.klass;
-    this.damageJ += energyJ;
+    // §11.2.4 immunity. Read as DAMAGE immunity rather than collision
+    // immunity: a car that passed through scenery for 2.5 s after every reset
+    // would make the reset a shortcut. The impact still happens, still slows
+    // the car, still classifies — it just does not count against a player who
+    // has this second been put back on the road by the game.
+    if (this.immuneFor <= 0) this.damageJ += energyJ;
     this.lastImpact = { klass, band: band.name, energyJ, angleDeg: incidenceDeg };
 
     // Speed loss from the band, applied as an impulse against travel.
@@ -528,8 +538,9 @@ export class Vehicle {
     this.body.setLinvel({ x: v.x * (1 - loss), y: v.y, z: v.z * (1 - loss) }, true);
   }
 
-  /** Put the car back on the road, upright. Phase 3 makes these reset nodes;
-   *  for now it is the manual recovery any rally game needs. */
+  /** Put the car back on the road, upright, still. §11.2 rules 2 and 3: facing
+   *  the stage, zero velocity, zero angular velocity. Where it goes and what it
+   *  costs are §11.2's business, not the vehicle's — see `main.ts`. */
   reset(x: number, y: number, z: number, heading: number): void {
     this.body.setTranslation({ x, y, z }, true);
     this.body.setRotation({ x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) }, true);

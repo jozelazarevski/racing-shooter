@@ -48,8 +48,12 @@ for (const stage of STAGES) {
 
   console.log(
     `${(name ?? stage).padEnd(14)} ${ok ? 'ok  ' : 'FAIL'}` +
-    ` ${r.finished ? `${r.seconds.toFixed(1)}s` : `DNF at ${(r.distance / 1000).toFixed(2)}/${km.toFixed(2)} km`}` +
-    ` · ${r.resets} resets · ${(r.damageJ / 1000).toFixed(2)} kJ` +
+    ` ${r.finished
+      ? `${r.seconds.toFixed(1)}s`
+      : r.loopedAt
+        ? `RESET LOOP at ${r.loopedAt} m of ${km.toFixed(2)} km — respawns to the same node and fails identically`
+        : `DNF at ${(r.distance / 1000).toFixed(2)}/${km.toFixed(2)} km`}` +
+    ` · ${r.resets} resets · ${r.cuts} cuts · +${r.penaltySeconds.toFixed(0)}s · ${(r.damageJ / 1000).toFixed(2)} kJ` +
     ` · ${r.offRoadSeconds.toFixed(1)}s off road` +
     ` · slowest ${r.minSpeedKmh.toFixed(0)} km/h at ${Math.round(r.slowestPoint)} m` +
     (r.resetPoints.length ? ` · resets at ${r.resetPoints.join(', ')} m` : '') +
