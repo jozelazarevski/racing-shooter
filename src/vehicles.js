@@ -1496,14 +1496,20 @@ export class Car {
     // corridor the ground is the HIGHER of the two surfaces, and only well
     // outside it does raw terrain take over. Out in the open, nothing changes.
     const SHELF_REACH = 16;      // u from centreline that the roadbed still holds you up
+    // Sampled CONTINUOUSLY along the centreline, not at the rounded index.
+    // `groundHeightAt` is a staircase between samples; at racing speed the car
+    // crosses a step every three frames, and the jump detector below — which
+    // differentiates this value twice — was reading those steps as crests.
+    // See Track.groundHeightAtPos.
+    const roadY = t.groundHeightAtPos
+      ? t.groundHeightAtPos(this.pos, this.trackIndex, this.lateral)
+      : t.groundHeightAt(this.trackIndex, this.lateral);
     let gY;
     if (offRoad) {
       const terr = t.terrainHeight(this.pos.x, this.pos.z);
-      gY = Math.abs(this.lateral) < SHELF_REACH
-        ? Math.max(terr, t.groundHeightAt(this.trackIndex, this.lateral))
-        : terr;
+      gY = Math.abs(this.lateral) < SHELF_REACH ? Math.max(terr, roadY) : terr;
     } else {
-      gY = t.groundHeightAt(this.trackIndex, this.lateral);
+      gY = roadY;
     }
 
     // TOO STEEP TO CLIMB.
@@ -1532,22 +1538,19 @@ export class Car {
     // switchback cut), and even then only on ground no vehicle could hold.
     const rimR2 = RIM_RADIUS * RIM_RADIUS;
     const atRim = this.pos.x * this.pos.x + this.pos.z * this.pos.z > rimR2;
-    let offPiste = Math.abs(this.lateral) > 25;
-    if (offPiste && t.nearestIndex && t.lateralOffset) {          // same check
-      offPiste = Math.abs(t.lateralOffset(this.pos, t.nearestIndex(this.pos))) > 25;
-    }
-    // Gradient alone does not describe the massif. Measured, its flank averages
-    // about 4.5% — a long gentle ramp, not a wall — so a car could simply drive
-    // up the side of the summit and look down on the stage. What actually marks
-    // "you are climbing the mountain" is ALTITUDE GAINED OFF THE COURSE: more
-    // than ~10 u above the nearest piece of road while 25 u away from it. The
-    // road's own switchbacks are exempt for free, because the nearest sample
-    // then IS the road above you and the difference collapses.
-    // In a RACE the course is the course. You may cut a verge, take to the
-    // grass, rejoin — all of that is under 25 u. Past 45 u you are not racing
-    // any more, and on a world whose road spirals a mountain (SUMMIT CLIMB) the
-    // altitude test below can never fire, because there is always a switchback
-    // near your height. This is the backstop that makes the boundary hard.
+    // In a RACE the course is the course — but "the course" is wider than the
+    // road. You may cut a verge, take to the grass, run the inside of a
+    // hairpin, drop off a bank and rejoin. All of that is a line, not an
+    // escape, and the price for it is grip and drag (see offMult above), never
+    // a hand on your throttle.
+    //
+    // What this backstop stops is LEAVING, not cutting: setting off across the
+    // map to rejoin half a stage later. The distance is measured to the NEAREST
+    // piece of road anywhere on the lap, which is what makes the two cases
+    // separable — a hairpin cut stays a few metres from the other branch no
+    // matter how far it is from the branch you left, so it never registers,
+    // while driving into the hinterland climbs away from everything.
+    //
     // FREE ROAM is exempt on purpose: out there the world is the point, and the
     // rim wall is what bounds it.
     if (!this.game.freeRoam && this === this.game.player && this.speedAlong > 0.5) {
@@ -1561,33 +1564,43 @@ export class Car {
       // So a strayed reading is now only believed if a GLOBAL nearest-sample
       // search agrees. The search costs a full sweep, but it only ever runs on
       // the frames that already look off-course, which is nowhere on a clean lap.
-      let strayed = Math.abs(this.lateral) - 45;
+      // The band was 45 u and it scrubbed hard enough to stop you. Both moved:
+      // out to 70 u, so a wide cut across the inside of a switchback fits
+      // inside it, and down to a drag you can drive against rather than a
+      // brake — at full strength this now bleeds speed roughly as fast as
+      // deep sand does, which is the right feel for "you have left the road
+      // and the ground does not want you here".
+      let strayed = Math.abs(this.lateral) - 70;
       if (strayed > 0 && t.nearestIndex && t.lateralOffset) {
         const gi = t.nearestIndex(this.pos);          // no hint: search the lap
-        strayed = Math.abs(t.lateralOffset(this.pos, gi)) - 45;
+        strayed = Math.abs(t.lateralOffset(this.pos, gi)) - 70;
       }
       if (strayed > 0) {
-        const over = Math.min(1, strayed / 15);
-        this.vel.multiplyScalar(Math.max(0, 1 - over * 3.5 * dt));
-        if (over > 0.3 && !this._steepFed) {
+        const over = Math.min(1, strayed / 30);
+        this.vel.multiplyScalar(Math.max(0, 1 - over * 1.2 * dt));
+        if (over > 0.5 && !this._steepFed) {
           this._steepFed = 1.8;
           this.game.hud?.feed?.('OFF THE COURSE — TURN BACK', 'bad');
         }
       }
     }
-    if (offRoad && offPiste && this.speedAlong > 0.5) {
-      const roadY = t.center[this.trackIndex]?.y ?? gY;
-      const above = gY - roadY;
-      if (above > 10) {
-        const over = Math.min(1, (above - 10) / 12);
-        this.vel.multiplyScalar(Math.max(0, 1 - over * 3.2 * dt));
-        if (this === this.game.player && over > 0.35 && !this._steepFed) {
-          this._steepFed = 1.8;
-          this.game.hud?.feed?.('OFF THE COURSE — TURN BACK', 'bad');
-        }
-      }
-    }
-    if (offRoad && (atRim || offPiste) && this.speedAlong > 0.5) {
+    // NO ALTITUDE GATE.
+    //
+    // There used to be one here: off the course and more than 10 u above the
+    // road scrubbed your velocity and flashed "OFF THE COURSE — TURN BACK". It
+    // was added to stop the massif being climbed, and it did — but it also
+    // walled off every legitimate line over a rise, which is not how driving
+    // works. Real rally is full of cuts: across the inside of a hairpin, over
+    // a bank, through a field. They cost you grip and they cost you time, and
+    // that is the entire price.
+    //
+    // So the price is now the OFF-ROAD SLOWDOWN and nothing else: reduced grip
+    // (offMult) and extra drag, both applied above. Take the cut, pay in speed,
+    // and if it was quicker you earned it.
+    //
+    // The world still has an edge — see the rim check below — but "steep" and
+    // "high" are no longer crimes on their own.
+    if (offRoad && atRim && this.speedAlong > 0.5) {
       const AHEAD = 6;
       const ax = this.pos.x + Math.sin(this.heading) * AHEAD;
       const az = this.pos.z + Math.cos(this.heading) * AHEAD;
@@ -1664,8 +1677,14 @@ export class Car {
       // the everyday lumps in the elevation profile do not.
       this._settleT = Math.max(0, (this._settleT ?? 0) - dt);
       const crested = this._climbRate > 4.5 && climbAccel < -42
-        && Math.abs(this.speedAlong) > 26 && this._settleT <= 0;
-      if ((drop > 0.9 && this._climbRate > 2.5) || crested) {
+        && Math.abs(this.speedAlong) > 26;
+      // THE SETTLE GUARD COVERS BOTH LAUNCH PATHS. It used to sit inside
+      // `crested` only, so the lip test could relaunch on the very frame after
+      // a landing — and a landing is exactly when `drop` reads large, because
+      // the car has just been placed on ground it was flying over. Jumps
+      // chained into each other for as long as the terrain kept falling.
+      const wantsAir = (drop > 0.9 && this._climbRate > 2.5) || crested;
+      if (wantsAir && this._settleT <= 0 && this._clearsGround(t, dt)) {
         this.airborne = true;
         // capped: an uncapped climb rate off a steep ramp at nitro speed sent
         // cars sailing 100+ u into the infield (user bug report)
@@ -1743,13 +1762,75 @@ export class Car {
     this.syncMesh(dt, vl, inputs);
   }
 
+  /* Would leaving the ground here actually produce a flight?
+   *
+   * The crest test upstream is a local one: it reads the ground's vertical
+   * acceleration under the wheels RIGHT NOW. That is the correct trigger — a
+   * car flies when the road curves away faster than gravity holds it down —
+   * but it is blind to what happens next. Over a short sharp lump the road
+   * curves hard for a moment and then flattens or climbs again, which passes
+   * the local test and then puts the ground straight back under the car.
+   *
+   * The result was measurable and it was most of the problem: 28-43 launches
+   * per 90 s stage, of which a third lasted three frames or less. You could
+   * not see those. You could only feel them, because EVERY landing bought
+   * 0.4 s of half grip (see onLand) — so the car spent about a quarter of the
+   * stage skating, for no reason the player could observe.
+   *
+   * So the trigger now has to survive a prediction. Throw the car forward
+   * ballistically and ask whether the road has genuinely dropped out from
+   * under it by the time it gets there. A real crest clears easily. A lump
+   * does not, and the car simply rolls over it — which is what it always
+   * should have done.
+   */
+  _clearsGround(t, dt) {
+    if (!t?.groundHeightAt || !t.center?.length) return true;  // unknown: don't block
+    const vy0 = Math.min(this._climbRate, 11);
+    const LOOK = 0.18;          // ~11 frames: long enough that a lump has ended
+    const CLEAR = 0.35;         // u of daylight that makes it a jump, not a jolt
+    const n = t.center.length;
+    const seg = t.segLen > 0 ? t.segLen : 2.4;
+    // Where the car is heading, in road samples. `speedAlong` is u/s and a
+    // sample is `seg` u, so this is just distance over sample length.
+    // Walk the arc rather than sampling only its end: the road can dip at the
+    // horizon while a lump sits between here and there, and the car lands on
+    // the lump. The flight has to clear everything it passes over.
+    //
+    // Sampled BETWEEN indices, for the same reason the caller does. Rounding
+    // to the nearest sample here would reintroduce the staircase inside the
+    // predictor — measured, that rejected genuine jumps, because a probe
+    // point could round onto a step the car never actually reaches.
+    const rate = Math.abs(this.speedAlong) / seg;   // samples per second
+    const STEPS = 8;
+    const at = (idx) => {
+      const lo = Math.floor(idx), f = idx - lo;
+      const a = ((lo % n) + n) % n, b = (a + 1) % n;
+      return t.groundHeightAt(a, this.lateral) * (1 - f)
+           + t.groundHeightAt(b, this.lateral) * f;
+    };
+    for (let s = 1; s <= STEPS; s++) {
+      const T = (LOOK * s) / STEPS;
+      // y(T) under the same gravity the airborne branch integrates with.
+      const arc = this.y + vy0 * T - 0.5 * 26 * T * T;
+      // Anywhere along the way it must still be flying; at the far end it must
+      // be flying by a margin worth calling a jump.
+      if (arc - at(this.trackIndex + rate * T) < (s === STEPS ? CLEAR : 0)) return false;
+    }
+    return true;
+  }
+
   onLand() {
     // hang time pays style: a real jump (not a curb hop) scores BIG AIR
     if (this === this.game.player && (this._airT || 0) > 0.7) {
       this.game.style?.(40, 'BIG AIR');
     }
+    // LOOSE GRIP IS PRICED BY THE JUMP, not handed out flat. At a flat 0.4 s
+    // every hop cost the same as a flying finish, and with a hop every two or
+    // three seconds that added up to a car that would not turn. Now a short
+    // hop barely registers and only real air makes you slide on touchdown.
+    const air = this._airT || 0;
+    this.landGrip = air < 0.15 ? 0 : Math.min(0.4, (air - 0.15) * 0.8);
     this._airT = 0;
-    this.landGrip = 0.4; // brief loose grip for a nice slidey landing
     if (Math.abs(this.speedAlong) > 12) {
       const side = new THREE.Vector3(this.forward.z, 0, -this.forward.x);
       for (const s of [-1, 1]) {

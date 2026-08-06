@@ -2251,6 +2251,45 @@ export class Track {
     return roadY;
   }
 
+  /** Road height under a WORLD POSITION, interpolated along the centreline.
+   *
+   *  `groundHeightAt` takes an integer sample index, so the road it describes
+   *  is a staircase: the height under a moving car holds flat for a few frames
+   *  and then jumps by a whole inter-sample step. Standing still that is
+   *  invisible. At 50 u/s over 2.4 u samples the car crosses a step every
+   *  three frames, and anything that DIFFERENTIATES the ground height sees
+   *  0, 0, then a spike of (step / dt) — about 29 u/s on a 20% grade, with an
+   *  implied acceleration in the thousands.
+   *
+   *  That is measurement noise, not terrain, and the jump detector in
+   *  vehicles.js was triggering on it. This returns the same profile sampled
+   *  continuously, so a derivative of it means what it says.
+   *
+   *  @param i a nearby sample index (the caller's tracked index is ideal)
+   */
+  groundHeightAtPos(pos, i, lateral) {
+    const n = this.center.length;
+    if (!n) return 0;
+    const wrap = (k) => ((k % n) + n) % n;
+    const a = wrap(i);
+    // How far along the segment leaving sample `a` the car sits. The tangent
+    // is unit length, so this is metres; divided by the segment length it is
+    // the interpolation parameter.
+    const t = this.tan[a];
+    let f = ((pos.x - this.center[a].x) * t.x + (pos.z - this.center[a].z) * t.z)
+          / (this.segLen > 0 ? this.segLen : 1);
+    // Behind the sample: interpolate over the PREVIOUS segment instead, so the
+    // result stays continuous across a sample boundary rather than clamping
+    // flat on one side of it.
+    let lo = a;
+    if (f < 0) { lo = wrap(a - 1); f += 1; }
+    f = Math.max(0, Math.min(1, f));
+    const hi = wrap(lo + 1);
+    const yLo = this.groundHeightAt(lo, lateral);
+    const yHi = this.groundHeightAt(hi, lateral);
+    return yLo + (yHi - yLo) * f;
+  }
+
   /** Distance from (x,z) to the nearest centerline sample (coarse), plus that
    *  sample's road elevation. Returns [dist, roadY]. */
   _nearRoad(x, z) {
@@ -8333,11 +8372,10 @@ export function seededRandom(seed) {
 /** FNV-1a. Turns a level id into a seed that depends on WHAT the world is,
  *  not on where it sits in the array — so reordering the career does not
  *  silently rebuild every world. */
-<<<<<<< HEAD
-export function seedForLevel(level, epoch = 'ignite-r82') {
-=======
-export function seedForLevel(level, epoch = 'ignite-r81') {
->>>>>>> origin/main
+// The epoch is DELIBERATELY not tied to the release number. Bumping it
+// reshuffles every world in the game at once, so it changes only when new
+// worlds are actually wanted — never as a side effect of shipping.
+export function seedForLevel(level, epoch = 'ignite-1') {
   const name = `${epoch}:${(level && level.id) ?? 0}:${(level && level.route) || (level && level.theme) || 'forest'}`;
   let h = 0x811c9dc5;
   for (let i = 0; i < name.length; i++) {
