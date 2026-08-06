@@ -68,11 +68,27 @@ needs redesigning" as the instruction:
 
 Each phase ships, is verified, and leaves the game playable.
 
-**Phase 0 — determinism first.** One seeded PRNG per world, per `RNG_CHANNELS`
-(`scatter`, `weather`, `ambient`, `damageRoll`). No engine change. This alone
-makes every open bug reproducible, and it is the single highest-value change
-available: it converts "I cannot reproduce it" into a test case. *Do this before
-anything else.*
+**Phase 0 — determinism first. LANDED.** One seeded PRNG per stage, per
+`RNG_CHANNELS` (`scatter`, `weather`, `ambient`, `damageRoll`), living in `v2/`
+alongside the untouched v1 game. No engine change. See `v2/DETERMINISM.md`.
+
+- `v2/src/core/rng.ts` — xoshiro128\*\*, all-uint32 state, named forks,
+  snapshots, unbiased `int()`, Box–Muller `gaussian()`
+- `v2/src/core/stageRng.ts` — the four spec channels, independent by
+  construction; content fingerprints; a `withoutMathRandom()` guard that turns
+  the 779th unseeded call into a build failure
+- `v2/src/world/scatter.ts` — the first consumer, conformant to §3.2 rules 1–3,
+  §3.3 density and §16.1 object shape
+- `v2/src/tools/dumpWorld.ts` — `npm run world -- <stage>` prints a fingerprint
+  that must never change
+
+58 tests, `cd v2 && npm run gate`. It caught two defects in its own first hour
+(an inverted §3.3 density basis, and draw accounting that ignored forks) — both
+recorded in `v2/DETERMINISM.md` rather than quietly fixed.
+
+What it does *not* do: the four open v1 bugs are still open and still not
+reproducible, because v1 remains unseeded and v2 has no car yet. Phase 0 built
+the instrument; Phases 1 and 2 point it at the patient.
 
 **Phase 1 — adopt the spec's numbers where the engine already agrees.** The
 angle-of-incidence bands (§9.4), corner grades (§1.3), flora tiers (§3.1),
