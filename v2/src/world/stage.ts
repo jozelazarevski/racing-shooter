@@ -18,6 +18,19 @@ export interface StageDef {
   country: string;
   surface: SurfaceKind;
   biome: Biome;
+  /**
+   * The RALLY_WORLD_BIBLE region, when §3.11's legacy mapping is wrong for
+   * this stage.
+   *
+   * §3.11 maps `nordic_pine` to `nordic_winter`, and for a Finnish winter
+   * stage that is right. Ouninpohja is authored as a SUMMER GRAVEL stage, and
+   * the winter region's near-white ground base turned it into a white screen
+   * with a red car on it. The bible has ten regions and none of them is a
+   * nordic summer forest, so this is a real gap in the document rather than a
+   * mapping mistake — §6's amendment procedure is where it belongs. Until
+   * then the stage names the region it is actually lit by.
+   */
+  region?: string;
   moves: StageMove[];
 }
 
@@ -155,6 +168,8 @@ export const STAGES: StageDef[] = [
     country: 'Finland',
     surface: 'gravel',
     biome: 'nordic_pine',
+    // Summer gravel, so not `nordic_winter` — see the note on StageDef.region.
+    region: 'alpine_pass',
     moves: [
       { kind: 'straight', length: 240, grade: 0.02 },
       { kind: 'crest', length: 90, height: 7 },

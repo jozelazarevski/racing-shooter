@@ -12,21 +12,35 @@ import { Tier } from '../../../spec/rally.constants.ts';
 import { Particles } from './particles.ts';
 import type { Stage } from '../world/stage.ts';
 import type { Heightfield } from '../world/terrain.ts';
+import { renderSettings, roadMaterialFor, sunDirection, type RegionRender } from '../world/region.ts';
 import { WHEEL_RADIUS } from '../physics/vehicle.ts';
 
-/** Palette per biome. Placeholder for the RALLY_WORLD_BIBLE region palettes,
- *  which land in Phase 4 — these are honest stand-ins, not the specified
- *  values, and are marked as such in PHASES.md. */
-const PALETTE: Record<string, { ground: number; road: number; rock: number; sky: number; fog: number; sun: number }> = {
-  alpine_forest:       { ground: 0x4a6741, road: 0x8a8175, rock: 0x6b6660, sky: 0x9dc4e0, fog: 0xaecbdd, sun: 0xfff4e0 },
-  nordic_pine:         { ground: 0x53684a, road: 0x94897a, rock: 0x767068, sky: 0xa8c8dc, fog: 0xc2d6e2, sun: 0xfff0d8 },
-  mediterranean_scrub: { ground: 0x8a8552, road: 0x50504e, rock: 0x9c8f75, sky: 0x7fb5dd, fog: 0xc9d8e0, sun: 0xfff8e8 },
-  farmland:            { ground: 0x6f8a4a, road: 0x8f8676, rock: 0x8a8175, sky: 0x9ac4e2, fog: 0xbfd4e0, sun: 0xfff6e4 },
-  desert_wash:         { ground: 0xa8905e, road: 0xb09a70, rock: 0xa08a68, sky: 0xc4d8e6, fog: 0xdcd0b8, sun: 0xfff2d0 },
-  moorland:            { ground: 0x6b6a4a, road: 0x8a8478, rock: 0x77726a, sky: 0x93a8b8, fog: 0xa8b6c0, sun: 0xf0eee4 },
+/* PHASE 4: the palette comes from RALLY_WORLD_BIBLE now.
+ *
+ * What was here was six hand-picked hex values per biome with a comment
+ * admitting they were placeholders. The bible is normative about appearance —
+ * *"if the world does not match this document, the world is wrong"* — and it
+ * specifies, per region, a six-colour palette, a sun in kelvin and lux at a
+ * named elevation and azimuth, an ambient intensity, a fog colour and a fog
+ * density to five decimals, and a base EV100. All of it is now read rather
+ * than chosen; see `world/region.ts` for the three conversions in between.
+ *
+ * The road colour is the exception and stays local, because the bible gives it
+ * as a surface mix (§3.x "Road") rather than a palette entry, and §16's
+ * surfaces already name the material. G1 — "the roadbed is always the
+ * highest-contrast element in frame" — is what it has to satisfy, so it is
+ * derived from the region's ground base by pushing it away in lightness rather
+ * than by picking a colour.
+ */
+type ScenePalette = {
+  ground: number; road: number; rock: number; sky: number; fog: number; sun: number;
+  foliageMid: number;
 };
 
-const SNOW = { ground: 0xdfe6ec, road: 0xc8d2da, rock: 0x9aa4ac, sky: 0xbdd0e0, fog: 0xdae6ee, sun: 0xfffaf0 };
+/* The road's colour comes from §1's material library, keyed by the segment's
+ * own §16 surface id — see `roadMaterialFor`. Deriving it from the region's
+ * ground base, which is what the first cut did, put an orange road on orange
+ * sand and broke G1. */
 
 export interface Renderer {
   scene: THREE.Scene;
@@ -47,7 +61,21 @@ export interface Renderer {
 }
 
 export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Renderer {
-  const pal = stage.def.surface === 'snow' ? SNOW : (PALETTE[stage.def.biome] ?? PALETTE.alpine_forest!);
+  const rs = renderSettings(stage.def.biome, stage.def.region);
+  const pal: ScenePalette = {
+    ground: rs.ground,
+    road: roadMaterialFor(stage.corridor.segments[0]!.surfaceId),
+    rock: rs.structure,
+    sky: rs.skyZenith,
+    fog: rs.fogColour,
+    sun: new THREE.Color(...rs.sunColour).getHex(),
+    foliageMid: rs.foliage,
+  };
+  // A snow stage keeps the region's light and sky and repaints the ground:
+  // §10.1 says snowfall "accumulates, shifts surface toward snow_deep", which
+  // is a surface state on top of a region, not a different region.
+  if (stage.def.surface === 'snow') { pal.ground = 0xdfe6ec; pal.rock = 0x9aa4ac; }
+
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -56,7 +84,11 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
   // linear space long before it should.
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  // §0.2: "Exposure: physically based, EV100 auto ... clamped +/-1.5 EV from
+  // the region base." The base is the region's, converted by the photographic
+  // relation rather than dialled in — see `ev100ToExposure`. Auto-adaptation
+  // is not implemented; the base is, exactly.
+  renderer.toneMappingExposure = rs.exposure;
   // Shadows, but only from the car: a 4 km stage of shadow-casting trees is not
   // a frame budget. The car's own shadow is the one that matters — it is what
   // tells you where you are about to land after a crest.
@@ -64,11 +96,28 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(pal.fog, 220, 820);
-  scene.add(buildSky(pal));
+  // FogExp2 with the region's own density, which is what the bible specifies
+  // and what R05 checks to five decimals. Linear fog with hand-picked near and
+  // far planes was the placeholder, and it made every region fade at the same
+  // distance regardless of what its air is supposed to be like.
+  scene.fog = new THREE.FogExp2(pal.fog, rs.fogDensity);
+  scene.add(buildSky(rs));
 
-  const sun = new THREE.DirectionalLight(pal.sun, 2.3);
-  sun.position.set(-0.4, 1, 0.6).multiplyScalar(120);
+  // Sun elevation, azimuth, colour temperature and lux, all from the region.
+  // The azimuth is relative to STAGE FORWARD, so two stages of the same region
+  // laid out in different directions are lit the same way relative to the road.
+  const first = stage.corridor.segments[0]!;
+  const dir = sunDirection(rs.region, Math.atan2(first.hx, first.hz));
+  // RAW LUX. The exposure belongs to the tone mapper and nowhere else.
+  //
+  // The first version pre-multiplied the light by the exposure as well, so the
+  // scene was lit by lux x exposure and then exposed again — the square of a
+  // number around 1e-5. Safari came out with a correct desert sky over a black
+  // desert. three.js reads a DirectionalLight's intensity as illuminance in
+  // lux and divides by pi for a Lambertian surface, which is exactly what the
+  // bible's numbers assume.
+  const sun = new THREE.DirectionalLight(new THREE.Color(...rs.sunColour), rs.sunIntensity);
+  sun.position.set(-dir.x, -dir.y, -dir.z).multiplyScalar(120);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   // A tight orthographic frustum that follows the car. A frustum big enough to
@@ -79,7 +128,9 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
   sc.near = 1; sc.far = 320;
   scene.add(sun);
   scene.add(sun.target);
-  scene.add(new THREE.HemisphereLight(pal.sky, pal.ground, 1.0));
+  // §3.x "Ambient sky intensity". Scaled the same way the sun is, so the ratio
+  // between key and fill is the region's rather than an accident of units.
+  scene.add(new THREE.HemisphereLight(rs.skyHorizon, pal.ground, rs.ambientIntensity));
 
   scene.add(buildTerrain(stage.heightfield, pal));
   const instanceIndex = new Map<string, { mesh: THREE.InstancedMesh; i: number }>();
@@ -141,13 +192,18 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
  * A two-stop vertical gradient — horizon haze into zenith — costs one inverted
  * sphere and no texture, and it is what makes the fog colour read as distance
  * rather than as a grey wall. */
-function buildSky(pal: (typeof PALETTE)[string]): THREE.Mesh {
+function buildSky(rs: RegionRender): THREE.Mesh {
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     uniforms: {
-      uTop: { value: new THREE.Color(pal.sky) },
-      uBottom: { value: new THREE.Color(pal.fog) },
+      uTop: { value: new THREE.Color(rs.skyZenith) },
+      uBottom: { value: new THREE.Color(rs.skyHorizon) },
+      // The dome is a raw ShaderMaterial, so its fragment colour goes to the
+      // framebuffer without tone mapping — which is why the exposure has to
+      // stay in the regime the rest of the renderer works in. See the note on
+      // ratios in world/region.ts.
+      uLum: { value: 1.0 },
     },
     vertexShader: `
       varying float vH;
@@ -158,10 +214,12 @@ function buildSky(pal: (typeof PALETTE)[string]): THREE.Mesh {
     fragmentShader: `
       uniform vec3 uTop;
       uniform vec3 uBottom;
+      uniform float uLum;
       varying float vH;
       void main() {
-        gl_FragColor = vec4(mix(uBottom, uTop, smoothstep(-0.06, 0.42, vH)), 1.0);
+        gl_FragColor = vec4(mix(uBottom, uTop, smoothstep(-0.06, 0.42, vH)) * uLum, 1.0);
       }`,
+    toneMapped: true,
   });
   const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), mat);
   sky.scale.setScalar(880);   // just inside the far plane
@@ -178,7 +236,7 @@ function buildSky(pal: (typeof PALETTE)[string]): THREE.Mesh {
  * still uses every one — visual decimation is safe, physical decimation is the
  * bug this whole rewrite is about.
  */
-function buildTerrain(hf: Heightfield, pal: (typeof PALETTE)[string]): THREE.Mesh {
+function buildTerrain(hf: Heightfield, pal: ScenePalette): THREE.Mesh {
   const MAX_VERTS = 150_000;
   let stride = 1;
   while (((hf.nx / stride + 1) * (hf.nz / stride + 1)) > MAX_VERTS) stride++;
@@ -248,7 +306,7 @@ function buildTerrain(hf: Heightfield, pal: (typeof PALETTE)[string]): THREE.Mes
  *  see and the fog hides the rest. */
 function buildProps(
   stage: Stage,
-  pal: (typeof PALETTE)[string],
+  pal: ScenePalette,
   index: Map<string, { mesh: THREE.InstancedMesh; i: number }>,
 ): THREE.Object3D[] {
   const CHUNK = 300;
@@ -269,7 +327,21 @@ function buildProps(
     4: new THREE.CylinderGeometry(0.22, 0.34, 1, 6),
   };
   const canopyGeo = new THREE.ConeGeometry(1, 1, 6);
-  const base: Record<number, number> = { 0: 0x7f9455, 1: 0x6d8a4a, 2: 0x5d7a42, 3: 0x6b5a3e, 4: 0x5a4a33 };
+  // G2: "every asset samples from the region palette". Tiers 0-2 are foliage
+  // and take the region's foliage mid; tiers 3-4 are trunks and rock and take
+  // its structure primary. The lightness ramp within a tier stays, because it
+  // is what keeps a hundred thousand instances from reading as one flat mass —
+  // the bible allows a +/-8% tint of a material, and this is inside that.
+  const foliage = new THREE.Color(pal.foliageMid);
+  const woody = new THREE.Color(pal.rock);
+  const tint = (c: THREE.Color, k: number) => c.clone().multiplyScalar(k).getHex();
+  const base: Record<number, number> = {
+    0: tint(foliage, 1.18),
+    1: tint(foliage, 1.0),
+    2: tint(foliage, 0.86),
+    3: tint(woody, 0.92),
+    4: tint(woody, 0.78),
+  };
   // Tier 0 is grass at 40-70 per 100 m2 — well over a hundred thousand blades
   // on a stage. Thinned for DRAWING only; the world model keeps every one and
   // nothing collides with them anyway.

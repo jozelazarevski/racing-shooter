@@ -1,4 +1,4 @@
-# v2 — Phases 0 to 3
+# v2 — Phases 0 to 4
 
 **Live: https://jozelazarevski.github.io/racing-shooter/play-v2/**
 
@@ -7,7 +7,7 @@ whole migration, exactly as `MIGRATION.md` promised.
 
 ```
 cd v2
-npm run gate       # typecheck + 124 unit tests
+npm run gate       # typecheck + 140 unit tests
 npm run lint       # build all six stages, run §15 against each, fail loudly
 npm run build      # -> ../play-v2
 npm run smoke      # drive every stage headless (needs a server on :8902)
@@ -144,8 +144,9 @@ Every one of these was found by measuring, not by reading the code.
   a check it did not run would be worse than no lint.
 - **§3.2 rules 4–5** (apex occlusion, canopy clearance) need canopy geometry.
   The racing line half of that arrived in Phase 3, so rule 4 is now reachable.
-- **Region palettes are placeholders**, not the `RALLY_WORLD_BIBLE` values.
-  Phase 4.
+- **Region palettes are the `RALLY_WORLD_BIBLE` values** as of Phase 4. What
+  is still placeholder is the geometry they are painted on: no structures, no
+  water, no fauna.
 - **No progression across stages** in v2 yet. Weapons and a rival have landed;
   the career, the garage, upgrades and the 28 v1 worlds have not.
 - **Content parity with v1 is a long way off.** v1 is ~13,000 lines: weapons,
@@ -669,12 +670,92 @@ roadbed is flat across its full width (worst deviation 0.18 m on that stage), an
 the driver arrives at a third of its normal speed by the sixth attempt and still
 stops in the same metre.
 
+---
+
+## Phase 4 — the bible, part one: regions
+
+`RALLY_WORLD_BIBLE.md` is normative about appearance the way `RALLY_RULES.md`
+is about physics: *"If the world does not match this document, the world is
+wrong."* v2 did not match it at all. The renderer carried six hand-picked hex
+values per biome, with a comment admitting they were placeholders, and the
+document's ten regions — palettes, suns in kelvin and lux at named elevations,
+fog densities to five decimals — were unread.
+
+`world/region.ts` is the bridge. Every colour in the game now comes from
+`biomes.constants.ts`: sky zenith and horizon, ground, foliage, structure, fog
+colour and density, sun colour from its colour temperature, and the sun's
+DIRECTION from the region's elevation and its azimuth relative to stage forward
+— so two stages of the same region laid out differently are lit the same way
+relative to the road. Props take the region's foliage and structure colours,
+which is G2's "every asset samples from the region palette". The road is the
+one thing that does not come from the palette, and that is also specified: it
+comes from §1's material library, keyed by the segment's §16 surface id.
+
+### Three admissions, because the pipeline cannot honour the photometry
+
+The bible specifies light photometrically. Consuming that absolutely needs a
+physically-based pipeline; this renderer is `MeshLambertMaterial` and a raw
+`ShaderMaterial` sky dome. Each of these was tried and measured before being
+written down:
+
+1. **The exposure was applied twice** — once to the light and once to the tone
+   mapper — so the scene was lit by lux × exposure and then exposed again.
+   Safari came out as a correct desert sky over black sand.
+2. **`baseEV100` now has no consumer.** Applying it as a relative exposure
+   double-counts: physically, a brighter region means both more light and less
+   exposure and the two cancel, but this renderer only scales the sun. Deep
+   Desert, two stops above the reference, came out at a third of its brightness
+   — noon as dusk. The field is read, printed by the lint, and unused. That is
+   the honest place to leave it.
+3. **The lux and ambient ratios are bounded** to ±35% of the reference region.
+   Unbounded, Nordic Winter's high sun on its near-white ground clipped:
+   Ouninpohja was a white screen with a red car on it.
+
+What survives is every ratio the renderer can express. What is lost is the
+claim that a surface reads at a specific cd/m², which it could not honour
+anyway. Making that true is a renderer change, not a constants change.
+
+### A gap in the document, not in the mapping
+
+§3.11 maps `nordic_pine` to `nordic_winter`. Ouninpohja is authored as a
+**summer gravel** stage, and the winter region's near-white ground base turned
+it into a whiteout. The bible has ten regions and none of them is a nordic
+summer forest — a real gap, and §6's amendment procedure is where it belongs.
+Until then `StageDef.region` lets a stage name the region it is actually lit
+by, and Ouninpohja names Alpine Pass.
+
+### §5's region lint, and what it found
+
+Twelve checks are specified. Six are answerable from the region definition and
+the material library and are implemented; the other six are claims about
+rendered frames or about content that does not exist yet, and are reported as
+SKIPPED with the reason. `npm run lint` now prints them per region in use.
+
+**It found nine failures across ten regions, and they are in the
+specification.**
+
+- **Three R02/G3 violations.** G3 caps structure saturation at 45%; Mountain
+  Oasis is 46%, Nordic Winter 49%, and Volcanic Highland 60% — `#A8492C`.
+  These are unambiguous: a number is over a limit the same document sets.
+- **Six R12/G1 failures**, with a caveat this lint states itself. G1 is about
+  the frame, and the check cannot render one, so it compares the road
+  material's albedo against the region's ground base. Amazon at 0.7% and
+  Mountain Oasis at 0.9% are a road that genuinely disappears into its
+  terrain; Nordic Winter's 4% is a snow road on snow ground, which the bible
+  answers elsewhere with snow poles and kerbs this build does not yet place.
+
+None is fixed here. §6 says a hex value changes in the document first and is
+mirrored into the constants in the same commit, so editing them here would put
+the implementation and the document into silent disagreement — the one thing
+the arrangement exists to prevent. They are listed, they stay listed, and the
+lint reports them on every run.
+
 ## Next
 
-1. **Col de Turini at 2,242 m**, with a proper instrumented capture of the
-   moment rather than another hypothesis.
-2. **Phase 4 — the bible.** Region palettes, lighting, archetype architecture,
-   and the R01–R12 region lint. This is what makes it stop looking like a
-   prototype, and it is the largest remaining gap between v2 and something worth
-   playing.
-3. **§3.2 rule 4**, apex occlusion, now that a racing line exists.
+1. **Amend the bible** for the nine §5 failures, or place the content that
+   answers the six R12s.
+2. **Col de Turini at 2,242 m**, with an instrumented capture of the moment
+   rather than another hypothesis.
+3. **§2's structure kit** — archetypes, settlements, walls. R03, R07 and G7 are
+   all waiting on it, and it is the largest remaining visual gap.
+4. **§3.2 rule 4**, apex occlusion, now that a racing line exists.

@@ -148,8 +148,18 @@ band. Testing it caught a progression lock that was silently handing the
 reference-lap harness the wrong stage — six requests, one stage, and a reported
 clean sweep of L15. See `v2/PHASES.md`.
 
-**Phase 4 — the bible.** Region palettes, lighting to five decimals, archetype
-architecture, scatter densities, and the R01–R12 region lint.
+**Phase 4 — the bible. STARTED.** Region palettes, lighting and fog now come
+from `RALLY_WORLD_BIBLE.md` rather than from six hand-picked hex values per
+biome, and §5's region lint is implemented for the six checks answerable from
+data. It immediately found nine failures across the bible's ten regions —
+three saturation caps exceeded by the document's own palettes, six roads that
+do not out-contrast their own terrain — none of which are fixed in code,
+because §6 says a hex value changes in the document first.
+
+Three things the renderer cannot honour are written down rather than fudged:
+the exposure was being applied twice, `baseEV100` has no consumer in a
+non-physically-based pipeline, and the lux ratios have to be bounded or Nordic
+Winter clips to white. Architecture, water and fauna are still absent.
 
 ## The rule for every phase
 
