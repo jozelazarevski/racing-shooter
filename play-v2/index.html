@@ -40,6 +40,33 @@
     font-size:28px; font-weight:800; letter-spacing:.1em; color:var(--hot);
     text-shadow:0 3px 18px rgba(0,0,0,.9); pointer-events:none; white-space:nowrap; }
 
+  /* Countdown, then sector splits — same slot, because they never overlap. */
+  #big { position:fixed; top:38%; left:50%; transform:translate(-50%,-50%);
+    font-size:64px; font-weight:800; letter-spacing:.06em; pointer-events:none;
+    text-shadow:0 4px 26px rgba(0,0,0,.95); white-space:nowrap; }
+  #big.go { color:var(--hot); }
+  #big.good { color:var(--ok); font-size:44px; }
+  #big.bad-split { color:var(--bad); font-size:44px; }
+  #big.neutral { color:var(--ink); font-size:44px; }
+  .good { color:var(--ok) !important; }
+  .bad-split { color:var(--bad) !important; }
+  .neutral { color:var(--dim) !important; }
+  #rival { font-size:11px; margin-top:5px; letter-spacing:.06em; }
+
+  #result { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(8,11,14,.86); backdrop-filter:blur(5px); z-index:9; }
+  #result-card { background:rgba(16,21,27,.97); border:1px solid rgba(255,255,255,.13);
+    border-radius:16px; padding:26px 32px; text-align:center; min-width:280px; }
+  #result-title { font-size:13px; letter-spacing:.24em; color:var(--dim); }
+  #result-time { font-size:46px; font-weight:800; margin:6px 0 4px; letter-spacing:-.01em; }
+  #result-sub { font-size:11px; color:var(--dim); line-height:1.7; }
+  #result-splits { margin:16px auto 4px; font-size:11px; border-collapse:collapse; }
+  #result-splits td { padding:2px 12px; text-align:right; color:var(--dim); }
+  #result-splits td:first-child { text-align:left; }
+  #restart { margin-top:16px; background:var(--hot); color:#12161b; border:0; border-radius:8px;
+    padding:9px 20px; font:inherit; font-weight:700; font-size:12px; letter-spacing:.08em;
+    cursor:pointer; }
+
   #bottom { left:10px; bottom:10px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;
     max-width:calc(100vw - 20px); }
   #debug { font-size:10px; color:var(--dim); }
@@ -56,9 +83,11 @@
     #speed { font-size:34px; }
     #keys { display:none; }
     #pacenote { font-size:21px; top:14%; }
+    #big { font-size:46px; }
+    #big.good, #big.bad-split, #big.neutral { font-size:30px; }
   }
 </style>
-  <script type="module" crossorigin src="./assets/index-BZuoJFEo.js"></script>
+  <script type="module" crossorigin src="./assets/index-VsBPgirP.js"></script>
 </head>
 <body>
 <canvas id="view"></canvas>
@@ -78,9 +107,21 @@
   <div id="dist">0.00 km</div>
   <div class="bar-track"><div id="damage-bar" class="bar" style="width:0"></div></div>
   <div id="surface"></div>
+  <div id="rival"></div>
 </div>
 
 <div id="pacenote"></div>
+<div id="big"></div>
+
+<div id="result">
+  <div id="result-card">
+    <div id="result-title">FINISH</div>
+    <div id="result-time">0:00.00</div>
+    <div id="result-sub"></div>
+    <table id="result-splits"></table>
+    <button id="restart">RUN IT AGAIN</button>
+  </div>
+</div>
 
 <div id="bottom" class="panel">
   <select id="stage-select"></select>

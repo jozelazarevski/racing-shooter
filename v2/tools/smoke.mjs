@@ -20,9 +20,19 @@ const BASE = process.env.BASE ?? 'http://localhost:8902/play-v2/';
 const STAGES = ['ouninpohja', 'col-de-turini', 'fafe', 'monte-carlo', 'safari', 'sweet-lamb'];
 const SHOTS = process.env.SHOTS ?? '/tmp/v2-shots';
 
+// Chromium does not read HTTPS_PROXY from the environment, so testing the
+// deployed build (rather than a local server) needs it passed explicitly.
+const proxy = process.env.HTTPS_PROXY ?? process.env.https_proxy;
+const useProxy = proxy && !BASE.includes('localhost');
+
 const browser = await chromium.launch({
   executablePath: '/opt/pw-browsers/chromium',
-  args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
+  args: [
+    '--use-gl=swiftshader',
+    '--enable-unsafe-swiftshader',
+    '--no-sandbox',
+    ...(useProxy ? [`--proxy-server=${proxy}`, '--ignore-certificate-errors'] : []),
+  ],
 });
 
 /* Known open issues. Listed here so they stay VISIBLE in every run and cannot
