@@ -188,6 +188,56 @@ conservative enough to be a fair pacer over the early sectors. Racing it over a
 whole stage is a driver-quality problem, not a physics one, and it is the next
 thing to fix.
 
+## Controls and cameras — brought across from v1
+
+Ported with their numbers, because every one was set in response to a specific
+complaint about how v1 felt on a phone, and re-deriving them would mean
+re-earning the same complaints.
+
+**The pad.** Drag anywhere in the left half: left/right steers, up is throttle,
+down is brake. The base re-centres wherever the thumb lands, so it works blind
+and in either orientation.
+
+- 62 px of travel to full lock. 52 px meant a thumb twitch was half a turn.
+- 0.14 deadzone, so a resting thumb does not steer.
+- An expo curve, `0.42a + 0.58a³`. Linear travel spends the whole useful range —
+  the small corrections you actually make on a straight — in the first few
+  millimetres of thumb. That is what "way too sensitive" feels like. Measured:
+  half travel gives 0.218 of lock, not 0.5.
+- **Sensitivity 0.5×–1.8×**, read live, stored. At 1.8× that same half travel
+  gives 0.393.
+
+**Two schemes**, stored per player:
+
+- **One thumb** — the pad steers and drives.
+- **Two thumbs** — the pad rails to horizontal and steers *only*; GAS and BRAKE
+  move to buttons with the throttle held open. Without the rail, the same drag
+  that turns the car also lifts off, which is exactly the coupling two thumbs
+  exist to remove. Verified: in two-thumb, dragging the pad down does not brake.
+
+**On-screen buttons** — CAM, RESET, HAND, plus GAS and BRAKE in two-thumb. Any
+element with `data-key` behaves like that keyboard key, so keyboard, gamepad
+and touch all arrive through one path.
+
+**Six cameras**, v1's five plus BONNET, opening on CHASE:
+
+| | back | height | look | notes |
+|---|---:|---:|---:|---|
+| TOP-DOWN | 20 | 52 | 7 | |
+| TOP FAR | 24 | 84 | 1 | |
+| TRAIL | 21 | 26 | 15 | exists to make rocks readable |
+| CHASE | 17 | 11.5 | 19 | the default |
+| CHASE FAR | 26 | 17 | 22 | |
+| BONNET | −0.4 | 1.35 | 22 | |
+
+v1's units and v2's metres are the same scale — a car is 4.4 u there and 4.2 m
+here — so the figures transfer directly. Speed pulls the camera back and up
+(`spdBack`, `spdH`), so the faster you go the further you see. Chase views take
+the car's heading; the overhead ones take the damped direction of *travel*,
+because at 50 m up raw heading whips on every steering flick. All of them are
+yaw-only: following roll and pitch makes the horizon tumble over a crest and
+the player loses the road, which is the one thing a camera exists to show.
+
 ## Next
 
 **Phase 3 proper.** Reset nodes every 120 m (lint L12), a better AI line

@@ -11,7 +11,7 @@ import { locate } from './world/corridor.ts';
 import { sampleHeight } from './world/terrain.ts';
 import { initPhysics, createWorld, probeGround, FixedStepper, type PhysicsWorld } from './physics/world.ts';
 import { Vehicle, WHEEL_RADIUS, type DriverInput } from './physics/vehicle.ts';
-import { Input } from './core/input.ts';
+import { Input, type Scheme } from './core/input.ts';
 import { createRenderer, type Renderer } from './render/scene.ts';
 import { fingerprint } from './core/stageRng.ts';
 import { RaceDirector, formatTime, formatDelta } from './race/director.ts';
@@ -20,12 +20,35 @@ import { SIM, ROLLOVER } from '../../spec/rally.constants.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 
-/** Chase cameras. Three, because a rally stage needs a close one for placing
- *  the car and a far one for reading the road ahead. */
+/* The five v1 cameras, brought across with their numbers.
+ *
+ * v1's "units" and v2's metres are the same scale — a car is 4.4 u there and
+ * 4.2 m here — so the figures transfer directly. The reasoning behind them is
+ * worth keeping too, because every one was a response to a specific complaint:
+ *
+ *   CHASE once sat at h 7.5 / back 13 / look 10 — bumper height and close
+ *   enough that the car filled the screen, so you could not see far enough up
+ *   the road to place the next corner. Lifted, pulled back, look-ahead pushed
+ *   well down the road.
+ *
+ *   TRAIL sits between the overhead family and the chase family and exists for
+ *   ONE reason: spotting rocks. From TOP-DOWN (52 up, 20 back — 69 degrees of
+ *   elevation, 56 away) a boulder is a flat disc against flat ground: no side
+ *   face, no useful shadow, and the car is small enough that judging a gap is
+ *   guesswork. At 51 degrees and 33 away every solid shows its side and its
+ *   cast shadow, and the car is roughly twice the size on screen.
+ *
+ * `chase` selects the yaw source. A chase camera follows the car's own
+ * heading; the overhead ones follow the damped direction of travel, because at
+ * that distance raw heading whips on every steering flick.
+ */
 const CAMS = [
-  { name: 'CHASE', back: 8.4, height: 3.1, look: 11, fov: 62 },
-  { name: 'FAR', back: 13.5, height: 5.4, look: 16, fov: 66 },
-  { name: 'BONNET', back: -0.4, height: 1.35, look: 22, fov: 72 },
+  { name: 'TOP-DOWN',  back: 20, h: 52,   look: 7,  lookH: 0,   spdBack: 6, spdH: 10, chase: false, steer: 1.00, fov: 60 },
+  { name: 'TOP FAR',   back: 24, h: 84,   look: 1,  lookH: 0,   spdBack: 4, spdH: 10, chase: false, steer: 1.00, fov: 60 },
+  { name: 'TRAIL',     back: 21, h: 26,   look: 15, lookH: 1.6, spdBack: 5, spdH: 6,  chase: true,  steer: 0.90, fov: 62 },
+  { name: 'CHASE',     back: 17, h: 11.5, look: 19, lookH: 3.2, spdBack: 4, spdH: 2,  chase: true,  steer: 0.76, fov: 64 },
+  { name: 'CHASE FAR', back: 26, h: 17,   look: 22, lookH: 3.4, spdBack: 4, spdH: 2,  chase: true,  steer: 0.84, fov: 66 },
+  { name: 'BONNET',    back: -0.4, h: 1.35, look: 22, lookH: 1.2, spdBack: 0, spdH: 0, chase: true, steer: 0.55, fov: 72 },
 ];
 
 class Game {
@@ -38,6 +61,12 @@ class Game {
   camIndex = 0;
   private camPos = new THREE.Vector3();
   private camLook = new THREE.Vector3();
+  /** Damped direction of travel, for the overhead views. */
+  private travelYaw = 0;
+  /** Damped camera yaw, so switching views does not snap. */
+  private camYaw = 0;
+  /** Last steering input, for the camera's lead into a corner. */
+  private lastSteer = 0;
   private last = 0;
   private frames = 0;
   private fps = 0;
@@ -107,7 +136,9 @@ class Game {
 
     const canvas = $('view') as HTMLCanvasElement;
     this.view = createRenderer(canvas, this.stage);
-    this.input = new Input(canvas);
+    this.input = new Input();
+    this.input.bindTouchButtons(document);
+    this.input.bindJoystick($('pad'), $('pad-base'), $('pad-knob'));
     addEventListener('resize', () => this.view.resize());
 
     $('stage-name').textContent = def.name;
@@ -119,6 +150,12 @@ class Game {
       `seed ${this.stage.rng.seed} · fingerprint <b>${fingerprint(this.stage.objects)}</b><br>` +
       `§15 lint: <b class="${summary.ok ? 'ok' : 'bad'}">${summary.passed} pass, ${summary.failed} fail</b>, ${summary.skipped} not yet implementable` +
       (summary.ok ? '' : `<br>${results.filter((r) => r.status === 'fail').map((r) => `${r.id}: ${r.detail}`).join('<br>')}`);
+
+    this.travelYaw = heading;
+    this.camYaw = heading;
+    // CHASE is index 3 and is the one to open on: TOP-DOWN first would start
+    // every stage looking straight down at a car you cannot place.
+    this.camIndex = 3;
 
     setStatus('');
     this.last = performance.now();
@@ -138,6 +175,7 @@ class Game {
       // Held on the line until the lights go out — but steering still works, so
       // you can set the car up rather than stare at a frozen screen.
       const player = this.race.locked ? { ...cmd, throttle: 0, brake: 1 } : cmd;
+      this.lastSteer = cmd.steer;
       this.car.step(player, h);
 
       const rp = this.rival.body.translation();
@@ -197,37 +235,55 @@ class Game {
   }
 
   private updateCamera(dt: number): void {
-    const cam = CAMS[this.camIndex]!;
+    const M = CAMS[this.camIndex]!;
     const p = this.car.body.translation();
     const q = this.car.body.rotation();
-    const quat = new THREE.Quaternion(q.x, q.y, q.z, q.w);
+    const v = this.car.body.linvel();
+    const speed = Math.hypot(v.x, v.z);
 
-    // Yaw only. Following the car's roll and pitch makes a rally camera
+    // Yaw source. Following the car's roll and pitch makes a rally camera
     // unwatchable over a crest — the horizon tumbles and the player loses the
-    // road, which is the one thing the camera exists to show.
+    // road, which is the one thing the camera exists to show. So: yaw only.
+    const quat = new THREE.Quaternion(q.x, q.y, q.z, q.w);
     const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
-    const yaw = Math.atan2(fwd.x, fwd.z);
+    const headingYaw = Math.atan2(fwd.x, fwd.z);
+    // Overhead views take the damped direction of TRAVEL instead: at 50 m up,
+    // raw heading whips on every steering flick.
+    if (speed > 2) {
+      this.travelYaw += shortestAngle(this.travelYaw, Math.atan2(v.x, v.z)) * (1 - Math.exp(-dt * 3.2));
+    }
+    const baseYaw = M.chase ? headingYaw : this.travelYaw;
+
+    // Steering lead: the camera swings a little into the corner, so you see
+    // where you are going rather than where you are pointing.
+    this.camYaw += shortestAngle(this.camYaw, baseYaw) * (1 - Math.exp(-dt * (M.chase ? 7 : 4)));
+    const yaw = this.camYaw + this.lastSteer * 0.30 * M.steer;
     const flat = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
 
+    // Speed pulls the camera back and up, so the faster you go the further you
+    // can see — which is what spdBack and spdH are for.
+    const t = Math.min(1, speed / 45);
+    const back = M.back + M.spdBack * t;
+    const height = M.h + M.spdH * t;
+
     const want = new THREE.Vector3(p.x, p.y, p.z)
-      .addScaledVector(flat, -cam.back)
-      .add(new THREE.Vector3(0, cam.height, 0));
+      .addScaledVector(flat, -back)
+      .add(new THREE.Vector3(0, height, 0));
 
     // Never let the camera end up under the ground: sample the same
     // heightfield the car drives on and stay above it.
-    const floor = sampleHeight(this.stage.heightfield, want.x, want.z) + 1.4;
-    want.y = Math.max(want.y, floor);
+    want.y = Math.max(want.y, sampleHeight(this.stage.heightfield, want.x, want.z) + 1.4);
 
-    const k = 1 - Math.exp(-dt * (this.camIndex === 2 ? 40 : 9));
+    const k = 1 - Math.exp(-dt * (M.name === 'BONNET' ? 40 : M.chase ? 9 : 6));
     this.camPos.lerp(want, k);
     this.camLook.lerp(
-      new THREE.Vector3(p.x, p.y + 1.1, p.z).addScaledVector(flat, cam.look),
+      new THREE.Vector3(p.x, p.y + M.lookH, p.z).addScaledVector(flat, M.look),
       1 - Math.exp(-dt * 11),
     );
     this.view.camera.position.copy(this.camPos);
     this.view.camera.lookAt(this.camLook);
-    if (this.view.camera.fov !== cam.fov) {
-      this.view.camera.fov = cam.fov;
+    if (this.view.camera.fov !== M.fov) {
+      this.view.camera.fov = M.fov;
       this.view.camera.updateProjectionMatrix();
     }
   }
@@ -423,7 +479,39 @@ select.addEventListener('change', () => {
 // byte — the only thing that changes between attempts is the driving.
 $('restart').addEventListener('click', () => location.reload());
 
-game.boot(select.value).catch((err) => {
+// --- controls, matching v1 ---------------------------------------------------
+// Both settings are stored, because a player who has found the sensitivity that
+// suits their thumb should not have to find it again on the next stage.
+const CTRL_KEY = 'ignite-v2-controls';
+const stored = (() => {
+  try { return JSON.parse(localStorage.getItem(CTRL_KEY) ?? '{}'); } catch { return {}; }
+})() as { scheme?: Scheme; sens?: number };
+
+const schemeSel = $('scheme') as HTMLSelectElement;
+const sensInput = $('sens') as HTMLInputElement;
+
+function applyControls(): void {
+  const scheme = schemeSel.value as Scheme;
+  const sens = Number(sensInput.value);
+  game.input?.setScheme(scheme);
+  if (game.input) game.input.joySens = sens;
+  $('sens-val').textContent = sens.toFixed(2) + '×';
+  // Two-thumb puts the pedals on buttons and rails the pad to steering only,
+  // so the throttle and brake buttons only exist in that scheme.
+  document.body.classList.toggle('two-thumb', scheme === 'two-thumb');
+  try { localStorage.setItem(CTRL_KEY, JSON.stringify({ scheme, sens })); } catch { /* private mode */ }
+}
+
+schemeSel.value = stored.scheme ?? 'pad';
+sensInput.value = String(stored.sens ?? 1);
+schemeSel.addEventListener('change', applyControls);
+sensInput.addEventListener('input', applyControls);
+
+$('settings-btn').addEventListener('click', () => {
+  $('settings').classList.toggle('open');
+});
+
+game.boot(select.value).then(applyControls).catch((err) => {
   setStatus(`Failed to start: ${err?.message ?? err}`);
   console.error(err);
 });
@@ -451,3 +539,13 @@ game.boot(select.value).catch((err) => {
       if (i % 30 === 0) game.enforceWorldBounds();
     }
   };
+
+/** Shortest signed angular difference from `a` to `b`, in radians. Damping raw
+ *  atan2 values without this makes the camera take the long way round every
+ *  time the car crosses the +/-pi boundary. */
+function shortestAngle(a: number, b: number): number {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
