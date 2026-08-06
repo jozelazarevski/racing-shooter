@@ -150,6 +150,7 @@ export class Particles {
     }
   }
 
+<<<<<<< HEAD
   /** A one-off burst — an impact, a shattered bush, a shell striking rock.
    *  Same ring buffer, so a firefight cannot allocate. */
   burst(x: number, y: number, z: number, count: number, colour: number): void {
@@ -179,6 +180,8 @@ export class Particles {
     }
   }
 
+=======
+>>>>>>> origin/main
   /** Integrate and upload. Called once per FRAME, not per physics step —
    *  particles are cosmetic, so they are the one thing allowed to run on
    *  render time (§14.5 forbids gameplay logic doing this, not decoration). */
