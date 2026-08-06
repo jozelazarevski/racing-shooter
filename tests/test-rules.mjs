@@ -100,8 +100,21 @@ const boot = async (url) => {
       return true;
     };
     const stones = t.solids.filter((s) => s.mat === 'stone' && s.r > 1.5);
-    const ob = stones.find(flatAround) || stones[0];
-    let best = 0, bestD = 99;
+    // Try SEVERAL stones, not just the first flat one.
+    //
+    // World generation is seeded now, so "the first flat stone" is a fixed
+    // stone — and on PINE VALLEY that one has a companion lump sitting in both
+    // run-ins, which caps the impact at 23 hull. Before seeding this test drew
+    // a different stone every run and reported 53 / 15 / 53 on three
+    // consecutive baseline runs: it was always unreliable, and determinism
+    // simply stopped hiding it.
+    //
+    // A blocked run-in is a property of the scenery. What this test is for is
+    // the MATERIAL model, so it takes the best clean head-on it can find.
+    const candidates = stones.filter(flatAround).slice(0, 12);
+    if (!candidates.length && stones.length) candidates.push(stones[0]);
+    let best = 0, bestD = 99, bestR = 0;
+    for (const ob of candidates) {
     // try both approach directions: one of them can be blocked by a companion
     // lump, and a blocked run-in is a property of the scenery, not the material
     for (const dir of [1, -1]) {
@@ -117,9 +130,15 @@ const boot = async (url) => {
         if (p.health < 100) break;
       }
       const loss = 100 - p.health;
-      if (loss > best) { best = loss; bestD = Math.hypot(p.pos.x - ob.x, p.pos.z - ob.z); }
+      if (loss > best) {
+        best = loss;
+        bestD = Math.hypot(p.pos.x - ob.x, p.pos.z - ob.z);
+        bestR = ob.r;
+      }
     }
-    return { hpLoss: +best.toFixed(0), d: +bestD.toFixed(1), r: +ob.r.toFixed(1), wrecked: !p.alive };
+    }
+    return { hpLoss: +best.toFixed(0), d: +bestD.toFixed(1), r: +bestR.toFixed(1),
+             tried: candidates.length, wrecked: !p.alive };
   });
   // NOTE: player hull intake is difficulty-scaled (NORMAL x0.62, RULES.md), so
   // the raw min(85,(impact-6)x3.5) lands ~0.62x on screen. 28+ keeps STONE

@@ -6,7 +6,7 @@ import { UnrealBloomPass } from '../lib/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
-import { Track, LEVELS, circuitPoints, disposeSubtree } from './track.js';
+import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel } from './track.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
@@ -516,6 +516,11 @@ class Game {
       : Math.min(Math.max(wantLv - 1, 0), LEVELS.length - 1);
     this.level = LEVELS[this.levelIndex];
     this.autoStart = params.get('go') === '1';
+    // ?seed=N forces a specific world build. A bug report that carries a seed
+    // is a bug report anyone can reproduce, which is the whole point of making
+    // generation deterministic in the first place.
+    const wantSeed = parseInt(params.get('seed'), 10);
+    this._seedOverride = Number.isFinite(wantSeed) ? wantSeed >>> 0 : null;
 
     // progression + difficulty + garage (persisted PER PROFILE — several
     // players keep separate careers on one device; settings stay shared)
@@ -637,7 +642,10 @@ class Game {
     // switching tracks is a teardown and a rebuild rather than a page reload.
     this.worldLayer = new THREE.Group();
     this.scene.add(this.worldLayer);
-    this.track = new Track(this.scene, this.level);
+    // Seeded: the same world every time, so a bug found here can be found again.
+    // ?seed= overrides it, which is what turns a report into a repro.
+    this.worldSeed = this._seedOverride ?? seedForLevel(this.level);
+    this.track = withSeed(this.worldSeed, () => new Track(this.scene, this.level));
     this._applyTheme();
     this.particles = new Particles(this.scene);
     this.particles.setTheme?.(this.level?.theme); // smashed barrels shed the theme's own stave/hoop colours
@@ -1123,7 +1131,10 @@ class Game {
     this.particles?.reset?.();
 
     // --- build the new world ---
-    this.track = new Track(this.scene, this.level);
+    // Seeded: the same world every time, so a bug found here can be found again.
+    // ?seed= overrides it, which is what turns a report into a repro.
+    this.worldSeed = this._seedOverride ?? seedForLevel(this.level);
+    this.track = withSeed(this.worldSeed, () => new Track(this.scene, this.level));
     this._applyTheme();
     this.particles?.setTheme?.(this.level.theme);
 
