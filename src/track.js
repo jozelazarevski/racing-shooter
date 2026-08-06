@@ -7847,6 +7847,12 @@ export class Track {
     // stepped stand full of spectators near the start line
     const i = (N - 40 + N) % N;
     const p = this.pointAt(i, WALL_OFF + 16);
+    // STAND IT ON THE GROUND, not at road height. `pointAt` returns the ROAD's
+    // elevation, and this sits 26 u off the centreline where the terrain has
+    // usually fallen away — measured on FURKA RIDGE the stand and all three of
+    // its colliders hovered 2.0 to 2.3 u in the air. NATURE.md rule 6:
+    // everything that stands, stands ON the ground.
+    p.y = this.terrainHeight(p.x, p.z);
     const g = new THREE.Group();
     const crowd = crowdTexture();
     const frame = new THREE.MeshStandardMaterial({ color: 0x5d4426, roughness: 0.9 });
@@ -7879,11 +7885,11 @@ export class Track {
     this.group.add(g);
     // 3 solid colliders along the 20-unit front face (which runs with the track)
     for (const off of [-7, 0, 7]) {
-      this.solids.push({
-        x: p.x + this.tan[i].x * off,
-        z: p.z + this.tan[i].z * off,
-        r: 2.5, y: p.y, mat: 'metal',
-      });
+      const cx = p.x + this.tan[i].x * off;
+      const cz = p.z + this.tan[i].z * off;
+      // Each collider takes the ground under ITSELF — the stand is 20 u wide
+      // and the hillside under it is not level.
+      this.solids.push({ x: cx, z: cz, r: 2.5, y: this.terrainHeight(cx, cz), mat: 'metal' });
     }
   }
 

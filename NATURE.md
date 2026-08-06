@@ -78,21 +78,71 @@ too vague to enforce and should be rewritten until it can.
 
 ---
 
-## Known violations — open
+## Status — every rule, measured
 
-These are measured, unfixed, and listed here so the file stays honest rather
-than aspirational.
+Nothing in this table is an opinion. Each row names the probe that decides it,
+because a rule with no probe is a belief: rule 1 sat here marked OPEN, then
+FIXED, while the largest river in the game ran at 41.8° for two releases —
+the fix had been applied to the small streams and verified on the wrong mesh.
 
-| # | Rule | Status |
-|---|---|---|
-| 1 | Waterfalls fall vertically | **OPEN** — angled water sheets on open terrain |
-| 9 | Car follows the inclination | **OPEN** — the body does not pitch/roll to the ground normal |
-| 10 | Buildings clear the road | **FIXED** — hut placement now re-checks against the nearest leg anywhere on the lap, with a 3.5 u margin |
+| # | Rule | Status | Enforced by |
+|---|---|---|---|
+| 1 | Falling water falls straight down | **CONFORMANT** — 0 % of water triangles lie between 3° and 87°, on every water mesh in the world | `tests/test-water.mjs` |
+| 2 | Flowing water runs downhill | **CONFORMANT in the open river** — 0 upstream rises over 473–532 stations. Fords are a declared exception, below | `tests/test-nature.mjs` |
+| 3 | Standing water is level | **UNTESTED** — no standing water exists yet; there is nothing to check | — |
+| 4 | Water finds the low ground | **UNVERIFIED** — see "rule 4" below. Not claimed either way | reported only |
+| 5 | Trunks and stems are vertical | **UNTESTED** — needs instance-matrix introspection | — |
+| 6 | Everything that stands, stands ON the ground | **CONFORMANT** — 0 floating, 0 buried across 172–440 solids and 288–308 trees per world | `tests/test-nature.mjs` |
+| 7 | Rock falls from rock | **CONFORMANT** | RULES.md hazard rule |
+| 8 | Snow lies on up-facing surfaces | **UNTESTED** | — |
+| 9 | A vehicle sits on the surface it is on | **CONFORMANT** — pitches to road gradient (0.12–0.17 rad on a 0.22–0.29 grade) and rolls to an off-road cross-slope | `tests/test-nature.mjs` |
+| 10 | Buildings belong beside the road | **CONFORMANT** — and it was only half-true when first marked fixed: `_buildHuts` had the lap-wide check, `_buildRoadCabins` did not, and four of five cabins on FURKA RIDGE were on the carriageway, one at lateral 0.25 with a 5 u solid radius | `tests/test-carriageway.mjs` |
+| 11 | A building is bigger than a car, smaller than a hill | **UNTESTED** | — |
+| 12 | Shadows agree with the sun | **CONFORMANT** — key light bearing matches the drawn sun to 0.0° on every world measured | `tests/test-nature.mjs` |
+
+### The ford exception to rule 2
+
+Where the road crosses a stream, the wash sits on the **deck**: the embankment
+dams the water and its surface climbs to meet the road. Along the direction of
+flow that is water running uphill, and rule 2 forbids it.
+
+It is allowed anyway, deliberately. The alternative is dipping the road into
+the channel at every crossing, which changes the racing line on a dozen worlds
+to satisfy a rule about scenery. Measured, the exception is exactly that narrow:
+**all** upstream rises are inside the ford band — 5 of 5 on LOG FLUME FURY,
+4 of 4 on PINE VALLEY — and **0** occur in open water. `test-nature.mjs` counts
+ford rises separately and reports them rather than hiding them in a threshold.
+
+### Why rule 4 is unverified rather than passing or failing
+
+`terrainHeight` folds the river valley in through `_riverValley`, while the
+channel bed lives in a separate `_river.bed` array, and the two do not obviously
+describe the same surface. Two reasonable formulations of "is the water above
+its banks" gave 79/169 and 87/169 on the same world — the signature of measuring
+the wrong thing, not of a world that is wrong. Rather than assert a pass or
+raise a false alarm, the probe prints its numbers and this row says unverified.
+
+Per the opening of this file: a rule that cannot be checked by a probe is too
+vague to enforce. Rule 4 needs a probe against the carved bed, and until it has
+one its status is unknown.
 
 ## A note on measuring any of this
 
-**World generation is randomised per load.** The same world built twice gives
-different prop placement and different terrain detail — measured, one world's
-crest count moved from 6 to 0 across two loads with no code change at all. Any
-probe that samples a world ONCE cannot tell a fix from noise. Sample repeatedly,
-or compare only differences far larger than the observed spread.
+**World generation is seeded** (`seedForLevel` / `withSeed`, since r81): the same
+level built twice is byte-identical, which is what makes single-sample probes
+meaningful at all. `?seed=<n>` builds a different world reproducibly.
+
+This was not always true. It used to say here that generation was randomised per
+load, and that any probe sampling a world once could not tell a fix from noise —
+which was correct at the time and is why several early measurements in this repo
+have to be read with suspicion.
+
+Two traps that have each cost a full measurement cycle, recorded so they are not
+paid for a third time:
+
+- **Check which tree your server is serving.** Ports get taken. A measurement
+  run once reported a fix as having zero effect because another process held the
+  port and was serving an older checkout.
+- **Headless Chromium under swiftshader runs at roughly 1 FPS.** Anything that
+  waits in wall-clock time for simulated time to pass is measuring the frame
+  rate, not the game.
