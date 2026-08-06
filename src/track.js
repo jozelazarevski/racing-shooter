@@ -4038,13 +4038,49 @@ export class Track {
         if (usedI.some((u) => this._circDist(i, u) < 4)) continue;                // no piles
         if (shoulder && this._nearNarrow(i, 6)) continue; // ---- width-variation: keep the pinch lane clear
         const side = Math.random() < 0.5 ? -1 : 1;
+        // SHOULDER PROPS SIT OUTSIDE THE RACING LINE, not across it.
+        //
+        // This was `3.5 + rand*5`, so with radii up to 1.7 a prop's inner edge
+        // reached 1.8 u of the centreline. Measured, 674 of 1050 props sat
+        // inside the drivable width and 326 sat inside the 4.5 u corridor the
+        // obstacles reserve — worst 1.78 u. On the timber worlds those are
+        // `hay`, recoloured to cut-log rounds, so the road was strewn with
+        // rock- and log-shaped objects however carefully the boulders had been
+        // moved aside. That is what the player photographed.
+        //
+        // They are NOT blockers — a car drives straight through one and
+        // accelerates — so this is clutter on the line rather than a wall. It
+        // still reads as "rocks and logs in the middle of the road", and it is
+        // the same complaint.
+        //
+        // They stay ON the drivable surface, just past the line: run wide,
+        // clip an apex, take a corner properly, and you will still smash them,
+        // which is the whole point of them being there.
+        const wHere = this.widthAt ? this.widthAt(i) : ROAD_HALF;
+        const clearHere = Math.max(4.5, wHere * 0.55);   // the obstacle corridor
         const lateral = shoulder
-          ? side * (3.5 + Math.random() * 5)           // in the drivable lane
+          ? side * (clearHere + 1.8 + Math.random() * 1.6)
           : this.T.cliffWalls
             ? side * (10.5 + Math.random() * 0.8)      // hug the canyon walls
             : side * (10.5 + Math.random() * 11.5);
-        usedI.push(i);
         const p = this.pointAt(i, lateral);
+        // AND CHECK IT AGAINST THE WHOLE LAP, not just this sample's normal.
+        //
+        // `lateral` is measured along the normal at sample `i`. On a hairpin
+        // world the road's other leg swings underneath that offset, so a prop
+        // correctly placed 6.8 u from ITS leg can be 2.4 u from the centreline
+        // of the one below — measured on COL DE TURINI after the widening
+        // above, which is what caught this. It is the same defect that put a
+        // cabin on the centreline of FURKA RIDGE and 38 tire stacks inside the
+        // road: an offset is not a distance.
+        //
+        // `_distToTrack` searches the lap, so it sees the near leg whichever
+        // one it is. BOTH branches need it: a trackside prop placed 10-22 u
+        // along one leg's normal can land 2.4 u from another leg just as
+        // easily, and on COL DE TURINI one did.
+        const need = shoulder ? clearHere + 1.8 : wHere + 1.8;
+        if (this._distToTrack(p.x, p.z) < need) continue;
+        usedI.push(i);
         // shoulder props sit on the road surface; trackside ones on the terrain
         const y = Math.abs(lateral) <= 9.5 ? p.y : this.terrainHeight(p.x, p.z);
         return { x: p.x, y, z: p.z };
@@ -4514,6 +4550,21 @@ export class Track {
       const side = Math.random() < 0.5 ? 1 : -1;
       const p = this.pointAt(i, side * (20 + Math.random() * 14));
       if (!this._buildableSpot(p.x, p.z, 7, 2.4)) continue;
+      // AND IT MUST ACTUALLY BE OFF THE ROAD.
+      //
+      // `pointAt(i, 20..34)` measures along ONE sample's normal. On a world
+      // whose road switchbacks up a mountain, the neighbouring leg of the
+      // centreline swings underneath that offset, so "34 u to the side" can
+      // land on tarmac. `_buildableSpot` cannot catch it: it tests terrain
+      // flatness and spacing against other buildings, and never asks how far
+      // the road is. Measured on FURKA RIDGE — the only world with roadCabins
+      // — FOUR OF FIVE cabins intruded, the worst sitting at lateral 0.25 with
+      // a 5 u solid radius. A house on the centreline, with push-out.
+      //
+      // `_clearsRoad` does a global nearest-sample search and is what
+      // _buildHuts and _buildRetainingWalls already use. The cabin's collider
+      // is ~5 u, so clear that plus the usual margin.
+      if (!this._clearsRoad(p.x, p.z, 5.2)) continue;
       // face the road
       const rot = this.headingAt(i) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
       this._element(B, Math.random() < 0.7 ? 'house' : 'shed', p.x, p.z, rot, K);
@@ -7648,6 +7699,12 @@ export class Track {
         const tireOff = this.T.cliffWalls ? WALL_OFF + 0.8
           : (this.T.retainingWalls || this.T.guardFence) ? WALL_OFF + 1.2 : WALL_OFF + 2.2;
         const p = this.pointAt(i, tireOff * side);
+        // Same trap as the road cabins: `tireOff` is measured along ONE
+        // sample's normal, and on a hairpin the road's other leg swings under
+        // it. Measured, 38 of 763 stacks landed inside the drivable width, the
+        // worst at lateral 4.01 — a solid on the racing line dressed as
+        // trackside furniture. The stack's collider is 1.1.
+        if (!this._clearsRoad(p.x, p.z, 1.1, 0.6)) continue;
         const stack = Math.random() < 0.5 ? 3 : 2;
         const ids = [];
         for (let s = 0; s < stack && tk < 180; s++) {
@@ -8077,14 +8134,18 @@ export class Track {
       F.push({ t, x: p.x, z: p.z, nx, nz, w: R.half * wob, df });
     }
 
-    const strip = (cols, yFor, uvFor, alphaFor) => {
+    // `frames` defaults to the shared sample list, but the WATER passes its own:
+    // a quantised copy carrying a doubled station at every fall, which is what
+    // lets one strip contain vertical faces at all. See the water section below.
+    const strip = (cols, yFor, uvFor, alphaFor, frames = F) => {
       const C = cols.length;
-      const verts = new Float32Array((SEGS + 1) * C * 3);
-      const uvs = new Float32Array((SEGS + 1) * C * 2);
-      const colA = new Float32Array((SEGS + 1) * C * 4);
+      const ROWS = frames.length;
+      const verts = new Float32Array(ROWS * C * 3);
+      const uvs = new Float32Array(ROWS * C * 2);
+      const colA = new Float32Array(ROWS * C * 4);
       const idx = [];
-      for (let s = 0; s <= SEGS; s++) {
-        const f = F[s];
+      for (let s = 0; s < ROWS; s++) {
+        const f = frames[s];
         for (let c = 0; c < C; c++) {
           const off = cols[c] * f.w;
           const vx = f.x + f.nx * off, vz = f.z + f.nz * off;
@@ -8098,7 +8159,7 @@ export class Track {
           colA[q + 3] = alphaFor(f, c, C);
         }
       }
-      for (let s = 0; s < SEGS; s++) {
+      for (let s = 0; s < ROWS - 1; s++) {
         for (let c = 0; c < C - 1; c++) {
           const a = s * C + c, b = a + 1, d = (s + 1) * C + c, e = d + 1;
           // WINDING: columns run along +normal and rows along +tangent, and
@@ -8162,14 +8223,93 @@ export class Track {
       const deck = this.center[this.nearestIndex(_clearV)].y;
       return open * (1 - lift) + (deck + 0.05) * lift;
     };
+    // ---- LEVEL REACHES, VERTICAL FALLS (the big river, not just the streams) --
+    //
+    // THE BUG: `waterY` above reads the bed under every station, so the surface
+    // followed the ground along its length and the river rendered as a ribbon
+    // draped down the hillside. Measured on PINE VALLEY, AMAZON RAPIDS and LOG
+    // FLUME FURY the `river-water` mesh had 2502 level triangles, ZERO vertical
+    // ones, and slopes running up to 41.8 degrees. Reported, correctly, as
+    // "the water is not falling 90 degrees as asked".
+    //
+    // `_buildRivers` (the small jungle streams) was given level-reach/vertical-
+    // drop treatment earlier and is clean — 384 level, 54 vertical, nothing in
+    // between. This is the same correction applied to the world-spanning river,
+    // which is the one you actually drive across on every world.
+    //
+    // A strip has ONE height per station, so a drop is otherwise forced to
+    // slope across a whole segment. The fix is two stations at the same x/z:
+    // the lip at the old level and the foot at the new one. The quad between
+    // them has no length in plan, so it stands upright by construction.
+    const FALL = 1.1;                  // bed drop that ends a reach, in units
+
+    // PASS 1 — the natural surface: level reaches that only ever DESCEND.
+    // A river does not run uphill. Where the bed climbs, the water pools and
+    // the bed pokes through it; only a bed that falls by more than FALL ends
+    // the reach. Letting a rising bed lift the surface instead produced 153
+    // upward steps on PINE VALLEY, one of them a 13 u wall of water facing
+    // upstream — measurably worse than the slope it replaced.
+    const surf = new Array(F.length);
+    let hold = null;
+    for (let s = 0; s < F.length; s++) {
+      const f = F[s];
+      const bed = R.bed ? R.bed[this._riverNearest(f.x, f.z).k] : this.terrainHeight(f.x, f.z);
+      const open = bed + R.depth * 0.42;
+      if (hold === null) hold = open;
+      if (hold - open > FALL) hold = open;
+      surf[s] = hold;
+    }
+
+    // PASS 2 — the fords. Where the river crosses the road the wash sits on the
+    // DECK, so the road works as a weir: the water is held up to deck level, it
+    // is never pulled down. `Math.max` is what keeps this from reintroducing a
+    // downhill drape, and the blend band is the one `waterY` already uses.
+    for (let s = 0; s < F.length; s++) {
+      const f = F[s];
+      const lift = 1 - THREE.MathUtils.smoothstep(f.df, 10, 26);
+      if (lift <= 0) continue;
+      _clearV.set(f.x, 0, f.z);
+      const deck = this.center[this.nearestIndex(_clearV)].y + 0.05;
+      // Blend TO the deck, not `Math.max` toward it. Taking the max let a
+      // pooled reach that already sat above the road stay there, and the wash
+      // came out 1.8 u proud of the carriageway on PINE VALLEY — a wall of
+      // water where a crossing should be. On the deck (lift = 1) this is the
+      // deck height exactly; the ramp either side is stepped by pass 3.
+      surf[s] = surf[s] * (1 - lift) + deck * lift;
+    }
+
+    // PASS 3 — emit, doubling the station wherever the level changes so the
+    // change is carried by an upright quad instead of a sloped one. Off the
+    // ford a step has to be worth taking (STEPMIN) or the approach becomes a
+    // shimmer of micro-terraces; across the carriageway itself the water must
+    // track the deck exactly, or you drive through a lip of water.
+    const STEPMIN = 0.35;
+    const wf = [];
+    let cur = null;
+    for (let s = 0; s < F.length; s++) {
+      const f = F[s];
+      const want = surf[s];
+      if (cur === null) cur = want;
+      const onDeck = f.df <= 10;
+      if (Math.abs(want - cur) > (onDeck ? 0.01 : STEPMIN)) {
+        wf.push({ ...f, y: cur });
+        cur = want;
+        // Nudge the foot's u so the upright face gets texture across it
+        // instead of one smeared column.
+        wf.push({ ...f, y: cur, t: f.t + 1e-4 });
+      } else {
+        wf.push({ ...f, y: cur });
+      }
+    }
     const waterGeo = strip(
       [-1, -0.35, 0.35, 1],
-      waterY,
+      (f) => f.y,
       (f, c, C) => [f.t * (total / 18), c / (C - 1)],
       // Fade the last stretch of each tail to nothing. The reach now runs well
       // past the fog, but a hard-edged rectangle of water is the exact thing
       // that reads as "the river stops here" if one ever does come into view.
-      (f) => Math.min(smoothstep01(f.t / 0.06), smoothstep01((1 - f.t) / 0.06))
+      (f) => Math.min(smoothstep01(f.t / 0.06), smoothstep01((1 - f.t) / 0.06)),
+      wf,
     );
     const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({
       map: waterTex, roughness: 0.18, metalness: 0.06, side: THREE.DoubleSide,
