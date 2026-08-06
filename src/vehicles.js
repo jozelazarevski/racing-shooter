@@ -1651,14 +1651,64 @@ export class Car {
       }
     }
     this.pos.y = this.y;
-    // nose up while climbing/launching, nose down while falling/descending.
-    // The raw climb rate steps frame-to-frame (ground height is sampled), so
-    // pitch reads the smoothed value; airborne keeps tracking vy directly.
+
+    // ---- body attitude on the ground ------------------------------------
+    //
+    // THE BUG THIS FIXES: pitch used to come only from the CLIMB RATE, and a
+    // climb rate is zero when you are not moving. Park on a 20% slope and the
+    // car stood bolt upright; creep up a hairpin and it stayed flat until it
+    // was quick enough to clear the 0.4 threshold. Reported as "car is not
+    // following the inclination", and it was exactly that.
+    //
+    // The ground's SPATIAL gradient does not care how fast you are going, so
+    // that is what attitude is taken from now. The climb-rate term stays, but
+    // only for what it was always right for: the airborne arc of a jump.
+    //
+    // Sampled from the SAME height source the car's own y comes from, a
+    // segment either side, so the road and the body cannot disagree.
+    let slopePitch = 0;
+    let slopeRoll = 0;
+    if (!this.airborne && !offRoad && t.groundHeightAt) {
+      const i = this.trackIndex;
+      const n = t.center ? t.center.length : 0;
+      const wrap = (k) => (n ? ((k % n) + n) % n : k);
+      const span = t.segLen > 0 ? t.segLen * 2 : 4.8;
+      const gAhead = t.groundHeightAt(wrap(i + 1), this.lateral);
+      const gBehind = t.groundHeightAt(wrap(i - 1), this.lateral);
+      // Along-road gradient. Nose UP on a climb: the mesh applies
+      // `pitch - jumpPitch` with +x pitching the nose down, so a positive
+      // gradient has to come through as a positive jumpPitch.
+      slopePitch = THREE.MathUtils.clamp(((gAhead - gBehind) / span) * 0.8, -0.4, 0.4);
+
+      // Cross-slope, for camber. Half a car width either side of where the
+      // wheels actually are.
+      const w = 1.6;
+      const gL = t.groundHeightAt(i, this.lateral - w);
+      const gR = t.groundHeightAt(i, this.lateral + w);
+      slopeRoll = THREE.MathUtils.clamp(((gR - gL) / (2 * w)) * 0.7, -0.22, 0.22);
+    } else if (!this.airborne && offRoad && t.terrainHeight) {
+      const hx = Math.sin(this.heading);
+      const hz = Math.cos(this.heading);
+      const d = 2.4;
+      const gA = t.terrainHeight(this.pos.x + hx * d, this.pos.z + hz * d);
+      const gB = t.terrainHeight(this.pos.x - hx * d, this.pos.z - hz * d);
+      slopePitch = THREE.MathUtils.clamp(((gA - gB) / (2 * d)) * 0.8, -0.4, 0.4);
+      const rx = hz;
+      const rz = -hx;
+      const gR2 = t.terrainHeight(this.pos.x + rx * 1.6, this.pos.z + rz * 1.6);
+      const gL2 = t.terrainHeight(this.pos.x - rx * 1.6, this.pos.z - rz * 1.6);
+      slopeRoll = THREE.MathUtils.clamp(((gR2 - gL2) / 3.2) * 0.7, -0.22, 0.22);
+    }
+    this.groundRoll = this.groundRoll ?? 0;
+    this.groundRoll += (slopeRoll - this.groundRoll) * Math.min(1, 7 * dt);
+
+    // Airborne pitch still tracks vy: in the air there is no ground to read,
+    // and the arc IS the climb rate.
     this._climbSm += ((this.airborne ? this.vy : this._climbRate) - this._climbSm) * Math.min(1, 6 * dt);
-    const pitchTarget = this.airborne || Math.abs(this._climbSm) > 0.4
-      ? THREE.MathUtils.clamp((this.airborne ? this.vy : this._climbSm) * 0.06, -0.35, 0.35)
-      : 0;
-    this.jumpPitch += (pitchTarget - this.jumpPitch) * Math.min(1, 8 * dt);
+    const airPitch = this.airborne
+      ? THREE.MathUtils.clamp(this.vy * 0.06, -0.35, 0.35)
+      : slopePitch;
+    this.jumpPitch += (airPitch - this.jumpPitch) * Math.min(1, 8 * dt);
 
     if (this.fireCooldown > 0) this.fireCooldown -= dt;
     if (this.invuln > 0) this.invuln -= dt;
@@ -1695,7 +1745,9 @@ export class Car {
     }
     this.mesh.rotation.set(0, this.heading + this.visYaw, 0);
     // body lean ('YXZ' order: +x pitches the nose down, so climb is subtracted)
-    const roll = THREE.MathUtils.clamp(-vl * 0.02, -0.18, 0.18);
+    // Cornering lean PLUS the camber of the ground underneath, so a car parked
+    // across a slope leans with it instead of sitting level on a hillside.
+    const roll = THREE.MathUtils.clamp(-vl * 0.02, -0.18, 0.18) + (this.groundRoll ?? 0);
     const pitch = THREE.MathUtils.clamp(-this.speedAlong * 0.0012, -0.05, 0.05);
     this.mesh.rotation.z = roll;
     this.mesh.rotation.x = pitch - this.jumpPitch;
