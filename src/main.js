@@ -4036,8 +4036,21 @@ class Game {
     const glance = square < 0.55;
     const angleMul = 0.45 + 0.55 * THREE.MathUtils.clamp(square, 0, 1);
     // damage: real, but a fraction of what the same stone cost as a wall
-    const dmg = Math.max(3, (impact - 9) * 0.9 * heft) * angleMul * (this.difficulty?.hullMul ?? 0.62);
-    car.health = Math.max(0, car.health - dmg);
+    // THROUGH damage(), NOT STRAIGHT INTO health. This was the one damage path
+    // in the game that wrote the hull directly, and everything damage() does
+    // was therefore skipped: hull plating, the part that pops off at 66% and
+    // 33%, the `_lastHurt` stamp, and — the bad one — the `health <= 0` wreck
+    // check. Measured: a player on 6 hull took one stone shunt and ended on
+    // { health: 0, alive: true, destroyCalled: false }. Still driving, no husk,
+    // no respawn. And because `_lastHurt` was never stamped, the 5-second
+    // pit-crew timer was already satisfied, so the wreck immediately began
+    // healing itself back up from zero.
+    //
+    // damage() applies the difficulty scale itself, so the manual hullMul that
+    // used to be here is gone rather than being applied twice.
+    const before = car.health;
+    car.damage(Math.max(3, (impact - 9) * 0.9 * heft) * angleMul, null);
+    const dmg = before - car.health;      // what it actually cost, post-scaling
     // …and the speed it takes with it answers the angle too
     car.vel.multiplyScalar(1 - 0.12 * heft * (0.3 + 0.7 * square));
     const at = new THREE.Vector3(ob.x, (ob.y ?? car.pos.y) + 0.4, ob.z);
