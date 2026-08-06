@@ -1,4 +1,4 @@
-# v2 — Phases 0, 1 and 2
+# v2 — Phases 0 to 3
 
 **Live: https://jozelazarevski.github.io/racing-shooter/play-v2/**
 
@@ -7,10 +7,11 @@ whole migration, exactly as `MIGRATION.md` promised.
 
 ```
 cd v2
-npm run gate     # typecheck + 58 unit tests
-npm run lint     # build all six stages, run §15 against each, fail loudly
-npm run build    # -> ../play-v2
-node tools/smoke.mjs   # drive every stage headless (needs a server on :8902)
+npm run gate       # typecheck + 86 unit tests
+npm run lint       # build all six stages, run §15 against each, fail loudly
+npm run build      # -> ../play-v2
+npm run smoke      # drive every stage headless (needs a server on :8902)
+npm run reference  # §15 L15: a full AI lap of every stage, measured
 ```
 
 ---
@@ -132,17 +133,20 @@ Every one of these was found by measuring, not by reading the code.
 - **Tier 3 does not fall.** §3.1 specifies "falls, momentum exchange"; here
   young trees are static colliders. Collision, tier and damage classification
   are correct — only knock-down is missing. Needs collider streaming.
-- **Col de Turini rolls the test autopilot** in the switchbacks. Reported as
-  `KNOWN` by the smoke test on every run so it stays visible.
+- **Col de Turini rolled the test autopilot** in the switchbacks, and was
+  reported as `KNOWN` by the smoke test. It was inverted steering, not the
+  switchbacks; the KNOWN list is now empty. See Phase 3.
 - **§15 L07, L10–L13, L15 are SKIPPED**, each with its reason printed. They need
-  a ballistic launch model, water volumes, bridges, reset nodes, fauna and an AI
-  reference lap. A lint that returned green for a check it did not run would be
-  worse than no lint.
-- **§3.2 rules 4–5** (apex occlusion, canopy clearance) need a racing line and
-  canopy geometry.
+  a ballistic launch model, water volumes, bridges, reset nodes and fauna. L15
+  is different in kind: it is a claim about a car driving, so the lint can never
+  answer it and `npm run reference` does instead. A lint that returned green for
+  a check it did not run would be worse than no lint.
+- **§3.2 rules 4–5** (apex occlusion, canopy clearance) need canopy geometry.
+  The racing line half of that arrived in Phase 3, so rule 4 is now reachable.
 - **Region palettes are placeholders**, not the `RALLY_WORLD_BIBLE` values.
   Phase 4.
-- **No weapons, no AI rivals, no progression** in v2 yet. They live in v1.
+- **No progression across stages** in v2 yet. Weapons and a rival have landed;
+  the career, the garage, upgrades and the 28 v1 worlds have not.
 - **Content parity with v1 is a long way off.** v1 is ~13,000 lines: weapons,
   choppers, hostiles, traffic, 28 worlds, the rally-star progression, the
   garage, upgrades, audio, the offline PWA. v2 has none of it. What has come
@@ -186,14 +190,14 @@ Two more things found by measuring:
 - **The final sector never recorded.** The finish fired at `length − 1` and
   closed the race before the boundary at `length` could be crossed.
 
-### Known gap in the race
+### Known gap in the race — CLOSED, and it was not what it looked like
 
-**The AI cannot yet complete a full stage cleanly at high skill.** At skill 1.0
-it crashes and beaches itself; auto-recovery gets it moving again, but a clean
-AI run start to finish is not proven. The rival runs at 0.78, which is
-conservative enough to be a fair pacer over the early sectors. Racing it over a
-whole stage is a driver-quality problem, not a physics one, and it is the next
-thing to fix.
+This section used to read: *"the AI cannot yet complete a full stage cleanly at
+high skill... racing it over a whole stage is a driver-quality problem, not a
+physics one."* Half of that was wrong. The AI could not complete a stage because
+**the finish line was unreachable and the steering was inverted**, and no amount
+of driver quality would have fixed either. See Phase 3 below. The rival now runs
+the stage's racing line at skill 0.82.
 
 ## Controls and cameras — brought across from v1
 
@@ -302,7 +306,185 @@ collider, hides the instance and scores. Fired at a hillside it hits the
 hillside — **you cannot shoot through terrain**, which cost me three confusing
 test runs before I recognised it as the right answer.
 
+## Phase 3, part one — the racing line, and three bugs it found
+
+The plan for this round was "a better AI line". Building one meant driving the
+stages end to end for the first time, and that turned up three defects that had
+nothing to do with the AI and everything to do with the game.
+
+### 1. Steering was inverted. All of it.
+
+`ArrowRight` produced `+1`. The touch pad's rightward drag produced `+1`. The
+camera swung right on `+1`. And `+1` turned the car **left**.
+
+`steerAngle` is a rotation about the body's up axis. A positive rotation about
+`+y` carries the car's local forward (`+z`) toward local `+x` — and with forward
+at `+z`, the car's right is `−x`, because right = forward × up. So the geometry
+meant "left" by the number every caller meant "right" by.
+
+Measured rather than reasoned, because a sign argument is exactly the kind of
+thing one talks oneself into: hold `+0.5` on Safari's opening straight at
+93 km/h and the car moves **7.2 m toward −normal**, which is the driver's left.
+`.probe/steer-sign.mjs` is four lines and settled it in one run.
+
+**Why nothing caught it.** The only thing that had ever driven v2 was the smoke
+test's autopilot, and that was inverted too — it steered away from every corner.
+The check that should have failed, "an autopilot can keep it on the road",
+allowed 25 m of drift over 12 s, and Sweet Lamb passed it at **24.3 m**. Col de
+Turini, a col of hairpins, was slow enough to be recorded as a KNOWN issue with
+a plausible explanation about cautious autopilots. It was not a cautious
+autopilot. With the sign fixed, the same dummy finishes **0.2 m** from the
+centreline on Col de Turini, the KNOWN list is empty, and the tolerance is 14 m.
+
+### 2. The finish line could not be crossed.
+
+The race reads progress from the driver's centreline cursor, so the number it
+sees is a *segment's* distance — quantised to the 4 m grid, and therefore never
+larger than `length − 4`. The finish fired at `length − 1`. No car at any speed
+could ever cross it.
+
+The first reference lap made it unmissable: 36 resets, all of them between
+4,709 m and 4,713 m of a 4,719 m stage, the car reaching the end of the road and
+being recovered onto it over and over while the clock ran. **v2 has never had a
+completable race.**
+
+The unit tests passed throughout, because they fed a continuous distance that
+reached the stage length exactly. There is now a test that feeds the quantised
+distance the game actually supplies, and it fails against the old threshold.
+
+### 3. §1.3 runoff was built on the inside of every slow corner.
+
+A hairpin gets 5 m of shoulder as runoff — the room a car that misses the corner
+needs. Which shoulder was chosen by a `direction === 'left' ? 1 : 0` mapping,
+written backwards in the builder; the L08 lint read the same inverted index, so
+it agreed with the bug and reported a pass on every stage.
+
+Measured by projecting the displacement across each corner run onto its entry
+normal: the road bends toward the widened side. It was the inside — where no car
+has ever left the road. The lint now derives the side from that measurement
+instead of asking the code, and `corridor.test.ts` asserts it independently.
+
+*A lint that shares its assumption with the code it checks is not a lint.*
+
+### The line itself
+
+`race/line.ts`. A minimum-curvature path inside the roadbed, found by
+constrained Laplacian relaxation: move each point toward the midpoint of its
+neighbours, clamp it back inside the road, repeat. Out-in-out is not written
+anywhere — it is what the clamp produces, binding on the inside at the apex and
+the outside at entry and exit.
+
+Two things had to be got right:
+
+- **The clamp has to be smooth.** §1.2 widths carry ±0.25 m of seeded jitter, so
+  the raw limit rattles by a decimetre between points 4 m apart. Through a
+  corner the line lies against the clamp the whole way and inherits the rattle —
+  and a 0.1 m wobble over a 4 m baseline *is* a 320 m radius. It turned
+  Ouninpohja's 140 m corner into a 116 m one and cost 10 km/h through every fast
+  corner on every stage. A minimum filter followed by a blur is smooth and
+  provably still inside the road, provided the filter radius is at least the
+  number of blur passes.
+- **Curvature is measured over a 2-segment stride, not post-smoothed.** Menger
+  curvature through three points on a circle is exactly 1/R at any spacing, so a
+  wider baseline is free on a real corner and divides the noise on a straight by
+  four. Blurring the curvature afterwards would also flatten the peak at a
+  hairpin, which is the one number the speed profile must not be optimistic
+  about.
+
+**The honest measurement of the geometry: it is worth almost nothing.** Ideal
+time on the relaxed line against ideal time on the centreline, same profile:
+
+| | centreline | racing line | gain |
+|---|---:|---:|---:|
+| Ouninpohja | 137.8 s | 137.8 s | 0.0 s |
+| Col de Turini | 144.8 s | 143.6 s | 1.1 s |
+| Fafe | 123.3 s | 123.6 s | −0.4 s |
+| Monte Carlo | 206.5 s | 205.0 s | 1.5 s |
+| Safari | 143.1 s | 143.2 s | −0.1 s |
+| Sweet Lamb | 150.6 s | 150.0 s | 0.6 s |
+
+A rally road is 4.5–8 m wide. After a car's track width and a margin there is
+about ±1.2 m of freedom, and swinging across that costs more curvature in the
+transition than it buys at the apex. So the line hugs the inside of tight
+corners rather than sweeping out-in-out, and that is correct for this corridor
+rather than a limitation to apologise for. **The improvement in the AI comes
+from the speed profile, not the geometry.**
+
+### The speed profile
+
+Three passes over the line: the lateral friction limit at each point, a backward
+pass so every point is slow enough for what follows, a forward pass under
+traction and then power. It replaces "if the tightest grade within v² × 0.05 m
+is slower than now, brake" — a horizon heuristic — with the exact answer to
+where braking must start.
+
+It also carries a **crest limit**, and that one was found by crashing. The first
+profile limited lateral acceleration and nothing else, so it sent the car over
+Ouninpohja's 240 m crest at 135 km/h. The crest's vertical radius is about 80 m:
+v²/r is over 2 g, so the car was thrown into the air with every wheel unloaded,
+drifted while it had no grip to correct with, and landed off the road. The
+driver was blamed twice before the trace showed `grounded: 0` for half a second
+in the middle of the excursion. The profile now caps vertical demand at 1.3 g —
+a hop over a real crest, not a launch.
+
+### The driver
+
+- **Feed-forward plus feedback.** Pure pursuit alone does not steer this car: it
+  is a *kinematic* law describing a car whose tyres do not slip, and on
+  Ouninpohja's first fast corner it asked for 0.07 of lock where the corner
+  needed about 0.13. The car ran wide while still under its target speed, which
+  is what made the cause obvious. The command is now the angle the corner needs
+  at this speed — `L·κ + K_us·a_y` — with pure pursuit correcting the rest.
+- **It never asks for more lock than the tyre can use.** Beyond `L·a/v² +
+  K_us·a`, more steering produces *less* grip, because the front slip angle is
+  past §8's Magic Formula peak. Without the cap, a small drift at 135 km/h made
+  the driver wind on half a turn and the correction became the accident.
+- **§8's friction ellipse, applied by the driver.** Grip spent turning is not
+  available for accelerating, so the throttle comes out in proportion to what
+  the steering is using. Before it, the car was spending 63% of its friction
+  budget on throttle alone at 135 km/h while asking for a correction as well.
+- **Off the line, slow down.** The profile answers "how fast through this corner
+  *on the line*" and says nothing about being three metres wide of it. Monte
+  Carlo's snow hairpin: the car ran wide, held its 52 km/h because the profile
+  still said 52, and hit a tree 4 m off the line. Lifting is the only control
+  left once the steering is already saturated.
+
+### §15 L15 — the AI reference lap, measured
+
+`tools/reference-lap.mjs` and `npm run reference`. The static lint cannot answer
+L15 and never will: it is a claim about a car driving a stage, and `lintStage`
+has no physics. So the game answers it, with the same driver, the same line and
+the same physics the player gets, and the harness reports it.
+
+| | before | after |
+|---|---|---|
+| Stages completed | **0 of 6** | **6 of 6** |
+| Total recoveries | — (none finished) | 21 |
+| L15 clean (zero resets) | 0 | 1 — Sweet Lamb |
+| Average | — | 80.8 km/h |
+
+Before this round the AI could not finish a single stage. It now finishes all
+six, at rally speeds, and one of them cleanly enough to pass L15 outright.
+
+**The gap, stated plainly.** Five stages still need recoveries — 10 on Col de
+Turini and 7 on Monte Carlo, the two switchback stages, and 1–2 on the others.
+Every one is the same event: the car understeers wide at a hairpin exit on a
+low-grip surface and hits scenery. L15 is therefore reported as **FAIL on five
+of six stages**, with the metre mark of every recovery printed, and it stays
+that way in the output until it is fixed. The lint still reports L15 as SKIPPED,
+because the lint still cannot run a car.
+
 ## Next
 
-**Phase 3 proper.** Reset nodes every 120 m (lint L12), a better AI line
-(racing line rather than centreline + offset), and progression across stages.
+Still Phase 3, and in this order:
+
+1. **Reset nodes every 120 m** — §11.2 and lint L12. Respawn at the nearest
+   upstream node the car legitimately passed, facing the stage, settled, with
+   the §11.2 immunity and time penalty. The current recovery puts the car back
+   two segments ahead of wherever it stopped, which is neither specified nor
+   fair.
+2. **§11.3 cutting** — three wheels outside roadbed + shoulder for 1.2 s with a
+   forward exit is a cut, at 2 s and then 5 s.
+3. **The five stages that still need recoveries.** All the same event, all at
+   hairpin exits on low grip.
+4. **Progression across stages.**

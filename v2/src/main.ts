@@ -121,7 +121,13 @@ class Game {
     // The rival. Same Vehicle class, same physics, same tyres — the only
     // difference is who supplies the input. A rival on a different model would
     // teach the player the wrong thing about grip.
-    this.rivalDriver = new RoadDriver(this.stage.corridor, 0.78, 2.0);
+    // It drives the stage's own racing line, at a fraction of that line's speed
+    // profile. `bias` holds it 2 m off the line for the first 120 m so the
+    // start straight is not a fight for the same piece of road, then fades.
+    this.rivalDriver = new RoadDriver(this.stage.corridor, 0.82, {
+      line: this.stage.line,
+      bias: 2.0,
+    });
     this.rival = new Vehicle(
       this.phys,
       first.x + -first.hz * 2.6,
@@ -135,8 +141,12 @@ class Game {
     // The player gets a RoadDriver too — not to drive, only to track progress
     // along the centreline with a monotonic cursor. A nearest-segment search
     // over the whole stage would jump between the two legs of a switchback.
-    this.playerDriver = new RoadDriver(this.stage.corridor);
-    this.race = new RaceDirector(def.id, this.stage.length);
+    this.playerDriver = new RoadDriver(this.stage.corridor, 1, { line: this.stage.line });
+    // The finish line is the LAST SEGMENT, not the stage length. Those are not
+    // the same number: the last segment sits one step short of the total, and
+    // the cursor can never report more than it.
+    const last = this.stage.corridor.segments[this.stage.corridor.segments.length - 1]!;
+    this.race = new RaceDirector(def.id, this.stage.length, last.distance);
     this.cannon = new Cannon(this.phys);
 
     const canvas = $('view') as HTMLCanvasElement;
@@ -183,27 +193,12 @@ class Game {
       this.lastSteer = cmd.steer;
       this.car.step(player, h);
 
-      // Tracers: a stretched box from where each shell was to where it is.
-    const m = new THREE.Matrix4();
-    const up = new THREE.Vector3(0, 1, 0);
-    const a = new THREE.Vector3();
-    const b = new THREE.Vector3();
-    for (let i = 0; i < this.cannon.shots.length; i++) {
-      const sh = this.cannon.shots[i]!;
-      if (!sh.alive) { m.makeScale(0, 0, 0); this.view.tracers.setMatrixAt(i, m); continue; }
-      a.set(sh.px, sh.py, sh.pz);
-      b.set(sh.x, sh.y, sh.z);
-      const len = Math.max(0.5, a.distanceTo(b) * 2.2);
-      const mid = a.clone().lerp(b, 0.5);
-      const dir = b.clone().sub(a).normalize();
-      m.lookAt(new THREE.Vector3(), dir, up);
-      m.scale(new THREE.Vector3(1, 1, len));
-      m.setPosition(mid);
-      this.view.tracers.setMatrixAt(i, m);
-    }
-    this.view.tracers.instanceMatrix.needsUpdate = true;
-
-    const rp = this.rival.body.translation();
+      // NOTE: the tracer meshes are updated once per FRAME, in syncCar. An
+      // earlier copy of that block also ran here, inside the fixed step, which
+      // meant rebuilding 24 instance matrices up to five times per frame and
+      // throwing away four of the five. Rendering does not belong in the
+      // physics loop even when it is cheap.
+      const rp = this.rival.body.translation();
       const rq = this.rival.body.rotation();
       const rvx = 2 * (rq.x * rq.z + rq.w * rq.y);
       const rvz = 1 - 2 * (rq.x * rq.x + rq.y * rq.y);
@@ -513,6 +508,10 @@ class Game {
    */
   /** Seconds each car has spent going nowhere. */
   private stuckFor = [0, 0];
+  /** How many times each car has had to be put back on the road. §15 L15 asks
+   *  for a reference lap with ZERO of these, so it has to be counted rather
+   *  than quietly performed. */
+  readonly resets = [0, 0];
 
   enforceWorldBounds(dt = SIM.fixedTimestep * 6): void {
     const hf = this.stage.heightfield;
@@ -539,6 +538,7 @@ class Game {
       const rolled = car.telemetry.roofTime > ROLLOVER.onRoofResetDelay;
       if (!outside && !fallen && !rolled && !stuck) continue;
       this.stuckFor[n] = 0;
+      this.resets[n] = (this.resets[n] ?? 0) + 1;
 
       // Put it back a little way ahead, so a car that beached ON a segment does
       // not reset straight back into the same obstacle.
@@ -552,6 +552,105 @@ class Game {
         Math.atan2(seg.hx, seg.hz),
       );
     }
+  }
+
+  /**
+   * THE REFERENCE LAP — §15 L15.
+   *
+   * "Stage completable by the AI reference lap with zero resets and under 8 kJ
+   *  of cumulative impact energy." That is a check the static lint can never
+   *  answer, because it is a statement about a car driving, not about a data
+   *  structure. So it is measured here, by the game, with the same driver, the
+   *  same racing line and the same physics the player gets — and reported by
+   *  `tools/reference-lap.mjs` as a build gate.
+   *
+   * The rival is left where it is. It is another car on the road, and a
+   * reference lap that needed the road to itself would be measuring a different
+   * stage from the one that ships.
+   */
+  runReferenceLap(skill = 1.0, maxSeconds = 420): {
+    finished: boolean;
+    seconds: number;
+    distance: number;
+    resets: number;
+    damageJ: number;
+    offRoadSeconds: number;
+    minSpeedKmh: number;
+    slowestPoint: number;
+    /** Where each recovery happened, metres along the stage. A reference lap
+     *  that fails L15 is only useful if it says WHERE. */
+    resetPoints: number[];
+  } {
+    const driver = new RoadDriver(this.stage.corridor, skill, { line: this.stage.line });
+    const h = SIM.fixedTimestep;
+    const steps = Math.round(maxSeconds / h);
+    // The countdown is race presentation, not part of the stage.
+    this.race.start();
+    this.resets[0] = 0;
+    let offRoad = 0;
+    let minSpeed = Infinity;
+    let slowestPoint = 0;
+    let elapsed = 0;
+    const resetPoints: number[] = [];
+
+    for (let i = 0; i < steps; i++) {
+      const p = this.car.body.translation();
+      const q = this.car.body.rotation();
+      const fx = 2 * (q.x * q.z + q.w * q.y);
+      const fz = 1 - 2 * (q.x * q.x + q.y * q.y);
+      const speed = this.car.telemetry.speedMs;
+      this.car.step(driver.drive(p.x, p.z, fx, fz, speed), h);
+
+      const rp = this.rival.body.translation();
+      const rq = this.rival.body.rotation();
+      this.rival.step(
+        this.rivalDriver.drive(
+          rp.x, rp.z,
+          2 * (rq.x * rq.z + rq.w * rq.y),
+          1 - 2 * (rq.x * rq.x + rq.y * rq.y),
+          this.rival.telemetry.speedMs,
+        ),
+        h,
+      );
+
+      this.phys.world.step();
+      this.phys.time += h;
+      elapsed += h;
+
+      const state = this.playerDriver.locate(p.x, p.z);
+      this.race.update(h, state.distance);
+      const seg = this.stage.corridor.segments[state.cursor]!;
+      const side = state.lateral >= 0 ? 0 : 1;
+      if (Math.abs(state.lateral) > seg.roadbedWidth / 2 + seg.shoulderWidth[side]!) offRoad += h;
+      // Ignore the standing start: every lap begins at 0 km/h and that is not
+      // the stage's slowest point.
+      if (state.distance > 60 && speed * 3.6 < minSpeed) {
+        minSpeed = speed * 3.6;
+        slowestPoint = state.distance;
+      }
+      // The same recovery the player gets, at the same rate the render loop
+      // calls it. Each one is counted, and one is a failed reference lap.
+      if (i % 6 === 0) {
+        const before = this.resets[0]!;
+        this.enforceWorldBounds();
+        if (this.resets[0]! > before && resetPoints.length < 12) {
+          resetPoints.push(Math.round(state.distance));
+        }
+      }
+      if (this.race.phase === 'finished') break;
+    }
+
+    return {
+      finished: this.race.phase === 'finished',
+      seconds: elapsed,
+      distance: this.playerDriver.state.distance,
+      resets: this.resets[0]!,
+      damageJ: this.car.telemetry.damageJ,
+      offRoadSeconds: offRoad,
+      minSpeedKmh: Number.isFinite(minSpeed) ? minSpeed : 0,
+      slowestPoint,
+      resetPoints,
+    };
   }
 
   /** Put the car back on the centreline at the nearest segment. */
@@ -633,6 +732,9 @@ game.boot(select.value).then(applyControls).catch((err) => {
 
 // Expose for the headless harness, the same way v1 exposes __game.
 (window as unknown as Record<string, unknown>).__v2 = game;
+// §15 L15: drive the whole stage with the AI and report what happened.
+(window as unknown as Record<string, unknown>).__referenceLap =
+  (skill?: number, maxSeconds?: number) => game.runReferenceLap(skill, maxSeconds);
 // Ask the solver where the ground is, for the smoke test.
 (window as unknown as Record<string, unknown>).__probeGround =
   (x: number, z: number) => probeGround(game.phys, x, z, game.car.body);

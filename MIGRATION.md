@@ -112,8 +112,26 @@ into a catapult, an inverted damper sign, a doubly-negated tyre force, missing
 reflected engine inertia, a centre of mass 50% too high. Each is written up in
 `v2/PHASES.md`, along with the gaps that are absent rather than pretended.
 
-**Phase 3 — stages.** Point-to-point courses, sectors, reset nodes, corner
-grading feeding auto-generated pacenotes. Progression reworked off laps.
+**Phase 3 — stages. IN PROGRESS.** Point-to-point courses, sectors and
+auto-generated pacenotes landed with the race slice. This round added the racing
+line, its speed profile, and a driver that follows both — and in the course of
+driving the stages end to end for the first time, found three defects that were
+not about the AI at all:
+
+- **steering was inverted**, on every input path, including the player's. `+1`
+  meant right to the keyboard, the touch pad and the camera, and left to the
+  geometry. Measured: hold `+0.5` at 93 km/h and the car goes 7.2 m the other
+  way.
+- **the finish line could not be crossed.** Progress is read from the centreline
+  cursor, which is quantised to the 4 m grid and stops one step short of the
+  stage length; the finish fired a metre short of the length itself. v2 had
+  never had a completable race.
+- **§1.3 runoff was built on the inside of every slow corner**, and the L08 lint
+  read the same inverted index, so it agreed with the bug.
+
+The AI reference lap (§15 L15) now exists as a measurement — `npm run reference`
+— and went from **0 of 6 stages completed to 6 of 6**. Reset nodes, cutting
+penalties and progression are still to come. See `v2/PHASES.md`.
 
 **Phase 4 — the bible.** Region palettes, lighting to five decimals, archetype
 architecture, scatter densities, and the R01–R12 region lint.

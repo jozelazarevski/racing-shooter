@@ -37,13 +37,16 @@ const browser = await chromium.launch({
 
 /* Known open issues. Listed here so they stay VISIBLE in every run and cannot
  * be mistaken for passing, while still letting the suite gate against
- * regressions. Removing the assertion instead would be the dishonest fix. */
-const KNOWN = {
-  'col-de-turini': {
-    'travels down the stage':
-      'the cautious autopilot averages ~9 m/s through a col of G1 hairpins; a player is much quicker',
-  },
-};
+ * regressions. Removing the assertion instead would be the dishonest fix.
+ *
+ * EMPTY as of Phase 3, and the reason is worth keeping. The one entry here was
+ * Col de Turini, where the autopilot averaged ~9 m/s through the col; it was
+ * recorded as a driver-quality problem. It was not. Steering was inverted at
+ * the vehicle (see the note in physics/vehicle.ts), so the dummy steered away
+ * from every corner and the col — all hairpins — punished it most. With the
+ * sign fixed the same dummy finishes 0.2 m from the centreline. A known-issues
+ * list that still named it would now be misinformation. */
+const KNOWN = {};
 
 let failures = 0;
 let known = 0;
@@ -198,7 +201,10 @@ for (const stage of STAGES) {
   check('the gearbox shifts up', driven.maxGear > 1, `reached gear ${driven.maxGear}`);
   check('travels down the stage', driven.distance > 140,
     `${driven.distance.toFixed(0)} m along, ${driven.moved.toFixed(0)} m travelled`);
-  check('an autopilot can keep it on the road', driven.lateral < 25,
+  // 25 m was the old tolerance, and it was wide enough to hide a car steering
+  // the wrong way: Sweet Lamb passed it at 24.3 m. 14 m is what the same dummy
+  // manages now on the worst stage, with room for a crest.
+  check('an autopilot can keep it on the road', driven.lateral < 14,
     `${driven.lateral.toFixed(1)} m from the centreline`);
   // Airborne over a crest is correct rally behaviour, so the ceiling is
   // generous; what matters is that it is not in orbit and not underground.

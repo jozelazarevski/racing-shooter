@@ -9,6 +9,7 @@ import { StageRng, withoutMathRandom } from '../core/stageRng.ts';
 import { buildCorridor, cornerRuns, type Corridor, type StageMove, type SurfaceKind, type CornerRun } from './corridor.ts';
 import { buildHeightfield, sampleHeight, type Heightfield } from './terrain.ts';
 import { scatterCorridor, type WorldObject, type Biome } from './scatter.ts';
+import { buildRacingLine, type RacingLine } from '../race/line.ts';
 
 export interface StageDef {
   id: string;
@@ -26,6 +27,11 @@ export interface Stage {
   heightfield: Heightfield;
   objects: WorldObject[];
   corners: CornerRun[];
+  /** The minimum-curvature path through the corridor and its speed profile.
+   *  Part of the stage rather than of the AI: it is a deterministic property of
+   *  the geometry, the lint reads it, and the rival and the reference lap must
+   *  be driving the same one or the reference lap measures nothing. */
+  line: RacingLine;
   /** Metres. */
   length: number;
 }
@@ -62,6 +68,7 @@ export function buildStage(def: StageDef): Stage {
       heightfield,
       objects,
       corners: cornerRuns(corridor),
+      line: buildRacingLine(corridor),
       length: corridor.length,
     };
   });

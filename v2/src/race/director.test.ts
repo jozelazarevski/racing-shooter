@@ -28,6 +28,26 @@ function run(director: RaceDirector, lengthM: number, speedMs: number): void {
   }
 }
 
+/**
+ * Drive it the way the GAME does: distance snapped to the 4 m centreline grid.
+ *
+ * This distinction is the whole reason for the test below. The director was
+ * only ever driven here with a continuous distance that reached the stage
+ * length exactly, so a finish line at `length - 1` was always crossed. The game
+ * feeds it a SEGMENT's distance, which stops one step short of the length — so
+ * in the game the line could not be crossed at all, and every run ended with
+ * the car sitting at the end of the road while recovery put it back, forever.
+ */
+function runQuantised(director: RaceDirector, lengthM: number, step: number, speedMs: number): void {
+  const dt = 1 / 120;
+  const lastNode = Math.floor((lengthM - 1e-9) / step) * step;
+  let d = 0;
+  for (let i = 0; i < 200_000 && director.phase !== 'finished'; i++) {
+    if (director.phase === 'running') d += speedMs * dt;
+    director.update(dt, Math.min(Math.floor(d / step) * step, lastNode));
+  }
+}
+
 describe('countdown', () => {
   it('holds the car, counts down, then releases', () => {
     const d = new RaceDirector('probe', 4000);
@@ -146,6 +166,33 @@ describe('finish', () => {
     const d = new RaceDirector('sanity', 4000);
     run(d, 4000, 25);
     expect(d.result!.total).toBeCloseTo(160, 0);
+  });
+
+  it('CAN BE REACHED by the distance the game actually supplies', () => {
+    // The stage is 4,002 m long; its last centreline node sits at 4,000 m.
+    // A finish line anywhere beyond 4,000 is unreachable no matter how fast or
+    // how long the car drives. This is the defect, in one assertion.
+    const length = 4002;
+    const step = 4;
+    const last = 4000;
+
+    const unreachable = new RaceDirector('default-finish', length);
+    runQuantised(unreachable, length, step, 25);
+    expect(unreachable.phase).not.toBe('finished');
+
+    const real = new RaceDirector('real-finish', length, last);
+    runQuantised(real, length, step, 25);
+    expect(real.phase).toBe('finished');
+    expect(real.result!.total).toBeCloseTo(160, 0);
+  });
+
+  it('records the final sector when the finish is the last node', () => {
+    const length = 4002;
+    const d = new RaceDirector('final-sector', length, 4000);
+    runQuantised(d, length, 4, 25);
+    // 4,000 m of 500 m sectors is 8 boundaries, the last one at the line.
+    expect(d.splits.length).toBe(8);
+    expect(d.splits[7]!.elapsed).toBeCloseTo(d.result!.total, 5);
   });
 });
 

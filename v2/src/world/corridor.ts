@@ -38,10 +38,15 @@ export interface Segment {
   hz: number;
   roadbedWidth: number;
   /** §1.2 shoulder — drivable with a grip penalty, never a hard stop. This is
-   *  also the runoff L08 checks on the outside of slow corners. */
+   *  also the runoff L08 checks on the outside of slow corners.
+   *
+   *  INDEXED [right, left], where "right" is the +normal side: normal =
+   *  (-hz, hx), which for a heading of +x is +z, and forward × up = right. Every
+   *  other file that touches a side index depends on this sentence — see
+   *  `outsideOfCorner` below for what went wrong when it was not written down. */
   shoulderWidth: [number, number];
   /** §1.2 verge — Tier 1 and Tier 2 objects only. Tier 3 and 4 start beyond
-   *  shoulder + verge, which is the "barrier band". */
+   *  shoulder + verge, which is the "barrier band". Same [right, left] order. */
   vergeWidth: [number, number];
   surfaceId: string;
   /** Signed curvature radius, metres. Infinity on a straight. */
@@ -189,9 +194,7 @@ export function buildCorridor(
   for (const run of cornerRuns(corridor)) {
     if (run.grade > 3) continue;
     const needed = CORNER_GRADES.find((g) => g.grade === run.grade)?.runoff ?? 0;
-    // Runoff belongs on the OUTSIDE of the corner: a left-hander runs off to
-    // the right.
-    const side = run.direction === 'left' ? 1 : 0;
+    const side = outsideOfCorner(run.direction);
     for (let i = run.from; i <= run.to; i++) {
       const s = segments[i]!;
       s.shoulderWidth[side] = Math.max(s.shoulderWidth[side]!, needed);
@@ -199,6 +202,27 @@ export function buildCorridor(
   }
 
   return corridor;
+}
+
+/**
+ * Which side index is the OUTSIDE of a corner turning this way.
+ *
+ * This function exists because the answer was wrong everywhere, in a way that
+ * could not be seen by reading the code. `cornerRuns` calls a corner 'right'
+ * when the heading rotates from +x toward +z, and that is also the direction
+ * the +normal points — so a right-hander bends TOWARD index 0, which makes
+ * index 0 its inside and index 1 its outside. The original wrote the mapping
+ * the other way round in two places, and because the L08 lint read the same
+ * inverted index it agreed with the bug and reported a pass.
+ *
+ * So §1.3's runoff — 5 m at a hairpin, the room a car that misses the corner
+ * needs — was being built on the inside of every slow corner on every stage,
+ * where nothing ever leaves the road. Found by measuring, not by reading:
+ * project the position change over a corner run onto the entry normal and see
+ * which way the road actually goes. It goes toward the widened side.
+ */
+export function outsideOfCorner(direction: 'left' | 'right'): 0 | 1 {
+  return direction === 'right' ? 1 : 0;
 }
 
 /** §13 TERRAIN_LIMITS. A stage may not ask for a gradient the spec forbids. */

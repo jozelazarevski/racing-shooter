@@ -238,7 +238,28 @@ export class Vehicle {
     // Speed-sensitive: full lock at a standstill would be undrivable at speed,
     // and this is specified rather than a feel choice.
     const speedFactor = 1 - STEERING.speedSensitiveFactor * Math.min(1, speed / STEERING.speedSensitiveReference);
-    const target = input.steer * maxLock * speedFactor;
+    // THE MINUS SIGN, and it is not a taste question.
+    //
+    // `steerAngle` is a rotation about the body's up axis, applied below with
+    // Rodrigues' formula. A positive rotation about +y carries the car's local
+    // forward (+z) toward local +x — and with forward at +z, the car's RIGHT is
+    // -x, because right = forward x up. So a positive rotation steers LEFT.
+    //
+    // Every caller means the opposite by a positive number: `ArrowRight` and
+    // `KeyD` produce +1, the touch pad's rightward drag produces +1, the
+    // camera's steering lead swings right on +1, and the AI's pure pursuit puts
+    // the target's side into the same sign as the corridor normal, which is the
+    // driver's right. So the input convention is "+1 is right" and the geometry
+    // is "+1 is left", and the two meet here.
+    //
+    // Measured, because it could not be seen: hold +0.5 on Safari's opening
+    // straight at 93 km/h and the car moves 7.2 m toward -normal, which is the
+    // driver's left. It shipped this way. Nothing caught it, and it is worth
+    // being precise about why: the only thing that drove v2 in the tests was an
+    // autopilot which was ALSO inverted, so it steered away from the line and
+    // the smoke test's tolerance (25 m off the centreline over 12 s) was wide
+    // enough to swallow the result. Sweet Lamb passed that check at 24.3 m.
+    const target = -input.steer * maxLock * speedFactor;
     const rackRate = (STEERING.rackSpeedDegPerSec * Math.PI) / 180;
     this.steerAngle += clamp(target - this.steerAngle, -rackRate * dt, rackRate * dt);
 

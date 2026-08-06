@@ -119,17 +119,35 @@ export function lintStage(stage: Stage): LintResult[] {
   skip('L07', 'needs a ballistic launch model — Phase 2 vehicle work');
 
   // L08 — runoff outside Grade 1-3 corners.
+  //
+  // The side is MEASURED, not looked up. The first version of this check asked
+  // `corners[i].direction` which index to read and got the same inverted answer
+  // the builder used, so it passed while every slow corner on every stage had
+  // its runoff on the inside. A lint that shares its assumption with the code
+  // it checks is not a lint. Here the outside is derived from where the road
+  // actually goes: project the displacement across the run onto the entry
+  // normal, and the corner bends toward the negative of the outside.
   {
     let bad = 0;
+    let worst = '';
     for (const c of stage.corners) {
       if (c.grade > 3) continue;
+      const a = segs[c.from]!;
+      const b = segs[Math.min(segs.length - 1, c.to)]!;
+      const bend = (b.x - a.x) * -a.hz + (b.z - a.z) * a.hx;
+      // bend > 0: the road moves toward the +normal side, so that side is the
+      // inside and the outside is index 1.
+      const outsideIndex = bend > 0 ? 1 : 0;
       const seg = segs[Math.floor((c.from + c.to) / 2)]!;
-      const outside = c.direction === 'left' ? seg.shoulderWidth[1] : seg.shoulderWidth[0];
+      const outside = seg.shoulderWidth[outsideIndex]!;
       const needed = gradeRunoff(c.grade);
-      if (outside < needed) bad++;
+      if (outside < needed - 1e-6) {
+        bad++;
+        if (!worst) worst = `G${c.grade} at segment ${c.from}: ${outside.toFixed(2)} m outside, needs ${needed} m`;
+      }
     }
     bad
-      ? fail('L08', `${bad} slow corners without the specified runoff`)
+      ? fail('L08', `${bad} slow corners without the specified runoff — ${worst}`)
       : pass('L08', 'runoff present outside every Grade 1-3 corner');
   }
 
@@ -177,7 +195,13 @@ export function lintStage(stage: Stage): LintResult[] {
       : pass('L14', `densest 150 m window holds ${worst} colliders`);
   }
 
-  skip('L15', 'needs an AI reference lap — not built yet');
+  // L15 is not skipped for want of effort. It is a claim about a car DRIVING a
+  // stage — zero resets, under 8 kJ of cumulative impact — and this function
+  // has no physics, no tyre model and no time. It is answered by
+  // `npm run reference`, which boots the real build and drives every stage with
+  // the same driver, line and physics the player gets. Anything this function
+  // could return would be a guess wearing a check's clothes.
+  skip('L15', `needs a car: measured by "npm run reference" (${STAGE_LINT.referenceLapMaxImpactEnergyJ / 1000} kJ, zero resets)`);
 
   // L16 — total stage length between 3.5 km and 22 km.
   {
