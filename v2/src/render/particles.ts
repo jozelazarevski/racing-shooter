@@ -150,6 +150,35 @@ export class Particles {
     }
   }
 
+  /** A one-off burst — an impact, a shattered bush, a shell striking rock.
+   *  Same ring buffer, so a firefight cannot allocate. */
+  burst(x: number, y: number, z: number, count: number, colour: number): void {
+    const c = new THREE.Color(colour);
+    for (let i = 0; i < count; i++) {
+      const k = this.next;
+      this.next = (this.next + 1) % MAX;
+      const j = k * 3;
+      this.pos[j] = x;
+      this.pos[j + 1] = y;
+      this.pos[j + 2] = z;
+      // Deterministic scatter from the slot index — no Math.random, because a
+      // replay that diverges on cosmetics is a replay that diverges.
+      const a = k * 2.399963;
+      const sp = 3 + (k % 7);
+      this.vel[j] = Math.cos(a) * sp;
+      this.vel[j + 1] = 2.5 + (k % 5);
+      this.vel[j + 2] = Math.sin(a) * sp;
+      this.col[j] = c.r;
+      this.col[j + 1] = c.g;
+      this.col[j + 2] = c.b;
+      this.age[k] = 0;
+      this.life[k] = 0.7 + (k % 4) * 0.12;
+      this.rise[k] = 2;
+      this.drag[k] = 1.5;
+      this.scl[k] = 0.7 + (k % 3) * 0.25;
+    }
+  }
+
   /** Integrate and upload. Called once per FRAME, not per physics step —
    *  particles are cosmetic, so they are the one thing allowed to run on
    *  render time (§14.5 forbids gameplay logic doing this, not decoration). */

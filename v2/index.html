@@ -56,6 +56,9 @@
   .bad-split { color:var(--bad) !important; }
   .neutral { color:var(--dim) !important; }
   #rival { font-size:11px; margin-top:5px; letter-spacing:.06em; }
+  #ammo { font-size:12px; color:var(--hot); letter-spacing:.16em; margin-top:6px; }
+  #score { font-size:17px; font-weight:800; color:var(--ok); margin-top:2px; }
+  .btn.fire { background:rgba(255,107,53,.2); border-color:rgba(255,107,53,.45); }
 
   #result { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
     background:rgba(8,11,14,.86); backdrop-filter:blur(5px); z-index:9; }
@@ -155,6 +158,8 @@
   <div class="bar-track"><div id="damage-bar" class="bar" style="width:0"></div></div>
   <div id="surface"></div>
   <div id="rival"></div>
+  <div id="ammo"></div>
+  <div id="score"></div>
 </div>
 
 <div id="pacenote"></div>
@@ -175,7 +180,7 @@
   <span id="cam-name">CHASE</span>
   <span id="debug"></span>
   <button id="settings-btn" class="link">CONTROLS</button>
-  <span id="keys">WASD drive · SPACE handbrake · Q/E gears · C camera · R reset</span>
+  <span id="keys">WASD drive · SPACE handbrake · Q/E gears · F fire · C camera · R reset</span>
 </div>
 
 <div id="pad"><div id="pad-base"><div id="pad-knob"></div></div></div>
@@ -186,6 +191,7 @@
   <button class="btn pedal stop" data-key="ArrowDown">BRAKE</button>
   <button class="btn pedal wide go" data-key="ArrowUp">GAS</button>
   <button class="btn" data-key="Space">HAND</button>
+  <button class="btn wide fire" data-key="KeyF">FIRE</button>
 </div>
 
 <div id="settings" class="panel">

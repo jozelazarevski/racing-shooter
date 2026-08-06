@@ -36,6 +36,11 @@ export interface Renderer {
   wheels: THREE.Mesh[];
   rival: THREE.Group;
   particles: Particles;
+  /** Tracer segments, one instanced mesh. */
+  tracers: THREE.InstancedMesh;
+  /** Hide a prop that has been shot away. Object id -> where its instance
+   *  lives, so a destroyed collider and its visible mesh go together. */
+  hideObject(id: string): void;
   /** Keep the shadow frustum on the car. */
   followSun(x: number, y: number, z: number): void;
   resize(): void;
@@ -77,7 +82,8 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
   scene.add(new THREE.HemisphereLight(pal.sky, pal.ground, 1.0));
 
   scene.add(buildTerrain(stage.heightfield, pal));
-  for (const m of buildProps(stage, pal)) scene.add(m);
+  const instanceIndex = new Map<string, { mesh: THREE.InstancedMesh; i: number }>();
+  for (const m of buildProps(stage, pal, instanceIndex)) scene.add(m);
 
   const { car, wheels } = buildCar(0xe8442c);
   scene.add(car);
@@ -86,6 +92,19 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
 
   const particles = new Particles();
   scene.add(particles.points);
+
+  // Tracers. A thin box scaled along its length per shot — one draw call for
+  // every shell in flight, and nothing allocated when firing.
+  const tracers = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.09, 0.09, 1),
+    new THREE.MeshBasicMaterial({ color: 0xffd08a }),
+    24,
+  );
+  tracers.frustumCulled = false;
+  tracers.count = 24;
+  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  for (let i = 0; i < 24; i++) tracers.setMatrixAt(i, zero);
+  scene.add(tracers);
 
   const camera = new THREE.PerspectiveCamera(62, 1, 0.4, 900);
 
@@ -106,7 +125,14 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
     sun.target.updateMatrixWorld();
   };
 
-  return { scene, camera, renderer, car, wheels, rival, particles, followSun, resize };
+  const hideObject = (id: string) => {
+    const at = instanceIndex.get(id);
+    if (!at) return;
+    at.mesh.setMatrixAt(at.i, zero);
+    at.mesh.instanceMatrix.needsUpdate = true;
+  };
+
+  return { scene, camera, renderer, car, wheels, rival, particles, tracers, hideObject, followSun, resize };
 }
 
 /** A gradient sky dome rather than a flat background colour.
@@ -220,7 +246,11 @@ function buildTerrain(hf: Heightfield, pal: (typeof PALETTE)[string]): THREE.Mes
  *  measured, 1.09 million triangles per frame with nothing off screen. Split
  *  into 300 m chunks, the renderer draws the handful the camera can actually
  *  see and the fog hides the rest. */
-function buildProps(stage: Stage, pal: (typeof PALETTE)[string]): THREE.Object3D[] {
+function buildProps(
+  stage: Stage,
+  pal: (typeof PALETTE)[string],
+  index: Map<string, { mesh: THREE.InstancedMesh; i: number }>,
+): THREE.Object3D[] {
   const CHUNK = 300;
   const out: THREE.Object3D[] = [];
   const m = new THREE.Matrix4();
@@ -276,6 +306,8 @@ function buildProps(stage: Stage, pal: (typeof PALETTE)[string]): THREE.Object3D
         new THREE.Vector3(o.transform.scale, tier >= 3 ? h : o.transform.scale, o.transform.scale),
       );
       mesh.setMatrixAt(i, m);
+      // Only tiers that can be shot away need an entry; grass has no collider.
+      if (tier >= 1 && tier <= 3) index.set(o.id, { mesh, i });
       // §3.4: foliage never pure green, saturation under 55%.
       col.setHex(base[tier]!).offsetHSL(0, 0, (i % 7) * 0.012 - 0.03);
       mesh.setColorAt(i, col);

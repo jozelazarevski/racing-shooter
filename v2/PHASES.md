@@ -269,6 +269,39 @@ the player loses the road, which is the one thing a camera exists to show.
 
 Measured after: 120–166 k triangles, 29–41 draw calls.
 
+## Weapons — landed
+
+`CONFORMANCE.md` settled the contradiction: §17 says the game has no weapons,
+but nothing in the spec's physics, collision, surface, water, air or damage
+model conflicts with a car that also carries a cannon. So weapons are an
+**additive layer on a conformant core**, and the code keeps it that way:
+
+- a hit is scored in **joules** and classified by `DAMAGE_ENERGY_BANDS_J` — the
+  same currency a collision uses. A shell and a tree are the same kind of event
+  to the damage model. The cannon's 0.9 kg at 400 m/s is 72 kJ, which lands in
+  the "major" band against a 120 kJ terminal figure.
+- what a hit *does* is decided by the object's **§3.1 tier**, the same table
+  that decides what happens when you drive into it. Tier 4 is "hard static,
+  full stop" and shrugs a shell off; Tier 1–3 break away. The world stays
+  readable — silhouette tells you what an object will do whether you hit it or
+  shoot it.
+
+Shells are **raycast along the segment travelled each step**, not simulated as
+bodies. At 400 m/s and 1/120 s a shell moves 3.3 m per tick, so a body would
+tunnel through every trunk on the stage and a point test would walk straight
+through a 0.24 m one. They also drop — about 1.4 m over the 420 m range, which
+is what makes aiming a skill.
+
+Recoil is real and correctly sized: 0.9 kg × 400 m/s is 360 N·s against 1230 kg,
+about 0.3 m/s. Enough to feel at the limit, not enough to be a weapon against
+yourself. Firing is stepped inside the fixed timestep, so a shell's flight does
+not depend on the frame rate.
+
+Verified end to end: fired at a Tier 3 trunk it hits, reports 72 kJ, removes the
+collider, hides the instance and scores. Fired at a hillside it hits the
+hillside — **you cannot shoot through terrain**, which cost me three confusing
+test runs before I recognised it as the right answer.
+
 ## Next
 
 **Phase 3 proper.** Reset nodes every 120 m (lint L12), a better AI line

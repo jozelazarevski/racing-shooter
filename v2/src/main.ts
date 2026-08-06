@@ -16,6 +16,7 @@ import { createRenderer, type Renderer } from './render/scene.ts';
 import { fingerprint } from './core/stageRng.ts';
 import { RaceDirector, formatTime, formatDelta } from './race/director.ts';
 import { RoadDriver } from './race/driver.ts';
+import { Cannon } from './combat/weapons.ts';
 import { SIM, ROLLOVER } from '../../spec/rally.constants.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -75,6 +76,9 @@ class Game {
   rival!: Vehicle;
   rivalDriver!: RoadDriver;
   private playerDriver!: RoadDriver;
+  cannon!: Cannon;
+  /** Arcade score, v1's currency: points for what you destroy. */
+  score = 0;
 
   /** Progress along the centreline. Exposed so the headless harness can drive
    *  the race without reaching into a private field. */
@@ -133,6 +137,7 @@ class Game {
     // over the whole stage would jump between the two legs of a switchback.
     this.playerDriver = new RoadDriver(this.stage.corridor);
     this.race = new RaceDirector(def.id, this.stage.length);
+    this.cannon = new Cannon(this.phys);
 
     const canvas = $('view') as HTMLCanvasElement;
     this.view = createRenderer(canvas, this.stage);
@@ -178,13 +183,34 @@ class Game {
       this.lastSteer = cmd.steer;
       this.car.step(player, h);
 
-      const rp = this.rival.body.translation();
+      // Tracers: a stretched box from where each shell was to where it is.
+    const m = new THREE.Matrix4();
+    const up = new THREE.Vector3(0, 1, 0);
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    for (let i = 0; i < this.cannon.shots.length; i++) {
+      const sh = this.cannon.shots[i]!;
+      if (!sh.alive) { m.makeScale(0, 0, 0); this.view.tracers.setMatrixAt(i, m); continue; }
+      a.set(sh.px, sh.py, sh.pz);
+      b.set(sh.x, sh.y, sh.z);
+      const len = Math.max(0.5, a.distanceTo(b) * 2.2);
+      const mid = a.clone().lerp(b, 0.5);
+      const dir = b.clone().sub(a).normalize();
+      m.lookAt(new THREE.Vector3(), dir, up);
+      m.scale(new THREE.Vector3(1, 1, len));
+      m.setPosition(mid);
+      this.view.tracers.setMatrixAt(i, m);
+    }
+    this.view.tracers.instanceMatrix.needsUpdate = true;
+
+    const rp = this.rival.body.translation();
       const rq = this.rival.body.rotation();
       const rvx = 2 * (rq.x * rq.z + rq.w * rq.y);
       const rvz = 1 - 2 * (rq.x * rq.x + rq.y * rq.y);
       const rivalCmd = this.rivalDriver.drive(rp.x, rp.z, rvx, rvz, this.rival.telemetry.speedMs);
       this.rival.step(this.race.locked ? { ...rivalCmd, throttle: 0, brake: 1 } : rivalCmd, h);
 
+      this.stepWeapons(cmd, h);
       this.phys.world.step();
       this.phys.time += h;
 
@@ -210,6 +236,45 @@ class Game {
     this.view.renderer.render(this.view.scene, this.view.camera);
     requestAnimationFrame(this.frame);
   };
+
+  /** Weapons, inside the fixed step like everything else, so a shell's flight
+   *  does not depend on the frame rate either. */
+  stepWeapons(cmd: DriverInput, h: number): void {
+    if (cmd.fire && !this.race.locked) this.fireCannon();
+    for (const hit of this.cannon.step(h, this.car.body, this.rival.body)) this.onHit(hit);
+  }
+
+  /** Muzzle position and direction: from the nose, along the car's heading. */
+  private fireCannon(): void {
+    const p = this.car.body.translation();
+    const q = this.car.body.rotation();
+    const fx = 2 * (q.x * q.z + q.w * q.y);
+    const fy = 2 * (q.y * q.z - q.w * q.x);
+    const fz = 1 - 2 * (q.x * q.x + q.y * q.y);
+    const v = this.car.body.linvel();
+    if (this.cannon.fire(p.x + fx * 2.4, p.y + 0.5, p.z + fz * 2.4, fx, fy + 0.02, fz, v.x, v.y, v.z)) {
+      // Recoil, in the right direction and the right order of magnitude:
+      // 0.9 kg at 400 m/s is 360 N.s against 1230 kg, so about 0.3 m/s. Enough
+      // to feel at the limit, not enough to be a weapon against yourself.
+      const j = this.cannon.spec.mass * this.cannon.spec.muzzle;
+      this.car.body.applyImpulse({ x: -fx * j, y: 0, z: -fz * j }, true);
+    }
+  }
+
+  /** What a hit does. Scoring follows §3.1 tiers, so the same silhouette that
+   *  tells you what an object does to your car tells you what it is worth. */
+  private onHit(hit: ReturnType<Cannon['step']>[number]): void {
+    const SCORE: Record<number, number> = { 0: 0, 1: 5, 2: 12, 3: 40, 4: 0 };
+    if (hit.destroyed && hit.object) this.score += SCORE[hit.object.tier] ?? 0;
+    if (hit.hitRival) {
+      this.rival.registerImpact(Math.sqrt((2 * hit.energyJ) / 1230), 90);
+      this.score += 150;
+    }
+    // Debris burst, coloured by what was struck.
+    this.view.particles.burst(hit.x, hit.y, hit.z, hit.destroyed ? 26 : 12,
+      hit.object && hit.object.tier >= 3 ? 0x6b5a3e : hit.destroyed ? 0x6d8a4a : 0xffc27a);
+    if (hit.destroyed && hit.object) this.view.hideObject(hit.object.id);
+  }
 
   /** Wheel spray. Emitted per FRAME, not per physics step: particles are
    *  cosmetic, and §14.5 forbids gameplay logic reading render delta, not
@@ -244,6 +309,26 @@ class Game {
     const q = this.car.body.rotation();
     this.view.car.position.set(p.x, p.y, p.z);
     this.view.car.quaternion.set(q.x, q.y, q.z, q.w);
+
+    // Tracers: a stretched box from where each shell was to where it is.
+    const m = new THREE.Matrix4();
+    const up = new THREE.Vector3(0, 1, 0);
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    for (let i = 0; i < this.cannon.shots.length; i++) {
+      const sh = this.cannon.shots[i]!;
+      if (!sh.alive) { m.makeScale(0, 0, 0); this.view.tracers.setMatrixAt(i, m); continue; }
+      a.set(sh.px, sh.py, sh.pz);
+      b.set(sh.x, sh.y, sh.z);
+      const len = Math.max(0.5, a.distanceTo(b) * 2.2);
+      const mid = a.clone().lerp(b, 0.5);
+      const dir = b.clone().sub(a).normalize();
+      m.lookAt(new THREE.Vector3(), dir, up);
+      m.scale(new THREE.Vector3(1, 1, len));
+      m.setPosition(mid);
+      this.view.tracers.setMatrixAt(i, m);
+    }
+    this.view.tracers.instanceMatrix.needsUpdate = true;
 
     const rp = this.rival.body.translation();
     const rq = this.rival.body.rotation();
@@ -370,6 +455,9 @@ class Game {
     $('rival').className = gapM > 0 ? 'bad' : 'good';
 
     const onRoad = Math.abs(lateral) < seg.roadbedWidth / 2 + seg.shoulderWidth[0];
+    $('ammo').textContent = '▮'.repeat(this.cannon.ammo) + '▯'.repeat(this.cannon.spec.capacity - this.cannon.ammo);
+    $('score').textContent = this.score ? this.score.toLocaleString() : '';
+
     $('surface').textContent = onRoad ? seg.surfaceId : 'OFF ROAD';
     $('surface').className = onRoad ? '' : 'bad';
 
@@ -558,6 +646,9 @@ game.boot(select.value).then(applyControls).catch((err) => {
     const input: DriverInput = { steer: 0, throttle: 0, brake: 0, handbrake: false, ...cmd };
     for (let i = 0; i < n; i++) {
       game.car.step(input, SIM.fixedTimestep);
+      // Weapons go through the same path as the render loop, or the harness
+      // would be testing a game the player never runs.
+      game.stepWeapons(input, SIM.fixedTimestep);
       game.phys.world.step();
       // The race director advances here too, or a headless run sits on the
       // start line for ever with the clock at zero.
