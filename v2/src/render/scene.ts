@@ -9,6 +9,7 @@
  */
 import * as THREE from 'three';
 import { Tier } from '../../../spec/rally.constants.ts';
+import { Particles } from './particles.ts';
 import type { Stage } from '../world/stage.ts';
 import type { Heightfield } from '../world/terrain.ts';
 import { WHEEL_RADIUS } from '../physics/vehicle.ts';
@@ -34,6 +35,9 @@ export interface Renderer {
   car: THREE.Group;
   wheels: THREE.Mesh[];
   rival: THREE.Group;
+  particles: Particles;
+  /** Keep the shadow frustum on the car. */
+  followSun(x: number, y: number, z: number): void;
   resize(): void;
 }
 
@@ -42,16 +46,35 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.shadowMap.enabled = false; // a 4 km stage of shadow casters is not a 60 fps budget
+  // Tone mapping and sRGB. Without them the specified palettes come out flat
+  // and washed: a Lambert surface lit by a 2.1-intensity sun clips to white in
+  // linear space long before it should.
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  // Shadows, but only from the car: a 4 km stage of shadow-casting trees is not
+  // a frame budget. The car's own shadow is the one that matters — it is what
+  // tells you where you are about to land after a crest.
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(pal.sky);
   scene.fog = new THREE.Fog(pal.fog, 220, 820);
+  scene.add(buildSky(pal));
 
-  const sun = new THREE.DirectionalLight(pal.sun, 2.1);
-  sun.position.set(-0.4, 1, 0.6).multiplyScalar(300);
+  const sun = new THREE.DirectionalLight(pal.sun, 2.3);
+  sun.position.set(-0.4, 1, 0.6).multiplyScalar(120);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  // A tight orthographic frustum that follows the car. A frustum big enough to
+  // cover the stage would put a 4 km scene into 1024 texels and the shadow
+  // would be a smear.
+  const sc = sun.shadow.camera as THREE.OrthographicCamera;
+  sc.left = -14; sc.right = 14; sc.top = 14; sc.bottom = -14;
+  sc.near = 1; sc.far = 320;
   scene.add(sun);
-  scene.add(new THREE.HemisphereLight(pal.sky, pal.ground, 1.05));
+  scene.add(sun.target);
+  scene.add(new THREE.HemisphereLight(pal.sky, pal.ground, 1.0));
 
   scene.add(buildTerrain(stage.heightfield, pal));
   for (const m of buildProps(stage, pal)) scene.add(m);
@@ -60,6 +83,9 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
   scene.add(car);
   const rival = buildCar(0x2f7fd4).car;
   scene.add(rival);
+
+  const particles = new Particles();
+  scene.add(particles.points);
 
   const camera = new THREE.PerspectiveCamera(62, 1, 0.4, 900);
 
@@ -72,7 +98,50 @@ export function createRenderer(canvas: HTMLCanvasElement, stage: Stage): Rendere
   };
   resize();
 
-  return { scene, camera, renderer, car, wheels, rival, resize };
+  // The sun follows the car so the shadow frustum stays tight.
+  const sunOffset = sun.position.clone();
+  const followSun = (x: number, y: number, z: number) => {
+    sun.target.position.set(x, y, z);
+    sun.position.copy(sunOffset).add(new THREE.Vector3(x, y, z));
+    sun.target.updateMatrixWorld();
+  };
+
+  return { scene, camera, renderer, car, wheels, rival, particles, followSun, resize };
+}
+
+/** A gradient sky dome rather than a flat background colour.
+ *
+ * A solid clear colour makes every stage look like it was shot against paper.
+ * A two-stop vertical gradient — horizon haze into zenith — costs one inverted
+ * sphere and no texture, and it is what makes the fog colour read as distance
+ * rather than as a grey wall. */
+function buildSky(pal: (typeof PALETTE)[string]): THREE.Mesh {
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    uniforms: {
+      uTop: { value: new THREE.Color(pal.sky) },
+      uBottom: { value: new THREE.Color(pal.fog) },
+    },
+    vertexShader: `
+      varying float vH;
+      void main() {
+        vH = normalize(position).y;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 uTop;
+      uniform vec3 uBottom;
+      varying float vH;
+      void main() {
+        gl_FragColor = vec4(mix(uBottom, uTop, smoothstep(-0.06, 0.42, vH)), 1.0);
+      }`,
+  });
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), mat);
+  sky.scale.setScalar(880);   // just inside the far plane
+  sky.frustumCulled = false;
+  sky.renderOrder = -1;
+  return sky;
 }
 
 /**
@@ -136,7 +205,9 @@ function buildTerrain(hf: Heightfield, pal: (typeof PALETTE)[string]): THREE.Mes
   geo.setIndex(indices.length > 65535 ? new THREE.Uint32BufferAttribute(indices, 1) : new THREE.Uint16BufferAttribute(indices, 1));
   geo.computeVertexNormals();
 
-  return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 /** InstancedMesh per tier PER SPATIAL CHUNK, per §12: "Trees, rocks, and fence
@@ -249,6 +320,7 @@ function buildCar(colour: number): { car: THREE.Group; wheels: THREE.Mesh[] } {
     new THREE.MeshLambertMaterial({ color: colour }),
   );
   body.position.y = 0.1;
+  body.castShadow = true;
   car.add(body);
 
   const cabin = new THREE.Mesh(
@@ -256,6 +328,7 @@ function buildCar(colour: number): { car: THREE.Group; wheels: THREE.Mesh[] } {
     new THREE.MeshLambertMaterial({ color: 0x27313a }),
   );
   cabin.position.set(0, 0.55, -0.15);
+  cabin.castShadow = true;
   car.add(cabin);
 
   const wheelGeo = new THREE.CylinderGeometry(WHEEL_RADIUS, WHEEL_RADIUS, 0.26, 12);
