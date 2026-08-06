@@ -8333,7 +8333,11 @@ export function seededRandom(seed) {
 /** FNV-1a. Turns a level id into a seed that depends on WHAT the world is,
  *  not on where it sits in the array — so reordering the career does not
  *  silently rebuild every world. */
+<<<<<<< HEAD
+export function seedForLevel(level, epoch = 'ignite-r82') {
+=======
 export function seedForLevel(level, epoch = 'ignite-r81') {
+>>>>>>> origin/main
   const name = `${epoch}:${(level && level.id) ?? 0}:${(level && level.route) || (level && level.theme) || 'forest'}`;
   let h = 0x811c9dc5;
   for (let i = 0; i < name.length; i++) {

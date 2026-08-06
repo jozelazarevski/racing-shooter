@@ -1475,9 +1475,36 @@ export class Car {
     // ---- end river-fords ----
 
     // ---- vertical motion (ramps & jumps; rolling terrain off-road in roam) ----
-    const gY = offRoad
-      ? t.terrainHeight(this.pos.x, this.pos.z)
-      : t.groundHeightAt(this.trackIndex, this.lateral);
+    //
+    // THE SINKING BUG.
+    //
+    // Off-road, ground height came from the raw terrain; on-road it came from
+    // the road ribbon. Those are two different surfaces, and on a shelf road
+    // they are a LONG way apart. Measured with seeded worlds:
+    //
+    //   FURKA RIDGE   road sits up to 30.8 u above the terrain at the verge
+    //   COL DE TURINI                  21.7 u
+    //   PIKES PEAK                     20.9 u
+    //
+    // Cross that threshold — two wheels onto the verge, a wide line through a
+    // switchback — and gY dropped by up to thirty units in one frame. The
+    // off-road branch below then EASES toward it at 12/s, so the car did not
+    // teleport, it slid down into the scenery. That is what "seems I'm
+    // sinking" was.
+    //
+    // The road is a physical shelf: you cannot be inside it. So within the
+    // corridor the ground is the HIGHER of the two surfaces, and only well
+    // outside it does raw terrain take over. Out in the open, nothing changes.
+    const SHELF_REACH = 16;      // u from centreline that the roadbed still holds you up
+    let gY;
+    if (offRoad) {
+      const terr = t.terrainHeight(this.pos.x, this.pos.z);
+      gY = Math.abs(this.lateral) < SHELF_REACH
+        ? Math.max(terr, t.groundHeightAt(this.trackIndex, this.lateral))
+        : terr;
+    } else {
+      gY = t.groundHeightAt(this.trackIndex, this.lateral);
+    }
 
     // TOO STEEP TO CLIMB.
     //

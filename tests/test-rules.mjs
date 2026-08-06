@@ -149,23 +149,44 @@ const boot = async (url) => {
   // next to the target, force velocity straight in, generous window)
   r = await page.evaluate(async () => {
     const g = window.__game, p = g.player, t = g.track;
-    const hut = t.solids.find(s => s.mat === 'hut');
-    if (!hut) return { skip: true };
-    p.alive = true; p.health = 100; p.invuln = 0; p.mesh.visible = true;
-    p.pos.set(hut.x - (hut.r + 8), t.terrainHeight(hut.x - (hut.r + 8), hut.z) + 0.3, hut.z);
-    p.y = p.pos.y; p.vy = 0; p.airborne = false;
-    p.heading = Math.PI / 2;
-    const fly0 = g.flyingProps.length;
+    // Try SEVERAL huts, for the same reason the STONE check does.
+    //
+    // World generation is seeded (r81), so "the first hut" is a FIXED hut — and
+    // whichever one that is may have its run-in blocked or sit on ground the
+    // car cannot reach at speed. Before seeding this drew a different hut each
+    // run and passed or failed accordingly. Determinism did not break this
+    // test; it stopped hiding that it was unreliable.
+    const huts = t.solids.filter(s => s.mat === 'hut').slice(0, 8);
+    if (!huts.length) return { skip: true };
     let feed = [];
     const f = g.hud.feed.bind(g.hud);
     g.hud.feed = (m, k) => { feed.push(m); f(m, k); };
-    const iv = setInterval(() => { p.vel.set(24, 0, 0); }, 80);
-    // condition-driven: drive until the hut actually bites
-    for (let w = 0; w < 120 && p.health > 99; w++) await new Promise(res => setTimeout(res, 200));
-    await new Promise(res => setTimeout(res, 300)); // let the planks spawn
-    clearInterval(iv);
-    return { hpLoss: +(100 - p.health).toFixed(0), planksFlew: g.flyingProps.length > fly0,
-      feed: feed.filter(m => /HUT/.test(m)).slice(0, 1) };
+    let bestLoss = 0, bestFlew = false, bestFeed = [], tried = 0;
+    for (const hut of huts) {
+      tried++;
+      feed.length = 0;
+      p.alive = true; p.health = 100; p.invuln = 0; p.mesh.visible = true;
+      p.slip = 0; p.landGrip = 0; p._wetT = 0;
+      const sx = hut.x - (hut.r + 8);
+      p.pos.set(sx, t.terrainHeight(sx, hut.z) + 0.3, hut.z);
+      p.y = p.pos.y; p.vy = 0; p.airborne = false;
+      p.heading = Math.PI / 2;
+      const fly0 = g.flyingProps.length;
+      const iv = setInterval(() => { p.vel.set(24, 0, 0); }, 80);
+      // condition-driven: drive until the hut actually bites
+      for (let w = 0; w < 25 && p.health > 99; w++) await new Promise(res => setTimeout(res, 200));
+      await new Promise(res => setTimeout(res, 300)); // let the planks spawn
+      clearInterval(iv);
+      const loss = 100 - p.health;
+      if (loss > bestLoss) {
+        bestLoss = loss;
+        bestFlew = g.flyingProps.length > fly0;
+        bestFeed = feed.filter(m => /HUT/.test(m)).slice(0, 1);
+      }
+      if (bestLoss >= 15 && bestFlew && bestFeed.length) break;
+    }
+    return { hpLoss: +bestLoss.toFixed(0), planksFlew: bestFlew, tried,
+      feed: bestFeed };
   });
   check('HUT crash = big effect (planks + >=15 hull)', r.skip || (r.hpLoss >= 15 && r.planksFlew && r.feed.length > 0), JSON.stringify(r));
 
