@@ -13,6 +13,12 @@ const DOWNHILL_CAP = 1.12; // downhill overspeed ceiling (× topSpeed)
 // near 24%, so this leaves all of it alone and only ever engages on the border
 // wall, which runs an order of magnitude steeper.
 const MAX_GRADE = 0.45;
+/** Fastest a crest may throw the car upward, u/s. Uncapped, a steep ramp taken
+ *  on nitro sent cars 100+ u into the infield. It also bounds a jump: against
+ *  gravity 26 this is 0.85 s of hang time and 2.3 u of height before the road
+ *  falls away underneath. A car may not launch while the ground is rising
+ *  faster than this — see the coherence check in the crest branch. */
+const VY_CAP = 11;
 
 const SCORCH = new THREE.Color(0x1c1a18); // damage tint target
 const _hitNormal = new THREE.Vector3(); // scratch: obstacle bounce normal
@@ -1684,11 +1690,24 @@ export class Car {
       // the car has just been placed on ground it was flying over. Jumps
       // chained into each other for as long as the terrain kept falling.
       const wantsAir = (drop > 0.9 && this._climbRate > 2.5) || crested;
-      if (wantsAir && this._settleT <= 0 && this._clearsGround(t, dt)) {
+      // YOU CANNOT LEAVE GROUND THAT IS RISING FASTER THAN YOU ARE.
+      //
+      // The launch speed is capped at VY_CAP for a good reason — uncapped, a
+      // steep ramp at nitro speed threw cars 100+ u into the infield. But the
+      // cap was applied without asking whether the capped launch still made
+      // sense. Where the ground climbs at 29 u/s, leaving it at 11 is not a
+      // jump: the road is still coming up under the car, and it re-grounds
+      // within a frame or two. Measured, that was the last source of
+      // three-frame hops, and both remaining ones on OUNINPOHJA were the same
+      // spot on the lap hit twice, launching at exactly the cap.
+      //
+      // Cresting means the climb rate is already falling (climbAccel < 0), so
+      // waiting costs nothing: a frame or two later it drops under the cap and
+      // the car leaves properly, at a speed it can actually hold.
+      const coherent = this._climbRate <= VY_CAP;
+      if (wantsAir && coherent && this._settleT <= 0 && this._clearsGround(t, dt)) {
         this.airborne = true;
-        // capped: an uncapped climb rate off a steep ramp at nitro speed sent
-        // cars sailing 100+ u into the infield (user bug report)
-        this.vy = Math.min(this._climbRate, 11);
+        this.vy = Math.min(this._climbRate, VY_CAP);
         this.y += this.vy * dt;
       } else {
         this._climbRate = dt > 0 ? (gY - this._lastGY) / dt : 0;
@@ -1785,7 +1804,7 @@ export class Car {
    */
   _clearsGround(t, dt) {
     if (!t?.groundHeightAt || !t.center?.length) return true;  // unknown: don't block
-    const vy0 = Math.min(this._climbRate, 11);
+    const vy0 = Math.min(this._climbRate, VY_CAP);
     const LOOK = 0.18;          // ~11 frames: long enough that a lump has ended
     const CLEAR = 0.35;         // u of daylight that makes it a jump, not a jolt
     const n = t.center.length;
@@ -1802,19 +1821,27 @@ export class Car {
     // point could round onto a step the car never actually reaches.
     const rate = Math.abs(this.speedAlong) / seg;   // samples per second
     const STEPS = 8;
-    const at = (idx) => {
-      const lo = Math.floor(idx), f = idx - lo;
-      const a = ((lo % n) + n) % n, b = (a + 1) % n;
-      return t.groundHeightAt(a, this.lateral) * (1 - f)
-           + t.groundHeightAt(b, this.lateral) * f;
-    };
+    // Deliberately the INTEGER index, despite `t.fracIndexAt` being available.
+    //
+    // Starting from the car's true fractional position is the more principled
+    // choice and I tried it: it removed the last micro-hop on FURKA RIDGE and
+    // cost ROCKFALL RAVINE every jump it had (5 -> 0) and FURKA more than half
+    // of its own (12 -> 5). `trackIndex` is the NEAREST sample, so the true
+    // position sits either side of it; sampling behind the car on an ascent
+    // reads high ground and rejects launches that were real. One harmless
+    // stutter is worth less than a ravine stage with no jumps in it, so the
+    // nearest sample stays.
+    const here = this.trackIndex;
+    const at = t.groundHeightAtFrac
+      ? (idx) => t.groundHeightAtFrac(idx, this.lateral)
+      : (idx) => t.groundHeightAt(((Math.round(idx) % n) + n) % n, this.lateral);
     for (let s = 1; s <= STEPS; s++) {
       const T = (LOOK * s) / STEPS;
       // y(T) under the same gravity the airborne branch integrates with.
       const arc = this.y + vy0 * T - 0.5 * 26 * T * T;
       // Anywhere along the way it must still be flying; at the far end it must
       // be flying by a margin worth calling a jump.
-      if (arc - at(this.trackIndex + rate * T) < (s === STEPS ? CLEAR : 0)) return false;
+      if (arc - at(here + rate * T) < (s === STEPS ? CLEAR : 0)) return false;
     }
     return true;
   }
