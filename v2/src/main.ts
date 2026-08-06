@@ -451,6 +451,7 @@ class Game {
     const race = this.race;
 
     $('speed').textContent = Math.round(t.speedKmh).toString();
+    this.updateDial(t.speedKmh);
     $('gear').textContent = t.gear === 0 ? 'R' : t.gear.toString();
     $('rpm-bar').style.width = `${Math.min(100, (t.rpm / 7200) * 100)}%`;
     $('rpm-bar').className = t.rpm > 6600 ? 'bar red' : 'bar';
@@ -509,8 +510,10 @@ class Game {
     $('surface').textContent = onRoad ? seg.surfaceId : 'OFF ROAD';
     $('surface').className = onRoad ? '' : 'bad';
 
-    // Damage in joules, §9. Terminal at 120 kJ cumulative.
-    $('damage-bar').style.width = `${Math.min(100, (t.damageJ / 120_000) * 100)}%`;
+    // Damage in joules, §9. Terminal at 120 kJ cumulative — shown as HULL
+    // INTEGRITY, counting down, because a driver wants to know what is left
+    // rather than what has been spent.
+    this.updateHull(t.damageJ);
 
     const slip = Math.max(...t.wheels.map((w) => w.utilisation));
     $('debug').textContent =
@@ -520,6 +523,42 @@ class Game {
     $('cam-name').textContent = CAMS[this.camIndex]!.name;
 
     if (race.phase === 'finished' && race.result && !this.resultShown) this.showResult();
+  }
+
+  /** The dial sweeps 240°, from -120° at rest to +120° at full scale. */
+  private updateDial(speedKmh: number): void {
+    const SCALE = 220;                       // km/h at the end of the arc
+    const t = Math.max(0, Math.min(1, speedKmh / SCALE));
+    $('dial-needle').setAttribute('transform', `rotate(${-120 + t * 240} 60 60)`);
+    // 259 is the arc's length in user units; the dash offset walks it round.
+    ($('dial-arc') as unknown as SVGPathElement).setAttribute(
+      'stroke-dashoffset', String(259 * (1 - t)),
+    );
+    $('dial-arc').setAttribute('stroke', t > 0.86 ? '#ff6b52' : t > 0.66 ? '#ffb545' : '#7ddc6a');
+    $('dial-value').textContent = Math.round(speedKmh).toString();
+  }
+
+  /** Twelve segments of hull, §9's 120 kJ terminal split into hits you can
+   *  count. Built once and then only reclassed, because rebuilding twelve
+   *  elements every frame is twelve layout invalidations every frame. */
+  private hullCells: HTMLElement[] = [];
+  private updateHull(damageJ: number): void {
+    const N = 12;
+    if (!this.hullCells.length) {
+      const host = $('hull');
+      for (let i = 0; i < N; i++) {
+        const cell = document.createElement('i');
+        host.appendChild(cell);
+        this.hullCells.push(cell);
+      }
+    }
+    const left = Math.max(0, 1 - damageJ / 120_000);
+    const lit = Math.ceil(left * N);
+    for (let i = 0; i < N; i++) {
+      const cell = this.hullCells[i]!;
+      cell.className = i < lit ? (left < 0.34 ? 'warn' : '') : 'gone';
+    }
+    $('hull-pct').textContent = Math.round(left * 100).toString();
   }
 
   private resultShown = false;

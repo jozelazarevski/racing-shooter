@@ -12,6 +12,7 @@ npm run lint       # build all six stages, run §15 against each, fail loudly
 npm run build      # -> ../play-v2
 npm run smoke      # drive every stage headless (needs a server on :8902)
 npm run reference  # §15 L15: a full AI lap of every stage, measured
+npm run touch      # the pad steers the way the thumb points (real touch events)
 ```
 
 ---
@@ -749,6 +750,54 @@ mirrored into the constants in the same commit, so editing them here would put
 the implementation and the document into silent disagreement — the one thing
 the arrangement exists to prevent. They are listed, they stay listed, and the
 lint reports them on every run.
+
+## The pad, and a harness that cannot agree with a sign error
+
+Reported from a phone: *"the joystick is moving the car in the opposite
+direction."* It was, in the build that is deployed — `/play-v2/` is still r81,
+one commit before the steering fix. On this branch it is not, and there is now
+a check that keeps it that way.
+
+`npm run touch` is the only harness here that uses the player's actual path: a
+mobile browser context with touch, real `TouchEvent`s on the real pad element,
+the game's own `input.sample()`, and the car's displacement along **its own
+right vector**. That last part is the point. Every previous check asked the
+code which way right was, and when the code was wrong they all agreed with it —
+the unit tests do not touch the DOM, the smoke test drives synthetic inputs, and
+the only autopilot that ever drove was inverted in the same direction.
+
+It caught two things immediately, both in itself:
+
+- **It measured the second drag on the first drag's leftovers** — a car already
+  sideways under full right lock — and reported that a leftward drag "steered
+  right". It had not; it had failed to unwind a spin in two seconds. It now
+  resets to the start line before each case.
+- **Its own yaw expression was sign-flipped**, so it reported that a rightward
+  drag steered left. That is the exact failure it exists to catch, committed by
+  the harness. The displacement metric is primary for precisely this reason: it
+  never asks which way is right, so it cannot be wrong in the same direction as
+  anything else.
+
+## The HUD — brass, wood, and a needle
+
+Restyled to the reference: brass-framed panels on dark wood, amber type, round
+thumb-sized controls, and an analogue speedo. Not decoration — a dial reads at a
+glance in a way a number does not, because you learn where the needle sits for a
+corner. The arc goes green to amber to red across the range and the needle is
+one rotated `<g>`, so it costs two attribute writes a frame.
+
+**HULL INTEGRITY replaces the damage bar**, counting down rather than up, in
+twelve segments. §9's terminal is 120 kJ; twelve segments turn that into hits
+you can count, which is what a smooth bar cannot tell you. Built once and
+reclassed, because rebuilding twelve elements a frame is twelve layout
+invalidations a frame.
+
+The phone layout was rebuilt around where thumbs are: the dev furniture that
+occupied the bottom strip moved to the top, the dial sits bottom-right clear of
+it, the actions stack up the right-hand edge, and the pad has the bottom-left
+quadrant to itself. Two collisions were found by screenshotting a real phone
+viewport rather than by reasoning: the dial was behind the bottom strip on both
+layouts, and the controls strip sat on top of the hull gauge.
 
 ## Next
 
