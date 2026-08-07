@@ -75,8 +75,13 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', a
     p.pos.set(pr.x - 10, (pr.y ?? 0) + 0.5, pr.z);
     p.heading = Math.atan2(pr.x - p.pos.x, pr.z - p.pos.z);
     const before = g.props.length;
+    // condition-driven, not a fixed sleep: headless swiftshader runs ~1 fps,
+    // so 2.5 s of wall time is two physics frames and the car never ARRIVES —
+    // this probe failed on pace, not on the smash path it exists to test
     const iv = setInterval(() => { p.vel.copy(p.forward).multiplyScalar(20); }, 100);
-    await new Promise(res => setTimeout(res, 2500));
+    for (let w = 0; w < 130 && g.props.length >= before; w++) {
+      await new Promise((res) => setTimeout(res, 150));
+    }
     clearInterval(iv);
     return { before, after: g.props.length };
   });
