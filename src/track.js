@@ -3553,12 +3553,16 @@ export class Track {
       // never on it.
       const side = k % 2 === 0 ? -1 : 1;
       const r = roots ? 1.2 + Math.random() * 0.5 : 2.2 + Math.random();
+<<<<<<< HEAD
       // Set BACK from the verge, not hard against it. At `w + r + 0.9` the
       // inner edges landed at 9.9 against a 9 u road half — a near-continuous
       // boulder ring in the exact band where you leave the road, which fights
       // both the open-world rule ("leave the road anywhere") and the shortcut
       // work. Rocks belong beside the course, not lining its edge like bollards.
       const lateral = side * (w + r + 4.6);
+=======
+      const lateral = side * (w + r + 0.9);   // inner edge just past the verge
+>>>>>>> origin/main
       const p = this.pointAt(i, lateral);
       if (spec.style === 'roots') {
         // gnarled redwood roots breaking the surface: 3 low half-buried ridges
