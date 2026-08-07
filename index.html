@@ -434,6 +434,22 @@
 
   /* ---------- WORLD CARDS (track selection) ---------- */
   #level-select{margin-top:8px;width:100%}
+  #star-key{margin:2px 0 10px;padding:8px 12px;border:1px solid var(--line-soft);
+    border-radius:10px;background:rgba(255,212,0,.05)}
+  #star-key .sk-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  #star-key .sk-title{font-size:10px;letter-spacing:3px;color:#e8c987}
+  #star-key .sk-total{font-family:'Luckiest Guy';font-size:17px;color:var(--yellow)}
+  #star-key .sk-rules{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:5px}
+  #star-key .sk-rule{font-size:11px;font-weight:700;letter-spacing:.6px;color:#d8c090;
+    white-space:nowrap}
+  #star-key .sk-rule b{color:var(--yellow);font-weight:700;margin-right:5px}
+  #star-key .sk-next{margin-top:6px;font-size:10.5px;letter-spacing:1px;color:#c9a86a}
+  #star-key .sk-next b{color:#8de89a}
+  @media (max-width:460px){
+    #star-key{padding:6px 9px}
+    #star-key .sk-rule{font-size:10px}
+    #star-key .sk-rules{gap:4px 10px}
+  }
   .region-head{display:flex;align-items:center;gap:10px;margin:16px 0 8px;
     font-family:'Luckiest Guy';font-size:12px;letter-spacing:5px;
     color:var(--gold-dim);text-shadow:1px 1px 0 var(--ink);white-space:nowrap}
@@ -836,6 +852,11 @@
   </div>
   <div id="tab-race" class="menu-panel">
     <div class="panel-head">MAP &amp; TRACK SELECTION</div>
+    <!-- HOW STARS ARE EARNED, on the screen that spends them. The rule was
+         only ever stated on the post-race panel, which you see AFTER the
+         decision it informs; the track list just said "NEEDS 27 STARS" at a
+         player with no way to know what a star costs to get. -->
+    <div id="star-key"></div>
     <div id="level-select"></div>
   </div>
   <!-- MODE picks what you are playing — race, free roam or an arena mission —
