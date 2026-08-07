@@ -743,7 +743,9 @@ export class Car {
     const surf = this.game.track?.T?.surface;
     const loose = this === this.game.player ? (this.offroadSkill ?? 0.7) : 0.7;
     const keep = (base) => base + (1 - base) * (0.62 * loose);
-    const sGrip = keep(surf === 'snow' ? 0.55 : surf === 'wet' ? 0.78 : 1);
+    // wet dropped 0.78 -> 0.68: at 0.78 the player couldn't FEEL the rain.
+    // Braking and cornering now visibly run long on every downpour world.
+    const sGrip = keep(surf === 'snow' ? 0.55 : surf === 'wet' ? 0.68 : 1);
     const sTract = keep(surf === 'snow' ? 0.72 : surf === 'wet' ? 0.88 : 1);
     const sBrake = keep(surf === 'snow' ? 0.58 : surf === 'wet' ? 0.80 : 1);
 
@@ -1090,6 +1092,13 @@ export class Car {
         // bowl, where the cliffs open up and free-roamers can drive out
         const prof = t._cliffProfile ? t._cliffProfile(this.trackIndex, fside) : null;
         wallHere = !prof || prof.h > 2.5;
+        // deep-valley worlds (cliffSetback) stand their faces well off the
+        // verge: the player may roam the valley floor and only the ROCK is
+        // solid - off-road slowness is the boundary in between
+        if (wallHere && prof && t.T?.cliffSetback
+            && Math.abs(this.lateral) < prof.base - 1.2) {
+          wallHere = false;
+        }
         // FREE ROAM law (RULES.md: roam differs only in REACH): the rock is
         // solid, but it is not an infinite fence. Once a roamer is past the
         // outer face — having driven out through the low berm — they are on

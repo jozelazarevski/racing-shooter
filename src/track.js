@@ -17,7 +17,8 @@ export const LEVELS = [
   { id: 1, name: 'PINE VALLEY',  theme: 'forest',  region: 'PINE VALLEY' },
   { id: 2, name: 'DUST CANYON',  theme: 'desert',  region: 'DUST CANYON' },
   { id: 3, name: 'FROST PEAK',   theme: 'snow',    region: 'FROST PEAK' },
-  { id: 4, name: 'CANYON RUN',   theme: 'canyon',  region: 'DUST CANYON' },
+  { id: 4, name: 'CANYON RUN',   theme: 'canyon',  region: 'DUST CANYON',
+    tune: { gorgeJump: { count: 2, depth: 26 }, tunnels: { count: 1 } } },
   { id: 5, name: 'EMBER PASS',   theme: 'volcano', region: 'EMBER RIDGE' },
   { id: 6, name: 'SUMMIT CLIMB', theme: 'alpine',  region: 'PINE VALLEY' },
   { id: 7, name: 'GLACIAL PASS', theme: 'glacial', region: 'FROST PEAK' },
@@ -40,10 +41,14 @@ export const LEVELS = [
   // Since a world opens only on a podium finish on the one before it, that put
   // the game's hardest circuit as a hard gate across the middle of the career.
   // It is now the technical exam immediately before the alpine finale.
-  { id: 10, name: 'ROCKFALL RAVINE', theme: 'ravine', region: 'DUST CANYON' },
-  { id: 19, name: 'GOTTHARD CLIMB', theme: 'pass', region: 'ALPINE PASSES' },
-  { id: 20, name: 'TREMOLA DESCENT', theme: 'tremola', region: 'ALPINE PASSES' },
-  { id: 21, name: 'FURKA RIDGE', theme: 'furka', region: 'ALPINE PASSES' },
+  { id: 10, name: 'ROCKFALL RAVINE', theme: 'ravine', region: 'DUST CANYON',
+    tune: { gorgeJump: { count: 1 } } },
+  { id: 19, name: 'GOTTHARD CLIMB', theme: 'pass', region: 'ALPINE PASSES',
+    tune: { tunnels: { count: 2 } } },
+  { id: 20, name: 'TREMOLA DESCENT', theme: 'tremola', region: 'ALPINE PASSES',
+    tune: { tunnels: { count: 1 } } },
+  { id: 21, name: 'FURKA RIDGE', theme: 'furka', region: 'ALPINE PASSES', laps: 1,
+    tune: { tunnels: { count: 1 } } },
 
   // ---- WORLD RALLY: real stages, each a ROUTE over a borrowed THEME with its
   // own `tune`. `tune` is layered over the theme object, so anything a theme
@@ -66,7 +71,9 @@ export const LEVELS = [
     tune: { elev: { amp: 7, ph: [2.9, 1.1, 0.5] }, rampCount: 0 } },
   { id: 28, name: 'ESTONIA CRESTS', theme: 'forest', route: 'estonia', region: 'WORLD RALLY',
     // the only world besides CANYON RUN to hang a hero bridge over a gorge
-    tune: { elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
+    tune: { // DAWN over the yumps: first light
+      sunColor: 0xffc8a0, sunIntensity: 2.3, sunEl: 0.22, sunAz: 0.4,
+      skyTop: '#3a5a94', skyHorizon: '#ffc8b0', fogColor: 0xe8c8c0, hemiIntensity: 0.62, elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
       heroBridge: { at: [0.55, 0.66], half: 24, len: 210, depth: 28, skew: 0 } } },
 
   // ---- MEDITERRANEAN. Appended, so nothing before it is re-priced (career
@@ -94,7 +101,8 @@ export const LEVELS = [
   // ---- OUTBACK RED DIRT. Appended at the END of the array on purpose: career
   // order is array position (starCost = index - 2), so anything inserted higher
   // re-prices every world after it in a save that already exists.
-  { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK', cost: 12, fresh: true },
+  { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK', cost: 12, fresh: true,
+    tune: { gorgeJump: { count: 1 } } },
 
   // ---- GRAND CIRCUITS: the reference sheet of twelve real layouts, each a
   // route over an existing theme (art is the theme's; the geometry is the
@@ -103,9 +111,11 @@ export const LEVELS = [
   { id: 33, name: 'RED BULL RING', theme: 'alpine', route: 'rbring', region: 'GRAND CIRCUITS',
     cost: 5, fresh: true, tune: { elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
   { id: 34, name: 'MONACO STREETS', theme: 'medterrace', route: 'monaco', region: 'GRAND CIRCUITS',
-    cost: 6, fresh: true, tune: { elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
+    cost: 6, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
   { id: 35, name: 'SILVERSTONE', theme: 'farmland', route: 'silverstone', region: 'GRAND CIRCUITS',
-    cost: 7, fresh: true, tune: { elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
+    cost: 7, fresh: true, tune: { // OVERCAST: flat grey racing light, no hard sun
+      sunColor: 0xe8e8e8, sunIntensity: 1.7, hemiIntensity: 1.05,
+      skyTop: '#7a8a9a', skyHorizon: '#d8dde2', fogColor: 0xd0d6da, cloudCount: 22, cloudOpacity: 1, elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
   { id: 36, name: 'SPA-FRANCORCHAMPS', theme: 'forest', route: 'spa', region: 'GRAND CIRCUITS',
     cost: 8, fresh: true, tune: { elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
   { id: 37, name: 'SUZUKA', theme: 'redwood', route: 'suzuka', region: 'GRAND CIRCUITS',
@@ -117,13 +127,30 @@ export const LEVELS = [
   { id: 40, name: 'MARINA BAY', theme: 'neon', route: 'marina', region: 'GRAND CIRCUITS',
     cost: 12, fresh: true, tune: { rampCount: 0 } },
   { id: 41, name: 'MOUNT PANORAMA', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
-    cost: 13, fresh: true, tune: { elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
+    cost: 13, fresh: true, tune: { // DUSK over the mountain: ember sky, violet ranges
+      sunColor: 0xffb078, sunIntensity: 1.9, sunEl: 0.18, sunAz: 5.6,
+      skyTop: '#3a3564', skyHorizon: '#ff9a58', fogColor: 0xc8a090, hemiIntensity: 0.78, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
   { id: 42, name: 'RALLYCROSS ARENA', theme: 'flume', route: 'rallyx', region: 'GRAND CIRCUITS',
     cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
   { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
-    cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0 } },
+    cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0,
+      // AUTUMN: copper woods under a low golden sun
+      foliageLow: 0x9a5a20, foliageTop: 0xc8842c,
+      foliage: { h: 0.07, hVar: 0.04, s: 0.62, sVar: 0.15, l: 0.36, lVar: 0.12 },
+      sunColor: 0xffd898, sunIntensity: 2.5, sunEl: 0.34, hemiGround: 0xa07a48,
+      skyTop: '#4a7ab8', skyHorizon: '#f0d8a8', fogColor: 0xe8d8b0,
+      terrainLow: '#8a7a3e', terrainHigh: '#b89a58' } },
   { id: 44, name: 'LAGUNA SECA', theme: 'canyon', route: 'laguna', region: 'GRAND CIRCUITS',
     cost: 16, fresh: true, tune: { elev: { amp: 9, ph: [1.9, 0.4, 2.6] }, rampCount: 0 } },
+  // the 25.8 km Corsican tarmac stage from the player's card: a 3000 u lap,
+  // hairpin over hairpin, on the Mediterranean island theme
+  { id: 45, name: 'TOUR DE CORSE', theme: 'medterrace', route: 'corse', region: 'GRAND CIRCUITS',
+    cost: 17, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 10, ph: [0.8, 1.7, 2.9] }, rampCount: 0 } },
+  // wine country, deep forest, and the Dolomites - the player's three asks,
+  // the vineyard lap tracing their third hand-drawn loop
+  { id: 46, name: 'VINEYARD VELOCE', theme: 'vineyard', region: 'HEARTLAND', cost: 18, fresh: true },
+  { id: 47, name: 'DEEPWOOD TRAIL', theme: 'deepwood', region: 'HEARTLAND', cost: 19, fresh: true },
+  { id: 48, name: 'DOLOMITI CORSA', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -164,27 +191,25 @@ const CIRCUITS = {
     [-120, -190], [-40, -220],
   ],
   // tight, twisty mountain switchbacks
-  snow: [
-    [0, -215], [85, -210], [160, -185], [150, -110], [215, -125],
-    [255, -60], [215, -5], [250, 55], [205, 115], [235, 180],
-    [150, 205], [75, 160], [0, 205], [-85, 225], [-145, 165],
-    [-105, 100], [-180, 70], [-245, 110], [-255, 25], [-190, -30],
-    [-245, -105], [-180, -170], [-90, -145], [-55, -210],
+  snow: [ // lasso: the valley run, the summit loop, the return leg
+    [0.0, 230.0], [-120.0, 225.0], [-200.0, 190.0], [-225.0, 120.0], [-215.0, 40.0],
+    [-180.0, -30.0], [-120.0, -90.0], [0.0, -160.0], [120.0, -170.0], [180.0, -100.0],
+    [140.0, -30.0], [40.0, -15.0], [-40.0, -55.0], [-61.9, -81.4], [-93.2, -64.3],
+    [-95.1, -54.3], [-0.1, 30.7], [60.0, 100.0], [90.0, 170.0], [60.0, 220.0],
   ],
   // slot-canyon: medium-twisty with two long snaking sections east and south
-  canyon: [
-    [0, -235], [80, -240], [140, -205], [200, -235], [252, -195],
-    [245, -120], [200, -85], [235, -20], [195, 40], [240, 105],
-    [190, 165], [120, 150], [80, 205], [0, 235], [-80, 200],
-    [-150, 235], [-215, 190], [-180, 120], [-245, 80], [-235, 0],
-    [-180, -40], [-235, -95], [-180, -150], [-100, -130], [-60, -195],
+  canyon: [ // square slot doglegs along three long shelves
+    [-220.0, 170.0], [-40.0, 172.0], [140.0, 170.0], [215.0, 168.0], [218.0, 60.0],
+    [30.0, 60.0], [-190.0, 60.0], [-211.1, 58.1], [-210.1, -49.8], [3.9, -49.9],
+    [190.0, -50.0], [215.0, -52.0], [218.0, -160.0], [40.0, -160.0], [-190.0, -160.0],
+    [-231.9, -110.1], [-242.9, -20.2], [-235.9, 79.9],
   ],
   // flowing lap with rhythmic S-curves along the lava fields
-  volcano: [
-    [0, -240], [90, -235], [170, -200], [225, -140], [250, -60],
-    [225, 20], [250, 100], [200, 170], [110, 205], [30, 170],
-    [-50, 205], [-140, 225], [-220, 180], [-250, 100], [-215, 30],
-    [-250, -45], [-210, -120], [-150, -90], [-90, -140], [-30, -180],
+  volcano: [ // crater orbit: the ring bitten deep north and south
+    [225.0, 0.0], [200.0, 100.0], [159.0, 159.0], [70.0, 100.0], [0.0, 120.0],
+    [-70.0, 100.0], [-159.0, 159.0], [-200.0, 100.0], [-225.0, 0.0], [-200.0, -100.0],
+    [-159.0, -159.0], [-70.0, -100.0], [0.0, -120.0], [70.0, -100.0], [159.0, -159.0],
+    [200.0, -100.0],
   ],
   // SUMMIT CLIMB: valley run along the mountain base, then FIVE stacked
   // switchback legs (east-west, ~26u apart in z, joined by 180° hairpins)
@@ -214,12 +239,10 @@ const CIRCUITS = {
     [-140, -175], [-70, -195],
   ],
   // GLACIAL PASS: winding ice-canyon course, medium technicality
-  glacial: [
-    [0, -225], [85, -235], [160, -210], [210, -160], [250, -100],
-    [225, -35], [250, 30], [205, 90], [215, 155], [150, 195],
-    [75, 165], [10, 200], [-70, 225], [-150, 200], [-190, 140],
-    [-155, 80], [-215, 45], [-245, -25], [-200, -85], [-235, -150],
-    [-165, -190], [-90, -160], [-45, -215],
+  glacial: [ // pear-valley: narrow moraine neck into a wide cirque toe
+    [-40.0, -220.0], [-55.0, -140.0], [-34.0, -40.0], [-48.0, 40.0], [-90.0, 130.0],
+    [-95.0, 200.0], [-20.0, 238.0], [60.0, 225.0], [95.0, 160.0], [60.0, 105.0],
+    [34.0, -40.0], [52.0, -110.0], [62.0, -170.0], [30.0, -222.0], [-10.0, -228.0],
   ],
   // AMAZON RAPIDS: snaking jungle lap threading between the river crossings
   jungle: [
@@ -249,19 +272,21 @@ const CIRCUITS = {
   ],
   // OASIS AMBUSH: rolling desert approach that dives through the palm grove
   // on the west half of the lap
-  oasis: [
-    [0, -225], [95, -235], [175, -200], [235, -140], [250, -55],
-    [215, 25], [245, 105], [195, 175], [110, 210], [25, 180],
-    [-55, 215], [-140, 235], [-215, 185], [-245, 110], [-200, 50],
-    [-250, -20], [-215, -95], [-235, -170], [-155, -205], [-75, -170],
-    [-30, -220],
+  oasis: [ // trefoil: three palm lobes off a tight core
+    [30.0, -20.0], [120.0, -90.0], [195.0, -55.0], [185.0, 35.0], [105.0, 55.0],
+    [49.2, 43.8], [60.0, 120.0], [15.0, 200.0], [-70.0, 195.0], [-95.0, 110.0],
+    [-35.0, 60.0], [-40.0, 10.0], [-120.0, 40.0], [-200.0, 0.0], [-185.0, -90.0],
+    [-100.0, -110.0], [-45.0, -55.0],
   ],
   // REDWOOD RAMPAGE: broad rolling forest lap — fast crests between the giants
-  redwood: [
-    [0, -220], [90, -235], [170, -210], [230, -155], [250, -75],
-    [220, 0], [250, 80], [215, 155], [140, 195], [65, 165],
-    [0, 210], [-85, 235], [-165, 200], [-230, 145], [-250, 65],
-    [-215, -10], [-245, -90], [-195, -160], [-110, -195], [-45, -230],
+  redwood: [ // the Pine Mountain Rally stage, border road home
+    [-210.5, -63.9], [-224.2, 16.0], [-226.4, 95.8], [-199.1, 178.0], [-127.2, 223.6],
+    [-24.5, 235.0], [72.4, 212.2], [115.8, 166.6], [104.4, 109.5], [61.0, 82.1],
+    [95.3, 47.9], [143.2, 52.5], [180.8, 95.8], [207.1, 59.3], [172.8, 25.1],
+    [120.4, 18.3], [61.0, 27.4], [17.7, -6.8], [26.8, -50.2], [78.1, -66.2],
+    [110.3, -89.1], [95.3, -123.2], [115.8, -157.4], [166.0, -152.9], [183.2, -120.7],
+    [211.6, -130.0], [226.4, -175.7], [209.3, -214.5], [118.1, -230.4], [-30.2, -235.0],
+    [-161.4, -221.3], [-215.0, -166.6],
   ],
   // LOG FLUME FURY: three long haul-road straights for the flume lanes,
   // joined by mid-speed corners around the timber yards
@@ -272,96 +297,118 @@ const CIRCUITS = {
     [-180, -200], [-90, -182],
   ],
   // FOREST FIRE ESCAPE: flowing escape run with rhythmic esses through the burn
-  wildfire: [
-    [0, -235], [100, -230], [180, -195], [240, -130], [250, -45],
-    [215, 35], [245, 115], [195, 185], [105, 215], [15, 185],
-    [-70, 215], [-160, 230], [-230, 175], [-250, 90], [-215, 15],
-    [-245, -65], [-205, -140], [-135, -105], [-75, -152], [-25, -192],
+  wildfire: [ // escape ladder: three tight esses, then the long flight south
+    [-153.7, 168.6], [-40.0, 152.0], [150.0, 140.0], [200.0, 110.0], [160.0, 85.0],
+    [-30.0, 72.0], [-160.0, 60.0], [-210.0, 28.0], [-170.0, -2.0], [0.0, -16.0],
+    [140.0, -30.0], [190.0, -62.0], [150.0, -92.0], [-40.0, -108.0], [-180.0, -122.0],
+    [-225.0, -165.0], [-140.0, -212.0], [80.0, -218.0], [180.0, -188.0], [222.0, -90.0],
+    [232.0, 30.0], [226.0, 118.0], [178.0, 172.0], [20.0, 196.0], [-140.0, 192.0],
   ],
   // GLACIER'S GRIND: winding sheet-ice canyon, medium sweeps with two folds
-  sheetice: [
-    [0, -230], [90, -240], [170, -215], [225, -160], [250, -85],
-    [230, -5], [250, 70], [210, 140], [225, 200], [145, 230],
-    [65, 195], [-20, 230], [-105, 200], [-150, 140], [-215, 172],
-    [-255, 100], [-225, 30], [-250, -45], [-205, -110], [-235, -180],
-    [-160, -220], [-80, -190], [-35, -235],
+  sheetice: [ // flat-out drift tri-oval
+    [0.0, -225.0], [140.0, -180.0], [215.0, -90.0], [232.0, 30.0], [170.0, 160.0],
+    [40.0, 210.0], [-100.0, 212.0], [-200.0, 140.0], [-232.0, 0.0], [-190.0, -130.0],
+    [-90.0, -200.0],
   ],
   // AVALANCHE ALLEY: narrow pass — the climb winds up the east and north
   // sides, then the final third is one long sweeping western descent
-  avalanche: [
-    [0, -225], [85, -240], [160, -210], [210, -155], [245, -90],
-    [235, -15], [250, 60], [220, 130], [235, 195], [160, 230],
-    [80, 200], [10, 235], [-80, 230], [-150, 190], [-192, 235],
-    [-250, 190], [-235, 110], [-250, 30], [-230, -55], [-245, -135],
-    [-190, -195], [-110, -230], [-55, -190],
+  avalanche: [ // diagonal Z-ladder traverses down the slide path
+    [-210.0, -190.0], [-20.0, -155.0], [160.0, -120.0], [205.0, -85.0], [150.0, -45.0],
+    [-30.0, 4.0], [-177.5, 19.6], [-210.1, 59.1], [-157.5, 99.6], [10.0, 128.0],
+    [170.0, 160.0], [210.0, 195.0], [140.0, 225.0], [-10.0, 220.0], [-120.0, 212.0],
+    [-192.5, 170.4], [-232.9, 40.9], [-226.5, -99.6],
   ],
   // NEON GRID EXPRESSWAY: huge fast expressway sweeps, minimum corner count
-  neon: [
-    [0, -240], [120, -225], [215, -175], [252, -70], [235, 40],
-    [250, 145], [180, 215], [70, 240], [-40, 215], [-140, 240],
-    [-230, 190], [-252, 85], [-225, -20], [-250, -125], [-195, -200],
-    [-90, -240],
+  neon: [ // Manhattan loop: right angles only
+    [-200.0, 220.0], [80.0, 220.0], [80.0, 140.0], [200.0, 140.0], [200.0, -40.0],
+    [60.0, -40.0], [60.0, -120.0], [180.0, -120.0], [180.0, -220.0], [-60.0, -220.0],
+    [-60.0, -140.0], [-160.0, -140.0], [-160.0, -40.0], [-220.0, -40.0], [-220.0, 60.0],
+    [-100.0, 60.0], [-100.0, 140.0], [-200.0, 140.0],
   ],
   // UNDERCITY SLIPSTREAM: cramped service-tunnel twists — hairpin folds and
   // short bursts, nothing opens up for long
-  undercity: [
-    [0, -215], [75, -230], [140, -195], [130, -125], [195, -140],
-    [245, -85], [205, -25], [245, 35], [200, 95], [230, 155],
-    [165, 195], [95, 160], [30, 205], [-50, 230], [-120, 190],
-    [-92, 122], [-160, 90], [-225, 125], [-250, 45], [-195, -5],
-    [-240, -70], [-250, -150], [-180, -195], [-95, -160], [-50, -215],
+  undercity: [ // sewer mains: a rectangle with two deep service notches
+    [-225.0, 130.0], [-40.0, 131.0], [-40.0, 22.7], [40.0, 22.6], [40.0, 130.8],
+    [225.0, 130.0], [225.0, -130.0], [60.0, -130.8], [60.0, -22.6], [-60.0, -22.7],
+    [-60.0, -131.0], [-225.0, -130.0],
   ],
   // GOTTHARD CLIMB: alpine village in the valley, a run along the mountain
   // base, then NINE stacked switchback legs (29u apart) hairpinning up the
   // granite face to a summit shelf, and three wide sweeps down the east side
   // back to the valley. Elevation: THEMES.pass.elev climbs ~45u through it.
-  pass: [
-    // valley floor: start line, village, run west along the base
-    [-60, -244], [-140, -232], [-196, -192], [-224, -142], [-218, -98],
-    [-176, -72], [-118, -64],
-    // the face: 9 legs, 8 hairpins, ~70u legs
-    ...switchbackStack({ legs: 9, z0: -64, dz: 29, halfX: 35, hp: 15 }),
-    // summit shelf running east along the crest
-    [96, 176], [158, 168], [214, 146],
-    // three wide switchback sweeps down the east face
-    [244, 104], [204, 72], [140, 62],
-    [104, 22], [162, -4], [226, -12],
-    [250, -70], [206, -102], [140, -114],
-    // valley run-in back to the line
-    [116, -164], [140, -210], [86, -242], [16, -250],
+  pass: [ // the player's green hand-drawn loop: coil summit, three finger valleys
+    [70.9, -235.0], [91.0, -230.4], [110.4, -215.8], [128.3, -198.7], [142.2, -179.4],
+    [148.9, -156.8], [150.3, -131.9], [150.2, -106.6], [148.7, -82.0], [144.4, -58.4],
+    [138.0, -35.6], [131.8, -12.7], [127.1, 10.8], [124.9, 35.3], [125.4, 60.1],
+    [127.9, 84.5], [131.9, 108.3], [137.1, 131.6], [142.3, 155.0], [145.4, 178.9],
+    [142.1, 201.9], [128.9, 220.0], [108.5, 230.9], [85.2, 235.0], [62.3, 231.0],
+    [47.0, 217.0], [48.4, 200.1], [65.1, 188.2], [80.2, 176.9], [77.3, 166.5],
+    [57.6, 162.4], [38.1, 157.5], [36.2, 147.6], [52.0, 137.4], [56.2, 128.8],
+    [53.2, 120.7], [45.3, 112.3], [44.9, 104.2], [53.8, 97.3], [73.0, 90.1],
+    [76.7, 75.0], [62.7, 62.8], [40.3, 61.8], [17.9, 68.9], [-2.8, 80.3],
+    [-22.9, 93.3], [-44.0, 104.1], [-66.9, 108.5], [-90.3, 105.9], [-112.6, 98.1],
+    [-131.9, 85.2], [-145.0, 66.4], [-150.3, 43.3], [-149.6, 19.0], [-145.7, -4.8],
+    [-139.9, -27.9], [-130.4, -49.4], [-115.0, -66.3], [-94.0, -74.9], [-71.2, -72.9],
+    [-51.8, -61.0], [-36.1, -43.2], [-19.3, -26.6], [1.5, -16.4], [25.3, -12.8],
+    [49.8, -13.9], [72.5, -20.6], [91.7, -33.9], [106.1, -52.6], [114.5, -74.6],
+    [117.5, -98.7], [115.6, -122.9], [106.6, -144.3], [90.3, -158.9], [73.1, -159.3],
+    [64.0, -143.3], [61.9, -119.7], [57.0, -96.8], [43.7, -78.6], [23.7, -69.9],
+    [0.6, -70.7], [-21.3, -78.5], [-34.9, -94.0], [-34.3, -114.8], [-21.4, -131.7],
+    [-3.3, -136.4], [7.8, -127.5], [13.2, -119.1], [20.0, -116.3], [27.7, -121.3],
+    [22.2, -141.2], [4.2, -153.6], [-18.9, -159.0], [-35.3, -169.4], [-35.3, -187.8],
+    [-20.7, -203.5], [1.1, -208.9], [23.5, -206.7], [40.8, -209.3], [54.2, -223.6],
   ],
   // TREMOLA DESCENT: the mirror. The line sits on the summit plateau; the lap
   // drops straight into NINE tighter cobbled hairpins (28u apart) down the
   // face, runs out along the gorge floor, then climbs the long modern road up
   // the east flank back to the plateau.
-  tremola: [
-    // summit plateau + start line
-    [170, 206], [104, 196], [52, 182],
-    // the cobbled face, descending
-    ...switchbackStack({ legs: 9, z0: 176, dz: -28, halfX: 35, hp: 15, dir: -1 }),
-    // out of the last hairpin into the gorge
-    [-78, -74], [-124, -112], [-152, -164],
-    // valley run-out east along the gorge floor
-    [-116, -216], [-46, -244], [34, -250], [110, -234], [176, -200],
-    // the long climb back up the east flank to the plateau
-    [224, -148], [246, -78], [230, -4], [248, 72], [224, 140], [232, 192],
+  tremola: [ // the player's red hand-drawn loop, knots crossed straight through
+    [-0.1, -63.6], [2.0, -73.7], [20.4, -82.3], [40.3, -82.7], [59.2, -74.8],
+    [77.7, -65.8], [93.2, -67.0], [99.7, -82.2], [97.8, -103.2], [90.4, -122.8],
+    [77.4, -138.2], [59.1, -145.2], [39.1, -144.0], [21.8, -144.8], [11.4, -156.6],
+    [11.6, -174.6], [15.8, -193.1], [11.8, -211.4], [-1.9, -227.0], [-19.8, -235.0],
+    [-37.8, -230.9], [-48.7, -216.6], [-45.6, -199.2], [-33.4, -182.7], [-24.4, -166.0],
+    [-27.5, -154.1], [-44.0, -151.8], [-65.5, -151.6], [-84.0, -144.4], [-96.5, -129.1],
+    [-103.5, -109.3], [-102.5, -89.6], [-90.1, -75.3], [-73.2, -72.2], [-65.2, -81.3],
+    [-65.5, -96.4], [-57.9, -107.5], [-41.9, -106.1], [-31.0, -91.8], [-30.5, -71.8],
+    [-37.9, -52.4], [-50.6, -37.0], [-68.6, -27.9], [-88.4, -21.2], [-102.9, -9.3],
+    [-104.5, 7.4], [-92.7, 23.2], [-74.3, 32.8], [-53.6, 33.6], [-35.4, 25.7],
+    [-21.4, 11.7], [-6.5, 1.1], [9.6, 4.0], [20.1, 19.6], [21.3, 39.2],
+    [12.2, 56.6], [-4.4, 68.9], [-23.5, 77.3], [-42.3, 86.7], [-56.2, 100.3],
+    [-59.9, 117.7], [-56.5, 137.1], [-50.9, 156.9], [-40.7, 175.0], [-27.2, 191.9],
+    [-12.7, 206.6], [0.6, 210.3], [8.2, 197.2], [9.4, 176.2], [6.2, 155.3],
+    [5.2, 137.8], [15.1, 129.4], [31.5, 134.4], [43.4, 149.9], [48.1, 170.5],
+    [48.8, 192.6], [50.3, 214.5], [58.6, 231.1], [74.7, 235.0], [90.4, 225.4],
+    [99.8, 207.8], [104.2, 187.0], [104.5, 165.2], [100.7, 144.1], [93.2, 124.6],
+    [81.0, 108.6], [63.9, 98.0], [49.6, 86.2], [46.3, 68.1], [54.6, 53.7],
+    [70.8, 49.6], [77.1, 43.2], [76.7, 32.7], [74.7, 14.7], [79.2, -4.6],
+    [77.3, -22.9], [63.7, -35.8], [45.0, -43.1], [26.4, -49.3], [6.9, -55.1],
   ],
   // FURKA RIDGE: a deep-winter pass. The valley floor is under snow; the dirt
   // road climbs a jagged grey-rock face in ONE long serpentine of seven legs,
   // so from the upper legs the whole pass is visible snaking down the valley
   // below you. A traverse along the top, then wide sweeps back down.
-  furka: [
-    // snowbound valley floor: start line + log cabins
-    [-40, -244], [-124, -232], [-192, -198], [-230, -148], [-224, -100],
-    [-182, -74], [-122, -66],
-    // the serpentine: 7 legs, 6 hairpins, cut into the face
-    ...switchbackStack({ legs: 7, z0: -66, dz: 30, halfX: 38, hp: 16 }),
-    // high traverse along the shoulder, looking back down the whole pass
-    [100, 118], [166, 110], [220, 86],
-    // wide sweeps back down the east side to the valley
-    [250, 40], [214, 2], [152, -8],
-    [118, -58], [170, -92], [234, -104],
-    [250, -160], [214, -206], [150, -232], [70, -246],
+  furka: [ // the player's downhill-run sketch: one-lap stage, border road home
+    [143.4, -235.0], [127.2, -231.4], [112.7, -227.3], [103.6, -218.7], [100.1, -204.0],
+    [95.4, -191.0], [83.5, -187.5], [72.4, -188.3], [68.5, -186.0], [66.9, -182.5],
+    [67.0, -178.3], [69.4, -172.9], [69.3, -166.5], [65.7, -161.2], [63.9, -159.0],
+    [62.8, -156.5], [62.5, -153.6], [63.1, -150.3], [63.9, -146.4], [63.3, -143.1],
+    [61.5, -140.3], [58.1, -138.4], [50.2, -139.0], [34.9, -143.1], [25.2, -153.0],
+    [18.5, -166.1], [6.5, -172.4], [-6.9, -168.9], [-11.4, -157.7], [-3.9, -147.4],
+    [8.9, -138.5], [21.5, -127.5], [36.6, -120.9], [51.6, -116.9], [60.5, -107.4],
+    [60.8, -93.4], [52.9, -79.9], [41.0, -68.0], [28.6, -56.4], [14.8, -49.4],
+    [-1.6, -48.2], [-18.0, -49.9], [-33.1, -54.1], [-47.1, -53.3], [-57.1, -42.6],
+    [-62.4, -27.1], [-64.1, -10.4], [-61.4, 5.7], [-52.6, 18.0], [-38.6, 25.0],
+    [-22.5, 27.4], [-6.6, 24.6], [6.0, 15.8], [7.1, 5.6], [-0.7, -1.5],
+    [-14.7, -6.4], [-18.5, -15.9], [-13.4, -24.9], [1.4, -28.0], [17.5, -26.8],
+    [29.3, -18.6], [34.5, -3.6], [34.9, 13.5], [32.8, 30.2], [26.8, 44.9],
+    [15.3, 55.6], [0.2, 60.9], [-16.5, 61.5], [-33.5, 60.2], [-50.3, 58.2],
+    [-66.8, 56.3], [-82.2, 58.9], [-93.5, 68.9], [-101.3, 83.0], [-109.7, 96.3],
+    [-110.0, 105.0], [-104.1, 111.6], [-88.7, 116.0], [-85.8, 122.9], [-87.8, 129.6],
+    [-90.1, 134.3], [-90.7, 139.1], [-89.1, 144.3], [-88.6, 151.1], [-91.6, 157.1],
+    [-99.9, 161.2], [-103.1, 165.3], [-103.2, 169.7], [-100.5, 174.3], [-87.1, 181.6],
+    [-81.8, 193.1], [-88.4, 203.0], [-102.3, 209.3], [-117.1, 216.1], [-130.8, 224.9],
+    [-143.4, 235.0], [-173.4, 265.0], [-173.4, -265.0], [173.4, -265.0],
   ],
 
   // ======================================================================
@@ -411,14 +458,10 @@ const CIRCUITS = {
 
   // FAFE — Portugal. A tight, technical village loop that exists to set up ONE
   // enormous jump: the run-in straightens and drops away over the crest.
-  fafe: [
-    [0, -228], [64, -244], [130, -226], [166, -178], [148, -128],
-    [188, -92], [244, -104], [252, -34], [214, 22], [246, 82],
-    // the long straight run-in to the leap, dead straight on purpose
-    [214, 140], [150, 176], [72, 190], [-8, 196], [-88, 190],
-    // village hairpins on the far side
-    [-152, 210], [-214, 178], [-186, 122], [-244, 88], [-252, 14],
-    [-208, -44], [-246, -110], [-192, -172], [-108, -196], [-52, -224],
+  fafe: [ // kite: two flat-out legs to the jump vertex, wide loop home
+    [-225.0, 190.0], [-60.0, 130.0], [90.0, 75.0], [200.0, 35.0], [232.0, -20.0],
+    [195.0, -60.0], [80.0, -95.0], [-60.0, -145.0], [-170.0, -195.0], [-225.0, -160.0],
+    [-235.0, -60.0], [-232.0, 60.0],
   ],
 
   // PIKES PEAK — one sustained climb, nothing else. A long approach across the
@@ -443,36 +486,34 @@ const CIRCUITS = {
   // wide corners. Nothing else on the roster has three-fold symmetry, and
   // running the edges out to the rim makes this the LONGEST flat lap: the
   // opposite extreme from OUNINPOHJA's narrow oval, from the same envelope.
-  safari: [
-    [-6, -250], [78, -222], [158, -192], [236, -160],
-    [254, -110], [240, -56],
-    [176, 46], [116, 138], [58, 216],
-    [4, 252], [-56, 240],
-    [-118, 152], [-178, 58], [-238, -38],
-    [-254, -96], [-228, -158], [-164, -206], [-86, -240],
+  safari: [ // the C: a plains sweep wrapped around one deep waterhole bay
+    [60.0, -225.0], [180.0, -175.0], [230.0, -60.0], [225.0, 70.0], [160.0, 175.0],
+    [30.0, 225.0], [-110.0, 215.0], [-205.0, 140.0], [-230.0, 20.0], [-190.0, -95.0],
+    [-90.0, -105.0], [-20.0, -45.0], [60.0, -20.0], [120.0, -60.0], [95.0, -140.0],
+    [16.2, -180.8],
   ],
 
   // CORNICHE — Corsica, the "rally of ten thousand corners". A cliff road that
   // never has a straight: every corner runs into the next one. Paired with the
   // canyon look, so the rock is right there on both sides.
-  corniche: [
-    [0, -240], [70, -250], [122, -216], [178, -238], [232, -206],
-    [244, -152], [204, -116], [246, -78], [212, -28], [250, 22],
-    [216, 72], [248, 124], [200, 168], [140, 152], [96, 196],
-    [30, 230], [-44, 208], [-108, 238], [-176, 220], [-232, 182],
-    [-198, 130], [-248, 96], [-238, 34], [-200, -8], [-246, -58],
-    [-214, -112], [-244, -168], [-186, -206], [-118, -186], [-58, -222],
+  corniche: [ // the Coastal Cliffs Run: lighthouse headland to the switchback point
+    [-235.0, -147.8], [-146.6, -173.1], [-64.4, -192.0], [11.4, -183.2], [80.9, -213.5],
+    [169.3, -226.2], [235.0, -173.1], [209.7, -112.4], [141.5, -97.3], [80.9, -120.0],
+    [36.6, -106.1], [2.5, -82.1], [30.3, -50.5], [65.7, -31.6], [53.1, 11.4],
+    [2.5, 25.3], [-39.2, 44.2], [-17.7, 82.1], [32.8, 94.8], [70.8, 127.6],
+    [93.5, 165.5], [65.7, 208.5], [15.2, 226.2], [-48.0, 213.5], [-91.0, 168.0],
+    [-83.4, 117.5], [-59.1, 94.1], [-73.3, 69.5], [-118.8, 77.1], [-149.1, 36.6],
+    [-174.4, -16.4], [-199.6, -67.0], [-224.9, -109.9],
   ],
 
   // ESTONIA — flat-out gravel over a river gorge. Fast open sweeps, big
   // crests, and the tune hangs a hero bridge across the deepest cut, so the
   // lap has one moment where the road is a span with nothing under it.
-  estonia: [
-    [0, -246], [92, -250], [178, -222], [238, -170],
-    [252, -96], [226, -26], [250, 46], [224, 118],
-    [166, 178], [88, 212], [4, 222], [-80, 214],
-    [-160, 232], [-226, 194], [-252, 124], [-232, 52],
-    [-252, -24], [-236, -104], [-250, -180], [-190, -226], [-104, -250],
+  estonia: [ // interleaved sinusoid: yumps out, yumps home
+    [-230.0, 60.0], [-160.0, 95.0], [-90.0, 25.0], [-20.0, 95.0], [50.0, 25.0],
+    [120.0, 95.0], [190.0, 25.0], [228.0, -12.0], [212.0, -58.0], [150.0, -95.0],
+    [80.0, -25.0], [10.0, -95.0], [-60.0, -25.0], [-130.0, -95.0], [-205.0, -28.0],
+    [-236.0, 12.0],
   ],
 
   // OLIVE COAST — Sanremo/Corsica tarmac. The fast region on the roster after
@@ -549,27 +590,10 @@ const CIRCUITS = {
   // a face, the rally routes flow. This one turns because the field turns.
   // Measured (900 samples): 1851 u lap, tightest radius 17 u, 3.9 % of the lap
   // under 25 u, self-approach 50.9 u — well clear of the 22 u ribbon width.
-  farmland: [
-    // start / finish: the straight lane along the southern field edge. Dead
-    // straight on purpose — the grid needs flat road, and a clean run of
-    // constant curvature is what lets the width profile hang a pinch on it.
-    [-70, -240], [-8, -240], [54, -240], [112, -238],
-    // hard left at the field corner onto the lane that climbs north
-    [168, -220], [194, -184], [186, -142],
-    // staggered crossroads — right, then immediately left
-    [212, -116], [246, -100], [250, -52],
-    // the long east lane over the blind crests
-    [220, -8], [230, 42], [252, 92],
-    // square corner at the top of the rise, back west along the headland
-    [246, 142], [206, 174], [156, 176], [126, 186],
-    // jog north around the copse, then the northern lane
-    [112, 230], [46, 240], [-18, 224],
-    [-84, 240], [-148, 226], [-172, 184],
-    // doubling back around a field corner, down into the stream hollow
-    [-132, 150], [-164, 118], [-214, 112], [-250, 70],
-    // tightening bends along the woodland edge, back to the line
-    [-226, 26], [-180, 0], [-218, -44], [-250, -100],
-    [-232, -158], [-186, -196], [-128, -214],
+  farmland: [ // hedgerow polygon: straight field boundaries, odd angles
+    [-215.0, 175.0], [30.0, 190.0], [95.0, 120.0], [225.0, 95.0], [215.0, -30.0],
+    [120.0, -55.0], [130.0, -140.0], [10.0, -195.0], [-140.0, -180.0], [-120.0, -80.0],
+    [-185.0, -40.0], [-230.0, 40.0], [-125.8, 69.5], [-165.0, 120.0],
   ],
 
   // RED CENTRE RUN — the fastest lap on the roster, and the shape is dictated
@@ -588,16 +612,22 @@ const CIRCUITS = {
   // is the one place on a 350 m-sight-line world you must not put a corner —
   // so sample 0 is now mid-straight, and it stays that way if you edit this:
   // the array's first control point is where t = 0 lands.
-  outback: [
-    [0, -253], [84, -251], [158, -243],
-    [212, -221], [246, -178], [255, -122],
-    [250, -58], [240, 6], [234, 70],
-    [212, 132], [172, 184], [118, 220],
-    [50, 240], [-24, 247], [-98, 241],
-    [-166, 222], [-220, 184], [-248, 128],
-    [-255, 64], [-252, -4], [-254, -72],
-    [-244, -140], [-218, -198], [-168, -238],
-    [-90, -253],
+  outback: [ // the Dusty Canyon Sprint, plateau chord and all
+    [76.7, -182.3], [70.9, -186.2], [52.9, -183.0], [33.8, -175.5], [18.5, -163.7],
+    [9.4, -146.2], [9.6, -126.8], [9.0, -116.1], [-4.7, -100.9], [-20.7, -85.9],
+    [-37.1, -70.9], [-53.5, -55.9], [-69.9, -40.9], [-86.3, -25.9], [-102.7, -10.9],
+    [-119.1, 4.1], [-135.5, 19.1], [-151.9, 34.1], [-168.3, 49.1], [-184.7, 64.1],
+    [-201.1, 79.1], [-217.6, 93.9], [-231.0, 109.9], [-235.0, 128.5], [-228.5, 147.2],
+    [-215.9, 164.0], [-200.0, 177.3], [-181.1, 184.8], [-160.4, 187.7], [-139.3, 187.7],
+    [-118.8, 184.1], [-99.7, 176.5], [-81.5, 166.8], [-64.9, 155.3], [-50.0, 141.5],
+    [-34.7, 127.6], [-18.8, 114.4], [-2.1, 101.9], [15.5, 90.8], [34.0, 82.5],
+    [52.8, 81.4], [69.6, 90.0], [84.0, 104.5], [98.0, 120.6], [113.0, 135.6],
+    [128.8, 148.8], [145.3, 160.1], [164.1, 166.0], [184.5, 164.5], [204.1, 158.1],
+    [221.1, 148.0], [230.6, 132.3], [233.2, 112.9], [235.0, 92.8], [233.8, 72.7],
+    [227.4, 53.7], [216.9, 36.7], [201.9, 23.5], [183.2, 15.3], [162.5, 11.5],
+    [141.0, 9.8], [120.6, 6.0], [103.9, -4.0], [92.7, -20.1], [87.2, -39.9],
+    [84.0, -60.8], [76.8, -79.9], [62.9, -94.1], [47.2, -102.4], [32.0, -110.9],
+    [31.4, -130.7], [45.0, -145.9], [61.3, -160.9], [77.7, -175.9],
   ],
 
   // ------------------------------------------------------------------------
@@ -609,82 +639,266 @@ const CIRCUITS = {
   // above the game's floors except where the real corner IS the point (the
   // Loews hairpin, the Corkscrew); parallel legs never run closer than 26 u.
   rbring: [ // Red Bull Ring — three big straights, hilltop rights, flowing left sweeps home
-    [-180, -140], [-60, -150], [60, -155], [150, -140],
-    [200, -90], [215, -20], [190, 40], [195, 120], [160, 170],
-    [90, 185], [30, 150], [0, 90], [-40, 30], [-90, -10],
-    [-150, 10], [-200, -20], [-215, -80], [-205, -125],
+    [121.6, 99.3], [142.1, 93.3], [162.6, 87.5], [183.4, 81.4], [203.7, 74.3],
+    [222.5, 64.4], [234.4, 49.3], [235.0, 29.8], [228.3, 9.6], [217.2, -8.0],
+    [200.2, -18.5], [178.7, -21.4], [155.8, -21.2], [132.8, -20.5], [109.9, -19.7],
+    [86.8, -19.3], [63.8, -18.6], [41.2, -17.1], [19.7, -12.9], [0.5, -3.2],
+    [-16.2, 11.4], [-33.4, 25.0], [-52.7, 29.3], [-70.7, 21.0], [-84.3, 4.8],
+    [-95.3, -13.9], [-101.6, -33.6], [-97.3, -52.2], [-82.0, -64.4], [-61.3, -67.9],
+    [-39.3, -66.3], [-17.1, -63.8], [5.1, -63.7], [26.1, -68.8], [44.1, -80.1],
+    [56.0, -96.8], [55.1, -112.5], [39.2, -120.2], [16.6, -121.8], [-6.1, -123.1],
+    [-28.4, -125.5], [-50.5, -128.2], [-72.8, -130.6], [-94.8, -133.5], [-116.8, -136.7],
+    [-139.0, -139.1], [-161.6, -140.4], [-184.3, -140.0], [-206.7, -137.8], [-226.5, -132.6],
+    [-235.0, -122.1], [-226.5, -107.4], [-210.0, -91.9], [-193.6, -76.5], [-178.0, -60.2],
+    [-164.8, -42.6], [-154.2, -23.7], [-144.5, -4.5], [-134.2, 14.5], [-123.1, 33.1],
+    [-111.1, 51.4], [-98.6, 69.5], [-85.8, 87.5], [-72.8, 105.3], [-59.4, 123.1],
+    [-43.6, 136.7], [-24.2, 140.4], [-3.4, 136.3], [17.3, 130.0], [37.9, 123.7],
+    [58.6, 117.4], [79.3, 111.4], [100.4, 105.4],
   ],
   monaco: [ // Monaco — Ste Devote, the climb to Casino, Loews, the tunnel sweep, Rascasse
-    [-160, -80], [-80, -95], [-10, -85], [20, -40], [10, 20],
-    [40, 70], [90, 85], [130, 60], [120, 10], [90, -15],
-    [60, -40], [45, -60], [60, -78], [85, -70], [130, -85],
-    [170, -110], [190, -160], [150, -200], [95, -195], [70, -175],
-    [10, -185], [-60, -200], [-120, -190], [-165, -150], [-185, -115],
+    [188.3, -138.2], [199.6, -130.1], [208.6, -120.3], [223.2, -116.1], [235.0, -108.0],
+    [233.1, -92.5], [223.2, -75.3], [211.9, -58.5], [199.4, -42.4], [184.4, -28.3],
+    [167.3, -17.5], [148.8, -10.5], [128.9, -6.6], [108.1, -4.9], [87.0, -5.0],
+    [66.4, -7.0], [46.2, -10.3], [26.5, -14.6], [7.2, -18.1], [-11.6, -19.4],
+    [-29.5, -22.5], [-47.4, -29.3], [-66.1, -36.0], [-85.1, -41.9], [-103.9, -48.1],
+    [-122.6, -53.1], [-140.5, -51.5], [-156.0, -40.4], [-167.5, -24.0], [-172.6, -5.7],
+    [-174.2, 13.4], [-178.5, 32.3], [-187.6, 49.0], [-198.3, 63.9], [-203.3, 81.5],
+    [-200.5, 100.9], [-193.6, 119.1], [-193.8, 132.0], [-202.9, 138.2], [-220.2, 133.2],
+    [-231.9, 121.0], [-235.0, 103.1], [-233.9, 83.0], [-230.5, 63.3], [-225.1, 44.0],
+    [-218.8, 25.1], [-211.7, 6.6], [-203.6, -11.5], [-194.5, -29.3], [-183.6, -46.2],
+    [-170.6, -62.3], [-155.4, -74.1], [-137.7, -76.8], [-118.6, -73.2], [-99.3, -67.8],
+    [-79.9, -62.5], [-60.3, -57.8], [-40.9, -52.6], [-21.3, -48.2], [-0.5, -46.4],
+    [20.3, -44.8], [40.2, -40.8], [59.6, -36.0], [79.5, -34.0], [97.8, -39.0],
+    [109.3, -52.8], [111.5, -71.6], [111.9, -90.4], [120.3, -105.9], [136.1, -117.2],
+    [153.8, -126.4], [171.6, -135.1],
   ],
   silverstone: [ // Silverstone — Copse, the Maggotts/Becketts esses, Stowe, Club
-    [-220, -60], [-140, -90], [-40, -95], [40, -70], [80, -10],
-    [60, 50], [110, 90], [90, 150], [160, 180], [220, 140],
-    [230, 60], [200, -10], [230, -80], [190, -150], [100, -180],
-    [0, -165], [-100, -175], [-180, -160], [-230, -110],
+    [124.1, -123.1], [142.4, -123.6], [161.3, -117.9], [178.9, -109.2], [194.1, -96.5],
+    [205.0, -80.3], [212.3, -62.1], [218.4, -43.3], [224.3, -24.5], [230.1, -5.7],
+    [235.0, 13.3], [234.4, 31.8], [224.5, 47.2], [208.5, 58.3], [190.7, 66.6],
+    [172.1, 72.8], [153.0, 78.0], [133.9, 83.2], [114.9, 88.8], [97.0, 96.4],
+    [79.5, 103.9], [60.5, 107.0], [41.4, 110.3], [23.7, 118.5], [6.0, 123.6],
+    [-11.5, 118.4], [-27.6, 106.7], [-44.4, 96.3], [-62.8, 89.3], [-81.7, 83.6],
+    [-100.5, 77.9], [-119.4, 72.3], [-138.4, 66.7], [-157.3, 61.2], [-176.3, 55.7],
+    [-195.2, 50.1], [-213.8, 43.6], [-229.3, 33.4], [-235.0, 18.0], [-227.6, 1.9],
+    [-213.6, -12.8], [-199.9, -28.0], [-188.1, -44.3], [-180.1, -61.3], [-178.9, -78.3],
+    [-178.0, -94.5], [-167.9, -108.0], [-150.6, -114.4], [-131.9, -112.1], [-113.7, -104.7],
+    [-96.0, -96.1], [-78.3, -87.5], [-60.6, -79.1], [-43.0, -70.4], [-27.4, -59.1],
+    [-17.4, -43.0], [-12.3, -23.9], [-6.1, -5.2], [5.6, 10.4], [20.6, 23.5],
+    [30.2, 37.3], [25.9, 51.4], [22.1, 61.8], [24.8, 69.6], [37.2, 72.3],
+    [55.8, 66.4], [71.3, 55.3], [83.0, 39.6], [93.0, 22.5], [103.2, 5.5],
+    [113.4, -11.5], [123.6, -28.5], [133.8, -45.5], [142.1, -63.3], [142.6, -80.1],
+    [131.1, -90.7], [116.5, -99.1], [113.1, -112.4],
   ],
   spa: [ // Spa — La Source, the Eau Rouge climb, Kemmel, and a long flowing east side
-    // (three attempts at the inner Blanchimont return all crossed the middle:
-    // at ±250 u with a 26 u leg floor, Spa only fits as a perimeter. The
-    // shallow east-side dents keep Pouhon and Stavelot readable.)
-    [-210, 40], [-225, 90], [-195, 125], [-130, 105], [-95, 150],
-    [-30, 185], [60, 195], [130, 165], [175, 120], [155, 60],
-    [190, 10], [160, -45], [195, -90], [150, -140], [75, -160],
-    [0, -140], [-70, -155], [-140, -140], [-185, -95], [-165, -45],
-    [-195, -5],
+    [-155.4, -5.4], [-169.5, 10.0], [-184.8, 24.5], [-199.6, 39.1], [-212.6, 54.5],
+    [-223.1, 71.2], [-231.9, 88.8], [-233.3, 101.2], [-226.6, 106.0], [-210.8, 99.0],
+    [-193.9, 88.5], [-177.0, 77.9], [-160.1, 67.4], [-143.0, 57.7], [-126.2, 53.4],
+    [-109.6, 55.0], [-91.2, 54.2], [-71.7, 50.0], [-52.8, 44.5], [-34.8, 36.7],
+    [-17.1, 28.1], [1.4, 22.6], [20.6, 23.0], [39.6, 27.9], [57.9, 35.0],
+    [75.1, 44.6], [89.8, 58.0], [101.7, 74.0], [112.7, 90.7], [125.3, 106.3],
+    [140.7, 119.3], [157.8, 129.1], [176.0, 136.5], [194.6, 139.1], [211.5, 132.6],
+    [223.4, 118.1], [225.1, 101.4], [214.4, 87.8], [197.8, 77.2], [185.0, 64.8],
+    [180.6, 47.6], [176.1, 30.5], [162.9, 19.1], [144.4, 12.4], [125.4, 7.0],
+    [106.8, 0.5], [90.6, -9.8], [80.4, -25.4], [79.8, -43.6], [89.8, -58.3],
+    [106.6, -66.9], [125.6, -72.5], [144.5, -78.0], [163.2, -84.3], [181.7, -89.9],
+    [199.4, -88.8], [215.7, -80.3], [228.6, -80.0], [235.0, -89.0], [227.2, -105.1],
+    [213.7, -120.8], [198.5, -133.4], [181.2, -137.7], [162.8, -137.2], [144.3, -139.1],
+    [125.6, -139.0], [107.1, -133.6], [88.7, -126.5], [70.4, -119.4], [52.0, -112.6],
+    [33.5, -105.9], [15.1, -99.1], [-3.3, -92.1], [-21.7, -85.4], [-39.9, -78.0],
+    [-57.3, -68.6], [-73.8, -57.3], [-90.3, -45.7], [-107.3, -35.4], [-125.2, -28.0],
+    [-141.6, -19.3],
   ],
   suzuka: [ // Suzuka — the esses, Dunlop, Degner, the hairpin, Spoon, 130R
-    [-30, -175], [70, -185], [145, -160], [178, -100], [135, -55],
-    [168, -5], [120, 40], [152, 90], [112, 140], [30, 158],
-    [-32, 132], [-48, 74], [-118, 86], [-135, 48], [-95, 28],
-    [-52, 4], [-90, -38], [-142, -18], [-172, -62], [-138, -108],
-    // no closing chicane: every version of the casio kink reversed direction
-    // sharply enough that the spline blew a 2 u bulb at it — the tail now
-    // flows from 130R straight onto the start straight
-    [-62, -122],
+    [-45.2, -8.0], [-30.7, -5.2], [-15.6, -12.0], [-2.2, -25.8], [10.2, -41.0],
+    [24.1, -54.4], [40.2, -63.8], [57.0, -71.2], [73.9, -77.6], [91.5, -77.7],
+    [108.5, -70.1], [123.7, -58.0], [138.2, -44.2], [152.6, -30.3], [167.1, -16.5],
+    [181.5, -2.5], [195.9, 11.4], [210.3, 25.3], [224.2, 39.6], [234.2, 55.3],
+    [235.0, 71.8], [225.1, 81.6], [210.4, 77.9], [196.2, 65.6], [180.9, 54.8],
+    [164.2, 47.5], [150.5, 37.1], [139.2, 23.8], [124.1, 14.8], [107.6, 7.9],
+    [97.6, -4.7], [93.5, -22.1], [85.5, -36.8], [69.9, -44.2], [51.5, -44.3],
+    [35.0, -37.2], [22.1, -24.1], [11.1, -8.7], [-1.6, 4.6], [-17.7, 13.1],
+    [-35.4, 15.9], [-51.5, 11.4], [-65.9, 2.6], [-82.0, -4.2], [-100.3, -8.2],
+    [-119.2, -11.2], [-138.2, -13.4], [-156.9, -16.8], [-174.7, -23.1], [-192.0, -30.6],
+    [-209.1, -38.0], [-225.3, -47.0], [-235.0, -59.6], [-231.4, -73.7], [-217.4, -81.6],
+    [-201.5, -77.6], [-188.6, -64.7], [-176.7, -50.0], [-162.0, -39.7], [-144.5, -34.7],
+    [-125.8, -32.6], [-107.6, -35.2], [-91.9, -44.8], [-79.0, -58.1], [-71.6, -58.2],
+    [-66.0, -52.7], [-63.0, -34.4], [-56.3, -18.5],
   ],
   nordschleife: [ // Nordschleife — a sprawling Eifel perimeter with the Karussell fold
-    [-240, -40], [-200, 20], [-215, 80], [-160, 120], [-120, 90],
-    [-80, 150], [-20, 185], [50, 160], [40, 110], [100, 80],
-    [170, 110], [220, 70], [195, 10], [235, -30], [180, -80],
-    [120, -60], [80, -110], [130, -160], [60, -195], [-20, -160],
-    [-90, -190], [-160, -170], [-190, -110], [-235, -95],
+    [151.0, -122.0], [168.8, -127.0], [186.9, -139.4], [207.2, -141.0], [225.3, -127.6],
+    [235.0, -106.6], [233.7, -87.8], [221.4, -71.8], [206.9, -52.8], [191.7, -32.6],
+    [172.5, -15.5], [149.9, -5.5], [127.5, 0.8], [118.3, 12.4], [120.6, 29.0],
+    [112.7, 45.5], [92.2, 59.2], [69.7, 71.1], [47.2, 83.2], [24.9, 95.5],
+    [2.8, 108.3], [-18.5, 122.7], [-37.5, 140.6], [-55.6, 159.0], [-75.4, 169.5],
+    [-97.3, 171.4], [-121.0, 171.4], [-144.9, 166.4], [-166.6, 152.4], [-186.6, 135.0],
+    [-203.5, 115.9], [-212.0, 92.9], [-214.6, 67.5], [-220.4, 42.9], [-231.2, 20.8],
+    [-235.0, 2.8], [-222.0, -12.2], [-203.1, -29.3], [-189.1, -50.4], [-175.4, -71.9],
+    [-161.5, -92.3], [-156.7, -112.9], [-156.3, -132.4], [-144.2, -145.2], [-122.3, -147.9],
+    [-98.4, -147.8], [-75.7, -153.8], [-54.5, -164.5], [-32.4, -171.4], [-14.7, -166.5],
+    [-1.8, -150.7], [16.9, -137.3], [42.0, -131.6], [66.9, -125.7], [90.8, -120.2],
+    [114.4, -122.9], [134.4, -125.6],
   ],
   monza: [ // Monza — long straights broken by chicanes, the Lesmos, Parabolica home
-    [-200, -120], [-60, -135], [80, -145], [130, -130], [145, -95],
-    [180, -40], [170, 20], [195, 70], [160, 105], [110, 95],
-    [0, 20], [-90, -40], [-140, -15], [-170, -45], [-195, -70],
-    [-220, -100],
+    [-58.1, 113.9], [-42.5, 111.7], [-23.6, 111.0], [-1.6, 111.3], [20.8, 111.1],
+    [43.3, 111.0], [65.6, 110.7], [87.9, 110.3], [110.3, 109.9], [132.5, 109.4],
+    [154.7, 108.7], [176.6, 107.3], [198.1, 104.9], [218.1, 99.2], [232.5, 86.7],
+    [235.0, 69.6], [223.7, 56.2], [204.0, 50.9], [181.9, 49.8], [159.6, 49.5],
+    [137.2, 49.3], [114.7, 49.3], [92.3, 49.1], [70.0, 48.6], [47.7, 48.2],
+    [26.3, 45.6], [6.1, 40.2], [-13.9, 34.2], [-32.8, 25.4], [-49.8, 12.3],
+    [-66.2, -2.5], [-82.5, -17.4], [-98.7, -32.5], [-114.5, -48.0], [-128.8, -64.4],
+    [-141.4, -81.7], [-154.0, -98.6], [-169.6, -110.7], [-189.1, -113.9], [-209.8, -110.6],
+    [-227.1, -102.0], [-235.0, -86.3], [-232.2, -66.9], [-223.6, -47.9], [-214.2, -29.3],
+    [-207.4, -9.7], [-203.0, 11.0], [-199.0, 31.8], [-194.3, 52.4], [-187.7, 72.1],
+    [-176.9, 89.7], [-160.9, 102.7], [-141.4, 109.9], [-120.0, 112.5], [-97.7, 112.9],
+    [-76.1, 113.9],
   ],
   marina: [ // Singapore Marina Bay — right-angle street blocks under lights
-    [-190, -90], [-60, -100], [60, -95], [150, -85], [180, -40],
-    [150, 0], [170, 50], [130, 85], [80, 70], [40, 110],
-    [-20, 125], [-60, 90], [-120, 105], [-160, 70], [-140, 20],
-    [-180, -10], [-160, -50],
+    [173.6, -147.4], [188.7, -144.2], [204.8, -133.8], [214.8, -118.5], [219.1, -98.6],
+    [221.8, -77.6], [224.5, -56.7], [227.3, -35.7], [230.1, -14.8], [232.8, 6.1],
+    [235.0, 27.0], [233.0, 46.9], [222.4, 62.4], [204.6, 69.8], [183.8, 70.5],
+    [162.2, 69.3], [140.6, 68.1], [123.4, 61.9], [111.0, 49.9], [94.9, 41.6],
+    [76.2, 42.3], [62.3, 51.9], [49.4, 63.1], [31.0, 66.6], [9.6, 64.9],
+    [-6.4, 57.2], [-16.0, 43.1], [-29.2, 32.0], [-47.4, 24.6], [-65.1, 14.0],
+    [-81.8, 1.1], [-98.8, -7.6], [-113.6, -4.0], [-122.7, 11.6], [-128.2, 31.4],
+    [-133.3, 51.4], [-137.9, 71.6], [-141.3, 92.2], [-143.6, 113.3], [-146.3, 134.2],
+    [-153.9, 147.4], [-168.2, 144.7], [-184.6, 131.5], [-197.9, 115.0], [-206.8, 97.0],
+    [-216.8, 80.9], [-229.4, 66.8], [-235.0, 50.0], [-229.8, 31.4], [-219.8, 13.5],
+    [-209.2, -4.2], [-198.5, -21.8], [-187.7, -39.5], [-175.6, -55.7], [-160.5, -63.3],
+    [-143.8, -56.9], [-127.1, -45.2], [-111.3, -43.1], [-98.3, -54.7], [-86.0, -71.1],
+    [-71.0, -80.5], [-53.5, -77.7], [-35.7, -67.9], [-18.0, -57.2], [-0.4, -46.6],
+    [17.6, -36.7], [36.8, -29.9], [57.7, -26.9], [79.3, -25.7], [101.0, -24.8],
+    [122.6, -23.9], [144.2, -23.2], [163.7, -26.4], [175.7, -38.6], [177.2, -57.4],
+    [171.9, -77.1], [165.3, -96.4], [161.8, -116.4], [164.3, -136.4],
   ],
   panorama: [ // Mount Panorama — the climb, the ridge esses, the plunge, Conrod
-    [-120, -190], [0, -200], [110, -190], [160, -160], [200, -80],
-    [180, -20], [210, 40], [180, 90], [120, 110], [90, 150],
-    [20, 135], [-40, 160], [-100, 140], [-150, 155], [-175, 110],
-    [-145, 80], [-180, 45], [-200, 0], [-190, -110], [-165, -160],
+    [227.7, -142.7], [208.4, -143.6], [186.4, -139.5], [164.5, -135.4], [142.4, -131.6],
+    [120.2, -128.0], [98.1, -126.1], [76.6, -129.1], [56.0, -135.5], [36.7, -135.8],
+    [20.4, -124.5], [4.6, -109.8], [-14.6, -100.4], [-36.5, -97.3], [-59.1, -98.1],
+    [-79.3, -96.0], [-92.2, -83.4], [-100.1, -63.7], [-111.6, -45.8], [-128.8, -32.3],
+    [-147.5, -20.5], [-166.4, -8.9], [-185.4, 2.4], [-204.3, 13.8], [-222.7, 26.0],
+    [-235.0, 41.5], [-232.8, 57.4], [-216.5, 65.5], [-194.4, 65.3], [-171.9, 62.6],
+    [-149.5, 59.6], [-127.0, 56.7], [-104.5, 54.0], [-82.0, 53.3], [-60.1, 56.7],
+    [-39.0, 62.9], [-18.2, 69.7], [-0.2, 79.6], [8.5, 96.0], [9.7, 116.5],
+    [16.2, 134.6], [33.0, 143.6], [52.3, 139.8], [66.2, 125.3], [76.2, 106.2],
+    [89.8, 92.1], [109.2, 89.0], [130.6, 93.4], [151.7, 99.6], [173.0, 105.3],
+    [193.5, 105.3], [208.4, 94.1], [214.6, 74.0], [217.0, 51.3], [222.5, 29.9],
+    [226.5, 10.2], [219.0, -5.7], [201.3, -16.4], [183.0, -27.4], [170.6, -44.1],
+    [166.6, -65.1], [172.0, -85.0], [186.8, -99.1], [206.2, -108.8], [225.1, -119.0],
+    [235.0, -132.3],
   ],
   rallyx: [ // Rallycross — a compact mixed-surface stadium loop
-    [-135, -90], [-30, -128], [90, -105], [150, -30], [113, 53],
-    [23, 83], [-68, 120], [-143, 83], [-105, 15], [-165, -30],
+    [-158.9, -48.9], [-117.5, -54.7], [-80.5, -43.1], [-63.5, -19.4], [-77.9, 3.2],
+    [-116.0, 16.9], [-157.7, 29.7], [-181.8, 52.3], [-175.9, 77.9], [-145.0, 89.3],
+    [-104.0, 80.6], [-62.1, 60.4], [-20.7, 37.3], [20.7, 14.5], [61.8, -5.0],
+    [102.0, -13.3], [141.8, -5.8], [181.5, 4.9], [216.5, -1.2], [235.0, -27.8],
+    [227.1, -59.7], [194.7, -80.6], [148.8, -88.1], [98.4, -89.3], [47.5, -89.3],
+    [-3.5, -89.3], [-54.2, -88.8], [-103.7, -85.2], [-150.0, -74.1], [-192.8, -53.5],
+    [-225.9, -25.1], [-224.1, -12.9], [-215.7, -9.4], [-194.9, -26.2],
   ],
   oulton: [ // Oulton Park — parkland kidney with Old Hall, Island, the Hislops flick
-    [-160, -120], [-60, -140], [40, -120], [90, -70], [60, -20],
-    [110, 20], [90, 80], [30, 110], [-30, 90], [-60, 130],
-    [-100, 110], [-90, 40], [-140, 10], [-180, -40], [-150, -80],
+    [76.7, 83.6], [95.7, 74.6], [114.3, 65.7], [133.0, 57.5], [151.8, 49.9],
+    [170.3, 41.4], [188.9, 32.3], [207.3, 22.9], [223.7, 11.0], [233.8, -5.7],
+    [235.0, -25.4], [229.7, -45.2], [222.2, -64.3], [213.6, -83.0], [202.9, -100.9],
+    [189.0, -116.6], [171.6, -127.4], [152.0, -130.3], [133.7, -123.4], [119.3, -108.9],
+    [108.1, -91.2], [98.2, -73.0], [88.7, -54.7], [77.7, -37.1], [66.0, -20.0],
+    [55.4, -3.1], [42.8, 11.4], [26.7, 23.7], [9.7, 35.9], [-8.2, 41.7],
+    [-23.8, 34.5], [-31.0, 17.1], [-31.3, -3.9], [-32.4, -24.6], [-39.1, -43.8],
+    [-50.2, -61.5], [-64.5, -76.5], [-82.4, -85.1], [-102.4, -85.5], [-122.5, -80.6],
+    [-142.3, -74.7], [-162.5, -69.5], [-182.9, -65.0], [-203.6, -61.1], [-223.0, -55.1],
+    [-235.0, -42.7], [-233.2, -25.9], [-219.5, -12.2], [-200.4, -5.0], [-180.1, -4.8],
+    [-161.7, -12.7], [-145.4, -25.9], [-128.1, -36.9], [-109.3, -38.2], [-93.9, -27.7],
+    [-85.8, -9.5], [-81.8, 11.1], [-77.8, 31.8], [-72.2, 51.8], [-65.3, 71.2],
+    [-58.1, 90.5], [-50.3, 109.5], [-38.3, 124.8], [-20.9, 130.3], [-1.2, 125.3],
+    [18.4, 115.4], [37.8, 104.6], [57.3, 93.7],
   ],
   laguna: [ // Laguna Seca — the Andretti hairpin and the Corkscrew drop
-    [-140, -70], [-30, -90], [60, -75], [100, -30], [70, 10],
-    [110, 50], [80, 100], [30, 120], [10, 85], [-40, 60],
-    [-80, 80], [-120, 40], [-100, -10], [-150, -30],
+    [109.5, -232.9], [137.3, -224.0], [159.9, -202.8], [178.9, -177.1], [197.2, -151.1],
+    [215.7, -125.2], [231.3, -98.4], [235.0, -70.4], [221.2, -47.3], [194.8, -34.0],
+    [163.9, -27.5], [132.4, -22.5], [101.4, -16.1], [71.8, -6.6], [43.6, 6.5],
+    [17.0, 23.3], [-5.4, 45.0], [-17.7, 72.5], [-19.5, 104.2], [-15.2, 136.0],
+    [-2.7, 162.3], [21.4, 176.0], [51.4, 175.6], [80.2, 164.9], [107.5, 150.2],
+    [134.0, 144.7], [150.5, 158.0], [144.7, 180.1], [121.2, 197.0], [92.5, 208.8],
+    [63.1, 218.9], [32.9, 227.1], [1.5, 232.3], [-30.7, 232.9], [-62.2, 228.7],
+    [-93.1, 222.0], [-123.7, 214.9], [-154.3, 207.5], [-184.7, 199.9], [-214.9, 191.9],
+    [-235.0, 178.2], [-232.7, 155.2], [-215.8, 129.0], [-197.2, 103.1], [-182.6, 76.0],
+    [-180.7, 47.8], [-193.6, 20.7], [-212.6, -5.0], [-228.2, -31.8], [-229.1, -58.3],
+    [-210.7, -78.6], [-183.3, -92.9], [-161.3, -110.8], [-145.5, -133.3], [-123.3, -150.6],
+    [-94.6, -162.3], [-65.6, -173.5], [-36.7, -184.8], [-7.8, -196.0], [21.2, -207.3],
+    [50.1, -218.5], [79.4, -228.7],
+  ],
+  corse: [ // Tour de Corse — 26 km of Corsican mountain tarmac, hairpin over hairpin
+    [82.6, 32.3], [57.4, 29.3], [36.8, 29.3], [16.2, 29.4], [10.1, 33.1],
+    [8.8, 39.0], [17.8, 51.7], [26.2, 68.8], [30.0, 87.7], [30.1, 107.6],
+    [29.1, 127.6], [31.7, 146.4], [42.3, 159.0], [58.1, 159.4], [69.1, 147.3],
+    [71.0, 129.1], [68.8, 109.7], [70.0, 91.3], [79.7, 78.2], [95.1, 76.9],
+    [108.8, 87.5], [119.4, 103.4], [131.5, 117.9], [147.6, 127.2], [166.3, 130.3],
+    [185.4, 128.1], [203.4, 121.6], [219.4, 111.2], [233.8, 98.0], [247.3, 83.6],
+    [259.7, 68.4], [267.9, 51.6], [267.1, 33.8], [257.9, 17.3], [247.3, 1.3],
+    [243.6, -15.8], [251.3, -29.2], [267.4, -33.3], [286.1, -32.4], [303.6, -36.3],
+    [316.0, -48.5], [320.0, -65.9], [316.6, -84.2], [308.9, -101.7], [299.1, -118.2],
+    [287.1, -133.4], [272.6, -146.5], [256.1, -156.6], [238.8, -159.4], [225.3, -151.1],
+    [223.0, -135.9], [233.1, -122.4], [249.3, -113.2], [266.0, -103.9], [277.7, -90.8],
+    [277.1, -77.1], [263.7, -70.4], [244.7, -70.8], [225.0, -73.0], [206.6, -78.1],
+    [191.5, -89.1], [178.6, -103.7], [164.1, -116.1], [146.8, -121.4], [128.7, -118.0],
+    [112.1, -108.3], [97.5, -95.6], [89.2, -80.3], [93.2, -65.9], [108.1, -59.5],
+    [126.6, -61.3], [144.9, -62.3], [160.3, -54.9], [169.9, -39.6], [175.3, -21.2],
+    [179.2, -2.2], [183.0, 16.9], [185.6, 36.1], [182.8, 53.6], [171.0, 62.8],
+    [156.5, 58.4], [147.1, 43.5], [142.7, 24.7], [138.2, 6.0], [128.3, -8.3],
+    [112.3, -13.1], [93.7, -11.6], [75.6, -13.6], [60.4, -23.7], [49.1, -38.9],
+    [37.8, -54.3], [23.2, -66.4], [5.9, -74.4], [-12.4, -80.1], [-31.2, -83.4],
+    [-49.5, -80.9], [-66.6, -73.1], [-84.0, -67.4], [-102.7, -67.8], [-121.9, -68.4],
+    [-139.1, -62.5], [-151.7, -49.2], [-160.3, -32.2], [-169.4, -16.2], [-182.7, -8.0],
+    [-195.5, -13.3], [-199.2, -28.8], [-194.0, -46.5], [-185.3, -63.5], [-176.7, -80.6],
+    [-171.2, -98.4], [-174.4, -114.2], [-187.1, -119.9], [-201.1, -112.1], [-211.4, -96.6],
+    [-220.3, -79.7], [-231.3, -65.9], [-241.2, -66.2], [-245.6, -76.4], [-241.9, -94.6],
+    [-241.7, -111.6], [-251.0, -120.7], [-264.8, -115.6], [-277.1, -101.4], [-287.7, -85.2],
+    [-295.4, -67.9], [-296.5, -49.7], [-289.4, -32.4], [-277.0, -17.1], [-265.9, -1.5],
+    [-265.1, 12.8], [-276.7, 18.0], [-293.3, 12.1], [-309.5, 7.4], [-320.0, 14.4],
+    [-319.1, 30.0], [-314.0, 48.1], [-310.3, 66.2], [-300.9, 79.0], [-283.5, 83.1],
+    [-264.2, 84.9], [-246.6, 91.6], [-229.7, 100.0], [-211.9, 102.2], [-194.0, 97.0],
+    [-176.0, 90.8], [-157.2, 88.4], [-138.8, 92.3], [-122.4, 102.5], [-107.0, 115.2],
+    [-90.8, 125.7], [-72.7, 130.6], [-54.2, 128.0], [-38.6, 118.1], [-28.8, 102.4],
+    [-26.4, 84.0], [-30.5, 65.5], [-35.8, 47.1], [-36.9, 28.1], [-31.3, 10.2],
+    [-19.5, -3.8], [-2.8, -11.2], [15.7, -12.8], [33.0, -6.5], [48.6, 4.2],
+    [64.8, 13.8], [77.9, 14.2], [86.8, 23.2],
+  ],
+  vineyard: [ // the player's third hand-drawn loop: spiral head, three paw lobes
+    [172.3, -40.4], [183.7, -29.9], [200.7, -17.7], [211.0, -1.3], [211.1, 19.9],
+    [204.4, 41.6], [194.1, 61.9], [181.2, 81.0], [166.2, 98.9], [149.4, 115.0],
+    [130.2, 127.4], [111.0, 131.8], [100.0, 123.3], [103.0, 105.2], [113.1, 84.8],
+    [119.3, 63.5], [115.6, 42.4], [101.5, 26.6], [82.4, 23.0], [66.0, 33.6],
+    [60.1, 52.0], [63.9, 72.8], [67.2, 95.7], [64.7, 118.8], [54.5, 137.1],
+    [35.5, 146.1], [16.1, 144.0], [8.3, 130.7], [10.8, 110.2], [11.7, 87.9],
+    [7.3, 65.7], [1.5, 43.5], [-8.9, 26.1], [-27.7, 20.1], [-49.0, 25.3],
+    [-62.0, 39.2], [-61.5, 58.9], [-57.2, 80.6], [-61.5, 100.8], [-75.5, 117.3],
+    [-93.8, 131.4], [-113.8, 140.9], [-132.1, 138.8], [-143.3, 123.9], [-149.9, 102.8],
+    [-151.7, 81.6], [-144.8, 61.3], [-128.8, 50.3], [-120.2, 31.0], [-115.9, 8.6],
+    [-118.0, -14.5], [-127.7, -34.3], [-145.1, -47.6], [-165.9, -50.6], [-182.9, -41.1],
+    [-186.8, -24.4], [-177.9, -6.9], [-167.6, 12.1], [-164.4, 32.5], [-163.8, 54.2],
+    [-176.8, 58.7], [-196.8, 56.7], [-216.4, 47.3], [-229.1, 30.2], [-234.7, 8.2],
+    [-235.0, -15.2], [-231.6, -38.2], [-224.2, -59.6], [-211.7, -78.9], [-195.0, -95.3],
+    [-175.5, -107.2], [-153.5, -112.7], [-130.3, -112.1], [-108.0, -106.7], [-87.8, -96.7],
+    [-71.7, -81.6], [-57.3, -66.9], [-37.7, -60.0], [-14.8, -56.1], [7.6, -50.9],
+    [30.7, -47.5], [54.8, -46.4], [78.8, -45.2], [102.6, -43.5], [126.7, -42.5],
+    [147.0, -45.3], [150.9, -55.8], [140.5, -74.3], [138.8, -96.1], [144.9, -117.3],
+    [157.3, -134.3], [176.2, -144.1], [198.8, -146.1], [220.2, -140.8], [233.8, -127.0],
+    [235.0, -106.8], [226.2, -86.6], [211.1, -70.3], [192.5, -57.6], [172.4, -48.4],
+  ],
+  deepwood: [ // forest weave: flowing esses that never leave the trees
+    [-210.0, 150.0], [-90.0, 190.0], [30.0, 160.0], [120.0, 190.0], [200.0, 150.0],
+    [225.0, 60.0], [160.0, 10.0], [60.0, 40.0], [-40.0, 10.0], [-120.0, -40.0],
+    [-60.0, -95.0], [40.0, -70.0], [140.0, -100.0], [200.0, -160.0], [120.0, -210.0],
+    [0.0, -185.0], [-100.0, -215.0], [-190.0, -170.0], [-225.0, -80.0], [-170.0, -20.0],
+    [-215.0, 50.0], [-225.0, 110.0],
+  ],
+  dolomiti: [ // meadow hairpin ladder under the pale rock faces, perimeter home
+    [-60.0, 220.0], [-160.0, 200.0], [-215.0, 140.0], [-150.0, 95.0], [-40.0, 110.0],
+    [80.0, 120.0], [160.0, 85.0], [90.0, 45.0], [-40.0, 55.0], [-140.0, 30.0],
+    [-190.0, -20.0], [-120.0, -60.0], [0.0, -45.0], [110.0, -70.0], [170.0, -120.0],
+    [90.0, -165.0], [-30.0, -140.0], [-140.0, -170.0], [-90.0, -215.0], [40.0, -220.0],
+    [150.0, -195.0], [215.0, -130.0], [225.0, -30.0], [215.0, 80.0], [150.0, 160.0],
+    [40.0, 195.0],
   ],
 };
 
@@ -712,7 +926,7 @@ const THEMES = {
     // horizon silhouettes
     hillColor: 0x4e8a3c, peakColor: 0x8d8578,
     // trees (material color multiplies per-instance HSL variation)
-    treeCount: 260, trunkColor: 0x6b4423,
+    treeCount: 377, trunkColor: 0x6b4423,
     foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
     foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.32, lVar: 0.14 },
     treeSnowCap: false,
@@ -726,7 +940,7 @@ const THEMES = {
     // debris chip colors when a fence/wall is scraped (painted pole red/cream)
     splinter: [0xc23b2a, 0xe8e2d4],
     // light drizzle drifting through the pines (rate overrides the default)
-    weather: { type: 'rain', color: 0xcfe0ee, rate: 130 },
+    weather: { type: 'rain', color: 0xcfe0ee, rate: 190 },
     // elevation profile: amplitude + deterministic per-octave phases
     elev: { amp: 8, ph: [0.9, 2.6, 4.2] },
     // per-level gameplay-placement tuning
@@ -796,7 +1010,7 @@ const THEMES = {
       snowCover: { slush: [206, 216, 226], slushAlpha: 0.38 },
     },
     hillColor: 0xcfdce4, peakColor: 0xeef4f8,
-    treeCount: 240, trunkColor: 0x5a4028,
+    treeCount: 348, trunkColor: 0x5a4028,
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
@@ -851,7 +1065,8 @@ const THEMES = {
     weather: { type: 'dust', color: 0xc9a06a },
     elev: { amp: 6, ph: [0.3, 3.7, 1.9] },              // gentle canyon-floor undulation
     rampMaxCurv: 0.02, padMaxCurv: 0.0075, boardMaxCurv: 0.018,
-    cliffWalls: true, horizon: 'mesa', bridgeCount: 3, oasis: true, outcrops: true,
+    cliffWalls: true, cliffSetback: 26, cliffHeight: 30,
+    horizon: 'mesa', bridgeCount: 3, oasis: true, outcrops: true,
     obstacleSpec: { count: 6, style: 'hoodoo' }, puddleCount: 5,
   },
   // EMBER PASS: charred basalt world — dark ash road, glowing ground fissures,
@@ -927,7 +1142,7 @@ const THEMES = {
     ground: {},   // lush meadow defaults read right at altitude too
     road: {},     // classic dirt rally surface
     hillColor: 0x54804a, peakColor: 0xdde8f0,           // snow-dusted horizon peaks
-    treeCount: 280, trunkColor: 0x6b4423,
+    treeCount: 406, trunkColor: 0x6b4423,
     foliageLow: 0x2a6e34, foliageTop: 0x3f9a44,         // bright alpine pines
     foliage: { h: 0.30, hVar: 0.06, s: 0.55, sVar: 0.2, l: 0.30, lVar: 0.14 },
     treeSnowCap: false,
@@ -985,7 +1200,7 @@ const THEMES = {
       },
     },
     hillColor: 0xbdd2e0, peakColor: 0xeef6fc,
-    treeCount: 140, trunkColor: 0x5a4028,
+    treeCount: 203, trunkColor: 0x5a4028,
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
@@ -1051,7 +1266,7 @@ const THEMES = {
       wet: { darken: 0.38, gleam: 15, pools: 6 },
     },
     hillColor: 0x2e6a34, peakColor: 0x4a8a4c,
-    vegetation: 'jungle', treeCount: 320, trunkColor: 0x7a5c3a,
+    vegetation: 'jungle', treeCount: 464, trunkColor: 0x7a5c3a,
     foliageLow: 0x1f6e2c, foliageTop: 0x35a03c,
     foliage: { h: 0.31, hVar: 0.08, s: 0.55, sVar: 0.2, l: 0.26, lVar: 0.16 },
     treeSnowCap: false,
@@ -1062,7 +1277,7 @@ const THEMES = {
     flowerCount: 420, flowerColors: ['#ff4a6a', '#ffd45e', '#ff8a3a', '#e86aff', '#ffffff'],
     hutRoof: 0x7a9a3c, hayColor: 0xc8b45e, hutCount: 6, hayCount: 30,
     splinter: [0x4a9a3c, 0x8a6a42],                     // shredded fronds + wet wood
-    weather: { type: 'rain', color: 0xbfd8ea },         // full tropical downpour
+    weather: { type: 'rain', color: 0xbfd8ea, rate: 220 }, // full tropical downpour
     elev: { amp: 7, ph: [2.2, 0.9, 4.4] },
     rampMaxCurv: 0.016, padMaxCurv: 0.005, boardMaxCurv: 0.014,
     // fallen log piles on the road (SOLID circle colliders like all obstacles)
@@ -1148,7 +1363,7 @@ const THEMES = {
     weather: { type: 'dust', color: 0xc08a5a },
     elev: { amp: 7, ph: [3.1, 1.2, 4.6] },
     rampMaxCurv: 0.022, padMaxCurv: 0.007, boardMaxCurv: 0.02,
-    cliffWalls: true, horizon: 'mesa', outcrops: true,
+    cliffWalls: true, cliffSetback: 22, cliffHeight: 28, horizon: 'mesa', outcrops: true,
     cliffPalette: {                                     // deep red-brown strata
       bands: ['#b06a3c', '#8f4d28', '#7a3e1f', '#c07e48', '#9a5830'],
       seam: 'rgba(52,26,14,0.5)',
@@ -1227,7 +1442,7 @@ const THEMES = {
       fringe: [48, 110, 36], fringeVar: [30, 46, 22],
     },
     hillColor: 0x3f6e34, peakColor: 0x8a8578,
-    vegetation: 'redwood', treeCount: 190, trunkColor: 0x7a3f24,
+    vegetation: 'redwood', treeCount: 275, trunkColor: 0x7a3f24,
     foliageLow: 0x2a5e28, foliageTop: 0x3a7a32,
     foliage: { h: 0.30, hVar: 0.05, s: 0.45, sVar: 0.18, l: 0.26, lVar: 0.10 },
     treeSnowCap: false,
@@ -1264,7 +1479,7 @@ const THEMES = {
       fringe: [64, 124, 40], fringeVar: [34, 46, 20],
     },
     hillColor: 0x4e7a3c, peakColor: 0x8d8578,
-    treeCount: 240, trunkColor: 0x6b4423,
+    treeCount: 348, trunkColor: 0x6b4423,
     foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
     foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.30, lVar: 0.14 },
     treeSnowCap: false,
@@ -1311,7 +1526,7 @@ const THEMES = {
       fringe: [90, 70, 50], fringeVar: [34, 26, 18],    // ash-choked verge
     },
     hillColor: 0x54291c, peakColor: 0x2e1812,
-    vegetation: 'burnt', treeCount: 220, trunkColor: 0x241d18,
+    vegetation: 'burnt', treeCount: 319, trunkColor: 0x241d18,
     foliageLow: 0x4a2814, foliageTop: 0x6a3a1a,         // ember-lit scorched canopy
     foliage: { h: 0.05, hVar: 0.03, s: 0.45, sVar: 0.15, l: 0.16, lVar: 0.08 },
     treeSnowCap: false,
@@ -1484,7 +1699,7 @@ const THEMES = {
     flowerCount: 0, flowerColors: ['#26f6ff'],
     hutRoof: 0x22262e, hutCount: 0, hayColor: 0x33363e, hayCount: 0,
     splinter: [0x26f6ff, 0xff3af0],                     // shattered neon shards
-    weather: { type: 'rain', color: 0x9ab8e8, rate: 90 },
+    weather: { type: 'rain', color: 0x9ab8e8, rate: 150 },
     elev: { amp: 7, ph: [1.3, 4.4, 2.7] },              // gentle overpass swells
     rampMaxCurv: 0.012, padMaxCurv: 0.005, boardMaxCurv: 0.014,
     bannerStyle: 'neon',                                // holographic sponsor boards
@@ -1595,7 +1810,7 @@ const THEMES = {
       fringe: [70, 118, 50], fringeVar: [34, 46, 24],
     },
     hillColor: 0x557a4e, peakColor: 0xe4edf4,
-    treeCount: 320, trunkColor: 0x6b4423,
+    treeCount: 464, trunkColor: 0x6b4423,
     foliageLow: 0x276634, foliageTop: 0x3d9444,
     foliage: { h: 0.31, hVar: 0.06, s: 0.52, sVar: 0.2, l: 0.28, lVar: 0.13 },
     treeSnowCap: false,
@@ -1633,6 +1848,7 @@ const THEMES = {
   // stone parapets on the outside of each, then a gorge run-out and the long
   // modern climb back up the east flank.
   tremola: {
+    stoneBridges: { count: 1 },
     fogColor: 0xcfdfec, fogNear: 300, fogFar: 1500,
     hemiSky: 0xa8cbf0, hemiGround: 0x58724a, hemiIntensity: 0.76,
     sunColor: 0xffeed4, sunIntensity: 2.7,
@@ -1658,7 +1874,7 @@ const THEMES = {
       },
     },
     hillColor: 0x4e7248, peakColor: 0xdde8f0,
-    treeCount: 220, trunkColor: 0x6b4423,
+    treeCount: 319, trunkColor: 0x6b4423,
     foliageLow: 0x2a6636, foliageTop: 0x428a48,
     foliage: { h: 0.29, hVar: 0.07, s: 0.45, sVar: 0.2, l: 0.28, lVar: 0.14 },
     treeSnowCap: false,
@@ -1693,47 +1909,48 @@ const THEMES = {
   // a reddish wooden guard fence running the downhill edge of the serpentine.
   // The road itself stays brown rutted dirt, ploughed clear of the snow.
   furka: {
-    surface: 'snow',                                    // physics reads this
-    fogColor: 0xdfeaf4, fogNear: 300, fogFar: 1600,
-    hemiSky: 0xb0d0ff, hemiGround: 0x94a6c4, hemiIntensity: 0.78,
-    sunColor: 0xfff2e0, sunIntensity: 2.45,
-    skyTop: '#3f7fc8', skyHorizon: '#e6f1f8', sunGlow: 0xfffbe8,
-    // high sun: a low winter sun threw car/tower shadows the length of the
-    // bridge deck and read as a black stripe down the middle of the crossing
-    sunAz: 0.72, sunEl: 0.62,
-    cloudCount: 10, cloudOpacity: 0.9,
-    terrainLow: '#dfe7ec', terrainHigh: '#ffffff', terrainDirt: '#9a8a72',
-    // steep-face colour for the faceted ground + warmth in the hut windows
-    terrainScree: '#9a8a72', hutGlow: 0.65,
+    // SUMMER, remade against the player's photo of the real pass: bright
+    // clear alpine light over GREEN grass slopes and grey rock, the asphalt
+    // ribbon switchbacking up the face, snow only on the high fields and the
+    // peaks, the Rhone glacier on the skyline — and the pass hotel standing
+    // alone at its hairpin. The old deep-winter dressing (snow surface
+    // physics, white valley, falling snow) is gone with it.
+    fogColor: 0xdcebf4, fogNear: 320, fogFar: 1650,
+    hemiSky: 0xaad2f8, hemiGround: 0x7c9468, hemiIntensity: 0.8,
+    sunColor: 0xfff4dc, sunIntensity: 2.75,
+    skyTop: '#2f76c6', skyHorizon: '#e2eef6', sunGlow: 0xfff8dc,
+    sunAz: 0.72, sunEl: 0.72,                           // high mountain summer sun
+    cloudCount: 9, cloudOpacity: 0.9, cloudTint: 0xffffff,
+    terrainLow: '#4e7c40', terrainHigh: '#98a48c', terrainDirt: '#8a8274',
+    terrainScree: '#8e8a7e', hutGlow: 0.45,
     skirtColor: '#8e8a80',                              // rock cut below the shelf
     ground: {
-      base: '#e8eef3', bandLight: 'rgba(255,255,255,0.06)', bandDark: 'rgba(120,150,175,0.05)',
-      patchA: 'rgba(150,140,120,0.16)', patchB: 'rgba(255,255,255,0.24)',
-      speckA: 'rgba(190,200,210,0.7)', speckB: 'rgba(255,255,255,0.9)', speckCount: 80,
+      base: '#6f8a5c', bandLight: 'rgba(214,232,196,0.06)', bandDark: 'rgba(52,72,44,0.06)',
+      patchA: 'rgba(120,140,90,0.18)', patchB: 'rgba(160,164,146,0.16)',
+      speckA: 'rgba(150,154,142,0.7)', speckB: 'rgba(226,232,222,0.8)', speckCount: 80,
     },
     road: {
-      // classic brown rutted dirt, ploughed clear — but the verge is snow,
-      // not grass, and the ruts run a little darker in the wet cold
-      base: '#8a6a44', mottleA: [104, 78, 48], mottleB: [166, 132, 88],
-      rut: 'rgba(62,44,26,0.55)', rutCore: 'rgba(44,30,16,0.45)', tread: 'rgba(24,16,8,0.5)',
-      stoneA: 'rgba(214,206,190,0.7)', stoneB: 'rgba(88,66,42,0.7)',
-      fringe: [222, 232, 240], fringeVar: [24, 16, 10],
+      // the real pass is sealed grey asphalt with a painted-on gravel verge
+      base: '#6d6862', mottleA: [80, 76, 70], mottleB: [134, 130, 122],
+      ruts: false,
+      rut: 'rgba(52,50,46,0.45)', rutCore: 'rgba(38,36,34,0.4)', tread: 'rgba(20,18,16,0.45)',
+      stoneA: 'rgba(198,194,184,0.65)', stoneB: 'rgba(66,62,56,0.7)',
+      fringe: [86, 124, 62], fringeVar: [30, 40, 22],
     },
-    hillColor: 0x9aa4ac, peakColor: 0xf2f7fb,           // grey rock, snow crowns
-    treeCount: 320, trunkColor: 0x5a4028,
-    foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,         // deep winter green
-    foliage: { h: 0.35, hVar: 0.04, s: 0.42, sVar: 0.12, l: 0.30, lVar: 0.08 },
-    treeSnowCap: true,                                  // white tips on every tier
-    treeAltFade: [22, 40],                              // thinning towards the top
-    tuftCount: 300, grass: { bladeA: '#5a7a58', bladeB: '#c8d8d0' },
-    bushCount: 70, bushColor: 0x9ab8a0,
-    bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.52, lVar: 0.12 },
-    rockCount: 520, pebbleCount: 380, rockColor: 0x9aa4ac, rockSnowCap: true,
-    flowerCount: 0, flowerColors: ['#ffffff'],
+    hillColor: 0x8a9a84, peakColor: 0xf2f7fb,           // green-grey rock, snow crowns
+    treeCount: 435, trunkColor: 0x5a4028,
+    foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,
+    foliage: { h: 0.33, hVar: 0.05, s: 0.48, sVar: 0.15, l: 0.29, lVar: 0.1 },
+    treeSnowCap: false,
+    treeAltFade: [18, 36],                              // treeline well below the summit
+    tuftCount: 950, grass: { bladeA: '#4e7c40', bladeB: '#8fae6a' },
+    bushCount: 130, bushColor: 0x3f7c38,
+    bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
+    rockCount: 520, pebbleCount: 380, rockColor: 0x8e948c, rockSnowCap: false,
+    flowerCount: 200, flowerColors: ['#ffffff', '#ffe234', '#7a9aff', '#e05a78'],
     hutRoof: 0x6a4028, hayColor: 0xc8bc94,
     hutCount: 8, hutZone: [0.86, 0.14], hayCount: 12,   // cabins in the valley
     splinter: [0x8a5a32, 0xdce8f0],
-    weather: { type: 'snow', color: 0xffffff },
     // climb the face through the serpentine, traverse the shoulder, drop back
     elev: {
       amp: 34, profile: 'ascent', ph: [0, 0, 0],
@@ -1750,8 +1967,9 @@ const THEMES = {
     roadCabins: 5,                                      // log cabins on the shelves
     obstacleSpec: { count: 3, style: 'boulder', downhill: true }, puddleCount: 0,
     elements: 'alpine',
-    snowPatches: { count: 60, minY: 20 },
+    snowPatches: { count: 60, minY: 24 },               // summit fields only
     glacier: true,
+    passHotel: true,
     // hero crossing: a rope suspension bridge over a red-rock river gorge on
     // the valley run-in (the straightest window in that stretch of the lap)
     heroBridge: { at: [0.82, 0.92], half: 26, len: 230, depth: 30, skew: 0 },
@@ -1769,6 +1987,7 @@ const THEMES = {
   // wet surface, any cool colour temperature. Hence no `surface`, no puddles,
   // no fog banks and a warm hemisphere ground bounce.
   medterrace: {
+    stoneBridges: { count: 1 },
     // FogExp2 density 0.00060 ≈ 1600 u of visibility; the engine fog is linear,
     // so it is matched at the far end and pushed out at the near end — this is
     // the 140 m sight-line region and the road has to stay readable a long way
@@ -1888,6 +2107,149 @@ const THEMES = {
     // side.
     coast: { a: [-200, -338.6], b: [400, -183.8], level: -2.1, floor: -7, beach: 70 },
     seaColor: 0x3d7f9e,
+  },
+
+  // VINEYARD VELOCE: wine country. Trellis rows and golden wheat in the open,
+  // and a WALL OF FOREST all around - the fields sit in a broad clearing
+  // (treeBelt holds the stands back off the road, then they close in).
+  vineyard: {
+    stoneBridges: { count: 2 },
+    fogColor: 0xdfe4cc, fogNear: 340, fogFar: 1500,
+    hemiSky: 0xbcd8f0, hemiGround: 0x9aa46a, hemiIntensity: 0.78,
+    sunColor: 0xfff0c8, sunIntensity: 2.7,
+    skyTop: '#3d84c8', skyHorizon: '#e8e8cc', sunGlow: 0xffeeb8,
+    sunAz: 3.9, sunEl: 0.78,
+    cloudCount: 8, cloudOpacity: 0.85, cloudTint: 0xfff8ea,
+    terrainLow: '#7a8a4a', terrainHigh: '#c8b878', terrainDirt: '#a08858',
+    terrainScree: '#b0a070', hutGlow: 0.4,
+    skirtColor: '#a89868',
+    ground: {
+      base: '#a8a468',
+      bandLight: 'rgba(232,220,160,0.09)', bandDark: 'rgba(110,120,60,0.08)',
+      patchA: 'rgba(196,170,88,0.28)',                  // ripe wheat blocks
+      patchB: 'rgba(120,140,70,0.22)',                  // vine-green blocks
+      speckA: 'rgba(160,150,100,0.7)', speckB: 'rgba(230,214,160,0.8)', speckCount: 110,
+    },
+    road: {
+      base: '#8a7a5c', mottleA: [110, 96, 70], mottleB: [160, 146, 112],
+      rut: 'rgba(84,70,48,0.5)', rutCore: 'rgba(62,50,34,0.45)', tread: 'rgba(36,28,18,0.45)',
+      stoneA: 'rgba(214,202,172,0.65)', stoneB: 'rgba(96,82,58,0.7)',
+      fringe: [128, 138, 74], fringeVar: [36, 40, 26],
+    },
+    hillColor: 0x4e6e38, peakColor: 0x8a9a78,
+    treeCount: 950, trunkColor: 0x6b4a28,
+    foliageLow: 0x2e6a34, foliageTop: 0x4a8a44,
+    foliage: { h: 0.3, hVar: 0.06, s: 0.5, sVar: 0.16, l: 0.28, lVar: 0.12 },
+    treeSnowCap: false,
+    treeBelt: [48, 150],                                // the forest ring
+    tuftCount: 1500, grass: { bladeA: '#c8a850', bladeB: '#e2c878' },   // wheat
+    bushCount: 90, bushColor: 0x3f7c38,
+    bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
+    rockCount: 60, pebbleCount: 160, rockColor: 0x9a9484, rockSnowCap: false,
+    flowerCount: 140, flowerColors: ['#c03a2e', '#e8d24a', '#ffffff'],
+    hutRoof: 0x8a4630, hayColor: 0xe0c268,
+    hutCount: 9, hutZone: [0.8, 0.2], hayCount: 44,
+    splinter: [0x8a5a32, 0xe0d4a8],
+    vineRows: { count: 85 },                            // carpet the slopes
+    windmill: true,
+    elev: { amp: 7, ph: [1.1, 2.2, 0.6] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    elements: 'medhill',
+    crossroads: 2,
+  },
+  // DEEPWOOD TRAIL: forest ONLY. The stands close right onto the verge on
+  // both sides, the fog sits close, and the lap never sees open country.
+  deepwood: {
+    fogColor: 0xb8c8b0, fogNear: 150, fogFar: 950,
+    hemiSky: 0xa8ccb4, hemiGround: 0x54644a, hemiIntensity: 0.88,
+    sunColor: 0xf8ecc8, sunIntensity: 2.55,
+    skyTop: '#4a7a9c', skyHorizon: '#c8d4bc', sunGlow: 0xf0e8b8,
+    sunAz: 2.4, sunEl: 0.62,
+    cloudCount: 6, cloudOpacity: 0.8,
+    terrainLow: '#41603a', terrainHigh: '#648250', terrainDirt: '#6a5c42',
+    terrainScree: '#5a5c48', hutGlow: 0.55,
+    skirtColor: '#4e4838',
+    ground: {
+      base: '#4c6a3c',
+      bandLight: 'rgba(140,170,104,0.08)', bandDark: 'rgba(34,52,28,0.07)',
+      patchA: 'rgba(70,90,44,0.25)', patchB: 'rgba(96,80,52,0.2)',
+      speckA: 'rgba(90,110,70,0.7)', speckB: 'rgba(150,160,120,0.7)', speckCount: 120,
+    },
+    road: {
+      base: '#6a5a42', mottleA: [84, 70, 50], mottleB: [130, 114, 86],
+      rut: 'rgba(58,46,30,0.55)', rutCore: 'rgba(40,32,20,0.5)', tread: 'rgba(22,16,10,0.5)',
+      stoneA: 'rgba(190,178,150,0.6)', stoneB: 'rgba(70,58,40,0.7)',
+      fringe: [62, 88, 46], fringeVar: [26, 34, 20],
+    },
+    hillColor: 0x33512c, peakColor: 0x4e6a48,
+    treeCount: 1500, trunkColor: 0x5a4028,
+    foliageLow: 0x24522c, foliageTop: 0x36703c,
+    foliage: { h: 0.32, hVar: 0.05, s: 0.5, sVar: 0.14, l: 0.24, lVar: 0.1 },
+    treeSnowCap: false,
+    treeBelt: [12.5, 95],                               // trees to the verge, DEEP
+    tuftCount: 700, grass: { bladeA: '#3e6a34', bladeB: '#6a9a4c' },
+    bushCount: 260, bushColor: 0x2c5c2c,
+    bush: { h: 0.34, hVar: 0.05, s: 0.42, sVar: 0.1, l: 0.24, lVar: 0.1 },
+    rockCount: 180, pebbleCount: 240, rockColor: 0x6e7264, rockSnowCap: false,
+    flowerCount: 90, flowerColors: ['#ffffff', '#c8b0ff'],
+    hutRoof: 0x4a3424, hayColor: 0x8a7a4e,
+    hutCount: 4, hutZone: [0.9, 0.1], hayCount: 6,
+    splinter: [0x5a4028, 0x9ab884],
+    elev: { amp: 9, ph: [0.8, 1.9, 2.8] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    elements: 'alpine',
+    vizZoneSpec: { count: 2, kind: 'fogbank' },
+  },
+  // DOLOMITI CORSA: gravel hairpins over alpine meadow, and the COLOSSAL
+  // pale-rose rock faces standing in front - the enrosadira massif is the
+  // whole skyline, per the player's Dolomites photo.
+  dolomiti: {
+    fogColor: 0xdce8f0, fogNear: 340, fogFar: 1650,
+    hemiSky: 0xaad0f4, hemiGround: 0x7c9468, hemiIntensity: 0.8,
+    sunColor: 0xfff2d8, sunIntensity: 2.8,
+    skyTop: '#2f78c8', skyHorizon: '#e6eef2', sunGlow: 0xfff6d8,
+    sunAz: 0.9, sunEl: 0.68,
+    cloudCount: 10, cloudOpacity: 0.92, cloudTint: 0xffffff,
+    terrainLow: '#4e7c40', terrainHigh: '#98a284', terrainDirt: '#8a8274',
+    terrainScree: '#a89a88', hutGlow: 0.45,
+    skirtColor: '#948a78',
+    ground: {
+      base: '#6f8a58',
+      bandLight: 'rgba(214,232,196,0.06)', bandDark: 'rgba(52,72,44,0.06)',
+      patchA: 'rgba(130,150,90,0.2)', patchB: 'rgba(170,168,140,0.16)',
+      speckA: 'rgba(150,154,142,0.7)', speckB: 'rgba(226,232,222,0.8)', speckCount: 90,
+    },
+    road: {
+      // pale dolomite gravel, per the hairpin photo
+      base: '#b0a48c', mottleA: [150, 138, 116], mottleB: [196, 186, 162],
+      rut: 'rgba(120,106,84,0.5)', rutCore: 'rgba(96,84,64,0.45)', tread: 'rgba(60,50,36,0.45)',
+      stoneA: 'rgba(230,222,202,0.7)', stoneB: 'rgba(120,108,88,0.7)',
+      fringe: [96, 128, 66], fringeVar: [30, 40, 22],
+    },
+    hillColor: 0x6e8a5c, peakColor: 0xd8c2b0,           // rose-grey rock crowns
+    treeCount: 551, trunkColor: 0x5a4028,
+    foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,
+    foliage: { h: 0.33, hVar: 0.05, s: 0.48, sVar: 0.15, l: 0.29, lVar: 0.1 },
+    treeSnowCap: false,
+    treeAltFade: [16, 34],
+    tuftCount: 900, grass: { bladeA: '#4e7c40', bladeB: '#8fae6a' },
+    bushCount: 120, bushColor: 0x3f7c38,
+    bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
+    rockCount: 420, pebbleCount: 320, rockColor: 0xa89a88, rockSnowCap: false,
+    flowerCount: 220, flowerColors: ['#ffffff', '#ffe234', '#e05a78', '#7a9aff'],
+    hutRoof: 0x6a4028, hayColor: 0xc8bc94,
+    hutCount: 10, hutZone: [0.82, 0.18], hayCount: 20,
+    splinter: [0x8a5a32, 0xdce8f0],
+    elev: { amp: 22, ph: [1.4, 0.5, 2.3] },
+    rampMaxCurv: 0.014, padMaxCurv: 0.0045, boardMaxCurv: 0.012,
+    guardFence: { lateral: 12.8, color: 0x8a8a8a, max: 220 },
+    elements: 'alpine',
+    snowPatches: { count: 30, minY: 16 },
+    // THE COLOSSI: Sassolungo-scale towers dead ahead - tall, not wide, and
+    // far enough out that no cone base reaches the arena (the first cut used
+    // w up to 420 at r 360 and a rock face swallowed half the track)
+    massif: { az: 4.75, spread: 1.5, count: 7, r0: 500, r1: 660,
+      h0: 240, h1: 360, w0: 150, w1: 240 },   // NORTH: dead ahead off the grid
   },
 
   // LANTERN QUARTER: the OLD TOWN NIGHT region. Wet cobbles under sodium
@@ -2047,6 +2409,7 @@ const THEMES = {
   // no mountain anywhere: the negative list forbids exposed rock, dry dust,
   // bright colour and any sight line worth the name.
   farmland: {
+    stoneBridges: { count: 2 },
     surface: 'wet',                                     // "wet mixed" — physics reads this
     // Bible fog is FogExp2 d=0.00150 #C3CBD2; the engine's fog is linear, so
     // near/far are set to the same half-fade (~550) and extinction (~1150).
@@ -2107,7 +2470,7 @@ const THEMES = {
     // `birch` stands in for ash (pale bark, airy crown — the nearest silhouette
     // in the species table). Weights are the Bible's 0.14 / 0.12, renormalised
     // over the tree tier so they sum to 1.0 (checklist R04).
-    treeCount: 300, trunkColor: 0x6b5a44,
+    treeCount: 435, trunkColor: 0x6b5a44,
     foliageLow: 0x35502a, foliageTop: 0x4a6b34,
     foliage: { h: 0.26, hVar: 0.05, s: 0.34, sVar: 0.14, l: 0.25, lVar: 0.10 },
     treeSnowCap: false,
@@ -2999,6 +3362,22 @@ export class Track {
     // the hero gorge must exist before ANY height is sampled (terrain mesh,
     // road skirts and every scenery placement read it through _blendHeight)
     if (this.T.heroBridge) this._planGorge();
+    // GORGE JUMPS: carved chasms where the roadway is simply OUT - a baked
+    // kicker lip launches anything at racing speed clean across (the r96
+    // ballistic flight does the rest); anything slower drops in and drives
+    // out along the chasm floor, whose ends ease back to grade below the
+    // off-road climb limit. Planned here for the same reason as the hero
+    // gorge: every height sample after this point must read the cut.
+    this._jumpGorges = [];
+    this._jumpCut = null;
+    if (this.T.gorgeJump) this._planJumpGorges();
+    // TUNNELS are planned, not found: the road-field blend flattens the
+    // ground beside every carriageway, so no natural cutting is ever deep
+    // enough to bore. Instead the straightest eligible stretches are chosen
+    // here and a rock ridge is RAISED over them in both height fields - the
+    // bore then runs through a hill that genuinely exists.
+    this._tunnels = [];
+    if (this.T.tunnels) this._planTunnels();
 
     this.animated = { flags: [], clouds: [] };
     // World-space circle colliders for on-road obstacles: [{x, z, r}].
@@ -3309,7 +3688,10 @@ export class Track {
   /** Road surface height at a track position: the elevation profile, plus the
    *  ramp wedge height when inside a ramp zone (ramps ADD to road height). */
   groundHeightAt(i, lateral) {
-    const roadY = this.center[i].y;
+    let roadY = this.center[i].y;
+    // gorge jumps: the roadway is OUT across the chasm - the surface here IS
+    // the collapsed span, and the crest detector launches anything fast
+    if (this._jumpCut) roadY -= this._jumpCut[i];
     for (const r of this.ramps) {
       const di = (i - r.index + N) % N;
       if (di < r.len && Math.abs(lateral - r.lateral) < r.halfW) {
@@ -3593,7 +3975,8 @@ export class Track {
     }
     // the hero gorge is carved out of whatever the ground would otherwise be,
     // road corridor included — that is the hole the suspension bridge spans
-    if (this._gorge) h -= this._gorgeCut(x, z);
+    if (this._gorge || this._jumpGorges?.length) h -= this._gorgeCut(x, z);
+    if (this._tunnels?.length) h = this._tunnelRidge(x, z, h);
     // the river runs in a real bed, not on top of the field — but the channel
     // is flattened out again as it nears the road so the FORD stays a shallow
     // wash across the carriageway instead of a trench (and so the road skirts,
@@ -3959,23 +4342,46 @@ export class Track {
   /** Depth of the river gorge at (x, z): 0 everywhere outside it, easing to
    *  the full depth along the channel. Applied inside _blendHeight so the
    *  scenery field, the terrain mesh and the free-roam ground all agree. */
-  _gorgeCut(x, z) {
-    const G = this._gorge;
+  _gorgeCutOne(G, x, z) {
     const dx = x - G.x, dz = z - G.z;
     const u = dx * G.ax + dz * G.az;          // along the gorge
     const v = dx * G.vx + dz * G.vz;          // across it (= along the road)
     const au = Math.abs(u), av = Math.abs(v);
     if (au > G.len || av >= G.half) return 0;
-    const along = 1 - THREE.MathUtils.smoothstep(au, G.len * 0.55, G.len);
+    // ease out over the last 55%: keeps the floor's end grade under the
+    // off-road climb limit, so a fallen car can drive out along the chasm
+    const along = 1 - THREE.MathUtils.smoothstep(au, G.len * 0.38, G.len);
     // U-shaped channel: full depth down the middle, rims easing back to grade
     const prof = Math.pow(Math.cos((av / G.half) * Math.PI * 0.5), 1.5);
     return G.depth * prof * along;
   }
 
-  /** True when sample i lies within `pad` samples of the bridge span (so
-   *  ramps, pads, obstacles, puddles and props keep off the crossing). */
+  /** Total chasm depth at a point: the hero-bridge gorge plus every gorge
+   *  JUMP chasm (same carve, no deck — the road is simply out). */
+  _gorgeCut(x, z) {
+    let c = 0;
+    if (this._gorge) c += this._gorgeCutOne(this._gorge, x, z);
+    if (this._jumpGorges) {
+      for (const G of this._jumpGorges) c += this._gorgeCutOne(G, x, z);
+    }
+    return c;
+  }
+
+  /** True when sample i lies within `pad` samples of the bridge span or any
+   *  jump chasm (so ramps, pads, obstacles, puddles and props keep off). */
   _nearGorge(i, pad) {
-    return !!this._gorge && this._circDist(i, this._gorge.i) < pad;
+    if (this._gorge && this._circDist(i, this._gorge.i) < pad) return true;
+    if (this._jumpGorges) {
+      for (const G of this._jumpGorges) {
+        if (this._circDist(i, G.i) < pad) return true;
+      }
+    }
+    if (this._tunnels) {
+      for (const T of this._tunnels) {
+        if (i >= T.s - pad && i <= T.e + pad) return true;
+      }
+    }
+    return false;
   }
 
   /** Pick where the gorge crosses the road. Runs BEFORE any geometry is built
@@ -4007,6 +4413,118 @@ export class Track {
       spanU: H.half / Math.max(0.35, Math.abs(t.x * vx + t.z * vz)),
       floorY: c.y - H.depth,
     };
+  }
+
+  /** Pick the straightest stretches for the jump chasms, carve them via
+   *  _gorgeCut, bake the launch kickers into the roadway, and precompute the
+   *  per-sample road collapse that groundHeightAt applies. */
+  _planJumpGorges() {
+    const J = this.T.gorgeJump;
+    const count = J.count ?? 1;
+    const half = J.half ?? 14, len = J.len ?? 190, depth = J.depth ?? 24;
+    const taken = this._gorge ? [this._gorge.i] : [];
+    for (let k = 0; k < count; k++) {
+      let best = -1, bc = Infinity;
+      for (let i = 0; i < N; i += 2) {
+        if (this._circDist(i, 0) < 90) continue;
+        if (taken.some((t) => this._circDist(i, t) < 140)) continue;
+        let mc = 0;
+        for (let w = -16; w <= 16; w++) mc = Math.max(mc, this.curvature[(i + w + N) % N]);
+        if (mc < bc) { bc = mc; best = i; }
+      }
+      // a jump needs a genuine straight: launching mid-corner throws the car
+      // off the far rim sideways, which is a trap rather than a stunt
+      if (best < 0 || bc > 0.009) break;
+      taken.push(best);
+      const c = this.center[best], t = this.tan[best], n = this.nrm[best];
+      const th = J.skew ?? 0.5;
+      const cs = Math.cos(th), sn = Math.sin(th);
+      const ax = n.x * cs + t.x * sn, az = n.z * cs + t.z * sn;
+      const vx = -n.x * sn + t.x * cs, vz = -n.z * sn + t.z * cs;
+      this._jumpGorges.push({
+        i: best, x: c.x, z: c.z, ax, az, vx, vz, half, len, depth,
+        spanU: half / Math.max(0.35, Math.abs(t.x * vx + t.z * vz)),
+        floorY: c.y - depth,
+      });
+    }
+    if (!this._jumpGorges.length) return;
+    // launch kickers: a rising lip baked into the roadway short of each rim,
+    // on BOTH sides - the race runs one way, but a spun car crosses back.
+    // The physical GAP is only the deep middle of the carve (the rest keeps
+    // full-grade roadway right up to a SHARP lip), and the kicker slope is
+    // real: ~0.19, worth ~8 u/s of launch at racing speed - the math that
+    // clears a ~21 u gap at 40+ u/s and drops anything slower in.
+    for (const G of this._jumpGorges) {
+      G.gapS = Math.ceil((G.spanU * 0.61 + 1) / this.segLen);
+      for (const dir of [1, -1]) {
+        for (let sN = 0; sN < 5; sN++) {
+          const j = (G.i + dir * (G.gapS + 1 + sN) + N) % N;
+          this.center[j].y += 2.3 * Math.pow(1 - sN / 5, 1.4);
+        }
+      }
+    }
+    // the collapse itself, per sample: the ribbon, the physics and the AI all
+    // read the road surface through groundHeightAt, so one array does it all.
+    // Shallow rim-cut is ZEROED - the roadway holds grade to the lip, then
+    // the surface is simply out.
+    this._jumpCut = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      let cut = 0;
+      for (const G of this._jumpGorges) {
+        const c1 = this._gorgeCutOne(G, this.center[i].x, this.center[i].z);
+        cut += c1 >= G.depth * 0.35 ? c1 : 0;
+      }
+      this._jumpCut[i] = cut;
+    }
+  }
+
+  _planTunnels() {
+    const S = this.T.tunnels;
+    const count = S.count ?? 1;
+    const lenS = Math.round((S.len ?? 80) / this.segLen);
+    for (let k = 0; k < count; k++) {
+      let best = -1, bc = Infinity;
+      for (let i = 0; i < N; i += 2) {
+        if (this._circDist(i, 0) < 100) continue;
+        if (this._nearGorge(i, 150)) continue;
+        if (this._tunnels.some((t) => this._circDist(i, t.mid) < 170)) continue;
+        let mc = 0;
+        for (let w = -lenS; w <= lenS; w++) mc = Math.max(mc, this.curvature[(i + w + N) % N]);
+        if (mc < bc) { bc = mc; best = i; }
+      }
+      // a bore through a corner self-intersects; only genuine straights bore
+      if (best < 0 || bc > 0.013) break;
+      const half = lenS >> 1;
+      if (best - half < 0 || best + half >= N) break;    // no wrap runs
+      const s0 = best - half, e0 = best + half;
+      const pts = [];
+      for (let j = s0; j <= e0; j += 3) {
+        pts.push([this.center[j].x, this.center[j].z, this.center[j].y]);
+      }
+      this._tunnels.push({ mid: best, s: s0, e: e0, pts, h: S.ridge ?? 13 });
+    }
+  }
+
+  /** The hill the tunnel bores through: terrain rises to roadY + h over the
+   *  tunnel line, easing across ~34 u and at the portals. Applied in BOTH
+   *  height fields, so physics and the visible mesh agree. */
+  _tunnelRidge(x, z, h) {
+    for (const T of this._tunnels) {
+      let bd = 1e9, by = 0, bi = 0;
+      for (let k = 0; k < T.pts.length; k++) {
+        const p = T.pts[k];
+        const d = (x - p[0]) * (x - p[0]) + (z - p[1]) * (z - p[1]);
+        if (d < bd) { bd = d; by = p[2]; bi = k; }
+      }
+      bd = Math.sqrt(bd);
+      if (bd > 34) continue;
+      const across = Math.pow(Math.cos((bd / 34) * Math.PI * 0.5), 1.3);
+      const ease = Math.min(1, Math.min(bi, T.pts.length - 1 - bi) / 3);
+      const w = across * ease;
+      if (w < 0.06) continue;
+      h = Math.max(h, by + T.h * w);
+    }
+    return h;
   }
 
   /** Rolling-hill height used by scenery placement and the free-roam mode's
@@ -4104,6 +4622,13 @@ export class Track {
    *  guarantee the smoothstep could not give. 0.5 still lets a hillside climb
    *  10 u within 20 u of the verge, so cuttings still read as cuttings. */
   _roadCeil(bi, d) {
+    // a tunnel stretch inverts the contract: the hill is SUPPOSED to stand
+    // over the carriageway there - the bore shell keeps it readable
+    if (this._tunnels) {
+      for (const T of this._tunnels) {
+        if (bi >= T.s && bi <= T.e) return this.center[bi].y + T.h + 6;
+      }
+    }
     const drivable = this.widthAt ? this.widthAt(bi) : ROAD_HALF;
     // the ribbon as DRAWN, not as driven — the fringe is part of the road
     const ribbon = drivable + (WALL_OFF + 0.6 - ROAD_HALF);
@@ -4345,12 +4870,16 @@ export class Track {
     const ph = side * 2.13;                      // asymmetric left/right walls
     // the walls open up around the start line so the gate + grandstand read
     const gap = THREE.MathUtils.smoothstep(this._circDist(j % N, 0), 30, 85);
-    let h = 18
+    let h = (this.T.cliffHeight ?? 18)
       + Math.sin(9 * t + ph) * 2.6
       + Math.sin(23 * t + 1.3 - ph) * 1.5
       + Math.sin(61 * t + 4.1 + ph) * 0.9;       // ≈14–22 when fully walled
     h = Math.max(1.7, h * gap);                  // low stone berm through the gap
-    const base = WALL_OFF + 0.65 + 0.24 * (Math.sin(31 * t + 2.2 + ph) + 1);
+    // cliffSetback pushes the faces off the verge: the corridor becomes a
+    // DEEP VALLEY with a drivable floor, not a walled slot ("don't build
+    // walled track in desert - or make it look like a deep valley")
+    const base = WALL_OFF + 0.65 + (this.T.cliffSetback ?? 0)
+      + 0.24 * (Math.sin(31 * t + 2.2 + ph) + 1);
     const l1 = 0.85 + 0.5 * Math.sin(17 * t + 0.7 - ph);   // mid-face lean
     const l2 = 2.0 + 0.85 * Math.sin(13 * t + 2.9 + ph) + 0.4 * Math.sin(47 * t - ph);
     return { h, base, l1, l2 };
@@ -5647,6 +6176,9 @@ export class Track {
     const m4 = new THREE.Matrix4();
     this._buildHorizon(m4);
     if (this.T.coast) this._buildSea();
+    if (this.T.vineRows) this._buildVineRows();
+    if (this.T.windmill) this._buildWindmill();
+    if (this.T.stoneBridges) this._buildStoneBridges();
     if (this.creeks?.length) this._buildCreekBeds(m4);   // outback dry watercourses
     this._buildForest(m4);
     this._buildGroundCover(m4);
@@ -5668,6 +6200,7 @@ export class Track {
     if (this.T.logYards) this._buildLogYards();      // flume timber stacks
     if (this.T.retainingWalls) this._buildRetainingWalls();   // alpine-pass parapets
     if (this.T.heroBridge) this._buildHeroBridge();           // hero rope crossing
+    if (this.T.tunnels) this._buildTunnels();                 // galleries through the cuts
     if (this.T.guardFence) this._buildGuardFence();           // breakable mountain rail fence
     if (this.T.roadCabins) this._buildRoadCabins();           // log cabins on the shelves
     if (this.T.snowPatches) this._buildSnowPatches(m4);       // old snow at altitude
@@ -6345,7 +6878,7 @@ export class Track {
     // is baked per-vertex instead — seaColor at the beach easing toward the
     // sky-horizon tone with distance from the arena, meeting the sky dome at
     // a proper sea horizon line instead of a cream wall.
-    const HALF = 4200, DEEP = 4200, COLS = 12, ROWS = 7;
+    const HALF = 4200, DEEP = 4200, COLS = 12, ROWS = 10;
     const cNear = new THREE.Color(this.T.seaColor ?? 0x3d7f9e);
     const cFar = cNear.clone().lerp(new THREE.Color(this.T.skyHorizon ?? '#dce8f0'), 0.8);
     const verts = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
@@ -6354,13 +6887,22 @@ export class Track {
     for (let r = 0, k = 0; r <= ROWS; r++) {
       for (let c = 0; c <= COLS; c++, k++) {
         const du = -HALF + (2 * HALF * c) / COLS;
-        const dn = (DEEP * r) / ROWS;
+        // quadratic row spacing: fine rows through the shallow/deep gradient
+        // near the beach, coarse rows out where one colour serves
+        const dn = DEEP * Math.pow(r / ROWS, 2.2);
         const wx = mx + ux * du + nx * dn, wz = mz + uz * du + nz * dn;
         verts[k * 3] = wx; verts[k * 3 + 1] = y; verts[k * 3 + 2] = wz;
         // haze by distance from the arena the camera lives in, matching the
         // land fog's reach (fogFar ~1650) without inheriting its colour
         const haze = smoothstep01(THREE.MathUtils.clamp((Math.hypot(wx, wz) - 380) / 1400, 0, 1));
         tmp.copy(cNear).lerp(cFar, haze);
+        // SHALLOWS to DEEP: turquoise off the beach, darkening teal past the
+        // bar - depth the way the player's reference art shades its bays,
+        // not one flat fill
+        const shal = 1 - smoothstep01(THREE.MathUtils.clamp(dn / 55, 0, 1));
+        if (shal > 0) tmp.lerp(new THREE.Color(0x7adfd6), shal * 0.8);
+        const deep = smoothstep01(THREE.MathUtils.clamp((dn - 55) / 180, 0, 1));
+        if (deep > 0) tmp.lerp(new THREE.Color(0x17415e), deep * 0.7);
         cols[k * 3] = tmp.r; cols[k * 3 + 1] = tmp.g; cols[k * 3 + 2] = tmp.b;
       }
     }
@@ -6377,12 +6919,113 @@ export class Track {
     geo.setIndex(idx);
     geo.computeVertexNormals();
     const sea = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-      vertexColors: true, roughness: 0.14, metalness: 0.05,
+      // matte enough that the depth gradient READS - at 0.14 the sun's
+      // specular washed the whole bay to one flat cyan
+      vertexColors: true, roughness: 0.55, metalness: 0.02,
       side: THREE.DoubleSide, fog: false,
     }));
     sea.name = 'sea';
     sea.receiveShadow = true;
     this.group.add(sea);
+
+    // SURF: two foam bands hugging the waterline - a bright broken line at
+    // the beach and a fainter one a few metres out
+    for (const [dn, w, op] of [[2.2, 1.7, 0.75], [9, 1.1, 0.32]]) {
+      const segs = 64;
+      const fverts = new Float32Array((segs + 1) * 2 * 3);
+      for (let c2 = 0; c2 <= segs; c2++) {
+        const du = -HALF * 0.35 + (HALF * 0.7 * c2) / segs;
+        const wig = Math.sin(c2 * 1.7) * 2.2;
+        for (let e = 0; e < 2; e++) {
+          const dd = dn + wig * 0.3 + e * w;
+          const o = (c2 * 2 + e) * 3;
+          fverts[o] = mx + ux * du + nx * dd;
+          fverts[o + 1] = y + 0.06;
+          fverts[o + 2] = mz + uz * du + nz * dd;
+        }
+      }
+      const fidx = [];
+      for (let c2 = 0; c2 < segs; c2++) {
+        const a = c2 * 2, b2 = a + 1, c3 = a + 2, d = a + 3;
+        fidx.push(a, c3, b2, b2, c3, d);
+      }
+      const fgeo = new THREE.BufferGeometry();
+      fgeo.setAttribute('position', new THREE.BufferAttribute(fverts, 3));
+      fgeo.setIndex(fidx);
+      const foam = new THREE.Mesh(fgeo, new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: op, depthWrite: false,
+      }));
+      foam.name = 'sea-foam';
+      this.group.add(foam);
+    }
+
+    // ISLETS: a few rock stacks standing out of the bay
+    const isle = new THREE.InstancedMesh(
+      new THREE.ConeGeometry(1, 1, 6),
+      new THREE.MeshStandardMaterial({ color: 0x9a8f7c, flatShading: true, roughness: 1 }),
+      4);
+    const im4 = new THREE.Matrix4();
+    const iq = new THREE.Quaternion(), iup = new THREE.Vector3(0, 1, 0);
+    const ISLES = [[-330, 120, 14, 9], [140, 180, 20, 13], [430, 240, 11, 7], [-90, 320, 26, 15]];
+    for (let k = 0; k < ISLES.length; k++) {
+      const [du, dn, w, hI] = ISLES[k];
+      iq.setFromAxisAngle(iup, k * 1.7);
+      im4.compose(new THREE.Vector3(mx + ux * du + nx * dn, y - 2, mz + uz * du + nz * dn),
+        iq, new THREE.Vector3(w, hI, w * 0.8));
+      isle.setMatrixAt(k, im4);
+    }
+    isle.castShadow = true;
+    this.group.add(isle);
+
+    // SAILS: little day boats moored in the bay
+    const hullG = new THREE.BoxGeometry(3.2, 0.9, 1.3);
+    const hulls = new THREE.InstancedMesh(hullG,
+      new THREE.MeshStandardMaterial({ color: 0xf2ede2, roughness: 0.7 }), 5);
+    const sailG = new THREE.ConeGeometry(1.1, 3.4, 3);
+    const sails = new THREE.InstancedMesh(sailG,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true,
+        roughness: 0.6, side: THREE.DoubleSide }), 5);
+    const BOATS = [[-220, 42], [-60, 70], [60, 38], [230, 85], [340, 55]];
+    for (let k = 0; k < BOATS.length; k++) {
+      const [du, dn] = BOATS[k];
+      const bx = mx + ux * du + nx * dn, bz = mz + uz * du + nz * dn;
+      iq.setFromAxisAngle(iup, k * 2.3);
+      im4.compose(new THREE.Vector3(bx, y + 0.35, bz), iq, new THREE.Vector3(1, 1, 1));
+      hulls.setMatrixAt(k, im4);
+      im4.compose(new THREE.Vector3(bx, y + 2.3, bz), iq, new THREE.Vector3(1, 1, 1));
+      sails.setMatrixAt(k, im4);
+    }
+    hulls.castShadow = sails.castShadow = true;
+    this.group.add(hulls, sails);
+
+    // WAVE CRESTS: broken white dashes drifting over the near bay
+    const CRESTS = 90;
+    const crest = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(3.4, 0.05, 0.32),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4,
+        depthWrite: false }),
+      CRESTS);
+    for (let k = 0; k < CRESTS; k++) {
+      const du = (Math.sin(k * 12.9898) * 0.5 + 0.5) * 2 - 1;
+      const dn2 = 14 + (Math.sin(k * 78.233) * 0.5 + 0.5) * 300;
+      const wx = mx + ux * du * 700 + nx * dn2, wz = mz + uz * du * 700 + nz * dn2;
+      iq.setFromAxisAngle(iup, Math.atan2(ux, uz) + Math.sin(k * 3.7) * 0.3);
+      im4.compose(new THREE.Vector3(wx, y + 0.05, wz), iq, new THREE.Vector3(1, 1, 1));
+      crest.setMatrixAt(k, im4);
+    }
+    this.group.add(crest);
+
+    // harbour buoys
+    const buoy = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(0.6, 6, 5),
+      new THREE.MeshStandardMaterial({ color: 0xd23c28, roughness: 0.6 }), 4);
+    for (let k = 0; k < 4; k++) {
+      const du = -260 + k * 160, dn2 = 26 + (k % 2) * 18;
+      im4.compose(new THREE.Vector3(mx + ux * du + nx * dn2, y + 0.3, mz + uz * du + nz * dn2),
+        iq, new THREE.Vector3(1, 1, 1));
+      buoy.setMatrixAt(k, im4);
+    }
+    this.group.add(buoy);
   }
 
   /** Old snow lying in the hollows above `minY`: flat white decals conformed
@@ -6506,6 +7149,303 @@ export class Track {
     }
     slabs.name = 'glacier';
     this.group.add(slabs);
+  }
+
+  /** THE PASS HOTEL — the Belvédère moment from the player's photo: a tall
+   *  gabled hotel standing alone on the outside of a mid-climb hairpin, the
+   *  serpentine wrapping around it. Placed at the tightest corner in the
+   *  middle third of the lap (that is the switchback stack), on the outside
+   *  of the bend, seated on the real terrain. */
+  _buildPassHotel(m4) {
+    // sharpest corner that is genuinely UP THE CLIMB: restrict to samples in
+    // the upper half of the lap's elevation range, else the valley bend at
+    // the foot of the pass wins on curvature and the hotel ends up flat
+    let maxY = -1e9, minY = 1e9;
+    for (let i = 0; i < this.N; i++) {
+      maxY = Math.max(maxY, this.center[i].y);
+      minY = Math.min(minY, this.center[i].y);
+    }
+    const yGate = minY + (maxY - minY) * 0.45;
+    let best = -1, bestC = 0;
+    for (let i = Math.floor(this.N * 0.15); i < Math.floor(this.N * 0.7); i++) {
+      if (this.center[i].y < yGate) continue;
+      if (this.curvature[i] > bestC) { bestC = this.curvature[i]; best = i; }
+    }
+    if (best < 0) return;
+    // outside of the bend: the normal points left of travel; curvature sign
+    // is unsigned, so probe both sides and take the one that DROPS (the
+    // outside of a climbing hairpin hangs over the lower leg)
+    const lat = 21;
+    const pL = this.pointAt(best, lat), pR = this.pointAt(best, -lat);
+    const hL = this.terrainHeight(pL.x, pL.z), hR = this.terrainHeight(pR.x, pR.z);
+    const p = hL < hR ? pL : pR;
+    const gy = Math.max(hL < hR ? hL : hR, this.groundHeightAt(best, 0) - 2.5);
+    const W = 17, D = 9.5, H = 11;                      // three storeys + attic
+    const yaw = Math.atan2(this.tan[best].x, this.tan[best].z) + Math.PI / 2;
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(W, H, D),
+      new THREE.MeshStandardMaterial({
+        map: townhouseTexture(), color: 0xe8e0d0, roughness: 0.8,
+        emissive: 0xffffff, emissiveMap: townhouseGlowTexture(),
+        emissiveIntensity: this.T.hutGlow ?? 0.4,
+      })
+    );
+    body.name = 'pass-hotel';
+    body.position.set(p.x, gy + H / 2, p.z);
+    body.rotation.y = yaw;
+    body.castShadow = body.receiveShadow = true;
+    const roof = new THREE.Mesh(gablePrismGeo(), new THREE.MeshStandardMaterial({
+      color: 0x9aa2a8, flatShading: true, roughness: 0.6,   // silvered mansard
+    }));
+    roof.scale.set(W + 1.6, 5.2, D + 1.6);
+    roof.position.set(p.x, gy + H, p.z);
+    roof.rotation.y = yaw;
+    roof.castShadow = true;
+    this.group.add(body, roof);
+    this._addShadow(p.x, p.z, Math.max(W, D) * 0.8);
+    this.solids.push({ x: p.x, z: p.z, r: Math.max(W, D) * 0.62, y: gy + 3, mat: 'stone' });
+  }
+
+  /** THE WINDMILL - the estate landmark from the player's vineyard art:
+   *  tapered stone tower, conical cap, four lattice sails, on open ground. */
+  _buildWindmill() {
+    let spot = null;
+    for (let tries = 0; tries < 40 && !spot; tries++) {
+      const p = this._trackSidePos(46, 110);
+      if (!p) continue;
+      const h0 = this.terrainHeight(p.x, p.z);
+      let ok = true;
+      for (const [dx, dz] of [[8, 0], [-8, 0], [0, 8], [0, -8]]) {
+        if (Math.abs(this.terrainHeight(p.x + dx, p.z + dz) - h0) > 1.4) { ok = false; break; }
+      }
+      if (ok) spot = { x: p.x, z: p.z, y: h0 };
+    }
+    if (!spot) return;
+    const g = new THREE.Group();
+    const stone = new THREE.MeshStandardMaterial({ color: 0xd8d0c0, flatShading: true, roughness: 1 });
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.4, 11, 8), stone);
+    tower.position.set(spot.x, spot.y + 5.5, spot.z);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(3.0, 2.6, 8),
+      new THREE.MeshStandardMaterial({ color: 0x8a4630, flatShading: true, roughness: 0.9 }));
+    cap.position.set(spot.x, spot.y + 12.2, spot.z);
+    const sailMat = new THREE.MeshStandardMaterial({ color: 0xf2ecd8, roughness: 0.85,
+      side: THREE.DoubleSide });
+    const hub = new THREE.Group();
+    for (let k = 0; k < 4; k++) {
+      const sail = new THREE.Mesh(new THREE.BoxGeometry(1.7, 7.2, 0.16), sailMat);
+      sail.position.set(0, 4.2, 0);
+      const arm = new THREE.Group();
+      arm.add(sail);
+      arm.rotation.z = (k * Math.PI) / 2 + 0.5;
+      hub.add(arm);
+    }
+    hub.position.set(spot.x, spot.y + 10.4, spot.z + 3.1);
+    tower.castShadow = cap.castShadow = true;
+    g.add(tower, cap, hub);
+    this.group.add(g);
+    this._addShadow(spot.x, spot.z, 4.5);
+    this.solids.push({ x: spot.x, z: spot.z, r: 3.4, y: spot.y + 2, mat: 'stone' });
+  }
+
+  /** STONE BRIDGES: arched masonry spans where the road crosses a dip - the
+   *  parapets read from far off, and the deck carries a baked hump that a
+   *  fast car JUMPS. Placement is honest: only where the ground beside the
+   *  road genuinely falls away. */
+  _buildStoneBridges() {
+    const B = this.T.stoneBridges;
+    const count = B.count ?? 2;
+    // find dips: ground 5+ u below the deck on both sides, straight-ish road
+    const cands = [];
+    for (let i = 0; i < N; i += 3) {
+      if (this._circDist(i, 0) < 90 || this._nearGorge(i, 60)) continue;
+      if (this.curvature[i] > 0.01) continue;
+      const c = this.center[i], n = this.nrm[i];
+      const dl = c.y - this.terrainHeight(c.x + n.x * 15, c.z + n.z * 15);
+      const dr = c.y - this.terrainHeight(c.x - n.x * 15, c.z - n.z * 15);
+      const drop = Math.min(dl, dr);
+      if (drop > 4.5) cands.push({ i, drop });
+    }
+    cands.sort((a, b) => b.drop - a.drop);
+    const picked = [];
+    for (const cand of cands) {
+      if (picked.length >= count) break;
+      if (picked.some((q) => this._circDist(cand.i, q.i) < 120)) continue;
+      picked.push(cand);
+    }
+    const stone = new THREE.MeshStandardMaterial({
+      color: 0x9a9188, flatShading: true, roughness: 1,
+    });
+    for (const { i } of picked) {
+      const span = Math.ceil(26 / this.segLen);
+      // the jump hump: raise the deck through the crossing
+      for (let k = -span; k <= span; k++) {
+        const j = (i + k + N) % N;
+        this.center[j].y += 1.5 * Math.pow(Math.cos((k / span) * Math.PI * 0.5), 1.4);
+      }
+      const g = new THREE.Group();
+      for (const side of [1, -1]) {
+        // parapet walls the length of the span
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), stone);
+        const a = this.center[(i - span + N) % N], b2 = this.center[(i + span) % N];
+        const mxx = (a.x + b2.x) / 2, mzz = (a.z + b2.z) / 2;
+        const yaw = this.headingAt(i);
+        const nn = this.nrm[i];
+        wall.scale.set(1.1, 1.6, span * 2 * this.segLen);
+        wall.position.set(mxx + nn.x * 10.6 * side, this.center[i].y + 0.6, mzz + nn.z * 10.6 * side);
+        wall.rotation.y = yaw;
+        wall.castShadow = true;
+        g.add(wall);
+        this.solids.push({ x: wall.position.x, z: wall.position.z, r: 1.4,
+          y: this.center[i].y + 1, mat: 'stone' });
+        // arch faces: two masonry blocks descending under the deck
+        for (const k of [-span * 0.55, span * 0.55]) {
+          const j = (i + Math.round(k) + N) % N;
+          const c = this.center[j];
+          const pier = new THREE.Mesh(new THREE.BoxGeometry(2.2, 9, 3.2), stone);
+          pier.position.set(c.x + nn.x * 8.5 * side, c.y - 4.6, c.z + nn.z * 8.5 * side);
+          pier.rotation.y = yaw;
+          g.add(pier);
+        }
+      }
+      this.group.add(g);
+    }
+  }
+
+  /** VINE TRELLIS FIELDS: parallel rows of clipped vine hedge on wooden end
+   *  posts, laid out in blocks beside the road the way real wine country is
+   *  planted. Instanced - one draw call for every hedge, one for the posts. */
+  _buildVineRows() {
+    const V = this.T.vineRows;
+    const blocks = V.count ?? 20;
+    const ROWS_MAX = 9;
+    const hedgeGeo = new THREE.BoxGeometry(1, 1, 1);
+    hedgeGeo.translate(0, 0.5, 0);
+    const hedges = new THREE.InstancedMesh(hedgeGeo,
+      new THREE.MeshStandardMaterial({ color: 0x3e7434, flatShading: true, roughness: 1 }),
+      blocks * ROWS_MAX);
+    const postGeo = new THREE.BoxGeometry(0.28, 1.7, 0.28);
+    postGeo.translate(0, 0.85, 0);
+    const posts = new THREE.InstancedMesh(postGeo,
+      new THREE.MeshStandardMaterial({ color: 0x6a4a2c, roughness: 1 }),
+      blocks * ROWS_MAX * 2);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    let hk = 0, pk = 0;
+    this._scatter(blocks, () => this._trackSidePos(17, 95), (p) => {
+      const h0 = this.terrainHeight(p.x, p.z);
+      // vines TERRACE gentle hills (the reference carpets whole slopes);
+      // only genuine breaks reject a block
+      for (const [dx, dz] of [[11, 0], [-11, 0], [0, 11], [0, -11]]) {
+        if (Math.abs(this.terrainHeight(p.x + dx, p.z + dz) - h0) > 3.4) return false;
+      }
+      const yaw = Math.random() * Math.PI;
+      q.setFromAxisAngle(up, yaw);
+      const rows = 5 + (Math.random() * 5 | 0);
+      const len = 20 + Math.random() * 16;
+      const dx = Math.cos(yaw), dz = -Math.sin(yaw);       // row direction
+      const px = Math.sin(yaw), pz = Math.cos(yaw);        // row spacing dir
+      for (let r = 0; r < rows && hk < hedges.count; r++) {
+        const off = (r - (rows - 1) / 2) * 3.1;
+        const cx = p.x + px * off, cz = p.z + pz * off;
+        const cy = this.terrainHeight(cx, cz);
+        m4.compose(new THREE.Vector3(cx, cy, cz), q, new THREE.Vector3(len, 1.15, 0.7));
+        hedges.setMatrixAt(hk, m4);
+        col.setScalar(0.85 + Math.random() * 0.3);
+        hedges.setColorAt(hk++, col);
+        for (const e of [-1, 1]) {
+          if (pk >= posts.count) break;
+          const ex = cx + dx * (len / 2 + 0.4) * e, ez = cz + dz * (len / 2 + 0.4) * e;
+          m4.compose(new THREE.Vector3(ex, this.terrainHeight(ex, ez), ez), q,
+            new THREE.Vector3(1, 1, 1));
+          posts.setMatrixAt(pk++, m4);
+        }
+      }
+      this._addShadow(p.x, p.z, 9);
+      return true;
+    });
+    hedges.count = hk;
+    posts.count = pk;
+    hedges.castShadow = posts.castShadow = true;
+    this.group.add(hedges, posts);
+  }
+
+  /** TUNNELS: rock galleries where the road runs through a deep cutting.
+   *  Detection is honest - a stretch only tunnels if the ground already
+   *  stands well above the roadway on BOTH sides - so flat worlds carrying
+   *  the flag simply build none. One DoubleSide sweep is both bore and
+   *  hillside shell; flared portal rings finish the mouths; wall solids stop
+   *  cars phasing out; a lamp strip runs under the crown. */
+  _buildTunnels() {
+    for (const T of this._tunnels) this._buildTunnel(T.s, T.e);
+  }
+
+  _buildTunnel(s0, e0) {
+    const HW = 11.6, WALL = 4.6, APEX = 8.6;
+    const PROF = [
+      [-HW, 0], [-HW, WALL], [-HW * 0.55, APEX], [0, APEX + 0.5],
+      [HW * 0.55, APEX], [HW, WALL], [HW, 0],
+    ];
+    const STEP = 2;
+    const rings = [];
+    // flared mouths: one extra ring past each portal, profile widened
+    for (let j = s0 - STEP; j <= e0 + STEP; j += STEP) {
+      const i = ((j % N) + N) % N;
+      const flare = (j < s0 || j > e0) ? 1.16 : 1.0;
+      const c = this.center[i], n = this.nrm[i];
+      const y = this.groundHeightAt(i, 0);
+      rings.push(PROF.map(([lat, up]) => [
+        c.x + n.x * lat * flare, y + up * flare, c.z + n.z * lat * flare,
+      ]));
+    }
+    const P = PROF.length;
+    const pos = new Float32Array(rings.length * P * 3);
+    rings.flat().forEach((v, k) => { pos[k * 3] = v[0]; pos[k * 3 + 1] = v[1]; pos[k * 3 + 2] = v[2]; });
+    const idx = [];
+    for (let r = 0; r < rings.length - 1; r++) {
+      for (let q = 0; q < P - 1; q++) {
+        const a = r * P + q, b = a + 1, c2 = a + P, d = c2 + 1;
+        idx.push(a, c2, b, b, c2, d);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const bore = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      color: this.T.terrainScree ? new THREE.Color(this.T.terrainScree).multiplyScalar(0.72)
+        : 0x55504a,
+      roughness: 1, flatShading: true, side: THREE.DoubleSide,
+    }));
+    bore.name = 'tunnel';
+    bore.castShadow = bore.receiveShadow = true;
+    this.group.add(bore);
+    // lamp strip under the crown + wall solids every few metres
+    const span = Math.floor((e0 - s0) / STEP);
+    const lampGeo = new THREE.BoxGeometry(0.9, 0.24, 0.42);
+    const lamps = new THREE.InstancedMesh(
+      lampGeo, new THREE.MeshBasicMaterial({ color: 0xffd9a0 }), Math.ceil(span / 3) + 1);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    let lk = 0;
+    for (let j = s0 + 2; j < e0; j += STEP * 3) {
+      const i = j % N;
+      const c = this.center[i];
+      q.setFromAxisAngle(up, this.headingAt(i));
+      m4.compose(new THREE.Vector3(c.x, this.groundHeightAt(i, 0) + APEX - 0.4, c.z), q,
+        new THREE.Vector3(1, 1, 1));
+      if (lk < lamps.count) lamps.setMatrixAt(lk++, m4);
+    }
+    lamps.count = lk;
+    this.group.add(lamps);
+    for (let j = s0; j <= e0; j += 1) {
+      const i = j % N;
+      const c = this.center[i], n = this.nrm[i];
+      for (const side of [1, -1]) {
+        this.solids.push({
+          x: c.x + n.x * (HW - 0.5) * side, z: c.z + n.z * (HW - 0.5) * side,
+          r: 1.4, y: this.groundHeightAt(i, 0) + 1, mat: 'stone',
+        });
+      }
+    }
   }
 
   /** Queue a baked contact shadow under an object. r is the DECAL radius in
@@ -7883,6 +8823,11 @@ export class Track {
       pos.setY(i, h - 0.12);
       const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
       tmp.copy(cLow).lerp(cHigh, t);
+      // a sand ring where coastal ground meets the water
+      if (T.coast) {
+        const sand = 1 - THREE.MathUtils.smoothstep(h, -0.6, 1.2);
+        if (sand > 0 && h > -3.5) tmp.lerp(new THREE.Color('#d8c9a0'), sand * 0.85);
+      }
       // sprinkle dirt patches
       const dirt = Math.max(0, Math.sin(x * 0.045 + 2) * Math.sin(z * 0.05) - 0.72) * 3;
       tmp.lerp(cDirt, THREE.MathUtils.clamp(dirt, 0, 0.55));
@@ -7897,7 +8842,7 @@ export class Track {
       tmp.multiplyScalar(0.93 + 0.07 * t);
       // the hero gorge is cut through red-rock strata: banded ochre/rust walls
       // fading back to the snowfield at the rim
-      if (this._gorge) {
+      if (this._gorge || this._jumpGorges?.length) {
         const cut = this._gorgeCut(x, z);
         if (cut > 0.6) {
           const band = STRATA[((Math.floor(h * 0.42) % STRATA.length) + STRATA.length) % STRATA.length];
@@ -8187,6 +9132,7 @@ export class Track {
     // mountain range across the bay turns open sea into a lake (and at fog
     // distance those cones ARE the cream the sea was built to replace).
     const inSea = (x, z, w) => this.T.coast && this._coastSide(x, z) > -(w * 0.7);
+    const jcol = new THREE.Color();
     let hk = 0;
     for (let i = 0; i < 40; i++) {
       const a = (i / 40) * Math.PI * 2;
@@ -8195,9 +9141,13 @@ export class Track {
       const w = 130 + Math.random() * 150;
       const px = Math.cos(a) * r, pz = Math.sin(a) * r;
       if (inSea(px, pz, w)) continue;
-      m4.makeScale(w, h, w);
+      // asymmetric base + a lean: a ridge fragment, not a pyramid
+      m4.makeRotationY(Math.random() * Math.PI);
+      m4.scale(new THREE.Vector3(w, h, w * (0.55 + Math.random() * 0.6)));
       m4.setPosition(px, h / 2 + seat(px, pz), pz);
-      hills.setMatrixAt(hk++, m4);
+      hills.setMatrixAt(hk, m4);
+      jcol.setScalar(0.82 + Math.random() * 0.3);
+      hills.setColorAt(hk++, jcol);
     }
     hills.count = hk;
     let pk = 0;
@@ -8208,9 +9158,26 @@ export class Track {
       const w = 120 + Math.random() * 140;
       const px = Math.cos(a) * r, pz = Math.sin(a) * r;
       if (inSea(px, pz, w)) continue;
-      m4.makeScale(w, h, w);
+      m4.makeRotationY(Math.random() * Math.PI);
+      m4.scale(new THREE.Vector3(w, h, w * (0.5 + Math.random() * 0.7)));
       m4.setPosition(px, h / 2 + seat(px, pz), pz);
-      peaks.setMatrixAt(pk++, m4);
+      peaks.setMatrixAt(pk, m4);
+      jcol.setScalar(0.78 + Math.random() * 0.36);
+      peaks.setColorAt(pk++, jcol);
+      // a lower shoulder leaning on the peak - crags come in families
+      if (pk < 30 && Math.random() < 0.6) {
+        const sw = w * 0.55, sh = h * (0.45 + Math.random() * 0.2);
+        const sx = px + Math.cos(a + 1.57) * w * 0.5;
+        const sz = pz + Math.sin(a + 1.57) * w * 0.5;
+        if (!inSea(sx, sz, sw)) {
+          m4.makeRotationY(Math.random() * Math.PI);
+          m4.scale(new THREE.Vector3(sw, sh, sw * 0.7));
+          m4.setPosition(sx, sh / 2 + seat(sx, sz), sz);
+          peaks.setMatrixAt(pk, m4);
+          jcol.setScalar(0.72 + Math.random() * 0.3);
+          peaks.setColorAt(pk++, jcol);
+        }
+      }
     }
     peaks.count = pk;
     // named so a world whose skyline must be built, not geological, can drop
@@ -8220,6 +9187,7 @@ export class Track {
     this.group.add(hills, peaks);
     if (T.massif) this._buildMassif(m4);
     if (T.glacier) this._buildGlacier(m4);
+    if (T.passHotel) this._buildPassHotel(m4);
   }
 
   /** Add flat-topped stratified mesas (3 stacked shrinking slabs each) for
@@ -8660,7 +9628,8 @@ export class Track {
     const placed = this._scatter(COUNT,
       () => {
         let p;
-        if (Math.random() < 0.62) p = this._trackSidePos(15, 46);
+        const belt = T.treeBelt;
+        if (Math.random() < 0.62) p = this._trackSidePos(belt ? belt[0] : 15, belt ? belt[1] : 46);
         else {
           const a = Math.random() * Math.PI * 2;
           const r = 80 + Math.random() * 560;

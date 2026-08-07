@@ -28,7 +28,7 @@ import { disposeSubtree } from './track.js';
 const RURAL = new Set([
   'forest', 'alpine', 'redwood', 'flume', 'oasis', 'desert', 'jungle',
   'snow', 'wildfire', 'pass', 'tremola', 'furka', 'medterrace', 'farmland',
-  'outback',
+  'outback', 'vineyard', 'deepwood', 'dolomiti',
 ]);
 
 // theme-tinted paint (body / darker trim)
@@ -48,6 +48,9 @@ const TINTS = {
   medterrace: [0xd8632a, 0x8f3a16],  // olive-grove orange
   farmland:[0x3e6e3a, 0x25401f],   // farm green, kept off the region accent
   outback: [0xcfc2a6, 0x8a7f66],  // dust-caked station ute cream
+  vineyard: [0x7a3a8a, 0x4e2458],  // wine purple
+  deepwood: [0x3e8a3a, 0x266224],
+  dolomiti: [0x2e72c8, 0x1c4a88],
 };
 
 const TRACTOR_HP = 70;
@@ -192,6 +195,103 @@ function buildTruckMeshes(tint, tintDark, mat) {
   return { group, body, driver, rearW, frontW, rwR: 0.62, fwR: 0.6, stack: _TRUCK_STACK_TIP };
 }
 
+/** Panel van - a delivery box on wheels. */
+function buildVanMeshes(tint, tintDark, mat) {
+  const group = new THREE.Group();
+  const DK = 0x23262b;
+  const body = new THREE.Mesh(mergeGeos([
+    box(1.8, 0.35, 4.2, 0, 0.7, 0, 0x33373d),        // chassis
+    box(1.75, 1.5, 2.6, 0, 1.6, -0.6, tint),         // cargo box
+    box(1.7, 0.95, 1.3, 0, 1.32, 1.35, tintDark),    // cab
+    box(1.5, 0.5, 0.12, 0, 1.6, 2.0, 0x8ec2d8),      // windscreen
+    box(1.6, 0.3, 0.28, 0, 0.68, 2.1, DK),           // bumper
+    box(1.6, 1.1, 0.1, 0, 1.55, -1.92, tintDark),    // rear doors
+  ]), mat);
+  const driver = new THREE.Mesh(mergeGeos([
+    box(0.6, 0.55, 0.38, 0, 0.28, 0, 0x4a4a52),
+    box(0.4, 0.4, 0.4, 0, 0.8, 0, 0xe8b48a),
+  ]), mat);
+  driver.position.set(0, 1.05, 1.1);
+  const rearW = new THREE.Mesh(wheelPairGeo(0.52, 0.32, 0.9, 0xb8b0a4), mat);
+  rearW.position.set(0, 0.52, -1.35);
+  const frontW = new THREE.Mesh(wheelPairGeo(0.52, 0.32, 0.9, 0xb8b0a4), mat);
+  frontW.position.set(0, 0.52, 1.45);
+  body.castShadow = rearW.castShadow = frontW.castShadow = true;
+  group.add(body, driver, rearW, frontW);
+  return { group, body, driver, rearW, frontW, rwR: 0.52, fwR: 0.52, stack: _TRUCK_STACK_TIP };
+}
+
+/** Road-maintenance truck: hazard-orange, tipper bed, amber beacon. */
+function buildMaintenanceMeshes(tint, tintDark, mat) {
+  const ORANGE = 0xd88a1e, ORDK = 0x9a5f12, DK = 0x23262b;
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(mergeGeos([
+    box(1.95, 0.4, 4.4, 0, 0.75, 0, 0x33373d),
+    box(1.85, 0.98, 1.4, 0, 1.45, 1.42, ORANGE),     // cab
+    box(1.6, 0.5, 0.12, 0, 1.72, 2.1, 0x8ec2d8),
+    box(1.9, 0.9, 2.6, 0, 1.35, -0.75, ORDK),        // tipper bed
+    box(1.7, 0.3, 2.4, 0, 1.85, -0.75, 0x6a625a),    // gravel load
+    box(0.5, 0.14, 0.5, 0, 2.05, 1.42, DK),          // beacon base
+    box(0.3, 0.3, 0.3, 0, 2.3, 1.42, 0xffb020),      // amber beacon
+    box(1.9, 0.18, 0.4, 0, 0.66, 2.35, 0xe0e0e0),    // stripe bumper
+  ]), mat);
+  const driver = new THREE.Mesh(mergeGeos([
+    box(0.6, 0.55, 0.38, 0, 0.28, 0, 0xd88a1e),      // hi-vis
+    box(0.4, 0.4, 0.4, 0, 0.8, 0, 0xe8b48a),
+    box(0.46, 0.16, 0.46, 0, 1.05, 0, 0xffffff),     // hard hat
+  ]), mat);
+  driver.position.set(0, 1.15, 1.1);
+  const rearW = new THREE.Mesh(wheelPairGeo(0.62, 0.42, 0.95, 0xb8b0a4), mat);
+  rearW.position.set(0, 0.62, -1.3);
+  const frontW = new THREE.Mesh(wheelPairGeo(0.6, 0.34, 0.95, 0xb8b0a4), mat);
+  frontW.position.set(0, 0.6, 1.55);
+  body.castShadow = rearW.castShadow = frontW.castShadow = true;
+  group.add(body, driver, rearW, frontW);
+  return { group, body, driver, rearW, frontW, rwR: 0.62, fwR: 0.6, stack: _TRUCK_STACK_TIP };
+}
+
+/** Family car - lower and quicker than the farm machinery; often tows. */
+function buildCarMeshes(tint, tintDark, mat) {
+  const group = new THREE.Group();
+  const DK = 0x23262b;
+  const body = new THREE.Mesh(mergeGeos([
+    box(1.7, 0.5, 3.6, 0, 0.72, 0, tint),            // shell
+    box(1.5, 0.5, 1.9, 0, 1.2, -0.15, tintDark),     // glasshouse
+    box(1.35, 0.4, 0.1, 0, 1.18, 0.85, 0x8ec2d8),    // windscreen
+    box(1.5, 0.22, 0.5, 0, 0.62, 1.85, DK),          // bumper
+    box(1.5, 0.22, 0.4, 0, 0.62, -1.82, DK),
+  ]), mat);
+  const driver = new THREE.Mesh(mergeGeos([
+    box(0.55, 0.5, 0.36, 0, 0.26, 0, 0x6a3a5a),
+    box(0.38, 0.38, 0.38, 0, 0.72, 0, 0xe8b48a),
+  ]), mat);
+  driver.position.set(0, 0.95, 0.2);
+  const rearW = new THREE.Mesh(wheelPairGeo(0.42, 0.28, 0.82, 0x2a2d33), mat);
+  rearW.position.set(0, 0.42, -1.15);
+  const frontW = new THREE.Mesh(wheelPairGeo(0.42, 0.28, 0.82, 0x2a2d33), mat);
+  frontW.position.set(0, 0.42, 1.15);
+  body.castShadow = rearW.castShadow = frontW.castShadow = true;
+  group.add(body, driver, rearW, frontW);
+  return { group, body, driver, rearW, frontW, rwR: 0.42, fwR: 0.42, stack: _STACK_TIP };
+}
+
+/** Box luggage trailer - towed by the family car, same contract as the hay
+ *  wagon so attachWagon-style logic applies unchanged. */
+function buildTrailerMeshes(mat) {
+  const group = new THREE.Group();
+  const DK = 0x23262b;
+  const body = new THREE.Mesh(mergeGeos([
+    box(1.4, 0.9, 1.9, 0, 1.05, 0, 0xd8d4c8),        // box
+    box(1.45, 0.12, 2.0, 0, 1.55, 0, 0x8a8478),      // lid
+    box(0.12, 0.12, 1.4, 0, 0.62, 1.5, DK),          // hitch beam
+  ]), mat);
+  const wheels = new THREE.Mesh(wheelPairGeo(0.42, 0.24, 0.78, DK), mat);
+  wheels.position.set(0, 0.42, -0.1);
+  body.castShadow = wheels.castShadow = true;
+  group.add(body, wheels);
+  return { group, body, wheels };
+}
+
 function buildWagonMeshes(mat) {
   const group = new THREE.Group();
   const WOOD = 0x8a6238, HAY = 0xd8b04a;
@@ -323,16 +423,18 @@ function install(game) {
     // They travel WITH the race direction — slow movers you overtake, never
     // head-on traps the AI can't read.
     const spawns = [
-      { f: 0.20, side: -1, lat: 5.8, speed: 6.5, kind: 'tractor', wagon: false },
-      { f: 0.52, side: 1, lat: 6.2, speed: 7.5, kind: 'tractor', wagon: true },
-      { f: 0.80, side: -1, lat: 6.4, speed: 9.5, kind: 'truck', wagon: false },
+      { f: 0.16, side: -1, lat: 5.8, speed: 6.5, kind: 'tractor', wagon: 'hay' },
+      { f: 0.34, side: 1, lat: 6.2, speed: 11.5, kind: 'van', wagon: null },
+      { f: 0.52, side: -1, lat: 6.2, speed: 7.5, kind: 'maint', wagon: null },
+      { f: 0.70, side: 1, lat: 6.0, speed: 12.5, kind: 'car', wagon: 'trailer' },
+      { f: 0.86, side: -1, lat: 6.4, speed: 9.5, kind: 'truck', wagon: null },
     ];
     for (const sp of spawns) {
       const ent = makeVehicle(sp.kind, tint, tintDark);
       ent.fi = ent.spawnFi = (sp.f * N) % N;
       ent.lat = sp.side * sp.lat;
       ent.baseSpeed = sp.speed;
-      if (sp.wagon) attachWagon(ent);
+      if (sp.wagon) attachWagon(ent, sp.wagon);
       S.ents.push(ent);
       poseRoad(ent, true);
     }
@@ -345,7 +447,7 @@ function install(game) {
         if (made >= 2) break;
         const route = makeRoute(trk, cr);
         if (!route) continue;
-        const ent = makeVehicle(made === 0 ? 'tractor' : 'truck', tint, tintDark);
+        const ent = makeVehicle(made === 0 ? 'tractor' : 'van', tint, tintDark);
         ent.baseSpeed = 4.6 + made * 0.8;   // slow = telegraphed
         ent.cross = route;
         if (made === 0) attachWagon(ent);   // the farm rig hauling hay across
@@ -388,8 +490,10 @@ function install(game) {
   }
 
   function makeVehicle(kind, tint, tintDark) {
-    const m = kind === 'truck'
-      ? buildTruckMeshes(tint, tintDark, S.mat)
+    const m = kind === 'truck' ? buildTruckMeshes(tint, tintDark, S.mat)
+      : kind === 'van' ? buildVanMeshes(tint, tintDark, S.mat)
+      : kind === 'maint' ? buildMaintenanceMeshes(tint, tintDark, S.mat)
+      : kind === 'car' ? buildCarMeshes(tint, tintDark, S.mat)
       : buildTractorMeshes(tint, tintDark, S.mat);
     (game.worldLayer || game.scene).add(m.group);
     return {
@@ -405,10 +509,10 @@ function install(game) {
     };
   }
 
-  function attachWagon(ent) {
-    const w = buildWagonMeshes(S.mat);
+  function attachWagon(ent, kind = 'hay') {
+    const w = kind === 'trailer' ? buildTrailerMeshes(S.mat) : buildWagonMeshes(S.mat);
     (game.worldLayer || game.scene).add(w.group);
-    ent.wagon = { ...w, hitch: 4.4, proxy: registerProxy() };
+    ent.wagon = { ...w, hitch: kind === 'trailer' ? 3.6 : 4.4, proxy: registerProxy() };
   }
 
   // ---------- posing ----------

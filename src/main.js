@@ -404,6 +404,10 @@ const DEMANDS = {
   42: { loose: 0.55, twist: 0.75, fast: 0.25, climb: 0.20 }, // RALLYCROSS ARENA
   43: { loose: 0.55, twist: 0.55, fast: 0.50, climb: 0.30 }, // OULTON PARK
   44: { loose: 0.12, twist: 0.60, fast: 0.55, climb: 0.55 }, // LAGUNA SECA
+  45: { loose: 0.10, twist: 0.95, fast: 0.15, climb: 0.60 }, // TOUR DE CORSE
+  46: { loose: 0.25, twist: 0.70, fast: 0.35, climb: 0.20 }, // VINEYARD VELOCE
+  47: { loose: 0.45, twist: 0.60, fast: 0.40, climb: 0.25 }, // DEEPWOOD TRAIL
+  48: { loose: 0.60, twist: 0.75, fast: 0.30, climb: 0.65 }, // DOLOMITI CORSA
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {
@@ -868,7 +872,8 @@ class Game {
     this.fovKick = 0;     // camera punch on the same impacts
     this.audio = new AudioEngine();
     this.input = new Input();
-    this.lapsTotal = LAPS;
+    // a point-to-point stage (FURKA) races ONE long lap; circuits race 3
+    this.lapsTotal = this.level?.laps ?? LAPS;
     this.contractPool = CONTRACT_POOL; // exposed for the headless suites
 
     const carEntry = CAR_CATALOG.find((c) => c.key === this.cars.selected) || CAR_CATALOG[0];
