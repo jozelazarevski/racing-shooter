@@ -3704,7 +3704,39 @@ export class Track {
     } else {
       for (let k = bed.length - 2; k >= 0; k--) bed[k] = Math.min(bed[k], bed[k + 1]);
     }
-    this._river.bed = bed;
+
+    // THE FLOOR IS STEPPED, BECAUSE THE WATER IS.
+    //
+    // The water runs in LEVEL REACHES joined by VERTICAL FALLS — that is the
+    // shape that was asked for and it is what makes a waterfall read as one.
+    // The bed it was cut into was smooth, so at every fall the surface stepped
+    // down and the ground beneath it did not: the water hung over the slope
+    // with daylight under its lip. Reported as "look at the river how it is
+    // floating in the air", and correctly — no clamp on the WATER can fix it,
+    // because the water is the thing that is right. It is the GROUND that has
+    // to have a rock face at the fall.
+    //
+    // So the same quantisation is applied here, ONCE, and the channel is
+    // carved from the result. The water profile in _buildRiver then re-derives
+    // the identical steps from this bed (its own pass becomes a no-op, every
+    // drop already exceeding FALL), so the rock face and the face of the water
+    // are the same face by construction — not two things kept in agreement.
+    const FALL = 1.1;                    // must match _buildRiver's FALL
+    const step = bed.slice();
+    if (flowsForward) {
+      let hold = step[0];
+      for (let k = 0; k < step.length; k++) {
+        if (hold - step[k] > FALL) hold = step[k];
+        step[k] = hold;
+      }
+    } else {
+      let hold = step[step.length - 1];
+      for (let k = step.length - 1; k >= 0; k--) {
+        if (hold - step[k] > FALL) hold = step[k];
+        step[k] = hold;
+      }
+    }
+    this._river.bed = step;
     // THE WIDTH IS PART OF THE TEMPLATE, so the carve and the ribbon have to
     // read the SAME number. The water's half-width breathes (so the reach does
     // not read as a canal) by up to 1.36x, but the channel was cut flat only
