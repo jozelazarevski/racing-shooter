@@ -85,10 +85,21 @@ r = await page.evaluate(async () => {
   pr.x = c.x; pr.z = c.z; pr.mesh.position.set(c.x, c.y, c.z);
   p.placeAt(700, 0);
   const before = g.props.length;
+  // CONDITION-DRIVEN, NOT WALL-CLOCK. This waited a flat 3500 ms, which at the
+  // ~1 fps headless Chromium manages under swiftshader is about three physics
+  // frames — roughly 0.35 u of travel, against the ~7 u the car has to cover to
+  // reach the prop. It passed only on a lightly loaded machine and reported the
+  // game as broken on a busy one. Poll for the smash instead, and cap the wait
+  // in FRAMES so a slow box simply takes longer rather than failing.
   const iv = setInterval(() => { if (Math.abs(p.speedAlong) < 4) p.vel.copy(p.forward).multiplyScalar(6); }, 200);
-  await new Promise(res => setTimeout(res, 3500));
+  let waited = 0;
+  while (g.props.length === before && waited < 60) {
+    await new Promise(res => setTimeout(res, 250));
+    waited++;
+  }
   clearInterval(iv);
-  return { before, after: g.props.length, sp: +p.speedAlong.toFixed(1) };
+  const gap = +Math.hypot(p.pos.x - pr.x, p.pos.z - pr.z).toFixed(2);
+  return { before, after: g.props.length, sp: +p.speedAlong.toFixed(1), gap, waited };
 });
 console.log('SLOW CONTACT:', JSON.stringify(r), r.after < r.before ? 'PASS' : 'FAIL');
 

@@ -1283,6 +1283,13 @@ class Game {
     this.roamStars = [];
     this.chopperTimer = 0;
     this.chopperWave = 0;
+    // ...and the raider countdown, which was the one spawn timer nobody reset.
+    // Measured, it held 24.4 s unchanged across four mode switches and four
+    // race resets while chopperTimer correctly returned to its start value, so
+    // a second free-roam session inherited a part-elapsed countdown instead of
+    // a fresh one. It cannot fire in a race (the spawner is freeRoam-gated),
+    // which is why it went unnoticed.
+    this._raiderTimer = 25;
     this._resetFlashes();
     this._buildGunNests();
     this._buildRoamStars();
@@ -4337,7 +4344,12 @@ class Game {
     // first burst reads as "bullets do nothing to buildings". Say it once,
     // on the first hit, and again when it is nearly down.
     if (credit === this.player && b.hp > 0) {
-      if (!b._hinted) { b._hinted = true; this.hud.feed('WALL HOLDING — KEEP FIRING', 'info'); }
+      // "WALL HOLDING" was reported as arena text leaking into a race, and the
+      // reading is fair: a bare singular "WALL" parses as an objective noun,
+      // not as the wall of the house you are shooting. It never was a leak —
+      // this is mode-agnostic building feedback on purpose — but the wording
+      // invited the bug report, and it now matches its own second stage below.
+      if (!b._hinted) { b._hinted = true; this.hud.feed('STRUCTURE HOLDING — KEEP FIRING', 'info'); }
       else if (!b._hinted2 && b.hp < b.maxHp * 0.35) {
         b._hinted2 = true; this.hud.feed('STRUCTURE FAILING', 'good');
       }
@@ -4380,7 +4392,11 @@ class Game {
     this.hud.feed('BUILDING DOWN', 'good');
     this.score += 120;
     if (credit === this.player) this.buzz(30);
-    this._missionEvent?.('prop', { type: 'building' });
+    // Guarded like its siblings. `_missionEvent` early-returns outside a
+    // mission anyway, so this is consistency rather than a fix — but it was
+    // the only race-side call into the mission bus, which is exactly the shape
+    // that makes an auditor suspect a mode leak.
+    if (this.missionMode) this._missionEvent?.('prop', { type: 'building' });
   }
 
   onTireSmash(st, car, ox, oz) {
@@ -4589,6 +4605,10 @@ class Game {
       prevHealth: null, prevHeat: 0, prevMissiles: null, prevMines: null, prevShock: 0 };
     this.hud?.setContracts?.([]);
     for (const a2 of this.herds ?? []) { a2.alive = true; a2.mesh.visible = true; a2.x = a2.homeX; a2.z = a2.homeZ; }
+    // Stand the world back up. Props, herds, pickups, husks and car parts were
+    // already restored here; buildings and trees never were, so a house you
+    // flattened in race 1 was still rubble in race 2 of the same session.
+    this.track?.restoreSmashed?.();
     this._missionReset?.(); // [MISSIONS] mission state never survives a reset
     this._clearWorldHazards?.();
     for (const h of this.husks) this.scene.remove(h.mesh);

@@ -3553,8 +3553,22 @@ export class Track {
       // never on it.
       const side = k % 2 === 0 ? -1 : 1;
       const r = roots ? 1.2 + Math.random() * 0.5 : 2.2 + Math.random();
-      const lateral = side * (w + r + 0.9);   // inner edge just past the verge
+      // Set BACK from the verge, not hard against it. At `w + r + 0.9` the
+      // inner edges landed at 9.9 against a 9 u road half — a near-continuous
+      // boulder ring in the exact band where you leave the road, which fights
+      // both the open-world rule ("leave the road anywhere") and the shortcut
+      // work. Rocks belong beside the course, not lining its edge like bollards.
+      const lateral = side * (w + r + 4.6);
       const p = this.pointAt(i, lateral);
+      // AND CHECK IT AGAINST THE WHOLE LAP. `lateral` is measured along the
+      // normal at sample `i`; on a switchback world the road's other leg
+      // swings underneath, so an obstacle correctly set back from ITS leg can
+      // land on the carriageway of the one below. Measured on TREMOLA DESCENT
+      // after the setback above, one came out 5.6 u from the centreline —
+      // squarely in the lane. This is the third system to need the lap-wide
+      // check (road cabins and props were the first two); an offset is not a
+      // distance, and `_distToTrack` searches the lap.
+      if (this._distToTrack(p.x, p.z) < w + r + 1.5) return;
       if (spec.style === 'roots') {
         // gnarled redwood roots breaking the surface: 3 low half-buried ridges
         const g = new THREE.Group();
@@ -4152,6 +4166,15 @@ export class Track {
     const g = new THREE.Group();
     const tint = new THREE.Color();
     for (const part of tr.parts) {
+      // Same as smashBuilding: keep the pristine transform so restoreSmashed
+      // can stand the tree back up between races. Keyed by instance id because
+      // one InstancedMesh carries every tree of that part type.
+      if (!part.m0) part.m0 = {};
+      if (!part.m0[tr.id]) {
+        const m = new THREE.Matrix4();
+        part.getMatrixAt(tr.id, m);
+        part.m0[tr.id] = m;
+      }
       // capture the per-instance color BEFORE zeroing the instance out
       if (part.instanceColor) part.getColorAt(tr.id, tint);
       else tint.setScalar(1);
@@ -7650,12 +7673,53 @@ export class Track {
     b.dead = true;
     const zero = new THREE.Matrix4().makeScale(0, 0, 0);
     for (const p of b.parts) {
+      // Keep the original transform BEFORE blanking it, so the world can be
+      // put back between races. Captured once — a rebuilt building that is
+      // smashed again must not overwrite the pristine matrix with itself.
+      if (!p.m0) { p.m0 = new THREE.Matrix4(); p.mesh.getMatrixAt(p.i, p.m0); }
       p.mesh.setMatrixAt(p.i, zero);
       p.mesh.instanceMatrix.needsUpdate = true;
     }
     const si = this.solids.indexOf(b.solid);
     if (si >= 0) this.solids.splice(si, 1);
     return b;
+  }
+
+  /** Put every smashed building and tree back.
+   *
+   *  `resetRace` restored props, herds, pickups, husks and car parts, but never
+   *  the world's buildings or trees — so a house you flattened in race 1 was
+   *  still rubble in race 2 of the same session, and the "STRUCTURE HOLDING"
+   *  hint fired once per building per PAGE LOAD rather than per race. Starting
+   *  a race on a world someone has already levelled is not a fresh start. */
+  restoreSmashed() {
+    let buildings = 0, trees = 0;
+    for (const b of this.buildings ?? []) {
+      if (!b.dead) continue;
+      for (const p of b.parts) {
+        if (!p.m0) continue;
+        p.mesh.setMatrixAt(p.i, p.m0);
+        p.mesh.instanceMatrix.needsUpdate = true;
+      }
+      b.dead = false;
+      b.hp = b.maxHp ?? b.hp;
+      b._hinted = false; b._hinted2 = false;
+      if (b.solid && !this.solids.includes(b.solid)) this.solids.push(b.solid);
+      buildings++;
+    }
+    for (const tr of this.trees ?? []) {
+      if (!tr.dead) continue;
+      for (const part of tr.parts ?? []) {
+        const m = part.m0 && part.m0[tr.id];
+        if (!m) continue;
+        part.setMatrixAt(tr.id, m);
+        part.instanceMatrix.needsUpdate = true;
+      }
+      tr.dead = false;
+      tr.hp = undefined;                 // re-derived from size on the next hit
+      trees++;
+    }
+    return { buildings, trees };
   }
 
   /** Glacial dwellings: white ice-block domes (half-sunk spheres) with a short

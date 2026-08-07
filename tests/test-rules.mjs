@@ -62,8 +62,16 @@ const boot = async (url) => {
     const n = t.nrm[p.trackIndex];
     const side = Math.sign(p.lateral) || 1;
     p.heading = Math.atan2(-n.x * side, -n.z * side);
+    // CONDITION-DRIVEN, NOT WALL-CLOCK. A flat 3500 ms is about three physics
+    // frames at the ~1 fps headless Chromium manages under swiftshader, which
+    // is nowhere near enough to drive 11 u back to the road — it reported
+    // backLat 10.0 against a "< 10" threshold and called an open world walled.
+    // Poll for the return and cap the wait in polls, so a slow box takes longer
+    // instead of failing.
     const iv2 = setInterval(() => { if (Math.abs(p.lateral) > 3) p.vel.copy(p.forward).multiplyScalar(20); }, 100);
-    await new Promise(res => setTimeout(res, 3500));
+    for (let k = 0; k < 60 && Math.abs(p.lateral) >= 8; k++) {
+      await new Promise(res => setTimeout(res, 250));
+    }
     clearInterval(iv2);
     return { out, usedIdx, maxLat: +maxLat.toFixed(1), backLat: +p.lateral.toFixed(1) };
   });
