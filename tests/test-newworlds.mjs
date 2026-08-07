@@ -24,7 +24,7 @@ const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' :
 
 const NEW = [[29, 'OLIVE COAST', 'medterrace'], [30, 'LANTERN QUARTER', 'oldtown'],
              [31, 'HEDGEROW DASH', 'farmland'], [32, 'RED CENTRE RUN', 'outback'],
-             [33, 'RED BULL RING', 'alpine'], [34, 'MONACO STREETS', 'medterrace'],
+             [33, 'RED BULL RING', 'alpine'], [34, 'MONACO STREETS', 'monteCarlo'],
              [35, 'SILVERSTONE', 'farmland'], [36, 'SPA-FRANCORCHAMPS', 'forest'],
              [37, 'SUZUKA', 'redwood'], [38, 'NORDSCHLEIFE', 'forest'],
              [39, 'MONZA', 'medterrace'], [40, 'MARINA BAY', 'neon'],
