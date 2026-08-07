@@ -1691,6 +1691,54 @@ export class Car {
         }
       }
     }
+    // CLIMBING IS A FUNCTION OF INCLINATION — everywhere, not just the rim.
+    //
+    // The gate above stops the border wall; this one is the report "climbing
+    // the hills needs to be appropriate with the inclination — too steep
+    // can't be climbed". The physics: driving force is capped by traction,
+    // traction by the normal force, so past tan(θ) ≈ μ the wheels cannot hold
+    // and gravity takes the rest. 0.40 (~22°) is the budget — every ROAD in
+    // the game grades under 24 % and is exempt anyway (this is off-road only),
+    // so nothing on a racing line changes.
+    //
+    // THE REGRESSION THIS MUST NOT RE-SHIP (see the rim gate's history): the
+    // banks beside a switchback stack read near-vertical, and braking there
+    // stranded players scrambling BACK to the road. So the rejoin corridor is
+    // exempt — this only engages beyond 14 u of lateral, confirmed by a
+    // global search before it is believed (the tracked index lies exactly on
+    // stacked legs), and the whole check runs only on frames already moving
+    // uphill off-road, which is nowhere on a clean lap.
+    const CLIMB_MAX = 0.40;
+    if (!this.airborne && offRoad && this.alive && this === this.game.player) {
+      const v2h = this.vel.x * this.vel.x + this.vel.z * this.vel.z;
+      if (v2h > 1) {
+        const inv = 1 / Math.sqrt(v2h);
+        const dxh = this.vel.x * inv, dzh = this.vel.z * inv;
+        const LOOK = 4;
+        const gradeUp = (t.terrainHeight(this.pos.x + dxh * LOOK, this.pos.z + dzh * LOOK) - gY) / LOOK;
+        if (gradeUp > CLIMB_MAX && Math.abs(this.lateral) > 14) {
+          let lat = Math.abs(this.lateral);
+          if (t.nearestIndex && t.lateralOffset) {
+            const gi = t.nearestIndex(this.pos);   // no hint: search the lap
+            lat = Math.abs(t.lateralOffset(this.pos, gi));
+          }
+          if (lat > 14) {
+            const over = Math.min(1, (gradeUp - CLIMB_MAX) / 0.30);
+            // traction fades out...
+            this.vel.multiplyScalar(Math.max(0, 1 - over * 3.5 * dt));
+            // ...and gravity's slope component pushes back down. 26 is the
+            // game's own g (the airborne branch integrates with it).
+            const gPush = 26 * Math.min(1.2, gradeUp) * over * 0.55;
+            this.vel.x -= dxh * gPush * dt;
+            this.vel.z -= dzh * gPush * dt;
+            if (over > 0.4 && !this._steepFed) {
+              this._steepFed = 1.5;
+              this.game.hud?.feed?.('TOO STEEP', 'bad');
+            }
+          }
+        }
+      }
+    }
     if (this._steepFed > 0) this._steepFed = Math.max(0, this._steepFed - dt);
     if (this.airborne) {
       this.vy -= 26 * dt;

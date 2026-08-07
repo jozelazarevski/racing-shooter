@@ -4240,18 +4240,25 @@ class Game {
         if (Math.abs((c.y ?? c.pos.y) - d.y) > 4.5) continue;   // on a bridge over it
         const dist = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
         const nx = dx / dist, nz = dz / dist;
-        c.pos.x = d.x + nx * rr;
-        c.pos.z = d.z + nz * rr;
         const vn = c.vel.x * nx + c.vel.z * nz;
-        if (vn < 0) {
-          // kill the closing speed and take a bite out of the rest: a low
-          // obstacle you can bulldoze through, at a price
-          c.vel.x -= nx * vn; c.vel.z -= nz * vn;
-          c.vel.multiplyScalar(0.86);
-          // ...and it gets kicked along, because a wheel is not a bollard
-          const push = Math.min(2.2, Math.abs(vn) * 0.06);
-          d.x -= nx * push; d.z -= nz * push;
-          d.mesh.position.x = d.x; d.mesh.position.z = d.z;
+        // MASS MATTERS. The first cut repositioned the car out of every piece
+        // it touched and killed the closing speed — so a car that drove into
+        // two settled tyres wedged between the alternating push-outs and went
+        // from 14 u/s to zero, a bollard made of rubber. A loose wheel weighs
+        // forty kilos: at speed the CAR wins — it punts the piece away down
+        // its own line of travel and pays a slice of momentum for it. Only a
+        // crawling car is walled out, because you cannot park inside a wreck.
+        if (vn < -6) {
+          const kick = Math.min(9, -vn * 0.9 / (d.r * d.r));   // r² as a mass proxy
+          d.x -= nx * kick; d.z -= nz * kick;
+          d.y = this._debrisGround(d.x, d.z);
+          d.mesh.position.set(d.x, d.y, d.mesh.position.z = d.z);
+          d.mesh.rotation.y += kick * 0.4;
+          c.vel.multiplyScalar(Math.max(0.7, 1 - 0.10 / d.r));  // heavier = costlier
+        } else {
+          c.pos.x = d.x + nx * rr;
+          c.pos.z = d.z + nz * rr;
+          if (vn < 0) { c.vel.x -= nx * vn; c.vel.z -= nz * vn; }
         }
         break;
       }
