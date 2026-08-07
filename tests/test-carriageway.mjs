@@ -40,8 +40,10 @@ const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' :
 // intrusion was measured. LOG FLUME FURY and ROCKFALL RAVINE had the densest
 // prop clutter. COL DE TURINI had the worst tire stack. PINE VALLEY has no
 // obstacles at all, so anything found there came from another system entirely.
+// OLIVE COAST is the only world that puts anything ON the tarmac on purpose
+// (the corner-exit gravel), so it is swept here as well.
 const WORLDS = [[21, 'FURKA RIDGE'], [13, 'LOG FLUME FURY'], [10, 'ROCKFALL RAVINE'],
-                [22, 'COL DE TURINI'], [1, 'PINE VALLEY']];
+                [22, 'COL DE TURINI'], [1, 'PINE VALLEY'], [29, 'OLIVE COAST']];
 
 for (const [id, name] of WORLDS) {
   const p = await browser.newPage({ viewport: { width: 640, height: 400 } });

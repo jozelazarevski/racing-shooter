@@ -75,6 +75,7 @@ const WORLD_TAGS = {
   flume: '💧 flume runs · log yard', wildfire: '🔥 burning treefall',
   sheetice: '❄ sheet ice · icicles', avalanche: '❄ avalanche chase',
   neon: 'maglev lanes · night city', undercity: '🐀 rats · tunnels',
+  medterrace: 'stone walls · gravel on the exits',
 };
 
 // steer: how much of the car's steering rate the player gets in this view.
@@ -197,6 +198,9 @@ const LIVESTOCK_BY_THEME = {
   oasis:    { kinds: ['camel', 'goat', 'coyote'], perHerd: 3 },
   jungle:   { kinds: ['capybara', 'boar', 'deer'], perHerd: 3 },
   flume:    { kinds: ['deer', 'cow', 'boar'],  perHerd: 3 },
+  // OLIVE COAST: sheep flocks behind wire on the terraces, and the wild boar
+  // that is the region's authored crossing
+  medterrace: { kinds: ['sheep', 'boar', 'goat'], perHerd: 5 },
 };
 
 // hazard particle tints (hoisted — per-frame spawns must not allocate)
@@ -353,6 +357,10 @@ const DEMANDS = {
   26: { loose: 0.12, twist: 0.00, fast: 0.88, climb: 0.35 }, // SAFARI PLAINS
   27: { loose: 0.12, twist: 0.88, fast: 0.06, climb: 0.48 }, // CORNICHE
   28: { loose: 0.55, twist: 0.09, fast: 0.78, climb: 0.69 }, // ESTONIA CRESTS
+  // MEDITERRANEAN. twist / fast / climb are read off the built world with the
+  // same expression tests/test-affinity.mjs uses, so this row is measured, not
+  // assigned. `loose` is 0.12: dry tarmac.
+  29: { loose: 0.12, twist: 0.24, fast: 0.57, climb: 0.63 }, // OLIVE COAST
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {
