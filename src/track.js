@@ -3737,6 +3737,11 @@ export class Track {
       }
     }
     this._river.bed = step;
+    // The direction the bed was stepped along. The water-profile pass in
+    // _buildRiver must walk the SAME direction: a reach-and-fall profile run
+    // against the flow reads every fall as a climb and flattens the whole
+    // river to its lowest level.
+    this._river.flow = flowsForward ? 1 : -1;
     // THE WIDTH IS PART OF THE TEMPLATE, so the carve and the ribbon have to
     // read the SAME number. The water's half-width breathes (so the reach does
     // not read as a canal) by up to 1.36x, but the channel was cut flat only
@@ -10545,40 +10550,6 @@ export class Track {
     this.group.add(bank);
 
     // --- water: sits IN the bed, rises to a shallow sheet over the ford ---
-    const waterY = (f, off, vx, vz) => {
-      const lift = 1 - THREE.MathUtils.smoothstep(f.df, 10, 26);
-      // LEVEL ACROSS THE WIDTH. Sampling the bed under each vertex made the
-      // surface follow the ground sideways, so on any slope the river banked
-      // over like a tilted tray and its edge climbed out onto the grass. Real
-      // water is level bank to bank and only falls along its length, so the
-      // height comes from the flow profile and the same value is used right
-      // across the ribbon. Reading the profile rather than the mesh also means
-      // the surface cannot be sliced up by whatever the hill noise is doing.
-      const bed = R.bed ? R.bed[this._riverNearest(f.x, f.z).k] : this.terrainHeight(f.x, f.z);
-      // PARTWAY UP THE CARVED CHANNEL — measured from the channel FLOOR.
-      //
-      // `R.bed[k]` is the smoothed GROUND profile along the reach; the carve in
-      // terrainHeight pulls the ground down to `bed - depth` at the centreline
-      // and blends back to `bed` at the bank top. So "0.42 of the way up the
-      // channel" is `bed - depth + 0.42 * depth`. Written as `bed + 0.42 *
-      // depth` it was one whole `depth` too high — 2.6 u — which put the water
-      // surface 1.09 u ABOVE the ground it was supposed to be cut into. Every
-      // river in the game was a slab standing proud of its own banks, which is
-      // what the hard blue edge on the grass was in the report.
-      const open = bed - R.depth * 0.58;
-      if (lift <= 0) return open;
-      // ACROSS THE ROAD THE WASH SITS ON THE DECK, NOT ON THE BED.
-      //
-      // "just proud of the deck" was measured from the river bed, and the road
-      // deck is metres above the carved channel — at every ford on AMAZON
-      // RAPIDS the water surface came out 1.3 to 3.0 u BELOW the road, and 8.3 u
-      // below it on LOG FLUME. So the water was buried inside the road mesh and
-      // a crossing rendered as two white foam lines with dry dirt between them:
-      // an unexplained stripe across the carriageway rather than a stream.
-      _clearV.set(f.x, 0, f.z);
-      const deck = this.center[this.nearestIndex(_clearV)].y;
-      return open * (1 - lift) + (deck + 0.05) * lift;
-    };
     // ---- LEVEL REACHES, VERTICAL FALLS (the big river, not just the streams) --
     //
     // THE BUG: `waterY` above reads the bed under every station, so the surface
@@ -10605,9 +10576,16 @@ export class Track {
     // the reach. Letting a rising bed lift the surface instead produced 153
     // upward steps on PINE VALLEY, one of them a 13 u wall of water facing
     // upstream — measurably worse than the slope it replaced.
+    // WALKED ALONG THE FLOW, which is not always along t: the curve's
+    // parameter runs whichever way the spline was authored, and the bed was
+    // stepped downhill from whichever end is higher. Running this loop against
+    // the flow turns every fall into a climb the hold logic ignores, and the
+    // river comes out as one flat sheet at the level of its lowest point.
     const surf = new Array(F.length);
+    const dirF = R.flow ?? 1;
     let hold = null;
-    for (let s = 0; s < F.length; s++) {
+    for (let i = 0; i < F.length; i++) {
+      const s = dirF > 0 ? i : F.length - 1 - i;
       const f = F[s];
       const bed = R.bed ? R.bed[this._riverNearest(f.x, f.z).k] : this.terrainHeight(f.x, f.z);
       const open = bed - R.depth * 0.58;   // see waterY — measured from the channel floor
@@ -10616,16 +10594,39 @@ export class Track {
       surf[s] = hold;
     }
 
-    // PASS 2 — the fords. Where the river crosses the road the wash sits on the
-    // DECK, so the road works as a weir: the water is held up to deck level, it
-    // is never pulled down. `Math.max` is what keeps this from reintroducing a
-    // downhill drape, and the blend band is the one `waterY` already uses.
+    // PASS 2 — the fords. Where the river CROSSES the road the wash sits on
+    // the DECK, so the road works as a weir.
+    //
+    // "Where it crosses" is the load-bearing part, and it used to be tested
+    // with distance to the ROADLINE alone. On HEDGEROW DASH the river runs
+    // down a ravine BESIDE a road that climbs the hillside above it: within
+    // 26 u laterally for a long stretch, 280 u from the nearest actual
+    // crossing, with the deck 41 u above the water. The blend hauled the
+    // river up toward that deck and built a wall of water standing in the
+    // valley — the single worst "floating river" offender measured, and the
+    // one in the report's screenshot. A ford is a PLACE, planned and stored
+    // in R.fords; proximity to the road is not it.
+    const fordPts = (R.fords ?? []).map((fd) => this.center[fd.i]).filter(Boolean);
+    const fordDist = (x, z) => {
+      let m = Infinity;
+      for (const c of fordPts) m = Math.min(m, Math.hypot(x - c.x, z - c.z));
+      return m;
+    };
     for (let s = 0; s < F.length; s++) {
       const f = F[s];
-      const lift = 1 - THREE.MathUtils.smoothstep(f.df, 10, 26);
-      if (lift <= 0) continue;
+      const nearFord = 1 - THREE.MathUtils.smoothstep(fordDist(f.x, f.z), 30, 46);
+      if (nearFord <= 0) continue;
       _clearV.set(f.x, 0, f.z);
       const deck = this.center[this.nearestIndex(_clearV)].y + 0.05;
+      // A FORD IS A PLACE *AND* A LEVEL. HEDGEROW DASH's planner threaded a
+      // crossing where the road runs 43 u above the river — the road BRIDGES
+      // the ravine there, it does not ford it — and this blend then ramped the
+      // water 42 u up the embankment to reach a deck it had no business on.
+      // If the deck is not within a car's height or two of the water, there is
+      // no weir: the river keeps its level and passes under.
+      const heightGate = 1 - THREE.MathUtils.smoothstep(Math.abs(deck - surf[s]), 5, 10);
+      const lift = (1 - THREE.MathUtils.smoothstep(f.df, 10, 26)) * nearFord * heightGate;
+      if (lift <= 0) continue;
       // Blend TO the deck, not `Math.max` toward it. Taking the max let a
       // pooled reach that already sat above the road stay there, and the wash
       // came out 1.8 u proud of the carriageway on PINE VALLEY — a wall of
@@ -10654,12 +10655,41 @@ export class Track {
     for (let s = 0; s < F.length; s++) {
       const f = F[s];
       let hi = -Infinity;
-      for (const c of [-1, -0.5, 0, 0.5, 1]) {
+      // CENTRE columns only. The outermost columns are SUPPOSED to be under
+      // the ground — that is what a shoreline is: the surface meets the bank
+      // somewhere inside the ribbon's width. Clamping the whole surface above
+      // the highest EDGE meant that wherever one bank stood tall the entire
+      // river was floated up to that bank's top: measured as the 5-8 u sheets
+      // standing over the channel on PINE VALLEY and LOG FLUME.
+      for (const c of [-0.5, 0, 0.5]) {
         const vx = f.x + f.nx * c * f.w, vz = f.z + f.nz * c * f.w;
         const g = this.terrainHeight(vx, vz);
         if (g > hi) hi = g;
       }
-      if (surf[s] < hi + MIN_CLEAR) surf[s] = hi + MIN_CLEAR;
+      // THE CULVERT RULE. Near the road the carve fades out on purpose (the
+      // roadbed must survive), so the ground here is road-grade even though
+      // the river runs 40 u lower either side. Raising the water over that
+      // lip built a 40 u hump of water climbing onto the carriageway at a
+      // spot that is NOT a ford — and a 40 u waterfall one station later,
+      // hanging in the air with no rock face behind it. That pair, on
+      // HEDGEROW DASH, is the screenshot in the report. A river that meets a
+      // road embankment anywhere but a ford goes UNDER it: skip the raise,
+      // let the embankment swallow the ribbon, and it re-emerges on the far
+      // side — a culvert, which is what a real road over a real stream has.
+      _clearV.set(f.x, 0, f.z);
+      const deckC = this.center[this.nearestIndex(_clearV)].y + 0.05;
+      // ...and a planned ford whose deck is far above the water is a BRIDGE,
+      // which for the water is the same as no ford at all
+      const culvert = f.df < 24
+        && (fordDist(f.x, f.z) > 46 || Math.abs(deckC - surf[s]) > 9);
+      // ...and the raise is CAPPED. Where a knob of ground pokes far through
+      // the reach, lifting the whole river over it built a one-station slab
+      // standing 7.9 u above the valley floor either side (HEDGEROW, at a
+      // mid-channel rock). A boulder in a stream parts the water: past 2 u the
+      // knob pierces the surface and the river keeps its level — which is
+      // also exactly how the deliberate in-stream rocks already read.
+      const need = hi + MIN_CLEAR;
+      if (!culvert && surf[s] < need && need - surf[s] <= 2.0) surf[s] = need;
       // ...and never a slab standing proud of the land it runs through
       const cap = hi + R.depth;
       if (surf[s] > cap) surf[s] = cap;
@@ -10671,19 +10701,116 @@ export class Track {
     // shimmer of micro-terraces; across the carriageway itself the water must
     // track the deck exactly, or you drive through a lip of water.
     const STEPMIN = 0.35;
+    // THE WATER'S FACE MUST STAND WHERE THE ROCK'S FACE STANDS.
+    //
+    // A fall used to be emitted as two stations at the x/z of whichever F
+    // sample first noticed the level change. The GROUND's step comes from the
+    // carve, which is quantised on the plan polyline — an 11 u grid — while
+    // the F stations sit on a ~13 u grid. The two faces could therefore stand
+    // up to half a station apart, and wherever the water's face landed on the
+    // low side of the rock's, the lip hung in the air by the full fall height
+    // with daylight underneath. Measured: 4.9 u of proud lip on PINE VALLEY 20 u
+    // from the road, 41.9 u on HEDGEROW DASH where the river drops through a
+    // ravine. Reported, twice, as the river floating.
+    //
+    // So a fall is now placed by asking the BED where it steps: find the pair
+    // of plan samples whose stepped-bed values differ, and emit the lip and
+    // the foot either side of that midpoint, 0.8 u apart. The rock face and
+    // the water face are then the same face to within the carve's own lateral
+    // smoothing, whatever the two grids are doing.
+    const fallBoundary = (sPrev, sNow) => {
+      if (!R.bed || !R.line) return null;
+      let kA = this._riverNearest(F[sPrev].x, F[sPrev].z).k;
+      let kB = this._riverNearest(F[sNow].x, F[sNow].z).k;
+      if (kA > kB) [kA, kB] = [kB, kA];
+      let best = -1, bestDrop = 0.5;      // below 0.5 it is a clamp artefact, not a fall
+      for (let j = kA; j < kB; j++) {
+        const drop = Math.abs(R.bed[j] - R.bed[j + 1]);
+        if (drop > bestDrop) { bestDrop = drop; best = j; }
+      }
+      if (best < 0) return null;
+      const a = R.line[best], b = R.line[best + 1];
+      let tx = b.x - a.x, tz = b.z - a.z;
+      const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+      return { mx: (a.x + b.x) / 2, mz: (a.z + b.z) / 2, tx, tz };
+    };
     const wf = [];
     let cur = null;
     for (let s = 0; s < F.length; s++) {
       const f = F[s];
       const want = surf[s];
       if (cur === null) cur = want;
-      const onDeck = f.df <= 10;
+      const onDeck = f.df <= 10 && fordDist(f.x, f.z) < 34;
       if (Math.abs(want - cur) > (onDeck ? 0.01 : STEPMIN)) {
-        wf.push({ ...f, y: cur });
-        cur = want;
-        // Nudge the foot's u so the upright face gets texture across it
-        // instead of one smeared column.
-        wf.push({ ...f, y: cur, t: f.t + 1e-4 });
+        const B = onDeck ? null : fallBoundary(Math.max(0, s - 1), s);
+        if (B) {
+          // BOTH stations at the boundary's own x/z: the fall stays a TRUE
+          // vertical face — the 90-degree drop that was asked for by name —
+          // and the alignment alone is the fix. (A first cut gave the pair a
+          // 1.6 u horizontal run so the ground could step "across" it; that
+          // remade every waterfall as a 35-60 degree ramp and failed the
+          // suite that guards exactly this. The ground's own step is blurred
+          // by the carve's lateral smoothing around this midpoint, so the lip
+          // overhangs by at most about half the fall — inside the ceiling.)
+          const nx = B.tz, nz = -B.tx;             // F's normal convention
+          const w = (F[Math.max(0, s - 1)].w + f.w) / 2;
+          const tMid = (F[Math.max(0, s - 1)].t + f.t) / 2;
+          wf.push({ t: tMid, x: B.mx, z: B.mz, nx, nz, w, y: cur });
+          cur = want;
+          wf.push({ t: tMid + 1e-4, x: B.mx, z: B.mz, nx, nz, w, y: cur });
+          wf.push({ ...f, y: cur });
+        } else if (Math.abs(want - cur) > 3 && !onDeck) {
+          // NO ROCK, NO WALL — AND NO SLOPE EITHER. A level change with no bed
+          // step behind it means the GROUND is ramping (a carve fade at an
+          // embankment, a clamp seam on a rough bank). One vertical face here
+          // is how a 40 u sheet of water ends up standing on air; but a plain
+          // ramp of water breaks the older law that water is level or falling,
+          // never tilted — and a first cut that ramped it scattered ~750
+          // sloped triangles per world through open country. So it becomes a
+          // STAIRCASE: walk the ground in short substeps, and every time the
+          // ground-following level has moved enough, emit a level tread and a
+          // vertical riser. Rapids, in the game's own idiom — every triangle
+          // level or upright, every tread just above the terrain under it, so
+          // it can neither hang nor tilt.
+          const prev = F[Math.max(0, s - 1)];
+          const lo = Math.min(cur, want), hiY = Math.max(cur, want);
+          // Substeps run all the way TO the station (j = N2 uses the station's
+          // own level), so the closing riser stands wherever the ground change
+          // is actually detected. Closing at the station unconditionally left
+          // a 9 u lip on HEDGEROW when the ground dropped in the last 1.6 u
+          // gap the old loop never sampled.
+          const N2 = 12;
+          let level = cur;
+          for (let j = 1; j <= N2; j++) {
+            const a = j / N2;
+            const x = prev.x + (f.x - prev.x) * a, z = prev.z + (f.z - prev.z) * a;
+            const gWant = j === N2 ? want
+              : Math.max(lo, Math.min(hiY, this.terrainHeight(x, z) + MIN_CLEAR));
+            if (Math.abs(gWant - level) > 0.5) {
+              const t2 = prev.t + (f.t - prev.t) * (j === N2 ? a - 0.02 : a);
+              const w2 = prev.w + (f.w - prev.w) * a;
+              wf.push({ t: t2, x, z, nx: f.nx, nz: f.nz, w: w2, y: level });
+              level = gWant;
+              wf.push({ t: t2 + 1e-4, x, z, nx: f.nx, nz: f.nz, w: w2, y: level });
+            }
+          }
+          cur = want;
+          // whatever sub-step remainder is left closes with a small riser at
+          // the station — vertical, and at most the 0.5 u stair threshold tall
+          // (the big drops were already stepped where the loop detected them)
+          if (Math.abs(cur - level) > 0.01) {
+            wf.push({ ...f, y: level });
+            wf.push({ ...f, y: cur, t: f.t + 1e-4 });
+          } else {
+            wf.push({ ...f, y: cur });
+          }
+        } else {
+          wf.push({ ...f, y: cur });
+          cur = want;
+          // Nudge the foot's u so the upright face gets texture across it
+          // instead of one smeared column.
+          wf.push({ ...f, y: cur, t: f.t + 1e-4 });
+        }
       } else {
         wf.push({ ...f, y: cur });
       }

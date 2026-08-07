@@ -82,26 +82,46 @@ for (const [id, name] of WORLDS) {
     }
 
     // ---- R2/R3/R4: the built meshes against the ground under them ----
+    // Two properties of the old version of this survey let the floating river
+    // ship TWICE after it was declared fixed, so both are called out here:
+    //
+    //   - it SKIPPED everything within 30 u of the road as "the ford band" —
+    //     and the 41 u wall of water in the player's screenshot stood 20-27 u
+    //     from the road, entirely inside the blind zone. The deliberate
+    //     deck-ride is only the innermost ~12 u at an actual ford; that is all
+    //     a skip may cover.
+    //   - it asserted a PERCENTAGE of proud vertices, which a handful of
+    //     40 u towers passes comfortably. Height is not a rate: ONE sheet of
+    //     water standing in the air is the defect. Hence worstVisible, a hard
+    //     ceiling, alpha-aware so the faded tails past the rim don't count.
     const survey = (mesh) => {
       const pos = mesh.geometry.attributes.position;
+      const col = mesh.geometry.attributes.color;
       let above = 0, below = 0, wa = 0, wb = 0, n = 0, proud = 0;
-      const step = Math.max(1, Math.floor(pos.count / 1600));
-      for (let i = 0; i < pos.count; i += step) {
+      let wv = 0, wvAt = null;
+      for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
         if (Math.hypot(x, z) > 1500) continue;            // tails past the world rim
-        // Skip the ford band: across the road the wash deliberately rides the
-        // DECK, which is metres above the surrounding field, so measuring it
-        // as "floating" would be measuring the feature, not a defect.
-        if (t._distToTrackCoarse(x, z) < 30) continue;
+        const visible = !col || col.getW(i) >= 0.3;
+        const rd = t._distToTrackCoarse(x, z);
         const d = y - t.terrainHeight(x, z);
+        // the hard ceiling: every visible vertex in the playable zone, with
+        // only the true on-deck band at a ford exempt
+        if (visible && rd >= 12 && rd < 200 && d > wv) { wv = d; wvAt = { x: +x.toFixed(0), z: +z.toFixed(0), rd: +rd.toFixed(0) }; }
+        if (rd < 30) continue;                            // legacy stats keep their old frame
         n++;
         if (d > 0.15) { above++; wa = Math.max(wa, d); }
         if (d > 7.8) proud++;                              // 3x channel depth
-        if (d < -0.15) { below++; wb = Math.min(wb, d); }
+        // 1.5 u, not 0.15: the staircase rapids deliberately tuck every
+        // riser's foot a step-height into the bank — those corners are behind
+        // the ground face and invisible. What this check exists for is water
+        // SWALLOWED — a river that visibly vanishes into its own valley floor.
+        if (d < -1.5) { below++; wb = Math.min(wb, d); }
       }
       return { n, pctProud: +(100 * proud / Math.max(1, n)).toFixed(1),
         pctAbove: +(100 * above / Math.max(1, n)).toFixed(1), worstAbove: +wa.toFixed(2),
-        pctBelow: +(100 * below / Math.max(1, n)).toFixed(1), worstBelow: +wb.toFixed(2) };
+        pctBelow: +(100 * below / Math.max(1, n)).toFixed(1), worstBelow: +wb.toFixed(2),
+        worstVisible: +wv.toFixed(2), worstVisibleAt: wvAt };
     };
     const meshes = {};
     g.scene.traverse((o) => { if (o.isMesh && /^river-/.test(o.name || '')) meshes[o.name] = o; });
@@ -129,7 +149,7 @@ for (const [id, name] of WORLDS) {
   // FALL sits below the ground at the lip by construction, and that is the
   // feature, not a defect. 25 % is set above the measured 15-16 % with room,
   // and well under the 84 % that was shipping.
-  check(`${name}: the ground does not swallow the water`, r.water && r.water.pctBelow <= 25,
+  check(`${name}: the ground does not swallow the water`, r.water && r.water.pctBelow <= 20,
     r.water ? `${r.water.pctBelow}% of vertices buried, worst ${r.water.worstBelow} u` : 'no water mesh');
 
   // R3 — and it is not a slab laid on the field either.
@@ -140,6 +160,13 @@ for (const [id, name] of WORLDS) {
   // drop — 32 u of it on HEDGEROW DASH, which is the feature working, not a
   // slab. An earlier version of this check asserted on the max and failed that
   // world for having a waterfall in it.
+  // THE HARD RULE, from the report: "Look at the river how it is floating in
+  // the air. Make this realistic and hard rule." No visible water anywhere a
+  // player can drive may stand more than the channel depth plus a fall lip
+  // (2.6 + 1.5) above the ground directly beneath it. Not a percentage.
+  check(`${name}: no visible water hangs in the air`, r.water && r.water.worstVisible <= 4.1,
+    r.water ? `worst ${r.water.worstVisible} u proud at ${JSON.stringify(r.water.worstVisibleAt)}` : 'no water mesh');
+
   check(`${name}: the water is not a slab on the field`, r.water && r.water.pctProud <= 4,
     r.water ? `${r.water.pctProud}% stands over 3 depths clear (worst ${r.water.worstAbove} u — the fall lips)`
       : 'no water mesh');

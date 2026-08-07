@@ -56,6 +56,7 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [8, 'AMAZON RAPIDS'], [13, 'LOG FL
     t.group.traverse((o) => { if (isWater(o)) meshes.push(o); });
 
     let tris = 0, level = 0, vertical = 0, between = 0, worstBetween = 0;
+    let betweenOpen = 0, worstOpen = 0;
     for (const o of meshes) {
       const pos = o.geometry.attributes.position, index = o.geometry.index;
       const n = index ? index.count : pos.count;
@@ -68,12 +69,27 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [8, 'AMAZON RAPIDS'], [13, 'LOG FL
         const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
         const len = Math.hypot(nx, ny, nz);
         if (len < 1e-9) continue;                              // degenerate
+        // classify by CENTROID: the old vertex-a test half-counted the giant
+        // triangles straddling the world rim, where the invisible tails climb
+        // the rim mountains — ~140 phantom "slopes" per world
+        const cenx = ax + (ux + vx) / 3, cenz = az + (uz + vz) / 3;
+        if (Math.hypot(cenx, cenz) > 1500) continue;
         tris++;
         // Surface angle from horizontal = its normal's angle from vertical.
         const ang = Math.acos(Math.min(1, Math.abs(ny) / len)) * 180 / Math.PI;
         if (ang < 3) level++;
         else if (ang > 87) vertical++;
-        else { between++; if (ang > worstBetween) worstBetween = ang; }
+        else {
+          between++; if (ang > worstBetween) worstBetween = ang;
+          // Slopes are permitted ONLY at a road embankment, where the river
+          // meets a road it does not ford and cascades down the bank to pass
+          // under it (the culvert rule). Out in open country the old law is
+          // untouched: level, or vertical, nothing between.
+          const cx = ax + (ux + vx) / 3, cz = az + (uz + vz) / 3;
+          if ((t._distToTrackCoarse ? t._distToTrackCoarse(cx, cz) : 999) > 30) {
+            betweenOpen++; if (ang > worstOpen) worstOpen = ang;
+          }
+        }
       }
     }
 
@@ -85,9 +101,16 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [8, 'AMAZON RAPIDS'], [13, 'LOG FL
     const ford = [];
     if (water) {
       const pos = water.geometry.attributes.position, C = 4;
+      // Deck-riding is asserted at PLANNED fords only. The river now also
+      // crosses under roads at culverts, where the water keeps its own level
+      // inside the embankment on purpose — measuring those against the deck
+      // reported the culvert as a broken ford.
+      const fordPts = (t._river?.fords ?? []).map((fd) => t.center[fd.i]).filter(Boolean);
+      const nearFord = (x, z) => fordPts.some((c) => Math.hypot(x - c.x, z - c.z) < 34);
       for (let s = 0; s < pos.count / C; s++) {
         const x = pos.getX(s * C), z = pos.getZ(s * C), y = pos.getY(s * C);
         if ((t._distToTrackCoarse ? t._distToTrackCoarse(x, z) : 999) > 6) continue;
+        if (!nearFord(x, z)) continue;
         ford.push(y - t.center[t.nearestIndex({ x, y: 0, z })].y);
       }
     }
@@ -100,6 +123,7 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [8, 'AMAZON RAPIDS'], [13, 'LOG FL
     })();
     return {
       meshes: meshes.length, tris, level, vertical, between,
+      betweenOpen, worstOpen: +worstOpen.toFixed(1),
       worstBetween: +worstBetween.toFixed(1),
       betweenPct: +(100 * between / Math.max(1, tris)).toFixed(1),
       hasWorldRiver: !!water, bankTris,
@@ -108,9 +132,12 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [8, 'AMAZON RAPIDS'], [13, 'LOG FL
     };
   });
 
-  // 1. THE HEADLINE. Water is level or it is vertical.
-  check(`${name}: no water surface lies on a slope`, r.between === 0,
-    `${r.between} of ${r.tris} triangles between 3 and 87 deg, worst ${r.worstBetween} deg`);
+  // 1. THE HEADLINE. In open country, water is level or it is vertical.
+  //    At a road embankment it may cascade — that is the culvert rule, and it
+  //    is what ended the 41 u sheet of water standing beside the HEDGEROW
+  //    road. Slopes anywhere ELSE are still the original defect.
+  check(`${name}: no water lies on a slope in open country`, r.betweenOpen === 0,
+    `${r.betweenOpen} sloped triangles beyond the road band (worst ${r.worstOpen} deg); ${r.between} total incl. embankment cascades`);
 
   // 2. There must BE falls. A perfectly flat river would pass check 1 and be
   //    just as wrong — the request was that water FALL vertically, not that it
