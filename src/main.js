@@ -149,6 +149,7 @@ const upgradeCost = (lvl) => 800 + lvl * lvl * 800;
 // event labels, this.deaths/kills, per-race counters accumulated in this._ct.
 // `gate` filters offers that a world/difficulty can't honor; `lap: true`
 // contracts resolve at lap boundaries; `atFinish` ones resolve in finishRace.
+const _dv = new THREE.Vector3();   // scratch for debris ground lookups
 const CONTRACT_POOL = [
   { id: 'cleanlap', label: 'CLEAN LAP',      pay: 100, desc: 'a full lap without hull damage', lap: true },
   { id: 'untouch',  label: 'UNTOUCHABLE',    pay: 120, desc: 'finish without wrecking',
@@ -854,6 +855,7 @@ class Game {
     this.hostiles = [];
     this.props = this.track.props ? [...this.track.props] : [];
     this.flyingProps = [];
+    this.debris = this.debris ?? [];   // settled wreckage — see _settleDebris
     this.chopperTimer = 0;
     this.chopperWave = 0;
 
@@ -1307,6 +1309,8 @@ class Game {
     for (const gsp of this.missionGates ?? []) this.worldLayer.remove(gsp.spr);
     this.missionGates = null;
     this.flyingProps = [];
+    // the settled wreckage lives under worldLayer and goes with it
+    this.debris = [];
     this.husks = [];
     this._resetFlashes();                  // pool lights live in the scene, not here
     this._rolling = [];                    // knocked rocks belong to the old world
@@ -4159,11 +4163,40 @@ class Game {
       f.mesh.rotation.x += f.spin.x * dt;
       f.mesh.rotation.y += f.spin.y * dt;
       f.mesh.rotation.z += f.spin.z * dt;
-      if (f.life <= 0 || f.mesh.position.y < -3) {
+
+      // ---- IT LANDS, AND IT STAYS THERE ----
+      //
+      // Every piece used to be deleted on a timer, so a smashed tyre stack, a
+      // felled tree and a blown-out house all evaporated a couple of seconds
+      // after the hit. Nothing you broke was on the track when you came round
+      // again, and nothing you broke was ever in anyone else's way.
+      //
+      // A piece now falls until it meets the ground, bounces off what speed it
+      // has left, and comes to rest where it stopped — visible for the whole
+      // race and, once settled, a real obstacle for every car (see
+      // `game.debris`, read by the car step alongside the standing props).
+      const gy = this._debrisGround(f.mesh.position.x, f.mesh.position.z);
+      if (f.mesh.position.y <= gy) {
+        f.mesh.position.y = gy;
+        const speed = Math.hypot(f.vel.x, f.vel.y, f.vel.z);
+        if (speed > 4.5 && (f.bounces ?? 0) < 2) {
+          // one or two bounces, shedding most of the energy each time — a
+          // wheel that lands at 30 u/s does not simply stop dead
+          f.bounces = (f.bounces ?? 0) + 1;
+          f.vel.y = Math.abs(f.vel.y) * 0.34;
+          f.vel.x *= 0.55; f.vel.z *= 0.55;
+          f.spin.x *= 0.5; f.spin.y *= 0.5; f.spin.z *= 0.5;
+        } else {
+          this._settleDebris(f);
+          this.flyingProps.splice(i, 1);
+        }
+      } else if (f.mesh.position.y < -3) {
+        // fell out of the world (off a cliff, into a gorge) — nothing to keep
         (f.mesh.parent ?? this.scene).remove(f.mesh);
         this.flyingProps.splice(i, 1);
       }
     }
+    this._pushCarsOffDebris();
   }
 
   /** Destroy every prop within `radius` of (x,z). `credit` gets score/pickups
@@ -4181,6 +4214,89 @@ class Game {
       }
     }
     return n;
+  }
+
+  /** SETTLED WRECKAGE PUSHES CARS — and it has to happen HERE, after every
+   *  car has finished moving, not inside the car step.
+   *
+   *  It was inside the step first, next to the standing-prop push-out, and
+   *  instrumentation showed it firing correctly on the right frame and setting
+   *  the right position — and the car still ended the frame sitting on top of
+   *  the wreck, 0.08 u from its centre against the 2.35 u it had just been
+   *  moved to. Something later in the step rebuilds the position, so a push
+   *  applied mid-step is simply overwritten. Running it once per frame over
+   *  the finished positions cannot be undone by anything, and it covers every
+   *  car in the field for free.
+   */
+  _pushCarsOffDebris() {
+    if (!this.debris?.length) return;
+    const cars = [this.player, ...(this.enemies ?? [])];
+    for (const c of cars) {
+      if (!c || !c.alive) continue;
+      for (const d of this.debris) {
+        const dx = c.pos.x - d.x, dz = c.pos.z - d.z;
+        const rr = d.r + 1.5;
+        if (dx * dx + dz * dz >= rr * rr) continue;
+        if (Math.abs((c.y ?? c.pos.y) - d.y) > 4.5) continue;   // on a bridge over it
+        const dist = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
+        const nx = dx / dist, nz = dz / dist;
+        c.pos.x = d.x + nx * rr;
+        c.pos.z = d.z + nz * rr;
+        const vn = c.vel.x * nx + c.vel.z * nz;
+        if (vn < 0) {
+          // kill the closing speed and take a bite out of the rest: a low
+          // obstacle you can bulldoze through, at a price
+          c.vel.x -= nx * vn; c.vel.z -= nz * vn;
+          c.vel.multiplyScalar(0.86);
+          // ...and it gets kicked along, because a wheel is not a bollard
+          const push = Math.min(2.2, Math.abs(vn) * 0.06);
+          d.x -= nx * push; d.z -= nz * push;
+          d.mesh.position.x = d.x; d.mesh.position.z = d.z;
+        }
+        break;
+      }
+    }
+  }
+
+  /** Ground height for a piece of debris, road deck included — a tyre that
+   *  lands on the carriageway must sit ON it, not sink to the field beside it,
+   *  because the carriageway is exactly where it has to be in the way. */
+  _debrisGround(x, z) {
+    const t = this.track;
+    if (!t?.center?.length) return 0;
+    _dv.set(x, 0, z);
+    const i = t.nearestIndex(_dv);
+    const lat = Math.abs(t.lateralOffset(_dv, i));
+    const half = t.widthAt ? t.widthAt(i) : 9;
+    if (lat <= half + 1.5 && t.groundHeightAtPos) return t.groundHeightAtPos(_dv, i) + 0.18;
+    return (t.terrainHeight ? t.terrainHeight(x, z) : 0) + 0.18;
+  }
+
+  /** Park a piece of debris where it stopped: kill its motion, lie it down,
+   *  and register a collider so every car has to deal with it for the rest of
+   *  the race.
+   *
+   *  CAPPED, because "stays forever" and "unbounded" are different promises. A
+   *  long race through a timber world can smash a lot; past the cap the OLDEST
+   *  piece is recycled, which is the one a driver is least likely to be about
+   *  to meet. */
+  _settleDebris(f) {
+    const DEBRIS_MAX = 300;
+    const m = f.mesh;
+    m.position.y = this._debrisGround(m.position.x, m.position.z);
+    // lie flat-ish: a settled object rests on a face, it does not stand on a
+    // corner in the middle of the road
+    m.rotation.set((Math.random() - 0.5) * 0.5, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.5);
+    m.castShadow = true;
+    if (!m.parent) (this.worldLayer ?? this.scene).add(m);
+    const r = Math.max(0.5, (f.r ?? 0.8));
+    const entry = { x: m.position.x, z: m.position.z, y: m.position.y, r, mesh: m,
+      kind: f.kind ?? 'debris' };
+    this.debris.push(entry);
+    while (this.debris.length > DEBRIS_MAX) {
+      const old = this.debris.shift();
+      (old.mesh.parent ?? this.scene).remove(old.mesh);
+    }
   }
 
   _smashProp(pr, car, minFling = 0) {
@@ -4217,6 +4333,9 @@ class Game {
         spin: new THREE.Vector3((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16),
         life: 1.1 + Math.random() * 0.7,
         dmg: k === 0 ? (DEBRIS_DMG[pr.type] ?? 0) : 0, owner: car, age: 0,
+        // the collider it will get once it settles — quarter-scale pieces, so
+        // a shattered crate leaves four small obstacles rather than one big one
+        r: Math.max(0.45, (pr.r ?? 1.2) * 0.3), kind: pr.type,
       });
     }
     const at = new THREE.Vector3(pr.x, (pr.y ?? 0) + 0.6, pr.z);
@@ -4273,6 +4392,10 @@ class Game {
       life: cactus ? 0.85 : 2.2,
       // a felled trunk is the heaviest thing in flight; a cactus is pulp
       dmg: cactus ? 0 : DEBRIS_DMG.tree, owner: car, age: 0,
+      // A FELLED TREE LIES WHERE IT FELL. The widest collider of the three,
+      // because a trunk across a lane is exactly the sort of thing that should
+      // still be there when the pack comes round again.
+      r: cactus ? 1.2 : 2.4, kind: cactus ? 'cactus' : 'trunk',
     });
     const at = new THREE.Vector3(tr.x, (tr.y ?? 0) + 1, tr.z);
     this.particles.debris(at, cactus ? 2 : 4);
@@ -4616,6 +4739,7 @@ class Game {
         spin: new THREE.Vector3((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9,
           (Math.random() - 0.5) * 9),
         life: 2.4,
+        r: 1.1, kind: 'rubble',       // the wreck of the house stays on the ground
       });
     }
     this.particles.explosion(at, false);
@@ -4643,11 +4767,18 @@ class Game {
       this.worldLayer.add(tm);
       this.flyingProps.push({
         mesh: tm,
+        // A STACK BURSTS, IT DOES NOT GET SHOVED. Every tyre used to leave on
+        // the same vector — straight away from the car — so the wreckage
+        // always ended up further off the road than the stack had been, and
+        // "hit the tyres and they end up in the road" never happened. A stack
+        // struck at speed throws wheels in every direction; the impact
+        // direction is a bias on that, not the whole of it.
         vel: new THREE.Vector3(
-          dir.x * sp * 0.4 + (Math.random() - 0.5) * 6, 5 + Math.random() * 5,
-          dir.z * sp * 0.4 + (Math.random() - 0.5) * 6),
+          dir.x * sp * 0.26 + (Math.random() - 0.5) * 15, 5 + Math.random() * 5,
+          dir.z * sp * 0.26 + (Math.random() - 0.5) * 15),
         spin: new THREE.Vector3((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10),
         life: 1.8,
+        r: 0.85, kind: 'tire',        // settles as a wheel lying in the road
       });
     }
     const at = new THREE.Vector3(st.x, (st.y ?? 0) + 0.6, st.z);
@@ -4887,6 +5018,11 @@ class Game {
     this.chopperTimer = 15;
     for (const f of this.flyingProps) this.scene.remove(f.mesh);
     this.flyingProps = [];
+    // A NEW RACE STARTS ON A CLEAN ROAD. The wreckage persists for the whole
+    // race, which is the point of it — but restarting means restarting, and
+    // the props and buildings are being stood back up on the next few lines.
+    for (const d of (this.debris ?? [])) (d.mesh.parent ?? this.scene).remove(d.mesh);
+    this.debris = [];
     if (this.track.props) {
       this.props = [...this.track.props];
       for (const p of this.props) {
