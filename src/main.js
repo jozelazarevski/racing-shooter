@@ -388,6 +388,22 @@ const DEMANDS = {
   31: { loose: 0.55, twist: 0.59, fast: 0.22, climb: 0.75 }, // HEDGEROW DASH
   // measured on the built track by the same formulae as the World Rally block
   32: { loose: 0.12, twist: 0.00, fast: 1.00, climb: 0.71 }, // RED CENTRE RUN
+  // ---- GRAND CIRCUITS. ESTIMATED from each layout's character (surface from
+  // the theme, twist/fast from the traced geometry), not yet measured — the
+  // measured convention needs a built world per row and there are twelve.
+  // If test-affinity reports measured values for these ids, adopt them.
+  33: { loose: 0.12, twist: 0.30, fast: 0.72, climb: 0.45 }, // RED BULL RING
+  34: { loose: 0.12, twist: 0.85, fast: 0.15, climb: 0.35 }, // MONACO STREETS
+  35: { loose: 0.55, twist: 0.35, fast: 0.80, climb: 0.10 }, // SILVERSTONE
+  36: { loose: 0.55, twist: 0.45, fast: 0.65, climb: 0.50 }, // SPA-FRANCORCHAMPS
+  37: { loose: 0.12, twist: 0.70, fast: 0.45, climb: 0.30 }, // SUZUKA
+  38: { loose: 0.55, twist: 0.60, fast: 0.55, climb: 0.55 }, // NORDSCHLEIFE
+  39: { loose: 0.12, twist: 0.25, fast: 0.95, climb: 0.08 }, // MONZA
+  40: { loose: 0.12, twist: 0.65, fast: 0.50, climb: 0.05 }, // MARINA BAY
+  41: { loose: 0.12, twist: 0.55, fast: 0.70, climb: 0.65 }, // MOUNT PANORAMA
+  42: { loose: 0.55, twist: 0.75, fast: 0.25, climb: 0.20 }, // RALLYCROSS ARENA
+  43: { loose: 0.55, twist: 0.55, fast: 0.50, climb: 0.30 }, // OULTON PARK
+  44: { loose: 0.12, twist: 0.60, fast: 0.55, climb: 0.55 }, // LAGUNA SECA
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {
@@ -1768,7 +1784,7 @@ class Game {
       .length;
     const next = LEVELS.filter((lv) => this.starCost(lv.id) > now)
       .sort((a, c) => this.starCost(a.id) - this.starCost(c.id))[0];
-    const RULES = [['★', 'FINISH THE RACE'], ['★★', 'PODIUM — TOP 3'], ['★★★', 'WIN IT']];
+    const RULES = [['★', 'FINISH — ANY PLACE'], ['★★', 'PODIUM — TOP 3'], ['★★★', 'WIN IT']];
     el.innerHTML = `
       <div class="sk-top">
         <span class="sk-title">RALLY STARS — HOW THEY ARE EARNED</span>
@@ -5334,7 +5350,12 @@ class Game {
     const box = document.getElementById('star-panel');
     const rowsEl = document.getElementById('sp-rows');
     if (!box || !rowsEl) return;
-    const got = [['FINISH', rank > 0], ['PODIUM — TOP 3', rank <= 3], ['WIN', rank === 1]];
+    // THE SAME WORDS AS THE MENU LEGEND, tier by tier. The reported mismatch:
+    // a P6 (dead last) banked a star under a menu that reads like stars are
+    // competitive rewards. The award is BY DESIGN — the one-star finish is the
+    // floor that keeps any driver progressing (see starCost's slope note) —
+    // so the words on BOTH surfaces now say so explicitly.
+    const got = [['FINISH — ANY PLACE', rank > 0], ['PODIUM — TOP 3', rank <= 3], ['WIN', rank === 1]];
     let html = '';
     for (const [label, won] of got) {
       html += `<div class="cb-row${won ? '' : ' missed'}"><span>${won ? '★' : '☆'} ${label}</span><b>${won ? '+1' : '—'}</b></div>`;

@@ -95,6 +95,35 @@ export const LEVELS = [
   // order is array position (starCost = index - 2), so anything inserted higher
   // re-prices every world after it in a save that already exists.
   { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK', cost: 12, fresh: true },
+
+  // ---- GRAND CIRCUITS: the reference sheet of twelve real layouts, each a
+  // route over an existing theme (art is the theme's; the geometry is the
+  // circuit's). Appended, priced with explicit `cost` like every fresh
+  // region, laddered so the collection spans a career.
+  { id: 33, name: 'RED BULL RING', theme: 'alpine', route: 'rbring', region: 'GRAND CIRCUITS',
+    cost: 5, fresh: true, tune: { elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
+  { id: 34, name: 'MONACO STREETS', theme: 'medterrace', route: 'monaco', region: 'GRAND CIRCUITS',
+    cost: 6, fresh: true, tune: { elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
+  { id: 35, name: 'SILVERSTONE', theme: 'farmland', route: 'silverstone', region: 'GRAND CIRCUITS',
+    cost: 7, fresh: true, tune: { elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
+  { id: 36, name: 'SPA-FRANCORCHAMPS', theme: 'forest', route: 'spa', region: 'GRAND CIRCUITS',
+    cost: 8, fresh: true, tune: { elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
+  { id: 37, name: 'SUZUKA', theme: 'redwood', route: 'suzuka', region: 'GRAND CIRCUITS',
+    cost: 9, fresh: true, tune: { elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
+  { id: 38, name: 'NORDSCHLEIFE', theme: 'forest', route: 'nordschleife', region: 'GRAND CIRCUITS',
+    cost: 10, fresh: true, tune: { elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
+  { id: 39, name: 'MONZA', theme: 'medterrace', route: 'monza', region: 'GRAND CIRCUITS',
+    cost: 11, fresh: true, tune: { elev: { amp: 1.5, ph: [1, 2, 3] }, rampCount: 0 } },
+  { id: 40, name: 'MARINA BAY', theme: 'neon', route: 'marina', region: 'GRAND CIRCUITS',
+    cost: 12, fresh: true, tune: { rampCount: 0 } },
+  { id: 41, name: 'MOUNT PANORAMA', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
+    cost: 13, fresh: true, tune: { elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
+  { id: 42, name: 'RALLYCROSS ARENA', theme: 'flume', route: 'rallyx', region: 'GRAND CIRCUITS',
+    cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
+  { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
+    cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0 } },
+  { id: 44, name: 'LAGUNA SECA', theme: 'canyon', route: 'laguna', region: 'GRAND CIRCUITS',
+    cost: 16, fresh: true, tune: { elev: { amp: 9, ph: [1.9, 0.4, 2.6] }, rampCount: 0 } },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -569,6 +598,93 @@ const CIRCUITS = {
     [-255, 64], [-252, -4], [-254, -72],
     [-244, -140], [-218, -198], [-168, -238],
     [-90, -253],
+  ],
+
+  // ------------------------------------------------------------------------
+  // GRAND CIRCUITS — twelve real-world layouts, requested as a reference
+  // sheet of "12 distinct race track designs". Each is a hand-traced
+  // silhouette of the real circuit at the game's ±250 u scale, riding an
+  // EXISTING theme (the WORLD RALLY pattern: a route is geometry, a theme is
+  // art), so twelve tracks cost zero new art systems. Corner radii are kept
+  // above the game's floors except where the real corner IS the point (the
+  // Loews hairpin, the Corkscrew); parallel legs never run closer than 26 u.
+  rbring: [ // Red Bull Ring — three big straights, hilltop rights, flowing left sweeps home
+    [-180, -140], [-60, -150], [60, -155], [150, -140],
+    [200, -90], [215, -20], [190, 40], [195, 120], [160, 170],
+    [90, 185], [30, 150], [0, 90], [-40, 30], [-90, -10],
+    [-150, 10], [-200, -20], [-215, -80], [-205, -125],
+  ],
+  monaco: [ // Monaco — Ste Devote, the climb to Casino, Loews, the tunnel sweep, Rascasse
+    [-160, -80], [-80, -95], [-10, -85], [20, -40], [10, 20],
+    [40, 70], [90, 85], [130, 60], [120, 10], [90, -15],
+    [60, -40], [45, -60], [60, -78], [85, -70], [130, -85],
+    [170, -110], [190, -160], [150, -200], [95, -195], [70, -175],
+    [10, -185], [-60, -200], [-120, -190], [-165, -150], [-185, -115],
+  ],
+  silverstone: [ // Silverstone — Copse, the Maggotts/Becketts esses, Stowe, Club
+    [-220, -60], [-140, -90], [-40, -95], [40, -70], [80, -10],
+    [60, 50], [110, 90], [90, 150], [160, 180], [220, 140],
+    [230, 60], [200, -10], [230, -80], [190, -150], [100, -180],
+    [0, -165], [-100, -175], [-180, -160], [-230, -110],
+  ],
+  spa: [ // Spa — La Source, the Eau Rouge climb, Kemmel, and a long flowing east side
+    // (three attempts at the inner Blanchimont return all crossed the middle:
+    // at ±250 u with a 26 u leg floor, Spa only fits as a perimeter. The
+    // shallow east-side dents keep Pouhon and Stavelot readable.)
+    [-210, 40], [-225, 90], [-195, 125], [-130, 105], [-95, 150],
+    [-30, 185], [60, 195], [130, 165], [175, 120], [155, 60],
+    [190, 10], [160, -45], [195, -90], [150, -140], [75, -160],
+    [0, -140], [-70, -155], [-140, -140], [-185, -95], [-165, -45],
+    [-195, -5],
+  ],
+  suzuka: [ // Suzuka — the esses, Dunlop, Degner, the hairpin, Spoon, 130R
+    [-30, -175], [70, -185], [145, -160], [178, -100], [135, -55],
+    [168, -5], [120, 40], [152, 90], [112, 140], [30, 158],
+    [-32, 132], [-48, 74], [-118, 86], [-135, 48], [-95, 28],
+    [-52, 4], [-90, -38], [-142, -18], [-172, -62], [-138, -108],
+    // no closing chicane: every version of the casio kink reversed direction
+    // sharply enough that the spline blew a 2 u bulb at it — the tail now
+    // flows from 130R straight onto the start straight
+    [-62, -122],
+  ],
+  nordschleife: [ // Nordschleife — a sprawling Eifel perimeter with the Karussell fold
+    [-240, -40], [-200, 20], [-215, 80], [-160, 120], [-120, 90],
+    [-80, 150], [-20, 185], [50, 160], [40, 110], [100, 80],
+    [170, 110], [220, 70], [195, 10], [235, -30], [180, -80],
+    [120, -60], [80, -110], [130, -160], [60, -195], [-20, -160],
+    [-90, -190], [-160, -170], [-190, -110], [-235, -95],
+  ],
+  monza: [ // Monza — long straights broken by chicanes, the Lesmos, Parabolica home
+    [-200, -120], [-60, -135], [80, -145], [130, -130], [145, -95],
+    [180, -40], [170, 20], [195, 70], [160, 105], [110, 95],
+    [0, 20], [-90, -40], [-140, -15], [-170, -45], [-195, -70],
+    [-220, -100],
+  ],
+  marina: [ // Singapore Marina Bay — right-angle street blocks under lights
+    [-190, -90], [-60, -100], [60, -95], [150, -85], [180, -40],
+    [150, 0], [170, 50], [130, 85], [80, 70], [40, 110],
+    [-20, 125], [-60, 90], [-120, 105], [-160, 70], [-140, 20],
+    [-180, -10], [-160, -50],
+  ],
+  panorama: [ // Mount Panorama — the climb, the ridge esses, the plunge, Conrod
+    [-120, -190], [0, -200], [110, -190], [160, -160], [200, -80],
+    [180, -20], [210, 40], [180, 90], [120, 110], [90, 150],
+    [20, 135], [-40, 160], [-100, 140], [-150, 155], [-175, 110],
+    [-145, 80], [-180, 45], [-200, 0], [-190, -110], [-165, -160],
+  ],
+  rallyx: [ // Rallycross — a compact mixed-surface stadium loop
+    [-135, -90], [-30, -128], [90, -105], [150, -30], [113, 53],
+    [23, 83], [-68, 120], [-143, 83], [-105, 15], [-165, -30],
+  ],
+  oulton: [ // Oulton Park — parkland kidney with Old Hall, Island, the Hislops flick
+    [-160, -120], [-60, -140], [40, -120], [90, -70], [60, -20],
+    [110, 20], [90, 80], [30, 110], [-30, 90], [-60, 130],
+    [-100, 110], [-90, 40], [-140, 10], [-180, -40], [-150, -80],
+  ],
+  laguna: [ // Laguna Seca — the Andretti hairpin and the Corkscrew drop
+    [-140, -70], [-30, -90], [60, -75], [100, -30], [70, 10],
+    [110, 50], [80, 100], [30, 120], [10, 85], [-40, 60],
+    [-80, 80], [-120, 40], [-100, -10], [-150, -30],
   ],
 };
 
@@ -6221,18 +6337,48 @@ export class Track {
     // extends only SEAWARD.
     const mx = (C.a[0] + C.b[0]) / 2, mz = (C.a[1] + C.b[1]) / 2;
     const y = C.level ?? -2;
-    const HALF = 2400, DEEP = 1900;
-    const corner = (du, dn) => [mx + ux * du + nx * dn, y, mz + uz * du + nz * dn];
-    const verts = new Float32Array([
-      ...corner(-HALF, 0), ...corner(HALF, 0), ...corner(HALF, DEEP), ...corner(-HALF, DEEP),
-    ]);
+    // TO THE HORIZON, AND EXEMPT FROM FOG. The first sea was a 1900 u quad
+    // under scene fog, and scene fog is the land's warm dust colour — so past
+    // ~1000 u the water faded to the exact cream it was built to replace, and
+    // the player kept seeing "the white stuff" over the bay. Water doesn't
+    // haze like a dusty hillside: the material opts out of fog and the fade
+    // is baked per-vertex instead — seaColor at the beach easing toward the
+    // sky-horizon tone with distance from the arena, meeting the sky dome at
+    // a proper sea horizon line instead of a cream wall.
+    const HALF = 4200, DEEP = 4200, COLS = 12, ROWS = 7;
+    const cNear = new THREE.Color(this.T.seaColor ?? 0x3d7f9e);
+    const cFar = cNear.clone().lerp(new THREE.Color(this.T.skyHorizon ?? '#dce8f0'), 0.8);
+    const verts = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
+    const cols = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
+    const tmp = new THREE.Color();
+    for (let r = 0, k = 0; r <= ROWS; r++) {
+      for (let c = 0; c <= COLS; c++, k++) {
+        const du = -HALF + (2 * HALF * c) / COLS;
+        const dn = (DEEP * r) / ROWS;
+        const wx = mx + ux * du + nx * dn, wz = mz + uz * du + nz * dn;
+        verts[k * 3] = wx; verts[k * 3 + 1] = y; verts[k * 3 + 2] = wz;
+        // haze by distance from the arena the camera lives in, matching the
+        // land fog's reach (fogFar ~1650) without inheriting its colour
+        const haze = smoothstep01(THREE.MathUtils.clamp((Math.hypot(wx, wz) - 380) / 1400, 0, 1));
+        tmp.copy(cNear).lerp(cFar, haze);
+        cols[k * 3] = tmp.r; cols[k * 3 + 1] = tmp.g; cols[k * 3 + 2] = tmp.b;
+      }
+    }
+    const idx = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const a = r * (COLS + 1) + c, b2 = a + 1, d = a + COLS + 1, e = d + 1;
+        idx.push(a, e, b2, a, d, e);
+      }
+    }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-    geo.setIndex([0, 2, 1, 0, 3, 2]);
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    geo.setIndex(idx);
     geo.computeVertexNormals();
     const sea = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-      color: this.T.seaColor ?? 0x3d7f9e, roughness: 0.14, metalness: 0.05,
-      side: THREE.DoubleSide,
+      vertexColors: true, roughness: 0.14, metalness: 0.05,
+      side: THREE.DoubleSide, fog: false,
     }));
     sea.name = 'sea';
     sea.receiveShadow = true;
@@ -6303,7 +6449,23 @@ export class Track {
       const r = M.r0 + Math.random() * (M.r1 - M.r0);
       const h = M.h0 + Math.random() * (M.h1 - M.h0);
       const w = M.w0 + Math.random() * (M.w1 - M.w0);
-      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      let x = Math.cos(a) * r, z = Math.sin(a) * r;
+      // "the dry inland range standing behind the terraces" — INLAND. On a
+      // coast world the azimuth ring can land a peak in the bay, a cream
+      // mountain rising out of open water. Reflect it across the coastline
+      // to the land side, footprint clear of the beach.
+      if (this.T.coast) {
+        const sd = this._coastSide(x, z);
+        const margin = (this.T.coast.beach ?? 60) + w * 0.6;
+        if (sd > -margin) {
+          const C = this.T.coast;
+          const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
+          const L = Math.hypot(abx, abz);
+          const nx = abz / L, nz = -abx / L;       // seaward normal
+          const back = sd + margin;
+          x -= nx * back; z -= nz * back;
+        }
+      }
       q.setFromAxisAngle(up, Math.random() * Math.PI);
       const y = -12 - (this.T.hillDrop || 0) + this._highland(x, z);
       m4.compose(new THREE.Vector3(x, y + h / 2, z), q, new THREE.Vector3(w, h, w * 0.85));
@@ -7709,12 +7871,15 @@ export class Track {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
       const far = Math.max(Math.abs(x), Math.abs(z)) > 900;
-      const h = far
+      let h = far
         // skip the track-distance falloff far away, but keep the FULL hill
         // noise: dropping octaves here left a visible ±2.4 u step at the 900 u
         // ring where the two height functions disagreed
         ? this._hillNoise(x, z)
         : this._terrainMeshHeight(x, z);
+      // the far branch skips _terrainMeshHeight and with it the coast sink —
+      // reapply it or the bay grows hills past 900 u
+      if (far && T.coast) h = this._coastDepress(x, z, h, 9999);
       pos.setY(i, h - 0.12);
       const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
       tmp.copy(cLow).lerp(cHigh, t);
@@ -7783,6 +7948,11 @@ export class Track {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
       let h = this._hillNoise(x, z);
+      // On a coast world the sea owns everything seaward, all the way out.
+      // Raw hill noise out here put fogged cream hills in the middle of the
+      // bay — the "white stuff" past the water. Full depression, no road
+      // exemption: no road reaches this ring.
+      if (T.coast) h = this._coastDepress(x, z, h, 9999);
       // SINK THIS MESH WHERE THE NEAR PATCH COVERS IT.
       //
       // This ring exists only to carry the horizon PAST the near patch, but it
@@ -8012,26 +8182,37 @@ export class Track {
     // old flat field — otherwise the terrain swallows them to the shoulders.
     // They become the peaks the highland climbs toward rather than a backdrop.
     const seat = (x, z) => base + this._highland(x, z);
+    // A coast world's sea reaches the horizon: the ring must not stand in it.
+    // Any cone whose footprint touches the water is dropped outright — a
+    // mountain range across the bay turns open sea into a lake (and at fog
+    // distance those cones ARE the cream the sea was built to replace).
+    const inSea = (x, z, w) => this.T.coast && this._coastSide(x, z) > -(w * 0.7);
+    let hk = 0;
     for (let i = 0; i < 40; i++) {
       const a = (i / 40) * Math.PI * 2;
       const r = 900 + Math.random() * 140;
       const h = 70 + Math.random() * 90;
       const w = 130 + Math.random() * 150;
       const px = Math.cos(a) * r, pz = Math.sin(a) * r;
+      if (inSea(px, pz, w)) continue;
       m4.makeScale(w, h, w);
       m4.setPosition(px, h / 2 + seat(px, pz), pz);
-      hills.setMatrixAt(i, m4);
+      hills.setMatrixAt(hk++, m4);
     }
+    hills.count = hk;
+    let pk = 0;
     for (let i = 0; i < 30; i++) {
       const a = (i / 30) * Math.PI * 2 + 0.1;
       const r = 1120 + Math.random() * 160;
       const h = 160 + Math.random() * 140;
       const w = 120 + Math.random() * 140;
       const px = Math.cos(a) * r, pz = Math.sin(a) * r;
+      if (inSea(px, pz, w)) continue;
       m4.makeScale(w, h, w);
       m4.setPosition(px, h / 2 + seat(px, pz), pz);
-      peaks.setMatrixAt(i, m4);
+      peaks.setMatrixAt(pk++, m4);
     }
+    peaks.count = pk;
     // named so a world whose skyline must be built, not geological, can drop
     // them (OLD TOWN — see _buildOldTown)
     hills.name = 'horizon-hills';

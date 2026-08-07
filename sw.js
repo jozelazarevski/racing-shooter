@@ -16,7 +16,7 @@
  * CACHE is bumped by the release version. Bump it whenever ?v= in index.html
  * is bumped, or phones will keep serving the previous build forever.
  */
-const CACHE = 'ignite-rally-r98';
+const CACHE = 'ignite-rally-r99';
 
 // ---- CORE vs EXTRA ---------------------------------------------------------
 // CORE is everything the game needs to RUN with the radio off: the shell, the
@@ -63,7 +63,7 @@ const CORE = [
 // 32, and read from one place: this list was hardcoded at 21 when the roster
 // was 21, and the eleven worlds added since shipped with previews the offline
 // cache never carried.
-const EXTRA = Array.from({ length: 32 }, (_, i) => `./assets/previews/w${i + 1}.jpg`);
+const EXTRA = Array.from({ length: 44 }, (_, i) => `./assets/previews/w${i + 1}.jpg`);
 const ASSETS = [...CORE, ...EXTRA];   // the full offline set, for status counts
 
 self.addEventListener('install', (e) => {
