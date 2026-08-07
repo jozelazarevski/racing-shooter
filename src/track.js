@@ -7757,17 +7757,31 @@ export class Track {
     const y = this.terrainHeight(x, z) - 0.25;
     const cs = Math.cos(rot), sn = Math.sin(rot);
     const T = HOUSE_TEMPLATES[type] ?? HOUSE_TEMPLATES.logpile;
+    // NO TWO ALIKE: each placement gets its own footprint stretch, height,
+    // mirror and weathering shade, so the shared templates stop reading as
+    // copy-paste rows of one house. The solid follows the stretched print.
+    const wS = 0.86 + Math.random() * 0.34;
+    const dS = 0.86 + Math.random() * 0.34;
+    const hS = 0.88 + Math.random() * 0.34;
+    const mir = Math.random() < 0.5 ? -1 : 1;
+    const shade = 0.84 + Math.random() * 0.28;
+    const tinted = (c) => {
+      const col = new THREE.Color(c);
+      col.multiplyScalar(shade);
+      return col.getHex();
+    };
     for (const [kind, dx, dy, dz, sx, sy, sz, colKey, roll = 0] of T.parts) {
-      const ox = dx * scale, oy = dy * scale, oz = dz * scale;
+      const ox = dx * scale * wS, oy = dy * scale * hS, oz = dz * scale * dS * mir;
       B[kind].push({
         x: x + ox * cs - oz * sn, y: y + oy, z: z + ox * sn + oz * cs,
-        sx: sx * scale, sy: sy * scale, sz: sz * scale, rot, roll,
-        // a string names a slot in the theme kit; a number is a literal that
-        // must not be re-tinted (the chapel cross)
-        color: typeof colKey === 'string' ? K[colKey] : colKey,
+        sx: sx * scale * wS, sy: sy * scale * hS, sz: sz * scale * dS,
+        rot, roll: roll * mir,
+        // a string names a slot in the theme kit (weather-shaded per house);
+        // a number is a literal that must not be re-tinted (the chapel cross)
+        color: typeof colKey === 'string' ? tinted(K[colKey]) : colKey,
       });
     }
-    const r = T.r * scale, mat = T.mat ?? 'hut';
+    const r = T.r * scale * Math.max(wS, dS), mat = T.mat ?? 'hut';
     const solid = { x, z, r, y: y + 0.6, mat };
     this.solids.push(solid);
     this._addShadow(x, z, r * 1.35);
@@ -10557,7 +10571,7 @@ export class Track {
           part.setMatrixAt(k, m4);
           part.setColorAt(k, color);
         }
-        this.trees.push({ x: p.x, z: p.z, y: py, r: 0.65 * s, id: k, parts: leafParts, kind: 'jungle', s, solid: false });
+        this.trees.push({ x: p.x, z: p.z, y: py, r: 0.65 * s, id: k, parts: leafParts, kind: 'jungle', s, solid: s >= 1.1 });
       });
     for (const part of leafParts) { part.count = pPlaced; this.group.add(part); }
   }
@@ -11004,7 +11018,7 @@ export class Track {
         m4.setPosition(p.x, ty, p.z);
         for (const part of oakParts) part.setMatrixAt(k, m4);
         // broadleaf, never a giant → always yields to a bumper
-        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.75 * s, id: k, parts: oakParts, kind: 'oak', s, solid: false });
+        this.trees.push({ x: p.x, z: p.z, y: ty, r: 0.75 * s, id: k, parts: oakParts, kind: 'oak', s, solid: s >= 1.05 });
         // yellower and a shade lighter than the conifers, same brightness band
         color.setHSL(
           F.h - 0.035 + Math.random() * F.hVar,
