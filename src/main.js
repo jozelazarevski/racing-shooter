@@ -77,6 +77,7 @@ const WORLD_TAGS = {
   neon: 'maglev lanes · night city', undercity: '🐀 rats · tunnels',
   medterrace: 'stone walls · gravel on the exits',
   oldtown: '💧 wet cobbles · no runoff',
+  farmland: '🌧 hedge banks · mud · blind crests',
 };
 
 // steer: how much of the car's steering rate the player gets in this view.
@@ -202,6 +203,8 @@ const LIVESTOCK_BY_THEME = {
   // OLIVE COAST: sheep flocks behind wire on the terraces, and the wild boar
   // that is the region's authored crossing
   medterrace: { kinds: ['sheep', 'boar', 'goat'], perHerd: 5 },
+  // FARMLAND: sheep and cattle in the fields behind the hedge, and nothing else
+  farmland: { kinds: ['sheep', 'cow'],         perHerd: 5 },
 };
 
 // hazard particle tints (hoisted — per-frame spawns must not allocate)
@@ -367,6 +370,9 @@ const DEMANDS = {
   // estimated: a street grid of hard corners joined by short straights, on a
   // hill, on a wet surface.
   30: { loose: 0.55, twist: 0.59, fast: 0.48, climb: 0.57 }, // LANTERN QUARTER
+  // ---- FARMLAND. twist / fast / climb MEASURED off the built track with the
+  // same formula test-affinity.mjs uses, then rounded to 2 dp.
+  31: { loose: 0.55, twist: 0.59, fast: 0.22, climb: 0.75 }, // HEDGEROW DASH
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {

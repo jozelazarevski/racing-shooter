@@ -78,6 +78,9 @@ export const LEVELS = [
   // `starCost` prices a world by its INDEX, so a mid-array insert silently
   // re-prices every world after it in an existing save.
   { id: 30, name: 'LANTERN QUARTER', theme: 'oldtown', region: 'OLD TOWN' },
+  // ---- FARMLAND. Appended, so no existing world's star price moves (career
+  // order is this array; starCost() = index - 2).
+  { id: 31, name: 'HEDGEROW DASH', theme: 'farmland', region: 'FARMLAND' },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -494,6 +497,36 @@ const CIRCUITS = {
     [-214, -12], [-190, -34], [-192, -70], [-214, -92], [-236, -116], [-238, -152],
     // last corner, back east onto the main street
     [-224, -186], [-198, -208],
+  ],
+
+  // HEDGEROW DASH — farmland lanes. The road does not choose its own line here:
+  // it runs where the field boundaries put it, so the lap is a chain of short
+  // headland straights meeting at bends the hedge hides until you are in them.
+  // Nothing on the roster is shaped this way — the alpine worlds stack legs up
+  // a face, the rally routes flow. This one turns because the field turns.
+  // Measured (900 samples): 1851 u lap, tightest radius 17 u, 3.9 % of the lap
+  // under 25 u, self-approach 50.9 u — well clear of the 22 u ribbon width.
+  farmland: [
+    // start / finish: the straight lane along the southern field edge. Dead
+    // straight on purpose — the grid needs flat road, and a clean run of
+    // constant curvature is what lets the width profile hang a pinch on it.
+    [-70, -240], [-8, -240], [54, -240], [112, -238],
+    // hard left at the field corner onto the lane that climbs north
+    [168, -220], [194, -184], [186, -142],
+    // staggered crossroads — right, then immediately left
+    [212, -116], [246, -100], [250, -52],
+    // the long east lane over the blind crests
+    [220, -8], [230, 42], [252, 92],
+    // square corner at the top of the rise, back west along the headland
+    [246, 142], [206, 174], [156, 176], [126, 186],
+    // jog north around the copse, then the northern lane
+    [112, 230], [46, 240], [-18, 224],
+    [-84, 240], [-148, 226], [-172, 184],
+    // doubling back around a field corner, down into the stream hollow
+    [-132, 150], [-164, 118], [-214, 112], [-250, 70],
+    // tightening bends along the woodland edge, back to the line
+    [-226, 26], [-180, 0], [-218, -44], [-250, -100],
+    [-232, -158], [-186, -196], [-128, -214],
   ],
 };
 
@@ -1836,6 +1869,103 @@ const THEMES = {
       tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
     },
   },
+
+  // HEDGEROW DASH: farmland lanes, per RALLY_WORLD_BIBLE 3.8. Overcast, low
+  // sun straight down the lane, everything green and grey and nothing bright.
+  // The identity is the BANK — a 1.9 u earth wall topped with 2.3 u of thorn
+  // running both sides of the road, so a car that goes wide meets masonry-hard
+  // ground rather than runoff. Mud off the field entrances, blind crests, and
+  // no mountain anywhere: the negative list forbids exposed rock, dry dust,
+  // bright colour and any sight line worth the name.
+  farmland: {
+    surface: 'wet',                                     // "wet mixed" — physics reads this
+    // Bible fog is FogExp2 d=0.00150 #C3CBD2; the engine's fog is linear, so
+    // near/far are set to the same half-fade (~550) and extinction (~1150).
+    fogColor: 0xc3cbd2, fogNear: 170, fogFar: 950,
+    hemiSky: 0x9fb2c6, hemiGround: 0x4e4535, hemiIntensity: 0.58,  // 0.58 = Bible ambient
+    sunColor: 0xffe4ce, sunIntensity: 2.05,             // 4800 K, broken by cloud
+    skyTop: '#6F8CA8', skyHorizon: '#C3CBD2', sunGlow: 0xffe4ce,
+    skyCurve: 0.7,                                      // overcast: the pale reaches high
+    sunAz: 5.24, sunEl: 0.31,                           // 300° bearing, 18° up — down the lane
+    cloudCount: 16, cloudOpacity: 0.95, cloudTint: 0xd6dbe0,
+    terrainLow: '#446232', terrainHigh: '#7d8a63', terrainDirt: '#4e4535',
+    // bank faces and the cut of the sunken lane, both bare earth
+    terrainScree: '#5a5442', skirtColor: '#5a4f3c', hutGlow: 0.42,
+    ground: {
+      base: '#4d6b39', bandLight: 'rgba(255,255,255,0.05)', bandDark: 'rgba(40,52,30,0.07)',
+      patchA: 'rgba(78,69,53,0.22)',                    // ploughed earth
+      patchB: 'rgba(122,134,92,0.16)',                  // cut hay / stubble
+      speckA: 'rgba(58,84,42,0.7)', speckB: 'rgba(150,160,120,0.7)', speckCount: 70,
+    },
+    road: {
+      // patched tarmac (35% of the Bible surface mix) with the dirt and mud
+      // that make up another 45% of it dragged across the top
+      base: '#4c4a44', mottleA: [62, 54, 42], mottleB: [110, 108, 102],
+      rut: 'rgba(46,38,26,0.5)', rutCore: 'rgba(32,26,18,0.45)', tread: 'rgba(18,14,10,0.4)',
+      stoneA: 'rgba(178,174,164,0.55)', stoneB: 'rgba(52,48,42,0.7)',
+      fringe: [58, 92, 40], fringeVar: [28, 38, 22],    // grass right to the edge
+      wet: { darken: 0.32, gleam: 9, pools: 5 },
+    },
+    // no mountains anywhere: a low green ridge line, sunk and half-eaten by fog
+    hillColor: 0x54664a, peakColor: 0x8a94a0, hillDrop: 34,
+    // the fields come up to the lane fast — that is what a sunken lane is
+    blend: { near: 11, far: 44 },
+    // Tier-4 flora is ONLY the hedgerow standards: oak and ash on the bank top.
+    // `birch` stands in for ash (pale bark, airy crown — the nearest silhouette
+    // in the species table). Weights are the Bible's 0.14 / 0.12, renormalised
+    // over the tree tier so they sum to 1.0 (checklist R04).
+    treeCount: 300, trunkColor: 0x6b5a44,
+    foliageLow: 0x35502a, foliageTop: 0x4a6b34,
+    foliage: { h: 0.26, hVar: 0.05, s: 0.34, sVar: 0.14, l: 0.25, lVar: 0.10 },
+    treeSnowCap: false,
+    // bracken and pasture grass; bramble and nettle as the understorey mass
+    tuftCount: 1400, grass: { bladeA: '#4a6b34', bladeB: '#7a8f52' },
+    understorey: 'blob',                                // broadleaf scrub = bramble
+    bushCount: 260, bushColor: 0x35592c,
+    bush: { h: 0.26, hVar: 0.04, s: 0.40, sVar: 0.10, l: 0.24, lVar: 0.10 },
+    // "Never: exposed rock." No boulders, no hero erratic — only road grit.
+    rockCount: 0, pebbleCount: 140, rockColor: 0x7e7468, rockSnowCap: false,
+    heroRock: false,
+    // "Never: bright colours." Nothing in the verge is allowed to shout.
+    flowerCount: 0, flowerColors: ['#e8e4d2'],
+    hutRoof: 0x4a5058,                                  // slate
+    hutCount: 10,                                       // dispersed, never a village
+    hayColor: 0x6e7a52, hayCount: 22,                   // silage bales in green wrap
+    hayNear: 18, hayFar: 30,                            // stacked in the field, behind the hedge
+    splinter: [0x7e7468, 0xe8e4d2],                     // rubble stone + lime pointing
+    weather: { type: 'rain', color: 0xc3cbd2, rate: 90 },
+    // rolling farmland: 40-260 m base, 4-12 % dominant gradient. The short
+    // crests that make the lane blind come from `rampCount` below, not here.
+    elev: { amp: 12, ph: [1.9, 0.7, 2.4] },
+    // Crests are the point of this world: ten a lap (rampCount + 3), and the
+    // straightness ceiling is loose enough that some of them sit on the entry
+    // to a bend — "blind crests into tightening corners", per the Bible.
+    rampCount: 9, crestHeight: 3.1,
+    rampMaxCurv: 0.016, padMaxCurv: 0.0035, boardMaxCurv: 0.012,
+    // 4.2-5.6 m roadbed: the narrowest region outside Old Town. 0.52 asks for
+    // a harder pinch than any other world (AVALANCHE ALLEY, the previous
+    // worst, is 0.55) and lands on _buildWidthProfile's 5 u floor, so this is
+    // as narrow as the engine goes. The count is a request: this lane is
+    // turning almost everywhere and only two windows are straight enough for
+    // one, which is why the start straight above is dead straight.
+    narrows: { count: 3, min: 0.52 },
+    // THE BANK. See _buildHedgeBanks — this is the region's hazard signature.
+    hedgeBanks: { lateral: 13.6, bankH: 1.9, bankW: 2.4, hedgeH: 2.3, bay: 6.2, max: 640 },
+    // streams in the valley bottoms, washing over the lane
+    fords: { count: 2 }, riverBank: { base: '#5a5442' }, reedColor: 0x5f7a3a,
+    // height fog in the field hollows + a wet squall; NEVER a tree corridor —
+    // the viz-corridor builder plants dense trunks where the banks already are
+    viz: [['fogbank', 2], ['squall', 1]],
+    // mud dragged onto the tarmac at the field entrances: 6-10 patches a stage
+    puddleCount: 9,
+    puddle: {
+      rim: '#4a4030', mud: '#221c12',
+      sheen: 'rgba(150,165,180,0.28)', gleam: 'rgba(200,215,225,0.34)',
+    },
+    elements: 'hedgerow',
+    // no massif, no glacier, no obstacleSpec, no hazard specs — the lane, the
+    // bank and the weather are the whole of it.
+  },
 };
 
 /** Free every geometry, material and texture under `root`, then empty it.
@@ -1977,6 +2107,9 @@ const PROP_SPECS = {
   // and steel drums. No rocks and no hay — the region's negative list rules
   // out gravel, dirt and anything that is not architectural.
   oldtown: [['crate', 20], ['cone', 18], ['barrel', 14]],
+  // farm dressing only — 'hay' is a wrapped silage bale here and 'barrel' a
+  // slurry drum. No 'rock': the region's negative list forbids exposed rock.
+  farmland: [['hay', 24], ['crate', 14], ['barrel', 10], ['cone', 10]],
 };
 const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20, penguin: 40 };
 const _m4 = new THREE.Matrix4(); // scratch (smashTree instance-zeroing)
@@ -1996,6 +2129,7 @@ const BARREL_PALETTES = {
   neon: { base: '#22262e', hoop: '#101318', stripe: '#26f6ff' },
   undercity: { base: '#3a4034', hoop: '#181c14', stripe: '#8a9a3c' },
   oldtown: { base: '#3a4048', hoop: '#1a1e24', stripe: '#f2a93b' },  // works drum
+  farmland: { base: '#5a6450', hoop: '#2c3226' },      // green slurry drum
 };
 
 // ---------- world elements: farms, chapels, outposts, field walls ----------
@@ -2068,6 +2202,15 @@ const ELEMENT_KITS = {
     builds: ['house', 'house', 'shed'], landmarks: ['chapel'],
     dress: ['well'], fenceColor: 0x5a5f66, stoneWalls: 6,
     field: [], fenceRuns: 4,
+  // FARMLAND HEDGEROW: rubble stone with lime pointing, slate roofs, dark
+  // green painted doors, and a muted-grey steel portal barn behind the house.
+  // The Bible allows this region exactly two archetypes — the farm longhouse
+  // and the universal chapel — so `builds` is house/barn only and there is one
+  // landmark, never a silo or a windmill (checklist R03).
+  hedgerow: {
+    wall: 0x8f8778, wall2: 0x8a8f8c, roof: 0x4a5058, trim: 0x2f4a3c, stone: 0x7e7468,
+    builds: ['house', 'barn', 'house', 'barn'], landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xa8a08c, stoneWalls: 6, fenceRuns: 4,
   },
 };
 // Species mix for the default (conifer-family) forest builder, per theme:
@@ -2099,6 +2242,9 @@ const FLORA_MIX = {
   // OLD TOWN: pollarded planes and limes only — the two broadleaf species in
   // the kit. A conifer anywhere near a European old town would be wrong.
   oldtown: [['oak', 0.62], ['birch', 0.38]],
+  // hedgerow standards and nothing else — no conifer has any business here.
+  // `birch` is the stand-in for ash: pale bark, open airy crown.
+  farmland: [['oak', 0.54], ['birch', 0.46]],
 };
 
 // How many decorative side-road junctions each RURAL world gets (city, ice
@@ -2106,6 +2252,9 @@ const FLORA_MIX = {
 const THEME_CROSSROADS = {
   forest: 3, desert: 2, snow: 2, alpine: 3, oasis: 2, redwood: 2, flume: 2,
   wildfire: 2, pass: 3, tremola: 2, furka: 2, medterrace: 2,
+  // the field entrances the tractors drag the mud out of — the maximum, since
+  // they are the region's stated hazard and every one of them opens the hedge
+  farmland: 4,
 };
 const ELEMENT_KIT_BY_THEME = {
   forest: 'farm', desert: 'desert', snow: 'alpine', canyon: 'desert', volcano: 'burnt',
@@ -2115,6 +2264,7 @@ const ELEMENT_KIT_BY_THEME = {
   pass: 'alpine', tremola: 'alpine', furka: 'alpine',
   medterrace: 'medhill',
   pass: 'alpine', tremola: 'alpine', furka: 'alpine', oldtown: 'oldtown',
+  farmland: 'hedgerow',
 };
 
 /** Unit gable-roof prism: 1×1×1, base at y=0, ridge running along local X at
@@ -4724,6 +4874,10 @@ export class Track {
     this._buildWorldElements(m4);                    // farms, chapels, fences, dressing
     this._buildPastures();                           // grazing spots for the animal system
     this._buildCrossroads();                         // dirt side-road junctions (rural worlds)
+    // FARMLAND: the banks that line every lane. AFTER the crossroads, the
+    // props and the tire stacks, because it leaves a gap wherever one of them
+    // already occupies the verge — a hedge cannot grow across a field gate.
+    if (this.T.hedgeBanks) this._buildHedgeBanks(m4);
     this._buildRoadsideDetail(m4);                   // corner markers + gravel
     this._buildContactShadows();                     // baked AO under everything
   }
@@ -5071,6 +5225,149 @@ export class Track {
     }
     mesh.count = k;
     if (k) this.group.add(mesh);
+  }
+
+  /** Unit hedge-bank prism: a trapezoid cross-section in the local X-Y plane
+   *  (base 1 wide at y=0, crest 0.36 wide at y=1) extruded 1 along local Z.
+   *
+   *  It exists because nothing in the kit is this shape. A BoxGeometry has no
+   *  batter, and the shared gable prism (gablePrismGeo) is a triangle whose
+   *  ridge runs along local X — i.e. ACROSS the road once it is rotated by
+   *  headingAt, which is the wrong axis and gives no crest for a hedge to sit
+   *  on. Local Z is along the lane, so scale is (bankWidth, height, bayLength).
+   *  Twelve triangles, built once per world. */
+  _bankPrismGeo() {
+    const b0 = [-0.5, 0, -0.5], b1 = [0.5, 0, -0.5], b2 = [0.5, 0, 0.5], b3 = [-0.5, 0, 0.5];
+    const t0 = [-0.18, 1, -0.5], t1 = [0.18, 1, -0.5], t2 = [0.18, 1, 0.5], t3 = [-0.18, 1, 0.5];
+    const tris = [
+      [t0, t3, t2], [t0, t2, t1],          // crest
+      [b1, t1, t2], [b1, t2, b2],          // +x batter
+      [b0, t3, t0], [b0, b3, t3],          // -x batter
+      [b0, t0, t1], [b0, t1, b1],          // end cap
+      [b3, t2, t3], [b3, b2, t2],          // end cap
+      [b0, b1, b2], [b0, b2, b3],          // sole (buried, but never see-through)
+    ];
+    const pos = new Float32Array(tris.length * 9);
+    let o = 0;
+    for (const t of tris) for (const v of t) { pos[o++] = v[0]; pos[o++] = v[1]; pos[o++] = v[2]; }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  /** FARMLAND HEDGEROW: THE BANK.
+   *
+   *  Every other world's answer to "what happens if you go wide" is runoff,
+   *  scenery, or a wall you can see coming from a corner away. This region's
+   *  answer, per RALLY_WORLD_BIBLE 3.8, is that there is no answer: an earth
+   *  bank 1.2-2.2 m high topped with 1.6-2.4 m of thorn runs continuously down
+   *  both sides of the lane, and a car that leaves the road hits it.
+   *
+   *  Two InstancedMeshes — bank prisms and hedge blocks, one draw call each —
+   *  and one small SOLID per bay. The bays are spaced so their PUSH-OUT circles
+   *  (r + the 1.8 u car radius the physics adds) overlap: a chain of separated
+   *  colliders is a fence with holes in it, and the whole point of this world
+   *  is that there are no holes.
+   *
+   *  It is deliberately NOT stone. The solids are tagged 'bank', which falls to
+   *  the generic barrier response in onSolidCrash — a scrape costs paint and
+   *  speed and caps at 24 hull. Earth is not a cliff face, and this thing is
+   *  close enough to the carriageway that stone damage would make the world
+   *  unplayable rather than intimidating.
+   *
+   *  Gaps are authored, not accidental: the start gate, every field entrance
+   *  (the crossroad spurs), every ford, one gateway per ~11 bays, and anywhere
+   *  a prop or a tire stack already stands on the verge. */
+  _buildHedgeBanks(m4) {
+    const S = this.T.hedgeBanks;
+    const LAT = S.lateral, H = S.bankH, W = S.bankW, HH = S.hedgeH, MAX = S.max || 520;
+    // One bay per `step` samples; the mesh runs 8 % long so the run reads
+    // continuous instead of as a row of separate lumps.
+    const step = Math.max(2, Math.round((S.bay || 6.2) / this.segLen));
+    const bayLen = step * this.segLen * 1.08;
+    const bankGeo = this._bankPrismGeo();
+    const hedgeGeo = new THREE.BoxGeometry(1, 1, 1);
+    hedgeGeo.translate(0, 0.5, 0);
+    const banks = new THREE.InstancedMesh(
+      bankGeo,
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color(this.T.terrainScree || this.T.terrainDirt),
+        flatShading: true, roughness: 1, envMapIntensity: 0.3,
+      }),
+      MAX
+    );
+    const hedges = new THREE.InstancedMesh(
+      hedgeGeo,
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff, flatShading: true, roughness: 1, envMapIntensity: 0.25,
+      }),
+      MAX
+    );
+    banks.castShadow = banks.receiveShadow = true;
+    hedges.castShadow = hedges.receiveShadow = true;
+    banks.name = 'hedge-bank';
+    hedges.name = 'hedge-top';
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const col = new THREE.Color(), leaf = new THREE.Color();
+    const F = this.T.foliage;
+    // Verge furniture that was here first — a bay is dropped rather than grown
+    // through a crate or a tire stack. Only things actually standing in the
+    // bank's own lateral band count: props scatter from 10.5 to 22 u out, and
+    // testing all of them threw away half the run for objects the bank was
+    // never going to touch.
+    const verge = [...this.props, ...this.tireStacks].filter(
+      (v) => Math.abs(this._distToTrack(v.x, v.z) - LAT) < W * 0.5 + (v.r ?? 1.2));
+    let k = 0, bay = 0;
+    for (let i = 0; i < N && k < MAX; i += step) {
+      if (this._circDist(i, 0) < 34) continue;                    // start grid + gate
+      if (this._nearGorge(i, 40)) continue;
+      // streams wash across the lane; the bank opens for them on both sides
+      if (this.fords.some((f) => this._circDist(i, f.i) < f.half / this.segLen + 5)) continue;
+      bay++;
+      for (const side of [1, -1]) {
+        if (k >= MAX) break;
+        // field entrance: the spur cuts the bank clean through
+        if (this.crossroads.some((c) => this._circDist(i, c.index)
+          < (c.side === side ? 9 : 4))) continue;
+        // one five-bar gateway every ~18 bays, staggered between the sides —
+        // roughly a gate every 110 u of hedge, which is the Bible's field
+        // entrance rate. They are the only way off the lane; that is the point.
+        if ((bay + (side > 0 ? 0 : 9)) % 18 === 0) continue;
+        const p = this.pointAt(i, LAT * side);
+        // AN OFFSET IS NOT A DISTANCE. `pointAt` measures along one sample's
+        // normal; on the inside of a bend the road swings under it. The bank
+        // is the closest thing to the carriageway in the world, so it is the
+        // one that must ask the whole lap how far away the road actually is.
+        if (!this._clearsRoad(p.x, p.z, W / 2, 1.0)) continue;
+        if (verge.some((v) => (v.x - p.x) ** 2 + (v.z - p.z) ** 2 < 5.8)) continue;
+        // seat it on the lower of the road and the field: the lane is sunken,
+        // so the bank always meets the road side and buries into the field side
+        const ground = this._terrainMeshHeight(p.x, p.z);
+        const base = Math.min(p.y, ground) - 0.4;
+        const h = H * (0.86 + Math.random() * 0.3);
+        q.setFromAxisAngle(up, this.headingAt(i));
+        m4.compose(new THREE.Vector3(p.x, base, p.z), q, new THREE.Vector3(W, h, bayLen));
+        banks.setMatrixAt(k, m4);
+        col.setScalar(0.84 + Math.random() * 0.3);
+        banks.setColorAt(k, col);
+        // the thorn on top: flailed, so it is a block, not a blob — jittered in
+        // height and yaw so the run has a ragged skyline rather than a hemline
+        const hh = HH * (0.8 + Math.random() * 0.42);
+        q.setFromAxisAngle(up, this.headingAt(i) + (Math.random() - 0.5) * 0.16);
+        m4.compose(new THREE.Vector3(p.x, base + h * 0.92, p.z), q,
+          new THREE.Vector3(W * 0.8, hh, bayLen * 1.02));
+        hedges.setMatrixAt(k, m4);
+        leaf.setHSL(F.h + Math.random() * F.hVar, F.s + Math.random() * F.sVar,
+          Math.max(0.10, F.l - 0.06 + Math.random() * F.lVar));
+        hedges.setColorAt(k, leaf);
+        this.solids.push({ x: p.x, z: p.z, r: W / 2, y: base + h * 0.5, mat: 'bank' });
+        k++;
+      }
+    }
+    banks.count = hedges.count = k;
+    if (k) this.group.add(banks, hedges);
+    else { bankGeo.dispose(); hedgeGeo.dispose(); }
   }
 
   /** Log cabins standing on the shelves right beside the pass, the way real
@@ -8879,7 +9176,8 @@ export class Track {
         // cliff-walled levels stack the tires right against the rock face;
         // pass levels tuck them inside the stone parapet
         const tireOff = this.T.cliffWalls ? WALL_OFF + 0.8
-          : (this.T.retainingWalls || this.T.guardFence) ? WALL_OFF + 1.2 : WALL_OFF + 2.2;
+          : (this.T.retainingWalls || this.T.guardFence || this.T.hedgeBanks)
+            ? WALL_OFF + 1.2 : WALL_OFF + 2.2;
         const p = this.pointAt(i, tireOff * side);
         // Same trap as the road cabins: `tireOff` is measured along ONE
         // sample's normal, and on a hairpin the road's other leg swings under
@@ -8916,7 +9214,12 @@ export class Track {
     );
     hay.castShadow = true;
     let hk = 0;
-    this._scatter(hayCount, () => this._trackSidePos(12.5, 20), (p) => {
+    // hayNear/hayFar move the stack off the verge: a world whose road edge is
+    // already occupied (FARMLAND's hedge banks) puts its bales in the field
+    // behind the hedge, where a real silage stack sits anyway. Unset = 12.5-20,
+    // the figures every other world has always used.
+    const hayNear = this.T.hayNear ?? 12.5, hayFar = this.T.hayFar ?? 20;
+    this._scatter(hayCount, () => this._trackSidePos(hayNear, hayFar), (p) => {
       q.setFromAxisAngle(up, Math.random() * Math.PI);
       m4.compose(new THREE.Vector3(p.x, this.terrainHeight(p.x, p.z) + 0.8, p.z), q, new THREE.Vector3(1, 1, 1));
       hay.setMatrixAt(hk++, m4);
@@ -8944,7 +9247,8 @@ export class Track {
     // inside the canyon instead of vanishing behind it; pass levels stand them
     // clear of the stone parapet
     const boardOff = this.T.cliffWalls ? WALL_OFF + 0.75
-      : (this.T.retainingWalls || this.T.guardFence) ? WALL_OFF + 6.4 : WALL_OFF + 3.6;
+      : (this.T.retainingWalls || this.T.guardFence || this.T.hedgeBanks)
+        ? WALL_OFF + 6.4 : WALL_OFF + 3.6;
     for (let b = 0; b < 10; b++) {
       const i = ((b + 0.5) * N / 10) | 0;
       if (this.curvature[i] > this.T.boardMaxCurv) continue; // keep boards off tight corners
