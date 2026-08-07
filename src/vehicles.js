@@ -905,6 +905,22 @@ export class Car {
     // drift reward: convert a slice of the scrubbed-off slide back into forward speed
     if (this.slip > 0.4) vf = Math.min(topSpeed, vf + Math.abs(vlBefore - vl) * 0.35 * (vf >= 0 ? 1 : -1));
 
+    // ---- IN THE AIR THERE ARE NO TYRES ----
+    //
+    // Everything above this point is a tyre force: engine thrust through the
+    // contact patch, lateral grip, slip. None of it exists once the wheels
+    // leave the ground, and the game was applying all of it. Measured on a
+    // 1.1 s jump from PINE VALLEY at 42 u/s: holding full lock moved the car
+    // THIRTY METRES sideways off its launch trajectory and spun it 167 degrees,
+    // and the difference between full throttle and none was 40.4 u/s against
+    // 12.3 u/s on landing. You could fly a corner you had no line for.
+    //
+    // A body in flight keeps the velocity it left with, less air drag, and
+    // falls. That is the whole model. `airVel` is that velocity, captured
+    // before the steering block so the recomposition below can be told to
+    // reproduce it exactly rather than rebuild it from a heading it no longer
+    // has any right to change.
+    const airVel = this.airborne ? this.vel.clone() : null;
     // ---- steering: quick to come in, gentle taper at very high speed ----
     const sp = Math.abs(vf);
     // Steering authority used to scale from ZERO with speed, so the slower you
@@ -916,7 +932,13 @@ export class Car {
     // track's geometry; the speed term still adds on top of it.
     const rise = 0.45 + 0.55 * THREE.MathUtils.clamp(sp / 13, 0, 1);
     const taper = 1 - this.steerTaper * THREE.MathUtils.clamp((sp - this.maxSpeed * 0.6) / (this.maxSpeed * 0.55), 0, 1);
-    const authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
+    let authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
+    // A rally car CAN rotate a little in the air — inertia, and a stab of
+    // throttle against the driveline — so this is not zero. It is small enough
+    // that it reads as tidying the car up for the landing rather than as
+    // steering, and it changes the ATTITUDE only: the trajectory is fixed
+    // below, whatever the heading ends up being.
+    if (this.airborne) authority *= 0.14;
     const dir = vf >= 0 ? 1 : -1;
     const stripSteer = this.stripLock ? this.stripLock.steerMul : 1;
     let dTheta = steer * this.steerRate * sense * camMul * authority * stripSteer * dir * dt;
@@ -936,10 +958,20 @@ export class Car {
       }
     }
     this.heading += dTheta;
+    // BALLISTIC. Project the velocity the car left the ground with onto the
+    // axes it now points along, so the recomposition at the bottom of this
+    // block rebuilds exactly that world vector. Rotating the body therefore
+    // changes what the car LOOKS like — it can land crossed up, or straighten
+    // itself out — and moves it not one unit off its arc.
+    if (airVel) {
+      const f = this.forward;
+      vf = airVel.x * f.x + airVel.z * f.z;
+      vl = airVel.x * f.z - airVel.z * f.x;
+    }
     // While gripped the velocity turns with the car (arcade rails). While slipping
     // it lags the yaw: part of the turn spills forward speed into lateral slide,
     // so hard cornering at speed visibly breaks the rear loose.
-    const lag = this.slip * this.driftLag;
+    const lag = this.airborne ? 0 : this.slip * this.driftLag;
     if (lag > 0) {
       const nvf = vf + vl * dTheta * lag;
       vl -= vf * dTheta * lag;
@@ -1656,6 +1688,54 @@ export class Car {
         if (this === this.game.player && over > 0.5 && !this._steepFed) {
           this._steepFed = 1.5;
           this.game.hud?.feed?.('TOO STEEP', 'bad');
+        }
+      }
+    }
+    // CLIMBING IS A FUNCTION OF INCLINATION — everywhere, not just the rim.
+    //
+    // The gate above stops the border wall; this one is the report "climbing
+    // the hills needs to be appropriate with the inclination — too steep
+    // can't be climbed". The physics: driving force is capped by traction,
+    // traction by the normal force, so past tan(θ) ≈ μ the wheels cannot hold
+    // and gravity takes the rest. 0.40 (~22°) is the budget — every ROAD in
+    // the game grades under 24 % and is exempt anyway (this is off-road only),
+    // so nothing on a racing line changes.
+    //
+    // THE REGRESSION THIS MUST NOT RE-SHIP (see the rim gate's history): the
+    // banks beside a switchback stack read near-vertical, and braking there
+    // stranded players scrambling BACK to the road. So the rejoin corridor is
+    // exempt — this only engages beyond 14 u of lateral, confirmed by a
+    // global search before it is believed (the tracked index lies exactly on
+    // stacked legs), and the whole check runs only on frames already moving
+    // uphill off-road, which is nowhere on a clean lap.
+    const CLIMB_MAX = 0.40;
+    if (!this.airborne && offRoad && this.alive && this === this.game.player) {
+      const v2h = this.vel.x * this.vel.x + this.vel.z * this.vel.z;
+      if (v2h > 1) {
+        const inv = 1 / Math.sqrt(v2h);
+        const dxh = this.vel.x * inv, dzh = this.vel.z * inv;
+        const LOOK = 4;
+        const gradeUp = (t.terrainHeight(this.pos.x + dxh * LOOK, this.pos.z + dzh * LOOK) - gY) / LOOK;
+        if (gradeUp > CLIMB_MAX && Math.abs(this.lateral) > 14) {
+          let lat = Math.abs(this.lateral);
+          if (t.nearestIndex && t.lateralOffset) {
+            const gi = t.nearestIndex(this.pos);   // no hint: search the lap
+            lat = Math.abs(t.lateralOffset(this.pos, gi));
+          }
+          if (lat > 14) {
+            const over = Math.min(1, (gradeUp - CLIMB_MAX) / 0.30);
+            // traction fades out...
+            this.vel.multiplyScalar(Math.max(0, 1 - over * 3.5 * dt));
+            // ...and gravity's slope component pushes back down. 26 is the
+            // game's own g (the airborne branch integrates with it).
+            const gPush = 26 * Math.min(1.2, gradeUp) * over * 0.55;
+            this.vel.x -= dxh * gPush * dt;
+            this.vel.z -= dzh * gPush * dt;
+            if (over > 0.4 && !this._steepFed) {
+              this._steepFed = 1.5;
+              this.game.hud?.feed?.('TOO STEEP', 'bad');
+            }
+          }
         }
       }
     }
