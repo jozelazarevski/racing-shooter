@@ -134,6 +134,11 @@ export const LEVELS = [
   // hairpin over hairpin, on the Mediterranean island theme
   { id: 45, name: 'TOUR DE CORSE', theme: 'medterrace', route: 'corse', region: 'GRAND CIRCUITS',
     cost: 17, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 10, ph: [0.8, 1.7, 2.9] }, rampCount: 0 } },
+  // wine country, deep forest, and the Dolomites - the player's three asks,
+  // the vineyard lap tracing their third hand-drawn loop
+  { id: 46, name: 'VINEYARD VELOCE', theme: 'vineyard', region: 'HEARTLAND', cost: 18, fresh: true },
+  { id: 47, name: 'DEEPWOOD TRAIL', theme: 'deepwood', region: 'HEARTLAND', cost: 19, fresh: true },
+  { id: 48, name: 'DOLOMITI CORSA', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -837,6 +842,43 @@ const CIRCUITS = {
     [-19.5, -3.8], [-2.8, -11.2], [15.7, -12.8], [33.0, -6.5], [48.6, 4.2],
     [64.8, 13.8], [77.9, 14.2], [86.8, 23.2],
   ],
+  vineyard: [ // the player's third hand-drawn loop: spiral head, three paw lobes
+    [172.3, -40.4], [183.7, -29.9], [200.7, -17.7], [211.0, -1.3], [211.1, 19.9],
+    [204.4, 41.6], [194.1, 61.9], [181.2, 81.0], [166.2, 98.9], [149.4, 115.0],
+    [130.2, 127.4], [111.0, 131.8], [100.0, 123.3], [103.0, 105.2], [113.1, 84.8],
+    [119.3, 63.5], [115.6, 42.4], [101.5, 26.6], [82.4, 23.0], [66.0, 33.6],
+    [60.1, 52.0], [63.9, 72.8], [67.2, 95.7], [64.7, 118.8], [54.5, 137.1],
+    [35.5, 146.1], [16.1, 144.0], [8.3, 130.7], [10.8, 110.2], [11.7, 87.9],
+    [7.3, 65.7], [1.5, 43.5], [-8.9, 26.1], [-27.7, 20.1], [-49.0, 25.3],
+    [-62.0, 39.2], [-61.5, 58.9], [-57.2, 80.6], [-61.5, 100.8], [-75.5, 117.3],
+    [-93.8, 131.4], [-113.8, 140.9], [-132.1, 138.8], [-143.3, 123.9], [-149.9, 102.8],
+    [-151.7, 81.6], [-144.8, 61.3], [-128.8, 50.3], [-120.2, 31.0], [-115.9, 8.6],
+    [-118.0, -14.5], [-127.7, -34.3], [-145.1, -47.6], [-165.9, -50.6], [-182.9, -41.1],
+    [-186.8, -24.4], [-177.9, -6.9], [-167.6, 12.1], [-164.4, 32.5], [-163.8, 54.2],
+    [-176.8, 58.7], [-196.8, 56.7], [-216.4, 47.3], [-229.1, 30.2], [-234.7, 8.2],
+    [-235.0, -15.2], [-231.6, -38.2], [-224.2, -59.6], [-211.7, -78.9], [-195.0, -95.3],
+    [-175.5, -107.2], [-153.5, -112.7], [-130.3, -112.1], [-108.0, -106.7], [-87.8, -96.7],
+    [-71.7, -81.6], [-57.3, -66.9], [-37.7, -60.0], [-14.8, -56.1], [7.6, -50.9],
+    [30.7, -47.5], [54.8, -46.4], [78.8, -45.2], [102.6, -43.5], [126.7, -42.5],
+    [147.0, -45.3], [150.9, -55.8], [140.5, -74.3], [138.8, -96.1], [144.9, -117.3],
+    [157.3, -134.3], [176.2, -144.1], [198.8, -146.1], [220.2, -140.8], [233.8, -127.0],
+    [235.0, -106.8], [226.2, -86.6], [211.1, -70.3], [192.5, -57.6], [172.4, -48.4],
+  ],
+  deepwood: [ // forest weave: flowing esses that never leave the trees
+    [-210.0, 150.0], [-90.0, 190.0], [30.0, 160.0], [120.0, 190.0], [200.0, 150.0],
+    [225.0, 60.0], [160.0, 10.0], [60.0, 40.0], [-40.0, 10.0], [-120.0, -40.0],
+    [-60.0, -95.0], [40.0, -70.0], [140.0, -100.0], [200.0, -160.0], [120.0, -210.0],
+    [0.0, -185.0], [-100.0, -215.0], [-190.0, -170.0], [-225.0, -80.0], [-170.0, -20.0],
+    [-215.0, 50.0], [-225.0, 110.0],
+  ],
+  dolomiti: [ // meadow hairpin ladder under the pale rock faces, perimeter home
+    [-60.0, 220.0], [-160.0, 200.0], [-215.0, 140.0], [-150.0, 95.0], [-40.0, 110.0],
+    [80.0, 120.0], [160.0, 85.0], [90.0, 45.0], [-40.0, 55.0], [-140.0, 30.0],
+    [-190.0, -20.0], [-120.0, -60.0], [0.0, -45.0], [110.0, -70.0], [170.0, -120.0],
+    [90.0, -165.0], [-30.0, -140.0], [-140.0, -170.0], [-90.0, -215.0], [40.0, -220.0],
+    [150.0, -195.0], [215.0, -130.0], [225.0, -30.0], [215.0, 80.0], [150.0, 160.0],
+    [40.0, 195.0],
+  ],
 };
 
 // Every color and density knob per theme. `fogColor…sunIntensity` are exposed
@@ -1002,7 +1044,8 @@ const THEMES = {
     weather: { type: 'dust', color: 0xc9a06a },
     elev: { amp: 6, ph: [0.3, 3.7, 1.9] },              // gentle canyon-floor undulation
     rampMaxCurv: 0.02, padMaxCurv: 0.0075, boardMaxCurv: 0.018,
-    cliffWalls: true, horizon: 'mesa', bridgeCount: 3, oasis: true, outcrops: true,
+    cliffWalls: true, cliffSetback: 26, cliffHeight: 30,
+    horizon: 'mesa', bridgeCount: 3, oasis: true, outcrops: true,
     obstacleSpec: { count: 6, style: 'hoodoo' }, puddleCount: 5,
   },
   // EMBER PASS: charred basalt world — dark ash road, glowing ground fissures,
@@ -1299,7 +1342,7 @@ const THEMES = {
     weather: { type: 'dust', color: 0xc08a5a },
     elev: { amp: 7, ph: [3.1, 1.2, 4.6] },
     rampMaxCurv: 0.022, padMaxCurv: 0.007, boardMaxCurv: 0.02,
-    cliffWalls: true, horizon: 'mesa', outcrops: true,
+    cliffWalls: true, cliffSetback: 22, cliffHeight: 28, horizon: 'mesa', outcrops: true,
     cliffPalette: {                                     // deep red-brown strata
       bands: ['#b06a3c', '#8f4d28', '#7a3e1f', '#c07e48', '#9a5830'],
       seam: 'rgba(52,26,14,0.5)',
@@ -2041,6 +2084,147 @@ const THEMES = {
     // side.
     coast: { a: [-200, -338.6], b: [400, -183.8], level: -2.1, floor: -7, beach: 70 },
     seaColor: 0x3d7f9e,
+  },
+
+  // VINEYARD VELOCE: wine country. Trellis rows and golden wheat in the open,
+  // and a WALL OF FOREST all around - the fields sit in a broad clearing
+  // (treeBelt holds the stands back off the road, then they close in).
+  vineyard: {
+    fogColor: 0xdfe4cc, fogNear: 340, fogFar: 1500,
+    hemiSky: 0xbcd8f0, hemiGround: 0x9aa46a, hemiIntensity: 0.78,
+    sunColor: 0xfff0c8, sunIntensity: 2.7,
+    skyTop: '#3d84c8', skyHorizon: '#e8e8cc', sunGlow: 0xffeeb8,
+    sunAz: 3.9, sunEl: 0.78,
+    cloudCount: 8, cloudOpacity: 0.85, cloudTint: 0xfff8ea,
+    terrainLow: '#7a8a4a', terrainHigh: '#c8b878', terrainDirt: '#a08858',
+    terrainScree: '#b0a070', hutGlow: 0.4,
+    skirtColor: '#a89868',
+    ground: {
+      base: '#a8a468',
+      bandLight: 'rgba(232,220,160,0.09)', bandDark: 'rgba(110,120,60,0.08)',
+      patchA: 'rgba(196,170,88,0.28)',                  // ripe wheat blocks
+      patchB: 'rgba(120,140,70,0.22)',                  // vine-green blocks
+      speckA: 'rgba(160,150,100,0.7)', speckB: 'rgba(230,214,160,0.8)', speckCount: 110,
+    },
+    road: {
+      base: '#8a7a5c', mottleA: [110, 96, 70], mottleB: [160, 146, 112],
+      rut: 'rgba(84,70,48,0.5)', rutCore: 'rgba(62,50,34,0.45)', tread: 'rgba(36,28,18,0.45)',
+      stoneA: 'rgba(214,202,172,0.65)', stoneB: 'rgba(96,82,58,0.7)',
+      fringe: [128, 138, 74], fringeVar: [36, 40, 26],
+    },
+    hillColor: 0x4e6e38, peakColor: 0x8a9a78,
+    treeCount: 720, trunkColor: 0x6b4a28,
+    foliageLow: 0x2e6a34, foliageTop: 0x4a8a44,
+    foliage: { h: 0.3, hVar: 0.06, s: 0.5, sVar: 0.16, l: 0.28, lVar: 0.12 },
+    treeSnowCap: false,
+    treeBelt: [55, 130],                                // the forest ring
+    tuftCount: 1500, grass: { bladeA: '#c8a850', bladeB: '#e2c878' },   // wheat
+    bushCount: 90, bushColor: 0x3f7c38,
+    bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
+    rockCount: 60, pebbleCount: 160, rockColor: 0x9a9484, rockSnowCap: false,
+    flowerCount: 140, flowerColors: ['#c03a2e', '#e8d24a', '#ffffff'],
+    hutRoof: 0x8a4630, hayColor: 0xe0c268,
+    hutCount: 9, hutZone: [0.8, 0.2], hayCount: 44,
+    splinter: [0x8a5a32, 0xe0d4a8],
+    vineRows: { count: 26 },                            // the trellis fields
+    elev: { amp: 7, ph: [1.1, 2.2, 0.6] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    elements: 'medhill',
+    crossroads: 2,
+  },
+  // DEEPWOOD TRAIL: forest ONLY. The stands close right onto the verge on
+  // both sides, the fog sits close, and the lap never sees open country.
+  deepwood: {
+    fogColor: 0xb8c8b0, fogNear: 150, fogFar: 950,
+    hemiSky: 0x9cc0a8, hemiGround: 0x3e4e34, hemiIntensity: 0.72,
+    sunColor: 0xf8ecc8, sunIntensity: 2.2,
+    skyTop: '#4a7a9c', skyHorizon: '#c8d4bc', sunGlow: 0xf0e8b8,
+    sunAz: 2.4, sunEl: 0.62,
+    cloudCount: 6, cloudOpacity: 0.8,
+    terrainLow: '#2e4a28', terrainHigh: '#4e6a3c', terrainDirt: '#5a4c34',
+    terrainScree: '#5a5c48', hutGlow: 0.55,
+    skirtColor: '#4e4838',
+    ground: {
+      base: '#3e5430',
+      bandLight: 'rgba(120,150,90,0.07)', bandDark: 'rgba(24,40,20,0.09)',
+      patchA: 'rgba(70,90,44,0.25)', patchB: 'rgba(96,80,52,0.2)',
+      speckA: 'rgba(90,110,70,0.7)', speckB: 'rgba(150,160,120,0.7)', speckCount: 120,
+    },
+    road: {
+      base: '#6a5a42', mottleA: [84, 70, 50], mottleB: [130, 114, 86],
+      rut: 'rgba(58,46,30,0.55)', rutCore: 'rgba(40,32,20,0.5)', tread: 'rgba(22,16,10,0.5)',
+      stoneA: 'rgba(190,178,150,0.6)', stoneB: 'rgba(70,58,40,0.7)',
+      fringe: [62, 88, 46], fringeVar: [26, 34, 20],
+    },
+    hillColor: 0x33512c, peakColor: 0x4e6a48,
+    treeCount: 950, trunkColor: 0x5a4028,
+    foliageLow: 0x24522c, foliageTop: 0x36703c,
+    foliage: { h: 0.32, hVar: 0.05, s: 0.5, sVar: 0.14, l: 0.24, lVar: 0.1 },
+    treeSnowCap: false,
+    treeBelt: [12.5, 60],                               // trees to the verge
+    tuftCount: 700, grass: { bladeA: '#3e6a34', bladeB: '#6a9a4c' },
+    bushCount: 260, bushColor: 0x2c5c2c,
+    bush: { h: 0.34, hVar: 0.05, s: 0.42, sVar: 0.1, l: 0.24, lVar: 0.1 },
+    rockCount: 180, pebbleCount: 240, rockColor: 0x6e7264, rockSnowCap: false,
+    flowerCount: 90, flowerColors: ['#ffffff', '#c8b0ff'],
+    hutRoof: 0x4a3424, hayColor: 0x8a7a4e,
+    hutCount: 4, hutZone: [0.9, 0.1], hayCount: 6,
+    splinter: [0x5a4028, 0x9ab884],
+    elev: { amp: 9, ph: [0.8, 1.9, 2.8] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    elements: 'alpine',
+    vizZoneSpec: { count: 2, kind: 'fogbank' },
+  },
+  // DOLOMITI CORSA: gravel hairpins over alpine meadow, and the COLOSSAL
+  // pale-rose rock faces standing in front - the enrosadira massif is the
+  // whole skyline, per the player's Dolomites photo.
+  dolomiti: {
+    fogColor: 0xdce8f0, fogNear: 340, fogFar: 1650,
+    hemiSky: 0xaad0f4, hemiGround: 0x7c9468, hemiIntensity: 0.8,
+    sunColor: 0xfff2d8, sunIntensity: 2.8,
+    skyTop: '#2f78c8', skyHorizon: '#e6eef2', sunGlow: 0xfff6d8,
+    sunAz: 0.9, sunEl: 0.68,
+    cloudCount: 10, cloudOpacity: 0.92, cloudTint: 0xffffff,
+    terrainLow: '#4e7c40', terrainHigh: '#98a284', terrainDirt: '#8a8274',
+    terrainScree: '#a89a88', hutGlow: 0.45,
+    skirtColor: '#948a78',
+    ground: {
+      base: '#6f8a58',
+      bandLight: 'rgba(214,232,196,0.06)', bandDark: 'rgba(52,72,44,0.06)',
+      patchA: 'rgba(130,150,90,0.2)', patchB: 'rgba(170,168,140,0.16)',
+      speckA: 'rgba(150,154,142,0.7)', speckB: 'rgba(226,232,222,0.8)', speckCount: 90,
+    },
+    road: {
+      // pale dolomite gravel, per the hairpin photo
+      base: '#b0a48c', mottleA: [150, 138, 116], mottleB: [196, 186, 162],
+      rut: 'rgba(120,106,84,0.5)', rutCore: 'rgba(96,84,64,0.45)', tread: 'rgba(60,50,36,0.45)',
+      stoneA: 'rgba(230,222,202,0.7)', stoneB: 'rgba(120,108,88,0.7)',
+      fringe: [96, 128, 66], fringeVar: [30, 40, 22],
+    },
+    hillColor: 0x6e8a5c, peakColor: 0xd8c2b0,           // rose-grey rock crowns
+    treeCount: 380, trunkColor: 0x5a4028,
+    foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,
+    foliage: { h: 0.33, hVar: 0.05, s: 0.48, sVar: 0.15, l: 0.29, lVar: 0.1 },
+    treeSnowCap: false,
+    treeAltFade: [16, 34],
+    tuftCount: 900, grass: { bladeA: '#4e7c40', bladeB: '#8fae6a' },
+    bushCount: 120, bushColor: 0x3f7c38,
+    bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
+    rockCount: 420, pebbleCount: 320, rockColor: 0xa89a88, rockSnowCap: false,
+    flowerCount: 220, flowerColors: ['#ffffff', '#ffe234', '#e05a78', '#7a9aff'],
+    hutRoof: 0x6a4028, hayColor: 0xc8bc94,
+    hutCount: 10, hutZone: [0.82, 0.18], hayCount: 20,
+    splinter: [0x8a5a32, 0xdce8f0],
+    elev: { amp: 22, ph: [1.4, 0.5, 2.3] },
+    rampMaxCurv: 0.014, padMaxCurv: 0.0045, boardMaxCurv: 0.012,
+    guardFence: { lateral: 12.8, color: 0x8a8a8a, max: 220 },
+    elements: 'alpine',
+    snowPatches: { count: 30, minY: 16 },
+    // THE COLOSSI: Sassolungo-scale towers dead ahead - tall, not wide, and
+    // far enough out that no cone base reaches the arena (the first cut used
+    // w up to 420 at r 360 and a rock face swallowed half the track)
+    massif: { az: 4.75, spread: 1.5, count: 7, r0: 500, r1: 660,
+      h0: 240, h1: 360, w0: 150, w1: 240 },   // NORTH: dead ahead off the grid
   },
 
   // LANTERN QUARTER: the OLD TOWN NIGHT region. Wet cobbles under sodium
@@ -4660,12 +4844,16 @@ export class Track {
     const ph = side * 2.13;                      // asymmetric left/right walls
     // the walls open up around the start line so the gate + grandstand read
     const gap = THREE.MathUtils.smoothstep(this._circDist(j % N, 0), 30, 85);
-    let h = 18
+    let h = (this.T.cliffHeight ?? 18)
       + Math.sin(9 * t + ph) * 2.6
       + Math.sin(23 * t + 1.3 - ph) * 1.5
       + Math.sin(61 * t + 4.1 + ph) * 0.9;       // ≈14–22 when fully walled
     h = Math.max(1.7, h * gap);                  // low stone berm through the gap
-    const base = WALL_OFF + 0.65 + 0.24 * (Math.sin(31 * t + 2.2 + ph) + 1);
+    // cliffSetback pushes the faces off the verge: the corridor becomes a
+    // DEEP VALLEY with a drivable floor, not a walled slot ("don't build
+    // walled track in desert - or make it look like a deep valley")
+    const base = WALL_OFF + 0.65 + (this.T.cliffSetback ?? 0)
+      + 0.24 * (Math.sin(31 * t + 2.2 + ph) + 1);
     const l1 = 0.85 + 0.5 * Math.sin(17 * t + 0.7 - ph);   // mid-face lean
     const l2 = 2.0 + 0.85 * Math.sin(13 * t + 2.9 + ph) + 0.4 * Math.sin(47 * t - ph);
     return { h, base, l1, l2 };
@@ -5962,6 +6150,7 @@ export class Track {
     const m4 = new THREE.Matrix4();
     this._buildHorizon(m4);
     if (this.T.coast) this._buildSea();
+    if (this.T.vineRows) this._buildVineRows();
     if (this.creeks?.length) this._buildCreekBeds(m4);   // outback dry watercourses
     this._buildForest(m4);
     this._buildGroundCover(m4);
@@ -6661,7 +6850,7 @@ export class Track {
     // is baked per-vertex instead — seaColor at the beach easing toward the
     // sky-horizon tone with distance from the arena, meeting the sky dome at
     // a proper sea horizon line instead of a cream wall.
-    const HALF = 4200, DEEP = 4200, COLS = 12, ROWS = 7;
+    const HALF = 4200, DEEP = 4200, COLS = 12, ROWS = 10;
     const cNear = new THREE.Color(this.T.seaColor ?? 0x3d7f9e);
     const cFar = cNear.clone().lerp(new THREE.Color(this.T.skyHorizon ?? '#dce8f0'), 0.8);
     const verts = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
@@ -6670,13 +6859,22 @@ export class Track {
     for (let r = 0, k = 0; r <= ROWS; r++) {
       for (let c = 0; c <= COLS; c++, k++) {
         const du = -HALF + (2 * HALF * c) / COLS;
-        const dn = (DEEP * r) / ROWS;
+        // quadratic row spacing: fine rows through the shallow/deep gradient
+        // near the beach, coarse rows out where one colour serves
+        const dn = DEEP * Math.pow(r / ROWS, 2.2);
         const wx = mx + ux * du + nx * dn, wz = mz + uz * du + nz * dn;
         verts[k * 3] = wx; verts[k * 3 + 1] = y; verts[k * 3 + 2] = wz;
         // haze by distance from the arena the camera lives in, matching the
         // land fog's reach (fogFar ~1650) without inheriting its colour
         const haze = smoothstep01(THREE.MathUtils.clamp((Math.hypot(wx, wz) - 380) / 1400, 0, 1));
         tmp.copy(cNear).lerp(cFar, haze);
+        // SHALLOWS to DEEP: turquoise off the beach, darkening teal past the
+        // bar - depth the way the player's reference art shades its bays,
+        // not one flat fill
+        const shal = 1 - smoothstep01(THREE.MathUtils.clamp(dn / 55, 0, 1));
+        if (shal > 0) tmp.lerp(new THREE.Color(0x7adfd6), shal * 0.8);
+        const deep = smoothstep01(THREE.MathUtils.clamp((dn - 55) / 180, 0, 1));
+        if (deep > 0) tmp.lerp(new THREE.Color(0x17415e), deep * 0.7);
         cols[k * 3] = tmp.r; cols[k * 3 + 1] = tmp.g; cols[k * 3 + 2] = tmp.b;
       }
     }
@@ -6693,12 +6891,84 @@ export class Track {
     geo.setIndex(idx);
     geo.computeVertexNormals();
     const sea = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-      vertexColors: true, roughness: 0.14, metalness: 0.05,
+      // matte enough that the depth gradient READS - at 0.14 the sun's
+      // specular washed the whole bay to one flat cyan
+      vertexColors: true, roughness: 0.55, metalness: 0.02,
       side: THREE.DoubleSide, fog: false,
     }));
     sea.name = 'sea';
     sea.receiveShadow = true;
     this.group.add(sea);
+
+    // SURF: two foam bands hugging the waterline - a bright broken line at
+    // the beach and a fainter one a few metres out
+    for (const [dn, w, op] of [[2.2, 1.7, 0.75], [9, 1.1, 0.32]]) {
+      const segs = 64;
+      const fverts = new Float32Array((segs + 1) * 2 * 3);
+      for (let c2 = 0; c2 <= segs; c2++) {
+        const du = -HALF * 0.35 + (HALF * 0.7 * c2) / segs;
+        const wig = Math.sin(c2 * 1.7) * 2.2;
+        for (let e = 0; e < 2; e++) {
+          const dd = dn + wig * 0.3 + e * w;
+          const o = (c2 * 2 + e) * 3;
+          fverts[o] = mx + ux * du + nx * dd;
+          fverts[o + 1] = y + 0.06;
+          fverts[o + 2] = mz + uz * du + nz * dd;
+        }
+      }
+      const fidx = [];
+      for (let c2 = 0; c2 < segs; c2++) {
+        const a = c2 * 2, b2 = a + 1, c3 = a + 2, d = a + 3;
+        fidx.push(a, c3, b2, b2, c3, d);
+      }
+      const fgeo = new THREE.BufferGeometry();
+      fgeo.setAttribute('position', new THREE.BufferAttribute(fverts, 3));
+      fgeo.setIndex(fidx);
+      const foam = new THREE.Mesh(fgeo, new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: op, depthWrite: false,
+      }));
+      foam.name = 'sea-foam';
+      this.group.add(foam);
+    }
+
+    // ISLETS: a few rock stacks standing out of the bay
+    const isle = new THREE.InstancedMesh(
+      new THREE.ConeGeometry(1, 1, 6),
+      new THREE.MeshStandardMaterial({ color: 0x9a8f7c, flatShading: true, roughness: 1 }),
+      4);
+    const im4 = new THREE.Matrix4();
+    const iq = new THREE.Quaternion(), iup = new THREE.Vector3(0, 1, 0);
+    const ISLES = [[-330, 120, 14, 9], [140, 180, 20, 13], [430, 240, 11, 7], [-90, 320, 26, 15]];
+    for (let k = 0; k < ISLES.length; k++) {
+      const [du, dn, w, hI] = ISLES[k];
+      iq.setFromAxisAngle(iup, k * 1.7);
+      im4.compose(new THREE.Vector3(mx + ux * du + nx * dn, y - 2, mz + uz * du + nz * dn),
+        iq, new THREE.Vector3(w, hI, w * 0.8));
+      isle.setMatrixAt(k, im4);
+    }
+    isle.castShadow = true;
+    this.group.add(isle);
+
+    // SAILS: little day boats moored in the bay
+    const hullG = new THREE.BoxGeometry(3.2, 0.9, 1.3);
+    const hulls = new THREE.InstancedMesh(hullG,
+      new THREE.MeshStandardMaterial({ color: 0xf2ede2, roughness: 0.7 }), 5);
+    const sailG = new THREE.ConeGeometry(1.1, 3.4, 3);
+    const sails = new THREE.InstancedMesh(sailG,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true,
+        roughness: 0.6, side: THREE.DoubleSide }), 5);
+    const BOATS = [[-220, 42], [-60, 70], [60, 38], [230, 85], [340, 55]];
+    for (let k = 0; k < BOATS.length; k++) {
+      const [du, dn] = BOATS[k];
+      const bx = mx + ux * du + nx * dn, bz = mz + uz * du + nz * dn;
+      iq.setFromAxisAngle(iup, k * 2.3);
+      im4.compose(new THREE.Vector3(bx, y + 0.35, bz), iq, new THREE.Vector3(1, 1, 1));
+      hulls.setMatrixAt(k, im4);
+      im4.compose(new THREE.Vector3(bx, y + 2.3, bz), iq, new THREE.Vector3(1, 1, 1));
+      sails.setMatrixAt(k, im4);
+    }
+    hulls.castShadow = sails.castShadow = true;
+    this.group.add(hulls, sails);
   }
 
   /** Old snow lying in the hollows above `minY`: flat white decals conformed
@@ -6877,6 +7147,62 @@ export class Track {
     this.group.add(body, roof);
     this._addShadow(p.x, p.z, Math.max(W, D) * 0.8);
     this.solids.push({ x: p.x, z: p.z, r: Math.max(W, D) * 0.62, y: gy + 3, mat: 'stone' });
+  }
+
+  /** VINE TRELLIS FIELDS: parallel rows of clipped vine hedge on wooden end
+   *  posts, laid out in blocks beside the road the way real wine country is
+   *  planted. Instanced - one draw call for every hedge, one for the posts. */
+  _buildVineRows() {
+    const V = this.T.vineRows;
+    const blocks = V.count ?? 20;
+    const hedgeGeo = new THREE.BoxGeometry(1, 1, 1);
+    hedgeGeo.translate(0, 0.5, 0);
+    const hedges = new THREE.InstancedMesh(hedgeGeo,
+      new THREE.MeshStandardMaterial({ color: 0x3e7434, flatShading: true, roughness: 1 }),
+      blocks * 5);
+    const postGeo = new THREE.BoxGeometry(0.28, 1.7, 0.28);
+    postGeo.translate(0, 0.85, 0);
+    const posts = new THREE.InstancedMesh(postGeo,
+      new THREE.MeshStandardMaterial({ color: 0x6a4a2c, roughness: 1 }),
+      blocks * 10);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    let hk = 0, pk = 0;
+    this._scatter(blocks, () => this._trackSidePos(19, 46), (p) => {
+      const h0 = this.terrainHeight(p.x, p.z);
+      // reject sloped ground - vines terrace, they don't hang
+      for (const [dx, dz] of [[9, 0], [-9, 0], [0, 9], [0, -9]]) {
+        if (Math.abs(this.terrainHeight(p.x + dx, p.z + dz) - h0) > 1.6) return false;
+      }
+      const yaw = Math.random() * Math.PI;
+      q.setFromAxisAngle(up, yaw);
+      const rows = 3 + (Math.random() * 3 | 0);
+      const len = 14 + Math.random() * 10;
+      const dx = Math.cos(yaw), dz = -Math.sin(yaw);       // row direction
+      const px = Math.sin(yaw), pz = Math.cos(yaw);        // row spacing dir
+      for (let r = 0; r < rows && hk < hedges.count; r++) {
+        const off = (r - (rows - 1) / 2) * 3.4;
+        const cx = p.x + px * off, cz = p.z + pz * off;
+        const cy = this.terrainHeight(cx, cz);
+        m4.compose(new THREE.Vector3(cx, cy, cz), q, new THREE.Vector3(len, 1.15, 0.7));
+        hedges.setMatrixAt(hk, m4);
+        col.setScalar(0.85 + Math.random() * 0.3);
+        hedges.setColorAt(hk++, col);
+        for (const e of [-1, 1]) {
+          if (pk >= posts.count) break;
+          const ex = cx + dx * (len / 2 + 0.4) * e, ez = cz + dz * (len / 2 + 0.4) * e;
+          m4.compose(new THREE.Vector3(ex, this.terrainHeight(ex, ez), ez), q,
+            new THREE.Vector3(1, 1, 1));
+          posts.setMatrixAt(pk++, m4);
+        }
+      }
+      this._addShadow(p.x, p.z, 9);
+      return true;
+    });
+    hedges.count = hk;
+    posts.count = pk;
+    hedges.castShadow = posts.castShadow = true;
+    this.group.add(hedges, posts);
   }
 
   /** TUNNELS: rock galleries where the road runs through a deep cutting.
@@ -8333,6 +8659,11 @@ export class Track {
       pos.setY(i, h - 0.12);
       const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
       tmp.copy(cLow).lerp(cHigh, t);
+      // a sand ring where coastal ground meets the water
+      if (T.coast) {
+        const sand = 1 - THREE.MathUtils.smoothstep(h, -0.6, 1.2);
+        if (sand > 0 && h > -3.5) tmp.lerp(new THREE.Color('#d8c9a0'), sand * 0.85);
+      }
       // sprinkle dirt patches
       const dirt = Math.max(0, Math.sin(x * 0.045 + 2) * Math.sin(z * 0.05) - 0.72) * 3;
       tmp.lerp(cDirt, THREE.MathUtils.clamp(dirt, 0, 0.55));
@@ -9111,7 +9442,8 @@ export class Track {
     const placed = this._scatter(COUNT,
       () => {
         let p;
-        if (Math.random() < 0.62) p = this._trackSidePos(15, 46);
+        const belt = T.treeBelt;
+        if (Math.random() < 0.62) p = this._trackSidePos(belt ? belt[0] : 15, belt ? belt[1] : 46);
         else {
           const a = Math.random() * Math.PI * 2;
           const r = 80 + Math.random() * 560;

@@ -1090,6 +1090,13 @@ export class Car {
         // bowl, where the cliffs open up and free-roamers can drive out
         const prof = t._cliffProfile ? t._cliffProfile(this.trackIndex, fside) : null;
         wallHere = !prof || prof.h > 2.5;
+        // deep-valley worlds (cliffSetback) stand their faces well off the
+        // verge: the player may roam the valley floor and only the ROCK is
+        // solid - off-road slowness is the boundary in between
+        if (wallHere && prof && t.T?.cliffSetback
+            && Math.abs(this.lateral) < prof.base - 1.2) {
+          wallHere = false;
+        }
         // FREE ROAM law (RULES.md: roam differs only in REACH): the rock is
         // solid, but it is not an infinite fence. Once a roamer is past the
         // outer face — having driven out through the low berm — they are on
