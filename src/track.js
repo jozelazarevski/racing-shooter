@@ -110,7 +110,7 @@ export const LEVELS = [
   // region, laddered so the collection spans a career.
   { id: 33, name: 'RED BULL RING', theme: 'alpine', route: 'rbring', region: 'GRAND CIRCUITS',
     cost: 5, fresh: true, tune: { elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
-  { id: 34, name: 'MONACO STREETS', theme: 'medterrace', route: 'monaco', region: 'GRAND CIRCUITS',
+  { id: 34, name: 'MONACO STREETS', theme: 'monteCarlo', route: 'monaco', region: 'GRAND CIRCUITS',
     cost: 6, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
   { id: 35, name: 'SILVERSTONE', theme: 'farmland', route: 'silverstone', region: 'GRAND CIRCUITS',
     cost: 7, fresh: true, tune: { // OVERCAST: flat grey racing light, no hard sun
@@ -119,7 +119,7 @@ export const LEVELS = [
   { id: 36, name: 'SPA-FRANCORCHAMPS', theme: 'forest', route: 'spa', region: 'GRAND CIRCUITS',
     cost: 8, fresh: true, tune: { elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
   { id: 37, name: 'SUZUKA', theme: 'redwood', route: 'suzuka', region: 'GRAND CIRCUITS',
-    cost: 9, fresh: true, tune: { elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
+    cost: 9, fresh: true, tune: { japan: { torii: 5, pagodas: 3 }, elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
   { id: 38, name: 'NORDSCHLEIFE', theme: 'forest', route: 'nordschleife', region: 'GRAND CIRCUITS',
     cost: 10, fresh: true, tune: { elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
   { id: 39, name: 'MONZA', theme: 'medterrace', route: 'monza', region: 'GRAND CIRCUITS',
@@ -612,22 +612,34 @@ const CIRCUITS = {
   // is the one place on a 350 m-sight-line world you must not put a corner —
   // so sample 0 is now mid-straight, and it stays that way if you edit this:
   // the array's first control point is where t = 0 lands.
-  outback: [ // the Dusty Canyon Sprint, plateau chord and all
-    [76.7, -182.3], [70.9, -186.2], [52.9, -183.0], [33.8, -175.5], [18.5, -163.7],
-    [9.4, -146.2], [9.6, -126.8], [9.0, -116.1], [-4.7, -100.9], [-20.7, -85.9],
-    [-37.1, -70.9], [-53.5, -55.9], [-69.9, -40.9], [-86.3, -25.9], [-102.7, -10.9],
-    [-119.1, 4.1], [-135.5, 19.1], [-151.9, 34.1], [-168.3, 49.1], [-184.7, 64.1],
-    [-201.1, 79.1], [-217.6, 93.9], [-231.0, 109.9], [-235.0, 128.5], [-228.5, 147.2],
-    [-215.9, 164.0], [-200.0, 177.3], [-181.1, 184.8], [-160.4, 187.7], [-139.3, 187.7],
-    [-118.8, 184.1], [-99.7, 176.5], [-81.5, 166.8], [-64.9, 155.3], [-50.0, 141.5],
-    [-34.7, 127.6], [-18.8, 114.4], [-2.1, 101.9], [15.5, 90.8], [34.0, 82.5],
-    [52.8, 81.4], [69.6, 90.0], [84.0, 104.5], [98.0, 120.6], [113.0, 135.6],
-    [128.8, 148.8], [145.3, 160.1], [164.1, 166.0], [184.5, 164.5], [204.1, 158.1],
-    [221.1, 148.0], [230.6, 132.3], [233.2, 112.9], [235.0, 92.8], [233.8, 72.7],
-    [227.4, 53.7], [216.9, 36.7], [201.9, 23.5], [183.2, 15.3], [162.5, 11.5],
-    [141.0, 9.8], [120.6, 6.0], [103.9, -4.0], [92.7, -20.1], [87.2, -39.9],
-    [84.0, -60.8], [76.8, -79.9], [62.9, -94.1], [47.2, -102.4], [32.0, -110.9],
-    [31.4, -130.7], [45.0, -145.9], [61.3, -160.9], [77.7, -175.9],
+  outback: [ // the player's double-bridge sketch: two flyovers, up and over
+    [-60.5, 13.3], [-69.9, -1.9], [-81.7, -16.0], [-90.4, -31.3], [-93.2, -48.6],
+    [-89.5, -65.3], [-79.0, -78.7], [-64.2, -87.8], [-47.8, -94.0], [-30.5, -97.9],
+    [-12.5, -98.3], [4.8, -94.3], [19.0, -85.6], [27.0, -71.5], [27.3, -54.5],
+    [21.1, -38.1], [11.0, -23.6], [-1.8, -11.0], [-16.3, -0.8], [-32.2, 6.6],
+    [-49.1, 11.5], [-66.4, 15.4], [-84.0, 18.7], [-101.8, 19.5], [-119.2, 16.4],
+    [-135.6, 10.3], [-149.5, 0.9], [-158.2, -13.3], [-161.3, -30.8], [-159.9, -48.7],
+    [-154.6, -65.5], [-147.7, -81.5], [-142.1, -98.2], [-138.6, -115.7], [-134.0, -132.7],
+    [-125.5, -148.1], [-115.4, -162.9], [-104.7, -177.4], [-93.0, -191.3], [-79.9, -204.3],
+    [-65.9, -215.8], [-50.7, -225.0], [-34.9, -232.5], [-18.5, -238.8], [-1.4, -243.2],
+    [16.4, -245.0], [34.7, -244.7], [53.5, -244.2], [72.2, -243.6], [90.1, -241.2],
+    [106.4, -235.2], [120.1, -224.1], [130.5, -210.3], [131.5, -198.8], [119.8, -192.2],
+    [102.9, -187.3], [86.5, -181.1], [70.6, -173.8], [55.7, -164.6], [44.1, -151.9],
+    [38.4, -135.5], [38.7, -117.7], [44.9, -101.3], [56.5, -87.7], [70.6, -76.4],
+    [85.2, -65.9], [99.0, -53.8], [111.8, -40.4], [123.2, -26.2], [132.8, -11.4],
+    [143.2, 2.6], [154.7, 16.1], [161.3, 31.2], [159.9, 47.8], [154.2, 64.3],
+    [146.2, 79.9], [134.8, 93.0], [119.9, 99.6], [104.0, 96.4], [90.5, 85.1],
+    [85.0, 71.1], [91.6, 58.3], [102.9, 45.4], [106.9, 30.8], [99.2, 18.5],
+    [83.5, 12.7], [65.8, 13.5], [51.1, 21.1], [41.2, 34.7], [33.7, 50.6],
+    [27.9, 67.1], [25.6, 84.6], [29.4, 101.4], [39.9, 115.6], [53.9, 126.9],
+    [69.3, 135.5], [85.1, 143.1], [98.6, 153.2], [106.2, 168.0], [108.0, 185.9],
+    [104.6, 203.3], [94.5, 217.5], [79.9, 227.8], [63.8, 234.5], [46.7, 238.9],
+    [28.8, 241.5], [10.2, 242.4], [-7.8, 241.1], [-21.3, 233.6], [-29.2, 231.4],
+    [-62.8, 245.0], [-109.1, 236.5], [-135.9, 197.5], [-138.3, 147.5], [-120.0, 104.9],
+    [-79.8, 81.7], [-37.2, 84.2], [-12.8, 117.1], [-11.6, 165.8], [-19.2, 189.7],
+    [-24.6, 193.1], [-29.4, 191.3], [-33.2, 180.9], [-36.0, 162.1], [-38.8, 143.4],
+    [-41.6, 124.7], [-44.5, 105.9], [-47.3, 87.2], [-50.1, 68.5], [-52.9, 49.7],
+    [-55.7, 31.0],
   ],
 
   // ------------------------------------------------------------------------
@@ -709,21 +721,21 @@ const CIRCUITS = {
     [-57.3, -68.6], [-73.8, -57.3], [-90.3, -45.7], [-107.3, -35.4], [-125.2, -28.0],
     [-141.6, -19.3],
   ],
-  suzuka: [ // Suzuka — the esses, Dunlop, Degner, the hairpin, Spoon, 130R
-    [-45.2, -8.0], [-30.7, -5.2], [-15.6, -12.0], [-2.2, -25.8], [10.2, -41.0],
-    [24.1, -54.4], [40.2, -63.8], [57.0, -71.2], [73.9, -77.6], [91.5, -77.7],
-    [108.5, -70.1], [123.7, -58.0], [138.2, -44.2], [152.6, -30.3], [167.1, -16.5],
-    [181.5, -2.5], [195.9, 11.4], [210.3, 25.3], [224.2, 39.6], [234.2, 55.3],
-    [235.0, 71.8], [225.1, 81.6], [210.4, 77.9], [196.2, 65.6], [180.9, 54.8],
-    [164.2, 47.5], [150.5, 37.1], [139.2, 23.8], [124.1, 14.8], [107.6, 7.9],
-    [97.6, -4.7], [93.5, -22.1], [85.5, -36.8], [69.9, -44.2], [51.5, -44.3],
-    [35.0, -37.2], [22.1, -24.1], [11.1, -8.7], [-1.6, 4.6], [-17.7, 13.1],
-    [-35.4, 15.9], [-51.5, 11.4], [-65.9, 2.6], [-82.0, -4.2], [-100.3, -8.2],
-    [-119.2, -11.2], [-138.2, -13.4], [-156.9, -16.8], [-174.7, -23.1], [-192.0, -30.6],
-    [-209.1, -38.0], [-225.3, -47.0], [-235.0, -59.6], [-231.4, -73.7], [-217.4, -81.6],
-    [-201.5, -77.6], [-188.6, -64.7], [-176.7, -50.0], [-162.0, -39.7], [-144.5, -34.7],
-    [-125.8, -32.6], [-107.6, -35.2], [-91.9, -44.8], [-79.0, -58.1], [-71.6, -58.2],
-    [-66.0, -52.7], [-63.0, -34.4], [-56.3, -18.5],
+  suzuka: [ // the TRUE figure-8 at last - the crossover rides an overpass
+    [-50.7, -4.6], [-34.0, -3.6], [-17.1, -13.2], [-3.6, -28.4], [9.7, -44.6],
+    [25.2, -58.3], [42.7, -67.9], [60.7, -75.7], [78.6, -82.6], [97.4, -82.7],
+    [115.5, -74.5], [131.6, -61.7], [147.0, -47.0], [162.4, -32.3], [177.8, -17.6],
+    [193.1, -2.7], [208.4, 12.1], [223.8, 26.9], [238.5, 42.1], [249.2, 58.9],
+    [250.0, 76.4], [239.4, 86.8], [223.8, 82.9], [208.7, 69.8], [192.4, 58.3],
+    [174.6, 50.5], [160.1, 39.4], [148.0, 25.3], [132.1, 15.8], [114.5, 8.4],
+    [103.8, -5.0], [99.5, -23.5], [91.0, -39.1], [74.4, -47.0], [55.5, -46.4],
+    [38.7, -38.4], [24.5, -24.9], [12.0, -9.0], [-1.7, 4.9], [-18.9, 14.0],
+    [-36.9, 15.7], [-52.7, 8.9], [-61.2, -17.7], [-67.0, -36.6], [-70.2, -56.1],
+    [-76.1, -61.9], [-84.0, -61.8], [-97.8, -47.7], [-114.3, -38.2], [-133.6, -36.3],
+    [-153.3, -38.4], [-172.0, -43.1], [-187.8, -53.5], [-200.6, -68.8], [-214.3, -82.6],
+    [-231.2, -86.8], [-246.2, -78.4], [-250.0, -63.4], [-239.7, -50.0], [-222.5, -40.4],
+    [-204.4, -32.1], [-186.4, -23.3], [-167.4, -16.1], [-147.2, -13.1], [-126.8, -11.6],
+    [-106.8, -8.7], [-86.8, -5.1], [-68.3, 0.1],
   ],
   nordschleife: [ // Nordschleife — a sprawling Eifel perimeter with the Karussell fold
     [151.0, -122.0], [168.8, -127.0], [186.9, -139.4], [207.2, -141.0], [225.3, -127.6],
@@ -2252,6 +2264,60 @@ const THEMES = {
       h0: 240, h1: 360, w0: 150, w1: 240 },   // NORTH: dead ahead off the grid
   },
 
+  // MONACO STREETS: Monte Carlo by day - cream Riviera frontage stacked over
+  // the harbour, armco-tight streets, the same sea machinery as the coast
+  // worlds. The old olive-terrace dressing never looked like Monaco; the
+  // buildings ARE the scenery now (frontage drops the cone horizon and puts
+  // rooftops on the skyline instead).
+  monteCarlo: {
+    fogColor: 0xdfe6ea, fogNear: 360, fogFar: 1650,
+    hemiSky: 0xbcd8f0, hemiGround: 0xb0a89a, hemiIntensity: 0.8,
+    sunColor: 0xfff2d6, sunIntensity: 2.85,
+    skyTop: '#2f7fd1', skyHorizon: '#e2e8ea', sunGlow: 0xffeec8,
+    sunAz: 4.2, sunEl: 0.95,
+    cloudCount: 5, cloudOpacity: 0.7, cloudTint: 0xfff6e4,
+    terrainLow: '#9a9a84', terrainHigh: '#c2bcac', terrainDirt: '#b0a890',
+    terrainScree: '#c2bcac', hutGlow: 0.3,
+    skirtColor: '#b8b2a2',
+    ground: {
+      base: '#b4aE9c'.toLowerCase(), bandLight: 'rgba(240,238,228,0.06)', bandDark: 'rgba(90,88,76,0.05)',
+      patchA: 'rgba(180,176,160,0.16)', patchB: 'rgba(214,210,196,0.16)',
+      speckA: 'rgba(160,156,140,0.7)', speckB: 'rgba(230,226,212,0.8)', speckCount: 70,
+    },
+    road: {
+      base: '#5e5c58', mottleA: [72, 70, 66], mottleB: [120, 118, 112],
+      ruts: false,
+      rut: 'rgba(48,47,44,0.4)', rutCore: 'rgba(36,35,32,0.35)', tread: 'rgba(18,17,16,0.4)',
+      stoneA: 'rgba(196,192,184,0.6)', stoneB: 'rgba(60,58,54,0.65)',
+      fringe: [150, 146, 134], fringeVar: [24, 22, 18],
+    },
+    hillColor: 0xa8a292, peakColor: 0xd8d2c2,
+    treeCount: 130, trunkColor: 0x6b4a28,
+    foliageLow: 0x2e6a34, foliageTop: 0x4a8a44,
+    foliage: { h: 0.3, hVar: 0.05, s: 0.5, sVar: 0.14, l: 0.28, lVar: 0.1 },
+    treeSnowCap: false,
+    tuftCount: 120, grass: { bladeA: '#7a8a5a', bladeB: '#a8b47a' },
+    bushCount: 60, bushColor: 0x3f7c38,
+    bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
+    rockCount: 30, pebbleCount: 60, rockColor: 0xa8a292, rockSnowCap: false,
+    flowerCount: 120, flowerColors: ['#e05a78', '#ffffff', '#c03a2e'],
+    hutRoof: 0x8a4630, hayColor: 0xc8bc94,
+    hutCount: 0, hutZone: [0.9, 0.1], hayCount: 0,
+    splinter: [0xb0a890, 0xf0ece0],
+    elev: { amp: 9, ph: [1.2, 2.5, 0.8] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    guardFence: { lateral: 12.6, color: 0xc8c8c8, max: 260 },
+    elements: 'medhill',
+    // Monte Carlo apartments: cream, white, apricot - continuous frontage
+    frontage: {
+      lateral: 16.5, depth: 9, unit: 7.5, height: 12.5, run: [5, 10],
+      tints: ['#e8e0d0', '#f2ece0', '#e0c8a8', '#d8cfc0', '#e8d4c0', '#ccc4b4'],
+    },
+    coast: { a: [-200, -338.6], b: [400, -183.8], level: -2.1, floor: -7, beach: 70 },
+    seaColor: 0x2e7f9e,
+    tunnels: { count: 1 },
+  },
+
   // LANTERN QUARTER: the OLD TOWN NIGHT region. Wet cobbles under sodium
   // lamps, continuous masonry frontage on both sides, and ZERO runoff — a
   // mistake here ends against a wall, not in a field.
@@ -3359,6 +3425,14 @@ export class Track {
 
     this._checkLayout();
 
+    // OVERPASSES: where the ROUTE crosses itself, one leg rises on a bridge.
+    // nearestIndex is hint-windowed (±30 samples), so index continuity keeps
+    // every car on its own leg through the stack - the capability the 2-opt
+    // uncrossing was invented to avoid is simply real now. Planned first so
+    // gorges, tunnels, ramps and skirts all keep clear.
+    this._overpasses = [];
+    this._planOverpasses();
+
     // the hero gorge must exist before ANY height is sampled (terrain mesh,
     // road skirts and every scenery placement read it through _blendHeight)
     if (this.T.heroBridge) this._planGorge();
@@ -4370,6 +4444,7 @@ export class Track {
   /** True when sample i lies within `pad` samples of the bridge span or any
    *  jump chasm (so ramps, pads, obstacles, puddles and props keep off). */
   _nearGorge(i, pad) {
+    if (this._onOverpass(i, Math.min(pad, 24))) return true;
     if (this._gorge && this._circDist(i, this._gorge.i) < pad) return true;
     if (this._jumpGorges) {
       for (const G of this._jumpGorges) {
@@ -4418,6 +4493,48 @@ export class Track {
   /** Pick the straightest stretches for the jump chasms, carve them via
    *  _gorgeCut, bake the launch kickers into the roadway, and precompute the
    *  per-sample road collapse that groundHeightAt applies. */
+  _planOverpasses() {
+    // XZ self-intersections of the centerline, neighbours excluded
+    for (let i = 0; i < N; i++) {
+      const a1 = this.center[i], a2 = this.center[(i + 1) % N];
+      for (let j = i + 40; j < N; j++) {
+        if (i < 40 && j > N - 40) continue;          // circular neighbours
+        const b1 = this.center[j], b2 = this.center[(j + 1) % N];
+        const d1x = a2.x - a1.x, d1z = a2.z - a1.z;
+        const d2x = b2.x - b1.x, d2z = b2.z - b1.z;
+        const den = d1x * d2z - d1z * d2x;
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((b1.x - a1.x) * d2z - (b1.z - a1.z) * d2x) / den;
+        const u = ((b1.x - a1.x) * d1z - (b1.z - a1.z) * d1x) / den;
+        if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+        if (this._overpasses.some((o) =>
+          (this._circDist(i, o.ia) < 30 && this._circDist(j, o.ib) < 30))) continue;
+        this._overpasses.push({ ia: i, ib: j, x: a1.x + t * d1x, z: a1.z + t * d1z });
+        j += 30;
+      }
+    }
+    if (!this._overpasses.length) return;
+    // alternate which leg flies (the sketch's up/down arrows), bake the rise
+    const CLEAR = 8.6;
+    const HALF = Math.ceil(30 / this.segLen);
+    this._overpasses.forEach((o, k) => {
+      o.up = (k % 2 === 0) ? o.ib : o.ia;
+      o.half = HALF;
+      for (let sN = -HALF; sN <= HALF; sN++) {
+        const j = (o.up + sN + N) % N;
+        this.center[j].y += CLEAR * Math.pow(Math.cos((sN / HALF) * Math.PI / 2), 1.2);
+      }
+    });
+  }
+
+  /** True when sample i lies on an overpass flyover span (+pad). */
+  _onOverpass(i, pad = 0) {
+    for (const o of this._overpasses ?? []) {
+      if (this._circDist(i, o.up) < o.half + pad) return true;
+    }
+    return false;
+  }
+
   _planJumpGorges() {
     const J = this.T.gorgeJump;
     const count = J.count ?? 1;
@@ -4801,7 +4918,8 @@ export class Track {
         // below the road; a fixed-depth toe would hang in the air there)
         // over the gorge the road is a bridge deck: the apron collapses to a
         // thin lip instead of hanging a curtain down into the chasm
-        const onSpan = this._gorge && this._circDist(j, this._gorge.i) < this._spanSamples() + 4;
+        const onSpan = (this._gorge && this._circDist(j, this._gorge.i) < this._spanSamples() + 4)
+          || this._onOverpass(j, 4);
         // ---- width-variation: skirts hug the (possibly pinched) road edge ----
         const wOff = WALL_OFF + this.widthAt(j) - ROAD_HALF;
         const face = onSpan ? 0.5 : steep
@@ -6179,6 +6297,8 @@ export class Track {
     if (this.T.vineRows) this._buildVineRows();
     if (this.T.windmill) this._buildWindmill();
     if (this.T.stoneBridges) this._buildStoneBridges();
+    if (this._overpasses.length) this._buildOverpassDecks();
+    if (this.T.japan) this._buildJapan();
     if (this.creeks?.length) this._buildCreekBeds(m4);   // outback dry watercourses
     this._buildForest(m4);
     this._buildGroundCover(m4);
@@ -7307,6 +7427,113 @@ export class Track {
           g.add(pier);
         }
       }
+      this.group.add(g);
+    }
+  }
+
+  /** TORII GATES straddling the road + hillside PAGODAS - the Japanese
+   *  dressing Suzuka asked for. Vermillion posts and lintels; tiered pagoda
+   *  roofs on the knolls. Pure scenery plus parapet-grade solids. */
+  _buildJapan() {
+    const J = this.T.japan;
+    const verm = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.8 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x2e2320, roughness: 0.9 });
+    // torii over the carriageway at calm, distinctive spots
+    let placed = 0;
+    for (let i = 60; i < N && placed < (J.torii ?? 4); i += 7) {
+      if (this.curvature[i] > 0.006 || this._nearGorge(i, 30)) continue;
+      const c = this.center[i], n = this.nrm[i];
+      const yaw = this.headingAt(i);
+      const g = new THREE.Group();
+      for (const side of [1, -1]) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 8.2, 8), verm);
+        post.position.set(c.x + n.x * 11 * side, c.y + 4.1, c.z + n.z * 11 * side);
+        g.add(post);
+        this.solids.push({ x: post.position.x, z: post.position.z, r: 0.9,
+          y: c.y + 1, mat: 'stone' });
+      }
+      const lintel = new THREE.Mesh(new THREE.BoxGeometry(25.5, 0.9, 1.3), verm);
+      lintel.position.set(c.x, c.y + 8.4, c.z);
+      lintel.rotation.y = yaw;
+      const lintel2 = new THREE.Mesh(new THREE.BoxGeometry(22.5, 0.6, 1.0), dark);
+      lintel2.position.set(c.x, c.y + 7.2, c.z);
+      lintel2.rotation.y = yaw;
+      g.add(lintel, lintel2);
+      g.traverse((mm) => { mm.castShadow = true; });
+      this.group.add(g);
+      placed++;
+      i += 120;                                   // spread the gates out
+    }
+    // pagodas on open knolls
+    const wall = new THREE.MeshStandardMaterial({ color: 0x8a2f26, flatShading: true, roughness: 0.9 });
+    const roof = new THREE.MeshStandardMaterial({ color: 0x35302c, flatShading: true, roughness: 0.85 });
+    for (let k = 0; k < (J.pagodas ?? 2); k++) {
+      let spot = null;
+      for (let t2 = 0; t2 < 30 && !spot; t2++) {
+        const q = this._trackSidePos(34, 90);
+        if (!q) continue;
+        const h0 = this.terrainHeight(q.x, q.z);
+        let ok = true;
+        for (const [dx, dz] of [[6, 0], [-6, 0], [0, 6], [0, -6]]) {
+          if (Math.abs(this.terrainHeight(q.x + dx, q.z + dz) - h0) > 1.6) { ok = false; break; }
+        }
+        if (ok) spot = { x: q.x, z: q.z, y: h0 };
+      }
+      if (!spot) continue;
+      const g = new THREE.Group();
+      let w = 7.5, y = spot.y;
+      for (let tier = 0; tier < 3; tier++) {
+        const body = new THREE.Mesh(new THREE.BoxGeometry(w, 3.1, w), wall);
+        body.position.set(spot.x, y + 1.55, spot.z);
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(w * 0.95, 1.6, 4), roof);
+        cap.rotation.y = Math.PI / 4;
+        cap.position.set(spot.x, y + 3.9, spot.z);
+        g.add(body, cap);
+        y += 3.6; w *= 0.74;
+      }
+      const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.2, 6), roof);
+      spire.position.set(spot.x, y + 1.4, spot.z);
+      g.add(spire);
+      g.traverse((mm) => { mm.castShadow = true; });
+      this.group.add(g);
+      this._addShadow(spot.x, spot.z, 6);
+      this.solids.push({ x: spot.x, z: spot.z, r: 4.4, y: spot.y + 2, mat: 'stone' });
+    }
+  }
+
+  /** OVERPASS DECKS: parapet rails and piers under every flyover span, so
+   *  the raised leg reads as a BRIDGE (the sketch's own word) and not a
+   *  floating ramp. Solids ride the parapets - falling off is not on. */
+  _buildOverpassDecks() {
+    const stone = new THREE.MeshStandardMaterial({
+      color: 0x8f8a80, flatShading: true, roughness: 1,
+    });
+    for (const o of this._overpasses) {
+      const g = new THREE.Group();
+      for (let sN = -o.half; sN <= o.half; sN += 2) {
+        const j = (o.up + sN + N) % N;
+        const c = this.center[j], n = this.nrm[j];
+        for (const side of [1, -1]) {
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.1, 2 * this.segLen + 0.4), stone);
+          rail.position.set(c.x + n.x * 10.2 * side, c.y + 0.45, c.z + n.z * 10.2 * side);
+          rail.rotation.y = this.headingAt(j);
+          g.add(rail);
+          if (sN % 6 === 0) {
+            this.solids.push({ x: rail.position.x, z: rail.position.z, r: 1.2,
+              y: c.y + 0.6, mat: 'stone' });
+          }
+        }
+        if (Math.abs(sN) % 8 === 0) {
+          const ground = this.terrainHeight(c.x, c.z);
+          if (c.y - ground > 2.5) {
+            const pier = new THREE.Mesh(new THREE.BoxGeometry(2.6, c.y - ground + 1, 3.4), stone);
+            pier.position.set(c.x, (c.y + ground) / 2 - 0.4, c.z);
+            pier.rotation.y = this.headingAt(j);
+            g.add(pier);
+          }
+        }
+      }
+      g.traverse((m) => { m.castShadow = true; });
       this.group.add(g);
     }
   }
