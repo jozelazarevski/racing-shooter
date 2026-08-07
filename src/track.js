@@ -926,7 +926,7 @@ const THEMES = {
     // horizon silhouettes
     hillColor: 0x4e8a3c, peakColor: 0x8d8578,
     // trees (material color multiplies per-instance HSL variation)
-    treeCount: 260, trunkColor: 0x6b4423,
+    treeCount: 377, trunkColor: 0x6b4423,
     foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
     foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.32, lVar: 0.14 },
     treeSnowCap: false,
@@ -1010,7 +1010,7 @@ const THEMES = {
       snowCover: { slush: [206, 216, 226], slushAlpha: 0.38 },
     },
     hillColor: 0xcfdce4, peakColor: 0xeef4f8,
-    treeCount: 240, trunkColor: 0x5a4028,
+    treeCount: 348, trunkColor: 0x5a4028,
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
@@ -1142,7 +1142,7 @@ const THEMES = {
     ground: {},   // lush meadow defaults read right at altitude too
     road: {},     // classic dirt rally surface
     hillColor: 0x54804a, peakColor: 0xdde8f0,           // snow-dusted horizon peaks
-    treeCount: 280, trunkColor: 0x6b4423,
+    treeCount: 406, trunkColor: 0x6b4423,
     foliageLow: 0x2a6e34, foliageTop: 0x3f9a44,         // bright alpine pines
     foliage: { h: 0.30, hVar: 0.06, s: 0.55, sVar: 0.2, l: 0.30, lVar: 0.14 },
     treeSnowCap: false,
@@ -1200,7 +1200,7 @@ const THEMES = {
       },
     },
     hillColor: 0xbdd2e0, peakColor: 0xeef6fc,
-    treeCount: 140, trunkColor: 0x5a4028,
+    treeCount: 203, trunkColor: 0x5a4028,
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
@@ -1266,7 +1266,7 @@ const THEMES = {
       wet: { darken: 0.38, gleam: 15, pools: 6 },
     },
     hillColor: 0x2e6a34, peakColor: 0x4a8a4c,
-    vegetation: 'jungle', treeCount: 320, trunkColor: 0x7a5c3a,
+    vegetation: 'jungle', treeCount: 464, trunkColor: 0x7a5c3a,
     foliageLow: 0x1f6e2c, foliageTop: 0x35a03c,
     foliage: { h: 0.31, hVar: 0.08, s: 0.55, sVar: 0.2, l: 0.26, lVar: 0.16 },
     treeSnowCap: false,
@@ -1442,7 +1442,7 @@ const THEMES = {
       fringe: [48, 110, 36], fringeVar: [30, 46, 22],
     },
     hillColor: 0x3f6e34, peakColor: 0x8a8578,
-    vegetation: 'redwood', treeCount: 190, trunkColor: 0x7a3f24,
+    vegetation: 'redwood', treeCount: 275, trunkColor: 0x7a3f24,
     foliageLow: 0x2a5e28, foliageTop: 0x3a7a32,
     foliage: { h: 0.30, hVar: 0.05, s: 0.45, sVar: 0.18, l: 0.26, lVar: 0.10 },
     treeSnowCap: false,
@@ -1479,7 +1479,7 @@ const THEMES = {
       fringe: [64, 124, 40], fringeVar: [34, 46, 20],
     },
     hillColor: 0x4e7a3c, peakColor: 0x8d8578,
-    treeCount: 240, trunkColor: 0x6b4423,
+    treeCount: 348, trunkColor: 0x6b4423,
     foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
     foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.30, lVar: 0.14 },
     treeSnowCap: false,
@@ -1526,7 +1526,7 @@ const THEMES = {
       fringe: [90, 70, 50], fringeVar: [34, 26, 18],    // ash-choked verge
     },
     hillColor: 0x54291c, peakColor: 0x2e1812,
-    vegetation: 'burnt', treeCount: 220, trunkColor: 0x241d18,
+    vegetation: 'burnt', treeCount: 319, trunkColor: 0x241d18,
     foliageLow: 0x4a2814, foliageTop: 0x6a3a1a,         // ember-lit scorched canopy
     foliage: { h: 0.05, hVar: 0.03, s: 0.45, sVar: 0.15, l: 0.16, lVar: 0.08 },
     treeSnowCap: false,
@@ -1810,7 +1810,7 @@ const THEMES = {
       fringe: [70, 118, 50], fringeVar: [34, 46, 24],
     },
     hillColor: 0x557a4e, peakColor: 0xe4edf4,
-    treeCount: 320, trunkColor: 0x6b4423,
+    treeCount: 464, trunkColor: 0x6b4423,
     foliageLow: 0x276634, foliageTop: 0x3d9444,
     foliage: { h: 0.31, hVar: 0.06, s: 0.52, sVar: 0.2, l: 0.28, lVar: 0.13 },
     treeSnowCap: false,
@@ -1874,7 +1874,7 @@ const THEMES = {
       },
     },
     hillColor: 0x4e7248, peakColor: 0xdde8f0,
-    treeCount: 220, trunkColor: 0x6b4423,
+    treeCount: 319, trunkColor: 0x6b4423,
     foliageLow: 0x2a6636, foliageTop: 0x428a48,
     foliage: { h: 0.29, hVar: 0.07, s: 0.45, sVar: 0.2, l: 0.28, lVar: 0.14 },
     treeSnowCap: false,
@@ -1938,7 +1938,7 @@ const THEMES = {
       fringe: [86, 124, 62], fringeVar: [30, 40, 22],
     },
     hillColor: 0x8a9a84, peakColor: 0xf2f7fb,           // green-grey rock, snow crowns
-    treeCount: 300, trunkColor: 0x5a4028,
+    treeCount: 435, trunkColor: 0x5a4028,
     foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,
     foliage: { h: 0.33, hVar: 0.05, s: 0.48, sVar: 0.15, l: 0.29, lVar: 0.1 },
     treeSnowCap: false,
@@ -2137,11 +2137,11 @@ const THEMES = {
       fringe: [128, 138, 74], fringeVar: [36, 40, 26],
     },
     hillColor: 0x4e6e38, peakColor: 0x8a9a78,
-    treeCount: 720, trunkColor: 0x6b4a28,
+    treeCount: 950, trunkColor: 0x6b4a28,
     foliageLow: 0x2e6a34, foliageTop: 0x4a8a44,
     foliage: { h: 0.3, hVar: 0.06, s: 0.5, sVar: 0.16, l: 0.28, lVar: 0.12 },
     treeSnowCap: false,
-    treeBelt: [55, 130],                                // the forest ring
+    treeBelt: [48, 150],                                // the forest ring
     tuftCount: 1500, grass: { bladeA: '#c8a850', bladeB: '#e2c878' },   // wheat
     bushCount: 90, bushColor: 0x3f7c38,
     bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
@@ -2150,7 +2150,8 @@ const THEMES = {
     hutRoof: 0x8a4630, hayColor: 0xe0c268,
     hutCount: 9, hutZone: [0.8, 0.2], hayCount: 44,
     splinter: [0x8a5a32, 0xe0d4a8],
-    vineRows: { count: 26 },                            // the trellis fields
+    vineRows: { count: 85 },                            // carpet the slopes
+    windmill: true,
     elev: { amp: 7, ph: [1.1, 2.2, 0.6] },
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'medhill',
@@ -2181,11 +2182,11 @@ const THEMES = {
       fringe: [62, 88, 46], fringeVar: [26, 34, 20],
     },
     hillColor: 0x33512c, peakColor: 0x4e6a48,
-    treeCount: 950, trunkColor: 0x5a4028,
+    treeCount: 1500, trunkColor: 0x5a4028,
     foliageLow: 0x24522c, foliageTop: 0x36703c,
     foliage: { h: 0.32, hVar: 0.05, s: 0.5, sVar: 0.14, l: 0.24, lVar: 0.1 },
     treeSnowCap: false,
-    treeBelt: [12.5, 60],                               // trees to the verge
+    treeBelt: [12.5, 95],                               // trees to the verge, DEEP
     tuftCount: 700, grass: { bladeA: '#3e6a34', bladeB: '#6a9a4c' },
     bushCount: 260, bushColor: 0x2c5c2c,
     bush: { h: 0.34, hVar: 0.05, s: 0.42, sVar: 0.1, l: 0.24, lVar: 0.1 },
@@ -2226,7 +2227,7 @@ const THEMES = {
       fringe: [96, 128, 66], fringeVar: [30, 40, 22],
     },
     hillColor: 0x6e8a5c, peakColor: 0xd8c2b0,           // rose-grey rock crowns
-    treeCount: 380, trunkColor: 0x5a4028,
+    treeCount: 551, trunkColor: 0x5a4028,
     foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,
     foliage: { h: 0.33, hVar: 0.05, s: 0.48, sVar: 0.15, l: 0.29, lVar: 0.1 },
     treeSnowCap: false,
@@ -2469,7 +2470,7 @@ const THEMES = {
     // `birch` stands in for ash (pale bark, airy crown — the nearest silhouette
     // in the species table). Weights are the Bible's 0.14 / 0.12, renormalised
     // over the tree tier so they sum to 1.0 (checklist R04).
-    treeCount: 300, trunkColor: 0x6b5a44,
+    treeCount: 435, trunkColor: 0x6b5a44,
     foliageLow: 0x35502a, foliageTop: 0x4a6b34,
     foliage: { h: 0.26, hVar: 0.05, s: 0.34, sVar: 0.14, l: 0.25, lVar: 0.10 },
     treeSnowCap: false,
@@ -6176,6 +6177,7 @@ export class Track {
     this._buildHorizon(m4);
     if (this.T.coast) this._buildSea();
     if (this.T.vineRows) this._buildVineRows();
+    if (this.T.windmill) this._buildWindmill();
     if (this.T.stoneBridges) this._buildStoneBridges();
     if (this.creeks?.length) this._buildCreekBeds(m4);   // outback dry watercourses
     this._buildForest(m4);
@@ -7204,6 +7206,47 @@ export class Track {
     this.solids.push({ x: p.x, z: p.z, r: Math.max(W, D) * 0.62, y: gy + 3, mat: 'stone' });
   }
 
+  /** THE WINDMILL - the estate landmark from the player's vineyard art:
+   *  tapered stone tower, conical cap, four lattice sails, on open ground. */
+  _buildWindmill() {
+    let spot = null;
+    for (let tries = 0; tries < 40 && !spot; tries++) {
+      const p = this._trackSidePos(46, 110);
+      if (!p) continue;
+      const h0 = this.terrainHeight(p.x, p.z);
+      let ok = true;
+      for (const [dx, dz] of [[8, 0], [-8, 0], [0, 8], [0, -8]]) {
+        if (Math.abs(this.terrainHeight(p.x + dx, p.z + dz) - h0) > 1.4) { ok = false; break; }
+      }
+      if (ok) spot = { x: p.x, z: p.z, y: h0 };
+    }
+    if (!spot) return;
+    const g = new THREE.Group();
+    const stone = new THREE.MeshStandardMaterial({ color: 0xd8d0c0, flatShading: true, roughness: 1 });
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.4, 11, 8), stone);
+    tower.position.set(spot.x, spot.y + 5.5, spot.z);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(3.0, 2.6, 8),
+      new THREE.MeshStandardMaterial({ color: 0x8a4630, flatShading: true, roughness: 0.9 }));
+    cap.position.set(spot.x, spot.y + 12.2, spot.z);
+    const sailMat = new THREE.MeshStandardMaterial({ color: 0xf2ecd8, roughness: 0.85,
+      side: THREE.DoubleSide });
+    const hub = new THREE.Group();
+    for (let k = 0; k < 4; k++) {
+      const sail = new THREE.Mesh(new THREE.BoxGeometry(1.7, 7.2, 0.16), sailMat);
+      sail.position.set(0, 4.2, 0);
+      const arm = new THREE.Group();
+      arm.add(sail);
+      arm.rotation.z = (k * Math.PI) / 2 + 0.5;
+      hub.add(arm);
+    }
+    hub.position.set(spot.x, spot.y + 10.4, spot.z + 3.1);
+    tower.castShadow = cap.castShadow = true;
+    g.add(tower, cap, hub);
+    this.group.add(g);
+    this._addShadow(spot.x, spot.z, 4.5);
+    this.solids.push({ x: spot.x, z: spot.z, r: 3.4, y: spot.y + 2, mat: 'stone' });
+  }
+
   /** STONE BRIDGES: arched masonry spans where the road crosses a dip - the
    *  parapets read from far off, and the deck carries a baked hump that a
    *  fast car JUMPS. Placement is honest: only where the ground beside the
@@ -7274,33 +7317,35 @@ export class Track {
   _buildVineRows() {
     const V = this.T.vineRows;
     const blocks = V.count ?? 20;
+    const ROWS_MAX = 9;
     const hedgeGeo = new THREE.BoxGeometry(1, 1, 1);
     hedgeGeo.translate(0, 0.5, 0);
     const hedges = new THREE.InstancedMesh(hedgeGeo,
       new THREE.MeshStandardMaterial({ color: 0x3e7434, flatShading: true, roughness: 1 }),
-      blocks * 5);
+      blocks * ROWS_MAX);
     const postGeo = new THREE.BoxGeometry(0.28, 1.7, 0.28);
     postGeo.translate(0, 0.85, 0);
     const posts = new THREE.InstancedMesh(postGeo,
       new THREE.MeshStandardMaterial({ color: 0x6a4a2c, roughness: 1 }),
-      blocks * 10);
+      blocks * ROWS_MAX * 2);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
     let hk = 0, pk = 0;
-    this._scatter(blocks, () => this._trackSidePos(19, 46), (p) => {
+    this._scatter(blocks, () => this._trackSidePos(17, 95), (p) => {
       const h0 = this.terrainHeight(p.x, p.z);
-      // reject sloped ground - vines terrace, they don't hang
-      for (const [dx, dz] of [[9, 0], [-9, 0], [0, 9], [0, -9]]) {
-        if (Math.abs(this.terrainHeight(p.x + dx, p.z + dz) - h0) > 1.6) return false;
+      // vines TERRACE gentle hills (the reference carpets whole slopes);
+      // only genuine breaks reject a block
+      for (const [dx, dz] of [[11, 0], [-11, 0], [0, 11], [0, -11]]) {
+        if (Math.abs(this.terrainHeight(p.x + dx, p.z + dz) - h0) > 3.4) return false;
       }
       const yaw = Math.random() * Math.PI;
       q.setFromAxisAngle(up, yaw);
-      const rows = 3 + (Math.random() * 3 | 0);
-      const len = 14 + Math.random() * 10;
+      const rows = 5 + (Math.random() * 5 | 0);
+      const len = 20 + Math.random() * 16;
       const dx = Math.cos(yaw), dz = -Math.sin(yaw);       // row direction
       const px = Math.sin(yaw), pz = Math.cos(yaw);        // row spacing dir
       for (let r = 0; r < rows && hk < hedges.count; r++) {
-        const off = (r - (rows - 1) / 2) * 3.4;
+        const off = (r - (rows - 1) / 2) * 3.1;
         const cx = p.x + px * off, cz = p.z + pz * off;
         const cy = this.terrainHeight(cx, cz);
         m4.compose(new THREE.Vector3(cx, cy, cz), q, new THREE.Vector3(len, 1.15, 0.7));
