@@ -3466,14 +3466,40 @@ export class Track {
       // whatever noise happened to be here — see _planRiver. The ford still
       // flattens out (the fade on `d`) so the crossing stays a shallow wash on
       // the carriageway instead of a trench across the racing line.
+      // THE CHANNEL CROSS-SECTION — the template every river in the game is
+      // cut to. A FLAT FLOOR across the full water width, then a bank that
+      // ramps back up to whatever the ground was doing.
+      //
+      // It used to be a cosine falloff from the centreline, which meant the
+      // carve was only about half applied by the time it reached the water's
+      // own edge. That is survivable when the bed profile hugs the ground —
+      // and it does not: the profile is forced monotonically DOWNHILL (water
+      // does not run uphill, and the level reaches and vertical falls depend
+      // on it), so on a long reach it sits far below the local hillside. The
+      // narrow falloff could not dig that deep, so the ribbon's edges were
+      // swallowed by the ground. Measured on the built meshes: 84 % of the
+      // water's vertices were BELOW the terrain at their own position, the
+      // worst by 35 u. The bank band, which conforms to the ground properly,
+      // was at 0 % — which is what made the river read as disconnected blue
+      // shards with grass growing through them.
+      //
+      // Carving the FULL water width flat guarantees containment by
+      // construction, on every world, at every station: the floor is one depth
+      // below the profile and the surface sits 0.42 of a depth above the floor,
+      // so there is no terrain that can rise into it.
       const R = this._river;
-      const outer = R.half + R.bank;
       const { d: rd, k } = this._riverNearest(x, z);
+      const hw = R.halfAt ? R.halfAt[k] : R.half;
+      const outer = hw + R.bank;
       if (rd < outer) {
-        const bedY = R.bed[k]
-          - R.depth * Math.pow(Math.cos((rd / outer) * Math.PI * 0.5), 1.4);
-        const w = smoothstep01(1 - rd / outer) * THREE.MathUtils.smoothstep(d, 9, 22);
-        h = h * (1 - w) + bedY * w;
+        const floorY = R.bed[k] - R.depth;
+        // 1 across the water, ramping to 0 at the bank top
+        const t = rd <= hw ? 1
+          : Math.max(0, 1 - (rd - hw) / Math.max(1e-3, outer - hw));
+        // the ford fade is unchanged: the crossing stays a shallow wash on the
+        // carriageway instead of a trench across the racing line
+        const w = smoothstep01(t) * THREE.MathUtils.smoothstep(d, 9, 22);
+        h = h * (1 - w) + floorY * w;
       }
     }
     return h;
@@ -3493,7 +3519,7 @@ export class Track {
    *  `chosen` = the ford samples picked by _buildFords, ascending by index. */
   _planRiver(chosen) {
     if (!chosen.length) return;
-    const pts = [];
+    let pts = [];              // reassigned by the radius relaxation below
     const lead = 34;                       // straight run either side of a ford
     const order = chosen.slice().sort((a, b) => a.i - b.i);
     const P = (x, z, lock) => { const v = new THREE.Vector3(x, 0, z); v.lock = !!lock; return v; };
@@ -3576,8 +3602,62 @@ export class Track {
       }
     }
 
-    const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
     const half = 4.0, bank = 6.0;
+    // A RIVER MAY NOT BEND TIGHTER THAN IT IS WIDE.
+    //
+    // The ribbon is built by offsetting the centreline by its own half-width.
+    // That is only a valid construction while the turning radius stays larger
+    // than the offset: below it the two edges cross and the strip folds back
+    // through itself. Measured on the shipped roster, PINE VALLEY's reach bent
+    // to a 6.7 u radius where its widest station needs 10 — which is the hard
+    // V, with the bank showing through the crease, in the report.
+    //
+    // No height rule can fix that, because it is not a height problem. So the
+    // constraint is applied to the PATH, before anything is built from it:
+    // relax any control point whose turn is too tight, leaving the ford
+    // crossings pinned (they have to meet the road square) and the ends pinned
+    // (they have to reach the world edge). Bounded iterations, because a
+    // constraint that cannot be met should give up rather than flatten the
+    // river into a straight line.
+    const NEED = (half * 1.36 + bank) * 1.15;      // widest station, plus margin
+    // Relaxation has to run on the SAMPLED CURVE, not on the control polygon.
+    // The first attempt eased the control points and made PINE VALLEY better
+    // (6.7 -> 8.9 u) while making HEDGEROW DASH WORSE (10.9 -> 6.5): a
+    // centripetal Catmull-Rom overshoots BETWEEN its controls, so a smooth
+    // control polygon is no guarantee about the curve drawn through it. So
+    // sample, relax the samples, and rebuild the spline from those.
+    const relax = (ctrl) => {
+      const c0 = new THREE.CatmullRomCurve3(ctrl, false, 'centripetal');
+      const M = Math.max(48, Math.min(300, Math.round(c0.getLength() / 24)));
+      const pl = [];
+      for (let i = 0; i <= M; i++) pl.push(c0.getPointAt(i / M));
+      // A sample sitting on the road is a FORD and must stay put: the crossing
+      // has to meet the carriageway square, which is the whole reason the
+      // reach was routed through it.
+      const pin = pl.map((q) => this._distToTrackCoarse(q.x, q.z) < 26);
+      pin[0] = pin[pl.length - 1] = true;
+      for (let pass = 0; pass < 60; pass++) {
+        let bad = 0;
+        for (let i = 1; i < pl.length - 1; i++) {
+          if (pin[i]) continue;
+          const A = pl[i - 1], C = pl[i], D = pl[i + 1];
+          const ab = Math.hypot(C.x - A.x, C.z - A.z);
+          const bc = Math.hypot(D.x - C.x, D.z - C.z);
+          const ac = Math.hypot(D.x - A.x, D.z - A.z);
+          const area = Math.abs((C.x - A.x) * (D.z - A.z) - (D.x - A.x) * (C.z - A.z)) / 2;
+          const rad = area < 1e-6 ? Infinity : (ab * bc * ac) / (4 * area);
+          if (rad >= NEED) continue;
+          bad++;
+          C.x = C.x * 0.4 + (A.x + D.x) * 0.3;
+          C.z = C.z * 0.4 + (A.z + D.z) * 0.3;
+        }
+        if (!bad) break;
+      }
+      return pl;
+    };
+    pts = relax(pts);
+
+    const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
     // dense polyline for distance queries + a uniform hash grid over it
     const SAMP = Math.max(64, Math.ceil(curve.getLength() / 11));
     const line = [];
@@ -3625,6 +3705,18 @@ export class Track {
       for (let k = bed.length - 2; k >= 0; k--) bed[k] = Math.min(bed[k], bed[k + 1]);
     }
     this._river.bed = bed;
+    // THE WIDTH IS PART OF THE TEMPLATE, so the carve and the ribbon have to
+    // read the SAME number. The water's half-width breathes (so the reach does
+    // not read as a canal) by up to 1.36x, but the channel was cut flat only
+    // out to the UNWOBBLED half — which left the widest sixth of the water
+    // sitting on the bank ramp, with the ground rising into it. That is the
+    // green wedges biting into the ribbon in the report. Baked per station
+    // here, and both consumers index it through `_riverNearest`, so they cannot
+    // disagree again.
+    this._river.halfAt = bed.map((_, k) => {
+      const t = k / Math.max(1, bed.length - 1);
+      return half * (1 + 0.24 * Math.sin(t * 41 + 0.7) + 0.12 * Math.sin(t * 17.3));
+    });
   }
 
   /** Nearest centreline sample to (x, z): {d, k}. d is Infinity past the bed. */
@@ -10347,10 +10439,13 @@ export class Track {
       const p = curve.getPointAt(t);
       const tn = curve.getTangentAt(t);
       const nx = tn.z, nz = -tn.x;
-      // width breathes a little so the reach never reads as a canal
-      const wob = 1 + 0.24 * Math.sin(t * 41 + 0.7) + 0.12 * Math.sin(t * 17.3);
+      // width breathes a little so the reach never reads as a canal — read
+      // from the plan, not recomputed, so the carve and the ribbon are the
+      // same shape (see `halfAt` in _planRiver)
       const df = this._distToTrackCoarse(p.x, p.z);
-      F.push({ t, x: p.x, z: p.z, nx, nz, w: R.half * wob, df });
+      const kk = this._riverNearest(p.x, p.z).k;
+      const w = (R.halfAt && R.halfAt[kk] != null) ? R.halfAt[kk] : R.half;
+      F.push({ t, x: p.x, z: p.z, nx, nz, w, df });
     }
 
     // `frames` defaults to the shared sample list, but the WATER passes its own:
@@ -10428,7 +10523,17 @@ export class Track {
       // across the ribbon. Reading the profile rather than the mesh also means
       // the surface cannot be sliced up by whatever the hill noise is doing.
       const bed = R.bed ? R.bed[this._riverNearest(f.x, f.z).k] : this.terrainHeight(f.x, f.z);
-      const open = bed + R.depth * 0.42;      // partway up the carved channel
+      // PARTWAY UP THE CARVED CHANNEL — measured from the channel FLOOR.
+      //
+      // `R.bed[k]` is the smoothed GROUND profile along the reach; the carve in
+      // terrainHeight pulls the ground down to `bed - depth` at the centreline
+      // and blends back to `bed` at the bank top. So "0.42 of the way up the
+      // channel" is `bed - depth + 0.42 * depth`. Written as `bed + 0.42 *
+      // depth` it was one whole `depth` too high — 2.6 u — which put the water
+      // surface 1.09 u ABOVE the ground it was supposed to be cut into. Every
+      // river in the game was a slab standing proud of its own banks, which is
+      // what the hard blue edge on the grass was in the report.
+      const open = bed - R.depth * 0.58;
       if (lift <= 0) return open;
       // ACROSS THE ROAD THE WASH SITS ON THE DECK, NOT ON THE BED.
       //
@@ -10473,7 +10578,7 @@ export class Track {
     for (let s = 0; s < F.length; s++) {
       const f = F[s];
       const bed = R.bed ? R.bed[this._riverNearest(f.x, f.z).k] : this.terrainHeight(f.x, f.z);
-      const open = bed + R.depth * 0.42;
+      const open = bed - R.depth * 0.58;   // see waterY — measured from the channel floor
       if (hold === null) hold = open;
       if (hold - open > FALL) hold = open;
       surf[s] = hold;
@@ -10495,6 +10600,37 @@ export class Track {
       // water where a crossing should be. On the deck (lift = 1) this is the
       // deck height exactly; the ramp either side is stepped by pass 3.
       surf[s] = surf[s] * (1 - lift) + deck * lift;
+    }
+
+    // PASS 2b — CONTAINMENT. The surface is level bank to bank and holds along
+    // a reach, which is what makes the falls vertical; the ground it crosses
+    // does neither. Where the carve is deliberately faded out — the 9-22 u
+    // approach to a ford, so the crossing is a wash and not a trench — nothing
+    // was keeping the two in step, and the ribbon's edges were swallowed.
+    //
+    // So this is the rule, checked at every station against the ground under
+    // the water's OWN EDGES rather than its centreline (the edges are what
+    // sink first, and they are what a player sees):
+    //
+    //     the surface sits at least MIN above the highest ground it covers,
+    //     and never more than one channel depth above it
+    //
+    // It only ever moves a station that breaks that, so the level reaches and
+    // vertical falls survive everywhere they were already valid — this is a
+    // clamp on the profile, not a replacement for it.
+    const MIN_CLEAR = 0.12;
+    for (let s = 0; s < F.length; s++) {
+      const f = F[s];
+      let hi = -Infinity;
+      for (const c of [-1, -0.5, 0, 0.5, 1]) {
+        const vx = f.x + f.nx * c * f.w, vz = f.z + f.nz * c * f.w;
+        const g = this.terrainHeight(vx, vz);
+        if (g > hi) hi = g;
+      }
+      if (surf[s] < hi + MIN_CLEAR) surf[s] = hi + MIN_CLEAR;
+      // ...and never a slab standing proud of the land it runs through
+      const cap = hi + R.depth;
+      if (surf[s] > cap) surf[s] = cap;
     }
 
     // PASS 3 — emit, doubling the station wherever the level changes so the
