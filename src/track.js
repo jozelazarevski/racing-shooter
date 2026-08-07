@@ -8800,6 +8800,34 @@ export class Track {
     const SIZE = 2000, SEG = 200;
     const UNITS_PER_TILE = 87.5;                 // 4200/48 — keep texel density
     this._buildFarTerrain(4200, 105, UNITS_PER_TILE);
+    // THE WORLD NEVER ENDS ("no white stuff like this ever"): an immense
+    // ground-toned disk under everything, far past every camera reach. Any
+    // view that outruns the terrain patches - the roam TOP FAR camera at the
+    // world edge was the reproduced case - lands on fogged ground, never on
+    // raw background. Coast worlds' seas draw over it; fog owns the far end.
+    {
+      const skirt = new THREE.Mesh(
+        new THREE.CircleGeometry(9000, 48),
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color(T.terrainLow).lerp(new THREE.Color(T.terrainHigh), 0.4),
+          roughness: 1,
+        })
+      );
+      skirt.geometry.rotateX(-Math.PI / 2);
+      // seat it under the world's true floor: gorges carve to -30, rivers and
+      // coasts to -8 - a fixed depth would fill them with a flat wash
+      let floor = -3.2 - (T.hillDrop || 0);
+      for (let gx = -1000; gx <= 1000; gx += 80) {
+        for (let gz = -1000; gz <= 1000; gz += 80) {
+          floor = Math.min(floor, this.terrainHeight(gx, gz));
+        }
+      }
+      if (this._gorge) floor = Math.min(floor, this._gorge.floorY);
+      for (const G of this._jumpGorges ?? []) floor = Math.min(floor, G.floorY);
+      skirt.position.y = floor - 2.5;
+      skirt.name = 'world-skirt';
+      this.group.add(skirt);
+    }
     const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
@@ -8998,7 +9026,12 @@ export class Track {
   _buildSky() {
     const T = this.T;
     const sky = new THREE.Mesh(
-      new THREE.SphereGeometry(1500, 24, 12),
+      // 3000, NOT 1500: the roam bounds reach 1400, and a top-down camera
+      // near the edge sliced straight through a 1500 dome - its pale horizon
+      // shader then painted half the frame white (the player's Gotthard
+      // screenshot). 3000 keeps the dome past every reachable camera while
+      // staying inside the 3200 far plane.
+      new THREE.SphereGeometry(3000, 24, 12),
       new THREE.ShaderMaterial({
         side: THREE.BackSide,
         depthWrite: false,
@@ -9022,7 +9055,7 @@ export class Track {
       for (let i = 0; i < 340; i++) {
         const a = Math.random() * Math.PI * 2;
         const el = 0.08 + Math.random() * 1.35;           // keep off the glow band
-        const r = 1400;
+        const r = 2850;
         starPos[i * 3] = Math.cos(a) * Math.cos(el) * r;
         starPos[i * 3 + 1] = Math.sin(el) * r;
         starPos[i * 3 + 2] = Math.sin(a) * Math.cos(el) * r;
@@ -9065,6 +9098,11 @@ export class Track {
       new THREE.CylinderGeometry(940, 940, 300, 48, 1, true), hazeMat
     );
     haze.position.y = 95;                 // dense band hugs the horizon line
+    // the game lead toggles this off when the camera pitches steeply down:
+    // from the roam TOP FAR camera the cylinder's far wall painted a WHITE
+    // SHEET over half the world (the player's "white stuff" screenshot)
+    haze.name = 'haze-band';
+    this.hazeBand = haze;
     this.group.add(haze);
 
     const ctex = cloudTexture();

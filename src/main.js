@@ -5743,6 +5743,12 @@ class Game {
     }
 
     if (this.state !== 'title') this._updateCamera(dt);
+    // horizon dressing is for horizon views: a steep-down camera (roam TOP
+    // FAR) must never see the haze cylinder's far wall as a white sheet
+    if (this.track?.hazeBand) {
+      this.camera.getWorldDirection(this._camDir ??= new THREE.Vector3());
+      this.track.hazeBand.visible = this._camDir.y > -0.45;
+    }
     this._watchCarVisible(dt);
     this.input.endFrame();
     this._autoQuality();
