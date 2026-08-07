@@ -6610,7 +6610,16 @@ export class Track {
     const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0);
     const cyl = new THREE.CylinderGeometry(1, 1, 1, 8); cyl.translate(0, 0.5, 0);
     const cone = new THREE.ConeGeometry(1, 1, 8); cone.translate(0, 0.5, 0);
-    const roof = new THREE.ConeGeometry(0.86, 0.5, 4); roof.rotateY(Math.PI / 4);
+    // The three above are base-anchored by `translate(0, 0.5, 0)`; this one is
+    // the only one that also needed a rotateY, and it is the only one that lost
+    // its translate — so every barn had HALF ITS ROOF inside the hayloft and
+    // showed a flat lid, the same defect as `_buildHuts` from the same cause.
+    // Found by tests/test-buildings.mjs on the first run after that fix, which
+    // is the whole argument for asserting the geometric property rather than
+    // patching the builder that happened to be reported.
+    const roof = new THREE.ConeGeometry(0.86, 0.5, 4);
+    roof.rotateY(Math.PI / 4);
+    roof.translate(0, 0.25, 0);
     const timber = new THREE.MeshStandardMaterial({
       color: 0x6b4a2a, flatShading: true, roughness: 0.95,
     });
@@ -9579,6 +9588,19 @@ export class Track {
     wallGeo.translate(0, 0.5, 0);
     const roofGeo = new THREE.ConeGeometry(0.85, 0.55, 4);
     roofGeo.rotateY(Math.PI / 4);
+    // HALF THE ROOF WAS INSIDE THE HOUSE.
+    //
+    // BoxGeometry and ConeGeometry are both centred on their own origin, and
+    // `wallGeo` is translated up by half its height so its base sits at y=0 —
+    // but the cone never got the matching translate. Both were then composed
+    // at the same anchor, so the pyramid's base landed HALF ITS HEIGHT BELOW
+    // the wall top: measured on a 7.65 u hut, wall 0.02-5.02, roof 4.03-6.01,
+    // buried 0.99 of its 1.98. What showed was the wall box's flat top face —
+    // window texture and all, because the building texture wraps every face —
+    // with a stub of pyramid poking out of the middle of it. Reported twice as
+    // "the weird house", and both times the redesign went into `_element`'s
+    // `house`, which is a different builder and was never what was on screen.
+    roofGeo.translate(0, 0.275, 0);
     // warm lit windows: the emissive map is black except the panes, so this is
     // one extra texture fetch on ~14 instanced boxes and the huts stop reading
     // as empty crates. `hutGlow` per theme — brightest at dusk (volcano,
@@ -9625,7 +9647,15 @@ export class Track {
       q.setFromAxisAngle(up, rot);
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(w, h, w));
       walls.setMatrixAt(placed, m4);
-      m4.compose(new THREE.Vector3(p.x, y + h, p.z), q, new THREE.Vector3(w * 0.88, h * 0.72, w * 0.88));
+      // ...and now that the roof sits ON the wall instead of through it, it can
+      // have an EAVE. At 0.88 the pyramid's flats reached 0.529 w against a
+      // wall half-width of 0.5 w — an oversail of 0.2 u on a 7 u house, which
+      // is flush to the eye. 1.06 puts the flats at 0.637 w, about a metre
+      // proud, which is what gives a small house a shadow line under the roof
+      // and stops it reading as a crate with a lid. Still nowhere near the
+      // 0.96 w that made these tower over the car in an earlier pass — that is
+      // the ceiling this is tuned under, not a number to creep back toward.
+      m4.compose(new THREE.Vector3(p.x, y + h, p.z), q, new THREE.Vector3(w * 1.06, h * 0.85, w * 1.06));
       roofs.setMatrixAt(placed, m4);
       // solid hut: walls are a unit box scaled w×w, so half the world-space
       // diagonal of the footprint is w·√2/2
