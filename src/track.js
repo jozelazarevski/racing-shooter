@@ -10,6 +10,7 @@ import {
   crateTexture, coneTexture, barrelTexture, riverTexture, riverBankTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
+  townhouseTexture, townhouseGlowTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -67,6 +68,23 @@ export const LEVELS = [
     // the only world besides CANYON RUN to hang a hero bridge over a gorge
     tune: { elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
       heroBridge: { at: [0.55, 0.66], half: 24, len: 210, depth: 28, skew: 0 } } },
+
+  // ---- MEDITERRANEAN. Appended, so nothing before it is re-priced (career
+  // order is this array, not the ids — see the note above ROCKFALL RAVINE).
+  { id: 29, name: 'OLIVE COAST', theme: 'medterrace', region: 'MEDITERRANEAN' },
+
+  // ---- OLD TOWN: the only urban region, and the only night stage that is not
+  // NEO-KYOTO. Appended, never inserted — career order is this array and
+  // `starCost` prices a world by its INDEX, so a mid-array insert silently
+  // re-prices every world after it in an existing save.
+  { id: 30, name: 'LANTERN QUARTER', theme: 'oldtown', region: 'OLD TOWN' },
+  // ---- FARMLAND. Appended, so no existing world's star price moves (career
+  // order is this array; starCost() = index - 2).
+  { id: 31, name: 'HEDGEROW DASH', theme: 'farmland', region: 'FARMLAND' },
+  // ---- OUTBACK RED DIRT. Appended at the END of the array on purpose: career
+  // order is array position (starCost = index - 2), so anything inserted higher
+  // re-prices every world after it in a save that already exists.
+  { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK' },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -416,6 +434,131 @@ const CIRCUITS = {
     [166, 178], [88, 212], [4, 222], [-80, 214],
     [-160, 232], [-226, 194], [-252, 124], [-232, 52],
     [-252, -24], [-236, -104], [-250, -180], [-190, -226], [-104, -250],
+  ],
+
+  // OLIVE COAST — Sanremo/Corsica tarmac. The fast region on the roster after
+  // the sand worlds: median corner radius 152 u and 57 % of the lap above
+  // 120 u, so it flows in fourth and fifth. Its shape is a seafront straight,
+  // a long climb inland through the terraces, a walled village on the ridge
+  // shoulder, and ONE tight linked pair down the dry ravine on the west flank
+  // (min radius 20 u) — the single place the stage bites, which is exactly the
+  // Bible's 10 % G1 corner budget. Nothing here is a hairpin stack: the threat
+  // is the stone at the edge of a road you are carrying speed on.
+  medterrace: [
+    // seafront: the start line and the fastest run on the lap
+    [0, -242], [92, -244], [176, -222], [240, -180],
+    // off the coast road and up into the first terraces
+    [254, -110], [222, -48],
+    // fourth-gear sweeps across the olive benches
+    [246, 22], [214, 92],
+    // the walled village: right-left through the hamlet
+    [232, 156], [172, 200], [98, 208],
+    // open ridge-shoulder run west, cypresses on the driveways
+    [22, 182], [-56, 196], [-136, 216], [-200, 178],
+    // the dry ravine — the one genuinely tight sequence
+    [-218, 112], [-172, 62], [-226, 6],
+    // fast descent back down to the sea
+    [-250, -70], [-212, -146], [-146, -202], [-70, -234],
+  ],
+
+  // LANTERN QUARTER — a STREET GRID, not a landscape. Every other circuit on
+  // the roster is a road following terrain, so its corners are radii; this one
+  // is a town, so its corners are BLOCKS. The shape is a rectilinear loop of
+  // straight streets meeting at near-right angles, with two doglegs where the
+  // route jinks around a block instead of going through it. The corner triplets
+  // are deliberately tight (~24 u between the three points that turn a corner)
+  // — that is what holds the average speed down to the region's 82 km/h without
+  // a single hairpin, which would read as a mountain road.
+  // Parallel legs are never closer than 46 u, well clear of the 22 u
+  // self-approach floor that a hand-authored rectilinear route usually trips.
+  oldtown: [
+    // MAIN STREET: the cobbled run through the lower town, eastbound — and it
+    // does NOT run straight through. A single 370 u street would have made
+    // this the fastest world on the roster instead of the slowest, so the
+    // route detours a block north around the market square and comes back.
+    [-150, -214], [-84, -216], [-40, -214],
+    [-14, -200], [-8, -176], [22, -168], [54, -174], [62, -198],
+    [96, -212], [150, -212],
+    // right-angle left onto the east avenue, and the climb starts
+    [196, -208], [218, -188], [218, -150],
+    // dogleg: the avenue jinks west around the market block and back
+    [216, -112], [204, -84], [176, -70], [166, -40],
+    [170, -8], [196, 8], [216, 34],
+    // left into the cathedral square at the top of the hill
+    [214, 70], [192, 94], [156, 100],
+    // the square itself — the one place the frontage opens out
+    [96, 104], [30, 100], [-26, 104],
+    // step north into the lantern quarter proper
+    [-62, 112], [-82, 138], [-84, 168],
+    // left, west along the rampart street
+    [-100, 192], [-140, 198], [-186, 194],
+    // left, south down the west wall street. This is deliberately the LONGEST
+    // straight on the lap: the arched gateways need a run of 50+ samples under
+    // 0.016 curvature to place, and a street grid this broken up only offers
+    // two such windows — this one and the cathedral square.
+    [-222, 184], [-238, 156], [-236, 110], [-234, 62], [-232, 16],
+    // the stepped square: the street kinks around a block and back
+    [-214, -12], [-190, -34], [-192, -70], [-214, -92], [-236, -116], [-238, -152],
+    // last corner, back east onto the main street
+    [-224, -186], [-198, -208],
+  ],
+
+  // HEDGEROW DASH — farmland lanes. The road does not choose its own line here:
+  // it runs where the field boundaries put it, so the lap is a chain of short
+  // headland straights meeting at bends the hedge hides until you are in them.
+  // Nothing on the roster is shaped this way — the alpine worlds stack legs up
+  // a face, the rally routes flow. This one turns because the field turns.
+  // Measured (900 samples): 1851 u lap, tightest radius 17 u, 3.9 % of the lap
+  // under 25 u, self-approach 50.9 u — well clear of the 22 u ribbon width.
+  farmland: [
+    // start / finish: the straight lane along the southern field edge. Dead
+    // straight on purpose — the grid needs flat road, and a clean run of
+    // constant curvature is what lets the width profile hang a pinch on it.
+    [-70, -240], [-8, -240], [54, -240], [112, -238],
+    // hard left at the field corner onto the lane that climbs north
+    [168, -220], [194, -184], [186, -142],
+    // staggered crossroads — right, then immediately left
+    [212, -116], [246, -100], [250, -52],
+    // the long east lane over the blind crests
+    [220, -8], [230, 42], [252, 92],
+    // square corner at the top of the rise, back west along the headland
+    [246, 142], [206, 174], [156, 176], [126, 186],
+    // jog north around the copse, then the northern lane
+    [112, 230], [46, 240], [-18, 224],
+    [-84, 240], [-148, 226], [-172, 184],
+    // doubling back around a field corner, down into the stream hollow
+    [-132, 150], [-164, 118], [-214, 112], [-250, 70],
+    // tightening bends along the woodland edge, back to the line
+    [-226, 26], [-180, 0], [-218, -44], [-250, -100],
+    [-232, -158], [-186, -196], [-128, -214],
+  ],
+
+  // RED CENTRE RUN — the fastest lap on the roster, and the shape is dictated
+  // by the region's negative list: NO tight corners in sequence. There is not
+  // one hairpin on it. Every direction change is spread over four control
+  // points so it comes out as a 90–150 u sweeper you take flat, joined by the
+  // long Finke blast down the south side and the boundary-fence run up the
+  // west. Measured against the spline the game actually builds:
+  //
+  //    min radius 92 u   (next-largest on the roster is NEON GRID at 57;
+  //                       DUST CANYON bottoms out at 19)
+  //    5th pct    110 u  nothing at all under 60 u
+  //    91 % of the lap above a 120 u radius, median radius 282 u
+  //
+  // The first cut of this route put a 34 u corner ACROSS THE START LINE, which
+  // is the one place on a 350 m-sight-line world you must not put a corner —
+  // so sample 0 is now mid-straight, and it stays that way if you edit this:
+  // the array's first control point is where t = 0 lands.
+  outback: [
+    [0, -253], [84, -251], [158, -243],
+    [212, -221], [246, -178], [255, -122],
+    [250, -58], [240, 6], [234, 70],
+    [212, 132], [172, 184], [118, 220],
+    [50, 240], [-24, 247], [-98, 241],
+    [-166, 222], [-220, 184], [-248, 128],
+    [-255, 64], [-252, -4], [-254, -72],
+    [-244, -140], [-218, -198], [-168, -238],
+    [-90, -253],
   ],
 };
 
@@ -1489,6 +1632,526 @@ const THEMES = {
     massif: { az: 1.5, spread: 2.1, count: 11, r0: 380, r1: 660,
       h0: 150, h1: 300, w0: 200, w1: 360 },
   },
+  // OLIVE COAST: Mediterranean terrace (RALLY_WORLD_BIBLE 3.6). Fast, sunlit,
+  // dusty tarmac between olive terraces and dry stone — warm, open, and
+  // deceptively narrow. Everything here is bright and low-saturation: bleached
+  // limestone ground, silver-green olive foliage, limewash walls and terracotta
+  // pantiles, with ONE hot accent (#C0532E) on the shutters, the poppies and
+  // the debris chips. The threat is the STONE WALL at the road edge and the
+  // gravel dragged onto the exits, not the drop.
+  // NEVER on this world (Bible 3.6): lush grass, northern deciduous trees, any
+  // wet surface, any cool colour temperature. Hence no `surface`, no puddles,
+  // no fog banks and a warm hemisphere ground bounce.
+  medterrace: {
+    // FogExp2 density 0.00060 ≈ 1600 u of visibility; the engine fog is linear,
+    // so it is matched at the far end and pushed out at the near end — this is
+    // the 140 m sight-line region and the road has to stay readable a long way
+    // out (checklist R12)
+    fogColor: 0xd8d0b8, fogNear: 380, fogFar: 1650,
+    hemiSky: 0xbcd8f0, hemiGround: 0xa89a72, hemiIntensity: 0.74,
+    // 5300 K key at 108000 lux: the brightest, warmest-white sun on the roster
+    sunColor: 0xfff0d2, sunIntensity: 2.95,
+    skyTop: '#2f7fd1', skyHorizon: '#ddd6be', sunGlow: 0xffeec8,
+    // Bible: azimuth 250°, elevation 58° — high, hard, slightly behind the
+    // right shoulder on the seafront run (radians, as the engine wants)
+    sunAz: 4.36, sunEl: 1.01,
+    // a Mediterranean summer sky is nearly empty; what cloud there is sits high
+    cloudCount: 5, cloudOpacity: 0.72, cloudTint: 0xfff6e4,
+    // sea haze on the coastal half of the lap, read as a warm pale band
+    hazeColor: 0xe0d8c0, hazeOpacity: 0.82,
+    // dry maquis low, limestone dust high — ground base #B9A47E is the middle
+    terrainLow: '#8f9059', terrainHigh: '#b9a47e', terrainDirt: '#c4b088',
+    terrainScree: '#cabf9f', hutGlow: 0.32,             // hot sun, dim windows
+    skirtColor: '#c2b28c',                              // cut limestone shoulder
+    ground: {
+      base: '#b9a47e',
+      bandLight: 'rgba(255,246,214,0.07)', bandDark: 'rgba(120,104,64,0.06)',
+      patchA: 'rgba(140,144,86,0.20)',                  // maquis patches
+      patchB: 'rgba(214,200,164,0.20)',                 // bleached dust
+      speckA: 'rgba(150,138,102,0.7)', speckB: 'rgba(226,216,188,0.8)', speckCount: 90,
+    },
+    road: {
+      // tarmac_patched 50 % + tarmac_dry 30 %: sun-bleached grey asphalt with
+      // darker patch repairs over it. Kept clearly darker than the ochre
+      // landscape so the road stays the highest-contrast element (R12).
+      base: '#66625b', mottleA: [72, 69, 64], mottleB: [126, 122, 114],
+      ruts: false,           // sealed tarmac never takes a wheel rut
+      rut: 'rgba(56,54,50,0.45)', rutCore: 'rgba(40,38,35,0.4)', tread: 'rgba(20,19,17,0.4)',
+      // aggregate showing through a worn seal, not loose chippings: the light
+      // stone is deliberately weak, or the road reads as gravel from the car
+      stoneA: 'rgba(192,184,162,0.30)', stoneB: 'rgba(50,48,44,0.55)',
+      fringe: [150, 140, 96], fringeVar: [36, 34, 26],  // dry ochre verge
+    },
+    hillColor: 0xa39a6a, peakColor: 0xdcd0b0,           // dry hills, limestone tops
+    // FLORA. Olive/cypress/cork oak/umbrella pine — see _buildOliveGrove.
+    treeCount: 300, trunkColor: 0x8a7a5e,               // grey olive wood
+    foliageLow: 0x6e7a4e, foliageTop: 0x8f9a6c,         // foliage mid → silvered
+    // hue 0.21 s 0.22: the olive band. Saturation stays under the 55 % ceiling
+    // the checklist sets for foliage (R02).
+    foliage: { h: 0.21, hVar: 0.035, s: 0.22, sVar: 0.09, l: 0.36, lVar: 0.10 },
+    treeSnowCap: false,
+    vegetation: 'olive',
+    understorey: 'blob',    // maquis is dense and rounded, not desert-angular
+    tuftCount: 820, grass: { bladeA: '#8e8450', bladeB: '#cbbc8a' },  // dry grass + thistle
+    bushCount: 300, bushColor: 0x74804e,                // rosemary / cistus maquis
+    bush: { h: 0.20, hVar: 0.04, s: 0.24, sVar: 0.08, l: 0.32, lVar: 0.10 },
+    rockCount: 380, pebbleCount: 340, rockColor: 0xc0b596, rockSnowCap: false,
+    // cistus white, poppy (the region accent), lavender, broom
+    flowerCount: 220, flowerColors: ['#efe8d2', '#c0532e', '#b28ac8', '#e8c84a'],
+    hutRoof: 0xb4552e, hayColor: 0xd8c48a,              // terracotta pantiles
+    hutCount: 12, hutZone: [0.44, 0.62],                // hamlet on the ridge shoulder
+    hayCount: 22,
+    splinter: [0xd2c7a6, 0xc0532e],                     // limestone chip + shutter red
+    // no rain, no snow: the only thing in this air is dust off the verges
+    weather: { type: 'dust', color: 0xd8cba4, rate: 30 },
+    // Sea level at the start line, a sustained climb inland into the terraces
+    // (peak +36 just past half distance), the village along the top, then the
+    // ravine and the fast drop back to the coast. Measured: mean grade 4.3 %,
+    // steepest 12.9 % — the Bible's 5–13 % band, before the crests go on.
+    elev: {
+      amp: 36, profile: 'ascent', ph: [0, 0, 0],
+      keys: [[0, 0], [0.06, 0], [0.17, 6], [0.27, 17], [0.34, 20], [0.43, 30],
+        [0.51, 35], [0.575, 36], [0.635, 30], [0.695, 31], [0.77, 20],
+        [0.85, 9], [0.92, 2], [0.965, 0], [1, 0]],
+    },
+    // A tarmac stage yumps over the brows it has; it does not have take-off
+    // ramps built into it. `rampCount: 0` does NOT mean zero (src/track.js
+    // `(T.rampCount || 3)`), so the count is 2 and `rampMaxCurv` is tightened
+    // to 0.009 until placement starves — MEASURED on the built world: 5 crests,
+    // 0 ramps, which is the shape this region wants.
+    rampCount: 2, crestHeight: 2.4,
+    rampMaxCurv: 0.009, padMaxCurv: 0.0035, boardMaxCurv: 0.008,
+    // THE STONE WALL. 1.1 u of dry stone standing right at the edge of a road
+    // you are carrying fifth-gear speed on: the region's whole hazard identity.
+    // `drop: 1.4` walls far more of the lap than the alpine passes do, because
+    // a terrace road is walled almost continuously.
+    retainingWalls: { drop: 1.4, lateral: 12.4, height: 1.1, max: 460 },
+    // gravel dragged onto the outside of corner exits by earlier passes
+    cornerGravel: { count: 7 },
+    // stones off the terrace walls, and the road is narrow enough already
+    obstacleSpec: { count: 3, style: 'boulder' },
+    puddleCount: 0,                                     // never wet here
+    narrows: { count: 3, min: 0.62 },                   // "deceptively narrow"
+    // NO FORD, and the Bible does ask for one live stream. The world-spanning
+    // river is a single held-level reach that only ever descends, and on a
+    // profile that climbs 36 u it has to give that height back somewhere: with
+    // a crossing on the terraces it put a MEASURED 17.6 u wall of water at the
+    // edge of the carriageway, and moving the crossing down to the coast only
+    // pushed the fall out onto the tail that runs back over the hillside — a
+    // waterfall in dry olive country, which is worse than no stream at all.
+    // Doing this properly needs a watercourse that can step down a terraced
+    // hillside; the dry ravine beds this region is really made of are already
+    // here. Left out on purpose rather than shipped broken.
+    // NO bridgeCount: `_buildBridges` builds WOODEN PLANK FOOT-BRIDGES over the
+    // road (the canyon archetype). The Bible's crossing here is a single-arch
+    // stone span over a dry bed, which is not an archetype the game owns, and a
+    // timber walkway over a Mediterranean tarmac road fails R03 outright.
+    elements: 'medhill',
+    crossroads: 2,
+    // the dry inland range standing behind the terraces — low, hazy, bare
+    massif: { az: 1.15, spread: 2.0, count: 8, r0: 420, r1: 700,
+      h0: 90, h1: 175, w0: 210, w1: 360 },
+  },
+
+  // LANTERN QUARTER: the OLD TOWN NIGHT region. Wet cobbles under sodium
+  // lamps, continuous masonry frontage on both sides, and ZERO runoff — a
+  // mistake here ends against a wall, not in a field.
+  //
+  // The brief that matters most is the one about what it must NOT be. This is
+  // the second night world in the game and it has to be unmistakably not
+  // NEO-KYOTO: no cyan, no magenta, no emissive lane-work, no skyscrapers.
+  // Every light source here is SODIUM or TUNGSTEN — 2100 K street lamps and
+  // 2700 K shop windows — so the whole frame sits on the warm side of neutral
+  // and the only cool thing in it is the sky.
+  //
+  // And it is deliberately lit brighter than the palette suggests. Both
+  // existing night worlds were measured too dark to drive (NEON GRID at 20.7
+  // mean luminance, UNDERCITY at 7.6) for exactly the same reason: a dark
+  // ground texture multiplied by a dark terrain vertex colour lands at an
+  // albedo no lamp can rescue. The Bible's #2A2A2E ground base is therefore
+  // the DARKEST thing on the ground plane and the wet cobble road is painted
+  // well above it, which is also what keeps the road the highest-contrast
+  // element in frame (global law G1).
+  oldtown: {
+    surface: 'wet',                                     // physics reads this
+    // the tightest sight line on the roster (region spec: 60 m) — the fog is
+    // the reason a town circuit feels claustrophobic rather than merely narrow
+    fogColor: 0x1c2436, fogNear: 110, fogFar: 780,
+    // hemiSky = the little the night sky gives back; hemiGround = SODIUM
+    // BOUNCE off wet stone, which is where most of the warmth in the frame
+    // actually comes from. Intensity is high on purpose (see the note above).
+    hemiSky: 0x323c60, hemiGround: 0x7a5426, hemiIntensity: 4.2,
+    // there is no sun. The key is the sodium wash down the street: warm, low
+    // and raking, so the frontage on one side is lit and the other is in
+    // silhouette — the "extreme local contrast" the region is graded for.
+    sunColor: 0xffb45e, sunIntensity: 2.3,
+    // skyCurve WELL ABOVE 1 on purpose: `mix(horizon, top, pow(smoothstep, curve))`
+    // means a high exponent holds the horizon colour — which IS the fog colour —
+    // far up the dome, so the roofline meets a sky of its own fog value and the
+    // skyline is silhouette rather than gradient. The zenith still goes to
+    // true night, which is where the stars have to read.
+    skyTop: '#0A0E1A', skyHorizon: '#1C2436', sunGlow: 0xffb45e, skyCurve: 2.4,
+    sunAz: 1.05, sunEl: 0.30,
+    stars: true,
+    // Sodium sky-glow ringing the horizon — an orange smear over the rooftops,
+    // never NEO-KYOTO's magenta. It can be this strong only because the cone
+    // hills that would silhouette against it are dropped (see _buildOldTown).
+    hazeColor: 0xc07830, hazeOpacity: 0.40,
+    cloudCount: 10, cloudOpacity: 0.45, cloudTint: 0x4a3a3c,  // low lit overcast
+    // The Bible's #2A2A2E ground base is the DARKEST value here, not the
+    // albedo: the ground texture multiplies the terrain vertex colour, so a
+    // literal #2A2A2E on both lands near 20/255 and no lamp can rescue it —
+    // the exact fault measured on EMBER PASS and UNDERCITY. Painted at the
+    // value it reads AS under 0.6 lux of moon and a sodium bounce.
+    terrainLow: '#3a3a42', terrainHigh: '#4e4e58', terrainDirt: '#4c463d',
+    terrainScree: '#42424a', hutGlow: 1.1,
+    skirtColor: '#4a453e',                              // kerb + gutter stone
+    ground: {
+      base: '#56565f', bandLight: 'rgba(255,200,130,0.05)', bandDark: 'rgba(0,0,0,0.08)',
+      patchA: 'rgba(30,34,48,0.24)', patchB: 'rgba(90,86,80,0.16)',
+      speckA: 'rgba(220,180,120,0.4)', speckB: 'rgba(150,160,180,0.4)', speckCount: 90,
+    },
+    road: {
+      // wet granite setts. `cobbles` paints the setts over this base and the
+      // `wet` pass darkens and glazes the lot — the polish bands down the
+      // wheel tracks come free with the cobble pass.
+      base: '#4c4842', mottleA: [58, 55, 50], mottleB: [104, 100, 94],
+      rut: 'rgba(30,28,25,0.5)', rutCore: 'rgba(20,19,17,0.45)', tread: 'rgba(12,11,10,0.4)',
+      stoneA: 'rgba(150,146,136,0.55)', stoneB: 'rgba(44,42,38,0.7)',
+      // the "verge" here is a granite kerb and gutter, never grass
+      fringe: [62, 60, 56], fringeVar: [18, 18, 16],
+      ruts: false,                                      // stone setts do not rut
+      cobbles: {
+        stones: ['#7c766c', '#6a655d', '#8a8378', '#5e5a53', '#948c80', '#726d65'],
+        mortar: 'rgba(30,29,27,0.9)', lip: 'rgba(255,214,150,0.16)',  // sodium on the crowns
+        rows: 30, per: 20,
+      },
+      // roughness 0.32 / reflection 0.85 in the region spec: a hard wet
+      // surface, standing water on about a fifth of the roadbed
+      wet: { darken: 0.24, gleam: 18, pools: 6 },
+    },
+    // no massif and no highland: this is a street grid over a hill, and the
+    // hill is the road's own elevation profile, not a mountain range
+    hillColor: 0x141a28, peakColor: 0x1e2638, hillDrop: 10, highland: 0,
+    // FLORA IS MINIMAL BY DESIGN: pollarded planes in the square and around
+    // the small park, nothing else. No conifers anywhere near a town.
+    treeCount: 26, trunkColor: 0x4a463e,
+    foliageLow: 0x1a241c, foliageTop: 0x27331f,
+    foliage: { h: 0.28, hVar: 0.03, s: 0.22, sVar: 0.06, l: 0.13, lVar: 0.05 },
+    treeSnowCap: false,
+    tuftCount: 0, grass: {},                            // paving, not meadow
+    bushCount: 26, bushColor: 0x1f2a20,                 // clipped park hedging
+    bush: { h: 0.29, hVar: 0.03, s: 0.20, sVar: 0.05, l: 0.14, lVar: 0.05 },
+    // NO gravel, NO boulders, NO pebbles — the region's negative list. The
+    // rock colour is still needed: the pinch dressing builds its kerb teeth
+    // from it, and here they read as the concrete blocks at the arch corners.
+    rockCount: 0, pebbleCount: 0, rockColor: 0x6e6e76, rockSnowCap: false,
+    heroRock: false,
+    flowerCount: 0, flowerColors: ['#f2a93b'],
+    hutRoof: 0x565c66, hutCount: 0, hayColor: 0x6a6258, hayCount: 0,  // slate
+    splinter: [0x8a8078, 0xf2a93b],                     // masonry chips + accent
+    weather: { type: 'rain', color: 0xc8a878, rate: 26 },  // the rain that just stopped
+    // A TOWN ON A HILL. The lap starts in the lower town, climbs the east
+    // avenue in TWO SHORT COBBLED RAMPS to the cathedral square at the top,
+    // and falls the whole way back down the west wall street. 42 u of gain
+    // over a 1.7 km lap: a 3–9 % dominant gradient with the two ramps
+    // steepening past 15 %, which is the region's terrain table.
+    elev: {
+      amp: 42, profile: 'ascent', ph: [0, 0, 0],
+      keys: [[0, 0], [0.06, 0], [0.125, 3.5], [0.19, 8],
+        [0.235, 16],                                    // ramp 1
+        [0.29, 20.5], [0.34, 25],
+        [0.385, 33],                                    // ramp 2
+        [0.44, 38], [0.50, 42], [0.56, 41],
+        [0.63, 36], [0.70, 29], [0.77, 21], [0.84, 13], [0.90, 6],
+        [0.95, 0], [1, 0]],
+    },
+    // A street is flat between its buildings: the ground barely moves, and
+    // what movement there is comes from the elevation profile, not noise.
+    relief: 0.3, blend: { near: 12, far: 46 },
+    // Jumps in a town would be absurd, and `rampCount: 0` does NOT mean zero
+    // (`T.rampCount || 3`). Starving the placement with a tiny straightness
+    // ceiling is the honest way to get short cobbled humps instead of yumps.
+    rampMaxCurv: 0.0016, padMaxCurv: 0.0035, boardMaxCurv: 0.008,
+    crestHeight: 1.6,                                   // stepped street, not a crest
+    // THE SIGNATURE SQUEEZE: arched gateways, twice per stage. The width pinch
+    // is the existing narrows machinery; `_buildOldTown` hangs the arch itself
+    // over each pinch, so the geometry and the physics agree by construction.
+    // Asked for THREE because the placement is a search — it needs a straight
+    // window of 50-84 samples clear of the start line, and a street grid this
+    // broken up does not always offer two. `_buildOldTown` arches the first two
+    // that land; a third, if it lands, is a plain kerbed squeeze.
+    narrows: { count: 3, min: 0.62 },
+    obstacleSpec: undefined,                            // nothing parked in a street
+    puddleCount: 5,
+    puddle: {
+      rim: '#23252c', mud: '#0d0f14',
+      sheen: 'rgba(255,190,120,0.26)', gleam: 'rgba(255,214,150,0.34)',
+    },
+    // sodium street lamps on the kerb line, 12 m apart counting both sides
+    lamps: { color: 0xffb14a, every: 7, height: 4.6 },
+    elements: 'oldtown',
+    // THE REGION'S OWN GEOMETRY. Continuous townhouse frontage down both sides
+    // of the street, the arched gateways, the mid-ground blocks behind, and
+    // the cathedral campanile that is visible from three points on the route.
+    // See `_buildOldTown`.
+    frontage: {
+      lateral: 17.5, depth: 8, unit: 7.0, height: 9.0,
+      run: [4, 9],                                      // units per terrace block
+      tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
+    },
+  },
+
+  // HEDGEROW DASH: farmland lanes, per RALLY_WORLD_BIBLE 3.8. Overcast, low
+  // sun straight down the lane, everything green and grey and nothing bright.
+  // The identity is the BANK — a 1.9 u earth wall topped with 2.3 u of thorn
+  // running both sides of the road, so a car that goes wide meets masonry-hard
+  // ground rather than runoff. Mud off the field entrances, blind crests, and
+  // no mountain anywhere: the negative list forbids exposed rock, dry dust,
+  // bright colour and any sight line worth the name.
+  farmland: {
+    surface: 'wet',                                     // "wet mixed" — physics reads this
+    // Bible fog is FogExp2 d=0.00150 #C3CBD2; the engine's fog is linear, so
+    // near/far are set to the same half-fade (~550) and extinction (~1150).
+    fogColor: 0xc3cbd2, fogNear: 170, fogFar: 950,
+    // OVERCAST IS NOT DARK. This shipped at 0.58 — the LOWEST hemisphere
+    // intensity of all 32 worlds, against a daylight norm of 0.72-0.80 — on the
+    // reasoning that an overcast sky is dim. It is the opposite: a solid cloud
+    // deck is a very large diffuse source, which is why an overcast day has
+    // weak SHADOWS and plenty of light. Measured, the pairing of 0.58 ambient
+    // with the roster's second-weakest sun (2.05) and the darkest terrain
+    // palette in the game rendered the world essentially black — see the note
+    // on terrainLow below. The sun stays weak, which is the real overcast
+    // signature (flat, shadowless); the sky dome carries the exposure.
+    hemiSky: 0x9fb2c6, hemiGround: 0x6a6350, hemiIntensity: 0.95,
+    sunColor: 0xffe4ce, sunIntensity: 2.05,             // 4800 K, broken by cloud
+    skyTop: '#6F8CA8', skyHorizon: '#C3CBD2', sunGlow: 0xffe4ce,
+    skyCurve: 0.7,                                      // overcast: the pale reaches high
+    sunAz: 5.24, sunEl: 0.31,                           // 300° bearing, 18° up — down the lane
+    cloudCount: 16, cloudOpacity: 0.95, cloudTint: 0xd6dbe0,
+    // THE WHOLE PALETTE HAD TO COME UP. As authored these were 446232 /
+    // 7d8a63 / 4e4535, whose relative luminances are 0.102 / 0.234 / 0.061 —
+    // the ENTIRE range sat below the DARK end of every other world on the
+    // roster (forest 0.201-0.381, alpine 0.200-0.426, outback 0.310-0.506), and
+    // the ploughed-earth tone at 0.061 was near enough to black that the field
+    // patches read as holes in the ground rather than as soil. Each colour is
+    // a plausible sample of a wet English field on its own; as the only three
+    // colours in a world lit by the weakest sun on the roster, they are not a
+    // world you can see to drive in. Now 0.220 / 0.391 / 0.161 — sitting on
+    // forest's band, still the least saturated and the greyest palette in the
+    // game, which is what makes this region read as farmland rather than as a
+    // forest floor.
+    terrainLow: '#6d8a4e', terrainHigh: '#9db075', terrainDirt: '#7d6f56',
+    // bank faces and the cut of the sunken lane, both bare earth
+    terrainScree: '#5a5442', skirtColor: '#5a4f3c', hutGlow: 0.42,
+    ground: {
+      // lifted with the terrain palette above — this texture multiplies the
+      // vertex colour, so leaving it at the old 4d6b39 would have cancelled
+      // most of that lift back out
+      base: '#6b8749', bandLight: 'rgba(255,255,255,0.05)', bandDark: 'rgba(40,52,30,0.07)',
+      patchA: 'rgba(122,106,80,0.22)',                  // ploughed earth
+      patchB: 'rgba(150,160,116,0.16)',                 // cut hay / stubble
+      speckA: 'rgba(78,104,58,0.7)', speckB: 'rgba(170,180,140,0.7)', speckCount: 70,
+    },
+    road: {
+      // patched tarmac (35% of the Bible surface mix) with the dirt and mud
+      // that make up another 45% of it dragged across the top
+      base: '#4c4a44', mottleA: [62, 54, 42], mottleB: [110, 108, 102],
+      rut: 'rgba(46,38,26,0.5)', rutCore: 'rgba(32,26,18,0.45)', tread: 'rgba(18,14,10,0.4)',
+      stoneA: 'rgba(178,174,164,0.55)', stoneB: 'rgba(52,48,42,0.7)',
+      fringe: [58, 92, 40], fringeVar: [28, 38, 22],    // grass right to the edge
+      wet: { darken: 0.32, gleam: 9, pools: 5 },
+    },
+    // no mountains anywhere: a low green ridge line, sunk and half-eaten by fog
+    hillColor: 0x54664a, peakColor: 0x8a94a0, hillDrop: 34,
+    // the fields come up to the lane fast — that is what a sunken lane is
+    blend: { near: 11, far: 44 },
+    // Tier-4 flora is ONLY the hedgerow standards: oak and ash on the bank top.
+    // `birch` stands in for ash (pale bark, airy crown — the nearest silhouette
+    // in the species table). Weights are the Bible's 0.14 / 0.12, renormalised
+    // over the tree tier so they sum to 1.0 (checklist R04).
+    treeCount: 300, trunkColor: 0x6b5a44,
+    foliageLow: 0x35502a, foliageTop: 0x4a6b34,
+    foliage: { h: 0.26, hVar: 0.05, s: 0.34, sVar: 0.14, l: 0.25, lVar: 0.10 },
+    treeSnowCap: false,
+    // bracken and pasture grass; bramble and nettle as the understorey mass
+    tuftCount: 1400, grass: { bladeA: '#4a6b34', bladeB: '#7a8f52' },
+    understorey: 'blob',                                // broadleaf scrub = bramble
+    bushCount: 260, bushColor: 0x35592c,
+    bush: { h: 0.26, hVar: 0.04, s: 0.40, sVar: 0.10, l: 0.24, lVar: 0.10 },
+    // "Never: exposed rock." No boulders, no hero erratic — only road grit.
+    rockCount: 0, pebbleCount: 140, rockColor: 0x7e7468, rockSnowCap: false,
+    heroRock: false,
+    // "Never: bright colours." Nothing in the verge is allowed to shout.
+    flowerCount: 0, flowerColors: ['#e8e4d2'],
+    hutRoof: 0x4a5058,                                  // slate
+    hutCount: 10,                                       // dispersed, never a village
+    hayColor: 0x6e7a52, hayCount: 22,                   // silage bales in green wrap
+    hayNear: 18, hayFar: 30,                            // stacked in the field, behind the hedge
+    splinter: [0x7e7468, 0xe8e4d2],                     // rubble stone + lime pointing
+    weather: { type: 'rain', color: 0xc3cbd2, rate: 90 },
+    // rolling farmland: 40-260 m base, 4-12 % dominant gradient. The short
+    // crests that make the lane blind come from `rampCount` below, not here.
+    elev: { amp: 12, ph: [1.9, 0.7, 2.4] },
+    // Crests are the point of this world: ten a lap (rampCount + 3), and the
+    // straightness ceiling is loose enough that some of them sit on the entry
+    // to a bend — "blind crests into tightening corners", per the Bible.
+    rampCount: 9, crestHeight: 3.1,
+    rampMaxCurv: 0.016, padMaxCurv: 0.0035, boardMaxCurv: 0.012,
+    // 4.2-5.6 m roadbed: the narrowest region outside Old Town. 0.52 asks for
+    // a harder pinch than any other world (AVALANCHE ALLEY, the previous
+    // worst, is 0.55) and lands on _buildWidthProfile's 5 u floor, so this is
+    // as narrow as the engine goes. The count is a request: this lane is
+    // turning almost everywhere and only two windows are straight enough for
+    // one, which is why the start straight above is dead straight.
+    narrows: { count: 3, min: 0.52 },
+    // THE BANK. See _buildHedgeBanks — this is the region's hazard signature.
+    hedgeBanks: { lateral: 13.6, bankH: 1.9, bankW: 2.4, hedgeH: 2.3, bay: 6.2, max: 640 },
+    // streams in the valley bottoms, washing over the lane
+    fords: { count: 2 }, riverBank: { base: '#5a5442' }, reedColor: 0x5f7a3a,
+    // height fog in the field hollows + a wet squall; NEVER a tree corridor —
+    // the viz-corridor builder plants dense trunks where the banks already are
+    viz: [['fogbank', 2], ['squall', 1]],
+    // mud dragged onto the tarmac at the field entrances: 6-10 patches a stage
+    puddleCount: 9,
+    puddle: {
+      rim: '#4a4030', mud: '#221c12',
+      sheen: 'rgba(150,165,180,0.28)', gleam: 'rgba(200,215,225,0.34)',
+    },
+    elements: 'hedgerow',
+    // no massif, no glacier, no obstacleSpec, no hazard specs — the lane, the
+    // bank and the weather are the whole of it.
+  },
+
+  // OUTBACK RED DIRT (Bible 3.10). The fastest region in the game and the one
+  // you can see furthest across: hardpack red laterite over a gibber plain,
+  // flat-topped mesa escarpments on the skyline, and a sun 66° up that leaves
+  // almost no shadow to read the surface by.
+  //
+  // It must NOT read as DEEP DESERT with the hue turned round. The dune worlds
+  // are a sand SEA — smooth golden rollers, palms, no stone. This is hardpack:
+  // the ground is dark red and littered with gibber (hence the very high
+  // pebble count and the stony ground speckle), the flora is grey-green and
+  // sparse rather than tropical, and the road is a hard, fast, dead-straight
+  // graded track rather than a serpent through dunes.
+  //
+  // The negative list is doing real work here: no rock walls beside the road
+  // (no cliffWalls, no stone field walls in the kit), no tight corners in
+  // sequence (see CIRCUITS.outback), no cool colours, NO FOG (viz: [] kills
+  // the fog banks and squalls outright — the atmosphere is warm dust haze at
+  // 350 m, not weather), and no green ground cover (every green in the world
+  // is desaturated to olive/grey-green, foliage saturation well under 55 %).
+  //
+  // Hazard signature: bulldust (puddleCount — the puddle system already gives
+  // heavy hull drag, a grip cut and a dust burst, which IS a bulldust hole,
+  // and the decal is retinted to the "identical-looking, slightly paler patch"
+  // the Bible describes), dry creek crossings that launch a car off the far
+  // bank (T.creeks — see _planCreeks), and kangaroos (LIVESTOCK_BY_THEME).
+  outback: {
+    fogColor: 0xe8c79a, fogNear: 350, fogFar: 1800,      // sight line 350 m — the longest in the game
+    // Bible 3.10 gives "ambient sky intensity 0.44, heavy red ground bounce
+    // #B85A38". The bounce colour is taken literally. The 0.44 is NOT the same
+    // quantity as this engine's hemisphere intensity, and taken literally it
+    // rendered the region at Very High contrast — black shadow sides on every
+    // rock and hut under a near-overhead sun — when the comparison table in
+    // section 4 calls for MEDIUM. 0.72 is the value that produces the contrast
+    // the document asks for; the deviation is deliberate and measured.
+    hemiSky: 0xa8cdea, hemiGround: 0xb85a38, hemiIntensity: 0.72,
+    sunColor: 0xffedcc, sunIntensity: 3.15,              // 5500 K, 122000 lux — the brightest world
+    skyTop: '#3a86c9', skyHorizon: '#e8c79a', sunGlow: 0xffe6b0,
+    sunAz: 0.96, sunEl: 1.15,                            // 55° bearing, 66° elevation: near-overhead
+    cloudCount: 4, cloudOpacity: 0.42, cloudTint: 0xfff2e0,
+    hazeColor: 0xe8c79a, hazeOpacity: 0.95,
+    // THE GROUND IS A PRODUCT, NOT A COLOUR. The terrain material carries the
+    // ground texture AND per-vertex colours, so what you see is
+    // `ground.base x terrainLow` multiplied in linear space. Writing the
+    // Bible's ground base (#A8452A) into both squares it and the plain came
+    // out as near-black crimson. These are the square ROOTS of the palette
+    // values, so the albedo that actually reaches the screen is the palette:
+    // #cf8568 x #cf8568 -> #A8452A, measured.
+    //
+    // `terrainDirt` is the patch colour the terrain sprinkles on a ~140 u
+    // sinusoid, and it is LIGHTER than the base on purpose: a darker one read
+    // as a black checkerboard laid over the plain, where what the outback
+    // shows is drifts of pale bleached dust over the red.
+    terrainLow: '#cf8568', terrainHigh: '#e0b492', terrainDirt: '#e2c3a4',
+    // steep-face colour for the faceted ground + warmth in the homestead windows
+    terrainScree: '#c07a5c', hutGlow: 0.4,
+    skirtColor: '#a85234',
+    // a plain, not a range: the local relief is dialled back so the sight line
+    // survives, but `highland` stays at full so the massif and the mesas still
+    // stand up out at r > 400
+    relief: 0.55, highland: 1, blend: { near: 18, far: 84 },
+    ground: {
+      // dark red laterite, stony rather than sandy: patches of bleached dust
+      // over it and a heavy dark speckle for the gibber
+      base: '#cf8568', bandLight: 'rgba(255,232,200,0.05)', bandDark: 'rgba(112,48,28,0.06)',
+      patchA: 'rgba(150,72,44,0.20)', patchB: 'rgba(226,178,132,0.16)',
+      speckA: 'rgba(64,34,24,0.8)', speckB: 'rgba(232,204,170,0.7)', speckCount: 140,
+    },
+    road: {
+      // graded hardpack: paler and pinker than the verge because the traffic
+      // has polished the dust off it, with loose gravel scattered across
+      base: '#b4573a', mottleA: [140, 66, 42], mottleB: [206, 134, 94],
+      rut: 'rgba(128,54,30,0.5)', rutCore: 'rgba(96,38,20,0.42)', tread: 'rgba(58,24,12,0.45)',
+      stoneA: 'rgba(226,198,160,0.72)', stoneB: 'rgba(112,52,32,0.7)',
+      fringe: [152, 132, 76], fringeVar: [34, 30, 26],   // dry spinifex verge, never a green kerb
+    },
+    hillColor: 0x9c4630, peakColor: 0xc8865a, horizon: 'mesa', // mesa escarpments
+    // OUTBACK FLORA (Bible 3.10 table): river red gum on the creek lines,
+    // desert oak and mulga on the plain. See _buildOutbackScrub.
+    vegetation: 'outback', treeCount: 150, trunkColor: 0xc4b79f,
+    foliageLow: 0x6e785c, foliageTop: 0x848e6c,
+    foliage: { h: 0.215, hVar: 0.03, s: 0.13, sVar: 0.07, l: 0.40, lVar: 0.08 },
+    treeSnowCap: false,
+    // spinifex: dry gold hummocks, everywhere, right up to the road edge
+    tuftCount: 1000, grass: { bladeA: '#9a8f46', bladeB: '#cdbc70' },
+    // saltbush — the 'spike' silhouette is the desert-scrub one
+    bushCount: 240, bushColor: 0x8b9070, understorey: 'spike',
+    bush: { h: 0.22, hVar: 0.04, s: 0.12, sVar: 0.06, l: 0.42, lVar: 0.08 },
+    // GIBBER PLAIN: the pebble count is the highest in the game on purpose —
+    // the ground is supposed to be paved with small dark stones
+    rockCount: 380, pebbleCount: 900, rockColor: 0x8e4a30, rockSnowCap: false,
+    rockRoughness: 1,
+    flowerCount: 130, flowerColors: ['#e8c23a', '#d8523a', '#f0e0b8'],
+    hutRoof: 0x9aa0a2, hayColor: 0xc9b177,               // corrugated iron, station fodder
+    hutCount: 12, hutZone: [0.30, 0.48], hayCount: 34,   // the station cluster
+    splinter: [0xc9b9a2, 0x8e8478],                      // weatherboard bleached to grey
+    weather: { type: 'dust', color: 0xc4703f, rate: 84 },// red dust always in the air
+    // 2–8 % dominant gradient over long swells; the sharp gradients in this
+    // world are the creek banks, not the profile
+    elev: { amp: 5, ph: [2.1, 0.9, 1.6] },
+    // fast open world: crests are allowed on almost anything, and there are a
+    // lot of them, because a plain with no vertical event in it is a corridor
+    rampCount: 6, crestHeight: 3.4,
+    rampMaxCurv: 0.020, padMaxCurv: 0.005, boardMaxCurv: 0.016,
+    // BULLDUST: 11 holes a lap (Bible says 8–15), sitting anywhere across the
+    // width including mid-road, with the decal knocked back to a matte pale
+    // dust patch — the whole point is that it looks like the road
+    puddleCount: 11,
+    puddle: { rim: '#b06a44', mud: '#c99a72', sheen: 'rgba(226,196,160,0.30)',
+      gleam: 'rgba(240,222,192,0.22)' },
+    puddleRough: 0.95, puddleMetal: 0,                   // dust, not water: no gleam
+    // DRY CREEK CROSSINGS: the region's other trap. Four notches a lap, each
+    // one a 15 %-ish drop into a sand bed and a climb out over a bank you can
+    // launch off. See _planCreeks / _buildCreekBeds.
+    creeks: { count: 4, depth: 3.6, len: 34, half: 9 },
+    // the one authored water crossing — a permanent waterhole in a creek
+    fords: { count: 1 },
+    // NEVER FOG (negative list). Explicit [] so the theme can never inherit a
+    // fog bank or a squall from a table default.
+    viz: [],
+    // a soft shoulder that falls away, not a squeeze: two gentle pinches only
+    narrows: { count: 2, min: 0.74 },
+    // no boulders in the road: the region's runoff is High and its sight line
+    // is 350 m, so a rock on a straight is not a hazard, it is a lie
+    obstacleSpec: null,
+    crossroads: 3,                                       // station tracks off the main road
+    elements: 'outback',                                 // homestead kit (weatherboard + iron)
+    // mesas standing off the north-east horizon rather than a mountain wall
+    massif: { az: 0.9, spread: 2.4, count: 7, r0: 460, r1: 720,
+      h0: 90, h1: 165, w0: 260, w1: 430 },
+  },
 };
 
 /** Free every geometry, material and texture under `root`, then empty it.
@@ -1623,6 +2286,19 @@ const PROP_SPECS = {
   pass: [['hay', 20], ['crate', 16], ['cone', 14], ['rock', 8]],
   tremola: [['hay', 16], ['crate', 16], ['cone', 14], ['rock', 10]],
   furka: [['snowman', 10], ['crate', 16], ['cone', 14], ['rock', 12]],
+  // OLIVE COAST: the Bible's roadside kit is blue plastic harvest crates,
+  // rolled olive nets (the hay rolls) and stones off the terrace walls
+  medterrace: [['crate', 20], ['hay', 14], ['cone', 12], ['rock', 8]],
+  // OLD TOWN: market stall crates packed away at the kerb, street-works cones
+  // and steel drums. No rocks and no hay — the region's negative list rules
+  // out gravel, dirt and anything that is not architectural.
+  oldtown: [['crate', 20], ['cone', 18], ['barrel', 14]],
+  // farm dressing only — 'hay' is a wrapped silage bale here and 'barrel' a
+  // slurry drum. No 'rock': the region's negative list forbids exposed rock.
+  farmland: [['hay', 24], ['crate', 14], ['barrel', 10], ['cone', 10]],
+  // OUTBACK: 44-gallon drums at the siding, station fodder, freight crates.
+  // No 'rock' — a gibber plain has no boulders worth stacking beside a road.
+  outback: [['barrel', 20], ['hay', 14], ['crate', 14], ['cone', 10]],
 };
 const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20, penguin: 40 };
 const _m4 = new THREE.Matrix4(); // scratch (smashTree instance-zeroing)
@@ -1641,6 +2317,9 @@ const BARREL_PALETTES = {
   avalanche: { base: '#7aa8c4', hoop: '#2c4456', stripe: '#e8f2f8' },
   neon: { base: '#22262e', hoop: '#101318', stripe: '#26f6ff' },
   undercity: { base: '#3a4034', hoop: '#181c14', stripe: '#8a9a3c' },
+  oldtown: { base: '#3a4048', hoop: '#1a1e24', stripe: '#f2a93b' },  // works drum
+  farmland: { base: '#5a6450', hoop: '#2c3226' },      // green slurry drum
+  outback: { base: '#9a5a38', hoop: '#3e2a1c', stripe: '#c9b9a2' },  // rusted 44-gallon drum
 };
 
 // ---------- world elements: farms, chapels, outposts, field walls ----------
@@ -1689,6 +2368,52 @@ const ELEMENT_KITS = {
     builds: ['shed', 'house', 'barn'], landmarks: ['watchtower'],
     dress: ['logpile'], fenceColor: 0x4a3c30, stoneWalls: 3,
   },
+  // OLIVE COAST. A new kit rather than a retint of 'alpine', because the
+  // Bible's archetype list for this region is exactly H_MED_CORTIJO +
+  // S_UNI_CHAPEL and nothing else (checklist R03) — 'alpine' also builds a
+  // silo and 'farm' a windmill, neither of which belongs on a terrace hillside.
+  // Limewash walls (#E0D6C0, the Bible's structure primary), terracotta
+  // pantiles, and the chapel with its bell gable as the one landmark
+  // silhouette. `stoneWalls: 8` is the highest on the roster: dry stone
+  // boundaries running across the terraces are half the region's identity.
+  medhill: {
+    wall: 0xe0d6c0, wall2: 0xd0c2a4, roof: 0xb4552e, trim: 0xc0532e, stone: 0xc4b896,
+    builds: ['house', 'house', 'barn', 'shed'], landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xc8bb96, stoneWalls: 8,
+  },
+  // OLD TOWN NIGHT: what the world is dressed with BEYOND the street frontage
+  // — the outer quarters, seen across the rooftops. Muted ochre render under
+  // slate, and a chapel with a bell gable as the second landmark silhouette
+  // after the campanile. No livestock and no paddocks in a town, so `field`
+  // is emptied (the same trick the city kit uses) and the budget goes into
+  // town-wall runs instead.
+  oldtown: {
+    wall: 0xb0a189, wall2: 0x8e8478, roof: 0x3f444a, trim: 0x5c5148, stone: 0x7a746a,
+    builds: ['house', 'house', 'shed'], landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0x5a5f66, stoneWalls: 6,
+    field: [], fenceRuns: 4,
+  },
+  // FARMLAND HEDGEROW: rubble stone with lime pointing, slate roofs, dark
+  // green painted doors, and a muted-grey steel portal barn behind the house.
+  // The Bible allows this region exactly two archetypes — the farm longhouse
+  // and the universal chapel — so `builds` is house/barn only and there is one
+  // landmark, never a silo or a windmill (checklist R03).
+  hedgerow: {
+    wall: 0x8f8778, wall2: 0x8a8f8c, roof: 0x4a5058, trim: 0x2f4a3c, stone: 0x7e7468,
+    builds: ['house', 'barn', 'house', 'barn'], landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xa8a08c, stoneWalls: 6, fenceRuns: 4,
+  },
+  // OUTBACK STATION (Bible 3.10 architecture): weatherboard bleached to grey
+  // under a corrugated-iron roof, machinery sheds, and a windmill over the
+  // stock tank as the landmark you steer by. `stoneWalls: 0` is deliberate —
+  // the region's negative list forbids rock walls, and a station is fenced
+  // with WIRE, so the whole masonry budget goes into long fence runs instead.
+  outback: {
+    wall: 0xb8ae9e, wall2: 0x8e8478, roof: 0x9aa0a2, trim: 0x6a6055, stone: 0x9c6a4e,
+    builds: ['house', 'shed', 'barn', 'shed'], landmarks: ['windmill', 'silo'],
+    dress: ['well', 'logpile'], fenceColor: 0xa89c88,
+    stoneWalls: 0, fenceRuns: 7,
+  },
 };
 // Species mix for the default (conifer-family) forest builder, per theme:
 // [[species, weight]...]. Species live in _buildForest. Themes not listed
@@ -1709,20 +2434,37 @@ const FLORA_MIX = {
   pass: [['pineA', 0.34], ['pineB', 0.22], ['larch', 0.28], ['birch', 0.16]],
   tremola: [['pineA', 0.36], ['pineB', 0.22], ['larch', 0.42]],
   furka: [['pineA', 0.40], ['pineB', 0.22], ['larch', 0.38]],
+  // OLIVE COAST. Species live in _buildOliveGrove, not the conifer builder.
+  // Weights are the Bible's tree tiers (0.22/0.18/0.10/0.08/0.06) renormalised
+  // over the 0.64 they sum to — the remaining 0.36 is the maquis and the dry
+  // grass, which this world scatters as bushes and tufts, so the full region
+  // scatter still sums to 1.0 (checklist R04).
+  medterrace: [['oliveOld', 0.344], ['oliveRow', 0.281], ['corkOak', 0.156],
+    ['umbrellaPine', 0.125], ['cypress', 0.094]],
+  // OLD TOWN: pollarded planes and limes only — the two broadleaf species in
+  // the kit. A conifer anywhere near a European old town would be wrong.
+  oldtown: [['oak', 0.62], ['birch', 0.38]],
+  // hedgerow standards and nothing else — no conifer has any business here.
+  // `birch` is the stand-in for ash: pale bark, open airy crown.
+  farmland: [['oak', 0.54], ['birch', 0.46]],
 };
 
 // How many decorative side-road junctions each RURAL world gets (city, ice
 // and cliff-walled worlds get none). A theme can override via T.crossroads.
 const THEME_CROSSROADS = {
   forest: 3, desert: 2, snow: 2, alpine: 3, oasis: 2, redwood: 2, flume: 2,
-  wildfire: 2, pass: 3, tremola: 2, furka: 2,
+  wildfire: 2, pass: 3, tremola: 2, furka: 2, medterrace: 2, outback: 3,
+  // the field entrances the tractors drag the mud out of — the maximum, since
+  // they are the region's stated hazard and every one of them opens the hedge
+  farmland: 4,
 };
 const ELEMENT_KIT_BY_THEME = {
   forest: 'farm', desert: 'desert', snow: 'alpine', canyon: 'desert', volcano: 'burnt',
   alpine: 'alpine', glacial: 'ice', jungle: 'jungle', dunes: 'desert', ravine: 'desert',
   oasis: 'desert', redwood: 'farm', flume: 'farm', wildfire: 'burnt', sheetice: 'ice',
   avalanche: 'alpine', neon: 'city', undercity: 'city',
-  pass: 'alpine', tremola: 'alpine', furka: 'alpine',
+  pass: 'alpine', tremola: 'alpine', furka: 'alpine', oldtown: 'oldtown',
+  medterrace: 'medhill', farmland: 'hedgerow', outback: 'outback',
 };
 
 /** Unit gable-roof prism: 1×1×1, base at y=0, ridge running along local X at
@@ -1928,6 +2670,9 @@ export class Track {
     // ribbon, its skirts, the ruts, the terrain blend and every prop placement
     // follow the hump for free.
     this._buildCrests();
+    // ---- outback creeks: cut the dry watercourses into the same profile, for
+    // the same reason and under the same contract as the crests above.
+    this._planCreeks();
 
     this._checkLayout();
 
@@ -2002,6 +2747,9 @@ export class Track {
     this._buildObstacles();  // …then rock towers block straights between them
     this._buildPuddles();
     this._buildFords();      // ---- river-fords: streams wash over the road
+    // MEDITERRANEAN: loose stone dragged onto corner exits. After the fords, so
+    // it can keep clear of the one water crossing.
+    this._buildCornerGravel();
     this._buildVizZones();   // ---- viz-zones: forest tunnels / fog banks / squalls
     this._buildNarrowDressing(); // ---- width-variation: pinch edge markers
     this._buildProps();      // …and smashable props fill the roadsides
@@ -3409,6 +4157,114 @@ export class Track {
     }
   }
 
+  /** OUTBACK RED DIRT: dry creek crossings — the region's signature terrain
+   *  event, and the reason it needs geometry that did not exist.
+   *
+   *  A crest is the OPPOSITE shape: it is a hump, it is visible from a long
+   *  way back, and it launches you off its own brow. A creek is a NOTCH. The
+   *  plain runs dead flat to the lip, drops a bank at ~15 % into a sand bed
+   *  and climbs the far one, and the far bank is where a car carrying 150 km/h
+   *  leaves the ground — you cannot see the fall until you are on it, which is
+   *  precisely why the Bible makes the river red gums grow ONLY on the creek
+   *  line: the tree line is the advance warning, and `_buildOutbackScrub`
+   *  reads the wash polylines planted here to honour that.
+   *
+   *  Same construction contract as `_buildCrests`: baked into center[].y
+   *  before any mesh exists, so the road ribbon, the shoulder skirts, the
+   *  terrain blend and every scatter inherit the cut for free. The profile is
+   *  a full negative cosine wave, which starts and ends at ZERO gradient —
+   *  there is no lip to catch a wheel, only the fall.
+   *
+   *  `T.creeks` = {count, depth, len, half}. Absent on every other theme, so
+   *  this returns before it can touch anyone else's seeded RNG stream.
+   */
+  _planCreeks() {
+    this.creeks = [];
+    const S = this.T.creeks;
+    if (!S || !(S.count > 0)) return;
+    const want = S.count | 0;
+    const depth = S.depth ?? 3.6;
+    const baseLen = S.len ?? 34;
+    // straight-ish only: a bank taken at an angle is a barrel roll, not a jump
+    const maxCurv = (this.T.rampMaxCurv ?? 0.014) * 1.2;
+    const windows = [];
+    for (let i = 0; i < N; i += 4) {
+      if (i < 70 || i > N - 90) continue;             // clear of the start gate
+      if (this._nearNarrow(i, 30)) continue;
+      let mc = 0;
+      for (let k = -6; k < baseLen + 6; k++) mc = Math.max(mc, this.curvature[(i + k + N) % N]);
+      windows.push({ i, mc });
+    }
+    windows.sort((a, b) => a.mc - b.mc);
+    const chosen = [];
+    // The crests are already down and each one blocks a stretch either side of
+    // it, so a first pass at full spacing routinely places one creek short —
+    // same failure mode `_buildCrests` documents, same fix: relax and go round
+    // again rather than ship a lap with a feature missing.
+    const take = (gap, crestPad) => {
+      for (const w of windows) {
+        if (chosen.length >= want) return;
+        if (w.mc > maxCurv) return;                    // sorted: nothing later is straighter
+        // never cut a creek through a crest — the two profiles would ADD and
+        // the exit bank would become a ski jump nobody authored
+        if (this.crests.some((c) => this._circDist(w.i, c.index) < c.len + crestPad)) continue;
+        if (chosen.some((c) => this._circDist(w.i, c) < gap)) continue;
+        chosen.push(w.i);
+      }
+    };
+    take(Math.min(150, ((N - 160) / want) | 0), 26);
+    if (chosen.length < want) take(110, 20);
+    if (chosen.length < want) take(90, 16);
+    for (const i of chosen) {
+      const L = Math.round(baseLen * (0.85 + Math.random() * 0.4));   // ~29..48 samples
+      const d = depth * (0.75 + Math.random() * 0.55);                // ~2.7..5.0 u banks
+      for (let k = 0; k < L; k++) {
+        const f = k / L;
+        this.center[(i + k) % N].y -= d * 0.5 * (1 - Math.cos(f * Math.PI * 2));
+      }
+      const mid = (i + (L >> 1)) % N;
+      this.creeks.push({
+        index: i, mid, len: L, depth: +d.toFixed(2), half: S.half ?? 9,
+        // the wash itself, running away from the road on both sides. Planned
+        // here (it is pure XZ) so the flora builder can use it even though the
+        // bed geometry is not built until the environment pass.
+        line: [this._creekWash(mid, 1), this._creekWash(mid, -1)],
+      });
+    }
+    // the profile moved under us — same rebuild the crests do, for the same
+    // reason (the physics and the mesh pitching both read _slope)
+    for (let i = 0; i < N; i++) {
+      this._slope[i] =
+        (this.center[(i + 2) % N].y - this.center[(i - 2 + N) % N].y) / (4 * this.segLen);
+    }
+  }
+
+  /** One side of a creek's wash: a meandering polyline of {x, z, w} leaving the
+   *  road at sample `mid` on `side` and wandering out into the plain. Width
+   *  grows with distance — a creek is narrowest where the road crosses it,
+   *  because that is where the crossing was graded. */
+  _creekWash(mid, side) {
+    const n = this.nrm[mid], t = this.tan[mid];
+    const c = this.center[mid];
+    // leave the road at a slant so the bed is not a stripe drawn square across
+    const skew = (Math.random() - 0.5) * 0.7;
+    let dx = n.x * side + t.x * skew, dz = n.z * side + t.z * skew;
+    const inv = 1 / Math.hypot(dx, dz);
+    dx *= inv; dz *= inv;
+    const pts = [];
+    let px = c.x + dx * 9, pz = c.z + dz * 9, ang = 0, d = 9;
+    for (let k = 0; k < 11; k++) {
+      pts.push({ x: px, z: pz, w: 7 + d * 0.06 + Math.random() * 3 });
+      ang += (Math.random() - 0.5) * 0.34;                 // the meander
+      const cs = Math.cos(ang), sn = Math.sin(ang);
+      const step = 11 + Math.random() * 9;
+      px += (dx * cs - dz * sn) * step;
+      pz += (dx * sn + dz * cs) * step;
+      d += step;
+    }
+    return pts;
+  }
+
   _buildRamps() {
     // Prop launch ramps are GONE — replaced by natural crests baked into the
     // road's own elevation (`_buildCrests`). The array stays so the many
@@ -3682,7 +4538,11 @@ export class Track {
       const m = new THREE.Mesh(
         new THREE.CircleGeometry(1, 26),
         new THREE.MeshStandardMaterial({
-          map: tex, transparent: true, roughness: 0.25, metalness: 0.08, depthWrite: false,
+          // a water puddle is glossy; a BULLDUST hole (outback) is the same
+          // decal with the shine taken out of it, so the theme may dial the
+          // reflectance right down without needing its own decal system
+          map: tex, transparent: true, depthWrite: false,
+          roughness: this.T.puddleRough ?? 0.25, metalness: this.T.puddleMetal ?? 0.08,
         })
       );
       m.rotation.order = 'YXZ';
@@ -3697,6 +4557,107 @@ export class Track {
       this.group.add(m);
       this.puddles.push({ x: p.x, z: p.z, r: rad, y: p.y });
     }
+  }
+
+  /** MEDITERRANEAN TERRACE hazard signature: gravel dragged onto the EXIT of a
+   *  corner by the cars that went through before you (Bible 3.6 — loose stone
+   *  on the outside of 40 % of corners, and the reason a warm open tarmac stage
+   *  bites). `_buildRoadsideDetail` already scatters gravel on the VERGE, at a
+   *  lateral of 10.9–14; this is the stuff that is on the road, past the apex,
+   *  exactly where you unwind the wheel and get on the throttle.
+   *
+   *  It registers in `this.puddles`, which is the engine's existing "patch of
+   *  road that costs you grip" contract — hull drag, a short slick, and a spray
+   *  that is already `particles.dust` rather than water — and which the rival
+   *  corner planner already avoids. This theme keeps `puddleCount: 0`, so
+   *  nothing wet is ever built on a world whose Bible entry forbids it.
+   *
+   *  Placement obeys the carriageway rule the same way `_buildObstacles` does:
+   *  the patch is pinned to the outer edge and its inner edge is checked
+   *  against max(4.5, widthAt × 0.55), so the racing line stays clean. Run
+   *  wide on the exit and the gravel is still there — that is the point. */
+  _buildCornerGravel() {
+    const spec = this.T.cornerGravel;
+    const count = spec && spec.count | 0;
+    if (!count) return;
+    const tex = puddleTexture({
+      // DRY palette: pale limestone chippings on grey tarmac. The sheen is
+      // nearly off and the gleam is killed outright — a wet highlight here
+      // would break the region's "never wet" rule on its own.
+      rim: '#a2977a', mud: '#c6ba99',
+      sheen: 'rgba(226,214,182,0.20)', gleam: 'rgba(0,0,0,0)',
+    });
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex, transparent: true, roughness: 1, metalness: 0, depthWrite: false,
+    });
+    const stoneGeo = this._rockGeo || (this._rockGeo = this._topLitRockGeo(0));
+    const stones = new THREE.InstancedMesh(
+      stoneGeo,
+      new THREE.MeshStandardMaterial({
+        color: this.T.rockColor ?? 0xc0b596, flatShading: true, roughness: 1, vertexColors: true,
+      }),
+      count * 12
+    );
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const scol = new THREE.Color();
+    const m4 = new THREE.Matrix4();
+    let sk = 0;
+    const chosen = [];
+    for (let i = 0; i < N && chosen.length < count; i += 3) {
+      // a corner, then walk forward to where it opens out again: the exit
+      if (this.curvature[i] < 0.0125) continue;
+      let e = i;
+      for (let s = 8; s < 46; s += 2) {
+        e = (i + s) % N;
+        if (this.curvature[e] < 0.010) break;
+      }
+      if (this._circDist(e, 0) < 55) continue;
+      if (this._nearNarrow(e, 8)) continue;             // pinches stay clean
+      if (this._nearGorge(e, 40)) continue;
+      if (this.ramps.some((r) => this._circDist(e, r.index) < 34)) continue;
+      if (this.fords.some((f) => this._circDist(e, f.i) < 30)) continue;
+      if (this._obstacleIdx.some((o) => this._circDist(e, o) < 24)) continue;
+      if (chosen.some((c) => this._circDist(e, c.i) < 44)) continue;
+      // outside of the bend the car has just come through
+      const a = this.tan[i], b = this.tan[(i + 12) % N];
+      const side = (a.x * b.z - a.z * b.x) > 0 ? -1 : 1;
+      const halfW = this.widthAt(e);
+      const r = 1.8 + Math.random() * 0.8;
+      const lat = side * (halfW - r * 0.55);
+      if (Math.abs(lat) - r < Math.max(4.5, halfW * 0.55)) continue;
+      chosen.push({ i: e, lat, r });
+    }
+    for (const c of chosen) {
+      const p = this.pointAt(c.i, c.lat);
+      const m = new THREE.Mesh(new THREE.CircleGeometry(1, 22), mat);
+      m.rotation.order = 'YXZ';
+      m.rotation.y = this.headingAt(c.i);
+      m.rotation.x = -Math.PI / 2 - Math.atan(this.slopeAt(c.i));
+      m.rotation.z = Math.random() * Math.PI * 2;
+      // drawn out along the road: gravel is dragged, not dropped
+      m.scale.set(c.r, c.r * (1.5 + Math.random() * 0.6), 1);
+      m.position.set(p.x, p.y + 0.035, p.z);
+      m.renderOrder = 1;
+      this.group.add(m);
+      this.puddles.push({ x: p.x, z: p.z, r: c.r, y: p.y });
+      // a dozen loose stones sitting proud of the decal so the patch reads as
+      // stone from the car, not as a stain on the tarmac
+      for (let s = 0; s < 12; s++) {
+        const t = (Math.random() - 0.5) * 2, u = (Math.random() - 0.5) * 2;
+        const sp = this.pointAt(
+          (c.i + Math.round(t * c.r * 2.2) + N) % N, c.lat + u * c.r * 0.85
+        );
+        const sc = 0.1 + Math.random() * 0.18;
+        q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
+        m4.compose(new THREE.Vector3(sp.x, sp.y + sc * 0.16, sp.z), q,
+          new THREE.Vector3(sc, sc * 0.5, sc));
+        stones.setMatrixAt(sk, m4);
+        scol.setScalar(0.85 + Math.random() * 0.3);
+        stones.setColorAt(sk++, scol);
+      }
+    }
+    stones.count = sk;
+    if (sk) this.group.add(stones);
   }
 
   // ---- river-fords ---------------------------------------------------------
@@ -4202,6 +5163,7 @@ export class Track {
     this._buildSky();
     const m4 = new THREE.Matrix4();
     this._buildHorizon(m4);
+    if (this.creeks?.length) this._buildCreekBeds(m4);   // outback dry watercourses
     this._buildForest(m4);
     this._buildGroundCover(m4);
     this._buildHuts(m4);
@@ -4218,6 +5180,7 @@ export class Track {
     if (this.T.riverCount) this._buildRivers();      // jungle streams under the road
     if (this.T.hollowArch) this._buildHollowArch();  // redwood drive-through trunk
     if (this.T.lamps) this._buildLamps();            // neon / undercity road lamps
+    if (this.T.frontage) this._buildOldTown(m4);     // OLD TOWN street frontage + arches
     if (this.T.logYards) this._buildLogYards();      // flume timber stacks
     if (this.T.retainingWalls) this._buildRetainingWalls();   // alpine-pass parapets
     if (this.T.heroBridge) this._buildHeroBridge();           // hero rope crossing
@@ -4227,8 +5190,126 @@ export class Track {
     this._buildWorldElements(m4);                    // farms, chapels, fences, dressing
     this._buildPastures();                           // grazing spots for the animal system
     this._buildCrossroads();                         // dirt side-road junctions (rural worlds)
+    // FARMLAND: the banks that line every lane. AFTER the crossroads, the
+    // props and the tire stacks, because it leaves a gap wherever one of them
+    // already occupies the verge — a hedge cannot grow across a field gate.
+    if (this.T.hedgeBanks) this._buildHedgeBanks(m4);
     this._buildRoadsideDetail(m4);                   // corner markers + gravel
     this._buildContactShadows();                     // baked AO under everything
+  }
+
+  /** OUTBACK RED DIRT: the dry creek beds, drawn from the wash polylines
+   *  `_planCreeks` planted before the terrain existed.
+   *
+   *  Three things, and each of them is doing a job the region asked for:
+   *
+   *    - the WASH: a pale sand ribbon leaving the road on both sides and
+   *      meandering out across the red plain. It is the only bright, low-
+   *      saturation shape in a world made entirely of red ground, so it reads
+   *      as a line across the landscape from a very long way off — which is
+   *      the whole point of a 350 m sight line.
+   *    - the BANK GRAVEL: a scatter of coarse stone along the first stretch of
+   *      each wash, where the bank has been cut back for the crossing.
+   *    - the FLOODWAY BOARDS: black-and-yellow chevrons on posts, one pair per
+   *      creek, planted ~24 samples before the lip. Real station tracks are
+   *      signed like this precisely because the drop is invisible until you
+   *      are on it, and the Bible calls the signs out by name. They are SOLID
+   *      at r = 0.4, well outside the carriageway (see the lateral below), so
+   *      they obey the Law of Solidity without ever being in the way. */
+  _buildCreekBeds(m4) {
+    const beds = [];
+    for (const ck of this.creeks) for (const side of ck.line) beds.push(side);
+    const segGeo = new THREE.BoxGeometry(1, 1, 1);
+    segGeo.translate(0, -0.5, 0);                       // hangs BELOW its anchor
+    const bedMesh = new THREE.InstancedMesh(
+      segGeo,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+      beds.length * 12
+    );
+    const sand = new THREE.Color('#d8b98a');
+    const sandDark = new THREE.Color('#b4915f');
+    const col = new THREE.Color();
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    let k = 0;
+    for (const line of beds) {
+      for (let s = 0; s + 1 < line.length; s++) {
+        const a = line[s], b = line[s + 1];
+        const dx = b.x - a.x, dz = b.z - a.z;
+        const len = Math.hypot(dx, dz);
+        if (len < 0.5) continue;
+        const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+        const w = (a.w + b.w) / 2;
+        // the bed lies just under the plain — a channel, not a painted stripe
+        const y = this.terrainHeight(mx, mz) + 0.06;
+        q.setFromAxisAngle(up, Math.atan2(dx, dz));
+        m4.compose(new THREE.Vector3(mx, y, mz), q, new THREE.Vector3(w, 0.55, len * 1.06));
+        bedMesh.setMatrixAt(k, m4);
+        col.copy(sand).lerp(sandDark, Math.random() * 0.55);
+        bedMesh.setColorAt(k++, col);
+      }
+    }
+    bedMesh.count = k;
+    bedMesh.receiveShadow = true;
+    this.group.add(bedMesh);
+
+    // coarse bank gravel where the crossing was cut through
+    const pebGeo = new THREE.DodecahedronGeometry(1, 0);
+    const gravel = new THREE.InstancedMesh(
+      pebGeo,
+      new THREE.MeshStandardMaterial({ color: this.T.rockColor ?? 0x8e4a30,
+        flatShading: true, roughness: 1 }),
+      this.creeks.length * 44
+    );
+    let gk = 0;
+    for (const ck of this.creeks) {
+      for (const line of ck.line) {
+        for (let n = 0; n < 22; n++) {
+          const t = Math.random() * 2.4;                 // first ~2 wash segments
+          const i0 = Math.min(line.length - 2, t | 0);
+          const f = t - i0;
+          const px = line[i0].x + (line[i0 + 1].x - line[i0].x) * f
+            + (Math.random() - 0.5) * line[i0].w * 1.5;
+          const pz = line[i0].z + (line[i0 + 1].z - line[i0].z) * f
+            + (Math.random() - 0.5) * line[i0].w * 1.5;
+          const s = 0.22 + Math.random() * 0.4;
+          if (!this._clearsRoad(px, pz, s, 0.8)) continue;
+          m4.makeScale(s, s * 0.6, s);
+          m4.setPosition(px, this.terrainHeight(px, pz) + s * 0.2, pz);
+          gravel.setMatrixAt(gk++, m4);
+        }
+      }
+    }
+    gravel.count = gk;
+    this.group.add(gravel);
+
+    // FLOODWAY boards on the approach to every creek
+    const boardTex = chevronTexture();
+    const boardMat = new THREE.MeshStandardMaterial({
+      map: boardTex, transparent: true, side: THREE.DoubleSide, roughness: 0.9,
+    });
+    const boardGeo = new THREE.PlaneGeometry(2.4, 1.7);
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x8e8478, roughness: 1 });
+    const postGeo = new THREE.CylinderGeometry(0.09, 0.11, 2.2, 5);
+    for (const ck of this.creeks) {
+      const j = (ck.index - 24 + N) % N;
+      const heading = this.headingAt(j);
+      for (const side of [1, -1]) {
+        // ROAD_HALF is 9 and the car collides as a 1.8 u disc: 12.6 leaves the
+        // full drivable width free even where the centreline swings under it
+        const lat = 12.6 * side;
+        const p = this.pointAt(j, lat);
+        if (!this._clearsRoad(p.x, p.z, 0.4, 1.0)) continue;
+        const post = new THREE.Mesh(postGeo, postMat);
+        post.position.set(p.x, p.y + 1.1, p.z);
+        post.castShadow = true;
+        const board = new THREE.Mesh(boardGeo, boardMat);
+        board.position.set(p.x, p.y + 2.2, p.z);
+        board.rotation.y = heading + Math.PI / 2;        // face back down the road
+        this.group.add(post, board);
+        this.solids.push({ x: p.x, z: p.z, r: 0.4, y: p.y, mat: 'metal' });
+        this._addShadow(p.x, p.z, 0.7, p.y);
+      }
+    }
   }
 
   /** ALPINE PASSES: dry-stone retaining parapets. A pass is built as a shelf
@@ -4574,6 +5655,149 @@ export class Track {
     }
     mesh.count = k;
     if (k) this.group.add(mesh);
+  }
+
+  /** Unit hedge-bank prism: a trapezoid cross-section in the local X-Y plane
+   *  (base 1 wide at y=0, crest 0.36 wide at y=1) extruded 1 along local Z.
+   *
+   *  It exists because nothing in the kit is this shape. A BoxGeometry has no
+   *  batter, and the shared gable prism (gablePrismGeo) is a triangle whose
+   *  ridge runs along local X — i.e. ACROSS the road once it is rotated by
+   *  headingAt, which is the wrong axis and gives no crest for a hedge to sit
+   *  on. Local Z is along the lane, so scale is (bankWidth, height, bayLength).
+   *  Twelve triangles, built once per world. */
+  _bankPrismGeo() {
+    const b0 = [-0.5, 0, -0.5], b1 = [0.5, 0, -0.5], b2 = [0.5, 0, 0.5], b3 = [-0.5, 0, 0.5];
+    const t0 = [-0.18, 1, -0.5], t1 = [0.18, 1, -0.5], t2 = [0.18, 1, 0.5], t3 = [-0.18, 1, 0.5];
+    const tris = [
+      [t0, t3, t2], [t0, t2, t1],          // crest
+      [b1, t1, t2], [b1, t2, b2],          // +x batter
+      [b0, t3, t0], [b0, b3, t3],          // -x batter
+      [b0, t0, t1], [b0, t1, b1],          // end cap
+      [b3, t2, t3], [b3, b2, t2],          // end cap
+      [b0, b1, b2], [b0, b2, b3],          // sole (buried, but never see-through)
+    ];
+    const pos = new Float32Array(tris.length * 9);
+    let o = 0;
+    for (const t of tris) for (const v of t) { pos[o++] = v[0]; pos[o++] = v[1]; pos[o++] = v[2]; }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  /** FARMLAND HEDGEROW: THE BANK.
+   *
+   *  Every other world's answer to "what happens if you go wide" is runoff,
+   *  scenery, or a wall you can see coming from a corner away. This region's
+   *  answer, per RALLY_WORLD_BIBLE 3.8, is that there is no answer: an earth
+   *  bank 1.2-2.2 m high topped with 1.6-2.4 m of thorn runs continuously down
+   *  both sides of the lane, and a car that leaves the road hits it.
+   *
+   *  Two InstancedMeshes — bank prisms and hedge blocks, one draw call each —
+   *  and one small SOLID per bay. The bays are spaced so their PUSH-OUT circles
+   *  (r + the 1.8 u car radius the physics adds) overlap: a chain of separated
+   *  colliders is a fence with holes in it, and the whole point of this world
+   *  is that there are no holes.
+   *
+   *  It is deliberately NOT stone. The solids are tagged 'bank', which falls to
+   *  the generic barrier response in onSolidCrash — a scrape costs paint and
+   *  speed and caps at 24 hull. Earth is not a cliff face, and this thing is
+   *  close enough to the carriageway that stone damage would make the world
+   *  unplayable rather than intimidating.
+   *
+   *  Gaps are authored, not accidental: the start gate, every field entrance
+   *  (the crossroad spurs), every ford, one gateway per ~11 bays, and anywhere
+   *  a prop or a tire stack already stands on the verge. */
+  _buildHedgeBanks(m4) {
+    const S = this.T.hedgeBanks;
+    const LAT = S.lateral, H = S.bankH, W = S.bankW, HH = S.hedgeH, MAX = S.max || 520;
+    // One bay per `step` samples; the mesh runs 8 % long so the run reads
+    // continuous instead of as a row of separate lumps.
+    const step = Math.max(2, Math.round((S.bay || 6.2) / this.segLen));
+    const bayLen = step * this.segLen * 1.08;
+    const bankGeo = this._bankPrismGeo();
+    const hedgeGeo = new THREE.BoxGeometry(1, 1, 1);
+    hedgeGeo.translate(0, 0.5, 0);
+    const banks = new THREE.InstancedMesh(
+      bankGeo,
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color(this.T.terrainScree || this.T.terrainDirt),
+        flatShading: true, roughness: 1, envMapIntensity: 0.3,
+      }),
+      MAX
+    );
+    const hedges = new THREE.InstancedMesh(
+      hedgeGeo,
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff, flatShading: true, roughness: 1, envMapIntensity: 0.25,
+      }),
+      MAX
+    );
+    banks.castShadow = banks.receiveShadow = true;
+    hedges.castShadow = hedges.receiveShadow = true;
+    banks.name = 'hedge-bank';
+    hedges.name = 'hedge-top';
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const col = new THREE.Color(), leaf = new THREE.Color();
+    const F = this.T.foliage;
+    // Verge furniture that was here first — a bay is dropped rather than grown
+    // through a crate or a tire stack. Only things actually standing in the
+    // bank's own lateral band count: props scatter from 10.5 to 22 u out, and
+    // testing all of them threw away half the run for objects the bank was
+    // never going to touch.
+    const verge = [...this.props, ...this.tireStacks].filter(
+      (v) => Math.abs(this._distToTrack(v.x, v.z) - LAT) < W * 0.5 + (v.r ?? 1.2));
+    let k = 0, bay = 0;
+    for (let i = 0; i < N && k < MAX; i += step) {
+      if (this._circDist(i, 0) < 34) continue;                    // start grid + gate
+      if (this._nearGorge(i, 40)) continue;
+      // streams wash across the lane; the bank opens for them on both sides
+      if (this.fords.some((f) => this._circDist(i, f.i) < f.half / this.segLen + 5)) continue;
+      bay++;
+      for (const side of [1, -1]) {
+        if (k >= MAX) break;
+        // field entrance: the spur cuts the bank clean through
+        if (this.crossroads.some((c) => this._circDist(i, c.index)
+          < (c.side === side ? 9 : 4))) continue;
+        // one five-bar gateway every ~18 bays, staggered between the sides —
+        // roughly a gate every 110 u of hedge, which is the Bible's field
+        // entrance rate. They are the only way off the lane; that is the point.
+        if ((bay + (side > 0 ? 0 : 9)) % 18 === 0) continue;
+        const p = this.pointAt(i, LAT * side);
+        // AN OFFSET IS NOT A DISTANCE. `pointAt` measures along one sample's
+        // normal; on the inside of a bend the road swings under it. The bank
+        // is the closest thing to the carriageway in the world, so it is the
+        // one that must ask the whole lap how far away the road actually is.
+        if (!this._clearsRoad(p.x, p.z, W / 2, 1.0)) continue;
+        if (verge.some((v) => (v.x - p.x) ** 2 + (v.z - p.z) ** 2 < 5.8)) continue;
+        // seat it on the lower of the road and the field: the lane is sunken,
+        // so the bank always meets the road side and buries into the field side
+        const ground = this._terrainMeshHeight(p.x, p.z);
+        const base = Math.min(p.y, ground) - 0.4;
+        const h = H * (0.86 + Math.random() * 0.3);
+        q.setFromAxisAngle(up, this.headingAt(i));
+        m4.compose(new THREE.Vector3(p.x, base, p.z), q, new THREE.Vector3(W, h, bayLen));
+        banks.setMatrixAt(k, m4);
+        col.setScalar(0.84 + Math.random() * 0.3);
+        banks.setColorAt(k, col);
+        // the thorn on top: flailed, so it is a block, not a blob — jittered in
+        // height and yaw so the run has a ragged skyline rather than a hemline
+        const hh = HH * (0.8 + Math.random() * 0.42);
+        q.setFromAxisAngle(up, this.headingAt(i) + (Math.random() - 0.5) * 0.16);
+        m4.compose(new THREE.Vector3(p.x, base + h * 0.92, p.z), q,
+          new THREE.Vector3(W * 0.8, hh, bayLen * 1.02));
+        hedges.setMatrixAt(k, m4);
+        leaf.setHSL(F.h + Math.random() * F.hVar, F.s + Math.random() * F.sVar,
+          Math.max(0.10, F.l - 0.06 + Math.random() * F.lVar));
+        hedges.setColorAt(k, leaf);
+        this.solids.push({ x: p.x, z: p.z, r: W / 2, y: base + h * 0.5, mat: 'bank' });
+        k++;
+      }
+    }
+    banks.count = hedges.count = k;
+    if (k) this.group.add(banks, hedges);
+    else { bankGeo.dispose(); hedgeGeo.dispose(); }
   }
 
   /** Log cabins standing on the shelves right beside the pass, the way real
@@ -5743,6 +6967,356 @@ export class Track {
     this.group.add(posts, heads);
   }
 
+  /** OLD TOWN NIGHT (LANTERN QUARTER): the street itself.
+   *
+   *  Every other world is a road THROUGH a landscape, so its roadside is
+   *  scattered — huts, farmsteads, boulders, trees, all placed independently
+   *  by `_scatter`. A town is the opposite: the buildings ARE the corridor,
+   *  they are CONTINUOUS, and they are the entire reason this region has no
+   *  runoff. Nothing in the existing kit builds a continuous frontage, which
+   *  is why this builder exists and why only this theme turns it on.
+   *
+   *  Four things in one pass so they can share two instanced meshes:
+   *    1. THE FRONTAGE — terraces of gable-fronted townhouses down both kerbs,
+   *       broken every 4–9 units by a side alley (region checklist R07: no
+   *       unbroken frontage past 120 m). Where the road swings back under an
+   *       offset the terrace STEPS BACK instead of eating the carriageway.
+   *    2. THE QUARTER BEHIND — a sparser, taller second rank, so the town has
+   *       depth in the fog instead of ending at the pavement. These are
+   *       registered as shootable `buildings`; the frontage deliberately is
+   *       not (see the note at the registration site).
+   *    3. THE ARCHED GATEWAYS — one hung over each authored width pinch, so
+   *       the squeeze you see and the squeeze the physics applies are the same
+   *       squeeze. Only the piers are solid: a solid on the span would collide
+   *       with a car driving under it (`solids` is a circle test with a ±6 u
+   *       height window, not a box), exactly as the start gantry avoids.
+   *    4. THE CAMPANILE — the single landmark, tall enough to navigate by.
+   *
+   *  EVERY SOLID IS VALIDATED WITH `_clearsRoad`, never with a bare lateral
+   *  offset. A fixed offset is measured along ONE sample's normal and a street
+   *  grid doubles back on itself constantly — the same defect that once put a
+   *  cabin on the centreline of FURKA RIDGE. */
+  _buildOldTown(m4) {
+    const F = {
+      lateral: 17.5, depth: 8, unit: 7.0, height: 9.0, run: [4, 9],
+      tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
+      ...this.T.frontage,
+    };
+    // THE SKYLINE MUST BE ROOFTOPS. The shared horizon builder rings every
+    // world with cone hills and a farther ring of peaks. Behind an old town
+    // that is a mountain range, which the region's negative list forbids
+    // outright ("any silhouette that is not architectural") — and no amount of
+    // fog or haze tuning hides a 300 u cone, because at this fog distance the
+    // cone IS the fog colour and the haze band behind it is not. Dropped here
+    // rather than in `_buildHorizon` so no other world is touched.
+    for (const n of ['horizon-hills', 'horizon-peaks']) {
+      const mesh = this.group.getObjectByName(n);
+      if (!mesh) continue;
+      this.group.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.map?.dispose();
+      mesh.material.dispose();
+    }
+    const MAX = 780;
+    const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
+    bodyGeo.translate(0, 0.5, 0);
+    const faceTex = townhouseTexture();
+    faceTex.anisotropy = 4;
+    const bodyMat = new THREE.MeshStandardMaterial({
+      map: faceTex, roughness: 0.86, envMapIntensity: 0.35,
+      // the lit bays are the ONLY light source that reaches the upper half of
+      // the frame — without them a night street is a black band over the road
+      emissive: 0xffffff, emissiveMap: townhouseGlowTexture(),
+      emissiveIntensity: this.T.hutGlow ?? 1,
+    });
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: this.T.hutRoof ?? 0x33363c, flatShading: true,
+      roughness: 0.72, envMapIntensity: 0.4,
+    });
+    const bodies = new THREE.InstancedMesh(bodyGeo, bodyMat, MAX);
+    const roofs = new THREE.InstancedMesh(gablePrismGeo(), roofMat, MAX);
+    bodies.name = 'oldtown-frontage';
+    bodies.castShadow = bodies.receiveShadow = true;
+    roofs.castShadow = true;
+    // wall-bracket lanterns: emissive heads on short arms, bloom does the glow
+    // (same contract as `_buildLamps` — no point lights, a night city cannot
+    // afford two hundred of them and a shader recompile per light count)
+    const LMAX = 200;
+    const armGeo = new THREE.BoxGeometry(0.7, 0.1, 0.1);
+    armGeo.translate(-0.35, 0, 0);
+    const bulbGeo = new THREE.SphereGeometry(0.26, 7, 5);
+    bulbGeo.translate(-0.72, -0.12, 0);
+    const arms = new THREE.InstancedMesh(
+      armGeo, new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.6, metalness: 0.5 }), LMAX);
+    const bulbs = new THREE.InstancedMesh(
+      bulbGeo, new THREE.MeshBasicMaterial({ color: this.T.lamps?.color ?? 0xffb14a }), LMAX);
+    let lk = 0;
+
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const col = new THREE.Color();
+    const tints = F.tints.map((c) => new THREE.Color(c));
+    let k = 0;
+
+    /** Place one masonry block. Returns its solid, or null if it could not be
+     *  fitted clear of the road at any of the offered lateral offsets. */
+    const put = (i, side, lat, wAlong, dAcross, h, roofH, tint) => {
+      if (k >= MAX) return null;
+      const p = this.pointAt(i, lat * side);
+      const r = Math.hypot(wAlong, dAcross) / 2;
+      if (!this._clearsRoad(p.x, p.z, r, 1.6)) return null;
+      // never swallow a tree or a smashable prop that is already placed
+      for (const t of this.trees) {
+        if ((t.x - p.x) ** 2 + (t.z - p.z) ** 2 < (r + 1.4) ** 2) return null;
+      }
+      for (const pr of this.props) {
+        if ((pr.x - p.x) ** 2 + (pr.z - p.z) ** 2 < (r + 1.0) ** 2) return null;
+      }
+      const y = this.terrainHeight(p.x, p.z) - 0.5;
+      q.setFromAxisAngle(up, this.headingAt(i));
+      // local +X is the road normal and local +Z runs along the street, so the
+      // GABLE END faces the road: the Baltic gable-fronted terrace, and the
+      // one roof orientation that still reads as separate houses in a row
+      m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(dAcross, h, wAlong));
+      bodies.setMatrixAt(k, m4);
+      m4.compose(new THREE.Vector3(p.x, y + h, p.z), q,
+        new THREE.Vector3(dAcross * 1.06, roofH, wAlong * 1.04));
+      roofs.setMatrixAt(k, m4);
+      col.copy(tint).multiplyScalar(0.86 + Math.random() * 0.26);
+      bodies.setColorAt(k, col);
+      roofs.setColorAt(k, col.setScalar(0.8 + Math.random() * 0.4));
+      k++;
+      const solid = { x: p.x, z: p.z, r, y: y + 0.6, mat: 'hut' };
+      this.solids.push(solid);
+      return { solid, p, y, h, r, lat };
+    };
+
+    // ---- 1 + 2: the frontage and the rank behind it ----
+    const step = Math.max(2, Math.round(F.unit / this.segLen));
+    for (const side of [1, -1]) {
+      let run = 0, want = F.run[0] + ((Math.random() * (F.run[1] - F.run[0] + 1)) | 0);
+      let gap = 0;
+      for (let s = 0; s * step < N; s++) {
+        const i = (s * step) % N;
+        // the start gate, the grid and the grandstand own this stretch
+        if (this._circDist(i, 0) < 40) { run = 0; continue; }
+        if (gap > 0) { gap--; run = 0; continue; }
+        // step the terrace back rather than break it, where the road swings in
+        let placed = null;
+        for (const extra of [0, 3.5, 7]) {
+          placed = put(i, side, F.lateral + extra, F.unit * 1.04, F.depth,
+            F.height * (0.92 + Math.random() * 0.24), 2.1 + Math.random() * 1.0,
+            tints[(Math.random() * tints.length) | 0]);
+          if (placed) break;
+        }
+        if (!placed) { run = 0; continue; }
+        // A LANTERN ON THE BRACKET, every third house. Anchored to the FRONT
+        // FACE, not the block centre — the arm only reaches 0.72 u and a
+        // 8 u-deep building would have swallowed the bulb whole.
+        if (lk < LMAX && run % 3 === 0) {
+          const fp = this.pointAt(i, (placed.lat - F.depth * 0.5 - 0.15) * side);
+          q.setFromAxisAngle(up, this.headingAt(i) + (side > 0 ? 0 : Math.PI));
+          m4.compose(new THREE.Vector3(fp.x, placed.y + 4.3, fp.z), q,
+            new THREE.Vector3(1, 1, 1));
+          arms.setMatrixAt(lk, m4);
+          bulbs.setMatrixAt(lk++, m4);
+        }
+        if (++run >= want) {                       // side alley, then a new block
+          gap = 1 + ((Math.random() * 2) | 0);
+          want = F.run[0] + ((Math.random() * (F.run[1] - F.run[0] + 1)) | 0);
+        }
+        // the quarter behind: taller, sparser, and shootable
+        if (s % 4 === 0) {
+          const back = put(i, side, F.lateral + F.depth + 9 + Math.random() * 12,
+            F.unit * (1.1 + Math.random() * 0.5), F.depth + 2 + Math.random() * 3,
+            F.height * (1.05 + Math.random() * 0.55), 2.4 + Math.random() * 1.4,
+            tints[(Math.random() * tints.length) | 0]);
+          // THE FRONTAGE IS NOT SHOOTABLE AND THE BLOCK BEHIND IT IS.
+          // The frontage is the corridor — level a terrace and the region's
+          // whole premise (no runoff, a mistake ends against masonry) goes with
+          // it. The rank behind is set dressing, so it takes fire like any
+          // other building in the game.
+          if (back) {
+            this.buildings.push({
+              x: back.p.x, z: back.p.z, y: back.y, r: back.r * 0.7,
+              w: back.r * 1.2, h: back.h, hp: 220, solid: back.solid,
+              parts: [{ mesh: bodies, i: k - 1 }, { mesh: roofs, i: k - 1 }],
+              roofColor: this.T.hutRoof,
+            });
+            this._addShadow(back.p.x, back.p.z, back.r * 1.25);
+          }
+        }
+      }
+    }
+    bodies.count = roofs.count = k;
+    arms.count = bulbs.count = lk;
+    bulbs.name = 'oldtown-lanterns';
+    if (k) this.group.add(bodies, roofs);
+    if (lk) this.group.add(arms, bulbs);
+
+    // ---- 3: the arched gateways over the authored pinches (two per stage) ----
+    for (const sec of (this._narrowSecs || []).slice(0, 2)) this._buildArchGateway(sec.mid, F);
+
+    // ---- 4: the campanile ----
+    this._buildCampanile();
+
+    // ---- kerb bollards: the region's edge treatment is "kerb plus bollard
+    // line", and it is what tells you where the street edge is between lamps.
+    // COSMETIC, like the trackside lamps and the reflector marker posts — a
+    // solid line of colliders 2 u off the drivable edge would be a wall, not a
+    // kerb, and this world already has walls.
+    const bolGeo = new THREE.CylinderGeometry(0.16, 0.2, 0.95, 6);
+    bolGeo.translate(0, 0.48, 0);
+    const bols = new THREE.InstancedMesh(bolGeo, new THREE.MeshStandardMaterial({
+      color: 0x2a2c30, roughness: 0.55, metalness: 0.45,
+    }), 260);
+    let bk = 0;
+    for (let i = 0; i < N && bk < 258; i += 9) {
+      if (this._circDist(i, 0) < 34) continue;
+      for (const side of [1, -1]) {
+        const p = this.pointAt(i, (WALL_OFF + 1.4) * side);
+        m4.makeTranslation(p.x, p.y - 0.15, p.z);
+        bols.setMatrixAt(bk++, m4);
+      }
+    }
+    bols.count = bk;
+    bols.name = 'oldtown-bollards';
+    if (bk) this.group.add(bols);
+  }
+
+  /** One arched gateway straddling a width pinch: two masonry piers, a voussoir
+   *  ring between them and the building mass carried over the top. Bible calls
+   *  for a 4.2–5.0 m opening at 4.6 m clear; this road is far wider than a real
+   *  old-town street, so the OPENING tracks the pinched carriageway and the
+   *  clear height is set above anything a crest can throw a car to (crests are
+   *  already excluded from pinches by `_buildCrests`). */
+  _buildArchGateway(mid, F) {
+    const CAR_R = 1.8;
+    const w = this.widthAt(mid);
+    const lat = w + 1.5 + CAR_R + 0.3;                  // pier centre
+    const clear = 6.4;                                  // soffit height
+    const stone = this._archStoneMat || (this._archStoneMat = new THREE.MeshStandardMaterial({
+      map: stoneTexture(), roughness: 0.92, envMapIntensity: 0.35,
+    }));
+    // one facade material for BOTH gateways — a fresh pair of 192x256 canvases
+    // per arch is pure waste, and disposeSubtree frees a shared material once
+    const faceMat = this._archFaceMat || (this._archFaceMat = new THREE.MeshStandardMaterial({
+      map: townhouseTexture({ render: '#a89c88' }), roughness: 0.88,
+      emissive: 0xffffff, emissiveMap: townhouseGlowTexture(),
+      emissiveIntensity: (this.T.hutGlow ?? 1) * 0.8,
+    }));
+    const g = new THREE.Group();
+    const c = this.center[mid];
+    const pierW = 2.6, pierD = 5.0;
+    for (const side of [1, -1]) {
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(pierW, clear, pierD), stone);
+      pier.position.set(side * lat, clear / 2, 0);
+      pier.castShadow = pier.receiveShadow = true;
+      g.add(pier);
+      const p = this.pointAt(mid, lat * side);
+      this.solids.push({ x: p.x, z: p.z, r: 1.55, y: p.y, mat: 'stone' });
+      this._addShadow(p.x, p.z, 2.4, p.y);
+    }
+    // voussoir ring: a close-laid semicircle of wedge blocks over the opening.
+    // Spacing matters — at nine blocks over a 35 u arc it read as loose rubble
+    // rather than an arch, so they are laid nearly edge to edge.
+    const span = lat - pierW * 0.5;
+    const RISE = 0.5;
+    const VN = 16;
+    for (let s = 0; s <= VN; s++) {
+      const a = (s / VN) * Math.PI;
+      const blk = new THREE.Mesh(new THREE.BoxGeometry(2.9, 1.5, pierD), stone);
+      blk.position.set(-Math.cos(a) * span, clear + Math.sin(a) * span * RISE, 0);
+      blk.rotation.z = a - Math.PI / 2;
+      blk.castShadow = true;
+      g.add(blk);
+    }
+    // the storey carried over the arch — this is a BUILDING you drive through,
+    // so it is built as a short TERRACE of unit-width bays rather than one
+    // stretched box, which is what makes it read as a gatehouse
+    const total = lat * 2 + pierW;
+    const bays = Math.max(3, Math.round(total / F.unit));
+    const bw = total / bays;
+    const yOver = clear + span * RISE + 2.8;
+    for (let s = 0; s < bays; s++) {
+      const x = -total / 2 + bw * (s + 0.5);
+      const over = new THREE.Mesh(new THREE.BoxGeometry(bw * 1.01, 5.4, pierD * 1.3), faceMat);
+      over.position.set(x, yOver, 0);
+      over.castShadow = over.receiveShadow = true;
+      g.add(over);
+    }
+    const roof = new THREE.Mesh(gablePrismGeo(), new THREE.MeshStandardMaterial({
+      color: this.T.hutRoof ?? 0x565c66, flatShading: true, roughness: 0.72,
+    }));
+    // the gatehouse spans the street, so its ridge runs ACROSS it (local +X)
+    // and the pitches fall up and down the road — the prism's own orientation
+    roof.scale.set(total, 2.6, pierD * 1.36);
+    roof.position.set(0, yOver + 2.7, 0);
+    roof.castShadow = true;
+    g.add(roof);
+    // a lantern hung under the keystone
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6),
+      new THREE.MeshBasicMaterial({ color: this.T.lamps?.color ?? 0xffb14a }));
+    lamp.position.set(0, clear + span * RISE - 1.4, 0);
+    g.add(lamp);
+    g.position.set(c.x, c.y, c.z);
+    g.rotation.y = this.headingAt(mid);                 // local +x = road normal
+    this.group.add(g);
+  }
+
+  /** The one landmark: a cathedral campanile beside the summit square, tall
+   *  enough to sit above the frontage from anywhere on the upper half of the
+   *  lap. Hand-placed rather than scattered, because "visible from three
+   *  points on the route" is a placement requirement, not a density. */
+  _buildCampanile() {
+    const want = (0.45 * N) | 0;
+    let at = null;
+    for (let d = 0; d < 90 && !at; d += 6) {
+      for (const i of [(want + d) % N, (want - d + N) % N]) {
+        for (const side of [1, -1]) {
+          for (const lat of [34, 42, 50]) {
+            const p = this.pointAt(i, lat * side);
+            if (!this._clearsRoad(p.x, p.z, 5.2, 3)) continue;
+            at = p; break;
+          }
+          if (at) break;
+        }
+        if (at) break;
+      }
+    }
+    if (!at) return;
+    const y = this.terrainHeight(at.x, at.z) - 0.6;
+    const stone = new THREE.MeshStandardMaterial({
+      map: stoneTexture(), roughness: 0.92, envMapIntensity: 0.35,
+    });
+    const g = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.BoxGeometry(7.4, 30, 7.4), stone);
+    shaft.position.y = 15;
+    shaft.castShadow = shaft.receiveShadow = true;
+    g.add(shaft);
+    // belfry: an open lantern stage, lit, which is what makes it read at night
+    const belfry = new THREE.Mesh(new THREE.BoxGeometry(8.2, 5.0, 8.2),
+      new THREE.MeshBasicMaterial({ color: 0xffc76a }));
+    belfry.position.y = 32.4;
+    g.add(belfry);
+    const cornice = new THREE.Mesh(new THREE.BoxGeometry(9.4, 0.9, 9.4), stone);
+    cornice.position.y = 35.2;
+    g.add(cornice);
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(6.2, 9.5, 4),
+      new THREE.MeshStandardMaterial({
+        color: this.T.hutRoof ?? 0x33363c, flatShading: true, roughness: 0.7,
+      }));
+    spire.rotation.y = Math.PI / 4;
+    spire.position.y = 40.4;
+    spire.castShadow = true;
+    g.add(spire);
+    g.position.set(at.x, y, at.z);
+    g.rotation.y = Math.random() * Math.PI;
+    g.name = 'oldtown-campanile';
+    this.group.add(g);
+    this.solids.push({ x: at.x, z: at.z, r: 5.4, y: y + 0.6, mat: 'hut' });
+    this._addShadow(at.x, at.z, 7.4, y);
+  }
+
   _buildTerrain() {
     const T = this.T;
     const STRATA = ['#c98b52', '#a45f34', '#b5764a', '#8d4c2a', '#cfa06a', '#96552f']
@@ -6104,6 +7678,10 @@ export class Track {
       m4.setPosition(px, h / 2 + seat(px, pz), pz);
       peaks.setMatrixAt(i, m4);
     }
+    // named so a world whose skyline must be built, not geological, can drop
+    // them (OLD TOWN — see _buildOldTown)
+    hills.name = 'horizon-hills';
+    peaks.name = 'horizon-peaks';
     this.group.add(hills, peaks);
     if (T.massif) this._buildMassif(m4);
     if (T.glacier) this._buildGlacier(m4);
@@ -6408,11 +7986,13 @@ export class Track {
     const T = this.T;
     if (T.vegetation === 'none' || !T.treeCount) return;
     if (T.vegetation === 'cactus') return this._buildCacti(m4);
+    if (T.vegetation === 'outback') return this._buildOutbackScrub(m4);
     if (T.vegetation === 'charred') return this._buildCharredTrees(m4);
     if (T.vegetation === 'jungle') return this._buildJungleTrees(m4);
     if (T.vegetation === 'palm') return this._buildPalms(m4);
     if (T.vegetation === 'redwood') return this._buildRedwoods(m4);
     if (T.vegetation === 'burnt') return this._buildBurntForest(m4);
+    if (T.vegetation === 'olive') return this._buildOliveGrove(m4);
     const COUNT = T.treeCount;
     const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 7);
     trunkGeo.translate(0, 1.2, 0);
@@ -6773,6 +8353,182 @@ export class Track {
     for (const part of parts) { part.count = ks.saguaro; this.group.add(part); }
     for (const part of barrelParts) { part.count = ks.barrel; this.group.add(part); }
     for (const part of acaciaParts) { part.count = ks.acacia; this.group.add(part); }
+  }
+
+  /** OUTBACK RED DIRT vegetation (Bible 3.10 flora table). Three species, and
+   *  the reason this is its own builder rather than a floraMix over the
+   *  conifer stand is that the region's readability rule is a PLACEMENT rule,
+   *  not a palette one:
+   *
+   *    RIVER RED GUM (tier 4, 16–24 m, pale cream fluted trunk, broad open
+   *      crown) grows ONLY on the creek lines. The Bible is explicit that this
+   *      is a deliberate readability device and must be preserved: on a plain
+   *      where you can see 350 m, a line of big pale trunks running away from
+   *      the road IS the sign that says "creek, 200 m". So the gums are placed
+   *      off `this.creeks[].line` — the same polylines the beds are drawn from
+   *      — and the few that are not on a creek are the odd survivor.
+   *    DESERT OAK (tier 4, 8–12 m) — a dark, narrow, drooping cone. It is the
+   *      only vertical silhouette out on the open gibber, and it reads at
+   *      distance because it is the one thing darker than the ground.
+   *    MULGA (tier 3, 4–7 m) — low grey-green multi-stem acacia scrub, the
+   *      bulk of the count, and it always yields.
+   *
+   *  Weights follow the Bible's table renormalised over the three woody tiers
+   *  (0.12 gum / 0.10 oak / 0.18 mulga → 0.30 / 0.25 / 0.45); the tier-0/1
+   *  species in that table (spinifex, saltbush, dry grass) are the tuft and
+   *  understorey layers, not trees. */
+  _buildOutbackScrub(m4) {
+    const T = this.T;
+    const COUNT = T.treeCount;
+
+    // --- river red gum: short fat pale trunk, limbs that FORK OUT wide, and
+    // three overlapping crown lobes low over them. The first cut put two flat
+    // discs on a tall bare pole and every one of them read as a mushroom: a
+    // gum is nearly as wide as it is tall and the crown starts low. ---
+    const gumTrunk = new THREE.CylinderGeometry(0.55, 0.95, 3.6, 8);
+    gumTrunk.translate(0, 1.8, 0);
+    const gumLimbA = new THREE.CylinderGeometry(0.2, 0.42, 3.6, 6);
+    gumLimbA.rotateZ(-0.72);
+    gumLimbA.translate(1.25, 4.4, 0.15);
+    const gumLimbB = new THREE.CylinderGeometry(0.18, 0.4, 3.3, 6);
+    gumLimbB.rotateZ(0.78);
+    gumLimbB.translate(-1.2, 4.2, -0.25);
+    const gumCrownA = new THREE.SphereGeometry(2.6, 8, 6);
+    gumCrownA.scale(1, 0.78, 1);
+    gumCrownA.translate(1.85, 6.0, 0.3);
+    const gumCrownB = new THREE.SphereGeometry(2.3, 8, 6);
+    gumCrownB.scale(1, 0.8, 1);
+    gumCrownB.translate(-1.75, 5.6, -0.5);
+    const gumCrownC = new THREE.SphereGeometry(2.0, 8, 6);
+    gumCrownC.scale(1, 0.85, 1);
+    gumCrownC.translate(0.1, 6.6, -0.1);
+    const barkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 0.95 });
+    const gumLeafMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, flatShading: true, roughness: 1,
+    });
+    const gumParts = [
+      new THREE.InstancedMesh(gumTrunk, barkMat, COUNT),
+      new THREE.InstancedMesh(gumLimbA, barkMat, COUNT),
+      new THREE.InstancedMesh(gumLimbB, barkMat, COUNT),
+      new THREE.InstancedMesh(gumCrownA, gumLeafMat, COUNT),
+      new THREE.InstancedMesh(gumCrownB, gumLeafMat, COUNT),
+      new THREE.InstancedMesh(gumCrownC, gumLeafMat, COUNT),
+    ];
+
+    // --- desert oak: a bare dark pole carrying a narrow shaggy column of
+    // drooping needles. NOT a conifer triangle — the first cut used a wide
+    // cone and the plain came out planted with pine trees. The silhouette is
+    // narrow (r ~ 1.05 against 6 u of height) and the inverted lower cone
+    // gives the sheoak's characteristic hanging skirt. ---
+    const oakTrunkGeo = new THREE.CylinderGeometry(0.18, 0.34, 3.6, 6);
+    oakTrunkGeo.translate(0, 1.8, 0);
+    const oakCone = new THREE.ConeGeometry(1.05, 4.0, 7);
+    oakCone.translate(0, 6.0, 0);
+    const oakSkirt = new THREE.ConeGeometry(1.15, 3.0, 7);
+    oakSkirt.rotateX(Math.PI);                          // inverted: the droop
+    oakSkirt.translate(0, 4.4, 0);
+    const oakBarkMat = new THREE.MeshStandardMaterial({ color: 0x5e4c3a, roughness: 1 });
+    const oakLeafMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, flatShading: true, roughness: 1,
+    });
+    const oakParts = [
+      new THREE.InstancedMesh(oakTrunkGeo, oakBarkMat, COUNT),
+      new THREE.InstancedMesh(oakCone, oakLeafMat, COUNT),
+      new THREE.InstancedMesh(oakSkirt, oakLeafMat, COUNT),
+    ];
+
+    // --- mulga: three leaning stems under a flat grey-green pad ---
+    const mulgaStems = [];
+    for (let s = 0; s < 3; s++) {
+      const st = new THREE.CylinderGeometry(0.07, 0.15, 2.1, 5);
+      st.rotateZ((s - 1) * 0.24);
+      st.rotateY(s * 2.1);
+      st.translate((s - 1) * 0.26, 1.05, (s - 1) * 0.14);
+      mulgaStems.push(st);
+    }
+    const mulgaPad = new THREE.SphereGeometry(1.5, 7, 4);
+    mulgaPad.scale(1, 0.34, 1);
+    mulgaPad.translate(0, 2.35, 0);
+    const mulgaBarkMat = new THREE.MeshStandardMaterial({ color: 0x6a5b48, roughness: 1 });
+    const mulgaLeafMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, flatShading: true, roughness: 1,
+    });
+    const mulgaParts = [
+      ...mulgaStems.map((g) => new THREE.InstancedMesh(g, mulgaBarkMat, COUNT)),
+      new THREE.InstancedMesh(mulgaPad, mulgaLeafMat, COUNT),
+    ];
+
+    for (const part of [...gumParts, ...oakParts, ...mulgaParts]) part.castShadow = true;
+
+    // every creek wash point, flattened, as the gum planting list
+    const washPts = [];
+    for (const ck of (this.creeks ?? [])) {
+      for (const line of ck.line) for (let s = 1; s < line.length; s++) washPts.push(line[s]);
+    }
+    const ks = { gum: 0, oak: 0, mulga: 0 };
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const color = new THREE.Color();
+    const F = T.foliage;
+
+    this._scatter(COUNT,
+      () => {
+        const roll = Math.random();
+        // 0.30 of the stand is gum, and 5 in 6 of those stand on a creek
+        if (roll < 0.30 && washPts.length && Math.random() < 0.84) {
+          const w = washPts[(Math.random() * washPts.length) | 0];
+          const a = Math.random() * Math.PI * 2;
+          const r = w.w * (0.55 + Math.random() * 0.8);
+          const x = w.x + Math.cos(a) * r, z = w.z + Math.sin(a) * r;
+          // a gum is a BIG tree: it needs real room off the carriageway
+          if (this._distToTrack(x, z) < 17) return null;
+          return { x, z, sp: 'gum' };
+        }
+        const sp = roll < 0.30 ? 'gum' : roll < 0.55 ? 'oak' : 'mulga';
+        const near = sp === 'mulga' ? 13 : 17;
+        const p = Math.random() < 0.55
+          ? this._trackSidePos(near, 52)
+          : (() => {
+            const a = Math.random() * Math.PI * 2;
+            const r = 90 + Math.random() * 520;
+            return { x: Math.cos(a) * r, z: Math.sin(a) * r };
+          })();
+        if (!p || this._distToTrack(p.x, p.z) < near) return null;
+        return { x: p.x, z: p.z, sp };
+      },
+      (p) => {
+        const sp = p.sp;
+        const parts = sp === 'gum' ? gumParts : sp === 'oak' ? oakParts : mulgaParts;
+        const k = ks[sp]++;
+        const s = sp === 'gum' ? 0.9 + Math.random() * 0.85
+          : sp === 'oak' ? 0.8 + Math.random() * 0.6
+            : 0.7 + Math.random() * 0.9;
+        const ty = this.terrainHeight(p.x, p.z) - 0.2;
+        q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
+        m4.compose(new THREE.Vector3(p.x, ty, p.z), q,
+          new THREE.Vector3(s, s * (0.88 + Math.random() * 0.36), s));
+        // grey-green, always: R02 caps foliage saturation and the region's
+        // negative list forbids green ground cover outright
+        color.setHSL(
+          F.h + Math.random() * F.hVar - (sp === 'oak' ? 0.02 : 0),
+          (F.s + Math.random() * F.sVar) * (sp === 'mulga' ? 0.8 : 1),
+          F.l + Math.random() * F.lVar - (sp === 'oak' ? 0.13 : sp === 'mulga' ? 0.02 : 0)
+        );
+        for (const part of parts) {
+          part.setMatrixAt(k, m4);
+          part.setColorAt(k, color);
+        }
+        this.trees.push({
+          x: p.x, z: p.z, y: ty, id: k, parts, s, kind: sp,
+          r: (sp === 'gum' ? 0.95 : sp === 'oak' ? 0.6 : 0.7) * s,
+          // material law: only a full-grown red gum is a tree that stops a car.
+          // The oaks and the mulga are scrub and always yield.
+          solid: sp === 'gum' && s >= 1.15,
+        });
+        this._addShadow(p.x, p.z, (sp === 'gum' ? 3.2 : sp === 'oak' ? 1.5 : 1.4) * s);
+      });
+    for (const part of gumParts) { part.count = ks.gum; this.group.add(part); }
+    for (const part of oakParts) { part.count = ks.oak; this.group.add(part); }
+    for (const part of mulgaParts) { part.count = ks.mulga; this.group.add(part); }
   }
 
   /** Volcano vegetation: nothing green survives a lava field, so the "flora"
@@ -7141,6 +8897,230 @@ export class Track {
       });
     for (const part of parts) { part.count = dates; this.group.add(part); }
     for (const part of doumParts) { part.count = doums; this.group.add(part); }
+  }
+
+  /** MEDITERRANEAN TERRACE: olive country.
+   *
+   *  WHY A NEW BUILDER. Bible 3.6 names five silhouettes and none of them is in
+   *  the game: the conifer builder is cones on a stick, the palm builder is
+   *  fronds, and repainting either of them green-grey would have given this
+   *  region the shape of a world it is not. What is here instead:
+   *    ANCIENT OLIVE  short, fat, multi-stemmed, three overlapping silver
+   *                   crowns — the tier-4 tree you actually remember.
+   *    GROVE OLIVE    the small planted one, and the one that lands on the grid.
+   *    CORK OAK       tall trunk with the bark stripped off the bottom two
+   *                   metres, which is the ruddy band you see from the road.
+   *    UMBRELLA PINE  bare trunk under a flat parasol, high and wide.
+   *    CYPRESS        a thin dark column. It is the tallest vertical cue in the
+   *                   region and it reads at the 140 m sight line (R06)
+   *                   precisely BECAUSE it is a column and nothing else here is.
+   *
+   *  The other half of the identity is ORDER. Olives on a terrace are planted
+   *  on a strict 7 m grid, so part of the stand snaps to a rotated 7 u lattice
+   *  around a handful of grove anchors — geometric rows standing against the
+   *  organic maquis, which is what tells you this hillside is farmed rather
+   *  than wild. Cypresses are never scattered: they go in short straight lines,
+   *  because in life they mark a driveway or a cemetery wall.
+   *
+   *  Nothing here is 'pine', so the material law lets a car fell the small
+   *  stuff; the thick-trunked species carry solid colliders at full scale. */
+  _buildOliveGrove(m4) {
+    const T = this.T;
+    const COUNT = T.treeCount;
+    const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
+    // stripped cork: the raw ruddy trunk under the harvested bark
+    const corkMat = new THREE.MeshStandardMaterial({ color: 0x9c5a33, roughness: 1 });
+    const lowMat = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
+    const topMat = new THREE.MeshStandardMaterial({ color: T.foliageTop, flatShading: true, roughness: 1 });
+
+    // --- ancient olive: two leaning stems, three overlapping crowns ---
+    const oTrunk = new THREE.CylinderGeometry(0.42, 0.78, 2.1, 7);
+    oTrunk.translate(0, 1.05, 0);
+    const oLimb = new THREE.CylinderGeometry(0.2, 0.34, 1.9, 6);
+    oLimb.rotateZ(0.34);
+    oLimb.translate(0.42, 1.5, 0.1);
+    const oCrownA = new THREE.SphereGeometry(1.95, 7, 5);
+    oCrownA.scale(1, 0.74, 1);
+    oCrownA.translate(0, 3.5, 0);
+    const oCrownB = new THREE.SphereGeometry(1.3, 6, 5);
+    oCrownB.scale(1, 0.8, 1);
+    oCrownB.translate(1.35, 3.1, 0.45);
+    const oCrownC = new THREE.SphereGeometry(1.15, 6, 5);
+    oCrownC.scale(1, 0.8, 1);
+    oCrownC.translate(-1.2, 3.3, -0.5);
+    // --- grove-row olive: the small planted one ---
+    const gTrunk = new THREE.CylinderGeometry(0.16, 0.27, 1.5, 6);
+    gTrunk.translate(0, 0.75, 0);
+    const gCrown = new THREE.SphereGeometry(1.38, 7, 5);
+    gCrown.scale(1, 0.86, 1);
+    gCrown.translate(0, 2.45, 0);
+    const gTop = new THREE.SphereGeometry(0.82, 6, 4);
+    gTop.translate(0.3, 3.15, -0.2);
+    // --- cork oak: stripped band low, broad dome high ---
+    const cTrunk = new THREE.CylinderGeometry(0.3, 0.44, 4.4, 7);
+    cTrunk.translate(0, 2.2, 0);
+    const cStrip = new THREE.CylinderGeometry(0.46, 0.54, 1.9, 8);
+    cStrip.translate(0, 0.95, 0);
+    const cDome = new THREE.SphereGeometry(2.85, 8, 6);
+    cDome.scale(1, 0.68, 1);
+    cDome.translate(0, 5.5, 0);
+    const cLobe = new THREE.SphereGeometry(1.75, 7, 5);
+    cLobe.scale(1, 0.7, 1);
+    cLobe.translate(1.55, 4.9, 0.6);
+    // --- umbrella pine: bare trunk, flat parasol ---
+    const uTrunk = new THREE.CylinderGeometry(0.26, 0.44, 8.1, 7);
+    uTrunk.translate(0, 4.05, 0);
+    const uCanopy = new THREE.SphereGeometry(3.2, 9, 5);
+    uCanopy.scale(1, 0.3, 1);
+    uCanopy.translate(0, 9.2, 0);
+    const uCanopy2 = new THREE.SphereGeometry(2.0, 8, 5);
+    uCanopy2.scale(1, 0.28, 1);
+    uCanopy2.translate(0.95, 8.5, -0.5);
+    // --- cypress: the column ---
+    const yStub = new THREE.CylinderGeometry(0.16, 0.22, 0.8, 6);
+    yStub.translate(0, 0.4, 0);
+    const yCol = new THREE.CylinderGeometry(0.34, 0.92, 8.6, 7);
+    yCol.translate(0, 4.9, 0);
+    const yTip = new THREE.ConeGeometry(0.4, 2.3, 7);
+    yTip.translate(0, 10.2, 0);
+
+    const mk = (specs) => {
+      const parts = specs.map(([g, mat]) => new THREE.InstancedMesh(g, mat, COUNT));
+      for (const p of parts) p.castShadow = true;
+      return parts;
+    };
+    const SPECIES = {
+      oliveOld: { parts: mk([[oTrunk, trunkMat], [oLimb, trunkMat], [oCrownA, lowMat],
+        [oCrownB, topMat], [oCrownC, lowMat]]),
+      kind: 'olive', rFac: 1.15, tiers: [2, 3, 4], solidAt: 1.0, tone: 'olive', shade: 2.6 },
+      oliveRow: { parts: mk([[gTrunk, trunkMat], [gCrown, lowMat], [gTop, topMat]]),
+        kind: 'olive', rFac: 0.7, tiers: [1, 2], solidAt: null, tone: 'olive', shade: 1.8 },
+      corkOak: { parts: mk([[cTrunk, trunkMat], [cStrip, corkMat], [cDome, lowMat],
+        [cLobe, topMat]]),
+      kind: 'oak', rFac: 1.1, tiers: [2, 3], solidAt: 1.0, tone: 'oak', shade: 3.0 },
+      umbrellaPine: { parts: mk([[uTrunk, trunkMat], [uCanopy, lowMat], [uCanopy2, topMat]]),
+        kind: 'pine', rFac: 0.95, tiers: [1, 2], solidAt: 1.05, tone: 'pine', shade: 3.2 },
+      cypress: { parts: mk([[yStub, trunkMat], [yCol, lowMat], [yTip, topMat]]),
+        kind: 'cypress', rFac: 0.55, tiers: [1, 2], solidAt: null, tone: 'cypress', shade: 1.1 },
+    };
+    const counts = {};
+    for (const k of Object.keys(SPECIES)) counts[k] = 0;
+
+    const mix = T.floraMix || FLORA_MIX[this.level && this.level.theme]
+      || [['oliveOld', 0.5], ['oliveRow', 0.5]];
+    // the cypresses come out of the scatter budget and are planted as lines
+    const cypWt = (mix.find(([n]) => n === 'cypress') || [null, 0])[1];
+    const scatterMix = mix.filter(([n]) => n !== 'cypress' && SPECIES[n]);
+    const wtSum = scatterMix.reduce((a, [, w]) => a + w, 0) || 1;
+    const pick = () => {
+      let roll = Math.random() * wtSum, acc = 0;
+      for (const [name, wt] of scatterMix) { acc += wt; if (roll < acc) return name; }
+      return scatterMix[scatterMix.length - 1][0];
+    };
+
+    const color = new THREE.Color();
+    const F = T.foliage;
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const plant = (name, x, z, s, rot) => {
+      const spec = SPECIES[name];
+      const k = counts[name]++;
+      if (k >= COUNT) { counts[name]--; return; }
+      const ty = this.terrainHeight(x, z) - 0.2;
+      q.setFromAxisAngle(up, rot);
+      m4.compose(new THREE.Vector3(x, ty, z), q,
+        new THREE.Vector3(s, s * (0.9 + Math.random() * 0.3), s));
+      for (const part of spec.parts) part.setMatrixAt(k, m4);
+      this.trees.push({
+        x, z, y: ty, r: spec.rFac * s, id: k, parts: spec.parts, kind: spec.kind, s,
+        solid: spec.solidAt != null && s >= spec.solidAt,
+      });
+      // Foliage tone per species inside the theme's olive hue band. Olive is
+      // the pale silvered one, cypress is the dark column, cork oak the deep
+      // saturated dome — all under the 55 % saturation ceiling (R02).
+      switch (spec.tone) {
+        case 'cypress':
+          color.setHSL(F.h + 0.03 + Math.random() * F.hVar, Math.min(0.55, F.s + 0.1),
+            Math.max(0.13, F.l - 0.14 + Math.random() * F.lVar * 0.6)); break;
+        case 'oak':
+          color.setHSL(F.h + 0.012 + Math.random() * F.hVar, Math.min(0.55, F.s + 0.08),
+            Math.max(0.16, F.l - 0.06 + Math.random() * F.lVar)); break;
+        case 'pine':
+          color.setHSL(F.h + 0.02 + Math.random() * F.hVar, Math.min(0.55, F.s + 0.05),
+            Math.max(0.16, F.l - 0.04 + Math.random() * F.lVar)); break;
+        default:      // olive: silver-green, the palest foliage in the world
+          color.setHSL(F.h + Math.random() * F.hVar, F.s * 0.9 + Math.random() * F.sVar,
+            F.l + 0.05 + Math.random() * F.lVar);
+      }
+      const woodTone = 0.86 + Math.random() * 0.28;
+      spec.parts[0].setColorAt(k, new THREE.Color(woodTone, woodTone * 0.98, woodTone * 0.94));
+      for (let ti = 1; ti < spec.parts.length; ti++) {
+        // `tiers` names the foliage parts; anything else on the tree (the
+        // olive's second stem, the cork oak's stripped band) is wood
+        spec.parts[ti].setColorAt(k, spec.tiers.includes(ti)
+          ? color.clone().multiplyScalar(0.9 + ti * 0.06)
+          : new THREE.Color(woodTone, woodTone * 0.98, woodTone * 0.94));
+      }
+      this._addShadow(x, z, spec.shade * s);
+    };
+
+    // GROVE ANCHORS: the corners of the planted terraces. Each carries its own
+    // rotation, so the rows run across the hillside at their own angle.
+    const anchors = [];
+    for (let a = 0; a < 6; a++) {
+      const p = this._trackSidePos(26, 96);
+      if (p) anchors.push({ x: p.x, z: p.z, rot: Math.random() * Math.PI * 2 });
+    }
+    const GRID = 7;                                   // the Bible's 7 m spacing
+    this._scatter(COUNT - Math.round(cypWt * COUNT),
+      () => {
+        if (anchors.length && Math.random() < 0.45) {
+          const an = anchors[(Math.random() * anchors.length) | 0];
+          const cs = Math.cos(an.rot), sn = Math.sin(an.rot);
+          const gx = (((Math.random() * 9) | 0) - 4) * GRID;
+          const gz = (((Math.random() * 9) | 0) - 4) * GRID;
+          const x = an.x + gx * cs - gz * sn + (Math.random() - 0.5) * 0.7;
+          const z = an.z + gx * sn + gz * cs + (Math.random() - 0.5) * 0.7;
+          return this._distToTrack(x, z) < 14 ? null : { x, z, grid: true };
+        }
+        const p = Math.random() < 0.55
+          ? this._trackSidePos(15, 48)
+          : (() => {
+            const ang = Math.random() * Math.PI * 2;
+            const r = 80 + Math.random() * 540;
+            const x = Math.cos(ang) * r, z = Math.sin(ang) * r;
+            return this._distToTrack(x, z) < 14 ? null : { x, z };
+          })();
+        return p && this._altOK(p.x, p.z) ? p : null;
+      },
+      (p) => {
+        // on the lattice it is a planted grove, so it is a grove tree and it
+        // stands the same way as its neighbours
+        const name = p.grid && Math.random() < 0.82 ? 'oliveRow' : pick();
+        const s = p.grid
+          ? (name === 'oliveRow' ? 0.92 + Math.random() * 0.2 : 0.85 + Math.random() * 0.3)
+          : 0.78 + Math.random() * 0.7;
+        plant(name, p.x, p.z, s, p.grid ? 0.2 + Math.random() * 0.3 : Math.random() * Math.PI * 2);
+      });
+
+    // CYPRESS LINES: 4–6 trees in a dead straight row, marking a boundary.
+    const lines = Math.max(2, Math.round(cypWt * COUNT / 5));
+    for (let l = 0; l < lines; l++) {
+      const p = this._trackSidePos(20, 90);
+      if (!p) continue;
+      const ang = Math.random() * Math.PI * 2;
+      const dx = Math.cos(ang) * 5.5, dz = Math.sin(ang) * 5.5;   // 5.5 u apart
+      const n = 4 + ((Math.random() * 3) | 0);
+      for (let t = 0; t < n; t++) {
+        const x = p.x + dx * t, z = p.z + dz * t;
+        if (this._distToTrack(x, z) < 13) continue;
+        plant('cypress', x, z, 0.85 + Math.random() * 0.45, Math.random() * Math.PI * 2);
+      }
+    }
+
+    for (const name of Object.keys(SPECIES)) {
+      for (const part of SPECIES[name].parts) part.count = counts[name];
+      if (counts[name]) this.group.add(...SPECIES[name].parts);
+    }
   }
 
   /** Gargantuan redwoods: scale 2.2–3.2 → the s ≥ 1.0 'pine' rule makes every
@@ -7803,7 +9783,8 @@ export class Track {
         // cliff-walled levels stack the tires right against the rock face;
         // pass levels tuck them inside the stone parapet
         const tireOff = this.T.cliffWalls ? WALL_OFF + 0.8
-          : (this.T.retainingWalls || this.T.guardFence) ? WALL_OFF + 1.2 : WALL_OFF + 2.2;
+          : (this.T.retainingWalls || this.T.guardFence || this.T.hedgeBanks)
+            ? WALL_OFF + 1.2 : WALL_OFF + 2.2;
         const p = this.pointAt(i, tireOff * side);
         // Same trap as the road cabins: `tireOff` is measured along ONE
         // sample's normal, and on a hairpin the road's other leg swings under
@@ -7840,7 +9821,12 @@ export class Track {
     );
     hay.castShadow = true;
     let hk = 0;
-    this._scatter(hayCount, () => this._trackSidePos(12.5, 20), (p) => {
+    // hayNear/hayFar move the stack off the verge: a world whose road edge is
+    // already occupied (FARMLAND's hedge banks) puts its bales in the field
+    // behind the hedge, where a real silage stack sits anyway. Unset = 12.5-20,
+    // the figures every other world has always used.
+    const hayNear = this.T.hayNear ?? 12.5, hayFar = this.T.hayFar ?? 20;
+    this._scatter(hayCount, () => this._trackSidePos(hayNear, hayFar), (p) => {
       q.setFromAxisAngle(up, Math.random() * Math.PI);
       m4.compose(new THREE.Vector3(p.x, this.terrainHeight(p.x, p.z) + 0.8, p.z), q, new THREE.Vector3(1, 1, 1));
       hay.setMatrixAt(hk++, m4);
@@ -7868,7 +9854,8 @@ export class Track {
     // inside the canyon instead of vanishing behind it; pass levels stand them
     // clear of the stone parapet
     const boardOff = this.T.cliffWalls ? WALL_OFF + 0.75
-      : (this.T.retainingWalls || this.T.guardFence) ? WALL_OFF + 6.4 : WALL_OFF + 3.6;
+      : (this.T.retainingWalls || this.T.guardFence || this.T.hedgeBanks)
+        ? WALL_OFF + 6.4 : WALL_OFF + 3.6;
     for (let b = 0; b < 10; b++) {
       const i = ((b + 0.5) * N / 10) | 0;
       if (this.curvature[i] > this.T.boardMaxCurv) continue; // keep boards off tight corners

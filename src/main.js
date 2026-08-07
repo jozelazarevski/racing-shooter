@@ -75,6 +75,10 @@ const WORLD_TAGS = {
   flume: '💧 flume runs · log yard', wildfire: '🔥 burning treefall',
   sheetice: '❄ sheet ice · icicles', avalanche: '❄ avalanche chase',
   neon: 'maglev lanes · night city', undercity: '🐀 rats · tunnels',
+  medterrace: 'stone walls · gravel on the exits',
+  oldtown: '💧 wet cobbles · no runoff',
+  farmland: '🌧 hedge banks · mud · blind crests',
+  outback: 'bulldust holes · creek jumps · 🦘',
 };
 
 // steer: how much of the car's steering rate the player gets in this view.
@@ -197,6 +201,15 @@ const LIVESTOCK_BY_THEME = {
   oasis:    { kinds: ['camel', 'goat', 'coyote'], perHerd: 3 },
   jungle:   { kinds: ['capybara', 'boar', 'deer'], perHerd: 3 },
   flume:    { kinds: ['deer', 'cow', 'boar'],  perHerd: 3 },
+  // OLIVE COAST: sheep flocks behind wire on the terraces, and the wild boar
+  // that is the region's authored crossing
+  medterrace: { kinds: ['sheep', 'boar', 'goat'], perHerd: 5 },
+  // FARMLAND: sheep and cattle in the fields behind the hedge, and nothing else
+  farmland: { kinds: ['sheep', 'cow'],         perHerd: 5 },
+  // OUTBACK RED DIRT: the Bible gives this region the HIGHEST authored
+  // fauna rate in the game — roos first, emus running the fence line, and
+  // unfenced station cattle near the homestead.
+  outback:  { kinds: ['kangaroo', 'emu', 'cow'], perHerd: 5 },
 };
 
 // hazard particle tints (hoisted — per-frame spawns must not allocate)
@@ -353,6 +366,20 @@ const DEMANDS = {
   26: { loose: 0.12, twist: 0.00, fast: 0.88, climb: 0.35 }, // SAFARI PLAINS
   27: { loose: 0.12, twist: 0.88, fast: 0.06, climb: 0.48 }, // CORNICHE
   28: { loose: 0.55, twist: 0.09, fast: 0.78, climb: 0.69 }, // ESTONIA CRESTS
+  // MEDITERRANEAN. twist / fast / climb are read off the built world with the
+  // same expression tests/test-affinity.mjs uses, so this row is measured, not
+  // assigned. `loose` is 0.12: dry tarmac.
+  29: { loose: 0.12, twist: 0.24, fast: 0.57, climb: 0.63 }, // OLIVE COAST
+  // ---- OLD TOWN. Measured on the live geometry with the same formula the
+  // test uses (kMean 0.01459, 29.2 % straight, mean grade 5.06 %), not
+  // estimated: a street grid of hard corners joined by short straights, on a
+  // hill, on a wet surface.
+  30: { loose: 0.55, twist: 0.59, fast: 0.48, climb: 0.57 }, // LANTERN QUARTER
+  // ---- FARMLAND. twist / fast / climb MEASURED off the built track with the
+  // same formula test-affinity.mjs uses, then rounded to 2 dp.
+  31: { loose: 0.55, twist: 0.59, fast: 0.22, climb: 0.75 }, // HEDGEROW DASH
+  // measured on the built track by the same formulae as the World Rally block
+  32: { loose: 0.12, twist: 0.00, fast: 1.00, climb: 0.71 }, // RED CENTRE RUN
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {
@@ -2467,6 +2494,11 @@ class Game {
       coyote:   { body: 0xb08d61, spot: 0x6d5438, w: 0.7,  h: 0.85, d: 1.7, mass: 0.35, pts: 95,  flee: 17, spookR: 26, amble: 1.4 },
       seal:     { body: 0x8f96a2, spot: 0x50565f, w: 0.9,  h: 0.6,  d: 2.0, mass: 0.6,  pts: 85,  flee: 5,  spookR: 9,  amble: 0.35 },
       hare:     { body: 0xe6e2d8, spot: 0xb8b2a4, w: 0.42, h: 0.5,  d: 0.72, mass: 0.18, pts: 70, flee: 19, spookR: 24, amble: 1.1 },
+      // OUTBACK RED DIRT. The roo is the region's authored crossing: it sees
+      // you from a long way off on an open plain and it bolts, so it gets the
+      // widest spook radius and the fastest flee on the roster.
+      kangaroo: { body: 0xa87250, spot: 0x6a4630, w: 0.62, h: 1.5,  d: 1.1, mass: 0.5,  pts: 100, flee: 21, spookR: 30, amble: 0.8 },
+      emu:      { body: 0x6f5f4c, spot: 0x3e3428, w: 0.6,  h: 1.7,  d: 1.0, mass: 0.45, pts: 90,  flee: 18, spookR: 28, amble: 1.3 },
     };
     // roster shifts per world so two worlds on the same roster don't open with
     // the same species, and one animal in four is the NEXT species along —
@@ -2526,6 +2558,24 @@ class Game {
         } else if (kind === 'capybara') { // blunt rounded muzzle, sits low
           head.position.set(0, K.h * 0.86, K.d * 0.5);
           head.scale.set(1.15, 0.9, 1.2);
+        } else if (kind === 'kangaroo') { // upright on a heavy tail
+          head.position.set(0, K.h * 1.12, K.d * 0.42);
+          head.scale.set(0.8, 0.8, 1.1);
+          const tail = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.34, K.h * 0.16, K.d * 1.5), darkMat);
+          tail.position.set(0, K.h * 0.34, -K.d * 0.85);
+          tail.rotation.x = 0.32;
+          g.add(tail);
+          for (const sx of [-1, 1]) { // ears
+            const ear = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.28, 0.07), darkMat);
+            ear.position.set(sx * 0.13, K.h * 1.4, K.d * 0.38);
+            g.add(ear);
+          }
+        } else if (kind === 'emu') { // long bare neck, tiny head, shaggy body
+          head.position.set(0, K.h * 1.3, K.d * 0.44);
+          head.scale.set(0.5, 0.42, 0.9);
+          const neck = new THREE.Mesh(new THREE.BoxGeometry(K.w * 0.22, K.h * 0.62, K.w * 0.24), darkMat);
+          neck.position.set(0, K.h * 0.98, K.d * 0.36);
+          g.add(neck);
         }
         // camels carry their bulk on long legs; everyone else is knee-high
         const legH = kind === 'camel' ? K.h * 0.68 : K.h * 0.55;

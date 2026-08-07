@@ -1692,3 +1692,146 @@ export function plankTexture() {
   t.wrapT = THREE.ClampToEdgeWrapping;
   return t;
 }
+
+/** OLD TOWN NIGHT townhouse facade (LANTERN QUARTER).
+ *
+ *  Every other building in the game is a cottage: one storey, a big timber
+ *  gable and two square windows (`buildingTexture`). A continuous urban
+ *  frontage needs the opposite — a STRICT VERTICAL RHYTHM over three storeys,
+ *  a shopfront at street level and a cornice at the top — because the thing
+ *  that makes a street read as a street is the repeat, not the detail.
+ *
+ *  The map is painted PALE on purpose: it is used on an InstancedMesh whose
+ *  per-instance colour multiplies it, so the muted ochre / grey / dusty-rose
+ *  render coats of the region palette land as tints and one texture dresses
+ *  the whole quarter. Bay layout is fixed (two windows per 6.5 m unit) so
+ *  neighbouring units line up into a terrace instead of a jumble. */
+const TH_W = 192, TH_H = 256;
+// [x, y, w, h] window bays in canvas pixels: two per storey, two upper
+// storeys. The ground floor is a shopfront and is laid out separately.
+const TH_BAYS = (() => {
+  const out = [];
+  for (const y of [96, 164]) for (const x of [30, 114]) out.push([x, y, 48, 52]);
+  return out;
+})();
+const TH_SHOP = [22, 200, 148, 44];        // ground-floor glazing
+
+export function townhouseTexture(palette = {}) {
+  const P = {
+    render: '#b9ad98',            // limewashed render (tinted per instance)
+    plinth: '#6e6a63',            // granite plinth + shopfront surround
+    trim: '#8e8578',              // string courses, cornice, sills
+    frame: '#2e2a26',             // window joinery
+    shutter: '#6b5a52',           // dusty-rose shutters, under 45% saturation
+    pane: '#171c26',              // unlit glass — never transparent (G7)
+    ...palette,
+  };
+  const t = make(TH_W, TH_H, (g, w, h) => {
+    g.fillStyle = P.render;
+    g.fillRect(0, 0, w, h);
+    // patchy limewash erosion, so a terrace of identical units is not identical
+    for (let i = 0; i < 160; i++) {
+      const s = 4 + Math.random() * 18;
+      g.fillStyle = `rgba(${60 + Math.random() * 60 | 0},${56 + Math.random() * 50 | 0},${50 + Math.random() * 44 | 0},${0.03 + Math.random() * 0.07})`;
+      g.beginPath();
+      g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
+      g.fill();
+    }
+    // rain staining below every sill — a wet town wears its water marks
+    for (const [x, y, bw, bh] of TH_BAYS) {
+      const grd = g.createLinearGradient(0, y + bh, 0, y + bh + 34);
+      grd.addColorStop(0, 'rgba(46,42,38,0.30)');
+      grd.addColorStop(1, 'rgba(46,42,38,0)');
+      g.fillStyle = grd;
+      g.fillRect(x - 4, y + bh, bw + 8, 34);
+    }
+    // cornice, string courses between storeys, and the plinth
+    g.fillStyle = P.trim;
+    g.fillRect(0, 2, w, 9);                         // cornice
+    g.fillRect(0, 84, w, 4);                        // string course, 1st floor
+    g.fillRect(0, 152, w, 4);                       // string course, 2nd floor
+    g.fillStyle = 'rgba(0,0,0,0.30)';
+    g.fillRect(0, 11, w, 4);
+    g.fillStyle = P.plinth;
+    g.fillRect(0, h - 12, w, 12);                   // granite plinth at the kerb
+    // upper-storey windows: recess, joinery, glazing bar, sill, folded shutters
+    for (const [x, y, bw, bh] of TH_BAYS) {
+      g.fillStyle = 'rgba(0,0,0,0.35)';
+      g.fillRect(x - 3, y - 3, bw + 6, bh + 6);     // reveal shadow
+      g.fillStyle = P.pane;
+      g.fillRect(x, y, bw, bh);
+      g.strokeStyle = P.frame;
+      g.lineWidth = 5;
+      g.strokeRect(x, y, bw, bh);
+      g.fillStyle = P.frame;
+      g.fillRect(x + bw / 2 - 2, y, 4, bh);         // mullion
+      g.fillRect(x, y + bh * 0.42, bw, 4);          // transom
+      g.fillStyle = P.trim;
+      g.fillRect(x - 6, y + bh, bw + 12, 6);        // sill
+      g.fillStyle = P.shutter;
+      g.fillRect(x - 12, y - 1, 9, bh + 2);
+      g.fillRect(x + bw + 3, y - 1, 9, bh + 2);
+      g.fillStyle = 'rgba(0,0,0,0.28)';
+      for (let sy = y + 3; sy < y + bh; sy += 6) {
+        g.fillRect(x - 12, sy, 9, 2);
+        g.fillRect(x + bw + 3, sy, 9, 2);
+      }
+    }
+    // ground floor: a shopfront bay with a stone surround and a stall riser
+    const [sx, sy, sw, sh] = TH_SHOP;
+    g.fillStyle = P.plinth;
+    g.fillRect(sx - 10, sy - 10, sw + 20, sh + 22);
+    g.fillStyle = P.pane;
+    g.fillRect(sx, sy, sw, sh);
+    g.strokeStyle = P.frame;
+    g.lineWidth = 6;
+    g.strokeRect(sx, sy, sw, sh);
+    g.fillStyle = P.frame;
+    for (let k = 1; k < 4; k++) g.fillRect(sx + (sw / 4) * k - 2, sy, 4, sh);
+    // hanging sign on a bracket beside the shopfront — the old-town silhouette
+    g.fillStyle = P.frame;
+    g.fillRect(sx + sw - 6, sy - 30, 4, 16);
+    g.fillRect(sx + sw - 26, sy - 20, 24, 3);
+    g.fillStyle = P.shutter;
+    g.fillRect(sx + sw - 24, sy - 18, 18, 14);
+    noiseOverlay(g, w, h, 0.09);
+  });
+  t.wrapS = THREE.ClampToEdgeWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/** Emissive companion for `townhouseTexture`: black except the bays that are
+ *  lit. The Bible calls for 15% of ground-floor bays lit and a scatter of
+ *  windows above, so the roll happens HERE, once per texture — every world
+ *  gets one facade map and the lit pattern repeats down the terrace, which is
+ *  what a row of identical houses actually looks like from a moving car. */
+export function townhouseGlowTexture(palette = {}) {
+  const P = { warm: '#ffb347', hot: '#ffd489', shop: '#f2a93b', ...palette };
+  const t = make(TH_W, TH_H, (g, w, h) => {
+    g.fillStyle = '#000000';
+    g.fillRect(0, 0, w, h);
+    for (const [x, y, bw, bh] of TH_BAYS) {
+      if (Math.random() < 0.45) continue;           // dark flat
+      const grd = g.createLinearGradient(0, y, 0, y + bh);
+      grd.addColorStop(0, P.hot);
+      grd.addColorStop(1, P.warm);
+      g.fillStyle = grd;
+      g.fillRect(x + 4, y + 4, bw - 8, bh - 8);
+      g.fillStyle = '#000000';                      // joinery stays dark
+      g.fillRect(x + bw / 2 - 2, y, 4, bh);
+      g.fillRect(x, y + bh * 0.42, bw, 4);
+    }
+    // the shopfront: lit far more often than the flats above it
+    if (Math.random() < 0.55) {
+      const [sx, sy, sw, sh] = TH_SHOP;
+      g.fillStyle = P.shop;
+      g.fillRect(sx + 5, sy + 5, sw - 10, sh - 10);
+      g.fillStyle = '#000000';
+      for (let k = 1; k < 4; k++) g.fillRect(sx + (sw / 4) * k - 2, sy, 4, sh);
+    }
+  });
+  t.wrapS = THREE.ClampToEdgeWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}

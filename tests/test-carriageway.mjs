@@ -40,8 +40,15 @@ const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' :
 // intrusion was measured. LOG FLUME FURY and ROCKFALL RAVINE had the densest
 // prop clutter. COL DE TURINI had the worst tire stack. PINE VALLEY has no
 // obstacles at all, so anything found there came from another system entirely.
+// OLIVE COAST is the only world that puts anything ON the tarmac on purpose
+// (the corner-exit gravel), so it is swept here as well.
+// LANTERN QUARTER is the densest placement on the roster by a wide margin —
+// a CONTINUOUS building frontage down both kerbs, ~430 solid masonry blocks
+// against a typical world's 14 huts — so it is the world where a placement
+// rule that only nearly works shows up.
 const WORLDS = [[21, 'FURKA RIDGE'], [13, 'LOG FLUME FURY'], [10, 'ROCKFALL RAVINE'],
-                [22, 'COL DE TURINI'], [1, 'PINE VALLEY']];
+                [22, 'COL DE TURINI'], [1, 'PINE VALLEY'], [29, 'OLIVE COAST'],
+                [30, 'LANTERN QUARTER']];
 
 for (const [id, name] of WORLDS) {
   const p = await browser.newPage({ viewport: { width: 640, height: 400 } });

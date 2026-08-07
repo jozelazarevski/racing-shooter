@@ -27,7 +27,8 @@ import { disposeSubtree } from './track.js';
 // glacier, dune, ravine and the two city worlds get no civilian traffic.
 const RURAL = new Set([
   'forest', 'alpine', 'redwood', 'flume', 'oasis', 'desert', 'jungle',
-  'snow', 'wildfire', 'pass', 'tremola', 'furka',
+  'snow', 'wildfire', 'pass', 'tremola', 'furka', 'medterrace', 'farmland',
+  'outback',
 ]);
 
 // theme-tinted paint (body / darker trim)
@@ -44,6 +45,9 @@ const TINTS = {
   pass:    [0x2e72c8, 0x1c4a88],
   tremola: [0x3e8a3a, 0x266224],
   furka:   [0xc8b03c, 0x8a7226],
+  medterrace: [0xd8632a, 0x8f3a16],  // olive-grove orange
+  farmland:[0x3e6e3a, 0x25401f],   // farm green, kept off the region accent
+  outback: [0xcfc2a6, 0x8a7f66],  // dust-caked station ute cream
 };
 
 const TRACTOR_HP = 70;

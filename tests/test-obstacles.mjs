@@ -34,7 +34,7 @@ const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' :
 // The themes that declare an obstacleSpec. One level per theme is enough —
 // placement is theme-driven, and building 28 worlds would take a quarter hour.
 const THEMES = ['canyon', 'volcano', 'alpine', 'jungle', 'ravine', 'redwood',
-                'flume', 'pass', 'tremola', 'furka'];
+                'flume', 'pass', 'tremola', 'furka', 'medterrace'];
 
 const probe = await browser.newPage({ viewport: { width: 640, height: 400 } });
 await probe.goto(`${BASE}/?unlockall=1`, { waitUntil: 'load' });
