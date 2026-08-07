@@ -6337,18 +6337,48 @@ export class Track {
     // extends only SEAWARD.
     const mx = (C.a[0] + C.b[0]) / 2, mz = (C.a[1] + C.b[1]) / 2;
     const y = C.level ?? -2;
-    const HALF = 2400, DEEP = 1900;
-    const corner = (du, dn) => [mx + ux * du + nx * dn, y, mz + uz * du + nz * dn];
-    const verts = new Float32Array([
-      ...corner(-HALF, 0), ...corner(HALF, 0), ...corner(HALF, DEEP), ...corner(-HALF, DEEP),
-    ]);
+    // TO THE HORIZON, AND EXEMPT FROM FOG. The first sea was a 1900 u quad
+    // under scene fog, and scene fog is the land's warm dust colour — so past
+    // ~1000 u the water faded to the exact cream it was built to replace, and
+    // the player kept seeing "the white stuff" over the bay. Water doesn't
+    // haze like a dusty hillside: the material opts out of fog and the fade
+    // is baked per-vertex instead — seaColor at the beach easing toward the
+    // sky-horizon tone with distance from the arena, meeting the sky dome at
+    // a proper sea horizon line instead of a cream wall.
+    const HALF = 4200, DEEP = 4200, COLS = 12, ROWS = 7;
+    const cNear = new THREE.Color(this.T.seaColor ?? 0x3d7f9e);
+    const cFar = cNear.clone().lerp(new THREE.Color(this.T.skyHorizon ?? '#dce8f0'), 0.8);
+    const verts = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
+    const cols = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
+    const tmp = new THREE.Color();
+    for (let r = 0, k = 0; r <= ROWS; r++) {
+      for (let c = 0; c <= COLS; c++, k++) {
+        const du = -HALF + (2 * HALF * c) / COLS;
+        const dn = (DEEP * r) / ROWS;
+        const wx = mx + ux * du + nx * dn, wz = mz + uz * du + nz * dn;
+        verts[k * 3] = wx; verts[k * 3 + 1] = y; verts[k * 3 + 2] = wz;
+        // haze by distance from the arena the camera lives in, matching the
+        // land fog's reach (fogFar ~1650) without inheriting its colour
+        const haze = smoothstep01(THREE.MathUtils.clamp((Math.hypot(wx, wz) - 380) / 1400, 0, 1));
+        tmp.copy(cNear).lerp(cFar, haze);
+        cols[k * 3] = tmp.r; cols[k * 3 + 1] = tmp.g; cols[k * 3 + 2] = tmp.b;
+      }
+    }
+    const idx = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const a = r * (COLS + 1) + c, b2 = a + 1, d = a + COLS + 1, e = d + 1;
+        idx.push(a, e, b2, a, d, e);
+      }
+    }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-    geo.setIndex([0, 2, 1, 0, 3, 2]);
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    geo.setIndex(idx);
     geo.computeVertexNormals();
     const sea = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-      color: this.T.seaColor ?? 0x3d7f9e, roughness: 0.14, metalness: 0.05,
-      side: THREE.DoubleSide,
+      vertexColors: true, roughness: 0.14, metalness: 0.05,
+      side: THREE.DoubleSide, fog: false,
     }));
     sea.name = 'sea';
     sea.receiveShadow = true;
@@ -6419,7 +6449,23 @@ export class Track {
       const r = M.r0 + Math.random() * (M.r1 - M.r0);
       const h = M.h0 + Math.random() * (M.h1 - M.h0);
       const w = M.w0 + Math.random() * (M.w1 - M.w0);
-      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      let x = Math.cos(a) * r, z = Math.sin(a) * r;
+      // "the dry inland range standing behind the terraces" — INLAND. On a
+      // coast world the azimuth ring can land a peak in the bay, a cream
+      // mountain rising out of open water. Reflect it across the coastline
+      // to the land side, footprint clear of the beach.
+      if (this.T.coast) {
+        const sd = this._coastSide(x, z);
+        const margin = (this.T.coast.beach ?? 60) + w * 0.6;
+        if (sd > -margin) {
+          const C = this.T.coast;
+          const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
+          const L = Math.hypot(abx, abz);
+          const nx = abz / L, nz = -abx / L;       // seaward normal
+          const back = sd + margin;
+          x -= nx * back; z -= nz * back;
+        }
+      }
       q.setFromAxisAngle(up, Math.random() * Math.PI);
       const y = -12 - (this.T.hillDrop || 0) + this._highland(x, z);
       m4.compose(new THREE.Vector3(x, y + h / 2, z), q, new THREE.Vector3(w, h, w * 0.85));
@@ -7825,12 +7871,15 @@ export class Track {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
       const far = Math.max(Math.abs(x), Math.abs(z)) > 900;
-      const h = far
+      let h = far
         // skip the track-distance falloff far away, but keep the FULL hill
         // noise: dropping octaves here left a visible ±2.4 u step at the 900 u
         // ring where the two height functions disagreed
         ? this._hillNoise(x, z)
         : this._terrainMeshHeight(x, z);
+      // the far branch skips _terrainMeshHeight and with it the coast sink —
+      // reapply it or the bay grows hills past 900 u
+      if (far && T.coast) h = this._coastDepress(x, z, h, 9999);
       pos.setY(i, h - 0.12);
       const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
       tmp.copy(cLow).lerp(cHigh, t);
@@ -7899,6 +7948,11 @@ export class Track {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
       let h = this._hillNoise(x, z);
+      // On a coast world the sea owns everything seaward, all the way out.
+      // Raw hill noise out here put fogged cream hills in the middle of the
+      // bay — the "white stuff" past the water. Full depression, no road
+      // exemption: no road reaches this ring.
+      if (T.coast) h = this._coastDepress(x, z, h, 9999);
       // SINK THIS MESH WHERE THE NEAR PATCH COVERS IT.
       //
       // This ring exists only to carry the horizon PAST the near patch, but it
@@ -8128,26 +8182,37 @@ export class Track {
     // old flat field — otherwise the terrain swallows them to the shoulders.
     // They become the peaks the highland climbs toward rather than a backdrop.
     const seat = (x, z) => base + this._highland(x, z);
+    // A coast world's sea reaches the horizon: the ring must not stand in it.
+    // Any cone whose footprint touches the water is dropped outright — a
+    // mountain range across the bay turns open sea into a lake (and at fog
+    // distance those cones ARE the cream the sea was built to replace).
+    const inSea = (x, z, w) => this.T.coast && this._coastSide(x, z) > -(w * 0.7);
+    let hk = 0;
     for (let i = 0; i < 40; i++) {
       const a = (i / 40) * Math.PI * 2;
       const r = 900 + Math.random() * 140;
       const h = 70 + Math.random() * 90;
       const w = 130 + Math.random() * 150;
       const px = Math.cos(a) * r, pz = Math.sin(a) * r;
+      if (inSea(px, pz, w)) continue;
       m4.makeScale(w, h, w);
       m4.setPosition(px, h / 2 + seat(px, pz), pz);
-      hills.setMatrixAt(i, m4);
+      hills.setMatrixAt(hk++, m4);
     }
+    hills.count = hk;
+    let pk = 0;
     for (let i = 0; i < 30; i++) {
       const a = (i / 30) * Math.PI * 2 + 0.1;
       const r = 1120 + Math.random() * 160;
       const h = 160 + Math.random() * 140;
       const w = 120 + Math.random() * 140;
       const px = Math.cos(a) * r, pz = Math.sin(a) * r;
+      if (inSea(px, pz, w)) continue;
       m4.makeScale(w, h, w);
       m4.setPosition(px, h / 2 + seat(px, pz), pz);
-      peaks.setMatrixAt(i, m4);
+      peaks.setMatrixAt(pk++, m4);
     }
+    peaks.count = pk;
     // named so a world whose skyline must be built, not geological, can drop
     // them (OLD TOWN — see _buildOldTown)
     hills.name = 'horizon-hills';
