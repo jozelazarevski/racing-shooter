@@ -81,6 +81,10 @@ export const LEVELS = [
   // ---- FARMLAND. Appended, so no existing world's star price moves (career
   // order is this array; starCost() = index - 2).
   { id: 31, name: 'HEDGEROW DASH', theme: 'farmland', region: 'FARMLAND' },
+  // ---- OUTBACK RED DIRT. Appended at the END of the array on purpose: career
+  // order is array position (starCost = index - 2), so anything inserted higher
+  // re-prices every world after it in a save that already exists.
+  { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK' },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -527,6 +531,34 @@ const CIRCUITS = {
     // tightening bends along the woodland edge, back to the line
     [-226, 26], [-180, 0], [-218, -44], [-250, -100],
     [-232, -158], [-186, -196], [-128, -214],
+  ],
+
+  // RED CENTRE RUN — the fastest lap on the roster, and the shape is dictated
+  // by the region's negative list: NO tight corners in sequence. There is not
+  // one hairpin on it. Every direction change is spread over four control
+  // points so it comes out as a 90–150 u sweeper you take flat, joined by the
+  // long Finke blast down the south side and the boundary-fence run up the
+  // west. Measured against the spline the game actually builds:
+  //
+  //    min radius 92 u   (next-largest on the roster is NEON GRID at 57;
+  //                       DUST CANYON bottoms out at 19)
+  //    5th pct    110 u  nothing at all under 60 u
+  //    91 % of the lap above a 120 u radius, median radius 282 u
+  //
+  // The first cut of this route put a 34 u corner ACROSS THE START LINE, which
+  // is the one place on a 350 m-sight-line world you must not put a corner —
+  // so sample 0 is now mid-straight, and it stays that way if you edit this:
+  // the array's first control point is where t = 0 lands.
+  outback: [
+    [0, -253], [84, -251], [158, -243],
+    [212, -221], [246, -178], [255, -122],
+    [250, -58], [240, 6], [234, 70],
+    [212, 132], [172, 184], [118, 220],
+    [50, 240], [-24, 247], [-98, 241],
+    [-166, 222], [-220, 184], [-248, 128],
+    [-255, 64], [-252, -4], [-254, -72],
+    [-244, -140], [-218, -198], [-168, -238],
+    [-90, -253],
   ],
 };
 
@@ -1966,6 +1998,136 @@ const THEMES = {
     // no massif, no glacier, no obstacleSpec, no hazard specs — the lane, the
     // bank and the weather are the whole of it.
   },
+
+  // OUTBACK RED DIRT (Bible 3.10). The fastest region in the game and the one
+  // you can see furthest across: hardpack red laterite over a gibber plain,
+  // flat-topped mesa escarpments on the skyline, and a sun 66° up that leaves
+  // almost no shadow to read the surface by.
+  //
+  // It must NOT read as DEEP DESERT with the hue turned round. The dune worlds
+  // are a sand SEA — smooth golden rollers, palms, no stone. This is hardpack:
+  // the ground is dark red and littered with gibber (hence the very high
+  // pebble count and the stony ground speckle), the flora is grey-green and
+  // sparse rather than tropical, and the road is a hard, fast, dead-straight
+  // graded track rather than a serpent through dunes.
+  //
+  // The negative list is doing real work here: no rock walls beside the road
+  // (no cliffWalls, no stone field walls in the kit), no tight corners in
+  // sequence (see CIRCUITS.outback), no cool colours, NO FOG (viz: [] kills
+  // the fog banks and squalls outright — the atmosphere is warm dust haze at
+  // 350 m, not weather), and no green ground cover (every green in the world
+  // is desaturated to olive/grey-green, foliage saturation well under 55 %).
+  //
+  // Hazard signature: bulldust (puddleCount — the puddle system already gives
+  // heavy hull drag, a grip cut and a dust burst, which IS a bulldust hole,
+  // and the decal is retinted to the "identical-looking, slightly paler patch"
+  // the Bible describes), dry creek crossings that launch a car off the far
+  // bank (T.creeks — see _planCreeks), and kangaroos (LIVESTOCK_BY_THEME).
+  outback: {
+    fogColor: 0xe8c79a, fogNear: 350, fogFar: 1800,      // sight line 350 m — the longest in the game
+    // Bible 3.10 gives "ambient sky intensity 0.44, heavy red ground bounce
+    // #B85A38". The bounce colour is taken literally. The 0.44 is NOT the same
+    // quantity as this engine's hemisphere intensity, and taken literally it
+    // rendered the region at Very High contrast — black shadow sides on every
+    // rock and hut under a near-overhead sun — when the comparison table in
+    // section 4 calls for MEDIUM. 0.72 is the value that produces the contrast
+    // the document asks for; the deviation is deliberate and measured.
+    hemiSky: 0xa8cdea, hemiGround: 0xb85a38, hemiIntensity: 0.72,
+    sunColor: 0xffedcc, sunIntensity: 3.15,              // 5500 K, 122000 lux — the brightest world
+    skyTop: '#3a86c9', skyHorizon: '#e8c79a', sunGlow: 0xffe6b0,
+    sunAz: 0.96, sunEl: 1.15,                            // 55° bearing, 66° elevation: near-overhead
+    cloudCount: 4, cloudOpacity: 0.42, cloudTint: 0xfff2e0,
+    hazeColor: 0xe8c79a, hazeOpacity: 0.95,
+    // THE GROUND IS A PRODUCT, NOT A COLOUR. The terrain material carries the
+    // ground texture AND per-vertex colours, so what you see is
+    // `ground.base x terrainLow` multiplied in linear space. Writing the
+    // Bible's ground base (#A8452A) into both squares it and the plain came
+    // out as near-black crimson. These are the square ROOTS of the palette
+    // values, so the albedo that actually reaches the screen is the palette:
+    // #cf8568 x #cf8568 -> #A8452A, measured.
+    //
+    // `terrainDirt` is the patch colour the terrain sprinkles on a ~140 u
+    // sinusoid, and it is LIGHTER than the base on purpose: a darker one read
+    // as a black checkerboard laid over the plain, where what the outback
+    // shows is drifts of pale bleached dust over the red.
+    terrainLow: '#cf8568', terrainHigh: '#e0b492', terrainDirt: '#e2c3a4',
+    // steep-face colour for the faceted ground + warmth in the homestead windows
+    terrainScree: '#c07a5c', hutGlow: 0.4,
+    skirtColor: '#a85234',
+    // a plain, not a range: the local relief is dialled back so the sight line
+    // survives, but `highland` stays at full so the massif and the mesas still
+    // stand up out at r > 400
+    relief: 0.55, highland: 1, blend: { near: 18, far: 84 },
+    ground: {
+      // dark red laterite, stony rather than sandy: patches of bleached dust
+      // over it and a heavy dark speckle for the gibber
+      base: '#cf8568', bandLight: 'rgba(255,232,200,0.05)', bandDark: 'rgba(112,48,28,0.06)',
+      patchA: 'rgba(150,72,44,0.20)', patchB: 'rgba(226,178,132,0.16)',
+      speckA: 'rgba(64,34,24,0.8)', speckB: 'rgba(232,204,170,0.7)', speckCount: 140,
+    },
+    road: {
+      // graded hardpack: paler and pinker than the verge because the traffic
+      // has polished the dust off it, with loose gravel scattered across
+      base: '#b4573a', mottleA: [140, 66, 42], mottleB: [206, 134, 94],
+      rut: 'rgba(128,54,30,0.5)', rutCore: 'rgba(96,38,20,0.42)', tread: 'rgba(58,24,12,0.45)',
+      stoneA: 'rgba(226,198,160,0.72)', stoneB: 'rgba(112,52,32,0.7)',
+      fringe: [152, 132, 76], fringeVar: [34, 30, 26],   // dry spinifex verge, never a green kerb
+    },
+    hillColor: 0x9c4630, peakColor: 0xc8865a, horizon: 'mesa', // mesa escarpments
+    // OUTBACK FLORA (Bible 3.10 table): river red gum on the creek lines,
+    // desert oak and mulga on the plain. See _buildOutbackScrub.
+    vegetation: 'outback', treeCount: 150, trunkColor: 0xc4b79f,
+    foliageLow: 0x6e785c, foliageTop: 0x848e6c,
+    foliage: { h: 0.215, hVar: 0.03, s: 0.13, sVar: 0.07, l: 0.40, lVar: 0.08 },
+    treeSnowCap: false,
+    // spinifex: dry gold hummocks, everywhere, right up to the road edge
+    tuftCount: 1000, grass: { bladeA: '#9a8f46', bladeB: '#cdbc70' },
+    // saltbush — the 'spike' silhouette is the desert-scrub one
+    bushCount: 240, bushColor: 0x8b9070, understorey: 'spike',
+    bush: { h: 0.22, hVar: 0.04, s: 0.12, sVar: 0.06, l: 0.42, lVar: 0.08 },
+    // GIBBER PLAIN: the pebble count is the highest in the game on purpose —
+    // the ground is supposed to be paved with small dark stones
+    rockCount: 380, pebbleCount: 900, rockColor: 0x8e4a30, rockSnowCap: false,
+    rockRoughness: 1,
+    flowerCount: 130, flowerColors: ['#e8c23a', '#d8523a', '#f0e0b8'],
+    hutRoof: 0x9aa0a2, hayColor: 0xc9b177,               // corrugated iron, station fodder
+    hutCount: 12, hutZone: [0.30, 0.48], hayCount: 34,   // the station cluster
+    splinter: [0xc9b9a2, 0x8e8478],                      // weatherboard bleached to grey
+    weather: { type: 'dust', color: 0xc4703f, rate: 84 },// red dust always in the air
+    // 2–8 % dominant gradient over long swells; the sharp gradients in this
+    // world are the creek banks, not the profile
+    elev: { amp: 5, ph: [2.1, 0.9, 1.6] },
+    // fast open world: crests are allowed on almost anything, and there are a
+    // lot of them, because a plain with no vertical event in it is a corridor
+    rampCount: 6, crestHeight: 3.4,
+    rampMaxCurv: 0.020, padMaxCurv: 0.005, boardMaxCurv: 0.016,
+    // BULLDUST: 11 holes a lap (Bible says 8–15), sitting anywhere across the
+    // width including mid-road, with the decal knocked back to a matte pale
+    // dust patch — the whole point is that it looks like the road
+    puddleCount: 11,
+    puddle: { rim: '#b06a44', mud: '#c99a72', sheen: 'rgba(226,196,160,0.30)',
+      gleam: 'rgba(240,222,192,0.22)' },
+    puddleRough: 0.95, puddleMetal: 0,                   // dust, not water: no gleam
+    // DRY CREEK CROSSINGS: the region's other trap. Four notches a lap, each
+    // one a 15 %-ish drop into a sand bed and a climb out over a bank you can
+    // launch off. See _planCreeks / _buildCreekBeds.
+    creeks: { count: 4, depth: 3.6, len: 34, half: 9 },
+    // the one authored water crossing — a permanent waterhole in a creek
+    fords: { count: 1 },
+    // NEVER FOG (negative list). Explicit [] so the theme can never inherit a
+    // fog bank or a squall from a table default.
+    viz: [],
+    // a soft shoulder that falls away, not a squeeze: two gentle pinches only
+    narrows: { count: 2, min: 0.74 },
+    // no boulders in the road: the region's runoff is High and its sight line
+    // is 350 m, so a rock on a straight is not a hazard, it is a lie
+    obstacleSpec: null,
+    crossroads: 3,                                       // station tracks off the main road
+    elements: 'outback',                                 // homestead kit (weatherboard + iron)
+    // mesas standing off the north-east horizon rather than a mountain wall
+    massif: { az: 0.9, spread: 2.4, count: 7, r0: 460, r1: 720,
+      h0: 90, h1: 165, w0: 260, w1: 430 },
+  },
 };
 
 /** Free every geometry, material and texture under `root`, then empty it.
@@ -2110,6 +2272,9 @@ const PROP_SPECS = {
   // farm dressing only — 'hay' is a wrapped silage bale here and 'barrel' a
   // slurry drum. No 'rock': the region's negative list forbids exposed rock.
   farmland: [['hay', 24], ['crate', 14], ['barrel', 10], ['cone', 10]],
+  // OUTBACK: 44-gallon drums at the siding, station fodder, freight crates.
+  // No 'rock' — a gibber plain has no boulders worth stacking beside a road.
+  outback: [['barrel', 20], ['hay', 14], ['crate', 14], ['cone', 10]],
 };
 const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20, penguin: 40 };
 const _m4 = new THREE.Matrix4(); // scratch (smashTree instance-zeroing)
@@ -2130,6 +2295,7 @@ const BARREL_PALETTES = {
   undercity: { base: '#3a4034', hoop: '#181c14', stripe: '#8a9a3c' },
   oldtown: { base: '#3a4048', hoop: '#1a1e24', stripe: '#f2a93b' },  // works drum
   farmland: { base: '#5a6450', hoop: '#2c3226' },      // green slurry drum
+  outback: { base: '#9a5a38', hoop: '#3e2a1c', stripe: '#c9b9a2' },  // rusted 44-gallon drum
 };
 
 // ---------- world elements: farms, chapels, outposts, field walls ----------
@@ -2211,6 +2377,16 @@ const ELEMENT_KITS = {
     wall: 0x8f8778, wall2: 0x8a8f8c, roof: 0x4a5058, trim: 0x2f4a3c, stone: 0x7e7468,
     builds: ['house', 'barn', 'house', 'barn'], landmarks: ['chapel'],
     dress: ['well'], fenceColor: 0xa8a08c, stoneWalls: 6, fenceRuns: 4,
+  // OUTBACK STATION (Bible 3.10 architecture): weatherboard bleached to grey
+  // under a corrugated-iron roof, machinery sheds, and a windmill over the
+  // stock tank as the landmark you steer by. `stoneWalls: 0` is deliberate —
+  // the region's negative list forbids rock walls, and a station is fenced
+  // with WIRE, so the whole masonry budget goes into long fence runs instead.
+  outback: {
+    wall: 0xb8ae9e, wall2: 0x8e8478, roof: 0x9aa0a2, trim: 0x6a6055, stone: 0x9c6a4e,
+    builds: ['house', 'shed', 'barn', 'shed'], landmarks: ['windmill', 'silo'],
+    dress: ['well', 'logpile'], fenceColor: 0xa89c88,
+    stoneWalls: 0, fenceRuns: 7,
   },
 };
 // Species mix for the default (conifer-family) forest builder, per theme:
@@ -2251,7 +2427,7 @@ const FLORA_MIX = {
 // and cliff-walled worlds get none). A theme can override via T.crossroads.
 const THEME_CROSSROADS = {
   forest: 3, desert: 2, snow: 2, alpine: 3, oasis: 2, redwood: 2, flume: 2,
-  wildfire: 2, pass: 3, tremola: 2, furka: 2, medterrace: 2,
+  wildfire: 2, pass: 3, tremola: 2, furka: 2, medterrace: 2, outback: 3,
   // the field entrances the tractors drag the mud out of — the maximum, since
   // they are the region's stated hazard and every one of them opens the hedge
   farmland: 4,
@@ -2261,10 +2437,8 @@ const ELEMENT_KIT_BY_THEME = {
   alpine: 'alpine', glacial: 'ice', jungle: 'jungle', dunes: 'desert', ravine: 'desert',
   oasis: 'desert', redwood: 'farm', flume: 'farm', wildfire: 'burnt', sheetice: 'ice',
   avalanche: 'alpine', neon: 'city', undercity: 'city',
-  pass: 'alpine', tremola: 'alpine', furka: 'alpine',
-  medterrace: 'medhill',
   pass: 'alpine', tremola: 'alpine', furka: 'alpine', oldtown: 'oldtown',
-  farmland: 'hedgerow',
+  medterrace: 'medhill', farmland: 'hedgerow', outback: 'outback',
 };
 
 /** Unit gable-roof prism: 1×1×1, base at y=0, ridge running along local X at
@@ -2470,6 +2644,9 @@ export class Track {
     // ribbon, its skirts, the ruts, the terrain blend and every prop placement
     // follow the hump for free.
     this._buildCrests();
+    // ---- outback creeks: cut the dry watercourses into the same profile, for
+    // the same reason and under the same contract as the crests above.
+    this._planCreeks();
 
     this._checkLayout();
 
@@ -3954,6 +4131,114 @@ export class Track {
     }
   }
 
+  /** OUTBACK RED DIRT: dry creek crossings — the region's signature terrain
+   *  event, and the reason it needs geometry that did not exist.
+   *
+   *  A crest is the OPPOSITE shape: it is a hump, it is visible from a long
+   *  way back, and it launches you off its own brow. A creek is a NOTCH. The
+   *  plain runs dead flat to the lip, drops a bank at ~15 % into a sand bed
+   *  and climbs the far one, and the far bank is where a car carrying 150 km/h
+   *  leaves the ground — you cannot see the fall until you are on it, which is
+   *  precisely why the Bible makes the river red gums grow ONLY on the creek
+   *  line: the tree line is the advance warning, and `_buildOutbackScrub`
+   *  reads the wash polylines planted here to honour that.
+   *
+   *  Same construction contract as `_buildCrests`: baked into center[].y
+   *  before any mesh exists, so the road ribbon, the shoulder skirts, the
+   *  terrain blend and every scatter inherit the cut for free. The profile is
+   *  a full negative cosine wave, which starts and ends at ZERO gradient —
+   *  there is no lip to catch a wheel, only the fall.
+   *
+   *  `T.creeks` = {count, depth, len, half}. Absent on every other theme, so
+   *  this returns before it can touch anyone else's seeded RNG stream.
+   */
+  _planCreeks() {
+    this.creeks = [];
+    const S = this.T.creeks;
+    if (!S || !(S.count > 0)) return;
+    const want = S.count | 0;
+    const depth = S.depth ?? 3.6;
+    const baseLen = S.len ?? 34;
+    // straight-ish only: a bank taken at an angle is a barrel roll, not a jump
+    const maxCurv = (this.T.rampMaxCurv ?? 0.014) * 1.2;
+    const windows = [];
+    for (let i = 0; i < N; i += 4) {
+      if (i < 70 || i > N - 90) continue;             // clear of the start gate
+      if (this._nearNarrow(i, 30)) continue;
+      let mc = 0;
+      for (let k = -6; k < baseLen + 6; k++) mc = Math.max(mc, this.curvature[(i + k + N) % N]);
+      windows.push({ i, mc });
+    }
+    windows.sort((a, b) => a.mc - b.mc);
+    const chosen = [];
+    // The crests are already down and each one blocks a stretch either side of
+    // it, so a first pass at full spacing routinely places one creek short —
+    // same failure mode `_buildCrests` documents, same fix: relax and go round
+    // again rather than ship a lap with a feature missing.
+    const take = (gap, crestPad) => {
+      for (const w of windows) {
+        if (chosen.length >= want) return;
+        if (w.mc > maxCurv) return;                    // sorted: nothing later is straighter
+        // never cut a creek through a crest — the two profiles would ADD and
+        // the exit bank would become a ski jump nobody authored
+        if (this.crests.some((c) => this._circDist(w.i, c.index) < c.len + crestPad)) continue;
+        if (chosen.some((c) => this._circDist(w.i, c) < gap)) continue;
+        chosen.push(w.i);
+      }
+    };
+    take(Math.min(150, ((N - 160) / want) | 0), 26);
+    if (chosen.length < want) take(110, 20);
+    if (chosen.length < want) take(90, 16);
+    for (const i of chosen) {
+      const L = Math.round(baseLen * (0.85 + Math.random() * 0.4));   // ~29..48 samples
+      const d = depth * (0.75 + Math.random() * 0.55);                // ~2.7..5.0 u banks
+      for (let k = 0; k < L; k++) {
+        const f = k / L;
+        this.center[(i + k) % N].y -= d * 0.5 * (1 - Math.cos(f * Math.PI * 2));
+      }
+      const mid = (i + (L >> 1)) % N;
+      this.creeks.push({
+        index: i, mid, len: L, depth: +d.toFixed(2), half: S.half ?? 9,
+        // the wash itself, running away from the road on both sides. Planned
+        // here (it is pure XZ) so the flora builder can use it even though the
+        // bed geometry is not built until the environment pass.
+        line: [this._creekWash(mid, 1), this._creekWash(mid, -1)],
+      });
+    }
+    // the profile moved under us — same rebuild the crests do, for the same
+    // reason (the physics and the mesh pitching both read _slope)
+    for (let i = 0; i < N; i++) {
+      this._slope[i] =
+        (this.center[(i + 2) % N].y - this.center[(i - 2 + N) % N].y) / (4 * this.segLen);
+    }
+  }
+
+  /** One side of a creek's wash: a meandering polyline of {x, z, w} leaving the
+   *  road at sample `mid` on `side` and wandering out into the plain. Width
+   *  grows with distance — a creek is narrowest where the road crosses it,
+   *  because that is where the crossing was graded. */
+  _creekWash(mid, side) {
+    const n = this.nrm[mid], t = this.tan[mid];
+    const c = this.center[mid];
+    // leave the road at a slant so the bed is not a stripe drawn square across
+    const skew = (Math.random() - 0.5) * 0.7;
+    let dx = n.x * side + t.x * skew, dz = n.z * side + t.z * skew;
+    const inv = 1 / Math.hypot(dx, dz);
+    dx *= inv; dz *= inv;
+    const pts = [];
+    let px = c.x + dx * 9, pz = c.z + dz * 9, ang = 0, d = 9;
+    for (let k = 0; k < 11; k++) {
+      pts.push({ x: px, z: pz, w: 7 + d * 0.06 + Math.random() * 3 });
+      ang += (Math.random() - 0.5) * 0.34;                 // the meander
+      const cs = Math.cos(ang), sn = Math.sin(ang);
+      const step = 11 + Math.random() * 9;
+      px += (dx * cs - dz * sn) * step;
+      pz += (dx * sn + dz * cs) * step;
+      d += step;
+    }
+    return pts;
+  }
+
   _buildRamps() {
     // Prop launch ramps are GONE — replaced by natural crests baked into the
     // road's own elevation (`_buildCrests`). The array stays so the many
@@ -4227,7 +4512,11 @@ export class Track {
       const m = new THREE.Mesh(
         new THREE.CircleGeometry(1, 26),
         new THREE.MeshStandardMaterial({
-          map: tex, transparent: true, roughness: 0.25, metalness: 0.08, depthWrite: false,
+          // a water puddle is glossy; a BULLDUST hole (outback) is the same
+          // decal with the shine taken out of it, so the theme may dial the
+          // reflectance right down without needing its own decal system
+          map: tex, transparent: true, depthWrite: false,
+          roughness: this.T.puddleRough ?? 0.25, metalness: this.T.puddleMetal ?? 0.08,
         })
       );
       m.rotation.order = 'YXZ';
@@ -4848,6 +5137,7 @@ export class Track {
     this._buildSky();
     const m4 = new THREE.Matrix4();
     this._buildHorizon(m4);
+    if (this.creeks?.length) this._buildCreekBeds(m4);   // outback dry watercourses
     this._buildForest(m4);
     this._buildGroundCover(m4);
     this._buildHuts(m4);
@@ -4880,6 +5170,120 @@ export class Track {
     if (this.T.hedgeBanks) this._buildHedgeBanks(m4);
     this._buildRoadsideDetail(m4);                   // corner markers + gravel
     this._buildContactShadows();                     // baked AO under everything
+  }
+
+  /** OUTBACK RED DIRT: the dry creek beds, drawn from the wash polylines
+   *  `_planCreeks` planted before the terrain existed.
+   *
+   *  Three things, and each of them is doing a job the region asked for:
+   *
+   *    - the WASH: a pale sand ribbon leaving the road on both sides and
+   *      meandering out across the red plain. It is the only bright, low-
+   *      saturation shape in a world made entirely of red ground, so it reads
+   *      as a line across the landscape from a very long way off — which is
+   *      the whole point of a 350 m sight line.
+   *    - the BANK GRAVEL: a scatter of coarse stone along the first stretch of
+   *      each wash, where the bank has been cut back for the crossing.
+   *    - the FLOODWAY BOARDS: black-and-yellow chevrons on posts, one pair per
+   *      creek, planted ~24 samples before the lip. Real station tracks are
+   *      signed like this precisely because the drop is invisible until you
+   *      are on it, and the Bible calls the signs out by name. They are SOLID
+   *      at r = 0.4, well outside the carriageway (see the lateral below), so
+   *      they obey the Law of Solidity without ever being in the way. */
+  _buildCreekBeds(m4) {
+    const beds = [];
+    for (const ck of this.creeks) for (const side of ck.line) beds.push(side);
+    const segGeo = new THREE.BoxGeometry(1, 1, 1);
+    segGeo.translate(0, -0.5, 0);                       // hangs BELOW its anchor
+    const bedMesh = new THREE.InstancedMesh(
+      segGeo,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+      beds.length * 12
+    );
+    const sand = new THREE.Color('#d8b98a');
+    const sandDark = new THREE.Color('#b4915f');
+    const col = new THREE.Color();
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    let k = 0;
+    for (const line of beds) {
+      for (let s = 0; s + 1 < line.length; s++) {
+        const a = line[s], b = line[s + 1];
+        const dx = b.x - a.x, dz = b.z - a.z;
+        const len = Math.hypot(dx, dz);
+        if (len < 0.5) continue;
+        const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+        const w = (a.w + b.w) / 2;
+        // the bed lies just under the plain — a channel, not a painted stripe
+        const y = this.terrainHeight(mx, mz) + 0.06;
+        q.setFromAxisAngle(up, Math.atan2(dx, dz));
+        m4.compose(new THREE.Vector3(mx, y, mz), q, new THREE.Vector3(w, 0.55, len * 1.06));
+        bedMesh.setMatrixAt(k, m4);
+        col.copy(sand).lerp(sandDark, Math.random() * 0.55);
+        bedMesh.setColorAt(k++, col);
+      }
+    }
+    bedMesh.count = k;
+    bedMesh.receiveShadow = true;
+    this.group.add(bedMesh);
+
+    // coarse bank gravel where the crossing was cut through
+    const pebGeo = new THREE.DodecahedronGeometry(1, 0);
+    const gravel = new THREE.InstancedMesh(
+      pebGeo,
+      new THREE.MeshStandardMaterial({ color: this.T.rockColor ?? 0x8e4a30,
+        flatShading: true, roughness: 1 }),
+      this.creeks.length * 44
+    );
+    let gk = 0;
+    for (const ck of this.creeks) {
+      for (const line of ck.line) {
+        for (let n = 0; n < 22; n++) {
+          const t = Math.random() * 2.4;                 // first ~2 wash segments
+          const i0 = Math.min(line.length - 2, t | 0);
+          const f = t - i0;
+          const px = line[i0].x + (line[i0 + 1].x - line[i0].x) * f
+            + (Math.random() - 0.5) * line[i0].w * 1.5;
+          const pz = line[i0].z + (line[i0 + 1].z - line[i0].z) * f
+            + (Math.random() - 0.5) * line[i0].w * 1.5;
+          const s = 0.22 + Math.random() * 0.4;
+          if (!this._clearsRoad(px, pz, s, 0.8)) continue;
+          m4.makeScale(s, s * 0.6, s);
+          m4.setPosition(px, this.terrainHeight(px, pz) + s * 0.2, pz);
+          gravel.setMatrixAt(gk++, m4);
+        }
+      }
+    }
+    gravel.count = gk;
+    this.group.add(gravel);
+
+    // FLOODWAY boards on the approach to every creek
+    const boardTex = chevronTexture();
+    const boardMat = new THREE.MeshStandardMaterial({
+      map: boardTex, transparent: true, side: THREE.DoubleSide, roughness: 0.9,
+    });
+    const boardGeo = new THREE.PlaneGeometry(2.4, 1.7);
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x8e8478, roughness: 1 });
+    const postGeo = new THREE.CylinderGeometry(0.09, 0.11, 2.2, 5);
+    for (const ck of this.creeks) {
+      const j = (ck.index - 24 + N) % N;
+      const heading = this.headingAt(j);
+      for (const side of [1, -1]) {
+        // ROAD_HALF is 9 and the car collides as a 1.8 u disc: 12.6 leaves the
+        // full drivable width free even where the centreline swings under it
+        const lat = 12.6 * side;
+        const p = this.pointAt(j, lat);
+        if (!this._clearsRoad(p.x, p.z, 0.4, 1.0)) continue;
+        const post = new THREE.Mesh(postGeo, postMat);
+        post.position.set(p.x, p.y + 1.1, p.z);
+        post.castShadow = true;
+        const board = new THREE.Mesh(boardGeo, boardMat);
+        board.position.set(p.x, p.y + 2.2, p.z);
+        board.rotation.y = heading + Math.PI / 2;        // face back down the road
+        this.group.add(post, board);
+        this.solids.push({ x: p.x, z: p.z, r: 0.4, y: p.y, mat: 'metal' });
+        this._addShadow(p.x, p.z, 0.7, p.y);
+      }
+    }
   }
 
   /** ALPINE PASSES: dry-stone retaining parapets. A pass is built as a shelf
@@ -7556,6 +7960,7 @@ export class Track {
     const T = this.T;
     if (T.vegetation === 'none' || !T.treeCount) return;
     if (T.vegetation === 'cactus') return this._buildCacti(m4);
+    if (T.vegetation === 'outback') return this._buildOutbackScrub(m4);
     if (T.vegetation === 'charred') return this._buildCharredTrees(m4);
     if (T.vegetation === 'jungle') return this._buildJungleTrees(m4);
     if (T.vegetation === 'palm') return this._buildPalms(m4);
@@ -7922,6 +8327,182 @@ export class Track {
     for (const part of parts) { part.count = ks.saguaro; this.group.add(part); }
     for (const part of barrelParts) { part.count = ks.barrel; this.group.add(part); }
     for (const part of acaciaParts) { part.count = ks.acacia; this.group.add(part); }
+  }
+
+  /** OUTBACK RED DIRT vegetation (Bible 3.10 flora table). Three species, and
+   *  the reason this is its own builder rather than a floraMix over the
+   *  conifer stand is that the region's readability rule is a PLACEMENT rule,
+   *  not a palette one:
+   *
+   *    RIVER RED GUM (tier 4, 16–24 m, pale cream fluted trunk, broad open
+   *      crown) grows ONLY on the creek lines. The Bible is explicit that this
+   *      is a deliberate readability device and must be preserved: on a plain
+   *      where you can see 350 m, a line of big pale trunks running away from
+   *      the road IS the sign that says "creek, 200 m". So the gums are placed
+   *      off `this.creeks[].line` — the same polylines the beds are drawn from
+   *      — and the few that are not on a creek are the odd survivor.
+   *    DESERT OAK (tier 4, 8–12 m) — a dark, narrow, drooping cone. It is the
+   *      only vertical silhouette out on the open gibber, and it reads at
+   *      distance because it is the one thing darker than the ground.
+   *    MULGA (tier 3, 4–7 m) — low grey-green multi-stem acacia scrub, the
+   *      bulk of the count, and it always yields.
+   *
+   *  Weights follow the Bible's table renormalised over the three woody tiers
+   *  (0.12 gum / 0.10 oak / 0.18 mulga → 0.30 / 0.25 / 0.45); the tier-0/1
+   *  species in that table (spinifex, saltbush, dry grass) are the tuft and
+   *  understorey layers, not trees. */
+  _buildOutbackScrub(m4) {
+    const T = this.T;
+    const COUNT = T.treeCount;
+
+    // --- river red gum: short fat pale trunk, limbs that FORK OUT wide, and
+    // three overlapping crown lobes low over them. The first cut put two flat
+    // discs on a tall bare pole and every one of them read as a mushroom: a
+    // gum is nearly as wide as it is tall and the crown starts low. ---
+    const gumTrunk = new THREE.CylinderGeometry(0.55, 0.95, 3.6, 8);
+    gumTrunk.translate(0, 1.8, 0);
+    const gumLimbA = new THREE.CylinderGeometry(0.2, 0.42, 3.6, 6);
+    gumLimbA.rotateZ(-0.72);
+    gumLimbA.translate(1.25, 4.4, 0.15);
+    const gumLimbB = new THREE.CylinderGeometry(0.18, 0.4, 3.3, 6);
+    gumLimbB.rotateZ(0.78);
+    gumLimbB.translate(-1.2, 4.2, -0.25);
+    const gumCrownA = new THREE.SphereGeometry(2.6, 8, 6);
+    gumCrownA.scale(1, 0.78, 1);
+    gumCrownA.translate(1.85, 6.0, 0.3);
+    const gumCrownB = new THREE.SphereGeometry(2.3, 8, 6);
+    gumCrownB.scale(1, 0.8, 1);
+    gumCrownB.translate(-1.75, 5.6, -0.5);
+    const gumCrownC = new THREE.SphereGeometry(2.0, 8, 6);
+    gumCrownC.scale(1, 0.85, 1);
+    gumCrownC.translate(0.1, 6.6, -0.1);
+    const barkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 0.95 });
+    const gumLeafMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, flatShading: true, roughness: 1,
+    });
+    const gumParts = [
+      new THREE.InstancedMesh(gumTrunk, barkMat, COUNT),
+      new THREE.InstancedMesh(gumLimbA, barkMat, COUNT),
+      new THREE.InstancedMesh(gumLimbB, barkMat, COUNT),
+      new THREE.InstancedMesh(gumCrownA, gumLeafMat, COUNT),
+      new THREE.InstancedMesh(gumCrownB, gumLeafMat, COUNT),
+      new THREE.InstancedMesh(gumCrownC, gumLeafMat, COUNT),
+    ];
+
+    // --- desert oak: a bare dark pole carrying a narrow shaggy column of
+    // drooping needles. NOT a conifer triangle — the first cut used a wide
+    // cone and the plain came out planted with pine trees. The silhouette is
+    // narrow (r ~ 1.05 against 6 u of height) and the inverted lower cone
+    // gives the sheoak's characteristic hanging skirt. ---
+    const oakTrunkGeo = new THREE.CylinderGeometry(0.18, 0.34, 3.6, 6);
+    oakTrunkGeo.translate(0, 1.8, 0);
+    const oakCone = new THREE.ConeGeometry(1.05, 4.0, 7);
+    oakCone.translate(0, 6.0, 0);
+    const oakSkirt = new THREE.ConeGeometry(1.15, 3.0, 7);
+    oakSkirt.rotateX(Math.PI);                          // inverted: the droop
+    oakSkirt.translate(0, 4.4, 0);
+    const oakBarkMat = new THREE.MeshStandardMaterial({ color: 0x5e4c3a, roughness: 1 });
+    const oakLeafMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, flatShading: true, roughness: 1,
+    });
+    const oakParts = [
+      new THREE.InstancedMesh(oakTrunkGeo, oakBarkMat, COUNT),
+      new THREE.InstancedMesh(oakCone, oakLeafMat, COUNT),
+      new THREE.InstancedMesh(oakSkirt, oakLeafMat, COUNT),
+    ];
+
+    // --- mulga: three leaning stems under a flat grey-green pad ---
+    const mulgaStems = [];
+    for (let s = 0; s < 3; s++) {
+      const st = new THREE.CylinderGeometry(0.07, 0.15, 2.1, 5);
+      st.rotateZ((s - 1) * 0.24);
+      st.rotateY(s * 2.1);
+      st.translate((s - 1) * 0.26, 1.05, (s - 1) * 0.14);
+      mulgaStems.push(st);
+    }
+    const mulgaPad = new THREE.SphereGeometry(1.5, 7, 4);
+    mulgaPad.scale(1, 0.34, 1);
+    mulgaPad.translate(0, 2.35, 0);
+    const mulgaBarkMat = new THREE.MeshStandardMaterial({ color: 0x6a5b48, roughness: 1 });
+    const mulgaLeafMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, flatShading: true, roughness: 1,
+    });
+    const mulgaParts = [
+      ...mulgaStems.map((g) => new THREE.InstancedMesh(g, mulgaBarkMat, COUNT)),
+      new THREE.InstancedMesh(mulgaPad, mulgaLeafMat, COUNT),
+    ];
+
+    for (const part of [...gumParts, ...oakParts, ...mulgaParts]) part.castShadow = true;
+
+    // every creek wash point, flattened, as the gum planting list
+    const washPts = [];
+    for (const ck of (this.creeks ?? [])) {
+      for (const line of ck.line) for (let s = 1; s < line.length; s++) washPts.push(line[s]);
+    }
+    const ks = { gum: 0, oak: 0, mulga: 0 };
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const color = new THREE.Color();
+    const F = T.foliage;
+
+    this._scatter(COUNT,
+      () => {
+        const roll = Math.random();
+        // 0.30 of the stand is gum, and 5 in 6 of those stand on a creek
+        if (roll < 0.30 && washPts.length && Math.random() < 0.84) {
+          const w = washPts[(Math.random() * washPts.length) | 0];
+          const a = Math.random() * Math.PI * 2;
+          const r = w.w * (0.55 + Math.random() * 0.8);
+          const x = w.x + Math.cos(a) * r, z = w.z + Math.sin(a) * r;
+          // a gum is a BIG tree: it needs real room off the carriageway
+          if (this._distToTrack(x, z) < 17) return null;
+          return { x, z, sp: 'gum' };
+        }
+        const sp = roll < 0.30 ? 'gum' : roll < 0.55 ? 'oak' : 'mulga';
+        const near = sp === 'mulga' ? 13 : 17;
+        const p = Math.random() < 0.55
+          ? this._trackSidePos(near, 52)
+          : (() => {
+            const a = Math.random() * Math.PI * 2;
+            const r = 90 + Math.random() * 520;
+            return { x: Math.cos(a) * r, z: Math.sin(a) * r };
+          })();
+        if (!p || this._distToTrack(p.x, p.z) < near) return null;
+        return { x: p.x, z: p.z, sp };
+      },
+      (p) => {
+        const sp = p.sp;
+        const parts = sp === 'gum' ? gumParts : sp === 'oak' ? oakParts : mulgaParts;
+        const k = ks[sp]++;
+        const s = sp === 'gum' ? 0.9 + Math.random() * 0.85
+          : sp === 'oak' ? 0.8 + Math.random() * 0.6
+            : 0.7 + Math.random() * 0.9;
+        const ty = this.terrainHeight(p.x, p.z) - 0.2;
+        q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
+        m4.compose(new THREE.Vector3(p.x, ty, p.z), q,
+          new THREE.Vector3(s, s * (0.88 + Math.random() * 0.36), s));
+        // grey-green, always: R02 caps foliage saturation and the region's
+        // negative list forbids green ground cover outright
+        color.setHSL(
+          F.h + Math.random() * F.hVar - (sp === 'oak' ? 0.02 : 0),
+          (F.s + Math.random() * F.sVar) * (sp === 'mulga' ? 0.8 : 1),
+          F.l + Math.random() * F.lVar - (sp === 'oak' ? 0.13 : sp === 'mulga' ? 0.02 : 0)
+        );
+        for (const part of parts) {
+          part.setMatrixAt(k, m4);
+          part.setColorAt(k, color);
+        }
+        this.trees.push({
+          x: p.x, z: p.z, y: ty, id: k, parts, s, kind: sp,
+          r: (sp === 'gum' ? 0.95 : sp === 'oak' ? 0.6 : 0.7) * s,
+          // material law: only a full-grown red gum is a tree that stops a car.
+          // The oaks and the mulga are scrub and always yield.
+          solid: sp === 'gum' && s >= 1.15,
+        });
+        this._addShadow(p.x, p.z, (sp === 'gum' ? 3.2 : sp === 'oak' ? 1.5 : 1.4) * s);
+      });
+    for (const part of gumParts) { part.count = ks.gum; this.group.add(part); }
+    for (const part of oakParts) { part.count = ks.oak; this.group.add(part); }
+    for (const part of mulgaParts) { part.count = ks.mulga; this.group.add(part); }
   }
 
   /** Volcano vegetation: nothing green survives a lava field, so the "flora"
