@@ -2368,6 +2368,7 @@ const ELEMENT_KITS = {
     builds: ['house', 'house', 'shed'], landmarks: ['chapel'],
     dress: ['well'], fenceColor: 0x5a5f66, stoneWalls: 6,
     field: [], fenceRuns: 4,
+  },
   // FARMLAND HEDGEROW: rubble stone with lime pointing, slate roofs, dark
   // green painted doors, and a muted-grey steel portal barn behind the house.
   // The Bible allows this region exactly two archetypes — the farm longhouse
@@ -2377,6 +2378,7 @@ const ELEMENT_KITS = {
     wall: 0x8f8778, wall2: 0x8a8f8c, roof: 0x4a5058, trim: 0x2f4a3c, stone: 0x7e7468,
     builds: ['house', 'barn', 'house', 'barn'], landmarks: ['chapel'],
     dress: ['well'], fenceColor: 0xa8a08c, stoneWalls: 6, fenceRuns: 4,
+  },
   // OUTBACK STATION (Bible 3.10 architecture): weatherboard bleached to grey
   // under a corrugated-iron roof, machinery sheds, and a windmill over the
   // stock tank as the landmark you steer by. `stoneWalls: 0` is deliberate —
