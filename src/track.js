@@ -1761,6 +1761,17 @@ const THEMES = {
     // the dry inland range standing behind the terraces — low, hazy, bare
     massif: { az: 1.15, spread: 2.0, count: 8, r0: 420, r1: 700,
       h0: 90, h1: 175, w0: 210, w1: 360 },
+    // THE SEA. A Mediterranean coast world shipped without one, and the
+    // seaward half of every elevated view was therefore pure fog — measured
+    // at 26% of the frame in a healthy lap and over half of it in the
+    // player's screenshot ("Bug"). The coastline is a half-plane: everything
+    // seaward of the a->b line sinks to the sea floor over a beach band, the
+    // road corridor is protected the same way the river carve protects it,
+    // and a water plane fills the bay. Fitted seaward of the seafront
+    // straight; the ravine descent at [-146,-202] stays 120+ u on the land
+    // side.
+    coast: { a: [-200, -338.6], b: [400, -183.8], level: -2.1, floor: -7, beach: 70 },
+    seaColor: 0x3d7f9e,
   },
 
   // LANTERN QUARTER: the OLD TOWN NIGHT region. Wet cobbles under sodium
@@ -3887,9 +3898,38 @@ export class Track {
    *  blends to the ROAD's elevation at the nearest centerline sample, so the
    *  meadow rises to meet the climbing road; the strand cap (_roadClampY)
    *  keeps it under any OTHER ribbon passing close by. */
+  /** Signed distance to the theme's coastline, positive on the SEA side. */
+  _coastSide(x, z) {
+    const C = this.T.coast;
+    const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
+    return ((x - C.a[0]) * abz - (z - C.a[1]) * abx) / Math.hypot(abx, abz);
+  }
+
+  /** Seaward of the coastline the land sinks to the sea floor over a beach
+   *  band. The road corridor is exempt exactly the way the river carve
+   *  exempts it, so the seafront straight keeps its shoulder. */
+  _coastDepress(x, z, h, dRoad) {
+    const C = this.T.coast;
+    const sd = this._coastSide(x, z);
+    if (sd <= 0) return h;
+    const w = smoothstep01(Math.min(1, sd / (C.beach ?? 60)))
+      * THREE.MathUtils.smoothstep(dRoad, 24, 44);
+    return h * (1 - w) + (C.floor ?? -7) * w;
+  }
+
+  /** Nothing gets BUILT in the sea — no cottage on the seabed, no sheep
+   *  grazing underwater. Placement, not physics: driving in is allowed and
+   *  the water is scenery (the ford machinery is the wet physics). */
+  _underwater(x, z) {
+    const C = this.T.coast;
+    if (!C) return false;
+    return this.terrainHeight(x, z) < (C.level ?? -2) + 0.6;
+  }
+
   terrainHeight(x, z) {
     const fld = this._roadFieldCoarse(x, z);
     let h = this._blendHeight(fld.d, fld.y, x, z);
+    if (this.T.coast) h = this._coastDepress(x, z, h, fld.d);
     if (fld.d <= 27) {
       const clamp = this._roadClampY(x, z);
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
@@ -3975,6 +4015,11 @@ export class Track {
     }
     const d = Math.sqrt(best);
     let h = this._blendHeight(d, this.center[bi].y, x, z);
+    // the coast term must live in BOTH ground functions: this one builds the
+    // mesh the player SEES, terrainHeight() the ground physics STANDS ON.
+    // With the term only in the latter, the physics said "seabed at -7" while
+    // the rendered land stayed dry — the sea existed as scattered pokes.
+    if (this.T.coast) h = this._coastDepress(x, z, h, d);
     if (d <= 27) {
       // exact strand cap (window/exclusion mirror _roadClampY)
       let clamp = Infinity;
@@ -5485,6 +5530,7 @@ export class Track {
     this._buildSky();
     const m4 = new THREE.Matrix4();
     this._buildHorizon(m4);
+    if (this.T.coast) this._buildSea();
     if (this.creeks?.length) this._buildCreekBeds(m4);   // outback dry watercourses
     this._buildForest(m4);
     this._buildGroundCover(m4);
@@ -6158,6 +6204,41 @@ export class Track {
     // after every producer has written into it
   }
 
+  /** The bay itself: one water plane on the sea side of the coastline,
+   *  aligned to it and big enough to reach the rim mountains, which rise
+   *  straight from the water the way a Riviera skyline does. Fog washes it
+   *  to haze at distance — but it is WATER fading out, not a void. */
+  _buildSea() {
+    const C = this.T.coast;
+    const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
+    const L = Math.hypot(abx, abz);
+    const ux = abx / L, uz = abz / L;             // along the coastline
+    const nx = abz / L, nz = -abx / L;            // seaward (grad of _coastSide)
+    // Corner-built in world space rather than a rotated plane: the first cut
+    // used rotation.y with the axes crossed and the "sea" sprawled under the
+    // whole map, surfacing as blue speckles in every inland dip. Four
+    // explicit corners cannot be misplaced: the quad spans the coastline and
+    // extends only SEAWARD.
+    const mx = (C.a[0] + C.b[0]) / 2, mz = (C.a[1] + C.b[1]) / 2;
+    const y = C.level ?? -2;
+    const HALF = 2400, DEEP = 1900;
+    const corner = (du, dn) => [mx + ux * du + nx * dn, y, mz + uz * du + nz * dn];
+    const verts = new Float32Array([
+      ...corner(-HALF, 0), ...corner(HALF, 0), ...corner(HALF, DEEP), ...corner(-HALF, DEEP),
+    ]);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    geo.setIndex([0, 2, 1, 0, 3, 2]);
+    geo.computeVertexNormals();
+    const sea = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      color: this.T.seaColor ?? 0x3d7f9e, roughness: 0.14, metalness: 0.05,
+      side: THREE.DoubleSide,
+    }));
+    sea.name = 'sea';
+    sea.receiveShadow = true;
+    this.group.add(sea);
+  }
+
   /** Old snow lying in the hollows above `minY`: flat white decals conformed
    *  to the ground, one instanced draw call. Pure decoration. */
   _buildSnowPatches(m4) {
@@ -6318,6 +6399,7 @@ export class Track {
   /** Is (x, z) flat enough (± `tol` over a `r` radius) to build on, and clear
    *  of everything already standing there? */
   _buildableSpot(x, z, r, tol = 2.2) {
+    if (this._underwater(x, z)) return false;
     const h = this.terrainHeight(x, z);
     for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r],
       [r * 0.7, r * 0.7], [-r * 0.7, -r * 0.7], [r * 0.7, -r * 0.7], [-r * 0.7, r * 0.7]]) {
@@ -8227,6 +8309,7 @@ export class Track {
     const x = this.center[i].x + this.nrm[i].x * side * dist;
     const z = this.center[i].z + this.nrm[i].z * side * dist;
     if (this._distToTrack(x, z) < minD - 1) return null;
+    if (this._underwater(x, z)) return null;
     return { x, z };
   }
 
