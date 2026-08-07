@@ -107,11 +107,25 @@ for (const { id, name, theme } of targets) {
   check(`${name}: nothing straddles the centreline`, straddling.length === 0,
     straddling.length ? JSON.stringify(straddling.slice(0, 3)) : 'none');
 
-  // ...and they must still be ON the road, not floating out in the scenery.
-  // An obstacle you can never reach is not a hazard, it is set dressing.
-  const offRoad = r.obs.filter((o) => o.inner > o.half);
-  check(`${name}: obstacles still sit on the road`, offRoad.length === 0,
-    offRoad.length ? JSON.stringify(offRoad.slice(0, 3)) : `all within half-width`);
+  // ...and they must be OFF the carriageway but still BESIDE it.
+  //
+  // This assertion used to read "obstacles still sit on the road", because r84
+  // moved them only out of the middle. Asked a third time to get rocks out of
+  // the road, and rightly: an 18 u road with a boulder whose inner edge is at
+  // 4.95 still has a boulder in the outer half of the lane, and a wide line
+  // still meets it. They now sit just past the drivable edge — you can still
+  // hit one by running off the road, which is the point of them, but never by
+  // driving on it.
+  //
+  // The upper bound matters as much as the lower: an obstacle flung far into
+  // the scenery is not a hazard, it is set dressing, and this would otherwise
+  // pass by deleting them from the world.
+  const onRoad = r.obs.filter((o) => o.inner < o.half);
+  check(`${name}: obstacles are off the carriageway`, onRoad.length === 0,
+    onRoad.length ? JSON.stringify(onRoad.slice(0, 3)) : `all clear of the ${r.obs[0].half} u half-width`);
+  const adrift = r.obs.filter((o) => o.inner > o.half + 6);
+  check(`${name}: obstacles still frame the road`, adrift.length === 0,
+    adrift.length ? JSON.stringify(adrift.slice(0, 3)) : 'all within 6 u of the edge');
 
   await p.close();
 }

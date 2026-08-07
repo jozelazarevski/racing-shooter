@@ -3541,15 +3541,19 @@ export class Track {
       // Clear corridor: never less than ±4.5 (a car is ~2 wide, so that is
       // room to place it rather than merely to fit), and on a wide road it
       // scales so the verge does not swallow the stage.
-      const clear = Math.max(4.5, w * 0.55);
-      const shoulder = w - clear;
-      // No usable verge here — a rock small enough to fit would be gravel.
-      // Drop it rather than shave it down to something that reads as a bug.
-      if (shoulder < 1.4) return;
+      // OFF THE CARRIAGEWAY ENTIRELY, not merely out of the middle.
+      //
+      // These sat at `clear + r` — inside the drivable width, at the edge of a
+      // reserved corridor. That was the second attempt at the same request and
+      // it was still wrong: the road is 18 u wide, so a boulder whose inner
+      // edge is at 4.95 is squarely in the outer half of the lane and a wide
+      // line still hits it. The ask, three times, was to get rocks OUT of the
+      // road, so they now sit just beyond the drivable edge: still framing the
+      // corner, still there to punish you for running wide off the road, but
+      // never on it.
       const side = k % 2 === 0 ? -1 : 1;
-      const natural = roots ? 1.2 + Math.random() * 0.5 : 2.2 + Math.random();
-      const r = Math.min(natural, shoulder * 0.5);
-      const lateral = side * (clear + r);   // inner edge lands exactly on `clear`
+      const r = roots ? 1.2 + Math.random() * 0.5 : 2.2 + Math.random();
+      const lateral = side * (w + r + 0.9);   // inner edge just past the verge
       const p = this.pointAt(i, lateral);
       if (spec.style === 'roots') {
         // gnarled redwood roots breaking the surface: 3 low half-buried ridges
@@ -4099,8 +4103,20 @@ export class Track {
         }
         for (let k = 0; k < Math.max(1, Math.round(count * 0.25)); k++) pickupSet.add(order[k]);
       }
+      // ROCKS AND TIMBER NEVER TAKE THE ON-ROAD BRANCH.
+      //
+      // Asked for three times: "remove rocks from the middle of the road". The
+      // first two passes moved them to the edge of a reserved corridor but left
+      // them ON the carriageway, so a wide line still met them and the answer
+      // was still no. Rock- and log-shaped props are now trackside only.
+      //
+      // Man-made clutter stays on the road, because that is the stuff you are
+      // MEANT to smash — crates, cones, barrels, fences read as debris and
+      // hitting one is the game working. A rock reads as terrain, and hitting
+      // terrain in the road reads as the road being unfair.
+      const trackside = /rock|stone|boulder|hay|log|timber/i.test(type);
       for (let k = 0; k < count; k++) {
-        const spot = spotFor(Math.random() < 0.62);
+        const spot = spotFor(!trackside && Math.random() < 0.62);
         if (!spot) continue;
         const { mesh, r } = this._makeProp(type);
         mesh.position.set(spot.x, spot.y, spot.z);
@@ -4564,7 +4580,7 @@ export class Track {
       // `_clearsRoad` does a global nearest-sample search and is what
       // _buildHuts and _buildRetainingWalls already use. The cabin's collider
       // is ~5 u, so clear that plus the usual margin.
-      if (!this._clearsRoad(p.x, p.z, 5.2)) continue;
+      if (!this._clearsRoad(p.x, p.z, 6.2)) continue;   // house footprint grew to r=6.0
       // face the road
       const rot = this.headingAt(i) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
       this._element(B, Math.random() < 0.7 ? 'house' : 'shed', p.x, p.z, rot, K);
@@ -4771,14 +4787,40 @@ export class Track {
         put('box', 6.05, 0, 0, 0.4, 6.0, 8.4, K.trim);
         r = 7.4;
         break;
-      case 'house':
-        put('wall', 0, 0, 0, 7.6, 5.0, 6.6, K.wall);
-        put('prism', 0, 5.0, 0, 8.4, 2.9, 7.4, K.roof);
-        put('box', 0, 0.1, 3.4, 1.5, 3.0, 0.3, K.trim);            // door
-        put('box', 2.2, 2.6, 0, 0.3, 5.6, 0.9, K.trim, 0);         // corner post
-        put('cyl', -2.2, 5.6, -1.6, 1.0, 2.6, 1.0, K.trim);        // chimney
-        r = 5.0;
+      // A FARMHOUSE, NOT A BOX WITH A LID.
+      //
+      // This was one 7.6 x 5.0 x 6.6 slab under a shallow prism, plus a 5.6 u
+      // "corner post" that read as a spike driven through the eaves. Nearly
+      // cubic, no overhang, nothing to give it scale, and the same silhouette
+      // from every angle — reported after a screenshot of one sitting in a
+      // field, and it deserved the report.
+      //
+      // What makes a small rural house read at a glance is not detail, it is
+      // MASSING: a stone footing so it sits IN the ground rather than on it, a
+      // steeper roof with an eaves line that oversails the walls, and a lower
+      // wing so the outline is not a rectangle. All of it merges into the same
+      // batched geometry as before, so the cost is a handful of boxes.
+      case 'house': {
+        put('box', 0, 0, 0, 7.8, 0.75, 6.8, K.stone);              // stone footing
+        put('wall', 0, 0.75, 0, 7.2, 4.8, 6.2, K.wall);            // main block
+        put('box', 0, 5.35, 0, 8.1, 0.28, 7.1, K.trim);            // eaves fascia
+        put('prism', 0, 5.55, 0, 8.6, 3.7, 7.6, K.roof);           // steeper, oversailing
+        // Lower side wing: breaks the rectangle and gives the roof a second
+        // ridge, which is what stops every house reading as the same object.
+        put('box', 4.7, 0, 0.6, 3.8, 0.6, 4.9, K.stone);
+        put('wall', 4.7, 0.6, 0.6, 3.4, 2.9, 4.4, K.wall2);
+        put('prism', 4.7, 3.5, 0.6, 3.9, 1.6, 5.0, K.roof);
+        // Porch: a canopy on two posts over the door. Cheap, and it gives the
+        // front a shadow line so the facade is not one flat plane.
+        put('box', -0.6, 3.15, 3.55, 3.4, 0.22, 1.9, K.roof);
+        put('cyl', -1.9, 0.75, 4.0, 0.24, 2.4, 0.24, K.trim);
+        put('cyl', 0.7, 0.75, 4.0, 0.24, 2.4, 0.24, K.trim);
+        put('box', -0.6, 0.8, 3.05, 1.4, 2.6, 0.28, K.trim);       // door
+        // Chimney on the RIDGE (z = 0), not floating off it as before.
+        put('cyl', -2.6, 5.4, 0, 0.95, 3.4, 0.95, K.stone);
+        r = 6.0;
         break;
+      }
       case 'chapel':
         put('wall', 0, 0, 0, 5.6, 5.4, 8.0, K.wall);
         put('prism', 0, 5.4, 0, 6.2, 3.0, 8.6, K.roof);
