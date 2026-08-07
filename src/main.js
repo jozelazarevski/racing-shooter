@@ -8,6 +8,7 @@ import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
 import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
   HOUSE_TEMPLATES } from './track.js';
+import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
@@ -222,7 +223,12 @@ const loadJSON = (key, fallback) => {
   try { return { ...fallback, ...JSON.parse(localStorage.getItem(key) || '{}') }; }
   catch { return { ...fallback }; }
 };
-const saveJSON = (key, obj) => { try { localStorage.setItem(key, JSON.stringify(obj)); } catch { /* private mode */ } };
+const saveJSON = (key, obj) => {
+  try { localStorage.setItem(key, JSON.stringify(obj)); } catch { /* private mode */ }
+  // any profile-scoped write marks the career dirty for the cloud row —
+  // sync.js registers this hook; before it does, writes are just local
+  if (key.startsWith('ir-p')) window.__igniteSyncDirty?.();
+};
 
 // ---- player profiles (local careers — several people share one device) ----
 // Registry `ir-profiles`: { list: [{id, name, color, created}], active }.
@@ -711,6 +717,11 @@ class Game {
     // progression + difficulty + garage (persisted PER PROFILE — several
     // players keep separate careers on one device; settings stay shared)
     this.profiles = loadProfiles();
+    this.sync = new SyncService(this);
+    // boot: converge with the cloud row if this profile has one. Async and
+    // quiet — offline or unconfigured costs nothing, localStorage remains the
+    // device's source of truth.
+    setTimeout(() => this.sync.pullMerge(), 1500);
     this._loadProfileState();
     // mode comes from the URL only — a fresh visit ALWAYS starts in RACE mode
     // (persisting roam silently made races "never finish" for returning players)
@@ -1358,6 +1369,17 @@ class Game {
   /** (Re)read everything scoped to the ACTIVE PROFILE — career, purse, garage.
    *  Lifted out of the constructor so changing driver is a state reload rather
    *  than a page reload. */
+  /** sync.js contract: persist the registry (it stamps syncIds onto it). */
+  saveProfiles() { saveJSON('ir-profiles', this.profiles); }
+
+  /** sync.js contract: storage changed under us — reread and repaint. */
+  reloadProfileState() {
+    this._loadProfileState();
+    this.renderGarage?.();
+    this._renderLevelCards?.();
+    this._renderProfiles?.();
+  }
+
   _loadProfileState() {
     this.profile = this.profiles.list.find((p) => p.id === this.profiles.active) ?? this.profiles.list[0];
     this._pkey = (base) => profileKey(this.profile.id, base);
@@ -1709,6 +1731,9 @@ class Game {
    *  roster and quietly stopped being true as worlds were appended. */
   starCost(id) {
     const i = LEVELS.findIndex((l) => l.id === id);
+    // a level may carry its own price — see the MEDITERRANEAN note in the
+    // level table for why new regions must not inherit the append-only slope
+    if (LEVELS[i]?.cost != null) return LEVELS[i].cost;
     return i < 3 ? 0 : i - 2;
   }
 
@@ -1783,7 +1808,16 @@ class Game {
       return row;
     };
     this._renderStarKey();
-    LEVELS.forEach((lv, i) => {
+    // FRESH REGIONS RENDER FIRST. Career order (pricing, progression) is the
+    // array and stays untouched — this is display order only. New content at
+    // the BOTTOM of a 32-card list is new content nobody sees: measured on a
+    // fresh save, the four newest worlds were the last four cards, locked at
+    // 26-29 stars. Reported as "I don't see the new tracks".
+    const freshRegions = new Set(LEVELS.filter((l) => l.fresh).map((l) => l.region));
+    const rows = LEVELS.map((lv, i) => ({ lv, i }));
+    rows.sort((a, b) =>
+      (freshRegions.has(a.lv.region) ? 0 : 1) - (freshRegions.has(b.lv.region) ? 0 : 1) || a.i - b.i);
+    rows.forEach(({ lv, i }) => {
       const card = document.createElement('button');
       const unlocked = this.isLevelUnlocked(lv.id);
       card.className = 'level-chip'
@@ -1801,7 +1835,7 @@ class Game {
           ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
           : '★ UNRACED')
         : `NEEDS ${cost}★ — ${Math.max(0, cost - this.totalStars())} TO GO`;
-      card.innerHTML = `<div class="wc-shot" data-shot="assets/previews/w${lv.id}.jpg">
+      card.innerHTML = `${lv.fresh ? '<div class="wc-new">NEW</div>' : ''}<div class="wc-shot" data-shot="assets/previews/w${lv.id}.jpg">
           <canvas class="wc-map" width="72" height="52"></canvas>
         </div>
         <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
@@ -2165,10 +2199,68 @@ class Game {
       listEl.appendChild(row);
     }
     this._renderResetBlock();
+    this._bindSyncUI();
     const cap = reg.list.length >= MAX_PROFILES;
     document.getElementById('profile-create').style.display = cap ? 'none' : '';
     document.getElementById('profile-cap-note').style.display = cap ? '' : 'none';
     this._renderSwatches();
+  }
+
+  /** CROSS-DEVICE SYNC UI. Two buttons over one engine (src/sync.js):
+   *  export packs the whole career into a code and puts it on the clipboard
+   *  (and in the box, for devices where the clipboard API is fenced off);
+   *  import merges a pasted code into the ACTIVE profile — merge, never
+   *  overwrite, so running it twice or in the wrong order cannot lose a
+   *  career. When the cloud row is configured the same engine syncs by
+   *  itself and this section mostly just reports it. */
+  _bindSyncUI() {
+    const box = document.getElementById('sync-code-box');
+    const exp = document.getElementById('sync-export');
+    const imp = document.getElementById('sync-import');
+    if (!box || !exp || !imp || exp._bound) return;
+    exp._bound = true;
+    exp.addEventListener('click', async () => {
+      const code = await encodeSyncCode(this.sync.snapshot());
+      box.value = code;
+      box.classList.add('open');
+      box.select?.();
+      try { await navigator.clipboard.writeText(code); exp.textContent = 'COPIED ✓'; }
+      catch { exp.textContent = 'SELECT + COPY'; }
+      setTimeout(() => { exp.textContent = 'COPY SYNC CODE'; }, 2500);
+    });
+    imp.addEventListener('click', async () => {
+      if (!box.classList.contains('open') || box.value.startsWith('IGNITE') === false) {
+        box.value = '';
+        box.classList.add('open');
+        box.focus();
+        imp.textContent = 'IMPORT PASTED CODE';
+        return;
+      }
+      try {
+        const snap = await decodeSyncCode(box.value);
+        this.sync.adopt(snap);
+        this.sync.schedulePush();
+        imp.textContent = 'MERGED ✓';
+        box.classList.remove('open');
+        this.hud?.feed?.('CAREER SYNCED', 'good');
+      } catch {
+        imp.textContent = 'NOT A SYNC CODE';
+      }
+      setTimeout(() => { imp.textContent = 'ENTER SYNC CODE'; }, 2500);
+    });
+    this._renderSyncStatus();
+  }
+
+  _renderSyncStatus() {
+    const el = document.getElementById('sync-status');
+    if (!el) return;
+    if (!cloudConfigured()) {
+      el.textContent = 'CLOUD OFF — CODES ONLY (SEE db/README.md TO ENABLE)';
+      return;
+    }
+    const id = this.profile?.syncId;
+    const word = { idle: 'CLOUD READY', sync: 'SYNCING…', ok: 'CLOUD ✓ IN SYNC', error: 'CLOUD UNREACHABLE — CHANGES KEPT LOCALLY' }[this.sync.status] ?? '';
+    el.textContent = id ? `${word} · ID ${id.slice(0, 6)}…` : word;
   }
 
   /** Two-tap confirm. The first tap ARMS the button (it says `armed` and goes
@@ -5743,6 +5835,7 @@ window.__LEVELS = LEVELS;
 window.__DIFFS = DIFFS;   // headless balance probes read the shipping table
 window.__CARS = CAR_CATALOG;   // headless suites drive every machine in turn
 window.__HOUSE_TEMPLATES = HOUSE_TEMPLATES;  // tests/test-buildings.mjs checks the shapes as data
+window.__sync = { encodeSyncCode, decodeSyncCode, mergeSnapshots };  // tests/test-sync.mjs drives the engine directly
 // test-affinity.mjs re-derives these from the live tracks and fails on drift
 window.__DEMANDS = DEMANDS;
 window.__DEMAND_BOUNDS = DEMAND_BOUNDS;
