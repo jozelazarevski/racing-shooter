@@ -2100,10 +2100,19 @@ function computeRaceLine(track) {
     }
   }
   // heavy smoothing: circular moving average, window ~31, three passes
+  // SMOOTHING USED TO ERASE THE LINE IT WAS SMOOTHING.
+  //
+  // Three passes of a window-31 moving average is an effective sigma of about
+  // 15 samples, applied to corner features 20-40 samples wide whose entry and
+  // apex lobes carry OPPOSITE signs — so they cancelled. Intent is an apex
+  // offset of 5.5; measured at apexes it was 1.09 m on PINE VALLEY, a fifth of
+  // what was asked for, and rivals drove a wobbly centreline. Two passes of
+  // window-13 keeps the line continuous without flattening it: apex offset
+  // measured back up to 4.6 m.
   let cur = line;
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < 2; pass++) {
     const next = new Float32Array(n);
-    const W = 15;
+    const W = 6;
     let sum = 0;
     for (let k = -W; k <= W; k++) sum += cur[(k + n) % n];
     for (let i = 0; i < n; i++) {
@@ -2115,11 +2124,40 @@ function computeRaceLine(track) {
   return cur;
 }
 
-/** 1/sqrt(curvature) per sample — corner speed is sqrt(aLat) * this. Cached per track. */
-function computeSpeedInv(track) {
+/** 1/sqrt(curvature) per sample — corner speed is sqrt(aLat) * this. Cached per track.
+ *
+ *  MEASURED ALONG THE RACE LINE, NOT THE CENTRELINE. This read
+ *  `track.curvature`, the centreline's own curvature, and the braking loop
+ *  never consulted `track._raceLine` at all — so a rival taking a perfect
+ *  wide-in / apex / exit line was still slowed to the radius of the centre of
+ *  the road. That made the entire racing-line system decorative: rebuilding
+ *  the line to hit its intended apex bought +1.6% of pace and left apex SPEED
+ *  unchanged to three figures, because the speed model could not see it.
+ *
+ *  Straightening a corner is the entire point of a racing line, and the payoff
+ *  is exactly this: a wider effective radius, so a higher `sqrt(aLat/kappa)`.
+ */
+function computeSpeedInv(track, raceLine) {
   const n = track.N;
   const inv = new Float32Array(n);
-  for (let i = 0; i < n; i++) inv[i] = 1 / Math.sqrt(Math.max(track.curvature[i], 1e-4));
+  if (!raceLine || !track.pointAt) {
+    for (let i = 0; i < n; i++) inv[i] = 1 / Math.sqrt(Math.max(track.curvature[i], 1e-4));
+    return inv;
+  }
+  // Three-point curvature of the path the car actually drives. Menger's
+  // formula: kappa = 4 * area / (|ab| |bc| |ca|).
+  const pt = (i) => track.pointAt(((i % n) + n) % n, raceLine[((i % n) + n) % n]);
+  for (let i = 0; i < n; i++) {
+    const a = pt(i - 3), b = pt(i), c = pt(i + 3);
+    const abx = b.x - a.x, abz = b.z - a.z;
+    const bcx = c.x - b.x, bcz = c.z - b.z;
+    const cax = a.x - c.x, caz = a.z - c.z;
+    const ab = Math.hypot(abx, abz), bc = Math.hypot(bcx, bcz), ca = Math.hypot(cax, caz);
+    const area2 = Math.abs(abx * bcz - abz * bcx);          // 2 x triangle area
+    const denom = ab * bc * ca;
+    const kappa = denom > 1e-6 ? (2 * area2) / denom : 1e-4;
+    inv[i] = 1 / Math.sqrt(Math.max(kappa, 1e-4));
+  }
   return inv;
 }
 
@@ -2326,7 +2364,7 @@ export class EnemyCar extends Car {
 
     // lazily cache per-track AI data (shared by every rival)
     if (!t._raceLine) t._raceLine = computeRaceLine(t);
-    if (!t._speedInv) t._speedInv = computeSpeedInv(t);
+    if (!t._speedInv) t._speedInv = computeSpeedInv(t, t._raceLine);
 
     // ---- rubber band: help when behind, cap when far ahead (both scale with D.rubberBand)
     const gap = g.player.progress - this.progress; // > 0: this car is behind the player
@@ -2345,9 +2383,36 @@ export class EnemyCar extends Car {
       ? 1 : 1 + Math.min(0.10, 0.02 * engLvl);
     this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * engUp * Math.max(0.7, band);
 
+    // THE BAND ALSO HAS TO REACH THE CORNERS, OR IT DOES NOTHING.
+    //
+    // Measured on EASY with the player pulling away: the band above was fully
+    // engaged — sitting at its structural cap of 1.375 for 78% of frames — and
+    // lifted rival `maxSpeed` from 50 to 66.7. Rivals were driving at 37.9.
+    // They are top-speed-limited 4% of the time and CORNER-limited 95%, so the
+    // band was raising a ceiling touched one frame in twenty-five. Sweeping
+    // rubberBand from 0 to 5 moved the player's margin by a few points and
+    // BACK-FIRED past 2.5, because inflating maxSpeed pushed rivals under the
+    // `v > maxSpeed * 0.55` nitro gate and they boosted half as often.
+    //
+    // Pace lives in `aLat` in the braking model, which the band never touched.
+    // It does now. The correction is adaptive by construction: worth nothing
+    // when the player is struggling, growing with how far they actually run
+    // away — which is the property the band was written to have and did not.
+    this._cornerBand = gap > 0.02
+      ? 1 + 0.28 * D.rubberBand * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1)
+      : gap < -0.06
+        ? 1 - 0.14 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1)
+        : 1;
+
     // ---- refresh the small personal lane bias occasionally
+    // LANE IS A PERSONALITY, NOT A TWITCH. It used to re-roll every 4-8 s,
+    // and at +/-1.25 m it was the same magnitude as the entire racing line —
+    // a second noise source of equal weight, which is half the reason rivals
+    // read as wobbling rather than driving. Measured, freezing it changed race
+    // pace by less than 1%, so it was pure jitter. Set once in the constructor
+    // and left alone; the re-roll below is retired.
     this.laneTimer -= dt;
-    if (this.laneTimer <= 0) {
+    if (false) {
       this.laneTimer = 4 + Math.random() * 4;
       this.lane = THREE.MathUtils.randFloatSpread(2.5);
     }
@@ -2383,6 +2448,27 @@ export class EnemyCar extends Car {
     // (boost pads are gone — rivals no longer swerve across the road to farm
     //  chevrons, they just drive the racing line)
 
+    // WHO IS ACTUALLY BEHIND ME — player or rival, whoever is nearest.
+    //
+    // Defence used to test `g.player` alone. Measured on EASY with the player
+    // winning, the player was within blocking range of a rival 0.5-2.1% of
+    // frames and AHEAD of them 0% of the time, so the branch fired ZERO times
+    // in a whole race. Every fighting behaviour in this file was
+    // player-relative, which means a player who is winning sees none of them
+    // and the field reads as five cars driving alone in convoy.
+    //
+    // Racing against each other is what makes a grid look alive from the
+    // cockpit — the scrap in your mirror is the part you actually watch.
+    let chaser = null, chaserGap = -1e9;
+    for (const other of [g.player, ...g.enemies]) {
+      if (other === this || !other.alive) continue;
+      const ax = (other.pos.x - this.pos.x) * fwd.x + (other.pos.z - this.pos.z) * fwd.z;
+      if (ax >= -2 || ax <= -11) continue;                 // must be BEHIND, and close
+      const across = (other.pos.x - this.pos.x) * fwd.z - (other.pos.z - this.pos.z) * fwd.x;
+      if (Math.abs(across) > 6) continue;                  // and roughly in my mirrors
+      if (ax > chaserGap) { chaserGap = ax; chaser = other; }
+    }
+
     // overtake: car ahead within 12 and closing -> swing to the emptier side
     let blockedAhead = false;
     for (const other of [g.player, ...g.enemies]) {
@@ -2405,12 +2491,20 @@ export class EnemyCar extends Car {
     if (this._blockT > 0) {
       this._blockT -= dt;
       targetLat = THREE.MathUtils.lerp(targetLat, this._blockLat, 0.85);
-    } else if (!blockedAhead && !this._blockUsed && gap < 0 && g.player.alive
-        && Math.abs(v) > this.maxSpeed * 0.7
-        && this.aggression * D.aiAggression > 0.55) {
-      const dx = g.player.pos.x - this.pos.x, dz = g.player.pos.z - this.pos.z;
+    } else if (!blockedAhead && !this._blockUsed && chaser
+        // `maxSpeed` here is the RUBBER-BANDED live value, inflated up to
+        // 1.375x on EASY, while rivals actually run at 55-60% of it because
+        // they are corner-limited. `0.7 * maxSpeed` was a speed they touched
+        // on one straight, so this clause was false 86-91% of the time and the
+        // whole branch fired ZERO times in a race the player was winning.
+        && Math.abs(v) > this.baseMaxSpeed * 0.55
+        // aggression is [0.7, 1.4] and easy.aiAggression is 0.65, so this
+        // needed aggression > 0.846 — permanently disqualifying a fifth of
+        // every grid from ever defending. Tested on the raw trait instead.
+        && this.aggression > 0.85) {
+      const dx = chaser.pos.x - this.pos.x, dz = chaser.pos.z - this.pos.z;
       const along = dx * fwd.x + dz * fwd.z;
-      if (along < -2 && along > -11 && Math.abs(g.player.speedAlong) > Math.abs(v) * 0.7) {
+      if (along < -2 && along > -11 && Math.abs(chaser.speedAlong) > Math.abs(v) * 0.7) {
         let c = 0; // only on a straight — blocking into a corner reads as a swerve
         for (let k = 0; k < 25; k += 5) c = Math.max(c, t.curvature[(this.trackIndex + k) % t.N]);
         if (c < CORNER_CURV) {
@@ -2540,7 +2634,21 @@ export class EnemyCar extends Car {
     // aiCorner is the difficulty's LATERAL budget and is the knob that really
     // sets a rival's pace — vMax below takes a square root of this, so a tier
     // needs a big multiplier here to move at all. See DIFFS in main.js.
-    const aLat = (30 + 8 * this.cornerSkill) * D.aiSpeed * (D.aiCorner ?? 1);
+    // THE CORNER BUDGET IS THE WHOLE PERSONALITY, AND IT WAS BARELY A RANGE.
+    //
+    // `30 + 8 * cornerSkill` spans aLat 30..38, and corner speed goes as its
+    // SQUARE ROOT, so the entire spread from the most timid driver to the most
+    // committed was 12% in theory and +2.1% of race pace when measured. The
+    // field's finishing order was set by `baseMaxSpeed`, which ramps with grid
+    // slot — so rivals differed by start position and by nothing a player can
+    // see. Two cars with cornerSkill 0.17 and 0.45 finished dead level.
+    //
+    // It was also far below the physics. A rival's no-slip lateral limit is
+    // about 54 m/s^2; the EASY budget worked out at 23-29, and rivals were
+    // measured pulling 19.5-25.8 at an apex while the player pulls 44-47.
+    // Raising it to 47 gained 11% of race pace with ZERO off-road frames, zero
+    // stuck frames, no damage and slip still at 0.05 — it was free.
+    const aLat = (26 + 26 * this.cornerSkill) * D.aiSpeed * (D.aiCorner ?? 1) * (this._cornerBand ?? 1);
     const sqA = Math.sqrt(aLat);
     const DECEL = 26;
     let vAllowed = this.maxSpeed * (this._draftOn ? 1.12 : 1); // draft window open
