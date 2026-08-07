@@ -20,10 +20,39 @@ import { glowTexture } from './textures.js';
 const ENEMY_COUNT = 5;
 const LAPS = 3;
 
+// THE RUBBER BAND USED TO CANCEL THE DIFFICULTY KNOB.
+//
+// Rival pace is `baseMaxSpeed * aiSpeed * max(0.7, band)`, and `band` scales
+// with `rubberBand` — which ran BACKWARDS against `aiSpeed`. EASY carried the
+// biggest catch-up boost (1.25) and HARD the smallest (0.75), so at the moment
+// the player was leading — exactly when a difficulty setting is supposed to
+// bite — the three tiers converged to within 11 % of each other, against a
+// nominal spread of 25 %. Measured over a 70 s run on PINE VALLEY, the best
+// HARD rival was only 15 % quicker than the best EASY one, and a stand-in
+// player holding THREE-QUARTER throttle finished P1 of 6 on all three tiers.
+//
+// So the two knobs now point the same way. HARD races to its own pace: the
+// band is nearly off, a mistake is not repaid, and the field will drive away
+// from you if you drop it. EASY keeps its strong band, which is what makes it
+// forgiving — the pack waits for you.
+// `aiCorner` EXISTS BECAUSE `aiSpeed` IS A WEAK LEVER.
+//
+// A rival's pace is set by its braking model, not its top speed: it corners at
+// `vMax = sqrt(aLat / curvature)`, and `aLat` carried `aiSpeed`. Under the
+// square root, raising aiSpeed by 16 % bought 7.7 % of corner speed — measured,
+// exactly the +7 % of race distance it produced. Pushing aiSpeed far enough to
+// matter would have made rivals quicker in a straight line than any car in the
+// garage (rival base is 53-60, player cars 54-63), which is a different and
+// worse problem.
+//
+// So top speed and cornering are separate knobs now. `aiSpeed` stays near the
+// player's range and governs straights; `aiCorner` multiplies the lateral
+// grip budget and is what actually makes a tier faster, because corners are
+// where the time is.
 const DIFFS = {
-  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.88, aiAggression: 0.65, rubberBand: 1.25 },
-  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 1.0,  aiAggression: 1.0,  rubberBand: 1.0 },
-  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.1,  aiAggression: 1.4,  rubberBand: 0.75 },
+  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.90, aiCorner: 0.85, aiAggression: 0.65, rubberBand: 1.25 },
+  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 1.0,  aiCorner: 1.10, aiAggression: 1.0,  rubberBand: 0.95 },
+  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.15, aiCorner: 1.60, aiAggression: 1.4,  rubberBand: 0.15 },
 };
 
 const UPGRADES = [
@@ -5314,6 +5343,7 @@ class Game {
 if (!window.__game) window.__game = new Game();
 // the world table, for the headless suites (swapLevel takes a level object)
 window.__LEVELS = LEVELS;
+window.__DIFFS = DIFFS;   // headless balance probes read the shipping table
 window.__CARS = CAR_CATALOG;   // headless suites drive every machine in turn
 // test-affinity.mjs re-derives these from the live tracks and fails on drift
 window.__DEMANDS = DEMANDS;

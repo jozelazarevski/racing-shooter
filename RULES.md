@@ -831,11 +831,38 @@ The three difficulties differ in pace, aggression, how hard the rubber band
 pulls, whether rivals carry rockets, and how much hull damage the player
 actually absorbs.
 
-| Difficulty | aiSpeed | aiAggression | rubberBand | Rockets fired at the player | Player hull intake |
-|---|---|---|---|---|---|
-| EASY | ×0.88 | ×0.65 | ×1.25 | **never** | ×0.45 |
-| NORMAL | ×1.00 | ×1.00 | ×1.00 | **~0.7/min** — first at 24 s, budget 1 per 85 s | ×0.62 |
-| HARD | ×1.10 | ×1.40 | ×0.75 | **~2–3.3/min** — first at 8 s, budget 1 per 20 s | ×0.85 |
+| Difficulty | aiSpeed | aiCorner | aiAggression | rubberBand | Rockets fired at the player | Player hull intake |
+|---|---|---|---|---|---|---|
+| EASY | ×0.90 | ×0.85 | ×0.65 | ×1.25 | **never** | ×0.45 |
+| NORMAL | ×1.00 | ×1.10 | ×1.00 | ×0.95 | **~0.7/min** — first at 24 s, budget 1 per 85 s | ×0.62 |
+| HARD | ×1.15 | ×1.60 | ×1.40 | ×0.15 | **~2–3.3/min** — first at 8 s, budget 1 per 20 s | ×0.85 |
+
+**`aiCorner` exists because `aiSpeed` is a weak lever.** A rival's pace is set by
+its braking model, not its top speed: it corners at `vMax = sqrt(aLat /
+curvature)`, and `aLat` carried `aiSpeed`. Under that square root, raising
+aiSpeed 16 % bought 7.7 % of corner speed — measured, exactly the +7 % of race
+distance it produced. Pushing aiSpeed far enough to matter would have made
+rivals quicker in a straight line than any car in the garage (rival base 53–60,
+player cars 54–63). So top speed and cornering are separate knobs: `aiSpeed`
+stays near the player's range, `aiCorner` multiplies the lateral grip budget and
+is what actually makes a tier fast, because corners are where the time is.
+
+**The rubber band used to cancel the difficulty knob.** It ran backwards against
+`aiSpeed` — EASY carried the biggest catch-up boost and HARD the smallest — so
+at the moment the player was leading, which is exactly when a difficulty setting
+is supposed to bite, the three tiers converged to within **11 %** of each other
+against a nominal spread of 25 %. Measured over 70 s, the best HARD rival was
+only 15 % quicker than the best EASY one, and a stand-in player holding
+**three-quarter throttle finished P1 of 6 on all three tiers**. Both knobs now
+point the same way: HARD races to its own pace (band nearly off — a mistake is
+not repaid), EASY keeps its strong band because that is what makes it forgiving.
+
+**`hullMul` was never a field.** Earlier versions of this table listed it as a
+difficulty property; it does not exist and never did. The scaling lives inside
+`Car.damage()`, and `knockStone` read `this.difficulty?.hullMul ?? 0.62`, so
+**rock damage was applied at the NORMAL rate on every difficulty**. Fixed in r87
+by routing that path through `damage()` — the intake column above is now true for
+rocks too, not just for crashes.
 
 Rival grid stats: `maxSpeed` 53–60 (× aiSpeed × engine parity × rubber band,
 floor ×0.7), `accel` **34.5–39.2** — deliberately inside the garage's 36–40 so
@@ -861,6 +888,17 @@ front of a mid-pack player and the two conditions cancel out.
 | Median P1–P2 gap, NORMAL | < 6 s | 0.09–0.52 s |
 | Rank volatility, NORMAL | lead must change hands | player finishes P1–P3, rank swings 1↔5 |
 | EASY stays casual-winnable | yes | a 0.85-pace driver still wins, gap 0.93 s |
+| **Rival pace rises with tier** | strict ordering | PINE VALLEY 1330 < 1491 < 1707; FURKA 945 < 1087 < 1210 |
+| **EASY→HARD rival spread** | ≥ 20 % | **28 %** on both worlds (was 15 %) |
+| **HARD punishes a sloppy lap** | a 75 %-throttle drive must not stroll away | rival best within 2 % of the player, P1 by 23–24 samples (was P1 by 126) |
+| **HARD still winnable clean** | yes | full throttle wins by 139–297 samples |
+
+The last three are enforced by `tests/test-difficulty.mjs`, which reads the
+shipping `DIFFS` table via `window.__DIFFS` rather than a copy, and asserts the
+SHAPE of the ladder rather than distances — terrain differs per world, so a
+distance target would be a change-detector. Its player stand-in drives a perfect
+line and never lifts, so its absolute margin flatters it; the rival-to-rival
+comparison is the honest half and is what the ordering checks rest on.
 
 ## 11. Rural traffic
 
