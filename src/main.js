@@ -6,7 +6,8 @@ import { UnrealBloomPass } from '../lib/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
-import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel } from './track.js';
+import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
+  HOUSE_TEMPLATES } from './track.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
@@ -5552,6 +5553,7 @@ if (!window.__game) window.__game = new Game();
 window.__LEVELS = LEVELS;
 window.__DIFFS = DIFFS;   // headless balance probes read the shipping table
 window.__CARS = CAR_CATALOG;   // headless suites drive every machine in turn
+window.__HOUSE_TEMPLATES = HOUSE_TEMPLATES;  // tests/test-buildings.mjs checks the shapes as data
 // test-affinity.mjs re-derives these from the live tracks and fails on drift
 window.__DEMANDS = DEMANDS;
 window.__DEMAND_BOUNDS = DEMAND_BOUNDS;
