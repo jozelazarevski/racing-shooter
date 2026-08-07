@@ -30,6 +30,59 @@ export class Hud {
     this.vignetteLevel = 0;
     this._standingsHtml = '';
     this._standingsTimer = 0;
+    this._watchLeftColumn();
+  }
+
+  /** THE LEFT COLUMN STACKS ITSELF.
+   *
+   *  On a phone the hull panel and the message feed were pinned to hard-coded
+   *  offsets — `top:96px` and `top:150px` — chosen for a race-info panel
+   *  carrying a position, a lap and a clock. It also carries the CONTRACTS
+   *  list, which is three rows and only appears once a race is running, so the
+   *  panel grows to 146 px after the numbers those offsets were picked from
+   *  were measured. Result, on every phone size tested (390x844, 360x800,
+   *  320x568, and 844x390 landscape): the hull panel sat ENTIRELY inside
+   *  race-info — a 150x47 overlap on a 150x47 panel — and the feed clipped its
+   *  bottom corner as well.
+   *
+   *  A bigger magic number would have failed the same way the moment a fourth
+   *  contract, a longer world name or a larger accessibility font arrived. So
+   *  nothing here is a constant: the panels publish their measured heights and
+   *  the stylesheet stacks off those. The observer fires on content change, not
+   *  per frame, so this costs nothing while racing.
+   */
+  _watchLeftColumn() {
+    const info = document.getElementById('race-info');
+    const hull = document.getElementById('health-box');
+    if (!info || !hull || typeof ResizeObserver === 'undefined') return;
+    const root = document.documentElement;
+    const publish = () => {
+      root.style.setProperty('--info-h', `${Math.round(info.offsetHeight)}px`);
+      root.style.setProperty('--hull-h', `${Math.round(hull.offsetHeight)}px`);
+    };
+    this._leftObs = new ResizeObserver(publish);
+    this._leftObs.observe(info);
+    this._leftObs.observe(hull);
+    publish();
+  }
+
+  /** How many feed rows fit between the feed's top and the controls below it.
+   *  Recomputed per message rather than cached: the feed's own top moves with
+   *  the panels above it, and an orientation change moves everything. */
+  _feedRows() {
+    const feed = this.el.feed;
+    if (!feed || !document.body.classList.contains('touch')) return 5;
+    const top = feed.getBoundingClientRect().top;
+    // the highest thing in the bottom control cluster is the ceiling
+    let floor = window.innerHeight;
+    for (const id of ['t-drift', 't-fire', 't-nitro', 't-missile', 't-mine', 't-shock', 'speed-box']) {
+      const el = document.getElementById(id);
+      if (!el || getComputedStyle(el).display === 'none') continue;
+      const r = el.getBoundingClientRect();
+      if (r.height > 0 && r.top < floor) floor = r.top;
+    }
+    const ROW = 34;                                   // message height + gap
+    return Math.max(1, Math.min(5, Math.floor((floor - top - 8) / ROW)));
   }
 
   show() { this.el.hud.classList.add('on'); }
@@ -271,7 +324,15 @@ export class Hud {
     div.className = `feed-msg ${kind}`;
     div.textContent = text;
     this.el.feed.appendChild(div);
-    while (this.el.feed.children.length > 5) this.el.feed.firstChild.remove();
+    // FIVE MESSAGES DO NOT FIT ON A SMALL PHONE. The cap used to be a flat 5,
+    // which is about 160px of stacked rows — fine on a desktop, but on a
+    // 320x568 screen the feed hangs off the bottom of its own space and the
+    // last rows land on the DRIFT and FIRE buttons. Since the feed's top is
+    // itself measured now (see _watchLeftColumn), the number of rows that fit
+    // is a measurement too: the room between the feed and the topmost touch
+    // control. Oldest rows go first, so the newest message is always the one
+    // that survives.
+    while (this.el.feed.children.length > this._feedRows()) this.el.feed.firstChild.remove();
     setTimeout(() => div.remove(), 3300);
   }
 

@@ -268,9 +268,19 @@
   body.touch #speedo{width:86px;height:86px}
   body.touch #nitro-wrap{display:none}  /* nitro lives on the ⚡ button */
   body.touch #weapon-box{display:none}  /* ammo counts live on the buttons */
-  body.touch #health-box{bottom:auto;top:96px;left:12px;width:150px;padding:6px 10px}
+  /* Stacked off the MEASURED height of the panel above (see hud.js
+     _watchLeftColumn), not a constant: race-info grows by ~60px once the
+     contracts list appears mid-race, which is exactly what the old top:96px
+     could not know. The fallback in var() is the panel's height WITHOUT
+     contracts, so the layout is still sane for the one frame before the
+     observer first reports. */
+  body.touch #health-box{bottom:auto;top:calc(12px + var(--info-h,86px) + 8px);
+    left:12px;width:150px;padding:6px 10px}
   body.touch #health-box #shield-hits{display:none}
-  body.touch #feed{top:150px}
+  /* ...and the feed stacks under the hull panel for the same reason: at
+     390px wide it is 274px of message reaching back under race-info, so a
+     fixed top clipped its corner on every portrait size measured. */
+  body.touch #feed{top:calc(12px + var(--info-h,86px) + var(--hull-h,47px) + 16px)}
   /* very narrow phones: nudge the inner weapon column out of the speedo's way */
   @media (max-width:380px){
     /* moving these inward to clear the speedo pushed them into FIRE, so the
@@ -279,11 +289,26 @@
     #t-missile{right:calc(100px + env(safe-area-inset-right));width:54px;height:54px}
     #t-mine{right:calc(96px + env(safe-area-inset-right));width:54px;height:54px;
       bottom:calc(104px + env(safe-area-inset-bottom))}
+    /* At 320px the gap the speedo was biased into is no longer wide enough for
+       it: measured, the dial ran 11px under the 🚀 button. Shrink and shift it
+       further into the gap rather than move the button, which has nowhere left
+       to go without reaching FIRE. */
+    body.touch #speed-box{left:calc(50% - 38px)}
+    body.touch #speedo{width:76px;height:76px}
   }
   /* landscape phones: everything anchors to corners, panels stay top */
   @media (max-height: 560px){
-    body.touch #health-box{top:76px;width:132px}
-    body.touch #feed{top:120px;right:200px}
+    /* landscape has less height to give away, so the gaps tighten — but the
+       stacking is still measured, never a constant */
+    body.touch #health-box{top:calc(8px + var(--info-h,86px) + 6px);width:132px}
+    /* LANDSCAPE HAS NO ROOM TO STACK. At 390px tall the left column already
+       reaches y=223, so continuing the stack put the feed straight through the
+       DRIFT button — measured, not guessed, once the probe was widened to
+       include the touch controls it had been ignoring. The band across the top
+       middle is the only real estate a landscape phone has spare: the left
+       column ends at x=163 and the score box starts at x=764. */
+    body.touch #feed{top:10px;right:auto;left:50%;transform:translateX(-50%);
+      align-items:center}
     body.touch #speed-box{bottom:10px}
     body.touch #speedo{width:84px;height:84px}
     #joy-zone{width:40%;height:80%}
