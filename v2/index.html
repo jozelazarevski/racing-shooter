@@ -7,14 +7,24 @@
 <title>IGNITE RALLY v2 — Phase 1 + 2</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2312161b'/%3E%3Cpath d='M6 21h20l-3-7H9z' fill='%23ff6b35'/%3E%3Ccircle cx='11' cy='23' r='3' fill='%23e8eef4'/%3E%3Ccircle cx='22' cy='23' r='3' fill='%23e8eef4'/%3E%3C/svg%3E">
 <style>
-  :root { --ink:#e8eef4; --dim:#8b9aa8; --hot:#ff6b35; --ok:#4ade80; --bad:#f87171; }
+  /* POLYGON RALLY CHROME.
+   Brass frames on dark wood, amber type, chunky rounded controls — the look
+   the reference shots ask for, and the one v1 already wears. The ids and the
+   markup are unchanged, so nothing in main.ts has to know about any of it. */
+  :root {
+    --ink:#f2e3c4; --dim:#a8906a; --hot:#ffb545; --ok:#7ddc6a; --bad:#ff6b52;
+    --brass:#c98f3c; --brass-dim:#6d4a1e;
+    --wood:rgba(38,26,14,.86); --wood-solid:#2a1c0e;
+  }
   * { box-sizing: border-box; }
-  html, body { margin:0; height:100%; overflow:hidden; background:#12161b; color:var(--ink);
+  html, body { margin:0; height:100%; overflow:hidden; background:#1a1208; color:var(--ink);
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; -webkit-text-size-adjust:100%; }
   #view { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
 
-  .panel { position:fixed; background:rgba(12,16,20,.74); backdrop-filter:blur(9px);
-    border:1px solid rgba(255,255,255,.09); border-radius:11px; padding:10px 13px; }
+  .panel { position:fixed; background:var(--wood); backdrop-filter:blur(6px);
+    border:2px solid var(--brass); border-radius:13px; padding:10px 14px;
+    box-shadow: inset 0 1px 0 rgba(255,214,150,.22), inset 0 -2px 6px rgba(0,0,0,.5),
+                0 4px 14px rgba(0,0,0,.45); }
   /* The read-only panels must not swallow a pad drag that starts on top of
      them; the ones with controls in re-enable pointer events on those. */
   #top, #hud { pointer-events:none; }
@@ -37,8 +47,37 @@
   .bar.red { background:var(--hot); }
   #damage-bar { background:var(--bad); }
   #time { font-size:21px; font-weight:700; margin-top:9px; letter-spacing:.02em; }
+  /* §11 penalties, under the clock. The clock already includes them; this says
+     how many of those seconds were not driving. */
+  #penalty { font-size:12px; font-weight:700; letter-spacing:.04em; min-height:14px; }
   #dist { font-size:10px; color:var(--dim); margin-top:3px; }
   #surface { font-size:10px; color:var(--dim); margin-top:4px; letter-spacing:.06em; text-transform:uppercase; }
+
+  /* Clear of the bottom strip, which is 60-odd pixels of dev furniture. The
+     first cut put the dial behind it and only the top of the arc showed. */
+  #dial { position:fixed; left:50%; bottom:86px; width:132px; height:132px;
+    margin-left:-66px; z-index:4; pointer-events:none;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,.55)); }
+  #dial svg { width:100%; height:100%; display:block; }
+  #dial-needle { transform-origin:60px 60px; transition:transform .05s linear; }
+  #dial-value { position:absolute; left:0; right:0; top:56%; text-align:center;
+    font-size:27px; font-weight:800; color:var(--ink); letter-spacing:-.02em; }
+  #dial-unit { position:absolute; left:0; right:0; top:78%; text-align:center;
+    font-size:9px; letter-spacing:.22em; color:var(--dim); }
+  /* On a phone the dial sits between the pad and the buttons, so it shrinks. */
+  @media (max-width:640px) {
+    #dial { width:104px; height:104px; margin-left:-52px; bottom:10px; }
+    #dial-value { font-size:21px; }
+  }
+
+  /* HULL INTEGRITY: segments, not a smooth bar. A segmented gauge tells you
+     how many hits you have left; a smooth one only tells you a fraction. */
+  #hull { display:flex; gap:2px; margin-top:5px; }
+  #hull i { flex:1; height:9px; background:#7ddc6a; border-radius:1px;
+    box-shadow: inset 0 -2px 3px rgba(0,0,0,.4); }
+  #hull i.warn { background:#ffb545; }
+  #hull i.gone { background:rgba(255,214,150,.10); box-shadow:none; }
+  #hull-label { font-size:9px; letter-spacing:.18em; color:var(--dim); }
 
   #pacenote { position:fixed; top:20%; left:50%; transform:translateX(-50%);
     font-size:28px; font-weight:800; letter-spacing:.1em; color:var(--hot);
@@ -70,12 +109,40 @@
   #result-splits { margin:16px auto 4px; font-size:11px; border-collapse:collapse; }
   #result-splits td { padding:2px 12px; text-align:right; color:var(--dim); }
   #result-splits td:first-child { text-align:left; }
+  #result-rally { font-size:11px; color:var(--dim); line-height:1.7; margin-top:14px;
+    padding-top:12px; border-top:1px solid rgba(255,255,255,.1); }
+  #next-leg { margin-top:12px; }
+  .dim { color:var(--dim); }
+
+  /* The itinerary: six legs, a service park, and what the car is carrying. */
+  #itinerary { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(8,11,15,.82); z-index:9; }
+  #itinerary.open { display:flex; }
+  #itinerary-card { background:rgba(16,21,27,.97); border:1px solid rgba(255,255,255,.13);
+    border-radius:16px; padding:26px 30px; text-align:center; max-width:min(520px, 92vw); }
+  #itinerary-title { font-size:13px; letter-spacing:.24em; color:var(--dim); margin-bottom:14px; }
+  #itinerary-legs { margin:0 auto; font-size:12px; border-collapse:collapse; width:100%; }
+  #itinerary-legs td { padding:5px 10px; text-align:right; color:var(--dim);
+    border-bottom:1px solid rgba(255,255,255,.05); }
+  #itinerary-legs td:first-child, #itinerary-legs td:nth-child(2) { text-align:left; }
+  #itinerary-legs tr.now td { color:var(--ink); font-weight:700; }
+  #itinerary-legs tr.locked td { opacity:.38; }
+  #itinerary-legs tr.service td { color:var(--ok); font-size:10px; letter-spacing:.14em;
+    border-bottom:none; padding:8px 10px 4px; }
+  #itinerary-legs a { color:inherit; text-decoration:none; border-bottom:1px dotted currentColor; }
+  #itinerary-sub { font-size:11px; color:var(--dim); line-height:1.7; margin-top:14px; }
   #restart { margin-top:16px; background:var(--hot); color:#12161b; border:0; border-radius:8px;
     padding:9px 20px; font:inherit; font-weight:700; font-size:12px; letter-spacing:.08em;
     cursor:pointer; }
 
+  /* Above the steering pad (z-index 3), or its controls cannot be touched.
+     The comment above says these panels re-enable pointer events; they did,
+     and it made no difference, because the pad's hit zone covers the left 52%
+     of the screen and painted on top of them. Found by a click that timed out
+     with "#pad intercepts pointer events" — on a phone it is the stage select
+     and the CONTROLS button that do not respond. */
   #bottom { left:10px; bottom:10px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;
-    max-width:calc(100vw - 20px); }
+    max-width:calc(100vw - 20px); z-index:4; }
   #debug { font-size:10px; color:var(--dim); }
   #cam-name { font-size:10px; color:var(--hot); letter-spacing:.08em; }
   select { background:rgba(255,255,255,.07); color:var(--ink); border:1px solid rgba(255,255,255,.16);
@@ -93,29 +160,41 @@
      to aim at and it works blind, in either orientation. */
   #pad { position:fixed; left:0; top:0; width:52%; height:100%; z-index:3;
     touch-action:none; -webkit-user-select:none; user-select:none; }
-  #pad-base { position:absolute; width:132px; height:132px; margin:-66px 0 0 -66px;
-    border-radius:50%; border:2px solid rgba(255,255,255,.16);
-    background:radial-gradient(circle, rgba(255,255,255,.07), rgba(255,255,255,.02));
-    opacity:.42; transition:opacity .16s; pointer-events:none; }
-  #pad-base.live { opacity:.92; border-color:rgba(255,107,53,.55); }
-  #pad-knob { position:absolute; left:50%; top:50%; width:62px; height:62px;
-    border-radius:50%; background:rgba(255,107,53,.72);
-    box-shadow:0 3px 14px rgba(0,0,0,.55); pointer-events:none; }
+  #pad-base { position:absolute; width:140px; height:140px; margin:-70px 0 0 -70px;
+    border-radius:50%; border:2px solid var(--brass-dim);
+    background:radial-gradient(circle at 50% 40%, rgba(255,214,150,.10), rgba(0,0,0,.34));
+    opacity:.55; transition:opacity .16s; pointer-events:none;
+    box-shadow: inset 0 -4px 12px rgba(0,0,0,.55); }
+  #pad-base.live { opacity:1; border-color:var(--brass); }
+  #pad-knob { position:absolute; left:50%; top:50%; width:70px; height:70px;
+    border-radius:50%;
+    background:radial-gradient(circle at 36% 30%, #ffd79a, #e08a22 70%);
+    box-shadow:0 4px 16px rgba(0,0,0,.6), inset 0 -3px 8px rgba(120,60,0,.5);
+    pointer-events:none; }
   /* In two-thumb the pad is railed to steering only, so say so. */
   body.two-thumb #pad-base { border-radius:34px; width:170px; height:68px; margin:-34px 0 0 -85px; }
   body.two-thumb #pad-knob { width:56px; height:56px; }
 
   #buttons { position:fixed; right:12px; bottom:12px; z-index:4; display:flex;
     flex-direction:column; gap:9px; align-items:flex-end; }
-  .btn { width:76px; height:52px; border-radius:12px; border:1px solid rgba(255,255,255,.17);
-    background:rgba(20,26,33,.8); color:var(--ink); font:inherit; font-size:11px;
-    font-weight:700; letter-spacing:.07em; display:flex; align-items:center;
+  /* Round brass discs, the size a thumb actually wants. */
+  .btn { width:66px; height:66px; border-radius:50%; border:2px solid var(--brass);
+    background:radial-gradient(circle at 34% 28%, #4a3218, #241606 72%);
+    color:var(--ink); font:inherit; font-size:11px;
+    font-weight:700; letter-spacing:.06em; display:flex; align-items:center;
     justify-content:center; touch-action:none; -webkit-user-select:none; user-select:none;
-    cursor:pointer; }
-  .btn.active { background:rgba(255,107,53,.75); color:#12161b; border-color:transparent; }
-  .btn.wide { width:96px; height:62px; font-size:13px; }
-  .btn.go { background:rgba(74,222,128,.16); border-color:rgba(74,222,128,.35); }
-  .btn.stop { background:rgba(248,113,113,.16); border-color:rgba(248,113,113,.35); }
+    cursor:pointer;
+    box-shadow: inset 0 2px 0 rgba(255,214,150,.2), inset 0 -3px 8px rgba(0,0,0,.6),
+                0 3px 10px rgba(0,0,0,.5); }
+  .btn.active { background:radial-gradient(circle at 34% 28%, #ffc66a, #c07a1c 72%);
+    color:#241606; border-color:#ffdca0; }
+  .btn.wide { width:86px; height:86px; font-size:14px; }
+  .btn.go { border-color:#7ddc6a;
+    background:radial-gradient(circle at 34% 28%, #2f4a20, #16250e 72%); }
+  .btn.stop { border-color:#ff6b52;
+    background:radial-gradient(circle at 34% 28%, #4a2018, #250c08 72%); }
+  .btn.fire { border-color:#ffb545;
+    background:radial-gradient(circle at 34% 28%, #6b4415, #3a2208 72%); }
   /* Pedals belong to two-thumb only — in one-thumb the pad already has them. */
   .pedal { display:none; }
   body.two-thumb .pedal { display:flex; }
@@ -129,13 +208,38 @@
   #sens-val { float:right; color:var(--hot); font-weight:700; }
   #settings p { font-size:10px; color:var(--dim); line-height:1.55; margin:2px 0 0; }
 
+  /* On a desktop these are a courtesy — the keyboard is the real control — so
+     they shrink rather than climb into the readout panel. */
+  @media (min-width:641px) {
+    .btn { width:54px; height:54px; font-size:10px; }
+    .btn.wide { width:66px; height:66px; font-size:12px; }
+  }
+
   @media (max-width:640px) {
     #build-info { display:none; }
-    #speed { font-size:34px; }
-    #keys { display:none; }
-    #pacenote { font-size:21px; top:14%; }
+    #speed, #gearline, #time { display:none; }   /* the dial says all three */
+    #keys, #debug, #cam-name { display:none; }
+    #pacenote { font-size:21px; top:12%; }
     #big { font-size:46px; }
     #big.good, #big.bad-split, #big.neutral { font-size:30px; }
+
+    /* THE BOTTOM OF A PHONE IS WHERE THE THUMBS ARE, and three things wanted
+       it: the dial, the fire button, and a row of desktop furniture. The
+       furniture loses. The stage select and the rally button move to a single
+       compact strip at the top, the dial sits clear above the pad, and the
+       action buttons stack up the right-hand side where a right thumb reaches
+       without covering the road. */
+    /* Three rows down the right-hand side, none of them overlapping: the
+       stage card, then the controls strip, then the readouts. The first cut
+       had the controls strip sitting on top of the hull gauge. */
+    #top { max-width:48vw; }
+    #bottom { top:10px; right:10px; left:auto; bottom:auto; padding:6px 8px;
+      max-width:50vw; gap:8px; }
+    #bottom select { max-width:32vw; font-size:11px; }
+    #dial { bottom:16px; left:auto; right:12px; margin-left:0; }
+    #buttons { bottom:150px; gap:11px; }
+    #hud { top:74px; min-width:132px; padding:8px 10px; }
+    #pad { width:60%; }
   }
 </style>
 </head>
@@ -153,13 +257,43 @@
   <div class="bar-track"><div id="rpm-bar" class="bar" style="width:0"></div></div>
   <div id="gearline">GEAR <span id="gear">1</span></div>
   <div id="time">0:00.00</div>
+  <div id="penalty"></div>
   <div class="bar-track"><div id="progress-bar" class="bar" style="width:0"></div></div>
   <div id="dist">0.00 km</div>
-  <div class="bar-track"><div id="damage-bar" class="bar" style="width:0"></div></div>
+  <div id="hull-label">HULL INTEGRITY <span id="hull-pct">100</span></div>
+  <div id="hull"></div>
+  <div class="bar-track" style="display:none"><div id="damage-bar" class="bar" style="width:0"></div></div>
   <div id="surface"></div>
   <div id="rival"></div>
   <div id="ammo"></div>
   <div id="score"></div>
+</div>
+
+<!-- The speedo, bottom centre. An analogue dial reads at a glance in a way a
+     number never does — you learn where the needle sits for a corner. The
+     needle is one rotated element and the arc is one stroked path, so it costs
+     nothing per frame beyond two attribute writes. -->
+<div id="dial">
+  <svg viewBox="0 0 120 120" aria-hidden="true">
+    <defs>
+      <linearGradient id="dial-face" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#3a2610"/><stop offset="1" stop-color="#160e05"/>
+      </linearGradient>
+    </defs>
+    <circle cx="60" cy="60" r="55" fill="url(#dial-face)" stroke="#c98f3c" stroke-width="4"/>
+    <!-- 240 degrees of sweep, from 150 to 390. -->
+    <path id="dial-track" d="M 30.4 107.6 A 55 55 0 1 1 89.6 107.6"
+          fill="none" stroke="rgba(255,214,150,.13)" stroke-width="7" stroke-linecap="round"/>
+    <path id="dial-arc" d="M 30.4 107.6 A 55 55 0 1 1 89.6 107.6"
+          fill="none" stroke="#7ddc6a" stroke-width="7" stroke-linecap="round"
+          stroke-dasharray="259 259" stroke-dashoffset="259"/>
+    <g id="dial-needle">
+      <line x1="60" y1="60" x2="60" y2="20" stroke="#ffb545" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="60" cy="60" r="6" fill="#c98f3c"/>
+    </g>
+  </svg>
+  <div id="dial-value">0</div>
+  <div id="dial-unit">KM/H</div>
 </div>
 
 <div id="pacenote"></div>
@@ -171,16 +305,29 @@
     <div id="result-time">0:00.00</div>
     <div id="result-sub"></div>
     <table id="result-splits"></table>
+    <div id="result-rally"></div>
+    <button id="next-leg" style="display:none">NEXT</button>
     <button id="restart">RUN IT AGAIN</button>
   </div>
 </div>
 
 <div id="bottom" class="panel">
+  <button id="itinerary-btn" class="link">RALLY</button>
   <select id="stage-select"></select>
   <span id="cam-name">CHASE</span>
   <span id="debug"></span>
   <button id="settings-btn" class="link">CONTROLS</button>
   <span id="keys">WASD drive · SPACE handbrake · Q/E gears · F fire · C camera · R reset</span>
+</div>
+
+<div id="itinerary">
+  <div id="itinerary-card">
+    <div id="itinerary-title">RALLY</div>
+    <table id="itinerary-legs"></table>
+    <div id="itinerary-sub"></div>
+    <button id="new-rally" class="link">START A NEW RALLY</button>
+    <button id="itinerary-close">CLOSE</button>
+  </div>
 </div>
 
 <div id="pad"><div id="pad-base"><div id="pad-knob"></div></div></div>

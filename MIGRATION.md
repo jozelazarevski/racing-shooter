@@ -112,11 +112,54 @@ into a catapult, an inverted damper sign, a doubly-negated tyre force, missing
 reflected engine inertia, a centre of mass 50% too high. Each is written up in
 `v2/PHASES.md`, along with the gaps that are absent rather than pretended.
 
-**Phase 3 — stages.** Point-to-point courses, sectors, reset nodes, corner
-grading feeding auto-generated pacenotes. Progression reworked off laps.
+**Phase 3 — stages. IN PROGRESS.** Point-to-point courses, sectors and
+auto-generated pacenotes landed with the race slice. This round added the racing
+line, its speed profile, and a driver that follows both — and in the course of
+driving the stages end to end for the first time, found three defects that were
+not about the AI at all:
 
-**Phase 4 — the bible.** Region palettes, lighting to five decimals, archetype
-architecture, scatter densities, and the R01–R12 region lint.
+- **steering was inverted**, on every input path, including the player's. `+1`
+  meant right to the keyboard, the touch pad and the camera, and left to the
+  geometry. Measured: hold `+0.5` at 93 km/h and the car goes 7.2 m the other
+  way.
+- **the finish line could not be crossed.** Progress is read from the centreline
+  cursor, which is quantised to the 4 m grid and stops one step short of the
+  stage length; the finish fired a metre short of the length itself. v2 had
+  never had a completable race.
+- **§1.3 runoff was built on the inside of every slow corner**, and the L08 lint
+  read the same inverted index, so it agreed with the bug.
+
+The AI reference lap (§15 L15) now exists as a measurement — `npm run reference`
+— and went from **0 of 6 stages completed to 6 of 6**.
+
+§11 followed: reset nodes every 120 m (**L12 now passes**, 17 checks a stage
+instead of 16), the six triggers with the spec's own delays, respawn at the
+nearest upstream node, a 10 s penalty on every reset including the player's own
+R key, and §11.3 cutting. That took the reference lap back to 4 of 6, and the
+regression is the honest kind: the old recovery moved the car FORWARD past
+obstacles it could not drive past, and the specified one does not. What the AI
+cannot do is two particular hairpins, and it never could.
+
+Progression landed on the same principle: §11.2.6 says only a service park
+repairs damage, which is only meaningful if damage outlives a stage. A rally is
+now six legs in order, a classification of driving plus every §11 penalty,
+damage carried between legs, one service park, and retirement at §9's terminal
+band. Testing it caught a progression lock that was silently handing the
+reference-lap harness the wrong stage — six requests, one stage, and a reported
+clean sweep of L15. See `v2/PHASES.md`.
+
+**Phase 4 — the bible. STARTED.** Region palettes, lighting and fog now come
+from `RALLY_WORLD_BIBLE.md` rather than from six hand-picked hex values per
+biome, and §5's region lint is implemented for the six checks answerable from
+data. It immediately found nine failures across the bible's ten regions —
+three saturation caps exceeded by the document's own palettes, six roads that
+do not out-contrast their own terrain — none of which are fixed in code,
+because §6 says a hex value changes in the document first.
+
+Three things the renderer cannot honour are written down rather than fudged:
+the exposure was being applied twice, `baseEV100` has no consumer in a
+non-physically-based pipeline, and the lux ratios have to be bounded or Nordic
+Winter clips to white. Architecture, water and fauna are still absent.
 
 ## The rule for every phase
 

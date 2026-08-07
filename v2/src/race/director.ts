@@ -53,17 +53,56 @@ export class RaceDirector {
   /** Seconds remaining on the countdown. */
   countdown = 3.2;
 
+  /** §11.2.5 and §11.3 time penalties, seconds. Added to the clock rather than
+   *  subtracted from it, because a penalty you cannot see on the HUD while you
+   *  are still driving is a penalty you cannot respond to. */
+  penalty = 0;
+
   readonly splits: SectorSplit[] = [];
   readonly best: StoredBest | null;
-  /** Set when the run finishes. */
-  result: { total: number; isBest: boolean; previous: number | null } | null = null;
+  /** Set when the run finishes. `raw` is the driving; `total` includes §11
+   *  penalties and is the time that counts. */
+  result: { total: number; raw: number; penalty: number; isBest: boolean; previous: number | null } | null = null;
 
   private nextSector = 1;
   private readonly sectors: number;
+  /** The distance that counts as crossing the line. */
+  private readonly finishAt: number;
 
-  constructor(private readonly stageId: string, private readonly lengthMetres: number) {
+  /**
+   * @param finishAt Distance that ends the race. Defaults to a metre short of
+   *   the stage length, which is right for a continuous distance — and WRONG
+   *   for the one the game actually supplies.
+   *
+   *   The race reads progress from the driver's centreline cursor, so the
+   *   number it sees is a SEGMENT's distance: quantised to the 4 m grid, and
+   *   therefore never larger than `length - 4`. Against a threshold of
+   *   `length - 1` the finish line could not be crossed by any car at any
+   *   speed. Every run reached the end of the road and sat there while the
+   *   recovery logic put it back on the road, over and over — 36 times in the
+   *   first reference lap, all of them between 4,709 m and 4,713 m of a
+   *   4,719 m stage. The unit tests passed throughout, because they fed a
+   *   continuous distance that reached the length exactly.
+   */
+  constructor(
+    private readonly stageId: string,
+    private readonly lengthMetres: number,
+    finishAt = lengthMetres - 1,
+  ) {
     this.best = loadBest(stageId);
-    this.sectors = Math.max(1, Math.ceil(lengthMetres / SECTOR_METRES));
+    this.finishAt = finishAt;
+    // Sectors are counted to the LINE, not to a length the car never reaches.
+    // Counting to the length gave a stage whose finish landed exactly on a
+    // 500 m boundary two final splits at the same time: the boundary fired,
+    // and then the extra sector clamped to the same distance and fired again.
+    this.sectors = Math.max(1, Math.ceil(finishAt / SECTOR_METRES));
+  }
+
+  /** Skip the countdown and go green now. The reference-lap harness uses this:
+   *  the lights are race presentation, not part of the stage being measured. */
+  start(): void {
+    this.countdown = 0;
+    this.phase = 'running';
   }
 
   /** True while the player's controls should be ignored. */
@@ -98,8 +137,9 @@ export class RaceDirector {
       this.nextSector <= this.sectors &&
       // The final boundary IS the finish line, so it uses the same threshold.
       // Comparing against the full length instead left the last sector
-      // unrecorded: the finish fired at length - 1 and closed the race first.
-      distanceMetres >= Math.min(this.nextSector * SECTOR_METRES, this.lengthMetres - 1)
+      // unrecorded: the finish closed the race before the boundary could be
+      // crossed.
+      distanceMetres >= Math.min(this.nextSector * SECTOR_METRES, this.finishAt)
     ) {
       const i = this.nextSector - 1;
       const bestSector = this.best?.sectors[i];
@@ -111,16 +151,22 @@ export class RaceDirector {
       this.nextSector++;
     }
 
-    if (distanceMetres >= this.lengthMetres - 1) this.finish();
+    if (distanceMetres >= this.finishAt) this.finish();
+  }
+
+  /** The time that counts: driving plus §11 penalties. */
+  get clock(): number {
+    return this.elapsed + this.penalty;
   }
 
   private finish(): void {
     if (this.phase === 'finished') return;
     this.phase = 'finished';
-    const total = this.elapsed;
+    const raw = this.elapsed;
+    const total = raw + this.penalty;
     const previous = this.best?.total ?? null;
     const isBest = previous === null || total < previous;
-    this.result = { total, isBest, previous };
+    this.result = { total, raw, penalty: this.penalty, isBest, previous };
     if (isBest) {
       saveBest(this.stageId, { total, sectors: this.splits.map((s) => s.elapsed) });
     }

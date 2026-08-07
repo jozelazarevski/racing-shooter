@@ -80,6 +80,13 @@ interface Wheel {
  *  quoted rev limit in each gear at sensible road speeds. */
 const GEAR_RATIOS = [3.58, 2.26, 1.64, 1.28, 1.0];
 const FINAL_DRIVE = 3.9;
+/** Reverse. §3 gives a five-speed box and does not name a reverse ratio, so it
+ *  takes a shade more than first — which is what a real box does, because
+ *  reverse exists to move a stationary car and never to be driven in. */
+const REVERSE_RATIO = 3.85;
+/** `gear === REVERSE` is reverse. Zero rather than -1 so nothing that indexes
+ *  or compares gears has to learn about negative numbers. */
+const REVERSE = 0;
 
 export interface VehicleTelemetry {
   speedMs: number;
@@ -107,11 +114,16 @@ export class Vehicle {
   /** Sequential automatic. Manual paddles still work; they just also exist. */
   automatic = true;
   private shiftCooldown = 0;
+  /** Seconds the brake has been held with the car stopped, for engaging
+   *  reverse. */
+  private reverseHold = 0;
   private steerAngle = 0;
   private airtime = 0;
   private onRoofFor = 0;
   damageJ = 0;
   lastImpact: VehicleTelemetry['lastImpact'] = null;
+  /** §11.2.4: seconds of post-reset immunity remaining. */
+  immuneFor = 0;
 
   compound: Compound = 'gravel';
   weather: WeatherId = 'clear';
@@ -224,6 +236,12 @@ export class Vehicle {
     this.body.resetForces(false);
     this.body.resetTorques(false);
 
+    // §11.2.4: immunity runs down with time and ends early on first throttle.
+    if (this.immuneFor > 0) {
+      const pedal = this.gear === REVERSE ? input.brake : input.throttle;
+      this.immuneFor = pedal > 0.02 ? 0 : Math.max(0, this.immuneFor - dt);
+    }
+
     const susp = this.surface.startsWith('tarmac') ? SUSPENSION.tarmac : SUSPENSION.gravel;
     const rot = this.body.rotation();
     const pos = this.body.translation();
@@ -238,17 +256,65 @@ export class Vehicle {
     // Speed-sensitive: full lock at a standstill would be undrivable at speed,
     // and this is specified rather than a feel choice.
     const speedFactor = 1 - STEERING.speedSensitiveFactor * Math.min(1, speed / STEERING.speedSensitiveReference);
-    const target = input.steer * maxLock * speedFactor;
+    // THE MINUS SIGN, and it is not a taste question.
+    //
+    // `steerAngle` is a rotation about the body's up axis, applied below with
+    // Rodrigues' formula. A positive rotation about +y carries the car's local
+    // forward (+z) toward local +x — and with forward at +z, the car's RIGHT is
+    // -x, because right = forward x up. So a positive rotation steers LEFT.
+    //
+    // Every caller means the opposite by a positive number: `ArrowRight` and
+    // `KeyD` produce +1, the touch pad's rightward drag produces +1, the
+    // camera's steering lead swings right on +1, and the AI's pure pursuit puts
+    // the target's side into the same sign as the corridor normal, which is the
+    // driver's right. So the input convention is "+1 is right" and the geometry
+    // is "+1 is left", and the two meet here.
+    //
+    // Measured, because it could not be seen: hold +0.5 on Safari's opening
+    // straight at 93 km/h and the car moves 7.2 m toward -normal, which is the
+    // driver's left. It shipped this way. Nothing caught it, and it is worth
+    // being precise about why: the only thing that drove v2 in the tests was an
+    // autopilot which was ALSO inverted, so it steered away from the line and
+    // the smoke test's tolerance (25 m off the centreline over 12 s) was wide
+    // enough to swallow the result. Sweet Lamb passed that check at 24.3 m.
+    const target = -input.steer * maxLock * speedFactor;
     const rackRate = (STEERING.rackSpeedDegPerSec * Math.PI) / 180;
     this.steerAngle += clamp(target - this.steerAngle, -rackRate * dt, rackRate * dt);
 
     // --- gearbox -----------------------------------------------------------
+    //
+    // REVERSE, and it is not a luxury. Without it the only way out of a car
+    // nose-first into a bank is a reset, which §11.2 correctly charges 10 s
+    // for — so a small mistake costs what a big one does, and the AI, which
+    // has no reset button of its own, simply sat there. Two stages of the
+    // reference lap ended in a loop of respawning into the same corner because
+    // the one manoeuvre that would have freed the car did not exist.
+    //
+    // Engagement is the arcade convention, because this game is played with two
+    // pedals and no clutch: hold the BRAKE with the car stopped and it selects
+    // reverse; from reverse, the throttle brings it back to first. So in
+    // reverse the two pedals swap jobs, which is what `drive` and `stop` are.
+    const stopped = speed < 0.8;
+    if (this.gear === REVERSE) {
+      if (stopped && input.throttle > 0.1) this.gear = 1;
+    } else if (stopped && input.brake > 0.5 && this.gear <= 1) {
+      this.reverseHold += dt;
+      // A moment of holding, so stopping hard at a hairpin does not drop the
+      // car into reverse the instant it comes to rest.
+      if (this.reverseHold > 0.35) { this.gear = REVERSE; this.reverseHold = 0; }
+    } else {
+      this.reverseHold = 0;
+    }
+    const reversing = this.gear === REVERSE;
+    const drivePedal = reversing ? input.brake : input.throttle;
+    const stopPedal = reversing ? input.throttle : input.brake;
+
     if (input.shiftUp && this.gear < VEHICLE.gearCount) this.gear++;
     if (input.shiftDown && this.gear > 1) this.gear--;
     // Sequential automatic by default. A five-speed box with no auto-shift and
     // no limiter let the car reach 243 km/h in first gear in the smoke test —
     // physically nonsense, and nothing about it looked wrong on screen.
-    if (this.automatic) {
+    if (this.automatic && !reversing) {
       if (this.shiftCooldown > 0) this.shiftCooldown -= dt;
       else if (this.rpm > VEHICLE.revLimit * 0.94 && this.gear < VEHICLE.gearCount) {
         this.gear++;
@@ -258,7 +324,7 @@ export class Vehicle {
         this.shiftCooldown = VEHICLE.shiftTimeMs / 1000 + 0.25;
       }
     }
-    const ratio = GEAR_RATIOS[this.gear - 1]! * FINAL_DRIVE;
+    const ratio = (reversing ? REVERSE_RATIO : GEAR_RATIOS[this.gear - 1]!) * FINAL_DRIVE;
 
     // Engine speed follows the driven wheels.
     let drivenOmega = 0;
@@ -275,9 +341,12 @@ export class Vehicle {
     // does nothing, because the torque is computed from a curve that never
     // reaches zero.
     const limited = this.rpm >= VEHICLE.revLimit * 0.995 || this.shiftCooldown > VEHICLE.shiftTimeMs / 1000;
-    const engineTorque = limited ? 0 : VEHICLE.peakTorqueNm * torqueCurve * input.throttle;
+    // Reverse is speed-limited by the ratio and by a hard cut: a car doing
+    // 90 km/h backwards is not a manoeuvre, it is a bug with a gear selected.
+    const reverseCut = reversing && speed > 8;
+    const engineTorque = limited || reverseCut ? 0 : VEHICLE.peakTorqueNm * torqueCurve * drivePedal;
     // Centre diff split, §3. All four driven — this is a rally car.
-    const wheelTorque = (engineTorque * ratio) / 4;
+    const wheelTorque = ((reversing ? -engineTorque : engineTorque) * ratio) / 4;
 
     // --- wheels ------------------------------------------------------------
     const restLength = susp.travel;
@@ -420,7 +489,7 @@ export class Vehicle {
 
       // --- wheel spin ------------------------------------------------------
       const rollingResistance = (SURFACES[this.surface]?.rollingResistance ?? 0.03) * force * Math.sign(w.omega);
-      let brakeTorque = (w.front ? BRAKES.torqueFront : BRAKES.torqueRear) * input.brake;
+      let brakeTorque = (w.front ? BRAKES.torqueFront : BRAKES.torqueRear) * stopPedal;
       if (input.handbrake && !w.front) brakeTorque += BRAKES.torqueRear * 1.6;
       const drive = w.driven ? wheelTorque : 0;
       const reaction = -f.fx * WHEEL_RADIUS;
@@ -460,8 +529,8 @@ export class Vehicle {
       // between a jump you can save and one you cannot.
       const decay = this.airtime > AIR.authorityDecayAfter ? AIR.authorityDecayFactor : 1;
       const pitch = (AIR.pitchAuthorityDegPerSec * Math.PI) / 180 * decay;
-      this.body.applyTorqueImpulse(scale(right, -input.brake * pitch * VEHICLE.inertiaPitch * dt * 0.02), true);
-      this.body.applyTorqueImpulse(scale(right, input.throttle * pitch * VEHICLE.inertiaPitch * dt * 0.02), true);
+      this.body.applyTorqueImpulse(scale(right, -stopPedal * pitch * VEHICLE.inertiaPitch * dt * 0.02), true);
+      this.body.applyTorqueImpulse(scale(right, drivePedal * pitch * VEHICLE.inertiaPitch * dt * 0.02), true);
       const yaw = (AIR.yawAuthorityDegPerSec * Math.PI) / 180 * decay;
       this.body.applyTorqueImpulse(scale(up, -input.steer * yaw * VEHICLE.inertiaYaw * dt * 0.02), true);
     } else {
@@ -498,7 +567,12 @@ export class Vehicle {
     const energyJ = 0.5 * VEHICLE.mass * normalSpeed * normalSpeed;
     const band = INCIDENCE_BANDS.find((b) => incidenceDeg <= b.maxAngleDeg) ?? INCIDENCE_BANDS[INCIDENCE_BANDS.length - 1]!;
     const klass = DAMAGE_ENERGY_BANDS_J.find((b) => energyJ <= b.max)!.klass;
-    this.damageJ += energyJ;
+    // §11.2.4 immunity. Read as DAMAGE immunity rather than collision
+    // immunity: a car that passed through scenery for 2.5 s after every reset
+    // would make the reset a shortcut. The impact still happens, still slows
+    // the car, still classifies — it just does not count against a player who
+    // has this second been put back on the road by the game.
+    if (this.immuneFor <= 0) this.damageJ += energyJ;
     this.lastImpact = { klass, band: band.name, energyJ, angleDeg: incidenceDeg };
 
     // Speed loss from the band, applied as an impulse against travel.
@@ -507,8 +581,9 @@ export class Vehicle {
     this.body.setLinvel({ x: v.x * (1 - loss), y: v.y, z: v.z * (1 - loss) }, true);
   }
 
-  /** Put the car back on the road, upright. Phase 3 makes these reset nodes;
-   *  for now it is the manual recovery any rally game needs. */
+  /** Put the car back on the road, upright, still. §11.2 rules 2 and 3: facing
+   *  the stage, zero velocity, zero angular velocity. Where it goes and what it
+   *  costs are §11.2's business, not the vehicle's — see `main.ts`. */
   reset(x: number, y: number, z: number, heading: number): void {
     this.body.setTranslation({ x, y, z }, true);
     this.body.setRotation({ x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) }, true);
@@ -516,6 +591,7 @@ export class Vehicle {
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     for (const w of this.wheels) { w.omega = 0; w.slipRatio = 0; w.slipAngle = 0; }
     this.gear = 1;
+    this.reverseHold = 0;
     this.onRoofFor = 0;
   }
 }

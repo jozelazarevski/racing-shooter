@@ -9,6 +9,8 @@ import { StageRng, withoutMathRandom } from '../core/stageRng.ts';
 import { buildCorridor, cornerRuns, type Corridor, type StageMove, type SurfaceKind, type CornerRun } from './corridor.ts';
 import { buildHeightfield, sampleHeight, type Heightfield } from './terrain.ts';
 import { scatterCorridor, type WorldObject, type Biome } from './scatter.ts';
+import { buildRacingLine, type RacingLine } from '../race/line.ts';
+import { buildResetNodes, type ResetNode } from '../race/reset.ts';
 
 export interface StageDef {
   id: string;
@@ -16,6 +18,19 @@ export interface StageDef {
   country: string;
   surface: SurfaceKind;
   biome: Biome;
+  /**
+   * The RALLY_WORLD_BIBLE region, when §3.11's legacy mapping is wrong for
+   * this stage.
+   *
+   * §3.11 maps `nordic_pine` to `nordic_winter`, and for a Finnish winter
+   * stage that is right. Ouninpohja is authored as a SUMMER GRAVEL stage, and
+   * the winter region's near-white ground base turned it into a white screen
+   * with a red car on it. The bible has ten regions and none of them is a
+   * nordic summer forest, so this is a real gap in the document rather than a
+   * mapping mistake — §6's amendment procedure is where it belongs. Until
+   * then the stage names the region it is actually lit by.
+   */
+  region?: string;
   moves: StageMove[];
 }
 
@@ -26,6 +41,13 @@ export interface Stage {
   heightfield: Heightfield;
   objects: WorldObject[];
   corners: CornerRun[];
+  /** The minimum-curvature path through the corridor and its speed profile.
+   *  Part of the stage rather than of the AI: it is a deterministic property of
+   *  the geometry, the lint reads it, and the rival and the reference lap must
+   *  be driving the same one or the reference lap measures nothing. */
+  line: RacingLine;
+  /** §11.2 respawn points, at most 120 m apart (L12). */
+  resetNodes: ResetNode[];
   /** Metres. */
   length: number;
 }
@@ -62,6 +84,8 @@ export function buildStage(def: StageDef): Stage {
       heightfield,
       objects,
       corners: cornerRuns(corridor),
+      line: buildRacingLine(corridor),
+      resetNodes: buildResetNodes(corridor),
       length: corridor.length,
     };
   });
@@ -144,6 +168,8 @@ export const STAGES: StageDef[] = [
     country: 'Finland',
     surface: 'gravel',
     biome: 'nordic_pine',
+    // Summer gravel, so not `nordic_winter` — see the note on StageDef.region.
+    region: 'alpine_pass',
     moves: [
       { kind: 'straight', length: 240, grade: 0.02 },
       { kind: 'crest', length: 90, height: 7 },

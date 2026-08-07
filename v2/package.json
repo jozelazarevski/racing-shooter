@@ -12,7 +12,10 @@
     "world": "tsx src/tools/dumpWorld.ts",
     "dev": "vite",
     "build": "vite build",
-    "lint": "tsx src/tools/lintStages.ts"
+    "lint": "tsx src/tools/lintStages.ts",
+    "smoke": "node tools/smoke.mjs",
+    "reference": "node tools/reference-lap.mjs",
+    "touch": "node tools/touch.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

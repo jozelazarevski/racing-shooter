@@ -37,13 +37,16 @@ const browser = await chromium.launch({
 
 /* Known open issues. Listed here so they stay VISIBLE in every run and cannot
  * be mistaken for passing, while still letting the suite gate against
- * regressions. Removing the assertion instead would be the dishonest fix. */
-const KNOWN = {
-  'col-de-turini': {
-    'travels down the stage':
-      'the cautious autopilot averages ~9 m/s through a col of G1 hairpins; a player is much quicker',
-  },
-};
+ * regressions. Removing the assertion instead would be the dishonest fix.
+ *
+ * EMPTY as of Phase 3, and the reason is worth keeping. The one entry here was
+ * Col de Turini, where the autopilot averaged ~9 m/s through the col; it was
+ * recorded as a driver-quality problem. It was not. Steering was inverted at
+ * the vehicle (see the note in physics/vehicle.ts), so the dummy steered away
+ * from every corner and the col — all hairpins — punished it most. With the
+ * sign fixed the same dummy finishes 0.2 m from the centreline. A known-issues
+ * list that still named it would now be misinformation. */
+const KNOWN = {};
 
 let failures = 0;
 let known = 0;
@@ -117,6 +120,43 @@ for (const stage of STAGES) {
   check('body attitude comes from the ground at zero speed',
     settled.upY > 0.85 && settled.upY <= 1.0000001, `up.y ${settled.upY.toFixed(4)}`);
 
+  // --- reverse: the manoeuvre that did not exist ------------------------
+  //
+  // Until Phase 3 the only way out of a car nose-first into a bank was a reset,
+  // which §11.2 charges 10 s for — so a small mistake cost what a big one did,
+  // and the AI, which has no reset button of its own, sat there. This asserts
+  // the gearbox has a reverse and that it moves the car the other way.
+  const reversed = await page.evaluate(() => {
+    const g = window.__v2;
+    const before = g.car.body.translation();
+    const q = g.car.body.rotation();
+    // The car's forward, so "backwards" is measured rather than assumed.
+    const fx = 2 * (q.x * q.z + q.w * q.y);
+    const fz = 1 - 2 * (q.x * q.x + q.y * q.y);
+    // Hold the brake at a standstill to select reverse, then keep holding it —
+    // in reverse the brake IS the accelerator.
+    window.__stepFixed(300, { brake: 1 });
+    const p = g.car.body.translation();
+    return {
+      gear: g.car.telemetry.gear,
+      along: (p.x - before.x) * fx + (p.z - before.z) * fz,
+      speed: g.car.telemetry.speedKmh,
+    };
+  });
+  check('the gearbox has a reverse', reversed.gear === 0, `gear ${reversed.gear}`);
+  check('reverse moves the car backwards', reversed.along < -2,
+    `${reversed.along.toFixed(1)} m along its own heading at ${reversed.speed.toFixed(0)} km/h`);
+  // Put the car back on the start line. Reversing 12 m up the stage would
+  // otherwise cost the drive test below 12 m of the ground it measures, and it
+  // would look like the car had got slower.
+  await page.evaluate(() => {
+    const g = window.__v2;
+    const s0 = g.stage.corridor.segments[0];
+    g.car.reset(s0.x, window.__probeGround(s0.x, s0.z) + 0.62, s0.z, Math.atan2(s0.hx, s0.hz));
+    g.referenceDriver.seek(0);
+    window.__stepFixed(240);   // settle, back in first
+  });
+
   // --- drive: 12 s of simulation, following the road --------------------
   //
   // With no steering the car leaves the stage at the first real corner, which
@@ -136,7 +176,12 @@ for (const stage of STAGES) {
       const q = g.car.body.rotation();
       // Advance the centreline cursor rather than searching the whole stage.
       let best = Infinity;
-      for (let i = nearest; i < Math.min(segs.length, nearest + 120); i++) {
+      // Search a little BEHIND as well. §11.2 respawns at the nearest upstream
+      // reset node, up to 120 m back, and a forward-only cursor cannot follow
+      // that — it would keep steering for a point the car no longer occupies,
+      // drive off, be reset again, and loop. Measured on Fafe: 120 m travelled
+      // in twelve seconds, parked exactly on the centreline.
+      for (let i = Math.max(0, nearest - 40); i < Math.min(segs.length, nearest + 120); i++) {
         const d = (segs[i].x - p.x) ** 2 + (segs[i].z - p.z) ** 2;
         if (d < best) { best = d; nearest = i; }
       }
@@ -198,7 +243,10 @@ for (const stage of STAGES) {
   check('the gearbox shifts up', driven.maxGear > 1, `reached gear ${driven.maxGear}`);
   check('travels down the stage', driven.distance > 140,
     `${driven.distance.toFixed(0)} m along, ${driven.moved.toFixed(0)} m travelled`);
-  check('an autopilot can keep it on the road', driven.lateral < 25,
+  // 25 m was the old tolerance, and it was wide enough to hide a car steering
+  // the wrong way: Sweet Lamb passed it at 24.3 m. 14 m is what the same dummy
+  // manages now on the worst stage, with room for a crest.
+  check('an autopilot can keep it on the road', driven.lateral < 14,
     `${driven.lateral.toFixed(1)} m from the centreline`);
   // Airborne over a crest is correct rally behaviour, so the ceiling is
   // generous; what matters is that it is not in orbit and not underground.

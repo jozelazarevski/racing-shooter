@@ -7,7 +7,6 @@
 import * as THREE from 'three';
 import { STAGES, buildStage, type Stage } from './world/stage.ts';
 import { lintStage, lintSummary } from './world/lint.ts';
-import { locate } from './world/corridor.ts';
 import { sampleHeight } from './world/terrain.ts';
 import { initPhysics, createWorld, probeGround, FixedStepper, type PhysicsWorld } from './physics/world.ts';
 import { Vehicle, WHEEL_RADIUS, type DriverInput } from './physics/vehicle.ts';
@@ -16,8 +15,13 @@ import { createRenderer, type Renderer } from './render/scene.ts';
 import { fingerprint } from './core/stageRng.ts';
 import { RaceDirector, formatTime, formatDelta } from './race/director.ts';
 import { RoadDriver } from './race/driver.ts';
+import { CutMonitor, ResetMonitor, nodeFor } from './race/reset.ts';
+import {
+  ITINERARY, classification, completeLeg, damageClass, emptyRally, isComplete,
+  legFor, loadRally, saveRally, unlocked, type RallyState,
+} from './race/rally.ts';
 import { Cannon } from './combat/weapons.ts';
-import { SIM, ROLLOVER } from '../../spec/rally.constants.ts';
+import { SIM, RESET, VEHICLE } from '../../spec/rally.constants.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -79,11 +83,24 @@ class Game {
   cannon!: Cannon;
   /** Arcade score, v1's currency: points for what you destroy. */
   score = 0;
+  /** The rally this stage belongs to. Loaded before the stage builds, because
+   *  it decides how bent the car starts. */
+  rally: RallyState = emptyRally();
+  /** True when this run counts toward the classification — you are driving the
+   *  leg you are ON, not practising one you have already passed. */
+  isCurrentLeg = false;
 
   /** Progress along the centreline. Exposed so the headless harness can drive
    *  the race without reaching into a private field. */
   playerDriverState(x: number, z: number) {
     return this.playerDriver.locate(x, z);
+  }
+
+  /** The driver that tracks the player's car — and, in a reference lap, drives
+   *  it. Exposed for the same reason: a harness that made its own would be
+   *  carrying a second cursor that no reset ever re-seats. */
+  get referenceDriver(): RoadDriver {
+    return this.playerDriver;
   }
 
   async boot(stageId: string): Promise<void> {
@@ -118,10 +135,23 @@ class Game {
     this.car.surface = first.surfaceId as typeof this.car.surface;
     this.car.compound = def.surface === 'tarmac' ? 'tarmac_slick' : def.surface === 'snow' ? 'snow_studded' : 'gravel';
 
+    // §11.2.6, the whole point of the rally: damage is not repaired by a reset,
+    // and only a service park repairs it — so it arrives with the car. A leg
+    // you are re-driving for practice starts fresh, because its result does not
+    // count toward the classification either.
+    this.isCurrentLeg = legFor(def.id) === this.rally.leg && !this.rally.retired;
+    if (this.isCurrentLeg) this.car.damageJ = this.rally.damageJ;
+
     // The rival. Same Vehicle class, same physics, same tyres — the only
     // difference is who supplies the input. A rival on a different model would
     // teach the player the wrong thing about grip.
-    this.rivalDriver = new RoadDriver(this.stage.corridor, 0.78, 2.0);
+    // It drives the stage's own racing line, at a fraction of that line's speed
+    // profile. `bias` holds it 2 m off the line for the first 120 m so the
+    // start straight is not a fight for the same piece of road, then fades.
+    this.rivalDriver = new RoadDriver(this.stage.corridor, 0.82, {
+      line: this.stage.line,
+      bias: 2.0,
+    });
     this.rival = new Vehicle(
       this.phys,
       first.x + -first.hz * 2.6,
@@ -135,8 +165,12 @@ class Game {
     // The player gets a RoadDriver too — not to drive, only to track progress
     // along the centreline with a monotonic cursor. A nearest-segment search
     // over the whole stage would jump between the two legs of a switchback.
-    this.playerDriver = new RoadDriver(this.stage.corridor);
-    this.race = new RaceDirector(def.id, this.stage.length);
+    this.playerDriver = new RoadDriver(this.stage.corridor, 1, { line: this.stage.line });
+    // The finish line is the LAST SEGMENT, not the stage length. Those are not
+    // the same number: the last segment sits one step short of the total, and
+    // the cursor can never report more than it.
+    const last = this.stage.corridor.segments[this.stage.corridor.segments.length - 1]!;
+    this.race = new RaceDirector(def.id, this.stage.length, last.distance);
     this.cannon = new Cannon(this.phys);
 
     const canvas = $('view') as HTMLCanvasElement;
@@ -147,9 +181,19 @@ class Game {
     addEventListener('resize', () => this.view.resize());
 
     $('stage-name').textContent = def.name;
+    const legIndex = legFor(def.id);
     $('stage-sub').textContent =
+      (legIndex >= 0 ? `SS${legIndex + 1}/${ITINERARY.length} · ` : '') +
       `${def.country} · ${def.surface} · ${(this.stage.length / 1000).toFixed(2)} km · ` +
-      `${this.stage.corners.length} corners`;
+      `${this.stage.corners.length} corners` +
+      (this.isCurrentLeg && this.rally.damageJ > 0
+        ? ` · carrying ${(this.rally.damageJ / 1000).toFixed(0)} kJ`
+        : '') +
+      // A run that does not count must say so while you are driving it, not
+      // only when you cross the line.
+      (legIndex >= 0 && !this.isCurrentLeg
+        ? this.rally.retired ? ' · RETIRED — practice only' : ' · practice — does not count'
+        : '');
     $('build-info').innerHTML =
       `built in ${buildMs.toFixed(0)} ms · ${this.stage.objects.length.toLocaleString()} objects · ` +
       `seed ${this.stage.rng.seed} · fingerprint <b>${fingerprint(this.stage.objects)}</b><br>` +
@@ -179,36 +223,31 @@ class Game {
       const cmd = this.input.sample(h);
       // Held on the line until the lights go out — but steering still works, so
       // you can set the car up rather than stare at a frozen screen.
-      const player = this.race.locked ? { ...cmd, throttle: 0, brake: 1 } : cmd;
+      //
+      // Held on the HANDBRAKE, not the foot brake. A rally start is, and more
+      // to the point a foot brake held at a standstill is exactly how reverse
+      // is selected — so the old version put the car into reverse on the grid
+      // and started every stage showing R.
+      const player = this.race.locked
+        ? { ...cmd, throttle: 0, brake: 0, handbrake: true }
+        : cmd;
       this.lastSteer = cmd.steer;
       this.car.step(player, h);
 
-      // Tracers: a stretched box from where each shell was to where it is.
-    const m = new THREE.Matrix4();
-    const up = new THREE.Vector3(0, 1, 0);
-    const a = new THREE.Vector3();
-    const b = new THREE.Vector3();
-    for (let i = 0; i < this.cannon.shots.length; i++) {
-      const sh = this.cannon.shots[i]!;
-      if (!sh.alive) { m.makeScale(0, 0, 0); this.view.tracers.setMatrixAt(i, m); continue; }
-      a.set(sh.px, sh.py, sh.pz);
-      b.set(sh.x, sh.y, sh.z);
-      const len = Math.max(0.5, a.distanceTo(b) * 2.2);
-      const mid = a.clone().lerp(b, 0.5);
-      const dir = b.clone().sub(a).normalize();
-      m.lookAt(new THREE.Vector3(), dir, up);
-      m.scale(new THREE.Vector3(1, 1, len));
-      m.setPosition(mid);
-      this.view.tracers.setMatrixAt(i, m);
-    }
-    this.view.tracers.instanceMatrix.needsUpdate = true;
-
-    const rp = this.rival.body.translation();
+      // NOTE: the tracer meshes are updated once per FRAME, in syncCar. An
+      // earlier copy of that block also ran here, inside the fixed step, which
+      // meant rebuilding 24 instance matrices up to five times per frame and
+      // throwing away four of the five. Rendering does not belong in the
+      // physics loop even when it is cheap.
+      const rp = this.rival.body.translation();
       const rq = this.rival.body.rotation();
       const rvx = 2 * (rq.x * rq.z + rq.w * rq.y);
       const rvz = 1 - 2 * (rq.x * rq.x + rq.y * rq.y);
-      const rivalCmd = this.rivalDriver.drive(rp.x, rp.z, rvx, rvz, this.rival.telemetry.speedMs);
-      this.rival.step(this.race.locked ? { ...rivalCmd, throttle: 0, brake: 1 } : rivalCmd, h);
+      const rivalCmd = this.rivalDriver.drive(rp.x, rp.z, rvx, rvz, this.rival.telemetry.speedMs, h);
+      this.rival.step(
+        this.race.locked ? { ...rivalCmd, throttle: 0, brake: 0, handbrake: true } : rivalCmd,
+        h,
+      );
 
       this.stepWeapons(cmd, h);
       this.phys.world.step();
@@ -218,7 +257,12 @@ class Game {
       this.race.update(h, this.playerDriver.locate(pp.x, pp.z).distance);
     });
 
-    this.enforceWorldBounds();
+    // Real frame time. §11.1's delays are in seconds of stage time, so feeding
+    // this a constant meant they ran at whatever multiple of real time the
+    // constant happened to be — three times fast at 60 fps, seven times fast in
+    // the headless harness, which is how Fafe's smoke dummy came to be "stuck"
+    // 0.8 s after it stopped rather than 6 s.
+    this.enforceWorldBounds(Math.min(dt, 0.25));
     this.emitParticles(dt);
     this.syncCar();
     this.updateCamera(dt);
@@ -407,7 +451,8 @@ class Game {
     const race = this.race;
 
     $('speed').textContent = Math.round(t.speedKmh).toString();
-    $('gear').textContent = t.gear.toString();
+    this.updateDial(t.speedKmh);
+    $('gear').textContent = t.gear === 0 ? 'R' : t.gear.toString();
     $('rpm-bar').style.width = `${Math.min(100, (t.rpm / 7200) * 100)}%`;
     $('rpm-bar').className = t.rpm > 6600 ? 'bar red' : 'bar';
 
@@ -428,7 +473,11 @@ class Game {
       $('pacenote').textContent = '';
     }
 
-    $('time').textContent = formatTime(race.elapsed);
+    // The clock shows the time that counts: driving plus §11 penalties, with
+    // the penalty called out so it is obvious where the seconds went.
+    $('time').textContent = formatTime(race.clock);
+    $('penalty').textContent = race.penalty ? `+${race.penalty.toFixed(0)}s` : '';
+    $('penalty').className = race.penalty ? 'bad' : '';
 
     // Countdown, and the sector split that replaces it once running.
     const big = $('big');
@@ -461,8 +510,10 @@ class Game {
     $('surface').textContent = onRoad ? seg.surfaceId : 'OFF ROAD';
     $('surface').className = onRoad ? '' : 'bad';
 
-    // Damage in joules, §9. Terminal at 120 kJ cumulative.
-    $('damage-bar').style.width = `${Math.min(100, (t.damageJ / 120_000) * 100)}%`;
+    // Damage in joules, §9. Terminal at 120 kJ cumulative — shown as HULL
+    // INTEGRITY, counting down, because a driver wants to know what is left
+    // rather than what has been spent.
+    this.updateHull(t.damageJ);
 
     const slip = Math.max(...t.wheels.map((w) => w.utilisation));
     $('debug').textContent =
@@ -474,11 +525,64 @@ class Game {
     if (race.phase === 'finished' && race.result && !this.resultShown) this.showResult();
   }
 
+  /** The dial sweeps 240°, from -120° at rest to +120° at full scale. */
+  private updateDial(speedKmh: number): void {
+    const SCALE = 220;                       // km/h at the end of the arc
+    const t = Math.max(0, Math.min(1, speedKmh / SCALE));
+    $('dial-needle').setAttribute('transform', `rotate(${-120 + t * 240} 60 60)`);
+    // 259 is the arc's length in user units; the dash offset walks it round.
+    ($('dial-arc') as unknown as SVGPathElement).setAttribute(
+      'stroke-dashoffset', String(259 * (1 - t)),
+    );
+    $('dial-arc').setAttribute('stroke', t > 0.86 ? '#ff6b52' : t > 0.66 ? '#ffb545' : '#7ddc6a');
+    $('dial-value').textContent = Math.round(speedKmh).toString();
+  }
+
+  /** Twelve segments of hull, §9's 120 kJ terminal split into hits you can
+   *  count. Built once and then only reclassed, because rebuilding twelve
+   *  elements every frame is twelve layout invalidations every frame. */
+  private hullCells: HTMLElement[] = [];
+  private updateHull(damageJ: number): void {
+    const N = 12;
+    if (!this.hullCells.length) {
+      const host = $('hull');
+      for (let i = 0; i < N; i++) {
+        const cell = document.createElement('i');
+        host.appendChild(cell);
+        this.hullCells.push(cell);
+      }
+    }
+    const left = Math.max(0, 1 - damageJ / 120_000);
+    const lit = Math.ceil(left * N);
+    for (let i = 0; i < N; i++) {
+      const cell = this.hullCells[i]!;
+      cell.className = i < lit ? (left < 0.34 ? 'warn' : '') : 'gone';
+    }
+    $('hull-pct').textContent = Math.round(left * 100).toString();
+  }
+
   private resultShown = false;
 
   private showResult(): void {
     const r = this.race.result!;
     this.resultShown = true;
+
+    // Record the leg BEFORE drawing, so the panel can show where the rally
+    // stands afterwards rather than where it stood before this stage.
+    let advanced = false;
+    if (this.isCurrentLeg) {
+      const before = this.rally;
+      this.rally = completeLeg(this.rally, {
+        stageId: this.stage.def.id,
+        raw: r.raw,
+        penalty: r.penalty,
+        resets: this.resets[0]!,
+        cuts: this.cuts.cuts,
+        damageJ: this.car.telemetry.damageJ,
+      });
+      advanced = this.rally !== before;
+      saveRally(this.rally);
+    }
     const rivalGap = this.rivalDriver.state.distance - this.playerDriver.state.distance;
     const rows = this.race.splits
       .map((s) => {
@@ -494,27 +598,75 @@ class Game {
       (r.previous === null
         ? 'First run on this stage.'
         : `Previous best ${formatTime(r.previous)} · <span class="${r.total < r.previous ? 'good' : 'bad-split'}">${formatDelta(r.total - r.previous)}</span>`) +
-      `<br>${rivalGap < 0 ? 'Beat the rival' : 'Rival ahead'} by ${Math.abs(Math.round(rivalGap))} m`;
+      `<br>${rivalGap < 0 ? 'Beat the rival' : 'Rival ahead'} by ${Math.abs(Math.round(rivalGap))} m` +
+      (r.penalty
+        ? `<br><span class="bad">${formatTime(r.raw)} driving + ${r.penalty.toFixed(0)}s penalties</span>` +
+          ` — ${this.resets[0]} reset${this.resets[0] === 1 ? '' : 's'}, ${this.cuts.cuts} cut${this.cuts.cuts === 1 ? '' : 's'}`
+        : '<br>Clean run: no resets, no cuts.');
     $('result-splits').innerHTML = rows;
+
+    // The rally line: where this leg leaves you.
+    const rally = $('result-rally');
+    if (!advanced) {
+      rally.innerHTML = this.rally.retired
+        ? '<span class="bad">RETIRED — the rally is over. START A NEW RALLY to run it again.</span>'
+        : '<span class="dim">Practice run — the classification counts the leg you are on.</span>';
+    } else if (this.rally.retired) {
+      rally.innerHTML =
+        `<span class="bad">RETIRED — ${(this.car.telemetry.damageJ / 1000).toFixed(0)} kJ, ${damageClass(this.car.telemetry.damageJ)}.</span>` +
+        '<br>§9 says terminal, so the car does not start the next stage.';
+    } else if (isComplete(this.rally)) {
+      rally.innerHTML =
+        `<span class="good">RALLY COMPLETE</span> — ${ITINERARY.length} stages in ` +
+        `<b>${formatTime(classification(this.rally))}</b>`;
+    } else {
+      const next = ITINERARY[this.rally.leg]!;
+      const nextName = STAGES.find((s) => s.id === next.stageId)?.name ?? next.stageId;
+      rally.innerHTML =
+        `Rally ${this.rally.leg}/${ITINERARY.length} · <b>${formatTime(classification(this.rally))}</b>` +
+        ` · damage ${(this.rally.damageJ / 1000).toFixed(0)} kJ (${damageClass(this.rally.damageJ)})` +
+        (next.service
+          ? `<br><span class="good">SERVICE PARK</span> before ${nextName} — damage repaired.`
+          : `<br>Next: ${nextName}, and the damage comes with you.`);
+      $('next-leg').textContent = `NEXT: ${nextName}`;
+      $('next-leg').style.display = 'block';
+      $('next-leg').onclick = () => { location.search = `?stage=${next.stageId}`; };
+    }
     $('result').style.display = 'flex';
   }
 
   /**
-   * Recovery. §7 gives 2.5 s on the roof before a reset; leaving the world is
-   * not in the spec because in a specified game it cannot happen, but it can
-   * here: a car that slides off the outside of a corner at speed runs past the
-   * 90 m of terrain either side of the corridor and falls for ever. Measured on
-   * Safari, it reached 575 km/h straight down — which is the terminal velocity
-   * the spec's own drag coefficient and 11 m/s² gravity imply, so at least the
-   * aerodynamics were right.
+   * §11 — RESET, PENALTIES, BOUNDARIES.
    *
-   * Phase 3 turns this into proper reset nodes every 120 m (lint L12). For now
-   * it is the difference between a bad corner and a lost run.
+   * What was here before was one hand-written rule: if the car is upside down,
+   * outside the world, or has not moved for four seconds, put it back two
+   * segments ahead of wherever it stopped. None of that is in the spec. It
+   * could gain you ground — two segments ahead of a car beached on the outside
+   * of a hairpin is past the hairpin — and it cost nothing at all.
+   *
+   * Now: §11.1's six triggers, each with its own delay and its own timer;
+   * §11.2's respawn at the nearest UPSTREAM reset node the car legitimately
+   * passed, facing the stage, settled, with immunity and a time penalty; and
+   * §11.3's cut detection on the roadbed-plus-shoulder corridor.
+   *
+   * Leaving the world is not one of the spec's triggers, because in a specified
+   * game it cannot happen. It can here: a car that slides off the outside of a
+   * corner at speed runs past the 90 m of terrain either side of the corridor
+   * and falls for ever. Measured on Safari, it reached 575 km/h straight down —
+   * which is the terminal velocity the spec's own drag coefficient and 11 m/s²
+   * gravity imply, so at least the aerodynamics were right. It is mapped onto
+   * §11.1's "outside the stage volume", which is what it is.
    */
-  /** Seconds each car has spent going nowhere. */
-  private stuckFor = [0, 0];
+  readonly monitors = [new ResetMonitor(), new ResetMonitor()];
+  readonly cuts = new CutMonitor();
+  /** How many times each car has had to be put back on the road. §15 L15 asks
+   *  for a reference lap with ZERO of these, so it has to be counted rather
+   *  than quietly performed. */
+  readonly resets = [0, 0];
 
-  enforceWorldBounds(dt = SIM.fixedTimestep * 6): void {
+  /** @param dt seconds of stage time since the last call. It is a REQUIRED
+   *  measurement, not a constant: §11.1's triggers are all times. */
+  enforceWorldBounds(dt: number): void {
     const hf = this.stage.heightfield;
     const cars = [
       [this.car, this.playerDriver],
@@ -523,47 +675,249 @@ class Game {
     for (let n = 0; n < cars.length; n++) {
       const [car, driver] = cars[n]!;
       const p = car.body.translation();
+      const monitor = this.monitors[n]!;
 
-      // Stuck: wedged against a tree, on its side in a ditch, nose into a bank.
-      // The player has R for this; a rival has nothing, and a stranded rival
-      // makes the whole race pointless. Measured on Safari, the AI beached
-      // itself at 798 m and sat there for the rest of the run.
-      this.stuckFor[n] = car.telemetry.speedMs < 1.5 && this.race.phase === 'running'
-        ? this.stuckFor[n]! + dt
-        : 0;
-      const stuck = this.stuckFor[n]! > 4;
       const outside =
         p.x < hf.x0 || p.z < hf.z0 ||
         p.x > hf.x0 + hf.nx * hf.cell || p.z > hf.z0 + hf.nz * hf.cell;
-      const fallen = p.y < hf.minY - 25;
-      const rolled = car.telemetry.roofTime > ROLLOVER.onRoofResetDelay;
-      if (!outside && !fallen && !rolled && !stuck) continue;
-      this.stuckFor[n] = 0;
 
-      // Put it back a little way ahead, so a car that beached ON a segment does
-      // not reset straight back into the same obstacle.
-      const seg = this.stage.corridor.segments[
-        Math.min(this.stage.corridor.segments.length - 1, driver.state.cursor + 2)
-      ]!;
-      car.reset(
-        seg.x,
-        sampleHeight(hf, seg.x, seg.z) + 0.6,
-        seg.z,
-        Math.atan2(seg.hx, seg.hz),
-      );
+      const due = monitor.update(dt, {
+        // §11.1 "on roof, no input" — the vehicle already keeps the timer, so
+        // the trigger is simply that it is inverted and the monitor times it.
+        roof: car.telemetry.onRoof,
+        outOfBounds: outside,
+        // "Vertical drop with no ground contact below deck level."
+        offDeck: p.y < hf.minY - 25,
+        // "Stuck, speed under 0.5 m/s with throttle held." The spec's numbers,
+        // not the 1.5 m/s over 4 s this used to invent. A car crawling out of a
+        // ditch at 1 m/s is recovering, and used to be reset for it.
+        stuck: this.race.phase === 'running' && car.telemetry.speedMs < RESET.stuckSpeedThreshold,
+      });
+      if (!due) continue;
+
+      this.resets[n] = (this.resets[n] ?? 0) + 1;
+      // Tell the driver where it went wrong BEFORE moving the car, while
+      // `driver.state.distance` still says where that was.
+      driver.beCautiousAt(driver.state.distance);
+      monitor.serve();
+      // The player's penalty is the one that counts; a rival's reset is a
+      // rival's problem and does not touch the player's clock.
+      if (n === 0) this.race.penalty += RESET.penaltySeconds.standard;
+      this.respawn(car, driver);
+    }
+
+    // §11.3 cutting, player only. A rival cutting costs the player nothing.
+    const tel = this.car.telemetry;
+    const cursor = this.stage.corridor.segments[this.playerDriver.state.cursor]!;
+    let wheelsOut = 0;
+    for (const w of tel.wheels) {
+      const lateral = (w.contact.x - cursor.x) * -cursor.hz + (w.contact.z - cursor.z) * cursor.hx;
+      const side = lateral >= 0 ? 0 : 1;
+      // §11.3: "The corridor is defined by the roadbed plus the shoulder."
+      if (Math.abs(lateral) > cursor.roadbedWidth / 2 + cursor.shoulderWidth[side]!) wheelsOut++;
+    }
+    const before = this.cuts.penaltySeconds;
+    if (this.race.phase === 'running') {
+      this.cuts.update(dt, wheelsOut, this.playerDriver.state.distance);
+      this.race.penalty += this.cuts.penaltySeconds - before;
     }
   }
 
-  /** Put the car back on the centreline at the nearest segment. */
-  private resetToRoad(): void {
-    const p = this.car.body.translation();
-    const { seg } = locate(this.stage.corridor, p.x, p.z);
-    this.car.reset(
-      seg.x,
-      sampleHeight(this.stage.heightfield, seg.x, seg.z) + 0.60,
-      seg.z,
-      Math.atan2(seg.hx, seg.hz),
+  /** §11.2, all six rules. */
+  private respawn(car: Vehicle, driver: RoadDriver): void {
+    const node = nodeFor(this.stage.resetNodes, driver.state.distance);
+    // ASK THE PHYSICS WORLD WHERE THE GROUND IS, not the heightfield function.
+    //
+    // `sampleHeight` is a bilinear read of the height buffer; the collider
+    // Rapier builds from the same buffer is two triangles per cell, and on any
+    // slope the two disagree. Spawning at the sampled height put the car
+    // INSIDE the collider, where the solver holds it: wheels at 0.03 m of
+    // compression instead of 0.08, almost no load, and therefore almost no
+    // tyre force. It looked exactly like being wedged against scenery.
+    //
+    // Measured on Col de Turini: the car respawned at the node at 2,242 m —
+    // clear straight, nearest collidable 5.25 m away — and could not move.
+    // Six resets in a row at the same metre, at every speed the driver tried,
+    // including a third of the profile. Nothing the driver did could have
+    // worked, because the car was in the ground.
+    //
+    // A raycast against the world the car actually drives on cannot disagree
+    // with itself.
+    const probed = probeGround(this.phys, node.x, node.z, car.body);
+    const ground = probed ?? sampleHeight(this.stage.heightfield, node.x, node.z);
+    car.reset(
+      node.x,
+      // 3: "ride height settled, no spawn drop". VEHICLE.cogHeight is exactly
+      // where the body sits at the static compression this spring rate implies,
+      // so the car appears already resting rather than falling.
+      //
+      // Plus a decimetre of clearance so the wheels start their probe above
+      // the surface rather than through it. 0.14 s of fall — invisible.
+      ground + VEHICLE.cogHeight + 0.10,
+      node.z,
+      // 2: "face the stage direction". Velocity and angular velocity are zeroed
+      // inside Vehicle.reset.
+      node.heading,
     );
+    // 4: 2.5 s of collision immunity, ending early on first throttle. The
+    // vehicle owns the countdown because it is the vehicle that decides whether
+    // an impact counts.
+    car.immuneFor = RESET.immunitySeconds;
+    // The driver's cursor moves with the car. It searches forward only, so
+    // without this it cannot follow a respawn that goes backwards — and a
+    // driver steering for a point it passed a hundred metres ago crashes in the
+    // same place for ever.
+    driver.seek(node.index);
+    // 6: "damage is not repaired by a reset" — nothing here touches damageJ,
+    // and that is deliberate rather than an omission.
+  }
+
+  /**
+   * THE REFERENCE LAP — §15 L15.
+   *
+   * "Stage completable by the AI reference lap with zero resets and under 8 kJ
+   *  of cumulative impact energy." That is a check the static lint can never
+   *  answer, because it is a statement about a car driving, not about a data
+   *  structure. So it is measured here, by the game, with the same driver, the
+   *  same racing line and the same physics the player gets — and reported by
+   *  `tools/reference-lap.mjs` as a build gate.
+   *
+   * The rival is left where it is. It is another car on the road, and a
+   * reference lap that needed the road to itself would be measuring a different
+   * stage from the one that ships.
+   */
+  runReferenceLap(skill = 1.0, maxSeconds = 420): {
+    finished: boolean;
+    seconds: number;
+    distance: number;
+    resets: number;
+    damageJ: number;
+    offRoadSeconds: number;
+    minSpeedKmh: number;
+    slowestPoint: number;
+    /** §11.3 cuts and the total §11 time penalty they and the resets cost. */
+    cuts: number;
+    penaltySeconds: number;
+    /** Metre mark where the lap gave up because the same recovery kept
+     *  repeating, or 0. See the note at the loop check below. */
+    loopedAt: number;
+    /** Where each recovery happened, metres along the stage. A reference lap
+     *  that fails L15 is only useful if it says WHERE. */
+    resetPoints: number[];
+  } {
+    // The reference lap drives with the PLAYER's driver, not a third instance.
+    // Two RoadDrivers on one car means two cursors, and only one of them is the
+    // one a reset re-seats — so the other keeps its stale idea of where the car
+    // is and the lap measures nothing.
+    const driver = this.playerDriver;
+    driver.skill = skill;
+    const h = SIM.fixedTimestep;
+    const steps = Math.round(maxSeconds / h);
+    // The countdown is race presentation, not part of the stage.
+    this.race.start();
+    this.resets[0] = 0;
+    let offRoad = 0;
+    let minSpeed = Infinity;
+    let slowestPoint = 0;
+    let elapsed = 0;
+    const resetPoints: number[] = [];
+    let lastResetAt = -1;
+    let repeats = 0;
+    let loopedAt = 0;
+
+    for (let i = 0; i < steps; i++) {
+      const p = this.car.body.translation();
+      const q = this.car.body.rotation();
+      const fx = 2 * (q.x * q.z + q.w * q.y);
+      const fz = 1 - 2 * (q.x * q.x + q.y * q.y);
+      const speed = this.car.telemetry.speedMs;
+      this.car.step(driver.drive(p.x, p.z, fx, fz, speed, h), h);
+
+      const rp = this.rival.body.translation();
+      const rq = this.rival.body.rotation();
+      this.rival.step(
+        this.rivalDriver.drive(
+          rp.x, rp.z,
+          2 * (rq.x * rq.z + rq.w * rq.y),
+          1 - 2 * (rq.x * rq.x + rq.y * rq.y),
+          this.rival.telemetry.speedMs,
+          h,
+        ),
+        h,
+      );
+
+      this.phys.world.step();
+      this.phys.time += h;
+      elapsed += h;
+
+      const state = driver.state;
+      this.race.update(h, state.distance);
+      const seg = this.stage.corridor.segments[state.cursor]!;
+      const side = state.lateral >= 0 ? 0 : 1;
+      if (Math.abs(state.lateral) > seg.roadbedWidth / 2 + seg.shoulderWidth[side]!) offRoad += h;
+      // Ignore the standing start: every lap begins at 0 km/h and that is not
+      // the stage's slowest point.
+      if (state.distance > 60 && speed * 3.6 < minSpeed) {
+        minSpeed = speed * 3.6;
+        slowestPoint = state.distance;
+      }
+      // The same recovery the player gets, at the same rate the render loop
+      // calls it. Each one is counted, and one is a failed reference lap.
+      if (i % 6 === 0) {
+        const before = this.resets[0]!;
+        this.enforceWorldBounds(h * 6);
+        if (this.resets[0]! > before) {
+          const where = Math.round(state.distance);
+          if (resetPoints.length < 12) resetPoints.push(where);
+          // A RESET LOOP, and it deserves a name rather than a timeout.
+          //
+          // §11.2 respawns at the nearest upstream node. A human then drives
+          // the corner differently; a deterministic AI drives it identically,
+          // beaches in the same place, and is respawned to the same node for
+          // the rest of the clock. Reporting that as "DNF at 2.26 km" would
+          // suggest the car stopped there, when what happened is that it
+          // reached there thirty-three times. So the lap ends and says so.
+          if (where === lastResetAt) repeats++; else { repeats = 0; lastResetAt = where; }
+          // Five, not two. The driver takes a fifth off its target speed at a
+          // place each time it comes to grief there, so the third and fourth
+          // attempts are genuinely different from the first — 0.8, 0.64, 0.51.
+          // Calling a loop after two denied that its own learning a chance to
+          // work.
+          if (repeats >= 5) { loopedAt = where; break; }
+        }
+      }
+      if (this.race.phase === 'finished') break;
+    }
+
+    return {
+      finished: this.race.phase === 'finished',
+      seconds: elapsed,
+      distance: this.playerDriver.state.distance,
+      resets: this.resets[0]!,
+      damageJ: this.car.telemetry.damageJ,
+      offRoadSeconds: offRoad,
+      minSpeedKmh: Number.isFinite(minSpeed) ? minSpeed : 0,
+      slowestPoint,
+      cuts: this.cuts.cuts,
+      penaltySeconds: this.race.penalty,
+      loopedAt,
+      resetPoints,
+    };
+  }
+
+  /**
+   * The R key: §11.1's "player requested" trigger.
+   *
+   * It goes through the same §11.2 respawn as every other trigger, which means
+   * it also carries the same 10 s penalty. That is the point of a penalty — a
+   * reset that is free is a teleport, and the fastest way round Col de Turini
+   * would be to press R at every hairpin.
+   */
+  private resetToRoad(): void {
+    this.monitors[0]!.serve();
+    this.race.penalty += RESET.penaltySeconds.standard;
+    this.resets[0] = (this.resets[0] ?? 0) + 1;
+    this.respawn(this.car, this.playerDriver);
   }
 }
 
@@ -576,18 +930,92 @@ function setStatus(text: string): void {
 // --- boot -------------------------------------------------------------------
 const game = new Game();
 
+// The rally is loaded before anything is built, because it decides which stages
+// may be started and how bent the car starts.
+game.rally = loadRally();
+const open = unlocked(game.rally);
+
+/** The stage the URL asked for, if it names a real one. Read before the list is
+ *  built so a locked stage opened by URL still appears selected in it. */
+function initialId(): string {
+  const q = new URLSearchParams(location.search).get('stage');
+  return q && STAGES.some((s) => s.id === q) ? q : '';
+}
+
 const select = $('stage-select') as HTMLSelectElement;
 for (const s of STAGES) {
   const opt = document.createElement('option');
   opt.value = s.id;
-  opt.textContent = `${s.name} — ${s.country}`;
+  const n = legFor(s.id) + 1;
+  opt.textContent = `${n ? `SS${n} ` : ''}${s.name} — ${s.country}`;
+  // A stage you have not reached cannot be picked from the list. An itinerary
+  // you can skip to the end of is a stage select with extra words. A URL still
+  // opens it — see the note below.
+  opt.disabled = !open.has(s.id) && s.id !== initialId();
   select.appendChild(opt);
 }
 
-const initial = new URLSearchParams(location.search).get('stage') ?? STAGES[0]!.id;
-select.value = STAGES.some((s) => s.id === initial) ? initial : STAGES[0]!.id;
+// An explicit ?stage= opens ANY stage that exists, locked or not.
+//
+// The lock is a UI affordance — it shapes the itinerary and the select — and
+// treating it as an access control is both pointless (it is a URL) and
+// actively harmful. Silently substituting the current leg for a locked one
+// meant `npm run reference` asked for six stages, was given Ouninpohja six
+// times, and reported "every stage passes L15". A run that does not count is
+// marked as practice; it is not redirected.
+const asked = new URLSearchParams(location.search).get('stage');
+const startAt = ITINERARY[Math.min(game.rally.leg, ITINERARY.length - 1)]!.stageId;
+const initial = asked && STAGES.some((s) => s.id === asked) ? asked : startAt;
+select.value = initial;
 select.addEventListener('change', () => {
   location.search = `?stage=${select.value}`;
+});
+
+// --- the itinerary ----------------------------------------------------------
+function renderItinerary(): void {
+  const rows: string[] = [];
+  for (let i = 0; i < ITINERARY.length; i++) {
+    const legDef = ITINERARY[i]!;
+    if (legDef.service) {
+      rows.push('<tr class="service"><td colspan="4">— SERVICE PARK · DAMAGE REPAIRED —</td></tr>');
+    }
+    const def = STAGES.find((s) => s.id === legDef.stageId)!;
+    const done = game.rally.results[i];
+    const isNow = i === game.rally.leg && !game.rally.retired;
+    const locked = !open.has(legDef.stageId);
+    const time = done ? formatTime(done.raw + done.penalty) : isNow ? 'NOW' : '—';
+    const notes = done
+      ? [done.penalty ? `+${done.penalty.toFixed(0)}s` : '', done.resets ? `${done.resets}R` : '',
+         done.cuts ? `${done.cuts}C` : ''].filter(Boolean).join(' ') || 'clean'
+      : '';
+    const name = locked
+      ? def.name
+      : `<a href="?stage=${def.id}">${def.name}</a>`;
+    rows.push(
+      `<tr class="${isNow ? 'now' : locked ? 'locked' : ''}">` +
+      `<td>SS${i + 1}</td><td>${name}</td><td>${time}</td><td>${notes}</td></tr>`,
+    );
+  }
+  $('itinerary-legs').innerHTML = rows.join('');
+  $('itinerary-sub').innerHTML = game.rally.retired
+    ? '<span class="bad">RETIRED.</span> §9 calls the damage terminal, so the car does not start again. Only a new rally clears it.'
+    : isComplete(game.rally)
+      ? `<span class="good">COMPLETE</span> — ${ITINERARY.length} stages in <b>${formatTime(classification(game.rally))}</b>`
+      : `Classification <b>${formatTime(classification(game.rally))}</b> after ${game.rally.leg} of ${ITINERARY.length}` +
+        `<br>Carrying ${(game.rally.damageJ / 1000).toFixed(0)} kJ of damage (${damageClass(game.rally.damageJ)}).` +
+        ' §11.2.6: only a service park repairs it.';
+}
+renderItinerary();
+
+$('itinerary-btn').addEventListener('click', () => {
+  renderItinerary();
+  $('itinerary').classList.add('open');
+});
+$('itinerary-close').addEventListener('click', () => $('itinerary').classList.remove('open'));
+$('new-rally').addEventListener('click', () => {
+  game.rally = emptyRally();
+  saveRally(game.rally);
+  location.search = `?stage=${ITINERARY[0]!.stageId}`;
 });
 
 // Restart re-runs the same stage. The world is seeded, so it rebuilds byte for
@@ -633,6 +1061,9 @@ game.boot(select.value).then(applyControls).catch((err) => {
 
 // Expose for the headless harness, the same way v1 exposes __game.
 (window as unknown as Record<string, unknown>).__v2 = game;
+// §15 L15: drive the whole stage with the AI and report what happened.
+(window as unknown as Record<string, unknown>).__referenceLap =
+  (skill?: number, maxSeconds?: number) => game.runReferenceLap(skill, maxSeconds);
 // Ask the solver where the ground is, for the smoke test.
 (window as unknown as Record<string, unknown>).__probeGround =
   (x: number, z: number) => probeGround(game.phys, x, z, game.car.body);
@@ -654,7 +1085,11 @@ game.boot(select.value).then(applyControls).catch((err) => {
       // start line for ever with the clock at zero.
       const p = game.car.body.translation();
       game.race.update(SIM.fixedTimestep, game.playerDriverState(p.x, p.z).distance);
-      if (i % 30 === 0) game.enforceWorldBounds();
+      // Every step, with the step's own dt. `i % 30` looked cheaper but this
+      // function is called with n = 4 from the harness, so the modulo matched
+      // on every call and the recovery ran seven times too often, each time
+      // advancing §11.1's clocks by a quarter of a second.
+      game.enforceWorldBounds(SIM.fixedTimestep);
     }
   };
 

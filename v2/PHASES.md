@@ -1,4 +1,4 @@
-# v2 — Phases 0, 1 and 2
+# v2 — Phases 0 to 4
 
 **Live: https://jozelazarevski.github.io/racing-shooter/play-v2/**
 
@@ -7,10 +7,12 @@ whole migration, exactly as `MIGRATION.md` promised.
 
 ```
 cd v2
-npm run gate     # typecheck + 58 unit tests
-npm run lint     # build all six stages, run §15 against each, fail loudly
-npm run build    # -> ../play-v2
-node tools/smoke.mjs   # drive every stage headless (needs a server on :8902)
+npm run gate       # typecheck + 140 unit tests
+npm run lint       # build all six stages, run §15 against each, fail loudly
+npm run build      # -> ../play-v2
+npm run smoke      # drive every stage headless (needs a server on :8902)
+npm run reference  # §15 L15: a full AI lap of every stage, measured
+npm run touch      # the pad steers the way the thumb points (real touch events)
 ```
 
 ---
@@ -132,17 +134,22 @@ Every one of these was found by measuring, not by reading the code.
 - **Tier 3 does not fall.** §3.1 specifies "falls, momentum exchange"; here
   young trees are static colliders. Collision, tier and damage classification
   are correct — only knock-down is missing. Needs collider streaming.
-- **Col de Turini rolls the test autopilot** in the switchbacks. Reported as
-  `KNOWN` by the smoke test on every run so it stays visible.
-- **§15 L07, L10–L13, L15 are SKIPPED**, each with its reason printed. They need
-  a ballistic launch model, water volumes, bridges, reset nodes, fauna and an AI
-  reference lap. A lint that returned green for a check it did not run would be
-  worse than no lint.
-- **§3.2 rules 4–5** (apex occlusion, canopy clearance) need a racing line and
-  canopy geometry.
-- **Region palettes are placeholders**, not the `RALLY_WORLD_BIBLE` values.
-  Phase 4.
-- **No weapons, no AI rivals, no progression** in v2 yet. They live in v1.
+- **Col de Turini rolled the test autopilot** in the switchbacks, and was
+  reported as `KNOWN` by the smoke test. It was inverted steering, not the
+  switchbacks; the KNOWN list is now empty. See Phase 3.
+- **§15 L07, L10, L11, L13 and L15 are SKIPPED**, each with its reason printed.
+  They need a ballistic launch model, water volumes, bridges and fauna. L12 —
+  reset nodes — landed in Phase 3 and now passes on every stage. L15 is
+  different in kind: it is a claim about a car driving, so the lint can never
+  answer it and `npm run reference` does instead. A lint that returned green for
+  a check it did not run would be worse than no lint.
+- **§3.2 rules 4–5** (apex occlusion, canopy clearance) need canopy geometry.
+  The racing line half of that arrived in Phase 3, so rule 4 is now reachable.
+- **Region palettes are the `RALLY_WORLD_BIBLE` values** as of Phase 4. What
+  is still placeholder is the geometry they are painted on: no structures, no
+  water, no fauna.
+- **No progression across stages** in v2 yet. Weapons and a rival have landed;
+  the career, the garage, upgrades and the 28 v1 worlds have not.
 - **Content parity with v1 is a long way off.** v1 is ~13,000 lines: weapons,
   choppers, hostiles, traffic, 28 worlds, the rally-star progression, the
   garage, upgrades, audio, the offline PWA. v2 has none of it. What has come
@@ -186,14 +193,14 @@ Two more things found by measuring:
 - **The final sector never recorded.** The finish fired at `length − 1` and
   closed the race before the boundary at `length` could be crossed.
 
-### Known gap in the race
+### Known gap in the race — CLOSED, and it was not what it looked like
 
-**The AI cannot yet complete a full stage cleanly at high skill.** At skill 1.0
-it crashes and beaches itself; auto-recovery gets it moving again, but a clean
-AI run start to finish is not proven. The rival runs at 0.78, which is
-conservative enough to be a fair pacer over the early sectors. Racing it over a
-whole stage is a driver-quality problem, not a physics one, and it is the next
-thing to fix.
+This section used to read: *"the AI cannot yet complete a full stage cleanly at
+high skill... racing it over a whole stage is a driver-quality problem, not a
+physics one."* Half of that was wrong. The AI could not complete a stage because
+**the finish line was unreachable and the steering was inverted**, and no amount
+of driver quality would have fixed either. See Phase 3 below. The rival now runs
+the stage's racing line at skill 0.82.
 
 ## Controls and cameras — brought across from v1
 
@@ -302,7 +309,502 @@ collider, hides the instance and scores. Fired at a hillside it hits the
 hillside — **you cannot shoot through terrain**, which cost me three confusing
 test runs before I recognised it as the right answer.
 
+## Phase 3, part one — the racing line, and three bugs it found
+
+The plan for this round was "a better AI line". Building one meant driving the
+stages end to end for the first time, and that turned up three defects that had
+nothing to do with the AI and everything to do with the game.
+
+### 1. Steering was inverted. All of it.
+
+`ArrowRight` produced `+1`. The touch pad's rightward drag produced `+1`. The
+camera swung right on `+1`. And `+1` turned the car **left**.
+
+`steerAngle` is a rotation about the body's up axis. A positive rotation about
+`+y` carries the car's local forward (`+z`) toward local `+x` — and with forward
+at `+z`, the car's right is `−x`, because right = forward × up. So the geometry
+meant "left" by the number every caller meant "right" by.
+
+Measured rather than reasoned, because a sign argument is exactly the kind of
+thing one talks oneself into: hold `+0.5` on Safari's opening straight at
+93 km/h and the car moves **7.2 m toward −normal**, which is the driver's left.
+`.probe/steer-sign.mjs` is four lines and settled it in one run.
+
+**Why nothing caught it.** The only thing that had ever driven v2 was the smoke
+test's autopilot, and that was inverted too — it steered away from every corner.
+The check that should have failed, "an autopilot can keep it on the road",
+allowed 25 m of drift over 12 s, and Sweet Lamb passed it at **24.3 m**. Col de
+Turini, a col of hairpins, was slow enough to be recorded as a KNOWN issue with
+a plausible explanation about cautious autopilots. It was not a cautious
+autopilot. With the sign fixed, the same dummy finishes **0.2 m** from the
+centreline on Col de Turini, the KNOWN list is empty, and the tolerance is 14 m.
+
+### 2. The finish line could not be crossed.
+
+The race reads progress from the driver's centreline cursor, so the number it
+sees is a *segment's* distance — quantised to the 4 m grid, and therefore never
+larger than `length − 4`. The finish fired at `length − 1`. No car at any speed
+could ever cross it.
+
+The first reference lap made it unmissable: 36 resets, all of them between
+4,709 m and 4,713 m of a 4,719 m stage, the car reaching the end of the road and
+being recovered onto it over and over while the clock ran. **v2 has never had a
+completable race.**
+
+The unit tests passed throughout, because they fed a continuous distance that
+reached the stage length exactly. There is now a test that feeds the quantised
+distance the game actually supplies, and it fails against the old threshold.
+
+### 3. §1.3 runoff was built on the inside of every slow corner.
+
+A hairpin gets 5 m of shoulder as runoff — the room a car that misses the corner
+needs. Which shoulder was chosen by a `direction === 'left' ? 1 : 0` mapping,
+written backwards in the builder; the L08 lint read the same inverted index, so
+it agreed with the bug and reported a pass on every stage.
+
+Measured by projecting the displacement across each corner run onto its entry
+normal: the road bends toward the widened side. It was the inside — where no car
+has ever left the road. The lint now derives the side from that measurement
+instead of asking the code, and `corridor.test.ts` asserts it independently.
+
+*A lint that shares its assumption with the code it checks is not a lint.*
+
+### The line itself
+
+`race/line.ts`. A minimum-curvature path inside the roadbed, found by
+constrained Laplacian relaxation: move each point toward the midpoint of its
+neighbours, clamp it back inside the road, repeat. Out-in-out is not written
+anywhere — it is what the clamp produces, binding on the inside at the apex and
+the outside at entry and exit.
+
+Two things had to be got right:
+
+- **The clamp has to be smooth.** §1.2 widths carry ±0.25 m of seeded jitter, so
+  the raw limit rattles by a decimetre between points 4 m apart. Through a
+  corner the line lies against the clamp the whole way and inherits the rattle —
+  and a 0.1 m wobble over a 4 m baseline *is* a 320 m radius. It turned
+  Ouninpohja's 140 m corner into a 116 m one and cost 10 km/h through every fast
+  corner on every stage. A minimum filter followed by a blur is smooth and
+  provably still inside the road, provided the filter radius is at least the
+  number of blur passes.
+- **Curvature is measured over a 2-segment stride, not post-smoothed.** Menger
+  curvature through three points on a circle is exactly 1/R at any spacing, so a
+  wider baseline is free on a real corner and divides the noise on a straight by
+  four. Blurring the curvature afterwards would also flatten the peak at a
+  hairpin, which is the one number the speed profile must not be optimistic
+  about.
+
+**The honest measurement of the geometry: it is worth almost nothing.** Ideal
+time on the relaxed line against ideal time on the centreline, same profile:
+
+| | centreline | racing line | gain |
+|---|---:|---:|---:|
+| Ouninpohja | 137.8 s | 137.8 s | 0.0 s |
+| Col de Turini | 144.8 s | 143.6 s | 1.1 s |
+| Fafe | 123.3 s | 123.6 s | −0.4 s |
+| Monte Carlo | 206.5 s | 205.0 s | 1.5 s |
+| Safari | 143.1 s | 143.2 s | −0.1 s |
+| Sweet Lamb | 150.6 s | 150.0 s | 0.6 s |
+
+A rally road is 4.5–8 m wide. After a car's track width and a margin there is
+about ±1.2 m of freedom, and swinging across that costs more curvature in the
+transition than it buys at the apex. So the line hugs the inside of tight
+corners rather than sweeping out-in-out, and that is correct for this corridor
+rather than a limitation to apologise for. **The improvement in the AI comes
+from the speed profile, not the geometry.**
+
+### The speed profile
+
+Three passes over the line: the lateral friction limit at each point, a backward
+pass so every point is slow enough for what follows, a forward pass under
+traction and then power. It replaces "if the tightest grade within v² × 0.05 m
+is slower than now, brake" — a horizon heuristic — with the exact answer to
+where braking must start.
+
+It also carries a **crest limit**, and that one was found by crashing. The first
+profile limited lateral acceleration and nothing else, so it sent the car over
+Ouninpohja's 240 m crest at 135 km/h. The crest's vertical radius is about 80 m:
+v²/r is over 2 g, so the car was thrown into the air with every wheel unloaded,
+drifted while it had no grip to correct with, and landed off the road. The
+driver was blamed twice before the trace showed `grounded: 0` for half a second
+in the middle of the excursion. The profile now caps vertical demand at 1.3 g —
+a hop over a real crest, not a launch.
+
+### The driver
+
+- **Feed-forward plus feedback.** Pure pursuit alone does not steer this car: it
+  is a *kinematic* law describing a car whose tyres do not slip, and on
+  Ouninpohja's first fast corner it asked for 0.07 of lock where the corner
+  needed about 0.13. The car ran wide while still under its target speed, which
+  is what made the cause obvious. The command is now the angle the corner needs
+  at this speed — `L·κ + K_us·a_y` — with pure pursuit correcting the rest.
+- **It never asks for more lock than the tyre can use.** Beyond `L·a/v² +
+  K_us·a`, more steering produces *less* grip, because the front slip angle is
+  past §8's Magic Formula peak. Without the cap, a small drift at 135 km/h made
+  the driver wind on half a turn and the correction became the accident.
+- **§8's friction ellipse, applied by the driver.** Grip spent turning is not
+  available for accelerating, so the throttle comes out in proportion to what
+  the steering is using. Before it, the car was spending 63% of its friction
+  budget on throttle alone at 135 km/h while asking for a correction as well.
+- **Off the line, slow down.** The profile answers "how fast through this corner
+  *on the line*" and says nothing about being three metres wide of it. Monte
+  Carlo's snow hairpin: the car ran wide, held its 52 km/h because the profile
+  still said 52, and hit a tree 4 m off the line. Lifting is the only control
+  left once the steering is already saturated.
+
+### §15 L15 — the AI reference lap, measured
+
+`tools/reference-lap.mjs` and `npm run reference`. The static lint cannot answer
+L15 and never will: it is a claim about a car driving a stage, and `lintStage`
+has no physics. So the game answers it, with the same driver, the same line and
+the same physics the player gets, and the harness reports it.
+
+| | before | after |
+|---|---|---|
+| Stages completed | **0 of 6** | **6 of 6** |
+| Total recoveries | — (none finished) | 21 |
+| L15 clean (zero resets) | 0 | 1 — Sweet Lamb |
+| Average | — | 80.8 km/h |
+
+Before this round the AI could not finish a single stage. It now finishes all
+six, at rally speeds, and one of them cleanly enough to pass L15 outright.
+
+**The gap, stated plainly.** Five stages still need recoveries — 10 on Col de
+Turini and 7 on Monte Carlo, the two switchback stages, and 1–2 on the others.
+Every one is the same event: the car understeers wide at a hairpin exit on a
+low-grip surface and hits scenery. L15 is therefore reported as **FAIL on five
+of six stages**, with the metre mark of every recovery printed, and it stays
+that way in the output until it is fixed. The lint still reports L15 as SKIPPED,
+because the lint still cannot run a car.
+
+## Phase 3, part two — §11, and what a specified reset costs
+
+`race/reset.ts`. Reset nodes, the six triggers with their delays, the six rules
+for what a reset does, and cutting. **L12 is no longer skipped**: every stage
+now passes 17 checks instead of 16.
+
+What was there before was one hand-written rule — if the car is upside down,
+outside the world, or has not moved for four seconds, put it back two segments
+*ahead* of wherever it stopped. None of that is in the spec. It could gain you
+ground: two segments ahead of a car beached on the outside of a hairpin is past
+the hairpin. And it cost nothing at all.
+
+- **Reset nodes** every ≤120 m, placed on the straightest road the spacing
+  allows. A node in the middle of a 20 m hairpin respawns you pointing at the
+  apex with no run-up, so each node is the flattest segment in its window —
+  flatness dominates the score, position breaks ties, and the spacing limit is
+  never traded away for a nicer node. Under 20% of Col de Turini's nodes sit in
+  anything tighter than a 40 m radius.
+- **Upstream, not nearest.** A car that has just fallen off the outside of a
+  corner is often physically closest to a node it has *not* reached. The
+  respawn uses the driver's monotonic distance, which cannot be advanced by a
+  car being thrown down a mountain.
+- **Six triggers, six clocks.** Roof 2.5 s, out of bounds 2.0 s, off deck
+  2.0 s, player 0.5 s, stuck 6.0 s under 0.5 m/s. One shared timer would answer
+  "which trigger fired" with whichever was noticed first; a car on its roof at
+  the bottom of a ravine should be recovered by the 2.0 s rule, not the 2.5 s
+  one.
+- **It costs 10 s.** Including the R key. A reset that is free is a teleport,
+  and the fastest way round Col de Turini would be to press R at every hairpin.
+- **Cutting**, §11.3: three wheels outside roadbed + shoulder for 1.2 s *with a
+  forward exit*. The second half is what makes it a cut rather than a mistake —
+  a car that runs wide, stops and rejoins behind itself has gained nothing and
+  is not penalised. 2 s, escalating to 5 s on the third.
+- **§11.2.4 immunity is read as DAMAGE immunity.** Taken literally, "collision
+  immunity" would mean driving through scenery for 2.5 s after every reset,
+  which turns a reset into a shortcut through a forest. The impact still
+  happens and still slows the car; the joules do not count.
+
+### Two bugs this uncovered, both about time and place
+
+- **A backwards respawn broke the driver's cursor.** `locate` searches forward
+  only, which is what stops a hairpin teleporting the cursor onto its other leg
+  — and it made the cursor unable to follow a car legitimately moved back up to
+  120 m. The driver kept steering for a point it had passed. Measured: Col de
+  Turini reset at 2,261 m thirty-three times without moving. `seek()` now moves
+  the cursor with the car.
+- **`enforceWorldBounds` was fed a constant `dt`.** Every §11.1 trigger is a
+  time, so a constant meant they ran at whatever multiple of real time the
+  constant happened to be — three times fast at 60 fps, seven times fast in the
+  headless harness, where "stuck for six seconds" fired after eight tenths of
+  one. Fafe's smoke autopilot stopped at 128 m because of it. The parameter is
+  now required rather than defaulted, so no caller can forget to measure it.
+
+### The reference lap after §11, and an honest regression
+
+| | after part one | after part two |
+|---|---|---|
+| Stages completed | 6 of 6 | **4 of 6** |
+| Total recoveries | 21 | 12 |
+| Clean (L15 pass) | 1 | 1 |
+| Average | 80.8 km/h | 94.8 km/h |
+
+**Two stages got worse, and it is the right kind of worse.** The old recovery
+put the car *forward* of where it stopped, which walked it past obstacles it
+could not drive past. §11.2's upstream respawn does not, so Col de Turini and
+Monte Carlo now do what a deterministic car must: respawn, drive the same
+corner the same way, beach in the same place, repeat. The harness detects that
+and reports `RESET LOOP at 2,242 m` instead of a DNF that would read as though
+the car had stopped there.
+
+So the number that went down is the number that was being flattered. What the
+AI cannot do is get round two particular hairpins, and it could never do it —
+the old recovery was carrying it past.
+
+**Grip was not the cause, and this was measured rather than assumed.** The
+profile's friction fraction is not monotonic in outcome: at 0.75 Monte Carlo
+went from 15 recoveries to 3 while Col de Turini got much worse (DNF at 1.25 km
+against 2.26 km); at 0.85 both were worse than either. It stays at 0.92.
+
+## Phase 3, part three — the rally
+
+Six stages existed and each was a separate, forgetful event: drive it, see a
+time, reload. `race/rally.ts` gives them somewhere to accumulate.
+
+The design is not invented. It is **§11.2.6** — *"Damage is not repaired by a
+reset. Only a service park repairs damage"* — taken seriously. That sentence has
+no content unless damage survives the end of a stage; if it survives there must
+be somewhere it stops surviving, and the spec names it; and if it accumulates
+across an itinerary then §9's terminal band stops being an abstract ceiling and
+becomes retirement.
+
+So a rally is: six legs in order, a classification that is driving **plus every
+§11 penalty**, damage carried from leg to leg, one service park that clears it,
+and retirement at 120 kJ. Nothing here is a new mechanic — it is the ones
+already built given consequences that outlive a single stage.
+
+- The service park sits between Fafe and Monte Carlo, on the principle that the
+  two stages most likely to destroy the car — the switchback ones — should not
+  both fall on the same side of it.
+- A stage you have already reached can be re-driven, and the itinerary says
+  `practice — does not count` on the top panel while you drive it. The
+  classification only counts the leg you are on.
+- Corrupt storage starts a new rally rather than throwing, the same rule the
+  personal best follows.
+
+### Two bugs found by testing it
+
+**A progression lock silently substituted a different stage.** `?stage=` for a
+locked stage opened the current leg instead. `npm run reference` asked for six
+stages, was handed Ouninpohja six times, and reported **"every stage passes
+L15"** — a clean sweep in a run where five stages were never driven. It looked
+like the best result the project has ever produced.
+
+Two changes, and the second matters more than the first. A URL now opens any
+stage that exists, because a lock on a query parameter is not access control and
+the select already gates the UI path. And the harness now compares the stage it
+was given with the stage it asked for and fails loudly on a mismatch: *a harness
+that cannot tell it was handed the wrong subject is worse than no harness.*
+
+**The steering pad covered the bottom-left controls.** `#pad` takes the left 52%
+of the screen at `z-index: 3` so a drag can start anywhere; the panel holding the
+stage select and the CONTROLS button had no z-index at all. The CSS comment two
+lines above says those panels "re-enable pointer events" — they did, and it made
+no difference. On a phone, that panel has never responded to a touch. Found by a
+click that timed out with `#pad intercepts pointer events`.
+
+## Phase 3, part four — the car can reverse, and the driver can learn
+
+The last round ended with two stages in a reset loop and a one-line diagnosis:
+*the car arrives, understeers into the bank, and beaches with full lock on and
+the throttle open. The controller has no way out of that — a real driver would
+reverse, and there is no reverse gear.* This is that.
+
+**Reverse.** §3 specifies a five-speed box and no reverse ratio, so reverse
+takes a shade more than first, which is what a real box does. Engagement is the
+arcade convention because the game is played with two pedals and no clutch:
+hold the brake with the car stopped and reverse selects; in reverse the two
+pedals swap jobs, and the throttle brings it back to first. It is speed-limited
+and torque-cut above 8 m/s, because a car doing 90 km/h backwards is not a
+manoeuvre.
+
+Without it, the only way out of a car nose-first into a bank was a reset — and
+§11.2 correctly charges 10 s for one, so a small mistake cost exactly what a
+big one did.
+
+**The countdown now holds the car on the handbrake.** It held the foot brake,
+which at a standstill is precisely how reverse is selected — so the moment
+reverse existed, every stage started in it.
+
+**The driver reverses out, and it has to feather the pedal.** Measured on Col de
+Turini: full reverse spun the wheels to 17 m/s of surface speed against a car
+doing 0.1, a slip ratio far past §8's Magic Formula peak — maximum noise,
+minimum force. The extraction now selects on a full pedal for half a second and
+then feathers to a third.
+
+**The driver learns.** A stage is deterministic and so is this driver, so a
+corner it cannot take is a corner it can *never* take: same approach, same
+speed, same bank, for the rest of the clock. No reset policy fixes that, because
+the reset is not what is wrong. Each failure now records a caution zone at the
+place it happened and takes a fifth off the target speed approaching it, with a
+floor at 40%. The next attempt is a different attempt, which is the whole point.
+
+### And the bug underneath two of the loops
+
+**Respawns were putting the car inside the ground.** The reset height came from
+`sampleHeight`, a bilinear read of the height buffer; the collider Rapier builds
+from that same buffer is two triangles per cell, and on any slope the two
+disagree. The car spawned in the collider, where the solver held it: wheels at
+0.03 m of compression instead of 0.08, almost no load, therefore almost no tyre
+force. It looked exactly like being wedged against scenery, and no pedal or gear
+could have helped. The respawn now raycasts the world the car actually drives on
+— which cannot disagree with itself.
+
+Finding it needed one more thing that is worth writing down, because it has now
+cost two sessions: **Rapier's ray queries return nothing until the world has
+stepped once.** A probe of 233 centreline points reported that every one of them
+had no collider beneath it, including the start line the car was visibly resting
+on. One `world.step()` first, and all 233 answer.
+
+### Where the reference lap stands
+
+| | part two | part four |
+|---|---|---|
+| Stages completed | 4 of 6 | **5 of 6** |
+| Reset loops | 2 | **1** |
+| L15 clean | 1 | 1 |
+
+Monte Carlo went from looping at 2,285 m to finishing. Col de Turini still loops
+at 2,242 m and is the one remaining, and it is genuinely not understood: the
+node there is on a clear straight with the nearest collidable 5.25 m away, the
+roadbed is flat across its full width (worst deviation 0.18 m on that stage), and
+the driver arrives at a third of its normal speed by the sixth attempt and still
+stops in the same metre.
+
+---
+
+## Phase 4 — the bible, part one: regions
+
+`RALLY_WORLD_BIBLE.md` is normative about appearance the way `RALLY_RULES.md`
+is about physics: *"If the world does not match this document, the world is
+wrong."* v2 did not match it at all. The renderer carried six hand-picked hex
+values per biome, with a comment admitting they were placeholders, and the
+document's ten regions — palettes, suns in kelvin and lux at named elevations,
+fog densities to five decimals — were unread.
+
+`world/region.ts` is the bridge. Every colour in the game now comes from
+`biomes.constants.ts`: sky zenith and horizon, ground, foliage, structure, fog
+colour and density, sun colour from its colour temperature, and the sun's
+DIRECTION from the region's elevation and its azimuth relative to stage forward
+— so two stages of the same region laid out differently are lit the same way
+relative to the road. Props take the region's foliage and structure colours,
+which is G2's "every asset samples from the region palette". The road is the
+one thing that does not come from the palette, and that is also specified: it
+comes from §1's material library, keyed by the segment's §16 surface id.
+
+### Three admissions, because the pipeline cannot honour the photometry
+
+The bible specifies light photometrically. Consuming that absolutely needs a
+physically-based pipeline; this renderer is `MeshLambertMaterial` and a raw
+`ShaderMaterial` sky dome. Each of these was tried and measured before being
+written down:
+
+1. **The exposure was applied twice** — once to the light and once to the tone
+   mapper — so the scene was lit by lux × exposure and then exposed again.
+   Safari came out as a correct desert sky over black sand.
+2. **`baseEV100` now has no consumer.** Applying it as a relative exposure
+   double-counts: physically, a brighter region means both more light and less
+   exposure and the two cancel, but this renderer only scales the sun. Deep
+   Desert, two stops above the reference, came out at a third of its brightness
+   — noon as dusk. The field is read, printed by the lint, and unused. That is
+   the honest place to leave it.
+3. **The lux and ambient ratios are bounded** to ±35% of the reference region.
+   Unbounded, Nordic Winter's high sun on its near-white ground clipped:
+   Ouninpohja was a white screen with a red car on it.
+
+What survives is every ratio the renderer can express. What is lost is the
+claim that a surface reads at a specific cd/m², which it could not honour
+anyway. Making that true is a renderer change, not a constants change.
+
+### A gap in the document, not in the mapping
+
+§3.11 maps `nordic_pine` to `nordic_winter`. Ouninpohja is authored as a
+**summer gravel** stage, and the winter region's near-white ground base turned
+it into a whiteout. The bible has ten regions and none of them is a nordic
+summer forest — a real gap, and §6's amendment procedure is where it belongs.
+Until then `StageDef.region` lets a stage name the region it is actually lit
+by, and Ouninpohja names Alpine Pass.
+
+### §5's region lint, and what it found
+
+Twelve checks are specified. Six are answerable from the region definition and
+the material library and are implemented; the other six are claims about
+rendered frames or about content that does not exist yet, and are reported as
+SKIPPED with the reason. `npm run lint` now prints them per region in use.
+
+**It found nine failures across ten regions, and they are in the
+specification.**
+
+- **Three R02/G3 violations.** G3 caps structure saturation at 45%; Mountain
+  Oasis is 46%, Nordic Winter 49%, and Volcanic Highland 60% — `#A8492C`.
+  These are unambiguous: a number is over a limit the same document sets.
+- **Six R12/G1 failures**, with a caveat this lint states itself. G1 is about
+  the frame, and the check cannot render one, so it compares the road
+  material's albedo against the region's ground base. Amazon at 0.7% and
+  Mountain Oasis at 0.9% are a road that genuinely disappears into its
+  terrain; Nordic Winter's 4% is a snow road on snow ground, which the bible
+  answers elsewhere with snow poles and kerbs this build does not yet place.
+
+None is fixed here. §6 says a hex value changes in the document first and is
+mirrored into the constants in the same commit, so editing them here would put
+the implementation and the document into silent disagreement — the one thing
+the arrangement exists to prevent. They are listed, they stay listed, and the
+lint reports them on every run.
+
+## The pad, and a harness that cannot agree with a sign error
+
+Reported from a phone: *"the joystick is moving the car in the opposite
+direction."* It was, in the build that is deployed — `/play-v2/` is still r81,
+one commit before the steering fix. On this branch it is not, and there is now
+a check that keeps it that way.
+
+`npm run touch` is the only harness here that uses the player's actual path: a
+mobile browser context with touch, real `TouchEvent`s on the real pad element,
+the game's own `input.sample()`, and the car's displacement along **its own
+right vector**. That last part is the point. Every previous check asked the
+code which way right was, and when the code was wrong they all agreed with it —
+the unit tests do not touch the DOM, the smoke test drives synthetic inputs, and
+the only autopilot that ever drove was inverted in the same direction.
+
+It caught two things immediately, both in itself:
+
+- **It measured the second drag on the first drag's leftovers** — a car already
+  sideways under full right lock — and reported that a leftward drag "steered
+  right". It had not; it had failed to unwind a spin in two seconds. It now
+  resets to the start line before each case.
+- **Its own yaw expression was sign-flipped**, so it reported that a rightward
+  drag steered left. That is the exact failure it exists to catch, committed by
+  the harness. The displacement metric is primary for precisely this reason: it
+  never asks which way is right, so it cannot be wrong in the same direction as
+  anything else.
+
+## The HUD — brass, wood, and a needle
+
+Restyled to the reference: brass-framed panels on dark wood, amber type, round
+thumb-sized controls, and an analogue speedo. Not decoration — a dial reads at a
+glance in a way a number does not, because you learn where the needle sits for a
+corner. The arc goes green to amber to red across the range and the needle is
+one rotated `<g>`, so it costs two attribute writes a frame.
+
+**HULL INTEGRITY replaces the damage bar**, counting down rather than up, in
+twelve segments. §9's terminal is 120 kJ; twelve segments turn that into hits
+you can count, which is what a smooth bar cannot tell you. Built once and
+reclassed, because rebuilding twelve elements a frame is twelve layout
+invalidations a frame.
+
+The phone layout was rebuilt around where thumbs are: the dev furniture that
+occupied the bottom strip moved to the top, the dial sits bottom-right clear of
+it, the actions stack up the right-hand edge, and the pad has the bottom-left
+quadrant to itself. Two collisions were found by screenshotting a real phone
+viewport rather than by reasoning: the dial was behind the bottom strip on both
+layouts, and the controls strip sat on top of the hull gauge.
+
 ## Next
 
-**Phase 3 proper.** Reset nodes every 120 m (lint L12), a better AI line
-(racing line rather than centreline + offset), and progression across stages.
+1. **Amend the bible** for the nine §5 failures, or place the content that
+   answers the six R12s.
+2. **Col de Turini at 2,242 m**, with an instrumented capture of the moment
+   rather than another hypothesis.
+3. **§2's structure kit** — archetypes, settlements, walls. R03, R07 and G7 are
+   all waiting on it, and it is the largest remaining visual gap.
+4. **§3.2 rule 4**, apex occlusion, now that a racing line exists.
