@@ -6,7 +6,8 @@ import { UnrealBloomPass } from '../lib/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
-import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel } from './track.js';
+import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
+  HOUSE_TEMPLATES } from './track.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
@@ -446,6 +447,65 @@ function paceEstimate(car, track) {
   return { seconds: t, length: len, gripEff: +gripEff.toFixed(2) };
 }
 
+/** WHY this machine is quick or slow HERE, in one phrase, per car.
+ *
+ *  The blurb used to be a pure function of (tier, surface), so with six cars
+ *  and three tiers duplicates were not a risk, they were arithmetic: measured
+ *  across seven worlds, EVERY ONE showed a repeat, and the worst had three
+ *  distinct sentences for six cars — OLIVE COAST told four different machines
+ *  "OFF THE PACE — 1s A LAP". A garage that says the same thing about half its
+ *  stock is not telling you anything about any of it.
+ *
+ *  The replacement is a sensitivity measurement, not a hand-written rule. For
+ *  each lever, re-run the SAME pace model with that one stat nudged and see
+ *  what the lap does:
+ *
+ *    reward[lever]  averaged over the field, how many seconds this TRACK pays
+ *                   for that stat — a flat circuit pays for top end, a
+ *                   switchback pays for grip, and this measures which
+ *    edge[lever]    how far THIS car sits from the field on that stat
+ *
+ *  reward x edge is then "how much this car's own character explains its lap
+ *  time here", signed. The most positive term is why it is fast; the most
+ *  negative is why it is slow. Nothing is asserted about a car — the model
+ *  that ranks them is the same model that explains them, so the two can never
+ *  drift apart.
+ */
+const LEVER_NUDGE = { maxSpeed: 1.10, grip: 1.10, offroad: 1.25, accel: 1.10 };
+// TWO WAYS TO SAY EACH THING, because on a DRY world the roster has only two
+// live levers: `offroad` multiplies into gripEff through (1 - base), and on dry
+// tarmac base is 1, so its sensitivity is exactly zero and it drops out — as
+// does `accel`, which the pace model does not attempt to represent at all.
+// One phrase per lever per polarity therefore left four sentences for six
+// cars on half the roster, and two machines a lap fell through to the generic
+// fallback. A second wording per polarity is not padding: it is what makes the
+// supply of phrases exceed the number of cars in the worst real case.
+//
+// { plus: [primary, secondary], minus: [primary, secondary] }
+const LEVER_PHRASE = {
+  maxSpeed: {
+    plus: ['USES ALL OF ITS TOP END', 'STRONG DOWN THE LONG STRAIGHTS'],
+    minus: ['GIVING IT AWAY ON THE STRAIGHTS', 'SHORT ON TOP END FOR THIS ONE'],
+  },
+  grip: {
+    plus: ['PLANTED THROUGH THE CORNERS', 'CARRIES SPEED THROUGH THE TURNS'],
+    minus: ['RUNS OUT OF GRIP IN THE TURNS', 'WASHES WIDE ON THE FAST BENDS'],
+  },
+  accel: {
+    plus: ['FIRES OUT OF THE SLOW CORNERS', 'QUICK TO REBUILD ITS SPEED'],
+    minus: ['SLOW TO WIND BACK UP', 'LABOURS OUT OF THE HAIRPINS'],
+  },
+  offroad: {
+    snow: { plus: ['HOLDS THE LOOSE STUFF', 'FINDS GRIP IN THE SNOW'],
+      minus: ['SPINS UP ON THE LOOSE', 'LOSES THE REAR ON SNOW'] },
+    wet: { plus: ['SURE-FOOTED IN THE WET', 'CONFIDENT ON A WET LINE'],
+      minus: ['SLIDES ON THE WET STUFF', 'NERVOUS ON A WET LINE'] },
+    dry: { plus: ['SETTLED OVER THE ROUGH', 'SHRUGS OFF THE BROKEN STUFF'],
+      minus: ['UNSETTLED OVER THE ROUGH', 'UPSET BY THE BROKEN STUFF'] },
+  },
+};
+const LEVERS = ['maxSpeed', 'grip', 'accel', 'offroad'];
+
 /** Rank every machine on the CURRENT track by that estimate, and phrase the
  *  result. Relative, because the absolute number means nothing to a player. */
 function rateCarsFor(track) {
@@ -456,23 +516,92 @@ function rateCarsFor(track) {
   const worst = Math.max(...rows.map((r) => r.est.seconds));
   const span = Math.max(1e-6, worst - best);
   const surf = track.T?.surface;
-  const out = new Map();
+  const dryish = surf === 'snow' || surf === 'wet' ? surf : 'dry';
+
+  // --- how many seconds does THIS TRACK pay for each stat? ---
+  // Measured by nudging one stat at a time and re-running the lap. `accel` is
+  // deliberately included even though paceEstimate does not model it: the
+  // sensitivity comes back as exactly zero, which correctly removes it from
+  // contention rather than letting a phrase be picked for a reason the model
+  // cannot see.
+  const sens = new Map();
   for (const r of rows) {
+    const s = {};
+    for (const lever of LEVERS) {
+      const stats = { ...r.car.stats, [lever]: r.car.stats[lever] * LEVER_NUDGE[lever] };
+      if (lever === 'offroad') stats.offroad = Math.min(1, stats.offroad);
+      s[lever] = r.est.seconds - (paceEstimate({ stats }, track)?.seconds ?? r.est.seconds);
+    }
+    sens.set(r.car.key, s);
+  }
+  const reward = {};
+  for (const lever of LEVERS) {
+    reward[lever] = rows.reduce((a, r) => a + sens.get(r.car.key)[lever], 0) / rows.length;
+  }
+  // --- and how far does each car sit from the field on that stat? ---
+  const edge = new Map();
+  for (const lever of LEVERS) {
+    const vals = rows.map((r) => r.car.stats[lever] ?? 0);
+    const mean = vals.reduce((a, v) => a + v, 0) / vals.length;
+    const spread = Math.max(1e-6, Math.max(...vals) - Math.min(...vals));
+    rows.forEach((r, i) => {
+      const e = edge.get(r.car.key) ?? {};
+      e[lever] = (vals[i] - mean) / spread;
+      edge.set(r.car.key, e);
+    });
+  }
+
+  const out = new Map();
+  // Assign in RANK ORDER and never reuse a phrase: the quickest car gets first
+  // claim on the reason it is quickest, and a car further down that shares the
+  // same headline falls through to its next-strongest term. That is what makes
+  // uniqueness a property of the output rather than a hope about the inputs.
+  const taken = new Set();
+  const ranked = [...rows].sort((a, c) => a.est.seconds - c.est.seconds);
+  for (const r of ranked) {
     const score = 1 - (r.est.seconds - best) / span;      // 1 = quickest here
     const tier = score >= 0.66 ? 'strong' : score >= 0.3 ? 'fair' : 'weak';
     const behind = r.est.seconds - best;
-    let note;
-    if (tier === 'strong') {
-      note = surf === 'snow' ? 'HOLDS THE LOOSE STUFF'
-        : surf === 'wet' ? 'SURE-FOOTED IN THE WET' : 'SUITED TO THIS CIRCUIT';
-    } else if (tier === 'weak') {
-      note = surf === 'snow' || surf === 'wet'
-        ? `SLIDES HERE — ${Math.round(behind)}s A LAP` : `OFF THE PACE — ${Math.round(behind)}s A LAP`;
-    } else {
-      note = `${behind < 0.5 ? 'ON' : `${Math.round(behind)}s OFF`} THE PACE`;
+    const e = edge.get(r.car.key);
+    // positive term = a strength worth naming, negative = a weakness
+    const terms = LEVERS
+      .map((lever) => ({ lever, v: reward[lever] * e[lever] }))
+      .filter((t) => Math.abs(t.v) > 1e-9);
+    // A leading car is explained by what it HAS; a trailing one by what it
+    // LACKS. Polarity is forced by tier rather than merely preferred: without
+    // that, a four-star machine whose positive phrases had all been claimed by
+    // the cars above it was handed the leftover NEGATIVE one, and PIT-99 sat
+    // second quickest on RED CENTRE RUN under the caption "RUNS OUT OF GRIP IN
+    // THE TURNS". A mid-pack car takes whichever term is larger either way.
+    const want = tier === 'strong' ? 1 : tier === 'weak' ? -1 : 0;
+    terms.sort((a, c) => (want === 0 ? Math.abs(c.v) - Math.abs(a.v) : (c.v - a.v) * want));
+    let note = null, polarity = 0, why = null;
+    for (const t of terms) {
+      if (want && Math.sign(t.v) !== want) continue;          // never miscaption a tier
+      const set = t.lever === 'offroad' ? LEVER_PHRASE.offroad[dryish] : LEVER_PHRASE[t.lever];
+      // primary wording first, then the alternate for the next car that lands
+      // on the same lever and polarity
+      for (const phrase of set[t.v >= 0 ? 'plus' : 'minus']) {
+        if (taken.has(phrase)) continue;
+        taken.add(phrase);
+        note = phrase;
+        polarity = t.v >= 0 ? 1 : -1;
+        why = t.lever;
+        break;
+      }
+      if (note) break;
     }
+    // Last resort when a car has no term of the right sign left. Kept vague on
+    // purpose — inventing a reason here would be the one thing this whole
+    // function exists to avoid.
+    if (!note) note = behind < 0.05 ? 'THE ONE TO BEAT' : 'MIDFIELD HERE';
+    if (behind >= 0.5) note += ` · ${behind.toFixed(behind < 10 ? 1 : 0)}s OFF`;
+    // `polarity` and `why` are not used by the UI — they are what lets
+    // tests/test-cars.mjs assert that a four-star machine is never captioned
+    // with a weakness, without the test having to keep its own copy of the
+    // phrase table and drift out of step with this one.
     out.set(r.car.key, { score, tier, note, seconds: r.est.seconds,
-      stars: 1 + Math.round(score * 4), behind });
+      stars: 1 + Math.round(score * 4), behind, polarity, why });
   }
   return out;
 }
@@ -1822,9 +1951,18 @@ class Game {
       card.innerHTML = `<img class="car-icon" src="${icons[car.key]}" alt="${car.name}">
         <div class="cname">${car.name}</div><div class="cdesc">${car.desc}</div>
         <div class="cstats">
-          ${bar('SPD', S.maxSpeed, 54, 63)}${bar('ACC', S.accel, 34, 40)}
-          ${bar('GRP', S.grip, 4.2, 5.6)}${bar('ARM', S.health / (S.plating ?? 1), 80, 170)}
-          ${bar('OFF', S.offroad, 0.4, 1)}${bar('NTR', S.nitroPower ?? 1, 0.85, 1.2)}
+          <!-- THE FLOOR OF EACH RANGE USED TO BE THE ROSTER MINIMUM, so the
+               weakest car in a stat rendered as an empty 6% stub — which reads
+               as ZERO. Measured across the catalogue, five of six machines had
+               one, and three showed it on ARM. The SLEEK read as having no top
+               speed at all on 54 against a best of 63: 86 % of the fastest car
+               in the game, drawn as nothing. Each range now brackets the
+               roster with headroom at both ends, so the weakest lands near a
+               quarter-full and the differences between machines are still the
+               thing the eye picks up. -->
+          ${bar('SPD', S.maxSpeed, 50, 64)}${bar('ACC', S.accel, 34, 40.5)}
+          ${bar('GRP', S.grip, 4.2, 5.7)}${bar('ARM', S.health / (S.plating ?? 1), 45, 175)}
+          ${bar('OFF', S.offroad, 0.18, 1.05)}${bar('NTR', S.nitroPower ?? 1, 0.78, 1.22)}
         </div>
         ${(() => {
     // how this machine suits the world you are about to run — the whole point
@@ -5415,6 +5553,7 @@ if (!window.__game) window.__game = new Game();
 window.__LEVELS = LEVELS;
 window.__DIFFS = DIFFS;   // headless balance probes read the shipping table
 window.__CARS = CAR_CATALOG;   // headless suites drive every machine in turn
+window.__HOUSE_TEMPLATES = HOUSE_TEMPLATES;  // tests/test-buildings.mjs checks the shapes as data
 // test-affinity.mjs re-derives these from the live tracks and fails on drift
 window.__DEMANDS = DEMANDS;
 window.__DEMAND_BOUNDS = DEMAND_BOUNDS;

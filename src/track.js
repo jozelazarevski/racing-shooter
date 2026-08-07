@@ -2328,6 +2328,189 @@ const BARREL_PALETTES = {
 // Buildings are SOLID ('hut' → they crash big); field walls are SOLID stone;
 // rail fences, troughs, feed bins and hay racks are BREAKABLE props (they go
 // through this.props, so cars AND weapons destroy them).
+/* ---------------------------------------------------------------------------
+ * HOUSE TEMPLATES — every structure in the game, as data.
+ *
+ * THE COMPLAINT: "Design houses templates and make sure they are referenced
+ * across all tracks instead of designing one by one."
+ *
+ * It was the right diagnosis. Five builders each rolled their own dwelling
+ * geometry — `_buildHuts` (the scattered cottages), `_element` (the farmstead
+ * kit), the spur farmstead's barn, the OLD TOWN frontage, and the igloos — and
+ * the cost of that was not abstraction for its own sake. THE SAME BUG SHIPPED
+ * TWICE, INDEPENDENTLY: `_buildHuts` and the barn builder both composed a
+ * centred ConeGeometry roof at the wall top without translating it to its own
+ * base, so half of every roof was inside the house it sat on. Two builders,
+ * one mistake, found weeks apart. A third would have made it three.
+ *
+ * So a template is a PART LIST, not a function. Every entry is
+ *
+ *     [kind, dx, dy, dz, sx, sy, sz, colourKey, roll?]
+ *
+ * in the structure's own local frame, with y measured from the ground and
+ * every shared geometry base-anchored ONCE in `_realizeElements`. There is
+ * nowhere left for an author to forget a translate, because no author writes a
+ * translate: they write a height. `colourKey` names a slot in the theme's
+ * ELEMENT_KIT (wall / wall2 / roof / trim / stone) so one template reads as
+ * limewash-and-pantile in the Mediterranean and weatherboard-and-tin in the
+ * outback without a second copy of the shape.
+ *
+ * `r` is the collider radius the car pushes off, and `mat` its solidity class.
+ */
+export const HOUSE_TEMPLATES = {
+  // ---- FARMSTEAD AND VILLAGE ----
+  barn: { r: 7.4, parts: [
+    ['wall', 0, 0, 0, 12, 6.0, 8.4, 'wall2'],
+    ['prism', 0, 6.0, 0, 12.8, 3.4, 9.1, 'roof'],
+    ['box', 0, 0.1, 4.3, 3.4, 4.6, 0.35, 'trim'],            // big door
+    ['box', 0, 4.9, 4.35, 1.6, 1.4, 0.3, 'trim'],            // hay loft hatch
+    ['box', -6.05, 0, 0, 0.4, 6.0, 8.4, 'trim'],
+    ['box', 6.05, 0, 0, 0.4, 6.0, 8.4, 'trim'],
+  ] },
+  // A FARMHOUSE, NOT A BOX WITH A LID. What makes a small rural house read at
+  // a glance is not detail, it is MASSING: a stone footing so it sits IN the
+  // ground rather than on it, a steep roof whose eaves oversail the walls, and
+  // a lower wing so the outline is not a rectangle.
+  house: { r: 6.0, parts: [
+    ['box', 0, 0, 0, 7.8, 0.75, 6.8, 'stone'],               // stone footing
+    ['wall', 0, 0.75, 0, 7.2, 4.8, 6.2, 'wall'],             // main block
+    ['box', 0, 5.35, 0, 8.1, 0.28, 7.1, 'trim'],             // eaves fascia
+    ['prism', 0, 5.55, 0, 8.6, 3.7, 7.6, 'roof'],            // steeper, oversailing
+    ['box', 4.7, 0, 0.6, 3.8, 0.6, 4.9, 'stone'],            // lower side wing
+    ['wall', 4.7, 0.6, 0.6, 3.4, 2.9, 4.4, 'wall2'],
+    ['prism', 4.7, 3.5, 0.6, 3.9, 1.6, 5.0, 'roof'],
+    ['box', -0.6, 3.15, 3.55, 3.4, 0.22, 1.9, 'roof'],       // porch canopy
+    ['cyl', -1.9, 0.75, 4.0, 0.24, 2.4, 0.24, 'trim'],
+    ['cyl', 0.7, 0.75, 4.0, 0.24, 2.4, 0.24, 'trim'],
+    ['box', -0.6, 0.8, 3.05, 1.4, 2.6, 0.28, 'trim'],        // door
+    ['cyl', -2.6, 5.4, 0, 0.95, 3.4, 0.95, 'stone'],         // chimney on the ridge
+  ] },
+  chapel: { r: 4.8, parts: [
+    ['wall', 0, 0, 0, 5.6, 5.4, 8.0, 'wall'],
+    ['prism', 0, 5.4, 0, 6.2, 3.0, 8.6, 'roof'],
+    ['wall', 0, 0, -4.6, 3.6, 9.6, 3.6, 'wall'],             // bell tower
+    ['cone', 0, 9.6, -4.6, 4.6, 3.8, 4.6, 'roof'],
+    ['box', 0, 13.4, -4.6, 0.22, 1.6, 0.22, 0xf0e6c8],       // cross
+    ['box', 0, 14.2, -4.6, 1.0, 0.22, 0.22, 0xf0e6c8],
+    ['box', 0, 0.1, 4.1, 1.4, 3.0, 0.3, 'trim'],
+  ] },
+  shed: { r: 3.4, parts: [
+    ['wall', 0, 0, 0, 5.2, 3.2, 4.2, 'wall2'],
+    ['box', 0, 3.2, 0.35, 5.8, 0.35, 4.9, 'roof'],           // lean-to roof
+    ['box', 0, 0.1, 2.2, 1.3, 2.4, 0.28, 'trim'],
+  ] },
+  adobe: { r: 5.7, parts: [
+    ['wall', 0, 0, 0, 8.6, 4.2, 7.2, 'wall'],
+    ['box', 0, 4.2, 0, 9.1, 0.7, 7.7, 'wall'],               // parapet
+    ['box', 0, 0.1, 3.7, 1.5, 2.9, 0.3, 'trim'],
+    ['cyl', -2.2, 3.6, 4.1, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],
+    ['cyl', 0, 3.6, 4.1, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],
+    ['cyl', 2.2, 3.6, 4.1, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],
+  ] },
+
+  // ---- COTTAGES ----
+  //
+  // Three of them, because the scattered dwellings are the buildings a player
+  // sees most and they were ONE shape at a random size: a box with a pyramid,
+  // repeated ten times a world. Same kit slots, same base anchoring, different
+  // massing — a long low one, a tall narrow one, and a squat gabled one.
+  cottageA: { r: 4.6, parts: [
+    ['box', 0, 0, 0, 7.0, 0.5, 5.4, 'stone'],
+    ['wall', 0, 0.5, 0, 6.5, 3.6, 5.0, 'wall'],
+    ['box', 0, 4.0, 0, 7.3, 0.24, 5.8, 'trim'],              // eaves
+    ['prism', 0, 4.2, 0, 7.7, 2.6, 6.1, 'roof'],
+    ['box', 0, 0.6, 2.6, 1.2, 2.2, 0.26, 'trim'],            // door
+    ['cyl', 2.2, 4.1, 0, 0.8, 2.6, 0.8, 'stone'],            // chimney
+  ] },
+  cottageB: { r: 4.2, parts: [
+    ['box', 0, 0, 0, 5.6, 0.6, 5.6, 'stone'],
+    ['wall', 0, 0.6, 0, 5.1, 5.2, 5.1, 'wall2'],             // taller, narrower
+    ['box', 0, 5.6, 0, 5.9, 0.26, 5.9, 'trim'],
+    ['cone', 0, 5.8, 0, 6.4, 3.0, 6.4, 'roof'],              // hipped pyramid roof
+    ['box', 0, 0.7, 2.7, 1.1, 2.2, 0.26, 'trim'],
+    ['cyl', -1.7, 5.7, 1.2, 0.7, 2.4, 0.7, 'stone'],
+  ] },
+  cottageC: { r: 5.0, parts: [
+    ['box', 0, 0, 0, 8.0, 0.45, 5.0, 'stone'],
+    ['wall', 0, 0.45, 0, 7.4, 3.0, 4.5, 'wall'],             // long and low
+    ['box', 0, 3.35, 0, 8.3, 0.22, 5.4, 'trim'],
+    ['prism', 0, 3.5, 0, 8.7, 2.2, 5.7, 'roof'],
+    ['wall', -4.4, 0.45, 0.4, 2.6, 2.2, 3.4, 'wall2'],       // lean-to at the end
+    ['box', -4.4, 2.65, 0.4, 3.0, 0.26, 3.8, 'roof'],
+    ['box', 1.0, 0.55, 2.4, 1.2, 2.1, 0.26, 'trim'],
+    ['cyl', 3.0, 3.4, 0, 0.75, 2.2, 0.75, 'stone'],
+  ] },
+
+  // ---- LANDMARKS AND DRESSING ----
+  watchtower: { r: 2.7, parts: [
+    ['wall', 0, 0, 0, 3.6, 9.5, 3.6, 'wall2'],
+    ['box', 0, 9.5, 0, 5.4, 0.5, 5.4, 'trim'],               // platform
+    ['box', -2.4, 10.0, -2.4, 0.28, 1.7, 0.28, 'trim'],
+    ['box', 2.4, 10.0, -2.4, 0.28, 1.7, 0.28, 'trim'],
+    ['box', -2.4, 10.0, 2.4, 0.28, 1.7, 0.28, 'trim'],
+    ['box', 2.4, 10.0, 2.4, 0.28, 1.7, 0.28, 'trim'],
+    ['cone', 0, 11.7, 0, 6.0, 2.2, 6.0, 'roof'],
+  ] },
+  stilt: { r: 3.8, parts: [
+    ['cyl', -2.4, 0, -1.9, 0.5, 3.0, 0.5, 'trim'],
+    ['cyl', 2.4, 0, -1.9, 0.5, 3.0, 0.5, 'trim'],
+    ['cyl', -2.4, 0, 1.9, 0.5, 3.0, 0.5, 'trim'],
+    ['cyl', 2.4, 0, 1.9, 0.5, 3.0, 0.5, 'trim'],
+    ['cyl', 0, 0, -1.9, 0.5, 3.0, 0.5, 'trim'],
+    ['cyl', 0, 0, 1.9, 0.5, 3.0, 0.5, 'trim'],
+    ['wall', 0, 3.0, 0, 6.2, 3.0, 5.2, 'wall'],
+    ['prism', 0, 6.0, 0, 7.2, 2.6, 6.2, 'roof'],
+    ['box', 1.2, 0, 3.4, 3.0, 0.25, 2.4, 'trim'],            // ramp/deck
+  ] },
+  kiosk: { r: 3.0, parts: [
+    ['wall', 0, 0, 0, 4.4, 3.2, 3.4, 'wall'],
+    ['box', 0, 3.2, 0, 4.8, 0.4, 3.8, 'roof'],
+    ['box', 0, 2.0, 2.1, 4.8, 0.2, 1.6, 'trim'],             // awning
+    ['box', 0, 3.7, 0, 3.2, 1.1, 0.24, 'trim'],              // sign board
+    ['box', -1.7, 1.9, 1.75, 0.2, 0.2, 1.5, 'trim'],
+  ] },
+  signalhut: { r: 3.2, parts: [
+    ['wall', 0, 0, 0, 4.6, 3.4, 4.2, 'wall'],
+    ['prism', 0, 3.4, 0, 5.2, 1.8, 4.8, 'roof'],
+    ['cyl', 1.9, 3.4, -1.7, 0.24, 6.4, 0.24, 'trim'],        // antenna mast
+    ['box', 1.9, 9.4, -1.7, 1.8, 0.16, 0.16, 'trim'],
+    ['box', 0, 0.1, 2.2, 1.2, 2.4, 0.28, 'trim'],
+  ] },
+  silo: { r: 2.4, mat: 'stone', parts: [
+    ['cyl', 0, 0, 0, 4.4, 9.0, 4.4, 'wall'],
+    ['cone', 0, 9.0, 0, 4.9, 2.4, 4.9, 'roof'],
+    ['cyl', 0, 2.2, 0, 4.6, 0.3, 4.6, 'trim'],
+    ['cyl', 0, 4.4, 0, 4.6, 0.3, 4.6, 'trim'],
+    ['cyl', 0, 6.6, 0, 4.6, 0.3, 4.6, 'trim'],
+  ] },
+  windmill: { r: 2.0, mat: 'stone', parts: [
+    ['cyl', 0, 0, 0, 3.0, 8.4, 2.4, 'wall'],
+    ['cone', 0, 8.4, 0, 3.6, 1.8, 3.0, 'roof'],
+    ['cyl', 0, 7.6, 1.6, 0.7, 0.9, 0.7, 'trim', Math.PI / 2],
+    ['box', 0, 7.6, 2.0, 0.5, 7.0, 0.22, 'trim', 0.4],
+    ['box', 0, 7.6, 2.0, 0.5, 7.0, 0.22, 'trim', Math.PI / 4 + 0.4],
+    ['box', 0, 7.6, 2.0, 0.5, 7.0, 0.22, 'trim', Math.PI / 2 + 0.4],
+    ['box', 0, 7.6, 2.0, 0.5, 7.0, 0.22, 'trim', 3 * Math.PI / 4 + 0.4],
+  ] },
+  well: { r: 1.8, mat: 'stone', parts: [
+    ['cyl', 0, 0, 0, 3.2, 1.3, 3.2, 'stone'],
+    ['box', -1.3, 1.3, 0, 0.3, 2.4, 0.3, 'trim'],
+    ['box', 1.3, 1.3, 0, 0.3, 2.4, 0.3, 'trim'],
+    ['prism', 0, 3.7, 0, 3.4, 0.9, 2.8, 'roof'],
+    ['cyl', 0, 3.5, 0, 0.28, 2.6, 0.28, 'trim', Math.PI / 2],
+  ] },
+  logpile: { r: 2.4, mat: 'stone', parts: [
+    ['cyl', 0, 0.55, -1.1, 1.05, 4.6, 1.05, 'trim', Math.PI / 2],
+    ['cyl', 0, 0.55, 0, 1.05, 4.6, 1.05, 'trim', Math.PI / 2],
+    ['cyl', 0, 0.55, 1.1, 1.05, 4.6, 1.05, 'trim', Math.PI / 2],
+    ['cyl', 0, 1.50, -0.55, 1.05, 4.6, 1.05, 'trim', Math.PI / 2],
+    ['cyl', 0, 1.50, 0.55, 1.05, 4.6, 1.05, 'trim', Math.PI / 2],
+    ['cyl', 0, 2.45, 0, 1.05, 4.6, 1.05, 'trim', Math.PI / 2],
+  ] },
+};
+// The cottage variants, for the builders that scatter dwellings at random.
+export const COTTAGES = ['cottageA', 'cottageB', 'cottageC'];
+
 const ELEMENT_KITS = {
   alpine: {
     wall: 0xe2d6bc, wall2: 0x9c6c40, roof: 0x7a4630, trim: 0x5d4426, stone: 0x9a978e,
@@ -5536,14 +5719,13 @@ export class Track {
     // --- log pile + fallen timber on the far bank ---
     {
       const K = ELEMENT_KITS[this.T.elements || 'alpine'];
-      const B = { wall: [], box: [], cyl: [], cone: [], prism: [] };
+      const B = this._elemB();          // shared — see the note on _elemB
       const c = this.center[(gi + Math.round(16 / this.segLen)) % N], n = this.nrm[gi];
       for (const [off, side] of [[15, 1], [19, -1]]) {
         const px = c.x + n.x * off * side, pz = c.z + n.z * off * side;
         if (!this._buildableSpot(px, pz, 4, 3.2)) continue;
         this._element(B, 'logpile', px, pz, this.headingAt(gi) + (Math.random() - 0.5), K);
       }
-      if (B.cyl.length) this._realizeElements(B, new THREE.Matrix4());
       // a couple of loose fallen logs
       const logGeo = new THREE.CylinderGeometry(0.55, 0.62, 6.5, 8);
       logGeo.rotateZ(Math.PI / 2);
@@ -5805,7 +5987,7 @@ export class Track {
    *  'hut' colliders with plank-burst crashes like every other building. */
   _buildRoadCabins() {
     const K = ELEMENT_KITS[this.T.elements || 'alpine'];
-    const B = { wall: [], box: [], cyl: [], cone: [], prism: [] };
+    const B = this._elemB();          // shared with the huts and the farmsteads
     let placed = 0;
     for (let tries = 0; tries < 220 && placed < this.T.roadCabins; tries++) {
       const i = (Math.random() * N) | 0;
@@ -5833,7 +6015,8 @@ export class Track {
       this._element(B, Math.random() < 0.7 ? 'house' : 'shed', p.x, p.z, rot, K);
       placed++;
     }
-    if (placed) this._realizeElements(B, new THREE.Matrix4());
+    // no realize here — `_buildWorldElements` flushes the shared batch once,
+    // after every producer has written into it
   }
 
   /** Old snow lying in the hollows above `minY`: flat white decals conformed
@@ -6014,151 +6197,39 @@ export class Track {
 
   /** One structure. Pushes its parts into the instancing buckets `B`, adds the
    *  SOLID collider + contact shadow, and returns its footprint radius. */
-  _element(B, type, x, z, rot, K) {
+  /** Stamp one HOUSE_TEMPLATE into the shared part batches at a world
+   *  position, in a theme's colours. This is the ONLY place a structure gets
+   *  built: the shapes live in the table above, the base anchoring lives in
+   *  `_realizeElements`, and every builder that wants a building comes through
+   *  here. That is the point — see the header on HOUSE_TEMPLATES for the two
+   *  independent copies of the same roof bug that made it necessary. */
+  _element(B, type, x, z, rot, K, scale = 1) {
     const y = this.terrainHeight(x, z) - 0.25;
     const cs = Math.cos(rot), sn = Math.sin(rot);
-    const put = (kind, dx, dy, dz, sx, sy, sz, color, roll = 0) => {
+    const T = HOUSE_TEMPLATES[type] ?? HOUSE_TEMPLATES.logpile;
+    for (const [kind, dx, dy, dz, sx, sy, sz, colKey, roll = 0] of T.parts) {
+      const ox = dx * scale, oy = dy * scale, oz = dz * scale;
       B[kind].push({
-        x: x + dx * cs - dz * sn, y: y + dy, z: z + dx * sn + dz * cs,
-        sx, sy, sz, rot, roll, color,
+        x: x + ox * cs - oz * sn, y: y + oy, z: z + ox * sn + oz * cs,
+        sx: sx * scale, sy: sy * scale, sz: sz * scale, rot, roll,
+        // a string names a slot in the theme kit; a number is a literal that
+        // must not be re-tinted (the chapel cross)
+        color: typeof colKey === 'string' ? K[colKey] : colKey,
       });
-    };
-    let r = 4, mat = 'hut';
-    switch (type) {
-      case 'barn':
-        put('wall', 0, 0, 0, 12, 6.0, 8.4, K.wall2);
-        put('prism', 0, 6.0, 0, 12.8, 3.4, 9.1, K.roof);
-        put('box', 0, 0.1, 4.3, 3.4, 4.6, 0.35, K.trim);           // big door
-        put('box', 0, 4.9, 4.35, 1.6, 1.4, 0.3, K.trim);           // hay loft hatch
-        put('box', -6.05, 0, 0, 0.4, 6.0, 8.4, K.trim);
-        put('box', 6.05, 0, 0, 0.4, 6.0, 8.4, K.trim);
-        r = 7.4;
-        break;
-      // A FARMHOUSE, NOT A BOX WITH A LID.
-      //
-      // This was one 7.6 x 5.0 x 6.6 slab under a shallow prism, plus a 5.6 u
-      // "corner post" that read as a spike driven through the eaves. Nearly
-      // cubic, no overhang, nothing to give it scale, and the same silhouette
-      // from every angle — reported after a screenshot of one sitting in a
-      // field, and it deserved the report.
-      //
-      // What makes a small rural house read at a glance is not detail, it is
-      // MASSING: a stone footing so it sits IN the ground rather than on it, a
-      // steeper roof with an eaves line that oversails the walls, and a lower
-      // wing so the outline is not a rectangle. All of it merges into the same
-      // batched geometry as before, so the cost is a handful of boxes.
-      case 'house': {
-        put('box', 0, 0, 0, 7.8, 0.75, 6.8, K.stone);              // stone footing
-        put('wall', 0, 0.75, 0, 7.2, 4.8, 6.2, K.wall);            // main block
-        put('box', 0, 5.35, 0, 8.1, 0.28, 7.1, K.trim);            // eaves fascia
-        put('prism', 0, 5.55, 0, 8.6, 3.7, 7.6, K.roof);           // steeper, oversailing
-        // Lower side wing: breaks the rectangle and gives the roof a second
-        // ridge, which is what stops every house reading as the same object.
-        put('box', 4.7, 0, 0.6, 3.8, 0.6, 4.9, K.stone);
-        put('wall', 4.7, 0.6, 0.6, 3.4, 2.9, 4.4, K.wall2);
-        put('prism', 4.7, 3.5, 0.6, 3.9, 1.6, 5.0, K.roof);
-        // Porch: a canopy on two posts over the door. Cheap, and it gives the
-        // front a shadow line so the facade is not one flat plane.
-        put('box', -0.6, 3.15, 3.55, 3.4, 0.22, 1.9, K.roof);
-        put('cyl', -1.9, 0.75, 4.0, 0.24, 2.4, 0.24, K.trim);
-        put('cyl', 0.7, 0.75, 4.0, 0.24, 2.4, 0.24, K.trim);
-        put('box', -0.6, 0.8, 3.05, 1.4, 2.6, 0.28, K.trim);       // door
-        // Chimney on the RIDGE (z = 0), not floating off it as before.
-        put('cyl', -2.6, 5.4, 0, 0.95, 3.4, 0.95, K.stone);
-        r = 6.0;
-        break;
-      }
-      case 'chapel':
-        put('wall', 0, 0, 0, 5.6, 5.4, 8.0, K.wall);
-        put('prism', 0, 5.4, 0, 6.2, 3.0, 8.6, K.roof);
-        put('wall', 0, 0, -4.6, 3.6, 9.6, 3.6, K.wall);            // bell tower
-        put('cone', 0, 9.6, -4.6, 4.6, 3.8, 4.6, K.roof);
-        put('box', 0, 13.4, -4.6, 0.22, 1.6, 0.22, 0xf0e6c8);      // cross
-        put('box', 0, 14.2, -4.6, 1.0, 0.22, 0.22, 0xf0e6c8);
-        put('box', 0, 0.1, 4.1, 1.4, 3.0, 0.3, K.trim);
-        r = 4.8;
-        break;
-      case 'shed':
-        put('wall', 0, 0, 0, 5.2, 3.2, 4.2, K.wall2);
-        put('box', 0, 3.2, 0.35, 5.8, 0.35, 4.9, K.roof);          // lean-to roof
-        put('box', 0, 0.1, 2.2, 1.3, 2.4, 0.28, K.trim);
-        r = 3.4;
-        break;
-      case 'adobe':
-        put('wall', 0, 0, 0, 8.6, 4.2, 7.2, K.wall);
-        put('box', 0, 4.2, 0, 9.1, 0.7, 7.7, K.wall);              // parapet
-        put('box', 0, 0.1, 3.7, 1.5, 2.9, 0.3, K.trim);
-        for (const d of [-2.2, 0, 2.2]) put('cyl', d, 3.6, 4.1, 0.35, 1.4, 0.35, K.trim, Math.PI / 2);
-        r = 5.7;
-        break;
-      case 'watchtower':
-        put('wall', 0, 0, 0, 3.6, 9.5, 3.6, K.wall2);
-        put('box', 0, 9.5, 0, 5.4, 0.5, 5.4, K.trim);              // platform
-        for (const [dx, dz] of [[-2.4, -2.4], [2.4, -2.4], [-2.4, 2.4], [2.4, 2.4]]) {
-          put('box', dx, 10.0, dz, 0.28, 1.7, 0.28, K.trim);
-        }
-        put('cone', 0, 11.7, 0, 6.0, 2.2, 6.0, K.roof);
-        r = 2.7;
-        break;
-      case 'stilt':
-        for (const [dx, dz] of [[-2.4, -1.9], [2.4, -1.9], [-2.4, 1.9], [2.4, 1.9], [0, -1.9], [0, 1.9]]) {
-          put('cyl', dx, 0, dz, 0.5, 3.0, 0.5, K.trim);
-        }
-        put('wall', 0, 3.0, 0, 6.2, 3.0, 5.2, K.wall);
-        put('prism', 0, 6.0, 0, 7.2, 2.6, 6.2, K.roof);
-        put('box', 1.2, 0, 3.4, 3.0, 0.25, 2.4, K.trim);           // ramp/deck
-        r = 3.8;
-        break;
-      case 'kiosk':
-        put('wall', 0, 0, 0, 4.4, 3.2, 3.4, K.wall);
-        put('box', 0, 3.2, 0, 4.8, 0.4, 3.8, K.roof);
-        put('box', 0, 2.0, 2.1, 4.8, 0.2, 1.6, K.trim);            // awning
-        put('box', 0, 3.7, 0, 3.2, 1.1, 0.24, K.trim);             // sign board
-        put('box', -1.7, 1.9, 1.75, 0.2, 0.2, 1.5, K.trim);
-        r = 3.0;
-        break;
-      case 'signalhut':
-        put('wall', 0, 0, 0, 4.6, 3.4, 4.2, K.wall);
-        put('prism', 0, 3.4, 0, 5.2, 1.8, 4.8, K.roof);
-        put('cyl', 1.9, 3.4, -1.7, 0.24, 6.4, 0.24, K.trim);       // antenna mast
-        put('box', 1.9, 9.4, -1.7, 1.8, 0.16, 0.16, K.trim);
-        put('box', 0, 0.1, 2.2, 1.2, 2.4, 0.28, K.trim);
-        r = 3.2;
-        break;
-      case 'silo':
-        put('cyl', 0, 0, 0, 4.4, 9.0, 4.4, K.wall);
-        put('cone', 0, 9.0, 0, 4.9, 2.4, 4.9, K.roof);
-        for (let b = 1; b <= 3; b++) put('cyl', 0, b * 2.2, 0, 4.6, 0.3, 4.6, K.trim);
-        r = 2.4; mat = 'stone';
-        break;
-      case 'windmill':
-        put('cyl', 0, 0, 0, 3.0, 8.4, 2.4, K.wall);
-        put('cone', 0, 8.4, 0, 3.6, 1.8, 3.0, K.roof);
-        put('cyl', 0, 7.6, 1.6, 0.7, 0.9, 0.7, K.trim, Math.PI / 2);
-        for (let b = 0; b < 4; b++) {
-          put('box', 0, 7.6, 2.0, 0.5, 7.0, 0.22, K.trim, b * Math.PI / 4 + 0.4);
-        }
-        r = 2.0; mat = 'stone';
-        break;
-      case 'well':
-        put('cyl', 0, 0, 0, 3.2, 1.3, 3.2, K.stone);
-        for (const d of [-1.3, 1.3]) put('box', d, 1.3, 0, 0.3, 2.4, 0.3, K.trim);
-        put('prism', 0, 3.7, 0, 3.4, 0.9, 2.8, K.roof);
-        put('cyl', 0, 3.5, 0, 0.28, 2.6, 0.28, K.trim, Math.PI / 2);
-        r = 1.8; mat = 'stone';
-        break;
-      default: {                                                   // 'logpile'
-        for (let t = 0; t < 3; t++) {
-          const row = [[-1.1, 0, 1.1], [-0.55, 0.55], [0]][t];
-          for (const off of row) put('cyl', 0, 0.55 + t * 0.95, off, 1.05, 4.6, 1.05, K.trim, Math.PI / 2);
-        }
-        r = 2.4; mat = 'stone';
-        break;
-      }
     }
-    this.solids.push({ x, z, r, y: y + 0.6, mat });
+    const r = T.r * scale, mat = T.mat ?? 'hut';
+    const solid = { x, z, r, y: y + 0.6, mat };
+    this.solids.push(solid);
     this._addShadow(x, z, r * 1.35);
-    return r;
+    return { r, solid, y };
+  }
+
+  /** Current fill level of each part bucket — bracket an `_element` call with
+   *  two of these and the difference is exactly that structure's slots. */
+  _batchLens(B) {
+    const o = {};
+    for (const k of Object.keys(B)) o[k] = B[k].length;
+    return o;
   }
 
   /** Everything the world is dressed with beyond the road: farmsteads and
@@ -6170,10 +6241,13 @@ export class Track {
     const kitName = this.T.elements
       || ELEMENT_KIT_BY_THEME[this.level && this.level.theme] || 'farm';
     const K = ELEMENT_KITS[kitName];
-    if (!K) return;
+    // Flush regardless: the huts and road cabins have already written into the
+    // shared batch by now, so an early return here would leave every building
+    // in the world without a mesh.
+    if (!K) { this._realizeElements(this._elemB(), m4); return; }
     // breakable field dressing this kit uses (livestock gear by default)
     const FIELD = K.field ?? ['trough', 'feedbin', 'hayrack'];
-    const B = { wall: [], box: [], cyl: [], cone: [], prism: [] };
+    const B = this._elemB();
 
     // --- pick 3 farmstead / outpost sites well off the racing line ---
     const sites = [];
@@ -6257,6 +6331,30 @@ export class Track {
     this._realizeElements(B, m4);
   }
 
+  /** The ONE part batch every structure in the world feeds into.
+   *
+   *  Was three separate batches realized at three different times — the
+   *  farmsteads, the road cabins, and (after this change) the scattered
+   *  cottages — which meant three copies of the same five InstancedMeshes and
+   *  fifteen draw calls where five will do. Sharing it is also what lets a
+   *  builder register a DESTRUCTIBLE before the meshes exist: it records the
+   *  bucket and slot it wrote into, and `_realizeElements` resolves those to
+   *  real meshes once, at the end. */
+  _elemB() {
+    if (!this._elemBatch) this._elemBatch = { wall: [], box: [], cyl: [], cone: [], prism: [] };
+    return this._elemBatch;
+  }
+
+  /** Note the slots a structure occupies so it can be shot down later. Called
+   *  with the batch lengths captured BEFORE and AFTER an `_element` stamp. */
+  _registerElementBuilding(meta, before, after) {
+    const slots = [];
+    for (const key of Object.keys(after)) {
+      for (let i = before[key]; i < after[key]; i++) slots.push([key, i]);
+    }
+    (this._pendingBuildings ??= []).push({ ...meta, slots });
+  }
+
   /** Turn the five part buckets into five InstancedMeshes (one draw call each
    *  for every building in the world). */
   _realizeElements(B, m4) {
@@ -6265,8 +6363,14 @@ export class Track {
     const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); gCyl.translate(0, 0.5, 0);
     const gCone = new THREE.ConeGeometry(0.5, 1, 10); gCone.translate(0, 0.5, 0);
     const specs = [
+      // The emissive window map came across from `_buildHuts` when the
+      // cottages moved onto the shared templates. It is not a port for its own
+      // sake: without it the scattered dwellings lost their lit panes, and
+      // WITH it every farmhouse, chapel and kiosk in the game gained them.
       ['wall', gWall, new THREE.MeshStandardMaterial({
         map: buildingTexture(), roughness: 0.85, envMapIntensity: 0.45,
+        emissive: 0xffffff, emissiveMap: buildingGlowTexture(),
+        emissiveIntensity: this.T.hutGlow !== undefined ? this.T.hutGlow : 0.5,
       })],
       ['box', gBox, new THREE.MeshStandardMaterial({ roughness: 0.9, envMapIntensity: 0.4 })],
       ['cyl', gCyl, new THREE.MeshStandardMaterial({ roughness: 0.9, envMapIntensity: 0.4 })],
@@ -6295,7 +6399,27 @@ export class Track {
         mesh.setColorAt(k, col);
       });
       this.group.add(mesh);
+      (this._elemMeshes ??= {})[key] = mesh;
     }
+    // ONLY THE SHARED BATCH MAY RESOLVE DEFERRED BUILDINGS.
+    //
+    // A third caller — the log-yard dressing — still had its own local batch
+    // and realized it early, part-way through the world build. That call
+    // created an `element-cyl` mesh with six instances in it and nothing else,
+    // then drained the pending list: every cottage registered so far was
+    // handed a single part pointing at a slot that mesh did not have, and lost
+    // its walls, its roof and its destructibility. Measured on FURKA RIDGE as
+    // eight buildings of one part each, indices 6 and 7 into a mesh of six.
+    // The log yard shares the batch now, but the guard stays: a private batch
+    // must never be able to claim structures it did not build.
+    if (B !== this._elemBatch) return;
+    for (const b of (this._pendingBuildings ?? [])) {
+      const parts = b.slots
+        .map(([key, i]) => ({ mesh: this._elemMeshes[key], i }))
+        .filter((pt) => pt.mesh);
+      if (parts.length) this.buildings.push({ ...b, parts, slots: undefined });
+    }
+    this._pendingBuildings = [];
   }
 
   /** A dry-stone field wall: `n` instanced blocks in a line, each a small
@@ -9581,42 +9705,29 @@ export class Track {
     this.group.add(flowers);
   }
 
+  /** The scattered dwellings — the buildings a player sees most of.
+   *
+   *  This used to own its geometry: one BoxGeometry wall and one ConeGeometry
+   *  roof, composed at a random width and height. Two consequences, both
+   *  reported. It was ONE SHAPE repeated ten times a world, so a village read
+   *  as a row of identical crates; and because the roof cone was never
+   *  translated to its own base, half of every roof sat inside the house — a
+   *  bug that also existed, independently and identically, in the spur
+   *  farmstead's barn builder.
+   *
+   *  It now stamps the shared HOUSE_TEMPLATES like every other structure in
+   *  the game. Three cottage variants instead of one box, colours from the
+   *  theme kit, base anchoring inherited from the one place that does it, and
+   *  the parts land in the same five InstancedMeshes as the farmsteads rather
+   *  than two more of their own.
+   */
   _buildHuts(m4) {
     if (this.T.hutStyle === 'igloo') return this._buildIgloos(m4);
     const COUNT = this.T.hutCount !== undefined ? this.T.hutCount : 14;
-    const wallGeo = new THREE.BoxGeometry(1, 1, 1);
-    wallGeo.translate(0, 0.5, 0);
-    const roofGeo = new THREE.ConeGeometry(0.85, 0.55, 4);
-    roofGeo.rotateY(Math.PI / 4);
-    // HALF THE ROOF WAS INSIDE THE HOUSE.
-    //
-    // BoxGeometry and ConeGeometry are both centred on their own origin, and
-    // `wallGeo` is translated up by half its height so its base sits at y=0 —
-    // but the cone never got the matching translate. Both were then composed
-    // at the same anchor, so the pyramid's base landed HALF ITS HEIGHT BELOW
-    // the wall top: measured on a 7.65 u hut, wall 0.02-5.02, roof 4.03-6.01,
-    // buried 0.99 of its 1.98. What showed was the wall box's flat top face —
-    // window texture and all, because the building texture wraps every face —
-    // with a stub of pyramid poking out of the middle of it. Reported twice as
-    // "the weird house", and both times the redesign went into `_element`'s
-    // `house`, which is a different builder and was never what was on screen.
-    roofGeo.translate(0, 0.275, 0);
-    // warm lit windows: the emissive map is black except the panes, so this is
-    // one extra texture fetch on ~14 instanced boxes and the huts stop reading
-    // as empty crates. `hutGlow` per theme — brightest at dusk (volcano,
-    // wildfire, neon) and in snow, where the reference art leans hardest on it.
-    const wallMat = new THREE.MeshStandardMaterial({
-      map: buildingTexture(), roughness: 0.8, envMapIntensity: 0.5,
-      emissive: 0xffffff, emissiveMap: buildingGlowTexture(),
-      emissiveIntensity: this.T.hutGlow !== undefined ? this.T.hutGlow : 0.5,
-    });
-    const roofMat = new THREE.MeshStandardMaterial({
-      color: this.T.hutRoof, flatShading: true, roughness: 0.8, envMapIntensity: 0.5,
-    });
-    const walls = new THREE.InstancedMesh(wallGeo, wallMat, COUNT);
-    const roofs = new THREE.InstancedMesh(roofGeo, roofMat, COUNT);
-    walls.castShadow = roofs.castShadow = true;
-    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const kitName = this.T.elements
+      || ELEMENT_KIT_BY_THEME[this.level && this.level.theme] || 'farm';
+    const K = ELEMENT_KITS[kitName] ?? ELEMENT_KITS.farm;
+    const B = this._elemB();
     let placed = 0;
     // hutZone [f0, f1] clusters the dwellings into one stretch of the lap (the
     // valley village at the foot of a pass); f0 > f1 wraps through the line
@@ -9624,12 +9735,13 @@ export class Track {
       ? () => this._zonePos(this.T.hutZone, 20, 62)
       : () => this._trackSidePos(24, 64);
     this._scatter(COUNT, makePos, (p) => {
-      // SCALE. The car is 4.4 u long and 2.6 u wide, so a 9-15 u hut under a
-      // roof scaled to w·1.6 towered over it — the pyramid's flats reached
-      // 0.96 w to each side, nearly twice the wall, which is what made the
-      // houses read as giant. A cottage is a bit wider than a car is long and
-      // about as tall again; the roof gets an eave, not a marquee.
-      const w = 6 + Math.random() * 3;
+      const type = COTTAGES[(Math.random() * COTTAGES.length) | 0];
+      // SCALE. The car is 4.4 u long and 2.6 u wide; a cottage is a bit wider
+      // than a car is long. The templates are authored at that size, so this
+      // is variation, not sizing — keep it narrow or the village stops looking
+      // like one settlement.
+      const scale = 0.92 + Math.random() * 0.30;
+      const rad = HOUSE_TEMPLATES[type].r * scale;
       // A HOUSE MUST NEVER STAND ON THE ROAD.
       //
       // `_trackSidePos` / `_zonePos` measure their offset from ONE track index,
@@ -9640,40 +9752,18 @@ export class Track {
       // house". `_clearsRoad` re-checks against the nearest leg anywhere on the
       // lap, and the margin is generous because a building is the one obstacle
       // that can end a race outright.
-      if (!this._clearsRoad(p.x, p.z, (w * Math.SQRT2) / 2, 3.5)) return;
-      const h = 3.6 + Math.random() * 1.4;
-      const rot = Math.random() * Math.PI * 2;
-      const y = this.terrainHeight(p.x, p.z) - 0.6;
-      q.setFromAxisAngle(up, rot);
-      m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(w, h, w));
-      walls.setMatrixAt(placed, m4);
-      // ...and now that the roof sits ON the wall instead of through it, it can
-      // have an EAVE. At 0.88 the pyramid's flats reached 0.529 w against a
-      // wall half-width of 0.5 w — an oversail of 0.2 u on a 7 u house, which
-      // is flush to the eye. 1.06 puts the flats at 0.637 w, about a metre
-      // proud, which is what gives a small house a shadow line under the roof
-      // and stops it reading as a crate with a lid. Still nowhere near the
-      // 0.96 w that made these tower over the car in an earlier pass — that is
-      // the ceiling this is tuned under, not a number to creep back toward.
-      m4.compose(new THREE.Vector3(p.x, y + h, p.z), q, new THREE.Vector3(w * 1.06, h * 0.85, w * 1.06));
-      roofs.setMatrixAt(placed, m4);
-      // solid hut: walls are a unit box scaled w×w, so half the world-space
-      // diagonal of the footprint is w·√2/2
-      const solid = { x: p.x, z: p.z, r: (w * Math.SQRT2) / 2, y: y + 0.6, mat: 'hut' };
-      this.solids.push(solid);
+      if (!this._clearsRoad(p.x, p.z, rad, 3.5)) return;
+      const before = this._batchLens(B);
+      const el = this._element(B, type, p.x, p.z, Math.random() * Math.PI * 2, K, scale);
       // A building is a target, not scenery: register it so cannon rounds and
-      // blasts can level it. `parts` carries the instanced meshes and the slot
-      // to blank when it comes down. Stone walls soak a lot more than a crate.
-      this.buildings.push({
-        x: p.x, z: p.z, y, r: w * 0.62, w, h, hp: 120, solid,
-        parts: [{ mesh: walls, i: placed }, { mesh: roofs, i: placed }],
-        roofColor: this.T.hutRoof,
-      });
-      this._addShadow(p.x, p.z, w * 0.85);
+      // blasts can level it. The slots are resolved to real meshes in
+      // `_realizeElements`, once the batch has been turned into geometry.
+      this._registerElementBuilding({
+        x: p.x, z: p.z, y: el.y, r: rad * 0.62, w: rad * 2, h: 5 * scale,
+        hp: 120, solid: el.solid, roofColor: this.T.hutRoof,
+      }, before, this._batchLens(B));
       placed++;
     });
-    walls.count = roofs.count = placed;
-    this.group.add(walls, roofs);
   }
 
   /** Blank a destroyed building's instances and drop its collider, so you can
