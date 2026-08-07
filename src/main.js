@@ -1698,8 +1698,11 @@ class Game {
    *  again, which is the entire point of replacing the podium chain.
    *
    *  The first three are free, so there is a real choice from the very first
-   *  race, and the last world costs 19 of a possible 63 — a third of the
-   *  roster can go unraced and the finale is still reachable. */
+   *  race, and the last world costs (roster - 3) of a possible 3x roster — on
+   *  the 32 worlds that ship today, 29 of 96, so two thirds of the roster can
+   *  go unraced and the finale is still reachable. Deliberately written as a
+   *  relation and not the old fixed "19 of 63", which was true of a 21-world
+   *  roster and quietly stopped being true as worlds were appended. */
   starCost(id) {
     const i = LEVELS.findIndex((l) => l.id === id);
     return i < 3 ? 0 : i - 2;
@@ -1707,6 +1710,48 @@ class Game {
 
   isLevelUnlocked(id) {
     return this.unlockAll || this.totalStars() >= this.starCost(id);
+  }
+
+  /** SAY HOW STARS ARE EARNED, WHERE THEY ARE SPENT.
+   *
+   *  The award rule — finish / podium / win — was only ever written on the
+   *  post-race panel, which appears AFTER the decision it should inform. The
+   *  track list, meanwhile, was full of cards reading "NEEDS 27★ — 13 TO GO"
+   *  at a player with no way to know what a star costs to earn, or that the
+   *  three they left on a world they already beat are still there for the
+   *  taking. Reported as: "How do you earn the stars? That needs to be clear."
+   *
+   *  Everything here is derived, never stored: the totals and the next
+   *  threshold come from the same `starsFor` / `starCost` the unlock check
+   *  uses, so the legend cannot describe a rule the game does not follow.
+   */
+  _renderStarKey() {
+    const el = document.getElementById('star-key');
+    if (!el) return;
+    const now = this.totalStars();
+    const max = LEVELS.length * 3;
+    // Worlds you have RACED and not maxed out — the ones with stars still on
+    // the table. The `finished` check is the point: without it a fresh career
+    // reported "3 WORLDS STILL HOLDING STARS" about three worlds nobody had
+    // entered yet, which reads as a nag rather than as unfinished business.
+    const partial = LEVELS
+      .filter((lv) => this.career.finished[lv.id] && this.starsFor(this.career.finished[lv.id]) < 3)
+      .length;
+    const next = LEVELS.filter((lv) => this.starCost(lv.id) > now)
+      .sort((a, c) => this.starCost(a.id) - this.starCost(c.id))[0];
+    const RULES = [['★', 'FINISH THE RACE'], ['★★', 'PODIUM — TOP 3'], ['★★★', 'WIN IT']];
+    el.innerHTML = `
+      <div class="sk-top">
+        <span class="sk-title">RALLY STARS — HOW THEY ARE EARNED</span>
+        <span class="sk-total">${now}<span style="font-size:11px">/${max}★</span></span>
+      </div>
+      <div class="sk-rules">
+        ${RULES.map(([s, t]) => `<span class="sk-rule"><b>${s}</b>${t}</span>`).join('')}
+      </div>
+      <div class="sk-next">${next
+    ? `EVERY WORLD KEEPS YOUR BEST RESULT — NEXT UNLOCK IS <b>${next.name}</b>, ${this.starCost(next.id) - now}★ TO GO`
+    : 'EVERY WORLD IS OPEN — THE REMAINING STARS ARE FOR THE RECORD'}${
+  partial ? ` · ${partial} WORLD${partial === 1 ? '' : 'S'} STILL HOLDING STARS` : ''}</div>`;
   }
 
   /** World cards: static circuit-outline badge + flavor + career best per
@@ -1733,6 +1778,7 @@ class Game {
       }
       return row;
     };
+    this._renderStarKey();
     LEVELS.forEach((lv, i) => {
       const card = document.createElement('button');
       const unlocked = this.isLevelUnlocked(lv.id);
