@@ -63,7 +63,7 @@ const CORE = [
 // 32, and read from one place: this list was hardcoded at 21 when the roster
 // was 21, and the eleven worlds added since shipped with previews the offline
 // cache never carried.
-const EXTRA = Array.from({ length: 44 }, (_, i) => `./assets/previews/w${i + 1}.jpg`);
+const EXTRA = Array.from({ length: 45 }, (_, i) => `./assets/previews/w${i + 1}.jpg`);
 const ASSETS = [...CORE, ...EXTRA];   // the full offline set, for status counts
 
 self.addEventListener('install', (e) => {

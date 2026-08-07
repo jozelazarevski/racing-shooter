@@ -404,6 +404,7 @@ const DEMANDS = {
   42: { loose: 0.55, twist: 0.75, fast: 0.25, climb: 0.20 }, // RALLYCROSS ARENA
   43: { loose: 0.55, twist: 0.55, fast: 0.50, climb: 0.30 }, // OULTON PARK
   44: { loose: 0.12, twist: 0.60, fast: 0.55, climb: 0.55 }, // LAGUNA SECA
+  45: { loose: 0.10, twist: 0.95, fast: 0.15, climb: 0.60 }, // TOUR DE CORSE
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {
