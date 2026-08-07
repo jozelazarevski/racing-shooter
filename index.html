@@ -408,6 +408,16 @@
   .prof-info small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* danger zone: reset (empties this driver) sits apart from ✕ (deletes them) */
   .danger-head{color:#ff9d86 !important}
+  #profile-sync{display:flex;flex-direction:column;align-items:center;gap:7px;align-self:stretch;
+    border-top:1px solid var(--line-soft);padding-top:10px;margin-top:4px}
+  #profile-sync .sync-head{font-size:10px;letter-spacing:3px;color:#e8c987}
+  #profile-sync .sync-status{font-size:9px;font-weight:800;letter-spacing:1.6px;color:#c9a86a;min-height:12px}
+  #profile-sync .sync-row{display:flex;gap:8px}
+  #sync-code-box{width:100%;display:none;background:rgba(0,0,0,.35);color:#ffe9a8;
+    border:1px solid var(--line-soft);border-radius:8px;font-size:10px;padding:6px 8px;
+    font-family:monospace;word-break:break-all;resize:none;pointer-events:auto}
+  #sync-code-box.open{display:block}
+  #profile-sync .sync-note{font-size:9px;font-weight:700;letter-spacing:1.6px;color:#b8a284;text-align:center}
   #profile-reset{display:flex;flex-direction:column;align-items:center;gap:7px;align-self:stretch}
   #profile-reset-loss{font-size:10px;font-weight:800;letter-spacing:1.4px;color:#e8a08c;
     text-align:center;line-height:1.5}
@@ -450,6 +460,10 @@
     #star-key .sk-rule{font-size:10px}
     #star-key .sk-rules{gap:4px 10px}
   }
+  .wc-new{position:absolute;top:8px;left:-26px;transform:rotate(-35deg);z-index:2;
+    background:linear-gradient(180deg,#ffd400,#f0a020);color:#241d16;font-weight:900;
+    font-size:10px;letter-spacing:3px;padding:3px 30px;box-shadow:0 2px 4px rgba(0,0,0,.35);
+    pointer-events:none}
   .region-head{display:flex;align-items:center;gap:10px;margin:16px 0 8px;
     font-family:'Luckiest Guy';font-size:12px;letter-spacing:5px;
     color:var(--gold-dim);text-shadow:1px 1px 0 var(--ink);white-space:nowrap}
@@ -459,6 +473,7 @@
      so every region shares one grid rhythm */
   .region-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%}
   .level-chip{pointer-events:auto;cursor:pointer;padding:8px 8px 10px;font-family:'Baloo 2';
+    position:relative;overflow:hidden;    /* anchors + clips the NEW ribbon */
     color:var(--cream);border-radius:var(--r-md);text-align:center;
     border:2px solid var(--line-strong);background:rgba(38,26,12,.6);
     transition:transform .1s;-webkit-tap-highlight-color:transparent;display:flex;
@@ -816,7 +831,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r96</div>
+<div id="build-tag">r97</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -950,6 +965,17 @@
     </div>
     <div id="profile-cap-note" class="footnote" style="display:none">PROFILE LIMIT REACHED — DELETE ONE TO ADD ANOTHER</div>
     <div class="panel-head danger-head">DANGER ZONE</div>
+    <div id="profile-sync">
+      <div class="sync-head">CROSS-DEVICE SYNC</div>
+      <div id="sync-status" class="sync-status"></div>
+      <div class="sync-row">
+        <button id="sync-export" class="up-buy prof-btn">COPY SYNC CODE</button>
+        <button id="sync-import" class="up-buy prof-btn">ENTER SYNC CODE</button>
+      </div>
+      <textarea id="sync-code-box" rows="3" spellcheck="false"
+        placeholder="PASTE A SYNC CODE FROM YOUR OTHER DEVICE HERE"></textarea>
+      <div class="sync-note">A SYNC CODE CARRIES THIS WHOLE CAREER · IMPORTING MERGES, NEVER ERASES</div>
+    </div>
     <div id="profile-reset">
       <div id="profile-reset-loss"></div>
       <button id="profile-reset-btn" class="up-buy danger">RESET CAREER</button>
@@ -1012,10 +1038,17 @@
 { "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 <!-- bump v on EVERY release so cached phones pull the fresh module graph -->
-<script type="module" src="./src/main.js?v=r96"></script>
+<script>
+  // CLOUD SYNC (optional). The game is fully playable without this — sync
+  // codes move careers between devices by hand. To make it automatic, create
+  // the one-table database in db/README.md (five minutes, free tier) and put
+  // its URL + anon key here. Leave empty to keep sync codes only.
+  window.IGNITE_SYNC = { url: '', key: '' };
+</script>
+<script type="module" src="./src/main.js?v=r97"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r96"></script>
+<script src="./src/offline.js?v=r97"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r96"></script>
+<script type="module" src="./src/traffic.js?v=r97"></script>
 </body>
 </html>

@@ -71,20 +71,30 @@ export const LEVELS = [
 
   // ---- MEDITERRANEAN. Appended, so nothing before it is re-priced (career
   // order is this array, not the ids — see the note above ROCKFALL RAVINE).
-  { id: 29, name: 'OLIVE COAST', theme: 'medterrace', region: 'MEDITERRANEAN' },
+  //
+  // `cost` OVERRIDES THE INDEX PRICE, and `fresh` marks the world as new on
+  // the tracks screen. Both exist because append-only pricing has a flaw the
+  // roster only just grew into: every NEW region automatically costs more
+  // than everything before it, forever. Measured on a fresh save, these four
+  // sat 26-29 stars deep — about thirteen podiums before a player could touch
+  // the newest content in the game, at the bottom of a 32-card list. Reported
+  // as "I don't see the new tracks", twice. New regions now ship at
+  // mid-career prices and announce themselves; the override never touches an
+  // existing world's cost.
+  { id: 29, name: 'OLIVE COAST', theme: 'medterrace', region: 'MEDITERRANEAN', cost: 6, fresh: true },
 
   // ---- OLD TOWN: the only urban region, and the only night stage that is not
   // NEO-KYOTO. Appended, never inserted — career order is this array and
   // `starCost` prices a world by its INDEX, so a mid-array insert silently
   // re-prices every world after it in an existing save.
-  { id: 30, name: 'LANTERN QUARTER', theme: 'oldtown', region: 'OLD TOWN' },
+  { id: 30, name: 'LANTERN QUARTER', theme: 'oldtown', region: 'OLD TOWN', cost: 8, fresh: true },
   // ---- FARMLAND. Appended, so no existing world's star price moves (career
   // order is this array; starCost() = index - 2).
-  { id: 31, name: 'HEDGEROW DASH', theme: 'farmland', region: 'FARMLAND' },
+  { id: 31, name: 'HEDGEROW DASH', theme: 'farmland', region: 'FARMLAND', cost: 10, fresh: true },
   // ---- OUTBACK RED DIRT. Appended at the END of the array on purpose: career
   // order is array position (starCost = index - 2), so anything inserted higher
   // re-prices every world after it in a save that already exists.
-  { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK' },
+  { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK', cost: 12, fresh: true },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
