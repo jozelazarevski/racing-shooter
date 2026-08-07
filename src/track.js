@@ -17,7 +17,8 @@ export const LEVELS = [
   { id: 1, name: 'PINE VALLEY',  theme: 'forest',  region: 'PINE VALLEY' },
   { id: 2, name: 'DUST CANYON',  theme: 'desert',  region: 'DUST CANYON' },
   { id: 3, name: 'FROST PEAK',   theme: 'snow',    region: 'FROST PEAK' },
-  { id: 4, name: 'CANYON RUN',   theme: 'canyon',  region: 'DUST CANYON' },
+  { id: 4, name: 'CANYON RUN',   theme: 'canyon',  region: 'DUST CANYON',
+    tune: { gorgeJump: { count: 2, depth: 26 }, tunnels: { count: 1 } } },
   { id: 5, name: 'EMBER PASS',   theme: 'volcano', region: 'EMBER RIDGE' },
   { id: 6, name: 'SUMMIT CLIMB', theme: 'alpine',  region: 'PINE VALLEY' },
   { id: 7, name: 'GLACIAL PASS', theme: 'glacial', region: 'FROST PEAK' },
@@ -40,10 +41,14 @@ export const LEVELS = [
   // Since a world opens only on a podium finish on the one before it, that put
   // the game's hardest circuit as a hard gate across the middle of the career.
   // It is now the technical exam immediately before the alpine finale.
-  { id: 10, name: 'ROCKFALL RAVINE', theme: 'ravine', region: 'DUST CANYON' },
-  { id: 19, name: 'GOTTHARD CLIMB', theme: 'pass', region: 'ALPINE PASSES' },
-  { id: 20, name: 'TREMOLA DESCENT', theme: 'tremola', region: 'ALPINE PASSES' },
-  { id: 21, name: 'FURKA RIDGE', theme: 'furka', region: 'ALPINE PASSES' },
+  { id: 10, name: 'ROCKFALL RAVINE', theme: 'ravine', region: 'DUST CANYON',
+    tune: { gorgeJump: { count: 1 } } },
+  { id: 19, name: 'GOTTHARD CLIMB', theme: 'pass', region: 'ALPINE PASSES',
+    tune: { tunnels: { count: 2 } } },
+  { id: 20, name: 'TREMOLA DESCENT', theme: 'tremola', region: 'ALPINE PASSES',
+    tune: { tunnels: { count: 1 } } },
+  { id: 21, name: 'FURKA RIDGE', theme: 'furka', region: 'ALPINE PASSES',
+    tune: { tunnels: { count: 1 } } },
 
   // ---- WORLD RALLY: real stages, each a ROUTE over a borrowed THEME with its
   // own `tune`. `tune` is layered over the theme object, so anything a theme
@@ -94,7 +99,8 @@ export const LEVELS = [
   // ---- OUTBACK RED DIRT. Appended at the END of the array on purpose: career
   // order is array position (starCost = index - 2), so anything inserted higher
   // re-prices every world after it in a save that already exists.
-  { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK', cost: 12, fresh: true },
+  { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK', cost: 12, fresh: true,
+    tune: { gorgeJump: { count: 1 } } },
 
   // ---- GRAND CIRCUITS: the reference sheet of twelve real layouts, each a
   // route over an existing theme (art is the theme's; the geometry is the
@@ -103,7 +109,7 @@ export const LEVELS = [
   { id: 33, name: 'RED BULL RING', theme: 'alpine', route: 'rbring', region: 'GRAND CIRCUITS',
     cost: 5, fresh: true, tune: { elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
   { id: 34, name: 'MONACO STREETS', theme: 'medterrace', route: 'monaco', region: 'GRAND CIRCUITS',
-    cost: 6, fresh: true, tune: { elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
+    cost: 6, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
   { id: 35, name: 'SILVERSTONE', theme: 'farmland', route: 'silverstone', region: 'GRAND CIRCUITS',
     cost: 7, fresh: true, tune: { elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
   { id: 36, name: 'SPA-FRANCORCHAMPS', theme: 'forest', route: 'spa', region: 'GRAND CIRCUITS',
@@ -127,7 +133,7 @@ export const LEVELS = [
   // the 25.8 km Corsican tarmac stage from the player's card: a 3000 u lap,
   // hairpin over hairpin, on the Mediterranean island theme
   { id: 45, name: 'TOUR DE CORSE', theme: 'medterrace', route: 'corse', region: 'GRAND CIRCUITS',
-    cost: 17, fresh: true, tune: { elev: { amp: 10, ph: [0.8, 1.7, 2.9] }, rampCount: 0 } },
+    cost: 17, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 10, ph: [0.8, 1.7, 2.9] }, rampCount: 0 } },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -3146,6 +3152,22 @@ export class Track {
     // the hero gorge must exist before ANY height is sampled (terrain mesh,
     // road skirts and every scenery placement read it through _blendHeight)
     if (this.T.heroBridge) this._planGorge();
+    // GORGE JUMPS: carved chasms where the roadway is simply OUT - a baked
+    // kicker lip launches anything at racing speed clean across (the r96
+    // ballistic flight does the rest); anything slower drops in and drives
+    // out along the chasm floor, whose ends ease back to grade below the
+    // off-road climb limit. Planned here for the same reason as the hero
+    // gorge: every height sample after this point must read the cut.
+    this._jumpGorges = [];
+    this._jumpCut = null;
+    if (this.T.gorgeJump) this._planJumpGorges();
+    // TUNNELS are planned, not found: the road-field blend flattens the
+    // ground beside every carriageway, so no natural cutting is ever deep
+    // enough to bore. Instead the straightest eligible stretches are chosen
+    // here and a rock ridge is RAISED over them in both height fields - the
+    // bore then runs through a hill that genuinely exists.
+    this._tunnels = [];
+    if (this.T.tunnels) this._planTunnels();
 
     this.animated = { flags: [], clouds: [] };
     // World-space circle colliders for on-road obstacles: [{x, z, r}].
@@ -3456,7 +3478,10 @@ export class Track {
   /** Road surface height at a track position: the elevation profile, plus the
    *  ramp wedge height when inside a ramp zone (ramps ADD to road height). */
   groundHeightAt(i, lateral) {
-    const roadY = this.center[i].y;
+    let roadY = this.center[i].y;
+    // gorge jumps: the roadway is OUT across the chasm - the surface here IS
+    // the collapsed span, and the crest detector launches anything fast
+    if (this._jumpCut) roadY -= this._jumpCut[i];
     for (const r of this.ramps) {
       const di = (i - r.index + N) % N;
       if (di < r.len && Math.abs(lateral - r.lateral) < r.halfW) {
@@ -3740,7 +3765,8 @@ export class Track {
     }
     // the hero gorge is carved out of whatever the ground would otherwise be,
     // road corridor included — that is the hole the suspension bridge spans
-    if (this._gorge) h -= this._gorgeCut(x, z);
+    if (this._gorge || this._jumpGorges?.length) h -= this._gorgeCut(x, z);
+    if (this._tunnels?.length) h = this._tunnelRidge(x, z, h);
     // the river runs in a real bed, not on top of the field — but the channel
     // is flattened out again as it nears the road so the FORD stays a shallow
     // wash across the carriageway instead of a trench (and so the road skirts,
@@ -4106,23 +4132,46 @@ export class Track {
   /** Depth of the river gorge at (x, z): 0 everywhere outside it, easing to
    *  the full depth along the channel. Applied inside _blendHeight so the
    *  scenery field, the terrain mesh and the free-roam ground all agree. */
-  _gorgeCut(x, z) {
-    const G = this._gorge;
+  _gorgeCutOne(G, x, z) {
     const dx = x - G.x, dz = z - G.z;
     const u = dx * G.ax + dz * G.az;          // along the gorge
     const v = dx * G.vx + dz * G.vz;          // across it (= along the road)
     const au = Math.abs(u), av = Math.abs(v);
     if (au > G.len || av >= G.half) return 0;
-    const along = 1 - THREE.MathUtils.smoothstep(au, G.len * 0.55, G.len);
+    // ease out over the last 55%: keeps the floor's end grade under the
+    // off-road climb limit, so a fallen car can drive out along the chasm
+    const along = 1 - THREE.MathUtils.smoothstep(au, G.len * 0.38, G.len);
     // U-shaped channel: full depth down the middle, rims easing back to grade
     const prof = Math.pow(Math.cos((av / G.half) * Math.PI * 0.5), 1.5);
     return G.depth * prof * along;
   }
 
-  /** True when sample i lies within `pad` samples of the bridge span (so
-   *  ramps, pads, obstacles, puddles and props keep off the crossing). */
+  /** Total chasm depth at a point: the hero-bridge gorge plus every gorge
+   *  JUMP chasm (same carve, no deck — the road is simply out). */
+  _gorgeCut(x, z) {
+    let c = 0;
+    if (this._gorge) c += this._gorgeCutOne(this._gorge, x, z);
+    if (this._jumpGorges) {
+      for (const G of this._jumpGorges) c += this._gorgeCutOne(G, x, z);
+    }
+    return c;
+  }
+
+  /** True when sample i lies within `pad` samples of the bridge span or any
+   *  jump chasm (so ramps, pads, obstacles, puddles and props keep off). */
   _nearGorge(i, pad) {
-    return !!this._gorge && this._circDist(i, this._gorge.i) < pad;
+    if (this._gorge && this._circDist(i, this._gorge.i) < pad) return true;
+    if (this._jumpGorges) {
+      for (const G of this._jumpGorges) {
+        if (this._circDist(i, G.i) < pad) return true;
+      }
+    }
+    if (this._tunnels) {
+      for (const T of this._tunnels) {
+        if (i >= T.s - pad && i <= T.e + pad) return true;
+      }
+    }
+    return false;
   }
 
   /** Pick where the gorge crosses the road. Runs BEFORE any geometry is built
@@ -4154,6 +4203,118 @@ export class Track {
       spanU: H.half / Math.max(0.35, Math.abs(t.x * vx + t.z * vz)),
       floorY: c.y - H.depth,
     };
+  }
+
+  /** Pick the straightest stretches for the jump chasms, carve them via
+   *  _gorgeCut, bake the launch kickers into the roadway, and precompute the
+   *  per-sample road collapse that groundHeightAt applies. */
+  _planJumpGorges() {
+    const J = this.T.gorgeJump;
+    const count = J.count ?? 1;
+    const half = J.half ?? 14, len = J.len ?? 190, depth = J.depth ?? 24;
+    const taken = this._gorge ? [this._gorge.i] : [];
+    for (let k = 0; k < count; k++) {
+      let best = -1, bc = Infinity;
+      for (let i = 0; i < N; i += 2) {
+        if (this._circDist(i, 0) < 90) continue;
+        if (taken.some((t) => this._circDist(i, t) < 140)) continue;
+        let mc = 0;
+        for (let w = -16; w <= 16; w++) mc = Math.max(mc, this.curvature[(i + w + N) % N]);
+        if (mc < bc) { bc = mc; best = i; }
+      }
+      // a jump needs a genuine straight: launching mid-corner throws the car
+      // off the far rim sideways, which is a trap rather than a stunt
+      if (best < 0 || bc > 0.009) break;
+      taken.push(best);
+      const c = this.center[best], t = this.tan[best], n = this.nrm[best];
+      const th = J.skew ?? 0.5;
+      const cs = Math.cos(th), sn = Math.sin(th);
+      const ax = n.x * cs + t.x * sn, az = n.z * cs + t.z * sn;
+      const vx = -n.x * sn + t.x * cs, vz = -n.z * sn + t.z * cs;
+      this._jumpGorges.push({
+        i: best, x: c.x, z: c.z, ax, az, vx, vz, half, len, depth,
+        spanU: half / Math.max(0.35, Math.abs(t.x * vx + t.z * vz)),
+        floorY: c.y - depth,
+      });
+    }
+    if (!this._jumpGorges.length) return;
+    // launch kickers: a rising lip baked into the roadway short of each rim,
+    // on BOTH sides - the race runs one way, but a spun car crosses back.
+    // The physical GAP is only the deep middle of the carve (the rest keeps
+    // full-grade roadway right up to a SHARP lip), and the kicker slope is
+    // real: ~0.19, worth ~8 u/s of launch at racing speed - the math that
+    // clears a ~21 u gap at 40+ u/s and drops anything slower in.
+    for (const G of this._jumpGorges) {
+      G.gapS = Math.ceil((G.spanU * 0.61 + 1) / this.segLen);
+      for (const dir of [1, -1]) {
+        for (let sN = 0; sN < 5; sN++) {
+          const j = (G.i + dir * (G.gapS + 1 + sN) + N) % N;
+          this.center[j].y += 2.3 * Math.pow(1 - sN / 5, 1.4);
+        }
+      }
+    }
+    // the collapse itself, per sample: the ribbon, the physics and the AI all
+    // read the road surface through groundHeightAt, so one array does it all.
+    // Shallow rim-cut is ZEROED - the roadway holds grade to the lip, then
+    // the surface is simply out.
+    this._jumpCut = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      let cut = 0;
+      for (const G of this._jumpGorges) {
+        const c1 = this._gorgeCutOne(G, this.center[i].x, this.center[i].z);
+        cut += c1 >= G.depth * 0.35 ? c1 : 0;
+      }
+      this._jumpCut[i] = cut;
+    }
+  }
+
+  _planTunnels() {
+    const S = this.T.tunnels;
+    const count = S.count ?? 1;
+    const lenS = Math.round((S.len ?? 80) / this.segLen);
+    for (let k = 0; k < count; k++) {
+      let best = -1, bc = Infinity;
+      for (let i = 0; i < N; i += 2) {
+        if (this._circDist(i, 0) < 100) continue;
+        if (this._nearGorge(i, 150)) continue;
+        if (this._tunnels.some((t) => this._circDist(i, t.mid) < 170)) continue;
+        let mc = 0;
+        for (let w = -lenS; w <= lenS; w++) mc = Math.max(mc, this.curvature[(i + w + N) % N]);
+        if (mc < bc) { bc = mc; best = i; }
+      }
+      // a bore through a corner self-intersects; only genuine straights bore
+      if (best < 0 || bc > 0.013) break;
+      const half = lenS >> 1;
+      if (best - half < 0 || best + half >= N) break;    // no wrap runs
+      const s0 = best - half, e0 = best + half;
+      const pts = [];
+      for (let j = s0; j <= e0; j += 3) {
+        pts.push([this.center[j].x, this.center[j].z, this.center[j].y]);
+      }
+      this._tunnels.push({ mid: best, s: s0, e: e0, pts, h: S.ridge ?? 13 });
+    }
+  }
+
+  /** The hill the tunnel bores through: terrain rises to roadY + h over the
+   *  tunnel line, easing across ~34 u and at the portals. Applied in BOTH
+   *  height fields, so physics and the visible mesh agree. */
+  _tunnelRidge(x, z, h) {
+    for (const T of this._tunnels) {
+      let bd = 1e9, by = 0, bi = 0;
+      for (let k = 0; k < T.pts.length; k++) {
+        const p = T.pts[k];
+        const d = (x - p[0]) * (x - p[0]) + (z - p[1]) * (z - p[1]);
+        if (d < bd) { bd = d; by = p[2]; bi = k; }
+      }
+      bd = Math.sqrt(bd);
+      if (bd > 34) continue;
+      const across = Math.pow(Math.cos((bd / 34) * Math.PI * 0.5), 1.3);
+      const ease = Math.min(1, Math.min(bi, T.pts.length - 1 - bi) / 3);
+      const w = across * ease;
+      if (w < 0.06) continue;
+      h = Math.max(h, by + T.h * w);
+    }
+    return h;
   }
 
   /** Rolling-hill height used by scenery placement and the free-roam mode's
@@ -4251,6 +4412,13 @@ export class Track {
    *  guarantee the smoothstep could not give. 0.5 still lets a hillside climb
    *  10 u within 20 u of the verge, so cuttings still read as cuttings. */
   _roadCeil(bi, d) {
+    // a tunnel stretch inverts the contract: the hill is SUPPOSED to stand
+    // over the carriageway there - the bore shell keeps it readable
+    if (this._tunnels) {
+      for (const T of this._tunnels) {
+        if (bi >= T.s && bi <= T.e) return this.center[bi].y + T.h + 6;
+      }
+    }
     const drivable = this.widthAt ? this.widthAt(bi) : ROAD_HALF;
     // the ribbon as DRAWN, not as driven — the fringe is part of the road
     const ribbon = drivable + (WALL_OFF + 0.6 - ROAD_HALF);
@@ -5815,6 +5983,7 @@ export class Track {
     if (this.T.logYards) this._buildLogYards();      // flume timber stacks
     if (this.T.retainingWalls) this._buildRetainingWalls();   // alpine-pass parapets
     if (this.T.heroBridge) this._buildHeroBridge();           // hero rope crossing
+    if (this.T.tunnels) this._buildTunnels();                 // galleries through the cuts
     if (this.T.guardFence) this._buildGuardFence();           // breakable mountain rail fence
     if (this.T.roadCabins) this._buildRoadCabins();           // log cabins on the shelves
     if (this.T.snowPatches) this._buildSnowPatches(m4);       // old snow at altitude
@@ -6708,6 +6877,85 @@ export class Track {
     this.group.add(body, roof);
     this._addShadow(p.x, p.z, Math.max(W, D) * 0.8);
     this.solids.push({ x: p.x, z: p.z, r: Math.max(W, D) * 0.62, y: gy + 3, mat: 'stone' });
+  }
+
+  /** TUNNELS: rock galleries where the road runs through a deep cutting.
+   *  Detection is honest - a stretch only tunnels if the ground already
+   *  stands well above the roadway on BOTH sides - so flat worlds carrying
+   *  the flag simply build none. One DoubleSide sweep is both bore and
+   *  hillside shell; flared portal rings finish the mouths; wall solids stop
+   *  cars phasing out; a lamp strip runs under the crown. */
+  _buildTunnels() {
+    for (const T of this._tunnels) this._buildTunnel(T.s, T.e);
+  }
+
+  _buildTunnel(s0, e0) {
+    const HW = 11.6, WALL = 4.6, APEX = 8.6;
+    const PROF = [
+      [-HW, 0], [-HW, WALL], [-HW * 0.55, APEX], [0, APEX + 0.5],
+      [HW * 0.55, APEX], [HW, WALL], [HW, 0],
+    ];
+    const STEP = 2;
+    const rings = [];
+    // flared mouths: one extra ring past each portal, profile widened
+    for (let j = s0 - STEP; j <= e0 + STEP; j += STEP) {
+      const i = ((j % N) + N) % N;
+      const flare = (j < s0 || j > e0) ? 1.16 : 1.0;
+      const c = this.center[i], n = this.nrm[i];
+      const y = this.groundHeightAt(i, 0);
+      rings.push(PROF.map(([lat, up]) => [
+        c.x + n.x * lat * flare, y + up * flare, c.z + n.z * lat * flare,
+      ]));
+    }
+    const P = PROF.length;
+    const pos = new Float32Array(rings.length * P * 3);
+    rings.flat().forEach((v, k) => { pos[k * 3] = v[0]; pos[k * 3 + 1] = v[1]; pos[k * 3 + 2] = v[2]; });
+    const idx = [];
+    for (let r = 0; r < rings.length - 1; r++) {
+      for (let q = 0; q < P - 1; q++) {
+        const a = r * P + q, b = a + 1, c2 = a + P, d = c2 + 1;
+        idx.push(a, c2, b, b, c2, d);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const bore = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      color: this.T.terrainScree ? new THREE.Color(this.T.terrainScree).multiplyScalar(0.72)
+        : 0x55504a,
+      roughness: 1, flatShading: true, side: THREE.DoubleSide,
+    }));
+    bore.name = 'tunnel';
+    bore.castShadow = bore.receiveShadow = true;
+    this.group.add(bore);
+    // lamp strip under the crown + wall solids every few metres
+    const span = Math.floor((e0 - s0) / STEP);
+    const lampGeo = new THREE.BoxGeometry(0.9, 0.24, 0.42);
+    const lamps = new THREE.InstancedMesh(
+      lampGeo, new THREE.MeshBasicMaterial({ color: 0xffd9a0 }), Math.ceil(span / 3) + 1);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    let lk = 0;
+    for (let j = s0 + 2; j < e0; j += STEP * 3) {
+      const i = j % N;
+      const c = this.center[i];
+      q.setFromAxisAngle(up, this.headingAt(i));
+      m4.compose(new THREE.Vector3(c.x, this.groundHeightAt(i, 0) + APEX - 0.4, c.z), q,
+        new THREE.Vector3(1, 1, 1));
+      if (lk < lamps.count) lamps.setMatrixAt(lk++, m4);
+    }
+    lamps.count = lk;
+    this.group.add(lamps);
+    for (let j = s0; j <= e0; j += 1) {
+      const i = j % N;
+      const c = this.center[i], n = this.nrm[i];
+      for (const side of [1, -1]) {
+        this.solids.push({
+          x: c.x + n.x * (HW - 0.5) * side, z: c.z + n.z * (HW - 0.5) * side,
+          r: 1.4, y: this.groundHeightAt(i, 0) + 1, mat: 'stone',
+        });
+      }
+    }
   }
 
   /** Queue a baked contact shadow under an object. r is the DECAL radius in
@@ -8099,7 +8347,7 @@ export class Track {
       tmp.multiplyScalar(0.93 + 0.07 * t);
       // the hero gorge is cut through red-rock strata: banded ochre/rust walls
       // fading back to the snowfield at the rim
-      if (this._gorge) {
+      if (this._gorge || this._jumpGorges?.length) {
         const cut = this._gorgeCut(x, z);
         if (cut > 0.6) {
           const band = STRATA[((Math.floor(h * 0.42) % STRATA.length) + STRATA.length) % STRATA.length];
