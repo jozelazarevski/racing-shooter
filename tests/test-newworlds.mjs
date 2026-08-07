@@ -23,7 +23,13 @@ let fail = 0;
 const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? '  ' + d : ''}`); };
 
 const NEW = [[29, 'OLIVE COAST', 'medterrace'], [30, 'LANTERN QUARTER', 'oldtown'],
-             [31, 'HEDGEROW DASH', 'farmland'], [32, 'RED CENTRE RUN', 'outback']];
+             [31, 'HEDGEROW DASH', 'farmland'], [32, 'RED CENTRE RUN', 'outback'],
+             [33, 'RED BULL RING', 'alpine'], [34, 'MONACO STREETS', 'medterrace'],
+             [35, 'SILVERSTONE', 'farmland'], [36, 'SPA-FRANCORCHAMPS', 'forest'],
+             [37, 'SUZUKA', 'redwood'], [38, 'NORDSCHLEIFE', 'forest'],
+             [39, 'MONZA', 'medterrace'], [40, 'MARINA BAY', 'neon'],
+             [41, 'MOUNT PANORAMA', 'outback'], [42, 'RALLYCROSS ARENA', 'flume'],
+             [43, 'OULTON PARK', 'farmland'], [44, 'LAGUNA SECA', 'canyon']];
 
 // The roster must agree with what we think we merged, before any of it is built.
 const probe = await browser.newPage({ viewport: { width: 640, height: 400 } });
@@ -41,8 +47,9 @@ for (const [id, name, theme] of NEW) {
 const ids = roster.map((r) => r.id);
 check('no duplicate level ids', new Set(ids).size === ids.length,
   `${ids.length} levels, ${new Set(ids).size} distinct`);
-check('the four new worlds are at the END of the array',
-  ids.slice(-4).join(',') === '29,30,31,32', `tail is ${ids.slice(-6).join(',')}`);
+check('the new worlds are appended at the END of the array, in order',
+  ids.slice(-16).join(',') === NEW.map(([id]) => id).join(','),
+  `tail is ${ids.slice(-6).join(',')}`);
 
 for (const [id, name] of NEW) {
   const p = await browser.newPage({ viewport: { width: 640, height: 400 } });

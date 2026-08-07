@@ -95,6 +95,35 @@ export const LEVELS = [
   // order is array position (starCost = index - 2), so anything inserted higher
   // re-prices every world after it in a save that already exists.
   { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK', cost: 12, fresh: true },
+
+  // ---- GRAND CIRCUITS: the reference sheet of twelve real layouts, each a
+  // route over an existing theme (art is the theme's; the geometry is the
+  // circuit's). Appended, priced with explicit `cost` like every fresh
+  // region, laddered so the collection spans a career.
+  { id: 33, name: 'RED BULL RING', theme: 'alpine', route: 'rbring', region: 'GRAND CIRCUITS',
+    cost: 5, fresh: true, tune: { elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
+  { id: 34, name: 'MONACO STREETS', theme: 'medterrace', route: 'monaco', region: 'GRAND CIRCUITS',
+    cost: 6, fresh: true, tune: { elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
+  { id: 35, name: 'SILVERSTONE', theme: 'farmland', route: 'silverstone', region: 'GRAND CIRCUITS',
+    cost: 7, fresh: true, tune: { elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
+  { id: 36, name: 'SPA-FRANCORCHAMPS', theme: 'forest', route: 'spa', region: 'GRAND CIRCUITS',
+    cost: 8, fresh: true, tune: { elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
+  { id: 37, name: 'SUZUKA', theme: 'redwood', route: 'suzuka', region: 'GRAND CIRCUITS',
+    cost: 9, fresh: true, tune: { elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
+  { id: 38, name: 'NORDSCHLEIFE', theme: 'forest', route: 'nordschleife', region: 'GRAND CIRCUITS',
+    cost: 10, fresh: true, tune: { elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
+  { id: 39, name: 'MONZA', theme: 'medterrace', route: 'monza', region: 'GRAND CIRCUITS',
+    cost: 11, fresh: true, tune: { elev: { amp: 1.5, ph: [1, 2, 3] }, rampCount: 0 } },
+  { id: 40, name: 'MARINA BAY', theme: 'neon', route: 'marina', region: 'GRAND CIRCUITS',
+    cost: 12, fresh: true, tune: { rampCount: 0 } },
+  { id: 41, name: 'MOUNT PANORAMA', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
+    cost: 13, fresh: true, tune: { elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
+  { id: 42, name: 'RALLYCROSS ARENA', theme: 'flume', route: 'rallyx', region: 'GRAND CIRCUITS',
+    cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
+  { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
+    cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0 } },
+  { id: 44, name: 'LAGUNA SECA', theme: 'canyon', route: 'laguna', region: 'GRAND CIRCUITS',
+    cost: 16, fresh: true, tune: { elev: { amp: 9, ph: [1.9, 0.4, 2.6] }, rampCount: 0 } },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -569,6 +598,93 @@ const CIRCUITS = {
     [-255, 64], [-252, -4], [-254, -72],
     [-244, -140], [-218, -198], [-168, -238],
     [-90, -253],
+  ],
+
+  // ------------------------------------------------------------------------
+  // GRAND CIRCUITS — twelve real-world layouts, requested as a reference
+  // sheet of "12 distinct race track designs". Each is a hand-traced
+  // silhouette of the real circuit at the game's ±250 u scale, riding an
+  // EXISTING theme (the WORLD RALLY pattern: a route is geometry, a theme is
+  // art), so twelve tracks cost zero new art systems. Corner radii are kept
+  // above the game's floors except where the real corner IS the point (the
+  // Loews hairpin, the Corkscrew); parallel legs never run closer than 26 u.
+  rbring: [ // Red Bull Ring — three big straights, hilltop rights, flowing left sweeps home
+    [-180, -140], [-60, -150], [60, -155], [150, -140],
+    [200, -90], [215, -20], [190, 40], [195, 120], [160, 170],
+    [90, 185], [30, 150], [0, 90], [-40, 30], [-90, -10],
+    [-150, 10], [-200, -20], [-215, -80], [-205, -125],
+  ],
+  monaco: [ // Monaco — Ste Devote, the climb to Casino, Loews, the tunnel sweep, Rascasse
+    [-160, -80], [-80, -95], [-10, -85], [20, -40], [10, 20],
+    [40, 70], [90, 85], [130, 60], [120, 10], [90, -15],
+    [60, -40], [45, -60], [60, -78], [85, -70], [130, -85],
+    [170, -110], [190, -160], [150, -200], [95, -195], [70, -175],
+    [10, -185], [-60, -200], [-120, -190], [-165, -150], [-185, -115],
+  ],
+  silverstone: [ // Silverstone — Copse, the Maggotts/Becketts esses, Stowe, Club
+    [-220, -60], [-140, -90], [-40, -95], [40, -70], [80, -10],
+    [60, 50], [110, 90], [90, 150], [160, 180], [220, 140],
+    [230, 60], [200, -10], [230, -80], [190, -150], [100, -180],
+    [0, -165], [-100, -175], [-180, -160], [-230, -110],
+  ],
+  spa: [ // Spa — La Source, the Eau Rouge climb, Kemmel, and a long flowing east side
+    // (three attempts at the inner Blanchimont return all crossed the middle:
+    // at ±250 u with a 26 u leg floor, Spa only fits as a perimeter. The
+    // shallow east-side dents keep Pouhon and Stavelot readable.)
+    [-210, 40], [-225, 90], [-195, 125], [-130, 105], [-95, 150],
+    [-30, 185], [60, 195], [130, 165], [175, 120], [155, 60],
+    [190, 10], [160, -45], [195, -90], [150, -140], [75, -160],
+    [0, -140], [-70, -155], [-140, -140], [-185, -95], [-165, -45],
+    [-195, -5],
+  ],
+  suzuka: [ // Suzuka — the esses, Dunlop, Degner, the hairpin, Spoon, 130R
+    [-30, -175], [70, -185], [145, -160], [178, -100], [135, -55],
+    [168, -5], [120, 40], [152, 90], [112, 140], [30, 158],
+    [-32, 132], [-48, 74], [-118, 86], [-135, 48], [-95, 28],
+    [-52, 4], [-90, -38], [-142, -18], [-172, -62], [-138, -108],
+    // no closing chicane: every version of the casio kink reversed direction
+    // sharply enough that the spline blew a 2 u bulb at it — the tail now
+    // flows from 130R straight onto the start straight
+    [-62, -122],
+  ],
+  nordschleife: [ // Nordschleife — a sprawling Eifel perimeter with the Karussell fold
+    [-240, -40], [-200, 20], [-215, 80], [-160, 120], [-120, 90],
+    [-80, 150], [-20, 185], [50, 160], [40, 110], [100, 80],
+    [170, 110], [220, 70], [195, 10], [235, -30], [180, -80],
+    [120, -60], [80, -110], [130, -160], [60, -195], [-20, -160],
+    [-90, -190], [-160, -170], [-190, -110], [-235, -95],
+  ],
+  monza: [ // Monza — long straights broken by chicanes, the Lesmos, Parabolica home
+    [-200, -120], [-60, -135], [80, -145], [130, -130], [145, -95],
+    [180, -40], [170, 20], [195, 70], [160, 105], [110, 95],
+    [0, 20], [-90, -40], [-140, -15], [-170, -45], [-195, -70],
+    [-220, -100],
+  ],
+  marina: [ // Singapore Marina Bay — right-angle street blocks under lights
+    [-190, -90], [-60, -100], [60, -95], [150, -85], [180, -40],
+    [150, 0], [170, 50], [130, 85], [80, 70], [40, 110],
+    [-20, 125], [-60, 90], [-120, 105], [-160, 70], [-140, 20],
+    [-180, -10], [-160, -50],
+  ],
+  panorama: [ // Mount Panorama — the climb, the ridge esses, the plunge, Conrod
+    [-120, -190], [0, -200], [110, -190], [160, -160], [200, -80],
+    [180, -20], [210, 40], [180, 90], [120, 110], [90, 150],
+    [20, 135], [-40, 160], [-100, 140], [-150, 155], [-175, 110],
+    [-145, 80], [-180, 45], [-200, 0], [-190, -110], [-165, -160],
+  ],
+  rallyx: [ // Rallycross — a compact mixed-surface stadium loop
+    [-135, -90], [-30, -128], [90, -105], [150, -30], [113, 53],
+    [23, 83], [-68, 120], [-143, 83], [-105, 15], [-165, -30],
+  ],
+  oulton: [ // Oulton Park — parkland kidney with Old Hall, Island, the Hislops flick
+    [-160, -120], [-60, -140], [40, -120], [90, -70], [60, -20],
+    [110, 20], [90, 80], [30, 110], [-30, 90], [-60, 130],
+    [-100, 110], [-90, 40], [-140, 10], [-180, -40], [-150, -80],
+  ],
+  laguna: [ // Laguna Seca — the Andretti hairpin and the Corkscrew drop
+    [-140, -70], [-30, -90], [60, -75], [100, -30], [70, 10],
+    [110, 50], [80, 100], [30, 120], [10, 85], [-40, 60],
+    [-80, 80], [-120, 40], [-100, -10], [-150, -30],
   ],
 };
 

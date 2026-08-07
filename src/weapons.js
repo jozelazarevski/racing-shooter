@@ -561,7 +561,12 @@ export class Weapons {
           for (const e of g.enemies) {
             if (!e.alive || e.invuln > 0) continue;
             const d = m.pos.distanceTo(e.pos);
-            if (d < 9) g.onEnemyHit(e, THREE.MathUtils.lerp(55, 18, d / 9), 'missile');
+            // 26 direct, not 55: rivals carry 70 hull, and 55 plus the blast
+            // debris meant any rival with a scratch died to ONE rocket —
+            // reported as "I destroy every car with one hit". At 26 a healthy
+            // rival survives two direct hits and dies to the third, and a
+            // splash-range hit is worth having without deciding the fight.
+            if (d < 9) g.onEnemyHit(e, THREE.MathUtils.lerp(26, 9, d / 9), 'missile');
           }
           for (const c of g.choppers ?? []) {
             if (!c.alive) continue;

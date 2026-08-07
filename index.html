@@ -691,11 +691,15 @@
     border:2px solid var(--line);border-radius:var(--r-lg);padding:10px 20px 12px}
   #credit-breakdown .cb-head{font-family:'Luckiest Guy';font-size:12px;letter-spacing:4px;color:#ffe9a8;
     text-align:center;margin-bottom:6px;text-shadow:1px 1px 0 var(--ink)}
-  #credit-breakdown .cb-row{display:flex;justify-content:space-between;gap:18px;font-size:12.5px;
+  /* shared by the credits breakdown AND the rally-star panel: the star rows
+     reused the class but not the scope, so they rendered as unstyled glued
+     text — the screenshot reads "FINISH+1 / TOP 3— / WIN—" as one word each,
+     which is half of why the panel looked like it disagreed with the menu */
+  #credit-breakdown .cb-row,#star-panel .cb-row{display:flex;justify-content:space-between;gap:18px;font-size:12.5px;
     font-weight:700;letter-spacing:1px;color:#d8c090;line-height:1.75}
-  #credit-breakdown .cb-row b{color:var(--amber);font-weight:800}
-  #credit-breakdown .cb-row.contract b{color:#8de89a}
-  #credit-breakdown .cb-row.missed{opacity:.45}
+  #credit-breakdown .cb-row b,#star-panel .cb-row b{color:var(--amber);font-weight:800}
+  #credit-breakdown .cb-row.contract b,#star-panel .cb-row.contract b{color:#8de89a}
+  #credit-breakdown .cb-row.missed,#star-panel .cb-row.missed{opacity:.45}
   #credit-breakdown .cb-row.total{border-top:1px solid rgba(255,233,168,.25);margin-top:5px;padding-top:5px;color:#ffe9a8}
   #credit-breakdown .cb-row.total b{color:var(--yellow)}
   /* results: one stats card, label left / value right, ruled rows.
