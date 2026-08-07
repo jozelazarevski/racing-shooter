@@ -76,6 +76,7 @@ const WORLD_TAGS = {
   sheetice: '❄ sheet ice · icicles', avalanche: '❄ avalanche chase',
   neon: 'maglev lanes · night city', undercity: '🐀 rats · tunnels',
   medterrace: 'stone walls · gravel on the exits',
+  oldtown: '💧 wet cobbles · no runoff',
 };
 
 // steer: how much of the car's steering rate the player gets in this view.
@@ -361,6 +362,11 @@ const DEMANDS = {
   // same expression tests/test-affinity.mjs uses, so this row is measured, not
   // assigned. `loose` is 0.12: dry tarmac.
   29: { loose: 0.12, twist: 0.24, fast: 0.57, climb: 0.63 }, // OLIVE COAST
+  // ---- OLD TOWN. Measured on the live geometry with the same formula the
+  // test uses (kMean 0.01459, 29.2 % straight, mean grade 5.06 %), not
+  // estimated: a street grid of hard corners joined by short straights, on a
+  // hill, on a wet surface.
+  30: { loose: 0.55, twist: 0.59, fast: 0.48, climb: 0.57 }, // LANTERN QUARTER
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {

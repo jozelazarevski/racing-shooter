@@ -10,6 +10,7 @@ import {
   crateTexture, coneTexture, barrelTexture, riverTexture, riverBankTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
+  townhouseTexture, townhouseGlowTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -71,6 +72,12 @@ export const LEVELS = [
   // ---- MEDITERRANEAN. Appended, so nothing before it is re-priced (career
   // order is this array, not the ids — see the note above ROCKFALL RAVINE).
   { id: 29, name: 'OLIVE COAST', theme: 'medterrace', region: 'MEDITERRANEAN' },
+
+  // ---- OLD TOWN: the only urban region, and the only night stage that is not
+  // NEO-KYOTO. Appended, never inserted — career order is this array and
+  // `starCost` prices a world by its INDEX, so a mid-array insert silently
+  // re-prices every world after it in an existing save.
+  { id: 30, name: 'LANTERN QUARTER', theme: 'oldtown', region: 'OLD TOWN' },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -445,6 +452,48 @@ const CIRCUITS = {
     [-218, 112], [-172, 62], [-226, 6],
     // fast descent back down to the sea
     [-250, -70], [-212, -146], [-146, -202], [-70, -234],
+  ],
+
+  // LANTERN QUARTER — a STREET GRID, not a landscape. Every other circuit on
+  // the roster is a road following terrain, so its corners are radii; this one
+  // is a town, so its corners are BLOCKS. The shape is a rectilinear loop of
+  // straight streets meeting at near-right angles, with two doglegs where the
+  // route jinks around a block instead of going through it. The corner triplets
+  // are deliberately tight (~24 u between the three points that turn a corner)
+  // — that is what holds the average speed down to the region's 82 km/h without
+  // a single hairpin, which would read as a mountain road.
+  // Parallel legs are never closer than 46 u, well clear of the 22 u
+  // self-approach floor that a hand-authored rectilinear route usually trips.
+  oldtown: [
+    // MAIN STREET: the cobbled run through the lower town, eastbound — and it
+    // does NOT run straight through. A single 370 u street would have made
+    // this the fastest world on the roster instead of the slowest, so the
+    // route detours a block north around the market square and comes back.
+    [-150, -214], [-84, -216], [-40, -214],
+    [-14, -200], [-8, -176], [22, -168], [54, -174], [62, -198],
+    [96, -212], [150, -212],
+    // right-angle left onto the east avenue, and the climb starts
+    [196, -208], [218, -188], [218, -150],
+    // dogleg: the avenue jinks west around the market block and back
+    [216, -112], [204, -84], [176, -70], [166, -40],
+    [170, -8], [196, 8], [216, 34],
+    // left into the cathedral square at the top of the hill
+    [214, 70], [192, 94], [156, 100],
+    // the square itself — the one place the frontage opens out
+    [96, 104], [30, 100], [-26, 104],
+    // step north into the lantern quarter proper
+    [-62, 112], [-82, 138], [-84, 168],
+    // left, west along the rampart street
+    [-100, 192], [-140, 198], [-186, 194],
+    // left, south down the west wall street. This is deliberately the LONGEST
+    // straight on the lap: the arched gateways need a run of 50+ samples under
+    // 0.016 curvature to place, and a street grid this broken up only offers
+    // two such windows — this one and the cathedral square.
+    [-222, 184], [-238, 156], [-236, 110], [-234, 62], [-232, 16],
+    // the stepped square: the street kinks around a block and back
+    [-214, -12], [-190, -34], [-192, -70], [-214, -92], [-236, -116], [-238, -152],
+    // last corner, back east onto the main street
+    [-224, -186], [-198, -208],
   ],
 };
 
@@ -1638,6 +1687,155 @@ const THEMES = {
     massif: { az: 1.15, spread: 2.0, count: 8, r0: 420, r1: 700,
       h0: 90, h1: 175, w0: 210, w1: 360 },
   },
+
+  // LANTERN QUARTER: the OLD TOWN NIGHT region. Wet cobbles under sodium
+  // lamps, continuous masonry frontage on both sides, and ZERO runoff — a
+  // mistake here ends against a wall, not in a field.
+  //
+  // The brief that matters most is the one about what it must NOT be. This is
+  // the second night world in the game and it has to be unmistakably not
+  // NEO-KYOTO: no cyan, no magenta, no emissive lane-work, no skyscrapers.
+  // Every light source here is SODIUM or TUNGSTEN — 2100 K street lamps and
+  // 2700 K shop windows — so the whole frame sits on the warm side of neutral
+  // and the only cool thing in it is the sky.
+  //
+  // And it is deliberately lit brighter than the palette suggests. Both
+  // existing night worlds were measured too dark to drive (NEON GRID at 20.7
+  // mean luminance, UNDERCITY at 7.6) for exactly the same reason: a dark
+  // ground texture multiplied by a dark terrain vertex colour lands at an
+  // albedo no lamp can rescue. The Bible's #2A2A2E ground base is therefore
+  // the DARKEST thing on the ground plane and the wet cobble road is painted
+  // well above it, which is also what keeps the road the highest-contrast
+  // element in frame (global law G1).
+  oldtown: {
+    surface: 'wet',                                     // physics reads this
+    // the tightest sight line on the roster (region spec: 60 m) — the fog is
+    // the reason a town circuit feels claustrophobic rather than merely narrow
+    fogColor: 0x1c2436, fogNear: 110, fogFar: 780,
+    // hemiSky = the little the night sky gives back; hemiGround = SODIUM
+    // BOUNCE off wet stone, which is where most of the warmth in the frame
+    // actually comes from. Intensity is high on purpose (see the note above).
+    hemiSky: 0x323c60, hemiGround: 0x7a5426, hemiIntensity: 4.2,
+    // there is no sun. The key is the sodium wash down the street: warm, low
+    // and raking, so the frontage on one side is lit and the other is in
+    // silhouette — the "extreme local contrast" the region is graded for.
+    sunColor: 0xffb45e, sunIntensity: 2.3,
+    // skyCurve WELL ABOVE 1 on purpose: `mix(horizon, top, pow(smoothstep, curve))`
+    // means a high exponent holds the horizon colour — which IS the fog colour —
+    // far up the dome, so the roofline meets a sky of its own fog value and the
+    // skyline is silhouette rather than gradient. The zenith still goes to
+    // true night, which is where the stars have to read.
+    skyTop: '#0A0E1A', skyHorizon: '#1C2436', sunGlow: 0xffb45e, skyCurve: 2.4,
+    sunAz: 1.05, sunEl: 0.30,
+    stars: true,
+    // Sodium sky-glow ringing the horizon — an orange smear over the rooftops,
+    // never NEO-KYOTO's magenta. It can be this strong only because the cone
+    // hills that would silhouette against it are dropped (see _buildOldTown).
+    hazeColor: 0xc07830, hazeOpacity: 0.40,
+    cloudCount: 10, cloudOpacity: 0.45, cloudTint: 0x4a3a3c,  // low lit overcast
+    // The Bible's #2A2A2E ground base is the DARKEST value here, not the
+    // albedo: the ground texture multiplies the terrain vertex colour, so a
+    // literal #2A2A2E on both lands near 20/255 and no lamp can rescue it —
+    // the exact fault measured on EMBER PASS and UNDERCITY. Painted at the
+    // value it reads AS under 0.6 lux of moon and a sodium bounce.
+    terrainLow: '#3a3a42', terrainHigh: '#4e4e58', terrainDirt: '#4c463d',
+    terrainScree: '#42424a', hutGlow: 1.1,
+    skirtColor: '#4a453e',                              // kerb + gutter stone
+    ground: {
+      base: '#56565f', bandLight: 'rgba(255,200,130,0.05)', bandDark: 'rgba(0,0,0,0.08)',
+      patchA: 'rgba(30,34,48,0.24)', patchB: 'rgba(90,86,80,0.16)',
+      speckA: 'rgba(220,180,120,0.4)', speckB: 'rgba(150,160,180,0.4)', speckCount: 90,
+    },
+    road: {
+      // wet granite setts. `cobbles` paints the setts over this base and the
+      // `wet` pass darkens and glazes the lot — the polish bands down the
+      // wheel tracks come free with the cobble pass.
+      base: '#4c4842', mottleA: [58, 55, 50], mottleB: [104, 100, 94],
+      rut: 'rgba(30,28,25,0.5)', rutCore: 'rgba(20,19,17,0.45)', tread: 'rgba(12,11,10,0.4)',
+      stoneA: 'rgba(150,146,136,0.55)', stoneB: 'rgba(44,42,38,0.7)',
+      // the "verge" here is a granite kerb and gutter, never grass
+      fringe: [62, 60, 56], fringeVar: [18, 18, 16],
+      ruts: false,                                      // stone setts do not rut
+      cobbles: {
+        stones: ['#7c766c', '#6a655d', '#8a8378', '#5e5a53', '#948c80', '#726d65'],
+        mortar: 'rgba(30,29,27,0.9)', lip: 'rgba(255,214,150,0.16)',  // sodium on the crowns
+        rows: 30, per: 20,
+      },
+      // roughness 0.32 / reflection 0.85 in the region spec: a hard wet
+      // surface, standing water on about a fifth of the roadbed
+      wet: { darken: 0.24, gleam: 18, pools: 6 },
+    },
+    // no massif and no highland: this is a street grid over a hill, and the
+    // hill is the road's own elevation profile, not a mountain range
+    hillColor: 0x141a28, peakColor: 0x1e2638, hillDrop: 10, highland: 0,
+    // FLORA IS MINIMAL BY DESIGN: pollarded planes in the square and around
+    // the small park, nothing else. No conifers anywhere near a town.
+    treeCount: 26, trunkColor: 0x4a463e,
+    foliageLow: 0x1a241c, foliageTop: 0x27331f,
+    foliage: { h: 0.28, hVar: 0.03, s: 0.22, sVar: 0.06, l: 0.13, lVar: 0.05 },
+    treeSnowCap: false,
+    tuftCount: 0, grass: {},                            // paving, not meadow
+    bushCount: 26, bushColor: 0x1f2a20,                 // clipped park hedging
+    bush: { h: 0.29, hVar: 0.03, s: 0.20, sVar: 0.05, l: 0.14, lVar: 0.05 },
+    // NO gravel, NO boulders, NO pebbles — the region's negative list. The
+    // rock colour is still needed: the pinch dressing builds its kerb teeth
+    // from it, and here they read as the concrete blocks at the arch corners.
+    rockCount: 0, pebbleCount: 0, rockColor: 0x6e6e76, rockSnowCap: false,
+    heroRock: false,
+    flowerCount: 0, flowerColors: ['#f2a93b'],
+    hutRoof: 0x565c66, hutCount: 0, hayColor: 0x6a6258, hayCount: 0,  // slate
+    splinter: [0x8a8078, 0xf2a93b],                     // masonry chips + accent
+    weather: { type: 'rain', color: 0xc8a878, rate: 26 },  // the rain that just stopped
+    // A TOWN ON A HILL. The lap starts in the lower town, climbs the east
+    // avenue in TWO SHORT COBBLED RAMPS to the cathedral square at the top,
+    // and falls the whole way back down the west wall street. 42 u of gain
+    // over a 1.7 km lap: a 3–9 % dominant gradient with the two ramps
+    // steepening past 15 %, which is the region's terrain table.
+    elev: {
+      amp: 42, profile: 'ascent', ph: [0, 0, 0],
+      keys: [[0, 0], [0.06, 0], [0.125, 3.5], [0.19, 8],
+        [0.235, 16],                                    // ramp 1
+        [0.29, 20.5], [0.34, 25],
+        [0.385, 33],                                    // ramp 2
+        [0.44, 38], [0.50, 42], [0.56, 41],
+        [0.63, 36], [0.70, 29], [0.77, 21], [0.84, 13], [0.90, 6],
+        [0.95, 0], [1, 0]],
+    },
+    // A street is flat between its buildings: the ground barely moves, and
+    // what movement there is comes from the elevation profile, not noise.
+    relief: 0.3, blend: { near: 12, far: 46 },
+    // Jumps in a town would be absurd, and `rampCount: 0` does NOT mean zero
+    // (`T.rampCount || 3`). Starving the placement with a tiny straightness
+    // ceiling is the honest way to get short cobbled humps instead of yumps.
+    rampMaxCurv: 0.0016, padMaxCurv: 0.0035, boardMaxCurv: 0.008,
+    crestHeight: 1.6,                                   // stepped street, not a crest
+    // THE SIGNATURE SQUEEZE: arched gateways, twice per stage. The width pinch
+    // is the existing narrows machinery; `_buildOldTown` hangs the arch itself
+    // over each pinch, so the geometry and the physics agree by construction.
+    // Asked for THREE because the placement is a search — it needs a straight
+    // window of 50-84 samples clear of the start line, and a street grid this
+    // broken up does not always offer two. `_buildOldTown` arches the first two
+    // that land; a third, if it lands, is a plain kerbed squeeze.
+    narrows: { count: 3, min: 0.62 },
+    obstacleSpec: undefined,                            // nothing parked in a street
+    puddleCount: 5,
+    puddle: {
+      rim: '#23252c', mud: '#0d0f14',
+      sheen: 'rgba(255,190,120,0.26)', gleam: 'rgba(255,214,150,0.34)',
+    },
+    // sodium street lamps on the kerb line, 12 m apart counting both sides
+    lamps: { color: 0xffb14a, every: 7, height: 4.6 },
+    elements: 'oldtown',
+    // THE REGION'S OWN GEOMETRY. Continuous townhouse frontage down both sides
+    // of the street, the arched gateways, the mid-ground blocks behind, and
+    // the cathedral campanile that is visible from three points on the route.
+    // See `_buildOldTown`.
+    frontage: {
+      lateral: 17.5, depth: 8, unit: 7.0, height: 9.0,
+      run: [4, 9],                                      // units per terrace block
+      tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
+    },
+  },
 };
 
 /** Free every geometry, material and texture under `root`, then empty it.
@@ -1775,6 +1973,10 @@ const PROP_SPECS = {
   // OLIVE COAST: the Bible's roadside kit is blue plastic harvest crates,
   // rolled olive nets (the hay rolls) and stones off the terrace walls
   medterrace: [['crate', 20], ['hay', 14], ['cone', 12], ['rock', 8]],
+  // OLD TOWN: market stall crates packed away at the kerb, street-works cones
+  // and steel drums. No rocks and no hay — the region's negative list rules
+  // out gravel, dirt and anything that is not architectural.
+  oldtown: [['crate', 20], ['cone', 18], ['barrel', 14]],
 };
 const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20, penguin: 40 };
 const _m4 = new THREE.Matrix4(); // scratch (smashTree instance-zeroing)
@@ -1793,6 +1995,7 @@ const BARREL_PALETTES = {
   avalanche: { base: '#7aa8c4', hoop: '#2c4456', stripe: '#e8f2f8' },
   neon: { base: '#22262e', hoop: '#101318', stripe: '#26f6ff' },
   undercity: { base: '#3a4034', hoop: '#181c14', stripe: '#8a9a3c' },
+  oldtown: { base: '#3a4048', hoop: '#1a1e24', stripe: '#f2a93b' },  // works drum
 };
 
 // ---------- world elements: farms, chapels, outposts, field walls ----------
@@ -1854,6 +2057,18 @@ const ELEMENT_KITS = {
     builds: ['house', 'house', 'barn', 'shed'], landmarks: ['chapel'],
     dress: ['well'], fenceColor: 0xc8bb96, stoneWalls: 8,
   },
+  // OLD TOWN NIGHT: what the world is dressed with BEYOND the street frontage
+  // — the outer quarters, seen across the rooftops. Muted ochre render under
+  // slate, and a chapel with a bell gable as the second landmark silhouette
+  // after the campanile. No livestock and no paddocks in a town, so `field`
+  // is emptied (the same trick the city kit uses) and the budget goes into
+  // town-wall runs instead.
+  oldtown: {
+    wall: 0xb0a189, wall2: 0x8e8478, roof: 0x3f444a, trim: 0x5c5148, stone: 0x7a746a,
+    builds: ['house', 'house', 'shed'], landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0x5a5f66, stoneWalls: 6,
+    field: [], fenceRuns: 4,
+  },
 };
 // Species mix for the default (conifer-family) forest builder, per theme:
 // [[species, weight]...]. Species live in _buildForest. Themes not listed
@@ -1881,6 +2096,9 @@ const FLORA_MIX = {
   // scatter still sums to 1.0 (checklist R04).
   medterrace: [['oliveOld', 0.344], ['oliveRow', 0.281], ['corkOak', 0.156],
     ['umbrellaPine', 0.125], ['cypress', 0.094]],
+  // OLD TOWN: pollarded planes and limes only — the two broadleaf species in
+  // the kit. A conifer anywhere near a European old town would be wrong.
+  oldtown: [['oak', 0.62], ['birch', 0.38]],
 };
 
 // How many decorative side-road junctions each RURAL world gets (city, ice
@@ -1896,6 +2114,7 @@ const ELEMENT_KIT_BY_THEME = {
   avalanche: 'alpine', neon: 'city', undercity: 'city',
   pass: 'alpine', tremola: 'alpine', furka: 'alpine',
   medterrace: 'medhill',
+  pass: 'alpine', tremola: 'alpine', furka: 'alpine', oldtown: 'oldtown',
 };
 
 /** Unit gable-roof prism: 1×1×1, base at y=0, ridge running along local X at
@@ -4495,6 +4714,7 @@ export class Track {
     if (this.T.riverCount) this._buildRivers();      // jungle streams under the road
     if (this.T.hollowArch) this._buildHollowArch();  // redwood drive-through trunk
     if (this.T.lamps) this._buildLamps();            // neon / undercity road lamps
+    if (this.T.frontage) this._buildOldTown(m4);     // OLD TOWN street frontage + arches
     if (this.T.logYards) this._buildLogYards();      // flume timber stacks
     if (this.T.retainingWalls) this._buildRetainingWalls();   // alpine-pass parapets
     if (this.T.heroBridge) this._buildHeroBridge();           // hero rope crossing
@@ -6020,6 +6240,356 @@ export class Track {
     this.group.add(posts, heads);
   }
 
+  /** OLD TOWN NIGHT (LANTERN QUARTER): the street itself.
+   *
+   *  Every other world is a road THROUGH a landscape, so its roadside is
+   *  scattered — huts, farmsteads, boulders, trees, all placed independently
+   *  by `_scatter`. A town is the opposite: the buildings ARE the corridor,
+   *  they are CONTINUOUS, and they are the entire reason this region has no
+   *  runoff. Nothing in the existing kit builds a continuous frontage, which
+   *  is why this builder exists and why only this theme turns it on.
+   *
+   *  Four things in one pass so they can share two instanced meshes:
+   *    1. THE FRONTAGE — terraces of gable-fronted townhouses down both kerbs,
+   *       broken every 4–9 units by a side alley (region checklist R07: no
+   *       unbroken frontage past 120 m). Where the road swings back under an
+   *       offset the terrace STEPS BACK instead of eating the carriageway.
+   *    2. THE QUARTER BEHIND — a sparser, taller second rank, so the town has
+   *       depth in the fog instead of ending at the pavement. These are
+   *       registered as shootable `buildings`; the frontage deliberately is
+   *       not (see the note at the registration site).
+   *    3. THE ARCHED GATEWAYS — one hung over each authored width pinch, so
+   *       the squeeze you see and the squeeze the physics applies are the same
+   *       squeeze. Only the piers are solid: a solid on the span would collide
+   *       with a car driving under it (`solids` is a circle test with a ±6 u
+   *       height window, not a box), exactly as the start gantry avoids.
+   *    4. THE CAMPANILE — the single landmark, tall enough to navigate by.
+   *
+   *  EVERY SOLID IS VALIDATED WITH `_clearsRoad`, never with a bare lateral
+   *  offset. A fixed offset is measured along ONE sample's normal and a street
+   *  grid doubles back on itself constantly — the same defect that once put a
+   *  cabin on the centreline of FURKA RIDGE. */
+  _buildOldTown(m4) {
+    const F = {
+      lateral: 17.5, depth: 8, unit: 7.0, height: 9.0, run: [4, 9],
+      tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
+      ...this.T.frontage,
+    };
+    // THE SKYLINE MUST BE ROOFTOPS. The shared horizon builder rings every
+    // world with cone hills and a farther ring of peaks. Behind an old town
+    // that is a mountain range, which the region's negative list forbids
+    // outright ("any silhouette that is not architectural") — and no amount of
+    // fog or haze tuning hides a 300 u cone, because at this fog distance the
+    // cone IS the fog colour and the haze band behind it is not. Dropped here
+    // rather than in `_buildHorizon` so no other world is touched.
+    for (const n of ['horizon-hills', 'horizon-peaks']) {
+      const mesh = this.group.getObjectByName(n);
+      if (!mesh) continue;
+      this.group.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.map?.dispose();
+      mesh.material.dispose();
+    }
+    const MAX = 780;
+    const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
+    bodyGeo.translate(0, 0.5, 0);
+    const faceTex = townhouseTexture();
+    faceTex.anisotropy = 4;
+    const bodyMat = new THREE.MeshStandardMaterial({
+      map: faceTex, roughness: 0.86, envMapIntensity: 0.35,
+      // the lit bays are the ONLY light source that reaches the upper half of
+      // the frame — without them a night street is a black band over the road
+      emissive: 0xffffff, emissiveMap: townhouseGlowTexture(),
+      emissiveIntensity: this.T.hutGlow ?? 1,
+    });
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: this.T.hutRoof ?? 0x33363c, flatShading: true,
+      roughness: 0.72, envMapIntensity: 0.4,
+    });
+    const bodies = new THREE.InstancedMesh(bodyGeo, bodyMat, MAX);
+    const roofs = new THREE.InstancedMesh(gablePrismGeo(), roofMat, MAX);
+    bodies.name = 'oldtown-frontage';
+    bodies.castShadow = bodies.receiveShadow = true;
+    roofs.castShadow = true;
+    // wall-bracket lanterns: emissive heads on short arms, bloom does the glow
+    // (same contract as `_buildLamps` — no point lights, a night city cannot
+    // afford two hundred of them and a shader recompile per light count)
+    const LMAX = 200;
+    const armGeo = new THREE.BoxGeometry(0.7, 0.1, 0.1);
+    armGeo.translate(-0.35, 0, 0);
+    const bulbGeo = new THREE.SphereGeometry(0.26, 7, 5);
+    bulbGeo.translate(-0.72, -0.12, 0);
+    const arms = new THREE.InstancedMesh(
+      armGeo, new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.6, metalness: 0.5 }), LMAX);
+    const bulbs = new THREE.InstancedMesh(
+      bulbGeo, new THREE.MeshBasicMaterial({ color: this.T.lamps?.color ?? 0xffb14a }), LMAX);
+    let lk = 0;
+
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const col = new THREE.Color();
+    const tints = F.tints.map((c) => new THREE.Color(c));
+    let k = 0;
+
+    /** Place one masonry block. Returns its solid, or null if it could not be
+     *  fitted clear of the road at any of the offered lateral offsets. */
+    const put = (i, side, lat, wAlong, dAcross, h, roofH, tint) => {
+      if (k >= MAX) return null;
+      const p = this.pointAt(i, lat * side);
+      const r = Math.hypot(wAlong, dAcross) / 2;
+      if (!this._clearsRoad(p.x, p.z, r, 1.6)) return null;
+      // never swallow a tree or a smashable prop that is already placed
+      for (const t of this.trees) {
+        if ((t.x - p.x) ** 2 + (t.z - p.z) ** 2 < (r + 1.4) ** 2) return null;
+      }
+      for (const pr of this.props) {
+        if ((pr.x - p.x) ** 2 + (pr.z - p.z) ** 2 < (r + 1.0) ** 2) return null;
+      }
+      const y = this.terrainHeight(p.x, p.z) - 0.5;
+      q.setFromAxisAngle(up, this.headingAt(i));
+      // local +X is the road normal and local +Z runs along the street, so the
+      // GABLE END faces the road: the Baltic gable-fronted terrace, and the
+      // one roof orientation that still reads as separate houses in a row
+      m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(dAcross, h, wAlong));
+      bodies.setMatrixAt(k, m4);
+      m4.compose(new THREE.Vector3(p.x, y + h, p.z), q,
+        new THREE.Vector3(dAcross * 1.06, roofH, wAlong * 1.04));
+      roofs.setMatrixAt(k, m4);
+      col.copy(tint).multiplyScalar(0.86 + Math.random() * 0.26);
+      bodies.setColorAt(k, col);
+      roofs.setColorAt(k, col.setScalar(0.8 + Math.random() * 0.4));
+      k++;
+      const solid = { x: p.x, z: p.z, r, y: y + 0.6, mat: 'hut' };
+      this.solids.push(solid);
+      return { solid, p, y, h, r, lat };
+    };
+
+    // ---- 1 + 2: the frontage and the rank behind it ----
+    const step = Math.max(2, Math.round(F.unit / this.segLen));
+    for (const side of [1, -1]) {
+      let run = 0, want = F.run[0] + ((Math.random() * (F.run[1] - F.run[0] + 1)) | 0);
+      let gap = 0;
+      for (let s = 0; s * step < N; s++) {
+        const i = (s * step) % N;
+        // the start gate, the grid and the grandstand own this stretch
+        if (this._circDist(i, 0) < 40) { run = 0; continue; }
+        if (gap > 0) { gap--; run = 0; continue; }
+        // step the terrace back rather than break it, where the road swings in
+        let placed = null;
+        for (const extra of [0, 3.5, 7]) {
+          placed = put(i, side, F.lateral + extra, F.unit * 1.04, F.depth,
+            F.height * (0.92 + Math.random() * 0.24), 2.1 + Math.random() * 1.0,
+            tints[(Math.random() * tints.length) | 0]);
+          if (placed) break;
+        }
+        if (!placed) { run = 0; continue; }
+        // A LANTERN ON THE BRACKET, every third house. Anchored to the FRONT
+        // FACE, not the block centre — the arm only reaches 0.72 u and a
+        // 8 u-deep building would have swallowed the bulb whole.
+        if (lk < LMAX && run % 3 === 0) {
+          const fp = this.pointAt(i, (placed.lat - F.depth * 0.5 - 0.15) * side);
+          q.setFromAxisAngle(up, this.headingAt(i) + (side > 0 ? 0 : Math.PI));
+          m4.compose(new THREE.Vector3(fp.x, placed.y + 4.3, fp.z), q,
+            new THREE.Vector3(1, 1, 1));
+          arms.setMatrixAt(lk, m4);
+          bulbs.setMatrixAt(lk++, m4);
+        }
+        if (++run >= want) {                       // side alley, then a new block
+          gap = 1 + ((Math.random() * 2) | 0);
+          want = F.run[0] + ((Math.random() * (F.run[1] - F.run[0] + 1)) | 0);
+        }
+        // the quarter behind: taller, sparser, and shootable
+        if (s % 4 === 0) {
+          const back = put(i, side, F.lateral + F.depth + 9 + Math.random() * 12,
+            F.unit * (1.1 + Math.random() * 0.5), F.depth + 2 + Math.random() * 3,
+            F.height * (1.05 + Math.random() * 0.55), 2.4 + Math.random() * 1.4,
+            tints[(Math.random() * tints.length) | 0]);
+          // THE FRONTAGE IS NOT SHOOTABLE AND THE BLOCK BEHIND IT IS.
+          // The frontage is the corridor — level a terrace and the region's
+          // whole premise (no runoff, a mistake ends against masonry) goes with
+          // it. The rank behind is set dressing, so it takes fire like any
+          // other building in the game.
+          if (back) {
+            this.buildings.push({
+              x: back.p.x, z: back.p.z, y: back.y, r: back.r * 0.7,
+              w: back.r * 1.2, h: back.h, hp: 220, solid: back.solid,
+              parts: [{ mesh: bodies, i: k - 1 }, { mesh: roofs, i: k - 1 }],
+              roofColor: this.T.hutRoof,
+            });
+            this._addShadow(back.p.x, back.p.z, back.r * 1.25);
+          }
+        }
+      }
+    }
+    bodies.count = roofs.count = k;
+    arms.count = bulbs.count = lk;
+    bulbs.name = 'oldtown-lanterns';
+    if (k) this.group.add(bodies, roofs);
+    if (lk) this.group.add(arms, bulbs);
+
+    // ---- 3: the arched gateways over the authored pinches (two per stage) ----
+    for (const sec of (this._narrowSecs || []).slice(0, 2)) this._buildArchGateway(sec.mid, F);
+
+    // ---- 4: the campanile ----
+    this._buildCampanile();
+
+    // ---- kerb bollards: the region's edge treatment is "kerb plus bollard
+    // line", and it is what tells you where the street edge is between lamps.
+    // COSMETIC, like the trackside lamps and the reflector marker posts — a
+    // solid line of colliders 2 u off the drivable edge would be a wall, not a
+    // kerb, and this world already has walls.
+    const bolGeo = new THREE.CylinderGeometry(0.16, 0.2, 0.95, 6);
+    bolGeo.translate(0, 0.48, 0);
+    const bols = new THREE.InstancedMesh(bolGeo, new THREE.MeshStandardMaterial({
+      color: 0x2a2c30, roughness: 0.55, metalness: 0.45,
+    }), 260);
+    let bk = 0;
+    for (let i = 0; i < N && bk < 258; i += 9) {
+      if (this._circDist(i, 0) < 34) continue;
+      for (const side of [1, -1]) {
+        const p = this.pointAt(i, (WALL_OFF + 1.4) * side);
+        m4.makeTranslation(p.x, p.y - 0.15, p.z);
+        bols.setMatrixAt(bk++, m4);
+      }
+    }
+    bols.count = bk;
+    bols.name = 'oldtown-bollards';
+    if (bk) this.group.add(bols);
+  }
+
+  /** One arched gateway straddling a width pinch: two masonry piers, a voussoir
+   *  ring between them and the building mass carried over the top. Bible calls
+   *  for a 4.2–5.0 m opening at 4.6 m clear; this road is far wider than a real
+   *  old-town street, so the OPENING tracks the pinched carriageway and the
+   *  clear height is set above anything a crest can throw a car to (crests are
+   *  already excluded from pinches by `_buildCrests`). */
+  _buildArchGateway(mid, F) {
+    const CAR_R = 1.8;
+    const w = this.widthAt(mid);
+    const lat = w + 1.5 + CAR_R + 0.3;                  // pier centre
+    const clear = 6.4;                                  // soffit height
+    const stone = this._archStoneMat || (this._archStoneMat = new THREE.MeshStandardMaterial({
+      map: stoneTexture(), roughness: 0.92, envMapIntensity: 0.35,
+    }));
+    // one facade material for BOTH gateways — a fresh pair of 192x256 canvases
+    // per arch is pure waste, and disposeSubtree frees a shared material once
+    const faceMat = this._archFaceMat || (this._archFaceMat = new THREE.MeshStandardMaterial({
+      map: townhouseTexture({ render: '#a89c88' }), roughness: 0.88,
+      emissive: 0xffffff, emissiveMap: townhouseGlowTexture(),
+      emissiveIntensity: (this.T.hutGlow ?? 1) * 0.8,
+    }));
+    const g = new THREE.Group();
+    const c = this.center[mid];
+    const pierW = 2.6, pierD = 5.0;
+    for (const side of [1, -1]) {
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(pierW, clear, pierD), stone);
+      pier.position.set(side * lat, clear / 2, 0);
+      pier.castShadow = pier.receiveShadow = true;
+      g.add(pier);
+      const p = this.pointAt(mid, lat * side);
+      this.solids.push({ x: p.x, z: p.z, r: 1.55, y: p.y, mat: 'stone' });
+      this._addShadow(p.x, p.z, 2.4, p.y);
+    }
+    // voussoir ring: a close-laid semicircle of wedge blocks over the opening.
+    // Spacing matters — at nine blocks over a 35 u arc it read as loose rubble
+    // rather than an arch, so they are laid nearly edge to edge.
+    const span = lat - pierW * 0.5;
+    const RISE = 0.5;
+    const VN = 16;
+    for (let s = 0; s <= VN; s++) {
+      const a = (s / VN) * Math.PI;
+      const blk = new THREE.Mesh(new THREE.BoxGeometry(2.9, 1.5, pierD), stone);
+      blk.position.set(-Math.cos(a) * span, clear + Math.sin(a) * span * RISE, 0);
+      blk.rotation.z = a - Math.PI / 2;
+      blk.castShadow = true;
+      g.add(blk);
+    }
+    // the storey carried over the arch — this is a BUILDING you drive through,
+    // so it is built as a short TERRACE of unit-width bays rather than one
+    // stretched box, which is what makes it read as a gatehouse
+    const total = lat * 2 + pierW;
+    const bays = Math.max(3, Math.round(total / F.unit));
+    const bw = total / bays;
+    const yOver = clear + span * RISE + 2.8;
+    for (let s = 0; s < bays; s++) {
+      const x = -total / 2 + bw * (s + 0.5);
+      const over = new THREE.Mesh(new THREE.BoxGeometry(bw * 1.01, 5.4, pierD * 1.3), faceMat);
+      over.position.set(x, yOver, 0);
+      over.castShadow = over.receiveShadow = true;
+      g.add(over);
+    }
+    const roof = new THREE.Mesh(gablePrismGeo(), new THREE.MeshStandardMaterial({
+      color: this.T.hutRoof ?? 0x565c66, flatShading: true, roughness: 0.72,
+    }));
+    // the gatehouse spans the street, so its ridge runs ACROSS it (local +X)
+    // and the pitches fall up and down the road — the prism's own orientation
+    roof.scale.set(total, 2.6, pierD * 1.36);
+    roof.position.set(0, yOver + 2.7, 0);
+    roof.castShadow = true;
+    g.add(roof);
+    // a lantern hung under the keystone
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6),
+      new THREE.MeshBasicMaterial({ color: this.T.lamps?.color ?? 0xffb14a }));
+    lamp.position.set(0, clear + span * RISE - 1.4, 0);
+    g.add(lamp);
+    g.position.set(c.x, c.y, c.z);
+    g.rotation.y = this.headingAt(mid);                 // local +x = road normal
+    this.group.add(g);
+  }
+
+  /** The one landmark: a cathedral campanile beside the summit square, tall
+   *  enough to sit above the frontage from anywhere on the upper half of the
+   *  lap. Hand-placed rather than scattered, because "visible from three
+   *  points on the route" is a placement requirement, not a density. */
+  _buildCampanile() {
+    const want = (0.45 * N) | 0;
+    let at = null;
+    for (let d = 0; d < 90 && !at; d += 6) {
+      for (const i of [(want + d) % N, (want - d + N) % N]) {
+        for (const side of [1, -1]) {
+          for (const lat of [34, 42, 50]) {
+            const p = this.pointAt(i, lat * side);
+            if (!this._clearsRoad(p.x, p.z, 5.2, 3)) continue;
+            at = p; break;
+          }
+          if (at) break;
+        }
+        if (at) break;
+      }
+    }
+    if (!at) return;
+    const y = this.terrainHeight(at.x, at.z) - 0.6;
+    const stone = new THREE.MeshStandardMaterial({
+      map: stoneTexture(), roughness: 0.92, envMapIntensity: 0.35,
+    });
+    const g = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.BoxGeometry(7.4, 30, 7.4), stone);
+    shaft.position.y = 15;
+    shaft.castShadow = shaft.receiveShadow = true;
+    g.add(shaft);
+    // belfry: an open lantern stage, lit, which is what makes it read at night
+    const belfry = new THREE.Mesh(new THREE.BoxGeometry(8.2, 5.0, 8.2),
+      new THREE.MeshBasicMaterial({ color: 0xffc76a }));
+    belfry.position.y = 32.4;
+    g.add(belfry);
+    const cornice = new THREE.Mesh(new THREE.BoxGeometry(9.4, 0.9, 9.4), stone);
+    cornice.position.y = 35.2;
+    g.add(cornice);
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(6.2, 9.5, 4),
+      new THREE.MeshStandardMaterial({
+        color: this.T.hutRoof ?? 0x33363c, flatShading: true, roughness: 0.7,
+      }));
+    spire.rotation.y = Math.PI / 4;
+    spire.position.y = 40.4;
+    spire.castShadow = true;
+    g.add(spire);
+    g.position.set(at.x, y, at.z);
+    g.rotation.y = Math.random() * Math.PI;
+    g.name = 'oldtown-campanile';
+    this.group.add(g);
+    this.solids.push({ x: at.x, z: at.z, r: 5.4, y: y + 0.6, mat: 'hut' });
+    this._addShadow(at.x, at.z, 7.4, y);
+  }
+
   _buildTerrain() {
     const T = this.T;
     const STRATA = ['#c98b52', '#a45f34', '#b5764a', '#8d4c2a', '#cfa06a', '#96552f']
@@ -6381,6 +6951,10 @@ export class Track {
       m4.setPosition(px, h / 2 + seat(px, pz), pz);
       peaks.setMatrixAt(i, m4);
     }
+    // named so a world whose skyline must be built, not geological, can drop
+    // them (OLD TOWN — see _buildOldTown)
+    hills.name = 'horizon-hills';
+    peaks.name = 'horizon-peaks';
     this.group.add(hills, peaks);
     if (T.massif) this._buildMassif(m4);
     if (T.glacier) this._buildGlacier(m4);

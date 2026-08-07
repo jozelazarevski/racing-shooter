@@ -60,6 +60,7 @@ const BARREL_TINTS = {
   ravine: ['#8f5434', '#2e2016'], wildfire: ['#2e2a26', '#e8481e'],
   sheetice: ['#8ab4d0', '#2c4456'], avalanche: ['#7aa8c4', '#2c4456'],
   neon: ['#22262e', '#26f6ff'], undercity: ['#3a4034', '#8a9a3c'],
+  oldtown: ['#3a4048', '#f2a93b'],
 };
 // Per-frame prop-burst budget (sprites). A shockwave levels a dozen props in
 // ONE frame; uncapped that is a four-figure spawn spike in a single tick —
