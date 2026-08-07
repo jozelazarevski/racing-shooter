@@ -1914,20 +1914,44 @@ const THEMES = {
     // Bible fog is FogExp2 d=0.00150 #C3CBD2; the engine's fog is linear, so
     // near/far are set to the same half-fade (~550) and extinction (~1150).
     fogColor: 0xc3cbd2, fogNear: 170, fogFar: 950,
-    hemiSky: 0x9fb2c6, hemiGround: 0x4e4535, hemiIntensity: 0.58,  // 0.58 = Bible ambient
+    // OVERCAST IS NOT DARK. This shipped at 0.58 — the LOWEST hemisphere
+    // intensity of all 32 worlds, against a daylight norm of 0.72-0.80 — on the
+    // reasoning that an overcast sky is dim. It is the opposite: a solid cloud
+    // deck is a very large diffuse source, which is why an overcast day has
+    // weak SHADOWS and plenty of light. Measured, the pairing of 0.58 ambient
+    // with the roster's second-weakest sun (2.05) and the darkest terrain
+    // palette in the game rendered the world essentially black — see the note
+    // on terrainLow below. The sun stays weak, which is the real overcast
+    // signature (flat, shadowless); the sky dome carries the exposure.
+    hemiSky: 0x9fb2c6, hemiGround: 0x6a6350, hemiIntensity: 0.95,
     sunColor: 0xffe4ce, sunIntensity: 2.05,             // 4800 K, broken by cloud
     skyTop: '#6F8CA8', skyHorizon: '#C3CBD2', sunGlow: 0xffe4ce,
     skyCurve: 0.7,                                      // overcast: the pale reaches high
     sunAz: 5.24, sunEl: 0.31,                           // 300° bearing, 18° up — down the lane
     cloudCount: 16, cloudOpacity: 0.95, cloudTint: 0xd6dbe0,
-    terrainLow: '#446232', terrainHigh: '#7d8a63', terrainDirt: '#4e4535',
+    // THE WHOLE PALETTE HAD TO COME UP. As authored these were 446232 /
+    // 7d8a63 / 4e4535, whose relative luminances are 0.102 / 0.234 / 0.061 —
+    // the ENTIRE range sat below the DARK end of every other world on the
+    // roster (forest 0.201-0.381, alpine 0.200-0.426, outback 0.310-0.506), and
+    // the ploughed-earth tone at 0.061 was near enough to black that the field
+    // patches read as holes in the ground rather than as soil. Each colour is
+    // a plausible sample of a wet English field on its own; as the only three
+    // colours in a world lit by the weakest sun on the roster, they are not a
+    // world you can see to drive in. Now 0.220 / 0.391 / 0.161 — sitting on
+    // forest's band, still the least saturated and the greyest palette in the
+    // game, which is what makes this region read as farmland rather than as a
+    // forest floor.
+    terrainLow: '#6d8a4e', terrainHigh: '#9db075', terrainDirt: '#7d6f56',
     // bank faces and the cut of the sunken lane, both bare earth
     terrainScree: '#5a5442', skirtColor: '#5a4f3c', hutGlow: 0.42,
     ground: {
-      base: '#4d6b39', bandLight: 'rgba(255,255,255,0.05)', bandDark: 'rgba(40,52,30,0.07)',
-      patchA: 'rgba(78,69,53,0.22)',                    // ploughed earth
-      patchB: 'rgba(122,134,92,0.16)',                  // cut hay / stubble
-      speckA: 'rgba(58,84,42,0.7)', speckB: 'rgba(150,160,120,0.7)', speckCount: 70,
+      // lifted with the terrain palette above — this texture multiplies the
+      // vertex colour, so leaving it at the old 4d6b39 would have cancelled
+      // most of that lift back out
+      base: '#6b8749', bandLight: 'rgba(255,255,255,0.05)', bandDark: 'rgba(40,52,30,0.07)',
+      patchA: 'rgba(122,106,80,0.22)',                  // ploughed earth
+      patchB: 'rgba(150,160,116,0.16)',                 // cut hay / stubble
+      speckA: 'rgba(78,104,58,0.7)', speckB: 'rgba(170,180,140,0.7)', speckCount: 70,
     },
     road: {
       // patched tarmac (35% of the Bible surface mix) with the dirt and mud

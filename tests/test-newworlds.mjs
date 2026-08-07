@@ -74,7 +74,9 @@ for (const [id, name] of NEW) {
       closed: +Math.hypot(c[0].x - c[c.length - 1].x, c[0].z - c[c.length - 1].z).toFixed(1),
       segMax: +Math.max(...seg).toFixed(2),
       lateral: +Math.abs(t.lateralOffset(g.player.pos, i)).toFixed(2),
-      drop: +(g.player.pos.y - t.groundHeightAtPos(g.player.pos)).toFixed(2),
+      // groundHeightAtPos needs the caller's index hint — it interpolates from
+      // that sample, it does not search.
+      drop: +(g.player.pos.y - t.groundHeightAtPos(g.player.pos, i)).toFixed(2),
       theme: t.T?.surface ?? 'dry',
       props: (t.props ?? []).length,
       solids: (t.solids ?? []).length,
@@ -85,8 +87,45 @@ for (const [id, name] of NEW) {
     `${r.n} samples, ends ${r.closed} u apart (seg ${r.segMax})`);
   check(`${name}: the player starts on the road`, r.lateral < 9 && Math.abs(r.drop) < 3,
     `lateral ${r.lateral} u, ${r.drop} u above the ground`);
+
+  const terrain = await p.evaluate(() => {
+    let big = null, bigN = 0;
+    window.__game.scene.traverse((o) => {
+      const n = o.isMesh ? (o.geometry?.attributes?.position?.count ?? 0) : 0;
+      if (n > bigN) { bigN = n; big = o; }           // the ground plane is the biggest mesh
+    });
+    const col = big?.geometry?.attributes?.color;
+    if (!col) return { meanL: -1, minL: -1, maxL: -1 };
+    const a = col.array, s = col.itemSize;
+    let sum = 0, min = 1, max = 0;
+    for (let i = 0; i < col.count; i++) {
+      const L = 0.2126 * a[i * s] + 0.7152 * a[i * s + 1] + 0.0722 * a[i * s + 2];
+      sum += L; if (L < min) min = L; if (L > max) max = L;
+    }
+    return { meanL: +(sum / col.count).toFixed(3), minL: +min.toFixed(3), maxL: +max.toFixed(3) };
+  });
   check(`${name}: built without a console error`, errs.length === 0,
     errs.length ? errs.slice(0, 2).join(' | ') : 'clean');
+
+  // THE GROUND HAS TO BE VISIBLE.
+  //
+  // HEDGEROW DASH shipped from its worktree with terrainLow/High/Dirt at
+  // relative luminances 0.102 / 0.234 / 0.061 — the whole palette below the
+  // DARK end of every other world (forest 0.201-0.381), paired with the
+  // roster's second-weakest sun and, at 0.58, its lowest hemisphere light.
+  // Each colour is a fair sample of a wet field; together they rendered a
+  // world you could not see to drive in, and nothing in the build, the
+  // geometry or the placement tests noticed, because all of those passed.
+  //
+  // Measured on the terrain's vertex colours, which is where the world's tone
+  // actually comes from — a screenshot would fold in the HUD, the fog and the
+  // time of day. The floor is deliberately loose: this is a "can you see the
+  // ground" gate, not an art-direction change-detector. Night worlds are
+  // exempt, which is why only LANTERN QUARTER carries a lower bar.
+  const night = await p.evaluate(() => (window.__game.track.T.hemiIntensity ?? 1) > 2);
+  const floor = night ? 0.03 : 0.15;
+  check(`${name}: the terrain is bright enough to drive on`, terrain.meanL >= floor,
+    `mean vertex luminance ${terrain.meanL} (min ${terrain.minL}, max ${terrain.maxL}), floor ${floor}`);
   console.log(`NOTE  ${name}: ${r.props} props, ${r.solids} solids, surface ${r.theme}`);
 
   await p.close();
