@@ -872,7 +872,8 @@ class Game {
     this.fovKick = 0;     // camera punch on the same impacts
     this.audio = new AudioEngine();
     this.input = new Input();
-    this.lapsTotal = LAPS;
+    // a point-to-point stage (FURKA) races ONE long lap; circuits race 3
+    this.lapsTotal = this.level?.laps ?? LAPS;
     this.contractPool = CONTRACT_POOL; // exposed for the headless suites
 
     const carEntry = CAR_CATALOG.find((c) => c.key === this.cars.selected) || CAR_CATALOG[0];

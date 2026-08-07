@@ -743,7 +743,9 @@ export class Car {
     const surf = this.game.track?.T?.surface;
     const loose = this === this.game.player ? (this.offroadSkill ?? 0.7) : 0.7;
     const keep = (base) => base + (1 - base) * (0.62 * loose);
-    const sGrip = keep(surf === 'snow' ? 0.55 : surf === 'wet' ? 0.78 : 1);
+    // wet dropped 0.78 -> 0.68: at 0.78 the player couldn't FEEL the rain.
+    // Braking and cornering now visibly run long on every downpour world.
+    const sGrip = keep(surf === 'snow' ? 0.55 : surf === 'wet' ? 0.68 : 1);
     const sTract = keep(surf === 'snow' ? 0.72 : surf === 'wet' ? 0.88 : 1);
     const sBrake = keep(surf === 'snow' ? 0.58 : surf === 'wet' ? 0.80 : 1);
 

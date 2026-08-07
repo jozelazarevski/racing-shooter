@@ -1,0 +1,158 @@
+// MODES + HAZARDS PLAYTEST: free roam loop, pause menu, live hazards firing
+// during a real race, and mobile touch controls.
+import { chromium } from 'playwright-core';
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+const bugs = [], ok = [];
+const check = (n, pass, d = '') => { (pass ? ok : bugs).push(`${n} :: ${d}`); console.log(`${pass ? 'PASS' : 'BUG '}  ${n}  ${d}`); };
+
+const race = async (q) => {
+  const page = await b.newPage({ viewport: { width: 820, height: 540 } });
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto(`http://localhost:8901/${q}`, { waitUntil: 'load', timeout: 45000 });
+  await page.waitForFunction(() => window.__game, null, { timeout: 30000 });
+  await page.click('#start-btn');
+  await page.evaluate(() => { window.__game.countdown = 0.01; });
+  await page.waitForFunction(() => window.__game.state === 'race', null, { timeout: 25000 });
+  return { page, errors };
+};
+
+// ---------- live hazards must actually fire while racing ----------
+for (const [lvl, what] of [[10, 'rockfall'], [14, 'burning treefall'], [15, 'icicles']]) {
+  const { page, errors } = await race(`?level=${lvl}&unlockall=1`);
+  const r = await page.evaluate(async () => {
+    const g = window.__game, p = g.player, t = g.track;
+    // Icicles SHATTER on landing and are spliced out in the same frame, so
+    // `fallers.filter(landed)` can never observe them — count the impact
+    // splinter burst instead, which every faller kind fires when it lands.
+    let shatters = 0;
+    const sp = g.particles.splinters.bind(g.particles);
+    g.particles.splinters = (...a) => { shatters++; return sp(...a); };
+    const rail = setInterval(() => {
+      if (g.state !== 'race') return;
+      const next = (p.trackIndex + 4) % t.N;
+      const c = t.pointAt(next, 0);
+      p.heading = t.headingAt(next);
+      p.pos.x = c.x; p.pos.z = c.z;
+      p.vel.copy(p.forward).multiplyScalar(34);
+    }, 45);
+    let spawned = 0, landed = 0;
+    for (let w = 0; w < 70; w++) {
+      await new Promise(r2 => setTimeout(r2, 400));
+      spawned = Math.max(spawned, g.fallers.length);
+      landed += g.fallers.filter(f => f.landed && !f._counted && (f._counted = 1)).length;
+      if (spawned > 0 && (landed > 0 || shatters > 0)) break;
+    }
+    clearInterval(rail);
+    return { spawned, landed: landed || shatters, period: t.T.fallHazard?.period };
+  });
+  check(`L${lvl} ${what} spawns and lands during a race`, r.spawned > 0 && r.landed > 0, JSON.stringify(r));
+  check(`L${lvl} no errors`, errors.length === 0, errors.slice(0, 2).join('|'));
+  await page.close();
+}
+
+// ---------- avalanche chase fires on the final lap ----------
+{
+  const { page, errors } = await race('?level=16&unlockall=1');
+  const r = await page.evaluate(async () => {
+    const g = window.__game, p = g.player;
+    p.lap = g.lapsTotal;
+    let banner = '';
+    const cm = g.hud.centerMsg.bind(g.hud);
+    g.hud.centerMsg = (m) => { if (/AVALANCHE/i.test(m)) banner = m; cm(m); };
+    for (let w = 0; w < 25 && !g.chaseWall; w++) await new Promise(r2 => setTimeout(r2, 200));
+    const sp0 = g.chaseWall?.speed ?? 0;
+    await new Promise(r2 => setTimeout(r2, 2500));
+    return { released: !!g.chaseWall, banner, accel: (g.chaseWall?.speed ?? 0) > sp0 };
+  });
+  check('L16 avalanche releases on the final lap with a banner', r.released && /AVALANCHE/.test(r.banner), JSON.stringify(r));
+  check('L16 avalanche accelerates', r.accel);
+  check('L16 no errors', errors.length === 0, errors.slice(0, 2).join('|'));
+  await page.close();
+}
+
+// ---------- free roam loop: stars, choppers, credit banking ----------
+{
+  const { page, errors } = await race('?level=1&mode=roam&unlockall=1');
+  const r = await page.evaluate(async () => {
+    const g = window.__game, p = g.player;
+    const out = { roam: g.freeRoam, stars: g.roamStars?.length ?? 0, lapsHidden: true };
+    // collect one star by driving to it
+    const s = g.roamStars[0];
+    p.pos.set(s.x - 5, s.y + 0.4, s.z); p.y = p.pos.y;
+    p.heading = Math.PI / 2;
+    const iv = setInterval(() => { p.vel.set(12, 0, 0); }, 90);
+    for (let w = 0; w < 25 && !s.got; w++) await new Promise(r2 => setTimeout(r2, 180));
+    clearInterval(iv);
+    out.starGot = s.got === true;
+    // choppers spawn in roam
+    g.chopperTimer = 0;
+    for (let w = 0; w < 25 && g.choppers.length === 0; w++) await new Promise(r2 => setTimeout(r2, 250));
+    out.choppers = g.choppers.length;
+    // banking credits on exit
+    const cr0 = g.garage.credits;
+    g.score = 800;
+    g.bankRoamCredits?.();
+    out.banked = g.garage.credits - cr0;
+    return out;
+  });
+  check('free roam active with 12 treasure stars', r.roam && r.stars === 12, JSON.stringify({ roam: r.roam, stars: r.stars }));
+  check('star collectable by driving', r.starGot);
+  check('choppers spawn in free roam', r.choppers > 0, `${r.choppers}`);
+  check('roam score banks into credits on exit', r.banked > 0, `+${r.banked}`);
+  check('roam no errors', errors.length === 0, errors.slice(0, 2).join('|'));
+  await page.close();
+}
+
+// ---------- pause menu ----------
+{
+  const { page, errors } = await race('?level=1&unlockall=1');
+  const r = await page.evaluate(async () => {
+    const g = window.__game;
+    g.togglePause();
+    await new Promise(r2 => setTimeout(r2, 300));
+    const paused = g.state === 'paused' && !document.getElementById('pause-menu').classList.contains('hidden');
+    document.getElementById('pm-resume').click();
+    await new Promise(r2 => setTimeout(r2, 300));
+    const resumed = g.state === 'race' && document.getElementById('pause-menu').classList.contains('hidden');
+    // camera cycle from the pause menu
+    const cam0 = g.camMode;
+    document.getElementById('pm-camera').click();
+    return { paused, resumed, camCycled: g.camMode !== cam0 };
+  });
+  check('pause menu opens and resumes', r.paused && r.resumed, JSON.stringify(r));
+  check('pause menu cycles the camera', r.camCycled);
+  check('pause no errors', errors.length === 0, errors.slice(0, 2).join('|'));
+  await page.close();
+}
+
+// ---------- mobile touch controls actually drive the car ----------
+{
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await ctx.newPage();
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto('http://localhost:8901/?level=1&unlockall=1', { waitUntil: 'load', timeout: 45000 });
+  await page.waitForFunction(() => window.__game, null, { timeout: 30000 });
+  await page.tap('#start-btn');
+  await page.evaluate(() => { window.__game.countdown = 0.01; });
+  await page.waitForFunction(() => window.__game.state === 'race', null, { timeout: 25000 });
+  const jr = await page.evaluate(() => document.getElementById('joy-zone').getBoundingClientRect().toJSON());
+  const cx = jr.x + jr.width / 2, cy = jr.y + jr.height / 2;
+  await page.touchscreen.tap(cx, cy);
+  // drag up = throttle
+  await page.evaluate(async ([x, y]) => {
+    const z = document.getElementById('joy-zone');
+    const mk = (t, cx2, cy2) => z.dispatchEvent(new TouchEvent(t, { bubbles: true, cancelable: true,
+      touches: t === 'touchend' ? [] : [new Touch({ identifier: 1, target: z, clientX: cx2, clientY: cy2 })],
+      changedTouches: [new Touch({ identifier: 1, target: z, clientX: cx2, clientY: cy2 })] }));
+    mk('touchstart', x, y);
+    for (let k = 0; k < 30; k++) { mk('touchmove', x, y - 60); await new Promise(r => setTimeout(r, 60)); }
+  }, [cx, cy]);
+  const moved = await page.evaluate(() => ({ sp: Math.hypot(window.__game.player.vel.x, window.__game.player.vel.z), thr: window.__game.input.throttle }));
+  check('mobile joystick applies throttle and moves the car', moved.sp > 3, JSON.stringify({ speed: +moved.sp.toFixed(1) }));
+  check('mobile no errors', errors.length === 0, errors.slice(0, 2).join('|'));
+  await ctx.close();
+}
+
+await b.close();
+console.log(`\n==== ${ok.length} PASSED / ${bugs.length} BUGS ====`);
+for (const x of bugs) console.log('BUG:', x);

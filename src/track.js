@@ -47,7 +47,7 @@ export const LEVELS = [
     tune: { tunnels: { count: 2 } } },
   { id: 20, name: 'TREMOLA DESCENT', theme: 'tremola', region: 'ALPINE PASSES',
     tune: { tunnels: { count: 1 } } },
-  { id: 21, name: 'FURKA RIDGE', theme: 'furka', region: 'ALPINE PASSES',
+  { id: 21, name: 'FURKA RIDGE', theme: 'furka', region: 'ALPINE PASSES', laps: 1,
     tune: { tunnels: { count: 1 } } },
 
   // ---- WORLD RALLY: real stages, each a ROUTE over a borrowed THEME with its
@@ -71,7 +71,9 @@ export const LEVELS = [
     tune: { elev: { amp: 7, ph: [2.9, 1.1, 0.5] }, rampCount: 0 } },
   { id: 28, name: 'ESTONIA CRESTS', theme: 'forest', route: 'estonia', region: 'WORLD RALLY',
     // the only world besides CANYON RUN to hang a hero bridge over a gorge
-    tune: { elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
+    tune: { // DAWN over the yumps: first light
+      sunColor: 0xffc8a0, sunIntensity: 2.3, sunEl: 0.22, sunAz: 0.4,
+      skyTop: '#3a5a94', skyHorizon: '#ffc8b0', fogColor: 0xe8c8c0, hemiIntensity: 0.62, elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
       heroBridge: { at: [0.55, 0.66], half: 24, len: 210, depth: 28, skew: 0 } } },
 
   // ---- MEDITERRANEAN. Appended, so nothing before it is re-priced (career
@@ -111,7 +113,9 @@ export const LEVELS = [
   { id: 34, name: 'MONACO STREETS', theme: 'medterrace', route: 'monaco', region: 'GRAND CIRCUITS',
     cost: 6, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
   { id: 35, name: 'SILVERSTONE', theme: 'farmland', route: 'silverstone', region: 'GRAND CIRCUITS',
-    cost: 7, fresh: true, tune: { elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
+    cost: 7, fresh: true, tune: { // OVERCAST: flat grey racing light, no hard sun
+      sunColor: 0xe8e8e8, sunIntensity: 1.7, hemiIntensity: 1.05,
+      skyTop: '#7a8a9a', skyHorizon: '#d8dde2', fogColor: 0xd0d6da, cloudCount: 22, cloudOpacity: 1, elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
   { id: 36, name: 'SPA-FRANCORCHAMPS', theme: 'forest', route: 'spa', region: 'GRAND CIRCUITS',
     cost: 8, fresh: true, tune: { elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
   { id: 37, name: 'SUZUKA', theme: 'redwood', route: 'suzuka', region: 'GRAND CIRCUITS',
@@ -123,11 +127,19 @@ export const LEVELS = [
   { id: 40, name: 'MARINA BAY', theme: 'neon', route: 'marina', region: 'GRAND CIRCUITS',
     cost: 12, fresh: true, tune: { rampCount: 0 } },
   { id: 41, name: 'MOUNT PANORAMA', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
-    cost: 13, fresh: true, tune: { elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
+    cost: 13, fresh: true, tune: { // DUSK over the mountain: ember sky, violet ranges
+      sunColor: 0xffb078, sunIntensity: 1.9, sunEl: 0.18, sunAz: 5.6,
+      skyTop: '#3a3564', skyHorizon: '#ff9a58', fogColor: 0xc8a090, hemiIntensity: 0.78, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
   { id: 42, name: 'RALLYCROSS ARENA', theme: 'flume', route: 'rallyx', region: 'GRAND CIRCUITS',
     cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
   { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
-    cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0 } },
+    cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0,
+      // AUTUMN: copper woods under a low golden sun
+      foliageLow: 0x9a5a20, foliageTop: 0xc8842c,
+      foliage: { h: 0.07, hVar: 0.04, s: 0.62, sVar: 0.15, l: 0.36, lVar: 0.12 },
+      sunColor: 0xffd898, sunIntensity: 2.5, sunEl: 0.34, hemiGround: 0xa07a48,
+      skyTop: '#4a7ab8', skyHorizon: '#f0d8a8', fogColor: 0xe8d8b0,
+      terrainLow: '#8a7a3e', terrainHigh: '#b89a58' } },
   { id: 44, name: 'LAGUNA SECA', theme: 'canyon', route: 'laguna', region: 'GRAND CIRCUITS',
     cost: 16, fresh: true, tune: { elev: { amp: 9, ph: [1.9, 0.4, 2.6] }, rampCount: 0 } },
   // the 25.8 km Corsican tarmac stage from the player's card: a 3000 u lap,
@@ -376,18 +388,27 @@ const CIRCUITS = {
   // road climbs a jagged grey-rock face in ONE long serpentine of seven legs,
   // so from the upper legs the whole pass is visible snaking down the valley
   // below you. A traverse along the top, then wide sweeps back down.
-  furka: [
-    // snowbound valley floor: start line + log cabins
-    [-40, -244], [-124, -232], [-192, -198], [-230, -148], [-224, -100],
-    [-182, -74], [-122, -66],
-    // the serpentine: 7 legs, 6 hairpins, cut into the face
-    ...switchbackStack({ legs: 7, z0: -66, dz: 30, halfX: 38, hp: 16 }),
-    // high traverse along the shoulder, looking back down the whole pass
-    [100, 118], [166, 110], [220, 86],
-    // wide sweeps back down the east side to the valley
-    [250, 40], [214, 2], [152, -8],
-    [118, -58], [170, -92], [234, -104],
-    [250, -160], [214, -206], [150, -232], [70, -246],
+  furka: [ // the player's downhill-run sketch: one-lap stage, border road home
+    [143.4, -235.0], [127.2, -231.4], [112.7, -227.3], [103.6, -218.7], [100.1, -204.0],
+    [95.4, -191.0], [83.5, -187.5], [72.4, -188.3], [68.5, -186.0], [66.9, -182.5],
+    [67.0, -178.3], [69.4, -172.9], [69.3, -166.5], [65.7, -161.2], [63.9, -159.0],
+    [62.8, -156.5], [62.5, -153.6], [63.1, -150.3], [63.9, -146.4], [63.3, -143.1],
+    [61.5, -140.3], [58.1, -138.4], [50.2, -139.0], [34.9, -143.1], [25.2, -153.0],
+    [18.5, -166.1], [6.5, -172.4], [-6.9, -168.9], [-11.4, -157.7], [-3.9, -147.4],
+    [8.9, -138.5], [21.5, -127.5], [36.6, -120.9], [51.6, -116.9], [60.5, -107.4],
+    [60.8, -93.4], [52.9, -79.9], [41.0, -68.0], [28.6, -56.4], [14.8, -49.4],
+    [-1.6, -48.2], [-18.0, -49.9], [-33.1, -54.1], [-47.1, -53.3], [-57.1, -42.6],
+    [-62.4, -27.1], [-64.1, -10.4], [-61.4, 5.7], [-52.6, 18.0], [-38.6, 25.0],
+    [-22.5, 27.4], [-6.6, 24.6], [6.0, 15.8], [7.1, 5.6], [-0.7, -1.5],
+    [-14.7, -6.4], [-18.5, -15.9], [-13.4, -24.9], [1.4, -28.0], [17.5, -26.8],
+    [29.3, -18.6], [34.5, -3.6], [34.9, 13.5], [32.8, 30.2], [26.8, 44.9],
+    [15.3, 55.6], [0.2, 60.9], [-16.5, 61.5], [-33.5, 60.2], [-50.3, 58.2],
+    [-66.8, 56.3], [-82.2, 58.9], [-93.5, 68.9], [-101.3, 83.0], [-109.7, 96.3],
+    [-110.0, 105.0], [-104.1, 111.6], [-88.7, 116.0], [-85.8, 122.9], [-87.8, 129.6],
+    [-90.1, 134.3], [-90.7, 139.1], [-89.1, 144.3], [-88.6, 151.1], [-91.6, 157.1],
+    [-99.9, 161.2], [-103.1, 165.3], [-103.2, 169.7], [-100.5, 174.3], [-87.1, 181.6],
+    [-81.8, 193.1], [-88.4, 203.0], [-102.3, 209.3], [-117.1, 216.1], [-130.8, 224.9],
+    [-143.4, 235.0], [-173.4, 265.0], [-173.4, -265.0], [173.4, -265.0],
   ],
 
   // ======================================================================
@@ -919,7 +940,7 @@ const THEMES = {
     // debris chip colors when a fence/wall is scraped (painted pole red/cream)
     splinter: [0xc23b2a, 0xe8e2d4],
     // light drizzle drifting through the pines (rate overrides the default)
-    weather: { type: 'rain', color: 0xcfe0ee, rate: 130 },
+    weather: { type: 'rain', color: 0xcfe0ee, rate: 190 },
     // elevation profile: amplitude + deterministic per-octave phases
     elev: { amp: 8, ph: [0.9, 2.6, 4.2] },
     // per-level gameplay-placement tuning
@@ -1256,7 +1277,7 @@ const THEMES = {
     flowerCount: 420, flowerColors: ['#ff4a6a', '#ffd45e', '#ff8a3a', '#e86aff', '#ffffff'],
     hutRoof: 0x7a9a3c, hayColor: 0xc8b45e, hutCount: 6, hayCount: 30,
     splinter: [0x4a9a3c, 0x8a6a42],                     // shredded fronds + wet wood
-    weather: { type: 'rain', color: 0xbfd8ea },         // full tropical downpour
+    weather: { type: 'rain', color: 0xbfd8ea, rate: 220 }, // full tropical downpour
     elev: { amp: 7, ph: [2.2, 0.9, 4.4] },
     rampMaxCurv: 0.016, padMaxCurv: 0.005, boardMaxCurv: 0.014,
     // fallen log piles on the road (SOLID circle colliders like all obstacles)
@@ -1678,7 +1699,7 @@ const THEMES = {
     flowerCount: 0, flowerColors: ['#26f6ff'],
     hutRoof: 0x22262e, hutCount: 0, hayColor: 0x33363e, hayCount: 0,
     splinter: [0x26f6ff, 0xff3af0],                     // shattered neon shards
-    weather: { type: 'rain', color: 0x9ab8e8, rate: 90 },
+    weather: { type: 'rain', color: 0x9ab8e8, rate: 150 },
     elev: { amp: 7, ph: [1.3, 4.4, 2.7] },              // gentle overpass swells
     rampMaxCurv: 0.012, padMaxCurv: 0.005, boardMaxCurv: 0.014,
     bannerStyle: 'neon',                                // holographic sponsor boards
@@ -1827,6 +1848,7 @@ const THEMES = {
   // stone parapets on the outside of each, then a gorge run-out and the long
   // modern climb back up the east flank.
   tremola: {
+    stoneBridges: { count: 1 },
     fogColor: 0xcfdfec, fogNear: 300, fogFar: 1500,
     hemiSky: 0xa8cbf0, hemiGround: 0x58724a, hemiIntensity: 0.76,
     sunColor: 0xffeed4, sunIntensity: 2.7,
@@ -1965,6 +1987,7 @@ const THEMES = {
   // wet surface, any cool colour temperature. Hence no `surface`, no puddles,
   // no fog banks and a warm hemisphere ground bounce.
   medterrace: {
+    stoneBridges: { count: 1 },
     // FogExp2 density 0.00060 ≈ 1600 u of visibility; the engine fog is linear,
     // so it is matched at the far end and pushed out at the near end — this is
     // the 140 m sight-line region and the road has to stay readable a long way
@@ -2090,6 +2113,7 @@ const THEMES = {
   // and a WALL OF FOREST all around - the fields sit in a broad clearing
   // (treeBelt holds the stands back off the road, then they close in).
   vineyard: {
+    stoneBridges: { count: 2 },
     fogColor: 0xdfe4cc, fogNear: 340, fogFar: 1500,
     hemiSky: 0xbcd8f0, hemiGround: 0x9aa46a, hemiIntensity: 0.78,
     sunColor: 0xfff0c8, sunIntensity: 2.7,
@@ -2136,17 +2160,17 @@ const THEMES = {
   // both sides, the fog sits close, and the lap never sees open country.
   deepwood: {
     fogColor: 0xb8c8b0, fogNear: 150, fogFar: 950,
-    hemiSky: 0x9cc0a8, hemiGround: 0x3e4e34, hemiIntensity: 0.72,
-    sunColor: 0xf8ecc8, sunIntensity: 2.2,
+    hemiSky: 0xa8ccb4, hemiGround: 0x54644a, hemiIntensity: 0.88,
+    sunColor: 0xf8ecc8, sunIntensity: 2.55,
     skyTop: '#4a7a9c', skyHorizon: '#c8d4bc', sunGlow: 0xf0e8b8,
     sunAz: 2.4, sunEl: 0.62,
     cloudCount: 6, cloudOpacity: 0.8,
-    terrainLow: '#2e4a28', terrainHigh: '#4e6a3c', terrainDirt: '#5a4c34',
+    terrainLow: '#41603a', terrainHigh: '#648250', terrainDirt: '#6a5c42',
     terrainScree: '#5a5c48', hutGlow: 0.55,
     skirtColor: '#4e4838',
     ground: {
-      base: '#3e5430',
-      bandLight: 'rgba(120,150,90,0.07)', bandDark: 'rgba(24,40,20,0.09)',
+      base: '#4c6a3c',
+      bandLight: 'rgba(140,170,104,0.08)', bandDark: 'rgba(34,52,28,0.07)',
       patchA: 'rgba(70,90,44,0.25)', patchB: 'rgba(96,80,52,0.2)',
       speckA: 'rgba(90,110,70,0.7)', speckB: 'rgba(150,160,120,0.7)', speckCount: 120,
     },
@@ -2384,6 +2408,7 @@ const THEMES = {
   // no mountain anywhere: the negative list forbids exposed rock, dry dust,
   // bright colour and any sight line worth the name.
   farmland: {
+    stoneBridges: { count: 2 },
     surface: 'wet',                                     // "wet mixed" — physics reads this
     // Bible fog is FogExp2 d=0.00150 #C3CBD2; the engine's fog is linear, so
     // near/far are set to the same half-fade (~550) and extinction (~1150).
@@ -6151,6 +6176,7 @@ export class Track {
     this._buildHorizon(m4);
     if (this.T.coast) this._buildSea();
     if (this.T.vineRows) this._buildVineRows();
+    if (this.T.stoneBridges) this._buildStoneBridges();
     if (this.creeks?.length) this._buildCreekBeds(m4);   // outback dry watercourses
     this._buildForest(m4);
     this._buildGroundCover(m4);
@@ -6969,6 +6995,35 @@ export class Track {
     }
     hulls.castShadow = sails.castShadow = true;
     this.group.add(hulls, sails);
+
+    // WAVE CRESTS: broken white dashes drifting over the near bay
+    const CRESTS = 90;
+    const crest = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(3.4, 0.05, 0.32),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4,
+        depthWrite: false }),
+      CRESTS);
+    for (let k = 0; k < CRESTS; k++) {
+      const du = (Math.sin(k * 12.9898) * 0.5 + 0.5) * 2 - 1;
+      const dn2 = 14 + (Math.sin(k * 78.233) * 0.5 + 0.5) * 300;
+      const wx = mx + ux * du * 700 + nx * dn2, wz = mz + uz * du * 700 + nz * dn2;
+      iq.setFromAxisAngle(iup, Math.atan2(ux, uz) + Math.sin(k * 3.7) * 0.3);
+      im4.compose(new THREE.Vector3(wx, y + 0.05, wz), iq, new THREE.Vector3(1, 1, 1));
+      crest.setMatrixAt(k, im4);
+    }
+    this.group.add(crest);
+
+    // harbour buoys
+    const buoy = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(0.6, 6, 5),
+      new THREE.MeshStandardMaterial({ color: 0xd23c28, roughness: 0.6 }), 4);
+    for (let k = 0; k < 4; k++) {
+      const du = -260 + k * 160, dn2 = 26 + (k % 2) * 18;
+      im4.compose(new THREE.Vector3(mx + ux * du + nx * dn2, y + 0.3, mz + uz * du + nz * dn2),
+        iq, new THREE.Vector3(1, 1, 1));
+      buoy.setMatrixAt(k, im4);
+    }
+    this.group.add(buoy);
   }
 
   /** Old snow lying in the hollows above `minY`: flat white decals conformed
@@ -7147,6 +7202,70 @@ export class Track {
     this.group.add(body, roof);
     this._addShadow(p.x, p.z, Math.max(W, D) * 0.8);
     this.solids.push({ x: p.x, z: p.z, r: Math.max(W, D) * 0.62, y: gy + 3, mat: 'stone' });
+  }
+
+  /** STONE BRIDGES: arched masonry spans where the road crosses a dip - the
+   *  parapets read from far off, and the deck carries a baked hump that a
+   *  fast car JUMPS. Placement is honest: only where the ground beside the
+   *  road genuinely falls away. */
+  _buildStoneBridges() {
+    const B = this.T.stoneBridges;
+    const count = B.count ?? 2;
+    // find dips: ground 5+ u below the deck on both sides, straight-ish road
+    const cands = [];
+    for (let i = 0; i < N; i += 3) {
+      if (this._circDist(i, 0) < 90 || this._nearGorge(i, 60)) continue;
+      if (this.curvature[i] > 0.01) continue;
+      const c = this.center[i], n = this.nrm[i];
+      const dl = c.y - this.terrainHeight(c.x + n.x * 15, c.z + n.z * 15);
+      const dr = c.y - this.terrainHeight(c.x - n.x * 15, c.z - n.z * 15);
+      const drop = Math.min(dl, dr);
+      if (drop > 4.5) cands.push({ i, drop });
+    }
+    cands.sort((a, b) => b.drop - a.drop);
+    const picked = [];
+    for (const cand of cands) {
+      if (picked.length >= count) break;
+      if (picked.some((q) => this._circDist(cand.i, q.i) < 120)) continue;
+      picked.push(cand);
+    }
+    const stone = new THREE.MeshStandardMaterial({
+      color: 0x9a9188, flatShading: true, roughness: 1,
+    });
+    for (const { i } of picked) {
+      const span = Math.ceil(26 / this.segLen);
+      // the jump hump: raise the deck through the crossing
+      for (let k = -span; k <= span; k++) {
+        const j = (i + k + N) % N;
+        this.center[j].y += 1.5 * Math.pow(Math.cos((k / span) * Math.PI * 0.5), 1.4);
+      }
+      const g = new THREE.Group();
+      for (const side of [1, -1]) {
+        // parapet walls the length of the span
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), stone);
+        const a = this.center[(i - span + N) % N], b2 = this.center[(i + span) % N];
+        const mxx = (a.x + b2.x) / 2, mzz = (a.z + b2.z) / 2;
+        const yaw = this.headingAt(i);
+        const nn = this.nrm[i];
+        wall.scale.set(1.1, 1.6, span * 2 * this.segLen);
+        wall.position.set(mxx + nn.x * 10.6 * side, this.center[i].y + 0.6, mzz + nn.z * 10.6 * side);
+        wall.rotation.y = yaw;
+        wall.castShadow = true;
+        g.add(wall);
+        this.solids.push({ x: wall.position.x, z: wall.position.z, r: 1.4,
+          y: this.center[i].y + 1, mat: 'stone' });
+        // arch faces: two masonry blocks descending under the deck
+        for (const k of [-span * 0.55, span * 0.55]) {
+          const j = (i + Math.round(k) + N) % N;
+          const c = this.center[j];
+          const pier = new THREE.Mesh(new THREE.BoxGeometry(2.2, 9, 3.2), stone);
+          pier.position.set(c.x + nn.x * 8.5 * side, c.y - 4.6, c.z + nn.z * 8.5 * side);
+          pier.rotation.y = yaw;
+          g.add(pier);
+        }
+      }
+      this.group.add(g);
+    }
   }
 
   /** VINE TRELLIS FIELDS: parallel rows of clipped vine hedge on wooden end
@@ -8968,6 +9087,7 @@ export class Track {
     // mountain range across the bay turns open sea into a lake (and at fog
     // distance those cones ARE the cream the sea was built to replace).
     const inSea = (x, z, w) => this.T.coast && this._coastSide(x, z) > -(w * 0.7);
+    const jcol = new THREE.Color();
     let hk = 0;
     for (let i = 0; i < 40; i++) {
       const a = (i / 40) * Math.PI * 2;
@@ -8976,9 +9096,13 @@ export class Track {
       const w = 130 + Math.random() * 150;
       const px = Math.cos(a) * r, pz = Math.sin(a) * r;
       if (inSea(px, pz, w)) continue;
-      m4.makeScale(w, h, w);
+      // asymmetric base + a lean: a ridge fragment, not a pyramid
+      m4.makeRotationY(Math.random() * Math.PI);
+      m4.scale(new THREE.Vector3(w, h, w * (0.55 + Math.random() * 0.6)));
       m4.setPosition(px, h / 2 + seat(px, pz), pz);
-      hills.setMatrixAt(hk++, m4);
+      hills.setMatrixAt(hk, m4);
+      jcol.setScalar(0.82 + Math.random() * 0.3);
+      hills.setColorAt(hk++, jcol);
     }
     hills.count = hk;
     let pk = 0;
@@ -8989,9 +9113,26 @@ export class Track {
       const w = 120 + Math.random() * 140;
       const px = Math.cos(a) * r, pz = Math.sin(a) * r;
       if (inSea(px, pz, w)) continue;
-      m4.makeScale(w, h, w);
+      m4.makeRotationY(Math.random() * Math.PI);
+      m4.scale(new THREE.Vector3(w, h, w * (0.5 + Math.random() * 0.7)));
       m4.setPosition(px, h / 2 + seat(px, pz), pz);
-      peaks.setMatrixAt(pk++, m4);
+      peaks.setMatrixAt(pk, m4);
+      jcol.setScalar(0.78 + Math.random() * 0.36);
+      peaks.setColorAt(pk++, jcol);
+      // a lower shoulder leaning on the peak - crags come in families
+      if (pk < 30 && Math.random() < 0.6) {
+        const sw = w * 0.55, sh = h * (0.45 + Math.random() * 0.2);
+        const sx = px + Math.cos(a + 1.57) * w * 0.5;
+        const sz = pz + Math.sin(a + 1.57) * w * 0.5;
+        if (!inSea(sx, sz, sw)) {
+          m4.makeRotationY(Math.random() * Math.PI);
+          m4.scale(new THREE.Vector3(sw, sh, sw * 0.7));
+          m4.setPosition(sx, sh / 2 + seat(sx, sz), sz);
+          peaks.setMatrixAt(pk, m4);
+          jcol.setScalar(0.72 + Math.random() * 0.3);
+          peaks.setColorAt(pk++, jcol);
+        }
+      }
     }
     peaks.count = pk;
     // named so a world whose skyline must be built, not geological, can drop
