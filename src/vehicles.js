@@ -2123,7 +2123,7 @@ function computeSpeedInv(track) {
   return inv;
 }
 
-const DEFAULT_DIFFICULTY = { aiSpeed: 1, aiAggression: 1, rubberBand: 1 };
+const DEFAULT_DIFFICULTY = { aiSpeed: 1, aiCorner: 1, aiAggression: 1, rubberBand: 1 };
 
 // ---------- AI rival ----------
 // The Voxel Racers collection — rival lineup
@@ -2537,7 +2537,10 @@ export class EnemyCar extends Car {
 
     // ---- braking model: physics corner speeds + late-but-correct brake points
     // vMax(j) = sqrt(aLat / curvature); brake so that v <= sqrt(vMax^2 + 2*decel*dist)
-    const aLat = (30 + 8 * this.cornerSkill) * D.aiSpeed;
+    // aiCorner is the difficulty's LATERAL budget and is the knob that really
+    // sets a rival's pace — vMax below takes a square root of this, so a tier
+    // needs a big multiplier here to move at all. See DIFFS in main.js.
+    const aLat = (30 + 8 * this.cornerSkill) * D.aiSpeed * (D.aiCorner ?? 1);
     const sqA = Math.sqrt(aLat);
     const DECEL = 26;
     let vAllowed = this.maxSpeed * (this._draftOn ? 1.12 : 1); // draft window open
