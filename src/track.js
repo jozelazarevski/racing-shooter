@@ -7906,33 +7906,35 @@ export class Track {
     }
   }
 
-  /** VINEYARD PARCELS: rows that WALK the contour.
+  /** VINEYARD PARCELS: one contour, many parallel rows.
    *
-   *  The first cut stretched ONE rigid box per row and seated it at the ground
-   *  height of its centre, so on any slope both ends hung in the air - green
-   *  beams floating over the hill, and a row long enough to reach onto the
-   *  carriageway. The second drew short straight rows aligned to the fall line
-   *  at the parcel's centre, which drapes correctly but reads as rectangular
-   *  patches: the reference is a hillside combed by long sweeping arcs.
+   *  Three earlier cuts, three lessons. A single rigid box per row floated
+   *  its ends over any slope. Short straight panels drape correctly but read
+   *  as rectangular patches, where the reference is a hillside combed by long
+   *  curves. Letting every row walk its OWN contour gave curves, but rows walk
+   *  independently: on real ground they fan apart, converge and braid, which
+   *  looks like hoses dropped on the grass, not planting.
    *
-   *  So a row is now WALKED. From its seed it steps 2.6 u at a time along the
-   *  local contour - perpendicular to the fall line, re-read at every step and
-   *  kept continuous by refusing any turn that reverses the previous heading -
-   *  and the next row seeds one spacing DOWN the fall line from the last. The
-   *  arcs come out of the terrain itself, so rows stay parallel, wrap the hill
-   *  together, and no two parcels comb against each other. On ground too flat
-   *  to have a fall line the walk holds its heading, which is what keeps a
-   *  valley floor from turning into scribble.
+   *  So a parcel now walks ONE master contour - stepping SEG at a time along
+   *  the local fall line's perpendicular, re-read each step, never doubling
+   *  back - and every row is that master path OFFSET sideways along its
+   *  normals. Parallel BY CONSTRUCTION: rows cannot converge, cannot cross,
+   *  and the whole block bends together the way a planted hillside does. The
+   *  one thing an offset curve can do is fold through the inside of a tight
+   *  bend, and a folded segment is simply dropped.
    *
-   *  Dressing sells the crop: tilled soil under every row, trellis posts proud
-   *  of the canopy, per-panel height jitter for a ragged top line, hue drift
-   *  down the rows. Three draw calls for the whole wine country. */
+   *  Panels are short, sample their own ground, and pitch to the local grade
+   *  about their WIDTH axis - a rotation about the length axis instead would
+   *  roll the row onto its side, which stood the tilled strip up as a wall.
+   *  Dressing: tilled soil under each row, trellis posts proud of the canopy,
+   *  per-panel height jitter for a ragged top line, hue drift. Three draw
+   *  calls for the whole wine country. */
   _buildVineRows() {
     const V = this.T.vineRows;
     const blocks = V.count ?? 20;
-    const ROWS_MAX = 13, STEPS_MAX = 26, SEG = 2.6, SPACING = 3.3;
+    const ROWS_MAX = 16, STEPS_MAX = 15, SEG = 2.7, SPACING = 2.9;
     const CLEAR = ROAD_HALF + 5.5;                 // no vine reaches the verge
-    const CAP = blocks * ROWS_MAX * STEPS_MAX;
+    const CAP = blocks * ROWS_MAX * (STEPS_MAX * 2 + 1);
     const unit = new THREE.BoxGeometry(1, 1, 1);
     unit.translate(0, 0.5, 0);
     const vines = new THREE.InstancedMesh(unit,
@@ -7943,89 +7945,122 @@ export class Track {
     postGeo.translate(0, 0.5, 0);
     const posts = new THREE.InstancedMesh(postGeo,
       new THREE.MeshStandardMaterial({ color: 0x7a5836, roughness: 1 }),
-      blocks * ROWS_MAX * 14);
+      Math.ceil(CAP / 3) + blocks);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
-    const eul = new THREE.Euler(0, 0, 0, 'YZX');
+    const eul = new THREE.Euler(0, 0, 0, 'YXZ');
     const up = new THREE.Vector3(0, 1, 0);
     const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
     let vk = 0, sk = 0, pk = 0;
+    // Parcels are kept apart at PARCEL scale. Testing every panel against a
+    // shared grid punched holes through the middle of otherwise good rows,
+    // and a vineyard with gaps in its rows reads as damaged, not as planted.
+    const planted = [];
 
     // downhill unit vector at (x,z), or null where the land is effectively flat
     const fall = (x, z) => {
       const gx = this.terrainHeight(x + 7, z) - this.terrainHeight(x - 7, z);
       const gz = this.terrainHeight(x, z + 7) - this.terrainHeight(x, z - 7);
       const m = Math.hypot(gx, gz);
-      return m < 0.5 ? null : { x: gx / m, z: gz / m, m };
+      return m < 0.5 ? null : { x: gx / m, z: gz / m };
     };
 
-    this._scatter(blocks, () => this._trackSidePos(21, 95), (p) => {
+    // NB the rejection lives in the position generator, not in the placer:
+    // _scatter counts a placer that bails as a parcel spent, so rejecting
+    // overlaps there quietly thinned the wine country by two thirds.
+    const seedPos = () => {
+      const q = this._trackSidePos(26, 95);
+      if (!q) return null;
+      for (const c of planted) {
+        if (Math.hypot(c[0] - q.x, c[1] - q.z) < 52) return null;
+      }
+      return q;
+    };
+    this._scatter(blocks, seedPos, (p) => {
       const h0 = this.terrainHeight(p.x, p.z);
       for (const [ox, oz] of [[11, 0], [-11, 0], [0, 11], [0, -11]]) {
         if (Math.abs(this.terrainHeight(p.x + ox, p.z + oz) - h0) > 3.4) return;
       }
-      const hue = 0.245 + Math.random() * 0.045;                   // parcel varietal
-      const rows = 7 + (Math.random() * (ROWS_MAX - 6) | 0);
-      const steps = 14 + (Math.random() * (STEPS_MAX - 13) | 0);
+      const rows = 9 + (Math.random() * (ROWS_MAX - 8) | 0);
+      const steps = 7 + (Math.random() * (STEPS_MAX - 8) | 0);
+      const halfW = ((rows - 1) / 2) * SPACING;      // how far the block reaches out
       // flat ground has no contour to follow: hold one estate heading instead
       const seedFall = fall(p.x, p.z);
       const est = Math.sin(Math.floor(p.x / 140) * 12.9898 + Math.floor(p.z / 140) * 78.233) * 43758.5453;
       const flatYaw = (est - Math.floor(est)) * Math.PI;
-      let sx = p.x, sz = p.z;
-      let seedDir = seedFall || { x: Math.cos(flatYaw), z: Math.sin(flatYaw) };
+      const sd = seedFall || { x: Math.cos(flatYaw), z: Math.sin(flatYaw) };
+
+      // ---- the master contour, walked out of the seed in both directions
+      const walk = (way) => {
+        const acc = [];
+        let cx = p.x, cz = p.z;
+        let dirx = -sd.z * way, dirz = sd.x * way;
+        for (let s = 0; s < steps; s++) {
+          const f = fall(cx, cz);
+          if (f) {
+            let nx = -f.z, nz = f.x;
+            if (nx * dirx + nz * dirz < 0) { nx = -nx; nz = -nz; }
+            dirx += (nx - dirx) * 0.5;                  // ease the turn
+            dirz += (nz - dirz) * 0.5;
+            const m = Math.hypot(dirx, dirz) || 1;
+            dirx /= m; dirz /= m;
+          }
+          cx += dirx * SEG; cz += dirz * SEG;
+          // the whole BLOCK has to clear the road, not just its middle
+          if (this._distToTrack(cx, cz) < CLEAR + halfW) break;
+          acc.push([cx, cz]);
+        }
+        return acc;
+      };
+      const back = walk(-1).reverse();
+      const path = back.concat([[p.x, p.z]], walk(1));
+      if (path.length < 4) return;
+
+      // per-point normals, from the local tangent
+      const nx = [], nz = [];
+      for (let i = 0; i < path.length; i++) {
+        const a = path[Math.max(0, i - 1)], b = path[Math.min(path.length - 1, i + 1)];
+        const tx = b[0] - a[0], tz = b[1] - a[1];
+        const m = Math.hypot(tx, tz) || 1;
+        nx.push(-tz / m); nz.push(tx / m);
+      }
+
+      const hue = 0.245 + Math.random() * 0.045;                   // parcel varietal
       let any = 0;
       for (let r = 0; r < rows; r++) {
-        const sat = 0.46 + Math.random() * 0.16, lum = 0.2 + Math.random() * 0.07;
-        // walk out from the seed in both directions along the contour
-        for (const way of [1, -1]) {
-          let cx = sx, cz = sz;
-          let dirx = -seedDir.z * way, dirz = seedDir.x * way;     // contour heading
-          const run = way > 0 ? Math.ceil(steps / 2) : (steps >> 1);
-          for (let s = 0; s < run && vk < CAP; s++) {
-            const f = fall(cx, cz);
-            if (f) {
-              // turn onto the local contour, but never double back on ourselves
-              let nx = -f.z, nz = f.x;
-              if (nx * dirx + nz * dirz < 0) { nx = -nx; nz = -nz; }
-              dirx += (nx - dirx) * 0.6;                            // ease the turn
-              dirz += (nz - dirz) * 0.6;
-              const m = Math.hypot(dirx, dirz) || 1;
-              dirx /= m; dirz /= m;
-            }
-            const ax = cx, az = cz;
-            const ex = cx + dirx * SEG, ez = cz + dirz * SEG;
-            const mx = (ax + ex) / 2, mz = (az + ez) / 2;
-            cx = ex; cz = ez;
-            if (this._distToTrack(mx, mz) < CLEAR) break;           // stop at the verge
-            const ya = this.terrainHeight(ax, az), yb = this.terrainHeight(ex, ez);
-            if (Math.abs(yb - ya) > 1.8) break;                     // a break in the land
-            const gy = Math.min((ya + yb) / 2, this.terrainHeight(mx, mz) + 0.3);
-            eul.set(0, Math.atan2(dirx, dirz), Math.atan2(yb - ya, SEG));
-            q.setFromEuler(eul);
-            // rows run along the box's Z after this yaw, so length goes in Z
-            m4.compose(pos.set(mx, gy - 0.02, mz), q, scl.set(2.35, 0.07, SEG * 1.06));
-            soil.setMatrixAt(sk, m4);
-            col.setHSL(0.072, 0.36, 0.19 + Math.random() * 0.05);
-            soil.setColorAt(sk++, col);
-            const ch = 1.02 + Math.random() * 0.34;
-            m4.compose(pos.set(mx, gy + 0.46, mz), q, scl.set(0.86, ch, SEG * 1.04));
-            vines.setMatrixAt(vk, m4);
-            col.setHSL(hue + (Math.random() - 0.5) * 0.02, sat, lum + (Math.random() - 0.5) * 0.05);
-            vines.setColorAt(vk++, col);
-            if (s % 3 === 0 && pk < posts.count) {
-              m4.compose(pos.set(ax, ya, az), q.setFromAxisAngle(up, 0),
-                scl.set(1, 1.86 + Math.random() * 0.24, 1));
-              posts.setMatrixAt(pk++, m4);
-            }
-            any++;
+        const off = (r - (rows - 1) / 2) * SPACING;
+        const sat = 0.5 + Math.random() * 0.14, lum = 0.17 + Math.random() * 0.06;
+        for (let i = 0; i + 1 < path.length && vk < CAP; i++) {
+          const ax = path[i][0] + nx[i] * off, az = path[i][1] + nz[i] * off;
+          const ex = path[i + 1][0] + nx[i + 1] * off, ez = path[i + 1][1] + nz[i + 1] * off;
+          const len = Math.hypot(ex - ax, ez - az);
+          if (len < SEG * 0.4) continue;              // folded through a tight bend
+          const mx = (ax + ex) / 2, mz = (az + ez) / 2;
+          if (this._distToTrack(mx, mz) < CLEAR) continue;
+          const ya = this.terrainHeight(ax, az), yb = this.terrainHeight(ex, ez);
+          if (Math.abs(yb - ya) > 1.8) break;         // the land breaks: END the row
+          const gy = Math.min((ya + yb) / 2, this.terrainHeight(mx, mz) + 0.3);
+          // rows run along local Z, so the grade turns about local X. About Z
+          // it would ROLL the row onto its side.
+          eul.set(-Math.atan2(yb - ya, len), Math.atan2(ex - ax, ez - az), 0);
+          q.setFromEuler(eul);
+          m4.compose(pos.set(mx, gy - 0.02, mz), q, scl.set(SPACING * 0.99, 0.07, len * 1.06));
+          soil.setMatrixAt(sk, m4);
+          col.setHSL(0.072, 0.36, 0.19 + Math.random() * 0.05);
+          soil.setColorAt(sk++, col);
+          const ch = 1.0 + Math.random() * 0.3;
+          m4.compose(pos.set(mx, gy + 0.44, mz), q, scl.set(1.15, ch, len * 1.04));
+          vines.setMatrixAt(vk, m4);
+          col.setHSL(hue + (Math.random() - 0.5) * 0.02, sat, lum + (Math.random() - 0.5) * 0.05);
+          vines.setColorAt(vk++, col);
+          if (i % 3 === 0 && pk < posts.count) {
+            m4.compose(pos.set(ax, ya, az), q.setFromAxisAngle(up, 0),
+              scl.set(1, 1.8 + Math.random() * 0.22, 1));
+            posts.setMatrixAt(pk++, m4);
           }
+          any++;
         }
-        // next row: one spacing DOWN the fall line, so rows stay concentric
-        const sf = fall(sx, sz) || seedDir;
-        seedDir = sf;
-        sx += sf.x * SPACING;
-        sz += sf.z * SPACING;
       }
-      if (any) this._addShadow(p.x, p.z, 9);
+      if (any) { planted.push([p.x, p.z]); this._addShadow(p.x, p.z, 9); }
     });
     vines.count = vk;
     soil.count = sk;
