@@ -291,65 +291,101 @@ function applySandRipples(g, w, h, spec) {
   }
 }
 
-/** Cobbled stone setts for the road canvas (TREMOLA DESCENT). Staggered rows
- *  of rounded granite blocks with mortar joints, laid across the direction of
- *  travel exactly like the Tremola's paved hairpins, then worn smooth and
- *  polished down the two wheel tracks. Painted OVER the dirt base so the ruts
- *  still darken the stone beneath. */
+/** Cobbled stone setts for the road canvas.
+ *
+ *  SCALE IS THE WHOLE GAME HERE. One tile of this canvas covers 22 u ACROSS
+ *  the ribbon and 10 u ALONG it, so `per` and `rows` are not taste - they set
+ *  the real size of a stone. At per 19 / rows 30 a sett came out 1.16 u wide
+ *  by 0.33 u long: five times life size, and three and a half times longer
+ *  across the road than along it. That is why every cobbled road in the game
+ *  read as a field of big blurry ovals rather than a paved street.
+ *
+ *  A granite sett is roughly 0.2-0.3 m square. These are laid at about 0.45 u
+ *  across by 0.36 u along - still generous, because a 0.25 u sett on a 1024 px
+ *  tile is 11 px and turns to mush in the mip chain, but square, and small
+ *  enough to read as paving from a car.
+ *
+ *  They are also drawn as SETTS: rounded rectangles with a lit crown and a
+ *  shadowed foot, laid in staggered courses across the direction of travel,
+ *  then polished down the two wheel tracks. An ellipse is a pebble, and a
+ *  road surfaced in pebbles is what the old pass drew.
+ */
 function applyCobbleRoad(g, w, h, spec) {
   const S = {
     stones: ['#8f8b84', '#7d7a75', '#9a958c', '#6f6d69', '#a29c92', '#85837e'],
-    mortar: 'rgba(48,46,43,0.85)', lip: 'rgba(255,250,235,0.20)',
-    rows: 22, per: 15,
+    mortar: 'rgba(58,55,50,0.75)', lip: 'rgba(255,250,235,0.16)',
+    rows: 28, per: 48,
     ...(spec === true ? {} : spec),
   };
+  const K = w / 512;                  // pixel constants below are authored at 512
   const rh = h / S.rows;
   g.fillStyle = S.mortar;
   g.fillRect(0, 0, w, h);
+  // a rounded rectangle without relying on ctx.roundRect, which is too new to
+  // count on across the phones this ships to
+  const sett = (x, y, ww, hh, r) => {
+    const rr = Math.min(r, ww / 2, hh / 2);
+    g.beginPath();
+    g.moveTo(x + rr, y);
+    g.lineTo(x + ww - rr, y);
+    g.quadraticCurveTo(x + ww, y, x + ww, y + rr);
+    g.lineTo(x + ww, y + hh - rr);
+    g.quadraticCurveTo(x + ww, y + hh, x + ww - rr, y + hh);
+    g.lineTo(x + rr, y + hh);
+    g.quadraticCurveTo(x, y + hh, x, y + hh - rr);
+    g.lineTo(x, y + rr);
+    g.quadraticCurveTo(x, y, x, y + rr);
+    g.closePath();
+    g.fill();
+  };
+  const joint = Math.max(1.2, 1.6 * K);       // mortar gap, in pixels
   for (let r = 0; r < S.rows; r++) {
     const y = r * rh;
     const stagger = (r % 2) * 0.5;
     const cw = w / S.per;
     for (let c = -1; c <= S.per; c++) {
       const x = (c + stagger) * cw;
-      const px = x + 0.9 + Math.random() * 0.7;
-      const py = y + 0.9 + Math.random() * 0.7;
-      const pw = cw - 2.0 - Math.random() * 1.2;
-      const ph = rh - 2.0 - Math.random() * 1.2;
-      // slight barrel to each sett: base stone, then a lit crown
+      const px = x + joint * 0.5 + Math.random() * joint * 0.4;
+      const py = y + joint * 0.5 + Math.random() * joint * 0.4;
+      const pw = cw - joint - Math.random() * joint * 0.5;
+      const ph = rh - joint - Math.random() * joint * 0.5;
+      if (pw <= 1 || ph <= 1) continue;
+      const rad = Math.min(pw, ph) * 0.22;
       g.fillStyle = S.stones[(Math.random() * S.stones.length) | 0];
-      g.beginPath();
-      g.ellipse(px + pw / 2, py + ph / 2, pw / 2, ph / 2, 0, 0, Math.PI * 2);
-      g.fill();
+      sett(px, py, pw, ph, rad);
+      // lit crown across the top of the stone, shadowed foot under it: the
+      // bevel is what separates one sett from the next once the mortar joint
+      // is only a pixel or two wide
       g.fillStyle = S.lip;
-      g.beginPath();
-      g.ellipse(px + pw / 2, py + ph * 0.38, pw * 0.36, ph * 0.24, 0, 0, Math.PI * 2);
-      g.fill();
-      // a few speckled grains per stone
-      for (let k = 0; k < 3; k++) {
-        g.fillStyle = `rgba(${30 + Math.random() * 90 | 0},${30 + Math.random() * 90 | 0},${28 + Math.random() * 80 | 0},0.35)`;
-        g.fillRect(px + Math.random() * pw, py + Math.random() * ph, 1.6, 1.6);
+      sett(px + pw * 0.14, py + ph * 0.10, pw * 0.72, ph * 0.34, rad * 0.7);
+      g.fillStyle = 'rgba(24,22,20,0.16)';
+      sett(px + pw * 0.12, py + ph * 0.70, pw * 0.76, ph * 0.24, rad * 0.7);
+      // a grain or two of mica per stone, sized to the stone
+      for (let k = 0; k < 2; k++) {
+        g.fillStyle = `rgba(${40 + Math.random() * 90 | 0},${40 + Math.random() * 90 | 0},${38 + Math.random() * 80 | 0},0.3)`;
+        g.fillRect(px + Math.random() * pw, py + Math.random() * ph, 1.2 * K, 1.2 * K);
       }
     }
   }
   // polished wheel tracks: iron tyres and car wheels have worn two dark bands,
   // car-width apart like the dirt ruts (not the old road-wide sweep)
   for (const cx of RUT_CX(w)) {
-    const grd = g.createLinearGradient(cx - 13, 0, cx + 13, 0);
+    const bw = 13 * K;
+    const grd = g.createLinearGradient(cx - bw, 0, cx + bw, 0);
     grd.addColorStop(0, 'rgba(28,26,24,0)');
-    grd.addColorStop(0.5, 'rgba(28,26,24,0.30)');
+    grd.addColorStop(0.5, 'rgba(28,26,24,0.24)');
     grd.addColorStop(1, 'rgba(28,26,24,0)');
     g.fillStyle = grd;
-    g.fillRect(cx - 13, 0, 26, h);
-    g.fillStyle = 'rgba(225,230,235,0.07)';
-    g.fillRect(cx - 4, 0, 8, h);
+    g.fillRect(cx - bw, 0, bw * 2, h);
+    g.fillStyle = 'rgba(225,230,235,0.06)';
+    g.fillRect(cx - 4 * K, 0, 8 * K, h);
   }
   // damp moss creeping into the joints near the verges
   for (let i = 0; i < 90; i++) {
-    const edge = Math.random() < 0.5 ? Math.random() * 90 : w - Math.random() * 90;
+    const edge = Math.random() < 0.5 ? Math.random() * 90 * K : w - Math.random() * 90 * K;
     g.fillStyle = `rgba(${50 + Math.random() * 40 | 0},${70 + Math.random() * 50 | 0},40,${0.10 + Math.random() * 0.16})`;
     g.beginPath();
-    g.arc(edge, Math.random() * h, 3 + Math.random() * 7, 0, Math.PI * 2);
+    g.arc(edge, Math.random() * h, (3 + Math.random() * 7) * K, 0, Math.PI * 2);
     g.fill();
   }
 }
@@ -492,7 +528,11 @@ export function roadTexture(palette = {}) {
     fringeVar: [34, 46, 20],    // per-blade jitter
     ...palette,
   };
-  const t = make(512, 512, (g, w, h) => {
+  // A SETT NEEDS TEXELS: 48 stones across a 512 px tile is ten pixels each,
+  // and the joint and bevel both vanish into the mip chain. Cobbled roads get
+  // a 1024 px tile; every other surface is broad mottle and stays at 512.
+  const RES = P.cobbles ? 1024 : 512;
+  const t = make(RES, RES, (g, w, h) => {
     g.fillStyle = P.base;
     g.fillRect(0, 0, w, h);
     // large soft dirt patches, then finer mottled grain
