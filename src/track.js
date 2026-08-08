@@ -2840,6 +2840,9 @@ const N = 900;              // centerline samples
 export function circuitPoints(themeKey) { return CIRCUITS[themeKey] || CIRCUITS.forest; }
 
 export const ROAD_HALF = 9; // drivable half-width
+// bore section, shared by the tunnel mesh and by anything that has to know
+// whether a point is INSIDE a tunnel (the chase camera, above all)
+export const TUNNEL_HW = 11.6, TUNNEL_APEX = 8.6;
 export const WALL_OFF = 10.4;
 
 // ---- width-variation ----
@@ -4750,6 +4753,13 @@ export class Track {
     return this.terrainHeight(x, z) < (C.level ?? -2) + 0.6;
   }
 
+  /** Harbour worlds only: the open stone strip between the seafront road and
+   *  the water. Nothing leafy scatters here — the reference quay is bare
+   *  stone, bollards and barrels, not a shrubbery with a sea view. */
+  _onQuayStrip(x, z) {
+    return !!this.T.quay && !!this.T.coast && this._coastSide(x, z) > -30;
+  }
+
   terrainHeight(x, z) {
     const fld = this._roadFieldCoarse(x, z);
     let h = this._blendHeight(fld.d, fld.y, x, z);
@@ -4824,6 +4834,28 @@ export class Track {
     const ribbon = drivable + (WALL_OFF + 0.6 - ROAD_HALF);
     const edge = ribbon + 1.5;
     return this.center[bi].y - 0.35 + Math.max(0, d - edge) * 0.5;
+  }
+
+  /** Is this point inside a tunnel bore, and if so what is the bore there?
+   *
+   *  Anything that reasons about "the ground" needs to know, because over a
+   *  tunnel the terrain height IS the hill overhead: a rule that keeps you
+   *  above the ground will happily put you on top of the mountain. Returns
+   *  {i, floorY, apex, half} for the bore at (pos), or null outside. Tunnel
+   *  runs never wrap the index (_planTunnels refuses them), so a plain range
+   *  test is enough. */
+  tunnelAt(pos, hint = null, pad = 0) {
+    if (!this._tunnels?.length) return null;
+    const bi = this.nearestIndex(pos, hint);
+    for (const T of this._tunnels) {
+      // `pad` reaches past the portals, because the ridge EASES out over ~34 u
+      // either side: the hill still stands over the sightline for a while
+      // after the bore proper has ended.
+      if (bi < T.s - pad || bi > T.e + pad) continue;
+      if (Math.abs(this.lateralOffset(pos, bi)) > TUNNEL_HW) continue;
+      return { i: bi, floorY: this.center[bi].y, apex: TUNNEL_APEX, half: TUNNEL_HW };
+    }
+    return null;
   }
 
   /** Terrain-MESH vertex height: same blend as terrainHeight but with an
@@ -7110,12 +7142,6 @@ export class Track {
         if (shal > 0) tmp.lerp(new THREE.Color(0x7adfd6), shal * 0.8);
         const deep = smoothstep01(THREE.MathUtils.clamp((dn - 55) / 180, 0, 1));
         if (deep > 0) tmp.lerp(new THREE.Color(0x17415e), deep * 0.7);
-        // FACET CONTRAST WHERE THE BOB IS DAMPED: a second hash jitters each
-        // vertex colour ±4 % luminance, so the triangle field still reads in
-        // the shallows where the geometry barely moves. Fades out with the
-        // far haze — the horizon stays a clean gradient.
-        const jsh = Math.sin(wx * 39.3468 + wz * 11.135) * 24634.6345;
-        tmp.multiplyScalar(1 + (jsh - Math.floor(jsh) - 0.5) * 0.08 * (1 - haze));
         cols[k * 3] = tmp.r; cols[k * 3 + 1] = tmp.g; cols[k * 3 + 2] = tmp.b;
       }
     }
@@ -7126,10 +7152,33 @@ export class Track {
         idx.push(a, e, b2, a, d, e);
       }
     }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-    geo.setIndex(idx);
+    const geoIdx = new THREE.BufferGeometry();
+    geoIdx.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    geoIdx.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    geoIdx.setIndex(idx);
+    // PER-FACE COLOUR, NOT PER-VERTEX. Vertex colours are Gouraud-interpolated
+    // no matter what flatShading says (flat shading only affects NORMALS), so
+    // a jitter baked per vertex smears into soft noise and the shallows —
+    // where the bob is damped to keep the waterline clean — still read as one
+    // flat gradient. De-indexing gives every triangle its own three vertices;
+    // one deterministic hash per FACE then tints the whole triangle ±5 %
+    // luminance, which is what makes the low-poly facet field read right up
+    // to the beach, exactly like the player's reference art. ~3k faces, and
+    // computeVertexNormals on unshared vertices yields true face normals.
+    const geo = geoIdx.toNonIndexed();
+    geoIdx.dispose();
+    const fpos = geo.getAttribute('position'), fcol = geo.getAttribute('color');
+    for (let f = 0; f < fpos.count; f += 3) {
+      const cx = (fpos.getX(f) + fpos.getX(f + 1) + fpos.getX(f + 2)) / 3;
+      const cz = (fpos.getZ(f) + fpos.getZ(f + 1) + fpos.getZ(f + 2)) / 3;
+      const fade = 1 - smoothstep01(THREE.MathUtils.clamp((Math.hypot(cx, cz) - 380) / 1400, 0, 1));
+      const fsh = Math.sin(cx * 17.2318 + cz * 3.7135) * 24634.6345;
+      const j = 1 + (fsh - Math.floor(fsh) - 0.5) * 0.10 * fade;
+      for (let v = 0; v < 3; v++) {
+        fcol.setXYZ(f + v, Math.min(1, fcol.getX(f + v) * j),
+          Math.min(1, fcol.getY(f + v) * j), Math.min(1, fcol.getZ(f + v) * j));
+      }
+    }
     geo.computeVertexNormals();
     const sea = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
       // matte enough that the depth gradient READS - at 0.14 the sun's
@@ -7544,6 +7593,12 @@ export class Track {
       color: 0xd8c9a4, roughness: 1 }), 40);
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     let kc = 0, kb = 0, kr = 0, kx = 0, ko = 0;
+    // THE STONE APRON: the strip between the road edge and the waterline IS
+    // the quay, so it is paved, not lawn. A conforming ribbon of stone-grey
+    // facets from the road shoulder down to just past the waterline; without
+    // it the harbour front reads as a seaside meadow with barrels on it.
+    const apron = { pos: [], col: [], idx: [], prev: -99 };
+    const aCol = new THREE.Color(0x9c947e), aTmp = new THREE.Color();
     for (let i = 0; i < N; i++) {
       const c = this.center[i];
       const sd0 = this._coastSide(c.x, c.z);
@@ -7558,6 +7613,26 @@ export class Track {
         p.y = this.terrainHeight(p.x, p.z);
         return p;
       };
+      // apron cross-section: road shoulder -> mid-quay -> water's edge
+      {
+        const inner = at(10.1);
+        const walk = Math.max(2, -this._coastSide(inner.x, inner.z) - 0.4);
+        const base = apron.pos.length / 3;
+        for (const f of [0, 0.55, 1]) {
+          const px = inner.x + cnx * walk * f, pz = inner.z + cnz * walk * f;
+          apron.pos.push(px, this.terrainHeight(px, pz) + 0.07, pz);
+          const hsh = Math.sin(px * 7.31 + pz * 13.77) * 43758.5453;
+          aTmp.copy(aCol).multiplyScalar(0.93 + (hsh - Math.floor(hsh)) * 0.16);
+          apron.col.push(aTmp.r, aTmp.g, aTmp.b);
+        }
+        if (i === apron.prev + 1) {
+          const a = base - 3;
+          for (let s2 = 0; s2 < 2; s2++) {
+            apron.idx.push(a + s2, a + s2 + 1, base + s2, a + s2 + 1, base + s2 + 1, base + s2);
+          }
+        }
+        apron.prev = i;
+      }
       q.setFromAxisAngle(up, this.headingAt(i));
       // the quay wall: one capstone per sample = a near-continuous low wall
       if (kc < 260) {
@@ -7601,6 +7676,21 @@ export class Track {
       m.castShadow = true;
       m.receiveShadow = true;
       this.group.add(m);
+    }
+    if (apron.idx.length) {
+      const ag = new THREE.BufferGeometry();
+      ag.setAttribute('position', new THREE.Float32BufferAttribute(apron.pos, 3));
+      ag.setAttribute('color', new THREE.Float32BufferAttribute(apron.col, 3));
+      ag.setIndex(apron.idx);
+      ag.computeVertexNormals();
+      const am = new THREE.Mesh(ag, new THREE.MeshStandardMaterial({
+        vertexColors: true, flatShading: true, roughness: 1,
+        side: THREE.DoubleSide, polygonOffset: true,
+        polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+      }));
+      am.name = 'quay-apron';
+      am.receiveShadow = true;
+      this.group.add(am);
     }
   }
 
@@ -7938,7 +8028,7 @@ export class Track {
   }
 
   _buildTunnel(s0, e0) {
-    const HW = 11.6, WALL = 4.6, APEX = 8.6;
+    const HW = TUNNEL_HW, WALL = 4.6, APEX = TUNNEL_APEX;
     const PROF = [
       [-HW, 0], [-HW, WALL], [-HW * 0.55, APEX], [0, APEX + 0.5],
       [HW * 0.55, APEX], [HW, WALL], [HW, 0],
@@ -7973,27 +8063,60 @@ export class Track {
       color: this.T.terrainScree ? new THREE.Color(this.T.terrainScree).multiplyScalar(0.72)
         : 0x55504a,
       roughness: 1, flatShading: true, side: THREE.DoubleSide,
+      emissive: 0x2b2620,
     }));
     bore.name = 'tunnel';
     bore.castShadow = bore.receiveShadow = true;
     this.group.add(bore);
     // lamp strip under the crown + wall solids every few metres
     const span = Math.floor((e0 - s0) / STEP);
-    const lampGeo = new THREE.BoxGeometry(0.9, 0.24, 0.42);
+    const lampGeo = new THREE.BoxGeometry(2.6, 0.26, 0.5);
+    const nLamp = Math.ceil(span / 3) + 1;
     const lamps = new THREE.InstancedMesh(
-      lampGeo, new THREE.MeshBasicMaterial({ color: 0xffd9a0 }), Math.ceil(span / 3) + 1);
+      lampGeo, new THREE.MeshBasicMaterial({ color: 0xffe6bc }), nLamp);
+    // No real lights in here: a bore lit by three PointLights costs every
+    // material in the world a recompile, and this game runs on phones. The
+    // lamps are emissive bars and each one drops a warm pool on the roadway,
+    // which is what actually makes the tunnel read as lit rather than as a
+    // black hole with a bright dot in it.
+    const poolTex = Track._tunnelPoolTex || (Track._tunnelPoolTex = (() => {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 64;
+      const cx2 = cv.getContext('2d');
+      const rg = cx2.createRadialGradient(32, 32, 1, 32, 32, 31);
+      rg.addColorStop(0, 'rgba(255,220,168,0.95)');
+      rg.addColorStop(0.34, 'rgba(255,198,132,0.32)');
+      rg.addColorStop(0.72, 'rgba(255,186,116,0.07)');
+      rg.addColorStop(1, 'rgba(255,180,110,0)');
+      cx2.fillStyle = rg;
+      cx2.fillRect(0, 0, 64, 64);
+      return new THREE.CanvasTexture(cv);
+    })());
+    const poolGeo = new THREE.PlaneGeometry(17, 20);
+    poolGeo.rotateX(-Math.PI / 2);
+    const pools = new THREE.InstancedMesh(poolGeo, new THREE.MeshBasicMaterial({
+      map: poolTex, transparent: true, blending: THREE.AdditiveBlending,
+      depthWrite: false, opacity: 0.8, fog: false,
+    }), nLamp);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-    let lk = 0;
+    let lk = 0, qk = 0;
     for (let j = s0 + 2; j < e0; j += STEP * 3) {
       const i = j % N;
       const c = this.center[i];
       q.setFromAxisAngle(up, this.headingAt(i));
-      m4.compose(new THREE.Vector3(c.x, this.groundHeightAt(i, 0) + APEX - 0.4, c.z), q,
+      const road = this.groundHeightAt(i, 0);
+      m4.compose(new THREE.Vector3(c.x, road + APEX - 0.4, c.z), q,
         new THREE.Vector3(1, 1, 1));
       if (lk < lamps.count) lamps.setMatrixAt(lk++, m4);
+      m4.compose(new THREE.Vector3(c.x, road + 0.16, c.z), q, new THREE.Vector3(1, 1, 1));
+      if (qk < pools.count) pools.setMatrixAt(qk++, m4);
     }
     lamps.count = lk;
-    this.group.add(lamps);
+    pools.count = qk;
+    lamps.name = 'tunnel-lamps';
+    pools.name = 'tunnel-lightpool';
+    pools.renderOrder = 2;
+    this.group.add(lamps, pools);
     for (let j = s0; j <= e0; j += 1) {
       const i = j % N;
       const c = this.center[i], n = this.nrm[i];
@@ -10353,7 +10476,8 @@ export class Track {
         }
         // the ring branch skips _trackSidePos and with it the underwater
         // check — on a coast world it was planting conifers IN the sea
-        return p && !this._underwater(p.x, p.z) && this._altOK(p.x, p.z) ? p : null;
+        return p && !this._underwater(p.x, p.z) && !this._onQuayStrip(p.x, p.z)
+          && this._altOK(p.x, p.z) ? p : null;
       },
       (p) => {
         const name = pick();
@@ -11582,7 +11706,10 @@ export class Track {
     const tufts = new THREE.InstancedMesh(tuftGeo, tuftMat, T.tuftCount * 2);
     let k = 0;
     this._scatter(T.tuftCount,
-      () => (Math.random() < 0.7 ? this._trackSidePos(11.2, 32) : this._trackSidePos(26, 62)),
+      () => {
+        const p = Math.random() < 0.7 ? this._trackSidePos(11.2, 32) : this._trackSidePos(26, 62);
+        return p && !this._onQuayStrip(p.x, p.z) ? p : null;
+      },
       (p) => {
         const y = this.terrainHeight(p.x, p.z) - 0.05;
         const s = 0.7 + Math.random() * 1.1;
@@ -11639,7 +11766,10 @@ export class Track {
     const B = T.bush;
     const bcolor = new THREE.Color();
     let bk = 0;
-    this._scatter(T.bushCount, () => this._trackSidePos(13, 70), (p) => {
+    this._scatter(T.bushCount, () => {
+      const p = this._trackSidePos(13, 70);
+      return p && !this._onQuayStrip(p.x, p.z) ? p : null;
+    }, (p) => {
       const s = 0.7 + Math.random() * 1.5;
       const by = this.terrainHeight(p.x, p.z) + s * 0.3;
       m4.makeScale(s, s, s);
@@ -11679,7 +11809,10 @@ export class Track {
     if (caps) caps.castShadow = true;
     const rcol = new THREE.Color();
     let rk = 0, lk = 0;
-    this._scatter(T.rockCount, () => this._trackSidePos(12.5, 90), (p) => {
+    this._scatter(T.rockCount, () => {
+      const p = this._trackSidePos(12.5, 90);
+      return p && !this._onQuayStrip(p.x, p.z) ? p : null;
+    }, (p) => {
       let s = 0.5 + Math.random() * 2.2;
       // never let a boulder reach into the carriageway — shrink it to fit, and
       // if it cannot fit, place nothing here at all
@@ -11784,7 +11917,10 @@ export class Track {
     const fcolors = T.flowerColors;
     const fc = new THREE.Color();
     let fk = 0;
-    this._scatter(T.flowerCount, () => this._trackSidePos(11.8, 42), (p) => {
+    this._scatter(T.flowerCount, () => {
+      const p = this._trackSidePos(11.8, 42);
+      return p && !this._onQuayStrip(p.x, p.z) ? p : null;
+    }, (p) => {
       m4.makeScale(1, 1, 1);
       m4.setPosition(p.x, this.terrainHeight(p.x, p.z) + 0.22, p.z);
       flowers.setMatrixAt(fk, m4);
@@ -12069,8 +12205,16 @@ export class Track {
     for (let b = 0; b < 10; b++) {
       const i = ((b + 0.5) * N / 10) | 0;
       if (this.curvature[i] > this.T.boardMaxCurv) continue; // keep boards off tight corners
-      const side = b % 2 === 0 ? 1 : -1;
-      const p = this.pointAt(i, boardOff * side);
+      let side = b % 2 === 0 ? 1 : -1;
+      let p = this.pointAt(i, boardOff * side);
+      // a harbour quay is not an ad site: a board between the seafront road
+      // and the water blocks the one view the world is built around. Stand
+      // it on the land side instead (or drop it if both sides are quay).
+      if (this._onQuayStrip(p.x, p.z)) {
+        side = -side;
+        p = this.pointAt(i, boardOff * side);
+        if (this._onQuayStrip(p.x, p.z)) continue;
+      }
       const g = new THREE.Group();
       const board = new THREE.Mesh(boardGeo, mats[b % mats.length]);
       board.position.y = 2.6;
