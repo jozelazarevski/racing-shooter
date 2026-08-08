@@ -1067,15 +1067,15 @@ const THEMES = {
     // horizon silhouettes
     hillColor: 0x4e8a3c, peakColor: 0x8d8578,
     // trees (material color multiplies per-instance HSL variation)
-    treeCount: 377, trunkColor: 0x6b4423,
+    treeCount: 641, trunkColor: 0x6b4423,
     foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
     foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.32, lVar: 0.14 },
     treeSnowCap: false,
     // ground cover
     tuftCount: 1100, grass: {},
-    bushCount: 160, bushColor: 0x2f7a30,
+    bushCount: 256, bushColor: 0x2f7a30,
     bush: { h: 0.30, hVar: 0.05, s: 0.5, sVar: 0, l: 0.30, lVar: 0.12 },
-    rockCount: 130, pebbleCount: 160, rockColor: 0x8d8578, rockSnowCap: false,
+    rockCount: 162, pebbleCount: 160, rockColor: 0x8d8578, rockSnowCap: false,
     flowerCount: 340, flowerColors: ['#ffe234', '#ff6a8a', '#ffffff', '#ff8a3a', '#c27aff'],
     hutRoof: 0xc9a24d, hayColor: 0xd8b95e,
     // debris chip colors when a fence/wall is scraped (painted pole red/cream)
@@ -1111,14 +1111,14 @@ const THEMES = {
     hillColor: 0xa85a32, peakColor: 0xc27a4a,
     // saguaros, not pine scrub: a desert should never grow SOLID trees that
     // stop a car dead — cacti all yield and burst on impact
-    vegetation: 'cactus', treeCount: 90, trunkColor: 0x4a8a4c,
+    vegetation: 'cactus', treeCount: 153, trunkColor: 0x4a8a4c,
     foliageLow: 0x3f7a34, foliageTop: 0x4c8a3e,
     foliage: { h: 0.10, hVar: 0.05, s: 0.40, sVar: 0.15, l: 0.45, lVar: 0.15 },
     treeSnowCap: false,
     tuftCount: 520, grass: { bladeA: '#8a7a30', bladeB: '#c8b45e' },
-    bushCount: 120, bushColor: 0x8a8050,
+    bushCount: 192, bushColor: 0x8a8050,
     bush: { h: 0.12, hVar: 0.04, s: 0.35, sVar: 0.1, l: 0.42, lVar: 0.12 },
-    rockCount: 300, pebbleCount: 240, rockColor: 0xb07a52, rockSnowCap: false,
+    rockCount: 375, pebbleCount: 240, rockColor: 0xb07a52, rockSnowCap: false,
     flowerCount: 90, flowerColors: ['#ffd45e', '#ff8a3a', '#e86a8a'],
     hutRoof: 0xb0794a, hayColor: 0xd8b95e,
     splinter: [0xe8b83a, 0xe8e2d4],                     // sun-bleached painted fence
@@ -1151,14 +1151,14 @@ const THEMES = {
       snowCover: { slush: [206, 216, 226], slushAlpha: 0.38 },
     },
     hillColor: 0xcfdce4, peakColor: 0xeef4f8,
-    treeCount: 348, trunkColor: 0x5a4028,
+    treeCount: 592, trunkColor: 0x5a4028,
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
     tuftCount: 360, grass: { bladeA: '#5a7a58', bladeB: '#b8d0c0' },
-    bushCount: 90, bushColor: 0x9ab8a0,
+    bushCount: 144, bushColor: 0x9ab8a0,
     bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.52, lVar: 0.12 },
-    rockCount: 150, pebbleCount: 140, rockColor: 0x9aa6b0, rockSnowCap: true,
+    rockCount: 188, pebbleCount: 140, rockColor: 0x9aa6b0, rockSnowCap: true,
     flowerCount: 60, flowerColors: ['#ffffff', '#cfe0ff', '#ffd0e0'],
     hutRoof: 0xe8eef4, hayColor: 0xd8c07a,
     splinter: [0xdce8f0, 0x9fc4d8],                     // icy chips
@@ -1192,16 +1192,16 @@ const THEMES = {
       fringe: [172, 122, 62], fringeVar: [42, 32, 22],  // dry brush fringe
     },
     hillColor: 0xb06a3c, peakColor: 0xd09263,           // mesa strata base/top tones
-    vegetation: 'cactus', treeCount: 110, trunkColor: 0x4a8a4c,
+    vegetation: 'cactus', treeCount: 187, trunkColor: 0x4a8a4c,
     foliageLow: 0x3f7a34, foliageTop: 0x4c8a3e,
     foliage: { h: 0.30, hVar: 0.05, s: 0.40, sVar: 0.15, l: 0.30, lVar: 0.10 },
     treeSnowCap: false,
     tuftCount: 260, grass: { bladeA: '#9a7a30', bladeB: '#d0b060' },
-    bushCount: 46, bushColor: 0x8a7a44,
+    bushCount: 74, bushColor: 0x8a7a44,
     bush: { h: 0.11, hVar: 0.04, s: 0.34, sVar: 0.1, l: 0.40, lVar: 0.12 },
-    rockCount: 150, pebbleCount: 130, rockColor: 0xb5744a, rockSnowCap: false,
+    rockCount: 188, pebbleCount: 130, rockColor: 0xb5744a, rockSnowCap: false,
     flowerCount: 60, flowerColors: ['#ffd45e', '#ff7a3a', '#e86a8a'],
-    hutRoof: 0xb0794a, hayColor: 0xd8b95e, hutCount: 3, hayCount: 22,
+    hutRoof: 0xb0794a, hayColor: 0xd8b95e, hutCount: 5, hayCount: 22,
     splinter: [0xc9a06a, 0xa06844],                     // sandstone chips
     weather: { type: 'dust', color: 0xc9a06a },
     elev: { amp: 6, ph: [0.3, 3.7, 1.9] },              // gentle canyon-floor undulation
@@ -1247,20 +1247,20 @@ const THEMES = {
       fringe: [72, 62, 54], fringeVar: [30, 24, 18],    // ash fringe
     },
     hillColor: 0x4a2018, peakColor: 0x2a1512,           // red-black mountains
-    vegetation: 'charred', treeCount: 120, trunkColor: 0x241d18,
+    vegetation: 'charred', treeCount: 204, trunkColor: 0x241d18,
     foliageLow: 0x2a2018, foliageTop: 0x3a2c20,
     foliage: { h: 0.06, hVar: 0.03, s: 0.20, sVar: 0.1, l: 0.14, lVar: 0.08 },
     treeSnowCap: false,
     tuftCount: 70, grass: { bladeA: '#4a4038', bladeB: '#6a5a48' },  // few scorched tufts
-    bushCount: 36, bushColor: 0x3a302a,
+    bushCount: 58, bushColor: 0x3a302a,
     bush: { h: 0.08, hVar: 0.03, s: 0.15, sVar: 0.08, l: 0.16, lVar: 0.08 },
-    rockCount: 240, pebbleCount: 380,                   // heavy dark gravel scatter
+    rockCount: 300, pebbleCount: 380,                   // heavy dark gravel scatter
     // Obsidian at 0x201c22 was invisible against the ground — you only learned
     // a rock was there from the −85 hull. Lifted to a lit basalt that still
     // reads volcanic but silhouettes against the ash in time to swerve.
     rockColor: 0x574c52, rockSnowCap: false, rockRoughness: 0.4,
     flowerCount: 0, flowerColors: ['#ff7a22'],
-    hutRoof: 0x4a3a30, hayColor: 0x8a6a3a, hutCount: 4, hayCount: 0,
+    hutRoof: 0x4a3a30, hayColor: 0x8a6a3a, hutCount: 7, hayCount: 0,
     splinter: [0x3a3634, 0xff5e2e],                     // basalt + ember chips
     weather: { type: 'embers', color: 0xff7a2e },
     elev: { amp: 12, ph: [4.1, 2.8, 0.7] },             // heaving lava-field climbs
@@ -1283,15 +1283,15 @@ const THEMES = {
     ground: {},   // lush meadow defaults read right at altitude too
     road: {},     // classic dirt rally surface
     hillColor: 0x54804a, peakColor: 0xdde8f0,           // snow-dusted horizon peaks
-    treeCount: 406, trunkColor: 0x6b4423,
+    treeCount: 690, trunkColor: 0x6b4423,
     foliageLow: 0x2a6e34, foliageTop: 0x3f9a44,         // bright alpine pines
     foliage: { h: 0.30, hVar: 0.06, s: 0.55, sVar: 0.2, l: 0.30, lVar: 0.14 },
     treeSnowCap: false,
     tuftCount: 900, grass: {},
-    bushCount: 140, bushColor: 0x2f7a30,
+    bushCount: 224, bushColor: 0x2f7a30,
     bush: { h: 0.30, hVar: 0.05, s: 0.5, sVar: 0, l: 0.30, lVar: 0.12 },
     // the slopes are strewn with mossy green granite
-    rockCount: 340, pebbleCount: 220, rockColor: 0x7a9a6c, rockSnowCap: false,
+    rockCount: 425, pebbleCount: 220, rockColor: 0x7a9a6c, rockSnowCap: false,
     flowerCount: 260, flowerColors: ['#ffffff', '#ffe234', '#7a9aff', '#ff6a8a'],
     hutRoof: 0x8a4a2a, hayColor: 0xd8b95e,
     splinter: [0x8a5a32, 0xe8e2d4],                     // pale mountain timber
@@ -1341,16 +1341,16 @@ const THEMES = {
       },
     },
     hillColor: 0xbdd2e0, peakColor: 0xeef6fc,
-    treeCount: 203, trunkColor: 0x5a4028,
+    treeCount: 345, trunkColor: 0x5a4028,
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
     tuftCount: 240, grass: { bladeA: '#6a8a78', bladeB: '#c8dcd0' },
-    bushCount: 60, bushColor: 0x9ab8a0,
+    bushCount: 96, bushColor: 0x9ab8a0,
     bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.55, lVar: 0.12 },
-    rockCount: 160, pebbleCount: 120, rockColor: 0x9ab4c4, rockSnowCap: true,
+    rockCount: 200, pebbleCount: 120, rockColor: 0x9ab4c4, rockSnowCap: true,
     flowerCount: 40, flowerColors: ['#ffffff', '#cfe0ff', '#aef0ff'],
-    hutRoof: 0xe8f2f8, hutStyle: 'igloo', hutCount: 8, hayCount: 0,   // nor by the igloos
+    hutRoof: 0xe8f2f8, hutStyle: 'igloo', hutCount: 14, hayCount: 0,   // nor by the igloos
     splinter: [0xcfe8f4, 0x8fd0e8],                     // shattered ice chips
     weather: { type: 'snow', color: 0xffffff },
     elev: { amp: 9, ph: [1.4, 3.1, 0.6] },
@@ -1407,16 +1407,16 @@ const THEMES = {
       wet: { darken: 0.38, gleam: 15, pools: 6 },
     },
     hillColor: 0x2e6a34, peakColor: 0x4a8a4c,
-    vegetation: 'jungle', treeCount: 464, trunkColor: 0x7a5c3a,
+    vegetation: 'jungle', treeCount: 789, trunkColor: 0x7a5c3a,
     foliageLow: 0x1f6e2c, foliageTop: 0x35a03c,
     foliage: { h: 0.31, hVar: 0.08, s: 0.55, sVar: 0.2, l: 0.26, lVar: 0.16 },
     treeSnowCap: false,
     tuftCount: 900, grass: { bladeA: '#2f7a22', bladeB: '#63c243' },
-    bushCount: 220, bushColor: 0x2c7a2e,
+    bushCount: 352, bushColor: 0x2c7a2e,
     bush: { h: 0.31, hVar: 0.06, s: 0.55, sVar: 0.15, l: 0.26, lVar: 0.14 },
-    rockCount: 90, pebbleCount: 120, rockColor: 0x6a7a5a, rockSnowCap: false,
+    rockCount: 112, pebbleCount: 120, rockColor: 0x6a7a5a, rockSnowCap: false,
     flowerCount: 420, flowerColors: ['#ff4a6a', '#ffd45e', '#ff8a3a', '#e86aff', '#ffffff'],
-    hutRoof: 0x7a9a3c, hutCount: 6, hayCount: 0,   // no straw in a rainforest
+    hutRoof: 0x7a9a3c, hutCount: 11, hayCount: 0,   // no straw in a rainforest
     splinter: [0x4a9a3c, 0x8a6a42],                     // shredded fronds + wet wood
     weather: { type: 'rain', color: 0xbfd8ea, rate: 220 }, // full tropical downpour
     elev: { amp: 7, ph: [2.2, 0.9, 4.4] },
@@ -1450,16 +1450,16 @@ const THEMES = {
       ripples: true,                                    // wind-carved sand crests
     },
     hillColor: 0xd8a95e, peakColor: 0xf2d492, horizon: 'dunes',
-    vegetation: 'palm', treeCount: 36, trunkColor: 0x8a6242,
+    vegetation: 'palm', treeCount: 61, trunkColor: 0x8a6242,
     foliageLow: 0x3f7a34, foliageTop: 0x4c8a3e,
     foliage: { h: 0.26, hVar: 0.05, s: 0.42, sVar: 0.15, l: 0.30, lVar: 0.10 },
     treeSnowCap: false,
     tuftCount: 260, grass: { bladeA: '#a08a3a', bladeB: '#d8c070' },
-    bushCount: 44, bushColor: 0x9a8a50,
+    bushCount: 70, bushColor: 0x9a8a50,
     bush: { h: 0.12, hVar: 0.04, s: 0.32, sVar: 0.1, l: 0.44, lVar: 0.12 },
-    rockCount: 60, pebbleCount: 150, rockColor: 0xc09058, rockSnowCap: false,
+    rockCount: 75, pebbleCount: 150, rockColor: 0xc09058, rockSnowCap: false,
     flowerCount: 0, flowerColors: ['#ffd45e'],
-    hutRoof: 0xc09a5c, hayColor: 0xd8b95e, hutCount: 3, hayCount: 8,
+    hutRoof: 0xc09a5c, hayColor: 0xd8b95e, hutCount: 5, hayCount: 8,
     splinter: [0xe8c87a, 0xb8905a],
     weather: { type: 'sand', color: 0xe0c080 },
     // ON THE CRESTS. The road was a flat ribbon on flat sand: 61 u of
@@ -1494,16 +1494,16 @@ const THEMES = {
       fringe: [155, 105, 52], fringeVar: [42, 32, 22],
     },
     hillColor: 0x9c4f28, peakColor: 0xc27848,
-    vegetation: 'cactus', treeCount: 70, trunkColor: 0x4a8a4c,
+    vegetation: 'cactus', treeCount: 119, trunkColor: 0x4a8a4c,
     foliageLow: 0x3f7a34, foliageTop: 0x4c8a3e,
     foliage: { h: 0.30, hVar: 0.05, s: 0.40, sVar: 0.15, l: 0.30, lVar: 0.10 },
     treeSnowCap: false,
     tuftCount: 200, grass: { bladeA: '#96702c', bladeB: '#c8a054' },
-    bushCount: 36, bushColor: 0x8a6e3e,
+    bushCount: 58, bushColor: 0x8a6e3e,
     bush: { h: 0.10, hVar: 0.04, s: 0.32, sVar: 0.1, l: 0.38, lVar: 0.12 },
-    rockCount: 170, pebbleCount: 200, rockColor: 0xa5602f, rockSnowCap: false,
+    rockCount: 212, pebbleCount: 200, rockColor: 0xa5602f, rockSnowCap: false,
     flowerCount: 30, flowerColors: ['#ffd45e', '#ff7a3a'],
-    hutRoof: 0xa06844, hayColor: 0xd8b95e, hutCount: 2, hayCount: 10,
+    hutRoof: 0xa06844, hayColor: 0xd8b95e, hutCount: 4, hayCount: 10,
     splinter: [0xb87848, 0x8a4a26],                     // red sandstone chips
     weather: { type: 'dust', color: 0xc08a5a },
     elev: { amp: 7, ph: [3.1, 1.2, 4.6] },
@@ -1545,16 +1545,16 @@ const THEMES = {
       fringe: [95, 130, 45], fringeVar: [36, 46, 24],   // green creeping in
     },
     hillColor: 0xc89858, peakColor: 0xe8cc90,
-    vegetation: 'palm', treeCount: 250, trunkColor: 0x8a6242,
+    vegetation: 'palm', treeCount: 425, trunkColor: 0x8a6242,
     foliageLow: 0x2f8a3c, foliageTop: 0x45a04a,
     foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.18, l: 0.30, lVar: 0.12 },
     treeSnowCap: false, palmGrove: [0.32, 0.58],        // grove section of the lap
     tuftCount: 700, grass: { bladeA: '#5a8a2c', bladeB: '#a8c85e' },
-    bushCount: 180, bushColor: 0x4a8a34,
+    bushCount: 288, bushColor: 0x4a8a34,
     bush: { h: 0.27, hVar: 0.05, s: 0.45, sVar: 0.12, l: 0.30, lVar: 0.12 },
-    rockCount: 90, pebbleCount: 120, rockColor: 0xb08a58, rockSnowCap: false,
+    rockCount: 112, pebbleCount: 120, rockColor: 0xb08a58, rockSnowCap: false,
     flowerCount: 260, flowerColors: ['#ffd45e', '#ff6a8a', '#ffffff', '#e86aff'],
-    hutRoof: 0xc9a24d, hayColor: 0xd8b95e, hutCount: 5, hayCount: 16,
+    hutRoof: 0xc9a24d, hayColor: 0xd8b95e, hutCount: 9, hayCount: 16,
     splinter: [0x4a9a3c, 0xc9a06a],                     // shredded fronds + dry wood
     weather: { type: 'leaves', color: 0x7ac84a },
     elev: { amp: 6, ph: [1.9, 4.2, 0.8] },
@@ -1587,14 +1587,14 @@ const THEMES = {
       fringe: [48, 110, 36], fringeVar: [30, 46, 22],
     },
     hillColor: 0x3f6e34, peakColor: 0x8a8578,
-    vegetation: 'redwood', treeCount: 275, trunkColor: 0x7a3f24,
+    vegetation: 'redwood', treeCount: 468, trunkColor: 0x7a3f24,
     foliageLow: 0x2a5e28, foliageTop: 0x3a7a32,
     foliage: { h: 0.30, hVar: 0.05, s: 0.45, sVar: 0.18, l: 0.26, lVar: 0.10 },
     treeSnowCap: false,
     tuftCount: 800, grass: { bladeA: '#2f6a22', bladeB: '#63b243' },
-    bushCount: 170, bushColor: 0x2f7a30,
+    bushCount: 272, bushColor: 0x2f7a30,
     bush: { h: 0.30, hVar: 0.05, s: 0.5, sVar: 0, l: 0.28, lVar: 0.12 },
-    rockCount: 120, pebbleCount: 150, rockColor: 0x8a8072, rockSnowCap: false,
+    rockCount: 150, pebbleCount: 150, rockColor: 0x8a8072, rockSnowCap: false,
     flowerCount: 160, flowerColors: ['#ffe234', '#ffffff', '#c27aff'],
     hutRoof: 0x8a5a2c, hayColor: 0xc8a468,
     splinter: [0x8a4a2a, 0xe8e2d4],                     // red bark chips
@@ -1624,17 +1624,17 @@ const THEMES = {
       fringe: [64, 124, 40], fringeVar: [34, 46, 20],
     },
     hillColor: 0x4e7a3c, peakColor: 0x8d8578,
-    treeCount: 348, trunkColor: 0x6b4423,
+    treeCount: 592, trunkColor: 0x6b4423,
     foliageLow: 0x2c6e2a, foliageTop: 0x3c8a34,
     foliage: { h: 0.29, hVar: 0.06, s: 0.5, sVar: 0.2, l: 0.30, lVar: 0.14 },
     treeSnowCap: false,
     tuftCount: 850, grass: {},
-    bushCount: 140, bushColor: 0x2f7a30,
+    bushCount: 224, bushColor: 0x2f7a30,
     bush: { h: 0.30, hVar: 0.05, s: 0.5, sVar: 0, l: 0.30, lVar: 0.12 },
-    rockCount: 110, pebbleCount: 150, rockColor: 0x8d8578, rockSnowCap: false,
+    rockCount: 138, pebbleCount: 150, rockColor: 0x8d8578, rockSnowCap: false,
     flowerCount: 200, flowerColors: ['#ffe234', '#ff6a8a', '#ffffff'],
     hutRoof: 0x8a5a2c, hayColor: 0x8a6238,              // hay recolored to cut-log rounds
-    hutCount: 6, hayCount: 34,
+    hutCount: 11, hayCount: 34,
     splinter: [0x8a5a32, 0xd8c89a],                     // fresh-cut timber
     weather: { type: 'leaves', color: 0xc8a468 },       // sawdust drift
     elev: { amp: 9, ph: [2.4, 0.6, 3.8] },
@@ -1671,16 +1671,16 @@ const THEMES = {
       fringe: [90, 70, 50], fringeVar: [34, 26, 18],    // ash-choked verge
     },
     hillColor: 0x54291c, peakColor: 0x2e1812,
-    vegetation: 'burnt', treeCount: 319, trunkColor: 0x241d18,
+    vegetation: 'burnt', treeCount: 542, trunkColor: 0x241d18,
     foliageLow: 0x4a2814, foliageTop: 0x6a3a1a,         // ember-lit scorched canopy
     foliage: { h: 0.05, hVar: 0.03, s: 0.45, sVar: 0.15, l: 0.16, lVar: 0.08 },
     treeSnowCap: false,
     tuftCount: 80, grass: { bladeA: '#4a4038', bladeB: '#6a5a48' },
-    bushCount: 30, bushColor: 0x3a302a,
+    bushCount: 48, bushColor: 0x3a302a,
     bush: { h: 0.08, hVar: 0.03, s: 0.15, sVar: 0.08, l: 0.16, lVar: 0.08 },
-    rockCount: 160, pebbleCount: 220, rockColor: 0x3a322c, rockSnowCap: false,
+    rockCount: 200, pebbleCount: 220, rockColor: 0x3a322c, rockSnowCap: false,
     flowerCount: 0, flowerColors: ['#ff7a22'],
-    hutRoof: 0x4a3a30, hayColor: 0x8a6a3a, hutCount: 2, hayCount: 0,
+    hutRoof: 0x4a3a30, hayColor: 0x8a6a3a, hutCount: 4, hayCount: 0,
     splinter: [0x2c2420, 0xff6a2e],                     // charcoal + ember chips
     weather: { type: 'embers', color: 0xff8a2e },
     elev: { amp: 10, ph: [3.7, 1.5, 5.3] },
@@ -1718,16 +1718,16 @@ const THEMES = {
       ruts: false,                                      // glazed ice never ruts
     },
     hillColor: 0xc2d8e6, peakColor: 0xf0f8fc,
-    treeCount: 60, trunkColor: 0x5a4028,
+    treeCount: 102, trunkColor: 0x5a4028,
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
     tuftCount: 120, grass: { bladeA: '#6a8a78', bladeB: '#c8dcd0' },
-    bushCount: 40, bushColor: 0x9ab8a0,
+    bushCount: 64, bushColor: 0x9ab8a0,
     bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.55, lVar: 0.12 },
-    rockCount: 140, pebbleCount: 110, rockColor: 0x9ab4c4, rockSnowCap: true,
+    rockCount: 175, pebbleCount: 110, rockColor: 0x9ab4c4, rockSnowCap: true,
     flowerCount: 0, flowerColors: ['#ffffff'],
-    hutRoof: 0xe8f2f8, hutStyle: 'igloo', hutCount: 6, hayCount: 0,   // nor on sheet ice
+    hutRoof: 0xe8f2f8, hutStyle: 'igloo', hutCount: 11, hayCount: 0,   // nor on sheet ice
     splinter: [0xdff2fc, 0x9fd8f0],                     // shattered ice chips
     weather: { type: 'snow', color: 0xffffff },
     elev: { amp: 8, ph: [2.1, 0.8, 3.9] },
@@ -1777,16 +1777,16 @@ const THEMES = {
       snowCover: { slush: [206, 216, 226], slushAlpha: 0.38 },
     },
     hillColor: 0xcfdce4, peakColor: 0xf4f8fc,
-    treeCount: 190, trunkColor: 0x5a4028,
+    treeCount: 323, trunkColor: 0x5a4028,
     foliageLow: 0x5a7a62, foliageTop: 0x668a70,
     foliage: { h: 0.38, hVar: 0.04, s: 0.22, sVar: 0.10, l: 0.42, lVar: 0.10 },
     treeSnowCap: true,
     tuftCount: 260, grass: { bladeA: '#5a7a58', bladeB: '#b8d0c0' },
-    bushCount: 60, bushColor: 0x9ab8a0,
+    bushCount: 96, bushColor: 0x9ab8a0,
     bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.52, lVar: 0.12 },
-    rockCount: 220, pebbleCount: 160, rockColor: 0x9aa6b0, rockSnowCap: true,
+    rockCount: 275, pebbleCount: 160, rockColor: 0x9aa6b0, rockSnowCap: true,
     flowerCount: 30, flowerColors: ['#ffffff', '#cfe0ff'],
-    hutRoof: 0xe8eef4, hutCount: 3, hayCount: 0,   // nor on a snowfield
+    hutRoof: 0xe8eef4, hutCount: 5, hayCount: 0,   // nor on a snowfield
     splinter: [0xdce8f0, 0x9fc4d8],
     weather: { type: 'snow', color: 0xffffff },
     // hand-shaped pass: climb through the lap's middle, hold the crest, then
@@ -1903,9 +1903,9 @@ const THEMES = {
     foliage: { h: 0.2, hVar: 0.05, s: 0.2, sVar: 0.1, l: 0.2, lVar: 0.1 },
     treeSnowCap: false,
     tuftCount: 90, grass: { bladeA: '#5a6a30', bladeB: '#8a9a48' },
-    bushCount: 40, bushColor: 0x3a4a28,
+    bushCount: 64, bushColor: 0x3a4a28,
     bush: { h: 0.22, hVar: 0.04, s: 0.3, sVar: 0.1, l: 0.18, lVar: 0.08 },
-    rockCount: 130, pebbleCount: 260, rockColor: 0x6e7264, rockSnowCap: false,
+    rockCount: 162, pebbleCount: 260, rockColor: 0x6e7264, rockSnowCap: false,
     flowerCount: 0, flowerColors: ['#8a9a48'],
     hutRoof: 0x3a3e34, hutCount: 0, hayColor: 0x5a5e50, hayCount: 0,
     splinter: [0x4a4e44, 0x8a9a48],                     // concrete + slime chips
@@ -1955,18 +1955,18 @@ const THEMES = {
       fringe: [70, 118, 50], fringeVar: [34, 46, 24],
     },
     hillColor: 0x557a4e, peakColor: 0xe4edf4,
-    treeCount: 464, trunkColor: 0x6b4423,
+    treeCount: 789, trunkColor: 0x6b4423,
     foliageLow: 0x276634, foliageTop: 0x3d9444,
     foliage: { h: 0.31, hVar: 0.06, s: 0.52, sVar: 0.2, l: 0.28, lVar: 0.13 },
     treeSnowCap: false,
     treeAltFade: [14, 34],                              // pines thin out with altitude
     tuftCount: 900, grass: {},
-    bushCount: 150, bushColor: 0x2f7a30,
+    bushCount: 240, bushColor: 0x2f7a30,
     bush: { h: 0.30, hVar: 0.05, s: 0.5, sVar: 0, l: 0.30, lVar: 0.12 },
-    rockCount: 420, pebbleCount: 300, rockColor: 0x8b8a82, rockSnowCap: false,
+    rockCount: 520, pebbleCount: 300, rockColor: 0x8b8a82, rockSnowCap: false,
     flowerCount: 240, flowerColors: ['#ffffff', '#ffe234', '#7a9aff', '#ff6a8a'],
     hutRoof: 0x7a4630, hayColor: 0xd8b95e,
-    hutCount: 13, hutZone: [0.84, 0.16],                // village clustered in the valley
+    hutCount: 23, hutZone: [0.84, 0.16],                // village clustered in the valley
     hayCount: 34,
     splinter: [0x8a5a32, 0xe8e2d4],
     weather: { type: 'snow', color: 0xffffff, rate: 60 },
@@ -2019,18 +2019,18 @@ const THEMES = {
       },
     },
     hillColor: 0x4e7248, peakColor: 0xdde8f0,
-    treeCount: 319, trunkColor: 0x6b4423,
+    treeCount: 542, trunkColor: 0x6b4423,
     foliageLow: 0x2a6636, foliageTop: 0x428a48,
     foliage: { h: 0.29, hVar: 0.07, s: 0.45, sVar: 0.2, l: 0.28, lVar: 0.14 },
     treeSnowCap: false,
     treeAltFade: [-26, -4],                             // larch only low in the gorge
     tuftCount: 780, grass: {},
-    bushCount: 130, bushColor: 0x357a34,
+    bushCount: 208, bushColor: 0x357a34,
     bush: { h: 0.30, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.28, lVar: 0.12 },
-    rockCount: 460, pebbleCount: 340, rockColor: 0x847f76, rockSnowCap: false,
+    rockCount: 520, pebbleCount: 340, rockColor: 0x847f76, rockSnowCap: false,
     flowerCount: 200, flowerColors: ['#ffffff', '#ffe234', '#c27aff', '#ff6a8a'],
     hutRoof: 0x6a5b4a, hayColor: 0xd0b46a,
-    hutCount: 12, hutZone: [0.62, 0.84],                // hamlet on the gorge floor
+    hutCount: 22, hutZone: [0.62, 0.84],                // hamlet on the gorge floor
     hayCount: 26,
     splinter: [0x8a8378, 0xe8e2d4],
     weather: { type: 'leaves', color: 0x9aa878 },
@@ -2083,18 +2083,18 @@ const THEMES = {
       fringe: [86, 124, 62], fringeVar: [30, 40, 22],
     },
     hillColor: 0x8a9a84, peakColor: 0xf2f7fb,           // green-grey rock, snow crowns
-    treeCount: 435, trunkColor: 0x5a4028,
+    treeCount: 740, trunkColor: 0x5a4028,
     foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,
     foliage: { h: 0.33, hVar: 0.05, s: 0.48, sVar: 0.15, l: 0.29, lVar: 0.1 },
     treeSnowCap: false,
     treeAltFade: [18, 36],                              // treeline well below the summit
     tuftCount: 950, grass: { bladeA: '#4e7c40', bladeB: '#8fae6a' },
-    bushCount: 130, bushColor: 0x3f7c38,
+    bushCount: 208, bushColor: 0x3f7c38,
     bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
     rockCount: 520, pebbleCount: 380, rockColor: 0x8e948c, rockSnowCap: false,
     flowerCount: 200, flowerColors: ['#ffffff', '#ffe234', '#7a9aff', '#e05a78'],
     hutRoof: 0x6a4028, hayColor: 0xc8bc94,
-    hutCount: 8, hutZone: [0.86, 0.14], hayCount: 12,   // cabins in the valley
+    hutCount: 14, hutZone: [0.86, 0.14], hayCount: 12,   // cabins in the valley
     splinter: [0x8a5a32, 0xdce8f0],
     // climb the face through the serpentine, traverse the shoulder, drop back
     elev: {
@@ -2174,7 +2174,7 @@ const THEMES = {
     },
     hillColor: 0xa39a6a, peakColor: 0xdcd0b0,           // dry hills, limestone tops
     // FLORA. Olive/cypress/cork oak/umbrella pine — see _buildOliveGrove.
-    treeCount: 300, trunkColor: 0x8a7a5e,               // grey olive wood
+    treeCount: 510, trunkColor: 0x8a7a5e,               // grey olive wood
     foliageLow: 0x6e7a4e, foliageTop: 0x8f9a6c,         // foliage mid → silvered
     // hue 0.21 s 0.22: the olive band. Saturation stays under the 55 % ceiling
     // the checklist sets for foliage (R02).
@@ -2183,13 +2183,13 @@ const THEMES = {
     vegetation: 'olive',
     understorey: 'blob',    // maquis is dense and rounded, not desert-angular
     tuftCount: 820, grass: { bladeA: '#8e8450', bladeB: '#cbbc8a' },  // dry grass + thistle
-    bushCount: 300, bushColor: 0x74804e,                // rosemary / cistus maquis
+    bushCount: 420, bushColor: 0x74804e,                // rosemary / cistus maquis
     bush: { h: 0.20, hVar: 0.04, s: 0.24, sVar: 0.08, l: 0.32, lVar: 0.10 },
-    rockCount: 380, pebbleCount: 340, rockColor: 0xc0b596, rockSnowCap: false,
+    rockCount: 475, pebbleCount: 340, rockColor: 0xc0b596, rockSnowCap: false,
     // cistus white, poppy (the region accent), lavender, broom
     flowerCount: 220, flowerColors: ['#efe8d2', '#c0532e', '#b28ac8', '#e8c84a'],
     hutRoof: 0xb4552e, hayColor: 0xd8c48a,              // terracotta pantiles
-    hutCount: 12, hutZone: [0.44, 0.62],                // hamlet on the ridge shoulder
+    hutCount: 22, hutZone: [0.44, 0.62],                // hamlet on the ridge shoulder
     hayCount: 22,
     splinter: [0xd2c7a6, 0xc0532e],                     // limestone chip + shutter red
     // no rain, no snow: the only thing in this air is dust off the verges
@@ -2282,18 +2282,18 @@ const THEMES = {
       fringe: [128, 138, 74], fringeVar: [36, 40, 26],
     },
     hillColor: 0x4e6e38, peakColor: 0x8a9a78,
-    treeCount: 950, trunkColor: 0x6b4a28,
+    treeCount: 900, trunkColor: 0x6b4a28,
     foliageLow: 0x2e6a34, foliageTop: 0x4a8a44,
     foliage: { h: 0.3, hVar: 0.06, s: 0.5, sVar: 0.16, l: 0.28, lVar: 0.12 },
     treeSnowCap: false,
     treeBelt: [48, 150],                                // the forest ring
     tuftCount: 1500, grass: { bladeA: '#c8a850', bladeB: '#e2c878' },   // wheat
-    bushCount: 90, bushColor: 0x3f7c38,
+    bushCount: 144, bushColor: 0x3f7c38,
     bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
-    rockCount: 60, pebbleCount: 160, rockColor: 0x9a9484, rockSnowCap: false,
+    rockCount: 75, pebbleCount: 160, rockColor: 0x9a9484, rockSnowCap: false,
     flowerCount: 140, flowerColors: ['#c03a2e', '#e8d24a', '#ffffff'],
     hutRoof: 0x8a4630, hayColor: 0xe0c268,
-    hutCount: 9, hutZone: [0.8, 0.2], hayCount: 44,
+    hutCount: 16, hutZone: [0.8, 0.2], hayCount: 44,
     splinter: [0x8a5a32, 0xe0d4a8],
     vineRows: { count: 85 },                            // carpet the slopes
     windmill: true,
@@ -2327,7 +2327,7 @@ const THEMES = {
       fringe: [62, 88, 46], fringeVar: [26, 34, 20],
     },
     hillColor: 0x33512c, peakColor: 0x4e6a48,
-    treeCount: 1500, trunkColor: 0x5a4028,
+    treeCount: 900, trunkColor: 0x5a4028,
     foliageLow: 0x24522c, foliageTop: 0x36703c,
     foliage: { h: 0.32, hVar: 0.05, s: 0.5, sVar: 0.14, l: 0.24, lVar: 0.1 },
     treeSnowCap: false,
@@ -2338,12 +2338,12 @@ const THEMES = {
     // concentrates the same count into the band you actually drive through.
     treeBelt: [10.4, 52],
     tuftCount: 700, grass: { bladeA: '#3e6a34', bladeB: '#6a9a4c' },
-    bushCount: 260, bushColor: 0x2c5c2c,
+    bushCount: 416, bushColor: 0x2c5c2c,
     bush: { h: 0.34, hVar: 0.05, s: 0.42, sVar: 0.1, l: 0.24, lVar: 0.1 },
-    rockCount: 180, pebbleCount: 240, rockColor: 0x6e7264, rockSnowCap: false,
+    rockCount: 225, pebbleCount: 240, rockColor: 0x6e7264, rockSnowCap: false,
     flowerCount: 90, flowerColors: ['#ffffff', '#c8b0ff'],
     hutRoof: 0x4a3424, hayColor: 0x8a7a4e,
-    hutCount: 4, hutZone: [0.9, 0.1], hayCount: 6,
+    hutCount: 7, hutZone: [0.9, 0.1], hayCount: 6,
     splinter: [0x5a4028, 0x9ab884],
     elev: { amp: 9, ph: [0.8, 1.9, 2.8] },
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
@@ -2377,18 +2377,18 @@ const THEMES = {
       fringe: [96, 128, 66], fringeVar: [30, 40, 22],
     },
     hillColor: 0x6e8a5c, peakColor: 0xd8c2b0,           // rose-grey rock crowns
-    treeCount: 551, trunkColor: 0x5a4028,
+    treeCount: 900, trunkColor: 0x5a4028,
     foliageLow: 0x2c6a3a, foliageTop: 0x3f8c4c,
     foliage: { h: 0.33, hVar: 0.05, s: 0.48, sVar: 0.15, l: 0.29, lVar: 0.1 },
     treeSnowCap: false,
     treeAltFade: [16, 34],
     tuftCount: 900, grass: { bladeA: '#4e7c40', bladeB: '#8fae6a' },
-    bushCount: 120, bushColor: 0x3f7c38,
+    bushCount: 192, bushColor: 0x3f7c38,
     bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
-    rockCount: 420, pebbleCount: 320, rockColor: 0xa89a88, rockSnowCap: false,
+    rockCount: 520, pebbleCount: 320, rockColor: 0xa89a88, rockSnowCap: false,
     flowerCount: 220, flowerColors: ['#ffffff', '#ffe234', '#e05a78', '#7a9aff'],
     hutRoof: 0x6a4028, hayColor: 0xc8bc94,
-    hutCount: 10, hutZone: [0.82, 0.18], hayCount: 20,
+    hutCount: 18, hutZone: [0.82, 0.18], hayCount: 20,
     splinter: [0x8a5a32, 0xdce8f0],
     elev: { amp: 22, ph: [1.4, 0.5, 2.3] },
     rampMaxCurv: 0.014, padMaxCurv: 0.0045, boardMaxCurv: 0.012,
@@ -2430,14 +2430,14 @@ const THEMES = {
       fringe: [150, 146, 134], fringeVar: [24, 22, 18],
     },
     hillColor: 0xa8a292, peakColor: 0xd8d2c2,
-    treeCount: 130, trunkColor: 0x6b4a28,
+    treeCount: 221, trunkColor: 0x6b4a28,
     foliageLow: 0x2e6a34, foliageTop: 0x4a8a44,
     foliage: { h: 0.3, hVar: 0.05, s: 0.5, sVar: 0.14, l: 0.28, lVar: 0.1 },
     treeSnowCap: false,
     tuftCount: 120, grass: { bladeA: '#7a8a5a', bladeB: '#a8b47a' },
-    bushCount: 60, bushColor: 0x3f7c38,
+    bushCount: 96, bushColor: 0x3f7c38,
     bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
-    rockCount: 30, pebbleCount: 60, rockColor: 0xa8a292, rockSnowCap: false,
+    rockCount: 38, pebbleCount: 60, rockColor: 0xa8a292, rockSnowCap: false,
     flowerCount: 120, flowerColors: ['#e05a78', '#ffffff', '#c03a2e'],
     hutRoof: 0x8a4630, hayColor: 0xc8bc94,
     hutCount: 0, hutZone: [0.9, 0.1], hayCount: 0,
@@ -2487,24 +2487,24 @@ const THEMES = {
       },
     },
     hillColor: 0x6e8a5c, peakColor: 0xa8b098,
-    treeCount: 220, trunkColor: 0x5a4028,
+    treeCount: 374, trunkColor: 0x5a4028,
     foliageLow: 0x2e6a34, foliageTop: 0x4a8a44,
     foliage: { h: 0.3, hVar: 0.06, s: 0.48, sVar: 0.14, l: 0.28, lVar: 0.1 },
     treeSnowCap: false,
     treeBelt: [40, 130],
     tuftCount: 500, grass: { bladeA: '#5e7a4a', bladeB: '#94aa6c' },
-    bushCount: 110, bushColor: 0x3f7c38,
+    bushCount: 176, bushColor: 0x3f7c38,
     bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
-    rockCount: 140, pebbleCount: 220, rockColor: 0x8e8a7a, rockSnowCap: false,
+    rockCount: 175, pebbleCount: 220, rockColor: 0x8e8a7a, rockSnowCap: false,
     flowerCount: 120, flowerColors: ['#ffffff', '#e0b040', '#c05a78'],
     hutRoof: 0x7a4630, hayColor: 0xd0b878,
-    hutCount: 5, hutZone: [0.55, 0.35], hayCount: 10,
+    hutCount: 9, hutZone: [0.55, 0.35], hayCount: 10,
     splinter: [0x8a5a32, 0xe0d8c0],
     elev: { amp: 5, ph: [0.9, 2.1, 3.0] },
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'medhill',
     frontage: {
-      lateral: 15.5, depth: 8, unit: 7.2, height: 9.5, run: [6, 12], rows: 4,
+      lateral: 15.5, depth: 8, unit: 7.2, height: 9.5, run: [6, 12], rows: 6,
       // WARM RENDER, NOT GREY. The shared default paints a muted stone/slate
       // street, which is right for a northern old town and wrong for this
       // one: the reference quay is limewash and painted render, ochre through
@@ -2609,12 +2609,12 @@ const THEMES = {
     hillColor: 0x141a28, peakColor: 0x1e2638, hillDrop: 10, highland: 0,
     // FLORA IS MINIMAL BY DESIGN: pollarded planes in the square and around
     // the small park, nothing else. No conifers anywhere near a town.
-    treeCount: 26, trunkColor: 0x4a463e,
+    treeCount: 44, trunkColor: 0x4a463e,
     foliageLow: 0x1a241c, foliageTop: 0x27331f,
     foliage: { h: 0.28, hVar: 0.03, s: 0.22, sVar: 0.06, l: 0.13, lVar: 0.05 },
     treeSnowCap: false,
     tuftCount: 0, grass: {},                            // paving, not meadow
-    bushCount: 26, bushColor: 0x1f2a20,                 // clipped park hedging
+    bushCount: 42, bushColor: 0x1f2a20,                 // clipped park hedging
     bush: { h: 0.29, hVar: 0.03, s: 0.20, sVar: 0.05, l: 0.14, lVar: 0.05 },
     // NO gravel, NO boulders, NO pebbles — the region's negative list. The
     // rock colour is still needed: the pinch dressing builds its kerb teeth
@@ -2745,14 +2745,14 @@ const THEMES = {
     // `birch` stands in for ash (pale bark, airy crown — the nearest silhouette
     // in the species table). Weights are the Bible's 0.14 / 0.12, renormalised
     // over the tree tier so they sum to 1.0 (checklist R04).
-    treeCount: 435, trunkColor: 0x6b5a44,
+    treeCount: 740, trunkColor: 0x6b5a44,
     foliageLow: 0x35502a, foliageTop: 0x4a6b34,
     foliage: { h: 0.26, hVar: 0.05, s: 0.34, sVar: 0.14, l: 0.25, lVar: 0.10 },
     treeSnowCap: false,
     // bracken and pasture grass; bramble and nettle as the understorey mass
     tuftCount: 1400, grass: { bladeA: '#4a6b34', bladeB: '#7a8f52' },
     understorey: 'blob',                                // broadleaf scrub = bramble
-    bushCount: 260, bushColor: 0x35592c,
+    bushCount: 416, bushColor: 0x35592c,
     bush: { h: 0.26, hVar: 0.04, s: 0.40, sVar: 0.10, l: 0.24, lVar: 0.10 },
     // "Never: exposed rock." No boulders, no hero erratic — only road grit.
     rockCount: 0, pebbleCount: 140, rockColor: 0x7e7468, rockSnowCap: false,
@@ -2760,7 +2760,7 @@ const THEMES = {
     // "Never: bright colours." Nothing in the verge is allowed to shout.
     flowerCount: 0, flowerColors: ['#e8e4d2'],
     hutRoof: 0x4a5058,                                  // slate
-    hutCount: 10,                                       // dispersed, never a village
+    hutCount: 18,                                       // dispersed, never a village
     hayColor: 0x6e7a52, hayCount: 22,                   // silage bales in green wrap
     hayNear: 18, hayFar: 30,                            // stacked in the field, behind the hedge
     splinter: [0x7e7468, 0xe8e4d2],                     // rubble stone + lime pointing
@@ -2875,22 +2875,22 @@ const THEMES = {
     hillColor: 0x9c4630, peakColor: 0xc8865a, horizon: 'mesa', // mesa escarpments
     // OUTBACK FLORA (Bible 3.10 table): river red gum on the creek lines,
     // desert oak and mulga on the plain. See _buildOutbackScrub.
-    vegetation: 'outback', treeCount: 150, trunkColor: 0xc4b79f,
+    vegetation: 'outback', treeCount: 255, trunkColor: 0xc4b79f,
     foliageLow: 0x6e785c, foliageTop: 0x848e6c,
     foliage: { h: 0.215, hVar: 0.03, s: 0.13, sVar: 0.07, l: 0.40, lVar: 0.08 },
     treeSnowCap: false,
     // spinifex: dry gold hummocks, everywhere, right up to the road edge
     tuftCount: 1000, grass: { bladeA: '#9a8f46', bladeB: '#cdbc70' },
     // saltbush — the 'spike' silhouette is the desert-scrub one
-    bushCount: 240, bushColor: 0x8b9070, understorey: 'spike',
+    bushCount: 384, bushColor: 0x8b9070, understorey: 'spike',
     bush: { h: 0.22, hVar: 0.04, s: 0.12, sVar: 0.06, l: 0.42, lVar: 0.08 },
     // GIBBER PLAIN: the pebble count is the highest in the game on purpose —
     // the ground is supposed to be paved with small dark stones
-    rockCount: 380, pebbleCount: 900, rockColor: 0x8e4a30, rockSnowCap: false,
+    rockCount: 475, pebbleCount: 900, rockColor: 0x8e4a30, rockSnowCap: false,
     rockRoughness: 1,
     flowerCount: 130, flowerColors: ['#e8c23a', '#d8523a', '#f0e0b8'],
     hutRoof: 0x9aa0a2, hayColor: 0xc9b177,               // corrugated iron, station fodder
-    hutCount: 12, hutZone: [0.30, 0.48], hayCount: 34,   // the station cluster
+    hutCount: 22, hutZone: [0.30, 0.48], hayCount: 34,   // the station cluster
     splinter: [0xc9b9a2, 0x8e8478],                      // weatherboard bleached to grey
     weather: { type: 'dust', color: 0xc4703f, rate: 84 },// red dust always in the air
     // 2–8 % dominant gradient over long swells; the sharp gradients in this
@@ -3045,11 +3045,11 @@ THEMES.savanna = {
   terrainLow: '#b8a05a', terrainHigh: '#e0cf8a', terrainDirt: '#a8834a',
   hillColor: 0xa8a05e, peakColor: 0xcabf80, horizon: undefined,
   skyTop: '#6fa8d8', skyHorizon: '#f0e2b0',
-  vegetation: 'cactus', treeCount: 150, trunkColor: 0x6a5138,
+  vegetation: 'cactus', treeCount: 255, trunkColor: 0x6a5138,
   tuftCount: 900, grass: { bladeA: '#c9b45e', bladeB: '#e8dca0' },
-  bushCount: 120, bushColor: 0x8a8a4a,
-  rockCount: 90, pebbleCount: 160, rockColor: 0xa8603a,
-  hutCount: 4, hayCount: 0,
+  bushCount: 192, bushColor: 0x8a8a4a,
+  rockCount: 112, pebbleCount: 160, rockColor: 0xa8603a,
+  hutCount: 7, hayCount: 0,
 };
 
 /** Free every geometry, material and texture under `root`, then empty it.
@@ -3730,12 +3730,12 @@ function mergeBoxes(specs) {
 let PROP_ASSETS = null;
 function propAssets() {
   if (PROP_ASSETS) return PROP_ASSETS;
-  const hay = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 16);
+  const hay = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 10);
   hay.rotateZ(Math.PI / 2);
   hay.translate(0, 0.8, 0);
   const crate = new THREE.BoxGeometry(1.55, 1.55, 1.55);
   crate.translate(0, 0.78, 0);
-  const cone = new THREE.ConeGeometry(0.55, 1.35, 16);
+  const cone = new THREE.ConeGeometry(0.55, 1.35, 10);
   cone.translate(0, 0.74, 0);
   const coneBase = new THREE.BoxGeometry(1.05, 0.14, 1.05);
   coneBase.translate(0, 0.07, 0);
@@ -3748,8 +3748,8 @@ function propAssets() {
       hay, crate, cone, coneBase, barrel, rock,
       ballBody: new THREE.SphereGeometry(0.8, 12, 9),
       ballHead: new THREE.SphereGeometry(0.52, 12, 9),
-      eye: new THREE.SphereGeometry(0.07, 8, 6),
-      carrot: new THREE.ConeGeometry(0.1, 0.5, 10),
+      eye: new THREE.SphereGeometry(0.07, 6, 5),
+      carrot: new THREE.ConeGeometry(0.1, 0.5, 6),
       // voxel penguin parts (glacial): boxes only, r ≈ 0.6
       pengBody: new THREE.BoxGeometry(0.62, 0.9, 0.54),
       pengBelly: new THREE.BoxGeometry(0.44, 0.66, 0.1),
@@ -4123,7 +4123,7 @@ export class Track {
     });
     const postMat = new THREE.MeshStandardMaterial({ map: hazardTexture(), roughness: 0.85 });
     const rockGeo = new THREE.DodecahedronGeometry(1, 0);
-    const postGeo = new THREE.CylinderGeometry(0.16, 0.22, 2.2, 8);
+    const postGeo = new THREE.CylinderGeometry(0.16, 0.22, 2.2, 6);
     const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
     for (const sec of this._narrowSecs) {
       for (const side of [1, -1]) {
@@ -5582,7 +5582,7 @@ export class Track {
     this.group.add(flag);
     this.animated.flags.push({ mesh: flag, phase: Math.random() * 9 });
     const pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.07, 0.07, 2.2, 8),
+      new THREE.CylinderGeometry(0.07, 0.07, 2.2, 6),
       new THREE.MeshStandardMaterial({ color: 0xd8d2c2 })
     );
     pole.position.set(x, y - 0.4, z);
@@ -6139,7 +6139,7 @@ export class Track {
           const rad = r * wr[Math.min(s, wr.length - 1)] * (0.92 + Math.random() * 0.16);
           const hh = (2.5 - s * 0.25) * (0.85 + Math.random() * 0.35);
           const seg = new THREE.Mesh(
-            new THREE.CylinderGeometry(rad * 0.8, rad, hh, 14),
+            new THREE.CylinderGeometry(rad * 0.8, rad, hh, 8),
             strata[s % strata.length]
           );
           seg.position.set(
@@ -6438,22 +6438,22 @@ export class Track {
     // the ones you actually drive between.
     const broadleaf = (this.level?.theme === 'jungle' || this.level?.theme === 'redwood');
     const trunkGeo = broadleaf
-      ? new THREE.CylinderGeometry(0.34, 0.66, 5.4, 12)   // clear bole, no low branches
-      : new THREE.CylinderGeometry(0.42, 0.6, 3.2, 12);
+      ? new THREE.CylinderGeometry(0.34, 0.66, 5.4, 7)   // clear bole, no low branches
+      : new THREE.CylinderGeometry(0.42, 0.6, 3.2, 7);
     trunkGeo.translate(0, broadleaf ? 2.7 : 1.6, 0);
     let lowGeo, topGeo;
     if (broadleaf) {
       // stacked parasols: a closed canopy seen from underneath
-      lowGeo = new THREE.SphereGeometry(3.6, 16, 8);
+      lowGeo = new THREE.SphereGeometry(3.6, 9, 5);
       lowGeo.scale(1, 0.46, 1);
       lowGeo.translate(0, 6.4, 0);
-      topGeo = new THREE.SphereGeometry(2.5, 14, 8);
+      topGeo = new THREE.SphereGeometry(2.5, 8, 5);
       topGeo.scale(1, 0.5, 1);
       topGeo.translate(0.5, 8.3, -0.4);
     } else {
-      lowGeo = new THREE.ConeGeometry(3.1, 4.8, 14);
+      lowGeo = new THREE.ConeGeometry(3.1, 4.8, 8);
       lowGeo.translate(0, 5.1, 0);
-      topGeo = new THREE.ConeGeometry(2.1, 3.9, 14);
+      topGeo = new THREE.ConeGeometry(2.1, 3.9, 8);
       topGeo.translate(0, 8.1, 0);
     }
     const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor ?? 0x5a4028, roughness: 1 });
@@ -6465,7 +6465,7 @@ export class Track {
       new THREE.InstancedMesh(topGeo, topMat, cap),
     ];
     if (T.treeSnowCap) {
-      const capGeo = new THREE.ConeGeometry(1.5, 2.1, 14);
+      const capGeo = new THREE.ConeGeometry(1.5, 2.1, 8);
       capGeo.translate(0, 8.9, 0);
       parts.push(new THREE.InstancedMesh(
         capGeo, new THREE.MeshStandardMaterial({ color: 0xf2f6fa, flatShading: true, roughness: 0.9 }), cap));
@@ -6947,7 +6947,7 @@ export class Track {
     });
     const boardGeo = new THREE.PlaneGeometry(2.4, 1.7);
     const postMat = new THREE.MeshStandardMaterial({ color: 0x8e8478, roughness: 1 });
-    const postGeo = new THREE.CylinderGeometry(0.09, 0.11, 2.2, 8);
+    const postGeo = new THREE.CylinderGeometry(0.09, 0.11, 2.2, 5);
     for (const ck of this.creeks) {
       const j = (ck.index - 24 + N) % N;
       const heading = this.headingAt(j);
@@ -7209,7 +7209,7 @@ export class Track {
         this._element(B, 'logpile', px, pz, this.headingAt(gi) + (Math.random() - 0.5), K);
       }
       // a couple of loose fallen logs
-      const logGeo = new THREE.CylinderGeometry(0.55, 0.62, 6.5, 14);
+      const logGeo = new THREE.CylinderGeometry(0.55, 0.62, 6.5, 8);
       logGeo.rotateZ(Math.PI / 2);
       for (let k = 0; k < 3; k++) {
         const off = (13 + Math.random() * 9) * (k % 2 ? 1 : -1);
@@ -7691,7 +7691,7 @@ export class Track {
 
     // ISLETS: a few rock stacks standing out of the bay
     const isle = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(1, 1, 10),
+      new THREE.ConeGeometry(1, 1, 6),
       new THREE.MeshStandardMaterial({ color: 0x9a8f7c, flatShading: true, roughness: 1 }),
       4);
     const im4 = new THREE.Matrix4();
@@ -7788,7 +7788,7 @@ export class Track {
 
     // harbour buoys
     const buoy = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.6, 10, 8),
+      new THREE.SphereGeometry(0.6, 6, 5),
       new THREE.MeshStandardMaterial({ color: 0xd23c28, roughness: 0.6 }), 4);
     for (let k = 0; k < 4; k++) {
       const du = -260 + k * 160, dn2 = 26 + (k % 2) * 18;
@@ -7868,7 +7868,7 @@ export class Track {
   _buildMassif(m4) {
     const M = this.T.massif;
     const rock = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(1, 1, 10),
+      new THREE.ConeGeometry(1, 1, 6),
       new THREE.MeshStandardMaterial({
         // ROCK, NOT HAZE. This used peakColor straight, and peakColor is the
         // tone for peaks on the HORIZON, where distance washes colour out. The
@@ -8154,7 +8154,7 @@ export class Track {
     astParts.push(at2(new THREE.CylinderGeometry(1.68, 1.68, 0.2, 12), galY + 2.35));
     astParts.push(at2(new THREE.SphereGeometry(1.62, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2.4),
       galY + 2.4));
-    astParts.push(at2(new THREE.SphereGeometry(0.24, 8, 6), galY + 3.62));
+    astParts.push(at2(new THREE.SphereGeometry(0.24, 10, 8), galY + 3.62));
     astParts.push(this._strut([0, galY + 3.6, 0], [0, galY + 4.35, 0], 0.05, 5));
     const lantM = new THREE.Mesh(this._bundle(astParts), red);
     lantM.position.set(spot.x, BY, spot.z);
@@ -8499,7 +8499,7 @@ export class Track {
     const fingers = new THREE.InstancedMesh(new THREE.BoxGeometry(FLEN, 0.5, 2.2),
       timber, FINGERS);
     const posts = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.22, 0.26, 3.4, 10), pile, FINGERS * 3);
+      new THREE.CylinderGeometry(0.22, 0.26, 3.4, 6), pile, FINGERS * 3);
     const fm = new THREE.Matrix4(), fq = new THREE.Quaternion();
     const fup = new THREE.Vector3(0, 1, 0), fone = new THREE.Vector3(1, 1, 1);
     fq.setFromAxisAngle(fup, yaw);
@@ -8535,12 +8535,12 @@ export class Track {
 
     const DECK = 1.0;                                  // deck datum, boat local
     const cabG = white(new THREE.BoxGeometry(1, 1, 1).toNonIndexed());
-    const mastG = new THREE.CylinderGeometry(0.09, 0.14, 9.4, 8);
-    const boomG = new THREE.CylinderGeometry(0.08, 0.09, 4.6, 8);
+    const mastG = new THREE.CylinderGeometry(0.09, 0.14, 9.4, 12);
+    const boomG = new THREE.CylinderGeometry(0.08, 0.09, 4.6, 10);
     boomG.rotateX(Math.PI / 2);
     const fendG = new THREE.TorusGeometry(0.26, 0.09, 6, 10);   // fist-sized: 120 tris, not 224
     fendG.rotateY(Math.PI / 2);
-    const portG = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 8);
+    const portG = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 10);
     portG.rotateZ(Math.PI / 2);
 
     // yacht standing rigging + guardrails, all in one bundle
@@ -8563,8 +8563,8 @@ export class Track {
       strut([-0.95, DECK + 0.02, -3.6], [-0.95, DECK + 0.22, -1.1], 0.07, 4),
       strut([0.95, DECK + 0.02, -3.6], [0.95, DECK + 0.22, -1.1], 0.07, 4),
       strut([-0.95, DECK + 0.22, -3.6], [0.95, DECK + 0.22, -3.6], 0.07, 4),
-      new THREE.CylinderGeometry(0.16, 0.19, 0.34, 8).translate(-0.78, DECK + 0.3, -2.2),
-      new THREE.CylinderGeometry(0.16, 0.19, 0.34, 8).translate(0.78, DECK + 0.3, -2.2),
+      new THREE.CylinderGeometry(0.16, 0.19, 0.34, 10).translate(-0.78, DECK + 0.3, -2.2),
+      new THREE.CylinderGeometry(0.16, 0.19, 0.34, 10).translate(0.78, DECK + 0.3, -2.2),
       new THREE.BoxGeometry(0.75, 0.1, 0.75).translate(0, DECK + 0.12, 1.55),
       strut([0, DECK + 0.62, 4.4], [-0.7, DECK + 0.62, 3.5], 0.032, 4),
       strut([0, DECK + 0.62, 4.4], [0.7, DECK + 0.62, 3.5], 0.032, 4),
@@ -8753,7 +8753,7 @@ export class Track {
     ringG.rotateX(Math.PI / 2);
     const rings = new THREE.InstancedMesh(ringG, new THREE.MeshStandardMaterial({
       color: 0x2a2622, roughness: 0.6, metalness: 0.5 }), 64);
-    const bollG = new THREE.CylinderGeometry(0.26, 0.34, 0.85, 14);
+    const bollG = new THREE.CylinderGeometry(0.26, 0.34, 0.85, 8);
     const bolls = new THREE.InstancedMesh(bollG, new THREE.MeshStandardMaterial({
       color: 0x6d6a62, roughness: 0.9, flatShading: true }), 40);
     let rk = 0, bk = 0;
@@ -8788,20 +8788,20 @@ export class Track {
     const XR = Math.PI / 2;                       // cylinders lie along X
     const lie = (g2) => g2.rotateZ(XR);
     const ironParts = [
-      new THREE.SphereGeometry(0.17, 8, 6).translate(-1.62, 1.05, 0),
+      new THREE.SphereGeometry(0.17, 12, 8).translate(-1.62, 1.05, 0),
       lie(new THREE.CylinderGeometry(0.36, 0.38, 0.9, 16)).translate(-1.15, 1.05, 0),
       lie(new THREE.CylinderGeometry(0.41, 0.41, 0.14, 16)).translate(-0.68, 1.05, 0),
       lie(new THREE.CylinderGeometry(0.24, 0.31, 1.92, 16)).translate(0.30, 1.05, 0),
       lie(new THREE.CylinderGeometry(0.30, 0.30, 0.12, 16)).translate(1.28, 1.05, 0),
       lie(new THREE.CylinderGeometry(0.31, 0.33, 0.30, 16)).translate(1.47, 1.05, 0),
-      new THREE.CylinderGeometry(0.115, 0.115, 0.94, 8).rotateX(XR).translate(-0.25, 1.05, 0),
+      new THREE.CylinderGeometry(0.115, 0.115, 0.94, 10).rotateX(XR).translate(-0.25, 1.05, 0),
     ];
     for (const wx of [-0.82, 0.66]) {
       const wr = wx < 0 ? 0.46 : 0.34;            // trail wheels run larger
       for (const wz of [0.8, -0.8]) {
         const tw = new THREE.TorusGeometry(wr, 0.075, 8, 18);
         ironParts.push(tw.translate(wx, wr - 0.02, wz));
-        ironParts.push(new THREE.CylinderGeometry(0.11, 0.11, 0.22, 8)
+        ironParts.push(new THREE.CylinderGeometry(0.11, 0.11, 0.22, 10)
           .rotateX(XR).translate(wx, wr - 0.02, wz));
         for (let sp = 0; sp < 8; sp++) {
           const an = (sp / 8) * Math.PI * 2;
@@ -8810,7 +8810,7 @@ export class Track {
               wr - 0.02 - Math.cos(an) * wr * 0.46, wz));
         }
       }
-      ironParts.push(new THREE.CylinderGeometry(0.09, 0.09, 1.74, 8)
+      ironParts.push(new THREE.CylinderGeometry(0.09, 0.09, 1.74, 10)
         .rotateX(XR).translate(wx, wr - 0.02, 0));
     }
     const woodParts = [];
@@ -8865,11 +8865,11 @@ export class Track {
     const capGeo = new THREE.BoxGeometry(0.95, 0.55, 2.6);
     const caps = mk(capGeo, new THREE.MeshStandardMaterial({
       color: 0xb0a894, flatShading: true, roughness: 1 }), 260);
-    const bolGeo = new THREE.CylinderGeometry(0.22, 0.17, 0.85, 8);
+    const bolGeo = new THREE.CylinderGeometry(0.22, 0.17, 0.85, 7);
     bolGeo.translate(0, 0.42, 0);
     const bols = mk(bolGeo, new THREE.MeshStandardMaterial({
       color: 0x26282c, roughness: 0.5, metalness: 0.55 }), 60);
-    const barGeo = new THREE.CylinderGeometry(0.5, 0.44, 1.05, 14);
+    const barGeo = new THREE.CylinderGeometry(0.5, 0.44, 1.05, 8);
     barGeo.translate(0, 0.52, 0);
     const bars = mk(barGeo, new THREE.MeshStandardMaterial({
       color: 0x7a5a34, flatShading: true, roughness: 0.9 }), 70);
@@ -8877,7 +8877,7 @@ export class Track {
     crGeo.translate(0, 0.5, 0);
     const crs = mk(crGeo, new THREE.MeshStandardMaterial({
       color: 0xb99a68, flatShading: true, roughness: 0.95 }), 50);
-    const ropeGeo = new THREE.CylinderGeometry(0.66, 0.7, 0.16, 16);
+    const ropeGeo = new THREE.CylinderGeometry(0.66, 0.7, 0.16, 9);
     ropeGeo.translate(0, 0.08, 0);
     const ropes = mk(ropeGeo, new THREE.MeshStandardMaterial({
       color: 0xd8c9a4, roughness: 1 }), 40);
@@ -9001,9 +9001,9 @@ export class Track {
     if (!spot) return;
     const g = new THREE.Group();
     const stone = new THREE.MeshStandardMaterial({ color: 0xd8d0c0, flatShading: true, roughness: 1 });
-    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.4, 11, 14), stone);
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.4, 11, 8), stone);
     tower.position.set(spot.x, spot.y + 5.5, spot.z);
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(3.0, 2.6, 14),
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(3.0, 2.6, 8),
       new THREE.MeshStandardMaterial({ color: 0x8a4630, flatShading: true, roughness: 0.9 }));
     cap.position.set(spot.x, spot.y + 12.2, spot.z);
     const sailMat = new THREE.MeshStandardMaterial({ color: 0xf2ecd8, roughness: 0.85,
@@ -9104,7 +9104,7 @@ export class Track {
       const yaw = this.headingAt(i);
       const g = new THREE.Group();
       for (const side of [1, -1]) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 8.2, 14), verm);
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 8.2, 8), verm);
         post.position.set(c.x + n.x * 11 * side, c.y + 4.1, c.z + n.z * 11 * side);
         g.add(post);
         this.solids.push({ x: post.position.x, z: post.position.z, r: 0.9,
@@ -9149,7 +9149,7 @@ export class Track {
         g.add(body, cap);
         y += 3.6; w *= 0.74;
       }
-      const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.2, 8), roof);
+      const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.2, 6), roof);
       spire.position.set(spot.x, y + 1.4, spot.z);
       g.add(spire);
       g.traverse((mm) => { mm.castShadow = true; });
@@ -9759,8 +9759,8 @@ export class Track {
   _realizeElements(B, m4) {
     const gWall = new THREE.BoxGeometry(1, 1, 1); gWall.translate(0, 0.5, 0);
     const gBox = new THREE.BoxGeometry(1, 1, 1); gBox.translate(0, 0.5, 0);
-    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 16); gCyl.translate(0, 0.5, 0);
-    const gCone = new THREE.ConeGeometry(0.5, 1, 16); gCone.translate(0, 0.5, 0);
+    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); gCyl.translate(0, 0.5, 0);
+    const gCone = new THREE.ConeGeometry(0.5, 1, 10); gCone.translate(0, 0.5, 0);
     const specs = [
       // The emissive window map came across from `_buildHuts` when the
       // cottages moved onto the shared templates. It is not a port for its own
@@ -10131,8 +10131,8 @@ export class Track {
       return im;
     };
     const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0);
-    const cyl = new THREE.CylinderGeometry(1, 1, 1, 14); cyl.translate(0, 0.5, 0);
-    const cone = new THREE.ConeGeometry(1, 1, 14); cone.translate(0, 0.5, 0);
+    const cyl = new THREE.CylinderGeometry(1, 1, 1, 8); cyl.translate(0, 0.5, 0);
+    const cone = new THREE.ConeGeometry(1, 1, 8); cone.translate(0, 0.5, 0);
     // The three above are base-anchored by `translate(0, 0.5, 0)`; this one is
     // the only one that also needed a rotateY, and it is the only one that lost
     // its translate — so every barn had HALF ITS ROOF inside the hayloft and
@@ -10368,7 +10368,7 @@ export class Track {
    *  Each stack gets one SOLID collider (stacked timber does not yield). */
   _buildLogYards() {
     const count = this.T.logYards | 0;
-    const logGeo = new THREE.CylinderGeometry(0.55, 0.55, 1, 16);
+    const logGeo = new THREE.CylinderGeometry(0.55, 0.55, 1, 9);
     logGeo.rotateZ(Math.PI / 2);                        // axis → local x
     const logMat = new THREE.MeshStandardMaterial({ color: 0x8a6238, roughness: 0.95 });
     const logs = new THREE.InstancedMesh(logGeo, logMat, count * 6);
@@ -10436,12 +10436,12 @@ export class Track {
     const g = new THREE.Group();
     for (const side of [1, -1]) {
       // shattered trunk halves the fallen giant rests on
-      const stump = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3.3, 12, 16), bark);
+      const stump = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3.3, 12, 10), bark);
       stump.position.set(side * 12.4, 6, 0);
       stump.castShadow = true;
       g.add(stump);
       // root flare at the base
-      const flare = new THREE.Mesh(new THREE.ConeGeometry(4.4, 3.4, 14), barkDark);
+      const flare = new THREE.Mesh(new THREE.ConeGeometry(4.4, 3.4, 8), barkDark);
       flare.position.set(side * 12.4, 1.4, 0);
       flare.castShadow = true;
       g.add(flare);
@@ -10455,7 +10455,7 @@ export class Track {
     g.add(beam);
     // a couple of snapped branch stubs on top
     for (const [bx, ba] of [[-4, 0.5], [5.5, -0.4]]) {
-      const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.75, 4.5, 12), barkDark);
+      const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.75, 4.5, 7), barkDark);
       stub.position.set(bx, 14.6, 0.6);
       stub.rotation.z = ba;
       g.add(stub);
@@ -10483,9 +10483,9 @@ export class Track {
     for (let i = 10; i < N; i += L.every) {
       specs.push({ i, side: (specs.length % 2 === 0) ? 1 : -1 });
     }
-    const postGeo = new THREE.CylinderGeometry(0.09, 0.13, L.height, 10);
+    const postGeo = new THREE.CylinderGeometry(0.09, 0.13, L.height, 6);
     postGeo.translate(0, L.height / 2, 0);
-    const headGeo = new THREE.SphereGeometry(0.3, 14, 9);
+    const headGeo = new THREE.SphereGeometry(0.3, 8, 6);
     headGeo.translate(0, L.height + 0.15, 0);
     const postMat = new THREE.MeshStandardMaterial({ color: 0x1c1e24, roughness: 0.6, metalness: 0.5 });
     const headMat = new THREE.MeshBasicMaterial({ color: L.color });
@@ -10534,7 +10534,7 @@ export class Track {
    *  cabin on the centreline of FURKA RIDGE. */
   _buildOldTown(m4) {
     const F = {
-      lateral: 15.5, depth: 8, unit: 7.0, height: 10.0, run: [7, 14], rows: 4,
+      lateral: 15.5, depth: 8, unit: 7.0, height: 10.0, run: [7, 14], rows: 6,
       tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
       ...this.T.frontage,
     };
@@ -10553,7 +10553,7 @@ export class Track {
       mesh.material.map?.dispose();
       mesh.material.dispose();
     }
-    const MAX = 1500;                 // four ranks of village, not one terrace
+    const MAX = 2600;                 // deep enough that the back lanes exist
     const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
     bodyGeo.translate(0, 0.5, 0);
     // THE FACADE IS THE STYLE. The body has no colour of its own - it wears a
@@ -10611,7 +10611,7 @@ export class Track {
     const LMAX = 200;
     const armGeo = new THREE.BoxGeometry(0.7, 0.1, 0.1);
     armGeo.translate(-0.35, 0, 0);
-    const bulbGeo = new THREE.SphereGeometry(0.26, 12, 8);
+    const bulbGeo = new THREE.SphereGeometry(0.26, 7, 5);
     bulbGeo.translate(-0.72, -0.12, 0);
     const arms = new THREE.InstancedMesh(
       armGeo, new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.6, metalness: 0.5 }), LMAX);
@@ -10757,7 +10757,11 @@ export class Track {
         // a wall. Every one of them is shootable set dressing.
         const RANKS = F.rows ?? 1;
         for (let rank = 1; rank <= RANKS; rank++) {
-        if (s % (3 + rank) === 0) {
+        // RANKS THINNED TOO FAST TO READ AS A TOWN. `s % (3 + rank)` places
+        // one bay in four at rank 1 and one in eight by rank 5, so the ranks
+        // the frontage was meant to hide behind were mostly gaps. Held flatter,
+        // the hillside actually fills in.
+        if (s % (2 + Math.min(rank, 3)) === 0) {
           const back = put(i, side,
             F.lateral + F.depth + 9 + (rank - 1) * (F.depth + 12) + Math.random() * 12,
             F.unit * (1.1 + Math.random() * 0.5), F.depth + 2 + Math.random() * 3,
@@ -10824,7 +10828,7 @@ export class Track {
     // at night the bulbs ARE the read, same contract as the lamps.
     if (this.T.lamps) {
       const SMAX = 42 * 9;
-      const strGeo = new THREE.SphereGeometry(0.14, 8, 6);
+      const strGeo = new THREE.SphereGeometry(0.14, 6, 5);
       const strings = new THREE.InstancedMesh(strGeo,
         new THREE.MeshBasicMaterial({ color: this.T.lamps.color ?? 0xffb14a }), SMAX);
       let sk = 0, since = 99;
@@ -10861,7 +10865,7 @@ export class Track {
     // COSMETIC, like the trackside lamps and the reflector marker posts — a
     // solid line of colliders 2 u off the drivable edge would be a wall, not a
     // kerb, and this world already has walls.
-    const bolGeo = new THREE.CylinderGeometry(0.16, 0.2, 0.95, 8);
+    const bolGeo = new THREE.CylinderGeometry(0.16, 0.2, 0.95, 6);
     bolGeo.translate(0, 0.48, 0);
     const bols = new THREE.InstancedMesh(bolGeo, new THREE.MeshStandardMaterial({
       color: 0x2a2c30, roughness: 0.55, metalness: 0.45,
@@ -10951,7 +10955,7 @@ export class Track {
     roof.castShadow = true;
     g.add(roof);
     // a lantern hung under the keystone
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 9),
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6),
       new THREE.MeshBasicMaterial({ color: this.T.lamps?.color ?? 0xffb14a }));
     lamp.position.set(0, clear + span * RISE - 1.4, 0);
     g.add(lamp);
@@ -11378,92 +11382,176 @@ export class Track {
     return horizonTexture('#' + top.getHexString(), '#' + base.getHexString());
   }
 
+  /** THE SKYLINE FORM LIBRARY.
+   *
+   *  Every world's horizon was two rings of CONES - forty at seven sides, thirty
+   *  at five - so every world on the roster, from the Alps to a Croatian bay,
+   *  was ringed by the same pyramids. Scale jitter does not fix that: a scaled
+   *  pyramid is a pyramid.
+   *
+   *  Six silhouettes instead, each authored as a unit form (height 1, centred
+   *  on the origin, so the existing seat-and-scale placement is unchanged):
+   *  a sharp pyramid, a thin spire, a rounded whaleback dome, a flat-topped
+   *  mesa, an asymmetric horn - steep face one side, long shoulder the other -
+   *  and a proper saw-tooth RIDGE, which is the one that stops a skyline
+   *  reading as a picket fence of separate hills.
+   */
+  _horizonForms() {
+    if (this._hzForms) return this._hzForms;
+    const F = {};
+    F.pyramid = new THREE.ConeGeometry(0.5, 1, 6);
+    F.spire = new THREE.ConeGeometry(0.40, 1, 5);
+    F.dome = (() => {
+      const pts = [];
+      for (let i = 0; i <= 6; i++) {
+        const t = i / 6;
+        pts.push(new THREE.Vector2(
+          Math.max(0.001, 0.5 * Math.cos(t * Math.PI / 2) * (1 - 0.10 * t)), -0.5 + t));
+      }
+      return new THREE.LatheGeometry(pts, 9);
+    })();
+    F.mesa = new THREE.CylinderGeometry(0.30, 0.52, 1, 6);
+    F.horn = (() => {
+      const g = new THREE.ConeGeometry(0.5, 1, 6);
+      // shear the apex sideways so one face is a cliff and the other a shoulder
+      g.applyMatrix4(new THREE.Matrix4().set(
+        1, 0.44, 0, 0,
+        0, 1, 0, 0,
+        0, 0.14, 1, 0,
+        0, 0, 0, 1));
+      return g;
+    })();
+    F.ridge = (() => {
+      // a wall with named peaks along it, tapering to nothing at both ends
+      const H = [0.03, 0.62, 0.30, 0.92, 0.44, 0.70, 0.05];
+      const n = H.length - 1, v = [];
+      const push = (a, b, c) => v.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+      for (let k = 0; k < n; k++) {
+        const x0 = -0.5 + k / n, x1 = -0.5 + (k + 1) / n;
+        const y0 = -0.5 + H[k], y1 = -0.5 + H[k + 1];
+        const d0 = 0.44 * Math.sin(Math.PI * (k / n)) + 0.06;
+        const d1 = 0.44 * Math.sin(Math.PI * ((k + 1) / n)) + 0.06;
+        // WIND EACH FLANK OUTWARD. Emitting both sides in the same vertex
+        // order leaves one of them back-facing, and a front-side material
+        // culls it - which is why half of every ridge vanished and the
+        // skyline grew thin dark slivers where the interior showed through.
+        for (const sg of [1, -1]) {
+          const A = [x0, y0, 0], B = [x1, y1, 0];
+          const C = [x1, -0.5, sg * d1], D = [x0, -0.5, sg * d0];
+          if (sg > 0) { push(A, B, C); push(A, C, D); }
+          else { push(B, A, C); push(C, A, D); }
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+      g.computeVertexNormals();
+      return g;
+    })();
+    this._hzForms = F;
+    return F;
+  }
+
   _buildHorizon(m4) {
     const T = this.T;
     if (T.horizon === 'mesa') return this._buildMesaHorizon(m4);
     if (T.horizon === 'dunes') return this._buildDuneHorizon(m4);
     if (T.horizon === 'city') return this._buildCityHorizon(m4);
-    const hills = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(1, 1, 7),
-      new THREE.MeshStandardMaterial({
-        map: this._horizonGrad(T.hillColor, 0.52, 0.10),
-        flatShading: true, roughness: 1,
-      }),
-      40
-    );
-    const peaks = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(1, 1, 5),
-      new THREE.MeshStandardMaterial({
-        // far ring: paler base + slight desaturation so distance reads
-        map: this._horizonGrad(T.peakColor, 0.68, 0.26, 0.3),
-        flatShading: true, roughness: 1,
-      }),
-      30
-    );
+    const F = this._horizonForms();
+    // A COUNTRY HAS A SKYLINE OF ITS OWN. The mix is per theme where a theme
+    // cares, and otherwise per WORLD - keyed off the level id, so two worlds
+    // in the same region do not get the same mountains.
+    // EVERY SET CARRIES A DOME AND A RIDGE. A mix of horn and spire is still
+    // three cones in a trenchcoat - the complaint was that every skyline is
+    // pyramids, and a set with no rounded and no linear form does not answer
+    // it. At most one cone-family shape per world.
+    const SETS = [
+      ['dome', 'ridge', 'horn'],          // sierra
+      ['ridge', 'dome', 'spire'],         // alpine
+      ['mesa', 'dome', 'ridge'],          // tableland
+      ['dome', 'ridge', 'mesa'],          // downs
+      ['ridge', 'dome', 'pyramid'],       // classic range
+      ['dome', 'ridge', 'dome'],          // rolling highland
+    ];
+    const set = T.range || SETS[((this.level && this.level.id) || 0) % SETS.length];
     const base = -8 - (T.hillDrop || 0);      // sit on the (possibly sunk) field
     // The drivable massif now rises through where these cones used to stand,
     // so each one is seated on the real ground beneath it instead of on the
     // old flat field — otherwise the terrain swallows them to the shoulders.
-    // They become the peaks the highland climbs toward rather than a backdrop.
     const seat = (x, z) => base + this._highland(x, z);
     // A coast world's sea reaches the horizon: the ring must not stand in it.
-    // Any cone whose footprint touches the water is dropped outright — a
-    // mountain range across the bay turns open sea into a lake (and at fog
-    // distance those cones ARE the cream the sea was built to replace).
+    // Any form whose footprint touches the water is dropped outright — a
+    // mountain range across the bay turns open sea into a lake.
     const inSea = (x, z, w) => this.T.coast && this._coastSide(x, z) > -(w * 0.7);
     const jcol = new THREE.Color();
-    let hk = 0;
-    for (let i = 0; i < 40; i++) {
-      const a = (i / 40) * Math.PI * 2;
-      const r = 900 + Math.random() * 140;
-      const h = 70 + Math.random() * 90;
-      const w = 130 + Math.random() * 150;
-      const px = Math.cos(a) * r, pz = Math.sin(a) * r;
-      if (inSea(px, pz, w)) continue;
-      // asymmetric base + a lean: a ridge fragment, not a pyramid
-      m4.makeRotationY(Math.random() * Math.PI);
-      m4.scale(new THREE.Vector3(w, h, w * (0.55 + Math.random() * 0.6)));
-      m4.setPosition(px, h / 2 + seat(px, pz), pz);
-      hills.setMatrixAt(hk, m4);
-      jcol.setScalar(0.82 + Math.random() * 0.3);
-      hills.setColorAt(hk++, jcol);
-    }
-    hills.count = hk;
-    let pk = 0;
-    for (let i = 0; i < 30; i++) {
-      const a = (i / 30) * Math.PI * 2 + 0.1;
-      const r = 1120 + Math.random() * 160;
-      const h = 160 + Math.random() * 140;
-      const w = 120 + Math.random() * 140;
-      const px = Math.cos(a) * r, pz = Math.sin(a) * r;
-      if (inSea(px, pz, w)) continue;
-      m4.makeRotationY(Math.random() * Math.PI);
-      m4.scale(new THREE.Vector3(w, h, w * (0.5 + Math.random() * 0.7)));
-      m4.setPosition(px, h / 2 + seat(px, pz), pz);
-      peaks.setMatrixAt(pk, m4);
-      jcol.setScalar(0.78 + Math.random() * 0.36);
-      peaks.setColorAt(pk++, jcol);
-      // a lower shoulder leaning on the peak - crags come in families
-      if (pk < 30 && Math.random() < 0.6) {
-        const sw = w * 0.55, sh = h * (0.45 + Math.random() * 0.2);
-        const sx = px + Math.cos(a + 1.57) * w * 0.5;
-        const sz = pz + Math.sin(a + 1.57) * w * 0.5;
-        if (!inSea(sx, sz, sw)) {
-          m4.makeRotationY(Math.random() * Math.PI);
-          m4.scale(new THREE.Vector3(sw, sh, sw * 0.7));
-          m4.setPosition(sx, sh / 2 + seat(sx, sz), sz);
-          peaks.setMatrixAt(pk, m4);
-          jcol.setScalar(0.72 + Math.random() * 0.3);
-          peaks.setColorAt(pk++, jcol);
+    const meshes = [];
+    const layer = (forms, mat, cap) => {
+      const per = {};
+      for (const f of forms) {
+        if (per[f]) continue;
+        per[f] = new THREE.InstancedMesh(F[f], mat, cap);
+        per[f].count = 0;
+        meshes.push(per[f]);
+      }
+      return per;
+    };
+    const near = layer(set, new THREE.MeshStandardMaterial({
+      map: this._horizonGrad(T.hillColor, 0.52, 0.10), flatShading: true, roughness: 1,
+    }), 64);
+    const far = layer(set, new THREE.MeshStandardMaterial({
+      // far ring: paler base + slight desaturation so distance reads
+      map: this._horizonGrad(T.peakColor, 0.68, 0.26, 0.3), flatShading: true, roughness: 1,
+    }), 64);
+    // RANGES, NOT A PICKET FENCE. Cones spaced evenly round the compass gave
+    // every world the same regular saw-tooth. Massifs are clumped into a few
+    // groups with open sky between them, and each group keeps ONE form and one
+    // height band so it reads as a single range seen from a distance.
+    const place = (per, groups, rMin, rSpan, hMin, hSpan, wMin, wSpan, shade) => {
+      for (let gi = 0; gi < groups; gi++) {
+        let aC = (gi / groups) * Math.PI * 2 + Math.random() * 0.5;
+        // A GROUP OVER WATER LOSES THE WHOLE RANGE. Clumping means one bad
+        // centre costs six massifs, not one, and on HARBOR QUAY that left a
+        // skyline of three. Re-aim the range along the coast instead.
+        for (let tries = 0; tries < 5; tries++) {
+          const tx = Math.cos(aC) * (rMin + rSpan * 0.5);
+          const tz = Math.sin(aC) * (rMin + rSpan * 0.5);
+          if (!inSea(tx, tz, wMin)) break;
+          aC += 0.7 + Math.random() * 0.9;
+        }
+        const form = set[(gi + (Math.random() * 1.4 | 0)) % set.length];
+        const mesh = per[form];
+        const band = 0.55 + Math.random() * 0.75;          // this range's height
+        const n = 3 + (Math.random() * 4 | 0);
+        for (let k = 0; k < n && mesh.count < mesh.instanceMatrix.count; k++) {
+          const a = aC + (k - n / 2) * (0.16 + Math.random() * 0.10);
+          const r = rMin + Math.random() * rSpan;
+          const h = (hMin + Math.random() * hSpan) * band;
+          const w = wMin + Math.random() * wSpan;
+          const px = Math.cos(a) * r, pz = Math.sin(a) * r;
+          if (inSea(px, pz, w)) continue;
+          // a ridge lies ALONG the range, so it is turned to face the middle
+          const yaw = form === 'ridge' ? a + Math.PI / 2 + (Math.random() - 0.5) * 0.3
+            : Math.random() * Math.PI;
+          m4.makeRotationY(yaw);
+          m4.scale(new THREE.Vector3(w, h, w * (0.5 + Math.random() * 0.7)));
+          m4.setPosition(px, h / 2 + seat(px, pz), pz);
+          const i = mesh.count;
+          mesh.setMatrixAt(i, m4);
+          jcol.setScalar(shade + Math.random() * 0.3);
+          mesh.setColorAt(i, jcol);
+          mesh.count = i + 1;
         }
       }
+    };
+    place(near, 9, 900, 140, 70, 90, 130, 150, 0.82);
+    place(far, 8, 1120, 160, 160, 140, 120, 140, 0.76);
+    let mi = 0;
+    for (const mesh of meshes) {
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      // named so a world whose skyline must be built, not geological, can drop
+      // them (OLD TOWN — see _buildOldTown)
+      mesh.name = mi++ < set.length ? 'horizon-hills' : 'horizon-peaks';
+      if (mesh.count) this.group.add(mesh);
     }
-    peaks.count = pk;
-    // named so a world whose skyline must be built, not geological, can drop
-    // them (OLD TOWN — see _buildOldTown)
-    hills.name = 'horizon-hills';
-    peaks.name = 'horizon-peaks';
-    this.group.add(hills, peaks);
     if (T.massif) this._buildMassif(m4);
     if (T.glacier) this._buildGlacier(m4);
     if (T.passHotel) this._buildPassHotel(m4);
@@ -11641,7 +11729,7 @@ export class Track {
 
     // freestanding hoodoos: 4 stacked drums per tower, wider cap stone
     const COUNT = 40, SEGS = 4;
-    const segGeo = new THREE.CylinderGeometry(0.8, 1, 1, 12);
+    const segGeo = new THREE.CylinderGeometry(0.8, 1, 1, 7);
     segGeo.translate(0, 0.5, 0);
     const hoodoos = new THREE.InstancedMesh(
       segGeo,
@@ -11777,7 +11865,7 @@ export class Track {
     if (T.vegetation === 'burnt') return this._buildBurntForest(m4);
     if (T.vegetation === 'olive') return this._buildOliveGrove(m4);
     const COUNT = T.treeCount;
-    const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 12);
+    const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 7);
     trunkGeo.translate(0, 1.2, 0);
     const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const lowMat = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
@@ -11793,7 +11881,7 @@ export class Track {
     // set of InstancedMeshes — one draw call per part regardless of count.
     const capFor = (parts, capY) => {
       if (!capMat || capY == null) return;
-      const capGeo = new THREE.ConeGeometry(1.3, 1.9, 14);
+      const capGeo = new THREE.ConeGeometry(1.3, 1.9, 8);
       capGeo.translate(0, capY, 0);
       parts.push(new THREE.InstancedMesh(capGeo, capMat, COUNT));
     };
@@ -11805,68 +11893,68 @@ export class Track {
       return parts;
     };
     // --- conifers ---
-    const lowA = new THREE.ConeGeometry(2.6, 4.2, 14);
+    const lowA = new THREE.ConeGeometry(2.6, 4.2, 8);
     lowA.translate(0, 4.0, 0);
-    const topA = new THREE.ConeGeometry(1.8, 3.4, 14);
+    const topA = new THREE.ConeGeometry(1.8, 3.4, 8);
     topA.translate(0, 6.6, 0);
-    const lowB = new THREE.ConeGeometry(2.3, 3.4, 12);
+    const lowB = new THREE.ConeGeometry(2.3, 3.4, 7);
     lowB.translate(0.2, 3.6, -0.12);
-    const midB = new THREE.ConeGeometry(1.75, 2.9, 12);
+    const midB = new THREE.ConeGeometry(1.75, 2.9, 7);
     midB.translate(-0.16, 5.6, 0.12);
-    const topB = new THREE.ConeGeometry(1.15, 2.6, 12);
+    const topB = new THREE.ConeGeometry(1.15, 2.6, 7);
     topB.translate(0.05, 7.4, -0.05);
     const larchTiers = [];
     for (const [r, y] of [[1.55, 3.3], [1.25, 4.9], [0.95, 6.3], [0.6, 7.6]]) {
-      const tg = new THREE.ConeGeometry(r, 1.5, 12);      // sparse gappy tiers
+      const tg = new THREE.ConeGeometry(r, 1.5, 7);      // sparse gappy tiers
       tg.translate(0, y, 0);
       larchTiers.push([tg, lowMat]);
     }
     // --- deciduous ---
-    const birchTrunk = new THREE.CylinderGeometry(0.2, 0.28, 3.6, 16);
+    const birchTrunk = new THREE.CylinderGeometry(0.2, 0.28, 3.6, 6);
     birchTrunk.translate(0, 1.8, 0);
     const birchBark = new THREE.MeshStandardMaterial({ color: 0xe6e8e0, roughness: 0.9 });
-    const birchCrown = new THREE.SphereGeometry(1.45, 12, 8);
+    const birchCrown = new THREE.SphereGeometry(1.45, 7, 5);
     birchCrown.scale(1, 1.3, 1);
     birchCrown.translate(0, 4.7, 0);
-    const birchTop = new THREE.SphereGeometry(0.85, 16, 8);
+    const birchTop = new THREE.SphereGeometry(0.85, 6, 5);
     birchTop.translate(0.15, 6.1, -0.1);
     const bareBranch = (rz, tx, ty2, tz) => {
-      const bg = new THREE.ConeGeometry(0.09, 1.9, 14);
+      const bg = new THREE.ConeGeometry(0.09, 1.9, 5);
       bg.rotateZ(rz);
       bg.translate(tx, ty2, tz);
       return [bg, trunkMat];
     };
-    const oakTrunk = new THREE.CylinderGeometry(0.42, 0.6, 2.7, 12);
+    const oakTrunk = new THREE.CylinderGeometry(0.42, 0.6, 2.7, 7);
     oakTrunk.translate(0, 1.35, 0);
-    const oakDome = new THREE.SphereGeometry(2.35, 14, 9);
+    const oakDome = new THREE.SphereGeometry(2.35, 8, 6);
     oakDome.scale(1, 0.78, 1);
     oakDome.translate(0, 4.0, 0);
-    const oakTop = new THREE.SphereGeometry(1.4, 12, 8);
+    const oakTop = new THREE.SphereGeometry(1.4, 7, 5);
     oakTop.translate(0.35, 5.5, 0.2);
     // --- rainforest ---
     // AMAZON RAPIDS was falling through to the default two-pine stand, so the
     // Amazon was planted with conifers. Three storeys instead, which is what
     // actually reads as rainforest from a car: a buttressed emergent standing
     // clear of everything, an umbrella-crowned mid-storey, and a low tree fern.
-    const kapokTrunk = new THREE.CylinderGeometry(0.30, 0.72, 8.6, 12);
+    const kapokTrunk = new THREE.CylinderGeometry(0.30, 0.72, 8.6, 7);
     kapokTrunk.translate(0, 4.3, 0);
-    const kapokButtress = new THREE.ConeGeometry(1.25, 2.4, 16);   // flared root flare
+    const kapokButtress = new THREE.ConeGeometry(1.25, 2.4, 6);   // flared root flare
     kapokButtress.translate(0, 1.2, 0);
     // emergents are flat-topped: the crown spreads sideways above the canopy
-    const kapokCrown = new THREE.SphereGeometry(3.5, 16, 8);
+    const kapokCrown = new THREE.SphereGeometry(3.5, 9, 5);
     kapokCrown.scale(1, 0.42, 1);
     kapokCrown.translate(0, 9.1, 0);
-    const kapokCrown2 = new THREE.SphereGeometry(2.2, 14, 8);
+    const kapokCrown2 = new THREE.SphereGeometry(2.2, 8, 5);
     kapokCrown2.scale(1, 0.5, 1);
     kapokCrown2.translate(0.9, 8.2, -0.6);
-    const cecTrunk = new THREE.CylinderGeometry(0.20, 0.30, 5.4, 16);
+    const cecTrunk = new THREE.CylinderGeometry(0.20, 0.30, 5.4, 6);
     cecTrunk.translate(0, 2.7, 0);
-    const cecCrown = new THREE.SphereGeometry(2.5, 14, 8);          // parasol
+    const cecCrown = new THREE.SphereGeometry(2.5, 8, 5);          // parasol
     cecCrown.scale(1, 0.5, 1);
     cecCrown.translate(0, 5.9, 0);
-    const fernTrunk = new THREE.CylinderGeometry(0.16, 0.24, 1.9, 8);
+    const fernTrunk = new THREE.CylinderGeometry(0.16, 0.24, 1.9, 6);
     fernTrunk.translate(0, 0.95, 0);
-    const fernFrond = new THREE.SphereGeometry(1.55, 12, 7);
+    const fernFrond = new THREE.SphereGeometry(1.55, 7, 4);
     fernFrond.scale(1, 0.34, 1);
     fernFrond.translate(0, 2.35, 0);
     const SPECIES = {
@@ -11989,10 +12077,10 @@ export class Track {
     const LOGS = Math.min(36, Math.max(10, (T.treeCount * 0.12) | 0));
     const STUMPS = Math.min(26, Math.max(8, (T.treeCount * 0.08) | 0));
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-    const logGeo = new THREE.CylinderGeometry(0.26, 0.33, 2.8, 12);
+    const logGeo = new THREE.CylinderGeometry(0.26, 0.33, 2.8, 7);
     logGeo.rotateZ(Math.PI / 2);                    // lie along local X
     logGeo.translate(0, 0.26, 0);
-    const stumpGeo = new THREE.CylinderGeometry(0.4, 0.5, 0.48, 12);
+    const stumpGeo = new THREE.CylinderGeometry(0.4, 0.5, 0.48, 7);
     stumpGeo.translate(0, 0.24, 0);
     const barkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const cutMat = new THREE.MeshStandardMaterial({
@@ -12036,16 +12124,16 @@ export class Track {
    *  up on the cliff rims, and around the open start bowl. */
   _buildCacti(m4) {
     const COUNT = this.T.treeCount;
-    const trunkGeo = new THREE.CapsuleGeometry(0.5, 3.6, 4, 14);
+    const trunkGeo = new THREE.CapsuleGeometry(0.5, 3.6, 4, 8);
     trunkGeo.translate(0, 2.3, 0);
-    const armUpA = new THREE.CapsuleGeometry(0.3, 1.5, 4, 14);
+    const armUpA = new THREE.CapsuleGeometry(0.3, 1.5, 4, 8);
     armUpA.translate(1.05, 3.5, 0);
-    const armElbowA = new THREE.CapsuleGeometry(0.3, 0.9, 4, 14);
+    const armElbowA = new THREE.CapsuleGeometry(0.3, 0.9, 4, 8);
     armElbowA.rotateZ(Math.PI / 2);
     armElbowA.translate(0.6, 2.75, 0);
-    const armUpB = new THREE.CapsuleGeometry(0.28, 1.1, 4, 14);
+    const armUpB = new THREE.CapsuleGeometry(0.28, 1.1, 4, 8);
     armUpB.translate(-0.95, 3.0, 0);
-    const armElbowB = new THREE.CapsuleGeometry(0.28, 0.75, 4, 14);
+    const armElbowB = new THREE.CapsuleGeometry(0.28, 0.75, 4, 8);
     armElbowB.rotateZ(Math.PI / 2);
     armElbowB.translate(-0.55, 2.4, 0);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 });
@@ -12054,22 +12142,22 @@ export class Track {
     // DESERT FLORA MIX: saguaros plus two more species so the desert never
     // reads copy-pasted — squat ribbed BARREL cacti with a blossom crown, and
     // dry flat-topped ACACIA scrub. All of them yield to a car.
-    const barrelBody = new THREE.CylinderGeometry(0.62, 0.78, 1.05, 16);
+    const barrelBody = new THREE.CylinderGeometry(0.62, 0.78, 1.05, 9);
     barrelBody.translate(0, 0.55, 0);
-    const barrelCrown = new THREE.SphereGeometry(0.3, 16, 8);
+    const barrelCrown = new THREE.SphereGeometry(0.3, 6, 5);
     barrelCrown.translate(0, 1.15, 0);
     const barrelParts = [
       new THREE.InstancedMesh(barrelBody, mat, COUNT),
       new THREE.InstancedMesh(barrelCrown,
         new THREE.MeshStandardMaterial({ color: 0xe89a4a, flatShading: true, roughness: 0.9 }), COUNT),
     ];
-    const acTrunk = new THREE.CylinderGeometry(0.12, 0.22, 2.6, 8);
+    const acTrunk = new THREE.CylinderGeometry(0.12, 0.22, 2.6, 6);
     acTrunk.rotateZ(0.16);
     acTrunk.translate(0, 1.3, 0);
-    const acBough = new THREE.CylinderGeometry(0.08, 0.12, 1.4, 8);
+    const acBough = new THREE.CylinderGeometry(0.08, 0.12, 1.4, 5);
     acBough.rotateZ(-0.8);
     acBough.translate(0.75, 2.2, 0);
-    const acCrown = new THREE.SphereGeometry(1.9, 14, 7);
+    const acCrown = new THREE.SphereGeometry(1.9, 8, 4);
     acCrown.scale(1, 0.22, 1);
     acCrown.translate(0.35, 3.0, 0);
     const acaciaParts = [
@@ -12172,21 +12260,21 @@ export class Track {
     // three overlapping crown lobes low over them. The first cut put two flat
     // discs on a tall bare pole and every one of them read as a mushroom: a
     // gum is nearly as wide as it is tall and the crown starts low. ---
-    const gumTrunk = new THREE.CylinderGeometry(0.55, 0.95, 3.6, 14);
+    const gumTrunk = new THREE.CylinderGeometry(0.55, 0.95, 3.6, 8);
     gumTrunk.translate(0, 1.8, 0);
-    const gumLimbA = new THREE.CylinderGeometry(0.2, 0.42, 3.6, 16);
+    const gumLimbA = new THREE.CylinderGeometry(0.2, 0.42, 3.6, 6);
     gumLimbA.rotateZ(-0.72);
     gumLimbA.translate(1.25, 4.4, 0.15);
-    const gumLimbB = new THREE.CylinderGeometry(0.18, 0.4, 3.3, 16);
+    const gumLimbB = new THREE.CylinderGeometry(0.18, 0.4, 3.3, 6);
     gumLimbB.rotateZ(0.78);
     gumLimbB.translate(-1.2, 4.2, -0.25);
-    const gumCrownA = new THREE.SphereGeometry(2.6, 14, 9);
+    const gumCrownA = new THREE.SphereGeometry(2.6, 8, 6);
     gumCrownA.scale(1, 0.78, 1);
     gumCrownA.translate(1.85, 6.0, 0.3);
-    const gumCrownB = new THREE.SphereGeometry(2.3, 14, 9);
+    const gumCrownB = new THREE.SphereGeometry(2.3, 8, 6);
     gumCrownB.scale(1, 0.8, 1);
     gumCrownB.translate(-1.75, 5.6, -0.5);
-    const gumCrownC = new THREE.SphereGeometry(2.0, 14, 9);
+    const gumCrownC = new THREE.SphereGeometry(2.0, 8, 6);
     gumCrownC.scale(1, 0.85, 1);
     gumCrownC.translate(0.1, 6.6, -0.1);
     const barkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 0.95 });
@@ -12207,11 +12295,11 @@ export class Track {
     // cone and the plain came out planted with pine trees. The silhouette is
     // narrow (r ~ 1.05 against 6 u of height) and the inverted lower cone
     // gives the sheoak's characteristic hanging skirt. ---
-    const oakTrunkGeo = new THREE.CylinderGeometry(0.18, 0.34, 3.6, 16);
+    const oakTrunkGeo = new THREE.CylinderGeometry(0.18, 0.34, 3.6, 6);
     oakTrunkGeo.translate(0, 1.8, 0);
-    const oakCone = new THREE.ConeGeometry(1.05, 4.0, 12);
+    const oakCone = new THREE.ConeGeometry(1.05, 4.0, 7);
     oakCone.translate(0, 6.0, 0);
-    const oakSkirt = new THREE.ConeGeometry(1.15, 3.0, 12);
+    const oakSkirt = new THREE.ConeGeometry(1.15, 3.0, 7);
     oakSkirt.rotateX(Math.PI);                          // inverted: the droop
     oakSkirt.translate(0, 4.4, 0);
     const oakBarkMat = new THREE.MeshStandardMaterial({ color: 0x5e4c3a, roughness: 1 });
@@ -12227,13 +12315,13 @@ export class Track {
     // --- mulga: three leaning stems under a flat grey-green pad ---
     const mulgaStems = [];
     for (let s = 0; s < 3; s++) {
-      const st = new THREE.CylinderGeometry(0.07, 0.15, 2.1, 8);
+      const st = new THREE.CylinderGeometry(0.07, 0.15, 2.1, 5);
       st.rotateZ((s - 1) * 0.24);
       st.rotateY(s * 2.1);
       st.translate((s - 1) * 0.26, 1.05, (s - 1) * 0.14);
       mulgaStems.push(st);
     }
-    const mulgaPad = new THREE.SphereGeometry(1.5, 12, 7);
+    const mulgaPad = new THREE.SphereGeometry(1.5, 7, 4);
     mulgaPad.scale(1, 0.34, 1);
     mulgaPad.translate(0, 2.35, 0);
     const mulgaBarkMat = new THREE.MeshStandardMaterial({ color: 0x6a5b48, roughness: 1 });
@@ -12325,26 +12413,26 @@ export class Track {
    *  in how far the char has bleached them. */
   _buildCharredTrees(m4) {
     const COUNT = this.T.treeCount;
-    const trunkGeo = new THREE.CylinderGeometry(0.13, 0.34, 4.8, 16);
+    const trunkGeo = new THREE.CylinderGeometry(0.13, 0.34, 4.8, 6);
     trunkGeo.translate(0, 2.4, 0);
-    const b1 = new THREE.ConeGeometry(0.1, 2.0, 14);
+    const b1 = new THREE.ConeGeometry(0.1, 2.0, 5);
     b1.rotateZ(-0.95);
     b1.translate(0.62, 3.2, 0);
-    const b2 = new THREE.ConeGeometry(0.09, 1.6, 14);
+    const b2 = new THREE.ConeGeometry(0.09, 1.6, 5);
     b2.rotateZ(0.85);
     b2.translate(-0.55, 2.6, 0.1);
-    const b3 = new THREE.ConeGeometry(0.08, 1.4, 14);
+    const b3 = new THREE.ConeGeometry(0.08, 1.4, 5);
     b3.rotateX(0.9);
     b3.translate(0, 3.7, 0.5);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 });
     const parts = [trunkGeo, b1, b2, b3].map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
     // stump: a snapped-off trunk with a jagged shoulder, half-buried in ash
-    const stTrunk = new THREE.CylinderGeometry(0.34, 0.6, 1.5, 16);
+    const stTrunk = new THREE.CylinderGeometry(0.34, 0.6, 1.5, 6);
     stTrunk.translate(0, 0.75, 0);
     const stShard = new THREE.ConeGeometry(0.2, 0.9, 4);
     stShard.rotateZ(0.22);
     stShard.translate(0.16, 1.7, 0);
-    const stRoot = new THREE.CylinderGeometry(0.62, 0.95, 0.36, 16);
+    const stRoot = new THREE.CylinderGeometry(0.62, 0.95, 0.36, 6);
     stRoot.translate(0, 0.18, 0);
     const stumpParts = [stTrunk, stShard, stRoot]
       .map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
@@ -12412,17 +12500,17 @@ export class Track {
     const canMatLow = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
     const canMatTop = new THREE.MeshStandardMaterial({ color: T.foliageTop, flatShading: true, roughness: 1 });
     // kapok: tall trunk, flared buttress base, wide plate crown + side domes
-    const kTrunk = new THREE.CylinderGeometry(0.26, 0.4, 7.0, 12);
+    const kTrunk = new THREE.CylinderGeometry(0.26, 0.4, 7.0, 7);
     kTrunk.translate(0, 3.5, 0);
-    const kButtress = new THREE.CylinderGeometry(0.62, 1.05, 1.5, 12);
+    const kButtress = new THREE.CylinderGeometry(0.62, 1.05, 1.5, 7);
     kButtress.translate(0, 0.75, 0);
-    const kCrown = new THREE.SphereGeometry(3.6, 14, 8);
+    const kCrown = new THREE.SphereGeometry(3.6, 8, 5);
     kCrown.scale(1, 0.34, 1);
     kCrown.translate(0, 7.3, 0);
-    const kDomeA = new THREE.SphereGeometry(2.0, 12, 8);
+    const kDomeA = new THREE.SphereGeometry(2.0, 7, 5);
     kDomeA.scale(1, 0.42, 1);
     kDomeA.translate(1.9, 6.8, 0.6);
-    const kDomeB = new THREE.SphereGeometry(1.7, 12, 8);
+    const kDomeB = new THREE.SphereGeometry(1.7, 7, 5);
     kDomeB.scale(1, 0.45, 1);
     kDomeB.translate(-1.8, 6.9, -0.5);
     // lianas: three thin strands dangling from the kapok crown — the single
@@ -12445,12 +12533,12 @@ export class Track {
       ...vineGeos.map((v) => new THREE.InstancedMesh(v, vineMat, COUNT)),
     ];
     // broadleaf: short trunk, two rounded stacked crowns
-    const bTrunk = new THREE.CylinderGeometry(0.24, 0.36, 4.2, 12);
+    const bTrunk = new THREE.CylinderGeometry(0.24, 0.36, 4.2, 7);
     bTrunk.translate(0, 2.1, 0);
-    const bCrown = new THREE.SphereGeometry(2.45, 14, 9);
+    const bCrown = new THREE.SphereGeometry(2.45, 8, 6);
     bCrown.scale(1, 0.72, 1);
     bCrown.translate(0, 4.7, 0);
-    const bTop = new THREE.SphereGeometry(1.5, 12, 8);
+    const bTop = new THREE.SphereGeometry(1.5, 7, 5);
     bTop.scale(1, 0.75, 1);
     bTop.translate(0.4, 6.0, 0.3);
     const broadParts = [
@@ -12459,7 +12547,7 @@ export class Track {
       new THREE.InstancedMesh(bTop, canMatTop, COUNT),
     ];
     // rainforest palm: slim bare stem, 7 drooping fronds, a nut cluster
-    const pTrunk = new THREE.CylinderGeometry(0.15, 0.28, 6.2, 16);
+    const pTrunk = new THREE.CylinderGeometry(0.15, 0.28, 6.2, 6);
     pTrunk.translate(0, 3.1, 0);
     const palmGeos = [pTrunk];
     for (let li = 0; li < 7; li++) {
@@ -12472,7 +12560,7 @@ export class Track {
       fr.translate(0, 6.15, 0);
       palmGeos.push(fr);
     }
-    const pNut = new THREE.SphereGeometry(0.2, 8, 6);
+    const pNut = new THREE.SphereGeometry(0.2, 6, 5);
     pNut.translate(0.26, 5.85, 0.16);
     const palmParts = [
       new THREE.InstancedMesh(pTrunk, trunkMat, COUNT),
@@ -12480,7 +12568,7 @@ export class Track {
       new THREE.InstancedMesh(pNut, new THREE.MeshStandardMaterial({ color: 0x6a4a26, roughness: 1 }), COUNT),
     ];
     // tree fern: squat fibrous trunk under an arching frond rosette
-    const fTrunk = new THREE.CylinderGeometry(0.2, 0.34, 2.0, 16);
+    const fTrunk = new THREE.CylinderGeometry(0.2, 0.34, 2.0, 6);
     fTrunk.translate(0, 1.0, 0);
     const fernParts = [new THREE.InstancedMesh(fTrunk, trunkMat, COUNT)];
     for (let li = 0; li < 6; li++) {
@@ -12591,7 +12679,7 @@ export class Track {
   _buildPalms(m4) {
     const T = this.T;
     const COUNT = T.treeCount;
-    const trunkGeo = new THREE.CylinderGeometry(0.16, 0.32, 5.4, 12);
+    const trunkGeo = new THREE.CylinderGeometry(0.16, 0.32, 5.4, 7);
     trunkGeo.translate(0, 2.7, 0);
     const partGeos = [trunkGeo];
     for (let li = 0; li < 6; li++) {
@@ -12604,7 +12692,7 @@ export class Track {
       fr.translate(0, 5.35, 0);
       partGeos.push(fr);
     }
-    const nutGeo = new THREE.SphereGeometry(0.22, 8, 6);
+    const nutGeo = new THREE.SphereGeometry(0.22, 6, 5);
     nutGeo.translate(0.28, 5.05, 0.18);
     partGeos.push(nutGeo);
     const PALM_OWN = new THREE.Color(1, 1, 1);   // 'keep your own material colour'
@@ -12615,7 +12703,7 @@ export class Track {
       geoPart, gi === 0 ? trunkMat : gi === partGeos.length - 1 ? nutMat : frondMat, COUNT
     ));
     // --- doum palm: short thick trunk, 8 stiff wide fans, no fruit ---
-    const dTrunk = new THREE.CylinderGeometry(0.3, 0.46, 2.5, 12);
+    const dTrunk = new THREE.CylinderGeometry(0.3, 0.46, 2.5, 7);
     dTrunk.translate(0, 1.25, 0);
     const doumGeos = [dTrunk];
     for (let li = 0; li < 8; li++) {
@@ -12727,54 +12815,54 @@ export class Track {
     const topMat = new THREE.MeshStandardMaterial({ color: T.foliageTop, flatShading: true, roughness: 1 });
 
     // --- ancient olive: two leaning stems, three overlapping crowns ---
-    const oTrunk = new THREE.CylinderGeometry(0.42, 0.78, 2.1, 12);
+    const oTrunk = new THREE.CylinderGeometry(0.42, 0.78, 2.1, 7);
     oTrunk.translate(0, 1.05, 0);
-    const oLimb = new THREE.CylinderGeometry(0.2, 0.34, 1.9, 16);
+    const oLimb = new THREE.CylinderGeometry(0.2, 0.34, 1.9, 6);
     oLimb.rotateZ(0.34);
     oLimb.translate(0.42, 1.5, 0.1);
-    const oCrownA = new THREE.SphereGeometry(1.95, 12, 8);
+    const oCrownA = new THREE.SphereGeometry(1.95, 7, 5);
     oCrownA.scale(1, 0.74, 1);
     oCrownA.translate(0, 3.5, 0);
-    const oCrownB = new THREE.SphereGeometry(1.3, 16, 8);
+    const oCrownB = new THREE.SphereGeometry(1.3, 6, 5);
     oCrownB.scale(1, 0.8, 1);
     oCrownB.translate(1.35, 3.1, 0.45);
-    const oCrownC = new THREE.SphereGeometry(1.15, 16, 8);
+    const oCrownC = new THREE.SphereGeometry(1.15, 6, 5);
     oCrownC.scale(1, 0.8, 1);
     oCrownC.translate(-1.2, 3.3, -0.5);
     // --- grove-row olive: the small planted one ---
-    const gTrunk = new THREE.CylinderGeometry(0.16, 0.27, 1.5, 16);
+    const gTrunk = new THREE.CylinderGeometry(0.16, 0.27, 1.5, 6);
     gTrunk.translate(0, 0.75, 0);
-    const gCrown = new THREE.SphereGeometry(1.38, 12, 8);
+    const gCrown = new THREE.SphereGeometry(1.38, 7, 5);
     gCrown.scale(1, 0.86, 1);
     gCrown.translate(0, 2.45, 0);
-    const gTop = new THREE.SphereGeometry(0.82, 16, 7);
+    const gTop = new THREE.SphereGeometry(0.82, 6, 4);
     gTop.translate(0.3, 3.15, -0.2);
     // --- cork oak: stripped band low, broad dome high ---
-    const cTrunk = new THREE.CylinderGeometry(0.3, 0.44, 4.4, 12);
+    const cTrunk = new THREE.CylinderGeometry(0.3, 0.44, 4.4, 7);
     cTrunk.translate(0, 2.2, 0);
-    const cStrip = new THREE.CylinderGeometry(0.46, 0.54, 1.9, 14);
+    const cStrip = new THREE.CylinderGeometry(0.46, 0.54, 1.9, 8);
     cStrip.translate(0, 0.95, 0);
-    const cDome = new THREE.SphereGeometry(2.85, 14, 9);
+    const cDome = new THREE.SphereGeometry(2.85, 8, 6);
     cDome.scale(1, 0.68, 1);
     cDome.translate(0, 5.5, 0);
-    const cLobe = new THREE.SphereGeometry(1.75, 12, 8);
+    const cLobe = new THREE.SphereGeometry(1.75, 7, 5);
     cLobe.scale(1, 0.7, 1);
     cLobe.translate(1.55, 4.9, 0.6);
     // --- umbrella pine: bare trunk, flat parasol ---
-    const uTrunk = new THREE.CylinderGeometry(0.26, 0.44, 8.1, 12);
+    const uTrunk = new THREE.CylinderGeometry(0.26, 0.44, 8.1, 7);
     uTrunk.translate(0, 4.05, 0);
-    const uCanopy = new THREE.SphereGeometry(3.2, 16, 8);
+    const uCanopy = new THREE.SphereGeometry(3.2, 9, 5);
     uCanopy.scale(1, 0.3, 1);
     uCanopy.translate(0, 9.2, 0);
-    const uCanopy2 = new THREE.SphereGeometry(2.0, 14, 8);
+    const uCanopy2 = new THREE.SphereGeometry(2.0, 8, 5);
     uCanopy2.scale(1, 0.28, 1);
     uCanopy2.translate(0.95, 8.5, -0.5);
     // --- cypress: the column ---
-    const yStub = new THREE.CylinderGeometry(0.16, 0.22, 0.8, 8);
+    const yStub = new THREE.CylinderGeometry(0.16, 0.22, 0.8, 6);
     yStub.translate(0, 0.4, 0);
-    const yCol = new THREE.CylinderGeometry(0.34, 0.92, 8.6, 12);
+    const yCol = new THREE.CylinderGeometry(0.34, 0.92, 8.6, 7);
     yCol.translate(0, 4.9, 0);
-    const yTip = new THREE.ConeGeometry(0.4, 2.3, 12);
+    const yTip = new THREE.ConeGeometry(0.4, 2.3, 7);
     yTip.translate(0, 10.2, 0);
 
     const mk = (specs) => {
@@ -12925,13 +13013,13 @@ export class Track {
   _buildRedwoods(m4) {
     const T = this.T;
     const COUNT = T.treeCount;
-    const trunkGeo = new THREE.CylinderGeometry(0.5, 0.9, 9, 14);
+    const trunkGeo = new THREE.CylinderGeometry(0.5, 0.9, 9, 8);
     trunkGeo.translate(0, 4.5, 0);
-    const lowGeo = new THREE.ConeGeometry(3.0, 6.5, 14);
+    const lowGeo = new THREE.ConeGeometry(3.0, 6.5, 8);
     lowGeo.translate(0, 11.4, 0);
-    const midGeo = new THREE.ConeGeometry(2.3, 5.5, 14);
+    const midGeo = new THREE.ConeGeometry(2.3, 5.5, 8);
     midGeo.translate(0, 15.1, 0);
-    const topGeo = new THREE.ConeGeometry(1.5, 4.6, 14);
+    const topGeo = new THREE.ConeGeometry(1.5, 4.6, 8);
     topGeo.translate(0, 18.6, 0);
     const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const lowMat = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
@@ -13001,13 +13089,13 @@ export class Track {
     // Short crooked trunk under two rounded crowns in a lighter, yellower
     // green than the conifers, so the stand never reads as one repeated tree.
     const OAKS = 120;
-    const oTrunk = new THREE.CylinderGeometry(0.26, 0.42, 4.4, 16);
+    const oTrunk = new THREE.CylinderGeometry(0.26, 0.42, 4.4, 6);
     oTrunk.rotateZ(0.06);
     oTrunk.translate(0, 2.2, 0);
-    const oCrown = new THREE.SphereGeometry(2.3, 14, 9);
+    const oCrown = new THREE.SphereGeometry(2.3, 8, 6);
     oCrown.scale(1, 0.82, 1);
     oCrown.translate(0, 5.1, 0);
-    const oTop = new THREE.SphereGeometry(1.4, 12, 8);
+    const oTop = new THREE.SphereGeometry(1.4, 7, 5);
     oTop.scale(1, 0.85, 1);
     oTop.translate(0.45, 6.3, 0.3);
     // reuse the theme's canopy materials so the tanoaks sit in the same
@@ -13050,12 +13138,12 @@ export class Track {
     const color = new THREE.Color();
     // --- charred snags (60%) ---
     const SNAGS = Math.round(T.treeCount * 0.6);
-    const trunkGeo = new THREE.CylinderGeometry(0.13, 0.34, 4.8, 16);
+    const trunkGeo = new THREE.CylinderGeometry(0.13, 0.34, 4.8, 6);
     trunkGeo.translate(0, 2.4, 0);
-    const b1 = new THREE.ConeGeometry(0.1, 2.0, 14);
+    const b1 = new THREE.ConeGeometry(0.1, 2.0, 5);
     b1.rotateZ(-0.95);
     b1.translate(0.62, 3.2, 0);
-    const b2 = new THREE.ConeGeometry(0.09, 1.6, 14);
+    const b2 = new THREE.ConeGeometry(0.09, 1.6, 5);
     b2.rotateZ(0.85);
     b2.translate(-0.55, 2.6, 0.1);
     const snagMat = new THREE.MeshStandardMaterial({
@@ -13090,11 +13178,11 @@ export class Track {
 
     // --- scorched standing pines (40%), canopies glowing from within ---
     const PINES = T.treeCount - SNAGS;
-    const pTrunk = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 12);
+    const pTrunk = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 7);
     pTrunk.translate(0, 1.2, 0);
-    const pLow = new THREE.ConeGeometry(2.6, 4.2, 14);
+    const pLow = new THREE.ConeGeometry(2.6, 4.2, 8);
     pLow.translate(0, 4.0, 0);
-    const pTop = new THREE.ConeGeometry(1.8, 3.4, 14);
+    const pTop = new THREE.ConeGeometry(1.8, 3.4, 8);
     pTop.translate(0, 6.6, 0);
     const pTrunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const scorchMat = new THREE.MeshStandardMaterial({
@@ -13190,7 +13278,7 @@ export class Track {
     let bushGeo;
     if (underKind === 'frond') {
       // a low rosette of fronds: wide, flat, overlapping
-      bushGeo = new THREE.SphereGeometry(1.15, 12, 3);
+      bushGeo = new THREE.SphereGeometry(1.15, 7, 3);
       bushGeo.scale(1, 0.3, 1);
     } else if (underKind === 'spray') {
       // bunchgrass: narrow at the base, splaying up and out
@@ -13361,7 +13449,7 @@ export class Track {
 
     // flowers sprinkled close to the road
     const flowers = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.22, 8, 6),
+      new THREE.SphereGeometry(0.22, 6, 5),
       new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }),
       T.flowerCount
     );
@@ -13620,7 +13708,7 @@ export class Track {
 
     // hay bales
     const hayCount = this.T.hayCount !== undefined ? this.T.hayCount : 50;
-    const hayGeo = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 16);
+    const hayGeo = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 10);
     hayGeo.rotateZ(Math.PI / 2);
     const hay = new THREE.InstancedMesh(
       hayGeo, new THREE.MeshStandardMaterial({ color: this.T.hayColor, roughness: 1 }), Math.max(hayCount, 1)
@@ -13653,7 +13741,7 @@ export class Track {
     // neon sponsor palettes on unlit (MeshBasic) panels so they burn through
     // the night and bloom picks up the lettering.
     const neonStyle = this.T.bannerStyle === 'neon';
-    const post = new THREE.CylinderGeometry(0.14, 0.16, 3.4, 8);
+    const post = new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7);
     const postMat = new THREE.MeshStandardMaterial({
       color: 0x4a4640, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
     });
@@ -13729,7 +13817,7 @@ export class Track {
     board.position.y = 2.6;
     g.add(board);
     const post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.14, 0.16, 3.4, 8),
+      new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7),
       new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.6, metalness: 0.5 })
     );
     post.position.set(0, 1.7, -0.1);
@@ -13849,13 +13937,13 @@ export class Track {
       // rope rails on short posts down both edges of the deck
       for (const s of [-1, 1]) {
         for (const ry of [9.6, 10.1]) {
-          const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, span, 8), ropeMat);
+          const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, span, 5), ropeMat);
           rope.rotation.z = Math.PI / 2;
           rope.position.set(0, ry, s * 1.45);
           g.add(rope);
         }
         for (let px = -span / 2 + 1.2; px <= span / 2 - 1.1; px += 3.4) {
-          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.25, 8), woodMat);
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.25, 6), woodMat);
           post.position.set(px, 9.75, s * 1.45);
           g.add(post);
         }
@@ -13889,7 +13977,7 @@ export class Track {
         // 25 u span reads as a stilt, not a trestle.
         for (const lean of [-1, 1]) {
           const leg = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.16, 0.26, drop, 10),
+            new THREE.CylinderGeometry(0.16, 0.26, drop, 6),
             woodMat
           );
           leg.castShadow = true;
@@ -14003,7 +14091,7 @@ export class Track {
       // coconuts
       for (let k = 0; k < 2; k++) {
         const nut = new THREE.Mesh(
-          new THREE.SphereGeometry(0.17, 8, 6),
+          new THREE.SphereGeometry(0.17, 6, 5),
           new THREE.MeshStandardMaterial({ color: 0x6a4a26, roughness: 1 })
         );
         nut.position.copy(tip).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, -0.25, (Math.random() - 0.5) * 0.5));
