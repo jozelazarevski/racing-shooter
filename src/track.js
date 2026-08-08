@@ -2450,7 +2450,7 @@ const THEMES = {
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'medhill',
     frontage: {
-      lateral: 15.5, depth: 8, unit: 7.2, height: 9.5, run: [6, 12],
+      lateral: 15.5, depth: 8, unit: 7.2, height: 9.5, run: [6, 12], rows: 4,
       // WARM RENDER, NOT GREY. The shared default paints a muted stone/slate
       // street, which is right for a northern old town and wrong for this
       // one: the reference quay is limewash and painted render, ochre through
@@ -4980,9 +4980,24 @@ export class Track {
       }
       bd = Math.sqrt(bd);
       if (bd > 34) continue;
+      // THE BORE IS A HOLE, AND A HEIGHTFIELD CANNOT HOLD A HOLE.
+      //
+      // This raised the ground to roof height for ANY point within 34 u of the
+      // tunnel line - the roadway included - so the hill was built straight
+      // through the space the car drives in. The shell mesh was then drawn
+      // inside solid rock, and the player was buried: three VIEW RESET
+      // (buried) messages stacked up in the reported frame.
+      //
+      // So the CORRIDOR never rises. Inside the bore's half-width the ground
+      // is held at or below the roadway, and the flank ramps up over the next
+      // dozen units, which is what makes the hillside close in beside the road
+      // instead of standing as a wall on the verge.
+      const CORR = TUNNEL_HW + 2.0, FLANK = TUNNEL_HW + 14.0;
+      if (bd < CORR) { h = Math.min(h, by - 1.2); continue; }
+      const open = Math.min(1, (bd - CORR) / (FLANK - CORR));
       const across = Math.pow(Math.cos((bd / 34) * Math.PI * 0.5), 1.3);
       const ease = Math.min(1, Math.min(bi, T.pts.length - 1 - bi) / 3);
-      const w = across * ease;
+      const w = across * ease * open;
       if (w < 0.06) continue;
       h = Math.max(h, by + T.h * w);
     }
@@ -9448,8 +9463,12 @@ export class Track {
     const pos = geo.attributes.position;
     const cols = new Float32Array(pos.count * 3);
     for (let i = 0; i < pos.count; i++) {
+      // TOP-LIT, NOT BLOWN OUT. This ran 0.68 -> 1.20, and a vertex colour
+      // above 1 BRIGHTENS the material: under a strong sun the tops washed to
+      // white, which is what turned every boulder field into "white mountains
+      // with no purpose". The gradient still reads; it just stops at 1.
       const t = THREE.MathUtils.clamp((pos.getY(i) + 1) / 2, 0, 1);
-      const v = 0.68 + 0.52 * t;
+      const v = 0.66 + 0.34 * t;
       cols[i * 3] = v; cols[i * 3 + 1] = v; cols[i * 3 + 2] = v;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
@@ -9627,7 +9646,7 @@ export class Track {
    *  cabin on the centreline of FURKA RIDGE. */
   _buildOldTown(m4) {
     const F = {
-      lateral: 15.5, depth: 8, unit: 7.0, height: 10.0, run: [7, 14],
+      lateral: 15.5, depth: 8, unit: 7.0, height: 10.0, run: [7, 14], rows: 4,
       tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
       ...this.T.frontage,
     };
@@ -9646,7 +9665,7 @@ export class Track {
       mesh.material.map?.dispose();
       mesh.material.dispose();
     }
-    const MAX = 780;
+    const MAX = 1500;                 // four ranks of village, not one terrace
     const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
     bodyGeo.translate(0, 0.5, 0);
     // THE FACADE IS THE STYLE. The body has no colour of its own - it wears a
@@ -9808,11 +9827,20 @@ export class Track {
           runH = 0.84 + Math.random() * 0.44;      // the next block, its own build
           runJ = (Math.random() - 0.5) * 1.6;
         }
-        // the quarter behind: taller, sparser, and shootable
-        if (s % 4 === 0) {
-          const back = put(i, side, F.lateral + F.depth + 9 + Math.random() * 12,
+        // THE VILLAGE HAS DEPTH. One rank behind the frontage reads as a
+        // stage flat - a single terrace with nothing behind it. The reference
+        // is a village climbing away from the road, roofs stepping back to the
+        // skyline, so `rows` ranks are laid: each further out, sparser than the
+        // last, and a touch lower so the rows read as receding rather than as
+        // a wall. Every one of them is shootable set dressing.
+        const RANKS = F.rows ?? 1;
+        for (let rank = 1; rank <= RANKS; rank++) {
+        if (s % (3 + rank) === 0) {
+          const back = put(i, side,
+            F.lateral + F.depth + 9 + (rank - 1) * (F.depth + 12) + Math.random() * 12,
             F.unit * (1.1 + Math.random() * 0.5), F.depth + 2 + Math.random() * 3,
-            F.height * (1.05 + Math.random() * 0.55), 2.4 + Math.random() * 1.4,
+            F.height * (1.05 + Math.random() * 0.55) * (1 - (rank - 1) * 0.07),
+            2.4 + Math.random() * 1.4,
             tints[(Math.random() * tints.length) | 0]);
           // THE FRONTAGE IS NOT SHOOTABLE AND THE BLOCK BEHIND IT IS.
           // The frontage is the corridor — level a terrace and the region's
@@ -9828,6 +9856,7 @@ export class Track {
             });
             this._addShadow(back.p.x, back.p.z, back.r * 1.25);
           }
+        }
         }
       }
     }
@@ -12299,9 +12328,13 @@ export class Track {
     if (caps) caps.castShadow = true;
     const rcol = new THREE.Color();
     let rk = 0, lk = 0;
+    // OFF THE VERGE. 12.5 u put boulders about three units from the road edge,
+    // so a scatter meant to dress the middle distance ended up crowding the
+    // carriageway. Deliberate road hazards are a different system entirely
+    // (obstacleSpec), and they still place where they always did.
     this._scatter(T.rockCount, () => {
-      const p = this._trackSidePos(12.5, 90);
-      return p && !this._onQuayStrip(p.x, p.z) ? p : null;
+      const p = this._trackSidePos(19, 90);
+      return p && !this._onQuayStrip(p.x, p.z) && !this._inWater(p.x, p.z) ? p : null;
     }, (p) => {
       let s = 0.5 + Math.random() * 2.2;
       // never let a boulder reach into the carriageway — shrink it to fit, and
