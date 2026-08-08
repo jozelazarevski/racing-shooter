@@ -409,6 +409,14 @@ const DEMANDS = {
   47: { loose: 0.45, twist: 0.60, fast: 0.40, climb: 0.25 }, // DEEPWOOD TRAIL
   48: { loose: 0.60, twist: 0.75, fast: 0.30, climb: 0.65 }, // DOLOMITI CORSA
   49: { loose: 0.15, twist: 0.55, fast: 0.50, climb: 0.10 }, // HARBOR QUAY
+  // THE MEDITERRANEAN FIVE. Estimates from each route's own geometry, not
+  // measured laps: corniche shelves are fast and twisty and barely climb, the
+  // island is tighter, the Brava's seafront straight makes it the fastest.
+  50: { loose: 0.20, twist: 0.62, fast: 0.48, climb: 0.30 }, // CINQUE TERRE
+  51: { loose: 0.28, twist: 0.58, fast: 0.45, climb: 0.18 }, // AEGEAN BLUE
+  52: { loose: 0.22, twist: 0.50, fast: 0.62, climb: 0.20 }, // COSTA BRAVA
+  53: { loose: 0.24, twist: 0.55, fast: 0.52, climb: 0.16 }, // DALMATIA DRIVE
+  54: { loose: 0.18, twist: 0.60, fast: 0.55, climb: 0.24 }, // COTE D AZUR
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {

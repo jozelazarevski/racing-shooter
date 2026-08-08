@@ -152,6 +152,18 @@ export const LEVELS = [
   { id: 47, name: 'DEEPWOOD TRAIL', theme: 'deepwood', region: 'HEARTLAND', cost: 19, fresh: true },
   { id: 48, name: 'DOLOMITI CORSA', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true },
   { id: 49, name: 'HARBOR QUAY', theme: 'harbor', region: 'HEARTLAND', cost: 21, fresh: true },
+  // THE MEDITERRANEAN FIVE - one coast each, all with bridges where the route
+  // crosses itself and tunnels where a headland gets in the way.
+  { id: 50, name: 'CINQUE TERRE', theme: 'liguria', region: 'MEDITERRANEAN', cost: 22, fresh: true,
+    route: 'liguriaRun', tune: { tunnels: { count: 1 } } },
+  { id: 51, name: 'AEGEAN BLUE', theme: 'aegean', region: 'MEDITERRANEAN', cost: 23, fresh: true,
+    route: 'aegeanRun' },
+  { id: 52, name: 'COSTA BRAVA', theme: 'brava', region: 'MEDITERRANEAN', cost: 24, fresh: true,
+    route: 'bravaRun', tune: { tunnels: { count: 1 } } },
+  { id: 53, name: 'DALMATIA DRIVE', theme: 'dalmatia', region: 'MEDITERRANEAN', cost: 25, fresh: true,
+    route: 'dalmatiaRun' },
+  { id: 54, name: 'COTE D AZUR', theme: 'azur', region: 'MEDITERRANEAN', cost: 26, fresh: true,
+    route: 'azurRun', tune: { tunnels: { count: 1 } } },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -177,6 +189,43 @@ function switchbackStack({ legs, z0, dz, halfX, hp, dir = 1,
 
 // Hand-designed circuit control points (x, z) per theme.
 const CIRCUITS = {
+  // ---- THE MEDITERRANEAN FIVE. Five coasts, five layout IDEAS - a cliff
+  // corniche with a village loop, an island round two bays, a seafront blast
+  // into inland hairpins, a peninsula through a narrow neck, and a corniche
+  // that crosses its own return leg twice so both crossings bridge.
+  liguriaRun: [
+    [-250, -140], [-140, -175], [-20, -190], [100, -178], [205, -150],
+    [280, -100], [318, -30], [300, 45], [240, 92], [160, 108],
+    [95, 152], [120, 215], [60, 258], [-30, 244], [-70, 186],
+    [-140, 205], [-215, 190], [-268, 130], [-282, 45], [-320, -25],
+    [-305, -95],
+  ],
+  aegeanRun: [
+    [-220, -60], [-165, -140], [-70, -178], [30, -166], [95, -110],
+    [120, -35], [185, 10], [270, 5], [318, 60], [295, 140],
+    [210, 178], [110, 168], [40, 120], [-40, 118], [-95, 165],
+    [-190, 172], [-262, 120], [-285, 35], [-258, -20],
+  ],
+  bravaRun: [
+    [-330, 120], [-190, 128], [-40, 132], [110, 130], [250, 120],
+    [330, 78], [345, 10], [292, -40], [210, -32], [175, -95],
+    [225, -150], [180, -205], [90, -196], [55, -140], [-25, -128],
+    [-70, -182], [-160, -190], [-205, -135], [-160, -78], [-235, -46],
+    [-320, 20],
+  ],
+  dalmatiaRun: [
+    [-300, -30], [-215, -95], [-120, -120], [-30, -108], [30, -60],
+    [55, 15], [125, 55], [215, 48], [292, 82], [318, 155],
+    [258, 210], [165, 205], [110, 155], [40, 168], [-30, 210],
+    [-125, 215], [-205, 175], [-232, 100], [-190, 40], [-268, 30],
+  ],
+  azurRun: [
+    [-290, 40], [-200, -30], [-90, -70], [30, -60], [120, -10],
+    [150, 70], [95, 130], [0, 150], [-95, 130], [-150, 60],
+    [-120, -20], [-30, -60], [70, -100], [175, -120], [270, -80],
+    [315, 0], [290, 90], [200, 150], [80, 190], [-50, 200],
+    [-175, 180], [-270, 130],
+  ],
   // classic forest rally loop
   forest: [
     [0, -180], [90, -170], [150, -120], [215, -130], [252, -70],
@@ -2374,6 +2423,11 @@ const THEMES = {
     elements: 'medhill',
     frontage: {
       lateral: 15.5, depth: 8, unit: 7.2, height: 9.5, run: [6, 12],
+      // WARM RENDER, NOT GREY. The shared default paints a muted stone/slate
+      // street, which is right for a northern old town and wrong for this
+      // one: the reference quay is limewash and painted render, ochre through
+      // apricot, and that warmth is most of what makes it read as the south.
+      tints: ['#e8c99a', '#dcae7a', '#f0dcc0', '#cf9a6a', '#e6d2ad', '#c98f66'],
       // THE QUAY IS OPEN TO THE WATER. `seaOpen` rejects any frontage block
       // whose centre is within this many units of the waterline (or seaward
       // of it) — so along the seafront straight the houses line ONLY the
@@ -2793,6 +2847,70 @@ const THEMES = {
   },
 };
 
+/** THE MEDITERRANEAN FIVE.
+ *
+ *  Built by CLONING the harbour, deliberately: the coastal machinery (the
+ *  faceted sea, the quay strip, the open-to-the-water frontage rule, the
+ *  lighthouse, the cobbles) is the same problem on every one of these coasts,
+ *  and forking it five times is how the back half of the roster became five
+ *  copies of one world. What differs is what actually differs between these
+ *  places - the building culture, the paint, the light and the water.
+ *
+ *  Each names its own ELEMENT KIT (different house SHAPES, not a retint) and
+ *  its own frontage tints, so a street in Liguria and a street in the Aegean
+ *  cannot be mistaken for one another from the driving seat.
+ */
+for (const [key, over] of [
+  ['liguria', {                                   // ITALY - Cinque Terre
+    elements: 'liguria',
+    frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e },
+    seaColor: 0x2f7fa8, sunColor: 0xffe8c0, sunIntensity: 2.7,
+    skyTop: '#2f7fd1', skyHorizon: '#e8ddc6',
+    terrainLow: '#7d8a4e', terrainHigh: '#a89a68',
+    hillColor: 0x8a8a58, peakColor: 0xb0a67e,
+  }],
+  ['aegean', {                                    // GREECE
+    elements: 'aegean',
+    frontage: { tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6 },
+    seaColor: 0x1f7fc4, sunColor: 0xfff4d8, sunIntensity: 3.0,
+    skyTop: '#2a86dc', skyHorizon: '#eaf1f4',
+    terrainLow: '#9a9a6a', terrainHigh: '#c0b489',
+    hillColor: 0xa8a276, peakColor: 0xcabf94,
+  }],
+  ['brava', {                                     // SPAIN - Costa Brava
+    elements: 'andalusia',
+    frontage: { tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33 },
+    seaColor: 0x2b6f9c, sunColor: 0xffe6b4, sunIntensity: 2.9,
+    skyTop: '#3182cc', skyHorizon: '#efe2c6',
+    terrainLow: '#8a8a52', terrainHigh: '#c2ad78',
+    hillColor: 0x9c9060, peakColor: 0xc4b485,
+  }],
+  ['dalmatia', {                                  // CROATIA
+    elements: 'dalmatia',
+    frontage: { tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a },
+    seaColor: 0x1c86ae, sunColor: 0xfff0d4, sunIntensity: 2.8,
+    skyTop: '#2f8ad4', skyHorizon: '#e6eee8',
+    terrainLow: '#6f8450', terrainHigh: '#a8a276',
+    hillColor: 0x8e9464, peakColor: 0xc0bb96,
+  }],
+  ['azur', {                                      // FRANCE - Cote d'Azur
+    elements: 'azur',
+    frontage: { tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52 },
+    seaColor: 0x2f74a6, sunColor: 0xffeccc, sunIntensity: 2.6,
+    skyTop: '#3a86c8', skyHorizon: '#eee4d2',
+    terrainLow: '#7f8a58', terrainHigh: '#b0a478',
+    hillColor: 0x94926a, peakColor: 0xbcb491,
+  }],
+]) {
+  THEMES[key] = {
+    ...THEMES.harbor,
+    ...over,
+    // the frontage override is a PATCH, not a replacement: geometry (lateral,
+    // depth, unit, height, run, seaOpen, side) stays the harbour's
+    frontage: { ...THEMES.harbor.frontage, ...(over.frontage || {}) },
+  };
+}
+
 /** Free every geometry, material and texture under `root`, then empty it.
  *
  *  GPU resources are not garbage collected — dropping the last JS reference to
@@ -3000,6 +3118,58 @@ const BARREL_PALETTES = {
  * `r` is the collider radius the car pushes off, and `mat` its solidity class.
  */
 export const HOUSE_TEMPLATES = {
+  // ---- THE MEDITERRANEAN COASTS ----
+  // Four archetypes that are genuinely different SHAPES, not the farmhouse
+  // retinted: a tall narrow Ligurian terrace house, a flat-roofed Aegean cube,
+  // its domed neighbour, and an Andalusian house around a walled patio. The
+  // silhouette is what tells you which coast you are on from the driving seat.
+
+  // LIGURIA: four storeys on a small footprint, painted render, shallow
+  // pantile roof, a shutter band per floor.
+  towerhouse: { r: 4.4, parts: [
+    ['box', 0, 0, 0, 5.8, 0.5, 5.4, 'stone'],                // footing
+    ['wall', 0, 0.5, 0, 5.4, 11.2, 5.0, 'wall'],             // the tall block
+    ['box', 0, 11.7, 0, 6.1, 0.26, 5.7, 'trim'],             // eaves
+    ['prism', 0, 11.95, 0, 6.3, 1.5, 5.9, 'roof'],           // shallow pantile
+    ['box', 0, 3.0, 2.6, 3.9, 0.5, 0.22, 'trim'],            // shutter bands
+    ['box', 0, 5.9, 2.6, 3.9, 0.5, 0.22, 'trim'],
+    ['box', 0, 8.8, 2.6, 3.9, 0.5, 0.22, 'trim'],
+    ['box', 0, 0.5, 2.6, 1.5, 2.4, 0.2, 'trim'],             // street door
+  ] },
+  // AEGEAN: a whitewashed cube with a parapet instead of eaves, an outside
+  // stair, and one painted door.
+  cube: { r: 4.6, parts: [
+    ['wall', 0, 0, 0, 8.0, 5.4, 7.2, 'wall'],
+    ['box', 0, 5.4, 0, 8.5, 0.55, 7.7, 'wall2'],             // parapet
+    ['wall', 2.2, 5.95, 0.8, 3.6, 2.8, 3.4, 'wall'],         // roof room
+    ['box', 2.2, 8.75, 0.8, 3.9, 0.45, 3.7, 'wall2'],
+    ['box', -2.6, 0, 3.7, 2.6, 2.6, 0.55, 'trim'],           // outside stair
+    ['box', 0.9, 0, 3.7, 1.5, 2.5, 0.22, 'trim'],            // blue door
+    ['box', -2.8, 3.2, 3.7, 1.2, 1.1, 0.2, 'trim'],          // shutter
+  ] },
+  // AEGEAN, the one with the dome: same cube, a drum and a blue cap.
+  domed: { r: 4.8, parts: [
+    ['wall', 0, 0, 0, 7.6, 4.8, 7.0, 'wall'],
+    ['box', 0, 4.8, 0, 8.1, 0.5, 7.5, 'wall2'],
+    ['cyl', 0, 5.3, 0, 3.4, 1.5, 3.4, 'wall'],               // drum
+    ['cone', 0, 6.8, 0, 3.8, 2.2, 3.8, 'roof'],              // the blue cap
+    ['box', 0, 0, 3.6, 1.5, 2.5, 0.22, 'trim'],
+    ['box', -2.4, 2.6, 3.6, 1.1, 1.0, 0.2, 'trim'],
+  ] },
+  // ANDALUSIA: the house is half the object - the other half is the walled
+  // patio it sits behind, which is what makes the street read as a street.
+  courtyard: { r: 6.4, parts: [
+    ['box', -1.6, 0, 0, 8.4, 0.6, 7.4, 'stone'],
+    ['wall', -1.6, 0.6, 0, 7.8, 5.0, 6.8, 'wall'],
+    ['box', -1.6, 5.6, 0, 8.6, 0.3, 7.6, 'trim'],
+    ['prism', -1.6, 5.9, 0, 9.0, 2.4, 8.0, 'roof'],
+    ['wall', 4.6, 0, 2.9, 4.2, 2.6, 0.7, 'wall2'],           // patio walls
+    ['wall', 6.4, 0, 0, 0.7, 2.6, 6.5, 'wall2'],
+    ['box', 4.6, 2.6, 2.9, 4.5, 0.35, 1.0, 'roof'],          // coping tiles
+    ['box', 6.4, 2.6, 0, 1.0, 0.35, 6.8, 'roof'],
+    ['box', -1.6, 0.6, 3.5, 1.6, 2.6, 0.22, 'trim'],
+  ] },
+
   // ---- FARMSTEAD AND VILLAGE ----
   barn: { r: 7.4, parts: [
     ['wall', 0, 0, 0, 12, 6.0, 8.4, 'wall2'],
@@ -3218,6 +3388,61 @@ const ELEMENT_KITS = {
     dress: ['well'], fenceColor: 0x5a5f66, stoneWalls: 6,
     field: [], fenceRuns: 4,
   },
+  // ---------------------------------------------------------------------
+  // THE MEDITERRANEAN KITS. Five coasts, five building cultures - not one
+  // kit retinted five times, which is the trap the back half of the roster
+  // already fell into. Each carries its own PALETTE, so a quay is a row of
+  // differently painted houses the way the reference art is, and its own
+  // build list, so the silhouettes differ too.
+  //
+  // LIGURIA (Italy) - Cinque Terre: tall narrow houses painted in saturated
+  // coral, ochre, rose and mustard, green shutters, pantile roofs.
+  liguria: {
+    wall: 0xe8a15c, wall2: 0xd4884a, roof: 0xb4552e, trim: 0x3f6b46, stone: 0xc9b998,
+    palette: [0xe98d5a, 0xe8b45c, 0xd9686a, 0xe4c37a, 0xc9705a, 0xefd9a6, 0xd98f4e],
+    roofs: [0xb4552e, 0xa74a2c, 0xc06238],
+    builds: ['towerhouse', 'towerhouse', 'house', 'shed'], landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xc8bb96, stoneWalls: 6,
+  },
+  // AEGEAN (Greece) - whitewashed cubes, flat roofs, one blue dome, and blue
+  // joinery. The palette is deliberately nearly monochrome WHITE, because
+  // that is the region's identity; the colour lives in the roofs and doors.
+  aegean: {
+    wall: 0xf4f1ea, wall2: 0xe6e2d8, roof: 0x2f6fae, trim: 0x2f6fae, stone: 0xd8d2c4,
+    palette: [0xf6f4ee, 0xefece2, 0xf8f6f2, 0xe9e6dc],
+    roofs: [0x2f6fae, 0x3f86c6, 0xf2efe6],
+    builds: ['cube', 'cube', 'domed', 'shed'], landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xe4e0d4, stoneWalls: 7,
+  },
+  // ANDALUSIA (Spain) - limewash white and ochre under terracotta, deep-set
+  // openings, courtyard walls.
+  andalusia: {
+    wall: 0xf0e6d2, wall2: 0xe0c893, roof: 0xb85c33, trim: 0x8a5a2c, stone: 0xd6c7a4,
+    palette: [0xf4ecdc, 0xeed8a8, 0xe8c88c, 0xf6f0e4, 0xdcb87a],
+    roofs: [0xb85c33, 0xa9522f, 0xc46a3a],
+    builds: ['courtyard', 'house', 'courtyard', 'shed'], landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xdccfae, stoneWalls: 8,
+  },
+  // DALMATIA (Croatia) - pale limestone, almost no paint, orange-red tile,
+  // green shutters. The stone IS the colour, so the palette is narrow and
+  // the variation goes into the roofs.
+  dalmatia: {
+    wall: 0xe6dfcd, wall2: 0xd2c9b2, roof: 0xc0603a, trim: 0x4a6b4a, stone: 0xcfc6ae,
+    palette: [0xe9e2d0, 0xdfd6c2, 0xf0ebdc, 0xd8cfba],
+    roofs: [0xc0603a, 0xb35634, 0xcc6c42, 0xa94f30],
+    builds: ['house', 'towerhouse', 'house', 'shed'], landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xd6cdb6, stoneWalls: 9,
+  },
+  // COTE D'AZUR (France) - Provencal pastels: rose, apricot, lavender-grey
+  // and cream render under faded pantile, pale blue shutters.
+  azur: {
+    wall: 0xf2ddc8, wall2: 0xe2c6ae, roof: 0xc07a52, trim: 0x8fb4cc, stone: 0xdccdb8,
+    palette: [0xf3d9c4, 0xefc9b0, 0xe8c8cf, 0xdcd2e2, 0xf6ead6, 0xe9d3a8],
+    roofs: [0xc07a52, 0xb8724c, 0xcb8a5e],
+    builds: ['house', 'house', 'towerhouse', 'shed'], landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xdfd3bc, stoneWalls: 5,
+  },
+
   // FARMLAND HEDGEROW: rubble stone with lime pointing, slate roofs, dark
   // green painted doors, and a muted-grey steel portal barn behind the house.
   // The Bible allows this region exactly two archetypes — the farm longhouse
@@ -8421,11 +8646,28 @@ export class Track {
     const dS = 0.86 + Math.random() * 0.34;
     const hS = 0.88 + Math.random() * 0.34;
     const mir = Math.random() < 0.5 ? -1 : 1;
-    const shade = 0.84 + Math.random() * 0.28;
+    const shade = 0.9 + Math.random() * 0.2;
     const tinted = (c) => {
       const col = new THREE.Color(c);
       col.multiplyScalar(shade);
       return col.getHex();
+    };
+    // A STREET IS MANY COLOURS. Every kit carried ONE wall tone, so a terrace
+    // came out as one colour repeated however much the footprints varied -
+    // which is exactly what a Mediterranean harbour is NOT. A kit may now
+    // carry `palette` (wall colours) and `roofs` (tile colours); each house
+    // draws its own from them, and the second wall tone is derived from the
+    // one it drew so trim and render still belong to the same building.
+    const pick = (list) => (list && list.length)
+      ? list[(Math.random() * list.length) | 0] : null;
+    const wallC = pick(K.palette), roofC = pick(K.roofs);
+    const slot = (key) => {
+      if (key === 'wall' && wallC !== null) return wallC;
+      if (key === 'wall2' && wallC !== null) {
+        return new THREE.Color(wallC).multiplyScalar(0.86).getHex();
+      }
+      if (key === 'roof' && roofC !== null) return roofC;
+      return K[key];
     };
     for (const [kind, dx, dy, dz, sx, sy, sz, colKey, roll = 0] of T.parts) {
       const ox = dx * scale * wS, oy = dy * scale * hS, oz = dz * scale * dS * mir;
@@ -8435,7 +8677,7 @@ export class Track {
         rot, roll: roll * mir,
         // a string names a slot in the theme kit (weather-shaded per house);
         // a number is a literal that must not be re-tinted (the chapel cross)
-        color: typeof colKey === 'string' ? tinted(K[colKey]) : colKey,
+        color: typeof colKey === 'string' ? tinted(slot(colKey)) : colKey,
       });
     }
     const r = T.r * scale * Math.max(wS, dS), mat = T.mat ?? 'hut';
@@ -9384,7 +9626,7 @@ export class Track {
       emissiveIntensity: this.T.hutGlow ?? 1,
     });
     const roofMat = new THREE.MeshStandardMaterial({
-      color: this.T.hutRoof ?? 0x33363c, flatShading: true,
+      color: F.roof ?? this.T.hutRoof ?? 0x33363c, flatShading: true,
       roughness: 0.72, envMapIntensity: 0.4,
     });
     const bodies = new THREE.InstancedMesh(bodyGeo, bodyMat, MAX);

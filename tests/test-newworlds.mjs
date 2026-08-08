@@ -32,7 +32,11 @@ const NEW = [[29, 'OLIVE COAST', 'medterrace'], [30, 'LANTERN QUARTER', 'oldtown
              [43, 'OULTON PARK', 'farmland'], [44, 'LAGUNA SECA', 'canyon'],
              [45, 'TOUR DE CORSE', 'medterrace'], [46, 'VINEYARD VELOCE', 'vineyard'],
              [47, 'DEEPWOOD TRAIL', 'deepwood'], [48, 'DOLOMITI CORSA', 'dolomiti'],
-             [49, 'HARBOR QUAY', 'harbor']];
+             [49, 'HARBOR QUAY', 'harbor'],
+  // THE MEDITERRANEAN FIVE
+  [50, 'CINQUE TERRE', 'liguria'], [51, 'AEGEAN BLUE', 'aegean'],
+  [52, 'COSTA BRAVA', 'brava'], [53, 'DALMATIA DRIVE', 'dalmatia'],
+  [54, 'COTE D AZUR', 'azur'],];
 
 // The roster must agree with what we think we merged, before any of it is built.
 const probe = await browser.newPage({ viewport: { width: 640, height: 400 } });
@@ -51,7 +55,7 @@ const ids = roster.map((r) => r.id);
 check('no duplicate level ids', new Set(ids).size === ids.length,
   `${ids.length} levels, ${new Set(ids).size} distinct`);
 check('the new worlds are appended at the END of the array, in order',
-  ids.slice(-21).join(',') === NEW.map(([id]) => id).join(','),
+  ids.slice(-NEW.length).join(',') === NEW.map(([id]) => id).join(','),
   `tail is ${ids.slice(-6).join(',')}`);
 
 for (const [id, name] of NEW) {
