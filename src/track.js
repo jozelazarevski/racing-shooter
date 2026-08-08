@@ -4492,6 +4492,17 @@ export class Track {
   /** Depth of the river gorge at (x, z): 0 everywhere outside it, easing to
    *  the full depth along the channel. Applied inside _blendHeight so the
    *  scenery field, the terrain mesh and the free-roam ground all agree. */
+  /** Is (x,z) inside a jump gorge's footprint (pad grows it outward)?
+   *  The rule "a gorge is a hole" needs one test every builder can ask. */
+  _inJumpGorge(x, z, pad = 0) {
+    if (!this._jumpGorges?.length) return false;
+    for (const G of this._jumpGorges) {
+      if (this._gorgeCutOne(G, x, z) > 0.4) return true;
+      if (pad > 0 && this._gorgeCutOne(G, x, z) > 0.05) return true;
+    }
+    return false;
+  }
+
   _gorgeCutOne(G, x, z) {
     const dx = x - G.x, dz = z - G.z;
     const u = dx * G.ax + dz * G.az;          // along the gorge
@@ -4751,6 +4762,17 @@ export class Track {
     const C = this.T.coast;
     if (!C) return false;
     return this.terrainHeight(x, z) < (C.level ?? -2) + 0.6;
+  }
+
+  /** IN WATER - sea OR river. `_underwater` only ever knew about the sea, so
+   *  every scatter that used it still dropped its props into the river: straw
+   *  bales standing in the current, trees growing mid-stream. One test now
+   *  covers both, and anything that would look absurd wet asks it. */
+  _inWater(x, z) {
+    if (this._underwater(x, z)) return true;
+    if (!this._river) return false;
+    const R = this._river;
+    return this._riverDist(x, z) < (R.half ?? 8) + 2.5;
   }
 
   /** Harbour worlds only: the open stone strip between the seafront road and
@@ -6814,6 +6836,9 @@ export class Track {
 
   /** The pale turquoise river winding along the bottom of the hero gorge. */
   _buildGorgeRiver() {
+    // A JUMP gorge is meant to be an empty hole: no floor, no water, nothing
+    // that reads as a way across. Worlds that carry jump gorges get a dry gap.
+    if (this._jumpGorges?.length) return;
     const G = this._gorge;
     const SEG = 26, HALF = 7.5;
     const verts = new Float32Array((SEG + 1) * 2 * 3);
@@ -7409,6 +7434,24 @@ export class Track {
    *  rock peaks standing a few hundred units beyond the summit, so from the
    *  valley the road visibly disappears into a wall of mountain instead of a
    *  flat green horizon. SOLID (free roamers can reach them). */
+  /** Rock tone for a NEAR mountain, dark enough to read as rock on any theme.
+   *
+   *  peakColor is the tone for peaks on the HORIZON, where distance washes
+   *  colour out; used close up it renders as a pale slab. Mixing toward
+   *  hillColor fixed the limestone themes but not the snow ones, where both
+   *  are near-white - on FURKA the massif still owned 79 % of the near-white
+   *  pixels in the worst frame. So the mix is followed by a hard lightness
+   *  CEILING: whatever the theme's palette, a mountain a few hundred units
+   *  away comes out as rock you can see the shape of. */
+  _massifRock() {
+    const c = new THREE.Color(this.T.peakColor)
+      .lerp(new THREE.Color(this.T.hillColor ?? 0x6b6a58), 0.62);
+    const hsl = { h: 0, s: 0, l: 0 };
+    c.getHSL(hsl);
+    c.setHSL(hsl.h, Math.max(hsl.s, 0.12), Math.min(hsl.l, 0.42));
+    return c.getHex();
+  }
+
   _buildMassif(m4) {
     const M = this.T.massif;
     const rock = new THREE.InstancedMesh(
@@ -7425,14 +7468,13 @@ export class Track {
         // theme can override outright with massif.color.
         // ...and barely any fog mix either: 0.34 baked a third of the land's
         // cream haze into rock that stands close enough to read as rock.
-        map: this._horizonGrad(M.color ?? new THREE.Color(this.T.peakColor)
-          .lerp(new THREE.Color(this.T.hillColor ?? 0x6b6a58), 0.62)
-          .multiplyScalar(0.78).getHex(), 0.1, 0.02),
+        map: this._horizonGrad(M.color ?? this._massifRock(), 0.1, 0.02),
         flatShading: true, roughness: 1,
       }),
       M.count
     );
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const shade = new THREE.Color();
     for (let k = 0; k < M.count; k++) {
       const t = M.count > 1 ? k / (M.count - 1) : 0.5;
       const a = M.az + (t - 0.5) * M.spread + (Math.random() - 0.5) * 0.1;
@@ -7460,17 +7502,29 @@ export class Track {
       const y = -12 - (this.T.hillDrop || 0) + this._highland(x, z);
       m4.compose(new THREE.Vector3(x, y + h / 2, z), q, new THREE.Vector3(w, h, w * 0.85));
       rock.setMatrixAt(k, m4);
+      // per-cone shade: eight identical tones stack into one flat wall, and a
+      // flat wall is what read as a void
+      shade.setScalar(0.78 + Math.random() * 0.3);
+      rock.setColorAt(k, shade);
       this.solids.push({ x, z, r: w * 0.3, y: y + 4, mat: 'stone' });
     }
     rock.name = 'massif';
+    if (rock.instanceColor) rock.instanceColor.needsUpdate = true;
     this.group.add(rock);
   }
 
   /** FURKA RIDGE: the Rhône glacier tongue spilling off the skyline — a
    *  stepped ice field of big pale slabs, well outside the drivable world. */
   _buildGlacier(m4) {
+    // GLACIER ICE, NOT PAPER. At 0xdff0fb under an alpine sun these slabs were
+    // the white wedge that kept filling the frame on FURKA: with the massif
+    // fixed, hiding the glacier still dropped the near-white share of the worst
+    // frame from 4.9 % to 0.55 %, so it owned nearly all of what was left.
+    // Real ice is a blue-grey that darkens fast out of the light - the tone
+    // comes down, the blue comes up, and the faces get enough spread to show
+    // the stepped tongue instead of one flat sheet.
     const ice = new THREE.MeshStandardMaterial({
-      color: 0xdff0fb, roughness: 0.55, flatShading: true, envMapIntensity: 0.7,
+      color: 0x9fc4dc, roughness: 0.62, flatShading: true, envMapIntensity: 0.5,
     });
     const geo = new THREE.BoxGeometry(1, 1, 1);
     geo.translate(0, 0.5, 0);
@@ -7491,7 +7545,7 @@ export class Track {
         q, new THREE.Vector3(w, h, d)
       );
       slabs.setMatrixAt(k, m4);
-      col.setRGB(0.86 + t * 0.12, 0.93 + t * 0.06, 1.0).multiplyScalar(0.92 + Math.random() * 0.14);
+      col.setRGB(0.78 + t * 0.14, 0.88 + t * 0.1, 1.0).multiplyScalar(0.7 + Math.random() * 0.3);
       slabs.setColorAt(k, col);
     }
     slabs.name = 'glacier';
@@ -8117,6 +8171,15 @@ export class Track {
           vines.setMatrixAt(vk, m4);
           col.setHSL(hue + (Math.random() - 0.5) * 0.02, sat, lum + (Math.random() - 0.5) * 0.05);
           vines.setColorAt(vk++, col);
+          // CRASHABLE. A trellis panel is wire and leaf, not masonry: it goes
+          // through the same material law as a sapling, so at pace you plough a
+          // gap through the row and the panels fly off, and at a crawl the row
+          // shoulders you back. Registered per panel, so the gap you carve is
+          // the width of the car, not the whole block.
+          this.trees.push({
+            x: mx, z: mz, y: gy, r: 1.0, id: vk - 1, parts: [vines],
+            kind: 'vine', s: 0.7, solid: false,
+          });
           if (i % 3 === 0 && pk < posts.count) {
             m4.compose(pos.set(ax, ya, az), q.setFromAxisAngle(up, 0),
               scl.set(1, 1.8 + Math.random() * 0.22, 1));
@@ -10599,7 +10662,7 @@ export class Track {
         }
         // the ring branch skips _trackSidePos and with it the underwater
         // check — on a coast world it was planting conifers IN the sea
-        return p && !this._underwater(p.x, p.z) && !this._onQuayStrip(p.x, p.z)
+        return p && !this._inWater(p.x, p.z) && !this._onQuayStrip(p.x, p.z)
           && this._altOK(p.x, p.z) ? p : null;
       },
       (p) => {
@@ -11566,7 +11629,7 @@ export class Track {
             return this._distToTrack(x, z) < 14 ? null : { x, z };
           })();
         // no olives rooted in the bay: the ring branch bypasses _trackSidePos
-        return p && !this._underwater(p.x, p.z) && this._altOK(p.x, p.z) ? p : null;
+        return p && !this._inWater(p.x, p.z) && this._altOK(p.x, p.z) ? p : null;
       },
       (p) => {
         // on the lattice it is a planted grove, so it is a grove tree and it
@@ -12301,7 +12364,13 @@ export class Track {
     // behind the hedge, where a real silage stack sits anyway. Unset = 12.5-20,
     // the figures every other world has always used.
     const hayNear = this.T.hayNear ?? 12.5, hayFar = this.T.hayFar ?? 20;
-    this._scatter(hayCount, () => this._trackSidePos(hayNear, hayFar), (p) => {
+    // A straw bale standing in the river is not scenery, it is a mistake. The
+    // rejection lives in the position generator so a wet spot is RETRIED
+    // rather than counting as a bale spent.
+    this._scatter(hayCount, () => {
+      const p = this._trackSidePos(hayNear, hayFar);
+      return p && !this._inWater(p.x, p.z) ? p : null;
+    }, (p) => {
       q.setFromAxisAngle(up, Math.random() * Math.PI);
       m4.compose(new THREE.Vector3(p.x, this.terrainHeight(p.x, p.z) + 0.8, p.z), q, new THREE.Vector3(1, 1, 1));
       hay.setMatrixAt(hk++, m4);
@@ -12719,7 +12788,11 @@ export class Track {
       // same shape (see `halfAt` in _planRiver)
       const df = this._distToTrackCoarse(p.x, p.z);
       const kk = this._riverNearest(p.x, p.z).k;
-      const w = (R.halfAt && R.halfAt[kk] != null) ? R.halfAt[kk] : R.half;
+      let w = (R.halfAt && R.halfAt[kk] != null) ? R.halfAt[kk] : R.half;
+      // ...and the MAIN river may not span one either. Where the reach crosses
+      // a jump gorge the ribbon pinches to nothing, so the water stops at the
+      // rim instead of laying a blue plank over the gap.
+      if (this._inJumpGorge(p.x, p.z, 6)) w = 0;
       F.push({ t, x: p.x, z: p.z, nx, nz, w, df });
     }
 
