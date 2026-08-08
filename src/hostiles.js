@@ -37,7 +37,7 @@ function buildNestMesh() {
     m.castShadow = true;
     g.add(m);
   }
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 0.5, 10), steel);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 0.5, 16), steel);
   base.position.y = 0.25;
   g.add(base);
   // the head is a child group so it can track the player independently
@@ -81,7 +81,7 @@ function buildRaiderMesh() {
   gun.rotation.x = Math.PI / 2;
   gun.position.set(0, 2.25, 0.9);
   g.add(gun);
-  const wheel = new THREE.CylinderGeometry(0.72, 0.72, 0.5, 10);
+  const wheel = new THREE.CylinderGeometry(0.72, 0.72, 0.5, 16);
   wheel.rotateZ(Math.PI / 2);
   for (const x of [-1.28, 1.28]) for (const z of [-1.45, 1.45]) {
     const w = new THREE.Mesh(wheel, rubber);

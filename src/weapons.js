@@ -26,19 +26,19 @@ const TRAIL_FIRE = new THREE.Color('#ffb52e');
 // ---- shared geometry & immutable materials (built once — a launch allocates
 // no GPU resources, and removal needs no dispose; only per-instance ANIMATED
 // materials below are cloned per launch and disposed on removal) ----
-const MISSILE_BODY_GEO = new THREE.CylinderGeometry(0.22, 0.3, 1.7, 8);
+const MISSILE_BODY_GEO = new THREE.CylinderGeometry(0.22, 0.3, 1.7, 14);
 const MISSILE_BODY_MAT = new THREE.MeshStandardMaterial({ color: 0x2a2444, metalness: 0.8, roughness: 0.3 });
-const MISSILE_TIP_GEO = new THREE.ConeGeometry(0.24, 0.6, 8);
+const MISSILE_TIP_GEO = new THREE.ConeGeometry(0.24, 0.6, 14);
 const MISSILE_TIP_MAT = new THREE.MeshBasicMaterial({ color: 0xffb52e });
-const MISSILE_FLAME_GEO = new THREE.ConeGeometry(0.3, 1.1, 8);
+const MISSILE_FLAME_GEO = new THREE.ConeGeometry(0.3, 1.1, 14);
 const MISSILE_FLAME_MAT = new THREE.MeshBasicMaterial({
   color: 0xffb32e, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false,
 });
-const MISSILE_GLOW_GEO = new THREE.SphereGeometry(0.34, 8, 6);
+const MISSILE_GLOW_GEO = new THREE.SphereGeometry(0.34, 14, 9);
 const MISSILE_GLOW_MAT = new THREE.MeshBasicMaterial({
   color: 0xffe9a0, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false,
 });
-const MINE_BODY_GEO = new THREE.SphereGeometry(0.5, 10, 8);
+const MINE_BODY_GEO = new THREE.SphereGeometry(0.5, 16, 8);
 const MINE_BODY_MAT = new THREE.MeshStandardMaterial({ color: 0x2a2622, metalness: 0.6, roughness: 0.4 });
 const MINE_LAMP_GEO = new THREE.SphereGeometry(0.14, 8, 6);
 const MINE_RING_GEO = new THREE.RingGeometry(0.55, 1.6, 24); // armed ground-glow

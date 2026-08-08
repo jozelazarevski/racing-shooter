@@ -3730,12 +3730,12 @@ function mergeBoxes(specs) {
 let PROP_ASSETS = null;
 function propAssets() {
   if (PROP_ASSETS) return PROP_ASSETS;
-  const hay = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 10);
+  const hay = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 16);
   hay.rotateZ(Math.PI / 2);
   hay.translate(0, 0.8, 0);
   const crate = new THREE.BoxGeometry(1.55, 1.55, 1.55);
   crate.translate(0, 0.78, 0);
-  const cone = new THREE.ConeGeometry(0.55, 1.35, 10);
+  const cone = new THREE.ConeGeometry(0.55, 1.35, 16);
   cone.translate(0, 0.74, 0);
   const coneBase = new THREE.BoxGeometry(1.05, 0.14, 1.05);
   coneBase.translate(0, 0.07, 0);
@@ -3748,8 +3748,8 @@ function propAssets() {
       hay, crate, cone, coneBase, barrel, rock,
       ballBody: new THREE.SphereGeometry(0.8, 12, 9),
       ballHead: new THREE.SphereGeometry(0.52, 12, 9),
-      eye: new THREE.SphereGeometry(0.07, 6, 5),
-      carrot: new THREE.ConeGeometry(0.1, 0.5, 6),
+      eye: new THREE.SphereGeometry(0.07, 8, 6),
+      carrot: new THREE.ConeGeometry(0.1, 0.5, 10),
       // voxel penguin parts (glacial): boxes only, r ≈ 0.6
       pengBody: new THREE.BoxGeometry(0.62, 0.9, 0.54),
       pengBelly: new THREE.BoxGeometry(0.44, 0.66, 0.1),
@@ -4123,7 +4123,7 @@ export class Track {
     });
     const postMat = new THREE.MeshStandardMaterial({ map: hazardTexture(), roughness: 0.85 });
     const rockGeo = new THREE.DodecahedronGeometry(1, 0);
-    const postGeo = new THREE.CylinderGeometry(0.16, 0.22, 2.2, 6);
+    const postGeo = new THREE.CylinderGeometry(0.16, 0.22, 2.2, 8);
     const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
     for (const sec of this._narrowSecs) {
       for (const side of [1, -1]) {
@@ -5582,7 +5582,7 @@ export class Track {
     this.group.add(flag);
     this.animated.flags.push({ mesh: flag, phase: Math.random() * 9 });
     const pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.07, 0.07, 2.2, 6),
+      new THREE.CylinderGeometry(0.07, 0.07, 2.2, 8),
       new THREE.MeshStandardMaterial({ color: 0xd8d2c2 })
     );
     pole.position.set(x, y - 0.4, z);
@@ -6139,7 +6139,7 @@ export class Track {
           const rad = r * wr[Math.min(s, wr.length - 1)] * (0.92 + Math.random() * 0.16);
           const hh = (2.5 - s * 0.25) * (0.85 + Math.random() * 0.35);
           const seg = new THREE.Mesh(
-            new THREE.CylinderGeometry(rad * 0.8, rad, hh, 8),
+            new THREE.CylinderGeometry(rad * 0.8, rad, hh, 14),
             strata[s % strata.length]
           );
           seg.position.set(
@@ -6438,22 +6438,22 @@ export class Track {
     // the ones you actually drive between.
     const broadleaf = (this.level?.theme === 'jungle' || this.level?.theme === 'redwood');
     const trunkGeo = broadleaf
-      ? new THREE.CylinderGeometry(0.34, 0.66, 5.4, 7)   // clear bole, no low branches
-      : new THREE.CylinderGeometry(0.42, 0.6, 3.2, 7);
+      ? new THREE.CylinderGeometry(0.34, 0.66, 5.4, 12)   // clear bole, no low branches
+      : new THREE.CylinderGeometry(0.42, 0.6, 3.2, 12);
     trunkGeo.translate(0, broadleaf ? 2.7 : 1.6, 0);
     let lowGeo, topGeo;
     if (broadleaf) {
       // stacked parasols: a closed canopy seen from underneath
-      lowGeo = new THREE.SphereGeometry(3.6, 9, 5);
+      lowGeo = new THREE.SphereGeometry(3.6, 16, 8);
       lowGeo.scale(1, 0.46, 1);
       lowGeo.translate(0, 6.4, 0);
-      topGeo = new THREE.SphereGeometry(2.5, 8, 5);
+      topGeo = new THREE.SphereGeometry(2.5, 14, 8);
       topGeo.scale(1, 0.5, 1);
       topGeo.translate(0.5, 8.3, -0.4);
     } else {
-      lowGeo = new THREE.ConeGeometry(3.1, 4.8, 8);
+      lowGeo = new THREE.ConeGeometry(3.1, 4.8, 14);
       lowGeo.translate(0, 5.1, 0);
-      topGeo = new THREE.ConeGeometry(2.1, 3.9, 8);
+      topGeo = new THREE.ConeGeometry(2.1, 3.9, 14);
       topGeo.translate(0, 8.1, 0);
     }
     const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor ?? 0x5a4028, roughness: 1 });
@@ -6465,7 +6465,7 @@ export class Track {
       new THREE.InstancedMesh(topGeo, topMat, cap),
     ];
     if (T.treeSnowCap) {
-      const capGeo = new THREE.ConeGeometry(1.5, 2.1, 8);
+      const capGeo = new THREE.ConeGeometry(1.5, 2.1, 14);
       capGeo.translate(0, 8.9, 0);
       parts.push(new THREE.InstancedMesh(
         capGeo, new THREE.MeshStandardMaterial({ color: 0xf2f6fa, flatShading: true, roughness: 0.9 }), cap));
@@ -6947,7 +6947,7 @@ export class Track {
     });
     const boardGeo = new THREE.PlaneGeometry(2.4, 1.7);
     const postMat = new THREE.MeshStandardMaterial({ color: 0x8e8478, roughness: 1 });
-    const postGeo = new THREE.CylinderGeometry(0.09, 0.11, 2.2, 5);
+    const postGeo = new THREE.CylinderGeometry(0.09, 0.11, 2.2, 8);
     for (const ck of this.creeks) {
       const j = (ck.index - 24 + N) % N;
       const heading = this.headingAt(j);
@@ -7209,7 +7209,7 @@ export class Track {
         this._element(B, 'logpile', px, pz, this.headingAt(gi) + (Math.random() - 0.5), K);
       }
       // a couple of loose fallen logs
-      const logGeo = new THREE.CylinderGeometry(0.55, 0.62, 6.5, 8);
+      const logGeo = new THREE.CylinderGeometry(0.55, 0.62, 6.5, 14);
       logGeo.rotateZ(Math.PI / 2);
       for (let k = 0; k < 3; k++) {
         const off = (13 + Math.random() * 9) * (k % 2 ? 1 : -1);
@@ -7691,7 +7691,7 @@ export class Track {
 
     // ISLETS: a few rock stacks standing out of the bay
     const isle = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(1, 1, 6),
+      new THREE.ConeGeometry(1, 1, 10),
       new THREE.MeshStandardMaterial({ color: 0x9a8f7c, flatShading: true, roughness: 1 }),
       4);
     const im4 = new THREE.Matrix4();
@@ -7788,7 +7788,7 @@ export class Track {
 
     // harbour buoys
     const buoy = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.6, 6, 5),
+      new THREE.SphereGeometry(0.6, 10, 8),
       new THREE.MeshStandardMaterial({ color: 0xd23c28, roughness: 0.6 }), 4);
     for (let k = 0; k < 4; k++) {
       const du = -260 + k * 160, dn2 = 26 + (k % 2) * 18;
@@ -7868,7 +7868,7 @@ export class Track {
   _buildMassif(m4) {
     const M = this.T.massif;
     const rock = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(1, 1, 6),
+      new THREE.ConeGeometry(1, 1, 10),
       new THREE.MeshStandardMaterial({
         // ROCK, NOT HAZE. This used peakColor straight, and peakColor is the
         // tone for peaks on the HORIZON, where distance washes colour out. The
@@ -8154,7 +8154,7 @@ export class Track {
     astParts.push(at2(new THREE.CylinderGeometry(1.68, 1.68, 0.2, 12), galY + 2.35));
     astParts.push(at2(new THREE.SphereGeometry(1.62, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2.4),
       galY + 2.4));
-    astParts.push(at2(new THREE.SphereGeometry(0.24, 10, 8), galY + 3.62));
+    astParts.push(at2(new THREE.SphereGeometry(0.24, 8, 6), galY + 3.62));
     astParts.push(this._strut([0, galY + 3.6, 0], [0, galY + 4.35, 0], 0.05, 5));
     const lantM = new THREE.Mesh(this._bundle(astParts), red);
     lantM.position.set(spot.x, BY, spot.z);
@@ -8499,7 +8499,7 @@ export class Track {
     const fingers = new THREE.InstancedMesh(new THREE.BoxGeometry(FLEN, 0.5, 2.2),
       timber, FINGERS);
     const posts = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.22, 0.26, 3.4, 6), pile, FINGERS * 3);
+      new THREE.CylinderGeometry(0.22, 0.26, 3.4, 10), pile, FINGERS * 3);
     const fm = new THREE.Matrix4(), fq = new THREE.Quaternion();
     const fup = new THREE.Vector3(0, 1, 0), fone = new THREE.Vector3(1, 1, 1);
     fq.setFromAxisAngle(fup, yaw);
@@ -8535,12 +8535,12 @@ export class Track {
 
     const DECK = 1.0;                                  // deck datum, boat local
     const cabG = white(new THREE.BoxGeometry(1, 1, 1).toNonIndexed());
-    const mastG = new THREE.CylinderGeometry(0.09, 0.14, 9.4, 12);
-    const boomG = new THREE.CylinderGeometry(0.08, 0.09, 4.6, 10);
+    const mastG = new THREE.CylinderGeometry(0.09, 0.14, 9.4, 8);
+    const boomG = new THREE.CylinderGeometry(0.08, 0.09, 4.6, 8);
     boomG.rotateX(Math.PI / 2);
-    const fendG = new THREE.TorusGeometry(0.26, 0.09, 8, 14);
+    const fendG = new THREE.TorusGeometry(0.26, 0.09, 6, 10);   // fist-sized: 120 tris, not 224
     fendG.rotateY(Math.PI / 2);
-    const portG = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 10);
+    const portG = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 8);
     portG.rotateZ(Math.PI / 2);
 
     // yacht standing rigging + guardrails, all in one bundle
@@ -8563,8 +8563,8 @@ export class Track {
       strut([-0.95, DECK + 0.02, -3.6], [-0.95, DECK + 0.22, -1.1], 0.07, 4),
       strut([0.95, DECK + 0.02, -3.6], [0.95, DECK + 0.22, -1.1], 0.07, 4),
       strut([-0.95, DECK + 0.22, -3.6], [0.95, DECK + 0.22, -3.6], 0.07, 4),
-      new THREE.CylinderGeometry(0.16, 0.19, 0.34, 10).translate(-0.78, DECK + 0.3, -2.2),
-      new THREE.CylinderGeometry(0.16, 0.19, 0.34, 10).translate(0.78, DECK + 0.3, -2.2),
+      new THREE.CylinderGeometry(0.16, 0.19, 0.34, 8).translate(-0.78, DECK + 0.3, -2.2),
+      new THREE.CylinderGeometry(0.16, 0.19, 0.34, 8).translate(0.78, DECK + 0.3, -2.2),
       new THREE.BoxGeometry(0.75, 0.1, 0.75).translate(0, DECK + 0.12, 1.55),
       strut([0, DECK + 0.62, 4.4], [-0.7, DECK + 0.62, 3.5], 0.032, 4),
       strut([0, DECK + 0.62, 4.4], [0.7, DECK + 0.62, 3.5], 0.032, 4),
@@ -8662,6 +8662,9 @@ export class Track {
     const HULLS = [0xf4efe4, 0x2f5f8f, 0xa8352c, 0xf4efe4, 0x2e6a4a, 0xefe6d2,
       0xf4efe4, 0x3d6f8f, 0xd8b45a, 0xefe6d2, 0x7a4a86, 0xf4efe4,
       0x2f5f8f, 0xc2603a, 0xf4efe4, 0x4a7f6a, 0xefe6d2, 0x8f3550];
+    // working boats wear working colours, and not all the same one
+    const WORK = [0x2f5f8f, 0x1f6b52, 0x8f4232, 0x3a5a72, 0x6a6f3a, 0x9a5a2a,
+      0x2f5f8f, 0x4a3f6a, 0x7a2f2a, 0x2a6a6a];
     let ck = 0, fk = 0, mk = 0, pk = 0, gk = 0, tk = 0;
     for (let i = 0; i < N; i++) {
       const p = at(slips[i][0], slips[i][1]);
@@ -8675,7 +8678,11 @@ export class Track {
       // chine crease is both what a boat does and what hides the bottom.
       const boat = new THREE.Matrix4().compose(V(p.x, y + 0.38, p.z), q, V(sc, sc, sc));
       hulls.setMatrixAt(i, boat);
-      col.set(trawler ? 0x2f5f8f : HULLS[i % HULLS.length]);
+      // STRIDE THE PALETTE. Walking it in order put runs of the same blue next
+      // to each other - eighteen liveries and the near row still read as one
+      // colour - and every trawler wore the identical navy on top of that.
+      col.set(trawler ? WORK[(i / 3 | 0) % WORK.length]
+        : HULLS[(i * 7) % HULLS.length]);
       hulls.setColorAt(i, col);
       decks.setMatrixAt(i, boat);
       bands.setMatrixAt(i, boat);
@@ -8746,7 +8753,7 @@ export class Track {
     ringG.rotateX(Math.PI / 2);
     const rings = new THREE.InstancedMesh(ringG, new THREE.MeshStandardMaterial({
       color: 0x2a2622, roughness: 0.6, metalness: 0.5 }), 64);
-    const bollG = new THREE.CylinderGeometry(0.26, 0.34, 0.85, 8);
+    const bollG = new THREE.CylinderGeometry(0.26, 0.34, 0.85, 14);
     const bolls = new THREE.InstancedMesh(bollG, new THREE.MeshStandardMaterial({
       color: 0x6d6a62, roughness: 0.9, flatShading: true }), 40);
     let rk = 0, bk = 0;
@@ -8781,20 +8788,20 @@ export class Track {
     const XR = Math.PI / 2;                       // cylinders lie along X
     const lie = (g2) => g2.rotateZ(XR);
     const ironParts = [
-      new THREE.SphereGeometry(0.17, 12, 8).translate(-1.62, 1.05, 0),
+      new THREE.SphereGeometry(0.17, 8, 6).translate(-1.62, 1.05, 0),
       lie(new THREE.CylinderGeometry(0.36, 0.38, 0.9, 16)).translate(-1.15, 1.05, 0),
       lie(new THREE.CylinderGeometry(0.41, 0.41, 0.14, 16)).translate(-0.68, 1.05, 0),
       lie(new THREE.CylinderGeometry(0.24, 0.31, 1.92, 16)).translate(0.30, 1.05, 0),
       lie(new THREE.CylinderGeometry(0.30, 0.30, 0.12, 16)).translate(1.28, 1.05, 0),
       lie(new THREE.CylinderGeometry(0.31, 0.33, 0.30, 16)).translate(1.47, 1.05, 0),
-      new THREE.CylinderGeometry(0.115, 0.115, 0.94, 10).rotateX(XR).translate(-0.25, 1.05, 0),
+      new THREE.CylinderGeometry(0.115, 0.115, 0.94, 8).rotateX(XR).translate(-0.25, 1.05, 0),
     ];
     for (const wx of [-0.82, 0.66]) {
       const wr = wx < 0 ? 0.46 : 0.34;            // trail wheels run larger
       for (const wz of [0.8, -0.8]) {
         const tw = new THREE.TorusGeometry(wr, 0.075, 8, 18);
         ironParts.push(tw.translate(wx, wr - 0.02, wz));
-        ironParts.push(new THREE.CylinderGeometry(0.11, 0.11, 0.22, 10)
+        ironParts.push(new THREE.CylinderGeometry(0.11, 0.11, 0.22, 8)
           .rotateX(XR).translate(wx, wr - 0.02, wz));
         for (let sp = 0; sp < 8; sp++) {
           const an = (sp / 8) * Math.PI * 2;
@@ -8803,7 +8810,7 @@ export class Track {
               wr - 0.02 - Math.cos(an) * wr * 0.46, wz));
         }
       }
-      ironParts.push(new THREE.CylinderGeometry(0.09, 0.09, 1.74, 10)
+      ironParts.push(new THREE.CylinderGeometry(0.09, 0.09, 1.74, 8)
         .rotateX(XR).translate(wx, wr - 0.02, 0));
     }
     const woodParts = [];
@@ -8858,11 +8865,11 @@ export class Track {
     const capGeo = new THREE.BoxGeometry(0.95, 0.55, 2.6);
     const caps = mk(capGeo, new THREE.MeshStandardMaterial({
       color: 0xb0a894, flatShading: true, roughness: 1 }), 260);
-    const bolGeo = new THREE.CylinderGeometry(0.22, 0.17, 0.85, 7);
+    const bolGeo = new THREE.CylinderGeometry(0.22, 0.17, 0.85, 8);
     bolGeo.translate(0, 0.42, 0);
     const bols = mk(bolGeo, new THREE.MeshStandardMaterial({
       color: 0x26282c, roughness: 0.5, metalness: 0.55 }), 60);
-    const barGeo = new THREE.CylinderGeometry(0.5, 0.44, 1.05, 8);
+    const barGeo = new THREE.CylinderGeometry(0.5, 0.44, 1.05, 14);
     barGeo.translate(0, 0.52, 0);
     const bars = mk(barGeo, new THREE.MeshStandardMaterial({
       color: 0x7a5a34, flatShading: true, roughness: 0.9 }), 70);
@@ -8870,7 +8877,7 @@ export class Track {
     crGeo.translate(0, 0.5, 0);
     const crs = mk(crGeo, new THREE.MeshStandardMaterial({
       color: 0xb99a68, flatShading: true, roughness: 0.95 }), 50);
-    const ropeGeo = new THREE.CylinderGeometry(0.66, 0.7, 0.16, 9);
+    const ropeGeo = new THREE.CylinderGeometry(0.66, 0.7, 0.16, 16);
     ropeGeo.translate(0, 0.08, 0);
     const ropes = mk(ropeGeo, new THREE.MeshStandardMaterial({
       color: 0xd8c9a4, roughness: 1 }), 40);
@@ -8994,9 +9001,9 @@ export class Track {
     if (!spot) return;
     const g = new THREE.Group();
     const stone = new THREE.MeshStandardMaterial({ color: 0xd8d0c0, flatShading: true, roughness: 1 });
-    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.4, 11, 8), stone);
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.4, 11, 14), stone);
     tower.position.set(spot.x, spot.y + 5.5, spot.z);
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(3.0, 2.6, 8),
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(3.0, 2.6, 14),
       new THREE.MeshStandardMaterial({ color: 0x8a4630, flatShading: true, roughness: 0.9 }));
     cap.position.set(spot.x, spot.y + 12.2, spot.z);
     const sailMat = new THREE.MeshStandardMaterial({ color: 0xf2ecd8, roughness: 0.85,
@@ -9097,7 +9104,7 @@ export class Track {
       const yaw = this.headingAt(i);
       const g = new THREE.Group();
       for (const side of [1, -1]) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 8.2, 8), verm);
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 8.2, 14), verm);
         post.position.set(c.x + n.x * 11 * side, c.y + 4.1, c.z + n.z * 11 * side);
         g.add(post);
         this.solids.push({ x: post.position.x, z: post.position.z, r: 0.9,
@@ -9142,7 +9149,7 @@ export class Track {
         g.add(body, cap);
         y += 3.6; w *= 0.74;
       }
-      const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.2, 6), roof);
+      const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.2, 8), roof);
       spire.position.set(spot.x, y + 1.4, spot.z);
       g.add(spire);
       g.traverse((mm) => { mm.castShadow = true; });
@@ -9752,8 +9759,8 @@ export class Track {
   _realizeElements(B, m4) {
     const gWall = new THREE.BoxGeometry(1, 1, 1); gWall.translate(0, 0.5, 0);
     const gBox = new THREE.BoxGeometry(1, 1, 1); gBox.translate(0, 0.5, 0);
-    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); gCyl.translate(0, 0.5, 0);
-    const gCone = new THREE.ConeGeometry(0.5, 1, 10); gCone.translate(0, 0.5, 0);
+    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 16); gCyl.translate(0, 0.5, 0);
+    const gCone = new THREE.ConeGeometry(0.5, 1, 16); gCone.translate(0, 0.5, 0);
     const specs = [
       // The emissive window map came across from `_buildHuts` when the
       // cottages moved onto the shared templates. It is not a port for its own
@@ -10124,8 +10131,8 @@ export class Track {
       return im;
     };
     const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0);
-    const cyl = new THREE.CylinderGeometry(1, 1, 1, 8); cyl.translate(0, 0.5, 0);
-    const cone = new THREE.ConeGeometry(1, 1, 8); cone.translate(0, 0.5, 0);
+    const cyl = new THREE.CylinderGeometry(1, 1, 1, 14); cyl.translate(0, 0.5, 0);
+    const cone = new THREE.ConeGeometry(1, 1, 14); cone.translate(0, 0.5, 0);
     // The three above are base-anchored by `translate(0, 0.5, 0)`; this one is
     // the only one that also needed a rotateY, and it is the only one that lost
     // its translate — so every barn had HALF ITS ROOF inside the hayloft and
@@ -10361,7 +10368,7 @@ export class Track {
    *  Each stack gets one SOLID collider (stacked timber does not yield). */
   _buildLogYards() {
     const count = this.T.logYards | 0;
-    const logGeo = new THREE.CylinderGeometry(0.55, 0.55, 1, 9);
+    const logGeo = new THREE.CylinderGeometry(0.55, 0.55, 1, 16);
     logGeo.rotateZ(Math.PI / 2);                        // axis → local x
     const logMat = new THREE.MeshStandardMaterial({ color: 0x8a6238, roughness: 0.95 });
     const logs = new THREE.InstancedMesh(logGeo, logMat, count * 6);
@@ -10429,12 +10436,12 @@ export class Track {
     const g = new THREE.Group();
     for (const side of [1, -1]) {
       // shattered trunk halves the fallen giant rests on
-      const stump = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3.3, 12, 10), bark);
+      const stump = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3.3, 12, 16), bark);
       stump.position.set(side * 12.4, 6, 0);
       stump.castShadow = true;
       g.add(stump);
       // root flare at the base
-      const flare = new THREE.Mesh(new THREE.ConeGeometry(4.4, 3.4, 8), barkDark);
+      const flare = new THREE.Mesh(new THREE.ConeGeometry(4.4, 3.4, 14), barkDark);
       flare.position.set(side * 12.4, 1.4, 0);
       flare.castShadow = true;
       g.add(flare);
@@ -10448,7 +10455,7 @@ export class Track {
     g.add(beam);
     // a couple of snapped branch stubs on top
     for (const [bx, ba] of [[-4, 0.5], [5.5, -0.4]]) {
-      const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.75, 4.5, 7), barkDark);
+      const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.75, 4.5, 12), barkDark);
       stub.position.set(bx, 14.6, 0.6);
       stub.rotation.z = ba;
       g.add(stub);
@@ -10476,9 +10483,9 @@ export class Track {
     for (let i = 10; i < N; i += L.every) {
       specs.push({ i, side: (specs.length % 2 === 0) ? 1 : -1 });
     }
-    const postGeo = new THREE.CylinderGeometry(0.09, 0.13, L.height, 6);
+    const postGeo = new THREE.CylinderGeometry(0.09, 0.13, L.height, 10);
     postGeo.translate(0, L.height / 2, 0);
-    const headGeo = new THREE.SphereGeometry(0.3, 8, 6);
+    const headGeo = new THREE.SphereGeometry(0.3, 14, 9);
     headGeo.translate(0, L.height + 0.15, 0);
     const postMat = new THREE.MeshStandardMaterial({ color: 0x1c1e24, roughness: 0.6, metalness: 0.5 });
     const headMat = new THREE.MeshBasicMaterial({ color: L.color });
@@ -10604,7 +10611,7 @@ export class Track {
     const LMAX = 200;
     const armGeo = new THREE.BoxGeometry(0.7, 0.1, 0.1);
     armGeo.translate(-0.35, 0, 0);
-    const bulbGeo = new THREE.SphereGeometry(0.26, 7, 5);
+    const bulbGeo = new THREE.SphereGeometry(0.26, 12, 8);
     bulbGeo.translate(-0.72, -0.12, 0);
     const arms = new THREE.InstancedMesh(
       armGeo, new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.6, metalness: 0.5 }), LMAX);
@@ -10817,7 +10824,7 @@ export class Track {
     // at night the bulbs ARE the read, same contract as the lamps.
     if (this.T.lamps) {
       const SMAX = 42 * 9;
-      const strGeo = new THREE.SphereGeometry(0.14, 6, 5);
+      const strGeo = new THREE.SphereGeometry(0.14, 8, 6);
       const strings = new THREE.InstancedMesh(strGeo,
         new THREE.MeshBasicMaterial({ color: this.T.lamps.color ?? 0xffb14a }), SMAX);
       let sk = 0, since = 99;
@@ -10854,7 +10861,7 @@ export class Track {
     // COSMETIC, like the trackside lamps and the reflector marker posts — a
     // solid line of colliders 2 u off the drivable edge would be a wall, not a
     // kerb, and this world already has walls.
-    const bolGeo = new THREE.CylinderGeometry(0.16, 0.2, 0.95, 6);
+    const bolGeo = new THREE.CylinderGeometry(0.16, 0.2, 0.95, 8);
     bolGeo.translate(0, 0.48, 0);
     const bols = new THREE.InstancedMesh(bolGeo, new THREE.MeshStandardMaterial({
       color: 0x2a2c30, roughness: 0.55, metalness: 0.45,
@@ -10944,7 +10951,7 @@ export class Track {
     roof.castShadow = true;
     g.add(roof);
     // a lantern hung under the keystone
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6),
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 9),
       new THREE.MeshBasicMaterial({ color: this.T.lamps?.color ?? 0xffb14a }));
     lamp.position.set(0, clear + span * RISE - 1.4, 0);
     g.add(lamp);
@@ -11634,7 +11641,7 @@ export class Track {
 
     // freestanding hoodoos: 4 stacked drums per tower, wider cap stone
     const COUNT = 40, SEGS = 4;
-    const segGeo = new THREE.CylinderGeometry(0.8, 1, 1, 7);
+    const segGeo = new THREE.CylinderGeometry(0.8, 1, 1, 12);
     segGeo.translate(0, 0.5, 0);
     const hoodoos = new THREE.InstancedMesh(
       segGeo,
@@ -11770,7 +11777,7 @@ export class Track {
     if (T.vegetation === 'burnt') return this._buildBurntForest(m4);
     if (T.vegetation === 'olive') return this._buildOliveGrove(m4);
     const COUNT = T.treeCount;
-    const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 7);
+    const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 12);
     trunkGeo.translate(0, 1.2, 0);
     const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const lowMat = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
@@ -11786,7 +11793,7 @@ export class Track {
     // set of InstancedMeshes — one draw call per part regardless of count.
     const capFor = (parts, capY) => {
       if (!capMat || capY == null) return;
-      const capGeo = new THREE.ConeGeometry(1.3, 1.9, 8);
+      const capGeo = new THREE.ConeGeometry(1.3, 1.9, 14);
       capGeo.translate(0, capY, 0);
       parts.push(new THREE.InstancedMesh(capGeo, capMat, COUNT));
     };
@@ -11798,68 +11805,68 @@ export class Track {
       return parts;
     };
     // --- conifers ---
-    const lowA = new THREE.ConeGeometry(2.6, 4.2, 8);
+    const lowA = new THREE.ConeGeometry(2.6, 4.2, 14);
     lowA.translate(0, 4.0, 0);
-    const topA = new THREE.ConeGeometry(1.8, 3.4, 8);
+    const topA = new THREE.ConeGeometry(1.8, 3.4, 14);
     topA.translate(0, 6.6, 0);
-    const lowB = new THREE.ConeGeometry(2.3, 3.4, 7);
+    const lowB = new THREE.ConeGeometry(2.3, 3.4, 12);
     lowB.translate(0.2, 3.6, -0.12);
-    const midB = new THREE.ConeGeometry(1.75, 2.9, 7);
+    const midB = new THREE.ConeGeometry(1.75, 2.9, 12);
     midB.translate(-0.16, 5.6, 0.12);
-    const topB = new THREE.ConeGeometry(1.15, 2.6, 7);
+    const topB = new THREE.ConeGeometry(1.15, 2.6, 12);
     topB.translate(0.05, 7.4, -0.05);
     const larchTiers = [];
     for (const [r, y] of [[1.55, 3.3], [1.25, 4.9], [0.95, 6.3], [0.6, 7.6]]) {
-      const tg = new THREE.ConeGeometry(r, 1.5, 7);      // sparse gappy tiers
+      const tg = new THREE.ConeGeometry(r, 1.5, 12);      // sparse gappy tiers
       tg.translate(0, y, 0);
       larchTiers.push([tg, lowMat]);
     }
     // --- deciduous ---
-    const birchTrunk = new THREE.CylinderGeometry(0.2, 0.28, 3.6, 6);
+    const birchTrunk = new THREE.CylinderGeometry(0.2, 0.28, 3.6, 16);
     birchTrunk.translate(0, 1.8, 0);
     const birchBark = new THREE.MeshStandardMaterial({ color: 0xe6e8e0, roughness: 0.9 });
-    const birchCrown = new THREE.SphereGeometry(1.45, 7, 5);
+    const birchCrown = new THREE.SphereGeometry(1.45, 12, 8);
     birchCrown.scale(1, 1.3, 1);
     birchCrown.translate(0, 4.7, 0);
-    const birchTop = new THREE.SphereGeometry(0.85, 6, 5);
+    const birchTop = new THREE.SphereGeometry(0.85, 16, 8);
     birchTop.translate(0.15, 6.1, -0.1);
     const bareBranch = (rz, tx, ty2, tz) => {
-      const bg = new THREE.ConeGeometry(0.09, 1.9, 5);
+      const bg = new THREE.ConeGeometry(0.09, 1.9, 14);
       bg.rotateZ(rz);
       bg.translate(tx, ty2, tz);
       return [bg, trunkMat];
     };
-    const oakTrunk = new THREE.CylinderGeometry(0.42, 0.6, 2.7, 7);
+    const oakTrunk = new THREE.CylinderGeometry(0.42, 0.6, 2.7, 12);
     oakTrunk.translate(0, 1.35, 0);
-    const oakDome = new THREE.SphereGeometry(2.35, 8, 6);
+    const oakDome = new THREE.SphereGeometry(2.35, 14, 9);
     oakDome.scale(1, 0.78, 1);
     oakDome.translate(0, 4.0, 0);
-    const oakTop = new THREE.SphereGeometry(1.4, 7, 5);
+    const oakTop = new THREE.SphereGeometry(1.4, 12, 8);
     oakTop.translate(0.35, 5.5, 0.2);
     // --- rainforest ---
     // AMAZON RAPIDS was falling through to the default two-pine stand, so the
     // Amazon was planted with conifers. Three storeys instead, which is what
     // actually reads as rainforest from a car: a buttressed emergent standing
     // clear of everything, an umbrella-crowned mid-storey, and a low tree fern.
-    const kapokTrunk = new THREE.CylinderGeometry(0.30, 0.72, 8.6, 7);
+    const kapokTrunk = new THREE.CylinderGeometry(0.30, 0.72, 8.6, 12);
     kapokTrunk.translate(0, 4.3, 0);
-    const kapokButtress = new THREE.ConeGeometry(1.25, 2.4, 6);   // flared root flare
+    const kapokButtress = new THREE.ConeGeometry(1.25, 2.4, 16);   // flared root flare
     kapokButtress.translate(0, 1.2, 0);
     // emergents are flat-topped: the crown spreads sideways above the canopy
-    const kapokCrown = new THREE.SphereGeometry(3.5, 9, 5);
+    const kapokCrown = new THREE.SphereGeometry(3.5, 16, 8);
     kapokCrown.scale(1, 0.42, 1);
     kapokCrown.translate(0, 9.1, 0);
-    const kapokCrown2 = new THREE.SphereGeometry(2.2, 8, 5);
+    const kapokCrown2 = new THREE.SphereGeometry(2.2, 14, 8);
     kapokCrown2.scale(1, 0.5, 1);
     kapokCrown2.translate(0.9, 8.2, -0.6);
-    const cecTrunk = new THREE.CylinderGeometry(0.20, 0.30, 5.4, 6);
+    const cecTrunk = new THREE.CylinderGeometry(0.20, 0.30, 5.4, 16);
     cecTrunk.translate(0, 2.7, 0);
-    const cecCrown = new THREE.SphereGeometry(2.5, 8, 5);          // parasol
+    const cecCrown = new THREE.SphereGeometry(2.5, 14, 8);          // parasol
     cecCrown.scale(1, 0.5, 1);
     cecCrown.translate(0, 5.9, 0);
-    const fernTrunk = new THREE.CylinderGeometry(0.16, 0.24, 1.9, 6);
+    const fernTrunk = new THREE.CylinderGeometry(0.16, 0.24, 1.9, 8);
     fernTrunk.translate(0, 0.95, 0);
-    const fernFrond = new THREE.SphereGeometry(1.55, 7, 4);
+    const fernFrond = new THREE.SphereGeometry(1.55, 12, 7);
     fernFrond.scale(1, 0.34, 1);
     fernFrond.translate(0, 2.35, 0);
     const SPECIES = {
@@ -11982,10 +11989,10 @@ export class Track {
     const LOGS = Math.min(36, Math.max(10, (T.treeCount * 0.12) | 0));
     const STUMPS = Math.min(26, Math.max(8, (T.treeCount * 0.08) | 0));
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-    const logGeo = new THREE.CylinderGeometry(0.26, 0.33, 2.8, 7);
+    const logGeo = new THREE.CylinderGeometry(0.26, 0.33, 2.8, 12);
     logGeo.rotateZ(Math.PI / 2);                    // lie along local X
     logGeo.translate(0, 0.26, 0);
-    const stumpGeo = new THREE.CylinderGeometry(0.4, 0.5, 0.48, 7);
+    const stumpGeo = new THREE.CylinderGeometry(0.4, 0.5, 0.48, 12);
     stumpGeo.translate(0, 0.24, 0);
     const barkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const cutMat = new THREE.MeshStandardMaterial({
@@ -12029,16 +12036,16 @@ export class Track {
    *  up on the cliff rims, and around the open start bowl. */
   _buildCacti(m4) {
     const COUNT = this.T.treeCount;
-    const trunkGeo = new THREE.CapsuleGeometry(0.5, 3.6, 4, 8);
+    const trunkGeo = new THREE.CapsuleGeometry(0.5, 3.6, 4, 14);
     trunkGeo.translate(0, 2.3, 0);
-    const armUpA = new THREE.CapsuleGeometry(0.3, 1.5, 4, 8);
+    const armUpA = new THREE.CapsuleGeometry(0.3, 1.5, 4, 14);
     armUpA.translate(1.05, 3.5, 0);
-    const armElbowA = new THREE.CapsuleGeometry(0.3, 0.9, 4, 8);
+    const armElbowA = new THREE.CapsuleGeometry(0.3, 0.9, 4, 14);
     armElbowA.rotateZ(Math.PI / 2);
     armElbowA.translate(0.6, 2.75, 0);
-    const armUpB = new THREE.CapsuleGeometry(0.28, 1.1, 4, 8);
+    const armUpB = new THREE.CapsuleGeometry(0.28, 1.1, 4, 14);
     armUpB.translate(-0.95, 3.0, 0);
-    const armElbowB = new THREE.CapsuleGeometry(0.28, 0.75, 4, 8);
+    const armElbowB = new THREE.CapsuleGeometry(0.28, 0.75, 4, 14);
     armElbowB.rotateZ(Math.PI / 2);
     armElbowB.translate(-0.55, 2.4, 0);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 });
@@ -12047,22 +12054,22 @@ export class Track {
     // DESERT FLORA MIX: saguaros plus two more species so the desert never
     // reads copy-pasted — squat ribbed BARREL cacti with a blossom crown, and
     // dry flat-topped ACACIA scrub. All of them yield to a car.
-    const barrelBody = new THREE.CylinderGeometry(0.62, 0.78, 1.05, 9);
+    const barrelBody = new THREE.CylinderGeometry(0.62, 0.78, 1.05, 16);
     barrelBody.translate(0, 0.55, 0);
-    const barrelCrown = new THREE.SphereGeometry(0.3, 6, 5);
+    const barrelCrown = new THREE.SphereGeometry(0.3, 16, 8);
     barrelCrown.translate(0, 1.15, 0);
     const barrelParts = [
       new THREE.InstancedMesh(barrelBody, mat, COUNT),
       new THREE.InstancedMesh(barrelCrown,
         new THREE.MeshStandardMaterial({ color: 0xe89a4a, flatShading: true, roughness: 0.9 }), COUNT),
     ];
-    const acTrunk = new THREE.CylinderGeometry(0.12, 0.22, 2.6, 6);
+    const acTrunk = new THREE.CylinderGeometry(0.12, 0.22, 2.6, 8);
     acTrunk.rotateZ(0.16);
     acTrunk.translate(0, 1.3, 0);
-    const acBough = new THREE.CylinderGeometry(0.08, 0.12, 1.4, 5);
+    const acBough = new THREE.CylinderGeometry(0.08, 0.12, 1.4, 8);
     acBough.rotateZ(-0.8);
     acBough.translate(0.75, 2.2, 0);
-    const acCrown = new THREE.SphereGeometry(1.9, 8, 4);
+    const acCrown = new THREE.SphereGeometry(1.9, 14, 7);
     acCrown.scale(1, 0.22, 1);
     acCrown.translate(0.35, 3.0, 0);
     const acaciaParts = [
@@ -12165,21 +12172,21 @@ export class Track {
     // three overlapping crown lobes low over them. The first cut put two flat
     // discs on a tall bare pole and every one of them read as a mushroom: a
     // gum is nearly as wide as it is tall and the crown starts low. ---
-    const gumTrunk = new THREE.CylinderGeometry(0.55, 0.95, 3.6, 8);
+    const gumTrunk = new THREE.CylinderGeometry(0.55, 0.95, 3.6, 14);
     gumTrunk.translate(0, 1.8, 0);
-    const gumLimbA = new THREE.CylinderGeometry(0.2, 0.42, 3.6, 6);
+    const gumLimbA = new THREE.CylinderGeometry(0.2, 0.42, 3.6, 16);
     gumLimbA.rotateZ(-0.72);
     gumLimbA.translate(1.25, 4.4, 0.15);
-    const gumLimbB = new THREE.CylinderGeometry(0.18, 0.4, 3.3, 6);
+    const gumLimbB = new THREE.CylinderGeometry(0.18, 0.4, 3.3, 16);
     gumLimbB.rotateZ(0.78);
     gumLimbB.translate(-1.2, 4.2, -0.25);
-    const gumCrownA = new THREE.SphereGeometry(2.6, 8, 6);
+    const gumCrownA = new THREE.SphereGeometry(2.6, 14, 9);
     gumCrownA.scale(1, 0.78, 1);
     gumCrownA.translate(1.85, 6.0, 0.3);
-    const gumCrownB = new THREE.SphereGeometry(2.3, 8, 6);
+    const gumCrownB = new THREE.SphereGeometry(2.3, 14, 9);
     gumCrownB.scale(1, 0.8, 1);
     gumCrownB.translate(-1.75, 5.6, -0.5);
-    const gumCrownC = new THREE.SphereGeometry(2.0, 8, 6);
+    const gumCrownC = new THREE.SphereGeometry(2.0, 14, 9);
     gumCrownC.scale(1, 0.85, 1);
     gumCrownC.translate(0.1, 6.6, -0.1);
     const barkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 0.95 });
@@ -12200,11 +12207,11 @@ export class Track {
     // cone and the plain came out planted with pine trees. The silhouette is
     // narrow (r ~ 1.05 against 6 u of height) and the inverted lower cone
     // gives the sheoak's characteristic hanging skirt. ---
-    const oakTrunkGeo = new THREE.CylinderGeometry(0.18, 0.34, 3.6, 6);
+    const oakTrunkGeo = new THREE.CylinderGeometry(0.18, 0.34, 3.6, 16);
     oakTrunkGeo.translate(0, 1.8, 0);
-    const oakCone = new THREE.ConeGeometry(1.05, 4.0, 7);
+    const oakCone = new THREE.ConeGeometry(1.05, 4.0, 12);
     oakCone.translate(0, 6.0, 0);
-    const oakSkirt = new THREE.ConeGeometry(1.15, 3.0, 7);
+    const oakSkirt = new THREE.ConeGeometry(1.15, 3.0, 12);
     oakSkirt.rotateX(Math.PI);                          // inverted: the droop
     oakSkirt.translate(0, 4.4, 0);
     const oakBarkMat = new THREE.MeshStandardMaterial({ color: 0x5e4c3a, roughness: 1 });
@@ -12220,13 +12227,13 @@ export class Track {
     // --- mulga: three leaning stems under a flat grey-green pad ---
     const mulgaStems = [];
     for (let s = 0; s < 3; s++) {
-      const st = new THREE.CylinderGeometry(0.07, 0.15, 2.1, 5);
+      const st = new THREE.CylinderGeometry(0.07, 0.15, 2.1, 8);
       st.rotateZ((s - 1) * 0.24);
       st.rotateY(s * 2.1);
       st.translate((s - 1) * 0.26, 1.05, (s - 1) * 0.14);
       mulgaStems.push(st);
     }
-    const mulgaPad = new THREE.SphereGeometry(1.5, 7, 4);
+    const mulgaPad = new THREE.SphereGeometry(1.5, 12, 7);
     mulgaPad.scale(1, 0.34, 1);
     mulgaPad.translate(0, 2.35, 0);
     const mulgaBarkMat = new THREE.MeshStandardMaterial({ color: 0x6a5b48, roughness: 1 });
@@ -12318,26 +12325,26 @@ export class Track {
    *  in how far the char has bleached them. */
   _buildCharredTrees(m4) {
     const COUNT = this.T.treeCount;
-    const trunkGeo = new THREE.CylinderGeometry(0.13, 0.34, 4.8, 6);
+    const trunkGeo = new THREE.CylinderGeometry(0.13, 0.34, 4.8, 16);
     trunkGeo.translate(0, 2.4, 0);
-    const b1 = new THREE.ConeGeometry(0.1, 2.0, 5);
+    const b1 = new THREE.ConeGeometry(0.1, 2.0, 14);
     b1.rotateZ(-0.95);
     b1.translate(0.62, 3.2, 0);
-    const b2 = new THREE.ConeGeometry(0.09, 1.6, 5);
+    const b2 = new THREE.ConeGeometry(0.09, 1.6, 14);
     b2.rotateZ(0.85);
     b2.translate(-0.55, 2.6, 0.1);
-    const b3 = new THREE.ConeGeometry(0.08, 1.4, 5);
+    const b3 = new THREE.ConeGeometry(0.08, 1.4, 14);
     b3.rotateX(0.9);
     b3.translate(0, 3.7, 0.5);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 });
     const parts = [trunkGeo, b1, b2, b3].map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
     // stump: a snapped-off trunk with a jagged shoulder, half-buried in ash
-    const stTrunk = new THREE.CylinderGeometry(0.34, 0.6, 1.5, 6);
+    const stTrunk = new THREE.CylinderGeometry(0.34, 0.6, 1.5, 16);
     stTrunk.translate(0, 0.75, 0);
     const stShard = new THREE.ConeGeometry(0.2, 0.9, 4);
     stShard.rotateZ(0.22);
     stShard.translate(0.16, 1.7, 0);
-    const stRoot = new THREE.CylinderGeometry(0.62, 0.95, 0.36, 6);
+    const stRoot = new THREE.CylinderGeometry(0.62, 0.95, 0.36, 16);
     stRoot.translate(0, 0.18, 0);
     const stumpParts = [stTrunk, stShard, stRoot]
       .map((geoPart) => new THREE.InstancedMesh(geoPart, mat, COUNT));
@@ -12405,17 +12412,17 @@ export class Track {
     const canMatLow = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
     const canMatTop = new THREE.MeshStandardMaterial({ color: T.foliageTop, flatShading: true, roughness: 1 });
     // kapok: tall trunk, flared buttress base, wide plate crown + side domes
-    const kTrunk = new THREE.CylinderGeometry(0.26, 0.4, 7.0, 7);
+    const kTrunk = new THREE.CylinderGeometry(0.26, 0.4, 7.0, 12);
     kTrunk.translate(0, 3.5, 0);
-    const kButtress = new THREE.CylinderGeometry(0.62, 1.05, 1.5, 7);
+    const kButtress = new THREE.CylinderGeometry(0.62, 1.05, 1.5, 12);
     kButtress.translate(0, 0.75, 0);
-    const kCrown = new THREE.SphereGeometry(3.6, 8, 5);
+    const kCrown = new THREE.SphereGeometry(3.6, 14, 8);
     kCrown.scale(1, 0.34, 1);
     kCrown.translate(0, 7.3, 0);
-    const kDomeA = new THREE.SphereGeometry(2.0, 7, 5);
+    const kDomeA = new THREE.SphereGeometry(2.0, 12, 8);
     kDomeA.scale(1, 0.42, 1);
     kDomeA.translate(1.9, 6.8, 0.6);
-    const kDomeB = new THREE.SphereGeometry(1.7, 7, 5);
+    const kDomeB = new THREE.SphereGeometry(1.7, 12, 8);
     kDomeB.scale(1, 0.45, 1);
     kDomeB.translate(-1.8, 6.9, -0.5);
     // lianas: three thin strands dangling from the kapok crown — the single
@@ -12438,12 +12445,12 @@ export class Track {
       ...vineGeos.map((v) => new THREE.InstancedMesh(v, vineMat, COUNT)),
     ];
     // broadleaf: short trunk, two rounded stacked crowns
-    const bTrunk = new THREE.CylinderGeometry(0.24, 0.36, 4.2, 7);
+    const bTrunk = new THREE.CylinderGeometry(0.24, 0.36, 4.2, 12);
     bTrunk.translate(0, 2.1, 0);
-    const bCrown = new THREE.SphereGeometry(2.45, 8, 6);
+    const bCrown = new THREE.SphereGeometry(2.45, 14, 9);
     bCrown.scale(1, 0.72, 1);
     bCrown.translate(0, 4.7, 0);
-    const bTop = new THREE.SphereGeometry(1.5, 7, 5);
+    const bTop = new THREE.SphereGeometry(1.5, 12, 8);
     bTop.scale(1, 0.75, 1);
     bTop.translate(0.4, 6.0, 0.3);
     const broadParts = [
@@ -12452,7 +12459,7 @@ export class Track {
       new THREE.InstancedMesh(bTop, canMatTop, COUNT),
     ];
     // rainforest palm: slim bare stem, 7 drooping fronds, a nut cluster
-    const pTrunk = new THREE.CylinderGeometry(0.15, 0.28, 6.2, 6);
+    const pTrunk = new THREE.CylinderGeometry(0.15, 0.28, 6.2, 16);
     pTrunk.translate(0, 3.1, 0);
     const palmGeos = [pTrunk];
     for (let li = 0; li < 7; li++) {
@@ -12465,7 +12472,7 @@ export class Track {
       fr.translate(0, 6.15, 0);
       palmGeos.push(fr);
     }
-    const pNut = new THREE.SphereGeometry(0.2, 6, 5);
+    const pNut = new THREE.SphereGeometry(0.2, 8, 6);
     pNut.translate(0.26, 5.85, 0.16);
     const palmParts = [
       new THREE.InstancedMesh(pTrunk, trunkMat, COUNT),
@@ -12473,7 +12480,7 @@ export class Track {
       new THREE.InstancedMesh(pNut, new THREE.MeshStandardMaterial({ color: 0x6a4a26, roughness: 1 }), COUNT),
     ];
     // tree fern: squat fibrous trunk under an arching frond rosette
-    const fTrunk = new THREE.CylinderGeometry(0.2, 0.34, 2.0, 6);
+    const fTrunk = new THREE.CylinderGeometry(0.2, 0.34, 2.0, 16);
     fTrunk.translate(0, 1.0, 0);
     const fernParts = [new THREE.InstancedMesh(fTrunk, trunkMat, COUNT)];
     for (let li = 0; li < 6; li++) {
@@ -12584,7 +12591,7 @@ export class Track {
   _buildPalms(m4) {
     const T = this.T;
     const COUNT = T.treeCount;
-    const trunkGeo = new THREE.CylinderGeometry(0.16, 0.32, 5.4, 7);
+    const trunkGeo = new THREE.CylinderGeometry(0.16, 0.32, 5.4, 12);
     trunkGeo.translate(0, 2.7, 0);
     const partGeos = [trunkGeo];
     for (let li = 0; li < 6; li++) {
@@ -12597,7 +12604,7 @@ export class Track {
       fr.translate(0, 5.35, 0);
       partGeos.push(fr);
     }
-    const nutGeo = new THREE.SphereGeometry(0.22, 6, 5);
+    const nutGeo = new THREE.SphereGeometry(0.22, 8, 6);
     nutGeo.translate(0.28, 5.05, 0.18);
     partGeos.push(nutGeo);
     const PALM_OWN = new THREE.Color(1, 1, 1);   // 'keep your own material colour'
@@ -12608,7 +12615,7 @@ export class Track {
       geoPart, gi === 0 ? trunkMat : gi === partGeos.length - 1 ? nutMat : frondMat, COUNT
     ));
     // --- doum palm: short thick trunk, 8 stiff wide fans, no fruit ---
-    const dTrunk = new THREE.CylinderGeometry(0.3, 0.46, 2.5, 7);
+    const dTrunk = new THREE.CylinderGeometry(0.3, 0.46, 2.5, 12);
     dTrunk.translate(0, 1.25, 0);
     const doumGeos = [dTrunk];
     for (let li = 0; li < 8; li++) {
@@ -12720,54 +12727,54 @@ export class Track {
     const topMat = new THREE.MeshStandardMaterial({ color: T.foliageTop, flatShading: true, roughness: 1 });
 
     // --- ancient olive: two leaning stems, three overlapping crowns ---
-    const oTrunk = new THREE.CylinderGeometry(0.42, 0.78, 2.1, 7);
+    const oTrunk = new THREE.CylinderGeometry(0.42, 0.78, 2.1, 12);
     oTrunk.translate(0, 1.05, 0);
-    const oLimb = new THREE.CylinderGeometry(0.2, 0.34, 1.9, 6);
+    const oLimb = new THREE.CylinderGeometry(0.2, 0.34, 1.9, 16);
     oLimb.rotateZ(0.34);
     oLimb.translate(0.42, 1.5, 0.1);
-    const oCrownA = new THREE.SphereGeometry(1.95, 7, 5);
+    const oCrownA = new THREE.SphereGeometry(1.95, 12, 8);
     oCrownA.scale(1, 0.74, 1);
     oCrownA.translate(0, 3.5, 0);
-    const oCrownB = new THREE.SphereGeometry(1.3, 6, 5);
+    const oCrownB = new THREE.SphereGeometry(1.3, 16, 8);
     oCrownB.scale(1, 0.8, 1);
     oCrownB.translate(1.35, 3.1, 0.45);
-    const oCrownC = new THREE.SphereGeometry(1.15, 6, 5);
+    const oCrownC = new THREE.SphereGeometry(1.15, 16, 8);
     oCrownC.scale(1, 0.8, 1);
     oCrownC.translate(-1.2, 3.3, -0.5);
     // --- grove-row olive: the small planted one ---
-    const gTrunk = new THREE.CylinderGeometry(0.16, 0.27, 1.5, 6);
+    const gTrunk = new THREE.CylinderGeometry(0.16, 0.27, 1.5, 16);
     gTrunk.translate(0, 0.75, 0);
-    const gCrown = new THREE.SphereGeometry(1.38, 7, 5);
+    const gCrown = new THREE.SphereGeometry(1.38, 12, 8);
     gCrown.scale(1, 0.86, 1);
     gCrown.translate(0, 2.45, 0);
-    const gTop = new THREE.SphereGeometry(0.82, 6, 4);
+    const gTop = new THREE.SphereGeometry(0.82, 16, 7);
     gTop.translate(0.3, 3.15, -0.2);
     // --- cork oak: stripped band low, broad dome high ---
-    const cTrunk = new THREE.CylinderGeometry(0.3, 0.44, 4.4, 7);
+    const cTrunk = new THREE.CylinderGeometry(0.3, 0.44, 4.4, 12);
     cTrunk.translate(0, 2.2, 0);
-    const cStrip = new THREE.CylinderGeometry(0.46, 0.54, 1.9, 8);
+    const cStrip = new THREE.CylinderGeometry(0.46, 0.54, 1.9, 14);
     cStrip.translate(0, 0.95, 0);
-    const cDome = new THREE.SphereGeometry(2.85, 8, 6);
+    const cDome = new THREE.SphereGeometry(2.85, 14, 9);
     cDome.scale(1, 0.68, 1);
     cDome.translate(0, 5.5, 0);
-    const cLobe = new THREE.SphereGeometry(1.75, 7, 5);
+    const cLobe = new THREE.SphereGeometry(1.75, 12, 8);
     cLobe.scale(1, 0.7, 1);
     cLobe.translate(1.55, 4.9, 0.6);
     // --- umbrella pine: bare trunk, flat parasol ---
-    const uTrunk = new THREE.CylinderGeometry(0.26, 0.44, 8.1, 7);
+    const uTrunk = new THREE.CylinderGeometry(0.26, 0.44, 8.1, 12);
     uTrunk.translate(0, 4.05, 0);
-    const uCanopy = new THREE.SphereGeometry(3.2, 9, 5);
+    const uCanopy = new THREE.SphereGeometry(3.2, 16, 8);
     uCanopy.scale(1, 0.3, 1);
     uCanopy.translate(0, 9.2, 0);
-    const uCanopy2 = new THREE.SphereGeometry(2.0, 8, 5);
+    const uCanopy2 = new THREE.SphereGeometry(2.0, 14, 8);
     uCanopy2.scale(1, 0.28, 1);
     uCanopy2.translate(0.95, 8.5, -0.5);
     // --- cypress: the column ---
-    const yStub = new THREE.CylinderGeometry(0.16, 0.22, 0.8, 6);
+    const yStub = new THREE.CylinderGeometry(0.16, 0.22, 0.8, 8);
     yStub.translate(0, 0.4, 0);
-    const yCol = new THREE.CylinderGeometry(0.34, 0.92, 8.6, 7);
+    const yCol = new THREE.CylinderGeometry(0.34, 0.92, 8.6, 12);
     yCol.translate(0, 4.9, 0);
-    const yTip = new THREE.ConeGeometry(0.4, 2.3, 7);
+    const yTip = new THREE.ConeGeometry(0.4, 2.3, 12);
     yTip.translate(0, 10.2, 0);
 
     const mk = (specs) => {
@@ -12918,13 +12925,13 @@ export class Track {
   _buildRedwoods(m4) {
     const T = this.T;
     const COUNT = T.treeCount;
-    const trunkGeo = new THREE.CylinderGeometry(0.5, 0.9, 9, 8);
+    const trunkGeo = new THREE.CylinderGeometry(0.5, 0.9, 9, 14);
     trunkGeo.translate(0, 4.5, 0);
-    const lowGeo = new THREE.ConeGeometry(3.0, 6.5, 8);
+    const lowGeo = new THREE.ConeGeometry(3.0, 6.5, 14);
     lowGeo.translate(0, 11.4, 0);
-    const midGeo = new THREE.ConeGeometry(2.3, 5.5, 8);
+    const midGeo = new THREE.ConeGeometry(2.3, 5.5, 14);
     midGeo.translate(0, 15.1, 0);
-    const topGeo = new THREE.ConeGeometry(1.5, 4.6, 8);
+    const topGeo = new THREE.ConeGeometry(1.5, 4.6, 14);
     topGeo.translate(0, 18.6, 0);
     const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const lowMat = new THREE.MeshStandardMaterial({ color: T.foliageLow, flatShading: true, roughness: 1 });
@@ -12994,13 +13001,13 @@ export class Track {
     // Short crooked trunk under two rounded crowns in a lighter, yellower
     // green than the conifers, so the stand never reads as one repeated tree.
     const OAKS = 120;
-    const oTrunk = new THREE.CylinderGeometry(0.26, 0.42, 4.4, 6);
+    const oTrunk = new THREE.CylinderGeometry(0.26, 0.42, 4.4, 16);
     oTrunk.rotateZ(0.06);
     oTrunk.translate(0, 2.2, 0);
-    const oCrown = new THREE.SphereGeometry(2.3, 8, 6);
+    const oCrown = new THREE.SphereGeometry(2.3, 14, 9);
     oCrown.scale(1, 0.82, 1);
     oCrown.translate(0, 5.1, 0);
-    const oTop = new THREE.SphereGeometry(1.4, 7, 5);
+    const oTop = new THREE.SphereGeometry(1.4, 12, 8);
     oTop.scale(1, 0.85, 1);
     oTop.translate(0.45, 6.3, 0.3);
     // reuse the theme's canopy materials so the tanoaks sit in the same
@@ -13043,12 +13050,12 @@ export class Track {
     const color = new THREE.Color();
     // --- charred snags (60%) ---
     const SNAGS = Math.round(T.treeCount * 0.6);
-    const trunkGeo = new THREE.CylinderGeometry(0.13, 0.34, 4.8, 6);
+    const trunkGeo = new THREE.CylinderGeometry(0.13, 0.34, 4.8, 16);
     trunkGeo.translate(0, 2.4, 0);
-    const b1 = new THREE.ConeGeometry(0.1, 2.0, 5);
+    const b1 = new THREE.ConeGeometry(0.1, 2.0, 14);
     b1.rotateZ(-0.95);
     b1.translate(0.62, 3.2, 0);
-    const b2 = new THREE.ConeGeometry(0.09, 1.6, 5);
+    const b2 = new THREE.ConeGeometry(0.09, 1.6, 14);
     b2.rotateZ(0.85);
     b2.translate(-0.55, 2.6, 0.1);
     const snagMat = new THREE.MeshStandardMaterial({
@@ -13083,11 +13090,11 @@ export class Track {
 
     // --- scorched standing pines (40%), canopies glowing from within ---
     const PINES = T.treeCount - SNAGS;
-    const pTrunk = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 7);
+    const pTrunk = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 12);
     pTrunk.translate(0, 1.2, 0);
-    const pLow = new THREE.ConeGeometry(2.6, 4.2, 8);
+    const pLow = new THREE.ConeGeometry(2.6, 4.2, 14);
     pLow.translate(0, 4.0, 0);
-    const pTop = new THREE.ConeGeometry(1.8, 3.4, 8);
+    const pTop = new THREE.ConeGeometry(1.8, 3.4, 14);
     pTop.translate(0, 6.6, 0);
     const pTrunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const scorchMat = new THREE.MeshStandardMaterial({
@@ -13183,7 +13190,7 @@ export class Track {
     let bushGeo;
     if (underKind === 'frond') {
       // a low rosette of fronds: wide, flat, overlapping
-      bushGeo = new THREE.SphereGeometry(1.15, 7, 3);
+      bushGeo = new THREE.SphereGeometry(1.15, 12, 3);
       bushGeo.scale(1, 0.3, 1);
     } else if (underKind === 'spray') {
       // bunchgrass: narrow at the base, splaying up and out
@@ -13354,7 +13361,7 @@ export class Track {
 
     // flowers sprinkled close to the road
     const flowers = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.22, 6, 5),
+      new THREE.SphereGeometry(0.22, 8, 6),
       new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }),
       T.flowerCount
     );
@@ -13613,7 +13620,7 @@ export class Track {
 
     // hay bales
     const hayCount = this.T.hayCount !== undefined ? this.T.hayCount : 50;
-    const hayGeo = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 10);
+    const hayGeo = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 16);
     hayGeo.rotateZ(Math.PI / 2);
     const hay = new THREE.InstancedMesh(
       hayGeo, new THREE.MeshStandardMaterial({ color: this.T.hayColor, roughness: 1 }), Math.max(hayCount, 1)
@@ -13646,7 +13653,7 @@ export class Track {
     // neon sponsor palettes on unlit (MeshBasic) panels so they burn through
     // the night and bloom picks up the lettering.
     const neonStyle = this.T.bannerStyle === 'neon';
-    const post = new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7);
+    const post = new THREE.CylinderGeometry(0.14, 0.16, 3.4, 8);
     const postMat = new THREE.MeshStandardMaterial({
       color: 0x4a4640, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
     });
@@ -13722,7 +13729,7 @@ export class Track {
     board.position.y = 2.6;
     g.add(board);
     const post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7),
+      new THREE.CylinderGeometry(0.14, 0.16, 3.4, 8),
       new THREE.MeshStandardMaterial({ color: 0x4a4640, roughness: 0.6, metalness: 0.5 })
     );
     post.position.set(0, 1.7, -0.1);
@@ -13842,13 +13849,13 @@ export class Track {
       // rope rails on short posts down both edges of the deck
       for (const s of [-1, 1]) {
         for (const ry of [9.6, 10.1]) {
-          const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, span, 5), ropeMat);
+          const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, span, 8), ropeMat);
           rope.rotation.z = Math.PI / 2;
           rope.position.set(0, ry, s * 1.45);
           g.add(rope);
         }
         for (let px = -span / 2 + 1.2; px <= span / 2 - 1.1; px += 3.4) {
-          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.25, 6), woodMat);
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.25, 8), woodMat);
           post.position.set(px, 9.75, s * 1.45);
           g.add(post);
         }
@@ -13882,7 +13889,7 @@ export class Track {
         // 25 u span reads as a stilt, not a trestle.
         for (const lean of [-1, 1]) {
           const leg = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.16, 0.26, drop, 6),
+            new THREE.CylinderGeometry(0.16, 0.26, drop, 10),
             woodMat
           );
           leg.castShadow = true;
@@ -13996,7 +14003,7 @@ export class Track {
       // coconuts
       for (let k = 0; k < 2; k++) {
         const nut = new THREE.Mesh(
-          new THREE.SphereGeometry(0.17, 6, 5),
+          new THREE.SphereGeometry(0.17, 8, 6),
           new THREE.MeshStandardMaterial({ color: 0x6a4a26, roughness: 1 })
         );
         nut.position.copy(tip).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, -0.25, (Math.random() - 0.5) * 0.5));
