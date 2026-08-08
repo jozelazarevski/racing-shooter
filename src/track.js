@@ -3394,6 +3394,118 @@ export const HOUSE_TEMPLATES = {
     ['cyl', 3.0, 3.4, 0, 0.75, 2.2, 0.75, 'stone'],
   ] },
 
+  // A VILLAGE OF THREE HOUSES IS A VILLAGE OF ONE HOUSE.
+  //
+  // Every settlement in the game - every hut scatter on every world - drew from
+  // COTTAGES, and COTTAGES held exactly three entries. Three silhouettes, hue-
+  // jittered, is what makes a street read as the same building stamped down the
+  // road, which is the complaint. Five more, and they differ in PLAN and
+  // ROOFLINE rather than in tint: an L-plan farmhouse with a porch and a
+  // dormer, a two-storey townhouse with a balcony, a half-timbered cottage
+  // with its upper floor jettied out over the street, a stone cottage with an
+  // outside stair and a woodstore, and a long chalet under a deep eave.
+  //
+  // They also carry two to three times the parts of the old three - porch
+  // posts, sills, braces, balcony rails, ridge chimneys - because at the
+  // distance a village is seen it is the number of EDGES catching the light
+  // that separates a house from a box, not the smoothness of any one of them.
+
+  // L-PLAN FARMHOUSE: a main range with a return wing, a posted porch and a
+  // dormer breaking the eaves.
+  cottageD: { r: 5.4, parts: [
+    ['box', 0, 0, 0, 8.4, 0.5, 5.6, 'stone'],
+    ['wall', 0, 0.5, 0, 7.8, 3.8, 5.0, 'wall'],
+    ['box', 0, 4.3, 0, 8.6, 0.26, 5.6, 'trim'],
+    ['prism', 0, 4.5, 0, 9.0, 2.8, 5.9, 'roof'],
+    ['wall', -3.0, 0.5, -3.6, 4.2, 3.2, 4.2, 'wall'],
+    ['box', -3.0, 3.7, -3.6, 4.5, 0.24, 4.5, 'trim'],
+    ['prism', -3.0, 3.9, -3.6, 4.8, 2.2, 4.8, 'roof'],
+    ['box', 1.6, 0.5, 2.9, 2.8, 0.22, 1.7, 'stone'],
+    ['cyl', 0.5, 0.7, 3.3, 0.26, 2.5, 0.26, 'trim'],
+    ['cyl', 2.7, 0.7, 3.3, 0.26, 2.5, 0.26, 'trim'],
+    ['box', 1.6, 3.2, 3.1, 3.2, 0.22, 1.9, 'roof'],
+    ['box', 1.6, 0.6, 2.5, 1.2, 2.2, 0.26, 'trim'],
+    ['box', -1.8, 1.9, 2.6, 1.3, 1.1, 0.2, 'trim'],
+    ['prism', -1.4, 5.2, 1.6, 1.9, 1.3, 1.8, 'roof'],
+    ['cyl', 3.4, 4.4, -1.2, 0.72, 2.8, 0.72, 'stone'],
+  ] },
+
+  // TOWNHOUSE: two full storeys, a string course between them, a shallow
+  // balcony on the upper floor and a pitched roof end-on to the street.
+  cottageE: { r: 4.4, parts: [
+    ['box', 0, 0, 0, 6.2, 0.45, 6.6, 'stone'],
+    ['wall', 0, 0.45, 0, 5.6, 6.6, 6.0, 'wall'],
+    ['box', 0, 3.6, 0, 5.9, 0.26, 6.3, 'trim'],
+    ['box', 0, 7.05, 0, 6.4, 0.28, 6.8, 'trim'],
+    ['prism', 0, 7.3, 0, 6.7, 2.4, 7.1, 'roof'],
+    ['box', 0, 4.3, 3.1, 3.4, 0.2, 1.1, 'trim'],
+    ['box', 0, 5.2, 3.5, 3.4, 0.9, 0.16, 'trim'],
+    ['box', -1.5, 4.5, 3.5, 0.16, 0.9, 0.16, 'trim'],
+    ['box', 1.5, 4.5, 3.5, 0.16, 0.9, 0.16, 'trim'],
+    ['box', 0, 0.55, 3.05, 1.2, 2.3, 0.24, 'trim'],
+    ['box', -1.7, 1.5, 3.05, 1.0, 1.2, 0.18, 'trim'],
+    ['box', 1.7, 1.5, 3.05, 1.0, 1.2, 0.18, 'trim'],
+    ['cyl', 2.0, 7.2, -1.6, 0.62, 2.4, 0.62, 'stone'],
+    ['cyl', -2.0, 7.2, 1.6, 0.62, 2.0, 0.62, 'stone'],
+  ] },
+
+  // HALF-TIMBERED: the upper floor JETTIES out over the lower one, which is
+  // the silhouette the eye reads before it reads any timber.
+  cottageF: { r: 4.8, parts: [
+    ['box', 0, 0, 0, 6.4, 0.4, 5.4, 'stone'],
+    ['wall', 0, 0.4, 0, 5.8, 3.0, 4.8, 'stone'],
+    ['wall', 0, 3.4, 0, 6.8, 3.0, 5.8, 'wall'],
+    ['box', 0, 3.3, 0, 7.1, 0.24, 6.1, 'trim'],
+    ['box', 0, 6.4, 0, 7.2, 0.26, 6.2, 'trim'],
+    ['prism', 0, 6.6, 0, 7.6, 3.0, 6.5, 'roof'],
+    ['box', -2.9, 3.4, 0, 0.24, 3.0, 5.6, 'trim'],
+    ['box', 2.9, 3.4, 0, 0.24, 3.0, 5.6, 'trim'],
+    ['box', 0, 4.8, 2.9, 6.4, 0.22, 0.2, 'trim'],
+    ['box', -1.7, 3.6, 2.9, 0.22, 2.7, 0.2, 'trim'],
+    ['box', 1.7, 3.6, 2.9, 0.22, 2.7, 0.2, 'trim'],
+    ['box', 0, 0.5, 2.5, 1.2, 2.2, 0.24, 'trim'],
+    ['box', -1.9, 1.5, 2.5, 1.1, 1.1, 0.18, 'trim'],
+    ['cyl', 2.4, 6.5, -1.0, 0.7, 2.6, 0.7, 'stone'],
+  ] },
+
+  // STONE COTTAGE with an outside stair to the upper door and a lean-to
+  // woodstore - the plan you get on any hillside.
+  cottageG: { r: 5.0, parts: [
+    ['box', 0, 0, 0, 7.2, 0.5, 5.2, 'stone'],
+    ['wall', 0, 0.5, 0, 6.6, 4.6, 4.6, 'stone'],
+    ['box', 0, 5.1, 0, 6.9, 0.26, 5.0, 'trim'],
+    ['prism', 0, 5.3, 0, 7.3, 2.6, 5.3, 'roof'],
+    ['box', 3.6, 0.5, 1.2, 1.8, 2.6, 0.5, 'stone'],
+    ['box', 3.6, 0.5, 0.2, 1.8, 1.7, 0.5, 'stone'],
+    ['box', 3.6, 0.5, -0.8, 1.8, 0.9, 0.5, 'stone'],
+    ['box', 2.9, 3.1, 1.6, 1.0, 2.0, 0.22, 'trim'],
+    ['wall', -4.2, 0.5, 0.6, 2.4, 2.2, 3.2, 'wall2'],
+    ['box', -4.2, 2.7, 0.6, 2.8, 0.22, 3.6, 'roof'],
+    ['cyl', -4.2, 0.7, 2.0, 0.36, 1.6, 0.36, 'trim'],
+    ['cyl', -4.2, 0.7, -0.6, 0.36, 1.6, 0.36, 'trim'],
+    ['box', 0, 0.6, 2.4, 1.1, 2.1, 0.24, 'trim'],
+    ['cyl', -1.6, 5.2, 0, 0.7, 2.8, 0.7, 'stone'],
+  ] },
+
+  // CHALET: long and low under a very deep eave, with a full-width balcony
+  // and a woodpile stacked under it.
+  cottageH: { r: 5.6, parts: [
+    ['box', 0, 0, 0, 9.0, 0.5, 5.4, 'stone'],
+    ['wall', 0, 0.5, 0, 8.4, 2.6, 4.8, 'stone'],
+    ['wall', 0, 3.1, 0, 8.2, 2.4, 4.6, 'wall2'],
+    ['box', 0, 5.5, 0, 10.4, 0.3, 7.0, 'trim'],
+    ['prism', 0, 5.8, 0, 10.8, 2.2, 7.3, 'roof'],
+    ['box', 0, 3.0, 2.7, 8.8, 0.22, 1.3, 'trim'],
+    ['box', 0, 3.9, 3.2, 8.8, 0.9, 0.16, 'trim'],
+    ['box', -4.2, 3.2, 3.2, 0.18, 0.9, 0.16, 'trim'],
+    ['box', 0, 3.2, 3.2, 0.18, 0.9, 0.16, 'trim'],
+    ['box', 4.2, 3.2, 3.2, 0.18, 0.9, 0.16, 'trim'],
+    ['box', -2.6, 0.55, 2.5, 1.2, 2.2, 0.24, 'trim'],
+    ['box', 1.4, 1.5, 2.5, 1.4, 1.2, 0.18, 'trim'],
+    ['cyl', -3.0, 0.6, 1.9, 0.34, 1.4, 0.34, 'trim'],
+    ['cyl', 3.2, 5.6, -1.4, 0.68, 2.4, 0.68, 'stone'],
+  ] },
+
   // ---- LANDMARKS AND DRESSING ----
   watchtower: { r: 2.7, parts: [
     ['wall', 0, 0, 0, 3.6, 9.5, 3.6, 'wall2'],
@@ -3462,7 +3574,8 @@ export const HOUSE_TEMPLATES = {
   ] },
 };
 // The cottage variants, for the builders that scatter dwellings at random.
-export const COTTAGES = ['cottageA', 'cottageB', 'cottageC'];
+export const COTTAGES = ['cottageA', 'cottageB', 'cottageC',
+  'cottageD', 'cottageE', 'cottageF', 'cottageG', 'cottageH'];
 
 const ELEMENT_KITS = {
   alpine: {
@@ -6834,6 +6947,7 @@ export class Track {
       for (let k = 0, n = this.T.oasisCount || 1; k < n; k++) this._buildOasis();
     }
     if (this._river) this._buildRiver();             // the one world-spanning waterway
+    if (this._river) this._buildRiverCrossings();    // fords get an apron, culverts a mouth
     if (this.T.riverCount) this._buildRivers();      // jungle streams under the road
     if (this.T.hollowArch) this._buildHollowArch();  // redwood drive-through trunk
     if (this.T.lamps) this._buildLamps();            // neon / undercity road lamps
@@ -14204,7 +14318,12 @@ export class Track {
       // outer columns feather into the grass; the whole band also fades out
       // across the road so the ford stays clean water on the carriageway
       (f, c, C) => (c === 0 || c === C - 1 ? 0 : 1)
-        * THREE.MathUtils.smoothstep(f.df, 9, 20)
+        // THE SHINGLE BAND MUST NOT CLIMB ONTO THE ROAD. At 9-20 it was still
+        // a third opaque over the carriageway, and being drawn with
+        // polygonOffset and no depth write it won the depth test against the
+        // road and painted a bright pebble slab across the tarmac beside every
+        // crossing. Held back to the verge; the wash carries the crossing.
+        * THREE.MathUtils.smoothstep(f.df, 14, 30)
         // ...and the shoreline fades out with the water at the tails
         * Math.min(smoothstep01(f.t / 0.06), smoothstep01((1 - f.t) / 0.06))
     );
@@ -14568,6 +14687,221 @@ export class Track {
     }
     if (reeds.count) { reeds.instanceMatrix.needsUpdate = true; this.group.add(reeds); }
     if (rocks.count) { rocks.instanceMatrix.needsUpdate = true; this.group.add(rocks); }
+  }
+
+  /** WHERE THE RIVER MEETS THE ROAD, SOMETHING IS BUILT THERE.
+   *
+   *  A river crosses a road in exactly two ways and the game already models
+   *  both: at a FORD the water washes over the carriageway, and anywhere else
+   *  it passes UNDER the embankment - a culvert, which is what a real road
+   *  over a real stream has. The culvert was correct and completely invisible:
+   *  the ribbon ran up to the shoulder, dived into a grass bank and did not
+   *  come out, which from the car reads as a river that stops dead in a field.
+   *  Measured on PINE VALLEY, a crossing 155 u from the nearest ford.
+   *
+   *  So every crossing gets built. A culvert gets a battered stone headwall
+   *  each side with an arch mouth cut into it, wing walls splaying back into
+   *  the bank, and a parapet along the road above. A ford gets a stone apron
+   *  either side of the wash and a pair of depth markers, so the crossing
+   *  announces itself before you are in it.
+   */
+  _buildRiverCrossings() {
+    const R = this._river;
+    if (!R || !R.curve) return;
+    const curve = R.curve;
+    // walk the reach and take the LOCAL MINIMUM of distance-to-road: one
+    // structure per crossing, not one per sample inside it
+    const N = 900;
+    const samp = [];
+    for (let i = 0; i <= N; i++) {
+      const p = curve.getPointAt(i / N);
+      samp.push({ p, d: this._distToTrackCoarse(p.x, p.z) });
+    }
+    const cross = [];
+    for (let i = 2; i < N - 2; i++) {
+      if (samp[i].d > 16) continue;
+      if (samp[i].d > samp[i - 1].d || samp[i].d > samp[i + 1].d) continue;
+      const p = samp[i].p;
+      if (cross.some((c) => Math.hypot(c.p.x - p.x, c.p.z - p.z) < 60)) continue;
+      const tan = curve.getTangentAt(i / N);
+      cross.push({ p, tan });
+    }
+    if (!cross.length) return;
+
+    const stone = new THREE.MeshStandardMaterial({
+      color: this.T.wallColor ?? 0x8e8778, roughness: 1, flatShading: true,
+    });
+    const cap = new THREE.MeshStandardMaterial({
+      color: 0x9a9488, roughness: 1, flatShading: true,
+    });
+    const g = new THREE.Group();
+    g.name = 'river-crossings';
+    const V = (a, b, c) => new THREE.Vector3(a, b, c);
+
+    for (const c of cross) {
+      const idx = this.nearestIndex(V(c.p.x, 0, c.p.z));
+      const deck = this.center[idx].y;
+      const roadYaw = this.headingAt(idx);
+      // is this a ford? the wash sits on the deck there, so nothing may block it
+      const isFord = (this.fords || []).some(
+        (f) => Math.hypot(f.x - c.p.x, f.z - c.p.z) < 34);
+      // the river's own bearing, for wing walls that follow the water
+      const rYaw = Math.atan2(c.tan.x, c.tan.z);
+      const hw = R.half + 1.2;
+
+      if (isFord) {
+        // THE WASH IS A THING, SO IT IS BUILT AS A THING.
+        //
+        // The water ribbon is supposed to rise onto the deck here, and four
+        // profile passes argue about whether it may: pass 2 lifts it, 2b
+        // clamps it to the ground with a 2 u cap meant for boulders, 2c takes
+        // a running minimum along the flow and can put it back. Measured on
+        // PINE VALLEY the ribbon still sat 2 u under the carriageway at its
+        // own ford - the river ran to one shoulder and reappeared at the
+        // other, with dry road between, which is the thing being complained
+        // about. Rather than add a fifth rule to that argument, the sheet of
+        // water that lies ON the road is its own mesh: sampled off the road
+        // surface itself, so it follows the camber and cannot be anywhere
+        // else. The ribbon either side is unchanged.
+        {
+          // AXES: the sheet follows the RIVER, not the road. Built the other
+          // way round it came out as a band lying along the carriageway, and
+          // the texture - whose V runs ACROSS the stream and whose U repeats
+          // ALONG it, the same convention the ribbon uses - was stretched
+          // sideways over the whole thing, which rendered the wash as a flat
+          // white slab of foam.
+          const AX = 12, AL = 6;                    // across the stream / along it
+          const halfA = hw + 0.8;                   // half the river's width
+          const halfL = ROAD_HALF + 9;              // far enough to clear the road
+          const ax = Math.cos(rYaw), az = -Math.sin(rYaw);   // across the stream
+          const lx = Math.sin(rYaw), lz = Math.cos(rYaw);    // along the flow
+          const vs = [], uv = [], wcol = [];
+          for (let il = 0; il <= AL; il++) {
+            for (let ia = 0; ia <= AX; ia++) {
+              const a = -halfA + (2 * halfA) * (ia / AX);
+              const l = -halfL + (2 * halfL) * (il / AL);
+              const wx = c.p.x + ax * a + lx * l;
+              const wz = c.p.z + az * a + lz * l;
+              // ABOVE THE ROAD RIBBON, NOT ABOVE THE TERRAIN. The carriageway
+              // is its own mesh laid over the ground, so a sheet seated on
+              // terrainHeight slides underneath it and is never seen.
+              const ny = this.center[this.nearestIndex(V(wx, 0, wz))].y;
+              vs.push(wx, Math.max(this.terrainHeight(wx, wz), ny) + 0.12, wz);
+              uv.push(l / 18, ia / AX);
+              // feather the ends into the ribbon and the sides into the verge
+              wcol.push(1, 1, 1, Math.min(
+                smoothstep01((halfL - Math.abs(l)) / 5),
+                smoothstep01((halfA - Math.abs(a)) / 1.2)));
+            }
+          }
+          const idxw = [];
+          for (let il = 0; il < AL; il++) {
+            for (let ia = 0; ia < AX; ia++) {
+              const p0 = il * (AX + 1) + ia, p1 = p0 + 1;
+              const p2 = p0 + AX + 1, p3 = p2 + 1;
+              idxw.push(p0, p2, p1, p1, p2, p3);
+            }
+          }
+          const wgeo = new THREE.BufferGeometry();
+          wgeo.setAttribute('position', new THREE.Float32BufferAttribute(vs, 3));
+          wgeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+          wgeo.setAttribute('color', new THREE.Float32BufferAttribute(wcol, 4));
+          wgeo.setIndex(idxw);
+          wgeo.computeVertexNormals();
+          const wash = new THREE.Mesh(wgeo, new THREE.MeshStandardMaterial({
+            map: riverTexture(), roughness: 0.16, metalness: 0.06,
+            transparent: true, opacity: 0.85, depthWrite: false,
+            vertexColors: true, side: THREE.DoubleSide,
+          }));
+          wash.name = 'ford-wash';
+          wash.renderOrder = 2;
+          g.add(wash);
+        }
+        // FORD: depth markers either side, so the crossing announces itself.
+        for (const sg of [1, -1]) {
+          const mx = c.p.x + Math.sin(rYaw) * sg * (hw + 1.0);
+          const mz = c.p.z + Math.cos(rYaw) * sg * (hw + 1.0);
+          const gy = this.terrainHeight(mx, mz);
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 2.2, 8),
+            new THREE.MeshStandardMaterial({ color: 0xe8e4d8, roughness: 0.9 }));
+          post.position.set(mx, gy + 1.1, mz);
+          post.castShadow = true;
+          g.add(post);
+          const band = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8),
+            new THREE.MeshStandardMaterial({ color: 0xb3352c, roughness: 0.9 }));
+          band.position.set(mx, gy + 1.5, mz);
+          g.add(band);
+          this.solids.push({ x: mx, z: mz, r: 0.35, y: gy + 1, mat: 'wood' });
+        }
+        continue;
+      }
+
+      // CULVERT: a headwall each side of the embankment with an arch mouth,
+      // wing walls splaying into the bank, and a parapet on the road above.
+      const bedY = this.terrainHeight(c.p.x, c.p.z) - 0.4;
+      for (const sg of [1, -1]) {
+        const off = ROAD_HALF + 3.5;
+        const hx = c.p.x + Math.sin(roadYaw) * sg * off;
+        const hz = c.p.z + Math.cos(roadYaw) * sg * off;
+        const gy = this.terrainHeight(hx, hz);
+        const H = Math.max(2.4, deck - bedY + 0.6);
+        // the wall, built as two piers and a lintel so the mouth is a hole
+        // rather than a dark rectangle painted on a slab
+        const pierW = 1.5;
+        for (const px of [-(hw + pierW / 2), hw + pierW / 2]) {
+          const pier = new THREE.Mesh(new THREE.BoxGeometry(pierW, H, 1.6), stone);
+          pier.position.set(hx + Math.cos(roadYaw) * px, bedY + H / 2,
+            hz - Math.sin(roadYaw) * px);
+          pier.rotation.y = roadYaw;
+          pier.castShadow = true; pier.receiveShadow = true;
+          g.add(pier);
+        }
+        const openH = Math.min(H * 0.55, 2.2);
+        const lint = new THREE.Mesh(
+          new THREE.BoxGeometry(hw * 2 + pierW * 2, H - openH, 1.6), stone);
+        lint.position.set(hx, bedY + openH + (H - openH) / 2, hz);
+        lint.rotation.y = roadYaw;
+        lint.castShadow = true;
+        g.add(lint);
+        // a voussoir arch under the lintel, so the mouth reads as masonry
+        for (let k = 0; k < 7; k++) {
+          const a = Math.PI * (k + 0.5) / 7;
+          const vx = -Math.cos(a) * hw, vy = Math.sin(a) * openH * 0.5;
+          const vo = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.42, 1.7), cap);
+          vo.position.set(hx + Math.cos(roadYaw) * vx, bedY + openH * 0.5 + vy,
+            hz - Math.sin(roadYaw) * vx);
+          vo.rotation.set(0, roadYaw, a - Math.PI / 2);
+          g.add(vo);
+        }
+        // wing walls, splayed back along the water into the bank
+        for (const wsg of [1, -1]) {
+          const wl = 5.5;
+          const wx = hx + Math.cos(roadYaw) * wsg * (hw + 1.2)
+            + Math.sin(rYaw) * sg * wl * 0.5;
+          const wz = hz - Math.sin(roadYaw) * wsg * (hw + 1.2)
+            + Math.cos(rYaw) * sg * wl * 0.5;
+          const wg = this.terrainHeight(wx, wz);
+          const wing = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.2, wl), stone);
+          wing.position.set(wx, wg + 0.5, wz);
+          wing.rotation.y = rYaw + wsg * 0.22;
+          wing.castShadow = true;
+          g.add(wing);
+        }
+        this.solids.push({ x: hx, z: hz, r: hw + 1.5, y: bedY + 1, mat: 'stone' });
+      }
+      // parapet on the road above the culvert - the giveaway from the car
+      for (const sg of [1, -1]) {
+        const px = c.p.x + Math.sin(roadYaw) * sg * (ROAD_HALF + 1.1);
+        const pz = c.p.z + Math.cos(roadYaw) * sg * (ROAD_HALF + 1.1);
+        const par = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.95, hw * 2 + 9), cap);
+        par.position.set(px, deck + 0.45, pz);
+        par.rotation.y = roadYaw + Math.PI / 2;
+        par.castShadow = true;
+        g.add(par);
+        this.solids.push({ x: px, z: pz, r: 1.4, y: deck + 0.5, mat: 'stone' });
+      }
+    }
+    this.group.add(g);
   }
 
   _buildRivers() {
