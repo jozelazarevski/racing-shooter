@@ -7604,7 +7604,24 @@ export class Track {
     roof.castShadow = true;
     this.group.add(body, roof);
     this._addShadow(p.x, p.z, Math.max(W, D) * 0.8);
-    this.solids.push({ x: p.x, z: p.z, r: Math.max(W, D) * 0.62, y: gy + 3, mat: 'stone' });
+    // THE PLINTH. `gy` is clamped to within 2.5 u of the ROAD, so on a steep
+    // hillside the hotel's floor stands well above the raw ground - measured
+    // 3.8 u on FURKA, which is a building with daylight under it. A real
+    // Belvedere sits on masonry, so build the masonry: a retaining base from
+    // the ground up to the floor, sized just inside the footprint.
+    const terr = this.terrainHeight(p.x, p.z);
+    const stand = gy - terr;
+    if (stand > 0.3) {
+      const plinth = new THREE.Mesh(new THREE.BoxGeometry(W * 2 - 0.6, stand + 0.6, D * 2 - 0.6),
+        new THREE.MeshStandardMaterial({ color: 0x6f6a60, roughness: 1, flatShading: true }));
+      plinth.position.set(p.x, terr + (stand + 0.6) / 2 - 0.3, p.z);
+      plinth.rotation.y = yaw;
+      plinth.castShadow = plinth.receiveShadow = true;
+      this.group.add(plinth);
+    }
+    // ...and the record is planted where the structure MEETS THE GROUND, which
+    // is the plinth's foot, not the floor above it.
+    this.solids.push({ x: p.x, z: p.z, r: Math.max(W, D) * 0.62, y: terr, mat: 'stone' });
   }
 
   /** THE LIGHTHOUSE - the harbour reference's headland sentinel: banded
@@ -13004,6 +13021,31 @@ export class Track {
       // ...and never a slab standing proud of the land it runs through
       const cap = hi + R.depth;
       if (surf[s] > cap) surf[s] = cap;
+    }
+
+    // PASS 2c — MONOTONE, AND THIS ONE WINS.
+    //
+    // Pass 2b raises a station by up to 2 u to keep the ribbon's edges out of
+    // the ground, and it does that per station, independently - so a knob of
+    // ground lifts one station above its downstream neighbour and the river
+    // runs uphill for a segment. Measured: 7 such rises on PINE VALLEY (worst
+    // 1.76 u) and 17 on LOG FLUME FURY (worst 1.79), every one of them well
+    // clear of any ford, all of them under 2b's own 2 u cap.
+    //
+    // Water does not run uphill, and containment is cosmetic, so containment
+    // gives way: a running minimum along the FLOW clamps any station that
+    // would rise. Where that re-swallows an edge, the ground is standing above
+    // the natural level of the reach - which is a rock in a stream, and is
+    // what the passes above already say should pierce the surface.
+    //
+    // Fords are exempt, by the same declared exception the rule carries
+    // everywhere else: there the wash sits on the road deck by design.
+    let flowMin = Infinity;
+    for (let i = 0; i < F.length; i++) {
+      const s = dirF > 0 ? i : F.length - 1 - i;
+      if (F[s].df < 30) continue;
+      if (surf[s] > flowMin) surf[s] = flowMin;
+      else flowMin = surf[s];
     }
 
     // PASS 3 — emit, doubling the station wherever the level changes so the
