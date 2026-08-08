@@ -7906,28 +7906,33 @@ export class Track {
     }
   }
 
-  /** VINEYARD PARCELS: rows that DRAPE the hillside.
+  /** VINEYARD PARCELS: rows that WALK the contour.
    *
    *  The first cut stretched ONE rigid box per row and seated it at the ground
    *  height of its centre, so on any slope both ends hung in the air - green
    *  beams floating over the hill, and a row long enough to reach onto the
-   *  carriageway. Rows are now built from short panels: each samples its own
-   *  ground, pitches to the local grade, and drops out where the land breaks or
-   *  the road comes near. A parcel's grain follows the contour - across the
-   *  fall line, the way wine country is really planted - so neighbouring
-   *  parcels comb the same way instead of crossing at random angles, and on
-   *  flat ground a per-estate hash keeps the grain coherent.
+   *  carriageway. The second drew short straight rows aligned to the fall line
+   *  at the parcel's centre, which drapes correctly but reads as rectangular
+   *  patches: the reference is a hillside combed by long sweeping arcs.
    *
-   *  What makes it read as VINES rather than hedge is the dressing: a tilled
-   *  soil strip under every row, trellis posts standing proud of the canopy,
-   *  per-panel height jitter so the top line is ragged instead of planed, and
-   *  hue drift down the rows. Three draw calls for the whole wine country. */
+   *  So a row is now WALKED. From its seed it steps 2.6 u at a time along the
+   *  local contour - perpendicular to the fall line, re-read at every step and
+   *  kept continuous by refusing any turn that reverses the previous heading -
+   *  and the next row seeds one spacing DOWN the fall line from the last. The
+   *  arcs come out of the terrain itself, so rows stay parallel, wrap the hill
+   *  together, and no two parcels comb against each other. On ground too flat
+   *  to have a fall line the walk holds its heading, which is what keeps a
+   *  valley floor from turning into scribble.
+   *
+   *  Dressing sells the crop: tilled soil under every row, trellis posts proud
+   *  of the canopy, per-panel height jitter for a ragged top line, hue drift
+   *  down the rows. Three draw calls for the whole wine country. */
   _buildVineRows() {
     const V = this.T.vineRows;
     const blocks = V.count ?? 20;
-    const ROWS_MAX = 11, SEGS_MAX = 15, SEG = 2.6;
+    const ROWS_MAX = 13, STEPS_MAX = 26, SEG = 2.6, SPACING = 3.3;
     const CLEAR = ROAD_HALF + 5.5;                 // no vine reaches the verge
-    const CAP = blocks * ROWS_MAX * SEGS_MAX;
+    const CAP = blocks * ROWS_MAX * STEPS_MAX;
     const unit = new THREE.BoxGeometry(1, 1, 1);
     unit.translate(0, 0.5, 0);
     const vines = new THREE.InstancedMesh(unit,
@@ -7938,69 +7943,87 @@ export class Track {
     postGeo.translate(0, 0.5, 0);
     const posts = new THREE.InstancedMesh(postGeo,
       new THREE.MeshStandardMaterial({ color: 0x7a5836, roughness: 1 }),
-      blocks * ROWS_MAX * 9);
+      blocks * ROWS_MAX * 14);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
     const eul = new THREE.Euler(0, 0, 0, 'YZX');
     const up = new THREE.Vector3(0, 1, 0);
     const pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
     let vk = 0, sk = 0, pk = 0;
+
+    // downhill unit vector at (x,z), or null where the land is effectively flat
+    const fall = (x, z) => {
+      const gx = this.terrainHeight(x + 7, z) - this.terrainHeight(x - 7, z);
+      const gz = this.terrainHeight(x, z + 7) - this.terrainHeight(x, z - 7);
+      const m = Math.hypot(gx, gz);
+      return m < 0.5 ? null : { x: gx / m, z: gz / m, m };
+    };
+
     this._scatter(blocks, () => this._trackSidePos(21, 95), (p) => {
       const h0 = this.terrainHeight(p.x, p.z);
       for (const [ox, oz] of [[11, 0], [-11, 0], [0, 11], [0, -11]]) {
         if (Math.abs(this.terrainHeight(p.x + ox, p.z + oz) - h0) > 3.4) return;
       }
-      const gx = this.terrainHeight(p.x + 9, p.z) - this.terrainHeight(p.x - 9, p.z);
-      const gz = this.terrainHeight(p.x, p.z + 9) - this.terrainHeight(p.x, p.z - 9);
-      let yaw;
-      if (Math.hypot(gx, gz) > 1.1) yaw = Math.atan2(gx, gz);     // along the contour
-      else {
-        const e = Math.sin(Math.floor(p.x / 140) * 12.9898 + Math.floor(p.z / 140) * 78.233) * 43758.5453;
-        yaw = (e - Math.floor(e)) * Math.PI;                       // estate grain
-      }
-      const dx = Math.cos(yaw), dz = -Math.sin(yaw);               // row direction
-      const px = Math.sin(yaw), pz = Math.cos(yaw);                // row spacing
-      const rows = 6 + (Math.random() * (ROWS_MAX - 5) | 0);
-      const segs = 8 + (Math.random() * (SEGS_MAX - 7) | 0);
-      const half = (segs * SEG) / 2;
       const hue = 0.245 + Math.random() * 0.045;                   // parcel varietal
+      const rows = 7 + (Math.random() * (ROWS_MAX - 6) | 0);
+      const steps = 14 + (Math.random() * (STEPS_MAX - 13) | 0);
+      // flat ground has no contour to follow: hold one estate heading instead
+      const seedFall = fall(p.x, p.z);
+      const est = Math.sin(Math.floor(p.x / 140) * 12.9898 + Math.floor(p.z / 140) * 78.233) * 43758.5453;
+      const flatYaw = (est - Math.floor(est)) * Math.PI;
+      let sx = p.x, sz = p.z;
+      let seedDir = seedFall || { x: Math.cos(flatYaw), z: Math.sin(flatYaw) };
       let any = 0;
       for (let r = 0; r < rows; r++) {
-        const off = (r - (rows - 1) / 2) * 3.2;
-        const bx = p.x + px * off, bz = p.z + pz * off;
-        // ragged parcel edge: each row starts and ends a little short
-        const s0 = (Math.random() * 1.9) | 0, s1 = segs - ((Math.random() * 1.9) | 0);
         const sat = 0.46 + Math.random() * 0.16, lum = 0.2 + Math.random() * 0.07;
-        for (let s = s0; s < s1 && vk < CAP; s++) {
-          const a = -half + s * SEG;
-          const ax = bx + dx * a, az = bz + dz * a;
-          const mx = bx + dx * (a + SEG / 2), mz = bz + dz * (a + SEG / 2);
-          const ex = bx + dx * (a + SEG), ez = bz + dz * (a + SEG);
-          if (this._distToTrack(mx, mz) < CLEAR) continue;
-          const ya = this.terrainHeight(ax, az), yb = this.terrainHeight(ex, ez);
-          if (Math.abs(yb - ya) > 1.8) continue;                   // a break in the land
-          // seat on the chord, but never let the panel hang over a dip
-          const gy = Math.min((ya + yb) / 2, this.terrainHeight(mx, mz) + 0.3);
-          eul.set(0, yaw, Math.atan2(yb - ya, SEG));
-          q.setFromEuler(eul);
-          // tilled earth under the row
-          m4.compose(pos.set(mx, gy - 0.02, mz), q, scl.set(SEG * 1.04, 0.07, 1.3));
-          soil.setMatrixAt(sk, m4);
-          col.setHSL(0.075, 0.34, 0.15 + Math.random() * 0.04);
-          soil.setColorAt(sk++, col);
-          // the canopy: jittered height so the top line reads leafy, not planed
-          const ch = 1.02 + Math.random() * 0.34;
-          m4.compose(pos.set(mx, gy + 0.46, mz), q, scl.set(SEG * 1.02, ch, 0.86));
-          vines.setMatrixAt(vk, m4);
-          col.setHSL(hue + (Math.random() - 0.5) * 0.02, sat, lum + (Math.random() - 0.5) * 0.05);
-          vines.setColorAt(vk++, col);
-          // trellis posts stand proud of the canopy
-          if ((s % 2 === 0 || s === s1 - 1) && pk < posts.count) {
-            m4.compose(pos.set(ax, ya, az), q.setFromAxisAngle(up, yaw),
-              scl.set(1, 1.86 + Math.random() * 0.24, 1));
-            posts.setMatrixAt(pk++, m4);
+        // walk out from the seed in both directions along the contour
+        for (const way of [1, -1]) {
+          let cx = sx, cz = sz;
+          let dirx = -seedDir.z * way, dirz = seedDir.x * way;     // contour heading
+          const run = way > 0 ? Math.ceil(steps / 2) : (steps >> 1);
+          for (let s = 0; s < run && vk < CAP; s++) {
+            const f = fall(cx, cz);
+            if (f) {
+              // turn onto the local contour, but never double back on ourselves
+              let nx = -f.z, nz = f.x;
+              if (nx * dirx + nz * dirz < 0) { nx = -nx; nz = -nz; }
+              dirx += (nx - dirx) * 0.6;                            // ease the turn
+              dirz += (nz - dirz) * 0.6;
+              const m = Math.hypot(dirx, dirz) || 1;
+              dirx /= m; dirz /= m;
+            }
+            const ax = cx, az = cz;
+            const ex = cx + dirx * SEG, ez = cz + dirz * SEG;
+            const mx = (ax + ex) / 2, mz = (az + ez) / 2;
+            cx = ex; cz = ez;
+            if (this._distToTrack(mx, mz) < CLEAR) break;           // stop at the verge
+            const ya = this.terrainHeight(ax, az), yb = this.terrainHeight(ex, ez);
+            if (Math.abs(yb - ya) > 1.8) break;                     // a break in the land
+            const gy = Math.min((ya + yb) / 2, this.terrainHeight(mx, mz) + 0.3);
+            eul.set(0, Math.atan2(dirx, dirz), Math.atan2(yb - ya, SEG));
+            q.setFromEuler(eul);
+            // rows run along the box's Z after this yaw, so length goes in Z
+            m4.compose(pos.set(mx, gy - 0.02, mz), q, scl.set(2.35, 0.07, SEG * 1.06));
+            soil.setMatrixAt(sk, m4);
+            col.setHSL(0.072, 0.36, 0.19 + Math.random() * 0.05);
+            soil.setColorAt(sk++, col);
+            const ch = 1.02 + Math.random() * 0.34;
+            m4.compose(pos.set(mx, gy + 0.46, mz), q, scl.set(0.86, ch, SEG * 1.04));
+            vines.setMatrixAt(vk, m4);
+            col.setHSL(hue + (Math.random() - 0.5) * 0.02, sat, lum + (Math.random() - 0.5) * 0.05);
+            vines.setColorAt(vk++, col);
+            if (s % 3 === 0 && pk < posts.count) {
+              m4.compose(pos.set(ax, ya, az), q.setFromAxisAngle(up, 0),
+                scl.set(1, 1.86 + Math.random() * 0.24, 1));
+              posts.setMatrixAt(pk++, m4);
+            }
+            any++;
           }
-          any++;
         }
+        // next row: one spacing DOWN the fall line, so rows stay concentric
+        const sf = fall(sx, sz) || seedDir;
+        seedDir = sf;
+        sx += sf.x * SPACING;
+        sz += sf.z * SPACING;
       }
       if (any) this._addShadow(p.x, p.z, 9);
     });
