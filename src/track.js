@@ -7711,42 +7711,63 @@ export class Track {
     // a second flotilla moors CLOSE IN — sail boats and smaller rowing boats
     // bobbing 8-25 u off the waterline, right under the quay wall, which is
     // what makes the seafront read as a working harbour and not a beach.
-    const hullG = new THREE.BoxGeometry(3.2, 0.9, 1.3);
-    const NEAR = this.T.quay
-      ? [[-190, 10, 1, 0xf2ede2], [-135, 18, 0, 0xc85a40], [-80, 9, 1, 0xf2ede2],
-         [-25, 22, 0, 0x4a6e8a], [35, 12, 1, 0xe8dcc4], [95, 8, 0, 0xf2ede2],
-         [150, 17, 1, 0x6a8a5a], [200, 24, 0, 0xc85a40]]
-      : [];
-    const FAR = [[-220, 42, 1, 0xf2ede2], [-60, 70, 1, 0xf2ede2], [60, 38, 1, 0xf2ede2],
-      [230, 85, 1, 0xf2ede2], [340, 55, 1, 0xf2ede2]];
-    const BOATS = FAR.concat(NEAR);
-    const nSails = BOATS.reduce((n, b) => n + b[2], 0);
-    const hulls = new THREE.InstancedMesh(hullG,
-      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 }), BOATS.length);
-    const sailG = new THREE.ConeGeometry(1.1, 3.4, 3);
+    // THE OPEN-WATER FLOTILLA. These used to be a BOX with a CONE stuck on
+    // top, and on a quay world eight of them moored 8-25 u out - the same
+    // water the marina fills, so its slips had toy boats parked through the
+    // real ones, and the cones were the little white pyramids dotted over
+    // every harbour screenshot. They share the marina's hull now, and on a
+    // quay world they keep to the far bay and leave the moorings to the
+    // marina, which does that job properly.
+    const HBs = this._boatHull();
+    const bdeckMat = new THREE.MeshStandardMaterial({ color: 0x9a7c52, roughness: 1,
+      side: THREE.DoubleSide, flatShading: true });
+    const BOATS = this.T.quay
+      ? [[-260, 120, 1, 0xf2ede2], [-40, 190, 1, 0xc85a40], [150, 105, 1, 0xf2ede2],
+         [330, 165, 1, 0x4a6e8a], [430, 88, 0, 0xe8dcc4]]
+      : [[-220, 42, 1, 0xf2ede2], [-60, 70, 1, 0xc85a40], [60, 38, 1, 0xf2ede2],
+         [230, 85, 1, 0x6a8a5a], [340, 55, 0, 0xf2ede2]];
+    const nSails = BOATS.reduce((n, bt) => n + bt[2], 0);
+    const hulls = new THREE.InstancedMesh(HBs.hull,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true,
+        roughness: 0.55, side: THREE.DoubleSide, flatShading: true }), BOATS.length);
+    const bdecks = new THREE.InstancedMesh(HBs.deck, bdeckMat, BOATS.length);
+    const bmastG = new THREE.CylinderGeometry(0.09, 0.13, 7.6, 8);
+    const bmasts = new THREE.InstancedMesh(bmastG,
+      new THREE.MeshStandardMaterial({ color: 0xcfcabc, roughness: 0.5 }),
+      Math.max(1, nSails));
+    const sailG = this._sailGeo([0, 1.35, 0.1], [0, 7.3, -0.05], [0, 1.8, -3.4], 0.3);
     const sails = new THREE.InstancedMesh(sailG,
-      new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true,
-        roughness: 0.6, side: THREE.DoubleSide }), Math.max(1, nSails));
+      new THREE.MeshStandardMaterial({ color: 0xf7f5ee, flatShading: true,
+        roughness: 0.8, side: THREE.DoubleSide }), Math.max(1, nSails));
     const bcol = new THREE.Color();
+    const bl = new THREE.Matrix4(), blq = new THREE.Quaternion();
     let sk2 = 0;
     for (let k = 0; k < BOATS.length; k++) {
-      const [du, dn, hasSail, tint] = BOATS[k];
+      const du = BOATS[k][0], dn = BOATS[k][1], hasSail = BOATS[k][2], tint = BOATS[k][3];
       const bx = mx + ux * du + nx * dn, bz = mz + uz * du + nz * dn;
-      // rowing boats (no sail) are smaller and sit lower
-      const bs = hasSail ? 1 : 0.62 + ((k * 7) % 3) * 0.06;
+      // a rowing boat is smaller and carries no rig
+      const bs = hasSail ? 0.62 + ((k * 7) % 3) * 0.05 : 0.42;
       iq.setFromAxisAngle(iup, k * 2.3);
-      im4.compose(new THREE.Vector3(bx, y + 0.35 * bs, bz), iq,
+      // floated on the chine, the same rule the marina uses
+      im4.compose(new THREE.Vector3(bx, y + 0.38 * bs, bz), iq,
         new THREE.Vector3(bs, bs, bs));
       hulls.setMatrixAt(k, im4);
       hulls.setColorAt(k, bcol.set(tint));
+      bdecks.setMatrixAt(k, im4);
       if (hasSail) {
-        im4.compose(new THREE.Vector3(bx, y + 2.3, bz), iq, new THREE.Vector3(1, 1, 1));
-        sails.setMatrixAt(sk2++, im4);
+        blq.identity();
+        bl.compose(new THREE.Vector3(0, 1.0, 0.05), blq, new THREE.Vector3(1, 1, 1));
+        const wm = new THREE.Matrix4().multiplyMatrices(im4, bl);
+        sails.setMatrixAt(sk2, wm);
+        bl.compose(new THREE.Vector3(0, 4.8, 0.05), blq, new THREE.Vector3(1, 1, 1));
+        bmasts.setMatrixAt(sk2, new THREE.Matrix4().multiplyMatrices(im4, bl));
+        sk2++;
       }
     }
-    sails.count = sk2;
-    hulls.castShadow = sails.castShadow = true;
-    this.group.add(hulls, sails);
+    sails.count = bmasts.count = sk2;
+    hulls.castShadow = sails.castShadow = bdecks.castShadow = true;
+    if (hulls.instanceColor) hulls.instanceColor.needsUpdate = true;
+    this.group.add(hulls, bdecks, bmasts, sails);
 
     // WAVE CRESTS: broken white dashes drifting over the near bay
     const CRESTS = 90;
@@ -8068,20 +8089,81 @@ export class Track {
       }
     }
     if (!spot) return;
+    // THE COASTAL LIGHTHOUSE TOWER, built the way the reference draws one: a
+    // battered stone plinth, a banded tapering tower, a GALLERY on corbels
+    // with a railing you can count the stanchions on, a glazed lantern room
+    // with astragals, and a domed cap under a finial. The old one was four
+    // primitives - a cone on a cylinder - and read as a traffic bollard from
+    // the quay. Everything rigid bundles down to five draw calls.
     const g = new THREE.Group();
-    const white = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.7 });
-    const red = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.6 });
-    const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.7, 13, 10), white);
-    tower.position.set(spot.x, spot.y + 6.5, spot.z);
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(2.25, 2.45, 2.2, 10), red);
-    band.position.set(spot.x, spot.y + 4.4, spot.z);
-    const room = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 1.8, 8),
+    const white = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.7,
+      flatShading: true });
+    const red = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.6,
+      flatShading: true });
+    const stoneL = new THREE.MeshStandardMaterial({ color: 0x8e8778, roughness: 1,
+      flatShading: true });
+    const ironL = new THREE.MeshStandardMaterial({ color: 0x2b2f34, roughness: 0.45,
+      metalness: 0.5, flatShading: true });
+    const SEG = 20;
+    const BY = spot.y;                                   // base of the tower
+    const at2 = (geo, yy) => geo.translate(0, yy, 0);
+    // plinth, shaft and the two navigation bands
+    const shaft = this._bundle([
+      at2(new THREE.CylinderGeometry(3.05, 3.5, 1.1, SEG), 0.55),
+      at2(new THREE.CylinderGeometry(2.85, 3.05, 0.35, SEG), 1.28),
+      at2(new THREE.CylinderGeometry(1.72, 2.85, 12.2, SEG), 7.55),
+    ]);
+    const shaftM = new THREE.Mesh(shaft, white);
+    shaftM.position.set(spot.x, BY, spot.z);
+    const bands = new THREE.Mesh(this._bundle([
+      at2(new THREE.CylinderGeometry(2.45, 2.6, 2.0, SEG), 5.1),
+      at2(new THREE.CylinderGeometry(1.99, 2.07, 1.7, SEG), 11.3),
+    ]), red);
+    bands.position.set(spot.x, BY, spot.z);
+    // gallery: corbel ring, deck, kick plate, stanchions and two handrails
+    const galY = 13.7, galR = 2.45;
+    const galParts = [
+      at2(new THREE.CylinderGeometry(2.35, 1.7, 0.5, SEG), galY - 0.35),
+      at2(new THREE.CylinderGeometry(galR, galR, 0.18, SEG), galY),
+    ];
+    const railParts = [];
+    for (let k = 0; k < 16; k++) {
+      const an = (k / 16) * Math.PI * 2;
+      const px = Math.sin(an) * (galR - 0.14), pz = Math.cos(an) * (galR - 0.14);
+      railParts.push(this._strut([px, galY, pz], [px, galY + 0.95, pz], 0.045, 5));
+      const an2 = ((k + 1) / 16) * Math.PI * 2;
+      const qx = Math.sin(an2) * (galR - 0.14), qz = Math.cos(an2) * (galR - 0.14);
+      for (const hy of [galY + 0.45, galY + 0.95]) {
+        railParts.push(this._strut([px, hy, pz], [qx, hy, qz], 0.04, 4));
+      }
+    }
+    const galleryM = new THREE.Mesh(this._bundle(galParts), stoneL);
+    galleryM.position.set(spot.x, BY, spot.z);
+    const railM = new THREE.Mesh(this._bundle(railParts), ironL);
+    railM.position.set(spot.x, BY, spot.z);
+    // lantern room: glazing between vertical astragals, capped by a dome
+    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.55, 2.1, 12),
       new THREE.MeshBasicMaterial({ color: 0xffe9a0 }));
-    room.position.set(spot.x, spot.y + 13.9, spot.z);
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(1.9, 1.6, 8), red);
-    cap.position.set(spot.x, spot.y + 15.6, spot.z);
-    tower.castShadow = cap.castShadow = true;
-    g.add(tower, band, room, cap);
+    lamp.position.set(spot.x, BY + galY + 1.25, spot.z);
+    const astParts = [];
+    for (let k = 0; k < 10; k++) {
+      const an = (k / 10) * Math.PI * 2;
+      const px = Math.sin(an) * 1.56, pz = Math.cos(an) * 1.56;
+      astParts.push(this._strut([px, galY + 0.2, pz], [px, galY + 2.3, pz], 0.06, 5));
+    }
+    astParts.push(at2(new THREE.CylinderGeometry(1.68, 1.68, 0.2, 12), galY + 2.35));
+    astParts.push(at2(new THREE.SphereGeometry(1.62, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2.4),
+      galY + 2.4));
+    astParts.push(at2(new THREE.SphereGeometry(0.24, 10, 8), galY + 3.62));
+    astParts.push(this._strut([0, galY + 3.6, 0], [0, galY + 4.35, 0], 0.05, 5));
+    const lantM = new THREE.Mesh(this._bundle(astParts), red);
+    lantM.position.set(spot.x, BY, spot.z);
+    // a door, so the tower has a scale you can read
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.9, 0.3), ironL);
+    door.position.set(spot.x, BY + 2.5, spot.z + 2.72);
+    shaftM.castShadow = bands.castShadow = galleryM.castShadow = true;
+    lantM.castShadow = railM.castShadow = true;
+    g.add(shaftM, bands, galleryM, railM, lamp, lantM, door);
     this.group.add(g);
     this._addShadow(spot.x, spot.z, 3.4);
     this.solids.push({ x: spot.x, z: spot.z, r: 2.7, y: spot.y + 2, mat: 'stone' });
@@ -8175,6 +8257,146 @@ export class Track {
     if (sk) this.group.add(awns, boards, legs);
   }
 
+
+  /** Three corners of a triangle into a flat position array. */
+  _tri(arr, a, b, c) {
+    arr.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+  }
+
+  /** A quad as two triangles, wound a->b->c->d. */
+  _quad(arr, a, b, c, d) { this._tri(arr, a, b, c); this._tri(arr, a, c, d); }
+
+  /** A flat-shaded BufferGeometry from a raw triangle soup. */
+  _geo(arr) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+
+  /** WHITE BASE COLOURS, OR THE INSTANCE COLOUR MULTIPLIES BY NOTHING.
+   *
+   *  `vertexColors: true` compiles USE_COLOR, and USE_COLOR reads a `color`
+   *  attribute the geometry may never have had - an unbound attribute is
+   *  (0,0,0), so diffuse * vColor * instanceColor comes out BLACK however
+   *  bright the instance colour is. Every geometry handed to a per-instance
+   *  tinted material goes through here first. */
+  _white(geo) {
+    const n = geo.attributes.position.count;
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
+    return geo;
+  }
+
+  /** THE BOAT HULL, lofted through nine stations with a hard chine.
+   *
+   *  ONE hull for the whole game. There used to be two kinds of boat in a
+   *  harbour: the marina's, and a flotilla of BOX HULLS WITH A CONE ON TOP
+   *  moored in the same water - those cones are the toy boats dotted across
+   *  every harbour screenshot. A hull is not a box, so it is built once, here,
+   *  and everything that floats uses it.
+   *
+   *  Five stations and a plain V gave a boat-shaped wedge; the reference is a
+   *  proper hull, so the loft runs nine stations and carries a CHINE - the
+   *  crease between topside and bottom that catches the light down the whole
+   *  length, and is most of what tells the eye this is a hull rather than a
+   *  shape. ~70 triangles, instanced across every boat in the world.
+   *
+   *  Per station: z aft->forward, deck half-beam, chine half-beam, chine
+   *  height, keel depth, sheer height. Deck datum is y = 1.0.
+   */
+  _boatHull() {
+    if (this._boatGeo) return this._boatGeo;
+    const STA = [
+      [-4.30, 1.28, 1.18, -0.30, -1.00, 1.00],   // transom
+      [-3.40, 1.42, 1.30, -0.36, -1.14, 0.97],
+      [-2.00, 1.53, 1.40, -0.42, -1.26, 0.95],
+      [-0.60, 1.55, 1.42, -0.44, -1.28, 0.97],
+      [0.80, 1.50, 1.35, -0.42, -1.24, 1.01],
+      [2.00, 1.32, 1.15, -0.36, -1.10, 1.10],
+      [3.10, 1.02, 0.85, -0.28, -0.86, 1.24],
+      [4.00, 0.62, 0.48, -0.18, -0.52, 1.42],
+      [4.70, 0.10, 0.08, -0.05, -0.12, 1.62],    // stem, sheer up to the bow
+    ];
+    const hv = [], dv = [], bv = [];
+    for (let i = 0; i < STA.length - 1; i++) {
+      const S = STA[i], T = STA[i + 1];
+      for (const sg of [1, -1]) {
+        const D0 = [sg * S[1], S[5], S[0]], D1 = [sg * T[1], T[5], T[0]];
+        const C0 = [sg * S[2], S[3], S[0]], C1 = [sg * T[2], T[3], T[0]];
+        const K0 = [0, S[4], S[0]], K1 = [0, T[4], T[0]];
+        this._quad(hv, D0, D1, C1, C0);            // topside
+        this._quad(hv, C0, C1, K1, K0);            // bottom
+        // the rubbing band: a dark strake right on the sheer line
+        const b0 = [sg * (S[1] + 0.04), S[5] - 0.16, S[0]];
+        const b1 = [sg * (T[1] + 0.04), T[5] - 0.16, T[0]];
+        this._quad(bv, D0, D1, b1, b0);
+      }
+      const e0 = S[1] * 0.90, e1 = T[1] * 0.90, h0 = S[5] + 0.02, h1 = T[5] + 0.02;
+      this._quad(dv, [-e0, h0, S[0]], [e0, h0, S[0]], [e1, h1, T[0]], [-e1, h1, T[0]]);
+    }
+    const S = STA[0];
+    this._quad(hv, [-S[1], S[5], S[0]], [S[1], S[5], S[0]], [S[2], S[3], S[0]],
+      [-S[2], S[3], S[0]]);
+    this._tri(hv, [-S[2], S[3], S[0]], [S[2], S[3], S[0]], [0, S[4], S[0]]);
+    this._boatGeo = {
+      hull: this._white(this._geo(hv)), deck: this._geo(dv), band: this._geo(bv),
+    };
+    return this._boatGeo;
+  }
+
+  /** A STRUT BETWEEN TWO POINTS - a cylinder posed from its real endpoints.
+   *  Standing rigging, railings and gantry legs all run somewhere specific,
+   *  so they are built from where they start and stop rather than posed by
+   *  hand with an Euler, which is the trap that has cost this file three
+   *  separate bugs. */
+  _strut(a, b, r, seg) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+    const len = Math.hypot(dx, dy, dz);
+    const geo = new THREE.CylinderGeometry(r, r, len, seg ?? 5);
+    geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / len, dy / len, dz / len)));
+    geo.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+    return geo;
+  }
+
+  /** MANY SMALL FIXED PARTS, ONE DRAW CALL. Detail is spokes, rings, glazing
+   *  bars and stanchions - dozens of little meshes, each of which would
+   *  otherwise be its own draw. Anything rigidly fixed relative to its parent
+   *  is concatenated into a single geometry here instead. */
+  _bundle(geos) {
+    const parts = geos.map((gm) => (gm.index ? gm.toNonIndexed() : gm));
+    let n = 0;
+    for (const gm of parts) n += gm.attributes.position.array.length;
+    const pos = new Float32Array(n);
+    let o = 0;
+    for (const gm of parts) {
+      pos.set(gm.attributes.position.array, o);
+      o += gm.attributes.position.array.length;
+    }
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    out.computeVertexNormals();
+    return out;
+  }
+
+  /** A SAIL IS NOT FLAT. Lofted from the luff toward the clew with a belly
+   *  that dies at head, tack and clew - a handful of triangles, and it stops
+   *  the canvas reading as a paper cut-out. */
+  _sailGeo(A, B, C, belly) {
+    const mix = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t,
+      p[2] + (q[2] - p[2]) * t];
+    const v = [], ROWS = 4;
+    for (let r = 0; r < ROWS; r++) {
+      const t0 = r / ROWS, t1 = (r + 1) / ROWS;
+      const l0 = mix(A, B, t0), l1 = mix(A, B, t1);
+      const f = (t) => Math.sin(Math.PI * t) * belly;
+      const o0 = mix(l0, C, 0.5), o1 = mix(l1, C, 0.5);
+      o0[0] += f(t0); o1[0] += f(t1);
+      this._tri(v, l0, l1, o1); this._tri(v, l0, o1, o0);
+      this._tri(v, o0, o1, C);
+    }
+    return this._geo(v);
+  }
 
   /** THE MARINA: a pontoon reached from the shore, boats with real hulls.
    *
@@ -8279,71 +8501,77 @@ export class Track {
       }
     }
 
-    // --- the hull, lofted through five stations ------------------------------
-    // z aft->forward, half-beam at the deck edge, keel depth, sheer height.
-    const STA = [
-      [-4.20, 1.25, -1.05, 1.00],     // transom
-      [-2.00, 1.52, -1.25, 0.96],
-      [0.60, 1.48, -1.22, 1.02],
-      [2.80, 1.08, -0.95, 1.20],
-      [4.60, 0.13, -0.25, 1.55],      // stem, sheer rising to the bow
-    ];
+    const HB = this._boatHull();
+    const hullG = HB.hull, deckG = HB.deck, bandG = HB.band;
     const tri = (arr, a, b, c) => {
       arr.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
     };
-    const hv = [], dv = [];
-    for (let i = 0; i < STA.length - 1; i++) {
-      const S0 = STA[i], S1 = STA[i + 1];
-      for (const sg of [1, -1]) {
-        const A = [sg * S0[1], S0[3], S0[0]], B = [sg * S1[1], S1[3], S1[0]];
-        const K0 = [0, S0[2], S0[0]], K1 = [0, S1[2], S1[0]];
-        tri(hv, A, B, K1); tri(hv, A, K1, K0);
-      }
-      const e0 = S0[1] * 0.88, e1 = S1[1] * 0.88, h0 = S0[3] + 0.02, h1 = S1[3] + 0.02;
-      tri(dv, [-e0, h0, S0[0]], [e0, h0, S0[0]], [e1, h1, S1[0]]);
-      tri(dv, [-e0, h0, S0[0]], [e1, h1, S1[0]], [-e1, h1, S1[0]]);
-    }
-    tri(hv, [-STA[0][1], STA[0][3], STA[0][0]], [STA[0][1], STA[0][3], STA[0][0]],
-      [0, STA[0][2], STA[0][0]]);
-    const hullG = new THREE.BufferGeometry();
-    hullG.setAttribute('position', new THREE.Float32BufferAttribute(hv, 3));
-    hullG.computeVertexNormals();
-    // WHITE BASE COLOURS, OR THE INSTANCE COLOUR MULTIPLIES BY NOTHING.
-    // `vertexColors: true` compiles USE_COLOR, and USE_COLOR reads a `color`
-    // attribute the geometry never had - an unbound attribute is (0,0,0), so
-    // diffuse * vColor * instanceColor came out black however bright the
-    // instance colour was. That is why the hulls and the deckhouses rendered
-    // as black slabs: not lighting, not the sun angle, a missing buffer.
-    const white = (geo) => {
-      const n = geo.attributes.position.count;
-      const c = new Float32Array(n * 3).fill(1);
-      geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
-      return geo;
-    };
-    white(hullG);
-    const deckG = new THREE.BufferGeometry();
-    deckG.setAttribute('position', new THREE.Float32BufferAttribute(dv, 3));
-    deckG.computeVertexNormals();
+    const buf = (arr) => this._geo(arr);
+    const white = (geo) => this._white(geo);
 
-    // --- rig, deckhouse and fenders -----------------------------------------
+    // --- spars, rigging and deck gear ---------------------------------------
+    const strut = (a, b, r, seg) => this._strut(a, b, r, seg);
+    const bundle = (geos) => this._bundle(geos);
+
+    const DECK = 1.0;                                  // deck datum, boat local
     const cabG = white(new THREE.BoxGeometry(1, 1, 1).toNonIndexed());
-    const mastG = new THREE.CylinderGeometry(0.09, 0.13, 9.4, 6);
-    const boomG = new THREE.CylinderGeometry(0.08, 0.08, 4.6, 5);
+    const mastG = new THREE.CylinderGeometry(0.09, 0.14, 9.4, 12);
+    const boomG = new THREE.CylinderGeometry(0.08, 0.09, 4.6, 10);
     boomG.rotateX(Math.PI / 2);
-    const fendG = new THREE.TorusGeometry(0.26, 0.085, 5, 9);
+    const fendG = new THREE.TorusGeometry(0.26, 0.09, 8, 14);
     fendG.rotateY(Math.PI / 2);
-    // A SAIL IS NOT FLAT. Three triangles round a bellied centre point cost
-    // nothing and stop the canvas reading as a paper cut-out.
-    const sail = (A, B, Cc, belly) => {
-      const M = [(A[0] + B[0] + Cc[0]) / 3 + belly, (A[1] + B[1] + Cc[1]) / 3,
-        (A[2] + B[2] + Cc[2]) / 3];
-      const v = [];
-      tri(v, A, B, M); tri(v, B, Cc, M); tri(v, Cc, A, M);
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-      geo.computeVertexNormals();
-      return geo;
-    };
+    const portG = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 10);
+    portG.rotateZ(Math.PI / 2);
+
+    // yacht standing rigging + guardrails, all in one bundle
+    const MH = [0, DECK + 9.2, 0.05];                  // masthead
+    const rigParts = [
+      strut(MH, [0, DECK + 0.6, 4.5], 0.035, 4),       // forestay
+      strut(MH, [0, DECK + 0.05, -4.2], 0.035, 4),     // backstay
+      strut(MH, [-1.34, DECK + 0.1, -0.2], 0.032, 4),  // port shroud
+      strut(MH, [1.34, DECK + 0.1, -0.2], 0.032, 4),   // starboard shroud
+    ];
+    for (const sg of [1, -1]) {
+      rigParts.push(strut([sg * 1.42, DECK + 0.62, -3.3], [sg * 1.5, DECK + 0.62, 2.5], 0.026, 4));
+      for (const sz of [-3.3, -1.4, 0.5, 2.5]) {
+        rigParts.push(strut([sg * 1.46, DECK, sz], [sg * 1.46, DECK + 0.64, sz], 0.035, 5));
+      }
+    }
+    const rigG = bundle(rigParts);
+    // yacht deck gear: cockpit coaming, two winches, a hatch and the pushpit
+    const gearG = bundle([
+      strut([-0.95, DECK + 0.02, -3.6], [-0.95, DECK + 0.22, -1.1], 0.07, 4),
+      strut([0.95, DECK + 0.02, -3.6], [0.95, DECK + 0.22, -1.1], 0.07, 4),
+      strut([-0.95, DECK + 0.22, -3.6], [0.95, DECK + 0.22, -3.6], 0.07, 4),
+      new THREE.CylinderGeometry(0.16, 0.19, 0.34, 10).translate(-0.78, DECK + 0.3, -2.2),
+      new THREE.CylinderGeometry(0.16, 0.19, 0.34, 10).translate(0.78, DECK + 0.3, -2.2),
+      new THREE.BoxGeometry(0.75, 0.1, 0.75).translate(0, DECK + 0.12, 1.55),
+      strut([0, DECK + 0.62, 4.4], [-0.7, DECK + 0.62, 3.5], 0.032, 4),
+      strut([0, DECK + 0.62, 4.4], [0.7, DECK + 0.62, 3.5], 0.032, 4),
+      strut([0, DECK, 4.45], [0, DECK + 0.64, 4.4], 0.035, 5),
+    ]);
+    // trawler working gear: stern gantry, net drum, mast light and rail
+    const gantG = bundle([
+      strut([-1.12, DECK, -3.2], [-0.9, DECK + 1.75, -3.5], 0.07, 6),
+      strut([1.12, DECK, -3.2], [0.9, DECK + 1.75, -3.5], 0.07, 6),
+      strut([-0.9, DECK + 1.75, -3.5], [0.9, DECK + 1.75, -3.5], 0.07, 6),
+      new THREE.CylinderGeometry(0.34, 0.34, 1.5, 12)
+        .rotateZ(Math.PI / 2).translate(0, DECK + 0.5, -2.4),
+    ]);
+    const tRailG = bundle([
+      strut([-1.2, DECK, 3.4], [-1.35, DECK + 0.62, 1.4], 0.045, 5),
+      strut([1.2, DECK, 3.4], [1.35, DECK + 0.62, 1.4], 0.045, 5),
+      strut([-1.35, DECK + 0.62, 1.4], [1.35, DECK + 0.62, 1.4], 0.04, 5),
+      strut([-1.35, DECK + 0.62, 1.4], [-1.42, DECK + 0.62, -2.6], 0.04, 5),
+      strut([1.35, DECK + 0.62, 1.4], [1.42, DECK + 0.62, -2.6], 0.04, 5),
+    ]);
+    // rudder and skeg, under the transom where a boat actually carries them
+    const keelG = bundle([
+      new THREE.BoxGeometry(0.14, 0.95, 0.8).translate(0, -1.75, -3.4),
+      new THREE.BoxGeometry(0.28, 0.62, 2.6).translate(0, -1.86, -0.6),
+    ]);
+
+    const sail = (Aa, Bb, Cc, belly) => this._sailGeo(Aa, Bb, Cc, belly);
     const mainG = sail([0, 1.50, 0.02], [0, 9.25, -0.05], [0, 1.95, -4.3], 0.34);
     const jibG = sail([0, 1.00, 4.25], [0, 8.55, 0.12], [0, 1.20, 0.35], 0.26);
     // SAILS ARE WHITE CANVAS, and they are NOT per-instance coloured. Two
@@ -8359,21 +8587,34 @@ export class Track {
       slips.push([du, PON + FLEN * 0.34], [du, PON + FLEN * 0.76]);
     }
     const N = slips.length;
-    const hulls = new THREE.InstancedMesh(hullG, new THREE.MeshStandardMaterial({
-      color: 0xffffff, vertexColors: true, roughness: 0.62,
+    const IM = (geo, mat, n) => new THREE.InstancedMesh(geo, mat, n);
+    const alloy = () => new THREE.MeshStandardMaterial({ color: 0xcfcabc,
+      roughness: 0.5, metalness: 0.35, flatShading: true });
+    const hulls = IM(hullG, new THREE.MeshStandardMaterial({
+      color: 0xffffff, vertexColors: true, roughness: 0.55,
       side: THREE.DoubleSide, flatShading: true }), N);
-    const decks = new THREE.InstancedMesh(deckG, new THREE.MeshStandardMaterial({
+    const decks = IM(deckG, new THREE.MeshStandardMaterial({
       color: 0x9a7c52, roughness: 1, side: THREE.DoubleSide, flatShading: true }), N);
-    const cabins = new THREE.InstancedMesh(cabG, new THREE.MeshStandardMaterial({
-      color: 0xffffff, vertexColors: true, roughness: 0.8, flatShading: true }), N * 2);
-    const masts = new THREE.InstancedMesh(mastG,
-      new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.6 }), N);
-    const booms = new THREE.InstancedMesh(boomG,
-      new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.6 }), N);
-    const mains = new THREE.InstancedMesh(mainG, sailMat(), N);
-    const jibs = new THREE.InstancedMesh(jibG, sailMat(), N);
-    const fends = new THREE.InstancedMesh(fendG,
-      new THREE.MeshStandardMaterial({ color: 0x201d1a, roughness: 0.9 }), N * 3);
+    const bands = IM(bandG, new THREE.MeshStandardMaterial({
+      color: 0x2b2a27, roughness: 0.6, side: THREE.DoubleSide, flatShading: true }), N);
+    const cabins = IM(cabG, new THREE.MeshStandardMaterial({
+      color: 0xffffff, vertexColors: true, roughness: 0.8, flatShading: true }), N * 3);
+    const masts = IM(mastG, alloy(), N);
+    const booms = IM(boomG, alloy(), N);
+    const rigs = IM(rigG, alloy(), N);
+    const gears = IM(gearG, new THREE.MeshStandardMaterial({
+      color: 0xe8e3d6, roughness: 0.7, flatShading: true }), N);
+    const gants = IM(gantG, new THREE.MeshStandardMaterial({
+      color: 0x8f4232, roughness: 0.85, flatShading: true }), N);
+    const trails = IM(tRailG, alloy(), N);
+    const keels = IM(keelG, new THREE.MeshStandardMaterial({
+      color: 0x2c3138, roughness: 0.8, flatShading: true }), N);
+    const ports = IM(portG, new THREE.MeshStandardMaterial({
+      color: 0x1d242c, roughness: 0.35, metalness: 0.4 }), N * 8);
+    const mains = IM(mainG, sailMat(), N);
+    const jibs = IM(jibG, sailMat(), N);
+    const fends = IM(fendG, new THREE.MeshStandardMaterial({
+      color: 0x201d1a, roughness: 0.9 }), N * 3);
 
     const m4 = new THREE.Matrix4(), lm = new THREE.Matrix4();
     const q = new THREE.Quaternion(), lq = new THREE.Quaternion();
@@ -8390,57 +8631,80 @@ export class Track {
       mesh.setMatrixAt(k, m4);
     };
     const HULLS = [0xf4efe4, 0x2f5f8f, 0xa8352c, 0xf4efe4, 0x2e6a4a, 0xefe6d2];
-    let ck = 0, fk = 0, mk = 0;
+    let ck = 0, fk = 0, mk = 0, pk = 0, gk = 0, tk = 0;
     for (let i = 0; i < N; i++) {
       const p = at(slips[i][0], slips[i][1]);
       const trawler = i % 3 === 2;
       const sc = trawler ? 1.12 : 0.90 + (i % 3) * 0.07;
       // bows to open water, with a degree or two of scatter on the warps
       q.setFromAxisAngle(up, yaw + Math.PI / 2 + (i % 2 ? 0.05 : -0.05));
-      const boat = new THREE.Matrix4().compose(V(p.x, y + 0.55, p.z), q, V(sc, sc, sc));
+      // FLOAT HER ON THE CHINE. At +0.55 the whole underwater body showed
+      // above the waterline at the transom - a dark wedge under the stern that
+      // reads as a box bolted on. Sitting the hull so the waterline meets the
+      // chine crease is both what a boat does and what hides the bottom.
+      const boat = new THREE.Matrix4().compose(V(p.x, y + 0.38, p.z), q, V(sc, sc, sc));
       hulls.setMatrixAt(i, boat);
       col.set(trawler ? 0x2f5f8f : HULLS[i % HULLS.length]);
       hulls.setColorAt(i, col);
       decks.setMatrixAt(i, boat);
+      bands.setMatrixAt(i, boat);
+      keels.setMatrixAt(i, boat);
       // a yacht carries a low coachroof aft; a trawler a tall wheelhouse
-      // forward with a stubby funnel behind it
+      // forward with a stubby funnel behind it, and both wear a window band
       if (trawler) {
-        put(cabins, ck, boat, V(0, 1.77, 0.9), V(2.0, 1.5, 2.1));
+        put(cabins, ck, boat, V(0, DECK + 0.77, 0.9), V(2.0, 1.5, 2.1));
         cabins.setColorAt(ck++, col.set(0xece7d8));
-        put(cabins, ck, boat, V(0, 2.42, -0.6), V(0.5, 0.9, 0.5));
+        put(cabins, ck, boat, V(0, DECK + 1.15, 0.9), V(2.06, 0.5, 2.16));
+        cabins.setColorAt(ck++, col.set(0x2b3038));
+        put(cabins, ck, boat, V(0, DECK + 1.42, -0.6), V(0.5, 0.9, 0.5));
         cabins.setColorAt(ck++, col.set(0x8a4a3a));
+        gants.setMatrixAt(gk, boat);
+        trails.setMatrixAt(gk, boat);
+        gk++;
       } else {
-        put(cabins, ck, boat, V(0, 1.36, -1.25), V(1.85, 0.72, 3.3));
+        put(cabins, ck, boat, V(0, DECK + 0.36, -1.25), V(1.85, 0.72, 3.3));
         cabins.setColorAt(ck++, col.set(0xf4efe4));
-        put(cabins, ck, boat, V(0, 1.22, 0.9), V(1.35, 0.34, 1.1));
+        put(cabins, ck, boat, V(0, DECK + 0.46, -1.25), V(1.9, 0.26, 3.0));
         cabins.setColorAt(ck++, col.set(0x39424e));
+        put(cabins, ck, boat, V(0, DECK + 0.22, 0.9), V(1.35, 0.34, 1.1));
+        cabins.setColorAt(ck++, col.set(0x39424e));
+        gears.setMatrixAt(tk++, boat);
+        rigs.setMatrixAt(mk, boat);
       }
       // rig: full on a yacht, a short derrick on the trawler
       const mh = trawler ? 0.46 : 1.0;
-      put(masts, i, boat, V(0, 1.02 + 4.7 * mh, 0.05), V(1, mh, 1));
+      put(masts, i, boat, V(0, DECK + 4.7 * mh, 0.05), V(1, mh, 1));
       if (trawler) {
-        // derrick boom, cocked up off the mast
-        lq.setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.55);
-        lm.compose(V(0, 3.6, -1.5), lq, ONE);
+        lq.setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.62);
+        lm.compose(V(0, DECK + 2.3, -1.2), lq, V(1, 1, 0.62));
         m4.multiplyMatrices(boat, lm);
         booms.setMatrixAt(i, m4);
       } else {
-        put(booms, i, boat, V(0, 2.45, -2.15), ONE);
-        put(mains, mk, boat, V(0, 1.02, 0), ONE);
-        put(jibs, mk, boat, V(0, 1.02, 0), ONE);
+        put(booms, i, boat, V(0, DECK + 1.45, -2.15), ONE);
+        put(mains, mk, boat, V(0, DECK, 0), ONE);
+        put(jibs, mk, boat, V(0, DECK, 0), ONE);
         mk++;
       }
-      // tyre fenders down the side facing the finger
+      // portholes down both topsides, and tyre fenders on the moored side
+      for (const sg of [1, -1]) {
+        for (const pz of [-1.9, -0.3, 1.3, 2.5]) {
+          put(ports, pk++, boat, V(sg * 1.47, DECK - 0.45, pz), ONE);
+        }
+      }
       const side = i % 2 ? 1 : -1;
       for (const fz of [-2.4, 0.1, 2.2]) {
-        put(fends, fk++, boat, V(side * 1.5, 0.62, fz), ONE);
+        put(fends, fk++, boat, V(side * 1.52, DECK - 0.38, fz), ONE);
       }
     }
-    mains.count = jibs.count = mk;
+    mains.count = jibs.count = rigs.count = mk;
     cabins.count = ck;
     fends.count = fk;
+    ports.count = pk;
+    gants.count = trails.count = gk;
+    gears.count = tk;
     booms.count = N;
-    for (const m of [hulls, decks, cabins, masts, booms, mains, jibs, fends]) {
+    for (const m of [hulls, decks, bands, keels, cabins, masts, booms, rigs,
+      gears, gants, trails, ports, mains, jibs, fends]) {
       m.castShadow = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
       g.add(m);
@@ -8476,32 +8740,66 @@ export class Track {
     // sea, and a DOCKING RAMP - a slipway running from the quay down into the
     // water, which is how a boat gets out of it.
     const carr = new THREE.MeshStandardMaterial({ color: 0x6b4a2c, roughness: 1, flatShading: true });
-    const iron = new THREE.MeshStandardMaterial({ color: 0x25282c, roughness: 0.45, metalness: 0.6 });
+    const iron = new THREE.MeshStandardMaterial({ color: 0x25282c, roughness: 0.4,
+      metalness: 0.65, flatShading: true });
+    // ORNATE, not a pipe on a plank. A gun is a stepped casting: cascabel
+    // knob, breech, base ring, chase tapering to a muzzle astragal and swell,
+    // with trunnions either side; the carriage is stepped cheeks on a bed
+    // with SPOKED wheels. All of it bundles into two geometries, so three
+    // cannons cost two draw calls between them.
+    const XR = Math.PI / 2;                       // cylinders lie along X
+    const lie = (g2) => g2.rotateZ(XR);
+    const ironParts = [
+      new THREE.SphereGeometry(0.17, 12, 8).translate(-1.62, 1.05, 0),
+      lie(new THREE.CylinderGeometry(0.36, 0.38, 0.9, 16)).translate(-1.15, 1.05, 0),
+      lie(new THREE.CylinderGeometry(0.41, 0.41, 0.14, 16)).translate(-0.68, 1.05, 0),
+      lie(new THREE.CylinderGeometry(0.24, 0.31, 1.92, 16)).translate(0.30, 1.05, 0),
+      lie(new THREE.CylinderGeometry(0.30, 0.30, 0.12, 16)).translate(1.28, 1.05, 0),
+      lie(new THREE.CylinderGeometry(0.31, 0.33, 0.30, 16)).translate(1.47, 1.05, 0),
+      new THREE.CylinderGeometry(0.115, 0.115, 0.94, 10).rotateX(XR).translate(-0.25, 1.05, 0),
+    ];
+    for (const wx of [-0.82, 0.66]) {
+      const wr = wx < 0 ? 0.46 : 0.34;            // trail wheels run larger
+      for (const wz of [0.8, -0.8]) {
+        const tw = new THREE.TorusGeometry(wr, 0.075, 8, 18);
+        ironParts.push(tw.translate(wx, wr - 0.02, wz));
+        ironParts.push(new THREE.CylinderGeometry(0.11, 0.11, 0.22, 10)
+          .rotateX(XR).translate(wx, wr - 0.02, wz));
+        for (let sp = 0; sp < 8; sp++) {
+          const an = (sp / 8) * Math.PI * 2;
+          ironParts.push(new THREE.BoxGeometry(0.055, wr * 0.92, 0.055)
+            .rotateZ(an).translate(wx + Math.sin(an) * wr * 0.46,
+              wr - 0.02 - Math.cos(an) * wr * 0.46, wz));
+        }
+      }
+      ironParts.push(new THREE.CylinderGeometry(0.09, 0.09, 1.74, 10)
+        .rotateX(XR).translate(wx, wr - 0.02, 0));
+    }
+    const woodParts = [];
+    for (const cz of [0.62, -0.62]) {
+      woodParts.push(new THREE.BoxGeometry(2.5, 0.46, 0.26).translate(-0.18, 0.62, cz));
+      woodParts.push(new THREE.BoxGeometry(1.5, 0.34, 0.26).translate(-0.55, 0.95, cz));
+      woodParts.push(new THREE.BoxGeometry(0.7, 0.26, 0.26).translate(-1.35, 0.42, cz));
+    }
+    woodParts.push(new THREE.BoxGeometry(2.4, 0.16, 1.35).translate(-0.18, 0.42, 0));
+    const gunIron = new THREE.InstancedMesh(this._bundle(ironParts), iron, 3);
+    const gunWood = new THREE.InstancedMesh(this._bundle(woodParts), carr, 3);
+    gunIron.castShadow = gunWood.castShadow = true;
+    let cgk = 0;
     for (const cn of [[-SPAN * 0.62, 1], [SPAN * 0.18, -1], [SPAN * 0.72, 1]]) {
       const p = at(cn[0], -19);        // up by the wall, not out on the sand
       const gy = this.terrainHeight(p.x, p.z);
-      const cg = new THREE.Group();
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.34, 3.1, 9), iron);
-      barrel.rotation.z = Math.PI / 2;
-      barrel.position.set(0, 1.05, 0);
-      const cheek = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.75, 0.28), carr);
-      cheek.position.set(-0.2, 0.62, 0.62);
-      const cheek2 = cheek.clone(); cheek2.position.z = -0.62;
-      const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 1.5, 6), iron);
-      axle.rotation.x = Math.PI / 2; axle.position.set(-0.8, 0.42, 0);
-      for (const wz of [0.78, -0.78]) {
-        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.18, 10), iron);
-        wheel.rotation.x = Math.PI / 2;
-        wheel.position.set(-0.8, 0.44, wz);
-        cg.add(wheel);
-      }
-      cg.add(barrel, cheek, cheek2, axle);
-      cg.position.set(p.x, gy, p.z);
-      cg.rotation.y = yaw + (cn[1] > 0 ? Math.PI / 2 : -Math.PI / 2);
-      cg.traverse((o) => { o.castShadow = true; });
-      g.add(cg);
+      // A GUN POINTS OUT TO SEA. `yaw` maps local +X seaward, so the +-PI/2 the
+      // first version used laid the barrel ALONG the quay, aimed at the next
+      // cannon. The flip is now just a few degrees of train either side.
+      m4.compose(V(p.x, gy, p.z),
+        q.setFromAxisAngle(up, yaw + cn[1] * 0.3), ONE);
+      gunIron.setMatrixAt(cgk, m4);
+      gunWood.setMatrixAt(cgk, m4);
+      cgk++;
       this.solids.push({ x: p.x, z: p.z, r: 1.5, y: gy + 0.5, mat: 'stone' });
     }
+    g.add(gunIron, gunWood);
     // the slipway: from the quay lip down under the water, corners placed
     // explicitly so the top meets the ground and the bottom meets the seabed
     {
