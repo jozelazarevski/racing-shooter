@@ -241,15 +241,15 @@ export function buildVoxelRacer(spec) {
   };
   /** Round lamp disc, parented so pods carry their lights when they pop off. */
   const lampDisc = (r, x, y, z, parent = g) => {
-    const d = new THREE.Mesh(new THREE.CircleGeometry(r, 20), headMat);
+    const d = new THREE.Mesh(new THREE.CircleGeometry(r, 10), headMat);
     d.position.set(x, y, z);
     parent.add(d);
     return d;
   };
   /** Spare wheel (tire + rim child). upright = facing fore/aft on a tailgate. */
   const spareWheel = (r, w, x, y, z, upright = false) => {
-    const geoT = new THREE.CylinderGeometry(r, r, w, 20);
-    const geoR = new THREE.CylinderGeometry(r * 0.48, r * 0.48, w + 0.04, 16);
+    const geoT = new THREE.CylinderGeometry(r, r, w, 10);
+    const geoR = new THREE.CylinderGeometry(r * 0.48, r * 0.48, w + 0.04, 8);
     if (upright) { geoT.rotateX(Math.PI / 2); geoR.rotateX(Math.PI / 2); }
     const t = new THREE.Mesh(geoT, tireMat);
     t.position.set(x, y, z);
@@ -377,7 +377,7 @@ export function buildVoxelRacer(spec) {
   }
   if (style === 'pit') {
     // front winch drum + fairlead + gold tow hook
-    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.85, 8), rimMat);
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.85, 10), rimMat);
     drum.rotation.z = Math.PI / 2;
     drum.position.set(0, baseY + 0.36, bodyLen / 2 + 0.32);
     g.add(drum);
@@ -547,42 +547,22 @@ export function buildVoxelRacer(spec) {
 
   // ---- wheels ----
   //
-  // A CAR IS ON SCREEN IN EVERY FRAME OF THIS GAME, and its wheels are the
-  // only part of it the art direction does NOT want boxy. At ten segments a
-  // tyre is a visible decagon from the chase camera - you can count the flats
-  // as it rolls - and the rim was a plain disc with no hub and no spokes.
+  // BUDGET SPENT WHERE THE VIEW IS. At ten segments a tyre is a visible
+  // decagon - you can count the flats as it rolls - so it goes to fourteen,
+  // which kills the flats from the chase camera. It does NOT get spokes, lug
+  // bolts or a spoke web: the view the game is actually played from is a car
+  // length away and thirty degrees up, where all of that is sub-pixel and only
+  // costs triangles that the forests want. A face plate proud of the tyre and
+  // a hub boss is the whole upgrade - about 100 triangles a car.
   //
-  // The bodies stay faceted on purpose: this is a voxel racer, and rounding
-  // the shell would be a different game. Round things read round, boxes stay
-  // boxes. Twenty-four segments and a spoked rim cost about 300 triangles a
-  // car against a world budget of 270,000.
-  const WSEG = 24;
+  // The BODIES stay faceted on purpose: this is a voxel racer.
+  const WSEG = 14;
   const tireGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.55, WSEG);
   tireGeo.rotateZ(Math.PI / 2);
-  // the rim is a dish, a hub and five spokes, welded into one geometry so a
-  // wheel is still two draw calls and not eight
-  // THE RIM HAS TO BE PROUD OF THE TYRE OR IT IS NOT THERE. A dish recessed
-  // inside a 0.55-wide tyre is invisible, and then the hub is the only thing
-  // sticking out - which reads as a peg driven through a black doughnut. The
-  // face plate sits a hair wider than the tyre, with a hub boss and five lug
-  // bolts standing off it.
-  const rimParts = [
-    new THREE.CylinderGeometry(wheelR * 0.58, wheelR * 0.58, 0.60, WSEG),
-    new THREE.CylinderGeometry(wheelR * 0.21, wheelR * 0.21, 0.66, 12),
-  ];
-  // MIND THE PLANE. Before the final rotateZ the axle runs along Y, so the
-  // wheel DISC is the X-Z plane - lugs laid out in X-Y sit edge-on to the rim
-  // and read as a dash painted across it.
-  for (let k = 0; k < 5; k++) {
-    const an = (k / 5) * Math.PI * 2;
-    rimParts.push(new THREE.CylinderGeometry(wheelR * 0.10, wheelR * 0.10, 0.68, 10)
-      .translate(Math.sin(an) * wheelR * 0.34, 0, Math.cos(an) * wheelR * 0.34));
-    // a spoke web between hub and rim, so the face is not a blank plate
-    rimParts.push(new THREE.BoxGeometry(wheelR * 0.22, 0.62, wheelR * 0.44)
-      .rotateY(an)
-      .translate(Math.sin(an) * wheelR * 0.30, 0, Math.cos(an) * wheelR * 0.30));
-  }
-  const rimGeo = mergeGeos(rimParts);
+  const rimGeo = mergeGeos([
+    new THREE.CylinderGeometry(wheelR * 0.54, wheelR * 0.54, 0.58, WSEG),
+    new THREE.CylinderGeometry(wheelR * 0.20, wheelR * 0.20, 0.64, 8),
+  ]);
   rimGeo.rotateZ(Math.PI / 2);
   g.userData.wheels = [];       // every wheel mesh, spun via rotation.x
   g.userData.frontWheels = [];  // z=+1.5 pair (+rims), yawed with steering input
