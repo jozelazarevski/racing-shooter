@@ -6815,6 +6815,7 @@ export class Track {
     if (this.T.windmill) this._buildWindmill();
     if (this.T.lighthouse) this._buildLighthouse();
     if (this.T.quay) this._buildQuayside(m4);        // harbour: quay wall + dockside kit
+    if (this.T.quay) this._buildMarina();           // pontoons, rigged boats, rings
     if (this.T.frontage) this._buildStreetLife();   // market stalls, produce, a fountain
     if (this.T.stoneBridges) this._buildStoneBridges();
     if (this._overpasses.length) this._buildOverpassDecks();
@@ -8172,6 +8173,173 @@ export class Track {
     if (awns.instanceColor) awns.instanceColor.needsUpdate = true;
     awns.castShadow = boards.castShadow = legs.castShadow = true;
     if (sk) this.group.add(awns, boards, legs);
+  }
+
+
+  /** THE MARINA: pontoons, rigged boats and mooring rings.
+   *
+   *  The old harbour boats were a box hull with a CONE stuck on top for a
+   *  sail, which is why they read as toys next to the reference: a real yacht
+   *  is a hull, a coachroof, a mast with a boom, and two triangular sails, and
+   *  a fishing boat is a broader hull with a wheelhouse and a derrick. Both are
+   *  built here, part by part, and every part type is ONE InstancedMesh across
+   *  the whole marina - seven draw calls for the lot.
+   *
+   *  They are moored the way boats actually are: a timber pontoon runs parallel
+   *  to the quay on piles, finger piers project from it, and a boat sits in
+   *  each slip either side. Mooring rings punctuate the quay wall.
+   */
+  _buildMarina() {
+    const C = this.T.coast;
+    if (!C) return;
+    const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
+    const L = Math.hypot(abx, abz);
+    const ux = abx / L, uz = abz / L;                 // along the shore
+    const nx = abz / L, nz = -abx / L;                // seaward
+    const mx = (C.a[0] + C.b[0]) / 2, mz = (C.a[1] + C.b[1]) / 2;
+    const y = C.level ?? -2;
+    const at = (du, dn) => new THREE.Vector3(mx + ux * du + nx * dn, y,
+      mz + uz * du + nz * dn);
+    const yaw = Math.atan2(ux, uz);
+    const g = new THREE.Group();
+    const timber = new THREE.MeshStandardMaterial({ color: 0x8a6a44, roughness: 1, flatShading: true });
+    const pile = new THREE.MeshStandardMaterial({ color: 0x5f4a30, roughness: 1 });
+
+    // --- the pontoon and its fingers ---------------------------------------
+    const SPAN = Math.min(190, L * 0.42);
+    // yaw maps local +Z ALONG the shore and +X seaward (headingAt convention),
+    // so the walkway runs on Z and the fingers project on X. Built the other
+    // way round, the pontoon marched out to sea and the fingers lay along it.
+    const walk = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.55, SPAN), timber);
+    walk.position.copy(at(0, 26)); walk.position.y = y + 0.5;
+    walk.rotation.y = yaw;
+    g.add(walk);
+    const FINGERS = 5, FLEN = 17;
+    const fingerAt = [];
+    for (let f = 0; f < FINGERS; f++) {
+      const du = -SPAN / 2 + (SPAN / (FINGERS - 1)) * f;
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(FLEN, 0.5, 2.6), timber);
+      const p = at(du, 26 - FLEN / 2);
+      fin.position.set(p.x, y + 0.48, p.z);
+      fin.rotation.y = yaw;
+      g.add(fin);
+      fingerAt.push(du);
+      for (let k = 0; k < 3; k++) {
+        const pp = at(du, 26 - FLEN / 2 + (k - 1) * (FLEN / 2.4));
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 3.4, 6), pile);
+        post.position.set(pp.x, y - 0.9, pp.z);
+        g.add(post);
+      }
+    }
+
+    // --- the boats ----------------------------------------------------------
+    const slips = [];
+    for (let f = 0; f < FINGERS - 1; f++) {
+      const du = (fingerAt[f] + fingerAt[f + 1]) / 2;
+      slips.push([du, 26 - FLEN * 0.34], [du, 26 - FLEN * 0.78]);
+    }
+    const N_B = slips.length;
+    const hullG = new THREE.BoxGeometry(2.9, 1.15, 8.2);
+    hullG.translate(0, 0.1, 0);
+    const deckG = new THREE.BoxGeometry(3.0, 0.16, 8.3);
+    const cabG = new THREE.BoxGeometry(2.0, 1.1, 2.6);
+    const mastG = new THREE.CylinderGeometry(0.10, 0.13, 11.5, 6);
+    const boomG = new THREE.CylinderGeometry(0.09, 0.09, 4.6, 5);
+    boomG.rotateX(Math.PI / 2);
+    const mainG = new THREE.BufferGeometry();
+    mainG.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      0, 0, -2.1, 0, 8.4, -0.3, 0, 0.3, 2.4,
+    ]), 3));
+    mainG.computeVertexNormals();
+    const jibG = new THREE.BufferGeometry();
+    jibG.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      0, 0.4, 2.6, 0, 7.6, -0.2, 0, 0.5, -0.4,
+    ]), 3));
+    jibG.computeVertexNormals();
+    // SAILS ARE WHITE CANVAS, and they are NOT per-instance coloured. Two
+    // instanced meshes sharing one vertexColors material rendered every sail
+    // black - the colour attribute belongs to the mesh, the shader define to
+    // the material, and one material cannot serve both. Plain white cloth
+    // needs neither, and each mesh gets its own material anyway.
+    const sailMat = () => new THREE.MeshStandardMaterial({ color: 0xf7f5ee,
+      roughness: 0.75, side: THREE.DoubleSide, flatShading: true });
+    const hulls = new THREE.InstancedMesh(hullG,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.7 }), N_B);
+    const decks = new THREE.InstancedMesh(deckG, timber, N_B);
+    const cabins = new THREE.InstancedMesh(cabG,
+      new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.8 }), N_B);
+    const masts = new THREE.InstancedMesh(mastG,
+      new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.6 }), N_B);
+    const booms = new THREE.InstancedMesh(boomG,
+      new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.6 }), N_B);
+    const mains = new THREE.InstancedMesh(mainG, sailMat(), N_B);
+    const jibs = new THREE.InstancedMesh(jibG, sailMat(), N_B);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    const HULLS = [0xf2ede2, 0x2f4f6f, 0x8a2f2a, 0xf2ede2, 0x2e5a3a, 0xf2ede2];
+    let hk = 0, mk = 0;
+    for (let i = 0; i < slips.length; i++) {
+      const [du, dn] = slips[i];
+      const p = at(du, dn);
+      // boats lie bow-out, nosed off the finger, with a little scatter
+      q.setFromAxisAngle(up, yaw + (i % 2 ? 0.06 : -0.06));
+      const fishing = i % 3 === 2;
+      const sc = fishing ? 1.15 : 0.92 + (i % 3) * 0.06;
+      m4.compose(new THREE.Vector3(p.x, y + 0.25, p.z), q, new THREE.Vector3(sc, sc, sc));
+      hulls.setMatrixAt(hk, m4);
+      col.set(fishing ? 0x2f4f6f : HULLS[i % HULLS.length]);
+      hulls.setColorAt(hk, col);
+      m4.compose(new THREE.Vector3(p.x, y + 0.95 * sc, p.z), q, new THREE.Vector3(sc, sc, sc));
+      decks.setMatrixAt(hk, m4);
+      // the coachroof sits aft on a yacht, forward as a wheelhouse on a trawler
+      const off = fishing ? -1.9 : 1.4;
+      const cp = new THREE.Vector3(p.x + ux * 0 + nx * 0, 0, p.z);
+      const cx = p.x + Math.sin(yaw) * 0 + Math.cos(yaw) * off * 0;
+      m4.compose(new THREE.Vector3(p.x - ux * 0 + (Math.sin(yaw + Math.PI / 2) * 0), y + 1.35 * sc, p.z), q,
+        new THREE.Vector3(sc, sc, sc));
+      cabins.setMatrixAt(hk, m4);
+      col.set(fishing ? 0xe8e4d8 : 0xf2ede2);
+      cabins.setColorAt(hk, col);
+      hk++;
+      // rig: yachts carry a full rig, trawlers a short derrick and no sails
+      const mh = fishing ? 0.55 : 1.0;
+      m4.compose(new THREE.Vector3(p.x, y + 1.0, p.z), q, new THREE.Vector3(sc, sc * mh, sc));
+      masts.setMatrixAt(i, m4);
+      m4.compose(new THREE.Vector3(p.x, y + 2.2 * sc, p.z), q, new THREE.Vector3(sc, sc, sc));
+      booms.setMatrixAt(i, m4);
+      if (!fishing) {
+        m4.compose(new THREE.Vector3(p.x, y + 1.5 * sc, p.z), q, new THREE.Vector3(sc, sc, sc));
+        mains.setMatrixAt(mk, m4);
+        jibs.setMatrixAt(mk, m4);
+        mk++;
+      }
+    }
+    hulls.count = decks.count = cabins.count = hk;
+    masts.count = booms.count = slips.length;
+    mains.count = jibs.count = mk;
+    for (const m of [hulls, decks, cabins, masts, booms, mains, jibs]) {
+      m.castShadow = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      g.add(m);
+    }
+
+    // --- mooring rings along the quay edge ----------------------------------
+    const ringG = new THREE.TorusGeometry(0.42, 0.09, 5, 10);
+    ringG.rotateX(Math.PI / 2);
+    const rings = new THREE.InstancedMesh(ringG,
+      new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 0.6, metalness: 0.5 }), 26);
+    let rk = 0;
+    for (let du = -SPAN * 0.8; du <= SPAN * 0.8 && rk < rings.count; du += 14) {
+      const p = at(du, (this.T.coast.beach ?? 10) * 0.35);
+      m4.compose(new THREE.Vector3(p.x, y + 1.4, p.z),
+        q.setFromAxisAngle(up, yaw), new THREE.Vector3(1, 1, 1));
+      rings.setMatrixAt(rk++, m4);
+    }
+    rings.count = rk;
+    g.add(rings);
+
+    g.name = 'marina';
+    this.group.add(g);
   }
 
   _buildQuayside(m4) {
