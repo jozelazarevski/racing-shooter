@@ -36,7 +36,7 @@ const NEW = [[29, 'OLIVE COAST', 'medterrace'], [30, 'LANTERN QUARTER', 'oldtown
   // THE MEDITERRANEAN FIVE
   [50, 'CINQUE TERRE', 'liguria'], [51, 'AEGEAN BLUE', 'aegean'],
   [52, 'COSTA BRAVA', 'brava'], [53, 'DALMATIA DRIVE', 'dalmatia'],
-  [54, 'COTE D AZUR', 'azur'],];
+  [54, 'COTE D AZUR', 'azur'], [55, 'BRIDGE RUN', 'vineyard'],];
 
 // The roster must agree with what we think we merged, before any of it is built.
 const probe = await browser.newPage({ viewport: { width: 640, height: 400 } });

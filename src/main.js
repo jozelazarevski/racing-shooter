@@ -417,6 +417,7 @@ const DEMANDS = {
   52: { loose: 0.22, twist: 0.50, fast: 0.62, climb: 0.20 }, // COSTA BRAVA
   53: { loose: 0.24, twist: 0.55, fast: 0.52, climb: 0.16 }, // DALMATIA DRIVE
   54: { loose: 0.18, twist: 0.60, fast: 0.55, climb: 0.24 }, // COTE D AZUR
+  55: { loose: 0.22, twist: 0.64, fast: 0.44, climb: 0.20 }, // BRIDGE RUN
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {
