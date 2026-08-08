@@ -2861,41 +2861,46 @@ const THEMES = {
  *  cannot be mistaken for one another from the driving seat.
  */
 for (const [key, over] of [
-  ['liguria', {                                   // ITALY - Cinque Terre
+  ['liguria', {
+    hutGlow: 0.12,                                   // ITALY - Cinque Terre
     elements: 'liguria',
-    frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e },
+    frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f0e4cf', plinth: '#a98a68', trim: '#f6ecd8', frame: '#3f6b46', shutter: '#3f6b46' } },
     seaColor: 0x2f7fa8, sunColor: 0xffe8c0, sunIntensity: 2.7,
     skyTop: '#2f7fd1', skyHorizon: '#e8ddc6',
     terrainLow: '#7d8a4e', terrainHigh: '#a89a68',
     hillColor: 0x8a8a58, peakColor: 0xb0a67e,
   }],
-  ['aegean', {                                    // GREECE
+  ['aegean', {
+    hutGlow: 0.12,                                    // GREECE
     elements: 'aegean',
-    frontage: { tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6 },
+    frontage: { tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6, face: { render: '#f7f5ef', plinth: '#e2ded4', trim: '#ffffff', frame: '#2f6fae', shutter: '#2f6fae' } },
     seaColor: 0x1f7fc4, sunColor: 0xfff4d8, sunIntensity: 3.0,
     skyTop: '#2a86dc', skyHorizon: '#eaf1f4',
     terrainLow: '#9a9a6a', terrainHigh: '#c0b489',
     hillColor: 0xa8a276, peakColor: 0xcabf94,
   }],
-  ['brava', {                                     // SPAIN - Costa Brava
+  ['brava', {
+    hutGlow: 0.12,                                     // SPAIN - Costa Brava
     elements: 'andalusia',
-    frontage: { tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33 },
+    frontage: { tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33, face: { render: '#f4ecda', plinth: '#c9b592', trim: '#fdf6e8', frame: '#7a5a34', shutter: '#8a5a2c' } },
     seaColor: 0x2b6f9c, sunColor: 0xffe6b4, sunIntensity: 2.9,
     skyTop: '#3182cc', skyHorizon: '#efe2c6',
     terrainLow: '#8a8a52', terrainHigh: '#c2ad78',
     hillColor: 0x9c9060, peakColor: 0xc4b485,
   }],
-  ['dalmatia', {                                  // CROATIA
+  ['dalmatia', {
+    hutGlow: 0.12,                                  // CROATIA
     elements: 'dalmatia',
-    frontage: { tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a },
+    frontage: { tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a, face: { render: '#f0ead9', plinth: '#c2b9a2', trim: '#f8f2e4', frame: '#4a6b4a', shutter: '#4a6b4a' } },
     seaColor: 0x1c86ae, sunColor: 0xfff0d4, sunIntensity: 2.8,
     skyTop: '#2f8ad4', skyHorizon: '#e6eee8',
     terrainLow: '#6f8450', terrainHigh: '#a8a276',
     hillColor: 0x8e9464, peakColor: 0xc0bb96,
   }],
-  ['azur', {                                      // FRANCE - Cote d'Azur
+  ['azur', {
+    hutGlow: 0.12,                                      // FRANCE - Cote d'Azur
     elements: 'azur',
-    frontage: { tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52 },
+    frontage: { tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52, face: { render: '#f6e7d6', plinth: '#d8c4ae', trim: '#fbf0e2', frame: '#8fb4cc', shutter: '#8fb4cc' } },
     seaColor: 0x2f74a6, sunColor: 0xffeccc, sunIntensity: 2.6,
     skyTop: '#3a86c8', skyHorizon: '#eee4d2',
     terrainLow: '#7f8a58', terrainHigh: '#b0a478',
@@ -9616,7 +9621,13 @@ export class Track {
     const MAX = 780;
     const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
     bodyGeo.translate(0, 0.5, 0);
-    const faceTex = townhouseTexture();
+    // THE FACADE IS THE STYLE. The body has no colour of its own - it wears a
+    // generated facade texture, and the per-house tint only MULTIPLIES that.
+    // So a northern timber-and-grey facade stayed northern however warm the
+    // tints were, which is why an Aegean street came out grey-green. The
+    // texture takes a regional palette now: light render (so the tint carries
+    // the colour) and regional joinery.
+    const faceTex = townhouseTexture(F.face);
     faceTex.anisotropy = 4;
     const bodyMat = new THREE.MeshStandardMaterial({
       map: faceTex, roughness: 0.86, envMapIntensity: 0.35,
