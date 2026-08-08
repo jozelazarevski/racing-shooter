@@ -65,7 +65,7 @@ export const LEVELS = [
   { id: 25, name: 'PIKES PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
     // the tallest climb on the roster, and nothing but the climb
     tune: { elev: { amp: 27, ph: [1.7, 0.3, 2.8] }, rampCount: 0 } },
-  { id: 26, name: 'SAFARI PLAINS', theme: 'dunes', route: 'safari', region: 'WORLD RALLY',
+  { id: 26, name: 'SAFARI PLAINS', theme: 'savanna', route: 'safari', region: 'WORLD RALLY',
     tune: { elev: { amp: 4, ph: [0.9, 2.6, 1.2] }, rampCount: 5 } },
   { id: 27, name: 'CORNICHE', theme: 'canyon', route: 'corniche', region: 'WORLD RALLY',
     tune: { elev: { amp: 7, ph: [2.9, 1.1, 0.5] }, rampCount: 0 } },
@@ -1462,7 +1462,11 @@ const THEMES = {
     hutRoof: 0xc09a5c, hayColor: 0xd8b95e, hutCount: 3, hayCount: 8,
     splinter: [0xe8c87a, 0xb8905a],
     weather: { type: 'sand', color: 0xe0c080 },
-    elev: { amp: 12, ph: [0.6, 2.9, 1.8] },             // serpent-back rollers
+    // ON THE CRESTS. The road was a flat ribbon on flat sand: 61 u of
+    // longest straight and nothing to read ahead. A bigger amplitude puts
+    // the lap over the dune tops with the sand falling away either side,
+    // which gives it a silhouette, a horizon and blind brows to judge.
+    elev: { amp: 17, ph: [0.9, 1.9, 2.7] },             // serpent-back rollers
     rampMaxCurv: 0.012, padMaxCurv: 0.005, boardMaxCurv: 0.012,
     geysers: { count: 6 },                              // hazard spec (lead implements)
   },
@@ -2327,7 +2331,12 @@ const THEMES = {
     foliageLow: 0x24522c, foliageTop: 0x36703c,
     foliage: { h: 0.32, hVar: 0.05, s: 0.5, sVar: 0.14, l: 0.24, lVar: 0.1 },
     treeSnowCap: false,
-    treeBelt: [12.5, 95],                               // trees to the verge, DEEP
+    // THE CANOPY MUST CLOSE. At 12.5 u the stands began a clear three units
+    // off the verge and the lap drove through open ground with a forest
+    // beside it - an audit called it '1500 trees and no wood'. Starting at
+    // 10.4 puts the trunks at the road edge, and pulling the belt in to 52
+    // concentrates the same count into the band you actually drive through.
+    treeBelt: [10.4, 52],
     tuftCount: 700, grass: { bladeA: '#3e6a34', bladeB: '#6a9a4c' },
     bushCount: 260, bushColor: 0x2c5c2c,
     bush: { h: 0.34, hVar: 0.05, s: 0.42, sVar: 0.1, l: 0.24, lVar: 0.1 },
@@ -3015,6 +3024,32 @@ THEMES.mountainsea = {
   coast: { a: [255, -580], b: [285, 580], level: -11, beach: 14 },
   massif: { az: 3.14, spread: 1.9, count: 8, r0: 430, r1: 700,
     h0: 110, h1: 200, w0: 200, w1: 340 },
+};
+
+
+/** SAFARI PLAINS gets its OWN place.
+ *
+ *  It shared the `dunes` theme with THE DUNE SERPENT - not a similar theme,
+ *  the SAME one - which is why an audit measuring frame similarity found them
+ *  closer to each other than any other pair on the roster. The layout was
+ *  never the problem: a C wrapped round a bay is a good shape. It had no
+ *  ground of its own.
+ *
+ *  So: bleached savanna grass instead of dune sand, flat-crowned acacias
+ *  instead of palms, rust-red termite mounds instead of pale desert stone, and
+ *  a green horizon rather than a dune sea. The cactus builder already carries
+ *  the acacia; it only ever needed to be asked for it.
+ */
+THEMES.savanna = {
+  ...THEMES.dunes,
+  terrainLow: '#b8a05a', terrainHigh: '#e0cf8a', terrainDirt: '#a8834a',
+  hillColor: 0xa8a05e, peakColor: 0xcabf80, horizon: undefined,
+  skyTop: '#6fa8d8', skyHorizon: '#f0e2b0',
+  vegetation: 'cactus', treeCount: 150, trunkColor: 0x6a5138,
+  tuftCount: 900, grass: { bladeA: '#c9b45e', bladeB: '#e8dca0' },
+  bushCount: 120, bushColor: 0x8a8a4a,
+  rockCount: 90, pebbleCount: 160, rockColor: 0xa8603a,
+  hutCount: 4, hayCount: 0,
 };
 
 /** Free every geometry, material and texture under `root`, then empty it.
