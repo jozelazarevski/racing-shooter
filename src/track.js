@@ -169,6 +169,10 @@ export const LEVELS = [
   // flooded tunnel bore. The drawing has no water in it; it has bridges.
   { id: 55, name: 'BRIDGE RUN', theme: 'vineyard', region: 'HEARTLAND',
     cost: 27, fresh: true, route: 'bridgeRun', tune: { tunnels: { count: 1 } } },
+  { id: 56, name: 'OLIVE CROSSING', theme: 'olivecountry', region: 'MEDITERRANEAN',
+    cost: 28, fresh: true, route: 'oliveCross', tune: { tunnels: { count: 1 } } },
+  { id: 57, name: 'MOUNTAIN TO SEA', theme: 'mountainsea', region: 'MEDITERRANEAN',
+    cost: 29, fresh: true, route: 'mountainSea', tune: { tunnels: { count: 1 } } },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -194,6 +198,47 @@ function switchbackStack({ legs, z0, dz, halfX, hp, dir = 1,
 
 // Hand-designed circuit control points (x, z) per theme.
 const CIRCUITS = {
+  // SKETCH A, hand-read: the big top loop with a hairpin biting into it, the
+  // long sweep down the left, and the strand that cuts back across the lap -
+  // the crossing the drawing wants bridged. Olive country.
+  oliveCross: [
+    [-53, 224], [-23, 233], [7, 241], [38, 239], [68, 231],
+    [94, 215], [111, 190], [117, 160], [113, 129], [93, 106],
+    [63, 115], [47, 140], [25, 161], [3, 143], [-1, 113],
+    [-20, 90], [-48, 98], [-59, 126], [-81, 146], [-104, 125],
+    [-108, 95], [-126, 70], [-143, 45], [-153, 16], [-153, -15],
+    [-137, -41], [-108, -50], [-77, -53], [-46, -50], [-15, -49],
+    [16, -50], [47, -53], [77, -60], [102, -76], [110, -104],
+    [95, -131], [65, -137], [34, -138], [3, -135], [-28, -133],
+    [-59, -132], [-90, -138], [-114, -157], [-119, -185], [-105, -210],
+    [-78, -225], [-47, -227], [-16, -229], [15, -226], [46, -221],
+    [76, -213], [103, -199], [127, -179], [144, -153], [150, -123],
+    [150, -92], [146, -61], [134, -32], [115, -8], [91, 10],
+    [62, 22], [31, 26], [1, 24], [-28, 13], [-51, -9],
+    [-72, 12], [-80, 41], [-82, 72], [-79, 103], [-76, 134],
+    [-72, 165], [-65, 195],
+  ],
+  // SKETCH B, hand-read: a vertical CHAIN of lobes, each looping back across
+  // the one before - the drawing's stacked coils, mountain on one flank and
+  // water on the other. Four crossings, all bridged.
+  mountainSea: [
+    [-50, -131], [-80, -149], [-92, -181], [-84, -215], [-56, -236],
+    [-22, -233], [3, -209], [8, -175], [2, -155], [2, -152],
+    [0, -148], [-8, -141], [-17, -108], [-4, -76], [27, -59],
+    [60, -66], [81, -94], [77, -117], [61, -119], [39, -92],
+    [16, -65], [-6, -38], [-29, -11], [-53, 13], [-82, -6],
+    [-92, -39], [-82, -72], [-53, -91], [-19, -87], [4, -61],
+    [7, -27], [2, -7], [1, -5], [0, -2], [-8, 5],
+    [-13, 37], [0, 70], [29, 87], [63, 77], [82, 49],
+    [76, 27], [60, 29], [37, 56], [14, 82], [-8, 109],
+    [-31, 136], [-56, 157], [-83, 137], [-92, 103], [-82, 73],
+    [-54, 58], [-18, 62], [5, 87], [7, 122], [4, 136],
+    [3, 140], [1, 143], [-11, 155], [-16, 189], [1, 219],
+    [33, 232], [65, 221], [83, 191], [80, 157], [65, 125],
+    [50, 92], [35, 60], [22, 28], [8, -3], [-7, -35],
+    [-21, -67], [-35, -100],
+  ],
+
   // SKETCH C, hand-read from the drawing: the tall top loop, two horizontal
   // bars, and the strand up the left that CROSSES both of them - which is
   // where the drawing writes 'Bridge'. Three crossings in all, every one of
@@ -2948,6 +2993,29 @@ for (const [key, over] of [
     frontage: { ...THEMES.harbor.frontage, ...(over.frontage || {}) },
   };
 }
+
+
+// SKETCH A and SKETCH B get their own places.
+//
+// OLIVE COUNTRY is OLIVE COAST inland: the same terraces, groves and limewash,
+// with the sea removed, because that route never reaches a shore and a coast
+// block it cannot see only risks flooding a lap (which is exactly how BRIDGE
+// RUN first came out - the car floating in a tunnel bore).
+//
+// MOUNTAIN TO SEA puts the water on ONE flank, east of the whole route, and
+// the massif opposite: the drawing labels one side "mountain" and the other
+// "sea", and that is the entire idea of the layout.
+THEMES.olivecountry = { ...THEMES.medterrace, coast: undefined, quay: false,
+  treeCount: Math.round((THEMES.medterrace.treeCount ?? 500) * 1.35) };
+THEMES.mountainsea = {
+  ...THEMES.dalmatia,
+  // The sea sits BELOW the road's lowest point, not at the harbour's default.
+  // This route dips to -4.3 u, and at the inherited -1.4 the lap's low
+  // sections were underwater 150 u inland - 514 of its samples read as wet.
+  coast: { a: [255, -580], b: [285, 580], level: -11, beach: 14 },
+  massif: { az: 3.14, spread: 1.9, count: 8, r0: 430, r1: 700,
+    h0: 110, h1: 200, w0: 200, w1: 340 },
+};
 
 /** Free every geometry, material and texture under `root`, then empty it.
  *
