@@ -116,7 +116,7 @@ function box(w, h, d, x, y, z, hex) {
 function wheelPairGeo(r, w, xOff, hubHex) {
   const parts = [];
   for (const s of [-1, 1]) {
-    const cyl = new THREE.CylinderGeometry(r, r, w, 10).toNonIndexed();
+    const cyl = new THREE.CylinderGeometry(r, r, w, 16).toNonIndexed();
     cyl.rotateZ(Math.PI / 2);
     cyl.translate(s * xOff, 0, 0);
     parts.push(paint(cyl, 0x24262a));
