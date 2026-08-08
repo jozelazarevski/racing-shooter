@@ -408,6 +408,7 @@ const DEMANDS = {
   46: { loose: 0.25, twist: 0.70, fast: 0.35, climb: 0.20 }, // VINEYARD VELOCE
   47: { loose: 0.45, twist: 0.60, fast: 0.40, climb: 0.25 }, // DEEPWOOD TRAIL
   48: { loose: 0.60, twist: 0.75, fast: 0.30, climb: 0.65 }, // DOLOMITI CORSA
+  49: { loose: 0.15, twist: 0.55, fast: 0.50, climb: 0.10 }, // HARBOR QUAY
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {

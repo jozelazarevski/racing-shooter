@@ -151,6 +151,7 @@ export const LEVELS = [
   { id: 46, name: 'VINEYARD VELOCE', theme: 'vineyard', region: 'HEARTLAND', cost: 18, fresh: true },
   { id: 47, name: 'DEEPWOOD TRAIL', theme: 'deepwood', region: 'HEARTLAND', cost: 19, fresh: true },
   { id: 48, name: 'DOLOMITI CORSA', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true },
+  { id: 49, name: 'HARBOR QUAY', theme: 'harbor', region: 'HEARTLAND', cost: 21, fresh: true },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -911,6 +912,12 @@ const CIRCUITS = {
     [90.0, -165.0], [-30.0, -140.0], [-140.0, -170.0], [-90.0, -215.0], [40.0, -220.0],
     [150.0, -195.0], [215.0, -130.0], [225.0, -30.0], [215.0, 80.0], [150.0, 160.0],
     [40.0, 195.0],
+  ],
+  harbor: [ // the quay run: seafront straight, headland turn, back lanes home
+    [-215, -38], [-150, -42], [-70, -44], [10, -44], [90, -42],
+    [160, -40], [215, -46], [252, -20], [258, 25], [230, 55],
+    [185, 48], [140, 58], [80, 70], [20, 62], [-45, 74],
+    [-110, 62], [-165, 74], [-215, 58], [-243, 20], [-240, -12],
   ],
 };
 
@@ -2316,6 +2323,63 @@ const THEMES = {
     coast: { a: [-200, -338.6], b: [400, -183.8], level: -2.1, floor: -7, beach: 70 },
     seaColor: 0x2e7f9e,
     tunnels: { count: 1 },
+  },
+
+  // HARBOR QUAY: the player's harbour reference - timber frontage down the
+  // LAND side only, a cobbled quay, the faceted sea lapping the other side,
+  // moored boats, barrels and nets on the stone, a lighthouse on the point.
+  harbor: {
+    fogColor: 0xdde6e8, fogNear: 340, fogFar: 1600,
+    hemiSky: 0xb8d4ec, hemiGround: 0x9a9484, hemiIntensity: 0.8,
+    sunColor: 0xffeed0, sunIntensity: 2.6,
+    skyTop: '#3f84c4', skyHorizon: '#e4ebe8', sunGlow: 0xffedbe,
+    sunAz: 3.6, sunEl: 0.55,
+    cloudCount: 8, cloudOpacity: 0.85, cloudTint: 0xfff4e0,
+    terrainLow: '#7a8a5c', terrainHigh: '#a8a888', terrainDirt: '#98907a',
+    terrainScree: '#a09a88', hutGlow: 0.5,
+    skirtColor: '#8e8a7a',
+    ground: {
+      base: '#9a9678', bandLight: 'rgba(228,224,204,0.07)', bandDark: 'rgba(90,88,70,0.07)',
+      patchA: 'rgba(140,150,100,0.2)', patchB: 'rgba(196,190,168,0.18)',
+      speckA: 'rgba(150,148,128,0.7)', speckB: 'rgba(226,222,204,0.8)', speckCount: 90,
+    },
+    road: {
+      base: '#8a8578', mottleA: [108, 104, 94], mottleB: [156, 152, 140],
+      ruts: false,
+      rut: 'rgba(70,68,60,0.4)', rutCore: 'rgba(52,50,44,0.35)', tread: 'rgba(26,25,22,0.4)',
+      stoneA: 'rgba(210,206,192,0.65)', stoneB: 'rgba(76,72,64,0.7)',
+      fringe: [120, 128, 88], fringeVar: [30, 34, 24],
+      cobbles: {
+        stones: ['#93907f', '#7f7c6e', '#a19d8c', '#6f6c62', '#a8a291', '#8a8778'],
+        mortar: 'rgba(52,50,44,0.9)', lip: 'rgba(255,252,240,0.12)',
+        rows: 30, per: 19,
+      },
+    },
+    hillColor: 0x6e8a5c, peakColor: 0xa8b098,
+    treeCount: 220, trunkColor: 0x5a4028,
+    foliageLow: 0x2e6a34, foliageTop: 0x4a8a44,
+    foliage: { h: 0.3, hVar: 0.06, s: 0.48, sVar: 0.14, l: 0.28, lVar: 0.1 },
+    treeSnowCap: false,
+    treeBelt: [40, 130],
+    tuftCount: 500, grass: { bladeA: '#5e7a4a', bladeB: '#94aa6c' },
+    bushCount: 110, bushColor: 0x3f7c38,
+    bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
+    rockCount: 140, pebbleCount: 220, rockColor: 0x8e8a7a, rockSnowCap: false,
+    flowerCount: 120, flowerColors: ['#ffffff', '#e0b040', '#c05a78'],
+    hutRoof: 0x7a4630, hayColor: 0xd0b878,
+    hutCount: 5, hutZone: [0.55, 0.35], hayCount: 10,
+    splinter: [0x8a5a32, 0xe0d8c0],
+    elev: { amp: 5, ph: [0.9, 2.1, 3.0] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    elements: 'medhill',
+    frontage: {
+      lateral: 15.5, depth: 8, unit: 7.2, height: 9.5, run: [6, 12], side: 1,
+      tints: ['#c9b58e', '#a8906c', '#b09a80', '#8a785e', '#c0a878', '#98826a'],
+    },
+    coast: { a: [-260, -75], b: [300, -63], level: -1.4, floor: -6.5, beach: 10 },
+    seaColor: 0x4585a0,
+    lighthouse: true,
+    stoneBridges: { count: 1 },
   },
 
   // LANTERN QUARTER: the OLD TOWN NIGHT region. Wet cobbles under sodium
@@ -6296,6 +6360,7 @@ export class Track {
     if (this.T.coast) this._buildSea();
     if (this.T.vineRows) this._buildVineRows();
     if (this.T.windmill) this._buildWindmill();
+    if (this.T.lighthouse) this._buildLighthouse();
     if (this.T.stoneBridges) this._buildStoneBridges();
     if (this._overpasses.length) this._buildOverpassDecks();
     if (this.T.japan) this._buildJapan();
@@ -6998,7 +7063,7 @@ export class Track {
     // is baked per-vertex instead — seaColor at the beach easing toward the
     // sky-horizon tone with distance from the arena, meeting the sky dome at
     // a proper sea horizon line instead of a cream wall.
-    const HALF = 4200, DEEP = 4200, COLS = 12, ROWS = 10;
+    const HALF = 4200, DEEP = 4200, COLS = 44, ROWS = 26;
     const cNear = new THREE.Color(this.T.seaColor ?? 0x3d7f9e);
     const cFar = cNear.clone().lerp(new THREE.Color(this.T.skyHorizon ?? '#dce8f0'), 0.8);
     const verts = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
@@ -7011,7 +7076,14 @@ export class Track {
         // near the beach, coarse rows out where one colour serves
         const dn = DEEP * Math.pow(r / ROWS, 2.2);
         const wx = mx + ux * du + nx * dn, wz = mz + uz * du + nz * dn;
-        verts[k * 3] = wx; verts[k * 3 + 1] = y; verts[k * 3 + 2] = wz;
+        // FACETED WATER, per the player's reference: every vertex bobs a
+        // little (deterministic hash - rebuild-stable), damped to nothing at
+        // the waterline so the shore contour never moves. flatShading below
+        // turns the jitter into the light-catching triangle field.
+        const hsh = Math.sin(wx * 12.9898 + wz * 78.233) * 43758.5453;
+        const bob = (hsh - Math.floor(hsh) - 0.5)
+          * 0.9 * smoothstep01(THREE.MathUtils.clamp(dn / 40, 0, 1));
+        verts[k * 3] = wx; verts[k * 3 + 1] = y + bob; verts[k * 3 + 2] = wz;
         // haze by distance from the arena the camera lives in, matching the
         // land fog's reach (fogFar ~1650) without inheriting its colour
         const haze = smoothstep01(THREE.MathUtils.clamp((Math.hypot(wx, wz) - 380) / 1400, 0, 1));
@@ -7042,7 +7114,7 @@ export class Track {
       // matte enough that the depth gradient READS - at 0.14 the sun's
       // specular washed the whole bay to one flat cyan
       vertexColors: true, roughness: 0.55, metalness: 0.02,
-      side: THREE.DoubleSide, fog: false,
+      side: THREE.DoubleSide, fog: false, flatShading: true,
     }));
     sea.name = 'sea';
     sea.receiveShadow = true;
@@ -7324,6 +7396,44 @@ export class Track {
     this.group.add(body, roof);
     this._addShadow(p.x, p.z, Math.max(W, D) * 0.8);
     this.solids.push({ x: p.x, z: p.z, r: Math.max(W, D) * 0.62, y: gy + 3, mat: 'stone' });
+  }
+
+  /** THE LIGHTHOUSE - the harbour reference's headland sentinel: banded
+   *  white tower, red lantern room, standing where land meets the water. */
+  _buildLighthouse() {
+    const C = this.T.coast;
+    if (!C) return;
+    const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
+    const L = Math.hypot(abx, abz);
+    const ux = abx / L, uz = abz / L;
+    const nx = abz / L, nz = -abx / L;
+    let spot = null;
+    for (const du of [L * 0.92, L * 0.06, L * 0.75, L * 0.25]) {
+      const x = C.a[0] + ux * du - nx * 8, z = C.a[1] + uz * du - nz * 8;
+      const h = this.terrainHeight(x, z);
+      if (h > (C.level ?? -2) + 0.8 && this._distToTrackCoarse(x, z) > 22) {
+        spot = { x, z, y: h };
+        break;
+      }
+    }
+    if (!spot) return;
+    const g = new THREE.Group();
+    const white = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.7 });
+    const red = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.6 });
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.7, 13, 10), white);
+    tower.position.set(spot.x, spot.y + 6.5, spot.z);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(2.25, 2.45, 2.2, 10), red);
+    band.position.set(spot.x, spot.y + 4.4, spot.z);
+    const room = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 1.8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffe9a0 }));
+    room.position.set(spot.x, spot.y + 13.9, spot.z);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(1.9, 1.6, 8), red);
+    cap.position.set(spot.x, spot.y + 15.6, spot.z);
+    tower.castShadow = cap.castShadow = true;
+    g.add(tower, band, room, cap);
+    this.group.add(g);
+    this._addShadow(spot.x, spot.z, 3.4);
+    this.solids.push({ x: spot.x, z: spot.z, r: 2.7, y: spot.y + 2, mat: 'stone' });
   }
 
   /** THE WINDMILL - the estate landmark from the player's vineyard art:
@@ -8695,7 +8805,7 @@ export class Track {
    *  cabin on the centreline of FURKA RIDGE. */
   _buildOldTown(m4) {
     const F = {
-      lateral: 17.5, depth: 8, unit: 7.0, height: 9.0, run: [4, 9],
+      lateral: 15.5, depth: 8, unit: 7.0, height: 10.0, run: [7, 14],
       tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
       ...this.T.frontage,
     };
@@ -8789,7 +8899,8 @@ export class Track {
 
     // ---- 1 + 2: the frontage and the rank behind it ----
     const step = Math.max(2, Math.round(F.unit / this.segLen));
-    for (const side of [1, -1]) {
+    const SIDES = F.side ? [F.side] : [1, -1];
+    for (const side of SIDES) {
       let run = 0, want = F.run[0] + ((Math.random() * (F.run[1] - F.run[0] + 1)) | 0);
       let gap = 0;
       for (let s = 0; s * step < N; s++) {
