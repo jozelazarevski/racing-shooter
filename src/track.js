@@ -164,6 +164,11 @@ export const LEVELS = [
     route: 'dalmatiaRun' },
   { id: 54, name: 'COTE D AZUR', theme: 'azur', region: 'MEDITERRANEAN', cost: 26, fresh: true,
     route: 'azurRun', tune: { tunnels: { count: 1 } } },
+  // ON LAND, deliberately. First cut put this on a coastal theme and part of
+  // the lap ran through the sea - the chase frame was the car floating in a
+  // flooded tunnel bore. The drawing has no water in it; it has bridges.
+  { id: 55, name: 'BRIDGE RUN', theme: 'vineyard', region: 'HEARTLAND',
+    cost: 27, fresh: true, route: 'bridgeRun', tune: { tunnels: { count: 1 } } },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -189,6 +194,29 @@ function switchbackStack({ legs, z0, dz, halfX, hp, dir = 1,
 
 // Hand-designed circuit control points (x, z) per theme.
 const CIRCUITS = {
+  // SKETCH C, hand-read from the drawing: the tall top loop, two horizontal
+  // bars, and the strand up the left that CROSSES both of them - which is
+  // where the drawing writes 'Bridge'. Three crossings in all, every one of
+  // them built as road-over-road by _planOverpasses. Measured against the
+  // game's own spline math: min radius 5.6 u, self-approach 21.0 u.
+  bridgeRun: [
+    [-21, 197], [5, 198], [31, 200], [57, 199], [65, 192],
+    [63, 185], [47, 180], [22, 177], [-3, 174], [-18, 153],
+    [-1, 134], [21, 122], [47, 116], [73, 112], [97, 104],
+    [95, 87], [71, 79], [45, 75], [20, 67], [0, 51],
+    [4, 33], [28, 24], [54, 19], [80, 24], [91, 42],
+    [77, 54], [52, 47], [28, 34], [5, 23], [-20, 15],
+    [-46, 14], [-73, 14], [-99, 15], [-123, 6], [-135, -16],
+    [-130, -41], [-112, -58], [-87, -64], [-61, -64], [-34, -63],
+    [-8, -62], [18, -63], [44, -67], [70, -72], [94, -81],
+    [108, -104], [107, -129], [102, -155], [91, -179], [77, -201],
+    [63, -223], [43, -241], [24, -258], [0, -269], [-21, -256],
+    [-37, -235], [-47, -211], [-56, -186], [-63, -161], [-70, -135],
+    [-75, -109], [-80, -84], [-81, -57], [-82, -31], [-81, -5],
+    [-77, 21], [-72, 47], [-66, 73], [-59, 98], [-52, 124],
+    [-45, 150], [-33, 173],
+  ],
+
   // ---- THE MEDITERRANEAN FIVE. Five coasts, five layout IDEAS - a cliff
   // corniche with a village loop, an island round two bays, a seafront blast
   // into inland hairpins, a peninsula through a narrow neck, and a corniche
