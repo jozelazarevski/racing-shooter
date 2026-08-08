@@ -1399,8 +1399,15 @@ export class Car {
         const rr = tr.r + 1.7;
         if (dx * dx + dz * dz >= rr * rr) continue;
         if (Math.abs(this.pos.y - (tr.y ?? 0)) > 4) continue; // rim cacti, cliff snags
-        const yields = tr.solid !== undefined ? !tr.solid : (tr.kind !== 'pine' || tr.s < 1.0);
-        if (yields && Math.abs(this.speedAlong) > 7) {
+        // REAL-WORLD RULE: any full-grown trunk is solid, whatever species -
+        // only saplings (small s), pulpy cacti and dead snags yield. Size is
+        // AUTHORITATIVE: a species record's solid:false cannot make a grown
+        // birch pushable (solid:true still hardens small specials).
+        const grown = (tr.s ?? 1) >= 1.0 && tr.kind !== 'cactus' && tr.kind !== 'snag';
+        const yields = tr.solid === true ? false : !grown;
+        // closing speed, not along-track speed: a broadside hit at pace
+        // snaps a sapling just as surely as a head-on one
+        if (yields && Math.hypot(this.vel.x, this.vel.z) > 8) {
           gm.onTreeSmash?.(tr, this);
         } else {
           const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));

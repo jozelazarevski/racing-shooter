@@ -408,6 +408,7 @@ const DEMANDS = {
   46: { loose: 0.25, twist: 0.70, fast: 0.35, climb: 0.20 }, // VINEYARD VELOCE
   47: { loose: 0.45, twist: 0.60, fast: 0.40, climb: 0.25 }, // DEEPWOOD TRAIL
   48: { loose: 0.60, twist: 0.75, fast: 0.30, climb: 0.65 }, // DOLOMITI CORSA
+  49: { loose: 0.15, twist: 0.55, fast: 0.50, climb: 0.10 }, // HARBOR QUAY
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {
@@ -5506,14 +5507,44 @@ class Game {
     // point on the sightline to the car. Lifting rather than pulling in,
     // because pulling in far enough on a steep rise puts the camera inside
     // the car; a slightly higher view still shows the road.
-    if (tk?.terrainHeight) {
+    // ...EXCEPT in a tunnel, where "the ground" is the hill you are driving
+    // UNDER. Over a bore terrainHeight returns the ridge, so the rule below
+    // lifted the camera clean through the roof and left you looking down at
+    // the mountainside while the car ran somewhere inside it. In the bore the
+    // camera obeys the BORE: over the roadway, under the crown, inside the
+    // walls. Either end counts — the car enters before the camera does and
+    // leaves before it too, and neither hand-off may flick the view outside.
+    const tun = tk?.tunnelAt
+      ? (tk.tunnelAt(p.pos, p.trackIndex, 6) || tk.tunnelAt(this.camPos, p.trackIndex, 6))
+      : null;
+    if (tun) {
+      const cp = this.camPos;
+      const ci = tk.nearestIndex(cp, tun.i);
+      const lat = tk.lateralOffset(cp, ci);
+      const lim = tun.half - 2.4;
+      if (Math.abs(lat) > lim) {                       // never inside the rock
+        const n = tk.nrm[ci];
+        const over = lat - Math.sign(lat) * lim;
+        cp.x -= n.x * over;
+        cp.z -= n.z * over;
+      }
+      const fy = tk.center[ci].y;
+      cp.y = Math.max(fy + 1.9, Math.min(cp.y, fy + tun.apex - 1.3));
+    } else if (tk?.terrainHeight) {
       const cp = this.camPos, pp = p.pos;
       const dx = pp.x - cp.x, dz = pp.z - cp.z, dy = pp.y - cp.y;
       let lift = 0;
       const STEPS = 7;
+      // A sample close to the car divides by a small (1 - f), so a modest
+      // intrusion there becomes an enormous lift — measured at 57 to 105 u on
+      // FURKA's tunnel mouth, where the ridge stands over the road by design.
+      // Samples inside a bore are not obstacles, they are the roof: skip them.
+      const probe = this._camProbe || (this._camProbe = new THREE.Vector3());
       for (let s = 1; s <= STEPS; s++) {
         const f = s / (STEPS + 1);
-        const gh = tk.terrainHeight(cp.x + dx * f, cp.z + dz * f) + 1.1;
+        const sx = cp.x + dx * f, sz = cp.z + dz * f;
+        if (tk.tunnelAt && tk.tunnelAt(probe.set(sx, 0, sz), p.trackIndex, 10)) continue;
+        const gh = tk.terrainHeight(sx, sz) + 1.1;
         const sy = cp.y + dy * f;
         if (gh > sy) lift = Math.max(lift, (gh - sy) / (1 - f));
       }
