@@ -828,7 +828,7 @@ class Game {
     // film grade: gentle saturation + contrast lift and a soft vignette —
     // runs pre-OutputPass (linear space), so it grades under the tone map
     this.grade = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, uVig: { value: 0.30 }, uSat: { value: 1.07 }, uCon: { value: 1.05 }, uAber: { value: 0.0017 } },
+      uniforms: { tDiffuse: { value: null }, uVig: { value: 0.30 }, uSat: { value: 1.07 }, uCon: { value: 1.05 }, uAber: { value: 0.0006 } },
       vertexShader: /* glsl */ `
         varying vec2 vUv;
         void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
