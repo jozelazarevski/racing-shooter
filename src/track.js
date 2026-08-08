@@ -1228,7 +1228,7 @@ const THEMES = {
     bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.55, lVar: 0.12 },
     rockCount: 160, pebbleCount: 120, rockColor: 0x9ab4c4, rockSnowCap: true,
     flowerCount: 40, flowerColors: ['#ffffff', '#cfe0ff', '#aef0ff'],
-    hutRoof: 0xe8f2f8, hutStyle: 'igloo', hutCount: 8, hayColor: 0xd8c07a, hayCount: 10,
+    hutRoof: 0xe8f2f8, hutStyle: 'igloo', hutCount: 8, hayCount: 0,   // nor by the igloos
     splinter: [0xcfe8f4, 0x8fd0e8],                     // shattered ice chips
     weather: { type: 'snow', color: 0xffffff },
     elev: { amp: 9, ph: [1.4, 3.1, 0.6] },
@@ -1294,7 +1294,7 @@ const THEMES = {
     bush: { h: 0.31, hVar: 0.06, s: 0.55, sVar: 0.15, l: 0.26, lVar: 0.14 },
     rockCount: 90, pebbleCount: 120, rockColor: 0x6a7a5a, rockSnowCap: false,
     flowerCount: 420, flowerColors: ['#ff4a6a', '#ffd45e', '#ff8a3a', '#e86aff', '#ffffff'],
-    hutRoof: 0x7a9a3c, hayColor: 0xc8b45e, hutCount: 6, hayCount: 30,
+    hutRoof: 0x7a9a3c, hutCount: 6, hayCount: 0,   // no straw in a rainforest
     splinter: [0x4a9a3c, 0x8a6a42],                     // shredded fronds + wet wood
     weather: { type: 'rain', color: 0xbfd8ea, rate: 220 }, // full tropical downpour
     elev: { amp: 7, ph: [2.2, 0.9, 4.4] },
@@ -1601,7 +1601,7 @@ const THEMES = {
     bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.55, lVar: 0.12 },
     rockCount: 140, pebbleCount: 110, rockColor: 0x9ab4c4, rockSnowCap: true,
     flowerCount: 0, flowerColors: ['#ffffff'],
-    hutRoof: 0xe8f2f8, hutStyle: 'igloo', hutCount: 6, hayColor: 0xd8c07a, hayCount: 6,
+    hutRoof: 0xe8f2f8, hutStyle: 'igloo', hutCount: 6, hayCount: 0,   // nor on sheet ice
     splinter: [0xdff2fc, 0x9fd8f0],                     // shattered ice chips
     weather: { type: 'snow', color: 0xffffff },
     elev: { amp: 8, ph: [2.1, 0.8, 3.9] },
@@ -1660,7 +1660,7 @@ const THEMES = {
     bush: { h: 0.40, hVar: 0.05, s: 0.18, sVar: 0.08, l: 0.52, lVar: 0.12 },
     rockCount: 220, pebbleCount: 160, rockColor: 0x9aa6b0, rockSnowCap: true,
     flowerCount: 30, flowerColors: ['#ffffff', '#cfe0ff'],
-    hutRoof: 0xe8eef4, hayColor: 0xd8c07a, hutCount: 3, hayCount: 8,
+    hutRoof: 0xe8eef4, hutCount: 3, hayCount: 0,   // nor on a snowfield
     splinter: [0xdce8f0, 0x9fc4d8],
     weather: { type: 'snow', color: 0xffffff },
     // hand-shaped pass: climb through the lap's middle, hold the crest, then
@@ -6596,7 +6596,11 @@ export class Track {
         const ground = this._terrainMeshHeight(p.x, p.z);
         // wall it where the shelf falls away, and always around tight bends
         if (p.y - ground < S.drop && !(tight && side === outside)) continue;
-        q.setFromAxisAngle(up, this.headingAt(i));
+        // A parapet runs ALONG the road. headingAt() maps local +Z to the
+        // tangent and +X across it, and this block's long axis is X (3.4 wide,
+        // 0.9 deep) - so the bare heading pointed every block radially out of
+        // the road edge and a hairpin came out as a comb of piano keys.
+        q.setFromAxisAngle(up, this.headingAt(i) + Math.PI / 2);
         m4.compose(new THREE.Vector3(p.x, p.y - 0.55, p.z), q, new THREE.Vector3(1, 1, 1));
         mesh.setMatrixAt(k, m4);
         col.setScalar(0.86 + Math.random() * 0.28);
@@ -6685,7 +6689,10 @@ export class Track {
       const beam = new THREE.Mesh(
         new THREE.BoxGeometry((deckW - 0.5) * 2 + 1.5, 0.7, 0.9), darkWood);
       beam.position.set(c.x, c.y + towerH - 0.9, c.z);
-      beam.rotation.y = this.headingAt(end) + Math.PI / 2;
+      // headingAt() maps local +Z along the road and local +X ACROSS it, and
+      // this beam's long axis is X - so a quarter turn laid the 13 u baulk
+      // lengthwise down the middle of the deck, at head height.
+      beam.rotation.y = this.headingAt(end);
       beam.castShadow = true;
       g.add(beam);
       towerTop.push(pair);
@@ -6756,7 +6763,7 @@ export class Track {
       const w = (deckW + 0.9) * 2 + 1.3;
       const beam = new THREE.Mesh(new THREE.BoxGeometry(w, 1.0, 1.0), darkWood);
       beam.position.set(c.x, c.y + 8.1, c.z);
-      beam.rotation.y = this.headingAt(gi) + Math.PI / 2;
+      beam.rotation.y = this.headingAt(gi);   // across the road, not along it
       beam.castShadow = true;
       arch.add(beam);
       // plank sign reading CHECKPOINT, visible from both approaches
@@ -7105,7 +7112,33 @@ export class Track {
     // is baked per-vertex instead — seaColor at the beach easing toward the
     // sky-horizon tone with distance from the arena, meeting the sky dome at
     // a proper sea horizon line instead of a cream wall.
-    const HALF = 4200, DEEP = 4200, COLS = 48, ROWS = 32;
+    const HALF = 4200, DEEP = 4200;
+    // COORDINATE LADDERS: uniform-fine in the near field, geometric to the
+    // horizon. Power spacing in both axes was fine in only ONE direction at a
+    // time - near the beach the triangles came out as slivers about 10 u deep
+    // and 60 u wide, and a sliver shades as a BAND, which is why the bay kept
+    // reading as a flat gradient however hard the colours were jittered. The
+    // reference is a field of small triangles, so the water the player can
+    // actually see is now a uniform CELL-metre grid, and only past it does
+    // the spacing grow.
+    const CELL = 20;
+    const ladder = (near, far) => {
+      const out = [];
+      for (let v = 0; v <= near; v += CELL) out.push(v);
+      // Gentle growth, not x1.55. Cells that reach ~1000 u across are flat
+      // enough to mirror the sun as ONE sheet, while the fine near cells break
+      // the same glare into facets - and the boundary between the two showed up
+      // as a hard vertical seam across the bay, measured 196 vs 168 brightness
+      // either side of it. Growing slowly keeps facets small for long enough
+      // that the glare stays broken all the way out.
+      let v = near, step = CELL * 1.4;
+      while (v < far - 1) { v = Math.min(far, v + step); out.push(v); step *= 1.22; }
+      return out;
+    };
+    const halfLadder = ladder(L / 2 + 320, HALF);
+    const us = halfLadder.slice(1).reverse().map((v) => -v).concat(halfLadder);
+    const dns = ladder(400, DEEP);
+    const COLS = us.length - 1, ROWS = dns.length - 1;
     const cNear = new THREE.Color(this.T.seaColor ?? 0x3d7f9e);
     const cFar = cNear.clone().lerp(new THREE.Color(this.T.skyHorizon ?? '#dce8f0'), 0.8);
     const verts = new Float32Array((COLS + 1) * (ROWS + 1) * 3);
@@ -7119,9 +7152,7 @@ export class Track {
         // the beach. Uniform columns were 190 u wide — near-shore triangles
         // that big shade as one flat gradient, which is exactly the "flat
         // water" the reference forbids. Centre columns now land ~15-40 u.
-        const ct = (2 * c) / COLS - 1;
-        const du = HALF * Math.sign(ct) * Math.pow(Math.abs(ct), 1.9);
-        const dn = DEEP * Math.pow(r / ROWS, 2.4);
+        const du = us[c], dn = dns[r];
         const wx = mx + ux * du + nx * dn, wz = mz + uz * du + nz * dn;
         // FACETED WATER, per the player's reference: every vertex bobs a
         // little (deterministic hash - rebuild-stable), damped to nothing at
@@ -7129,11 +7160,16 @@ export class Track {
         // turns the jitter into the light-catching triangle field.
         const hsh = Math.sin(wx * 12.9898 + wz * 78.233) * 43758.5453;
         const bob = (hsh - Math.floor(hsh) - 0.5)
-          * 1.15 * smoothstep01(THREE.MathUtils.clamp((dn - 3) / 42, 0, 1));
+          * 2.9 * smoothstep01(THREE.MathUtils.clamp((dn - 3) / 42, 0, 1));
         verts[k * 3] = wx; verts[k * 3 + 1] = y + bob; verts[k * 3 + 2] = wz;
-        // haze by distance from the arena the camera lives in, matching the
-        // land fog's reach (fogFar ~1650) without inheriting its colour
-        const haze = smoothstep01(THREE.MathUtils.clamp((Math.hypot(wx, wz) - 380) / 1400, 0, 1));
+        // Haze by distance from the ROAD, not from the world origin. Origin is
+        // not where the player is: on a coast that sits off-centre, the water
+        // at one end of the bay measured 750 u from origin and the other end
+        // far less, so half the bay washed pale while the other half stayed
+        // saturated - and the near-field/far-field grid boundary turned that
+        // gradient into a hard vertical seam across the water. Distance to the
+        // carriageway is what "far away" actually means to a driver.
+        const haze = smoothstep01(THREE.MathUtils.clamp((this._distToTrack(wx, wz) - 380) / 1400, 0, 1));
         tmp.copy(cNear).lerp(cFar, haze);
         // SHALLOWS to DEEP: turquoise off the beach, darkening teal past the
         // bar - depth the way the player's reference art shades its bays,
@@ -7149,7 +7185,10 @@ export class Track {
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const a = r * (COLS + 1) + c, b2 = a + 1, d = a + COLS + 1, e = d + 1;
-        idx.push(a, e, b2, a, d, e);
+        // wound UP. The first version pushed (a,e,b2),(a,d,e), whose face
+        // normals came out at y = -0.998: the sea was built face-down and
+        // only looked lit because DoubleSide flips normals on back faces.
+        idx.push(a, b2, e, a, e, d);
       }
     }
     const geoIdx = new THREE.BufferGeometry();
@@ -7171,19 +7210,31 @@ export class Track {
     for (let f = 0; f < fpos.count; f += 3) {
       const cx = (fpos.getX(f) + fpos.getX(f + 1) + fpos.getX(f + 2)) / 3;
       const cz = (fpos.getZ(f) + fpos.getZ(f + 1) + fpos.getZ(f + 2)) / 3;
-      const fade = 1 - smoothstep01(THREE.MathUtils.clamp((Math.hypot(cx, cz) - 380) / 1400, 0, 1));
+      // Facet jitter belongs to the near field ONLY. Carried out to 1780 u
+      // it was tinting single facets hundreds of units across by 11 % - one
+      // of those reads as a pale sheet with a dead-straight edge, which is
+      // the 'seam' that showed up in the bay. Gone by ~700 u, where facets
+      // are too big to jitter honestly.
+      const fade = 1 - smoothstep01(THREE.MathUtils.clamp((this._distToTrack(cx, cz) - 250) / 450, 0, 1));
+      // Two hashes, because facets differ in TONE as well as brightness in the
+      // reference art: one shifts the whole triangle's luminance, the other
+      // rocks it between green-turquoise and blue. 5 % was invisible.
       const fsh = Math.sin(cx * 17.2318 + cz * 3.7135) * 24634.6345;
-      const j = 1 + (fsh - Math.floor(fsh) - 0.5) * 0.10 * fade;
+      const tsh = Math.sin(cx * 4.8891 + cz * 21.4471) * 13571.1357;
+      const j = 1 + (fsh - Math.floor(fsh) - 0.5) * 0.3 * fade;
+      const tw = (tsh - Math.floor(tsh) - 0.5) * 0.19 * fade;
       for (let v = 0; v < 3; v++) {
-        fcol.setXYZ(f + v, Math.min(1, fcol.getX(f + v) * j),
-          Math.min(1, fcol.getY(f + v) * j), Math.min(1, fcol.getZ(f + v) * j));
+        fcol.setXYZ(f + v,
+          Math.min(1, fcol.getX(f + v) * j * (1 - tw * 0.7)),
+          Math.min(1, fcol.getY(f + v) * j * (1 + tw)),
+          Math.min(1, fcol.getZ(f + v) * j * (1 - tw * 0.5)));
       }
     }
     geo.computeVertexNormals();
     const sea = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
       // matte enough that the depth gradient READS - at 0.14 the sun's
       // specular washed the whole bay to one flat cyan
-      vertexColors: true, roughness: 0.55, metalness: 0.02,
+      vertexColors: true, roughness: 0.7, metalness: 0.02,
       side: THREE.DoubleSide, fog: false, flatShading: true,
     }));
     sea.name = 'sea';
@@ -7192,7 +7243,7 @@ export class Track {
 
     // SURF: two foam bands hugging the waterline - a bright broken line at
     // the beach and a fainter one a few metres out
-    for (const [dn, w, op] of [[2.2, 1.7, 0.75], [9, 1.1, 0.32]]) {
+    for (const [dn, w, op] of [[2.2, 1.5, 0.5], [9, 0.9, 0.2]]) {
       const segs = 64;
       const fverts = new Float32Array((segs + 1) * 2 * 3);
       for (let c2 = 0; c2 <= segs; c2++) {
@@ -7363,7 +7414,21 @@ export class Track {
     const rock = new THREE.InstancedMesh(
       new THREE.ConeGeometry(1, 1, 6),
       new THREE.MeshStandardMaterial({
-        map: this._horizonGrad(this.T.peakColor, 0.34, 0.04), flatShading: true, roughness: 1,
+        // ROCK, NOT HAZE. This used peakColor straight, and peakColor is the
+        // tone for peaks on the HORIZON, where distance washes colour out. The
+        // near massif stands a few hundred units away and fills a third of the
+        // frame, so cream limestone lit by a Mediterranean sun rendered as a
+        // pale sheet - measured on OLIVE COAST, hiding the massif dropped that
+        // part of the frame from 218 to 135 brightness. It is the same fault
+        // as the old sky-dome-inside-the-arena bug wearing a different hat.
+        // Near rock is therefore mixed most of the way to the hill tone, and a
+        // theme can override outright with massif.color.
+        // ...and barely any fog mix either: 0.34 baked a third of the land's
+        // cream haze into rock that stands close enough to read as rock.
+        map: this._horizonGrad(M.color ?? new THREE.Color(this.T.peakColor)
+          .lerp(new THREE.Color(this.T.hillColor ?? 0x6b6a58), 0.62)
+          .multiplyScalar(0.78).getHex(), 0.1, 0.02),
+        flatShading: true, roughness: 1,
       }),
       M.count
     );
@@ -11224,6 +11289,7 @@ export class Track {
     const nutGeo = new THREE.SphereGeometry(0.22, 6, 5);
     nutGeo.translate(0.28, 5.05, 0.18);
     partGeos.push(nutGeo);
+    const PALM_OWN = new THREE.Color(1, 1, 1);   // 'keep your own material colour'
     const trunkMat = new THREE.MeshStandardMaterial({ color: T.trunkColor, roughness: 1 });
     const frondMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 });
     const nutMat = new THREE.MeshStandardMaterial({ color: 0x6a4a26, roughness: 1 });
@@ -11288,9 +11354,14 @@ export class Track {
           (F.s + Math.random() * F.sVar) * (doum ? 0.78 : 1),
           F.l + Math.random() * F.lVar
         );
-        for (const part of sp) {
-          part.setMatrixAt(k, m4);
-          part.setColorAt(k, color);
+        for (let pi = 0; pi < sp.length; pi++) {
+          sp[pi].setMatrixAt(k, m4);
+          // Only the FRONDS take the foliage tint. Instance colour multiplies
+          // the material's, so tinting the brown trunk green rendered it
+          // near-black - a grove of black poles under pale fans, reading as
+          // TV aerials rather than palms.
+          const own = pi === 0 || (!doum && pi === sp.length - 1);
+          sp[pi].setColorAt(k, own ? PALM_OWN : color);
         }
         // NOT 'pine' → the material law lets any car snap a palm
         this.trees.push({
@@ -12284,7 +12355,11 @@ export class Track {
         g.add(pl);
       }
       g.position.set(p.x, this.terrainHeight(p.x, p.z), p.z);
-      g.rotation.y = this.headingAt(i) + (side > 0 ? Math.PI : 0);
+      // Boards face ONCOMING traffic, both sides of the road alike. The yaw
+      // used to depend on which side the board stood, so every board on one
+      // side presented its back - and because the material is DoubleSide you
+      // read the lettering mirrored rather than seeing nothing.
+      g.rotation.y = this.headingAt(i) + Math.PI;
       this.group.add(g);
       this.banners.push({
         x: p.x, z: p.z, y: g.position.y, r: 1.3, dead: false,
