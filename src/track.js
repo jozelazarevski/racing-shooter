@@ -2015,7 +2015,7 @@ const THEMES = {
       cobbles: {                                        // Tremola stone setts
         stones: ['#7d7a73', '#6c6963', '#87817a', '#5e5c58', '#8e887e', '#74726d'],
         mortar: 'rgba(38,36,33,0.9)', lip: 'rgba(255,250,235,0.13)',
-        rows: 32, per: 21,                              // small hand-laid setts
+        rows: 30, per: 52,          // small hand-laid setts: ~0.42 u across
       },
     },
     hillColor: 0x4e7248, peakColor: 0xdde8f0,
@@ -2483,7 +2483,7 @@ const THEMES = {
       cobbles: {
         stones: ['#93907f', '#7f7c6e', '#a19d8c', '#6f6c62', '#a8a291', '#8a8778'],
         mortar: 'rgba(52,50,44,0.9)', lip: 'rgba(255,252,240,0.12)',
-        rows: 30, per: 19,
+        rows: 28, per: 46,          // ~0.48 u x 0.36 u setts, not 1.16 u ovals
       },
     },
     hillColor: 0x6e8a5c, peakColor: 0xa8b098,
@@ -2598,7 +2598,7 @@ const THEMES = {
       cobbles: {
         stones: ['#7c766c', '#6a655d', '#8a8378', '#5e5a53', '#948c80', '#726d65'],
         mortar: 'rgba(30,29,27,0.9)', lip: 'rgba(255,214,150,0.16)',  // sodium on the crowns
-        rows: 30, per: 20,
+        rows: 28, per: 48,          // fine wet setts under the sodium light
       },
       // roughness 0.32 / reflection 0.85 in the region spec: a hard wet
       // surface, standing water on about a fifth of the roadbed
@@ -8450,7 +8450,6 @@ export class Track {
     // So the quay dressing is placed at negative dn and the moorings at
     // positive, and nothing has to guess.
     const PON = 15;                                 // pontoon, well afloat
-    const FLEN = 15;
 
     // a flat quad between four points, used for the ramps that have to meet
     // ground at one end and water at the other - explicit corners instead of a
@@ -8468,8 +8467,20 @@ export class Track {
     };
 
     // --- the pontoon, its piles and the gangway off the shore ---------------
-    const SPAN = Math.min(190, L * 0.42);
-    const walk = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.42, SPAN), timber);
+    //
+    // ONE BOAT PER SLIP. The first layout moored TWO boats nose-to-tail in
+    // each slip, at dn 20.1 and 26.4 - and a boat is 9.4 u long, so they
+    // overlapped by three metres and drove through each other. A marina moors
+    // one boat between each pair of fingers, all bows out, all at the same
+    // distance off; that is both what a marina looks like and what makes the
+    // spacing checkable, because every boat shares a heading and the whole
+    // fleet can be tested as axis-aligned boxes in the (along, out) frame.
+    const SPAN = Math.min(250, L * 0.45);
+    const SLIPS = 30;
+    const FINGERS = SLIPS + 1;
+    const PITCH = SPAN / (FINGERS - 1);              // finger-to-finger spacing
+    const FLEN = 14;
+    const walk = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.42, SPAN + 4), timber);
     walk.position.copy(at(0, PON)); walk.position.y = y + 0.5;
     walk.rotation.y = yaw;
     walk.castShadow = true;
@@ -8482,24 +8493,33 @@ export class Track {
       g.add(quad([a[0], gy, a[1]], [b[0], gy, b[1]],
         [c[0], y + 0.78, c[1]], [d[0], y + 0.78, d[1]], timber));
     }
-    const FINGERS = 5;
+    // THIRTY-ONE FINGERS AND NINETY-THREE PILES IS NOT NINETY-THREE DRAW
+    // CALLS. Both are one instanced mesh; the old loop added a Mesh per part,
+    // which was survivable at five fingers and is not at thirty-one.
+    const fingers = new THREE.InstancedMesh(new THREE.BoxGeometry(FLEN, 0.5, 2.2),
+      timber, FINGERS);
+    const posts = new THREE.InstancedMesh(
+      new THREE.CylinderGeometry(0.22, 0.26, 3.4, 6), pile, FINGERS * 3);
+    const fm = new THREE.Matrix4(), fq = new THREE.Quaternion();
+    const fup = new THREE.Vector3(0, 1, 0), fone = new THREE.Vector3(1, 1, 1);
+    fq.setFromAxisAngle(fup, yaw);
     const fingerAt = [];
+    let fpk = 0;
     for (let f = 0; f < FINGERS; f++) {
-      const du = -SPAN / 2 + (SPAN / (FINGERS - 1)) * f;
-      const fin = new THREE.Mesh(new THREE.BoxGeometry(FLEN, 0.5, 2.6), timber);
+      const du = -SPAN / 2 + PITCH * f;
       const p = at(du, PON + FLEN / 2);
-      fin.position.set(p.x, y + 0.48, p.z);
-      fin.rotation.y = yaw;
-      fin.castShadow = true;
-      g.add(fin);
+      fm.compose(new THREE.Vector3(p.x, y + 0.48, p.z), fq, fone);
+      fingers.setMatrixAt(f, fm);
       fingerAt.push(du);
       for (let k = 0; k < 3; k++) {
         const pp = at(du, PON + 2 + k * (FLEN / 2.6));
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 3.4, 6), pile);
-        post.position.set(pp.x, y - 0.9, pp.z);
-        g.add(post);
+        fm.compose(new THREE.Vector3(pp.x, y - 0.9, pp.z), fq, fone);
+        posts.setMatrixAt(fpk++, fm);
       }
     }
+    posts.count = fpk;
+    fingers.castShadow = true;
+    g.add(fingers, posts);
 
     const HB = this._boatHull();
     const hullG = HB.hull, deckG = HB.deck, bandG = HB.band;
@@ -8581,10 +8601,19 @@ export class Track {
     const sailMat = () => new THREE.MeshStandardMaterial({ color: 0xf7f5ee,
       roughness: 0.8, side: THREE.DoubleSide, flatShading: true });
 
+    // A HULL RUNS -4.30 TO +4.70 IN ITS OWN FRAME, so a boat whose stern is to
+    // clear the walkway sits at PON + 2.6 + 4.30 * scale. Worked out per boat
+    // rather than fixed, because the scale varies and a trawler is 12 % longer
+    // than the yacht beside it.
+    const SCALE_AT = (i) => (i % 3 === 2 ? 1.12 : 0.90 + (i % 3) * 0.07);
     const slips = [];
-    for (let f = 0; f < FINGERS - 1; f++) {
+    for (let f = 0; f < FINGERS - 1 && slips.length < SLIPS; f++) {
       const du = (fingerAt[f] + fingerAt[f + 1]) / 2;
-      slips.push([du, PON + FLEN * 0.34], [du, PON + FLEN * 0.76]);
+      // a metre of scatter fore-and-aft: thirty boats whose bows line up to
+      // the centimetre read as a car park, and the slack is on the axis that
+      // cannot cause a collision - neighbours sit side by side, not in line
+      const jit = ((Math.sin(slips.length * 12.9898) * 43758.5453) % 1) * 1.6;
+      slips.push([du, PON + 2.6 + 4.30 * SCALE_AT(slips.length) + jit]);
     }
     const N = slips.length;
     const IM = (geo, mat, n) => new THREE.InstancedMesh(geo, mat, n);
@@ -8630,12 +8659,14 @@ export class Track {
       m4.multiplyMatrices(boat, lm);
       mesh.setMatrixAt(k, m4);
     };
-    const HULLS = [0xf4efe4, 0x2f5f8f, 0xa8352c, 0xf4efe4, 0x2e6a4a, 0xefe6d2];
+    const HULLS = [0xf4efe4, 0x2f5f8f, 0xa8352c, 0xf4efe4, 0x2e6a4a, 0xefe6d2,
+      0xf4efe4, 0x3d6f8f, 0xd8b45a, 0xefe6d2, 0x7a4a86, 0xf4efe4,
+      0x2f5f8f, 0xc2603a, 0xf4efe4, 0x4a7f6a, 0xefe6d2, 0x8f3550];
     let ck = 0, fk = 0, mk = 0, pk = 0, gk = 0, tk = 0;
     for (let i = 0; i < N; i++) {
       const p = at(slips[i][0], slips[i][1]);
       const trawler = i % 3 === 2;
-      const sc = trawler ? 1.12 : 0.90 + (i % 3) * 0.07;
+      const sc = SCALE_AT(i);
       // bows to open water, with a degree or two of scatter on the warps
       q.setFromAxisAngle(up, yaw + Math.PI / 2 + (i % 2 ? 0.05 : -0.05));
       // FLOAT HER ON THE CHINE. At +0.55 the whole underwater body showed
@@ -8714,7 +8745,7 @@ export class Track {
     const ringG = new THREE.TorusGeometry(0.34, 0.075, 5, 9);
     ringG.rotateX(Math.PI / 2);
     const rings = new THREE.InstancedMesh(ringG, new THREE.MeshStandardMaterial({
-      color: 0x2a2622, roughness: 0.6, metalness: 0.5 }), 40);
+      color: 0x2a2622, roughness: 0.6, metalness: 0.5 }), 64);
     const bollG = new THREE.CylinderGeometry(0.26, 0.34, 0.85, 8);
     const bolls = new THREE.InstancedMesh(bollG, new THREE.MeshStandardMaterial({
       color: 0x6d6a62, roughness: 0.9, flatShading: true }), 40);
