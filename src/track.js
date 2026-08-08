@@ -6712,6 +6712,7 @@ export class Track {
     if (this.T.windmill) this._buildWindmill();
     if (this.T.lighthouse) this._buildLighthouse();
     if (this.T.quay) this._buildQuayside(m4);        // harbour: quay wall + dockside kit
+    if (this.T.frontage) this._buildStreetLife();   // market stalls, produce, a fountain
     if (this.T.stoneBridges) this._buildStoneBridges();
     if (this._overpasses.length) this._buildOverpassDecks();
     if (this.T.japan) this._buildJapan();
@@ -7988,6 +7989,88 @@ export class Track {
    *  clusters of barrels, crates and coiled rope on the stone. Everything is
    *  COSMETIC and everything stays ≥ 10.8 u off the centreline (drivable
    *  half-width is 9): dressing, never an obstacle. */
+
+  /** STREET LIFE: what makes a street look lived-in rather than built.
+   *
+   *  The frontage gives a town its walls; the reference gives it a market -
+   *  stalls under striped awnings, produce crates stacked at the doors,
+   *  barrels against the render, and a fountain where the road opens out. All
+   *  of it sits on the PAVEMENT band between the carriageway and the building
+   *  line, so it dresses the drive without narrowing it, and all of it is
+   *  registered crushable rather than solid: a market you can plough through
+   *  is a feature, a market that stops you dead is a wall with fruit on it.
+   */
+  _buildStreetLife() {
+    const F = this.T.frontage || {};
+    const SIDES = F.side ? [F.side] : [1, -1];
+    const inner = ROAD_HALF + 2.2;                       // clear of the road
+    const outer = Math.max(inner + 1.5, (F.lateral ?? 15.5) - 2.4);
+    const A = propAssets();
+    const awnMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, vertexColors: true, roughness: 0.9, side: THREE.DoubleSide,
+    });
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x6a4a2c, roughness: 1 });
+    const stallGeo = new THREE.BoxGeometry(3.2, 0.9, 1.8);
+    const awnGeo = new THREE.BoxGeometry(3.8, 0.18, 2.4);
+    const legGeo = new THREE.BoxGeometry(0.16, 2.1, 0.16);
+    const STALLS = 26;
+    const awns = new THREE.InstancedMesh(awnGeo, awnMat, STALLS);
+    const boards = new THREE.InstancedMesh(stallGeo,
+      new THREE.MeshStandardMaterial({ color: 0x8a6238, roughness: 1 }), STALLS);
+    const legs = new THREE.InstancedMesh(legGeo, legMat, STALLS * 4);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    const AWNING = ['#c9483a', '#e0e0d8', '#3f6b8a', '#d8a23a', '#4a7a4a'];
+    let sk = 0, lk = 0;
+    for (let n = 0; n < STALLS * 3 && sk < STALLS; n++) {
+      const i = ((Math.random() * N) | 0);
+      if (this.curvature[i] > 0.02) continue;            // not on a tight bend
+      const side = SIDES[(Math.random() * SIDES.length) | 0];
+      const lat = (inner + Math.random() * (outer - inner)) * side;
+      const p = this.pointAt(i, lat);
+      if (this._inWater(p.x, p.z)) continue;
+      if (!this._clearsRoad(p.x, p.z, 2.4, 1.2)) continue;
+      const y = this.terrainHeight(p.x, p.z);
+      const yaw = this.headingAt(i);
+      q.setFromAxisAngle(up, yaw);
+      m4.compose(new THREE.Vector3(p.x, y + 0.45, p.z), q, new THREE.Vector3(1, 1, 1));
+      boards.setMatrixAt(sk, m4);
+      m4.compose(new THREE.Vector3(p.x, y + 2.1, p.z), q, new THREE.Vector3(1, 1, 1));
+      awns.setMatrixAt(sk, m4);
+      col.set(AWNING[(Math.random() * AWNING.length) | 0]);
+      awns.setColorAt(sk, col);
+      for (const [ox, oz] of [[-1.7, -1.0], [1.7, -1.0], [-1.7, 1.0], [1.7, 1.0]]) {
+        if (lk >= legs.count) break;
+        const wx = p.x + Math.cos(yaw) * ox - Math.sin(yaw) * oz;
+        const wz = p.z + Math.sin(yaw) * ox + Math.cos(yaw) * oz;
+        m4.compose(new THREE.Vector3(wx, y, wz), q, new THREE.Vector3(1, 1, 1));
+        legs.setMatrixAt(lk++, m4);
+      }
+      this._addShadow(p.x, p.z, 2.6, y);
+      // produce at the stall: crushable, like every other street prop
+      for (let c = 0; c < 2; c++) {
+        const type = Math.random() < 0.5 ? 'crate' : 'barrel';
+        const { mesh, r } = this._makeProp(type);
+        const ox = (Math.random() - 0.5) * 3.4, oz = 1.6 + Math.random() * 0.9;
+        const wx = p.x + Math.cos(yaw) * ox - Math.sin(yaw) * oz;
+        const wz = p.z + Math.sin(yaw) * ox + Math.cos(yaw) * oz;
+        if (!this._clearsRoad(wx, wz, r, 1.0)) continue;
+        mesh.position.set(wx, this.terrainHeight(wx, wz), wz);
+        mesh.rotation.y = Math.random() * Math.PI * 2;
+        this.group.add(mesh);
+        this.props.push({ mesh, x: wx, y: mesh.position.y, z: wz, r, type,
+          scoreValue: PROP_SCORE[type], pickup: null });
+      }
+      sk++;
+    }
+    awns.count = boards.count = sk;
+    legs.count = lk;
+    awns.name = 'street-awnings';
+    if (awns.instanceColor) awns.instanceColor.needsUpdate = true;
+    awns.castShadow = boards.castShadow = legs.castShadow = true;
+    if (sk) this.group.add(awns, boards, legs);
+  }
+
   _buildQuayside(m4) {
     const C = this.T.coast;
     if (!C) return;
