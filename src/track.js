@@ -2890,6 +2890,7 @@ const THEMES = {
  */
 for (const [key, over] of [
   ['liguria', {
+    vegetation: 'olive',
     hutGlow: 0.12,                                   // ITALY - Cinque Terre
     elements: 'liguria',
     frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f0e4cf', plinth: '#a98a68', trim: '#f6ecd8', frame: '#3f6b46', shutter: '#3f6b46' } },
@@ -2899,6 +2900,7 @@ for (const [key, over] of [
     hillColor: 0x8a8a58, peakColor: 0xb0a67e,
   }],
   ['aegean', {
+    vegetation: 'olive',
     hutGlow: 0.12,                                    // GREECE
     elements: 'aegean',
     frontage: { tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6, face: { render: '#f7f5ef', plinth: '#e2ded4', trim: '#ffffff', frame: '#2f6fae', shutter: '#2f6fae' } },
@@ -2908,6 +2910,7 @@ for (const [key, over] of [
     hillColor: 0xa8a276, peakColor: 0xcabf94,
   }],
   ['brava', {
+    vegetation: 'olive',
     hutGlow: 0.12,                                     // SPAIN - Costa Brava
     elements: 'andalusia',
     frontage: { tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33, face: { render: '#f4ecda', plinth: '#c9b592', trim: '#fdf6e8', frame: '#7a5a34', shutter: '#8a5a2c' } },
@@ -2917,6 +2920,7 @@ for (const [key, over] of [
     hillColor: 0x9c9060, peakColor: 0xc4b485,
   }],
   ['dalmatia', {
+    vegetation: 'olive',
     hutGlow: 0.12,                                  // CROATIA
     elements: 'dalmatia',
     frontage: { tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a, face: { render: '#f0ead9', plinth: '#c2b9a2', trim: '#f8f2e4', frame: '#4a6b4a', shutter: '#4a6b4a' } },
@@ -2926,6 +2930,7 @@ for (const [key, over] of [
     hillColor: 0x8e9464, peakColor: 0xc0bb96,
   }],
   ['azur', {
+    vegetation: 'olive',
     hutGlow: 0.12,                                      // FRANCE - Cote d'Azur
     elements: 'azur',
     frontage: { tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52, face: { render: '#f6e7d6', plinth: '#d8c4ae', trim: '#fbf0e2', frame: '#8fb4cc', shutter: '#8fb4cc' } },
@@ -3524,6 +3529,15 @@ const FLORA_MIX = {
   // scatter still sums to 1.0 (checklist R04).
   medterrace: [['oliveOld', 0.344], ['oliveRow', 0.281], ['corkOak', 0.156],
     ['umbrellaPine', 0.125], ['cypress', 0.094]],
+  // THE MEDITERRANEAN FIVE inherit the harbour's machinery but must not
+  // inherit a northern forest with it: olive, cypress and umbrella pine, with
+  // the cypress weighted up because it is the species that says "this coast"
+  // in one silhouette - it lines the roads in the reference art.
+  liguria: [['oliveOld', 0.30], ['oliveRow', 0.22], ['umbrellaPine', 0.22], ['cypress', 0.26]],
+  aegean: [['oliveOld', 0.38], ['oliveRow', 0.26], ['cypress', 0.22], ['umbrellaPine', 0.14]],
+  brava: [['oliveOld', 0.32], ['oliveRow', 0.24], ['corkOak', 0.20], ['cypress', 0.24]],
+  dalmatia: [['oliveOld', 0.26], ['oliveRow', 0.20], ['umbrellaPine', 0.22], ['cypress', 0.32]],
+  azur: [['oliveOld', 0.28], ['oliveRow', 0.22], ['umbrellaPine', 0.24], ['cypress', 0.26]],
   // OLD TOWN: pollarded planes and limes only — the two broadleaf species in
   // the kit. A conifer anywhere near a European old town would be wrong.
   oldtown: [['oak', 0.62], ['birch', 0.38]],
