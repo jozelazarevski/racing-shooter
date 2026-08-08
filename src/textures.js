@@ -1716,7 +1716,26 @@ const TH_BAYS = (() => {
 })();
 const TH_SHOP = [22, 200, 148, 44];        // ground-floor glazing
 
-export function townhouseTexture(palette = {}) {
+/** VARIANTS. The bay layout used to be a constant - two windows, two upper
+ *  storeys, one shopfront - so every building in the game was the same
+ *  building, and a player driving four coastal worlds in a row saw one house
+ *  several hundred times. A variant picks how many storeys and how many bays
+ *  per storey, and whether the ground floor is a shop or a plain wall with a
+ *  door, which is the difference between a merchant terrace and a cottage. */
+export function townhouseBays(variant = 0) {
+  const V = [
+    { rows: [96, 164], xs: [30, 114], shop: true },        // 2 storeys, 2 bays, shop
+    { rows: [110], xs: [30, 114], shop: false },           // cottage: 1 storey, no shop
+    { rows: [72, 132, 190], xs: [40, 106], shop: true },   // tall merchant house
+    { rows: [96, 164], xs: [22, 78, 134], shop: false },   // wide, 3 bays, no shop
+    { rows: [120], xs: [66], shop: true },                 // narrow single-bay shop
+  ][variant % 5];
+  const bays = [];
+  for (const y of V.rows) for (const x of V.xs) bays.push([x, y, V.xs.length > 2 ? 38 : 48, 52]);
+  return { bays, shop: V.shop };
+}
+
+export function townhouseTexture(palette = {}, variant = 0) {
   const P = {
     render: '#b9ad98',            // limewashed render (tinted per instance)
     plinth: '#6e6a63',            // granite plinth + shopfront surround
@@ -1726,6 +1745,8 @@ export function townhouseTexture(palette = {}) {
     pane: '#171c26',              // unlit glass — never transparent (G7)
     ...palette,
   };
+  const VB = townhouseBays(variant);
+  const TH_BAYS = VB.bays;
   const t = make(TH_W, TH_H, (g, w, h) => {
     g.fillStyle = P.render;
     g.fillRect(0, 0, w, h);
@@ -1777,17 +1798,31 @@ export function townhouseTexture(palette = {}) {
         g.fillRect(x + bw + 3, sy, 9, 2);
       }
     }
-    // ground floor: a shopfront bay with a stone surround and a stall riser
+    // GROUND FLOOR. A shopfront where the variant asks for one; otherwise a
+    // plain rendered wall with a door, which is what a cottage has. Every
+    // building in the game used to get the shop.
+    // hoisted: the hanging sign below is positioned from the shopfront bay
+    // whether or not this variant draws one
     const [sx, sy, sw, sh] = TH_SHOP;
-    g.fillStyle = P.plinth;
-    g.fillRect(sx - 10, sy - 10, sw + 20, sh + 22);
-    g.fillStyle = P.pane;
-    g.fillRect(sx, sy, sw, sh);
-    g.strokeStyle = P.frame;
-    g.lineWidth = 6;
-    g.strokeRect(sx, sy, sw, sh);
-    g.fillStyle = P.frame;
-    for (let k = 1; k < 4; k++) g.fillRect(sx + (sw / 4) * k - 2, sy, 4, sh);
+    if (VB.shop) {
+      // ground floor: a shopfront bay with a stone surround and a stall riser
+      g.fillStyle = P.plinth;
+      g.fillRect(sx - 10, sy - 10, sw + 20, sh + 22);
+      g.fillStyle = P.pane;
+      g.fillRect(sx, sy, sw, sh);
+      g.strokeStyle = P.frame;
+      g.lineWidth = 6;
+      g.strokeRect(sx, sy, sw, sh);
+      g.fillStyle = P.frame;
+      for (let k = 1; k < 4; k++) g.fillRect(sx + (sw / 4) * k - 2, sy, 4, sh);
+    } else {
+      g.fillStyle = P.plinth;
+      g.fillRect(0, 216, w, h - 216);
+      g.fillStyle = P.frame;
+      g.fillRect(78, 194, 36, 62);
+      g.fillStyle = P.trim;
+      g.fillRect(74, 188, 44, 7);
+    }
     // hanging sign on a bracket beside the shopfront — the old-town silhouette
     g.fillStyle = P.frame;
     g.fillRect(sx + sw - 6, sy - 30, 4, 16);

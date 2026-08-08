@@ -9674,7 +9674,16 @@ export class Track {
     // tints were, which is why an Aegean street came out grey-green. The
     // texture takes a regional palette now: light render (so the tint carries
     // the colour) and regional joinery.
-    const faceTex = townhouseTexture(F.face);
+    // FOUR BUILDINGS, NOT ONE. The facade generator carried a fixed bay layout,
+    // so every house in every town was the same house - reported as "this house
+    // I see everywhere". Four variants are built (merchant terrace, cottage,
+    // tall house, wide three-bay), each its own texture and its own instanced
+    // mesh, and a building picks one. The cottage is weighted heaviest so a
+    // street is mostly modest houses with the big blocks as punctuation.
+    const VARIANTS = 4;
+    const faceTexes = [];
+    for (let v = 0; v < VARIANTS; v++) faceTexes.push(townhouseTexture(F.face, v));
+    const faceTex = faceTexes[0];
     faceTex.anisotropy = 4;
     const bodyMat = new THREE.MeshStandardMaterial({
       map: faceTex, roughness: 0.86, envMapIntensity: 0.35,
@@ -9687,9 +9696,25 @@ export class Track {
       color: F.roof ?? this.T.hutRoof ?? 0x33363c, flatShading: true,
       roughness: 0.72, envMapIntensity: 0.4,
     });
-    const bodies = new THREE.InstancedMesh(bodyGeo, bodyMat, MAX);
-    const roofs = new THREE.InstancedMesh(gablePrismGeo(), roofMat, MAX);
-    bodies.name = 'oldtown-frontage';
+    const bodySet = faceTexes.map((tex, v) => {
+      const m = bodyMat.clone();
+      m.map = tex;
+      tex.anisotropy = 4;
+      const im = new THREE.InstancedMesh(bodyGeo, m, Math.ceil(MAX / 2));
+      im.name = 'oldtown-frontage';
+      im.castShadow = im.receiveShadow = true;
+      return im;
+    });
+    const roofSet = faceTexes.map(() => {
+      const im = new THREE.InstancedMesh(gablePrismGeo(), roofMat, Math.ceil(MAX / 2));
+      im.castShadow = im.receiveShadow = true;
+      return im;
+    });
+    const kv = new Array(VARIANTS).fill(0);
+    // the cottage (1) twice, so the street is mostly modest houses
+    const VPICK = [0, 1, 1, 2, 3];
+    const bodies = bodySet[0];
+    const roofs = roofSet[0];
     bodies.castShadow = bodies.receiveShadow = true;
     roofs.castShadow = true;
     // wall-bracket lanterns: emissive heads on short arms, bloom does the glow
@@ -9735,18 +9760,27 @@ export class Track {
       // local +X is the road normal and local +Z runs along the street, so the
       // GABLE END faces the road: the Baltic gable-fronted terrace, and the
       // one roof orientation that still reads as separate houses in a row
-      m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(dAcross, h, wAlong));
-      bodies.setMatrixAt(k, m4);
-      m4.compose(new THREE.Vector3(p.x, y + h, p.z), q,
+      const vi = VPICK[(Math.random() * VPICK.length) | 0];
+      const bm = bodySet[vi], rm = roofSet[vi];
+      if (kv[vi] >= bm.count) return null;
+      // a cottage is a cottage: the variant sets the storey count, so it must
+      // set the HEIGHT too or a one-storey facade gets stretched over three
+      const vh = h * [1, 0.62, 1.24, 0.94][vi];
+      m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(dAcross, vh, wAlong));
+      bm.setMatrixAt(kv[vi], m4);
+      m4.compose(new THREE.Vector3(p.x, y + vh, p.z), q,
         new THREE.Vector3(dAcross * 1.06, roofH, wAlong * 1.04));
-      roofs.setMatrixAt(k, m4);
+      rm.setMatrixAt(kv[vi], m4);
       col.copy(tint).multiplyScalar(0.86 + Math.random() * 0.26);
-      bodies.setColorAt(k, col);
-      roofs.setColorAt(k, col.setScalar(0.8 + Math.random() * 0.4));
+      bm.setColorAt(kv[vi], col);
+      rm.setColorAt(kv[vi], col.setScalar(0.8 + Math.random() * 0.4));
+      const myMesh = bm, myRoof = rm, myIdx = kv[vi];
+      kv[vi]++;
       k++;
+      h = vh;
       const solid = { x: p.x, z: p.z, r, y: y + 0.6, mat: 'hut' };
       this.solids.push(solid);
-      return { solid, p, y, h, r, lat };
+      return { solid, p, y, h, r, lat, mesh: myMesh, roof: myRoof, idx: myIdx };
     };
 
     // chimney stacks: a small dark box riding most ridges. The cheapest thing
@@ -9851,7 +9885,7 @@ export class Track {
             this.buildings.push({
               x: back.p.x, z: back.p.z, y: back.y, r: back.r * 0.7,
               w: back.r * 1.2, h: back.h, hp: 220, solid: back.solid,
-              parts: [{ mesh: bodies, i: k - 1 }, { mesh: roofs, i: k - 1 }],
+              parts: [{ mesh: back.mesh, i: back.idx }, { mesh: back.roof, i: back.idx }],
               roofColor: this.T.hutRoof,
             });
             this._addShadow(back.p.x, back.p.z, back.r * 1.25);
@@ -9881,12 +9915,18 @@ export class Track {
       }
     }
 
-    bodies.count = roofs.count = k;
+    for (let v = 0; v < VARIANTS; v++) {
+      bodySet[v].count = roofSet[v].count = kv[v];
+      if (bodySet[v].instanceColor) bodySet[v].instanceColor.needsUpdate = true;
+      if (roofSet[v].instanceColor) roofSet[v].instanceColor.needsUpdate = true;
+    }
     arms.count = bulbs.count = lk;
     chims.count = ck;
     chims.name = 'oldtown-chimneys';
     bulbs.name = 'oldtown-lanterns';
-    if (k) this.group.add(bodies, roofs);
+    for (let v = 0; v < VARIANTS; v++) {
+      if (kv[v]) this.group.add(bodySet[v], roofSet[v]);
+    }
     if (ck) this.group.add(chims);
     if (lk) this.group.add(arms, bulbs);
 
