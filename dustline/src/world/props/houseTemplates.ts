@@ -428,6 +428,13 @@ export const KITS: Record<string, Kit> = {
   alpine: { wall: 0xe2d6bc, wall2: 0x9c6c40, roof: 0x7a4630, trim: 0x5d4426, stone: 0x9a978e, wallBase: '#96683c', planks: true },
   dalmatia: { wall: 0xe6dfcd, wall2: 0xd2c9b2, roof: 0xc0603a, trim: 0x4a6b4a, stone: 0xcfc6ae, wallBase: '#ffffff', planks: false },
   liguria: { wall: 0xe8a15c, wall2: 0xd4884a, roof: 0xb4552e, trim: 0x3f6b46, stone: 0xc9b998, wallBase: '#ffffff', planks: false },
+  // Three more of v1's, added when the templates that need them were exposed.
+  // `cube` and `domed` are the AEGEAN archetypes and their doors and domes are
+  // blue — with only the four kits above, the whitewashed cube came out with a
+  // dalmatia-green door, which is a missing kit rather than a wrong template.
+  aegean: { wall: 0xf4f1ea, wall2: 0xe6e2d8, roof: 0x2f6fae, trim: 0x2f6fae, stone: 0xd8d2c4, wallBase: '#ffffff', planks: false },
+  andalusia: { wall: 0xf0e6d2, wall2: 0xe0c893, roof: 0xb85c33, trim: 0x8a5a2c, stone: 0xd6c7a4, wallBase: '#ffffff', planks: false },
+  desert: { wall: 0xdcbd90, wall2: 0xc09a68, roof: 0xa8794a, trim: 0x6a4a2c, stone: 0xb08a5c, wallBase: '#ffffff', planks: false },
 };
 
 /** The five unit geometries, each base-anchored ONCE — `_realizeElements`.

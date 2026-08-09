@@ -17,7 +17,7 @@ export default dwelling({
   name: 'Domed house',
   template: 'domed',
   kit: 'dalmatia',
-  description: 'Limewashed cube under a drum and conical cap, 7.6 x 7 m, 9 m tall. Solid.',
+  description: 'Limewashed cube under a drum and conical cap, 8.1 x 7.5 m, 9 m tall. Solid.',
   massKg: 85000,
   scale: [0.9, 1.12],
   minRoadDist: 12,

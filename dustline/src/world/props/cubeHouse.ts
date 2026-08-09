@@ -20,7 +20,7 @@ export default dwelling({
   name: 'Cube house',
   template: 'cube',
   kit: 'dalmatia',
-  description: 'Flat-roofed limewashed cube with a parapet, outside stair and roof room, 8 x 7.2 m, 9.2 m tall. Solid.',
+  description: 'Flat-roofed limewashed cube with a parapet, outside stair and roof room, 8.5 x 7.8 m, 9.2 m tall. Solid.',
   massKg: 90000,
   scale: [0.85, 1.2],
   minRoadDist: 12,
