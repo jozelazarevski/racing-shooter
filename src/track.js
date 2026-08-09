@@ -3014,7 +3014,18 @@ for (const [key, over] of [
 // MOUNTAIN TO SEA puts the water on ONE flank, east of the whole route, and
 // the massif opposite: the drawing labels one side "mountain" and the other
 // "sea", and that is the entire idea of the layout.
+// OLIVE CROSSING: medterrace WITHOUT the sea - and that is exactly what broke
+// it. medterrace's haze and sky horizon are a pale sand (#ddd6be over fog
+// 0xd8d0b8) which works on a COAST, because the sea lays a blue band between
+// the beige ground and the beige sky. Take the sea away and ground, haze, sky
+// and the horizon mountains are all the same colour: the player's screenshot of
+// this world is two thirds featureless beige with no horizon line in it at all.
+// An inland world needs its own air - cooler and lighter than its ground - and
+// hills that are not the colour of the sky they stand against.
 THEMES.olivecountry = { ...THEMES.medterrace, coast: undefined, quay: false,
+  skyTop: '#3a86cf', skyHorizon: '#bcd2dc',
+  fogColor: 0xc4d2d6, fogNear: 520, fogFar: 2200,
+  hillColor: 0x7c8a58, peakColor: 0x9aa886,
   treeCount: Math.round((THEMES.medterrace.treeCount ?? 500) * 1.35) };
 THEMES.mountainsea = {
   ...THEMES.dalmatia,
@@ -3958,6 +3969,37 @@ export class Track {
     // Elevation profile: the road climbs and descends over the lap (tan/nrm and
     // curvature stay XZ-based — heading math is unaffected by the y channel).
     for (let i = 0; i < N; i++) this.center[i].y = this._elevProfile(i);
+    // A COAST ROAD RUNS ABOVE THE WATER.
+    //
+    // The elevation profile is written without any knowledge of the sea, and on
+    // CINQUE TERRE it dipped the carriageway up to 2.9 u BELOW the waterline for
+    // 70 of 225 sampled stations. The sea is a flat plane at coast.level drawn
+    // over everything, so the racing line was simply submerged: the player
+    // drives out along the seafront and ends up steering a car across open
+    // water. Reported with a screenshot of exactly that.
+    //
+    // The road is the one thing in this world that is never allowed to be
+    // wrong, so it wins: any station under the waterline is lifted to a
+    // freeboard above it, and the profile is then relaxed so the lift arrives
+    // as a rise in the road rather than a step in it. The relax is re-clamped
+    // each pass, so smoothing can never push a station back under.
+    if (T.coast) {
+      const SEA = (T.coast.level ?? -2) + 1.6;
+      let lifted = 0;
+      for (let i = 0; i < N; i++) {
+        if (this.center[i].y < SEA) { this.center[i].y = SEA; lifted++; }
+      }
+      if (lifted) {
+        for (let pass = 0; pass < 8; pass++) {
+          const src = new Float32Array(N);
+          for (let i = 0; i < N; i++) src[i] = this.center[i].y;
+          for (let i = 0; i < N; i++) {
+            const v = (src[(i - 1 + N) % N] + 2 * src[i] + src[(i + 1) % N]) / 4;
+            this.center[i].y = Math.max(v, SEA);
+          }
+        }
+      }
+    }
     this.length = this.curve.getLength();
     this.segLen = this.length / N;
 
@@ -7853,6 +7895,45 @@ export class Track {
     const sails = new THREE.InstancedMesh(sailG,
       new THREE.MeshStandardMaterial({ color: 0xf7f5ee, flatShading: true,
         roughness: 0.8, side: THREE.DoubleSide }), Math.max(1, nSails));
+    // THE BOATS OUT IN THE BAY GET THE SAME RIG AS THE ONES IN THE SLIPS.
+    //
+    // The flotilla shares the marina's HULL, but it was still carrying a bare
+    // pole and one flat triangle while the moored fleet had a coachroof, a
+    // boom, a jib, standing rigging and guardrails. From the seafront the
+    // difference is obvious - reported as "sailboats need the same high poly
+    // you've developed" - and it costs four more instanced meshes for the whole
+    // bay, because every one of these parts is identical on every boat.
+    const bjibG = this._sailGeo([0, 0.95, 3.6], [0, 6.7, 0.1], [0, 1.1, 0.3], 0.24);
+    const bjibs = new THREE.InstancedMesh(bjibG,
+      new THREE.MeshStandardMaterial({ color: 0xeee9dc, flatShading: true,
+        roughness: 0.8, side: THREE.DoubleSide }), Math.max(1, nSails));
+    const bboomG = new THREE.CylinderGeometry(0.07, 0.08, 3.6, 8);
+    bboomG.rotateX(Math.PI / 2);
+    bboomG.translate(0, 1.72, -1.7);
+    const bbooms = new THREE.InstancedMesh(bboomG,
+      new THREE.MeshStandardMaterial({ color: 0xcfcabc, roughness: 0.5 }),
+      Math.max(1, nSails));
+    // coachroof + a dark window band, welded so it is one draw call
+    const bcabG = this._bundle([
+      new THREE.BoxGeometry(1.5, 0.6, 2.6).translate(0, 1.28, -1.0),
+      new THREE.BoxGeometry(1.56, 0.2, 2.2).translate(0, 1.42, -1.0),
+    ]);
+    const bcabs = new THREE.InstancedMesh(bcabG,
+      new THREE.MeshStandardMaterial({ color: 0xf2ede2, roughness: 0.8,
+        flatShading: true }), BOATS.length);
+    // standing rigging and a guardrail, from their real endpoints
+    const MHb = [0, 8.6, 0.05];
+    const brigG = this._bundle([
+      this._strut(MHb, [0, 1.1, 3.9], 0.03, 4),
+      this._strut(MHb, [0, 0.95, -3.7], 0.03, 4),
+      this._strut(MHb, [-1.1, 1.0, -0.2], 0.028, 4),
+      this._strut(MHb, [1.1, 1.0, -0.2], 0.028, 4),
+      this._strut([-1.2, 1.5, -2.8], [-1.25, 1.5, 2.2], 0.024, 4),
+      this._strut([1.2, 1.5, -2.8], [1.25, 1.5, 2.2], 0.024, 4),
+    ]);
+    const brigs = new THREE.InstancedMesh(brigG,
+      new THREE.MeshStandardMaterial({ color: 0xcfcabc, roughness: 0.5,
+        metalness: 0.3 }), Math.max(1, nSails));
     const bcol = new THREE.Color();
     const bl = new THREE.Matrix4(), blq = new THREE.Quaternion();
     let sk2 = 0;
@@ -7868,20 +7949,29 @@ export class Track {
       hulls.setMatrixAt(k, im4);
       hulls.setColorAt(k, bcol.set(tint));
       bdecks.setMatrixAt(k, im4);
+      // every boat gets a coachroof; the rigged ones get the whole wardrobe
+      blq.identity();
+      bl.compose(new THREE.Vector3(0, 1.0, 0), blq, new THREE.Vector3(1, 1, 1));
+      bcabs.setMatrixAt(k, new THREE.Matrix4().multiplyMatrices(im4, bl));
       if (hasSail) {
-        blq.identity();
         bl.compose(new THREE.Vector3(0, 1.0, 0.05), blq, new THREE.Vector3(1, 1, 1));
         const wm = new THREE.Matrix4().multiplyMatrices(im4, bl);
         sails.setMatrixAt(sk2, wm);
+        bjibs.setMatrixAt(sk2, wm);
+        bbooms.setMatrixAt(sk2, wm);
+        brigs.setMatrixAt(sk2, wm);
         bl.compose(new THREE.Vector3(0, 4.8, 0.05), blq, new THREE.Vector3(1, 1, 1));
         bmasts.setMatrixAt(sk2, new THREE.Matrix4().multiplyMatrices(im4, bl));
         sk2++;
       }
     }
+    bjibs.count = bbooms.count = brigs.count = sk2;
+    bcabs.count = BOATS.length;
+    bjibs.castShadow = bbooms.castShadow = brigs.castShadow = bcabs.castShadow = true;
     sails.count = bmasts.count = sk2;
     hulls.castShadow = sails.castShadow = bdecks.castShadow = true;
     if (hulls.instanceColor) hulls.instanceColor.needsUpdate = true;
-    this.group.add(hulls, bdecks, bmasts, sails);
+    this.group.add(hulls, bdecks, bmasts, sails, bjibs, bbooms, brigs, bcabs);
 
     // WAVE CRESTS: broken white dashes drifting over the near bay
     const CRESTS = 90;
@@ -8589,16 +8679,36 @@ export class Track {
     // distance off; that is both what a marina looks like and what makes the
     // spacing checkable, because every boat shares a heading and the whole
     // fleet can be tested as axis-aligned boxes in the (along, out) frame.
-    const SPAN = Math.min(250, L * 0.45);
+    // THIRTY BOATS IN ONE STRAIGHT LINE IS A FENCE, NOT A HARBOUR.
+    //
+    // Measured on the shipped build: the fleet ran du -120.8 to +120.8 - 241
+    // metres of unbroken boats - every hull at the same distance offshore and
+    // every scale between 0.90 and 1.12. From the seafront that is a picket of
+    // identical white sails marching to the horizon.
+    //
+    // The r119 check that passed on this layout tested that no two boats
+    // OVERLAP. They did not overlap. A non-overlap test says nothing about
+    // whether thirty identical objects in a row look like a place.
+    //
+    // Three basins, at different distances off with open water between them.
     const SLIPS = 30;
-    const FINGERS = SLIPS + 1;
-    const PITCH = SPAN / (FINGERS - 1);              // finger-to-finger spacing
     const FLEN = 14;
-    const walk = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.42, SPAN + 4), timber);
-    walk.position.copy(at(0, PON)); walk.position.y = y + 0.5;
-    walk.rotation.y = yaw;
-    walk.castShadow = true;
-    g.add(walk);
+    const PITCH = 8.6;
+    const BASINS = [
+      { du: -96, n: 11, dn: PON + 5 },
+      { du: 6, n: 10, dn: PON - 3 },
+      { du: 102, n: 9, dn: PON + 9 },
+    ];
+    const SPAN = 250;                                // still used by the quay dressing
+    const FINGERS = SLIPS + BASINS.length;
+    for (const B of BASINS) {
+      const bw = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.42, PITCH * B.n + 4), timber);
+      const wp = at(B.du, B.dn);
+      bw.position.set(wp.x, y + 0.5, wp.z);
+      bw.rotation.y = yaw;
+      bw.castShadow = true;
+      g.add(bw);
+    }
     // the gangway: quay lip down to the pontoon deck
     {
       const gy = this.terrainHeight(...P(6, -3)) + 0.35;
@@ -8618,19 +8728,22 @@ export class Track {
     const fup = new THREE.Vector3(0, 1, 0), fone = new THREE.Vector3(1, 1, 1);
     fq.setFromAxisAngle(fup, yaw);
     const fingerAt = [];
-    let fpk = 0;
-    for (let f = 0; f < FINGERS; f++) {
-      const du = -SPAN / 2 + PITCH * f;
-      const p = at(du, PON + FLEN / 2);
-      fm.compose(new THREE.Vector3(p.x, y + 0.48, p.z), fq, fone);
-      fingers.setMatrixAt(f, fm);
-      fingerAt.push(du);
-      for (let k = 0; k < 3; k++) {
-        const pp = at(du, PON + 2 + k * (FLEN / 2.6));
-        fm.compose(new THREE.Vector3(pp.x, y - 0.9, pp.z), fq, fone);
-        posts.setMatrixAt(fpk++, fm);
+    let fpk = 0, fgi = 0;
+    for (const B of BASINS) {
+      for (let f = 0; f <= B.n; f++) {
+        const du = B.du - (PITCH * B.n) / 2 + PITCH * f;
+        const p = at(du, B.dn + FLEN / 2);
+        fm.compose(new THREE.Vector3(p.x, y + 0.48, p.z), fq, fone);
+        fingers.setMatrixAt(fgi++, fm);
+        if (f < B.n) fingerAt.push({ du: du + PITCH / 2, dn: B.dn });
+        for (let k = 0; k < 3; k++) {
+          const pp = at(du, B.dn + 2 + k * (FLEN / 2.6));
+          fm.compose(new THREE.Vector3(pp.x, y - 0.9, pp.z), fq, fone);
+          posts.setMatrixAt(fpk++, fm);
+        }
       }
     }
+    fingers.count = fgi;
     posts.count = fpk;
     fingers.castShadow = true;
     g.add(fingers, posts);
@@ -8719,15 +8832,25 @@ export class Track {
     // clear the walkway sits at PON + 2.6 + 4.30 * scale. Worked out per boat
     // rather than fixed, because the scale varies and a trawler is 12 % longer
     // than the yacht beside it.
-    const SCALE_AT = (i) => (i % 3 === 2 ? 1.12 : 0.90 + (i % 3) * 0.07);
+    // A MARINA IS MOSTLY SMALL BOATS. The old mix ran 0.90 to 1.12 - a spread
+    // of 24 per cent, invisible at fifty metres - and every hull carried the
+    // same 9.4 u mast, which is what built the uniform skyline. This is a real
+    // population, and a third of it carries NO MAST AT ALL: the motor launches
+    // are what actually break a picket of sails.
+    //   0 = motor launch (no rig)  1 = small yacht  2 = cruiser  3 = trawler
+    const KIND = [1, 0, 2, 1, 0, 3, 1, 0, 1, 2, 0, 1, 3, 0, 1,
+      2, 0, 1, 0, 1, 3, 0, 2, 1, 0, 1, 0, 2, 1, 0];
+    const SCALE_OF = [0.60, 0.86, 1.28, 1.10];
+    const SCALE_AT = (i) => SCALE_OF[KIND[i % KIND.length]]
+      * (0.92 + (((Math.sin(i * 7.13) * 43758.5453) % 1) + 1) % 1 * 0.16);
     const slips = [];
-    for (let f = 0; f < FINGERS - 1 && slips.length < SLIPS; f++) {
-      const du = (fingerAt[f] + fingerAt[f + 1]) / 2;
+    for (let f = 0; f < fingerAt.length && slips.length < SLIPS; f++) {
+      const du = fingerAt[f].du;
       // a metre of scatter fore-and-aft: thirty boats whose bows line up to
       // the centimetre read as a car park, and the slack is on the axis that
       // cannot cause a collision - neighbours sit side by side, not in line
       const jit = ((Math.sin(slips.length * 12.9898) * 43758.5453) % 1) * 1.6;
-      slips.push([du, PON + 2.6 + 4.30 * SCALE_AT(slips.length) + jit]);
+      slips.push([du, fingerAt[f].dn + 2.6 + 4.30 * SCALE_AT(slips.length) + jit]);
     }
     const N = slips.length;
     const IM = (geo, mat, n) => new THREE.InstancedMesh(geo, mat, n);
@@ -8782,7 +8905,9 @@ export class Track {
     let ck = 0, fk = 0, mk = 0, pk = 0, gk = 0, tk = 0;
     for (let i = 0; i < N; i++) {
       const p = at(slips[i][0], slips[i][1]);
-      const trawler = i % 3 === 2;
+      const kind = KIND[i % KIND.length];
+      const trawler = kind === 3;
+      const motor = kind === 0;
       const sc = SCALE_AT(i);
       // bows to open water, with a degree or two of scatter on the warps
       q.setFromAxisAngle(up, yaw + Math.PI / 2 + (i % 2 ? 0.05 : -0.05));
@@ -8814,19 +8939,26 @@ export class Track {
         trails.setMatrixAt(gk, boat);
         gk++;
       } else {
-        put(cabins, ck, boat, V(0, DECK + 0.36, -1.25), V(1.85, 0.72, 3.3));
+        put(cabins, ck, boat, V(0, DECK + 0.36, -1.25),
+          V(1.85, motor ? 1.15 : 0.72, motor ? 4.4 : 3.3));
         cabins.setColorAt(ck++, col.set(0xf4efe4));
         put(cabins, ck, boat, V(0, DECK + 0.46, -1.25), V(1.9, 0.26, 3.0));
         cabins.setColorAt(ck++, col.set(0x39424e));
         put(cabins, ck, boat, V(0, DECK + 0.22, 0.9), V(1.35, 0.34, 1.1));
         cabins.setColorAt(ck++, col.set(0x39424e));
         gears.setMatrixAt(tk++, boat);
-        rigs.setMatrixAt(mk, boat);
+        if (!motor) rigs.setMatrixAt(mk, boat);
       }
       // rig: full on a yacht, a short derrick on the trawler
-      const mh = trawler ? 0.46 : 1.0;
-      put(masts, i, boat, V(0, DECK + 4.7 * mh, 0.05), V(1, mh, 1));
-      if (trawler) {
+      const mh = motor ? 0.0001 : (trawler ? 0.46 : 1.0);
+      put(masts, i, boat, V(0, DECK + 4.7 * mh, 0.05), V(motor ? 0.0001 : 1, mh, 1));
+      if (motor) {
+        // a launch carries nothing aloft: collapse the boom rather than skip
+        // it, so every per-boat instanced mesh keeps index === boat index
+        lm.compose(V(0, DECK, 0), lq.identity(), V(0.0001, 0.0001, 0.0001));
+        m4.multiplyMatrices(boat, lm);
+        booms.setMatrixAt(i, m4);
+      } else if (trawler) {
         lq.setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.62);
         lm.compose(V(0, DECK + 2.3, -1.2), lq, V(1, 1, 0.62));
         m4.multiplyMatrices(boat, lm);
@@ -10682,7 +10814,14 @@ export class Track {
     // tall house, wide three-bay), each its own texture and its own instanced
     // mesh, and a building picks one. The cottage is weighted heaviest so a
     // street is mostly modest houses with the big blocks as punctuation.
+    // A STREET WHERE EVERY HOUSE IS LIT IS A STREET WHERE NOBODY LIVES.
+    // Four bay layouts, each in TWO lighting states - a lit house and a mostly
+    // dark one - so a terrace reads as occupied rather than as a switchboard.
+    // Emissive is a MATERIAL property and these are instanced meshes, so
+    // per-house lighting has to be per-mesh: eight slots instead of four, which
+    // is eight more draw calls on the one world type that has a night street.
     const VARIANTS = 4;
+    const SLOTS = VARIANTS * 2;
     const faceTexes = [];
     for (let v = 0; v < VARIANTS; v++) faceTexes.push(townhouseTexture(F.face, v));
     const faceTex = faceTexes[0];
@@ -10691,30 +10830,38 @@ export class Track {
       map: faceTex, roughness: 0.86, envMapIntensity: 0.35,
       // the lit bays are the ONLY light source that reaches the upper half of
       // the frame — without them a night street is a black band over the road
-      emissive: 0xffffff, emissiveMap: townhouseGlowTexture(),
+      emissive: 0xffffff,
       emissiveIntensity: this.T.hutGlow ?? 1,
     });
     const roofMat = new THREE.MeshStandardMaterial({
       color: F.roof ?? this.T.hutRoof ?? 0x33363c, flatShading: true,
       roughness: 0.72, envMapIntensity: 0.4,
     });
-    const bodySet = faceTexes.map((tex, v) => {
+    const bodySet = [];
+    for (let sl = 0; sl < SLOTS; sl++) {
+      const v = sl >> 1, dark = (sl & 1) === 1;
+      const tex = faceTexes[v];
       const m = bodyMat.clone();
       m.map = tex;
       tex.anisotropy = 4;
-      const im = new THREE.InstancedMesh(bodyGeo, m, Math.ceil(MAX / 2));
+      m.emissiveMap = townhouseGlowTexture(F.glow, v, dark ? 0.13 : 0.6);
+      m.emissiveIntensity = (this.T.hutGlow ?? 1) * (dark ? 0.75 : 1);
+      const im = new THREE.InstancedMesh(bodyGeo, m, Math.ceil(MAX / 3));
       im.name = 'oldtown-frontage';
       im.castShadow = im.receiveShadow = true;
-      return im;
-    });
-    const roofSet = faceTexes.map(() => {
-      const im = new THREE.InstancedMesh(gablePrismGeo(), roofMat, Math.ceil(MAX / 2));
+      bodySet.push(im);
+    }
+    const roofSet = bodySet.map(() => {
+      const im = new THREE.InstancedMesh(gablePrismGeo(), roofMat, Math.ceil(MAX / 3));
       im.castShadow = im.receiveShadow = true;
       return im;
     });
-    const kv = new Array(VARIANTS).fill(0);
+    const kv = new Array(SLOTS).fill(0);
     // the cottage (1) twice, so the street is mostly modest houses
     const VPICK = [0, 1, 1, 2, 3];
+    // ...and roughly two houses in five have the lights off
+    const pickSlot = () => VPICK[(Math.random() * VPICK.length) | 0] * 2
+      + (Math.random() < 0.42 ? 1 : 0);
     const bodies = bodySet[0];
     const roofs = roofSet[0];
     bodies.castShadow = bodies.receiveShadow = true;
@@ -10762,12 +10909,12 @@ export class Track {
       // local +X is the road normal and local +Z runs along the street, so the
       // GABLE END faces the road: the Baltic gable-fronted terrace, and the
       // one roof orientation that still reads as separate houses in a row
-      const vi = VPICK[(Math.random() * VPICK.length) | 0];
+      const vi = pickSlot();
       const bm = bodySet[vi], rm = roofSet[vi];
       if (kv[vi] >= bm.count) return null;
       // a cottage is a cottage: the variant sets the storey count, so it must
       // set the HEIGHT too or a one-storey facade gets stretched over three
-      const vh = h * [1, 0.62, 1.24, 0.94][vi];
+      const vh = h * [1, 0.62, 1.24, 0.94][vi >> 1];
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(dAcross, vh, wAlong));
       bm.setMatrixAt(kv[vi], m4);
       m4.compose(new THREE.Vector3(p.x, y + vh, p.z), q,
@@ -10796,14 +10943,27 @@ export class Track {
     }), CMAX);
     let ck = 0;
     const chimOff = new THREE.Vector3();
-    const chimAt = (i, side, lat, dAcross, wAlong, baseY) => {
+    const chimAt = (i, side, lat, dAcross, wAlong, eaveY, roofH) => {
       if (ck >= CMAX) return;
       const p = this.pointAt(i, lat * side);
       q.setFromAxisAngle(up, this.headingAt(i));
-      // the gable ridge runs along local X (toward the road); sit the stack
-      // on the ridge, off-centre, with a touch of along-street jitter
-      chimOff.set((Math.random() < 0.5 ? -1 : 1) * dAcross * (0.14 + Math.random() * 0.16),
-        0, (Math.random() - 0.5) * wAlong * 0.22).applyQuaternion(q);
+      // A STACK STANDS ON THE ROOF IT IS ON, NOT ON THE RIDGE IT IS NEAR.
+      //
+      // The base used to be handed in as `eaveY + roofH * 0.8` - the height of
+      // the ridge - and the stack was THEN slid up to 0.30 * depth sideways
+      // across the roof. A gable falls away from its ridge, so at 2.4 u across
+      // an 8 u-deep roof the tiles are only 0.4 of the way up while the stack
+      // was still sitting at 0.8: about a metre of daylight under every
+      // chimney on the street, which is exactly what was reported.
+      //
+      // Pick the offset FIRST, then read the roof height at that offset.
+      const across = (Math.random() < 0.5 ? -1 : 1) * dAcross * (0.14 + Math.random() * 0.16);
+      const along = (Math.random() - 0.5) * wAlong * 0.22;
+      chimOff.set(across, 0, along).applyQuaternion(q);
+      // gable slopes across the roof's DEPTH: full height on the ridge, zero
+      // at the eaves. 0.35 sinks the stack's foot into the tiles.
+      const f = Math.max(0, 1 - Math.abs(across) / (dAcross * 0.5));
+      const baseY = eaveY + roofH * f - 0.35;
       m4.compose(new THREE.Vector3(p.x + chimOff.x, baseY, p.z + chimOff.z), q,
         new THREE.Vector3(1, 0.75 + Math.random() * 0.6, 1));
       chims.setMatrixAt(ck++, m4);
@@ -10845,7 +11005,7 @@ export class Track {
         }
         if (!placed) { run = 0; continue; }
         placedS[side].add(i);
-        if (Math.random() < 0.62) chimAt(i, side, placed.lat, F.depth, ww, placed.y + hh + roofH * 0.8);
+        if (Math.random() < 0.62) chimAt(i, side, placed.lat, F.depth, ww, placed.y + hh, roofH);
         // A LANTERN ON THE BRACKET, every third house. Anchored to the FRONT
         // FACE, not the block centre — the arm only reaches 0.72 u and a
         // 8 u-deep building would have swallowed the bulb whole.
@@ -10921,7 +11081,7 @@ export class Track {
       }
     }
 
-    for (let v = 0; v < VARIANTS; v++) {
+    for (let v = 0; v < SLOTS; v++) {
       bodySet[v].count = roofSet[v].count = kv[v];
       if (bodySet[v].instanceColor) bodySet[v].instanceColor.needsUpdate = true;
       if (roofSet[v].instanceColor) roofSet[v].instanceColor.needsUpdate = true;
@@ -10930,7 +11090,7 @@ export class Track {
     chims.count = ck;
     chims.name = 'oldtown-chimneys';
     bulbs.name = 'oldtown-lanterns';
-    for (let v = 0; v < VARIANTS; v++) {
+    for (let v = 0; v < SLOTS; v++) {
       if (kv[v]) this.group.add(bodySet[v], roofSet[v]);
     }
     if (ck) this.group.add(chims);
