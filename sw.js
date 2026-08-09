@@ -1,9 +1,15 @@
 /* IGNITE RALLY offline service worker.
  *
- * The whole game is static: an HTML file, ten ES modules, a vendored three.js,
- * two fonts and the world-card art. That means it can run with the radio off
- * entirely — on a plane, in a tunnel, anywhere — provided every one of those
- * files is already in the cache before the network disappears.
+ * The whole game is static: an HTML file, a graph of ES modules, a vendored
+ * three.js, two fonts and the world-card art. That means it can run with the
+ * radio off entirely — on a plane, in a tunnel, anywhere — provided every one
+ * of those files is already in the cache before the network disappears.
+ *
+ * CORE below is hand-written and the module graph is not, so the two used to
+ * drift in silence: `src/sync.js` was imported by main.js and missing from this
+ * list for its whole life, which fails only offline, only once, as a blank
+ * screen. `tests/test-static.mjs` now walks the real import graph and fails if
+ * this list disagrees with it in either direction. Add a module, run the gate.
  *
  * Strategy:
  *   - install : precache the complete asset list, so one visit on wifi arms
@@ -16,7 +22,7 @@
  * CACHE is bumped by the release version. Bump it whenever ?v= in index.html
  * is bumped, or phones will keep serving the previous build forever.
  */
-const CACHE = 'ignite-rally-r127';
+const CACHE = 'ignite-rally-r128';
 
 // ---- CORE vs EXTRA ---------------------------------------------------------
 // CORE is everything the game needs to RUN with the radio off: the shell, the
@@ -45,6 +51,18 @@ const CORE = [
   './src/track.js',
   './src/vehicles.js',
   './src/weapons.js',
+  './src/sync.js',
+  // world data + engine utilities split out of track.js — every one of these
+  // is imported by the module graph, so a missing entry breaks offline boot
+  './src/engine/dispose.js',
+  './src/world/constants.js',
+  './src/world/levels.js',
+  './src/world/circuits.js',
+  './src/world/themes.js',
+  './src/world/catalog.js',
+  './src/world/rng.js',
+  './src/world/sky.js',
+  './src/world/flora.js',
   './lib/three.module.min.js',
   './lib/postprocessing/EffectComposer.js',
   './lib/postprocessing/MaskPass.js',

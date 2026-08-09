@@ -201,3 +201,31 @@ on the buttons. Works in portrait and landscape.
   roads and car-paint sheen), per-theme sun disc + layered horizon haze,
   and a film-grade post pass (saturation/contrast lift + soft vignette)
   on top of UnrealBloom for lamps, tracers and explosions
+
+## Source layout
+
+```
+src/
+  main.js       the game — modes, career, HUD wiring, the loop
+  track.js      the world builder
+  world/        what the worlds ARE, and the rules for building them
+    levels.js     the career roster                            (pure data)
+    circuits.js   hand-designed circuit control polygons       (pure data)
+    themes.js     every colour and density knob, per theme     (pure data)
+    catalog.js    props, house templates, regional element kits
+    constants.js  road half-width, rim radius, tunnel bore
+    rng.js        the seeded world generator
+    sky.js        sky dome, sun, clouds, horizon silhouettes
+    flora.js      placement rules + the biome vegetation builders
+  engine/
+    dispose.js    three.js resource disposal — knows nothing of racing
+  vehicles.js  textures.js  particles.js  weapons.js  hud.js
+  input.js  audio.js  traffic.js  choppers.js  hostiles.js  sync.js  offline.js
+```
+
+Dependencies point inwards — `data → engine → world → game` — and data never
+imports behaviour. **[`ARCHITECTURE.md`](ARCHITECTURE.md)** is the full review:
+what is here, which defects are structural rather than incidental, and the
+staged plan for the rest. `MIGRATION.md` covers the v2 engine move; the
+normative world rules live in `RULES.md`, `NATURE.md`, `STRUCTURES.md` and
+`SCENES.md`.

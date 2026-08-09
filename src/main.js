@@ -6,8 +6,12 @@ import { UnrealBloomPass } from '../lib/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
-import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
-  HOUSE_TEMPLATES } from './track.js';
+import { Track } from './track.js';
+import { disposeSubtree } from './engine/dispose.js';
+import { LEVELS } from './world/levels.js';
+import { circuitPoints } from './world/circuits.js';
+import { HOUSE_TEMPLATES } from './world/catalog.js';
+import { withSeed, seedForLevel } from './world/rng.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
 import { Chopper } from './choppers.js';
