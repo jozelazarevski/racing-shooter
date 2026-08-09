@@ -59,6 +59,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   terrain: '#9c9184',
   trackside: '#ffb52e',
   structure: '#9fdcff',
+  debris: '#c98bd8',
 };
 
 /** Shaded relief of the open country, drawn once per definition change into an

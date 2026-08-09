@@ -2,7 +2,7 @@
 // is never restricted, because if you put one on a glacier you meant it.
 
 import * as THREE from 'three';
-import { PropTemplate, cylinderAt, standard } from './types';
+import { PropTemplate, cylinderAt, standard, mergeGeoms } from './types';
 
 const arm = (side: number) => {
   const up = cylinderAt(0.16, 0.16, 1.1, 8, 0);
@@ -10,31 +10,8 @@ const arm = (side: number) => {
   const across = cylinderAt(0.15, 0.15, 0.62, 8, 0);
   across.rotateZ(Math.PI / 2);
   across.translate(side * 0.28, 1.5, 0);
-  return BufferGeometryUtilsMerge([up, across]);
+  return mergeGeoms([up, across]);
 };
-
-// tiny local merge: three's BufferGeometryUtils lives in examples/ and pulling
-// the whole module in for two cylinders is not worth the bytes
-function BufferGeometryUtilsMerge(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  const nonIndexed = list.map((g) => (g.index ? g.toNonIndexed() : g));
-  let total = 0;
-  for (const g of nonIndexed) total += g.getAttribute('position').count;
-  const pos = new Float32Array(total * 3);
-  const nrm = new Float32Array(total * 3);
-  let o = 0;
-  for (const g of nonIndexed) {
-    g.computeVertexNormals();
-    const p = g.getAttribute('position') as THREE.BufferAttribute;
-    const n = g.getAttribute('normal') as THREE.BufferAttribute;
-    pos.set(p.array as Float32Array, o * 3);
-    nrm.set(n.array as Float32Array, o * 3);
-    o += p.count;
-  }
-  const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  out.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
-  return out;
-}
 
 const cactus: PropTemplate = {
   id: 'cactus',

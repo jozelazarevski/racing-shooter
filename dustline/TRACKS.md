@@ -25,6 +25,10 @@ npm run dev          # then open /editor.html
 
 Or in the published build: **`/racing-shooter/play-dustline/editor.html`**.
 
+Two tracks ship: **DUSTBOWL LOOP**, the original world written out as data, and
+**PROVING GROUND**, a circuit carrying 114 placed components that exercises the
+whole library as content. Open either from the toolbar.
+
 ## What a track is
 
 One JSON file — see `src/data/tracks/dustbowl.json` and the typed shape in

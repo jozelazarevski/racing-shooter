@@ -96,7 +96,7 @@ export interface AuthoringRule {
 export interface PropTemplate {
   id: string;
   name: string;
-  category: 'flora' | 'terrain' | 'trackside' | 'structure';
+  category: 'flora' | 'terrain' | 'trackside' | 'structure' | 'debris';
   /** one line, shown under the palette thumbnail */
   description: string;
   /** Built once per world. Geometries and materials are shared by every
@@ -136,3 +136,57 @@ export function boxAt(w: number, h: number, d: number, baseY: number): THREE.Box
 
 export const standard = (color: number, opts: Partial<THREE.MeshStandardMaterialParameters> = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true, ...opts });
+
+export function sphereAt(radius: number, seg: number, centreY: number): THREE.SphereGeometry {
+  const g = new THREE.SphereGeometry(radius, seg, Math.max(4, seg >> 1));
+  g.translate(0, centreY, 0);
+  return g;
+}
+
+/** Merge geometries into one buffer.
+ *
+ *  three's own BufferGeometryUtils lives in examples/ and pulling that module in
+ *  for a handful of boxes is not worth the bytes. This keeps position and
+ *  normal only, which is all any component here needs — none of them are
+ *  textured, and carrying empty UV arrays into every instanced mesh in the
+ *  world is a real cost for nothing.
+ *
+ *  Merging matters for INSTANCING: a fence made of five separate parts is five
+ *  InstancedMeshes and five draw calls, where one merged part is one. Parts
+ *  should stay separate only when they need different materials or their own
+ *  per-instance tint. */
+export function mergeGeoms(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const flat = list.map((g) => (g.index ? g.toNonIndexed() : g));
+  for (const g of flat) if (!g.getAttribute('normal')) g.computeVertexNormals();
+  let total = 0;
+  for (const g of flat) total += g.getAttribute('position').count;
+  const pos = new Float32Array(total * 3);
+  const nrm = new Float32Array(total * 3);
+  let o = 0;
+  for (const g of flat) {
+    const p = g.getAttribute('position') as THREE.BufferAttribute;
+    const n = g.getAttribute('normal') as THREE.BufferAttribute;
+    pos.set(p.array as Float32Array, o * 3);
+    nrm.set(n.array as Float32Array, o * 3);
+    o += p.count;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  return out;
+}
+
+/** A box placed and rotated in the component's local space — the workhorse for
+ *  anything built out of planks, posts and panels. */
+export function beam(
+  w: number, h: number, d: number,
+  x: number, y: number, z: number,
+  rx = 0, ry = 0, rz = 0,
+): THREE.BoxGeometry {
+  const g = new THREE.BoxGeometry(w, h, d);
+  if (rx) g.rotateX(rx);
+  if (ry) g.rotateY(ry);
+  if (rz) g.rotateZ(rz);
+  g.translate(x, y, z);
+  return g;
+}

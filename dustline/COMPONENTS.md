@@ -148,22 +148,61 @@ seed, so **adding rocks never moves the trees**. Placed props draw from a
 separate stream again, so hand-placing something does not reshuffle the
 scattered world around it.
 
-## The library
+## The library — 34 components
 
-| category | components |
-|---|---|
-| flora | Pine, Bush, Dead tree, Saguaro |
-| terrain | Rock, Boulder |
-| trackside | Tyre stack, Hay bale, Marshal post |
+| category | components | solid |
+|---|---|---|
+| **flora** | Pine, Birch, Palm, Saguaro, Dead tree, Stump | yes |
+| | Bush, Reeds | no |
+| **terrain** | Rock (above 1.1 scale), Boulder, Rock spire, Fallen log | yes |
+| | Scree, Rock (below 1.1) | no |
+| **trackside** | Tyre stack, Hay bale, Marshal post, Chevron board, Barrier block, Guardrail, Sandbag wall | yes |
+| | Cone | no |
+| **structure** | Barn, Shed, Grandstand, Pit building, Watchtower, Water tower, Light mast | yes |
+| | Start gantry, Fence run | no |
+| **debris** | Oil drum, Crate (0.7 scale and up) | yes |
+| | Pallet, Spare tyre, Crate (below 0.7) | no |
 
 Pine, Rock and Bush are ports of the three hardcoded scenery kinds, geometry
 and colliders unchanged, so the shipped world still looks and drives as it did.
 
+**The non-solid choices are decisions, not omissions.** A traffic cone that
+stops a rally car is the most immersion-breaking object a track can contain, so
+the cone marks a line and never blocks one. A start gantry you can hit is one
+you WILL hit on the opening lap of a four-car grid. A field fence should
+splinter, and until there is destruction to splinter it, driving through is
+closer to the truth than bouncing off. A pallet lies on the ground and you drive
+over it. Each of those is written in the component's own file, next to the
+geometry it applies to, where it can be argued with.
+
 ## Checks
 
-`npm run smoke:components` drives the whole path headless: every component is
-discovered and previews itself, scatter builds through the component system,
-an armed click places one, it reaches the preview as real geometry, and — in
-the **game** — the declared physical rules become real Rapier colliders,
-including that a non-solid component gets none and a scale-dependent rule is
-respected on both sides of its threshold.
+`npm run smoke:components` sweeps **the whole library**, not a sample — it reads
+whatever is in the folder today, so a component added tomorrow is covered
+without touching the test. For every one it checks that `build()` returns parts
+with non-empty, NaN-free geometry; that `physics.shape()` answers with positive
+dimensions at both ends of the component's own scale range; and that a
+thumbnail renders. Then it places one of every component, loads them all in the
+**game**, and requires each to have exactly the collider its file declares —
+26 solid, 8 not, all correct.
+
+That last check found its own bug first: with the scatter layers still in place,
+colliders from nearby scattered pines were being counted against a placed
+pallet, reporting a non-solid component as solid. The test now clears the
+scatter, because isolating the thing under test is the difference between a
+check and a coincidence.
+
+## The proving ground
+
+`src/data/tracks/proving-ground.json` is a second built-in track that exercises
+the library as content: 114 placed components across every category, positioned
+relative to the racing line — guardrail runs spaced by the component's own 6 m
+length, tyre stacks on the outside of the hairpin, chevron boards on its
+approach, a hay-bale chicane, cones marking a narrowing, and a farm, water tower
+and pit complex out in the country.
+
+It is *generated* (`node tools/make-proving-ground.mjs`) rather than
+hand-written, because placing 114 props by typing coordinates is exactly the
+work the editor exists to remove — and because anything positioned relative to
+the road has to be recomputed when the road moves. Open it in the editor and
+edit it like any other track; the generator only makes the starting point.
