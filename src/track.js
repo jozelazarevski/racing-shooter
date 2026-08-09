@@ -2524,7 +2524,12 @@ const THEMES = {
     rockCount: 175, pebbleCount: 220, rockColor: 0x8e8a7a, rockSnowCap: false,
     flowerCount: 120, flowerColors: ['#ffffff', '#e0b040', '#c05a78'],
     hutRoof: 0x7a4630, hayColor: 0xd0b878,
-    hutCount: 9, hutZone: [0.55, 0.35], hayCount: 10,
+    // NO HUTS. Nine copies of one long red-roofed shed, scattered through a
+    // world whose whole point is a varied Mediterranean shore, is the
+    // building the player pointed at and called too repetitive - and it is
+    // the second time that same shed has been reported. This world dresses
+    // its land with the medhill element kit and the citadel instead.
+    hutCount: 0, hutZone: [0.55, 0.35], hayCount: 6,
     splinter: [0x8a5a32, 0xe0d8c0],
     elev: { amp: 5, ph: [0.9, 2.1, 3.0] },
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
@@ -2550,6 +2555,8 @@ const THEMES = {
     // quay dressing: capstone edge wall, bollards, barrels, crates, rope
     // coils on the stone, and boats moored close in (see _buildQuayside)
     quay: true,
+    archGates: false,      // no gatehouse straddling the seafront
+
     stoneBridges: { count: 1 },
     // the landmark this world is built around
     citadel: true,
@@ -12101,7 +12108,13 @@ if (this._citMound) h += this._citMoundH(x, z);
     }
 
     // ---- 3: the arched gateways over the authored pinches (two per stage) ----
-    for (const sec of (this._narrowSecs || []).slice(0, 2)) this._buildArchGateway(sec.mid, F);
+    // ARCH GATEWAYS ARE OPT-OUT. The gatehouse that straddles the street -
+    // a terrace of unit-width bays on piers - is a strong shape, and the
+    // player has now pointed at it twice as the building they see
+    // everywhere. Worlds that do not want it say so.
+    if (this.T.archGates !== false) {
+      for (const sec of (this._narrowSecs || []).slice(0, 2)) this._buildArchGateway(sec.mid, F);
+    }
 
     // ---- 4: the campanile ----
     this._buildCampanile();
