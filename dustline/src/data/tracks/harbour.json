@@ -827,7 +827,7 @@
     },
     {
       "template": "sailboat",
-      "x": -273,
+      "x": -276,
       "z": -48,
       "rot": 1.691,
       "scale": 1
@@ -835,7 +835,7 @@
     {
       "template": "rowboat",
       "x": -261,
-      "z": -57,
+      "z": -58,
       "rot": 1.271,
       "scale": 1
     },
@@ -848,7 +848,7 @@
     },
     {
       "template": "fishingBoat",
-      "x": -267,
+      "x": -270,
       "z": 10,
       "rot": 1.691,
       "scale": 1
@@ -856,7 +856,7 @@
     {
       "template": "rowboat",
       "x": -258,
-      "z": 1,
+      "z": 0,
       "rot": 1.271,
       "scale": 1
     },
@@ -868,8 +868,8 @@
       "scale": 1.05
     },
     {
-      "template": "sailboat",
-      "x": -264,
+      "template": "launch",
+      "x": -267,
       "z": 66,
       "rot": 1.691,
       "scale": 1
@@ -877,7 +877,7 @@
     {
       "template": "rowboat",
       "x": -256,
-      "z": 57,
+      "z": 56,
       "rot": 1.271,
       "scale": 1
     },
@@ -938,6 +938,20 @@
       "scale": 1
     },
     {
+      "template": "launch",
+      "x": -249,
+      "z": 90,
+      "rot": 1.371,
+      "scale": 1
+    },
+    {
+      "template": "sailboat",
+      "x": -258,
+      "z": -122,
+      "rot": 1.371,
+      "scale": 1
+    },
+    {
       "template": "lobsterPots",
       "x": -254.5,
       "z": -60,
@@ -994,100 +1008,100 @@
       "scale": 1
     },
     {
-      "template": "cottage",
-      "x": -237,
-      "z": -78,
+      "template": "townhouse",
+      "x": -236,
+      "z": -80,
       "rot": 1.571,
       "scale": 0.95
     },
     {
-      "template": "townhouse",
-      "x": -239,
-      "z": -60,
+      "template": "cottage",
+      "x": -237,
+      "z": -61,
       "rot": 1.571,
       "scale": 1
     },
     {
-      "template": "cottage",
-      "x": -242,
+      "template": "towerhouse",
+      "x": -241,
       "z": -42,
       "rot": 1.571,
       "scale": 1.05
     },
     {
-      "template": "cottage",
-      "x": -237,
-      "z": -24,
+      "template": "cottageHipped",
+      "x": -236,
+      "z": -23,
       "rot": 1.571,
       "scale": 1.1
     },
     {
       "template": "townhouse",
-      "x": -239,
-      "z": -6,
-      "rot": 1.571,
-      "scale": 1
-    },
-    {
-      "template": "cottage",
-      "x": -236,
-      "z": 12,
-      "rot": 1.571,
-      "scale": 1
-    },
-    {
-      "template": "cottage",
-      "x": -239,
-      "z": 30,
-      "rot": 1.571,
-      "scale": 1.05
-    },
-    {
-      "template": "townhouse",
-      "x": -235,
-      "z": 48,
-      "rot": 1.571,
-      "scale": 1
-    },
-    {
-      "template": "cottage",
-      "x": -232,
-      "z": 66,
+      "x": -238,
+      "z": -4,
       "rot": 1.571,
       "scale": 0.95
     },
     {
-      "template": "townhouse",
-      "x": -223,
-      "z": -66,
+      "template": "cottageLong",
+      "x": -235,
+      "z": 15,
       "rot": 1.571,
       "scale": 1
+    },
+    {
+      "template": "towerhouse",
+      "x": -238,
+      "z": 34,
+      "rot": 1.571,
+      "scale": 1.05
     },
     {
       "template": "cottage",
-      "x": -220,
-      "z": -40,
+      "x": -233,
+      "z": 53,
+      "rot": 1.571,
+      "scale": 1.1
+    },
+    {
+      "template": "halfTimbered",
+      "x": -226,
+      "z": 72,
+      "rot": 1.571,
+      "scale": 0.95
+    },
+    {
+      "template": "cottageLong",
+      "x": -218,
+      "z": -68,
       "rot": 1.571,
       "scale": 1
     },
     {
-      "template": "townhouse",
-      "x": -221,
-      "z": -14,
+      "template": "stoneCottage",
+      "x": -216,
+      "z": -40,
       "rot": 1.571,
       "scale": 1
     },
     {
       "template": "cottage",
       "x": -217,
+      "z": -14,
+      "rot": 1.571,
+      "scale": 1
+    },
+    {
+      "template": "chalet",
+      "x": -213,
       "z": 16,
       "rot": 1.571,
       "scale": 1
     },
     {
-      "template": "townhouse",
-      "x": -221,
-      "z": 44,
+      "template": "cottageHipped",
+      "x": -217,
+      "z": 46,
       "rot": 1.571,
       "scale": 1
     },
@@ -1135,10 +1149,17 @@
     },
     {
       "template": "marketStall",
-      "x": -230,
+      "x": -229,
       "z": -4,
       "rot": 1.571,
       "scale": 1.05
+    },
+    {
+      "template": "kiosk",
+      "x": -229,
+      "z": -20,
+      "rot": 1.571,
+      "scale": 1
     },
     {
       "template": "church",
@@ -1272,6 +1293,27 @@
       "z": 128,
       "rot": 0,
       "scale": 1
+    },
+    {
+      "template": "silo",
+      "x": 356,
+      "z": 42,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "farmhouseL",
+      "x": 268,
+      "z": -108,
+      "rot": 2.2,
+      "scale": 1
+    },
+    {
+      "template": "logPile",
+      "x": 292,
+      "z": 74,
+      "rot": 0.9,
+      "scale": 1.1
     },
     {
       "template": "stoneWall",

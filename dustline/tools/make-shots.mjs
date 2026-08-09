@@ -31,7 +31,7 @@ const SHOTS = [
     file: 'harbour-quay.png',
     track: 'harbour',
     what: 'the quay — jetty, moored boats, buoys, willows on the shoreline',
-    orbit: { target: [-262, 2, 6], dist: 62, pitch: 0.2, yaw: 2.35 },
+    orbit: { target: [-256, 2, 14], dist: 112, pitch: 0.24, yaw: 2.45 },
   },
 ];
 

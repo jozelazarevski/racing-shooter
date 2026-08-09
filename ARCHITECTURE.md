@@ -342,11 +342,29 @@ for its slope shading. That one is NOT being taken: computing slope from
 neighbouring grid heights instead would be much cheaper and would change every
 vertex colour, and a visual change is not a refactor.
 
-**Water, and what a world is made of.** The component library is now 53 files
+**Water, and what a world is made of.** The component library is now 64 files
 across seven categories, and the two newest categories exist because of a plain
 gap: there were farm buildings and trackside furniture, and nothing anybody
-lived in. **settlement** adds dwellings, a church, a windmill and street
-furniture; **marine** adds boats, a jetty, a lighthouse and quayside gear.
+lived in. **settlement** adds eleven dwellings, a church, a windmill and street
+furniture; **marine** adds four boats, a jetty, a lighthouse and quayside gear.
+
+**Their shapes are v1's, copied across, and that is the interesting part of
+this repository's two-games problem turning into an asset.** The first cut of
+all of them was hand-rolled boxes, and v1's own sources say exactly what that
+looks like: its first boats were "a BOX WITH A CONE ON TOP", its first
+lighthouse "read as a traffic bollard from the quay", and it had already
+shipped the same roof bug twice because two builders each rolled their own
+dwelling geometry. So `HOUSE_TEMPLATES`, the nine-station lofted hull, the rig
+and the lighthouse came over verbatim into `props/houseTemplates.ts`,
+`props/kit.ts` and `props/boatParts.ts` — comments included, because the
+comments are the record of what was learned. A settlement component is now a
+name and a sentence with no geometry in it.
+
+Rendering the ported library found two bugs that are in the v1 table too: a
+rolled part is still base-anchored, which is right for the pueblo ruin's
+protruding vigas and wrong for a diameter, so the windmill's four sails came
+out as a 135° fan with every arm on one side of the hub, and the well's winch
+barrel hung 2.6 m past one post. Both are marked where they are repaired.
 
 Boats needed something to float on, so `TrackDef` grew an optional
 `water: { level, … }` — **one number**, below which the land is wet. Not a lake

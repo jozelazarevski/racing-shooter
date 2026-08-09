@@ -1,61 +1,68 @@
-// JETTY — a 10 m timber deck on piles, running out from the bank.
+// JETTY — a timber walkway on piles, with fingers off it.
+//
+// SHAPE FROM IGNITE RALLY: the pontoon, fingers and piles of
+// `Track._buildMarina` — a 3.4 m walkway deck, 14 m fingers projecting seaward
+// at an 8.6 m pitch, three piles under each. The dimensions and the two
+// timber tones are its, so a jetty here and a marina there are the same
+// structure at different lengths.
 //
 // `shore` placement, not `water`: it stands on the BED, so its base belongs on
-// the ground, and putting it at the waterline would leave it hovering. The
+// the ground and putting it at the waterline would leave it hovering. The
 // piles are cut long and driven well below y = 0 for the same reason a real
 // one is — the bed is not flat, and legs that stop exactly at the modelled
 // depth leave a jetty on tiptoe over the first dip.
 //
-// Placed by hand it points along its own +Z, so rotate it to face the water.
+// Placed by hand it runs out along its own +Z, so rotate it to face the water.
 
 import * as THREE from 'three';
-import { PropTemplate, standard, mergeGeoms, beam, cylinderAt } from './types';
+import { PropTemplate, standard } from './types';
+import { bundle } from './kit';
+
+/** v1's marina constants. */
+const FLEN = 14;      // finger length
+const PITCH = 8.6;    // finger pitch along the pontoon
+const RUN = 22;       // how much walkway this component carries
 
 const jetty: PropTemplate = {
   id: 'jetty',
   name: 'Jetty',
   category: 'marine',
-  description: '10 m timber landing stage on piles. Runs out along +Z. Solid.',
+  description: '22 m timber walkway with two fingers, on piles. Runs out along +Z. Solid.',
 
   build: () => [
     {
-      key: 'piles',
-      geometry: mergeGeoms(
-        [-1.1, 1.1].flatMap((x) =>
-          [1.2, 3.6, 6.0, 8.4].map((z) => cylinderAt(0.17, 0.19, 6.4, 6, -4.6).translate(x, 0, z))),
-      ),
-      material: standard(0x5d4c3a, { roughness: 1, flatShading: false }),
-      castShadow: true,
-    },
-    {
       key: 'deck',
-      geometry: mergeGeoms([
-        // planks, laid across, with the gaps that make a deck read as boards
-        ...Array.from({ length: 24 }, (_, i) =>
-          beam(2.7, 0.12, 0.32, 0, 1.74, 0.6 + i * 0.4)),
-        beam(0.16, 0.16, 9.8, -1.2, 1.6, 5.0),                      // stringers
-        beam(0.16, 0.16, 9.8, 1.2, 1.6, 5.0),
+      geometry: bundle([
+        // the walkway itself — the marina's `bw`, 3.4 x 0.42
+        new THREE.BoxGeometry(3.4, 0.42, RUN).translate(0, 1.71, RUN / 2 - 2),
+        // two fingers, at the marina's own pitch and length
+        ...[-1, 1].map((sg) => new THREE.BoxGeometry(FLEN, 0.5, 2.2)
+          .translate(sg * (FLEN / 2 + 1.7), 1.7, PITCH)),
       ]),
-      material: standard(0x9a825f, { roughness: 0.95, flatShading: false }),
+      material: standard(0x8a6a44, { roughness: 1 }),
       castShadow: true,
-      tint: (c) => new THREE.Color(0x9a825f).offsetHSL(0, c.rng.centered(0.04), c.rng.centered(0.06)),
+      tint: (c) => new THREE.Color(0x8a6a44).offsetHSL(0, c.rng.centered(0.04), c.rng.centered(0.06)),
     },
     {
-      key: 'rail',
-      geometry: mergeGeoms([
-        ...[-1.25, 1.25].flatMap((x) => [
-          ...[1.2, 4.2, 7.2, 9.6].map((z) => beam(0.1, 1.0, 0.1, x, 2.3, z)),
-          beam(0.09, 0.09, 8.8, x, 2.75, 5.4),
-        ]),
+      key: 'piles',
+      // three under each finger, plus a row down the walkway
+      geometry: bundle([
+        ...[-1, 1].flatMap((sg) => [0, 1, 2].map((k) => {
+          const g = new THREE.CylinderGeometry(0.22, 0.26, 6.8, 6);
+          return g.translate(sg * (2.4 + k * (FLEN / 2.6)), -1.4, PITCH);
+        })),
+        ...[-0.5, 5, 11, 17].map((z) => new THREE.CylinderGeometry(0.22, 0.26, 6.8, 6)
+          .translate(0, -1.4, z)),
       ]),
-      material: standard(0x7d6a4e, { roughness: 0.95, flatShading: false }),
+      material: standard(0x5f4a30, { roughness: 1 }),
+      castShadow: true,
     },
   ],
 
   physics: {
-    // The deck, not the piles. Half-extents cover the run; centreY puts the
-    // box at deck height so a car ramps onto it rather than into it.
-    shape: (s) => ({ kind: 'box', halfExtents: [1.4 * s, 0.15 * s, 5 * s], centerY: 1.7 * s }),
+    // The walkway, not the fingers. Half-extents cover the run; centreY puts
+    // the box at deck height so a car ramps onto it rather than into it.
+    shape: (s) => ({ kind: 'box', halfExtents: [1.7 * s, 0.21 * s, (RUN / 2) * s], centerY: 1.71 * s }),
     solid: true,
     massKg: 12000,
   },
@@ -63,7 +70,7 @@ const jetty: PropTemplate = {
   authoring: {
     scale: [0.9, 1.2], defaultScale: 1,
     placement: 'shore', shoreBand: 4,
-    minRoadDist: 8, randomYaw: true,
+    minRoadDist: 8, randomYaw: true, previewDist: 34,
   },
 };
 

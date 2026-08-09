@@ -12,8 +12,8 @@
     "other": "8f5fe1ef"
   },
   "proving-ground": {
-    "fingerprint": "44ad19d4",
-    "instances": 1768,
+    "fingerprint": "51c7d432",
+    "instances": 1772,
     "components": {
       "pine": 150,
       "birch": 120,
@@ -51,11 +51,11 @@
     },
     "roadSamples": 480,
     "seedIndependent": true,
-    "other": "44ad19d4"
+    "other": "51c7d432"
   },
   "harbour": {
-    "fingerprint": "596a11ea",
-    "instances": 1617,
+    "fingerprint": "2650dd1d",
+    "instances": 1719,
     "components": {
       "pine": 110,
       "oak": 82,
@@ -84,13 +84,21 @@
       "sailboat": 3,
       "rowboat": 8,
       "fishingBoat": 3,
+      "launch": 2,
       "crate": 2,
       "oilDrum": 1,
-      "cottage": 8,
-      "townhouse": 6,
+      "townhouse": 2,
+      "cottage": 3,
+      "towerhouse": 2,
+      "cottageHipped": 2,
+      "cottageLong": 2,
+      "halfTimbered": 1,
+      "stoneCottage": 1,
+      "chalet": 1,
       "streetLamp": 4,
       "wellHouse": 1,
       "marketStall": 2,
+      "kiosk": 1,
       "church": 1,
       "lighthouse": 1,
       "shed": 2,
@@ -98,10 +106,13 @@
       "farmhouse": 1,
       "barn": 1,
       "fenceRun": 8,
-      "waterTower": 1
+      "waterTower": 1,
+      "silo": 1,
+      "farmhouseL": 1,
+      "logPile": 1
     },
     "roadSamples": 480,
     "seedIndependent": true,
-    "other": "596a11ea"
+    "other": "2650dd1d"
   }
 }

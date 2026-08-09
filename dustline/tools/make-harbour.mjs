@@ -143,22 +143,26 @@ for (let z = -70; z <= 90; z += 10) {
   moorings.push({ z, s });
 }
 
-// Three jetties, each with boats moored off the end of it.
-for (const z of [-52, 6, 62]) {
+// Three jetties, each with boats moored off the end of it. The big boat
+// alternates KIND the way the v1 marina's population does — a basin of nothing
+// but masts is a picket fence, so a third of that fleet carries no rig at all.
+const BIG = ['sailboat', 'fishingBoat', 'launch'];
+[-52, 6, 62].forEach((z, i) => {
   const s = shoreX(z);
   putAt('jetty', s + 2, z, SEAWARD, 1.05);
-  const big = moorAt(z + 4, 1.9);
-  if (big) putAt(z === 6 ? 'fishingBoat' : 'sailboat', big.x - 4, big.z, Math.PI / 2 + 0.12, 1);
-  const small = moorAt(z - 5, 0.6);
+  const big = moorAt(z + 4, 2.0);
+  if (big) putAt(BIG[i], big.x - 6, big.z, Math.PI / 2 + 0.12, 1);
+  const small = moorAt(z - 6, 0.6);
   if (small) putAt('rowboat', small.x, small.z, Math.PI / 2 - 0.3, 1);
-}
+});
 
 // Loose boats along the rest of the frontage.
 for (const z of [-84, -26, 34, 78, 104]) {
   const m = moorAt(z, 0.6);
   if (m) putAt('rowboat', m.x, m.z, Math.PI / 2 + (z % 3) * 0.2, 0.95);
 }
-for (const [z, want, tpl] of [[-104, 2.2, 'fishingBoat'], [126, 2.4, 'sailboat'], [-140, 2.0, 'fishingBoat']]) {
+for (const [z, want, tpl] of [[-104, 2.2, 'fishingBoat'], [126, 2.4, 'sailboat'],
+  [-140, 2.0, 'fishingBoat'], [90, 1.8, 'launch'], [-122, 2.2, 'sailboat']]) {
   const m = moorAt(z, want);
   if (m) putAt(tpl, m.x - 10, m.z, Math.PI / 2 - 0.2, 1);
 }
@@ -172,20 +176,26 @@ putAt('oilDrum', shoreX(-30) + 6, -30, 0, 1);
 // A front row facing the water, a back row behind it, and the church on the
 // rise between the village and the road. Set back from the shore by a fixed
 // margin so raising the tide floods the beach and not the parlour.
-const front = [-78, -60, -42, -24, -6, 12, 30, 48, 66];
+// A VILLAGE OF THREE HOUSES IS A VILLAGE OF ONE HOUSE — the lesson recorded in
+// the v1 template table, which is why there are eleven dwelling archetypes to
+// draw from. The front row walks through them instead of repeating two.
+const FRONT = ['townhouse', 'cottage', 'towerhouse', 'cottageHipped', 'townhouse',
+  'cottageLong', 'towerhouse', 'cottage', 'halfTimbered'];
+const BACK = ['cottageLong', 'stoneCottage', 'cottage', 'chalet', 'cottageHipped'];
+const front = [-80, -61, -42, -23, -4, 15, 34, 53, 72];
 front.forEach((z, i) => {
   const s = shoreX(z);
-  const kind = i % 3 === 1 ? 'townhouse' : 'cottage';
-  putAt(kind, s + 16 + (i % 2) * 3, z, Math.PI / 2, i % 3 === 1 ? 1 : 0.95 + (i % 4) * 0.05);
+  putAt(FRONT[i], s + 17 + (i % 2) * 3, z, Math.PI / 2, 0.95 + (i % 4) * 0.05);
 });
-[-66, -40, -14, 16, 44].forEach((z, i) => {
+[-68, -40, -14, 16, 46].forEach((z, i) => {
   const s = shoreX(z);
-  putAt(i % 2 ? 'cottage' : 'townhouse', s + 34 + (i % 2) * 4, z, Math.PI / 2, 1);
+  putAt(BACK[i], s + 38 + (i % 2) * 4, z, Math.PI / 2, 1);
 });
 for (const z of [-70, -30, 10, 50]) putAt('streetLamp', shoreX(z) + 26, z, 0, 1);
 putAt('wellHouse', shoreX(-10) + 27, -10, 0.4, 1.1);
 putAt('marketStall', shoreX(2) + 25, 2, Math.PI / 2, 1);
-putAt('marketStall', shoreX(-4) + 25, -4, Math.PI / 2, 1.05);
+putAt('marketStall', shoreX(-4) + 26, -4, Math.PI / 2, 1.05);
+putAt('kiosk', shoreX(-20) + 27, -20, Math.PI / 2, 1);
 putAt('church', shoreX(24) + 52, 24, Math.PI / 2, 1.05);
 putAt('oak', shoreX(36) + 46, 36, 0, 1.4);
 putAt('oak', shoreX(-52) + 44, -52, 0, 1.2);
@@ -207,6 +217,9 @@ putAt('barn', 336, 66, 0.9, 1.05);
 putAt('shed', 312, 88, 0.9, 0.95);
 for (let i = 0; i < 8; i++) putAt('fenceRun', 268 + i * 8 * Math.cos(0.9), 20 + i * 8 * Math.sin(0.9), 0.9, 1);
 putAt('waterTower', 372, 128, 0, 1);
+putAt('silo', 356, 42, 0, 1);
+putAt('farmhouseL', 268, -108, 2.2, 1);
+putAt('logPile', 292, 74, 0.9, 1.1);
 for (let i = 0; i < 6; i++) putAt('stoneWall', 250 + i * 8 * Math.cos(2.1), -150 + i * 8 * Math.sin(2.1), 2.1, 1);
 
 const track = {
@@ -298,7 +311,8 @@ const track = {
 
 writeFileSync('src/data/tracks/harbour.json', `${JSON.stringify(track, null, 2)}\n`);
 
-const afloat = props.filter((p) => ['rowboat', 'fishingBoat', 'sailboat'].includes(p.template));
+const FLOATS = ['rowboat', 'fishingBoat', 'sailboat', 'launch'];
+const afloat = props.filter((p) => FLOATS.includes(p.template));
 const shallow = afloat.filter((p) => depth(p.x, p.z) < 0.4);
 console.log(`wrote harbour.json — ${props.length} placed components, `
   + `${track.scenery.length} scatter layers, ${afloat.length} boats`);

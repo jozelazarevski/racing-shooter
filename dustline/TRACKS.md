@@ -91,7 +91,9 @@ a level of 1.4 m actually floods without building the world and going to look.
 ![the harbour coast](docs/harbour.png)
 ![the quay](docs/harbour-quay.png)
 
-`harbour.json`, in the editor's own preview. Regenerate these with
+`harbour.json`, in the editor's own preview. The dwellings, the boats and the
+lighthouse are IGNITE RALLY's shapes ported across rather than redesigned —
+see `COMPONENTS.md`. Regenerate these with
 `npm run make:shots` — they are rendered by the engine from the committed
 track, so they cannot describe a world that no longer exists.
 

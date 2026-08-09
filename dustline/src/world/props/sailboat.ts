@@ -1,75 +1,51 @@
-// SAILBOAT — 6.5 m sloop, sail up. The tall thin silhouette on open water:
-// the fishing boat is all horizontal, and a bay with only fishing boats in it
-// has nothing standing up in it anywhere.
+// SAILBOAT — the day boat under sail.
+//
+// SHAPE FROM IGNITE RALLY: the RIGGED flotilla boat in `Track._buildSea` — the
+// marina hull at 0.62–0.72, a coachroof, mast, boom, mainsail, jib and
+// standing rigging. That rig exists in v1 because of a complaint recorded in
+// its source: the bay's boats were carrying "a bare pole and one flat
+// triangle" while the moored fleet had the whole wardrobe, and from the
+// seafront the difference is obvious.
+//
+// dustline's first sailboat was a stack of tapered slabs up a mast, which read
+// as a ladder. This is the wardrobe.
 
-import * as THREE from 'three';
-import { PropTemplate, standard, mergeGeoms, beam, cylinderAt } from './types';
-import { hullSections } from './rowboat';
+import { PropTemplate } from './types';
+import {
+  hullParts, dayCabinGeo, dayMastGeo, dayBoomGeo, daySailGeo, dayJibGeo,
+  dayRigGeo, trimGeo, afloat, standard, alloy, canvasMat,
+} from './boatParts';
 
-/** A single flat triangle. Nothing else in the library needs one — every other
- *  component is made of boxes and cylinders — but a sail is a triangle, and
- *  approximating it out of boxes costs more geometry AND looks worse. */
-function triangle(a: number[], b: number[], c: number[]): THREE.BufferGeometry {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(
-    new Float32Array([...a, ...b, ...c]), 3,
-  ));
-  g.computeVertexNormals();
-  return g;
-}
+/** v1's rigged day boat sits at `bs = 0.62 + (k % 3) * 0.05`. */
+const S = 0.66;
 
 const sailboat: PropTemplate = {
   id: 'sailboat',
   name: 'Sailboat',
   category: 'marine',
-  description: '6.5 m sloop under sail, 8 m mast. Floats. Solid.',
+  description: '6 m sloop under main and jib, on the lofted hull. Floats.',
 
   build: () => [
-    {
-      key: 'hull',
-      geometry: mergeGeoms([
-        ...hullSections(6.5, 2.1, 0.55, 0.6, 0.3, 13),
-        beam(0.16, 1.0, 1.8, 0, -1.0, -0.3),                        // fin keel
-      ]),
-      material: standard(0xf2efe6, { roughness: 0.55, flatShading: false }),
-      castShadow: true,
-      tint: (c) => new THREE.Color(0xf2efe6).offsetHSL(c.rng.centered(0.5), c.rng.centered(0.1), c.rng.centered(0.06)),
-    },
-    {
-      key: 'deck',
-      geometry: mergeGeoms([
-        beam(1.5, 0.5, 2.0, 0, 0.85, -0.6),                         // coachroof
-        beam(1.2, 0.08, 1.4, 0, 0.64, 1.5),                         // cockpit sole
-        cylinderAt(0.1, 0.12, 8.0, 6, 0.6).translate(0, 0, -0.3),   // mast
-        beam(0.09, 0.09, 3.0, 0, 1.5, 1.1),                         // boom
-      ]),
-      material: standard(0xb9ae95, { roughness: 0.8, flatShading: false }),
-      castShadow: true,
-    },
-    {
-      key: 'sails',
-      // Two flat triangles, each ONE triangle. The first cut stacked tapered
-      // slabs up the mast, which from any distance reads as a ladder rather
-      // than a sail — the steps are wider than the sail is thick.
-      geometry: mergeGeoms([
-        triangle([0, 1.5, -0.25], [0, 8.4, -0.25], [0, 1.5, 2.5]),   // mainsail
-        triangle([0, 1.2, 0.1], [0, 7.6, -0.28], [0, 1.0, 2.9]),     // jib
-      ]),
-      material: standard(0xfbf8f0, { roughness: 0.9, flatShading: false, side: THREE.DoubleSide }),
-      castShadow: true,
-    },
+    ...hullParts(S, 0xf2ede2),
+    { key: 'cabin', geometry: afloat(dayCabinGeo(), S), material: standard(0xf2ede2, { roughness: 0.8 }), castShadow: true },
+    { key: 'spars', geometry: afloat(dayMastGeo(), S), material: alloy(), castShadow: true },
+    { key: 'boom', geometry: afloat(dayBoomGeo(), S), material: alloy(), castShadow: true },
+    { key: 'main', geometry: afloat(daySailGeo(), S), material: canvasMat(), castShadow: true },
+    { key: 'jib', geometry: afloat(dayJibGeo(), S), material: canvasMat(), castShadow: true },
+    { key: 'rig', geometry: afloat(dayRigGeo(), S), material: alloy() },
+    { key: 'trim', geometry: afloat(trimGeo(), S), material: standard(0x201d1a, { roughness: 0.9 }) },
   ],
 
   physics: {
-    shape: (s) => ({ kind: 'box', halfExtents: [1.05 * s, 0.7 * s, 3.25 * s], centerY: 0.4 * s }),
+    shape: (s) => ({ kind: 'box', halfExtents: [1.05 * s, 0.7 * s, 3.0 * s], centerY: 0.5 * s }),
     solid: true,
     massKg: 2400,
   },
 
   authoring: {
-    scale: [0.9, 1.15], defaultScale: 1,
-    placement: 'water', minDepth: 2.0,
-    minRoadDist: 6, randomYaw: true,
+    scale: [0.9, 1.2], defaultScale: 1,
+    placement: 'water', minDepth: 1.4,
+    minRoadDist: 6, randomYaw: true, previewDist: 20,
   },
 };
 

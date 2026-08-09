@@ -182,8 +182,8 @@ things are, and nothing answers that except seeing them next to a car.
 Order in each sheet is alphabetical, after the car:
 
 - **flora** — Birch · Bush · Dead tree · Oak · Palm · Pine · Reeds · Saguaro · Stump · Willow
-- **settlement** — Church · Cottage · Dry-stone wall · Farmhouse · Market stall · Street lamp · Townhouse · Well · Windmill
-- **marine** — Channel buoy · Fishing boat · Jetty · Lighthouse · Lobster pots · Mooring post · Rowboat · Sailboat
+- **settlement** — Chalet · Church · Cottage · Cottage, hipped · Cottage, long · Dry-stone wall · Farmhouse · Farmhouse, L-plan · Half-timbered house · Kiosk · Market stall · Silo · Stone cottage · Street lamp · Tower house · Townhouse · Well · Windmill
+- **marine** — Channel buoy · Fishing boat · Jetty · Lighthouse · Lobster pots · Mooring post · Motor launch · Rowboat · Sailboat
 - **trackside** — Barrier block · Chevron board · Cone · Guardrail · Hay bale · Marshal post · Sandbag wall · Tyre stack
 - **structure** — Barn · Fence run · Grandstand · Light mast · Pit building · Shed · Start gantry · Watchtower · Water tower
 - **terrain** — Boulder · Fallen log · Rock · Rock spire · Scree
@@ -194,7 +194,38 @@ Every component in it either floats or stands at the water's edge, and a
 rowboat photographed on grass shows you the two inches of gunwale that clear
 it rather than the boat.
 
-## The library — 53 components
+## Where the shapes come from
+
+**The dwellings, the boats and the lighthouse are IGNITE RALLY's, copied
+across.** They are not dustline designs and were never meant to be: the other
+game in this repository has eighteen worked dwelling archetypes in a data table
+(`src/world/catalog.js`), a boat hull lofted through nine stations with a hard
+chine, and a lighthouse with a corbelled gallery you can count the stanchions
+on. dustline's first cut of all three was hand-rolled boxes, and the v1 sources
+say plainly what that looks like from the driving seat — its own first boats
+were "a BOX WITH A CONE ON TOP", its own first lighthouse "read as a traffic
+bollard from the quay".
+
+So the port is verbatim, comments included, and three files carry it:
+
+| file | from | what |
+|---|---|---|
+| `props/kit.ts` | `track.js` | hull loft, sail loft, strut-between-two-points, bundle, gable prism |
+| `props/houseTemplates.ts` | `world/catalog.js` | `HOUSE_TEMPLATES` and the colour kits |
+| `props/boatParts.ts` | `track.js` | rig, deck gear, trawler gantry, coachroofs, fenders |
+
+A settlement component is then a name and a sentence — `dwelling({ template:
+'cottageA', kit: 'dalmatia', … })` — with no geometry in it left to get wrong.
+
+**Two things were repaired in the port, and they are marked in the file.** A
+rolled part in a house template is still BASE-anchored, so it radiates one way
+from its origin rather than spanning it. That is right for the pueblo ruin's
+protruding vigas and wrong for a diameter: the windmill's four sails, written
+45° apart, came out as a 135° FAN with every arm on one side of the hub, and
+the well's winch barrel hung 2.6 m out past one post. Rendering the library is
+what made both visible. They are bugs in the v1 table too.
+
+## The library — 64 components
 
 | category | components | solid |
 |---|---|---|
@@ -206,9 +237,9 @@ it rather than the boat.
 | | Cone | no |
 | **structure** | Barn, Shed, Grandstand, Pit building, Watchtower, Water tower, Light mast | yes |
 | | Start gantry, Fence run | no |
-| **settlement** | Cottage, Farmhouse, Townhouse, Church, Windmill, Well, Market stall, Street lamp | yes |
+| **settlement** | Cottage, Cottage (hipped), Cottage (long), Stone cottage, Half-timbered house, Chalet, Tower house, Townhouse, Farmhouse, Farmhouse (L-plan), Church, Windmill, Silo, Well, Kiosk, Market stall, Street lamp | yes |
 | | Dry-stone wall | no |
-| **marine** | Rowboat, Fishing boat, Sailboat, Jetty, Lighthouse, Mooring post | yes |
+| **marine** | Rowboat, Motor launch, Sailboat, Fishing boat, Jetty, Lighthouse, Mooring post | yes |
 | | Channel buoy, Lobster pots | no |
 | **debris** | Oil drum, Crate (0.7 scale and up) | yes |
 | | Pallet, Spare tyre, Crate (below 0.7) | no |
@@ -218,6 +249,16 @@ were farm buildings and trackside furniture, and nothing anybody lived in. A
 dry-stone wall is not solid for the same reason a fence run is not — a wall
 that stops a rally car dead turns every field into a pen — and a channel buoy
 is a plastic float on a chain, not a bollard.
+
+**Eleven dwellings, not three.** That number is not padding: the v1 table's own
+comment records why it grew from three, and it is the single best sentence in
+either codebase about content — *"A VILLAGE OF THREE HOUSES IS A VILLAGE OF ONE
+HOUSE."* Three silhouettes, hue-jittered, reads as the same building stamped
+down the road. They differ in PLAN and ROOFLINE, not tint.
+
+**Barn, shed and watchtower moved onto the same templates.** They were
+dustline's own boxes, and a farmyard containing a v1 farmhouse and a dustline
+barn looks like two different games sharing a field — which is what it was.
 
 Pine, Rock and Bush are ports of the three hardcoded scenery kinds, geometry
 and colliders unchanged, so the shipped world still looks and drives as it did.
@@ -240,7 +281,7 @@ with non-empty, NaN-free geometry; that `physics.shape()` answers with positive
 dimensions at both ends of the component's own scale range; and that a
 thumbnail renders. Then it places one of every component, loads them all in the
 **game**, and requires each to have exactly the collider its file declares —
-42 solid, 11 not, all correct.
+53 solid, 11 not, all correct.
 
 It then loads the harbour track and reads the **actual instance matrices** out
 of the built world, checking that every floating component came out at the
