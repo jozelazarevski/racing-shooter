@@ -8061,9 +8061,23 @@ export class Track {
         metalness: 0.3 }), Math.max(1, nSails));
     const bcol = new THREE.Color();
     const bl = new THREE.Matrix4(), blq = new THREE.Quaternion();
-    let sk2 = 0;
+    let sk2 = 0, placedB = 0;
     for (let k = 0; k < BOATS.length; k++) {
-      const du = BOATS[k][0], dn = BOATS[k][1], hasSail = BOATS[k][2], tint = BOATS[k][3];
+      const du = BOATS[k][0], hasSail = BOATS[k][2], tint = BOATS[k][3];
+      // MOOR IN WATER. The authored (du, dn) offsets assume the straight
+      // coastline; a meandering shore holds ground above the sea well past
+      // it, and a day boat berthed on the numbers stands in a meadow with
+      // its rig up. Slide seaward to the first berth with a wet swing
+      // circle; a boat with no water within 80 u stays ashore (unbuilt).
+      let dn = BOATS[k][1], okB = false;
+      for (; dn <= BOATS[k][1] + 80 && !okB; dn += 3) {
+        okB = true;
+        for (const [so, no] of [[0, 0], [-5, 0], [5, 0], [0, -5], [0, 5]])
+          if (this.terrainHeight(mx + ux * (du + so) + nx * (dn + no),
+            mz + uz * (du + so) + nz * (dn + no)) > y - 0.6) { okB = false; break; }
+        if (okB) break;
+      }
+      if (!okB) continue;
       const bx = mx + ux * du + nx * dn, bz = mz + uz * du + nz * dn;
       // a rowing boat is smaller and carries no rig
       const bs = hasSail ? 0.62 + ((k * 7) % 3) * 0.05 : 0.42;
@@ -8071,13 +8085,14 @@ export class Track {
       // floated on the chine, the same rule the marina uses
       im4.compose(new THREE.Vector3(bx, y + 0.38 * bs, bz), iq,
         new THREE.Vector3(bs, bs, bs));
-      hulls.setMatrixAt(k, im4);
-      hulls.setColorAt(k, bcol.set(tint));
-      bdecks.setMatrixAt(k, im4);
+      hulls.setMatrixAt(placedB, im4);
+      hulls.setColorAt(placedB, bcol.set(tint));
+      bdecks.setMatrixAt(placedB, im4);
       // every boat gets a coachroof; the rigged ones get the whole wardrobe
       blq.identity();
       bl.compose(new THREE.Vector3(0, 1.0, 0), blq, new THREE.Vector3(1, 1, 1));
-      bcabs.setMatrixAt(k, new THREE.Matrix4().multiplyMatrices(im4, bl));
+      bcabs.setMatrixAt(placedB, new THREE.Matrix4().multiplyMatrices(im4, bl));
+      placedB++;
       if (hasSail) {
         bl.compose(new THREE.Vector3(0, 1.0, 0.05), blq, new THREE.Vector3(1, 1, 1));
         const wm = new THREE.Matrix4().multiplyMatrices(im4, bl);
@@ -8091,11 +8106,14 @@ export class Track {
       }
     }
     bjibs.count = bbooms.count = brigs.count = sk2;
-    bcabs.count = BOATS.length;
+    hulls.count = bdecks.count = bcabs.count = placedB;
     bjibs.castShadow = bbooms.castShadow = brigs.castShadow = bcabs.castShadow = true;
     sails.count = bmasts.count = sk2;
     hulls.castShadow = sails.castShadow = bdecks.castShadow = true;
     if (hulls.instanceColor) hulls.instanceColor.needsUpdate = true;
+    // named so the beached-boat sweep can judge exactly these meshes
+    for (const m of [hulls, bdecks, bmasts, sails, bjibs, bbooms, brigs, bcabs])
+      m.name = 'flotilla';
     this.group.add(hulls, bdecks, bmasts, sails, bjibs, bbooms, brigs, bcabs);
 
     // SEA ROCKS: near-shore outcrops with the same wet tide band. Placement
@@ -8959,6 +8977,24 @@ export class Track {
     const timber = new THREE.MeshStandardMaterial({ color: 0x8a6a44, roughness: 1, flatShading: true });
     const pile = new THREE.MeshStandardMaterial({ color: 0x5f4a30, roughness: 1 });
 
+    // THE STRAIGHT COASTLINE IS A LIE ON A MEANDERING SHORE. dn = 0 is where
+    // the sea MESH lays its first row, and on a straight quay front that is
+    // the waterline everywhere. On a bay like AEGEAN BLUE the heightfield
+    // walks back ABOVE the water well seaward of the line, and everything
+    // laid off the straight frame - a whole basin, its pontoon, its fleet -
+    // moors in a meadow with the masts standing out of the grass
+    // (photographed by the player). Ask the ground itself: the first dn from
+    // which the next `need` metres stay drowned.
+    const wetDn = (du, need) => {
+      for (let dn = 0; dn <= 90; dn += 2) {
+        let wet = true;
+        for (let s = 0; wet && s <= need; s += 3)
+          if (this.terrainHeight(...P(du, dn + s)) > y - 0.5) wet = false;
+        if (wet) return dn;
+      }
+      return null;
+    };
+
     // WHERE IS THE WATER? Never assume - the beach band, the sea level and the
     // road shoulder all move per world, and a pontoon laid out from a guessed
     // shoreline either sits on the sand or floats offshore. Walk out until the
@@ -9020,21 +9056,53 @@ export class Track {
     ];
     const SPAN = 250;                                // still used by the quay dressing
     const FINGERS = SLIPS + BASINS.length;
+    // Conform each basin to the REAL shore before anything is laid off it.
+    // The condition is JOINT: the first version took the max of each
+    // finger's own wetDn, and on COSTA BRAVA one headland pushed the basin
+    // 78 u out - onto an island that the OTHER fingers' windows had never
+    // been checked against. Scan candidate offsets and accept the first at
+    // which EVERY finger fronts water through the whole slip depth; a basin
+    // that cannot find one within 90 u is not built - fewer boats beat
+    // boats aground.
     for (const B of BASINS) {
+      const wetAt = (du, D) => {
+        for (let s = -2; s <= FLEN + 16; s += 3)
+          if (this.terrainHeight(...P(du, D + s)) > y - 0.5) return false;
+        return true;
+      };
+      let found = null;
+      for (let D = B.dn; D <= 90 && found === null; D += 2) {
+        let ok = true;
+        for (let f = 0; ok && f <= B.n; f++)
+          ok = wetAt(B.du - (PITCH * B.n) / 2 + PITCH * f, D);
+        if (ok) found = D;
+      }
+      if (found === null) { B.dead = true; continue; }
+      B.dn = found;
+    }
+    for (const B of BASINS) {
+      if (B.dead) continue;
       const bw = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.42, PITCH * B.n + 4), timber);
       const wp = at(B.du, B.dn);
       bw.position.set(wp.x, y + 0.5, wp.z);
       bw.rotation.y = yaw;
       bw.castShadow = true;
+      bw.name = 'marina-pontoon';
       g.add(bw);
     }
-    // the gangway: quay lip down to the pontoon deck
+    // the gangway: quay lip down to the pontoon deck of the middle basin -
+    // which may have slid seaward to find water, so the ramp follows its dn
     {
-      const gy = this.terrainHeight(...P(6, -3)) + 0.35;
-      const a = P(6 - 1.7, -3), b = P(6 + 1.7, -3);
-      const c = P(6 + 1.7, PON - 2.1), d = P(6 - 1.7, PON - 2.1);
-      g.add(quad([a[0], gy, a[1]], [b[0], gy, b[1]],
-        [c[0], y + 0.78, c[1]], [d[0], y + 0.78, d[1]], timber));
+      const gb = (BASINS[1] && !BASINS[1].dead) ? BASINS[1]
+        : BASINS.find((B) => !B.dead);
+      if (gb) {
+        const gdu = gb.du;
+        const gy = this.terrainHeight(...P(gdu, -3)) + 0.35;
+        const a = P(gdu - 1.7, -3), b = P(gdu + 1.7, -3);
+        const c = P(gdu + 1.7, gb.dn - 2.1), d = P(gdu - 1.7, gb.dn - 2.1);
+        g.add(quad([a[0], gy, a[1]], [b[0], gy, b[1]],
+          [c[0], y + 0.78, c[1]], [d[0], y + 0.78, d[1]], timber));
+      }
     }
     // THIRTY-ONE FINGERS AND NINETY-THREE PILES IS NOT NINETY-THREE DRAW
     // CALLS. Both are one instanced mesh; the old loop added a Mesh per part,
@@ -9049,6 +9117,7 @@ export class Track {
     const fingerAt = [];
     let fpk = 0, fgi = 0;
     for (const B of BASINS) {
+      if (B.dead) continue;
       for (let f = 0; f <= B.n; f++) {
         const du = B.du - (PITCH * B.n) / 2 + PITCH * f;
         const p = at(du, B.dn + FLEN / 2);
@@ -9065,6 +9134,8 @@ export class Track {
     fingers.count = fgi;
     posts.count = fpk;
     fingers.castShadow = true;
+    fingers.name = 'marina-fingers';  // wet-zone fixtures, judged by the
+    posts.name = 'marina-posts';      // beached-boat sweep
     g.add(fingers, posts);
 
     const HB = this._boatHull();
@@ -9335,6 +9406,7 @@ export class Track {
       gears, gants, trails, ports, mains, jibs, fends]) {
       m.castShadow = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      m.name = 'marina-fleet';        // the beached-boat sweep judges these
       g.add(m);
     }
 
@@ -9348,12 +9420,24 @@ export class Track {
       color: 0x6d6a62, roughness: 0.9, flatShading: true }), 40);
     let rk = 0, bk = 0;
     q.setFromAxisAngle(up, yaw);
-    for (let du = -SPAN * 0.5; du <= SPAN * 0.5 && rk < rings.count; du += 12) {
-      const p = at(du, PON + 2.4);
-      m4.compose(V(p.x, y + 0.82, p.z), q, ONE);
-      rings.setMatrixAt(rk++, m4);
+    // rings live on the pontoon lips, so they follow the basins - the old
+    // full-span line put a march of cleats through the open water between
+    // basins, and across any tongue of ground the bay pushed through it
+    for (const B of BASINS) {
+      if (B.dead) continue;
+      const half = (PITCH * B.n) / 2;
+      for (let du = B.du - half; du <= B.du + half && rk < rings.count; du += 12) {
+        const p = at(du, B.dn + 2.4);
+        m4.compose(V(p.x, y + 0.82, p.z), q, ONE);
+        rings.setMatrixAt(rk++, m4);
+      }
     }
     for (let du = -SPAN * 0.8; du <= SPAN * 0.8 && bk < bolls.count; du += 11) {
+      // a bollard belongs on a quay LIP. Where the beach walks out seaward
+      // there is no lip, and the same bollard stands alone in a meadow -
+      // eighteen of them did, in a row, across the AEGEAN BLUE headland
+      const w = wetDn(du, 10);
+      if (w === null || w > 8) continue;
       const p = at(du, -4);
       const gy = this.terrainHeight(p.x, p.z);
       m4.compose(V(p.x, gy + 0.36, p.z), q, ONE);
@@ -9361,6 +9445,8 @@ export class Track {
     }
     rings.count = rk; bolls.count = bk;
     bolls.castShadow = true;
+    rings.name = 'marina-rings';      // wet-zone: judged by the sweep
+    bolls.name = 'marina-quay';       // land-side: exempt
     g.add(rings, bolls);
 
     // --- the two remaining pieces of the harbour kit ------------------------
@@ -9431,14 +9517,19 @@ export class Track {
     // the slipway: from the quay lip down under the water, corners placed
     // explicitly so the top meets the ground and the bottom meets the seabed
     {
+      // a slipway STARTS on land and ENDS under water; seat it on the real
+      // waterline at its du, wherever the shore actually is
       const du = -SPAN * 0.34, HW = 4.5;
-      const a = P(du - HW, -7), b = P(du + HW, -7);
-      const c = P(du + HW, 13), d = P(du - HW, 13);
-      const ty = this.terrainHeight(a[0], a[1]) + 0.12;
-      const conc = new THREE.MeshStandardMaterial({ color: 0x9a9484, roughness: 1,
-        side: THREE.DoubleSide, flatShading: true });
-      g.add(quad([a[0], ty, a[1]], [b[0], ty, b[1]],
-        [c[0], y - 1.9, c[1]], [d[0], y - 1.9, d[1]], conc));
+      const w = wetDn(du, 14);
+      if (w !== null) {
+        const a = P(du - HW, w - 9), b = P(du + HW, w - 9);
+        const c = P(du + HW, w + 11), d = P(du - HW, w + 11);
+        const ty = this.terrainHeight(a[0], a[1]) + 0.12;
+        const conc = new THREE.MeshStandardMaterial({ color: 0x9a9484, roughness: 1,
+          side: THREE.DoubleSide, flatShading: true });
+        g.add(quad([a[0], ty, a[1]], [b[0], ty, b[1]],
+          [c[0], y - 1.9, c[1]], [d[0], y - 1.9, d[1]], conc));
+      }
     }
 
     g.name = 'marina';
