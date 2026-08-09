@@ -8,6 +8,7 @@ import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
 import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
   HOUSE_TEMPLATES } from './track.js';
+import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
 import { Chopper } from './choppers.js';
@@ -874,7 +875,8 @@ class Game {
     // Seeded: the same world every time, so a bug found here can be found again.
     // ?seed= overrides it, which is what turns a report into a repro.
     this.worldSeed = this._seedOverride ?? seedForLevel(this.level);
-    this.track = withSeed(this.worldSeed, () => new Track(this.scene, this.level));
+    this.track = withSeed(this.worldSeed,
+      () => new Track(this.scene, this.level, this.editScene));
     this._applyTheme();
     this.particles = new Particles(this.scene);
     this.particles.setTheme?.(this.level?.theme); // smashed barrels shed the theme's own stave/hoop colours
@@ -945,6 +947,12 @@ class Game {
       if (document.hidden && this.state === 'race') this.togglePause();
     });
     document.getElementById('start-btn').addEventListener('click', () => this.startRace());
+    // THE WORLD EDITOR. Mounted lazily on first use: it builds its own DOM and
+    // takes the pointer, and a player who never opens it should pay nothing.
+    document.getElementById('editor-btn')?.addEventListener('click', () => {
+      if (!this.editor) this.editor = new WorldEditor(this);
+      this.editor.enter();
+    });
     document.getElementById('restart-btn').addEventListener('click', () => {
       document.getElementById('results').classList.add('hidden');
       this.resetRace();
@@ -1341,10 +1349,10 @@ class Game {
    *  grid, because placeAt reads the new track's centreline.
    *
    *  Returns false if the level isn't playable, leaving the current one up. */
-  swapLevel(level) {
+  swapLevel(level, force = false) {
     if (!level || this.state === 'race' || this.state === 'countdown') return false;
     const same = this.level && this.level.id === level.id;
-    if (same) return true;
+    if (same && !force) return true;
 
     this.level = level;
     this.levelIndex = Math.max(0, LEVELS.findIndex((l) => l.id === level.id));
@@ -1367,7 +1375,8 @@ class Game {
     // Seeded: the same world every time, so a bug found here can be found again.
     // ?seed= overrides it, which is what turns a report into a repro.
     this.worldSeed = this._seedOverride ?? seedForLevel(this.level);
-    this.track = withSeed(this.worldSeed, () => new Track(this.scene, this.level));
+    this.track = withSeed(this.worldSeed,
+      () => new Track(this.scene, this.level, this.editScene));
     this._applyTheme();
     this.particles?.setTheme?.(this.level.theme);
 
@@ -1397,6 +1406,19 @@ class Game {
       history.replaceState(null, '', `${location.pathname}?${q}`);
     } catch { /* history is not worth failing a track swap over */ }
     return true;
+  }
+
+  /** Rebuild the CURRENT world from scratch — the world editor's Apply.
+   *
+   *  Goes through swapLevel rather than round-tripping the menu because that
+   *  is the one path that disposes everything a world owns (worldLayer
+   *  subtree, track group, pickups, hazards, choppers, hostiles, debris) and
+   *  then re-seats the cars on the new centreline. Editing is exactly a level
+   *  swap where the level happens to be the same one, so `force` is all it
+   *  needs; the sculpt reaches the builder through `this.editScene`. */
+  rebuildWorld() {
+    if (!this.level) return false;
+    return this.swapLevel(this.level, true);
   }
 
   /** (Re)read everything scoped to the ACTIVE PROFILE — career, purse, garage.
@@ -1845,11 +1867,53 @@ class Game {
   /** World cards: static circuit-outline badge + flavor + career best per
    *  level, grouped under region headers (region order = first appearance).
    *  The .wc-map badge is card decoration ONLY — never a HUD map (RULES §0).
-   *  Rebuildable, because a career reset changes every lock and every best. */
+  /** MY SCENES — the worlds the owner built, above the shipped roster.
+   *
+   *  A saved scene is a base level plus its edits, so launching one is a level
+   *  load with `editScene` primed: no new world id, no career entry, nothing
+   *  in the star economy. They sit at the top because a tool you cannot find
+   *  your own work in is not a tool. The row is absent entirely when nothing
+   *  has been saved, so a player who never opens the editor never sees it. */
+  _renderSceneCards(sel) {
+    let scenes = {};
+    try { scenes = JSON.parse(localStorage.getItem('ir-scenes') || '{}'); } catch { scenes = {}; }
+    const names = Object.keys(scenes);
+    if (!names.length) return;
+    const head = document.createElement('div');
+    head.className = 'region-head';
+    head.textContent = 'MY SCENES';
+    sel.appendChild(head);
+    const row = document.createElement('div');
+    row.className = 'region-row';
+    sel.appendChild(row);
+    for (const name of names) {
+      const data = scenes[name];
+      const base = LEVELS.find((l) => l.id === data.base);
+      const card = document.createElement('button');
+      card.className = 'level-chip';
+      card.innerHTML = `<div class="wc-name">${name}</div>`
+        + `<div class="wc-sub">${base ? base.name : 'WORLD ' + data.base}`
+        + ` · ${(data.dabs || []).length} edits · ${(data.elements || []).length} objects</div>`;
+      card.addEventListener('click', () => {
+        if (!base) return;
+        if (!this.editor) this.editor = new WorldEditor(this);
+        this.editor.load(data);
+        this.editScene = { delta: this.editor.delta, elements: this.editor.elements };
+        // force: the base level may already be up, and its unedited build is
+        // exactly what we must NOT keep
+        this.swapLevel(base, true);
+        this.hud?.feed?.(name, 'good');
+      });
+      row.appendChild(card);
+    }
+  }
+
+  /*  Rebuildable, because a career reset changes every lock and every best. */
   _renderLevelCards() {
     const sel = document.getElementById('level-select');
     if (!sel) return;
     sel.innerHTML = '';
+    this._renderSceneCards(sel);
     const regionRows = new Map();
     const rowFor = (lv) => {
       const rg = lv.region || 'CHAMPIONSHIP';
@@ -5698,6 +5762,11 @@ class Game {
   _frameBody() {
     let dt = Math.min(this.clock.getDelta(), 0.05);
     const time = this.clock.elapsedTime;
+    // THE EDITOR OWNS THE FRAME. It drives its own camera and renders
+    // straight (no composer, no post) so a sculpt reads as geometry rather
+    // than through bloom and grade; the race sim below must not run at all,
+    // or the cars would drive the world out from under the brush.
+    if (this.state === 'editor') { this.editor.update(dt); return; }
     // brutal-impact slow motion: time crawls for a beat, then snaps back
     if (this.hitStop > 0) {
       this.hitStop = Math.max(0, this.hitStop - dt);

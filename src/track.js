@@ -3951,9 +3951,21 @@ function propAssets() {
 }
 
 export class Track {
-  constructor(scene, level = LEVELS[0]) {
+  /** `edit` is the WORLD EDITOR's contract (src/editor.js), and it is
+   *  deliberately an INPUT to the builder rather than a post-pass:
+   *    { delta, elements }
+   *  `delta.at(x, z)` is added inside terrainHeight, so every consumer of the
+   *  ground - the drape of the road, where a tree seats, where the water
+   *  meets the land, what the car's wheels rest on - sees the sculpt as
+   *  ground truth. A post-pass that moved vertices would move the picture and
+   *  leave all of that behind. `elements` are stamped into the same batched
+   *  instanced meshes the world's own buildings use, so a placed house costs
+   *  no extra draw call. */
+  constructor(scene, level = LEVELS[0], edit = null) {
     this.scene = scene;
     this.level = level;
+    this.edit = edit;
+    this._delta = edit && edit.delta ? edit.delta : null;
     // ---- THEME = the LOOK. ROUTE = the SHAPE. They used to be the same key,
     // which meant a new circuit cost a whole new art set and no two worlds could
     // share a palette. Real rally does not work that way — Monte Carlo and
@@ -5389,6 +5401,13 @@ export class Track {
     const fld = this._roadFieldCoarse(x, z);
     let h = this._blendHeight(fld.d, fld.y, x, z);
     if (this.T.coast) h = this._coastDepress(x, z, h, fld.d);
+    // THE EDITOR'S SCULPT, applied BEFORE the road clamps below - never
+    // after. The clamps are what keep the carriageway drivable (the road is
+    // the floor, and a tunnel stretch inverts it); a sculpt added after them
+    // could raise a hill straight through the road surface and strand the
+    // car. Applied here, the ground can be pushed anywhere and the road
+    // still wins where they disagree.
+    if (this._delta) h += this._delta.at(x, z);
     if (fld.d <= 27) {
       const clamp = this._roadClampY(x, z);
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
@@ -5508,6 +5527,13 @@ export class Track {
     // With the term only in the latter, the physics said "seabed at -7" while
     // the rendered land stayed dry — the sea existed as scattered pokes.
     if (this.T.coast) h = this._coastDepress(x, z, h, d);
+    // AND SO MUST THE EDITOR'S SCULPT, for exactly the same reason. Added to
+    // terrainHeight alone, an Apply moved the physics, the scatter and the
+    // road drape onto a 34 u hill while the drawn ground stayed dead flat —
+    // measured +33.91 at the centre with nothing whatsoever on screen. The
+    // numbers agreed with each other and disagreed with the picture; the
+    // picture was right.
+    if (this._delta) h += this._delta.at(x, z);
     if (d <= 27) {
       // exact strand cap (window/exclusion mirror _roadClampY)
       let clamp = Infinity;
@@ -10325,7 +10351,7 @@ export class Track {
     // Flush regardless: the huts and road cabins have already written into the
     // shared batch by now, so an early return here would leave every building
     // in the world without a mesh.
-    if (!K) { this._realizeElements(this._elemB(), m4); return; }
+    if (!K) { this._stampEditElements(K); this._realizeElements(this._elemB(), m4); return; }
     // breakable field dressing this kit uses (livestock gear by default)
     const FIELD = K.field ?? ['trough', 'feedbin', 'hayrack'];
     const B = this._elemB();
@@ -10448,6 +10474,7 @@ export class Track {
     }
 
     this._sitePastures = pastures;
+    this._stampEditElements(K);
     this._realizeElements(B, m4);
   }
 
@@ -10477,6 +10504,26 @@ export class Track {
 
   /** Turn the five part buckets into five InstancedMeshes (one draw call each
    *  for every building in the world). */
+  /** Stamp the WORLD EDITOR's placed objects into the shared element batch,
+   *  just before it is realised into instanced meshes. Placed last so an
+   *  authored object always wins the spot over procedural dressing, and
+   *  stamped through the ordinary `_element` path so it seats on the ground
+   *  (including the editor's own sculpt), registers as a solid, and is
+   *  breakable exactly like a building the world placed itself.
+   *
+   *  Unknown preset names are SKIPPED rather than thrown: a scene saved
+   *  against a later palette must still load on an older build. */
+  _stampEditElements(K) {
+    const list = this.edit && this.edit.elements;
+    if (!list || !list.length) return;
+    const B = this._elemB();
+    const kit = K || ELEMENT_KITS.farm;
+    for (const e of list) {
+      if (!HOUSE_TEMPLATES[e.preset]) continue;
+      this._element(B, e.preset, e.x, e.z, e.rot || 0, kit, e.scale || 1);
+    }
+  }
+
   _realizeElements(B, m4) {
     const gWall = new THREE.BoxGeometry(1, 1, 1); gWall.translate(0, 0.5, 0);
     const gBox = new THREE.BoxGeometry(1, 1, 1); gBox.translate(0, 0.5, 0);
@@ -11911,6 +11958,9 @@ export class Track {
       // the far branch skips _terrainMeshHeight and with it the coast sink —
       // reapply it or the bay grows hills past 900 u
       if (far && T.coast) h = this._coastDepress(x, z, h, 9999);
+      // ...and with it the editor's sculpt, which would otherwise tear open
+      // at the 900 u ring: near cells lifted, far cells not
+      if (far && this._delta) h += this._delta.at(x, z);
       pos.setY(i, h - 0.12);
       const t = THREE.MathUtils.clamp((h + 2) / 7, 0, 1);
       tmp.copy(cLow).lerp(cHigh, t);
@@ -11995,6 +12045,8 @@ export class Track {
       // bay — the "white stuff" past the water. Full depression, no road
       // exemption: no road reaches this ring.
       if (T.coast) h = this._coastDepress(x, z, h, 9999);
+      // the editor's sculpt reaches here too, for the same reason
+      if (this._delta) h += this._delta.at(x, z);
       // SINK THIS MESH WHERE THE NEAR PATCH COVERS IT.
       //
       // This ring exists only to carry the horizon PAST the near patch, but it
