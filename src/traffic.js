@@ -21,7 +21,7 @@
 // pausing at the mouth to "look both ways" so the hazard is telegraphed.
 
 import * as THREE from 'three';
-import { disposeSubtree } from './track.js';
+import { disposeSubtree } from './engine/dispose.js';
 
 // Worlds that read as farmland / mountain-pasture country. Canyon, volcano,
 // glacier, dune, ravine and the two city worlds get no civilian traffic.

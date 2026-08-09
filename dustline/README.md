@@ -1,7 +1,37 @@
 # DUSTLINE — Rally Combat Racer
 
 Arcade rally racing + vehicular combat. Full end-to-end spec lives in
-`CLAUDE.md` (milestones M1–M8). **Current status: M3 complete.**
+`CLAUDE.md` (milestones M1–M8). **Current status: M3 complete, plus track
+authoring.**
+
+```bash
+npm install
+npm run dev        # game at /, editor at /editor.html
+npm run gate       # typecheck + prove the track format reproduces the world
+```
+
+## Tracks are data, and there is an editor — see `TRACKS.md`
+
+A track used to be a literal in `Terrain`'s constructor, with its snow line and
+mud flat and jump crest written as comparisons inside three functions. All of
+that is now a JSON file (`src/data/tracks/*.json`, typed in
+`src/tracks/trackDef.ts`), and **`editor.html`** authors it: a live 2D map with
+shaded relief, surfaces and corner-speed colouring, above a 3D preview that
+builds the *real* `Terrain` rather than an approximation.
+
+Tracks save to `localStorage`, export as JSON, or pack whole into a URL — which
+is the useful bug-report format, because generation is seeded and the link
+therefore reproduces the world rather than just its outline.
+
+Everything in the world you can point at is a **component** — one file in
+`src/world/props/` with its geometry, physical rules and preview together, see
+`COMPONENTS.md`. Drag them from the editor's palette onto the map or straight
+onto the 3D terrain; the collider the file declares is the collider the car
+hits.
+
+`npm run verify:track` proves the format did not lose anything: it drives the
+original hardcoded implementation and the data path over 48,400 grid samples
+and requires them to agree.
 
 ## M3 — race loop (done)
 

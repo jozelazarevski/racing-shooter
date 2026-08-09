@@ -19,6 +19,7 @@ import { AIDriver, DriverSpec } from './ai/driver';
 import { RaceDirector } from './race/director';
 import carData from './data/car.json';
 import aiData from './data/ai.json';
+import { resolveTrackFromUrl } from './tracks/registry';
 
 // Countdown hold: NO brake — in this control scheme brake at standstill
 // means reverse, and a braking grid would quietly drive itself backwards.
@@ -31,21 +32,26 @@ const IDLE: InputState = {
 async function boot() {
   await RAPIER.init();
 
+  // ?track=<id> picks a saved or built-in track; ?t=<packed> carries a whole
+  // track in the link. Neither can fail the boot — both fall back to default.
+  const trackDef = resolveTrackFromUrl();
+
   const canvas = document.getElementById('app') as HTMLCanvasElement;
   const renderer = buildRenderer(canvas);
   const scene = new THREE.Scene();
-  buildWorld(scene);
   const chase = new ChaseCamera();
   addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
 
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = FIXED_DT;
-  const terrain = new Terrain();
+  const terrain = new Terrain(trackDef);
+  buildWorld(scene, trackDef, terrain.spawn.x, terrain.spawn.z);
   terrain.build(scene, world, RAPIER);
-  buildSky(scene);
-  const clouds = buildClouds(scene);
-  buildMountains(scene);
-  buildVegetation(scene, terrain, world, RAPIER);
+  buildSky(scene, trackDef);
+  const clouds = buildClouds(scene, trackDef);
+  buildMountains(scene, trackDef);
+  const components = buildVegetation(scene, terrain, world, RAPIER);
+  console.info('[world] components:', components.counts);
 
   const line = bakeRacingLine(terrain);
   const director = new RaceDirector(line);
@@ -163,6 +169,10 @@ async function boot() {
   // headless-test + tuning hook
   (window as unknown as { __dust: object }).__dust = {
     car: playerCtrl, world, loop, input, terrain, fx, line, director, racers,
+    track: trackDef,
+    // exposed for tools/: the renderer's own triangle and draw-call counters
+    // are the only honest answer to "what did that cost"
+    renderer,
     fastForward: (ticks: number) => { for (let i = 0; i < ticks; i++) fixedStep(FIXED_DT); },
   };
 }

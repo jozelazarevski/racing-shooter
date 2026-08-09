@@ -1,5 +1,21 @@
 # Engine decision, and the migration
 
+> **STATUS: SETTLED. The engine is `dustline/`.**
+>
+> This document made the case for moving off hand-rolled physics to Rapier +
+> TypeScript. That case was accepted and the argument below still stands — but
+> the code that carried it out is **not** the `v2/` tree this document
+> describes. `v2/` has been **deleted**, along with its built output in
+> `play-v2/`, and every `v2/…` path named below is gone with it.
+>
+> **`dustline/` is the game under active development.** It is TypeScript +
+> Vite, Rapier under a raycast car, and it reaches the conclusion this document
+> argued for by a different road. Read sections 1–3 for *why* the move was
+> right; read `ARCHITECTURE.md` §5.4 for what is actually next.
+>
+> The phase log at the end is kept as a record of what was learned, not as a
+> plan. It is marked accordingly.
+
 ## The judgement: yes, move to Rapier + TypeScript. Staged, not big-bang.
 
 The deciding argument is not in the specification. It is this, from the owner:
@@ -64,7 +80,24 @@ needs redesigning" as the instruction:
   and the 3.5–22 km lint meaningful. It lands in Phase 3, not before, because
   the progression and HUD are built on laps.
 
-## Phases
+## Phases — HISTORICAL RECORD of the deleted `v2/` tree
+
+**None of the code or paths below still exists.** `v2/` was removed when
+`dustline/` became the engine. This section is kept because the *findings* cost
+real effort and remain true of any engine this project builds; the file paths
+are retained verbatim so the record stays checkable against git history rather
+than being quietly reworded into something that never shipped.
+
+Three things here are worth carrying into dustline, and are listed as work in
+`ARCHITECTURE.md` §5.4:
+
+1. **Seeded RNG per stage, in named channels**, with a guard that turns an
+   unseeded call into a build failure. Determinism is cheapest to add before
+   there is content, and v1 proves what it costs to add after.
+2. **A stage lint that runs on boot and prints its verdict**, so a malformed
+   course fails loudly instead of subtly.
+3. **A content fingerprint that must never change**, which is what turns "did
+   this refactor alter the world?" from a judgement call into a test.
 
 Each phase ships, is verified, and leaves the game playable.
 
@@ -104,7 +137,8 @@ above are now assertions in `v2/tools/smoke.mjs` and they pass on all six
 stages** — including the one v1 could never do, body attitude taken from the
 ground at zero speed.
 
-Live at **/racing-shooter/play-v2/**. v1 is untouched and still on r77.
+~~Live at **/racing-shooter/play-v2/**~~ — that build has been deleted and the
+URL no longer resolves. v1 was untouched by this work and was on r77 at the time.
 
 Ten defects were found and fixed on the way, all by measurement rather than by
 reading code — a transposed Rapier heightfield, persistent forces integrating
@@ -112,13 +146,20 @@ into a catapult, an inverted damper sign, a doubly-negated tyre force, missing
 reflected engine inertia, a centre of mass 50% too high. Each is written up in
 `v2/PHASES.md`, along with the gaps that are absent rather than pretended.
 
-**Phase 3 — stages.** Point-to-point courses, sectors, reset nodes, corner
-grading feeding auto-generated pacenotes. Progression reworked off laps.
+**Phase 3 — stages. NEVER BUILT.** Point-to-point courses, sectors, reset nodes,
+corner grading feeding auto-generated pacenotes. Progression reworked off laps.
 
-**Phase 4 — the bible.** Region palettes, lighting to five decimals, archetype
-architecture, scatter densities, and the R01–R12 region lint.
+**Phase 4 — the bible. NEVER BUILT.** Region palettes, lighting to five
+decimals, archetype architecture, scatter densities, and the R01–R12 region lint.
+
+Phases 3 and 4 were planned for `v2/` and never reached it. dustline arrives at
+the same place from its own spec (`dustline/CLAUDE.md`, milestones M1–M8) and is
+at M3; its equivalent of Phase 3 is M5–M6.
 
 ## The rule for every phase
 
 Ship it, gate it, and never claim what has not been measured. That has been the
-only thing keeping this codebase honest, and a new engine does not change it.
+only thing keeping this codebase honest, and a new engine does not change it —
+nor does deleting one. This document was rewritten rather than deleted for
+exactly that reason: the record of a path not taken is worth more than a clean
+file, provided it is labelled honestly as a path not taken.

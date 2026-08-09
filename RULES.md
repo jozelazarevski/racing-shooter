@@ -1,5 +1,10 @@
 # IGNITE RALLY — World Rules & Object Reference
 
+> **Scope: IGNITE RALLY (`src/`, the game at the repository root).**
+> This document is normative for v1 and says nothing about `dustline/`,
+> which is a separate game with its own specification in
+> `dustline/CLAUDE.md`. A rule here is not a rule there.
+
 This is the single source of truth for how the physical world must behave.
 Every object in the game belongs to exactly one **collision class**, and every
 class has exact, non-negotiable mechanics. Any object that violates its class

@@ -6,7 +6,20 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "verify:track": "node tools/verify-track-format.mjs",
+    "verify:sdf": "node tools/verify-sdf.mjs",
+    "verify:worlds": "node tools/verify-worlds.mjs",
+    "make:proving-ground": "node tools/make-proving-ground.mjs",
+    "make:harbour": "node tools/make-harbour.mjs",
+    "make:sets": "node tools/make-set-sheets.mjs",
+    "make:shots": "node tools/make-shots.mjs",
+    "smoke:editor": "node tools/editor-smoke.mjs",
+    "smoke:components": "node tools/components-smoke.mjs",
+    "verify:deploy": "node tools/verify-deploy.mjs",
+    "gate": "npm run typecheck && npm run verify:track && npm run verify:sdf",
+    "gate:full": "npm run build && npm run gate && npm run verify:worlds && npm run smoke:components && npm run smoke:editor"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.12.0",

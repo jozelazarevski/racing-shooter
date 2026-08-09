@@ -26,6 +26,18 @@ There are no hand-made image, model, or audio files — the only images in the
 repo are the menu's world-preview cards, which are auto-captured screenshots
 of the procedural worlds themselves. The game is intentionally silent.
 
+## Admin
+
+Authoring tools are published alongside the games at
+**https://jozelazarevski.github.io/racing-shooter/admin/** — the dustline track
+editor, direct links to both builds, and the component set sheets. It is not
+linked from either game and is marked `noindex`.
+
+That is *unlisted, not protected*: GitHub Pages is a static host and cannot
+authenticate anyone. It is acceptable because every tool there is read-only
+against the repository — the editor writes only to the visitor's own browser
+storage, so nothing on that page can change what either game ships.
+
 ## Play
 
 The game is a fully static site — open `index.html` from any web server, or play
@@ -201,3 +213,54 @@ on the buttons. Works in portrait and landscape.
   roads and car-paint sheen), per-theme sun disc + layered horizon haze,
   and a film-grade post pass (saturation/contrast lift + soft vignette)
   on top of UnrealBloom for lamps, tracers and explosions
+
+## Source layout
+
+```
+src/
+  main.js       the game — modes, career, HUD wiring, the loop
+  track.js      the world builder
+  world/        what the worlds ARE, and the rules for building them
+    levels.js     the career roster                            (pure data)
+    circuits.js   hand-designed circuit control polygons       (pure data)
+    themes.js     every colour and density knob, per theme     (pure data)
+    catalog.js    props, house templates, regional element kits
+    constants.js  road half-width, rim radius, tunnel bore
+    rng.js        the seeded world generator
+    sky.js        sky dome, sun, clouds, horizon silhouettes
+    flora.js      placement rules + the biome vegetation builders
+  engine/
+    dispose.js    three.js resource disposal — knows nothing of racing
+  vehicles.js  textures.js  particles.js  weapons.js  hud.js
+  input.js  audio.js  traffic.js  choppers.js  hostiles.js  sync.js  offline.js
+```
+
+Dependencies point inwards — `data → engine → world → game` — and data never
+imports behaviour. **[`ARCHITECTURE.md`](ARCHITECTURE.md)** is the full review:
+what is here, which defects are structural rather than incidental, and the
+staged plan for the rest. The normative world rules for **this** game live in
+`RULES.md`, `NATURE.md`, `STRUCTURES.md` and `SCENES.md`; `MIGRATION.md` records
+the engine decision and why it was made.
+
+## The other game in this repository
+
+`dustline/` is a separate, ground-up rally combat racer — TypeScript + Vite,
+Rapier physics under a raycast car — and it is **the game under active
+development**. It has its own specification and milestone plan in
+`dustline/CLAUDE.md`, is currently at M3 (race loop complete), and shares no
+code with IGNITE RALLY. Built output lives in `play-dustline/`.
+
+It also has a **visual track editor**, reached from the admin page at
+**`/racing-shooter/admin/`** (or directly at
+`/racing-shooter/play-dustline/editor.html`). Tracks there are data, not code:
+draw the loop on a map, set the land, the surfaces, the scatter and the sky in
+a panel, watch the real engine rebuild it beside you, then save it, export it,
+or pack the whole track into a link that anyone can drive. See
+`dustline/TRACKS.md`.
+
+IGNITE RALLY, described above, is what ships at the repository root today.
+Anything in this README, and in the four normative documents, is about **it**
+and not about dustline.
+
+(A third tree, `v2/` — a staged Rapier migration of IGNITE RALLY — has been
+deleted. `MIGRATION.md` keeps the record of what it was and what it taught.)

@@ -32,6 +32,34 @@ slipstream, big air, shield, treasure stars), `test-round-fixes.mjs`
 `test-menu-noreset.mjs` (live car swap + menu state restore),
 `test-roam.mjs`, `test-destruction.mjs`.
 
+## Refactor gate — `test-equivalence.mjs`
+
+Not a behaviour test: a **proof that a change to the world builder changed no
+world.** It fingerprints every world's built geometry on two servers — the old
+code and the new — and fails if any differ. This is what makes the staged
+decomposition of `src/track.js` (ARCHITECTURE.md §5.1) safe to continue, because
+reading a diff of procedural generation proves nothing: one reordered statement
+shifts every subsequent draw from the seeded PRNG, and with it every tree, rock
+and building in the world.
+
+```bash
+git worktree add /tmp/baseline HEAD
+(cd /tmp/baseline && python3 -m http.server 8902 &)
+python3 -m http.server 8901 &                        # the working tree
+BASE_A=http://localhost:8902/ BASE_B=http://localhost:8901/ \
+  node tests/test-equivalence.mjs                    # all worlds; or pass ids
+```
+
+Run with only `BASE_A` and it compares a build against itself, which is the
+determinism check.
+
+`test-static.mjs` needs no browser and no server — run it first, always. Besides
+the conflict-marker and module-parse checks it now walks the real import graph
+from `index.html` and fails if `sw.js`'s precache list disagrees with it in
+either direction. That check was added after finding `src/sync.js` imported by
+`main.js` and missing from the cache list for its whole life: nothing fails in
+development, because in development the network is there.
+
 ## Writing new checks
 
 Two rules learned the hard way:
