@@ -51,6 +51,21 @@ allowed to be placed. When a rule names a probe, run it before shipping.
 - **Fog is theme-local.** Compute `fogNear = max(T.fogNear × 0.72,
   min(T.fogNear, 190))` into `scene.fog` — never write derived values back
   into the shared theme object.
+- **A mountain is not a cone.** No hill, peak, massif or skyline form may be
+  a `ConeGeometry` (nor a cone jittered, sheared, or scaled). Build them with
+  `_mountainGeo(seed, opts)`: height is measured from a *crest segment*, not
+  an apex, so the form has a ridgeline with peaks and saddles, flanks that
+  curve, spurs and gullies in azimuth, and no radial symmetry. Reported by
+  the player twice — "they look like shark teeth".
+- **Proportion is half the silhouette.** Ranges are far wider than tall.
+  Keep placed height/width ≤ ~1.0 and aim for 0.3–0.6; anything ≥ 1.6 reads
+  as a tooth whatever its shape. Verify with the aspect probe, not by eye.
+- **Wind faces outward.** Azimuth increases anticlockwise seen from above,
+  so a ring-to-ring quad is `(a, c, b)` / `(a, d, c)`. Wound the other way,
+  a front-side material culls the entire outer surface and draws the
+  *interior* — which reads as thin dark slivers and curved shells hanging
+  off the skyline, not as missing geometry. Cost this file two separate
+  bugs; check any new lofted or generated form with fog off.
 
 ## 3. Roads, tunnels and corridors
 

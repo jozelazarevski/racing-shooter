@@ -8353,8 +8353,142 @@ export class Track {
    *  boulders; and every facet gets its own tone wobble so the faces read as
    *  rock instead of upholstery.
    */
+  /** A MOUNTAIN IS NOT A CONE.
+   *
+   *  Reported twice, and the second time with a photograph: "stop making the
+   *  hills and mountains look like cones — they look like shark teeth". They
+   *  did, because they were cones. A cone has the three properties no real
+   *  mountain has: straight flanks, one apex, and radial symmetry. Jittering
+   *  the vertices of a cone does not fix any of them, and neither does mixing
+   *  in a taller cone and a thinner cone.
+   *
+   *  This builds a mountain as a polar HEIGHTFIELD instead, from the three
+   *  things that actually shape one:
+   *
+   *   - FLANKS THAT FLARE. Height falls as (1 - t)^p with p > 1, so the
+   *     profile is steep just under the summit and lays back into a broad
+   *     apron at the foot — the concave sweep of a real hillside. A cone is
+   *     the p = 1 case, which is why it reads as a tooth.
+   *   - MORE THAN ONE SUMMIT. A gaussian shoulder placed off-centre, combined
+   *     with `max` rather than a sum, so the two peaks meet in a genuine
+   *     SADDLE instead of a smooth bulge.
+   *   - SPURS AND GULLIES. The footprint radius is modulated by two sine
+   *     waves in azimuth, so ridges run down the flanks and the silhouette
+   *     breaks. The gullies also bite into the height, which is what makes
+   *     the skyline edge irregular rather than a clean triangle.
+   *
+   *  Everything is keyed off `seed`, so the form library can hold several
+   *  distinct mountains for the price of one function, and every instance is
+   *  turned on Y at random — which only produces variety BECAUSE the shape is
+   *  no longer radially symmetric.
+   *
+   *  Unit form: height 1, base at y = -0.5, footprint ~1 across, matching the
+   *  cones it replaces so every existing seat-and-scale placement is unchanged.
+   */
+  _mountainGeo(seed = 1, o = {}) {
+    const SECT = o.sect ?? 14, RINGS = o.rings ?? 6;
+    const hsh = (n) => {
+      const v = Math.sin(n * 12.9898 + seed * 78.233) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    // `az` pins the ridge direction for forms whose placement turns them to
+    // face along a range (the long wall); otherwise it is seeded
+    const ridgeAz = o.az ?? (hsh(1) * Math.PI * 2);
+    // THE SUMMIT IS A LINE, NOT A POINT. This is the whole difference. Height
+    // is measured from a CREST SEGMENT of half-length `cl` lying along the
+    // ridge azimuth, so the top of the form is a walkable crest with peaks
+    // and saddles strung along it. Measured from a point instead - which is
+    // what the first attempt did, and what every cone does - the silhouette
+    // can only ever be a triangle, however the flanks are curved.
+    const cl = o.crest ?? (0.30 + hsh(2) * 0.34);   // crest half-length
+    const q = o.p ?? (1.55 + hsh(3) * 0.75);        // flank curvature
+    const nPk = 2 + Math.floor(hsh(4) * 3);         // summits along the crest
+    const saddle = o.saddle ?? (0.20 + hsh(5) * 0.20);
+    const phS = hsh(6) * 6.283;
+    const elong = o.elong ?? (0.16 + hsh(7) * 0.26);  // footprint stretch
+    const nSpur = 3 + Math.floor(hsh(8) * 3);
+    const spur = o.spur ?? (0.14 + hsh(9) * 0.12);
+    const nGul = nSpur + 2;
+    const gul = 0.08 + hsh(10) * 0.10;
+    const ph1 = hsh(11) * 6.283, ph2 = hsh(12) * 6.283;
+    const lean = (hsh(13) - 0.5) * (o.lean ?? 0.22);
+
+    // distance from the crest segment, in crest-local coordinates
+    const crestD = (a, s) => {
+      const du = Math.max(0, Math.abs(a) - cl);
+      return Math.hypot(du / (1 - cl), s);
+    };
+    const H = (t, th) => {
+      if (t >= 1) return 0;
+      const dth = th - ridgeAz;
+      const ca = Math.cos(dth), sa = Math.sin(dth);
+      // normalised by the rim distance in the SAME direction, so height
+      // reaches exactly zero all the way round the base - no floating skirt
+      const rim = crestD(ca, sa) || 1;
+      const d = Math.min(1, crestD(t * ca, t * sa) / rim);
+      // q > 1: rounded shoulders under the crest steepening into the flanks,
+      // instead of the straight edge a cone draws
+      let h = Math.max(0, 1 - Math.pow(d, q));
+      // peaks and saddles ALONG the crest - this is what makes a range read
+      // as several mountains rather than one lump
+      h *= 1 - saddle * (0.5 + 0.5 * Math.sin(nPk * (t * ca) * 3.1 + phS));
+      // gullies bite into the flanks, deepest at mid-height
+      h *= 1 - gul * Math.abs(Math.sin(nGul * dth * 0.5 + ph2))
+        * Math.sin(Math.PI * Math.min(1, t * 1.2));
+      return Math.max(0, h);
+    };
+    // footprint: an ellipse stretched along the ridge, with spurs standing
+    // proud of it and re-entrants cutting in
+    // ELONGATION EXTENDS THE RIDGE; it must not squeeze the flanks. Dividing
+    // this by (1 + elong) to keep the form inside a unit circle did the
+    // second thing: the across-ridge radius fell to 0.4 against a height of
+    // 1, and the skyline turned into vertical blades. The across radius
+    // stays at the nominal 0.5 the cones used, and a long form simply
+    // reaches further along its own axis - which is what a range does.
+    const RS = (th) => {
+      const ca = Math.cos(th - ridgeAz);
+      return (1 + elong * ca * ca)
+        * (1 + spur * Math.sin(nSpur * (th - ridgeAz) + ph1)
+             + spur * 0.55 * Math.sin((nSpur + 3) * th + ph2));
+    };
+
+    const v = [];
+    const P = (ti, si) => {
+      const t = ti / RINGS, th = (si / SECT) * 6.283185;
+      const h = H(t, th);
+      const r = 0.5 * t * RS(th);
+      // lean the summit so the peak is not centred over its own footprint
+      return [Math.cos(th) * r + lean * (1 - t) * 0.5, -0.5 + h,
+        Math.sin(th) * r + lean * (1 - t) * 0.3];
+    };
+    for (let ti = 0; ti < RINGS; ti++) {
+      for (let si = 0; si < SECT; si++) {
+        const a = P(ti, si), b = P(ti + 1, si), c = P(ti + 1, si + 1), d = P(ti, si + 1);
+        // WOUND OUTWARD. Azimuth increases anticlockwise seen from above, so
+        // (a, b, c) - ring, next ring, next sector - puts the normal INTO the
+        // mountain, and a front-side material then culls the whole outer
+        // surface and draws the inside instead. That is what the dark curved
+        // slivers hanging off the skyline were: the interior of a mountain
+        // seen through its own missing front. The same trap the old ridge
+        // form documented, walked into again from the other direction.
+        if (ti === 0) {                       // apex fan
+          v.push(a[0], a[1], a[2], c[0], c[1], c[2], b[0], b[1], b[2]);
+        } else {
+          v.push(a[0], a[1], a[2], c[0], c[1], c[2], b[0], b[1], b[2]);
+          v.push(a[0], a[1], a[2], d[0], d[1], d[2], c[0], c[1], c[2]);
+        }
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+
   _cragGeo() {
-    const geo = new THREE.ConeGeometry(1, 1, 10, 5);
+    // the near massif is the same mountain, carrying enough rings to hold up
+    // at a few hundred metres, then broken further by the crag jitter below
+    const geo = this._mountainGeo(7, { sect: 18, rings: 8, spur: 0.20 });
     const p0 = geo.attributes.position;
     const hsh = (a, b, c) => {
       const v = Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453;
@@ -8365,11 +8499,15 @@ export class Track {
       const r = Math.hypot(x, z);
       if (r < 1e-3) continue;                        // apex + cap centre stay
       const hf = y + 0.5;                            // 0 at foot, 1 at crest
-      const j = 1 + (hsh(x, y, z) - 0.5) * (0.36 - 0.22 * hf);
+      // lighter than it was: the form now carries its own spurs and gullies,
+      // and the old +-18 % on a smooth cone was doing all the work alone
+      const j = 1 + (hsh(x, y, z) - 0.5) * (0.20 - 0.12 * hf);
       p0.setX(i, x * j); p0.setZ(i, z * j);
       if (hf > 0.05 && hf < 0.95) p0.setY(i, y + (hsh(z, x, y) - 0.5) * 0.05);
     }
-    return geo.toNonIndexed();
+    p0.needsUpdate = true;
+    geo.computeVertexNormals();
+    return geo;                                      // already non-indexed
   }
 
   _buildMassif(m4) {
@@ -12336,54 +12474,50 @@ export class Track {
   _horizonForms() {
     if (this._hzForms) return this._hzForms;
     const F = {};
-    F.pyramid = new THREE.ConeGeometry(0.5, 1, 6);
-    F.spire = new THREE.ConeGeometry(0.40, 1, 5);
-    F.dome = (() => {
-      const pts = [];
-      for (let i = 0; i <= 6; i++) {
-        const t = i / 6;
-        pts.push(new THREE.Vector2(
-          Math.max(0.001, 0.5 * Math.cos(t * Math.PI / 2) * (1 - 0.10 * t)), -0.5 + t));
-      }
-      return new THREE.LatheGeometry(pts, 9);
-    })();
+    // THE CONE FAMILY IS GONE. `pyramid`, `spire` and `horn` were literally
+    // ConeGeometry - a 6-sided pyramid, a 5-sided pyramid, and a 6-sided
+    // pyramid sheared sideways - which is why every skyline still read as
+    // shark teeth after the set was "mixed". They are mountains now, each a
+    // different seed of the same generator, so a range keeps one character
+    // while no two instances present the same silhouette (every one is turned
+    // on Y at random, which only means something for an asymmetric form).
+    // Fewer rings than the near massif: these are 1100 u out, in haze.
+    F.pyramid = this._mountainGeo(3, { sect: 13, rings: 5, p: 1.5 });
+    F.spire = this._mountainGeo(11, { sect: 12, rings: 5, p: 2.2, sub: 0.22, spur: 0.10 });
+    // a whaleback: broad rounded crest, flanks that steepen away from it.
+    // It was a LatheGeometry - radially symmetric, so from every bearing it
+    // presented the same smooth triangle, which is a cone by another name.
+    F.dome = this._mountainGeo(5, {
+      sect: 14, rings: 5, p: 2.7, crest: 0.52, saddle: 0.12, spur: 0.07, elong: 0.26,
+    });
     F.mesa = new THREE.CylinderGeometry(0.30, 0.52, 1, 6);
     F.horn = (() => {
-      const g = new THREE.ConeGeometry(0.5, 1, 6);
-      // shear the apex sideways so one face is a cliff and the other a shoulder
+      // a horn is a mountain with the summit thrown off its own footprint:
+      // one face falls as a cliff, the other runs out as a long shoulder
+      const g = this._mountainGeo(23, {
+        sect: 14, rings: 5, p: 1.7, crest: 0.26, saddle: 0.30, elong: 0.34, lean: 0.42,
+      });
+      // a light shear only: at full strength it laid the peak over into a
+      // wedge lying on the ground rather than a mountain with a steep face
       g.applyMatrix4(new THREE.Matrix4().set(
-        1, 0.44, 0, 0,
+        1, 0.20, 0, 0,
         0, 1, 0, 0,
-        0, 0.14, 1, 0,
+        0, 0.07, 1, 0,
         0, 0, 0, 1));
-      return g;
-    })();
-    F.ridge = (() => {
-      // a wall with named peaks along it, tapering to nothing at both ends
-      const H = [0.03, 0.62, 0.30, 0.92, 0.44, 0.70, 0.05];
-      const n = H.length - 1, v = [];
-      const push = (a, b, c) => v.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
-      for (let k = 0; k < n; k++) {
-        const x0 = -0.5 + k / n, x1 = -0.5 + (k + 1) / n;
-        const y0 = -0.5 + H[k], y1 = -0.5 + H[k + 1];
-        const d0 = 0.44 * Math.sin(Math.PI * (k / n)) + 0.06;
-        const d1 = 0.44 * Math.sin(Math.PI * ((k + 1) / n)) + 0.06;
-        // WIND EACH FLANK OUTWARD. Emitting both sides in the same vertex
-        // order leaves one of them back-facing, and a front-side material
-        // culls it - which is why half of every ridge vanished and the
-        // skyline grew thin dark slivers where the interior showed through.
-        for (const sg of [1, -1]) {
-          const A = [x0, y0, 0], B = [x1, y1, 0];
-          const C = [x1, -0.5, sg * d1], D = [x0, -0.5, sg * d0];
-          if (sg > 0) { push(A, B, C); push(A, C, D); }
-          else { push(B, A, C); push(C, A, D); }
-        }
-      }
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
       g.computeVertexNormals();
       return g;
     })();
+    // THE LONG WALL. This was a strip of flat triangles with a saw-tooth top
+    // edge - the literal picket fence the horizon was accused of being, and
+    // paper-thin from any bearing off its face. It is a heavily elongated
+    // massif now: one crest running the length of the range with four or
+    // five summits along it, real flanks either side, and the ridge axis
+    // PINNED to +X (az: 0) because the placement turns each wall to lie
+    // along its range.
+    F.ridge = this._mountainGeo(31, {
+      sect: 20, rings: 5, az: 0, elong: 0.42, crest: 0.50,
+      p: 1.7, saddle: 0.42, spur: 0.12,
+    });
     this._hzForms = F;
     return F;
   }
@@ -12479,8 +12613,15 @@ export class Track {
         }
       }
     };
-    place(near, 9, 900, 140, 70, 90, 130, 150, 0.82);
-    place(far, 8, 1120, 160, 160, 140, 120, 140, 0.76);
+    // PROPORTION IS HALF OF WHY THEY READ AS TEETH. Measured on the shipped
+    // ring, the far peaks ran up to 2.6 times TALLER than wide and the median
+    // was 1.3 - which is a tooth whatever shape you carve, because no real
+    // mountain is twice as tall as it is broad. A range 250 u high spreads
+    // 500 u and more. Widened, and the height spans pulled in a little; the
+    // forms in a group now overlap into a continuous crest instead of
+    // standing apart like a picket fence.
+    place(near, 9, 900, 140, 60, 80, 200, 190, 0.82);
+    place(far, 8, 1120, 160, 140, 130, 260, 220, 0.76);
     let mi = 0;
     for (const mesh of meshes) {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -13103,33 +13244,58 @@ export class Track {
     // THE DISTANT STAND. Between the playfield scatter (out to ~640 u) and
     // the horizon rings (900 u+) there was an empty ring - the mid-distance
     // read as bare lawn on every wooded world, which is most of why the
-    // scene lacked depth. One instanced 6-sided cone, 420 copies, tinted a
-    // little toward the fog so the band reads as trees IN AIR.
+    // scene lacked depth.
+    //
+    // A STAND OF TREES IS NOT ONE CONE. The first cut was a single 6-sided
+    // cone per copy, 5-12 u wide and up to 21 u tall, scattered evenly and
+    // washed 40 % toward the fog: from the road that is a field of pale
+    // pyramids sitting on the grass, which is what the player photographed.
+    // Three faults, all fixed here:
+    //   - SHAPE: a clump of three offset crowns at different heights, welded
+    //     into one geometry, so the silhouette is a lumpy tree-line rather
+    //     than a triangle.
+    //   - GROUPING: clumps are drawn in GROVES of five to nine, because a
+    //     wood is a mass with edges, not evenly spaced dots.
+    //   - TONE: half the fog wash, so they read as trees in haze instead of
+    //     ghosts, and none of them stands taller than a real tree.
     if (T.treeCount >= 150) {
-      const bandGeo = new THREE.ConeGeometry(1, 1, 6);
-      bandGeo.translate(0, 0.5, 0);
+      const crown = (r, h, y, dx, dz) => new THREE.ConeGeometry(r, h, 5)
+        .translate(dx, y + h / 2, dz);
+      const bandGeo = this._bundle([
+        crown(1.00, 1.70, 0, 0, 0),
+        crown(0.78, 1.25, 0, -0.95, 0.42),
+        crown(0.66, 1.00, 0, 0.82, -0.55),
+      ]);
       const band = new THREE.InstancedMesh(bandGeo, new THREE.MeshStandardMaterial({
         color: 0xffffff, vertexColors: false, flatShading: true, roughness: 1,
-      }), 420);
+      }), 300);
       const bandCol = new THREE.Color(), fogC2 = new THREE.Color(T.fogColor ?? 0xcccccc);
       const baseC2 = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
       const bq = new THREE.Quaternion(), bup = new THREE.Vector3(0, 1, 0);
       let bk3 = 0;
-      for (let k = 0; k < 900 && bk3 < 420; k++) {
-        const hh = (n) => { const v = Math.sin((k + n) * 12.9898) * 43758.5453; return v - Math.floor(v); };
-        const a2 = hh(0.1) * Math.PI * 2;
-        const r2 = 640 + hh(1.7) * 260;
-        const x2 = Math.cos(a2) * r2, z2 = Math.sin(a2) * r2;
-        if (this._inWater(x2, z2)) continue;
-        const gy2 = this.terrainHeight(x2, z2);
-        const sw2 = 5 + hh(2.9) * 7, sh2 = 9 + hh(4.1) * 12;
-        bq.setFromAxisAngle(bup, hh(5.3) * Math.PI);
-        m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
-          new THREE.Vector3(sw2, sh2, sw2 * 0.9));
-        band.setMatrixAt(bk3, m4);
-        bandCol.copy(baseC2).multiplyScalar(0.75 + hh(6.7) * 0.4)
-          .lerp(fogC2, 0.25 + hh(8.3) * 0.15);
-        band.setColorAt(bk3++, bandCol);
+      for (let gv = 0; gv < 46 && bk3 < 300; gv++) {
+        const gh = (n) => { const v = Math.sin((gv + n) * 12.9898) * 43758.5453; return v - Math.floor(v); };
+        const aG = gh(0.1) * Math.PI * 2;
+        const rG = 640 + gh(1.7) * 260;
+        const gx = Math.cos(aG) * rG, gz = Math.sin(aG) * rG;
+        const n = 5 + Math.floor(gh(2.3) * 5);
+        for (let k = 0; k < n && bk3 < 300; k++) {
+          const hh = (m) => {
+            const v = Math.sin((gv * 13 + k + m) * 12.9898) * 43758.5453;
+            return v - Math.floor(v);
+          };
+          const x2 = gx + (hh(0.7) - 0.5) * 150, z2 = gz + (hh(1.9) - 0.5) * 150;
+          if (this._inWater(x2, z2)) continue;
+          const gy2 = this.terrainHeight(x2, z2);
+          const sw2 = 4.5 + hh(2.9) * 4.5, sh2 = 5.5 + hh(4.1) * 5.5;
+          bq.setFromAxisAngle(bup, hh(5.3) * Math.PI * 2);
+          m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
+            new THREE.Vector3(sw2, sh2, sw2 * 0.9));
+          band.setMatrixAt(bk3, m4);
+          bandCol.copy(baseC2).multiplyScalar(0.72 + hh(6.7) * 0.36)
+            .lerp(fogC2, 0.12 + hh(8.3) * 0.10);
+          band.setColorAt(bk3++, bandCol);
+        }
       }
       band.count = bk3;
       if (band.instanceColor) band.instanceColor.needsUpdate = true;
