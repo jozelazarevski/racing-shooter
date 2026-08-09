@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DUSTLINE — track editor</title>
+  <!-- Admin tooling: keep it out of search results. This is obscurity, not
+       access control — GitHub Pages is static and cannot authenticate anyone.
+       Safe because the editor only ever writes to the visitor's own
+       localStorage; there is no shared state for a stranger to damage. -->
+  <meta name="robots" content="noindex, nofollow" />
   <!-- inline, so the page makes no request for it and works offline -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>" />
   <style>

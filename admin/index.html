@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin — racing-shooter</title>
+<!-- Unlisted, not protected. GitHub Pages is a static host: it cannot
+     authenticate anyone, so noindex keeps this out of search results and
+     nothing more. That is acceptable here because every tool below is
+     read-only against the repository and writes only to the visitor's own
+     browser storage — there is no shared state a stranger could damage. -->
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛠️</text></svg>" />
+<style>
+  :root {
+    --bg: #0d0f12; --panel: #151920; --panel2: #1b212a; --line: #2a3340;
+    --ink: #d8e4f0; --dim: #8fa3b8; --accent: #9fdcff; --gold: #ffd400;
+    --mono: 'Consolas', 'Menlo', ui-monospace, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); min-height: 100vh;
+    font: 15px/1.6 system-ui, -apple-system, 'Segoe UI', sans-serif; padding: 32px 20px 64px; }
+  main { max-width: 940px; margin: 0 auto; }
+  h1 { font: 700 15px/1 var(--mono); letter-spacing: 4px; color: #fff; margin-bottom: 4px; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 28px; }
+  h2 { font: 700 10px/1 var(--mono); letter-spacing: 2px; color: var(--dim);
+    text-transform: uppercase; margin: 30px 0 12px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--line); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
+  a.card { display: block; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px 18px; text-decoration: none; color: inherit;
+    transition: border-color .15s, transform .15s; }
+  a.card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  a.card.primary { border-color: #2f7ea8; background: #16222c; }
+  a.card.primary:hover { border-color: var(--gold); }
+  a.card b { display: block; font: 700 13px/1.3 var(--mono); letter-spacing: 1px;
+    color: #fff; margin-bottom: 6px; }
+  a.card.primary b { color: var(--gold); }
+  a.card p { color: var(--dim); font-size: 13px; margin: 0; }
+  a.card code { font: 11px var(--mono); color: var(--accent); }
+  .note { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--gold);
+    border-radius: 8px; padding: 14px 18px; color: var(--dim); font-size: 13px; margin-top: 14px; }
+  .note b { color: var(--ink); }
+  .sets { display: grid; gap: 10px; }
+  .sets figure { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px; overflow: hidden; }
+  .sets figcaption { font: 10px/1 var(--mono); letter-spacing: 2px; color: var(--dim);
+    text-transform: uppercase; margin-bottom: 8px; }
+  .sets img { width: 100%; display: block; border-radius: 4px; }
+  footer { color: var(--dim); font-size: 12px; margin-top: 36px;
+    border-top: 1px solid var(--line); padding-top: 14px; }
+  footer code { font: 11px var(--mono); color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>RACING<span>-</span>SHOOTER · ADMIN</h1>
+  <p class="sub">Authoring tools and builds. Not linked from either game.</p>
+
+  <h2>Authoring</h2>
+  <div class="grid">
+    <a class="card primary" href="../play-dustline/editor.html">
+      <b>TRACK EDITOR</b>
+      <p>Draw a course, set the land, surfaces, scatter and sky, drag components
+      onto the world, and preview it in the real engine. Saves to this browser;
+      exports JSON; packs a whole track into a link.</p>
+    </a>
+    <a class="card" href="../play-dustline/editor.html?track=proving-ground">
+      <b>EDIT: PROVING GROUND</b>
+      <p>The reference circuit — 114 placed components across every category.
+      Opens straight into the editor.</p>
+    </a>
+  </div>
+
+  <h2>Builds</h2>
+  <div class="grid">
+    <a class="card" href="../play-dustline/">
+      <b>DUSTLINE</b>
+      <p>The game under active development. TypeScript, Rapier physics.
+      <code>?track=&lt;id&gt;</code> or <code>?t=&lt;packed&gt;</code> loads a specific track.</p>
+    </a>
+    <a class="card" href="../">
+      <b>IGNITE RALLY</b>
+      <p>The shipped game at the repository root. 18 worlds, vanilla JS,
+      no build step.</p>
+    </a>
+  </div>
+
+  <div class="note">
+    <b>Unlisted, not protected.</b> GitHub Pages is a static host and cannot
+    authenticate anyone, so this page and the editor are marked
+    <code>noindex</code> to stay out of search results — that is obscurity, not
+    access control. It is acceptable because every tool here is read-only
+    against the repository: the editor writes only to <b>your own browser's</b>
+    localStorage, so the worst a stranger can do is edit a track for themselves.
+    Nothing here can change what either game ships.
+  </div>
+
+  <h2>Component sets</h2>
+  <div class="sets">
+    <figure><figcaption>flora</figcaption><img src="../dustline/docs/sets/flora.png" alt="flora components" loading="lazy" /></figure>
+    <figure><figcaption>trackside</figcaption><img src="../dustline/docs/sets/trackside.png" alt="trackside components" loading="lazy" /></figure>
+    <figure><figcaption>structure</figcaption><img src="../dustline/docs/sets/structure.png" alt="structure components" loading="lazy" /></figure>
+    <figure><figcaption>terrain</figcaption><img src="../dustline/docs/sets/terrain.png" alt="terrain components" loading="lazy" /></figure>
+    <figure><figcaption>debris</figcaption><img src="../dustline/docs/sets/debris.png" alt="debris components" loading="lazy" /></figure>
+  </div>
+
+  <footer>
+    Rendered from the component library by <code>npm run make:sets</code>. The
+    orange block at the left of each row is a car (1.9 &times; 3.9 m), for scale.
+    Docs: <code>dustline/TRACKS.md</code>, <code>dustline/COMPONENTS.md</code>,
+    <code>ARCHITECTURE.md</code>.
+  </footer>
+</main>
+</body>
+</html>
