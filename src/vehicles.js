@@ -1793,6 +1793,7 @@ export class Car {
       this.vel.multiplyScalar(Math.max(0, 1 - 0.10 * dt));
       if (this.y <= gY + 0.01) {
         this.y = gY;
+        this._impactVy = this.vy;   // captured for onLand - the price of the drop
         this.vy = 0;
         this.airborne = false;
         this._lastGY = gY;
@@ -2005,6 +2006,25 @@ export class Car {
   }
 
   onLand() {
+    // A CLIFF IS NOT A JUMP. Landing used to cost nothing whatever the drop -
+    // sail off a forty-metre wall and the car touched down and simply drove
+    // on, reported as "if I fall off a cliff... it's doing nothing". Impact
+    // speed prices the landing now. Under vy 19 - which clears every designed
+    // ramp and gorge jump on the roster (they land near launch height, impact
+    // ~12-16) - a landing stays free. Past that the hull pays 8 points per
+    // unit of impact speed, so a 20 u drop is a heavy hit and a real cliff is
+    // total destruction, difficulty scaling notwithstanding.
+    const impact = Math.abs(this._impactVy || 0);
+    this._impactVy = 0;
+    if (impact > 19 && this.alive) {
+      if (this === this.game.player) {
+        this.game.hud?.feed?.(impact > 30 ? 'CLIFF FALL' : 'HARD LANDING', 'bad');
+        this.game.shake = Math.min(1, (this.game.shake || 0) + 0.55);
+      }
+      this.game.particles?.debris?.(this.pos, impact > 30 ? 4 : 2);
+      this.damage((impact - 19) * 8, null);
+      if (!this.alive) return;    // wrecked on touchdown: skip the style pay
+    }
     // hang time pays style: a real jump (not a curb hop) scores BIG AIR
     if (this === this.game.player && (this._airT || 0) > 0.7) {
       this.game.style?.(40, 'BIG AIR');

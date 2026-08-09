@@ -8080,24 +8080,79 @@ export class Track {
     return c.getHex();
   }
 
+  /** THE CRAG GEOMETRY: a mountain, not a traffic cone.
+   *
+   *  The massif was ConeGeometry(1, 1, 6) - six sides, ONE height segment -
+   *  so up close each mountain was six enormous flat quads, and the player's
+   *  screenshot of PINE VALLEY is two of them filling the sky as blank grey
+   *  walls. Ten sides and five height rings now, every shared vertex displaced
+   *  radially by a position-keyed hash (position-keyed so the side wall and
+   *  the base cap move together and nothing cracks), which breaks the
+   *  silhouette into crags. ~110 faces, built once, instanced per peak.
+   *
+   *  And COLOUR, baked per face: the foot blends into the theme's own hill
+   *  tone so the range grows out of the land instead of being parked on it;
+   *  the body carries alternating strata bands warmed and cooled off the base
+   *  rock; the crest lightens, or turns to snow on worlds that cap their
+   *  boulders; and every facet gets its own tone wobble so the faces read as
+   *  rock instead of upholstery.
+   */
+  _cragGeo() {
+    const geo = new THREE.ConeGeometry(1, 1, 10, 5);
+    const p0 = geo.attributes.position;
+    const hsh = (a, b, c) => {
+      const v = Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    for (let i = 0; i < p0.count; i++) {
+      const x = p0.getX(i), y = p0.getY(i), z = p0.getZ(i);
+      const r = Math.hypot(x, z);
+      if (r < 1e-3) continue;                        // apex + cap centre stay
+      const hf = y + 0.5;                            // 0 at foot, 1 at crest
+      const j = 1 + (hsh(x, y, z) - 0.5) * (0.36 - 0.22 * hf);
+      p0.setX(i, x * j); p0.setZ(i, z * j);
+      if (hf > 0.05 && hf < 0.95) p0.setY(i, y + (hsh(z, x, y) - 0.5) * 0.05);
+    }
+    return geo.toNonIndexed();
+  }
+
   _buildMassif(m4) {
     const M = this.T.massif;
+    const geo = this._cragGeo();
+    const pos = geo.attributes.position;
+    const cols = new Float32Array(pos.count * 3);
+    const rockA = new THREE.Color(M.color ?? this._massifRock());
+    const rockB = rockA.clone().offsetHSL(0.015, 0.05, -0.045);   // warm stratum
+    const foot = new THREE.Color(this.T.hillColor ?? 0x6e8a5c);
+    const snow = !!(this.T.rockSnowCap || this.T.treeSnowCap);
+    const crest = snow ? new THREE.Color(0xf2f6fa)
+      : rockA.clone().offsetHSL(0, -0.04, 0.10);
+    const tmp = new THREE.Color();
+    const fh = (a, b) => {
+      const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    for (let f = 0; f < pos.count; f += 3) {
+      const hf = THREE.MathUtils.clamp(
+        (pos.getY(f) + pos.getY(f + 1) + pos.getY(f + 2)) / 3 + 0.5, 0, 1);
+      // strata bands off the base rock, alternating by height
+      tmp.copy((Math.floor(hf * 7) % 2) ? rockB : rockA);
+      // the foot grows out of the land
+      if (hf < 0.34) tmp.lerp(foot, (1 - hf / 0.34) * 0.7);
+      // the crest lightens - or snows
+      if (hf > 0.72) tmp.lerp(crest, ((hf - 0.72) / 0.28) * (snow ? 0.95 : 0.6));
+      // per-facet tone, so faces read as rock instead of upholstery
+      tmp.multiplyScalar(0.90 + fh(pos.getX(f), pos.getZ(f)) * 0.18);
+      for (let k = 0; k < 3; k++) {
+        cols[(f + k) * 3] = tmp.r; cols[(f + k) * 3 + 1] = tmp.g; cols[(f + k) * 3 + 2] = tmp.b;
+      }
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    geo.computeVertexNormals();
     const rock = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(1, 1, 6),
+      geo,
       new THREE.MeshStandardMaterial({
-        // ROCK, NOT HAZE. This used peakColor straight, and peakColor is the
-        // tone for peaks on the HORIZON, where distance washes colour out. The
-        // near massif stands a few hundred units away and fills a third of the
-        // frame, so cream limestone lit by a Mediterranean sun rendered as a
-        // pale sheet - measured on OLIVE COAST, hiding the massif dropped that
-        // part of the frame from 218 to 135 brightness. It is the same fault
-        // as the old sky-dome-inside-the-arena bug wearing a different hat.
-        // Near rock is therefore mixed most of the way to the hill tone, and a
-        // theme can override outright with massif.color.
-        // ...and barely any fog mix either: 0.34 baked a third of the land's
-        // cream haze into rock that stands close enough to read as rock.
-        map: this._horizonGrad(M.color ?? this._massifRock(), 0.1, 0.02),
-        flatShading: true, roughness: 1,
+        color: 0xffffff, vertexColors: true, flatShading: true, roughness: 1,
       }),
       M.count
     );
