@@ -1881,13 +1881,27 @@ export function townhouseTexture(palette = {}, variant = 0) {
  *  windows above, so the roll happens HERE, once per texture — every world
  *  gets one facade map and the lit pattern repeats down the terrace, which is
  *  what a row of identical houses actually looks like from a moving car. */
-export function townhouseGlowTexture(palette = {}) {
+/** The lit-window map for a town facade.
+ *
+ *  TWO BUGS LIVED HERE. It read TH_BAYS - the module's default bay layout -
+ *  while the FACE textures are drawn from `townhouseBays(variant)`, so on three
+ *  of the four variants the lit rectangles did not land on the windows at all.
+ *  And one texture object was built and shared by all four facade materials, so
+ *  every house on every street carried the identical pattern of lit rooms: a
+ *  terrace where nobody has gone to bed and everybody has the same curtains.
+ *
+ *  Per variant now, and `litFrac` sets how much of the building is awake, so a
+ *  street can hold dark houses next to lit ones.
+ */
+export function townhouseGlowTexture(palette = {}, variant = 0, litFrac = 0.55) {
   const P = { warm: '#ffb347', hot: '#ffd489', shop: '#f2a93b', ...palette };
+  const VB = townhouseBays(variant);
+  const BAYS = VB.bays;
   const t = make(TH_W, TH_H, (g, w, h) => {
     g.fillStyle = '#000000';
     g.fillRect(0, 0, w, h);
-    for (const [x, y, bw, bh] of TH_BAYS) {
-      if (Math.random() < 0.45) continue;           // dark flat
+    for (const [x, y, bw, bh] of BAYS) {
+      if (Math.random() > litFrac) continue;        // dark flat
       const grd = g.createLinearGradient(0, y, 0, y + bh);
       grd.addColorStop(0, P.hot);
       grd.addColorStop(1, P.warm);
@@ -1898,7 +1912,7 @@ export function townhouseGlowTexture(palette = {}) {
       g.fillRect(x, y + bh * 0.42, bw, 4);
     }
     // the shopfront: lit far more often than the flats above it
-    if (Math.random() < 0.55) {
+    if (VB.shop && Math.random() < litFrac) {
       const [sx, sy, sw, sh] = TH_SHOP;
       g.fillStyle = P.shop;
       g.fillRect(sx + 5, sy + 5, sw - 10, sh - 10);
