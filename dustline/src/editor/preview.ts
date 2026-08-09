@@ -117,11 +117,13 @@ function disposeDeep(obj: THREE.Object3D) {
 export class Preview {
   readonly renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private orbit: Orbit;
+  orbit: Orbit;
   private built: THREE.Object3D[] = [];
   private carMarker: THREE.Mesh;
   /** wall-clock cost of the last rebuild, shown in the status bar */
   lastBuildMs = 0;
+  /** how many of each component the last build actually placed */
+  componentCounts: Record<string, number> = {};
   terrain: Terrain | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
@@ -144,6 +146,37 @@ export class Preview {
   }
 
   focus(x: number, z: number, dist?: number) { this.orbit.focus(x, z, dist); }
+
+  /** Where on the ground is this screen point?
+   *
+   *  Raycasts the built world so a drop lands where the cursor is even on a
+   *  hillside — a flat y=0 plane would put a prop metres from where you aimed
+   *  wherever the terrain is not at sea level, which is most of it. Falls back
+   *  to the ground plane if the ray misses everything (over the sky dome). */
+  pick(clientX: number, clientY: number): { x: number; z: number } | null {
+    const r = this.canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - r.left) / r.width) * 2 - 1,
+      -((clientY - r.top) / r.height) * 2 + 1,
+    );
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, this.orbit.camera);
+    const targets = this.built.filter((o) => (o as THREE.Mesh).isMesh && !(o as THREE.InstancedMesh).isInstancedMesh);
+    const hits = ray.intersectObjects(targets, false);
+    if (hits.length) return { x: hits[0].point.x, z: hits[0].point.z };
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const at = new THREE.Vector3();
+    return ray.ray.intersectPlane(plane, at) ? { x: at.x, z: at.z } : null;
+  }
+
+  /** Screen position of a world point, for drawing a selection marker over the
+   *  3D view. Returns null when the point is behind the camera. */
+  project(x: number, y: number, z: number): { sx: number; sy: number } | null {
+    const r = this.canvas.getBoundingClientRect();
+    const v = new THREE.Vector3(x, y, z).project(this.orbit.camera);
+    if (v.z > 1) return null;
+    return { sx: (v.x * 0.5 + 0.5) * r.width, sy: (-v.y * 0.5 + 0.5) * r.height };
+  }
 
   /** Point the camera at the whole of a track. */
   frameTrack(def: TrackDef) {
@@ -171,7 +204,9 @@ export class Preview {
     this.built.push(buildSky(this.scene, def));
     this.built.push(buildClouds(this.scene, def));
     this.built.push(buildMountains(this.scene, def));
-    this.built.push(...buildVegetation(this.scene, terrain, null, null));
+    const comps = buildVegetation(this.scene, terrain, null, null);
+    this.built.push(...comps.objects);
+    this.componentCounts = comps.counts;
 
     const s = terrain.spawn;
     this.carMarker.position.set(s.x, terrain.heightAt(s.x, s.z) + 0.7, s.z);

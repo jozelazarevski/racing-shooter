@@ -127,23 +127,43 @@ export interface RoadBand {
 // scenery
 // ---------------------------------------------------------------------------
 
-export type SceneryKind = 'pine' | 'rock' | 'bush';
-
+/** A scatter layer names a COMPONENT by id (see world/props/) rather than
+ *  choosing from a closed list of hardcoded kinds. Adding a plantable thing to
+ *  the game is adding a file, not editing an enum and three switch statements. */
 export interface SceneryLayer {
-  kind: SceneryKind;
+  template: string;
   count: number;
   /** rejected if closer than this to the road centreline */
   minRoadDist: number;
   /** rejected if closer than this to the start pad */
   minSpawnDist: number;
-  /** rejected on these surfaces */
-  avoidSurfaces: SurfaceId[];
-  /** uniform scale range */
-  scale: [number, number];
+  /** rejected on these surfaces; omitted means "use the component's own rule" */
+  avoidSurfaces?: SurfaceId[];
+  /** uniform scale range; omitted means "use the component's own range" */
+  scale?: [number, number];
   /** scale bonus on these surfaces (the original grows bigger rocks on sand) */
   scaleBonusOn?: { surfaces: SurfaceId[]; extra: number };
   /** area sampled, as a fraction of world size */
   spread: number;
+}
+
+/** ONE COMPONENT, PUT SOMEWHERE ON PURPOSE.
+ *
+ *  The counterpart to a scatter layer: scatter fills a landscape, placement
+ *  puts a tyre stack on the outside of turn four. Position is stored in world
+ *  units; the ground height is NOT stored, because it is derived at build time
+ *  — so a prop stays on the ground when the terrain under it is edited, which
+ *  is the behaviour you want every single time. */
+export interface PlacedProp {
+  /** component id, e.g. "tyreStack" */
+  template: string;
+  x: number;
+  z: number;
+  /** yaw in radians */
+  rot: number;
+  scale: number;
+  /** lift off the ground, for the rare deliberate float */
+  yOffset?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +224,10 @@ export interface TrackDef {
   };
 
   scenery: SceneryLayer[];
+
+  /** Hand-placed components. Optional so tracks written before placement
+   *  existed still load. */
+  props?: PlacedProp[];
 
   sky: {
     /** four stops of the dome gradient, top to horizon */
@@ -380,7 +404,7 @@ export function validateTrack(def: TrackDef): TrackIssue[] {
     if (b.from >= b.to) out.push({ level: 'warning', message: `road band ${b.surface} has from >= to and will never apply` });
   }
   for (const l of def.scenery) {
-    if (l.count > 4000) out.push({ level: 'warning', message: `${l.kind} count ${l.count} is very high and will cost frame rate` });
+    if (l.count > 4000) out.push({ level: 'warning', message: `${l.template} count ${l.count} is very high and will cost frame rate` });
   }
   return out;
 }

@@ -81,7 +81,7 @@
 
   "scenery": [
     {
-      "kind": "pine",
+      "template": "pine",
       "count": 260,
       "minRoadDist": 11,
       "minSpawnDist": 62,
@@ -90,7 +90,7 @@
       "spread": 0.944
     },
     {
-      "kind": "rock",
+      "template": "rock",
       "count": 150,
       "minRoadDist": 10,
       "minSpawnDist": 62,
@@ -100,7 +100,7 @@
       "spread": 0.956
     },
     {
-      "kind": "bush",
+      "template": "bush",
       "count": 170,
       "minRoadDist": 9,
       "minSpawnDist": 60,

@@ -23,6 +23,12 @@ Tracks save to `localStorage`, export as JSON, or pack whole into a URL — whic
 is the useful bug-report format, because generation is seeded and the link
 therefore reproduces the world rather than just its outline.
 
+Everything in the world you can point at is a **component** — one file in
+`src/world/props/` with its geometry, physical rules and preview together, see
+`COMPONENTS.md`. Drag them from the editor's palette onto the map or straight
+onto the 3D terrain; the collider the file declares is the collider the car
+hits.
+
 `npm run verify:track` proves the format did not lose anything: it drives the
 original hardcoded implementation and the data path over 48,400 grid samples
 and requires them to agree.

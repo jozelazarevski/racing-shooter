@@ -39,7 +39,8 @@ One JSON file — see `src/data/tracks/dustbowl.json` and the typed shape in
 | `terrain.road` | the road's own elevation: waves over the lap, plus crests (jumps) |
 | `surfaces.bands` | stretches of the lap with their own surface |
 | `surfaces.zones` | regions that override the surface, with optional patches (ice) |
-| `scenery` | per-layer scatter: counts, clearances, forbidden surfaces, scale |
+| `scenery` | per-layer scatter: which COMPONENT, how many, clearances, scale |
+| `props` | hand-placed components: what, where, rotation, scale |
 | `sky` | dome gradient, fog, sun, fill light, horizon mountains, clouds |
 | `seed` | every scattered object derives from this — same seed, same world |
 
@@ -57,6 +58,18 @@ residual is attributed rather than waved away — one octave form computes
 `sin(x*fx + z*fz)` where the original wrote `sin((x+z)*f)`, and those are not
 the same float. The alternative was dropping diagonal ridges from the format.
 
+## Components — see `COMPONENTS.md`
+
+Everything in the world you can point at — trees, rocks, tyre stacks, hay bales
+— is a **component**: one file in `src/world/props/` carrying its geometry, its
+physical rules and its preview together. Adding one to the game is adding a
+file; there is no manifest, and the palette thumbnail is rendered from the
+geometry so it cannot go stale.
+
+Components reach a world two ways, both through the same builder: a **scatter
+layer** fills the landscape by rule, and a **placed prop** is one you dropped
+somewhere on purpose.
+
 ## Using the editor
 
 **Map (top).** The live surface. Shaded relief of the land, surfaces painted,
@@ -69,14 +82,21 @@ fast each corner can be taken.
 - `ctrl`+`Z` / `ctrl`+`shift`+`Z` to undo and redo
 - double-click anywhere to fly the 3D preview to that spot
 
+**Palette (left).** Every component, grouped by category, previewed from its own
+geometry. Drag onto the map or the 3D view, or click to arm and then click to
+place. Selected props: drag to move, `[` `]` rotate, `-` `=` resize, arrows
+nudge, `ctrl+D` duplicate, `del` remove.
+
 **3D preview (bottom).** The **real** `Terrain`, the real scenery placement,
 the real lighting — not an approximation. It rebuilds 220 ms after you stop
 changing things, because a full build costs ~66 ms in node and ~120–160 ms in
 a browser, which is fine on a pause and hopeless per mouse-move. That split is
 the whole performance design: the map is live, the preview catches up.
 
-**Panel (right).** Five tabs — SHAPE, LAND, SURFACE, SCATTER, SKY — exposing
-every field above. The snow line is a number box now.
+**Panel (right).** Six tabs — SHAPE, LAND, SURFACE, SCATTER, PLACED, SKY —
+exposing every field above. The snow line is a number box now. PLACED lists
+every hand-placed component with exact numbers and tells you whether it is
+solid at its current scale and what it weighs, read from its own file.
 
 **Status bar.** Lap length, control-point count, the tightest corner in km/h,
 the last build time, and any problems with the track.
@@ -132,6 +152,9 @@ should vary between runs.
 ## Checks
 
 ```bash
-npm run gate            # typecheck + the track-format equivalence proof
-npm run smoke:editor    # headless: needs a build served on :8903 (see the file header)
+npm run gate              # typecheck + the track-format equivalence proof
+npm run smoke:editor      # headless editor drive, ending in the game
+npm run smoke:components  # components: discovery, preview, placement, real colliders
 ```
+
+The last two need a build served on :8903 — see each file's header.

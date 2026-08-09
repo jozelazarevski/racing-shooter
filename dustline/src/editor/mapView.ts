@@ -12,6 +12,8 @@
 // widths, which are divided by the scale to keep them one pixel wide at any zoom.
 
 import type { TrackDef, SurfaceId, TrackIssue } from '../tracks/trackDef';
+import { getTemplate } from '../world/props/registry';
+import type { PropTemplate } from '../world/props/types';
 import {
   Sample, sampleLoop, landHeight, offroadSurfaceAt, roadSurfaceAt, cornerSpeedKmh,
 } from './geometry';
@@ -42,7 +44,22 @@ export interface MapOptions {
   hover: number;
   /** index of the sample nearest the cursor, for the readout; -1 for none */
   hoverSample: number;
+  /** index into def.props of the selected placed component; -1 for none */
+  selectedProp: number;
+  hoverProp: number;
+  /** world position of a component being dragged in from the palette */
+  ghost: { x: number; z: number; radius: number } | null;
 }
+
+/** Placed components are drawn by CATEGORY colour, not by component, so a
+ *  glance separates "things that grow" from "things someone bolted down"
+ *  without needing fifty distinguishable colours. */
+const CATEGORY_COLORS: Record<string, string> = {
+  flora: '#5fbf6a',
+  terrain: '#9c9184',
+  trackside: '#ffb52e',
+  structure: '#9fdcff',
+};
 
 /** Shaded relief of the open country, drawn once per definition change into an
  *  offscreen canvas and then blitted. Recomputing 200x200 height samples on
@@ -107,6 +124,17 @@ function hexToRgb(hex: string): [number, number, number] {
   return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
 }
 const clamp255 = (v: number) => Math.max(0, Math.min(255, v | 0));
+
+/** Map footprint of a placed component, from its own collider rule where it has
+ *  one — so what you see on the map is what the car will hit. */
+export function propRadius(tpl: PropTemplate | null, scale: number): number {
+  if (!tpl) return 1.5;
+  const shape = tpl.physics.shape(scale);
+  if (shape.kind === 'ball') return shape.radius;
+  if (shape.kind === 'cylinder') return shape.radius;
+  if (shape.kind === 'box') return Math.max(shape.halfExtents[0], shape.halfExtents[2]);
+  return 1.2 * scale;
+}
 
 /** Blue-to-red ramp for corner tightness. Deliberately NOT a rainbow: a rainbow
  *  has no perceptual order, so "which of these two corners is tighter" becomes
@@ -297,6 +325,49 @@ export class MapView {
       ctx.beginPath();
       ctx.arc(s.x, s.z, Math.max(2.5, half * 0.6), 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    // ---- placed components ----
+    for (let i = 0; i < (def.props ?? []).length; i++) {
+      const p = def.props![i];
+      const tpl = getTemplate(p.template);
+      const colour = tpl ? (CATEGORY_COLORS[tpl.category] ?? '#ffffff') : '#ff4d3d';
+      const sel = i === opts.selectedProp;
+      const hov = i === opts.hoverProp;
+      // Radius reflects the component's real footprint, so you can see whether
+      // two placed things overlap before you build the world — but never
+      // smaller than a few screen pixels. A tyre stack is 0.66 m across, which
+      // is a third of a pixel with the whole 900 m world in view: drawn
+      // honestly and to scale, it is invisible exactly when you most need to
+      // find it.
+      const rr = Math.max(propRadius(tpl, p.scale), 5 * px);
+      ctx.beginPath();
+      ctx.arc(p.x, p.z, rr, 0, Math.PI * 2);
+      ctx.fillStyle = `${colour}${sel ? 'cc' : hov ? '99' : '66'}`;
+      ctx.fill();
+      ctx.lineWidth = (sel ? 2.2 : 1.2) * px;
+      ctx.strokeStyle = sel ? '#ffd400' : colour;
+      ctx.stroke();
+      // heading tick — rotation is invisible on a circle, and rotation is the
+      // thing you set most often after position
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.z);
+      ctx.lineTo(p.x + Math.sin(p.rot) * rr * 1.9, p.z + Math.cos(p.rot) * rr * 1.9);
+      ctx.strokeStyle = sel ? '#ffd400' : colour;
+      ctx.lineWidth = 1.4 * px;
+      ctx.stroke();
+    }
+
+    if (opts.ghost) {
+      ctx.beginPath();
+      ctx.arc(opts.ghost.x, opts.ghost.z, Math.max(opts.ghost.radius, 6 * px), 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,212,0,.28)';
+      ctx.fill();
+      ctx.setLineDash([4 * px, 4 * px]);
+      ctx.strokeStyle = '#ffd400';
+      ctx.lineWidth = 1.6 * px;
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     // ---- control polygon ----

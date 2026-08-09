@@ -12,11 +12,12 @@
 // be machinery earning nothing.
 
 import type {
-  TrackDef, SurfaceId, HeightOctave, SurfaceZone, ZonePredicate, SceneryLayer, SceneryKind,
+  TrackDef, SurfaceId, HeightOctave, SurfaceZone, ZonePredicate, SceneryLayer,
 } from '../tracks/trackDef';
 import { SURFACE_IDS } from '../tracks/trackDef';
+import { templateIds, getTemplate } from '../world/props/registry';
 
-export type TabId = 'shape' | 'terrain' | 'surfaces' | 'scenery' | 'sky';
+export type TabId = 'shape' | 'terrain' | 'surfaces' | 'scenery' | 'props' | 'sky';
 
 type Commit = (mutate: (d: TrackDef) => void, label: string) => void;
 
@@ -133,13 +134,17 @@ function addButton(parent: HTMLElement, label: string, onClick: () => void) {
 
 // ---------------------------------------------------------------------------
 
-export function renderPanel(root: HTMLElement, def: TrackDef, tab: TabId, commit: Commit) {
+export function renderPanel(
+  root: HTMLElement, def: TrackDef, tab: TabId, commit: Commit,
+  selectedProp = -1, onSelectProp: (i: number) => void = () => {},
+) {
   root.innerHTML = '';
   switch (tab) {
     case 'shape': return shapeTab(root, def, commit);
     case 'terrain': return terrainTab(root, def, commit);
     case 'surfaces': return surfacesTab(root, def, commit);
     case 'scenery': return sceneryTab(root, def, commit);
+    case 'props': return propsTab(root, def, commit, selectedProp, onSelectProp);
     case 'sky': return skyTab(root, def, commit);
   }
 }
@@ -313,36 +318,83 @@ function surfacesTab(root: HTMLElement, def: TrackDef, commit: Commit) {
 }
 
 function sceneryTab(root: HTMLElement, def: TrackDef, commit: Commit) {
+  const ids = templateIds();
   const g = group(root, 'Scatter layers');
-  hint(g, 'Placement is seeded per layer, so editing the rocks never moves the trees. '
-    + 'A layer that cannot find room reports it in the console rather than silently coming up short.');
+  hint(g, 'A layer fills the landscape with one COMPONENT, by rule. Placement is seeded per '
+    + 'component, so editing the rocks never moves the trees. Leave a field blank to use the '
+    + "component's own default — a pine already knows it does not grow on ice.");
   def.scenery.forEach((layer, i) => {
-    const c = card(g, layer.kind, () => commit((d) => { d.scenery.splice(i, 1); }, 'remove layer'));
-    selectRow(c, 'kind', layer.kind, ['pine', 'rock', 'bush'] as const, (v) => commit((d) => { d.scenery[i].kind = v as SceneryKind; }, 'layer kind'));
+    const tpl = getTemplate(layer.template);
+    const c = card(g, tpl ? tpl.name : `${layer.template} (missing!)`,
+      () => commit((d) => { d.scenery.splice(i, 1); }, 'remove layer'));
+    selectRow(c, 'component', layer.template, ids, (v) => commit((d) => { d.scenery[i].template = v; }, 'layer component'));
     numRow(c, 'count', layer.count, (v) => commit((d) => { d.scenery[i].count = Math.max(0, v | 0); }, 'count'), { step: 10, min: 0 });
     numRow(c, 'clear of road (m)', layer.minRoadDist, (v) => commit((d) => { d.scenery[i].minRoadDist = v; }, 'road clearance'), { step: 1 });
     numRow(c, 'clear of start (m)', layer.minSpawnDist, (v) => commit((d) => { d.scenery[i].minSpawnDist = v; }, 'start clearance'), { step: 5 });
-    numRow(c, 'scale min', layer.scale[0], (v) => commit((d) => { d.scenery[i].scale[0] = v; }, 'scale'), { step: 0.1 });
-    numRow(c, 'scale max', layer.scale[1], (v) => commit((d) => { d.scenery[i].scale[1] = v; }, 'scale'), { step: 0.1 });
-    numRow(c, 'spread (0–1)', layer.spread, (v) => commit((d) => { d.scenery[i].spread = Math.max(0.05, Math.min(1, v)); }, 'spread'), { step: 0.02 });
+    const range = layer.scale ?? tpl?.authoring.scale ?? [1, 1];
+    numRow(c, 'scale min', range[0], (v) => commit((d) => {
+      const cur = d.scenery[i].scale ?? [...range];
+      d.scenery[i].scale = [v, cur[1]];
+    }, 'scale'), { step: 0.1 });
+    numRow(c, 'scale max', range[1], (v) => commit((d) => {
+      const cur = d.scenery[i].scale ?? [...range];
+      d.scenery[i].scale = [cur[0], v];
+    }, 'scale'), { step: 0.1 });
+    numRow(c, 'spread (0-1)', layer.spread, (v) => commit((d) => { d.scenery[i].spread = Math.max(0.05, Math.min(1, v)); }, 'spread'), { step: 0.02 });
     const av = el('div');
     av.appendChild(el('label', 'hint', 'never on:'));
-    for (const s of SURFACE_IDS) {
-      checkRow(av, s, layer.avoidSurfaces.includes(s), (on) => commit((d) => {
-        const list = d.scenery[i].avoidSurfaces;
-        const at = list.indexOf(s);
-        if (on && at < 0) list.push(s);
+    const avoid = layer.avoidSurfaces ?? tpl?.authoring.avoidSurfaces ?? [];
+    for (const sfc of SURFACE_IDS) {
+      checkRow(av, sfc, avoid.includes(sfc), (on) => commit((d) => {
+        const list = d.scenery[i].avoidSurfaces ?? [...avoid];
+        const at = list.indexOf(sfc);
+        if (on && at < 0) list.push(sfc);
         if (!on && at >= 0) list.splice(at, 1);
+        d.scenery[i].avoidSurfaces = list;
       }, 'avoid surface'));
     }
     c.appendChild(av);
   });
   addButton(g, '+ layer', () => commit((d) => {
     d.scenery.push({
-      kind: 'rock', count: 80, minRoadDist: 10, minSpawnDist: 60,
-      avoidSurfaces: [], scale: [0.5, 1.5], spread: 0.95,
+      template: ids[0] ?? 'rock', count: 80, minRoadDist: 10, minSpawnDist: 60, spread: 0.95,
     } as SceneryLayer);
   }, 'add layer'));
+}
+
+function propsTab(
+  root: HTMLElement, def: TrackDef, commit: Commit,
+  selectedProp: number, onSelect: (i: number) => void,
+) {
+  const g = group(root, 'Placed components');
+  const list = def.props ?? [];
+  if (!list.length) {
+    hint(g, 'Nothing placed by hand yet. Drag a component from the palette onto the map — '
+      + 'or drop it on the 3D view. Scatter fills a landscape; placement puts a tyre stack on '
+      + 'the outside of turn four.');
+  } else {
+    hint(g, 'Click a row to select it on the map. Selected props move with drag, rotate with '
+      + '[ and ], resize with - and =, duplicate with ctrl+D, and delete with del.');
+  }
+  list.forEach((p, i) => {
+    const tpl = getTemplate(p.template);
+    const c = card(g, `${tpl ? tpl.name : p.template} #${i + 1}`,
+      () => commit((d) => { d.props?.splice(i, 1); }, 'remove prop'));
+    if (i === selectedProp) c.style.borderColor = '#ffd400';
+    c.addEventListener('click', () => onSelect(i));
+    numRow(c, 'x', Math.round(p.x), (v) => commit((d) => { d.props![i].x = v; }, 'prop x'), { step: 1 });
+    numRow(c, 'z', Math.round(p.z), (v) => commit((d) => { d.props![i].z = v; }, 'prop z'), { step: 1 });
+    numRow(c, 'rotation (deg)', Math.round((p.rot * 180) / Math.PI),
+      (v) => commit((d) => { d.props![i].rot = (v * Math.PI) / 180; }, 'prop rot'), { step: 15 });
+    numRow(c, 'scale', p.scale, (v) => commit((d) => { d.props![i].scale = Math.max(0.05, v); }, 'prop scale'), { step: 0.1 });
+    numRow(c, 'lift (m)', p.yOffset ?? 0, (v) => commit((d) => { d.props![i].yOffset = v; }, 'prop lift'), { step: 0.25 });
+    if (tpl) {
+      const solid = typeof tpl.physics.solid === 'function' ? tpl.physics.solid(p.scale) : tpl.physics.solid;
+      hint(c, `${tpl.description} — ${solid ? `SOLID at this scale, ${tpl.physics.massKg ?? '?'} kg` : 'not solid at this scale'}`);
+    } else {
+      hint(c, 'This component no longer exists. The world will skip it and warn in the console.');
+    }
+  });
 }
 
 function skyTab(root: HTMLElement, def: TrackDef, commit: Commit) {

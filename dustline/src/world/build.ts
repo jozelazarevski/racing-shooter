@@ -1,0 +1,209 @@
+// Building the world's components — scattered and hand-placed, one path.
+//
+// This replaces three near-identical hardcoded loops (`buildPines`,
+// `buildRocks`, `buildBushes`), each of which had its own copy of the
+// placement rules, its own instanced meshes and its own collider code. They
+// differed in ways that were accidents rather than decisions: the pine loop
+// had a guard of 4000 and the rock loop 3000, the pine checked spawn distance
+// before surface and the rock after.
+//
+// Now there is ONE placement routine and ONE instancing routine, and what
+// differs between a pine and a tyre stack lives in the component file where
+// you can see it.
+//
+// TWO WAYS A COMPONENT REACHES THE WORLD:
+//   - a SCATTER LAYER fills the landscape with them, seeded, by rule
+//   - a PLACED PROP is one you put somewhere on purpose
+// Both end up in the same InstancedMesh per part, so a hand-placed pine costs
+// nothing extra over a scattered one.
+
+import * as THREE from 'three';
+import type RAPIER_API from '@dimforge/rapier3d-compat';
+import type { TrackDef, SceneryLayer, PlacedProp, SurfaceId } from '../tracks/trackDef';
+import type { Terrain } from '../tracks/terrain';
+import type { PropTemplate, PlaceCtx, PhysicsShape } from './props/types';
+import { isSolid } from './props/types';
+import { getTemplate, partsFor, resetPartCache } from './props/registry';
+import { Rng } from '../core/rng';
+
+/** One instance of one component, ready to be written into a matrix. */
+interface Instance {
+  ctx: PlaceCtx;
+  rot: number;
+  yOffset: number;
+}
+
+/** Find room for `layer.count` instances under the layer's rules.
+ *
+ *  The rejection budget scales with the requested count instead of being a flat
+ *  constant, and a shortfall is REPORTED. The old loops silently stopped at a
+ *  fixed guard, so a layer whose rules rejected most of the map just quietly
+ *  produced forty trees and nothing said why. */
+function scatter(
+  layer: SceneryLayer, tpl: PropTemplate, terrain: Terrain, rng: Rng,
+): Instance[] {
+  const def = terrain.def;
+  const spread = def.world.size * layer.spread;
+  const avoid = layer.avoidSurfaces ?? tpl.authoring.avoidSurfaces ?? [];
+  const range = layer.scale ?? tpl.authoring.scale;
+  const out: Instance[] = [];
+  const budget = Math.max(3000, layer.count * 20);
+  let guard = 0;
+
+  while (out.length < layer.count && guard++ < budget) {
+    const x = rng.centered(spread / 2);
+    const z = rng.centered(spread / 2);
+    if (terrain.distToRoad(x, z) < layer.minRoadDist) continue;
+    if (Math.hypot(x - terrain.spawn.x, z - terrain.spawn.z) < layer.minSpawnDist) continue;
+    const surface = terrain.surfaceIdAt(x, z) as SurfaceId;
+    if (avoid.includes(surface)) continue;
+    let scale = rng.range(range[0], range[1]);
+    if (layer.scaleBonusOn && layer.scaleBonusOn.surfaces.includes(surface)) {
+      scale += rng.float() * layer.scaleBonusOn.extra;
+    }
+    out.push({
+      ctx: { x, z, y: terrain.heightAt(x, z), surface, scale, rng },
+      rot: tpl.authoring.randomYaw ? rng.float() * Math.PI * 2 : 0,
+      yOffset: 0,
+    });
+  }
+
+  if (out.length < layer.count) {
+    console.warn(
+      `[world] ${layer.template}: placed ${out.length}/${layer.count} — the rules reject too much `
+      + `of the map (minRoadDist ${layer.minRoadDist}, avoids ${avoid.join('/') || 'nothing'})`,
+    );
+  }
+  return out;
+}
+
+/** A hand-placed prop. Ground height is looked up NOW rather than stored, so
+ *  editing the terrain under a prop moves the prop with it. */
+function placed(p: PlacedProp, terrain: Terrain, rng: Rng): Instance {
+  return {
+    ctx: {
+      x: p.x, z: p.z, y: terrain.heightAt(p.x, p.z),
+      surface: terrain.surfaceIdAt(p.x, p.z) as SurfaceId,
+      scale: p.scale, rng,
+    },
+    rot: p.rot,
+    yOffset: p.yOffset ?? 0,
+  };
+}
+
+function addCollider(
+  shape: PhysicsShape, ctx: PlaceCtx, yOffset: number, friction: number,
+  world: RAPIER_API.World, RAPIER: typeof RAPIER_API, body: RAPIER_API.RigidBody,
+) {
+  const y = ctx.y + yOffset;
+  let desc: RAPIER_API.ColliderDesc | null = null;
+  switch (shape.kind) {
+    case 'cylinder':
+      desc = RAPIER.ColliderDesc.cylinder(shape.halfHeight, shape.radius)
+        .setTranslation(ctx.x, y + shape.centerY, ctx.z);
+      break;
+    case 'ball':
+      desc = RAPIER.ColliderDesc.ball(shape.radius)
+        .setTranslation(ctx.x, y + shape.centerY, ctx.z);
+      break;
+    case 'box':
+      desc = RAPIER.ColliderDesc.cuboid(...shape.halfExtents)
+        .setTranslation(ctx.x, y + shape.centerY, ctx.z);
+      break;
+    case 'none':
+      return;
+  }
+  if (desc) world.createCollider(desc.setFriction(friction), body);
+}
+
+export interface BuiltWorld {
+  objects: THREE.Object3D[];
+  /** how many of each component actually made it into the world */
+  counts: Record<string, number>;
+}
+
+/** Build every component the track asks for.
+ *
+ *  `world`/`RAPIER` may be null — that is the editor preview, which wants to
+ *  see the scenery but has no physics and needs no colliders. */
+export function buildComponents(
+  scene: THREE.Scene, terrain: Terrain,
+  world: RAPIER_API.World | null, RAPIER: typeof RAPIER_API | null,
+): BuiltWorld {
+  const def: TrackDef = terrain.def;
+  // Geometry from the previous world has been disposed by the caller, so the
+  // shared part cache must go with it or we hand out dead buffers.
+  resetPartCache();
+
+  const byTemplate = new Map<string, Instance[]>();
+  const push = (id: string, inst: Instance) => {
+    const list = byTemplate.get(id);
+    if (list) list.push(inst); else byTemplate.set(id, [inst]);
+  };
+
+  for (const layer of def.scenery) {
+    const tpl = getTemplate(layer.template);
+    if (!tpl) { console.warn(`[world] unknown component "${layer.template}" in a scatter layer`); continue; }
+    // forked BY COMPONENT, so adding rocks never moves the trees
+    const rng = Rng.fork(def.seed, `scatter:${layer.template}`);
+    for (const inst of scatter(layer, tpl, terrain, rng)) push(layer.template, inst);
+  }
+
+  // Placed props draw from their own stream, so hand-placing something does not
+  // reshuffle the scattered world around it.
+  const placedRng = Rng.fork(def.seed, 'placed');
+  for (const p of def.props ?? []) {
+    if (!getTemplate(p.template)) { console.warn(`[world] unknown component "${p.template}" placed`); continue; }
+    push(p.template, placed(p, terrain, placedRng));
+  }
+
+  const objects: THREE.Object3D[] = [];
+  const counts: Record<string, number> = {};
+  const solids = world && RAPIER ? world.createRigidBody(RAPIER.RigidBodyDesc.fixed()) : null;
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
+  const pos = new THREE.Vector3();
+  const scl = new THREE.Vector3();
+
+  for (const [id, instances] of byTemplate) {
+    const tpl = getTemplate(id)!;
+    counts[id] = instances.length;
+    if (!instances.length) continue;
+    const parts = partsFor(tpl);
+
+    for (const part of parts) {
+      const eligible = part.when ? instances.filter((i) => part.when!(i.ctx)) : instances;
+      if (!eligible.length) continue;
+      const mesh = new THREE.InstancedMesh(part.geometry, part.material, eligible.length);
+      mesh.castShadow = part.castShadow ?? false;
+      let n = 0;
+      for (const inst of eligible) {
+        const s = inst.ctx.scale;
+        pos.set(inst.ctx.x, inst.ctx.y + inst.yOffset + (part.offsetY ?? 0), inst.ctx.z);
+        q.setFromAxisAngle(up, inst.rot);
+        scl.set(s, s, s);
+        m4.compose(pos, q, scl);
+        mesh.setMatrixAt(n, m4);
+        const tint = part.tint?.(inst.ctx);
+        if (tint) mesh.setColorAt(n, tint);
+        n++;
+      }
+      mesh.count = n;
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      scene.add(mesh);
+      objects.push(mesh);
+    }
+
+    if (solids && world && RAPIER) {
+      const friction = tpl.physics.friction ?? 1;
+      for (const inst of instances) {
+        if (!isSolid(tpl.physics, inst.ctx.scale)) continue;
+        addCollider(tpl.physics.shape(inst.ctx.scale), inst.ctx, inst.yOffset, friction, world, RAPIER, solids);
+      }
+    }
+  }
+
+  return { objects, counts };
+}

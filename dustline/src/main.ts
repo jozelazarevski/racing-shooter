@@ -50,7 +50,8 @@ async function boot() {
   buildSky(scene, trackDef);
   const clouds = buildClouds(scene, trackDef);
   buildMountains(scene, trackDef);
-  buildVegetation(scene, terrain, world, RAPIER);
+  const components = buildVegetation(scene, terrain, world, RAPIER);
+  console.info('[world] components:', components.counts);
 
   const line = bakeRacingLine(terrain);
   const director = new RaceDirector(line);

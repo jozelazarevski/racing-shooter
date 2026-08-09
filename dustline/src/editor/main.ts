@@ -20,6 +20,9 @@ import { MapView } from './mapView';
 import { Preview } from './preview';
 import { renderPanel, TabId } from './panel';
 import { hitTest, sampleLoop, lapLength, cornerSpeedKmh, starterLoop } from './geometry';
+import { propRadius } from './mapView';
+import { Palette, DRAG_MIME } from './palette';
+import { getTemplate } from '../world/props/registry';
 
 // ---- document + history ---------------------------------------------------
 
@@ -68,6 +71,48 @@ const selected = new Set<number>();
 let hover = -1;
 let hoverSample = -1;
 
+// ---- placed components ----
+let selectedProp = -1;
+let hoverProp = -1;
+let draggingProp = -1;
+let ghost: { x: number; z: number; radius: number } | null = null;
+
+const palette = new Palette(document.getElementById('palette')!, {
+  onArm: () => { mapCanvas.style.cursor = palette.armedId ? 'copy' : 'crosshair'; },
+});
+
+/** Which placed component is at (x, z)? Uses each component's real footprint,
+ *  so a boulder is easier to grab than a marshal post — which is correct: it
+ *  IS bigger. */
+function propAt(x: number, z: number): { index: number; dist: number } {
+  let best = -1, bestD = Infinity;
+  const list = def.props ?? [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const p = list[i];
+    const d = Math.hypot(p.x - x, p.z - z);
+    const rr = Math.max(propRadius(getTemplate(p.template), p.scale), 6 / map.view.scale);
+    if (d <= rr && d < bestD) { bestD = d; best = i; }
+  }
+  return { index: best, dist: bestD };
+}
+
+function placeComponent(id: string, x: number, z: number) {
+  const tpl = getTemplate(id);
+  if (!tpl) return;
+  commit((d) => {
+    if (!d.props) d.props = [];
+    d.props.push({
+      template: id,
+      x: Math.round(x), z: Math.round(z),
+      rot: tpl.authoring.randomYaw ? Math.random() * Math.PI * 2 : 0,
+      scale: tpl.authoring.defaultScale,
+    });
+  }, 'place component');
+  selectedProp = (def.props?.length ?? 1) - 1;
+  selected.clear();
+  if (tab !== 'props') setTab('props'); else changed();
+}
+
 // ---- the debounce that makes this usable ----------------------------------
 //
 // 220 ms after the last change. Long enough that dragging a corner through
@@ -92,10 +137,28 @@ function scheduleRebuild() {
 }
 
 function changed() {
-  renderPanel(panelEl, def, tab, commit);
+  renderPanel(panelEl, def, tab, commit, selectedProp, (i) => {
+    selectedProp = i;
+    redraw();
+    changed();
+  });
   (document.getElementById('trackName') as HTMLInputElement).value = def.name;
   scheduleRebuild();
   updateStatus();
+  // The map is only repainted when something marks it dirty, and until this
+  // line existed nothing did on a NON-pointer edit: typing a new snow line, or
+  // dropping a component, left the map showing the previous world until you
+  // happened to move the mouse over it. Drag edits hid the bug because they
+  // redraw on every pointermove.
+  redraw();
+}
+
+function setTab(next: TabId) {
+  tab = next;
+  for (const o of Array.from(document.querySelectorAll('.tab'))) {
+    o.classList.toggle('on', (o as HTMLElement).dataset.tab === next);
+  }
+  changed();
 }
 
 // ---- status bar -----------------------------------------------------------
@@ -116,6 +179,9 @@ function updateStatus() {
     ? `${tightest.toFixed(0)} km/h` : '—';
   document.getElementById('stBuild')!.textContent = pendingRebuild
     ? 'building…' : preview.lastBuildMs ? `${preview.lastBuildMs.toFixed(0)} ms` : '—';
+
+  const propEl = document.getElementById('stProps');
+  if (propEl) propEl.textContent = String((def.props ?? []).length);
 
   const box = document.getElementById('issues')!;
   box.innerHTML = '';
@@ -151,8 +217,36 @@ mapCanvas.addEventListener('pointerdown', (e) => {
     lastPan = [e.clientX, e.clientY];
     return;
   }
+  // An armed component places on click — that is the "twenty tyre stacks along
+  // one corner" workflow, and it must beat every other click behaviour.
+  if (palette.armedId && !e.altKey) {
+    placeComponent(palette.armedId, wx, wz);
+    if (!e.shiftKey) palette.arm(null);      // shift keeps it armed for a run
+    return;
+  }
+
   const tol = 9 / map.view.scale;
   const hit = hitTest(def.road.points, wx, wz, tol, tol);
+
+  // Whichever is NEARER wins — control points and props are both round dots on
+  // the same map, and a rule like "control points always win" makes a prop you
+  // just dropped near the road impossible to grab again.
+  const ph = propAt(wx, wz);
+  const ctrlDist = hit.kind === 'point'
+    ? Math.hypot(def.road.points[hit.index][0] - wx, def.road.points[hit.index][1] - wz)
+    : Infinity;
+  if (ph.index >= 0 && ph.dist <= ctrlDist) {
+    selectedProp = ph.index;
+    selected.clear();
+    draggingProp = ph.index;
+    past.push(snapshot());
+    future.length = 0;
+    dragMoved = false;
+    if (tab !== 'props') setTab('props'); else changed();
+    redraw();
+    return;
+  }
+  if (hit.kind !== 'point') selectedProp = -1;
 
   if (e.altKey) {
     // insert INTO the segment under the cursor, never append: appending turns
@@ -195,6 +289,18 @@ mapCanvas.addEventListener('pointermove', (e) => {
   }
   const [wx, wz] = map.toWorld(e.offsetX, e.offsetY);
 
+  if (draggingProp >= 0) {
+    const p = def.props![draggingProp];
+    p.x = Math.round(wx);
+    p.z = Math.round(wz);
+    dragMoved = true;
+    dirty = true;
+    scheduleRebuild();
+    updateStatus();
+    redraw();
+    return;
+  }
+
   if (dragging >= 0) {
     const p = def.road.points[dragging];
     const dx = wx - p[0], dz = wz - p[1];
@@ -216,6 +322,7 @@ mapCanvas.addEventListener('pointermove', (e) => {
   const tol = 9 / map.view.scale;
   const hit = hitTest(def.road.points, wx, wz, tol, -1);
   hover = hit.kind === 'point' ? hit.index : -1;
+  hoverProp = propAt(wx, wz).index;
 
   // nearest centreline sample, for the readout
   const samples = sampleLoop(def, 1);
@@ -244,8 +351,11 @@ mapCanvas.addEventListener('pointermove', (e) => {
 });
 
 const endDrag = () => {
-  if (dragging >= 0 && !dragMoved) past.pop();   // a click that moved nothing is not an edit
+  // a click that moved nothing is not an edit and must not cost an undo slot
+  if ((dragging >= 0 || draggingProp >= 0) && !dragMoved) past.pop();
+  if (draggingProp >= 0 && dragMoved) changed();
   dragging = -1;
+  draggingProp = -1;
   panning = false;
 };
 mapCanvas.addEventListener('pointerup', endDrag);
@@ -262,6 +372,49 @@ mapCanvas.addEventListener('dblclick', (e) => {
   preview.focus(wx, wz, 90);          // double-click the map to fly the preview there
 });
 
+// ---- drag and drop from the palette --------------------------------------
+//
+// Both views accept a drop. The map is the precise one; the 3D view raycasts
+// the actual terrain, so dropping on a hillside lands where the cursor is
+// rather than where a flat plane would have put it.
+
+const dragOver = (e: DragEvent) => {
+  if (!e.dataTransfer?.types.includes(DRAG_MIME)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+};
+
+mapCanvas.addEventListener('dragover', (e) => {
+  dragOver(e);
+  const id = palette.armedId;
+  if (!id) return;
+  const [wx, wz] = map.toWorld(e.offsetX, e.offsetY);
+  const tpl = getTemplate(id);
+  ghost = { x: wx, z: wz, radius: propRadius(tpl, tpl?.authoring.defaultScale ?? 1) };
+  redraw();
+});
+mapCanvas.addEventListener('dragleave', () => { ghost = null; redraw(); });
+mapCanvas.addEventListener('drop', (e) => {
+  e.preventDefault();
+  ghost = null;
+  const id = e.dataTransfer?.getData(DRAG_MIME) || e.dataTransfer?.getData('text/plain');
+  if (!id || !getTemplate(id)) return;
+  const [wx, wz] = map.toWorld(e.offsetX, e.offsetY);
+  placeComponent(id, wx, wz);
+  palette.arm(null);
+});
+
+previewCanvas.addEventListener('dragover', dragOver);
+previewCanvas.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const id = e.dataTransfer?.getData(DRAG_MIME) || e.dataTransfer?.getData('text/plain');
+  if (!id || !getTemplate(id)) return;
+  const at = preview.pick(e.clientX, e.clientY);
+  if (!at) return;
+  placeComponent(id, at.x, at.z);
+  palette.arm(null);
+});
+
 addEventListener('keydown', (e) => {
   const typing = (e.target as HTMLElement)?.tagName?.match(/INPUT|SELECT|TEXTAREA/);
   if (typing) return;
@@ -272,6 +425,37 @@ addEventListener('keydown', (e) => {
     if (e.shiftKey) redo(); else undo();
   }
   if ((e.key === 'y' || e.key === 'Y') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); redo(); }
+  // ---- selected placed component ----
+  if (selectedProp >= 0 && def.props?.[selectedProp]) {
+    const nudge = e.shiftKey ? 5 : 1;
+    let handled = true;
+    if (e.key === '[') commit((d) => { d.props![selectedProp].rot -= Math.PI / 12; }, 'rotate');
+    else if (e.key === ']') commit((d) => { d.props![selectedProp].rot += Math.PI / 12; }, 'rotate');
+    else if (e.key === '-' || e.key === '_') commit((d) => {
+      d.props![selectedProp].scale = Math.max(0.1, d.props![selectedProp].scale - 0.1);
+    }, 'scale');
+    else if (e.key === '=' || e.key === '+') commit((d) => {
+      d.props![selectedProp].scale += 0.1;
+    }, 'scale');
+    else if (e.key === 'ArrowLeft') commit((d) => { d.props![selectedProp].x -= nudge; }, 'nudge');
+    else if (e.key === 'ArrowRight') commit((d) => { d.props![selectedProp].x += nudge; }, 'nudge');
+    else if (e.key === 'ArrowUp') commit((d) => { d.props![selectedProp].z -= nudge; }, 'nudge');
+    else if (e.key === 'ArrowDown') commit((d) => { d.props![selectedProp].z += nudge; }, 'nudge');
+    else if ((e.key === 'd' || e.key === 'D') && (e.ctrlKey || e.metaKey)) {
+      const src = def.props![selectedProp];
+      commit((d) => { d.props!.push({ ...src, x: src.x + 6, z: src.z + 6 }); }, 'duplicate');
+      selectedProp = def.props!.length - 1;
+      changed();
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      commit((d) => { d.props!.splice(selectedProp, 1); }, 'delete prop');
+      selectedProp = -1;
+      changed();
+    } else if (e.key === 'Escape') { selectedProp = -1; changed(); }
+    else handled = false;
+    if (handled) { e.preventDefault(); redraw(); return; }
+  }
+  if (e.key === 'Escape' && palette.armedId) { palette.arm(null); return; }
+
   if (e.key === 'Delete' || e.key === 'Backspace') {
     if (!selected.size) return;
     e.preventDefault();
@@ -295,7 +479,7 @@ function frame() {
   if (needsDraw) {
     map.draw(def, {
       showRelief: true, showSurfaces: true, showCurvature: true, showGrid: true,
-      selected, hover, hoverSample,
+      selected, hover, hoverSample, selectedProp, hoverProp, ghost,
     }, validateTrack(def));
     needsDraw = false;
   }
@@ -413,12 +597,7 @@ $('btnLayout').addEventListener('click', () => {
 });
 
 for (const t of Array.from(document.querySelectorAll('.tab'))) {
-  t.addEventListener('click', () => {
-    for (const o of Array.from(document.querySelectorAll('.tab'))) o.classList.remove('on');
-    t.classList.add('on');
-    tab = (t as HTMLElement).dataset.tab as TabId;
-    renderPanel(panelEl, def, tab, commit);
-  });
+  t.addEventListener('click', () => setTab((t as HTMLElement).dataset.tab as TabId));
 }
 
 addEventListener('beforeunload', (e) => {
