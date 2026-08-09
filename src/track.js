@@ -8819,14 +8819,39 @@ export class Track {
     ]);
 
     const sail = (Aa, Bb, Cc, belly) => this._sailGeo(Aa, Bb, Cc, belly);
-    const mainG = sail([0, 1.50, 0.02], [0, 9.25, -0.05], [0, 1.95, -4.3], 0.34);
-    const jibG = sail([0, 1.00, 4.25], [0, 8.55, 0.12], [0, 1.20, 0.35], 0.26);
+    // A MOORED BOAT DOES NOT FLY ITS SAILS.
+    //
+    // Twenty of the thirty boats were yachts and every one of them carried a
+    // full-size 9.4 m mainsail AND a jib, hoisted, while tied up in a slip.
+    // That is not a lighting or a spacing problem - it is twenty white
+    // triangles of identical size and shape standing in a row, and it is
+    // literally the wall of sails in the player's photograph. Boats in a
+    // marina have their main flaked on the boom under a cover and their jib
+    // rolled on the forestay.
+    //
+    // Same two instanced meshes, same indices, same draw calls - the geometry
+    // is a furled bundle instead of a sail. The sails in this world are now
+    // on the boats that are SAILING, out in the bay (see the flotilla in
+    // _buildSea), which is where a sail means something.
+    const mainG = this._bundle([
+      new THREE.CylinderGeometry(0.19, 0.15, 4.3, 8)
+        .rotateX(Math.PI / 2).translate(0, 1.66, -2.15),
+      // the cover's tie-downs, three little bands round the bundle
+      new THREE.CylinderGeometry(0.22, 0.22, 0.12, 8)
+        .rotateX(Math.PI / 2).translate(0, 1.66, -0.6),
+      new THREE.CylinderGeometry(0.22, 0.22, 0.12, 8)
+        .rotateX(Math.PI / 2).translate(0, 1.66, -2.2),
+      new THREE.CylinderGeometry(0.22, 0.22, 0.12, 8)
+        .rotateX(Math.PI / 2).translate(0, 1.66, -3.8),
+    ]);
+    // the headsail, rolled up the forestay
+    const jibG = this._strut([0, 0.85, 4.3], [0, 9.0, 0.08], 0.14, 8);
     // SAILS ARE WHITE CANVAS, and they are NOT per-instance coloured. Two
     // instanced meshes sharing one vertexColors material rendered every sail
     // black - the colour attribute belongs to the mesh, the shader define to
     // the material, and one material cannot serve both.
-    const sailMat = () => new THREE.MeshStandardMaterial({ color: 0xf7f5ee,
-      roughness: 0.8, side: THREE.DoubleSide, flatShading: true });
+    const sailMat = () => new THREE.MeshStandardMaterial({ color: 0xdcd6c6,
+      roughness: 0.9, flatShading: true });
 
     // A HULL RUNS -4.30 TO +4.70 IN ITS OWN FRAME, so a boat whose stern is to
     // clear the walkway sits at PON + 2.6 + 4.30 * scale. Worked out per boat
@@ -10723,29 +10748,64 @@ export class Track {
 
   /** Trackside lamps (NEO-KYOTO / undercity): unlit emissive heads on dark
    *  posts down both road edges — pure set dressing, bloom does the glowing. */
+  /** STREET LAMPS - and the metronome they used to be.
+   *
+   *  Measured on LANTERN QUARTER: 128 lamps, consecutive step 26.24 u at a
+   *  coefficient of variation of 0.02. The matrix was `makeTranslation` - a
+   *  translation and NOTHING else, so every post was the same height, the same
+   *  rotation, the same six-sided cylinder presenting the same facet to the
+   *  sun, and the sides strictly alternated. It is the same defect as the row
+   *  of identical boats in the harbour, and it costs nothing to fix because
+   *  every knob is instance data on two meshes that already exist.
+   *
+   *  Deterministic hash off the sample index, so a rebuild is identical.
+   */
   _buildLamps() {
     const L = { color: 0xffffff, every: 38, height: 6.4, ...this.T.lamps };
+    const hash = (n) => { const v = Math.sin(n * 12.9898) * 43758.5453; return v - Math.floor(v); };
     const specs = [];
     for (let i = 10; i < N; i += L.every) {
-      specs.push({ i, side: (specs.length % 2 === 0) ? 1 : -1 });
+      const h = hash(i);
+      // the side comes off the hash, not off a strict alternation, and about
+      // one sample in six carries a PAIR - a junction, which gives the street
+      // punctuation instead of a beat
+      const both = hash(i + 7.7) > 0.84;
+      const side = h > 0.5 ? 1 : -1;
+      specs.push({ i, side, k: h });
+      if (both) specs.push({ i, side: -side, k: hash(i + 3.3) });
     }
     const postGeo = new THREE.CylinderGeometry(0.09, 0.13, L.height, 6);
     postGeo.translate(0, L.height / 2, 0);
     const headGeo = new THREE.SphereGeometry(0.3, 8, 6);
     headGeo.translate(0, L.height + 0.15, 0);
     const postMat = new THREE.MeshStandardMaterial({ color: 0x1c1e24, roughness: 0.6, metalness: 0.5 });
-    const headMat = new THREE.MeshBasicMaterial({ color: L.color });
+    const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true });
+    this._white(headGeo);
     const posts = new THREE.InstancedMesh(postGeo, postMat, specs.length);
     const heads = new THREE.InstancedMesh(headGeo, headMat, specs.length);
-    const m4 = new THREE.Matrix4();
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    const base = new THREE.Color(L.color);
+    const hsl = { h: 0, s: 0, l: 0 };
+    base.getHSL(hsl);
     let k = 0;
-    for (const s of specs) {
-      const p = this.pointAt(s.i, (WALL_OFF + 0.9) * s.side);
-      m4.makeTranslation(p.x, p.y, p.z);
+    for (const sp of specs) {
+      // a third of a pitch of slack along the road, so the rhythm breaks
+      const along = (sp.k - 0.5) * L.every * 0.34;
+      const p = this.pointAt(Math.round(sp.i + along + N) % N, (WALL_OFF + 0.9) * sp.side);
+      // yaw alone changes which facet of a six-sided post catches the sun
+      q.setFromAxisAngle(up, sp.k * Math.PI * 2);
+      const hh = 0.86 + sp.k * 0.3;
+      m4.compose(new THREE.Vector3(p.x, p.y, p.z), q, new THREE.Vector3(1, hh, 1));
       posts.setMatrixAt(k, m4);
-      heads.setMatrixAt(k++, m4);
+      heads.setMatrixAt(k, m4);
+      // sodium temperature wanders, and roughly one lamp in twelve is dead
+      const dead = hash(sp.i + 19.1) > 0.92;
+      col.setHSL(hsl.h, hsl.s, dead ? 0.06 : hsl.l * (0.9 + sp.k * 0.2));
+      heads.setColorAt(k++, col);
     }
     posts.count = heads.count = k;
+    if (heads.instanceColor) heads.instanceColor.needsUpdate = true;
     this.group.add(posts, heads);
   }
 
