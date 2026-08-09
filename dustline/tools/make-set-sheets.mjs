@@ -83,6 +83,27 @@ for (const [cat, items] of Object.entries(categories).sort()) {
       ...base.sky, clouds: 5,
       mountains: { count: 18, radius: 900, height: 55, snowline: -1 },
     };
+    // THE MARINE SHEET IS SHOT AFLOAT. Everything in that category either
+    // floats or stands at the edge of the water, and a rowboat photographed on
+    // a lawn shows you the two inches of gunwale that clear the grass rather
+    // than the boat. The land here is dead flat at y = 0, so a water level a
+    // hair above it floods the whole shelf — the boats then sit at their own
+    // waterline, which is the only height any of them are ever seen at.
+    //
+    // `base` is cloned from whatever the preview is showing, which is the
+    // PREVIOUS category's sheet — so the water has to be cleared explicitly or
+    // every set after the marine one is shot underwater.
+    delete base.water;
+    if (cat === 'marine') {
+      // A QUARTER OF A METRE, not two centimetres. The first attempt put the
+      // surface a hair above the flat shelf and the sheet came back mottled:
+      // over 900 m of coplanar geometry viewed nearly edge-on, a 2 cm gap is
+      // inside the depth buffer's resolution and the plane and the ground
+      // fight. 25 cm is out of the fight and still shallow enough to leave the
+      // quayside components — pots, bollards, the jetty — standing dry-ish in
+      // the shallows, which is where they belong.
+      base.water = { level: 0.25, color: '#2f7f99', deep: '#0f3348', deepAt: 1, opacity: 0.86 };
+    }
 
     // open ground, well clear of the road
     const t0 = e.preview.terrain;

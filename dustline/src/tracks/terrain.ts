@@ -246,6 +246,43 @@ export class Terrain {
     return out.set(-hx, 2 * e, -hz).normalize();
   }
 
+  /** Surface height of standing water, or null when the track has none.
+   *  Components that float read this instead of the ground. */
+  get waterLevel(): number | null {
+    return this.def.water ? this.def.water.level : null;
+  }
+
+  /** Is this point under water? Used by scatter (nothing grows in a lake) and
+   *  by the map. */
+  isSubmerged(x: number, z: number): boolean {
+    const w = this.def.water;
+    return !!w && this.heightAt(x, z) < w.level;
+  }
+
+  /** Roughly how far it is to the waterline, giving up past `maxDist`.
+   *
+   *  Deliberately a probe and not a field. The shoreline is wherever the
+   *  heightfield crosses one number, so it moves every time you touch an
+   *  octave; baking a distance field for it would cost as much as the road's
+   *  and be thrown away as often. Scatter only ever asks "is the water within
+   *  a few metres", which eight rays answer well enough — and being an
+   *  approximation is safe here because the only thing it decides is where a
+   *  clump of reeds is allowed to grow. */
+  distToWater(x: number, z: number, maxDist: number): number {
+    if (!this.def.water) return Infinity;
+    if (this.isSubmerged(x, z)) return 0;
+    const RAYS = 8;
+    const STEPS = 4;
+    for (let s = 1; s <= STEPS; s++) {
+      const r = (maxDist * s) / STEPS;
+      for (let i = 0; i < RAYS; i++) {
+        const a = (i / RAYS) * Math.PI * 2;
+        if (this.isSubmerged(x + Math.cos(a) * r, z + Math.sin(a) * r)) return r;
+      }
+    }
+    return Infinity;
+  }
+
   /** Distance to the road centerline (scenery keeps clear of the route). */
   distToRoad(x: number, z: number): number {
     return this.sdf(x, z).d;
@@ -296,7 +333,18 @@ export class Terrain {
     // valleys sit a touch darker (cheap baked-AO feel), crests a touch lighter
     const h = this.heightAt(x, z);
     const n = Math.sin(x * 0.13) * Math.sin(z * 0.17) * 0.05 + Math.sin(x * 0.041 + z * 0.037) * 0.035;
-    return out.offsetHSL(0, 0, n + THREE.MathUtils.clamp(h * 0.006, -0.045, 0.05));
+    out.offsetHSL(0, 0, n + THREE.MathUtils.clamp(h * 0.006, -0.045, 0.05));
+    // SUBMERGED GROUND IS DARKENED HERE, not left to the water plane. The plane
+    // is translucent, so a seabed painted like a meadow shows through as a
+    // green lagoon; darkening the bed is what makes a shore read as depth
+    // rather than as a blue sheet laid over a field.
+    const w = def.water;
+    if (w && h < w.level) {
+      const depth = THREE.MathUtils.clamp((w.level - h) / Math.max(0.5, w.deepAt), 0, 1);
+      out.lerp(new THREE.Color(w.deep), 0.35 + 0.45 * depth);
+      out.offsetHSL(0, 0.05 * depth, -0.06 * depth);
+    }
+    return out;
   }
 
   /** Shared grid: render mesh (vertex-colored) + Rapier trimesh collider.
@@ -423,6 +471,29 @@ export class Terrain {
     road.receiveShadow = true;
     scene.add(road);
     added.push(road);
+
+    // ---- standing water ----------------------------------------------------
+    // One plane at the water level, spanning the world. Deliberately simple:
+    // the depth reading comes from the darkened bed underneath (see colorAt),
+    // so the surface itself only has to be a translucent sheet with a colour.
+    if (def.water) {
+      const wGeo = new THREE.PlaneGeometry(SIZE * 1.4, SIZE * 1.4, 1, 1);
+      wGeo.rotateX(-Math.PI / 2);
+      const water = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({
+        color: new THREE.Color(def.water.color),
+        transparent: true,
+        opacity: def.water.opacity,
+        roughness: 0.18,
+        metalness: 0.25,
+        // Off, on purpose. With depthWrite on, the translucent surface hides
+        // whatever is drawn after it — including every boat sitting on it.
+        depthWrite: false,
+      }));
+      water.position.y = def.water.level;
+      water.renderOrder = 1;
+      scene.add(water);
+      added.push(water);
+    }
 
     // road edge posts every ~10 samples so the route reads at speed
     const postGeo = new THREE.BoxGeometry(0.22, 1.0, 0.22);

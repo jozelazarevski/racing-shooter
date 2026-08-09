@@ -43,6 +43,7 @@ One JSON file — see `src/data/tracks/dustbowl.json` and the typed shape in
 | `terrain.road` | the road's own elevation: waves over the lap, plus crests (jumps) |
 | `surfaces.bands` | stretches of the lap with their own surface |
 | `surfaces.zones` | regions that override the surface, with optional patches (ice) |
+| `water` | optional: one level, below which everything is under water |
 | `scenery` | per-layer scatter: which COMPONENT, how many, clearances, scale |
 | `props` | hand-placed components: what, where, rotation, scale |
 | `sky` | dome gradient, fog, sun, fill light, horizon mountains, clouds |
@@ -61,6 +62,38 @@ classification matches everywhere; height matches to 1.07e-14 m, and the
 residual is attributed rather than waved away — one octave form computes
 `sin(x*fx + z*fz)` where the original wrote `sin((x+z)*f)`, and those are not
 the same float. The alternative was dropping diagonal ridges from the format.
+
+## Water
+
+Optional, and one number: `water.level`. Every square metre of land below it is
+wet. That is deliberately not a lake system — the terrain is already a
+heightfield, so "below this line" describes a sea, a flooded valley and a pond
+in a hollow all at once, and it costs one field instead of a shape editor.
+**Where the water goes is decided by the land**: sink a bay with an octave or a
+ramp and it fills.
+
+A ramp with a NEGATIVE slope is how you make a coast — it takes the land down
+past the level rather than up to a snow line. `harbour.json` is the worked
+example: one ramp west for the sea, one south for the bay, one east for hills.
+
+Two things follow from water being a level rather than a volume:
+
+- The road is **not** lifted clear of it. Raise the level past the lowest point
+  of the road profile and the lap floods — which the validator warns about,
+  because a ford is a reasonable thing to want and a submerged circuit is not.
+- The seabed is **darkened in the terrain colour**, not by the water plane. The
+  plane is translucent, so a bed painted like a meadow shows through it as a
+  green lagoon; darkening the ground is what makes a shore read as depth.
+
+The map draws it the way a chart does — darker with depth — so you can see what
+a level of 1.4 m actually floods without building the world and going to look.
+
+![the harbour coast](docs/harbour.png)
+![the quay](docs/harbour-quay.png)
+
+`harbour.json`, in the editor's own preview. Regenerate these with
+`npm run make:shots` — they are rendered by the engine from the committed
+track, so they cannot describe a world that no longer exists.
 
 ## Components — see `COMPONENTS.md`
 
@@ -119,7 +152,8 @@ undrivable — not a style guide, a track is allowed to be ugly:
   a sample count or mesh resolution too low to resolve a road
 - **warning** — two runs of road closer together than a road width (the engine
   has no overpass concept, so they merge); a band that can never apply; a
-  scenery count high enough to cost frame rate
+  scenery count high enough to cost frame rate; a water level above the road's
+  lowest point
 
 Errors block the preview rebuild, so the last good world stays on screen with
 the problem named, rather than the canvas going blank.

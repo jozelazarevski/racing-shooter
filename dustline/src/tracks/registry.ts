@@ -17,11 +17,13 @@ import type { TrackDef } from './trackDef';
 import { trackErrors } from './trackDef';
 import dustbowl from '../data/tracks/dustbowl.json';
 import provingGround from '../data/tracks/proving-ground.json';
+import harbour from '../data/tracks/harbour.json';
 
 // JSON imports widen tuples to number[], so the cast goes through unknown.
 const BUILT_IN: TrackDef[] = [
   dustbowl as unknown as TrackDef,
   provingGround as unknown as TrackDef,
+  harbour as unknown as TrackDef,
 ];
 
 const LS_KEY = 'dustline.tracks.v1';

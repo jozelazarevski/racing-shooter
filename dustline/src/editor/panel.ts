@@ -220,6 +220,26 @@ function terrainTab(root: HTMLElement, def: TrackDef, commit: Commit) {
     d.terrain.ramps.push({ axis: 'z', beyond: -140, dir: 'lt', slope: 0.08, max: 14 });
   }, 'add ramp'));
 
+  const wt = group(root, 'Water');
+  hint(wt, 'One level for the whole map: every square metre of land below it is under water. '
+    + 'Where the water goes is decided by the LAND — sink a bay with an octave or a ramp and it '
+    + 'fills. Boats float at this height wherever you drop them.');
+  if (!def.water) {
+    addButton(wt, '+ flood below a level', () => commit((d) => {
+      d.water = { level: 0, color: '#3f7f96', deep: '#12384c', deepAt: 6, opacity: 0.78 };
+    }, 'add water'));
+  } else {
+    const wc = card(wt, 'water', () => commit((d) => { delete d.water; }, 'remove water'));
+    numRow(wc, 'level (m)', def.water.level, (v) => commit((d) => { d.water!.level = v; }, 'water level'), { step: 0.5 });
+    numRow(wc, 'deep at (m)', def.water.deepAt, (v) => commit((d) => { d.water!.deepAt = Math.max(0.5, v); }, 'water deepAt'), { step: 0.5, min: 0.5 });
+    numRow(wc, 'opacity', def.water.opacity, (v) => commit((d) => { d.water!.opacity = Math.max(0, Math.min(1, v)); }, 'water opacity'), { step: 0.05, min: 0, max: 1 });
+    colorRow(wc, 'shallow', def.water.color, (v) => commit((d) => { d.water!.color = v; }, 'water colour'));
+    colorRow(wc, 'deep', def.water.deep, (v) => commit((d) => { d.water!.deep = v; }, 'water deep colour'));
+    hint(wc, 'The road is NOT lifted clear of the water. Raise the level past the lowest point of '
+      + 'the road profile and you will flood the lap — which the validator warns about, because a '
+      + 'ford is a fine thing to want and a submerged circuit is not.');
+  }
+
   const rd = group(root, 'Road profile');
   hint(rd, 'The road has its own elevation, independent of the land — waves are rolling '
     + 'gradient over the lap, crests are jumps. A narrow crest is a kicker; a wide one is a hill.');

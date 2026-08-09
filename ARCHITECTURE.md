@@ -342,6 +342,41 @@ for its slope shading. That one is NOT being taken: computing slope from
 neighbouring grid heights instead would be much cheaper and would change every
 vertex colour, and a visual change is not a refactor.
 
+**Water, and what a world is made of.** The component library is now 53 files
+across seven categories, and the two newest categories exist because of a plain
+gap: there were farm buildings and trackside furniture, and nothing anybody
+lived in. **settlement** adds dwellings, a church, a windmill and street
+furniture; **marine** adds boats, a jetty, a lighthouse and quayside gear.
+
+Boats needed something to float on, so `TrackDef` grew an optional
+`water: { level, … }` — **one number**, below which the land is wet. Not a lake
+system: the terrain is already a heightfield, so "below this line" describes a
+sea, a flooded valley and a pond in a hollow at once, and where the water goes
+is decided by the land. Making a coast is then a ramp with a negative slope
+instead of a positive one, which is one sign flip in `rampAt` away from the
+snow-line ramps the format already had.
+
+A component declares `placement: 'land' | 'water' | 'shore'`, and a floating
+one's origin is the WATERLINE rather than its keel — which is why a rowboat in
+1 m of water and one in 8 m sit correctly without either knowing the depth.
+
+`harbour.json` is the worked example and is generated (`npm run make:harbour`)
+for a reason beyond the proving ground's: the shoreline is not typed anywhere,
+it is wherever the land crosses the level, so it MOVES whenever an octave, a
+ramp or the level changes. Every piece of the village is placed relative to the
+shore found by marching outward from dry land.
+
+That generator recomputes land height from the track's own octaves and ramps —
+real duplication of engine arithmetic — so it is **checked rather than
+trusted**: `npm run smoke:components` loads the harbour in the game and reads
+the actual instance matrices out of the built world, requiring every floating
+component to be at the water level and every land one on the ground. The first
+version of that check restated the placement rule instead of measuring the
+result, and passed happily with the builder deliberately broken to sink every
+boat. Adding all of this left `dustbowl` and `proving-ground` **bit-identical**
+(`npm run verify:worlds`, fingerprints unchanged), which is the point of having
+kept the golden file.
+
 ### 5.5 State which specification governs which codebase — DONE
 
 Six normative documents — `RULES.md`, `NATURE.md`, `STRUCTURES.md`, `SCENES.md`,

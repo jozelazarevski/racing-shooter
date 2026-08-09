@@ -30,8 +30,15 @@ import type { Rng } from '../../core/rng';
 export interface PlaceCtx {
   x: number;
   z: number;
-  /** ground height at (x, z) */
+  /** The height the component's base sits at — ground for most things, the
+   *  water surface for a floating one. Not necessarily the terrain height:
+   *  read `ground` for that. */
   y: number;
+  /** terrain height at (x, z), whether or not it is under water */
+  ground: number;
+  /** How deep the water is here, 0 on dry land. A jetty reads this to know how
+   *  long its legs must be. */
+  depth: number;
   surface: SurfaceId;
   /** uniform scale chosen for this instance */
   scale: number;
@@ -77,9 +84,32 @@ export interface PhysicsRule {
   friction?: number;
 }
 
+/** WHAT A COMPONENT STANDS ON.
+ *
+ *  - `land`   — the default. Sits on the terrain, and scatter refuses to put it
+ *               under water: a pine growing on a lake bed is the giveaway that
+ *               nothing in the system knows the lake is there.
+ *  - `water`  — floats. Its base is the WATER SURFACE, not the bed, so a boat
+ *               in 1 m and a boat in 8 m of water both sit at the waterline.
+ *               Scatter only puts it where there is water deep enough.
+ *  - `shore`  — wants the boundary: scatter keeps it on land, but within
+ *               `shoreBand` metres of the waterline. Reeds and jetties.
+ *
+ *  This governs SCATTER. Hand placement is never refused — drop a rowboat in a
+ *  field if you mean to — but a floating component always floats, wherever you
+ *  put it, because "it is a boat" is a fact about the component and not about
+ *  where it was dropped. */
+export type Placement = 'land' | 'water' | 'shore';
+
 export interface AuthoringRule {
   /** scale range offered when placing by hand and when scattering */
   scale: [number, number];
+  /** Default `land`. */
+  placement?: Placement;
+  /** For `water`: the least depth this thing can sit in without looking
+   *  beached. For `shore`: how far inland from the waterline it may stray. */
+  shoreBand?: number;
+  minDepth?: number;
   /** default when dropped from the palette */
   defaultScale: number;
   /** never scattered onto these surfaces (hand placement is always allowed —
@@ -96,7 +126,7 @@ export interface AuthoringRule {
 export interface PropTemplate {
   id: string;
   name: string;
-  category: 'flora' | 'terrain' | 'trackside' | 'structure' | 'debris';
+  category: 'flora' | 'terrain' | 'trackside' | 'structure' | 'settlement' | 'marine' | 'debris';
   /** one line, shown under the palette thumbnail */
   description: string;
   /** Built once per world. Geometries and materials are shared by every

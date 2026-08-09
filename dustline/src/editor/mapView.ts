@@ -59,6 +59,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   terrain: '#9c9184',
   trackside: '#ffb52e',
   structure: '#9fdcff',
+  settlement: '#ff8f6b',
+  marine: '#4fd4c8',
   debris: '#c98bd8',
 };
 
@@ -73,7 +75,7 @@ export class ReliefLayer {
   /** Returns a canvas covering the whole world square, or null if the track has
    *  no terrain to speak of. */
   get(def: TrackDef): HTMLCanvasElement {
-    const key = JSON.stringify([def.terrain.octaves, def.terrain.ramps, def.world.size, def.surfaces]);
+    const key = JSON.stringify([def.terrain.octaves, def.terrain.ramps, def.world.size, def.surfaces, def.water]);
     if (key === this.key) return this.canvas;
     this.key = key;
 
@@ -107,11 +109,28 @@ export class ReliefLayer {
 
         const surf = offroadSurfaceAt(def, x, z, h[o]);
         const base = hexToRgb(SURFACE_COLORS[surf]);
-        const lift = 0.55 + 0.55 * shade;
+        let lift = 0.55 + 0.55 * shade;
         const p = o * 4;
-        img.data[p] = clamp255(base[0] * lift);
-        img.data[p + 1] = clamp255(base[1] * lift);
-        img.data[p + 2] = clamp255(base[2] * lift);
+        let [r, g, b] = base;
+        // WATER IS DRAWN ON THE MAP, and drawn the way the sea is drawn on a
+        // chart: darker with depth. Without it the only way to find out where a
+        // level of 1.4 m actually floods is to build the world and go and look,
+        // which is precisely the round trip this editor exists to remove.
+        const w = def.water;
+        if (w && h[o] < w.level) {
+          const t = Math.min(1, (w.level - h[o]) / Math.max(0.5, w.deepAt));
+          const shallow = hexToRgb(w.color);
+          const deep = hexToRgb(w.deep);
+          r = shallow[0] + (deep[0] - shallow[0]) * t;
+          g = shallow[1] + (deep[1] - shallow[1]) * t;
+          b = shallow[2] + (deep[2] - shallow[2]) * t;
+          // Flat, not shaded: a lake surface is level, and relief shading under
+          // it would draw the bed's hills as if they broke the surface.
+          lift = 1;
+        }
+        img.data[p] = clamp255(r * lift);
+        img.data[p + 1] = clamp255(g * lift);
+        img.data[p + 2] = clamp255(b * lift);
         img.data[p + 3] = 255;
       }
     }

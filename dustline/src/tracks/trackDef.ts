@@ -147,6 +147,28 @@ export interface SceneryLayer {
   spread: number;
 }
 
+/** STANDING WATER.
+ *
+ *  A single level, not a set of lakes: the terrain is a heightfield, so
+ *  "everything below this line is wet" describes a sea, a flooded valley and a
+ *  lake in a hollow all at once, and costs one number instead of a shape
+ *  system. Where the water goes is decided by the LAND — carve a bay with an
+ *  octave or a ramp and the water fills it.
+ *
+ *  Optional. A track without it has no water at all, which is why every track
+ *  written before this one still builds byte-identically. */
+export interface WaterDef {
+  /** world height of the surface; terrain below this is submerged */
+  level: number;
+  /** surface colour in shallow water */
+  color: string;
+  /** surface colour over deep water — the gradient is what makes a shore read */
+  deep: string;
+  /** how far below the surface counts as "deep" */
+  deepAt: number;
+  opacity: number;
+}
+
 /** ONE COMPONENT, PUT SOMEWHERE ON PURPOSE.
  *
  *  The counterpart to a scatter layer: scatter fills a landscape, placement
@@ -229,6 +251,9 @@ export interface TrackDef {
    *  existed still load. */
   props?: PlacedProp[];
 
+  /** Standing water. Optional — omit it and the track has none. */
+  water?: WaterDef;
+
   sky: {
     /** four stops of the dome gradient, top to horizon */
     stops: [string, string, string, string];
@@ -269,7 +294,14 @@ export function rampAt(r: Ramp, x: number, z: number): number {
   const v = r.axis === 'x' ? x : z;
   const past = r.dir === 'lt' ? r.beyond - v : v - r.beyond;
   if (past <= 0) return 0;
-  return Math.min(r.max, past * r.slope);
+  const rise = past * r.slope;
+  // Clamp TOWARDS ZERO, not with a bare `Math.min`. A ramp with a negative
+  // slope descends — which is how a coastline is made, since the water level is
+  // one number and the only way to get a sea is to take the land below it — and
+  // `Math.min(-34, -0.6)` returns the floor at the very first metre, dropping
+  // the whole map off a cliff at the ramp's edge instead of sloping it. For the
+  // ascending ramps every existing track uses, this is `Math.min` exactly.
+  return r.slope < 0 ? Math.max(r.max, rise) : Math.min(r.max, rise);
 }
 
 /** Open-country height before the road is carved into it. */
@@ -395,6 +427,21 @@ export function validateTrack(def: TrackDef): TrackIssue[] {
             + `(${clear.toFixed(0)} m); the two runs will merge`,
         });
       }
+    }
+  }
+
+  if (def.water) {
+    // The road is carved to its own profile and is NOT pushed above water, so a
+    // level above the road's lowest point floods the circuit. That is a
+    // warning rather than an error because a deliberately flooded ford is a
+    // real thing to want; drowning the whole lap is not.
+    const floor = def.terrain.road.waves.reduce((a, w) => a - Math.abs(w.amp), 0);
+    if (def.water.level > floor + 0.5) {
+      out.push({
+        level: 'warning',
+        message: `water level ${def.water.level} is above the road's lowest point (${floor.toFixed(1)}) `
+          + '— part of the lap will be underwater',
+      });
     }
   }
 

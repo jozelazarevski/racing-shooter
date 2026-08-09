@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import type RAPIER_API from '@dimforge/rapier3d-compat';
 import type { TrackDef, SceneryLayer, PlacedProp, SurfaceId } from '../tracks/trackDef';
 import type { Terrain } from '../tracks/terrain';
-import type { PropTemplate, PlaceCtx, PhysicsShape } from './props/types';
+import type { PropTemplate, PlaceCtx, PhysicsShape, Placement } from './props/types';
 import { isSolid } from './props/types';
 import { getTemplate, partsFor, resetPartCache } from './props/registry';
 import { Rng } from '../core/rng';
@@ -31,6 +31,20 @@ interface Instance {
   ctx: PlaceCtx;
   rot: number;
   yOffset: number;
+}
+
+/** Where the base of an instance sits, and what it is standing in.
+ *
+ *  ONE function, used by scatter and by hand placement alike, because the day
+ *  they disagree is the day a boat you dragged in floats and the same boat
+ *  scattered sits on the bottom. A floating component's base is the waterline;
+ *  everything else stands on the ground. */
+function siteAt(terrain: Terrain, x: number, z: number, placement: Placement) {
+  const ground = terrain.heightAt(x, z);
+  const level = terrain.waterLevel;
+  const depth = level !== null ? Math.max(0, level - ground) : 0;
+  const y = placement === 'water' && level !== null ? Math.max(ground, level) : ground;
+  return { y, ground, depth };
 }
 
 /** Find room for `layer.count` instances under the layer's rules.
@@ -46,15 +60,31 @@ function scatter(
   const spread = def.world.size * layer.spread;
   const avoid = layer.avoidSurfaces ?? tpl.authoring.avoidSurfaces ?? [];
   const range = layer.scale ?? tpl.authoring.scale;
+  const placement = tpl.authoring.placement ?? 'land';
+  const minDepth = tpl.authoring.minDepth ?? 0.4;
+  const shoreBand = tpl.authoring.shoreBand ?? 6;
   const out: Instance[] = [];
   const budget = Math.max(3000, layer.count * 20);
   let guard = 0;
+
+  // A boat layer on a track with no water is not a near miss to be retried
+  // three thousand times — it is a mistake, and it should say so once.
+  if (placement !== 'land' && terrain.waterLevel === null) {
+    console.warn(`[world] ${layer.template} needs water (${placement}) and this track has none — layer skipped`);
+    return out;
+  }
 
   while (out.length < layer.count && guard++ < budget) {
     const x = rng.centered(spread / 2);
     const z = rng.centered(spread / 2);
     if (terrain.distToRoad(x, z) < layer.minRoadDist) continue;
     if (Math.hypot(x - terrain.spawn.x, z - terrain.spawn.z) < layer.minSpawnDist) continue;
+    const site = siteAt(terrain, x, z, placement);
+    // Water is a placement rule, not a surface, so it is filtered here rather
+    // than through avoidSurfaces — the bed of a lake is still "dirt".
+    if (placement === 'land' && site.depth > 0) continue;
+    if (placement === 'water' && site.depth < minDepth) continue;
+    if (placement === 'shore' && (site.depth > 0 || terrain.distToWater(x, z, shoreBand) > shoreBand)) continue;
     const surface = terrain.surfaceIdAt(x, z) as SurfaceId;
     if (avoid.includes(surface)) continue;
     let scale = rng.range(range[0], range[1]);
@@ -62,27 +92,30 @@ function scatter(
       scale += rng.float() * layer.scaleBonusOn.extra;
     }
     out.push({
-      ctx: { x, z, y: terrain.heightAt(x, z), surface, scale, rng },
+      ctx: { x, z, ...site, surface, scale, rng },
       rot: tpl.authoring.randomYaw ? rng.float() * Math.PI * 2 : 0,
       yOffset: 0,
     });
   }
 
   if (out.length < layer.count) {
+    const why = placement === 'land' ? '' : `, wants ${placement}`;
     console.warn(
       `[world] ${layer.template}: placed ${out.length}/${layer.count} — the rules reject too much `
-      + `of the map (minRoadDist ${layer.minRoadDist}, avoids ${avoid.join('/') || 'nothing'})`,
+      + `of the map (minRoadDist ${layer.minRoadDist}, avoids ${avoid.join('/') || 'nothing'}${why})`,
     );
   }
   return out;
 }
 
 /** A hand-placed prop. Ground height is looked up NOW rather than stored, so
- *  editing the terrain under a prop moves the prop with it. */
-function placed(p: PlacedProp, terrain: Terrain, rng: Rng): Instance {
+ *  editing the terrain under a prop moves the prop with it — and raising the
+ *  water level lifts the boats you already placed. */
+function placed(p: PlacedProp, tpl: PropTemplate, terrain: Terrain, rng: Rng): Instance {
   return {
     ctx: {
-      x: p.x, z: p.z, y: terrain.heightAt(p.x, p.z),
+      x: p.x, z: p.z,
+      ...siteAt(terrain, p.x, p.z, tpl.authoring.placement ?? 'land'),
       surface: terrain.surfaceIdAt(p.x, p.z) as SurfaceId,
       scale: p.scale, rng,
     },
@@ -153,8 +186,9 @@ export function buildComponents(
   // reshuffle the scattered world around it.
   const placedRng = Rng.fork(def.seed, 'placed');
   for (const p of def.props ?? []) {
-    if (!getTemplate(p.template)) { console.warn(`[world] unknown component "${p.template}" placed`); continue; }
-    push(p.template, placed(p, terrain, placedRng));
+    const tpl = getTemplate(p.template);
+    if (!tpl) { console.warn(`[world] unknown component "${p.template}" placed`); continue; }
+    push(p.template, placed(p, tpl, terrain, placedRng));
   }
 
   const objects: THREE.Object3D[] = [];
@@ -176,6 +210,12 @@ export function buildComponents(
       const eligible = part.when ? instances.filter((i) => part.when!(i.ctx)) : instances;
       if (!eligible.length) continue;
       const mesh = new THREE.InstancedMesh(part.geometry, part.material, eligible.length);
+      // Named so tools can find the instances of a given component in a built
+      // world. `tools/components-smoke.mjs` reads the actual matrices out of
+      // these to check that boats float — a check that restates the placement
+      // rule instead of reading the result passes just as happily when the
+      // builder is broken, which was true of this one until it was measured.
+      mesh.name = `${id}:${part.key}`;
       mesh.castShadow = part.castShadow ?? false;
       let n = 0;
       for (const inst of eligible) {

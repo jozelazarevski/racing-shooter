@@ -47,7 +47,7 @@ export function thumbnail(template: PropTemplate, size = 96): string {
   // A thumbnail must show the SNOW-FREE, ordinary case, so the context is a
   // neutral gravel lie rather than whatever surface sorts first.
   const ctx = {
-    x: 0, z: 0, y: 0, surface: 'gravel' as const, scale: 1,
+    x: 0, z: 0, y: 0, ground: 0, depth: 0, surface: 'gravel' as const, scale: 1,
     rng: new Rng(0x5eed),          // fixed: a thumbnail that flickers is a bug
   };
 

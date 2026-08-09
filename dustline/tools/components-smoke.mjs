@@ -223,6 +223,84 @@ check(wrong.length === 0,
 check(gameErrors.length === 0, 'no page errors in the game with the whole library placed',
   gameErrors.slice(0, 3).join(' | '));
 
+// ---- 7. floating components actually float ---------------------------------
+//
+// The claim: a component declared `placement: 'water'` sits on the WATER
+// SURFACE, not on the bed, wherever it is put — and one declared `shore` or
+// `land` still sits on the ground. This is the only part of the system where
+// the same coordinates give two different heights, so it is the only part where
+// being wrong is invisible until a boat is discovered sitting in a crater.
+//
+// It also checks the harbour generator against the engine. That tool
+// recomputes land height from the track's own octaves and ramps to find the
+// shoreline; if its copy of the arithmetic ever drifts from `Terrain`, boats it
+// believed were moored in 2 m of water turn up aground, and this fails.
+const afloat = await page.evaluate(async () => {
+  const e = window.__editor;
+  const harbour = e.builtInTracks().find((t) => t.id === 'harbour');
+  if (!harbour) return { error: 'harbour track is not built in' };
+  e.def = harbour;                       // the editor's own load path
+  await new Promise((r) => setTimeout(r, 3000));
+  const t = e.preview.terrain;
+  const level = t.waterLevel;
+
+  // Read the WORLD, not the rule. Every instanced mesh is named
+  // "<template>:<part>", so this pulls the real transform of the real instance
+  // nearest each placed prop and asks where it actually ended up.
+  const heightOfInstanceAt = (template, x, z) => {
+    let best = null;
+    let bestD = 1.0;
+    for (const o of e.preview.objects) {
+      if (!o.isInstancedMesh || !o.name.startsWith(`${template}:`)) continue;
+      const m = new Float32Array(16);
+      for (let i = 0; i < o.count; i++) {
+        const a = o.instanceMatrix.array;
+        m.set(a.subarray(i * 16, i * 16 + 16));
+        const d = Math.hypot(m[12] - x, m[14] - z);
+        if (d < bestD) { bestD = d; best = m[13]; }
+      }
+    }
+    return best;
+  };
+
+  const wrong = [];
+  let boats = 0;
+  for (const p of harbour.props) {
+    const tpl = e.getTemplate(p.template);
+    const place = tpl.authoring.placement ?? 'land';
+    const ground = t.heightAt(p.x, p.z);
+    const y = heightOfInstanceAt(p.template, p.x, p.z);
+    if (y === null) { wrong.push(`${p.template}@(${p.x},${p.z}) has no instance in the world`); continue; }
+    if (place === 'water') {
+      boats++;
+      if (Math.abs(y - level) > 0.01) {
+        wrong.push(`${p.template}@(${p.x},${p.z}) sits at y=${y.toFixed(2)}, water is ${level} `
+          + `(bed ${ground.toFixed(2)})`);
+      }
+      const d = level - ground;
+      if (d < (tpl.authoring.minDepth ?? 0.4)) {
+        wrong.push(`${p.template}@(${p.x},${p.z}) aground: ${d.toFixed(2)} m of water, wants ${tpl.authoring.minDepth}`);
+      }
+    } else {
+      if (Math.abs(y - ground) > 0.01) wrong.push(`${p.template}@(${p.x},${p.z}) is not on the ground`);
+      if (ground < level - 0.35) {
+        wrong.push(`${p.template}@(${p.x},${p.z}) is ${(level - ground).toFixed(1)} m under water`);
+      }
+    }
+  }
+  return { level, boats, wrong, counts: e.preview.componentCounts };
+});
+check(!afloat.error && afloat.boats > 0, 'the harbour track is built in and has boats on it',
+  afloat.error ?? `${afloat.boats} floating components, water at ${afloat.level} m`);
+check(!afloat.error && afloat.wrong.length === 0,
+  'floating components sit on the water and land ones stay dry',
+  (afloat.wrong ?? []).slice(0, 4).join(' | '));
+// Scatter has its own placement rules, and a `water` layer that silently
+// produced nothing would still pass every check above.
+check(!afloat.error && (afloat.counts?.buoy ?? 0) > 0 && (afloat.counts?.willow ?? 0) > 0,
+  'scatter places components onto water and along the shoreline',
+  `buoy=${afloat.counts?.buoy ?? 0} (water) willow=${afloat.counts?.willow ?? 0} (shore)`);
+
 check(errors.length === 0, 'no page errors in the editor', errors.slice(0, 4).join(' | '));
 
 await browser.close();

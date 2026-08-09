@@ -74,7 +74,9 @@ Two per-instance hooks:
 - `when(ctx)` — per-instance opt-out. The pine's snow cap only exists on snow.
 
 `ctx` carries where the instance is going and what it is standing on:
-`{ x, z, y, surface, scale, rng }`.
+`{ x, z, y, ground, depth, surface, scale, rng }`. `y` is where the component's
+base sits, `ground` is the terrain under it and `depth` is how much water is
+over that — for anything on dry land all three agree.
 
 ### Physical rules — `physics`
 
@@ -96,6 +98,20 @@ bush is dressing and always has been.
 `minRoadDist` for scattering, `randomYaw`. Scatter layers may override any of
 these; hand placement never restricts you — if you put a saguaro on a glacier,
 you meant to.
+
+`placement` says what the component stands on, and defaults to `land`:
+
+| | scatter puts it | its base sits at |
+|---|---|---|
+| `land` | anywhere dry | the ground |
+| `water` | in water at least `minDepth` deep | **the water surface** |
+| `shore` | on dry land within `shoreBand` m of the waterline | the ground |
+
+A floating component floats **wherever you put it**, including by hand in the
+middle of a field — "it is a boat" is a fact about the component, not about
+where it was dropped. That is why a rowboat in 1 m of water and one in 8 m sit
+at the same height without either of them knowing the depth: their zero *is*
+the waterline. Scatter is the only thing `placement` filters.
 
 ### Preview — nothing to write
 
@@ -156,6 +172,8 @@ with `npm run make:sets`. The orange block at the left of each row is a car
 things are, and nothing answers that except seeing them next to a car.
 
 ![flora](docs/sets/flora.png)
+![settlement](docs/sets/settlement.png)
+![marine](docs/sets/marine.png)
 ![trackside](docs/sets/trackside.png)
 ![structure](docs/sets/structure.png)
 ![terrain](docs/sets/terrain.png)
@@ -163,17 +181,24 @@ things are, and nothing answers that except seeing them next to a car.
 
 Order in each sheet is alphabetical, after the car:
 
-- **flora** — Birch · Bush · Dead tree · Palm · Pine · Reeds · Saguaro · Stump
+- **flora** — Birch · Bush · Dead tree · Oak · Palm · Pine · Reeds · Saguaro · Stump · Willow
+- **settlement** — Church · Cottage · Dry-stone wall · Farmhouse · Market stall · Street lamp · Townhouse · Well · Windmill
+- **marine** — Channel buoy · Fishing boat · Jetty · Lighthouse · Lobster pots · Mooring post · Rowboat · Sailboat
 - **trackside** — Barrier block · Chevron board · Cone · Guardrail · Hay bale · Marshal post · Sandbag wall · Tyre stack
 - **structure** — Barn · Fence run · Grandstand · Light mast · Pit building · Shed · Start gantry · Watchtower · Water tower
 - **terrain** — Boulder · Fallen log · Rock · Rock spire · Scree
 - **debris** — Crate · Oil drum · Pallet · Spare tyre
 
-## The library — 34 components
+The marine sheet is shot **afloat** — on a flooded shelf rather than a lawn.
+Every component in it either floats or stands at the water's edge, and a
+rowboat photographed on grass shows you the two inches of gunwale that clear
+it rather than the boat.
+
+## The library — 53 components
 
 | category | components | solid |
 |---|---|---|
-| **flora** | Pine, Birch, Palm, Saguaro, Dead tree, Stump | yes |
+| **flora** | Pine, Birch, Oak, Willow, Palm, Saguaro, Dead tree, Stump | yes |
 | | Bush, Reeds | no |
 | **terrain** | Rock (above 1.1 scale), Boulder, Rock spire, Fallen log | yes |
 | | Scree, Rock (below 1.1) | no |
@@ -181,8 +206,18 @@ Order in each sheet is alphabetical, after the car:
 | | Cone | no |
 | **structure** | Barn, Shed, Grandstand, Pit building, Watchtower, Water tower, Light mast | yes |
 | | Start gantry, Fence run | no |
+| **settlement** | Cottage, Farmhouse, Townhouse, Church, Windmill, Well, Market stall, Street lamp | yes |
+| | Dry-stone wall | no |
+| **marine** | Rowboat, Fishing boat, Sailboat, Jetty, Lighthouse, Mooring post | yes |
+| | Channel buoy, Lobster pots | no |
 | **debris** | Oil drum, Crate (0.7 scale and up) | yes |
 | | Pallet, Spare tyre, Crate (below 0.7) | no |
+
+**Settlement and marine exist because the library had no people in it.** There
+were farm buildings and trackside furniture, and nothing anybody lived in. A
+dry-stone wall is not solid for the same reason a fence run is not — a wall
+that stops a rally car dead turns every field into a pen — and a channel buoy
+is a plastic float on a chain, not a bollard.
 
 Pine, Rock and Bush are ports of the three hardcoded scenery kinds, geometry
 and colliders unchanged, so the shipped world still looks and drives as it did.
@@ -205,7 +240,14 @@ with non-empty, NaN-free geometry; that `physics.shape()` answers with positive
 dimensions at both ends of the component's own scale range; and that a
 thumbnail renders. Then it places one of every component, loads them all in the
 **game**, and requires each to have exactly the collider its file declares —
-26 solid, 8 not, all correct.
+42 solid, 11 not, all correct.
+
+It then loads the harbour track and reads the **actual instance matrices** out
+of the built world, checking that every floating component came out at the
+water level and every land one on the ground. That check is written that way on
+purpose: the first version restated the placement rule instead of measuring the
+result, and passed happily with the builder deliberately broken to put boats on
+the seabed.
 
 That last check found its own bug first: with the scatter layers still in place,
 colliders from nearby scattered pines were being counted against a placed
@@ -227,3 +269,18 @@ hand-written, because placing 114 props by typing coordinates is exactly the
 work the editor exists to remove — and because anything positioned relative to
 the road has to be recomputed when the road moves. Open it in the editor and
 edit it like any other track; the generator only makes the starting point.
+
+## The harbour
+
+`src/data/tracks/harbour.json` is a third built-in track and the one that
+exercises water: a coast made by ramping the land below the water level, a
+village of thirty-odd dwellings along the shore, three jetties with boats
+moored off them, a lighthouse on the headland, and buoys and willows scattered
+by rule onto the water and along the shoreline.
+
+Like the proving ground it is *generated* (`npm run make:harbour`), and for one
+extra reason. The shoreline is not a thing anybody typed — it is wherever the
+land crosses the water level — so it MOVES whenever an octave, a ramp or the
+level changes. Every piece of the village is placed relative to the shore found
+by marching outwards from dry land, which is why the whole harbour stays on the
+harbour when the terrain is edited.
