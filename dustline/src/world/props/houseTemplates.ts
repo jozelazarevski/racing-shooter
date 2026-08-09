@@ -32,7 +32,8 @@
 
 import * as THREE from 'three';
 import { gablePrismGeo } from './kit';
-import { standard, mergeGeoms } from './types';
+import { standard, mergeGeoms, mergeGeomsUV } from './types';
+import { wallMaps } from './wallTexture';
 import type { PropPart, PropTemplate } from './types';
 
 export type HousePart = [string, number, number, number, number, number, number, string | number, number?];
@@ -410,13 +411,23 @@ export const COTTAGES = ['cottageA', 'cottageB', 'cottageC',
  *  all sixteen: the point of a kit is that ONE template reads as a different
  *  region without a second copy of the shape, and four regions is enough to
  *  prove it while keeping this file about the shapes. */
-export interface Kit { wall: number; wall2: number; roof: number; trim: number; stone: number }
+export interface Kit {
+  wall: number; wall2: number; roof: number; trim: number; stone: number;
+  /** How this kit's walls are surfaced under their windows.
+   *
+   *  v1 has no such field: it planks every wall tile over #96683c and lets the
+   *  instance colour multiply it, which makes a limewashed Aegean cube come out
+   *  plank-brown. Timber kits keep that; rendered ones take v1's limewash over
+   *  white, so the kit colour survives the multiply. */
+  wallBase: string;
+  planks: boolean;
+}
 
 export const KITS: Record<string, Kit> = {
-  farm: { wall: 0xdac9a4, wall2: 0xa8442e, roof: 0x8a3a2a, trim: 0x5d4426, stone: 0x8d8578 },
-  alpine: { wall: 0xe2d6bc, wall2: 0x9c6c40, roof: 0x7a4630, trim: 0x5d4426, stone: 0x9a978e },
-  dalmatia: { wall: 0xe6dfcd, wall2: 0xd2c9b2, roof: 0xc0603a, trim: 0x4a6b4a, stone: 0xcfc6ae },
-  liguria: { wall: 0xe8a15c, wall2: 0xd4884a, roof: 0xb4552e, trim: 0x3f6b46, stone: 0xc9b998 },
+  farm: { wall: 0xdac9a4, wall2: 0xa8442e, roof: 0x8a3a2a, trim: 0x5d4426, stone: 0x8d8578, wallBase: '#96683c', planks: true },
+  alpine: { wall: 0xe2d6bc, wall2: 0x9c6c40, roof: 0x7a4630, trim: 0x5d4426, stone: 0x9a978e, wallBase: '#96683c', planks: true },
+  dalmatia: { wall: 0xe6dfcd, wall2: 0xd2c9b2, roof: 0xc0603a, trim: 0x4a6b4a, stone: 0xcfc6ae, wallBase: '#ffffff', planks: false },
+  liguria: { wall: 0xe8a15c, wall2: 0xd4884a, roof: 0xb4552e, trim: 0x3f6b46, stone: 0xc9b998, wallBase: '#ffffff', planks: false },
 };
 
 /** The five unit geometries, each base-anchored ONCE — `_realizeElements`.
@@ -451,7 +462,7 @@ export function realize(
   const T = HOUSE_TEMPLATES[name];
   if (!T) throw new Error(`unknown house template "${name}"`);
   const K = KITS[kitName] ?? KITS.farm;
-  const byColour = new Map<string, { colour: number; geoms: THREE.BufferGeometry[] }>();
+  const byColour = new Map<string, { colour: number; wall: boolean; geoms: THREE.BufferGeometry[] }>();
 
   for (const [kind, dx, dy, dz, sx, sy, sz, colKey, roll = 0] of T.parts) {
     // scale, then roll about Z, then translate — the order `_element` composes.
@@ -459,20 +470,48 @@ export function realize(
     if (roll) g.rotateZ(roll);
     g.translate(dx, dy, dz);
     const colour = typeof colKey === 'string' ? (K as unknown as Record<string, number>)[colKey] : colKey;
-    const key = `${typeof colKey === 'string' ? colKey : `x${colKey.toString(16)}`}`;
+    // KIND 'wall' IS ITS OWN PART, always, even when it shares a colour slot
+    // with a footing or a flight of steps. That is the split v1 keeps, and the
+    // reason is the window texture: `wall` is the inhabited mass, and the
+    // stone cottage's outside stair is written in the same 'stone' slot as the
+    // block it climbs. Merged together, the steps get windows.
+    const wall = kind === 'wall';
+    const key = `${typeof colKey === 'string' ? colKey : `x${colKey.toString(16)}`}${wall ? ':wall' : ''}`;
     const slot = byColour.get(key);
     if (slot) slot.geoms.push(g);
-    else byColour.set(key, { colour, geoms: [g] });
+    else byColour.set(key, { colour, wall, geoms: [g] });
   }
 
-  return [...byColour].map(([key, v]) => ({
-    key,
-    geometry: mergeGeoms(v.geoms),
-    // Flat shading on everything: these are faceted masses, and smooth normals
-    // across a merged buffer of unrelated boxes round the corners off a house.
-    material: standard(v.colour, { roughness: 0.9 }),
-    castShadow: opts.castShadow ?? true,
-  }));
+  return [...byColour].map(([key, v]) => {
+    if (!v.wall) {
+      return {
+        key,
+        geometry: mergeGeoms(v.geoms),
+        // Flat shading on everything: these are faceted masses, and smooth
+        // normals across a merged buffer of unrelated boxes round the corners
+        // off a house.
+        material: standard(v.colour, { roughness: 0.9 }),
+        castShadow: opts.castShadow ?? true,
+      };
+    }
+    const maps = wallMaps(K.wallBase, K.planks);
+    return {
+      key,
+      // UVs carried: a merged wall without them samples one texel across the
+      // whole face, which is a solid box where the windows should be.
+      geometry: mergeGeomsUV(v.geoms),
+      material: standard(v.colour, {
+        roughness: 0.85,
+        map: maps.map,
+        // The emissive half of v1's trick: one extra map and every dwelling in
+        // the world is lit at dusk, with no light source and no per-house cost.
+        emissive: 0xffffff,
+        emissiveMap: maps.glow,
+        emissiveIntensity: 0.5,
+      }),
+      castShadow: opts.castShadow ?? true,
+    };
+  });
 }
 
 /** A template's own collider, from its own `r`. A building's footprint radius

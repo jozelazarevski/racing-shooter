@@ -206,6 +206,43 @@ export function mergeGeoms(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return out;
 }
 
+/** Merge geometries KEEPING UVs.
+ *
+ *  `mergeGeoms` drops them on purpose — nothing in the library was textured, and
+ *  carrying empty UV arrays into every instanced mesh in the world is a real
+ *  cost for nothing. Then the house templates arrived with a window texture,
+ *  and a merged wall with no UVs samples texel (0,0) across its whole face: a
+ *  solid brown box where the windows should be.
+ *
+ *  So this is the same merge with the UV channel carried through, used ONLY by
+ *  the parts that are textured. Anything without a `uv` attribute contributes
+ *  zeroes rather than shifting every following vertex's UVs, which is the bug
+ *  you get from packing a short array. */
+export function mergeGeomsUV(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const flat = list.map((g) => (g.index ? g.toNonIndexed() : g));
+  for (const g of flat) if (!g.getAttribute('normal')) g.computeVertexNormals();
+  let total = 0;
+  for (const g of flat) total += g.getAttribute('position').count;
+  const pos = new Float32Array(total * 3);
+  const nrm = new Float32Array(total * 3);
+  const uvs = new Float32Array(total * 2);
+  let o = 0;
+  for (const g of flat) {
+    const p = g.getAttribute('position') as THREE.BufferAttribute;
+    const n = g.getAttribute('normal') as THREE.BufferAttribute;
+    const u = g.getAttribute('uv') as THREE.BufferAttribute | undefined;
+    pos.set(p.array as Float32Array, o * 3);
+    nrm.set(n.array as Float32Array, o * 3);
+    if (u) uvs.set(u.array as Float32Array, o * 2);
+    o += p.count;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  return out;
+}
+
 /** A box placed and rotated in the component's local space — the workhorse for
  *  anything built out of planks, posts and panels. */
 export function beam(

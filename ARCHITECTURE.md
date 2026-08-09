@@ -360,6 +360,13 @@ and the lighthouse came over verbatim into `props/houseTemplates.ts`,
 comments are the record of what was learned. A settlement component is now a
 name and a sentence with no geometry in it.
 
+The first cut of that port shipped the dwellings with their massing and **no
+windows**, which is a good illustration of why the wall/box split in v1's
+element buckets is not arbitrary: `wall` is the bucket that carries the window
+texture, and the merge that flattened it also dropped the UVs a texture needs.
+Both are restored, and the emissive companion map means every dwelling in the
+world is lit at dusk for one extra texture fetch.
+
 Rendering the ported library found two bugs that are in the v1 table too: a
 rolled part is still base-anchored, which is right for the pueblo ruin's
 protruding vigas and wrong for a diameter, so the windmill's four sails came

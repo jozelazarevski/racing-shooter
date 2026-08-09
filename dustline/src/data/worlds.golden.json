@@ -54,8 +54,8 @@
     "other": "51c7d432"
   },
   "harbour": {
-    "fingerprint": "2650dd1d",
-    "instances": 1719,
+    "fingerprint": "aaccc89b",
+    "instances": 1722,
     "components": {
       "pine": 110,
       "oak": 82,
@@ -113,6 +113,6 @@
     },
     "roadSamples": 480,
     "seedIndependent": true,
-    "other": "2650dd1d"
+    "other": "aaccc89b"
   }
 }

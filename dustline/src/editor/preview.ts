@@ -109,6 +109,10 @@ function disposeDeep(obj: THREE.Object3D) {
     else if (mat) {
       const withMap = mat as THREE.MeshStandardMaterial;
       withMap.map?.dispose();
+      // The emissive map goes with it. It was not here before anything used
+      // one, and a texture the disposer does not know about is a canvas leaked
+      // on every rebuild — which, at a rebuild per keystroke, adds up fast.
+      withMap.emissiveMap?.dispose();
       mat.dispose();
     }
   });

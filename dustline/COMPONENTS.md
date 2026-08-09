@@ -213,9 +213,32 @@ So the port is verbatim, comments included, and three files carry it:
 | `props/kit.ts` | `track.js` | hull loft, sail loft, strut-between-two-points, bundle, gable prism |
 | `props/houseTemplates.ts` | `world/catalog.js` | `HOUSE_TEMPLATES` and the colour kits |
 | `props/boatParts.ts` | `track.js` | rig, deck gear, trawler gantry, coachroofs, fenders |
+| `props/wallTexture.ts` | `textures.js` | the window tile and its emissive companion |
 
 A settlement component is then a name and a sentence — `dwelling({ template:
 'cottageA', kit: 'dalmatia', … })` — with no geometry in it left to get wrong.
+
+**Windows are a texture, and it is v1's.** `buildingTexture` draws the panes,
+frames, glazing bars, sills and door into a 256 tile, and
+`buildingGlowTexture` is the same tile black except the glass — so one extra
+map lights every dwelling in the world at dusk with no light source and no
+per-house cost. Its own comment states the split: the pane colour is the
+albedo half, the emissive map is the glow.
+
+That texture is why kind `wall` is its own part even when it shares a colour
+slot with something else. The stone cottage's outside stair is written in the
+same `stone` slot as the block it climbs; merged, the steps would get windows.
+It is also why `mergeGeomsUV` exists next to `mergeGeoms` — the plain merge
+drops UVs on purpose, and a merged wall without them samples one texel across
+its whole face, which is a solid box where the windows should be. The first
+cut of this port did exactly that and shipped dwellings with their massing and
+none of their windows.
+
+A kit picks between two v1 wall surfaces: the **planks** of `buildingTexture`
+for the timber kits, and the **limewash** of `townhouseTexture` ("patchy
+limewash erosion, so a terrace of identical units is not identical") for the
+rendered ones. v1 planks every wall and lets the kit colour multiply it, which
+makes a limewashed harbour come out mud.
 
 **Two things were repaired in the port, and they are marked in the file.** A
 rolled part in a house template is still BASE-anchored, so it radiates one way

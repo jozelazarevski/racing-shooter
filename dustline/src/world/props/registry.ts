@@ -9,6 +9,7 @@
 // itself, so lazy loading would only buy a flash of empty palette.
 
 import type { PropTemplate, PropPart } from './types';
+import { disposeWallMaps } from './wallTexture';
 
 const modules = import.meta.glob<{ default: PropTemplate }>('./*.ts', { eager: true });
 
@@ -64,4 +65,10 @@ export function partsFor(template: PropTemplate): PropPart[] {
  *  no error, which is a miserable thing to debug. */
 export function resetPartCache() {
   partCache.clear();
+  // The wall textures are cached across components — sixty-four canvases for
+  // three distinct pictures is not a trade worth making — but the caller has
+  // just disposed the materials that hold them, and a disposed texture handed
+  // out again renders black with no error. Same rule as the geometry: cleared
+  // together or not at all.
+  disposeWallMaps();
 }
