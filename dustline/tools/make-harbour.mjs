@@ -279,6 +279,10 @@ const track = {
   },
 
   scenery: [
+    // GROUND COVER FIRST, and in the thousands. Everything else in the
+    // library stands ON the ground; without this the ground itself is a
+    // painted plane, and the eye has no scale between a rock and the horizon.
+    { template: 'grassTuft', count: 4000, minRoadDist: 6, maxRoadDist: 60, minSpawnDist: 30, spread: 0.98 },
     { template: 'pine', count: 110, minRoadDist: 15, minSpawnDist: 70, spread: 0.93 },
     { template: 'oak', count: 80, minRoadDist: 15, minSpawnDist: 70, spread: 0.92 },
     { template: 'willow', count: 40, minRoadDist: 12, minSpawnDist: 60, spread: 0.95 },

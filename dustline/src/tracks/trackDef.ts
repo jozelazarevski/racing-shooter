@@ -135,6 +135,12 @@ export interface SceneryLayer {
   count: number;
   /** rejected if closer than this to the road centreline */
   minRoadDist: number;
+  /** Rejected if FURTHER than this from the centreline. Optional, and it exists
+   *  for ground cover: detail is only worth paying for where it is seen, and a
+   *  tuft of grass in the far corner of a 900 m map is an instance nobody will
+   *  ever be within two hundred metres of. Banding the scatter to the road
+   *  corridor buys the same density near the car for a fraction of the count. */
+  maxRoadDist?: number;
   /** rejected if closer than this to the start pad */
   minSpawnDist: number;
   /** rejected on these surfaces; omitted means "use the component's own rule" */

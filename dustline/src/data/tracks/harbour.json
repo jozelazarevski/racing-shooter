@@ -208,6 +208,14 @@
   },
   "scenery": [
     {
+      "template": "grassTuft",
+      "count": 4000,
+      "minRoadDist": 6,
+      "minSpawnDist": 30,
+      "spread": 0.98,
+      "maxRoadDist": 60
+    },
+    {
       "template": "pine",
       "count": 110,
       "minRoadDist": 15,

@@ -77,7 +77,9 @@ function scatter(
   while (out.length < layer.count && guard++ < budget) {
     const x = rng.centered(spread / 2);
     const z = rng.centered(spread / 2);
-    if (terrain.distToRoad(x, z) < layer.minRoadDist) continue;
+    const dRoad = terrain.distToRoad(x, z);
+    if (dRoad < layer.minRoadDist) continue;
+    if (layer.maxRoadDist !== undefined && dRoad > layer.maxRoadDist) continue;
     if (Math.hypot(x - terrain.spawn.x, z - terrain.spawn.z) < layer.minSpawnDist) continue;
     const site = siteAt(terrain, x, z, placement);
     // Water is a placement rule, not a surface, so it is filtered here rather

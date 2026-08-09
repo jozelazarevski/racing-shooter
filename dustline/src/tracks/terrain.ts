@@ -402,29 +402,65 @@ export class Terrain {
     // ---- textured road ribbon swept along the loop (visual only — the
     // trimesh below it is the drivable surface). Crowned profile with edge
     // skirts that tuck into the terrain, per-vertex surface tint. ----
+    // THE ROAD IS THE SURFACE A PLAYER LOOKS AT FOR AN ENTIRE LAP, and it was
+    // a 128 px tile of flat grey with 700 two-pixel dots on it. From the chase
+    // camera that is a painted band. v1's `roadTexture` is built the other way
+    // round — a base colour, then LARGE soft blotches, then finer grain over
+    // them, then aggregate — and the layering is what stops asphalt reading as
+    // noise on a flat colour. That structure is ported here at its resolution;
+    // the tone and the edge lines stay dustline's.
+    //
+    // 512, not 1024: v1 raises the tile only for cobbles, on the grounds that
+    // "a sett needs texels" and broad mottle does not.
     const speckle = Rng.fork(def.seed, 'roadTexture');
+    const RTEX = 512;
     const rcv = document.createElement('canvas');
-    rcv.width = 128; rcv.height = 128;
+    rcv.width = RTEX; rcv.height = RTEX;
     const rctx = rcv.getContext('2d')!;
-    rctx.fillStyle = '#a6a6a4';
-    rctx.fillRect(0, 0, 128, 128);
-    for (let i = 0; i < 700; i++) { // asphalt speckle
-      const g = 120 + speckle.float() * 60 | 0;
-      rctx.fillStyle = `rgba(${g},${g},${g},0.5)`;
-      rctx.fillRect(speckle.float() * 128, speckle.float() * 128, 2, 2);
+    rctx.fillStyle = '#9d9d9b';
+    rctx.fillRect(0, 0, RTEX, RTEX);
+    const blotch = (n: number, rMin: number, rSpan: number, aMin: number, aSpan: number) => {
+      for (let i = 0; i < n; i++) {
+        const g = 108 + speckle.float() * 70 | 0;
+        rctx.fillStyle = `rgba(${g},${g},${g + (speckle.float() * 6 | 0)},${aMin + speckle.float() * aSpan})`;
+        rctx.beginPath();
+        rctx.arc(speckle.float() * RTEX, speckle.float() * RTEX, rMin + speckle.float() * rSpan, 0, Math.PI * 2);
+        rctx.fill();
+      }
+    };
+    blotch(420, 9, 26, 0.05, 0.10);            // patched and weathered areas
+    blotch(1800, 2, 6, 0.06, 0.14);            // grain over them
+    for (let i = 0; i < 2600; i++) {           // aggregate: chips in the binder
+      const g = 150 + speckle.float() * 80 | 0;
+      rctx.fillStyle = `rgba(${g},${g},${g},${0.10 + speckle.float() * 0.25})`;
+      const sz = 1 + speckle.float() * 2.2;
+      rctx.fillRect(speckle.float() * RTEX, speckle.float() * RTEX, sz, sz);
     }
+    // A worn crown: the middle of the lane is polished by traffic, the edges
+    // are not. One gradient, and it is what makes the camber read.
+    const crown = rctx.createLinearGradient(0, 0, 0, RTEX);
+    crown.addColorStop(0, 'rgba(40,40,44,0.18)');
+    crown.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+    crown.addColorStop(1, 'rgba(40,40,44,0.18)');
+    rctx.fillStyle = crown;
+    rctx.fillRect(0, 0, RTEX, RTEX);
     rctx.fillStyle = '#f2ede0';                 // edge lines run along v edges
-    rctx.fillRect(0, 3, 128, 4);
-    rctx.fillRect(0, 121, 128, 4);
+    rctx.fillRect(0, RTEX * 0.023, RTEX, RTEX * 0.031);
+    rctx.fillRect(0, RTEX * 0.945, RTEX, RTEX * 0.031);
     const rtex = new THREE.CanvasTexture(rcv);
     rtex.wrapS = rtex.wrapT = THREE.RepeatWrapping;
     rtex.colorSpace = THREE.SRGBColorSpace;
     const NPTS = this.roadPts.length;
-    const COLS = 4;
+    // SEVEN COLUMNS, NOT FOUR. With four the ribbon is a flat plane between its
+    // two inner edges, so the crown painted into the texture above has no
+    // geometry under it and the road takes the same light right across. Three
+    // more columns cost one more quad per sample and give the surface an actual
+    // camber to catch it — 12 cm at the centreline, which is a real road's.
+    const COLS = 7;
     const H = def.road.halfWidth + 0.6;
-    const lats = [-(H + 1.7), -(H - 0.15), H - 0.15, H + 1.7];
-    const lifts = [-0.3, 0.14, 0.14, -0.3];
-    const vvs = [0, 0.06, 0.94, 1];
+    const lats = [-(H + 1.7), -(H - 0.15), -H * 0.5, 0, H * 0.5, H - 0.15, H + 1.7];
+    const lifts = [-0.3, 0.14, 0.2, 0.26, 0.2, 0.14, -0.3];
+    const vvs = [0, 0.06, 0.3, 0.5, 0.7, 0.94, 1];
     const rVerts = new Float32Array((NPTS + 1) * COLS * 3);
     const rCols = new Float32Array((NPTS + 1) * COLS * 3);
     const rUvs = new Float32Array((NPTS + 1) * COLS * 2);

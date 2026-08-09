@@ -190,7 +190,7 @@ things are, and nothing answers that except seeing them next to a car.
 Order in each sheet is alphabetical, after the car:
 
 - **debris** — Crate · Log pile · Oil drum · Pallet · Spare tyre
-- **flora-1** — Birch · Bush · Crop row · Dead tree · Oak · Olive · Orchard tree
+- **flora-1** — Birch · Bush · Crop row · Dead tree · Grass tuft · Oak · Olive · Orchard tree
 - **flora-2** — Palm · Pine · Reeds · Saguaro · Stump · Vine row · Willow
 - **marine-1** — Beacon · Boat shed · Breakwater · Capstan · Channel buoy · Dock ladder · Fishing boat
 - **marine-2** — Harbour crane · Jetty · Lighthouse · Lobster pots · Mooring post · Motor launch · Net loft
@@ -265,7 +265,7 @@ protruding vigas and wrong for a diameter: the windmill's four sails, written
 the well's winch barrel hung 2.6 m out past one post. Rendering the library is
 what made both visible. They are bugs in the v1 table too.
 
-## The library — 108 components
+## The library — 109 components
 
 One file each, discovered from the folder. The table below is the shape of the
 library rather than an inventory — the sheets above are the inventory, and they
@@ -319,6 +319,10 @@ Three things came out of building them that are worth more than the assets:
   tree and wrong for anything that RUNS OUT from its origin, and the jetty had
   already shipped with 22 m of deck and a hitbox centred on the shore end. It
   now offsets in X and Z, rotated by the instance's yaw.
+- **Scatter had a `minRoadDist` and no maximum.** Ground cover is only worth
+  paying for where it is seen, so a layer may now band itself to the road
+  corridor with `maxRoadDist` — the same density beside the car for a fraction
+  of the count.
 - **Box colliders ignored the instance's rotation.** A 12 m barn at 45 degrees
   had an axis-aligned hitbox covering a quite different footprint from the barn.
 - **A deck you drive over cannot be a solid lump.** The bridges take the deck
@@ -347,7 +351,7 @@ with non-empty, NaN-free geometry; that `physics.shape()` answers with positive
 dimensions at both ends of the component's own scale range; and that a
 thumbnail renders. Then it places one of every component, loads them all in the
 **game**, and requires each to have exactly the collider its file declares —
-87 solid, 21 not, all correct.
+87 solid, 22 not, all correct.
 
 It then loads the harbour track and reads the **actual instance matrices** out
 of the built world, checking that every floating component came out at the

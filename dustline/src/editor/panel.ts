@@ -350,6 +350,11 @@ function sceneryTab(root: HTMLElement, def: TrackDef, commit: Commit) {
     selectRow(c, 'component', layer.template, ids, (v) => commit((d) => { d.scenery[i].template = v; }, 'layer component'));
     numRow(c, 'count', layer.count, (v) => commit((d) => { d.scenery[i].count = Math.max(0, v | 0); }, 'count'), { step: 10, min: 0 });
     numRow(c, 'clear of road (m)', layer.minRoadDist, (v) => commit((d) => { d.scenery[i].minRoadDist = v; }, 'road clearance'), { step: 1 });
+    numRow(c, 'within of road (m)', layer.maxRoadDist ?? 0, (v) => commit((d) => {
+      // 0 means "no limit" rather than "nowhere", because a band of zero width
+      // is never a thing anyone wants and an empty box has to mean something.
+      if (v > 0) d.scenery[i].maxRoadDist = v; else delete d.scenery[i].maxRoadDist;
+    }, 'road band'), { step: 5, min: 0 });
     numRow(c, 'clear of start (m)', layer.minSpawnDist, (v) => commit((d) => { d.scenery[i].minSpawnDist = v; }, 'start clearance'), { step: 5 });
     const range = layer.scale ?? tpl?.authoring.scale ?? [1, 1];
     numRow(c, 'scale min', range[0], (v) => commit((d) => {

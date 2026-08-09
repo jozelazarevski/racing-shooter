@@ -1,20 +1,22 @@
 {
   "dustbowl": {
-    "fingerprint": "cf27981f",
-    "instances": 1446,
+    "fingerprint": "70668082",
+    "instances": 5446,
     "components": {
+      "grassTuft": 4000,
       "pine": 260,
       "rock": 150,
       "bush": 170
     },
     "roadSamples": 480,
     "seedIndependent": true,
-    "other": "cf27981f"
+    "other": "70668082"
   },
   "proving-ground": {
-    "fingerprint": "b917fd5e",
-    "instances": 1857,
+    "fingerprint": "ea10f8d0",
+    "instances": 5857,
     "components": {
+      "grassTuft": 4000,
       "pine": 150,
       "birch": 120,
       "bush": 180,
@@ -51,12 +53,13 @@
     },
     "roadSamples": 480,
     "seedIndependent": true,
-    "other": "b917fd5e"
+    "other": "ea10f8d0"
   },
   "harbour": {
-    "fingerprint": "2bf7c65d",
-    "instances": 1797,
+    "fingerprint": "483b4359",
+    "instances": 5797,
     "components": {
+      "grassTuft": 4000,
       "pine": 110,
       "oak": 82,
       "willow": 40,
@@ -113,6 +116,6 @@
     },
     "roadSamples": 480,
     "seedIndependent": true,
-    "other": "2bf7c65d"
+    "other": "483b4359"
   }
 }

@@ -463,6 +463,26 @@ is 0 and Cylinder is 11, not the 1/2/10 it assumed) silently dropped every ball
 and cylinder in the world. Both were caught by the gate, which is the argument
 for having one.
 
+**Detail where it is actually seen.** Two surfaces fill most of the screen and
+both were plain. The ROAD was a 128 px tile of flat grey with 700 two-pixel dots
+on it — from the chase camera, a painted band. It is now built the way v1's
+`roadTexture` is: base, then large soft blotches, then finer grain over them,
+then aggregate, because that layering is what stops asphalt reading as noise on
+a flat colour. The ribbon also went from four columns across to seven, so the
+camber painted into the texture has geometry under it to catch the light.
+
+The GROUND between components was empty: 109 components and nothing smaller than
+a bush anywhere, so the eye had no scale reference between a 0.6 m rock and 900
+metres of vertex-coloured plane. `grassTuft` is six triangles, no collider, and
+scattered in the thousands.
+
+Two measured corrections to it, both from looking at the result rather than the
+plan: 1,200 tufts over a 900 m world is one per 675 square metres and simply
+invisible, and 0.3 m — the honest height of meadow grass — is invisible too from
+thirty metres. So scatter gained `maxRoadDist`, which bands a layer to the road
+corridor, and the tuft grew to 0.5 m. 4,000 in a 60 m band beside the road buys
+what 40,000 spread over the whole map would have.
+
 ### 5.5 State which specification governs which codebase — DONE
 
 Six normative documents — `RULES.md`, `NATURE.md`, `STRUCTURES.md`, `SCENES.md`,
