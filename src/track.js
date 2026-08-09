@@ -4157,6 +4157,21 @@ export class Track {
     // [{x, z, r, y}] for big boulders, huts, gantry legs, the grandstand
     // front and distant mesas. Car physics treats them like this.obstacles.
     this.solids = [];
+    // WALLS ARE SEGMENTS, NOT DOTS. A masonry run - a pass parapet, a dry
+    // stone field wall, a quay coping - is a continuous barrier, and a row of
+    // circle colliders is not: measured on GOTTHARD, four of six runs driven
+    // straight at the retaining wall went THROUGH it and one ended up parked
+    // on top, because a 1.2 u circle standing in for a 3.4 u block leaves the
+    // ends open and the gaps between blocks open with them. Reported as
+    // "walls like this need to be not penetrable, now I can just drive into
+    // it and up on top".
+    //
+    // Each entry is a wall SEGMENT with a height span:
+    //   { x1, z1, x2, z2, hw, y, h, mat }
+    // where hw is half its thickness, y the base and h the height. Physics
+    // resolves against the nearest point on the segment, so a run of them is
+    // an unbroken barrier however the blocks are spaced.
+    this.barriers = [];
     // Shootable buildings: [{x, z, y, r, w, h, hp, solid, parts, dead}]. Huts
     // and igloos are instanced, so `parts` names the mesh + slot to blank when
     // one is levelled, and `solid` is the collider to pull out of this.solids.
@@ -7296,7 +7311,13 @@ export class Track {
         mesh.setMatrixAt(k, m4);
         col.setScalar(0.86 + Math.random() * 0.28);
         mesh.setColorAt(k++, col);
-        this.solids.push({ x: p.x, z: p.z, r: 1.2, y: p.y, mat: 'stone' });
+        // A PARAPET IS A BARRIER, not a bollard. The 1.2 u circle this used
+        // to register covered the middle of a 3.4 u block and neither end,
+        // and consecutive blocks left the joints open: driven at head-on, the
+        // car went through four times in six. The segment runs the block's
+        // full length (3.6, so neighbours overlap) and carries its height.
+        const hd = this.headingAt(i);
+        this._barrier(p.x, p.z, Math.sin(hd), Math.cos(hd), 3.6, 0.9, p.y - 0.55, H);
       }
     }
     mesh.count = k;
@@ -9918,8 +9939,12 @@ export class Track {
         wall.rotation.y = yaw;
         wall.castShadow = true;
         g.add(wall);
-        this.solids.push({ x: wall.position.x, z: wall.position.z, r: 1.4,
-          y: this.center[i].y + 1, mat: 'stone' });
+        // A 40 u PARAPET IS NOT A 1.4 u DOT. This registered one circle at
+        // the middle of the whole span, which is why the bridge wall in the
+        // player's screenshot could be driven straight into and over. The
+        // barrier runs the full span at its real thickness and height.
+        this._barrier(wall.position.x, wall.position.z, Math.sin(yaw), Math.cos(yaw),
+          span * 2 * this.segLen, 1.1, this.center[i].y - 0.2, 1.6);
         // arch faces: two masonry blocks descending under the deck
         for (const k of [-span * 0.55, span * 0.55]) {
           const j = (i + Math.round(k) + N) % N;
@@ -10729,17 +10754,39 @@ export class Track {
 
   /** A dry-stone field wall: `n` instanced blocks in a line, each a small
    *  SOLID stone collider. Runs out in the fields, never along the road. */
+  /** Register a wall BLOCK as a barrier segment: `len` along `rot`, `thick`
+   *  across it, standing `h` high from `y`. Every masonry run in the game
+   *  goes through here, so "walls are solid" is one rule in one place rather
+   *  than a promise each builder has to remember to keep. */
+  /*  Takes an explicit DIRECTION VECTOR rather than an angle, deliberately:
+   *  this file carries two angle conventions - plain math angles, where the
+   *  direction is (cos, sin), and `headingAt`, where it is (sin, cos) - and
+   *  passing a heading to a cos/sin helper is the exact mistake that laid a
+   *  hairpin's parapets out as a comb of piano keys. A vector cannot be
+   *  misread. */
+  _barrier(x, z, dirX, dirZ, len, thick, y, h, mat = 'stone') {
+    const dl = Math.hypot(dirX, dirZ) || 1;
+    const hl = len / 2, ux = (dirX / dl) * hl, uz = (dirZ / dl) * hl;
+    this.barriers.push({
+      x1: x - ux, z1: z - uz, x2: x + ux, z2: z + uz,
+      hw: thick / 2, y, h, mat,
+    });
+  }
+
   _stoneWallRun(B, x, z, rot, n, K) {
     const cs = Math.cos(rot), sn = Math.sin(rot);
     for (let k = 0; k < n; k++) {
       const d = (k - (n - 1) / 2) * 3.1;
       const wx = x + cs * d, wz = z + sn * d;
       const wy = this.terrainHeight(wx, wz) - 0.3;
+      const wh = 1.15 + Math.random() * 0.3;
       B.box.push({
-        x: wx, y: wy, z: wz, sx: 3.2, sy: 1.15 + Math.random() * 0.3, sz: 0.85,
+        x: wx, y: wy, z: wz, sx: 3.2, sy: wh, sz: 0.85,
         rot: rot + Math.PI / 2, roll: 0, color: K.stone,
       });
-      this.solids.push({ x: wx, z: wz, r: 1.3, y: wy + 0.6, mat: 'stone' });
+      // the block's long axis is `rot`; overlap the segments slightly (3.3 for
+      // a 3.1 pitch) so a run has no seams for a nose to find
+      this._barrier(wx, wz, Math.cos(rot), Math.sin(rot), 3.3, 0.85, wy, wh);
     }
     this._addShadow(x, z, n * 1.7);
   }
@@ -16161,6 +16208,7 @@ export class Track {
     // drop the world-sized lookup tables too — these are the big retained
     // arrays (900 centreline samples, every collider, the river grid)
     this.solids = []; this.buildings = []; this.trees = []; this.props = [];
+    this.barriers = [];
     this.tireStacks = []; this.banners = [];
     this._river = null;
     this.disposed = true;

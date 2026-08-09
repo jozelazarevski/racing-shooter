@@ -88,6 +88,18 @@ allowed to be placed. When a rule names a probe, run it before shipping.
   `color` attribute (`_white()`) or instance colours multiply to black.
 - **One material serves one colour scheme.** Two instanced meshes must not
   share a material when only one has vertex/instance colours.
+- **A wall is a segment, not a dot.** Every masonry run — pass parapets, dry
+  stone field walls, bridge parapets, quay copings — registers through
+  `_barrier(x, z, dirX, dirZ, len, thick, y, h)` so physics resolves against
+  the nearest point on the *segment*. Circle colliders (one per block) leave
+  every block end and every joint open: measured, four runs in six driven at
+  a GOTTHARD parapet went through it. Never register a wall as `solids`
+  circles. Verify with `tests/test-walls.mjs`.
+- **Barriers gate on the coping only.** Block whenever the car is below wall
+  top + 1.0, with *no* lower bound — a parapet's base is sampled on the road
+  plane, and on a climbing, banked shelf the car's own height differs from it
+  by more than a wall is tall. A lower gate let the car through at 0.88 u
+  inside a 2.15 u standoff.
 - **Elements seat on the ground they claim.** `_element(...)` samples
   `terrainHeight` unless an explicit `yOverride` is passed (rocky spots,
   rim ruins); a `yOverride` of `undefined` is a bug — pass `null`.

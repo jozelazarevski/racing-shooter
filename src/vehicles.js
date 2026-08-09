@@ -1256,6 +1256,71 @@ export class Car {
       }
     }
 
+    // ---- MASONRY BARRIERS: parapets, dry-stone walls, quay copings.
+    //
+    // A wall is a SEGMENT, and it is solid for its whole length. It used to
+    // be registered as a row of circles, one per block, which left every
+    // block end and every joint open: driven head-on at a GOTTHARD parapet,
+    // four runs in six went through and one finished on top of it. Resolving
+    // against the nearest point on the segment closes both.
+    //
+    // Height matters as much as footprint. The barrier bites while the car is
+    // anywhere between just under its base and just over its coping, so you
+    // can neither slip beneath it on a falling shelf nor ride up onto it; a
+    // car genuinely above the coping (a big jump) passes over, which is the
+    // one way a wall should ever be cleared.
+    if (t.barriers && t.barriers.length) {
+      const R = 1.7;                       // car half-width against masonry
+      let hits = 0;
+      for (let i = 0; i < t.barriers.length && hits < 3; i++) {
+        const w = t.barriers[i];
+        // ONLY AN UPPER GATE. A lower one - "skip if the car is well below the
+        // wall's foot" - reads as sensible and is wrong on the roads that have
+        // walls: a pass parapet's base is sampled on the road PLANE, and on a
+        // climbing, banked shelf the car's own height differs from it by more
+        // than a wall is tall. That let the car through on GOTTHARD and
+        // TREMOLA, measured 0.88 u inside a wall with a 2.15 u standoff.
+        // Below the coping you are stopped by it; above it you are over it.
+        if (this.pos.y > w.y + w.h + 1.0) continue;
+        const ex = w.x2 - w.x1, ez = w.z2 - w.z1;
+        const len2 = ex * ex + ez * ez || 1;
+        // nearest point on the segment, clamped to its ends
+        let s = ((this.pos.x - w.x1) * ex + (this.pos.z - w.z1) * ez) / len2;
+        s = s < 0 ? 0 : s > 1 ? 1 : s;
+        const cx = w.x1 + ex * s, cz = w.z1 + ez * s;
+        const dx = this.pos.x - cx, dz = this.pos.z - cz;
+        const rr = w.hw + R;
+        const d2 = dx * dx + dz * dz;
+        if (d2 >= rr * rr) continue;
+        const d = Math.max(0.001, Math.sqrt(d2));
+        const nx = dx / d, nz = dz / d;
+        const vApp = this.vel.x * nx + this.vel.z * nz;
+        const spd = Math.hypot(this.vel.x, this.vel.z);
+        const square = THREE.MathUtils.clamp(-vApp / Math.max(3, spd), 0, 1);
+        this.pos.x = cx + nx * rr;
+        this.pos.z = cz + nz * rr;
+        if (vApp < 0) {
+          this.vel.x -= nx * vApp * 1.05;
+          this.vel.z -= nz * vApp * 1.05;
+          this.vel.multiplyScalar(1 - 0.07 * square);
+          if (this.wallGrind <= 0) {
+            this.wallGrind = square < 0.55 ? 0.55 : 0.18;
+            if (this === gm.player && gm.onSolidCrash) {
+              gm.onSolidCrash({ mat: w.mat || 'stone' }, this, Math.abs(vApp), nx, nz, square);
+            } else {
+              _hitNormal.set(nx, 0, nz);
+              this.onWallHit(_hitNormal, Math.abs(vApp));
+            }
+          }
+        }
+        // resolve up to three: at a joint the push-out of one block can seat
+        // the car against its neighbour, and inside a hairpin it can be
+        // between walls on both sides - stopping early leaves it a frame
+        // inside one of them (measured 0.93 u into a 2.15 u standoff)
+        hits++;
+      }
+    }
+
     // ---- solid scenery (boulders/mesas = stone, huts, gantry/stand = metal):
     // material-aware crashes — stone wrecks you, buildings crash big
     if (this === gm.player && t.solids && t.solids.length) {
