@@ -1594,12 +1594,38 @@ class Game {
   _applyTheme() {
     const th = this.track.theme;
     if (th) {
-      if (th.fogColor !== undefined) this.scene.fog = new THREE.Fog(th.fogColor, th.fogNear ?? 320, th.fogFar ?? 1500);
+      if (th.fogColor !== undefined) {
+        // same near-plane pull as the track ctor (aerial layering), local only
+        const fn = th.fogNear ?? 320;
+        this.scene.fog = new THREE.Fog(th.fogColor,
+          Math.max(fn * 0.72, Math.min(fn, 190)), th.fogFar ?? 1500);
+      }
       if (th.hemiSky !== undefined) this.hemi.color.setHex(th.hemiSky);
-      if (th.hemiGround !== undefined) this.hemi.groundColor.setHex(th.hemiGround);
+      if (th.hemiGround !== undefined) {
+        this.hemi.groundColor.setHex(th.hemiGround);
+        // GROUND BOUNCE HAS A COLOUR. The reference's shadow sides pick up
+        // the ground's own hue; a desaturated bounce is why shaded faces read
+        // grey. Saturation only - lightness untouched so nothing brightens -
+        // and faded out on the few very-hot-hemi worlds where it would tint.
+        const w = 1 - THREE.MathUtils.smoothstep(th.hemiIntensity ?? 1, 1.6, 2.6);
+        if (w > 0) {
+          const hsl = { h: 0, s: 0, l: 0 };
+          this.hemi.groundColor.getHSL(hsl);
+          this.hemi.groundColor.setHSL(hsl.h, Math.min(1, hsl.s * (1 + 0.22 * w)), hsl.l);
+        }
+      }
       if (th.hemiIntensity !== undefined) this.hemi.intensity = th.hemiIntensity;
       if (th.sunColor !== undefined) this.moon.color.setHex(th.sunColor);
       if (th.sunIntensity !== undefined) this.moon.intensity = th.sunIntensity;
+      // the vignette breathes with the world: bright hazy worlds take a
+      // firmer edge (it is what focuses the road in the reference), dark
+      // night worlds keep a light one so the frame edge stays readable
+      if (this.grade && this.grade.uniforms && this.grade.uniforms.uVig) {
+        const fc = new THREE.Color(th.fogColor ?? 0x888888);
+        const fl = 0.2126 * fc.r + 0.7152 * fc.g + 0.0722 * fc.b;
+        this.grade.uniforms.uVig.value = Math.min(0.38,
+          0.26 + 0.10 * THREE.MathUtils.smoothstep(fl, 0.15, 0.45));
+      }
       // key direction agrees with the sun the player can actually see
       if (th.sunAz !== undefined) {
         const az = th.sunAz;
@@ -5790,6 +5816,7 @@ class Game {
     if (this.track?.hazeBand) {
       this.camera.getWorldDirection(this._camDir ??= new THREE.Vector3());
       this.track.hazeBand.visible = this._camDir.y > -0.45;
+      if (this.track.hazeBand2) this.track.hazeBand2.visible = this.track.hazeBand.visible;
     }
     this._watchCarVisible(dt);
     this.input.endFrame();
