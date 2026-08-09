@@ -1,20 +1,27 @@
-// M2 terrain: procedural heightmap with a carved rally loop, surface zones,
-// a shared render mesh + Rapier trimesh collider, and O(1) surface lookup.
-// The same functions feed physics (mu), rendering (vertex color) and FX.
+// Terrain: turns a TrackDef into a heightfield, a surface map, a render mesh
+// and a Rapier trimesh collider. The same functions feed physics (mu),
+// rendering (vertex color) and FX.
+//
+// WHAT CHANGED, AND WHY IT MATTERS: this class used to CONTAIN a track. The
+// loop was a literal in the constructor, the landscape was three hand-written
+// sine terms, and the snow line was `z < -150` typed into an if. Now it
+// contains none of that — it takes a `TrackDef` and evaluates it. Every number
+// that used to be here lives in `data/tracks/*.json`, and `trackDef.ts` owns
+// the maths that reads it.
+//
+// The generated world is unchanged: `dustbowl.json` is the old constructor
+// written out in the new format, and it builds the same terrain to the metre.
 
 import * as THREE from 'three';
 import type RAPIER_API from '@dimforge/rapier3d-compat';
 import surfacesJson from '../data/surfaces.json';
+import {
+  TrackDef, SurfaceId, hillsAt, roadHeightAt, surfaceAt as surfaceForPoint,
+} from './trackDef';
+import { Rng } from '../core/rng';
 
-export type SurfaceId = keyof typeof surfacesJson;
+export type { SurfaceId };
 export interface SurfaceDef { muLong: number; muLat: number; rollingResistance: number; }
-
-const SIZE = 900;        // world meters, centered on origin
-const RES = 160;         // grid cells per side (mesh + collider share this)
-const ROAD_HALF = 6.5;   // road corridor half-width
-const ROAD_BLEND = 15;   // terrain flattens toward road inside this distance
-const PAD_R = 55;        // flat tarmac spawn pad radius (keeps M1 tests true)
-const SDF_RES = 220;     // road-distance lookup grid
 
 const SURF_COLORS: Record<SurfaceId, THREE.Color> = {
   tarmac: new THREE.Color(0x494b4f),
@@ -25,38 +32,58 @@ const SURF_COLORS: Record<SurfaceId, THREE.Color> = {
   sand: new THREE.Color(0xd8c07a),
 };
 const GRASS = new THREE.Color(0x6f9150);
+const ROCKFACE = new THREE.Color(0x7d7466);
 
 export class Terrain {
-  readonly spawn = new THREE.Vector3(0, 1.2, -24);
+  readonly def: TrackDef;
+  readonly spawn = new THREE.Vector3();
   private roadPts: THREE.Vector3[] = [];
-  private sdfDist = new Float32Array(SDF_RES * SDF_RES);
-  private sdfT = new Float32Array(SDF_RES * SDF_RES);
-  private mudCenter = new THREE.Vector2(-210, 160);
+  private sdfDist: Float32Array;
+  private sdfT: Float32Array;
+  private size: number;
+  private sdfRes: number;
 
-  constructor() {
-    // closed rally loop that tours the biome zones (snow north, sand east,
-    // mud west) and comes home across the spawn pad
-    const ctrl: THREE.Vector3[] = [];
-    const loop: [number, number][] = [
-      [0, -24], [120, -60], [230, 20], [250, 150], [150, 240],
-      [10, 260], [-130, 230], [-230, 120], [-240, -40], [-150, -140], [-60, -110],
-    ];
-    for (const [x, z] of loop) ctrl.push(new THREE.Vector3(x, 0, z));
+  constructor(def: TrackDef) {
+    this.def = def;
+    this.size = def.world.size;
+    this.sdfRes = def.world.sdfRes;
+    this.sdfDist = new Float32Array(this.sdfRes * this.sdfRes);
+    this.sdfT = new Float32Array(this.sdfRes * this.sdfRes);
+
+    const ctrl = def.road.points.map(([x, z]) => new THREE.Vector3(x, 0, z));
     const curve = new THREE.CatmullRomCurve3(ctrl, true, 'centripetal');
-    for (let i = 0; i < 480; i++) this.roadPts.push(curve.getPoint(i / 480));
+    const n = def.road.samples;
+    for (let i = 0; i < n; i++) this.roadPts.push(curve.getPoint(i / n));
 
-    // bake the road distance field once
-    for (let gz = 0; gz < SDF_RES; gz++) {
-      for (let gx = 0; gx < SDF_RES; gx++) {
-        const x = (gx / (SDF_RES - 1) - 0.5) * SIZE;
-        const z = (gz / (SDF_RES - 1) - 0.5) * SIZE;
+    // The start line is the top of the loop, so the pad follows the track
+    // rather than being a second thing to keep in sync with it.
+    this.spawn.set(this.roadPts[0].x, 1.2, this.roadPts[0].z);
+
+    this.bakeSdf();
+  }
+
+  /** Nearest-road distance and lap fraction, on a grid, baked once.
+   *
+   *  Brute force over every road sample: at the shipped resolution that is
+   *  220 x 220 x 480 = 23.2 M distance tests, measured at ~32 ms. That is
+   *  affordable once at boot and it is the single most expensive thing about
+   *  building a track — if track loading ever needs to be faster than this, a
+   *  chamfer distance transform over the rasterised road turns it into one
+   *  pass over the grid (~48 K operations) and is the change to make. It is
+   *  left alone for now because 32 ms is not a problem anybody has. */
+  private bakeSdf() {
+    const R = this.sdfRes, S = this.size, pts = this.roadPts, n = pts.length;
+    for (let gz = 0; gz < R; gz++) {
+      for (let gx = 0; gx < R; gx++) {
+        const x = (gx / (R - 1) - 0.5) * S;
+        const z = (gz / (R - 1) - 0.5) * S;
         let best = 1e9, bestT = 0;
-        for (let i = 0; i < this.roadPts.length; i++) {
-          const p = this.roadPts[i];
+        for (let i = 0; i < n; i++) {
+          const p = pts[i];
           const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
-          if (d < best) { best = d; bestT = i / this.roadPts.length; }
+          if (d < best) { best = d; bestT = i / n; }
         }
-        const o = gz * SDF_RES + gx;
+        const o = gz * R + gx;
         this.sdfDist[o] = Math.sqrt(best);
         this.sdfT[o] = bestT;
       }
@@ -64,41 +91,24 @@ export class Terrain {
   }
 
   private sdf(x: number, z: number): { d: number; t: number } {
-    const gx = Math.round(((x / SIZE) + 0.5) * (SDF_RES - 1));
-    const gz = Math.round(((z / SIZE) + 0.5) * (SDF_RES - 1));
-    const cx = Math.max(0, Math.min(SDF_RES - 1, gx));
-    const cz = Math.max(0, Math.min(SDF_RES - 1, gz));
-    const o = cz * SDF_RES + cx;
+    const R = this.sdfRes;
+    const gx = Math.round(((x / this.size) + 0.5) * (R - 1));
+    const gz = Math.round(((z / this.size) + 0.5) * (R - 1));
+    const cx = Math.max(0, Math.min(R - 1, gx));
+    const cz = Math.max(0, Math.min(R - 1, gz));
+    const o = cz * R + cx;
     return { d: this.sdfDist[o], t: this.sdfT[o] };
   }
 
-  /** Raw rolling-hill field before the road carve. */
-  private hills(x: number, z: number): number {
-    return (
-      Math.sin(x * 0.011 + 1.7) * Math.cos(z * 0.009 + 0.4) * 7.5 +
-      Math.sin(x * 0.027 - 0.8) * Math.sin(z * 0.031 + 2.1) * 3.2 +
-      Math.sin((x + z) * 0.05) * 1.1 +
-      (z < -140 ? Math.min(14, (-140 - z) * 0.08) : 0) // north rises to the snow line
-    );
-  }
-
-  /** Road elevation along t: gentle rises + one sharp jump crest. */
-  private roadHeight(t: number): number {
-    let h = Math.sin(t * Math.PI * 2 * 2 + 0.7) * 3.4 + Math.sin(t * Math.PI * 2 * 5 + 2.2) * 1.4;
-    const crest = Math.exp(-((t - 0.62) * (t - 0.62)) / 0.00028); // the jump
-    h += crest * 5.5;
-    return h;
-  }
-
   heightAt(x: number, z: number): number {
+    const def = this.def;
     const pad = Math.hypot(x - this.spawn.x, z - this.spawn.z);
     const { d, t } = this.sdf(x, z);
-    let h = this.hills(x, z);
-    const road = this.roadHeight(t);
-    const k = THREE.MathUtils.smoothstep(d, ROAD_HALF, ROAD_HALF + ROAD_BLEND);
+    let h = hillsAt(def, x, z);
+    const road = roadHeightAt(def, t);
+    const k = THREE.MathUtils.smoothstep(d, def.road.halfWidth, def.road.halfWidth + def.road.blend);
     h = THREE.MathUtils.lerp(road, h, k);
-    // spawn pad: dead flat tarmac apron
-    const pk = THREE.MathUtils.smoothstep(pad, PAD_R * 0.7, PAD_R);
+    const pk = THREE.MathUtils.smoothstep(pad, def.start.padRadius * 0.7, def.start.padRadius);
     return THREE.MathUtils.lerp(0, h, pk);
   }
 
@@ -114,29 +124,25 @@ export class Terrain {
     return this.sdf(x, z).d;
   }
 
-  /** The 480 baked centerline samples (read-only — the racing line bakes from these). */
+  /** The baked centerline samples (read-only — the racing line bakes from these). */
   get roadPoints(): readonly THREE.Vector3[] {
     return this.roadPts;
   }
 
   surfaceIdAt(x: number, z: number): SurfaceId {
+    const def = this.def;
     const pad = Math.hypot(x - this.spawn.x, z - this.spawn.z);
-    if (pad < PAD_R) return 'tarmac';
+    const onPad = pad < def.start.padRadius;
     const { d, t } = this.sdf(x, z);
-    const snowZone = z < -150 || this.heightAt(x, z) > 13;
-    if (d < ROAD_HALF + 1.5) {
-      // the loop alternates: tarmac start leg, long gravel rally leg,
-      // mud river crossing on the west, snow-packed leg through the north
-      if (snowZone) return t % 0.07 < 0.012 ? 'ice' : 'snow';
-      if (Math.hypot(x - this.mudCenter.x, z - this.mudCenter.y) < 80) return 'mud';
-      if (t > 0.08 && t < 0.52) return 'gravel';
-      return 'tarmac';
-    }
-    // off-road zones
-    if (snowZone) return 'snow';
-    if (Math.hypot(x - this.mudCenter.x, z - this.mudCenter.y) < 90) return 'mud';
-    if (x > 190) return 'sand';
-    return 'gravel';
+    const onRoad = d < def.road.halfWidth + 1.5;
+    // `height` is only consulted by aboveHeight predicates, but it is not free
+    // — computing it eagerly would add a full heightAt to every surface lookup,
+    // and surface lookups run per wheel per physics tick at 120 Hz.
+    const needsHeight = def.surfaces.zones.some(
+      (zn) => (onRoad ? zn.onRoad : zn.offRoad) && zn.any.some((p) => p.kind === 'aboveHeight'),
+    );
+    const height = needsHeight ? this.heightAt(x, z) : 0;
+    return surfaceForPoint(def, x, z, { onRoad, t, height, onPad });
   }
 
   surfaceAt(x: number, z: number): SurfaceDef {
@@ -144,14 +150,14 @@ export class Terrain {
   }
 
   colorAt(x: number, z: number, out: THREE.Color): THREE.Color {
+    const def = this.def;
     const id = this.surfaceIdAt(x, z);
     const { d } = this.sdf(x, z);
-    if (Math.hypot(x - this.spawn.x, z - this.spawn.z) < PAD_R && d > ROAD_HALF + 1.5) {
+    const edge = def.road.halfWidth + 1.5;
+    if (Math.hypot(x - this.spawn.x, z - this.spawn.z) < def.start.padRadius && d > edge) {
       return out.setHex(0x9a988e); // spawn pad: light concrete apron
     }
-    if (d < ROAD_HALF + 1.5) {
-      return out.copy(SURF_COLORS[id]);
-    }
+    if (d < edge) return out.copy(SURF_COLORS[id]);
     // off-road: blend zone tint over grass so the map reads
     out.copy(GRASS).lerp(SURF_COLORS[id], id === 'gravel' ? 0.25 : 0.75);
     // slope shading: steep faces read as exposed rock/dirt
@@ -159,15 +165,22 @@ export class Terrain {
     const gx = (this.heightAt(x + e, z) - this.heightAt(x - e, z)) / (2 * e);
     const gz = (this.heightAt(x, z + e) - this.heightAt(x, z - e)) / (2 * e);
     const slope = Math.hypot(gx, gz);
-    if (slope > 0.28) out.lerp(new THREE.Color(0x7d7466), Math.min(0.75, (slope - 0.28) * 2.6));
+    if (slope > 0.28) out.lerp(ROCKFACE, Math.min(0.75, (slope - 0.28) * 2.6));
     // valleys sit a touch darker (cheap baked-AO feel), crests a touch lighter
     const h = this.heightAt(x, z);
     const n = Math.sin(x * 0.13) * Math.sin(z * 0.17) * 0.05 + Math.sin(x * 0.041 + z * 0.037) * 0.035;
     return out.offsetHSL(0, 0, n + THREE.MathUtils.clamp(h * 0.006, -0.045, 0.05));
   }
 
-  /** Shared grid: render mesh (vertex-colored) + Rapier trimesh collider. */
-  build(scene: THREE.Scene, world: RAPIER_API.World, RAPIER: typeof RAPIER_API) {
+  /** Shared grid: render mesh (vertex-colored) + Rapier trimesh collider.
+   *  Returns the objects it added so a caller that rebuilds — the editor —
+   *  can dispose them without hunting through the scene graph. */
+  build(scene: THREE.Scene, world: RAPIER_API.World, RAPIER: typeof RAPIER_API): THREE.Object3D[] {
+    const def = this.def;
+    const RES = def.world.meshRes;
+    const SIZE = this.size;
+    const added: THREE.Object3D[] = [];
+
     const verts = new Float32Array((RES + 1) * (RES + 1) * 3);
     const cols = new Float32Array((RES + 1) * (RES + 1) * 3);
     const idx: number[] = [];
@@ -201,22 +214,26 @@ export class Terrain {
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96 }));
     mesh.receiveShadow = true;
     scene.add(mesh);
+    added.push(mesh);
 
-    const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-    world.createCollider(RAPIER.ColliderDesc.trimesh(verts, new Uint32Array(idx)).setFriction(1), body);
+    if (world && RAPIER) {
+      const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+      world.createCollider(RAPIER.ColliderDesc.trimesh(verts, new Uint32Array(idx)).setFriction(1), body);
+    }
 
     // ---- textured road ribbon swept along the loop (visual only — the
     // trimesh below it is the drivable surface). Crowned profile with edge
     // skirts that tuck into the terrain, per-vertex surface tint. ----
+    const speckle = Rng.fork(def.seed, 'roadTexture');
     const rcv = document.createElement('canvas');
     rcv.width = 128; rcv.height = 128;
     const rctx = rcv.getContext('2d')!;
     rctx.fillStyle = '#a6a6a4';
     rctx.fillRect(0, 0, 128, 128);
     for (let i = 0; i < 700; i++) { // asphalt speckle
-      const g = 120 + Math.random() * 60 | 0;
+      const g = 120 + speckle.float() * 60 | 0;
       rctx.fillStyle = `rgba(${g},${g},${g},0.5)`;
-      rctx.fillRect(Math.random() * 128, Math.random() * 128, 2, 2);
+      rctx.fillRect(speckle.float() * 128, speckle.float() * 128, 2, 2);
     }
     rctx.fillStyle = '#f2ede0';                 // edge lines run along v edges
     rctx.fillRect(0, 3, 128, 4);
@@ -226,7 +243,7 @@ export class Terrain {
     rtex.colorSpace = THREE.SRGBColorSpace;
     const NPTS = this.roadPts.length;
     const COLS = 4;
-    const H = ROAD_HALF + 0.6;
+    const H = def.road.halfWidth + 0.6;
     const lats = [-(H + 1.7), -(H - 0.15), H - 0.15, H + 1.7];
     const lifts = [-0.3, 0.14, 0.14, -0.3];
     const vvs = [0, 0.06, 0.94, 1];
@@ -278,22 +295,23 @@ export class Terrain {
     }));
     road.receiveShadow = true;
     scene.add(road);
+    added.push(road);
 
-    // road edge posts every ~20 samples so the route reads at speed
+    // road edge posts every ~10 samples so the route reads at speed
     const postGeo = new THREE.BoxGeometry(0.22, 1.0, 0.22);
     const postMat = new THREE.MeshStandardMaterial({ color: 0xe8e2d4, roughness: 0.8 });
-    const posts = new THREE.InstancedMesh(postGeo, postMat, Math.ceil(this.roadPts.length / 10) * 2);
+    const posts = new THREE.InstancedMesh(postGeo, postMat, Math.ceil(NPTS / 10) * 2);
     const m4 = new THREE.Matrix4();
     let pi = 0;
-    for (let i = 0; i < this.roadPts.length; i += 10) {
+    for (let i = 0; i < NPTS; i += 10) {
       const p = this.roadPts[i];
-      const p2 = this.roadPts[(i + 1) % this.roadPts.length];
+      const p2 = this.roadPts[(i + 1) % NPTS];
       const tx = p2.x - p.x, tz = p2.z - p.z;
       const len = Math.hypot(tx, tz) || 1;
       const nx = tz / len, nz = -tx / len;
       for (const s of [-1, 1]) {
-        const px = p.x + nx * s * (ROAD_HALF + 1.2);
-        const pz = p.z + nz * s * (ROAD_HALF + 1.2);
+        const px = p.x + nx * s * (def.road.halfWidth + 1.2);
+        const pz = p.z + nz * s * (def.road.halfWidth + 1.2);
         m4.setPosition(px, this.heightAt(px, pz) + 0.5, pz);
         posts.setMatrixAt(pi++, m4);
       }
@@ -301,5 +319,8 @@ export class Terrain {
     posts.count = pi;
     posts.castShadow = true;
     scene.add(posts);
+    added.push(posts);
+
+    return added;
   }
 }

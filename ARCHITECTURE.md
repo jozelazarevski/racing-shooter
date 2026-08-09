@@ -277,35 +277,47 @@ is the cleanest first cut: it is already nearly separable, it is pure data
 manipulation, and it is the part most worth having unit tests for, because a
 save-format bug costs a player their progress.
 
-### 5.4 dustline — the actual work
+### 5.4 dustline — track authoring. DONE.
 
-The engine question is settled: dustline is it, and v2 is deleted. What dustline
-needs is not a migration argument, it is content infrastructure.
+The engine question is settled: dustline is it, and v2 is deleted. The first
+three things dustline needed have landed; see `dustline/TRACKS.md`.
 
-**A track is currently a literal.** `dustline/src/tracks/terrain.ts` defines the
-one and only course as an array of eleven `[x, z]` pairs inside the `Terrain`
-constructor, turned into a closed centripetal `CatmullRomCurve3` — the same
-idiom v1 uses, which is a genuinely useful coincidence. But there is no track
-id, no registry, and no way to select a second one. Everything downstream
-(surface zones, the spawn point, the flat pad, the road-distance field) is
-built around that single loop.
+**A track was a literal.** `terrain.ts` defined the one and only course as
+eleven `[x, z]` pairs inside the `Terrain` constructor, and its *character* was
+worse — the snow line was `z < -150`, the mud flat was a circle written into an
+`if`, the jump was a gaussian typed into `roadHeight()`. There was no track id,
+no registry, no way to select a second one.
 
-So the first piece of work is **a track format**: lift the shape out of the
-constructor into typed data, give `Terrain` a loader, and make everything that
-currently hardcodes a position read it from the track instead. That is the
-precondition for a second track existing at all, and therefore the precondition
-for an editor, a stage roster, or a campaign.
+Now: a **track format** (`src/tracks/trackDef.ts`, tracks in
+`src/data/tracks/*.json`) that carries the loop, the landscape octaves, the
+road's elevation profile with named crests, the surface zones and bands, the
+scenery layers and the sky. `Terrain` evaluates it and contains none of it.
 
-The second piece is **the editor** that authors that format — the reason this
-matters is that authoring tracks by typing coordinate pairs into a constructor
-does not scale past the one that is there.
+An **editor** (`editor.html`) that authors the format: a live 2D map with shaded
+relief, painted surfaces and corner-speed colouring, over a 3D preview that
+builds the real `Terrain`. The 2D view is live and the 3D view is debounced at
+220 ms, because a full build measures ~66 ms in node and ~120–160 ms in a
+browser — fine on a pause, hopeless per mouse-move.
 
-The third is **determinism**, and it is worth doing before there is content
-rather than after: whatever scatters scenery must be seeded per track, or the
-same track will not rebuild the same way twice, and no visual regression can be
-caught. v1 learned this expensively — `MIGRATION.md` records a world's crest
-count moving 6 → 0 across two loads with no code change — and dustline has the
-chance to not pay for it twice.
+**Determinism**, which was the third item and is now paid for before there is
+content rather than after: `src/core/rng.ts` seeds every scattered object per
+track and forks the stream by layer name, so the same track builds the same
+world and adding a rock does not move the trees. v1 shows what skipping this
+costs — `MIGRATION.md` records a world's crest count moving 6 → 0 across two
+loads with no code change, and a bug that could not be reproduced for weeks.
+
+The format is proved rather than asserted: `npm run verify:track` drives the
+original hardcoded implementation and the data path over 48,400 grid samples
+and every centreline sample and requires them to agree. Surfaces match
+everywhere; height matches to 1.07e-14 m, and that residual is attributed to a
+single octave form (`sin(x*fx + z*fz)` where the original wrote `sin((x+z)*f)`,
+which is not the same float) rather than absorbed into a loose tolerance.
+
+**What is still open here:** the road-distance field is baked by brute force —
+23.2 M distance tests, ~32 ms, the dominant cost of building a track. A chamfer
+distance transform over the rasterised road makes it one pass (~48 K
+operations). Nobody is blocked on it, which is why it is written down instead
+of done.
 
 ### 5.5 State which specification governs which codebase
 

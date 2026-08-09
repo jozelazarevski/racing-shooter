@@ -238,6 +238,13 @@ development**. It has its own specification and milestone plan in
 `dustline/CLAUDE.md`, is currently at M3 (race loop complete), and shares no
 code with IGNITE RALLY. Built output lives in `play-dustline/`.
 
+It also has a **visual track editor** — `dustline/editor.html`, published at
+`/racing-shooter/play-dustline/editor.html`. Tracks there are data, not code:
+draw the loop on a map, set the land, the surfaces, the scatter and the sky in
+a panel, watch the real engine rebuild it beside you, then save it, export it,
+or pack the whole track into a link that anyone can drive. See
+`dustline/TRACKS.md`.
+
 IGNITE RALLY, described above, is what ships at the repository root today.
 Anything in this README, and in the four normative documents, is about **it**
 and not about dustline.

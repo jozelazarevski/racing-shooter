@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import carData from '../data/car.json';
+import type { TrackDef } from '../tracks/trackDef';
 
 export function buildRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -15,28 +16,42 @@ export function buildRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   return renderer;
 }
 
-export function buildWorld(scene: THREE.Scene) {
-  scene.fog = new THREE.Fog(0xcfe6f4, 240, 980);
+/** Fog, key light and fill, all read from the track. The tuning rings are
+ *  positioned relative to the track's own start point rather than the (0, -24)
+ *  they used to be nailed to, so they follow the pad on any track. */
+export function buildWorld(scene: THREE.Scene, def: TrackDef, startX = 0, startZ = 0): THREE.Object3D[] {
+  const sky = def.sky;
+  scene.fog = new THREE.Fog(new THREE.Color(sky.fogColor).getHex(), sky.fogNear, sky.fogFar);
 
-  const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x5f7748, 0.9);
+  const added: THREE.Object3D[] = [];
+  const hemi = new THREE.HemisphereLight(
+    new THREE.Color(sky.hemiSky).getHex(), new THREE.Color(sky.hemiGround).getHex(), sky.hemiIntensity,
+  );
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff2d8, 2.2);
-  sun.position.set(60, 90, 40);
+  added.push(hemi);
+
+  const sun = new THREE.DirectionalLight(new THREE.Color(sky.sunColor).getHex(), sky.sunIntensity);
+  sun.position.set(sky.sunDir[0], sky.sunDir[1], sky.sunDir[2]);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   const sc = sun.shadow.camera;
   sc.left = -90; sc.right = 90; sc.top = 90; sc.bottom = -90;
   scene.add(sun);
+  added.push(sun);
 
   // spawn-pad figure-8 painted on the flat tarmac apron: the M1 tuning
   // playground lives on inside the M2 rally world
-  const asphaltPaint = new THREE.MeshStandardMaterial({ color: 0x5a5d63, roughness: 0.92 });
-  for (const sx of [-1, 1]) {
-    const ring = new THREE.Mesh(new THREE.RingGeometry(9, 15, 48), asphaltPaint);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.set(sx * 17, 0.04, -24);
-    scene.add(ring);
+  if (def.start.tuningRings) {
+    const asphaltPaint = new THREE.MeshStandardMaterial({ color: 0x5a5d63, roughness: 0.92 });
+    for (const sx of [-1, 1]) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(9, 15, 48), asphaltPaint);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(startX + sx * 17, 0.04, startZ);
+      scene.add(ring);
+      added.push(ring);
+    }
   }
+  return added;
 }
 
 export interface CarVisual {

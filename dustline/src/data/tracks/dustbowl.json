@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "id": "dustbowl",
+  "name": "DUSTBOWL LOOP",
+  "author": "dustline",
+  "notes": "The original M2 track, written out as data. Every coefficient here was previously a literal inside Terrain: the loop from the constructor, the octaves from hills(), the crest from roadHeight(), the zones from surfaceIdAt(). Generated terrain is identical to the hardcoded version.",
+  "seed": 20260809,
+
+  "world": { "size": 900, "meshRes": 160, "sdfRes": 220 },
+
+  "road": {
+    "points": [
+      [0, -24], [120, -60], [230, 20], [250, 150], [150, 240],
+      [10, 260], [-130, 230], [-230, 120], [-240, -40], [-150, -140], [-60, -110]
+    ],
+    "halfWidth": 6.5,
+    "blend": 15,
+    "samples": 480
+  },
+
+  "start": { "padRadius": 55, "padSurface": "tarmac", "tuningRings": true },
+
+  "terrain": {
+    "octaves": [
+      { "kind": "product", "amp": 7.5, "freqX": 0.011, "phaseX": 1.7, "fnX": "sin", "freqZ": 0.009, "phaseZ": 0.4, "fnZ": "cos" },
+      { "kind": "product", "amp": 3.2, "freqX": 0.027, "phaseX": -0.8, "fnX": "sin", "freqZ": 0.031, "phaseZ": 2.1, "fnZ": "sin" },
+      { "kind": "wave", "amp": 1.1, "fx": 0.05, "fz": 0.05, "phase": 0 }
+    ],
+    "ramps": [
+      { "axis": "z", "beyond": -140, "dir": "lt", "slope": 0.08, "max": 14 }
+    ],
+    "road": {
+      "waves": [
+        { "amp": 3.4, "cycles": 2, "phase": 0.7 },
+        { "amp": 1.4, "cycles": 5, "phase": 2.2 }
+      ],
+      "crests": [
+        { "at": 0.62, "height": 5.5, "width": 0.00028 }
+      ]
+    }
+  },
+
+  "surfaces": {
+    "road": "tarmac",
+    "offroad": "gravel",
+    "bands": [
+      { "from": 0.08, "to": 0.52, "surface": "gravel" }
+    ],
+    "zones": [
+      {
+        "id": "snowline",
+        "surface": "snow",
+        "onRoad": true,
+        "offRoad": true,
+        "any": [
+          { "kind": "halfPlane", "axis": "z", "op": "lt", "value": -150 },
+          { "kind": "aboveHeight", "height": 13 }
+        ],
+        "stripe": { "period": 0.07, "duty": 0.012, "surface": "ice" }
+      },
+      {
+        "id": "riverbed",
+        "surface": "mud",
+        "onRoad": true,
+        "offRoad": true,
+        "any": [
+          { "kind": "circle", "x": -210, "z": 160, "radius": 80, "offroadRadius": 90 }
+        ]
+      },
+      {
+        "id": "eastdunes",
+        "surface": "sand",
+        "onRoad": false,
+        "offRoad": true,
+        "any": [
+          { "kind": "halfPlane", "axis": "x", "op": "gt", "value": 190 }
+        ]
+      }
+    ]
+  },
+
+  "scenery": [
+    {
+      "kind": "pine",
+      "count": 260,
+      "minRoadDist": 11,
+      "minSpawnDist": 62,
+      "avoidSurfaces": ["tarmac", "mud", "sand", "ice"],
+      "scale": [0.8, 2.1],
+      "spread": 0.944
+    },
+    {
+      "kind": "rock",
+      "count": 150,
+      "minRoadDist": 10,
+      "minSpawnDist": 62,
+      "avoidSurfaces": ["mud"],
+      "scale": [0.5, 1.7],
+      "scaleBonusOn": { "surfaces": ["sand", "gravel"], "extra": 0.9 },
+      "spread": 0.956
+    },
+    {
+      "kind": "bush",
+      "count": 170,
+      "minRoadDist": 9,
+      "minSpawnDist": 60,
+      "avoidSurfaces": ["snow", "ice"],
+      "scale": [0.5, 1.4],
+      "spread": 0.956
+    }
+  ],
+
+  "sky": {
+    "stops": ["#3d7fd0", "#7db4e6", "#cfe6f4", "#e8dfc8"],
+    "fogColor": "#cfe6f4",
+    "fogNear": 240,
+    "fogFar": 980,
+    "hemiSky": "#cfe6ff",
+    "hemiGround": "#5f7748",
+    "hemiIntensity": 0.9,
+    "sunColor": "#fff2d8",
+    "sunIntensity": 2.2,
+    "sunDir": [60, 90, 40],
+    "mountains": { "count": 30, "radius": 640, "height": 90, "snowline": -0.3 },
+    "clouds": 14
+  }
+}
