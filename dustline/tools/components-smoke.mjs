@@ -5,14 +5,18 @@
  * the editor; and the thing you placed exists in the GAME as a real object with
  * the collider its file declared.
  *
- *   npx vite build
- *   (cd ../play-dustline && python3 -m http.server 8903 &)
+ *   npx vite build          # the tool serves ../play-dustline itself
  *   node tools/components-smoke.mjs
  */
 import { chromium } from 'playwright-core';
+import { ensureServer } from './serve.mjs';
 
 const BASE = process.env.BASE || 'http://localhost:8903/';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+
+// Serves ../play-dustline itself unless something already is, so the check
+// never fails because a server from an earlier session has gone away.
+const stopServer = await ensureServer(BASE, '../play-dustline');
 
 const browser = await chromium.launch({
   executablePath: EXE,
@@ -222,5 +226,6 @@ check(gameErrors.length === 0, 'no page errors in the game with the whole librar
 check(errors.length === 0, 'no page errors in the editor', errors.slice(0, 4).join(' | '));
 
 await browser.close();
+await stopServer();
 console.log(fails ? `\n${fails} FAILED` : '\ncomponent smoke passed');
 process.exit(fails ? 1 : 0);

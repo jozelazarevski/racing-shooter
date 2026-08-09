@@ -342,16 +342,17 @@ for its slope shading. That one is NOT being taken: computing slope from
 neighbouring grid heights instead would be much cheaper and would change every
 vertex colour, and a visual change is not a refactor.
 
-### 5.5 State which specification governs which codebase
+### 5.5 State which specification governs which codebase — DONE
 
 Six normative documents — `RULES.md`, `NATURE.md`, `STRUCTURES.md`, `SCENES.md`,
 `spec/RALLY_RULES.md`, `spec/RALLY_WORLD_BIBLE.md` — all describe v1's world.
 dustline has a seventh in `dustline/CLAUDE.md`, written to a different game.
-None of them says at the top which codebase it governs, so all seven read as
-authoritative over everything, and `CONFORMANCE.md` audits v1 against specs that
-were never scoped to it.
+None of them said at the top which codebase it governed, so all seven read as
+authoritative over everything.
 
-One line at the head of each document fixes this, and it costs nothing. It is
-listed last because it is small, not because it is unimportant: a normative
-document that is silently false about half the repository is worse than no
-document, and this is the cheapest correction on the list.
+Every one now carries a scope banner in its first five lines, and
+`dustline/CLAUDE.md` carries the mirror image disclaiming the root documents.
+`CONFORMANCE.md` states the same thing in its status section. It was the
+cheapest correction on this list and the one with the worst failure mode: a
+normative document that is silently false about half the repository is worse
+than no document at all.

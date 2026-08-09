@@ -1,5 +1,11 @@
 # RALLY GAME DESIGN RULESET
 
+> **Scope: a specification IGNITE RALLY (`src/`) is audited against — see
+> `CONFORMANCE.md`.** It is normative for v1 and describes a game that does
+> not fully exist; `CONFORMANCE.md` is the honest measure of the gap. It is
+> NOT a specification for `dustline/`, which has its own in
+> `dustline/CLAUDE.md` and `dustline/SPEC.md`.
+
 **Authority level: normative.** Every rule here is binding on implementation. Where a rule and a request conflict, the rule wins unless the rule is explicitly amended in this file. Do not invent values that are not in this document. If a value is missing, add it to the tuning table first, then use it.
 
 **Stack assumption:** TypeScript, Three.js (render), Rapier.js (physics), Vite. If the stack differs, the numbers still hold; only the API bindings change.

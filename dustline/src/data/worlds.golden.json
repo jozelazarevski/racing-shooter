@@ -1,0 +1,56 @@
+{
+  "dustbowl": {
+    "fingerprint": "8f5fe1ef",
+    "instances": 1341,
+    "components": {
+      "pine": 260,
+      "rock": 150,
+      "bush": 170
+    },
+    "roadSamples": 480,
+    "seedIndependent": true,
+    "other": "8f5fe1ef"
+  },
+  "proving-ground": {
+    "fingerprint": "44ad19d4",
+    "instances": 1768,
+    "components": {
+      "pine": 150,
+      "birch": 120,
+      "bush": 180,
+      "reeds": 130,
+      "rock": 120,
+      "scree": 70,
+      "stump": 46,
+      "palm": 40,
+      "deadTree": 35,
+      "startGantry": 1,
+      "pitBuilding": 1,
+      "grandstand": 2,
+      "lightMast": 4,
+      "guardrail": 14,
+      "tyreStack": 9,
+      "chevronSign": 2,
+      "marshalPost": 11,
+      "watchtower": 2,
+      "hayBale": 10,
+      "barrierBlock": 6,
+      "sandbagWall": 4,
+      "cone": 24,
+      "barn": 1,
+      "shed": 2,
+      "fenceRun": 7,
+      "waterTower": 1,
+      "oilDrum": 3,
+      "crate": 2,
+      "pallet": 1,
+      "spareTyre": 2,
+      "rockSpire": 2,
+      "boulder": 1,
+      "fallenLog": 1
+    },
+    "roadSamples": 480,
+    "seedIndependent": true,
+    "other": "44ad19d4"
+  }
+}

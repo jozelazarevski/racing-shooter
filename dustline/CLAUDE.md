@@ -1,4 +1,10 @@
 # DUSTLINE — Rally Combat Racer
+
+> **Scope: DUSTLINE (`dustline/`) only.** The normative documents at the
+> repository root — `RULES.md`, `NATURE.md`, `STRUCTURES.md`, `SCENES.md`
+> and `spec/` — describe IGNITE RALLY, a different game in the same
+> repository. None of them governs this one.
+
 ## End-to-End Implementation Spec (CLAUDE.md)
 
 **Genre:** Arcade rally racing + vehicular combat (Mario Kart meets Colin McRae meets Twisted Metal)

@@ -1,5 +1,10 @@
 # IGNITE RALLY — Structure Rules
 
+> **Scope: IGNITE RALLY (`src/`, the game at the repository root).**
+> This document is normative for v1 and says nothing about `dustline/`,
+> which is a separate game with its own specification in
+> `dustline/CLAUDE.md`. A rule here is not a rule there.
+
 `NATURE.md` governs the natural world. This file governs everything **built** —
 bridges, gantries, fences, buildings, walls, jumps. Same standard: every rule
 is testable, and a rule that cannot be checked by a probe is too vague to

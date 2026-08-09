@@ -1,5 +1,9 @@
 # RALLY WORLD BIBLE
 
+> **Scope: the appearance companion to `RALLY_RULES.md`, for IGNITE RALLY
+> (`src/`).** Same standing, same caveat: audited in `CONFORMANCE.md`, and
+> not a specification for `dustline/`.
+
 **Companion to RALLY_RULES.md.** That document governs physics and collision. This one governs appearance. Same authority level: normative. If the world does not match this document, the world is wrong.
 
 **Purpose:** eliminate iteration. Every region below is specified to the point where two separate implementations built from this file are visually interchangeable. No mood boards, no "make it feel rugged". Numbers, hex codes, species lists, dimensions.

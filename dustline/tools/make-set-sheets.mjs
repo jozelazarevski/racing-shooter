@@ -21,15 +21,19 @@
  *     field of view, so every sheet is framed the same way regardless of how
  *     many components a category has.
  *
- *   npx vite build
- *   (cd ../play-dustline && python3 -m http.server 8903 &)
+ *   npx vite build          # the tool serves ../play-dustline itself
  *   node tools/make-set-sheets.mjs
  */
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright-core';
+import { ensureServer } from './serve.mjs';
 
 const BASE = process.env.BASE || 'http://localhost:8903/';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+
+// Serves ../play-dustline itself unless something already is, so the check
+// never fails because a server from an earlier session has gone away.
+const stopServer = await ensureServer(BASE, '../play-dustline');
 const OUT = process.env.OUT || 'docs/sets';
 
 mkdirSync(OUT, { recursive: true });
@@ -179,3 +183,4 @@ console.log('\nleft to right in each sheet (after the car):');
 for (const m of manifest) console.log(`  ${m.cat.padEnd(10)} ${m.names.join(' · ')}`);
 
 await browser.close();
+await stopServer();

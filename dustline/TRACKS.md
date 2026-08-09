@@ -161,9 +161,21 @@ should vary between runs.
 ## Checks
 
 ```bash
-npm run gate              # typecheck + the track-format equivalence proof
-npm run smoke:editor      # headless editor drive, ending in the game
-npm run smoke:components  # components: discovery, preview, placement, real colliders
+npm run gate        # fast, no browser: typecheck + format equivalence + exact SDF
+npm run gate:full   # everything, including the browser checks
 ```
 
-The last two need a build served on :8903 — see each file's header.
+Individually:
+
+| check | what it proves |
+|---|---|
+| `verify:track` | `dustbowl.json` reproduces the pre-refactor world exactly |
+| `verify:sdf` | the fast road-distance bake is bit-identical to brute force |
+| `verify:worlds` | every world matches its committed fingerprint, and does not depend on unseeded randomness |
+| `smoke:editor` | the editor drives, and a packed link opens as that track in the game |
+| `smoke:components` | every component builds, previews, places, and gets the collider its file declares |
+
+The browser checks start their own server, so there is no setup step. After an
+INTENDED world change, re-bless the fingerprints with
+`npm run verify:worlds -- --update` and commit the golden file with the change
+that caused it.

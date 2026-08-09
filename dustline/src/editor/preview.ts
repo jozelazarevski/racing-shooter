@@ -147,6 +147,11 @@ export class Preview {
 
   focus(x: number, z: number, dist?: number) { this.orbit.focus(x, z, dist); }
 
+  /** Everything the last rebuild added to the scene. Exposed so
+   *  `tools/verify-worlds.mjs` can fingerprint the built world rather than
+   *  trusting that it was built correctly. */
+  get objects(): THREE.Object3D[] { return this.built; }
+
   /** Where on the ground is this screen point?
    *
    *  Raycasts the built world so a drop lands where the cursor is even on a

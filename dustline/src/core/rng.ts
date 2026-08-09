@@ -77,3 +77,30 @@ export class Rng {
 
   pick<T>(items: readonly T[]): T { return items[this.int(items.length)]; }
 }
+
+/** Run `fn` with `Math.random` replaced by a seeded generator.
+ *
+ *  THE OBVIOUS VERSION OF THIS DOES NOT WORK, and the reason is worth keeping.
+ *  The first attempt made `Math.random` throw, so that any unseeded call during
+ *  world construction blew up with a stack pointing at the culprit. It fired
+ *  immediately — on three.js. `THREE.MathUtils.generateUUID()` calls
+ *  `Math.random()` four times, and every geometry, material and texture created
+ *  while building a world generates a UUID. A guard that throws on any call can
+ *  never pass in a three.js application, so it tests nothing.
+ *
+ *  What actually matters is not "is Math.random called" but "does the WORLD
+ *  depend on it". So the generator is replaced rather than removed, and
+ *  `tools/verify-worlds.mjs` builds each world twice under two different seeds
+ *  and requires the fingerprints to match. UUIDs differ between the runs and
+ *  nobody cares; a scatter position that differed would fail the check.
+ *
+ *  Restores the real function even if `fn` throws. */
+export function withStubbedRandom<T>(seed: number, fn: () => T): T {
+  const real = Math.random;
+  Math.random = mulberry32(seed);
+  try {
+    return fn();
+  } finally {
+    Math.random = real;
+  }
+}

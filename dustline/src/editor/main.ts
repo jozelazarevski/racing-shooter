@@ -24,6 +24,7 @@ import { propRadius } from './mapView';
 import { Palette, DRAG_MIME } from './palette';
 import { getTemplate, templateIds } from '../world/props/registry';
 import { thumbnail } from '../world/props/thumbnail';
+import { withStubbedRandom } from '../core/rng';
 
 // ---- document + history ---------------------------------------------------
 
@@ -623,5 +624,5 @@ frame();
   set def(d: TrackDef) { def = d; changed(); },
   map, preview, validate: () => validateTrack(def), commit,
   // exposed for tools/components-smoke.mjs, which sweeps the whole library
-  templateIds, getTemplate, thumbnail,
+  templateIds, getTemplate, thumbnail, withStubbedRandom, builtInTracks,
 };
