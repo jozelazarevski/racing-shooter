@@ -148,6 +148,27 @@ seed, so **adding rocks never moves the trees**. Placed props draw from a
 separate stream again, so hand-placing something does not reshuffle the
 scattered world around it.
 
+## The sets
+
+Rendered by the real engine from whatever is in `src/world/props/` — regenerate
+with `npm run make:sets`. The orange block at the left of each row is a car
+(1.9 x 3.9 m), because the one thing a catalogue has to tell you is how big
+things are, and nothing answers that except seeing them next to a car.
+
+![flora](docs/sets/flora.png)
+![trackside](docs/sets/trackside.png)
+![structure](docs/sets/structure.png)
+![terrain](docs/sets/terrain.png)
+![debris](docs/sets/debris.png)
+
+Order in each sheet is alphabetical, after the car:
+
+- **flora** — Birch · Bush · Dead tree · Palm · Pine · Reeds · Saguaro · Stump
+- **trackside** — Barrier block · Chevron board · Cone · Guardrail · Hay bale · Marshal post · Sandbag wall · Tyre stack
+- **structure** — Barn · Fence run · Grandstand · Light mast · Pit building · Shed · Start gantry · Watchtower · Water tower
+- **terrain** — Boulder · Fallen log · Rock · Rock spire · Scree
+- **debris** — Crate · Oil drum · Pallet · Spare tyre
+
 ## The library — 34 components
 
 | category | components | solid |

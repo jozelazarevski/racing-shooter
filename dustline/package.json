@@ -11,6 +11,7 @@
     "verify:track": "node tools/verify-track-format.mjs",
     "verify:sdf": "node tools/verify-sdf.mjs",
     "make:proving-ground": "node tools/make-proving-ground.mjs",
+    "make:sets": "node tools/make-set-sheets.mjs",
     "smoke:editor": "node tools/editor-smoke.mjs",
     "smoke:components": "node tools/components-smoke.mjs",
     "gate": "npm run typecheck && npm run verify:track && npm run verify:sdf"
