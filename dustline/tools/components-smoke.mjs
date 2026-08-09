@@ -154,12 +154,19 @@ const placedAll = await page.evaluate(async () => {
     // difference between a check and a coincidence.
     d.scenery = [];
     d.props = [];
+    // A GRID SIZED FROM THE LIBRARY, not from what the library happened to be
+    // the day this was written. The first version stepped 34 m in rows of 8
+    // from -380, which fits 64 components and walks straight off the ±419 m
+    // buildable edge at 112 — so growing the library would have broken the
+    // check that exists to cover a growing library.
+    const cols = Math.ceil(Math.sqrt(ids.length));
+    const step = Math.min(34, 760 / Math.max(1, cols - 1));
+    const origin = -(step * (cols - 1)) / 2;
     ids.forEach((id, i) => {
-      // a grid well clear of the road, so nothing is rejected for position
       d.props.push({
         template: id,
-        x: -380 + (i % 8) * 34,
-        z: -380 + Math.floor(i / 8) * 34,
+        x: origin + (i % cols) * step,
+        z: origin + Math.floor(i / cols) * step,
         rot: 0,
         scale: e.getTemplate(id).authoring.defaultScale,
       });
@@ -193,10 +200,28 @@ await gamePage.waitForFunction(() => window.__dust?.track, null, { timeout: 1200
 const verdicts = await gamePage.evaluate((ids) => {
   const d = window.__dust;
   const props = d.track.props ?? [];
+  // ONLY THE COMPONENT COLLIDERS. The terrain is one big trimesh whose own
+  // translation is the origin, so any prop that happens to land on (0, 0)
+  // counts it and is reported solid whatever its file says. That was not
+  // reachable while the grid started at -380 and stepped 34; it became
+  // reachable the moment the grid was sized from the library instead.
   const cols = [];
-  d.world.forEachCollider((c) => { const t = c.translation(); cols.push([t.x, t.z]); });
+  d.world.forEachCollider((c) => {
+    const kind = c.shape?.type;
+    // 1 = ball, 2 = cuboid, 10 = cylinder in rapier's ShapeType; trimesh is not
+    // in that set, which is the whole point. Guard on a name where available.
+    const name = c.shape?.constructor?.name ?? '';
+    if (/TriMesh|HeightField/i.test(name)) return;
+    if (kind !== undefined && ![1, 2, 10].includes(kind) && !/Ball|Cuboid|Cylinder/i.test(name)) return;
+    const t = c.translation();
+    cols.push([t.x, t.z]);
+  });
   const near = (x, z, r) => cols.filter(([cx, cz]) => Math.hypot(cx - x, cz - z) < r).length;
-  return props.map((p) => ({ id: p.template, n: near(p.x, p.z, 8) }));
+  // Radius from the grid step, not a constant: at a tighter spacing a fixed
+  // 8 m window starts counting the NEIGHBOUR's collider, which is exactly the
+  // bug that once reported a non-solid pallet as solid.
+  const r = Math.min(8, (d.track.props[1] ? Math.abs(d.track.props[1].x - d.track.props[0].x) : 8) * 0.45);
+  return props.map((p) => ({ id: p.template, n: near(p.x, p.z, r) }));
 }, sweep.ids);
 
 const expectSolid = await page.evaluate((ids) => {

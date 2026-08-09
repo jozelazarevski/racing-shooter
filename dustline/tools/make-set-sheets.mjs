@@ -62,7 +62,20 @@ const categories = await page.evaluate(() => {
 
 const manifest = [];
 
+// PAGE A BIG CATEGORY INSTEAD OF STRETCHING IT. A contact sheet has one job —
+// showing how big things are — and a row of thirty components framed to fit is
+// thirty things too small to see. Anything past this many gets a second sheet.
+const PER_SHEET = 9;
+const pages = [];
 for (const [cat, items] of Object.entries(categories).sort()) {
+  if (items.length <= PER_SHEET) { pages.push([cat, items, 0, 1]); continue; }
+  const n = Math.ceil(items.length / PER_SHEET);
+  const per = Math.ceil(items.length / n);
+  for (let k = 0; k < n; k++) pages.push([cat, items.slice(k * per, (k + 1) * per), k, n]);
+}
+
+// NOT `page` — that name is the Playwright page this whole file drives.
+for (const [cat, items, pageIdx, npages] of pages) {
   const info = await page.evaluate(async ({ cat, items }) => {
     const e = window.__editor;
     const base = structuredClone(e.def);
@@ -192,16 +205,19 @@ for (const [cat, items] of Object.entries(categories).sort()) {
     };
   }, info);
 
-  const file = `${OUT}/${cat}.png`;
+  const file = `${OUT}/${cat}${npages > 1 ? `-${pageIdx + 1}` : ''}.png`;
   if (clip) await page.screenshot({ path: file, clip });
   else await (await page.$('#preview3d')).screenshot({ path: file });
 
-  manifest.push({ cat, count: items.length, names: items.map((i) => i.name), maxH: info.maxH });
+  manifest.push({ cat, pageIdx, npages, count: items.length, names: items.map((i) => i.name), maxH: info.maxH });
   console.log(`${file} — ${items.length} components, tallest ${info.maxH} m, camera ${info.dist} m`);
 }
 
 console.log('\nleft to right in each sheet (after the car):');
-for (const m of manifest) console.log(`  ${m.cat.padEnd(10)} ${m.names.join(' · ')}`);
+for (const m of manifest) {
+  const label = m.npages > 1 ? `${m.cat}-${m.pageIdx + 1}` : m.cat;
+  console.log(`  ${label.padEnd(12)} ${m.names.join(' · ')}`);
+}
 
 await browser.close();
 await stopServer();
