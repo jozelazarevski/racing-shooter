@@ -226,6 +226,21 @@ src/
 Dependencies point inwards — `data → engine → world → game` — and data never
 imports behaviour. **[`ARCHITECTURE.md`](ARCHITECTURE.md)** is the full review:
 what is here, which defects are structural rather than incidental, and the
-staged plan for the rest. `MIGRATION.md` covers the v2 engine move; the
-normative world rules live in `RULES.md`, `NATURE.md`, `STRUCTURES.md` and
-`SCENES.md`.
+staged plan for the rest. The normative world rules for **this** game live in
+`RULES.md`, `NATURE.md`, `STRUCTURES.md` and `SCENES.md`; `MIGRATION.md` records
+the engine decision and why it was made.
+
+## The other game in this repository
+
+`dustline/` is a separate, ground-up rally combat racer — TypeScript + Vite,
+Rapier physics under a raycast car — and it is **the game under active
+development**. It has its own specification and milestone plan in
+`dustline/CLAUDE.md`, is currently at M3 (race loop complete), and shares no
+code with IGNITE RALLY. Built output lives in `play-dustline/`.
+
+IGNITE RALLY, described above, is what ships at the repository root today.
+Anything in this README, and in the four normative documents, is about **it**
+and not about dustline.
+
+(A third tree, `v2/` — a staged Rapier migration of IGNITE RALLY — has been
+deleted. `MIGRATION.md` keeps the record of what it was and what it taught.)

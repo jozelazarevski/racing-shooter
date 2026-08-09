@@ -12,29 +12,30 @@ about behaviour was checked by running the game, not by reading it.
 
 Three complete, separately-built games share one repository.
 
-| | entry | lines | language | physics | last touched |
+| | entry | lines | language | physics | role |
 |---|---|---|---|---|---|
-| **v1 — IGNITE RALLY** | `index.html` → `src/main.js` | ~31,100 | vanilla JS, ES modules, no build | hand-rolled | current |
-| **v2** | `v2/index.html` | ~4,300 | TypeScript + Vite | Rapier (WASM) | 2026-08-06 |
-| **dustline** | `dustline/index.html` | ~2,600 | TypeScript + Vite | raycast car | 2026-08-06 |
+| **dustline** | `dustline/index.html` | ~2,000 | TypeScript + Vite | Rapier + raycast car | **active development** |
+| **v1 — IGNITE RALLY** | `index.html` → `src/main.js` | ~31,100 | vanilla JS, ES modules, no build | hand-rolled | shipped, legacy |
 
-Two of them ship built output that is committed to the repo (`play-v2/`,
-`play-dustline/`, 5.3 MB together) and both are live on Pages. v1 is the game
-the README describes, the one the 30-odd test suites drive, and the only one
-under active development.
+> **Correction, and it matters.** The first draft of this document asserted that
+> v1 was "the only one under active development", and section 5.4 offered
+> retiring `dustline` as an option. Both were wrong, and the error was mine: I
+> inferred the active project from commit recency on `src/` instead of asking.
+> **`dustline` is the game under active development.** v1 is what currently
+> ships at the repo root. Everything below is written to that fact.
 
-This is not an accident, and it is not (yet) a mistake. `MIGRATION.md` argues —
-correctly, and with evidence — that the hand-rolled physics is the root cause of
-a class of bugs that keeps reappearing, and that the move to Rapier should be
-staged rather than big-bang. v2 is that stage. `dustline` is an earlier,
-independent attempt at the same idea from a different specification.
+There was a third engine, `v2/` — a staged Rapier migration of v1, with its
+built output in `play-v2/`. **It has been deleted.** The question section 5.4
+used to pose is therefore answered: dustline is the engine, and the migration
+argument in `MIGRATION.md` has already landed there rather than in v2.
 
-**But three engines is a cost that is being paid continuously and is not
-written down anywhere.** The specifications have diverged into five normative
-documents (`RULES.md`, `NATURE.md`, `STRUCTURES.md`, `SCENES.md`, plus
-`spec/RALLY_RULES.md` and `spec/RALLY_WORLD_BIBLE.md`), and `CONFORMANCE.md`
-already states the conclusion plainly: *"The specification describes a different
-game from the one that exists."* Section 5 says what to do about that.
+What remains is a real cost that is still not written down: the specifications
+have diverged across `RULES.md`, `NATURE.md`, `STRUCTURES.md`, `SCENES.md`,
+`spec/RALLY_RULES.md` and `spec/RALLY_WORLD_BIBLE.md` — six normative documents,
+all describing v1's world, none of them scoped to dustline, which has its own
+spec in `dustline/CLAUDE.md`. `CONFORMANCE.md` already states the conclusion
+plainly: *"The specification describes a different game from the one that
+exists."* Section 5.4 says what to do about that now.
 
 ### The shape of v1
 
@@ -231,7 +232,11 @@ than to report the flake as a finding.
 Staged, each stage shippable and gated. Same rule as `MIGRATION.md`: ship it,
 gate it, and never claim what has not been measured.
 
-### 5.1 Finish decomposing the builder
+**Priority is dustline.** 5.1–5.3 are v1 maintenance and should be treated as
+such: worth doing when v1 needs work, not worth doing ahead of the active game.
+5.4 is where the effort belongs.
+
+### 5.1 Finish decomposing the builder — *v1, opportunistic*
 
 `track.js` is still 9,605 lines and 100-odd methods. The remaining groups are
 already visible as contiguous runs and can move the same way `sky.js` and
@@ -254,15 +259,16 @@ context object instead of `this`. That is the step that actually decouples, and
 it should be paid for one module at a time, after the physical split has made
 each module's true dependency list visible.
 
-### 5.2 Make determinism checkable, not just true
+### 5.2 Make determinism checkable, not just true — *v1, opportunistic*
 
-Port v2's `withoutMathRandom()` guard to v1: assert that no unseeded
-`Math.random` is reachable during world construction, and fail the build if one
-is. Pair it with the world fingerprint from 4.3 as a committed golden file, so
-an unintended world change fails a test instead of being discovered in a
-screenshot three releases later.
+Assert that no unseeded `Math.random` is reachable during world construction and
+fail the build if one is — v2 had a `withoutMathRandom()` guard doing exactly
+this, and the idea is worth keeping even though the code that implemented it has
+been deleted. Pair it with the world fingerprint from 4.3 as a committed golden
+file, so an unintended world change fails a test instead of being discovered in
+a screenshot three releases later.
 
-### 5.3 Extract `main.js`
+### 5.3 Extract `main.js` — *v1, opportunistic*
 
 `Game` has 134 methods spanning career persistence, cloud sync, menus, HUD
 wiring, race rules, missions, free-roam and the render loop. It is the same
@@ -271,32 +277,46 @@ is the cleanest first cut: it is already nearly separable, it is pure data
 manipulation, and it is the part most worth having unit tests for, because a
 save-format bug costs a player their progress.
 
-### 5.4 Resolve the three-engine question — explicitly
+### 5.4 dustline — the actual work
 
-This is a decision, not a refactor, and it is the highest-value thing on this
-list. The options are:
+The engine question is settled: dustline is it, and v2 is deleted. What dustline
+needs is not a migration argument, it is content infrastructure.
 
-- **Continue the v2 migration** as `MIGRATION.md` lays out, and formally retire
-  `dustline` — it is a second answer to the question v2 is already answering,
-  and keeping both means neither gets finished.
-- **Freeze v1 to bug-fixes only**, so effort stops being split between an engine
-  being replaced and its replacement.
-- **State which specification governs which codebase**, at the top of each
-  document. Six normative documents with no precedence order is worse than
-  three, because every one of them is currently true of *something*.
+**A track is currently a literal.** `dustline/src/tracks/terrain.ts` defines the
+one and only course as an array of eleven `[x, z]` pairs inside the `Terrain`
+constructor, turned into a closed centripetal `CatmullRomCurve3` — the same
+idiom v1 uses, which is a genuinely useful coincidence. But there is no track
+id, no registry, and no way to select a second one. Everything downstream
+(surface zones, the spawn point, the flat pad, the road-distance field) is
+built around that single loop.
 
-Whatever the answer, it should be written down where the next person reads
-first. The one option that is not available is leaving it implicit, which is
-what it is now.
+So the first piece of work is **a track format**: lift the shape out of the
+constructor into typed data, give `Terrain` a loader, and make everything that
+currently hardcodes a position read it from the track instead. That is the
+precondition for a second track existing at all, and therefore the precondition
+for an editor, a stage roster, or a campaign.
 
-### 5.5 Then, and only then, the engine rewrite
+The second piece is **the editor** that authors that format — the reason this
+matters is that authoring tracks by typing coordinate pairs into a constructor
+does not scale past the one that is there.
 
-`MIGRATION.md`'s argument for Rapier is sound and its evidence is real. Nothing
-above contradicts it — 5.1 to 5.3 make it *cheaper*, because a v1 whose data is
-separated from its builder is a v1 whose worlds can be fed to a new engine
-without dragging fifteen thousand lines of rendering behind them. The rosters,
-circuits, themes and catalogues extracted in this change are plain values with
-no three.js in three of the five files: they are already portable.
+The third is **determinism**, and it is worth doing before there is content
+rather than after: whatever scatters scenery must be seeded per track, or the
+same track will not rebuild the same way twice, and no visual regression can be
+caught. v1 learned this expensively — `MIGRATION.md` records a world's crest
+count moving 6 → 0 across two loads with no code change — and dustline has the
+chance to not pay for it twice.
 
-That is the real argument for doing the boring split first. The data was always
-the durable part; it was just locked inside the part that is being thrown away.
+### 5.5 State which specification governs which codebase
+
+Six normative documents — `RULES.md`, `NATURE.md`, `STRUCTURES.md`, `SCENES.md`,
+`spec/RALLY_RULES.md`, `spec/RALLY_WORLD_BIBLE.md` — all describe v1's world.
+dustline has a seventh in `dustline/CLAUDE.md`, written to a different game.
+None of them says at the top which codebase it governs, so all seven read as
+authoritative over everything, and `CONFORMANCE.md` audits v1 against specs that
+were never scoped to it.
+
+One line at the head of each document fixes this, and it costs nothing. It is
+listed last because it is small, not because it is unimportant: a normative
+document that is silently false about half the repository is worse than no
+document, and this is the cheapest correction on the list.

@@ -69,20 +69,23 @@ newtons is meaningless. They land together or not at all.
 The documents are vendored, the gap is measured, and the two contradictions are
 resolved in `MIGRATION.md` (weapons stay; stages replace laps at Phase 3).
 
-**Landed — `v2/`, Phase 0: determinism.** N4 and §14.3 are implemented and
-gated. One seeded PRNG set per stage, four independent channels, named forks,
-state snapshots, and a `withoutMathRandom()` guard. `npm run world -- <stage>`
-prints a fingerprint that is identical on every machine and every run.
-Its first consumer, `v2/src/world/scatter.ts`, also implements §3.2 rules 1–3,
-§3.3 biome density, the §16.1 object shape and lint checks L02 and L03 — so
-item 3 of the table above (flora tiers) is partly done as a side effect.
-58 tests; see `v2/DETERMINISM.md`.
+**WITHDRAWN — the `v2/` conformance work.** N4 and §14.3 had been implemented
+and gated there: one seeded PRNG set per stage, four independent channels, named
+forks, state snapshots, a `withoutMathRandom()` guard, a per-stage fingerprint,
+and a scatter module conformant to §3.2 rules 1–3, §3.3 biome density and the
+§16.1 object shape. **That tree has been deleted** (see `MIGRATION.md`), so none
+of it is in the repository and none of it can be claimed here. Nothing in this
+file is currently conformant by way of `v2/`.
 
-**Not landed.** Everything else in both tables, including the four open v1
-bugs. v1 still ships r77 with 778 unseeded `Math.random` calls and is untouched
-by this work — deliberately, so it stays playable throughout the migration.
-Determinism now applies to v2 world generation only, not to v1 and not yet to
-physics (§14.1–14.2 arrive with Rapier in Phase 2).
+**Not landed.** Everything in both tables. v1 ships with ~1,229 unseeded
+`Math.random` occurrences and a `withSeed()` wrapper that makes world
+construction — and only world construction — reproducible; that is a property of
+call timing rather than of the code, and §14.1–14.2 (physics determinism) are
+untouched.
 
-Adoption continues at item 1 of the "can be adopted" table, each shipped and
-verified the way every other change here has been.
+**Scope, which this file previously left implicit.** Every specification audited
+here — `spec/RALLY_RULES.md`, `spec/RALLY_WORLD_BIBLE.md` and the four root
+documents — describes **v1**. The game under active development is `dustline/`,
+which has its own specification in `dustline/CLAUDE.md` (milestones M1–M8,
+currently at M3) and is **not** audited by this file. Do not read a row below as
+a statement about dustline; it is not one.
