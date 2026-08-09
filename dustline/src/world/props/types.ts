@@ -60,11 +60,24 @@ export interface PropPart {
   castShadow?: boolean;
 }
 
+/** A collider, in the component's own local frame.
+ *
+ *  `centerX` and `centerZ` DEFAULT TO ZERO, and for most of the library that is
+ *  right: a tree, a rock, a house is centred on its own origin. It is wrong for
+ *  anything that RUNS OUT from its origin — a jetty, a slipway, a flight of
+ *  quay steps, a bridge deck — and until these two fields existed those
+ *  components had half their hitbox in empty space beside them. The jetty
+ *  shipped that way: 22 m of deck running out along +Z, and a collider centred
+ *  on the shore end.
+ *
+ *  The offset is in LOCAL space and is rotated by the instance's yaw when the
+ *  collider is placed, which is the whole point — a jetty turned to face the
+ *  water has to take its hitbox with it. */
 export type PhysicsShape =
   | { kind: 'none' }
-  | { kind: 'cylinder'; halfHeight: number; radius: number; centerY: number }
-  | { kind: 'ball'; radius: number; centerY: number }
-  | { kind: 'box'; halfExtents: [number, number, number]; centerY: number };
+  | { kind: 'cylinder'; halfHeight: number; radius: number; centerY: number; centerX?: number; centerZ?: number }
+  | { kind: 'ball'; radius: number; centerY: number; centerX?: number; centerZ?: number }
+  | { kind: 'box'; halfExtents: [number, number, number]; centerY: number; centerX?: number; centerZ?: number };
 
 /** The physical rules, as data. `shape` is a function of scale because a
  *  collider that ignores the instance scale is the classic invisible-wall bug:

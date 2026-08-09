@@ -132,7 +132,9 @@ const culvert: PropTemplate = {
 
   authoring: {
     scale: [0.8, 1.25], defaultScale: 1,
-    minRoadDist: 4, randomYaw: false,
+    // v1 sets its headwalls at ROAD_HALF + 3.5 from the centreline; on
+    // dustline's 14 m road that is 10.5, so the toe of the embankment.
+    minRoadDist: 10, randomYaw: false,
   },
 };
 

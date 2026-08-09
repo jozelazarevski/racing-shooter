@@ -92,9 +92,10 @@ const breakwater: PropTemplate = {
   ],
 
   physics: {
-    // What stands out of the water, and nothing below it. The 3.95 m of block
-    // under the surface is the seabed's problem; a collider that deep would
-    // stop a boat two hull-lengths short of a mole it is nowhere near.
+    // The DRESSED block, from the water up. The 3.95 m of pier under the
+    // surface is the seabed's problem, and the armour is a heap of stone lying
+    // at and below the waterline either side — including it would widen the
+    // hitbox by 3 m a side for rubble whose tops are level with the sea.
     shape: (s) => ({
       kind: 'box',
       halfExtents: [(RUN_L / 2) * s, 0.775 * s, (SLAB_W / 2) * s],

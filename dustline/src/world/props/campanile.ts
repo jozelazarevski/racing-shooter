@@ -16,14 +16,30 @@
 // tower ahead is the near small one or the far big one, which is exactly the
 // mistake a distance cue is supposed to prevent.
 //
-// WHAT CHANGED IN THE PORT, and only this: v1's belfry is a MeshBasicMaterial
-// box — an unlit block of colour standing in for a lit lantern stage, so it
-// glows at night. dustline has no unlit material in the library, so it is an
-// emissive standard material at the same tone, which is the substitution the
-// lighthouse's lamp already makes for the same reason.
+// WHAT CHANGED IN THE PORT. Two things, and the second is the interesting one.
+//
+// v1's belfry is a MeshBasicMaterial box — an unlit block of colour standing in
+// for a lit lantern stage, so it glows at night. dustline has no unlit material
+// in the library, so it is an emissive standard material at the same tone,
+// which is the substitution the lighthouse's lamp already makes.
+//
+// AND THE SHAFT IS NOT A BARE BOX. The port was faithful and the result was a
+// featureless 30 m slab with a yellow band and a black cap — because v1 leans
+// the whole reading of this tower on `stoneTexture()`, a masonry map dustline
+// does not apply here, and on only ever being seen at distance across an old
+// town. Rendered on its own it is the weakest thing in the library.
+//
+// So the shaft keeps v1's exact massing — 7.4 x 30, cornice at 35.2, spire at
+// 40.4, nothing moved — and gains the details a tower of that height cannot be
+// read without: a plinth, string courses at the stages, corner pilasters, and
+// belfry openings on all four faces. Those are EDGES, which is the same
+// argument the v1 house table makes about why its dwellings carry two to three
+// times the parts of the ones they replaced: "at the distance a village is seen
+// it is the number of EDGES catching the light that separates a house from a
+// box, not the smoothness of any one of them."
 
 import * as THREE from 'three';
-import { PropTemplate, standard } from './types';
+import { PropTemplate, standard, mergeGeoms, beam } from './types';
 
 const campanile: PropTemplate = {
   id: 'campanile',
@@ -34,14 +50,49 @@ const campanile: PropTemplate = {
   build: () => [
     {
       key: 'shaft',
-      geometry: new THREE.BoxGeometry(7.4, 30, 7.4).translate(0, 15, 0),
+      geometry: mergeGeoms([
+        new THREE.BoxGeometry(7.4, 30, 7.4).translate(0, 15, 0),
+        // plinth
+        new THREE.BoxGeometry(8.6, 1.4, 8.6).translate(0, 0.7, 0),
+        new THREE.BoxGeometry(8.0, 0.4, 8.0).translate(0, 1.6, 0),
+        // corner pilasters, standing proud the whole height — the vertical
+        // that stops a 30 m face reading as one flat plane
+        ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].flatMap(([sx, sz]) => [
+          beam(1.1, 28.4, 1.1, sx * 3.5, 15.9, sz * 3.5),
+        ]),
+        // string courses at the stages, where a real campanile has them
+        ...[8.5, 15.5, 22.5].map((y) => new THREE.BoxGeometry(8.0, 0.45, 8.0).translate(0, y, 0)),
+      ]),
       material: standard(0x9d9585, { roughness: 0.92 }),
       castShadow: true,
     },
     {
+      key: 'openings',
+      // Tall recessed panels up the shaft and the belfry's own arched voids.
+      // Inset rather than cut: a real hole means a shell, and a shell is a lot
+      // of triangles for something read from two hundred metres.
+      geometry: mergeGeoms([
+        ...[1, -1].flatMap((sg) => [
+          ...[11.5, 18.5].map((y) => beam(1.5, 3.4, 0.25, 0, y, sg * 3.75)),
+          ...[11.5, 18.5].map((y) => beam(0.25, 3.4, 1.5, sg * 3.75, y, 0)),
+        ]),
+        // the belfry openings, one per face
+        ...[1, -1].flatMap((sg) => [
+          beam(3.2, 4.0, 0.3, 0, 32.4, sg * 4.15),
+          beam(0.3, 4.0, 3.2, sg * 4.15, 32.4, 0),
+        ]),
+      ]),
+      material: standard(0x2e2b28, { roughness: 0.9 }),
+    },
+    {
       key: 'belfry',
-      // "an open lantern stage, lit, which is what makes it read at night"
-      geometry: new THREE.BoxGeometry(8.2, 5.0, 8.2).translate(0, 32.4, 0),
+      // "an open lantern stage, lit, which is what makes it read at night" —
+      // now behind the openings above rather than instead of them, so the glow
+      // reads as light coming OUT of a stage instead of as a painted band.
+      geometry: mergeGeoms([
+        new THREE.BoxGeometry(8.2, 5.0, 8.2).translate(0, 32.4, 0),
+        new THREE.BoxGeometry(8.8, 0.5, 8.8).translate(0, 29.9, 0),
+      ]),
       material: standard(0xffc76a, {
         roughness: 0.35, emissive: 0xffc76a, emissiveIntensity: 0.85,
       }),

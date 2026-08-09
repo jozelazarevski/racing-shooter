@@ -92,7 +92,7 @@ const cattleGrid: PropTemplate = {
     // wide enough to include them would seal the lane.
     shape: (s) => ({
       kind: 'box',
-      halfExtents: [(BAR_W / 2 + 0.45) * s, (TOP / 2 + 0.02) * s, (RUN / 2 + 0.45) * s],
+      halfExtents: [(BAR_W / 2 + 0.45) * s, (TOP / 2) * s, (RUN / 2 + 0.45) * s],
       centerY: (TOP / 2) * s,
     }),
     solid: true,

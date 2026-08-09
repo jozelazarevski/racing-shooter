@@ -124,29 +124,59 @@ function placed(p: PlacedProp, tpl: PropTemplate, terrain: Terrain, rng: Rng): I
   };
 }
 
+/** Place one collider for one instance.
+ *
+ *  TWO THINGS THIS DID NOT USED TO DO, both found by building a set of
+ *  components that RUN OUT from their own origin — a jetty, a slipway, a
+ *  bridge deck, a flight of quay steps — rather than standing on it:
+ *
+ *  1. THE OFFSET. A shape could sit anywhere in Y and nowhere else, so a 22 m
+ *     jetty deck got a hitbox centred on the shore end with half of it in open
+ *     water. `centerX`/`centerZ` fix that, and they are rotated by the
+ *     instance's yaw here — a jetty turned to face the water has to take its
+ *     collider with it, and an offset applied in world space would swing the
+ *     hitbox off the deck the moment you rotated the prop.
+ *  2. THE ROTATION. Every box was axis-aligned however the prop was turned, so
+ *     a 12 m barn at 45 degrees had a hitbox covering a quite different
+ *     footprint from the barn. Boxes now carry the yaw.
+ *
+ *  Both default to the old behaviour when a component says nothing: offset zero
+ *  is the old placement exactly, and a yawed box only differs from an axis
+ *  aligned one for props that are actually rotated.
+ */
 function addCollider(
-  shape: PhysicsShape, ctx: PlaceCtx, yOffset: number, friction: number,
+  shape: PhysicsShape, ctx: PlaceCtx, rot: number, yOffset: number, friction: number,
   world: RAPIER_API.World, RAPIER: typeof RAPIER_API, body: RAPIER_API.RigidBody,
 ) {
+  if (shape.kind === 'none') return;
   const y = ctx.y + yOffset;
-  let desc: RAPIER_API.ColliderDesc | null = null;
+  // local offset, turned into the instance's frame
+  const ox = shape.centerX ?? 0;
+  const oz = shape.centerZ ?? 0;
+  const cs = Math.cos(rot), sn = Math.sin(rot);
+  const wx = ctx.x + ox * cs + oz * sn;
+  const wz = ctx.z - ox * sn + oz * cs;
+
+  let desc: RAPIER_API.ColliderDesc;
   switch (shape.kind) {
     case 'cylinder':
-      desc = RAPIER.ColliderDesc.cylinder(shape.halfHeight, shape.radius)
-        .setTranslation(ctx.x, y + shape.centerY, ctx.z);
+      desc = RAPIER.ColliderDesc.cylinder(shape.halfHeight, shape.radius);
       break;
     case 'ball':
-      desc = RAPIER.ColliderDesc.ball(shape.radius)
-        .setTranslation(ctx.x, y + shape.centerY, ctx.z);
+      desc = RAPIER.ColliderDesc.ball(shape.radius);
       break;
     case 'box':
-      desc = RAPIER.ColliderDesc.cuboid(...shape.halfExtents)
-        .setTranslation(ctx.x, y + shape.centerY, ctx.z);
+      desc = RAPIER.ColliderDesc.cuboid(...shape.halfExtents);
       break;
-    case 'none':
-      return;
   }
-  if (desc) world.createCollider(desc.setFriction(friction), body);
+  desc.setTranslation(wx, y + shape.centerY, wz);
+  // A ball is a ball; a cylinder here is always upright, so yaw about Y does
+  // nothing to either. Only the box needs turning.
+  if (shape.kind === 'box' && rot) {
+    const h = rot / 2;
+    desc.setRotation({ x: 0, y: Math.sin(h), z: 0, w: Math.cos(h) });
+  }
+  world.createCollider(desc.setFriction(friction), body);
 }
 
 export interface BuiltWorld {
@@ -240,7 +270,7 @@ export function buildComponents(
       const friction = tpl.physics.friction ?? 1;
       for (const inst of instances) {
         if (!isSolid(tpl.physics, inst.ctx.scale)) continue;
-        addCollider(tpl.physics.shape(inst.ctx.scale), inst.ctx, inst.yOffset, friction, world, RAPIER, solids);
+        addCollider(tpl.physics.shape(inst.ctx.scale), inst.ctx, inst.rot, inst.yOffset, friction, world, RAPIER, solids);
       }
     }
   }

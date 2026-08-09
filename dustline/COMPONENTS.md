@@ -171,23 +171,39 @@ with `npm run make:sets`. The orange block at the left of each row is a car
 (1.9 x 3.9 m), because the one thing a catalogue has to tell you is how big
 things are, and nothing answers that except seeing them next to a car.
 
-![flora](docs/sets/flora.png)
-![settlement](docs/sets/settlement.png)
-![marine](docs/sets/marine.png)
-![trackside](docs/sets/trackside.png)
-![structure](docs/sets/structure.png)
-![terrain](docs/sets/terrain.png)
 ![debris](docs/sets/debris.png)
+![flora-1](docs/sets/flora-1.png)
+![flora-2](docs/sets/flora-2.png)
+![marine-1](docs/sets/marine-1.png)
+![marine-2](docs/sets/marine-2.png)
+![marine-3](docs/sets/marine-3.png)
+![settlement-1](docs/sets/settlement-1.png)
+![settlement-2](docs/sets/settlement-2.png)
+![settlement-3](docs/sets/settlement-3.png)
+![settlement-4](docs/sets/settlement-4.png)
+![structure-1](docs/sets/structure-1.png)
+![structure-2](docs/sets/structure-2.png)
+![terrain](docs/sets/terrain.png)
+![trackside-1](docs/sets/trackside-1.png)
+![trackside-2](docs/sets/trackside-2.png)
 
 Order in each sheet is alphabetical, after the car:
 
-- **flora** — Birch · Bush · Dead tree · Oak · Palm · Pine · Reeds · Saguaro · Stump · Willow
-- **settlement** — Chalet · Church · Cottage · Cottage, hipped · Cottage, long · Dry-stone wall · Farmhouse · Farmhouse, L-plan · Half-timbered house · Kiosk · Market stall · Silo · Stone cottage · Street lamp · Tower house · Townhouse · Well · Windmill
-- **marine** — Channel buoy · Fishing boat · Jetty · Lighthouse · Lobster pots · Mooring post · Motor launch · Rowboat · Sailboat
-- **trackside** — Barrier block · Chevron board · Cone · Guardrail · Hay bale · Marshal post · Sandbag wall · Tyre stack
-- **structure** — Barn · Fence run · Grandstand · Light mast · Pit building · Shed · Start gantry · Watchtower · Water tower
+- **debris** — Crate · Log pile · Oil drum · Pallet · Spare tyre
+- **flora-1** — Birch · Bush · Crop row · Dead tree · Oak · Olive · Orchard tree
+- **flora-2** — Palm · Pine · Reeds · Saguaro · Stump · Vine row · Willow
+- **marine-1** — Beacon · Boat shed · Breakwater · Capstan · Channel buoy · Dock ladder · Fishing boat
+- **marine-2** — Harbour crane · Jetty · Lighthouse · Lobster pots · Mooring post · Motor launch · Net loft
+- **marine-3** — Quay steps · Quay wall · Rowboat · Sailboat · Slipway
+- **settlement-1** — Adobe house · Arch gateway · Barrel stack · Campanile · Chalet · Church · Cottage · Cottage, hipped · Cottage, long
+- **settlement-2** — Courtyard house · Cube house · Domed house · Dry-stone wall · Farmhouse · Farmhouse, L-plan · Feed bin · Fountain · Half-timbered house
+- **settlement-3** — Hay rack · Kiosk · Market stall · Pueblo ruin · Scarecrow · Signal hut · Silo · Stilt house · Stone cottage
+- **settlement-4** — Street lamp · Terrace wall · Tower house · Townhouse · Trellis post · Water trough · Well · Windmill · Wine press
+- **structure-1** — Barn · Culvert · Fence run · Grandstand · Light mast · Pit building · Retaining wall
+- **structure-2** — Shed · Start gantry · Stone bridge · Timber bridge · Tunnel mouth · Watchtower · Water tower
 - **terrain** — Boulder · Fallen log · Rock · Rock spire · Scree
-- **debris** — Crate · Oil drum · Pallet · Spare tyre
+- **trackside-1** — Barrier block · Bus shelter · Cattle grid · Chevron board · Cone · Ford stones · Guardrail · Hay bale
+- **trackside-2** — Marshal post · Milestone · Road sign · Sandbag wall · Signpost · Telegraph pole · Tyre stack
 
 The marine sheet is shot **afloat** — on a flooded shelf rather than a lawn.
 Every component in it either floats or stands at the water's edge, and a
@@ -249,7 +265,11 @@ protruding vigas and wrong for a diameter: the windmill's four sails, written
 the well's winch barrel hung 2.6 m out past one post. Rendering the library is
 what made both visible. They are bugs in the v1 table too.
 
-## The library — 64 components
+## The library — 108 components
+
+One file each, discovered from the folder. The table below is the shape of the
+library rather than an inventory — the sheets above are the inventory, and they
+are rendered from whatever is in `src/world/props/` today.
 
 | category | components | solid |
 |---|---|---|
@@ -284,6 +304,28 @@ down the road. They differ in PLAN and ROOFLINE, not tint.
 dustline's own boxes, and a farmyard containing a v1 farmhouse and a dustline
 barn looks like two different games sharing a field — which is what it was.
 
+**Four more sets landed together, built in parallel** — a stone harbour (quay
+wall, steps, slipway, breakwater, capstan, ladder, boat shed, net loft, crane,
+beacon), roads and crossings (stone and timber bridges, culvert, tunnel mouth,
+retaining wall, cattle grid, milestone, signpost, road sign, ford stones), a
+vineyard and farmland (vine rows, trellis, terrace wall, wine press, barrel
+stack, olive and orchard trees, crop rows, hay rack, trough, feed bin,
+scarecrow), and a civic set that also exposed seven templates already sitting
+in the ported table with nothing pointing at them.
+
+Three things came out of building them that are worth more than the assets:
+
+- **`PhysicsShape` could offset in Y and nowhere else.** That is fine for a
+  tree and wrong for anything that RUNS OUT from its origin, and the jetty had
+  already shipped with 22 m of deck and a hitbox centred on the shore end. It
+  now offsets in X and Z, rotated by the instance's yaw.
+- **Box colliders ignored the instance's rotation.** A 12 m barn at 45 degrees
+  had an axis-aligned hitbox covering a quite different footprint from the barn.
+- **A deck you drive over cannot be a solid lump.** The bridges take the deck
+  slab only, with the parapets deliberately not solid, and both files say so:
+  falling through a bridge is a far worse bug than driving through its parapet,
+  and one convex shape per component cannot have both.
+
 Pine, Rock and Bush are ports of the three hardcoded scenery kinds, geometry
 and colliders unchanged, so the shipped world still looks and drives as it did.
 
@@ -305,7 +347,7 @@ with non-empty, NaN-free geometry; that `physics.shape()` answers with positive
 dimensions at both ends of the component's own scale range; and that a
 thumbnail renders. Then it places one of every component, loads them all in the
 **game**, and requires each to have exactly the collider its file declares —
-53 solid, 11 not, all correct.
+87 solid, 21 not, all correct.
 
 It then loads the harbour track and reads the **actual instance matrices** out
 of the built world, checking that every floating component came out at the

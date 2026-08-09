@@ -102,7 +102,7 @@ const boatShed: PropTemplate = {
     {
       key: 'rails',
       // The haul-out road: two greased baulks running the length of the shed
-      // and out through the opening onto the hard. They are the reason the
+      // and 4 m out through the opening onto the hard. They are the reason the
       // building faces the water, and they cost four boxes.
       geometry: bundle([-1, 1].flatMap((sx) => [
         beam(0.22, 0.16, LEN + 4, sx * 1.15, 0.08, 2),
@@ -113,9 +113,10 @@ const boatShed: PropTemplate = {
   ],
 
   physics: {
-    // The building, to the ridge. The rails run 2 m out past the open end and
+    // The building, to the ridge. The rails run 4 m out past the open end and
     // are 0.16 m proud of the ground — you drive over those, and a collider
-    // that included them would put a 15 m box on the quay for an 11 m shed.
+    // that included them would have to be centred on the origin like every
+    // other one, so it would put 4 m of invisible box behind the shed as well.
     shape: (s) => ({
       kind: 'box',
       halfExtents: [(HW + 0.1) * s, ((EAVE + RISE) / 2) * s, (LEN / 2) * s],

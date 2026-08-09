@@ -94,6 +94,10 @@ const harbourCrane: PropTemplate = {
     // The post and its plinth. The jib is 0.25 m of timber out at head height
     // with nothing under it, and a collider that swept its reach would be a
     // 5.6 m invisible cylinder standing on the quay in front of the crane.
+    // The two back stays are outside it as well: 55 mm of iron running down to
+    // the ground 2.8 m behind the post, which a car goes through — the same
+    // call the start gantry and the fence run make, and for the same reason
+    // (a wire you can hit is a wire you WILL hit).
     shape: (s) => ({ kind: 'cylinder', halfHeight: (MAST / 2) * s, radius: 1.1 * s, centerY: (MAST / 2) * s }),
     solid: true,
     massKg: 7000,

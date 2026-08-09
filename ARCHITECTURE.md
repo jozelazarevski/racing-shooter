@@ -433,6 +433,36 @@ original world exactly, and every component count in the golden file is
 byte-identical across all three tracks. The whole delta is the horizon's extra
 instances — +105, +85 and +75, matching the peak counts exactly.
 
+**The library is 108 components, and 44 of them were built in parallel.** Four
+agents, one asset set each, each owning a disjoint list of new files — which
+worked because the registry discovers the folder and there is no manifest to
+contend over. A stone harbour, roads and crossings, a vineyard and farmland,
+and a civic set that also exposed seven dwelling archetypes that were already
+sitting in the ported table with nothing pointing at them.
+
+The assets are the smaller half of what that produced. Three defects came out of
+it, all in code I wrote:
+
+- **`PhysicsShape` could offset in Y and nowhere else.** Right for a tree,
+  wrong for anything that runs OUT from its origin, and the jetty had already
+  shipped with 22 m of deck and its hitbox centred on the shore end. It now
+  offsets in X and Z, rotated by the instance yaw so a jetty turned to face the
+  water takes its collider with it.
+- **Box colliders ignored the instance rotation entirely.** A 12 m barn at 45
+  degrees had an axis-aligned hitbox over a quite different footprint.
+- **Two checks were sized for the library as it stood the day they were
+  written** and would have broken on the next batch rather than catching
+  anything in it: the smoke test's grid walked off the buildable edge past 112
+  components, and the set sheets stretched one row however many things a
+  category held.
+
+And fixing the first of those broke the check that was supposed to verify it,
+in two different ways — a legitimate negative centreY read as a broken
+component, and a collider allow-list keyed on guessed ShapeType numbers (Ball
+is 0 and Cylinder is 11, not the 1/2/10 it assumed) silently dropped every ball
+and cylinder in the world. Both were caught by the gate, which is the argument
+for having one.
+
 ### 5.5 State which specification governs which codebase — DONE
 
 Six normative documents — `RULES.md`, `NATURE.md`, `STRUCTURES.md`, `SCENES.md`,

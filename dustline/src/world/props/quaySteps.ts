@@ -12,6 +12,15 @@
 // Runs down along +Z, like the jetty. Rotate it to face the water; butt it
 // against a `quayWall` run, which is what its open sides assume — a real stair
 // of this kind is recessed INTO the quay, so it has no cheek walls of its own.
+//
+// THE ORIGIN IS THE MIDDLE OF THE FLIGHT, NOT THE TOP OF IT, and that is a
+// concession to the collider. `PhysicsShape` can offset a box in Y and nowhere
+// else, so a box is always centred on the instance origin in plan. Built with
+// the origin at the quay lip — which is how you would want to place it — the
+// stair's 4.8 m of masonry runs out along +Z while its hitbox sits astride the
+// origin: half of the flight uncollided and an equal volume of empty water
+// solid behind it. Measured, on the first cut. So the whole flight is written
+// centred instead, and the top tread is 2.4 m back along -Z from the origin.
 
 import * as THREE from 'three';
 import { PropTemplate, standard, beam } from './types';
@@ -23,6 +32,8 @@ const GOING = 0.32;           // with an armful, not run down
 const W = 1.6;                // two abreast, no more
 const LEN = N * GOING;        // 3.84 m of projection
 const BOT = -RISE * N - 0.35; // the flight's own footing, -2.75
+const DEEP = LEN + 1.0;       // flight plus the footing that projects past it
+const ZC = -DEEP / 2;         // ...slid back so the whole mass straddles z = 0
 
 /** THE TIDE LINE, at -1.2. Everything below it is weeded, and the height is a
  *  guess in the only sense that matters — dustline has no tide, so this is
@@ -66,19 +77,25 @@ const quaySteps: PropTemplate = {
   id: 'quaySteps',
   name: 'Quay steps',
   category: 'marine',
-  description: '12 stone steps down a quay face to the water, 1.6 x 3.9 m. Runs down along +Z.',
+  description: '12 stone steps down a quay face to the water, 1.9 x 4.8 m, 2.4 m of fall. Descends along +Z.',
 
   build: () => [
     {
       key: 'stone',
-      geometry: bundle(flight()),
+      // Both parts are written from the top tread at z = 0 and slid back as a
+      // whole, so the step arithmetic above stays readable. Translating the
+      // merged buffer is safe here and only here: `bundle` hands back a fresh
+      // geometry on every call, so `build()` is still idempotent — hoisting
+      // this to module scope and translating it would move the stair 2.4 m
+      // further back on every rebuild.
+      geometry: bundle(flight()).translate(0, 0, ZC),
       material: standard(0x9a9282, { roughness: 1 }),
       castShadow: true,
       tint: (c) => new THREE.Color(0x9a9282).offsetHSL(0, c.rng.centered(0.02), c.rng.centered(0.05)),
     },
     {
       key: 'weed',
-      geometry: bundle(weed()),
+      geometry: bundle(weed()).translate(0, 0, ZC),
       material: standard(0x4c5340, { roughness: 1 }),
     },
   ],
@@ -90,7 +107,7 @@ const quaySteps: PropTemplate = {
     // water beside it, so the collider is the block it is cut from.
     shape: (s) => ({
       kind: 'box',
-      halfExtents: [(W / 2) * s, (-BOT / 2) * s, (LEN / 2 + 0.5) * s],
+      halfExtents: [((W + 0.3) / 2) * s, (-BOT / 2) * s, (DEEP / 2) * s],
       centerY: (BOT / 2) * s,
     }),
     solid: true,

@@ -121,11 +121,19 @@ const sweep = await page.evaluate(async () => {
         const shape = t.physics.shape(s);
         if (!shape || !shape.kind) broken.push(`${id}: physics.shape(${s}) returned nothing`);
         if (shape.kind !== 'none') {
-          const nums = shape.kind === 'box' ? [...shape.halfExtents, shape.centerY]
-            : shape.kind === 'ball' ? [shape.radius, shape.centerY]
-              : [shape.halfHeight, shape.radius, shape.centerY];
-          if (nums.some((n) => !Number.isFinite(n) || n <= 0)) {
-            broken.push(`${id}: physics.shape(${s}) has a non-positive dimension`);
+          // EXTENTS must be positive. CENTRES must only be finite, and that is
+          // a real distinction rather than pedantry: a flight of quay steps
+          // descends BELOW its own origin, so its centreY is negative and
+          // correct, and this check used to call that a broken component.
+          const extents = shape.kind === 'box' ? [...shape.halfExtents]
+            : shape.kind === 'ball' ? [shape.radius]
+              : [shape.halfHeight, shape.radius];
+          const centres = [shape.centerY, shape.centerX ?? 0, shape.centerZ ?? 0];
+          if (extents.some((n) => !Number.isFinite(n) || n <= 0)) {
+            broken.push(`${id}: physics.shape(${s}) has a non-positive extent`);
+          }
+          if (centres.some((n) => !Number.isFinite(n))) {
+            broken.push(`${id}: physics.shape(${s}) has a non-finite centre`);
           }
         }
       }
@@ -197,7 +205,18 @@ await gamePage.waitForFunction(() => window.__dust?.track, null, { timeout: 1200
 // Every SOLID component must have produced a collider at its own position, and
 // every non-solid one must not have. This is the claim that matters: the rules
 // written in the component file are the rules the car meets.
-const verdicts = await gamePage.evaluate((ids) => {
+const offsets = await page.evaluate((ids) => {
+  const e = window.__editor;
+  const out = {};
+  for (const id of ids) {
+    const t = e.getTemplate(id);
+    const sh = t.physics.shape(t.authoring.defaultScale);
+    out[id] = { x: sh.centerX ?? 0, z: sh.centerZ ?? 0 };
+  }
+  return out;
+}, sweep.ids);
+
+const verdicts = await gamePage.evaluate(({ ids, offsets }) => {
   const d = window.__dust;
   const props = d.track.props ?? [];
   // ONLY THE COMPONENT COLLIDERS. The terrain is one big trimesh whose own
@@ -205,14 +224,18 @@ const verdicts = await gamePage.evaluate((ids) => {
   // counts it and is reported solid whatever its file says. That was not
   // reachable while the grid started at -380 and stepped 34; it became
   // reachable the moment the grid was sized from the library instead.
+  // EXCLUDE THE TERRAIN BY WHAT IT IS, rather than allow-listing everything
+  // else. The terrain is one big trimesh whose own translation is the origin,
+  // so a prop landing on (0, 0) counts it and is reported solid whatever its
+  // file says. The first attempt allow-listed ball/cuboid/cylinder by
+  // ShapeType number and got the numbers wrong — Ball is 0 and Cylinder is 11,
+  // not the 1/2/10 it guessed — which silently dropped every ball and cylinder
+  // collider in the world and failed three components that were fine. Naming
+  // the two shapes actually being excluded cannot go wrong that way.
+  const TERRAIN_SHAPES = new Set([5, 6, 8]);           // TriMesh, Polyline, HeightField
   const cols = [];
   d.world.forEachCollider((c) => {
-    const kind = c.shape?.type;
-    // 1 = ball, 2 = cuboid, 10 = cylinder in rapier's ShapeType; trimesh is not
-    // in that set, which is the whole point. Guard on a name where available.
-    const name = c.shape?.constructor?.name ?? '';
-    if (/TriMesh|HeightField/i.test(name)) return;
-    if (kind !== undefined && ![1, 2, 10].includes(kind) && !/Ball|Cuboid|Cylinder/i.test(name)) return;
+    if (TERRAIN_SHAPES.has(c.shape?.type)) return;
     const t = c.translation();
     cols.push([t.x, t.z]);
   });
@@ -221,8 +244,18 @@ const verdicts = await gamePage.evaluate((ids) => {
   // 8 m window starts counting the NEIGHBOUR's collider, which is exactly the
   // bug that once reported a non-solid pallet as solid.
   const r = Math.min(8, (d.track.props[1] ? Math.abs(d.track.props[1].x - d.track.props[0].x) : 8) * 0.45);
-  return props.map((p) => ({ id: p.template, n: near(p.x, p.z, r) }));
-}, sweep.ids);
+  // LOOK WHERE THE COMPONENT SAID ITS COLLIDER WOULD BE, not merely where the
+  // prop is. A shape may now offset in X and Z, and the jetty uses it — 22 m of
+  // deck running out from the origin, hitbox centred 9 m along it. Searching
+  // the prop's own position found nothing there and reported a solid component
+  // as having no collider, which is the check being out of date rather than
+  // the component being wrong. Every prop here is placed at rot 0, so the
+  // local offset is the world offset.
+  return props.map((p) => {
+    const off = offsets[p.template] ?? { x: 0, z: 0 };
+    return { id: p.template, n: near(p.x + off.x, p.z + off.z, r) };
+  });
+}, { ids: sweep.ids, offsets });
 
 const expectSolid = await page.evaluate((ids) => {
   const e = window.__editor;

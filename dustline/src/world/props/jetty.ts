@@ -60,9 +60,19 @@ const jetty: PropTemplate = {
   ],
 
   physics: {
-    // The walkway, not the fingers. Half-extents cover the run; centreY puts
-    // the box at deck height so a car ramps onto it rather than into it.
-    shape: (s) => ({ kind: 'box', halfExtents: [1.7 * s, 0.21 * s, (RUN / 2) * s], centerY: 1.71 * s }),
+    // The walkway, not the fingers, at deck height so a car ramps onto it
+    // rather than into it — AND OFFSET ALONG +Z, because the deck runs out from
+    // the origin instead of standing on it. This shipped without the offset:
+    // 22 m of jetty with its hitbox centred on the shore end, half of it in
+    // open water and the seaward half of the deck not solid at all. It is the
+    // reason `centerX`/`centerZ` exist on `PhysicsShape`; the geometry puts the
+    // walkway from z = -2 to z = 20, so its middle is at 9.
+    shape: (s) => ({
+      kind: 'box',
+      halfExtents: [1.7 * s, 0.21 * s, (RUN / 2) * s],
+      centerY: 1.71 * s,
+      centerZ: (RUN / 2 - 2) * s,
+    }),
     solid: true,
     massKg: 12000,
   },
