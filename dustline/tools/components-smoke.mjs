@@ -331,16 +331,22 @@ const afloat = await page.evaluate(async () => {
     if (y === null) { wrong.push(`${p.template}@(${p.x},${p.z}) has no instance in the world`); continue; }
     if (place === 'water') {
       boats++;
-      if (Math.abs(y - level) > 0.01) {
+      // `yOffset` is the format's own per-prop lift and the editor exposes it as
+      // "lift (m)" — the harbour's beacon uses it to stand on the mole's cap,
+      // 1.25 m above the water. A check that ignores a field the format has
+      // will fail correct content, which is what it did here.
+      const lift = p.yOffset ?? 0;
+      if (Math.abs(y - (level + lift)) > 0.01) {
         wrong.push(`${p.template}@(${p.x},${p.z}) sits at y=${y.toFixed(2)}, water is ${level} `
-          + `(bed ${ground.toFixed(2)})`);
+          + `+ lift ${lift} (bed ${ground.toFixed(2)})`);
       }
       const d = level - ground;
       if (d < (tpl.authoring.minDepth ?? 0.4)) {
         wrong.push(`${p.template}@(${p.x},${p.z}) aground: ${d.toFixed(2)} m of water, wants ${tpl.authoring.minDepth}`);
       }
     } else {
-      if (Math.abs(y - ground) > 0.01) wrong.push(`${p.template}@(${p.x},${p.z}) is not on the ground`);
+      const lift = p.yOffset ?? 0;
+      if (Math.abs(y - (ground + lift)) > 0.01) wrong.push(`${p.template}@(${p.x},${p.z}) is not on the ground`);
       if (ground < level - 0.35) {
         wrong.push(`${p.template}@(${p.x},${p.z}) is ${(level - ground).toFixed(1)} m under water`);
       }

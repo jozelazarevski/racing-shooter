@@ -90,6 +90,8 @@ a level of 1.4 m actually floods without building the world and going to look.
 
 ![the harbour coast](docs/harbour.png)
 ![the quay](docs/harbour-quay.png)
+![the frontage](docs/harbour-frontage.png)
+![the vineyard](docs/harbour-vineyard.png)
 
 `harbour.json`, in the editor's own preview. The dwellings, the boats and the
 lighthouse are IGNITE RALLY's shapes ported across rather than redesigned —

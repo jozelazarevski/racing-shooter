@@ -69,6 +69,17 @@ function shoreX(z, from = -120) {
   return x;
 }
 
+/** March INLAND from the shore until the ground is `above` metres clear of the
+ *  water. A quay wall does not stand at the waterline — it stands at the top of
+ *  the bank it retains, with its face going down into the water. Placed at the
+ *  shoreline itself the first cut showed 46 cm of coping above the sea and read
+ *  as nothing at all. */
+function bankX(z, above) {
+  let x = shoreX(z);
+  while (x < -80 && land(x, z) < WATER + above) x += 1;
+  return x;
+}
+
 /** March seaward from the shore until the water is at least `want` deep.
  *  Returns null rather than guessing if the bed never gets there — a boat
  *  reported as beached is worth more than a boat quietly placed on a rock. */
@@ -110,8 +121,11 @@ const put = (template, t, lat, opts = {}) => {
   const { x, z, heading } = beside(t, lat);
   props.push({ template, x: r1(x), z: r1(z), rot: r3((opts.rot ?? heading) + (opts.turn ?? 0)), scale: opts.scale ?? 1 });
 };
-const putAt = (template, x, z, rot = 0, scale = 1) =>
-  props.push({ template, x: r1(x), z: r1(z), rot: r3(rot), scale });
+const putAt = (template, x, z, rot = 0, scale = 1, yOffset = 0) => {
+  const p = { template, x: r1(x), z: r1(z), rot: r3(rot), scale };
+  if (yOffset) p.yOffset = yOffset;
+  props.push(p);
+};
 
 // A jetty's deck runs along its own +Z, so this yaw points it out to sea.
 const SEAWARD = -Math.PI / 2;
@@ -133,13 +147,52 @@ for (let i = 0; i < 6; i++) put('barrierBlock', 0.60 + i * 0.005, 10.5);
 for (let i = 0; i < 10; i++) put('cone', 0.75 + i * 0.0055, 7.4 - i * 0.14);
 put('watchtower', 0.33, -17);
 
-// ---- THE HARBOUR ------------------------------------------------------------
+// ---- THE STONE QUAY ---------------------------------------------------------
+//
+// The village stood on a SAND BEACH. A working harbour with a fishing fleet and
+// three jetties does not have a beach where its quay should be — boats come
+// alongside stone, and everything the marine set builds (steps, ladders,
+// capstans, a crane) is furniture for a wall that was not there.
+//
+// The wall is laid in its own 7.8 m modules along the shoreline found for the
+// MIDDLE of each module rather than its end, so a run follows a curved coast
+// instead of stepping away from it. `quayWall` runs along its local +X, so
+// yawing it a quarter turn lays it along z.
+const QUAY_FROM = -96, QUAY_TO = 108, QUAY_MOD = 7.8;
+const ALONGSHORE = Math.PI / 2;
+for (let z = QUAY_FROM; z <= QUAY_TO; z += QUAY_MOD) {
+  const zc = z + QUAY_MOD / 2;
+  putAt('quayWall', bankX(zc, 1.9), zc, ALONGSHORE, 1);
+}
+
+// Steps down the face where boats come alongside, and ladders between them.
+for (const z of [-58, 2, 58]) putAt('quaySteps', bankX(z, 1.9), z, SEAWARD, 1);
+for (const z of [-76, -30, 26, 84]) putAt('dockLadder', bankX(z, 1.9) - 0.6, z, SEAWARD, 1);
+
+// The slipway: the one place a hull can be brought out of the water.
+putAt('slipway', shoreX(-118) + 3, -118, SEAWARD, 1);
+putAt('boatShed', shoreX(-118) + 26, -118, ALONGSHORE, 1);
+
+// THE MOLE, and the beacon on the end of it. Laid across the northern approach
+// so the moorings sit inside sheltered water, which is the whole reason a
+// harbour is where it is. `breakwater` is 26 m of dressed stone per module.
+for (let k = 0; k < 4; k++) {
+  putAt('breakwater', shoreX(-150) - 4 - k * 25.6, -150 + k * 3, ALONGSHORE + 0.12, 1);
+}
+// lifted onto the mole's cap, which stands 1.25 m above the water
+putAt('beacon', shoreX(-150) - 4 - 3.6 * 25.6, -150 + 3.4 * 3, 0, 1, 1.25);
+
+// Working gear on the wall itself.
+putAt('harbourCrane', bankX(-16, 1.9) + 4.5, -16, ALONGSHORE, 1);
+putAt('netLoft', bankX(40, 1.9) + 12, 40, Math.PI / 2, 1);
+for (const z of [-66, -8, 46]) putAt('capstan', bankX(z, 1.9) + 4.5, z, 0, 1);
+
 // Quay furniture follows the shoreline, so it stays on the shore if the land
 // or the water level is edited afterwards.
 const moorings = [];
 for (let z = -70; z <= 90; z += 10) {
   const s = shoreX(z);
-  putAt('mooringPost', s + 1.5, z, 0, 1);
+  putAt('mooringPost', bankX(z, 1.9) + 2.2, z, 0, 1);
   moorings.push({ z, s });
 }
 
@@ -168,9 +221,9 @@ for (const [z, want, tpl] of [[-104, 2.2, 'fishingBoat'], [126, 2.4, 'sailboat']
 }
 
 // Pots and gear on the hard.
-for (const z of [-60, -44, 14, 52, 70]) putAt('lobsterPots', shoreX(z) + 3.5, z, z * 0.03, 1);
-for (const z of [-36, 24]) putAt('crate', shoreX(z) + 5, z, 0.4, 1);
-putAt('oilDrum', shoreX(-30) + 6, -30, 0, 1);
+for (const z of [-60, -44, 14, 52, 70]) putAt('lobsterPots', shoreX(z) + 6.5, z, z * 0.03, 1);
+for (const z of [-36, 24]) putAt('crate', shoreX(z) + 8, z, 0.4, 1);
+putAt('oilDrum', shoreX(-30) + 9, -30, 0, 1);
 
 // ---- THE VILLAGE ------------------------------------------------------------
 // A front row facing the water, a back row behind it, and the church on the
@@ -209,6 +262,68 @@ putAt('oak', shoreX(-52) + 44, -52, 0, 1.2);
   putAt('shed', shoreX(z) + 22, z + 14, 0.5, 0.9);
   putAt('mooringPost', shoreX(z - 12) + 1.5, z - 12, 0, 1);
 }
+
+// ---- THE VINEYARD, on the eastern slope --------------------------------------
+//
+// Put where the land is: the third ramp lifts everything east of x = 175, and a
+// vineyard belongs on a slope. TERRACED, because that is what a slope forces —
+// each terrace is a retaining wall with its rows planted behind it, and the
+// rows run ALONG the contour rather than down it, which is both what a grower
+// does and what stops the whole planting reading as a hatch pattern.
+//
+// `vineRow` runs along its local +Z and `terraceWall` along its local +X, so a
+// contour running north-south takes the rows unrotated and the walls a quarter
+// turn. The 2.9 m row spacing is v1's own from `_buildVineRows`.
+const VINE_ROW_PITCH = 2.9;
+// INLAND OF THE ROAD, NOT ACROSS IT. The first placement ran the terraces from
+// x = 232 to 326 and the circuit passes through x ~ 272 on this stretch, so the
+// road went straight through the middle of the planting. Vine rows are not
+// solid, so it drove fine and looked absurd. Everything now starts beyond
+// x = 318, which is 45 m clear of the carriageway at its nearest.
+const TERRACES = [
+  { x: 320, z0: -84, rows: 7, len: 6 },
+  { x: 350, z0: -66, rows: 8, len: 6 },
+  { x: 382, z0: -46, rows: 7, len: 5 },
+];
+for (const T of TERRACES) {
+  // the wall holding the step up, laid in 6 m modules along the contour
+  for (let k = 0; k < T.len + 1; k++) {
+    putAt('terraceWall', T.x - 5, T.z0 + k * 6.1, Math.PI / 2, 1);
+  }
+  for (let r = 0; r < T.rows; r++) {
+    const x = T.x + r * VINE_ROW_PITCH;
+    for (let k = 0; k < T.len; k++) putAt('vineRow', x, T.z0 + k * 8.3, 0, 1);
+    // an anchor post at each end of the row, which is what a trellis needs to
+    // pull against and what makes a row read as a row from the road
+    putAt('trellisPost', x, T.z0 - 1.4, 0, 1);
+    putAt('trellisPost', x, T.z0 + T.len * 8.3 + 1.4, 0, 1);
+  }
+}
+// The working end of it, at the foot of the lowest terrace.
+putAt('winePress', 312, -26, 0.5, 1);
+putAt('barrelStack', 308, -32, 0.2, 1);
+putAt('barrelStack', 308, -35, 0.2, 1);
+putAt('farmhouseL', 306, -52, 1.2, 1);
+putAt('shed', 310, -16, 1.2, 0.95);
+for (let i = 0; i < 6; i++) putAt('oliveTree', 330 + (i % 3) * 16, 30 + Math.floor(i / 3) * 18, 0, 1.1);
+for (let i = 0; i < 8; i++) putAt('orchardTree', 336 + (i % 4) * 10, 84 + Math.floor(i / 4) * 10, 0, 1);
+for (let i = 0; i < 5; i++) putAt('cropRow', 330 + i * 4, 130, 0, 1);
+putAt('scarecrow', 338, 140, 0.7, 1);
+
+// ---- ROAD FURNITURE, round the lap ------------------------------------------
+// The pieces that tell you a road is a road someone maintains rather than a
+// ribbon: distance stones, a fingerpost at the junction, a warning board on the
+// approach to the tightest corner, a grid where the lane leaves the fields, and
+// a telegraph line that follows the route.
+for (let i = 0; i < 8; i++) put('milestone', i / 8 + 0.012, -9.5, { turn: Math.PI / 2 });
+put('signpost', 0.205, -11);
+put('roadSign', 0.285, -11);
+put('roadSign', 0.62, -11);
+put('busShelter', 0.16, -12.5, { turn: Math.PI });
+put('cattleGrid', 0.53, 0);
+// A telegraph line: EVENLY SPACED and unrotated, because a jittered line stops
+// being a line — the component's own file says so and sets randomYaw false.
+for (let i = 0; i < 26; i++) put('telegraphPole', i / 26 + 0.006, -15, { turn: 0 });
 
 // ---- the farm, inland east --------------------------------------------------
 putAt('windmill', 330, -60, 0.4, 1);
@@ -264,16 +379,24 @@ const track = {
         onRoad: false,
         offRoad: true,
         any: [
-          { kind: 'halfPlane', axis: 'x', op: 'lt', value: -215 },
+          // Pulled back from -215 to the waterline. A working harbour does not
+          // have a BEACH where its quay is: with the sand reaching 40 m inland
+          // the whole village stood on it, which is a seaside resort.
+          { kind: 'halfPlane', axis: 'x', op: 'lt', value: -252 },
           { kind: 'halfPlane', axis: 'z', op: 'gt', value: 268 },
         ],
       },
       {
-        id: 'highground',
-        surface: 'snow',
-        onRoad: true,
+        // BARE HILLTOP, NOT SNOW. The east ramp tops out at +22 and the octaves
+        // add ten on top, so a snow line at 19 put a white cap on the hill the
+        // vineyard is planted on — snow above a Mediterranean harbour with
+        // olives and vines under it. The horizon peaks still carry snow; they
+        // are three quarters of a kilometre away and a different climate.
+        id: 'hilltop',
+        surface: 'gravel',
+        onRoad: false,
         offRoad: true,
-        any: [{ kind: 'aboveHeight', height: 19 }],
+        any: [{ kind: 'aboveHeight', height: 24 }],
       },
     ],
   },

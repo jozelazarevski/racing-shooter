@@ -129,7 +129,7 @@ const beacon: PropTemplate = {
 
   authoring: {
     scale: [0.85, 1.25], defaultScale: 1,
-    placement: 'shore', shoreBand: 6,
+    placement: 'water', minDepth: 0.4,
     minRoadDist: 10, randomYaw: true, previewDist: 14,
   },
 };

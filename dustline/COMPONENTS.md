@@ -381,6 +381,31 @@ work the editor exists to remove — and because anything positioned relative to
 the road has to be recomputed when the road moves. Open it in the editor and
 edit it like any other track; the generator only makes the starting point.
 
+## Placed, not just built
+
+A component that exists and is in no world is a catalogue entry. Both showcase
+tracks now carry the new sets as content:
+
+- **Harbour Point** gained a stone quay — wall, steps, ladders, capstans, a
+  crane, a net loft, a slipway with its boat shed, and a mole with a beacon on
+  the end of it — a terraced vineyard on the eastern slope, and road furniture
+  round the lap.
+- **The proving ground** gained the roads and crossings set beside the route, a
+  hamlet of the seven newly-exposed dwelling archetypes, and a farmyard.
+
+Three things had to be fixed to get there, and all three were found by looking
+at the render or by the gate rather than by reading the code:
+
+- **The quay wall stood at the waterline** and showed 46 cm of coping. A quay
+  wall stands at the top of the bank it retains, so the generator marches
+  inland until the ground is 1.9 m clear of the water and puts it there.
+- **The vineyard was planted across the road.** Vine rows are not solid, so it
+  drove perfectly and looked absurd.
+- **The mole was declared `shore` and its geometry authored relative to the
+  WATER**, which is how v1 builds one. Run out across a harbour mouth it ended
+  up 12 m under. It is `water` placement now, and the smoke test caught it by
+  reading the built world.
+
 ## The harbour
 
 `src/data/tracks/harbour.json` is a third built-in track and the one that

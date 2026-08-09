@@ -29,6 +29,12 @@ import { bundle } from './kit';
 
 const RUN_L = 26;             // v1's runL
 const RUN_W = 6.5;            // v1's runW
+// PLACEMENT IS `water`, NOT `shore`, and that follows from the line below: the
+// whole block is authored RELATIVE TO THE WATER, which is how v1 builds its
+// mole (`top = lvl + 1.25`). Declared `shore` it stood on the seabed instead,
+// and a mole run out across a harbour mouth ended up 12 m under — which the
+// component smoke caught by reading the built world rather than the intent.
+// `water` puts its origin on the surface, where its own numbers assume it is.
 const TOP = 1.25;             // v1's top, relative to the water
 const SLAB_W = RUN_W + 1.1;   // v1's cap oversails by 0.55 a side
 const SLAB_L = RUN_L + 0.8;
@@ -112,7 +118,7 @@ const breakwater: PropTemplate = {
     // Fixed scale: a line of moles is only a mole if the pieces are the same
     // width, and the eye reads a step in a 26 m block from the far quay.
     scale: [1, 1], defaultScale: 1,
-    placement: 'shore', shoreBand: 8,
+    placement: 'water', minDepth: 0.4,
     minRoadDist: 14, randomYaw: false, previewDist: 52,
   },
 };

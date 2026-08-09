@@ -116,6 +116,70 @@ put('pallet', 0.047, 35.5, { scale: 1 });
 put('spareTyre', 0.05, 33.5, { scale: 1 });
 put('spareTyre', 0.052, 34.5, { scale: 1 });
 
+// ---- ROADS AND CROSSINGS ------------------------------------------------------
+// The proving ground's job is to exercise the library as CONTENT, so the roads
+// set is laid out beside the route the way it would be on a real stage rather
+// than lined up in a field. Everything here is placed relative to the racing
+// line, so it follows the road if the road moves.
+//
+// The bridges sit BESIDE the lap rather than carrying it. A component cannot
+// know where the road is, so a bridge placed on the centreline would have to
+// have its deck height match the road profile exactly at that point or a car
+// would hit its parapet — and the deck is the only solid part it has. Beside
+// the route they are scenery you drive past, which is honest.
+put('stoneBridge', 0.115, 34, { turn: Math.PI / 2 });
+put('timberBridge', 0.395, 36, { turn: Math.PI / 2 });
+put('culvert', 0.47, 16, { turn: Math.PI });
+put('tunnelMouth', 0.815, 40, { turn: Math.PI / 2, scale: 0.9 });
+for (let i = 0; i < 7; i++) put('retainingWall', 0.235 + i * 0.0068, 15.5);
+put('cattleGrid', 0.55, 0);
+put('fordStones', 0.66, 22);
+for (let i = 0; i < 10; i++) put('milestone', i / 10 + 0.005, -9.5, { turn: Math.PI / 2 });
+put('signpost', 0.30, -12);
+put('roadSign', 0.245, -12);
+put('roadSign', 0.70, -12);
+put('busShelter', 0.075, -13, { turn: Math.PI });
+for (let i = 0; i < 24; i++) put('telegraphPole', i / 24 + 0.004, -16, { turn: 0 });
+
+// ---- A HAMLET, so the settlement set is content and not a catalogue ---------
+const HAMLET = ['cubeHouse', 'domedHouse', 'courtyardHouse', 'adobeHouse',
+  'stiltHouse', 'signalHut', 'puebloRuin'];
+HAMLET.forEach((id, i) => putAt(id, -350 + (i % 4) * 34, 130 + Math.floor(i / 4) * 38, 0.4 + i, 1));
+putAt('campanile', -300, 96, 0, 1);
+putAt('fountain', -316, 132, 0, 1);
+putAt('archGateway', -352, 210, 0, 1);
+for (let i = 0; i < 5; i++) putAt('vineRow', 300 + i * 2.9, 150, 0, 1);
+putAt('trellisPost', 300, 143, 0, 1);
+putAt('terraceWall', 296, 160, 0, 1);
+putAt('winePress', 288, 146, 0.6, 1);
+putAt('barrelStack', 286, 152, 0.2, 1);
+putAt('oliveTree', 322, 158, 0, 1.1);
+putAt('orchardTree', 316, 168, 0, 1);
+putAt('hayRack', 276, 168, 0.8, 1);
+putAt('waterTrough', 270, 160, 0.8, 1);
+putAt('feedBin', 268, 172, 0.8, 1);
+putAt('scarecrow', 306, 176, 0.4, 1);
+putAt('quayWall', -390, -60, Math.PI / 2, 1);
+putAt('quaySteps', -382, -70, 0, 1);
+putAt('capstan', -384, -50, 0, 1);
+putAt('dockLadder', -392, -44, 0, 1);
+putAt('boatShed', -370, -84, 0.6, 1);
+putAt('netLoft', -368, -30, 0.6, 1);
+putAt('harbourCrane', -380, -14, 0, 1);
+putAt('breakwater', -404, 20, Math.PI / 2, 1);
+putAt('beacon', -404, 50, 0, 1);
+putAt('slipway', -374, 70, 0, 1);
+putAt('logPile', -330, -100, 0.5, 1);
+putAt('silo', 342, 88, 0, 1);
+putAt('kiosk', -140, 320, 0.9, 1);
+putAt('towerhouse', -170, 316, 0.9, 1);
+putAt('chalet', -206, 306, 0.9, 1);
+putAt('halfTimbered', -240, 300, 0.9, 1);
+putAt('stoneCottage', -272, 292, 0.9, 1);
+putAt('cottageHipped', -300, 282, 0.9, 1);
+putAt('cottageLong', -330, 272, 0.9, 1);
+putAt('farmhouseL', -360, 258, 0.9, 1);
+
 // ---- landmarks --------------------------------------------------------------
 putAt('rockSpire', 250, -330, 0, 1.6);
 putAt('rockSpire', 286, -300, 0, 1.1);

@@ -33,6 +33,18 @@ const SHOTS = [
     what: 'the quay — jetty, moored boats, buoys, willows on the shoreline',
     orbit: { target: [-256, 2, 14], dist: 112, pitch: 0.24, yaw: 2.45 },
   },
+  {
+    file: 'harbour-frontage.png',
+    track: 'harbour',
+    what: 'along the quay at eye level — wall, steps, capstans, crane, moored fleet',
+    orbit: { target: [-247, 2, 20], dist: 78, pitch: 0.13, yaw: 4.35 },
+  },
+  {
+    file: 'harbour-vineyard.png',
+    track: 'harbour',
+    what: 'the terraced vineyard on the eastern slope',
+    orbit: { target: [352, 12, -40], dist: 135, pitch: 0.26, yaw: 1.75 },
+  },
 ];
 
 mkdirSync(OUT, { recursive: true });

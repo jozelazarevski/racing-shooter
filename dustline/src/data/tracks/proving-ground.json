@@ -211,9 +211,9 @@
       "template": "grassTuft",
       "count": 4000,
       "minRoadDist": 6,
+      "maxRoadDist": 60,
       "minSpawnDist": 30,
-      "spread": 0.98,
-      "maxRoadDist": 60
+      "spread": 0.98
     },
     {
       "template": "pine",
@@ -1047,6 +1047,678 @@
       "x": 128.8,
       "z": -286.6,
       "rot": 1.451,
+      "scale": 1
+    },
+    {
+      "template": "stoneBridge",
+      "x": 267.6,
+      "z": -234.7,
+      "rot": 2.441,
+      "scale": 1
+    },
+    {
+      "template": "timberBridge",
+      "x": 101.9,
+      "z": 132.2,
+      "rot": 0.396,
+      "scale": 1
+    },
+    {
+      "template": "culvert",
+      "x": 51.5,
+      "z": 201.1,
+      "rot": 2.396,
+      "scale": 1
+    },
+    {
+      "template": "tunnelMouth",
+      "x": -275.5,
+      "z": -131.5,
+      "rot": 4.363,
+      "scale": 0.9
+    },
+    {
+      "template": "retainingWall",
+      "x": 306.2,
+      "z": -3.8,
+      "rot": -0.402,
+      "scale": 1
+    },
+    {
+      "template": "retainingWall",
+      "x": 301.6,
+      "z": 6.2,
+      "rot": -0.477,
+      "scale": 1
+    },
+    {
+      "template": "retainingWall",
+      "x": 296.3,
+      "z": 16,
+      "rot": -0.545,
+      "scale": 1
+    },
+    {
+      "template": "retainingWall",
+      "x": 288.1,
+      "z": 28.6,
+      "rot": -0.628,
+      "scale": 1
+    },
+    {
+      "template": "retainingWall",
+      "x": 281.2,
+      "z": 37.6,
+      "rot": -0.687,
+      "scale": 1
+    },
+    {
+      "template": "retainingWall",
+      "x": 273.9,
+      "z": 46.2,
+      "rot": -0.745,
+      "scale": 1
+    },
+    {
+      "template": "retainingWall",
+      "x": 266.1,
+      "z": 54.3,
+      "rot": -0.805,
+      "scale": 1
+    },
+    {
+      "template": "cattleGrid",
+      "x": -74.9,
+      "z": 235.9,
+      "rot": -1.557,
+      "scale": 1
+    },
+    {
+      "template": "fordStones",
+      "x": -237.9,
+      "z": 160.3,
+      "rot": -2.755,
+      "scale": 1
+    },
+    {
+      "template": "milestone",
+      "x": 8.9,
+      "z": -240.7,
+      "rot": 3.181,
+      "scale": 1
+    },
+    {
+      "template": "milestone",
+      "x": 224.3,
+      "z": -211.9,
+      "rot": 2.601,
+      "scale": 1
+    },
+    {
+      "template": "milestone",
+      "x": 293.6,
+      "z": -62.6,
+      "rot": 1.5,
+      "scale": 1
+    },
+    {
+      "template": "milestone",
+      "x": 216,
+      "z": 59.5,
+      "rot": 0.361,
+      "scale": 1
+    },
+    {
+      "template": "milestone",
+      "x": 72.7,
+      "z": 96,
+      "rot": 0.575,
+      "scale": 1
+    },
+    {
+      "template": "milestone",
+      "x": -5.9,
+      "z": 210.7,
+      "rot": 0.42,
+      "scale": 1
+    },
+    {
+      "template": "milestone",
+      "x": -156.2,
+      "z": 207.2,
+      "rot": -0.571,
+      "scale": 1
+    },
+    {
+      "template": "milestone",
+      "x": -226.1,
+      "z": 80.8,
+      "rot": -1.359,
+      "scale": 1
+    },
+    {
+      "template": "milestone",
+      "x": -233.7,
+      "z": -98.1,
+      "rot": 4.476,
+      "scale": 1
+    },
+    {
+      "template": "milestone",
+      "x": -124,
+      "z": -221.1,
+      "rot": 3.549,
+      "scale": 1
+    },
+    {
+      "template": "signpost",
+      "x": 219.8,
+      "z": 55.1,
+      "rot": -1.14,
+      "scale": 1
+    },
+    {
+      "template": "roadSign",
+      "x": 274.3,
+      "z": -1,
+      "rot": -0.523,
+      "scale": 1
+    },
+    {
+      "template": "roadSign",
+      "x": -222.2,
+      "z": 87.2,
+      "rot": -2.938,
+      "scale": 1
+    },
+    {
+      "template": "busShelter",
+      "x": 169.7,
+      "z": -229.8,
+      "rot": 4.438,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 9.1,
+      "z": -234.2,
+      "rot": 1.611,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 108.7,
+      "z": -237.5,
+      "rot": 1.512,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 192.7,
+      "z": -219.3,
+      "rot": 1.208,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 251.4,
+      "z": -180,
+      "rot": 0.652,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 282.2,
+      "z": -115.8,
+      "rot": 0.245,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 285.8,
+      "z": -49.6,
+      "rot": -0.148,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 264.4,
+      "z": 7.5,
+      "rot": -0.608,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 222.1,
+      "z": 49.3,
+      "rot": -1.06,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 169.2,
+      "z": 63.3,
+      "rot": -1.393,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 108.1,
+      "z": 76.7,
+      "rot": -1.356,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 48.5,
+      "z": 113,
+      "rot": -0.432,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": 31.9,
+      "z": 173.2,
+      "rot": -0.475,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -8.6,
+      "z": 204.8,
+      "rot": -1.151,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -68.3,
+      "z": 219.6,
+      "rot": -1.522,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -133,
+      "z": 211.5,
+      "rot": -1.949,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -179.5,
+      "z": 179.9,
+      "rot": -2.384,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -207.8,
+      "z": 131.9,
+      "rot": -2.853,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -222.8,
+      "z": 65,
+      "rot": -2.939,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -233.7,
+      "z": -11.1,
+      "rot": -3.099,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -229.9,
+      "z": -83.1,
+      "rot": 2.975,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -206.1,
+      "z": -144.3,
+      "rot": 2.521,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -155.2,
+      "z": -195.8,
+      "rot": 2.197,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -96.5,
+      "z": -224.5,
+      "rot": 1.875,
+      "scale": 1
+    },
+    {
+      "template": "telegraphPole",
+      "x": -44.9,
+      "z": -234.7,
+      "rot": 1.588,
+      "scale": 1
+    },
+    {
+      "template": "cubeHouse",
+      "x": -350,
+      "z": 130,
+      "rot": 0.4,
+      "scale": 1
+    },
+    {
+      "template": "domedHouse",
+      "x": -316,
+      "z": 130,
+      "rot": 1.4,
+      "scale": 1
+    },
+    {
+      "template": "courtyardHouse",
+      "x": -282,
+      "z": 130,
+      "rot": 2.4,
+      "scale": 1
+    },
+    {
+      "template": "adobeHouse",
+      "x": -248,
+      "z": 130,
+      "rot": 3.4,
+      "scale": 1
+    },
+    {
+      "template": "stiltHouse",
+      "x": -350,
+      "z": 168,
+      "rot": 4.4,
+      "scale": 1
+    },
+    {
+      "template": "signalHut",
+      "x": -316,
+      "z": 168,
+      "rot": 5.4,
+      "scale": 1
+    },
+    {
+      "template": "puebloRuin",
+      "x": -282,
+      "z": 168,
+      "rot": 6.4,
+      "scale": 1
+    },
+    {
+      "template": "campanile",
+      "x": -300,
+      "z": 96,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "fountain",
+      "x": -316,
+      "z": 132,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "archGateway",
+      "x": -352,
+      "z": 210,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "vineRow",
+      "x": 300,
+      "z": 150,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "vineRow",
+      "x": 302.9,
+      "z": 150,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "vineRow",
+      "x": 305.8,
+      "z": 150,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "vineRow",
+      "x": 308.7,
+      "z": 150,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "vineRow",
+      "x": 311.6,
+      "z": 150,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "trellisPost",
+      "x": 300,
+      "z": 143,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "terraceWall",
+      "x": 296,
+      "z": 160,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "winePress",
+      "x": 288,
+      "z": 146,
+      "rot": 0.6,
+      "scale": 1
+    },
+    {
+      "template": "barrelStack",
+      "x": 286,
+      "z": 152,
+      "rot": 0.2,
+      "scale": 1
+    },
+    {
+      "template": "oliveTree",
+      "x": 322,
+      "z": 158,
+      "rot": 0,
+      "scale": 1.1
+    },
+    {
+      "template": "orchardTree",
+      "x": 316,
+      "z": 168,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "hayRack",
+      "x": 276,
+      "z": 168,
+      "rot": 0.8,
+      "scale": 1
+    },
+    {
+      "template": "waterTrough",
+      "x": 270,
+      "z": 160,
+      "rot": 0.8,
+      "scale": 1
+    },
+    {
+      "template": "feedBin",
+      "x": 268,
+      "z": 172,
+      "rot": 0.8,
+      "scale": 1
+    },
+    {
+      "template": "scarecrow",
+      "x": 306,
+      "z": 176,
+      "rot": 0.4,
+      "scale": 1
+    },
+    {
+      "template": "quayWall",
+      "x": -390,
+      "z": -60,
+      "rot": 1.5707963267948966,
+      "scale": 1
+    },
+    {
+      "template": "quaySteps",
+      "x": -382,
+      "z": -70,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "capstan",
+      "x": -384,
+      "z": -50,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "dockLadder",
+      "x": -392,
+      "z": -44,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "boatShed",
+      "x": -370,
+      "z": -84,
+      "rot": 0.6,
+      "scale": 1
+    },
+    {
+      "template": "netLoft",
+      "x": -368,
+      "z": -30,
+      "rot": 0.6,
+      "scale": 1
+    },
+    {
+      "template": "harbourCrane",
+      "x": -380,
+      "z": -14,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "breakwater",
+      "x": -404,
+      "z": 20,
+      "rot": 1.5707963267948966,
+      "scale": 1
+    },
+    {
+      "template": "beacon",
+      "x": -404,
+      "z": 50,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "slipway",
+      "x": -374,
+      "z": 70,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "logPile",
+      "x": -330,
+      "z": -100,
+      "rot": 0.5,
+      "scale": 1
+    },
+    {
+      "template": "silo",
+      "x": 342,
+      "z": 88,
+      "rot": 0,
+      "scale": 1
+    },
+    {
+      "template": "kiosk",
+      "x": -140,
+      "z": 320,
+      "rot": 0.9,
+      "scale": 1
+    },
+    {
+      "template": "towerhouse",
+      "x": -170,
+      "z": 316,
+      "rot": 0.9,
+      "scale": 1
+    },
+    {
+      "template": "chalet",
+      "x": -206,
+      "z": 306,
+      "rot": 0.9,
+      "scale": 1
+    },
+    {
+      "template": "halfTimbered",
+      "x": -240,
+      "z": 300,
+      "rot": 0.9,
+      "scale": 1
+    },
+    {
+      "template": "stoneCottage",
+      "x": -272,
+      "z": 292,
+      "rot": 0.9,
+      "scale": 1
+    },
+    {
+      "template": "cottageHipped",
+      "x": -300,
+      "z": 282,
+      "rot": 0.9,
+      "scale": 1
+    },
+    {
+      "template": "cottageLong",
+      "x": -330,
+      "z": 272,
+      "rot": 0.9,
+      "scale": 1
+    },
+    {
+      "template": "farmhouseL",
+      "x": -360,
+      "z": 258,
+      "rot": 0.9,
       "scale": 1
     },
     {
