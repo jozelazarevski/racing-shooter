@@ -3,10 +3,10 @@
 // stops a rally car is a worse lie than one you drive through.
 
 import * as THREE from 'three';
-import { PropTemplate, standard } from './types';
+import { PropTemplate, standard, craggy } from './types';
 
 const geo = () => {
-  const g = new THREE.IcosahedronGeometry(1, 0);
+  const g = craggy(new THREE.IcosahedronGeometry(1, 1), 0.18);
   g.scale(1, 0.6, 1);
   g.translate(0, 0.2, 0);
   return g;

@@ -2,10 +2,12 @@
 // than an obstacle you nudge aside.
 
 import * as THREE from 'three';
-import { PropTemplate, standard } from './types';
+import { PropTemplate, standard, craggy } from './types';
 
 const geo = () => {
-  const g = new THREE.DodecahedronGeometry(1, 1);
+  // Two subdivisions, because a boulder is the one stone a player drives right
+  // up to and there are only ever a handful in a world.
+  const g = craggy(new THREE.DodecahedronGeometry(1, 2), 0.14);
   g.scale(1.15, 0.85, 1);
   g.translate(0, 0.6, 0);
   return g;

@@ -1,7 +1,7 @@
 {
   "dustbowl": {
-    "fingerprint": "8f5fe1ef",
-    "instances": 1341,
+    "fingerprint": "cf27981f",
+    "instances": 1446,
     "components": {
       "pine": 260,
       "rock": 150,
@@ -9,11 +9,11 @@
     },
     "roadSamples": 480,
     "seedIndependent": true,
-    "other": "8f5fe1ef"
+    "other": "cf27981f"
   },
   "proving-ground": {
-    "fingerprint": "51c7d432",
-    "instances": 1772,
+    "fingerprint": "b917fd5e",
+    "instances": 1857,
     "components": {
       "pine": 150,
       "birch": 120,
@@ -51,11 +51,11 @@
     },
     "roadSamples": 480,
     "seedIndependent": true,
-    "other": "51c7d432"
+    "other": "b917fd5e"
   },
   "harbour": {
-    "fingerprint": "aaccc89b",
-    "instances": 1722,
+    "fingerprint": "2bf7c65d",
+    "instances": 1797,
     "components": {
       "pine": 110,
       "oak": 82,
@@ -113,6 +113,6 @@
     },
     "roadSamples": 480,
     "seedIndependent": true,
-    "other": "aaccc89b"
+    "other": "2bf7c65d"
   }
 }

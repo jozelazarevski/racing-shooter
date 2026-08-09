@@ -19,13 +19,13 @@ const pine: PropTemplate = {
   build: () => [
     {
       key: 'trunk',
-      geometry: cylinderAt(0.22, 0.34, 1.8, 6, 0),
+      geometry: cylinderAt(0.22, 0.34, 1.8, 9, 0),
       material: standard(0x5a4028, { flatShading: false }),
       castShadow: true,
     },
     {
       key: 'low',
-      geometry: coneAt(1.9, 3.1, 7, 1.45),
+      geometry: coneAt(1.9, 3.1, 10, 1.45),
       material: standard(0xffffff),
       castShadow: true,
       tint: (c) => {
@@ -35,7 +35,7 @@ const pine: PropTemplate = {
     },
     {
       key: 'top',
-      geometry: coneAt(1.25, 2.4, 7, 3.7),
+      geometry: coneAt(1.25, 2.4, 10, 3.7),
       material: standard(0xffffff),
       castShadow: true,
       tint: (c) => {
@@ -47,7 +47,7 @@ const pine: PropTemplate = {
     },
     {
       key: 'cap',
-      geometry: coneAt(0.95, 1.5, 7, 4.75),
+      geometry: coneAt(0.95, 1.5, 10, 4.75),
       material: standard(0xf2f6fa, { roughness: 0.9 }),
       when: (c) => c.surface === 'snow',
     },

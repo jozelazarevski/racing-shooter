@@ -212,7 +212,7 @@ export class Preview {
     this.built.push(...terrain.build(this.scene, null as never, null as never));
     this.built.push(buildSky(this.scene, def));
     this.built.push(buildClouds(this.scene, def));
-    this.built.push(buildMountains(this.scene, def));
+    this.built.push(...buildMountains(this.scene, def));
     const comps = buildVegetation(this.scene, terrain, null, null);
     this.built.push(...comps.objects);
     this.componentCounts = comps.counts;

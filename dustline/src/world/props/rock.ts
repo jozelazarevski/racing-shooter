@@ -6,10 +6,13 @@
 // hundreds of lines from the geometry it applied to.
 
 import * as THREE from 'three';
-import { PropTemplate, standard } from './types';
+import { PropTemplate, standard, craggy } from './types';
 
 const geo = () => {
-  const g = new THREE.DodecahedronGeometry(1, 0);
+  // Subdivided once and then ROUGHENED. A plain detail-1 dodecahedron is a
+  // sphere with extra steps: more triangles buy a worse rock unless they buy
+  // irregularity, which is what `craggy` is for.
+  const g = craggy(new THREE.DodecahedronGeometry(1, 1), 0.22);
   g.scale(1, 0.72, 1);
   g.translate(0, 0.15, 0);     // sits ON the ground, not half-buried in it
   return g;

@@ -15,7 +15,7 @@ const oak: PropTemplate = {
     {
       key: 'trunk',
       geometry: mergeGeoms([
-        cylinderAt(0.34, 0.62, 3.0, 8, 0),
+        cylinderAt(0.34, 0.62, 3.0, 10, 0),
         // three limbs, angled out — an oak's shape is in the branching, and a
         // bare cylinder under a sphere reads as a lollipop
         beam(0.22, 1.8, 0.22, 0.5, 3.4, 0.2, 0, 0, -0.55),
@@ -28,10 +28,10 @@ const oak: PropTemplate = {
     {
       key: 'canopy',
       geometry: mergeGeoms([
-        sphereAt(2.5, 8, 5.4),
-        sphereAt(1.8, 7, 4.5).translate(1.9, 0, 0.5),
-        sphereAt(1.7, 7, 4.7).translate(-1.8, 0, -0.6),
-        sphereAt(1.5, 7, 4.3).translate(0.3, 0, -1.9),
+        sphereAt(2.5, 11, 5.4),
+        sphereAt(1.8, 10, 4.5).translate(1.9, 0, 0.5),
+        sphereAt(1.7, 10, 4.7).translate(-1.8, 0, -0.6),
+        sphereAt(1.5, 9, 4.3).translate(0.3, 0, -1.9),
       ]),
       material: standard(0xffffff),
       castShadow: true,

@@ -170,6 +170,9 @@ async function boot() {
   (window as unknown as { __dust: object }).__dust = {
     car: playerCtrl, world, loop, input, terrain, fx, line, director, racers,
     track: trackDef,
+    // exposed for tools/: the renderer's own triangle and draw-call counters
+    // are the only honest answer to "what did that cost"
+    renderer,
     fastForward: (ticks: number) => { for (let i = 0; i < ticks; i++) fixedStep(FIXED_DT); },
   };
 }

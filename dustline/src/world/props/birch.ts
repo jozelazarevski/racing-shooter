@@ -14,10 +14,10 @@ const birch: PropTemplate = {
     {
       key: 'trunk',
       geometry: mergeGeoms([
-        cylinderAt(0.16, 0.26, 4.2, 7, 0),
+        cylinderAt(0.16, 0.26, 4.2, 9, 0),
         // two dark bark bands, the thing that makes a birch read as a birch
-        cylinderAt(0.19, 0.19, 0.22, 7, 1.3),
-        cylinderAt(0.175, 0.175, 0.16, 7, 2.5),
+        cylinderAt(0.19, 0.19, 0.22, 9, 1.3),
+        cylinderAt(0.175, 0.175, 0.16, 9, 2.5),
       ]),
       material: standard(0xe4e0d4, { flatShading: false }),
       castShadow: true,
@@ -25,9 +25,9 @@ const birch: PropTemplate = {
     {
       key: 'canopy',
       geometry: mergeGeoms([
-        sphereAt(1.5, 7, 5.0),
-        sphereAt(1.05, 7, 4.1).translate(0.9, 0, 0.3),
-        sphereAt(0.95, 7, 4.4).translate(-0.85, 0, -0.4),
+        sphereAt(1.5, 10, 5.0),
+        sphereAt(1.05, 9, 4.1).translate(0.9, 0, 0.3),
+        sphereAt(0.95, 9, 4.4).translate(-0.85, 0, -0.4),
       ]),
       material: standard(0xffffff),
       castShadow: true,

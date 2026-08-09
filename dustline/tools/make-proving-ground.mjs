@@ -133,7 +133,7 @@ const track = {
     + 'structures where structures go, and scatter using the full flora set.',
   seed: 4711,
 
-  world: { size: 900, meshRes: 160, sdfRes: 220 },
+  world: { size: 900, meshRes: 224, sdfRes: 220 },
   road: { points, halfWidth: 7, blend: 16, samples: SAMPLES },
   start: { padRadius: 48, padSurface: 'tarmac', tuningRings: false },
 

@@ -147,6 +147,10 @@ export interface SceneryLayer {
   spread: number;
 }
 
+/** The six skyline silhouettes. See `render/horizon.ts` for what each one is
+ *  and why a horizon of nothing but cones was the problem. */
+export type HorizonForm = 'pyramid' | 'spire' | 'dome' | 'mesa' | 'horn' | 'ridge';
+
 /** STANDING WATER.
  *
  *  A single level, not a set of lakes: the terrain is a heightfield, so
@@ -267,7 +271,16 @@ export interface TrackDef {
     sunIntensity: number;
     /** sun direction; length is irrelevant, only the bearing matters */
     sunDir: [number, number, number];
-    mountains: { count: number; radius: number; height: number; snowline: number };
+    mountains: {
+      count: number;
+      radius: number;
+      height: number;
+      snowline: number;
+      /** Which silhouettes this world's skyline is built from. Optional — a
+       *  track that does not say picks a set from its own seed, so two worlds
+       *  are not ringed by the same mountains. See `render/horizon.ts`. */
+      forms?: HorizonForm[];
+    };
     clouds: number;
   };
 }

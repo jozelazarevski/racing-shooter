@@ -29,7 +29,7 @@ const willow: PropTemplate = {
     {
       key: 'trunk',
       geometry: mergeGeoms([
-        cylinderAt(0.3, 0.5, 3.4, 7, 0),
+        cylinderAt(0.3, 0.5, 3.4, 9, 0),
         beam(0.2, 1.2, 0.2, 0.35, 3.6, 0.1, 0, 0, -0.4),
         beam(0.18, 1.1, 0.18, -0.35, 3.6, -0.15, 0, 0, 0.42),
       ]),

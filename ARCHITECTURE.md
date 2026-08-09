@@ -402,6 +402,37 @@ boat. Adding all of this left `dustbowl` and `proving-ground` **bit-identical**
 (`npm run verify:worlds`, fingerprints unchanged), which is the point of having
 kept the golden file.
 
+**Fidelity pass.** Three things were carrying the world's low-poly look, and
+none of them was the thing anyone would have guessed:
+
+- **The horizon** was thirty five-sided cones in one evenly spaced ring. v1 had
+  already diagnosed and fixed exactly that — *"a scaled pyramid is a pyramid"* —
+  so its six silhouettes and its clumped-massif placement came across into
+  `render/horizon.ts`, along with the vertical gradient strip that makes a
+  distant peak fade into haze from the base up. That last piece is what lets two
+  rings STACK rather than reading as one band of triangles. 30 peaks became 135,
+  for 2.8k triangles.
+- **The sea** was a single quad — two triangles, one flat colour, with the only
+  depth cue coming from the darkened bed showing through it. It is now a 128x128
+  sheet carrying a two-octave static swell and a per-vertex depth gradient. The
+  bed darkening had to come DOWN when that landed: doing the job twice, through
+  a translucent surface, made deep water black.
+- **Rocks and bushes** were detail-0 solids. Subdividing them alone would have
+  made them spheres — more triangles for a worse rock — so `craggy()` displaces
+  each vertex along its own radius by a hash of its position, which keeps the
+  facets hard while stopping any two agreeing on a plane.
+
+Terrain went 160/170 to 224 (2x the triangles), and the tree and trunk segment
+counts up with it. Measured under the headless software rasteriser, which
+over-weights fill and is NOT a GPU figure: harbour 228k to 303k triangles,
+dustbowl 98k to 180k, draw calls unchanged.
+
+All three golden fingerprints moved, and it is worth saying exactly why they
+are allowed to: `verify:track` still proves `dustbowl.json` reproduces the
+original world exactly, and every component count in the golden file is
+byte-identical across all three tracks. The whole delta is the horizon's extra
+instances — +105, +85 and +75, matching the peak counts exactly.
+
 ### 5.5 State which specification governs which codebase — DONE
 
 Six normative documents — `RULES.md`, `NATURE.md`, `STRUCTURES.md`, `SCENES.md`,

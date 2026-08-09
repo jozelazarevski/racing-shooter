@@ -214,6 +214,7 @@ So the port is verbatim, comments included, and three files carry it:
 | `props/houseTemplates.ts` | `world/catalog.js` | `HOUSE_TEMPLATES` and the colour kits |
 | `props/boatParts.ts` | `track.js` | rig, deck gear, trawler gantry, coachroofs, fenders |
 | `props/wallTexture.ts` | `textures.js` | the window tile and its emissive companion |
+| `render/horizon.ts` | `world/sky.js` | the six skyline silhouettes and the massif placement |
 
 A settlement component is then a name and a sentence — `dwelling({ template:
 'cottageA', kit: 'dalmatia', … })` — with no geometry in it left to get wrong.

@@ -7,7 +7,7 @@
   "seed": 4711,
   "world": {
     "size": 900,
-    "meshRes": 160,
+    "meshRes": 224,
     "sdfRes": 220
   },
   "road": {

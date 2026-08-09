@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { PropTemplate, cylinderAt, standard } from './types';
 
 const limb = (angle: number, lean: number) => {
-  const g = cylinderAt(0.06, 0.12, 2.1, 5, 0);
+  const g = cylinderAt(0.06, 0.12, 2.1, 6, 0);
   g.rotateZ(lean);
   g.rotateY(angle);
   g.translate(0, 2.2, 0);
@@ -19,7 +19,7 @@ const deadTree: PropTemplate = {
   description: 'Bare trunk and limbs. Solid, and cheap — three parts.',
 
   build: () => [
-    { key: 'trunk', geometry: cylinderAt(0.16, 0.36, 3.6, 6, 0), material: standard(0x6b5b47, { flatShading: false }), castShadow: true,
+    { key: 'trunk', geometry: cylinderAt(0.16, 0.36, 3.6, 9, 0), material: standard(0x6b5b47, { flatShading: false }), castShadow: true,
       tint: (c) => new THREE.Color(0x6b5b47).offsetHSL(0, 0, c.rng.centered(0.05)) },
     { key: 'limbA', geometry: limb(0.4, 0.7), material: standard(0x6b5b47, { flatShading: false }), castShadow: true },
     { key: 'limbB', geometry: limb(2.6, -0.6), material: standard(0x60513f, { flatShading: false }), castShadow: true },

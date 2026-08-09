@@ -46,7 +46,7 @@ One JSON file — see `src/data/tracks/dustbowl.json` and the typed shape in
 | `water` | optional: one level, below which everything is under water |
 | `scenery` | per-layer scatter: which COMPONENT, how many, clearances, scale |
 | `props` | hand-placed components: what, where, rotation, scale |
-| `sky` | dome gradient, fog, sun, fill light, horizon mountains, clouds |
+| `sky` | dome gradient, fog, sun, fill light, horizon massifs, clouds |
 | `seed` | every scattered object derives from this — same seed, same world |
 
 The format is designed so `dustbowl.json` reproduces the pre-refactor world
@@ -96,6 +96,20 @@ lighthouse are IGNITE RALLY's shapes ported across rather than redesigned —
 see `COMPONENTS.md`. Regenerate these with
 `npm run make:shots` — they are rendered by the engine from the committed
 track, so they cannot describe a world that no longer exists.
+
+## The horizon
+
+`sky.mountains.count` is the number of **massifs**, not of peaks. A massif is a
+clump of three to six summits sharing one silhouette and one height band, and
+the ring is built as two: nearer hills in front, taller snow-catching peaks
+behind, each fading into the world's own fog colour from the base up.
+
+It reads that way because it was a ring of five-sided cones, evenly spaced,
+and the sister game had already written down why that never works — *"a scaled
+pyramid is a pyramid"*. Six silhouettes came across with it: pyramid, spire,
+dome, mesa, horn and a saw-tooth ridge. A track may name its own set in
+`sky.mountains.forms`; one that does not gets a set from its seed, so two
+worlds are not ringed by the same mountains.
 
 ## Components — see `COMPONENTS.md`
 

@@ -206,6 +206,31 @@ export function mergeGeoms(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return out;
 }
 
+/** ROUGHEN A SHAPE, without rounding it off.
+ *
+ *  A rock is a Dodecahedron. Subdividing one to get more polygons just makes it
+ *  a SPHERE — more triangles and a worse rock — so the extra detail has to buy
+ *  irregularity rather than smoothness. Every vertex is pushed along its own
+ *  radius by a hash of where it is, which keeps the facets flat and hard but
+ *  stops any two faces agreeing on a plane.
+ *
+ *  The hash is a function of position, not a random stream: the same shape
+ *  comes out of every build, and it does not matter what order geometries are
+ *  created in. */
+export function craggy(g: THREE.BufferGeometry, amount: number): THREE.BufferGeometry {
+  const p = g.getAttribute('position') as THREE.BufferAttribute;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    const n = Math.sin(v.x * 12.9898 + v.y * 78.233 + v.z * 37.719) * 43758.5453;
+    const k = 1 + (n - Math.floor(n) - 0.5) * 2 * amount;
+    p.setXYZ(i, v.x * k, v.y * k, v.z * k);
+  }
+  p.needsUpdate = true;
+  g.computeVertexNormals();
+  return g;
+}
+
 /** Merge geometries KEEPING UVs.
  *
  *  `mergeGeoms` drops them on purpose — nothing in the library was textured, and

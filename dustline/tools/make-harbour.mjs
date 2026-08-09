@@ -233,7 +233,7 @@ const track = {
     + 'settlement component sets as content.',
   seed: 1852,
 
-  world: { size: 900, meshRes: 170, sdfRes: 220 },
+  world: { size: 900, meshRes: 224, sdfRes: 220 },
   road: { points, halfWidth: 7, blend: 17, samples: SAMPLES },
   start: { padRadius: 46, padSurface: 'tarmac', tuningRings: false },
 
@@ -246,7 +246,7 @@ const track = {
     },
   },
 
-  water: { level: WATER, color: '#3f8aa4', deep: '#0f3348', deepAt: 8, opacity: 0.8 },
+  water: { level: WATER, color: '#3f8aa4', deep: '#124a66', deepAt: 8, opacity: 0.8 },
 
   surfaces: {
     road: 'tarmac',

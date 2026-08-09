@@ -26,7 +26,7 @@ const palm: PropTemplate = {
         const segs = [];
         for (let i = 0; i < 7; i++) {
           const t = i / 7;
-          const g = cylinderAt(0.2 - t * 0.06, 0.24 - t * 0.06, 0.68, 7, i * 0.62);
+          const g = cylinderAt(0.2 - t * 0.06, 0.24 - t * 0.06, 0.68, 9, i * 0.62);
           g.translate(Math.sin(t * 1.5) * 0.35, 0, 0);
           segs.push(g);
         }

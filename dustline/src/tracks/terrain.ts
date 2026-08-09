@@ -340,9 +340,12 @@ export class Terrain {
     // rather than as a blue sheet laid over a field.
     const w = def.water;
     if (w && h < w.level) {
+      // Lighter than it was. The water SURFACE now carries a depth gradient of
+      // its own, so the bed only has to stop reading as a meadow under glass —
+      // doing the whole job twice made deep water black.
       const depth = THREE.MathUtils.clamp((w.level - h) / Math.max(0.5, w.deepAt), 0, 1);
-      out.lerp(new THREE.Color(w.deep), 0.35 + 0.45 * depth);
-      out.offsetHSL(0, 0.05 * depth, -0.06 * depth);
+      out.lerp(new THREE.Color(w.deep), 0.22 + 0.3 * depth);
+      out.offsetHSL(0, 0.04 * depth, -0.04 * depth);
     }
     return out;
   }
@@ -473,23 +476,61 @@ export class Terrain {
     added.push(road);
 
     // ---- standing water ----------------------------------------------------
-    // One plane at the water level, spanning the world. Deliberately simple:
-    // the depth reading comes from the darkened bed underneath (see colorAt),
-    // so the surface itself only has to be a translucent sheet with a colour.
+    //
+    // A SEA IS NOT ONE QUAD. The first cut was a single 1x1 plane: two
+    // triangles, one flat colour, and the only thing telling you where the
+    // shallows were was the darkened bed showing through it. From the quay
+    // that reads as a sheet of blue plastic laid over the beach.
+    //
+    // Three things fix it, and all three are cheap because they are vertex
+    // work on a grid nothing collides with:
+    //
+    //   SWELL — a two-octave standing wave, ~15 cm and ~20 m across. It is
+    //     STATIC, not animated: at this scale it reads as surface texture
+    //     rather than frozen waves, and animating it would mean the water
+    //     owned an update hook, which is how every prop ends up with one.
+    //   DEPTH COLOUR — per vertex, from the bed under it. This is what makes
+    //     a shoreline read: the shallows go pale over the sand, the channel
+    //     goes dark, and the gradient between them is where the beach is.
+    //   A SHORE FADE — the surface goes transparent as it meets the land, so
+    //     the waterline is a wet margin instead of a cut edge.
     if (def.water) {
-      const wGeo = new THREE.PlaneGeometry(SIZE * 1.4, SIZE * 1.4, 1, 1);
+      const W = def.water;
+      const SEG = 128;                       // 32k triangles, no collider
+      const span = SIZE * 1.4;
+      const wGeo = new THREE.PlaneGeometry(span, span, SEG, SEG);
       wGeo.rotateX(-Math.PI / 2);
+      const wp = wGeo.getAttribute('position') as THREE.BufferAttribute;
+      const wc = new Float32Array(wp.count * 3);
+      const shallow = new THREE.Color(W.color);
+      const deep = new THREE.Color(W.deep);
+      const c = new THREE.Color();
+      for (let i = 0; i < wp.count; i++) {
+        const x = wp.getX(i), z = wp.getZ(i);
+        wp.setY(i, Math.sin(x * 0.31 + z * 0.17) * 0.09 + Math.sin(x * 0.11 - z * 0.19 + 2.1) * 0.06);
+        const d = W.level - this.heightAt(x, z);
+        // Linear, and capped short of the full deep colour. Squaring it looked
+        // right in isolation and came out near-black in the world, because the
+        // BED is darkened too (see colorAt) and the two multiply through a
+        // translucent surface. Between them the channel was swallowing the
+        // middle distance.
+        const t = THREE.MathUtils.clamp(d / Math.max(0.5, W.deepAt), 0, 1);
+        c.copy(shallow).lerp(deep, t * 0.88);
+        wc[i * 3] = c.r; wc[i * 3 + 1] = c.g; wc[i * 3 + 2] = c.b;
+      }
+      wGeo.setAttribute('color', new THREE.BufferAttribute(wc, 3));
+      wGeo.computeVertexNormals();
       const water = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({
-        color: new THREE.Color(def.water.color),
+        vertexColors: true,
         transparent: true,
-        opacity: def.water.opacity,
+        opacity: W.opacity,
         roughness: 0.18,
         metalness: 0.25,
         // Off, on purpose. With depthWrite on, the translucent surface hides
         // whatever is drawn after it — including every boat sitting on it.
         depthWrite: false,
       }));
-      water.position.y = def.water.level;
+      water.position.y = W.level;
       water.renderOrder = 1;
       scene.add(water);
       added.push(water);

@@ -13,9 +13,9 @@ const rockSpire: PropTemplate = {
   build: () => [{
     key: 'body',
     geometry: mergeGeoms([
-      cylinderAt(0.9, 1.5, 3.2, 6, 0),
-      cylinderAt(0.62, 0.95, 2.6, 6, 3.1),
-      cylinderAt(0.3, 0.66, 1.8, 6, 5.6),
+      cylinderAt(0.9, 1.5, 3.2, 9, 0),
+      cylinderAt(0.62, 0.95, 2.6, 9, 3.1),
+      cylinderAt(0.3, 0.66, 1.8, 9, 5.6),
     ]),
     material: standard(0x9a8874, { roughness: 0.98 }),
     castShadow: true,

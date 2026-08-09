@@ -7,7 +7,7 @@
   "seed": 1852,
   "world": {
     "size": 900,
-    "meshRes": 170,
+    "meshRes": 224,
     "sdfRes": 220
   },
   "road": {
@@ -152,7 +152,7 @@
   "water": {
     "level": -7,
     "color": "#3f8aa4",
-    "deep": "#0f3348",
+    "deep": "#124a66",
     "deepAt": 8,
     "opacity": 0.8
   },
