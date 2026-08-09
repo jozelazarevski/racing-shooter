@@ -2137,20 +2137,26 @@ const THEMES = {
     // so it is matched at the far end and pushed out at the near end — this is
     // the 140 m sight-line region and the road has to stay readable a long way
     // out (checklist R12)
-    fogColor: 0xd8d0b8, fogNear: 380, fogFar: 1650,
+    // THE AIR IS NOT THE GROUND. Fog, haze, sky horizon, terrain and the
+    // house walls all sat inside one narrow beige band, so a hillside view
+    // was a single cream sheet with orange roofs floating in it - the walls
+    // dissolved into the fog and the roofs were the only thing left. Real
+    // Mediterranean distance haze is a milky blue-grey; the limestone stays
+    // warm, and now it reads AGAINST the air instead of into it.
+    fogColor: 0xc9d3d1, fogNear: 380, fogFar: 1650,
     hemiSky: 0xbcd8f0, hemiGround: 0xa89a72, hemiIntensity: 0.74,
     // 5300 K key at 108000 lux: the brightest, warmest-white sun on the roster
     sunColor: 0xfff0d2, sunIntensity: 2.95,
-    skyTop: '#2f7fd1', skyHorizon: '#ddd6be', sunGlow: 0xffeec8,
+    skyTop: '#2f7fd1', skyHorizon: '#c6d7dd', sunGlow: 0xffeec8,
     // Bible: azimuth 250°, elevation 58° — high, hard, slightly behind the
     // right shoulder on the seafront run (radians, as the engine wants)
     sunAz: 4.36, sunEl: 1.01,
     // a Mediterranean summer sky is nearly empty; what cloud there is sits high
     cloudCount: 5, cloudOpacity: 0.72, cloudTint: 0xfff6e4,
     // sea haze on the coastal half of the lap, read as a warm pale band
-    hazeColor: 0xe0d8c0, hazeOpacity: 0.82,
+    hazeColor: 0xd2dcd8, hazeOpacity: 0.82,
     // dry maquis low, limestone dust high — ground base #B9A47E is the middle
-    terrainLow: '#8f9059', terrainHigh: '#b9a47e', terrainDirt: '#c4b088',
+    terrainLow: '#7c874d', terrainHigh: '#b9a47e', terrainDirt: '#a8905f',
     terrainScree: '#cabf9f', hutGlow: 0.32,             // hot sun, dim windows
     skirtColor: '#c2b28c',                              // cut limestone shoulder
     ground: {
@@ -2172,7 +2178,7 @@ const THEMES = {
       stoneA: 'rgba(192,184,162,0.30)', stoneB: 'rgba(50,48,44,0.55)',
       fringe: [150, 140, 96], fringeVar: [36, 34, 26],  // dry ochre verge
     },
-    hillColor: 0xa39a6a, peakColor: 0xdcd0b0,           // dry hills, limestone tops
+    hillColor: 0x8f9160, peakColor: 0xdcd0b0,           // dry olive hills, limestone tops
     // FLORA. Olive/cypress/cork oak/umbrella pine — see _buildOliveGrove.
     treeCount: 510, trunkColor: 0x8a7a5e,               // grey olive wood
     foliageLow: 0x6e7a4e, foliageTop: 0x8f9a6c,         // foliage mid → silvered
@@ -3637,9 +3643,14 @@ const ELEMENT_KITS = {
   // silhouette. `stoneWalls: 8` is the highest on the roster: dry stone
   // boundaries running across the terraces are half the region's identity.
   medhill: {
-    wall: 0xe0d6c0, wall2: 0xd0c2a4, roof: 0xb4552e, trim: 0xc0532e, stone: 0xc4b896,
+    // WALLS THAT ARE NOT THE GROUND. wall 0xe0d6c0 against fog 0xd8d0b8 and
+    // dirt 0xc4b088 meant the walls of every hillside house dissolved into
+    // the haze and its orange roof floated alone in mid-air - reported twice,
+    // with photographs, as "floating buildings". Bright limewash and dusty
+    // ochre now, over a plinth dark enough to seat the house on the ground.
+    wall: 0xf6efe0, wall2: 0xcf9257, roof: 0xb4552e, trim: 0xc0532e, stone: 0x9d9178,
     builds: ['house', 'house', 'barn', 'shed'], landmarks: ['chapel'],
-    dress: ['well'], fenceColor: 0xc8bb96, stoneWalls: 8,
+    dress: ['well'], fenceColor: 0x8f8264, stoneWalls: 8,
   },
   // OLD TOWN NIGHT: what the world is dressed with BEYOND the street frontage
   // — the outer quarters, seen across the rooftops. Muted ochre render under
@@ -10614,6 +10625,40 @@ export class Track {
     if (mk) this.group.add(posts, bands);
   }
 
+  /** STEEP GROUND IS ROCK, NOT PAINT.
+   *
+   *  The terrain bake colours by HEIGHT alone - lerp low to high, clamped -
+   *  so any hillside above the ramp's ceiling came out as ONE flat colour. On
+   *  OLIVE COAST a whole slope filled the player's screen as a single
+   *  featureless sheet, the same beige as the fog and the sky, with nothing
+   *  on it to say "this is ground" at all. Real slopes shed their soil: past
+   *  about 24 degrees the colour now pulls toward a darker rock tone derived
+   *  from the theme's own high colour, so a face breaks into shaded form and
+   *  a cutting shows earth. Slope comes from grid-neighbour differencing on
+   *  the already-computed heights - no extra height samples, build-time only.
+   */
+  _slopeRock(pos, colors, cHigh) {
+    const W = Math.round(Math.sqrt(pos.count));
+    if (W * W !== pos.count) return;
+    const cell = Math.abs(pos.getX(1) - pos.getX(0)) || 1;
+    const rock = cHigh.clone().multiplyScalar(0.60);
+    const tmp = new THREE.Color();
+    for (let iz = 0; iz < W; iz++) {
+      for (let ix = 0; ix < W; ix++) {
+        const i = iz * W + ix;
+        const y0 = pos.getY(i);
+        const yx = pos.getY(iz * W + (ix + 1 < W ? ix + 1 : ix - 1));
+        const yz = pos.getY((iz + 1 < W ? iz + 1 : iz - 1) * W + ix);
+        const slope = Math.max(Math.abs(yx - y0), Math.abs(yz - y0)) / cell;
+        const k = THREE.MathUtils.smoothstep(slope, 0.45, 1.15) * 0.52;
+        if (k < 0.02) continue;
+        tmp.setRGB(colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2]);
+        tmp.lerp(rock, k);
+        colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
+      }
+    }
+  }
+
   /** Shared top-lit rock geometry: a dodecahedron with a baked vertex-color
    *  brightness gradient (dark underside → sun-catching crown) that multiplies
    *  whatever material/instance color rides on top. */
@@ -11456,8 +11501,14 @@ export class Track {
           tmp.lerp(band, THREE.MathUtils.clamp(cut / 6, 0, 1) * 0.94);
         }
       }
+      // facet life: a per-vertex tone wobble (deterministic, rebuild-stable)
+      // so gentle ground that saturates the height ramp still breaks into a
+      // soft patchwork instead of one flat sheet
+      const tj = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+      tmp.multiplyScalar(0.92 + (tj - Math.floor(tj)) * 0.13);
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
     }
+    this._slopeRock(pos, colors, cHigh);
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
     const REPEAT = SIZE / UNITS_PER_TILE;        // same texel density as before
@@ -11527,8 +11578,14 @@ export class Track {
       const dirt = Math.max(0, Math.sin(x * 0.045 + 2) * Math.sin(z * 0.05) - 0.72) * 3;
       tmp.lerp(cDirt, THREE.MathUtils.clamp(dirt, 0, 0.55));
       tmp.multiplyScalar(0.93 + 0.07 * t);      // matches the near patch
+      // facet life: a per-vertex tone wobble (deterministic, rebuild-stable)
+      // so gentle ground that saturates the height ramp still breaks into a
+      // soft patchwork instead of one flat sheet
+      const tj = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+      tmp.multiplyScalar(0.92 + (tj - Math.floor(tj)) * 0.13);
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
     }
+    this._slopeRock(pos, colors, cHigh);
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
     const REPEAT = size / unitsPerTile;
