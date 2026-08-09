@@ -1206,7 +1206,20 @@ const THEMES = {
     weather: { type: 'dust', color: 0xc9a06a },
     elev: { amp: 6, ph: [0.3, 3.7, 1.9] },              // gentle canyon-floor undulation
     rampMaxCurv: 0.02, padMaxCurv: 0.0075, boardMaxCurv: 0.018,
-    cliffWalls: true, cliffSetback: 26, cliffHeight: 30,
+    cliffWalls: true, cliffSetback: 26, cliffHeight: 30, cliffRimNotch: 1.0,
+    // the canyon ran on the GENERIC tan default - the one cliffWalls theme
+    // with no palette of its own. Six bands off the theme's own rock/peak/
+    // terrain tones: ochre, rust anchor, deep rust, the pale caliche standout
+    // layer the reference shows, and two tones shared with the gorge STRATA
+    // so walls and terrain cuts read as the same geology.
+    cliffPalette: {
+      bands: ['#d9a268', '#b5744a', '#8f4f2e', '#ead9ae', '#c98b52', '#a45f34'],
+      seam: 'rgba(70,42,24,0.55)',
+      // v is world-locked now (see _cliffRibbon): the canvas's baked rim
+      // bleach and talus stripes would sit at absolute height rather than on
+      // the rim/foot, so they are off here - vertex colours carry both.
+      bleach: 'rgba(0,0,0,0)', talus: 'rgba(0,0,0,0)',
+    },
     horizon: 'mesa', bridgeCount: 3, oasis: true, outcrops: true,
     obstacleSpec: { count: 6, style: 'hoodoo' }, puddleCount: 5,
   },
@@ -3369,6 +3382,31 @@ export const HOUSE_TEMPLATES = {
     ['box', 0, 3.2, 0.35, 5.8, 0.35, 4.9, 'roof'],           // lean-to roof
     ['box', 0, 0.1, 2.2, 1.3, 2.4, 0.28, 'trim'],
   ] },
+  // PUEBLO RUIN: the broken fortress silhouette from the player's canyon
+  // reference, standing on the mesa rim. All masonry is kind 'box'/'cyl' -
+  // NEVER kind 'wall', whose bucket carries the emissive window map, and a
+  // ruin with lit windows is a haunted house. Roofless main block, stepped
+  // lower block, breached curtain wall with a doorway gap, a collapsed round
+  // tower under a ragged cap, protruding viga beams (the adobe motif), and
+  // tumbled rubble. _element's per-placement stretch/mirror/shade means the
+  // same ruin never reads twice.
+  puebloRuin: { r: 8.5, mat: 'stone', parts: [
+    ['box', 0, 0, 0, 10.5, 0.6, 8.5, 'stone'],               // rubble plinth
+    ['box', -1.4, 0.6, -0.6, 6.0, 4.6, 6.4, 'wall'],         // roofless main block
+    ['box', -2.6, 5.2, -2.2, 3.4, 0.7, 0.9, 'wall2'],        // broken parapet
+    ['box', 2.9, 0.6, 1.2, 4.6, 2.9, 5.2, 'wall2'],          // stepped lower block
+    ['box', -0.2, 0.6, 3.6, 4.2, 3.2, 0.7, 'wall'],          // curtain wall A
+    ['box', 4.5, 0.6, 3.4, 2.6, 2.2, 0.7, 'wall'],           // curtain wall B (gap = gate)
+    ['cyl', -4.2, 0.6, 2.4, 3.4, 6.4, 3.4, 'stone'],         // collapsed tower stump
+    ['cyl', -4.2, 6.9, 2.4, 3.7, 0.6, 3.7, 'trim'],          // ragged cap ring
+    ['cyl', -3.2, 4.4, 2.6, 0.3, 1.3, 0.3, 'trim', Math.PI / 2],   // vigas
+    ['cyl', 0.4, 4.0, 2.6, 0.3, 1.3, 0.3, 'trim', Math.PI / 2],
+    ['cyl', 2.2, 2.8, 3.9, 0.3, 1.3, 0.3, 'trim', Math.PI / 2],
+    ['box', 3.6, 0.6, -2.6, 1.7, 1.1, 1.4, 'stone'],         // tumbled blocks
+    ['box', -4.6, 0.6, -1.8, 1.3, 0.9, 1.1, 'stone'],
+    ['cone', 1.2, 0.6, -3.4, 2.6, 1.7, 2.6, 'stone'],        // scree heap
+  ] },
+
   adobe: { r: 5.7, parts: [
     ['wall', 0, 0, 0, 8.6, 4.2, 7.2, 'wall'],
     ['box', 0, 4.2, 0, 9.1, 0.7, 7.7, 'wall'],               // parapet
@@ -3609,6 +3647,7 @@ const ELEMENT_KITS = {
     wall: 0xdcbd90, wall2: 0xc09a68, roof: 0xa8794a, trim: 0x6a4a2c, stone: 0xb08a5c,
     builds: ['adobe', 'adobe', 'shed'], landmarks: ['watchtower', 'well'],
     dress: ['well', 'logpile'], fenceColor: 0xc9a06a, stoneWalls: 4,
+    ruin: 'puebloRuin',
   },
   jungle: {
     wall: 0xac9660, wall2: 0x8a7a44, roof: 0x6f8a38, trim: 0x5a4a28, stone: 0x6a7a5a,
@@ -3642,6 +3681,7 @@ const ELEMENT_KITS = {
   // pantiles, and the chapel with its bell gable as the one landmark
   // silhouette. `stoneWalls: 8` is the highest on the roster: dry stone
   // boundaries running across the terraces are half the region's identity.
+  // (the desert worlds' shared ruin flag lives on the kit, see placement)
   medhill: {
     // WALLS THAT ARE NOT THE GROUND. wall 0xe0d6c0 against fog 0xd8d0b8 and
     // dirt 0xc4b088 meant the walls of every hillside house dissolved into
@@ -3951,7 +3991,14 @@ export class Track {
       critters: T.critters,      // { kind: 'scorpion'|'rat', count }
     };
     // levels are self-contained: fog is set here (main.js may re-apply from theme)
-    scene.fog = new THREE.Fog(T.fogColor, T.fogNear, T.fogFar);
+    // AERIAL PERSPECTIVE STARTS CLOSER. Fog is the only depth cue that works
+    // on every world, and it used to start ~320-520 u out - past most of what
+    // the player looks at. Pulling the near plane in by a quarter layers the
+    // mid-ground without touching the far limit. Computed LOCALLY - never
+    // written back to T, because a theme object is shared across rebuilds and
+    // a *= would compound every restart.
+    const fogNear = Math.max(T.fogNear * 0.72, Math.min(T.fogNear, 190));
+    scene.fog = new THREE.Fog(T.fogColor, fogNear, T.fogFar);
 
     // EVERYTHING the track builds goes in here, nothing straight into the
     // scene. That is what makes a level swappable without reloading the page:
@@ -5675,6 +5722,18 @@ export class Track {
       + Math.sin(9 * t + ph) * 2.6
       + Math.sin(23 * t + 1.3 - ph) * 1.5
       + Math.sin(61 * t + 4.1 + ph) * 0.9;       // ≈14–22 when fully walled
+    // A MESA RIM IS CASTELLATED, NOT WAVY. Erosion bays cut flat-bottomed
+    // notches into the skyline and the odd tower stands proud - which is most
+    // of the reference's "ruined fortress" mood before any building exists.
+    // Integer frequencies keep the seam-closure contract above, and because
+    // the rim cacti query THIS function, they follow the new skyline free.
+    const notch = this.T.cliffRimNotch ?? 0;
+    if (notch > 0) {
+      const nb = THREE.MathUtils.smoothstep(Math.sin(29 * t + 2.6 * ph), 0.55, 0.9);
+      h -= notch * nb * nb * (this.T.cliffHeight ?? 18) * 0.45;
+      const tw = THREE.MathUtils.smoothstep(Math.sin(53 * t - 1.7 * ph), 0.78, 0.97);
+      h += notch * tw * tw * 5;
+    }
     h = Math.max(1.7, h * gap);                  // low stone berm through the gap
     // cliffSetback pushes the faces off the verge: the corridor becomes a
     // DEEP VALLEY with a drivable floor, not a walled slot ("don't build
@@ -5690,7 +5749,24 @@ export class Track {
     const rows = 5;                       // base, mid, rim edge, rim plateau, outer ground
     const verts = new Float32Array((N + 1) * rows * 3);
     const uvs = new Float32Array((N + 1) * rows * 2);
+    const cols = new Float32Array((N + 1) * rows * 3);
     const idx = [];
+    // STRATA ARE HORIZONTAL IN THE WORLD, NOT ON THE WALLPAPER. The v
+    // coordinate used to be a fraction of the LOCAL wall height, so the bands
+    // stretched with the profile swing and rode up and down with the road -
+    // wallpaper glued to a ribbon. v now maps WORLD height across the wall's
+    // global extremes, so the rim rises and falls THROUGH the layers the way
+    // sedimentary rock actually does. One deterministic prepass finds the
+    // extremes; the texture's own baked bleach/talus stripes stop tracking
+    // the rim, so rim light and talus shade move into vertex colours below.
+    let yMin = Infinity, yMax = -Infinity;
+    for (let j = 0; j < N; j++) {
+      const base = this.center[j].y;
+      const Pp = this._cliffProfile(j, side);
+      if (base < yMin) yMin = base;
+      if (base + Pp.h > yMax) yMax = base + Pp.h;
+    }
+    const ySpan = Math.max(1, yMax - yMin);
     // deterministic per-vertex jitter, identical at the i=0 / i=N seam
     const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
     for (let i = 0; i <= N; i++) {
@@ -5709,13 +5785,20 @@ export class Track {
       ];
       const u = (i * this.segLen) / 20;
       for (let r = 0; r < rows; r++) {
-        const [lat, y, v] = rowSpec[r];
+        const [lat, y] = rowSpec[r];
         const o = (i * rows + r) * 3;
         verts[o] = c.x + n.x * lat * side;
         verts[o + 1] = c.y + y;                // cliffs base at (and ride) the road y
         verts[o + 2] = c.z + n.z * lat * side;
         uvs[(i * rows + r) * 2] = u;
-        uvs[(i * rows + r) * 2 + 1] = v;
+        // world-height v: 0 at the lowest wall foot anywhere on the lap, 1 at
+        // the highest rim - horizontal geology by construction
+        uvs[(i * rows + r) * 2 + 1] = 0.02 + 0.96
+          * THREE.MathUtils.clamp((c.y + y - yMin) / ySpan, 0, 1);
+        // rim light / talus shade / per-column life, never above 1.0
+        const shade = (r === 2 || r === 3 ? 1.0 : r === 1 ? 0.95 : 0.83)
+          * (0.96 + jt(r + 11) * 0.08);
+        cols[o] = cols[o + 1] = cols[o + 2] = Math.min(1, shade);
       }
     }
     for (let i = 0; i < N; i++) {
@@ -5727,10 +5810,11 @@ export class Track {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     geo.setIndex(idx);
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-      map: tex, roughness: 1, side: THREE.DoubleSide,
+      map: tex, roughness: 1, side: THREE.DoubleSide, vertexColors: true,
     }));
     mesh.receiveShadow = true;
     this.group.add(mesh);
@@ -7805,13 +7889,26 @@ export class Track {
       // rocks it between green-turquoise and blue. 5 % was invisible.
       const fsh = Math.sin(cx * 17.2318 + cz * 3.7135) * 24634.6345;
       const tsh = Math.sin(cx * 4.8891 + cz * 21.4471) * 13571.1357;
-      const j = 1 + (fsh - Math.floor(fsh) - 0.5) * 0.3 * fade;
-      const tw = (tsh - Math.floor(tsh) - 0.5) * 0.19 * fade;
+      // THE SHALLOWS ARE THE NEAREST WATER TO EVERY CAMERA and were the
+      // flattest, because the vertex bob is deliberately damped there to pin
+      // the waterline. Louder COLOUR jitter restores the facet read without
+      // moving a vertex, and a milky lerp at the waterline gives the foam
+      // dashes water that looks like it made them.
+      const rdu = cx - mx, rdz = cz - mz;
+      const dnF = rdu * nx + rdz * nz;
+      const shallow = dnF > 1 && dnF < 55 ? 1.35 : 1;
+      const j = 1 + (fsh - Math.floor(fsh) - 0.5) * 0.3 * fade * shallow
+        + (shallow > 1 ? 0.03 : 0);
+      const tw = (tsh - Math.floor(tsh) - 0.5) * 0.19 * fade * shallow;
+      const milk = dnF > 0 && dnF < 8 ? 0.15 * (1 - dnF / 8) : 0;
       for (let v = 0; v < 3; v++) {
-        fcol.setXYZ(f + v,
-          Math.min(1, fcol.getX(f + v) * j * (1 - tw * 0.7)),
-          Math.min(1, fcol.getY(f + v) * j * (1 + tw)),
-          Math.min(1, fcol.getZ(f + v) * j * (1 - tw * 0.5)));
+        let r2 = fcol.getX(f + v) * j * (1 - tw * 0.7);
+        let g2 = fcol.getY(f + v) * j * (1 + tw);
+        let b2 = fcol.getZ(f + v) * j * (1 - tw * 0.5);
+        if (milk > 0) {
+          r2 += (0.92 - r2) * milk; g2 += (0.965 - g2) * milk; b2 += (0.95 - b2) * milk;
+        }
+        fcol.setXYZ(f + v, Math.min(1, r2), Math.min(1, g2), Math.min(1, b2));
       }
     }
     geo.computeVertexNormals();
@@ -7827,7 +7924,9 @@ export class Track {
 
     // SURF: two foam bands hugging the waterline - a bright broken line at
     // the beach and a fainter one a few metres out
-    for (const [dn, w, op] of [[2.2, 1.5, 0.5], [9, 0.9, 0.2]]) {
+    // one bright ribbon only: the old 0.2-opacity outer band was invisible
+    // and cost a draw; the broken outer line is dashes now (see WAVE CRESTS)
+    for (const [dn, w, op] of [[2.2, 1.5, 0.5]]) {
       const segs = 64;
       const fverts = new Float32Array((segs + 1) * 2 * 3);
       for (let c2 = 0; c2 <= segs; c2++) {
@@ -7856,11 +7955,25 @@ export class Track {
       this.group.add(foam);
     }
 
-    // ISLETS: a few rock stacks standing out of the bay
-    const isle = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(1, 1, 6),
-      new THREE.MeshStandardMaterial({ color: 0x9a8f7c, flatShading: true, roughness: 1 }),
-      4);
+    // ISLETS: craggy rock stacks, not traffic cones - a wet-band clone of the
+    // shared top-lit rock geometry whose baked gradient darkens below local
+    // y ~= -0.1, so the tide line comes free with the vertex colours
+    const wetRock = (detail) => {
+      const g2 = this._topLitRockGeo(detail).clone();
+      const pp = g2.attributes.position, cc = g2.attributes.color;
+      for (let vi = 0; vi < pp.count; vi++) {
+        if (pp.getY(vi) < -0.1) {
+          const dk = 0.34 + 0.16 * (pp.getY(vi) + 1);
+          cc.setXYZ(vi, dk, dk, dk);
+        }
+      }
+      return g2;
+    };
+    const wetMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(this.T.rockColor ?? 0x8a8272).lerp(new THREE.Color(0x3c4448), 0.25),
+      flatShading: true, roughness: 0.95, vertexColors: true,
+    });
+    const isle = new THREE.InstancedMesh(wetRock(1), wetMat, 4);
     const im4 = new THREE.Matrix4();
     const iq = new THREE.Quaternion(), iup = new THREE.Vector3(0, 1, 0);
     const ISLES = [[-330, 120, 14, 9], [140, 180, 20, 13], [430, 240, 11, 7], [-90, 320, 26, 15]];
@@ -7873,6 +7986,7 @@ export class Track {
     }
     isle.castShadow = true;
     this.group.add(isle);
+
 
     // SAILS: little day boats moored in the bay. On a quay world (harbour)
     // a second flotilla moors CLOSE IN — sail boats and smaller rowing boats
@@ -7984,21 +8098,119 @@ export class Track {
     if (hulls.instanceColor) hulls.instanceColor.needsUpdate = true;
     this.group.add(hulls, bdecks, bmasts, sails, bjibs, bbooms, brigs, bcabs);
 
-    // WAVE CRESTS: broken white dashes drifting over the near bay
-    const CRESTS = 90;
+    // SEA ROCKS: near-shore outcrops with the same wet tide band. Placement
+    // rejects everything that matters: every flotilla mooring, every buoy,
+    // every isle, and on a quay world the whole marina/mole water. Only
+    // stacks a car can actually reach (shallow, big) become solid.
+    const seaRocks = new THREE.InstancedMesh(wetRock(0), wetMat, 48);
+    let srk = 0;
+    const srCol = new THREE.Color();
+    const srTaken = [];
+    const hsh2 = (n) => { const v = Math.sin(n * 12.9898) * 43758.5453; return v - Math.floor(v); };
+    for (let cand = 0; cand < 60 && srk < 30; cand++) {
+      const du = (hsh2(cand + 0.7) - 0.5) * (L + 480);
+      const dn = this.T.quay ? 48 + hsh2(cand + 1.3) * 72 : 16 + hsh2(cand + 1.3) * 54;
+      if (this.T.quay && du > 0.62 * L && dn < 70) continue;   // harbour mouth + mole
+      const bx = mx + ux * du + nx * dn, bz = mz + uz * du + nz * dn;
+      let clear = true;
+      for (const bt of BOATS) {
+        if (Math.hypot((bt[0] - du), (bt[1] - dn)) < 28) { clear = false; break; }
+      }
+      if (!clear) continue;
+      for (const t2 of srTaken) {
+        if (Math.hypot(t2[0] - du, t2[1] - dn) < 34) { clear = false; break; }
+      }
+      if (!clear) continue;
+      for (const [idu, idn, iw] of ISLES) {
+        if (Math.hypot(idu - du, idn - dn) < 40 + iw) { clear = false; break; }
+      }
+      if (!clear) continue;
+      srTaken.push([du, dn]);
+      const sscale = 1.2 + hsh2(cand + 2.9) * 3.4;
+      iq.setFromAxisAngle(iup, hsh2(cand + 4.1) * Math.PI * 2);
+      im4.compose(new THREE.Vector3(bx, y - sscale * 0.45, bz), iq,
+        new THREE.Vector3(sscale, sscale * (0.8 + hsh2(cand + 5.3) * 0.7), sscale * 0.85));
+      seaRocks.setMatrixAt(srk, im4);
+      srCol.setScalar(0.82 + hsh2(cand + 6.7) * 0.24);
+      seaRocks.setColorAt(srk++, im4 && srCol);
+      // a shoulder lump beside the big ones
+      if (srk < 30 && sscale > 2.4) {
+        const la = hsh2(cand + 8.3) * Math.PI * 2;
+        im4.compose(new THREE.Vector3(bx + Math.cos(la) * sscale * 1.1, y - sscale * 0.4,
+          bz + Math.sin(la) * sscale * 1.1), iq,
+          new THREE.Vector3(sscale * 0.55, sscale * 0.4, sscale * 0.5));
+        seaRocks.setMatrixAt(srk, im4);
+        seaRocks.setColorAt(srk++, srCol);
+      }
+      if (dn <= 24 && sscale >= 2) {
+        this.solids.push({ x: bx, z: bz, r: sscale * 0.85, y, mat: 'stone' });
+      }
+    }
+    seaRocks.count = srk;
+    seaRocks.castShadow = true;
+    if (seaRocks.instanceColor) seaRocks.instanceColor.needsUpdate = true;
+    this.group.add(seaRocks);
+    // spare capacity for the lighthouse promontory (built after the sea)
+    this._seaRocks = { mesh: seaRocks, next: srk, wetRock, wetMat, im4, iq, iup };
+
+    // FOAM, ONE MESH, FOUR JOBS. The 90 open-bay dashes stay; the same
+    // InstancedMesh now also carries the broken waterline band the reference
+    // shows, a dimmer outer break line, and a surf ring around every isle and
+    // sea rock - about 480 instances, one draw call. Alpha variety comes from
+    // instanceColor (MeshBasicMaterial honours it): a dash tinted toward the
+    // theme's own sea colour reads as faded foam over that exact water.
+    const CRESTS = 500;
     const crest = new THREE.InstancedMesh(
       new THREE.BoxGeometry(3.4, 0.05, 0.32),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4,
         depthWrite: false }),
       CRESTS);
-    for (let k = 0; k < CRESTS; k++) {
-      const du = (Math.sin(k * 12.9898) * 0.5 + 0.5) * 2 - 1;
-      const dn2 = 14 + (Math.sin(k * 78.233) * 0.5 + 0.5) * 300;
-      const wx = mx + ux * du * 700 + nx * dn2, wz = mz + uz * du * 700 + nz * dn2;
-      iq.setFromAxisAngle(iup, Math.atan2(ux, uz) + Math.sin(k * 3.7) * 0.3);
-      im4.compose(new THREE.Vector3(wx, y + 0.05, wz), iq, new THREE.Vector3(1, 1, 1));
-      crest.setMatrixAt(k, im4);
+    const seaTint = new THREE.Color(this.T.seaColor ?? 0x3d7f9e);
+    const foamCol = new THREE.Color();
+    const cyaw = Math.atan2(ux, uz);
+    let ck2 = 0;
+    const dash = (du, dn2, yawJ, sx, sz, fade) => {
+      if (ck2 >= CRESTS) return;
+      const wx = mx + ux * du + nx * dn2, wz = mz + uz * du + nz * dn2;
+      iq.setFromAxisAngle(iup, cyaw + yawJ);
+      im4.compose(new THREE.Vector3(wx, y + 0.05, wz), iq, new THREE.Vector3(sx, 1, sz));
+      crest.setMatrixAt(ck2, im4);
+      foamCol.setRGB(1, 1, 1).lerp(seaTint, fade);
+      crest.setColorAt(ck2++, foamCol);
+    };
+    // (a) open-bay drift dashes - as before
+    for (let k = 0; k < 90; k++) {
+      dash((Math.sin(k * 12.9898) * 0.5 + 0.5) * 1400 - 700,
+        14 + (Math.sin(k * 78.233) * 0.5 + 0.5) * 300,
+        Math.sin(k * 3.7) * 0.3, 1, 1, 0.25);
     }
+    // (b) the waterline band: broken foam patches at the drawn shore
+    for (let k = 0; k < 170; k++) {
+      const du = -700 + k * (1400 / 170) + Math.sin(k * 7.31) * 3;
+      dash(du, 1.5 + (Math.sin(k * 12.9898) * 0.5 + 0.5) * 3.5,
+        Math.sin(k * 5.1) * 0.25,
+        0.5 + (Math.sin(k * 3.3) * 0.5 + 0.5) * 1.1,
+        1.2 + (Math.sin(k * 9.7) * 0.5 + 0.5) * 2.0,
+        0.10 + (Math.sin(k * 2.2) * 0.5 + 0.5) * 0.2);
+    }
+    // (c) the outer break line, dimmer
+    for (let k = 0; k < 110; k++) {
+      const du = -700 + k * (1400 / 110) + Math.sin(k * 4.7) * 5;
+      dash(du, 7 + (Math.sin(k * 6.9) * 0.5 + 0.5) * 7,
+        Math.sin(k * 8.3) * 0.3, 0.8, 1.4, 0.35 + (Math.sin(k * 3.1) * 0.5 + 0.5) * 0.15);
+    }
+    // (d) surf rings around every isle and sea rock
+    const ring = (cdu, cdn, rr) => {
+      for (let k = 0; k < 8; k++) {
+        const an = (k / 8) * Math.PI * 2;
+        dash(cdu + Math.cos(an) * rr, cdn + Math.sin(an) * rr,
+          an + Math.PI / 2 - cyaw, 0.7, 1.1, 0.2);
+      }
+    };
+    for (const [idu, idn, iw] of ISLES) ring(idu, idn, iw * 0.75);
+    for (const t2 of srTaken) ring(t2[0], t2[1], 4.5);
+    crest.count = ck2;
+    if (crest.instanceColor) crest.instanceColor.needsUpdate = true;
     this.group.add(crest);
 
     // harbour buoys
@@ -8333,7 +8545,9 @@ export class Track {
         const mole = new THREE.Group();
         // the pier: a long low block from the beach out into the bay, plus a
         // slightly wider cap slab so it reads as dressed stone from the quay
-        const runL = 40, runW = 6.5, top = lvl + 1.25;
+        // the mole shortens: the last stretch is ROCK now (below), so the
+        // dressed stone hands over to a natural promontory under the tower
+        const runL = 26, runW = 6.5, top = lvl + 1.25;
         const mcx = bx + nx * (runL / 2 - 6), mcz = bz + nz * (runL / 2 - 6);
         const pier = new THREE.Mesh(new THREE.BoxGeometry(runW, 5.2, runL), stone);
         pier.position.set(mcx, top - 2.6, mcz);
@@ -8345,8 +8559,47 @@ export class Track {
         pier.receiveShadow = slab.receiveShadow = true;
         mole.add(pier, slab);
         this.group.add(mole);
-        spot = { x: bx + nx * (runL - 10), z: bz + nz * (runL - 10), y: top + 0.3 };
+        spot = { x: bx + nx * (runL + 4), z: bz + nz * (runL + 4), y: top + 0.9, rocky: true };
       }
+    }
+    // THE LIGHT STANDS ON ROCK. The reference puts the tower on a rocky
+    // promontory with skerries off the point, not on a paved slab - so the
+    // spot gets a pile of wet-band sea rocks poured under and around it,
+    // written into the sea's spare instanced slots (the sea builds first).
+    if (spot && this._seaRocks) {
+      const SR = this._seaRocks;
+      const put = (px, pz, sx, sy, sz, seed) => {
+        if (SR.next >= SR.mesh.instanceMatrix.count) return;
+        SR.iq.setFromAxisAngle(SR.iup, seed * 2.39996);
+        SR.im4.compose(new THREE.Vector3(px, (C.level ?? -2) - sy * 0.35, pz),
+          SR.iq, new THREE.Vector3(sx, sy, sz));
+        SR.mesh.setMatrixAt(SR.next, SR.im4);
+        SR.mesh.setColorAt(SR.next++, new THREE.Color().setScalar(0.85 + (seed % 1) * 0.2));
+      };
+      const hsh = (n) => { const v = Math.sin(n * 12.9898) * 43758.5453; return v - Math.floor(v); };
+      for (let k = 0; k < 10; k++) {
+        const an = hsh(k + 0.3) * Math.PI * 2;
+        const rr = 3.5 + hsh(k + 1.7) * 6.5;
+        put(spot.x + Math.cos(an) * rr, spot.z + Math.sin(an) * rr,
+          2.2 + hsh(k + 2.9) * 3.4, 1.6 + hsh(k + 4.1) * 2.6, 2.0 + hsh(k + 5.3) * 2.8, k);
+      }
+      // skerries off the point
+      put(spot.x + nx * 14, spot.z + nz * 14, 2.6, 1.4, 2.2, 11);
+      put(spot.x + nx * 22 + ux * 6, spot.z + nz * 22 + uz * 6, 1.8, 1.0, 1.6, 12);
+      SR.mesh.count = SR.next;
+      if (SR.mesh.instanceColor) SR.mesh.instanceColor.needsUpdate = true;
+    }
+    // ...and the keeper lives beside it: one cottage through the shared
+    // element batches (realized later in _buildWorldElements - zero draws),
+    // on the landward side of the tower where the ground is real.
+    if (spot) {
+      const kitName = this.T.elements
+        || ELEMENT_KIT_BY_THEME[this.level && this.level.theme] || 'farm';
+      const K = ELEMENT_KITS[kitName] ?? ELEMENT_KITS.farm;
+      const cx2 = spot.x - nx * 9 + ux * 4, cz2 = spot.z - nz * 9 + uz * 4;
+      this._element(this._elemB(), 'cottageA', cx2, cz2,
+        Math.atan2(nx, nz) + Math.PI, K, 0.85,
+        spot.rocky ? spot.y - 0.2 : null);
     }
     if (!spot) {
       for (const du of [L * 0.92, L * 0.06, L * 0.75, L * 0.25]) {
@@ -9908,8 +10161,9 @@ export class Track {
    *  `_realizeElements`, and every builder that wants a building comes through
    *  here. That is the point — see the header on HOUSE_TEMPLATES for the two
    *  independent copies of the same roof bug that made it necessary. */
-  _element(B, type, x, z, rot, K, scale = 1) {
-    const y = this.terrainHeight(x, z) - 0.25;
+  _element(B, type, x, z, rot, K, scale = 1, yOverride = null) {
+    // == null catches undefined too - a caller passing undefined must not NaN
+    const y = (yOverride == null ? this.terrainHeight(x, z) : yOverride) - 0.25;
     const cs = Math.cos(rot), sn = Math.sin(rot);
     const T = HOUSE_TEMPLATES[type] ?? HOUSE_TEMPLATES.logpile;
     // NO TWO ALIKE: each placement gets its own footprint stretch, height,
@@ -10035,6 +10289,45 @@ export class Track {
         if (!p || !this._buildableSpot(p.x, p.z, 9, 2.6)) continue;
         this._element(B, type, p.x, p.z, Math.random() * Math.PI * 2, K);
         break;
+      }
+    }
+
+    // --- THE RUIN ON THE RIM. A canyon needs a destination, and the
+    // reference gives it one: a broken pueblo standing against the sky. On
+    // cliff worlds it goes on the RIM PLATEAU - the deterministic profile is
+    // queried for the tallest wall section clear of the start gap, and the
+    // ruin sits at rim height on the flat row of the ribbon, unreachable and
+    // silhouetted. On open desert worlds it crowns the highest buildable
+    // ground in the 60-140 u band instead.
+    if (K.ruin) {
+      if (this.T.cliffWalls) {
+        let best = null;
+        for (let c = 0; c < 24; c++) {
+          const i = (Math.random() * N) | 0;
+          if (this._circDist(i, 0) < 85) continue;
+          const side = Math.random() < 0.5 ? 1 : -1;
+          const prof = this._cliffProfile(i, side);
+          if (!best || prof.h > best.h) best = { i, side, ...prof };
+        }
+        if (best && best.h > 10) {
+          const lat = best.side * (best.base + best.l2 + 6.5);
+          const p = this.pointAt(best.i, lat);
+          const rimY = this.center[best.i].y + best.h * 0.97 - 0.3;
+          this._element(B, K.ruin, p.x, p.z,
+            this.headingAt(best.i) + Math.PI / 2, K, 1.2, rimY);
+        }
+      } else {
+        let best = null;
+        for (let c = 0; c < 24; c++) {
+          const p = this._trackSidePos(60, 140);
+          if (!p || !this._buildableSpot(p.x, p.z, 11, 4.5)) continue;
+          const h = this.terrainHeight(p.x, p.z);
+          if (!best || h > best.h) best = { p, h };
+        }
+        if (best) {
+          this._element(B, K.ruin, best.p.x, best.p.z,
+            Math.random() * Math.PI * 2, K, 1.35);
+        }
       }
     }
 
@@ -11732,10 +12025,25 @@ export class Track {
           horizon: { value: new THREE.Color(T.skyHorizon) },
           // < 1 lets the horizon glow reach higher (volcano's deep red haze)
           curve: { value: T.skyCurve !== undefined ? T.skyCurve : 1.0 },
+          // the sunGlow knob was authored in ~30 palettes and read by NOTHING
+          // since the sun sprite was banned. This is not that sprite: it is a
+          // forward-scatter lobe painted ON the BackSide dome at r=3000,
+          // behind all geometry and correctly occluded - it cannot smear over
+          // the road from the top-down camera the way the billboard did.
+          sunDir: { value: new THREE.Vector3(
+            Math.cos(T.sunAz ?? 0.68) * Math.cos(T.sunEl ?? 0.3),
+            Math.sin(T.sunEl ?? 0.3),
+            Math.sin(T.sunAz ?? 0.68) * Math.cos(T.sunEl ?? 0.3)) },
+          glow: { value: new THREE.Color(T.sunGlow ?? 0xfff2c8) },
         },
-        vertexShader: `varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-        fragmentShader: `uniform vec3 top; uniform vec3 horizon; uniform float curve; varying float vY;
-          void main(){ float t = pow(smoothstep(0.0, 0.5, max(vY, 0.0)), curve); gl_FragColor = vec4(mix(horizon, top, t), 1.0); }`,
+        vertexShader: `varying float vY; varying vec3 vDir; void main(){ vDir = normalize(position); vY = vDir.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+        fragmentShader: `uniform vec3 top; uniform vec3 horizon; uniform float curve; uniform vec3 sunDir; uniform vec3 glow; varying float vY; varying vec3 vDir;
+          void main(){
+            float t = pow(smoothstep(0.0, 0.5, max(vY, 0.0)), curve);
+            vec3 col = mix(horizon, top, t);
+            col += glow * pow(max(dot(vDir, sunDir), 0.0), 24.0) * (1.0 - t) * 0.55;
+            gl_FragColor = vec4(col, 1.0);
+          }`,
       })
     );
     this.group.add(sky);
@@ -11795,20 +12103,60 @@ export class Track {
     haze.name = 'haze-band';
     this.hazeBand = haze;
     this.group.add(haze);
-
-    const ctex = cloudTexture();
-    for (let i = 0; i < T.cloudCount; i++) {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: ctex, transparent: true, opacity: T.cloudOpacity, fog: false, depthWrite: false,
-        color: T.cloudTint !== undefined ? T.cloudTint : 0xffffff,
+    // a second, farther, fainter ring OUTSIDE the far peak ring: the skyline
+    // now stacks hills -> haze -> peaks -> haze -> sky, which is the banded
+    // aerial perspective the reference has. Hidden with the same camera
+    // toggle as ring one (main.js keys off hazeBand; ring two is its child
+    // in visibility terms via the shared name prefix check below).
+    const haze2 = new THREE.Mesh(
+      new THREE.CylinderGeometry(1450, 1450, 480, 48, 1, true),
+      new THREE.MeshBasicMaterial({
+        map: hazeTexture(),
+        color: new THREE.Color(T.hazeColor !== undefined ? T.hazeColor : T.fogColor)
+          .lerp(new THREE.Color(T.skyHorizon ?? '#dce8f0'), 0.4),
+        transparent: true, opacity: (T.hazeOpacity !== undefined ? T.hazeOpacity : 0.9) * 0.55,
+        side: THREE.BackSide, fog: false, depthWrite: false,
       }));
-      const a = (i / T.cloudCount) * Math.PI * 2 + Math.random();
-      const r = 550 + Math.random() * 500;
-      sp.position.set(Math.cos(a) * r, 190 + Math.random() * 160, Math.sin(a) * r);
-      const s = 160 + Math.random() * 180;
-      sp.scale.set(s, s * 0.5, 1);
+    haze2.position.y = 150;
+    haze2.name = 'haze-band-far';
+    this.hazeBand2 = haze2;
+    this.group.add(haze2);
+
+    // THE CLOUD FIELD. Still one sprite per cloud - and a sprite IS a draw
+    // call, so the count is held to 1.5x, not the 2.5x the design wanted.
+    // The full fix (one InstancedMesh billboard layer, which makes the whole
+    // sky ONE draw and would fund 30+ clouds) is designed and still open.
+    // What this pass buys: a squared size bias so the field is many small
+    // puffs under a few heroes, aspect and opacity ranges instead of two
+    // constants, far clouds sinking and fading toward the fog for recession,
+    // and sun-side clouds warmed by the sunGlow knob so the sky's light
+    // agrees with the shadow rig.
+    const ctex = cloudTexture();
+    const nClouds = Math.ceil(T.cloudCount * 1.5);
+    const fogC3 = new THREE.Color(T.fogColor ?? 0xcccccc);
+    const glowC3 = new THREE.Color(T.sunGlow ?? 0xfff2c8);
+    for (let i = 0; i < nClouds; i++) {
+      const rr = Math.random();
+      const a = (i / Math.max(1, nClouds)) * Math.PI * 2 + Math.random();
+      const r = 500 + Math.random() * 800;
+      const far2 = (r - 500) / 800;
+      const cTint = new THREE.Color(T.cloudTint !== undefined ? T.cloudTint : 0xffffff);
+      // warm rim on the sun's side of the compass
+      const sunSide = Math.max(0, Math.cos(a - (T.sunAz ?? 0.68)));
+      cTint.lerp(glowC3, 0.3 * sunSide);
+      cTint.lerp(fogC3, 0.35 * far2);                    // recession haze
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: ctex, transparent: true, fog: false, depthWrite: false,
+        opacity: T.cloudOpacity * (0.55 + 0.45 * Math.random()) * (1 - 0.35 * far2),
+        color: cTint,
+      }));
+      sp.position.set(Math.cos(a) * r,
+        (190 + Math.random() * 160) * (1 - 0.45 * far2) + 60 * far2,
+        Math.sin(a) * r);
+      const s = 120 + rr * rr * 260;
+      sp.scale.set(s, s * (0.38 + Math.random() * 0.24), 1);
       this.group.add(sp);
-      this.animated.clouds.push({ sprite: sp, speed: 1.5 + Math.random() * 2.5 });
+      this.animated.clouds.push({ sprite: sp, speed: (1.5 + Math.random() * 2.5) * (1 - 0.4 * far2) });
     }
   }
 
@@ -12438,6 +12786,36 @@ export class Track {
     const color = new THREE.Color();
     const F = T.foliage;
 
+    // A FOREST IS GROVES AND CLEARINGS, NOT CONFETTI. Uniform scatter reads
+    // as texture; the reference reads as PLACE because trees clump into
+    // stands with open ground between them. Same counts, same meshes, same
+    // draws - only WHERE changes: grove centres are drawn once, most trees
+    // pull toward their nearest grove, and a few clearing discs push
+    // everything out entirely.
+    const GROVES = [];
+    {
+      const nG = THREE.MathUtils.clamp(Math.round(COUNT / 50), 8, 16);
+      const belt = T.treeBelt;
+      for (let gI = 0; gI < nG; gI++) {
+        const p2 = gI % 5 < 3
+          // grove CENTRES stand well off the verge: a clump centred at 15 u
+          // walls the chase camera in (measured at PINE VALLEY station 640)
+          ? this._trackSidePos(34, (belt ? belt[1] : 46) + 26)
+          : (() => {
+              const a2 = Math.random() * Math.PI * 2;
+              const r2 = 80 + Math.random() * 480;
+              return { x: Math.cos(a2) * r2, z: Math.sin(a2) * r2 };
+            })();
+        if (p2) GROVES.push({ x: p2.x, z: p2.z, r: 26 + Math.random() * 30 });
+      }
+    }
+    const CLEARINGS = [];
+    for (let cI = 0; cI < 3 + ((Math.random() * 3) | 0); cI++) {
+      const a2 = Math.random() * Math.PI * 2;
+      const r2 = 90 + Math.random() * 420;
+      CLEARINGS.push({ x: Math.cos(a2) * r2, z: Math.sin(a2) * r2,
+        r: 30 + Math.random() * 25 });
+    }
     const placed = this._scatter(COUNT,
       () => {
         let p;
@@ -12449,6 +12827,26 @@ export class Track {
           const x = Math.cos(a) * r, z = Math.sin(a) * r;
           p = this._distToTrack(x, z) < 14.5 ? null : { x, z };
         }
+        if (!p) return null;
+        // pull toward the nearest grove (70% of trees), and stay out of the
+        // clearings - the pull keeps the tree on the same side of the road
+        if (GROVES.length && Math.random() < 0.7) {
+          let g2 = null, bd = 1e9;
+          for (const G of GROVES) {
+            const d2 = Math.hypot(G.x - p.x, G.z - p.z);
+            if (d2 < bd) { bd = d2; g2 = G; }
+          }
+          if (g2 && bd > g2.r) {
+            const pull = Math.min(0.75, (bd - g2.r) / bd);
+            const nx2 = p.x + (g2.x - p.x) * pull, nz2 = p.z + (g2.z - p.z) * pull;
+            // pulled trees keep a wider berth than loose scatter: a clump at
+            // the 14.5 u line is a wall the camera lives inside
+            if (this._distToTrack(nx2, nz2) > 20) { p = { x: nx2, z: nz2 }; }
+          }
+        }
+        for (const cl of CLEARINGS) {
+          if (Math.hypot(cl.x - p.x, cl.z - p.z) < cl.r) return null;
+        }
         // the ring branch skips _trackSidePos and with it the underwater
         // check — on a coast world it was planting conifers IN the sea
         return p && !this._inWater(p.x, p.z) && !this._onQuayStrip(p.x, p.z)
@@ -12459,7 +12857,14 @@ export class Track {
         const spec = SPECIES[name];
         const parts = spec.parts;
         const k = ks[name]++;
-        const s = 0.75 + Math.random() * 1.25;
+        // squared bias: a real stand is many modest trees and a few giants -
+        // but giants live AWAY from the road, or a hero canopy parks itself
+        // in front of the chase camera (measured: station 640 on PINE VALLEY
+        // rendered the inside of a crown)
+        const rr2 = Math.random();
+        const dRoad2 = this._distToTrack(p.x, p.z);
+        const sMax = dRoad2 < 26 ? 1.35 : 2.5;
+        const s = Math.min(sMax, 0.6 + rr2 * rr2 * 1.9);
         const ty = this.terrainHeight(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.45), s);
         m4.setPosition(p.x, ty, p.z);
@@ -12552,6 +12957,43 @@ export class Track {
     });
     logs.count = lk;
     let sk = 0;
+    // THE DISTANT STAND. Between the playfield scatter (out to ~640 u) and
+    // the horizon rings (900 u+) there was an empty ring - the mid-distance
+    // read as bare lawn on every wooded world, which is most of why the
+    // scene lacked depth. One instanced 6-sided cone, 420 copies, tinted a
+    // little toward the fog so the band reads as trees IN AIR.
+    if (T.treeCount >= 150) {
+      const bandGeo = new THREE.ConeGeometry(1, 1, 6);
+      bandGeo.translate(0, 0.5, 0);
+      const band = new THREE.InstancedMesh(bandGeo, new THREE.MeshStandardMaterial({
+        color: 0xffffff, vertexColors: false, flatShading: true, roughness: 1,
+      }), 420);
+      const bandCol = new THREE.Color(), fogC2 = new THREE.Color(T.fogColor ?? 0xcccccc);
+      const baseC2 = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
+      const bq = new THREE.Quaternion(), bup = new THREE.Vector3(0, 1, 0);
+      let bk3 = 0;
+      for (let k = 0; k < 900 && bk3 < 420; k++) {
+        const hh = (n) => { const v = Math.sin((k + n) * 12.9898) * 43758.5453; return v - Math.floor(v); };
+        const a2 = hh(0.1) * Math.PI * 2;
+        const r2 = 640 + hh(1.7) * 260;
+        const x2 = Math.cos(a2) * r2, z2 = Math.sin(a2) * r2;
+        if (this._inWater(x2, z2)) continue;
+        const gy2 = this.terrainHeight(x2, z2);
+        const sw2 = 5 + hh(2.9) * 7, sh2 = 9 + hh(4.1) * 12;
+        bq.setFromAxisAngle(bup, hh(5.3) * Math.PI);
+        m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
+          new THREE.Vector3(sw2, sh2, sw2 * 0.9));
+        band.setMatrixAt(bk3, m4);
+        bandCol.copy(baseC2).multiplyScalar(0.75 + hh(6.7) * 0.4)
+          .lerp(fogC2, 0.25 + hh(8.3) * 0.15);
+        band.setColorAt(bk3++, bandCol);
+      }
+      band.count = bk3;
+      if (band.instanceColor) band.instanceColor.needsUpdate = true;
+      band.name = 'distant-stand';
+      this.group.add(band);
+    }
+
     this._scatter(STUMPS, () => this._trackSidePos(12, 34), (p) => {
       const s = 0.7 + Math.random() * 0.7;
       q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
@@ -12612,8 +13054,30 @@ export class Track {
       new THREE.InstancedMesh(acCrown,
         new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 }), COUNT),
     ];
-    for (const part of [...parts, ...barrelParts, ...acaciaParts]) part.castShadow = true;
-    const ks = { saguaro: 0, barrel: 0, acacia: 0 };
+    // TWO MORE SILHOUETTES, AND A TRIANGLE SAVING. A saguaro is 1,360 tris
+    // (five 272-tri capsules); the agave and ocotillo below are ~60 each, so
+    // shifting a fifth of the ground mix onto them CUTS the desert's triangle
+    // count while adding the two shapes the mix lacked: a ground-hugging
+    // spiked rosette and a splayed fan of whips.
+    const agSkirtA = new THREE.ConeGeometry(1.25, 1.0, 7);
+    agSkirtA.translate(0, 0.5, 0);
+    const agSkirtB = new THREE.ConeGeometry(0.85, 1.4, 7);
+    agSkirtB.rotateY(Math.PI / 7);                 // facets interleave: spikes
+    agSkirtB.translate(0, 0.7, 0);
+    const agStalk = new THREE.CylinderGeometry(0.09, 0.16, 3.4, 5);
+    agStalk.translate(0, 1.7, 0);
+    const agaveParts = [agSkirtA, agSkirtB, agStalk]
+      .map((g2) => new THREE.InstancedMesh(g2, mat, COUNT));
+    const ocParts = [];
+    for (const [rz, rx] of [[0.30, 0.05], [-0.38, 0.12], [0.16, -0.34], [-0.12, 0.30]]) {
+      const cane = new THREE.ConeGeometry(0.07, 3.4, 5);
+      cane.translate(0, 1.7, 0);
+      cane.rotateZ(rz); cane.rotateX(rx);
+      ocParts.push(new THREE.InstancedMesh(cane, mat, COUNT));
+    }
+    for (const part of [...parts, ...barrelParts, ...acaciaParts,
+      ...agaveParts, ...ocParts]) part.castShadow = true;
+    const ks = { saguaro: 0, barrel: 0, acacia: 0, agave: 0, ocotillo: 0 };
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
     this._scatter(COUNT,
@@ -12642,11 +13106,14 @@ export class Track {
       (spot, k) => {
         const p = this.pointAt(spot.i, spot.lateral);
         const y = spot.terrain ? this.terrainHeight(p.x, p.z) : p.y + spot.dy;
-        // rim spots stay saguaro (their silhouette carries the skyline);
-        // ground spots mix in barrels and dry acacia
-        const roll = spot.dy ? 0 : Math.random();
-        const species = roll < 0.55 ? 'saguaro' : roll < 0.8 ? 'barrel' : 'acacia';
-        const sp = species === 'saguaro' ? parts : species === 'barrel' ? barrelParts : acaciaParts;
+        // rim spots stay mostly saguaro (the skyline silhouette) with the odd
+        // leaning ocotillo fan; ground spots run the full five-species mix
+        const roll = spot.dy ? (Math.random() < 0.8 ? 0 : 0.99) : Math.random();
+        const species = roll < 0.34 ? 'saguaro' : roll < 0.52 ? 'barrel'
+          : roll < 0.66 ? 'acacia' : roll < 0.86 ? 'agave' : 'ocotillo';
+        const sp = species === 'saguaro' ? parts : species === 'barrel' ? barrelParts
+          : species === 'acacia' ? acaciaParts
+          : species === 'agave' ? agaveParts : ocParts;
         const k2 = ks[species]++;
         const s = species === 'acacia' ? spot.s * 1.35 : spot.s;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
@@ -12656,6 +13123,12 @@ export class Track {
         );
         if (species === 'acacia') {
           color.setHSL(0.155 + Math.random() * 0.04, 0.32 + Math.random() * 0.12, 0.3 + Math.random() * 0.1);
+        } else if (species === 'agave') {
+          // glaucous blue-green, distinct from every other desert green
+          color.setHSL(0.38 + Math.random() * 0.05, 0.18 + Math.random() * 0.08,
+            0.32 + Math.random() * 0.10);
+        } else if (species === 'ocotillo') {
+          color.setHSL(0.09, 0.26 + Math.random() * 0.10, 0.28 + Math.random() * 0.08);
         } else {
           color.setHSL(0.30 + Math.random() * 0.06, 0.35 + Math.random() * 0.15, 0.22 + Math.random() * 0.12);
         }
@@ -12665,7 +13138,7 @@ export class Track {
         }
         this.trees.push({
           x: p.x, z: p.z, y: y - 0.15, id: k2, parts: sp, s,
-          r: (species === 'barrel' ? 0.6 : 0.75) * s,
+          r: (species === 'barrel' ? 0.6 : species === 'agave' ? 0.55 : 0.75) * s,
           kind: species === 'acacia' ? 'acacia' : 'cactus',
           solid: false,                                  // desert scrub always yields
         });
@@ -12674,6 +13147,8 @@ export class Track {
     for (const part of parts) { part.count = ks.saguaro; this.group.add(part); }
     for (const part of barrelParts) { part.count = ks.barrel; this.group.add(part); }
     for (const part of acaciaParts) { part.count = ks.acacia; this.group.add(part); }
+    for (const part of agaveParts) { part.count = ks.agave; this.group.add(part); }
+    for (const part of ocParts) { part.count = ks.ocotillo; this.group.add(part); }
   }
 
   /** OUTBACK RED DIRT vegetation (Bible 3.10 flora table). Three species, and
