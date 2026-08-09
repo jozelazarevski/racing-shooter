@@ -1271,34 +1271,39 @@ export class Car {
     // one way a wall should ever be cleared.
     if (t.barriers && t.barriers.length) {
       const R = 1.7;                       // car half-width against masonry
-      let hits = 0;
-      for (let i = 0; i < t.barriers.length && hits < 3; i++) {
-        const w = t.barriers[i];
-        // ONLY AN UPPER GATE. A lower one - "skip if the car is well below the
-        // wall's foot" - reads as sensible and is wrong on the roads that have
-        // walls: a pass parapet's base is sampled on the road PLANE, and on a
-        // climbing, banked shelf the car's own height differs from it by more
-        // than a wall is tall. That let the car through on GOTTHARD and
-        // TREMOLA, measured 0.88 u inside a wall with a 2.15 u standoff.
-        // Below the coping you are stopped by it; above it you are over it.
-        if (this.pos.y > w.y + w.h + 1.0) continue;
-        const ex = w.x2 - w.x1, ez = w.z2 - w.z1;
-        const len2 = ex * ex + ez * ez || 1;
-        // nearest point on the segment, clamped to its ends
-        let s = ((this.pos.x - w.x1) * ex + (this.pos.z - w.z1) * ez) / len2;
-        s = s < 0 ? 0 : s > 1 ? 1 : s;
-        const cx = w.x1 + ex * s, cz = w.z1 + ez * s;
-        const dx = this.pos.x - cx, dz = this.pos.z - cz;
-        const rr = w.hw + R;
-        const d2 = dx * dx + dz * dz;
-        if (d2 >= rr * rr) continue;
-        const d = Math.max(0.001, Math.sqrt(d2));
+      // RESOLVE THE WORST INTRUSION, NOT THE FIRST ONE FOUND. Walking the
+      // list in order and fixing the first few overlaps leaves the deepest
+      // one unfixed when it happens to sit later in the array: measured on
+      // VINEYARD VELOCE, a car ended a frame 0.62 u inside a wall whose
+      // standoff is 2.13. Each pass finds the deepest overlap and pushes out
+      // of that one; two passes settle a joint, where clearing one block
+      // seats the car against its neighbour.
+      for (let pass = 0; pass < 2; pass++) {
+        let w = null, wd = 0, wcx = 0, wcz = 0, wrr = 0;
+        for (let i = 0; i < t.barriers.length; i++) {
+          const q = t.barriers[i];
+          if (this.pos.y > q.y + q.h + 1.0) continue;   // cleared the coping
+          const ex = q.x2 - q.x1, ez = q.z2 - q.z1;
+          const len2 = ex * ex + ez * ez || 1;
+          let s2 = ((this.pos.x - q.x1) * ex + (this.pos.z - q.z1) * ez) / len2;
+          s2 = s2 < 0 ? 0 : s2 > 1 ? 1 : s2;
+          const cx = q.x1 + ex * s2, cz = q.z1 + ez * s2;
+          const dx = this.pos.x - cx, dz = this.pos.z - cz;
+          const rr = q.hw + R;
+          const d2 = dx * dx + dz * dz;
+          if (d2 >= rr * rr) continue;
+          const depth = rr - Math.sqrt(d2);
+          if (depth > wd) { wd = depth; w = q; wcx = cx; wcz = cz; wrr = rr; }
+        }
+        if (!w) break;
+        const dx = this.pos.x - wcx, dz = this.pos.z - wcz;
+        const d = Math.max(0.001, Math.hypot(dx, dz));
         const nx = dx / d, nz = dz / d;
         const vApp = this.vel.x * nx + this.vel.z * nz;
         const spd = Math.hypot(this.vel.x, this.vel.z);
         const square = THREE.MathUtils.clamp(-vApp / Math.max(3, spd), 0, 1);
-        this.pos.x = cx + nx * rr;
-        this.pos.z = cz + nz * rr;
+        this.pos.x = wcx + nx * wrr;
+        this.pos.z = wcz + nz * wrr;
         if (vApp < 0) {
           this.vel.x -= nx * vApp * 1.05;
           this.vel.z -= nz * vApp * 1.05;
@@ -1313,11 +1318,6 @@ export class Car {
             }
           }
         }
-        // resolve up to three: at a joint the push-out of one block can seat
-        // the car against its neighbour, and inside a hairpin it can be
-        // between walls on both sides - stopping early leaves it a frame
-        // inside one of them (measured 0.93 u into a 2.15 u standoff)
-        hits++;
       }
     }
 
