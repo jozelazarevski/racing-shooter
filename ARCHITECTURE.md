@@ -313,11 +313,34 @@ everywhere; height matches to 1.07e-14 m, and that residual is attributed to a
 single octave form (`sin(x*fx + z*fz)` where the original wrote `sin((x+z)*f)`,
 which is not the same float) rather than absorbed into a loose tolerance.
 
-**What is still open here:** the road-distance field is baked by brute force —
-23.2 M distance tests, ~32 ms, the dominant cost of building a track. A chamfer
-distance transform over the rasterised road makes it one pass (~48 K
-operations). Nobody is blocked on it, which is why it is written down instead
-of done.
+**The road-distance bake — done, and smaller than it looked.** It was brute
+force: every grid cell against every road sample, 23.2 M distance tests. It is
+now a bucketed nearest-neighbour search with row coherence (each cell starts
+from its neighbour's winner, which makes the search bound tight immediately).
+Measured in isolation: **2.0–2.3x faster, 21–24 ms saved per world build**, and
+the baked field is **bit-identical** to the old loop on every track —
+`npm run verify:sdf` keeps the original as an oracle and compares cell for cell,
+not within a tolerance.
+
+Two things worth recording because they are counter-intuitive:
+
+- **A chamfer distance transform would have been wrong.** It is the obvious
+  answer and it is one pass instead of a search, but chamfer distance is an
+  approximation a few percent out — and this field decides where the road
+  surface ends, where the terrain stops being flattened, and how far scenery
+  keeps clear. A few percent is a different world.
+- **Smaller buckets made it slower.** Most of a 900 m map is far from a 1.5 km
+  loop, so the cost is dominated by cells walking empty buckets outward until
+  they find the road, not by distance tests near it. Measured across six bucket
+  sizes; the sweep is why the constant is S/12 rather than a guess.
+
+**And the win is smaller end-to-end than in isolation, which is the honest
+figure.** The editor's preview rebuild measured 121 ms median in a browser both
+before and after — within noise. The bake is no longer the dominant cost; the
+vertex/colour loop is, because `colorAt` calls `heightAt` five times per vertex
+for its slope shading. That one is NOT being taken: computing slope from
+neighbouring grid heights instead would be much cheaper and would change every
+vertex colour, and a visual change is not a refactor.
 
 ### 5.5 State which specification governs which codebase
 

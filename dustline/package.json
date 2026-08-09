@@ -9,10 +9,11 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "verify:track": "node tools/verify-track-format.mjs",
+    "verify:sdf": "node tools/verify-sdf.mjs",
     "make:proving-ground": "node tools/make-proving-ground.mjs",
     "smoke:editor": "node tools/editor-smoke.mjs",
     "smoke:components": "node tools/components-smoke.mjs",
-    "gate": "npm run typecheck && npm run verify:track"
+    "gate": "npm run typecheck && npm run verify:track && npm run verify:sdf"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.12.0",

@@ -64,15 +64,136 @@ export class Terrain {
 
   /** Nearest-road distance and lap fraction, on a grid, baked once.
    *
-   *  Brute force over every road sample: at the shipped resolution that is
-   *  220 x 220 x 480 = 23.2 M distance tests, measured at ~32 ms. That is
-   *  affordable once at boot and it is the single most expensive thing about
-   *  building a track — if track loading ever needs to be faster than this, a
-   *  chamfer distance transform over the rasterised road turns it into one
-   *  pass over the grid (~48 K operations) and is the change to make. It is
-   *  left alone for now because 32 ms is not a problem anybody has. */
+   *  This used to be brute force — every grid cell against every road sample,
+   *  220 x 220 x 480 = 23.2 M distance tests, measured at ~32 ms. It was the
+   *  single most expensive thing about building a track, and the editor pays it
+   *  again on every preview rebuild.
+   *
+   *  It is now a bucketed nearest-neighbour search: road samples are sorted
+   *  into a coarse uniform grid, and each cell searches outward one ring of
+   *  buckets at a time, stopping once the next ring cannot possibly contain
+   *  anything closer than what it has already found.
+   *
+   *  WHY NOT A DISTANCE TRANSFORM. The obvious answer is a chamfer pass over
+   *  the rasterised road — one sweep instead of a search. It is also wrong
+   *  here: chamfer distance is an APPROXIMATION, a few percent out, and this
+   *  field decides where the road surface ends, where the terrain stops being
+   *  flattened, and how far scenery must keep clear. A few percent is a
+   *  different world. Bucketing keeps the answer exact.
+   *
+   *  EXACT means exact, including tie-breaking. A linear scan keeps the FIRST
+   *  index that achieved the minimum; buckets are not visited in index order,
+   *  so that ordering is restored explicitly by breaking ties on index.
+   *  `bakeSdfReference()` below is the original loop, kept as the oracle that
+   *  `tools/verify-sdf.mjs` checks this against — bit for bit, not within a
+   *  tolerance. */
   private bakeSdf() {
     const R = this.sdfRes, S = this.size, pts = this.roadPts, n = pts.length;
+
+    // Bucket size is a real trade, and it was measured rather than guessed.
+    // Small buckets mean few points per bucket but many (mostly empty) buckets
+    // to walk for a cell far from the road; large buckets mean the opposite.
+    // At S/12 a near-road cell resolves in one ring and a far corner still
+    // walks well under a hundred buckets.
+    const BUCKET = Math.max(8, S / 12);
+    const B = Math.max(1, Math.ceil(S / BUCKET));
+    const bucketOf = (v: number) => Math.max(0, Math.min(B - 1, Math.floor(((v / S) + 0.5) * B)));
+
+    // counting sort of the samples into buckets: one flat Int32Array of sample
+    // indices plus a start offset per bucket, so the hot loop touches two typed
+    // arrays and allocates nothing
+    const starts = new Int32Array(B * B + 1);
+    for (let i = 0; i < n; i++) starts[bucketOf(pts[i].z) * B + bucketOf(pts[i].x) + 1]++;
+    for (let i = 0; i < B * B; i++) starts[i + 1] += starts[i];
+    const items = new Int32Array(n);
+    const cursor = starts.slice(0, B * B);
+    for (let i = 0; i < n; i++) items[cursor[bucketOf(pts[i].z) * B + bucketOf(pts[i].x)]++] = i;
+
+    // flat copies of the sample coordinates — pts[i].x on a Vector3 is a
+    // property load per test, and this loop runs millions of times
+    const px = new Float64Array(n), pz = new Float64Array(n);
+    for (let i = 0; i < n; i++) { px[i] = pts[i].x; pz[i] = pts[i].z; }
+
+    // ROW COHERENCE. Neighbouring cells almost always share a nearest sample,
+    // so each cell starts from the previous cell's winner. That is only an
+    // initial upper bound — the search still visits every bucket that could
+    // hold something closer — but it makes the bound tight immediately, and
+    // most cells then terminate at ring 0 or 1 instead of expanding outward
+    // until they stumble into the road. Measured: this is where the speedup is.
+    let prevIdx = -1;
+    for (let gz = 0; gz < R; gz++) {
+      const z = (gz / (R - 1) - 0.5) * S;
+      const bz = bucketOf(z);
+      prevIdx = -1;                       // rows are scanned independently
+      for (let gx = 0; gx < R; gx++) {
+        const x = (gx / (R - 1) - 0.5) * S;
+        const bx = bucketOf(x);
+
+        let best = Infinity, bestIdx = -1;
+        if (prevIdx >= 0) {
+          const dx = px[prevIdx] - x, dz = pz[prevIdx] - z;
+          best = dx * dx + dz * dz;
+          bestIdx = prevIdx;
+        }
+        const maxRing = Math.max(bx, B - 1 - bx, bz, B - 1 - bz);
+        for (let ring = 0; ring <= maxRing; ring++) {
+          // Everything not yet visited lies at least (ring-1) whole buckets
+          // away, so once the best hit is closer than that, nothing further
+          // out can beat it.
+          if (bestIdx >= 0) {
+            const bound = (ring - 1) * BUCKET;
+            // STRICTLY less than, not <=. A sample sitting at exactly the bound
+            // must still be examined, or a tie could be decided by which ring
+            // it happened to fall in rather than by index — and the whole point
+            // of the tie-break is that the answer does not depend on traversal
+            // order.
+            if (bound > 0 && best < bound * bound) break;
+          }
+          const x0 = Math.max(0, bx - ring), x1 = Math.min(B - 1, bx + ring);
+          const z0 = Math.max(0, bz - ring), z1 = Math.min(B - 1, bz + ring);
+          for (let cz = z0; cz <= z1; cz++) {
+            const onZEdge = cz === bz - ring || cz === bz + ring;
+            for (let cx = x0; cx <= x1; cx++) {
+              // interior buckets were covered by an earlier ring
+              if (ring > 0 && !onZEdge && cx !== bx - ring && cx !== bx + ring) continue;
+              const c = cz * B + cx;
+              const end = starts[c + 1];
+              for (let k = starts[c]; k < end; k++) {
+                const i = items[k];
+                const dx = px[i] - x, dz = pz[i] - z;
+                const d = dx * dx + dz * dz;
+                // `d < best` reproduces the brute-force winner; the tie-break
+                // on index reproduces its ORDER, because a linear scan keeps
+                // the first index that achieved the minimum. Buckets are not
+                // visited in index order, so the tie has to be broken here.
+                if (d < best || (d === best && i < bestIdx)) { best = d; bestIdx = i; }
+              }
+            }
+          }
+        }
+
+        prevIdx = bestIdx;
+        const o = gz * R + gx;
+        this.sdfDist[o] = Math.sqrt(best);
+        this.sdfT[o] = bestIdx / n;
+      }
+    }
+  }
+
+  /** Re-run the fast bake in place. Exists so `tools/verify-sdf.mjs` can time
+   *  the bake ALONE — timing `new Terrain()` also times curve sampling, which
+   *  is common to both paths and quietly flattens whatever difference there is. */
+  rebake() { this.bakeSdf(); }
+
+  /** The original brute-force bake, kept as the ORACLE.
+   *
+   *  Not dead code: `tools/verify-sdf.mjs` builds both and requires them to
+   *  agree bit for bit on every track. An optimisation whose reference
+   *  implementation has been deleted is an optimisation nobody can check. */
+  bakeSdfReference(): { dist: Float32Array; t: Float32Array } {
+    const R = this.sdfRes, S = this.size, pts = this.roadPts, n = pts.length;
+    const dist = new Float32Array(R * R);
+    const t = new Float32Array(R * R);
     for (let gz = 0; gz < R; gz++) {
       for (let gx = 0; gx < R; gx++) {
         const x = (gx / (R - 1) - 0.5) * S;
@@ -84,10 +205,16 @@ export class Terrain {
           if (d < best) { best = d; bestT = i / n; }
         }
         const o = gz * R + gx;
-        this.sdfDist[o] = Math.sqrt(best);
-        this.sdfT[o] = bestT;
+        dist[o] = Math.sqrt(best);
+        t[o] = bestT;
       }
     }
+    return { dist, t };
+  }
+
+  /** The baked field, for the verifier. */
+  get sdfField(): { dist: Float32Array; t: Float32Array } {
+    return { dist: this.sdfDist, t: this.sdfT };
   }
 
   private sdf(x: number, z: number): { d: number; t: number } {

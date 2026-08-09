@@ -93,9 +93,14 @@ nudge, `ctrl+D` duplicate, `del` remove.
 
 **3D preview (bottom).** The **real** `Terrain`, the real scenery placement,
 the real lighting — not an approximation. It rebuilds 220 ms after you stop
-changing things, because a full build costs ~66 ms in node and ~120–160 ms in
-a browser, which is fine on a pause and hopeless per mouse-move. That split is
-the whole performance design: the map is live, the preview catches up.
+changing things, because a full build measures ~121 ms median in a browser,
+which is fine on a pause and hopeless per mouse-move. That split is the whole
+performance design: the map is live, the preview catches up.
+
+(The road-distance bake inside that build is ~19 ms, down from ~42 ms, and
+`npm run verify:sdf` proves the faster version produces a bit-identical field.
+The rebuild total is unchanged within noise, because the bake is no longer what
+dominates it.)
 
 **Panel (right).** Six tabs — SHAPE, LAND, SURFACE, SCATTER, PLACED, SKY —
 exposing every field above. The snow line is a number box now. PLACED lists
