@@ -421,6 +421,8 @@ const DEMANDS = {
   55: { loose: 0.22, twist: 0.64, fast: 0.44, climb: 0.20 }, // BRIDGE RUN
   56: { loose: 0.24, twist: 0.58, fast: 0.50, climb: 0.26 }, // OLIVE CROSSING
   57: { loose: 0.20, twist: 0.70, fast: 0.38, climb: 0.34 }, // MOUNTAIN TO SEA
+  // shares the Aegean lap, so it inherits its demands
+  58: { loose: 0.28, twist: 0.58, fast: 0.45, climb: 0.18 }, // CITADEL BAY
 };
 // The short human-readable character of each world, from the same measurements.
 const WORLD_TRAITS = (id) => {

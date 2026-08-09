@@ -173,6 +173,13 @@ export const LEVELS = [
     cost: 28, fresh: true, route: 'oliveCross', tune: { tunnels: { count: 1 } } },
   { id: 57, name: 'MOUNTAIN TO SEA', theme: 'mountainsea', region: 'MEDITERRANEAN',
     cost: 29, fresh: true, route: 'mountainSea', tune: { tunnels: { count: 1 } } },
+  // CITADEL BAY: the player's harbour reference - a turquoise bay, the quay
+  // and its marina along the shore, and a walled hill town with a keep
+  // standing over the whole thing. Shares the Aegean route because that lap
+  // hugs its coast for most of its length, which is what puts the citadel in
+  // frame from the road.
+  { id: 58, name: 'CITADEL BAY', theme: 'citadel', region: 'MEDITERRANEAN',
+    cost: 30, fresh: true, route: 'aegeanRun' },
 ];
 
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
@@ -2478,6 +2485,76 @@ const THEMES = {
   // HARBOR QUAY: the player's harbour reference - timber frontage down the
   // LAND side only, a cobbled quay, the faceted sea lapping the other side,
   // moored boats, barrels and nets on the stone, a lighthouse on the point.
+  citadel: {
+    fogColor: 0xd8e8ea, fogNear: 350, fogFar: 1650,
+    hemiSky: 0xc0e0f0, hemiGround: 0xa89a80, hemiIntensity: 0.85,
+    sunColor: 0xffeed0, sunIntensity: 2.6,
+    skyTop: '#2f7fc8', skyHorizon: '#dfeef0', sunGlow: 0xfff0c8,
+    sunAz: 3.6, sunEl: 0.55,
+    cloudCount: 8, cloudOpacity: 0.85, cloudTint: 0xfff4e0,
+    terrainLow: '#84925a', terrainHigh: '#b4ae8a', terrainDirt: '#a4977c',
+    terrainScree: '#a09a88', hutGlow: 0.5,
+    skirtColor: '#8e8a7a',
+    ground: {
+      base: '#9a9678', bandLight: 'rgba(228,224,204,0.07)', bandDark: 'rgba(90,88,70,0.07)',
+      patchA: 'rgba(140,150,100,0.2)', patchB: 'rgba(196,190,168,0.18)',
+      speckA: 'rgba(150,148,128,0.7)', speckB: 'rgba(226,222,204,0.8)', speckCount: 90,
+    },
+    road: {
+      base: '#8a8578', mottleA: [108, 104, 94], mottleB: [156, 152, 140],
+      ruts: false,
+      rut: 'rgba(70,68,60,0.4)', rutCore: 'rgba(52,50,44,0.35)', tread: 'rgba(26,25,22,0.4)',
+      stoneA: 'rgba(210,206,192,0.65)', stoneB: 'rgba(76,72,64,0.7)',
+      fringe: [120, 128, 88], fringeVar: [30, 34, 24],
+      cobbles: {
+        stones: ['#93907f', '#7f7c6e', '#a19d8c', '#6f6c62', '#a8a291', '#8a8778'],
+        mortar: 'rgba(52,50,44,0.9)', lip: 'rgba(255,252,240,0.12)',
+        rows: 28, per: 46,          // ~0.48 u x 0.36 u setts, not 1.16 u ovals
+      },
+    },
+    hillColor: 0x7d8f5e, peakColor: 0xb4b49c,
+    treeCount: 300, trunkColor: 0x5a4028,
+    foliageLow: 0x2e6a34, foliageTop: 0x4a8a44,
+    foliage: { h: 0.3, hVar: 0.06, s: 0.48, sVar: 0.14, l: 0.28, lVar: 0.1 },
+    treeSnowCap: false,
+    treeBelt: [40, 130],
+    tuftCount: 500, grass: { bladeA: '#5e7a4a', bladeB: '#94aa6c' },
+    bushCount: 176, bushColor: 0x3f7c38,
+    bush: { h: 0.32, hVar: 0.05, s: 0.45, sVar: 0.1, l: 0.3, lVar: 0.1 },
+    rockCount: 175, pebbleCount: 220, rockColor: 0x8e8a7a, rockSnowCap: false,
+    flowerCount: 120, flowerColors: ['#ffffff', '#e0b040', '#c05a78'],
+    hutRoof: 0x7a4630, hayColor: 0xd0b878,
+    hutCount: 9, hutZone: [0.55, 0.35], hayCount: 10,
+    splinter: [0x8a5a32, 0xe0d8c0],
+    elev: { amp: 5, ph: [0.9, 2.1, 3.0] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    elements: 'medhill',
+    frontage: {
+      lateral: 15.5, depth: 8, unit: 7.2, height: 9.5, run: [6, 12], rows: 6,
+      // WARM RENDER, NOT GREY. The shared default paints a muted stone/slate
+      // street, which is right for a northern old town and wrong for this
+      // one: the reference quay is limewash and painted render, ochre through
+      // apricot, and that warmth is most of what makes it read as the south.
+      tints: ['#e8c99a', '#dcae7a', '#f0dcc0', '#cf9a6a', '#e6d2ad', '#c98f66'],
+      // THE QUAY IS OPEN TO THE WATER. `seaOpen` rejects any frontage block
+      // whose centre is within this many units of the waterline (or seaward
+      // of it) — so along the seafront straight the houses line ONLY the
+      // land side and the seaward flank is bare quay, per the player's
+      // harbour reference. The back lanes, well inland, still get both sides.
+      seaOpen: 24,
+      tints: ['#c9b58e', '#a8906c', '#b09a80', '#8a785e', '#c0a878', '#98826a'],
+    },
+    coast: { a: [-260, -75], b: [300, -63], level: -1.4, floor: -6.5, beach: 10 },
+    seaColor: 0x27a3ad,          // turquoise harbour water, the reference's own
+    lighthouse: true,
+    // quay dressing: capstone edge wall, bollards, barrels, crates, rope
+    // coils on the stone, and boats moored close in (see _buildQuayside)
+    quay: true,
+    stoneBridges: { count: 1 },
+    // the landmark this world is built around
+    citadel: true,
+  },
+
   harbor: {
     fogColor: 0xdde6e8, fogNear: 340, fogFar: 1600,
     hemiSky: 0xb8d4ec, hemiGround: 0x9a9484, hemiIntensity: 0.8,
@@ -3840,6 +3917,7 @@ const ELEMENT_KIT_BY_THEME = {
   avalanche: 'alpine', neon: 'city', undercity: 'city',
   pass: 'alpine', tremola: 'alpine', furka: 'alpine', oldtown: 'oldtown',
   medterrace: 'medhill', farmland: 'hedgerow', outback: 'outback',
+  citadel: 'medhill',
 };
 
 /** Unit gable-roof prism: 1×1×1, base at y=0, ridge running along local X at
@@ -3978,6 +4056,36 @@ export class Track {
     const base = THEMES[level && level.theme] || THEMES.forest;
     const T = (level && level.tune) ? { ...base, ...level.tune } : base;
     this.T = T;
+
+    // THE CITADEL'S HILL, raised by the world itself.
+    //
+    // A hill town needs a hill, and this coast has none: the highest
+    // buildable ground within 620 u measured y 10.4, so the town read as a
+    // housing estate on a lawn. The world grows its own headland - one
+    // smooth mound, defined here so it exists BEFORE any builder samples the
+    // ground, and added inside BOTH ground functions (terrainHeight for
+    // physics and scatter, _terrainMeshHeight for the mesh you see) exactly
+    // as SCENE-RULES demands. Placed inland off the coast frame so it can
+    // never rise out of the bay, and far enough from the route that the
+    // road never climbs it.
+    this._citMound = null;
+    if (T.citadel && T.coast) {
+      const C = T.coast;
+      const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
+      const L = Math.hypot(abx, abz) || 1;
+      const ux = abx / L, uz = abz / L;          // along the shore
+      const nx = abz / L, nz = -abx / L;         // seaward
+      const mx = (C.a[0] + C.b[0]) / 2, mz = (C.a[1] + C.b[1]) / 2;
+      // -540, not -300: the mound's own 165 u skirt has to clear the
+      // carriageway, and at -300 the hill stood 74 u from the road - it would
+      // have swallowed it. Here the summit is 304 u inland, which is where a
+      // hill town belongs: on the skyline across the bay, not over the bonnet.
+      const du = 60, dn = -540;                  // negative dn = inland
+      this._citMound = {
+        x: mx + ux * du + nx * dn, z: mz + uz * du + nz * dn, r: 165, h: 58,
+      };
+    }
+
     // plain-number lighting/fog summary for main.js
     this.theme = {
       fogColor: T.fogColor, fogNear: T.fogNear, fogFar: T.fogFar,
@@ -5412,6 +5520,18 @@ export class Track {
     return !!this.T.quay && !!this.T.coast && this._coastSide(x, z) > -30;
   }
 
+  /** The citadel headland: a single smooth mound, cos-squared so it meets
+   *  the surrounding ground with zero gradient and leaves no rim. */
+  _citMoundH(x, z) {
+    const M = this._citMound;
+    if (!M) return 0;
+    const dx = x - M.x, dz = z - M.z;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d >= M.r) return 0;
+    const t = Math.cos((d / M.r) * Math.PI * 0.5);
+    return M.h * t * t;
+  }
+
   terrainHeight(x, z) {
     const fld = this._roadFieldCoarse(x, z);
     let h = this._blendHeight(fld.d, fld.y, x, z);
@@ -5423,6 +5543,7 @@ export class Track {
     // car. Applied here, the ground can be pushed anywhere and the road
     // still wins where they disagree.
     if (this._delta) h += this._delta.at(x, z);
+    if (this._citMound) h += this._citMoundH(x, z);
     if (fld.d <= 27) {
       const clamp = this._roadClampY(x, z);
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
@@ -5548,7 +5669,8 @@ export class Track {
     // measured +33.91 at the centre with nothing whatsoever on screen. The
     // numbers agreed with each other and disagreed with the picture; the
     // picture was right.
-    if (this._delta) h += this._delta.at(x, z);
+if (this._citMound) h += this._citMoundH(x, z);
+        if (this._delta) h += this._delta.at(x, z);
     if (d <= 27) {
       // exact strand cap (window/exclusion mirror _roadClampY)
       let clamp = Infinity;
@@ -7106,6 +7228,7 @@ export class Track {
     if (this.T.windmill) this._buildWindmill();
     if (this.T.lighthouse) this._buildLighthouse();
     if (this.T.quay) this._buildQuayside(m4);        // harbour: quay wall + dockside kit
+    if (this.T.citadel) this._buildCitadel();        // the walled hill town
     if (this.T.quay) this._buildMarina();           // pontoons, rigged boats, rings
     if (this.T.frontage) this._buildStreetLife();   // market stalls, produce, a fountain
     if (this.T.stoneBridges) this._buildStoneBridges();
@@ -10754,6 +10877,79 @@ export class Track {
 
   /** A dry-stone field wall: `n` instanced blocks in a line, each a small
    *  SOLID stone collider. Runs out in the fields, never along the road. */
+  /** THE CITADEL: a walled hill town standing over the bay.
+   *
+   *  The landmark CITADEL BAY is named for, and built the way a real one
+   *  grew: houses climbing a headland in rings, each ring smaller and
+   *  tighter than the one below, a ring of rampart wall around the skirt,
+   *  and a keep on the summit. Nothing here is new art - every building is a
+   *  HOUSE_TEMPLATE stamped through `_element`, so the whole town joins the
+   *  five batched instanced meshes the world's own buildings use and costs no
+   *  extra draw call. The ramparts go through `_stoneWallRun`, which means
+   *  they register as barrier segments and are solid (r131).
+   *
+   *  It is placed on the highest buildable ground on the LAND side of the
+   *  bay, within sight of the road: a hill town you cannot see from the car
+   *  is set dressing nobody will ever meet.
+   */
+  _buildCitadel() {
+    const K = ELEMENT_KITS[this.T.elements || 'medhill'] || ELEMENT_KITS.farm;
+    const B = this._elemB();
+    // --- find the hill: the highest spot that is on land, off the road, and
+    // not out at the world edge where the fog eats it
+    // STAND IT ON ITS OWN HILL. The world raises a headland for this world
+    // (see _citMound in the constructor), so the town is placed on the
+    // summit rather than hunting for high ground that does not exist.
+    const M = this._citMound;
+    if (!M) return;
+    const best = { x: M.x, z: M.z, y: this.terrainHeight(M.x, M.z) };
+    if (this._distToTrack(best.x, best.z) < 90) return;   // never over the road
+    this._citadelAt = best;
+
+    // --- the town: rings of houses climbing the slope, tightening as they go
+    const HOUSES = ['cube', 'cube', 'towerhouse', 'domed', 'courtyard', 'cube', 'adobe'];
+    const hsh = (n) => { const v = Math.sin(n * 12.9898 + 4.11) * 43758.5453; return v - Math.floor(v); };
+    let placed = 0;
+    const RINGS = [
+      { r: 46, n: 13, s: 1.15 },
+      { r: 32, n: 10, s: 1.05 },
+      { r: 19, n: 7, s: 0.95 },
+    ];
+    for (let ri = 0; ri < RINGS.length; ri++) {
+      const R = RINGS[ri];
+      for (let k = 0; k < R.n; k++) {
+        const a = (k / R.n) * Math.PI * 2 + hsh(ri * 31 + k) * 0.4 + ri * 0.5;
+        const rr = R.r * (0.88 + hsh(ri * 71 + k + 0.5) * 0.24);
+        const x = best.x + Math.cos(a) * rr, z = best.z + Math.sin(a) * rr;
+        if (this._inWater(x, z)) continue;
+        // FACE THE STREET. Every house on a ring turns its front outward, the
+        // way a hill town presents a wall of facades to whoever looks up at it
+        const rot = a + Math.PI / 2 + (hsh(k + ri * 13) - 0.5) * 0.5;
+        const type = HOUSES[(k + ri) % HOUSES.length];
+        this._element(B, type, x, z, rot, K, R.s * (0.92 + hsh(k * 7 + ri) * 0.2));
+        placed++;
+      }
+    }
+
+    // --- the keep: one big square tower on the summit, which is the whole
+    // silhouette from the far side of the bay
+    this._element(B, 'watchtower', best.x, best.z, hsh(3) * Math.PI, K, 2.5);
+    this.solids.push({ x: best.x, z: best.z, r: 5, y: best.y + 3, mat: 'stone' });
+
+    // --- the ramparts: a ring of dry-stone runs round the skirt, broken by a
+    // gate gap so the town reads as enclosed rather than fenced
+    const WR = 58;
+    for (let k = 0; k < 11; k++) {
+      const a = (k / 11) * Math.PI * 2;
+      if (k === 4) continue;                            // the gate
+      const x = best.x + Math.cos(a) * WR, z = best.z + Math.sin(a) * WR;
+      if (this._inWater(x, z)) continue;
+      // tangent to the ring, so the runs chain into a wall rather than spokes
+      this._stoneWallRun(B, x, z, a + Math.PI / 2, 5, K);
+    }
+    this._citadelHouses = placed;
+  }
+
   /** Register a wall BLOCK as a barrier segment: `len` along `rot`, `thick`
    *  across it, standing `h` high from `y`. Every masonry run in the game
    *  goes through here, so "walls are solid" is one rule in one place rather
