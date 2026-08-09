@@ -118,7 +118,22 @@ allowed to be placed. When a rule names a probe, run it before shipping.
 - **Segment counts don't sell at distance.** Detail budgets go to *variety
   and placement* (r121 lesson), not to subdivision the player never sees.
 
-## 6. Process gates (non-negotiable before ship)
+## 6. The camera
+
+- **Bound the lens against the CAR, not just the ground.** Camera rules that
+  only say "stay above the terrain" have no upper limit: parked at the foot of
+  a steep bank, the ground behind stands 50 u over the roof and the lens goes
+  with it (measured: car y 2.0, camera y 54.0). The frame becomes one
+  featureless slab of hillside — reported as a void, twice, on two different
+  worlds. Height above the car is capped (13 u); when the cap bites the boom
+  comes *in* instead, stopping short of the bonnet.
+- **A void report is a camera report until proven otherwise.** Both "void"
+  screenshots turned out to be the lens somewhere it should not be, not
+  missing geometry. Probe the camera position before hunting the scene:
+  `cambelow.mjs` (is the lens under ground) and the camera-height check
+  (`camY − carY`, which must stay ≤ ~15).
+
+## 7. Process gates (non-negotiable before ship)
 
 1. `tests/test-static.mjs` — parses every module in module goal (catches
    duplicate declarations `node --check` misses) and checks the build tag.

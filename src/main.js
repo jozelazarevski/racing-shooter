@@ -5653,6 +5653,34 @@ class Game {
       // ...and never underground wherever it ended up
       const gCam = tk.terrainHeight(cp.x, cp.z) + 2.2;
       if (cp.y < gCam) cp.y = gCam;
+
+      // A CAMERA HIGH ENOUGH TO CLEAR THE HILL IS NOT A CAMERA ANY MORE.
+      //
+      // Both rules above raise the lens and neither bounds it against the
+      // CAR. Park at the foot of a steep bank - which is where a car ends up
+      // after leaving the road - and the ground behind stands 50 u over the
+      // roof, so "stay above the ground you are over" put the lens 52 u up
+      // (measured: car y 2.0, camera y 54.0). From there the frame is a
+      // single featureless slab of hillside with the world in a sliver at
+      // the edge, which is exactly what the player photographed and called a
+      // void.
+      //
+      // Height above the car is capped. When the cap bites, the boom comes IN
+      // instead - a nearer, lower view still shows the car and the road,
+      // where a high one shows neither - and it stops short of the bonnet so
+      // the fix can never put the lens inside the car.
+      const MAX_UP = 13;
+      if (cp.y > pp.y + MAX_UP) {
+        cp.y = pp.y + MAX_UP;
+        for (let k = 0; k < 6; k++) {
+          const g2 = tk.terrainHeight(cp.x, cp.z) + 2.2;
+          if (cp.y >= g2) break;                 // clear of the slope: done
+          const ox = cp.x - pp.x, oz = cp.z - pp.z;
+          if (Math.hypot(ox, oz) < 4) { cp.y = g2; break; }   // never in the car
+          cp.x = pp.x + ox * 0.72;
+          cp.z = pp.z + oz * 0.72;
+        }
+      }
     }
 
     // a solid pine on the camera->player sightline fills the whole frame —
