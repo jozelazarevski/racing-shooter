@@ -11,6 +11,7 @@ import { buildRenderer, buildWorld, buildCarVisual, CarVisual } from './render/s
 import { ChaseCamera } from './render/camera';
 import { Telemetry } from './ui/telemetry';
 import { RaceHUD } from './ui/hud';
+import { chooseTrack } from './ui/trackSelect';
 import { Terrain } from './tracks/terrain';
 import { WheelFX } from './render/particles';
 import { buildSky, buildClouds, buildMountains, buildVegetation } from './render/scenery';
@@ -34,7 +35,20 @@ async function boot() {
 
   // ?track=<id> picks a saved or built-in track; ?t=<packed> carries a whole
   // track in the link. Neither can fail the boot — both fall back to default.
-  const trackDef = resolveTrackFromUrl();
+  //
+  // WITH NO TRACK NAMED, ASK. Opening the game used to boot the first built-in
+  // and nothing else, so a track saved in the editor was reachable only by
+  // hand-typing its id into the address bar. A link that names a track still
+  // goes straight there — that is what makes `?track=` and `?t=` shareable —
+  // but the bare URL now shows what this browser can play.
+  const named = new URLSearchParams(location.search);
+  // "LOADING PHYSICS" goes before the picker, not after it: leaving it up
+  // behind the overlay means it is still there if the picker ever fails to
+  // paint, which is the one case where you want to see what happened.
+  document.getElementById('boot')?.remove();
+  const trackDef = (named.has('track') || named.has('t'))
+    ? resolveTrackFromUrl()
+    : await chooseTrack();
 
   const canvas = document.getElementById('app') as HTMLCanvasElement;
   const renderer = buildRenderer(canvas);
