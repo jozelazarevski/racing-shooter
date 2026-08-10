@@ -309,11 +309,29 @@ Individually:
 |---|---|
 | `verify:track` | `dustbowl.json` reproduces the pre-refactor world exactly |
 | `verify:sdf` | the fast road-distance bake is bit-identical to brute force |
+| `verify:templates` | `src/templates/` still depends on nothing but `three` and `core/`, has no import side effects, and the barrel drops no name |
+| `verify:generated` | the committed `harbour.json` and `proving-ground.json` are what their generators produce *today* |
 | `verify:worlds` | every world matches its committed fingerprint, and does not depend on unseeded randomness |
 | `smoke:editor` | the editor drives, and a packed link opens as that track in the game |
 | `smoke:components` | every component builds, previews, places, and gets the collider its file declares |
+| `verify:deploy` | the committed build works served under a Pages-style sub-path |
 
 The browser checks start their own server, so there is no setup step. After an
 INTENDED world change, re-bless the fingerprints with
 `npm run verify:worlds -- --update` and commit the golden file with the change
 that caused it.
+
+### Generated artifacts
+
+Two tracks and the docs images are generated *and* committed, so they can drift
+from the generator with nothing to notice — every other check reads the
+committed artifact and asks whether it is CONSISTENT; this one asks whether it
+is CURRENT. `verify:generated` regenerates into a snapshot, compares, and puts
+the original back whatever happens.
+
+The images are off by default (`--images`, needs a browser, ~2 min) and are
+compared **as pixels, not bytes** — the renderer is not byte-deterministic. Two
+runs on the same commit differ in a scatter of edge pixels: measured, 0.01% of
+subpixels off by more than 8/255, against 0.53% for one prop-sized change and
+75% for a different camera. The thresholds sit between. A byte comparison there
+fails every run and teaches you to ignore it.

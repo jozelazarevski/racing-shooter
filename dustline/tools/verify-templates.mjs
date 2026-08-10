@@ -112,5 +112,23 @@ check(notComponents.length === 0,
   `world/props/ holds components and nothing else (${props.length - infra.length} of them)`,
   notComponents.join(', '));
 
+// ---- 5. and the docs still say how many there are ---------------------------
+//
+// "the library is N components" is the one number in the prose that a new file
+// invalidates, and adding a component is the single most common change here.
+// A count that drifts is worse than no count: it reads as measured.
+const COUNT = props.length - infra.length;
+const DOCS = ['COMPONENTS.md', 'TRACKS.md', 'README.md', '../ARCHITECTURE.md'];
+const wrong = [];
+for (const d of DOCS) {
+  const text = readFileSync(d, 'utf8').split('\n');
+  text.forEach((line, i) => {
+    for (const m of line.matchAll(/(\d+) components/g)) {
+      if (Number(m[1]) !== COUNT) wrong.push(`${d}:${i + 1} says ${m[1]}`);
+    }
+  });
+}
+check(wrong.length === 0, `every "N components" in the docs says ${COUNT}`, wrong.join(' | '));
+
 console.log(fails ? `\n${fails} FAILED` : '\nthe template boundary holds');
 process.exit(fails ? 1 : 0);
