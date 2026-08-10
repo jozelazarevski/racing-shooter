@@ -169,6 +169,82 @@ const deterministic = await gamePage.evaluate(() => {
 });
 check(deterministic.a === deterministic.b, 'terrain queries are stable', deterministic.a);
 
+// ---- SAVE PUTS THE TRACK IN THE GAME -----------------------------------------
+//
+// The claim the user actually cares about: "once I save the track it needs to
+// be automatically uploaded to the game". On a static host there is no server
+// to upload to, so what that has to mean is: saved in the editor, and the game
+// plays it without being told where to look.
+//
+// Three separate things have to be true, and they are checked separately
+// because each one used to be false on its own:
+//   1. Save writes it where the game reads from.
+//   2. The BARE game URL — no ?track=, no ?t= — offers it, and offers it first.
+//   3. The game will actually build and race it.
+const saved = await page.evaluate(async () => {
+  const e = window.__editor;
+  const id = `smoke-save-${Date.now().toString(36)}`;
+  const d = structuredClone(e.def);
+  d.id = id;
+  d.name = 'SAVED BY THE SMOKE TEST';
+  e.def = d;
+  await new Promise((r) => setTimeout(r, 900));
+  document.getElementById('btnSave').click();
+  await new Promise((r) => setTimeout(r, 400));
+  return { id, note: document.getElementById('savedNote')?.textContent ?? '' };
+});
+check(saved.note.includes('in the game'), 'saving says where the track went', saved.note);
+
+// The OPEN dialog must list it — this is "I need to be able to edit tracks".
+const listed = await page.evaluate(async (id) => {
+  document.getElementById('btnOpen').click();
+  await new Promise((r) => setTimeout(r, 300));
+  const cards = [...document.querySelectorAll('#odlg .card')];
+  const names = cards.map((c) => c.querySelector('b').textContent);
+  const mine = cards.filter((c) => c.querySelector('.mine')).length;
+  const deletable = cards.filter((c) => c.querySelector('.del')).length;
+  document.querySelector('#odlg .close').click();
+  await new Promise((r) => setTimeout(r, 200));
+  return { names, mine, deletable, gone: !document.getElementById('odlg') };
+}, saved.id);
+check(listed.names.includes('SAVED BY THE SMOKE TEST'),
+  'the saved track is listed in Open, ready to edit again',
+  `${listed.names.length} tracks, ${listed.mine} yours, ${listed.deletable} deletable`);
+check(listed.gone, 'the open dialog closes');
+
+// Now the GAME, on the bare URL, in the same browser context so it shares
+// localStorage with the editor — which is the whole mechanism.
+const playPage = await ctx.newPage();
+const playErrors = [];
+playPage.on('pageerror', (e) => playErrors.push(e.message.split('\n')[0]));
+await playPage.goto(`${BASE}index.html`, { waitUntil: 'load' });
+await playPage.waitForSelector('#tsel .card', { timeout: 60000 });
+const picker = await playPage.evaluate(() => ({
+  first: document.querySelector('#tsel .card b')?.textContent,
+  selected: document.querySelector('#tsel .card.sel b')?.textContent,
+  count: document.querySelectorAll('#tsel .card').length,
+  outlines: [...document.querySelectorAll('#tsel .card path')].every((p) => (p.getAttribute('d') || '').length > 40),
+}));
+check(picker.selected === 'SAVED BY THE SMOKE TEST',
+  'the bare game URL offers the just-saved track, already selected',
+  `${picker.count} tracks, top is "${picker.first}"`);
+check(picker.outlines, 'every card draws its own road outline');
+
+await playPage.evaluate(() => document.querySelector('#tsel .card.sel').click());
+await playPage.waitForFunction(() => window.__dust?.track, null, { timeout: 120000 });
+const raced = await playPage.evaluate(() => ({
+  id: window.__dust.track.id, name: window.__dust.track.name,
+  racers: window.__dust.racers?.length ?? 0, url: location.search,
+}));
+check(raced.id === saved.id && raced.racers >= 3, 'the game races the saved track',
+  `${raced.name}, ${raced.racers} racers`);
+check(raced.url.includes(`track=${saved.id}`), 'picking a track puts it in the URL, so a reload keeps it', raced.url);
+check(playErrors.length === 0, 'no page errors playing a saved track', playErrors.slice(0, 2).join(' | '));
+
+// Clean up after ourselves — the smoke test must not leave a track behind in
+// whatever browser profile it ran in.
+await page.evaluate((id) => window.__editor.deleteLocalTrack(id), saved.id);
+
 check(errors.length === 0, 'no page errors in the editor', errors.slice(0, 4).join(' | '));
 
 await browser.close();

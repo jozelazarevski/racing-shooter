@@ -15,22 +15,41 @@
 
 import type { TrackDef } from './trackDef';
 import { trackErrors } from './trackDef';
-import dustbowl from '../data/tracks/dustbowl.json';
-import provingGround from '../data/tracks/proving-ground.json';
-import harbour from '../data/tracks/harbour.json';
+
+// DISCOVERED, NOT LISTED — the same rule the component registry follows. Every
+// `.json` in `data/tracks/` ships with the build, so PUBLISHING a track you
+// made in the editor is: export it, drop the file in that folder, commit. There
+// is no manifest to remember to update, which is the single most common way a
+// list like this rots. It used to be three hand-written imports and an array.
+const modules = import.meta.glob<{ default: unknown }>('../data/tracks/*.json', { eager: true });
 
 // JSON imports widen tuples to number[], so the cast goes through unknown.
-const BUILT_IN: TrackDef[] = [
-  dustbowl as unknown as TrackDef,
-  provingGround as unknown as TrackDef,
-  harbour as unknown as TrackDef,
-];
+const BUILT_IN: TrackDef[] = Object.entries(modules)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([, m]) => m.default as TrackDef)
+  .filter((t) => t && typeof t === 'object' && 'id' in t && 'road' in t);
 
 const LS_KEY = 'dustline.tracks.v1';
 const LS_LAST = 'dustline.tracks.last';
 
 export function builtInTracks(): TrackDef[] {
   return BUILT_IN.map((t) => structuredClone(t));
+}
+
+/** The id of the last track saved in the editor, if it is still there.
+ *
+ *  This was WRITTEN AND NEVER READ. `saveLocalTrack` has always recorded it and
+ *  nothing ever asked — so saving a track put it in storage where the game
+ *  could load it by id and the game had no reason to. That is the whole of
+ *  "once I save it, it should be in the game": the note was being left and
+ *  nobody was picking it up. */
+export function lastSavedId(): string | null {
+  try {
+    const id = localStorage.getItem(LS_LAST);
+    return id && localTracks().some((t) => t.id === id) ? id : null;
+  } catch {
+    return null;
+  }
 }
 
 export function localTracks(): TrackDef[] {
@@ -110,6 +129,15 @@ export function resolveTrackFromUrl(search = location.search): TrackDef {
     const def = findTrack(id);
     if (def) return def;
     console.warn(`[tracks] no track "${id}" — loading the default`);
+  }
+  // NOTHING ASKED FOR: the last track saved in the editor wins over the shipped
+  // default. Saving is the act of saying "this is the one I am working on", and
+  // making the player then hand-type `?track=` to see it is the round trip this
+  // whole editor exists to remove.
+  const last = lastSavedId();
+  if (last) {
+    const def = findTrack(last);
+    if (def) return def;
   }
   return builtInTracks()[0];
 }
