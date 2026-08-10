@@ -62,6 +62,43 @@ check(!!ver && stamp === ver, 'build stamp matches script version', `stamp=${sta
 const sw = readFileSync(join(ROOT, 'sw.js'), 'utf8');
 check(!!ver && sw.includes(ver), 'sw.js CACHE name carries the version', `looking for ${ver}`);
 
+// 3b. THE SERVICE WORKER MUST PRECACHE THE WHOLE MODULE GRAPH.
+//
+// CORE in sw.js is a hand-written list, and the module graph is not — it is
+// whatever `import` statements say. The two drift silently: nothing fails in
+// development, because the network is there. It fails on a plane, once, for a
+// player, with a blank screen. Found this way: `src/sync.js` had been imported
+// by main.js and absent from CORE for its whole life.
+//
+// So: walk the real graph from the entry points and require every file in it
+// to be listed. Bare specifiers ('three') resolve through the page's import
+// map, which is read here rather than hard-coded — a renamed three.js build
+// must not be able to fall out of the cache list unnoticed.
+const importMap = JSON.parse(
+  html.match(/<script type="importmap">([\s\S]*?)<\/script>/)?.[1] ?? '{}').imports ?? {};
+const entries = [...html.matchAll(/<script[^>]*\ssrc="\.\/(src\/[^"?]+)/g)].map((m) => m[1]);
+const graph = new Set();
+const follow = (rel) => {
+  if (graph.has(rel)) return;
+  graph.add(rel);
+  let src;
+  try { src = readFileSync(join(ROOT, rel), 'utf8'); } catch { return; }
+  for (const m of src.matchAll(/^\s*(?:import|export)[^'"]*from\s*['"]([^'"]+)['"]/gm)) {
+    const spec = m[1];
+    const mapped = importMap[spec];
+    if (mapped) { follow(mapped.replace(/^\.\//, '')); continue; }
+    if (!spec.startsWith('.')) continue;              // unmapped bare: not ours
+    follow(join(dirname(rel), spec).replace(/\\/g, '/'));
+  }
+};
+entries.forEach(follow);
+const cached = new Set([...sw.matchAll(/'\.\/((?:src|lib)\/[^']+)'/g)].map((m) => m[1]));
+const missing = [...graph].filter((f) => !cached.has(f)).sort();
+const stale = [...cached].filter((f) => !graph.has(f)).sort();
+check(graph.size > 1 && missing.length === 0,
+  'sw.js precaches every module in the import graph', missing.join(', '));
+check(stale.length === 0, 'sw.js precaches nothing that left the graph', stale.join(', '));
+
 // 4. every module PARSES AS A MODULE.
 //
 // `node --check src/track.js` is not this check. With no package.json in the

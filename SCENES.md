@@ -1,5 +1,10 @@
 # IGNITE RALLY — Scene Plan
 
+> **Scope: IGNITE RALLY (`src/`, the game at the repository root).**
+> This document is normative for v1 and says nothing about `dustline/`,
+> which is a separate game with its own specification in
+> `dustline/CLAUDE.md`. A rule here is not a rule there.
+
 What each world is *of*, in the real world, and what therefore has to be in it.
 This is the reference the scene work is built and checked against. Where the
 game currently disagrees with the plan, that is written down as OUTSTANDING

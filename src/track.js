@@ -1,80 +1,55 @@
-// Procedural race circuits + rich themed worlds around them.
-// Five levels share one Track class: the level's theme picks the circuit layout
-// and every color in the world (terrain, sky, vegetation, road tint, lighting).
+// The world BUILDER. One Track class turns a level's theme into a circuit,
+// its terrain, its water, its structures and its scatter.
+//
+// What used to sit in this file, and now does not:
+//   world/levels.js     the career roster            (pure data)
+//   world/circuits.js   circuit control polygons     (pure data)
+//   world/themes.js     per-theme art direction      (pure data)
+//   world/catalog.js    props, houses, element kits  (data + asset builders)
+//   world/constants.js  ROAD_HALF, RIM_RADIUS, tunnel bore
+//   world/rng.js        the seeded-world generator
+//   engine/dispose.js   generic three.js resource disposal
+//
+// Those modules know nothing about this one. The arrow points one way: data
+// and engine utilities never import the builder.
 import * as THREE from 'three';
 import {
   roadTexture, wallTexture, groundTexture, buildingTexture, buildingGlowTexture,
-  chevronTexture, checkerTexture, glowTexture, cloudTexture,
-  grassTexture, bannerTexture, hazardTexture, crowdTexture, awningTexture,
+  chevronTexture, checkerTexture,
+  bannerTexture, hazardTexture, crowdTexture, awningTexture,
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
-  crateTexture, coneTexture, barrelTexture, riverTexture, riverBankTexture, iglooTexture,
-  sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
-  contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
+  barrelTexture, riverTexture, riverBankTexture, iglooTexture,
+  roadNeonEmissiveTexture,
+  contactShadowTexture, stoneTexture, junctionTexture,
   townhouseTexture, townhouseGlowTexture,
 } from './textures.js';
 
-export const LEVELS = [
-  { id: 1, name: 'PINE VALLEY',  theme: 'forest',  region: 'PINE VALLEY' },
-  { id: 2, name: 'DUST CANYON',  theme: 'desert',  region: 'DUST CANYON' },
-  { id: 3, name: 'FROST PEAK',   theme: 'snow',    region: 'FROST PEAK' },
-  { id: 4, name: 'CANYON RUN',   theme: 'canyon',  region: 'DUST CANYON',
-    tune: { gorgeJump: { count: 2, depth: 26 }, tunnels: { count: 1 } } },
-  { id: 5, name: 'EMBER PASS',   theme: 'volcano', region: 'EMBER RIDGE' },
-  { id: 6, name: 'SUMMIT CLIMB', theme: 'alpine',  region: 'PINE VALLEY' },
-  { id: 7, name: 'GLACIAL PASS', theme: 'glacial', region: 'FROST PEAK' },
-  { id: 8, name: 'AMAZON RAPIDS', theme: 'jungle', region: 'AMAZON' },
-  { id: 9, name: 'THE DUNE SERPENT', theme: 'dunes', region: 'DUST CANYON' },
-  { id: 11, name: 'OASIS AMBUSH', theme: 'oasis', region: 'DUST CANYON' },
-  { id: 12, name: 'REDWOOD RAMPAGE', theme: 'redwood', region: 'PINE VALLEY' },
-  { id: 13, name: 'LOG FLUME FURY', theme: 'flume', region: 'PINE VALLEY' },
-  { id: 14, name: 'FOREST FIRE ESCAPE', theme: 'wildfire', region: 'PINE VALLEY' },
-  { id: 15, name: "GLACIER'S GRIND", theme: 'sheetice', region: 'FROST PEAK' },
-  { id: 16, name: 'AVALANCHE ALLEY', theme: 'avalanche', region: 'FROST PEAK' },
-  { id: 17, name: 'NEON GRID EXPRESSWAY', theme: 'neon', region: 'NEO-KYOTO' },
-  { id: 18, name: 'UNDERCITY SLIPSTREAM', theme: 'undercity', region: 'NEO-KYOTO' },
-  // ---- CAREER ORDER IS THIS ARRAY, NOT THE ids. ROCKFALL RAVINE sat at slot
-  // 10 of 21 and measured as the HARDEST track in the game: 25.8 % of its lap
-  // under a 40 u corner radius and 14.3 % under 25 u — both the worst figures
-  // on the roster, ahead of GOTTHARD (22.9 / 11.8) and TREMOLA (21.3 / 10.8),
-  // on the tightest median radius (87 u) — and it is one of only five worlds
-  // with solid cliff walls, and the only one that ALSO drops live rockfall.
-  // Since a world opens only on a podium finish on the one before it, that put
-  // the game's hardest circuit as a hard gate across the middle of the career.
-  // It is now the technical exam immediately before the alpine finale.
-  { id: 10, name: 'ROCKFALL RAVINE', theme: 'ravine', region: 'DUST CANYON',
-    tune: { gorgeJump: { count: 1 } } },
-  { id: 19, name: 'GOTTHARD CLIMB', theme: 'pass', region: 'ALPINE PASSES',
-    tune: { tunnels: { count: 2 } } },
-  { id: 20, name: 'TREMOLA DESCENT', theme: 'tremola', region: 'ALPINE PASSES',
-    tune: { tunnels: { count: 1 } } },
-  { id: 21, name: 'FURKA RIDGE', theme: 'furka', region: 'ALPINE PASSES', laps: 1,
-    tune: { tunnels: { count: 1 } } },
+import { disposeSubtree } from './engine/dispose.js';
+import { RIM_RADIUS, ROAD_HALF, TUNNEL_HW, TUNNEL_APEX, WALL_OFF, CENTER_SAMPLES }
+  from './world/constants.js';
+import { LEVELS } from './world/levels.js';
+import { CIRCUITS } from './world/circuits.js';
+import { THEMES } from './world/themes.js';
+import {
+  NARROW_TUNE, FORD_TUNE, VIZ_TUNE, SPONSORS, NEON_SPONSORS,
+  PROP_SPECS, PROP_SCORE, PROP_PICKUPS, BARREL_PALETTES,
+  HOUSE_TEMPLATES, COTTAGES, ELEMENT_KITS,
+  THEME_CROSSROADS, ELEMENT_KIT_BY_THEME,
+  gablePrismGeo, mergeBoxes, propAssets,
+} from './world/catalog.js';
+import { skyMethods } from './world/sky.js';
+import { floraMethods } from './world/flora.js';
 
-  // ---- WORLD RALLY: real stages, each a ROUTE over a borrowed THEME with its
-  // own `tune`. `tune` is layered over the theme object, so anything a theme
-  // sets can be overridden per level — elevation, jump count, cliff walls, the
-  // hero bridge. Career order is this array; ids are stable and never reused.
-  { id: 22, name: 'COL DE TURINI', theme: 'pass', route: 'turini', region: 'WORLD RALLY',
-    // relentless short hairpins, and jumps would be absurd on a tarmac col
-    tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0 } },
-  { id: 23, name: 'OUNINPOHJA', theme: 'forest', route: 'ouninpohja', region: 'WORLD RALLY',
-    // the fastest stage in the sport: everything is crests and yumps
-    tune: { elev: { amp: 4, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
-  { id: 24, name: 'FAFE LEAP', theme: 'redwood', route: 'fafe', region: 'WORLD RALLY',
-    tune: { elev: { amp: 8, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
-  { id: 25, name: 'PIKES PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
-    // the tallest climb on the roster, and nothing but the climb
-    tune: { elev: { amp: 27, ph: [1.7, 0.3, 2.8] }, rampCount: 0 } },
-  { id: 26, name: 'SAFARI PLAINS', theme: 'savanna', route: 'safari', region: 'WORLD RALLY',
-    tune: { elev: { amp: 4, ph: [0.9, 2.6, 1.2] }, rampCount: 5 } },
-  { id: 27, name: 'CORNICHE', theme: 'canyon', route: 'corniche', region: 'WORLD RALLY',
-    tune: { elev: { amp: 7, ph: [2.9, 1.1, 0.5] }, rampCount: 0 } },
-  { id: 28, name: 'ESTONIA CRESTS', theme: 'forest', route: 'estonia', region: 'WORLD RALLY',
-    // the only world besides CANYON RUN to hang a hero bridge over a gorge
-    tune: { // DAWN over the yumps: first light
-      sunColor: 0xffc8a0, sunIntensity: 2.3, sunEl: 0.22, sunAz: 0.4,
-      skyTop: '#3a5a94', skyHorizon: '#ffc8b0', fogColor: 0xe8c8c0, hemiIntensity: 0.62, elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
-      heroBridge: { at: [0.55, 0.66], half: 24, len: 210, depth: 28, skew: 0 } } },
+// Compatibility surface. `Track` is defined here; everything else below is
+// re-exported from its new home so that existing importers of './track.js'
+// keep working. New code should import from the module that owns the name.
+export { disposeSubtree } from './engine/dispose.js';
+export { RIM_RADIUS, ROAD_HALF, TUNNEL_HW, TUNNEL_APEX, WALL_OFF }
+  from './world/constants.js';
+export { LEVELS } from './world/levels.js';
+export { circuitPoints } from './world/circuits.js';
+export { HOUSE_TEMPLATES, COTTAGES } from './world/catalog.js';
+export { seededRandom, seedForLevel, withSeed } from './world/rng.js';
 
   // ---- MEDITERRANEAN. Appended, so nothing before it is re-priced (career
   // order is this array, not the ids — see the note above ROCKFALL RAVINE).
@@ -3208,114 +3183,8 @@ const smoothstep01 = (t) => {
   return u * u * (3 - 2 * u);
 };
 
-const N = 900;              // centerline samples
-/** Title-screen minimaps: the raw circuit control polygon for a theme. */
-export function circuitPoints(themeKey) { return CIRCUITS[themeKey] || CIRCUITS.forest; }
+const N = CENTER_SAMPLES;   // centerline samples
 
-export const ROAD_HALF = 9; // drivable half-width
-// bore section, shared by the tunnel mesh and by anything that has to know
-// whether a point is INSIDE a tunnel (the chase camera, above all)
-export const TUNNEL_HW = 11.6, TUNNEL_APEX = 8.6;
-export const WALL_OFF = 10.4;
-
-// ---- width-variation ----
-// Per-theme narrow-section tuning: {count, min} — `min` is the pinch floor as
-// a fraction of ROAD_HALF. Themes may also declare `narrows` directly on their
-// THEMES entry (it wins). Cliff-walled corridors (canyon/glacial/ravine/
-// sheetice/undercity) are auto-off — those roads are already the constraint.
-// Everything else defaults to { count: 3, min: 0.6 }.
-const NARROW_TUNE = {
-  avalanche: { count: 4, min: 0.55 },  // the pass squeezes hardest
-  alpine: { count: 2, min: 0.62 },     // switchback stack is left alone
-  dunes: { count: 2, min: 0.65 },      // fast flow world — gentler pinches
-  neon: { count: 2, min: 0.65 },       // expressway keeps its speed
-};
-// ---- river-fords ----
-// Worlds with shallow watercourses crossing the road (visible stream + splash
-// + wet-tire traction loss; consumed by the vehicle code via track.fords).
-// Themes may declare `fords: {count}` on their THEMES entry (it wins).
-const FORD_TUNE = {
-  forest: { count: 2 }, alpine: { count: 2 }, jungle: { count: 3 },
-  oasis: { count: 2 }, flume: { count: 2 }, redwood: { count: 2 },
-};
-// ---- viz-zones ----
-// Sectional visibility hazards, per theme: [kind, count] pairs.
-//   'forest'  — thick tree corridor pressed against both road edges + gloom
-//   'fogbank' — localized dense fog (pure zone data; runtime pulls fog in)
-//   'squall'  — rain burst + fog pull on wet worlds
-// Exposed as track.vizZones [{i0, i1, len, mid, half, kind, strength}];
-// the game lead lerps scene fog from it, rivals slow inside.
-const VIZ_TUNE = {
-  forest: [['forest', 2], ['squall', 1]],
-  alpine: [['forest', 2], ['fogbank', 1]],
-  redwood: [['forest', 2]],
-  flume: [['forest', 2]],
-  wildfire: [['forest', 1]],
-  jungle: [['forest', 2], ['squall', 1]],
-  avalanche: [['forest', 1], ['fogbank', 2]],
-  snow: [['fogbank', 2]],
-  glacial: [['fogbank', 1]],
-  sheetice: [['fogbank', 1]],
-};
-
-const SPONSORS = [
-  ['AETHER', '#14243a', '#7fd4ff'],
-  ['HYPER-FLUX', '#2a1436', '#ff7fd4'],
-  ['CLAW TIRES', '#1c1812', '#e8b83a'],
-  ['VOLT FUEL', '#26300f', '#d4ff5e'],
-  ['RALLY CO.', '#3a1414', '#ffd4c2'],
-];
-// NEO-KYOTO holo sponsors: near-black panels, searing neon lettering
-const NEON_SPONSORS = [
-  ['KIRIN CYBER', '#050510', '#2af6ff'],
-  ['LOTUS-9', '#0a0514', '#ff3af0'],
-  ['HYPER-FLUX', '#02101a', '#7fd4ff'],
-  ['ONI RAMEN', '#140505', '#ffd23a'],
-  ['VOLT', '#0a1405', '#d4ff5e'],
-];
-
-// ---------- destructible prop catalog ----------
-// Per-theme mix of smashable roadside props ([type, count]); every level totals
-// well under 60 individual meshes. Geometry (and theme-independent materials)
-// are shared module-wide — each prop is still its own cheap Mesh/Group so the
-// game code can knock it flying individually.
-const PROP_SPECS = {
-  forest: [['hay', 22], ['crate', 16], ['cone', 14]],
-  desert: [['crate', 16], ['cone', 14], ['barrel', 18]],
-  snow: [['snowman', 16], ['crate', 16], ['cone', 14]],
-  canyon: [['crate', 16], ['barrel', 13], ['cone', 13], ['rock', 8]],
-  volcano: [['barrel', 18], ['crate', 16], ['cone', 14]],
-  alpine: [['hay', 20], ['crate', 16], ['cone', 14]],
-  glacial: [['penguin', 10], ['snowman', 10], ['crate', 14], ['barrel', 10]],
-  jungle: [['crate', 14], ['barrel', 12], ['cone', 12], ['hay', 14]],
-  dunes: [['barrel', 16], ['crate', 16], ['cone', 14]],
-  ravine: [['crate', 14], ['barrel', 14], ['cone', 12], ['rock', 8]],
-  oasis: [['crate', 16], ['barrel', 12], ['hay', 14], ['cone', 10]],
-  redwood: [['hay', 18], ['crate', 16], ['cone', 12]],
-  flume: [['hay', 26], ['crate', 16], ['barrel', 12]],   // hay = cut-log rounds here
-  wildfire: [['barrel', 18], ['crate', 14], ['cone', 12]],
-  sheetice: [['penguin', 10], ['snowman', 10], ['crate', 14], ['barrel', 10]],
-  avalanche: [['snowman', 14], ['crate', 16], ['cone', 12], ['hay', 10]],
-  neon: [['barrel', 18], ['crate', 16], ['cone', 14]],
-  undercity: [['crate', 18], ['barrel', 18], ['cone', 12]],
-  pass: [['hay', 20], ['crate', 16], ['cone', 14], ['rock', 8]],
-  tremola: [['hay', 16], ['crate', 16], ['cone', 14], ['rock', 10]],
-  furka: [['snowman', 10], ['crate', 16], ['cone', 14], ['rock', 12]],
-  // OLIVE COAST: the Bible's roadside kit is blue plastic harvest crates,
-  // rolled olive nets (the hay rolls) and stones off the terrace walls
-  medterrace: [['crate', 20], ['hay', 14], ['cone', 12], ['rock', 8]],
-  // OLD TOWN: market stall crates packed away at the kerb, street-works cones
-  // and steel drums. No rocks and no hay — the region's negative list rules
-  // out gravel, dirt and anything that is not architectural.
-  oldtown: [['crate', 20], ['cone', 18], ['barrel', 14]],
-  // farm dressing only — 'hay' is a wrapped silage bale here and 'barrel' a
-  // slurry drum. No 'rock': the region's negative list forbids exposed rock.
-  farmland: [['hay', 24], ['crate', 14], ['barrel', 10], ['cone', 10]],
-  // OUTBACK: 44-gallon drums at the siding, station fodder, freight crates.
-  // No 'rock' — a gibber plain has no boulders worth stacking beside a road.
-  outback: [['barrel', 20], ['hay', 14], ['crate', 14], ['cone', 10]],
-};
-const PROP_SCORE = { cone: 25, crate: 50, hay: 40, barrel: 60, snowman: 75, rock: 20, penguin: 40 };
 const _m4 = new THREE.Matrix4(); // scratch (smashTree instance-zeroing)
 const PROP_PICKUPS = ['health', 'missile', 'nitro', 'mine'];
 // theme tints for the barrel drum texture
@@ -16424,61 +16293,18 @@ if (this._citMound) h += this._citMoundH(x, z);
   }
 }
 
-// ---------------------------------------------------------------------------
-// SEEDED WORLD GENERATION
-// ---------------------------------------------------------------------------
+// The two method groups that live in their own files. Installed here, once,
+// after the class is defined — `this` inside them is the Track instance, so
+// nothing about call order or shared state differs from having them inline.
 //
-// v1 makes 778 unseeded Math.random calls while building a world — 302 of them
-// in this file. The consequence is not "worlds vary", which would be fine: it
-// is that NO WORLD BUG CAN BE REPRODUCED. Measured on the shipped game, one
-// world's crest count moved 6 -> 0 across two loads with no code change. That
-// is why fixed bugs come back, and why the sinking report has stayed open —
-// there was never a way to make it happen twice.
-//
-// Rather than rewrite 302 call sites (and every helper outside this class, and
-// textures.js on top), the generator is swapped in for the DURATION OF WORLD
-// CONSTRUCTION and swapped back afterwards. World building is synchronous, so
-// the scope is exact: everything the Track constructor touches is seeded, and
-// nothing afterwards is. Gameplay randomness — damage rolls, AI jitter, particle
-// scatter — is deliberately left alone, because it should vary between runs.
-
-/** mulberry32: tiny, fast, well-distributed, and identical on every engine
- *  because it runs entirely on uint32 arithmetic. */
-export function seededRandom(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** FNV-1a. Turns a level id into a seed that depends on WHAT the world is,
- *  not on where it sits in the array — so reordering the career does not
- *  silently rebuild every world. */
-// The epoch is DELIBERATELY not tied to the release number. Bumping it
-// reshuffles every world in the game at once, so it changes only when new
-// worlds are actually wanted — never as a side effect of shipping.
-export function seedForLevel(level, epoch = 'ignite-1') {
-  const name = `${epoch}:${(level && level.id) ?? 0}:${(level && level.route) || (level && level.theme) || 'forest'}`;
-  let h = 0x811c9dc5;
-  for (let i = 0; i < name.length; i++) {
-    h ^= name.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
-}
-
-/** Run `fn` with Math.random seeded. Restores the real one even if fn throws —
- *  a half-built world must never leave the rest of the game deterministic. */
-export function withSeed(seed, fn) {
-  const real = Math.random;
-  Math.random = seededRandom(seed);
-  try {
-    return fn();
-  } finally {
-    Math.random = real;
+// Written with defineProperties rather than Object.assign so the methods land
+// non-enumerable, exactly like the ones declared in the class body: a plain
+// assign would make them show up in `for…in` and in JSON dumps of a track,
+// which the class's own methods do not.
+for (const group of [skyMethods, floraMethods]) {
+  for (const [name, fn] of Object.entries(group)) {
+    Object.defineProperty(Track.prototype, name, {
+      value: fn, writable: true, enumerable: false, configurable: true,
+    });
   }
 }
