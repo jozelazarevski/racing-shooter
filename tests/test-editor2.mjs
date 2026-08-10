@@ -133,10 +133,12 @@ ok(R.weather === 'snow' && R.surface === 'snow',
   'WEATHER reaches the theme the world and physics read', `${R.weather}/${R.surface}`);
 ok(!R.weatherCleared, 'CLEAR weather removes a deck the theme shipped with',
   String(R.weatherCleared));
-// PINE VALLEY may have no straight long enough to bore — that refusal is the
-// correct answer, and the tool now says so at tap time rather than building
-// nothing at APPLY. Assert whichever outcome the route actually earns.
-if (R.straightCurv <= 0.013) {
+// CONTRACT CHANGED, DELIBERATELY. "No straight long enough" used to be a
+// refusal; a bore's length is now fitted to the run that is actually there, so
+// a twisty lap gets a SHORTER tunnel instead of none. PINE VALLEY — the world
+// the editor opens on — had no station that passed the old full-length test,
+// which is why TUNNEL could not be used on it at all.
+if (true) {
   ok(R.tunnelsAsked === 1 && R.tunnelsInTheme === 1 && R.tunnelsSited,
     'ROAD features reach the builder, sited where they were asked for',
     `${R.tunnelsAsked}/${R.tunnelsInTheme}/at:${R.tunnelsSited}`);

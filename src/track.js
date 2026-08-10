@@ -4358,6 +4358,7 @@ export class Track {
       this.tan.push(tg);
       this.nrm.push(new THREE.Vector3(tg.z, 0, -tg.x));
     }
+    this._applyRouteWarp(edit);
     this._buildSampleGrid();
     // Elevation profile: the road climbs and descends over the lap (tan/nrm and
     // curvature stay XZ-based — heading math is unaffected by the y channel).
@@ -4861,6 +4862,52 @@ export class Track {
    *  samples in the rings it needs. Rings expand until the best hit so far is
    *  closer than the nearest unscanned cell could possibly be, so the result is
    *  the true nearest sample, not a good guess. */
+  /** THE EDITOR MOVED THE ROAD.
+   *
+   *  `edit.warp` is a list of pulls — {x, z, r, dx, dz} — laid down by dragging
+   *  a handle on the racing line. Each one displaces the centreline, falling
+   *  off as cos² of the distance from where it was grabbed, so the lap BENDS
+   *  toward the new point instead of kinking at it.
+   *
+   *  This runs before anything else touches `center`, and that ordering is the
+   *  whole trick: the elevation profile, the overpass planner, the terrain
+   *  blend, every scatter and the physics all derive from the centreline, so
+   *  moving it here means the world is built around the new shape rather than
+   *  the road being slid across ground that was shaped for the old one.
+   *
+   *  Tangents and normals are re-derived from the moved points afterwards —
+   *  keeping the originals would leave the road's cross-section pointing the
+   *  way the lap used to go, which is how a widened bend ends up with its
+   *  verge inside the carriageway. */
+  _applyRouteWarp(edit) {
+    const W = edit && edit.warp;
+    if (!W || !W.length) return;
+    const moved = [];
+    for (let i = 0; i < N; i++) {
+      const c = this.center[i];
+      let mx = 0, mz = 0;
+      for (const w of W) {
+        const d = Math.hypot(c.x - w.x, c.z - w.z);
+        if (d >= w.r) continue;
+        const t = Math.cos((d / w.r) * Math.PI * 0.5);
+        const k = t * t;
+        mx += w.dx * k; mz += w.dz * k;
+      }
+      moved.push([mx, mz]);
+    }
+    for (let i = 0; i < N; i++) {
+      this.center[i].x += moved[i][0];
+      this.center[i].z += moved[i][1];
+    }
+    for (let i = 0; i < N; i++) {
+      const a = this.center[(i - 1 + N) % N], b = this.center[(i + 1) % N];
+      const tx = b.x - a.x, tz = b.z - a.z;
+      const l = Math.hypot(tx, tz) || 1;
+      this.tan[i].set(tx / l, 0, tz / l);
+      this.nrm[i].set(this.tan[i].z, 0, -this.tan[i].x);
+    }
+  }
+
   _buildSampleGrid() {
     const CS = 32;
     const cells = new Map();
@@ -5745,6 +5792,41 @@ export class Track {
     }
   }
 
+  /** HOW LONG A BORE WILL THIS STATION TAKE?
+   *
+   *  A tunnel through a corner cuts its own mouth open, so the planner capped
+   *  curvature at 0.013 over the FULL requested bore length and gave up when
+   *  nothing cleared it. On PINE VALLEY — the world the editor opens on — the
+   *  straightest run measures 0.014, so a tunnel could not be built anywhere
+   *  on it at all, and the editor's TUNNEL tool spent its life arguing with
+   *  taps it was never going to accept.
+   *
+   *  But "too curved" is a statement about a LENGTH, not about a place: the
+   *  same bend takes a short bore happily. So instead of one pass/fail, this
+   *  returns the longest half-length that stays under the ceiling here, and a
+   *  twisty world gets a shorter tunnel rather than none. Zero means even the
+   *  minimum will not fit, which is the only honest refusal.
+   *
+   *  Shared by the planner and by the editor's TUNNEL tool, so what the tool
+   *  promises and what the builder does cannot drift apart. */
+  tunnelFitAt(i, maxHalf) {
+    const MIN = Math.max(6, Math.round(26 / this.segLen));   // ~26 u of bore
+    if (this._circDist(i, 0) < 100) return 0;
+    // Clear of a chasm by the BORE'S OWN LENGTH plus a margin, not by a flat
+    // 150 samples. The planner runs before the gorges are cut, so that constant
+    // never bit there — but the editor asks the same question after the world
+    // exists, and on GOTTHARD CLIMB 150 samples either side of two gorges ruled
+    // out 503 of 900 stations and left the tool with nowhere to put anything.
+    if (this._nearGorge(i, Math.max(8, maxHalf))) return 0;
+    let mc = 0, half = 0;
+    for (let w = 1; w <= maxHalf; w++) {
+      mc = Math.max(mc, this.curvature[(i + w + N) % N], this.curvature[(i - w + N) % N]);
+      if (mc > 0.013) break;
+      half = w;
+    }
+    return half >= MIN ? half : 0;
+  }
+
   _planTunnels() {
     const S = this.T.tunnels;
     const count = S.count ?? 1;
@@ -5756,21 +5838,20 @@ export class Track {
     // because a bore through a corner cuts its own mouth open.
     const want = Array.isArray(S.at) ? S.at.map((f) => Math.round(f * N) % N) : null;
     for (let k = 0; k < count; k++) {
-      let best = -1, bc = Infinity;
+      // take the LONGEST bore available, not the straightest station: a run
+      // that fits 40 u of tunnel beats one that is marginally straighter but
+      // only fits 27
+      let best = -1, bestFit = 0;
       const lo = want ? want[k] - 30 : 0, hi = want ? want[k] + 30 : N - 1;
       if (want && k >= want.length) break;
       for (let i0 = lo; i0 <= hi; i0 += want ? 1 : 2) {
         const i = (i0 + N) % N;
-        if (this._circDist(i, 0) < 100) continue;
-        if (this._nearGorge(i, 150)) continue;
         if (this._tunnels.some((t) => this._circDist(i, t.mid) < 170)) continue;
-        let mc = 0;
-        for (let w = -lenS; w <= lenS; w++) mc = Math.max(mc, this.curvature[(i + w + N) % N]);
-        if (mc < bc) { bc = mc; best = i; }
+        const fit = this.tunnelFitAt(i, lenS);
+        if (fit > bestFit) { bestFit = fit; best = i; }
       }
-      // a bore through a corner self-intersects; only genuine straights bore
-      if (best < 0 || bc > 0.013) break;
-      const half = lenS >> 1;
+      if (best < 0 || !bestFit) break;
+      const half = Math.min(bestFit, lenS >> 1);
       if (best - half < 0 || best + half >= N) break;    // no wrap runs
       const s0 = best - half, e0 = best + half;
       const pts = [];
@@ -11139,8 +11220,16 @@ if (this._citMound) h += this._citMoundH(x, z);
    *  `_realizeElements`, and every builder that wants a building comes through
    *  here. That is the point — see the header on HOUSE_TEMPLATES for the two
    *  independent copies of the same roof bug that made it necessary. */
-  _element(B, type, x, z, rot, K, scale = 1, yOverride = null) {
-    if (this._erased(x, z)) return;
+  /** `authored` marks a placement the PLAYER made in the editor.
+   *
+   *  A clear zone means "the world must not invent scenery here" — it has
+   *  never meant "and delete the chapel I put there myself". Because this veto
+   *  applied to every caller alike, drawing a CLEAR AREA over your own village
+   *  silently removed it at the next APPLY while its markers stayed on screen:
+   *  fourteen chapels became zero and nothing said so. Authored placements are
+   *  yours, and the eraser you aimed at the world does not eat them. */
+  _element(B, type, x, z, rot, K, scale = 1, yOverride = null, authored = false) {
+    if (!authored && this._erased(x, z)) return;
     // == null catches undefined too - a caller passing undefined must not NaN
     const y = (yOverride == null ? this.terrainHeight(x, z) : yOverride) - 0.25;
     const cs = Math.cos(rot), sn = Math.sin(rot);
@@ -11382,7 +11471,7 @@ if (this._citMound) h += this._citMoundH(x, z);
     const kit = K || ELEMENT_KITS.farm;
     for (const e of list) {
       if (!HOUSE_TEMPLATES[e.preset]) continue;
-      this._element(B, e.preset, e.x, e.z, e.rot || 0, kit, e.scale || 1);
+      this._element(B, e.preset, e.x, e.z, e.rot || 0, kit, e.scale || 1, null, true);
     }
   }
 

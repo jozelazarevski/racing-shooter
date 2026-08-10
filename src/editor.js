@@ -166,6 +166,25 @@ export const THEME_MENU = [
   ['neon', 'NEON CITY'], ['dunes', 'DUNES'], ['glacial', 'GLACIAL'],
 ];
 
+/* What each tool actually wants you to do. Picking a tool used to echo its own
+ * name back at you, which tells you nothing you did not just read off the
+ * button — and for the tools whose gesture is not obvious (tap versus drag,
+ * which slider matters) that was the difference between working and broken. */
+const HINT = {
+  raise: 'RAISE — drag to paint the ground up (SIZE and FORCE)',
+  lower: 'LOWER — drag to dig (SIZE and FORCE)',
+  smooth: 'SMOOTH — drag to average the ground under the brush',
+  flatten: 'FLATTEN — drag to level everything to where you started',
+  place: 'PLACE — pick a preset, then TAP the ground. ROT and SCALE aim it',
+  erase: 'ERASE — tap to remove what is under the brush, yours or the world\'s',
+  clear: 'CLEAR AREA — tap to strip the world\'s own scenery from a circle',
+  rotate: 'ROTATE — tap an object you placed to turn it by ROT',
+  road: 'ROAD — pick TUNNEL or BRIDGE, then tap the road',
+  route: 'MOVE ROAD — drag a marker on the racing line to bend the lap',
+  water: 'WATER — tap to sink a lake (SIZE sets it)',
+  orbit: 'ORBIT — drag to swing the camera, pinch or wheel to zoom',
+};
+
 /* ---------------------------------------------------------------------------
  * WorldEditor
  * ------------------------------------------------------------------------- */
@@ -210,6 +229,26 @@ export class WorldEditor {
     this._hasHit = false;
     this._previewed = new Set();     // meshes whose vertices we pushed
 
+    // ONE UNDO STACK FOR EVERYTHING.
+    //
+    // Undo used to guess what you meant from the current tool, and its first
+    // test was `tool === 'place' || this.preset` — but `preset` is set the
+    // moment you touch the palette and never clears, so from then on UNDO
+    // popped buildings no matter which tool was live. Sculpt, erase and the
+    // road features had no way to be undone at all. Every edit now pushes the
+    // exact inverse of itself and UNDO runs the last one.
+    this._history = [];
+
+    // Point-and-drag re-routing: displacements applied to the racing line
+    // itself, {x, z, r, dx, dz}. The Track sums them over the centreline
+    // before anything else is built, so the whole world follows the new shape.
+    this.warp = [];
+    this._drag = null;               // the control point currently being moved
+
+    this._placeRot = 0;
+    this._placeScale = 1;
+    this._rotStep = Math.PI / 8;   // 22.5 deg per tap of the ROTATE tool
+
     this._buildDOM();
   }
 
@@ -244,6 +283,10 @@ export class WorldEditor {
       waters: this.waters.length ? this.waters.map((w) => ({
         x: +w.x.toFixed(1), z: +w.z.toFixed(1), r: +w.r.toFixed(1), y: +w.y.toFixed(2),
       })) : undefined,
+      warp: this.warp.length ? this.warp.map((w) => ({
+        x: +w.x.toFixed(1), z: +w.z.toFixed(1), r: +w.r.toFixed(1),
+        dx: +w.dx.toFixed(1), dz: +w.dz.toFixed(1),
+      })) : undefined,
       elements: this.elements.map((e) => ({
         preset: e.preset, x: +e.x.toFixed(1), z: +e.z.toFixed(1),
         rot: +e.rot.toFixed(3), scale: +e.scale.toFixed(2),
@@ -269,6 +312,7 @@ export class WorldEditor {
       elements: this.elements,
       erase: this.erase,
       waters: this.waters,
+      warp: this.warp,
       theme: this.themeName || undefined,
       tune: Object.keys(tune).length ? tune : undefined,
     };
@@ -289,7 +333,9 @@ export class WorldEditor {
       bridge: typeof rd.bridge === 'number' ? rd.bridge : null,
     };
     this.waters = (data.waters || []).map((w) => ({ ...w }));
+    this.warp = (data.warp || []).map((w) => ({ ...w }));
     this.sceneName = data.name || '';
+    this._history = [];
     this.dirty = false;
   }
 
@@ -321,6 +367,10 @@ export class WorldEditor {
     this._syncCam();
     this._bindPointer();
     this._renderPalette();
+    if (this._routeGrp) this._routeGrp.visible = true;
+    // exit() takes the markers down, so enter() has to put them back — a
+    // second visit used to open on a scene with no sign of the work in it
+    this._refreshMarkers();
     this._status('EDITOR — sculpt, place, then APPLY');
   }
 
@@ -329,6 +379,16 @@ export class WorldEditor {
     this.active = false;
     this._unbindPointer();
     this._clearPreview();
+    // TAKE THE MARKERS WITH YOU. The ghosts, clear-zone discs and road pins
+    // live on `game.scene`, not on the track group, so a rebuild does not
+    // touch them and exit() left them standing: you drove the lap through a
+    // row of floating yellow rings and blue pins. They are editor furniture
+    // and they belong to the editor.
+    this._clearGhosts();
+    this._clearZoneMarks();
+    this._clearRoadMarks();
+    if (this._routeGrp) this._routeGrp.visible = false;
+    if (this.ring) this.ring.visible = false;
     this.root.classList.add('off');
     document.getElementById('hud')?.style.removeProperty('display');
     for (const id of ['race-info', 'score-box', 'health-box', 'weapon-box',
@@ -351,11 +411,19 @@ export class WorldEditor {
   update() {
     if (!this.active) return;
     this._syncCam();
-    if (this.ring) this.ring.visible = this._hasHit && this._isSculpt();
+    if (this.ring) this.ring.visible = this._hasHit && this._hasRadius();
     this.game.renderer.render(this.game.scene, this.game.camera);
   }
 
   _isSculpt() { return ['raise', 'lower', 'smooth', 'flatten'].includes(this.tool); }
+
+  /** Tools whose SIZE slider means something, and which therefore deserve the
+   *  brush ring. It used to show only while sculpting, so ERASE, CLEAR AREA
+   *  and WATER — all of which use the same radius — gave no clue how much
+   *  ground they were about to take. */
+  _hasRadius() {
+    return this._isSculpt() || ['erase', 'clear', 'water'].includes(this.tool);
+  }
 
   _syncCam() {
     const cam = this.game.camera;
@@ -481,6 +549,9 @@ export class WorldEditor {
     this.elements.push(e);
     this.dirty = true;
     this._ghost(e);
+    this._push(`a ${this.preset}`, () => {
+      this.elements = this.elements.filter((q) => q !== e);
+    });
     this._status(`placed ${this.preset} (${this.elements.length} total) — APPLY to build`);
   }
 
@@ -551,30 +622,33 @@ export class WorldEditor {
   }
 
   /* --- apply -------------------------------------------------------------- */
-  apply() {
+  /** `then` runs AFTER the rebuild, not after the timer that schedules it.
+   *  The delay exists only so the status line paints before a rebuild that
+   *  blocks for about a second — but TEST DRIVE used to call apply() and then
+   *  immediately start the race, so `startRace` set the state to 'countdown'
+   *  and the rebuild, arriving 30 ms later, found swapLevel refusing to run.
+   *  You drove the UNEDITED world while the screen said APPLIED. */
+  apply(then = null) {
     this._status('rebuilding…');
     this._clearPreview();
-    // let the status paint before the (synchronous, second-long) rebuild
     setTimeout(() => {
       this.game.editScene = this.buildPayload();
       this.game.rebuildWorld();
       this._tmCache = null;
       this.dirty = false;
-      this._clearGhosts();
       // everything on the list is now a real building in the rebuilt world,
       // so its marker drops to a footprint ring instead of a crate over it
-      for (const e of this.elements) { e.built = true; this._ghost(e); }
-      this._clearZoneMarks();
-      for (const z of this.erase) this._zoneMark(z);
+      for (const e of this.elements) e.built = true;
+      this._refreshMarkers();
       this._status(`APPLIED — ${this.delta.length} dabs, ${this.elements.length} objects, `
-        + `${this.erase.length} cleared`);
+        + `${this.erase.length} cleared, ${this.warp.length} road moves`);
+      if (then) then();
     }, 30);
   }
 
   testDrive() {
-    if (this.dirty) this.apply();
-    this.exit();
-    this.game.startRace?.();
+    const go = () => { this.exit(); this.game.startRace?.(); };
+    if (this.dirty) this.apply(go); else go();
   }
 
   /* --- input -------------------------------------------------------------- */
@@ -584,27 +658,31 @@ export class WorldEditor {
       el.setPointerCapture?.(e.pointerId);
       this._ptr.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
       if (this._ptr.size === 1) {
-        // left/touch = act with the tool; right/middle = orbit
-        this._orbiting = (e.button === 2 || e.button === 1) || this.tool === 'orbit';
-        if (!this._orbiting) {
+        // THE CAMERA IS ALWAYS YOURS.
+        //
+        // Orbit used to need a right button or the ORBIT tool, which on a
+        // phone means it needed the ORBIT tool — so with any other tool
+        // selected a drag did nothing and the view was stuck wherever it had
+        // been parked. Reported as the camera not being fixed.
+        //
+        // Now a DRAG always moves the camera and a TAP always acts. The only
+        // exception is the sculpt brushes, which are painted by dragging and
+        // would be useless otherwise; those keep the right button for orbit.
+        this._orbiting = (e.button === 2 || e.button === 1) || this.tool === 'orbit'
+          || !this._isSculpt();
+        this._tapPending = !this._isSculpt() && this.tool !== 'orbit' && e.button === 0;
+        if (this._isSculpt() && !this._orbiting) {
           const p = this._pick(e.clientX, e.clientY);
           if (p) {
-            if (this._isSculpt()) {
-              this._flatY = this.game.track.terrainHeight(p.x, p.z) + this.delta.at(p.x, p.z);
-              this._painting = true;
-              this._dab(p);
-            } else if (this.tool === 'place') {
-              this._place(p);
-            } else if (this.tool === 'erase') {
-              this._eraseAt(p);
-            } else if (this.tool === 'clear') {
-              this._eraseWorldAt(p);
-            } else if (this.tool === 'road') {
-              this._roadAt(p);
-            } else if (this.tool === 'water') {
-              this._waterAt(p);
-            }
+            this._flatY = this.game.track.terrainHeight(p.x, p.z) + this.delta.at(p.x, p.z);
+            this._painting = true;
+            this._strokeFrom = this.delta.dabs.length;
+            this._dab(p);
           }
+        } else if (this._tapPending && this.tool === 'route') {
+          // the one drag that is not the camera: a control point being moved
+          this._beginRouteDrag(e.clientX, e.clientY);
+          if (this._drag) { this._orbiting = false; this._tapPending = false; }
         }
       } else {
         this._painting = false;
@@ -622,12 +700,16 @@ export class WorldEditor {
       if (!rec) return;
       const dx = e.clientX - rec.x, dy = e.clientY - rec.y;
       rec.x = e.clientX; rec.y = e.clientY;
+      // once the finger has travelled, this is a drag and not a tap
+      if (Math.hypot(e.clientX - rec.sx, e.clientY - rec.sy) > 8) this._tapPending = false;
       if (this._ptr.size >= 2) {
         // pinch = zoom, drag = pan
         const d = this._pinchDist();
         if (this._pinch) this.dist = Math.max(30, Math.min(1400, this.dist * (this._pinch / d)));
         this._pinch = d;
         this._pan(dx * 0.5, dy * 0.5);
+      } else if (this._drag) {
+        this._dragRoute(e.clientX, e.clientY);
       } else if (this._orbiting) {
         this.yaw -= dx * 0.006;
         this.pitch = Math.max(0.12, Math.min(1.52, this.pitch + dy * 0.005));
@@ -637,8 +719,22 @@ export class WorldEditor {
       e.preventDefault();
     };
     this._onUp = (e) => {
+      const rec = this._ptr.get(e.pointerId);
       this._ptr.delete(e.pointerId);
-      if (this._ptr.size === 0) { this._painting = false; this._orbiting = false; }
+      // A TAP IS A CLICK THAT DID NOT MOVE. Acting on pointerDOWN meant every
+      // attempt to swing the camera also dropped a building where the finger
+      // landed, so the two could not coexist; acting on pointerUP, only when
+      // the finger stayed put, lets one finger do both.
+      if (rec && this._tapPending && this._ptr.size === 0) {
+        const moved = Math.hypot(e.clientX - rec.sx, e.clientY - rec.sy);
+        if (moved <= 8) this._tapAt(e.clientX, e.clientY);
+      }
+      if (this._drag) this._endRouteDrag();
+      this._tapPending = false;
+      if (this._ptr.size === 0) {
+        if (this._painting) this._endStroke();
+        this._painting = false; this._orbiting = false;
+      }
       this._pinch = 0;
     };
     this._onWheel = (e) => {
@@ -676,6 +772,68 @@ export class WorldEditor {
     if (this.ring) this.ring.visible = false;
   }
 
+  /** One tap, one action — every click-once tool dispatches from here. */
+  _tapAt(cx, cy) {
+    const p = this._pick(cx, cy);
+    if (!p) { this._status('tap the ground, not the sky'); return; }
+    if (this.tool === 'place') this._place(p);
+    else if (this.tool === 'erase') this._eraseAt(p);
+    else if (this.tool === 'clear') this._eraseWorldAt(p);
+    else if (this.tool === 'road') this._roadAt(p);
+    else if (this.tool === 'water') this._waterAt(p);
+    else if (this.tool === 'rotate') this._rotateAt(p);
+    else if (this.tool === 'route') this._status('drag a marker on the road to move the line');
+  }
+
+  /* --- undo --------------------------------------------------------------- */
+  /** Record the inverse of an edit. Every mutating tool calls this, so UNDO
+   *  never has to guess which one you meant from the tool that happens to be
+   *  selected — which is exactly how it used to get it wrong. */
+  _push(label, undo) { this._history.push({ label, undo }); }
+
+  /** A sculpt STROKE is one action, not forty. Dragging the brush lays a dab
+   *  every frame; undoing them one at a time would take as long as painting. */
+  _endStroke() {
+    const from = this._strokeFrom ?? this.delta.dabs.length;
+    const n = this.delta.dabs.length - from;
+    if (n <= 0) return;
+    this._push(`${n} dab${n > 1 ? 's' : ''}`, () => {
+      this.delta.dabs.length = from;
+      this.delta.rebuild();
+    });
+    this._strokeFrom = null;
+  }
+
+  _undo() {
+    const a = this._history.pop();
+    if (!a) { this._status('nothing left to undo'); return; }
+    a.undo();
+    this.dirty = true;
+    this._refreshMarkers();
+    this._status(`undid ${a.label} — ${this._history.length} step`
+      + `${this._history.length === 1 ? '' : 's'} left`);
+  }
+
+  /** Redraw every marker from the current model. Cheaper to think about than
+   *  patching each list's markers at each call site, and it means UNDO cannot
+   *  leave a ghost behind for something that no longer exists. */
+  _refreshMarkers() {
+    this._clearGhosts();
+    for (const e of this.elements) this._ghost(e);
+    this._clearZoneMarks();
+    for (const z of this.erase) this._zoneMark(z);
+    this._clearRoadMarks();
+    const t = this.game.track;
+    for (const f of this.roadFeat.tunnels) {
+      this._roadMark(t.center[Math.round(f * t.center.length) % t.center.length], 0x9ad8ff);
+    }
+    if (this.roadFeat.bridge != null) {
+      const i = Math.round(this.roadFeat.bridge * t.center.length) % t.center.length;
+      this._roadMark(t.center[i], 0xffd24a);
+    }
+    this._routeMarks();
+  }
+
   _pinchDist() {
     const a = [...this._ptr.values()];
     if (a.length < 2) return 0;
@@ -694,11 +852,14 @@ export class WorldEditor {
    *  build - so the only honest way to remove it is to record a keep-out
    *  circle and have the builders skip it. Takes effect at APPLY, like every
    *  other edit, and the marker shows what will go. */
-  _eraseWorldAt(p) {
-    this.erase.push({ x: p.x, z: p.z, r: this.radius });
+  _eraseWorldAt(p, why = null) {
+    const z = { x: p.x, z: p.z, r: this.radius };
+    this.erase.push(z);
     this.dirty = true;
-    this._zoneMark(this.erase[this.erase.length - 1]);
-    this._status(`clear zone ${this.erase.length} (r ${Math.round(this.radius)}) — APPLY to strip it`);
+    this._zoneMark(z);
+    this._push('a clear zone', () => { this.erase = this.erase.filter((q) => q !== z); });
+    this._status(why || `clear zone ${this.erase.length} (r ${Math.round(this.radius)})`
+      + ' — APPLY to strip it');
   }
 
   _zoneMark(z) {
@@ -747,8 +908,22 @@ export class WorldEditor {
     // ...then stand the water just under the original rim, so the bank shows
     const y = surf - 0.5;
     const near = this.waters.find((w) => Math.hypot(w.x - p.x, w.z - p.z) < w.r * 0.6);
-    if (near) { near.r = Math.max(near.r, r); near.y = Math.min(near.y, y); }
-    else this.waters.push({ x: p.x, z: p.z, r, y });
+    const dabAt = this.delta.dabs.length - 1;
+    if (near) {
+      const wasR = near.r, wasY = near.y;
+      near.r = Math.max(near.r, r); near.y = Math.min(near.y, y);
+      this._push('a lake', () => {
+        near.r = wasR; near.y = wasY;
+        this.delta.dabs.splice(dabAt, 1); this.delta.rebuild();
+      });
+    } else {
+      const w = { x: p.x, z: p.z, r, y };
+      this.waters.push(w);
+      this._push('a lake', () => {
+        this.waters = this.waters.filter((q) => q !== w);
+        this.delta.dabs.splice(dabAt, 1); this.delta.rebuild();
+      });
+    }
     this.dirty = true;
     this._status(`water: ${this.waters.length} ${this.waters.length === 1 ? 'lake' : 'lakes'}`
       + ` — ${depth.toFixed(1)} u deep, APPLY to fill`);
@@ -772,10 +947,13 @@ export class WorldEditor {
     this._zones.add(m);
   }
 
+  /** With no colour, clear every road pin — which is what UNDO and exit need.
+   *  With one, clear just that kind (the bridge replaces its own pin). */
   _clearRoadMarks(color) {
     if (!this._zones) return;
     for (const c of [...this._zones.children]) {
-      if (c.userData.roadMark !== color) continue;
+      if (c.userData.roadMark === undefined) continue;
+      if (color !== undefined && c.userData.roadMark !== color) continue;
       c.geometry.dispose(); c.material.dispose(); this._zones.remove(c);
     }
   }
@@ -804,58 +982,224 @@ export class WorldEditor {
     const n = t.center.length;
     const frac = i / n;
 
+    // SITE IT, DO NOT REFUSE IT.
+    //
+    // Both features used to test the exact station you tapped and give up if
+    // it failed. On PINE VALLEY — the world the editor opens on — not one of
+    // the 900 stations passed the tunnel test, so TUNNEL could not be placed
+    // anywhere at all and simply argued with every tap. BRIDGE did the same
+    // thing for a different reason: the camera starts parked over the start
+    // line, and a gorge is forbidden within 70 samples of it.
+    //
+    // A tap means "about here". So walk outward from it and take the first
+    // station that works, telling you how far it had to go. Only when the
+    // WHOLE LAP has nowhere is there anything to refuse, and then the message
+    // is about the world rather than about your aim.
     if (this.roadMode === 'tunnel') {
-      // MEASURE WHAT THE PLANNER MEASURES. A ±20-sample window said "straight
-      // enough" while _planTunnels, which looks over the whole bore length,
-      // said no — so the editor accepted the tap and then nothing appeared at
-      // APPLY, which is the silence this tool was supposed to end.
+      // Measure what the planner measures: _planTunnels looks over the whole
+      // bore length, so a +/-20 sample window said "straight enough" and then
+      // nothing appeared at APPLY.
+      // ASK THE BUILDER, DO NOT GUESS. The editor used to keep its own copy of
+      // the planner's curvature ceiling; the two then had to be kept in step by
+      // hand, and when the planner learned to shorten a bore rather than refuse
+      // it, the editor would have gone on refusing. `tunnelFitAt` is the one
+      // rule, and it answers with the LENGTH available rather than yes/no.
       const lenS = Math.round(((t.T.tunnels && t.T.tunnels.len) || 80) / t.segLen);
-      let mc = 0;
-      for (let w = -lenS; w <= lenS; w++) mc = Math.max(mc, t.curvature[(i + w + n) % n]);
-      if (mc > 0.013) {
-        this._status(`too twisty here (${mc.toFixed(3)}) — a bore through a corner `
-          + 'cuts its own mouth. Find a straighter run.');
+      const clash = (k) => this.roadFeat.tunnels.some(
+        (f) => t._circDist(Math.round(f * n) % n, k) < lenS * 2 + 8);
+      const site = this._walkOut(i, n, (k) => t.tunnelFitAt(k, lenS) > 0 && !clash(k));
+      if (site == null) {
+        this._status(clash(i)
+          ? 'every straight on this lap already has a bore — UNDO one first'
+          : 'nowhere on this lap holds even a short bore — it is corners all the way');
         return;
       }
-      if (this.roadFeat.tunnels.some((f) => Math.abs(f - frac) * n < 170)) {
-        this._status('there is already a tunnel on this stretch'); return;
-      }
-      this.roadFeat.tunnels.push(frac);
-      this._roadMark(c, 0x9ad8ff);
-      this._status(`tunnel at ${(frac * 100) | 0}% of the lap `
-        + `(${this.roadFeat.tunnels.length} total) — APPLY to bore it`);
+      const fit = Math.round(t.tunnelFitAt(site, lenS) * 2 * t.segLen);
+      const f = site / n;
+      this.roadFeat.tunnels.push(f);
+      this._roadMark(t.center[site], 0x9ad8ff);
+      this._push('a tunnel', () => {
+        this.roadFeat.tunnels = this.roadFeat.tunnels.filter((q) => q !== f);
+      });
+      const moved = Math.round(t._circDist(site, i) * t.segLen);
+      this._status(`tunnel at ${(f * 100) | 0}% of the lap, ${fit} u long`
+        + (moved > 6 ? ` (${moved} u along, to the nearest straight)` : '')
+        + ` — ${this.roadFeat.tunnels.length} total, APPLY to bore it`);
     } else {
       // ONE road bridge per world: it is a carved gorge with a span over it,
       // and two of them fighting over the same elevation profile is how you
       // get a road that leads into a hole.
-      //
-      // _planGorge takes the straightest sample inside the window it is given
-      // and imposes no curvature ceiling of its own, so the editor must not
-      // invent one either — it only enforces the rule the planner does have:
-      // not on top of the start line.
-      if (t._circDist(i, 0) < 70) {
-        this._status('too close to the start line for a gorge — pick a spot further round');
-        return;
-      }
-      this.roadFeat.bridge = frac;
+      const site = this._walkOut(i, n, (k) => t._circDist(k, 0) >= 70);
+      if (site == null) { this._status('this lap is too short to carry a gorge'); return; }
+      const f = site / n;
+      const was = this.roadFeat.bridge;
+      this.roadFeat.bridge = f;
       this._clearRoadMarks(0xffd24a);
-      this._roadMark(c, 0xffd24a);
-      this._status(`bridge over a new gorge at ${(frac * 100) | 0}% of the lap `
-        + '— APPLY to carve and span it');
+      this._roadMark(t.center[site], 0xffd24a);
+      this._push('the bridge', () => { this.roadFeat.bridge = was; });
+      const moved = Math.round(t._circDist(site, i) * t.segLen);
+      this._status(`bridge over a new gorge at ${(f * 100) | 0}% of the lap`
+        + (moved > 6 ? ` (${moved} u clear of the start line)` : '')
+        + ' — APPLY to carve and span it');
     }
     this.dirty = true;
   }
 
-  _eraseAt(p) {
-    // drop placed objects within the brush; sculpt dabs are undone with UNDO
-    const before = this.elements.length;
-    this.elements = this.elements.filter((e) => Math.hypot(e.x - p.x, e.z - p.z) > this.radius);
-    if (this.elements.length !== before) {
-      this._clearGhosts();
-      for (const e of this.elements) this._ghost(e);
-      this.dirty = true;
-      this._status(`erased ${before - this.elements.length}`);
+  /* --- point-and-drag re-routing ------------------------------------------ */
+  /** MOVE THE ROAD ITSELF.
+   *
+   *  The ROAD tool only ever placed tunnels and bridges — there was no way to
+   *  change where the lap GOES, which is the first thing anyone expects from a
+   *  track editor. Handles sit on the racing line; drag one and the centreline
+   *  follows it, with the pull falling off smoothly along the lap so the road
+   *  bends rather than kinking.
+   *
+   *  The displacement is stored, not baked: `edit.warp` is a list of pulls,
+   *  and the Track sums them over the centreline before anything else is
+   *  built. That is what makes the whole world follow — the terrain blend, the
+   *  scenery, the overpasses and the elevation all read the moved line, so the
+   *  road does not end up sliding across ground that was shaped for the old
+   *  one. */
+  _routeHandles() {
+    const t = this.game.track, n = t.center.length;
+    const out = [];
+    const STEP = Math.max(1, Math.round(n / 24));      // two dozen handles
+    for (let i = 0; i < n; i += STEP) out.push(i);
+    return out;
+  }
+
+  _routeMarks() {
+    if (this._routeGrp) {
+      for (const c of [...this._routeGrp.children]) {
+        c.geometry.dispose(); c.material.dispose(); this._routeGrp.remove(c);
+      }
     }
+    if (this.tool !== 'route') return;
+    if (!this._routeGrp) {
+      this._routeGrp = new THREE.Group();
+      this._routeGrp.name = 'editor-route';
+      this.game.scene.add(this._routeGrp);
+    }
+    const t = this.game.track;
+    for (const i of this._routeHandles()) {
+      const c = t.center[i];
+      const pulled = this.warp.some((w) => Math.hypot(w.x - c.x, w.z - c.z) < 12);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(2.6, 10, 8),
+        new THREE.MeshBasicMaterial({ color: pulled ? 0x7dff9b : 0x6fe3ff,
+          transparent: true, opacity: 0.9, depthTest: false }));
+      m.position.set(c.x, c.y + 3.2, c.z);
+      m.renderOrder = 998;
+      m.userData.station = i;
+      this._routeGrp.add(m);
+    }
+  }
+
+  _beginRouteDrag(cx, cy) {
+    if (!this._routeGrp || !this._routeGrp.children.length) return;
+    const g = this.game;
+    const r = g.renderer.domElement.getBoundingClientRect();
+    this._ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    this._ray.setFromCamera(this._ndc, g.camera);
+    const hit = this._ray.intersectObjects(this._routeGrp.children, false)[0];
+    if (!hit) return;
+    const i = hit.object.userData.station;
+    const c = g.track.center[i];
+    this._drag = { i, ox: c.x, oz: c.z, mesh: hit.object };
+  }
+
+  _dragRoute(cx, cy) {
+    const p = this._pick(cx, cy);
+    if (!p || !this._drag) return;
+    this._drag.mesh.position.set(p.x, p.y + 3.2, p.z);
+    this._drag.nx = p.x; this._drag.nz = p.z;
+  }
+
+  _endRouteDrag() {
+    const d = this._drag;
+    this._drag = null;
+    if (!d || d.nx === undefined) { this._routeMarks(); return; }
+    const dx = d.nx - d.ox, dz = d.nz - d.oz;
+    const moved = Math.hypot(dx, dz);
+    if (moved < 3) { this._routeMarks(); return; }
+    // REACH IS PROPORTIONAL TO THE PULL. A 10 u nudge that dragged 300 u of
+    // lap with it is not an edit, it is a new circuit; a 120 u haul that only
+    // reached 40 u either side would fold the road back on itself.
+    const w = { x: d.ox, z: d.oz, r: Math.max(70, moved * 3.2), dx, dz };
+    this.warp.push(w);
+    this.dirty = true;
+    this._push('a road move', () => { this.warp = this.warp.filter((q) => q !== w); });
+    this._routeMarks();
+    this._status(`road pulled ${Math.round(moved)} u over ${Math.round(w.r)} u of lap `
+      + `(${this.warp.length} move${this.warp.length > 1 ? 's' : ''}) — APPLY to rebuild it`);
+  }
+
+  /** The nearest station to `i` that `ok` accepts, searched outward in both
+   *  directions. Returns null only when the whole lap refuses. */
+  _walkOut(i, n, ok) {
+    if (ok(i)) return i;
+    for (let d = 1; d <= n / 2; d++) {
+      const a = (i + d) % n, b = (i - d + n) % n;
+      if (ok(a)) return a;
+      if (ok(b)) return b;
+    }
+    return null;
+  }
+
+  /** ERASE removes what is under the brush, whoever built it.
+   *
+   *  It used to drop only objects YOU had placed, and — worse — its status
+   *  line lived inside the "something changed" branch, so pointing it at a
+   *  tree did nothing AND said nothing. Two different silences at once: the
+   *  tool looked broken because you could not tell it apart from a missed tap.
+   *
+   *  Now: your own objects go first, because that is the reversible, precise
+   *  thing to do. If there were none, it falls through to a keep-out circle,
+   *  which is the only way generated scenery can be removed at all — the
+   *  village and the wood are invented afresh on every build, so there is no
+   *  instance to delete, only a place to tell the builders to skip. Either
+   *  way it says which of the two it did. */
+  _eraseAt(p) {
+    const before = this.elements.length;
+    const kept = this.elements.filter((e) => Math.hypot(e.x - p.x, e.z - p.z) > this.radius);
+    const gone = before - kept.length;
+    if (gone) {
+      const removed = this.elements.filter((e) => Math.hypot(e.x - p.x, e.z - p.z) <= this.radius);
+      this.elements = kept;
+      this.dirty = true;
+      this._refreshMarkers();
+      this._push(`erase of ${gone} object${gone > 1 ? 's' : ''}`, () => {
+        this.elements.push(...removed);
+      });
+      this._status(`erased ${gone} placed object${gone > 1 ? 's' : ''}`);
+      return;
+    }
+    this._eraseWorldAt(p, 'nothing of yours here — cleared the world\'s scenery instead');
+  }
+
+  /* --- rotate ------------------------------------------------------------- */
+  /** Turn the object nearest the tap by the ROT slider's step.
+   *
+   *  `_placeRot` and `_placeScale` existed from the beginning and were never
+   *  written by anything, so every building the editor placed faced due north
+   *  at scale 1. The sliders now write them for the NEXT placement, and this
+   *  tool re-aims one already down. */
+  _rotateAt(p) {
+    let best = null, bd = Infinity;
+    for (const e of this.elements) {
+      const d = Math.hypot(e.x - p.x, e.z - p.z);
+      if (d < bd) { bd = d; best = e; }
+    }
+    if (!best || bd > Math.max(14, this.radius)) {
+      this._status('no object of yours near that tap — place one first');
+      return;
+    }
+    const was = best.rot || 0;
+    best.rot = was + this._rotStep;
+    this.dirty = true;
+    this._refreshMarkers();
+    this._push('a rotation', () => { best.rot = was; });
+    this._status(`turned ${best.preset} to ${Math.round((best.rot * 180 / Math.PI) % 360)}°`
+      + ' — APPLY to rebuild it');
   }
 
   /* --- DOM ---------------------------------------------------------------- */
@@ -880,13 +1224,17 @@ export class WorldEditor {
         <button class="ed-tool" data-tool="place">PLACE</button>
         <button class="ed-tool" data-tool="erase">ERASE</button>
         <button class="ed-tool" data-tool="clear">CLEAR AREA</button>
+        <button class="ed-tool" data-tool="rotate">ROTATE</button>
         <button class="ed-tool" data-tool="road">ROAD</button>
+        <button class="ed-tool" data-tool="route">MOVE ROAD</button>
         <button class="ed-tool" data-tool="water">WATER</button>
         <button class="ed-tool" data-tool="orbit">ORBIT</button>
       </div>
       <div id="ed-sliders">
         <label>SIZE <input id="ed-radius" type="range" min="8" max="180" value="40"><b id="ed-radius-v">40</b></label>
         <label>FORCE <input id="ed-strength" type="range" min="1" max="20" value="3"><b id="ed-strength-v">3</b></label>
+        <label>ROT <input id="ed-rot" type="range" min="0" max="345" step="15" value="0"><b id="ed-rot-v">0°</b></label>
+        <label>SCALE <input id="ed-scale" type="range" min="50" max="220" step="5" value="100"><b id="ed-scale-v">1.0</b></label>
       </div>
       <div id="ed-world">
         <div class="ed-pgroup">WORLD RECIPE</div>
@@ -916,7 +1264,9 @@ export class WorldEditor {
         this.tool = t.dataset.tool;
         root.querySelectorAll('.ed-tool').forEach((b) => b.classList.toggle('current', b === t));
         root.querySelector('#ed-palette').classList.toggle('open', this.tool === 'place');
-        this._status(this.tool.toUpperCase());
+        // the road handles only exist while you are moving the road
+        this._routeMarks();
+        this._status(HINT[this.tool] || this.tool.toUpperCase());
         return;
       }
       const a = e.target.closest('[data-act]');
@@ -962,6 +1312,19 @@ export class WorldEditor {
     str.addEventListener('input', () => {
       this.strength = +str.value;
       root.querySelector('#ed-strength-v').textContent = str.value;
+    });
+    // ROT and SCALE finally write the two fields `_place` has always read.
+    // They were declared, defaulted and never assigned, so every building the
+    // editor placed faced the same way at the same size.
+    const rot = root.querySelector('#ed-rot'), scl = root.querySelector('#ed-scale');
+    rot.addEventListener('input', () => {
+      this._placeRot = (+rot.value) * Math.PI / 180;
+      this._rotStep = Math.PI / 8;
+      root.querySelector('#ed-rot-v').textContent = `${rot.value}°`;
+    });
+    scl.addEventListener('input', () => {
+      this._placeScale = (+scl.value) / 100;
+      root.querySelector('#ed-scale-v').textContent = this._placeScale.toFixed(1);
     });
   }
 
