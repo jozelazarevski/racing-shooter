@@ -9405,7 +9405,15 @@ if (this._citMound) h += this._citMoundH(x, z);
       // flat wall is what read as a void
       shade.setScalar(0.78 + Math.random() * 0.3);
       rock.setColorAt(k, shade);
-      this.solids.push({ x, z, r: w * 0.3, y: y + 4, mat: 'stone' });
+      // THE COLLIDER IS THE MOUNTAIN, NOT A POST INSIDE IT. At r = w * 0.3
+      // against a drawn base of w / 2 you could drive 30-86 u INTO the rock
+      // before anything stopped you — on a 430 u cone that is most of the way
+      // to the middle. The footprint is an ellipse (the cone is scaled
+      // w by w*0.85), and a circle has to pick one axis: it takes the LONG one,
+      // because a few metres of invisible margin on the short axis is a far
+      // smaller lie than a mountain you can walk into. `h` makes it solid over
+      // its whole height — see the height gate in Car.step.
+      this.solids.push({ x, z, r: w * 0.48, y: y + 2, h, mat: 'stone' });
     }
     rock.name = 'massif';
     if (rock.instanceColor) rock.instanceColor.needsUpdate = true;

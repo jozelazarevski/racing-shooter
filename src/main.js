@@ -161,11 +161,11 @@ const plankMat = (col) => {
   return m;
 };
 
-const CREDIT_RATE = 1 / 12;                // score -> credits
-const PODIUM_CR = [200, 120, 60];          // 1st / 2nd / 3rd
-const FIRST_CLEAR_CR = 500;                // once per world, on your first podium
-const CLEAN_RUN_CR = 200;                  // finished without wrecking
-const SWEEP_CR = 250;                      // all three contracts in one race
+const CREDIT_RATE = 1 / 5;                 // score -> credits
+const PODIUM_CR = [650, 400, 220];         // 1st / 2nd / 3rd
+const FIRST_CLEAR_CR = 1200;               // once per world, on your first podium
+const CLEAN_RUN_CR = 350;                  // finished without wrecking
+const SWEEP_CR = 600;                      // all three contracts in one race
 // Upgrades escalate QUADRATICALLY: 800 / 1,600 / 4,000 / 8,000 / 13,600 —
 // 28,000 to max one line, against ~1,300 CR for a win. The old linear
 // 500+400×lvl put a fully maxed line five races away, which made every car
@@ -173,7 +173,18 @@ const SWEEP_CR = 250;                      // all three contracts in one race
 // rather than raising the entry keeps the first upgrade an easy, satisfying
 // buy while the last one is a genuine target — and it forces a real choice
 // about WHICH line to pour credits into, per car.
-const upgradeCost = (lvl) => 800 + lvl * lvl * 800;
+// THE UPGRADE LADDER, RE-PRICED.
+//
+// It was 800 + lvl^2 * 800: steps of 800 / 1600 / 4000 / 8000 / 13600, so one
+// line cost 28,000 CR and a fully built car 196,000 across seven lines. A
+// strong race paid about 730. That is 267 races to finish ONE car and 203 to
+// own the roster, against a campaign of 61 worlds — the content was priced
+// out of reach of the game that earns it.
+//
+// Now 600 + lvl^2 * 500: 600 / 1100 / 2600 / 5100 / 8600, 18,000 a line. The
+// SHAPE is kept — the last level is still the one you save for — but the top
+// step is 14x the first instead of 17x, and the whole line is affordable.
+const upgradeCost = (lvl) => 600 + lvl * lvl * 500;
 
 // ---- race contracts ----
 // Every race offers 3 side objectives that pay flat credits on completion, so

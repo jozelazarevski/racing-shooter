@@ -1456,7 +1456,24 @@ export class Car {
         const dx = this.pos.x - ob.x, dz = this.pos.z - ob.z;
         const rr = ob.r + 1.8;
         if (dx * dx + dz * dz >= rr * rr) continue;
-        if (ob.y !== undefined && Math.abs(this.pos.y - ob.y) > 6) continue;
+        // A TALL THING IS SOLID ALL THE WAY UP.
+        //
+        // The height gate was a flat +/-6 u around the collider's own y, which
+        // is right for a boulder and catastrophic for a mountain: a massif
+        // cone is 110-360 u tall and stands on sloping highland, so the car's
+        // height differed from the cone's BASE by far more than 6 the moment
+        // it started climbing toward it — and the collider was skipped
+        // entirely. Reported as driving into the mountains rather than hitting
+        // or climbing them, and that is exactly what it was.
+        //
+        // Anything that declares a height `h` is now solid over its whole
+        // span. Everything else keeps the old window, because for a knee-high
+        // rock under a flyover that window is the point.
+        if (ob.y !== undefined) {
+          if (ob.h !== undefined) {
+            if (this.pos.y < ob.y - 3 || this.pos.y > ob.y + ob.h) continue;
+          } else if (Math.abs(this.pos.y - ob.y) > 6) continue;
+        }
         const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
         const nx = dx / d, nz = dz / d;
         // angle of attack — see the wall block above. Taken before anything
@@ -3333,17 +3350,17 @@ export const CAR_CATALOG = [
     // 13 of the 21 worlds, which made every machine above it pointless. It is a
     // road hatch now — still the sharpest thing through a dry corner, but short
     // on top end and hopeless once the surface turns.
-    key: 'sleek', name: 'SLEEK', price: 5000, desc: 'Nimble hatch',
+    key: 'sleek', name: 'SLEEK', price: 4000, desc: 'Nimble hatch',
     spec: { name: 'SLEEK', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, stripe: [0x241d16], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 54, accel: 40, grip: 5.60, health: 90, offroad: 0.45, nitroPower: 1.15, plating: 1.10 },
   },
   {
-    key: 'crown', name: 'CROWN', price: 10000, desc: 'Fast on tarmac',
+    key: 'crown', name: 'CROWN', price: 8000, desc: 'Fast on tarmac',
     spec: { name: 'CROWN', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [GOLD, 0xf2f0e8], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 63, accel: 37, grip: 4.60, health: 85, offroad: 0.42, nitroPower: 1.05, plating: 1.05 },
   },
   {
-    key: 'dune', name: 'DUNE', price: 16000, desc: 'Off-road king',
+    key: 'dune', name: 'DUNE', price: 13000, desc: 'Off-road king',
     spec: { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 56, accel: 38, grip: 5.15, health: 105, offroad: 1.00, nitroPower: 0.95, plating: 0.95 },
   },
@@ -3354,7 +3371,7 @@ export const CAR_CATALOG = [
     // grip in the catalogue and the best nitro, because a rear-engined car
     // puts its weight over the driven axle — it is the sharpest thing here
     // through a dry corner and has no answer at all once the surface turns.
-    key: 'flatsix', name: 'FLATSIX', price: 22000,
+    key: 'flatsix', name: 'FLATSIX', price: 18000,
     desc: 'Rear-engined coupe — sealed surfaces only',
     spec: { name: 'FLATSIX', style: 'flatsix', body: 0xd8d4cc, accent: 0x2a2d33,
       stripe: [0xc4342a], number: 11, brand: 'ZENITH', rims: GOLD },
@@ -3371,7 +3388,7 @@ export const CAR_CATALOG = [
     // is SNOW class, so it takes the loose and the ice and is barred from the
     // circuits its coupe sibling owns. Between them they cover the roster and
     // neither covers it alone, which is the whole point of the tyre rule.
-    key: 'bastion', name: 'BASTION', price: 30000,
+    key: 'bastion', name: 'BASTION', price: 26000,
     desc: 'Performance estate — loose and ice',
     spec: { name: 'BASTION', style: 'bastion', body: 0x1f2a38, accent: 0xc8ccd2,
       stripe: [0xc8ccd2], number: 9, brand: 'ZENITH', rims: GOLD },
@@ -3386,7 +3403,7 @@ export const CAR_CATALOG = [
     // specialist — so it owns the twisty snow stages the DUNE is too slow for
     // and the CROWN cannot hold at all, while its top speed keeps it off the
     // open circuits.
-    key: 'alpine', name: 'ALPINE', price: 26000, desc: 'Mountain drifter',
+    key: 'alpine', name: 'ALPINE', price: 22000, desc: 'Mountain drifter',
     spec: { name: 'ALPINE', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [GOLD, 0xd8342a], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 57, accel: 39, grip: 5.25, health: 95, offroad: 0.85, nitroPower: 1.20, plating: 1.05 },
   },
@@ -3395,7 +3412,7 @@ export const CAR_CATALOG = [
     // was sold purely on hull, which makes 40,000 CR a strange ask. Heavy but
     // planted: it now has the grip to own a fast, dry, flowing circuit, and
     // still takes the least damage doing it.
-    key: 'pit', name: 'PIT-99', price: 40000, desc: 'Armored bruiser',
+    key: 'pit', name: 'PIT-99', price: 32000, desc: 'Armored bruiser',
     spec: { name: 'PIT-99', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 60, accel: 36, grip: 5.05, health: 130, offroad: 0.55, nitroPower: 0.90, plating: 0.78 },
   },
