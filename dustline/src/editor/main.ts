@@ -14,8 +14,11 @@
 import type { TrackDef } from '../tracks/trackDef';
 import { validateTrack } from '../tracks/trackDef';
 import {
-  builtInTracks, localTracks, saveLocalTrack, deleteLocalTrack, packTrack, resolveTrackFromUrl,
+  builtInTracks, saveLocalTrack, deleteLocalTrack, packTrack, resolveTrackFromUrl,
 } from '../tracks/registry';
+import { openTrackDialog } from './openDialog';
+import { newTrackDialog } from './newDialog';
+import { LANDS, WEATHERS, composeTrack } from '../tracks/presets';
 import { MapView } from './mapView';
 import { Preview } from './preview';
 import { renderPanel, TabId } from './panel';
@@ -498,40 +501,38 @@ $('trackName').addEventListener('change', (e) => {
   commit((d) => { d.name = v; }, 'rename');
 });
 
-$('btnNew').addEventListener('click', () => {
+$('btnNew').addEventListener('click', async () => {
   if (dirty && !confirm('Discard unsaved changes?')) return;
-  const base = builtInTracks()[0];
-  const id = `track-${Date.now().toString(36)}`;
-  def = {
-    ...structuredClone(base),
-    id,
-    name: 'NEW TRACK',
-    seed: (Math.random() * 0xffffffff) >>> 0,
-    road: { ...base.road, points: starterLoop(180, 12) },
-  };
+  // A LAND AND A WEATHER, rather than a copy of DUSTBOWL. See `newDialog.ts`
+  // for why those are two questions and not one.
+  const made = await newTrackDialog();
+  if (!made) return;
+  def = made;
   past.length = 0; future.length = 0;
   dirty = true;
+  // A new track is not saved yet, so the URL must stop pointing at whatever was
+  // open before — a reload here should not resurrect the previous track.
+  const u = new URL(location.href);
+  u.searchParams.delete('track');
+  u.searchParams.delete('t');
+  history.replaceState(null, '', u);
   map.fit(def);
   preview.frameTrack(def);
   changed();
 });
 
-$('btnOpen').addEventListener('click', () => {
-  const all = [...localTracks(), ...builtInTracks()];
-  const names = all.map((t, i) => `${i + 1}. ${t.name}${localTracks().some((l) => l.id === t.id) ? ' (saved)' : ''}`);
-  const pick = prompt(`Open which track?\n\n${names.join('\n')}\n\nNumber, or "d<n>" to delete a saved one:`);
-  if (!pick) return;
-  if (/^d\d+$/i.test(pick.trim())) {
-    const i = parseInt(pick.trim().slice(1), 10) - 1;
-    if (all[i] && confirm(`Delete "${all[i].name}"?`)) { deleteLocalTrack(all[i].id); alert('Deleted.'); }
-    return;
-  }
-  const i = parseInt(pick, 10) - 1;
-  if (!all[i]) return;
-  if (dirty && !confirm('Discard unsaved changes?')) return;
-  def = structuredClone(all[i]);
+$('btnOpen').addEventListener('click', async () => {
+  const chosen = await openTrackDialog(() => !dirty || confirm('Discard unsaved changes?'));
+  if (!chosen) return;
+  def = chosen;
   past.length = 0; future.length = 0;
   dirty = false;
+  // The URL follows the document, so a reload comes back to what you were
+  // editing and the address bar is a link to it.
+  const u = new URL(location.href);
+  u.searchParams.set('track', def.id);
+  u.searchParams.delete('t');
+  history.replaceState(null, '', u);
   map.fit(def);
   preview.frameTrack(def);
   changed();
@@ -542,8 +543,37 @@ $('btnSave').addEventListener('click', () => {
   if (errs.length && !confirm(`This track has ${errs.length} error(s) and will not load. Save anyway?`)) return;
   saveLocalTrack(def);
   dirty = false;
+  // Saving IS publishing to the game, on this browser — it goes to the top of
+  // the game's picker and the bare game URL opens it. That was already true and
+  // completely invisible, which is why the status line now says it.
+  const u = new URL(location.href);
+  u.searchParams.set('track', def.id);
+  u.searchParams.delete('t');
+  history.replaceState(null, '', u);
   updateStatus();
+  savedNote();
 });
+
+/** A brief line confirming where the track just went. An alert() would be a
+ *  modal on the most-repeated action in the editor; silence was the status quo
+ *  and left the whole feature undiscovered. */
+let noteTimer = 0;
+function savedNote() {
+  let n = document.getElementById('savedNote');
+  if (!n) {
+    n = document.createElement('div');
+    n.id = 'savedNote';
+    n.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:70;'
+      + 'background:#1d4b6b;border:1px solid #2f7ea8;color:#eaf7ff;border-radius:8px;'
+      + "padding:9px 16px;font:12px 'Consolas',monospace;letter-spacing:1px;pointer-events:none";
+    document.body.appendChild(n);
+  }
+  n.textContent = `Saved — "${def.name}" is now in the game on this browser`;
+  n.style.opacity = '1';
+  clearTimeout(noteTimer);
+  noteTimer = window.setTimeout(() => { n!.style.opacity = '0'; }, 2600);
+  n.style.transition = 'opacity .4s';
+}
 
 $('btnExport').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(def, null, 2)], { type: 'application/json' });
@@ -587,7 +617,12 @@ $('btnLink').addEventListener('click', async () => {
 $('btnDrive').addEventListener('click', () => {
   const errs = validateTrack(def).filter((i) => i.level === 'error');
   if (errs.length) { alert(`Fix these first:\n\n${errs.map((x) => x.message).join('\n')}`); return; }
-  window.open(`./index.html?t=${packTrack(def)}`, '_blank');
+  // A SAVED track opens BY ID: that is the same path a player takes, so the
+  // test drive proves the saved copy works rather than proving a packed copy
+  // of the editor's memory works. Unsaved, there is nothing to point at, so it
+  // still travels packed in the link.
+  const url = dirty ? `./index.html?t=${packTrack(def)}` : `./index.html?track=${encodeURIComponent(def.id)}`;
+  window.open(url, '_blank');
 });
 
 let layout = 0;
@@ -624,5 +659,7 @@ frame();
   set def(d: TrackDef) { def = d; changed(); },
   map, preview, validate: () => validateTrack(def), commit,
   // exposed for tools/components-smoke.mjs, which sweeps the whole library
-  templateIds, getTemplate, thumbnail, withStubbedRandom, builtInTracks,
+  templateIds, getTemplate, thumbnail, withStubbedRandom, builtInTracks, deleteLocalTrack,
+  // exposed for tools/editor-smoke.mjs, which checks every land x weather
+  presets: { LANDS, WEATHERS, composeTrack }, starterLoop, validateDef: validateTrack,
 };

@@ -176,6 +176,92 @@ undrivable — not a style guide, a track is allowed to be ugly:
 Errors block the preview rebuild, so the last good world stays on screen with
 the problem named, rather than the canvas going blank.
 
+## Starting a new track
+
+**New** asks two questions: what kind of **land**, and what **weather**.
+
+It used to clone DUSTBOWL. You got a fresh loop and a fresh seed and somebody
+else's octaves, snow line, gravel, pines and sky — changeable, but only if you
+knew which of forty numbers in the panel to touch, and the starting point was
+quietly arguing for one kind of world.
+
+The two are separate lists because they are separate things: alpine in a
+snowfall and alpine at golden hour are the same terrain lit differently, and
+dunes under sea mist is a legitimate thing to want. Eight lands by seven
+weathers is 56 starting points out of fifteen entries.
+
+| land | what it gives you |
+|---|---|
+| Rolling farmland | gentle country, hedgerows and field walls |
+| Alpine pass | a ramped massif with a snow line and pines to the treeline |
+| Desert dunes | long sand swells, saguaro and dead wood |
+| Canyon plateau | flat-topped country broken by spires and scree |
+| Coast and harbour | the land falls into the sea; boats float, willows line the shore |
+| Deep forest | low relief, close trees |
+| Vineyard terraces | a worked slope with terrace walls, olives and orchards |
+| Snowfield | everything above the line is white, and some of it is ice |
+
+| weather | |
+|---|---|
+| Clear noon · Overcast · Golden hour · Storm light · Snowfall · Dust haze · Sea mist |
+
+A land sets the octaves, ramps, road profile, surfaces, scatter layers, any
+water and the horizon range. A weather sets nothing but light and air — sky
+stops, fog, sun, hemisphere fill, cloud count — and nudges the snow line
+without redefining the range.
+
+**The lighting numbers are IGNITE RALLY's**, out of `THEMES` in
+`src/world/themes.js`: thirty worlds' worth of sky, fog and sun that has
+already been looked at on a screen.
+
+Everything a preset writes is ordinary track data the panel can then edit.
+Choosing one is choosing a starting point, not a mode — there is no hidden
+state and nothing in a preset the editor cannot express.
+
+`smoke:editor` checks **all 56 combinations** validate, that every scatter
+layer in every preset names a component that exists, and that one of them —
+coast in sea mist, which has water in it — builds in the real engine.
+
+## Saving, and getting it into the game
+
+**Save puts the track in the game.** On this browser, immediately: it goes to
+the top of the game's track picker, already selected, and the bare game URL
+opens it. There is nothing to upload and no step in between.
+
+That is worth stating plainly because it was true and completely invisible.
+`saveLocalTrack` had always recorded which track you saved last, and *nothing
+ever read it* — the note was being left and nobody picked it up. The game
+booted the first built-in whatever you did, so a track you had just made was
+reachable only by hand-typing `?track=<id>` into the address bar.
+
+Three things changed:
+
+- The game shows a **picker** when the URL names no track — everything this
+  browser can play, your own first, each card drawing its own road outline from
+  the track's real control points. A link that names a track still goes
+  straight there, which is what keeps `?track=` and `?t=` shareable.
+- With no track named and nothing to pick, **the last one you saved wins** over
+  the shipped default.
+- **Open** is a real dialog rather than a numbered `prompt()` — the same cards,
+  with the saved ones marked and deletable. You could always edit an existing
+  track; nothing about typing "3" into a prompt said so.
+
+Picking a track writes it into the URL, so a reload keeps it.
+
+## Shipping a track to everyone
+
+The above is per-browser: localStorage is yours and does not leave the machine.
+To put a track in the **build**, so anyone who opens the site gets it:
+
+1. **Export** it from the editor — you get `<id>.json`.
+2. Drop that file in `dustline/src/data/tracks/`.
+3. Commit. That is the whole procedure.
+
+There is no manifest to update. The registry globs that folder, the same way
+the component registry globs `world/props/` — a list you have to remember to
+edit is the most common way a list like this rots, and this one already had
+three hand-written imports in it.
+
 ## Getting a track out
 
 - **Save** — into `localStorage`. Yours, survives reloads, never leaves the browser.
