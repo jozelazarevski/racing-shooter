@@ -11,7 +11,7 @@
 // `minRoadDist` sized for a cottage puts the patio coping in the carriageway.
 // 16 m clears the wall at the top of the scale range with margin.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'courtyardHouse',

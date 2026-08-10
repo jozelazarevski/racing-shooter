@@ -22,7 +22,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, cylinderAt } from './types';
-import { bundle, strut } from './kit';
+import { bundle, strut } from '../../templates/geometry';
 
 const SEG = 12;
 const galY = 3.74;            // gallery deck

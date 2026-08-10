@@ -22,8 +22,8 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, beam, mergeGeoms, mergeGeomsUV } from './types';
-import { bundle, gablePrismGeo, strut } from './kit';
-import { wallMaps } from './wallTexture';
+import { bundle, gablePrismGeo, strut } from '../../templates/geometry';
+import { wallMaps } from '../../templates/textures';
 
 const HW = 3.6;               // 7.2 m across
 const LEN = 9.6;              // and 9.6 deep — a working footprint, not a house

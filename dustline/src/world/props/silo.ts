@@ -4,7 +4,7 @@
 // the repository root. The farm's vertical: a farmstead of nothing but low buildings has no
 // silhouette at all from the road.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'silo',

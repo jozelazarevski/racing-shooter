@@ -25,7 +25,7 @@
 // halfway into a stone wall before stopping it is worse than one that stops it
 // a metre early.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'puebloRuin',

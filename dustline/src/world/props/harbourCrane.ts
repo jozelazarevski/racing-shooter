@@ -20,7 +20,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, beam, cylinderAt } from './types';
-import { bundle, strut } from './kit';
+import { bundle, strut } from '../../templates/geometry';
 
 const MAST = 6.6;                       // masthead
 const HEAD: number[] = [0, 5.2, 5.6];   // jib head — the working reach

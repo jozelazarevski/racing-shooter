@@ -3,7 +3,7 @@
 // SHAPE FROM IGNITE RALLY: `HOUSE_TEMPLATES.cottageE` in `src/world/catalog.js` at
 // the repository root. Roof end-on to the street, which is what makes a row of them a terrace.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'townhouse',

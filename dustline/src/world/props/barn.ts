@@ -6,7 +6,7 @@
 // a farmyard with a v1 farmhouse and a dustline barn in it looks like two
 // different games sharing a field, which it was.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'barn',

@@ -17,7 +17,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, cylinderAt, beam } from './types';
-import { bundle, strut } from './kit';
+import { bundle, strut } from '../../templates/geometry';
 
 const H_HEAD = 0.88;          // top of the barrel, underside of the drumhead
 const H_TOP = 1.11;           // overall — waist height, like every capstan

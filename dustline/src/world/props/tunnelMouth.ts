@@ -25,7 +25,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, mergeGeoms, beam } from './types';
-import { quad, soup } from './kit';
+import { quad, soup } from '../../templates/geometry';
 
 const HW = 11.6, WALL = 4.6, APEX = 8.6;      // v1 constants, verbatim
 const FLARE = 1.16;                            // v1's mouth flare

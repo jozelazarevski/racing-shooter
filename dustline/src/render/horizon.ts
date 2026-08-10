@@ -26,122 +26,17 @@
 // dustline world must rebuild identically; and the near/far rings take their
 // radius and height from the track's own `sky.mountains` instead of v1's
 // per-theme constants.
+//
+// THE SHAPES THEMSELVES ARE IN `templates/horizon.ts`. What is left here is the
+// PLACEMENT, which is the half of the problem that is about this world rather
+// than about mountains.
 
 import * as THREE from 'three';
 import type { TrackDef, HorizonForm } from '../tracks/trackDef';
 import { Rng } from '../core/rng';
+import { form, horizonGrad, HORIZON_FORMS } from '../templates/horizon';
 
-export const HORIZON_FORMS: HorizonForm[] = ['pyramid', 'spire', 'dome', 'mesa', 'horn', 'ridge'];
-
-/** `textures.horizonTexture` — a vertical strip, pale at the top and fading
- *  into the fog at the base.
- *
- *  THIS IS WHAT MAKES A DISTANT MOUNTAIN LOOK DISTANT, and it is the piece the
- *  first cut of this port left out: a peak painted one flat colour is a
- *  cardboard cut-out standing on the ground, where a real one dissolves into
- *  haze from the bottom up. It is also what lets two rings STACK — hills, haze,
- *  peaks, sky — instead of reading as one band of triangles. */
-function horizonTexture(topHex: string, baseHex: string): THREE.Texture {
-  const cv = document.createElement('canvas');
-  cv.width = 16; cv.height = 128;
-  const g = cv.getContext('2d')!;
-  const grd = g.createLinearGradient(0, 0, 0, 128);
-  grd.addColorStop(0, topHex);
-  grd.addColorStop(0.55, topHex);
-  grd.addColorStop(1, baseHex);
-  g.fillStyle = grd;
-  g.fillRect(0, 0, 16, 128);
-  const t = new THREE.CanvasTexture(cv);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = THREE.RepeatWrapping;
-  t.wrapT = THREE.ClampToEdgeWrapping;
-  // The canvas runs top-to-bottom and a form's v runs base-to-summit, so the
-  // strip is flipped rather than the gradient being written upside down.
-  t.flipY = false;
-  return t;
-}
-
-/** `Track._horizonGrad` — one ring's strip, mixed toward the world's own fog so
- *  the skyline belongs to the weather it is standing in. */
-function horizonGrad(hex: number, fogHex: string, baseMix: number, topMix: number, desat = 0) {
-  const fogC = new THREE.Color(fogHex);
-  const c = new THREE.Color(hex);
-  if (desat) {
-    const hsl = { h: 0, s: 0, l: 0 };
-    c.getHSL(hsl);
-    c.setHSL(hsl.h, hsl.s * (1 - desat), hsl.l);
-  }
-  const top = c.clone().lerp(fogC, topMix);
-  const base = c.clone().lerp(fogC, baseMix);
-  return horizonTexture(`#${top.getHexString()}`, `#${base.getHexString()}`);
-}
-
-/** One unit form: height 1, centred on the origin. */
-function form(name: HorizonForm): THREE.BufferGeometry {
-  switch (name) {
-    case 'pyramid':
-      return new THREE.ConeGeometry(0.5, 1, 6);
-    case 'spire':
-      return new THREE.ConeGeometry(0.40, 1, 5);
-    case 'dome': {
-      const pts: THREE.Vector2[] = [];
-      for (let i = 0; i <= 6; i++) {
-        const t = i / 6;
-        pts.push(new THREE.Vector2(
-          Math.max(0.001, 0.5 * Math.cos((t * Math.PI) / 2) * (1 - 0.10 * t)), -0.5 + t));
-      }
-      return new THREE.LatheGeometry(pts, 9);
-    }
-    case 'mesa':
-      return new THREE.CylinderGeometry(0.30, 0.52, 1, 6);
-    case 'horn': {
-      const g = new THREE.ConeGeometry(0.5, 1, 6);
-      // shear the apex sideways so one face is a cliff and the other a shoulder
-      g.applyMatrix4(new THREE.Matrix4().set(
-        1, 0.44, 0, 0,
-        0, 1, 0, 0,
-        0, 0.14, 1, 0,
-        0, 0, 0, 1));
-      return g;
-    }
-    case 'ridge': {
-      // a wall with named peaks along it, tapering to nothing at both ends
-      const H = [0.03, 0.62, 0.30, 0.92, 0.44, 0.70, 0.05];
-      const n = H.length - 1;
-      const v: number[] = [];
-      const push = (a: number[], b: number[], c: number[]) =>
-        v.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
-      for (let k = 0; k < n; k++) {
-        const x0 = -0.5 + k / n, x1 = -0.5 + (k + 1) / n;
-        const y0 = -0.5 + H[k], y1 = -0.5 + H[k + 1];
-        const d0 = 0.44 * Math.sin(Math.PI * (k / n)) + 0.06;
-        const d1 = 0.44 * Math.sin(Math.PI * ((k + 1) / n)) + 0.06;
-        // WIND EACH FLANK OUTWARD. Emitting both sides in the same vertex order
-        // leaves one of them back-facing, and a front-side material culls it —
-        // which is why half of every ridge vanished and the skyline grew thin
-        // dark slivers where the interior showed through.
-        for (const sg of [1, -1]) {
-          const A = [x0, y0, 0], B = [x1, y1, 0];
-          const C = [x1, -0.5, sg * d1], D = [x0, -0.5, sg * d0];
-          if (sg > 0) { push(A, B, C); push(A, C, D); }
-          else { push(B, A, C); push(C, A, D); }
-        }
-      }
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-      // UVs the other forms get for free from three's primitives, and the
-      // vertical gradient below needs: v runs 0 at the base to 1 at the ridge.
-      const uv = new Float32Array((v.length / 3) * 2);
-      for (let i = 0; i < v.length / 3; i++) {
-        uv[i * 2] = v[i * 3] + 0.5;
-        uv[i * 2 + 1] = v[i * 3 + 1] + 0.5;
-      }
-      g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-      g.computeVertexNormals();
-      return g;
-    }
-  }
-}
+export { HORIZON_FORMS };
 
 /** EVERY SET CARRIES A DOME AND A RIDGE. A mix of horn and spire is still
  *  three cones in a trenchcoat — the complaint was that every skyline is

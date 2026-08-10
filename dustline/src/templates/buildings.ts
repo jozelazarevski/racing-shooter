@@ -31,10 +31,12 @@
 // roll about Z, then translate — so a part lands exactly where v1 puts it.
 
 import * as THREE from 'three';
-import { gablePrismGeo } from './kit';
-import { standard, mergeGeoms, mergeGeomsUV } from './types';
-import { wallMaps } from './wallTexture';
-import type { PropPart, PropTemplate } from './types';
+import { gablePrismGeo } from './geometry';
+import { standard, mergeGeoms, mergeGeomsUV } from './geometry';
+import { wallMaps } from './textures';
+// TYPE ONLY — see the note in `boats.ts`. Erased at build time, so this folder
+// has no runtime dependency on the component catalogue.
+import type { PropPart, PropTemplate } from '../world/props/types';
 
 export type HousePart = [string, number, number, number, number, number, number, string | number, number?];
 export interface HouseTemplate { r: number; mat?: string; parts: HousePart[] }

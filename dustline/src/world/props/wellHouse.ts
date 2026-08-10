@@ -3,7 +3,7 @@
 // SHAPE FROM IGNITE RALLY: `HOUSE_TEMPLATES.well` in `src/world/catalog.js` at
 // the repository root. Village-square furniture at a scale nothing else in the set covers.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'wellHouse',

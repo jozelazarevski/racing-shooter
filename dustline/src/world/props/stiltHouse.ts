@@ -19,7 +19,7 @@
 // and the posts are anchored to the ground the base sits on. Put one at a
 // waterline by hand if you want it in the shallows.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'stiltHouse',

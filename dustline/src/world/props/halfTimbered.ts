@@ -3,7 +3,7 @@
 // SHAPE FROM IGNITE RALLY: `HOUSE_TEMPLATES.cottageF` in `src/world/catalog.js` at
 // the repository root. That overhang is the silhouette the eye reads before it reads any timber.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'halfTimbered',
