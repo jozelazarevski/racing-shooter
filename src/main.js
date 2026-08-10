@@ -1900,7 +1900,7 @@ class Game {
         if (!base) return;
         if (!this.editor) this.editor = new WorldEditor(this);
         this.editor.load(data);
-        this.editScene = { delta: this.editor.delta, elements: this.editor.elements };
+        this.editScene = this.editor.buildPayload();
         // force: the base level may already be up, and its unedited build is
         // exactly what we must NOT keep
         this.swapLevel(base, true);
