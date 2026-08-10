@@ -1343,7 +1343,7 @@ class Game {
    * not draw, so nothing reaches the screen), let three build every program,
    * and put the visibility flags back exactly as they were.
    */
-  _warmShaders() {
+  _warmShaders(sync = false) {
     if (!this.renderer?.compile) return;
     const hidden = [];
     try {
@@ -1361,7 +1361,17 @@ class Game {
       // already traversed by the time compileAsync returns, so the flags can go
       // back before the render loop starts. Leave it to the .then() and the
       // title screen spends the warm-up drawing bullets, husks and explosions.
-      if (this.renderer.compileAsync) {
+      // ...BUT NOT WHEN THE WORLD IS ABOUT TO BE TORN DOWN AGAIN.
+      //
+      // `compileAsync` polls its captured material list from a timer of its
+      // own, reading `materialProperties.currentProgram.isReady()`. Dispose
+      // those materials before the poll lands — which is exactly what a world
+      // rebuild does — and `currentProgram` is undefined, so three throws
+      // "Cannot read properties of undefined (reading 'isReady')" from inside
+      // its own timer, where the promise's .catch() cannot reach it. Every
+      // APPLY in the editor produced one. On a rebuild the synchronous compile
+      // is used instead: it is slower, and it cannot outlive its own scene.
+      if (this.renderer.compileAsync && !sync) {
         const p = this.renderer.compileAsync(this.scene, this.camera);
         for (const o of hidden) o.visible = false;
         hidden.length = 0;
@@ -1481,7 +1491,10 @@ class Game {
     // --- put everyone on the new grid ---
     this.__ratingsFor = null;   // car ratings are per-world
     this.resetRace();
-    this._warmShaders();   // a new world means new materials — pay for them now
+    // SYNCHRONOUS here: a rebuild disposes the materials an async compile is
+    // still polling, and three throws 'isReady' from its own timer where no
+    // .catch() of ours can reach it. Every editor APPLY produced one.
+    this._warmShaders(true);   // a new world means new materials — pay for them now
     this.hud?.feed?.(`${this.level.name}`, 'good');
     // Keep the address bar honest without navigating — a refresh (or a shared
     // link) then lands on the world you actually picked.

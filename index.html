@@ -851,7 +851,8 @@
     letter-spacing:.06em;color:#9fb4c8}
   #ed-sliders input{width:96px}
   #ed-sliders b{color:#9fd3ff;min-width:22px;text-align:right}
-  #ed-world{position:absolute;right:8px;top:150px;width:170px;background:rgba(12,16,22,.9);
+  /* below #ed-sliders, which grew by two rows when ROT and SCALE were added */
+  #ed-world{position:absolute;right:8px;top:196px;width:170px;background:rgba(12,16,22,.9);
     border:1px solid #2c3a4a;border-radius:10px;padding:8px}
   #ed-world label{display:flex;flex-direction:column;gap:3px;font-size:9px;
     letter-spacing:.08em;color:#8fa4b8;margin-bottom:6px}
@@ -976,7 +977,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r145</div>
+<div id="build-tag">r146</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -1195,10 +1196,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r145"></script>
+<script type="module" src="./src/main.js?v=r146"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r145"></script>
+<script src="./src/offline.js?v=r146"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r145"></script>
+<script type="module" src="./src/traffic.js?v=r146"></script>
 </body>
 </html>
