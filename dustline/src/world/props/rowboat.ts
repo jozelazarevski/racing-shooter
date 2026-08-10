@@ -11,7 +11,7 @@
 // water and in eight without knowing the depth.
 
 import { PropTemplate } from './types';
-import { hullParts, dayCabinGeo, trimGeo, afloat, standard } from './boatParts';
+import { hullParts, dayCabinGeo, trimGeo, afloat, standard } from '../../templates/boats';
 
 /** v1's rowing boat: `bs = 0.42` in the flotilla loop. */
 const S = 0.42;

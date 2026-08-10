@@ -4,7 +4,7 @@
 // the repository root. One of the five added when three silhouettes turned out to make every
 // village read as the same house stamped down the road.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'farmhouseL',

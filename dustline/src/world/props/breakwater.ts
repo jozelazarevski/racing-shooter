@@ -25,7 +25,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, beam } from './types';
-import { bundle } from './kit';
+import { bundle } from '../../templates/geometry';
 
 const RUN_L = 26;             // v1's runL
 const RUN_W = 6.5;            // v1's runW

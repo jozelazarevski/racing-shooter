@@ -10,7 +10,7 @@
 // the eye picks out of a row, and a row containing the same dome at 0.85 and
 // at 1.2 reads as one building drawn twice at two distances.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'domedHouse',

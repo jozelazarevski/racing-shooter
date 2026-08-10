@@ -14,7 +14,7 @@ import { PropTemplate } from './types';
 import {
   hullParts, dayCabinGeo, dayMastGeo, dayBoomGeo, daySailGeo, dayJibGeo,
   dayRigGeo, trimGeo, afloat, standard, alloy, canvasMat,
-} from './boatParts';
+} from '../../templates/boats';
 
 /** v1's rigged day boat sits at `bs = 0.62 + (k % 3) * 0.05`. */
 const S = 0.66;

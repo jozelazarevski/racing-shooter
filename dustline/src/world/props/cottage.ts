@@ -4,7 +4,7 @@
 // the repository root. The archetype the v1 game puts more of in front of a player
 // than any other building, and the one the keeper's house at its lighthouse is.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'cottage',

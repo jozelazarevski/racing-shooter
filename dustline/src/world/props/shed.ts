@@ -3,7 +3,7 @@
 //
 // SHAPE FROM IGNITE RALLY: `HOUSE_TEMPLATES.shed`.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'shed',

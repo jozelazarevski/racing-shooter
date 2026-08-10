@@ -16,7 +16,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard } from './types';
-import { bundle } from './kit';
+import { bundle } from '../../templates/geometry';
 
 /** v1's marina constants. */
 const FLEN = 14;      // finger length

@@ -226,14 +226,31 @@ So the port is verbatim, comments included, and three files carry it:
 
 | file | from | what |
 |---|---|---|
-| `props/kit.ts` | `track.js` | hull loft, sail loft, strut-between-two-points, bundle, gable prism |
-| `props/houseTemplates.ts` | `world/catalog.js` | `HOUSE_TEMPLATES` and the colour kits |
-| `props/boatParts.ts` | `track.js` | rig, deck gear, trawler gantry, coachroofs, fenders |
-| `props/wallTexture.ts` | `textures.js` | the window tile and its emissive companion |
-| `render/horizon.ts` | `world/sky.js` | the six skyline silhouettes and the massif placement |
+| `templates/geometry.ts` | `track.js` | primitives, hull loft, sail loft, strut-between-two-points, bundle, gable prism |
+| `templates/buildings.ts` | `world/catalog.js` | `HOUSE_TEMPLATES` and the colour kits |
+| `templates/boats.ts` | `track.js` | rig, deck gear, trawler gantry, coachroofs, fenders |
+| `templates/textures.ts` | `textures.js` | the window tile and its emissive companion |
+| `templates/horizon.ts` | `world/sky.js` | the six skyline silhouettes |
+
+**They all live in `src/templates/`** — see the README in that folder. The line
+is: *templates are what a thing is made of; `world/props/` is what a thing is.*
+Three of these used to sit in `world/props/` because that is where they were
+first needed, which meant the component registry had to skip them by inspection
+and anything outside that folder wanting a hull or a gable roof had to reach
+into a folder about something else. `world/props/` is now 109 components and
+three files of infrastructure, and nothing else.
 
 A settlement component is then a name and a sentence — `dwelling({ template:
 'cottageA', kit: 'dalmatia', … })` — with no geometry in it left to get wrong.
+
+The boundary is **checked, not described**: `npm run verify:templates` fails if
+a template acquires a runtime dependency on the component catalogue, if one of
+them does something on import, if the barrel stops re-exporting a file, if two
+files declare the same name (`export *` drops it silently, which fails at the
+import site rather than anywhere useful), or if a non-component turns up in
+`world/props/`. It caught two real leaks the moment it was written — `boats.ts`
+and `buildings.ts` were pulling values back out of `props/types.ts`, which is
+the exact tangle the folder was created to end.
 
 **Windows are a texture, and it is v1's.** `buildingTexture` draws the panes,
 frames, glazing bars, sills and door into a 256 tile, and

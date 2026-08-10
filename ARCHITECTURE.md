@@ -483,6 +483,31 @@ thirty metres. So scatter gained `maxRoadDist`, which bands a layer to the road
 corridor, and the tuft grew to 0.5 m. 4,000 in a 60 m band beside the road buys
 what 40,000 spread over the whole map would have.
 
+**A shape library, in one place.** The ported v1 shapes had ended up in three
+folders according to where each was first needed rather than what it is: the
+geometry kit, the house table, the boat parts and the window textures were all
+in `world/props/`, which is the COMPONENT CATALOGUE, and the skyline forms were
+inside the renderer that arranges them. The registry had to skip four files by
+inspection, and anything outside `props/` that wanted a hull or a gable roof had
+to reach into a folder about something else.
+
+`src/templates/` is now that library — geometry, buildings, boats, textures,
+horizon, and a barrel — and `world/props/` is 109 components plus three files of
+infrastructure. The line is *templates are what a thing is made of; props is
+what a thing is*.
+
+The boundary is CHECKED rather than described. `npm run verify:templates` fails
+if a template acquires a runtime dependency on the catalogue, if one does
+anything on import, if the barrel stops re-exporting a file, if two files
+declare the same name — `export *` drops a duplicate silently, so that one fails
+at the import site and nowhere near the cause — or if a non-component appears in
+`world/props/`. It caught two genuine leaks in the first run: `boats.ts` and
+`buildings.ts` were importing values back out of `props/types.ts`, which is
+exactly the tangle the move was meant to end.
+
+All three world fingerprints are unchanged, which is the point of doing it as a
+pure move.
+
 ### 5.5 State which specification governs which codebase — DONE
 
 Six normative documents — `RULES.md`, `NATURE.md`, `STRUCTURES.md`, `SCENES.md`,

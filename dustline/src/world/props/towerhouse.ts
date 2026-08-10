@@ -4,7 +4,7 @@
 // the repository root. The Ligurian terrace house: painted render, shallow pantile roof, a shutter
 // band per floor. The silhouette is what tells you which coast you are on.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'towerhouse',

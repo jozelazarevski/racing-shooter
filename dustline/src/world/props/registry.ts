@@ -9,14 +9,14 @@
 // itself, so lazy loading would only buy a flash of empty palette.
 
 import type { PropTemplate, PropPart } from './types';
-import { disposeWallMaps } from './wallTexture';
+import { disposeWallMaps } from '../../templates/textures';
 
 const modules = import.meta.glob<{ default: PropTemplate }>('./*.ts', { eager: true });
 
 const TEMPLATES = new Map<string, PropTemplate>();
 for (const [path, mod] of Object.entries(modules)) {
   const t = mod?.default;
-  if (!t || typeof t !== 'object' || !('id' in t) || !('build' in t)) continue;   // types.ts etc.
+  if (!t || typeof t !== 'object' || !('id' in t) || !('build' in t)) continue;   // types.ts
   if (TEMPLATES.has(t.id)) {
     console.warn(`[props] duplicate template id "${t.id}" from ${path} — keeping the first`);
     continue;

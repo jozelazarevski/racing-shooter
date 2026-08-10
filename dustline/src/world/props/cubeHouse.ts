@@ -13,7 +13,7 @@
 // the blue the table's comment names. That is a missing kit, not a wrong
 // template, and adding one belongs in `houseTemplates.ts`, not here.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'cubeHouse',

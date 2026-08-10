@@ -29,7 +29,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard } from './types';
-import { bundle, quad, soup } from './kit';
+import { bundle, quad, soup } from '../../templates/geometry';
 
 const HW = 4.5;        // v1's half-width
 const Z0 = -7;         // up the hard

@@ -3,7 +3,7 @@
 // SHAPE FROM IGNITE RALLY: `HOUSE_TEMPLATES.cottageC` in `src/world/catalog.js` at
 // the repository root. The long low member of the original three.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'cottageLong',

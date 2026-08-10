@@ -21,7 +21,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, beam } from './types';
-import { bundle } from './kit';
+import { bundle } from '../../templates/geometry';
 
 const CAP = 2.6;              // v1's capstone module, along the run
 const RUN = CAP * 3;          // 7.8 m — what one component carries

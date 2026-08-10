@@ -13,7 +13,7 @@
 import { PropTemplate } from './types';
 import {
   hullParts, cab, gearGeo, keelGeo, trimGeo, afloat, standard, mergeGeoms,
-} from './boatParts';
+} from '../../templates/boats';
 
 const S = 0.86;
 

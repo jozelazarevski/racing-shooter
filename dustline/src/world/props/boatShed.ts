@@ -20,7 +20,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, beam } from './types';
-import { bundle, gablePrismGeo } from './kit';
+import { bundle, gablePrismGeo } from '../../templates/geometry';
 
 const HW = 3.2;               // half-width — 6.4 m clear inside
 const LEN = 11;               // z from -5.5 (closed) to +5.5 (open)

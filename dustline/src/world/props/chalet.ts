@@ -3,7 +3,7 @@
 // SHAPE FROM IGNITE RALLY: `HOUSE_TEMPLATES.cottageH` in `src/world/catalog.js` at
 // the repository root. Full-width balcony, woodpile stacked under it.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'chalet',

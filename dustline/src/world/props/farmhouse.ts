@@ -5,7 +5,7 @@
 // a steep roof whose eaves oversail the walls, and a lower wing so the outline
 // is not a rectangle. Its table comment is worth reading.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'farmhouse',

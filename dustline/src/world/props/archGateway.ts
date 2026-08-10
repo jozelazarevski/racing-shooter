@@ -28,8 +28,8 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, mergeGeoms, mergeGeomsUV } from './types';
-import { gablePrismGeo } from './kit';
-import { wallMaps } from './wallTexture';
+import { gablePrismGeo } from '../../templates/geometry';
+import { wallMaps } from '../../templates/textures';
 
 const CAR_R = 1.8;
 const ROAD_HALF = 7;                                  // dustline's 14 m road

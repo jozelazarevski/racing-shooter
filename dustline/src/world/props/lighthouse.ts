@@ -16,7 +16,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard } from './types';
-import { bundle, strut } from './kit';
+import { bundle, strut } from '../../templates/geometry';
 
 const SEG = 20;
 const at2 = (geo: THREE.BufferGeometry, yy: number) => geo.translate(0, yy, 0);

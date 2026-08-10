@@ -4,7 +4,7 @@
 // the repository root. Yard dressing, and the fallback shape the v1 element builder uses when it is
 // handed a name it does not know.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'logPile',

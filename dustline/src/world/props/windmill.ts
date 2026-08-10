@@ -4,7 +4,7 @@
 // the repository root. The other long-range landmark, and the one that suits open farmland where a
 // church tower would not.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'windmill',
