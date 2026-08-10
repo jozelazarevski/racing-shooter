@@ -138,6 +138,34 @@ export const PALETTE = [
   ] },
 ];
 
+/* WEATHER DECKS. Each is a patch over the theme, in the theme's own language,
+ * so a deck costs no new systems: `weather` drives the ambient particle
+ * recipe, `surface` tells the physics the road is wet or snowed, and the fog
+ * pair closes the world down in a squall. CLEAR is the absence of all three,
+ * which is why it has to null them explicitly - a theme that ships rain would
+ * otherwise keep raining. */
+export const WEATHER_DECKS = {
+  clear: { weather: null, surface: undefined },
+  rain: { weather: { type: 'rain', color: 0x9fb4c8, rate: 220 }, surface: 'wet',
+    fogNear: 150, fogFar: 900 },
+  snow: { weather: { type: 'snow', color: 0xffffff, rate: 90 }, surface: 'snow',
+    fogNear: 120, fogFar: 700 },
+  fog: { weather: null, surface: undefined, fogNear: 40, fogFar: 380 },
+};
+export const WEATHER_ORDER = ['clear', 'rain', 'snow', 'fog'];
+
+/* The palettes a scene may borrow. Every one is a shipped theme, so borrowing
+ * costs nothing and cannot fail: this is the "reuse the old to make new" of
+ * the world recipe - one world's route wearing another world's country. */
+export const THEME_MENU = [
+  ['', 'AS BUILT'], ['forest', 'PINE FOREST'], ['alpine', 'ALPINE'],
+  ['pass', 'HIGH PASS'], ['desert', 'DESERT'], ['canyon', 'CANYON'],
+  ['snow', 'SNOWFIELD'], ['jungle', 'JUNGLE'], ['outback', 'OUTBACK'],
+  ['medterrace', 'MEDITERRANEAN'], ['harbor', 'HARBOUR'], ['citadel', 'CITADEL'],
+  ['oldtown', 'OLD TOWN'], ['vineyard', 'VINEYARD'], ['farmland', 'FARMLAND'],
+  ['neon', 'NEON CITY'], ['dunes', 'DUNES'], ['glacial', 'GLACIAL'],
+];
+
 /* ---------------------------------------------------------------------------
  * WorldEditor
  * ------------------------------------------------------------------------- */
@@ -152,6 +180,16 @@ export class WorldEditor {
 
     this.delta = new TerrainDelta();
     this.elements = [];
+    // circles the world must leave empty. This is how generated scenery -
+    // trees, rocks, villages, the lot - gets DELETED: you cannot move what
+    // the builder invents each time, but you can tell it to keep out.
+    this.erase = [];
+    // per-scene overrides: another world's palette on this route, and a
+    // weather deck. Both are read by the Track constructor as `edit.theme`
+    // and `edit.tune`, so a recombined world needs no new art.
+    this.themeName = null;
+    this.weather = null;
+    this.roadFeat = { tunnels: null, bridges: null };
     this.sceneName = '';
     this.dirty = false;
 
@@ -195,6 +233,11 @@ export class WorldEditor {
       base: this.game.level ? this.game.level.id : 1,
       name: this.sceneName,
       dabs: this.delta.toJSON(),
+      erase: this.erase.map((z) => ({ x: +z.x.toFixed(1), z: +z.z.toFixed(1), r: +z.r.toFixed(1) })),
+      theme: this.themeName || undefined,
+      weather: this.weather || undefined,
+      road: (this.roadFeat.tunnels != null || this.roadFeat.bridges != null)
+        ? { tunnels: this.roadFeat.tunnels, bridges: this.roadFeat.bridges } : undefined,
       elements: this.elements.map((e) => ({
         preset: e.preset, x: +e.x.toFixed(1), z: +e.z.toFixed(1),
         rot: +e.rot.toFixed(3), scale: +e.scale.toFixed(2),
@@ -202,9 +245,29 @@ export class WorldEditor {
     };
   }
 
+  /** Everything the Track constructor needs, in its own vocabulary. */
+  buildPayload() {
+    const tune = {};
+    if (this.weather) Object.assign(tune, WEATHER_DECKS[this.weather] || {});
+    if (this.roadFeat.tunnels != null) tune.tunnels = { count: this.roadFeat.tunnels };
+    if (this.roadFeat.bridges != null) tune.bridgeCount = this.roadFeat.bridges;
+    return {
+      delta: this.delta,
+      elements: this.elements,
+      erase: this.erase,
+      theme: this.themeName || undefined,
+      tune: Object.keys(tune).length ? tune : undefined,
+    };
+  }
+
   load(data) {
     this.delta = new TerrainDelta(data.dabs || []);
     this.elements = (data.elements || []).map((e) => ({ ...e }));
+    this.erase = (data.erase || []).map((z) => ({ ...z }));
+    this.themeName = data.theme || null;
+    this.weather = data.weather || null;
+    this.roadFeat = { tunnels: data.road ? data.road.tunnels : null,
+      bridges: data.road ? data.road.bridges : null };
     this.sceneName = data.name || '';
     this.dirty = false;
   }
@@ -430,6 +493,13 @@ export class WorldEditor {
         return;
       }
     }
+    if (this.tool === 'clear' && this.erase.length) {
+      this.erase.pop();
+      this._clearZoneMarks();
+      for (const z of this.erase) this._zoneMark(z);
+      this._status(`undo — ${this.erase.length} clear zones`);
+      return;
+    }
     if (this.delta.dabs.length) {
       this.delta.dabs.pop();
       this.delta.rebuild();
@@ -443,13 +513,16 @@ export class WorldEditor {
     this._clearPreview();
     // let the status paint before the (synchronous, second-long) rebuild
     setTimeout(() => {
-      this.game.editScene = { delta: this.delta, elements: this.elements };
+      this.game.editScene = this.buildPayload();
       this.game.rebuildWorld();
       this._tmCache = null;
       this.dirty = false;
       this._clearGhosts();
       for (const e of this.elements) this._ghost(e);
-      this._status(`APPLIED — ${this.delta.length} dabs, ${this.elements.length} objects`);
+      this._clearZoneMarks();
+      for (const z of this.erase) this._zoneMark(z);
+      this._status(`APPLIED — ${this.delta.length} dabs, ${this.elements.length} objects, `
+        + `${this.erase.length} cleared`);
     }, 30);
   }
 
@@ -479,6 +552,10 @@ export class WorldEditor {
               this._place(p);
             } else if (this.tool === 'erase') {
               this._eraseAt(p);
+            } else if (this.tool === 'clear') {
+              this._eraseWorldAt(p);
+            } else if (this.tool === 'road') {
+              this._roadAt(p);
             }
           }
         }
@@ -565,6 +642,56 @@ export class WorldEditor {
     this.target.z += (sy * dx + cy * dy) * s;
   }
 
+  /** DELETE WHAT THE WORLD BUILT. Generated scenery has no stored identity -
+   *  the village, the wood and the boulder field are invented afresh on every
+   *  build - so the only honest way to remove it is to record a keep-out
+   *  circle and have the builders skip it. Takes effect at APPLY, like every
+   *  other edit, and the marker shows what will go. */
+  _eraseWorldAt(p) {
+    this.erase.push({ x: p.x, z: p.z, r: this.radius });
+    this.dirty = true;
+    this._zoneMark(this.erase[this.erase.length - 1]);
+    this._status(`clear zone ${this.erase.length} (r ${Math.round(this.radius)}) — APPLY to strip it`);
+  }
+
+  _zoneMark(z) {
+    if (!this._zones) {
+      this._zones = new THREE.Group();
+      this._zones.name = 'editor-zones';
+      this.game.scene.add(this._zones);
+    }
+    const g = new THREE.RingGeometry(z.r * 0.94, z.r, 40);
+    g.rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+      color: 0xff5a4a, transparent: true, opacity: 0.75, depthTest: false }));
+    m.position.set(z.x, this.game.track.terrainHeight(z.x, z.z) + 0.5, z.z);
+    m.renderOrder = 998;
+    this._zones.add(m);
+  }
+
+  _clearZoneMarks() {
+    if (!this._zones) return;
+    for (const c of [...this._zones.children]) {
+      c.geometry.dispose(); c.material.dispose(); this._zones.remove(c);
+    }
+  }
+
+  /** ROAD FEATURES. Bridges and tunnels are built BY the road system - they
+   *  need a straight enough run, a gorge or a hillside, and a clear approach -
+   *  so the editor asks for one more of each rather than pretending you can
+   *  drop a tunnel mouth wherever you tap. The builder still chooses the spot
+   *  it can actually carry; this is the honest knob. */
+  _roadAt() {
+    const t = this.game.track;
+    const cur = this.roadFeat;
+    if (cur.tunnels == null) cur.tunnels = (t.T.tunnels && t.T.tunnels.count) || 0;
+    if (cur.bridges == null) cur.bridges = (t.T.bridgeCount | 0) || 0;
+    if (this.roadMode === 'tunnel') cur.tunnels = Math.min(6, cur.tunnels + 1);
+    else cur.bridges = Math.min(6, cur.bridges + 1);
+    this.dirty = true;
+    this._status(`road: ${cur.tunnels} tunnels, ${cur.bridges} bridges — APPLY to cut them`);
+  }
+
   _eraseAt(p) {
     // drop placed objects within the brush; sculpt dabs are undone with UNDO
     const before = this.elements.length;
@@ -598,11 +725,24 @@ export class WorldEditor {
         <button class="ed-tool" data-tool="flatten">FLATTEN</button>
         <button class="ed-tool" data-tool="place">PLACE</button>
         <button class="ed-tool" data-tool="erase">ERASE</button>
+        <button class="ed-tool" data-tool="clear">CLEAR AREA</button>
+        <button class="ed-tool" data-tool="road">ROAD</button>
         <button class="ed-tool" data-tool="orbit">ORBIT</button>
       </div>
       <div id="ed-sliders">
         <label>SIZE <input id="ed-radius" type="range" min="8" max="180" value="40"><b id="ed-radius-v">40</b></label>
         <label>FORCE <input id="ed-strength" type="range" min="1" max="20" value="3"><b id="ed-strength-v">3</b></label>
+      </div>
+      <div id="ed-world">
+        <div class="ed-pgroup">WORLD RECIPE</div>
+        <label>LOOK <select id="ed-theme"></select></label>
+        <label>SKY <select id="ed-weather"></select></label>
+        <div class="ed-pgroup">ROAD</div>
+        <div id="ed-roadrow">
+          <button class="ed-mini current" data-road="tunnel">TUNNEL</button>
+          <button class="ed-mini" data-road="bridge">BRIDGE</button>
+        </div>
+        <div class="ed-hint">pick one, then tap ROAD on the map to add</div>
       </div>
       <div id="ed-palette"></div>
       <div id="ed-bottom">
@@ -634,6 +774,29 @@ export class WorldEditor {
       else if (act === 'clear') this._clearAll();
       else if (act === 'save') this._saveFlow();
       else if (act === 'load') this._loadFlow();
+    });
+
+    // world recipe: another world's look, and the weather over it
+    const th = root.querySelector('#ed-theme');
+    th.innerHTML = THEME_MENU.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+    th.addEventListener('change', () => {
+      this.themeName = th.value || null;
+      this.dirty = true;
+      this._status(this.themeName ? `look: ${th.options[th.selectedIndex].text} — APPLY` : 'look: as built');
+    });
+    const wx = root.querySelector('#ed-weather');
+    wx.innerHTML = WEATHER_ORDER.map((k) => `<option value="${k}">${k.toUpperCase()}</option>`).join('');
+    wx.addEventListener('change', () => {
+      this.weather = wx.value === 'clear' ? 'clear' : wx.value;
+      this.dirty = true;
+      this._status(`sky: ${wx.value.toUpperCase()} — APPLY`);
+    });
+    this.roadMode = 'tunnel';
+    root.querySelector('#ed-roadrow').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-road]');
+      if (!b) return;
+      this.roadMode = b.dataset.road;
+      root.querySelectorAll('#ed-roadrow .ed-mini').forEach((x) => x.classList.toggle('current', x === b));
     });
 
     const rad = root.querySelector('#ed-radius'), str = root.querySelector('#ed-strength');
@@ -668,7 +831,12 @@ export class WorldEditor {
     if (!confirm('Clear all edits in this scene?')) return;
     this.delta = new TerrainDelta();
     this.elements = [];
+    this.erase = [];
+    this.themeName = null;
+    this.weather = null;
+    this.roadFeat = { tunnels: null, bridges: null };
     this._clearGhosts();
+    this._clearZoneMarks();
     this.dirty = true;
     this._status('cleared — APPLY to rebuild');
   }
@@ -694,7 +862,7 @@ export class WorldEditor {
     const swap = lv && (!this.game.level || this.game.level.id !== lv.id);
     this.load(data);
     if (swap) {
-      this.game.editScene = { delta: this.delta, elements: this.elements };
+      this.game.editScene = this.buildPayload();
       this.game.swapLevel(lv);
       this._tmCache = null;
     } else {

@@ -23,10 +23,27 @@ on the drawn ground; APPLY is the moment the whole world is rebuilt around it.
 | **SMOOTH** | Pull the middle toward the average height around the brush ring — flattens lumps without picking a level. |
 | **FLATTEN** | Pull everything toward the height where you first pressed — the way to cut a terrace or a building pad. |
 | **PLACE** | Drop the selected preset from the palette. Ghost markers show the layout; the real buildings appear at APPLY. |
-| **ERASE** | Remove placed objects inside the brush. (Sculpt strokes come off with UNDO.) |
+| **ERASE** | Remove objects *you* placed, inside the brush. (Sculpt strokes come off with UNDO.) |
+| **CLEAR AREA** | Delete what the WORLD built — trees, rocks, villages, dressing. Generated scenery is invented afresh on every build and has no stored identity, so the editor records a keep-out circle and the builders skip it. The red ring shows what goes; it takes effect at APPLY. |
+| **ROAD** | Add a tunnel or a bridge. Pick TUNNEL or BRIDGE in the WORLD RECIPE panel, then tap ROAD. These are built *by* the road system — they need a straight enough run and the right ground — so this asks for one more and the builder chooses a spot it can actually carry. |
 | **ORBIT** | Camera-only mode, for when a drag should never paint. |
 
 **SIZE** is the brush radius, **FORCE** the height change per dab.
+
+## World recipe
+
+The panel on the right builds a NEW world out of old parts, which is the
+cheapest way to get somewhere new: nothing here needs new art.
+
+- **LOOK** — wear another world's palette on this world's route. Pick
+  CITADEL, DESERT, NEON CITY, ALPINE and so on; the route, the corners and
+  the elevation stay exactly as they were, everything you see changes.
+- **SKY** — CLEAR, RAIN, SNOW or FOG. A deck is a patch over the theme in the
+  theme's own language: it drives the ambient particles, tells the physics the
+  road is wet or snowed, and closes the fog down in a squall. CLEAR strips a
+  deck the world shipped with.
+
+Both are saved with the scene, so a recombined world reloads exactly.
 
 ## Camera
 

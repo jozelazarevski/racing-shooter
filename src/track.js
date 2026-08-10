@@ -4060,8 +4060,15 @@ export class Track {
     // level overrides layered over the theme: elevation, jump count, cliff
     // walls, gorge and bridge). Levels that name neither behave exactly as
     // before, so every existing world is untouched.
-    const base = THEMES[level && level.theme] || THEMES.forest;
-    const T = (level && level.tune) ? { ...base, ...level.tune } : base;
+    // A SCENE MAY RECOMBINE. `edit.theme` swaps the palette (another world's
+    // look on this world's route), `edit.tune` layers per-scene overrides -
+    // weather, tunnel and bridge counts - over it. This is what lets the
+    // editor build a NEW world out of the parts of old ones instead of
+    // needing new art for every idea.
+    const themeName = (edit && edit.theme) || (level && level.theme);
+    const base = THEMES[themeName] || THEMES.forest;
+    let T = (level && level.tune) ? { ...base, ...level.tune } : base;
+    if (edit && edit.tune) T = { ...T, ...edit.tune };
     this.T = T;
 
     // THE CITADEL'S HILL, raised by the world itself.
@@ -10538,6 +10545,21 @@ if (this._citMound) h += this._citMoundH(x, z);
 
   /** Is (x, z) flat enough (± `tol` over a `r` radius) to build on, and clear
    *  of everything already standing there? */
+  /** THE EDITOR'S ERASER. A scene may carry circles the world must leave
+   *  empty; anything the world would normally place inside one is skipped at
+   *  BUILD time, which is the only way to remove scenery that is generated
+   *  rather than stored. Cheap enough to sit in the hot placement path: a
+   *  scene with no erase zones costs one null check. */
+  _erased(x, z) {
+    const Z = this.edit && this.edit.erase;
+    if (!Z || !Z.length) return false;
+    for (let i = 0; i < Z.length; i++) {
+      const dx = x - Z[i].x, dz = z - Z[i].z;
+      if (dx * dx + dz * dz < Z[i].r * Z[i].r) return true;
+    }
+    return false;
+  }
+
   _buildableSpot(x, z, r, tol = 2.2) {
     // NOT IN THE WATER, AND NOT ON THE QUAY. This gate is the one place every
     // village building passes through, and it only ever knew about the sea -
@@ -10547,6 +10569,7 @@ if (this._citMound) h += this._citMoundH(x, z);
     // house standing on the beach at HARBOR QUAY.
     if (this._inWater(x, z)) return false;
     if (this._onQuayStrip(x, z)) return false;
+    if (this._erased(x, z)) return false;
     const h = this.terrainHeight(x, z);
     for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r],
       [r * 0.7, r * 0.7], [-r * 0.7, -r * 0.7], [r * 0.7, -r * 0.7], [-r * 0.7, r * 0.7]]) {
@@ -10572,6 +10595,7 @@ if (this._citMound) h += this._citMoundH(x, z);
    *  here. That is the point — see the header on HOUSE_TEMPLATES for the two
    *  independent copies of the same roof bug that made it necessary. */
   _element(B, type, x, z, rot, K, scale = 1, yOverride = null) {
+    if (this._erased(x, z)) return;
     // == null catches undefined too - a caller passing undefined must not NaN
     const y = (yOverride == null ? this.terrainHeight(x, z) : yOverride) - 0.25;
     const cs = Math.cos(rot), sn = Math.sin(rot);
@@ -13111,6 +13135,11 @@ if (this._citMound) h += this._citMoundH(x, z);
     while (placed < count && guard++ < count * 30) {
       const p = makePos();
       if (!p) continue;
+      // the editor's eraser reaches the SCATTER too - trees, rocks, tufts and
+      // every other generated dressing goes through here, and clearing a
+      // building site by hand while the wood grew back over it would make the
+      // tool feel broken
+      if (this._erased(p.x, p.z)) continue;
       place(p, placed);
       placed++;
     }
