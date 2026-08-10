@@ -13,8 +13,11 @@
 //
 //     import { gablePrismGeo } from '../templates/geometry';
 
+export * from './canvas';
 export * from './geometry';
 export * from './buildings';
 export * from './boats';
 export * from './textures';
+export * from './surfaces';
+export * from './markings';
 export * from './horizon';

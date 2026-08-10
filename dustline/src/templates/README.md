@@ -8,10 +8,15 @@ it has a side effect on import.
 
 ```
 templates/
+  canvas.ts     make(), the value-noise tile, and the texture memo cache
   geometry.ts   primitives and the lofting helpers
   buildings.ts  HOUSE_TEMPLATES — 18 dwelling archetypes as part lists
   boats.ts      the hull's rig, deck gear, cabins and trim
   textures.ts   the window tile and its emissive companion
+  surfaces.ts   what a thing is made of — stone, planks, rock face, crate
+                boards, barrel staves, cone wrap, grass blades
+  markings.ts   what somebody painted on it — chevrons, checkers, hazard
+                stripes, awnings, a grandstand crowd
   horizon.ts    the six skyline silhouettes
   index.ts      one import for all of it
 ```
@@ -29,6 +34,9 @@ needed, not because of what they are:
 | `world/props/wallTexture.ts` | `templates/textures.ts` |
 | bottom of `world/props/types.ts` | `templates/geometry.ts` |
 | shapes inside `render/horizon.ts` | `templates/horizon.ts` |
+| v1 `src/textures.js` (surfaces) | `templates/surfaces.ts` |
+| v1 `src/textures.js` (graphics) | `templates/markings.ts` |
+| v1 `src/textures.js` (helpers) | `templates/canvas.ts` |
 
 Three of those sat in `world/props/`, which is the **component catalogue** — one
 file per placeable thing. They were not components. The registry globs that
@@ -73,3 +81,48 @@ the header of each file for the exact v1 function, and `COMPONENTS.md` for why
 copying rather than redesigning was the right call. In short: the other game in
 this repository had already found the bugs, and its sources say plainly what my
 first attempts looked like from the driving seat.
+
+## Textures
+
+Of the 109 components, **four had a texture and a hundred and five were flat
+colour** — while the other game in this repository already had thirty-eight
+hand-painted maps tuned against its own worlds. A flat-shaded stone wall next
+to v1's is not a stylistic choice; it is the same wall with the detail missing.
+So `surfaces.ts` and `markings.ts` are v1's painters, ported with their
+comments.
+
+Two things about them are not v1's, and both are forced by checks this project
+has and that one does not:
+
+1. **They are seeded.** Every one draws with `Math.random()`. Rewriting fifteen
+   call sites per function into a seeded generator is exactly the reinvention
+   that loses the look, so the *generator is swapped underneath* instead, with
+   `withStubbedRandom` from `core/`. It matters because `verify:generated`
+   compares the committed contact sheets against a fresh render — a wall that
+   re-rolls its blocks each load would fail that check forever.
+2. **They are memoised, and dropped with the part cache.** `build()` runs per
+   component, so an uncached `crateTexture()` is a fresh canvas and a fresh GPU
+   upload per crate. The cache is registered so `resetPartCache()` clears it:
+   a disposed texture handed out again renders black and logs nothing.
+
+Anything that varies per surface — how many times a tile repeats across it —
+goes in the **palette**, not on the returned texture. These are shared
+instances; `tex.repeat.set(...)` at a call site silently re-tiles every other
+component holding the same one.
+
+### Fitting a texture to geometry
+
+A map is only an improvement where the geometry has a surface to take it, and
+`mergeGeoms` drops UVs — use `mergeGeomsUV` on anything that carries a map.
+Where a texture was tried and backed out, it was for a reason worth repeating:
+
+| component | why not |
+|---|---|
+| oil drum | `barrelTexture` is an oak cask; the drum is painted steel, and its saturated instance tints multiplied the wood brown into mud |
+| barrel stack | the casks already have hoop *geometry*; the texture paints hoops too, so they doubled |
+| stone wall | already models every block as geometry — a block texture on blocks |
+| traffic cone | the reflective band is already a mesh; the wrap only added white patches to the base flange |
+| grandstand | `crowdTexture` needs a surface facing the track; the benches are 16 cm tall |
+
+Use `node tools/shot-component.mjs <id>` to look before deciding. At contact
+sheet distance a painted masonry tile and a grey fill are the same few pixels.

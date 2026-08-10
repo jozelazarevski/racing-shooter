@@ -10,6 +10,7 @@
 
 import type { PropTemplate, PropPart } from './types';
 import { disposeWallMaps } from '../../templates/textures';
+import { disposeCachedTextures } from '../../templates/canvas';
 
 const modules = import.meta.glob<{ default: PropTemplate }>('./*.ts', { eager: true });
 
@@ -71,4 +72,8 @@ export function resetPartCache() {
   // out again renders black with no error. Same rule as the geometry: cleared
   // together or not at all.
   disposeWallMaps();
+  // Same rule for the surface and marking maps — stone, planks, crate boards,
+  // hazard stripes. They are memoised per palette across every component that
+  // asks for them, so they outlive any one world unless dropped here.
+  disposeCachedTextures();
 }

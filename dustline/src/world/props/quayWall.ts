@@ -21,7 +21,8 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, beam } from './types';
-import { bundle } from '../../templates/geometry';
+import { bundle, mergeGeomsUV } from '../../templates/geometry';
+import { stoneTexture } from '../../templates/surfaces';
 
 const CAP = 2.6;              // v1's capstone module, along the run
 const RUN = CAP * 3;          // 7.8 m — what one component carries
@@ -80,8 +81,16 @@ const quayWall: PropTemplate = {
       key: 'face',
       // The mole's stone from `_buildLighthouse`, which is the darker, wetter
       // grey v1 dresses everything below the coping in.
-      geometry: bundle(face()),
-      material: standard(0x9a9282, { roughness: 1 }),
+      // UV-preserving, because the face is the one big flat surface on this
+      // component and v1's masonry tile is what turns it from a grey slab into
+      // dressed stone. `bundle` keeps positions only, so it cannot carry a map.
+      geometry: mergeGeomsUV(face()),
+      // The tile is 7.8 m of quay wide and about 2 m tall, so three courses
+      // across and one up puts the blocks at roughly the size they are cut.
+      material: standard(0x9a9282, {
+        roughness: 1,
+        map: stoneTexture({ repeat: [3, 1] }),
+      }),
       castShadow: true,
     },
   ],
