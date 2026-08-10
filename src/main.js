@@ -7,7 +7,7 @@ import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
 import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
-  HOUSE_TEMPLATES } from './track.js';
+  HOUSE_TEMPLATES, worldFacets } from './track.js';
 import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
@@ -83,6 +83,30 @@ const WORLD_TAGS = {
   farmland: '🌧 hedge banks · mud · blind crests',
   outback: 'bulldust holes · creek jumps · 🦘',
 };
+
+// TRACK-LIST FILTERS. The vocabulary lives here and the facets themselves are
+// derived in track.js (`worldFacets`), so adding a world adds its chips.
+//
+// Within a group the chips are OR — RAIN *or* SNOW — because picking two
+// weathers means "either will do". Across groups they are AND, because
+// picking NIGHT and WET means you want a wet night stage, not a list of
+// everything that is one or the other. An empty group constrains nothing.
+const FILTER_GROUPS = [
+  { key: 'time', label: 'TIME', tags: [
+    ['DAY', '☀ DAY'], ['DUSK', '🌅 DUSK'], ['NIGHT', '🌙 NIGHT']] },
+  { key: 'weather', label: 'WEATHER', tags: [
+    ['CLEAR', '☁ CLEAR'], ['RAIN', '🌧 RAIN'], ['SNOW', '❄ SNOW'],
+    ['DUST', '🌪 DUST'], ['EMBERS', '🔥 EMBERS'], ['MIST', '🌫 MIST']] },
+  { key: 'scenery', label: 'SCENERY', tags: [
+    ['FOREST', '🌲 FOREST'], ['MOUNTAIN', '⛰ MOUNTAIN'], ['SNOWFIELD', '🏔 SNOWFIELD'],
+    ['COAST', '🌊 COAST'], ['DESERT', '🏜 DESERT'], ['CANYON', '🪨 CANYON'],
+    ['JUNGLE', '🌴 JUNGLE'], ['FARMLAND', '🌾 FARMLAND'], ['PLAINS', '🦓 PLAINS'],
+    ['CITY', '🏙 CITY'], ['VOLCANIC', '🌋 VOLCANIC']] },
+  // Grip, not looks — this is the `surface` the physics reads, so a WET chip
+  // promises a road that actually behaves wet.
+  { key: 'road', label: 'ROAD', tags: [
+    ['DRY', 'DRY'], ['WET', '💧 WET'], ['SNOW', '❄ SNOW/ICE']] },
+];
 
 // steer: how much of the car's steering rate the player gets in this view.
 // From above, a yaw change moves the car against a fixed world and reads as
@@ -1350,11 +1374,29 @@ class Game {
    *  new one, then re-apply the theme, and only then put the cars on the new
    *  grid, because placeAt reads the new track's centreline.
    *
-   *  Returns false if the level isn't playable, leaving the current one up. */
-  swapLevel(level, force = false) {
+   *  Returns false if the level isn't playable, leaving the current one up.
+   *
+   *  `scene` IS THE THIRD ARGUMENT ON PURPOSE. It used to be ambient state —
+   *  `this.editScene`, set once by the editor and never cleared — and the
+   *  result was the worst bug the editor has had: sculpt a hill on PINE
+   *  VALLEY, go back to the track list, and every world you opened after that
+   *  carried your hill, including PINE VALLEY itself. The shipped world could
+   *  not be got back at all, because `same && !force` made re-picking it a
+   *  no-op. Measured: PINE VALLEY's ground at one probe point went -5.66 ->
+   *  12.34 and stayed there, and the edit leaked into DUST CANYON badly
+   *  enough to split its physics ground (16.31) from its drawn ground (11.17).
+   *
+   *  So the edits now travel WITH the request. Passing nothing means the
+   *  shipped world, which is what every ordinary track-list click wants, and
+   *  a caller has to ask for edits explicitly to get them. */
+  swapLevel(level, force = false, scene = null) {
     if (!level || this.state === 'race' || this.state === 'countdown') return false;
     const same = this.level && this.level.id === level.id;
-    if (same && !force) return true;
+    // A world already up but standing on DIFFERENT edits is not the world
+    // being asked for, so this is a real change however same the id looks.
+    const sameEdits = (this.editScene || null) === (scene || null);
+    if (same && sameEdits && !force) return true;
+    this.editScene = scene || null;
 
     this.level = level;
     this.levelIndex = Math.max(0, LEVELS.findIndex((l) => l.id === level.id));
@@ -1420,7 +1462,9 @@ class Game {
    *  needs; the sculpt reaches the builder through `this.editScene`. */
   rebuildWorld() {
     if (!this.level) return false;
-    return this.swapLevel(this.level, true);
+    // the editor's own rebuild — it has just put the pending edits on
+    // `editScene`, and this is the one caller that means to keep them
+    return this.swapLevel(this.level, true, this.editScene);
   }
 
   /** (Re)read everything scoped to the ACTIVE PROFILE — career, purse, garage.
@@ -1892,21 +1936,213 @@ class Game {
       const data = scenes[name];
       const base = LEVELS.find((l) => l.id === data.base);
       const card = document.createElement('button');
-      card.className = 'level-chip';
+      card.className = 'level-chip scene-chip';
       card.innerHTML = `<div class="wc-name">${name}</div>`
         + `<div class="wc-sub">${base ? base.name : 'WORLD ' + data.base}`
-        + ` · ${(data.dabs || []).length} edits · ${(data.elements || []).length} objects</div>`;
-      card.addEventListener('click', () => {
+        + ` · ${(data.dabs || []).length} edits · ${(data.elements || []).length} objects</div>`
+        + '<div class="wc-del" title="delete this scene">✕</div>';
+      card.addEventListener('click', (ev) => {
+        // DELETE. A world you made is yours to throw away, and there was no
+        // way to do it at all — saved scenes accumulated with no bin.
+        if (ev.target.classList.contains('wc-del')) {
+          ev.stopPropagation();
+          if (!card.classList.contains('confirm')) {
+            // two taps, because this cannot be undone and the card is small
+            card.classList.add('confirm');
+            card.querySelector('.wc-del').textContent = 'DELETE?';
+            setTimeout(() => {
+              card.classList.remove('confirm');
+              const x = card.querySelector('.wc-del');
+              if (x) x.textContent = '✕';
+            }, 3000);
+            return;
+          }
+          let all = {};
+          try { all = JSON.parse(localStorage.getItem('ir-scenes') || '{}'); } catch { all = {}; }
+          delete all[name];
+          try { localStorage.setItem('ir-scenes', JSON.stringify(all)); } catch { /* private mode */ }
+          // if the world you just deleted is the one standing, get off it
+          if (this.editScene && this.level && base && this.level.id === base.id) {
+            this.swapLevel(base, true, null);
+          }
+          this._renderLevelCards();
+          this.hud?.feed?.(`DELETED ${name}`, 'bad');
+          return;
+        }
         if (!base) return;
         if (!this.editor) this.editor = new WorldEditor(this);
         this.editor.load(data);
-        this.editScene = this.editor.buildPayload();
-        // force: the base level may already be up, and its unedited build is
-        // exactly what we must NOT keep
-        this.swapLevel(base, true);
+        // the edits travel WITH the request — see swapLevel
+        this.swapLevel(base, true, this.editor.buildPayload());
         this.hud?.feed?.(name, 'good');
       });
       row.appendChild(card);
+    }
+  }
+
+  /** FILTERS. Fifty-eight worlds in one scroll is a list you hunt through.
+   *
+   *  The bar is built once and then only ever toggled: filtering hides cards
+   *  with a class instead of re-rendering the list, so the lazy preview-image
+   *  observers survive a filter change and a world you have already scrolled
+   *  to keeps its art. The chips themselves come from FILTER_GROUPS and the
+   *  per-world facets from `worldFacets`, so neither list is hand-maintained.
+   *
+   *  The choice persists, which is the whole point of a filter you set once —
+   *  and is exactly why the count line below it is not optional: "SHOWING 9 OF
+   *  58" is what stops a filter left on last week from reading as lost worlds. */
+  _loadFilters() {
+    const F = { q: '' };
+    for (const g of FILTER_GROUPS) F[g.key] = new Set();
+    try {
+      const s = JSON.parse(localStorage.getItem('ir-filters') || '{}');
+      for (const g of FILTER_GROUPS) {
+        const known = new Set(g.tags.map(([t]) => t));
+        // drop anything this build no longer has a chip for, so a stored
+        // filter can never hide the whole list with a tag nothing carries
+        for (const t of (s[g.key] || [])) if (known.has(t)) F[g.key].add(t);
+      }
+      if (typeof s.q === 'string') F.q = s.q;
+      if (typeof s.open === 'boolean') F.open = s.open;
+    } catch { /* a corrupt filter is not worth a broken menu */ }
+    return F;
+  }
+
+  _saveFilters() {
+    const s = { q: this.filters.q, open: this.filters.open };
+    for (const g of FILTER_GROUPS) s[g.key] = [...this.filters[g.key]];
+    try { localStorage.setItem('ir-filters', JSON.stringify(s)); } catch { /* private mode */ }
+  }
+
+  _buildFilterBar() {
+    const host = document.getElementById('world-filters');
+    if (!host || host.dataset.built) return;
+    host.dataset.built = '1';
+    if (!this.filters) this.filters = this._loadFilters();
+
+    const top = document.createElement('div');
+    top.className = 'wf-top';
+    const search = document.createElement('input');
+    search.id = 'wf-search';
+    search.type = 'search';
+    search.placeholder = 'SEARCH WORLDS, REGIONS, ROUTES';
+    search.autocomplete = 'off';
+    search.value = this.filters.q;
+    search.addEventListener('input', () => {
+      this.filters.q = search.value;
+      this._saveFilters();
+      this._applyWorldFilter();
+    });
+    // COLLAPSE. Four rows of chips is most of a phone screen, and the thing
+    // the player came here for is the cards. Folded, the bar keeps the search
+    // box, the count, and the chips that are actually ON — so a filter you set
+    // is never hidden from you, which is the one thing a fold must not do.
+    const fold = document.createElement('button');
+    fold.id = 'wf-toggle';
+    fold.addEventListener('click', () => {
+      host.classList.toggle('wf-collapsed');
+      this.filters.open = !host.classList.contains('wf-collapsed');
+      this._saveFilters();
+      this._applyWorldFilter();
+    });
+    const clear = document.createElement('button');
+    clear.id = 'wf-clear';
+    clear.textContent = 'CLEAR';
+    clear.addEventListener('click', () => {
+      for (const g of FILTER_GROUPS) this.filters[g.key].clear();
+      this.filters.q = '';
+      search.value = '';
+      host.querySelectorAll('.wf-chip.on').forEach((c) => c.classList.remove('on'));
+      this._saveFilters();
+      this._applyWorldFilter();
+    });
+    top.append(search, fold, clear);
+    host.appendChild(top);
+
+    this._filterRows = new Map();
+    for (const g of FILTER_GROUPS) {
+      const row = document.createElement('div');
+      row.className = 'wf-group';
+      this._filterRows.set(g.key, row);
+      const lbl = document.createElement('span');
+      lbl.className = 'wf-glabel';
+      lbl.textContent = g.label;
+      row.appendChild(lbl);
+      for (const [tag, text] of g.tags) {
+        const chip = document.createElement('button');
+        chip.className = 'wf-chip' + (this.filters[g.key].has(tag) ? ' on' : '');
+        chip.textContent = text;
+        chip.addEventListener('click', () => {
+          const set = this.filters[g.key];
+          if (set.has(tag)) set.delete(tag); else set.add(tag);
+          chip.classList.toggle('on', set.has(tag));
+          this._saveFilters();
+          this._applyWorldFilter();
+        });
+        row.appendChild(chip);
+      }
+      host.appendChild(row);
+    }
+    const count = document.createElement('div');
+    count.id = 'wf-count';
+    host.appendChild(count);
+    // Open on a screen with room for it, folded on a phone — unless the
+    // player last left it the other way.
+    const roomy = !window.matchMedia?.('(max-width:620px)').matches;
+    host.classList.toggle('wf-collapsed', !(this.filters.open ?? roomy));
+  }
+
+  /** Show/hide the already-rendered cards. Region headers go with their rows,
+   *  so a filtered list never leaves a heading standing over nothing. */
+  _applyWorldFilter() {
+    if (!this.filters) this.filters = this._loadFilters();
+    const F = this.filters;
+    const q = F.q.trim().toLowerCase();
+    let shown = 0, total = 0, filtering = !!q;
+    for (const g of FILTER_GROUPS) if (F[g.key].size) filtering = true;
+
+    for (const { head, row } of (this._regionRows || new Map()).values()) {
+      let live = 0;
+      for (const card of row.children) {
+        total++;
+        let hit = !q || (card.dataset.q || '').includes(q);
+        for (const g of FILTER_GROUPS) {
+          if (!hit) break;
+          const want = F[g.key];
+          if (!want.size) continue;
+          const have = (card.dataset[g.key] || '').split(' ');
+          hit = [...want].some((t) => have.includes(t));
+        }
+        card.classList.toggle('wf-out', !hit);
+        if (hit) { shown++; live++; }
+      }
+      head.classList.toggle('wf-out', !live);
+      row.classList.toggle('wf-out', !live);
+    }
+
+    const count = document.getElementById('wf-count');
+    if (count) {
+      count.textContent = !filtering
+        ? `${total} WORLDS`
+        : shown ? `SHOWING ${shown} OF ${total} WORLDS`
+          : 'NO WORLD MATCHES — TAP CLEAR TO SEE THEM ALL';
+      count.classList.toggle('none', filtering && !shown);
+    }
+    const clear = document.getElementById('wf-clear');
+    if (clear) clear.classList.toggle('on', filtering);
+
+    // Folded, the bar shows only the groups with something switched on, so
+    // what is filtering the list is always on screen.
+    let set = 0;
+    for (const g of FILTER_GROUPS) {
+      set += F[g.key].size;
+      this._filterRows?.get(g.key)?.classList.toggle('wf-empty', !F[g.key].size);
+    }
+    const fold = document.getElementById('wf-toggle');
+    if (fold) {
+      const open = !document.getElementById('world-filters').classList.contains('wf-collapsed');
+      fold.textContent = open ? 'HIDE ▲' : set ? `FILTERS ${set} ▼` : 'FILTERS ▼';
+      fold.classList.toggle('on', !open && set > 0);
     }
   }
 
@@ -1916,21 +2152,24 @@ class Game {
     if (!sel) return;
     sel.innerHTML = '';
     this._renderSceneCards(sel);
+    this._buildFilterBar();
     const regionRows = new Map();
+    this._regionRows = regionRows;
     const rowFor = (lv) => {
       const rg = lv.region || 'CHAMPIONSHIP';
-      let row = regionRows.get(rg);
-      if (!row) {
+      let pair = regionRows.get(rg);
+      if (!pair) {
         const head = document.createElement('div');
         head.className = 'region-head';
         head.textContent = rg;
         sel.appendChild(head);
-        row = document.createElement('div');
+        const row = document.createElement('div');
         row.className = 'region-row';
         sel.appendChild(row);
-        regionRows.set(rg, row);
+        pair = { head, row };
+        regionRows.set(rg, pair);
       }
-      return row;
+      return pair.row;
     };
     this._renderStarKey();
     // FRESH REGIONS RENDER FIRST. Career order (pricing, progression) is the
@@ -1948,6 +2187,16 @@ class Game {
       card.className = 'level-chip'
         + (i === this.levelIndex ? ' current' : '')
         + (unlocked ? '' : ' locked');
+      // What this world IS, stamped on the card so filtering is an attribute
+      // read rather than a rebuild. `q` is everything you might type at it:
+      // the name, the region, the theme and route keys (a player who knows
+      // "spa" should not have to know it is dressed as a forest), and the
+      // facet words themselves, so typing "night" works without the chips.
+      const F = worldFacets(lv);
+      for (const g of FILTER_GROUPS) card.dataset[g.key] = F[g.key].join(' ');
+      card.dataset.q = [lv.name, lv.region, lv.theme, lv.route || '',
+        WORLD_TAGS[lv.theme] || '', F.time.join(' '), F.weather.join(' '),
+        F.scenery.join(' '), F.road.join(' ')].join(' ').toLowerCase();
       const best = this.career.finished[lv.id];
       // Stars carry both halves of the story: how much of this world you have
       // taken, and — when it is shut — exactly what it costs to open. A bare
@@ -1970,7 +2219,12 @@ class Game {
         <div class="wc-best${best ? '' : ' new'}${unlocked ? '' : ' cost'}">${bestTxt}</div>`;
       this._drawCircuitMap(card.querySelector(".wc-map"), lv.route || lv.theme, !unlocked, i === this.levelIndex);
       card.addEventListener('click', () => {
-        if (i === this.levelIndex) return;
+        // "Already on it" is only true if what is standing is the SHIPPED
+        // world. With an edited build up, this card is the way back to the
+        // real one, and returning early here is what made the original
+        // unreachable — you could see PINE VALLEY in the list, tap it, and
+        // keep the hill you had sculpted on it.
+        if (i === this.levelIndex && !this.editScene) return;
         if (!this.isLevelUnlocked(lv.id)) {
           card.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
             { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
@@ -1979,7 +2233,8 @@ class Game {
         // Swap the world under the menu instead of navigating. Falls back to
         // the old reload only if the swap declines (mid-race), so picking a
         // track can never leave you stuck on the one you were leaving.
-        if (this.swapLevel(lv)) {
+        // no third argument: a track-list pick is always the shipped world
+        if (this.swapLevel(lv, !!this.editScene)) {
           this._renderLevelCards();      // repaint which card is current
           this.renderCarShop();          // the garage ratings are per-world
           this._buildMissionPicker?.();  // missions are per-world
@@ -1990,6 +2245,7 @@ class Game {
       rowFor(lv).appendChild(card);
       this._watchShot(card.querySelector('.wc-shot'));
     });
+    this._applyWorldFilter();
   }
 
   /** LAZY WORLD ART. The 21 preview jpgs are 1.15 MB — 40 % of everything the

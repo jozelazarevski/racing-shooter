@@ -80,13 +80,27 @@ const R = await page.evaluate(async () => {
   out.weatherCleared = g.track.T.weather;
 
   // --- ROAD FEATURES -------------------------------------------------------
+  // These used to be COUNTS — "one more tunnel, somewhere" — and the builder
+  // chose the site, which is why tapping the ground appeared to do nothing.
+  // They are now SITED: the tap picks the nearest point on the lap and the
+  // bore is cut there, so the test has to hand _roadAt a place.
   ed.roadMode = 'tunnel';
-  ed._roadAt();
-  ed._roadAt();
-  out.tunnelsAsked = ed.roadFeat.tunnels;
+  const tk = g.track, nn = tk.center.length;
+  const lenS = Math.round(80 / tk.segLen);
+  let straight = -1, sc = Infinity;
+  for (let i = 0; i < nn; i++) {
+    if (tk._circDist(i, 0) < 120) continue;
+    let m = 0;
+    for (let w = -lenS; w <= lenS; w++) m = Math.max(m, tk.curvature[(i + w + nn) % nn]);
+    if (m < sc) { sc = m; straight = i; }
+  }
+  out.straightCurv = sc;
+  ed._roadAt({ x: tk.center[straight].x, z: tk.center[straight].z });
+  out.tunnelsAsked = ed.roadFeat.tunnels.length;
   g.editScene = ed.buildPayload();
   g.rebuildWorld();
   out.tunnelsInTheme = g.track.T.tunnels && g.track.T.tunnels.count;
+  out.tunnelsSited = !!(g.track.T.tunnels && g.track.T.tunnels.at);
 
   // --- round trip ----------------------------------------------------------
   const json = JSON.stringify(ed.serialize());
@@ -94,7 +108,7 @@ const R = await page.evaluate(async () => {
   ed2.load(JSON.parse(json));
   out.rtZones = ed2.erase.length;
   out.rtTheme = ed2.themeName;
-  out.rtTunnels = ed2.roadFeat.tunnels;
+  out.rtTunnels = ed2.roadFeat.tunnels.length;
   out.bytes = json.length;
 
   // --- and a scene with nothing set must leave the world alone -------------
@@ -119,10 +133,21 @@ ok(R.weather === 'snow' && R.surface === 'snow',
   'WEATHER reaches the theme the world and physics read', `${R.weather}/${R.surface}`);
 ok(!R.weatherCleared, 'CLEAR weather removes a deck the theme shipped with',
   String(R.weatherCleared));
-ok(R.tunnelsAsked === 2 && R.tunnelsInTheme === 2,
-  'ROAD features reach the builder', `${R.tunnelsAsked}/${R.tunnelsInTheme}`);
-ok(R.rtZones === 1 && R.rtTheme === 'desert' && R.rtTunnels === 2,
-  'a saved scene reloads its zones, recipe and road features');
+// PINE VALLEY may have no straight long enough to bore — that refusal is the
+// correct answer, and the tool now says so at tap time rather than building
+// nothing at APPLY. Assert whichever outcome the route actually earns.
+if (R.straightCurv <= 0.013) {
+  ok(R.tunnelsAsked === 1 && R.tunnelsInTheme === 1 && R.tunnelsSited,
+    'ROAD features reach the builder, sited where they were asked for',
+    `${R.tunnelsAsked}/${R.tunnelsInTheme}/at:${R.tunnelsSited}`);
+} else {
+  ok(R.tunnelsAsked === 0,
+    'a route with no straight long enough refuses the bore instead of faking it',
+    `curv ${R.straightCurv.toFixed(4)} > 0.013, asked ${R.tunnelsAsked}`);
+}
+ok(R.rtZones === 1 && R.rtTheme === 'desert' && R.rtTunnels === R.tunnelsAsked,
+  'a saved scene reloads its zones, recipe and road features',
+  `${R.rtZones}/${R.rtTheme}/${R.rtTunnels}`);
 ok(R.bytes < 8000, 'the extended scene still serialises small', R.bytes);
 ok(R.cleanTrees === R.treesBefore && R.cleanTheme === R.themeBefore,
   'clearing every edit restores the original world exactly',

@@ -189,7 +189,9 @@ export class WorldEditor {
     // and `edit.tune`, so a recombined world needs no new art.
     this.themeName = null;
     this.weather = null;
-    this.roadFeat = { tunnels: null, bridges: null };
+    // sited features, not counts: lap fractions for the bores, one for a span
+    this.roadFeat = { tunnels: [], bridge: null };
+    this.waters = [];
     this.sceneName = '';
     this.dirty = false;
 
@@ -236,8 +238,12 @@ export class WorldEditor {
       erase: this.erase.map((z) => ({ x: +z.x.toFixed(1), z: +z.z.toFixed(1), r: +z.r.toFixed(1) })),
       theme: this.themeName || undefined,
       weather: this.weather || undefined,
-      road: (this.roadFeat.tunnels != null || this.roadFeat.bridges != null)
-        ? { tunnels: this.roadFeat.tunnels, bridges: this.roadFeat.bridges } : undefined,
+      road: (this.roadFeat.tunnels.length || this.roadFeat.bridge != null)
+        ? { tunnels: this.roadFeat.tunnels.map((f) => +f.toFixed(4)),
+          bridge: this.roadFeat.bridge } : undefined,
+      waters: this.waters.length ? this.waters.map((w) => ({
+        x: +w.x.toFixed(1), z: +w.z.toFixed(1), r: +w.r.toFixed(1), y: +w.y.toFixed(2),
+      })) : undefined,
       elements: this.elements.map((e) => ({
         preset: e.preset, x: +e.x.toFixed(1), z: +e.z.toFixed(1),
         rot: +e.rot.toFixed(3), scale: +e.scale.toFixed(2),
@@ -249,12 +255,20 @@ export class WorldEditor {
   buildPayload() {
     const tune = {};
     if (this.weather) Object.assign(tune, WEATHER_DECKS[this.weather] || {});
-    if (this.roadFeat.tunnels != null) tune.tunnels = { count: this.roadFeat.tunnels };
-    if (this.roadFeat.bridges != null) tune.bridgeCount = this.roadFeat.bridges;
+    // `at` is what turns a count into a place — see _planTunnels / _planGorge
+    if (this.roadFeat.tunnels.length) {
+      tune.tunnels = { count: this.roadFeat.tunnels.length, at: [...this.roadFeat.tunnels] };
+    }
+    if (this.roadFeat.bridge != null) {
+      const f = this.roadFeat.bridge;
+      tune.heroBridge = { at: [Math.max(0, f - 0.03), Math.min(1, f + 0.03)],
+        half: 24, len: 210, depth: 28, skew: 0 };
+    }
     return {
       delta: this.delta,
       elements: this.elements,
       erase: this.erase,
+      waters: this.waters,
       theme: this.themeName || undefined,
       tune: Object.keys(tune).length ? tune : undefined,
     };
@@ -266,8 +280,15 @@ export class WorldEditor {
     this.erase = (data.erase || []).map((z) => ({ ...z }));
     this.themeName = data.theme || null;
     this.weather = data.weather || null;
-    this.roadFeat = { tunnels: data.road ? data.road.tunnels : null,
-      bridges: data.road ? data.road.bridges : null };
+    // v1 scenes stored COUNTS ("two tunnels, somewhere"); there is no place to
+    // recover from a number, so an old scene keeps its features by count and
+    // gains sited ones only when you tap for them.
+    const rd = data.road || {};
+    this.roadFeat = {
+      tunnels: Array.isArray(rd.tunnels) ? [...rd.tunnels] : [],
+      bridge: typeof rd.bridge === 'number' ? rd.bridge : null,
+    };
+    this.waters = (data.waters || []).map((w) => ({ ...w }));
     this.sceneName = data.name || '';
     this.dirty = false;
   }
@@ -464,7 +485,14 @@ export class WorldEditor {
   }
 
   /** A placed building only becomes real at Apply (it has to join the batched
-   *  instanced meshes). Until then it is a marker, so the layout can be seen. */
+   *  instanced meshes). Until then it is a marker, so the layout can be seen.
+   *
+   *  AFTER Apply the marker must get out of the way. It used to stay a big
+   *  yellow wireframe box around the finished house, which made every
+   *  building the editor placed look like a placeholder crate — reported as
+   *  exactly that. A built object keeps only a flat footprint ring on the
+   *  ground: enough to see what you put there and to aim ERASE at, and low
+   *  enough that the actual house is what you look at. */
   _ghost(e) {
     if (!this._ghosts) {
       this._ghosts = new THREE.Group();
@@ -472,13 +500,23 @@ export class WorldEditor {
       this.game.scene.add(this._ghosts);
     }
     const y = this.game.track.terrainHeight(e.x, e.z) + this.delta.at(e.x, e.z);
-    const box = new THREE.Mesh(
-      new THREE.BoxGeometry(6 * e.scale, 7 * e.scale, 6 * e.scale),
-      new THREE.MeshBasicMaterial({ color: 0xffc14a, wireframe: true }));
-    box.position.set(e.x, y + 3.5 * e.scale, e.z);
-    box.rotation.y = e.rot;
-    box.userData.el = e;
-    this._ghosts.add(box);
+    let m;
+    if (e.built) {
+      const r = 3.4 * e.scale;
+      m = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.5, 20),
+        new THREE.MeshBasicMaterial({ color: 0xffc14a, transparent: true,
+          opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(e.x, y + 0.25, e.z);
+    } else {
+      m = new THREE.Mesh(
+        new THREE.BoxGeometry(6 * e.scale, 7 * e.scale, 6 * e.scale),
+        new THREE.MeshBasicMaterial({ color: 0xffc14a, wireframe: true }));
+      m.position.set(e.x, y + 3.5 * e.scale, e.z);
+      m.rotation.y = e.rot;
+    }
+    m.userData.el = e;
+    this._ghosts.add(m);
   }
 
   _clearGhosts() {
@@ -523,7 +561,9 @@ export class WorldEditor {
       this._tmCache = null;
       this.dirty = false;
       this._clearGhosts();
-      for (const e of this.elements) this._ghost(e);
+      // everything on the list is now a real building in the rebuilt world,
+      // so its marker drops to a footprint ring instead of a crate over it
+      for (const e of this.elements) { e.built = true; this._ghost(e); }
       this._clearZoneMarks();
       for (const z of this.erase) this._zoneMark(z);
       this._status(`APPLIED — ${this.delta.length} dabs, ${this.elements.length} objects, `
@@ -561,6 +601,8 @@ export class WorldEditor {
               this._eraseWorldAt(p);
             } else if (this.tool === 'road') {
               this._roadAt(p);
+            } else if (this.tool === 'water') {
+              this._waterAt(p);
             }
           }
         }
@@ -681,20 +723,127 @@ export class WorldEditor {
     }
   }
 
-  /** ROAD FEATURES. Bridges and tunnels are built BY the road system - they
-   *  need a straight enough run, a gorge or a hillside, and a clear approach -
-   *  so the editor asks for one more of each rather than pretending you can
-   *  drop a tunnel mouth wherever you tap. The builder still chooses the spot
-   *  it can actually carry; this is the honest knob. */
-  _roadAt() {
+  /** WATER, IN ONE GESTURE.
+   *
+   *  A lake is a hole with water in it, and asking the player to dig the hole
+   *  first and then find a separate fill tool is asking them to do the
+   *  engine's job — "I can't add water" is what that gets you. So the tool
+   *  does both: it sinks a bowl under the brush and records a surface at the
+   *  level of the ground you tapped, which is what makes the shoreline meet
+   *  the land instead of a blue disc lying on a field.
+   *
+   *  The bowl goes through the ordinary terrain delta, so BOTH height fields
+   *  see it, the road clamps after it, and the scatter keeps out of it — the
+   *  same guarantees every other sculpt gets. */
+  _waterAt(p) {
+    if (!p) return;
     const t = this.game.track;
-    const cur = this.roadFeat;
-    if (cur.tunnels == null) cur.tunnels = (t.T.tunnels && t.T.tunnels.count) || 0;
-    if (cur.bridges == null) cur.bridges = (t.T.bridgeCount | 0) || 0;
-    if (this.roadMode === 'tunnel') cur.tunnels = Math.min(6, cur.tunnels + 1);
-    else cur.bridges = Math.min(6, cur.bridges + 1);
+    const r = this.radius;
+    const surf = t.terrainHeight(p.x, p.z) + this.delta.at(p.x, p.z);
+    // dig first: a bowl about a fifth as deep as it is wide, floored so a
+    // huge brush does not punch a well through the world
+    const depth = Math.min(9, Math.max(3, r * 0.22));
+    this.delta.add({ x: p.x, z: p.z, r, dh: -depth, mode: 'water' });
+    // ...then stand the water just under the original rim, so the bank shows
+    const y = surf - 0.5;
+    const near = this.waters.find((w) => Math.hypot(w.x - p.x, w.z - p.z) < w.r * 0.6);
+    if (near) { near.r = Math.max(near.r, r); near.y = Math.min(near.y, y); }
+    else this.waters.push({ x: p.x, z: p.z, r, y });
     this.dirty = true;
-    this._status(`road: ${cur.tunnels} tunnels, ${cur.bridges} bridges — APPLY to cut them`);
+    this._status(`water: ${this.waters.length} ${this.waters.length === 1 ? 'lake' : 'lakes'}`
+      + ` — ${depth.toFixed(1)} u deep, APPLY to fill`);
+  }
+
+  /** Where a sited road feature will be cut. Lives with the zone marks so it
+   *  is cleared and rebuilt on the same schedule. */
+  _roadMark(c, color) {
+    if (!this._zones) {
+      this._zones = new THREE.Group();
+      this._zones.name = 'editor-zones';
+      this.game.scene.add(this._zones);
+    }
+    const g = new THREE.RingGeometry(9, 13, 22);
+    g.rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.85, depthTest: false }));
+    m.position.set(c.x, c.y + 0.6, c.z);
+    m.renderOrder = 999;
+    m.userData.roadMark = color;
+    this._zones.add(m);
+  }
+
+  _clearRoadMarks(color) {
+    if (!this._zones) return;
+    for (const c of [...this._zones.children]) {
+      if (c.userData.roadMark !== color) continue;
+      c.geometry.dispose(); c.material.dispose(); this._zones.remove(c);
+    }
+  }
+
+  /** ROAD FEATURES, AT THE PLACE YOU TAPPED.
+   *
+   *  This used to bump a COUNT — "one more tunnel somewhere" — and let the
+   *  builder choose the site. Tapping the ground did nothing you could see,
+   *  which is exactly how it was reported: "the editor is not adding roads".
+   *  Worse, BRIDGE raised `bridgeCount`, and that number builds wooden plank
+   *  FOOTbridges over streams, not a road bridge — so the one thing the word
+   *  promises was the one thing it could not do.
+   *
+   *  Now the tap picks the nearest point on the lap and the feature is sited
+   *  THERE. A bore through a corner self-intersects and a span needs a run to
+   *  land on, so the road still has the final say — but it says so NOW, in
+   *  the status line, instead of silently building nothing at APPLY. */
+  _roadAt(p) {
+    const t = this.game.track;
+    if (!p) { this._status('tap the map where the road should carry it'); return; }
+    const V = new THREE.Vector3(p.x, 0, p.z);
+    const i = t.nearestIndex(V);
+    const c = t.center[i];
+    const away = Math.hypot(c.x - p.x, c.z - p.z);
+    if (away > 220) { this._status('too far from the road — tap nearer the lap'); return; }
+    const n = t.center.length;
+    const frac = i / n;
+
+    if (this.roadMode === 'tunnel') {
+      // MEASURE WHAT THE PLANNER MEASURES. A ±20-sample window said "straight
+      // enough" while _planTunnels, which looks over the whole bore length,
+      // said no — so the editor accepted the tap and then nothing appeared at
+      // APPLY, which is the silence this tool was supposed to end.
+      const lenS = Math.round(((t.T.tunnels && t.T.tunnels.len) || 80) / t.segLen);
+      let mc = 0;
+      for (let w = -lenS; w <= lenS; w++) mc = Math.max(mc, t.curvature[(i + w + n) % n]);
+      if (mc > 0.013) {
+        this._status(`too twisty here (${mc.toFixed(3)}) — a bore through a corner `
+          + 'cuts its own mouth. Find a straighter run.');
+        return;
+      }
+      if (this.roadFeat.tunnels.some((f) => Math.abs(f - frac) * n < 170)) {
+        this._status('there is already a tunnel on this stretch'); return;
+      }
+      this.roadFeat.tunnels.push(frac);
+      this._roadMark(c, 0x9ad8ff);
+      this._status(`tunnel at ${(frac * 100) | 0}% of the lap `
+        + `(${this.roadFeat.tunnels.length} total) — APPLY to bore it`);
+    } else {
+      // ONE road bridge per world: it is a carved gorge with a span over it,
+      // and two of them fighting over the same elevation profile is how you
+      // get a road that leads into a hole.
+      //
+      // _planGorge takes the straightest sample inside the window it is given
+      // and imposes no curvature ceiling of its own, so the editor must not
+      // invent one either — it only enforces the rule the planner does have:
+      // not on top of the start line.
+      if (t._circDist(i, 0) < 70) {
+        this._status('too close to the start line for a gorge — pick a spot further round');
+        return;
+      }
+      this.roadFeat.bridge = frac;
+      this._clearRoadMarks(0xffd24a);
+      this._roadMark(c, 0xffd24a);
+      this._status(`bridge over a new gorge at ${(frac * 100) | 0}% of the lap `
+        + '— APPLY to carve and span it');
+    }
+    this.dirty = true;
   }
 
   _eraseAt(p) {
@@ -732,6 +881,7 @@ export class WorldEditor {
         <button class="ed-tool" data-tool="erase">ERASE</button>
         <button class="ed-tool" data-tool="clear">CLEAR AREA</button>
         <button class="ed-tool" data-tool="road">ROAD</button>
+        <button class="ed-tool" data-tool="water">WATER</button>
         <button class="ed-tool" data-tool="orbit">ORBIT</button>
       </div>
       <div id="ed-sliders">
@@ -839,7 +989,9 @@ export class WorldEditor {
     this.erase = [];
     this.themeName = null;
     this.weather = null;
-    this.roadFeat = { tunnels: null, bridges: null };
+    // sited features, not counts: lap fractions for the bores, one for a span
+    this.roadFeat = { tunnels: [], bridge: null };
+    this.waters = [];
     this._clearGhosts();
     this._clearZoneMarks();
     this.dirty = true;
@@ -867,8 +1019,8 @@ export class WorldEditor {
     const swap = lv && (!this.game.level || this.game.level.id !== lv.id);
     this.load(data);
     if (swap) {
-      this.game.editScene = this.buildPayload();
-      this.game.swapLevel(lv);
+      // the edits travel with the request, never as ambient game state
+      this.game.swapLevel(lv, true, this.buildPayload());
       this._tmCache = null;
     } else {
       this.apply();

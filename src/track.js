@@ -182,6 +182,102 @@ export const LEVELS = [
     cost: 30, fresh: true, route: 'aegeanRun' },
 ];
 
+/* ==========================================================================
+ * WORLD FACETS — what a world IS, so the track list can be filtered.
+ *
+ * Fifty-eight cards in one scroll is a list you hunt through, not one you
+ * choose from. The filters answer "show me the night city ones", "the wet
+ * ones", "the coast ones" — so every world needs those properties as DATA.
+ *
+ * The rule here is DERIVE, DON'T DECLARE. Three of the four facets already
+ * exist in the theme and are read straight out of it, which means a world
+ * added tomorrow classifies itself and can never drift out of sync with how
+ * it actually looks:
+ *
+ *   TIME     from the sky gradient's luminance (a night world has a dark
+ *            dome; a dusk world has a dark dome under a hot horizon)
+ *   WEATHER  from the particle deck the theme flies, plus the fog distance
+ *   ROAD     from `surface`, which is the same field the physics reads for
+ *            grip, so the chip cannot promise a wet road the car does not get
+ *
+ * SCENERY is the exception and has to be told: no number in a palette says
+ * "this is a coast". It is keyed by THEME, not by level, so the routes that
+ * borrow a theme (SPA on `forest`, MONZA on `medterrace`) inherit it for
+ * free. `tests/test-filters.mjs` fails if a theme in LEVELS has no entry.
+ *
+ * `tune` is layered over the theme first, exactly as Track does it, so a
+ * level that overrides its own sky — ESTONIA CRESTS races at dawn — filters
+ * as what it is rather than as the theme it borrowed.
+ * ======================================================================== */
+
+const SCENERY = {
+  forest: ['FOREST'], deepwood: ['FOREST'], redwood: ['FOREST'],
+  flume: ['FOREST'], wildfire: ['FOREST'],
+  jungle: ['JUNGLE'],
+  alpine: ['MOUNTAIN'], pass: ['MOUNTAIN'], tremola: ['MOUNTAIN'],
+  furka: ['MOUNTAIN'], dolomiti: ['MOUNTAIN'],
+  snow: ['SNOWFIELD', 'MOUNTAIN'], glacial: ['SNOWFIELD', 'MOUNTAIN'],
+  avalanche: ['SNOWFIELD', 'MOUNTAIN'], sheetice: ['SNOWFIELD'],
+  desert: ['DESERT'], dunes: ['DESERT'], oasis: ['DESERT'], outback: ['DESERT'],
+  savanna: ['PLAINS'],
+  canyon: ['CANYON'], ravine: ['CANYON'],
+  volcano: ['VOLCANIC', 'MOUNTAIN'],
+  farmland: ['FARMLAND'], vineyard: ['FARMLAND'],
+  medterrace: ['COAST', 'FARMLAND'], olivecountry: ['COAST', 'FARMLAND'],
+  harbor: ['COAST'], liguria: ['COAST'], aegean: ['COAST'], brava: ['COAST'],
+  dalmatia: ['COAST'], azur: ['COAST'],
+  mountainsea: ['COAST', 'MOUNTAIN'],
+  citadel: ['COAST', 'CITY'], monteCarlo: ['COAST', 'CITY'],
+  neon: ['CITY'], undercity: ['CITY'], oldtown: ['CITY'],
+};
+
+/** Perceived brightness of a '#rrggbb' sky colour, 0..1. */
+const _skyLum = (hex) => {
+  if (typeof hex !== 'string') return 0.5;      // no sky set: assume daylight
+  const n = parseInt(hex.replace('#', ''), 16);
+  if (!Number.isFinite(n)) return 0.5;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+};
+
+/** The facets one level filters by. Cheap and pure — safe to call per card. */
+export function worldFacets(level) {
+  const T = { ...(THEMES[level.theme] || {}), ...(level.tune || {}) };
+
+  // TIME. Order matters: EMBER PASS and FOREST FIRE ESCAPE have skies as dark
+  // as the night worlds', and what separates them is the burning horizon
+  // underneath — so the dusk test has to run before the night test or every
+  // sunset in the game files as night.
+  const top = _skyLum(T.skyTop), hor = _skyLum(T.skyHorizon);
+  const warm = typeof T.skyHorizon === 'string'
+    && (() => {
+      const n = parseInt(T.skyHorizon.replace('#', ''), 16);
+      return ((n >> 16) & 255) > (n & 255) + 20;      // more red than blue
+    })();
+  let time = 'DAY';
+  if (top < 0.36 && hor > 0.45 && warm) time = 'DUSK';
+  else if (top < 0.22) time = 'NIGHT';
+
+  // WEATHER. `leaves` is drifting foliage, not weather — those worlds have
+  // clear air and are found by looking for clear air.
+  const w = T.weather && T.weather.type;
+  const weather = [
+    w === 'rain' ? 'RAIN'
+      : w === 'snow' ? 'SNOW'
+        : (w === 'sand' || w === 'dust') ? 'DUST'
+          : w === 'embers' ? 'EMBERS' : 'CLEAR'];
+  if ((T.fogFar ?? 1500) <= 1000) weather.push('MIST');
+
+  // Every facet is a LIST, including the single-valued ones, so the filter
+  // matcher is one loop rather than one loop and two special cases.
+  return {
+    time: [time],
+    weather,
+    scenery: SCENERY[level.theme] || [],
+    road: [T.surface === 'wet' ? 'WET' : T.surface === 'snow' ? 'SNOW' : 'DRY'],
+  };
+}
+
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
  *  Tremola signature. Every leg runs east-west at a fixed z, the next leg sits
  *  `dz` further along, and a single control point `hp` beyond the leg end folds
@@ -5423,9 +5519,18 @@ export class Track {
     const S = this.T.tunnels;
     const count = S.count ?? 1;
     const lenS = Math.round((S.len ?? 80) / this.segLen);
+    // `at` — lap fractions, from the WORLD EDITOR. A bore the owner asked for
+    // at a spot they tapped is sited THERE, near enough to be the same place;
+    // the search below only picks the straightest sample within a short window
+    // of the request, and the eligibility rules still get the last word,
+    // because a bore through a corner cuts its own mouth open.
+    const want = Array.isArray(S.at) ? S.at.map((f) => Math.round(f * N) % N) : null;
     for (let k = 0; k < count; k++) {
       let best = -1, bc = Infinity;
-      for (let i = 0; i < N; i += 2) {
+      const lo = want ? want[k] - 30 : 0, hi = want ? want[k] + 30 : N - 1;
+      if (want && k >= want.length) break;
+      for (let i0 = lo; i0 <= hi; i0 += want ? 1 : 2) {
+        const i = (i0 + N) % N;
         if (this._circDist(i, 0) < 100) continue;
         if (this._nearGorge(i, 150)) continue;
         if (this._tunnels.some((t) => this._circDist(i, t.mid) < 170)) continue;
@@ -7238,6 +7343,7 @@ if (this._citMound) h += this._citMoundH(x, z);
     const m4 = new THREE.Matrix4();
     this._buildHorizon(m4);
     if (this.T.coast) this._buildSea();
+    this._buildEditWaters();                         // lakes the owner dug
     if (this.T.vineRows) this._buildVineRows();
     if (this.T.windmill) this._buildWindmill();
     if (this.T.lighthouse) this._buildLighthouse();
@@ -10838,6 +10944,75 @@ if (this._citMound) h += this._citMoundH(x, z);
     for (const e of list) {
       if (!HOUSE_TEMPLATES[e.preset]) continue;
       this._element(B, e.preset, e.x, e.z, e.rot || 0, kit, e.scale || 1);
+    }
+  }
+
+  /** LAKES the WORLD EDITOR dug.
+   *
+   *  The basin itself is not built here — the editor sank it through the
+   *  ordinary terrain delta, so both height fields already carry it and the
+   *  road clamps over it exactly as it does over any other sculpt. All that is
+   *  left is the surface, and the surface is the part with the rule attached:
+   *
+   *    NO WATER MAY HANG OVER AIR (SCENE-RULES).
+   *
+   *  So the disc is clipped to the bowl. Every ring of vertices is dropped to
+   *  the water level only where the ground is genuinely below it; where the
+   *  bank has come back up, the vertex is pulled DOWN to the ground, which
+   *  ends the sheet exactly at the shoreline instead of letting it sail out
+   *  over the field. Two triangles' worth of geometry per lake, one draw. */
+  _buildEditWaters() {
+    const list = this.edit && this.edit.waters;
+    if (!list || !list.length) return;
+    const tint = this.T.seaColor ?? 0x2e7fc0;
+    for (const w of list) {
+      const RINGS = 14, SEG = 30;
+      // CircleGeometry is a fan and cannot be shaped ring by ring; build the
+      // disc by hand so every vertex can consult the ground under it.
+      const pos = [], idx = [];
+      pos.push(0, 0, 0);
+      for (let r = 1; r <= RINGS; r++) {
+        for (let s = 0; s < SEG; s++) {
+          const a = (s / SEG) * Math.PI * 2;
+          const rad = (r / RINGS) * w.r;
+          pos.push(Math.cos(a) * rad, 0, Math.sin(a) * rad);
+        }
+      }
+      for (let s = 0; s < SEG; s++) idx.push(0, 1 + s, 1 + ((s + 1) % SEG));
+      for (let r = 1; r < RINGS; r++) {
+        const a0 = 1 + (r - 1) * SEG, b0 = 1 + r * SEG;
+        for (let s = 0; s < SEG; s++) {
+          const s1 = (s + 1) % SEG;
+          idx.push(a0 + s, b0 + s, b0 + s1);
+          idx.push(a0 + s, b0 + s1, a0 + s1);
+        }
+      }
+      // clip to the bowl, and drop the whole lake if the basin never formed
+      let wet = 0, bad = false;
+      for (let i = 0; i < pos.length; i += 3) {
+        const gx = w.x + pos[i], gz = w.z + pos[i + 2];
+        const gy = this._terrainMeshHeight(gx, gz);
+        // ONE NaN POISONS THE WHOLE MESH. A non-finite vertex gives the
+        // geometry a NaN bounding sphere, which takes frustum culling with it
+        // and faults inside the renderer's draw list rather than anywhere near
+        // here — a page error with no line of ours in the stack.
+        if (!Number.isFinite(gy)) { bad = true; break; }
+        if (gy < w.y - 0.02) { pos[i + 1] = w.y; wet++; }
+        else pos[i + 1] = gy - 0.02;          // beached rim: sit ON the ground
+      }
+      if (bad || wet < 6) continue;           // no hole here — no lake
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      geo.translate(w.x, 0, w.z);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        color: tint, roughness: 0.14, metalness: 0.12,
+        transparent: true, opacity: 0.88, flatShading: true,
+      }));
+      mesh.name = 'edit-lake';
+      mesh.renderOrder = 2;
+      this.group.add(mesh);
     }
   }
 
