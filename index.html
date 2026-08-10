@@ -460,6 +460,49 @@
     #star-key .sk-rule{font-size:10px}
     #star-key .sk-rules{gap:4px 10px}
   }
+  /* ---------- WORLD FILTERS ---------- */
+  #world-filters{width:100%;display:flex;flex-direction:column;gap:5px;
+    margin:0 0 4px;padding:8px 10px;border:1px solid var(--line-soft);
+    border-radius:10px;background:rgba(12,8,3,.35)}
+  .wf-top{display:flex;gap:8px;align-items:center}
+  #wf-search{flex:1;min-width:0;background:rgba(0,0,0,.4);border:1px solid var(--line-soft);
+    border-radius:8px;color:var(--cream);font-family:'Baloo 2';font-weight:700;
+    font-size:12px;letter-spacing:1.2px;padding:6px 10px;pointer-events:auto;
+    -webkit-appearance:none;appearance:none}
+  #wf-search::placeholder{color:var(--gold-dim);letter-spacing:1px}
+  #wf-search:focus{outline:none;border-color:var(--yellow)}
+  #wf-clear,#wf-toggle{pointer-events:auto;cursor:pointer;font-family:'Baloo 2';font-weight:800;
+    font-size:10px;letter-spacing:1.6px;padding:6px 11px;border-radius:8px;
+    border:1px solid var(--line-soft);background:rgba(255,255,255,.04);
+    color:var(--gold-dim);white-space:nowrap;-webkit-tap-highlight-color:transparent}
+  #wf-clear.on,#wf-toggle.on{border-color:var(--yellow);color:var(--yellow);
+    background:rgba(255,212,0,.14)}
+  /* folded: keep the search, the count and whatever is switched ON */
+  .wf-collapsed .wf-chip:not(.on){display:none}
+  .wf-collapsed .wf-group.wf-empty{display:none}
+  .wf-group{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+  .wf-glabel{font-size:9px;font-weight:800;letter-spacing:1.6px;color:var(--gold-dim);
+    width:58px;flex:0 0 58px}
+  .wf-chip{pointer-events:auto;cursor:pointer;font-family:'Baloo 2';font-weight:700;
+    font-size:10px;letter-spacing:.7px;padding:3px 9px;border-radius:999px;
+    border:1px solid var(--line-soft);background:rgba(255,255,255,.05);
+    color:#d8cbb0;-webkit-tap-highlight-color:transparent;transition:transform .08s}
+  .wf-chip:active{transform:scale(.94)}
+  .wf-chip.on{background:rgba(255,212,0,.18);border-color:var(--yellow);color:var(--yellow)}
+  #wf-count{font-size:10px;font-weight:700;letter-spacing:1.4px;color:var(--gold-dim);
+    padding-top:2px}
+  #wf-count.none{color:#e8946a}
+  /* the one thing a filter does to the list */
+  .wf-out{display:none!important}
+  @media (max-width:460px){
+    #world-filters{padding:6px 8px;gap:4px}
+    .wf-glabel{width:100%;flex:0 0 100%;letter-spacing:1.2px}
+    .wf-chip{font-size:9.5px;padding:3px 8px}
+    /* three controls on one phone row squeezes the search to a stub — give it
+       its own line above the two buttons */
+    .wf-top{flex-wrap:wrap}
+    #wf-search{flex:1 0 100%;order:-1}
+  }
   .wc-new{position:absolute;top:8px;left:-26px;transform:rotate(-35deg);z-index:2;
     background:linear-gradient(180deg,#ffd400,#f0a020);color:#241d16;font-weight:900;
     font-size:10px;letter-spacing:3px;padding:3px 30px;box-shadow:0 2px 4px rgba(0,0,0,.35);
@@ -892,7 +935,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r137</div>
+<div id="build-tag">r138</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -933,6 +976,9 @@
          decision it informs; the track list just said "NEEDS 27 STARS" at a
          player with no way to know what a star costs to get. -->
     <div id="star-key"></div>
+    <!-- FILTERS. Fifty-eight cards is a list you hunt through; the chips and
+         the count line are built in main.js from FILTER_GROUPS. -->
+    <div id="world-filters"></div>
     <div id="level-select"></div>
   </div>
   <!-- MODE picks what you are playing — race, free roam or an arena mission —
@@ -1108,10 +1154,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r137"></script>
+<script type="module" src="./src/main.js?v=r138"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r137"></script>
+<script src="./src/offline.js?v=r138"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r137"></script>
+<script type="module" src="./src/traffic.js?v=r138"></script>
 </body>
 </html>

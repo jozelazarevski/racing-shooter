@@ -182,6 +182,102 @@ export const LEVELS = [
     cost: 30, fresh: true, route: 'aegeanRun' },
 ];
 
+/* ==========================================================================
+ * WORLD FACETS — what a world IS, so the track list can be filtered.
+ *
+ * Fifty-eight cards in one scroll is a list you hunt through, not one you
+ * choose from. The filters answer "show me the night city ones", "the wet
+ * ones", "the coast ones" — so every world needs those properties as DATA.
+ *
+ * The rule here is DERIVE, DON'T DECLARE. Three of the four facets already
+ * exist in the theme and are read straight out of it, which means a world
+ * added tomorrow classifies itself and can never drift out of sync with how
+ * it actually looks:
+ *
+ *   TIME     from the sky gradient's luminance (a night world has a dark
+ *            dome; a dusk world has a dark dome under a hot horizon)
+ *   WEATHER  from the particle deck the theme flies, plus the fog distance
+ *   ROAD     from `surface`, which is the same field the physics reads for
+ *            grip, so the chip cannot promise a wet road the car does not get
+ *
+ * SCENERY is the exception and has to be told: no number in a palette says
+ * "this is a coast". It is keyed by THEME, not by level, so the routes that
+ * borrow a theme (SPA on `forest`, MONZA on `medterrace`) inherit it for
+ * free. `tests/test-filters.mjs` fails if a theme in LEVELS has no entry.
+ *
+ * `tune` is layered over the theme first, exactly as Track does it, so a
+ * level that overrides its own sky — ESTONIA CRESTS races at dawn — filters
+ * as what it is rather than as the theme it borrowed.
+ * ======================================================================== */
+
+const SCENERY = {
+  forest: ['FOREST'], deepwood: ['FOREST'], redwood: ['FOREST'],
+  flume: ['FOREST'], wildfire: ['FOREST'],
+  jungle: ['JUNGLE'],
+  alpine: ['MOUNTAIN'], pass: ['MOUNTAIN'], tremola: ['MOUNTAIN'],
+  furka: ['MOUNTAIN'], dolomiti: ['MOUNTAIN'],
+  snow: ['SNOWFIELD', 'MOUNTAIN'], glacial: ['SNOWFIELD', 'MOUNTAIN'],
+  avalanche: ['SNOWFIELD', 'MOUNTAIN'], sheetice: ['SNOWFIELD'],
+  desert: ['DESERT'], dunes: ['DESERT'], oasis: ['DESERT'], outback: ['DESERT'],
+  savanna: ['PLAINS'],
+  canyon: ['CANYON'], ravine: ['CANYON'],
+  volcano: ['VOLCANIC', 'MOUNTAIN'],
+  farmland: ['FARMLAND'], vineyard: ['FARMLAND'],
+  medterrace: ['COAST', 'FARMLAND'], olivecountry: ['COAST', 'FARMLAND'],
+  harbor: ['COAST'], liguria: ['COAST'], aegean: ['COAST'], brava: ['COAST'],
+  dalmatia: ['COAST'], azur: ['COAST'],
+  mountainsea: ['COAST', 'MOUNTAIN'],
+  citadel: ['COAST', 'CITY'], monteCarlo: ['COAST', 'CITY'],
+  neon: ['CITY'], undercity: ['CITY'], oldtown: ['CITY'],
+};
+
+/** Perceived brightness of a '#rrggbb' sky colour, 0..1. */
+const _skyLum = (hex) => {
+  if (typeof hex !== 'string') return 0.5;      // no sky set: assume daylight
+  const n = parseInt(hex.replace('#', ''), 16);
+  if (!Number.isFinite(n)) return 0.5;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+};
+
+/** The facets one level filters by. Cheap and pure — safe to call per card. */
+export function worldFacets(level) {
+  const T = { ...(THEMES[level.theme] || {}), ...(level.tune || {}) };
+
+  // TIME. Order matters: EMBER PASS and FOREST FIRE ESCAPE have skies as dark
+  // as the night worlds', and what separates them is the burning horizon
+  // underneath — so the dusk test has to run before the night test or every
+  // sunset in the game files as night.
+  const top = _skyLum(T.skyTop), hor = _skyLum(T.skyHorizon);
+  const warm = typeof T.skyHorizon === 'string'
+    && (() => {
+      const n = parseInt(T.skyHorizon.replace('#', ''), 16);
+      return ((n >> 16) & 255) > (n & 255) + 20;      // more red than blue
+    })();
+  let time = 'DAY';
+  if (top < 0.36 && hor > 0.45 && warm) time = 'DUSK';
+  else if (top < 0.22) time = 'NIGHT';
+
+  // WEATHER. `leaves` is drifting foliage, not weather — those worlds have
+  // clear air and are found by looking for clear air.
+  const w = T.weather && T.weather.type;
+  const weather = [
+    w === 'rain' ? 'RAIN'
+      : w === 'snow' ? 'SNOW'
+        : (w === 'sand' || w === 'dust') ? 'DUST'
+          : w === 'embers' ? 'EMBERS' : 'CLEAR'];
+  if ((T.fogFar ?? 1500) <= 1000) weather.push('MIST');
+
+  // Every facet is a LIST, including the single-valued ones, so the filter
+  // matcher is one loop rather than one loop and two special cases.
+  return {
+    time: [time],
+    weather,
+    scenery: SCENERY[level.theme] || [],
+    road: [T.surface === 'wet' ? 'WET' : T.surface === 'snow' ? 'SNOW' : 'DRY'],
+  };
+}
+
 /** Stacked hairpin switchbacks up (or down) a mountain face — the Gotthard /
  *  Tremola signature. Every leg runs east-west at a fixed z, the next leg sits
  *  `dz` further along, and a single control point `hp` beyond the leg end folds

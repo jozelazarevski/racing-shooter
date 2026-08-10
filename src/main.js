@@ -7,7 +7,7 @@ import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
 import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
-  HOUSE_TEMPLATES } from './track.js';
+  HOUSE_TEMPLATES, worldFacets } from './track.js';
 import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
@@ -83,6 +83,30 @@ const WORLD_TAGS = {
   farmland: '🌧 hedge banks · mud · blind crests',
   outback: 'bulldust holes · creek jumps · 🦘',
 };
+
+// TRACK-LIST FILTERS. The vocabulary lives here and the facets themselves are
+// derived in track.js (`worldFacets`), so adding a world adds its chips.
+//
+// Within a group the chips are OR — RAIN *or* SNOW — because picking two
+// weathers means "either will do". Across groups they are AND, because
+// picking NIGHT and WET means you want a wet night stage, not a list of
+// everything that is one or the other. An empty group constrains nothing.
+const FILTER_GROUPS = [
+  { key: 'time', label: 'TIME', tags: [
+    ['DAY', '☀ DAY'], ['DUSK', '🌅 DUSK'], ['NIGHT', '🌙 NIGHT']] },
+  { key: 'weather', label: 'WEATHER', tags: [
+    ['CLEAR', '☁ CLEAR'], ['RAIN', '🌧 RAIN'], ['SNOW', '❄ SNOW'],
+    ['DUST', '🌪 DUST'], ['EMBERS', '🔥 EMBERS'], ['MIST', '🌫 MIST']] },
+  { key: 'scenery', label: 'SCENERY', tags: [
+    ['FOREST', '🌲 FOREST'], ['MOUNTAIN', '⛰ MOUNTAIN'], ['SNOWFIELD', '🏔 SNOWFIELD'],
+    ['COAST', '🌊 COAST'], ['DESERT', '🏜 DESERT'], ['CANYON', '🪨 CANYON'],
+    ['JUNGLE', '🌴 JUNGLE'], ['FARMLAND', '🌾 FARMLAND'], ['PLAINS', '🦓 PLAINS'],
+    ['CITY', '🏙 CITY'], ['VOLCANIC', '🌋 VOLCANIC']] },
+  // Grip, not looks — this is the `surface` the physics reads, so a WET chip
+  // promises a road that actually behaves wet.
+  { key: 'road', label: 'ROAD', tags: [
+    ['DRY', 'DRY'], ['WET', '💧 WET'], ['SNOW', '❄ SNOW/ICE']] },
+];
 
 // steer: how much of the car's steering rate the player gets in this view.
 // From above, a yaw change moves the car against a fixed world and reads as
@@ -1910,27 +1934,196 @@ class Game {
     }
   }
 
+  /** FILTERS. Fifty-eight worlds in one scroll is a list you hunt through.
+   *
+   *  The bar is built once and then only ever toggled: filtering hides cards
+   *  with a class instead of re-rendering the list, so the lazy preview-image
+   *  observers survive a filter change and a world you have already scrolled
+   *  to keeps its art. The chips themselves come from FILTER_GROUPS and the
+   *  per-world facets from `worldFacets`, so neither list is hand-maintained.
+   *
+   *  The choice persists, which is the whole point of a filter you set once —
+   *  and is exactly why the count line below it is not optional: "SHOWING 9 OF
+   *  58" is what stops a filter left on last week from reading as lost worlds. */
+  _loadFilters() {
+    const F = { q: '' };
+    for (const g of FILTER_GROUPS) F[g.key] = new Set();
+    try {
+      const s = JSON.parse(localStorage.getItem('ir-filters') || '{}');
+      for (const g of FILTER_GROUPS) {
+        const known = new Set(g.tags.map(([t]) => t));
+        // drop anything this build no longer has a chip for, so a stored
+        // filter can never hide the whole list with a tag nothing carries
+        for (const t of (s[g.key] || [])) if (known.has(t)) F[g.key].add(t);
+      }
+      if (typeof s.q === 'string') F.q = s.q;
+      if (typeof s.open === 'boolean') F.open = s.open;
+    } catch { /* a corrupt filter is not worth a broken menu */ }
+    return F;
+  }
+
+  _saveFilters() {
+    const s = { q: this.filters.q, open: this.filters.open };
+    for (const g of FILTER_GROUPS) s[g.key] = [...this.filters[g.key]];
+    try { localStorage.setItem('ir-filters', JSON.stringify(s)); } catch { /* private mode */ }
+  }
+
+  _buildFilterBar() {
+    const host = document.getElementById('world-filters');
+    if (!host || host.dataset.built) return;
+    host.dataset.built = '1';
+    if (!this.filters) this.filters = this._loadFilters();
+
+    const top = document.createElement('div');
+    top.className = 'wf-top';
+    const search = document.createElement('input');
+    search.id = 'wf-search';
+    search.type = 'search';
+    search.placeholder = 'SEARCH WORLDS, REGIONS, ROUTES';
+    search.autocomplete = 'off';
+    search.value = this.filters.q;
+    search.addEventListener('input', () => {
+      this.filters.q = search.value;
+      this._saveFilters();
+      this._applyWorldFilter();
+    });
+    // COLLAPSE. Four rows of chips is most of a phone screen, and the thing
+    // the player came here for is the cards. Folded, the bar keeps the search
+    // box, the count, and the chips that are actually ON — so a filter you set
+    // is never hidden from you, which is the one thing a fold must not do.
+    const fold = document.createElement('button');
+    fold.id = 'wf-toggle';
+    fold.addEventListener('click', () => {
+      host.classList.toggle('wf-collapsed');
+      this.filters.open = !host.classList.contains('wf-collapsed');
+      this._saveFilters();
+      this._applyWorldFilter();
+    });
+    const clear = document.createElement('button');
+    clear.id = 'wf-clear';
+    clear.textContent = 'CLEAR';
+    clear.addEventListener('click', () => {
+      for (const g of FILTER_GROUPS) this.filters[g.key].clear();
+      this.filters.q = '';
+      search.value = '';
+      host.querySelectorAll('.wf-chip.on').forEach((c) => c.classList.remove('on'));
+      this._saveFilters();
+      this._applyWorldFilter();
+    });
+    top.append(search, fold, clear);
+    host.appendChild(top);
+
+    this._filterRows = new Map();
+    for (const g of FILTER_GROUPS) {
+      const row = document.createElement('div');
+      row.className = 'wf-group';
+      this._filterRows.set(g.key, row);
+      const lbl = document.createElement('span');
+      lbl.className = 'wf-glabel';
+      lbl.textContent = g.label;
+      row.appendChild(lbl);
+      for (const [tag, text] of g.tags) {
+        const chip = document.createElement('button');
+        chip.className = 'wf-chip' + (this.filters[g.key].has(tag) ? ' on' : '');
+        chip.textContent = text;
+        chip.addEventListener('click', () => {
+          const set = this.filters[g.key];
+          if (set.has(tag)) set.delete(tag); else set.add(tag);
+          chip.classList.toggle('on', set.has(tag));
+          this._saveFilters();
+          this._applyWorldFilter();
+        });
+        row.appendChild(chip);
+      }
+      host.appendChild(row);
+    }
+    const count = document.createElement('div');
+    count.id = 'wf-count';
+    host.appendChild(count);
+    // Open on a screen with room for it, folded on a phone — unless the
+    // player last left it the other way.
+    const roomy = !window.matchMedia?.('(max-width:620px)').matches;
+    host.classList.toggle('wf-collapsed', !(this.filters.open ?? roomy));
+  }
+
+  /** Show/hide the already-rendered cards. Region headers go with their rows,
+   *  so a filtered list never leaves a heading standing over nothing. */
+  _applyWorldFilter() {
+    if (!this.filters) this.filters = this._loadFilters();
+    const F = this.filters;
+    const q = F.q.trim().toLowerCase();
+    let shown = 0, total = 0, filtering = !!q;
+    for (const g of FILTER_GROUPS) if (F[g.key].size) filtering = true;
+
+    for (const { head, row } of (this._regionRows || new Map()).values()) {
+      let live = 0;
+      for (const card of row.children) {
+        total++;
+        let hit = !q || (card.dataset.q || '').includes(q);
+        for (const g of FILTER_GROUPS) {
+          if (!hit) break;
+          const want = F[g.key];
+          if (!want.size) continue;
+          const have = (card.dataset[g.key] || '').split(' ');
+          hit = [...want].some((t) => have.includes(t));
+        }
+        card.classList.toggle('wf-out', !hit);
+        if (hit) { shown++; live++; }
+      }
+      head.classList.toggle('wf-out', !live);
+      row.classList.toggle('wf-out', !live);
+    }
+
+    const count = document.getElementById('wf-count');
+    if (count) {
+      count.textContent = !filtering
+        ? `${total} WORLDS`
+        : shown ? `SHOWING ${shown} OF ${total} WORLDS`
+          : 'NO WORLD MATCHES — TAP CLEAR TO SEE THEM ALL';
+      count.classList.toggle('none', filtering && !shown);
+    }
+    const clear = document.getElementById('wf-clear');
+    if (clear) clear.classList.toggle('on', filtering);
+
+    // Folded, the bar shows only the groups with something switched on, so
+    // what is filtering the list is always on screen.
+    let set = 0;
+    for (const g of FILTER_GROUPS) {
+      set += F[g.key].size;
+      this._filterRows?.get(g.key)?.classList.toggle('wf-empty', !F[g.key].size);
+    }
+    const fold = document.getElementById('wf-toggle');
+    if (fold) {
+      const open = !document.getElementById('world-filters').classList.contains('wf-collapsed');
+      fold.textContent = open ? 'HIDE ▲' : set ? `FILTERS ${set} ▼` : 'FILTERS ▼';
+      fold.classList.toggle('on', !open && set > 0);
+    }
+  }
+
   /*  Rebuildable, because a career reset changes every lock and every best. */
   _renderLevelCards() {
     const sel = document.getElementById('level-select');
     if (!sel) return;
     sel.innerHTML = '';
     this._renderSceneCards(sel);
+    this._buildFilterBar();
     const regionRows = new Map();
+    this._regionRows = regionRows;
     const rowFor = (lv) => {
       const rg = lv.region || 'CHAMPIONSHIP';
-      let row = regionRows.get(rg);
-      if (!row) {
+      let pair = regionRows.get(rg);
+      if (!pair) {
         const head = document.createElement('div');
         head.className = 'region-head';
         head.textContent = rg;
         sel.appendChild(head);
-        row = document.createElement('div');
+        const row = document.createElement('div');
         row.className = 'region-row';
         sel.appendChild(row);
-        regionRows.set(rg, row);
+        pair = { head, row };
+        regionRows.set(rg, pair);
       }
-      return row;
+      return pair.row;
     };
     this._renderStarKey();
     // FRESH REGIONS RENDER FIRST. Career order (pricing, progression) is the
@@ -1948,6 +2141,16 @@ class Game {
       card.className = 'level-chip'
         + (i === this.levelIndex ? ' current' : '')
         + (unlocked ? '' : ' locked');
+      // What this world IS, stamped on the card so filtering is an attribute
+      // read rather than a rebuild. `q` is everything you might type at it:
+      // the name, the region, the theme and route keys (a player who knows
+      // "spa" should not have to know it is dressed as a forest), and the
+      // facet words themselves, so typing "night" works without the chips.
+      const F = worldFacets(lv);
+      for (const g of FILTER_GROUPS) card.dataset[g.key] = F[g.key].join(' ');
+      card.dataset.q = [lv.name, lv.region, lv.theme, lv.route || '',
+        WORLD_TAGS[lv.theme] || '', F.time.join(' '), F.weather.join(' '),
+        F.scenery.join(' '), F.road.join(' ')].join(' ').toLowerCase();
       const best = this.career.finished[lv.id];
       // Stars carry both halves of the story: how much of this world you have
       // taken, and — when it is shut — exactly what it costs to open. A bare
@@ -1990,6 +2193,7 @@ class Game {
       rowFor(lv).appendChild(card);
       this._watchShot(card.querySelector('.wc-shot'));
     });
+    this._applyWorldFilter();
   }
 
   /** LAZY WORLD ART. The 21 preview jpgs are 1.15 MB — 40 % of everything the
