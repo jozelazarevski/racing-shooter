@@ -37,7 +37,8 @@ const NEW = [[29, 'OLIVE COAST', 'medterrace'], [30, 'LANTERN QUARTER', 'oldtown
   [50, 'CINQUE TERRE', 'liguria'], [51, 'AEGEAN BLUE', 'aegean'],
   [52, 'COSTA BRAVA', 'brava'], [53, 'DALMATIA DRIVE', 'dalmatia'],
   [54, 'COTE D AZUR', 'azur'], [55, 'BRIDGE RUN', 'vineyard'],
-  [56, 'OLIVE CROSSING', 'olivecountry'], [57, 'MOUNTAIN TO SEA', 'mountainsea'],];
+  [56, 'OLIVE CROSSING', 'olivecountry'], [57, 'MOUNTAIN TO SEA', 'mountainsea'],
+  [58, 'CITADEL BAY', 'citadel'],];
 
 // The roster must agree with what we think we merged, before any of it is built.
 const probe = await browser.newPage({ viewport: { width: 640, height: 400 } });

@@ -746,6 +746,52 @@
   /* START is the one action that must never be out of reach: pin it to the
      bottom of the scrollport whenever its natural spot is below the fold */
   #start-btn{margin-top:24px;position:sticky;bottom:10px;z-index:6;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+  #editor-btn{margin-top:10px;width:100%;background:#1d2530;border-color:#3a4a5e;color:#9fd3ff}
+
+  /* ---- WORLD EDITOR ------------------------------------------------------
+     Full-screen chrome over the live renderer. Panels hug the edges so the
+     middle of the screen — the ground being sculpted — stays clear, and every
+     control is thumb-sized because the tool is used on a phone as often as a
+     desktop. */
+  #editor-ui{position:fixed;inset:0;z-index:40;pointer-events:none;
+    font-family:inherit;color:#e8eef6}
+  #editor-ui.off{display:none}
+  #editor-ui > *{pointer-events:auto}
+  #ed-top{position:absolute;top:8px;left:8px;right:8px;display:flex;gap:8px;
+    align-items:center;background:rgba(12,16,22,.86);border:1px solid #2c3a4a;
+    border-radius:10px;padding:7px 9px}
+  #ed-status{flex:1;font-size:12px;letter-spacing:.04em;color:#9fd3ff;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ed-btn{background:#1b2430;border:1px solid #35485c;color:#dce8f4;
+    border-radius:8px;padding:8px 11px;font:inherit;font-size:12px;cursor:pointer}
+  .ed-btn:active{background:#26374a}
+  .ed-btn.ed-go{background:#2b6d3f;border-color:#3f9159;color:#eafff0}
+  #ed-tools{position:absolute;left:8px;top:56px;display:flex;flex-direction:column;gap:5px}
+  .ed-tool{background:rgba(12,16,22,.86);border:1px solid #2c3a4a;color:#c8d6e4;
+    border-radius:8px;padding:9px 10px;font:inherit;font-size:11px;letter-spacing:.05em;
+    cursor:pointer;min-width:78px;text-align:left}
+  .ed-tool.current{background:#2a5f8a;border-color:#4d92c8;color:#fff}
+  #ed-sliders{position:absolute;right:8px;top:56px;display:flex;flex-direction:column;
+    gap:8px;background:rgba(12,16,22,.86);border:1px solid #2c3a4a;border-radius:10px;padding:9px}
+  #ed-sliders label{display:flex;align-items:center;gap:7px;font-size:10px;
+    letter-spacing:.06em;color:#9fb4c8}
+  #ed-sliders input{width:96px}
+  #ed-sliders b{color:#9fd3ff;min-width:22px;text-align:right}
+  #ed-palette{position:absolute;right:8px;bottom:58px;width:170px;max-height:46vh;
+    overflow-y:auto;background:rgba(12,16,22,.9);border:1px solid #2c3a4a;
+    border-radius:10px;padding:8px;display:none}
+  #ed-palette.open{display:block}
+  .ed-pgroup{font-size:9px;letter-spacing:.12em;color:#6d8299;margin:7px 0 4px}
+  .ed-preset{display:block;width:100%;text-align:left;background:#18212c;
+    border:1px solid #2c3a4a;color:#cfe0f0;border-radius:6px;padding:6px 8px;
+    margin-bottom:3px;font:inherit;font-size:11px;cursor:pointer}
+  .ed-preset.current{background:#2a5f8a;border-color:#4d92c8;color:#fff}
+  #ed-bottom{position:absolute;left:8px;bottom:8px;display:flex;gap:6px}
+  @media (max-width:520px){
+    .ed-tool{min-width:0;padding:8px;font-size:10px}
+    #ed-sliders input{width:70px}
+    #ed-palette{width:140px}
+  }
   #car-shop{touch-action:pan-x pan-y}
   /* compact menu on short viewports (phones, small laptops) */
   @media (max-height:1000px){
@@ -835,7 +881,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r128</div>
+<div id="build-tag">r135</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -936,6 +982,9 @@
     <div id="garage-rows"></div>
   </div>
   <button id="start-btn" class="btn">START RACE</button>
+  <!-- The owner's build tool. Sits beside START because it opens the world
+       you have selected above — the editor always edits the current pick. -->
+  <button id="editor-btn" class="btn btn-alt">🛠 WORLD EDITOR</button>
   <div class="controls">
     <b>W / ↑</b><span>Throttle</span>
     <b>S / ↓</b><span>Brake / Reverse</span>
@@ -1048,10 +1097,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r128"></script>
+<script type="module" src="./src/main.js?v=r135"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r128"></script>
+<script src="./src/offline.js?v=r135"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r128"></script>
+<script type="module" src="./src/traffic.js?v=r135"></script>
 </body>
 </html>
