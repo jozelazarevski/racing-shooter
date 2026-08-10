@@ -4110,7 +4110,7 @@ function gablePrismGeo() {
 /** Merge a list of box specs {w,h,d,x,y,z,ry?} into ONE BufferGeometry so a
  *  multi-part smashable (a fence bay, a trough, a hay rack) costs a single
  *  mesh. Build-time only. */
-function mergeBoxes(specs) {
+export function mergeBoxes(specs) {
   const geos = specs.map((s) => {
     const g = new THREE.BoxGeometry(s.w, s.h, s.d).toNonIndexed();
     const m = new THREE.Matrix4().makeRotationY(s.ry || 0);
@@ -5655,6 +5655,34 @@ export class Track {
     return ((x - C.a[0]) * abz - (z - C.a[1]) * abx) / Math.hypot(abx, abz);
   }
 
+  /** THE HIGHEST WATER SURFACE AT A POINT, or -Infinity where there is none.
+   *
+   *  The world has three separate bodies of water built by three separate
+   *  systems, and nothing could previously ask a simple question of all of
+   *  them at once: drive off a corniche into the bay and the car simply
+   *  carried on along the sea floor, because the seabed IS ground and ground
+   *  is drivable. This is what the drowning rule reads.
+   *
+   *  The RIVER is deliberately not included. It is 2.6 u deep and every world
+   *  that has one gives it fords to cross — it is meant to be driven through,
+   *  and a car is taller than it is deep, so nothing there is ever fully
+   *  submerged. Including it would drown people at the ford, which is the one
+   *  place the design says to go. */
+  waterTopAt(x, z) {
+    let top = -Infinity;
+    const C = this.T.coast;
+    if (C && this._coastSide(x, z) > 0) top = Math.max(top, C.level ?? -2);
+    const W = this.edit && this.edit.waters;
+    if (W) {
+      for (let i = 0; i < W.length; i++) {
+        const w = W[i];
+        const dx = x - w.x, dz = z - w.z;
+        if (dx * dx + dz * dz <= w.r * w.r) top = Math.max(top, w.y);
+      }
+    }
+    return top;
+  }
+
   /** Seaward of the coastline the land sinks to the sea floor over a beach
    *  band. The road corridor is exempt exactly the way the river carve
    *  exempts it, so the seafront straight keeps its shoulder. */
@@ -5682,6 +5710,19 @@ export class Track {
    *  covers both, and anything that would look absurd wet asks it. */
   _inWater(x, z) {
     if (this._underwater(x, z)) return true;
+    // ...and the third body of water: a lake the EDITOR dug. Fixing the lake's
+    // winding is what made this visible — the first correctly-blue render had
+    // a pine standing in the middle of it, because the scatter had run against
+    // ground that was open field when the world was laid out and a basin only
+    // afterwards. Asked here rather than at each scatter site, so all twelve
+    // callers get it for the price of one.
+    const W = this.edit && this.edit.waters;
+    if (W) {
+      for (const w of W) {
+        if (Math.hypot(x - w.x, z - w.z) > w.r) continue;
+        if (this.terrainHeight(x, z) < w.y + 0.35) return true;
+      }
+    }
     if (!this._river) return false;
     const R = this._river;
     return this._riverDist(x, z) < (R.half ?? 8) + 2.5;
@@ -11168,13 +11209,20 @@ if (this._citMound) h += this._citMoundH(x, z);
           pos.push(Math.cos(a) * rad, 0, Math.sin(a) * rad);
         }
       }
-      for (let s = 0; s < SEG; s++) idx.push(0, 1 + s, 1 + ((s + 1) % SEG));
+      // WIND IT SO THE FACES LOOK UP. The ring runs anticlockwise in the XZ
+      // plane, which — with Y up and a right-handed cross product — makes the
+      // naive order (centre, s, s+1) face the SEABED. The material is
+      // FrontSide, so the lake vanished from above and lit as if the sun were
+      // under it: the surface photographed pale green, the colour of the field
+      // showing straight through, while every river in the game reads blue.
+      // Reversed, `computeVertexNormals` returns +Y for all 421 vertices.
+      for (let s = 0; s < SEG; s++) idx.push(0, 1 + ((s + 1) % SEG), 1 + s);
       for (let r = 1; r < RINGS; r++) {
         const a0 = 1 + (r - 1) * SEG, b0 = 1 + r * SEG;
         for (let s = 0; s < SEG; s++) {
           const s1 = (s + 1) % SEG;
-          idx.push(a0 + s, b0 + s, b0 + s1);
-          idx.push(a0 + s, b0 + s1, a0 + s1);
+          idx.push(a0 + s, b0 + s1, b0 + s);
+          idx.push(a0 + s, a0 + s1, b0 + s1);
         }
       }
       // clip to the bowl, and drop the whole lake if the basin never formed

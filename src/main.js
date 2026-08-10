@@ -1522,6 +1522,22 @@ class Game {
     this.career = loadJSON(this._pkey('career'), { finished: {} });
     this.garage = loadJSON(this._pkey('garage'), { credits: 0 });
     this.cars = loadJSON(this._pkey('cars'), { owned: [STARTER_CAR], selected: STARTER_CAR });
+    // RENAMED MACHINES. r142 shipped two cars under marque names and r143
+    // renamed them; a car key is what a purchase is recorded as, so without
+    // this anyone who bought one in that window silently loses it and the
+    // credits with it. Carry the key across — owned list, selection, and the
+    // per-car upgrade row, which is keyed the same way.
+    const RENAMED = { nine11: 'flatsix', cayen: 'bastion' };
+    this.cars.owned = (this.cars.owned || []).map((k) => RENAMED[k] || k);
+    if (RENAMED[this.cars.selected]) this.cars.selected = RENAMED[this.cars.selected];
+    if (this.garage.upgrades) {
+      for (const [was, now] of Object.entries(RENAMED)) {
+        if (this.garage.upgrades[was] && !this.garage.upgrades[now]) {
+          this.garage.upgrades[now] = this.garage.upgrades[was];
+        }
+        delete this.garage.upgrades[was];
+      }
+    }
     if (!this.cars.owned.length) this.cars.owned = [STARTER_CAR];
     if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = STARTER_CAR;
     // upgrades are PER-CAR (`garage.upgrades[carKey]`) — a newly bought

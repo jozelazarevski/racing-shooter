@@ -969,8 +969,20 @@ export class WorldEditor {
     const el = this.root.querySelector('#ed-palette');
     if (el.dataset.built) return;
     el.dataset.built = '1';
+    // A NAME IS NOT A CHOICE. The palette listed twenty-six words, so picking a
+    // building meant already knowing what "COTTAGE F" looks like. Each preset
+    // now carries a thumbnail rendered from the REAL element pipeline
+    // (assets/palette/<key>.jpg, baked by scratchpad/palbake.mjs), so what you
+    // pick is a picture of what you get. The label stays underneath — the
+    // image is `onerror`-hidden, so a missing thumbnail degrades to exactly
+    // the old text button rather than to a broken-image icon.
     el.innerHTML = PALETTE.map((g) => `<div class="ed-pgroup">${g.group}</div>`
-      + g.items.map(([k, label]) => `<button class="ed-preset" data-preset="${k}">${label}</button>`).join('')).join('');
+      + '<div class="ed-pgrid">'
+      + g.items.map(([k, label]) => `<button class="ed-preset" data-preset="${k}" title="${label}">`
+        + `<img class="ed-pshot" src="assets/palette/${k}.jpg" alt="" loading="lazy"`
+        + ` onerror="this.style.display='none'">`
+        + `<span class="ed-plabel">${label}</span></button>`).join('')
+      + '</div>').join('');
     el.addEventListener('click', (e) => {
       const b = e.target.closest('[data-preset]');
       if (!b) return;

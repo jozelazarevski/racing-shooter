@@ -862,20 +862,30 @@
     border-radius:6px;padding:5px;font:inherit;font-size:10px;cursor:pointer}
   .ed-mini.current{background:#2a5f8a;border-color:#4d92c8;color:#fff}
   .ed-hint{font-size:9px;color:#6d8299;margin-top:5px;line-height:1.3}
-  #ed-palette{position:absolute;right:8px;bottom:58px;width:170px;max-height:34vh;
-    overflow-y:auto;background:rgba(12,16,22,.9);border:1px solid #2c3a4a;
+  /* Wider, because the presets are pictures now — two to a row. And parked
+     CLEAR OF THE RIGHT-HAND COLUMN: at 236 px it grew tall enough to reach up
+     under #ed-world and cover the ROAD row, so TUNNEL and BRIDGE could not be
+     reached at all while the palette was open. */
+  #ed-palette{position:absolute;right:186px;bottom:58px;width:236px;max-height:52vh;
+    overflow-y:auto;background:rgba(12,16,22,.92);border:1px solid #2c3a4a;
     border-radius:10px;padding:8px;display:none}
   #ed-palette.open{display:block}
   .ed-pgroup{font-size:9px;letter-spacing:.12em;color:#6d8299;margin:7px 0 4px}
-  .ed-preset{display:block;width:100%;text-align:left;background:#18212c;
-    border:1px solid #2c3a4a;color:#cfe0f0;border-radius:6px;padding:6px 8px;
-    margin-bottom:3px;font:inherit;font-size:11px;cursor:pointer}
+  .ed-pgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  .ed-preset{display:block;width:100%;text-align:center;background:#18212c;
+    border:1px solid #2c3a4a;color:#cfe0f0;border-radius:6px;padding:0 0 4px;
+    font:inherit;font-size:10px;cursor:pointer;overflow:hidden}
+  .ed-pshot{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;
+    border-radius:5px 5px 0 0;background:#0e141b}
+  .ed-plabel{display:block;padding:3px 2px 0;letter-spacing:.04em;line-height:1.15}
   .ed-preset.current{background:#2a5f8a;border-color:#4d92c8;color:#fff}
+  .ed-preset.current .ed-pshot{outline:1px solid #4d92c8;outline-offset:-1px}
   #ed-bottom{position:absolute;left:8px;bottom:8px;display:flex;gap:6px}
   @media (max-width:520px){
     .ed-tool{min-width:0;padding:8px;font-size:10px}
     #ed-sliders input{width:70px}
-    #ed-palette{width:140px}
+    #ed-world{width:132px}
+    #ed-palette{width:150px;right:150px}
   }
   #car-shop{touch-action:pan-x pan-y}
   /* compact menu on short viewports (phones, small laptops) */
@@ -966,7 +976,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r142</div>
+<div id="build-tag">r143</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -1185,10 +1195,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r142"></script>
+<script type="module" src="./src/main.js?v=r143"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r142"></script>
+<script src="./src/offline.js?v=r143"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r142"></script>
+<script type="module" src="./src/traffic.js?v=r143"></script>
 </body>
 </html>
