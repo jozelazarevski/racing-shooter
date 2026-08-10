@@ -16,7 +16,7 @@
  * CACHE is bumped by the release version. Bump it whenever ?v= in index.html
  * is bumped, or phones will keep serving the previous build forever.
  */
-const CACHE = 'ignite-rally-r136';
+const CACHE = 'ignite-rally-r137';
 
 // ---- CORE vs EXTRA ---------------------------------------------------------
 // CORE is everything the game needs to RUN with the radio off: the shell, the
