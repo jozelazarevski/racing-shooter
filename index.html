@@ -503,6 +503,15 @@
     .wf-top{flex-wrap:wrap}
     #wf-search{flex:1 0 100%;order:-1}
   }
+  /* MY SCENES: a world you made is yours to throw away. Two taps, because it
+     cannot be undone and the target is small. */
+  .scene-chip{padding-top:14px}
+  .wc-del{position:absolute;top:3px;right:5px;z-index:3;pointer-events:auto;cursor:pointer;
+    font-size:11px;font-weight:900;letter-spacing:1px;line-height:1;padding:3px 6px;
+    border-radius:6px;color:var(--gold-dim);background:rgba(0,0,0,.35);
+    border:1px solid var(--line-soft)}
+  .scene-chip.confirm .wc-del{color:#1a1208;background:#e8946a;border-color:#e8946a}
+  .scene-chip.confirm{border-color:#e8946a}
   .wc-new{position:absolute;top:8px;left:-26px;transform:rotate(-35deg);z-index:2;
     background:linear-gradient(180deg,#ffd400,#f0a020);color:#241d16;font-weight:900;
     font-size:10px;letter-spacing:3px;padding:3px 30px;box-shadow:0 2px 4px rgba(0,0,0,.35);
@@ -935,7 +944,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r138</div>
+<div id="build-tag">r139</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -1154,10 +1163,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r138"></script>
+<script type="module" src="./src/main.js?v=r139"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r138"></script>
+<script src="./src/offline.js?v=r139"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r138"></script>
+<script type="module" src="./src/traffic.js?v=r139"></script>
 </body>
 </html>

@@ -1374,11 +1374,29 @@ class Game {
    *  new one, then re-apply the theme, and only then put the cars on the new
    *  grid, because placeAt reads the new track's centreline.
    *
-   *  Returns false if the level isn't playable, leaving the current one up. */
-  swapLevel(level, force = false) {
+   *  Returns false if the level isn't playable, leaving the current one up.
+   *
+   *  `scene` IS THE THIRD ARGUMENT ON PURPOSE. It used to be ambient state —
+   *  `this.editScene`, set once by the editor and never cleared — and the
+   *  result was the worst bug the editor has had: sculpt a hill on PINE
+   *  VALLEY, go back to the track list, and every world you opened after that
+   *  carried your hill, including PINE VALLEY itself. The shipped world could
+   *  not be got back at all, because `same && !force` made re-picking it a
+   *  no-op. Measured: PINE VALLEY's ground at one probe point went -5.66 ->
+   *  12.34 and stayed there, and the edit leaked into DUST CANYON badly
+   *  enough to split its physics ground (16.31) from its drawn ground (11.17).
+   *
+   *  So the edits now travel WITH the request. Passing nothing means the
+   *  shipped world, which is what every ordinary track-list click wants, and
+   *  a caller has to ask for edits explicitly to get them. */
+  swapLevel(level, force = false, scene = null) {
     if (!level || this.state === 'race' || this.state === 'countdown') return false;
     const same = this.level && this.level.id === level.id;
-    if (same && !force) return true;
+    // A world already up but standing on DIFFERENT edits is not the world
+    // being asked for, so this is a real change however same the id looks.
+    const sameEdits = (this.editScene || null) === (scene || null);
+    if (same && sameEdits && !force) return true;
+    this.editScene = scene || null;
 
     this.level = level;
     this.levelIndex = Math.max(0, LEVELS.findIndex((l) => l.id === level.id));
@@ -1444,7 +1462,9 @@ class Game {
    *  needs; the sculpt reaches the builder through `this.editScene`. */
   rebuildWorld() {
     if (!this.level) return false;
-    return this.swapLevel(this.level, true);
+    // the editor's own rebuild — it has just put the pending edits on
+    // `editScene`, and this is the one caller that means to keep them
+    return this.swapLevel(this.level, true, this.editScene);
   }
 
   /** (Re)read everything scoped to the ACTIVE PROFILE — career, purse, garage.
@@ -1916,18 +1936,44 @@ class Game {
       const data = scenes[name];
       const base = LEVELS.find((l) => l.id === data.base);
       const card = document.createElement('button');
-      card.className = 'level-chip';
+      card.className = 'level-chip scene-chip';
       card.innerHTML = `<div class="wc-name">${name}</div>`
         + `<div class="wc-sub">${base ? base.name : 'WORLD ' + data.base}`
-        + ` · ${(data.dabs || []).length} edits · ${(data.elements || []).length} objects</div>`;
-      card.addEventListener('click', () => {
+        + ` · ${(data.dabs || []).length} edits · ${(data.elements || []).length} objects</div>`
+        + '<div class="wc-del" title="delete this scene">✕</div>';
+      card.addEventListener('click', (ev) => {
+        // DELETE. A world you made is yours to throw away, and there was no
+        // way to do it at all — saved scenes accumulated with no bin.
+        if (ev.target.classList.contains('wc-del')) {
+          ev.stopPropagation();
+          if (!card.classList.contains('confirm')) {
+            // two taps, because this cannot be undone and the card is small
+            card.classList.add('confirm');
+            card.querySelector('.wc-del').textContent = 'DELETE?';
+            setTimeout(() => {
+              card.classList.remove('confirm');
+              const x = card.querySelector('.wc-del');
+              if (x) x.textContent = '✕';
+            }, 3000);
+            return;
+          }
+          let all = {};
+          try { all = JSON.parse(localStorage.getItem('ir-scenes') || '{}'); } catch { all = {}; }
+          delete all[name];
+          try { localStorage.setItem('ir-scenes', JSON.stringify(all)); } catch { /* private mode */ }
+          // if the world you just deleted is the one standing, get off it
+          if (this.editScene && this.level && base && this.level.id === base.id) {
+            this.swapLevel(base, true, null);
+          }
+          this._renderLevelCards();
+          this.hud?.feed?.(`DELETED ${name}`, 'bad');
+          return;
+        }
         if (!base) return;
         if (!this.editor) this.editor = new WorldEditor(this);
         this.editor.load(data);
-        this.editScene = this.editor.buildPayload();
-        // force: the base level may already be up, and its unedited build is
-        // exactly what we must NOT keep
-        this.swapLevel(base, true);
+        // the edits travel WITH the request — see swapLevel
+        this.swapLevel(base, true, this.editor.buildPayload());
         this.hud?.feed?.(name, 'good');
       });
       row.appendChild(card);
@@ -2173,7 +2219,12 @@ class Game {
         <div class="wc-best${best ? '' : ' new'}${unlocked ? '' : ' cost'}">${bestTxt}</div>`;
       this._drawCircuitMap(card.querySelector(".wc-map"), lv.route || lv.theme, !unlocked, i === this.levelIndex);
       card.addEventListener('click', () => {
-        if (i === this.levelIndex) return;
+        // "Already on it" is only true if what is standing is the SHIPPED
+        // world. With an edited build up, this card is the way back to the
+        // real one, and returning early here is what made the original
+        // unreachable — you could see PINE VALLEY in the list, tap it, and
+        // keep the hill you had sculpted on it.
+        if (i === this.levelIndex && !this.editScene) return;
         if (!this.isLevelUnlocked(lv.id)) {
           card.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
             { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], { duration: 200 });
@@ -2182,7 +2233,8 @@ class Game {
         // Swap the world under the menu instead of navigating. Falls back to
         // the old reload only if the swap declines (mid-race), so picking a
         // track can never leave you stuck on the one you were leaving.
-        if (this.swapLevel(lv)) {
+        // no third argument: a track-list pick is always the shipped world
+        if (this.swapLevel(lv, !!this.editScene)) {
           this._renderLevelCards();      // repaint which card is current
           this.renderCarShop();          // the garage ratings are per-world
           this._buildMissionPicker?.();  // missions are per-world
