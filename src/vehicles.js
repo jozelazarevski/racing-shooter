@@ -1,6 +1,6 @@
 // Car meshes (built from primitives), arcade physics, and rival AI.
 import * as THREE from 'three';
-import { ROAD_HALF, RIM_RADIUS } from './world/constants.js';
+import { ROAD_HALF, RIM_RADIUS } from './track.js';
 import { numberPlateTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
