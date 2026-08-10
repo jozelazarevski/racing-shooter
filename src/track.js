@@ -73,7 +73,7 @@ export const LEVELS = [
     // the only world besides CANYON RUN to hang a hero bridge over a gorge
     tune: { // DAWN over the yumps: first light
       sunColor: 0xffc8a0, sunIntensity: 2.3, sunEl: 0.22, sunAz: 0.4,
-      skyTop: '#3a5a94', skyHorizon: '#ffc8b0', fogColor: 0xe8c8c0, hemiIntensity: 0.62, elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
+      skyTop: '#6d8fbe', skyHorizon: '#ffe2d4', fogColor: 0xf2ded8, hemiIntensity: 0.74, elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
       heroBridge: { at: [0.55, 0.66], half: 24, len: 210, depth: 28, skew: 0 } } },
 
   // ---- MEDITERRANEAN. Appended, so nothing before it is re-priced (career
@@ -129,7 +129,7 @@ export const LEVELS = [
   { id: 41, name: 'MOUNT PANORAMA', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
     cost: 13, fresh: true, tune: { // DUSK over the mountain: ember sky, violet ranges
       sunColor: 0xffb078, sunIntensity: 1.9, sunEl: 0.18, sunAz: 5.6,
-      skyTop: '#3a3564', skyHorizon: '#ff9a58', fogColor: 0xc8a090, hemiIntensity: 0.78, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
+      skyTop: '#6b62a0', skyHorizon: '#ffc79c', fogColor: 0xdec4b6, hemiIntensity: 0.9, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
   { id: 42, name: 'RALLYCROSS ARENA', theme: 'flume', route: 'rallyx', region: 'GRAND CIRCUITS',
     cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
   { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
@@ -197,6 +197,17 @@ export const LEVELS = [
     tune: {
       tunnels: { count: 1 },
       coast: { a: [176, -300], b: [206, 320], level: -2.6, floor: -11, beach: 30 },
+    } },
+  // SKETCH E: the cliff run. The sea sits close on the east — 30 u off the
+  // straight rather than the 60-90 CLIFF KNOT keeps — because the drawing
+  // writes "sharp cliff NEXT TO the sea", and a corniche you cannot see the
+  // water from is just a road. Whales breach out past it.
+  { id: 60, name: 'SEA CLIFF RUN', theme: 'mountainsea', region: 'MEDITERRANEAN',
+    cost: 32, fresh: true, route: 'seaCliffRun',
+    tune: {
+      tunnels: { count: 1 },
+      coast: { a: [128, -260], b: [140, 300], level: -3.0, floor: -13, beach: 18 },
+      whaleCount: 5,
     } },
 ];
 
@@ -436,6 +447,33 @@ const CIRCUITS = {
     [-75, -109], [-80, -84], [-81, -57], [-82, -31], [-81, -5],
     [-77, 21], [-72, 47], [-66, 73], [-59, 98], [-52, 124],
     [-45, 150], [-33, 173],
+  ],
+
+  // SKETCH E, hand-read, and a deliberate INVERSION of CLIFF KNOT. There the
+  // sea was a lobe on a busy lap; here the drawing's only label — "Sharp clif
+  // next to the sea" — is written against one long straight running the whole
+  // eastern edge, and every switchback, lobe and hairpin is the return leg
+  // inland. So the cliff IS the lap: a full-throttle run with the water on
+  // your shoulder, paid for by a knot you have to pick your way back through.
+  seaCliffRun: [
+    [97, -183], [96, -145], [96, -100], [95, -55], [94, -10],
+    [93, 35], [90, 79], [87, 121], [83, 159], [77, 191],
+    [67, 211], [46, 233], [23, 239], [7, 220], [8, 195],
+    [21, 175], [33, 159], [34, 147], [20, 147], [4, 156],
+    [-12, 175], [-30, 185], [-42, 169], [-37, 147], [-22, 127],
+    [-9, 115], [-13, 105], [-31, 108], [-53, 121], [-76, 131],
+    [-95, 127], [-101, 105], [-98, 76], [-94, 51], [-85, 41],
+    [-60, 41], [-31, 42], [-19, 43], [1, 44], [30, 41],
+    [52, 31], [64, 12], [57, -1], [33, -3], [4, -1],
+    [-25, 5], [-53, 6], [-79, 3], [-95, -17], [-96, -42],
+    [-82, -56], [-53, -59], [-25, -55], [-7, -39], [-5, -17],
+    [-19, 1], [-44, 3], [-60, -7], [-66, -29], [-67, -55],
+    [-66, -87], [-69, -106], [-73, -116], [-57, -118], [-36, -116],
+    [-25, -113], [-21, -100], [-19, -87], [-9, -82], [11, -82],
+    [21, -87], [23, -106], [14, -119], [7, -129], [8, -141],
+    [21, -152], [33, -154], [46, -151], [55, -150], [61, -157],
+    [55, -166], [46, -173], [36, -183], [30, -191], [39, -195],
+    [62, -196], [78, -195],
   ],
 
   // SKETCH D, hand-read from the drawing, and it is a KNOT on purpose: a top
@@ -1441,7 +1479,7 @@ const THEMES = {
     // tone lifted so the driving surface reads while the embers still glow.
     hemiSky: 0xe8b088, hemiGround: 0x8a6c58, hemiIntensity: 3.1,
     sunColor: 0xffa060, sunIntensity: 3.2,
-    skyTop: '#4e2a3a', skyHorizon: '#dd541c', sunGlow: 0xff6a28, skyCurve: 0.72,
+    skyTop: '#7b5566', skyHorizon: '#f08a5c', sunGlow: 0xff6a28, skyCurve: 0.72,
     sunAz: 0.6, sunEl: 0.17,                             // ember sun low on the haze
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
     terrainLow: '#877668', terrainHigh: '#9a8676', terrainDirt: '#ac6a4a',
@@ -1871,7 +1909,7 @@ const THEMES = {
     // escaping a fire you could not see the road through
     hemiSky: 0xf0ab74, hemiGround: 0x94705a, hemiIntensity: 2.9,
     sunColor: 0xff8a48, sunIntensity: 2.6,
-    skyTop: '#46292c', skyHorizon: '#e8601e', sunGlow: 0xff6a20, skyCurve: 0.66,
+    skyTop: '#7c5354', skyHorizon: '#f09c6a', sunGlow: 0xff6a20, skyCurve: 0.66,
     sunAz: 0.55, sunEl: 0.15,
     cloudCount: 9, cloudOpacity: 0.5, cloudTint: 0x5a4238,   // smoke columns
     terrainLow: '#705a42', terrainHigh: '#94785a', terrainDirt: '#a86436',
@@ -4453,7 +4491,7 @@ export class Track {
     this._tunnels = [];
     if (this.T.tunnels) this._planTunnels();
 
-    this.animated = { flags: [], clouds: [] };
+    this.animated = { flags: [], clouds: [], whales: [] };
     // World-space circle colliders for on-road obstacles: [{x, z, r}].
     // Always present; [] on levels without obstacles. Consumed by car physics.
     this.obstacles = [];
@@ -7701,7 +7739,7 @@ if (this._citMound) h += this._citMoundH(x, z);
     this._buildSky();
     const m4 = new THREE.Matrix4();
     this._buildHorizon(m4);
-    if (this.T.coast) this._buildSea();
+    if (this.T.coast) { this._buildSea(); this._buildWhales(); }
     this._buildEditWaters();                         // lakes the owner dug
     if (this.T.vineRows) this._buildVineRows();
     if (this.T.windmill) this._buildWindmill();
@@ -17176,7 +17214,79 @@ if (this._citMound) h += this._citMoundH(x, z);
     }
   }
 
-  /** Per-frame ambient animation: waving flags, drifting clouds. */
+  /** WHALES, BREACHING.
+   *
+   *  The sea is the biggest thing in a coast world and the only one that never
+   *  did anything. A pod out past the shoreline gives it something to look at
+   *  and — because a breach is slow, rare and always somewhere you are not
+   *  looking — it reads as a place that is alive rather than as an effect.
+   *
+   *  Built low-poly to match everything else: a tapered body, a dorsal fin and
+   *  a two-lobe fluke, merged into ONE geometry per whale so a pod costs one
+   *  draw call each rather than four. They live on the ordinary animated list
+   *  and are driven by `update`, so nothing new ticks them.
+   *
+   *  They are placed WELL out to sea — past the beach, clear of the racing
+   *  line — because a whale close enough to matter to a car is a whale you
+   *  would have to collide with, and this is scenery. */
+  _buildWhales() {
+    const C = this.T.coast;
+    if (!C) return;
+    const count = this.T.whaleCount ?? 3;
+    if (count <= 0) return;
+    const level = C.level ?? -2;
+    const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
+    const L = Math.hypot(abx, abz) || 1;
+    const nx = abz / L, nz = -abx / L;                     // seaward normal
+    const mat = new THREE.MeshStandardMaterial({
+      color: this.T.whaleColor ?? 0x2f3a48, roughness: 0.55, metalness: 0.05,
+      flatShading: true,
+    });
+    const belly = new THREE.MeshStandardMaterial({
+      color: 0xb9c4cc, roughness: 0.6, flatShading: true,
+    });
+    // `Math.random` is the SEEDED generator during a build (`withSeed` wraps
+    // the whole construction), so a pod is in the same place every time you
+    // open the world — same as every other scatter in this file.
+    for (let k = 0; k < count; k++) {
+      const t = (k + 0.7) / (count + 0.4);
+      const along = t * L + (Math.random() - 0.5) * L * 0.18;
+      const out = 150 + Math.random() * 260;               // well past the beach
+      const x = C.a[0] + (abx / L) * along + nx * out;
+      const z = C.a[1] + (abz / L) * along + nz * out;
+      const s = 5.5 + Math.random() * 3.5;
+      // one merged body: nose, barrel, tail stock, dorsal, two fluke lobes
+      const body = mergeBoxes([
+        { w: 0.55, h: 0.5, d: 1.5, x: 0, y: 0, z: 1.55 },
+        { w: 1.0, h: 0.95, d: 2.4, x: 0, y: 0, z: 0.1 },
+        { w: 0.6, h: 0.55, d: 1.6, x: 0, y: 0.05, z: -1.7 },
+        { w: 0.12, h: 0.5, d: 0.5, x: 0, y: 0.6, z: -0.4 },
+      ]);
+      const g = new THREE.Group();
+      const hull = new THREE.Mesh(body, mat);
+      hull.castShadow = true;
+      g.add(hull);
+      const fluke = new THREE.Mesh(mergeBoxes([
+        { w: 1.0, h: 0.1, d: 0.5, x: 0.5, y: 0, z: -2.6 },
+        { w: 1.0, h: 0.1, d: 0.5, x: -0.5, y: 0, z: -2.6 },
+      ]), belly);
+      g.add(fluke);
+      g.scale.setScalar(s);
+      g.position.set(x, level - s * 0.6, z);
+      g.rotation.y = Math.atan2(nx, nz) + (Math.random() - 0.5) * 1.2;
+      g.name = 'whale';
+      this.group.add(g);
+      this.animated.whales.push({
+        g, level, s,
+        // a breach every 14-26 s, staggered so the pod never surfaces together
+        period: 14 + Math.random() * 12,
+        phase: Math.random() * 20,
+      });
+    }
+  }
+
+  /** Per-frame ambient animation: waving flags, drifting clouds, breaching
+   *  whales. */
   update(dt, time) {
     for (const f of this.animated.flags) {
       f.mesh.rotation.y = Math.sin(time * 5 + f.phase) * 0.35 + Math.sin(time * 1.7 + f.phase) * 0.2;
@@ -17184,6 +17294,23 @@ if (this._citMound) h += this._citMoundH(x, z);
     for (const c of this.animated.clouds) {
       c.sprite.position.x += c.speed * dt;
       if (c.sprite.position.x > 1100) c.sprite.position.x = -1100;
+    }
+    // ONE ARC, THEN GONE. `u` runs 0..1 through the breach and the whale spends
+    // the rest of the period submerged, which is what keeps a pod from reading
+    // as a row of bobbing toys: most of the time there is nothing to see, and
+    // then one of them comes out of the water.
+    for (const w of this.animated.whales) {
+      const u = ((time + w.phase) % w.period) / (w.period * 0.22);
+      if (u >= 1) {
+        if (w.g.visible) w.g.visible = false;
+        continue;
+      }
+      w.g.visible = true;
+      const rise = Math.sin(u * Math.PI);                  // out and back in
+      w.g.position.y = w.level - w.s * 0.6 + rise * w.s * 1.55;
+      // nose up on the way out, down on the way back — the shape of a breach
+      w.g.rotation.x = Math.cos(u * Math.PI) * 0.85;
+      w.g.rotation.z = Math.sin(u * Math.PI * 2) * 0.18;
     }
   }
 

@@ -67,15 +67,20 @@ const R = await page.evaluate(async () => {
   cardFor('PINE VALLEY').click();
 
   // ---- DELETE a saved scene ---------------------------------------------
-  localStorage.setItem('ir-scenes', JSON.stringify({ TOGO: { v: 1, base: 1, dabs: [], elements: [] } }));
+  // Through WorldEditor, not through a raw localStorage key. Scenes moved into
+  // the PROFILE key space so the sync engine carries them across devices, and
+  // the legacy global key is folded in once and then removed — a test that
+  // wrote and read that key directly was talking to a store the game no
+  // longer keeps.
+  WorldEditor.save('TOGO', { v: 1, base: 1, dabs: [], elements: [] }, g);
   g._renderLevelCards();
   const del = document.querySelector('#level-select .scene-chip .wc-del');
   out.hasDelete = !!del;
   del.click();                                   // first tap arms
   out.armed = !!document.querySelector('#level-select .scene-chip.confirm');
-  out.survivesOneTap = Object.keys(JSON.parse(localStorage.getItem('ir-scenes'))).length;
+  out.survivesOneTap = Object.keys(WorldEditor.list(g)).length;
   document.querySelector('#level-select .scene-chip .wc-del').click();   // second confirms
-  out.afterDelete = Object.keys(JSON.parse(localStorage.getItem('ir-scenes'))).length;
+  out.afterDelete = Object.keys(WorldEditor.list(g)).length;
   out.cardGone = !document.querySelector('#level-select .scene-chip');
 
   // ---- PLACED HOUSES ARE HOUSES, NOT CRATES ------------------------------
