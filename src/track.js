@@ -231,6 +231,61 @@ const SCENERY = {
   neon: ['CITY'], undercity: ['CITY'], oldtown: ['CITY'],
 };
 
+/* ==========================================================================
+ * WHAT THE ROAD IS MADE OF — the axis the garage is bought against.
+ *
+ * Three classes, because three is what a player can hold in their head and
+ * read off a card at a glance:
+ *
+ *   0 SEALED  tarmac, cobbles, concrete — circuits, passes, corniches
+ *   1 LOOSE   gravel, dirt, sand, forest track — rally stages
+ *   2 ICE     snow and sheet ice
+ *
+ * This could NOT be derived from `DEMANDS.loose`, which is what it looks like
+ * it should come from. That number conflates WET with LOOSE: it reads 0.55
+ * for SPA and SILVERSTONE — sealed circuits that happen to race in the rain —
+ * and 0.12 for DUST CANYON and THE DUNE SERPENT, which are dirt and sand. A
+ * gate built on it would have demanded gravel tyres at Silverstone and let a
+ * road car loose in the dunes.
+ *
+ * Snow is derived (the theme's own `surface`, the field the physics reads).
+ * The GRAND CIRCUITS region is sealed by definition — those are real
+ * racetracks, whatever theme they borrow their art from, which is why SPA on
+ * the `forest` palette is not a forest track. Everything else is keyed by
+ * theme, and `tests/test-surfaceclass.mjs` fails if a theme on the roster has
+ * no entry.
+ * ======================================================================== */
+export const SEALED = 0, LOOSE = 1, ICE = 2;
+
+const SURFACE_BY_THEME = {
+  // sealed: tarmac passes, corniches, town streets, the Mediterranean coast
+  canyon: SEALED, volcano: SEALED, alpine: SEALED, pass: SEALED,
+  tremola: SEALED, dolomiti: SEALED, neon: SEALED, undercity: SEALED,
+  oldtown: SEALED, monteCarlo: SEALED, medterrace: SEALED, vineyard: SEALED,
+  harbor: SEALED, liguria: SEALED, aegean: SEALED, brava: SEALED,
+  dalmatia: SEALED, azur: SEALED, olivecountry: SEALED, mountainsea: SEALED,
+  citadel: SEALED,
+  // loose: rally stages, dirt, sand, forest track, farm lane
+  forest: LOOSE, desert: LOOSE, dunes: LOOSE, oasis: LOOSE, redwood: LOOSE,
+  flume: LOOSE, wildfire: LOOSE, jungle: LOOSE, savanna: LOOSE,
+  outback: LOOSE, ravine: LOOSE, deepwood: LOOSE, farmland: LOOSE,
+  // ice: the surface the physics already calls 'snow', plus the high pass
+  snow: ICE, glacial: ICE, sheetice: ICE, avalanche: ICE, furka: ICE,
+};
+
+/** Which of the three surfaces this world is raced on. */
+export function surfaceClass(level) {
+  const T = { ...(THEMES[level.theme] || {}), ...(level.tune || {}) };
+  if (T.surface === 'snow') return ICE;              // the physics already agrees
+  if (level.region === 'GRAND CIRCUITS') return SEALED;
+  return SURFACE_BY_THEME[level.theme] ?? LOOSE;
+}
+
+export const SURFACE_NAME = ['SEALED', 'LOOSE', 'ICE'];
+export const SURFACE_LABEL = ['🛣 SEALED', '🪨 LOOSE', '❄ ICE'];
+/** What the card asks you to fit. */
+export const TYRE_NAME = ['ROAD TYRES', 'GRAVEL TYRES', 'SNOW TYRES'];
+
 /** Perceived brightness of a '#rrggbb' sky colour, 0..1. */
 const _skyLum = (hex) => {
   if (typeof hex !== 'string') return 0.5;      // no sky set: assume daylight
@@ -7378,6 +7433,7 @@ if (this._citMound) h += this._citMoundH(x, z);
     if (this.T.heroBridge) this._buildHeroBridge();           // hero rope crossing
     if (this.T.tunnels) this._buildTunnels();                 // galleries through the cuts
     if (this.T.guardFence) this._buildGuardFence();           // breakable mountain rail fence
+    this._buildEdgeRails();                                   // SOLID rail wherever the road runs beside a fall
     if (this.T.roadCabins) this._buildRoadCabins();           // log cabins on the shelves
     if (this.T.snowPatches) this._buildSnowPatches(m4);       // old snow at altitude
     this._buildWorldElements(m4);                    // farms, chapels, fences, dressing
@@ -7819,6 +7875,132 @@ if (this._citMound) h += this._citMoundH(x, z);
    *  existing knockable-board array, so a car bursts through it at speed and
    *  missiles/blasts level it, exactly like a sponsor board. `smashBanner`
    *  below zeroes the instance and hands back a loose bay to fling. */
+  /** THE RAIL ON THE EDGE THAT FALLS AWAY — on every world, not three.
+   *
+   *  Reported from a screenshot: a dirt road with the ground dropping off the
+   *  right-hand verge and nothing between the car and the fall. Surveyed
+   *  across the roster, that is the normal case, not a one-off — measured
+   *  drop from the carriageway to a car's length beyond the verge:
+   *
+   *      SUMMIT CLIMB   169 sample-sides over 2 u, 44 over 10 u, worst 21.9
+   *      REDWOOD        63 / 23, worst 22.8      FROST PEAK  29 / 16, worst 23.4
+   *      CANYON RUN     69 / 26, worst 26.2      FURKA       143 / 56, worst 31.5
+   *
+   *  and on FURKA — a world that HAS `guardFence` — barrier coverage of those
+   *  drops measured 0 %. That is the other half of the bug: `_buildGuardFence`
+   *  does detect the falling edge, but it registers its posts in `banners` as
+   *  BREAKABLE props, so the fence is scenery you drive through on your way
+   *  over the edge. It is left exactly as it is (a rail fence in a field
+   *  should smash), and this runs alongside it for the drops that kill.
+   *
+   *  Two rules keep it from becoming a corridor:
+   *    - it only answers a REAL fall (>= 3.5 u), not a shallow verge, and
+   *    - it needs a RUN of them, so a rail is a rail and not a lone post
+   *      stranded beside a dip.
+   *  Everything already walled — the alpine parapets, the cliff worlds, the
+   *  bridge decks — is skipped by consulting `this.barriers`, which is why
+   *  this is built last.
+   *
+   *  Cost: two InstancedMesh, so +2 draw calls and ~5 k triangles on the
+   *  worst world. */
+  _buildEdgeRails() {
+    if (this.T.edgeRails === false) return;
+    // 2.5 u, not 3.5: the drop in the report that started this measures 3.3 u
+    // at its worst on PINE VALLEY, so a 3.5 gate answered every world EXCEPT
+    // the one that was complained about. A car sits ~1.4 u tall — 2.5 u is
+    // already over the roof, and below that the verge is a bank you bounce
+    // off rather than a fall you go over.
+    const DROP = 2.5;                 // a fall worth stopping, not a verge
+    const MINRUN = 3;                 // consecutive stations before it is a rail
+    const MAXBAY = 340;               // hard ceiling on the instance count
+    const LIFT = 0.35;                // rail foot sits just below the road plane
+    const step = Math.max(1, Math.round(4.5 / this.segLen));   // one bay ~4.5 u
+
+    // ---- where does the ground fall away, and is it already guarded? ----
+    const want = [];                  // [i, side] stations that need a rail
+    for (const side of [1, -1]) {
+      const hits = [];
+      for (let i = 0; i < N; i += step) {
+        if (this._circDist(i, 0) < 30) { hits.push(false); continue; }
+        if (this._nearGorge(i, 40)) { hits.push(false); continue; }  // its own rails
+        if (this.fords.some((f) => this._circDist(i, f.i) < 14)) { hits.push(false); continue; }
+        if (this._tunnels.some((t) => i >= t.s - 6 && i <= t.e + 6)) { hits.push(false); continue; }
+        const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;
+        const p = this.pointAt(i, (half + 1.8) * side);
+        const out = this.pointAt(i, (half + 7.0) * side);
+        const drop = this.center[i].y - this.terrainHeight(out.x, out.z);
+        if (drop < DROP) { hits.push(false); continue; }
+        // already walled? the masonry went in before this did
+        let guarded = false;
+        for (let b = 0; b < this.barriers.length && !guarded; b++) {
+          const q = this.barriers[b];
+          const mx = (q.x1 + q.x2) / 2, mz = (q.z1 + q.z2) / 2;
+          // 12 u, not 6: a rail standing just off an existing parapet gives the
+          // car TWO overlapping barriers, and the deepest-first resolution then
+          // pushed it off the rail and into the masonry — measured on GOTTHARD,
+          // the car ended 0.35 u from a wall it should have been held 2.15 u
+          // off. Where the world already built masonry, the masonry is the
+          // guard; this only fills the stretches that have none.
+          if ((mx - p.x) * (mx - p.x) + (mz - p.z) * (mz - p.z) < 144) guarded = true;
+        }
+        hits.push(!guarded);
+      }
+      // keep only runs long enough to read as a rail
+      let run = 0;
+      for (let k = 0; k <= hits.length; k++) {
+        if (hits[k]) { run++; continue; }
+        if (run >= MINRUN) {
+          for (let j = k - run; j < k; j++) want.push([j * step, side]);
+        }
+        run = 0;
+      }
+    }
+    if (!want.length) return;
+
+    // ---- one bay: two posts and two rails, merged --------------------------
+    const bay = 4.5, H = 1.0;
+    const geo = mergeBoxes([
+      { w: 0.22, h: H, d: 0.22, x: -bay / 2, y: H / 2, z: 0 },
+      { w: 0.22, h: H, d: 0.22, x: bay / 2, y: H / 2, z: 0 },
+      { w: bay + 0.3, h: 0.22, d: 0.10, x: 0, y: H - 0.14, z: 0 },
+      { w: bay + 0.3, h: 0.16, d: 0.09, x: 0, y: H - 0.52, z: 0 },
+    ]);
+    // steel where the road is sealed, timber where it is not — the world
+    // already knows which it is from the surface it gives the physics
+    const sealed = this.T.surface === 'wet' || this.T.tarmac || this.T.lamps;
+    const mat = new THREE.MeshStandardMaterial({
+      color: this.T.edgeRailColor ?? (sealed ? 0xb9bcc0 : 0x8a6a44),
+      roughness: sealed ? 0.45 : 0.95, metalness: sealed ? 0.5 : 0,
+    });
+    const n = Math.min(want.length, MAXBAY);
+    const mesh = new THREE.InstancedMesh(geo, mat, n);
+    mesh.castShadow = mesh.receiveShadow = true;
+    mesh.name = 'edge-rail';
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+    for (let k = 0; k < n; k++) {
+      const [i, side] = want[k];
+      const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;
+      const p = this.pointAt(i, (half + 1.8) * side);
+      const hd = this.headingAt(i);
+      q.setFromAxisAngle(up, hd);
+      m4.compose(new THREE.Vector3(p.x, this.center[i].y - LIFT, p.z), q, one);
+      mesh.setMatrixAt(k, m4);
+      // SOLID. The whole point: `banners` is breakable scenery, `barriers` is
+      // the list the car cannot pass. Overlap the bays slightly (4.9 for a 4.5
+      // pitch) so a run has no seam for a nose to find.
+      this._barrier(p.x, p.z, Math.sin(hd), Math.cos(hd), 4.9, 0.5,
+        this.center[i].y - LIFT, H, 'stone');
+      // TAG IT. Builders that run after this one push barriers of their own,
+      // so "the last N entries" is not the rails — a test that assumed it was
+      // ended up measuring stone walls and reporting them as rails.
+      this.barriers[this.barriers.length - 1].kind = 'edgeRail';
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    this.group.add(mesh);
+    this._edgeRailCount = n;
+  }
+
   _buildGuardFence() {
     const S = this.T.guardFence;
     const LAT = S.lateral, MAX = S.max || 190;

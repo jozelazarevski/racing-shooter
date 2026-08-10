@@ -774,9 +774,20 @@ export class Car {
     const keep = (base) => base + (1 - base) * (0.62 * loose);
     // wet dropped 0.78 -> 0.68: at 0.78 the player couldn't FEEL the rain.
     // Braking and cornering now visibly run long on every downpour world.
-    const sGrip = keep(surf === 'snow' ? 0.55 : surf === 'wet' ? 0.68 : 1);
-    const sTract = keep(surf === 'snow' ? 0.72 : surf === 'wet' ? 0.88 : 1);
-    const sBrake = keep(surf === 'snow' ? 0.58 : surf === 'wet' ? 0.80 : 1);
+    let sGrip = keep(surf === 'snow' ? 0.55 : surf === 'wet' ? 0.68 : 1);
+    let sTract = keep(surf === 'snow' ? 0.72 : surf === 'wet' ? 0.88 : 1);
+    let sBrake = keep(surf === 'snow' ? 0.58 : surf === 'wet' ? 0.80 : 1);
+
+    // THE WRONG TYRE HAS TO BE FELT, not just refused at the start line.
+    //
+    // Under-specced never reaches here — the grid refuses it — so this is the
+    // other direction: studs on hot tarmac, or knobblies on a circuit. They
+    // squirm, they take longer to stop, and they will not hold a fast corner.
+    // Without this the mechanic collapses into "buy the snow set once and
+    // never think about tyres again", which is the same one-decision garage
+    // the class system exists to replace.
+    const f = tyrePenalty(this._tyreOver);
+    if (f < 1) { sGrip *= f; sTract *= f; sBrake *= f; }
 
     const fwd = this.forward;
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
@@ -3092,6 +3103,70 @@ export class EnemyCar extends Car {
 // it reads as "yours" on the grid. The lead reads this for the shop UI and
 // passes the chosen entry into new PlayerCar(game, entry).
 const GOLD = 0xe8b83a;
+/* ==========================================================================
+ * TYRES — the one stat that says where a car may race.
+ *
+ * The garage used to be a ladder: every car could enter every world, so the
+ * only question a player ever asked was "is this one's numbers bigger". The
+ * OFF-ROAD stat existed but only applied once you had LEFT the carriageway
+ * (`offRoad ? … : 1`), so the surface a stage is actually made of never met
+ * the machine at all. Fifty-eight worlds, one decision.
+ *
+ * Tyres cut across that. A car carries a class, a world demands one, and the
+ * demand is a FLOOR, not a preference:
+ *
+ *   0 ROAD    slicks and street rubber — sealed surfaces only
+ *   1 GRAVEL  rally tyres — sealed and loose
+ *   2 SNOW    studs and all-terrain — everything
+ *
+ * Under-specced is refused at the start line; the world says which tyre it
+ * wants and the garage sells it. OVER-specced is allowed and costs you — a
+ * studded tyre on hot tarmac is vague and slow — so the answer is never
+ * "own the most expensive set and forget the mechanic".
+ *
+ * The class comes from the car's own OFF-ROAD stat, so no car needed a new
+ * number, and the existing per-car TIRES upgrade raises it — which is what
+ * turns that upgrade from "+4 % grip" into the thing that opens a region.
+ * One level (800 CR) takes the starter BRAWLER from GRAVEL to SNOW, so the
+ * first ice stage is a purchase and not a wall.
+ * ======================================================================== */
+/** Grip multiplier for running MORE tyre than the surface needs. Pure, and
+ *  exported, because the driven A/B this was first asserted with could not be
+ *  made repeatable: with a fresh car per run and six-run averages the control
+ *  still drifted 10 % in one direction, so the simulation was measuring
+ *  accumulated state, not tyres. Testing the rule itself is honest; asserting
+ *  on a rig that cannot repeat itself is not. */
+export const tyrePenalty = (over) => 1 - Math.min(0.20, 0.09 * Math.max(0, over | 0));
+
+export const TYRE_ROAD = 0, TYRE_GRAVEL = 1, TYRE_SNOW = 2;
+export const TYRE_LABEL = ['ROAD', 'GRAVEL', 'SNOW'];
+
+/** A car's tyre class before any upgrade, read off the stat it already had. */
+export const baseTyreClass = (offroad) =>
+  (offroad < 0.5 ? TYRE_ROAD : offroad < 0.85 ? TYRE_GRAVEL : TYRE_SNOW);
+
+/** What this car is running, given its per-car upgrade row. */
+export function tyreClass(carKey, upgrades) {
+  const c = CAR_CATALOG.find((x) => x.key === carKey);
+  if (!c) return TYRE_ROAD;
+  const lvl = (upgrades && upgrades.tires) | 0;
+  const bump = lvl >= 3 ? 2 : lvl >= 1 ? 1 : 0;
+  return Math.min(TYRE_SNOW, baseTyreClass(c.stats.offroad) + bump);
+}
+
+/** The tyre level that would first make `carKey` legal on `need`, or null if
+ *  it already is. Used to price the advice the track card gives. */
+export function tyreLevelFor(carKey, upgrades, need) {
+  if (tyreClass(carKey, upgrades) >= need) return null;
+  const c = CAR_CATALOG.find((x) => x.key === carKey);
+  if (!c) return null;
+  const base = baseTyreClass(c.stats.offroad);
+  for (const lvl of [1, 3]) {
+    if (Math.min(TYRE_SNOW, base + (lvl >= 3 ? 2 : 1)) >= need) return lvl;
+  }
+  return null;                        // no upgrade reaches it — buy a car
+}
+
 export const CAR_CATALOG = [
   {
     key: 'brawler', name: 'BRAWLER', price: 0, desc: 'All-rounder',
