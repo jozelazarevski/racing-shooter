@@ -4309,6 +4309,7 @@ export class Track {
       this.tan.push(tg);
       this.nrm.push(new THREE.Vector3(tg.z, 0, -tg.x));
     }
+    this._buildSampleGrid();
     // Elevation profile: the road climbs and descends over the lap (tan/nrm and
     // curvature stay XZ-based — heading math is unaffected by the y channel).
     for (let i = 0; i < N; i++) this.center[i].y = this._elevProfile(i);
@@ -4794,14 +4795,81 @@ export class Track {
 
   /** Distance from (x,z) to the nearest centerline sample (coarse), plus that
    *  sample's road elevation. Returns [dist, roadY]. */
-  _nearRoad(x, z) {
-    let best = Infinity, bi = 0;
-    for (let i = 0; i < N; i += 5) {
-      const dx = x - this.center[i].x, dz = z - this.center[i].z;
-      const d = dx * dx + dz * dz;
-      if (d < best) { best = d; bi = i; }
+  /** WHICH CENTRELINE SAMPLE IS ACTUALLY NEAREST — exactly, and cheaply.
+   *
+   *  Every "how far is the road, and how high is it there" question used to be
+   *  answered by a stride-scan (`i += 5`) plus, in places, a bilinear blend
+   *  between grid corners. On a switchback pass the two legs run within a few
+   *  metres of each other in plan and tens of metres apart in height, so a
+   *  blend of "the nearest sample here" and "the nearest sample 8 u away"
+   *  averages two DIFFERENT ROADS and lands on a height that is neither. The
+   *  car stood on that average while the hillside was drawn from an exact
+   *  scan — measured 14.4 u of daylight between them on TREMOLA DESCENT, which
+   *  is the car submerged to the roof in a mountain.
+   *
+   *  Bucketing the samples by cell makes the exact answer affordable: build is
+   *  one pass over the centreline, and a query touches only the handful of
+   *  samples in the rings it needs. Rings expand until the best hit so far is
+   *  closer than the nearest unscanned cell could possibly be, so the result is
+   *  the true nearest sample, not a good guess. */
+  _buildSampleGrid() {
+    const CS = 32;
+    const cells = new Map();
+    for (let i = 0; i < N; i++) {
+      const k = (Math.floor(this.center[i].x / CS) + 4096) * 8192
+        + (Math.floor(this.center[i].z / CS) + 4096);
+      let a = cells.get(k);
+      if (!a) cells.set(k, a = []);
+      a.push(i);
     }
-    return [Math.sqrt(best), this.center[bi].y];
+    this._sGrid = { CS, cells };
+  }
+
+  /** Index of the true nearest centreline sample to (x, z), and its distance.
+   *  Writes into a scratch object — per-frame callers must not retain it. */
+  _nearestSample(x, z) {
+    const out = this._nsTmp || (this._nsTmp = { i: 0, d: 0 });
+    const G = this._sGrid;
+    if (!G) {                       // called before the grid exists: honest scan
+      let best = Infinity, bi = 0;
+      for (let i = 0; i < N; i++) {
+        const dx = x - this.center[i].x, dz = z - this.center[i].z;
+        const d = dx * dx + dz * dz;
+        if (d < best) { best = d; bi = i; }
+      }
+      out.i = bi; out.d = Math.sqrt(best);
+      return out;
+    }
+    const CS = G.CS;
+    const cx = Math.floor(x / CS), cz = Math.floor(z / CS);
+    let best = Infinity, bi = 0;
+    for (let ring = 0; ring < 256; ring++) {
+      for (let ax = cx - ring; ax <= cx + ring; ax++) {
+        const edgeX = Math.abs(ax - cx) === ring;
+        for (let az = cz - ring; az <= cz + ring; az++) {
+          // only the shell of each ring — the interior was scanned already
+          if (!edgeX && Math.abs(az - cz) !== ring) continue;
+          const a = G.cells.get((ax + 4096) * 8192 + (az + 4096));
+          if (!a) continue;
+          for (let n = 0; n < a.length; n++) {
+            const i = a[n];
+            const dx = x - this.center[i].x, dz = z - this.center[i].z;
+            const d = dx * dx + dz * dz;
+            if (d < best) { best = d; bi = i; }
+          }
+        }
+      }
+      // Anything still unscanned sits at least `ring * CS` away, so once the
+      // best hit beats that the search is provably finished.
+      if (best < Infinity && best <= (ring * CS) * (ring * CS)) break;
+    }
+    out.i = bi; out.d = Math.sqrt(best);
+    return out;
+  }
+
+  _nearRoad(x, z) {
+    const s = this._nearestSample(x, z);
+    return [s.d, this.center[s.i].y];
   }
 
   /** Distance from (x,z) to the nearest centerline sample (coarse). */
@@ -4954,16 +5022,20 @@ export class Track {
    *  different heights run close (frost S-folds, the alpine switchback stack),
    *  ground near the lower ribbon must never rise above it — un-capped blends
    *  poke sawtooth wedges up through the road. Infinity when no strand near. */
-  _roadClampY(x, z) {
-    let best = Infinity, bi = 0;
-    for (let i = 0; i < N; i += 4) {
-      const dx = x - this.center[i].x, dz = z - this.center[i].z;
-      const d = dx * dx + dz * dz;
-      if (d < best) { best = d; bi = i; }
+  _roadClampY(x, z, nearIdx = -1, nearDist = -1) {
+    // The caller usually already knows the nearest sample; taking it avoids a
+    // second scan AND — the reason this matters — guarantees the physics and
+    // the drawn mesh clamp against the same strand. The mesh used to run its
+    // own inline copy of this loop at stride 2 while this ran at stride 4, so
+    // the two could pick different capping strands on a tight fold.
+    let bi = nearIdx, best = nearDist >= 0 ? nearDist * nearDist : Infinity;
+    if (bi < 0) {
+      const ns = this._nearestSample(x, z);
+      bi = ns.i; best = ns.d * ns.d;
     }
     if (best > 25.2 * 25.2) return Infinity;   // no strand in capping range
     let clamp = Infinity;
-    for (let i = 0; i < N; i += 4) {
+    for (let i = 0; i < N; i += 2) {
       const di = Math.abs(i - bi);
       const gap = Math.min(di, N - di);
       if (gap <= 12) continue;                              // own path neighbours
@@ -5489,17 +5561,71 @@ export class Track {
       }
     }
     if (!this._overpasses.length) return;
-    // alternate which leg flies (the sketch's up/down arrows), bake the rise
+    // Alternate which leg flies (the sketch's up/down arrows), then bake the
+    // rise. Both halves of that used to be wrong, and MOUNTAIN TO SEA — nine
+    // crossings on one lap — showed it as a cobbled wall climbing into the
+    // sky: 86.7 % at its worst against a roster maximum of 53 %, with 113
+    // samples over 30 % and every single one of them at an overpass.
+    //
+    //   THE RAMP WAS TOO SHORT. 8.6 u of clearance in 30 u of run is a 28 %
+    //   average before shaping, and `cos^1.2` puts its steepest part in the
+    //   middle. Doubled to 60 u and shaped as a raised cosine, whose slope is
+    //   bounded analytically at CLEAR·pi/(2·HALF·segLen) — about 22 %, inside
+    //   what the rest of the roster already does.
+    //
+    //   THE LIFTS ADDED UP. Two crossings 5 stations apart each added their
+    //   full 8.6 u to the same piece of road, so the car climbed 17 u in the
+    //   length of a ramp built for 8.6. Clearance is not cumulative — it is
+    //   "be at least this far above the other leg" — so overlapping bumps take
+    //   the MAXIMUM, not the sum.
     const CLEAR = 8.6;
-    const HALF = Math.ceil(30 / this.segLen);
+    const HALF = Math.ceil(60 / this.segLen);
+    const lift = new Float32Array(N);
+    const bump = (up, height) => {
+      for (let sN = -HALF; sN <= HALF; sN++) {
+        const j = (up + sN + N) % N;
+        const v = height * (0.5 + 0.5 * Math.cos((sN / HALF) * Math.PI));
+        if (v > lift[j]) lift[j] = v;
+      }
+    };
     this._overpasses.forEach((o, k) => {
       o.up = (k % 2 === 0) ? o.ib : o.ia;
+      o.down = (k % 2 === 0) ? o.ia : o.ib;
       o.half = HALF;
-      for (let sN = -HALF; sN <= HALF; sN++) {
-        const j = (o.up + sN + N) % N;
-        this.center[j].y += CLEAR * Math.pow(Math.cos((sN / HALF) * Math.PI / 2), 1.2);
-      }
+      bump(o.up, CLEAR);
     });
+    // AND THEN LIMIT THE SLOPE, rather than trusting the shape.
+    //
+    // A bounded-slope ramp is only bounded on flat ground. Lay one on a road
+    // already climbing, or let two of them meet, and the sum is as steep as it
+    // likes — the first attempt at this topped up each crossing until it had
+    // its full clearance and made the world WORSE, 225 samples over 20 % where
+    // there had been 153, because every top-up compounded the last.
+    //
+    // So the ramp is eroded instead: any station whose combined profile breaks
+    // the gradient cap gets its lift cut back until it does not. It can only
+    // ever LOWER the road, so it cannot invent a new wall, and it converges
+    // because each pass strictly decreases. A crossing in a dense knot ends up
+    // with less clearance than the ideal; a road you cannot drive up is worse
+    // than a bridge with a low deck.
+    const CAP = 0.24;                       // 24 %, inside the roster's norm
+    const run = Math.max(0.5, this.segLen);
+    for (let pass = 0; pass < 80; pass++) {
+      let moved = 0;
+      for (let i = 0; i < N; i++) {
+        if (lift[i] <= 0) continue;
+        const a = this.center[(i - 1 + N) % N].y + lift[(i - 1 + N) % N];
+        const b = this.center[(i + 1) % N].y + lift[(i + 1) % N];
+        const here = this.center[i].y + lift[i];
+        const ceil = Math.min(a, b) + CAP * run;
+        if (here > ceil + 1e-4) {
+          lift[i] = Math.max(0, lift[i] - (here - ceil));
+          moved++;
+        }
+      }
+      if (!moved) break;
+    }
+    for (let i = 0; i < N; i++) this.center[i].y += lift[i];
   }
 
   /** True when sample i lies on an overpass flyover span (+pad). */
@@ -5748,9 +5874,15 @@ export class Track {
   }
 
   terrainHeight(x, z) {
-    const fld = this._roadFieldCoarse(x, z);
-    let h = this._blendHeight(fld.d, fld.y, x, z);
-    if (this.T.coast) h = this._coastDepress(x, z, h, fld.d);
+    // THE SAME DATUM THE MESH IS BUILT FROM. This used to read a bilinear
+    // blend over an 8 u grid, which is why the car and the hillside disagreed:
+    // see `_nearestSample`. Now both functions ask the identical question and
+    // get the identical answer, so anything below is a deliberate difference
+    // rather than an accident of sampling.
+    const ns = this._nearestSample(x, z);
+    const nd = ns.d, bi = ns.i;
+    let h = this._blendHeight(nd, this.center[bi].y, x, z);
+    if (this.T.coast) h = this._coastDepress(x, z, h, nd);
     // THE EDITOR'S SCULPT, applied BEFORE the road clamps below - never
     // after. The clamps are what keep the carriageway drivable (the road is
     // the floor, and a tunnel stretch inverts it); a sculpt added after them
@@ -5759,11 +5891,13 @@ export class Track {
     // still wins where they disagree.
     if (this._delta) h += this._delta.at(x, z);
     if (this._citMound) h += this._citMoundH(x, z);
-    if (fld.d <= 27) {
-      const clamp = this._roadClampY(x, z);
+    if (nd <= 27) {
+      const clamp = this._roadClampY(x, z, bi, nd);
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
     }
-    return this._roadFloor(x, z, h, fld.d);
+    // The nearest sample is already in hand, so the floor no longer re-scans
+    // for it — and it is now the SAME sample the mesh clamps against.
+    return Math.min(h, this._roadCeil(bi, nd));
   }
 
   /** THE ROAD IS THE FLOOR — the hard guarantee, applied last.
@@ -5817,6 +5951,14 @@ export class Track {
    *  guarantee the smoothstep could not give. 0.5 still lets a hillside climb
    *  10 u within 20 u of the verge, so cuttings still read as cuttings. */
   _roadCeil(bi, d) {
+    // FAR FROM THE ROAD THERE IS NO CEILING. This guard used to live in
+    // `_roadFloor` — that is, in the physics only — while the mesh applied the
+    // ceiling at any distance. The tunnel branch below ignores `d` entirely,
+    // so beside a bore the DRAWN ridge was being flattened to bore height at
+    // any range while the ground the car stands on kept climbing: TREMOLA
+    // DESCENT floated the car 8.5 u over its own hillside. One rule, both
+    // callers, and the ridge over a tunnel gets its height back.
+    if (d > 34) return Infinity;
     // a tunnel stretch inverts the contract: the hill is SUPPOSED to stand
     // over the carriageway there - the bore shell keeps it readable
     if (this._tunnels) {
@@ -5859,19 +6001,12 @@ export class Track {
    *  strands at different elevations pass near each other, which is what
    *  tore the terrain into sawtooth wedges through the ribbon. */
   _terrainMeshHeight(x, z) {
-    let best = Infinity, bi = 0;
-    for (let i = 0; i < N; i += 3) {
-      const dx = x - this.center[i].x, dz = z - this.center[i].z;
-      const d = dx * dx + dz * dz;
-      if (d < best) { best = d; bi = i; }
-    }
-    for (let k = -2; k <= 2; k++) {
-      const i = (bi + k + N) % N;
-      const dx = x - this.center[i].x, dz = z - this.center[i].z;
-      const d = dx * dx + dz * dz;
-      if (d < best) { best = d; bi = i; }
-    }
-    const d = Math.sqrt(best);
+    // Was a stride-3 scan with a ±2 refine — very nearly exact, but "very
+    // nearly" is what let it disagree with the physics. Both now go through
+    // the one query, so the mesh and the ground the car stands on cannot
+    // diverge by construction.
+    const ns = this._nearestSample(x, z);
+    const bi = ns.i, d = ns.d;
     let h = this._blendHeight(d, this.center[bi].y, x, z);
     // the coast term must live in BOTH ground functions: this one builds the
     // mesh the player SEES, terrainHeight() the ground physics STANDS ON.
@@ -5887,18 +6022,8 @@ export class Track {
 if (this._citMound) h += this._citMoundH(x, z);
         if (this._delta) h += this._delta.at(x, z);
     if (d <= 27) {
-      // exact strand cap (window/exclusion mirror _roadClampY)
-      let clamp = Infinity;
-      for (let i = 0; i < N; i += 2) {
-        const di = Math.abs(i - bi);
-        const gap = Math.min(di, N - di);
-        if (gap <= 12) continue;
-        const dx = x - this.center[i].x, dz = z - this.center[i].z;
-        const d2 = dx * dx + dz * dz;
-        if (d2 < 11 * 11 || d2 > 25.2 * 25.2 || this.center[i].y >= clamp) continue;
-        if (Math.sqrt(d2) > 0.72 * gap * this.segLen) continue;
-        clamp = this.center[i].y;
-      }
+      // the SAME clamp the physics height uses, not a hand-copied mirror of it
+      const clamp = this._roadClampY(x, z, bi, d);
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
     }
     // and the same hard ceiling the physics height uses — this is the function
@@ -7979,6 +8104,26 @@ if (this._citMound) h += this._citMoundH(x, z);
         const out = this.pointAt(i, (half + 7.0) * side);
         const drop = this.center[i].y - this.terrainHeight(out.x, out.z);
         if (drop < DROP) { hits.push(false); continue; }
+        // AN OFFSET IS NOT A DISTANCE — the same trap the hedge banks document.
+        // `pointAt` steps along ONE sample's normal, and on the inside of a
+        // bend the lap swings back underneath it, so "1.8 u outside the edge"
+        // can land in the middle of the carriageway a moment later round the
+        // corner. Rails were photographed standing across the road because of
+        // it. A bay is 4.5 u long, so both ends have to clear, not just the
+        // middle: a rail that pivots one end onto the tarmac is still a wall
+        // in the road.
+        // ALONG the road for the bay's two ends — `this.tan` rather than a
+        // heading and a pair of trig calls, because I got that pair the wrong
+        // way round first time and tested a point 2.4 u INTO the carriageway,
+        // which deleted every rail in the game (0 of 0 in the suite).
+        const tg = this.tan[i];
+        const ex = tg.x * 2.4, ez = tg.z * 2.4;
+        // The bar is "outside the drivable width", not "the full 1.8 u out":
+        // `pointAt` measures from one sample, and on any curve the nearest
+        // sample is nearer than that, so a rail never keeps its whole offset.
+        const clearAll = [[0, 0], [ex, ez], [-ex, -ez]].every(([ox, oz]) =>
+          this._distToTrack(p.x + ox, p.z + oz) >= half + 0.25);
+        if (!clearAll) { hits.push(false); continue; }
         // already walled? the masonry went in before this did
         let guarded = false;
         for (let b = 0; b < this.barriers.length && !guarded; b++) {
@@ -11187,25 +11332,61 @@ if (this._citMound) h += this._citMoundH(x, z);
    *
    *    NO WATER MAY HANG OVER AIR (SCENE-RULES).
    *
-   *  So the disc is clipped to the bowl. Every ring of vertices is dropped to
-   *  the water level only where the ground is genuinely below it; where the
-   *  bank has come back up, the vertex is pulled DOWN to the ground, which
-   *  ends the sheet exactly at the shoreline instead of letting it sail out
-   *  over the field. Two triangles' worth of geometry per lake, one draw. */
+   *  THE SHEET IS DEAD FLAT AND ITS EDGE IS THE SHORELINE.
+   *
+   *  The first cut clipped a fixed-radius disc by dropping each vertex to the
+   *  ground wherever the bank had come back up. That obeys the rule but is
+   *  ugly: neighbouring spokes cross the waterline at different radii, so the
+   *  rim came out as a sawtooth of triangles draping down the bank, and the
+   *  "water" visibly climbed out of its own basin. Reported simply as: the
+   *  lake needs to be smooth.
+   *
+   *  So the boundary is FOUND instead of clipped. Each spoke binary-searches
+   *  outward for the radius where the ground crosses the water level, and that
+   *  radius becomes the rim vertex for that spoke. Every vertex then sits at
+   *  exactly w.y — one flat plane, no stair-stepping, and no water over air by
+   *  construction, because the edge IS the waterline. */
   _buildEditWaters() {
     const list = this.edit && this.edit.waters;
     if (!list || !list.length) return;
     const tint = this.T.seaColor ?? 0x2e7fc0;
     for (const w of list) {
-      const RINGS = 14, SEG = 30;
-      // CircleGeometry is a fan and cannot be shaped ring by ring; build the
-      // disc by hand so every vertex can consult the ground under it.
-      const pos = [], idx = [];
+      const RINGS = 10, SEG = 64;      // more spokes, fewer rings: the rim is
+      const pos = [], idx = [];        // where the shape lives, not the middle
       pos.push(0, 0, 0);
+      // How far out is the shore along each spoke? Bisection on "is the ground
+      // below the water here", 12 steps — about 1 cm of radius on a 40 u lake.
+      const dry = (rad, ca, sa) =>
+        this._terrainMeshHeight(w.x + ca * rad, w.z + sa * rad) >= w.y;
+      const reach = new Array(SEG);
+      let bad = false;
+      for (let s = 0; s < SEG && !bad; s++) {
+        const a = (s / SEG) * Math.PI * 2;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        if (!Number.isFinite(this._terrainMeshHeight(w.x + ca * 0.5, w.z + sa * 0.5))) {
+          bad = true; break;
+        }
+        let lo = 0, hi = w.r;
+        if (!dry(hi, ca, sa)) { reach[s] = hi; continue; }   // bowl runs past
+        for (let k = 0; k < 12; k++) {
+          const mid = (lo + hi) / 2;
+          if (dry(mid, ca, sa)) hi = mid; else lo = mid;
+        }
+        reach[s] = lo;
+      }
+      if (bad) continue;
+      // Smooth the rim around the ring so a single noisy sample cannot put a
+      // notch in the shoreline — three passes of a 1-2-1 kernel, wrapped.
+      for (let pass = 0; pass < 3; pass++) {
+        const src = reach.slice();
+        for (let s = 0; s < SEG; s++) {
+          reach[s] = (src[(s - 1 + SEG) % SEG] + 2 * src[s] + src[(s + 1) % SEG]) / 4;
+        }
+      }
       for (let r = 1; r <= RINGS; r++) {
         for (let s = 0; s < SEG; s++) {
           const a = (s / SEG) * Math.PI * 2;
-          const rad = (r / RINGS) * w.r;
+          const rad = (r / RINGS) * reach[s];
           pos.push(Math.cos(a) * rad, 0, Math.sin(a) * rad);
         }
       }
@@ -11225,28 +11406,23 @@ if (this._citMound) h += this._citMoundH(x, z);
           idx.push(a0 + s, a0 + s1, b0 + s1);
         }
       }
-      // clip to the bowl, and drop the whole lake if the basin never formed
-      let wet = 0, bad = false;
-      for (let i = 0; i < pos.length; i += 3) {
-        const gx = w.x + pos[i], gz = w.z + pos[i + 2];
-        const gy = this._terrainMeshHeight(gx, gz);
-        // ONE NaN POISONS THE WHOLE MESH. A non-finite vertex gives the
-        // geometry a NaN bounding sphere, which takes frustum culling with it
-        // and faults inside the renderer's draw list rather than anywhere near
-        // here — a page error with no line of ours in the stack.
-        if (!Number.isFinite(gy)) { bad = true; break; }
-        if (gy < w.y - 0.02) { pos[i + 1] = w.y; wet++; }
-        else pos[i + 1] = gy - 0.02;          // beached rim: sit ON the ground
-      }
-      if (bad || wet < 6) continue;           // no hole here — no lake
+      // ONE FLAT PLANE. Nothing is clipped any more — the rim already sits on
+      // the waterline — so every vertex simply takes the water level. A lake
+      // whose bowl never formed shows up as a rim that never left the middle.
+      let widest = 0;
+      for (let s = 0; s < SEG; s++) widest = Math.max(widest, reach[s]);
+      if (!(widest > 3)) continue;            // no hole here — no lake
+      for (let i = 1; i < pos.length; i += 3) pos[i] = w.y;
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       geo.setIndex(idx);
       geo.computeVertexNormals();
       geo.translate(w.x, 0, w.z);
+      // Smooth-shaded, because it IS smooth: a faceted sheet was drawing facet
+      // seams across a surface that has no facets to show.
       const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
         color: tint, roughness: 0.14, metalness: 0.12,
-        transparent: true, opacity: 0.88, flatShading: true,
+        transparent: true, opacity: 0.88, flatShading: false,
       }));
       mesh.name = 'edit-lake';
       mesh.renderOrder = 2;
@@ -12571,6 +12747,9 @@ if (this._citMound) h += this._citMoundH(x, z);
       if (this._circDist(i, 0) < 34) continue;
       for (const side of [1, -1]) {
         const p = this.pointAt(i, (WALL_OFF + 1.4) * side);
+        // kerbside furniture, not a chicane — a bollard that the bend has
+        // swung the road under gets left out rather than planted in the lane
+        if (!this._clearsRoad(p.x, p.z, 0.25, 0.5)) continue;
         m4.makeTranslation(p.x, p.y - 0.15, p.z);
         bols.setMatrixAt(bk++, m4);
       }
@@ -16312,12 +16491,18 @@ if (this._citMound) h += this._citMoundH(x, z);
     //
     // Fords are exempt, by the same declared exception the rule carries
     // everywhere else: there the wash sits on the road deck by design.
+    // A ford is exempt from being MOVED, not from being COUNTED. `continue`
+    // skipped it for both, so a crossing broke the running minimum: the first
+    // open station downstream of a ford had nothing bounding it and was free
+    // to sit above the reach that fed it. Measured as a 0.36 u step 37 u clear
+    // of the road on PINE VALLEY — small, but the rule says never. The minimum
+    // now walks every station; only non-ford stations are clamped to it.
     let flowMin = Infinity;
     for (let i = 0; i < F.length; i++) {
       const s = dirF > 0 ? i : F.length - 1 - i;
-      if (F[s].df < 30) continue;
-      if (surf[s] > flowMin) surf[s] = flowMin;
-      else flowMin = surf[s];
+      const isFord = F[s].df < 30;
+      if (!isFord && surf[s] > flowMin) surf[s] = flowMin;
+      else if (surf[s] < flowMin) flowMin = surf[s];
     }
 
     // PASS 3 — emit, doubling the station wherever the level changes so the
@@ -16657,6 +16842,12 @@ if (this._citMound) h += this._citMoundH(x, z);
         const off = ROAD_HALF + 3.5;
         const hx = c.p.x + Math.sin(roadYaw) * sg * off;
         const hz = c.p.z + Math.cos(roadYaw) * sg * off;
+        // Offset, not distance, again: a headwall 3.5 u beyond the edge of a
+        // bend can be inside the carriageway once the lap curls back under it,
+        // and this one carries piers reaching `hw` further along the road. If
+        // the stonework cannot stand clear of the road it does not get built —
+        // a stream mouth is dressing, and dressing never blocks the lane.
+        if (!this._clearsRoad(hx, hz, hw + 1.5, 0.8)) continue;
         const gy = this.terrainHeight(hx, hz);
         const H = Math.max(2.4, deck - bedY + 0.6);
         // the wall, built as two piers and a lintel so the mouth is a hole

@@ -61,12 +61,13 @@ const L = await page.evaluate(async () => {
 
   // find it: the only mesh whose material carries the sea tint and which is
   // not the river ribbon or the sea plane
+  // BY NAME, not by vertex count. The first cut counted 1 + 14*30 vertices to
+  // identify the disc, so re-tessellating the lake (RINGS/SEG changed when the
+  // rim was fitted to the shoreline) made the test report "no lake built"
+  // rather than anything about winding.
   let found = null;
   g.track.group.traverse((o) => {
-    if (!o.isMesh || !o.geometry?.attributes?.normal) return;
-    const p = o.geometry.attributes.position;
-    if (p.count !== 1 + 14 * 30) return;             // the lake disc, exactly
-    found = o;
+    if (o.isMesh && o.name === 'edit-lake') found = o;
   });
   if (!found) return { built: false };
   const n = found.geometry.attributes.normal;
