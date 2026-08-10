@@ -66,6 +66,12 @@ const UPGRADES = [
   { key: 'nitro',    name: 'BOOST NITRO CAN',   icon: '⚡', desc: '+22% nitro charge / lvl',   max: 5 },
   { key: 'armor',    name: 'ARMOR SHIELD',      icon: '🛡️', desc: '+15 max hull / lvl',        max: 5 },
   { key: 'cannon',   name: 'CANNON CORE',       icon: '🔥', desc: '+18% cannon damage / lvl',  max: 5 },
+  // Landings are the one thing the garage had no answer to: a stock car pays
+  // hull for every unit of impact speed past a fixed threshold, so a big air
+  // was a wreck no matter what you had bought. Dampers raise the speed a
+  // landing is free at AND halve what the rest of it costs, which turns "don't
+  // jump that" into "buy the springs and jump it".
+  { key: 'dampers',  name: 'LONG-TRAVEL DAMPERS', icon: '🪂', desc: 'survive bigger drops / lvl', max: 5 },
 ];
 
 // world-card flavor lines (surface + signature hazards per theme)
@@ -2496,6 +2502,7 @@ class Game {
     p.nitroRate = 1 + 0.22 * g.nitro;
     p.handling = 0.2 * (g.handling || 0);
     p.gripBoost = 1 + 0.04 * (g.tires || 0);
+    p.damperLvl = g.dampers || 0;                // read by Car.onLand
     p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
     p.assist = { pro: 0, standard: 0.5, assist: 1 }[this.assistSetting] ?? 0.5;
   }

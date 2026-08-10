@@ -2212,20 +2212,29 @@ export class Car {
     // A CLIFF IS NOT A JUMP. Landing used to cost nothing whatever the drop -
     // sail off a forty-metre wall and the car touched down and simply drove
     // on, reported as "if I fall off a cliff... it's doing nothing". Impact
-    // speed prices the landing now. Under vy 19 - which clears every designed
-    // ramp and gorge jump on the roster (they land near launch height, impact
-    // ~12-16) - a landing stays free. Past that the hull pays 8 points per
-    // unit of impact speed, so a 20 u drop is a heavy hit and a real cliff is
-    // total destruction, difficulty scaling notwithstanding.
+    // speed prices the landing.
+    //
+    // THAT PRICE WAS TOO STEEP AND HAD NO ANSWER. At a free ceiling of 19 and
+    // 8 hull per unit past it, a 30 u/s touchdown took 88 of a stock 100-point
+    // hull — so a big air off anything larger than a designed ramp was a wreck,
+    // reported as exactly that, and no purchase anywhere in the garage changed
+    // it. The base is gentler now (free to 22, 6.5 a unit past), and
+    // LONG-TRAVEL DAMPERS move both numbers: +2.6 u of free landing per level
+    // and -10% on the rest, so at level 5 a landing is free to 35 u/s and the
+    // overflow costs 3.25. A genuine cliff still writes the car off at any
+    // level; what changes is where "cliff" starts.
+    const dl = this.damperLvl || 0;
+    const free = 22 + 2.6 * dl;
+    const perUnit = 6.5 * (1 - 0.10 * dl);
     const impact = Math.abs(this._impactVy || 0);
     this._impactVy = 0;
-    if (impact > 19 && this.alive) {
+    if (impact > free && this.alive) {
       if (this === this.game.player) {
-        this.game.hud?.feed?.(impact > 30 ? 'CLIFF FALL' : 'HARD LANDING', 'bad');
+        this.game.hud?.feed?.(impact > free + 11 ? 'CLIFF FALL' : 'HARD LANDING', 'bad');
         this.game.shake = Math.min(1, (this.game.shake || 0) + 0.55);
       }
-      this.game.particles?.debris?.(this.pos, impact > 30 ? 4 : 2);
-      this.damage((impact - 19) * 8, null);
+      this.game.particles?.debris?.(this.pos, impact > free + 11 ? 4 : 2);
+      this.damage((impact - free) * perUnit, null);
       if (!this.alive) return;    // wrecked on touchdown: skip the style pay
     }
     // hang time pays style: a real jump (not a curb hop) scores BIG AIR
@@ -3441,15 +3450,18 @@ export class PlayerCar extends Car {
     this.step(dt, inputs);
 
     // RECOVERY NET. Respawn only ever triggered on a WRECK, so a car that was
-    // still alive but had ended up somewhere impossible — flung far off the
-    // world, or under the terrain — could never come back, and the player was
-    // left looking at an empty screen with the HUD still ticking. Free roam is
-    // exempt on the lateral test: going a long way from the road is the point
-    // out there. Being under the ground is never right anywhere.
+    // still alive but had ended up somewhere impossible — under the terrain,
+    // or at a coordinate that is not a number — could never come back, and the
+    // player was left looking at an empty screen with the HUD still ticking.
+    //
+    // IT NO LONGER CARES HOW FAR FROM THE ROAD YOU ARE. The lateral test used
+    // to drag you back to the racing line after 2.5 s beyond 120 u, which made
+    // "go and look at that mountain" impossible in a race and read as the game
+    // resetting you for leaving the track. Wandering off is a choice the world
+    // is big enough to allow; only genuinely broken states are rescued now.
     if (this.alive && g.state === 'race') {
       const groundY = g.track.terrainHeight(this.pos.x, this.pos.z);
-      const lost = (!g.freeRoam && Math.abs(this.lateral) > 120)
-        || this.y < groundY - 6
+      const lost = this.y < groundY - 6
         || !Number.isFinite(this.pos.x) || !Number.isFinite(this.y);
       this._lostT = lost ? (this._lostT ?? 0) + dt : 0;
       if (this._lostT > 2.5) {
