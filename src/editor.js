@@ -282,7 +282,11 @@ export class WorldEditor {
 
     // hide the racing UI; the editor owns the screen
     document.getElementById('hud')?.style.setProperty('display', 'none');
-    document.getElementById('title-screen')?.classList.add('off');
+    // 'hidden', NOT 'off'. A .screen is hidden with .hidden - .off is the
+    // class the menu PANELS use - so the editor opened on top of a fully
+    // visible track list and the tools floated over the world cards.
+    document.getElementById('title-screen')?.classList.add('hidden');
+    document.getElementById('results')?.classList.add('hidden');
     for (const id of ['race-info', 'score-box', 'health-box', 'weapon-box',
       'speed-box', 'joy-zone', 'touch-ui', 'feed']) {
       const el = document.getElementById(id);
@@ -317,6 +321,7 @@ export class WorldEditor {
     // showMenu() is the one path that puts the title screen back up IN PLACE
     // (it owns the tab state and the level cards); setting state alone left a
     // live renderer with no UI on it.
+    document.getElementById('title-screen')?.classList.remove('hidden');
     this.game.state = 'title';
     this.game.showMenu?.();
   }
