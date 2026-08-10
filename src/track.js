@@ -231,6 +231,61 @@ const SCENERY = {
   neon: ['CITY'], undercity: ['CITY'], oldtown: ['CITY'],
 };
 
+/* ==========================================================================
+ * WHAT THE ROAD IS MADE OF — the axis the garage is bought against.
+ *
+ * Three classes, because three is what a player can hold in their head and
+ * read off a card at a glance:
+ *
+ *   0 SEALED  tarmac, cobbles, concrete — circuits, passes, corniches
+ *   1 LOOSE   gravel, dirt, sand, forest track — rally stages
+ *   2 ICE     snow and sheet ice
+ *
+ * This could NOT be derived from `DEMANDS.loose`, which is what it looks like
+ * it should come from. That number conflates WET with LOOSE: it reads 0.55
+ * for SPA and SILVERSTONE — sealed circuits that happen to race in the rain —
+ * and 0.12 for DUST CANYON and THE DUNE SERPENT, which are dirt and sand. A
+ * gate built on it would have demanded gravel tyres at Silverstone and let a
+ * road car loose in the dunes.
+ *
+ * Snow is derived (the theme's own `surface`, the field the physics reads).
+ * The GRAND CIRCUITS region is sealed by definition — those are real
+ * racetracks, whatever theme they borrow their art from, which is why SPA on
+ * the `forest` palette is not a forest track. Everything else is keyed by
+ * theme, and `tests/test-surfaceclass.mjs` fails if a theme on the roster has
+ * no entry.
+ * ======================================================================== */
+export const SEALED = 0, LOOSE = 1, ICE = 2;
+
+const SURFACE_BY_THEME = {
+  // sealed: tarmac passes, corniches, town streets, the Mediterranean coast
+  canyon: SEALED, volcano: SEALED, alpine: SEALED, pass: SEALED,
+  tremola: SEALED, dolomiti: SEALED, neon: SEALED, undercity: SEALED,
+  oldtown: SEALED, monteCarlo: SEALED, medterrace: SEALED, vineyard: SEALED,
+  harbor: SEALED, liguria: SEALED, aegean: SEALED, brava: SEALED,
+  dalmatia: SEALED, azur: SEALED, olivecountry: SEALED, mountainsea: SEALED,
+  citadel: SEALED,
+  // loose: rally stages, dirt, sand, forest track, farm lane
+  forest: LOOSE, desert: LOOSE, dunes: LOOSE, oasis: LOOSE, redwood: LOOSE,
+  flume: LOOSE, wildfire: LOOSE, jungle: LOOSE, savanna: LOOSE,
+  outback: LOOSE, ravine: LOOSE, deepwood: LOOSE, farmland: LOOSE,
+  // ice: the surface the physics already calls 'snow', plus the high pass
+  snow: ICE, glacial: ICE, sheetice: ICE, avalanche: ICE, furka: ICE,
+};
+
+/** Which of the three surfaces this world is raced on. */
+export function surfaceClass(level) {
+  const T = { ...(THEMES[level.theme] || {}), ...(level.tune || {}) };
+  if (T.surface === 'snow') return ICE;              // the physics already agrees
+  if (level.region === 'GRAND CIRCUITS') return SEALED;
+  return SURFACE_BY_THEME[level.theme] ?? LOOSE;
+}
+
+export const SURFACE_NAME = ['SEALED', 'LOOSE', 'ICE'];
+export const SURFACE_LABEL = ['🛣 SEALED', '🪨 LOOSE', '❄ ICE'];
+/** What the card asks you to fit. */
+export const TYRE_NAME = ['ROAD TYRES', 'GRAVEL TYRES', 'SNOW TYRES'];
+
 /** Perceived brightness of a '#rrggbb' sky colour, 0..1. */
 const _skyLum = (hex) => {
   if (typeof hex !== 'string') return 0.5;      // no sky set: assume daylight

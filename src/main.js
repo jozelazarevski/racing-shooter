@@ -7,10 +7,11 @@ import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
 import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
-  HOUSE_TEMPLATES, worldFacets } from './track.js';
+  HOUSE_TEMPLATES, worldFacets, surfaceClass, SURFACE_LABEL, TYRE_NAME } from './track.js';
 import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
-import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
+import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
+  tyreClass, tyreLevelFor, TYRE_LABEL } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
 import { Weapons } from './weapons.js';
@@ -1422,6 +1423,7 @@ class Game {
     this.track = withSeed(this.worldSeed,
       () => new Track(this.scene, this.level, this.editScene));
     this._applyTheme();
+    this._applyTyreClass();          // a new world can be a new tyre demand
     this.particles?.setTheme?.(this.level.theme);
 
     this.props = this.track.props ? [...this.track.props] : [];
@@ -1525,6 +1527,101 @@ class Game {
     return this.__ratings;
   }
 
+  /** The surface line every card carries: what the road is made of, and — in
+   *  the same glance — whether the car you have selected may race on it.
+   *
+   *  This is deliberately the loudest thing on the card after the name. The
+   *  old affinity chip said "weak", which is a review; this says "YOU CANNOT
+   *  START", which is a fact you can act on. */
+  _surfaceChip(lv) {
+    const f = this.carFitness(lv.id);
+    if (!f) return '';
+    const surf = SURFACE_LABEL[f.need];
+    if (f.ok) {
+      const over = f.over > 0
+        ? `<span class="wc-over" title="over-tyred: slower here">${TYRE_LABEL[f.have]} — SLOW HERE</span>`
+        : '<span class="wc-fitok">✓</span>';
+      return `<div class="wc-surf ok">${surf} ${over}</div>`;
+    }
+    const why = f.tooMuch
+      ? `TOO MUCH TYRE — WANTS ${TYRE_NAME[f.need]}`
+      : `NEEDS ${TYRE_NAME[f.need]}`;
+    return `<div class="wc-surf bad">${surf} · ${why}`
+      + `<span class="wc-fix">${f.fix.text}</span></div>`;
+  }
+
+  /** CAN THIS CAR RACE THIS WORLD? The one question the garage now answers.
+   *
+   *  Returns what the world demands, what the car is running, and — when it
+   *  cannot go — the CHEAPEST thing the player can do about it, named and
+   *  priced. "You need better tyres" is not advice; "FIT GRAVEL TYRES — 800
+   *  CR" is. Where no upgrade reaches the class, it names a car they could
+   *  buy instead, preferring one they already own. */
+  carFitness(levelId, carKey = this.cars.selected) {
+    const lv = LEVELS.find((l) => l.id === levelId);
+    if (!lv) return null;
+    const need = surfaceClass(lv);
+    const have = tyreClass(carKey, (this.garage.upgrades || {})[carKey]);
+    // ONE CLASS EITHER SIDE, NOT ANY AMOUNT ABOVE.
+    //
+    // If a bigger tyre were always legal, the whole rule would collapse into a
+    // ladder again — buy the snow set once and every world in the game opens,
+    // which is the single-decision garage this replaces. Capping the overshoot
+    // at one class is what makes the roster mutually exclusive: an all-terrain
+    // machine is barred from the sealed circuits (37 worlds) exactly as a road
+    // car is barred from the loose stages, and NO SINGLE CAR COVERS THE
+    // ROSTER. The starter is legal on 53 of 58 and slow on the circuits, so
+    // there is a reason to buy in both directions.
+    if (have >= need && have - need <= 1) {
+      return { ok: true, need, have, over: have - need };
+    }
+    if (have > need) {
+      // too much tyre: name the lightest thing that can do this properly
+      const fit = (k) => {
+        const c = tyreClass(k, (this.garage.upgrades || {})[k]);
+        return c >= need && c - need <= 1;
+      };
+      const owned = this.cars.owned.filter(fit);
+      const buy = CAR_CATALOG.filter((c) => {
+        const t = tyreClass(c.key, null);
+        return t >= need && t - need <= 1;
+      }).sort((a, b) => a.price - b.price)[0];
+      const fix = owned.length
+        ? { kind: 'own', car: owned[0],
+          text: `DRIVE YOUR ${CAR_CATALOG.find((c) => c.key === owned[0]).name}` }
+        : buy ? { kind: 'buy', car: buy.key,
+          text: `BUY THE ${buy.name} — ${buy.price.toLocaleString()} CR` }
+          : { kind: 'none', text: 'NOTHING IN THE GARAGE SUITS THIS SURFACE' };
+      return { ok: false, need, have, over: have - need, tooMuch: true, fix };
+    }
+    // cheapest route back to legal: an upgrade if one reaches, else a car
+    const lvl = tyreLevelFor(carKey, (this.garage.upgrades || {})[carKey], need);
+    let fix = null;
+    if (lvl != null) {
+      const cur = ((this.garage.upgrades || {})[carKey] || {}).tires | 0;
+      let cost = 0;
+      for (let k = cur; k < lvl; k++) cost += upgradeCost(k);
+      fix = { kind: 'upgrade', level: lvl, cost,
+        text: `FIT ${TYRE_NAME[need]} — ${cost.toLocaleString()} CR IN THE GARAGE` };
+    } else {
+      const owned = this.cars.owned
+        .filter((k) => tyreClass(k, (this.garage.upgrades || {})[k]) >= need);
+      if (owned.length) {
+        const name = CAR_CATALOG.find((c) => c.key === owned[0]).name;
+        fix = { kind: 'own', car: owned[0], text: `DRIVE YOUR ${name}` };
+      } else {
+        const buy = CAR_CATALOG
+          .filter((c) => tyreClass(c.key, null) >= need)
+          .sort((a, b) => a.price - b.price)[0];
+        fix = buy
+          ? { kind: 'buy', car: buy.key,
+            text: `BUY THE ${buy.name} — ${buy.price.toLocaleString()} CR` }
+          : { kind: 'none', text: 'NO MACHINE IN THE GARAGE CAN TAKE THIS' };
+      }
+    }
+    return { ok: false, need, have, over: 0, fix };
+  }
+
   /** The line on a track card: what the world is like, and — for the world you
    *  are on — whether the machine you picked is the right one for it. */
   _affinityChip(levelId) {
@@ -1610,12 +1707,26 @@ class Game {
     }
     const sel = document.getElementById('mission-select');
     if (sel) sel.style.display = this.missionMode ? 'flex' : 'none';
-    const start = document.getElementById('start-btn');
-    if (start) {
-      start.textContent = this.missionMode ? 'START MISSION'
-        : this.freeRoam ? 'START EXPLORING' : 'START RACE';
-    }
+    this._syncStartButton();
     if (this.missionMode) this._buildMissionPicker?.(); // also sets its own label
+  }
+
+  /** The start button says what will happen when you press it.
+   *
+   *  A button that looks armed and then refuses is worse than one that tells
+   *  you first, so when the tyres are wrong it names the tyre the world wants
+   *  and goes visibly cold. Repainted on every level pick, car pick, upgrade
+   *  and mode switch — anything that can change the answer. */
+  _syncStartButton() {
+    const start = document.getElementById('start-btn');
+    if (!start) return;
+    const f = this.freeRoam ? null : this.carFitness(this.level.id);
+    const blocked = !!(f && !f.ok);
+    start.classList.toggle('blocked', blocked);
+    start.textContent = blocked
+      ? (f.tooMuch ? `WRONG TYRE — WANTS ${TYRE_NAME[f.need]}` : `NEEDS ${TYRE_NAME[f.need]}`)
+      : this.missionMode ? 'START MISSION'
+        : this.freeRoam ? 'START EXPLORING' : 'START RACE';
   }
 
   /** Keep the address bar in step with the live state, without navigating, so
@@ -2213,6 +2324,7 @@ class Game {
           <canvas class="wc-map" width="72" height="52"></canvas>
         </div>
         <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
+        ${this._surfaceChip(lv)}
         <div class="wc-tags">${WORLD_TAGS[lv.theme] || ''}</div>
         <div class="wc-stars${got ? '' : ' none'}">${starRow}</div>
         ${unlocked ? this._affinityChip(lv.id) : ''}
@@ -2237,6 +2349,7 @@ class Game {
         if (this.swapLevel(lv, !!this.editScene)) {
           this._renderLevelCards();      // repaint which card is current
           this.renderCarShop();          // the garage ratings are per-world
+          this._syncStartButton();       // a new world can demand a new tyre
           this._buildMissionPicker?.();  // missions are per-world
         } else {
           this.fadeTo(`?level=${lv.id}${this.unlockAll ? '&unlockall=1' : ''}`);
@@ -2311,9 +2424,19 @@ class Game {
     return up;
   }
 
+  /** Tell the car how far its tyres are OVER-specced for this world, which is
+   *  what the physics turns into a grip penalty. Under-specced never reaches
+   *  the road — the start line refuses it — so this is only ever >= 0. */
+  _applyTyreClass() {
+    if (!this.player || !this.level) return;
+    const f = this.carFitness(this.level.id);
+    this.player._tyreOver = f ? Math.max(0, f.over) : 0;
+  }
+
   /** Apply the SELECTED car's purchased upgrades to the player (base stats
    *  captured once per machine — swapPlayerCar clears the capture). */
   applyUpgrades() {
+    this._applyTyreClass();
     const p = this.player;
     if (!this._base) this._base = { maxSpeed: p.maxSpeed, maxHealth: p.maxHealth };
     const g = this.carUpgrades();
@@ -2430,6 +2553,18 @@ class Game {
           ${bar('OFF', S.offroad, 0.18, 1.05)}${bar('NTR', S.nitroPower ?? 1, 0.78, 1.22)}
         </div>
         ${(() => {
+    // WHAT IT IS SHOD WITH, and whether that is legal here. This is the line
+    // that decides the purchase, so it sits above the star rating: a machine
+    // that cannot take the start is not "three stars", it is not eligible.
+    const f = this.carFitness(this.level.id, car.key);
+    if (!f) return '';
+    const tc = tyreClass(car.key, (this.garage.upgrades || {})[car.key]);
+    const badge = `<b>${TYRE_LABEL[tc]}</b> TYRES`;
+    if (!f.ok) return `<div class="ctyre bad">${badge} · CANNOT RACE ${this.level.name}</div>`;
+    if (f.over > 0) return `<div class="ctyre over">${badge} · OVER-TYRED HERE</div>`;
+    return `<div class="ctyre ok">${badge} · READY</div>`;
+  })()}
+        ${(() => {
     // how this machine suits the world you are about to run — the whole point
     // of owning more than one, and useless information anywhere but here
     const a = this._ratings().get(car.key);
@@ -2457,6 +2592,7 @@ class Game {
         this.renderCarShop();
         this.renderGarage();
         this._renderLevelCards();   // every track card names your car — repaint
+        this._syncStartButton();    // ...and whether it may take the start
         this.hud.feed?.(`NOW DRIVING: ${car.name}`, 'good');
       });
       shop.appendChild(card);
@@ -2497,6 +2633,15 @@ class Game {
           saveJSON(this._pkey('garage'), this.garage);
           this.applyUpgrades();
           this.renderGarage();
+          // a TIRES level can change which worlds this car may enter, so the
+          // track list, the shop and the start button all have to be retold
+          this.renderCarShop();
+          this._renderLevelCards();
+          this._syncStartButton();
+          if (u.key === 'tires') {
+            this.hud.feed?.(`${TYRE_LABEL[tyreClass(this.cars.selected,
+              (this.garage.upgrades || {})[this.cars.selected])]} TYRES FITTED`, 'good');
+          }
         });
       }
       row.appendChild(btn);
@@ -5516,6 +5661,27 @@ class Game {
   }
 
   startRace() {
+    // THE GATE. A car on the wrong tyres does not take the start.
+    //
+    // Free roam is deliberately exempt: wandering a snow world on road tyres
+    // is a bad idea you are allowed to have, and it is the cheapest way to
+    // FEEL why the rule exists before you pay for the fix.
+    if (!this.freeRoam) {
+      const f = this.carFitness(this.level.id);
+      if (f && !f.ok) {
+        const car = CAR_CATALOG.find((c) => c.key === this.cars.selected);
+        this.hud.feed(`${car.name} IS ON ${TYRE_LABEL[f.have]} TYRES — `
+          + `${this.level.name} ${f.tooMuch ? 'IS TOO SMOOTH FOR THEM, IT WANTS'
+            : 'NEEDS'} ${TYRE_NAME[f.need]}`, 'bad');
+        this.hud.feed(f.fix.text, 'info');
+        // send them where the fix is, rather than leaving them on a dead button
+        if (f.fix.kind === 'upgrade' || f.fix.kind === 'buy' || f.fix.kind === 'own') {
+          document.getElementById('tab-btn-garage')?.click();
+        }
+        this._syncStartButton();
+        return;
+      }
+    }
     this.audio.start();
     document.getElementById('title-screen').classList.add('hidden');
     this.hud.show();
