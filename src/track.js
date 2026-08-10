@@ -5884,7 +5884,15 @@ if (this._citMound) h += this._citMoundH(x, z);
       // top of it is never coplanar (coplanar strips z-fight into dark bands
       // at grazing angles). Physics still reads center[j].y — the DECK is the
       // surface the car drives on there.
-      const y = c.y - this._deckDip(j);
+      // ...AND THE GORGE-JUMP COLLAPSE, for the same reason. This is why the
+      // chasms were invisible: `groundHeightAt` subtracts `_jumpCut` so the
+      // car really does drop into the gap, but the RIBBON was still drawn
+      // straight across it at grade — measured 26.0 u of tarmac hanging over
+      // the chasm on CANYON RUN and 24.0 u on RED CENTRE RUN. From the seat
+      // the road looked continuous, so the jump the world had built could not
+      // be seen and could not be read. The roadway is OUT there; it has to
+      // LOOK out.
+      const y = c.y - this._deckDip(j) - (this._jumpCut ? this._jumpCut[j] : 0);
       verts[o] = c.x + n.x * w; verts[o + 1] = y; verts[o + 2] = c.z + n.z * w;
       verts[o + 3] = c.x - n.x * w; verts[o + 4] = y; verts[o + 5] = c.z - n.z * w;
       const v = (i * this.segLen) / 10;

@@ -548,27 +548,48 @@ const LEVER_NUDGE = { maxSpeed: 1.10, grip: 1.10, offroad: 1.25, accel: 1.10 };
 // fallback. A second wording per polarity is not padding: it is what makes the
 // supply of phrases exceed the number of cars in the worst real case.
 //
-// { plus: [primary, secondary], minus: [primary, secondary] }
+// A THIRD WORDING, because the roster grew to eight. The note above sized this
+// table at two phrases per lever per polarity for SIX cars; adding the 911 and
+// the CAYENNE pushed the generic fallback to 6 of 40 cells (15 %) against a
+// 10 % ceiling, and left a four-star ALPINE captioned with a weakness on RED
+// CENTRE RUN because every positive phrase above it was already spoken for.
+// The supply of phrases has to exceed the number of cars in the worst real
+// case, so it grows with the garage — the alternative is loosening a test that
+// is telling the truth.
+//
+// { plus: [primary, secondary, third], minus: [primary, secondary, third] }
 const LEVER_PHRASE = {
   maxSpeed: {
-    plus: ['USES ALL OF ITS TOP END', 'STRONG DOWN THE LONG STRAIGHTS'],
-    minus: ['GIVING IT AWAY ON THE STRAIGHTS', 'SHORT ON TOP END FOR THIS ONE'],
+    plus: ['USES ALL OF ITS TOP END', 'STRONG DOWN THE LONG STRAIGHTS',
+      'KEEPS PULLING WHERE OTHERS STOP'],
+    minus: ['GIVING IT AWAY ON THE STRAIGHTS', 'SHORT ON TOP END FOR THIS ONE',
+      'OUT OF LEGS BEFORE THE BRAKING'],
   },
   grip: {
-    plus: ['PLANTED THROUGH THE CORNERS', 'CARRIES SPEED THROUGH THE TURNS'],
-    minus: ['RUNS OUT OF GRIP IN THE TURNS', 'WASHES WIDE ON THE FAST BENDS'],
+    plus: ['PLANTED THROUGH THE CORNERS', 'CARRIES SPEED THROUGH THE TURNS',
+      'STAYS TIED DOWN MID-CORNER'],
+    minus: ['RUNS OUT OF GRIP IN THE TURNS', 'WASHES WIDE ON THE FAST BENDS',
+      'PUSHES ON AT EVERY APEX'],
   },
   accel: {
-    plus: ['FIRES OUT OF THE SLOW CORNERS', 'QUICK TO REBUILD ITS SPEED'],
-    minus: ['SLOW TO WIND BACK UP', 'LABOURS OUT OF THE HAIRPINS'],
+    plus: ['FIRES OUT OF THE SLOW CORNERS', 'QUICK TO REBUILD ITS SPEED',
+      'LEAPS OFF THE SLOW STUFF'],
+    minus: ['SLOW TO WIND BACK UP', 'LABOURS OUT OF THE HAIRPINS',
+      'TAKES AN AGE TO GET GOING'],
   },
   offroad: {
-    snow: { plus: ['HOLDS THE LOOSE STUFF', 'FINDS GRIP IN THE SNOW'],
-      minus: ['SPINS UP ON THE LOOSE', 'LOSES THE REAR ON SNOW'] },
-    wet: { plus: ['SURE-FOOTED IN THE WET', 'CONFIDENT ON A WET LINE'],
-      minus: ['SLIDES ON THE WET STUFF', 'NERVOUS ON A WET LINE'] },
-    dry: { plus: ['SETTLED OVER THE ROUGH', 'SHRUGS OFF THE BROKEN STUFF'],
-      minus: ['UNSETTLED OVER THE ROUGH', 'UPSET BY THE BROKEN STUFF'] },
+    snow: { plus: ['HOLDS THE LOOSE STUFF', 'FINDS GRIP IN THE SNOW',
+      'DIGS IN WHERE IT IS SLIPPERY'],
+    minus: ['SPINS UP ON THE LOOSE', 'LOSES THE REAR ON SNOW',
+      'SCRABBLES ON THE PACKED SNOW'] },
+    wet: { plus: ['SURE-FOOTED IN THE WET', 'CONFIDENT ON A WET LINE',
+      'READS THE STANDING WATER WELL'],
+    minus: ['SLIDES ON THE WET STUFF', 'NERVOUS ON A WET LINE',
+      'SKATES ONCE THE ROAD IS WET'] },
+    dry: { plus: ['SETTLED OVER THE ROUGH', 'SHRUGS OFF THE BROKEN STUFF',
+      'SOAKS UP THE RUTS AND STONES'],
+    minus: ['UNSETTLED OVER THE ROUGH', 'UPSET BY THE BROKEN STUFF',
+      'CRASHES THROUGH THE RUTS'] },
   },
 };
 const LEVERS = ['maxSpeed', 'grip', 'accel', 'offroad'];
@@ -640,7 +661,19 @@ function rateCarsFor(track) {
     // the cars above it was handed the leftover NEGATIVE one, and PIT-99 sat
     // second quickest on RED CENTRE RUN under the caption "RUNS OUT OF GRIP IN
     // THE TURNS". A mid-pack car takes whichever term is larger either way.
-    const want = tier === 'strong' ? 1 : tier === 'weak' ? -1 : 0;
+    //
+    // ...and polarity is forced by STARS, not by `tier`, because stars are
+    // what the player sees and what the rule is written in. The two disagree
+    // at their boundaries: `stars = 1 + round(score * 4)` reaches four at
+    // score 0.625 while `tier` only reaches 'strong' at 0.66, so a car in that
+    // band showed FOUR STARS while the picker treated it as mid-pack and
+    // handed it a leftover weakness — measured, a 4-star ALPINE captioned
+    // "GIVING IT AWAY ON THE STRAIGHTS" on RED CENTRE RUN. The same gap exists
+    // at the bottom (2 stars from 0.375, 'weak' only below 0.3). Deriving the
+    // sign from stars closes both by construction rather than by tuning two
+    // thresholds to agree.
+    const starCount = 1 + Math.round(score * 4);
+    const want = starCount >= 4 ? 1 : starCount <= 2 ? -1 : 0;
     terms.sort((a, c) => (want === 0 ? Math.abs(c.v) - Math.abs(a.v) : (c.v - a.v) * want));
     let note = null, polarity = 0, why = null;
     for (const t of terms) {
@@ -668,7 +701,7 @@ function rateCarsFor(track) {
     // with a weakness, without the test having to keep its own copy of the
     // phrase table and drift out of step with this one.
     out.set(r.car.key, { score, tier, note, seconds: r.est.seconds,
-      stars: 1 + Math.round(score * 4), behind, polarity, why });
+      stars: starCount, behind, polarity, why });
   }
   return out;
 }

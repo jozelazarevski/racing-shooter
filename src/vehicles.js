@@ -226,9 +226,14 @@ export function buildVoxelRacer(spec) {
   const headMat = new THREE.MeshBasicMaterial({ color: 0xfff9e2 });
   const tailMat = new THREE.MeshBasicMaterial({ color: 0xff2418 });
 
-  const tall = style === 'brawler' || style === 'dune';
-  const low = style === 'crown' || style === 'alpine' || style === 'pit';
-  const wheelR = style === 'brawler' ? 0.85 : tall ? 0.76 : 0.62;
+  // 'nine11' is a rear-engined fastback: short nose, roof falling in one
+  // unbroken line to the tail. 'cayen' is the tall performance estate on the
+  // same platform — SUV height and length, but a saloon's rake, not a truck's.
+  const tall = style === 'brawler' || style === 'dune' || style === 'cayen';
+  const low = style === 'crown' || style === 'alpine' || style === 'pit'
+    || style === 'nine11';
+  const wheelR = style === 'brawler' ? 0.85 : style === 'cayen' ? 0.80
+    : tall ? 0.76 : style === 'nine11' ? 0.66 : 0.62;
   const wheelY = wheelR;
   const baseY = wheelY + (low ? 0.18 : 0.34); // chassis floor height
 
@@ -259,10 +264,13 @@ export function buildVoxelRacer(spec) {
   };
 
   // ---- proportions: every car is a wedge now ----
-  const bodyLen = style === 'crown' || style === 'pit' ? 4.7 : style === 'sleek' ? 4.0 : 4.4;
+  const bodyLen = style === 'crown' || style === 'pit' ? 4.7 : style === 'sleek' ? 4.0
+    : style === 'cayen' ? 4.8 : style === 'nine11' ? 4.3 : 4.4;
   const bodyH = low ? 0.62 : 0.78;
-  const noseLen = tall ? 1.2 : style === 'sleek' ? 1.3 : 1.5; // sloped hood length
-  const frontDrop = tall ? 0.26 : style === 'sleek' ? 0.3 : 0.34;
+  // the rear-engined car has almost no bonnet — the nose drops away at once,
+  // which is the single most recognisable thing about its profile
+  const noseLen = style === 'nine11' ? 1.55 : tall ? 1.2 : style === 'sleek' ? 1.3 : 1.5;
+  const frontDrop = style === 'nine11' ? 0.46 : tall ? 0.26 : style === 'sleek' ? 0.3 : 0.34;
   const hoodAng = Math.atan2(frontDrop, noseLen);
   const noseZ0 = bodyLen / 2 - noseLen; // where the flat deck ends
   const topY = baseY + 0.12 + bodyH;    // flat deck height
@@ -277,11 +285,17 @@ export function buildVoxelRacer(spec) {
 
   // ---- greenhouse: raked glass trapezoid under a painted roof cap ----
   const cabW = 2.15, cabH = low ? 0.6 : 0.74;
-  const cabZ = style === 'sleek' ? -0.45 : style === 'dune' ? 0.1 : -0.15;
-  const cabL = style === 'sleek' ? 1.9 : style === 'dune' ? 1.7 : 2.0;
-  const fRake = tall ? 0.42 : style === 'sleek' ? 0.55 : 0.62; // windshield rake
-  const bRake = style === 'sleek' ? 0.5 : style === 'crown' ? 0.45
-    : style === 'alpine' ? 0.35 : style === 'pit' ? 0.3 : 0.2; // tail rake
+  const cabZ = style === 'sleek' ? -0.45 : style === 'dune' ? 0.1
+    : style === 'nine11' ? -0.30 : style === 'cayen' ? -0.20 : -0.15;
+  const cabL = style === 'sleek' ? 1.9 : style === 'dune' ? 1.7
+    : style === 'nine11' ? 2.25 : style === 'cayen' ? 2.15 : 2.0;
+  const fRake = style === 'nine11' ? 0.70 : style === 'cayen' ? 0.52
+    : tall ? 0.42 : style === 'sleek' ? 0.55 : 0.62; // windshield rake
+  // 0.95 is the fastback: the glasshouse runs out almost to nothing at the
+  // back, so the roofline and the tail are one continuous fall.
+  const bRake = style === 'nine11' ? 0.95 : style === 'cayen' ? 0.34
+    : style === 'sleek' ? 0.5 : style === 'crown' ? 0.45
+      : style === 'alpine' ? 0.35 : style === 'pit' ? 0.3 : 0.2; // tail rake
   const cabY = topY + cabH / 2;
   const glassHouse = new THREE.Mesh(
     _wedgeGeo(cabW, cabH, cabL, { frontBack: fRake, backFwd: bRake }), glassMat);
@@ -339,6 +353,42 @@ export function buildVoxelRacer(spec) {
       p.position.set(1.315 * s, baseY + 0.12 + bodyH / 2 + 0.02, -0.75);
       p.rotation.y = s * Math.PI / 2;
       g.add(p);
+    }
+  }
+
+  // ---- the two signatures that make these silhouettes readable ----------
+  if (style === 'nine11') {
+    // REAR HAUNCHES. The rear-engined car is widest over its back axle, and
+    // that shoulder — not the nose — is what the eye names it by. A pair of
+    // shallow blisters over the rear arches, plus the ducktail lip that sits
+    // on the engine cover.
+    for (const sd of [-1, 1]) {
+      box(0.30, bodyH * 0.66, 1.55, bodyMat, sd * 1.32,
+        baseY + 0.12 + bodyH * 0.42, -bodyLen / 2 + 1.25, true);
+    }
+    // ducktail: a short raised lip across the tail, on two stubs
+    box(2.05, 0.09, 0.42, accentMat, 0, topY + 0.22, -bodyLen / 2 + 0.42);
+    for (const sd of [-1, 1]) {
+      box(0.12, 0.22, 0.18, darkMat, sd * 0.8, topY + 0.11, -bodyLen / 2 + 0.42);
+    }
+    // engine-cover louvres, between the haunches
+    for (let k = 0; k < 4; k++) {
+      box(1.5, 0.03, 0.07, darkMat, 0, topY + 0.035,
+        -bodyLen / 2 + 0.75 + k * 0.17);
+    }
+  }
+  if (style === 'cayen') {
+    // ROOF RAILS and a tailgate spoiler: the estate cues. Rails run the full
+    // length of the cap so the roof reads long, which is what separates this
+    // from the short, upright off-roader body.
+    for (const sd of [-1, 1]) {
+      box(0.10, 0.07, capL + 0.55, darkMat, sd * (cabW / 2 - 0.22),
+        capTop + 0.05, capZ);
+    }
+    box(1.9, 0.08, 0.30, accentMat, 0, capTop + 0.02, capZ - capL / 2 - 0.22);
+    // underbody skid plates, front and rear
+    for (const zz of [bodyLen / 2 - 0.18, -bodyLen / 2 + 0.18]) {
+      box(1.7, 0.07, 0.42, mat('#b8bcc0'), 0, baseY - 0.10, zz);
     }
   }
 
@@ -3192,6 +3242,35 @@ export const CAR_CATALOG = [
     key: 'dune', name: 'DUNE', price: 16000, desc: 'Off-road king',
     spec: { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 56, accel: 38, grip: 5.15, health: 105, offroad: 1.00, nitroPower: 0.95, plating: 0.95 },
+  },
+  {
+    // A 911 IS A SEALED-SURFACE CAR, and the tyre rule means that is a real
+    // constraint rather than flavour text: offroad 0.44 puts it in ROAD class,
+    // so it takes the 37 circuits and is refused on the rally stages. Highest
+    // grip in the catalogue and the best nitro, because a rear-engined car
+    // puts its weight over the driven axle — it is the sharpest thing here
+    // through a dry corner and has no answer at all once the surface turns.
+    key: 'nine11', name: '911', price: 22000, desc: 'Rear-engined coupe — sealed surfaces only',
+    spec: { name: '911', style: 'nine11', body: 0xd8d4cc, accent: 0x2a2d33,
+      stripe: [0xc4342a], number: 11, brand: 'PORSCHE', rims: GOLD },
+    // ACC is the one headline stat no other machine claims (CROWN owns SPD,
+    // SLEEK GRP, DUNE OFF, PIT ARM, ALPINE NTR — tests/test-cars.mjs enforces
+    // it), so that is this car's identity: it leaves a corner harder than
+    // anything else here. Deliberately NOT the grip or nitro leader; taking
+    // either would have made an existing card lie about its own machine.
+    stats: { maxSpeed: 60, accel: 42, grip: 5.45, health: 82, offroad: 0.44,
+      nitroPower: 1.10, plating: 1.0 },
+  },
+  {
+    // ...AND THE ESTATE ON THE SAME BADGE IS THE OPPOSITE ANSWER: offroad 0.88
+    // is SNOW class, so it takes the loose and the ice and is barred from the
+    // circuits its coupe sibling owns. Between them they cover the roster and
+    // neither covers it alone, which is the whole point of the tyre rule.
+    key: 'cayen', name: 'CAYENNE', price: 30000, desc: 'Performance estate — loose and ice',
+    spec: { name: 'CAYENNE', style: 'cayen', body: 0x1f2a38, accent: 0xc8ccd2,
+      stripe: [0xc8ccd2], number: 9, brand: 'PORSCHE', rims: GOLD },
+    stats: { maxSpeed: 59, accel: 38, grip: 5.20, health: 118, offroad: 0.88,
+      nitroPower: 1.0, plating: 1.12 },
   },
   {
     // The ALPINE was the one machine that was never the right answer: lowest
