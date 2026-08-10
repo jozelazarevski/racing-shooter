@@ -24,7 +24,7 @@
  *   npx vite build          # the tool serves ../play-dustline itself
  *   node tools/make-set-sheets.mjs
  */
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { chromium } from 'playwright-core';
 import { ensureServer } from './serve.mjs';
 
@@ -37,6 +37,14 @@ const stopServer = await ensureServer(BASE, '../play-dustline');
 const OUT = process.env.OUT || 'docs/sets';
 
 mkdirSync(OUT, { recursive: true });
+
+// EMPTY IT FIRST. Sheet names carry the page count — a category that fits on
+// one sheet is `flora.png`, one that needs two is `flora-1.png` — so growing a
+// category past nine renames its sheets and leaves the old ones behind, still
+// committed, still linked from nothing, still showing an outdated subset to
+// anyone who finds them. Writing into a directory that is not emptied means
+// the output is the union of every run there has ever been.
+for (const f of readdirSync(OUT)) rmSync(`${OUT}/${f}`);
 
 const browser = await chromium.launch({
   executablePath: EXE,

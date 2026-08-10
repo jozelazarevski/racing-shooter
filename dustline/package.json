@@ -12,6 +12,7 @@
     "verify:sdf": "node tools/verify-sdf.mjs",
     "verify:templates": "node tools/verify-templates.mjs",
     "verify:worlds": "node tools/verify-worlds.mjs",
+    "verify:generated": "node tools/verify-generated.mjs",
     "make:proving-ground": "node tools/make-proving-ground.mjs",
     "make:harbour": "node tools/make-harbour.mjs",
     "make:sets": "node tools/make-set-sheets.mjs",
@@ -19,8 +20,8 @@
     "smoke:editor": "node tools/editor-smoke.mjs",
     "smoke:components": "node tools/components-smoke.mjs",
     "verify:deploy": "node tools/verify-deploy.mjs",
-    "gate": "npm run typecheck && npm run verify:templates && npm run verify:track && npm run verify:sdf",
-    "gate:full": "npm run build && npm run gate && npm run verify:worlds && npm run smoke:components && npm run smoke:editor"
+    "gate": "npm run typecheck && npm run verify:templates && npm run verify:track && npm run verify:sdf && npm run verify:generated",
+    "gate:full": "npm run build && npm run gate && npm run verify:worlds && npm run smoke:components && npm run smoke:editor && npm run verify:deploy"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.12.0",

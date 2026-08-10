@@ -433,7 +433,7 @@ original world exactly, and every component count in the golden file is
 byte-identical across all three tracks. The whole delta is the horizon's extra
 instances — +105, +85 and +75, matching the peak counts exactly.
 
-**The library is 108 components, and 44 of them were built in parallel.** Four
+**The library is 109 components, and 44 of them were built in parallel.** Four
 agents, one asset set each, each owning a disjoint list of new files — which
 worked because the registry discovers the folder and there is no manifest to
 contend over. A stone harbour, roads and crossings, a vineyard and farmland,

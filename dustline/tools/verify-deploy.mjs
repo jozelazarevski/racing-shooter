@@ -18,7 +18,7 @@
  *   node tools/verify-deploy.mjs
  */
 import { createServer } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, readdir } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { chromium } from 'playwright-core';
 
@@ -83,6 +83,16 @@ async function visit(path, ready, timeout = 120000) {
   check(errs.length === 0, 'admin page loads clean', errs.slice(0,3).join(' | '));
   check(bad.length === 0, `every admin link resolves (${links.length})`, bad.join(' | '));
   check(badImg.length === 0, `every sheet image resolves (${imgs.length})`, badImg.slice(0,4).join(' | '));
+
+  // AND THE PAGE LISTS EVERY SHEET THERE IS. Resolving only catches a link to a
+  // sheet that is gone; the opposite — a sheet that exists and is linked from
+  // nowhere — is invisible, and it is the likelier one, because sheet filenames
+  // carry their page count and a category growing past nine renames them.
+  const onDisk = (await readdir(join(ROOT, 'dustline/docs/sets'))).filter((f) => f.endsWith('.png')).sort();
+  const linked = new Set(imgs.map((s) => s.split('/').pop()));
+  const unlisted = onDisk.filter((f) => !linked.has(f));
+  check(unlisted.length === 0,
+    `the admin page lists every sheet in docs/sets (${onDisk.length})`, unlisted.join(', '));
   await p.close();
 }
 
