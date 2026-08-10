@@ -42,7 +42,9 @@ const NEW = [[29, 'OLIVE COAST', 'medterrace'], [30, 'LANTERN QUARTER', 'oldtown
   // SKETCH D, drawn and handed over with its own labels: tunnels, a bridge
   // and sea cliffs. Its layout invariants live in test-cliffknot; this suite
   // only cares that it is on the roster, in order, and builds clean.
-  [59, 'CLIFF KNOT', 'mountainsea'],];
+  [59, 'CLIFF KNOT', 'mountainsea'],
+  // SKETCH E: the cliff straight, with the sea close on the east.
+  [60, 'SEA CLIFF RUN', 'mountainsea'],];
 
 // The roster must agree with what we think we merged, before any of it is built.
 const probe = await browser.newPage({ viewport: { width: 640, height: 400 } });

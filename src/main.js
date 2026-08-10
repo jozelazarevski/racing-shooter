@@ -2100,8 +2100,9 @@ class Game {
    *  your own work in is not a tool. The row is absent entirely when nothing
    *  has been saved, so a player who never opens the editor never sees it. */
   _renderSceneCards(sel) {
-    let scenes = {};
-    try { scenes = JSON.parse(localStorage.getItem('ir-scenes') || '{}'); } catch { scenes = {}; }
+    // through WorldEditor, so the track list reads the SAME profile-scoped
+    // store the editor writes and the sync engine carries
+    const scenes = WorldEditor.list(this);
     const names = Object.keys(scenes);
     if (!names.length) return;
     const head = document.createElement('div');
@@ -2136,10 +2137,7 @@ class Game {
             }, 3000);
             return;
           }
-          let all = {};
-          try { all = JSON.parse(localStorage.getItem('ir-scenes') || '{}'); } catch { all = {}; }
-          delete all[name];
-          try { localStorage.setItem('ir-scenes', JSON.stringify(all)); } catch { /* private mode */ }
+          WorldEditor.remove(name, this);
           // if the world you just deleted is the one standing, get off it
           if (this.editScene && this.level && base && this.level.id === base.id) {
             this.swapLevel(base, true, null);

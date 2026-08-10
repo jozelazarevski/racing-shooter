@@ -252,20 +252,64 @@ export class WorldEditor {
     this._buildDOM();
   }
 
-  /* --- storage ----------------------------------------------------------- */
-  static list() {
-    try { return JSON.parse(localStorage.getItem('ir-scenes') || '{}'); }
-    catch { return {}; }
+  /* --- storage ------------------------------------------------------------
+   *
+   * SCENES BELONG TO THE PROFILE, SO THEY TRAVEL.
+   *
+   * They used to live under a single global `ir-scenes` key. The sync engine
+   * snapshots the PROFILE key space (`ir-p<id>-*`) — career, garage, cars —
+   * so a scene sat outside the only mechanism the game has for getting your
+   * data onto another device: build a world on the phone and it did not
+   * exist on the laptop. Moving it inside that space is the whole fix; the
+   * cloud row and the sync codes then carry scenes with no new transport,
+   * which is the machinery this game already had.
+   *
+   * The old global key is read once and folded in, so nothing built before
+   * this is lost. */
+  static _key(game) {
+    const id = game && game.profile ? game.profile.id : null;
+    return id == null ? 'ir-scenes' : `ir-p${id}-scenes`;
   }
-  static save(name, data) {
-    const all = WorldEditor.list();
+
+  static list(game) {
+    const k = WorldEditor._key(game);
+    let mine = {};
+    try { mine = JSON.parse(localStorage.getItem(k) || '{}'); } catch { /* private mode */ }
+    if (k !== 'ir-scenes') {
+      // one-time fold-in of anything saved before scenes were profile-scoped
+      let old = {};
+      try { old = JSON.parse(localStorage.getItem('ir-scenes') || '{}'); } catch { /* ignore */ }
+      let grew = false;
+      for (const [n, v] of Object.entries(old)) if (!(n in mine)) { mine[n] = v; grew = true; }
+      if (grew || Object.keys(old).length) {
+        try {
+          localStorage.setItem(k, JSON.stringify(mine));
+          // AND THEN THE OLD KEY GOES. Leaving it meant every `list()` folded
+          // it back in, so deleting a migrated scene "worked" and the scene
+          // reappeared on the next read — the card delete stopped sticking.
+          // The data is in the profile store now; the legacy copy is a
+          // duplicate that can only cause that.
+          localStorage.removeItem('ir-scenes');
+        } catch { /* private mode: the fold-in is a no-op and that is fine */ }
+      }
+    }
+    return mine;
+  }
+
+  static save(name, data, game) {
+    const k = WorldEditor._key(game);
+    const all = WorldEditor.list(game);
     all[name] = data;
-    localStorage.setItem('ir-scenes', JSON.stringify(all));
+    try { localStorage.setItem(k, JSON.stringify(all)); } catch { /* private mode */ }
+    game?.sync?.schedulePush?.();
   }
-  static remove(name) {
-    const all = WorldEditor.list();
+
+  static remove(name, game) {
+    const k = WorldEditor._key(game);
+    const all = WorldEditor.list(game);
     delete all[name];
-    localStorage.setItem('ir-scenes', JSON.stringify(all));
+    try { localStorage.setItem(k, JSON.stringify(all)); } catch { /* private mode */ }
+    game?.sync?.schedulePush?.();
   }
 
   serialize() {
@@ -1226,6 +1270,10 @@ export class WorldEditor {
         <button class="ed-tool" data-tool="clear">CLEAR AREA</button>
         <button class="ed-tool" data-tool="rotate">ROTATE</button>
         <button class="ed-tool" data-tool="road">ROAD</button>
+        <div id="ed-roadsub"><div id="ed-roadrow">
+          <button class="ed-mini current" data-road="tunnel">TUNNEL</button>
+          <button class="ed-mini" data-road="bridge">BRIDGE</button>
+        </div><div class="ed-hint">then tap the road</div></div>
         <button class="ed-tool" data-tool="route">MOVE ROAD</button>
         <button class="ed-tool" data-tool="water">WATER</button>
         <button class="ed-tool" data-tool="orbit">ORBIT</button>
@@ -1240,12 +1288,7 @@ export class WorldEditor {
         <div class="ed-pgroup">WORLD RECIPE</div>
         <label>LOOK <select id="ed-theme"></select></label>
         <label>SKY <select id="ed-weather"></select></label>
-        <div class="ed-pgroup">ROAD</div>
-        <div id="ed-roadrow">
-          <button class="ed-mini current" data-road="tunnel">TUNNEL</button>
-          <button class="ed-mini" data-road="bridge">BRIDGE</button>
-        </div>
-        <div class="ed-hint">pick one, then tap ROAD on the map to add</div>
+
       </div>
       <div id="ed-palette"></div>
       <div id="ed-bottom">
@@ -1264,6 +1307,11 @@ export class WorldEditor {
         this.tool = t.dataset.tool;
         root.querySelectorAll('.ed-tool').forEach((b) => b.classList.toggle('current', b === t));
         root.querySelector('#ed-palette').classList.toggle('open', this.tool === 'place');
+        // TUNNEL / BRIDGE sat in the WORLD RECIPE panel on the far side of the
+        // screen from the ROAD tool that uses them, so which one was armed —
+        // and that you had to arm one at all — was anyone's guess. It now lives
+        // under the ROAD button and only exists while ROAD is the live tool.
+        root.querySelector('#ed-roadsub').classList.toggle('open', this.tool === 'road');
         // the road handles only exist while you are moving the road
         this._routeMarks();
         this._status(HINT[this.tool] || this.tool.toUpperCase());
@@ -1373,18 +1421,45 @@ export class WorldEditor {
     this._status('cleared — APPLY to rebuild');
   }
 
+  /** SAVING NEVER QUIETLY REPLACES SOMETHING.
+   *
+   *  Two different overwrites were possible and neither said a word. Saving
+   *  over an existing scene of the same name replaced it outright; and a scene
+   *  named after a shipped world reads, on the track list, as that world — so
+   *  it looked as though the original had been destroyed. Both now ask, and
+   *  the shipped-world case says plainly that the original is untouched. */
   _saveFlow() {
-    const name = prompt('Scene name:', this.sceneName
-      || ((this.game.level && this.game.level.name) || 'SCENE') + ' EDIT');
+    const suggested = this.sceneName
+      || ((this.game.level && this.game.level.name) || 'SCENE') + ' EDIT';
+    const name = prompt('Scene name:', suggested);
     if (!name) return;
-    this.sceneName = name;
-    WorldEditor.save(name, this.serialize());
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const existing = WorldEditor.list(this.game);
+    if (trimmed in existing && trimmed !== this.sceneName) {
+      if (!confirm(`"${trimmed}" already exists.\n\nReplace that saved scene?`)) {
+        this._status('save cancelled — nothing was replaced');
+        return;
+      }
+    }
+    const shipped = LEVELS.some((l) => l.name.toUpperCase() === trimmed.toUpperCase());
+    if (shipped) {
+      if (!confirm(`"${trimmed}" is the name of a built-in world.\n\n`
+        + 'The original is NOT changed — it stays on the track list and you can '
+        + 'always race it. Your scene will appear beside it under the same name, '
+        + 'which is easy to confuse.\n\nSave it under that name anyway?')) {
+        this._status('save cancelled — pick a name of your own');
+        return;
+      }
+    }
+    this.sceneName = trimmed;
+    WorldEditor.save(trimmed, this.serialize(), this.game);
     this.game._renderLevelCards?.();
-    this._status(`saved "${name}"`);
+    this._status(`saved "${trimmed}" — it syncs with your profile`);
   }
 
   _loadFlow() {
-    const all = WorldEditor.list();
+    const all = WorldEditor.list(this.game);
     const names = Object.keys(all);
     if (!names.length) { this._status('no saved scenes'); return; }
     const pick = prompt('Load which scene?\n\n' + names.join('\n'), names[0]);
