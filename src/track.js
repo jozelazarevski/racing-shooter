@@ -180,6 +180,24 @@ export const LEVELS = [
   // frame from the road.
   { id: 58, name: 'CITADEL BAY', theme: 'citadel', region: 'MEDITERRANEAN',
     cost: 30, fresh: true, route: 'aegeanRun' },
+  // SKETCH D, drawn and handed over with its own labels on it: tunnels where
+  // the north-south strand crosses the two straights, a bridge where the
+  // right-hand strand crosses the lower one, and sea cliffs on the water side.
+  // The crossings are real self-intersections, so `_planOverpasses` builds
+  // every one of them as road-over-road without being told where they are —
+  // the drawing's tunnels and bridge ARE those crossings. The bored tunnel in
+  // `tune` is the one the drawing puts through a hill rather than under a road.
+  // The sea is given here rather than taken from the theme: `mountainsea`
+  // places its water for the lap IT was drawn around, which is nowhere near
+  // this one. The shoreline runs north-south just off the eastern flank, so
+  // the lap's right-hand lobe — the part the drawing labels "Sea clifs" —
+  // runs along a real drop with real water under it.
+  { id: 59, name: 'CLIFF KNOT', theme: 'mountainsea', region: 'MEDITERRANEAN',
+    cost: 31, fresh: true, route: 'seaKnot',
+    tune: {
+      tunnels: { count: 1 },
+      coast: { a: [176, -300], b: [206, 320], level: -2.6, floor: -11, beach: 30 },
+    } },
 ];
 
 /* ==========================================================================
@@ -418,6 +436,37 @@ const CIRCUITS = {
     [-75, -109], [-80, -84], [-81, -57], [-82, -31], [-81, -5],
     [-77, 21], [-72, 47], [-66, 73], [-59, 98], [-52, 124],
     [-45, 150], [-33, 173],
+  ],
+
+  // SKETCH D, hand-read from the drawing, and it is a KNOT on purpose: a top
+  // hairpin, two long horizontal straights, a north-south strand that crosses
+  // BOTH of them (the drawing writes "Tunels" against exactly those two), a
+  // right-hand strand crossing the lower straight ("Bridge"), a lobe out on
+  // the water ("Sea clifs") and a big pointed loop across the bottom.
+  //
+  // Four self-crossings, so four road-over-road overpasses — which is what the
+  // drawing's tunnels and bridge ARE. That is also why the scale matters and
+  // was asked for by name: the same layout at the first scale I traced came
+  // out 2469 u round with two strands passing 15 u apart, which is inside two
+  // road half-widths. At 0.235 it is 2021 u — mid-roster — and the tightest
+  // parallel pass is 28 u, comfortably wider than the carriageway.
+  seaKnot: [
+    [-116, 71], [-131, 60], [-136, 37], [-135, 12], [-128, -4],
+    [-111, -11], [-81, -12], [-46, -11], [-10, -9], [18, -8],
+    [34, -4], [44, -18], [49, -37], [60, -41], [81, -43],
+    [97, -33], [103, -18], [97, -2], [79, 9], [60, 11],
+    [57, 31], [55, 52], [55, 71], [57, 93], [64, 120],
+    [75, 148], [73, 179], [54, 207], [26, 231], [-2, 249],
+    [-30, 230], [-48, 202], [-60, 171], [-70, 141], [-78, 110],
+    [-82, 82], [-83, 54], [-84, 26], [-84, -4], [-84, -18],
+    [-81, -47], [-72, -75], [-60, -101], [-47, -127], [-33, -155],
+    [-23, -178], [13, -182], [51, -182], [80, -178], [44, -164],
+    [11, -157], [-20, -150], [-48, -142], [-69, -128], [-81, -110],
+    [-84, -89], [-83, -75], [-74, -64], [-50, -63], [-20, -64],
+    [13, -68], [46, -72], [79, -76], [107, -80], [134, -74],
+    [143, -47], [145, -14], [142, 19], [134, 45], [116, 63],
+    [74, 66], [41, 67], [8, 68], [-25, 69], [-57, 69],
+    [-93, 70],
   ],
 
   // ---- THE MEDITERRANEAN FIVE. Five coasts, five layout IDEAS - a cliff
@@ -8152,12 +8201,26 @@ if (this._citMound) h += this._citMoundH(x, z);
     if (!want.length) return;
 
     // ---- one bay: two posts and two rails, merged --------------------------
+    // THE BAY RUNS ALONG LOCAL Z, AND IT MUST.
+    //
+    // It was built along local X — posts at x = +/-bay/2 — and then instanced
+    // with `setFromAxisAngle(up, heading)`. A Y-rotation by the heading sends
+    // local +X to (cos, -sin), which is the LATERAL direction, so every rail
+    // in the game was drawn lying ACROSS the carriageway: pale grey bars over
+    // the road at bay intervals, running out into the grass on both sides.
+    // That is the screenshot that was reported twice.
+    //
+    // The giveaway is three lines below: the barrier this same loop registers
+    // uses (sin, cos) — along the road, correctly. The invisible wall and the
+    // thing you can see were ninety degrees apart, which is also why the
+    // clear-the-road guard could not catch it: the anchor point was fine and
+    // the mesh reached across anyway.
     const bay = 4.5, H = 1.0;
     const geo = mergeBoxes([
-      { w: 0.22, h: H, d: 0.22, x: -bay / 2, y: H / 2, z: 0 },
-      { w: 0.22, h: H, d: 0.22, x: bay / 2, y: H / 2, z: 0 },
-      { w: bay + 0.3, h: 0.22, d: 0.10, x: 0, y: H - 0.14, z: 0 },
-      { w: bay + 0.3, h: 0.16, d: 0.09, x: 0, y: H - 0.52, z: 0 },
+      { w: 0.22, h: H, d: 0.22, x: 0, y: H / 2, z: -bay / 2 },
+      { w: 0.22, h: H, d: 0.22, x: 0, y: H / 2, z: bay / 2 },
+      { w: 0.10, h: 0.22, d: bay + 0.3, x: 0, y: H - 0.14, z: 0 },
+      { w: 0.09, h: 0.16, d: bay + 0.3, x: 0, y: H - 0.52, z: 0 },
     ]);
     // steel where the road is sealed, timber where it is not — the world
     // already knows which it is from the surface it gives the physics
