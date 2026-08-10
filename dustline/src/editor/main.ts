@@ -17,6 +17,8 @@ import {
   builtInTracks, saveLocalTrack, deleteLocalTrack, packTrack, resolveTrackFromUrl,
 } from '../tracks/registry';
 import { openTrackDialog } from './openDialog';
+import { newTrackDialog } from './newDialog';
+import { LANDS, WEATHERS, composeTrack } from '../tracks/presets';
 import { MapView } from './mapView';
 import { Preview } from './preview';
 import { renderPanel, TabId } from './panel';
@@ -499,19 +501,21 @@ $('trackName').addEventListener('change', (e) => {
   commit((d) => { d.name = v; }, 'rename');
 });
 
-$('btnNew').addEventListener('click', () => {
+$('btnNew').addEventListener('click', async () => {
   if (dirty && !confirm('Discard unsaved changes?')) return;
-  const base = builtInTracks()[0];
-  const id = `track-${Date.now().toString(36)}`;
-  def = {
-    ...structuredClone(base),
-    id,
-    name: 'NEW TRACK',
-    seed: (Math.random() * 0xffffffff) >>> 0,
-    road: { ...base.road, points: starterLoop(180, 12) },
-  };
+  // A LAND AND A WEATHER, rather than a copy of DUSTBOWL. See `newDialog.ts`
+  // for why those are two questions and not one.
+  const made = await newTrackDialog();
+  if (!made) return;
+  def = made;
   past.length = 0; future.length = 0;
   dirty = true;
+  // A new track is not saved yet, so the URL must stop pointing at whatever was
+  // open before — a reload here should not resurrect the previous track.
+  const u = new URL(location.href);
+  u.searchParams.delete('track');
+  u.searchParams.delete('t');
+  history.replaceState(null, '', u);
   map.fit(def);
   preview.frameTrack(def);
   changed();
@@ -656,4 +660,6 @@ frame();
   map, preview, validate: () => validateTrack(def), commit,
   // exposed for tools/components-smoke.mjs, which sweeps the whole library
   templateIds, getTemplate, thumbnail, withStubbedRandom, builtInTracks, deleteLocalTrack,
+  // exposed for tools/editor-smoke.mjs, which checks every land x weather
+  presets: { LANDS, WEATHERS, composeTrack }, starterLoop, validateDef: validateTrack,
 };

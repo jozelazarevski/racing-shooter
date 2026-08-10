@@ -169,6 +169,67 @@ const deterministic = await gamePage.evaluate(() => {
 });
 check(deterministic.a === deterministic.b, 'terrain queries are stable', deterministic.a);
 
+// ---- NEW: EVERY LAND x EVERY WEATHER ------------------------------------------
+//
+// "New" now asks for a land and a weather instead of cloning DUSTBOWL, and the
+// two are independent — which means the thing to check is not the two
+// combinations someone happened to click. It is ALL of them: every land in
+// every weather has to produce a track that VALIDATES and that the real
+// Terrain will build, because any one of the 56 is one click away.
+const combos = await page.evaluate(async () => {
+  const e = window.__editor;
+  const { LANDS, WEATHERS, composeTrack } = e.presets;
+  const bad = [];
+  let n = 0;
+  for (const land of LANDS) {
+    for (const weather of WEATHERS) {
+      const def = composeTrack(land, weather, e.starterLoop(180, 12), 1234);
+      const issues = e.validateDef(def).filter((i) => i.level === 'error');
+      if (issues.length) bad.push(`${land.id}/${weather.id}: ${issues[0].message}`);
+      n++;
+    }
+  }
+  return { n, bad, lands: LANDS.length, weathers: WEATHERS.length };
+});
+check(combos.bad.length === 0,
+  `every land x weather validates (${combos.lands} x ${combos.weathers})`,
+  combos.bad.length ? combos.bad.slice(0, 3).join(' | ') : `${combos.n} combinations`);
+
+// Scatter layers naming a component that does not exist would build a world
+// with silent holes in it — the builder warns and carries on, which is right at
+// runtime and useless as a check.
+const layerIds = await page.evaluate(() => {
+  const e = window.__editor;
+  const known = new Set(e.templateIds());
+  const bad = [];
+  for (const land of e.presets.LANDS) {
+    for (const l of land.scenery) if (!known.has(l.template)) bad.push(`${land.id}: ${l.template}`);
+  }
+  return bad;
+});
+check(layerIds.length === 0, 'every preset scatter layer names a real component', layerIds.join(' | '));
+
+// And one of them all the way through the real engine, including a land with
+// water in it, because a preset that validates can still fail to build.
+const presetBuilt = await page.evaluate(async () => {
+  const e = window.__editor;
+  const coast = e.presets.LANDS.find((l) => l.id === 'coast');
+  const mist = e.presets.WEATHERS.find((w) => w.id === 'seaMist');
+  e.def = e.presets.composeTrack(coast, mist, e.starterLoop(180, 12), 99);
+  await new Promise((r) => setTimeout(r, 3500));
+  const t = e.preview.terrain;
+  return {
+    water: t.waterLevel,
+    components: Object.keys(e.preview.componentCounts).length,
+    grass: e.preview.componentCounts.grassTuft ?? 0,
+    fog: e.def.sky.fogColor,
+  };
+});
+check(presetBuilt.water === -7 && presetBuilt.components >= 6 && presetBuilt.grass > 500,
+  'a preset builds in the real engine, water and all',
+  `water ${presetBuilt.water} m, ${presetBuilt.components} component kinds, `
+  + `${presetBuilt.grass} grass, fog ${presetBuilt.fog}`);
+
 // ---- SAVE PUTS THE TRACK IN THE GAME -----------------------------------------
 //
 // The claim the user actually cares about: "once I save the track it needs to
