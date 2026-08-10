@@ -4110,7 +4110,7 @@ function gablePrismGeo() {
 /** Merge a list of box specs {w,h,d,x,y,z,ry?} into ONE BufferGeometry so a
  *  multi-part smashable (a fence bay, a trough, a hay rack) costs a single
  *  mesh. Build-time only. */
-function mergeBoxes(specs) {
+export function mergeBoxes(specs) {
   const geos = specs.map((s) => {
     const g = new THREE.BoxGeometry(s.w, s.h, s.d).toNonIndexed();
     const m = new THREE.Matrix4().makeRotationY(s.ry || 0);
@@ -5653,6 +5653,34 @@ export class Track {
     const C = this.T.coast;
     const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
     return ((x - C.a[0]) * abz - (z - C.a[1]) * abx) / Math.hypot(abx, abz);
+  }
+
+  /** THE HIGHEST WATER SURFACE AT A POINT, or -Infinity where there is none.
+   *
+   *  The world has three separate bodies of water built by three separate
+   *  systems, and nothing could previously ask a simple question of all of
+   *  them at once: drive off a corniche into the bay and the car simply
+   *  carried on along the sea floor, because the seabed IS ground and ground
+   *  is drivable. This is what the drowning rule reads.
+   *
+   *  The RIVER is deliberately not included. It is 2.6 u deep and every world
+   *  that has one gives it fords to cross — it is meant to be driven through,
+   *  and a car is taller than it is deep, so nothing there is ever fully
+   *  submerged. Including it would drown people at the ford, which is the one
+   *  place the design says to go. */
+  waterTopAt(x, z) {
+    let top = -Infinity;
+    const C = this.T.coast;
+    if (C && this._coastSide(x, z) > 0) top = Math.max(top, C.level ?? -2);
+    const W = this.edit && this.edit.waters;
+    if (W) {
+      for (let i = 0; i < W.length; i++) {
+        const w = W[i];
+        const dx = x - w.x, dz = z - w.z;
+        if (dx * dx + dz * dz <= w.r * w.r) top = Math.max(top, w.y);
+      }
+    }
+    return top;
   }
 
   /** Seaward of the coastline the land sinks to the sea floor over a beach

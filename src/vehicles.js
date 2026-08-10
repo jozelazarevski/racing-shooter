@@ -1,6 +1,6 @@
 // Car meshes (built from primitives), arcade physics, and rival AI.
 import * as THREE from 'three';
-import { ROAD_HALF, RIM_RADIUS } from './track.js';
+import { ROAD_HALF, RIM_RADIUS, mergeBoxes } from './track.js';
 import { numberPlateTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
@@ -226,14 +226,14 @@ export function buildVoxelRacer(spec) {
   const headMat = new THREE.MeshBasicMaterial({ color: 0xfff9e2 });
   const tailMat = new THREE.MeshBasicMaterial({ color: 0xff2418 });
 
-  // 'nine11' is a rear-engined fastback: short nose, roof falling in one
-  // unbroken line to the tail. 'cayen' is the tall performance estate on the
+  // 'flatsix' is a rear-engined fastback: short nose, roof falling in one
+  // unbroken line to the tail. 'bastion' is the tall performance estate on the
   // same platform — SUV height and length, but a saloon's rake, not a truck's.
-  const tall = style === 'brawler' || style === 'dune' || style === 'cayen';
+  const tall = style === 'brawler' || style === 'dune' || style === 'bastion';
   const low = style === 'crown' || style === 'alpine' || style === 'pit'
-    || style === 'nine11';
-  const wheelR = style === 'brawler' ? 0.85 : style === 'cayen' ? 0.80
-    : tall ? 0.76 : style === 'nine11' ? 0.66 : 0.62;
+    || style === 'flatsix';
+  const wheelR = style === 'brawler' ? 0.85 : style === 'bastion' ? 0.80
+    : tall ? 0.76 : style === 'flatsix' ? 0.66 : 0.62;
   const wheelY = wheelR;
   const baseY = wheelY + (low ? 0.18 : 0.34); // chassis floor height
 
@@ -265,12 +265,12 @@ export function buildVoxelRacer(spec) {
 
   // ---- proportions: every car is a wedge now ----
   const bodyLen = style === 'crown' || style === 'pit' ? 4.7 : style === 'sleek' ? 4.0
-    : style === 'cayen' ? 4.8 : style === 'nine11' ? 4.3 : 4.4;
+    : style === 'bastion' ? 4.8 : style === 'flatsix' ? 4.3 : 4.4;
   const bodyH = low ? 0.62 : 0.78;
   // the rear-engined car has almost no bonnet — the nose drops away at once,
   // which is the single most recognisable thing about its profile
-  const noseLen = style === 'nine11' ? 1.55 : tall ? 1.2 : style === 'sleek' ? 1.3 : 1.5;
-  const frontDrop = style === 'nine11' ? 0.46 : tall ? 0.26 : style === 'sleek' ? 0.3 : 0.34;
+  const noseLen = style === 'flatsix' ? 1.55 : tall ? 1.2 : style === 'sleek' ? 1.3 : 1.5;
+  const frontDrop = style === 'flatsix' ? 0.46 : tall ? 0.26 : style === 'sleek' ? 0.3 : 0.34;
   const hoodAng = Math.atan2(frontDrop, noseLen);
   const noseZ0 = bodyLen / 2 - noseLen; // where the flat deck ends
   const topY = baseY + 0.12 + bodyH;    // flat deck height
@@ -286,14 +286,14 @@ export function buildVoxelRacer(spec) {
   // ---- greenhouse: raked glass trapezoid under a painted roof cap ----
   const cabW = 2.15, cabH = low ? 0.6 : 0.74;
   const cabZ = style === 'sleek' ? -0.45 : style === 'dune' ? 0.1
-    : style === 'nine11' ? -0.30 : style === 'cayen' ? -0.20 : -0.15;
+    : style === 'flatsix' ? -0.30 : style === 'bastion' ? -0.20 : -0.15;
   const cabL = style === 'sleek' ? 1.9 : style === 'dune' ? 1.7
-    : style === 'nine11' ? 2.25 : style === 'cayen' ? 2.15 : 2.0;
-  const fRake = style === 'nine11' ? 0.70 : style === 'cayen' ? 0.52
+    : style === 'flatsix' ? 2.25 : style === 'bastion' ? 2.15 : 2.0;
+  const fRake = style === 'flatsix' ? 0.70 : style === 'bastion' ? 0.52
     : tall ? 0.42 : style === 'sleek' ? 0.55 : 0.62; // windshield rake
   // 0.95 is the fastback: the glasshouse runs out almost to nothing at the
   // back, so the roofline and the tail are one continuous fall.
-  const bRake = style === 'nine11' ? 0.95 : style === 'cayen' ? 0.34
+  const bRake = style === 'flatsix' ? 0.95 : style === 'bastion' ? 0.34
     : style === 'sleek' ? 0.5 : style === 'crown' ? 0.45
       : style === 'alpine' ? 0.35 : style === 'pit' ? 0.3 : 0.2; // tail rake
   const cabY = topY + cabH / 2;
@@ -357,7 +357,7 @@ export function buildVoxelRacer(spec) {
   }
 
   // ---- the two signatures that make these silhouettes readable ----------
-  if (style === 'nine11') {
+  if (style === 'flatsix') {
     // REAR HAUNCHES. The rear-engined car is widest over its back axle, and
     // that shoulder — not the nose — is what the eye names it by. A pair of
     // shallow blisters over the rear arches, plus the ducktail lip that sits
@@ -377,7 +377,7 @@ export function buildVoxelRacer(spec) {
         -bodyLen / 2 + 0.75 + k * 0.17);
     }
   }
-  if (style === 'cayen') {
+  if (style === 'bastion') {
     // ROOF RAILS and a tailgate spoiler: the estate cues. Rails run the full
     // length of the cap so the roof reads long, which is what separates this
     // from the short, upright off-roader body.
@@ -402,6 +402,68 @@ export function buildVoxelRacer(spec) {
     box(0.44, 0.2, 0.07, tailMat, 0.88 * s, baseY + bodyH * 0.55 + 0.12, -bodyLen / 2 - 0.03);
   }
   box(0.9, 0.09, 0.06, darkMat, 0, baseY + bodyH * 0.55 + 0.12, -bodyLen / 2 - 0.02);
+
+  // ---- HIGH-POLY REAR AND ROOF ------------------------------------------
+  //
+  // The back of every car was a flat slab with two small lamps on it, and the
+  // roof a bare painted cap — which is a problem, because the back of the car
+  // is the view you have of it for the entire race, and the roof is what the
+  // overhead cameras look at. Detail here is worth more than detail anywhere
+  // else on the machine.
+  //
+  // COST DISCIPLINE: every `box()` above is its OWN mesh, and a car already
+  // costs 49-63 of them — a six-car grid is ~343 draw calls against a world
+  // budget around 900. Adding eighteen more boxes each the naive way would be
+  // another 108 draws for the grid. So this section does not use `box()`: it
+  // accumulates specs per material and merges each material into ONE geometry,
+  // which is +3 draw calls per car for ~430 triangles. Polygons are cheap
+  // here; draw calls are not.
+  const dBody = [], dDark = [], dLamp = [], dChrome = [];
+  const rear = -bodyLen / 2;                  // tail face
+  const sillY = baseY + 0.10;
+  {
+    // --- tail-light clusters: a wrapped lens with an inner strip ----------
+    for (const s of [-1, 1]) {
+      dLamp.push({ w: 0.30, h: 0.16, d: 0.07, x: 1.16 * s, y: baseY + bodyH * 0.55 + 0.12, z: rear - 0.03 });
+      dLamp.push({ w: 0.10, h: 0.13, d: 0.16, x: 1.30 * s, y: baseY + bodyH * 0.55 + 0.12, z: rear + 0.10 });
+      // reverse lamp, below the cluster
+      dChrome.push({ w: 0.20, h: 0.08, d: 0.05, x: 0.62 * s, y: baseY + bodyH * 0.25, z: rear - 0.02 });
+    }
+    // --- boot / tailgate shut line and a number-plate recess --------------
+    dDark.push({ w: 1.9, h: 0.035, d: 0.05, x: 0, y: baseY + bodyH * 0.9, z: rear - 0.02 });
+    dDark.push({ w: 0.78, h: 0.26, d: 0.05, x: 0, y: baseY + bodyH * 0.30, z: rear - 0.05 });
+    dChrome.push({ w: 0.70, h: 0.20, d: 0.02, x: 0, y: baseY + bodyH * 0.30, z: rear - 0.08 });
+    // --- diffuser: a valance with vertical fins --------------------------
+    dDark.push({ w: 2.15, h: 0.20, d: 0.30, x: 0, y: sillY - 0.06, z: rear - 0.16 });
+    for (let k = -2; k <= 2; k++) {
+      dDark.push({ w: 0.07, h: 0.22, d: 0.34, x: k * 0.42, y: sillY - 0.04, z: rear - 0.18 });
+    }
+    // --- twin exhaust tips ------------------------------------------------
+    for (const s of [-1, 1]) {
+      dChrome.push({ w: 0.15, h: 0.15, d: 0.24, x: 0.70 * s, y: sillY + 0.02, z: rear - 0.26 });
+    }
+    // --- ROOF: drip rails, a panel seam and a shark-fin aerial ------------
+    for (const s of [-1, 1]) {
+      dDark.push({ w: 0.06, h: 0.05, d: capL + 0.06, x: (cabW / 2 - 0.10) * s, y: capTop + 0.02, z: capZ });
+    }
+    dDark.push({ w: cabW - 0.34, h: 0.03, d: 0.05, x: 0, y: capTop + 0.03, z: capZ - capL / 2 + 0.16 });
+    dDark.push({ w: 0.10, h: 0.14, d: 0.34, x: 0, y: capTop + 0.08, z: capZ - capL / 2 + 0.02 });
+    dDark.push({ w: 0.07, h: 0.09, d: 0.20, x: 0, y: capTop + 0.19, z: capZ - capL / 2 - 0.02 });
+    // a low-slung car gets a roof vent instead of a rack it would never carry
+    if (low) {
+      dBody.push({ w: 0.52, h: 0.07, d: 0.40, x: 0, y: capTop + 0.03, z: capZ + capL / 2 - 0.30 });
+      dDark.push({ w: 0.40, h: 0.05, d: 0.05, x: 0, y: capTop + 0.07, z: capZ + capL / 2 - 0.22 });
+    }
+  }
+  const chromeMat = mat(0xc8ccd2, { roughness: 0.35, metalness: 0.6 });
+  for (const [specs, m] of [[dBody, bodyMat], [dDark, darkMat],
+    [dLamp, tailMat], [dChrome, chromeMat]]) {
+    if (!specs.length) continue;
+    const dm = new THREE.Mesh(mergeBoxes(specs), m);
+    dm.castShadow = true;
+    dm.userData.detail = true;            // not a smashable panel
+    g.add(dm);
+  }
 
   // ---- style signatures ----
   if (style === 'brawler') {
@@ -633,6 +695,11 @@ export function buildVoxelRacer(spec) {
     }
   }
 
+  // HOW TALL THIS MACHINE IS, from the contact patch (local y = 0) to the top
+  // of the roof cap. The drowning rule needs the real roofline: a flat 2.4 u
+  // guess would sink a BRAWLER (3.4 u tall) while a metre of it was still in
+  // the air, and let a low coupe drive on with its roof under.
+  g.userData.hullHeight = capTop + 0.12;
   // body material handle for damage scorch tinting
   g.userData.bodyMat = bodyMat;
   g.userData.baseBodyColor = new THREE.Color(body);
@@ -1910,6 +1977,16 @@ export class Car {
         }
       }
     }
+    // FULLY SUBMERGED = SUNK. Measured at the ROOF, not the floor: a car
+    // fording a stream is wet, a car whose roof is under the surface is gone.
+    // `waterTopAt` deliberately excludes the river (2.6 u deep, forded on
+    // purpose, and shallower than the car is tall), so this can only fire in
+    // the sea or in a lake dug in the editor.
+    if (this.alive && !this.airborne) {
+      const wt = t.waterTopAt ? t.waterTopAt(this.pos.x, this.pos.z) : -Infinity;
+      const roof = this.y + (this.mesh?.userData?.hullHeight ?? 2.4);
+      if (wt > -Infinity && roof < wt) this.drown();
+    }
     if (this._steepFed > 0) this._steepFed = Math.max(0, this._steepFed - dt);
     if (this.airborne) {
       this.vy -= 26 * dt;
@@ -2309,6 +2386,24 @@ export class Car {
     this.game.particles.explosion(this.pos, true);
     this.game.audio.explosion(true);
     this.game.flashLight(this.pos);
+  }
+
+  /** GOING UNDER IS A WRECK. Deep water used to be free driving: the seabed is
+   *  ground and ground is drivable, so a car that went off a corniche simply
+   *  carried on along the bottom of the bay with the waves over its roof.
+   *
+   *  Not routed through destroy(), because a car does not detonate underwater
+   *  — no fireball, no flash, no husk left floating on the surface. It is the
+   *  same outcome (dead, respawn on the timer) presented as what it is. */
+  drown() {
+    if (!this.alive) return;
+    this.health = 0;
+    this.alive = false;
+    this.mesh.visible = false;
+    this.respawnTimer = this.respawnDelay ?? 5;
+    this.game.particles?.splash?.(this.pos, 2.2);
+    this.game.audio?.splash?.();
+    if (this === this.game.player) this.game.hud?.feed?.('SUNK', 'bad');
   }
 
   respawn() {
@@ -3250,9 +3345,10 @@ export const CAR_CATALOG = [
     // grip in the catalogue and the best nitro, because a rear-engined car
     // puts its weight over the driven axle — it is the sharpest thing here
     // through a dry corner and has no answer at all once the surface turns.
-    key: 'nine11', name: '911', price: 22000, desc: 'Rear-engined coupe — sealed surfaces only',
-    spec: { name: '911', style: 'nine11', body: 0xd8d4cc, accent: 0x2a2d33,
-      stripe: [0xc4342a], number: 11, brand: 'PORSCHE', rims: GOLD },
+    key: 'flatsix', name: 'FLATSIX', price: 22000,
+    desc: 'Rear-engined coupe — sealed surfaces only',
+    spec: { name: 'FLATSIX', style: 'flatsix', body: 0xd8d4cc, accent: 0x2a2d33,
+      stripe: [0xc4342a], number: 11, brand: 'ZENITH', rims: GOLD },
     // ACC is the one headline stat no other machine claims (CROWN owns SPD,
     // SLEEK GRP, DUNE OFF, PIT ARM, ALPINE NTR — tests/test-cars.mjs enforces
     // it), so that is this car's identity: it leaves a corner harder than
@@ -3266,9 +3362,10 @@ export const CAR_CATALOG = [
     // is SNOW class, so it takes the loose and the ice and is barred from the
     // circuits its coupe sibling owns. Between them they cover the roster and
     // neither covers it alone, which is the whole point of the tyre rule.
-    key: 'cayen', name: 'CAYENNE', price: 30000, desc: 'Performance estate — loose and ice',
-    spec: { name: 'CAYENNE', style: 'cayen', body: 0x1f2a38, accent: 0xc8ccd2,
-      stripe: [0xc8ccd2], number: 9, brand: 'PORSCHE', rims: GOLD },
+    key: 'bastion', name: 'BASTION', price: 30000,
+    desc: 'Performance estate — loose and ice',
+    spec: { name: 'BASTION', style: 'bastion', body: 0x1f2a38, accent: 0xc8ccd2,
+      stripe: [0xc8ccd2], number: 9, brand: 'ZENITH', rims: GOLD },
     stats: { maxSpeed: 59, accel: 38, grip: 5.20, health: 118, offroad: 0.88,
       nitroPower: 1.0, plating: 1.12 },
   },
