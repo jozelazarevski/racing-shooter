@@ -1,6 +1,6 @@
 // Car meshes (built from primitives), arcade physics, and rival AI.
 import * as THREE from 'three';
-import { ROAD_HALF, RIM_RADIUS } from './world/constants.js';
+import { ROAD_HALF, RIM_RADIUS } from './track.js';
 import { numberPlateTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
@@ -1251,6 +1251,71 @@ export class Car {
             _hitNormal.set(nx, 0, nz);
             this.onWallHit(_hitNormal, Math.abs(vn));
             if (this === gm.player) gm.shake = Math.min(1, gm.shake + 0.2);
+          }
+        }
+      }
+    }
+
+    // ---- MASONRY BARRIERS: parapets, dry-stone walls, quay copings.
+    //
+    // A wall is a SEGMENT, and it is solid for its whole length. It used to
+    // be registered as a row of circles, one per block, which left every
+    // block end and every joint open: driven head-on at a GOTTHARD parapet,
+    // four runs in six went through and one finished on top of it. Resolving
+    // against the nearest point on the segment closes both.
+    //
+    // Height matters as much as footprint. The barrier bites while the car is
+    // anywhere between just under its base and just over its coping, so you
+    // can neither slip beneath it on a falling shelf nor ride up onto it; a
+    // car genuinely above the coping (a big jump) passes over, which is the
+    // one way a wall should ever be cleared.
+    if (t.barriers && t.barriers.length) {
+      const R = 1.7;                       // car half-width against masonry
+      // RESOLVE THE WORST INTRUSION, NOT THE FIRST ONE FOUND. Walking the
+      // list in order and fixing the first few overlaps leaves the deepest
+      // one unfixed when it happens to sit later in the array: measured on
+      // VINEYARD VELOCE, a car ended a frame 0.62 u inside a wall whose
+      // standoff is 2.13. Each pass finds the deepest overlap and pushes out
+      // of that one; two passes settle a joint, where clearing one block
+      // seats the car against its neighbour.
+      for (let pass = 0; pass < 2; pass++) {
+        let w = null, wd = 0, wcx = 0, wcz = 0, wrr = 0;
+        for (let i = 0; i < t.barriers.length; i++) {
+          const q = t.barriers[i];
+          if (this.pos.y > q.y + q.h + 1.0) continue;   // cleared the coping
+          const ex = q.x2 - q.x1, ez = q.z2 - q.z1;
+          const len2 = ex * ex + ez * ez || 1;
+          let s2 = ((this.pos.x - q.x1) * ex + (this.pos.z - q.z1) * ez) / len2;
+          s2 = s2 < 0 ? 0 : s2 > 1 ? 1 : s2;
+          const cx = q.x1 + ex * s2, cz = q.z1 + ez * s2;
+          const dx = this.pos.x - cx, dz = this.pos.z - cz;
+          const rr = q.hw + R;
+          const d2 = dx * dx + dz * dz;
+          if (d2 >= rr * rr) continue;
+          const depth = rr - Math.sqrt(d2);
+          if (depth > wd) { wd = depth; w = q; wcx = cx; wcz = cz; wrr = rr; }
+        }
+        if (!w) break;
+        const dx = this.pos.x - wcx, dz = this.pos.z - wcz;
+        const d = Math.max(0.001, Math.hypot(dx, dz));
+        const nx = dx / d, nz = dz / d;
+        const vApp = this.vel.x * nx + this.vel.z * nz;
+        const spd = Math.hypot(this.vel.x, this.vel.z);
+        const square = THREE.MathUtils.clamp(-vApp / Math.max(3, spd), 0, 1);
+        this.pos.x = wcx + nx * wrr;
+        this.pos.z = wcz + nz * wrr;
+        if (vApp < 0) {
+          this.vel.x -= nx * vApp * 1.05;
+          this.vel.z -= nz * vApp * 1.05;
+          this.vel.multiplyScalar(1 - 0.07 * square);
+          if (this.wallGrind <= 0) {
+            this.wallGrind = square < 0.55 ? 0.55 : 0.18;
+            if (this === gm.player && gm.onSolidCrash) {
+              gm.onSolidCrash({ mat: w.mat || 'stone' }, this, Math.abs(vApp), nx, nz, square);
+            } else {
+              _hitNormal.set(nx, 0, nz);
+              this.onWallHit(_hitNormal, Math.abs(vApp));
+            }
           }
         }
       }
