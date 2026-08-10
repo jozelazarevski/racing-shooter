@@ -16,7 +16,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard } from './types';
-import { bundle, strut } from './kit';
+import { bundle, strut } from '../../templates/geometry';
 
 const HALF = 0.22;            // stiles 0.44 apart — one person, both hands
 const OUT = -0.12;            // standoff from the face, for boots

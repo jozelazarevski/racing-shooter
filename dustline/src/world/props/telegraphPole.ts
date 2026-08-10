@@ -25,7 +25,7 @@
 // wires arrive they belong to whatever places the run, not to the pole.
 
 import { PropTemplate, standard, mergeGeoms, beam, cylinderAt, coneAt } from './types';
-import { strut } from './kit';
+import { strut } from '../../templates/geometry';
 
 const ARM_LO = 6.7, ARM_HI = 7.45;   // crossarm centres
 const ARM_T = 0.11;                  // arm thickness, so an insulator sits on ARM + half

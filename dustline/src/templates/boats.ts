@@ -17,8 +17,14 @@
 // are baked into the geometry at build time. The numbers are unchanged.
 
 import * as THREE from 'three';
-import { PropPart, standard, mergeGeoms } from './types';
-import { boatHull, strut, bundle, sailGeo, afloat } from './kit';
+import { standard, mergeGeoms } from './geometry';
+// TYPE ONLY, and it has to stay that way: a template describes shapes, and the
+// only thing it needs from the component contract is the shape of the object it
+// hands back. `import type` is erased at build time, so templates have no
+// runtime dependency on `world/props/` at all — which is the property
+// `tools/verify-templates.mjs` exists to keep true.
+import type { PropPart } from '../world/props/types';
+import { boatHull, strut, bundle, sailGeo, afloat } from './geometry';
 
 /** `DECK` in the marina builder — the deck datum in the hull's own frame. */
 export const DECK = 1.0;
@@ -196,4 +202,9 @@ export function dayRigGeo(): THREE.BufferGeometry {
 export const mastGeo = (h: number) => new THREE.CylinderGeometry(0.09, 0.14, 9.4, 12)
   .scale(1, h, 1).translate(0, DECK + 4.7 * h, 0.05);
 
+// RE-EXPORTED, NOT REDEFINED. A boat component wants the hull and the paint in
+// one import, and these are the very symbols imported from `./geometry` above —
+// not copies of them — so the barrel in `index.ts` sees one declaration per
+// name and `export *` has nothing to disambiguate. Redeclaring any of them here
+// is what would silently make the barrel drop it.
 export { mergeGeoms, standard, afloat, bundle, strut };

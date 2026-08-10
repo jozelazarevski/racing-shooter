@@ -3,7 +3,7 @@
 //
 // SHAPE FROM IGNITE RALLY: `HOUSE_TEMPLATES.watchtower`.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'watchtower',

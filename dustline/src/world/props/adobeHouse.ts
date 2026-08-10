@@ -11,7 +11,7 @@
 // dark brown, which is what the vigas need — the two Mediterranean kits paint
 // trim green for shutters, and green beam ends look like a mistake.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'adobeHouse',

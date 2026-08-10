@@ -24,7 +24,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, beam } from './types';
-import { bundle } from './kit';
+import { bundle } from '../../templates/geometry';
 
 const N = 12;                 // steps in the flight
 const RISE = 0.2;             // shallow and deep: these are worked in wet boots

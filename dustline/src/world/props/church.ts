@@ -5,7 +5,7 @@
 // map, which makes it what tells you where the village is while you are still
 // driving towards it.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'church',

@@ -4,7 +4,7 @@
 // the repository root. One of the three original scattered dwellings: the massing differs from
 // cottageA, not the tint, which is the whole reason there is more than one.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'cottageHipped',

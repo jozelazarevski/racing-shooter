@@ -19,7 +19,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, mergeGeoms, beam, cylinderAt, sphereAt } from './types';
-import { strut } from './kit';
+import { strut } from '../../templates/geometry';
 
 const R = 2.2;              // circumradius to the centre of each rim panel
 const WALL = 0.34;          // rim thickness, radial

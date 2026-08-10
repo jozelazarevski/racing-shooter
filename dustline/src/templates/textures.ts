@@ -31,7 +31,7 @@
 //      same flecks come from a fixed stream instead.
 
 import * as THREE from 'three';
-import { Rng } from '../../core/rng';
+import { Rng } from '../core/rng';
 
 /** Where the windows sit in the 256x256 wall tile. Shared by the albedo and
  *  the emissive companion so the glow lands exactly on the glass. */

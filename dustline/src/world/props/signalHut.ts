@@ -15,7 +15,7 @@
 // walls rather than at the mast — right, because the mast is a thin pole and
 // the walls are what you actually hit.
 
-import { dwelling } from './houseTemplates';
+import { dwelling } from '../../templates/buildings';
 
 export default dwelling({
   id: 'signalHut',

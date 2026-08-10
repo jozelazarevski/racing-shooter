@@ -27,7 +27,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, mergeGeoms, beam } from './types';
-import { strut } from './kit';
+import { strut } from '../../templates/geometry';
 
 const HALF_X = 7.5;          // 15 m deck
 const LEN_Z = 24;            // span, end to end
