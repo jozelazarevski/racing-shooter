@@ -1069,6 +1069,14 @@ class Game {
     }
 
     this._renderLevelCards();
+    // PAINT THE BUTTON ON THE WAY IN, not only after something changes it.
+    // _syncStartButton runs on a level pick, a car pick, an upgrade and a mode
+    // switch — none of which happen on a plain page load, so a boot straight
+    // into a world the current car is wrong for showed the bare "START RACE"
+    // from the HTML and said nothing about the grip it was about to cost. The
+    // career's own next-world transition is a page load, so this is the
+    // ordinary path, not just a hand-typed URL.
+    this._syncStartButton();
 
     // mode chips: RACE | FREE ROAM | MISSIONS
     const msel = document.getElementById('mode-select');
@@ -1645,10 +1653,12 @@ class Game {
     // ladder again — buy the snow set once and every world in the game opens,
     // which is the single-decision garage this replaces. Capping the overshoot
     // at one class is what makes the roster mutually exclusive: an all-terrain
-    // machine is barred from the sealed circuits (37 worlds) exactly as a road
-    // car is barred from the loose stages, and NO SINGLE CAR COVERS THE
-    // ROSTER. The starter is legal on 53 of 58 and slow on the circuits, so
-    // there is a reason to buy in both directions.
+    // machine is priced out of the sealed circuits exactly as a road car is
+    // priced out of the loose stages, and NO SINGLE CAR COVERS THE ROSTER.
+    // Counts deliberately not written down here: they were "53 of 58" against
+    // a 57-world roster, because a number typed into a comment stops being
+    // true the moment a world is appended. Measure it if you need it —
+    // `LEVELS.filter((l) => carFitness(l.id).ok).length`.
     // `ok` now means "in the ideal window", not "allowed to race" — nothing
     // is barred any more. One eligible car per surface turned the roster into
     // one car per trail, reported as exactly that; the mismatch is priced in
@@ -2061,11 +2071,12 @@ class Game {
    *  again, which is the entire point of replacing the podium chain.
    *
    *  The first three are free, so there is a real choice from the very first
-   *  race, and the last world costs (roster - 3) of a possible 3x roster — on
-   *  the 32 worlds that ship today, 29 of 96, so two thirds of the roster can
-   *  go unraced and the finale is still reachable. Deliberately written as a
-   *  relation and not the old fixed "19 of 63", which was true of a 21-world
-   *  roster and quietly stopped being true as worlds were appended. */
+   *  race, and the last world costs (roster - 3) of a possible 3x roster, so
+   *  two thirds of the roster can go unraced and the finale is still
+   *  reachable. Deliberately written as a relation and never as a count: the
+   *  fixed "19 of 63" was true of a 21-world roster, "29 of 96" was true of a
+   *  32-world one, and both quietly stopped being true as worlds were
+   *  appended — which is the whole argument for the relation. */
   starCost(id) {
     const i = LEVELS.findIndex((l) => l.id === id);
     // a level may carry its own price — see the MEDITERRANEAN note in the

@@ -4,7 +4,7 @@ A bright, cartoon toy-car combat racer in the spirit of the classic *Ignition*
 (1997), playable entirely in the browser — on desktop **and phones** (full
 touch controls). Race 3 laps against the **Voxel Racers** — CROWN, SLEEK,
 DUNE, ALPINE and PIT-99, each a distinct liveried block-built machine — on a
-championship of **eighteen themed worlds across six regions** — from PINE
+championship of **fifty-seven themed worlds across fourteen regions** — from PINE
 VALLEY and the SUMMIT CLIMB switchbacks, through DUST CANYON's dune
 sweeps, live-rockfall ravine and scorpion-guarded oasis, FROST PEAK's
 glacier sheet ice and avalanche-chased mountain pass, the burning FOREST
@@ -83,7 +83,7 @@ on the buttons. Works in portrait and landscape.
 
 ## Gameplay
 
-- **18 worlds in 6 regions, 3 laps each, 6 racers.** Finish a world to unlock
+- **57 worlds in 14 regions, 3 laps each, 6 racers.** Finish a world to unlock
   the next; the results screen chains you onward and your score carries over.
 - **Dynamic hazards** (per world, spec in `RULES.md`): live rockfall, falling
   burning trees and shattering icicles; sand-geyser launch pads; water-flume

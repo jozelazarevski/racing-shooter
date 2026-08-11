@@ -2,13 +2,26 @@
 // Checks per world: AI progress/stuck, NaN, falling through terrain, lap
 // detection, pickup reachability, hazard sanity, and page errors.
 import { chromium } from 'playwright-core';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// THE ROSTER IS DATA, NOT A NUMBER TYPED HERE. This loop read `lvl <= 28`
+// against a roster that had grown to 57, so every MEDITERRANEAN, GRAND
+// CIRCUITS, HEARTLAND, FARMLAND, OUTBACK and OLD TOWN world went unswept —
+// and six of the eight worlds carrying the most misplaced scenery were in
+// that unswept range. Read levels.js and a world added tomorrow is swept
+// tomorrow.
+const ROSTER = [...fs.readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/world/levels.js'), 'utf8')
+  .matchAll(/\{\s*id:\s*(\d+),/g)].map((m) => +m[1]);
+
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const bugs = [];
 const note = (lvl, name, detail) => { bugs.push({ lvl, name, detail }); console.log(`  BUG  L${lvl} ${name}: ${detail}`); };
 
-// 28 worlds now (21 originals + the WORLD RALLY routes) — the three ALPINE PASSES were added after this loop was written
-// and were quietly going unswept.
-for (let lvl = 1; lvl <= 28; lvl++) {
+console.log(`sweeping ${ROSTER.length} worlds`);
+for (const lvl of ROSTER) {
   const page = await b.newPage({ viewport: { width: 800, height: 520 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   let name = `L${lvl}`;

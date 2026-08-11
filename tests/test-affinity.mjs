@@ -9,6 +9,14 @@
 // a driver-free calculation from the physics constants (paceEstimate), and this
 // suite checks the properties that calculation must have.
 import { chromium } from 'playwright-core';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// roster from levels.js — this file used to stop at 21 of 57
+const ROSTER = [...fs.readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/world/levels.js'), 'utf8')
+  .matchAll(/\{\s*id:\s*(\d+),/g)].map((m) => +m[1]);
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -29,7 +37,7 @@ const boot = async (lvl) => {
 
 // ---- 1. the world-character tags still match the real geometry
 const drift = [];
-for (let lvl = 1; lvl <= 21; lvl++) {
+for (const lvl of ROSTER) {
   await boot(lvl);
   const r = await page.evaluate(() => {
     const g = window.__game, t = g.track;
@@ -144,7 +152,7 @@ for (const [lvl, surf, mustDiffer] of [[3, 'snow', true], [2, 'dry', false]]) {
 // the pick is a hole in the garage, and the point of the system is switching.
 {
   const wins = new Map();
-  for (let lvl = 1; lvl <= 21; lvl++) {
+  for (const lvl of ROSTER) {
     await boot(lvl);
     const top = await page.evaluate(() => {
       const rows = [...window.__rateCarsFor(window.__game.track)]

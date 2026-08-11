@@ -4757,6 +4757,10 @@ export class Track {
           const j = (sec.i0 + k) % N;
           const lat = (this.widthAt(j) + 0.45 + CAR_R + 0.2) * side;
           const p = this.pointAt(j, lat);
+          // the teeth below get this check and say why; the posts flagging the
+          // same squeeze were placed on the lateral alone, and landed in the
+          // lane on three worlds
+          if (!this._clearsRoad(p.x, p.z, 0.45, 0.6)) continue;
           const post = new THREE.Mesh(postGeo, postMat);
           post.position.set(p.x, p.y + 1.05, p.z);
           post.castShadow = true;
@@ -6597,8 +6601,23 @@ export class Track {
     const steel = new THREE.MeshStandardMaterial({
       color: 0x4a4640, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
     });
+    // THE GANTRY STRADDLES THE START LINE, AND THE LAP COMES BACK PAST IT.
+    // The towers sat at a flat 12.5 u either side, which is clear of the road
+    // at sample 0 and inside it wherever the circuit loops back within a dozen
+    // units of its own start — TOUR DE CORSE, VINEYARD VELOCE and RALLYCROSS
+    // ARENA each had a tower's legs standing in the racing line, on the fast
+    // part of the lap. The span now opens until both towers stand clear of
+    // every stretch of road, and the banner between them just gets wider.
+    let span = 12.5;
+    for (let s = 12.5; s <= 22; s += 0.5) {
+      const clear = [1, -1].every((side) =>
+        [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]].every(([ox, oz]) =>
+          this._clearsRoad(c.x + n.x * s * side + ox, c.z + n.z * s * side + oz, 0.6, 0.9)));
+      if (clear) { span = s; break; }
+      span = s;                       // nothing clears: keep the widest tried
+    }
     for (const side of [1, -1]) {
-      const bx = c.x + n.x * 12.5 * side, bz = c.z + n.z * 12.5 * side;
+      const bx = c.x + n.x * span * side, bz = c.z + n.z * span * side;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
         const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 10, 8), steel);
         leg.position.set(bx + ox, 5, bz + oz);
@@ -6621,7 +6640,7 @@ export class Track {
       this._checkerFlag(bx, 11.8, bz);
     }
     const banner = new THREE.Mesh(
-      new THREE.BoxGeometry(26, 2.4, 0.5),
+      new THREE.BoxGeometry(span * 2 + 1, 2.4, 0.5),   // spans whatever the towers opened to
       new THREE.MeshStandardMaterial({ map: wallTexture(), roughness: 0.85 })
     );
     banner.material.map = wallTexture();
@@ -6635,7 +6654,7 @@ export class Track {
     const finTex = finishBannerTexture();
     for (const flip of [0, Math.PI]) {
       const fin = new THREE.Mesh(
-        new THREE.PlaneGeometry(24, 2.15),
+        new THREE.PlaneGeometry(span * 2 - 1, 2.15),
         new THREE.MeshStandardMaterial({ map: finTex, roughness: 0.85 })
       );
       fin.position.set(c.x, 9, c.z);
@@ -10609,6 +10628,8 @@ export class Track {
     let cgk = 0;
     for (const cn of [[-SPAN * 0.62, 1], [SPAN * 0.18, -1], [SPAN * 0.72, 1]]) {
       const p = at(cn[0], -19);        // up by the wall, not out on the sand
+      // a gun on the quay, never on the road that runs along it
+      if (!this._clearsRoad(p.x, p.z, 1.5, 1.0)) continue;
       const gy = this.terrainHeight(p.x, p.z);
       // A GUN POINTS OUT TO SEA. `yaw` maps local +X seaward, so the +-PI/2 the
       // first version used laid the barrel ALONG the quay, aimed at the next
@@ -16274,7 +16295,20 @@ export class Track {
   _buildGrandstand() {
     // stepped stand full of spectators near the start line
     const i = (N - 40 + N) % N;
-    const p = this.pointAt(i, WALL_OFF + 16);
+    let p = this.pointAt(i, WALL_OFF + 16);
+    // A 20-UNIT STAND PLACED ON A LATERAL CAN STILL LAND ON THE ROAD. The
+    // offset clears the carriageway at sample i and says nothing about the
+    // stretch that loops back behind it — measured, the front face stood in
+    // the racing line on six worlds. Step it back until the whole front face
+    // is clear of every part of the lap.
+    const faceClear = (q) => [-7, 0, 7].every((off) =>
+      this._clearsRoad(q.x + this.tan[i].x * off, q.z + this.tan[i].z * off, 2.5, 1.0));
+    if (!faceClear(p)) {
+      for (let extra = 4; extra <= 24; extra += 4) {
+        const q = this.pointAt(i, WALL_OFF + 16 + extra);
+        if (faceClear(q)) { p = q; break; }
+      }
+    }
     // STAND IT ON THE GROUND, not at road height. `pointAt` returns the ROAD's
     // elevation, and this sits 26 u off the centreline where the terrain has
     // usually fallen away — measured on FURKA RIDGE the stand and all three of
@@ -17136,6 +17170,14 @@ export class Track {
         for (const sg of [1, -1]) {
           const mx = c.p.x + Math.sin(rYaw) * sg * (hw + 1.0);
           const mz = c.p.z + Math.cos(rYaw) * sg * (hw + 1.0);
+          // THE OFFSET IS ALONG THE RIVER, AND THE ROAD IS NOT ALWAYS ACROSS
+          // IT. `rYaw` is the water's bearing, so these markers only land on
+          // the shoulders when the stream crosses square. At any other angle
+          // both posts stand IN the crossing: measured on PINE VALLEY at
+          // lateral 5.3 and -7.1 of a road whose half-width is 9, and 50 of
+          // them in the racing line across 19 worlds. A marker you hit is not
+          // a marker, so one that cannot stand clear is not built.
+          if (!this._clearsRoad(mx, mz, 0.35, 0.6)) continue;
           const gy = this.terrainHeight(mx, mz);
           const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 2.2, 8),
             new THREE.MeshStandardMaterial({ color: 0xe8e4d8, roughness: 0.9 }));
@@ -17214,6 +17256,16 @@ export class Track {
       for (const sg of [1, -1]) {
         const px = c.p.x + Math.sin(roadYaw) * sg * (ROAD_HALF + 1.1);
         const pz = c.p.z + Math.cos(roadYaw) * sg * (ROAD_HALF + 1.1);
+        // OFFSET IS NOT DISTANCE — the same lesson the headwall above already
+        // carries, and the reason it calls _clearsRoad. `ROAD_HALF + 1.1` is
+        // clear of the road AT THIS SAMPLE and can be dead centre of another
+        // one where the lap curls back under it. Measured with an autopilot
+        // over all 57 worlds, this line alone put 106 stone colliders in the
+        // racing line across 17 worlds - PINE VALLEY's sat at lateral 0.4 -
+        // and the car parked against them on OASIS AMBUSH and OUNINPOHJA.
+        // A parapet is dressing; dressing that cannot stand clear of the road
+        // does not get built.
+        if (!this._clearsRoad(px, pz, 1.4, 0.8)) continue;
         const par = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.95, hw * 2 + 9), cap);
         par.position.set(px, deck + 0.45, pz);
         par.rotation.y = roadYaw + Math.PI / 2;
