@@ -124,6 +124,35 @@ separation (or a deliberate bridge where the sketch says "crossing") —
 mainline's call, since the routes are its design. test-field-stalls stays RED
 on 56/57/60 as the definition of done.
 
+**r153d (dustline session): two player-reported bugs fixed, one lead handed
+over.** (1) LAP 1/1 on three-lap circuits — `lapsTotal` was read once in the
+Game CONSTRUCTOR, so it described whichever world the page BOOTED on for the
+whole session. FURKA RIDGE is the only `laps: 1` world; boot there, swap
+anywhere (r152 picker, next-level, menu all swap in place) and the campaign
+silently became one lap. Fixed in `swapLevel` beside the other per-level
+refreshes — seed, track, theme and particles were all already recomputed
+there and this was the one sibling left behind. (2) A car wedged on a chasm
+face at 0 km/h with the throttle held: the recovery net only rescued cars
+UNDER the terrain, so on-the-ground-but-immovable was unhandled. Player-only,
+five seconds of full throttle with no motion. Both have standing tests
+(`test-lap-count.mjs`, `test-wedge-recovery.mjs`), both mutation-tested,
+`test-walls` still 12/12.
+
+**INVISIBLE WALLS — unresolved, with the suspects narrowed.** Two reports on
+r153c. `tests/tool-corridor-solids.mjs` (new) sweeps every world for solids
+reaching into the carriageway. It cleared BOTH of this session's recent
+changes: the r153b horizon solids never appear (>= 360 u from any road) and
+the r153c kink relaxation cannot be it (`this.curve` is read only during
+construction, so nothing is placed off the un-relaxed path). Everything the
+sweep does list has a visible mesh beside it. THE LIVE HYPOTHESIS, untested:
+the lateral clamp reads `widthAt(trackIndex)`, and `nearestIndex` is
+hint-windowed +-30 precisely so a car keeps its own leg through an overpass
+stack — where two legs share XZ (the first screenshot is a start grid UNDER
+an overpass, and it is the same geometry as the field-stall pile) an index
+that snaps to the wrong leg would clamp the car against a road edge belonging
+somewhere else. One mechanism that would explain both reports and the stalls.
+Fair game for whoever gets there first.
+
 **Unclaimed findings** (fair game for whoever gets there first, say so here):
 BUGS.md #2's four unexplained stalls (NORDSCHLEIFE, DOLOMITI, SUMMIT,
 MOUNTAIN TO SEA decks), #6 (roster-wide sweep in the standing suites),
