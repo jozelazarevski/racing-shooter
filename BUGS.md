@@ -33,19 +33,36 @@ Two things had to be solved first, and both are worth knowing:
 - **Five worlds refuse the stock car** (see #5). Fitted with snow tyres they
   drive clean.
 
-## The findings
+## Status
 
-| # | What | Severity | Worlds |
-|---|---|---|---|
-| 1 | Trackside furniture standing in the drivable lane | **high** | 29 of 57 |
-| 2 | The agent parked against it — 7 stalls | **high** | 6 |
-| 3 | MOUNTAIN TO SEA crosses itself at its own height — 58 times | **high** | 1 |
-| 4 | Wall runs laid inside the road width | med | 2 |
-| 5 | START looks armed on a world that refuses it | med | 5 |
-| 6 | Half the roster is not swept by the existing suites | med | — |
-| 7 | Player sank 7.4 u under the terrain (once, unreproduced) | med | 1 |
-| 8 | Three worlds lap at half the roster's pace | low | 3 |
-| 9 | Documented counts no longer match the roster | low | — |
+Everything below was found on the roster as it stood at the top of this
+branch. All of it has since been fixed on the same branch except where the row
+says otherwise, and every fix was re-measured rather than assumed. The numbers
+in each section are the ones that were found; the status line says where it
+stands now.
+
+| # | What | Severity | Worlds | Now |
+|---|---|---|---|---|
+| 1 | Trackside furniture standing in the drivable lane | **high** | 29 of 57 | **fixed** — 211 → 0 |
+| 2 | The agent parked against it — 7 stalls | **high** | 6 | **fixed** — 7 → 0 |
+| 3 | Flyover parapets in the road under them | **high** | 2 | **fixed** — see #3 |
+| 3b | A car under a flyover collided with its parapet | **high** | roster-wide | **fixed** — MOUNTAIN TO SEA 0.18 → 1.09 laps/min |
+| 4 | Wall runs laid inside the road width | med | 2 | **fixed** |
+| 5 | START looks armed on a world that refuses it | med | 5 | **fixed** — gate itself removed upstream by r151 |
+| 6 | Half the roster is not swept by the existing suites | med | — | **fixed** |
+| 7 | Player sank 7.4 u under the terrain (once, unreproduced) | med | 1 | **open** — never reproduced |
+| 8 | Three worlds lap at half the roster's pace | low | 3 | **open** — TOUR DE CORSE still 23 % off-road |
+| 9 | Documented counts no longer match the roster | low | — | **fixed** |
+| 10 | Routes that cross themselves at their own height | med | 2 | **open by design** — see below |
+
+**#10, the one that is left.** OLIVE CROSSING crosses itself 11 times and
+MOUNTAIN TO SEA 39 times with under 4 u of vertical separation. The overpass
+planner asks for 11.5 u of lift and its eroder is allowed to take that back,
+deliberately — in a dense knot a road you cannot drive up is worse than a low
+deck. Both worlds now drive cleanly, because the dressing no longer pretends
+there is a bridge where there is no clearance, and a crossing at grade is a
+junction. But the routes still ask for more crossings than the terrain can
+lift, and that is a route-design decision, not a bug to patch in the builder.
 
 ---
 
@@ -158,6 +175,30 @@ stalls, both on an elevated deck with the terrain 6–9 u below.
 
 Either give the crossings real vertical separation or route them through the
 tunnel/bridge machinery the other Mediterranean worlds use.
+
+---
+
+## 3b. A car under a flyover collided with its parapet
+
+Found while fixing #3, and the deepest thing in this report.
+
+The barrier test knew when a car had **cleared** a wall — `pos.y` above the
+coping — and nothing about a car **underneath** one. A wall spans `y` to
+`y + h`, so a parapet on a deck ten units overhead was still a wall in the face
+of anything driving the leg below it.
+
+MOUNTAIN TO SEA carries nine crossings on one lap, which is what made it
+visible: driven, the whole field was pinned within a few samples of the grid —
+the agent covering **0.18 of a lap in a minute** against a roster median of
+1.39, the five rivals moving **0.003 between them**, one of them dead where it
+stood. It read as a world with impassable scenery; it was the physics.
+
+With the test completed — a car more than a car's height below a wall's base is
+under it, not against it — the same world drives **1.09 laps** in the minute
+with no stalls, and the rivals race. `src/vehicles.js`, the `t.barriers` block.
+
+This one was roster-wide in reach: every world with a flyover was paying some
+of it.
 
 ---
 
