@@ -11446,6 +11446,14 @@ export class Track {
     if (this._inWater(x, z)) return false;
     if (this._onQuayStrip(x, z)) return false;
     if (this._erased(x, z)) return false;
+    // AND NOT IN THE ROAD. This gate knew about water, quay and its own
+    // neighbours, and nothing at all about the carriageway — so anything
+    // placed on a lateral offset from a bend could pass it and still stand in
+    // the lane where the lap curls back. ESTONIA CRESTS had a log pile beside
+    // the hero bridge sitting 5.4 u from a centreline whose half-width is 9.
+    // Every structure in the game comes through here, so the rule belongs
+    // here rather than at each of its callers.
+    if (!this._clearsRoad(x, z, r, 1.0)) return false;
     const h = this.terrainHeight(x, z);
     for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r],
       [r * 0.7, r * 0.7], [-r * 0.7, -r * 0.7], [r * 0.7, -r * 0.7], [-r * 0.7, r * 0.7]]) {
@@ -11996,6 +12004,13 @@ export class Track {
     for (let k = 0; k < n; k++) {
       const d = (k - (n - 1) / 2) * 3.1;
       const wx = x + cs * d, wz = z + sn * d;
+      // A RUN IS LAID FROM A CENTRE AND A BEARING, so a wall that starts clear
+      // of the road can walk into it — measured on HEDGEROW DASH and OULTON
+      // PARK, field walls lay at lateral 8.0 and 7.4 of a road that advertises
+      // 9. Blocks that would stand in the lane are simply left out of the run;
+      // a stone wall with a gap in it is a stone wall, and a stone wall across
+      // the racing line is a crash.
+      if (!this._clearsRoad(wx, wz, 1.7, 0.8)) continue;
       const wy = this.terrainHeight(wx, wz) - 0.3;
       const wh = 1.15 + Math.random() * 0.3;
       B.box.push({
