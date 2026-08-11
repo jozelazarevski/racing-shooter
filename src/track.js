@@ -10909,7 +10909,7 @@ export class Track {
         // player's screenshot could be driven straight into and over. The
         // barrier runs the full span at its real thickness and height.
         this._barrier(wall.position.x, wall.position.z, Math.sin(yaw), Math.cos(yaw),
-          span * 2 * this.segLen, 1.1, this.center[i].y - 0.2, 1.6);
+          span * 2 * this.segLen, 1.1, this.center[i].y - 0.2, 1.6, 'stone', true);
         // arch faces: two masonry blocks descending under the deck
         for (const k of [-span * 0.55, span * 0.55]) {
           const j = (i + Math.round(k) + N) % N;
@@ -11046,7 +11046,7 @@ export class Track {
           // segment, so the run has no seam for a nose to find.
           this._barrier(rail.position.x, rail.position.z,
             this.tan[j].x, this.tan[j].z, 2 * this.segLen + 0.8, 0.7,
-            c.y - 0.2, 1.5, 'stone');
+            c.y - 0.2, 1.5, 'stone', true);   // a deck rail: cars pass under it
         }
         if (Math.abs(sN) % 8 === 0) {
           const ground = this.terrainHeight(c.x, c.z);
@@ -11987,19 +11987,22 @@ export class Track {
    *  passing a heading to a cos/sin helper is the exact mistake that laid a
    *  hairpin's parapets out as a comb of piano keys. A vector cannot be
    *  misread. */
-  _barrier(x, z, dirX, dirZ, len, thick, y, h, mat = 'stone') {
+  /** `deck`: this wall is the parapet of a BRIDGE — there is a road under it,
+   *  and a car driving that road passes beneath (see the barrier under-gate
+   *  in vehicles.js). Only the two deck builders pass it.
+   *
+   *  This is declared, not inferred. It was first written as "its base stands
+   *  more than 3 u above the terrain at its own footprint", which is true of
+   *  a flyover rail AND of GOTTHARD's switchback retaining walls, whose
+   *  footprint terrain is the hillside falling away beside them: measured,
+   *  that let a car drive clean through the masonry on one approach in five.
+   *  A bridge knows it is a bridge; nothing else has to be guessed at. */
+  _barrier(x, z, dirX, dirZ, len, thick, y, h, mat = 'stone', deck = false) {
     const dl = Math.hypot(dirX, dirZ) || 1;
     const hl = len / 2, ux = (dirX / dl) * hl, uz = (dirZ / dl) * hl;
-    // `over`: this wall has AIR under it — its base stands well clear of the
-    // ground at its own footprint (a flyover rail above a road or a gorge).
-    // Only these may be passed beneath (see the barrier under-gate in
-    // vehicles.js). A wall SEATED on its ground — a bank wall above a sunken
-    // approach, GOTTHARD's switchback masonry — keeps stopping a car coming
-    // from below, because there the "under" side is solid earth, not air.
     this.barriers.push({
       x1: x - ux, z1: z - uz, x2: x + ux, z2: z + uz,
-      hw: thick / 2, y, h, mat,
-      over: y - this.terrainHeight(x, z) > 3,
+      hw: thick / 2, y, h, mat, over: deck,
     });
   }
 
