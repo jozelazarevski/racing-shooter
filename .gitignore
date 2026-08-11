@@ -11,3 +11,4 @@ node_modules/
 /.sweep/
 /tests/agent-sweep-report.json
 /tests/world-matrix.json
+/track-matrix.html
