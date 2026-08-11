@@ -62,6 +62,41 @@ The new solids sit >=360 u from every road; the 1-24 u clearances a sweep
 will find on COL DE TURINI / GOTTHARD / OLIVE COAST are r148's own massif
 cones hugging alpine roads, pre-existing and by design — do not "fix" them.
 
+**The field-stall family (BUGS.md #2) is reproduced fixed-step, quantified,
+and partially eliminated — dossier for whoever fixes it (dustline session,
+2026-08-11).** Two more user photographs arrived: the whole field parked under
+MOUNTAIN TO SEA's deck, and a pile at OLIVE CROSSING's crossing ("Bridge needs
+to be raised higher"). `tests/test-field-stalls.mjs` (new, deliberately RED on
+57/56/60) reproduces it: under a true 1/60 step the rival field runs 0.13 /
+0.30 / 0.70 laps in 90 game-seconds on MOUNTAIN TO SEA / OLIVE CROSSING /
+SEA CLIFF RUN, against 1.9-2.1 on PINE VALLEY, TREMOLA and SUMMIT CLIMB.
+Jam sites are stable: 57 at (4,-72) frac 0.12, 56 at (-80,130) frac 0.29,
+60 at (-82,-58) frac 0.67.
+
+Eliminated (all measured): racing-line curvature / width / `_speedInv`
+(healthy, equal to PINE VALLEY's); traffic (none spawns on these themes);
+the grid position (rotating the route moved the start — the jam stayed at the
+same world coordinates); at-grade corridor overlap ALONE (56's jam site has
+28 u of vertical leg separation, 60's has 11 u — though real at-grade
+overlaps DO exist, see below). Stalled rivals sit at FULL THROTTLE, v 0-6,
+legal lateral, correct index, alive. Whatever pins them is physical and local
+to those three sites.
+
+Two real authoring facts found on the way, independent of the stall:
+`tools`→`tests/tool-overlap-census.mjs` shows MOUNTAIN TO SEA runs two legs
+of its lap 1.3-2.8 u apart for up to 62 u (shared tarmac, opposing traffic)
+and OLIVE CROSSING's west knot passes 3-12 u with a 0.3 u height gap — the
+"raise the bridge" request is engineering-correct there whatever the stall
+turns out to be. A near-miss extension to `_planOverpasses` was tried and
+REVERTED: the dedup-vs-existing-crossings and the erosion pass made it a
+no-op in exactly the dense knots it targeted.
+
+**MEASURE FIXED-STEP OR MEASURE NOTHING** (re-learned the hard way): headless
+SwiftShader runs these heavy worlds at a few fps with dt capped at 50 ms, so
+wall-clock probes run the sim at ~1/8 speed — `raceTime` read 1.8 s after 20
+real seconds, and every wall-clock "stall" observation before that discovery
+was an artifact. Same trap as BUGS.md #8.
+
 **Unclaimed findings** (fair game for whoever gets there first, say so here):
 BUGS.md #2's four unexplained stalls (NORDSCHLEIFE, DOLOMITI, SUMMIT,
 MOUNTAIN TO SEA decks), #6 (roster-wide sweep in the standing suites),
