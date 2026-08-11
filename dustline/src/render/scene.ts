@@ -34,7 +34,15 @@ export function buildRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
     canvas, antialias: true, powerPreference: 'high-performance',
   });
   renderer.setSize(innerWidth, innerHeight);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  // v1 `src/main.js:862` clamps a touch device to 1.75 rather than 2, and the
+  // port dropped that clamp in the same change that gave dustline phone
+  // controls — which is the worst possible time to lose it. A DPR-3 phone at
+  // 2.0 draws (2.0/1.75)^2 = 1.31x the pixels v1 asks of the same handset, for
+  // a difference nobody can see at that density. Detection is `pointer: coarse`
+  // to match `ui/touch.ts`; the two must agree or the budget goes to a machine
+  // that has no thumb pads on it.
+  const coarse = matchMedia?.('(pointer: coarse)').matches ?? false;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, coarse ? 1.75 : 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   // v1 `src/main.js:871`, kept at v1's value. Its comment records the reason:
   // "Lifted from 1.12 after the lighting retune measured 35 % darker overall
@@ -75,7 +83,15 @@ export function buildWorld(scene: THREE.Scene, def: TrackDef, startX = 0, startZ
     .normalize().multiplyScalar(SUN_DIST);
   sun.position.copy(offset);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  // 1024 on a phone, 2048 elsewhere — v1 `src/main.js:889` makes the same
+  // split. A shadow map is a full depth pass over everything that casts, so
+  // 2048 is 4x the texels and 4x the bandwidth of 1024, and it buys resolution
+  // that a 6-inch screen cannot resolve at this frustum size. Same
+  // `pointer: coarse` test as the pixel-ratio clamp above, deliberately: the
+  // two decisions are one decision about what device this is.
+  const touchDevice = matchMedia?.('(pointer: coarse)').matches ?? false;
+  const shadowRes = touchDevice ? 1024 : 2048;
+  sun.shadow.mapSize.set(shadowRes, shadowRes);
   const sc = sun.shadow.camera;
   sc.left = -SHADOW_HALF; sc.right = SHADOW_HALF; sc.top = SHADOW_HALF; sc.bottom = -SHADOW_HALF;
   // v1 `src/main.js:892` is near 10 / far 400 around a 72-unit half-frustum;

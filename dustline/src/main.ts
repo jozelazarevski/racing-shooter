@@ -12,6 +12,18 @@
 // Ported with it: v1's moving shadow rig (`_updateCamera`, `src/main.js:1918`),
 // which re-aims the sun at the player every frame; the light itself and its
 // tuning live in `render/scene.ts`.
+//
+// AND IT IS DRIVABLE WITH TWO THUMBS. Every reference image for this game is a
+// portrait phone screenshot with on-screen controls, and until this line the
+// game had no touch input at all — `core/input.ts` was keyboard and gamepad,
+// so on the device it is aimed at the car did not move. `ui/touch.ts` carries
+// v1's tuned joystick across; the two lines here are all the wiring it needs.
+//
+// A NOTE ON WHY THAT WIRING IS CALLED OUT. The ported modules landed as dead
+// code first — `sky.ts`, `skidMarks.ts` and `touch.ts` all existed, all
+// typechecked, and none of them had a single importer, so the running game was
+// unchanged while the commit message said otherwise. Ported is not delivered.
+// An import is the difference, and it is worth one comment to remember that.
 
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
@@ -24,9 +36,11 @@ import { ChaseCamera } from './render/camera';
 import { Telemetry } from './ui/telemetry';
 import { RaceHUD } from './ui/hud';
 import { chooseTrack } from './ui/trackSelect';
+import { initTouchControls } from './ui/touch';
 import { Terrain } from './tracks/terrain';
 import { WheelFX } from './render/particles';
-import { buildSky, buildClouds, buildMountains, buildVegetation } from './render/scenery';
+import { Sky } from './render/sky';
+import { buildMountains, buildVegetation } from './render/scenery';
 import { bakeRacingLine } from './ai/racingLine';
 import { AIDriver, DriverSpec } from './ai/driver';
 import { RaceDirector } from './race/director';
@@ -84,8 +98,11 @@ async function boot() {
   // paint has no sheen. One PMREM bake at load, nothing per frame.
   buildEnvironment(renderer, scene, trackDef);
   terrain.build(scene, world, RAPIER);
-  buildSky(scene, trackDef);
-  const clouds = buildClouds(scene, trackDef);
+  // v1's five-layer sky, not the M1 mockup it replaces. `render/scenery.ts`
+  // still exports `buildSky`/`buildClouds` — a 16x256 canvas gradient on a
+  // sphere and some icosahedron puffs — and the editor preview still uses
+  // them; this is the game's path onto the ported one. See `render/sky.ts`.
+  const sky = new Sky(scene, trackDef);
   buildMountains(scene, trackDef);
   const components = buildVegetation(scene, terrain, world, RAPIER);
   console.info('[world] components:', components.counts);
@@ -124,6 +141,12 @@ async function boot() {
   placeAll();
 
   const input = new Input();
+  // ON-SCREEN CONTROLS, AND THE REASON THEY ARE CREATED HERE. `initTouchControls`
+  // returns null on anything that is not a touch device, so `touch?.` below is
+  // the whole desktop story — no branch, no second code path. It has to run
+  // AFTER `chooseTrack()` resolves, which is what keeps thumb pads off the
+  // track picker.
+  const touch = initTouchControls(input);
   const telemetry = new Telemetry();
   const hud = new RaceHUD();
   hud.onRestart = () => { director.restart(() => {}); placeAll(); };
@@ -187,7 +210,7 @@ async function boot() {
         }
       }
       fx.update(frameDt);
-      clouds.rotation.y += frameDt * 0.004;
+      sky.update(frameDt);
 
       const plv = playerCtrl.body.linvel();
       vel.set(plv.x, plv.y, plv.z);
@@ -200,6 +223,7 @@ async function boot() {
       followSun?.(iPos.x, iPos.y, iPos.z);
       telemetry.update(frameDt, loop, playerCtrl);
       hud.update(director);
+      touch?.update(playerCtrl.speedKmh, playerCtrl.nitroActive);
       post.render(scene, chase.camera);
     },
   });
@@ -211,6 +235,9 @@ async function boot() {
   (window as unknown as { __dust: object }).__dust = {
     car: playerCtrl, world, loop, input, terrain, fx, line, director, racers,
     track: trackDef,
+    // exposed so `tools/verify-mobile.mjs` can assert the controls exist and
+    // that a synthetic thumb drag reaches the car, rather than inferring it
+    sky, touch,
     // exposed for tools/: the renderer's own triangle and draw-call counters
     // are the only honest answer to "what did that cost"
     renderer,

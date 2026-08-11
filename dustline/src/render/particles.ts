@@ -155,13 +155,15 @@ const _pbB = new THREE.Color();
  *  is that `particles.js` must stay free of track/theme imports, which holds
  *  here for the same reason — this file may not reach into `tracks/`.)
  *
- *  NONE OF THESE KEYS MATCHES A DUSTLINE PRESET. v1 names a theme
- *  ('canyon', 'glacial'); dustline names a land and a weather
- *  (`presets.ts` — 'Canyon plateau' x 'Storm light'). So `setTheme` is inert
- *  until something maps one onto the other, and the working route today is
- *  `propBurst(at, type, dir, energy, [staveHex, hoopHex])`, which every barrel
- *  component can pass from its own palette. The table stays because it is the
- *  palette, not because it is currently reachable. */
+ *  WHAT REACHES IT IN DUSTLINE: four of the eight land ids in `presets.ts` are
+ *  keys here — `farmland`, `desert`, `canyon`, `glacial` — and `alpine`,
+ *  `coast`, `deepwood` and `vineyard` are not, so those four fall through to
+ *  the wooden default. The larger obstacle is that `composeTrack()` does not
+ *  record which land a track came from: it copies the land's numbers into the
+ *  `TrackDef` and keeps only a display name, so a track loaded from JSON has no
+ *  id to hand `setTheme`. The route that always works is the last argument of
+ *  `propBurst(at, type, dir, energy, [staveHex, hoopHex])`, which a barrel
+ *  component can pass from its own palette. */
 const BARREL_TINTS: Record<string, [string, string]> = {
   desert: ['#c29a5c', '#4a3620'], canyon: ['#9a6440', '#33291e'],
   volcano: ['#37322e', '#e8381e'], glacial: ['#7aa8c4', '#2c4456'],
@@ -239,12 +241,13 @@ const FRAG = /* glsl */ `
 
 /** One pooled GPU particle system for every effect.
  *
- *  MEMORY CEILING, MEASURED FROM THE ARRAY LENGTHS: eleven `Float32Array`s over
- *  `MAX = 6000` — four attribute buffers (position 3, colour 3, size 1, alpha
- *  1) at 192 KB and seven CPU-side ones (velocity 3, life, maxLife, drag, grav,
- *  shrink, baseSize, balpha) at 264 KB, so about 456 KB resident, plus the same
- *  192 KB again on the GPU. Fixed at construction and never reallocated: an
- *  over-budget frame overwrites the oldest sprite instead of growing. */
+ *  MEMORY CEILING, SUMMED FROM THE ARRAY LENGTHS: twelve `Float32Array`s over
+ *  `MAX = 6000`. Four are attributes — position 3, colour 3, size 1, alpha 1 —
+ *  at 192,000 bytes, and eight are CPU-side only — velocity 3, life, maxLife,
+ *  drag, grav, shrink, baseSize, balpha — at 240,000. 432,000 bytes, 422 KiB,
+ *  plus the 188 KiB the GPU holds of the four attributes. Fixed at construction
+ *  and never reallocated: an over-budget frame overwrites the oldest sprite
+ *  rather than growing, which is what the ring buffer is for. */
 export class Particles {
   readonly points: THREE.Points;
   private geo: THREE.BufferGeometry;

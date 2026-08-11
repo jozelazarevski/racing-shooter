@@ -31,6 +31,9 @@
 //      is unchanged.
 //   3. `dispose()` EXISTS. v1 never tears its instance down because that game
 //      keeps one for the process lifetime.
+//   4. THE EMISSION CLOCK CARRIES ITS REMAINDER, so the mark spacing does not
+//      change with the frame rate. Written out at `due()`, with the two
+//      measurements that prompted it.
 //
 // NOT CHANGED, AND WORTH KNOWING: a mark is a flat quad at a fixed Y, so it
 // does not follow the terrain under it. v1 places them at `car.y + 0.07` and
@@ -63,10 +66,11 @@ const MAX_EMITTERS = 16;
 /** Road-hugging dark quads that persist and fade.
  *
  *  MEMORY CEILING AT THE DEFAULT 2000 MARKS: the `instanceMatrix` is
- *  2000 * 16 floats = 128 KB, held on both sides (three.js keeps the CPU copy
- *  it uploads from), plus `life` at 8 KB and `data` at 40 KB, so about 304 KB
- *  total. One geometry, one material, ONE DRAW CALL. Fixed at construction:
- *  the pool never grows, and mark 2001 overwrites the oldest.
+ *  2000 * 16 floats = 128,000 bytes, and three.js keeps the CPU copy it uploads
+ *  from, so that is paid twice. Add `life` at 8,000 and `data` at 40,000 and
+ *  the total is 176,000 bytes on the CPU (172 KiB) and 128,000 on the GPU
+ *  (125 KiB). One geometry, one material, ONE DRAW CALL. Fixed at
+ *  construction: the pool never grows, and mark 2001 overwrites the oldest.
  *
  *  THE COST THAT IS NOT MEMORY is overdraw. These are transparent, depth-write
  *  off, and they lie on the most-looked-at surface in the game, so a full pool

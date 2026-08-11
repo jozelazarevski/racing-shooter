@@ -212,19 +212,104 @@ export class Terrain {
     return { dist, t };
   }
 
-  /** The baked field, for the verifier. */
+  /** The baked field, for the verifier. Note this is the BAKE, which `sdf()`
+   *  below now reads bilinearly — the two are separate concerns, and
+   *  `verify:sdf` still compares this bake against `bakeSdfReference()`'s
+   *  brute force cell for cell, which is the same comparison it always made. */
   get sdfField(): { dist: Float32Array; t: Float32Array } {
     return { dist: this.sdfDist, t: this.sdfT };
   }
 
+  /** READ the baked field at a point — BILINEARLY, in both `d` and `t`.
+   *
+   *  THE BUG THIS FIXES: "is the car above the ground beneath it".
+   *
+   *  Two surfaces are built from `heightAt` at two different rates. The
+   *  COLLIDER is a lattice of it at `world.meshRes` (4.02 m on dustbowl) and is
+   *  the only thing the car stands on; the PAINTED ROAD is a ribbon that
+   *  evaluates it continuously along the centreline. They agree only where
+   *  `heightAt` is smooth at the lattice's spacing.
+   *
+   *  This function used to answer with the NEAREST CELL, which made `heightAt`
+   *  a STAIRCASE with treads of one sdf cell (4.11 m) — coarser than the
+   *  lattice sampling it. A staircase cannot be represented by a lattice at all:
+   *  the collider linearly interpolates across the risers and cuts a chord,
+   *  while the ribbon lands wherever it lands. Measured by
+   *  `tools/verify-terrain-integrity.mjs` on dustbowl, that put the painted road
+   *  1.262 m clear of the ground under it — 119% of the car's 1.06 m wheel ray,
+   *  so a wheel set on the paint there cast down and found NOTHING.
+   *
+   *  Both terms of the staircase had to go, and they are two different bugs:
+   *
+   *    `d` — the corridor blend is `smoothstep(d, halfWidth, halfWidth+blend)`,
+   *      so a lattice node genuinely inside the road can be handed a
+   *      whole-cell-too-large `d`, be blended toward the hills and drag the
+   *      corridor EDGE down with it. This is the 1.262 m float at sample 76.
+   *      Interpolating `d` alone measured 0.953 m.
+   *    `t` — inside the corridor `k` is 0, so the height is `roadHeightAt(t)`
+   *      and NOTHING ELSE. dustbowl's crest is a gaussian of sigma 0.0118 of a
+   *      lap standing 5.5 m tall, whose steepest flank runs at ~282 m per unit
+   *      t; one 4.11 m cell of lap is 0.0028 of t, so each tread of the `t`
+   *      staircase was a 0.78 m step in the road's own centreline. That is the
+   *      residual 0.953 m BURY at sample 303 — which sits at t=0.631, right on
+   *      that flank. Interpolating `t` as well is what removes it.
+   *
+   *  Together: 1.262 -> 0.511 m, 48% of the wheel ray, and the stations past
+   *  the 0.225 m a resting wheel can droop fall from 853 to 103.
+   *
+   *  WHY NOT A FINER FIELD. `world.sdfRes` 220 -> 330 was measured at 0.801 m
+   *  and costs 25 -> 45 ms of bake on EVERY world build, including the editor's
+   *  per-keystroke rebuild against a ~121 ms budget — and it is not even
+   *  monotone (440 measures 0.927 m, worse than 330), because resolution only
+   *  makes the treads shorter and never stops them being treads. Interpolating
+   *  removes the treads. It also costs nothing measurable: the bake is untouched
+   *  (23.2 -> 23.6 ms, inside run-to-run noise) and `heightAt` over dustbowl's
+   *  50,625 lattice nodes goes 12.04 -> 12.05 ms, because this function's
+   *  handful of array reads sits next to three octaves of trigonometry.
+   *
+   *  This is a better answer, not merely a smoother one: distance-to-the-loop
+   *  and nearest-arc-length are both CONTINUOUS fields, and the staircase was
+   *  an artifact of rasterising them. `distToRoad` (scenery clearance) and the
+   *  `d < halfWidth + 1.5` surface edge get the same accuracy for free.
+   *
+   *  THE SEAM. `t` is a lap fraction and wraps, so interpolating 0.998 against
+   *  0.002 naively yields 0.5 — the far side of the lap, which is `_jumpCut`
+   *  all over again. Each corner is unwrapped to within half a lap of `t00`
+   *  first, and the result wrapped back. Where the four corners genuinely
+   *  disagree by more than half a lap the unwrap is arbitrary — but that only
+   *  happens on the medial axis between two stretches of road, which is at
+   *  least a corner radius away from either, so `k` is 1 there (the hills own
+   *  the height) and `t` is not consulted for surface at all: `surfaceAt` reads
+   *  `t` only for bands and stripes, and both are gated on `onRoad`. */
   private sdf(x: number, z: number): { d: number; t: number } {
     const R = this.sdfRes;
-    const gx = Math.round(((x / this.size) + 0.5) * (R - 1));
-    const gz = Math.round(((z / this.size) + 0.5) * (R - 1));
-    const cx = Math.max(0, Math.min(R - 1, gx));
-    const cz = Math.max(0, Math.min(R - 1, gz));
-    const o = cz * R + cx;
-    return { d: this.sdfDist[o], t: this.sdfT[o] };
+    const fx = ((x / this.size) + 0.5) * (R - 1);
+    const fz = ((z / this.size) + 0.5) * (R - 1);
+    // Clamp the CELL, then the fraction within it, so a point off the edge of
+    // the world reads the edge value exactly as the nearest-cell version did.
+    const x0 = fx <= 0 ? 0 : (fx >= R - 2 ? R - 2 : Math.floor(fx));
+    const z0 = fz <= 0 ? 0 : (fz >= R - 2 ? R - 2 : Math.floor(fz));
+    const u = fx - x0 <= 0 ? 0 : (fx - x0 >= 1 ? 1 : fx - x0);
+    const v = fz - z0 <= 0 ? 0 : (fz - z0 >= 1 ? 1 : fz - z0);
+    const o00 = z0 * R + x0, o10 = o00 + 1, o01 = o00 + R, o11 = o01 + 1;
+
+    // `d` is a distance, so it is smooth except at the centreline, where it has
+    // a V. Interpolating across that V overestimates — but the corners of a
+    // cell straddling the centreline are at most one half-diagonal (2.91 m)
+    // from it, well inside the 6.5 m half-width, so the overestimate never
+    // reaches the blend and the corridor floor stays flat.
+    const D = this.sdfDist;
+    const d = (D[o00] * (1 - u) + D[o10] * u) * (1 - v) + (D[o01] * (1 - u) + D[o11] * u) * v;
+
+    const T = this.sdfT;
+    const t00 = T[o00];
+    let t10 = T[o10], t01 = T[o01], t11 = T[o11];
+    if (t10 - t00 > 0.5) t10 -= 1; else if (t00 - t10 > 0.5) t10 += 1;
+    if (t01 - t00 > 0.5) t01 -= 1; else if (t00 - t01 > 0.5) t01 += 1;
+    if (t11 - t00 > 0.5) t11 -= 1; else if (t00 - t11 > 0.5) t11 += 1;
+    let t = (t00 * (1 - u) + t10 * u) * (1 - v) + (t01 * (1 - u) + t11 * u) * v;
+    t -= Math.floor(t);                 // back into [0, 1) after the unwrap
+    return { d, t };
   }
 
   heightAt(x: number, z: number): number {

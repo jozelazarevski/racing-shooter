@@ -128,13 +128,19 @@
       transition: opacity .2s, border-color .2s;
     }
     #joy-base.live { background: rgba(12, 22, 32, .55); border-color: rgba(159, 220, 255, .75); }
+    /* The legend has to clear the knob, which is 58px across and paints
+       between ::before and ::after — a percentage transform off the centre put
+       one label under the knob and the other on top of it. These are absolute
+       offsets inside the 124px base: 33px is the knob's edge, so 12 and 100
+       leave a clear ring at the top and bottom of the base. */
     #joy-base::before {
-      content: '◀ ▲ ▶'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -150%);
-      font: 700 10px 'Consolas', monospace; letter-spacing: 2px; color: rgba(223, 242, 255, .55);
+      content: '◀ ▲ ▶'; position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      font: 700 10px 'Consolas', monospace; letter-spacing: 2px; color: rgba(223, 242, 255, .6);
+      white-space: nowrap;
     }
     #joy-base::after {
-      content: '▼'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, 70%);
-      font: 700 10px 'Consolas', monospace; color: rgba(223, 242, 255, .55);
+      content: '▼'; position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
+      font: 700 10px 'Consolas', monospace; color: rgba(223, 242, 255, .6); white-space: nowrap;
     }
     #joy-knob {
       position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; border-radius: 50%;
@@ -180,8 +186,8 @@
        there is not room for two clear of the pad's 150px capture zone. ---- */
     .pedal { display: none; }
     html.thumbs2 .pedal { display: flex; }
-    html.thumbs2 #joy-base::before { content: '◀ ▶'; }
-    html.thumbs2 #joy-base::after { content: 'STEER'; font-size: 9px; letter-spacing: 2px; }
+    html.thumbs2 #joy-base::before { content: '◀ STEER ▶'; }
+    html.thumbs2 #joy-base::after { content: ''; }
     html.thumbs2 #t-gas {
       right: calc(16px + var(--sa-r)); bottom: calc(26px + var(--sa-b));
       width: 100px; height: 100px; font-size: 14px; background: rgba(20, 80, 60, .55);
@@ -208,7 +214,15 @@
        so it spreads along the bottom edge instead — there is width to spare
        here and there is not any height. ---- */
     @media (max-height: 520px) {
-      #joy-zone { width: 40%; height: 84%; }
+      /* 80%, not 84%: at 84% of a 390px-tall landscape phone the pad's capture
+         zone starts at y=62, and the scheme pill stacked below RESET sat at
+         y=68-116 — 112x48 of the steering pad that swallowed the touch instead
+         of steering with it. A dead patch in the middle of the one control you
+         need mid-corner is worse than a smaller pad, so the pills move into a
+         row above it and the zone gives up 15px to leave a clear gap. */
+      #joy-zone { width: 40%; height: 80%; }
+      #t-reset  { left: calc(12px + var(--sa-l)); top: calc(12px + var(--sa-t)); }
+      #t-thumbs { left: calc(132px + var(--sa-l)); top: calc(12px + var(--sa-t)); }
       #t-drift { bottom: calc(16px + var(--sa-b)); width: 84px; height: 84px; }
       #t-nitro { right: calc(112px + var(--sa-r)); bottom: calc(22px + var(--sa-b)); width: 64px; height: 64px; }
       #t-fire  { right: calc(186px + var(--sa-r)); bottom: calc(24px + var(--sa-b)); width: 58px; height: 58px; }

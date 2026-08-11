@@ -50,6 +50,20 @@
  * every step here is `world.step()` at `world.timestep`, so SwiftShader's frame
  * rate cannot enter the arithmetic.
  *
+ * AS SHIPPED THIS FILE IS RED, AND THAT IS THE POINT OF IT. dustline has the
+ * same defect v1 had, in the same place: `render/horizon.ts` builds its
+ * mountains with `buildMountains(scene, def)` — no `world`, no `RAPIER`, no
+ * `createCollider` anywhere in the file — so all 343 horizon instances across
+ * the three committed tracks are bare, and on every one of them some of that
+ * skyline stands ON the drivable terrain rather than beyond it: 5 instances on
+ * DUSTBOWL, 1 on HARBOUR POINT, 4 on PROVING GROUND. The nearest dome on
+ * DUSTBOWL puts 42.8 m of its footprint inside the terrain collider, so a car
+ * driven into the north-west corner is inside a hillside with no flight
+ * involved. Checks 5, 6 and 9 stay red until `buildMountains` registers
+ * colliders, in the same way `tests/test-field-stalls.mjs` stays red as the
+ * definition of done. Checks 1-4, 7 and 8 are green and are the standing guard
+ * over everything that is already right.
+ *
  *   npx vite build          # the tool serves ../play-dustline itself
  *   node tools/verify-solidity.mjs
  *   node tools/verify-solidity.mjs --table   # the full census, per track
@@ -164,19 +178,41 @@ const V_TERM = Math.sqrt(car.engine.force / car.engine.dragCoeff);
 const CAR_HALF = car.chassis.halfExtents[0];
 
 /** How far a collider may sit from the instance it belongs to before the two
- *  are not the same object. `PhysicsShape.centerX/centerZ` offset a collider
- *  inside the component's own frame — a jetty's deck runs 22 m out from its
- *  origin — so the allowance is the LARGEST such offset in the library at the
- *  LARGEST scale that component is authored at, measured from the library
- *  rather than guessed, plus a centimetre for float. Computed below. */
+ *  are not the same object — ON TOP OF that component's own declared offset.
+ *  `PhysicsShape.centerX/centerZ` deliberately move a collider inside the
+ *  component's frame (a jetty's collider sits 13 m along its deck at full
+ *  scale, a grandstand's 3.8 m back), and each component is allowed exactly
+ *  its own, read from the library rather than guessed. Everything else must be
+ *  on its instance's origin, so 1 cm is float noise and nothing more. */
 const MATCH_EPS = 0.01;
 
-/** How far a 53.6 m/s impact may push the probe past the face it hit before
- *  "it stopped" stops being true. At the engine's 1/120 s step the probe covers
- *  0.45 m per step, and Rapier resolves a 1.2 t impact over a handful of them:
- *  4 m is nine steps of contact resolution. Anything more is not a collision,
- *  it is a hole. */
+/** How far the probe may sink past a surface it lands on before "it stopped"
+ *  stops being true. At the engine's 1/120 s step the probe covers 0.45 m per
+ *  step, and Rapier resolves a 1.2 t impact over a handful of them: 4 m is nine
+ *  steps of contact resolution. Used for the GROUND control, where the impact is
+ *  square-on and the distance means what it looks like. */
 const PENETRATION_MAX = 4;
+
+/** WHAT "STOPPED" MEANS AT THE MOUNTAIN, and why it is a speed and not a
+ *  distance. Against a hillside the probe hits an oblique face and slides along
+ *  it, so how far it travelled depends on the shape of the face and not on
+ *  whether anything was there. What it has left in it does not: the measurement
+ *  is bimodal and the two modes are nowhere near each other.
+ *
+ *    nothing there   — 49-50 m/s of 53.6 survives (92%); only the chassis'
+ *                      0.02 linear damping takes anything at all
+ *    something there — 2-10 m/s survives (3-18%)
+ *
+ *  Half is the middle of a gap with no measurements in it. Any threshold
+ *  between 0.2 and 0.9 returns the same verdict on every track, which is what
+ *  makes it a safe number rather than a tuned one. The probe must ALSO not come
+ *  out the far side, so a body that ricochets fast and sideways cannot pass. */
+const STOP_FRACTION = 0.5;
+
+/** How far the ground control drops the probe. 60 m is longer than any terrain
+ *  feature on the roster is tall (the relief is 36 m on DUSTBOWL), so the probe
+ *  is always released in clear air above the pad. */
+const DROP = 60;
 
 let fails = 0;
 const check = (ok, label, detail = '') => {
@@ -334,7 +370,7 @@ for (const id of trackIds) {
   await page.waitForFunction(() => window.__dust?.track, null, { timeout: 180000 });
 
   const r = await page.evaluate((args) => {
-    const { library, MATCH_EPS, V_TERM, PENETRATION_MAX } = args;
+    const { library, MATCH_EPS, V_TERM, PENETRATION_MAX, STOP_FRACTION, DROP } = args;
     const d = window.__dust;
     const def = d.track;
     const terrain = d.terrain;
@@ -550,7 +586,10 @@ for (const id of trackIds) {
       return V_TERM * Math.sqrt((2 * drop) / 9.81);
     };
     const hzReach = [];
-    for (const h of horizon) {
+    // With no terrain collider there is no drivable ground to measure against.
+    // Check 7 is what says so; this one steps aside rather than throwing, so a
+    // missing floor produces one clear failure instead of a stack trace.
+    for (const h of trimesh ? horizon : []) {
       const reach = reachOf(h.y0);
       // gap 0 means the footprint OVERLAPS the drivable ground: there is
       // terrain under part of that mountain and no flight is needed at all.
@@ -589,6 +628,17 @@ for (const id of trackIds) {
     const fly = (from, dir, metres) => {
       const L = Math.hypot(dir.x, dir.y, dir.z) || 1;
       const u = { x: dir.x / L, y: dir.y / L, z: dir.z / L };
+      // CCD ON, AND THIS IS NOT A DETAIL. Without it the instrument lies: the
+      // chassis is 0.68 m thick and covers 0.45 m per step at terminal speed,
+      // and measured on DUSTBOWL it goes STRAIGHT THROUGH the terrain trimesh
+      // — dropped 60 m onto the start pad it ended 30 m under the world still
+      // doing 51.8 m/s. Falling at gravity's own pace (19.8 m/s at impact) the
+      // same body lands correctly on the pad, and in the game the car rides on
+      // raycast suspension rather than on chassis contact, so this is the
+      // PROBE's problem and not the car's. A probe that can tunnel would report
+      // "nothing there" for a mountain that was solid, which is the one answer
+      // this file must never give by accident.
+      body.enableCcd(true);
       body.setGravityScale(0, true);
       body.setTranslation({ x: from.x, y: from.y, z: from.z }, true);
       body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
@@ -614,13 +664,22 @@ for (const id of trackIds) {
     const ceiling = (trimesh ? trimesh.y1 : 0) + 400;
     const air = fly({ x: 0, y: ceiling, z: 0 }, { x: 1, y: 0, z: 0 }, 200);
 
-    // CONTROL 2 — the ground. Dropped onto the start pad from 60 m. Must stop:
-    // this is the same probe, the same stepping, against a collider that is
-    // known to be there, and it is the only thing standing behind the word
+    // CONTROL 2 — the ground. Dropped onto the start pad from DROP metres. Must
+    // stop: this is the same probe, the same stepping, against a collider that
+    // is known to be there, and it is the only thing standing behind the word
     // "stopped" in the horizon probe.
+    //
+    // THE FLIGHT IS LONGER THAN THE DROP, and the reason is a bug this control
+    // had until it was mutation-tested. It was flown exactly DROP metres, which
+    // is also its own failure threshold plus a bit — so with the terrain
+    // collider deliberately DELETED from the physics world the probe fell the
+    // whole way and the control still passed, because it ran out of steps
+    // before it ran out of allowance. A control that cannot fail is not a
+    // control. The budget is now DROP + 20 m, so an unstopped probe provably
+    // overshoots.
     const sp = terrain.spawn;
     const padY = terrain.heightAt(sp.x, sp.z);
-    const ground = fly({ x: sp.x, y: padY + 60, z: sp.z }, { x: 0, y: -1, z: 0 }, 60);
+    const ground = fly({ x: sp.x, y: padY + DROP, z: sp.z }, { x: 0, y: -1, z: 0 }, DROP + 20);
 
     // THE MEASUREMENT — driven at the mountain. The target is the horizon
     // instance a car can most easily get to: the one whose footprint overlaps
@@ -635,7 +694,7 @@ for (const id of trackIds) {
     // it, so "it stopped" means one thing only.
     let mountain = null;
     const flightY = (trimesh ? trimesh.y1 : 0) + 3;
-    const target = hzReach.find((h) => h.y1 > flightY + 10) ?? null;
+    const target = trimesh ? (hzReach.find((h) => h.y1 > flightY + 10) ?? null) : null;
     if (target) {
       const h = target;
       const cx = (h.x0 + h.x1) / 2, cz = (h.z0 + h.z1) / 2;
@@ -644,14 +703,32 @@ for (const id of trackIds) {
       const half = Math.max(h.x1 - h.x0, h.z1 - h.z0) / 2;
       const standoff = 30;
       const from = { x: cx - ax * (half + standoff), y: flightY, z: cz - az * (half + standoff) };
-      const res = fly(from, { x: ax, y: 0, z: az }, half * 2 + standoff + 40);
+      // WHERE THE MOUNTAIN ACTUALLY STARTS along the probe's own line — the
+      // slab intersection of the ray with the footprint, not `half`. Approached
+      // on a diagonal the near face can be tens of metres nearer the centre than
+      // the widest half-extent, and measuring penetration from `half` would
+      // charge the probe for open air it crossed before touching anything.
+      const slab = (p, d, lo, hi) => (Math.abs(d) < 1e-9
+        ? (p >= lo && p <= hi ? [-Infinity, Infinity] : [Infinity, -Infinity])
+        : [(lo - p) / d, (hi - p) / d].sort((m, n) => m - n));
+      const [tx0, tx1] = slab(from.x, ax, h.x0, h.x1);
+      const [tz0, tz1] = slab(from.z, az, h.z0, h.z1);
+      const face = Math.max(0, Math.max(tx0, tz0));      // distance to the near face
+      const exit = Math.min(tx1, tz1);
+      const res = fly(from, { x: ax, y: 0, z: az }, exit + 40);
       mountain = {
-        ...res, standoff, half, flightY: +flightY.toFixed(1),
+        ...res, standoff, half, face: +face.toFixed(1), depth: +(exit - face).toFixed(1),
+        flightY: +flightY.toFixed(1),
         form: h.form, cx: +cx.toFixed(1), cz: +cz.toFixed(1),
         top: +h.y1.toFixed(1), base: +h.y0.toFixed(1),
         onGround: h.onGround, overlap: +h.overlap.toFixed(1),
-        // "entered" is the owner's word: did the probe get inside the footprint
-        entered: res.travelled > standoff + PENETRATION_MAX,
+        // "entered" is the owner's word. Two ways to have entered, and either
+        // is enough: the probe still has most of its speed (nothing touched
+        // it), or it came out the far side of the footprint.
+        inside: +(res.travelled - face).toFixed(1),
+        kept: +(res.speed / V_TERM).toFixed(2),
+        outFarSide: res.travelled >= exit,
+        entered: res.speed > V_TERM * STOP_FRACTION || res.travelled >= exit,
       };
     }
 
@@ -679,7 +756,7 @@ for (const id of trackIds) {
       probe: { air, ground, mountain },
       compAll,
     };
-  }, { library, MATCH_EPS, V_TERM, PENETRATION_MAX });
+  }, { library, MATCH_EPS, V_TERM, PENETRATION_MAX, STOP_FRACTION, DROP });
 
   r.errors = errors;
   perTrack.push(r);
@@ -801,23 +878,27 @@ check(perTrack.every((t) => t.errors.length === 0), 'no page errors building the
     jammed.map((t) => `${t.id}: travelled ${t.probe.air.travelled.toFixed(1)} of ${t.probe.air.budget.toFixed(1)} m`).join(' | '));
 
   // control B — the instrument can be stopped
-  const fell = perTrack.filter((t) => t.probe.ground.travelled > 60 + PENETRATION_MAX);
+  const fell = perTrack.filter((t) => t.probe.ground.travelled > DROP + PENETRATION_MAX);
   check(fell.length === 0,
-    `control: the same probe dropped 60 m onto the start pad STOPS (within ${PENETRATION_MAX} m)`,
+    `control: the same probe dropped ${DROP} m onto the start pad STOPS `
+    + `(within ${PENETRATION_MAX} m, flown ${DROP + 20} m so it can overshoot)`,
     fell.map((t) => `${t.id}: fell ${t.probe.ground.travelled.toFixed(1)} m — through the floor`).join(' | '));
 
   // the measurement
   const entered = perTrack.filter((t) => t.probe.mountain?.entered);
   const noTarget = perTrack.filter((t) => t.horizon.n > 0 && !t.probe.mountain);
   check(entered.length === 0 && noTarget.length === 0,
-    `driven at ${V_TERM.toFixed(0)} m/s, fixed-step, the probe STOPS at the mountain`,
+    `driven at ${V_TERM.toFixed(0)} m/s, fixed-step (${(perTrack[0]?.probe.air.dt ?? 0).toFixed(5)} s), `
+    + `the probe STOPS at the mountain — it must shed at least `
+    + `${((1 - STOP_FRACTION) * 100).toFixed(0)}% of its speed and must not come out the far side`,
     [
       ...entered.map((t) => {
         const m = t.probe.mountain;
-        return `${t.id}: drove ${m.travelled.toFixed(0)} m from ${m.standoff} m out and ended up `
-          + `${(m.travelled - m.standoff).toFixed(0)} m inside a ${m.top} m ${m.form} at ${m.cx},${m.cz}`
-          + `${m.onGround ? ` (${m.overlap} m of it standing on drivable ground)` : ''} `
-          + `still doing ${m.speed.toFixed(0)} m/s — "Still can enter."`;
+        return `${t.id}: drove ${m.travelled.toFixed(0)} m at a face ${m.face} m away and ended up `
+          + `${m.inside} m inside a ${m.top} m ${m.form} at ${m.cx},${m.cz} (${m.depth} m of mountain on that line)`
+          + `${m.onGround ? `, ${m.overlap} m of its footprint standing on drivable ground` : ''}, `
+          + `still doing ${m.speed.toFixed(0)} m/s — ${(m.kept * 100).toFixed(0)}% of launch speed`
+          + `${m.outFarSide ? ', and out the far side' : ''} — "Still can enter."`;
       }),
       ...noTarget.map((t) => `${t.id}: has ${t.horizon.n} horizon instances and no probe ran`),
     ].join(' | '));
@@ -833,8 +914,10 @@ if (TABLE) {
     }
     const p = t.probe;
     console.log(`  probe: air ${p.air.travelled.toFixed(1)}/${p.air.budget.toFixed(0)} m, `
-      + `ground ${p.ground.travelled.toFixed(1)} m (60 m drop), `
-      + (p.mountain ? `mountain ${p.mountain.travelled.toFixed(1)} m from ${p.mountain.standoff} m out` : 'no mountain')
+      + `ground ${p.ground.travelled.toFixed(1)} m (${DROP} m drop), `
+      + (p.mountain
+        ? `mountain ${p.mountain.travelled.toFixed(1)} m against a face at ${p.mountain.face} m (${p.mountain.inside} m inside, ${p.mountain.speed.toFixed(1)} m/s left)`
+        : 'no mountain')
       + ` @ dt ${p.air.dt.toFixed(5)} s`);
   }
   console.log('');
@@ -869,6 +952,16 @@ for (const t of perTrack) {
  *    that way, and it is generous on purpose.
  *  - DYNAMIC BODIES ARE OUT OF SCOPE. Only fixed colliders are counted, because
  *    only fixed ones are scenery.
+ *  - THE PROBE FLIES WITH CCD AND NO GRAVITY, so it is not the car. That is
+ *    deliberate — see `fly()` — and it means check 9 answers "is a collider
+ *    there", not "does a car handle the impact well". Whether a car that lands
+ *    at 50 m/s vertical tunnels through the floor is a real question and this
+ *    file does not ask it: measured on DUSTBOWL, without CCD it does.
+ *  - THE ROAD-EDGE POSTS ARE EXEMPTED ON THIS FILE'S AUTHORITY. terrain.ts
+ *    states no intent for them either way, and somebody had to. If the intent
+ *    is that they should stop a car, this is where to change it — and
+ *    `verify-clearance.mjs` should be re-run afterwards, because at
+ *    halfWidth + 1.2 they sit 0.3 m outside the corridor the road promises.
  *  - IT SAYS NOTHING ABOUT WHERE THINGS STAND. A solid object in the middle of
  *    the road passes every check here; `verify-clearance.mjs` is that one. */
 
