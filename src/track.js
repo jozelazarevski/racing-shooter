@@ -4728,6 +4728,39 @@ export class Track {
         this._width[j] = Math.min(this._width[j], ROAD_HALF + (minW - ROAD_HALF) * f);
       }
     }
+    this._applyWidenEdits();
+  }
+
+  /** THE EDITOR'S WIDEN BRUSH. `edit.widen` is a list of strokes in WORLD
+   *  space — {x, z, r, w} — where `w` is the half-width the road is being
+   *  ASKED FOR there, not a delta.
+   *
+   *  It lands HERE, in the one profile every consumer reads through
+   *  `widthAt(i)`: the ribbon mesh and its verges, the AI's lateral clamp and
+   *  its pinch braking, the scenery clearance rules, the wall-run gates and the
+   *  editor's own marks. Widening anywhere else would have moved the paint and
+   *  left the road, which is the mistake the sculpt made before r150.
+   *
+   *  Strokes resolve LIKE PAINT: in the order they were laid, each pulling the
+   *  profile toward its target by a smoothstep falloff, so the newest stroke
+   *  wins where it is thickest and the ones under it show through at the rim.
+   *  A target rather than a delta is what makes the tool correctable — under
+   *  "biggest pull wins" a narrowing stroke laid over a wider one did nothing
+   *  at all, and under summing, two taps of the same intent doubled the road
+   *  while the status line reported one. Both were measured; this is neither.
+   */
+  _applyWidenEdits() {
+    const W = this.edit && this.edit.widen;
+    if (!W || !W.length) return;
+    for (let i = 0; i < N; i++) {
+      const c = this.center[i];
+      for (const s of W) {
+        const d = Math.hypot(c.x - s.x, c.z - s.z);
+        if (d >= s.r) continue;
+        const f = 1 - THREE.MathUtils.smoothstep(d / s.r, 0, 1);
+        this._width[i] += (THREE.MathUtils.clamp(s.w, 5, 22) - this._width[i]) * f;
+      }
+    }
   }
 
   /** Pinch dressing: the squeeze must read as intentional — stone markers and

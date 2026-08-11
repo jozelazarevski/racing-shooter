@@ -181,6 +181,7 @@ const HINT = {
   rotate: 'ROTATE — tap an object you placed to turn it by ROT',
   road: 'ROAD — pick TUNNEL, BRIDGE or RIVER, then tap the road',
   route: 'MOVE ROAD — drag a marker on the racing line to bend the lap',
+  widen: 'WIDEN — tap the road to open the carriageway (SIZE = length, STRENGTH = metres). NARROW inverts it',
   water: 'WATER — tap to sink a lake (SIZE sets it)',
   orbit: 'ORBIT — drag to swing the camera, pinch or wheel to zoom',
 };
@@ -244,6 +245,13 @@ export class WorldEditor {
     // before anything else is built, so the whole world follows the new shape.
     this.warp = [];
     this._drag = null;               // the control point currently being moved
+
+    // WIDEN: pulls on the carriageway's own half-width, {x, z, r, d}. Read by
+    // Track._applyWidenEdits into the ONE width profile everything else asks
+    // through widthAt(), so the ribbon, the verges, the rival lateral clamp
+    // and the scenery-clearance rules all open out together.
+    this.widen = [];
+    this._widenStep = 3;             // metres of half-width per tap
 
     this._placeRot = 0;
     this._placeScale = 1;
@@ -333,6 +341,9 @@ export class WorldEditor {
         x: +w.x.toFixed(1), z: +w.z.toFixed(1), r: +w.r.toFixed(1),
         dx: +w.dx.toFixed(1), dz: +w.dz.toFixed(1),
       })) : undefined,
+      widen: this.widen.length ? this.widen.map((s) => ({
+        x: +s.x.toFixed(1), z: +s.z.toFixed(1), r: +s.r.toFixed(1), w: +s.w.toFixed(2),
+      })) : undefined,
       elements: this.elements.map((e) => ({
         preset: e.preset, x: +e.x.toFixed(1), z: +e.z.toFixed(1),
         rot: +e.rot.toFixed(3), scale: +e.scale.toFixed(2),
@@ -366,6 +377,7 @@ export class WorldEditor {
       erase: this.erase,
       waters: this.waters,
       warp: this.warp,
+      widen: this.widen,
       theme: this.themeName || undefined,
       tune: Object.keys(tune).length ? tune : undefined,
     };
@@ -388,6 +400,7 @@ export class WorldEditor {
     };
     this.waters = (data.waters || []).map((w) => ({ ...w }));
     this.warp = (data.warp || []).map((w) => ({ ...w }));
+    this.widen = (data.widen || []).map((w) => ({ ...w }));
     this.sceneName = data.name || '';
     this._history = [];
     this.dirty = false;
@@ -836,7 +849,90 @@ export class WorldEditor {
     else if (this.tool === 'road') this._roadAt(p);
     else if (this.tool === 'water') this._waterAt(p);
     else if (this.tool === 'rotate') this._rotateAt(p);
+    else if (this.tool === 'widen') this._widenAt(p);
     else if (this.tool === 'route') this._status('drag a marker on the road to move the line');
+  }
+
+  /** WIDEN / NARROW the carriageway itself.
+   *
+   *  "Make a wider u turn" was answered with MOVE ROAD and the sculpt, which
+   *  bend the line and reshape the ground but leave the road exactly nine
+   *  metres wide — you could move the hairpin, never open it. This is the
+   *  missing gesture: tap the road, and the surface there gets wider.
+   *
+   *  Stated in world space like every other brush (a circle and an amount)
+   *  rather than as a sample range, so it survives a MOVE ROAD that shifts
+   *  the centreline underneath it: the pull is on the ROAD NEAR HERE, and
+   *  wherever the road ends up, that is what opens. */
+  _widenAt(p) {
+    const t = this.game.track;
+    const i = t.nearestIndex({ x: p.x, y: 0, z: p.z });
+    const c = t.center[i];
+    const d = Math.hypot(p.x - c.x, p.z - c.z);
+    // the brush must be ON the road: widening open country does nothing you
+    // could see, and silently doing nothing is the editor's oldest complaint
+    if (d > (t.widthAt ? t.widthAt(i) : 9) + 14) {
+      this._status('tap the ROAD — widen works on the carriageway');
+      return;
+    }
+    const step = this.narrowMode ? -this._widenStep : this._widenStep;
+    // read the PENDING width, not the built one: strokes only reach the road
+    // at APPLY, so a second tap before then has to step up from where the
+    // first tap left it or the tool would appear to stop working
+    const here = this._pendingWidthAt(c.x, c.z, t.widthAt ? t.widthAt(i) : 9);
+    const want = Math.max(5, Math.min(22, here + step));
+    if (Math.abs(want - here) < 0.05) {
+      this._status(here <= 5.05 ? 'as narrow as a road gets' : 'as wide as a road gets');
+      return;
+    }
+    const w = { x: c.x, z: c.z, r: this.radius, w: want };
+    this.widen.push(w);
+    this.dirty = true;
+    this._widenMark(w, i);
+    this._push('a width change', () => {
+      this.widen = this.widen.filter((q) => q !== w);
+      this._refreshMarkers();
+    });
+    this._status(`${this.narrowMode ? 'NARROWED' : 'WIDENED'} to ${want.toFixed(1)} u half-width `
+      + `over ${(this.radius * 2) | 0} u — APPLY to rebuild`);
+  }
+
+  /** The half-width a point will HAVE once the pending strokes are applied.
+   *  Mirrors Track._applyWidenEdits exactly — same order, same falloff — so
+   *  what the status line promises is what the rebuild delivers. */
+  _pendingWidthAt(x, z, built) {
+    let w = built;
+    for (const s of this.widen) {
+      const d = Math.hypot(x - s.x, z - s.z);
+      if (d >= s.r) continue;
+      const u = d / s.r;
+      const f = 1 - (u * u * (3 - 2 * u));      // smoothstep, as the Track does
+      w += (Math.max(5, Math.min(22, s.w)) - w) * f;
+    }
+    return w;
+  }
+
+  /** A width change is invisible until APPLY, so draw what was asked for: a
+   *  ring at the NEW half-width, green for wider and amber for narrower,
+   *  sitting on the road where the pull was placed. */
+  _widenMark(w, i) {
+    if (!this._zones) {
+      this._zones = new THREE.Group();
+      this._zones.name = 'editor-zones';
+      this.game.scene.add(this._zones);
+    }
+    const t = this.game.track;
+    const half = Math.max(1, w.w);
+    const g = new THREE.RingGeometry(Math.max(0.5, half - 0.6), half + 0.6, 40);
+    g.rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+      color: w.w >= (t.widthAt ? t.widthAt(i) : 9) ? 0x6cf07a : 0xf0a44c,
+      transparent: true, opacity: 0.8, depthTest: false,
+    }));
+    m.position.set(w.x, t.center[i].y + 0.55, w.z);
+    m.renderOrder = 999;
+    m.userData.widenMark = true;
+    this._zones.add(m);
   }
 
   /* --- undo --------------------------------------------------------------- */
@@ -887,6 +983,9 @@ export class WorldEditor {
     }
     for (const f of this.roadFeat.rivers) {
       this._roadMark(t.center[Math.round(f * t.center.length) % t.center.length], 0x54c8f0);
+    }
+    for (const w of this.widen) {
+      this._widenMark(w, t.nearestIndex({ x: w.x, y: 0, z: w.z }));
     }
     this._routeMarks();
   }
@@ -1314,6 +1413,11 @@ export class WorldEditor {
           <button class="ed-mini" data-road="river">RIVER</button>
         </div><div class="ed-hint">then tap the road</div></div>
         <button class="ed-tool" data-tool="route">MOVE ROAD</button>
+        <button class="ed-tool" data-tool="widen">WIDEN</button>
+        <div id="ed-widensub"><div id="ed-widenrow">
+          <button class="ed-mini current" data-widen="wide">WIDER</button>
+          <button class="ed-mini" data-widen="narrow">NARROWER</button>
+        </div><div class="ed-hint">FORCE = metres per tap</div></div>
         <button class="ed-tool" data-tool="water">WATER</button>
         <button class="ed-tool" data-tool="orbit">ORBIT</button>
       </div>
@@ -1351,6 +1455,7 @@ export class WorldEditor {
         // and that you had to arm one at all — was anyone's guess. It now lives
         // under the ROAD button and only exists while ROAD is the live tool.
         root.querySelector('#ed-roadsub').classList.toggle('open', this.tool === 'road');
+        root.querySelector('#ed-widensub').classList.toggle('open', this.tool === 'widen');
         // the road handles only exist while you are moving the road
         this._routeMarks();
         this._status(HINT[this.tool] || this.tool.toUpperCase());
@@ -1390,6 +1495,13 @@ export class WorldEditor {
       this.roadMode = b.dataset.road;
       root.querySelectorAll('#ed-roadrow .ed-mini').forEach((x) => x.classList.toggle('current', x === b));
     });
+    this.narrowMode = false;
+    root.querySelector('#ed-widenrow').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-widen]');
+      if (!b) return;
+      this.narrowMode = b.dataset.widen === 'narrow';
+      root.querySelectorAll('#ed-widenrow .ed-mini').forEach((x) => x.classList.toggle('current', x === b));
+    });
 
     const rad = root.querySelector('#ed-radius'), str = root.querySelector('#ed-strength');
     rad.addEventListener('input', () => {
@@ -1398,6 +1510,9 @@ export class WorldEditor {
     });
     str.addEventListener('input', () => {
       this.strength = +str.value;
+      // FORCE is metres of half-width for WIDEN, capped so one tap cannot
+      // jump the road from a lane to a runway
+      this._widenStep = Math.max(1, Math.min(8, +str.value));
       root.querySelector('#ed-strength-v').textContent = str.value;
     });
     // ROT and SCALE finally write the two fields `_place` has always read.
