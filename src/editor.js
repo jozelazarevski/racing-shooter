@@ -179,6 +179,7 @@ const HINT = {
   erase: 'ERASE — tap to remove what is under the brush, yours or the world\'s',
   clear: 'CLEAR AREA — tap to strip the world\'s own scenery from a circle',
   rotate: 'ROTATE — tap an object you placed to turn it by ROT',
+  select: 'SELECT — tap any object. Then DRAG it to move, ROT to turn, DELETE to remove. You see it happen',
   road: 'ROAD — pick TUNNEL, BRIDGE or RIVER, then tap the road',
   route: 'MOVE ROAD — drag a marker on the racing line to bend the lap',
   widen: 'WIDEN — tap the road to open the carriageway (SIZE = length, STRENGTH = metres). NARROW inverts it',
@@ -252,6 +253,12 @@ export class WorldEditor {
     // and the scenery-clearance rules all open out together.
     this.widen = [];
     this._widenStep = 3;             // metres of half-width per tap
+
+    // SELECTION. One object, picked off the ground, with its own handles.
+    // `_hidden` remembers the instance matrices we blanked so a live delete
+    // or move can be undone without a rebuild.
+    this.sel = null;
+    this._hidden = [];
 
     this._placeRot = 0;
     this._placeScale = 1;
@@ -454,6 +461,7 @@ export class WorldEditor {
     this._clearGhosts();
     this._clearZoneMarks();
     this._clearRoadMarks();
+    this._clearSelection();
     if (this._routeGrp) this._routeGrp.visible = false;
     if (this.ring) this.ring.visible = false;
     this.root.classList.add('off');
@@ -702,6 +710,10 @@ export class WorldEditor {
       this.game.editScene = this.buildPayload();
       this.game.rebuildWorld();
       this._tmCache = null;
+      // the rebuild IS the truth now — the live blanking we did to preview a
+      // delete or a move belongs to a world that no longer exists
+      this._hidden = [];
+      this._clearSelection();
       this.dirty = false;
       // everything on the list is now a real building in the rebuilt world,
       // so its marker drops to a footprint ring instead of a crate over it
@@ -750,6 +762,21 @@ export class WorldEditor {
           // the one drag that is not the camera: a control point being moved
           this._beginRouteDrag(e.clientX, e.clientY);
           if (this._drag) { this._orbiting = false; this._tapPending = false; }
+        } else if (this._tapPending && this.tool === 'select' && this.sel) {
+          // dragging ON a selected object moves it; dragging anywhere else
+          // still swings the camera, so selection never costs you the view
+          const q = this._pick(e.clientX, e.clientY);
+          const near = q && Math.hypot(q.x - this.sel.x, q.z - this.sel.z)
+            < Math.max(6, (this.sel.r ?? 4) * 1.6);
+          if (near && this.sel.kind !== 'solid') {
+            const el = this._adoptSelection() || this.sel.el;
+            // where it started, so UNDO puts it back there and not wherever
+            // the drag happened to end
+            this._selDragFrom = el ? { el, x: el.x, z: el.z } : null;
+            this._selDrag = !!el;
+            this._orbiting = false;
+            this._tapPending = false;
+          }
         }
       } else {
         this._painting = false;
@@ -777,6 +804,8 @@ export class WorldEditor {
         this._pan(dx * 0.5, dy * 0.5);
       } else if (this._drag) {
         this._dragRoute(e.clientX, e.clientY);
+      } else if (this._selDrag) {
+        this._dragSelection(e.clientX, e.clientY);
       } else if (this._orbiting) {
         this.yaw -= dx * 0.006;
         this.pitch = Math.max(0.12, Math.min(1.52, this.pitch + dy * 0.005));
@@ -797,6 +826,19 @@ export class WorldEditor {
         if (moved <= 8) this._tapAt(e.clientX, e.clientY);
       }
       if (this._drag) this._endRouteDrag();
+      if (this._selDrag) {
+        this._selDrag = false;
+        const from = this._selDragFrom;
+        this._selDragFrom = null;
+        if (from && (from.el.x !== from.x || from.el.z !== from.z)) {
+          this._push('a move', () => {
+            from.el.x = from.x; from.el.z = from.z;
+            this._refreshMarkers();
+          });
+          this._status(`moved — APPLY to build it there (${this.elements.length} objects)`);
+          this._syncSelPanel();
+        }
+      }
       this._tapPending = false;
       if (this._ptr.size === 0) {
         if (this._painting) this._endStroke();
@@ -850,7 +892,231 @@ export class WorldEditor {
     else if (this.tool === 'water') this._waterAt(p);
     else if (this.tool === 'rotate') this._rotateAt(p);
     else if (this.tool === 'widen') this._widenAt(p);
+    else if (this.tool === 'select') this._selectAt(p);
     else if (this.tool === 'route') this._status('drag a marker on the road to move the line');
+  }
+
+  /* --- selection: pick a thing up and change it, and SEE it change -------- */
+  /** THE EDIT YOU CAN SEE.
+   *
+   *  Everything else in this editor is deferred: you paint, the status line
+   *  counts, and the world only catches up at APPLY. That is right for a
+   *  sculpt (the whole terrain has to be rebuilt) and wrong for one object,
+   *  where "did that work?" should be answered by looking at it.
+   *
+   *  So a selected object is taken OUT of the built world immediately — its
+   *  instances are blanked in place — and a live proxy is drawn in its stead,
+   *  which moves and turns with you. APPLY makes it permanent by the ordinary
+   *  route: an erase circle where it stood, and an element of the same
+   *  template where you left it. Nothing here invents a new payload concept. */
+  _selectAt(p) {
+    const t = this.game.track;
+    let best = null, bd = 14 * 14;
+    // 1. my own placed objects win — they are the ones I am most likely to be
+    //    aiming at, and they carry their template already
+    for (const e of this.elements) {
+      const d = (e.x - p.x) ** 2 + (e.z - p.z) ** 2;
+      if (d < bd) { bd = d; best = { kind: 'mine', el: e, x: e.x, z: e.z, rot: e.rot, scale: e.scale, preset: e.preset }; }
+    }
+    // 2. then anything the BUILDER put down, with the template it used
+    if (!best) {
+      for (const w of t.placedElements ?? []) {
+        const d = (w.x - p.x) ** 2 + (w.z - p.z) ** 2;
+        if (d < bd) { bd = d; best = { kind: 'world', src: w, x: w.x, z: w.z, rot: w.rot, scale: w.scale, preset: w.type, r: w.r }; }
+      }
+    }
+    // 3. and failing that, anything solid at all — trees, rocks, masonry.
+    //    These have no template to re-place, so they can be removed but not
+    //    moved, and the panel says so rather than pretending.
+    if (!best) {
+      for (const s of t.solids ?? []) {
+        const d = (s.x - p.x) ** 2 + (s.z - p.z) ** 2;
+        if (d < bd) { bd = d; best = { kind: 'solid', src: s, x: s.x, z: s.z, rot: 0, scale: 1, r: s.r }; }
+      }
+    }
+    if (!best) {
+      this._clearSelection();
+      this._status('nothing here — tap an object');
+      return;
+    }
+    this._clearSelection();
+    this.sel = best;
+    this._selMark();
+    const what = best.preset ? best.preset.toUpperCase() : (best.src?.mat || 'OBJECT').toUpperCase();
+    this._status(best.kind === 'solid'
+      ? `${what} selected — DELETE removes it (no template to move it by)`
+      : `${what} selected — drag to move, ROT to turn, DELETE to remove`);
+    this._syncSelPanel();
+  }
+
+  /** Draw the selection: a ring on the ground and a box in the air, so a
+   *  picked object is unmistakable from any camera angle. */
+  _selMark() {
+    if (!this._selGroup) {
+      this._selGroup = new THREE.Group();
+      this._selGroup.name = 'editor-selection';
+      this.game.scene.add(this._selGroup);
+    }
+    const s = this.sel;
+    if (!s) return;
+    const t = this.game.track;
+    const y = t.terrainHeight(s.x, s.z) + this.delta.at(s.x, s.z);
+    const r = Math.max(2.5, (s.r ?? 3.4) * (s.scale ?? 1));
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(r, r + 0.7, 32),
+      new THREE.MeshBasicMaterial({ color: 0x5ad7ff, transparent: true, opacity: 0.95, depthTest: false }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(s.x, y + 0.4, s.z);
+    ring.renderOrder = 1000;
+    this._selGroup.add(ring);
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(r * 1.5, r * 1.7, r * 1.5),
+      new THREE.MeshBasicMaterial({ color: 0x5ad7ff, wireframe: true, transparent: true,
+        opacity: 0.7, depthTest: false }));
+    box.position.set(s.x, y + r * 0.85, s.z);
+    box.rotation.y = s.rot ?? 0;
+    box.renderOrder = 1000;
+    this._selGroup.add(box);
+  }
+
+  /** Drop the highlight but keep the selection (used when it is about to be
+   *  redrawn somewhere else). */
+  _clearSelMarks() {
+    if (!this._selGroup) return;
+    for (const c of [...this._selGroup.children]) {
+      c.geometry.dispose(); c.material.dispose(); this._selGroup.remove(c);
+    }
+  }
+
+  _clearSelection() {
+    this.sel = null;
+    this._clearSelMarks();
+  }
+
+  /** Blank every batched instance standing within `r` of a point, remembering
+   *  what was there. This is what makes a delete or a move VISIBLE at once:
+   *  the house goes now, not at APPLY. */
+  _hideAround(x, z, r) {
+    const hidden = [];
+    const m = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    this.game.track.group.traverse((o) => {
+      if (!o.isInstancedMesh) return;
+      for (let i = 0; i < o.count; i++) {
+        o.getMatrixAt(i, m);
+        pos.setFromMatrixPosition(m);
+        if ((pos.x - x) ** 2 + (pos.z - z) ** 2 > r * r) continue;
+        hidden.push({ mesh: o, i, mat: m.clone() });
+        o.setMatrixAt(i, zero);
+      }
+      o.instanceMatrix.needsUpdate = true;
+    });
+    if (hidden.length) this._hidden.push(...hidden);
+    return hidden;
+  }
+
+  /** Put back what `_hideAround` blanked (one undo step's worth). */
+  _unhide(list) {
+    const meshes = new Set();
+    for (const h of list) { h.mesh.setMatrixAt(h.i, h.mat); meshes.add(h.mesh); }
+    for (const m of meshes) m.instanceMatrix.needsUpdate = true;
+    this._hidden = this._hidden.filter((h) => !list.includes(h));
+  }
+
+  /** Take a world object into MY list so it can be moved or turned: erase
+   *  where it stood, and add an element of the same template in its place.
+   *  Idempotent — a second call on an already-adopted selection is a no-op. */
+  _adoptSelection() {
+    const s = this.sel;
+    if (!s || s.kind !== 'world') return s && s.el ? s.el : null;
+    const r = Math.max(4, (s.r ?? 4) * 1.4);
+    const zone = { x: s.x, z: s.z, r };
+    this.erase.push(zone);
+    const el = { preset: s.preset, x: s.x, z: s.z, rot: s.rot ?? 0, scale: s.scale ?? 1 };
+    this.elements.push(el);
+    this.dirty = true;
+    // out of the built world NOW, and a marker in its place
+    const hidden = this._hideAround(s.x, s.z, r);
+    this._ghost(el);
+    this.sel = { ...s, kind: 'mine', el };
+    this._push('adopting a world object', () => {
+      this.erase = this.erase.filter((q) => q !== zone);
+      this.elements = this.elements.filter((q) => q !== el);
+      this._unhide(hidden);
+      this._refreshMarkers();
+    });
+    return el;
+  }
+
+  /** DELETE the selection, visibly. */
+  deleteSelection() {
+    const s = this.sel;
+    if (!s) { this._status('nothing selected'); return; }
+    if (s.kind === 'mine') {
+      const el = s.el;
+      const idx = this.elements.indexOf(el);
+      if (idx >= 0) this.elements.splice(idx, 1);
+      // a placed object that has already been built is also in the world
+      const hidden = el.built ? this._hideAround(el.x, el.z, 6 * (el.scale || 1)) : [];
+      this.dirty = true;
+      this._push('deleting an object', () => {
+        this.elements.push(el);
+        if (hidden.length) this._unhide(hidden);
+        this._refreshMarkers();
+      });
+    } else {
+      const r = Math.max(4, (s.r ?? 4) * 1.4);
+      const zone = { x: s.x, z: s.z, r };
+      this.erase.push(zone);
+      this.dirty = true;
+      const hidden = this._hideAround(s.x, s.z, r);
+      this._zoneMark(zone);
+      this._push('deleting a world object', () => {
+        this.erase = this.erase.filter((q) => q !== zone);
+        this._unhide(hidden);
+        this._refreshMarkers();
+      });
+    }
+    this._clearSelection();
+    this._refreshMarkers();
+    this._status('DELETED — gone from the world now, permanent at APPLY');
+    this._syncSelPanel();
+  }
+
+  /** Turn the selection by the ROT slider, live. */
+  rotateSelection() {
+    const s = this.sel;
+    if (!s) { this._status('nothing selected'); return; }
+    if (s.kind === 'solid') { this._status('this one has no template — it can only be deleted'); return; }
+    const el = s.kind === 'world' ? this._adoptSelection() : s.el;
+    if (!el) return;
+    const before = el.rot;
+    el.rot = (el.rot + this._rotStep) % (Math.PI * 2);
+    this.sel.rot = el.rot;
+    this.dirty = true;
+    this._push('a rotation', () => { el.rot = before; this._refreshMarkers(); });
+    this._refreshMarkers();
+    this._clearSelMarks();
+    this.sel = { ...this.sel, kind: 'mine', el, rot: el.rot };
+    this._selMark();
+    this._status(`turned to ${Math.round(el.rot * 180 / Math.PI)}° — APPLY to build it there`);
+  }
+
+  /** Drag the selection across the ground. Called from the pointer move
+   *  handler while a selection drag is live. */
+  _dragSelection(cx, cy) {
+    const p = this._pick(cx, cy);
+    if (!p || !this.sel) return;
+    const el = this.sel.el;
+    if (!el) return;
+    el.x = p.x; el.z = p.z;
+    this.sel.x = p.x; this.sel.z = p.z;
+    this.dirty = true;
+    this._clearGhosts();
+    for (const e of this.elements) this._ghost(e);
+    this._clearSelMarks();
+    this._selMark();
   }
 
   /** WIDEN / NARROW the carriageway itself.
@@ -1384,7 +1650,51 @@ export class WorldEditor {
   }
 
   /* --- DOM ---------------------------------------------------------------- */
-  _status(msg) { if (this.statusEl) this.statusEl.textContent = msg; }
+  _status(msg) {
+    if (this.statusEl) this.statusEl.textContent = msg;
+    // every status line is the tail of an edit, so this is the one place that
+    // has to remember to keep the CHANGES panel honest
+    this._syncChanges();
+  }
+
+  /** WHAT HAVE I ACTUALLY CHANGED? Live, itemised, always on screen.
+   *
+   *  The editor's whole model is deferred — paint now, rebuild at APPLY — and
+   *  the only account of the pending work was a sentence in the status bar
+   *  that the next action overwrote. You could not tell a scene with one dab
+   *  from one with forty, or notice that you had left a stray clear zone
+   *  somewhere behind the camera. */
+  _syncChanges() {
+    const el = this.root && this.root.querySelector('#ed-changelist');
+    if (!el) return;
+    const rows = [];
+    if (this.delta.dabs.length) rows.push([`${this.delta.dabs.length}`, 'terrain dabs']);
+    if (this.elements.length) rows.push([`${this.elements.length}`, 'objects placed']);
+    if (this.erase.length) rows.push([`${this.erase.length}`, 'things removed']);
+    if (this.warp.length) rows.push([`${this.warp.length}`, 'road moves']);
+    if (this.widen.length) rows.push([`${this.widen.length}`, 'width changes']);
+    if (this.waters.length) rows.push([`${this.waters.length}`, 'lakes']);
+    if (this.roadFeat.tunnels.length) rows.push([`${this.roadFeat.tunnels.length}`, 'tunnels']);
+    if (this.roadFeat.bridge != null) rows.push(['1', 'bridge']);
+    if (this.roadFeat.rivers.length) rows.push([`${this.roadFeat.rivers.length}`, 'river crossings']);
+    if (this.themeName) rows.push(['—', `look: ${this.themeName}`]);
+    if (this.weather) rows.push(['—', `sky: ${this.weather}`]);
+    el.innerHTML = rows.length
+      ? rows.map(([n, what]) => `<div class="ed-chg"><b>${n}</b> ${what}</div>`).join('')
+        + (this.dirty ? '<div class="ed-chg pend">APPLY to rebuild</div>' : '')
+      : 'nothing yet';
+  }
+
+  /** The selection panel says what is picked and what can be done to it. */
+  _syncSelPanel() {
+    const el = this.root && this.root.querySelector('#ed-selwhat');
+    if (!el) return;
+    const s = this.sel;
+    if (!s) { el.textContent = 'nothing selected'; return; }
+    const what = s.preset ? s.preset.toUpperCase() : (s.src?.mat || 'object').toUpperCase();
+    el.textContent = s.kind === 'solid'
+      ? `${what} — removable` : `${what} — move / turn / remove`;
+  }
 
   _buildDOM() {
     const root = document.createElement('div');
@@ -1398,6 +1708,15 @@ export class WorldEditor {
         <button class="ed-btn" data-act="drive">TEST DRIVE</button>
       </div>
       <div id="ed-tools">
+        <button class="ed-tool" data-tool="select">SELECT</button>
+        <div id="ed-selsub">
+          <div id="ed-selwhat">nothing selected</div>
+          <div id="ed-selrow">
+            <button class="ed-mini" data-sel="rotate">ROTATE</button>
+            <button class="ed-mini" data-sel="delete">DELETE</button>
+          </div>
+          <div class="ed-hint">drag the object itself to move it</div>
+        </div>
         <button class="ed-tool current" data-tool="raise">RAISE</button>
         <button class="ed-tool" data-tool="lower">LOWER</button>
         <button class="ed-tool" data-tool="smooth">SMOOTH</button>
@@ -1426,6 +1745,10 @@ export class WorldEditor {
         <label>FORCE <input id="ed-strength" type="range" min="1" max="20" value="3"><b id="ed-strength-v">3</b></label>
         <label>ROT <input id="ed-rot" type="range" min="0" max="345" step="15" value="0"><b id="ed-rot-v">0°</b></label>
         <label>SCALE <input id="ed-scale" type="range" min="50" max="220" step="5" value="100"><b id="ed-scale-v">1.0</b></label>
+      </div>
+      <div id="ed-changes">
+        <div class="ed-pgroup">CHANGES</div>
+        <div id="ed-changelist">nothing yet</div>
       </div>
       <div id="ed-world">
         <div class="ed-pgroup">WORLD RECIPE</div>
@@ -1456,6 +1779,9 @@ export class WorldEditor {
         // under the ROAD button and only exists while ROAD is the live tool.
         root.querySelector('#ed-roadsub').classList.toggle('open', this.tool === 'road');
         root.querySelector('#ed-widensub').classList.toggle('open', this.tool === 'widen');
+        root.querySelector('#ed-selsub').classList.toggle('open', this.tool === 'select');
+        if (this.tool !== 'select') this._clearSelection();
+        this._syncSelPanel();
         // the road handles only exist while you are moving the road
         this._routeMarks();
         this._status(HINT[this.tool] || this.tool.toUpperCase());
@@ -1494,6 +1820,12 @@ export class WorldEditor {
       if (!b) return;
       this.roadMode = b.dataset.road;
       root.querySelectorAll('#ed-roadrow .ed-mini').forEach((x) => x.classList.toggle('current', x === b));
+    });
+    root.querySelector('#ed-selrow').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-sel]');
+      if (!b) return;
+      if (b.dataset.sel === 'rotate') this.rotateSelection();
+      else if (b.dataset.sel === 'delete') this.deleteSelection();
     });
     this.narrowMode = false;
     root.querySelector('#ed-widenrow').addEventListener('click', (e) => {

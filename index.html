@@ -882,6 +882,23 @@
     background:rgba(12,16,22,.86);border:1px solid #2c3a4a;max-width:150px}
   #ed-widensub.open{display:block}
   #ed-widensub .ed-hint{margin-top:4px}
+  /* SELECT's panel: what is picked, and the two things you can do to it that
+     are not a drag */
+  #ed-selrow{display:flex;gap:4px}
+  #ed-selsub{display:none;margin:2px 0 4px;padding:5px;border-radius:8px;
+    background:rgba(12,16,22,.86);border:1px solid #3a6b8a;max-width:150px}
+  #ed-selsub.open{display:block}
+  #ed-selwhat{font-size:10px;color:#8fd4f5;margin-bottom:5px;line-height:1.25;
+    word-break:break-word}
+  #ed-selsub .ed-hint{margin-top:4px}
+  /* the running account of everything not yet applied */
+  /* sits UNDER the world recipe: measured, anywhere higher collides with the
+     slider stack on the same edge */
+  #ed-changes{position:absolute;right:8px;top:364px;width:170px;z-index:31;
+    background:rgba(12,16,22,.86);border:1px solid #2c3a4a;border-radius:8px;padding:6px}
+  #ed-changelist{font-size:10px;color:#9fb4c8;line-height:1.45}
+  .ed-chg b{color:#ffd98a;font-weight:700}
+  .ed-chg.pend{color:#7fe08a;margin-top:3px}
   .ed-mini{flex:1;background:#18212c;border:1px solid #2c3a4a;color:#cfe0f0;
     border-radius:6px;padding:5px;font:inherit;font-size:10px;cursor:pointer}
   .ed-mini.current{background:#2a5f8a;border-color:#4d92c8;color:#fff}
@@ -909,6 +926,7 @@
     .ed-tool{min-width:0;padding:8px;font-size:10px}
     #ed-sliders input{width:70px}
     #ed-world{width:132px}
+    #ed-changes{width:132px}
     #ed-palette{width:150px;right:150px}
   }
   #car-shop{touch-action:pan-x pan-y}

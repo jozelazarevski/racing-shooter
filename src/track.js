@@ -4542,6 +4542,16 @@ export class Track {
     // [{x, z, r, y}] for big boulders, huts, gantry legs, the grandstand
     // front and distant mesas. Car physics treats them like this.obstacles.
     this.solids = [];
+    // EVERY STRUCTURE THE BUILDER PUT DOWN, AND WHAT IT WAS BUILT FROM.
+    //
+    // The world editor can delete world scenery (an erase circle) but could
+    // never MOVE it, because a batched instance is geometry in a buffer with
+    // no memory of the template that produced it. This is that memory:
+    // {type, x, z, rot, scale, r} for each `_element` placement, which is
+    // exactly the vocabulary `edit.elements` already speaks — so the editor
+    // can adopt a house it did not place, erase the original and re-place the
+    // same template anywhere, at any angle.
+    this.placedElements = [];
     // WALLS ARE SEGMENTS, NOT DOTS. A masonry run - a pass parapet, a dry
     // stone field wall, a quay coping - is a continuous barrier, and a row of
     // circle colliders is not: measured on GOTTHARD, four of six runs driven
@@ -11521,6 +11531,8 @@ export class Track {
     const r = T.r * scale * Math.max(wS, dS), mat = T.mat ?? 'hut';
     const solid = { x, z, r, y: y + 0.6, mat };
     this.solids.push(solid);
+    // the editor's handle on this structure — see `placedElements`
+    this.placedElements.push({ type, x, z, rot, scale, r, authored });
     this._addShadow(x, z, r * 1.35);
     return { r, solid, y };
   }
