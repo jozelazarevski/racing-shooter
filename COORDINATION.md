@@ -97,7 +97,7 @@ wall-clock probes run the sim at ~1/8 speed — `raceTime` read 1.8 s after 20
 real seconds, and every wall-clock "stall" observation before that discovery
 was an artifact. Same trap as BUGS.md #8.
 
-**The field-stall family is FIXED (r154, mainline session).** Taking the
+**The field-stall family is FIXED (r154/r155, mainline session).** Taking the
 dustline dossier: the pin was never the racing line or the planner — it was
 three collision/build rules, found by autopsying the pinned rivals in-engine:
 
@@ -148,6 +148,29 @@ its structures will not appear there.
 the `_width` profile — so anything reading `widthAt(i)` sees an edited road
 automatically. If your lane adds a new width consumer, read `widthAt`, never
 `ROAD_HALF`.
+
+**Field-stall update 2 (dustline session, written against main BEFORE r154
+merged): cusps fixed, standoff mechanism pinned, remaining fix flagged as
+route authoring.** The lone-rival probe caught a car pinned at exactly
+|lateral| = wallLim with the recovery timer cycling, at MOUNTAIN TO SEA's
+chain waist — whose control points sit 2-4 u apart ([2,-155],[2,-152]) and fed
+the spline 21-30 DEG/station tangent cusps. SEA CLIFF RUN carried twelve such
+kinks up to 60 deg from its sketch's sharp Vs. SHIPPED: a kink-relaxation pass
+over the sampled centreline (cap 13 deg/station, kink stations pulled to their
+neighbours' midpoint, tangents recomputed where moved). Healthy worlds are
+provably untouched — their kink census is zero, PINE VALLEY / TREMOLA still
+run 1.6-2.0 rival laps/90 s fixed-step.
+
+Written up as "does NOT clear the stalls, needs route authoring" — true of
+main at the time, which did not yet have r154's barrier under-gate / rail
+intrusion / progressive pit-lift. **Re-measured on the merge of both fixes
+(r155 + kink-relaxation, mainline session):** test-field-stalls PASS, 0
+stalled, 1.6-1.8 rival laps/90s on 57/56/60 — see the result logged just
+below this merge. The two fixes are complementary, not competing: kink-
+relaxation removed undrivable geometry the racing line was choking on, and
+the collision/pit-lift fixes cleared the standoff the kinks were masking.
+Nobody needs to redraw a route waist — recorded here so neither lane re-opens
+this expecting red.
 
 **Unclaimed findings** (fair game for whoever gets there first, say so here):
 BUGS.md #2's two remaining unexplained stalls (NORDSCHLEIFE, DOLOMITI —
