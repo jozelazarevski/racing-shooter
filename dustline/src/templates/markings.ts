@@ -52,8 +52,8 @@ export const chevronTexture = cached((): THREE.Texture => {
   });
 });
 
-/** Start/finish checkered strip. */
-export const checkerTexture = cached((): THREE.Texture => {
+/** Start/finish checkered strip. `repeat` tiles it, cache-keyed as ever. */
+export const checkerTexture = cached((repeat?: [number, number]): THREE.Texture => {
   const t = make(256, 64, (g, w, h) => {
     const s = 32;
     for (let y = 0; y < h; y += s)
@@ -63,6 +63,7 @@ export const checkerTexture = cached((): THREE.Texture => {
       }
   });
   t.wrapS = THREE.RepeatWrapping;
+  if (repeat) t.repeat.set(repeat[0], repeat[1]);
   return t;
 });
 
@@ -82,11 +83,17 @@ export const hazardTexture = cached((): THREE.Texture => {
   return t;
 });
 
-/** Red/white awning stripes. */
-export const awningTexture = cached((): THREE.Texture => {
+/** Red/white awning stripes.
+ *
+ *  The default pair is v1's, verbatim. Pass a PALE pair when the mesh is
+ *  tinted per instance — v1's own technique, written down at its townhouse:
+ *  "the map is painted PALE on purpose: it is used on an InstancedMesh whose
+ *  per-instance colour multiplies it", so one texture dresses every colour of
+ *  canopy instead of fixing the whole market red. */
+export const awningTexture = cached((stripeA: string = '#d8342a', stripeB: string = '#f2ede0'): THREE.Texture => {
   const t = make(128, 64, (g, w, h) => {
     for (let x = 0, i = 0; x < w; x += 16, i++) {
-      g.fillStyle = i % 2 === 0 ? '#d8342a' : '#f2ede0';
+      g.fillStyle = i % 2 === 0 ? stripeA : stripeB;
       g.fillRect(x, 0, 16, h);
     }
     g.fillStyle = 'rgba(0,0,0,0.12)';

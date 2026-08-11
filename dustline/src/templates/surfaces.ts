@@ -104,8 +104,13 @@ export const stoneTexture = cached((palette: StonePalette = {}): THREE.Texture =
   return t;
 });
 
-/** Wooden plank deck (canyon foot-bridges): planks run across the strip. */
-export const plankTexture = cached((): THREE.Texture => {
+/** Wooden plank deck (canyon foot-bridges): planks run across the strip.
+ *
+ *  `repeat` tiles it — cache-keyed like the stone, because these are shared
+ *  instances and `t.repeat.set()` at a call site re-tiles everyone else's. A
+ *  vertical repeat also flips wrapT to repeat, which the base texture keeps
+ *  clamped so a single strip does not smear its nail heads down its length. */
+export const plankTexture = cached((repeat?: [number, number]): THREE.Texture => {
   const t = painted(0x914ec5, 256, 128, (g, w, h) => {
     g.fillStyle = '#8a6238';
     g.fillRect(0, 0, w, h);
@@ -130,7 +135,8 @@ export const plankTexture = cached((): THREE.Texture => {
     }
   });
   t.wrapS = THREE.RepeatWrapping;
-  t.wrapT = THREE.ClampToEdgeWrapping;
+  t.wrapT = repeat && repeat[1] > 1 ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+  if (repeat) t.repeat.set(repeat[0], repeat[1]);
   return t;
 });
 

@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard, mergeGeoms, beam, cylinderAt } from './types';
+import { checkerTexture } from '../../templates/markings';
 
 const startGantry: PropTemplate = {
   id: 'startGantry',
@@ -39,8 +40,11 @@ const startGantry: PropTemplate = {
     },
     {
       key: 'banner',
+      // a single beam, so its own box UVs survive — no merge needed
       geometry: beam(12.5, 1.5, 0.12, 0, 7.5, 0),
-      material: standard(0xd8452e, { flatShading: false }),
+      // the start line's own cloth: v1's checkered strip, three tiles along the
+      // span so the squares come out near-square on a 12.5 x 1.5 banner
+      material: standard(0xffffff, { flatShading: false, map: checkerTexture([3, 1]) }),
       castShadow: true,
     },
   ],
