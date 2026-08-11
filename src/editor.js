@@ -179,7 +179,7 @@ const HINT = {
   erase: 'ERASE — tap to remove what is under the brush, yours or the world\'s',
   clear: 'CLEAR AREA — tap to strip the world\'s own scenery from a circle',
   rotate: 'ROTATE — tap an object you placed to turn it by ROT',
-  road: 'ROAD — pick TUNNEL or BRIDGE, then tap the road',
+  road: 'ROAD — pick TUNNEL, BRIDGE or RIVER, then tap the road',
   route: 'MOVE ROAD — drag a marker on the racing line to bend the lap',
   water: 'WATER — tap to sink a lake (SIZE sets it)',
   orbit: 'ORBIT — drag to swing the camera, pinch or wheel to zoom',
@@ -209,7 +209,7 @@ export class WorldEditor {
     this.themeName = null;
     this.weather = null;
     // sited features, not counts: lap fractions for the bores, one for a span
-    this.roadFeat = { tunnels: [], bridge: null };
+    this.roadFeat = { tunnels: [], bridge: null, rivers: [] };
     this.waters = [];
     this.sceneName = '';
     this.dirty = false;
@@ -321,9 +321,11 @@ export class WorldEditor {
       erase: this.erase.map((z) => ({ x: +z.x.toFixed(1), z: +z.z.toFixed(1), r: +z.r.toFixed(1) })),
       theme: this.themeName || undefined,
       weather: this.weather || undefined,
-      road: (this.roadFeat.tunnels.length || this.roadFeat.bridge != null)
+      road: (this.roadFeat.tunnels.length || this.roadFeat.bridge != null
+        || this.roadFeat.rivers.length)
         ? { tunnels: this.roadFeat.tunnels.map((f) => +f.toFixed(4)),
-          bridge: this.roadFeat.bridge } : undefined,
+          bridge: this.roadFeat.bridge,
+          rivers: this.roadFeat.rivers.map((f) => +f.toFixed(4)) } : undefined,
       waters: this.waters.length ? this.waters.map((w) => ({
         x: +w.x.toFixed(1), z: +w.z.toFixed(1), r: +w.r.toFixed(1), y: +w.y.toFixed(2),
       })) : undefined,
@@ -351,6 +353,13 @@ export class WorldEditor {
       tune.heroBridge = { at: [Math.max(0, f - 0.03), Math.min(1, f + 0.03)],
         half: 24, len: 210, depth: 28, skew: 0 };
     }
+    // RIVER: authored ford crossings. The whole waterway — the spline that
+    // threads them, the bed carve, the ribbon, the banks and the wash — is the
+    // machinery every themed river already uses; the editor only states where
+    // it crosses the road. Authoring any replaces the theme's random ones.
+    if (this.roadFeat.rivers.length) {
+      tune.fords = { count: this.roadFeat.rivers.length, at: [...this.roadFeat.rivers] };
+    }
     return {
       delta: this.delta,
       elements: this.elements,
@@ -375,6 +384,7 @@ export class WorldEditor {
     this.roadFeat = {
       tunnels: Array.isArray(rd.tunnels) ? [...rd.tunnels] : [],
       bridge: typeof rd.bridge === 'number' ? rd.bridge : null,
+      rivers: Array.isArray(rd.rivers) ? [...rd.rivers] : [],
     };
     this.waters = (data.waters || []).map((w) => ({ ...w }));
     this.warp = (data.warp || []).map((w) => ({ ...w }));
@@ -875,6 +885,9 @@ export class WorldEditor {
       const i = Math.round(this.roadFeat.bridge * t.center.length) % t.center.length;
       this._roadMark(t.center[i], 0xffd24a);
     }
+    for (const f of this.roadFeat.rivers) {
+      this._roadMark(t.center[Math.round(f * t.center.length) % t.center.length], 0x54c8f0);
+    }
     this._routeMarks();
   }
 
@@ -1039,6 +1052,31 @@ export class WorldEditor {
     // station that works, telling you how far it had to go. Only when the
     // WHOLE LAP has nowhere is there anything to refuse, and then the message
     // is about the world rather than about your aim.
+    if (this.roadMode === 'river') {
+      // Site it with the BUILDER'S rule (Track.fordFitAt), same discipline as
+      // the tunnel: the tap means "the river crosses about here", and the
+      // nearest station the ford gates accept is where it lands.
+      const taken = this.roadFeat.rivers.map((f) => ({ i: Math.round(f * n) % n }));
+      const site = this._walkOut(i, n, (k) => t.fordFitAt(k, taken));
+      if (site == null) {
+        this._status('nowhere left on this lap for another crossing — '
+          + 'they need 150 samples of separation');
+        return;
+      }
+      const f = site / n;
+      this.roadFeat.rivers.push(f);
+      this._roadMark(t.center[site], 0x54c8f0);
+      this._push('a river crossing', () => {
+        this.roadFeat.rivers = this.roadFeat.rivers.filter((q) => q !== f);
+      });
+      const moved = Math.round(t._circDist(site, i) * t.segLen);
+      this._status(`river crossing at ${(f * 100) | 0}% of the lap`
+        + (moved > 6 ? ` (${moved} u along, to a legal crossing)` : '')
+        + ` — ${this.roadFeat.rivers.length} total. One river threads them all; `
+        + 'APPLY to cut it');
+      this.dirty = true;
+      return;
+    }
     if (this.roadMode === 'tunnel') {
       // Measure what the planner measures: _planTunnels looks over the whole
       // bore length, so a +/-20 sample window said "straight enough" and then
@@ -1273,6 +1311,7 @@ export class WorldEditor {
         <div id="ed-roadsub"><div id="ed-roadrow">
           <button class="ed-mini current" data-road="tunnel">TUNNEL</button>
           <button class="ed-mini" data-road="bridge">BRIDGE</button>
+          <button class="ed-mini" data-road="river">RIVER</button>
         </div><div class="ed-hint">then tap the road</div></div>
         <button class="ed-tool" data-tool="route">MOVE ROAD</button>
         <button class="ed-tool" data-tool="water">WATER</button>
@@ -1413,7 +1452,7 @@ export class WorldEditor {
     this.themeName = null;
     this.weather = null;
     // sited features, not counts: lap fractions for the bores, one for a span
-    this.roadFeat = { tunnels: [], bridge: null };
+    this.roadFeat = { tunnels: [], bridge: null, rivers: [] };
     this.waters = [];
     this._clearGhosts();
     this._clearZoneMarks();
