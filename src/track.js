@@ -11945,9 +11945,16 @@ export class Track {
   _barrier(x, z, dirX, dirZ, len, thick, y, h, mat = 'stone') {
     const dl = Math.hypot(dirX, dirZ) || 1;
     const hl = len / 2, ux = (dirX / dl) * hl, uz = (dirZ / dl) * hl;
+    // `over`: this wall has AIR under it — its base stands well clear of the
+    // ground at its own footprint (a flyover rail above a road or a gorge).
+    // Only these may be passed beneath (see the barrier under-gate in
+    // vehicles.js). A wall SEATED on its ground — a bank wall above a sunken
+    // approach, GOTTHARD's switchback masonry — keeps stopping a car coming
+    // from below, because there the "under" side is solid earth, not air.
     this.barriers.push({
       x1: x - ux, z1: z - uz, x2: x + ux, z2: z + uz,
       hw: thick / 2, y, h, mat,
+      over: y - this.terrainHeight(x, z) > 3,
     });
   }
 

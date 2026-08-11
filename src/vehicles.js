@@ -1413,8 +1413,12 @@ export class Car {
           // knew the top, so a car driving beneath a flyover was stopped dead
           // by the deck's own handrail 8 u overhead — photographed by the
           // player as the whole field parked under MOUNTAIN TO SEA's bridge.
-          // A rail whose base sits above the roof passes clean over us.
-          if (this.pos.y < q.y - 2.6) continue;
+          // A rail whose base sits above the roof passes clean over us — but
+          // ONLY a rail with air beneath it (`over`, stamped at build). A
+          // wall seated on a bank above the car is backed by earth, and
+          // driving into the bank must still find the wall (GOTTHARD's
+          // switchback masonry, caught by test-walls).
+          if (q.over && this.pos.y < q.y - 2.6) continue;
           const ex = q.x2 - q.x1, ez = q.z2 - q.z1;
           const len2 = ex * ex + ez * ez || 1;
           let s2 = ((this.pos.x - q.x1) * ex + (this.pos.z - q.z1) * ez) / len2;
