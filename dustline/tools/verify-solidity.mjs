@@ -153,6 +153,7 @@ const BACKDROP = {
 
   skyDome: 'the sky: a BackSide sphere at r = max(1100, world.size * 1.25) with fog off, drawn behind everything. A collider on it would be a lid over the map',
   cloudPuff: 'cloud, 120-180 m up and 250-650 m out. Nothing in this game leaves the ground for more than a jump',
+  hazeRing: 'atmosphere, not terrain: v1\'s two open-ended BackSide cylinders standing off past the horizon massifs (templates/horizon.ts:331), depthWrite off, fog off, drawn to make a distant peak fade into air from its base up. They sit OUTSIDE the mountains they haze, so a collider here would be a fence around the world at a radius no car reaches — and worse, a solid one would be invisible, which is the exact failure mode this file exists to catch pointed the wrong way round',
   roadRibbon: 'the road SURFACE is drawn here and driven on the terrain trimesh underneath it — terrain.ts:506 says so in its own comment. Solid by proxy, and check 7 is what proves the proxy covers it',
   waterSurface: 'water is not a floor. The lake BED is terrain and carries the trimesh; the surface is a translucent sheet with depthWrite off',
   tuningRing: 'paint on the tarmac: a flat RingGeometry 4 cm above the start apron',
@@ -401,6 +402,14 @@ for (const id of trackIds) {
       const dx = bb ? bb.max.x - bb.min.x : 0, dy = bb ? bb.max.y - bb.min.y : 0, dz = bb ? bb.max.z - bb.min.z : 0;
       if (g.type === 'SphereGeometry' && m.side === 1 && m.fog === false) return { path: 'backdrop', key: 'skyDome' };
       if (g.type === 'RingGeometry') return { path: 'backdrop', key: 'tuningRing' };
+      // the haze rings: an open-ended BackSide cylinder with fog and depth
+      // write both off. All four facts are required, so a closed cylinder, or
+      // one that writes depth, does NOT inherit this exemption — which is what
+      // stops a real cylindrical solid (a silo, a tank) hiding behind it.
+      if (g.type === 'CylinderGeometry' && g.parameters?.openEnded === true
+        && m.side === 1 && m.fog === false && m.depthWrite === false) {
+        return { path: 'backdrop', key: 'hazeRing' };
+      }
       if (g.type === 'IcosahedronGeometry' && !o.isInstancedMesh
         && m.emissive && m.emissive.getHex() !== 0) return { path: 'backdrop', key: 'cloudPuff' };
       // the verge posts: an unnamed instanced box, one per side every ten road

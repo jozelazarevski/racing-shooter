@@ -261,12 +261,25 @@ export function buildMountains(scene: THREE.Scene, def: TrackDef): THREE.Object3
 // point: a hand-copied 0.5 is exactly the kind of number that goes stale
 // silently, and a stale number here means a collider inside its own mountain.
 //
-// ONE COLLIDER PER INSTANCE, NOT MORE, and that is deliberate too. A ridge
-// would fit better as six boxes, one per tooth. But `verify-solidity.mjs`
-// counts colliders against instances, so as long as the two numbers are equal
-// its census is exact — 343 of 343 — and a form that lost its solid could not
-// hide behind another form's extras. A sharper check on the whole skyline is
-// worth more than a better fit on the notches of a ridge 640 m away.
+// ONE COLLIDER PER INSTANCE, AND THE FINER FIT WAS TRIED AND MEASURED. A ridge
+// is a saw-tooth wall and one box around it fills in the notches, so it was
+// built the other way too: cut at the form's own six drawn stations, a box per
+// tooth, its own height and its own depth. Probed over every instance in the
+// three committed worlds — a vertical ray on a 24 x 24 grid across each
+// footprint, Rapier's own colliders against the drawn triangles — six boxes
+// took the MEAN invisible height on a ridge from 69.8 m to 52.7 m on DUSTBOWL
+// (52.6 -> 39.7 on HARBOUR POINT, 77.2 -> 58.3 on PROVING GROUND) and moved
+// neither worst case at all: 192.5 m -> 192.3 m of invisible height above
+// visible rock, and 296.2 m -> 296.2 m on the sideways probe. A quarter of the
+// mean for six times the colliders, because what dominates is not the notches
+// but the foot of the wall, where any box stands full height over rock that
+// has tapered to nothing — and a box is the only primitive a wall has.
+//
+// So one box, and the census stays honest: 343 colliders for 343 instances
+// means `verify-solidity.mjs` counting colliders against instances is EXACT —
+// a form that lost its solid cannot hide behind another form's extras. If a
+// track ever puts a ridge where a car can reach it, the per-tooth version is
+// the first thing to bring back; the numbers above are what it is worth.
 //
 // THE SHAPES CONTAIN THE ROCK, THEY DO NOT APPROXIMATE IT. Every fit below is
 // the smallest member of its family that contains every sampled point of the
@@ -516,11 +529,15 @@ export function horizonSolids(def: TrackDef): HorizonSolid[] {
         break;
       }
       case 'box': {
+        // THE BOX IS THE FORM'S OWN EXTENT, turned with it — a wall's collider
+        // has to carry its yaw or it would stand across the ridge instead of
+        // along it, which is the same mistake `world/build.ts` fixed for a
+        // 12 m barn at 45 degrees.
         const half: [number, number, number] = [
           s.hx * p.w, ((s.top - s.base) * p.h) / 2, s.hz * p.d,
         ];
-        // the corner of a box is farther out than its faces; the widest a band
-        // can be and still be inside it is that corner
+        // an upper bound on how far it can stand proud: its own corner against
+        // the widest the rock ever gets
         let margin = 0;
         for (const b of s.bands) margin = Math.max(margin, Math.hypot(half[0], half[2]) - b.r * rs);
         out.push({

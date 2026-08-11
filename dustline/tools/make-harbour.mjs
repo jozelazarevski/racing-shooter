@@ -513,12 +513,14 @@ putAt('kiosk', shoreX(-20) + 27, -20, Math.PI / 2, 1);
 // track and exactly v1's #1. Nothing about the statement was wrong as a
 // statement about the COAST; it was never a statement about the road.
 //
-// Pulled back to `shoreX + 40`, which puts its wall 12.2 m off the centreline —
-// the same standoff the guardrails run at on the far side of the lap, and clear
-// of the back row of the village at `shoreX + 38 .. + 42` in Z. It is still on
-// the rise between the village and the road, which is where a church goes; there
-// is only about 12 m of corridor there and this is the honest use of it.
-putAt('church', shoreX(24) + 40, 24, Math.PI / 2, 1.05);
+// Pulled back onto the back row's own line, `shoreX + 38`, and moved to z = 30 —
+// the gap in that row, between the houses at z = 16 and z = 46. Its wall now
+// measures 14.4 m from the centreline, further out than the guardrails run at
+// 12.4 m on the far side of the lap, with 2.8 m between its body and the nearest
+// thing in the village (the oak at z = 36). There is only about 12 m of corridor
+// between the back row and the road along this shore, which is why the answer is
+// to stand the church IN the row rather than to squeeze it into the corridor.
+putAt('church', shoreX(30) + 38, 30, Math.PI / 2, 1.05);
 putAt('oak', shoreX(36) + 46, 36, 0, 1.4);
 putAt('oak', shoreX(-52) + 44, -52, 0, 1.2);
 
@@ -605,7 +607,7 @@ putAt('shed', 312, 88, 0.9, 0.95);
 // no collider check can see it and the car drives through it; it is simply drawn
 // through the windscreen instead. The line and its relationship to the farm are
 // right, so the run keeps both and starts two modules further up it, which puts
-// the nearest post 13.4 m out.
+// the nearest post 13.3 m out.
 for (let i = 2; i < 10; i++) putAt('fenceRun', 268 + i * 8 * Math.cos(0.9), 20 + i * 8 * Math.sin(0.9), 0.9, 1);
 putAt('waterTower', 372, 128, 0, 1);
 putAt('silo', 356, 42, 0, 1);
@@ -622,7 +624,7 @@ putAt('logPile', 292, 74, 0.9, 1.1);
 // from the centreline of a road whose edge is at 7, so it ran through the
 // carriageway; `stoneWall` is not solid, so again nothing could stop the car and
 // nothing could see it. The run keeps its line and its angle and starts one
-// module further along, putting the nearest wall 13.7 m out.
+// module further along, putting the nearest wall 13.6 m out.
 for (let i = 1; i < 7; i++) putAt('stoneWall', 250 + i * 8 * Math.cos(2.1), -150 + i * 8 * Math.sin(2.1), 2.1, 1);
 
 const track = {
