@@ -34,8 +34,9 @@
  * comparison here fails every single time and teaches you to ignore it.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, readdirSync, statSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, readdirSync, statSync, rmSync, mkdtempSync } from 'node:fs';
+import { join, basename } from 'node:path';
+import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { compare } from './png.mjs';
 
@@ -57,11 +58,7 @@ function snapshot(paths) {
   const out = new Map();
   for (const p of paths) {
     if (statSync(p, { throwIfNoEntry: false })?.isDirectory()) {
-      // `.was` is this tool's own held-back copy, not an output
-      for (const f of readdirSync(p)) {
-        if (f.endsWith('.was')) continue;
-        out.set(join(p, f), readFileSync(join(p, f)));
-      }
+      for (const f of readdirSync(p)) out.set(join(p, f), readFileSync(join(p, f)));
     } else if (statSync(p, { throwIfNoEntry: false })) {
       out.set(p, readFileSync(p));
     }
@@ -80,7 +77,15 @@ function verify(name, script, outputs, { pixels = false } = {}) {
     restored = true;
     for (const [p, buf] of before) writeFileSync(p, buf);
   };
-  const scratch = (p) => `${p}.was`;
+  // HELD OUTSIDE THE OUTPUT DIRECTORY. The first version put each copy beside
+  // its original as `<file>.was`, which worked until `make-set-sheets` started
+  // emptying `docs/sets` before writing — then the generator deleted this
+  // tool's only copy of what it was about to compare against.
+  let hold = null;
+  const scratch = (p) => {
+    hold ??= mkdtempSync(join(tmpdir(), 'verify-generated-'));
+    return join(hold, basename(p));
+  };
   try {
     // pixel comparison needs both versions on disk at once to decode them
     if (pixels) for (const [p, buf] of before) writeFileSync(scratch(p), buf);
@@ -108,7 +113,7 @@ function verify(name, script, outputs, { pixels = false } = {}) {
     check(false, `${name}: ${script} ran`, String(e.message).split('\n')[0].slice(0, 120));
   } finally {
     restore();
-    if (pixels) for (const p of before.keys()) rmSync(scratch(p), { force: true });
+    if (hold) rmSync(hold, { recursive: true, force: true });
   }
 }
 

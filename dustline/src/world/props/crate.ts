@@ -2,7 +2,8 @@
 // the rock: a small one should be scenery, not a wall.
 
 import * as THREE from 'three';
-import { PropTemplate, standard, mergeGeoms, boxAt, beam } from './types';
+import { PropTemplate, standard, mergeGeomsUV, boxAt, beam } from './types';
+import { crateTexture } from '../../templates/surfaces';
 
 const crate: PropTemplate = {
   id: 'crate',
@@ -12,16 +13,18 @@ const crate: PropTemplate = {
 
   build: () => [{
     key: 'box',
-    geometry: mergeGeoms([
+    geometry: mergeGeomsUV([
       boxAt(1.1, 1.1, 1.1, 0),
       // corner battens, so it reads as timber rather than a grey cube
       beam(1.16, 0.1, 0.1, 0, 0.08, 0.55), beam(1.16, 0.1, 0.1, 0, 1.02, 0.55),
       beam(1.16, 0.1, 0.1, 0, 0.08, -0.55), beam(1.16, 0.1, 0.1, 0, 1.02, -0.55),
       beam(0.1, 0.1, 1.16, 0.55, 0.08, 0), beam(0.1, 0.1, 1.16, 0.55, 1.02, 0),
     ]),
-    material: standard(0xb08a52, { flatShading: false }),
+    // the map carries the timber colour, so the material is white and the
+    // per-instance tint jitters lightness around it rather than re-dyeing it
+    material: standard(0xffffff, { flatShading: false, map: crateTexture() }),
     castShadow: true,
-    tint: (c) => new THREE.Color(0xb08a52).offsetHSL(0, 0, c.rng.centered(0.06)),
+    tint: (c) => new THREE.Color(0xffffff).offsetHSL(0, 0, c.rng.centered(0.06)),
   }],
 
   physics: {

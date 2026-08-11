@@ -32,6 +32,7 @@
 
 import * as THREE from 'three';
 import { Rng } from '../core/rng';
+import { make } from './canvas';
 
 /** Where the windows sit in the 256x256 wall tile. Shared by the albedo and
  *  the emissive companion so the glow lands exactly on the glass. */
@@ -39,15 +40,6 @@ const HUT_WINDOWS = [
   [30, 96, 44, 40], [98, 96, 44, 40], [182, 96, 44, 40],
   [40, 26, 38, 34], [178, 26, 38, 34],
 ];
-
-function make(w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) {
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  draw(c.getContext('2d')!, w, h);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
 
 /** Wall: horizontal banding, lit windows and a door.
  *
