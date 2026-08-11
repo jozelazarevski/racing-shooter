@@ -3,7 +3,8 @@
 // where the same square with only houses could have been abandoned for years.
 
 import * as THREE from 'three';
-import { PropTemplate, standard, mergeGeoms, beam } from './types';
+import { PropTemplate, standard, mergeGeoms, mergeGeomsUV, beam } from './types';
+import { awningTexture } from '../../templates/markings';
 
 const marketStall: PropTemplate = {
   id: 'marketStall',
@@ -26,11 +27,18 @@ const marketStall: PropTemplate = {
     },
     {
       key: 'awning',
-      geometry: mergeGeoms([
+      geometry: mergeGeomsUV([
         beam(2.9, 0.08, 0.95, 0, 2.5, 0.35, -0.42, 0, 0),
         beam(2.9, 0.08, 0.95, 0, 2.5, -0.35, 0.42, 0, 0),
       ]),
-      material: standard(0xffffff, { roughness: 0.85, flatShading: false }),
+      // PALE STRIPES, NOT v1'S RED — the tint below is the whole point of this
+      // part, a different canopy colour per stall, and a red/cream map
+      // multiplied by a random hue is mud. White/grey stripes take the tint:
+      // full-strength colour and a dimmed band of the same colour.
+      material: standard(0xffffff, {
+        roughness: 0.85, flatShading: false,
+        map: awningTexture('#ffffff', '#a9a9a9'),
+      }),
       // The awning is the only part anyone sees from a distance, so it carries
       // all the variety — a market of identical canopies looks like a car park.
       tint: (c) => new THREE.Color().setHSL(

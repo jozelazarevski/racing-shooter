@@ -116,11 +116,24 @@ A map is only an improvement where the geometry has a surface to take it, and
 `mergeGeoms` drops UVs — use `mergeGeomsUV` on anything that carries a map.
 Where a texture was tried and backed out, it was for a reason worth repeating:
 
+Wired in (each verified with a close-up render before it stayed):
+
+| component | map | note |
+|---|---|---|
+| crate | `crateTexture` | boards, braces, nail heads |
+| quay wall face | `stoneTexture({repeat})` | the one big flat surface on it |
+| jetty deck | `plankTexture([1, 6])` | flat slabs with no boards modelled — the case the map is FOR |
+| start gantry banner | `checkerTexture([3, 1])` | a single beam, so its own box UVs survive |
+| market stall awning | `awningTexture('#ffffff', '#a9a9a9')` | PALE stripes under the per-instance tint — v1's own townhouse technique, so every stall keeps its own colour |
+
 | component | why not |
 |---|---|
 | oil drum | `barrelTexture` is an oak cask; the drum is painted steel, and its saturated instance tints multiplied the wood brown into mud |
 | barrel stack | the casks already have hoop *geometry*; the texture paints hoops too, so they doubled |
 | stone wall | already models every block as geometry — a block texture on blocks |
+| terrace wall | same — its courses are modelled |
+| timber bridge deck | twenty modelled baulks; the plank map would paint boards on boards |
+| chevron sign | the three chevrons are modelled bars; `chevronTexture` on the board behind them would double the arrows |
 | traffic cone | the reflective band is already a mesh; the wrap only added white patches to the base flange |
 | grandstand | `crowdTexture` needs a surface facing the track; the benches are 16 cm tall |
 

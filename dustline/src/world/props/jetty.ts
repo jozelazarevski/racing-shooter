@@ -16,7 +16,8 @@
 
 import * as THREE from 'three';
 import { PropTemplate, standard } from './types';
-import { bundle } from '../../templates/geometry';
+import { bundle, mergeGeomsUV } from '../../templates/geometry';
+import { plankTexture } from '../../templates/surfaces';
 
 /** v1's marina constants. */
 const FLEN = 14;      // finger length
@@ -32,16 +33,22 @@ const jetty: PropTemplate = {
   build: () => [
     {
       key: 'deck',
-      geometry: bundle([
+      // UV-preserving, because these are the one kind of surface the plank map
+      // is FOR — flat slabs with no boards modelled on them. (The timber
+      // bridge's deck is the opposite case: twenty modelled baulks, where the
+      // map would paint boards on boards.)
+      geometry: mergeGeomsUV([
         // the walkway itself — the marina's `bw`, 3.4 x 0.42
         new THREE.BoxGeometry(3.4, 0.42, RUN).translate(0, 1.71, RUN / 2 - 2),
         // two fingers, at the marina's own pitch and length
         ...[-1, 1].map((sg) => new THREE.BoxGeometry(FLEN, 0.5, 2.2)
           .translate(sg * (FLEN / 2 + 1.7), 1.7, PITCH)),
       ]),
-      material: standard(0x8a6a44, { roughness: 1 }),
+      // ~10 boards per tile across the 3.4 m walkway is a 34 cm board; the
+      // repeat down the run keeps the grain from smearing over 22 m
+      material: standard(0xffffff, { roughness: 1, map: plankTexture([1, 6]) }),
       castShadow: true,
-      tint: (c) => new THREE.Color(0x8a6a44).offsetHSL(0, c.rng.centered(0.04), c.rng.centered(0.06)),
+      tint: (c) => new THREE.Color(0xffffff).offsetHSL(0, 0, c.rng.centered(0.06)),
     },
     {
       key: 'piles',

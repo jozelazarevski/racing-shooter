@@ -26,7 +26,12 @@ const argv = process.argv.slice(2);
 const outIdx = argv.indexOf('--out');
 const OUT = outIdx >= 0 ? argv[outIdx + 1] : 'docs/close';
 const WATER = argv.includes('--water');
-const ids = argv.filter((a, i) => !a.startsWith('--') && i !== outIdx + 1);
+// look-down angle in radians; the default matches the set sheets. Pass a
+// steeper one to judge a roof or an awning — the chase camera looks DOWN, so
+// the top of a canopy is what a player actually sees of it.
+const pitchIdx = argv.indexOf('--pitch');
+const PITCH_ARG = pitchIdx >= 0 ? Number(argv[pitchIdx + 1]) : 0.26;
+const ids = argv.filter((a, i) => !a.startsWith('--') && i !== outIdx + 1 && i !== pitchIdx + 1);
 if (!ids.length) {
   console.error('usage: node tools/shot-component.mjs [--out DIR] <componentId>...');
   process.exit(2);
@@ -49,7 +54,7 @@ await page.waitForFunction(() => window.__editor?.preview?.terrain, null, { time
 await page.evaluate(() => { document.getElementById('views').className = 'd3-only'; });
 
 for (const id of ids) {
-  const info = await page.evaluate(async ({ id, water }) => {
+  const info = await page.evaluate(async ({ id, water, pitch }) => {
     const e = window.__editor;
     const t = e.getTemplate(id);
     if (!t) return { error: `no component "${id}"` };
@@ -102,11 +107,11 @@ for (const id of ids) {
     o.target.set(spot.x, hgt * 0.45, spot.z);
     // fit the LARGER of width and height, with a small margin
     o.dist = Math.max(3.5, (Math.max(w, hgt) / 2) / Math.tan(halfW) * 1.9);
-    o.pitch = 0.26;
+    o.pitch = pitch;
     o.yaw = 0.7;
     e.preview.carMarker.position.set(spot.x + w / 2 + 2.2, 0.45, spot.z);
     return { w: Math.round(w * 100) / 100, h: Math.round(hgt * 100) / 100, dist: Math.round(o.dist) };
-  }, { id, water: WATER });
+  }, { id, water: WATER, pitch: PITCH_ARG });
 
   if (info?.error) { console.log(`SKIP  ${id} — ${info.error}`); continue; }
   await page.waitForTimeout(1500);
