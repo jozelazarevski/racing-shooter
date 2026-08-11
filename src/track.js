@@ -6608,27 +6608,39 @@ export class Track {
     // ARENA each had a tower's legs standing in the racing line, on the fast
     // part of the lap. The span now opens until both towers stand clear of
     // every stretch of road, and the banner between them just gets wider.
-    const legsIn = (s) => {
+    //
+    // EACH TOWER FINDS ITS OWN OFFSET. A single symmetric span has to satisfy
+    // both sides at once, so a lap that runs close on the left pushed the
+    // right-hand tower out with it and often satisfied neither — on TOUR DE
+    // CORSE no symmetric width in range worked at all. The banner simply hangs
+    // between wherever the two towers end up.
+    const legsIn = (s, side) => {
       let n0 = 0;
-      for (const side of [1, -1]) {
-        for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
-          if (!this._clearsRoad(c.x + n.x * s * side + ox, c.z + n.z * s * side + oz, 0.6, 0.9)) n0++;
-        }
+      for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
+        if (!this._clearsRoad(c.x + n.x * s * side + ox, c.z + n.z * s * side + oz, 0.6, 0.9)) n0++;
       }
       return n0;
     };
-    // Widen to the first span that stands entirely clear. If none does — a
-    // circuit that runs back past its own start line at every plausible width
-    // — take the span with the FEWEST legs in the road, ties going to the
-    // narrowest. Taking the widest tried instead made it worse than doing
-    // nothing: 13 legs in the lane against the 8 it started with.
-    let span = 12.5, best = legsIn(12.5);
-    for (let s = 12.5; s <= 22 && best > 0; s += 0.5) {
-      const n0 = legsIn(s);
-      if (n0 < best) { best = n0; span = s; }
-    }
+    // Push out to the first offset that stands entirely clear. If none does,
+    // take the one with the FEWEST legs in the road, ties to the narrowest —
+    // so the fallback can never be worse than leaving it where it was. Keeping
+    // the widest tried instead was worse than doing nothing: 13 legs in the
+    // lane against the 8 it started with.
+    const offsetFor = (side) => {
+      let bestS = 12.5, bestN = legsIn(12.5, side);
+      for (let s = 13; s <= 26 && bestN > 0; s += 0.5) {
+        const n0 = legsIn(s, side);
+        if (n0 < bestN) { bestN = n0; bestS = s; }
+      }
+      return bestS;
+    };
+    const offs = { 1: offsetFor(1), '-1': offsetFor(-1) };
+    // the crossbar reaches from one tower to the other, wherever they landed
+    const reach = offs[1] + offs['-1'];
+    const mid = (offs[1] - offs['-1']) / 2;      // centre of the two towers
     for (const side of [1, -1]) {
-      const bx = c.x + n.x * span * side, bz = c.z + n.z * span * side;
+      const off = offs[side];
+      const bx = c.x + n.x * off * side, bz = c.z + n.z * off * side;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
         const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 10, 8), steel);
         leg.position.set(bx + ox, 5, bz + oz);
@@ -6651,12 +6663,12 @@ export class Track {
       this._checkerFlag(bx, 11.8, bz);
     }
     const banner = new THREE.Mesh(
-      new THREE.BoxGeometry(span * 2 + 1, 2.4, 0.5),   // spans whatever the towers opened to
+      new THREE.BoxGeometry(reach + 1, 2.4, 0.5),      // spans whatever the towers opened to
       new THREE.MeshStandardMaterial({ map: wallTexture(), roughness: 0.85 })
     );
     banner.material.map = wallTexture();
     banner.material.map.repeat.set(6, 1);
-    banner.position.set(c.x, 9, c.z);
+    banner.position.set(c.x + n.x * mid, 9, c.z + n.z * mid);
     banner.rotation.y = heading;
     banner.castShadow = true;
     this.group.add(banner);
@@ -6665,7 +6677,7 @@ export class Track {
     const finTex = finishBannerTexture();
     for (const flip of [0, Math.PI]) {
       const fin = new THREE.Mesh(
-        new THREE.PlaneGeometry(span * 2 - 1, 2.15),
+        new THREE.PlaneGeometry(reach - 1, 2.15),
         new THREE.MeshStandardMaterial({ map: finTex, roughness: 0.85 })
       );
       fin.position.set(c.x, 9, c.z);
