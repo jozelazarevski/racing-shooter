@@ -11,7 +11,7 @@ import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
 import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
-  tyreClass, tyreLevelFor, TYRE_LABEL } from './vehicles.js';
+  tyreClass, tyreLevelFor, TYRE_LABEL, tyrePenalty } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
 import { Weapons } from './weapons.js';
@@ -1622,9 +1622,7 @@ class Game {
         : '<span class="wc-fitok">✓</span>';
       return `<div class="wc-surf ok">${surf} ${over}</div>`;
     }
-    const why = f.tooMuch
-      ? `TOO MUCH TYRE — WANTS ${TYRE_NAME[f.need]}`
-      : `NEEDS ${TYRE_NAME[f.need]}`;
+    const why = `${TYRE_LABEL[f.have]} TYRES −${f.pen}% GRIP`;
     return `<div class="wc-surf bad">${surf} · ${why}`
       + `<span class="wc-fix">${f.fix.text}</span></div>`;
   }
@@ -1651,8 +1649,15 @@ class Game {
     // car is barred from the loose stages, and NO SINGLE CAR COVERS THE
     // ROSTER. The starter is legal on 53 of 58 and slow on the circuits, so
     // there is a reason to buy in both directions.
+    // `ok` now means "in the ideal window", not "allowed to race" — nothing
+    // is barred any more. One eligible car per surface turned the roster into
+    // one car per trail, reported as exactly that; the mismatch is priced in
+    // grip instead (see tyrePenalty), and `pen` is that price as a percent so
+    // every label can state it rather than assert a prohibition.
+    const overC = Math.max(0, have - need), underC = Math.max(0, need - have);
+    const pen = Math.round((1 - tyrePenalty(overC, underC)) * 100);
     if (have >= need && have - need <= 1) {
-      return { ok: true, need, have, over: have - need };
+      return { ok: true, need, have, over: have - need, under: 0, pen };
     }
     if (have > need) {
       // too much tyre: name the lightest thing that can do this properly
@@ -1671,7 +1676,7 @@ class Game {
         : buy ? { kind: 'buy', car: buy.key,
           text: `BUY THE ${buy.name} — ${buy.price.toLocaleString()} CR` }
           : { kind: 'none', text: 'NOTHING IN THE GARAGE SUITS THIS SURFACE' };
-      return { ok: false, need, have, over: have - need, tooMuch: true, fix };
+      return { ok: false, need, have, over: have - need, under: 0, pen, tooMuch: true, fix };
     }
     // cheapest route back to legal: an upgrade if one reaches, else a car
     const lvl = tyreLevelFor(carKey, (this.garage.upgrades || {})[carKey], need);
@@ -1799,11 +1804,13 @@ class Game {
   _syncStartButton() {
     const start = document.getElementById('start-btn');
     if (!start) return;
+    // THE BUTTON NEVER BLOCKS ON TYRES ANY MORE. It states the price instead:
+    // the wrong set costs grip, and grip is a number, not a prohibition.
     const f = this.freeRoam ? null : this.carFitness(this.level.id);
-    const blocked = !!(f && !f.ok);
-    start.classList.toggle('blocked', blocked);
-    start.textContent = blocked
-      ? (f.tooMuch ? `WRONG TYRE — WANTS ${TYRE_NAME[f.need]}` : `NEEDS ${TYRE_NAME[f.need]}`)
+    const warned = !!(f && !f.ok);
+    start.classList.remove('blocked');
+    start.textContent = warned
+      ? `START — WRONG TYRES (−${f.pen}% GRIP)`
       : this.missionMode ? 'START MISSION'
         : this.freeRoam ? 'START EXPLORING' : 'START RACE';
   }
@@ -2521,6 +2528,7 @@ class Game {
     if (!this.player || !this.level) return;
     const f = this.carFitness(this.level.id);
     this.player._tyreOver = f ? Math.max(0, f.over) : 0;
+    this.player._tyreUnder = f ? Math.max(0, f.need - f.have) : 0;
   }
 
   /** Apply the SELECTED car's purchased upgrades to the player (base stats
@@ -2651,8 +2659,8 @@ class Game {
     if (!f) return '';
     const tc = tyreClass(car.key, (this.garage.upgrades || {})[car.key]);
     const badge = `<b>${TYRE_LABEL[tc]}</b> TYRES`;
-    if (!f.ok) return `<div class="ctyre bad">${badge} · CANNOT RACE ${this.level.name}</div>`;
-    if (f.over > 0) return `<div class="ctyre over">${badge} · OVER-TYRED HERE</div>`;
+    if (!f.ok) return `<div class="ctyre bad">${badge} · −${f.pen}% GRIP HERE</div>`;
+    if (f.over > 0) return `<div class="ctyre over">${badge} · OVER-TYRED, −${f.pen}%</div>`;
     return `<div class="ctyre ok">${badge} · READY</div>`;
   })()}
         ${(() => {
@@ -5752,25 +5760,17 @@ class Game {
   }
 
   startRace() {
-    // THE GATE. A car on the wrong tyres does not take the start.
-    //
-    // Free roam is deliberately exempt: wandering a snow world on road tyres
-    // is a bad idea you are allowed to have, and it is the cheapest way to
-    // FEEL why the rule exists before you pay for the fix.
+    // NO GATE — A WARNING WITH A NUMBER ON IT. The start line used to refuse
+    // the wrong tyres outright, and with one eligible car per surface that
+    // collapsed the roster into one car per trail. You now take the start on
+    // anything; the physics prices the mismatch, and this pair of lines makes
+    // sure you knew before the lights went out.
     if (!this.freeRoam) {
       const f = this.carFitness(this.level.id);
       if (f && !f.ok) {
-        const car = CAR_CATALOG.find((c) => c.key === this.cars.selected);
-        this.hud.feed(`${car.name} IS ON ${TYRE_LABEL[f.have]} TYRES — `
-          + `${this.level.name} ${f.tooMuch ? 'IS TOO SMOOTH FOR THEM, IT WANTS'
-            : 'NEEDS'} ${TYRE_NAME[f.need]}`, 'bad');
-        this.hud.feed(f.fix.text, 'info');
-        // send them where the fix is, rather than leaving them on a dead button
-        if (f.fix.kind === 'upgrade' || f.fix.kind === 'buy' || f.fix.kind === 'own') {
-          document.getElementById('tab-btn-garage')?.click();
-        }
-        this._syncStartButton();
-        return;
+        this.hud.feed(`${TYRE_LABEL[f.have]} TYRES ON A ${SURFACE_LABEL[f.need]} STAGE `
+          + `— GRIP −${f.pen}%`, 'bad');
+        if (f.fix && f.fix.text) this.hud.feed(f.fix.text, 'info');
       }
     }
     this.audio.start();
