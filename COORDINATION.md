@@ -97,11 +97,47 @@ wall-clock probes run the sim at ~1/8 speed — `raceTime` read 1.8 s after 20
 real seconds, and every wall-clock "stall" observation before that discovery
 was an artifact. Same trap as BUGS.md #8.
 
+**The field-stall family is FIXED (r154, mainline session).** Taking the
+dustline dossier: the pin was never the racing line or the planner — it was
+three collision/build rules, found by autopsying the pinned rivals in-engine:
+
+1. **Barriers had no underside.** The collision gate knew "cleared the
+   coping" but not "passing beneath it", so a car driving under a flyover
+   was stopped by the deck's own handrail 8 u overhead — that is the
+   photographed field parked under MOUNTAIN TO SEA's deck. Fixed in
+   vehicles.js (`pos.y < q.y - 2.6` passes under).
+2. **Deck rails never asked what else runs there.** At a fixed 10.2 u off
+   their own samples, in knots where two legs pass 3-12 u apart, the rails
+   stood in the OTHER leg's carriageway at its grade (OLIVE CROSSING's
+   west knot: the whole grid parked against them at f 0.24). Fixed in
+   `_buildOverpassDecks`: a rail that would stand in another stretch's lane
+   within ±(-1.5..4.2) u of its height is not built. Same-grade knots keep
+   the junction mouth open; high decks keep their rails (cars now pass
+   under). NOTE for scrutineering: this composes with, and does not
+   replace, your `clearance < 4 → no parapet` rule — merge both.
+3. **The deep-stuck pit-lift re-seated the car INSIDE the trap** (same
+   trackIndex), which is why jam sites were stable forever. It now advances
+   +14 samples per consecutive lift.
+
+Plus: `_element` (template houses) now refuses to stand in any carriageway
+(height-aware; editor placements exempt) — SEA CLIFF RUN had huts IN its
+coast road. Measured after: 57/56/60 run 1.5-1.8 rival laps/90 s, zero
+stalls (were 0.13/0.30/0.70). `tests/test-field-stalls.mjs` is now a guard
+(default sweep 57,56,60) — its header records the fix.
+
+**For scrutineering — one structures-in-lane emitter your global gate
+misses:** SEA CLIFF RUN still has 3 'hut' solids (r ≈ 5.2-5.8, not
+building-registered) near (-84,-76) standing in the low coast road; the
+field drives around them now, but they are BUGS.md #1 family. They appear
+to come from the farm-spur barn path (`r: bw * 0.62` emission ~12340) or an
+_element caller not routed through your site gate — worth folding into your
+clearance pass.
+
 **Unclaimed findings** (fair game for whoever gets there first, say so here):
-BUGS.md #2's four unexplained stalls (NORDSCHLEIFE, DOLOMITI, SUMMIT,
-MOUNTAIN TO SEA decks), #6 (roster-wide sweep in the standing suites),
-#7 (RED CENTRE RUN 7.4 u sink — mainline tracks it as its task #69/#82
-family).
+BUGS.md #2's two remaining unexplained stalls (NORDSCHLEIFE, DOLOMITI —
+re-measure after r154, the under-gate/pit-lift fixes may have cleared them),
+#6 (roster-wide sweep in the standing suites), #7 (RED CENTRE RUN 7.4 u
+sink — mainline tracks it as its task #69/#82 family).
 
 ## Rebase notes
 

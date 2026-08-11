@@ -1,9 +1,18 @@
-/* THE RIVAL FIELD STALLS ON THREE WORLDS. A fixed-step reproduction.
+/* THE RIVAL FIELD MUST NEVER PARK. A fixed-step guard.
  *
- * OPEN BUG — this test is RED on MOUNTAIN TO SEA (57), OLIVE CROSSING (56)
- * and SEA CLIFF RUN (60), and green everywhere else checked. It exists so the
- * fix has a definition of done. Reported twice with photographs: "Everyone is
- * stuck here under the tunnel" (57) and a pile at the crossing (56).
+ * Written by the dustline session as a deliberately-RED reproduction of the
+ * field stalls (0.13-0.70 laps/90 s on MOUNTAIN TO SEA (57), OLIVE CROSSING
+ * (56) and SEA CLIFF RUN (60), whole grid wedged; photographed twice by the
+ * player). FIXED — the fix landed as three rules, and this test now guards
+ * them:
+ *   - a barrier's underside exists: cars pass beneath rails whose base sits
+ *     above the roof, so a flyover's own handrail cannot dam the road below
+ *     (vehicles.js barrier under-gate);
+ *   - a deck rail that would stand in ANOTHER stretch's lane at its grade is
+ *     not built — the gap is a junction mouth (track.js _buildOverpassDecks);
+ *   - the deep-stuck pit-lift advances past the trap instead of re-seating
+ *     the car inside it (vehicles.js).
+ * All three worlds now run 1.5-1.8 rival laps/90 s with zero stalls.
  *
  * MEASURE FIXED-STEP OR MEASURE NOTHING. Headless SwiftShader renders these
  * heavy worlds at a few fps and the game clock advances per-frame capped at
@@ -25,7 +34,7 @@
  *     position, at-grade corridor overlap alone (56's jam site has 28 u of
  *     vertical leg separation; 60's has 11 u)
  *
- *   node tests/test-field-stalls.mjs             # 57,56 by default
+ *   node tests/test-field-stalls.mjs             # 57,56,60 by default
  *   LEVELS=1,57,56,60,20 node tests/test-field-stalls.mjs
  */
 import { chromium } from 'playwright-core';
@@ -34,7 +43,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 480, height: 320 } });
 page.setDefaultTimeout(900000);
-for (const lvl of (process.env.LEVELS ?? '57,56').split(',')) {
+for (const lvl of (process.env.LEVELS ?? '57,56,60').split(',')) {
   await page.goto(`http://localhost:8901/?level=${lvl}&unlockall=1`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__game, null, { timeout: 30000 });
   await page.click('#start-btn');
