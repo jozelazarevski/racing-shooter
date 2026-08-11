@@ -13790,14 +13790,27 @@ export class Track {
           // a ridge lies ALONG the range, so it is turned to face the middle
           const yaw = form === 'ridge' ? a + Math.PI / 2 + (Math.random() - 0.5) * 0.3
             : Math.random() * Math.PI;
+          const zs = 0.5 + Math.random() * 0.7;
           m4.makeRotationY(yaw);
-          m4.scale(new THREE.Vector3(w, h, w * (0.5 + Math.random() * 0.7)));
+          m4.scale(new THREE.Vector3(w, h, w * zs));
           m4.setPosition(px, h / 2 + seat(px, pz), pz);
           const i = mesh.count;
           mesh.setMatrixAt(i, m4);
           jcol.setScalar(shade + Math.random() * 0.3);
           mesh.setColorAt(i, jcol);
           mesh.count = i + 1;
+          // THE HORIZON IS SOLID TOO. r148 made the drivable massif solid and
+          // measured 18 runs at its peaks — but these rings never registered a
+          // collider at all, and nothing fences the field, so a car driven
+          // ~900 u out sailed straight into a skyline range ("Still can
+          // enter", photographed from inside a hillside). Audited: 51 of 60
+          // worlds had EVERY horizon mountain bare. Same treatment as the
+          // massif cones — the long axis of the (w x w*zs, yawed) footprint,
+          // at the cone rule's 0.48, solid over the full height.
+          this.solids.push({
+            x: px, z: pz, r: w * Math.max(1, zs) * 0.48,
+            y: seat(px, pz) + 2, h, mat: 'stone',
+          });
         }
       }
     };
@@ -13970,6 +13983,19 @@ export class Track {
       });
     }
     this._addMesaTiers(m4, specs);
+    // THE HORIZON MESAS ARE SOLID TOO — same hole as the mountain rings, same
+    // r148 treatment. Pushed HERE and not in `_addMesaTiers`, because
+    // `_buildOutcrops` also calls that helper for its in-field mesas and
+    // already registers their solids; doing it in the shared helper would
+    // double every outcrop. The base tier is a unit box scaled to w wide and
+    // up to 1.2 w deep, rotated — 0.6 w covers the long axis, the cone rule's
+    // trade of a little invisible margin on the short one.
+    for (const s of specs) {
+      this.solids.push({
+        x: s.x, z: s.z, r: s.w * 0.6,
+        y: -2 + this._highland(s.x, s.z) + 2, h: s.h, mat: 'stone',
+      });
+    }
   }
 
   /** Mid-distance canyon country outside the walls: smaller mesa blocks and a
