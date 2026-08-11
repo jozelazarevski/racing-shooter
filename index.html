@@ -142,6 +142,17 @@
     opacity:0;transition:opacity .45s ease}
   #fade.dark{opacity:1}
 
+  /* Raised while a picked world builds (a synchronous, seconds-long job): the
+     tap paints the highlight and THIS before the freeze, so the wait reads as
+     loading instead of a hang. pointer-events stays off — the menu remains
+     browsable in the beat before the build lands, and a further tap simply
+     re-aims the pending build. */
+  #build-veil{position:fixed;inset:0;display:grid;place-items:center;z-index:35;
+    background:rgba(13,8,5,.55);color:#ffe9a8;font-weight:700;font-size:17px;
+    letter-spacing:.1em;text-shadow:0 2px 8px rgba(0,0,0,.8);
+    opacity:0;pointer-events:none;transition:opacity .12s ease}
+  #build-veil.on{opacity:1}
+
   /* camera + pause buttons */
   .icon-btn{pointer-events:auto;position:absolute;width:46px;height:46px;border-radius:12px;
     border:2px solid var(--edge);background:var(--panel);color:#ffe9a8;font-size:22px;
@@ -982,8 +993,9 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r151</div>
+<div id="build-tag">r152</div>
 <div id="fade"></div>
+<div id="build-veil"></div>
 
 <div id="touch-ui">
   <div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
@@ -1201,10 +1213,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r151"></script>
+<script type="module" src="./src/main.js?v=r152"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r151"></script>
+<script src="./src/offline.js?v=r152"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r151"></script>
+<script type="module" src="./src/traffic.js?v=r152"></script>
 </body>
 </html>
