@@ -11057,6 +11057,23 @@ export class Track {
       color: 0x8f8a80, flatShading: true, roughness: 1,
     });
     for (const o of this._overpasses) {
+      // NO CLEARANCE, NO BRIDGE — AND THEREFORE NO PARAPET.
+      //
+      // The planner asks for 11.5 u of lift and the eroder is allowed to take
+      // it back, deliberately: in a dense knot of crossings a road you cannot
+      // drive up is worse than a low deck. But the DRESSING was built either
+      // way, and a parapet only makes sense on a deck that is actually up in
+      // the air. Measured on OLIVE CROSSING, whose single crossing ends up
+      // with 0.15 u of lift: seven stone rail segments lay straight across the
+      // road below, spanning lateral -6.8 to +8 of a nine-wide carriageway.
+      // Reported from a phone, as a car stopped dead against a wall with the
+      // pack piling into it.
+      //
+      // Below the height a car could pass under, the two legs simply cross at
+      // grade — which is a junction, and drivable. Rails guard a drop; where
+      // there is no drop they are just a wall in the road.
+      const clearance = this.center[o.up].y - this.center[o.down].y;
+      if (clearance < 4) continue;
       const g = new THREE.Group();
       for (let sN = -o.half; sN <= o.half; sN += 2) {
         const j = (o.up + sN + N) % N;
