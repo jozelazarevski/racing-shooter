@@ -897,13 +897,11 @@ export class Car {
 
     // THE WRONG TYRE HAS TO BE FELT, not just refused at the start line.
     //
-    // Under-specced never reaches here — the grid refuses it — so this is the
-    // other direction: studs on hot tarmac, or knobblies on a circuit. They
-    // squirm, they take longer to stop, and they will not hold a fast corner.
-    // Without this the mechanic collapses into "buy the snow set once and
-    // never think about tyres again", which is the same one-decision garage
-    // the class system exists to replace.
-    const f = tyrePenalty(this._tyreOver);
+    // Both directions of wrong tyre pay here now. Over-specced squirms;
+    // under-specced — which the grid used to refuse outright — slides worse
+    // and stops longer, so a snow stage on road tyres is drivable and clearly
+    // a bad idea, which is the lesson the hard gate could only ever assert.
+    const f = tyrePenalty(this._tyreOver, this._tyreUnder);
     if (f < 1) { sGrip *= f; sTract *= f; sBrake *= f; }
 
     const fwd = this.forward;
@@ -3307,7 +3305,17 @@ const GOLD = 0xe8b83a;
  *  still drifted 10 % in one direction, so the simulation was measuring
  *  accumulated state, not tyres. Testing the rule itself is honest; asserting
  *  on a rig that cannot repeat itself is not. */
-export const tyrePenalty = (over) => 1 - Math.min(0.20, 0.09 * Math.max(0, over | 0));
+/** The price of the wrong tyres, in grip. Over-specced squirms (studs on hot
+ *  tarmac); UNDER-specced is worse and steeper (road rubber on ice), because
+ *  that is the direction that used to be a hard refusal — the start line said
+ *  CANNOT RACE, and with one eligible car per surface the roster collapsed to
+ *  "one car per trail", reported as exactly that. A penalty keeps the whole
+ *  point of the class system — the right machine is clearly, measurably
+ *  faster — without forbidding anything: -17 % a class under, -34 % two
+ *  under, stacking with the over-spec squirm. */
+export const tyrePenalty = (over, under = 0) =>
+  (1 - Math.min(0.20, 0.09 * Math.max(0, over | 0)))
+  * (1 - Math.min(0.34, 0.17 * Math.max(0, under | 0)));
 
 export const TYRE_ROAD = 0, TYRE_GRAVEL = 1, TYRE_SNOW = 2;
 export const TYRE_LABEL = ['ROAD', 'GRAVEL', 'SNOW'];

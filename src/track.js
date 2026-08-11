@@ -73,7 +73,7 @@ export const LEVELS = [
     // the only world besides CANYON RUN to hang a hero bridge over a gorge
     tune: { // DAWN over the yumps: first light
       sunColor: 0xffc8a0, sunIntensity: 2.3, sunEl: 0.22, sunAz: 0.4,
-      skyTop: '#6d8fbe', skyHorizon: '#ffe2d4', fogColor: 0xf2ded8, hemiIntensity: 0.74, elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
+      dusk: true, skyTop: '#6d8fbe', skyHorizon: '#ffe2d4', fogColor: 0xf2ded8, hemiIntensity: 0.74, elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
       heroBridge: { at: [0.55, 0.66], half: 24, len: 210, depth: 28, skew: 0 } } },
 
   // ---- MEDITERRANEAN. Appended, so nothing before it is re-priced (career
@@ -129,7 +129,7 @@ export const LEVELS = [
   { id: 41, name: 'MOUNT PANORAMA', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
     cost: 13, fresh: true, tune: { // DUSK over the mountain: ember sky, violet ranges
       sunColor: 0xffb078, sunIntensity: 1.9, sunEl: 0.18, sunAz: 5.6,
-      skyTop: '#6b62a0', skyHorizon: '#ffc79c', fogColor: 0xdec4b6, hemiIntensity: 0.9, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
+      dusk: true, skyTop: '#6b62a0', skyHorizon: '#ffc79c', fogColor: 0xdec4b6, hemiIntensity: 0.9, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
   { id: 42, name: 'RALLYCROSS ARENA', theme: 'flume', route: 'rallyx', region: 'GRAND CIRCUITS',
     cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
   { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
@@ -339,7 +339,13 @@ export function worldFacets(level) {
       return ((n >> 16) & 255) > (n & 255) + 20;      // more red than blue
     })();
   let time = 'DAY';
-  if (top < 0.36 && hor > 0.45 && warm) time = 'DUSK';
+  // The four sunset worlds DECLARE themselves now. They used to be inferred
+  // from how dark their sky tops were, and the moment those tops were
+  // lightened (asked for by name in r147) they all reclassified as DAY and
+  // the DUSK filter chip went empty. A property this deliberate should be
+  // stated, not deduced.
+  if (T.dusk) time = 'DUSK';
+  else if (top < 0.36 && hor > 0.45 && warm) time = 'DUSK';
   else if (top < 0.22) time = 'NIGHT';
 
   // WEATHER. `leaves` is drifting foliage, not weather — those worlds have
@@ -1479,7 +1485,7 @@ const THEMES = {
     // tone lifted so the driving surface reads while the embers still glow.
     hemiSky: 0xe8b088, hemiGround: 0x8a6c58, hemiIntensity: 3.1,
     sunColor: 0xffa060, sunIntensity: 3.2,
-    skyTop: '#7b5566', skyHorizon: '#f08a5c', sunGlow: 0xff6a28, skyCurve: 0.72,
+    dusk: true, skyTop: '#7b5566', skyHorizon: '#f08a5c', sunGlow: 0xff6a28, skyCurve: 0.72,
     sunAz: 0.6, sunEl: 0.17,                             // ember sun low on the haze
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
     terrainLow: '#877668', terrainHigh: '#9a8676', terrainDirt: '#ac6a4a',
@@ -1909,7 +1915,7 @@ const THEMES = {
     // escaping a fire you could not see the road through
     hemiSky: 0xf0ab74, hemiGround: 0x94705a, hemiIntensity: 2.9,
     sunColor: 0xff8a48, sunIntensity: 2.6,
-    skyTop: '#7c5354', skyHorizon: '#f09c6a', sunGlow: 0xff6a20, skyCurve: 0.66,
+    dusk: true, skyTop: '#7c5354', skyHorizon: '#f09c6a', sunGlow: 0xff6a20, skyCurve: 0.66,
     sunAz: 0.55, sunEl: 0.15,
     cloudCount: 9, cloudOpacity: 0.5, cloudTint: 0x5a4238,   // smoke columns
     terrainLow: '#705a42', terrainHigh: '#94785a', terrainDirt: '#a86436',
@@ -4401,6 +4407,23 @@ export class Track {
     // Elevation profile: the road climbs and descends over the lap (tan/nrm and
     // curvature stay XZ-based — heading math is unaffected by the y channel).
     for (let i = 0; i < N; i++) this.center[i].y = this._elevProfile(i);
+    // THE SCULPT MOVES THE ROAD TOO.
+    //
+    // "The road is the floor" clamps the GROUND to the road, so an editor
+    // sculpt could raise or dig everything EXCEPT the one surface the car
+    // actually drives on: lower the ground under the carriageway and the road
+    // stayed up on a shelf at its old height — reported as "if I lower the
+    // ground with the editor tool, when driving it is still high ground",
+    // and as no way to raise a road over a bridge. The delta now displaces
+    // the elevation profile itself, HERE, before the coast lift, the overpass
+    // ramps and every clamp read it — so all of those keep their guarantees
+    // on top of the shape you carved, RAISE under an approach lifts the
+    // road, and LOWER digs a genuine cutting through it.
+    if (edit && edit.delta) {
+      for (let i = 0; i < N; i++) {
+        this.center[i].y += edit.delta.at(this.center[i].x, this.center[i].z);
+      }
+    }
     // A COAST ROAD RUNS ABOVE THE WATER.
     //
     // The elevation profile is written without any knowledge of the sea, and on
@@ -5712,8 +5735,13 @@ export class Track {
     //   length of a ramp built for 8.6. Clearance is not cumulative — it is
     //   "be at least this far above the other leg" — so overlapping bumps take
     //   the MAXIMUM, not the sum.
-    const CLEAR = 8.6;
-    const HALF = Math.ceil(60 / this.segLen);
+    // 8.6 u of clearance put the deck's soffit barely over a roofline, and
+    // from the lower road the flyover loomed at head height — reported simply
+    // as "raise the bridge". 11.5 u reads as a bridge; the ramp grows to keep
+    // the raised-cosine's peak slope at 11.5*pi/(2*82) = 22 %, inside the
+    // 24 % cap the eroder enforces anyway.
+    const CLEAR = 11.5;
+    const HALF = Math.ceil(82 / this.segLen);
     const lift = new Float32Array(N);
     const bump = (up, height) => {
       for (let sN = -HALF; sN <= HALF; sN++) {
@@ -5759,7 +5787,27 @@ export class Track {
       }
       if (!moved) break;
     }
-    for (let i = 0; i < N; i++) this.center[i].y += lift[i];
+    // WHERE THE RAMP CANNOT GO HIGHER, THE UNDERPASS GOES LOWER.
+    //
+    // In a dense knot the eroder legitimately takes clearance back (that is
+    // its job — a wall of road is worse than a low deck), and topping the
+    // ramp back up is the fix that compounded last time. Digging the DOWN
+    // leg cannot compound: it is bounded at 4 u, it takes the minimum where
+    // dips overlap rather than the sum, and 4 u over an 82 u approach is a
+    // 5 % grade — far inside the cap the eroder enforces on the ramps.
+    const dip = new Float32Array(N);
+    for (const o of this._overpasses) {
+      const gap = (this.center[o.up].y + lift[o.up])
+        - (this.center[o.down].y + lift[o.down]);
+      const short = Math.min(4, CLEAR - 1 - gap);
+      if (short <= 0) continue;
+      for (let sN = -HALF; sN <= HALF; sN++) {
+        const j = (o.down + sN + N) % N;
+        const v = -short * (0.5 + 0.5 * Math.cos((sN / HALF) * Math.PI));
+        if (v < dip[j]) dip[j] = v;
+      }
+    }
+    for (let i = 0; i < N; i++) this.center[i].y += lift[i] + dip[i];
   }
 
   /** True when sample i lies on an overpass flyover span (+pad). */
@@ -6057,7 +6105,14 @@ export class Track {
     // could raise a hill straight through the road surface and strand the
     // car. Applied here, the ground can be pushed anywhere and the road
     // still wins where they disagree.
-    if (this._delta) h += this._delta.at(x, z);
+    // FADED IN OVER THE ROAD BLEND. The road datum itself now carries the
+    // sculpt (the elevation profile is displaced in the constructor), and the
+    // blend above already pulls the ground toward that datum near the
+    // carriageway — adding the full delta again there counted it twice, so a
+    // dig dropped the verge twice as far as the road and the ribbon rode a
+    // shelf over its own cutting. On the road the datum speaks; in the open
+    // the delta speaks; the ramp between matches the corridor blend's reach.
+    if (this._delta) h += this._delta.at(x, z) * smoothstep01((nd - 10) / 60);
     if (this._citMound) h += this._citMoundH(x, z);
     if (nd <= 27) {
       const clamp = this._roadClampY(x, z, bi, nd);
@@ -6187,8 +6242,9 @@ export class Track {
     // measured +33.91 at the centre with nothing whatsoever on screen. The
     // numbers agreed with each other and disagreed with the picture; the
     // picture was right.
-if (this._citMound) h += this._citMoundH(x, z);
-        if (this._delta) h += this._delta.at(x, z);
+    if (this._citMound) h += this._citMoundH(x, z);
+    // same fade as terrainHeight — see the note there; these two must agree
+    if (this._delta) h += this._delta.at(x, z) * smoothstep01((d - 10) / 60);
     if (d <= 27) {
       // the SAME clamp the physics height uses, not a hand-copied mirror of it
       const clamp = this._roadClampY(x, z, bi, d);
@@ -9437,7 +9493,13 @@ if (this._citMound) h += this._citMoundH(x, z);
         }
       }
       q.setFromAxisAngle(up, Math.random() * Math.PI);
-      const y = -12 - (this.T.hillDrop || 0) + this._highland(x, z);
+      // SEATED ON THE GROUND, NOT ON A CONSTANT DATUM. The old y ignored what
+      // the terrain actually does at (x, z): on a world that drops its valley
+      // floor (FURKA) the cones sank with the datum and only their tips broke
+      // the surface — a row of isolated triangles on flat ground, reported as
+      // shark teeth. terrainHeight knows the drop, the highland and the hill
+      // noise, so the peak stands rooted a fifth-buried in whatever is there.
+      const y = this.terrainHeight(x, z) - h * 0.2;
       m4.compose(new THREE.Vector3(x, y + h / 2, z), q, new THREE.Vector3(w, h, w * 0.85));
       rock.setMatrixAt(k, m4);
       // per-cone shade: eight identical tones stack into one flat wall, and a
@@ -9472,8 +9534,13 @@ if (this._citMound) h += this._citMoundH(x, z);
     const ice = new THREE.MeshStandardMaterial({
       color: 0x9fc4dc, roughness: 0.62, flatShading: true, envMapIntensity: 0.5,
     });
-    const geo = new THREE.BoxGeometry(1, 1, 1);
-    geo.translate(0, 0.5, 0);
+    // FACETED ICE, NOT STACKED CRATES. The tongue was 14 BoxGeometry slabs,
+    // and from the valley floor their right-angle faces read as exactly what
+    // they were — giant pale cubes stacked on the skyline, reported as such.
+    // The massif's own crag geometry is an irregular faceted cone; flattened
+    // and overlapped it reads as a stepped icefall, and it costs the same one
+    // draw call.
+    const geo = this._cragGeo();
     const slabs = new THREE.InstancedMesh(geo, ice, 14);
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const col = new THREE.Color();
@@ -9486,8 +9553,15 @@ if (this._citMound) h += this._citMoundH(x, z);
       const w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
       q.setFromAxisAngle(up, a + 1.2);
       const gx = Math.cos(a) * r, gz = Math.sin(a) * r;
+      // seated ON the ground it stands on — the old constant-datum placement
+      // buried most of each slab wherever the valley floor dropped, and what
+      // poked out was the boxy top
+      const gy = this.terrainHeight(gx, gz);
+      // the crag geometry is CENTRED (the massif composes it at y + h/2); the
+      // box it replaces had its base at the origin — anchor accordingly, or
+      // two-thirds of every slab ends up underground
       m4.compose(
-        new THREE.Vector3(gx, -18 - (this.T.hillDrop || 0) + t * 4 + this._highland(gx, gz), gz),
+        new THREE.Vector3(gx, gy + h * 0.32, gz),
         q, new THREE.Vector3(w, h, d)
       );
       slabs.setMatrixAt(k, m4);
@@ -10894,10 +10968,15 @@ if (this._citMound) h += this._citMoundH(x, z);
           rail.position.set(c.x + n.x * 10.2 * side, c.y + 0.45, c.z + n.z * 10.2 * side);
           rail.rotation.y = this.headingAt(j);
           g.add(rail);
-          if (sN % 6 === 0) {
-            this.solids.push({ x: rail.position.x, z: rail.position.z, r: 1.2,
-              y: c.y + 0.6, mat: 'stone' });
-          }
+          // WALLS ARE SEGMENTS, NOT DOTS — the same lesson the masonry
+          // already carries. These parapets were r=1.2 point colliders every
+          // SIXTH sample, so between the dots you drove clean through the
+          // rail and off the flyover, reported as going in and out of a
+          // bridge wall. Every rail piece is now one continuous barrier
+          // segment, so the run has no seam for a nose to find.
+          this._barrier(rail.position.x, rail.position.z,
+            this.tan[j].x, this.tan[j].z, 2 * this.segLen + 0.8, 0.7,
+            c.y - 0.2, 1.5, 'stone');
         }
         if (Math.abs(sN) % 8 === 0) {
           const ground = this.terrainHeight(c.x, c.z);

@@ -58,7 +58,12 @@ const R = await page.evaluate(async () => {
   out.crownL1 = V.tyreClass('crown', { tires: 1 });
   out.crownL3 = V.tyreClass('crown', { tires: 3 });
 
-  // ---- the gate refuses, and says what it costs ---------------------------
+  // ---- CONTRACT CHANGED, DELIBERATELY: the gate PRICES, it does not refuse.
+  // One eligible car per surface turned the roster into one car per trail —
+  // reported as exactly that — so `ok` now means "in the ideal window" and a
+  // mismatch races anyway with a stated grip penalty. What must still be true:
+  // the mismatch is REAL in the physics, every label states the price, and
+  // the fix is still named so the incentive to buy the right machine stays.
   const iceLv = T.LEVELS.find((l) => T.surfaceClass(l) === T.ICE);
   const looseLv = T.LEVELS.find((l) => T.surfaceClass(l) === T.LOOSE);
   const sealedLv = T.LEVELS.find((l) => T.surfaceClass(l) === T.SEALED);
@@ -77,11 +82,13 @@ const R = await page.evaluate(async () => {
   out.fixNamesPrice = /\d/.test(fIce.fix.text) && /GARAGE|BUY|DRIVE/.test(fIce.fix.text);
   out.fixText = fIce.fix.text;
 
-  // pressing START must NOT start the race
+  // pressing START now TAKES the start — the mismatch is priced, not barred
   g.state = 'title';
   g.freeRoam = false;
   g.startRace();
   out.refusedState = g.state;
+  out.underReached = g.player._tyreUnder;   // the physics got the number
+  g.state = 'title';
 
   // the button says so before you press it
   g._syncStartButton();
@@ -159,6 +166,10 @@ const R = await page.evaluate(async () => {
   out.pen0 = V.tyrePenalty(0);
   out.pen1 = V.tyrePenalty(1);
   out.pen2 = V.tyrePenalty(2);
+  // ...and the under-spec direction, which used to be a refusal and is now
+  // the steeper penalty of the two — worse than over by design
+  out.penU1 = V.tyrePenalty(0, 1);
+  out.penU2 = V.tyrePenalty(0, 2);
   g.cars.selected = 'brawler';
   g.garage.upgrades = {};
   return out;
@@ -179,25 +190,32 @@ ok(R.brawler === 1 && R.crown === 0 && R.dune === 2,
 ok(R.brawlerL1 === 2 && R.crownL1 === 1 && R.crownL3 === 2,
   'a TIRES level raises the class — the upgrade now opens regions',
   `${R.brawlerL1}/${R.crownL1}/${R.crownL3}`);
-ok(R.blockedOnIce, `the starter car is refused on ${R.iceName}`);
-ok(R.fixNamesPrice, 'the refusal names a priced, actionable fix', R.fixText);
-ok(R.refusedState !== 'countdown' && R.refusedState !== 'race',
-  'pressing START does not start the race', R.refusedState);
-ok(/NEEDS/.test(R.btnText) && R.btnBlocked,
-  'the button says so before you press it', R.btnText);
+ok(R.blockedOnIce, `the starter car is outside the window on ${R.iceName}`);
+ok(R.fixNamesPrice, 'the mismatch still names a priced, actionable fix', R.fixText);
+ok(R.refusedState === 'countdown' || R.refusedState === 'race',
+  'pressing START takes the start — priced, not barred', R.refusedState);
+// BRAWLER is class 1 and ice needs 2 — the gap is ONE class, and a first
+// cut of this assertion demanded two, which is a fact about the assertion
+ok(R.underReached === 1,
+  'and the physics is handed the under-spec gap', R.underReached);
+ok(/WRONG TYRES.*%/.test(R.btnText) && !R.btnBlocked,
+  'the button states the price instead of blocking', R.btnText);
 ok(R.cardWarns && R.cardHasFix, 'the track card carries the demand and the fix');
 ok(R.openedByUpgrade && R.startedAfter,
   'fitting the tyre opens the world and the race starts', R.startedAfter);
 ok(R.roamAllowed,
   'free roam is exempt — you may go and find out why the rule exists', R.roamAllowed);
 ok(R.crownOnLoose && R.crownOnSealed,
-  'a road car is shut out of loose stages but keeps the circuits');
+  'a road car pays on loose stages and is at home on the circuits');
 ok(/DRIVE YOUR|GARAGE/.test(R.crownAdvice),
   'it points at a machine already owned rather than a shop', R.crownAdvice);
 ok(R.duneBlockedOnSealed,
-  'an all-terrain car is refused on a sealed circuit — too much tyre');
+  'an all-terrain car is outside the window on a sealed circuit — too much tyre');
 ok(/DRIVE YOUR|BUY THE/.test(R.duneAdvice),
   'and it is told what to take instead', R.duneAdvice);
+ok(R.penU1 < R.pen1 && R.penU2 < R.penU1 && R.penU2 <= 0.7,
+  'under-spec costs MORE grip than over-spec, and two classes more than one',
+  `under1 ${R.penU1}, under2 ${R.penU2}, over1 ${R.pen1}`);
 ok(R.duneOnLoose && R.duneOverLoose === 1,
   'one class over is still allowed, just penalised', R.duneOverLoose);
 ok(R.coversAll.length === 0,
