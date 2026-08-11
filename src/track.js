@@ -10936,30 +10936,42 @@ export class Track {
       }
       const g = new THREE.Group();
       for (const side of [1, -1]) {
-        // parapet walls the length of the span
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), stone);
-        const a = this.center[(i - span + N) % N], b2 = this.center[(i + span) % N];
-        const mxx = (a.x + b2.x) / 2, mzz = (a.z + b2.z) / 2;
-        const yaw = this.headingAt(i);
-        const nn = this.nrm[i];
-        wall.scale.set(1.1, 1.6, span * 2 * this.segLen);
-        wall.position.set(mxx + nn.x * 10.6 * side, this.center[i].y + 0.6, mzz + nn.z * 10.6 * side);
-        wall.rotation.y = yaw;
-        wall.castShadow = true;
-        g.add(wall);
-        // A 40 u PARAPET IS NOT A 1.4 u DOT. This registered one circle at
-        // the middle of the whole span, which is why the bridge wall in the
-        // player's screenshot could be driven straight into and over. The
-        // barrier runs the full span at its real thickness and height.
-        this._barrier(wall.position.x, wall.position.z, Math.sin(yaw), Math.cos(yaw),
-          span * 2 * this.segLen, 1.1, this.center[i].y - 0.2, 1.6);
-        // arch faces: two masonry blocks descending under the deck
+        // PARAPET WALLS THE LENGTH OF THE SPAN, FOLLOWING THE ROAD.
+        //
+        // A 40 u PARAPET IS NOT A 1.4 u DOT: this once registered a single
+        // circle at the middle of the whole span, which is why the bridge wall
+        // in the player's screenshot could be driven straight into and over.
+        //
+        // AND A ROAD IS NOT A STRAIGHT LINE. The replacement was one straight
+        // box laid on the tangent at the middle sample, so on a span with any
+        // bend in it the wall cut the corner and its ends came inside the
+        // carriageway — measured on HEDGEROW DASH and OULTON PARK, a 54 u run
+        // sitting at lateral 8.0 and 7.4 of a road that advertises 9. Built in
+        // pieces along the centreline instead, the way the flyover rails
+        // already are: each piece takes its own sample's normal, heading and
+        // deck height, so the run follows the road and still has no seam.
+        for (let k = -span; k < span; k += 2) {
+          const j = (i + k + N) % N;
+          const cj = this.center[j], nn = this.nrm[j];
+          const yaw = this.headingAt(j);
+          const len = 2 * this.segLen + 0.4;
+          const px = cj.x + nn.x * 10.6 * side, pz = cj.z + nn.z * 10.6 * side;
+          const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), stone);
+          wall.scale.set(1.1, 1.6, len);
+          wall.position.set(px, cj.y + 0.6, pz);
+          wall.rotation.y = yaw;
+          wall.castShadow = true;
+          g.add(wall);
+          this._barrier(px, pz, Math.sin(yaw), Math.cos(yaw), len + 0.4, 1.1, cj.y - 0.2, 1.6);
+        }
+        // arch faces: two masonry blocks descending under the deck, each on
+        // its own sample's normal like the parapet above it
         for (const k of [-span * 0.55, span * 0.55]) {
           const j = (i + Math.round(k) + N) % N;
-          const c = this.center[j];
+          const c = this.center[j], nj = this.nrm[j];
           const pier = new THREE.Mesh(new THREE.BoxGeometry(2.2, 9, 3.2), stone);
-          pier.position.set(c.x + nn.x * 8.5 * side, c.y - 4.6, c.z + nn.z * 8.5 * side);
-          pier.rotation.y = yaw;
+          pier.position.set(c.x + nj.x * 8.5 * side, c.y - 4.6, c.z + nj.z * 8.5 * side);
+          pier.rotation.y = this.headingAt(j);
           g.add(pier);
         }
       }
