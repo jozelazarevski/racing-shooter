@@ -46,6 +46,8 @@ const oak: PropTemplate = {
   physics: {
     shape: (s) => ({ kind: 'cylinder', halfHeight: 1.6 * s, radius: 0.62 * s, centerY: 1.6 * s }),
     solid: true,
+    // COVERAGE — the trunk. The crown spreads 8 m and stops nothing.
+    coverage: 'trunk',
     massKg: 4000,
   },
 

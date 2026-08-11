@@ -12,8 +12,14 @@ const hayBale: PropTemplate = {
 
   build: () => {
     const g = cylinderAt(0.75, 0.75, 1.3, 16, 0);
-    g.rotateZ(Math.PI / 2);          // lying down, axis across the track
-    g.translate(0, 0.75, 0);
+    // LYING DOWN, AXIS ACROSS THE TRACK. `cylinderAt` is base-anchored — it
+    // spans y = 0 .. 1.3 — so rolling it a quarter turn about Z swings it out
+    // to x = -1.3 .. 0 rather than turning it on the spot. Without the 0.65
+    // back the bale renders two thirds of a metre from where it was placed,
+    // with its collider sitting on the empty side of the origin: you clip
+    // through half a visible bale and hit an invisible one beside it.
+    g.rotateZ(Math.PI / 2);
+    g.translate(0.65, 0.75, 0);
     return [{
       key: 'bale',
       geometry: g,

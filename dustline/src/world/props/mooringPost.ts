@@ -33,7 +33,10 @@ const mooringPost: PropTemplate = {
   ],
 
   physics: {
-    shape: (s) => ({ kind: 'cylinder', halfHeight: 0.45 * s, radius: 0.22 * s, centerY: 0.45 * s }),
+    // Radius to the FLARED HEAD, not the shaft. A bollard is a thing you nudge
+    // a wing against at walking pace on a quay; 10 cm of it not being there is
+    // the difference between scraping it and passing through it.
+    shape: (s) => ({ kind: 'cylinder', halfHeight: 0.45 * s, radius: 0.27 * s, centerY: 0.45 * s }),
     solid: true,
     massKg: 260,
   },

@@ -100,6 +100,8 @@ const harbourCrane: PropTemplate = {
     // (a wire you can hit is a wire you WILL hit).
     shape: (s) => ({ kind: 'cylinder', halfHeight: (MAST / 2) * s, radius: 1.1 * s, centerY: (MAST / 2) * s }),
     solid: true,
+    // COVERAGE — the tower. The jib swings out over the water and a car cannot reach it.
+    coverage: 'trunk',
     massKg: 7000,
   },
 

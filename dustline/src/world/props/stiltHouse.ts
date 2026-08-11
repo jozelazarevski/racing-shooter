@@ -28,6 +28,8 @@ export default dwelling({
   kit: 'farm',
   description: 'Boarded cabin on six 3 m posts with a side deck, 7.2 x 7.7 m overall, 8.6 m tall. Solid.',
   massKg: 22000,
+  // COVERAGE — the core. The veranda deck cantilevers out around it.
+  coverage: 'partial',
   scale: [0.85, 1.15],
   minRoadDist: 12,
 });

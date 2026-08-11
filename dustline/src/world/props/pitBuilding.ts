@@ -41,6 +41,8 @@ const pitBuilding: PropTemplate = {
     shape: (s) => ({ kind: 'box', halfExtents: [13 * s, 3.2 * s, 4.2 * s], centerY: 3.2 * s }),
     solid: true,
     massKg: 200000,
+    // COVERAGE — the building. The pit canopy reaches out over the lane.
+    coverage: 'partial',
   },
 
   authoring: { scale: [0.8, 1.2], defaultScale: 1, minRoadDist: 16 },

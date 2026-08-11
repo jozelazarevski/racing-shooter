@@ -80,6 +80,8 @@ const oliveTree: PropTemplate = {
     // and a grove of those is a field of invisible walls between the trees.
     shape: (s) => ({ kind: 'cylinder', halfHeight: 1.1 * s, radius: 0.7 * s, centerY: 1.1 * s }),
     solid: true,
+    // COVERAGE — the trunk, not the grey crown above it.
+    coverage: 'trunk',
     massKg: 3000,
   },
 

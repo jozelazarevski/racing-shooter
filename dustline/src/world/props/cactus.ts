@@ -29,6 +29,8 @@ const cactus: PropTemplate = {
   physics: {
     shape: (s) => ({ kind: 'cylinder', halfHeight: 1.6 * s, radius: 0.4 * s, centerY: 1.6 * s }),
     solid: true,
+    // COVERAGE — the stem. The arms are above a bonnet and would not stop one anyway.
+    coverage: 'trunk',
     massKg: 700,
   },
 

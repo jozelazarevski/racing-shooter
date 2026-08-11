@@ -105,6 +105,8 @@ const fountain: PropTemplate = {
     // 2.4 m of invisible wall standing over a 0.75 m obstacle.
     shape: (s) => ({ kind: 'cylinder', halfHeight: 0.42 * s, radius: 2.4 * s, centerY: 0.42 * s }),
     solid: true,
+    // COVERAGE — the basin. The column and jet above it are ornament.
+    coverage: 'partial',
     massKg: 14000,
   },
 

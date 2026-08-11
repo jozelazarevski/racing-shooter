@@ -87,6 +87,8 @@ const capstan: PropTemplate = {
     // out at 1.7 m would be an invisible 3.4 m disc on the quay.
     shape: (s) => ({ kind: 'cylinder', halfHeight: (H_TOP / 2) * s, radius: R_BASE * s, centerY: (H_TOP / 2) * s }),
     solid: true,
+    // COVERAGE — the drum. The handspikes are removable in life and pass through in play.
+    coverage: 'partial',
     massKg: 1400,
   },
 

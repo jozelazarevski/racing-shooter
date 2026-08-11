@@ -523,19 +523,86 @@ export function realize(
   });
 }
 
-/** A template's own collider, from its own `r`. A building's footprint radius
- *  is written next to its parts in the table; inventing a second one in the
- *  component file is how the two drift apart. */
+/** A template's own collider, measured from its own parts.
+ *
+ *  BUILDINGS ARE RECTANGULAR AND WERE BEING COLLIDED AS CIRCLES. The first
+ *  version of this took the template's `r` — its bounding RADIUS — and returned
+ *  a cylinder, which is what v1 does. On a square tower that is fine. On
+ *  anything longer than it is wide it wraps the building in a disc the size of
+ *  its diagonal, and the audit puts numbers on how bad that gets: the pueblo
+ *  ruin is 11.8 x 9.0 m and was collided as a 17 m circle, the long cottage at
+ *  1.75x, the stone cottage 1.89x. That is four metres of invisible wall off
+ *  each corner — you stop dead in an empty street, with nothing on screen to
+ *  blame. It is the single most-repeated collision fault in the library,
+ *  because twenty-six components come through here.
+ *
+ *  So the footprint is MEASURED, from the same table the geometry is built
+ *  from — there is no second set of numbers to drift.
+ *
+ *  Only the parts a car can actually reach count toward the footprint. A roof
+ *  overhangs its walls by design, and including the eaves would put the
+ *  invisible edge half a metre outside the wall at ground level; a car cannot
+ *  hit an eave at four metres up, so it has no business in the footprint. The
+ *  HEIGHT still comes from everything, because the collider has to be tall
+ *  enough to stop something launched off a ramp. */
+const REACHABLE = 1.6;      // metres — roughly the roof of a rally car
+
 export function houseCollider(name: string) {
   const T = HOUSE_TEMPLATES[name];
-  const r = T ? T.r : 3;
+  if (!T) {
+    return (s: number) => ({ kind: 'cylinder' as const, halfHeight: 1.5 * s, radius: 3 * s, centerY: 1.5 * s });
+  }
+
+  // parts are [kind, dx, dy, dz, sx, sy, sz, colour, roll?]: the unit
+  // primitives are 1x1x1 and BASE-ANCHORED, so a part spans x = dx +/- sx/2,
+  // z = dz +/- sz/2 and y = dy .. dy + sy — and then `realize` ROLLS it about
+  // Z before translating.
+  //
+  // The roll is not decoration and skipping it is not a rounding error. A log
+  // pile is cylinders rolled flat: 1 m thick, 4.6 m long, and taking `sx` at
+  // face value called that pile 1 m wide and let a car drive through four
+  // metres of timber. So the four corners are rotated properly.
+  const extent = (dx: number, dy: number, sx: number, sy: number, roll: number) => {
+    if (!roll) return { x0: dx - sx / 2, x1: dx + sx / 2, y1: dy + sy };
+    const c = Math.cos(roll), s = Math.sin(roll);
+    let x0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const lx of [-sx / 2, sx / 2]) {
+      for (const ly of [0, sy]) {
+        const rx = lx * c - ly * s;
+        const ry = lx * s + ly * c;
+        x0 = Math.min(x0, rx); x1 = Math.max(x1, rx); y1 = Math.max(y1, ry);
+      }
+    }
+    return { x0: dx + x0, x1: dx + x1, y1: dy + y1 };
+  };
+
   let top = 1;
-  for (const p of T?.parts ?? []) top = Math.max(top, p[2] + p[5]);
+  for (const [, dx, dy, , sx, sy, , , roll = 0] of T.parts) {
+    top = Math.max(top, extent(dx, dy, sx, sy, roll).y1);
+  }
+
+  const foot = (parts: HousePart[]) => {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const [, dx, dy, dz, sx, sy, sz, , roll = 0] of parts) {
+      const e = extent(dx, dy, sx, sy, roll);
+      x0 = Math.min(x0, e.x0); x1 = Math.max(x1, e.x1);
+      z0 = Math.min(z0, dz - sz / 2); z1 = Math.max(z1, dz + sz / 2);
+    }
+    return { x0, x1, z0, z1 };
+  };
+
+  const low = T.parts.filter((p) => p[2] < REACHABLE);
+  const { x0, x1, z0, z1 } = foot(low.length ? low : T.parts);
+
   return (s: number) => ({
-    kind: 'cylinder' as const,
-    halfHeight: (top / 2) * s,
-    radius: r * s,
+    kind: 'box' as const,
+    halfExtents: [((x1 - x0) / 2) * s, (top / 2) * s, ((z1 - z0) / 2) * s] as [number, number, number],
     centerY: (top / 2) * s,
+    // A template is not necessarily centred on its own origin — the courtyard
+    // house is built around a patio off to one side — so the box has to be
+    // offset too, or it is the right SIZE in the wrong PLACE.
+    centerX: ((x0 + x1) / 2) * s,
+    centerZ: ((z0 + z1) / 2) * s,
   });
 }
 
@@ -557,6 +624,7 @@ export function dwelling(o: {
   defaultScale?: number;
   minRoadDist?: number;
   solid?: boolean;
+  coverage?: 'full' | 'trunk' | 'partial';
   previewDist?: number;
 }): PropTemplate {
   return {
@@ -569,6 +637,11 @@ export function dwelling(o: {
       shape: houseCollider(o.template),
       solid: o.solid ?? true,
       massKg: o.massKg,
+      // Most templates need nothing here: `houseCollider` measures the walls,
+      // and an eaves oversail under the checker's slack passes as 'full'. The
+      // handful that declare otherwise have a roof, canopy or gallery that
+      // reaches well past the mass holding it up.
+      coverage: o.coverage,
     },
     authoring: {
       scale: o.scale ?? [0.85, 1.2],

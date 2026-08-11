@@ -86,6 +86,8 @@ const telegraphPole: PropTemplate = {
     // visibly enter it before anything happens.
     shape: (s) => ({ kind: 'cylinder', halfHeight: 4.1 * s, radius: 0.2 * s, centerY: 4.1 * s }),
     solid: true,
+    // COVERAGE — the pole. The crossarms and wire are overhead.
+    coverage: 'trunk',
     massKg: 450,
   },
 

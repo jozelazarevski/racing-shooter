@@ -47,6 +47,8 @@ const palm: PropTemplate = {
   physics: {
     shape: (s) => ({ kind: 'cylinder', halfHeight: 2.2 * s, radius: 0.28 * s, centerY: 2.2 * s }),
     solid: true,
+    // COVERAGE — the trunk. Fronds part round a car.
+    coverage: 'trunk',
     massKg: 480,
   },
 

@@ -117,12 +117,20 @@ const campanile: PropTemplate = {
   ],
 
   physics: {
-    // The shaft, up to the cornice. Radius 5.2 is v1's own solid radius of 5.4
-    // trimmed to the 3.7 m half-width plus the cornice oversail — a cylinder
-    // circumscribing a square tower already stops a car at the corners before
-    // it reaches the wall, and making it any wider stops it in open air.
-    shape: (s) => ({ kind: 'cylinder', halfHeight: 17.6 * s, radius: 5.2 * s, centerY: 17.6 * s }),
+    // THE SHAFT, AND IT IS SQUARE. This was a cylinder of radius 5.2 — v1's own
+    // solid radius, trimmed — and the note that used to sit here argued a disc
+    // round a square tower is close enough. Measured, it is half a metre of
+    // invisible wall off each face and 1.5 m off each corner, on a tower that
+    // stands in a village square where cars come past it on all four sides. A
+    // box is the shape the building actually is.
+    shape: (s) => ({
+      kind: 'box',
+      halfExtents: [3.7 * s, 17.6 * s, 3.7 * s],
+      centerY: 17.6 * s,
+    }),
     solid: true,
+    // COVERAGE — the shaft. The cornice oversails it 40 m up.
+    coverage: 'partial',
     massKg: 1_800_000,
   },
 

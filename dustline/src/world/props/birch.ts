@@ -42,6 +42,8 @@ const birch: PropTemplate = {
   physics: {
     shape: (s) => ({ kind: 'cylinder', halfHeight: 2.1 * s, radius: 0.3 * s, centerY: 2.1 * s }),
     solid: true,
+    // COVERAGE — the trunk. A birch is mostly air.
+    coverage: 'trunk',
     massKg: 650,
   },
 

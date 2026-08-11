@@ -46,7 +46,17 @@ const grandstand: PropTemplate = {
   ],
 
   physics: {
-    shape: (s) => ({ kind: 'box', halfExtents: [7 * s, 2.6 * s, 4 * s], centerY: 2.6 * s }),
+    // THE STAND RECEDES BACKWARD. Every tier steps away in -Z and the roof
+    // posts stand at -7.2, so the mass runs from the trackside edge back nearly
+    // eight metres — while the collider was a box centred on the origin. That
+    // put four metres of invisible wall out in FRONT of the barrier, on the
+    // racing side, and left the back third of the stand hollow.
+    shape: (s) => ({
+      kind: 'box',
+      halfExtents: [7 * s, 2.6 * s, 4.1 * s],
+      centerY: 2.6 * s,
+      centerZ: -3.8 * s,
+    }),
     solid: true,
     massKg: 30000,
   },
