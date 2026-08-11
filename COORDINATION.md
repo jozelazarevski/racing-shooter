@@ -133,6 +133,22 @@ to come from the farm-spur barn path (`r: bw * 0.62` emission ~12340) or an
 _element caller not routed through your site gate — worth folding into your
 clearance pass.
 
+**New Track surface: `track.placedElements` (r155, mainline).** `_element`
+now records every structure it builds as `{type, x, z, rot, scale, r,
+authored}` — the same vocabulary `edit.elements` speaks. It exists so the
+world editor can adopt scenery it did not place (select → erase where it
+stood → re-place the same template where you drag it), and it is a cheap,
+accurate census for anyone auditing structures: `placedElements` beats
+scanning `solids` because it carries the template name. Cost is one push per
+`_element` call. If your lane adds a placement path that bypasses `_element`,
+its structures will not appear there.
+
+**Also new in r155:** an editor WIDEN/NARROW brush writing `edit.widen`
+(`{x, z, r, w}`, w = target half-width) resolved in `_applyWidenEdits` into
+the `_width` profile — so anything reading `widthAt(i)` sees an edited road
+automatically. If your lane adds a new width consumer, read `widthAt`, never
+`ROAD_HALF`.
+
 **Unclaimed findings** (fair game for whoever gets there first, say so here):
 BUGS.md #2's two remaining unexplained stalls (NORDSCHLEIFE, DOLOMITI —
 re-measure after r154, the under-gate/pit-lift fixes may have cleared them),

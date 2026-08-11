@@ -770,6 +770,12 @@ export class WorldEditor {
             < Math.max(6, (this.sel.r ?? 4) * 1.6);
           if (near && this.sel.kind !== 'solid') {
             const el = this._adoptSelection() || this.sel.el;
+            // one of MY objects that has already been through APPLY is real
+            // geometry too — take it out of the world for the drag, or you
+            // watch a marker slide away from a house that never moved
+            if (el && el.built && !this._selHidden) {
+              this._selHidden = this._hideAround(el.x, el.z, 7 * (el.scale || 1));
+            }
             // where it started, so UNDO puts it back there and not wherever
             // the drag happened to end
             this._selDragFrom = el ? { el, x: el.x, z: el.z } : null;
@@ -829,10 +835,13 @@ export class WorldEditor {
       if (this._selDrag) {
         this._selDrag = false;
         const from = this._selDragFrom;
+        const hid = this._selHidden;
         this._selDragFrom = null;
+        this._selHidden = null;
         if (from && (from.el.x !== from.x || from.el.z !== from.z)) {
           this._push('a move', () => {
             from.el.x = from.x; from.el.z = from.z;
+            if (hid) this._unhide(hid);
             this._refreshMarkers();
           });
           this._status(`moved — APPLY to build it there (${this.elements.length} objects)`);
