@@ -1409,6 +1409,16 @@ export class Car {
         for (let i = 0; i < t.barriers.length; i++) {
           const q = t.barriers[i];
           if (this.pos.y > q.y + q.h + 1.0) continue;   // cleared the coping
+          // ...AND DRIVEN UNDER IT. A wall spans `y` to `y + h` and the test
+          // above only knew about the top of it, so a car on the lower leg of
+          // a flyover was stopped by the parapet of the deck over its head.
+          // MOUNTAIN TO SEA carries nine crossings on one lap: driven, the
+          // whole field — player and all five rivals — was pinned within a few
+          // samples of the grid, 0.18 of a lap in a minute against a roster
+          // median of 1.39, with rivals moving 0.003 between them. A car more
+          // than a car's height below a wall's base is underneath it, not
+          // against it.
+          if (this.pos.y < q.y - 2.0) continue;         // passing underneath
           const ex = q.x2 - q.x1, ez = q.z2 - q.z1;
           const len2 = ex * ex + ez * ez || 1;
           let s2 = ((this.pos.x - q.x1) * ex + (this.pos.z - q.z1) * ez) / len2;

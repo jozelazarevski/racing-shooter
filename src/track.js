@@ -8528,8 +8528,9 @@ export class Track {
       // SOLID. The whole point: `banners` is breakable scenery, `barriers` is
       // the list the car cannot pass. Overlap the bays slightly (4.9 for a 4.5
       // pitch) so a run has no seam for a nose to find.
-      this._barrier(p.x, p.z, Math.sin(hd), Math.cos(hd), 4.9, 0.5,
+      const laid = this._barrier(p.x, p.z, Math.sin(hd), Math.cos(hd), 4.9, 0.5,
         this.center[i].y - LIFT, H, 'stone');
+      if (!laid) continue;              // refused: it would have been in the road
       // TAG IT. Builders that run after this one push barriers of their own,
       // so "the last N entries" is not the rails — a test that assumed it was
       // ended up measuring stone walls and reporting them as rails.
@@ -12019,13 +12020,42 @@ export class Track {
    *  passing a heading to a cos/sin helper is the exact mistake that laid a
    *  hairpin's parapets out as a comb of piano keys. A vector cannot be
    *  misread. */
+  /** Does this wall segment lie ACROSS or INSIDE the carriageway anywhere
+   *  along its length? Sampled at five points, each against the road at its
+   *  own nearest sample, and ignored where the wall is genuinely a storey
+   *  above or below the road it passes (a real flyover parapet). */
+  _segmentInRoad(x1, z1, x2, z2, y) {
+    for (let t = 0; t <= 1.0001; t += 0.25) {
+      const x = x1 + (x2 - x1) * t, z = z1 + (z2 - z1) * t;
+      _clearV.set(x, 0, z);
+      const i = this.nearestIndex(_clearV);
+      if (Number.isFinite(y) && Math.abs(y - this.center[i].y) > 5) continue;
+      const hw = this.widthAt ? this.widthAt(i) : ROAD_HALF;
+      if (Math.abs(this.lateralOffset(_clearV, i)) < hw - 1) return true;
+    }
+    return false;
+  }
+
+  /** Push one wall SEGMENT. Returns false when the wall was refused because it
+   *  would lie in the road — callers that tag the entry they just pushed must
+   *  check, or they will tag somebody else's wall.
+   *
+   *  THE RULE LIVES HERE BECAUSE EVERY WALL COMES THROUGH HERE. Retaining
+   *  walls, edge rails, flyover parapets, field walls and bridge copings are
+   *  each laid from a point and a bearing by a different builder, and every
+   *  one of them measures its offset against ONE sample of a road that bends.
+   *  Fixing them one at a time fixed them one at a time: MOUNTAIN TO SEA still
+   *  had 24 stone runs lying across its own lap after the flyover rails were
+   *  dealt with, and the whole field — player and rivals — was parked against
+   *  them, 0.2 of a lap in a minute against a roster median of 1.39. A wall in
+   *  the racing line is never what any of these builders meant. */
   _barrier(x, z, dirX, dirZ, len, thick, y, h, mat = 'stone') {
     const dl = Math.hypot(dirX, dirZ) || 1;
     const hl = len / 2, ux = (dirX / dl) * hl, uz = (dirZ / dl) * hl;
-    this.barriers.push({
-      x1: x - ux, z1: z - uz, x2: x + ux, z2: z + uz,
-      hw: thick / 2, y, h, mat,
-    });
+    const x1 = x - ux, z1 = z - uz, x2 = x + ux, z2 = z + uz;
+    if (this._segmentInRoad(x1, z1, x2, z2, y)) return false;
+    this.barriers.push({ x1, z1, x2, z2, hw: thick / 2, y, h, mat });
+    return true;
   }
 
   _stoneWallRun(B, x, z, rot, n, K) {
