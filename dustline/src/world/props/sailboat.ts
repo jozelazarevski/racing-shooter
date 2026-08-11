@@ -39,6 +39,8 @@ const sailboat: PropTemplate = {
   physics: {
     shape: (s) => ({ kind: 'box', halfExtents: [1.05 * s, 0.7 * s, 3.0 * s], centerY: 0.5 * s }),
     solid: true,
+    // COVERAGE — the hull to the gunwale. The rig is not something you hit.
+    coverage: 'partial',
     massKg: 2400,
   },
 

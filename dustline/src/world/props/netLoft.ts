@@ -137,22 +137,25 @@ const netLoft: PropTemplate = {
   },
 
   physics: {
-    // A CYLINDER, like every dwelling in the library — `houseCollider` gives
-    // each house template a cylinder from its own footprint radius rather than
-    // a box, and this building needs it for a specific reason: the outside
-    // stair is 2.9 m of masonry standing 1 m clear of the -X wall, and a box
-    // can only be centred on the instance origin in plan. A box wide enough to
-    // contain the stair would put the same metre of invisible wall down the
-    // OTHER side, where there is nothing. The radius is the half-length, which
-    // takes in the stair and the gable ends and oversails the long walls by a
-    // metre at their midpoints — the same trade the dwellings make.
+    // A BOX, OFFSET ONTO THE BUILDING. This was a cylinder, and the note here
+    // gave a good reason at the time: the outside stair is 2.9 m of masonry
+    // standing clear of the -X wall, and a box "can only be centred on the
+    // instance origin in plan", so one wide enough to hold the stair would put
+    // the same metre of invisible wall down the far side.
+    //
+    // That stopped being true when `centerX`/`centerZ` were added to
+    // `PhysicsShape` — the jetty needed them for exactly this reason. The
+    // workaround outlived the limitation, and it cost a metre of oversail all
+    // the way round. The box now sits on the mass, stair included.
     shape: (s) => ({
-      kind: 'cylinder',
-      halfHeight: ((EAVE + RISE) / 2) * s,
-      radius: (LEN / 2) * s,
+      kind: 'box',
+      halfExtents: [(SW + 0.5) * s, ((EAVE + RISE) / 2) * s, (LEN / 2) * s],
       centerY: ((EAVE + RISE) / 2) * s,
+      centerX: -0.32 * s,
     }),
     solid: true,
+    // COVERAGE — the mass, stair included. The oversailing loft floor clears it above.
+    coverage: 'partial',
     // Stone below, timber above: about 60 m³ of masonry at 2.4 t/m³ plus a
     // boarded storey. Half the church, and more than the townhouse it stands
     // next to, which is what a building with a stone ground floor should be.

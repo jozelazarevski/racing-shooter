@@ -53,6 +53,8 @@ const willow: PropTemplate = {
   physics: {
     shape: (s) => ({ kind: 'cylinder', halfHeight: 1.8 * s, radius: 0.5 * s, centerY: 1.8 * s }),
     solid: true,
+    // COVERAGE — the trunk. The curtain of withies is not a wall.
+    coverage: 'trunk',
     massKg: 2200,
   },
 

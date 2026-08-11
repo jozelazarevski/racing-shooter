@@ -13,6 +13,8 @@ export default dwelling({
   kit: 'farm',
   description: 'Tapered mill tower with four sails, 10 m to the cap. Solid.',
   massKg: 150000,
+  // COVERAGE — the tower. The sails sweep a 13 m circle and are not solid.
+  coverage: 'trunk',
   scale: [0.85, 1.15],
   minRoadDist: 16,
   previewDist: 34,

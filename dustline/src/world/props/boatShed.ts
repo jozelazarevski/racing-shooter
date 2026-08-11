@@ -123,6 +123,8 @@ const boatShed: PropTemplate = {
       centerY: ((EAVE + RISE) / 2) * s,
     }),
     solid: true,
+    // COVERAGE — the building. The launch rails run 4 m past the open end and stand 16 cm proud — you drive over those.
+    coverage: 'partial',
     massKg: 22000,
   },
 

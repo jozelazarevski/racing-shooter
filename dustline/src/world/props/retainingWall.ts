@@ -89,12 +89,15 @@ const retainingWall: PropTemplate = {
     // it exists is that there is a drop behind it. A parapet you drive through
     // is a parapet that does not do its job.
     //
-    // The box covers face and parapet together, at the parapet's thickness, so
-    // it is honest at the height a car meets it.
+    // The box covers face and parapet together, and it is 1.7 m deep rather
+    // than the footing's 1.25: the coping oversails the parapet toward the
+    // road, and 30 cm of overhanging stone at exactly bonnet height is the part
+    // you actually hit. Offset with it, because the oversail is on one side.
     shape: (s) => ({
       kind: 'box',
-      halfExtents: [(RUN / 2) * s, ((FACE_H + PARAPET_H) / 2) * s, (BASE_D / 2) * s],
+      halfExtents: [(RUN / 2) * s, ((FACE_H + PARAPET_H) / 2) * s, 0.85 * s],
       centerY: ((FACE_H + PARAPET_H) / 2) * s,
+      centerZ: -0.07 * s,
     }),
     solid: true,
     massKg: 80000,

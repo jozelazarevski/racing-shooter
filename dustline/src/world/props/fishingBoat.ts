@@ -64,6 +64,8 @@ const fishingBoat: PropTemplate = {
   physics: {
     shape: (s) => ({ kind: 'box', halfExtents: [1.7 * s, 1.3 * s, 5.0 * s], centerY: 1.0 * s }),
     solid: true,
+    // COVERAGE — the hull to the gunwale. Mast, rigging and gantry are above a car.
+    coverage: 'partial',
     massKg: 9000,
   },
 

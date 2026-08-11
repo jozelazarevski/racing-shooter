@@ -12,6 +12,8 @@ export default dwelling({
   kit: 'dalmatia',
   description: 'Roadside kiosk with an awning and a sign board, 4.4 m. Solid.',
   massKg: 4000,
+  // COVERAGE — the walls. The serving canopy reaches well past them.
+  coverage: 'partial',
   scale: [0.9, 1.15],
   minRoadDist: 8,
 });

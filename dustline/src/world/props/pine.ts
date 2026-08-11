@@ -58,6 +58,8 @@ const pine: PropTemplate = {
     // A collider around the foliage would stop a car a metre from the tree.
     shape: (s) => ({ kind: 'cylinder', halfHeight: 2.4 * s, radius: 0.42 * s, centerY: 2.2 * s }),
     solid: true,
+    // COVERAGE — the trunk. You drive under a canopy, not into it.
+    coverage: 'trunk',
     massKg: 900,
   },
 

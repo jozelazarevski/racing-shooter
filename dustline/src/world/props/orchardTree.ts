@@ -75,6 +75,8 @@ const orchardTree: PropTemplate = {
     // is no reason to let a car drive through a tree.
     shape: (s) => ({ kind: 'cylinder', halfHeight: 0.85 * s, radius: 0.3 * s, centerY: 0.85 * s }),
     solid: true,
+    // COVERAGE — the trunk, not the fruiting crown.
+    coverage: 'trunk',
     massKg: 700,
   },
 

@@ -74,6 +74,8 @@ const roadSign: PropTemplate = {
     // post, not the plate — the plate is at 2.3 m, over the roof of a car.
     shape: (s) => ({ kind: 'cylinder', halfHeight: 1.1 * s, radius: 0.09 * s, centerY: 1.1 * s }),
     solid: true,
+    // COVERAGE — the post. The board is at head height.
+    coverage: 'trunk',
     massKg: 45,
   },
 

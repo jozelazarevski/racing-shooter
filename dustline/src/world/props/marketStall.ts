@@ -53,6 +53,8 @@ const marketStall: PropTemplate = {
   physics: {
     shape: (s) => ({ kind: 'box', halfExtents: [1.3 * s, 0.5 * s, 0.6 * s], centerY: 0.5 * s }),
     solid: true,
+    // COVERAGE — the counter and frame. The canvas canopy is over your roofline.
+    coverage: 'partial',
     massKg: 220,
   },
 

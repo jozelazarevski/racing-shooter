@@ -95,6 +95,29 @@ export interface PhysicsRule {
    *  is how a hay bale ends up heavier than a boulder. */
   massKg?: number;
   friction?: number;
+  /** HOW MUCH OF THE VISIBLE THING THE COLLIDER IS MEANT TO COVER.
+   *
+   *  `verify:physics` measures every solid component's collider against its own
+   *  geometry, and the two ways of being wrong feel completely different from
+   *  the driving seat: a collider smaller than the shape lets you clip through
+   *  a corner of a church, and one larger stops you dead in an empty street
+   *  with nothing on screen to blame.
+   *
+   *  But a collider that is smaller is not automatically a fault, and that is
+   *  the whole reason this field exists. A pine's collider is its TRUNK — you
+   *  are supposed to drive under the canopy. A quay wall's is its coping,
+   *  because the face is below the ground a car can reach. Those are decisions,
+   *  and left unwritten they are indistinguishable from the bugs.
+   *
+   *  So the intent is declared and then CHECKED against it:
+   *
+   *  - `full`    — the default. The collider must match the visible footprint.
+   *  - `trunk`   — deliberately a narrow core inside a much wider shape: tree
+   *                canopies, the sails of a windmill, a lamp's bracket.
+   *  - `partial` — deliberately covers only part of the mass, for a reason the
+   *                component file states. Not a shrug — every one of these has
+   *                a comment next to it saying which part and why. */
+  coverage?: 'full' | 'trunk' | 'partial';
 }
 
 /** WHAT A COMPONENT STANDS ON.

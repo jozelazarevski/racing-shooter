@@ -127,6 +127,8 @@ const culvert: PropTemplate = {
     // which stand behind it and are never the first thing you hit — get none.
     shape: (s) => ({ kind: 'box', halfExtents: [(FACE_W / 2) * s, (H / 2) * s, (WALL_D / 2) * s], centerY: (H / 2) * s }),
     solid: true,
+    // COVERAGE — the headwall. The wing walls stand behind it and are never what you hit first.
+    coverage: 'partial',
     massKg: 280000,
   },
 

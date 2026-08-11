@@ -68,6 +68,8 @@ const signpost: PropTemplate = {
     // invisible slab on a verge.
     shape: (s) => ({ kind: 'cylinder', halfHeight: (POST_H / 2) * s, radius: 0.11 * s, centerY: (POST_H / 2) * s }),
     solid: true,
+    // COVERAGE — the post. The fingerboards are at head height.
+    coverage: 'trunk',
     massKg: 70,
   },
 

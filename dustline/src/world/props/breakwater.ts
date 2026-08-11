@@ -108,6 +108,8 @@ const breakwater: PropTemplate = {
       centerY: 0.775 * s,
     }),
     solid: true,
+    // COVERAGE — the crown. The armour slopes away under water on both flanks.
+    coverage: 'partial',
     // 26 x 6.5 x 5.2 of masonry is about 880 m³, and dressed stone runs
     // 2.4 t/m³. That is heavier than the lighthouse by three and a half times,
     // which is right: this is the thing the lighthouse stands on.

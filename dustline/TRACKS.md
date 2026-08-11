@@ -312,6 +312,8 @@ Individually:
 | `verify:templates` | `src/templates/` still depends on nothing but `three` and `core/`, has no import side effects, and the barrel drops no name |
 | `verify:generated` | the committed `harbour.json` and `proving-ground.json` are what their generators produce *today* |
 | `verify:worlds` | every world matches its committed fingerprint, and does not depend on unseeded randomness |
+| `verify:physics` | every collider is the size and in the place of the thing you can see |
+| `verify:architecture` | every object is built to the real-world dimensions of its counterpart |
 | `smoke:editor` | the editor drives, and a packed link opens as that track in the game |
 | `smoke:components` | every component builds, previews, places, and gets the collider its file declares |
 | `verify:deploy` | the committed build works served under a Pages-style sub-path |
@@ -335,3 +337,57 @@ runs on the same commit differ in a scatter of edge pixels: measured, 0.01% of
 subpixels off by more than 8/255, against 0.53% for one prop-sized change and
 75% for a different camera. The thresholds sit between. A byte comparison there
 fails every run and teaches you to ignore it.
+
+
+## Collision and dimensions
+
+Two gates cover the parts of a world that are wrong in ways a screenshot cannot
+show.
+
+### `verify:physics` — is the collider the thing you can see?
+
+`smoke:components` proves a component declares a collider, that its extents are
+positive and that one appears in the physics world. None of that asks whether
+the invisible shape is the same size as the visible one, and both ways of being
+wrong feel completely different: a collider that is too small lets you clip
+through the corner of a church, and one that is too big stops you dead in an
+empty street with nothing on screen to blame.
+
+Two things make the measurement mean something:
+
+- **It measures at the collider's own height**, not against the whole bounding
+  box. A campanile is a 7.4 m shaft under a 9.4 m cornice forty metres up; a
+  cottage's eaves oversail its walls. Against full extents both look broken and
+  the correct fix for both is to change nothing. Measuring only below bumper
+  height is also wrong — a bridge deck is the drivable surface four metres up.
+- **The tolerance scales with the object.** A flat 0.6 m allowance passed a
+  crate collider shrunk to 17% of its size, because 0.5 m of shortfall on a
+  1.2 m crate is "within 0.6 m". Mutation testing caught that. It is 30% of the
+  object now, capped at 0.6 m: strict on a crate, still forgiving of a barn.
+
+A smaller collider is not automatically a fault, so the component says which it
+is — `physics.coverage` is `full` (default, must match), `trunk` (a narrow core
+inside a much wider shape: tree canopies, windmill sails) or `partial` (covers
+part of the mass on purpose, with a comment naming which part). Intent that is
+only in someone's head is indistinguishable from a bug, so the declaration is
+checked both ways: a `full` collider must cover its shape, and a `trunk` or
+`partial` one that turns out not to need the excuse is a stale declaration and
+fails too.
+
+### `verify:architecture` — is it the size it is in life?
+
+A world reads as real when things are the size they are in life, and the eye is
+unforgiving about exactly the objects it has stood next to. Get a mountain wrong
+by 30% and nobody can tell; get a lamp post wrong by 30% and the street looks
+like a model railway without anyone being able to say why.
+
+So the standards are written down — 79 of them, each with the reason it is what
+it is — and every component is either covered by one or **named as exempt**.
+Nature is exempt on purpose: a boulder has no standard to violate, and inventing
+"correct" heights for scree would be taste dressed as engineering.
+
+The table is not above being wrong. Its first run flagged two components, and
+both times the rule was at fault rather than the world: a cast-iron village lamp
+really is about 4 m (the 8–10 m figure is a modern steel highway column, a
+different object), and a quay ladder measured 3.7 m once you count the part
+below the waterline, which is the dimension that matters for a ladder.

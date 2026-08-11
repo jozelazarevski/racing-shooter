@@ -128,6 +128,8 @@ const timberBridge: PropTemplate = {
       centerY: (DECK_TOP - 0.24) * s,
     }),
     solid: true,
+    // COVERAGE — the deck slab. The trestle below and the rope rails get nothing, on purpose.
+    coverage: 'partial',
     massKg: 74000,
   },
 

@@ -74,6 +74,8 @@ const jetty: PropTemplate = {
       centerZ: (RUN / 2 - 2) * s,
     }),
     solid: true,
+    // COVERAGE — the walkway. The finger pontoons either side are at water level.
+    coverage: 'partial',
     massKg: 12000,
   },
 

@@ -33,6 +33,8 @@ const lightMast: PropTemplate = {
   physics: {
     shape: (s) => ({ kind: 'cylinder', halfHeight: 5.3 * s, radius: 0.32 * s, centerY: 5.3 * s }),
     solid: true,
+    // COVERAGE — the mast. The lamp gantry is 9 m up.
+    coverage: 'trunk',
     massKg: 3500,
   },
 

@@ -12,6 +12,8 @@ export default dwelling({
   kit: 'alpine',
   description: 'Long chalet under a deep eave, full-width balcony, 9 m. Solid.',
   massKg: 80000,
+  // COVERAGE — the walls. Alpine eaves oversail them by nearly a metre on every side.
+  coverage: 'partial',
   scale: [0.9, 1.15],
   minRoadDist: 13,
 });

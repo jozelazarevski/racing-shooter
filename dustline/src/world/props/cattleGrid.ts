@@ -96,6 +96,8 @@ const cattleGrid: PropTemplate = {
       centerY: (TOP / 2) * s,
     }),
     solid: true,
+    // COVERAGE — the rails, flush with the road. It is a surface, not an obstacle.
+    coverage: 'partial',
     // Hollow section bars, not solid billets: five 9.4 m solid steel bars of
     // this cross-section would weigh 22 tonnes on their own, which is not what
     // anybody drops into a farm lane.

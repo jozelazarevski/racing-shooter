@@ -13,6 +13,8 @@ export default dwelling({
   category: 'structure',
   description: 'Tower with a railed platform under a conical roof, 14 m. Solid.',
   massKg: 5000,
+  // COVERAGE — the shaft. The gallery corbels out at the top.
+  coverage: 'partial',
   scale: [0.85, 1.3],
   minRoadDist: 11,
   previewDist: 34,

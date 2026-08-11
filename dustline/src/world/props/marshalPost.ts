@@ -19,6 +19,8 @@ const marshalPost: PropTemplate = {
   physics: {
     shape: (s) => ({ kind: 'cylinder', halfHeight: 1.3 * s, radius: 0.12 * s, centerY: 1.3 * s }),
     solid: true,
+    // COVERAGE — the post. The board and flag are above the car.
+    coverage: 'trunk',
     massKg: 25,
   },
 

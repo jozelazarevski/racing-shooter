@@ -40,6 +40,8 @@ const streetLamp: PropTemplate = {
   physics: {
     shape: (s) => ({ kind: 'cylinder', halfHeight: 1.8 * s, radius: 0.16 * s, centerY: 1.8 * s }),
     solid: true,
+    // COVERAGE — the column. The lantern and its bracket overhang at 3.5 m.
+    coverage: 'trunk',
     massKg: 180,
   },
 
