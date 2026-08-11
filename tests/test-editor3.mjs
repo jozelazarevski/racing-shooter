@@ -58,13 +58,21 @@ const R = await page.evaluate(async () => {
   const cardFor = (n) => [...document.querySelectorAll('#level-select .level-chip')]
     .find((el) => el.querySelector('.wc-name')
       && el.querySelector('.wc-name').textContent.replace('🔒 ', '').trim() === n);
+  // CONTRACT CHANGE (r152): a card tap no longer builds the world inside the
+  // click handler — the build is deferred and coalesced so browsing does not
+  // freeze the menu. _flushPick() is the same "make it real NOW" the start
+  // button uses; the assertions still read the BUILT world, as a player
+  // would after the veil drops.
   cardFor('PINE VALLEY').click();
+  g._flushPick();
   out.restored = +groundAt(px, pz).toFixed(3);
   out.leakCleared = !g.editScene;
   cardFor('DUST CANYON').click();
+  g._flushPick();
   out.otherClean = !g.editScene && g.level.id === 2;
   out.otherAgrees = Math.abs(groundAt(px, pz) - meshAt(px, pz)) < 0.5;
   cardFor('PINE VALLEY').click();
+  g._flushPick();
 
   // ---- DELETE a saved scene ---------------------------------------------
   // Through WorldEditor, not through a raw localStorage key. Scenes moved into
