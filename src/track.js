@@ -5875,6 +5875,21 @@ export class Track {
     for (let i = 0; i < N; i++) {
       let cut = 0;
       for (const G of this._jumpGorges) {
+        // ONLY WHERE THE JUMP IS. A gorge is a TRENCH — 190 u of it — and this
+        // loop cut the road wherever the trench happened to pass under it,
+        // purely on distance. A lap that meets the same trench twice therefore
+        // got two holes and one jump: the designed crossing with its raised
+        // lips, its gap warning and its launch, and somewhere else a bare 21 u
+        // drop with nothing to read and nothing to clear it with.
+        //
+        // Measured on RED CENTRE RUN: `_jumpCut` ran 95-106 at 21.75 u deep
+        // against a single declared gorge at 416, and the drive fell through
+        // the world there — the "sank under the terrain" report, which only
+        // ever showed up when the lap happened to take the car over that spot.
+        //
+        // Away from its own crossing the road simply bridges the trench, which
+        // is what a road does when it meets a ravine it was not built to jump.
+        if (this._circDist(i, G.i) > (G.gapS ?? 0) + 6) continue;
         const c1 = this._gorgeCutOne(G, this.center[i].x, this.center[i].z);
         cut += c1 >= G.depth * 0.35 ? c1 : 0;
       }

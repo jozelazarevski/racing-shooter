@@ -82,6 +82,33 @@ const PROBE = () => {
       || (l1 * l2 < 0 && Math.min(Math.abs(l1), Math.abs(l2)) < hw - 1)) barIn++;
   }
 
+  // IS THERE FLOOR UNDER THE WIDTH THE ROAD ADVERTISES? Walk out from the
+  // centreline until the physics ground drops more than 2 u below the road
+  // surface: that is the real edge of the deck, and it must not be inside the
+  // width the road promises. RED CENTRE RUN had 19 samples where the edge was
+  // ZERO — a gorge cut applied away from its own jump, so the road had a 21 u
+  // hole in it and the car fell through the world.
+  // A declared jump gorge is SUPPOSED to have no floor — that is the jump.
+  // Anywhere else, a hole in the road is a hole in the road.
+  const inGorge = (i) => (t._jumpGorges ?? []).some((G) => {
+    const d = Math.abs(i - G.i), c = Math.min(d, N - d);
+    return c <= (G.gapS ?? 0) + 8;
+  });
+  let deckShort = 0, worstEdge = null;
+  for (let i = 0; i < N; i++) {
+    if (inGorge(i)) continue;
+    const road = t.pointAt(i, 0).y;
+    const hw = t.widthAt?.(i) ?? 9;
+    let edge = hw;
+    for (let lat = 0.5; lat <= hw; lat += 0.5) {
+      if (t.groundHeightAt(i, lat) < road - 2 || t.groundHeightAt(i, -lat) < road - 2) { edge = lat - 0.5; break; }
+    }
+    if (edge < hw - 0.4) {
+      deckShort++;
+      if (!worstEdge || edge < worstEdge.edge) worstEdge = { i, edge: +edge.toFixed(1), hw: +hw.toFixed(1) };
+    }
+  }
+
   // geometry
   let minW = Infinity, maxRise = 0, steep = 0;
   for (let i = 0; i < N; i++) {
@@ -105,6 +132,7 @@ const PROBE = () => {
     id: g.level.id, world: g.level.name, theme: g.level.theme, region: g.level.region,
     surface: t.T?.surface ?? 'dry', laps: g.level.laps ?? 3, starCost: g.starCost?.(g.level.id) ?? null,
     inLane: hits.filter((h) => h.inLane).length, nearRule: hits.length, bySource, barIn,
+    deckShort, worstEdge,
     minHalfWidth: +minW.toFixed(1), maxGrade: +steep.toFixed(3), maxRise: +maxRise.toFixed(2),
     crossings: cross, flatCrossings: flat,
     pickups: g.pickups?.length ?? 0,
@@ -138,7 +166,9 @@ await Promise.all(Array.from({ length: 2 }, async () => {
       });
       r.pageErrors = errs.length;
       out.push(r);
-      console.log(`L${r.id} ${r.world}: ${r.inLane} in lane, ${r.nearRule} near rule, fps ${r.renderFps}`);
+      console.log(`L${r.id} ${r.world}: ${r.inLane} in lane, ${r.nearRule} near rule`
+        + `${r.deckShort ? `, NO FLOOR under ${r.deckShort} samples (worst edge ${r.worstEdge.edge} of ${r.worstEdge.hw})` : ''}`
+        + `, fps ${r.renderFps}`);
     } catch (e) {
       out.push({ id: lv.id, world: lv.name, error: e.message.split('\n')[0] });
       console.log(`L${lv.id} ${lv.name}: FAILED ${e.message.split('\n')[0]}`);

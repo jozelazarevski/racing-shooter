@@ -50,8 +50,8 @@ stands now.
 | 4 | Wall runs laid inside the road width | med | 2 | **fixed** |
 | 5 | START looks armed on a world that refuses it | med | 5 | **fixed** — gate itself removed upstream by r151 |
 | 6 | Half the roster is not swept by the existing suites | med | — | **fixed** |
-| 7 | Player sank 7.4 u under the terrain (once, unreproduced) | med | 1 | **open** — never reproduced |
-| 8 | Three worlds lap at half the roster's pace | low | 3 | **open** — TOUR DE CORSE still 23 % off-road |
+| 7 | A hole in the road — the car fell through the world | **high** | 1 | **fixed** — a gorge cut applied away from its own jump |
+| 8 | Three worlds lap at half the roster's pace | low | 3 | **not a bug** — the rivals lap them at the same pace |
 | 9 | Documented counts no longer match the roster | low | — | **fixed** |
 | 10 | Routes that cross themselves at their own height | med | 2 | **open by design** — see below |
 
@@ -254,30 +254,51 @@ Both should read the roster from `src/world/levels.js` the way
 
 ---
 
-## 7. Player sank 7.4 u under the terrain — RED CENTRE RUN
+## 7. There was a hole in the road — RED CENTRE RUN
 
-The 60 s drive recorded the car at **7.43 u below `terrainHeight`**. A second
-60 s run over the same world did not reproduce it (0 samples under ground), so
-this is logged with what is known rather than diagnosed: the world has one
-`gorgeJump` at sample 416 and two overpasses at 899 and 785, and the recovery
-net only rescues a car below `groundY - 6` after 2.5 s, which this would have
-tripped. Re-run with sample capture before chasing it.
+The first drive recorded the car **7.43 u below `terrainHeight`**; a second did
+not reproduce it; a third hit it again at −3.38 u. Intermittent because it
+depended on where the lap happened to take the car.
+
+It is not a physics glitch. A jump gorge is a **trench** — this one 190 u long
+and 24 u deep — and the collapse was applied to the road *wherever the trench
+passed under it*, on distance alone, with nothing tying it to the crossing it
+was designed for. RED CENTRE RUN's lap meets that trench twice, so it got two
+holes and one jump: the designed crossing at sample 416 with its raised lips,
+its gap warning and its launch, and a bare **21.75 u drop at samples 95–106**
+with nothing to read it by and nothing to clear it with. Measured there: road
+surface −0.4, ground under its own centreline −21.2.
+
+Away from its own crossing the road now bridges the trench, which is what a
+road does when it meets a ravine it was not built to jump. `src/track.js`, the
+`_jumpCut` loop.
+
+**The audit could not have caught this, so the audit changed.** Nothing stood
+in the lane, nothing was drawn wrong, every collider check passed — the floor
+simply was not there. `tests/world-matrix.mjs` now walks out from each
+centreline until the physics ground drops away, and reports any sample whose
+edge falls inside the width the road advertises. Declared gorges are excepted,
+because a jump is supposed to have no floor.
 
 ---
 
-## 8. Three worlds lap at half the roster's pace
+## 8. Three worlds lap at half the roster's pace — and that is correct
 
-Median is 1.39 laps per 60 s. These sit far below it, and none of them is
-explained by a stall:
+Median is 1.39 laps per 60 s; TOUR DE CORSE managed 0.67 and PIKES PEAK 0.74.
+I wrote that the racing line and the road must therefore disagree. Measured,
+they do not: across all three worlds, **zero** samples put the line plus a
+car's width outside the corridor.
 
-| World | laps/60 s | note |
-|---|---|---|
-| TOUR DE CORSE | 0.67 | **23 % of samples off the road** — the racing line does not fit the corridor |
-| PIKES PEAK | 0.74 | 1 % off-road, so this is corner speed, not line |
-| MOUNTAIN TO SEA | 0.79 | see #3 |
+They are simply tight. Minimum corner radius is 17.3 u on TOUR DE CORSE, 16.2
+on PIKES PEAK and 15.2 on COL DE TURINI, against a lateral budget worth about
+27 u/s through a 17 u corner. The shipped rivals agree: driven on TOUR DE
+CORSE they lap at **0.68–0.72** — the same pace — with **0 %** of samples off
+the road.
 
-TOUR DE CORSE is the one to look at: a quarter of a lap spent beyond the road
-edge while following the racing line means the line and the road disagree.
+So these worlds are slow by design, and the off-road fraction was my autopilot
+running wide on hairpins rather than anything in the world. Left here rather
+than deleted, because the first version of this section diagnosed it wrongly
+from a single number.
 
 ---
 
