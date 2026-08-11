@@ -50,10 +50,22 @@ per stroke, so a scene keeps the ground it was carved with.
 
 | Tool | What it does |
 |---|---|
-| **SELECT** | Tap any object at all and it is picked up: one you placed, one the *world* built, or any solid — a tree, a rock, a wall. **Drag it on the ground to move it**, ROTATE to turn it, DELETE to remove it, and it leaves the built world immediately rather than waiting for APPLY. Taking a world-built structure over adopts it: a keep-out circle where it stood and an element of the same template where you put it. Tap a lake, a clear zone or a road pin instead and the panel on the right edits *its* numbers. ROT and SCALE aim the selection rather than the next placement; DUPLICATE and DELETE are on the panel and on `ctrl+D` / `delete`. Anything with no template can be removed but not moved, and the panel says so rather than pretending. |
+| **SELECT** | Tap any object at all and it is picked up: one you placed, one the *world* built, or any solid — a tree, a rock, a wall. **Drag it on the ground to move it**, ROTATE to turn it, DELETE to remove it, and it leaves the built world immediately rather than waiting for APPLY. Taking a world-built structure over adopts it: a keep-out circle where it stood and an element of the same template where you put it. Tap a lake, a clear zone or a road pin instead and the panel on the right edits *its* numbers. ROT and SCALE aim the selection rather than the next placement; ROTATE, DUPLICATE and DELETE are on the panel, and on `ctrl+D` / `delete`. Anything with no template can be removed but not moved, and the panel says so rather than pretending. |
 | **ERASE** | Remove what is under the brush — your buildings and your plants first, and if there were none, the world's own scenery instead. It always says which of the two it did. |
 | **CLEAR AREA** | Delete what the WORLD built — trees, rocks, villages, dressing. Generated scenery is invented afresh on every build and has no stored identity, so the editor records a keep-out circle and the builders skip it. The red ring shows what goes; it takes effect at APPLY. |
 | **ORBIT** | Camera-only mode, for when a drag should never paint. |
+
+**More than one.** SHIFT-TAP a second object and it joins the selection;
+shift-tap it again and it leaves. Everything the panel does then applies to
+the whole group — move, turn, duplicate, delete — as one undo step, and a
+group drag keeps the spacing between them, so a village moves as a village
+rather than into a heap.
+
+**Nudge.** A drag is how you place something; the **arrow keys** are how you
+get it exactly right afterwards, which no amount of zoom lets a mouse do. One
+unit a press, ten with SHIFT held.
+
+One selection is described in **one** place — the panel on the right rail.
 
 **SNAP** puts every placement on a grid, in units. Off by default.
 
@@ -94,8 +106,9 @@ Both are saved with the scene, so a recombined world reloads exactly.
 Press **?** for the full list, which is generated from the same table the
 handler reads — the two cannot drift. In short: `Q W E R T` are the sculpt
 brushes, `A S D F G` the build tools, `V X C` the edit tools, `[` and `]`
-size the brush, `ctrl+Z` / `ctrl+shift+Z` undo and redo, `ENTER` applies,
-`P` test-drives, `K` checks, and `ESC` closes whatever is open.
+size the brush, the **arrow keys** nudge the selection (SHIFT for ten units),
+`ctrl+Z` / `ctrl+shift+Z` undo and redo, `ENTER` applies, `P` test-drives,
+`K` checks, and `ESC` closes whatever is open.
 
 ## Undo, and redo
 
@@ -110,6 +123,11 @@ move is visible before APPLY, and that lives on the GPU rather than in the
 model. An action that hid something hands back a closure to put it back on
 screen; the model is always the snapshot's job. That is what keeps the picture
 and the scene from ever disagreeing about what is there.
+
+A restore rebuilds every object in the scene from its snapshot, so anything
+holding the old ones is holding corpses — which is why an undo drops the
+selection rather than leaving it pointing at objects that are in no list at
+all. Undo, then select again.
 
 ## Saving
 

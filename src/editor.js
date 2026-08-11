@@ -200,7 +200,7 @@ const HINT = {
   erase: 'ERASE — tap to remove what is under the brush, yours or the world\'s',
   clear: 'CLEAR AREA — tap to strip the world\'s own scenery from a circle',
   rotate: 'ROTATE — tap an object you placed to turn it by ROT',
-  select: 'SELECT — tap any object to move, turn or remove it. Lakes, clear zones and road pins too',
+  select: 'SELECT — tap an object to move, turn or remove it. SHIFT-TAP adds more; arrows nudge',
   road: 'ROAD — pick TUNNEL, BRIDGE or RIVER, then tap the road',
   route: 'MOVE ROAD — drag a marker on the racing line to bend the lap',
   widen: 'WIDEN — tap the road to open the carriageway (SIZE = length, FORCE = metres). NARROWER inverts it',
@@ -228,6 +228,16 @@ const KEYS = [
     ['-', 'weaker force', { act: 'force-' }], ['=', 'stronger force', { act: 'force+' }],
     [',', 'turn selection left', { act: 'rot-' }],
     ['.', 'turn selection right', { act: 'rot+' }],
+  ]],
+  ['THE SELECTION', [
+    ['arrowleft', 'nudge west', { act: 'nudge-x-' }],
+    ['arrowright', 'nudge east', { act: 'nudge-x+' }],
+    ['arrowup', 'nudge north', { act: 'nudge-z-' }],
+    ['arrowdown', 'nudge south', { act: 'nudge-z+' }],
+    ['shift+arrowleft', 'nudge west, ten times', { act: 'nudge-X-' }],
+    ['shift+arrowright', 'nudge east, ten times', { act: 'nudge-X+' }],
+    ['shift+arrowup', 'nudge north, ten times', { act: 'nudge-Z-' }],
+    ['shift+arrowdown', 'nudge south, ten times', { act: 'nudge-Z+' }],
   ]],
   ['CAMERA', [
     ['1', 'top-down', { act: 'cam-top' }], ['2', 'low angle', { act: 'cam-low' }],
@@ -371,6 +381,12 @@ export class WorldEditor {
     // `_hidden` remembers the instance matrices we blanked so a live delete
     // or move can be undone without a rebuild.
     this.sel = null;
+    // MORE THAN ONE. `sel` is still the primary selection and every existing
+    // path reads it unchanged; `also` is the rest of a shift-tapped group.
+    // A second selection MODEL is what the r155 merge had to unpick, so this
+    // is deliberately not one: it is a list of the same `mine` entries, and
+    // every group operation is just the singular one run over `_selGroupEls()`.
+    this.also = [];
     this._hidden = [];
 
     this._placeRot = 0;
@@ -1111,7 +1127,7 @@ export class WorldEditor {
       // the finger stayed put, lets one finger do both.
       if (rec && this._tapPending && this._ptr.size === 0) {
         const moved = Math.hypot(e.clientX - rec.sx, e.clientY - rec.sy);
-        if (moved <= 8) this._tapAt(e.clientX, e.clientY);
+        if (moved <= 8) this._tapAt(e.clientX, e.clientY, e.shiftKey);
       }
       if (this._drag) this._endRouteDrag();
       if (this._selDrag) {
@@ -1126,12 +1142,15 @@ export class WorldEditor {
           // the length of one snapshot and let the action move it again, and
           // the history entry is an honest pair instead of a closure holding
           // references that a later restore would invalidate.
-          const to = { x: from.el.x, z: from.el.z };
-          from.el.x = from.x; from.el.z = from.z;
-          this._act('a move', () => { from.el.x = to.x; from.el.z = to.z; },
-            hid ? () => this._unhide(hid) : null);
-          this._status(`moved — APPLY to build it there (${this.elements.length} objects)`);
-          this._syncSelPanel();
+          const dx = from.el.x - from.x, dz = from.el.z - from.z;
+          const moved = [from.el, ...this.also];
+          for (const q of moved) { q.x -= dx; q.z -= dz; }
+          this._act(moved.length > 1 ? `moving ${moved.length} objects` : 'a move', () => {
+            for (const q of moved) { q.x += dx; q.z += dz; }
+          }, hid ? () => this._unhide(hid) : null);
+          this._status(`moved ${moved.length > 1 ? `${moved.length} objects` : ''}`
+            + ` — APPLY to build ${moved.length > 1 ? 'them' : 'it'} there`);
+          this._syncInspector();
         }
       }
       this._tapPending = false;
@@ -1235,6 +1254,14 @@ export class WorldEditor {
       case 'radius+': this._setSlider('ed-radius', this.radius + 8); break;
       case 'force-': this._setSlider('ed-strength', this.strength - 1); break;
       case 'force+': this._setSlider('ed-strength', this.strength + 1); break;
+      case 'nudge-x-': this._nudgeSelection(-1, 0); break;
+      case 'nudge-x+': this._nudgeSelection(1, 0); break;
+      case 'nudge-z-': this._nudgeSelection(0, -1); break;
+      case 'nudge-z+': this._nudgeSelection(0, 1); break;
+      case 'nudge-X-': this._nudgeSelection(-10, 0); break;
+      case 'nudge-X+': this._nudgeSelection(10, 0); break;
+      case 'nudge-Z-': this._nudgeSelection(0, -10); break;
+      case 'nudge-Z+': this._nudgeSelection(0, 10); break;
       case 'rot-': this._turnSelection(-this._rotStep); break;
       case 'rot+': this._turnSelection(this._rotStep); break;
       case 'cam-top': this.pitch = 1.5; break;
@@ -1273,9 +1300,10 @@ export class WorldEditor {
   }
 
   /** One tap, one action — every click-once tool dispatches from here. */
-  _tapAt(cx, cy) {
+  _tapAt(cx, cy, add = false) {
     const p = this._pick(cx, cy);
     if (!p) { this._status('tap the ground, not the sky'); return; }
+    if (add && this.tool === 'select') { this._addToSelection(p); return; }
     if (this.tool === 'place') this._place(p);
     else if (this.tool === 'nature') this._natureAt(p);
     else if (this.tool === 'erase') this._eraseAt(p);
@@ -1312,7 +1340,15 @@ export class WorldEditor {
     this.roadFeat = d.roadFeat || { tunnels: [], bridge: null, rivers: [] };
     this.themeName = d.theme || null;
     this.weather = d.weather || null;
-    this.sel = null;
+    // A RESTORE INVALIDATES EVERY REFERENCE. The lists above are rebuilt from
+    // JSON, so every object in them is new — and anything still holding the
+    // old ones is holding corpses. `sel` was already dropped for that reason;
+    // the group has to go with it, or an undo leaves `also` pointing at
+    // objects that are in no list at all. Measured: after undoing a nudge, a
+    // group DUPLICATE pushed its copies into `elements` because the stale
+    // originals failed the `props.includes()` test, and the count it reported
+    // was zero.
+    this._clearSelection();
     this._syncControls();
   }
 
@@ -1399,7 +1435,7 @@ export class WorldEditor {
     this._clearSelection();
     this.sel = best;
     this._selMark();
-    this._syncSelPanel();
+    this._syncInspector();
     this._syncInspector();
     if (best.kind === 'water' || best.kind === 'zone' || best.kind === 'road') {
       this._status(`${this._selName()} selected — the panel on the right sets its numbers`);
@@ -1422,6 +1458,19 @@ export class WorldEditor {
     const s = this.sel;
     if (!s) return;
     const t = this.game.track;
+    // the rest of a shift-tapped group gets a plainer ring: enough to see what
+    // is coming with you, quiet enough that the primary still reads as primary
+    for (const q of this.also) {
+      const qy = t.terrainHeight(q.x, q.z) + this.delta.at(q.x, q.z);
+      const qr = Math.max(2.5, 3.4 * (q.scale ?? 1));
+      const m = new THREE.Mesh(new THREE.RingGeometry(qr, qr + 0.5, 26),
+        new THREE.MeshBasicMaterial({ color: 0x5ad7ff, transparent: true,
+          opacity: 0.55, depthTest: false }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(q.x, qy + 0.4, q.z);
+      m.renderOrder = 1000;
+      this._selGroup.add(m);
+    }
     const y = t.terrainHeight(s.x, s.z) + this.delta.at(s.x, s.z);
     const r = Math.max(2.5, (s.r ?? 3.4) * (s.scale ?? 1));
     const ring = new THREE.Mesh(
@@ -1452,6 +1501,7 @@ export class WorldEditor {
 
   _clearSelection() {
     this.sel = null;
+    this.also = [];
     this._clearSelMarks();
   }
 
@@ -1532,10 +1582,14 @@ export class WorldEditor {
       const hidden = el.built ? this._hideAround(el.x, el.z, 6 * (el.scale || 1)) : [];
       // whichever of my two lists it came out of — a plant is deleted by the
       // same button as a building, and filtering only `elements` left every
-      // hand-planted tree undeletable
-      this._act('deleting an object', () => {
-        this.elements = this.elements.filter((q) => q !== el);
-        this.props = this.props.filter((q) => q !== el);
+      // hand-planted tree undeletable. And the whole group, if there is one.
+      const els = this._selGroupEls();
+      for (const q of els) {
+        if (q !== el && q.built) hidden.push(...this._hideAround(q.x, q.z, 6 * (q.scale || 1)));
+      }
+      this._act(els.length > 1 ? `deleting ${els.length} objects` : 'deleting an object', () => {
+        this.elements = this.elements.filter((q) => !els.includes(q));
+        this.props = this.props.filter((q) => !els.includes(q));
       }, hidden.length ? () => this._unhide(hidden) : null);
     } else {
       const r = Math.max(4, (s.r ?? 4) * 1.4);
@@ -1547,7 +1601,7 @@ export class WorldEditor {
     this._clearSelection();
     this._refreshMarkers();
     this._status('DELETED — gone from the world now, permanent at APPLY');
-    this._syncSelPanel();
+    this._syncInspector();
   }
 
   /** Turn the selection by the ROT slider, live. */
@@ -1574,6 +1628,10 @@ export class WorldEditor {
     if (!p || !this.sel) return;
     const el = this.sel.el;
     if (!el) return;
+    // everything else in the group keeps its offset from the one under the
+    // finger, so a village moves as a village and not into a heap
+    const dx = p.x - el.x, dz = p.z - el.z;
+    for (const q of this.also) { q.x += dx; q.z += dz; }
     el.x = p.x; el.z = p.z;
     this.sel.x = p.x; this.sel.z = p.z;
     this.dirty = true;
@@ -2152,15 +2210,26 @@ export class WorldEditor {
   /** DUPLICATE. A row of six identical cottages is six taps of this and six
    *  drags, not six trips back to the palette to line up ROT and SCALE again. */
   _duplicateSelection() {
-    const s = this.sel;
-    const el = s && s.kind === 'mine' ? s.el : null;
-    if (!el) { this._status('DUPLICATE works on an object you have placed'); return; }
-    const list = this.props.includes(el) ? this.props : this.elements;
-    const copy = { ...el, x: el.x + 12, z: el.z + 12, built: false };
-    this._act('a duplicate', () => { list.push(copy); });
-    this.sel = { ...s, el: copy, x: copy.x, z: copy.z };
+    const els = this._selGroupEls();
+    if (!els.length) { this._status('DUPLICATE works on objects you have placed'); return; }
+    const copies = [];
+    this._act(els.length > 1 ? `${els.length} duplicates` : 'a duplicate', () => {
+      for (const el of els) {
+        const copy = { ...el, x: el.x + 12, z: el.z + 12, built: false };
+        (this.props.includes(el) ? this.props : this.elements).push(copy);
+        copies.push(copy);
+      }
+    });
+    // the copies become the selection, so the next drag moves what you just
+    // made rather than the thing you copied it from
+    const first = copies[0];
+    this.sel = { kind: 'mine', el: first, x: first.x, z: first.z,
+      rot: first.rot, scale: first.scale, preset: first.preset || first.kind };
+    this.also = copies.slice(1);
     this._selMarkRefresh();
-    this._status(`duplicated ${this._selName()} — drag it where you want it`);
+    this._status(copies.length > 1
+      ? `duplicated ${copies.length} objects — drag them where you want them`
+      : `duplicated ${this._selName()} — drag it where you want it`);
   }
 
   /** Turn the selection by an exact amount (the , and . keys). Their ROTATE
@@ -2168,16 +2237,68 @@ export class WorldEditor {
    *  it works on a plant as well as a building. */
   _turnSelection(by) {
     const s = this.sel;
-    const el = s && s.kind === 'mine' ? s.el : (s && s.kind === 'world' ? this._adoptSelection() : null);
-    if (!el) { this._status('nothing turnable selected'); return; }
-    this._act('a rotation', () => { el.rot = (el.rot || 0) + by; });
+    if (s && s.kind === 'world') this._adoptSelection();
+    const els = this._selGroupEls();
+    if (!els.length) { this._status('nothing turnable selected'); return; }
+    this._act('a rotation', () => {
+      for (const el of els) el.rot = (el.rot || 0) + by;
+    });
+    const el = els[0];
     this.sel = { ...this.sel, kind: 'mine', el, rot: el.rot };
     this._selMarkRefresh();
-    this._status(`turned to ${Math.round((el.rot * 180 / Math.PI) % 360)}° — APPLY`);
+    this._status(els.length > 1
+      ? `turned ${els.length} objects by ${Math.round(by * 180 / Math.PI)}° — APPLY`
+      : `turned to ${Math.round((el.rot * 180 / Math.PI) % 360)}° — APPLY`);
   }
 
   /** Redraw the highlight where the selection now is. */
   _selMarkRefresh() { this._clearSelMarks(); this._selMark(); this._syncInspector(); }
+
+  /** Every object the current selection covers — the primary plus anything
+   *  shift-tapped onto it. Only objects I own can be in a group: a world
+   *  solid has no template, so there is nothing to move it BY. */
+  _selGroupEls() {
+    const out = [];
+    if (this.sel && this.sel.kind === 'mine' && this.sel.el) out.push(this.sel.el);
+    for (const e of this.also) if (!out.includes(e)) out.push(e);
+    return out;
+  }
+
+  /** Add to (or take out of) the group. Shift-tap, the way every editor
+   *  since the first one has spelled it. */
+  _addToSelection(p) {
+    let best = null, bd = Infinity;
+    for (const e of this.elements.concat(this.props)) {
+      const d = Math.hypot(e.x - p.x, e.z - p.z);
+      if (d < bd && d < Math.max(14, this.radius)) { bd = d; best = e; }
+    }
+    if (!best) { this._status('nothing of yours there to add'); return; }
+    if (this.sel && this.sel.el === best) { this._status('that one is already the selection'); return; }
+    const at = this.also.indexOf(best);
+    if (at >= 0) this.also.splice(at, 1);
+    else if (!this.sel) {
+      this.sel = { kind: 'mine', el: best, x: best.x, z: best.z,
+        rot: best.rot, scale: best.scale, preset: best.preset || best.kind };
+    } else this.also.push(best);
+    this._selMarkRefresh();
+    const n = this._selGroupEls().length;
+    this._status(`${n} object${n === 1 ? '' : 's'} selected — move, turn, duplicate or delete them together`);
+  }
+
+  /** NUDGE. A drag is how you place something; arrow keys are how you get it
+   *  exactly right afterwards, which a mouse cannot do at any zoom. */
+  _nudgeSelection(dx, dz) {
+    const els = this._selGroupEls();
+    if (!els.length) { this._status('nothing selected to nudge'); return; }
+    this._act('a nudge', () => {
+      for (const e of els) { e.x += dx; e.z += dz; }
+    });
+    if (this.sel && this.sel.el) { this.sel.x = this.sel.el.x; this.sel.z = this.sel.el.z; }
+    this._selMarkRefresh();
+    const step = Math.round(Math.hypot(dx, dz));
+    this._status(`nudged ${els.length > 1 ? `${els.length} objects` : this._selName()}`
+      + ` ${step} u — APPLY to rebuild`);
+  }
 
   /** Where the selection sits, for the camera and the inspector. */
   _selectionPos() {
@@ -2358,16 +2479,6 @@ export class WorldEditor {
   }
 
   /** The selection panel says what is picked and what can be done to it. */
-  _syncSelPanel() {
-    const el = this.root && this.root.querySelector('#ed-selwhat');
-    if (!el) return;
-    const s = this.sel;
-    if (!s) { el.textContent = 'nothing selected'; return; }
-    const what = s.preset ? s.preset.toUpperCase() : (s.src?.mat || 'object').toUpperCase();
-    el.textContent = s.kind === 'solid'
-      ? `${what} — removable` : `${what} — move / turn / remove`;
-  }
-
   _buildDOM() {
     const root = document.createElement('div');
     root.id = 'editor-ui';
@@ -2404,14 +2515,6 @@ export class WorldEditor {
         </div><div class="ed-hint">FORCE = metres per tap</div></div>
         <div class="ed-tgroup">EDIT</div>
         ${tool('select', 'SELECT')}
-        <div id="ed-selsub">
-          <div id="ed-selwhat">nothing selected</div>
-          <div id="ed-selrow">
-            <button class="ed-mini" data-sel="rotate">ROTATE</button>
-            <button class="ed-mini" data-sel="delete">DELETE</button>
-          </div>
-          <div class="ed-hint">drag the object itself to move it</div>
-        </div>
         ${tool('erase', 'ERASE')}${tool('clear', 'CLEAR AREA')}
         ${tool('orbit', 'ORBIT')}
       </div>
@@ -2438,6 +2541,7 @@ export class WorldEditor {
         <div class="ed-pgroup">SELECTION <span id="ed-insp-name"></span></div>
         <div id="ed-insp-body"></div>
         <div class="ed-insprow">
+          <button class="ed-mini" data-act="turn">ROTATE</button>
           <button class="ed-mini" data-act="dup">DUPLICATE</button>
           <button class="ed-mini ed-danger" data-act="del">DELETE</button>
         </div>
@@ -2478,6 +2582,7 @@ export class WorldEditor {
       else if (act === 'check') this._check();
       else if (act === 'help') this._toggleHelp();
       else if (act === 'del') this.deleteSelection();
+      else if (act === 'turn') this.rotateSelection();
       else if (act === 'dup') this._duplicateSelection();
       else if (act === 'modal-close') this._closeModal();
     });
@@ -2501,12 +2606,6 @@ export class WorldEditor {
       if (!b) return;
       this.roadMode = b.dataset.road;
       root.querySelectorAll('#ed-roadrow .ed-mini').forEach((x) => x.classList.toggle('current', x === b));
-    });
-    root.querySelector('#ed-selrow').addEventListener('click', (e) => {
-      const b = e.target.closest('[data-sel]');
-      if (!b) return;
-      if (b.dataset.sel === 'rotate') this.rotateSelection();
-      else if (b.dataset.sel === 'delete') this.deleteSelection();
     });
     this.narrowMode = false;
     root.querySelector('#ed-widenrow').addEventListener('click', (e) => {
@@ -2570,11 +2669,10 @@ export class WorldEditor {
     root.querySelector('#ed-roadsub').classList.toggle('open', t === 'road');
     // WIDEN and SELECT carry the same kind of sub-choice, under the same rule
     root.querySelector('#ed-widensub').classList.toggle('open', t === 'widen');
-    root.querySelector('#ed-selsub').classList.toggle('open', t === 'select');
     // a selection belongs to the SELECT tool: leaving it live under a brush
     // means the next DELETE key removes something you can no longer see picked
     if (t !== 'select') this._clearSelection();
-    this._syncSelPanel();
+    this._syncInspector();
     this._syncInspector();
     // the road handles only exist while you are moving the road
     this._routeMarks();

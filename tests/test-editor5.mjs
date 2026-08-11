@@ -226,6 +226,81 @@ const R = await page.evaluate(async () => {
   out.unknownPropSkipped = ed2.props.every((p) => p.kind !== 'nonesuch');
   ed2.dispose();
 
+  // ---- MORE THAN ONE: shift-tap, group move, nudge -----------------------
+  {
+    const eG = new WorldEditor(g);
+    eG.enter();
+    eG.tool = 'place'; eG.preset = 'shed';
+    const a = off(700, 40), b = off(706, 40), c = off(712, 40);
+    eG._place(a); eG._place(b); eG._place(c);
+    // An UNDO rebuilds the model from a snapshot, so every object reference
+    // taken before it is a corpse afterwards — by design, and the reason the
+    // editor drops its own selection on a restore. The test has to re-read the
+    // live objects the same way, by position in the list.
+    const E = (i) => eG.elements[i];
+    eG._pickTool('select');
+    eG.radius = 10;
+    eG._selectAt({ x: E(0).x, z: E(0).z });
+    out.gPrimary = eG.sel && eG.sel.el === E(0);
+    // shift-tap the other two on
+    eG._addToSelection({ x: E(1).x, z: E(1).z });
+    eG._addToSelection({ x: E(2).x, z: E(2).z });
+    out.gCount = eG._selGroupEls().length;
+    out.gMarks = eG._selGroup ? eG._selGroup.children.length : 0;
+    // shift-tapping one already in the group takes it back out
+    eG._addToSelection({ x: E(2).x, z: E(2).z });
+    out.gAfterToggle = eG._selGroupEls().length;
+    eG._addToSelection({ x: E(2).x, z: E(2).z });
+
+    // NUDGE moves every one of them by exactly the same amount
+    const bx = [E(0).x, E(1).x, E(2).x], bz = [E(0).z, E(1).z, E(2).z];
+    eG._nudgeSelection(10, 0);
+    out.gNudged = [E(0).x - bx[0], E(1).x - bx[1], E(2).x - bx[2]]
+      .every((d) => Math.abs(d - 10) < 1e-9)
+      && [E(0).z - bz[0], E(1).z - bz[1], E(2).z - bz[2]].every((d) => d === 0);
+    eG._undo();
+    out.gNudgeUndone = Math.abs(E(0).x - bx[0]) < 1e-9 && Math.abs(E(2).x - bx[2]) < 1e-9;
+    // the restore dropped the selection with the references it was made of
+    out.gUndoClearsGroup = eG._selGroupEls().length === 0;
+
+    // a group DRAG keeps the spacing between them
+    const regroup = () => {
+      eG.sel = { kind: 'mine', el: E(0), x: E(0).x, z: E(0).z,
+        rot: E(0).rot, scale: E(0).scale, preset: E(0).preset };
+      eG.also = [E(1), E(2)];
+    };
+    const gapBefore = Math.round(Math.hypot(E(2).x - E(0).x, E(2).z - E(0).z));
+    regroup();
+    const shift = { x: E(0).x + 40, z: E(0).z + 25 };
+    const dx = shift.x - E(0).x, dz = shift.z - E(0).z;
+    for (const q of eG.also) { q.x += dx; q.z += dz; }
+    E(0).x = shift.x; E(0).z = shift.z;
+    out.gGapKept = Math.round(Math.hypot(E(2).x - E(0).x, E(2).z - E(0).z)) === gapBefore;
+
+    // DUPLICATE copies the whole group, and the copies become the selection
+    const nBefore = eG.elements.length;
+    eG._duplicateSelection();
+    out.gDupAdded = eG.elements.length - nBefore;
+    out.gDupSelected = eG._selGroupEls().length;
+    out.gDupAreCopies = eG._selGroupEls().every((e) => eG.elements.indexOf(e) >= nBefore);
+    eG._undo();
+    out.gDupUndone = eG.elements.length === nBefore;
+
+    // DELETE takes the whole group
+    regroup();
+    eG.deleteSelection();
+    out.gDeleted = eG.elements.length === nBefore - 3;
+    eG._undo();
+    out.gDeleteUndone = eG.elements.length === nBefore;
+
+    // ONE selection panel, not two
+    out.oneSelPanel = !eG.root.querySelector('#ed-selsub')
+      && !!eG.root.querySelector('#ed-inspect');
+    out.inspectHasRotate = !!eG.root.querySelector('[data-act="turn"]');
+    eG.exit();
+    eG.dispose();
+  }
+
   // ---- a CODE is untrusted text ------------------------------------------
   // It arrives from another device, so it is the one input this tool has that
   // it did not write itself: a name is text on a card, never markup, and a
@@ -356,6 +431,25 @@ ok(R.codeIsText, 'and is plain text you can paste anywhere');
 ok(R.codeKb < 24, 'a full scene code is small enough to paste', `${R.codeKb} kB`);
 ok(R.draftExists && R.draftBase === 1,
   'unsaved work is written to a draft as you go', `base ${R.draftBase}`);
+
+console.log('\n--- more than one object at a time ---');
+ok(R.gPrimary, 'tapping picks a primary');
+ok(R.gCount === 3, 'shift-tap adds to the group', R.gCount);
+ok(R.gMarks >= 4, 'and every member of it is ringed', `${R.gMarks} marks`);
+ok(R.gAfterToggle === 2, 'shift-tapping a member again takes it out', R.gAfterToggle);
+ok(R.gNudged, 'an arrow key nudges the whole group by the same amount');
+ok(R.gNudgeUndone, 'and the nudge undoes as one step');
+ok(R.gUndoClearsGroup,
+  'an undo drops the selection, because a restore invalidates every reference');
+ok(R.gGapKept, 'a group drag keeps the spacing between them');
+ok(R.gDupAdded === 3, 'DUPLICATE copies every one of them', R.gDupAdded);
+ok(R.gDupSelected === 3 && R.gDupAreCopies,
+  'and the copies become the selection, so the next drag moves what you made');
+ok(R.gDupUndone, 'the whole duplication is one undo');
+ok(R.gDeleted, 'DELETE takes the whole group');
+ok(R.gDeleteUndone, 'and that undoes as one step too');
+ok(R.oneSelPanel, 'the selection is described in ONE panel, not two');
+ok(R.inspectHasRotate, 'and that panel carries ROTATE, DUPLICATE and DELETE');
 
 console.log('\n--- a pasted CODE is text, not markup ---');
 ok(R.pwned === false, 'a scene name cannot run script');

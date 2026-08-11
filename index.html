@@ -913,15 +913,9 @@
     background:rgba(12,16,22,.86);border:1px solid #2c3a4a;max-width:150px}
   #ed-widensub.open{display:block}
   #ed-widensub .ed-hint{margin-top:4px}
-  /* SELECT's panel: what is picked, and the two things you can do to it that
-     are not a drag */
-  #ed-selrow{display:flex;gap:4px}
-  #ed-selsub{display:none;margin:2px 0 4px;padding:5px;border-radius:8px;
-    background:rgba(12,16,22,.86);border:1px solid #3a6b8a;max-width:150px}
-  #ed-selsub.open{display:block}
-  #ed-selwhat{font-size:10px;color:#8fd4f5;margin-bottom:5px;line-height:1.25;
-    word-break:break-word}
-  #ed-selsub .ed-hint{margin-top:4px}
+  /* SELECT describes itself in ONE place — the inspector on the right rail.
+     It briefly had two: a sub-panel under the tool button and the inspector,
+     both naming the selection and both carrying DELETE. */
   /* the running account of everything not yet applied. It used to be pinned
      at a measured `top:364px` — the one offset that cleared the slider stack —
      which is exactly the arrangement #ed-right replaced: it is a row in the
@@ -1085,7 +1079,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r156</div>
+<div id="build-tag">r157</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1305,10 +1299,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r156"></script>
+<script type="module" src="./src/main.js?v=r157"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r156"></script>
+<script src="./src/offline.js?v=r157"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r156"></script>
+<script type="module" src="./src/traffic.js?v=r157"></script>
 </body>
 </html>
