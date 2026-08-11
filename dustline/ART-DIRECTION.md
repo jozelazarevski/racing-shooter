@@ -30,6 +30,52 @@ last two:
 6. **Vineyard circuit.** Hundreds of vine rows following the contour of rolling
    hills, a villa, a windmill, spectator stands, banners, a tarmac road.
 
+A second batch of five arrived after the first, and it changes the reading:
+
+7. **Vineyard grand prix, flat vector.** The same subject as 6, captioned
+   **"LOW POLY RACING"** in the frame. Flat fills, no texture anywhere.
+8. **A marina circuit — the only photograph in the set.** Superyachts moored
+   three deep along a street circuit, grandstands, a city behind. Read as a
+   *content* reference, not a style one: it says a harbour circuit lined with
+   moored hulls is wanted. v1 already has MARINA BAY.
+9. **Coastal rally stage, flat vector.** Red cliffs, a switchback descending to
+   a bay, cypress, spectators, a stage timer in the corner.
+10. **Alpine pass, low-poly 3D.** Faceted snow peaks, a gravel switchback, a
+    turquoise glacial lake, scattered pines. **Untextured** — the road surface
+    is flat colour. Dense: hundreds of individual facets and trees.
+11. **Six arctic frames.** Ice cave under aurora, snow forest track, frozen
+    waterfall canyon, night desert, a research station, a crevasse field. All
+    flat-shaded low-poly, all vehicle-scale.
+
+## Surface style — DECIDED, and it reverses part of this document
+
+The two batches pull in different directions. Frame 5 has legible cobblestones
+and roof tiles; frames 7, 10 and 11 have no textures at all, and one of them
+says "LOW POLY" in the picture. That is a fork, not a nuance, so it was put to
+the owner rather than guessed.
+
+**The decision: flat-shaded faceted geometry everywhere, with the road textured.**
+
+- Terrain, rock, foliage, buildings, boats, horizon: vertex colour on faceted
+  geometry. No albedo maps, no normal maps. Silhouette and light do the work.
+- The road surface and its markings: fully textured — cobble, tarmac, kerbs,
+  start line, painted strips.
+
+The reasoning is that the road is the one surface on screen for the entire race,
+so it is where a texture budget returns the most, and it is exactly the surface
+frame 5 makes legible. Everything else keeps the look of frames 10 and 11 and
+costs a fraction as much on a phone.
+
+**This reverses item 3 below.** That section was written from the first batch
+alone and ranked material third across the whole world. It is now scoped to the
+road, and the budget it would have spent moves to items 2 and 4 — which is the
+better trade anyway, because "highly poly" means triangles.
+
+**And it re-scopes the texture port already underway.** v1's 38 canvas
+generators are still worth having, but for the road, markings, banners, number
+plates, chevrons, kerbs and the finish gantry — not for cladding every wall and
+roof in the world.
+
 ## What actually carries that look, ranked
 
 The ranking matters: the first item is worth more than the rest combined, and
@@ -56,24 +102,35 @@ has continuous undergrowth, not scattered props on visible bare ground.
 This is mostly track data and scatter rules, not engine work — which makes it
 the cheapest large win available, provided instancing holds up.
 
-### 3. Material, not just colour
+### 3. The road surface — and only the road
 
 Frames 4 and 5 both put a cobbled road across most of the frame, and the cobbles
-are legible — individual stones, worn and irregular. The town's roofs read as
-tile courses. dustline paints its surfaces with flat vertex colour and no map at
-all: six colours in `SURF_COLORS`, lerped against grass. That is why the current
-render looks like a diagram of a world rather than a place.
+are legible: individual stones, worn and irregular. dustline paints every
+surface with flat vertex colour and no map at all — six colours in
+`SURF_COLORS`, lerped against grass — so the road reads as a grey ribbon rather
+than a thing with a material.
+
+Per the decision above this is now the *whole* texture programme. The road, its
+kerbs, its painted markings and the gantry banners get real maps. Nothing else
+does, and the walls and roofs stay flat-shaded, which is what frames 10 and 11
+look like anyway.
 
 ### 4. Subdivision — the "high poly" ask
 
-Every silhouette in the references is curved. Rocks are faceted but irregular;
-tree crowns are lumpy; hulls are lofted; walls have thickness and a coping.
-dustline's horizon is five-sided cones and much of the library is boxes.
+Every silhouette in the references is curved or crisply faceted, never a plain
+box. Rocks are irregular; tree crowns are lumpy; hulls are lofted; walls have
+thickness and a coping. Frame 10 is the clearest statement of the target: it is
+untextured, and it reads well *entirely* because there are a great many facets
+and a great many individual objects.
 
-Subdivision is listed fourth deliberately. A subdivided box under flat light
-still looks like a box; the same box under item 1 with a contact shadow already
-reads. Spend here after the light is right, and spend it on silhouettes the
-camera gets close to.
+That is what "highly poly" means here — high triangle count in a low-poly style,
+not photorealism. It is also why this item is worth more than it looks: with the
+texture programme scoped down to the road, triangles are where the budget goes.
+
+Subdivision is still listed after light, deliberately. A subdivided box under
+flat light is still a box; the same box under item 1 with a contact shadow
+already reads. Spend here once the light is right, and spend it on silhouettes
+the camera gets close to.
 
 ### 5. Sky and distance
 
@@ -133,6 +190,13 @@ raises geometry reports its measured triangle count and draw calls, per track,
 before and after — the same discipline the rest of this repository already
 applies to timings. A fidelity pass that ships an unplayable frame rate has
 failed, and it fails silently unless the numbers are taken.
+
+**The flat-shaded decision buys headroom here, which is why it is the right one
+for this target and not only an aesthetic call.** An untextured vertex-coloured
+mesh costs no texture fetch, no texture memory and very little fill; a phone
+running it is bound by vertices and draw calls rather than by fragments. That is
+the cheap axis, and it is precisely the axis "more triangles" spends on. One
+textured surface — the road — is a bounded exception rather than a policy.
 
 ## What is deliberately not being chased
 
