@@ -25,6 +25,13 @@ import type { PropTemplate, PlaceCtx, PhysicsShape, Placement } from './props/ty
 import { isSolid } from './props/types';
 import { getTemplate, partsFor, resetPartCache } from './props/registry';
 import { Rng } from '../core/rng';
+// THE SKYLINE'S COLLIDERS ARE CREATED HERE, WITH EVERY OTHER COLLIDER IN THE
+// WORLD. `render/horizon.ts` measures the shapes and hands over plain numbers;
+// this file turns numbers into Rapier. The alternative — the renderer making
+// its own colliders — is exactly the shape of the bug this fixes: v1's r148
+// made the massif solid in one file and the skyline stayed bare in another,
+// with no check spanning both.
+import { horizonSolids } from '../render/horizon';
 
 /** One instance of one component, ready to be written into a matrix. */
 interface Instance {
@@ -181,6 +188,57 @@ function addCollider(
   world.createCollider(desc.setFriction(friction), body);
 }
 
+/** Friction on rock. The terrain trimesh is built with 1 (terrain.ts:484) and a
+ *  mountain is the same stone as the ground it stands in, so it carries the
+ *  same number rather than Rapier's 0.5 default. It is not cosmetic: against a
+ *  hillside the car meets an oblique face, and the friction impulse is what
+ *  turns a 54 m/s impact into a stop instead of a 33 m/s slide up the slope. */
+const ROCK_FRICTION = 1;
+
+/** MAKE THE SKYLINE SOLID.
+ *
+ *  One primitive per horizon instance, on the same fixed body as every other
+ *  piece of scenery — chosen and sized in `render/horizon.ts`, which measures
+ *  the drawn form and hands back a shape that CONTAINS it.
+ *
+ *  NOTHING IS EXEMPTED, and that is a decision rather than an oversight. The
+ *  obvious economy is to skip peaks no car could reach, but "could reach" is a
+ *  ballistic envelope off the edge of the terrain that moves with the car's
+ *  tuning — `verify-solidity.mjs` recomputes it from `car.json` for exactly
+ *  that reason — so any constant here would be a stale number waiting to
+ *  become a hole. Measured instead: the 343 solids on the three committed
+ *  tracks cost 0.03-0.06 ms of a 0.37-0.65 ms fixed step, because they are
+ *  convex primitives on a fixed body that the broad phase sorts once and never
+ *  touches again. There is nothing to buy back. */
+function addHorizonSolids(
+  def: TrackDef, world: RAPIER_API.World, RAPIER: typeof RAPIER_API, body: RAPIER_API.RigidBody,
+) {
+  const solids = horizonSolids(def);
+  let worst = 0;
+  for (const s of solids) {
+    let desc: RAPIER_API.ColliderDesc;
+    switch (s.kind) {
+      case 'cone': desc = RAPIER.ColliderDesc.cone(s.halfHeight, s.radius); break;
+      case 'cylinder': desc = RAPIER.ColliderDesc.cylinder(s.halfHeight, s.radius); break;
+      case 'ball': desc = RAPIER.ColliderDesc.ball(s.radius); break;
+      case 'box': desc = RAPIER.ColliderDesc.cuboid(s.half[0], s.half[1], s.half[2]); break;
+    }
+    desc.setTranslation(s.x, s.y, s.z);
+    // Only the box has corners to turn: the other three are surfaces of
+    // revolution about the same Y axis the instance is yawed around.
+    if (s.kind === 'box' && s.yaw) {
+      const h = s.yaw / 2;
+      desc.setRotation({ x: 0, y: Math.sin(h), z: 0, w: Math.cos(h) });
+    }
+    world.createCollider(desc.setFriction(ROCK_FRICTION), body);
+    worst = Math.max(worst, s.margin);
+  }
+  if (solids.length) {
+    console.info(`[world] horizon: ${solids.length} solids, `
+      + `worst invisible margin ${worst.toFixed(1)} m`);
+  }
+}
+
 export interface BuiltWorld {
   objects: THREE.Object3D[];
   /** how many of each component actually made it into the world */
@@ -276,6 +334,11 @@ export function buildComponents(
       }
     }
   }
+
+  // The skyline is scenery too. It is drawn by `render/horizon.ts` and made
+  // solid here, on the same body, for the reason above the import: one file
+  // creates the colliders in this world, so there is no second path to forget.
+  if (solids && world && RAPIER) addHorizonSolids(def, world, RAPIER, solids);
 
   return { objects, counts };
 }

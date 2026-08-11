@@ -324,7 +324,10 @@ await page.evaluate(() => {
 });
 
 if (TABLE) {
-  console.log('\nscreen / scheme'.padEnd(42) + 'control'.padEnd(11) + 'x,y'.padEnd(14) + 'w×h');
+  // Coordinates as measured WITH that screen's safe-area insets applied, which
+  // is where the control sits on the phone rather than where the CSS would put
+  // it on a rectangle: on a 390×844 that moves the top-left rail down by 59 px.
+  console.log('\nscreen / scheme'.padEnd(42) + 'control'.padEnd(11) + 'x,y (insets applied)'.padEnd(14) + 'w×h');
   console.log('-'.repeat(88));
   for (const { where, L } of rows) {
     for (const t of [L.zone, L.ring, ...L.drawn, L.gauge]) {
@@ -477,7 +480,12 @@ const turned = Math.abs(left.yawDeg) >= MIN_YAW_DEG && Math.abs(right.yawDeg) >=
 check(sameWay && opposed && turned && keyLeft.dist >= MIN_DRIVE_M,
   `THE STEERING IS CONNECTED AND THE RIGHT WAY ROUND: a thumb held left turns the car the way the A key does, at least ${MIN_YAW_DEG}°`,
   `thumb-left ${left.yawDeg.toFixed(1)}°, keyboard-left ${keyLeft.yawDeg.toFixed(1)}°, thumb-right ${right.yawDeg.toFixed(1)}°`
-  + (sameWay ? '' : ' — THE PAD STEERS THE OPPOSITE WAY TO THE KEYBOARD'));
+  // A dead pad and an inverted pad are different bugs and the message has to
+  // say which: sign(0) is not sign(x) either, so "opposite" would be a lie
+  // about a pad that simply did nothing.
+  + (!turned ? ' — the pad did not turn the car at all'
+    : !sameWay ? ' — THE PAD STEERS THE OPPOSITE WAY TO THE KEYBOARD'
+      : !opposed ? ' — left and right turn the car the same way' : ''));
 
 check(straight.rest.steer === 0 && straight.rest.throttle === 0 && straight.rest.brake === 0
   && left.rest.steer === 0 && right.rest.steer === 0,
@@ -605,16 +613,19 @@ await dpage.evaluate((n) => window.__dust.fastForward(n), DRIVE_TICKS);
 const a1 = await dpage.evaluate(() => window.__mob.pose());
 await dpage.keyboard.up('w');
 const deskDist = Math.hypot(a1.x - a0.x, a1.z - a0.z);
+check(wThrottle === 1 && deskDist >= MIN_DRIVE_M,
+  'the keyboard still drives on a desktop',
+  `W → throttle ${wThrottle}, ${deskDist.toFixed(2)} m in ${DRIVE_TICKS / HZ} s`);
 // The phone drove the same car, from the same grid slot, for the same 240
 // ticks, on a thumb. If the touch merge in `poll()` were anything but the
 // identity it claims to be when `analog` is all zeros, these two numbers would
 // not be the same number. 0.25 m is 1.7% of the drive — enough slack for two
-// browser contexts, far too little to hide a changed input path.
-const identical = Math.abs(deskDist - straight.dist) < 0.25;
-check(wThrottle === 1 && deskDist >= MIN_DRIVE_M && identical,
-  'the keyboard still drives on a desktop, exactly as far as the thumb drove on the phone',
-  `W → throttle ${wThrottle}, ${deskDist.toFixed(2)} m in ${DRIVE_TICKS / HZ} s `
-  + `vs the thumb's ${straight.dist.toFixed(2)} m (Δ ${Math.abs(deskDist - straight.dist).toFixed(3)} m)`);
+// browser contexts, far too little to hide a changed input path. Kept separate
+// from the check above so that a dead pad fails THIS line and not the claim
+// that a desktop keyboard works, which would still be true.
+check(Math.abs(deskDist - straight.dist) < 0.25,
+  'the touch merge is an identity: the key drives the car exactly as far as the thumb did',
+  `keyboard ${deskDist.toFixed(2)} m vs thumb ${straight.dist.toFixed(2)} m, Δ ${Math.abs(deskDist - straight.dist).toFixed(3)} m`);
 check(derrs.length === 0, 'no page errors on the desktop', derrs.slice(0, 3).join(' | '));
 
 await browser.close();
@@ -628,27 +639,50 @@ process.exit(fails ? 1 : 0);
 
 /* PROVEN TO FAIL, which is the only way to know a check works.
  *
- * Mutation, run against a copy of the tree with the wiring in place (DIST
- * pointed at that build, nothing in the shared tree touched): the one line
- * `input.bindJoystick(zone, base, knob)` was commented out of `ui/touch.ts` —
- * the smallest edit that leaves every control on screen, correctly sized,
- * correctly spaced and completely dead, which is precisely the bug a check
- * that only measured the DOM would wave through.
+ * A check that has never been red is not known to work, so this one was made
+ * to go red on purpose. The mutation was run against a COPY of this tree built
+ * into a private directory with `DIST` pointed at it — nothing in the shared
+ * tree was touched — and the edit was one line commented out of `ui/touch.ts`:
  *
- * What it said, rebuilt and re-run:
+ *   // input.bindJoystick(zone, base, knob);
+ *
+ * That is the smallest edit that leaves every control drawn, correctly sized,
+ * correctly spaced and completely dead: the exact bug a check that only read
+ * the DOM would wave through, and the exact bug that would put the owner on a
+ * phone with a car that does not move.
+ *
+ * Rebuilt and re-run, it said (verbatim, trimmed):
  *
  *   FAIL  the on-screen controls are built, shown and bound to the input system
- *         — the markup is on the page but nothing bound it...
+ *         — the markup is on the page but nothing bound it: main.ts never
+ *           calls initTouchControls(input) — add ...
  *   FAIL  a thumb dragged to full travel opens the throttle and nothing else
  *         — analog = throttle 0.000, steer 0.000, brake 0.000
- *   FAIL  THE CAR DRIVES — thumb 0.00 m (0 km/h avg), idle 0.00 m
- *   FAIL  THE STEERING IS CONNECTED AND THE RIGHT WAY ROUND
- *         — thumb-left 0.0°, keyboard-left -46.2°, thumb-right 0.0°
+ *   FAIL  THE CAR DRIVES ... — thumb 0.00 m (0 km/h avg), idle 0.00 m
+ *   FAIL  THE STEERING IS CONNECTED AND THE RIGHT WAY ROUND ...
+ *         — thumb-left 0.0°, keyboard-left 92.8°, thumb-right 0.0°
+ *           — the pad did not turn the car at all
  *   FAIL  a steering drag scrolls nothing and zooms nothing
  *         — 3 touch events, all preventDefault()ed: false
+ *   FAIL  the touch merge is an identity ... — Δ 14.548 m
+ *   FAIL  nothing drawn falls off the screen — joy-base at -62,258.7 ...
+ *   FAIL  the pad's resting ring stays inside its own capture zone ...
+ *   FAIL  no control loses more than 10% of itself to a notch ...
  *
- * The buttons still passed (DRIFT is bound separately, by bindTouchButtons),
- * every geometry check still passed, and the desktop keyboard still drove
- * 17.28 m. That is the shape a real regression would have, and the four lines
- * that went red are the four this file exists for.
+ * Nine lines, on four screens, for one commented-out call. Three of them were
+ * a surprise worth writing down: the ring's resting position is placed by
+ * `bindJoystick`'s `rest()`, so an unbound pad also leaves the ring at its
+ * CSS default — half of it off the left edge at x = −62. The geometry checks
+ * catch the dead pad from a completely different direction than the drive
+ * does, which is why they are worth their runtime.
+ *
+ * What stayed green is as much of the proof as what went red: DRIFT still
+ * passed (`bindTouchButtons` is a separate binding, and the mutation did not
+ * touch it), the 44 px and overlap rules still passed, the desktop still had
+ * no thumb pads, and the desktop keyboard still drove its 14.55 m. A check
+ * that goes red everywhere when you break one thing is not a check, it is an
+ * alarm — this one named the thing that broke.
+ *
+ * The line was restored and the copy rebuilt; the tree this file lives in was
+ * never modified.
  */

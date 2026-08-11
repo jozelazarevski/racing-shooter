@@ -119,6 +119,26 @@
  *     accumulated state. It does not prove two different machines agree.
  *     `verify-worlds`'s golden file is what covers that, which is why the two
  *     checks are complements and not duplicates.
+ *
+ *   - AND THERE IS ONE GAP LEFT THAT NEITHER OF THEM CLOSES, MEASURED RATHER
+ *     THAN GUESSED. A DELIBERATE, DETERMINISTIC change to a yaw, an X/Z scale
+ *     or a geometry is invisible to both. Mutation-tested: dropping the near
+ *     horizon ring's width factor from 1.45 to 0.35 — every near hill four
+ *     times too thin, the literal shark fin — leaves `verify-worlds` printing
+ *     "every world matches its fingerprint and is fully seeded" with its golden
+ *     hashes byte-identical (4b996042 / a5e1e543 / 65557997 before and after),
+ *     and leaves check 3 green too, because the change is perfectly consistent
+ *     from run to run. It is only a golden file that can catch that, and the
+ *     golden here is the wrong shape.
+ *
+ *     THE FIX IS FOUR LINES IN `verify-worlds.mjs`, not another golden file in
+ *     this one: make its `fingerprint()` traverse (`root.traverse(...)` instead
+ *     of skipping every non-InstancedMesh) and hash all sixteen matrix elements
+ *     instead of 12/13/14 and 5. The full hash here DOES separate that mutant
+ *     (a92dc3aa -> a6356523 on dustbowl), so the discrimination exists and only
+ *     the golden is missing it. A second golden file committed here would go red
+ *     on every intended world change and have to be blessed by hand twice, which
+ *     teaches people to bless without looking — and that is how "still" happens.
  *   - Check 1 registers the three 2D canvas painters in `templates/` as exempt.
  *     Their unseeded grain lands in an ImageData and never in a coordinate; the
  *     structural reason that is safe is that `verify-templates` already proves

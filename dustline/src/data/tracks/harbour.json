@@ -555,36 +555,36 @@
     },
     {
       "template": "hayBale",
-      "x": 115,
-      "z": 193.1,
+      "x": 116.5,
+      "z": 196.8,
       "rot": -1.171,
       "scale": 1
     },
     {
       "template": "hayBale",
-      "x": 111.4,
-      "z": 193.6,
+      "x": 112.9,
+      "z": 197.3,
       "rot": -1.18,
       "scale": 1
     },
     {
       "template": "hayBale",
-      "x": 104.4,
-      "z": 195.5,
+      "x": 105.9,
+      "z": 199.2,
       "rot": -1.2,
       "scale": 1
     },
     {
       "template": "hayBale",
-      "x": 97.3,
-      "z": 197.3,
+      "x": 98.7,
+      "z": 201,
       "rot": -1.219,
       "scale": 1
     },
     {
       "template": "hayBale",
-      "x": 90.1,
-      "z": 198.9,
+      "x": 91.4,
+      "z": 202.7,
       "rot": -1.239,
       "scale": 1
     },
@@ -1494,7 +1494,7 @@
     },
     {
       "template": "church",
-      "x": -203,
+      "x": -215,
       "z": 24,
       "rot": 1.571,
       "scale": 1.05
@@ -3335,20 +3335,6 @@
     },
     {
       "template": "fenceRun",
-      "x": 268,
-      "z": 20,
-      "rot": 0.9,
-      "scale": 1
-    },
-    {
-      "template": "fenceRun",
-      "x": 273,
-      "z": 26.3,
-      "rot": 0.9,
-      "scale": 1
-    },
-    {
-      "template": "fenceRun",
       "x": 277.9,
       "z": 32.5,
       "rot": 0.9,
@@ -3390,6 +3376,20 @@
       "scale": 1
     },
     {
+      "template": "fenceRun",
+      "x": 307.8,
+      "z": 70.1,
+      "rot": 0.9,
+      "scale": 1
+    },
+    {
+      "template": "fenceRun",
+      "x": 312.8,
+      "z": 76.4,
+      "rot": 0.9,
+      "scale": 1
+    },
+    {
       "template": "waterTower",
       "x": 372,
       "z": 128,
@@ -3405,8 +3405,8 @@
     },
     {
       "template": "farmhouseL",
-      "x": 268,
-      "z": -108,
+      "x": 300,
+      "z": -130,
       "rot": 2.2,
       "scale": 1
     },
@@ -3416,13 +3416,6 @@
       "z": 74,
       "rot": 0.9,
       "scale": 1.1
-    },
-    {
-      "template": "stoneWall",
-      "x": 250,
-      "z": -150,
-      "rot": 2.1,
-      "scale": 1
     },
     {
       "template": "stoneWall",
@@ -3456,6 +3449,13 @@
       "template": "stoneWall",
       "x": 229.8,
       "z": -115.5,
+      "rot": 2.1,
+      "scale": 1
+    },
+    {
+      "template": "stoneWall",
+      "x": 225.8,
+      "z": -108.6,
       "rot": 2.1,
       "scale": 1
     }

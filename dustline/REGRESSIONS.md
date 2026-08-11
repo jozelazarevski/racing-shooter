@@ -42,6 +42,24 @@ check without deleting the row is how you find out you did.
 4. Add the row. The owner's words go in verbatim if the defect was reported;
    `—` if it was found by a tool rather than by a person.
 
+## How it runs
+
+`node tools/verify-regression-memory.mjs` has three checks. Checks 1 and 2 read
+source and cost nothing; check 3 builds every committed track four times in a
+headless browser and takes a couple of minutes.
+
+```
+node tools/verify-regression-memory.mjs --static        # 1 and 2, no browser — belongs in `gate`
+npx vite build && node tools/verify-regression-memory.mjs   # all three — belongs in `gate:full`
+node tools/verify-regression-memory.mjs --fingerprints  # print the full vs golden hash per track
+```
+
+`gate` does not run `npm run build`, so a plain invocation there measures
+whatever happens to be sitting in `../play-dustline` — which is a check
+reporting on a build nobody made, the exact shape of problem this file is
+about. Wire the `--static` form into `gate` and the full form into `gate:full`,
+which builds first.
+
 ## The register
 
 | # | The defect, and where it came from | Reported as | The check that stands watch |
@@ -80,3 +98,36 @@ rewritten.
 
 It also cannot know about a defect nobody wrote down. It is a register, not a
 detector: it makes forgetting visible, it does not make remembering automatic.
+
+## One row is only half closed — row 8
+
+Row 8 is registered against `verify-regression-memory`, and that check catches
+the *unseeded* half of it: a yaw or an X/Z scale that re-rolls between loads
+now fails, where `verify-worlds` passes. Measured head to head on one build,
+with every horizon massif's depth and every scattered prop's yaw re-rolling
+unseeded:
+
+| | `verify-worlds` | `verify-regression-memory` |
+|---|---|---|
+| dustbowl | PASS | **FAIL** — `78d59e92` vs `9dd71e6d` under two seeds |
+| harbour | PASS | **FAIL** — `2c514942` vs `9ea29cc4` |
+| proving-ground | PASS | **FAIL** — `16437996` vs `354600ce` |
+| its golden hashes | `4b996042` / `a5e1e543` / `65557997`, unchanged | — |
+
+The other half is still open, and it is the half the owner actually reported. A
+**deliberate, deterministic** change to a yaw, an X/Z scale or a geometry — the
+near horizon ring's width factor moved 1.45 → 0.35, every near hill four times
+too thin — is invisible to *both* checks: `verify-worlds` prints "every world
+matches its fingerprint and is fully seeded" with byte-identical goldens, and
+the run-to-run comparison stays green because the change is perfectly
+consistent. Only a golden file can catch that one, and the golden is the wrong
+shape.
+
+**The fix is four lines in `tools/verify-worlds.mjs`**: traverse the built
+world instead of skipping every non-`InstancedMesh`, and hash all sixteen
+matrix elements instead of 12/13/14 and 5. The full-transform hash already
+separates that mutant (`a92dc3aa` → `a6356523` on dustbowl), so the
+discrimination exists; only the golden is missing it. A second golden committed
+against this file instead would have to be blessed by hand alongside the first
+one on every intended world change, which teaches people to bless without
+looking — which is how "still" happens in the first place.

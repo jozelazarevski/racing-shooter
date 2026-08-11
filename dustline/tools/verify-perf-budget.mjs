@@ -92,7 +92,7 @@
  * WHY THE BUDGET IS CHECKED IN PORTRAIT. Every reference image the owner sent
  * is a portrait phone screenshot, and v1's touch UI is a portrait layout. A
  * portrait frame is also the CHEAPER one: three's `fov` is vertical, so at
- * 390x844 the horizontal field of view is about 35 degrees against about 100
+ * 390x844 the horizontal field of view is about 35 degrees against about 111
  * turned sideways, and far less of the world survives the frustum. The check is
  * therefore made on the stated target framing, and the landscape cost is
  * measured and printed beside it so that turning the phone is a known price
@@ -159,12 +159,19 @@ const BUDGET_COLOUR_CALLS = 100;  // the colour pass's own half of the above
 // primitives and calls, and none of them changes with resolution.
 const VIEWPORT = { width: 390, height: 844 };
 
-// Poses sampled around the lap. 24 over a road of 480 samples is one every ~20
-// road samples, which is fine enough that a corner opening onto the whole
-// harbour is not stepped over and coarse enough to stay under a minute a track.
-const STATIONS = Number(argOf('--stations') ?? 24);
+// Poses sampled around the lap. 16 over a road of 480 samples is one every 30
+// road samples — fine enough that a corner opening onto the whole harbour is
+// not stepped over, coarse enough that a full run stays inside five minutes.
+// Each station costs four renders (two orientations, each read twice to
+// separate the shadow pass), and a 500k-triangle submit is not free even when
+// only the counters are wanted.
+const STATIONS = Number(argOf('--stations') ?? 16);
 
-const BASE = process.env.BASE || 'http://localhost:8907/';
+// Its own port. `ensureServer` reuses a server it finds, so sharing one is
+// safe when tools run in sequence — but this tool takes minutes, and whichever
+// tool STARTED a shared server shuts it down when it finishes. A port nothing
+// else in `tools/` claims means a concurrent run cannot pull the floor out.
+const BASE = process.env.BASE || 'http://localhost:8915/';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const JSON_OUT = process.argv.includes('--json');
 const ONLY = argOf('--track');
@@ -507,10 +514,35 @@ page.setDefaultNavigationTimeout(180_000);
 const pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message.split('\n')[0]));
 
+/* Wait for a page hook, and say something useful when it never arrives.
+ *
+ * A bare playwright TimeoutError here reads as "the tool is broken", and the
+ * three things that actually cause it are all somebody else's: a stale bundle,
+ * a build running in another shell while this one serves the half-written
+ * output, or a genuine boot error in the game. The page errors collected above
+ * distinguish them, so they are printed instead of swallowed. */
+async function waitForHook(fn, what, hint) {
+  const before = pageErrors.length;
+  try {
+    await page.waitForFunction(fn, null, { timeout: 180_000 });
+    return true;
+  } catch {
+    const fresh = pageErrors.slice(before);
+    console.error(`FAIL  ${what} never appeared after 180 s.`);
+    console.error(fresh.length
+      ? `      the page threw: ${fresh.slice(0, 3).join(' | ')}`
+      : `      the page threw nothing — ${hint}`);
+    process.exitCode = 1;
+    return false;
+  }
+}
+
 const results = [];
 for (const track of TRACKS) {
   await page.goto(`${BASE}index.html?track=${track.id}`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__dust?.track, null, { timeout: 180_000 });
+  const up = await waitForHook(() => window.__dust?.track, `${track.id}: window.__dust`,
+    'the served bundle is probably stale or half-written — run `npx vite build` and try again');
+  if (!up) continue;
   const loaded = await page.evaluate(() => window.__dust.track.id);
   if (loaded !== track.id) {
     console.error(`FAIL  ${track.id}: the game loaded "${loaded}" instead`);
@@ -521,8 +553,9 @@ for (const track of TRACKS) {
 }
 
 await page.goto(`${BASE}editor.html`, { waitUntil: 'load' });
-await page.waitForFunction(() => window.__editor?.preview?.terrain, null, { timeout: 180_000 });
-const buildCost = await measureBuildCost(page, TRACKS.map((t) => t.id));
+const editorUp = await waitForHook(() => window.__editor?.preview?.terrain, 'the editor preview',
+  'the served bundle is probably stale or half-written — run `npx vite build` and try again');
+const buildCost = editorUp ? await measureBuildCost(page, TRACKS.map((t) => t.id)) : {};
 
 await browser.close();
 await stopServer();
@@ -598,15 +631,32 @@ for (const r of results) {
   // is a table; the reason this tool exists is to point at something.
   const topDraws = cats[0];
   const topTris = [...cats].sort((a, b) => frameOf(b[0]).allTris - frameOf(a[0]).allTris)[0];
+  const how = (v) => (v.instanced === v.objects
+    ? `${v.objects} instanced meshes carrying ${n(v.instances)} instances`
+    : `${v.objects} separate meshes over ${v.materials} materials`);
   say(`    -> ${pct(frameOf(topDraws[0]).allCalls, r.whole.allCalls)} of the frame's draw calls are ${topDraws[0]}`
-    + ` (${topDraws[1].objects} separate meshes over ${topDraws[1].materials} materials);`);
-  say(`       ${pct(frameOf(topTris[0]).allTris, r.whole.allTris)} of its triangles are ${topTris[0]}`
-    + ` (${topTris[1].objects} object${topTris[1].objects === 1 ? '' : 's'}).`);
-  // Which categories carry a texture map, which ART-DIRECTION.md scopes to the
-  // road alone. Stated as a measurement so the policy is checkable, not a claim.
+    + ` — ${how(topDraws[1])}`);
+  say(`       ${pct(frameOf(topTris[0]).allTris, r.whole.allTris)} of the frame's triangles are ${topTris[0]}`
+    + ` — ${how(topTris[1])}`);
+  // Categories drawn whole in every frame: one mesh, no instancing, and a
+  // bounding volume that spans the world, so no camera pose can cull them.
+  // This is the part of the bill that no amount of pointing the camera
+  // elsewhere will reduce, which makes it the first thing worth knowing.
+  const fixed = cats.filter(([, v]) => v.objects === 1 && v.instanced === 0);
+  const fixedTris = fixed.reduce((a, [c]) => a + frameOf(c).allTris, 0);
+  if (fixed.length) {
+    say(`       ${n(fixedTris)} tris (${pct(fixedTris, BUDGET_TRIS)} of the whole budget) are in `
+      + `${fixed.map(([c, v]) => `${c} ${n(v.tris)}`).join(', ')} — one mesh each,`);
+    say('       world-spanning, so no camera angle culls any of it.');
+  }
+  // Which categories carry a texture map. ART-DIRECTION.md scopes maps to the
+  // road and states a cost reason for doing so, so this is printed as a
+  // measurement of that policy rather than left as a claim.
   const textured = cats.filter(([, v]) => v.texturedTris > 0)
+    .sort((a, b) => b[1].texturedTris - a[1].texturedTris)
     .map(([c, v]) => `${c} ${n(v.texturedTris)}`);
-  say(`       textured triangles live in: ${textured.length ? textured.join(', ') : 'nothing'}`);
+  say(`       textured tris by category: ${textured.length ? textured.join(', ') : 'nothing'}`);
+  say('       (ART-DIRECTION.md scopes maps to the road; sky and fx are a gradient and a sprite)');
   // The parts must sum to the whole. If they do not, a drawable is filed under
   // a category this loop did not print, which means the classifier has a hole.
   const sumTris = Object.values(r.perCategory).reduce((a, b) => a + b.allTris, 0);
@@ -680,16 +730,26 @@ for (const r of results) {
 
   // ---- the checks --------------------------------------------------------
   say();
+  // Each failure quotes the CHEAPEST reading as well as the worst, so that a
+  // fail cannot be waved away as an artefact of a pessimistic pose. If the
+  // best pose on the lap, with three of the four cars hidden, is still over,
+  // the pose is not what is wrong.
   check(P.allTris <= BUDGET_TRIS, `${r.track}: triangles per frame within budget`,
     `${n(P.allTris)} / ${n(BUDGET_TRIS)} = ${pct(P.allTris, BUDGET_TRIS)} at the worst pose`
     + (P.allTris > BUDGET_TRIS
-      ? ` — over by ${n(P.allTris - BUDGET_TRIS)}. The floor is ${n(Pfloor.allTris)}, so `
-        + `${pct(Pfloor.allTris, BUDGET_TRIS)} of the budget is spent at EVERY pose before any scenery is chosen.`
+      ? `, over by ${n(P.allTris - BUDGET_TRIS)}. The cheapest pose on the lap is `
+        + `${n(Pfloor.allTris)} (${pct(Pfloor.allTris, BUDGET_TRIS)}) and the player's car alone is `
+        + `${n(r.soloCar.allTris)} — the budget is gone before the camera is pointed anywhere.`
       : ''));
   check(Pcalls.allCalls <= BUDGET_CALLS, `${r.track}: draw calls per frame within budget`,
-    `${Pcalls.allCalls} / ${BUDGET_CALLS} = ${pct(Pcalls.allCalls, BUDGET_CALLS)} at the worst pose`);
+    `${Pcalls.allCalls} / ${BUDGET_CALLS} = ${pct(Pcalls.allCalls, BUDGET_CALLS)} at the worst pose`
+    + (Pcalls.allCalls > BUDGET_CALLS
+      ? `, ${Pfloor.allCalls} at the cheapest, ${r.soloCar.allCalls} with the player's car alone`
+      : ''));
   check(Pcalls.colourCalls <= BUDGET_COLOUR_CALLS, `${r.track}: colour pass within its half of the draw calls`,
-    `${Pcalls.colourCalls} / ${BUDGET_COLOUR_CALLS}`);
+    `${Pcalls.colourCalls} / ${BUDGET_COLOUR_CALLS}`
+    + (Pcalls.colourCalls > BUDGET_COLOUR_CALLS
+      ? `, ${r.soloCar.colourCalls} with the player's car alone` : ''));
   check(r.fixedStepMs < r.fixedDtMs, `${r.track}: the fixed step fits inside its own period here`,
     `${r.fixedStepMs.toFixed(3)} ms of ${r.fixedDtMs.toFixed(2)} ms — a phone CPU is slower, so this can only get worse`);
 }
@@ -698,12 +758,39 @@ say();
 check(pageErrors.length === 0, 'no page errors while measuring every track',
   pageErrors.slice(0, 3).join(' | '));
 
+// ---- one table, so the whole answer fits on a screen ------------------------
+const measured = results.filter((r) => !r.error);
+if (!JSON_OUT && measured.length) {
+  say();
+  say(`${'='.repeat(78)}`);
+  say('SUMMARY — worst portrait frame per track, colour pass plus shadow pass');
+  say(`${'='.repeat(78)}`);
+  say(`  ${'track'.padEnd(16)}${'triangles'.padStart(10)}${'of budget'.padStart(11)}`
+    + `${'draws'.padStart(7)}${'of budget'.padStart(11)}${'shadow share'.padStart(14)}`);
+  for (const r of measured) {
+    const t = worstOf(r.stations.portrait, 'allTris');
+    const c = worstOf(r.stations.portrait, 'allCalls');
+    say(`  ${r.track.padEnd(16)}${n(t.allTris).padStart(10)}${pct(t.allTris, BUDGET_TRIS).padStart(11)}`
+      + `${String(c.allCalls).padStart(7)}${pct(c.allCalls, BUDGET_CALLS).padStart(11)}`
+      + `${`${pct(c.shadowTris, c.allTris)} tris`.padStart(14)}`);
+  }
+  say(`  ${'budget'.padEnd(16)}${n(BUDGET_TRIS).padStart(10)}${'100%'.padStart(11)}`
+    + `${String(BUDGET_CALLS).padStart(7)}${'100%'.padStart(11)}`);
+  say();
+  say('  The shadow map is the cheapest single thing on this list to argue about: it is a');
+  say('  second full submission of every castShadow object, it is the share printed above,');
+  say('  and unlike the terrain it can be turned off in one line to see what it buys.');
+}
+
 if (!JSON_OUT) {
   say();
   say(fails
-    ? `${fails} FAILED — the world does not fit a mid-range phone at 60 fps. The numbers above say\n`
-      + '           where it does not fit; the derivation at the top of this file says why the\n'
-      + '           ceiling is where it is. Cut the world or argue with the derivation, in writing.'
+    ? `${fails} FAILED — this world does not run at 60 fps on a mid-range phone. That is the\n`
+      + '           finding, not a tooling problem: the numbers above are API-level counts that\n'
+      + '           a phone would receive unchanged, and they are two to three and a half times\n'
+      + '           the derived ceiling before the density pass has added anything at all.\n'
+      + '           Cut the world, or argue with the derivation at the top of this file — in\n'
+      + '           writing, with a source. Do not nudge the constants.'
     : 'every track fits the mobile budget');
 }
 process.exit(fails ? 1 : 0);
