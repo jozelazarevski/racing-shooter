@@ -73,7 +73,7 @@ export const LEVELS = [
     // the only world besides CANYON RUN to hang a hero bridge over a gorge
     tune: { // DAWN over the yumps: first light
       sunColor: 0xffc8a0, sunIntensity: 2.3, sunEl: 0.22, sunAz: 0.4,
-      skyTop: '#6d8fbe', skyHorizon: '#ffe2d4', fogColor: 0xf2ded8, hemiIntensity: 0.74, elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
+      dusk: true, skyTop: '#6d8fbe', skyHorizon: '#ffe2d4', fogColor: 0xf2ded8, hemiIntensity: 0.74, elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
       heroBridge: { at: [0.55, 0.66], half: 24, len: 210, depth: 28, skew: 0 } } },
 
   // ---- MEDITERRANEAN. Appended, so nothing before it is re-priced (career
@@ -129,7 +129,7 @@ export const LEVELS = [
   { id: 41, name: 'MOUNT PANORAMA', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
     cost: 13, fresh: true, tune: { // DUSK over the mountain: ember sky, violet ranges
       sunColor: 0xffb078, sunIntensity: 1.9, sunEl: 0.18, sunAz: 5.6,
-      skyTop: '#6b62a0', skyHorizon: '#ffc79c', fogColor: 0xdec4b6, hemiIntensity: 0.9, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
+      dusk: true, skyTop: '#6b62a0', skyHorizon: '#ffc79c', fogColor: 0xdec4b6, hemiIntensity: 0.9, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
   { id: 42, name: 'RALLYCROSS ARENA', theme: 'flume', route: 'rallyx', region: 'GRAND CIRCUITS',
     cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
   { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
@@ -339,7 +339,13 @@ export function worldFacets(level) {
       return ((n >> 16) & 255) > (n & 255) + 20;      // more red than blue
     })();
   let time = 'DAY';
-  if (top < 0.36 && hor > 0.45 && warm) time = 'DUSK';
+  // The four sunset worlds DECLARE themselves now. They used to be inferred
+  // from how dark their sky tops were, and the moment those tops were
+  // lightened (asked for by name in r147) they all reclassified as DAY and
+  // the DUSK filter chip went empty. A property this deliberate should be
+  // stated, not deduced.
+  if (T.dusk) time = 'DUSK';
+  else if (top < 0.36 && hor > 0.45 && warm) time = 'DUSK';
   else if (top < 0.22) time = 'NIGHT';
 
   // WEATHER. `leaves` is drifting foliage, not weather — those worlds have
@@ -1479,7 +1485,7 @@ const THEMES = {
     // tone lifted so the driving surface reads while the embers still glow.
     hemiSky: 0xe8b088, hemiGround: 0x8a6c58, hemiIntensity: 3.1,
     sunColor: 0xffa060, sunIntensity: 3.2,
-    skyTop: '#7b5566', skyHorizon: '#f08a5c', sunGlow: 0xff6a28, skyCurve: 0.72,
+    dusk: true, skyTop: '#7b5566', skyHorizon: '#f08a5c', sunGlow: 0xff6a28, skyCurve: 0.72,
     sunAz: 0.6, sunEl: 0.17,                             // ember sun low on the haze
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
     terrainLow: '#877668', terrainHigh: '#9a8676', terrainDirt: '#ac6a4a',
@@ -1909,7 +1915,7 @@ const THEMES = {
     // escaping a fire you could not see the road through
     hemiSky: 0xf0ab74, hemiGround: 0x94705a, hemiIntensity: 2.9,
     sunColor: 0xff8a48, sunIntensity: 2.6,
-    skyTop: '#7c5354', skyHorizon: '#f09c6a', sunGlow: 0xff6a20, skyCurve: 0.66,
+    dusk: true, skyTop: '#7c5354', skyHorizon: '#f09c6a', sunGlow: 0xff6a20, skyCurve: 0.66,
     sunAz: 0.55, sunEl: 0.15,
     cloudCount: 9, cloudOpacity: 0.5, cloudTint: 0x5a4238,   // smoke columns
     terrainLow: '#705a42', terrainHigh: '#94785a', terrainDirt: '#a86436',
