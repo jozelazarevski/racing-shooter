@@ -44,17 +44,23 @@ per stroke, so a scene keeps the ground it was carved with.
 | **WATER** | Tap to sink a lake (SIZE sets it). The tool digs the bowl *and* stands the water in it; SELECT the lake afterwards to set its **level** and width, which is how you flood a valley rather than puddle a field. |
 | **ROAD** | Add a tunnel, a bridge or a river crossing. Pick TUNNEL, BRIDGE or RIVER under the ROAD button, then tap the road. These are built *by* the road system — they need a straight enough run and the right ground — so the tap means "about here" and the builder sites it at the nearest station that works, and says how far it had to go. |
 | **MOVE ROAD** | Drag a marker on the racing line and the lap bends to follow it. The pull is stored, not baked: the terrain blend, the scenery, the elevation and the overpasses all read the moved line, so the world follows the road rather than the road sliding across the old world. |
+| **WIDEN** | Tap the road and the carriageway there opens out; WIDER/NARROWER picks the direction and FORCE is metres of half-width per tap. Stated in world space like every other brush, so it survives a MOVE ROAD underneath it — the pull is on *the road near here*, wherever that road ends up. |
 
 ### EDIT — everything you have already made
 
 | Tool | What it does |
 |---|---|
-| **SELECT** | Tap anything you made — a building, a plant, a lake, a clear zone, a road pin — and the panel on the right edits it exactly. **Drag it on the ground to move it.** ROT and SCALE then aim *that* object rather than the next one. DUPLICATE and DELETE are on the panel, and on `ctrl+D` / `delete`. |
+| **SELECT** | Tap any object at all and it is picked up: one you placed, one the *world* built, or any solid — a tree, a rock, a wall. **Drag it on the ground to move it**, ROTATE to turn it, DELETE to remove it, and it leaves the built world immediately rather than waiting for APPLY. Taking a world-built structure over adopts it: a keep-out circle where it stood and an element of the same template where you put it. Tap a lake, a clear zone or a road pin instead and the panel on the right edits *its* numbers. ROT and SCALE aim the selection rather than the next placement; DUPLICATE and DELETE are on the panel and on `ctrl+D` / `delete`. Anything with no template can be removed but not moved, and the panel says so rather than pretending. |
 | **ERASE** | Remove what is under the brush — your buildings and your plants first, and if there were none, the world's own scenery instead. It always says which of the two it did. |
 | **CLEAR AREA** | Delete what the WORLD built — trees, rocks, villages, dressing. Generated scenery is invented afresh on every build and has no stored identity, so the editor records a keep-out circle and the builders skip it. The red ring shows what goes; it takes effect at APPLY. |
 | **ORBIT** | Camera-only mode, for when a drag should never paint. |
 
 **SNAP** puts every placement on a grid, in units. Off by default.
+
+The **CHANGES** panel on the right is a live itemised account of everything not
+yet applied — dabs, objects, plants, removals, road moves, width changes,
+lakes — because the editor's whole model is deferred and a sentence in the
+status bar that the next action overwrites is not an account of your work.
 
 ## World recipe
 
@@ -98,6 +104,12 @@ scene either side of what it did, so a new tool is undoable the moment it
 exists — there is no per-tool inverse to write and therefore none to get
 wrong. A sculpt stroke is one step, not forty; a scattered copse is one step,
 not twenty-five; a slider drag is one step, not one per pixel.
+
+The selection tools also blank instances in the *built* world so a delete or a
+move is visible before APPLY, and that lives on the GPU rather than in the
+model. An action that hid something hands back a closure to put it back on
+screen; the model is always the snapshot's job. That is what keeps the picture
+and the scene from ever disagreeing about what is there.
 
 ## Saving
 
@@ -156,8 +168,8 @@ carried no brush shape, and their road features were counts rather than
 places, and all three cases are read the way they were written.
 
 ```js
-{ v, base, name, dabs[], erase[], waters[], warp[], props[], elements[],
-  theme, weather, road: { tunnels[], bridge, rivers[] } }
+{ v, base, name, dabs[], erase[], waters[], warp[], widen[], props[],
+  elements[], theme, weather, road: { tunnels[], bridge, rivers[] } }
 ```
 
 ## Not in this version

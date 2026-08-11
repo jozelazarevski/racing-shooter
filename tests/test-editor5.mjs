@@ -108,15 +108,22 @@ const R = await page.evaluate(async () => {
   ed._pickTool('select');
   ed.radius = 20;
   ed._selectAt(treeSpot);
-  out.selType = ed.selection && ed.selection.type;
-  out.selKind = ed.selection && ed.selection.ref.kind;
+  out.selType = ed.sel && ed.sel.kind;
+  out.selKind = ed.sel && ed.sel.preset;    // a plant's kind is its template name
 
   // move it, through the same drag the mouse drives
   const moveTo = off(122, 90);
-  ed._moveDrag = { el: ed.selection.ref, mesh: { position: { x: 0, z: 0 } },
-    ox: ed.selection.ref.x, oz: ed.selection.ref.z, before: ed._stateSnapshot() };
-  ed._moveDrag.el.x = moveTo.x; ed._moveDrag.el.z = moveTo.z; ed._moveDrag.moved = true;
-  ed._endMoveDrag();
+  // the same drag the pointer handler runs: move it, then hand the start
+  // point to _act so the history entry is a real before/after pair
+  {
+    const el = ed.sel.el;
+    const from = { el, x: el.x, z: el.z };
+    el.x = moveTo.x; el.z = moveTo.z;
+    const to = { x: el.x, z: el.z };
+    el.x = from.x; el.z = from.z;
+    ed._act('a move', () => { el.x = to.x; el.z = to.z; });
+    ed.sel.x = el.x; ed.sel.z = el.z;
+  }
   out.movedTo = Math.round(Math.hypot(ed.props[0].x - treeSpot.x, ed.props[0].z - treeSpot.z));
   ed._undo();
   out.moveUndone = Math.round(Math.hypot(ed.props[0].x - treeSpot.x, ed.props[0].z - treeSpot.z));
@@ -127,7 +134,7 @@ const R = await page.evaluate(async () => {
   const nBefore = ed.props.length;
   ed._duplicateSelection();
   out.dupAdded = ed.props.length - nBefore;
-  ed._deleteSelection();
+  ed.deleteSelection();
   out.delRemoved = nBefore === ed.props.length;
 
   // ---- SELECT reaches a placed BUILDING too, and the sliders aim it -------
@@ -136,11 +143,11 @@ const R = await page.evaluate(async () => {
   ed._place(houseSpot);
   ed._pickTool('select');
   ed._selectAt(houseSpot);
-  out.selBuilding = ed.selection && ed.selection.type === 'element';
+  out.selBuilding = ed.sel && ed.sel.kind === 'mine' && ed.sel.preset === 'chapel';
   ed._applyToSelection('scale', 1.8);
   ed._turnSelection(Math.PI / 2);
-  out.builtScale = ed.selection.ref.scale;
-  out.builtRot = +ed.selection.ref.rot.toFixed(3);
+  out.builtScale = ed.sel.el.scale;
+  out.builtRot = +ed.sel.el.rot.toFixed(3);
 
   // ---- WATER: a level you can set ----------------------------------------
   ed._pickTool('water'); ed.radius = 50;
@@ -150,9 +157,9 @@ const R = await page.evaluate(async () => {
   const y0 = ed.waters[0].y;
   ed._pickTool('select');
   ed._selectAt(lakeSpot);
-  out.selWater = ed.selection && ed.selection.type === 'water';
+  out.selWater = ed.sel && ed.sel.kind === 'water';
   // the inspector's own RAISE button, through the handler the DOM calls
-  ed._act('the water level', () => { ed.selection.ref.y += 2; });
+  ed._act('the water level', () => { ed.sel.ref.y += 2; });
   out.lakeRose = +(ed.waters[0].y - y0).toFixed(2);
   out.payloadCarriesLevel = ed.buildPayload().waters[0].y === ed.waters[0].y;
   ed._undo();
@@ -307,8 +314,8 @@ ok(R.propIsTracked, 'an authored tree is a real tree in the world\'s tree list')
 ok(R.rockIsSolid, 'an authored boulder registers as a stone solid');
 
 console.log('\n--- SELECT: pick it up again ---');
-ok(R.selType === 'prop' && R.selKind === 'pine', 'tapping a plant selects it',
-  `${R.selType}/${R.selKind}`);
+ok(R.selType === 'mine' && R.selKind === 'pine',
+  'tapping a plant selects it, as one of mine', `${R.selType}/${R.selKind}`);
 ok(R.movedTo > 20, 'dragging it moves it', `${R.movedTo} u`);
 ok(R.moveUndone === 0, 'and the move undoes', `${R.moveUndone} u`);
 ok(R.dupAdded === 1, 'DUPLICATE makes one copy', R.dupAdded);

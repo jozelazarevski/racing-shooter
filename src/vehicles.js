@@ -1409,6 +1409,16 @@ export class Car {
         for (let i = 0; i < t.barriers.length; i++) {
           const q = t.barriers[i];
           if (this.pos.y > q.y + q.h + 1.0) continue;   // cleared the coping
+          // PASSING UNDER IT. A wall has a top AND a bottom: this gate only
+          // knew the top, so a car driving beneath a flyover was stopped dead
+          // by the deck's own handrail 8 u overhead — photographed by the
+          // player as the whole field parked under MOUNTAIN TO SEA's bridge.
+          // A rail whose base sits above the roof passes clean over us — but
+          // ONLY a rail with air beneath it (`over`, stamped at build). A
+          // wall seated on a bank above the car is backed by earth, and
+          // driving into the bank must still find the wall (GOTTHARD's
+          // switchback masonry, caught by test-walls).
+          if (q.over && this.pos.y < q.y - 2.6) continue;
           const ex = q.x2 - q.x1, ez = q.z2 - q.z1;
           const len2 = ex * ex + ez * ez || 1;
           let s2 = ((this.pos.x - q.x1) * ex + (this.pos.z - q.z1) * ez) / len2;
@@ -3110,6 +3120,7 @@ export class EnemyCar extends Car {
     } else if (spdAbs > 5) {
       this._stuckT = 0;
       this._deepStuckT = 0;
+      this._liftAhead = 0;     // moving again — the next pit-lift starts near
     }
     if (this._revT <= 0 && this._stuckT > 1.5) {
       this._stuckT = 0;
@@ -3121,7 +3132,15 @@ export class EnemyCar extends Car {
         && dxp * Math.sin(g.player.heading) + dzp * Math.cos(g.player.heading) > 0;
       if (!seen || this._deepStuckT > 9) {
         this._deepStuckT = 0; this._stuckT = 0; this._revT = 0;
-        this.placeAt(this.trackIndex, THREE.MathUtils.clamp(this.lateral, -6, 6), true);
+        // PAST THE TRAP, NOT BACK INTO IT. This lift used to re-seat the car
+        // at the SAME index it was pinned at — against a wall in the lane
+        // that meant teleporting straight back into the wall, forever, which
+        // is exactly the stable jam the field-stall dossier measured. Each
+        // consecutive lift now advances further down the lap, so no fixed
+        // obstruction can hold a rival through more than a couple of lifts.
+        this._liftAhead = Math.min(60, (this._liftAhead ?? 0) + 14);
+        this.placeAt((this.trackIndex + this._liftAhead) % t.N,
+          THREE.MathUtils.clamp(this.lateral, -6, 6), true);
         return;
       }
     }
@@ -3489,8 +3508,22 @@ export class PlayerCar extends Car {
       const lost = this.y < groundY - 6
         || !Number.isFinite(this.pos.x) || !Number.isFinite(this.y);
       this._lostT = lost ? (this._lostT ?? 0) + dt : 0;
-      if (this._lostT > 2.5) {
+      // WEDGED IS NOT WANDERING. The net above deliberately lets a player
+      // drive anywhere — but a car photographed parked on a gorge face at
+      // 0 km/h with the throttle held ("I still see this") is not exploring,
+      // it is stuck on ground too steep to climb with no way to turn around.
+      // The tell is the INPUT: full throttle and no motion, sustained. An
+      // idle car parked on a mountainside is never touched, and five seconds
+      // is long enough that anyone who could reverse out already has.
+      // Player only — rivals carry their own staged recovery with the
+      // off-camera deferral, and this simpler net would preempt it in view.
+      const wedged = this === g.player && controlsLive && !this.airborne
+        && input.throttle > 0.5
+        && Math.hypot(this.vel.x, this.vel.z) < 0.8;
+      this._wedgeT = wedged ? (this._wedgeT ?? 0) + dt : 0;
+      if (this._lostT > 2.5 || this._wedgeT > 5) {
         this._lostT = 0;
+        this._wedgeT = 0;
         this.vel.set(0, 0, 0); this.vy = 0; this.airborne = false;
         this.placeAt(this.trackIndex, 0, true);
         this.invuln = Math.max(this.invuln, 1.5);

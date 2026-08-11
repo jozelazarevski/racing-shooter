@@ -1468,6 +1468,21 @@ class Game {
 
     this.level = level;
     this.levelIndex = Math.max(0, LEVELS.findIndex((l) => l.id === level.id));
+    // THE LAP COUNT BELONGS TO THE WORLD, NOT TO THE PAGE LOAD.
+    //
+    // This was set in the constructor and nowhere else, so it described
+    // whichever world the page happened to BOOT on, for the rest of the
+    // session. FURKA RIDGE is the one point-to-point stage and the only
+    // world that declares `laps: 1` — boot there, then swap to anything
+    // (the r152 picker, "next level", the menu, all of which swap in place)
+    // and the whole campaign quietly became one lap. Reported as a
+    // screenshot of LAP 1/1 on a circuit: "I see lap 1/1. Why?"
+    //
+    // It sits here with the other per-level refreshes because it is one of
+    // them: the seed, the track, the theme and the particle palette are all
+    // recomputed a few lines below off `this.level`, and this line was the
+    // only sibling that got left behind.
+    this.lapsTotal = this.level?.laps ?? LAPS;
 
     // --- tear down ---
     for (const gsp of this.missionGates ?? []) this.worldLayer.remove(gsp.spr);

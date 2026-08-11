@@ -97,38 +97,115 @@ wall-clock probes run the sim at ~1/8 speed — `raceTime` read 1.8 s after 20
 real seconds, and every wall-clock "stall" observation before that discovery
 was an artifact. Same trap as BUGS.md #8.
 
-**Field-stall update 2 (dustline session): cusps fixed, standoff mechanism
-pinned, remaining fix is route authoring.** The lone-rival probe caught a car
-pinned at exactly |lateral| = wallLim with the recovery timer cycling, at
-MOUNTAIN TO SEA's chain waist — whose control points sit 2-4 u apart
-([2,-155],[2,-152]) and fed the spline 21-30 DEG/station tangent cusps.
-SEA CLIFF RUN carried twelve such kinks up to 60 deg from its sketch's sharp
-Vs. SHIPPED: a kink-relaxation pass over the sampled centreline (cap 13
-deg/station, kink stations pulled to their neighbours' midpoint, tangents
-recomputed where moved. Healthy worlds are provably untouched — their kink
-census is zero, and PINE VALLEY / TREMOLA still run 1.6-2.0 rival laps/90 s
-fixed-step).
+**The field-stall family is FIXED (r154/r155, mainline session).** Taking the
+dustline dossier: the pin was never the racing line or the planner — it was
+three collision/build rules, found by autopsying the pinned rivals in-engine:
 
-That removes undrivable geometry but does NOT clear the stalls: the field
-still parks at the shared-tarmac overlaps, and the fixed-step state now shows
-the mechanism plainly — on MOUNTAIN TO SEA half the field sits at frac 0.16
-and half at frac 0.97 AT THE SAME WORLD COORDINATES, the two legs of the
-overlap, head-on; OLIVE CROSSING's five all park at its at-grade west knot
-(frac 0.24-0.25). Two generic rescues were implemented, measured, and
-REVERTED: near-miss overpasses (deduped/eroded to a no-op in the dense knots)
-and lateral leg separation (unstable on serpentine geometry — adjacent
-stations choose opposite push sides and shred the road, 83 kinks up to 175
-deg). CONCLUSION: which side each leg takes at a waist is a route-authoring
-decision. The three routes need their waists redrawn with >= 20 u of leg
-separation (or a deliberate bridge where the sketch says "crossing") —
-mainline's call, since the routes are its design. test-field-stalls stays RED
-on 56/57/60 as the definition of done.
+1. **Barriers had no underside.** The collision gate knew "cleared the
+   coping" but not "passing beneath it", so a car driving under a flyover
+   was stopped by the deck's own handrail 8 u overhead — that is the
+   photographed field parked under MOUNTAIN TO SEA's deck. Fixed in
+   vehicles.js (`pos.y < q.y - 2.6` passes under).
+2. **Deck rails never asked what else runs there.** At a fixed 10.2 u off
+   their own samples, in knots where two legs pass 3-12 u apart, the rails
+   stood in the OTHER leg's carriageway at its grade (OLIVE CROSSING's
+   west knot: the whole grid parked against them at f 0.24). Fixed in
+   `_buildOverpassDecks`: a rail that would stand in another stretch's lane
+   within ±(-1.5..4.2) u of its height is not built. Same-grade knots keep
+   the junction mouth open; high decks keep their rails (cars now pass
+   under). NOTE for scrutineering: this composes with, and does not
+   replace, your `clearance < 4 → no parapet` rule — merge both.
+3. **The deep-stuck pit-lift re-seated the car INSIDE the trap** (same
+   trackIndex), which is why jam sites were stable forever. It now advances
+   +14 samples per consecutive lift.
+
+Plus: `_element` (template houses) now refuses to stand in any carriageway
+(height-aware; editor placements exempt) — SEA CLIFF RUN had huts IN its
+coast road. Measured after: 57/56/60 run 1.5-1.8 rival laps/90 s, zero
+stalls (were 0.13/0.30/0.70). `tests/test-field-stalls.mjs` is now a guard
+(default sweep 57,56,60) — its header records the fix.
+
+**For scrutineering — one structures-in-lane emitter your global gate
+misses:** SEA CLIFF RUN still has 3 'hut' solids (r ≈ 5.2-5.8, not
+building-registered) near (-84,-76) standing in the low coast road; the
+field drives around them now, but they are BUGS.md #1 family. They appear
+to come from the farm-spur barn path (`r: bw * 0.62` emission ~12340) or an
+_element caller not routed through your site gate — worth folding into your
+clearance pass.
+
+**New Track surface: `track.placedElements` (r155, mainline).** `_element`
+now records every structure it builds as `{type, x, z, rot, scale, r,
+authored}` — the same vocabulary `edit.elements` speaks. It exists so the
+world editor can adopt scenery it did not place (select → erase where it
+stood → re-place the same template where you drag it), and it is a cheap,
+accurate census for anyone auditing structures: `placedElements` beats
+scanning `solids` because it carries the template name. Cost is one push per
+`_element` call. If your lane adds a placement path that bypasses `_element`,
+its structures will not appear there.
+
+**Also new in r155:** an editor WIDEN/NARROW brush writing `edit.widen`
+(`{x, z, r, w}`, w = target half-width) resolved in `_applyWidenEdits` into
+the `_width` profile — so anything reading `widthAt(i)` sees an edited road
+automatically. If your lane adds a new width consumer, read `widthAt`, never
+`ROAD_HALF`.
+
+**Field-stall update 2 (dustline session, written against main BEFORE r154
+merged): cusps fixed, standoff mechanism pinned, remaining fix flagged as
+route authoring.** The lone-rival probe caught a car pinned at exactly
+|lateral| = wallLim with the recovery timer cycling, at MOUNTAIN TO SEA's
+chain waist — whose control points sit 2-4 u apart ([2,-155],[2,-152]) and fed
+the spline 21-30 DEG/station tangent cusps. SEA CLIFF RUN carried twelve such
+kinks up to 60 deg from its sketch's sharp Vs. SHIPPED: a kink-relaxation pass
+over the sampled centreline (cap 13 deg/station, kink stations pulled to their
+neighbours' midpoint, tangents recomputed where moved). Healthy worlds are
+provably untouched — their kink census is zero, PINE VALLEY / TREMOLA still
+run 1.6-2.0 rival laps/90 s fixed-step.
+
+Written up as "does NOT clear the stalls, needs route authoring" — true of
+main at the time, which did not yet have r154's barrier under-gate / rail
+intrusion / progressive pit-lift. **Re-measured on the merge of both fixes
+(r155 + kink-relaxation, mainline session):** test-field-stalls PASS, 0
+stalled, 1.6-1.8 rival laps/90s on 57/56/60 — see the result logged just
+below this merge. The two fixes are complementary, not competing: kink-
+relaxation removed undrivable geometry the racing line was choking on, and
+the collision/pit-lift fixes cleared the standoff the kinks were masking.
+Nobody needs to redraw a route waist — recorded here so neither lane re-opens
+this expecting red.
+
+**r153d (dustline session): two player-reported bugs fixed, one lead handed
+over.** (1) LAP 1/1 on three-lap circuits — `lapsTotal` was read once in the
+Game CONSTRUCTOR, so it described whichever world the page BOOTED on for the
+whole session. FURKA RIDGE is the only `laps: 1` world; boot there, swap
+anywhere (r152 picker, next-level, menu all swap in place) and the campaign
+silently became one lap. Fixed in `swapLevel` beside the other per-level
+refreshes — seed, track, theme and particles were all already recomputed
+there and this was the one sibling left behind. (2) A car wedged on a chasm
+face at 0 km/h with the throttle held: the recovery net only rescued cars
+UNDER the terrain, so on-the-ground-but-immovable was unhandled. Player-only,
+five seconds of full throttle with no motion. Both have standing tests
+(`test-lap-count.mjs`, `test-wedge-recovery.mjs`), both mutation-tested,
+`test-walls` still 12/12.
+
+**INVISIBLE WALLS — unresolved, with the suspects narrowed.** Two reports on
+r153c. `tests/tool-corridor-solids.mjs` (new) sweeps every world for solids
+reaching into the carriageway. It cleared BOTH of this session's recent
+changes: the r153b horizon solids never appear (>= 360 u from any road) and
+the r153c kink relaxation cannot be it (`this.curve` is read only during
+construction, so nothing is placed off the un-relaxed path). Everything the
+sweep does list has a visible mesh beside it. THE LIVE HYPOTHESIS, untested:
+the lateral clamp reads `widthAt(trackIndex)`, and `nearestIndex` is
+hint-windowed +-30 precisely so a car keeps its own leg through an overpass
+stack — where two legs share XZ (the first screenshot is a start grid UNDER
+an overpass, and it is the same geometry as the field-stall pile) an index
+that snaps to the wrong leg would clamp the car against a road edge belonging
+somewhere else. One mechanism that would explain both reports and the stalls.
+Fair game for whoever gets there first.
 
 **Unclaimed findings** (fair game for whoever gets there first, say so here):
-BUGS.md #2's four unexplained stalls (NORDSCHLEIFE, DOLOMITI, SUMMIT,
-MOUNTAIN TO SEA decks), #6 (roster-wide sweep in the standing suites),
-#7 (RED CENTRE RUN 7.4 u sink — mainline tracks it as its task #69/#82
-family).
+BUGS.md #2's two remaining unexplained stalls (NORDSCHLEIFE, DOLOMITI —
+re-measure after r154, the under-gate/pit-lift fixes may have cleared them),
+#6 (roster-wide sweep in the standing suites), #7 (RED CENTRE RUN 7.4 u
+sink — mainline tracks it as its task #69/#82 family).
 
 ## Rebase notes
 
