@@ -14264,6 +14264,143 @@ export class Track {
     return this._distToTrack(x, z) - r >= half + margin;
   }
 
+  /** IS THIS WORLD DRIVABLE? The three invariants, asked of the built world.
+   *
+   *  These were measured from the outside by a test file that re-derived each
+   *  rule, and re-deriving a rule is how a check comes to disagree with the
+   *  code it checks: the tree test counted cacti the car smashes by design, and
+   *  a crossing count reported six because it measured a list of six examples.
+   *  So the questions live here, next to the functions that answer them, and
+   *  the release gate, the sweep and the in-game overlay all ask the same one.
+   *
+   *  Everything reported is a violation of RULES.md §3 — "the width the road
+   *  advertises is always genuinely free at racing speed":
+   *
+   *    inLane    a collider whose whole footprint sits inside that width
+   *    nearRule  inside the documented margin (widthAt + r + carRadius)
+   *    barIn     a wall segment lying in the road rather than beyond its edge
+   *    noFloor   a sample with no ground under the width the road promises
+   *
+   *  All four are ZERO on the shipped roster. A world that breaks any of them
+   *  is broken for everyone who drives it.
+   */
+  roadAudit() {
+    const CAR_R = 1.8, TREE_R = 1.7;
+    const out = { inLane: [], nearRule: 0, barIn: [], noFloor: [] };
+    // vehicles.js smashes saplings, cacti and snags and stops the car dead on a
+    // grown trunk — ask that question, do not re-invent it
+    const treeIsSolid = (t) => (t.solid === true)
+      || ((t.s ?? 1) >= 1.0 && t.kind !== 'cactus' && t.kind !== 'snag' && t.solid !== false);
+
+    const scan = (arr, what, carR) => {
+      for (const s of arr ?? []) {
+        if (!s || s._faller || s.inRoad) continue;   // landed hazards belong in the road
+        if (what === 'tree' && !treeIsSolid(s)) continue;
+        const { x, z } = s;
+        if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
+        _clearV.set(x, 0, z);
+        const i = this.nearestIndex(_clearV);
+        const roadY = this.center[i].y;
+        // a pier under a viaduct, or a rail on the deck above, is not in the way
+        if (Number.isFinite(s.y) && Math.abs(s.y - roadY) > 5) continue;
+        const lat = Math.abs(this.lateralOffset({ x, y: 0, z }, i));
+        const hw = this.widthAt(i), r = s.r ?? 1;
+        if (lat >= hw + r + carR) continue;
+        out.nearRule++;
+        if (lat + r < hw - 0.5) {
+          out.inLane.push({ what, i, lat: +lat.toFixed(1), r: +r.toFixed(2), hw: +hw.toFixed(1), mat: s.mat ?? s.kind ?? null });
+        }
+      }
+    };
+    scan(this.solids, 'solid', CAR_R);
+    scan(this.trees, 'tree', TREE_R);
+    scan(this.buildings, 'building', CAR_R);
+
+    for (const w of this.barriers ?? []) {
+      if (w.inRoad) continue;
+      const mx = (w.x1 + w.x2) / 2, mz = (w.z1 + w.z2) / 2;
+      if (!Number.isFinite(mx)) continue;
+      _clearV.set(mx, 0, mz);
+      const i = this.nearestIndex(_clearV);
+      const roadY = this.center[i].y;
+      if (Number.isFinite(w.y) && (w.y - roadY > 3 || w.y + (w.h ?? 0) < roadY - 3)) continue;
+      const hw = this.widthAt(i);
+      const l1 = this.lateralOffset({ x: w.x1, y: 0, z: w.z1 }, i);
+      const l2 = this.lateralOffset({ x: w.x2, y: 0, z: w.z2 }, i);
+      if ((Math.abs(l1) < hw - 1 && Math.abs(l2) < hw - 1)
+        || (l1 * l2 < 0 && Math.min(Math.abs(l1), Math.abs(l2)) < hw - 1)) {
+        out.barIn.push({ i, l1: +l1.toFixed(1), l2: +l2.toFixed(1), hw: +hw.toFixed(1), mat: w.mat ?? null });
+      }
+    }
+
+    // A declared jump gorge is SUPPOSED to have no floor. Anywhere else, a hole
+    // in the road is a hole in the road — see the RED CENTRE RUN note on
+    // `_jumpCut`, where the car fell 21 u through a road that looked fine.
+    const inGorge = (i) => (this._jumpGorges ?? []).some(
+      (G) => this._circDist(i, G.i) <= (G.gapS ?? 0) + 8);
+    for (let i = 0; i < N; i++) {
+      if (inGorge(i)) continue;
+      const roadY = this.center[i].y, hw = this.widthAt(i);
+      let edge = hw;
+      for (let lat = 0.5; lat <= hw; lat += 0.5) {
+        if (this.groundHeightAt(i, lat) < roadY - 2 || this.groundHeightAt(i, -lat) < roadY - 2) {
+          edge = lat - 0.5; break;
+        }
+      }
+      if (edge < hw - 0.4) out.noFloor.push({ i, edge: +edge.toFixed(1), hw: +hw.toFixed(1) });
+    }
+
+    out.ok = !out.inLane.length && !out.barIn.length && !out.noFloor.length;
+    out.counts = { inLane: out.inLane.length, nearRule: out.nearRule, barIn: out.barIn.length, noFloor: out.noFloor.length };
+    return out;
+  }
+
+  /** `?audit=1` — draw what `roadAudit()` found, in the world, at the spot.
+   *
+   *  A report tells you a world is broken after you ship it; a marker standing
+   *  in the road tells the person sculpting it, while they sculpt. Same data,
+   *  same function — this only paints it.
+   *
+   *  Red post: a collider inside the drivable width. Amber bar: a wall run
+   *  lying in the road. Magenta patch: no floor under the width the road
+   *  advertises. Nothing here is collidable and nothing is in the physics.
+   */
+  buildAuditOverlay() {
+    const a = this.roadAudit();
+    const g = new THREE.Group();
+    g.name = 'road-audit';
+    const flag = (color, w, h, d) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75 });
+    const post = new THREE.BoxGeometry(0.5, 6, 0.5);
+    const postMat = flag(0xff2d3f);
+    for (const h of a.inLane) {
+      const p = this.pointAt(h.i, h.lat);
+      const m = new THREE.Mesh(post, postMat);
+      m.position.set(p.x, p.y + 3, p.z);
+      g.add(m);
+    }
+    const barMat = flag(0xffa322);
+    for (const h of a.barIn) {
+      const c = this.center[h.i];
+      const m = new THREE.Mesh(new THREE.BoxGeometry(this.widthAt(h.i) * 2, 0.4, 0.6), barMat);
+      m.position.set(c.x, c.y + 2.2, c.z);
+      m.rotation.y = this.headingAt(h.i);
+      g.add(m);
+    }
+    const holeMat = new THREE.MeshBasicMaterial({ color: 0xff35d0, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
+    for (const h of a.noFloor) {
+      const c = this.center[h.i];
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(this.widthAt(h.i) * 2, this.segLen * 1.2), holeMat);
+      m.rotation.order = 'YXZ';
+      m.rotation.y = this.headingAt(h.i);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(c.x, c.y + 0.25, c.z);
+      g.add(m);
+    }
+    g.userData.audit = a;
+    this.group.add(g);
+    return g;
+  }
+
   _trackSidePos(minD, maxD) {
     const i = (Math.random() * N) | 0;
     const side = Math.random() < 0.5 ? 1 : -1;

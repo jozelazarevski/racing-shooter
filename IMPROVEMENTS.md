@@ -5,7 +5,13 @@ Written after driving all 57 worlds with an autopilot and fixing what it hit
 sweep or a pattern the fixes exposed. Ordered by what it buys against what it
 costs.
 
-## 1. Make "the road is free" a gate, not a discovery
+**§1, §2, §4 and §5 are now done** — the audit lives in the game, a release
+gate fails the build on any violation, and `?audit=1` paints the violations in
+the world. What each one turned out to mean in practice is written into its
+section. §3 is an authoring decision and stays with the owner; §6 and §7 are
+open.
+
+## 1. Make "the road is free" a gate, not a discovery — DONE
 
 Ten separate builders each placed scenery by a lateral offset from one sample
 and each put colliders in the racing line — 211 of them across 29 of 57 worlds.
@@ -18,15 +24,20 @@ two places every builder must pass through: `_buildableSpot` for anything that
 stands, `_barrier` for anything that runs. New scenery now inherits the rule
 instead of having to remember it.
 
-**Do the same for the remaining shared choke points.** `this.solids.push` is
-still called directly from ~37 sites. A `_solid(x, z, r, y, mat)` helper that
-applies the clearance rule — with an explicit `{ onRoad: true }` opt-out for
-the handful of things that genuinely belong in the lane (landed rockfall,
-toppled trees) — would close the class permanently rather than per-world.
+**What was done instead, and why.** The obvious move was a `_solid()` helper
+that every one of the ~37 direct `this.solids.push` calls goes through. Written
+out, it has a hole in it: a helper that silently refuses a collider leaves the
+*mesh* standing, and scenery you can see and drive through is a Law of Solidity
+violation — trading a wall in the road for a ghost.
 
-Cost: an afternoon. Value: this class of bug stops recurring.
+So the enforcement is a check, not a filter. `Track.roadAudit()` asks the built
+world the three questions, and `tests/verify-roads.mjs` fails the build on any
+answer above zero. A new call site that puts something in the road does not get
+silently corrected; it gets caught, and the fix stays where the object is
+placed. Colliders that genuinely belong in the road — landed rockfall, and
+anything else deliberate — declare `inRoad: true` and are not findings.
 
-## 2. Run the sweep in CI, on the two cheap checks
+## 2. Run the sweep in CI, on the cheap checks — DONE
 
 `tests/world-matrix.mjs` covers the whole roster in ~15 minutes and needs no
 car to move. Three of its checks are now invariants with a known-good value of
@@ -38,9 +49,16 @@ zero:
 | `barIn` | a wall run lying inside the road | 0 |
 | `deckShort` | no floor under the width the road promises | 0 |
 
-A world that breaks any of them is broken for every player who drives it. They
-belong in the release gate next to `verify:track` — not as a report someone
-reads, but as a build that fails.
+A world that breaks any of them is broken for every player who drives it.
+
+```bash
+node tests/verify-roads.mjs          # ~12 min, exits 1 on any violation
+node tests/verify-roads.mjs --levels 32,56
+```
+
+It reports `nearRule` — objects inside the documented margin but not in the
+lane — without failing on it, because that number is a housekeeping figure
+(891 across the roster) and not a broken world.
 
 The driving sweep (`tests/agent-sweep.mjs`, ~55 min) is too slow for every
 push, but it is the right thing to run before a release and after any change to
@@ -69,7 +87,7 @@ are three honest answers:
 
 The first is the least code and the most certain.
 
-## 4. Give the audits a home in the game, not just in tests
+## 4. Give the audits a home in the game, not just in tests — DONE
 
 Every check in the sweep reads only public state — `t.solids`, `t.barriers`,
 `t.widthAt`, `groundHeightAt`. That means the same code could run behind a
@@ -81,7 +99,13 @@ The editor already exists and authors tracks. An author who can see the rule
 being broken while sculpting will not ship the break. This is the difference
 between a QA report and a ruler.
 
-## 5. Close the loop the report opened
+`?audit=1` does this now: a red post at every collider inside the drivable
+width, an amber bar across every wall run lying in the road, a magenta patch
+over every sample with no floor, and the totals in the HUD feed. Nothing it
+draws is collidable and nothing is added to the physics; with the flag off it
+costs nothing.
+
+## 5. Close the loop the report opened — DONE
 
 Two things in this pass were measured wrong before they were measured right,
 and both were my own instruments:
@@ -92,10 +116,14 @@ and both were my own instruments:
   RUN read three worse than it was.
 
 Both are the same failure: **the audit did not ask the question the game
-answers.** The tree check now calls the same predicate `vehicles.js` uses. Any
-new check should be written the same way — against the function that decides
-the behaviour, not against a re-derivation of it. Where that is impractical,
-the check should say what it approximates.
+answers.**
+
+The three road checks now live in `Track.roadAudit()`, next to the functions
+that answer them, and all three consumers — the release gate, the world matrix
+and the in-game overlay — call that one function. There is no longer a copy of
+the rule to drift. Any new check should go the same way: against the code that
+decides the behaviour, and where that is impractical, saying what it
+approximates.
 
 ## 6. Smaller things worth doing
 

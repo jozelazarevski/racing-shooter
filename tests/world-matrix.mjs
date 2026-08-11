@@ -34,80 +34,21 @@ const PROBE = () => {
     if (m === 'stone' && Math.abs(r - 2.7) < 0.06) return 'boulder';
     return 'other';
   };
-  // A TREE IS ONLY IN THE WAY IF IT IS SOLID. vehicles.js smashes saplings,
-  // cacti and snags at speed and stops the car dead on a grown trunk, so a
-  // yielding cactus standing in the lane costs paint, not a lap — counting it
-  // beside a boulder overstated CANYON RUN by three.
-  const treeIsSolid = (t2) => (t2.solid === true)
-    || ((t2.s ?? 1) >= 1.0 && t2.kind !== 'cactus' && t2.kind !== 'snag' && t2.solid !== false);
-  const scan = (arr, label, carR) => {
-    const out = [];
-    for (const s of arr ?? []) {
-      if (s._faller) continue;                       // landed hazards belong there
-      if (label === 'tree' && !treeIsSolid(s)) continue;
-      const { x, z } = s;
-      if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
-      const i = t.nearestIndex({ x, y: s.y ?? 0, z });
-      const lat = Math.abs(t.lateralOffset({ x, y: 0, z }, i));
-      const hw = t.widthAt?.(i) ?? 9;
-      const roadY = t.pointAt(i, 0).y;
-      if (Number.isFinite(s.y) && Math.abs(s.y - roadY) > 5) continue;
-      const r = s.r ?? 1;
-      if (lat >= hw + r + carR) continue;            // clears the promised width
-      out.push({ what: label, i, lat: +lat.toFixed(1), r: +r.toFixed(2), hw: +hw.toFixed(1),
-        mat: s.mat ?? s.kind ?? null, inLane: lat + r < hw - 0.5 });
-    }
-    return out;
-  };
-  const hits = [...scan(t.solids, 'solid', 1.8), ...scan(t.trees, 'tree', 1.7), ...scan(t.buildings, 'building', 1.8)];
+  // ASK THE GAME, DO NOT RE-DERIVE IT. These three used to be reimplemented
+  // here, and a check that reimplements a rule is how it comes to disagree
+  // with the code it checks — this file once counted cacti the car smashes by
+  // design. `roadAudit()` lives in track.js beside the functions that answer
+  // it, and the release gate and the in-game ?audit=1 overlay call the same one.
+  const audit = t.roadAudit();
   const bySource = {};
-  for (const h of hits) {
+  for (const h of audit.inLane) {
     const k = source(h);
     bySource[k] ??= { inLane: 0, near: 0 };
-    bySource[k].near++; if (h.inLane) bySource[k].inLane++;
+    bySource[k].inLane++; bySource[k].near++;
   }
-
-  // barriers laid inside the road rather than beyond its edge
-  let barIn = 0;
-  for (const w of t.barriers ?? []) {
-    const mx = (w.x1 + w.x2) / 2, mz = (w.z1 + w.z2) / 2;
-    if (!Number.isFinite(mx)) continue;
-    const i = t.nearestIndex({ x: mx, y: w.y ?? 0, z: mz });
-    const hw = t.widthAt?.(i) ?? 9;
-    const roadY = t.pointAt(i, 0).y;
-    if (Number.isFinite(w.y) && Math.abs(w.y - roadY) > 5) continue;
-    const l1 = t.lateralOffset({ x: w.x1, y: 0, z: w.z1 }, i);
-    const l2 = t.lateralOffset({ x: w.x2, y: 0, z: w.z2 }, i);
-    if ((Math.abs(l1) < hw - 1 && Math.abs(l2) < hw - 1)
-      || (l1 * l2 < 0 && Math.min(Math.abs(l1), Math.abs(l2)) < hw - 1)) barIn++;
-  }
-
-  // IS THERE FLOOR UNDER THE WIDTH THE ROAD ADVERTISES? Walk out from the
-  // centreline until the physics ground drops more than 2 u below the road
-  // surface: that is the real edge of the deck, and it must not be inside the
-  // width the road promises. RED CENTRE RUN had 19 samples where the edge was
-  // ZERO — a gorge cut applied away from its own jump, so the road had a 21 u
-  // hole in it and the car fell through the world.
-  // A declared jump gorge is SUPPOSED to have no floor — that is the jump.
-  // Anywhere else, a hole in the road is a hole in the road.
-  const inGorge = (i) => (t._jumpGorges ?? []).some((G) => {
-    const d = Math.abs(i - G.i), c = Math.min(d, N - d);
-    return c <= (G.gapS ?? 0) + 8;
-  });
-  let deckShort = 0, worstEdge = null;
-  for (let i = 0; i < N; i++) {
-    if (inGorge(i)) continue;
-    const road = t.pointAt(i, 0).y;
-    const hw = t.widthAt?.(i) ?? 9;
-    let edge = hw;
-    for (let lat = 0.5; lat <= hw; lat += 0.5) {
-      if (t.groundHeightAt(i, lat) < road - 2 || t.groundHeightAt(i, -lat) < road - 2) { edge = lat - 0.5; break; }
-    }
-    if (edge < hw - 0.4) {
-      deckShort++;
-      if (!worstEdge || edge < worstEdge.edge) worstEdge = { i, edge: +edge.toFixed(1), hw: +hw.toFixed(1) };
-    }
-  }
+  const barIn = audit.counts.barIn;
+  const deckShort = audit.counts.noFloor;
+  const worstEdge = audit.noFloor[0] ?? null;
 
   // geometry
   let minW = Infinity, maxRise = 0, steep = 0;
@@ -131,7 +72,7 @@ const PROBE = () => {
   return {
     id: g.level.id, world: g.level.name, theme: g.level.theme, region: g.level.region,
     surface: t.T?.surface ?? 'dry', laps: g.level.laps ?? 3, starCost: g.starCost?.(g.level.id) ?? null,
-    inLane: hits.filter((h) => h.inLane).length, nearRule: hits.length, bySource, barIn,
+    inLane: audit.counts.inLane, nearRule: audit.counts.nearRule, bySource, barIn,
     deckShort, worstEdge,
     minHalfWidth: +minW.toFixed(1), maxGrade: +steep.toFixed(3), maxRise: +maxRise.toFixed(2),
     crossings: cross, flatCrossings: flat,

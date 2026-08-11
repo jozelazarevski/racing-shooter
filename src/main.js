@@ -846,6 +846,9 @@ class Game {
     this.assistSetting = localStorage.getItem('ir-assist')
       || (matchMedia('(pointer: coarse)').matches ? 'assist' : 'standard');
     this.unlockAll = params.get('unlockall') === '1';
+    // ?audit=1 — paint the road-clearance violations in the world, where the
+    // person building the world can see them. See Track.buildAuditOverlay.
+    this.roadAudit = params.get('audit') === '1';
     const diffId = localStorage.getItem('ir-diff') || 'normal';
     this.difficulty = DIFFS[diffId] || DIFFS.normal;
     // guard: don't start a locked level via URL tampering
@@ -954,6 +957,7 @@ class Game {
     this.worldSeed = this._seedOverride ?? seedForLevel(this.level);
     this.track = withSeed(this.worldSeed,
       () => new Track(this.scene, this.level, this.editScene));
+    this._paintRoadAudit();
     this._applyTheme();
     this.particles = new Particles(this.scene);
     this.particles.setTheme?.(this.level?.theme); // smashed barrels shed the theme's own stave/hoop colours
@@ -1490,6 +1494,7 @@ class Game {
     this.worldSeed = this._seedOverride ?? seedForLevel(this.level);
     this.track = withSeed(this.worldSeed,
       () => new Track(this.scene, this.level, this.editScene));
+    this._paintRoadAudit();
     this._applyTheme();
     this._applyTyreClass();          // a new world can be a new tyre demand
     this.particles?.setTheme?.(this.level.theme);
@@ -1823,6 +1828,22 @@ class Game {
       ? `START — WRONG TYRES (−${f.pen}% GRIP)`
       : this.missionMode ? 'START MISSION'
         : this.freeRoam ? 'START EXPLORING' : 'START RACE';
+  }
+
+  /** ?audit=1 — mark every road-clearance violation in the world itself, and
+   *  say the totals in the feed. Off by default and costs nothing when off. */
+  _paintRoadAudit() {
+    if (!this.roadAudit || !this.track?.buildAuditOverlay) return;
+    try {
+      const g = this.track.buildAuditOverlay();
+      const c = g.userData.audit.counts;
+      const line = `ROAD AUDIT — ${c.inLane} in lane, ${c.barIn} wall runs in the road, `
+        + `${c.noFloor} samples with no floor (${c.nearRule} inside the documented margin)`;
+      console.log(line);
+      setTimeout(() => this.hud?.feed?.(line, c.inLane + c.barIn + c.noFloor ? 'bad' : 'good'), 400);
+    } catch (err) {
+      console.error('[audit]', err);
+    }
   }
 
   /** Keep the address bar in step with the live state, without navigating, so
