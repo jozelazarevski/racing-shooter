@@ -251,8 +251,10 @@ export function buildMountains(scene: THREE.Scene, def: TrackDef): THREE.Object3
 //   `ConvexPolyhedron` has one — so 343 hulls would also blind the check that
 //   the ground collider is the ground you can see.
 //   A BOX PER PEAK is what you reach for and it is the one thing a mountain is
-//   not. A 150 m wide, 70 m tall cone inside its own bounding box leaves 30 m
-//   of invisible rock standing in clear sky either side of the summit.
+//   not. Measured on the roster with a vertical probe over each footprint, a
+//   box round a pyramid averages 98.8 m of invisible rock standing in clear
+//   sky where the cone below averages 18.1 m; round a spire, 92.8 m against
+//   19.6 m; round a dome, 67.5 m against the sphere's 45.6 m.
 //
 // So: ONE RAPIER PRIMITIVE PER INSTANCE, chosen per form to follow that form's
 // own profile, and sized by MEASURING the geometry rather than by copying
@@ -285,8 +287,24 @@ export function buildMountains(scene: THREE.Scene, def: TrackDef): THREE.Object3
 // the smallest member of its family that contains every sampled point of the
 // drawn form, so the error has ONE SIGN: a collider may stand proud of the
 // mountain, never inside it. That is the direction that fails safe — "I can
-// still enter the mountains" is the bug on record, three times, and stopping a
-// metre early on a peak nobody has ever been within 300 m of is not.
+// still enter the mountains" is the bug on record, three times, and stopping
+// short of a peak the road never goes near is not.
+//
+// AND WHAT IT LEAVES, measured rather than hoped: 98,784 rays fired at the 343
+// instances on the three committed tracks, Rapier's own colliders against the
+// drawn triangles, found NO drawn rock outside its own collider — the bug is
+// gone in the direction it was reported. What is left is margin, and the
+// margin is the price of a surface of revolution on a footprint that is an
+// ellipse: a form is scaled `w` across and `d` deep, `d` runs as narrow as half
+// of `w`, and one radius has to hold both. So the radius is the LONG axis —
+// v1's own cone rule from r148, "the long axis of the drawn footprint... the
+// cone rule's trade of a little invisible margin on the short one" — and on
+// the narrow flank the collider stands up to (w - d) / 2 proud. On the peaks
+// that actually stand on drivable ground that is 33.6 m (DUSTBOWL), 39.5 m
+// (HARBOUR POINT) and 55.3 m (PROVING GROUND) within 10 m of the base; out on
+// the far ring, where nothing can reach, it runs to 250-296 m on the widest
+// ridges. Rapier has no elliptic cone; the fix that would remove this is a
+// convex hull per peak, which is barred above for two reasons.
 // ---------------------------------------------------------------------------
 
 /** WHAT EACH SILHOUETTE IS MADE OF. Exhaustive over `HorizonForm` on purpose:

@@ -206,10 +206,22 @@ const ROCK_FRICTION = 1;
  *  ballistic envelope off the edge of the terrain that moves with the car's
  *  tuning — `verify-solidity.mjs` recomputes it from `car.json` for exactly
  *  that reason — so any constant here would be a stale number waiting to
- *  become a hole. Measured instead: the 343 solids on the three committed
- *  tracks cost 0.03-0.06 ms of a 0.37-0.65 ms fixed step, because they are
- *  convex primitives on a fixed body that the broad phase sorts once and never
- *  touches again. There is nothing to buy back. */
+ *  become a hole.
+ *
+ *  MEASURED INSTEAD, because the exemption would only be worth arguing for if
+ *  it bought something. 240 `world.step()` calls at the engine's own fixed
+ *  timestep, nine batches, median, in the real game with the field spawned:
+ *
+ *    DUSTBOWL        362 -> 498 colliders   0.370 ms -> 0.378, 0.387 ms
+ *    HARBOUR POINT   525 -> 622 colliders   0.521 ms -> 0.487, 0.448 ms
+ *    PROVING GROUND  611 -> 722 colliders   0.648 ms -> 0.545, 0.556 ms
+ *
+ *  Two runs of the same build straddle the one before it — on two tracks the
+ *  "after" is FASTER, which is what run-to-run noise looks like and what an
+ *  honest reading of this table says: 343 more colliders did not move the step
+ *  out of its own variance. They are convex primitives on a fixed body, so the
+ *  broad phase sorts them once and the narrow phase never sees a pair. There
+ *  is nothing here to buy back by exempting anything. */
 function addHorizonSolids(
   def: TrackDef, world: RAPIER_API.World, RAPIER: typeof RAPIER_API, body: RAPIER_API.RigidBody,
 ) {
@@ -234,8 +246,12 @@ function addHorizonSolids(
     worst = Math.max(worst, s.margin);
   }
   if (solids.length) {
+    // an UPPER BOUND, and labelled as one: it is each fit's own worst case
+    // against its form's widest band, not a measurement of the built world.
+    // What the world actually does is measured from outside, by rays fired at
+    // the colliders and the drawn triangles together.
     console.info(`[world] horizon: ${solids.length} solids, `
-      + `worst invisible margin ${worst.toFixed(1)} m`);
+      + `fit margin <= ${worst.toFixed(1)} m`);
   }
 }
 
