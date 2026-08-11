@@ -22,6 +22,7 @@ const SRC = [
   ['other', 'other', '—'],
 ];
 const lanes = (w, k) => w.bySource?.[k]?.inLane ?? 0;
+const tot = (f) => M.reduce((a, w) => a + (w.error ? 0 : f(w)), 0);
 const dash = (n) => (n ? String(n) : '·');
 const med = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
 
@@ -44,10 +45,11 @@ P();
 P('| | as found | now |');
 P('|---|---|---|');
 P('| colliders in the drivable lane | 211, across 29 of 57 worlds | **0** |');
-P('| objects inside the promised clearance | 1,884 | 883 |');
+P(`| objects inside the promised clearance | 1,884 | ${tot((w) => w.nearRule)} |`);
 P('| wall runs lying inside the road | 64 | **0** |');
 P('| stalls, driving all 57 worlds | 7 | **1** — ROCKFALL RAVINE, its own live rockfall |');
 P('| self-crossings under 4 u apart | 50 | 50 — open, a route decision |');
+P('| samples with no floor under the advertised width | 19 (RED CENTRE RUN) | **0** |');
 P();
 
 // ---------- 1. world × finding ----------
@@ -56,22 +58,23 @@ P();
 P('`lane` = colliders inside the advertised drivable width. `near` = inside the');
 P('clearance RULES.md §3 promises (`widthAt + r + carRadius`). `laps` = the');
 P("agent's lap progress in 60 s (roster median 1.39). `stall` = 3 s with no");
-P('progress. `flat×` = self-crossings under 4 u apart vertically.');
+P('progress. `flat×` = self-crossings under 4 u apart vertically. `hole` =');
+P('samples with no floor under the width the road advertises.');
 P();
-P('| # | world | region | lane | near | wall | flat× | stall | laps | minHW | grade | fps | gate |');
-P('|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|');
+P('| # | world | region | lane | near | wall | hole | flat× | stall | laps | minHW | grade | fps | gate |');
+P('|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|');
 for (const w of M) {
   if (w.error) { P(`| ${w.id} | ${w.world} | — | ? | ? | ? | ? | ? | ? | ? | ? | ? | probe failed |`); continue; }
   const d = drive[w.id] ?? {};
   P(`| ${w.id} | ${w.world} | ${w.region} | ${dash(w.inLane)} | ${dash(w.nearRule)} | ${dash(w.barIn)} `
-    + `| ${dash(w.flatCrossings)} | ${dash(d.stuck)} | ${d.laps?.toFixed(2) ?? '—'} | ${w.minHalfWidth} `
+    + `| ${dash(w.deckShort ?? 0)} | ${dash(w.flatCrossings)} | ${dash(d.stuck)} | ${d.laps?.toFixed(2) ?? '—'} | ${w.minHalfWidth} `
     + `| ${w.maxGrade} | ${w.renderFps} | ${w.tyreGate ? `${w.tyreGate.cost} CR` : '·'} |`);
 }
 P();
-const tot = (f) => M.reduce((a, w) => a + (w.error ? 0 : f(w)), 0);
 P(`**Totals** — ${tot((w) => w.inLane)} colliders in the lane, `
   + `${tot((w) => w.nearRule)} inside the promised clearance, `
   + `${tot((w) => w.barIn)} wall runs inside the road, `
+  + `${tot((w) => w.deckShort ?? 0)} samples with no floor, `
   + `${tot((w) => w.flatCrossings)} flat self-crossings, `
   + `${Object.values(drive).reduce((a, d) => a + d.stuck, 0)} stalls across `
   + `${M.filter((w) => !w.error).length} worlds.`);

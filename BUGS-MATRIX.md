@@ -14,79 +14,81 @@ found. What changed:
 | | as found | now |
 |---|---|---|
 | colliders in the drivable lane | 211, across 29 of 57 worlds | **0** |
-| objects inside the promised clearance | 1,884 | 883 |
+| objects inside the promised clearance | 1,884 | 891 |
 | wall runs lying inside the road | 64 | **0** |
 | stalls, driving all 57 worlds | 7 | **1** — ROCKFALL RAVINE, its own live rockfall |
 | self-crossings under 4 u apart | 50 | 50 — open, a route decision |
+| samples with no floor under the advertised width | 19 (RED CENTRE RUN) | **0** |
 
 ## 1. World × finding
 
 `lane` = colliders inside the advertised drivable width. `near` = inside the
 clearance RULES.md §3 promises (`widthAt + r + carRadius`). `laps` = the
 agent's lap progress in 60 s (roster median 1.39). `stall` = 3 s with no
-progress. `flat×` = self-crossings under 4 u apart vertically.
+progress. `flat×` = self-crossings under 4 u apart vertically. `hole` =
+samples with no floor under the width the road advertises.
 
-| # | world | region | lane | near | wall | flat× | stall | laps | minHW | grade | fps | gate |
-|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 1 | PINE VALLEY | PINE VALLEY | · | · | · | · | · | 1.29 | 5.3 | 0.268 | 1.29 | · |
-| 2 | DUST CANYON | DUST CANYON | · | · | · | · | · | 1.78 | 5.2 | 0.315 | 1.22 | · |
-| 3 | FROST PEAK | FROST PEAK | · | · | · | · | · | 1.39 | 5.3 | 0.323 | 1.05 | 600 CR |
-| 4 | CANYON RUN | DUST CANYON | · | 56 | · | · | · | 1.22 | 9 | 0.18 | 1.09 | · |
-| 5 | EMBER PASS | EMBER RIDGE | · | · | · | · | · | 1.54 | 5.1 | 0.375 | 1.67 | · |
-| 6 | SUMMIT CLIMB | PINE VALLEY | · | · | · | · | 1 | 1.14 | 5.4 | 0.253 | 1.28 | · |
-| 7 | GLACIAL PASS | FROST PEAK | · | 2 | · | · | · | 1.63 | 9 | 0.372 | 1.5 | 600 CR |
-| 8 | AMAZON RAPIDS | AMAZON | · | · | · | · | · | 1.28 | 5.4 | 0.285 | 0.98 | · |
-| 9 | THE DUNE SERPENT | DUST CANYON | · | · | · | · | · | 1.49 | 5.7 | 0.327 | 1.42 | · |
-| 10 | ROCKFALL RAVINE | DUST CANYON | · | · | · | · | · | 1.06 | 9 | 0.185 | 1.61 | · |
-| 11 | OASIS AMBUSH | DUST CANYON | · | · | · | · | 1 | 1.42 | 5.4 | 0.322 | 1.23 | · |
-| 12 | REDWOOD RAMPAGE | PINE VALLEY | · | 2 | · | · | · | 1.12 | 5.3 | 0.238 | 0.94 | · |
-| 13 | LOG FLUME FURY | PINE VALLEY | · | 1 | · | · | · | 1.57 | 5.2 | 0.235 | 1.42 | · |
-| 14 | FOREST FIRE ESCAPE | PINE VALLEY | · | 1 | · | · | · | 0.97 | 5.4 | 0.126 | 1.11 | · |
-| 15 | GLACIER'S GRIND | FROST PEAK | · | · | · | · | · | 1.83 | 9 | 0.371 | 1.43 | 600 CR |
-| 16 | AVALANCHE ALLEY | FROST PEAK | · | 2 | · | · | · | 1.08 | 5 | 0.175 | 1.46 | 600 CR |
-| 17 | NEON GRID EXPRESSWAY | NEO-KYOTO | · | 2 | · | · | · | 1.15 | 5.7 | 0.175 | 1.55 | · |
-| 18 | UNDERCITY SLIPSTREAM | NEO-KYOTO | · | 2 | · | · | · | 1.39 | 9 | 0.15 | 1.52 | · |
-| 19 | GOTTHARD CLIMB | ALPINE PASSES | · | 140 | · | · | · | 1.09 | 5.4 | 0.202 | 1.17 | · |
-| 20 | TREMOLA DESCENT | ALPINE PASSES | · | 80 | · | · | · | 1.10 | 9 | 0.251 | 0.99 | · |
-| 21 | FURKA RIDGE | ALPINE PASSES | · | 12 | · | · | · | 1.01 | 5.2 | 0.238 | 1.22 | 600 CR |
-| 22 | COL DE TURINI | WORLD RALLY | · | · | · | · | · | 0.96 | 5.2 | 0.224 | 1.27 | · |
-| 23 | OUNINPOHJA | WORLD RALLY | · | · | · | · | 1 | 1.90 | 5.4 | 0.387 | 1.3 | · |
-| 24 | FAFE LEAP | WORLD RALLY | · | 4 | · | · | · | 1.73 | 5.4 | 0.304 | 0.94 | · |
-| 25 | PIKES PEAK | WORLD RALLY | · | 1 | · | · | · | 0.74 | 5.7 | 0.23 | 1.36 | · |
-| 26 | SAFARI PLAINS | WORLD RALLY | · | · | · | · | · | 1.44 | 5.2 | 0.209 | 1.15 | · |
-| 27 | CORNICHE | WORLD RALLY | · | 1 | · | · | · | 1.31 | 9 | 0.249 | 1.5 | · |
-| 28 | ESTONIA CRESTS | WORLD RALLY | · | 8 | · | · | · | 1.39 | 5.6 | 0.34 | 1.13 | · |
-| 29 | OLIVE COAST | MEDITERRANEAN | · | · | · | · | · | 1.42 | 5.5 | 0.283 | 1.13 | · |
-| 30 | LANTERN QUARTER | OLD TOWN | · | 2 | · | · | · | 1.38 | 5.6 | 0.205 | 1.43 | · |
-| 31 | HEDGEROW DASH | FARMLAND | · | 1 | · | · | · | 1.34 | 5 | 0.297 | 1.02 | · |
-| 32 | RED CENTRE RUN | OUTBACK | · | · | · | · | · | 0.96 | 6.9 | 0.221 | 1.15 | · |
-| 33 | RED BULL RING | GRAND CIRCUITS | · | · | · | · | · | 1.43 | 5.6 | 0.288 | 1.29 | · |
-| 34 | MONACO STREETS | GRAND CIRCUITS | · | 131 | · | · | · | 1.74 | 5.6 | 0.306 | 1.41 | · |
-| 35 | SILVERSTONE | GRAND CIRCUITS | · | 1 | · | · | · | 1.43 | 5 | 0.322 | 1.21 | · |
-| 36 | SPA-FRANCORCHAMPS | GRAND CIRCUITS | · | 2 | · | · | · | 1.32 | 5.5 | 0.307 | 1.34 | · |
-| 37 | SUZUKA | GRAND CIRCUITS | · | 10 | · | · | · | 1.44 | 5.6 | 0.338 | 0.81 | · |
-| 38 | NORDSCHLEIFE | GRAND CIRCUITS | · | · | · | · | 1 | 1.50 | 5.1 | 0.323 | 1.54 | · |
-| 39 | MONZA | GRAND CIRCUITS | · | · | · | · | · | 2.08 | 5.5 | 0.285 | 1.24 | · |
-| 40 | MARINA BAY | GRAND CIRCUITS | · | 2 | · | · | · | 1.52 | 5.6 | 0.315 | 1.73 | · |
-| 41 | MOUNT PANORAMA | GRAND CIRCUITS | · | 1 | · | · | · | 1.58 | 6.7 | 0.379 | 1.39 | · |
-| 42 | RALLYCROSS ARENA | GRAND CIRCUITS | · | 2 | · | · | · | 1.80 | 5.2 | 0.332 | 1.24 | · |
-| 43 | OULTON PARK | GRAND CIRCUITS | · | · | · | · | · | 1.52 | 5 | 0.37 | 1.01 | · |
-| 44 | LAGUNA SECA | GRAND CIRCUITS | · | · | · | · | · | 1.48 | 9 | 0.209 | 1.92 | · |
-| 45 | TOUR DE CORSE | GRAND CIRCUITS | · | 28 | · | · | · | 0.67 | 5.5 | 0.156 | 1.19 | · |
-| 46 | VINEYARD VELOCE | HEARTLAND | · | 2 | · | · | · | 1.12 | 5.2 | 0.22 | 0.82 | · |
-| 47 | DEEPWOOD TRAIL | HEARTLAND | · | 7 | · | · | · | 1.29 | 5.2 | 0.212 | 1.13 | · |
-| 48 | DOLOMITI CORSA | ALPINE PASSES | · | · | · | · | 1 | 0.98 | 5.2 | 0.301 | 1.27 | · |
-| 49 | HARBOR QUAY | HEARTLAND | · | 27 | · | · | · | 1.90 | 5.5 | 0.383 | 1.32 | · |
-| 50 | CINQUE TERRE | MEDITERRANEAN | · | 90 | · | · | · | 1.53 | 5.2 | 0.251 | 1.47 | · |
-| 51 | AEGEAN BLUE | MEDITERRANEAN | · | 14 | · | · | · | 1.55 | 5.5 | 0.283 | 1.18 | · |
-| 52 | COSTA BRAVA | MEDITERRANEAN | · | 86 | · | · | · | 1.28 | 5.1 | 0.222 | 1.49 | · |
-| 53 | DALMATIA DRIVE | MEDITERRANEAN | · | 6 | · | · | · | 1.56 | 5.2 | 0.265 | 1.39 | · |
-| 54 | COTE D AZUR | MEDITERRANEAN | · | 62 | · | · | · | 1.31 | 5.6 | 0.146 | 1.28 | · |
-| 55 | BRIDGE RUN | HEARTLAND | · | 60 | · | · | · | 1.24 | 5.4 | 0.234 | 0.64 | · |
-| 56 | OLIVE CROSSING | MEDITERRANEAN | · | 20 | · | 11 | · | 1.11 | 5.3 | 0.177 | 1.42 | · |
-| 57 | MOUNTAIN TO SEA | MEDITERRANEAN | · | 15 | · | 39 | 2 | 0.79 | 5.4 | 0.139 | 1.71 | · |
+| # | world | region | lane | near | wall | hole | flat× | stall | laps | minHW | grade | fps | gate |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | PINE VALLEY | PINE VALLEY | · | · | · | · | · | · | 1.29 | 5.3 | 0.268 | 1.43 | · |
+| 2 | DUST CANYON | DUST CANYON | · | · | · | · | · | · | 1.78 | 5.2 | 0.315 | 1.45 | · |
+| 3 | FROST PEAK | FROST PEAK | · | · | · | · | · | · | 1.39 | 5.3 | 0.323 | 1.21 | 600 CR |
+| 4 | CANYON RUN | DUST CANYON | · | 64 | · | · | · | · | 1.22 | 9 | 0.18 | 1.41 | · |
+| 5 | EMBER PASS | EMBER RIDGE | · | · | · | · | · | · | 1.54 | 5.1 | 0.375 | 1.95 | · |
+| 6 | SUMMIT CLIMB | PINE VALLEY | · | · | · | · | · | 1 | 1.14 | 5.4 | 0.253 | 1.38 | · |
+| 7 | GLACIAL PASS | FROST PEAK | · | 2 | · | · | · | · | 1.63 | 9 | 0.372 | 1.63 | 600 CR |
+| 8 | AMAZON RAPIDS | AMAZON | · | · | · | · | · | · | 1.28 | 5.4 | 0.285 | 1.11 | · |
+| 9 | THE DUNE SERPENT | DUST CANYON | · | · | · | · | · | · | 1.49 | 5.7 | 0.327 | 2.17 | · |
+| 10 | ROCKFALL RAVINE | DUST CANYON | · | · | · | · | · | · | 1.06 | 9 | 0.185 | 1.91 | · |
+| 11 | OASIS AMBUSH | DUST CANYON | · | · | · | · | · | 1 | 1.42 | 5.4 | 0.322 | 1.43 | · |
+| 12 | REDWOOD RAMPAGE | PINE VALLEY | · | 2 | · | · | · | · | 1.12 | 5.3 | 0.238 | 1.32 | · |
+| 13 | LOG FLUME FURY | PINE VALLEY | · | 1 | · | · | · | · | 1.57 | 5.2 | 0.235 | 1.43 | · |
+| 14 | FOREST FIRE ESCAPE | PINE VALLEY | · | 1 | · | · | · | · | 0.97 | 5.4 | 0.126 | 1.23 | · |
+| 15 | GLACIER'S GRIND | FROST PEAK | · | · | · | · | · | · | 1.83 | 9 | 0.371 | 1.6 | 600 CR |
+| 16 | AVALANCHE ALLEY | FROST PEAK | · | 2 | · | · | · | · | 1.08 | 5 | 0.175 | 1.69 | 600 CR |
+| 17 | NEON GRID EXPRESSWAY | NEO-KYOTO | · | 2 | · | · | · | · | 1.15 | 5.7 | 0.175 | 1.74 | · |
+| 18 | UNDERCITY SLIPSTREAM | NEO-KYOTO | · | 2 | · | · | · | · | 1.39 | 9 | 0.15 | 1.69 | · |
+| 19 | GOTTHARD CLIMB | ALPINE PASSES | · | 140 | · | · | · | · | 1.09 | 5.4 | 0.202 | 1.37 | · |
+| 20 | TREMOLA DESCENT | ALPINE PASSES | · | 80 | · | · | · | · | 1.10 | 9 | 0.251 | 1.23 | · |
+| 21 | FURKA RIDGE | ALPINE PASSES | · | 12 | · | · | · | · | 1.01 | 5.2 | 0.238 | 1.34 | 600 CR |
+| 22 | COL DE TURINI | WORLD RALLY | · | · | · | · | · | · | 0.96 | 5.2 | 0.224 | 1.48 | · |
+| 23 | OUNINPOHJA | WORLD RALLY | · | · | · | · | · | 1 | 1.90 | 5.4 | 0.387 | 1.38 | · |
+| 24 | FAFE LEAP | WORLD RALLY | · | 4 | · | · | · | · | 1.73 | 5.4 | 0.304 | 1.4 | · |
+| 25 | PIKES PEAK | WORLD RALLY | · | 1 | · | · | · | · | 0.74 | 5.7 | 0.23 | 1.66 | · |
+| 26 | SAFARI PLAINS | WORLD RALLY | · | · | · | · | · | · | 1.44 | 5.2 | 0.209 | 1.73 | · |
+| 27 | CORNICHE | WORLD RALLY | · | 1 | · | · | · | · | 1.31 | 9 | 0.249 | 1.66 | · |
+| 28 | ESTONIA CRESTS | WORLD RALLY | · | 8 | · | · | · | · | 1.39 | 5.6 | 0.34 | 1.52 | · |
+| 29 | OLIVE COAST | MEDITERRANEAN | · | · | · | · | · | · | 1.42 | 5.5 | 0.283 | 1.45 | · |
+| 30 | LANTERN QUARTER | OLD TOWN | · | 2 | · | · | · | · | 1.38 | 5.6 | 0.205 | 1.5 | · |
+| 31 | HEDGEROW DASH | FARMLAND | · | 1 | · | · | · | · | 1.34 | 5 | 0.297 | 1.12 | · |
+| 32 | RED CENTRE RUN | OUTBACK | · | · | · | · | · | · | 0.96 | 6.9 | 0.221 | 1.18 | · |
+| 33 | RED BULL RING | GRAND CIRCUITS | · | · | · | · | · | · | 1.43 | 5.6 | 0.288 | 1.21 | · |
+| 34 | MONACO STREETS | GRAND CIRCUITS | · | 131 | · | · | · | · | 1.74 | 5.6 | 0.306 | 1.91 | · |
+| 35 | SILVERSTONE | GRAND CIRCUITS | · | 1 | · | · | · | · | 1.43 | 5 | 0.322 | 1.24 | · |
+| 36 | SPA-FRANCORCHAMPS | GRAND CIRCUITS | · | 2 | · | · | · | · | 1.32 | 5.5 | 0.307 | 1.58 | · |
+| 37 | SUZUKA | GRAND CIRCUITS | · | 10 | · | · | · | · | 1.44 | 5.6 | 0.338 | 0.88 | · |
+| 38 | NORDSCHLEIFE | GRAND CIRCUITS | · | · | · | · | · | 1 | 1.50 | 5.1 | 0.323 | 1.6 | · |
+| 39 | MONZA | GRAND CIRCUITS | · | · | · | · | · | · | 2.08 | 5.5 | 0.285 | 1.24 | · |
+| 40 | MARINA BAY | GRAND CIRCUITS | · | 2 | · | · | · | · | 1.52 | 5.6 | 0.315 | 2.19 | · |
+| 41 | MOUNT PANORAMA | GRAND CIRCUITS | · | 1 | · | · | · | · | 1.58 | 6.7 | 0.379 | 1.7 | · |
+| 42 | RALLYCROSS ARENA | GRAND CIRCUITS | · | 2 | · | · | · | · | 1.80 | 5.2 | 0.332 | 1.41 | · |
+| 43 | OULTON PARK | GRAND CIRCUITS | · | · | · | · | · | · | 1.52 | 5 | 0.37 | 1 | · |
+| 44 | LAGUNA SECA | GRAND CIRCUITS | · | · | · | · | · | · | 1.48 | 9 | 0.209 | 1.77 | · |
+| 45 | TOUR DE CORSE | GRAND CIRCUITS | · | 28 | · | · | · | · | 0.67 | 5.5 | 0.156 | 1.38 | · |
+| 46 | VINEYARD VELOCE | HEARTLAND | · | 2 | · | · | · | · | 1.12 | 5.2 | 0.22 | 0.91 | · |
+| 47 | DEEPWOOD TRAIL | HEARTLAND | · | 7 | · | · | · | · | 1.29 | 5.2 | 0.212 | 1.34 | · |
+| 48 | DOLOMITI CORSA | ALPINE PASSES | · | · | · | · | · | 1 | 0.98 | 5.2 | 0.301 | 1.42 | · |
+| 49 | HARBOR QUAY | HEARTLAND | · | 27 | · | · | · | · | 1.90 | 5.5 | 0.383 | 1.46 | · |
+| 50 | CINQUE TERRE | MEDITERRANEAN | · | 90 | · | · | · | · | 1.53 | 5.2 | 0.251 | 1.69 | · |
+| 51 | AEGEAN BLUE | MEDITERRANEAN | · | 14 | · | · | · | · | 1.55 | 5.5 | 0.283 | 1.44 | · |
+| 52 | COSTA BRAVA | MEDITERRANEAN | · | 86 | · | · | · | · | 1.28 | 5.1 | 0.222 | 1.73 | · |
+| 53 | DALMATIA DRIVE | MEDITERRANEAN | · | 6 | · | · | · | · | 1.56 | 5.2 | 0.265 | 1.66 | · |
+| 54 | COTE D AZUR | MEDITERRANEAN | · | 62 | · | · | · | · | 1.31 | 5.6 | 0.146 | 1.4 | · |
+| 55 | BRIDGE RUN | HEARTLAND | · | 60 | · | · | · | · | 1.24 | 5.4 | 0.234 | 0.7 | · |
+| 56 | OLIVE CROSSING | MEDITERRANEAN | · | 20 | · | · | 11 | · | 1.11 | 5.3 | 0.177 | 1.16 | · |
+| 57 | MOUNTAIN TO SEA | MEDITERRANEAN | · | 15 | · | · | 39 | 2 | 0.79 | 5.4 | 0.139 | 1.98 | · |
 
-**Totals** — 0 colliders in the lane, 883 inside the promised clearance, 0 wall runs inside the road, 50 flat self-crossings, 7 stalls across 57 worlds.
+**Totals** — 0 colliders in the lane, 891 inside the promised clearance, 0 wall runs inside the road, 0 samples with no floor, 50 flat self-crossings, 7 stalls across 57 worlds.
 
 ## 2. Which builder put it there
 
@@ -147,7 +149,7 @@ From the full driving sweep (all 57 worlds), not the build-time probe.
 | lap progress per 60 s | 0.67 | 1.39 | 2.08 |
 | narrowest half-width per world (u) | 5 | 5.4 | 9 |
 | steepest sustained grade | 0.126 | 0.265 | 0.387 |
-| render fps (SwiftShader — relative only) | 0.64 | 1.28 | 1.92 |
+| render fps (SwiftShader — relative only) | 0.7 | 1.43 | 2.19 |
 | solid colliders per world | 63 | 290 | 824 |
 
 Frame rates are software-rendered and comparable only with each other — not

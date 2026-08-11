@@ -385,7 +385,8 @@ footer p { max-width: 74ch; }
       <div class="stat"><b>29 → ${affected}</b><span>of 57 worlds carrying at least one</span></div>
       <div class="stat"><b>64 → ${totBar}</b><span>wall runs lying inside the road</span></div>
       <div class="stat"><b>7 → 1</b><span>stalls driving all 57 — the one left is a live rockfall</span></div>
-      <div class="stat flag"><b>2</b><span>findings still open, listed below</span></div>
+      <div class="stat"><b>19 → 0</b><span>samples with no floor under the road</span></div>
+      <div class="stat flag"><b>1</b><span>finding still open — a route decision, below</span></div>
     </div>
   </div>
 </header>
