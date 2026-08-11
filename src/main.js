@@ -1243,6 +1243,12 @@ class Game {
 
     this.renderGarage();
     this.renderCarShop();
+    // Paint the start button ONCE ON BOOT. It repaints on every pick, car
+    // change, upgrade and mode switch — but a fresh page load (career
+    // fallthrough, shared link) reached the menu without a single one of
+    // those, so the tyre-price label was only ever correct after the first
+    // interaction. Found by the track-testing agent's sweep (BUGS.md #5).
+    this._syncStartButton();
     this._initProfileUI();
 
     // pause menu
@@ -1640,18 +1646,17 @@ class Game {
     if (!lv) return null;
     const need = surfaceClass(lv);
     const have = tyreClass(carKey, (this.garage.upgrades || {})[carKey]);
-    // ONE CLASS EITHER SIDE, NOT ANY AMOUNT ABOVE.
+    // ONE CLASS EITHER SIDE IS THE IDEAL WINDOW, NOT A PERMISSION.
     //
-    // If a bigger tyre were always legal, the whole rule would collapse into a
-    // ladder again — buy the snow set once and every world in the game opens,
-    // which is the single-decision garage this replaces. Capping the overshoot
-    // at one class is what makes the roster mutually exclusive: an all-terrain
-    // machine is barred from the sealed circuits (37 worlds) exactly as a road
-    // car is barred from the loose stages, and NO SINGLE CAR COVERS THE
-    // ROSTER. The starter is legal on 53 of 58 and slow on the circuits, so
-    // there is a reason to buy in both directions.
-    // `ok` now means "in the ideal window", not "allowed to race" — nothing
-    // is barred any more. One eligible car per surface turned the roster into
+    // If a bigger tyre always counted as ideal, the whole rule would collapse
+    // into a ladder again — buy the snow set once and every world in the game
+    // reads READY — which is the single-decision garage this replaces. The
+    // window is what keeps the roster mutually exclusive ON MERIT: an
+    // all-terrain machine pays grip on the sealed circuits exactly as a road
+    // car pays it on the loose stages, and no single car is ideal everywhere,
+    // so there is a reason to buy in both directions.
+    // `ok` means "in the ideal window", not "allowed to race" — nothing
+    // is barred (r151). One eligible car per surface turned the roster into
     // one car per trail, reported as exactly that; the mismatch is priced in
     // grip instead (see tyrePenalty), and `pen` is that price as a percent so
     // every label can state it rather than assert a prohibition.
@@ -1704,7 +1709,9 @@ class Game {
           : { kind: 'none', text: 'NO MACHINE IN THE GARAGE CAN TAKE THIS' };
       }
     }
-    return { ok: false, need, have, over: 0, fix };
+    // `pen`/`under` ride on EVERY path — the under-tyred one shipped without
+    // them in r151 and every label built from it read "−undefined% GRIP".
+    return { ok: false, need, have, over: 0, under: underC, pen, fix };
   }
 
   /** The line on a track card: what the world is like, and — for the world you
@@ -2064,7 +2071,7 @@ class Game {
    *
    *  The first three are free, so there is a real choice from the very first
    *  race, and the last world costs (roster - 3) of a possible 3x roster — on
-   *  the 32 worlds that ship today, 29 of 96, so two thirds of the roster can
+   *  the 60 worlds that ship today, 57 of 180, so two thirds of the roster can
    *  go unraced and the finale is still reachable. Deliberately written as a
    *  relation and not the old fixed "19 of 63", which was true of a 21-world
    *  roster and quietly stopped being true as worlds were appended. */
