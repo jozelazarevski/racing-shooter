@@ -13,7 +13,7 @@ _Last updated: 2026-08-11, by the mainline session (r153)._
 |---|---|---|
 | Mainline (racing-shooter-game) | `claude/racing-shooter-game-0td0g7` → main | Menu/UX, economy, tyres, editor, releases rNNN. Shipped r152 (deferred track pick — `main.js` picker + `index.html` veil). Next after r153: world-build speed pass — **waiting for the scrutineering branch to merge first** to avoid track.js conflicts. |
 | Track scrutineering | `claude/agent-track-testing-bugs-f6jfms` | BUGS.md findings #1–#4: road-clearance gating at the eight placement call sites, MOUNTAIN TO SEA crossings, wall runs. agent-sweep + world-matrix harnesses. |
-| Dustline | `claude/codebase-architecture-refactor-eos0rs` | The `dustline/` TypeScript rewrite, self-contained, deploys to `/play-dustline/`. No contention with `src/`. |
+| Dustline | `claude/codebase-architecture-refactor-eos0rs` | The `dustline/` TypeScript rewrite, self-contained, deploys to `/play-dustline/`. Normally no contention with `src/` — one exception below, shipped as r153b. |
 
 ## Measurements crossing lanes
 
@@ -47,6 +47,20 @@ regions.** `src/world/levels.js` (57 worlds) is a stale copy nothing in
 would bake the staleness in. Point `agent-sweep`/`playtest-all`/`test-affinity`
 at `src/track.js`'s export instead — the sweep's "57 worlds driven" missed
 CITADEL BAY (58), CLIFF KNOT (59) and SEA CLIFF RUN (60).
+
+**Horizon mountains were enterable and are now solid (r153b, dustline
+session).** Reported straight to that session with a photograph taken from
+inside a hillside on an r152 build. r148's massif fix never covered the
+skyline: the rings from `_buildHorizon` and the mesas from `_buildMesaHorizon`
+registered no colliders at all — 51 of 60 worlds, 3,464 bare instances.
+Fixed with r148's own cone rule (long axis x 0.48, seated on the highland,
+`h` for the full-height gate). The two edits sit at ~13790 and ~13990 in
+`src/track.js` — OUTSIDE all eight placement call sites the scrutineering
+lane claims. New standing test: `tests/test-horizon-solids.mjs` (census over
+all 60 worlds + 4 driven runs). test-mountains and test-walls still pass.
+The new solids sit >=360 u from every road; the 1-24 u clearances a sweep
+will find on COL DE TURINI / GOTTHARD / OLIVE COAST are r148's own massif
+cones hugging alpine roads, pre-existing and by design — do not "fix" them.
 
 **Unclaimed findings** (fair game for whoever gets there first, say so here):
 BUGS.md #2's four unexplained stalls (NORDSCHLEIFE, DOLOMITI, SUMMIT,
