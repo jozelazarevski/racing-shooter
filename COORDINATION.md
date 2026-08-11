@@ -97,6 +97,33 @@ wall-clock probes run the sim at ~1/8 speed — `raceTime` read 1.8 s after 20
 real seconds, and every wall-clock "stall" observation before that discovery
 was an artifact. Same trap as BUGS.md #8.
 
+**Field-stall update 2 (dustline session): cusps fixed, standoff mechanism
+pinned, remaining fix is route authoring.** The lone-rival probe caught a car
+pinned at exactly |lateral| = wallLim with the recovery timer cycling, at
+MOUNTAIN TO SEA's chain waist — whose control points sit 2-4 u apart
+([2,-155],[2,-152]) and fed the spline 21-30 DEG/station tangent cusps.
+SEA CLIFF RUN carried twelve such kinks up to 60 deg from its sketch's sharp
+Vs. SHIPPED: a kink-relaxation pass over the sampled centreline (cap 13
+deg/station, kink stations pulled to their neighbours' midpoint, tangents
+recomputed where moved. Healthy worlds are provably untouched — their kink
+census is zero, and PINE VALLEY / TREMOLA still run 1.6-2.0 rival laps/90 s
+fixed-step).
+
+That removes undrivable geometry but does NOT clear the stalls: the field
+still parks at the shared-tarmac overlaps, and the fixed-step state now shows
+the mechanism plainly — on MOUNTAIN TO SEA half the field sits at frac 0.16
+and half at frac 0.97 AT THE SAME WORLD COORDINATES, the two legs of the
+overlap, head-on; OLIVE CROSSING's five all park at its at-grade west knot
+(frac 0.24-0.25). Two generic rescues were implemented, measured, and
+REVERTED: near-miss overpasses (deduped/eroded to a no-op in the dense knots)
+and lateral leg separation (unstable on serpentine geometry — adjacent
+stations choose opposite push sides and shred the road, 83 kinks up to 175
+deg). CONCLUSION: which side each leg takes at a waist is a route-authoring
+decision. The three routes need their waists redrawn with >= 20 u of leg
+separation (or a deliberate bridge where the sketch says "crossing") —
+mainline's call, since the routes are its design. test-field-stalls stays RED
+on 56/57/60 as the definition of done.
+
 **Unclaimed findings** (fair game for whoever gets there first, say so here):
 BUGS.md #2's four unexplained stalls (NORDSCHLEIFE, DOLOMITI, SUMMIT,
 MOUNTAIN TO SEA decks), #6 (roster-wide sweep in the standing suites),
