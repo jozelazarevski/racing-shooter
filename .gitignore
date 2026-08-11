@@ -6,3 +6,6 @@ node_modules/
 /oldtown-*.png
 /olive-sea*.png
 /vine-*.png
+
+# headless sweep scratch (probes + raw logs, regenerated on demand)
+/.sweep/
