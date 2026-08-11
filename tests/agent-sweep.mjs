@@ -317,7 +317,26 @@ async function sweepLevel(browser, lv) {
   try {
     await page.goto(`${BASE}/?level=${lv.id}&unlockall=1`, { waitUntil: 'load', timeout: 60000 });
     await page.waitForFunction(() => window.__game, null, { timeout: 60000 });
-    await page.click('#start-btn');
+    // THE TYRE GATE STOPS A SWEEP DEAD. Five worlds demand snow tyres and
+    // refuse the stock car, so an unprepared sweep reports them as "never
+    // reached the race" — which is what they look like from outside, and is
+    // not a bug in the world. Fit the cheapest legal set first and note that
+    // the world needed it.
+    rec.tyreGate = await page.evaluate(() => {
+      const g = window.__game;
+      const f = g.carFitness?.(g.level.id);
+      if (!f || f.ok) return null;
+      const key = g.cars.selected;
+      g.garage.upgrades ??= {};
+      g.garage.upgrades[key] = { ...(g.garage.upgrades[key] ?? {}), tires: 3 };
+      g.applyUpgrades?.();
+      g._syncStartButton?.();
+      return { need: f.need, have: f.have, fix: f.fix?.text ?? null };
+    });
+    // click through the DOM: fitting a tyre repaints the garage, and the
+    // sticky start button can still be moving when Playwright's actionability
+    // wait gives up on it
+    await page.evaluate(() => document.getElementById('start-btn').click());
     await page.evaluate(() => { window.__game.countdown = 0.01; });
     await page.waitForFunction(() => window.__game.state === 'race', null, { timeout: 45000 });
     // rendered-frame budget: how heavy is this world to actually draw? Same
