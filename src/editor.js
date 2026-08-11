@@ -171,8 +171,8 @@ export const THEME_MENU = [
  * button — and for the tools whose gesture is not obvious (tap versus drag,
  * which slider matters) that was the difference between working and broken. */
 const HINT = {
-  raise: 'RAISE — drag to paint the ground up (SIZE and FORCE)',
-  lower: 'LOWER — drag to dig (SIZE and FORCE)',
+  raise: 'RAISE — drag to paint the ground up. The ROAD follows the sculpt',
+  lower: 'LOWER — drag to dig. The ROAD follows: dig a cutting, raise a ramp',
   smooth: 'SMOOTH — drag to average the ground under the brush',
   flatten: 'FLATTEN — drag to level everything to where you started',
   place: 'PLACE — pick a preset, then TAP the ground. ROT and SCALE aim it',
