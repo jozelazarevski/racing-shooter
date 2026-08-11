@@ -6580,8 +6580,11 @@ export class Track {
 
   _buildStartGate() {
     const i = 0;
-    const c = this.center[i], n = this.nrm[i];
-    const heading = this.headingAt(i);
+    // the painted line marks the START, and never moves; the scaffold over it
+    // is allowed to shuffle a few samples to find ground (see below)
+    const c0 = this.center[i];
+    let c = c0, n = this.nrm[i];
+    let heading = this.headingAt(i);
     // checkered strip on the road
     const strip = new THREE.Mesh(
       new THREE.PlaneGeometry(ROAD_HALF * 2 + 2, 4),
@@ -6591,7 +6594,7 @@ export class Track {
     strip.rotation.order = 'YXZ';
     strip.rotation.y = heading;
     strip.rotation.x = -Math.PI / 2;
-    strip.position.set(c.x, c.y + 0.04, c.z);  // start area is flat (c.y = 0)
+    strip.position.set(c0.x, c0.y + 0.04, c0.z);  // start area is flat (c.y = 0)
     this.group.add(strip);
 
     // scaffold towers + banner
@@ -6614,10 +6617,10 @@ export class Track {
     // right-hand tower out with it and often satisfied neither — on TOUR DE
     // CORSE no symmetric width in range worked at all. The banner simply hangs
     // between wherever the two towers end up.
-    const legsIn = (s, side) => {
+    const legsIn = (s, side, cc = c, nn = n) => {
       let n0 = 0;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
-        if (!this._clearsRoad(c.x + n.x * s * side + ox, c.z + n.z * s * side + oz, 0.6, 0.9)) n0++;
+        if (!this._clearsRoad(cc.x + nn.x * s * side + ox, cc.z + nn.z * s * side + oz, 0.6, 0.9)) n0++;
       }
       return n0;
     };
@@ -6626,15 +6629,31 @@ export class Track {
     // so the fallback can never be worse than leaving it where it was. Keeping
     // the widest tried instead was worse than doing nothing: 13 legs in the
     // lane against the 8 it started with.
-    const offsetFor = (side) => {
-      let bestS = 12.5, bestN = legsIn(12.5, side);
-      for (let s = 13; s <= 26 && bestN > 0; s += 0.5) {
-        const n0 = legsIn(s, side);
+    const offsetFor = (side, cc, nn) => {
+      let bestS = 12.5, bestN = legsIn(12.5, side, cc, nn);
+      for (let s = 13; s <= 20 && bestN > 0; s += 0.5) {
+        const n0 = legsIn(s, side, cc, nn);
         if (n0 < bestN) { bestN = n0; bestS = s; }
       }
-      return bestS;
+      return { s: bestS, n: bestN };
     };
-    const offs = { 1: offsetFor(1), '-1': offsetFor(-1) };
+    // WIDTH IS NOT THE ONLY AXIS. On TOUR DE CORSE, RALLYCROSS ARENA and
+    // VINEYARD VELOCE another stretch of the lap runs ALONGSIDE the start
+    // straight, so one side is blocked at every width out to 30 u — measured,
+    // it only clears at 34, which is a gantry you could park a bus under.
+    // Shuffling the scaffold a few samples along the lap moves it past the
+    // parallel stretch instead, and the painted line stays exactly where it
+    // was. The line is the start; the arch over it is dressing.
+    let gi = i, offs = null, worst = Infinity;
+    for (const di of [0, -6, 6, -12, 12, -18, 18, -24, 24]) {
+      const j = ((i + di) % N + N) % N;
+      const cc = this.center[j], nn = this.nrm[j];
+      const a = offsetFor(1, cc, nn), b = offsetFor(-1, cc, nn);
+      const bad = a.n + b.n;
+      if (bad < worst) { worst = bad; gi = j; offs = { 1: a.s, '-1': b.s }; }
+      if (!bad) break;
+    }
+    c = this.center[gi]; n = this.nrm[gi]; heading = this.headingAt(gi);
     // the crossbar reaches from one tower to the other, wherever they landed
     const reach = offs[1] + offs['-1'];
     const mid = (offs[1] - offs['-1']) / 2;      // centre of the two towers
@@ -9648,9 +9667,25 @@ export class Track {
     const lat = 21;
     const pL = this.pointAt(best, lat), pR = this.pointAt(best, -lat);
     const hL = this.terrainHeight(pL.x, pL.z), hR = this.terrainHeight(pR.x, pR.z);
-    const p = hL < hR ? pL : pR;
-    const gy = Math.max(hL < hR ? hL : hR, this.groundHeightAt(best, 0) - 2.5);
+    let p = hL < hR ? pL : pR;
     const W = 17, D = 9.5, H = 11;                      // three storeys + attic
+    // A HOTEL ON THE OUTSIDE OF A HAIRPIN IS A HOTEL BESIDE THE OTHER LEG.
+    // 21 u off the bend is clear of the bend and can be in the lane of the
+    // road coming back under it — measured on ESTONIA CRESTS, the plinth's
+    // collider sat 5.4 u from a centreline whose half-width is 9. Step it
+    // back until the footprint clears the whole lap; if the mountain has no
+    // room for it, the hotel is not built. Nothing gets to stand in the road.
+    const foot = Math.max(W, D) * 0.62;
+    if (!this._clearsRoad(p.x, p.z, foot, 1.2)) {
+      const side = hL < hR ? 1 : -1;
+      let placed = false;
+      for (let extra = 6; extra <= 30 && !placed; extra += 6) {
+        const q = this.pointAt(best, side * (lat + extra));
+        if (this._clearsRoad(q.x, q.z, foot, 1.2)) { p = q; placed = true; }
+      }
+      if (!placed) return;
+    }
+    const gy = Math.max(hL < hR ? hL : hR, this.groundHeightAt(best, 0) - 2.5);
     const yaw = Math.atan2(this.tan[best].x, this.tan[best].z) + Math.PI / 2;
     const body = new THREE.Mesh(
       new THREE.BoxGeometry(W, H, D),
