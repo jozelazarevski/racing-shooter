@@ -38,8 +38,8 @@ Two things had to be solved first, and both are worth knowing:
 | # | What | Severity | Worlds |
 |---|---|---|---|
 | 1 | Trackside furniture standing in the drivable lane | **high** | 29 of 57 |
-| 2 | The agent parked against it — 6 stalls | **high** | 5 |
-| 3 | MOUNTAIN TO SEA crosses itself at its own height | **high** | 1 |
+| 2 | The agent parked against it — 7 stalls | **high** | 6 |
+| 3 | MOUNTAIN TO SEA crosses itself at its own height — 58 times | **high** | 1 |
 | 4 | Wall runs laid inside the road width | med | 2 |
 | 5 | START looks armed on a world that refuses it | med | 5 |
 | 6 | Half the roster is not swept by the existing suites | med | — |
@@ -118,10 +118,10 @@ solids carrying `_faller`.
 
 ---
 
-## 2. The agent parked against it — 6 stalls on 5 worlds
+## 2. The agent parked against it — 7 stalls on 6 worlds
 
 A stall is three seconds with no lap progress while the agent is trying to
-drive. Two of the six are directly attributable to #1 — the car stopped within
+drive. Two of the seven are directly attributable to #1 — the car stopped within
 two samples of a mid-lane parapet:
 
 | World | stalled at | what is there |
@@ -142,14 +142,18 @@ either geometry or a physics corner the audit does not model.
 ## 3. MOUNTAIN TO SEA crosses itself at its own height
 
 The lap has **127 places** where two stretches more than 40 samples apart pass
-within 12 u of each other, and **6 of them are within 4 u vertically** — e.g.
+within 12 u of each other, and **58 of them are within 4 u vertically** — e.g.
 samples 147 and 364 at 3.1 u apart in plan and 3.4 u in height. At that
 separation the two roads are the same piece of ground.
+
+(The first sweep said 6. That was the harness counting a list it had already
+truncated to six examples; `agent-sweep.mjs` now counts before it slices. The
+finding is four times worse than first reported, not better.)
 
 This is also why it holds the roster's worst collider count (27, and 25 of them
 are overpass rails from `track.js:10898`): the bridge's own parapets fall into
 the road it is supposed to be bridging. It is the slowest-but-two world on the
-roster (0.79 laps/60 s against a 1.39 median) and it took two of the six
+roster (0.79 laps/60 s against a 1.39 median) and it took two of the seven
 stalls, both on an elevated deck with the terrain 6–9 u below.
 
 Either give the crossings real vertical separation or route them through the

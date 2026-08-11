@@ -297,7 +297,11 @@ const AGENT = async (secs) => {
     }
   }
   audit.crossings = cross.length;
-  audit.crossingsFlat = cross.filter((c) => c.dy < 4).slice(0, 6);
+  // COUNT FIRST, THEN TRUNCATE. Reporting `.length` of the sliced example list
+  // capped every world at "6 flat crossings" — MOUNTAIN TO SEA has 58.
+  const flat = cross.filter((c) => c.dy < 4);
+  audit.crossingsFlatN = flat.length;
+  audit.crossingsFlat = flat.slice(0, 6);
   audit.hazards = {
     decl: { fall: !!t.T.fallHazard, geys: !!t.T.geysers, strips: !!t.T.strips, crit: !!t.T.critters, chase: !!t.T.chase },
     built: { geys: g.geysers?.length ?? -1, strips: g.strips?.length ?? -1, crit: g.critters?.length ?? -1 },
@@ -411,8 +415,8 @@ async function sweepLevel(browser, lv) {
       `${a.maxGrade} rise/run at sample ${a.maxGradeAt}`);
     if (a.minHalfWidth < 3) note(lv, 'med', 'road pinches below a car-and-a-half',
       `half-width ${a.minHalfWidth} u at sample ${a.minHalfWidthAt}`);
-    if (a.crossingsFlat.length) note(lv, 'med', 'route crosses itself at the same height',
-      `${a.crossingsFlat.length} flat crossing(s), e.g. ${JSON.stringify(a.crossingsFlat.slice(0, 2))} — needs a bridge or tunnel`);
+    if (a.crossingsFlatN) note(lv, 'med', 'route crosses itself at the same height',
+      `${a.crossingsFlatN} of ${a.crossings} near-passes are within 4 u vertically, e.g. ${JSON.stringify(a.crossingsFlat.slice(0, 2))} — needs a bridge or tunnel`);
     const h = a.hazards;
     if (h.decl.geys && h.built.geys <= 0) note(lv, 'high', 'geysers declared but none built', '');
     if (h.decl.strips && h.built.strips <= 0) note(lv, 'high', 'strips declared but none built', '');
