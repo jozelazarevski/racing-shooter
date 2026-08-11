@@ -1892,6 +1892,19 @@ class Game {
         this._sunOffset.set(
           Math.cos(az) * Math.cos(el) * D, Math.sin(el) * D, Math.sin(az) * Math.cos(el) * D
         );
+        // ...AND SEAT THE RIG NOW, not only per frame. The follow lives at the
+        // tail of _updateCamera, which only runs while you are driving — so on
+        // the TITLE SCREEN the shadow light still sat at its construction
+        // default (0,1,0) and every shadow pointed somewhere the sun is not.
+        // Found on FURKA RIDGE, where the tyre gate refuses the stock car and
+        // the world therefore idles on the menu: shadows 41.3 deg off the
+        // drawn sun, every time. Any world browsed from the menu had it.
+        const at = this.player?.pos ?? this.track?.center?.[0];
+        if (at) {
+          this.moon.position.set(at.x + this._sunOffset.x, at.y + this._sunOffset.y,
+            at.z + this._sunOffset.z);
+          this.moon.target.position.set(at.x, at.y, at.z);
+        }
       }
     }
     // image-based lighting: a tiny theme-tinted gradient dome through PMREM.

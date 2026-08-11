@@ -7243,11 +7243,51 @@ if (this._citMound) h += this._citMoundH(x, z);
    *  stream ribbon meanders off into the landscape on both sides; foam lines
    *  mark the water's edge across the road. Physics (splash, drag, wet tires)
    *  is consumed from track.fords by the vehicle code. */
+  /** Can a river cross the road at sample `i`?
+   *
+   *  One rule, shared by the random picker below and by the editor's RIVER
+   *  tool — the tunnel work taught this lesson already: a tool that keeps its
+   *  own copy of the builder's gates drifts from them, and then it promises
+   *  crossings the builder refuses (or refuses ones it would take). */
+  fordFitAt(i, taken = []) {
+    if (this.curvature[i] > 0.013) return false;             // square, straight crossings
+    if (this._circDist(i, 0) < 70) return false;
+    if (this._nearNarrow(i, 20)) return false;
+    if (this.ramps.some((r) => this._circDist(i, r.index) < 45)) return false;
+    if (this.boostPads.some((p) => this._circDist(i, p.index) < 25)) return false;
+    if (this._obstacleIdx.some((o) => this._circDist(i, o) < 25)) return false;
+    if (taken.some((c) => this._circDist(i, c.i) < 150)) return false;
+    return true;
+  }
+
   _buildFords() {
     const themeKey = (this.level && this.level.theme) || 'forest';
     const spec = this.T.fords !== undefined ? this.T.fords : FORD_TUNE[themeKey];
     const count = spec && spec.count | 0;
     if (!count) return;
+    // `at` — lap fractions from the WORLD EDITOR, same contract as tunnels:
+    // the owner tapped "the river crosses HERE", so each request is sited at
+    // the nearest sample the eligibility rules accept rather than rolled from
+    // the seed. An authored spec replaces the theme's random crossings —
+    // `tune` already merges over the theme, so this falls out of the merge.
+    if (Array.isArray(spec.at) && spec.at.length) {
+      const chosen = [];
+      for (const f of spec.at) {
+        const want = Math.round(f * N) % N;
+        let site = null;
+        if (this.fordFitAt(want, chosen)) site = want;
+        else {
+          for (let d = 1; d <= N / 2 && site == null; d++) {
+            const a = (want + d) % N, b = (want - d + N) % N;
+            if (this.fordFitAt(a, chosen)) site = a;
+            else if (this.fordFitAt(b, chosen)) site = b;
+          }
+        }
+        if (site != null) chosen.push({ i: site, half: 3.6 });
+      }
+      if (chosen.length) this._finishFords(chosen.sort((a, b) => a.i - b.i));
+      return;
+    }
     // deterministic per theme (offset seed so fords never mirror the narrows)
     let seed = 374761393 >>> 0;
     for (let k = 0; k < themeKey.length; k++) {
@@ -7260,19 +7300,18 @@ if (this._citMound) h += this._citMoundH(x, z);
     const chosen = [];
     for (let tries = 0; tries < 400 && chosen.length < count; tries++) {
       const i = 60 + Math.floor(rnd() * (N - 120));
-      if (this.curvature[i] > 0.013) continue;                 // straight-ish crossings
-      if (this._circDist(i, 0) < 70) continue;
-      if (this._nearNarrow(i, 20)) continue;
-      if (this.ramps.some((r) => this._circDist(i, r.index) < 45)) continue;
-      if (this.boostPads.some((p) => this._circDist(i, p.index) < 25)) continue;
-      if (this._obstacleIdx.some((o) => this._circDist(i, o) < 25)) continue;
-      if (chosen.some((c) => this._circDist(i, c.i) < 150)) continue;
+      if (!this.fordFitAt(i, chosen)) continue;
       chosen.push({ i, half: 3 + rnd() * 2 });                 // 6–10u wide band
     }
     if (!chosen.length) return;
-    // ONE river through all of them (see _planRiver): the water ribbon itself
-    // is built later, in _buildRiver, from that single curve — this loop now
-    // only registers the physics bands and paints the foam lines on the road.
+    this._finishFords(chosen);
+  }
+
+  /** ONE river through all the chosen crossings (see _planRiver); the water
+   *  ribbon itself is built later, in _buildRiver, from that single curve —
+   *  this only registers the physics bands and paints the foam lines. Shared
+   *  by the theme's random crossings and the editor's authored ones. */
+  _finishFords(chosen) {
     this._planRiver(chosen);
     const foamMat = new THREE.MeshBasicMaterial({
       color: 0xf2fbff, transparent: true, opacity: 0.4, depthWrite: false,
