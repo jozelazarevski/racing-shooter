@@ -36,11 +36,18 @@ P();
 P('`·` is a clean cell. Regenerate with `node tests/world-matrix.mjs` (build-time');
 P('columns) — the drive column comes from the full `tests/agent-sweep.mjs` run.');
 P();
-P('The build-time columns were measured in a **separate build** of every world');
-P('from the one that was driven, and CONFORMANCE.md warns that a world differs');
-P('between two builds. The in-lane totals came back identical to the driving');
-P("sweep's — 211, with the same split per call site — which is itself the");
-P('finding: this furniture lands in the road every time, not by luck of a seed.');
+P('**This is the state AFTER the fixes.** The `lane`, `near`, `wall` and');
+P('`flat×` columns were rebuilt against the fixed code; the `laps` and `stall`');
+P('columns are the original as-found drive, kept as the record of what was');
+P('found. What changed:');
+P();
+P('| | as found | now |');
+P('|---|---|---|');
+P('| colliders in the drivable lane | 211, across 29 of 57 worlds | **0** |');
+P('| objects inside the promised clearance | 1,884 | 883 |');
+P('| wall runs lying inside the road | 64 | **0** |');
+P('| stalls, driving all 57 worlds | 7 | **1** — ROCKFALL RAVINE, its own live rockfall |');
+P('| self-crossings under 4 u apart | 50 | 50 — open, a route decision |');
 P();
 
 // ---------- 1. world × finding ----------
@@ -75,18 +82,36 @@ P('## 2. Which builder put it there');
 P();
 P('Colliders **in the lane**, by the call site that placed them. Every column is');
 P('the same bug: a fixed lateral offset from the object\'s own sample, never');
-P('re-checked against the rest of the centreline.');
+P('re-checked against the rest of the centreline — and every column is now');
+P('zero. The as-found counts are kept beside each call site, because the row of');
+P('zeros only means something next to what it replaced.');
 P();
-P(`| # | world | ${SRC.map(([, n]) => n).join(' | ')} | total |`);
-P(`|---|---|${SRC.map(() => '---:').join('|')}|---:|`);
-for (const w of M) {
-  if (w.error || !w.inLane) continue;
-  P(`| ${w.id} | ${w.world} | ${SRC.map(([k]) => dash(lanes(w, k))).join(' | ')} | **${w.inLane}** |`);
+P('| call site | what it places | as found | now |');
+P('|---|---|---:|---:|');
+P('| `track.js:17143` | culvert parapet | 106, 17 worlds | **0** |');
+P('| `track.js:17070` | ford depth marker | 50, 19 worlds | **0** |');
+P('| `track.js:10898` | flyover parapet rail | 25, 1 world | **0** |');
+P('| `track.js:6551` | start-gantry leg | 8, 3 worlds | **0** |');
+P('| `track.js:16241` | grandstand front | 6, 4 worlds | **0** |');
+P('| `track.js:10547` | quay cannon | 4, 3 worlds | **0** |');
+P('| `track.js:4741` | narrow-section post | 3, 2 worlds | **0** |');
+P('| `track.js:9743` | roadside boulder | 1, 1 world | **0** |');
+P('| various | grown trunks | 8, 2 worlds | **0** |');
+P('| `_buildableSpot` | every structure in the game | — | gate added |');
+P('| `_barrier` | every wall in the game | — | gate added |');
+P();
+if (tot((w) => w.inLane)) {
+  P(`| # | world | ${SRC.map(([, n]) => n).join(' | ')} | total |`);
+  P(`|---|---|${SRC.map(() => '---:').join('|')}|---:|`);
+  for (const w of M) {
+    if (w.error || !w.inLane) continue;
+    P(`| ${w.id} | ${w.world} | ${SRC.map(([k]) => dash(lanes(w, k))).join(' | ')} | **${w.inLane}** |`);
+  }
+  P(`| | **all worlds** | ${SRC.map(([k]) => `**${tot((w) => lanes(w, k))}**`).join(' | ')} | **${tot((w) => w.inLane)}** |`);
+  P(`| | *worlds hit* | ${SRC.map(([k]) => M.filter((w) => lanes(w, k)).length || '·').join(' | ')} | ${M.filter((w) => w.inLane).length} |`);
+  P(`| | *call site* | ${SRC.map(([, , f]) => `\`${f}\``).join(' | ')} | |`);
+  P();
 }
-P(`| | **all worlds** | ${SRC.map(([k]) => `**${tot((w) => lanes(w, k))}**`).join(' | ')} | **${tot((w) => w.inLane)}** |`);
-P(`| | *worlds hit* | ${SRC.map(([k]) => M.filter((w) => lanes(w, k)).length || '·').join(' | ')} | ${M.filter((w) => w.inLane).length} |`);
-P(`| | *call site* | ${SRC.map(([, , f]) => `\`${f}\``).join(' | ')} | |`);
-P();
 P(`${M.filter((w) => !w.error && !w.inLane).length} of ${M.filter((w) => !w.error).length} worlds carry nothing in the lane.`);
 P();
 
@@ -105,11 +130,20 @@ const rows = [
   ['8', 'Lap pace far below the roster median', 'low', Object.entries(drive).filter(([, d]) => d.laps < 0.85).map(([id]) => +id), 'TOUR DE CORSE spends 23 % of the lap off the road', 'check the racing line against the corridor'],
   ['9', 'Documented counts stale', 'low', [], 'README says 18 worlds; the roster is 57', 'derive the counts'],
 ];
-P('| # | finding | sev | worlds | root cause | fix |');
+// worlds is the AS-FOUND scope; the status column says where each one stands
+const STATUS = {
+  1: 'fixed — 211 → 0', 2: 'fixed — 7 stalls → 1, and that one is a live hazard',
+  3: 'dressing fixed, both worlds drive; the routes stay open',
+  4: 'fixed — 64 → 0', 5: 'fixed (the gate itself went upstream in r151)',
+  6: 'fixed', 7: '**open** — reproduced later at −3.38 u, intermittent',
+  8: '**open** — TOUR DE CORSE still 23 % off-road', 9: 'fixed',
+};
+const SCOPE = { 1: '29 of 57', 2: '6', 3: '2 — 56, 57', 4: '2 — 31, 43', 5: '5 — 3, 7, 15, 16, 21',
+  6: 'roster-wide', 7: '1 — 32', 8: '3 — 25, 45, 57', 9: 'roster-wide' };
+P('| # | finding | sev | worlds (as found) | root cause | status |');
 P('|---|---|---|---|---|---|');
-for (const [n, name, sev, ids, cause, fix] of rows) {
-  const w = ids.length ? `${ids.length} — ${ids.join(', ')}` : 'roster-wide';
-  P(`| ${n} | ${name} | ${sev === 'high' ? '**high**' : sev} | ${w} | ${cause} | ${fix} |`);
+for (const [n, name, sev, , cause] of rows) {
+  P(`| ${n} | ${name} | ${sev === 'high' ? '**high**' : sev} | ${SCOPE[n] ?? '—'} | ${cause} | ${STATUS[n] ?? ''} |`);
 }
 P();
 

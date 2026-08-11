@@ -31,6 +31,7 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 const inLaneTotal = tot((w) => w.inLane);
 const affected = M.filter((w) => w.inLane > 0).length;
 const stalls = Object.values(drive).reduce((a, d) => a + d.stuck, 0);
+const totBar = tot((w) => w.barIn);
 const stallWorlds = Object.values(drive).filter((d) => d.stuck).length;
 const flat = tot((w) => w.flatCrossings);
 const laps = Object.values(drive).map((d) => d.laps);
@@ -73,13 +74,13 @@ const srcRows = M.filter((w) => w.inLane).map((w) => `<tr>
 
 const FINDINGS = [
   [1, 'Trackside furniture standing in the drivable lane', 'high',
-    `${inLaneTotal} colliders, ${affected} worlds`,
+    '211 colliders, 29 worlds — as found',
     'Eight call sites place scenery at a fixed lateral offset from its own sample and never re-check it against the rest of the centreline. On a bend the lap curls back under the offset and the object lands in the racing line at road height.',
     'Gate each push on the <code>_clearsRoad(x, z, r, 1.8)</code> that three sibling call sites already use.'],
-  [2, 'The agent parked against it', 'high', `${stalls} stalls, ${stallWorlds} worlds`,
+  [2, 'The agent parked against it', 'high', '7 stalls, 6 worlds — as found',
     'Two of the stalls sit two samples from a mid-lane parapet — OASIS AMBUSH at 474 against parapets at 476, OUNINPOHJA at 684 against 686.',
     'Falls out with #1. The other four stalls have no collider on record and want eyes on screen.'],
-  [3, 'MOUNTAIN TO SEA crosses itself at its own height', 'high', `${flat} of 127 near-passes`,
+  [3, 'Routes that cross themselves at their own height', 'high', 'MOUNTAIN TO SEA 39 of 127 near-passes; OLIVE CROSSING 11 of 11',
     'Two stretches of the same lap pass within 12 u of each other 127 times, and 58 of those are within 4 u vertically. At that separation they are the same piece of ground — which is why 25 of the world’s own bridge rails end up in the road the bridge crosses.',
     'Give the crossings real vertical separation, or route them through the bridge/tunnel machinery the other Mediterranean worlds use.'],
   [4, 'Wall runs laid inside the road width', 'med', '2 worlds',
@@ -102,6 +103,17 @@ const FINDINGS = [
     'Derive the counts instead of writing them down.'],
 ];
 
+const STATUS = {
+  1: ['fixed', '211 colliders in the lane → 0, across all 57 worlds'],
+  2: ['fixed', '7 stalls → 1, and that one is ROCKFALL RAVINE’s own live rockfall'],
+  3: ['part', 'the dressing is fixed and both worlds drive; the routes still ask for more crossings than the terrain can lift'],
+  4: ['fixed', '64 wall runs inside the road → 0'],
+  5: ['fixed', 'the tyre gate itself was removed upstream in r151; the button now paints at boot'],
+  6: ['fixed', 'both suites read the roster from levels.js'],
+  7: ['open', 'reproduced later at −3.38 u — real and intermittent, wants its own session'],
+  8: ['open', 'TOUR DE CORSE still spends 23 % of its lap off the road'],
+  9: ['fixed', 'counts derived, not written down'],
+};
 const findingCards = FINDINGS.map(([n, name, sev, scope, cause, fix]) => `<article class="finding s-${sev}">
     <header>
       <span class="fnum">${n}</span>
@@ -111,6 +123,7 @@ const findingCards = FINDINGS.map(([n, name, sev, scope, cause, fix]) => `<artic
     <p class="scope">${scope}</p>
     <p>${cause}</p>
     <p class="fix"><span class="fixlabel">Fix</span> ${fix}</p>
+    <p class="status st-${STATUS[n][0]}"><span class="stlabel">${STATUS[n][0] === 'open' ? 'Still open' : STATUS[n][0] === 'part' ? 'Partly' : 'Fixed'}</span> ${STATUS[n][1]}</p>
   </article>`).join('\n');
 
 const srcTotals = SRC.map(([k, name, file]) => ({
@@ -334,7 +347,13 @@ ul.sources li { background: var(--surface); display: grid; align-items: center; 
 .finding .scope { font-family: var(--mono); font-size: 12px; color: var(--ink-3); margin-bottom: 10px; }
 .finding .fix { color: var(--ink); }
 .fixlabel { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--ok); margin-right: 8px; }
+  color: var(--ink-3); margin-right: 8px; }
+.status { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule-2); color: var(--ink); }
+.stlabel { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  margin-right: 8px; padding: 2px 7px; border-radius: 2px; }
+.st-fixed .stlabel { background: color-mix(in oklab, var(--ok) 16%, transparent); color: var(--ok); }
+.st-part .stlabel { background: color-mix(in oklab, var(--warn) 18%, transparent); color: var(--warn); }
+.st-open .stlabel { background: color-mix(in oklab, var(--bad) 16%, transparent); color: var(--bad); }
 
 /* ---- two-up ---- */
 .twoup { display: grid; gap: 28px; grid-template-columns: 1fr 1fr; }
@@ -354,18 +373,19 @@ footer p { max-width: 74ch; }
 <header class="top">
   <div class="wrap">
     <p class="eyebrow">Scrutineering sheet · IGNITE RALLY</p>
-    <h1>An agent drove all 57 worlds. This is what it hit.</h1>
+    <h1>An agent drove all 57 worlds, hit 211 things, and now hits none.</h1>
     <p class="dek">
       An autopilot lapped every world in the career on the same analog steer, throttle
       and brake a touch player uses — no rail, no teleport — at rival pace, and the
-      world was audited around it. Every figure below is a measurement.
+      world was audited around it. Everything it found has been fixed except the two
+      rows marked open. Every figure is a measurement, before and after.
     </p>
     <div class="stats">
-      <div class="stat flag"><b>${inLaneTotal}</b><span>colliders standing in the drivable lane</span></div>
-      <div class="stat flag"><b>${affected} / 57</b><span>worlds carrying at least one</span></div>
-      <div class="stat"><b>8</b><span>call sites that placed them</span></div>
-      <div class="stat flag"><b>${stalls}</b><span>stalls — the car stopped and stayed stopped</span></div>
-      <div class="stat"><b>${lapMed.toFixed(2)}</b><span>median laps per 60 s</span></div>
+      <div class="stat"><b>211 → ${inLaneTotal}</b><span>colliders standing in the drivable lane</span></div>
+      <div class="stat"><b>29 → ${affected}</b><span>of 57 worlds carrying at least one</span></div>
+      <div class="stat"><b>64 → ${totBar}</b><span>wall runs lying inside the road</span></div>
+      <div class="stat"><b>7 → 1</b><span>stalls driving all 57 — the one left is a live rockfall</span></div>
+      <div class="stat flag"><b>2</b><span>findings still open, listed below</span></div>
     </div>
   </div>
 </header>
