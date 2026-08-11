@@ -547,6 +547,28 @@
   .wc-name{font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.5px;line-height:1.1;
     min-height:2.2em;display:flex;align-items:center;justify-content:center}
   .level-chip.current .wc-name{color:var(--yellow)}
+  /* ---------- SURFACE / TYRE REQUIREMENT ---------- */
+  /* The loudest thing on a card after the name: a world you cannot enter has
+     to say so where you are looking, not in a tooltip. */
+  .wc-surf{font-size:9.5px;font-weight:800;letter-spacing:.9px;line-height:1.3;
+    border-radius:6px;padding:2px 6px;width:100%;box-sizing:border-box}
+  .wc-surf.ok{color:#9fd8a4;background:rgba(90,200,110,.10);border:1px solid rgba(90,200,110,.30)}
+  .wc-surf.bad{color:#ffb38a;background:rgba(232,120,60,.14);border:1px solid rgba(232,120,60,.45)}
+  .wc-surf .wc-fitok{color:#8de89a}
+  .wc-surf .wc-over{color:#e8c987}
+  .wc-surf .wc-fix{display:block;font-weight:700;font-size:8.5px;letter-spacing:.6px;
+    color:var(--yellow);margin-top:1px}
+  .level-chip:has(.wc-surf.bad){border-color:rgba(232,120,60,.55)}
+  /* garage: what this machine is shod with */
+  .ctyre{font-size:9.5px;font-weight:800;letter-spacing:.8px;padding:2px 5px;
+    border-radius:5px;margin-top:2px}
+  .ctyre b{color:inherit}
+  .ctyre.ok{color:#9fd8a4;background:rgba(90,200,110,.10)}
+  .ctyre.over{color:#e8c987;background:rgba(232,201,135,.10)}
+  .ctyre.bad{color:#ffb38a;background:rgba(232,120,60,.16)}
+  /* a start button that will refuse should not look armed */
+  #start-btn.blocked{background:linear-gradient(180deg,#6a5442,#4a3a2c);
+    color:#e8c0a0;box-shadow:0 3px 0 var(--ink)}
   .wc-tags{font-size:9.5px;letter-spacing:.6px;color:var(--gold-dim);line-height:1.25}
   .wc-best{margin-top:auto;padding-top:2px;font-size:10px;font-weight:800;letter-spacing:1px;color:#8de89a}
   /* "is my car right for this world" — on the track card and in the garage */
@@ -829,31 +851,47 @@
     letter-spacing:.06em;color:#9fb4c8}
   #ed-sliders input{width:96px}
   #ed-sliders b{color:#9fd3ff;min-width:22px;text-align:right}
-  #ed-world{position:absolute;right:8px;top:150px;width:170px;background:rgba(12,16,22,.9);
+  /* below #ed-sliders, which grew by two rows when ROT and SCALE were added */
+  #ed-world{position:absolute;right:8px;top:196px;width:170px;background:rgba(12,16,22,.9);
     border:1px solid #2c3a4a;border-radius:10px;padding:8px}
   #ed-world label{display:flex;flex-direction:column;gap:3px;font-size:9px;
     letter-spacing:.08em;color:#8fa4b8;margin-bottom:6px}
   #ed-world select{background:#18212c;border:1px solid #2c3a4a;color:#cfe0f0;
     border-radius:6px;padding:5px;font:inherit;font-size:11px}
   #ed-roadrow{display:flex;gap:4px}
+  /* the ROAD tool's own sub-choice, tucked under the button that arms it */
+  #ed-roadsub{display:none;margin:2px 0 4px;padding:5px;border-radius:8px;
+    background:rgba(12,16,22,.86);border:1px solid #2c3a4a;max-width:150px}
+  #ed-roadsub.open{display:block}
+  #ed-roadsub .ed-hint{margin-top:4px}
   .ed-mini{flex:1;background:#18212c;border:1px solid #2c3a4a;color:#cfe0f0;
     border-radius:6px;padding:5px;font:inherit;font-size:10px;cursor:pointer}
   .ed-mini.current{background:#2a5f8a;border-color:#4d92c8;color:#fff}
   .ed-hint{font-size:9px;color:#6d8299;margin-top:5px;line-height:1.3}
-  #ed-palette{position:absolute;right:8px;bottom:58px;width:170px;max-height:34vh;
-    overflow-y:auto;background:rgba(12,16,22,.9);border:1px solid #2c3a4a;
+  /* Wider, because the presets are pictures now — two to a row. And parked
+     CLEAR OF THE RIGHT-HAND COLUMN: at 236 px it grew tall enough to reach up
+     under #ed-world and cover the ROAD row, so TUNNEL and BRIDGE could not be
+     reached at all while the palette was open. */
+  #ed-palette{position:absolute;right:186px;bottom:58px;width:236px;max-height:52vh;
+    overflow-y:auto;background:rgba(12,16,22,.92);border:1px solid #2c3a4a;
     border-radius:10px;padding:8px;display:none}
   #ed-palette.open{display:block}
   .ed-pgroup{font-size:9px;letter-spacing:.12em;color:#6d8299;margin:7px 0 4px}
-  .ed-preset{display:block;width:100%;text-align:left;background:#18212c;
-    border:1px solid #2c3a4a;color:#cfe0f0;border-radius:6px;padding:6px 8px;
-    margin-bottom:3px;font:inherit;font-size:11px;cursor:pointer}
+  .ed-pgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  .ed-preset{display:block;width:100%;text-align:center;background:#18212c;
+    border:1px solid #2c3a4a;color:#cfe0f0;border-radius:6px;padding:0 0 4px;
+    font:inherit;font-size:10px;cursor:pointer;overflow:hidden}
+  .ed-pshot{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;
+    border-radius:5px 5px 0 0;background:#0e141b}
+  .ed-plabel{display:block;padding:3px 2px 0;letter-spacing:.04em;line-height:1.15}
   .ed-preset.current{background:#2a5f8a;border-color:#4d92c8;color:#fff}
+  .ed-preset.current .ed-pshot{outline:1px solid #4d92c8;outline-offset:-1px}
   #ed-bottom{position:absolute;left:8px;bottom:8px;display:flex;gap:6px}
   @media (max-width:520px){
     .ed-tool{min-width:0;padding:8px;font-size:10px}
     #ed-sliders input{width:70px}
-    #ed-palette{width:140px}
+    #ed-world{width:132px}
+    #ed-palette{width:150px;right:150px}
   }
   #car-shop{touch-action:pan-x pan-y}
   /* compact menu on short viewports (phones, small laptops) */
@@ -944,7 +982,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r139</div>
+<div id="build-tag">r148</div>
 <div id="fade"></div>
 
 <div id="touch-ui">
@@ -1163,10 +1201,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r139"></script>
+<script type="module" src="./src/main.js?v=r148"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r139"></script>
+<script src="./src/offline.js?v=r148"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r139"></script>
+<script type="module" src="./src/traffic.js?v=r148"></script>
 </body>
 </html>

@@ -73,7 +73,7 @@ export const LEVELS = [
     // the only world besides CANYON RUN to hang a hero bridge over a gorge
     tune: { // DAWN over the yumps: first light
       sunColor: 0xffc8a0, sunIntensity: 2.3, sunEl: 0.22, sunAz: 0.4,
-      skyTop: '#3a5a94', skyHorizon: '#ffc8b0', fogColor: 0xe8c8c0, hemiIntensity: 0.62, elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
+      skyTop: '#6d8fbe', skyHorizon: '#ffe2d4', fogColor: 0xf2ded8, hemiIntensity: 0.74, elev: { amp: 9, ph: [1.4, 3.1, 0.8] }, rampCount: 8,
       heroBridge: { at: [0.55, 0.66], half: 24, len: 210, depth: 28, skew: 0 } } },
 
   // ---- MEDITERRANEAN. Appended, so nothing before it is re-priced (career
@@ -129,7 +129,7 @@ export const LEVELS = [
   { id: 41, name: 'MOUNT PANORAMA', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
     cost: 13, fresh: true, tune: { // DUSK over the mountain: ember sky, violet ranges
       sunColor: 0xffb078, sunIntensity: 1.9, sunEl: 0.18, sunAz: 5.6,
-      skyTop: '#3a3564', skyHorizon: '#ff9a58', fogColor: 0xc8a090, hemiIntensity: 0.78, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
+      skyTop: '#6b62a0', skyHorizon: '#ffc79c', fogColor: 0xdec4b6, hemiIntensity: 0.9, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
   { id: 42, name: 'RALLYCROSS ARENA', theme: 'flume', route: 'rallyx', region: 'GRAND CIRCUITS',
     cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
   { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
@@ -180,6 +180,35 @@ export const LEVELS = [
   // frame from the road.
   { id: 58, name: 'CITADEL BAY', theme: 'citadel', region: 'MEDITERRANEAN',
     cost: 30, fresh: true, route: 'aegeanRun' },
+  // SKETCH D, drawn and handed over with its own labels on it: tunnels where
+  // the north-south strand crosses the two straights, a bridge where the
+  // right-hand strand crosses the lower one, and sea cliffs on the water side.
+  // The crossings are real self-intersections, so `_planOverpasses` builds
+  // every one of them as road-over-road without being told where they are —
+  // the drawing's tunnels and bridge ARE those crossings. The bored tunnel in
+  // `tune` is the one the drawing puts through a hill rather than under a road.
+  // The sea is given here rather than taken from the theme: `mountainsea`
+  // places its water for the lap IT was drawn around, which is nowhere near
+  // this one. The shoreline runs north-south just off the eastern flank, so
+  // the lap's right-hand lobe — the part the drawing labels "Sea clifs" —
+  // runs along a real drop with real water under it.
+  { id: 59, name: 'CLIFF KNOT', theme: 'mountainsea', region: 'MEDITERRANEAN',
+    cost: 31, fresh: true, route: 'seaKnot',
+    tune: {
+      tunnels: { count: 1 },
+      coast: { a: [176, -300], b: [206, 320], level: -2.6, floor: -11, beach: 30 },
+    } },
+  // SKETCH E: the cliff run. The sea sits close on the east — 30 u off the
+  // straight rather than the 60-90 CLIFF KNOT keeps — because the drawing
+  // writes "sharp cliff NEXT TO the sea", and a corniche you cannot see the
+  // water from is just a road. Whales breach out past it.
+  { id: 60, name: 'SEA CLIFF RUN', theme: 'mountainsea', region: 'MEDITERRANEAN',
+    cost: 32, fresh: true, route: 'seaCliffRun',
+    tune: {
+      tunnels: { count: 1 },
+      coast: { a: [128, -260], b: [140, 300], level: -3.0, floor: -13, beach: 18 },
+      whaleCount: 5,
+    } },
 ];
 
 /* ==========================================================================
@@ -230,6 +259,61 @@ const SCENERY = {
   citadel: ['COAST', 'CITY'], monteCarlo: ['COAST', 'CITY'],
   neon: ['CITY'], undercity: ['CITY'], oldtown: ['CITY'],
 };
+
+/* ==========================================================================
+ * WHAT THE ROAD IS MADE OF — the axis the garage is bought against.
+ *
+ * Three classes, because three is what a player can hold in their head and
+ * read off a card at a glance:
+ *
+ *   0 SEALED  tarmac, cobbles, concrete — circuits, passes, corniches
+ *   1 LOOSE   gravel, dirt, sand, forest track — rally stages
+ *   2 ICE     snow and sheet ice
+ *
+ * This could NOT be derived from `DEMANDS.loose`, which is what it looks like
+ * it should come from. That number conflates WET with LOOSE: it reads 0.55
+ * for SPA and SILVERSTONE — sealed circuits that happen to race in the rain —
+ * and 0.12 for DUST CANYON and THE DUNE SERPENT, which are dirt and sand. A
+ * gate built on it would have demanded gravel tyres at Silverstone and let a
+ * road car loose in the dunes.
+ *
+ * Snow is derived (the theme's own `surface`, the field the physics reads).
+ * The GRAND CIRCUITS region is sealed by definition — those are real
+ * racetracks, whatever theme they borrow their art from, which is why SPA on
+ * the `forest` palette is not a forest track. Everything else is keyed by
+ * theme, and `tests/test-surfaceclass.mjs` fails if a theme on the roster has
+ * no entry.
+ * ======================================================================== */
+export const SEALED = 0, LOOSE = 1, ICE = 2;
+
+const SURFACE_BY_THEME = {
+  // sealed: tarmac passes, corniches, town streets, the Mediterranean coast
+  canyon: SEALED, volcano: SEALED, alpine: SEALED, pass: SEALED,
+  tremola: SEALED, dolomiti: SEALED, neon: SEALED, undercity: SEALED,
+  oldtown: SEALED, monteCarlo: SEALED, medterrace: SEALED, vineyard: SEALED,
+  harbor: SEALED, liguria: SEALED, aegean: SEALED, brava: SEALED,
+  dalmatia: SEALED, azur: SEALED, olivecountry: SEALED, mountainsea: SEALED,
+  citadel: SEALED,
+  // loose: rally stages, dirt, sand, forest track, farm lane
+  forest: LOOSE, desert: LOOSE, dunes: LOOSE, oasis: LOOSE, redwood: LOOSE,
+  flume: LOOSE, wildfire: LOOSE, jungle: LOOSE, savanna: LOOSE,
+  outback: LOOSE, ravine: LOOSE, deepwood: LOOSE, farmland: LOOSE,
+  // ice: the surface the physics already calls 'snow', plus the high pass
+  snow: ICE, glacial: ICE, sheetice: ICE, avalanche: ICE, furka: ICE,
+};
+
+/** Which of the three surfaces this world is raced on. */
+export function surfaceClass(level) {
+  const T = { ...(THEMES[level.theme] || {}), ...(level.tune || {}) };
+  if (T.surface === 'snow') return ICE;              // the physics already agrees
+  if (level.region === 'GRAND CIRCUITS') return SEALED;
+  return SURFACE_BY_THEME[level.theme] ?? LOOSE;
+}
+
+export const SURFACE_NAME = ['SEALED', 'LOOSE', 'ICE'];
+export const SURFACE_LABEL = ['🛣 SEALED', '🪨 LOOSE', '❄ ICE'];
+/** What the card asks you to fit. */
+export const TYRE_NAME = ['ROAD TYRES', 'GRAVEL TYRES', 'SNOW TYRES'];
 
 /** Perceived brightness of a '#rrggbb' sky colour, 0..1. */
 const _skyLum = (hex) => {
@@ -363,6 +447,64 @@ const CIRCUITS = {
     [-75, -109], [-80, -84], [-81, -57], [-82, -31], [-81, -5],
     [-77, 21], [-72, 47], [-66, 73], [-59, 98], [-52, 124],
     [-45, 150], [-33, 173],
+  ],
+
+  // SKETCH E, hand-read, and a deliberate INVERSION of CLIFF KNOT. There the
+  // sea was a lobe on a busy lap; here the drawing's only label — "Sharp clif
+  // next to the sea" — is written against one long straight running the whole
+  // eastern edge, and every switchback, lobe and hairpin is the return leg
+  // inland. So the cliff IS the lap: a full-throttle run with the water on
+  // your shoulder, paid for by a knot you have to pick your way back through.
+  seaCliffRun: [
+    [97, -183], [96, -145], [96, -100], [95, -55], [94, -10],
+    [93, 35], [90, 79], [87, 121], [83, 159], [77, 191],
+    [67, 211], [46, 233], [23, 239], [7, 220], [8, 195],
+    [21, 175], [33, 159], [34, 147], [20, 147], [4, 156],
+    [-12, 175], [-30, 185], [-42, 169], [-37, 147], [-22, 127],
+    [-9, 115], [-13, 105], [-31, 108], [-53, 121], [-76, 131],
+    [-95, 127], [-101, 105], [-98, 76], [-94, 51], [-85, 41],
+    [-60, 41], [-31, 42], [-19, 43], [1, 44], [30, 41],
+    [52, 31], [64, 12], [57, -1], [33, -3], [4, -1],
+    [-25, 5], [-53, 6], [-79, 3], [-95, -17], [-96, -42],
+    [-82, -56], [-53, -59], [-25, -55], [-7, -39], [-5, -17],
+    [-19, 1], [-44, 3], [-60, -7], [-66, -29], [-67, -55],
+    [-66, -87], [-69, -106], [-73, -116], [-57, -118], [-36, -116],
+    [-25, -113], [-21, -100], [-19, -87], [-9, -82], [11, -82],
+    [21, -87], [23, -106], [14, -119], [7, -129], [8, -141],
+    [21, -152], [33, -154], [46, -151], [55, -150], [61, -157],
+    [55, -166], [46, -173], [36, -183], [30, -191], [39, -195],
+    [62, -196], [78, -195],
+  ],
+
+  // SKETCH D, hand-read from the drawing, and it is a KNOT on purpose: a top
+  // hairpin, two long horizontal straights, a north-south strand that crosses
+  // BOTH of them (the drawing writes "Tunels" against exactly those two), a
+  // right-hand strand crossing the lower straight ("Bridge"), a lobe out on
+  // the water ("Sea clifs") and a big pointed loop across the bottom.
+  //
+  // Four self-crossings, so four road-over-road overpasses — which is what the
+  // drawing's tunnels and bridge ARE. That is also why the scale matters and
+  // was asked for by name: the same layout at the first scale I traced came
+  // out 2469 u round with two strands passing 15 u apart, which is inside two
+  // road half-widths. At 0.235 it is 2021 u — mid-roster — and the tightest
+  // parallel pass is 28 u, comfortably wider than the carriageway.
+  seaKnot: [
+    [-116, 71], [-131, 60], [-136, 37], [-135, 12], [-128, -4],
+    [-111, -11], [-81, -12], [-46, -11], [-10, -9], [18, -8],
+    [34, -4], [44, -18], [49, -37], [60, -41], [81, -43],
+    [97, -33], [103, -18], [97, -2], [79, 9], [60, 11],
+    [57, 31], [55, 52], [55, 71], [57, 93], [64, 120],
+    [75, 148], [73, 179], [54, 207], [26, 231], [-2, 249],
+    [-30, 230], [-48, 202], [-60, 171], [-70, 141], [-78, 110],
+    [-82, 82], [-83, 54], [-84, 26], [-84, -4], [-84, -18],
+    [-81, -47], [-72, -75], [-60, -101], [-47, -127], [-33, -155],
+    [-23, -178], [13, -182], [51, -182], [80, -178], [44, -164],
+    [11, -157], [-20, -150], [-48, -142], [-69, -128], [-81, -110],
+    [-84, -89], [-83, -75], [-74, -64], [-50, -63], [-20, -64],
+    [13, -68], [46, -72], [79, -76], [107, -80], [134, -74],
+    [143, -47], [145, -14], [142, 19], [134, 45], [116, 63],
+    [74, 66], [41, 67], [8, 68], [-25, 69], [-57, 69],
+    [-93, 70],
   ],
 
   // ---- THE MEDITERRANEAN FIVE. Five coasts, five layout IDEAS - a cliff
@@ -1337,7 +1479,7 @@ const THEMES = {
     // tone lifted so the driving surface reads while the embers still glow.
     hemiSky: 0xe8b088, hemiGround: 0x8a6c58, hemiIntensity: 3.1,
     sunColor: 0xffa060, sunIntensity: 3.2,
-    skyTop: '#4e2a3a', skyHorizon: '#dd541c', sunGlow: 0xff6a28, skyCurve: 0.72,
+    skyTop: '#7b5566', skyHorizon: '#f08a5c', sunGlow: 0xff6a28, skyCurve: 0.72,
     sunAz: 0.6, sunEl: 0.17,                             // ember sun low on the haze
     cloudCount: 7, cloudOpacity: 0.35, cloudTint: 0x8a6a58,
     terrainLow: '#877668', terrainHigh: '#9a8676', terrainDirt: '#ac6a4a',
@@ -1767,7 +1909,7 @@ const THEMES = {
     // escaping a fire you could not see the road through
     hemiSky: 0xf0ab74, hemiGround: 0x94705a, hemiIntensity: 2.9,
     sunColor: 0xff8a48, sunIntensity: 2.6,
-    skyTop: '#46292c', skyHorizon: '#e8601e', sunGlow: 0xff6a20, skyCurve: 0.66,
+    skyTop: '#7c5354', skyHorizon: '#f09c6a', sunGlow: 0xff6a20, skyCurve: 0.66,
     sunAz: 0.55, sunEl: 0.15,
     cloudCount: 9, cloudOpacity: 0.5, cloudTint: 0x5a4238,   // smoke columns
     terrainLow: '#705a42', terrainHigh: '#94785a', terrainDirt: '#a86436',
@@ -4055,7 +4197,7 @@ function gablePrismGeo() {
 /** Merge a list of box specs {w,h,d,x,y,z,ry?} into ONE BufferGeometry so a
  *  multi-part smashable (a fence bay, a trough, a hay rack) costs a single
  *  mesh. Build-time only. */
-function mergeBoxes(specs) {
+export function mergeBoxes(specs) {
   const geos = specs.map((s) => {
     const g = new THREE.BoxGeometry(s.w, s.h, s.d).toNonIndexed();
     const m = new THREE.Matrix4().makeRotationY(s.ry || 0);
@@ -4254,6 +4396,8 @@ export class Track {
       this.tan.push(tg);
       this.nrm.push(new THREE.Vector3(tg.z, 0, -tg.x));
     }
+    this._applyRouteWarp(edit);
+    this._buildSampleGrid();
     // Elevation profile: the road climbs and descends over the lap (tan/nrm and
     // curvature stay XZ-based — heading math is unaffected by the y channel).
     for (let i = 0; i < N; i++) this.center[i].y = this._elevProfile(i);
@@ -4347,7 +4491,7 @@ export class Track {
     this._tunnels = [];
     if (this.T.tunnels) this._planTunnels();
 
-    this.animated = { flags: [], clouds: [] };
+    this.animated = { flags: [], clouds: [], whales: [] };
     // World-space circle colliders for on-road obstacles: [{x, z, r}].
     // Always present; [] on levels without obstacles. Consumed by car physics.
     this.obstacles = [];
@@ -4739,14 +4883,127 @@ export class Track {
 
   /** Distance from (x,z) to the nearest centerline sample (coarse), plus that
    *  sample's road elevation. Returns [dist, roadY]. */
-  _nearRoad(x, z) {
-    let best = Infinity, bi = 0;
-    for (let i = 0; i < N; i += 5) {
-      const dx = x - this.center[i].x, dz = z - this.center[i].z;
-      const d = dx * dx + dz * dz;
-      if (d < best) { best = d; bi = i; }
+  /** WHICH CENTRELINE SAMPLE IS ACTUALLY NEAREST — exactly, and cheaply.
+   *
+   *  Every "how far is the road, and how high is it there" question used to be
+   *  answered by a stride-scan (`i += 5`) plus, in places, a bilinear blend
+   *  between grid corners. On a switchback pass the two legs run within a few
+   *  metres of each other in plan and tens of metres apart in height, so a
+   *  blend of "the nearest sample here" and "the nearest sample 8 u away"
+   *  averages two DIFFERENT ROADS and lands on a height that is neither. The
+   *  car stood on that average while the hillside was drawn from an exact
+   *  scan — measured 14.4 u of daylight between them on TREMOLA DESCENT, which
+   *  is the car submerged to the roof in a mountain.
+   *
+   *  Bucketing the samples by cell makes the exact answer affordable: build is
+   *  one pass over the centreline, and a query touches only the handful of
+   *  samples in the rings it needs. Rings expand until the best hit so far is
+   *  closer than the nearest unscanned cell could possibly be, so the result is
+   *  the true nearest sample, not a good guess. */
+  /** THE EDITOR MOVED THE ROAD.
+   *
+   *  `edit.warp` is a list of pulls — {x, z, r, dx, dz} — laid down by dragging
+   *  a handle on the racing line. Each one displaces the centreline, falling
+   *  off as cos² of the distance from where it was grabbed, so the lap BENDS
+   *  toward the new point instead of kinking at it.
+   *
+   *  This runs before anything else touches `center`, and that ordering is the
+   *  whole trick: the elevation profile, the overpass planner, the terrain
+   *  blend, every scatter and the physics all derive from the centreline, so
+   *  moving it here means the world is built around the new shape rather than
+   *  the road being slid across ground that was shaped for the old one.
+   *
+   *  Tangents and normals are re-derived from the moved points afterwards —
+   *  keeping the originals would leave the road's cross-section pointing the
+   *  way the lap used to go, which is how a widened bend ends up with its
+   *  verge inside the carriageway. */
+  _applyRouteWarp(edit) {
+    const W = edit && edit.warp;
+    if (!W || !W.length) return;
+    const moved = [];
+    for (let i = 0; i < N; i++) {
+      const c = this.center[i];
+      let mx = 0, mz = 0;
+      for (const w of W) {
+        const d = Math.hypot(c.x - w.x, c.z - w.z);
+        if (d >= w.r) continue;
+        const t = Math.cos((d / w.r) * Math.PI * 0.5);
+        const k = t * t;
+        mx += w.dx * k; mz += w.dz * k;
+      }
+      moved.push([mx, mz]);
     }
-    return [Math.sqrt(best), this.center[bi].y];
+    for (let i = 0; i < N; i++) {
+      this.center[i].x += moved[i][0];
+      this.center[i].z += moved[i][1];
+    }
+    for (let i = 0; i < N; i++) {
+      const a = this.center[(i - 1 + N) % N], b = this.center[(i + 1) % N];
+      const tx = b.x - a.x, tz = b.z - a.z;
+      const l = Math.hypot(tx, tz) || 1;
+      this.tan[i].set(tx / l, 0, tz / l);
+      this.nrm[i].set(this.tan[i].z, 0, -this.tan[i].x);
+    }
+  }
+
+  _buildSampleGrid() {
+    const CS = 32;
+    const cells = new Map();
+    for (let i = 0; i < N; i++) {
+      const k = (Math.floor(this.center[i].x / CS) + 4096) * 8192
+        + (Math.floor(this.center[i].z / CS) + 4096);
+      let a = cells.get(k);
+      if (!a) cells.set(k, a = []);
+      a.push(i);
+    }
+    this._sGrid = { CS, cells };
+  }
+
+  /** Index of the true nearest centreline sample to (x, z), and its distance.
+   *  Writes into a scratch object — per-frame callers must not retain it. */
+  _nearestSample(x, z) {
+    const out = this._nsTmp || (this._nsTmp = { i: 0, d: 0 });
+    const G = this._sGrid;
+    if (!G) {                       // called before the grid exists: honest scan
+      let best = Infinity, bi = 0;
+      for (let i = 0; i < N; i++) {
+        const dx = x - this.center[i].x, dz = z - this.center[i].z;
+        const d = dx * dx + dz * dz;
+        if (d < best) { best = d; bi = i; }
+      }
+      out.i = bi; out.d = Math.sqrt(best);
+      return out;
+    }
+    const CS = G.CS;
+    const cx = Math.floor(x / CS), cz = Math.floor(z / CS);
+    let best = Infinity, bi = 0;
+    for (let ring = 0; ring < 256; ring++) {
+      for (let ax = cx - ring; ax <= cx + ring; ax++) {
+        const edgeX = Math.abs(ax - cx) === ring;
+        for (let az = cz - ring; az <= cz + ring; az++) {
+          // only the shell of each ring — the interior was scanned already
+          if (!edgeX && Math.abs(az - cz) !== ring) continue;
+          const a = G.cells.get((ax + 4096) * 8192 + (az + 4096));
+          if (!a) continue;
+          for (let n = 0; n < a.length; n++) {
+            const i = a[n];
+            const dx = x - this.center[i].x, dz = z - this.center[i].z;
+            const d = dx * dx + dz * dz;
+            if (d < best) { best = d; bi = i; }
+          }
+        }
+      }
+      // Anything still unscanned sits at least `ring * CS` away, so once the
+      // best hit beats that the search is provably finished.
+      if (best < Infinity && best <= (ring * CS) * (ring * CS)) break;
+    }
+    out.i = bi; out.d = Math.sqrt(best);
+    return out;
+  }
+
+  _nearRoad(x, z) {
+    const s = this._nearestSample(x, z);
+    return [s.d, this.center[s.i].y];
   }
 
   /** Distance from (x,z) to the nearest centerline sample (coarse). */
@@ -4899,16 +5156,20 @@ export class Track {
    *  different heights run close (frost S-folds, the alpine switchback stack),
    *  ground near the lower ribbon must never rise above it — un-capped blends
    *  poke sawtooth wedges up through the road. Infinity when no strand near. */
-  _roadClampY(x, z) {
-    let best = Infinity, bi = 0;
-    for (let i = 0; i < N; i += 4) {
-      const dx = x - this.center[i].x, dz = z - this.center[i].z;
-      const d = dx * dx + dz * dz;
-      if (d < best) { best = d; bi = i; }
+  _roadClampY(x, z, nearIdx = -1, nearDist = -1) {
+    // The caller usually already knows the nearest sample; taking it avoids a
+    // second scan AND — the reason this matters — guarantees the physics and
+    // the drawn mesh clamp against the same strand. The mesh used to run its
+    // own inline copy of this loop at stride 2 while this ran at stride 4, so
+    // the two could pick different capping strands on a tight fold.
+    let bi = nearIdx, best = nearDist >= 0 ? nearDist * nearDist : Infinity;
+    if (bi < 0) {
+      const ns = this._nearestSample(x, z);
+      bi = ns.i; best = ns.d * ns.d;
     }
     if (best > 25.2 * 25.2) return Infinity;   // no strand in capping range
     let clamp = Infinity;
-    for (let i = 0; i < N; i += 4) {
+    for (let i = 0; i < N; i += 2) {
       const di = Math.abs(i - bi);
       const gap = Math.min(di, N - di);
       if (gap <= 12) continue;                              // own path neighbours
@@ -5434,17 +5695,71 @@ export class Track {
       }
     }
     if (!this._overpasses.length) return;
-    // alternate which leg flies (the sketch's up/down arrows), bake the rise
+    // Alternate which leg flies (the sketch's up/down arrows), then bake the
+    // rise. Both halves of that used to be wrong, and MOUNTAIN TO SEA — nine
+    // crossings on one lap — showed it as a cobbled wall climbing into the
+    // sky: 86.7 % at its worst against a roster maximum of 53 %, with 113
+    // samples over 30 % and every single one of them at an overpass.
+    //
+    //   THE RAMP WAS TOO SHORT. 8.6 u of clearance in 30 u of run is a 28 %
+    //   average before shaping, and `cos^1.2` puts its steepest part in the
+    //   middle. Doubled to 60 u and shaped as a raised cosine, whose slope is
+    //   bounded analytically at CLEAR·pi/(2·HALF·segLen) — about 22 %, inside
+    //   what the rest of the roster already does.
+    //
+    //   THE LIFTS ADDED UP. Two crossings 5 stations apart each added their
+    //   full 8.6 u to the same piece of road, so the car climbed 17 u in the
+    //   length of a ramp built for 8.6. Clearance is not cumulative — it is
+    //   "be at least this far above the other leg" — so overlapping bumps take
+    //   the MAXIMUM, not the sum.
     const CLEAR = 8.6;
-    const HALF = Math.ceil(30 / this.segLen);
+    const HALF = Math.ceil(60 / this.segLen);
+    const lift = new Float32Array(N);
+    const bump = (up, height) => {
+      for (let sN = -HALF; sN <= HALF; sN++) {
+        const j = (up + sN + N) % N;
+        const v = height * (0.5 + 0.5 * Math.cos((sN / HALF) * Math.PI));
+        if (v > lift[j]) lift[j] = v;
+      }
+    };
     this._overpasses.forEach((o, k) => {
       o.up = (k % 2 === 0) ? o.ib : o.ia;
+      o.down = (k % 2 === 0) ? o.ia : o.ib;
       o.half = HALF;
-      for (let sN = -HALF; sN <= HALF; sN++) {
-        const j = (o.up + sN + N) % N;
-        this.center[j].y += CLEAR * Math.pow(Math.cos((sN / HALF) * Math.PI / 2), 1.2);
-      }
+      bump(o.up, CLEAR);
     });
+    // AND THEN LIMIT THE SLOPE, rather than trusting the shape.
+    //
+    // A bounded-slope ramp is only bounded on flat ground. Lay one on a road
+    // already climbing, or let two of them meet, and the sum is as steep as it
+    // likes — the first attempt at this topped up each crossing until it had
+    // its full clearance and made the world WORSE, 225 samples over 20 % where
+    // there had been 153, because every top-up compounded the last.
+    //
+    // So the ramp is eroded instead: any station whose combined profile breaks
+    // the gradient cap gets its lift cut back until it does not. It can only
+    // ever LOWER the road, so it cannot invent a new wall, and it converges
+    // because each pass strictly decreases. A crossing in a dense knot ends up
+    // with less clearance than the ideal; a road you cannot drive up is worse
+    // than a bridge with a low deck.
+    const CAP = 0.24;                       // 24 %, inside the roster's norm
+    const run = Math.max(0.5, this.segLen);
+    for (let pass = 0; pass < 80; pass++) {
+      let moved = 0;
+      for (let i = 0; i < N; i++) {
+        if (lift[i] <= 0) continue;
+        const a = this.center[(i - 1 + N) % N].y + lift[(i - 1 + N) % N];
+        const b = this.center[(i + 1) % N].y + lift[(i + 1) % N];
+        const here = this.center[i].y + lift[i];
+        const ceil = Math.min(a, b) + CAP * run;
+        if (here > ceil + 1e-4) {
+          lift[i] = Math.max(0, lift[i] - (here - ceil));
+          moved++;
+        }
+      }
+      if (!moved) break;
+    }
+    for (let i = 0; i < N; i++) this.center[i].y += lift[i];
   }
 
   /** True when sample i lies on an overpass flyover span (+pad). */
@@ -5515,6 +5830,41 @@ export class Track {
     }
   }
 
+  /** HOW LONG A BORE WILL THIS STATION TAKE?
+   *
+   *  A tunnel through a corner cuts its own mouth open, so the planner capped
+   *  curvature at 0.013 over the FULL requested bore length and gave up when
+   *  nothing cleared it. On PINE VALLEY — the world the editor opens on — the
+   *  straightest run measures 0.014, so a tunnel could not be built anywhere
+   *  on it at all, and the editor's TUNNEL tool spent its life arguing with
+   *  taps it was never going to accept.
+   *
+   *  But "too curved" is a statement about a LENGTH, not about a place: the
+   *  same bend takes a short bore happily. So instead of one pass/fail, this
+   *  returns the longest half-length that stays under the ceiling here, and a
+   *  twisty world gets a shorter tunnel rather than none. Zero means even the
+   *  minimum will not fit, which is the only honest refusal.
+   *
+   *  Shared by the planner and by the editor's TUNNEL tool, so what the tool
+   *  promises and what the builder does cannot drift apart. */
+  tunnelFitAt(i, maxHalf) {
+    const MIN = Math.max(6, Math.round(26 / this.segLen));   // ~26 u of bore
+    if (this._circDist(i, 0) < 100) return 0;
+    // Clear of a chasm by the BORE'S OWN LENGTH plus a margin, not by a flat
+    // 150 samples. The planner runs before the gorges are cut, so that constant
+    // never bit there — but the editor asks the same question after the world
+    // exists, and on GOTTHARD CLIMB 150 samples either side of two gorges ruled
+    // out 503 of 900 stations and left the tool with nowhere to put anything.
+    if (this._nearGorge(i, Math.max(8, maxHalf))) return 0;
+    let mc = 0, half = 0;
+    for (let w = 1; w <= maxHalf; w++) {
+      mc = Math.max(mc, this.curvature[(i + w + N) % N], this.curvature[(i - w + N) % N]);
+      if (mc > 0.013) break;
+      half = w;
+    }
+    return half >= MIN ? half : 0;
+  }
+
   _planTunnels() {
     const S = this.T.tunnels;
     const count = S.count ?? 1;
@@ -5526,21 +5876,20 @@ export class Track {
     // because a bore through a corner cuts its own mouth open.
     const want = Array.isArray(S.at) ? S.at.map((f) => Math.round(f * N) % N) : null;
     for (let k = 0; k < count; k++) {
-      let best = -1, bc = Infinity;
+      // take the LONGEST bore available, not the straightest station: a run
+      // that fits 40 u of tunnel beats one that is marginally straighter but
+      // only fits 27
+      let best = -1, bestFit = 0;
       const lo = want ? want[k] - 30 : 0, hi = want ? want[k] + 30 : N - 1;
       if (want && k >= want.length) break;
       for (let i0 = lo; i0 <= hi; i0 += want ? 1 : 2) {
         const i = (i0 + N) % N;
-        if (this._circDist(i, 0) < 100) continue;
-        if (this._nearGorge(i, 150)) continue;
         if (this._tunnels.some((t) => this._circDist(i, t.mid) < 170)) continue;
-        let mc = 0;
-        for (let w = -lenS; w <= lenS; w++) mc = Math.max(mc, this.curvature[(i + w + N) % N]);
-        if (mc < bc) { bc = mc; best = i; }
+        const fit = this.tunnelFitAt(i, lenS);
+        if (fit > bestFit) { bestFit = fit; best = i; }
       }
-      // a bore through a corner self-intersects; only genuine straights bore
-      if (best < 0 || bc > 0.013) break;
-      const half = lenS >> 1;
+      if (best < 0 || !bestFit) break;
+      const half = Math.min(bestFit, lenS >> 1);
       if (best - half < 0 || best + half >= N) break;    // no wrap runs
       const s0 = best - half, e0 = best + half;
       const pts = [];
@@ -5600,6 +5949,34 @@ export class Track {
     return ((x - C.a[0]) * abz - (z - C.a[1]) * abx) / Math.hypot(abx, abz);
   }
 
+  /** THE HIGHEST WATER SURFACE AT A POINT, or -Infinity where there is none.
+   *
+   *  The world has three separate bodies of water built by three separate
+   *  systems, and nothing could previously ask a simple question of all of
+   *  them at once: drive off a corniche into the bay and the car simply
+   *  carried on along the sea floor, because the seabed IS ground and ground
+   *  is drivable. This is what the drowning rule reads.
+   *
+   *  The RIVER is deliberately not included. It is 2.6 u deep and every world
+   *  that has one gives it fords to cross — it is meant to be driven through,
+   *  and a car is taller than it is deep, so nothing there is ever fully
+   *  submerged. Including it would drown people at the ford, which is the one
+   *  place the design says to go. */
+  waterTopAt(x, z) {
+    let top = -Infinity;
+    const C = this.T.coast;
+    if (C && this._coastSide(x, z) > 0) top = Math.max(top, C.level ?? -2);
+    const W = this.edit && this.edit.waters;
+    if (W) {
+      for (let i = 0; i < W.length; i++) {
+        const w = W[i];
+        const dx = x - w.x, dz = z - w.z;
+        if (dx * dx + dz * dz <= w.r * w.r) top = Math.max(top, w.y);
+      }
+    }
+    return top;
+  }
+
   /** Seaward of the coastline the land sinks to the sea floor over a beach
    *  band. The road corridor is exempt exactly the way the river carve
    *  exempts it, so the seafront straight keeps its shoulder. */
@@ -5627,6 +6004,19 @@ export class Track {
    *  covers both, and anything that would look absurd wet asks it. */
   _inWater(x, z) {
     if (this._underwater(x, z)) return true;
+    // ...and the third body of water: a lake the EDITOR dug. Fixing the lake's
+    // winding is what made this visible — the first correctly-blue render had
+    // a pine standing in the middle of it, because the scatter had run against
+    // ground that was open field when the world was laid out and a basin only
+    // afterwards. Asked here rather than at each scatter site, so all twelve
+    // callers get it for the price of one.
+    const W = this.edit && this.edit.waters;
+    if (W) {
+      for (const w of W) {
+        if (Math.hypot(x - w.x, z - w.z) > w.r) continue;
+        if (this.terrainHeight(x, z) < w.y + 0.35) return true;
+      }
+    }
     if (!this._river) return false;
     const R = this._river;
     return this._riverDist(x, z) < (R.half ?? 8) + 2.5;
@@ -5652,9 +6042,15 @@ export class Track {
   }
 
   terrainHeight(x, z) {
-    const fld = this._roadFieldCoarse(x, z);
-    let h = this._blendHeight(fld.d, fld.y, x, z);
-    if (this.T.coast) h = this._coastDepress(x, z, h, fld.d);
+    // THE SAME DATUM THE MESH IS BUILT FROM. This used to read a bilinear
+    // blend over an 8 u grid, which is why the car and the hillside disagreed:
+    // see `_nearestSample`. Now both functions ask the identical question and
+    // get the identical answer, so anything below is a deliberate difference
+    // rather than an accident of sampling.
+    const ns = this._nearestSample(x, z);
+    const nd = ns.d, bi = ns.i;
+    let h = this._blendHeight(nd, this.center[bi].y, x, z);
+    if (this.T.coast) h = this._coastDepress(x, z, h, nd);
     // THE EDITOR'S SCULPT, applied BEFORE the road clamps below - never
     // after. The clamps are what keep the carriageway drivable (the road is
     // the floor, and a tunnel stretch inverts it); a sculpt added after them
@@ -5663,11 +6059,13 @@ export class Track {
     // still wins where they disagree.
     if (this._delta) h += this._delta.at(x, z);
     if (this._citMound) h += this._citMoundH(x, z);
-    if (fld.d <= 27) {
-      const clamp = this._roadClampY(x, z);
+    if (nd <= 27) {
+      const clamp = this._roadClampY(x, z, bi, nd);
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
     }
-    return this._roadFloor(x, z, h, fld.d);
+    // The nearest sample is already in hand, so the floor no longer re-scans
+    // for it — and it is now the SAME sample the mesh clamps against.
+    return Math.min(h, this._roadCeil(bi, nd));
   }
 
   /** THE ROAD IS THE FLOOR — the hard guarantee, applied last.
@@ -5721,6 +6119,14 @@ export class Track {
    *  guarantee the smoothstep could not give. 0.5 still lets a hillside climb
    *  10 u within 20 u of the verge, so cuttings still read as cuttings. */
   _roadCeil(bi, d) {
+    // FAR FROM THE ROAD THERE IS NO CEILING. This guard used to live in
+    // `_roadFloor` — that is, in the physics only — while the mesh applied the
+    // ceiling at any distance. The tunnel branch below ignores `d` entirely,
+    // so beside a bore the DRAWN ridge was being flattened to bore height at
+    // any range while the ground the car stands on kept climbing: TREMOLA
+    // DESCENT floated the car 8.5 u over its own hillside. One rule, both
+    // callers, and the ridge over a tunnel gets its height back.
+    if (d > 34) return Infinity;
     // a tunnel stretch inverts the contract: the hill is SUPPOSED to stand
     // over the carriageway there - the bore shell keeps it readable
     if (this._tunnels) {
@@ -5763,19 +6169,12 @@ export class Track {
    *  strands at different elevations pass near each other, which is what
    *  tore the terrain into sawtooth wedges through the ribbon. */
   _terrainMeshHeight(x, z) {
-    let best = Infinity, bi = 0;
-    for (let i = 0; i < N; i += 3) {
-      const dx = x - this.center[i].x, dz = z - this.center[i].z;
-      const d = dx * dx + dz * dz;
-      if (d < best) { best = d; bi = i; }
-    }
-    for (let k = -2; k <= 2; k++) {
-      const i = (bi + k + N) % N;
-      const dx = x - this.center[i].x, dz = z - this.center[i].z;
-      const d = dx * dx + dz * dz;
-      if (d < best) { best = d; bi = i; }
-    }
-    const d = Math.sqrt(best);
+    // Was a stride-3 scan with a ±2 refine — very nearly exact, but "very
+    // nearly" is what let it disagree with the physics. Both now go through
+    // the one query, so the mesh and the ground the car stands on cannot
+    // diverge by construction.
+    const ns = this._nearestSample(x, z);
+    const bi = ns.i, d = ns.d;
     let h = this._blendHeight(d, this.center[bi].y, x, z);
     // the coast term must live in BOTH ground functions: this one builds the
     // mesh the player SEES, terrainHeight() the ground physics STANDS ON.
@@ -5791,18 +6190,8 @@ export class Track {
 if (this._citMound) h += this._citMoundH(x, z);
         if (this._delta) h += this._delta.at(x, z);
     if (d <= 27) {
-      // exact strand cap (window/exclusion mirror _roadClampY)
-      let clamp = Infinity;
-      for (let i = 0; i < N; i += 2) {
-        const di = Math.abs(i - bi);
-        const gap = Math.min(di, N - di);
-        if (gap <= 12) continue;
-        const dx = x - this.center[i].x, dz = z - this.center[i].z;
-        const d2 = dx * dx + dz * dz;
-        if (d2 < 11 * 11 || d2 > 25.2 * 25.2 || this.center[i].y >= clamp) continue;
-        if (Math.sqrt(d2) > 0.72 * gap * this.segLen) continue;
-        clamp = this.center[i].y;
-      }
+      // the SAME clamp the physics height uses, not a hand-copied mirror of it
+      const clamp = this._roadClampY(x, z, bi, d);
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
     }
     // and the same hard ceiling the physics height uses — this is the function
@@ -5829,7 +6218,15 @@ if (this._citMound) h += this._citMoundH(x, z);
       // top of it is never coplanar (coplanar strips z-fight into dark bands
       // at grazing angles). Physics still reads center[j].y — the DECK is the
       // surface the car drives on there.
-      const y = c.y - this._deckDip(j);
+      // ...AND THE GORGE-JUMP COLLAPSE, for the same reason. This is why the
+      // chasms were invisible: `groundHeightAt` subtracts `_jumpCut` so the
+      // car really does drop into the gap, but the RIBBON was still drawn
+      // straight across it at grade — measured 26.0 u of tarmac hanging over
+      // the chasm on CANYON RUN and 24.0 u on RED CENTRE RUN. From the seat
+      // the road looked continuous, so the jump the world had built could not
+      // be seen and could not be read. The roadway is OUT there; it has to
+      // LOOK out.
+      const y = c.y - this._deckDip(j) - (this._jumpCut ? this._jumpCut[j] : 0);
       verts[o] = c.x + n.x * w; verts[o + 1] = y; verts[o + 2] = c.z + n.z * w;
       verts[o + 3] = c.x - n.x * w; verts[o + 4] = y; verts[o + 5] = c.z - n.z * w;
       const v = (i * this.segLen) / 10;
@@ -7342,7 +7739,7 @@ if (this._citMound) h += this._citMoundH(x, z);
     this._buildSky();
     const m4 = new THREE.Matrix4();
     this._buildHorizon(m4);
-    if (this.T.coast) this._buildSea();
+    if (this.T.coast) { this._buildSea(); this._buildWhales(); }
     this._buildEditWaters();                         // lakes the owner dug
     if (this.T.vineRows) this._buildVineRows();
     if (this.T.windmill) this._buildWindmill();
@@ -7378,6 +7775,7 @@ if (this._citMound) h += this._citMoundH(x, z);
     if (this.T.heroBridge) this._buildHeroBridge();           // hero rope crossing
     if (this.T.tunnels) this._buildTunnels();                 // galleries through the cuts
     if (this.T.guardFence) this._buildGuardFence();           // breakable mountain rail fence
+    this._buildEdgeRails();                                   // SOLID rail wherever the road runs beside a fall
     if (this.T.roadCabins) this._buildRoadCabins();           // log cabins on the shelves
     if (this.T.snowPatches) this._buildSnowPatches(m4);       // old snow at altitude
     this._buildWorldElements(m4);                    // farms, chapels, fences, dressing
@@ -7819,6 +8217,166 @@ if (this._citMound) h += this._citMoundH(x, z);
    *  existing knockable-board array, so a car bursts through it at speed and
    *  missiles/blasts level it, exactly like a sponsor board. `smashBanner`
    *  below zeroes the instance and hands back a loose bay to fling. */
+  /** THE RAIL ON THE EDGE THAT FALLS AWAY — on every world, not three.
+   *
+   *  Reported from a screenshot: a dirt road with the ground dropping off the
+   *  right-hand verge and nothing between the car and the fall. Surveyed
+   *  across the roster, that is the normal case, not a one-off — measured
+   *  drop from the carriageway to a car's length beyond the verge:
+   *
+   *      SUMMIT CLIMB   169 sample-sides over 2 u, 44 over 10 u, worst 21.9
+   *      REDWOOD        63 / 23, worst 22.8      FROST PEAK  29 / 16, worst 23.4
+   *      CANYON RUN     69 / 26, worst 26.2      FURKA       143 / 56, worst 31.5
+   *
+   *  and on FURKA — a world that HAS `guardFence` — barrier coverage of those
+   *  drops measured 0 %. That is the other half of the bug: `_buildGuardFence`
+   *  does detect the falling edge, but it registers its posts in `banners` as
+   *  BREAKABLE props, so the fence is scenery you drive through on your way
+   *  over the edge. It is left exactly as it is (a rail fence in a field
+   *  should smash), and this runs alongside it for the drops that kill.
+   *
+   *  Two rules keep it from becoming a corridor:
+   *    - it only answers a REAL fall (>= 3.5 u), not a shallow verge, and
+   *    - it needs a RUN of them, so a rail is a rail and not a lone post
+   *      stranded beside a dip.
+   *  Everything already walled — the alpine parapets, the cliff worlds, the
+   *  bridge decks — is skipped by consulting `this.barriers`, which is why
+   *  this is built last.
+   *
+   *  Cost: two InstancedMesh, so +2 draw calls and ~5 k triangles on the
+   *  worst world. */
+  _buildEdgeRails() {
+    if (this.T.edgeRails === false) return;
+    // 2.5 u, not 3.5: the drop in the report that started this measures 3.3 u
+    // at its worst on PINE VALLEY, so a 3.5 gate answered every world EXCEPT
+    // the one that was complained about. A car sits ~1.4 u tall — 2.5 u is
+    // already over the roof, and below that the verge is a bank you bounce
+    // off rather than a fall you go over.
+    const DROP = 2.5;                 // a fall worth stopping, not a verge
+    const MINRUN = 3;                 // consecutive stations before it is a rail
+    const MAXBAY = 340;               // hard ceiling on the instance count
+    const LIFT = 0.35;                // rail foot sits just below the road plane
+    const step = Math.max(1, Math.round(4.5 / this.segLen));   // one bay ~4.5 u
+
+    // ---- where does the ground fall away, and is it already guarded? ----
+    const want = [];                  // [i, side] stations that need a rail
+    for (const side of [1, -1]) {
+      const hits = [];
+      for (let i = 0; i < N; i += step) {
+        if (this._circDist(i, 0) < 30) { hits.push(false); continue; }
+        if (this._nearGorge(i, 40)) { hits.push(false); continue; }  // its own rails
+        if (this.fords.some((f) => this._circDist(i, f.i) < 14)) { hits.push(false); continue; }
+        if (this._tunnels.some((t) => i >= t.s - 6 && i <= t.e + 6)) { hits.push(false); continue; }
+        const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;
+        const p = this.pointAt(i, (half + 1.8) * side);
+        const out = this.pointAt(i, (half + 7.0) * side);
+        const drop = this.center[i].y - this.terrainHeight(out.x, out.z);
+        if (drop < DROP) { hits.push(false); continue; }
+        // AN OFFSET IS NOT A DISTANCE — the same trap the hedge banks document.
+        // `pointAt` steps along ONE sample's normal, and on the inside of a
+        // bend the lap swings back underneath it, so "1.8 u outside the edge"
+        // can land in the middle of the carriageway a moment later round the
+        // corner. Rails were photographed standing across the road because of
+        // it. A bay is 4.5 u long, so both ends have to clear, not just the
+        // middle: a rail that pivots one end onto the tarmac is still a wall
+        // in the road.
+        // ALONG the road for the bay's two ends — `this.tan` rather than a
+        // heading and a pair of trig calls, because I got that pair the wrong
+        // way round first time and tested a point 2.4 u INTO the carriageway,
+        // which deleted every rail in the game (0 of 0 in the suite).
+        const tg = this.tan[i];
+        const ex = tg.x * 2.4, ez = tg.z * 2.4;
+        // The bar is "outside the drivable width", not "the full 1.8 u out":
+        // `pointAt` measures from one sample, and on any curve the nearest
+        // sample is nearer than that, so a rail never keeps its whole offset.
+        const clearAll = [[0, 0], [ex, ez], [-ex, -ez]].every(([ox, oz]) =>
+          this._distToTrack(p.x + ox, p.z + oz) >= half + 0.25);
+        if (!clearAll) { hits.push(false); continue; }
+        // already walled? the masonry went in before this did
+        let guarded = false;
+        for (let b = 0; b < this.barriers.length && !guarded; b++) {
+          const q = this.barriers[b];
+          const mx = (q.x1 + q.x2) / 2, mz = (q.z1 + q.z2) / 2;
+          // 12 u, not 6: a rail standing just off an existing parapet gives the
+          // car TWO overlapping barriers, and the deepest-first resolution then
+          // pushed it off the rail and into the masonry — measured on GOTTHARD,
+          // the car ended 0.35 u from a wall it should have been held 2.15 u
+          // off. Where the world already built masonry, the masonry is the
+          // guard; this only fills the stretches that have none.
+          if ((mx - p.x) * (mx - p.x) + (mz - p.z) * (mz - p.z) < 144) guarded = true;
+        }
+        hits.push(!guarded);
+      }
+      // keep only runs long enough to read as a rail
+      let run = 0;
+      for (let k = 0; k <= hits.length; k++) {
+        if (hits[k]) { run++; continue; }
+        if (run >= MINRUN) {
+          for (let j = k - run; j < k; j++) want.push([j * step, side]);
+        }
+        run = 0;
+      }
+    }
+    if (!want.length) return;
+
+    // ---- one bay: two posts and two rails, merged --------------------------
+    // THE BAY RUNS ALONG LOCAL Z, AND IT MUST.
+    //
+    // It was built along local X — posts at x = +/-bay/2 — and then instanced
+    // with `setFromAxisAngle(up, heading)`. A Y-rotation by the heading sends
+    // local +X to (cos, -sin), which is the LATERAL direction, so every rail
+    // in the game was drawn lying ACROSS the carriageway: pale grey bars over
+    // the road at bay intervals, running out into the grass on both sides.
+    // That is the screenshot that was reported twice.
+    //
+    // The giveaway is three lines below: the barrier this same loop registers
+    // uses (sin, cos) — along the road, correctly. The invisible wall and the
+    // thing you can see were ninety degrees apart, which is also why the
+    // clear-the-road guard could not catch it: the anchor point was fine and
+    // the mesh reached across anyway.
+    const bay = 4.5, H = 1.0;
+    const geo = mergeBoxes([
+      { w: 0.22, h: H, d: 0.22, x: 0, y: H / 2, z: -bay / 2 },
+      { w: 0.22, h: H, d: 0.22, x: 0, y: H / 2, z: bay / 2 },
+      { w: 0.10, h: 0.22, d: bay + 0.3, x: 0, y: H - 0.14, z: 0 },
+      { w: 0.09, h: 0.16, d: bay + 0.3, x: 0, y: H - 0.52, z: 0 },
+    ]);
+    // steel where the road is sealed, timber where it is not — the world
+    // already knows which it is from the surface it gives the physics
+    const sealed = this.T.surface === 'wet' || this.T.tarmac || this.T.lamps;
+    const mat = new THREE.MeshStandardMaterial({
+      color: this.T.edgeRailColor ?? (sealed ? 0xb9bcc0 : 0x8a6a44),
+      roughness: sealed ? 0.45 : 0.95, metalness: sealed ? 0.5 : 0,
+    });
+    const n = Math.min(want.length, MAXBAY);
+    const mesh = new THREE.InstancedMesh(geo, mat, n);
+    mesh.castShadow = mesh.receiveShadow = true;
+    mesh.name = 'edge-rail';
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+    for (let k = 0; k < n; k++) {
+      const [i, side] = want[k];
+      const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;
+      const p = this.pointAt(i, (half + 1.8) * side);
+      const hd = this.headingAt(i);
+      q.setFromAxisAngle(up, hd);
+      m4.compose(new THREE.Vector3(p.x, this.center[i].y - LIFT, p.z), q, one);
+      mesh.setMatrixAt(k, m4);
+      // SOLID. The whole point: `banners` is breakable scenery, `barriers` is
+      // the list the car cannot pass. Overlap the bays slightly (4.9 for a 4.5
+      // pitch) so a run has no seam for a nose to find.
+      this._barrier(p.x, p.z, Math.sin(hd), Math.cos(hd), 4.9, 0.5,
+        this.center[i].y - LIFT, H, 'stone');
+      // TAG IT. Builders that run after this one push barriers of their own,
+      // so "the last N entries" is not the rails — a test that assumed it was
+      // ended up measuring stone walls and reporting them as rails.
+      this.barriers[this.barriers.length - 1].kind = 'edgeRail';
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    this.group.add(mesh);
+    this._edgeRailCount = n;
+  }
+
   _buildGuardFence() {
     const S = this.T.guardFence;
     const LAT = S.lateral, MAX = S.max || 190;
@@ -8847,7 +9405,15 @@ if (this._citMound) h += this._citMoundH(x, z);
       // flat wall is what read as a void
       shade.setScalar(0.78 + Math.random() * 0.3);
       rock.setColorAt(k, shade);
-      this.solids.push({ x, z, r: w * 0.3, y: y + 4, mat: 'stone' });
+      // THE COLLIDER IS THE MOUNTAIN, NOT A POST INSIDE IT. At r = w * 0.3
+      // against a drawn base of w / 2 you could drive 30-86 u INTO the rock
+      // before anything stopped you — on a 430 u cone that is most of the way
+      // to the middle. The footprint is an ellipse (the cone is scaled
+      // w by w*0.85), and a circle has to pick one axis: it takes the LONG one,
+      // because a few metres of invisible margin on the short axis is a far
+      // smaller lie than a mountain you can walk into. `h` makes it solid over
+      // its whole height — see the height gate in Car.step.
+      this.solids.push({ x, z, r: w * 0.48, y: y + 2, h, mat: 'stone' });
     }
     rock.name = 'massif';
     if (rock.instanceColor) rock.instanceColor.needsUpdate = true;
@@ -10700,8 +11266,16 @@ if (this._citMound) h += this._citMoundH(x, z);
    *  `_realizeElements`, and every builder that wants a building comes through
    *  here. That is the point — see the header on HOUSE_TEMPLATES for the two
    *  independent copies of the same roof bug that made it necessary. */
-  _element(B, type, x, z, rot, K, scale = 1, yOverride = null) {
-    if (this._erased(x, z)) return;
+  /** `authored` marks a placement the PLAYER made in the editor.
+   *
+   *  A clear zone means "the world must not invent scenery here" — it has
+   *  never meant "and delete the chapel I put there myself". Because this veto
+   *  applied to every caller alike, drawing a CLEAR AREA over your own village
+   *  silently removed it at the next APPLY while its markers stayed on screen:
+   *  fourteen chapels became zero and nothing said so. Authored placements are
+   *  yours, and the eraser you aimed at the world does not eat them. */
+  _element(B, type, x, z, rot, K, scale = 1, yOverride = null, authored = false) {
+    if (!authored && this._erased(x, z)) return;
     // == null catches undefined too - a caller passing undefined must not NaN
     const y = (yOverride == null ? this.terrainHeight(x, z) : yOverride) - 0.25;
     const cs = Math.cos(rot), sn = Math.sin(rot);
@@ -10943,7 +11517,7 @@ if (this._citMound) h += this._citMoundH(x, z);
     const kit = K || ELEMENT_KITS.farm;
     for (const e of list) {
       if (!HOUSE_TEMPLATES[e.preset]) continue;
-      this._element(B, e.preset, e.x, e.z, e.rot || 0, kit, e.scale || 1);
+      this._element(B, e.preset, e.x, e.z, e.rot || 0, kit, e.scale || 1, null, true);
     }
   }
 
@@ -10956,59 +11530,97 @@ if (this._citMound) h += this._citMoundH(x, z);
    *
    *    NO WATER MAY HANG OVER AIR (SCENE-RULES).
    *
-   *  So the disc is clipped to the bowl. Every ring of vertices is dropped to
-   *  the water level only where the ground is genuinely below it; where the
-   *  bank has come back up, the vertex is pulled DOWN to the ground, which
-   *  ends the sheet exactly at the shoreline instead of letting it sail out
-   *  over the field. Two triangles' worth of geometry per lake, one draw. */
+   *  THE SHEET IS DEAD FLAT AND ITS EDGE IS THE SHORELINE.
+   *
+   *  The first cut clipped a fixed-radius disc by dropping each vertex to the
+   *  ground wherever the bank had come back up. That obeys the rule but is
+   *  ugly: neighbouring spokes cross the waterline at different radii, so the
+   *  rim came out as a sawtooth of triangles draping down the bank, and the
+   *  "water" visibly climbed out of its own basin. Reported simply as: the
+   *  lake needs to be smooth.
+   *
+   *  So the boundary is FOUND instead of clipped. Each spoke binary-searches
+   *  outward for the radius where the ground crosses the water level, and that
+   *  radius becomes the rim vertex for that spoke. Every vertex then sits at
+   *  exactly w.y — one flat plane, no stair-stepping, and no water over air by
+   *  construction, because the edge IS the waterline. */
   _buildEditWaters() {
     const list = this.edit && this.edit.waters;
     if (!list || !list.length) return;
     const tint = this.T.seaColor ?? 0x2e7fc0;
     for (const w of list) {
-      const RINGS = 14, SEG = 30;
-      // CircleGeometry is a fan and cannot be shaped ring by ring; build the
-      // disc by hand so every vertex can consult the ground under it.
-      const pos = [], idx = [];
+      const RINGS = 10, SEG = 64;      // more spokes, fewer rings: the rim is
+      const pos = [], idx = [];        // where the shape lives, not the middle
       pos.push(0, 0, 0);
+      // How far out is the shore along each spoke? Bisection on "is the ground
+      // below the water here", 12 steps — about 1 cm of radius on a 40 u lake.
+      const dry = (rad, ca, sa) =>
+        this._terrainMeshHeight(w.x + ca * rad, w.z + sa * rad) >= w.y;
+      const reach = new Array(SEG);
+      let bad = false;
+      for (let s = 0; s < SEG && !bad; s++) {
+        const a = (s / SEG) * Math.PI * 2;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        if (!Number.isFinite(this._terrainMeshHeight(w.x + ca * 0.5, w.z + sa * 0.5))) {
+          bad = true; break;
+        }
+        let lo = 0, hi = w.r;
+        if (!dry(hi, ca, sa)) { reach[s] = hi; continue; }   // bowl runs past
+        for (let k = 0; k < 12; k++) {
+          const mid = (lo + hi) / 2;
+          if (dry(mid, ca, sa)) hi = mid; else lo = mid;
+        }
+        reach[s] = lo;
+      }
+      if (bad) continue;
+      // Smooth the rim around the ring so a single noisy sample cannot put a
+      // notch in the shoreline — three passes of a 1-2-1 kernel, wrapped.
+      for (let pass = 0; pass < 3; pass++) {
+        const src = reach.slice();
+        for (let s = 0; s < SEG; s++) {
+          reach[s] = (src[(s - 1 + SEG) % SEG] + 2 * src[s] + src[(s + 1) % SEG]) / 4;
+        }
+      }
       for (let r = 1; r <= RINGS; r++) {
         for (let s = 0; s < SEG; s++) {
           const a = (s / SEG) * Math.PI * 2;
-          const rad = (r / RINGS) * w.r;
+          const rad = (r / RINGS) * reach[s];
           pos.push(Math.cos(a) * rad, 0, Math.sin(a) * rad);
         }
       }
-      for (let s = 0; s < SEG; s++) idx.push(0, 1 + s, 1 + ((s + 1) % SEG));
+      // WIND IT SO THE FACES LOOK UP. The ring runs anticlockwise in the XZ
+      // plane, which — with Y up and a right-handed cross product — makes the
+      // naive order (centre, s, s+1) face the SEABED. The material is
+      // FrontSide, so the lake vanished from above and lit as if the sun were
+      // under it: the surface photographed pale green, the colour of the field
+      // showing straight through, while every river in the game reads blue.
+      // Reversed, `computeVertexNormals` returns +Y for all 421 vertices.
+      for (let s = 0; s < SEG; s++) idx.push(0, 1 + ((s + 1) % SEG), 1 + s);
       for (let r = 1; r < RINGS; r++) {
         const a0 = 1 + (r - 1) * SEG, b0 = 1 + r * SEG;
         for (let s = 0; s < SEG; s++) {
           const s1 = (s + 1) % SEG;
-          idx.push(a0 + s, b0 + s, b0 + s1);
-          idx.push(a0 + s, b0 + s1, a0 + s1);
+          idx.push(a0 + s, b0 + s1, b0 + s);
+          idx.push(a0 + s, a0 + s1, b0 + s1);
         }
       }
-      // clip to the bowl, and drop the whole lake if the basin never formed
-      let wet = 0, bad = false;
-      for (let i = 0; i < pos.length; i += 3) {
-        const gx = w.x + pos[i], gz = w.z + pos[i + 2];
-        const gy = this._terrainMeshHeight(gx, gz);
-        // ONE NaN POISONS THE WHOLE MESH. A non-finite vertex gives the
-        // geometry a NaN bounding sphere, which takes frustum culling with it
-        // and faults inside the renderer's draw list rather than anywhere near
-        // here — a page error with no line of ours in the stack.
-        if (!Number.isFinite(gy)) { bad = true; break; }
-        if (gy < w.y - 0.02) { pos[i + 1] = w.y; wet++; }
-        else pos[i + 1] = gy - 0.02;          // beached rim: sit ON the ground
-      }
-      if (bad || wet < 6) continue;           // no hole here — no lake
+      // ONE FLAT PLANE. Nothing is clipped any more — the rim already sits on
+      // the waterline — so every vertex simply takes the water level. A lake
+      // whose bowl never formed shows up as a rim that never left the middle.
+      let widest = 0;
+      for (let s = 0; s < SEG; s++) widest = Math.max(widest, reach[s]);
+      if (!(widest > 3)) continue;            // no hole here — no lake
+      for (let i = 1; i < pos.length; i += 3) pos[i] = w.y;
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       geo.setIndex(idx);
       geo.computeVertexNormals();
       geo.translate(w.x, 0, w.z);
+      // Smooth-shaded, because it IS smooth: a faceted sheet was drawing facet
+      // seams across a surface that has no facets to show.
       const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
         color: tint, roughness: 0.14, metalness: 0.12,
-        transparent: true, opacity: 0.88, flatShading: true,
+        transparent: true, opacity: 0.88, flatShading: false,
       }));
       mesh.name = 'edit-lake';
       mesh.renderOrder = 2;
@@ -12333,6 +12945,9 @@ if (this._citMound) h += this._citMoundH(x, z);
       if (this._circDist(i, 0) < 34) continue;
       for (const side of [1, -1]) {
         const p = this.pointAt(i, (WALL_OFF + 1.4) * side);
+        // kerbside furniture, not a chicane — a bollard that the bend has
+        // swung the road under gets left out rather than planted in the lane
+        if (!this._clearsRoad(p.x, p.z, 0.25, 0.5)) continue;
         m4.makeTranslation(p.x, p.y - 0.15, p.z);
         bols.setMatrixAt(bk++, m4);
       }
@@ -16074,12 +16689,18 @@ if (this._citMound) h += this._citMoundH(x, z);
     //
     // Fords are exempt, by the same declared exception the rule carries
     // everywhere else: there the wash sits on the road deck by design.
+    // A ford is exempt from being MOVED, not from being COUNTED. `continue`
+    // skipped it for both, so a crossing broke the running minimum: the first
+    // open station downstream of a ford had nothing bounding it and was free
+    // to sit above the reach that fed it. Measured as a 0.36 u step 37 u clear
+    // of the road on PINE VALLEY — small, but the rule says never. The minimum
+    // now walks every station; only non-ford stations are clamped to it.
     let flowMin = Infinity;
     for (let i = 0; i < F.length; i++) {
       const s = dirF > 0 ? i : F.length - 1 - i;
-      if (F[s].df < 30) continue;
-      if (surf[s] > flowMin) surf[s] = flowMin;
-      else flowMin = surf[s];
+      const isFord = F[s].df < 30;
+      if (!isFord && surf[s] > flowMin) surf[s] = flowMin;
+      else if (surf[s] < flowMin) flowMin = surf[s];
     }
 
     // PASS 3 — emit, doubling the station wherever the level changes so the
@@ -16419,6 +17040,12 @@ if (this._citMound) h += this._citMoundH(x, z);
         const off = ROAD_HALF + 3.5;
         const hx = c.p.x + Math.sin(roadYaw) * sg * off;
         const hz = c.p.z + Math.cos(roadYaw) * sg * off;
+        // Offset, not distance, again: a headwall 3.5 u beyond the edge of a
+        // bend can be inside the carriageway once the lap curls back under it,
+        // and this one carries piers reaching `hw` further along the road. If
+        // the stonework cannot stand clear of the road it does not get built —
+        // a stream mouth is dressing, and dressing never blocks the lane.
+        if (!this._clearsRoad(hx, hz, hw + 1.5, 0.8)) continue;
         const gy = this.terrainHeight(hx, hz);
         const H = Math.max(2.4, deck - bedY + 0.6);
         // the wall, built as two piers and a lintel so the mouth is a hole
@@ -16595,7 +17222,79 @@ if (this._citMound) h += this._citMoundH(x, z);
     }
   }
 
-  /** Per-frame ambient animation: waving flags, drifting clouds. */
+  /** WHALES, BREACHING.
+   *
+   *  The sea is the biggest thing in a coast world and the only one that never
+   *  did anything. A pod out past the shoreline gives it something to look at
+   *  and — because a breach is slow, rare and always somewhere you are not
+   *  looking — it reads as a place that is alive rather than as an effect.
+   *
+   *  Built low-poly to match everything else: a tapered body, a dorsal fin and
+   *  a two-lobe fluke, merged into ONE geometry per whale so a pod costs one
+   *  draw call each rather than four. They live on the ordinary animated list
+   *  and are driven by `update`, so nothing new ticks them.
+   *
+   *  They are placed WELL out to sea — past the beach, clear of the racing
+   *  line — because a whale close enough to matter to a car is a whale you
+   *  would have to collide with, and this is scenery. */
+  _buildWhales() {
+    const C = this.T.coast;
+    if (!C) return;
+    const count = this.T.whaleCount ?? 3;
+    if (count <= 0) return;
+    const level = C.level ?? -2;
+    const abx = C.b[0] - C.a[0], abz = C.b[1] - C.a[1];
+    const L = Math.hypot(abx, abz) || 1;
+    const nx = abz / L, nz = -abx / L;                     // seaward normal
+    const mat = new THREE.MeshStandardMaterial({
+      color: this.T.whaleColor ?? 0x2f3a48, roughness: 0.55, metalness: 0.05,
+      flatShading: true,
+    });
+    const belly = new THREE.MeshStandardMaterial({
+      color: 0xb9c4cc, roughness: 0.6, flatShading: true,
+    });
+    // `Math.random` is the SEEDED generator during a build (`withSeed` wraps
+    // the whole construction), so a pod is in the same place every time you
+    // open the world — same as every other scatter in this file.
+    for (let k = 0; k < count; k++) {
+      const t = (k + 0.7) / (count + 0.4);
+      const along = t * L + (Math.random() - 0.5) * L * 0.18;
+      const out = 150 + Math.random() * 260;               // well past the beach
+      const x = C.a[0] + (abx / L) * along + nx * out;
+      const z = C.a[1] + (abz / L) * along + nz * out;
+      const s = 5.5 + Math.random() * 3.5;
+      // one merged body: nose, barrel, tail stock, dorsal, two fluke lobes
+      const body = mergeBoxes([
+        { w: 0.55, h: 0.5, d: 1.5, x: 0, y: 0, z: 1.55 },
+        { w: 1.0, h: 0.95, d: 2.4, x: 0, y: 0, z: 0.1 },
+        { w: 0.6, h: 0.55, d: 1.6, x: 0, y: 0.05, z: -1.7 },
+        { w: 0.12, h: 0.5, d: 0.5, x: 0, y: 0.6, z: -0.4 },
+      ]);
+      const g = new THREE.Group();
+      const hull = new THREE.Mesh(body, mat);
+      hull.castShadow = true;
+      g.add(hull);
+      const fluke = new THREE.Mesh(mergeBoxes([
+        { w: 1.0, h: 0.1, d: 0.5, x: 0.5, y: 0, z: -2.6 },
+        { w: 1.0, h: 0.1, d: 0.5, x: -0.5, y: 0, z: -2.6 },
+      ]), belly);
+      g.add(fluke);
+      g.scale.setScalar(s);
+      g.position.set(x, level - s * 0.6, z);
+      g.rotation.y = Math.atan2(nx, nz) + (Math.random() - 0.5) * 1.2;
+      g.name = 'whale';
+      this.group.add(g);
+      this.animated.whales.push({
+        g, level, s,
+        // a breach every 14-26 s, staggered so the pod never surfaces together
+        period: 14 + Math.random() * 12,
+        phase: Math.random() * 20,
+      });
+    }
+  }
+
+  /** Per-frame ambient animation: waving flags, drifting clouds, breaching
+   *  whales. */
   update(dt, time) {
     for (const f of this.animated.flags) {
       f.mesh.rotation.y = Math.sin(time * 5 + f.phase) * 0.35 + Math.sin(time * 1.7 + f.phase) * 0.2;
@@ -16603,6 +17302,23 @@ if (this._citMound) h += this._citMoundH(x, z);
     for (const c of this.animated.clouds) {
       c.sprite.position.x += c.speed * dt;
       if (c.sprite.position.x > 1100) c.sprite.position.x = -1100;
+    }
+    // ONE ARC, THEN GONE. `u` runs 0..1 through the breach and the whale spends
+    // the rest of the period submerged, which is what keeps a pod from reading
+    // as a row of bobbing toys: most of the time there is nothing to see, and
+    // then one of them comes out of the water.
+    for (const w of this.animated.whales) {
+      const u = ((time + w.phase) % w.period) / (w.period * 0.22);
+      if (u >= 1) {
+        if (w.g.visible) w.g.visible = false;
+        continue;
+      }
+      w.g.visible = true;
+      const rise = Math.sin(u * Math.PI);                  // out and back in
+      w.g.position.y = w.level - w.s * 0.6 + rise * w.s * 1.55;
+      // nose up on the way out, down on the way back — the shape of a breach
+      w.g.rotation.x = Math.cos(u * Math.PI) * 0.85;
+      w.g.rotation.z = Math.sin(u * Math.PI * 2) * 0.18;
     }
   }
 

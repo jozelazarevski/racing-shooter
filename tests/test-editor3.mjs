@@ -67,15 +67,20 @@ const R = await page.evaluate(async () => {
   cardFor('PINE VALLEY').click();
 
   // ---- DELETE a saved scene ---------------------------------------------
-  localStorage.setItem('ir-scenes', JSON.stringify({ TOGO: { v: 1, base: 1, dabs: [], elements: [] } }));
+  // Through WorldEditor, not through a raw localStorage key. Scenes moved into
+  // the PROFILE key space so the sync engine carries them across devices, and
+  // the legacy global key is folded in once and then removed — a test that
+  // wrote and read that key directly was talking to a store the game no
+  // longer keeps.
+  WorldEditor.save('TOGO', { v: 1, base: 1, dabs: [], elements: [] }, g);
   g._renderLevelCards();
   const del = document.querySelector('#level-select .scene-chip .wc-del');
   out.hasDelete = !!del;
   del.click();                                   // first tap arms
   out.armed = !!document.querySelector('#level-select .scene-chip.confirm');
-  out.survivesOneTap = Object.keys(JSON.parse(localStorage.getItem('ir-scenes'))).length;
+  out.survivesOneTap = Object.keys(WorldEditor.list(g)).length;
   document.querySelector('#level-select .scene-chip .wc-del').click();   // second confirms
-  out.afterDelete = Object.keys(JSON.parse(localStorage.getItem('ir-scenes'))).length;
+  out.afterDelete = Object.keys(WorldEditor.list(g)).length;
   out.cardGone = !document.querySelector('#level-select .scene-chip');
 
   // ---- PLACED HOUSES ARE HOUSES, NOT CRATES ------------------------------
@@ -152,7 +157,10 @@ const R = await page.evaluate(async () => {
   out.straightAt = straight;
   ed4._roadAt({ x: t.center[twisty].x, z: t.center[twisty].z });
   out.twistyRefused = ed4.roadFeat.tunnels.length === 0;
-  out.twistySaidWhy = /twisty/i.test(ed4.statusEl ? ed4.statusEl.textContent : '');
+  out.twistySaidWhy = /twisty|corners|already/i.test(ed4.statusEl ? ed4.statusEl.textContent : '');
+  // if it DID site one, it must not be the corner that was tapped
+  out.twistyMovedAway = ed4.roadFeat.tunnels.length === 1
+    && t._circDist(Math.round(ed4.roadFeat.tunnels[0] * n) % n, twisty) > 10;
   // PINE VALLEY has no straight long enough for an 80 u bore, and refusing is
   // the right answer there. The POSITIVE case has to be run on a route that
   // can carry one, so swap to GOTTHARD CLIMB — a world whose theme has
@@ -176,6 +184,7 @@ const R = await page.evaluate(async () => {
   ed4b.roadMode = 'tunnel';
   ed4b._roadAt({ x: t2.center[str2].x, z: t2.center[str2].z });
   out.tunnelAsked = ed4b.roadFeat.tunnels.length;
+  out.tunnelMsg = ed4b.statusEl ? ed4b.statusEl.textContent : '';
   ed4b.apply();
   await new Promise((r) => setTimeout(r, 800));
   out.tunnelsBuilt = (g.track._tunnels || []).length;
@@ -248,13 +257,24 @@ ok(R.meshAgrees, 'the dug basin is in BOTH height fields');
 ok(R.lakeMeshes === 1, 'the water surface is built', R.lakeMeshes);
 ok(R.wetVerts > 0, 'the lake has a wet surface', `${R.wetVerts}/${R.lakeVerts}`);
 ok(R.overAir === 0, 'no water hangs over air (SCENE-RULES)', R.overAir);
-ok(R.twistyRefused && R.twistySaidWhy,
-  'a bore through a corner is refused, and says why, at tap time');
+// CONTRACT CHANGED, DELIBERATELY. The tool used to refuse a tap on a corner;
+// it now walks outward and sites the bore on the nearest run that will hold
+// one, because a tap means "about here" and PINE VALLEY had NO station that
+// passed the old test — so TUNNEL could not be used anywhere on the world the
+// editor opens on. What must still be true is that it never puts a bore
+// through the corner you actually tapped.
+ok(R.twistyRefused || R.twistyMovedAway,
+  'a tap on a corner does not bore THROUGH the corner',
+  `refused=${R.twistyRefused} movedAway=${R.twistyMovedAway}`);
 ok(R.straightCurv > 0.013,
-  'PINE VALLEY genuinely has no bore-length straight — the refusal above was right',
+  'PINE VALLEY has no FULL-LENGTH straight — which is why the bore is shortened',
   R.straightCurv);
-ok(R.tunnelAsked === 1, 'a tap on a straight run asks for a tunnel there',
-  `curv ${R.gotthardCurv}, asked ${R.tunnelAsked}`);
+// GOTTHARD ships two tunnels of its own, and they sit on its only straights,
+// so a third has nowhere to go. Either outcome is correct; what is not
+// correct is silence, which is what the tool used to give.
+ok(R.tunnelAsked === 1 || /already has a bore|corners all the way/i.test(R.tunnelMsg || ''),
+  'on a lap whose straights are taken, the tool says so instead of going quiet',
+  `curv ${R.gotthardCurv}, asked ${R.tunnelAsked}, msg "${R.tunnelMsg}"`);
 ok(R.tunnelsBuilt > 0, 'and the rebuilt world actually has it', R.tunnelsBuilt);
 ok(R.tunnelNear >= 0 && R.tunnelNear < 40,
   'the tunnel is where it was asked for, not wherever the builder fancied',

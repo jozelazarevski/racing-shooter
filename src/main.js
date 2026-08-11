@@ -7,10 +7,11 @@ import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
 import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
-  HOUSE_TEMPLATES, worldFacets } from './track.js';
+  HOUSE_TEMPLATES, worldFacets, surfaceClass, SURFACE_LABEL, TYRE_NAME } from './track.js';
 import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
-import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh } from './vehicles.js';
+import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
+  tyreClass, tyreLevelFor, TYRE_LABEL } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
 import { Weapons } from './weapons.js';
@@ -65,6 +66,12 @@ const UPGRADES = [
   { key: 'nitro',    name: 'BOOST NITRO CAN',   icon: '⚡', desc: '+22% nitro charge / lvl',   max: 5 },
   { key: 'armor',    name: 'ARMOR SHIELD',      icon: '🛡️', desc: '+15 max hull / lvl',        max: 5 },
   { key: 'cannon',   name: 'CANNON CORE',       icon: '🔥', desc: '+18% cannon damage / lvl',  max: 5 },
+  // Landings are the one thing the garage had no answer to: a stock car pays
+  // hull for every unit of impact speed past a fixed threshold, so a big air
+  // was a wreck no matter what you had bought. Dampers raise the speed a
+  // landing is free at AND halve what the rest of it costs, which turns "don't
+  // jump that" into "buy the springs and jump it".
+  { key: 'dampers',  name: 'LONG-TRAVEL DAMPERS', icon: '🪂', desc: 'survive bigger drops / lvl', max: 5 },
 ];
 
 // world-card flavor lines (surface + signature hazards per theme)
@@ -154,11 +161,11 @@ const plankMat = (col) => {
   return m;
 };
 
-const CREDIT_RATE = 1 / 12;                // score -> credits
-const PODIUM_CR = [200, 120, 60];          // 1st / 2nd / 3rd
-const FIRST_CLEAR_CR = 500;                // once per world, on your first podium
-const CLEAN_RUN_CR = 200;                  // finished without wrecking
-const SWEEP_CR = 250;                      // all three contracts in one race
+const CREDIT_RATE = 1 / 5;                 // score -> credits
+const PODIUM_CR = [650, 400, 220];         // 1st / 2nd / 3rd
+const FIRST_CLEAR_CR = 1200;               // once per world, on your first podium
+const CLEAN_RUN_CR = 350;                  // finished without wrecking
+const SWEEP_CR = 600;                      // all three contracts in one race
 // Upgrades escalate QUADRATICALLY: 800 / 1,600 / 4,000 / 8,000 / 13,600 —
 // 28,000 to max one line, against ~1,300 CR for a win. The old linear
 // 500+400×lvl put a fully maxed line five races away, which made every car
@@ -166,7 +173,18 @@ const SWEEP_CR = 250;                      // all three contracts in one race
 // rather than raising the entry keeps the first upgrade an easy, satisfying
 // buy while the last one is a genuine target — and it forces a real choice
 // about WHICH line to pour credits into, per car.
-const upgradeCost = (lvl) => 800 + lvl * lvl * 800;
+// THE UPGRADE LADDER, RE-PRICED.
+//
+// It was 800 + lvl^2 * 800: steps of 800 / 1600 / 4000 / 8000 / 13600, so one
+// line cost 28,000 CR and a fully built car 196,000 across seven lines. A
+// strong race paid about 730. That is 267 races to finish ONE car and 203 to
+// own the roster, against a campaign of 61 worlds — the content was priced
+// out of reach of the game that earns it.
+//
+// Now 600 + lvl^2 * 500: 600 / 1100 / 2600 / 5100 / 8600, 18,000 a line. The
+// SHAPE is kept — the last level is still the one you save for — but the top
+// step is 14x the first instead of 17x, and the whole line is affordable.
+const upgradeCost = (lvl) => 600 + lvl * lvl * 500;
 
 // ---- race contracts ----
 // Every race offers 3 side objectives that pay flat credits on completion, so
@@ -547,27 +565,48 @@ const LEVER_NUDGE = { maxSpeed: 1.10, grip: 1.10, offroad: 1.25, accel: 1.10 };
 // fallback. A second wording per polarity is not padding: it is what makes the
 // supply of phrases exceed the number of cars in the worst real case.
 //
-// { plus: [primary, secondary], minus: [primary, secondary] }
+// A THIRD WORDING, because the roster grew to eight. The note above sized this
+// table at two phrases per lever per polarity for SIX cars; adding the 911 and
+// the CAYENNE pushed the generic fallback to 6 of 40 cells (15 %) against a
+// 10 % ceiling, and left a four-star ALPINE captioned with a weakness on RED
+// CENTRE RUN because every positive phrase above it was already spoken for.
+// The supply of phrases has to exceed the number of cars in the worst real
+// case, so it grows with the garage — the alternative is loosening a test that
+// is telling the truth.
+//
+// { plus: [primary, secondary, third], minus: [primary, secondary, third] }
 const LEVER_PHRASE = {
   maxSpeed: {
-    plus: ['USES ALL OF ITS TOP END', 'STRONG DOWN THE LONG STRAIGHTS'],
-    minus: ['GIVING IT AWAY ON THE STRAIGHTS', 'SHORT ON TOP END FOR THIS ONE'],
+    plus: ['USES ALL OF ITS TOP END', 'STRONG DOWN THE LONG STRAIGHTS',
+      'KEEPS PULLING WHERE OTHERS STOP'],
+    minus: ['GIVING IT AWAY ON THE STRAIGHTS', 'SHORT ON TOP END FOR THIS ONE',
+      'OUT OF LEGS BEFORE THE BRAKING'],
   },
   grip: {
-    plus: ['PLANTED THROUGH THE CORNERS', 'CARRIES SPEED THROUGH THE TURNS'],
-    minus: ['RUNS OUT OF GRIP IN THE TURNS', 'WASHES WIDE ON THE FAST BENDS'],
+    plus: ['PLANTED THROUGH THE CORNERS', 'CARRIES SPEED THROUGH THE TURNS',
+      'STAYS TIED DOWN MID-CORNER'],
+    minus: ['RUNS OUT OF GRIP IN THE TURNS', 'WASHES WIDE ON THE FAST BENDS',
+      'PUSHES ON AT EVERY APEX'],
   },
   accel: {
-    plus: ['FIRES OUT OF THE SLOW CORNERS', 'QUICK TO REBUILD ITS SPEED'],
-    minus: ['SLOW TO WIND BACK UP', 'LABOURS OUT OF THE HAIRPINS'],
+    plus: ['FIRES OUT OF THE SLOW CORNERS', 'QUICK TO REBUILD ITS SPEED',
+      'LEAPS OFF THE SLOW STUFF'],
+    minus: ['SLOW TO WIND BACK UP', 'LABOURS OUT OF THE HAIRPINS',
+      'TAKES AN AGE TO GET GOING'],
   },
   offroad: {
-    snow: { plus: ['HOLDS THE LOOSE STUFF', 'FINDS GRIP IN THE SNOW'],
-      minus: ['SPINS UP ON THE LOOSE', 'LOSES THE REAR ON SNOW'] },
-    wet: { plus: ['SURE-FOOTED IN THE WET', 'CONFIDENT ON A WET LINE'],
-      minus: ['SLIDES ON THE WET STUFF', 'NERVOUS ON A WET LINE'] },
-    dry: { plus: ['SETTLED OVER THE ROUGH', 'SHRUGS OFF THE BROKEN STUFF'],
-      minus: ['UNSETTLED OVER THE ROUGH', 'UPSET BY THE BROKEN STUFF'] },
+    snow: { plus: ['HOLDS THE LOOSE STUFF', 'FINDS GRIP IN THE SNOW',
+      'DIGS IN WHERE IT IS SLIPPERY'],
+    minus: ['SPINS UP ON THE LOOSE', 'LOSES THE REAR ON SNOW',
+      'SCRABBLES ON THE PACKED SNOW'] },
+    wet: { plus: ['SURE-FOOTED IN THE WET', 'CONFIDENT ON A WET LINE',
+      'READS THE STANDING WATER WELL'],
+    minus: ['SLIDES ON THE WET STUFF', 'NERVOUS ON A WET LINE',
+      'SKATES ONCE THE ROAD IS WET'] },
+    dry: { plus: ['SETTLED OVER THE ROUGH', 'SHRUGS OFF THE BROKEN STUFF',
+      'SOAKS UP THE RUTS AND STONES'],
+    minus: ['UNSETTLED OVER THE ROUGH', 'UPSET BY THE BROKEN STUFF',
+      'CRASHES THROUGH THE RUTS'] },
   },
 };
 const LEVERS = ['maxSpeed', 'grip', 'accel', 'offroad'];
@@ -639,7 +678,19 @@ function rateCarsFor(track) {
     // the cars above it was handed the leftover NEGATIVE one, and PIT-99 sat
     // second quickest on RED CENTRE RUN under the caption "RUNS OUT OF GRIP IN
     // THE TURNS". A mid-pack car takes whichever term is larger either way.
-    const want = tier === 'strong' ? 1 : tier === 'weak' ? -1 : 0;
+    //
+    // ...and polarity is forced by STARS, not by `tier`, because stars are
+    // what the player sees and what the rule is written in. The two disagree
+    // at their boundaries: `stars = 1 + round(score * 4)` reaches four at
+    // score 0.625 while `tier` only reaches 'strong' at 0.66, so a car in that
+    // band showed FOUR STARS while the picker treated it as mid-pack and
+    // handed it a leftover weakness — measured, a 4-star ALPINE captioned
+    // "GIVING IT AWAY ON THE STRAIGHTS" on RED CENTRE RUN. The same gap exists
+    // at the bottom (2 stars from 0.375, 'weak' only below 0.3). Deriving the
+    // sign from stars closes both by construction rather than by tuning two
+    // thresholds to agree.
+    const starCount = 1 + Math.round(score * 4);
+    const want = starCount >= 4 ? 1 : starCount <= 2 ? -1 : 0;
     terms.sort((a, c) => (want === 0 ? Math.abs(c.v) - Math.abs(a.v) : (c.v - a.v) * want));
     let note = null, polarity = 0, why = null;
     for (const t of terms) {
@@ -667,7 +718,7 @@ function rateCarsFor(track) {
     // with a weakness, without the test having to keep its own copy of the
     // phrase table and drift out of step with this one.
     out.set(r.car.key, { score, tier, note, seconds: r.est.seconds,
-      stars: 1 + Math.round(score * 4), behind, polarity, why });
+      stars: starCount, behind, polarity, why });
   }
   return out;
 }
@@ -1303,7 +1354,7 @@ class Game {
    * not draw, so nothing reaches the screen), let three build every program,
    * and put the visibility flags back exactly as they were.
    */
-  _warmShaders() {
+  _warmShaders(sync = false) {
     if (!this.renderer?.compile) return;
     const hidden = [];
     try {
@@ -1321,7 +1372,17 @@ class Game {
       // already traversed by the time compileAsync returns, so the flags can go
       // back before the render loop starts. Leave it to the .then() and the
       // title screen spends the warm-up drawing bullets, husks and explosions.
-      if (this.renderer.compileAsync) {
+      // ...BUT NOT WHEN THE WORLD IS ABOUT TO BE TORN DOWN AGAIN.
+      //
+      // `compileAsync` polls its captured material list from a timer of its
+      // own, reading `materialProperties.currentProgram.isReady()`. Dispose
+      // those materials before the poll lands — which is exactly what a world
+      // rebuild does — and `currentProgram` is undefined, so three throws
+      // "Cannot read properties of undefined (reading 'isReady')" from inside
+      // its own timer, where the promise's .catch() cannot reach it. Every
+      // APPLY in the editor produced one. On a rebuild the synchronous compile
+      // is used instead: it is slower, and it cannot outlive its own scene.
+      if (this.renderer.compileAsync && !sync) {
         const p = this.renderer.compileAsync(this.scene, this.camera);
         for (const o of hidden) o.visible = false;
         hidden.length = 0;
@@ -1422,6 +1483,7 @@ class Game {
     this.track = withSeed(this.worldSeed,
       () => new Track(this.scene, this.level, this.editScene));
     this._applyTheme();
+    this._applyTyreClass();          // a new world can be a new tyre demand
     this.particles?.setTheme?.(this.level.theme);
 
     this.props = this.track.props ? [...this.track.props] : [];
@@ -1440,7 +1502,10 @@ class Game {
     // --- put everyone on the new grid ---
     this.__ratingsFor = null;   // car ratings are per-world
     this.resetRace();
-    this._warmShaders();   // a new world means new materials — pay for them now
+    // SYNCHRONOUS here: a rebuild disposes the materials an async compile is
+    // still polling, and three throws 'isReady' from its own timer where no
+    // .catch() of ours can reach it. Every editor APPLY produced one.
+    this._warmShaders(true);   // a new world means new materials — pay for them now
     this.hud?.feed?.(`${this.level.name}`, 'good');
     // Keep the address bar honest without navigating — a refresh (or a shared
     // link) then lands on the world you actually picked.
@@ -1487,6 +1552,22 @@ class Game {
     this.career = loadJSON(this._pkey('career'), { finished: {} });
     this.garage = loadJSON(this._pkey('garage'), { credits: 0 });
     this.cars = loadJSON(this._pkey('cars'), { owned: [STARTER_CAR], selected: STARTER_CAR });
+    // RENAMED MACHINES. r142 shipped two cars under marque names and r143
+    // renamed them; a car key is what a purchase is recorded as, so without
+    // this anyone who bought one in that window silently loses it and the
+    // credits with it. Carry the key across — owned list, selection, and the
+    // per-car upgrade row, which is keyed the same way.
+    const RENAMED = { nine11: 'flatsix', cayen: 'bastion' };
+    this.cars.owned = (this.cars.owned || []).map((k) => RENAMED[k] || k);
+    if (RENAMED[this.cars.selected]) this.cars.selected = RENAMED[this.cars.selected];
+    if (this.garage.upgrades) {
+      for (const [was, now] of Object.entries(RENAMED)) {
+        if (this.garage.upgrades[was] && !this.garage.upgrades[now]) {
+          this.garage.upgrades[now] = this.garage.upgrades[was];
+        }
+        delete this.garage.upgrades[was];
+      }
+    }
     if (!this.cars.owned.length) this.cars.owned = [STARTER_CAR];
     if (!this.cars.owned.includes(this.cars.selected)) this.cars.selected = STARTER_CAR;
     // upgrades are PER-CAR (`garage.upgrades[carKey]`) — a newly bought
@@ -1523,6 +1604,101 @@ class Game {
       this.__ratingsFor = this.level.id;
     }
     return this.__ratings;
+  }
+
+  /** The surface line every card carries: what the road is made of, and — in
+   *  the same glance — whether the car you have selected may race on it.
+   *
+   *  This is deliberately the loudest thing on the card after the name. The
+   *  old affinity chip said "weak", which is a review; this says "YOU CANNOT
+   *  START", which is a fact you can act on. */
+  _surfaceChip(lv) {
+    const f = this.carFitness(lv.id);
+    if (!f) return '';
+    const surf = SURFACE_LABEL[f.need];
+    if (f.ok) {
+      const over = f.over > 0
+        ? `<span class="wc-over" title="over-tyred: slower here">${TYRE_LABEL[f.have]} — SLOW HERE</span>`
+        : '<span class="wc-fitok">✓</span>';
+      return `<div class="wc-surf ok">${surf} ${over}</div>`;
+    }
+    const why = f.tooMuch
+      ? `TOO MUCH TYRE — WANTS ${TYRE_NAME[f.need]}`
+      : `NEEDS ${TYRE_NAME[f.need]}`;
+    return `<div class="wc-surf bad">${surf} · ${why}`
+      + `<span class="wc-fix">${f.fix.text}</span></div>`;
+  }
+
+  /** CAN THIS CAR RACE THIS WORLD? The one question the garage now answers.
+   *
+   *  Returns what the world demands, what the car is running, and — when it
+   *  cannot go — the CHEAPEST thing the player can do about it, named and
+   *  priced. "You need better tyres" is not advice; "FIT GRAVEL TYRES — 800
+   *  CR" is. Where no upgrade reaches the class, it names a car they could
+   *  buy instead, preferring one they already own. */
+  carFitness(levelId, carKey = this.cars.selected) {
+    const lv = LEVELS.find((l) => l.id === levelId);
+    if (!lv) return null;
+    const need = surfaceClass(lv);
+    const have = tyreClass(carKey, (this.garage.upgrades || {})[carKey]);
+    // ONE CLASS EITHER SIDE, NOT ANY AMOUNT ABOVE.
+    //
+    // If a bigger tyre were always legal, the whole rule would collapse into a
+    // ladder again — buy the snow set once and every world in the game opens,
+    // which is the single-decision garage this replaces. Capping the overshoot
+    // at one class is what makes the roster mutually exclusive: an all-terrain
+    // machine is barred from the sealed circuits (37 worlds) exactly as a road
+    // car is barred from the loose stages, and NO SINGLE CAR COVERS THE
+    // ROSTER. The starter is legal on 53 of 58 and slow on the circuits, so
+    // there is a reason to buy in both directions.
+    if (have >= need && have - need <= 1) {
+      return { ok: true, need, have, over: have - need };
+    }
+    if (have > need) {
+      // too much tyre: name the lightest thing that can do this properly
+      const fit = (k) => {
+        const c = tyreClass(k, (this.garage.upgrades || {})[k]);
+        return c >= need && c - need <= 1;
+      };
+      const owned = this.cars.owned.filter(fit);
+      const buy = CAR_CATALOG.filter((c) => {
+        const t = tyreClass(c.key, null);
+        return t >= need && t - need <= 1;
+      }).sort((a, b) => a.price - b.price)[0];
+      const fix = owned.length
+        ? { kind: 'own', car: owned[0],
+          text: `DRIVE YOUR ${CAR_CATALOG.find((c) => c.key === owned[0]).name}` }
+        : buy ? { kind: 'buy', car: buy.key,
+          text: `BUY THE ${buy.name} — ${buy.price.toLocaleString()} CR` }
+          : { kind: 'none', text: 'NOTHING IN THE GARAGE SUITS THIS SURFACE' };
+      return { ok: false, need, have, over: have - need, tooMuch: true, fix };
+    }
+    // cheapest route back to legal: an upgrade if one reaches, else a car
+    const lvl = tyreLevelFor(carKey, (this.garage.upgrades || {})[carKey], need);
+    let fix = null;
+    if (lvl != null) {
+      const cur = ((this.garage.upgrades || {})[carKey] || {}).tires | 0;
+      let cost = 0;
+      for (let k = cur; k < lvl; k++) cost += upgradeCost(k);
+      fix = { kind: 'upgrade', level: lvl, cost,
+        text: `FIT ${TYRE_NAME[need]} — ${cost.toLocaleString()} CR IN THE GARAGE` };
+    } else {
+      const owned = this.cars.owned
+        .filter((k) => tyreClass(k, (this.garage.upgrades || {})[k]) >= need);
+      if (owned.length) {
+        const name = CAR_CATALOG.find((c) => c.key === owned[0]).name;
+        fix = { kind: 'own', car: owned[0], text: `DRIVE YOUR ${name}` };
+      } else {
+        const buy = CAR_CATALOG
+          .filter((c) => tyreClass(c.key, null) >= need)
+          .sort((a, b) => a.price - b.price)[0];
+        fix = buy
+          ? { kind: 'buy', car: buy.key,
+            text: `BUY THE ${buy.name} — ${buy.price.toLocaleString()} CR` }
+          : { kind: 'none', text: 'NO MACHINE IN THE GARAGE CAN TAKE THIS' };
+      }
+    }
+    return { ok: false, need, have, over: 0, fix };
   }
 
   /** The line on a track card: what the world is like, and — for the world you
@@ -1610,12 +1786,26 @@ class Game {
     }
     const sel = document.getElementById('mission-select');
     if (sel) sel.style.display = this.missionMode ? 'flex' : 'none';
-    const start = document.getElementById('start-btn');
-    if (start) {
-      start.textContent = this.missionMode ? 'START MISSION'
-        : this.freeRoam ? 'START EXPLORING' : 'START RACE';
-    }
+    this._syncStartButton();
     if (this.missionMode) this._buildMissionPicker?.(); // also sets its own label
+  }
+
+  /** The start button says what will happen when you press it.
+   *
+   *  A button that looks armed and then refuses is worse than one that tells
+   *  you first, so when the tyres are wrong it names the tyre the world wants
+   *  and goes visibly cold. Repainted on every level pick, car pick, upgrade
+   *  and mode switch — anything that can change the answer. */
+  _syncStartButton() {
+    const start = document.getElementById('start-btn');
+    if (!start) return;
+    const f = this.freeRoam ? null : this.carFitness(this.level.id);
+    const blocked = !!(f && !f.ok);
+    start.classList.toggle('blocked', blocked);
+    start.textContent = blocked
+      ? (f.tooMuch ? `WRONG TYRE — WANTS ${TYRE_NAME[f.need]}` : `NEEDS ${TYRE_NAME[f.need]}`)
+      : this.missionMode ? 'START MISSION'
+        : this.freeRoam ? 'START EXPLORING' : 'START RACE';
   }
 
   /** Keep the address bar in step with the live state, without navigating, so
@@ -1921,8 +2111,9 @@ class Game {
    *  your own work in is not a tool. The row is absent entirely when nothing
    *  has been saved, so a player who never opens the editor never sees it. */
   _renderSceneCards(sel) {
-    let scenes = {};
-    try { scenes = JSON.parse(localStorage.getItem('ir-scenes') || '{}'); } catch { scenes = {}; }
+    // through WorldEditor, so the track list reads the SAME profile-scoped
+    // store the editor writes and the sync engine carries
+    const scenes = WorldEditor.list(this);
     const names = Object.keys(scenes);
     if (!names.length) return;
     const head = document.createElement('div');
@@ -1957,10 +2148,7 @@ class Game {
             }, 3000);
             return;
           }
-          let all = {};
-          try { all = JSON.parse(localStorage.getItem('ir-scenes') || '{}'); } catch { all = {}; }
-          delete all[name];
-          try { localStorage.setItem('ir-scenes', JSON.stringify(all)); } catch { /* private mode */ }
+          WorldEditor.remove(name, this);
           // if the world you just deleted is the one standing, get off it
           if (this.editScene && this.level && base && this.level.id === base.id) {
             this.swapLevel(base, true, null);
@@ -2213,6 +2401,7 @@ class Game {
           <canvas class="wc-map" width="72" height="52"></canvas>
         </div>
         <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
+        ${this._surfaceChip(lv)}
         <div class="wc-tags">${WORLD_TAGS[lv.theme] || ''}</div>
         <div class="wc-stars${got ? '' : ' none'}">${starRow}</div>
         ${unlocked ? this._affinityChip(lv.id) : ''}
@@ -2237,6 +2426,7 @@ class Game {
         if (this.swapLevel(lv, !!this.editScene)) {
           this._renderLevelCards();      // repaint which card is current
           this.renderCarShop();          // the garage ratings are per-world
+          this._syncStartButton();       // a new world can demand a new tyre
           this._buildMissionPicker?.();  // missions are per-world
         } else {
           this.fadeTo(`?level=${lv.id}${this.unlockAll ? '&unlockall=1' : ''}`);
@@ -2311,9 +2501,19 @@ class Game {
     return up;
   }
 
+  /** Tell the car how far its tyres are OVER-specced for this world, which is
+   *  what the physics turns into a grip penalty. Under-specced never reaches
+   *  the road — the start line refuses it — so this is only ever >= 0. */
+  _applyTyreClass() {
+    if (!this.player || !this.level) return;
+    const f = this.carFitness(this.level.id);
+    this.player._tyreOver = f ? Math.max(0, f.over) : 0;
+  }
+
   /** Apply the SELECTED car's purchased upgrades to the player (base stats
    *  captured once per machine — swapPlayerCar clears the capture). */
   applyUpgrades() {
+    this._applyTyreClass();
     const p = this.player;
     if (!this._base) this._base = { maxSpeed: p.maxSpeed, maxHealth: p.maxHealth };
     const g = this.carUpgrades();
@@ -2324,6 +2524,7 @@ class Game {
     p.nitroRate = 1 + 0.22 * g.nitro;
     p.handling = 0.2 * (g.handling || 0);
     p.gripBoost = 1 + 0.04 * (g.tires || 0);
+    p.damperLvl = g.dampers || 0;                // read by Car.onLand
     p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
     p.assist = { pro: 0, standard: 0.5, assist: 1 }[this.assistSetting] ?? 0.5;
   }
@@ -2430,6 +2631,18 @@ class Game {
           ${bar('OFF', S.offroad, 0.18, 1.05)}${bar('NTR', S.nitroPower ?? 1, 0.78, 1.22)}
         </div>
         ${(() => {
+    // WHAT IT IS SHOD WITH, and whether that is legal here. This is the line
+    // that decides the purchase, so it sits above the star rating: a machine
+    // that cannot take the start is not "three stars", it is not eligible.
+    const f = this.carFitness(this.level.id, car.key);
+    if (!f) return '';
+    const tc = tyreClass(car.key, (this.garage.upgrades || {})[car.key]);
+    const badge = `<b>${TYRE_LABEL[tc]}</b> TYRES`;
+    if (!f.ok) return `<div class="ctyre bad">${badge} · CANNOT RACE ${this.level.name}</div>`;
+    if (f.over > 0) return `<div class="ctyre over">${badge} · OVER-TYRED HERE</div>`;
+    return `<div class="ctyre ok">${badge} · READY</div>`;
+  })()}
+        ${(() => {
     // how this machine suits the world you are about to run — the whole point
     // of owning more than one, and useless information anywhere but here
     const a = this._ratings().get(car.key);
@@ -2457,6 +2670,7 @@ class Game {
         this.renderCarShop();
         this.renderGarage();
         this._renderLevelCards();   // every track card names your car — repaint
+        this._syncStartButton();    // ...and whether it may take the start
         this.hud.feed?.(`NOW DRIVING: ${car.name}`, 'good');
       });
       shop.appendChild(card);
@@ -2497,6 +2711,15 @@ class Game {
           saveJSON(this._pkey('garage'), this.garage);
           this.applyUpgrades();
           this.renderGarage();
+          // a TIRES level can change which worlds this car may enter, so the
+          // track list, the shop and the start button all have to be retold
+          this.renderCarShop();
+          this._renderLevelCards();
+          this._syncStartButton();
+          if (u.key === 'tires') {
+            this.hud.feed?.(`${TYRE_LABEL[tyreClass(this.cars.selected,
+              (this.garage.upgrades || {})[this.cars.selected])]} TYRES FITTED`, 'good');
+          }
         });
       }
       row.appendChild(btn);
@@ -5516,6 +5739,27 @@ class Game {
   }
 
   startRace() {
+    // THE GATE. A car on the wrong tyres does not take the start.
+    //
+    // Free roam is deliberately exempt: wandering a snow world on road tyres
+    // is a bad idea you are allowed to have, and it is the cheapest way to
+    // FEEL why the rule exists before you pay for the fix.
+    if (!this.freeRoam) {
+      const f = this.carFitness(this.level.id);
+      if (f && !f.ok) {
+        const car = CAR_CATALOG.find((c) => c.key === this.cars.selected);
+        this.hud.feed(`${car.name} IS ON ${TYRE_LABEL[f.have]} TYRES — `
+          + `${this.level.name} ${f.tooMuch ? 'IS TOO SMOOTH FOR THEM, IT WANTS'
+            : 'NEEDS'} ${TYRE_NAME[f.need]}`, 'bad');
+        this.hud.feed(f.fix.text, 'info');
+        // send them where the fix is, rather than leaving them on a dead button
+        if (f.fix.kind === 'upgrade' || f.fix.kind === 'buy' || f.fix.kind === 'own') {
+          document.getElementById('tab-btn-garage')?.click();
+        }
+        this._syncStartButton();
+        return;
+      }
+    }
     this.audio.start();
     document.getElementById('title-screen').classList.add('hidden');
     this.hud.show();

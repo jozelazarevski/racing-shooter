@@ -1,6 +1,6 @@
 // Car meshes (built from primitives), arcade physics, and rival AI.
 import * as THREE from 'three';
-import { ROAD_HALF, RIM_RADIUS } from './track.js';
+import { ROAD_HALF, RIM_RADIUS, mergeBoxes } from './track.js';
 import { numberPlateTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
@@ -226,9 +226,14 @@ export function buildVoxelRacer(spec) {
   const headMat = new THREE.MeshBasicMaterial({ color: 0xfff9e2 });
   const tailMat = new THREE.MeshBasicMaterial({ color: 0xff2418 });
 
-  const tall = style === 'brawler' || style === 'dune';
-  const low = style === 'crown' || style === 'alpine' || style === 'pit';
-  const wheelR = style === 'brawler' ? 0.85 : tall ? 0.76 : 0.62;
+  // 'flatsix' is a rear-engined fastback: short nose, roof falling in one
+  // unbroken line to the tail. 'bastion' is the tall performance estate on the
+  // same platform — SUV height and length, but a saloon's rake, not a truck's.
+  const tall = style === 'brawler' || style === 'dune' || style === 'bastion';
+  const low = style === 'crown' || style === 'alpine' || style === 'pit'
+    || style === 'flatsix';
+  const wheelR = style === 'brawler' ? 0.85 : style === 'bastion' ? 0.80
+    : tall ? 0.76 : style === 'flatsix' ? 0.66 : 0.62;
   const wheelY = wheelR;
   const baseY = wheelY + (low ? 0.18 : 0.34); // chassis floor height
 
@@ -259,10 +264,13 @@ export function buildVoxelRacer(spec) {
   };
 
   // ---- proportions: every car is a wedge now ----
-  const bodyLen = style === 'crown' || style === 'pit' ? 4.7 : style === 'sleek' ? 4.0 : 4.4;
+  const bodyLen = style === 'crown' || style === 'pit' ? 4.7 : style === 'sleek' ? 4.0
+    : style === 'bastion' ? 4.8 : style === 'flatsix' ? 4.3 : 4.4;
   const bodyH = low ? 0.62 : 0.78;
-  const noseLen = tall ? 1.2 : style === 'sleek' ? 1.3 : 1.5; // sloped hood length
-  const frontDrop = tall ? 0.26 : style === 'sleek' ? 0.3 : 0.34;
+  // the rear-engined car has almost no bonnet — the nose drops away at once,
+  // which is the single most recognisable thing about its profile
+  const noseLen = style === 'flatsix' ? 1.55 : tall ? 1.2 : style === 'sleek' ? 1.3 : 1.5;
+  const frontDrop = style === 'flatsix' ? 0.46 : tall ? 0.26 : style === 'sleek' ? 0.3 : 0.34;
   const hoodAng = Math.atan2(frontDrop, noseLen);
   const noseZ0 = bodyLen / 2 - noseLen; // where the flat deck ends
   const topY = baseY + 0.12 + bodyH;    // flat deck height
@@ -277,11 +285,17 @@ export function buildVoxelRacer(spec) {
 
   // ---- greenhouse: raked glass trapezoid under a painted roof cap ----
   const cabW = 2.15, cabH = low ? 0.6 : 0.74;
-  const cabZ = style === 'sleek' ? -0.45 : style === 'dune' ? 0.1 : -0.15;
-  const cabL = style === 'sleek' ? 1.9 : style === 'dune' ? 1.7 : 2.0;
-  const fRake = tall ? 0.42 : style === 'sleek' ? 0.55 : 0.62; // windshield rake
-  const bRake = style === 'sleek' ? 0.5 : style === 'crown' ? 0.45
-    : style === 'alpine' ? 0.35 : style === 'pit' ? 0.3 : 0.2; // tail rake
+  const cabZ = style === 'sleek' ? -0.45 : style === 'dune' ? 0.1
+    : style === 'flatsix' ? -0.30 : style === 'bastion' ? -0.20 : -0.15;
+  const cabL = style === 'sleek' ? 1.9 : style === 'dune' ? 1.7
+    : style === 'flatsix' ? 2.25 : style === 'bastion' ? 2.15 : 2.0;
+  const fRake = style === 'flatsix' ? 0.70 : style === 'bastion' ? 0.52
+    : tall ? 0.42 : style === 'sleek' ? 0.55 : 0.62; // windshield rake
+  // 0.95 is the fastback: the glasshouse runs out almost to nothing at the
+  // back, so the roofline and the tail are one continuous fall.
+  const bRake = style === 'flatsix' ? 0.95 : style === 'bastion' ? 0.34
+    : style === 'sleek' ? 0.5 : style === 'crown' ? 0.45
+      : style === 'alpine' ? 0.35 : style === 'pit' ? 0.3 : 0.2; // tail rake
   const cabY = topY + cabH / 2;
   const glassHouse = new THREE.Mesh(
     _wedgeGeo(cabW, cabH, cabL, { frontBack: fRake, backFwd: bRake }), glassMat);
@@ -342,6 +356,42 @@ export function buildVoxelRacer(spec) {
     }
   }
 
+  // ---- the two signatures that make these silhouettes readable ----------
+  if (style === 'flatsix') {
+    // REAR HAUNCHES. The rear-engined car is widest over its back axle, and
+    // that shoulder — not the nose — is what the eye names it by. A pair of
+    // shallow blisters over the rear arches, plus the ducktail lip that sits
+    // on the engine cover.
+    for (const sd of [-1, 1]) {
+      box(0.30, bodyH * 0.66, 1.55, bodyMat, sd * 1.32,
+        baseY + 0.12 + bodyH * 0.42, -bodyLen / 2 + 1.25, true);
+    }
+    // ducktail: a short raised lip across the tail, on two stubs
+    box(2.05, 0.09, 0.42, accentMat, 0, topY + 0.22, -bodyLen / 2 + 0.42);
+    for (const sd of [-1, 1]) {
+      box(0.12, 0.22, 0.18, darkMat, sd * 0.8, topY + 0.11, -bodyLen / 2 + 0.42);
+    }
+    // engine-cover louvres, between the haunches
+    for (let k = 0; k < 4; k++) {
+      box(1.5, 0.03, 0.07, darkMat, 0, topY + 0.035,
+        -bodyLen / 2 + 0.75 + k * 0.17);
+    }
+  }
+  if (style === 'bastion') {
+    // ROOF RAILS and a tailgate spoiler: the estate cues. Rails run the full
+    // length of the cap so the roof reads long, which is what separates this
+    // from the short, upright off-roader body.
+    for (const sd of [-1, 1]) {
+      box(0.10, 0.07, capL + 0.55, darkMat, sd * (cabW / 2 - 0.22),
+        capTop + 0.05, capZ);
+    }
+    box(1.9, 0.08, 0.30, accentMat, 0, capTop + 0.02, capZ - capL / 2 - 0.22);
+    // underbody skid plates, front and rear
+    for (const zz of [bodyLen / 2 - 0.18, -bodyLen / 2 + 0.18]) {
+      box(1.7, 0.07, 0.42, mat('#b8bcc0'), 0, baseY - 0.10, zz);
+    }
+  }
+
   // ---- chunky bumpers, grille, round headlamps, tail bar ----
   box(2.6, 0.34, 0.38, darkMat, 0, baseY + 0.02, bodyLen / 2 + 0.06);
   box(2.6, 0.34, 0.38, darkMat, 0, baseY + 0.02, -bodyLen / 2 - 0.06);
@@ -352,6 +402,68 @@ export function buildVoxelRacer(spec) {
     box(0.44, 0.2, 0.07, tailMat, 0.88 * s, baseY + bodyH * 0.55 + 0.12, -bodyLen / 2 - 0.03);
   }
   box(0.9, 0.09, 0.06, darkMat, 0, baseY + bodyH * 0.55 + 0.12, -bodyLen / 2 - 0.02);
+
+  // ---- HIGH-POLY REAR AND ROOF ------------------------------------------
+  //
+  // The back of every car was a flat slab with two small lamps on it, and the
+  // roof a bare painted cap — which is a problem, because the back of the car
+  // is the view you have of it for the entire race, and the roof is what the
+  // overhead cameras look at. Detail here is worth more than detail anywhere
+  // else on the machine.
+  //
+  // COST DISCIPLINE: every `box()` above is its OWN mesh, and a car already
+  // costs 49-63 of them — a six-car grid is ~343 draw calls against a world
+  // budget around 900. Adding eighteen more boxes each the naive way would be
+  // another 108 draws for the grid. So this section does not use `box()`: it
+  // accumulates specs per material and merges each material into ONE geometry,
+  // which is +3 draw calls per car for ~430 triangles. Polygons are cheap
+  // here; draw calls are not.
+  const dBody = [], dDark = [], dLamp = [], dChrome = [];
+  const rear = -bodyLen / 2;                  // tail face
+  const sillY = baseY + 0.10;
+  {
+    // --- tail-light clusters: a wrapped lens with an inner strip ----------
+    for (const s of [-1, 1]) {
+      dLamp.push({ w: 0.30, h: 0.16, d: 0.07, x: 1.16 * s, y: baseY + bodyH * 0.55 + 0.12, z: rear - 0.03 });
+      dLamp.push({ w: 0.10, h: 0.13, d: 0.16, x: 1.30 * s, y: baseY + bodyH * 0.55 + 0.12, z: rear + 0.10 });
+      // reverse lamp, below the cluster
+      dChrome.push({ w: 0.20, h: 0.08, d: 0.05, x: 0.62 * s, y: baseY + bodyH * 0.25, z: rear - 0.02 });
+    }
+    // --- boot / tailgate shut line and a number-plate recess --------------
+    dDark.push({ w: 1.9, h: 0.035, d: 0.05, x: 0, y: baseY + bodyH * 0.9, z: rear - 0.02 });
+    dDark.push({ w: 0.78, h: 0.26, d: 0.05, x: 0, y: baseY + bodyH * 0.30, z: rear - 0.05 });
+    dChrome.push({ w: 0.70, h: 0.20, d: 0.02, x: 0, y: baseY + bodyH * 0.30, z: rear - 0.08 });
+    // --- diffuser: a valance with vertical fins --------------------------
+    dDark.push({ w: 2.15, h: 0.20, d: 0.30, x: 0, y: sillY - 0.06, z: rear - 0.16 });
+    for (let k = -2; k <= 2; k++) {
+      dDark.push({ w: 0.07, h: 0.22, d: 0.34, x: k * 0.42, y: sillY - 0.04, z: rear - 0.18 });
+    }
+    // --- twin exhaust tips ------------------------------------------------
+    for (const s of [-1, 1]) {
+      dChrome.push({ w: 0.15, h: 0.15, d: 0.24, x: 0.70 * s, y: sillY + 0.02, z: rear - 0.26 });
+    }
+    // --- ROOF: drip rails, a panel seam and a shark-fin aerial ------------
+    for (const s of [-1, 1]) {
+      dDark.push({ w: 0.06, h: 0.05, d: capL + 0.06, x: (cabW / 2 - 0.10) * s, y: capTop + 0.02, z: capZ });
+    }
+    dDark.push({ w: cabW - 0.34, h: 0.03, d: 0.05, x: 0, y: capTop + 0.03, z: capZ - capL / 2 + 0.16 });
+    dDark.push({ w: 0.10, h: 0.14, d: 0.34, x: 0, y: capTop + 0.08, z: capZ - capL / 2 + 0.02 });
+    dDark.push({ w: 0.07, h: 0.09, d: 0.20, x: 0, y: capTop + 0.19, z: capZ - capL / 2 - 0.02 });
+    // a low-slung car gets a roof vent instead of a rack it would never carry
+    if (low) {
+      dBody.push({ w: 0.52, h: 0.07, d: 0.40, x: 0, y: capTop + 0.03, z: capZ + capL / 2 - 0.30 });
+      dDark.push({ w: 0.40, h: 0.05, d: 0.05, x: 0, y: capTop + 0.07, z: capZ + capL / 2 - 0.22 });
+    }
+  }
+  const chromeMat = mat(0xc8ccd2, { roughness: 0.35, metalness: 0.6 });
+  for (const [specs, m] of [[dBody, bodyMat], [dDark, darkMat],
+    [dLamp, tailMat], [dChrome, chromeMat]]) {
+    if (!specs.length) continue;
+    const dm = new THREE.Mesh(mergeBoxes(specs), m);
+    dm.castShadow = true;
+    dm.userData.detail = true;            // not a smashable panel
+    g.add(dm);
+  }
 
   // ---- style signatures ----
   if (style === 'brawler') {
@@ -583,6 +695,11 @@ export function buildVoxelRacer(spec) {
     }
   }
 
+  // HOW TALL THIS MACHINE IS, from the contact patch (local y = 0) to the top
+  // of the roof cap. The drowning rule needs the real roofline: a flat 2.4 u
+  // guess would sink a BRAWLER (3.4 u tall) while a metre of it was still in
+  // the air, and let a low coupe drive on with its roof under.
+  g.userData.hullHeight = capTop + 0.12;
   // body material handle for damage scorch tinting
   g.userData.bodyMat = bodyMat;
   g.userData.baseBodyColor = new THREE.Color(body);
@@ -774,9 +891,20 @@ export class Car {
     const keep = (base) => base + (1 - base) * (0.62 * loose);
     // wet dropped 0.78 -> 0.68: at 0.78 the player couldn't FEEL the rain.
     // Braking and cornering now visibly run long on every downpour world.
-    const sGrip = keep(surf === 'snow' ? 0.55 : surf === 'wet' ? 0.68 : 1);
-    const sTract = keep(surf === 'snow' ? 0.72 : surf === 'wet' ? 0.88 : 1);
-    const sBrake = keep(surf === 'snow' ? 0.58 : surf === 'wet' ? 0.80 : 1);
+    let sGrip = keep(surf === 'snow' ? 0.55 : surf === 'wet' ? 0.68 : 1);
+    let sTract = keep(surf === 'snow' ? 0.72 : surf === 'wet' ? 0.88 : 1);
+    let sBrake = keep(surf === 'snow' ? 0.58 : surf === 'wet' ? 0.80 : 1);
+
+    // THE WRONG TYRE HAS TO BE FELT, not just refused at the start line.
+    //
+    // Under-specced never reaches here — the grid refuses it — so this is the
+    // other direction: studs on hot tarmac, or knobblies on a circuit. They
+    // squirm, they take longer to stop, and they will not hold a fast corner.
+    // Without this the mechanic collapses into "buy the snow set once and
+    // never think about tyres again", which is the same one-decision garage
+    // the class system exists to replace.
+    const f = tyrePenalty(this._tyreOver);
+    if (f < 1) { sGrip *= f; sTract *= f; sBrake *= f; }
 
     const fwd = this.forward;
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
@@ -1328,7 +1456,24 @@ export class Car {
         const dx = this.pos.x - ob.x, dz = this.pos.z - ob.z;
         const rr = ob.r + 1.8;
         if (dx * dx + dz * dz >= rr * rr) continue;
-        if (ob.y !== undefined && Math.abs(this.pos.y - ob.y) > 6) continue;
+        // A TALL THING IS SOLID ALL THE WAY UP.
+        //
+        // The height gate was a flat +/-6 u around the collider's own y, which
+        // is right for a boulder and catastrophic for a mountain: a massif
+        // cone is 110-360 u tall and stands on sloping highland, so the car's
+        // height differed from the cone's BASE by far more than 6 the moment
+        // it started climbing toward it — and the collider was skipped
+        // entirely. Reported as driving into the mountains rather than hitting
+        // or climbing them, and that is exactly what it was.
+        //
+        // Anything that declares a height `h` is now solid over its whole
+        // span. Everything else keeps the old window, because for a knee-high
+        // rock under a flyover that window is the point.
+        if (ob.y !== undefined) {
+          if (ob.h !== undefined) {
+            if (this.pos.y < ob.y - 3 || this.pos.y > ob.y + ob.h) continue;
+          } else if (Math.abs(this.pos.y - ob.y) > 6) continue;
+        }
         const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
         const nx = dx / d, nz = dz / d;
         // angle of attack — see the wall block above. Taken before anything
@@ -1849,6 +1994,16 @@ export class Car {
         }
       }
     }
+    // FULLY SUBMERGED = SUNK. Measured at the ROOF, not the floor: a car
+    // fording a stream is wet, a car whose roof is under the surface is gone.
+    // `waterTopAt` deliberately excludes the river (2.6 u deep, forded on
+    // purpose, and shallower than the car is tall), so this can only fire in
+    // the sea or in a lake dug in the editor.
+    if (this.alive && !this.airborne) {
+      const wt = t.waterTopAt ? t.waterTopAt(this.pos.x, this.pos.z) : -Infinity;
+      const roof = this.y + (this.mesh?.userData?.hullHeight ?? 2.4);
+      if (wt > -Infinity && roof < wt) this.drown();
+    }
     if (this._steepFed > 0) this._steepFed = Math.max(0, this._steepFed - dt);
     if (this.airborne) {
       this.vy -= 26 * dt;
@@ -2074,20 +2229,29 @@ export class Car {
     // A CLIFF IS NOT A JUMP. Landing used to cost nothing whatever the drop -
     // sail off a forty-metre wall and the car touched down and simply drove
     // on, reported as "if I fall off a cliff... it's doing nothing". Impact
-    // speed prices the landing now. Under vy 19 - which clears every designed
-    // ramp and gorge jump on the roster (they land near launch height, impact
-    // ~12-16) - a landing stays free. Past that the hull pays 8 points per
-    // unit of impact speed, so a 20 u drop is a heavy hit and a real cliff is
-    // total destruction, difficulty scaling notwithstanding.
+    // speed prices the landing.
+    //
+    // THAT PRICE WAS TOO STEEP AND HAD NO ANSWER. At a free ceiling of 19 and
+    // 8 hull per unit past it, a 30 u/s touchdown took 88 of a stock 100-point
+    // hull — so a big air off anything larger than a designed ramp was a wreck,
+    // reported as exactly that, and no purchase anywhere in the garage changed
+    // it. The base is gentler now (free to 22, 6.5 a unit past), and
+    // LONG-TRAVEL DAMPERS move both numbers: +2.6 u of free landing per level
+    // and -10% on the rest, so at level 5 a landing is free to 35 u/s and the
+    // overflow costs 3.25. A genuine cliff still writes the car off at any
+    // level; what changes is where "cliff" starts.
+    const dl = this.damperLvl || 0;
+    const free = 22 + 2.6 * dl;
+    const perUnit = 6.5 * (1 - 0.10 * dl);
     const impact = Math.abs(this._impactVy || 0);
     this._impactVy = 0;
-    if (impact > 19 && this.alive) {
+    if (impact > free && this.alive) {
       if (this === this.game.player) {
-        this.game.hud?.feed?.(impact > 30 ? 'CLIFF FALL' : 'HARD LANDING', 'bad');
+        this.game.hud?.feed?.(impact > free + 11 ? 'CLIFF FALL' : 'HARD LANDING', 'bad');
         this.game.shake = Math.min(1, (this.game.shake || 0) + 0.55);
       }
-      this.game.particles?.debris?.(this.pos, impact > 30 ? 4 : 2);
-      this.damage((impact - 19) * 8, null);
+      this.game.particles?.debris?.(this.pos, impact > free + 11 ? 4 : 2);
+      this.damage((impact - free) * perUnit, null);
       if (!this.alive) return;    // wrecked on touchdown: skip the style pay
     }
     // hang time pays style: a real jump (not a curb hop) scores BIG AIR
@@ -2248,6 +2412,24 @@ export class Car {
     this.game.particles.explosion(this.pos, true);
     this.game.audio.explosion(true);
     this.game.flashLight(this.pos);
+  }
+
+  /** GOING UNDER IS A WRECK. Deep water used to be free driving: the seabed is
+   *  ground and ground is drivable, so a car that went off a corniche simply
+   *  carried on along the bottom of the bay with the waves over its roof.
+   *
+   *  Not routed through destroy(), because a car does not detonate underwater
+   *  — no fireball, no flash, no husk left floating on the surface. It is the
+   *  same outcome (dead, respawn on the timer) presented as what it is. */
+  drown() {
+    if (!this.alive) return;
+    this.health = 0;
+    this.alive = false;
+    this.mesh.visible = false;
+    this.respawnTimer = this.respawnDelay ?? 5;
+    this.game.particles?.splash?.(this.pos, 2.2);
+    this.game.audio?.splash?.();
+    if (this === this.game.player) this.game.hud?.feed?.('SUNK', 'bad');
   }
 
   respawn() {
@@ -3092,6 +3274,70 @@ export class EnemyCar extends Car {
 // it reads as "yours" on the grid. The lead reads this for the shop UI and
 // passes the chosen entry into new PlayerCar(game, entry).
 const GOLD = 0xe8b83a;
+/* ==========================================================================
+ * TYRES — the one stat that says where a car may race.
+ *
+ * The garage used to be a ladder: every car could enter every world, so the
+ * only question a player ever asked was "is this one's numbers bigger". The
+ * OFF-ROAD stat existed but only applied once you had LEFT the carriageway
+ * (`offRoad ? … : 1`), so the surface a stage is actually made of never met
+ * the machine at all. Fifty-eight worlds, one decision.
+ *
+ * Tyres cut across that. A car carries a class, a world demands one, and the
+ * demand is a FLOOR, not a preference:
+ *
+ *   0 ROAD    slicks and street rubber — sealed surfaces only
+ *   1 GRAVEL  rally tyres — sealed and loose
+ *   2 SNOW    studs and all-terrain — everything
+ *
+ * Under-specced is refused at the start line; the world says which tyre it
+ * wants and the garage sells it. OVER-specced is allowed and costs you — a
+ * studded tyre on hot tarmac is vague and slow — so the answer is never
+ * "own the most expensive set and forget the mechanic".
+ *
+ * The class comes from the car's own OFF-ROAD stat, so no car needed a new
+ * number, and the existing per-car TIRES upgrade raises it — which is what
+ * turns that upgrade from "+4 % grip" into the thing that opens a region.
+ * One level (800 CR) takes the starter BRAWLER from GRAVEL to SNOW, so the
+ * first ice stage is a purchase and not a wall.
+ * ======================================================================== */
+/** Grip multiplier for running MORE tyre than the surface needs. Pure, and
+ *  exported, because the driven A/B this was first asserted with could not be
+ *  made repeatable: with a fresh car per run and six-run averages the control
+ *  still drifted 10 % in one direction, so the simulation was measuring
+ *  accumulated state, not tyres. Testing the rule itself is honest; asserting
+ *  on a rig that cannot repeat itself is not. */
+export const tyrePenalty = (over) => 1 - Math.min(0.20, 0.09 * Math.max(0, over | 0));
+
+export const TYRE_ROAD = 0, TYRE_GRAVEL = 1, TYRE_SNOW = 2;
+export const TYRE_LABEL = ['ROAD', 'GRAVEL', 'SNOW'];
+
+/** A car's tyre class before any upgrade, read off the stat it already had. */
+export const baseTyreClass = (offroad) =>
+  (offroad < 0.5 ? TYRE_ROAD : offroad < 0.85 ? TYRE_GRAVEL : TYRE_SNOW);
+
+/** What this car is running, given its per-car upgrade row. */
+export function tyreClass(carKey, upgrades) {
+  const c = CAR_CATALOG.find((x) => x.key === carKey);
+  if (!c) return TYRE_ROAD;
+  const lvl = (upgrades && upgrades.tires) | 0;
+  const bump = lvl >= 3 ? 2 : lvl >= 1 ? 1 : 0;
+  return Math.min(TYRE_SNOW, baseTyreClass(c.stats.offroad) + bump);
+}
+
+/** The tyre level that would first make `carKey` legal on `need`, or null if
+ *  it already is. Used to price the advice the track card gives. */
+export function tyreLevelFor(carKey, upgrades, need) {
+  if (tyreClass(carKey, upgrades) >= need) return null;
+  const c = CAR_CATALOG.find((x) => x.key === carKey);
+  if (!c) return null;
+  const base = baseTyreClass(c.stats.offroad);
+  for (const lvl of [1, 3]) {
+    if (Math.min(TYRE_SNOW, base + (lvl >= 3 ? 2 : 1)) >= need) return lvl;
+  }
+  return null;                        // no upgrade reaches it — buy a car
+}
+
 export const CAR_CATALOG = [
   {
     key: 'brawler', name: 'BRAWLER', price: 0, desc: 'All-rounder',
@@ -3104,19 +3350,50 @@ export const CAR_CATALOG = [
     // 13 of the 21 worlds, which made every machine above it pointless. It is a
     // road hatch now — still the sharpest thing through a dry corner, but short
     // on top end and hopeless once the surface turns.
-    key: 'sleek', name: 'SLEEK', price: 5000, desc: 'Nimble hatch',
+    key: 'sleek', name: 'SLEEK', price: 4000, desc: 'Nimble hatch',
     spec: { name: 'SLEEK', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, stripe: [0x241d16], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 54, accel: 40, grip: 5.60, health: 90, offroad: 0.45, nitroPower: 1.15, plating: 1.10 },
   },
   {
-    key: 'crown', name: 'CROWN', price: 10000, desc: 'Fast on tarmac',
+    key: 'crown', name: 'CROWN', price: 8000, desc: 'Fast on tarmac',
     spec: { name: 'CROWN', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [GOLD, 0xf2f0e8], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 63, accel: 37, grip: 4.60, health: 85, offroad: 0.42, nitroPower: 1.05, plating: 1.05 },
   },
   {
-    key: 'dune', name: 'DUNE', price: 16000, desc: 'Off-road king',
+    key: 'dune', name: 'DUNE', price: 13000, desc: 'Off-road king',
     spec: { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 56, accel: 38, grip: 5.15, health: 105, offroad: 1.00, nitroPower: 0.95, plating: 0.95 },
+  },
+  {
+    // A 911 IS A SEALED-SURFACE CAR, and the tyre rule means that is a real
+    // constraint rather than flavour text: offroad 0.44 puts it in ROAD class,
+    // so it takes the 37 circuits and is refused on the rally stages. Highest
+    // grip in the catalogue and the best nitro, because a rear-engined car
+    // puts its weight over the driven axle — it is the sharpest thing here
+    // through a dry corner and has no answer at all once the surface turns.
+    key: 'flatsix', name: 'FLATSIX', price: 18000,
+    desc: 'Rear-engined coupe — sealed surfaces only',
+    spec: { name: 'FLATSIX', style: 'flatsix', body: 0xd8d4cc, accent: 0x2a2d33,
+      stripe: [0xc4342a], number: 11, brand: 'ZENITH', rims: GOLD },
+    // ACC is the one headline stat no other machine claims (CROWN owns SPD,
+    // SLEEK GRP, DUNE OFF, PIT ARM, ALPINE NTR — tests/test-cars.mjs enforces
+    // it), so that is this car's identity: it leaves a corner harder than
+    // anything else here. Deliberately NOT the grip or nitro leader; taking
+    // either would have made an existing card lie about its own machine.
+    stats: { maxSpeed: 60, accel: 42, grip: 5.45, health: 82, offroad: 0.44,
+      nitroPower: 1.10, plating: 1.0 },
+  },
+  {
+    // ...AND THE ESTATE ON THE SAME BADGE IS THE OPPOSITE ANSWER: offroad 0.88
+    // is SNOW class, so it takes the loose and the ice and is barred from the
+    // circuits its coupe sibling owns. Between them they cover the roster and
+    // neither covers it alone, which is the whole point of the tyre rule.
+    key: 'bastion', name: 'BASTION', price: 26000,
+    desc: 'Performance estate — loose and ice',
+    spec: { name: 'BASTION', style: 'bastion', body: 0x1f2a38, accent: 0xc8ccd2,
+      stripe: [0xc8ccd2], number: 9, brand: 'ZENITH', rims: GOLD },
+    stats: { maxSpeed: 59, accel: 38, grip: 5.20, health: 118, offroad: 0.88,
+      nitroPower: 1.0, plating: 1.12 },
   },
   {
     // The ALPINE was the one machine that was never the right answer: lowest
@@ -3126,7 +3403,7 @@ export const CAR_CATALOG = [
     // specialist — so it owns the twisty snow stages the DUNE is too slow for
     // and the CROWN cannot hold at all, while its top speed keeps it off the
     // open circuits.
-    key: 'alpine', name: 'ALPINE', price: 26000, desc: 'Mountain drifter',
+    key: 'alpine', name: 'ALPINE', price: 22000, desc: 'Mountain drifter',
     spec: { name: 'ALPINE', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [GOLD, 0xd8342a], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 57, accel: 39, grip: 5.25, health: 95, offroad: 0.85, nitroPower: 1.20, plating: 1.05 },
   },
@@ -3135,7 +3412,7 @@ export const CAR_CATALOG = [
     // was sold purely on hull, which makes 40,000 CR a strange ask. Heavy but
     // planted: it now has the grip to own a fast, dry, flowing circuit, and
     // still takes the least damage doing it.
-    key: 'pit', name: 'PIT-99', price: 40000, desc: 'Armored bruiser',
+    key: 'pit', name: 'PIT-99', price: 32000, desc: 'Armored bruiser',
     spec: { name: 'PIT-99', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
     stats: { maxSpeed: 60, accel: 36, grip: 5.05, health: 130, offroad: 0.55, nitroPower: 0.90, plating: 0.78 },
   },
@@ -3190,15 +3467,18 @@ export class PlayerCar extends Car {
     this.step(dt, inputs);
 
     // RECOVERY NET. Respawn only ever triggered on a WRECK, so a car that was
-    // still alive but had ended up somewhere impossible — flung far off the
-    // world, or under the terrain — could never come back, and the player was
-    // left looking at an empty screen with the HUD still ticking. Free roam is
-    // exempt on the lateral test: going a long way from the road is the point
-    // out there. Being under the ground is never right anywhere.
+    // still alive but had ended up somewhere impossible — under the terrain,
+    // or at a coordinate that is not a number — could never come back, and the
+    // player was left looking at an empty screen with the HUD still ticking.
+    //
+    // IT NO LONGER CARES HOW FAR FROM THE ROAD YOU ARE. The lateral test used
+    // to drag you back to the racing line after 2.5 s beyond 120 u, which made
+    // "go and look at that mountain" impossible in a race and read as the game
+    // resetting you for leaving the track. Wandering off is a choice the world
+    // is big enough to allow; only genuinely broken states are rescued now.
     if (this.alive && g.state === 'race') {
       const groundY = g.track.terrainHeight(this.pos.x, this.pos.z);
-      const lost = (!g.freeRoam && Math.abs(this.lateral) > 120)
-        || this.y < groundY - 6
+      const lost = this.y < groundY - 6
         || !Number.isFinite(this.pos.x) || !Number.isFinite(this.y);
       this._lostT = lost ? (this._lostT ?? 0) + dt : 0;
       if (this._lostT > 2.5) {

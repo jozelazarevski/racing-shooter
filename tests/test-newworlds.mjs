@@ -38,7 +38,13 @@ const NEW = [[29, 'OLIVE COAST', 'medterrace'], [30, 'LANTERN QUARTER', 'oldtown
   [52, 'COSTA BRAVA', 'brava'], [53, 'DALMATIA DRIVE', 'dalmatia'],
   [54, 'COTE D AZUR', 'azur'], [55, 'BRIDGE RUN', 'vineyard'],
   [56, 'OLIVE CROSSING', 'olivecountry'], [57, 'MOUNTAIN TO SEA', 'mountainsea'],
-  [58, 'CITADEL BAY', 'citadel'],];
+  [58, 'CITADEL BAY', 'citadel'],
+  // SKETCH D, drawn and handed over with its own labels: tunnels, a bridge
+  // and sea cliffs. Its layout invariants live in test-cliffknot; this suite
+  // only cares that it is on the roster, in order, and builds clean.
+  [59, 'CLIFF KNOT', 'mountainsea'],
+  // SKETCH E: the cliff straight, with the sea close on the east.
+  [60, 'SEA CLIFF RUN', 'mountainsea'],];
 
 // The roster must agree with what we think we merged, before any of it is built.
 const probe = await browser.newPage({ viewport: { width: 640, height: 400 } });

@@ -126,6 +126,15 @@ export function mergeSnapshots(a, b) {
         finished[id] = mergeWorldResult(ka?.finished?.[id], kb?.finished?.[id]);
       }
       keys.career = { ...(newerIsB ? kb : ka), finished };
+    } else if (base === 'scenes') {
+      // A SCENE IS A DOCUMENT, NOT A SCORE. `mergeMax` walks into objects and
+      // takes the larger of every leaf, which for two different edits of the
+      // same world would splice them together into a scene that was never
+      // built — a delta from one and a building list from the other. Scenes
+      // union by NAME, and where both devices hold the same name the newer
+      // snapshot's copy wins whole.
+      const out = { ...(newerIsB ? ka : kb), ...(newerIsB ? kb : ka) };
+      keys.scenes = out;
     } else if (base === 'cars') {
       keys.cars = mergeMax(ka, kb, newerIsB);
       // the one field where max/union is wrong: you drive ONE car, and it is
