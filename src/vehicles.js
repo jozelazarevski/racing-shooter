@@ -3508,8 +3508,22 @@ export class PlayerCar extends Car {
       const lost = this.y < groundY - 6
         || !Number.isFinite(this.pos.x) || !Number.isFinite(this.y);
       this._lostT = lost ? (this._lostT ?? 0) + dt : 0;
-      if (this._lostT > 2.5) {
+      // WEDGED IS NOT WANDERING. The net above deliberately lets a player
+      // drive anywhere — but a car photographed parked on a gorge face at
+      // 0 km/h with the throttle held ("I still see this") is not exploring,
+      // it is stuck on ground too steep to climb with no way to turn around.
+      // The tell is the INPUT: full throttle and no motion, sustained. An
+      // idle car parked on a mountainside is never touched, and five seconds
+      // is long enough that anyone who could reverse out already has.
+      // Player only — rivals carry their own staged recovery with the
+      // off-camera deferral, and this simpler net would preempt it in view.
+      const wedged = this === g.player && controlsLive && !this.airborne
+        && input.throttle > 0.5
+        && Math.hypot(this.vel.x, this.vel.z) < 0.8;
+      this._wedgeT = wedged ? (this._wedgeT ?? 0) + dt : 0;
+      if (this._lostT > 2.5 || this._wedgeT > 5) {
         this._lostT = 0;
+        this._wedgeT = 0;
         this.vel.set(0, 0, 0); this.vy = 0; this.airborne = false;
         this.placeAt(this.trackIndex, 0, true);
         this.invuln = Math.max(this.invuln, 1.5);
