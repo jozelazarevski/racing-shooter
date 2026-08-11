@@ -4402,6 +4402,58 @@ export class Track {
       this.tan.push(tg);
       this.nrm.push(new THREE.Vector3(tg.z, 0, -tg.x));
     }
+    // KINK RELAXATION — a road must never turn faster than a car can steer.
+    //
+    // Hand-read sketch routes can hand the spline geometry it turns into a
+    // CUSP: MOUNTAIN TO SEA's chain waists sit on control points 2-4 u apart
+    // ([2,-155],[2,-152]) and SEA CLIFF RUN's coast corners come off the
+    // drawing as genuine Vs — measured, those laps carry per-station tangent
+    // turns of 21-60 DEGREES where every other world stays under ~15. A car
+    // cannot track that: the rival AI arrives at speed, overshoots straight
+    // across the verge, is stopped dead by the road-edge clamp, reverse-
+    // recovers into the same cusp, and parks there forever. Measured
+    // fixed-step, the whole field ran 0.13-0.70 laps in 90 s on those worlds
+    // (1.9-2.1 is healthy), and a LONE rival pinned at exactly
+    // |lateral| = wallLim with the recovery timer cycling — the pile the
+    // player meets was photographed twice ("Everyone is stuck here").
+    //
+    // So the sampled centreline is relaxed until no station turns more than
+    // MAX_TURN: a kink station is pulled toward its neighbours' midpoint,
+    // repeatedly, which flattens the cusp and nothing else — stations already
+    // under the cap are never touched, so the 57 healthy worlds are provably
+    // unchanged (their kink census is zero). Tangents and normals are then
+    // recomputed around whatever moved.
+    {
+      const MAX_TURN = (13 * Math.PI) / 180;
+      const moved = new Uint8Array(N);
+      for (let pass = 0; pass < 80; pass++) {
+        let any = 0;
+        for (let i = 0; i < N; i++) {
+          const p0 = this.center[(i - 1 + N) % N];
+          const p1 = this.center[i];
+          const p2 = this.center[(i + 1) % N];
+          const a1 = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+          const a2 = Math.atan2(p2.x - p1.x, p2.z - p1.z);
+          let d = a2 - a1;
+          while (d > Math.PI) d -= 2 * Math.PI;
+          while (d < -Math.PI) d += 2 * Math.PI;
+          if (Math.abs(d) > MAX_TURN) {
+            p1.x = p1.x * 0.5 + (p0.x + p2.x) * 0.25;
+            p1.z = p1.z * 0.5 + (p0.z + p2.z) * 0.25;
+            moved[i] = moved[(i - 1 + N) % N] = moved[(i + 1) % N] = 1;
+            any = 1;
+          }
+        }
+        if (!any) break;
+      }
+      for (let i = 0; i < N; i++) {
+        if (!moved[i]) continue;
+        const p0 = this.center[(i - 1 + N) % N], p2 = this.center[(i + 1) % N];
+        const tg = this.tan[i];
+        tg.set(p2.x - p0.x, 0, p2.z - p0.z).normalize();
+        this.nrm[i].set(tg.z, 0, -tg.x);
+      }
+    }
     this._applyRouteWarp(edit);
     this._buildSampleGrid();
     // Elevation profile: the road climbs and descends over the lap (tan/nrm and
