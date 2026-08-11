@@ -10958,14 +10958,41 @@ export class Track {
     const stone = new THREE.MeshStandardMaterial({
       color: 0x8f8a80, flatShading: true, roughness: 1,
     });
+    // A RAIL BESIDE MY DECK CAN BE A WALL ACROSS YOUR ROAD. Each rail stands
+    // at a fixed 10.2 u off its own sample and never used to ask what else
+    // runs there — in a knot where two legs pass 3-12 u apart (OLIVE
+    // CROSSING's west knot, MOUNTAIN TO SEA's tangles) the offset lands the
+    // rail inside the OTHER leg's carriageway at the other leg's grade, a
+    // continuous stone wall in the racing line. The field-stall dossier
+    // measured whole grids parked against exactly these. A rail that stands
+    // in any other stretch's lane within reach of its cars does not get
+    // built — the gap it leaves is a junction mouth, which is drivable and
+    // correct. Rails well ABOVE another road still build: cars pass beneath
+    // them now (see the barrier under-gate in vehicles.js).
+    const railBlocked = (x, z, y, jSelf, half) => {
+      for (let i = 0; i < N; i++) {
+        const dLap = Math.min((i - jSelf + N) % N, (jSelf - i + N) % N);
+        if (dLap <= half + 4) continue;             // its own deck run
+        const c2 = this.center[i];
+        const dx = x - c2.x, dz = z - c2.z;
+        if (dx * dx + dz * dz > 400) continue;
+        const dy = y - c2.y;
+        if (dy > 4.2 || dy < -1.5) continue;        // clear over (or under) it
+        const lat = Math.abs(dx * this.nrm[i].x + dz * this.nrm[i].z);
+        if (lat < (this.widthAt ? this.widthAt(i) : 9) + 1.4) return true;
+      }
+      return false;
+    };
     for (const o of this._overpasses) {
       const g = new THREE.Group();
       for (let sN = -o.half; sN <= o.half; sN += 2) {
         const j = (o.up + sN + N) % N;
         const c = this.center[j], n = this.nrm[j];
         for (const side of [1, -1]) {
+          const rx = c.x + n.x * 10.2 * side, rz = c.z + n.z * 10.2 * side;
+          if (railBlocked(rx, rz, c.y, j, o.half)) continue;
           const rail = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.1, 2 * this.segLen + 0.4), stone);
-          rail.position.set(c.x + n.x * 10.2 * side, c.y + 0.45, c.z + n.z * 10.2 * side);
+          rail.position.set(rx, c.y + 0.45, rz);
           rail.rotation.y = this.headingAt(j);
           g.add(rail);
           // WALLS ARE SEGMENTS, NOT DOTS — the same lesson the masonry
@@ -11398,6 +11425,25 @@ export class Track {
     const y = (yOverride == null ? this.terrainHeight(x, z) : yOverride) - 0.25;
     const cs = Math.cos(rot), sn = Math.sin(rot);
     const T = HOUSE_TEMPLATES[type] ?? HOUSE_TEMPLATES.logpile;
+    // A HOUSE DOES NOT STAND IN THE CARRIAGEWAY. Placement callers are meant
+    // to check `_clearsRoad`, but the village fills did not everywhere, and
+    // SEA CLIFF RUN ended with three huts IN its low coast road at road
+    // grade — the third leg of the field-stall dossier's jams. The gate
+    // lives HERE now so no caller can forget it, and it is height-aware
+    // (unlike `_clearsRoad`) so a house under a tall flyover still builds.
+    // Deliberately conservative — it kills lane-blockers, not streetscapes.
+    // Editor placements (`authored`) are exempt: your map, your rules.
+    if (!authored) {
+      const fr = T.r * scale;
+      for (let i = 0; i < N; i++) {
+        const c = this.center[i];
+        const dx = x - c.x, dz = z - c.z;
+        if (dx * dx + dz * dz > 900) continue;
+        if (Math.abs(y - c.y) > 6) continue;
+        const lat = Math.abs(dx * this.nrm[i].x + dz * this.nrm[i].z);
+        if (lat < (this.widthAt ? this.widthAt(i) : 9) + fr * 0.45) return;
+      }
+    }
     // NO TWO ALIKE: each placement gets its own footprint stretch, height,
     // mirror and weathering shade, so the shared templates stop reading as
     // copy-paste rows of one house. The solid follows the stretched print.
@@ -15978,6 +16024,7 @@ export class Track {
       if (!this._clearsRoad(p.x, p.z, rad, 3.5)) return;
       const before = this._batchLens(B);
       const el = this._element(B, type, p.x, p.z, Math.random() * Math.PI * 2, K, scale);
+      if (!el) return;   // the element gate (road/erase) declined the site
       // A building is a target, not scenery: register it so cannon rounds and
       // blasts can level it. The slots are resolved to real meshes in
       // `_realizeElements`, once the batch has been turned into geometry.
