@@ -32,6 +32,14 @@ slipstream, big air, shield, treasure stars), `test-round-fixes.mjs`
 `test-menu-noreset.mjs` (live car swap + menu state restore),
 `test-roam.mjs`, `test-destruction.mjs`.
 
+**The world editor** has five, each pinning what the one before it could not
+do: `test-editor.mjs` (the sculpt reaches both ground functions and the
+physics), `test-editor2.mjs` (clear zones, the world recipe, weather),
+`test-editor3.mjs` (road features land where they were asked for),
+`test-editor4.mjs` (one undo stack, ERASE, ROTATE, MOVE ROAD, and exit taking
+its markers with it), `test-editor5.mjs` (NATURE, SELECT/move/duplicate,
+REDO, water levels, brush shape, SNAP, scene codes, the draft, and CHECK).
+
 ## Writing new checks
 
 Two rules learned the hard way:

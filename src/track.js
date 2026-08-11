@@ -4109,6 +4109,35 @@ const ELEMENT_KITS = {
     stoneWalls: 0, fenceRuns: 7,
   },
 };
+/* THE NATURE PALETTE THE WORLD EDITOR PLANTS FROM (`edit.props`).
+ *
+ * Deliberately a handful of SILHOUETTES rather than a copy of the theme's own
+ * species tables: a hand-planted tree has to read the same under every one of
+ * the eighteen palettes, and it takes its colours from the live theme, so what
+ * it must not carry is a shape that only makes sense in one of them. Exported
+ * so the editor's palette and this builder can never drift apart — the editor
+ * lists exactly what the builder can stamp.
+ *
+ * `solidAt` is the material law, same as the forest: at or above that scale
+ * the trunk stops a car, below it the trunk always yields. */
+export const EDIT_PROP_KINDS = {
+  pine: { size: 1.5, rFac: 0.9, solidAt: 1.0, shadow: true, treeKind: 'pine', trunk: 2.4,
+    tiers: [{ r: 1.55, h: 3.0, y: 2.0 }, { r: 1.2, h: 2.6, y: 3.5 },
+      { r: 0.85, h: 2.2, y: 4.9, top: true }] },
+  broadleaf: { size: 1.5, rFac: 0.8, solidAt: 1.0, shadow: true, treeKind: 'oak', trunk: 2.8,
+    tiers: [{ r: 1.9, h: 2.6, y: 4.0, round: true },
+      { r: 1.35, h: 1.7, y: 5.4, round: true, top: true }] },
+  slim: { size: 1.4, rFac: 0.55, solidAt: 1.1, shadow: true, treeKind: 'pine', trunk: 3.4,
+    tiers: [{ r: 0.95, h: 5.4, y: 2.6 }, { r: 0.6, h: 3.0, y: 6.4, top: true }] },
+  snag: { size: 1.3, rFac: 0.45, solidAt: null, shadow: true, treeKind: 'snag', trunk: 4.2,
+    tiers: [{ r: 0.42, h: 1.5, y: 4.0 }] },
+  bush: { size: 1.1, rFac: 0.5, solidAt: null, shadow: false, treeKind: 'bush', trunk: 0.4,
+    tiers: [{ r: 1.0, h: 1.1, y: 0.8, round: true },
+      { r: 0.62, h: 0.7, y: 1.5, round: true, top: true }] },
+  rock: { rock: true, size: 1.4, squash: 0.8 },
+  boulder: { rock: true, size: 3.0, squash: 0.75 },
+};
+
 // Species mix for the default (conifer-family) forest builder, per theme:
 // [[species, weight]...]. Species live in _buildForest. Themes not listed
 // fall back to the classic two-pine stand; a theme can override the whole
@@ -7933,6 +7962,10 @@ export class Track {
     // already occupies the verge — a hedge cannot grow across a field gate.
     if (this.T.hedgeBanks) this._buildHedgeBanks(m4);
     this._buildRoadsideDetail(m4);                   // corner markers + gravel
+    // LAST OF THE SCENERY, so an authored tree or boulder always wins its spot
+    // over anything the world scattered there — and still BEFORE the contact
+    // shadows, which have to see it to ground it.
+    this._buildEditProps();                          // trees and rocks the owner planted
     this._buildContactShadows();                     // baked AO under everything
   }
 
@@ -11795,6 +11828,113 @@ export class Track {
       mesh.name = 'edit-lake';
       mesh.renderOrder = 2;
       this.group.add(mesh);
+    }
+  }
+
+  /** NATURE THE OWNER PLANTED.
+   *
+   *  CLEAR AREA could only ever take scenery AWAY: the wood and the boulder
+   *  field are invented afresh on every build, so there was no instance to
+   *  move and no way to add one — "I can delete a forest but I cannot plant a
+   *  tree" was the whole shape of the gap. `edit.props` closes it. Each entry
+   *  is {kind, x, z, rot, scale} and is stored, not baked, exactly like a
+   *  placed building: the scene stays a few kB and the props re-seat
+   *  themselves on whatever ground the sculpt leaves under them.
+   *
+   *  They are built HERE rather than folded into `_buildForest` on purpose.
+   *  The forest has ten vegetation variants, each pre-allocating its own
+   *  InstancedMeshes to the theme's tree count; threading an authored list
+   *  through all of them would mean ten edits that all have to stay in step.
+   *  This is one batch per part per kind — still one draw call each, still
+   *  registered in `trees` and `solids` so an authored pine fells and an
+   *  authored boulder stops a car exactly like the world's own.
+   *
+   *  Colour comes from the THEME, not from the scene, so a prop planted under
+   *  PINE FOREST and then re-skinned to DESERT changes with everything else
+   *  around it — the same rule the world recipe follows everywhere. */
+  _buildEditProps() {
+    const list = this.edit && this.edit.props;
+    if (!list || !list.length) return;
+    const T = this.T;
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const col = new THREE.Color();
+
+    const byKind = new Map();
+    for (const p of list) {
+      if (!EDIT_PROP_KINDS[p.kind]) continue;          // a later palette: skip, never throw
+      if (!byKind.has(p.kind)) byKind.set(p.kind, []);
+      byKind.get(p.kind).push(p);
+    }
+    if (!byKind.size) return;
+
+    const trunkMat = new THREE.MeshStandardMaterial({
+      color: T.trunkColor ?? 0x6b4423, roughness: 1 });
+    const lowMat = new THREE.MeshStandardMaterial({
+      color: T.foliageLow ?? 0x2f5d34, flatShading: true, roughness: 1 });
+    const topMat = new THREE.MeshStandardMaterial({
+      color: T.foliageTop ?? 0x3f7a44, flatShading: true, roughness: 1 });
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: T.rockColor ?? 0x7d7669, flatShading: true,
+      roughness: T.rockRoughness !== undefined ? T.rockRoughness : 0.9,
+      envMapIntensity: 0.5, vertexColors: true,
+    });
+
+    for (const [kind, items] of byKind) {
+      const spec = EDIT_PROP_KINDS[kind];
+      const n = items.length;
+      if (spec.rock) {
+        const geo = this._rockGeo || (this._rockGeo = this._topLitRockGeo(0));
+        const im = new THREE.InstancedMesh(geo, rockMat, n);
+        im.castShadow = true;
+        im.name = `edit-prop-${kind}`;
+        for (let k = 0; k < n; k++) {
+          const e = items[k];
+          const s = (e.scale || 1) * spec.size;
+          const sy = s * spec.squash;
+          const y = this.terrainHeight(e.x, e.z) + s * 0.25;
+          q.setFromAxisAngle(up, e.rot || 0);
+          m4.compose(new THREE.Vector3(e.x, y, e.z), q, new THREE.Vector3(s, sy, s));
+          im.setMatrixAt(k, m4);
+          col.setScalar(0.86 + ((k * 0.37) % 1) * 0.28);
+          im.setColorAt(k, col);
+          if (s > 0.7) {
+            this.solids.push({ x: e.x, z: e.z, r: s * 0.9, y: y - s * 0.25,
+              mat: 'stone', inst: k, im, sc: s });
+            this._addShadow(e.x, e.z, s * 1.5);
+          }
+        }
+        this.group.add(im);
+        continue;
+      }
+      // --- a tree: a trunk and one or more crown tiers, each its own batch
+      const parts = [];
+      const trunk = new THREE.CylinderGeometry(0.3, 0.46, spec.trunk, 7);
+      trunk.translate(0, spec.trunk * 0.5, 0);
+      parts.push(new THREE.InstancedMesh(trunk, trunkMat, n));
+      for (const tier of spec.tiers) {
+        const g = tier.round
+          ? new THREE.IcosahedronGeometry(tier.r, 0)
+          : new THREE.ConeGeometry(tier.r, tier.h, 8);
+        g.scale(1, tier.round ? tier.h / tier.r : 1, 1);
+        g.translate(0, tier.y, 0);
+        parts.push(new THREE.InstancedMesh(g, tier.top ? topMat : lowMat, n));
+      }
+      for (const part of parts) { part.castShadow = true; part.name = `edit-prop-${kind}`; }
+      for (let k = 0; k < n; k++) {
+        const e = items[k];
+        const s = (e.scale || 1) * spec.size;
+        const ty = this.terrainHeight(e.x, e.z) - 0.25;
+        q.setFromAxisAngle(up, e.rot || 0);
+        m4.compose(new THREE.Vector3(e.x, ty, e.z), q, new THREE.Vector3(s, s, s));
+        for (const part of parts) part.setMatrixAt(k, m4);
+        this.trees.push({
+          x: e.x, z: e.z, y: ty, r: spec.rFac * s, id: k, parts, kind: spec.treeKind, s,
+          solid: spec.solidAt != null && s >= spec.solidAt,
+        });
+        if (spec.shadow) this._addShadow(e.x, e.z, 2.4 * spec.rFac * s);
+      }
+      this.group.add(...parts);
     }
   }
 
