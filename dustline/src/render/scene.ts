@@ -1,15 +1,52 @@
 // M1 world: flat ground with a painted figure-8 tuning circuit, simple sun
 // + sky, a chassis mesh with four visual wheels. Stylized, readable (§7.1).
+//
+// THE RENDERER AND SHADOW SETTINGS ARE PORTED FROM IGNITE RALLY — v1's
+// `Game` constructor in `src/main.js`, the renderer block at :858-871 and the
+// sun block at :886-910. dustline had the same lights in the same places with
+// none of the tuning, and every number v1 sets there has a comment naming the
+// artefact it removes. What came across, and what did not, is written at each
+// site below. `buildCarVisual` is dustline's own and is untouched.
 
 import * as THREE from 'three';
 import carData from '../data/car.json';
 import type { TrackDef } from '../tracks/trackDef';
 
+/** Half-width of the shadow frustum, in world units. dustline's own number —
+ *  v1 uses 72 — and every depth constant below is derived from it. */
+const SHADOW_HALF = 90;
+
+/** How far up the sun sits from whatever it is lighting.
+ *
+ *  A directional light's ILLUMINATION does not depend on this at all, only on
+ *  the direction; its SHADOW does, because the ortho shadow camera is placed at
+ *  the light. `TrackDef.sky.sunDir` is documented as a bearing whose length is
+ *  irrelevant, and the presets duly range from 105 to 190 units long, so a
+ *  fixed near/far pair could not be safe for all of them until the distance
+ *  itself was fixed. v1's rig is 156.5 units out with a 72-unit half-frustum;
+ *  this is that ratio at dustline's 90, i.e. 156.5 * 90 / 72. */
+const SUN_DIST = 196;
+
 export function buildRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  const renderer = new THREE.WebGLRenderer({
+    // v1 `src/main.js:860`. On a laptop with switchable graphics this is what
+    // decides whether the game gets the discrete GPU or the integrated one.
+    canvas, antialias: true, powerPreference: 'high-performance',
+  });
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // v1 `src/main.js:871`, kept at v1's value. Its comment records the reason:
+  // "Lifted from 1.12 after the lighting retune measured 35 % darker overall
+  //  (mean scene luminance 71 -> 46 on PINE VALLEY). The retune's fill/key
+  //  RATIO is what buys the shadow contrast, so exposure is the right lever to
+  //  put the brightness back without flattening it again."
+  // dustline inherited that retune — its `WEATHERS` carry v1's key/fill ratio,
+  // ported into `tracks/presets.ts` — but not the exposure that pays for it,
+  // so it has been rendering the dark half of v1's trade. UNVERIFIED: I have
+  // not re-measured scene luminance in dustline; the number is v1's, applied
+  // because dustline uses v1's lighting ratio.
+  renderer.toneMappingExposure = 1.46;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -31,13 +68,48 @@ export function buildWorld(scene: THREE.Scene, def: TrackDef, startX = 0, startZ
   added.push(hemi);
 
   const sun = new THREE.DirectionalLight(new THREE.Color(sky.sunColor).getHex(), sky.sunIntensity);
-  sun.position.set(sky.sunDir[0], sky.sunDir[1], sky.sunDir[2]);
+  // The bearing is the track's; the DISTANCE is normalised so the shadow
+  // camera's near/far can be constants (see SUN_DIST). Illumination is
+  // unchanged by this — only the shadow camera's placement.
+  const offset = new THREE.Vector3(sky.sunDir[0], sky.sunDir[1], sky.sunDir[2])
+    .normalize().multiplyScalar(SUN_DIST);
+  sun.position.copy(offset);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   const sc = sun.shadow.camera;
-  sc.left = -90; sc.right = 90; sc.top = 90; sc.bottom = -90;
-  scene.add(sun);
-  added.push(sun);
+  sc.left = -SHADOW_HALF; sc.right = SHADOW_HALF; sc.top = SHADOW_HALF; sc.bottom = -SHADOW_HALF;
+  // v1 `src/main.js:892` is near 10 / far 400 around a 72-unit half-frustum;
+  // these are those numbers scaled by the same 90/72 as the box (12.5 and 500,
+  // the near rounded down). Without a depth range the ortho camera keeps its
+  // 0.5-500 default, which for a light 196 units out clips nothing but spends
+  // most of the depth buffer's precision on empty space in front of the sun.
+  sc.near = 12; sc.far = 500;
+  // Three only calls this itself when it first allocates the shadow map
+  // (`WebGLShadowMap`, at `shadow.map === null`), so mutating the frustum after
+  // that first frame would otherwise be silently ignored. v1 calls it here too.
+  sc.updateProjectionMatrix();
+  // v1 `src/main.js:894-900`, all three verbatim, with v1's own reasons:
+  //   bias/normalBias — "kills the acne the raked sun exposes". Several
+  //     dustline weathers have a sun 12 degrees above the horizon
+  //     (`presets.ts` sunset, sunDir [-160, 34, 20]), which is exactly the
+  //     case that rakes shadow acne across flat ground.
+  //   radius — v1: "A 1024 map stretched over a 144 u frustum is 0.14 u per
+  //     texel, so a car shadow is ~30 texels across and its edge steps
+  //     visibly". dustline's 2048 map over a 180 u frustum is 0.088 u per
+  //     texel, so the same 3.5-texel kernel is a 0.31 u soft edge here against
+  //     0.25 u on v1's desktop path. Close enough to keep v1's number rather
+  //     than invent one.
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.035;
+  sun.shadow.radius = 3.5;
+  sun.userData.sunOffset = offset;
+  // The target has to be IN the scene for its world matrix to be updated, and
+  // therefore for `shadowFollower` below to be able to move it. v1 adds both
+  // (`scene.add(sun, sun.target)`); dustline added neither the target nor a
+  // way to move it, which is why its shadow box has been nailed to the world
+  // origin while the tracks are hundreds of units across.
+  scene.add(sun, sun.target);
+  added.push(sun, sun.target);
 
   // spawn-pad figure-8 painted on the flat tarmac apron: the M1 tuning
   // playground lives on inside the M2 rally world
@@ -52,6 +124,40 @@ export function buildWorld(scene: THREE.Scene, def: TrackDef, startX = 0, startZ
     }
   }
   return added;
+}
+
+/** THE SHADOW RIG FOLLOWS THE PLAYER — v1 `src/main.js:910` (`_sunOffset`) and
+ *  `:1918-1923`, where `_updateCamera` re-aims the light at the player each
+ *  frame.
+ *
+ *  A 180-unit shadow box is a crisp shadow if it is around the car and no
+ *  shadow at all if it is not. dustline's box has been centred on the world
+ *  origin, so on a track whose road runs out to x = 300 the cars have simply
+ *  been driving out of their own shadows. Moving the light and its target
+ *  together keeps the direction — and so the lighting — identical while the box
+ *  travels with the car.
+ *
+ *  Takes what `buildWorld` returned and hands back an update function, or null
+ *  if there is no sun in it. Callers that do not want a moving rig (the editor
+ *  preview, which has no player) simply never call this, and the light stays
+ *  where `buildWorld` put it.
+ *
+ *  NOT PORTED: v1 also lifts a low sun's ELEVATION for the shadow rig, because
+ *  its light direction is derived from the theme's sun-sprite azimuth and would
+ *  otherwise sit near the horizon. dustline authors `sunDir` directly per
+ *  weather, so bending it here would make the shadows disagree with the light. */
+export function shadowFollower(
+  built: THREE.Object3D[],
+): ((x: number, y: number, z: number) => void) | null {
+  const sun = built.find(
+    (o): o is THREE.DirectionalLight => (o as THREE.DirectionalLight).isDirectionalLight === true,
+  );
+  const offset = sun?.userData.sunOffset as THREE.Vector3 | undefined;
+  if (!sun || !offset) return null;
+  return (x, y, z) => {
+    sun.position.set(x + offset.x, y + offset.y, z + offset.z);
+    sun.target.position.set(x, y, z);
+  };
 }
 
 export interface CarVisual {

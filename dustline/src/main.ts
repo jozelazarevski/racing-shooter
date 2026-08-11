@@ -1,13 +1,25 @@
 // DUSTLINE — M3: full race loop. Fixed-timestep Rapier sim (120 Hz) with
 // interpolated rendering; 4 racers (player + 3 AI on the baked line),
 // countdown, sectors, laps, positions, results.
+//
+// THE FRAME NOW GOES THROUGH A COMPOSER, ported from IGNITE RALLY. v1 draws
+// every frame with `this.composer.render()` (`src/main.js:6519`) rather than
+// `renderer.render`, and resizes the composer alongside the renderer
+// (`src/main.js:1011`). Both of those are done here; what the chain contains,
+// and the image-based lighting that goes with it, is `render/post.ts`. The
+// chain is optional — see `postWanted` there for how it switches itself off
+// under a software rasteriser, which is what the headless tools run on.
+// Ported with it: v1's moving shadow rig (`_updateCamera`, `src/main.js:1918`),
+// which re-aims the sun at the player every frame; the light itself and its
+// tuning live in `render/scene.ts`.
 
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { GameLoop, FIXED_DT } from './core/loop';
 import { Input, InputState } from './core/input';
 import { VehicleController } from './physics/vehicleController';
-import { buildRenderer, buildWorld, buildCarVisual, CarVisual } from './render/scene';
+import { buildRenderer, buildWorld, buildCarVisual, shadowFollower, CarVisual } from './render/scene';
+import { Post, buildEnvironment } from './render/post';
 import { ChaseCamera } from './render/camera';
 import { Telemetry } from './ui/telemetry';
 import { RaceHUD } from './ui/hud';
@@ -54,12 +66,23 @@ async function boot() {
   const renderer = buildRenderer(canvas);
   const scene = new THREE.Scene();
   const chase = new ChaseCamera();
-  addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
+  const post = new Post(renderer);
+  addEventListener('resize', () => {
+    renderer.setSize(innerWidth, innerHeight);
+    post.setSize(innerWidth, innerHeight);   // v1 resizes both, src/main.js:1010-1011
+  });
 
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = FIXED_DT;
   const terrain = new Terrain(trackDef);
-  buildWorld(scene, trackDef, terrain.spawn.x, terrain.spawn.z);
+  const built = buildWorld(scene, trackDef, terrain.spawn.x, terrain.spawn.z);
+  // The sun's shadow box travels with the player from here on. Nothing else
+  // about the light changes — same colour, same intensity, same direction.
+  const followSun = shadowFollower(built);
+  // Image-based lighting from the track's own sky colours: without it every
+  // standard material reflects nothing, so metalness reads black and the car
+  // paint has no sheen. One PMREM bake at load, nothing per frame.
+  buildEnvironment(renderer, scene, trackDef);
   terrain.build(scene, world, RAPIER);
   buildSky(scene, trackDef);
   const clouds = buildClouds(scene, trackDef);
@@ -171,9 +194,13 @@ async function boot() {
       iPos.lerpVectors(playerCtrl.prevPos, playerCtrl.currPos, alpha);
       iQuat.slerpQuaternions(playerCtrl.prevQuat, playerCtrl.currQuat, alpha);
       chase.update(frameDt, iPos, iQuat, vel, playerCtrl.speedKmh, playerCtrl.nitroActive, input.state.lookBack);
+      // ...and the shadow box follows the car, not the camera: what has to be
+      // inside a 180-unit frustum is the thing casting the shadow you are
+      // looking at. v1 aims at the player for the same reason.
+      followSun?.(iPos.x, iPos.y, iPos.z);
       telemetry.update(frameDt, loop, playerCtrl);
       hud.update(director);
-      renderer.render(scene, chase.camera);
+      post.render(scene, chase.camera);
     },
   });
 
@@ -187,6 +214,9 @@ async function boot() {
     // exposed for tools/: the renderer's own triangle and draw-call counters
     // are the only honest answer to "what did that cost"
     renderer,
+    // `post.setEnabled(false)` is the runtime escape hatch, for a tool that
+    // wants the cheap path without reloading with `?nopost`.
+    post,
     fastForward: (ticks: number) => { for (let i = 0; i < ticks; i++) fixedStep(FIXED_DT); },
   };
 }
