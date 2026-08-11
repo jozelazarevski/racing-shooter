@@ -6608,13 +6608,24 @@ export class Track {
     // ARENA each had a tower's legs standing in the racing line, on the fast
     // part of the lap. The span now opens until both towers stand clear of
     // every stretch of road, and the banner between them just gets wider.
-    let span = 12.5;
-    for (let s = 12.5; s <= 22; s += 0.5) {
-      const clear = [1, -1].every((side) =>
-        [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]].every(([ox, oz]) =>
-          this._clearsRoad(c.x + n.x * s * side + ox, c.z + n.z * s * side + oz, 0.6, 0.9)));
-      if (clear) { span = s; break; }
-      span = s;                       // nothing clears: keep the widest tried
+    const legsIn = (s) => {
+      let n0 = 0;
+      for (const side of [1, -1]) {
+        for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
+          if (!this._clearsRoad(c.x + n.x * s * side + ox, c.z + n.z * s * side + oz, 0.6, 0.9)) n0++;
+        }
+      }
+      return n0;
+    };
+    // Widen to the first span that stands entirely clear. If none does — a
+    // circuit that runs back past its own start line at every plausible width
+    // — take the span with the FEWEST legs in the road, ties going to the
+    // narrowest. Taking the widest tried instead made it worse than doing
+    // nothing: 13 legs in the lane against the 8 it started with.
+    let span = 12.5, best = legsIn(12.5);
+    for (let s = 12.5; s <= 22 && best > 0; s += 0.5) {
+      const n0 = legsIn(s);
+      if (n0 < best) { best = n0; span = s; }
     }
     for (const side of [1, -1]) {
       const bx = c.x + n.x * span * side, bz = c.z + n.z * span * side;
@@ -7535,6 +7546,13 @@ export class Track {
           const sc = 1.15 + hash(j * 9.1 - side) * 0.75;      // big canopy pines
           const lat = (this.widthAt(j) + 0.75 * sc + 2.0 + row * 3.2 + h1 * 1.4) * side;
           const p = this.pointAt(j, lat);
+          // The lateral above is measured against THIS sample's width, which is
+          // what the note beside it promises and not what it delivers: on a
+          // corridor that bends back on itself the trunk lands in another
+          // stretch of the lap. A grown pine is SOLID — the car stops dead on
+          // it — so a trunk that cannot stand clear of the whole lap is not
+          // planted. Measured on SUZUKA, four of them stood in the racing line.
+          if (!this._clearsRoad(p.x, p.z, 0.75 * sc, 1.7)) continue;
           const ty = this.terrainHeight(p.x, p.z) - 0.2;
           // lean the whole tree inward over the road (rotation about the tangent)
           const lean = (0.10 + hash(j * 3.3 + side) * 0.12) * side;
@@ -14637,6 +14655,12 @@ export class Track {
         const sp = species === 'saguaro' ? parts : species === 'barrel' ? barrelParts
           : species === 'acacia' ? acaciaParts
           : species === 'agave' ? agaveParts : ocParts;
+        // The scrub yields — a cactus in the lane costs paint and goes over.
+        // A grown ACACIA does not: `s * 1.35` puts it past the size at which
+        // the material law calls a trunk solid, so one standing in the road
+        // stops the car dead. CANYON RUN had exactly that. Only the solid
+        // species has to clear the lap.
+        if (species === 'acacia' && !this._clearsRoad(p.x, p.z, spot.s * 1.35, 1.7)) return;
         const k2 = ks[species]++;
         const s = species === 'acacia' ? spot.s * 1.35 : spot.s;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
@@ -16304,10 +16328,22 @@ export class Track {
     const faceClear = (q) => [-7, 0, 7].every((off) =>
       this._clearsRoad(q.x + this.tan[i].x * off, q.z + this.tan[i].z * off, 2.5, 1.0));
     if (!faceClear(p)) {
-      for (let extra = 4; extra <= 24; extra += 4) {
+      // step back first, then walk along the lap — a stand wants to be near
+      // the start line, but "near" is worth less than "not in the road"
+      let placed = false;
+      for (let extra = 4; extra <= 28 && !placed; extra += 4) {
         const q = this.pointAt(i, WALL_OFF + 16 + extra);
-        if (faceClear(q)) { p = q; break; }
+        if (faceClear(q)) { p = q; placed = true; }
       }
+      for (let back = 12; back <= 96 && !placed; back += 12) {
+        for (const off of [16, 22, 28]) {
+          const q = this.pointAt((i - back + N) % N, WALL_OFF + off);
+          if (faceClear(q)) { p = q; placed = true; break; }
+        }
+      }
+      // nowhere on the lap takes it: a stand in the road is worse than no
+      // stand, and the crowd noise is not load-bearing
+      if (!placed) return;
     }
     // STAND IT ON THE GROUND, not at road height. `pointAt` returns the ROAD's
     // elevation, and this sits 26 u off the centreline where the terrain has

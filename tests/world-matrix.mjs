@@ -34,10 +34,17 @@ const PROBE = () => {
     if (m === 'stone' && Math.abs(r - 2.7) < 0.06) return 'boulder';
     return 'other';
   };
+  // A TREE IS ONLY IN THE WAY IF IT IS SOLID. vehicles.js smashes saplings,
+  // cacti and snags at speed and stops the car dead on a grown trunk, so a
+  // yielding cactus standing in the lane costs paint, not a lap — counting it
+  // beside a boulder overstated CANYON RUN by three.
+  const treeIsSolid = (t2) => (t2.solid === true)
+    || ((t2.s ?? 1) >= 1.0 && t2.kind !== 'cactus' && t2.kind !== 'snag' && t2.solid !== false);
   const scan = (arr, label, carR) => {
     const out = [];
     for (const s of arr ?? []) {
       if (s._faller) continue;                       // landed hazards belong there
+      if (label === 'tree' && !treeIsSolid(s)) continue;
       const { x, z } = s;
       if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
       const i = t.nearestIndex({ x, y: s.y ?? 0, z });
