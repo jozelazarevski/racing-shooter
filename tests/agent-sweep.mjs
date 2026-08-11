@@ -202,10 +202,16 @@ const AGENT = async (secs) => {
   audit.pickups = g.pickups.length;
   audit.pickupBad = g.pickups.filter((pk) => Math.abs(pk.pos.y - t.pointAt(pk.index, pk.lateral).y) > 3).length;
   // solid scenery standing in the drivable corridor
-  const inRoad = (arr, rKey = 'r') => {
+  // A TREE IS ONLY IN THE WAY IF IT IS SOLID — vehicles.js smashes saplings,
+  // cacti and snags at speed and stops the car dead on a grown trunk. Counting
+  // a yielding cactus beside a boulder overstated CANYON RUN by three.
+  const treeIsSolid = (x) => (x.solid === true)
+    || ((x.s ?? 1) >= 1.0 && x.kind !== 'cactus' && x.kind !== 'snag' && x.solid !== false);
+  const inRoad = (arr, rKey = 'r', kind = null) => {
     const hits = [];
     for (const s of arr ?? []) {
       if (!Number.isFinite(s.x) || !Number.isFinite(s.z)) continue;
+      if (kind === 'tree' && !treeIsSolid(s)) continue;
       // A LANDED HAZARD IS SUPPOSED TO BE IN THE ROAD. Rockfall and toppled
       // burning trees push temporary stone solids onto the carriageway for
       // 18 s, which is the whole point of them — counting those as misplaced
@@ -226,7 +232,7 @@ const AGENT = async (secs) => {
     }
     return hits;
   };
-  const sRoad = inRoad(t.solids), tRoad = inRoad(t.trees), bRoad = inRoad(t.buildings);
+  const sRoad = inRoad(t.solids), tRoad = inRoad(t.trees, 'r', 'tree'), bRoad = inRoad(t.buildings);
   audit.solidsInRoad = sRoad.slice(0, 8);
   audit.solidsInRoadN = sRoad.length;
   audit.treesInRoad = tRoad.length;
