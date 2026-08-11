@@ -9,3 +9,4 @@ node_modules/
 
 # headless sweep scratch (probes + raw logs, regenerated on demand)
 /.sweep/
+/tests/agent-sweep-report.json
