@@ -206,6 +206,11 @@ const AGENT = async (secs) => {
     const hits = [];
     for (const s of arr ?? []) {
       if (!Number.isFinite(s.x) || !Number.isFinite(s.z)) continue;
+      // A LANDED HAZARD IS SUPPOSED TO BE IN THE ROAD. Rockfall and toppled
+      // burning trees push temporary stone solids onto the carriageway for
+      // 18 s, which is the whole point of them — counting those as misplaced
+      // scenery reported ROCKFALL RAVINE as broken for working correctly.
+      if (s._faller) continue;
       const i = t.nearestIndex({ x: s.x, y: s.y ?? 0, z: s.z });
       const lat = Math.abs(t.lateralOffset({ x: s.x, y: 0, z: s.z }, i));
       const hw = t.widthAt?.(i) ?? 8;

@@ -18,7 +18,8 @@ Requires `playwright-core` and a Chromium at `/opt/pw-browsers/chromium`
 
 | Suite | What it does |
 |---|---|
-| `playtest-all.mjs` | Races **all 18 worlds**. Flags NaN in car state, cars sinking under terrain, AI that makes no progress or falls out of the world, pickups off the road plane, declared-but-unbuilt hazards, and page errors. |
+| `agent-sweep.mjs` | An autopilot **drives every world in `levels.js`** on the analog steer/throttle/brake a touch player uses — no rail, no teleport — and audits the built world around it: colliders standing in the drivable lane, walls across the road, steps and grades in the road surface, flat self-crossings, pickups off the plane, unbuilt hazards. Findings from the first full run are written up in `../BUGS.md`. |
+| `playtest-all.mjs` | Races **all 18 worlds**. Flags NaN in car state, cars sinking under terrain, AI that makes no progress or falls out of the world, pickups off the road plane, declared-but-unbuilt hazards, and page errors. **Stale: the loop stops at level 28 of a 57-world roster** — see `BUGS.md` §6. |
 | `playtest-systems.mjs` | Weapons (cannon / missile / mine / shockwave each damage a rival), wreck→respawn, a full race to the results screen, podium unlock gating, credit economy, upgrade purchase, pickup collection. |
 | `playtest-modes.mjs` | Live hazards firing mid-race (rockfall, burning treefall, icicles), the final-lap avalanche chase, the free-roam loop (stars, choppers, credit banking), the pause menu, and mobile touch driving. |
 
@@ -42,3 +43,13 @@ Two rules learned the hard way:
 2. **Drive, don't teleport.** Setting `player.pos` doesn't stick — physics
    moves the car straight off again, so proximity triggers (pickups, stars)
    never fire. Rail the car along the road through the target instead.
+3. **A rail is not a driver.** Railing gets a probe past a proximity trigger,
+   and it also drives straight through every boulder, wall and pinch in the
+   road — which is the whole class of bug a playtest exists to find. When the
+   question is "can this world be driven", write to `input.analog` and let the
+   physics answer; see `agent-sweep.mjs`.
+4. **Stub the composer for long drives.** SwiftShader draws a world at ~1 fps
+   and `dt` is clamped at 0.05, so a rendered probe runs at a tenth of real
+   time. `game.composer.render = () => {}` puts the simulation back to 60 fps
+   and real time; restore it afterwards, and measure the rendered path
+   separately.
