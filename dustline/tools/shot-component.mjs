@@ -39,7 +39,7 @@ if (!ids.length) {
 
 const BASE = process.env.BASE || 'http://localhost:8904/';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const stopServer = await ensureServer(BASE, '../play-dustline');
+const stopServer = await ensureServer(BASE, '../V2');
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({

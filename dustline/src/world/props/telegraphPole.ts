@@ -24,6 +24,7 @@
 // into the geometry would be right at one spacing and wrong at every other. If
 // wires arrive they belong to whatever places the run, not to the pole.
 
+import * as THREE from 'three';
 import { PropTemplate, standard, mergeGeoms, beam, cylinderAt, coneAt } from './types';
 import { strut } from '../../templates/geometry';
 
@@ -31,11 +32,35 @@ const ARM_LO = 6.7, ARM_HI = 7.45;   // crossarm centres
 const ARM_T = 0.11;                  // arm thickness, so an insulator sits on ARM + half
 
 /** Insulators standing on a crossarm: a ceramic body and a wider skirt, which
- *  is the silhouette that reads at 60 m — a plain peg reads as a nail. */
+ *  is the silhouette that reads at 60 m — a plain peg reads as a nail.
+ *
+ *  480 TRIANGLES, AND THE FILE'S OWN HEADER SAYS WHY THAT WAS ABSURD. This
+ *  component is built to be planted twelve at a time; at 26 poles the ten
+ *  insulators on each were 12,480 triangles of the frame — more than the entire
+ *  horizon — for ten objects 15 cm tall on an 8.2 m pole. The closest the road
+ *  ever comes is `minRoadDist` 6 m, which with 7 m of pole above the car is a
+ *  slant of 8 m, and at 8 m a 15 cm skirt is 15 px.
+ *
+ *  Two changes, both of them removing geometry that cannot be seen from a road:
+ *
+ *  SIX SIDES -> FOUR. At 8 m the chord error goes from 1 cm to 2.2 cm, which is
+ *  1.3 px to 2.8 px, and beyond 15 m neither is resolvable at all. The
+ *  silhouette this comment is about — narrow body, wider skirt — is untouched,
+ *  and `randomYaw: false` means every pole in a run presents the same face, so
+ *  a four-sided peg reads as a peg rather than rotating through its corners.
+ *
+ *  THE BODY LOSES ITS CAPS. Both of them are coincident with another surface
+ *  rather than merely hidden: the bottom disc sits exactly on the crossarm's
+ *  top face (`ARM + ARM_T/2` is that face), and the top disc is coplanar with,
+ *  and inside, the skirt's own top disc. They were two z-fighting pairs, and
+ *  removing them is a fix as much as a saving. The skirt keeps both of its caps
+ *  — the underside is what you see when the line passes over the road. */
 function insulators(y: number, xs: number[]) {
   return xs.flatMap((x) => [
-    cylinderAt(0.05, 0.062, 0.15, 6, y).translate(x, 0, 0),
-    cylinderAt(0.075, 0.075, 0.05, 6, y + 0.1).translate(x, 0, 0),
+    // openEnded: the 6th argument. Base at `y`, like `cylinderAt`.
+    new THREE.CylinderGeometry(0.05, 0.062, 0.15, 4, 1, true)
+      .translate(x, y + 0.075, 0),
+    cylinderAt(0.075, 0.075, 0.05, 4, y + 0.1).translate(x, 0, 0),
   ]);
 }
 

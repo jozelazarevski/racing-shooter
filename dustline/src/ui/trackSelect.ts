@@ -1,7 +1,7 @@
 // THE TRACK PICKER.
 //
 // Saving a track in the editor has always put it somewhere the game could load
-// it from. The game just had no way to ASK: `/play-dustline/` booted the first
+// it from. The game just had no way to ASK: `/V2/` booted the first
 // built-in and nothing else, so a track you had just made was reachable only by
 // hand-typing `?track=<id>` into the address bar. That is not "saved into the
 // game", it is saved next to it.

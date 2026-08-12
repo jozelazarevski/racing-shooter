@@ -56,8 +56,20 @@ const rows = await page.evaluate(async () => {
       const half = (t.widthAt?.(bi) ?? 7) + 0.55;
       // overlap: the solid's disc reaches inside the drivable half-width
       const intrude = (half + 1.8) - (d - s.r);
-      if (intrude > 0.5) hits.push({ r: +s.r.toFixed(1), mat: s.mat, h: s.h,
+      if (intrude <= 0.5) continue;
+      // THE HEIGHT GATE DECIDES WHETHER IT IS THERE AT ALL. `Car.step` skips a
+      // solid whose y is more than 6 u from the car unless it declares `h`
+      // (then it is solid over its whole span). Without this filter the sweep
+      // is mostly noise: proxies parked at y = -9999 and cellar-level colliders
+      // read as blocking the road when nothing can ever touch them.
+      const roadY = t.center[bi].y;
+      const reachable = s.y === undefined ? true
+        : s.h !== undefined ? (roadY >= s.y - 3 && roadY <= s.y + s.h)
+          : Math.abs(roadY - s.y) <= 6;
+      if (!reachable) continue;
+      hits.push({ r: +s.r.toFixed(1), mat: s.mat, h: s.h,
         d: +d.toFixed(1), half: +half.toFixed(1), intrude: +intrude.toFixed(1),
+        y: s.y === undefined ? 'any' : +(+s.y).toFixed(1), roadY: +roadY.toFixed(1),
         frac: +(bi / N).toFixed(3), x: +s.x.toFixed(0), z: +s.z.toFixed(0) });
     }
     hits.sort((a, c) => c.intrude - a.intrude);

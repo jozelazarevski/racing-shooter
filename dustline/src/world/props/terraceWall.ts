@@ -16,6 +16,19 @@
 //   A COPING COURSE. Stones set on edge along the top, which is what keeps
 //   the fill from washing over the lip — and from the road it is the line
 //   that reads, because it is the only straight edge on the object.
+//
+// 684 TRIANGLES AND NOT ONE OF THEM IS SUB-PIXEL, which is why the pass that
+// cut the boat fenders, the telegraph insulators, the lighthouse rail and the
+// scree stones did not touch this file. Measured, longest edge per triangle:
+// all 684 are over 50 cm. It is 45 course blocks and 12 coping stones, every
+// one a box at the 12 triangles a box costs, and the block count is the
+// stagger, which is the whole difference between dry stone and brick.
+//
+// The saving that is really here is 20 instances x 684 x 2 passes = 27,360
+// triangles submitted every frame in harbour whatever the camera is pointed at,
+// and that is bought with per-instance visibility, not by making the wall out
+// of fewer, longer stones. See `stoneWall.ts`, which carries the same argument
+// at 61 instances and the same conclusion.
 
 import * as THREE from 'three';
 import { PropTemplate, standard, mergeGeoms, beam } from './types';
