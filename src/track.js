@@ -4109,6 +4109,35 @@ const ELEMENT_KITS = {
     stoneWalls: 0, fenceRuns: 7,
   },
 };
+/* THE NATURE PALETTE THE WORLD EDITOR PLANTS FROM (`edit.props`).
+ *
+ * Deliberately a handful of SILHOUETTES rather than a copy of the theme's own
+ * species tables: a hand-planted tree has to read the same under every one of
+ * the eighteen palettes, and it takes its colours from the live theme, so what
+ * it must not carry is a shape that only makes sense in one of them. Exported
+ * so the editor's palette and this builder can never drift apart — the editor
+ * lists exactly what the builder can stamp.
+ *
+ * `solidAt` is the material law, same as the forest: at or above that scale
+ * the trunk stops a car, below it the trunk always yields. */
+export const EDIT_PROP_KINDS = {
+  pine: { size: 1.5, rFac: 0.9, solidAt: 1.0, shadow: true, treeKind: 'pine', trunk: 2.4,
+    tiers: [{ r: 1.55, h: 3.0, y: 2.0 }, { r: 1.2, h: 2.6, y: 3.5 },
+      { r: 0.85, h: 2.2, y: 4.9, top: true }] },
+  broadleaf: { size: 1.5, rFac: 0.8, solidAt: 1.0, shadow: true, treeKind: 'oak', trunk: 2.8,
+    tiers: [{ r: 1.9, h: 2.6, y: 4.0, round: true },
+      { r: 1.35, h: 1.7, y: 5.4, round: true, top: true }] },
+  slim: { size: 1.4, rFac: 0.55, solidAt: 1.1, shadow: true, treeKind: 'pine', trunk: 3.4,
+    tiers: [{ r: 0.95, h: 5.4, y: 2.6 }, { r: 0.6, h: 3.0, y: 6.4, top: true }] },
+  snag: { size: 1.3, rFac: 0.45, solidAt: null, shadow: true, treeKind: 'snag', trunk: 4.2,
+    tiers: [{ r: 0.42, h: 1.5, y: 4.0 }] },
+  bush: { size: 1.1, rFac: 0.5, solidAt: null, shadow: false, treeKind: 'bush', trunk: 0.4,
+    tiers: [{ r: 1.0, h: 1.1, y: 0.8, round: true },
+      { r: 0.62, h: 0.7, y: 1.5, round: true, top: true }] },
+  rock: { rock: true, size: 1.4, squash: 0.8 },
+  boulder: { rock: true, size: 3.0, squash: 0.75 },
+};
+
 // Species mix for the default (conifer-family) forest builder, per theme:
 // [[species, weight]...]. Species live in _buildForest. Themes not listed
 // fall back to the classic two-pine stand; a theme can override the whole
@@ -4594,6 +4623,16 @@ export class Track {
     // [{x, z, r, y}] for big boulders, huts, gantry legs, the grandstand
     // front and distant mesas. Car physics treats them like this.obstacles.
     this.solids = [];
+    // EVERY STRUCTURE THE BUILDER PUT DOWN, AND WHAT IT WAS BUILT FROM.
+    //
+    // The world editor can delete world scenery (an erase circle) but could
+    // never MOVE it, because a batched instance is geometry in a buffer with
+    // no memory of the template that produced it. This is that memory:
+    // {type, x, z, rot, scale, r} for each `_element` placement, which is
+    // exactly the vocabulary `edit.elements` already speaks — so the editor
+    // can adopt a house it did not place, erase the original and re-place the
+    // same template anywhere, at any angle.
+    this.placedElements = [];
     // WALLS ARE SEGMENTS, NOT DOTS. A masonry run - a pass parapet, a dry
     // stone field wall, a quay coping - is a continuous barrier, and a row of
     // circle colliders is not: measured on GOTTHARD, four of six runs driven
@@ -4778,6 +4817,39 @@ export class Track {
         const f = THREE.MathUtils.smoothstep(Math.min(1, edge), 0, 1);
         const j = (i0 + k) % N;
         this._width[j] = Math.min(this._width[j], ROAD_HALF + (minW - ROAD_HALF) * f);
+      }
+    }
+    this._applyWidenEdits();
+  }
+
+  /** THE EDITOR'S WIDEN BRUSH. `edit.widen` is a list of strokes in WORLD
+   *  space — {x, z, r, w} — where `w` is the half-width the road is being
+   *  ASKED FOR there, not a delta.
+   *
+   *  It lands HERE, in the one profile every consumer reads through
+   *  `widthAt(i)`: the ribbon mesh and its verges, the AI's lateral clamp and
+   *  its pinch braking, the scenery clearance rules, the wall-run gates and the
+   *  editor's own marks. Widening anywhere else would have moved the paint and
+   *  left the road, which is the mistake the sculpt made before r150.
+   *
+   *  Strokes resolve LIKE PAINT: in the order they were laid, each pulling the
+   *  profile toward its target by a smoothstep falloff, so the newest stroke
+   *  wins where it is thickest and the ones under it show through at the rim.
+   *  A target rather than a delta is what makes the tool correctable — under
+   *  "biggest pull wins" a narrowing stroke laid over a wider one did nothing
+   *  at all, and under summing, two taps of the same intent doubled the road
+   *  while the status line reported one. Both were measured; this is neither.
+   */
+  _applyWidenEdits() {
+    const W = this.edit && this.edit.widen;
+    if (!W || !W.length) return;
+    for (let i = 0; i < N; i++) {
+      const c = this.center[i];
+      for (const s of W) {
+        const d = Math.hypot(c.x - s.x, c.z - s.z);
+        if (d >= s.r) continue;
+        const f = 1 - THREE.MathUtils.smoothstep(d / s.r, 0, 1);
+        this._width[i] += (THREE.MathUtils.clamp(s.w, 5, 22) - this._width[i]) * f;
       }
     }
   }
@@ -7933,6 +8005,10 @@ export class Track {
     // already occupies the verge — a hedge cannot grow across a field gate.
     if (this.T.hedgeBanks) this._buildHedgeBanks(m4);
     this._buildRoadsideDetail(m4);                   // corner markers + gravel
+    // LAST OF THE SCENERY, so an authored tree or boulder always wins its spot
+    // over anything the world scattered there — and still BEFORE the contact
+    // shadows, which have to see it to ground it.
+    this._buildEditProps();                          // trees and rocks the owner planted
     this._buildContactShadows();                     // baked AO under everything
   }
 
@@ -10918,7 +10994,7 @@ export class Track {
         // player's screenshot could be driven straight into and over. The
         // barrier runs the full span at its real thickness and height.
         this._barrier(wall.position.x, wall.position.z, Math.sin(yaw), Math.cos(yaw),
-          span * 2 * this.segLen, 1.1, this.center[i].y - 0.2, 1.6);
+          span * 2 * this.segLen, 1.1, this.center[i].y - 0.2, 1.6, 'stone', true);
         // arch faces: two masonry blocks descending under the deck
         for (const k of [-span * 0.55, span * 0.55]) {
           const j = (i + Math.round(k) + N) % N;
@@ -11010,14 +11086,41 @@ export class Track {
     const stone = new THREE.MeshStandardMaterial({
       color: 0x8f8a80, flatShading: true, roughness: 1,
     });
+    // A RAIL BESIDE MY DECK CAN BE A WALL ACROSS YOUR ROAD. Each rail stands
+    // at a fixed 10.2 u off its own sample and never used to ask what else
+    // runs there — in a knot where two legs pass 3-12 u apart (OLIVE
+    // CROSSING's west knot, MOUNTAIN TO SEA's tangles) the offset lands the
+    // rail inside the OTHER leg's carriageway at the other leg's grade, a
+    // continuous stone wall in the racing line. The field-stall dossier
+    // measured whole grids parked against exactly these. A rail that stands
+    // in any other stretch's lane within reach of its cars does not get
+    // built — the gap it leaves is a junction mouth, which is drivable and
+    // correct. Rails well ABOVE another road still build: cars pass beneath
+    // them now (see the barrier under-gate in vehicles.js).
+    const railBlocked = (x, z, y, jSelf, half) => {
+      for (let i = 0; i < N; i++) {
+        const dLap = Math.min((i - jSelf + N) % N, (jSelf - i + N) % N);
+        if (dLap <= half + 4) continue;             // its own deck run
+        const c2 = this.center[i];
+        const dx = x - c2.x, dz = z - c2.z;
+        if (dx * dx + dz * dz > 400) continue;
+        const dy = y - c2.y;
+        if (dy > 4.2 || dy < -1.5) continue;        // clear over (or under) it
+        const lat = Math.abs(dx * this.nrm[i].x + dz * this.nrm[i].z);
+        if (lat < (this.widthAt ? this.widthAt(i) : 9) + 1.4) return true;
+      }
+      return false;
+    };
     for (const o of this._overpasses) {
       const g = new THREE.Group();
       for (let sN = -o.half; sN <= o.half; sN += 2) {
         const j = (o.up + sN + N) % N;
         const c = this.center[j], n = this.nrm[j];
         for (const side of [1, -1]) {
+          const rx = c.x + n.x * 10.2 * side, rz = c.z + n.z * 10.2 * side;
+          if (railBlocked(rx, rz, c.y, j, o.half)) continue;
           const rail = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.1, 2 * this.segLen + 0.4), stone);
-          rail.position.set(c.x + n.x * 10.2 * side, c.y + 0.45, c.z + n.z * 10.2 * side);
+          rail.position.set(rx, c.y + 0.45, rz);
           rail.rotation.y = this.headingAt(j);
           g.add(rail);
           // WALLS ARE SEGMENTS, NOT DOTS — the same lesson the masonry
@@ -11028,7 +11131,7 @@ export class Track {
           // segment, so the run has no seam for a nose to find.
           this._barrier(rail.position.x, rail.position.z,
             this.tan[j].x, this.tan[j].z, 2 * this.segLen + 0.8, 0.7,
-            c.y - 0.2, 1.5, 'stone');
+            c.y - 0.2, 1.5, 'stone', true);   // a deck rail: cars pass under it
         }
         if (Math.abs(sN) % 8 === 0) {
           const ground = this.terrainHeight(c.x, c.z);
@@ -11450,6 +11553,25 @@ export class Track {
     const y = (yOverride == null ? this.terrainHeight(x, z) : yOverride) - 0.25;
     const cs = Math.cos(rot), sn = Math.sin(rot);
     const T = HOUSE_TEMPLATES[type] ?? HOUSE_TEMPLATES.logpile;
+    // A HOUSE DOES NOT STAND IN THE CARRIAGEWAY. Placement callers are meant
+    // to check `_clearsRoad`, but the village fills did not everywhere, and
+    // SEA CLIFF RUN ended with three huts IN its low coast road at road
+    // grade — the third leg of the field-stall dossier's jams. The gate
+    // lives HERE now so no caller can forget it, and it is height-aware
+    // (unlike `_clearsRoad`) so a house under a tall flyover still builds.
+    // Deliberately conservative — it kills lane-blockers, not streetscapes.
+    // Editor placements (`authored`) are exempt: your map, your rules.
+    if (!authored) {
+      const fr = T.r * scale;
+      for (let i = 0; i < N; i++) {
+        const c = this.center[i];
+        const dx = x - c.x, dz = z - c.z;
+        if (dx * dx + dz * dz > 900) continue;
+        if (Math.abs(y - c.y) > 6) continue;
+        const lat = Math.abs(dx * this.nrm[i].x + dz * this.nrm[i].z);
+        if (lat < (this.widthAt ? this.widthAt(i) : 9) + fr * 0.45) return;
+      }
+    }
     // NO TWO ALIKE: each placement gets its own footprint stretch, height,
     // mirror and weathering shade, so the shared templates stop reading as
     // copy-paste rows of one house. The solid follows the stretched print.
@@ -11494,6 +11616,8 @@ export class Track {
     const r = T.r * scale * Math.max(wS, dS), mat = T.mat ?? 'hut';
     const solid = { x, z, r, y: y + 0.6, mat };
     this.solids.push(solid);
+    // the editor's handle on this structure — see `placedElements`
+    this.placedElements.push({ type, x, z, rot, scale, r, authored });
     this._addShadow(x, z, r * 1.35);
     return { r, solid, y };
   }
@@ -11798,6 +11922,113 @@ export class Track {
     }
   }
 
+  /** NATURE THE OWNER PLANTED.
+   *
+   *  CLEAR AREA could only ever take scenery AWAY: the wood and the boulder
+   *  field are invented afresh on every build, so there was no instance to
+   *  move and no way to add one — "I can delete a forest but I cannot plant a
+   *  tree" was the whole shape of the gap. `edit.props` closes it. Each entry
+   *  is {kind, x, z, rot, scale} and is stored, not baked, exactly like a
+   *  placed building: the scene stays a few kB and the props re-seat
+   *  themselves on whatever ground the sculpt leaves under them.
+   *
+   *  They are built HERE rather than folded into `_buildForest` on purpose.
+   *  The forest has ten vegetation variants, each pre-allocating its own
+   *  InstancedMeshes to the theme's tree count; threading an authored list
+   *  through all of them would mean ten edits that all have to stay in step.
+   *  This is one batch per part per kind — still one draw call each, still
+   *  registered in `trees` and `solids` so an authored pine fells and an
+   *  authored boulder stops a car exactly like the world's own.
+   *
+   *  Colour comes from the THEME, not from the scene, so a prop planted under
+   *  PINE FOREST and then re-skinned to DESERT changes with everything else
+   *  around it — the same rule the world recipe follows everywhere. */
+  _buildEditProps() {
+    const list = this.edit && this.edit.props;
+    if (!list || !list.length) return;
+    const T = this.T;
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const col = new THREE.Color();
+
+    const byKind = new Map();
+    for (const p of list) {
+      if (!EDIT_PROP_KINDS[p.kind]) continue;          // a later palette: skip, never throw
+      if (!byKind.has(p.kind)) byKind.set(p.kind, []);
+      byKind.get(p.kind).push(p);
+    }
+    if (!byKind.size) return;
+
+    const trunkMat = new THREE.MeshStandardMaterial({
+      color: T.trunkColor ?? 0x6b4423, roughness: 1 });
+    const lowMat = new THREE.MeshStandardMaterial({
+      color: T.foliageLow ?? 0x2f5d34, flatShading: true, roughness: 1 });
+    const topMat = new THREE.MeshStandardMaterial({
+      color: T.foliageTop ?? 0x3f7a44, flatShading: true, roughness: 1 });
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: T.rockColor ?? 0x7d7669, flatShading: true,
+      roughness: T.rockRoughness !== undefined ? T.rockRoughness : 0.9,
+      envMapIntensity: 0.5, vertexColors: true,
+    });
+
+    for (const [kind, items] of byKind) {
+      const spec = EDIT_PROP_KINDS[kind];
+      const n = items.length;
+      if (spec.rock) {
+        const geo = this._rockGeo || (this._rockGeo = this._topLitRockGeo(0));
+        const im = new THREE.InstancedMesh(geo, rockMat, n);
+        im.castShadow = true;
+        im.name = `edit-prop-${kind}`;
+        for (let k = 0; k < n; k++) {
+          const e = items[k];
+          const s = (e.scale || 1) * spec.size;
+          const sy = s * spec.squash;
+          const y = this.terrainHeight(e.x, e.z) + s * 0.25;
+          q.setFromAxisAngle(up, e.rot || 0);
+          m4.compose(new THREE.Vector3(e.x, y, e.z), q, new THREE.Vector3(s, sy, s));
+          im.setMatrixAt(k, m4);
+          col.setScalar(0.86 + ((k * 0.37) % 1) * 0.28);
+          im.setColorAt(k, col);
+          if (s > 0.7) {
+            this.solids.push({ x: e.x, z: e.z, r: s * 0.9, y: y - s * 0.25,
+              mat: 'stone', inst: k, im, sc: s });
+            this._addShadow(e.x, e.z, s * 1.5);
+          }
+        }
+        this.group.add(im);
+        continue;
+      }
+      // --- a tree: a trunk and one or more crown tiers, each its own batch
+      const parts = [];
+      const trunk = new THREE.CylinderGeometry(0.3, 0.46, spec.trunk, 7);
+      trunk.translate(0, spec.trunk * 0.5, 0);
+      parts.push(new THREE.InstancedMesh(trunk, trunkMat, n));
+      for (const tier of spec.tiers) {
+        const g = tier.round
+          ? new THREE.IcosahedronGeometry(tier.r, 0)
+          : new THREE.ConeGeometry(tier.r, tier.h, 8);
+        g.scale(1, tier.round ? tier.h / tier.r : 1, 1);
+        g.translate(0, tier.y, 0);
+        parts.push(new THREE.InstancedMesh(g, tier.top ? topMat : lowMat, n));
+      }
+      for (const part of parts) { part.castShadow = true; part.name = `edit-prop-${kind}`; }
+      for (let k = 0; k < n; k++) {
+        const e = items[k];
+        const s = (e.scale || 1) * spec.size;
+        const ty = this.terrainHeight(e.x, e.z) - 0.25;
+        q.setFromAxisAngle(up, e.rot || 0);
+        m4.compose(new THREE.Vector3(e.x, ty, e.z), q, new THREE.Vector3(s, s, s));
+        for (const part of parts) part.setMatrixAt(k, m4);
+        this.trees.push({
+          x: e.x, z: e.z, y: ty, r: spec.rFac * s, id: k, parts, kind: spec.treeKind, s,
+          solid: spec.solidAt != null && s >= spec.solidAt,
+        });
+        if (spec.shadow) this._addShadow(e.x, e.z, 2.4 * spec.rFac * s);
+      }
+      this.group.add(...parts);
+    }
+  }
+
   _realizeElements(B, m4) {
     const gWall = new THREE.BoxGeometry(1, 1, 1); gWall.translate(0, 0.5, 0);
     const gBox = new THREE.BoxGeometry(1, 1, 1); gBox.translate(0, 0.5, 0);
@@ -11948,12 +12179,22 @@ export class Track {
    *  passing a heading to a cos/sin helper is the exact mistake that laid a
    *  hairpin's parapets out as a comb of piano keys. A vector cannot be
    *  misread. */
-  _barrier(x, z, dirX, dirZ, len, thick, y, h, mat = 'stone') {
+  /** `deck`: this wall is the parapet of a BRIDGE — there is a road under it,
+   *  and a car driving that road passes beneath (see the barrier under-gate
+   *  in vehicles.js). Only the two deck builders pass it.
+   *
+   *  This is declared, not inferred. It was first written as "its base stands
+   *  more than 3 u above the terrain at its own footprint", which is true of
+   *  a flyover rail AND of GOTTHARD's switchback retaining walls, whose
+   *  footprint terrain is the hillside falling away beside them: measured,
+   *  that let a car drive clean through the masonry on one approach in five.
+   *  A bridge knows it is a bridge; nothing else has to be guessed at. */
+  _barrier(x, z, dirX, dirZ, len, thick, y, h, mat = 'stone', deck = false) {
     const dl = Math.hypot(dirX, dirZ) || 1;
     const hl = len / 2, ux = (dirX / dl) * hl, uz = (dirZ / dl) * hl;
     this.barriers.push({
       x1: x - ux, z1: z - uz, x2: x + ux, z2: z + uz,
-      hw: thick / 2, y, h, mat,
+      hw: thick / 2, y, h, mat, over: deck,
     });
   }
 
@@ -16030,6 +16271,7 @@ export class Track {
       if (!this._clearsRoad(p.x, p.z, rad, 3.5)) return;
       const before = this._batchLens(B);
       const el = this._element(B, type, p.x, p.z, Math.random() * Math.PI * 2, K, scale);
+      if (!el) return;   // the element gate (road/erase) declined the site
       // A building is a target, not scenery: register it so cannon rounds and
       // blasts can level it. The slots are resolved to real meshes in
       // `_realizeElements`, once the batch has been turned into geometry.
