@@ -99,7 +99,12 @@ const R = await page.evaluate(async () => {
   ed2.preset = 'house';
   ed2.tool = 'place';
   ed2._place({ x: px, z: pz });
-  const ghostKinds = () => (ed2._ghosts ? ed2._ghosts.children.map((m) => m.geometry.type) : []);
+  // A marker is one mesh and carries its geometry; a LIVE PREVIEW is a group
+  // of real parts and carries none, so describe children by what they are.
+  const ghostKinds = () => (ed2._ghosts
+    ? ed2._ghosts.children.map((m) => (m.userData.preview ? 'preview'
+      : (m.geometry ? m.geometry.type : 'group')))
+    : []);
   out.beforeApply = ghostKinds();
   ed2.apply();
   await new Promise((r) => setTimeout(r, 500));
@@ -251,8 +256,9 @@ ok(R.otherAgrees, 'and its physics ground still agrees with its drawn ground');
 ok(R.hasDelete, 'a saved scene card carries a delete');
 ok(R.armed && R.survivesOneTap === 1, 'one tap arms the delete, it does not fire', R.survivesOneTap);
 ok(R.afterDelete === 0 && R.cardGone, 'the second tap deletes it', R.afterDelete);
-ok(R.beforeApply.join() === 'BoxGeometry',
-  'an unbuilt placement shows as a crate marker', R.beforeApply.join());
+ok(R.beforeApply.join() === 'preview',
+  'an unbuilt placement stands as the real building, straight away',
+  R.beforeApply.join());
 ok(R.afterApply.join() === 'RingGeometry',
   'once built it drops to a footprint ring — the house is what you see',
   R.afterApply.join());

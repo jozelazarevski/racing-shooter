@@ -11575,11 +11575,26 @@ export class Track {
     // NO TWO ALIKE: each placement gets its own footprint stretch, height,
     // mirror and weathering shade, so the shared templates stop reading as
     // copy-paste rows of one house. The solid follows the stretched print.
-    const wS = 0.86 + Math.random() * 0.34;
-    const dS = 0.86 + Math.random() * 0.34;
-    const hS = 0.88 + Math.random() * 0.34;
-    const mir = Math.random() < 0.5 ? -1 : 1;
-    const shade = 0.9 + Math.random() * 0.2;
+    //
+    // AN AUTHORED BUILDING DRAWS ITS OWN LOOK FROM ITS OWN POSITION.
+    //
+    // The world build is seeded, so the jitter is reproducible for a given
+    // build — but it comes off ONE stream in call order, which makes a placed
+    // building's appearance depend on how many were placed before it. Add a
+    // cottage at the start of the list and every later one silently restyles.
+    // Worse for the editor: a live preview runs outside the build entirely and
+    // could never draw the same numbers, so what you saw while placing was
+    // never quite what APPLY produced.
+    //
+    // Keying the stream to (x, z, type) fixes both at once: the look is a
+    // property of the building rather than of its place in a queue, so the
+    // preview and the rebuild agree exactly and neighbours stop restyling.
+    const rnd = authored ? seededRandom(hashPlacement(type, x, z)) : Math.random;
+    const wS = 0.86 + rnd() * 0.34;
+    const dS = 0.86 + rnd() * 0.34;
+    const hS = 0.88 + rnd() * 0.34;
+    const mir = rnd() < 0.5 ? -1 : 1;
+    const shade = 0.9 + rnd() * 0.2;
     const tinted = (c) => {
       const col = new THREE.Color(c);
       col.multiplyScalar(shade);
@@ -11592,7 +11607,7 @@ export class Track {
     // draws its own from them, and the second wall tone is derived from the
     // one it drew so trim and render still belong to the same building.
     const pick = (list) => (list && list.length)
-      ? list[(Math.random() * list.length) | 0] : null;
+      ? list[(rnd() * list.length) | 0] : null;
     const wallC = pick(K.palette), roofC = pick(K.roofs);
     const slot = (key) => {
       if (key === 'wall' && wallC !== null) return wallC;
@@ -12027,6 +12042,135 @@ export class Track {
       }
       this.group.add(...parts);
     }
+  }
+
+  /* ---------------------------------------------------------------------
+   * LIVE PREVIEW — what you place, visible NOW.
+   *
+   * Everything the editor does is deferred to APPLY, because the world is
+   * rebuilt from scratch and a placed building has to join a shared instanced
+   * batch to cost no draw call. That is right for the batch and wrong for the
+   * person placing it: a wireframe crate where a chapel will eventually be
+   * tells you a chapel is coming, not what it will look like or whether it
+   * fits, and "I cannot see what I am building until I apply" is the whole
+   * complaint.
+   *
+   * So the same template, the same kit, the same materials are realised for a
+   * SINGLE object into a plain Group the editor owns. It costs a handful of
+   * draw calls per previewed object, which is exactly why these are transient
+   * and why APPLY throws them away — at that point the real batch has it, and
+   * the batch is the version that costs nothing.
+   *
+   * It is the REAL thing, not an impression of it: `_element` fills the same
+   * bucket it fills during a build, and authored placements seed their jitter
+   * from their own position (see `hashPlacement`), so the preview and the
+   * rebuilt world are the same building down to the weathering shade.
+   * ------------------------------------------------------------------- */
+  previewElement(preset, x, z, rot = 0, scale = 1) {
+    if (!HOUSE_TEMPLATES[preset]) return null;
+    const B = { wall: [], box: [], cyl: [], cone: [], prism: [] };
+    // the SAME resolution `_buildWorldElements` uses, or the preview would be
+    // dressed in a different kit from the building APPLY finally stamps
+    const kit = ELEMENT_KITS[this.T.elements
+      || ELEMENT_KIT_BY_THEME[this.level && this.level.theme] || 'farm'] || ELEMENT_KITS.farm;
+    // `authored` — a preview is never subject to the road gate or the erase
+    // circles, for the same reason an authored placement is not: your map.
+    this._element(B, preset, x, z, rot, kit, scale, null, true);
+    return this._previewGroup(B);
+  }
+
+  /** Turn a one-object bucket into ordinary meshes. Mirrors `_realizeElements`
+   *  part for part — same geometries, same materials — but instanced meshes of
+   *  one are pure overhead, so these are plain Meshes. */
+  _previewGroup(B) {
+    const g = new THREE.Group();
+    g.name = 'edit-preview';
+    const gWall = new THREE.BoxGeometry(1, 1, 1); gWall.translate(0, 0.5, 0);
+    const gBox = new THREE.BoxGeometry(1, 1, 1); gBox.translate(0, 0.5, 0);
+    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); gCyl.translate(0, 0.5, 0);
+    const gCone = new THREE.ConeGeometry(0.5, 1, 10); gCone.translate(0, 0.5, 0);
+    const specs = {
+      wall: [gWall, () => new THREE.MeshStandardMaterial({
+        map: buildingTexture(), roughness: 0.85, envMapIntensity: 0.45,
+        emissive: 0xffffff, emissiveMap: buildingGlowTexture(),
+        emissiveIntensity: this.T.hutGlow !== undefined ? this.T.hutGlow : 0.5 })],
+      box: [gBox, () => new THREE.MeshStandardMaterial({ roughness: 0.9, envMapIntensity: 0.4 })],
+      cyl: [gCyl, () => new THREE.MeshStandardMaterial({ roughness: 0.9, envMapIntensity: 0.4 })],
+      cone: [gCone, () => new THREE.MeshStandardMaterial({
+        flatShading: true, roughness: 0.9, envMapIntensity: 0.4 })],
+      prism: [gablePrismGeo(), () => new THREE.MeshStandardMaterial({
+        flatShading: true, roughness: 0.9, envMapIntensity: 0.4 })],
+    };
+    const q = new THREE.Quaternion(), qr = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), fwd = new THREE.Vector3(0, 0, 1);
+    for (const key of Object.keys(specs)) {
+      const list = B[key];
+      if (!list || !list.length) continue;
+      const [geo, mat] = specs[key];
+      for (const p of list) {
+        const m = new THREE.Mesh(geo, mat());
+        m.material.color.set(p.color);
+        q.setFromAxisAngle(up, p.rot);
+        if (p.roll) q.multiply(qr.setFromAxisAngle(fwd, p.roll));
+        m.position.set(p.x, p.y, p.z);
+        m.quaternion.copy(q);
+        m.scale.set(p.sx, p.sy, p.sz);
+        m.castShadow = true;
+        g.add(m);
+      }
+    }
+    return g.children.length ? g : null;
+  }
+
+  /** The same, for a hand-planted tree or rock. Built from EDIT_PROP_KINDS so
+   *  it cannot drift from what `_buildEditProps` will stamp at APPLY. */
+  previewProp(kind, x, z, rot = 0, scale = 1) {
+    const spec = EDIT_PROP_KINDS[kind];
+    if (!spec) return null;
+    const T = this.T;
+    const g = new THREE.Group();
+    g.name = 'edit-preview';
+    const s = (scale || 1) * spec.size;
+    if (spec.rock) {
+      const geo = this._rockGeo || (this._rockGeo = this._topLitRockGeo(0));
+      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        color: T.rockColor ?? 0x7d7669, flatShading: true,
+        roughness: T.rockRoughness !== undefined ? T.rockRoughness : 0.9,
+        envMapIntensity: 0.5, vertexColors: true }));
+      m.position.set(x, this.terrainHeight(x, z) + s * 0.25, z);
+      m.rotation.y = rot || 0;
+      m.scale.set(s, s * spec.squash, s);
+      m.castShadow = true;
+      g.add(m);
+      return g;
+    }
+    const trunkMat = new THREE.MeshStandardMaterial({
+      color: T.trunkColor ?? 0x6b4423, roughness: 1 });
+    const lowMat = new THREE.MeshStandardMaterial({
+      color: T.foliageLow ?? 0x2f5d34, flatShading: true, roughness: 1 });
+    const topMat = new THREE.MeshStandardMaterial({
+      color: T.foliageTop ?? 0x3f7a44, flatShading: true, roughness: 1 });
+    const y = this.terrainHeight(x, z) - 0.25;
+    const trunk = new THREE.CylinderGeometry(0.3, 0.46, spec.trunk, 7);
+    trunk.translate(0, spec.trunk * 0.5, 0);
+    const parts = [[trunk, trunkMat]];
+    for (const tier of spec.tiers) {
+      const tg = tier.round
+        ? new THREE.IcosahedronGeometry(tier.r, 0)
+        : new THREE.ConeGeometry(tier.r, tier.h, 8);
+      tg.scale(1, tier.round ? tier.h / tier.r : 1, 1);
+      tg.translate(0, tier.y, 0);
+      parts.push([tg, tier.top ? topMat : lowMat]);
+    }
+    for (const [geo, mat] of parts) {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, y, z);
+      m.rotation.y = rot || 0;
+      m.scale.setScalar(s);
+      m.castShadow = true;
+      g.add(m);
+    }
+    return g;
   }
 
   _realizeElements(B, m4) {
@@ -17799,6 +17943,21 @@ export class Track {
 // the scope is exact: everything the Track constructor touches is seeded, and
 // nothing afterwards is. Gameplay randomness — damage rolls, AI jitter, particle
 // scatter — is deliberately left alone, because it should vary between runs.
+
+/** A stable seed for one AUTHORED placement, from what it is and where it
+ *  stands. FNV-1a over the rounded position, so a building keeps its look
+ *  across rebuilds, across a live preview, and regardless of how many other
+ *  buildings were placed before it. Rounded to 0.1 u because the scene format
+ *  stores one decimal — a saved-and-reloaded scene must key identically. */
+export function hashPlacement(type, x, z) {
+  const str = `${type}:${Math.round(x * 10)}:${Math.round(z * 10)}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
 
 /** mulberry32: tiny, fast, well-distributed, and identical on every engine
  *  because it runs entirely on uint32 arithmetic. */

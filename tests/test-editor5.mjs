@@ -153,6 +153,81 @@ const R = await page.evaluate(async () => {
   out.builtScale = ed.sel.el.scale;
   out.builtRot = +ed.sel.el.rot.toFixed(3);
 
+  // ---- WHAT YOU BUILD IS VISIBLE NOW, NOT AFTER APPLY --------------------
+  {
+    const eV = new WorldEditor(g);
+    eV.enter();
+    const spot = off(660, 52);
+    eV._pickTool('place'); eV.preset = 'cottageA';
+    eV._place(spot);
+    // real geometry, standing before APPLY — not a wireframe stand-in
+    let meshes = 0, wires = 0;
+    eV._ghosts.traverse((o) => {
+      if (!o.isMesh) return;
+      meshes++;
+      if (o.material && o.material.wireframe) wires++;
+    });
+    out.previewMeshes = meshes;
+    out.previewNoWireframe = wires === 0;
+    out.previewIsGroup = eV._ghosts.children.some((c) => c.userData.preview);
+
+    // and it is THE SAME building the rebuild will make: an authored
+    // placement seeds its look from its own position, so two previews of the
+    // same thing are identical down to the colour
+    const shape = (grp) => grp.children.map((m) =>
+      [m.position.x.toFixed(3), m.position.y.toFixed(3), m.position.z.toFixed(3),
+        m.scale.x.toFixed(3), m.scale.y.toFixed(3), m.scale.z.toFixed(3),
+        m.material.color.getHexString()].join(',')).join('|');
+    const a1 = g.track.previewElement('cottageA', spot.x, spot.z, 0.4, 1.1);
+    const a2 = g.track.previewElement('cottageA', spot.x, spot.z, 0.4, 1.1);
+    out.previewDeterministic = shape(a1) === shape(a2);
+    out.previewHasParts = a1.children.length > 1;
+    // a preset this build has never heard of degrades to a marker, not a throw
+    out.previewUnknownIsNull = g.track.previewElement('nonesuch', 0, 0) === null;
+    // ...and a plant previews the same way
+    const pv = g.track.previewProp('pine', spot.x + 30, spot.z, 0, 1);
+    out.previewPlant = pv && pv.children.length > 1;
+
+    // APPLY hands over to the batch: the preview goes, a footprint ring stays
+    await new Promise((res) => eV.apply(res));
+    let afterMeshes = 0, rings = 0;
+    eV._ghosts.traverse((o) => {
+      if (!o.isMesh) return;
+      afterMeshes++;
+      if (o.geometry && o.geometry.type === 'RingGeometry') rings++;
+    });
+    out.afterApplyMeshes = afterMeshes;
+    out.afterApplyRings = rings;
+    eV.exit();
+    eV.dispose();
+  }
+
+  // ---- an authored building keeps its look, whatever is placed near it ----
+  // The jitter used to come off the build's single seeded stream in call
+  // order, so adding one cottage restyled every cottage placed after it, and
+  // no preview outside the build could ever draw the same numbers.
+  {
+    const mk = async (extraFirst) => {
+      const e = new WorldEditor(g);
+      const at = off(680, 60);
+      if (extraFirst) { e.preset = 'barn'; e.tool = 'place'; e._place(off(690, 60)); }
+      e.preset = 'cottageB'; e.tool = 'place';
+      e._place(at);
+      await new Promise((res) => { g.editScene = e.buildPayload(); g.rebuildWorld(); res(); });
+      const found = (g.track.placedElements || []).find((q) => q.authored
+        && q.type === 'cottageB' && Math.hypot(q.x - at.x, q.z - at.z) < 1);
+      e.dispose();
+      return found ? +found.r.toFixed(4) : null;
+    };
+    const alone = await mk(false);
+    const withNeighbour = await mk(true);
+    out.styleAlone = alone;
+    out.styleWithNeighbour = withNeighbour;
+    out.styleStable = alone !== null && alone === withNeighbour;
+    g.editScene = null;
+    g.rebuildWorld();
+  }
+
   // ---- RUN: a row is two taps, not twenty --------------------------------
   {
     const eR = new WorldEditor(g);
@@ -468,6 +543,23 @@ ok(R.selBuilding, 'a placed building selects the same way');
 ok(R.builtScale === 1.8 && R.builtRot !== 0,
   'and the SCALE / ROT controls aim the object already down',
   `scale ${R.builtScale}, rot ${R.builtRot}`);
+
+console.log('\n--- what you build is visible NOW ---');
+ok(R.previewMeshes > 1,
+  'a placed building stands as real geometry before APPLY', `${R.previewMeshes} meshes`);
+ok(R.previewNoWireframe, 'and not as a wireframe stand-in');
+ok(R.previewIsGroup, 'drawn from the real template, as a group of real parts');
+ok(R.previewHasParts, 'which has more than one part to it');
+ok(R.previewDeterministic,
+  'two previews of the same placement are identical — the look is seeded by position');
+ok(R.styleStable,
+  'so a building keeps its look no matter what is placed before it',
+  `${R.styleAlone} vs ${R.styleWithNeighbour}`);
+ok(R.previewUnknownIsNull, 'an unknown preset previews as null, and gets a marker instead');
+ok(R.previewPlant, 'a plant previews the same way');
+ok(R.afterApplyRings > 0 && R.afterApplyMeshes === R.afterApplyRings,
+  'APPLY hands over to the batch: preview gone, footprint ring left',
+  `${R.afterApplyMeshes} meshes, ${R.afterApplyRings} rings`);
 
 console.log('\n--- RUN lays a row in two taps ---');
 ok(R.runArmedPlaced === 0, 'the first tap places nothing — it only anchors', R.runArmedPlaced);
