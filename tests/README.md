@@ -32,7 +32,7 @@ slipstream, big air, shield, treasure stars), `test-round-fixes.mjs`
 `test-menu-noreset.mjs` (live car swap + menu state restore),
 `test-roam.mjs`, `test-destruction.mjs`.
 
-**The world editor** has seven, each pinning what the ones before it could not
+**The world editor** has eight, each pinning what the ones before it could not
 do: `test-editor.mjs` (the sculpt reaches both ground functions and the
 physics), `test-editor2.mjs` (clear zones, the world recipe, weather),
 `test-editor3.mjs` (road features land where they were asked for),
@@ -41,7 +41,9 @@ its markers with it), `test-select.mjs` (selecting what the WORLD built, live
 in-place delete and move), `test-widen.mjs` (opening and narrowing the
 carriageway), `test-editor5.mjs` (NATURE, selection of plants/lakes/zones/road
 pins, DUPLICATE, REDO, water levels, brush shape, SNAP, scene codes, the
-draft, and CHECK).
+draft, and CHECK), `test-warp.mjs` (MOVE ROAD cannot knot a lap: the steering
+cap sees the warp, a pull is anchored to a station, and a road move can be
+selected and deleted).
 
 ## Writing new checks
 

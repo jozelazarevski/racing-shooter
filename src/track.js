@@ -4452,10 +4452,26 @@ export class Track {
     // under the cap are never touched, so the 57 healthy worlds are provably
     // unchanged (their kink census is zero). Tangents and normals are then
     // recomputed around whatever moved.
+    //
+    // AND THE WARP GOES THROUGH IT, NOT AROUND IT.
+    //
+    // `_applyRouteWarp` used to run AFTER this block, so the one thing in the
+    // game that can move the racing line at will was the one thing the rule
+    // never checked. Measured on a lap knotted with the editor's MOVE ROAD:
+    // per-station turns of 100.8 degrees, against a shipped roster whose
+    // census after r153c is zero worlds over 20. The pass that exists to stop
+    // cusps was running before the cusps were made.
+    this._applyRouteWarp(edit);
     {
       const MAX_TURN = (13 * Math.PI) / 180;
       const moved = new Uint8Array(N);
-      for (let pass = 0; pass < 80; pass++) {
+      // The budget was 80, which is ample for the hand-drawn Vs this was
+      // written for — a warped lap needs far more, because a warp cusp is
+      // deeper and has to be spread over many more stations. Measured: 318
+      // passes to bring 100.8 degrees down under the cap, and the loop already
+      // breaks the moment nothing moves, so a healthy world still exits on
+      // pass one and is provably untouched.
+      for (let pass = 0; pass < 600; pass++) {
         let any = 0;
         for (let i = 0; i < N; i++) {
           const p0 = this.center[(i - 1 + N) % N];
@@ -4483,7 +4499,6 @@ export class Track {
         this.nrm[i].set(tg.z, 0, -tg.x);
       }
     }
-    this._applyRouteWarp(edit);
     this._buildSampleGrid();
     // Elevation profile: the road climbs and descends over the lap (tan/nrm and
     // curvature stay XZ-based — heading math is unaffected by the y channel).
@@ -5064,7 +5079,26 @@ export class Track {
    *  keeping the originals would leave the road's cross-section pointing the
    *  way the lap used to go, which is how a widened bend ends up with its
    *  verge inside the carriageway. */
+  /** MOVE ROAD's pulls, replayed on the pristine spline.
+   *
+   *  A WARP IS ANCHORED TO A STATION, NOT TO A PLACE.
+   *
+   *  Each pull is measured from the untouched centreline — which is right, and
+   *  was the whole bug: the editor recorded the pull's centre from the road as
+   *  it stood on screen, which after the first drag is the WARPED road, and
+   *  this then looked for that point on the PRISTINE one. The two disagree by
+   *  more the more you drag. Measured over ten ordinary 120 u drags, the tenth
+   *  pull's stored centre sat 192 u from the spline it was replayed against:
+   *  aim at 72% of the lap, move 19% of it. That is how a lap ends up knotted
+   *  by nothing worse than using the tool as intended.
+   *
+   *  So a warp now carries the station it grabbed (`i`) and that is what is
+   *  resolved here. `x, z` stay in the format and are still honoured for
+   *  scenes saved before this, which is the best that can be done for them —
+   *  the information to place them correctly was never written down. */
   _applyRouteWarp(edit) {
+    // the pristine line, kept so the editor can anchor a new pull to it
+    this._preWarp = this.center.map((c) => ({ x: c.x, z: c.z }));
     const W = edit && edit.warp;
     if (!W || !W.length) return;
     const moved = [];
@@ -5072,7 +5106,8 @@ export class Track {
       const c = this.center[i];
       let mx = 0, mz = 0;
       for (const w of W) {
-        const d = Math.hypot(c.x - w.x, c.z - w.z);
+        const anchor = (w.i != null && this._preWarp[((w.i % N) + N) % N]) || w;
+        const d = Math.hypot(c.x - anchor.x, c.z - anchor.z);
         if (d >= w.r) continue;
         const t = Math.cos((d / w.r) * Math.PI * 0.5);
         const k = t * t;
@@ -6056,7 +6091,7 @@ export class Track {
       if (want && k >= want.length) break;
       for (let i0 = lo; i0 <= hi; i0 += want ? 1 : 2) {
         const i = (i0 + N) % N;
-        if (this._tunnels.some((t) => this._circDist(i, t.mid) < 170)) continue;
+        if (this._tunnels.some((t) => this._circDist(i, t.mid) < TUNNEL_SEP)) continue;
         const fit = this.tunnelFitAt(i, lenS);
         if (fit > bestFit) { bestFit = fit; best = i; }
       }
@@ -17961,6 +17996,12 @@ export function hashPlacement(type, x, z) {
 
 /** mulberry32: tiny, fast, well-distributed, and identical on every engine
  *  because it runs entirely on uint32 arithmetic. */
+/** How far apart two bores must sit, in centreline samples. Exported because
+ *  the EDITOR has to gate on the same number: it used to keep its own (92),
+ *  accept four taps, promise "4 total, APPLY to bore it", and then watch the
+ *  builder drop two of them without a word. One rule, one place. */
+export const TUNNEL_SEP = 170;
+
 export function seededRandom(seed) {
   let a = seed >>> 0;
   return function () {
