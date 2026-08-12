@@ -194,32 +194,93 @@ const upgradeCost = (lvl) => 600 + lvl * lvl * 500;
 // `gate` filters offers that a world/difficulty can't honor; `lap: true`
 // contracts resolve at lap boundaries; `atFinish` ones resolve in finishRace.
 const _dv = new THREE.Vector3();   // scratch for debris ground lookups
+/* RACE CONTRACTS — the side objectives, and the rung you are standing on.
+ *
+ * These used to be flat: DEMOLITION asked for twelve props on the fiftieth
+ * race exactly as it did on the first, and paid the same 60 CR for it. By then
+ * a player smashes twelve props without noticing, so the objective had stopped
+ * being an objective and become a tax rebate.
+ *
+ * Each contract now has RUNGS. Complete one and that contract — only that one
+ * — steps up for you permanently: a harder target, a bigger payout, and at
+ * rung III a difficulty floor. Keep failing it and it stays where it is. The
+ * result is a difficulty curve the player writes themselves by playing, and it
+ * needs no new systems: the offer screen, the progress readout and the itemised
+ * payout were all already there.
+ *
+ * `need` is what the rung asks for; `check` and `prog` are handed it, so the
+ * numbers live in ONE place instead of being repeated in the description, the
+ * predicate and the progress string (where they used to disagree the moment
+ * anyone edited one of them).
+ *
+ * `hard: true` on the top rung is the bound the plan asked for: rung III is
+ * only reachable on HARD, so a full sweep of three of them is worth about one
+ * strong race rather than three, and the side objectives cannot quietly become
+ * the main way to earn.
+ */
 const CONTRACT_POOL = [
-  { id: 'cleanlap', label: 'CLEAN LAP',      pay: 100, desc: 'a full lap without hull damage', lap: true },
-  { id: 'untouch',  label: 'UNTOUCHABLE',    pay: 120, desc: 'finish without wrecking',
-    atFinish: true, check: (g) => g.deaths === 0 },
+  { id: 'cleanlap', label: 'CLEAN LAP', desc: (n) => `${n} lap${n > 1 ? 's' : ''} without hull damage`,
+    lap: true, rungs: [{ need: 1, pay: 100 }, { need: 2, pay: 220 }, { need: 3, pay: 400, hard: true }],
+    check: (g, ct, rank, need) => ct.cleanLaps >= need,
+    prog: (ct, need) => `${Math.min(ct.cleanLaps, need)}/${need}` },
+  { id: 'untouch', label: 'UNTOUCHABLE', desc: () => 'finish without wrecking',
+    atFinish: true, rungs: [{ pay: 120 }, { pay: 260 }, { pay: 420, hard: true }],
+    check: (g) => g.deaths === 0 },
   // `sure: true` marks contracts any driver can complete by active play in any
   // world, whatever the race outcome — the offer always includes at least one.
-  { id: 'demo',     label: 'DEMOLITION',     pay: 60,  desc: 'smash 12 props', sure: true,
-    check: (g, ct) => ct.props >= 12, prog: (ct) => `${Math.min(ct.props, 12)}/12` },
-  { id: 'head',     label: 'HEADHUNTER',     pay: 90,  desc: 'destroy 2 rivals',
-    check: (g, ct) => ct.rivalKills >= 2, prog: (ct) => `${Math.min(ct.rivalKills, 2)}/2` },
-  { id: 'combo',    label: 'COMBO ARTIST',   pay: 70,  desc: 'reach a ×2.5 style combo', sure: true,
-    check: (g, ct) => ct.comboMax >= 2.5 },
-  { id: 'draft',    label: 'DRAFT KING',     pay: 60,  desc: '3 slipstream tucks', sure: true,
-    check: (g, ct) => ct.drafts >= 3, prog: (ct) => `${Math.min(ct.drafts, 3)}/3` },
-  { id: 'air',      label: 'AIRBORNE',       pay: 60,  desc: '2 BIG AIR jumps',
-    check: (g, ct) => ct.bigAirs >= 2, prog: (ct) => `${Math.min(ct.bigAirs, 2)}/2` },
-  { id: 'hardpod',  label: 'PODIUM ON HARD', pay: 150, desc: 'top 3 on HARD',
-    gate: (g) => g.difficulty.id === 'hard', atFinish: true, check: (g, ct, rank) => rank <= 3 },
-  { id: 'pacifist', label: 'PACIFIST',       pay: 130, desc: 'podium with zero weapon fire',
-    atFinish: true, check: (g, ct, rank) => rank <= 3 && !ct.weaponFired },
-  { id: 'start',    label: 'FLAWLESS START', pay: 80,  desc: 'lead at the end of lap 1', lap: true },
-  { id: 'herd',     label: 'HERDSMAN',       pay: 50,  desc: 'never hit livestock',
-    gate: (g) => (g.herds?.length ?? 0) > 0, atFinish: true, check: (g, ct) => ct.livestock === 0 },
-  { id: 'shave',    label: 'CLOSE SHAVE',    pay: 60,  desc: '3 CLOSE CALL passes',
-    check: (g, ct) => ct.closeCalls >= 3, prog: (ct) => `${Math.min(ct.closeCalls, 3)}/3` },
+  { id: 'demo', label: 'DEMOLITION', desc: (n) => `smash ${n} props`, sure: true,
+    rungs: [{ need: 12, pay: 60 }, { need: 25, pay: 140 }, { need: 40, pay: 320, hard: true }],
+    check: (g, ct, rank, need) => ct.props >= need,
+    prog: (ct, need) => `${Math.min(ct.props, need)}/${need}` },
+  { id: 'head', label: 'HEADHUNTER', desc: (n) => `destroy ${n} rivals`,
+    rungs: [{ need: 2, pay: 90 }, { need: 3, pay: 200 }, { need: 4, pay: 380, hard: true }],
+    check: (g, ct, rank, need) => ct.rivalKills >= need,
+    prog: (ct, need) => `${Math.min(ct.rivalKills, need)}/${need}` },
+  { id: 'combo', label: 'COMBO ARTIST', desc: (n) => `reach a ×${n} style combo`, sure: true,
+    rungs: [{ need: 2.5, pay: 70 }, { need: 3.25, pay: 160 }, { need: 4, pay: 340, hard: true }],
+    check: (g, ct, rank, need) => ct.comboMax >= need },
+  { id: 'draft', label: 'DRAFT KING', desc: (n) => `${n} slipstream tucks`, sure: true,
+    rungs: [{ need: 3, pay: 60 }, { need: 6, pay: 150 }, { need: 10, pay: 330, hard: true }],
+    check: (g, ct, rank, need) => ct.drafts >= need,
+    prog: (ct, need) => `${Math.min(ct.drafts, need)}/${need}` },
+  { id: 'air', label: 'AIRBORNE', desc: (n) => `${n} BIG AIR jumps`,
+    rungs: [{ need: 2, pay: 60 }, { need: 4, pay: 150 }, { need: 6, pay: 320, hard: true }],
+    check: (g, ct, rank, need) => ct.bigAirs >= need,
+    prog: (ct, need) => `${Math.min(ct.bigAirs, need)}/${need}` },
+  { id: 'hardpod', label: 'PODIUM ON HARD', desc: (n) => `top ${n} on HARD`,
+    gate: (g) => g.difficulty.id === 'hard', atFinish: true,
+    rungs: [{ need: 3, pay: 150 }, { need: 2, pay: 300 }, { need: 1, pay: 480, hard: true }],
+    check: (g, ct, rank, need) => rank <= need },
+  { id: 'pacifist', label: 'PACIFIST', desc: (n) => `top ${n} with zero weapon fire`,
+    atFinish: true, rungs: [{ need: 3, pay: 130 }, { need: 2, pay: 280 }, { need: 1, pay: 450, hard: true }],
+    check: (g, ct, rank, need) => rank <= need && !ct.weaponFired },
+  { id: 'start', label: 'FLAWLESS START', desc: () => 'lead at the end of lap 1',
+    lap: true, rungs: [{ pay: 80 }, { pay: 180 }, { pay: 350, hard: true }] },
+  { id: 'herd', label: 'HERDSMAN', desc: () => 'never hit livestock',
+    gate: (g) => (g.herds?.length ?? 0) > 0, atFinish: true,
+    rungs: [{ pay: 50 }, { pay: 120 }, { pay: 280, hard: true }],
+    check: (g, ct) => ct.livestock === 0 },
+  { id: 'shave', label: 'CLOSE SHAVE', desc: (n) => `${n} CLOSE CALL passes`,
+    rungs: [{ need: 3, pay: 60 }, { need: 6, pay: 150 }, { need: 10, pay: 330, hard: true }],
+    check: (g, ct, rank, need) => ct.closeCalls >= need,
+    prog: (ct, need) => `${Math.min(ct.closeCalls, need)}/${need}` },
 ];
+
+/** Roman numerals for the three rungs, because "DEMOLITION II" reads as a
+ *  standing at a glance and "DEMOLITION (rung 1)" does not. */
+const RUNG_NUMERAL = ['I', 'II', 'III'];
+
+/** Resolve a contract to the rung this player stands on, clamped to what the
+ *  contract actually offers and to what the difficulty allows: a `hard` rung
+ *  is not dealt on EASY or NORMAL, so the offer is always one the player in
+ *  front of it can complete. */
+function contractAtRung(c, level, difficulty) {
+  let ix = Math.max(0, Math.min(c.rungs.length - 1, level | 0));
+  while (ix > 0 && c.rungs[ix].hard && difficulty !== 'hard') ix--;
+  const r = c.rungs[ix];
+  return { ...c, rungIx: ix, need: r.need, pay: r.pay,
+    label: `${c.label} ${RUNG_NUMERAL[ix] ?? ix + 1}`, done: false };
+}
 
 // which animals graze in which biome (a theme can override with T.livestock).
 // Each pasture takes a LEAD species from its roster and the roster shifts from
@@ -1571,7 +1632,13 @@ class Game {
   _loadProfileState() {
     this.profile = this.profiles.list.find((p) => p.id === this.profiles.active) ?? this.profiles.list[0];
     this._pkey = (base) => profileKey(this.profile.id, base);
-    this.career = loadJSON(this._pkey('career'), { finished: {} });
+    // `rungs` is the contract-progression field: {contractId: rungIndex}. It
+    // lives on CAREER rather than on the garage because it is progression, not
+    // money, and career is already profile-scoped and carried by the sync
+    // engine. Absent on every save written before this, which reads as rung I
+    // everywhere — the correct default for an existing player.
+    this.career = loadJSON(this._pkey('career'), { finished: {}, rungs: {} });
+    this.career.rungs ??= {};
     this.garage = loadJSON(this._pkey('garage'), { credits: 0 });
     this.cars = loadJSON(this._pkey('cars'), { owned: [STARTER_CAR], selected: STARTER_CAR });
     // RENAMED MACHINES. r142 shipped two cars under marque names and r143
@@ -2881,7 +2948,7 @@ class Game {
     listEl.innerHTML = '';
     for (const p of reg.list) {
       // per-profile career summary read straight from its namespaced keys
-      const career = loadJSON(profileKey(p.id, 'career'), { finished: {} });
+      const career = loadJSON(profileKey(p.id, 'career'), { finished: {}, rungs: {} });
       const garage = loadJSON(profileKey(p.id, 'garage'), { credits: 0 });
       const worlds = Object.values(career.finished).filter((f) => f && f.place <= 3).length;
       const active = p.id === reg.active;
@@ -3037,7 +3104,7 @@ class Game {
   _resetCareer(id) {
     const keys = wipeProfileData(id);
     if (id !== this.profile.id) { this._renderProfiles(); return keys; }
-    this.career = { finished: {} };
+    this.career = { finished: {}, rungs: {} };
     this.garage = { credits: 0, upgrades: {} };
     this.cars = { owned: [STARTER_CAR], selected: STARTER_CAR };
     saveJSON(this._pkey('career'), this.career);
@@ -3366,6 +3433,9 @@ class Game {
       const j = (rnd() * (i + 1)) | 0;
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
+    // deal each pick at the rung THIS player stands on for that contract
+    const rungs = this.career.rungs ?? {};
+    const atRung = (c) => contractAtRung(c, rungs[c.id] ?? 0, this.difficulty.id);
     const picks = arr.slice(0, 3);
     // never deal three long-shots: at least one slot is a `sure` contract any
     // driver can actively complete regardless of world or finishing position
@@ -3373,7 +3443,7 @@ class Game {
       const sure = arr.slice(3).filter((c) => c.sure);
       if (sure.length) picks[2] = sure[(rnd() * sure.length) | 0];
     }
-    return picks.map((c) => ({ ...c, done: false }));
+    return picks.map(atRung);
   }
 
   /** Per-frame contract bookkeeping. Only ever OBSERVES state other systems
@@ -3400,7 +3470,9 @@ class Game {
       ct.comboMax = Math.max(ct.comboMax, Math.min(4, 1 + (this.comboN ?? 0) * 0.25));
     }
     for (const c of this.contracts) {
-      if (!c.done && !c.atFinish && c.check && c.check(this, ct)) this._completeContract(c);
+      if (!c.done && !c.atFinish && c.check && c.check(this, ct, this.playerRank, c.need)) {
+        this._completeContract(c);
+      }
     }
     this.hud.setContracts?.(this.contracts, ct); // diffed inside — cheap
   }
@@ -3409,22 +3481,41 @@ class Game {
     if (c.done) return;
     c.done = true;
     this.contractCredits = (this.contractCredits ?? 0) + c.pay;
+    // THE RUNG YOU CLIMBED STAYS CLIMBED. Only this contract advances, and
+    // only past the rung that was actually completed — so a player who is
+    // handed rung I because HARD was not selected cannot skip II by winning it.
+    const rungs = (this.career.rungs ??= {});
+    const was = rungs[c.id] ?? 0;
+    const top = (CONTRACT_POOL.find((x) => x.id === c.id)?.rungs.length ?? 1) - 1;
+    if (c.rungIx >= was && was < top) {
+      rungs[c.id] = was + 1;
+      saveJSON(this._pkey('career'), this.career);
+      this.hud.feed(`${c.label.replace(/ [IVX]+$/, '')} steps up to `
+        + `${RUNG_NUMERAL[was + 1]}`, 'info');
+    }
     this.hud.feed(`CONTRACT: ${c.label}  +${c.pay} CR`, 'good');
     this.hud.setContracts?.(this.contracts, this._ct);
     this.audio.pickup?.();
     this.buzz([20, 30, 20]);
   }
 
+  /** Fire a contract that is resolved by an EVENT rather than by polling. If
+   *  it carries a predicate (CLEAN LAP counts laps now, so it does) the
+   *  predicate still has to pass — the event only says "now is a moment when
+   *  this could be true", not "it is". */
   _tryContract(id) {
     const c = this.contracts?.find((x) => x.id === id && !x.done);
-    if (c) this._completeContract(c);
+    if (!c) return;
+    if (c.check && !c.check(this, this._ct, this.playerRank, c.need)) return;
+    this._completeContract(c);
   }
 
   /** Lap `lapNo` just completed — resolve the lap-boundary contracts. */
   _lapContracts(lapNo) {
     const ct = this._ct;
     if (!this.contracts?.length || !ct) return;
-    if (!ct.lapDamaged) this._tryContract('cleanlap');
+    if (!ct.lapDamaged) ct.cleanLaps = (ct.cleanLaps ?? 0) + 1;
+    this._tryContract('cleanlap');
     ct.lapDamaged = false;
     if (lapNo === 1 && this.playerRank === 1) this._tryContract('start');
   }
@@ -3432,7 +3523,7 @@ class Game {
   _checkFinishContracts(rank) {
     if (!this.contracts?.length || !this._ct) return;
     for (const c of this.contracts) {
-      if (!c.done && c.atFinish && c.check(this, this._ct, rank)) this._completeContract(c);
+      if (!c.done && c.atFinish && c.check(this, this._ct, rank, c.need)) this._completeContract(c);
     }
   }
 
@@ -5787,7 +5878,7 @@ class Game {
     this.contracts = [];
     this.contractCredits = 0;
     this._ct = { props: 0, rivalKills: 0, drafts: 0, bigAirs: 0, closeCalls: 0,
-      livestock: 0, comboMax: 1, weaponFired: false, lapDamaged: false,
+      livestock: 0, comboMax: 1, cleanLaps: 0, weaponFired: false, lapDamaged: false,
       prevHealth: null, prevHeat: 0, prevMissiles: null, prevMines: null, prevShock: 0 };
     this.hud?.setContracts?.([]);
     for (const a2 of this.herds ?? []) { a2.alive = true; a2.mesh.visible = true; a2.x = a2.homeX; a2.z = a2.homeZ; }
@@ -6452,7 +6543,7 @@ class Game {
         if (surf === 'snow') this.hud.feed('SNOW ROAD — LOW GRIP, LONG SLIDES', 'info');
         else if (surf === 'wet') this.hud.feed('WET ROAD — SLICK UNDER BRAKING', 'info');
         for (const c of this.contracts ?? []) {
-          this.hud.feed(`◇ ${c.label}: ${c.desc}  +${c.pay} CR`, 'info');
+          this.hud.feed(`◇ ${c.label}: ${c.desc(c.need)}  +${c.pay} CR`, 'info');
         }
       }
     }

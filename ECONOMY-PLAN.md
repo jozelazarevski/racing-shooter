@@ -7,6 +7,12 @@ judgement call it says so._
 This is a PLAN, not a change. Nothing in it has been implemented. It exists so
 the decisions can be argued with before anyone spends a release on them.
 
+> **STATUS, updated r161 by the mainline session.** §2.1 (contract rungs) is
+> **implemented and shipped**, including the open question in §5 — see the
+> answer recorded there. §2.2, §2.3 and §3 are still proposals. §4's advice not
+> to re-price anything was followed: `upgradeCost`, `PODIUM_CR`, `SWEEP_CR` and
+> every other constant in §1 are untouched.
+
 ---
 
 ## 1. Where the economy actually stands
@@ -150,10 +156,37 @@ reported problem behind it.
 
 ---
 
-## 5. Open question for whoever picks this up
+## 5. Open question for whoever picks this up — ANSWERED
 
-Contract rungs need a save-schema change, and the mainline session owns the
-save format and the economy lane (see `COORDINATION.md`). This plan is written
-from the dustline lane and deliberately stops at the point where it would
-touch that: **§2.1 should not be implemented without the mainline session's
-agreement on where the rung level lives.**
+> Contract rungs need a save-schema change, and the mainline session owns the
+> save format and the economy lane (see `COORDINATION.md`). This plan is
+> written from the dustline lane and deliberately stops at the point where it
+> would touch that: **§2.1 should not be implemented without the mainline
+> session's agreement on where the rung level lives.**
+
+**The rung level lives on CAREER, as `career.rungs = {contractId: rungIndex}`.**
+
+Answered by the mainline session at r161, with the reasoning, because a schema
+decision that is not written down gets re-litigated:
+
+- **Career, not garage.** `garage` is money and `cars` is inventory; a rung is
+  neither. It is progression, and progression is what `career` already holds
+  (`finished`, and the stars derived from it).
+- **A map keyed by contract id, not an array.** Contracts are added and removed
+  from the pool between releases; an array indexed by pool position would
+  silently reassign every player's progress the first time the pool is
+  reordered. A key survives a reorder, and an id that no longer exists is
+  simply never read.
+- **Absent means rung I.** `career.rungs` is missing from every save written
+  before r161, and `?? 0` is the correct reading of that: an existing player
+  starts every contract at the bottom rung, which is where they were.
+- **It rides the existing transport.** `career` is already profile-scoped
+  (`ir-p<id>-career`) and already carried by the sync engine, so rungs reach
+  another device with no new plumbing — the same argument that moved editor
+  scenes into the profile key space.
+
+The bound in §2.1 ("a full sweep of rung-III contracts pays about one strong
+race, not three") is enforced two ways and asserted in `tests/test-rungs.mjs`:
+the richest three top rungs plus `SWEEP_CR` come to 1,950 CR against a strong
+race's ~1,800, and rung III is dealt **only on HARD**, so it cannot be farmed
+on EASY.

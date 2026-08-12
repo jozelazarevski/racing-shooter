@@ -309,7 +309,9 @@ export class Hud {
       return;
     }
     const rows = list.map((c) => {
-      const prog = !c.done && c.prog && ct ? ` ${c.prog(ct)}` : '';
+      // the rung's own target, not a number baked into the contract: DEMOLITION
+      // II asks for 25 and must say 25
+      const prog = !c.done && c.prog && ct ? ` ${c.prog(ct, c.need)}` : '';
       return `<div class="crow${c.done ? ' done' : ''}"><span>${c.done ? '✓' : '◇'} ${c.label}${prog}</span><span class="cpay">${c.pay} CR</span></div>`;
     }).join('');
     if (rows === this._contractsKey) return;

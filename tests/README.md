@@ -30,7 +30,9 @@ Requires `playwright-core` and a Chromium at `/opt/pw-browsers/chromium`
 slipstream, big air, shield, treasure stars), `test-round-fixes.mjs`
 (mines on elevated roads, ramp launch cap, gating, economy),
 `test-menu-noreset.mjs` (live car swap + menu state restore),
-`test-roam.mjs`, `test-destruction.mjs`.
+`test-roam.mjs`, `test-destruction.mjs`, `test-rungs.mjs` (contract rungs: the
+ladder hardens, the top rung is HARD-only, a sweep stays worth about one strong
+race, and climbing persists per contract).
 
 **The world editor** has eight, each pinning what the ones before it could not
 do: `test-editor.mjs` (the sculpt reaches both ground functions and the
