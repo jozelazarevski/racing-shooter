@@ -4914,11 +4914,35 @@ export class Track {
   // ---- end width-variation -------------------------------------------------
 
   // ---------- queries ----------
-  nearestIndex(pos, hint = null) {
-    // XZ distance only — the elevated centerline must not bias index tracking
+  /** `useY`: break XZ ties with height. Off by default (and for every
+   *  build-time / one-shot caller), because a car in the AIR has an altitude
+   *  that matches nothing in particular — biasing toward "whichever station
+   *  happens to be that high" would be actively wrong mid-jump, which is
+   *  exactly why this stayed XZ-only originally.
+   *
+   *  But on the ground, XZ ALONE cannot tell two crossing legs apart — that
+   *  is what makes them a crossing: at an overpass their centrelines share
+   *  the same XZ point by construction, sometimes to the centimetre, so an
+   *  XZ-only metric sees a tie where the road plainly does not. A car
+   *  driving under a deck was measured pinned at trackIndex 199 for the
+   *  remainder of a 150 s drive: once the windowed search settled on the
+   *  deck's own station there (a legitimate tie, not a bug in the window),
+   *  next frame's hint was that answer, and nothing in an XZ-only distance
+   *  could ever prefer the ground leg over it again. Reported as the car
+   *  stopped dead beside a wall that, from the seat, was not there.
+   *
+   *  Grounded callers pass their own elevation and get the tie broken by it:
+   *  the two legs of a crossing differ in height by definition (that is what
+   *  the deck is FOR), so the leg matching where the car actually stands
+   *  wins outright. The player's own per-frame tracking is the one caller
+   *  that keeps a hint alive frame over frame and can therefore get stuck
+   *  this way; it passes `!airborne`. */
+  nearestIndex(pos, hint = null, useY = false) {
     const d2 = (i) => {
-      const dx = pos.x - this.center[i].x, dz = pos.z - this.center[i].z;
-      return dx * dx + dz * dz;
+      const c = this.center[i];
+      const dx = pos.x - c.x, dz = pos.z - c.z;
+      const dy = useY ? pos.y - c.y : 0;
+      return dx * dx + dz * dz + dy * dy;
     };
     let best = -1, bd = Infinity;
     if (hint === null) {
@@ -4932,6 +4956,50 @@ export class Track {
       const i = (hint + k + N) % N;
       const d = d2(i);
       if (d < bd) { bd = d; best = i; }
+    }
+    // HEIGHT CANNOT BREAK A TIE THE WINDOW NEVER OFFERED. useY penalises the
+    // wrong leg once both candidates are IN the +-30 window — but the two
+    // legs of a crossing sit >=40 apart by construction, so a hint seeded on
+    // one of them never has the other in reach at all: there is no tie to
+    // break, just one answer, and it is the wrong one. If `best` turned out
+    // to be on a crossing's ramp, also search the crossing's OTHER anchor's
+    // own window and take whichever genuinely matches (XZ AND height, once
+    // useY) better. This is what actually recovers a wrong-leg mis-seed;
+    // the >2500 fallback below only ever catches a hint stale enough to have
+    // left the map entirely.
+    if (useY && this._overpasses) {
+      for (const o of this._overpasses) {
+        const nearUp = this._circDist(best, o.up) <= o.half + 5;
+        const nearDown = !nearUp && this._circDist(best, o.down) <= o.half + 5;
+        if (!nearUp && !nearDown) continue;
+        const other = nearUp ? o.down : o.up;
+        const half = o.half + 5;
+        for (let k = -half; k <= half; k++) {
+          const i = (other + k + N) % N;
+          const d = d2(i);
+          if (d < bd) { bd = d; best = i; }
+        }
+      }
+    }
+    // BELT AND BRACES: a windowed search seeded far from anywhere plausible
+    // (a stale hint after a teleport, a jump that outran the +-30 window)
+    // has no way back on its own — the correct station lies outside its
+    // reach by definition. 50u is well past any legitimate pinch, verge or
+    // off-road excursion the window itself would still track correctly, so
+    // this only spends the coarse sweep the hint===null branch already pays
+    // on an actual mis-seed.
+    if (bd > 2500) {
+      let gBest = -1, gBd = Infinity;
+      for (let i = 0; i < N; i += 4) {
+        const d = d2(i);
+        if (d < gBd) { gBd = d; gBest = i; }
+      }
+      for (let k = -30; k <= 30; k++) {
+        const i = (gBest + k + N) % N;
+        const d = d2(i);
+        if (d < gBd) { gBd = d; gBest = i; }
+      }
+      if (gBd < bd) { best = gBest; bd = gBd; }
     }
     return best;
   }
