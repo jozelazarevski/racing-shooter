@@ -695,14 +695,46 @@ const track = {
     // GROUND COVER FIRST, and in the thousands. Everything else in the
     // library stands ON the ground; without this the ground itself is a
     // painted plane, and the eye has no scale between a rock and the horizon.
-    { template: 'grassTuft', count: 4000, minRoadDist: 6, maxRoadDist: 60, minSpawnDist: 30, spread: 0.98 },
-    { template: 'pine', count: 110, minRoadDist: 15, minSpawnDist: 70, spread: 0.93 },
-    { template: 'oak', count: 80, minRoadDist: 15, minSpawnDist: 70, spread: 0.92 },
-    { template: 'willow', count: 40, minRoadDist: 12, minSpawnDist: 60, spread: 0.95 },
-    { template: 'bush', count: 160, minRoadDist: 12, minSpawnDist: 60, spread: 0.95 },
-    { template: 'reeds', count: 120, minRoadDist: 12, minSpawnDist: 60, spread: 0.95 },
-    { template: 'rock', count: 100, minRoadDist: 13, minSpawnDist: 65, spread: 0.95 },
-    { template: 'scree', count: 50, minRoadDist: 13, minSpawnDist: 65, spread: 0.95 },
+    // THE VERGE WAS BARE, AND THE VERGE IS WHAT YOU LOOK AT. Every layer here
+    // used to start at minRoadDist 12-15 against a road half-width of about 7,
+    // which left a five-to-eight metre ring of empty ground on both sides of
+    // the road — precisely the band that fills the lower half of the frame at
+    // driving speed. The world was not sparse everywhere; it was sparse exactly
+    // where the camera points.
+    //
+    // AND THE GROUND COVER WAS SPARSE ON ITS OWN NUMBERS. 4,000 tufts banded
+    // 6-60 m over a 1.5 km lap is 162,000 m of corridor: one tuft per 40 m,
+    // which is a tuft every six metres and reads as bare ground with litter on
+    // it. The near band below is one per 4 m, which is what makes it a surface.
+    //
+    // WHAT MAKES THIS AFFORDABLE is the cell merging in `world/build.ts`: a
+    // layer splits into 60 m cells once the triangles it saves beat the
+    // budget's exchange rate, so a dense band is culled to the few cells in
+    // frame instead of being submitted whole. Before that change this count
+    // would have cost its full triangle bill on every frame from every angle.
+    // Measured with `node tools/verify-perf-budget.mjs`, not assumed.
+    // NARROW THE BAND RATHER THAN THIN THE GRASS. The first cut of this was
+    // 16,000 tufts over 7.5-26 m and it cost 51,000 triangles a frame — real
+    // money at 12 triangles a tuft. Thinning it would have undone the point.
+    // Instead the near band is 7.5-20 m: 11,000 tufts over 37,500 m of corridor
+    // is one per 3.4 m, which is the same surface density the 16,000 bought
+    // over the wider band, for a third fewer instances. Past 20 m a sparser
+    // layer carries it, because past 20 m you are not looking at blades.
+    { template: 'grassTuft', count: 11000, minRoadDist: 7.5, maxRoadDist: 20, minSpawnDist: 24, spread: 0.98 },
+    { template: 'grassTuft', count: 6000, minRoadDist: 20, maxRoadDist: 85, minSpawnDist: 30, spread: 0.98 },
+    { template: 'pine', count: 150, minRoadDist: 14, minSpawnDist: 70, spread: 0.93 },
+    { template: 'oak', count: 110, minRoadDist: 14, minSpawnDist: 70, spread: 0.92 },
+    { template: 'willow', count: 55, minRoadDist: 11, minSpawnDist: 60, spread: 0.95 },
+    // bush/reeds carry the verge itself — they are the layer that stops the
+    // road edge being a line between two flat colours
+    { template: 'bush', count: 520, minRoadDist: 8, maxRoadDist: 34, minSpawnDist: 40, spread: 0.96 },
+    { template: 'bush', count: 180, minRoadDist: 34, minSpawnDist: 60, spread: 0.95 },
+    { template: 'reeds', count: 340, minRoadDist: 9, minSpawnDist: 50, spread: 0.95 },
+    // rock and scree are SOLID, so they keep clear of the lane by the margin
+    // verify-clearance enforces — 13 m is the figure that was already proven
+    // clear on this track and it is not being reduced to win a screenshot
+    { template: 'rock', count: 240, minRoadDist: 13, minSpawnDist: 65, spread: 0.95 },
+    { template: 'scree', count: 160, minRoadDist: 13, minSpawnDist: 65, spread: 0.95 },
     { template: 'stoneWall', count: 55, minRoadDist: 14, minSpawnDist: 70, spread: 0.9 },
     { template: 'lobsterPots', count: 24, minRoadDist: 8, minSpawnDist: 60, spread: 0.98 },
     { template: 'buoy', count: 22, minRoadDist: 6, minSpawnDist: 60, spread: 0.98 },
@@ -710,19 +742,37 @@ const track = {
 
   props,
 
+  // GOLDEN HOUR, and it is the single largest visual decision in this file.
+  //
+  // This was `noon`: sunDir [-90, 90, -30], which is 90 up against 95 across —
+  // a sun 43 degrees above the horizon. A sun that high casts a shadow almost
+  // directly beneath the thing casting it, so nothing in the world appeared to
+  // SIT on the ground; and a `hemiIntensity` of 1.0 on top of it is a large
+  // flat ambient fill that lifts every shaded face back toward the lit one.
+  // Between them they removed the two cues that tell an eye a scene has form.
+  //
+  // These are the `golden` numbers from `tracks/presets.ts`, which are v1's own
+  // out of `THEMES`. The sun is 12 degrees up ([-160, 34, 20], 34 against a 161
+  // horizontal), so shadows run four to five times the height of what casts
+  // them; the fill drops to 0.8 so those shadows survive; the sun warms to
+  // #ffc98a and the fog and the top of the sky warm with it.
+  //
+  // Cloud count comes DOWN from 18 to 9, which is the preset's own figure and
+  // is not a performance change: a low sun works by raking, and an overcast lid
+  // is the one condition that stops it.
   sky: {
-    stops: ['#2a6fb8', '#6fa6d6', '#c6dcea', '#e4e2d2'],
-    fogColor: '#c6dcea',
-    fogNear: 280,
-    fogFar: 1060,
-    hemiSky: '#d4ecff',
-    hemiGround: '#5c7060',
-    hemiIntensity: 1.0,
-    sunColor: '#fff3da',
-    sunIntensity: 2.3,
-    sunDir: [-90, 90, -30],
+    stops: ['#2b5f9e', '#8fa8c8', '#f0c98e', '#ffd9a0'],
+    fogColor: '#f2ddb6',
+    fogNear: 260,
+    fogFar: 1200,
+    hemiSky: '#cfd8f0',
+    hemiGround: '#8a6a44',
+    hemiIntensity: 0.8,
+    sunColor: '#ffc98a',
+    sunIntensity: 2.9,
+    sunDir: [-160, 34, 20],
     mountains: { count: 22, radius: 680, height: 95, snowline: 0.1 },
-    clouds: 18,
+    clouds: 9,
   },
 };
 

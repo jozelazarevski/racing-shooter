@@ -257,23 +257,23 @@
   ],
   "sky": {
     "stops": [
-      "#3d7fd0",
-      "#7db4e6",
-      "#cfe6f4",
-      "#e8dfc8"
+      "#2b5f9e",
+      "#8fa8c8",
+      "#f0c98e",
+      "#ffd9a0"
     ],
-    "fogColor": "#cfe6f4",
+    "fogColor": "#f2ddb6",
     "fogNear": 240,
-    "fogFar": 980,
-    "hemiSky": "#cfe6ff",
-    "hemiGround": "#5f7748",
-    "hemiIntensity": 0.9,
-    "sunColor": "#fff2d8",
-    "sunIntensity": 2.2,
+    "fogFar": 1200,
+    "hemiSky": "#cfd8f0",
+    "hemiGround": "#8a6a44",
+    "hemiIntensity": 0.8,
+    "sunColor": "#ffc98a",
+    "sunIntensity": 2.9,
     "sunDir": [
-      60,
-      90,
-      40
+      160,
+      34,
+      -40
     ],
     "mountains": {
       "count": 30,
@@ -281,6 +281,6 @@
       "height": 90,
       "snowline": -0.3
     },
-    "clouds": 14
+    "clouds": 9
   }
 }

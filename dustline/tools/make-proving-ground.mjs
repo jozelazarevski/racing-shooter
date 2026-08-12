@@ -509,19 +509,30 @@ const track = {
 
   props,
 
+  // Late afternoon rather than the full golden hour that harbour takes — the
+  // reason is written down so it does not read as an inconsistency. This track
+  // is the component library's proving ground: its whole job is that you can
+  // SEE each of the 114 placed pieces and judge it. A 12-degree sun throws
+  // shadows four times an object's height, which is what makes harbour read as
+  // a place and would make this read as a thicket of stripes.
+  //
+  // So: the same warm sun and the same low fill, at 24 degrees instead of 12
+  // ([-150, 67, 40]). Shadows still land beside their object rather than under
+  // it, which is the cue that was missing at the old 51 degrees, without any
+  // piece hiding in the shadow of the piece before it.
   sky: {
-    stops: ['#2f6fbe', '#79a8d8', '#cfdfe8', '#e6dcc4'],
-    fogColor: '#cfdfe8',
+    stops: ['#2f6ab4', '#89a6cc', '#e8c79a', '#f6d5a8'],
+    fogColor: '#eadcbe',
     fogNear: 260,
-    fogFar: 1020,
-    hemiSky: '#cfe6ff',
-    hemiGround: '#6a7a52',
-    hemiIntensity: 0.95,
-    sunColor: '#fff4dc',
-    sunIntensity: 2.35,
-    sunDir: [-70, 95, 45],
+    fogFar: 1100,
+    hemiSky: '#cfdcf2',
+    hemiGround: '#7c6a4c',
+    hemiIntensity: 0.85,
+    sunColor: '#ffd6a4',
+    sunIntensity: 2.7,
+    sunDir: [-150, 67, 40],
     mountains: { count: 26, radius: 660, height: 105, snowline: -0.1 },
-    clouds: 16,
+    clouds: 12,
   },
 };
 
