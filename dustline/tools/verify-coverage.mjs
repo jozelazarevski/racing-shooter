@@ -150,21 +150,32 @@ const check = (ok, label, detail = '') => {
 // a hundred lines, and every source scan downstream went quietly blind. That is
 // the failure mode this whole file is about, committed by this file.
 const BEFORE_REGEX = /[(,=:[!&|?{};>]\s*$|\b(return|typeof|case|of|in|do|else)\s*$/;
+// A THIRD STREAM, `str`, MARKING WHAT IS INSIDE A STRING LITERAL, and why it has
+// to exist. The sync invariant below reads "a line that is nothing but a `//`
+// comment must be blank in the code stream". That is true of source, and FALSE
+// of the inside of a template literal: several tools here build a browser
+// payload as a backtick string, and a commented line inside one is genuinely
+// code as far as this file is concerned — the splitter is right to keep it.
+// Without this mask the invariant reported its own correct behaviour as a
+// desync (verify-boot-state.mjs:183, a `//` line inside a `page.evaluate`
+// template) and, because it breaks at the first hit, blinded itself to every
+// real desync after it. A false alarm in a check whose entire job is to notice
+// silent blinding is worse than no check, so it is fixed rather than muted.
 function split(src) {
-  let code = '', comment = '';
+  let code = '', comment = '', str = '';
   let i = 0;
   const n = src.length;
   const blank = (c) => (c === '\n' ? '\n' : ' ');
   while (i < n) {
     const c = src[i], d = src[i + 1];
     if (c === '/' && d === '/') {
-      while (i < n && src[i] !== '\n') { comment += src[i]; code += blank(src[i]); i++; }
+      while (i < n && src[i] !== '\n') { comment += src[i]; code += blank(src[i]); str += blank(src[i]); i++; }
       continue;
     }
     if (c === '/' && d === '*') {
       const end = src.indexOf('*/', i + 2);
       const stop = end === -1 ? n : end + 2;
-      for (; i < stop; i++) { comment += src[i]; code += blank(src[i]); }
+      for (; i < stop; i++) { comment += src[i]; code += blank(src[i]); str += blank(src[i]); }
       continue;
     }
     if (c === '/' && BEFORE_REGEX.test(code.slice(Math.max(0, code.length - 24)))) {
@@ -177,25 +188,29 @@ function split(src) {
         else if (src[j] === '/' && !cls) { closed = j; break; }
       }
       if (closed > i) {
-        for (; i <= closed; i++) { code += blank(src[i]); comment += blank(src[i]); }
+        for (; i <= closed; i++) { code += blank(src[i]); comment += blank(src[i]); str += blank(src[i]); }
         continue;
       }
     }
     if (c === "'" || c === '"' || c === '`') {
       const q = c;
-      code += c; comment += blank(c); i++;
+      code += c; comment += blank(c); str += 'S'; i++;
       while (i < n) {
-        if (src[i] === '\\') { code += src[i] + (src[i + 1] ?? ''); comment += blank(src[i]) + blank(src[i + 1] ?? ''); i += 2; continue; }
-        code += src[i]; comment += blank(src[i]);
+        if (src[i] === '\\') {
+          code += src[i] + (src[i + 1] ?? ''); comment += blank(src[i]) + blank(src[i + 1] ?? '');
+          str += (src[i] === '\n' ? '\n' : 'S') + (src[i + 1] === '\n' ? '\n' : src[i + 1] === undefined ? '' : 'S');
+          i += 2; continue;
+        }
+        code += src[i]; comment += blank(src[i]); str += (src[i] === '\n' ? '\n' : 'S');
         const done = src[i] === q;
         i++;
         if (done) break;
       }
       continue;
     }
-    code += c; comment += blank(c); i++;
+    code += c; comment += blank(c); str += blank(c); i++;
   }
-  return { code, comment };
+  return { code, comment, str };
 }
 const lineAt = (src, idx) => src.slice(0, idx).split('\n').length;
 
@@ -272,7 +287,7 @@ function stringArrays(code) {
 
 const tools = files.map((f) => {
   const src = readFileSync(join(TOOLS, f), 'utf8');
-  const { code, comment } = split(src);
+  const { code, comment, str } = split(src);
   const arrays = stringArrays(code);
   // A ROSTER LITERAL is a literal list naming two or more real tracks. One id
   // on its own is a deliberate pick — `components-smoke` loads `harbour`
@@ -299,7 +314,7 @@ const tools = files.map((f) => {
     covers = new Set(ROSTER_IDS);
   } else source = 'synthetic';
 
-  return { f, src, code, comment, kind: kindOf(f), arrays, rosterLits, drivesGame, source, covers };
+  return { f, src, code, comment, str, kind: kindOf(f), arrays, rosterLits, drivesGame, source, covers };
 });
 
 // ---------------------------------------------------------------------------
@@ -322,8 +337,11 @@ for (const t of tools) {
     desync.push(`${t.f}: streams are ${t.code.length}/${t.comment.length} against ${t.src.length} chars`);
     continue;
   }
-  const s = t.src.split('\n'), c = t.code.split('\n');
+  const s = t.src.split('\n'), c = t.code.split('\n'), m = (t.str ?? '').split('\n');
   for (let i = 0; i < s.length; i++) {
+    // a `//` line INSIDE a string literal is code, not a comment, and the
+    // splitter keeping it is the splitter being right — see split()'s header
+    if ((m[i] ?? '').includes('S')) continue;
     if (s[i].trim().startsWith('//') && c[i].trim().length) {
       desync.push(`${t.f}:${i + 1} comment leaked into the code stream — every scan below is now blind`);
       break;

@@ -36,6 +36,28 @@
 // the part list.
 //
 // TRIANGLES: 324, against 378 before.
+//
+// AND IT STAYS 324. The sub-pixel pass that halved the boat trim, the telegraph
+// insulators, the lighthouse rail and the scree stones came here next, because
+// 82 oaks casting shadows is 53,136 triangles submitted per frame in harbour —
+// more than any other component in the world. It cut nothing, and the reason is
+// the same measurement the rest of that pass was run on. Longest edge per
+// triangle:
+//
+//   canopy   192 triangles, ALL of them over 50 cm
+//   crownTop  56 triangles, ALL of them over 50 cm
+//
+// There is no small geometry in this tree to find. The crown is a 5 m cushion
+// seen from `minRoadDist` 13 m, where it is roughly 290 px across and its
+// existing eight-segment facets are already 11 px of visible flat; taking the
+// dome to six segments would put a 20 px flat on the one wide silhouette in a
+// library whose other trees are all tall and narrow. That is the shape the file
+// above spends forty lines arguing for, and it was already reduced once,
+// against v1's own segment counts, for exactly this reason.
+//
+// So the oak's cost is a density and per-instance-visibility problem, not a
+// tessellation one. Cutting it here would be paying for a draw call with the
+// thing the component exists to provide.
 
 import * as THREE from 'three';
 import { PropTemplate, PlaceCtx, cylinderAt, standard, mergeGeoms, beam } from './types';

@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import type RAPIER_API from '@dimforge/rapier3d-compat';
 import type { TrackDef, SceneryLayer, PlacedProp, SurfaceId } from '../tracks/trackDef';
 import type { Terrain } from '../tracks/terrain';
-import type { PropTemplate, PlaceCtx, PhysicsShape, Placement } from './props/types';
+import type { PropTemplate, PropPart, PlaceCtx, PhysicsShape, Placement } from './props/types';
 import { isSolid } from './props/types';
 import { getTemplate, partsFor, resetPartCache } from './props/registry';
 import { Rng } from '../core/rng';
@@ -255,6 +255,488 @@ function addHorizonSolids(
   }
 }
 
+// ===========================================================================
+// HOW SCENERY IS DRAWN, AND WHY IT IS NOT ONE INSTANCED MESH PER PART ANY MORE
+// ===========================================================================
+//
+// THE DEFECT. One InstancedMesh per part spans the whole 900 m world, so its
+// bounding sphere always intersects the frustum and EVERY instance in the world
+// is submitted every frame, in the colour pass and again in the shadow pass.
+// Measured on HARBOUR POINT at the worst of sixteen poses round the lap:
+// 231,016 colour triangles over 149 draws and 133,640 shadow triangles over 96,
+// of which only 19.9% of the triangles were inside the frustum at all. Scenery
+// was 89% of the frame's draw calls and 70% of its triangles, against a mobile
+// budget of 150,000 triangles and 200 draws (`tools/verify-perf-budget.mjs`).
+// Instancing buys draw calls; it does not buy culling.
+//
+// THE FIX IS SPATIAL, AND THE SHAPE OF IT WAS MEASURED, NOT ARGUED. Four
+// designs were built and posed at the same sixteen stations; scenery alone:
+//
+//   design                                 colour draws  tris   shadow draws  tris
+//   world-spanning instanced (was)              149    231,016      96     133,640
+//   per-PART buckets, 60 m cells                370     65,405     227      48,223
+//   parts merged per TEMPLATE, 60 m cells       162     69,461     106      48,223
+//   EVERYTHING IN A CELL MERGED, 60 m cells      53     76,365      23      50,715
+//   exact per-instance floor                      —     57,345       —      43,102
+//
+// Bucketing per part makes draws WORSE — splitting 241 part-meshes spatially
+// multiplies them. Only merging ACROSS parts inside a cell gets under budget,
+// and it costs +17% triangles over the per-instance floor because a cell is
+// drawn whole or not at all. On this engine draws are the binding constraint,
+// so that is the trade taken. 60 m is the cell size from that table.
+//
+// WHAT IT ACTUALLY DID, `tools/verify-perf-budget.mjs`, sixteen stations, the
+// SCENERY category alone, measured before and after:
+//
+//   track            world tris   frame tris   draws   colour   shadow
+//   dustbowl  before      73,036      117,440      15       10        5
+//            after        73,036       28,317      57       41       16
+//   harbour   before     280,588      364,656     245      149       96
+//            after       253,188      131,895      86       51       35
+//   proving   before     192,548      258,508     180      141       39
+//            after       177,888       91,897      89       64       25
+//
+// The world column moved on its own — components were being trimmed in other
+// files while this was measured — so the number that belongs to THIS change is
+// the RATIO: a frame used to submit 130-161% of the world's scenery triangles
+// (every instance, twice) and now submits 39-52% of it. Whole frame, worst
+// portrait pose: dustbowl 242,062 tris / 48 draws -> 158,095 / 89;
+// harbour 525,968 / 276 -> 293,375 / 117; proving ground 387,231 / 210 ->
+// 213,275 / 119. Every draw-call check on every track is green for the first
+// time, colour pass included.
+//
+// MERGING NEEDS ONE MATERIAL PER BATCH, and `ART-DIRECTION.md` is what makes
+// that legal: "flat-shaded faceted geometry everywhere, with the road textured
+// ... vertex colour on faceted geometry. No albedo maps." A part's material
+// colour and its per-instance tint therefore become a vertex colour attribute,
+// which is exactly what `setColorAt` was feeding the shader before — three
+// defines `USE_COLOR` for `instancingColor` too, so the fragment arithmetic is
+// unchanged (`WebGLProgram.js:794`).
+//
+// WHAT CANNOT JOIN A MERGED BATCH, counted in the built worlds rather than
+// assumed: harbour 46 of 241 parts and proving ground 37 of 235, over 15 and 14
+// distinct materials, carrying 26,200 and 17,362 triangles. Every one of them
+// is textured, transparent, emissive or two-sided, and the two-sided ones are
+// folded in anyway (see `prepare`). So what genuinely stays out is texture and
+// emission — and 16,000 of those triangles on every track are ONE component,
+// `grassTuft`, which carries an albedo map that `ART-DIRECTION.md` says nothing
+// outside the road should have. That map is why the grass cannot share a cell's
+// batch with everything else standing in it, and it is the largest single
+// draw-call item left in this file's half of the frame: it is 16,000 triangles
+// that are now submitted whole in every frame on every track, because splitting
+// them costs more draws than the triangles are worth. Dropping the map from
+// `grassTuft` (a component file, not this one) would fold it into the shared
+// batch, and it would then be culled with everything else for nothing.
+//
+// ---------------------------------------------------------------------------
+// COLLIDERS ARE NOT VISUALS, AND THE PLACEMENT IS STILL PUBLISHED
+// ---------------------------------------------------------------------------
+//
+// This is a RENDERING change only. Every component keeps the per-instance
+// Rapier collider it had, built from the same instance list, in the same loop,
+// a few lines below the geometry that merged.
+//
+// But merging destroys the one-mesh-per-part structure that four tools read the
+// world's placement out of — `verify-solidity` matches every solid instance to
+// its collider and every collider to something drawn, `verify-clearance`
+// measures those instances against the road, `components-smoke` checks that
+// boats float, `verify-worlds` fingerprints the world. Those checks were red
+// hours ago on defects the owner reported three times, and blinding them to win
+// a draw call would be a straight loss.
+//
+// So the builder still publishes every instance's matrix in exactly the form
+// they already read: THE PLACEMENT RECORD — the same `<component>:<part>`
+// InstancedMesh, the same matrices, the same count, in the same order, holding
+// NO GEOMETRY and sitting on a layer no camera renders. It is not a drawable:
+// it issues no draw call and no triangle in either pass, and `renderer.info`
+// never sees it. It cannot drift from what is drawn, because the batch and the
+// record are filled from one instance list in one pass.
+//
+// TOOLS THAT NEED TO LEARN THE NEW PATH — reported rather than edited here,
+// because this file owns none of them:
+//   - `verify-solidity.mjs` classifies by name, so a batch lands in `component`
+//     with the key `sceneryBatch`, which has no library entry and therefore no
+//     verdict. Check 8 stays green and should not: the batch is a NEW DRAWING
+//     PATH and the whole point of that census is that a path nobody remembered
+//     is the bug. It wants an explicit rule ahead of the `':'` rule —
+//     `if (n.startsWith('sceneryBatch:')) return { path: 'backdrop', key: 'sceneryBatch' }`
+//     — and a BACKDROP entry saying: merged scenery geometry, solid BY PROXY,
+//     every instance inside it is published by the `<component>:<part>`
+//     placement records that checks 3 and 4 already match against colliders.
+
+/** Cell size for the spatial batches, in metres. The measured optimum in the
+ *  table above: at 60 m a harbour cell carries about 1,400 triangles, which is
+ *  roughly two draw calls' worth at the budget's own exchange rate below, so a
+ *  cell is worth its call and still small enough to be culled as a unit. */
+const CELL_M = 60;
+
+/** WHAT ONE DRAW CALL IS WORTH IN TRIANGLES, from the budget itself:
+ *  `verify-perf-budget.mjs` spends 150,000 triangles and 200 draw calls on the
+ *  same frame, so at the margin a draw call is worth 750 triangles. Used below
+ *  to decide whether a batch is worth splitting spatially at all — a thin layer
+ *  spread over the whole map (grass: 16,000 triangles over 79 cells on harbour)
+ *  costs more in draws than it saves in triangles, and stays whole. */
+const TRIS_PER_DRAW = 150_000 / 200;
+
+/** How much of a batch a worst-case frame actually draws.
+ *
+ *  MEASURED, and it is the fraction of BATCHES drawn, not of triangles: at each
+ *  track's worst portrait pose the renderer issued 64 of 299 harbour batches
+ *  (21%), 67 of 283 on dustbowl (24%) and 99 of 318 on proving ground (31%).
+ *  Mean 25%. (The three-lens analysis's 19.9% is the neighbouring figure for
+ *  TRIANGLES inside the frustum, which is not the same quantity and is not the
+ *  one this arithmetic needs.)
+ *
+ *  BOTH ENDS OF THAT RANGE WERE BUILT AND MEASURED, because the constant moves
+ *  exactly one decision — whether the grass layer is split — and that decision
+ *  is worth about 25 colour draws and 12,000 triangles a track:
+ *
+ *              0.20                              0.25
+ *    dustbowl  143,594 tris / 115 draws / 93 col  158,095 /  89 /  67
+ *    harbour   279,551 / 130 /  89                293,375 / 117 /  76
+ *    proving   203,887 / 154 / 123  COLOUR FAIL   213,275 / 119 /  88
+ *
+ *  0.25 is taken, and it is the measured value rather than the flattering one.
+ *  At 0.20 dustbowl slips under the triangle ceiling (96%) and proving ground
+ *  misses the colour-pass ceiling; at 0.25 EVERY draw-call check on every track
+ *  is green and the whole residual overage is triangles. That is the right way
+ *  round for this engine — draws are the binding constraint the four measured
+ *  designs above were chosen against — and the triangles that remain are not
+ *  this file's: terrain 100,352, water 32,768 and the road 5,760 are one mesh
+ *  each, world-spanning, and no camera angle culls any of them. */
+const CELL_IN_VIEW = 0.25;
+
+/** The layer the placement records sit on. Nothing in dustline sets `layers`
+ *  on a camera, so every camera in the game and in the editor tests against
+ *  layer 0 only and a record is skipped before frustum culling, before the
+ *  shadow pass and before the raycaster. */
+const RECORD_LAYER = 1;
+
+/** One part's geometry, flattened into the form a merge can consume: no index,
+ *  normals as that part's own material shades it, in the component's local
+ *  space. Built once per part and reused by every instance of it. */
+interface Prepared {
+  pos: Float32Array;
+  nrm: Float32Array;
+  verts: number;
+  tris: number;
+}
+
+/** Everything that goes into one batch from one part. `rgb` is the part's
+ *  material colour times its per-instance tint, resolved in the ORDER THE
+ *  BUILDER ALREADY WALKED — several tints draw from `ctx.rng` (grassTuft, rock,
+ *  bush, birch), so evaluating them anywhere else would move the stream and
+ *  reseed the world. */
+interface Member {
+  part: PropPart;
+  src: Prepared;
+  instances: Instance[];
+  rgb: Uint8Array;
+}
+
+interface Bucket {
+  /** the material every batch in this bucket is drawn with */
+  material: THREE.Material;
+  members: Member[];
+  tris: number;
+  cells: Set<string>;
+}
+
+const cellOf = (x: number, z: number) => `${Math.floor(x / CELL_M)},${Math.floor(z / CELL_M)}`;
+
+/** THE ONE MATERIAL THE FLAT-SHADED WORLD MERGES INTO.
+ *
+ *  `roughness: 1, metalness: 0` is `templates/geometry.ts`'s own `standard()`
+ *  default and the library's mode by a wide margin — 162,414 of harbour's
+ *  251,276 scenery triangles are authored at exactly this. `flatShading` is
+ *  FALSE here and that is not a change of look: a part whose material asks for
+ *  flat shading has its face normals baked into the merged buffer by
+ *  `prepare()`, which is the same normal the flat-shading derivative would have
+ *  produced, so flat parts stay flat and smooth parts stay smooth in one
+ *  material. `vertexColors` carries what `setColorAt` used to. */
+const litMaterial = () => new THREE.MeshStandardMaterial({
+  color: 0xffffff, roughness: 1, metalness: 0, flatShading: false, vertexColors: true,
+});
+
+/** ...and the one metals merge into. Kept apart from the matte batch because
+ *  metalness is not a colour and cannot become one: a metal part folded into
+ *  the matte material loses its environment reflection and reads as flat grey.
+ *  The threshold is 0.25 — below it a material is a dielectric with a sheen
+ *  (a ceramic insulator at 0.1) and belongs with the matte world; at or above
+ *  it the surface is meant to be metal (0.3 to 0.65 across the library). */
+const METAL_FLOOR = 0.25;
+const metalMaterial = () => new THREE.MeshStandardMaterial({
+  color: 0xffffff, roughness: 0.5, metalness: 0.5, flatShading: false, vertexColors: true,
+});
+
+/** Can this material's geometry be folded into a shared batch material, with
+ *  only its colour surviving as vertex colour?
+ *
+ *  Everything a shared material would silently throw away disqualifies: any
+ *  map, any transparency, any emission, any depth or blend trick. `side` is NOT
+ *  in this list — a two-sided or inside-out part is folded into a one-sided
+ *  batch by `prepare()` duplicating or reversing its triangles, which is exact
+ *  and costs geometry rather than a draw call. */
+function sharedShadable(m: THREE.Material): boolean {
+  const s = m as THREE.MeshStandardMaterial;
+  return m.type === 'MeshStandardMaterial'
+    && !s.map && !s.normalMap && !s.emissiveMap && !s.roughnessMap && !s.metalnessMap
+    && !s.aoMap && !s.alphaMap && !s.bumpMap && !s.displacementMap && !s.envMap && !s.lightMap
+    && m.transparent !== true && m.opacity === 1 && m.alphaTest === 0
+    && m.depthWrite !== false && m.depthTest !== false && s.wireframe !== true
+    && s.emissive !== undefined && s.emissive.getHex() === 0;
+}
+
+/** Which batch a part belongs in. Two shared buckets carry the flat-shaded
+ *  world; everything else is grouped by the material it was authored with, so a
+ *  textured wall keeps its texture and only joins walls drawn from the same
+ *  map. Keyed on the PARAMETERS rather than the material's uuid, because the
+ *  twenty-one wall parts of the house table each build their own
+ *  `MeshStandardMaterial` around one shared canvas. */
+function bucketKey(m: THREE.Material): string {
+  const s = m as THREE.MeshStandardMaterial;
+  if (sharedShadable(m)) return s.metalness >= METAL_FLOOR ? 'metal' : 'lit';
+  const tex = (t?: THREE.Texture | null) => (t ? t.uuid : '-');
+  return ['as', m.type, m.side, m.transparent, m.opacity, m.alphaTest, m.depthWrite, m.depthTest,
+    s.roughness, s.metalness, s.flatShading, s.emissive?.getHex(), s.emissiveIntensity,
+    tex(s.map), tex(s.normalMap), tex(s.emissiveMap), tex(s.alphaMap), tex(s.aoMap),
+    tex(s.roughnessMap), tex(s.metalnessMap)].join('|');
+}
+
+/** Flatten one part's geometry for merging.
+ *
+ *  THE NORMALS ARE THE POINT. `flatShading: true` is a fragment-shader
+ *  derivative, so it is a property of the MATERIAL and cannot survive a merge
+ *  into a shared one. It does not have to: a non-indexed geometry whose normals
+ *  are recomputed has exactly the face normal at every vertex, which is what
+ *  the derivative would have produced. So flat parts are baked flat here and
+ *  the batch material shades smoothly, and both kinds of part look the same
+ *  merged as they did instanced.
+ *
+ *  `fold` handles `side` for the shared buckets, which are FrontSide: a
+ *  DoubleSide part is emitted twice, once wound backwards with its normals
+ *  negated, and a BackSide part is emitted reversed only. That is exact, and it
+ *  buys the boats' open hull shells — 1,912 triangles on harbour, 3,824 once
+ *  doubled — a place in the matte batch instead of four materials of their own.
+ *
+ *  Nothing here mutates the part: `toNonIndexed()` and `clone()` both return a
+ *  new geometry, and the shared part cache hands the same `PropPart` to the
+ *  editor's palette thumbnails. */
+function prepare(part: PropPart, fold: boolean): Prepared {
+  const mat = part.material as THREE.MeshStandardMaterial;
+  const g = part.geometry;
+  const work = g.index ? g.toNonIndexed() : g.clone();
+  if (mat.flatShading === true || !work.getAttribute('normal')) work.computeVertexNormals();
+  const p = work.getAttribute('position') as THREE.BufferAttribute;
+  const n = work.getAttribute('normal') as THREE.BufferAttribute;
+  let pos = Float32Array.from(p.array as ArrayLike<number>);
+  let nrm = Float32Array.from(n.array as ArrayLike<number>);
+  const side = fold ? mat.side : THREE.FrontSide;
+  if (side === THREE.DoubleSide || side === THREE.BackSide) {
+    const tris = pos.length / 9;
+    const back = new Float32Array(pos.length);
+    const backN = new Float32Array(nrm.length);
+    for (let t = 0; t < tris; t++) {
+      // same three corners, wound the other way, facing the other way
+      for (let k = 0; k < 3; k++) {
+        const from = (t * 3 + [0, 2, 1][k]) * 3;
+        const to = (t * 3 + k) * 3;
+        back[to] = pos[from]; back[to + 1] = pos[from + 1]; back[to + 2] = pos[from + 2];
+        backN[to] = -nrm[from]; backN[to + 1] = -nrm[from + 1]; backN[to + 2] = -nrm[from + 2];
+      }
+    }
+    if (side === THREE.BackSide) { pos = back; nrm = backN; } else {
+      const both = new Float32Array(pos.length * 2);
+      const bothN = new Float32Array(nrm.length * 2);
+      both.set(pos, 0); both.set(back, pos.length);
+      bothN.set(nrm, 0); bothN.set(backN, nrm.length);
+      pos = both; nrm = bothN;
+    }
+  }
+  work.dispose();
+  return { pos, nrm, verts: pos.length / 3, tris: pos.length / 9 };
+}
+
+/** IS THIS BUCKET WORTH SPLITTING INTO CELLS AT ALL?
+ *
+ *  Whole, it is one draw call and every one of its triangles is submitted every
+ *  frame. Split, it is one draw call per occupied cell IN VIEW, and only those
+ *  cells' triangles are submitted. So splitting buys `(1 - CELL_IN_VIEW) * tris`
+ *  and costs `CELL_IN_VIEW * cells - 1` draw calls, and it is worth it exactly
+ *  when the triangles saved per extra call beat the budget's own exchange rate.
+ *
+ *  It matters that this is a rule and not a list. The density pass is next, and
+ *  the answer has to move with the world: grass at 4,000 tufts is 16,000
+ *  triangles over 79 cells and stays whole, and the same layer at ten times the
+ *  density splits, without anybody remembering to come back here. */
+function worthSplitting(b: Bucket): boolean {
+  const extraDraws = CELL_IN_VIEW * b.cells.size - 1;
+  if (extraDraws <= 0) return true;                 // splitting costs nothing on average
+  return b.tris * (1 - CELL_IN_VIEW) > TRIS_PER_DRAW * extraDraws;
+}
+
+/** One drawn batch: the members of a bucket that fall in one cell, or all of
+ *  them when the bucket is not worth splitting. */
+interface Group {
+  cell: string;
+  ox: number;
+  oz: number;
+  parts: { member: Member; instances: Instance[]; from: number[] }[];
+}
+
+/** WELD ONE GROUP INTO ONE BUFFER.
+ *
+ *  Every instance's geometry is transformed into the batch's frame and written
+ *  out: position through the instance matrix, normal through its rotation alone
+ *  (the instance scale is uniform, so it does not tilt a normal), colour flat
+ *  per instance. That is the whole of the trade this file makes — the geometry
+ *  is stored once per INSTANCE rather than once per part, and in exchange the
+ *  frustum can throw away a cell of it in one test.
+ *
+ *  The instance matrix is written by hand rather than through `Matrix4`: it is
+ *  a Y rotation and a uniform scale, three multiplies and two adds per
+ *  component, and this loop runs over every vertex of every instance in the
+ *  world — 759,000 of them on harbour. */
+function weld(g: Group, material: THREE.Material, name: string): THREE.InstancedMesh {
+  let verts = 0;
+  let casts = false;
+  for (const p of g.parts) {
+    verts += p.member.src.verts * p.instances.length;
+    if (p.member.part.castShadow) casts = true;
+  }
+  const pos = new Float32Array(verts * 3);
+  const nrm = new Float32Array(verts * 3);
+  const col = new Uint8Array(verts * 3);
+  let o = 0;
+  for (const p of g.parts) {
+    const { pos: sp, nrm: sn, verts: nv } = p.member.src;
+    const offsetY = p.member.part.offsetY ?? 0;
+    for (let k = 0; k < p.instances.length; k++) {
+      const inst = p.instances[k];
+      const i0 = p.from[k] * 3;
+      const r = p.member.rgb[i0], gr = p.member.rgb[i0 + 1], b = p.member.rgb[i0 + 2];
+      const s = inst.ctx.scale;
+      const c = Math.cos(inst.rot), sr = Math.sin(inst.rot);
+      const tx = inst.ctx.x - g.ox;
+      const ty = inst.ctx.y + inst.yOffset + offsetY;
+      const tz = inst.ctx.z - g.oz;
+      for (let i = 0; i < nv; i++) {
+        const a = i * 3, w = o * 3;
+        const x = sp[a], y = sp[a + 1], z = sp[a + 2];
+        pos[w] = (x * c + z * sr) * s + tx;
+        pos[w + 1] = y * s + ty;
+        pos[w + 2] = (z * c - x * sr) * s + tz;
+        const nx = sn[a], ny = sn[a + 1], nz = sn[a + 2];
+        nrm[w] = nx * c + nz * sr;
+        nrm[w + 1] = ny;
+        nrm[w + 2] = nz * c - nx * sr;
+        col[w] = r; col[w + 1] = gr; col[w + 2] = b;
+        o++;
+      }
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  // Unsigned bytes, normalised: a vertex colour is a flat per-instance constant
+  // here, never a gradient, so the quantisation cannot band — it can only shift
+  // a whole surface by at most half of 1/255 of the linear range, which at the
+  // darkest colour in the library (0x201d1a, linear 0.0144) is under 4% and
+  // invisible. It saves 9 bytes a vertex, which on harbour is 6.2 MB.
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3, true));
+  // One batch, placed by its own matrix. It is an InstancedMesh with a single
+  // instance rather than a Mesh, and the reason is honesty in the instruments
+  // rather than rendering: `verify-perf-budget.mjs` identifies scenery as an
+  // InstancedMesh whose name carries a ':', and a plain Mesh with a colour
+  // attribute would be filed under TERRAIN — which would corrupt the one tool
+  // this repository has for the mobile budget, for every other category too.
+  const mesh = new THREE.InstancedMesh(geo, material, 1);
+  mesh.name = name;
+  mesh.castShadow = casts;
+  mesh.setMatrixAt(0, new THREE.Matrix4().makeTranslation(g.ox, 0, g.oz));
+  mesh.instanceMatrix.needsUpdate = true;
+  return mesh;
+}
+
+/** Turn the buckets into drawn batches and hang them under one container.
+ *
+ *  THE CONTAINER IS NOT DECORATION. `editor/preview.ts` raycasts the top level
+ *  of the built world to decide where a dropped prop lands, filtering to plain
+ *  meshes; and `verify-worlds.mjs` fingerprints the top level, filtering to
+ *  InstancedMeshes. Both walk `preview.objects` one level deep, so a batch
+ *  parked under a container is invisible to both — the editor still drops props
+ *  on the ground rather than on a roof, and the committed golden world
+ *  fingerprint is untouched by a change that draws the same world differently.
+ *  It is an `Object3D` and not a `Group` because `verify-perf-budget.mjs`
+ *  identifies the cloud layer as "the only Group added straight to the scene". */
+function emitBatches(scene: THREE.Scene, buckets: Map<string, Bucket>): THREE.Object3D {
+  const t0 = performance.now();
+  const root = new THREE.Object3D();
+  root.name = 'sceneryBatches';
+  let batches = 0, split = 0, tris = 0, bytes = 0, alwaysOn = 0, apart = 0;
+  let bi = 0;
+  for (const [key, bucket] of buckets) {
+    if (key !== 'lit' && key !== 'metal') apart++;
+    const groups = new Map<string, Group>();
+    const doSplit = worthSplitting(bucket);
+    if (doSplit) split++; else alwaysOn += bucket.tris;
+    for (const member of bucket.members) {
+      const byCell = new Map<string, { instances: Instance[]; from: number[] }>();
+      for (let i = 0; i < member.instances.length; i++) {
+        const inst = member.instances[i];
+        const cell = doSplit ? cellOf(inst.ctx.x, inst.ctx.z) : '';
+        let e = byCell.get(cell);
+        if (!e) { e = { instances: [], from: [] }; byCell.set(cell, e); }
+        e.instances.push(inst); e.from.push(i);
+      }
+      for (const [cell, e] of byCell) {
+        let g = groups.get(cell);
+        if (!g) {
+          const [gx, gz] = cell ? cell.split(',').map(Number) : [0, 0];
+          g = {
+            cell,
+            ox: cell ? (gx + 0.5) * CELL_M : 0,
+            oz: cell ? (gz + 0.5) * CELL_M : 0,
+            parts: [],
+          };
+          groups.set(cell, g);
+        }
+        g.parts.push({ member, instances: e.instances, from: e.from });
+      }
+    }
+    // Sorted, so the built world does not depend on the order a Map happened to
+    // fill — `verify-regression-memory` builds every track four times and
+    // requires the whole fingerprint, geometry included, to be identical.
+    for (const cell of [...groups.keys()].sort()) {
+      const g = groups.get(cell)!;
+      const mesh = weld(g, bucket.material, `sceneryBatch:${bi}${cell ? `@${cell}` : ''}`);
+      root.add(mesh);
+      batches++;
+      const p = mesh.geometry.getAttribute('position');
+      tris += p.count / 3;
+      bytes += p.count * 27;                       // pos + normal f32, colour u8
+    }
+    bi++;
+  }
+  scene.add(root);
+  // Says what the merge could and could not do, every build, because "the road
+  // is the only textured surface" is a policy this world does not yet keep and
+  // the exceptions are what cost draw calls. `apart` is how many materials
+  // refused the two shared ones — textured, transparent, emissive or two-sided
+  // — and `alwaysOn` is the geometry too thin to be worth culling, which is
+  // submitted whole in every frame and is therefore the number to watch when
+  // the density pass lands.
+  console.info(`[world] scenery: ${batches} batches over ${buckets.size} materials `
+    + `(${buckets.size - apart} shared, ${apart} kept apart; ${split} split into ${CELL_M} m cells, `
+    + `${buckets.size - split} left whole at ${alwaysOn.toLocaleString()} always-drawn triangles), `
+    + `${tris.toLocaleString()} triangles in ${(bytes / 1048576).toFixed(1)} MB of merged buffers, `
+    // The welding cost, on the machine that ran it. It is a LOAD cost and a
+    // rebuild cost — the editor rebuilds on every keystroke — and it is the
+    // price of the culling, so it is stated rather than left to be discovered.
+    + `welded in ${(performance.now() - t0).toFixed(0)} ms`);
+  return root;
+}
+
 export interface BuiltWorld {
   objects: THREE.Object3D[];
   /** how many of each component actually made it into the world */
@@ -305,6 +787,14 @@ export function buildComponents(
   const up = new THREE.Vector3(0, 1, 0);
   const pos = new THREE.Vector3();
   const scl = new THREE.Vector3();
+  const tintCol = new THREE.Color();
+
+  // ONE geometry, shared by every placement record, and it is empty on purpose:
+  // a record publishes where the instances are, and the instances are drawn by
+  // the batches below. See the essay above `CELL_M`.
+  const recordGeometry = new THREE.BufferGeometry();
+  const buckets = new Map<string, Bucket>();
+  const prepared = new Map<PropPart, Prepared>();
 
   for (const [id, instances] of byTemplate) {
     const tpl = getTemplate(id)!;
@@ -315,14 +805,45 @@ export function buildComponents(
     for (const part of parts) {
       const eligible = part.when ? instances.filter((i) => part.when!(i.ctx)) : instances;
       if (!eligible.length) continue;
-      const mesh = new THREE.InstancedMesh(part.geometry, part.material, eligible.length);
-      // Named so tools can find the instances of a given component in a built
-      // world. `tools/components-smoke.mjs` reads the actual matrices out of
-      // these to check that boats float — a check that restates the placement
-      // rule instead of reading the result passes just as happily when the
-      // builder is broken, which was true of this one until it was measured.
+
+      // THE PLACEMENT RECORD. Named so tools can find the instances of a given
+      // component in a built world. `tools/components-smoke.mjs` reads the
+      // actual matrices out of these to check that boats float — a check that
+      // restates the placement rule instead of reading the result passes just
+      // as happily when the builder is broken, which was true of this one until
+      // it was measured. `verify-solidity` and `verify-clearance` read the same
+      // matrices to match every solid instance against its collider and against
+      // the road. It carries no geometry and no camera renders its layer, so it
+      // costs nothing in either pass.
+      const mesh = new THREE.InstancedMesh(recordGeometry, part.material, eligible.length);
       mesh.name = `${id}:${part.key}`;
-      mesh.castShadow = part.castShadow ?? false;
+      mesh.layers.set(RECORD_LAYER);
+      mesh.frustumCulled = false;        // never reached: the layer test comes first
+
+      const key = bucketKey(part.material);
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = {
+          material: key === 'lit' ? litMaterial() : key === 'metal' ? metalMaterial()
+            : Object.assign(part.material.clone(), { vertexColors: true }),
+          members: [], tris: 0, cells: new Set(),
+        };
+        // the batch's own colour is white: every part's colour is in the
+        // vertex buffer now, and a tinted batch material would multiply twice
+        (bucket.material as THREE.MeshStandardMaterial).color?.setHex(0xffffff);
+        buckets.set(key, bucket);
+      }
+      let src = prepared.get(part);
+      // Only the two SHARED materials are FrontSide and therefore need a
+      // two-sided part folding into one-sided geometry; an as-authored bucket
+      // keeps the `side` its parts were written with.
+      if (!src) { src = prepare(part, key === 'lit' || key === 'metal'); prepared.set(part, src); }
+
+      // The tints are resolved HERE, inside the walk the builder already made,
+      // because several of them draw from `ctx.rng` — evaluating them later, in
+      // cell order, would move the stream and reseed the world.
+      const rgb = new Uint8Array(eligible.length * 3);
+      const base = (part.material as THREE.MeshStandardMaterial).color;
       let n = 0;
       for (const inst of eligible) {
         const s = inst.ctx.scale;
@@ -331,15 +852,24 @@ export function buildComponents(
         scl.set(s, s, s);
         m4.compose(pos, q, scl);
         mesh.setMatrixAt(n, m4);
+        tintCol.copy(base);
         const tint = part.tint?.(inst.ctx);
-        if (tint) mesh.setColorAt(n, tint);
+        if (tint) tintCol.multiply(tint);
+        // three's own arithmetic, byte for byte: material colour times
+        // instance colour, in the linear working space both already live in
+        rgb[n * 3] = Math.max(0, Math.min(255, Math.round(tintCol.r * 255)));
+        rgb[n * 3 + 1] = Math.max(0, Math.min(255, Math.round(tintCol.g * 255)));
+        rgb[n * 3 + 2] = Math.max(0, Math.min(255, Math.round(tintCol.b * 255)));
+        bucket.cells.add(cellOf(inst.ctx.x, inst.ctx.z));
         n++;
       }
       mesh.count = n;
       mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       scene.add(mesh);
       objects.push(mesh);
+
+      bucket.members.push({ part, src, instances: eligible, rgb });
+      bucket.tris += src.tris * eligible.length;
     }
 
     if (solids && world && RAPIER) {
@@ -350,6 +880,8 @@ export function buildComponents(
       }
     }
   }
+
+  if (buckets.size) objects.push(emitBatches(scene, buckets));
 
   // The skyline is scenery too. It is drawn by `render/horizon.ts` and made
   // solid here, on the same body, for the reason above the import: one file

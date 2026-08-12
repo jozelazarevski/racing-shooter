@@ -23,6 +23,29 @@ const at2 = (geo: THREE.BufferGeometry, yy: number) => geo.translate(0, yy, 0);
 const galY = 13.7;
 const galR = 2.45;
 
+/** A CAPPED-OFF `strut`: the same bar between two points, with the two end
+ *  discs left out.
+ *
+ *  `templates/geometry.ts`'s `strut` builds a full cylinder because standing
+ *  rigging runs to a masthead in open air. A GALLERY RAIL does not: every
+ *  stanchion's foot is inside the deck and its head is a 9 cm disc 13.7 m up,
+ *  and every handrail segment butts into the stanchion at each end. Measured,
+ *  those end discs were 416 of the rail's 844 triangles — half the part — and
+ *  every one of them is a triangle under 10 cm that no camera in the game can
+ *  be pointed at.
+ *
+ *  A capless bar is still opaque from outside: a convex prism's front faces
+ *  cover its whole silhouette, so nothing shows through except through the open
+ *  ends themselves, which are the faces being argued about. */
+function bar(a: number[], b: number[], r: number, seg: number): THREE.BufferGeometry {
+  const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+  const len = Math.hypot(dx, dy, dz);
+  const g = new THREE.CylinderGeometry(r, r, len, seg, 1, true);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / len, dy / len, dz / len)));
+  return g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+}
+
 const lighthouse: PropTemplate = {
   id: 'lighthouse',
   name: 'Lighthouse',
@@ -63,6 +86,16 @@ const lighthouse: PropTemplate = {
       key: 'rail',
       // sixteen stanchions and two handrails, from their real endpoints — and
       // the door, which is what gives the tower a scale you can read
+      //
+      // SIXTEEN IS STILL SIXTEEN. v1's comment asks for "a railing you can
+      // count the stanchions on", so the COUNT is the read and it is untouched;
+      // what changed is that each bar is a prism rather than a cylinder, and
+      // has no end discs. A stanchion is 9 cm thick at `previewDist` 44 m —
+      // 1.6 px — so its cross-section is a decision about triangles and not
+      // about how the railing looks. Four sides on the uprights because a
+      // square section is at its widest on the diagonal and so holds the
+      // apparent thickness that lets you count them; three on the horizontals,
+      // which are seen almost end-on from the quay.
       geometry: bundle([
         ...Array.from({ length: 16 }, (_, k) => {
           const an = (k / 16) * Math.PI * 2;
@@ -70,9 +103,9 @@ const lighthouse: PropTemplate = {
           const an2 = ((k + 1) / 16) * Math.PI * 2;
           const qx = Math.sin(an2) * (galR - 0.14), qz = Math.cos(an2) * (galR - 0.14);
           return [
-            strut([px, galY, pz], [px, galY + 0.95, pz], 0.045, 5),
-            strut([px, galY + 0.45, pz], [qx, galY + 0.45, qz], 0.04, 4),
-            strut([px, galY + 0.95, pz], [qx, galY + 0.95, qz], 0.04, 4),
+            bar([px, galY, pz], [px, galY + 0.95, pz], 0.045, 4),
+            bar([px, galY + 0.45, pz], [qx, galY + 0.45, qz], 0.04, 3),
+            bar([px, galY + 0.95, pz], [qx, galY + 0.95, qz], 0.04, 3),
           ];
         }).flat(),
         new THREE.BoxGeometry(1.05, 1.9, 0.3).translate(0, 2.5, 2.72),

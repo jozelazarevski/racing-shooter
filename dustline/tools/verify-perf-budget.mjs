@@ -40,40 +40,143 @@
  *     miss it on a phone. Passing here proves nothing; failing here is proof.
  *
  * ---------------------------------------------------------------------------
+ * WHAT THE PHONE RUNS THAT THIS HARNESS DOES NOT
+ * ---------------------------------------------------------------------------
+ *
+ * `render/post.ts`'s `postWanted()` returns TRUE on a real GPU and FALSE only
+ * when the GL renderer string names a software rasteriser. This harness launches
+ * Chromium with `--use-gl=swiftshader`, so it trips that sniff: every count in
+ * this report is taken with `post.enabled === false`, and the phone tomorrow
+ * will run with it TRUE. The chain is RenderPass -> UnrealBloomPass -> grade ->
+ * OutputPass, and the bloom alone is five mip levels of separable blur over the
+ * whole frame.
+ *
+ *   WHAT THAT COSTS THE COUNTS: nothing, and this is worth stating rather than
+ *     leaving implied. A pass is a full-screen quad, not scene geometry, and
+ *     `shot()` below calls `renderer.render` directly rather than going through
+ *     the composer — so no triangle or draw-call number in this report moves
+ *     when the chain is switched on or off.
+ *
+ *   WHAT IT COSTS THE FRAME is fragment work and bandwidth, inside the same
+ *     16.7 ms the ceiling below is derived against. That is NOT measurable
+ *     here and is not guessed at: a CPU rasteriser's fragment throughput says
+ *     nothing whatever about an Adreno's.
+ *
+ *   SO THE CHAIN IS BUILT AND COUNTED ANYWAY, at the phone's own resolution,
+ *     for the four things about it that ARE device-meaningful: how many render
+ *     targets it allocates, at what size and pixel format, how many extra
+ *     shader programs it compiles (a first-frame stall on mobile, not a
+ *     per-frame cost), and how many draw calls it adds to every frame. Those
+ *     are printed under "THE PHONE'S RENDER PATH" per track. The fragment cost
+ *     is named there and left unquantified, which is the honest shape of it.
+ *
+ * FILL IS NOT ONLY VERTICES, EITHER. `ART-DIRECTION.md`'s cost argument — a
+ * phone here is "bound by vertices and draw calls rather than by fragments" —
+ * is true of the opaque flat-shaded world and false in two specific places, so
+ * both are censused per track. A material still `THREE.DoubleSide` at draw time
+ * shades BOTH faces of every triangle while submitting it once, so the counts
+ * here understate its fragment work by exactly 2x; `templates/boats.ts` asks for
+ * that on hull, deck, band and canvas, and harbour moors forty hulls. And
+ * harbour floats a translucent water sheet across the bottom half of the frame,
+ * which is one draw call, no early-z, and a great many blended fragments.
+ *   THE CENSUS COUNTS WHAT IS DoubleSide AT DRAW TIME, which is not what
+ *   `boats.ts` asks for, and the difference is the whole reason to measure it
+ *   rather than read it off the source: `world/build.ts`'s `prepare()` folds a
+ *   two-sided part that joins a shared batch into DOUBLED GEOMETRY wound both
+ *   ways, so those back faces are already inside the triangle counts above and
+ *   must not be counted twice. MEASURED, and it is not what `boats.ts` implies:
+ *   on all three committed tracks every boat part has folded, and the only
+ *   surface still DoubleSide at draw time is a single TEXTURED scenery batch —
+ *   16,000 triangles in one draw, 8-17% of the frame depending on the track,
+ *   shaded twice. A map is what keeps a batch out of the shared bucket, so the
+ *   surviving two-sided fill and the surviving textured fill are the same
+ *   object. Both routes end at the same fragment work; only one of them is
+ *   visible in a triangle count, and the census says which is which.
+ *
+ * ---------------------------------------------------------------------------
  * THE CEILING, AND WHERE IT COMES FROM
  * ---------------------------------------------------------------------------
  *
  * Argue with this derivation rather than nudging the constants.
  *
- * TRIANGLES: 150,000 submitted per frame, colour pass plus shadow pass.
+ * TRIANGLES: 150,000 submitted per frame, colour pass plus shadow pass, with a
+ * SOFT TARGET of 110,000 printed beside it — because the published sources
+ * disagree by 5x and pretending otherwise would be the bare number this
+ * codebase's comment style exists to prevent.
  *
- *   1. Published platform budgets put a mid-range Android/iOS phone at
- *      300k-500k on-screen triangles at 60 fps "once shaders and lighting are
- *      reasonable" (low-poly.com, "Polygon Budgets by Platform", 2026).
- *   2. Take the BOTTOM of that band, 300k, for two reasons. The phone in the
- *      owner's hand tomorrow is not the best mid-ranger on the market; and
- *      dustline does not shade cheaply — every surface is `MeshStandardMaterial`
- *      (a full metal/rough BRDF) lit by a hemisphere light and a directional
- *      light with a 2048x2048 PCF soft shadow map at a 3.5-texel kernel
- *      (`render/scene.ts`). That is the expensive end of "reasonable".
- *   3. Halve it, to 150k, for THERMAL SUSTAIN. This is measured device
+ *   THE TWO BANDS, AND THEY DO NOT AGREE:
+ *
+ *     (a) low-poly.com, "Polygon Budgets by Platform" (2026): a mid-range
+ *         Android/iOS phone holds 300k-500k on-screen triangles at 60 fps
+ *         "once shaders and lighting are reasonable".
+ *     (b) a second published band puts mid-range phones "dropping frames above
+ *         65,000" triangles, and rates an iPhone 14 at ~150,000 as a PEAK
+ *         figure rather than a sustained one.
+ *
+ *     They cannot both be right, and the gap is not a rounding difference: (a)
+ *     is roughly five times (b) at the mid-range, and where (a) claims 300k
+ *     sustained (b) allows 150k as a burst on a handset two tiers better. This
+ *     tool cannot settle it — a software rasteriser has no opinion about a
+ *     phone's fill rate, and neither band was measured on the owner's handset.
+ *     What follows therefore derives the GATE from (a), the pessimistic case
+ *     from (b), and prints the second as an advisory rather than hiding it.
+ *
+ *   1. Take the BOTTOM of (a), 300k. The phone in the owner's hand tomorrow is
+ *      not the best mid-ranger on the market; dustline does not shade cheaply —
+ *      every surface is `MeshStandardMaterial` (a full metal/rough BRDF) lit by
+ *      a hemisphere light and a directional light with a PCF soft shadow map at
+ *      a 3.5-texel kernel (`render/scene.ts`) — and on top of that the phone,
+ *      unlike this harness, runs the whole post chain over every pixel. That is
+ *      the expensive end of "reasonable".
+ *
+ *      CORRECTED, AND THE CORRECTION MATTERS MORE THAN THE NUMBER. This step
+ *      used to cite a "2048x2048 PCF soft shadow map" as part of the reason to
+ *      take the bottom of the band. That was wrong twice: 2048 is the DESKTOP
+ *      map, and the phone gets 1024 (`render/scene.ts` splits on
+ *      `pointer: coarse`, exactly as it splits the pixel-ratio clamp); and a
+ *      shadow map's resolution is fill and bandwidth, never submissions, so it
+ *      could not have justified a SUBMISSION budget in either size. The harness
+ *      itself was the desktop that made the mistake plausible — it launched
+ *      without `hasTouch`, so the game handed it 2048 and DPR 2.0. It now runs
+ *      as a touch device and measures the phone's 1024 and 1.75, and NOT ONE
+ *      COUNT IN THIS REPORT MOVED when that was fixed. What survives the
+ *      correction as a reason to take the bottom of the band is the BRDF, the
+ *      soft kernel and the post chain.
+ *
+ *   2. Halve it, to 150k, for THERMAL SUSTAIN. This is measured device
  *      behaviour, not a safety fudge: 3DMark's Wild Life Stress Test reports
  *      "stability" as final score over peak score across a 20-minute run, and
  *      sustained mobile GPU performance lands at roughly 50-65% of burst — an
  *      iPhone 11 Pro measured 51.7% (7,945 down to 4,106). A test drive is
  *      judged in minute five, not second five, so the budget is set against
  *      the throttled clock, not the first-lap clock.
- *   4. The 300k figure is ON-SCREEN triangles, i.e. one colour pass. dustline
+ *   3. The 300k figure is ON-SCREEN triangles, i.e. one colour pass. dustline
  *      also fills a shadow map every frame, which re-submits every `castShadow`
  *      object. That second pass runs on the same GPU inside the same 16.7 ms,
  *      so it comes OUT OF the 150k rather than sitting beside it.
+ *   4. THE SOFT TARGET, 110,000, is (b) put through step 2's arithmetic. An
+ *      iPhone 14's ~150k PEAK at 50-65% sustain is 75k-98k; take the bottom,
+ *      75k, to keep the pessimistic route pessimistic. The two routes then
+ *      bracket the sustained answer at 75k and 150k, and their geometric mean
+ *      is sqrt(75,000 * 150,000) = 106,066, rounded up to 110,000. Nobody
+ *      published 110k. It is the middle of a disagreement, and it is printed as
+ *      a clearly-labelled ADVISORY LINE and is never a check, because failing a
+ *      build on the midpoint of two sources that differ by 5x would be
+ *      inventing precision that nobody has.
  *
- *   CROSS-CHECK, from a different direction: the same source's mobile-web band
- *   is 30k-150k triangles. Its ceiling is set largely by download size and JS
+ *      WHAT IT IS FOR: the density pass. A world that lands at 110k still has
+ *      somewhere to go if the phone turns out to be the (b) kind of phone; a
+ *      world that lands at 149k has passed the gate by spending a margin that
+ *      was never certain to exist. Spend down to the advisory, gate at 150k.
+ *
+ *   CROSS-CHECK, from a different direction: (a)'s own mobile-web band is
+ *   30k-150k triangles. Its ceiling is set largely by download size and JS
  *   heap, neither of which binds here — dustline generates every vertex in the
  *   browser and downloads no geometry at all — so it is not the right number to
  *   adopt directly. But two independent routes landing on the same 150k is a
- *   reason to trust it rather than a coincidence to ignore.
+ *   reason to trust it rather than a coincidence to ignore. Note that this
+ *   cross-check is NOT independent of (a): it is the same publisher. (b) is the
+ *   independent voice, and it is the one that disagrees.
  *
  * DRAW CALLS: 200 submitted per frame, colour plus shadow; colour alone <= 100.
  *
@@ -109,6 +212,19 @@
  * world the two numbers are close, and why they are close is the finding.
  *
  * At each station the frame is assembled the way a raced frame actually is:
+ *
+ *   THE DEVICE IS A TOUCH DEVICE, because the game asks whether it is one and
+ *     changes what it builds. `render/scene.ts` reads `(pointer: coarse)`
+ *     twice — for the shadow map (1024 on a phone, 2048 elsewhere) and for the
+ *     pixel-ratio clamp (1.75 on a phone, 2 elsewhere) — and `ui/touch.ts`
+ *     reads the same predicate for the thumb pads. A Playwright page launched
+ *     without `hasTouch` answers "fine", so this harness was a DESKTOP: 2048
+ *     map, DPR 2.0, neither of which the owner's phone will use. The context
+ *     below sets `hasTouch`, `isMobile` and a DPR-3 screen, and then the GAME'S
+ *     OWN clamp lands on 1.75 rather than this file asserting it. What the
+ *     harness actually got is read back out of the page and checked, so a
+ *     future Playwright that stops emulating the media query fails loudly
+ *     instead of quietly measuring a laptop again.
  *
  *   THE CAMERA is the game's own `ChaseCamera` object, captured by wrapping
  *     `__dust.post.render` for one frame — the renderer is handed the scene and
@@ -148,16 +264,43 @@ import { chromium } from 'playwright-core';
 import { ensureServer } from './serve.mjs';
 
 // ---- the budget ------------------------------------------------------------
-// Derived in the header. These are the two numbers to argue with.
-const BUDGET_TRIS = 150_000;      // submitted per frame, colour + shadow
+// Derived in the header. These are the numbers to argue with.
+const BUDGET_TRIS = 150_000;      // THE GATE: submitted per frame, colour + shadow
 const BUDGET_CALLS = 200;         // submitted per frame, colour + shadow
 const BUDGET_COLOUR_CALLS = 100;  // the colour pass's own half of the above
 
+// ADVISORY, NOT A GATE. sqrt(75,000 * 150,000) = 106,066 rounded up: the
+// geometric mean of the two published bands once both are put through the same
+// thermal-sustain step (header, TRIANGLES step 4). Nothing fails on this
+// number — it exists so the density pass can see how much of a CONTESTED
+// margin it is spending, and it is printed on its own labelled line.
+const SOFT_TRIS = 110_000;
+
 // A phone in portrait, in CSS pixels: the iPhone 14 / 13 / 12 viewport, which
-// is also close to the middle of the Android mid-range. Device pixel ratio is
-// deliberately irrelevant here — every number this tool reports is a count of
-// primitives and calls, and none of them changes with resolution.
+// is also close to the middle of the Android mid-range.
 const VIEWPORT = { width: 390, height: 844 };
+
+/* THE CONTEXT THE GAME IS ASKED TO BUILD ITSELF FOR. See the header's THE
+ * DEVICE note for why a desktop page was the wrong harness.
+ *
+ *   hasTouch          the one that matters: it is what makes `(pointer: coarse)`
+ *                     match, and that single predicate is what `render/scene.ts`
+ *                     switches BOTH the shadow map and the pixel-ratio clamp on.
+ *   isMobile          mobile layout/viewport emulation, to be the same kind of
+ *                     client the phone is. Safe for the counts only because
+ *                     `index.html` carries `width=device-width`: measured,
+ *                     `innerWidth` stays 390 with it on, so `camera.aspect` and
+ *                     therefore every culling result is unchanged. Without that
+ *                     meta tag Chromium would lay out at 980 CSS px and this
+ *                     flag would silently rewrite every number in the report.
+ *   deviceScaleFactor 3, an iPhone 14's screen — NOT the ratio the game will
+ *                     use. The point is to hand the clamp in `render/scene.ts`
+ *                     something to clamp, so the 1.75 this harness renders at is
+ *                     the game's own arithmetic and not a constant copied into
+ *                     this file. No count here changes with it; the composer
+ *                     census does, which is why it is the phone's number.
+ */
+const PHONE_CONTEXT = { viewport: VIEWPORT, deviceScaleFactor: 3, hasTouch: true, isMobile: true };
 
 // Poses sampled around the lap. 16 over a road of 480 samples is one every 30
 // road samples — fine enough that a corner opening onto the whole harbour is
@@ -165,6 +308,11 @@ const VIEWPORT = { width: 390, height: 844 };
 // Each station costs four renders (two orientations, each read twice to
 // separate the shadow pass), and a 500k-triangle submit is not free even when
 // only the counters are wanted.
+//   MEASURED, three tracks at 16 stations: 1m27 when this harness rendered at
+//   390x844, 2m39 now that it renders the phone's 682x1477 drawing buffer and
+//   builds the post chain once per track. That 1.8x is the price of measuring
+//   the right device and it is still inside the five minutes; if it ever is
+//   not, drop `--stations`, do not drop the emulation.
 const STATIONS = Number(argOf('--stations') ?? 16);
 
 // Its own port. `ensureServer` reuses a server it finds, so sharing one is
@@ -277,6 +425,15 @@ async function measureTrack(page, stations) {
     const textures = new Set();
     const shared = new Map();          // non-instanced meshes sharing geo+material
     let texturedTris = 0;
+    // FILL, NOT VERTICES. `THREE.DoubleSide === 2`, `BackSide === 1`. A
+    // DoubleSide material submits its triangle ONCE and shades it TWICE, so it
+    // is invisible in every triangle count in this report and real on the
+    // device; a transparent surface is blended, drawn after the opaque world,
+    // and gets no early-z rejection from anything drawn before it. Both are
+    // gathered here so the "vertex-bound, not fill-bound" claim in
+    // ART-DIRECTION.md is checked rather than repeated.
+    const twoSided = [];               // {cat, name, tris, instances}
+    const translucent = [];
     scene.traverse((o) => {
       if (!o.geometry || !o.material) return;
       const c = classify(o);
@@ -287,13 +444,50 @@ async function measureTrack(page, stations) {
       const tri = pos ? (idx ? idx.count : pos.count) / 3 : 0;
       const n = o.isInstancedMesh ? o.count : 1;
       const e = byCat[c] || (byCat[c] = {
-        tris: 0, objects: 0, instanced: 0, instances: 0, texturedTris: 0, mats: new Set(),
+        tris: 0, objects: 0, instanced: 0, instances: 0, texturedTris: 0,
+        twoSidedTris: 0, backSideTris: 0, transparentTris: 0, mats: new Set(),
       });
       e.tris += tri * n; e.objects++; e.instances += n;
       if (o.isInstancedMesh) e.instanced++;
       e.mats.add(o.material.uuid);
       materials.add(o.material);
       if (o.material.map) { texturedTris += tri * n; e.texturedTris += tri * n; }
+      // The footprint is the honest way to say "how much of the screen is this
+      // likely to cover" without pretending to have measured coverage: it is
+      // the object's own bounding box in world units, which is a geometric
+      // fact. Only for single meshes — an InstancedMesh's box is one instance's.
+      const footprint = () => {
+        if (o.isInstancedMesh || !o.geometry.computeBoundingBox) return null;
+        o.geometry.computeBoundingBox();
+        const bb = o.geometry.boundingBox;
+        if (!bb) return null;
+        // `localToWorld` on the box's two corners: exact for the axis-aligned
+        // sheets this is asked about, and it needs no THREE import in a page
+        // whose bundle does not export one. `clone()` because it mutates.
+        const lo = o.localToWorld(bb.min.clone());
+        const hi = o.localToWorld(bb.max.clone());
+        return [Math.abs(hi.x - lo.x), Math.abs(hi.z - lo.z)];
+      };
+      if (o.material.side === 2 /* THREE.DoubleSide */) {
+        e.twoSidedTris += tri * n;
+        // `textured` because it is the reason a surface is still DoubleSide at
+        // draw time at all: `world/build.ts` folds two-sided parts into doubled
+        // geometry only when they can join a shared batch, and a map is what
+        // keeps a part out of one.
+        twoSided.push({
+          cat: c, name: o.name || o.geometry.type, tris: tri * n, instances: n,
+          textured: !!o.material.map,
+        });
+      }
+      if (o.material.side === 1 /* THREE.BackSide */) e.backSideTris += tri * n;
+      if (o.material.transparent === true) {
+        e.transparentTris += tri * n;
+        translucent.push({
+          cat: c, name: o.name || o.geometry.type, tris: tri * n, instances: n,
+          opacity: o.material.opacity, depthWrite: o.material.depthWrite !== false,
+          footprint: footprint(),
+        });
+      }
       for (const k of ['map', 'normalMap', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'alphaMap']) {
         if (o.material[k]) textures.add(o.material[k]);
       }
@@ -323,6 +517,29 @@ async function measureTrack(page, stations) {
     let sun = null;
     scene.traverse((o) => { if (o.isDirectionalLight) sun = o; });
     const sunOffset = sun?.userData?.sunOffset || null;
+
+    /* WHAT DEVICE DID THE HARNESS ACTUALLY GET?
+     *
+     * Read back rather than assumed, and checked by the caller. Every value
+     * here is a decision the GAME made about the machine it found itself on —
+     * `render/scene.ts` picks the shadow map and the pixel-ratio clamp off one
+     * `(pointer: coarse)` test, and `render/post.ts` picks the composer off the
+     * GL renderer string. If a future Playwright stops emulating the media
+     * query, this report says "desktop" out loud instead of quietly costing a
+     * 2048 map the phone will never allocate. */
+    const gl = renderer.getContext();
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const device = {
+      pointerCoarse: matchMedia('(pointer: coarse)').matches,
+      screenDpr: devicePixelRatio,
+      pixelRatio: renderer.getPixelRatio(),          // after the game's own clamp
+      css: [innerWidth, innerHeight],
+      buffer: [renderer.domElement.width, renderer.domElement.height],
+      shadowMapSize: sun?.shadow?.mapSize?.x ?? 0,
+      shadowKernel: sun?.shadow?.radius ?? 0,
+      gl: String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)),
+      postEnabled: post.enabled,
+    };
 
     const info = renderer.info;
     // TWO READS, and the difference between them is the shadow pass.
@@ -434,6 +651,28 @@ async function measureTrack(page, stations) {
     const soloCar = shot();
     drawables.forEach((o, i) => { o.visible = wasVisible[i]; });
 
+    // ---- THE SAME FRAME CUT BY FILL COST ----------------------------------
+    // Same worst pose and the same method as the per-category split — render
+    // only the objects that match, and read the counters — but cutting the
+    // frame a second way. These two do NOT sum with the categories and are not
+    // meant to: an object can be both, and most are neither. What each one
+    // answers is a question the triangle count cannot:
+    //
+    //   double-sided — how many of the triangles submitted at this pose are
+    //     shaded on BOTH faces, i.e. how far the frame's fragment work exceeds
+    //     what its triangle count implies. Submitted once, rasterised twice.
+    //   transparent  — how much of the frame is blended geometry, which is
+    //     drawn after the opaque world, writes no depth to reject anything
+    //     behind it, and on harbour is one 1,260 m sheet under everything.
+    const onlyWhere = (pred) => {
+      for (const o of drawables) o.visible = pred(o);
+      const s = shot();
+      drawables.forEach((o, i) => { o.visible = wasVisible[i]; });
+      return s;
+    };
+    const twoSidedFrame = onlyWhere((o) => o.material.side === 2);
+    const translucentFrame = onlyWhere((o) => o.material.transparent === true);
+
     // ---- CPU, fixed step --------------------------------------------------
     // `fastForward` runs `main.ts`'s own `fixedStep` — Rapier, four vehicle
     // controllers, three AI drivers, the race director. 60 ticks first so the
@@ -444,21 +683,112 @@ async function measureTrack(page, stations) {
     d.fastForward(TICKS);
     const fixedStepMs = (performance.now() - t0) / TICKS;
 
+    /* ---- THE POST CHAIN, WHICH THIS MACHINE WILL NOT RUN AND THE PHONE WILL
+     *
+     * Read the header first: `postWanted()` is false here because of the
+     * SwiftShader sniff and true on a real GPU, so the frame the owner sees has
+     * four passes over it that nothing above accounts for. The fragment cost of
+     * those passes is NOT measurable on a CPU rasteriser and is not guessed at.
+     * What IS measurable, and is API-level like everything else in this report:
+     * the draw calls the chain adds, the render targets it allocates and their
+     * size, and the shader programs it compiles.
+     *
+     * MEASURED LAST, ON PURPOSE. Building the composer allocates GPU textures
+     * and compiles programs, so the world's own memory figures are taken before
+     * it exists — otherwise this measurement would appear in the numbers it is
+     * meant to sit beside. The chain is disposed again afterwards.
+     *
+     * The counts are a difference between two renders at ONE pose: a direct
+     * `renderer.render` (what every other number here is), then one composer
+     * frame at the same pose. `Post.render` resets `info` itself and leaves
+     * `autoReset` off, so both readings include the shadow pass and the
+     * difference is exactly the chain's own full-screen quads. */
+    const worldPrograms = info.programs?.length ?? 0;
+    const worldGpuTextures = info.memory.textures;
+    const worldGeometries = info.memory.geometries;
+    // NOT counted by shader name. `renderer.info.programs[].name` reads
+    // `undefined` for 25 of the 27 the chain adds in this build, so a breakdown
+    // by name would be a table of question marks dressed as a finding. The
+    // count against the world's own program count is what this can honestly
+    // say, and it is printed that way.
+    place(worstNode, baseAspect);
+    const directFrame = shot();
+    const wasPostEnabled = post.enabled;
+    // Re-measuring the worst pose is also the check on everything above it that
+    // hid objects: if the per-category loop or the fill cuts left one drawable
+    // switched off, this no longer matches `whole` and the caller says so.
+    const chain = { wanted: wasPostEnabled, baseline: { allCalls: directFrame.allCalls, allTris: directFrame.allTris } };
+    try {
+      post.setEnabled(true);
+      post.render(scene, camera);
+      chain.calls = info.render.calls - directFrame.allCalls;
+      chain.tris = info.render.triangles - directFrame.allTris;
+      info.autoReset = true;
+      chain.programs = (info.programs?.length ?? 0) - worldPrograms;
+      chain.gpuTextures = info.memory.textures - worldGpuTextures;
+      chain.worldPrograms = worldPrograms;
+      // `composer` is `private` in TypeScript, which is a compile-time word and
+      // nothing at runtime — reached deliberately, and for the same reason
+      // `WheelFX.mesh` is above: it is the only handle on the render targets,
+      // and their size IS the number worth having.
+      const composer = post.composer;
+      chain.passes = composer?.passes?.length ?? 0;
+      // Bytes per pixel by texture type: UnsignedByte 1009 -> 4 (RGBA8),
+      // HalfFloat 1016 -> 8 (RGBA16F), Float 1015 -> 16 (RGBA32F). An
+      // EffectComposer defaults to half float, which is why the chain costs
+      // twice what a byte target would.
+      const BPP = { 1009: 4, 1015: 16, 1016: 8 };
+      const targets = [];
+      const addRT = (rt, what) => {
+        if (!rt || !rt.width) return;
+        const type = rt.texture?.type ?? 0;
+        targets.push({ what, w: rt.width, h: rt.height, type, bytes: rt.width * rt.height * (BPP[type] ?? 4) });
+      };
+      addRT(composer?.renderTarget1, 'composer ping');
+      addRT(composer?.renderTarget2, 'composer pong');
+      addRT(post.bloom?.renderTargetBright, 'bloom bright');
+      (post.bloom?.renderTargetsHorizontal ?? []).forEach((rt, i) => addRT(rt, `bloom mip${i + 1} h`));
+      (post.bloom?.renderTargetsVertical ?? []).forEach((rt, i) => addRT(rt, `bloom mip${i + 1} v`));
+      chain.targets = targets;
+      chain.bytes = targets.reduce((a, t) => a + t.bytes, 0);
+      chain.size = targets.length ? [targets[0].w, targets[0].h] : null;
+      const TYPE_NAME = { 1009: 'RGBA8', 1015: 'float RGBA32F', 1016: 'half-float RGBA16F' };
+      chain.format = [...new Set(targets.map((t) => t.type))]
+        .map((t) => TYPE_NAME[t] ?? `texture type ${t}`).join(' + ');
+      post.dispose();
+    } catch (e) {
+      // A chain that cannot be built here is a finding about the harness, not
+      // about the phone: say so rather than dropping the section silently.
+      chain.error = String((e && e.message) || e);
+    }
+    info.autoReset = true;
+    post.setEnabled(wasPostEnabled);
+
     return {
       track: d.track.id,
       name: d.track.name,
       racers: d.racers.length,
+      device,
+      chain,
       world: {
         tris: Object.values(byCat).reduce((a, b) => a + b.tris, 0),
         objects: drawables.length,
         materials: materials.size,
-        programs: renderer.info.programs?.length ?? 0,
-        geometries: renderer.info.memory.geometries,
+        programs: worldPrograms,
+        geometries: worldGeometries,
         textures: textures.size,
-        gpuTextures: renderer.info.memory.textures,
+        gpuTextures: worldGpuTextures,
         texBytes,
         texSizes: texSizes.sort(),
         texturedTris,
+      },
+      fill: {
+        twoSidedFrame,
+        translucentFrame,
+        twoSided: twoSided.sort((a, b) => b.tris - a.tris).slice(0, 6),
+        translucent: translucent.sort((a, b) => b.tris - a.tris).slice(0, 6),
+        worldTwoSidedTris: twoSided.reduce((a, b) => a + b.tris, 0),
+        worldTransparentTris: translucent.reduce((a, b) => a + b.tris, 0),
       },
       byCategory: byCat,
       perCategory,
@@ -507,7 +837,10 @@ const browser = await chromium.launch({
   executablePath: EXE,
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],
 });
-const page = await browser.newPage({ viewport: VIEWPORT });
+// A context rather than a bare page: `hasTouch` / `isMobile` are context
+// options, and a page created straight off the browser cannot carry them.
+const context = await browser.newContext(PHONE_CONTEXT);
+const page = await context.newPage();
 // The world build plus Rapier's WASM is a few seconds under a software
 // rasteriser; playwright's 30 s default trips over the third track.
 page.setDefaultNavigationTimeout(180_000);
@@ -563,8 +896,14 @@ await stopServer();
 // ---- report ----------------------------------------------------------------
 if (JSON_OUT) {
   console.log(JSON.stringify({
-    budget: { tris: BUDGET_TRIS, calls: BUDGET_CALLS, colourCalls: BUDGET_COLOUR_CALLS },
-    viewport: VIEWPORT, stations: STATIONS, tracks: results, buildCost, pageErrors,
+    budget: {
+      tris: BUDGET_TRIS, calls: BUDGET_CALLS, colourCalls: BUDGET_COLOUR_CALLS,
+      // Advisory, never a gate — see the header. Named `softTris` rather than
+      // put beside the others so no consumer can mistake it for a limit.
+      softTris: SOFT_TRIS,
+    },
+    viewport: VIEWPORT, context: PHONE_CONTEXT, stations: STATIONS,
+    tracks: results, buildCost, pageErrors,
   }, null, 2));
 }
 
@@ -582,11 +921,19 @@ const bestOf = (list, key) => list.reduce((a, b) => (b[key] < a[key] ? b : a));
 
 say();
 say('MOBILE PERFORMANCE BUDGET — 60 fps on a mid-range phone GPU, WebGL, portrait');
-say(`  ceiling: ${n(BUDGET_TRIS)} triangles and ${BUDGET_CALLS} draw calls submitted per frame,`);
-say('           colour pass plus shadow pass. Derivation in the header of this file.');
+say(`  THE GATE: ${n(BUDGET_TRIS)} triangles and ${BUDGET_CALLS} draw calls submitted per frame,`);
+say('            colour pass plus shadow pass. Derivation in the header of this file.');
+say(`  ADVISORY, NOT A GATE: a soft target of ${n(SOFT_TRIS)} triangles, printed beside every`);
+say('            verdict and never failed on. The two published mobile bands disagree by 5x');
+say(`            — one says 300k-500k on-screen, the other says frames drop above 65k — and`);
+say(`            ${n(SOFT_TRIS)} is where they meet once both are put through the same thermal-sustain`);
+say('            step. Spend the density budget down to the advisory; the gate stays at 150k.');
 say(`  posed at ${STATIONS} stations round the racing line, four cars packed on the grid,`);
-say(`  viewport ${VIEWPORT.width}x${VIEWPORT.height} CSS px. Counts are API-level and device-independent;`);
-say('  no frame time is reported, because this runs on a software rasteriser.');
+say(`  viewport ${VIEWPORT.width}x${VIEWPORT.height} CSS px, as a TOUCH device so the game builds itself for a`);
+say('  phone (1024 shadow map, 1.75 pixel-ratio clamp) and not for this laptop. Counts are');
+say('  API-level and device-independent; no frame time is reported, because this runs on a');
+say('  software rasteriser — and so does not run the post chain the phone will. See each');
+say("  track's THE PHONE'S RENDER PATH for what that chain costs where it can be counted.");
 
 for (const r of results) {
   if (r.error) { check(false, `${r.track}: measurable`, r.error); continue; }
@@ -682,10 +1029,105 @@ for (const r of results) {
   say(`    landscape, worst        ${n(Lworst.allTris).padStart(9)} tris  ${String(LworstCalls.allCalls).padStart(4)} draws`
     + `   (${n(Lworst.allTris - P.allTris)} more tris, ${LworstCalls.allCalls - Pcalls.allCalls} more draws`
     + ' if the phone is turned)');
-  say(`    shadow map ${r.shadowMapSize}x${r.shadowMapSize}. Its cost barely moves between stations because the`);
-  say('    scenery is instanced: an InstancedMesh spanning the map is submitted whole to the');
-  say('    shadow camera wherever the 180 m shadow box happens to be. Instancing buys draw');
-  say('    calls, not culling — a phone pays for every instance in every pass, every frame.');
+  say(`    shadow map ${r.shadowMapSize}x${r.shadowMapSize} — the PHONE's map (\`render/scene.ts\` takes 1024 on`);
+  say('    `pointer: coarse`, 2048 elsewhere), and it sets not one number above: a shadow map\'s');
+  say('    size is fill and bandwidth, never submissions. What the shadow pass costs HERE is the');
+  say('    second column, and it barely moves between stations because the scenery is instanced:');
+  say('    an InstancedMesh spanning the map is submitted whole to the shadow camera wherever the');
+  say('    180 m shadow box happens to be. Instancing buys draw calls, not culling — a phone pays');
+  say('    for every instance in every pass, every frame.');
+
+  // ---- fill, which the triangle counts above cannot show -------------------
+  say();
+  say('  FILL, NOT ONLY VERTICES — the same worst frame cut by shading cost instead');
+  const F = r.fill;
+  if (F) {
+    const two = F.twoSidedFrame;
+    const tra = F.translucentFrame;
+    const dr = (s) => `${String(s.allCalls).padStart(4)} draw${s.allCalls === 1 ? ' ' : 's'}`;
+    say(`    double-sided  ${n(two.allTris).padStart(9)} tris ${dr(two)}`
+      + `   submitted once, rasterised twice: ${n(two.allTris * 2)} faces shaded`
+      + (two.allTris ? ` (${pct(two.allTris, r.whole.allTris)} of the frame's triangles)` : ''));
+    // Zero-triangle entries are filtered rather than printed as zeroes. They
+    // are `world/build.ts`'s PLACEMENT RECORDS — a `<component>:<part>`
+    // InstancedMesh carrying every instance matrix, no geometry, on a layer no
+    // camera renders, so that `verify-solidity` and `verify-clearance` can still
+    // find where each component stands after its triangles were merged into a
+    // batch. They issue no draw and shade no fragment; a "3,979 instances /
+    // 0 tris" row would say nothing about fill.
+    for (const t of F.twoSided.filter((x) => x.tris > 0).slice(0, 3)) {
+      say(`      ${t.cat}/${t.name}: ${n(t.tris)} tris${t.textured ? ', textured' : ''}`
+        + (t.instances > 1 ? ` over ${n(t.instances)} instances` : ''));
+    }
+    say(`    transparent   ${n(tra.allTris).padStart(9)} tris ${dr(tra)}`
+      + '   blended, drawn after the opaque world, rejects nothing behind it');
+    for (const t of F.translucent.slice(0, 3)) {
+      const fp = t.footprint ? `${n(t.footprint[0])} x ${n(t.footprint[1])} m sheet, ` : '';
+      // Rounded for the eye only: a material built by multiplying two floats
+      // reports 0.49500000000000005, and the fifteenth decimal place of an
+      // opacity has never told anybody anything.
+      say(`      ${t.cat}/${t.name}: ${n(t.tris)} tris, ${fp}opacity ${t.opacity.toFixed(2)}`
+        + `, depth write ${t.depthWrite ? 'on' : 'off'}`);
+    }
+    const twoBy = Object.entries(r.byCategory).filter(([, v]) => v.twoSidedTris > 0)
+      .sort((a, b) => b[1].twoSidedTris - a[1].twoSidedTris)
+      .map(([c, v]) => `${c} ${n(v.twoSidedTris)}`);
+    say(`    two-sided in the world as built: ${twoBy.length ? twoBy.join(', ') : 'nothing'}`);
+    // Said every run, not only when the number is small, because the number
+    // being small is the surprising part and the reason is in another file.
+    say('    (`templates/boats.ts` asks for DoubleSide on hull, deck, band and canvas — forty');
+    say('     hulls of it on harbour — and almost none of that survives to here, because');
+    say('     `world/build.ts` `prepare()` folds a two-sided part that joins a shared batch into');
+    say('     doubled geometry wound both ways. Those back faces are already IN the triangle');
+    say('     counts above and must not be counted twice. What is left on this line is what is');
+    say('     still DoubleSide AT DRAW TIME — a textured batch cannot join a shared one, so it');
+    say('     keeps its own material and its own two-sidedness — and it is the only part of the');
+    say('     fragment bill that no triangle count in this report already shows.)');
+  }
+
+  // ---- the render path this machine does not take --------------------------
+  say();
+  say("  THE PHONE'S RENDER PATH — what was measured, and the one part that cannot be");
+  const D = r.device;
+  const C = r.chain;
+  if (D) {
+    say(`    device      pointer: coarse = ${D.pointerCoarse ? 'yes' : 'NO — this is a desktop page'}`
+      + `   screen DPR ${D.screenDpr} clamped by the game to ${D.pixelRatio}`);
+    say(`                ${D.css[0]}x${D.css[1]} CSS px = ${D.buffer[0]}x${D.buffer[1]} drawing buffer`
+      + `   shadow map ${D.shadowMapSize}, PCF radius ${D.shadowKernel}`);
+    say(`    GL          ${D.gl}`);
+  }
+  if (C && C.error) {
+    say(`    post chain  COULD NOT BE BUILT HERE: ${C.error}`);
+    say('                (a harness finding, not a phone finding — the phone still runs it)');
+  } else if (C) {
+    say(`    post chain  ${C.wanted ? 'ON here' : 'OFF here'} — \`postWanted()\` sniffs the software`
+      + ' rasteriser; ON for the phone.');
+    say(`                ${C.passes} passes, ${C.targets.length} render targets at `
+      + `${C.size ? `${C.size[0]}x${C.size[1]}` : '?'} (CSS px x the ${r.device.pixelRatio} clamp, unrounded`
+      + ' — three does not round it either)');
+    say(`                ${(C.bytes / 1048576).toFixed(1)} MB of ${C.format}, against `
+      + `${(r.world.texBytes / 1048576).toFixed(2)} MB for every texture in the world`);
+    say(`                +${C.calls} draw calls and +${n(C.tris)} triangles per frame on top of every`);
+    say('                count above (full-screen quads, not scene geometry — which is exactly');
+    say('                why no triangle number in this report moves when the chain is on).');
+    // The program count is the one number here that surprises, so it is
+    // explained where it is printed rather than in a header nobody re-reads.
+    say(`                +${C.programs} shader programs compiled, against the ${C.worldPrograms} this world needed`);
+    say('                to draw itself at all. They come from two places and this tool does not');
+    say('                separate them: the passes\' own shaders (the bloom alone carries five blur');
+    say('                levels, and a different kernel radius is a different program), and the');
+    say('                world\'s own materials in a SECOND permutation — three forces');
+    say('                NoToneMapping whenever `currentRenderTarget !== null`, which');
+    say('                `render/post.ts` already records from the other end. Every one of them is');
+    say('                a compile the phone pays before the first frame the owner sees, and a');
+    say('                stall this harness never encounters. It is not a per-frame cost.');
+    say('    NOT COUNTED ANYWHERE, and not guessed at: the FRAGMENT cost of those passes — five');
+    say('                mip levels of separable blur plus a grade and a tone map over every');
+    say('                pixel of that buffer, inside the same 16.7 ms this budget is derived');
+    say('                against. A CPU rasteriser cannot price it. It is the largest thing');
+    say('                about the phone\'s frame that this tool does not know.');
+  }
 
   say();
   say('  NOT INSTANCED — draw calls being spent where one call would do');
@@ -752,6 +1194,42 @@ for (const r of results) {
       ? `, ${r.soloCar.colourCalls} with the player's car alone` : ''));
   check(r.fixedStepMs < r.fixedDtMs, `${r.track}: the fixed step fits inside its own period here`,
     `${r.fixedStepMs.toFixed(3)} ms of ${r.fixedDtMs.toFixed(2)} ms — a phone CPU is slower, so this can only get worse`);
+
+  // TWO CHECKS ON THE HARNESS ITSELF, not on the world. The first is the whole
+  // point of running as a touch device: if a future Playwright stops emulating
+  // `(pointer: coarse)`, the game silently hands this tool a desktop's 2048 map
+  // and DPR 2.0 again, every count stays valid, and every REASON printed beside
+  // them becomes wrong. That is precisely the failure this file already made
+  // once, so it is now a failure the file can detect.
+  const phonePath = D && D.pointerCoarse && D.pixelRatio === 1.75
+    && (D.shadowMapSize === 0 || D.shadowMapSize === 1024);
+  check(phonePath, `${r.track}: the harness is on the phone's device path`,
+    D ? `pointer: coarse=${D.pointerCoarse}, renderer pixel ratio ${D.pixelRatio}, shadow map ${D.shadowMapSize}`
+      + (phonePath ? '' : ' — `render/scene.ts` gives a coarse-pointer device 1.75 and 1024 and this one'
+        + ' something else, so the context is not emulating a phone and the shadow-map and'
+        + ' pixel-ratio reasoning in this report does not describe what ran')
+      : 'no device readback');
+  // The second is hygiene for everything above that hid objects to measure a
+  // part of the frame: per-category, solo car, double-sided, transparent. Every
+  // one of them restores what it hid; this re-renders the whole worst pose
+  // afterwards and requires the same numbers back.
+  const restored = C && C.baseline
+    && C.baseline.allTris === r.whole.allTris && C.baseline.allCalls === r.whole.allCalls;
+  check(!!restored, `${r.track}: the frame is intact after the per-category and fill cuts`,
+    C && C.baseline
+      ? `${n(C.baseline.allTris)} tris / ${C.baseline.allCalls} draws re-measured against `
+        + `${n(r.whole.allTris)} / ${r.whole.allCalls}`
+      : 'no re-measurement');
+
+  // THE ADVISORY. Deliberately printed after the checks, with its own prefix
+  // and no PASS/FAIL word anywhere in it, because it is not one: nothing in
+  // this tool exits non-zero on the soft target. See the header for why 110k
+  // is a midpoint and not a measurement.
+  say(`SOFT  ${r.track}: ${n(P.allTris)} against the ${n(SOFT_TRIS)} soft target = ${pct(P.allTris, SOFT_TRIS)}`
+    + ` (advisory, not a gate — ${P.allTris > SOFT_TRIS
+      ? `${n(P.allTris - SOFT_TRIS)} over, so a phone at the pessimistic end of the two published`
+        + ' bands is already the one being asked for'
+      : `${n(SOFT_TRIS - P.allTris)} of headroom for the density pass`})`);
 }
 
 say();
@@ -765,32 +1243,68 @@ if (!JSON_OUT && measured.length) {
   say(`${'='.repeat(78)}`);
   say('SUMMARY — worst portrait frame per track, colour pass plus shadow pass');
   say(`${'='.repeat(78)}`);
-  say(`  ${'track'.padEnd(16)}${'triangles'.padStart(10)}${'of budget'.padStart(11)}`
-    + `${'draws'.padStart(7)}${'of budget'.padStart(11)}${'shadow share'.padStart(14)}`);
+  say(`  ${'track'.padEnd(16)}${'triangles'.padStart(10)}${'of gate'.padStart(9)}${'of soft'.padStart(9)}`
+    + `${'draws'.padStart(7)}${'of gate'.padStart(9)}${'shadow share'.padStart(14)}`);
   for (const r of measured) {
     const t = worstOf(r.stations.portrait, 'allTris');
     const c = worstOf(r.stations.portrait, 'allCalls');
-    say(`  ${r.track.padEnd(16)}${n(t.allTris).padStart(10)}${pct(t.allTris, BUDGET_TRIS).padStart(11)}`
-      + `${String(c.allCalls).padStart(7)}${pct(c.allCalls, BUDGET_CALLS).padStart(11)}`
+    say(`  ${r.track.padEnd(16)}${n(t.allTris).padStart(10)}${pct(t.allTris, BUDGET_TRIS).padStart(9)}`
+      + `${pct(t.allTris, SOFT_TRIS).padStart(9)}`
+      + `${String(c.allCalls).padStart(7)}${pct(c.allCalls, BUDGET_CALLS).padStart(9)}`
       + `${`${pct(c.shadowTris, c.allTris)} tris`.padStart(14)}`);
   }
-  say(`  ${'budget'.padEnd(16)}${n(BUDGET_TRIS).padStart(10)}${'100%'.padStart(11)}`
-    + `${String(BUDGET_CALLS).padStart(7)}${'100%'.padStart(11)}`);
+  say(`  ${'GATE'.padEnd(16)}${n(BUDGET_TRIS).padStart(10)}${'100%'.padStart(9)}${''.padStart(9)}`
+    + `${String(BUDGET_CALLS).padStart(7)}${'100%'.padStart(9)}`);
+  say(`  ${'soft target'.padEnd(16)}${n(SOFT_TRIS).padStart(10)}${''.padStart(9)}${'100%'.padStart(9)}`
+    + '        advisory only — nothing fails on this column');
   say();
   say('  The shadow map is the cheapest single thing on this list to argue about: it is a');
   say('  second full submission of every castShadow object, it is the share printed above,');
   say('  and unlike the terrain it can be turned off in one line to see what it buys.');
+  say('  And two costs are NOT in this table at all, by construction: the fragment work of');
+  say('  double-sided and blended surfaces (counted per track, one triangle, two faces), and');
+  say('  the post chain the phone runs and this machine does not (counted per track as passes,');
+  say('  targets and draw calls; its fill cost is unmeasurable here and is not guessed at).');
 }
 
 if (!JSON_OUT) {
   say();
-  say(fails
-    ? `${fails} FAILED — this world does not run at 60 fps on a mid-range phone. That is the\n`
-      + '           finding, not a tooling problem: the numbers above are API-level counts that\n'
-      + '           a phone would receive unchanged, and they are two to three and a half times\n'
-      + '           the derived ceiling before the density pass has added anything at all.\n'
+  // THE VERDICT IS COMPUTED, not asserted, in both of its parts.
+  //
+  // The multiple used to read "two to three and a half times", which was true
+  // of the worlds this tool was written against and silently stopped being true
+  // the first time somebody cut a track — a stale number in the summary of a
+  // measuring tool is the worst place in the repository to keep one.
+  //
+  // And the failure count is no longer the same thing as "the world is too big":
+  // some checks here are about the HARNESS (is it on the phone's device path,
+  // did the category cuts put the frame back), and answering "this world does
+  // not run at 60 fps" to a broken harness would be a wrong finding stated
+  // confidently. So the two cases are separated and named.
+  const overs = measured
+    .map((r) => ({ r, t: worstOf(r.stations.portrait, 'allTris').allTris }))
+    .filter((x) => x.t > BUDGET_TRIS);
+  const ratios = overs.map((x) => x.t / BUDGET_TRIS);
+  const hi = ratios.length ? Math.max(...ratios) : 0;
+  const lo = ratios.length ? Math.min(...ratios) : 0;
+  const span = hi === lo ? `${hi.toFixed(2)}x` : `${lo.toFixed(2)}x to ${hi.toFixed(2)}x`;
+  const soft = measured.filter((r) => worstOf(r.stations.portrait, 'allTris').allTris > SOFT_TRIS).length;
+  if (overs.length) {
+    say(`${fails} FAILED — ${overs.length} of ${measured.length} tracks do not run at 60 fps on a mid-range phone.\n`
+      + '           That is the finding, not a tooling problem: the numbers above are\n'
+      + `           API-level counts that a phone would receive unchanged, and they are ${span}\n`
+      + '           the derived ceiling before the density pass has added anything at all — and\n'
+      + '           that ceiling is the GENEROUS reading of two sources that disagree by 5x.\n'
       + '           Cut the world, or argue with the derivation at the top of this file — in\n'
-      + '           writing, with a source. Do not nudge the constants.'
-    : 'every track fits the mobile budget');
+      + '           writing, with a source. Do not nudge the constants.');
+  } else if (fails) {
+    say(`${fails} FAILED, and none of them is the triangle ceiling — every track is inside it.\n`
+      + '           Read the FAIL lines above: a failure here can also mean the harness measured\n'
+      + '           something other than what it claims to (the wrong device, a frame it did not\n'
+      + '           put back together), and that is a finding about this tool, not about the world.');
+  } else {
+    say(`every track fits the mobile budget${soft ? `, though ${soft} of ${measured.length} `
+      + `${soft === 1 ? 'is' : 'are'} over the ${n(SOFT_TRIS)} soft target — advisory, see the header` : ''}`);
+  }
 }
 process.exit(fails ? 1 : 0);
