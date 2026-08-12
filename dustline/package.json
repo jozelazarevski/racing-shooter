@@ -22,7 +22,7 @@
     "smoke:components": "node tools/components-smoke.mjs",
     "verify:deploy": "node tools/verify-deploy.mjs",
     "gate": "npm run typecheck && npm run verify:separation && npm run verify:templates && npm run verify:track && npm run verify:sdf && npm run verify:generated && npm run verify:coverage && npm run verify:regressions",
-    "gate:full": "npm run build && npm run gate && npm run verify:worlds && npm run verify:physics && npm run verify:architecture && npm run verify:clearance && npm run verify:solidity && npm run verify:terrain && npm run verify:boot && npm run verify:mobile && npm run verify:perf && npm run smoke:components && npm run smoke:editor && npm run verify:deploy",
+    "gate:full": "npm run build && npm run gate && npm run verify:worlds && npm run verify:physics && npm run verify:architecture && npm run verify:clearance && npm run verify:solidity && npm run verify:terrain && npm run verify:boot && npm run verify:mobile && npm run verify:perf && npm run verify:legibility && npm run smoke:components && npm run smoke:editor && npm run verify:deploy",
     "verify:physics": "node tools/verify-physics.mjs",
     "verify:architecture": "node tools/verify-architecture.mjs",
     "verify:clearance": "node tools/verify-clearance.mjs",
@@ -32,7 +32,8 @@
     "verify:boot": "node tools/verify-boot-state.mjs",
     "verify:regressions": "node tools/verify-regression-memory.mjs",
     "verify:mobile": "node tools/verify-mobile.mjs",
-    "verify:perf": "node tools/verify-perf-budget.mjs"
+    "verify:perf": "node tools/verify-perf-budget.mjs",
+    "verify:legibility": "node tools/verify-legibility.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.12.0",
