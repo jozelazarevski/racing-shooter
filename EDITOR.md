@@ -57,7 +57,7 @@ per stroke, so a scene keeps the ground it was carved with.
 | **NATURE** | Plant trees, bushes and rocks by hand. Pick a kind, then tap. **COUNT** turns one tap into a whole copse scattered across the brush, with the sizes and angles jittered — nobody is tapping four hundred times for a wood. Switch to RUN for an avenue instead of a copse. |
 | **WATER** | Tap to sink a lake (SIZE sets it). The tool digs the bowl *and* stands the water in it; SELECT the lake afterwards to set its **level** and width, which is how you flood a valley rather than puddle a field. |
 | **ROAD** | Add a tunnel, a bridge or a river crossing. Pick TUNNEL, BRIDGE or RIVER under the ROAD button, then tap the road. These are built *by* the road system — they need a straight enough run and the right ground — so the tap means "about here" and the builder sites it at the nearest station that works, and says how far it had to go. |
-| **MOVE ROAD** | Drag a marker on the racing line and the lap bends to follow it. The pull is stored, not baked: the terrain blend, the scenery, the elevation and the overpasses all read the moved line, so the world follows the road rather than the road sliding across the old world. |
+| **MOVE ROAD** | Drag a marker on the racing line and the lap bends to follow it. The pull is stored, not baked: the terrain blend, the scenery, the elevation and the overpasses all read the moved line, so the world follows the road rather than the road sliding across the old world. Each pull is anchored to the *station* it grabbed, and the whole warped lap then goes through the same rule every world does — **a road can never turn faster than a car can steer** — so no number of drags can fold the lap into a knot. SELECT a pull's green ring and DELETE to take that stretch back. |
 | **WIDEN** | Tap the road and the carriageway there opens out; WIDER/NARROWER picks the direction and FORCE is metres of half-width per tap. Stated in world space like every other brush, so it survives a MOVE ROAD underneath it — the pull is on *the road near here*, wherever that road ends up. |
 
 ### EDIT — everything you have already made
@@ -167,9 +167,13 @@ offered, never restored behind your back.
 
 **TEST DRIVE** applies any pending edits and drops you straight into the world
 to drive it. **CHECK** is the pass that reads the scene against the things
-that only show up at speed: something standing in the carriageway, water
-above the road it covers, a clear zone that swallowed the start line, a
-sculpt too steep for ground to hold, a scene too big to save comfortably.
+that only show up at speed: something standing in the carriageway (measured
+against the *local* half-width, so a widened corner counts as the road it now
+is), water above the road it covers, a clear zone that swallowed the start
+line, a sculpt too steep for ground to hold, a width stroke the lap has moved
+out from under, a scene too big to save comfortably — and the lap itself,
+where it turns faster than a car can steer or runs back over its own
+carriageway.
 
 ## Rules the editor enforces for you
 

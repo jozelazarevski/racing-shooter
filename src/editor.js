@@ -35,7 +35,7 @@
  */
 
 import * as THREE from 'three';
-import { LEVELS, EDIT_PROP_KINDS, ROAD_HALF } from './track.js';
+import { LEVELS, EDIT_PROP_KINDS, ROAD_HALF, TUNNEL_SEP } from './track.js';
 
 /* ---------------------------------------------------------------------------
  * TerrainDelta — the sculpt, as a function of (x, z)
@@ -529,7 +529,7 @@ export class WorldEditor {
         x: +w.x.toFixed(1), z: +w.z.toFixed(1), r: +w.r.toFixed(1), y: +w.y.toFixed(2),
       })) : undefined,
       warp: this.warp.length ? this.warp.map((w) => ({
-        x: +w.x.toFixed(1), z: +w.z.toFixed(1), r: +w.r.toFixed(1),
+        i: w.i, x: +w.x.toFixed(1), z: +w.z.toFixed(1), r: +w.r.toFixed(1),
         dx: +w.dx.toFixed(1), dz: +w.dz.toFixed(1),
       })) : undefined,
       widen: this.widen.length ? this.widen.map((s) => ({
@@ -1579,7 +1579,13 @@ export class WorldEditor {
         if (d < bd) { bd = d; best = { kind: 'world', src: w, x: w.x, z: w.z, rot: w.rot, scale: w.scale, preset: w.type, r: w.r }; }
       }
     }
-    // 3. and failing that, anything solid at all — trees, rocks, masonry.
+    // 3. then the parts of the scene that are not objects — a lake, a clear
+    //    zone, a road pin, a road move. These rank ABOVE anonymous world
+    //    solids because they are things the user placed deliberately: a warp
+    //    anchor with a boulder near it must select the warp, or the one edit
+    //    that needed a repair path is the one you cannot reach.
+    if (!best) best = this._selectNonObject(p);
+    // 4. and failing that, anything solid at all — trees, rocks, masonry.
     //    These have no template to re-place, so they can be removed but not
     //    moved, and the panel says so rather than pretending.
     if (!best) {
@@ -1588,9 +1594,6 @@ export class WorldEditor {
         if (d < bd) { bd = d; best = { kind: 'solid', src: s, x: s.x, z: s.z, rot: 0, scale: 1, r: s.r }; }
       }
     }
-    // 4. and finally the parts of a scene that are not objects at all — a
-    //    lake, a clear zone, a road pin. Last, so nothing above is affected.
-    if (!best) best = this._selectNonObject(p);
     if (!best) {
       this._clearSelection();
       this._status('nothing here — tap an object');
@@ -1722,12 +1725,16 @@ export class WorldEditor {
   deleteSelection() {
     const s = this.sel;
     if (!s) { this._status('nothing selected'); return; }
-    // a lake, a clear zone or a road pin is a line in the scene, not geometry
-    // in a batch: nothing to blank, so it simply comes off the list
-    if (s.kind === 'water' || s.kind === 'zone' || s.kind === 'road') {
+    // a lake, a clear zone, a road pin or a road move is a line in the scene,
+    // not geometry in a batch: nothing to blank, so it comes off the list.
+    // Anything NOT listed here falls through to the world-object branch and is
+    // "deleted" by having a keep-out circle dropped on it — which for a road
+    // move is nonsense, and was measured doing exactly that.
+    if (s.kind === 'water' || s.kind === 'zone' || s.kind === 'road' || s.kind === 'warp') {
       const name = this._selName();
       this._act(`deleting ${name}`, () => {
-        if (s.kind === 'water') this.waters = this.waters.filter((w) => w !== s.ref);
+        if (s.kind === 'warp') this.warp = this.warp.filter((w) => w !== s.ref);
+        else if (s.kind === 'water') this.waters = this.waters.filter((w) => w !== s.ref);
         else if (s.kind === 'zone') this.erase = this.erase.filter((z) => z !== s.ref);
         else if (s.ref.what === 'bridge') this.roadFeat.bridge = null;
         else if (s.ref.what === 'tunnel') {
@@ -2000,6 +2007,7 @@ export class WorldEditor {
     for (const w of this.widen) {
       this._widenMark(w, t.nearestIndex({ x: w.x, y: 0, z: w.z }));
     }
+    for (const w of this.warp) this._warpMark(w);
     this._routeMarks();
     // theirs APPENDS a ring and a box, so it has to be cleared first or every
     // refresh leaves another copy of the highlight stacked on the same object
@@ -2119,6 +2127,25 @@ export class WorldEditor {
       + ` — ${depth.toFixed(1)} u deep, APPLY to fill. SELECT it to set the level`);
   }
 
+  /** Where a road move was anchored, so it can be found and taken back. Green
+   *  like the pulled route handles, because it is the same edit seen later. */
+  _warpMark(w) {
+    if (!this._zones) {
+      this._zones = new THREE.Group();
+      this._zones.name = 'editor-zones';
+      this.game.scene.add(this._zones);
+    }
+    const g = new THREE.RingGeometry(7, 9.5, 24);
+    g.rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+      color: 0x7dff9b, transparent: true, opacity: 0.7, depthTest: false }));
+    const t = this.game.track;
+    m.position.set(w.x, t.terrainHeight(w.x, w.z) + 0.7, w.z);
+    m.renderOrder = 998;
+    m.userData.warp = w;
+    this._zones.add(m);
+  }
+
   /** Where a sited road feature will be cut. Lives with the zone marks so it
    *  is cleared and rebuilt on the same schedule. */
   _roadMark(c, color, frac = null) {
@@ -2215,8 +2242,12 @@ export class WorldEditor {
       // it, the editor would have gone on refusing. `tunnelFitAt` is the one
       // rule, and it answers with the LENGTH available rather than yes/no.
       const lenS = Math.round(((t.T.tunnels && t.T.tunnels.len) || 80) / t.segLen);
+      // THE BUILDER'S RULE, NOT A COPY OF IT. This used to be `lenS * 2 + 8`
+      // — about 92 samples — while `_planTunnels` drops any bore within 170.
+      // Tap four times at 120/240/360/480 and the editor accepted all four and
+      // said so; the world came back with two, silently.
       const clash = (k) => this.roadFeat.tunnels.some(
-        (f) => t._circDist(Math.round(f * n) % n, k) < lenS * 2 + 8);
+        (f) => t._circDist(Math.round(f * n) % n, k) < TUNNEL_SEP);
       const site = this._walkOut(i, n, (k) => t.tunnelFitAt(k, lenS) > 0 && !clash(k));
       if (site == null) {
         this._status(clash(i)
@@ -2326,7 +2357,16 @@ export class WorldEditor {
     // REACH IS PROPORTIONAL TO THE PULL. A 10 u nudge that dragged 300 u of
     // lap with it is not an edit, it is a new circuit; a 120 u haul that only
     // reached 40 u either side would fold the road back on itself.
-    const w = { x: d.ox, z: d.oz, r: Math.max(70, moved * 3.2), dx, dz };
+    // ANCHOR IT TO THE STATION, NOT TO WHERE THE ROAD HAPPENS TO BE.
+    //
+    // `d.ox/oz` is the handle's position on the road AS IT STANDS, which after
+    // the first pull is the warped road — and the builder replays every pull
+    // against the pristine one. Storing the station index is what closes that
+    // gap; the pristine world position goes in beside it so a build that
+    // predates this still has something sane to aim at.
+    const pre = this.game.track._preWarp;
+    const at = pre && pre[d.i] ? pre[d.i] : { x: d.ox, z: d.oz };
+    const w = { i: d.i, x: at.x, z: at.z, r: Math.max(70, moved * 3.2), dx, dz };
     this._act('a road move', () => { this.warp.push(w); });
     this._status(`road pulled ${Math.round(moved)} u over ${Math.round(w.r)} u of lap `
       + `(${this.warp.length} move${this.warp.length > 1 ? 's' : ''}) — APPLY to rebuild it`);
@@ -2357,6 +2397,16 @@ export class WorldEditor {
     for (const f of this.roadFeat.tunnels) pin(f, 'tunnel');
     for (const f of this.roadFeat.rivers) pin(f, 'river');
     if (this.roadFeat.bridge != null) pin(this.roadFeat.bridge, 'bridge');
+    // A ROAD MOVE CAN BE TAKEN BACK LONG AFTER IT WAS MADE.
+    //
+    // A warp was the one edit with no way out except UNDO, and UNDO only
+    // reaches the last few. A lap pulled into a knot over a dozen drags was
+    // therefore unrepairable — you could see the damage and not remove it,
+    // which is exactly the state one was reported in. Each pull is now
+    // selectable where it was anchored, and DELETE takes it off the list.
+    for (const w of this.warp) {
+      consider('warp', w, w.x, w.z, Math.max(30, w.r * 0.35));
+    }
     return best;
   }
 
@@ -2367,6 +2417,7 @@ export class WorldEditor {
     if (s.kind === 'water') return 'a lake';
     if (s.kind === 'zone') return 'a clear zone';
     if (s.kind === 'road') return `the ${s.ref.what}`;
+    if (s.kind === 'warp') return 'a road move';
     if (s.preset) return s.preset;
     return (s.src && s.src.mat) || 'an object';
   }
@@ -2545,7 +2596,14 @@ export class WorldEditor {
   _check() {
     const t = this.game.track;
     const out = [];
-    const onRoad = (x, z, pad) => t._distToTrack(x, z) < (ROAD_HALF + pad);
+    // the LOCAL half-width, not the constant: WIDEN can take it to 22, and a
+    // shed 13 u off the centre of a widened corner sits squarely on the
+    // carriageway while `ROAD_HALF + pad` calls it clear
+    const halfAt = (x, z) => {
+      const i = t.nearestIndex(new THREE.Vector3(x, 0, z));
+      return (t.widthAt ? t.widthAt(i) : ROAD_HALF);
+    };
+    const onRoad = (x, z, pad) => t._distToTrack(x, z) < (halfAt(x, z) + pad);
     let inRoad = 0;
     for (const e of this.elements) if (onRoad(e.x, e.z, 3 * (e.scale || 1))) inRoad++;
     if (inRoad) {
@@ -2574,6 +2632,43 @@ export class WorldEditor {
     if (steep.length) {
       out.push(`${steep.length} sculpt dab${steep.length > 1 ? 's are' : ' is'} steeper than `
         + 'the ground can hold — expect a cliff face, not a hill');
+    }
+    // THE LAP ITSELF. Everything above checks what is standing beside the
+    // road; nothing looked at the road. A lap pulled into a knot with MOVE
+    // ROAD reported "Nothing to report" while carrying a 100-degree cusp and
+    // thirty-seven places where it crossed itself.
+    const N = t.center.length;
+    let worstTurn = 0, worstAt = 0, overCap = 0;
+    for (let i = 0; i < N; i++) {
+      const p0 = t.center[(i - 1 + N) % N], p1 = t.center[i], p2 = t.center[(i + 1) % N];
+      const a1 = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+      const a2 = Math.atan2(p2.x - p1.x, p2.z - p1.z);
+      let d = a2 - a1;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      d = Math.abs(d) * 180 / Math.PI;
+      if (d > worstTurn) { worstTurn = d; worstAt = i; }
+      if (d > 13.5) overCap++;
+    }
+    if (overCap) {
+      out.push(`the lap turns faster than a car can steer at ${overCap} `
+        + `place${overCap > 1 ? 's' : ''} (worst ${worstTurn.toFixed(0)}° at ${(worstAt / N * 100) | 0}%`
+        + ') — delete the road moves near there with SELECT');
+    }
+    // and where it runs back over itself: two carriageways sharing tarmac is
+    // the shape that makes a field drive into itself
+    let crossings = 0;
+    for (let i = 0; i < N; i += 3) {
+      for (let j = i + 60; j < N - 3; j += 3) {
+        if (Math.min(j - i, N - (j - i)) < 60) continue;
+        const a = t.center[i], b = t.center[j];
+        if (Math.abs(a.y - b.y) > 4) continue;      // a flyover is not a crossing
+        if (Math.hypot(a.x - b.x, a.z - b.z) < 20) { crossings++; break; }
+      }
+    }
+    if (crossings) {
+      out.push(`the lap runs back over itself in ${crossings} place`
+        + `${crossings > 1 ? 's' : ''} — the racing line is ambiguous there`);
     }
     const bytes = JSON.stringify(this.serialize()).length;
     if (bytes > 120000) {
@@ -2986,6 +3081,12 @@ export class WorldEditor {
              <button class="ed-mini" data-zon="-10">SMALLER</button>
              <button class="ed-mini" data-zon="10">WIDER</button>
            </div>`;
+    } else if (S.kind === 'warp') {
+      const pull = Math.round(Math.hypot(S.ref.dx, S.ref.dz));
+      html += row('PULL', `${pull} u`) + row('REACH', `${Math.round(S.ref.r)} u`)
+        + (S.ref.i != null ? row('STATION', S.ref.i) : '')
+        + '<div class="ed-hint">DELETE puts this stretch of the lap back where '
+        + 'it started. Road moves are the one edit UNDO alone could not reach.</div>';
     } else if (S.kind === 'road') {
       html += row('LAP', `${(S.ref.f * 100) | 0}%`)
         + '<div class="ed-hint">Where it sits is chosen by the builder from where you '
