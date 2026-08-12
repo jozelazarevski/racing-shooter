@@ -201,8 +201,58 @@ that snaps to the wrong leg would clamp the car against a road edge belonging
 somewhere else. One mechanism that would explain both reports and the stalls.
 Fair game for whoever gets there first.
 
-**INVISIBLE WALLS: NOT REPRODUCED ON r158, everything cheap eliminated
-(dustline session, 2026-08-12).** Two reports, both photographed on **r153c**
+**INVISIBLE WALLS: FOUND AND FIXED (dustline session, 2026-08-12).** Superseded
+the "not reproduced" entry below, which was wrong — not in any measurement it
+reported, but in the question it asked. Every sweep in it walked the COLLIDER
+list, found each collider's nearest centreline station and gated it against
+THAT station's height. A mountain standing on the road is legitimate against
+its own footprint; the road it blocks is on another leg, at another height, and
+is never consulted. Asking it the other way round — walk the ROAD, evaluate the
+vehicle's own predicates at each station across the drivable width
+(`tests/tool-corridor-blockers.mjs`) — found it on the first run:
+
+| world | what | how much road |
+|---|---|---|
+| FURKA RIDGE | massif cone, r = 138 | 58 stations, FULL width — 135 u of carriageway inside a mountain |
+| FURKA RIDGE | a second cone, r = 118 | 31 stations |
+| COL DE TURINI | one cone | 16 stations |
+
+Two independent faults; the fix needs both halves.
+
+1. **`_buildMassif` never looked at the lap.** Cones are placed on an azimuth
+   ring by radius and angle alone. They now walk clear of the corridor (the
+   same "push it back" shape the coast reflection above them already used),
+   shrinking to fit only if the lap encircles them. Measured: 101 cones over
+   14 worlds, **0 hidden, 0 shrunk** — every one of them just moved.
+2. **The collider was a cylinder of the BASE radius.** `h` makes a solid bite
+   over its whole span, which r148 got right for driving into a flank, and
+   wrong for a road passing one 70 u up: 118 u of collider against 96 u of
+   drawn rock on FURKA, so 22 u of open carriageway was walled off by nothing.
+   `Track._formProfile` reads the drawn cross-section off the geometry, band by
+   band, and `solidRadiusAt` (new export in `vehicles.js`) is the one place
+   that answers "how wide is this thing at my height". Massif cones, skyline
+   peaks and horizon mesas all carry it.
+
+`tests/test-invisible-walls.mjs` gates it, and every check was
+mutation-tested. Two results worth passing on:
+
+- **With the placement guard in, the taper is not load-bearing on any shipped
+  world** — flatten every profile to 1 and all 60 stay green, because the
+  guard's 24 u margin already keeps the base cylinder off the corridor. It is
+  kept because it is the honest model and the next world with a road up a
+  flank meets it first, and it gets its own check (collider radius vs the
+  drawn silhouette, read off the instance in the scene) rather than riding
+  along on the others.
+- **A ratio-based version of that check could not see a uniformly scaled
+  profile** — a hollow mountain reads as the same shape. The shipped check
+  compares absolute radii and holds a band, 0.55..1.05 of the drawn rock.
+
+The driven check independently reproduces the reported symptom: with the guard
+disabled, 3 stations of FURKA's racing line pin the car, the worst moving
+**2.7 u in two seconds at full throttle**.
+
+**Superseded — the "not reproduced" write-up (kept for the record):** Two
+reports, both photographed on **r153c**
 — which matters, because r153d then shipped the wedge rescue (full throttle +
 no motion for 5 s), and both screenshots show exactly that state: a car
 stationary with the field gone. Worth re-testing on r158 before hunting

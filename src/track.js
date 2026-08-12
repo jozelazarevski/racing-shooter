@@ -9555,9 +9555,41 @@ export class Track {
     return geo;                                      // already non-indexed
   }
 
+  /** How wide is this form actually DRAWN, band by band up its own height?
+   *
+   *  Returns `bands` fractions of the base radius, bottom first, read off the
+   *  geometry rather than assumed: the crag is a heightfield with spurs,
+   *  gullies and a crest LINE, so no formula describes its cross-section.
+   *
+   *  Each band takes the widest vertex at or above it, which both fills the
+   *  bands that happen to contain no vertex (the mesh carries 8 rings, so
+   *  most bands are empty) and makes the profile monotone by construction —
+   *  a mountain never gets wider going up, and a collider that thought so
+   *  would be a new invisible wall of its own. */
+  _formProfile(geo, bands = 16) {
+    const p = geo.attributes.position;
+    const mx = new Array(bands).fill(0);
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i);
+      if (y < lo) lo = y;
+      if (y > hi) hi = y;
+    }
+    const span = hi - lo || 1;
+    for (let i = 0; i < p.count; i++) {
+      const k = Math.min(bands - 1, Math.max(0, Math.floor(((p.getY(i) - lo) / span) * bands)));
+      const rr = Math.hypot(p.getX(i), p.getZ(i));
+      if (rr > mx[k]) mx[k] = rr;
+    }
+    for (let k = bands - 2; k >= 0; k--) mx[k] = Math.max(mx[k], mx[k + 1]);
+    const base = mx[0] || 1;
+    return mx.map((v) => v / base);
+  }
+
   _buildMassif(m4) {
     const M = this.T.massif;
     const geo = this._cragGeo();
+    const prof = this._formProfile(geo);
     const pos = geo.attributes.position;
     const cols = new Float32Array(pos.count * 3);
     const rockA = new THREE.Color(M.color ?? this._massifRock());
@@ -9602,7 +9634,7 @@ export class Track {
       const a = M.az + (t - 0.5) * M.spread + (Math.random() - 0.5) * 0.1;
       const r = M.r0 + Math.random() * (M.r1 - M.r0);
       const h = M.h0 + Math.random() * (M.h1 - M.h0);
-      const w = M.w0 + Math.random() * (M.w1 - M.w0);
+      let w = M.w0 + Math.random() * (M.w1 - M.w0);
       let x = Math.cos(a) * r, z = Math.sin(a) * r;
       // "the dry inland range standing behind the terraces" — INLAND. On a
       // coast world the azimuth ring can land a peak in the bay, a cream
@@ -9618,6 +9650,41 @@ export class Track {
           const nx = abz / L, nz = -abx / L;       // seaward normal
           const back = sd + margin;
           x -= nx * back; z -= nz * back;
+        }
+      }
+      // A MOUNTAIN MUST NOT STAND ON THE ROAD. The azimuth ring is drawn with
+      // no knowledge of where the lap goes, and on FURKA RIDGE it planted a
+      // 138 u cone across 62 stations of carriageway — the road running
+      // literally inside the rock, with the collider reaching a further 30 u
+      // past the drawn flank as an invisible wall. Walk it out of the way,
+      // away from whatever road sample it is closest to, which is the
+      // shortest way clear; a few passes because stepping off one leg of a
+      // lap can walk onto another.
+      const clearance = (i) => w * 0.5 + (this.widthAt?.(i) ?? 9) + 24;
+      for (let pass = 0; pass < 8; pass++) {
+        const s = this._nearestSample(x, z);
+        const need = clearance(s.i);
+        if (s.d >= need) break;
+        const c = this.center[s.i];
+        let ox = x - c.x, oz = z - c.z;
+        const ol = Math.hypot(ox, oz);
+        if (ol < 1e-3) {                 // dead centre: leave along the ring
+          const rr = Math.hypot(x, z) || 1;
+          ox = x / rr; oz = z / rr;
+        } else { ox /= ol; oz /= ol; }
+        x += ox * (need - s.d + 4); z += oz * (need - s.d + 4);
+      }
+      // Still crowding the road after eight passes means the lap encircles
+      // this spot. Shrink to fit rather than shove a peak to the far horizon;
+      // below a real mountain's worth of base it is a boulder, so drop it out
+      // of sight and register nothing.
+      const fin = this._nearestSample(x, z);
+      if (fin.d < clearance(fin.i)) {
+        w = Math.max(0, (fin.d - (this.widthAt?.(fin.i) ?? 9) - 24) * 2);
+        if (w < 30) {
+          m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
+          rock.setMatrixAt(k, m4);
+          continue;
         }
       }
       q.setFromAxisAngle(up, Math.random() * Math.PI);
@@ -9642,7 +9709,14 @@ export class Track {
       // because a few metres of invisible margin on the short axis is a far
       // smaller lie than a mountain you can walk into. `h` makes it solid over
       // its whole height — see the height gate in Car.step.
-      this.solids.push({ x, z, r: w * 0.48, y: y + 2, h, mat: 'stone' });
+      //
+      // AND IT IS A MOUNTAIN, NOT A GRAIN SILO. `h` alone makes the disc solid
+      // at every height, so a road running past the flank 70 u up met the full
+      // BASE radius — measured at 22 u of invisible wall on FURKA RIDGE, where
+      // the rock is 96 u wide and the collider 118. `prof` carries the drawn
+      // cross-section band by band so the gate can ask how wide the rock is at
+      // the car's own height instead of assuming the widest it ever gets.
+      this.solids.push({ x, z, r: w * 0.48, y: y + 2, h, mat: 'stone', prof });
     }
     rock.name = 'massif';
     if (rock.instanceColor) rock.instanceColor.needsUpdate = true;
@@ -14180,6 +14254,7 @@ export class Track {
     const inSea = (x, z, w) => this.T.coast && this._coastSide(x, z) > -(w * 0.7);
     const jcol = new THREE.Color();
     const meshes = [];
+    const profOf = {};                 // drawn cross-section, one per form
     const layer = (forms, mat, cap) => {
       const per = {};
       for (const f of forms) {
@@ -14244,9 +14319,17 @@ export class Track {
           // worlds had EVERY horizon mountain bare. Same treatment as the
           // massif cones — the long axis of the (w x w*zs, yawed) footprint,
           // at the cone rule's 0.48, solid over the full height.
+          // ...and, like the massif cones, they taper. A skyline peak's
+          // collider used to be a cylinder of its base radius the whole way
+          // up; `prof` is the form's own drawn cross-section (see
+          // `_formProfile`), memoised per form since a whole ring shares one
+          // geometry. Out here it changes little — nothing drives at 900 u —
+          // but it keeps ONE rule for "how wide is this mountain at my
+          // height", and one rule is the only kind worth having.
+          if (!profOf[form]) profOf[form] = this._formProfile(F[form]);
           this.solids.push({
             x: px, z: pz, r: w * Math.max(1, zs) * 0.48,
-            y: seat(px, pz) + 2, h, mat: 'stone',
+            y: seat(px, pz) + 2, h, mat: 'stone', prof: profOf[form],
           });
         }
       }
@@ -14427,10 +14510,19 @@ export class Track {
     // double every outcrop. The base tier is a unit box scaled to w wide and
     // up to 1.2 w deep, rotated — 0.6 w covers the long axis, the cone rule's
     // trade of a little invisible margin on the short one.
+    // A mesa steps in as it rises, so its collider steps in too — same `prof`
+    // the massif and skyline cones carry, built from the tier table in
+    // `_addMesaTiers` rather than restated, so the two cannot drift apart.
+    const HR = [0.5, 0.32, 0.2], WR = [1, 0.74, 0.5];
+    const BANDS = 16, total = HR[0] + HR[1] + HR[2];
+    const prof = Array.from({ length: BANDS }, (_, k) => {
+      const f = ((k + 0.5) / BANDS) * total;
+      return f < HR[0] ? WR[0] : f < HR[0] + HR[1] ? WR[1] : WR[2];
+    });
     for (const s of specs) {
       this.solids.push({
         x: s.x, z: s.z, r: s.w * 0.6,
-        y: -2 + this._highland(s.x, s.z) + 2, h: s.h, mat: 'stone',
+        y: -2 + this._highland(s.x, s.z) + 2, h: s.h, mat: 'stone', prof,
       });
     }
   }
