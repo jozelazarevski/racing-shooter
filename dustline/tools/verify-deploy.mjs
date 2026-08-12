@@ -98,7 +98,7 @@ async function visit(path, ready, timeout = 120000) {
 
 // 2. the editor, booted from the committed build
 {
-  const { p, errs, info } = await visit('/play-dustline/editor.html',
+  const { p, errs, info } = await visit('/V2/editor.html',
     () => window.__editor?.preview?.terrain ? {
       components: window.__editor.templateIds().length,
       tracks: window.__editor.builtInTracks().map(t => t.id),
@@ -112,7 +112,7 @@ async function visit(path, ready, timeout = 120000) {
 
 // 3. every built-in track, in the GAME
 for (const id of ['dustbowl', 'proving-ground', 'harbour']) {
-  const { p, errs, info } = await visit(`/play-dustline/index.html?track=${id}`,
+  const { p, errs, info } = await visit(`/V2/index.html?track=${id}`,
     () => window.__dust?.track ? {
       id: window.__dust.track.id, name: window.__dust.track.name,
       racers: window.__dust.racers?.length ?? 0,

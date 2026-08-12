@@ -21,7 +21,7 @@
  *     field of view, so every sheet is framed the same way regardless of how
  *     many components a category has.
  *
- *   npx vite build          # the tool serves ../play-dustline itself
+ *   npx vite build          # the tool serves ../V2 itself
  *   node tools/make-set-sheets.mjs
  */
 import { mkdirSync, readdirSync, rmSync } from 'node:fs';
@@ -31,9 +31,9 @@ import { ensureServer } from './serve.mjs';
 const BASE = process.env.BASE || 'http://localhost:8903/';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
-// Serves ../play-dustline itself unless something already is, so the check
+// Serves ../V2 itself unless something already is, so the check
 // never fails because a server from an earlier session has gone away.
-const stopServer = await ensureServer(BASE, '../play-dustline');
+const stopServer = await ensureServer(BASE, '../V2');
 const OUT = process.env.OUT || 'docs/sets';
 
 mkdirSync(OUT, { recursive: true });

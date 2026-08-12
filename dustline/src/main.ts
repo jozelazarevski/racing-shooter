@@ -1,20 +1,46 @@
 // DUSTLINE — M3: full race loop. Fixed-timestep Rapier sim (120 Hz) with
 // interpolated rendering; 4 racers (player + 3 AI on the baked line),
 // countdown, sectors, laps, positions, results.
+//
+// THE FRAME NOW GOES THROUGH A COMPOSER, ported from IGNITE RALLY. v1 draws
+// every frame with `this.composer.render()` (`src/main.js:6519`) rather than
+// `renderer.render`, and resizes the composer alongside the renderer
+// (`src/main.js:1011`). Both of those are done here; what the chain contains,
+// and the image-based lighting that goes with it, is `render/post.ts`. The
+// chain is optional — see `postWanted` there for how it switches itself off
+// under a software rasteriser, which is what the headless tools run on.
+// Ported with it: v1's moving shadow rig (`_updateCamera`, `src/main.js:1918`),
+// which re-aims the sun at the player every frame; the light itself and its
+// tuning live in `render/scene.ts`.
+//
+// AND IT IS DRIVABLE WITH TWO THUMBS. Every reference image for this game is a
+// portrait phone screenshot with on-screen controls, and until this line the
+// game had no touch input at all — `core/input.ts` was keyboard and gamepad,
+// so on the device it is aimed at the car did not move. `ui/touch.ts` carries
+// v1's tuned joystick across; the two lines here are all the wiring it needs.
+//
+// A NOTE ON WHY THAT WIRING IS CALLED OUT. The ported modules landed as dead
+// code first — `sky.ts`, `skidMarks.ts` and `touch.ts` all existed, all
+// typechecked, and none of them had a single importer, so the running game was
+// unchanged while the commit message said otherwise. Ported is not delivered.
+// An import is the difference, and it is worth one comment to remember that.
 
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { GameLoop, FIXED_DT } from './core/loop';
 import { Input, InputState } from './core/input';
 import { VehicleController } from './physics/vehicleController';
-import { buildRenderer, buildWorld, buildCarVisual, CarVisual } from './render/scene';
+import { buildRenderer, buildWorld, buildCarVisual, shadowFollower, CarVisual } from './render/scene';
+import { Post, buildEnvironment } from './render/post';
 import { ChaseCamera } from './render/camera';
 import { Telemetry } from './ui/telemetry';
 import { RaceHUD } from './ui/hud';
 import { chooseTrack } from './ui/trackSelect';
+import { initTouchControls } from './ui/touch';
 import { Terrain } from './tracks/terrain';
 import { WheelFX } from './render/particles';
-import { buildSky, buildClouds, buildMountains, buildVegetation } from './render/scenery';
+import { Sky } from './render/sky';
+import { buildMountains, buildVegetation } from './render/scenery';
 import { bakeRacingLine } from './ai/racingLine';
 import { AIDriver, DriverSpec } from './ai/driver';
 import { RaceDirector } from './race/director';
@@ -54,15 +80,29 @@ async function boot() {
   const renderer = buildRenderer(canvas);
   const scene = new THREE.Scene();
   const chase = new ChaseCamera();
-  addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
+  const post = new Post(renderer);
+  addEventListener('resize', () => {
+    renderer.setSize(innerWidth, innerHeight);
+    post.setSize(innerWidth, innerHeight);   // v1 resizes both, src/main.js:1010-1011
+  });
 
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = FIXED_DT;
   const terrain = new Terrain(trackDef);
-  buildWorld(scene, trackDef, terrain.spawn.x, terrain.spawn.z);
+  const built = buildWorld(scene, trackDef, terrain.spawn.x, terrain.spawn.z);
+  // The sun's shadow box travels with the player from here on. Nothing else
+  // about the light changes — same colour, same intensity, same direction.
+  const followSun = shadowFollower(built);
+  // Image-based lighting from the track's own sky colours: without it every
+  // standard material reflects nothing, so metalness reads black and the car
+  // paint has no sheen. One PMREM bake at load, nothing per frame.
+  buildEnvironment(renderer, scene, trackDef);
   terrain.build(scene, world, RAPIER);
-  buildSky(scene, trackDef);
-  const clouds = buildClouds(scene, trackDef);
+  // v1's five-layer sky, not the M1 mockup it replaces. `render/scenery.ts`
+  // still exports `buildSky`/`buildClouds` — a 16x256 canvas gradient on a
+  // sphere and some icosahedron puffs — and the editor preview still uses
+  // them; this is the game's path onto the ported one. See `render/sky.ts`.
+  const sky = new Sky(scene, trackDef);
   buildMountains(scene, trackDef);
   const components = buildVegetation(scene, terrain, world, RAPIER);
   console.info('[world] components:', components.counts);
@@ -101,6 +141,12 @@ async function boot() {
   placeAll();
 
   const input = new Input();
+  // ON-SCREEN CONTROLS, AND THE REASON THEY ARE CREATED HERE. `initTouchControls`
+  // returns null on anything that is not a touch device, so `touch?.` below is
+  // the whole desktop story — no branch, no second code path. It has to run
+  // AFTER `chooseTrack()` resolves, which is what keeps thumb pads off the
+  // track picker.
+  const touch = initTouchControls(input);
   const telemetry = new Telemetry();
   const hud = new RaceHUD();
   hud.onRestart = () => { director.restart(() => {}); placeAll(); };
@@ -164,16 +210,21 @@ async function boot() {
         }
       }
       fx.update(frameDt);
-      clouds.rotation.y += frameDt * 0.004;
+      sky.update(frameDt);
 
       const plv = playerCtrl.body.linvel();
       vel.set(plv.x, plv.y, plv.z);
       iPos.lerpVectors(playerCtrl.prevPos, playerCtrl.currPos, alpha);
       iQuat.slerpQuaternions(playerCtrl.prevQuat, playerCtrl.currQuat, alpha);
       chase.update(frameDt, iPos, iQuat, vel, playerCtrl.speedKmh, playerCtrl.nitroActive, input.state.lookBack);
+      // ...and the shadow box follows the car, not the camera: what has to be
+      // inside a 180-unit frustum is the thing casting the shadow you are
+      // looking at. v1 aims at the player for the same reason.
+      followSun?.(iPos.x, iPos.y, iPos.z);
       telemetry.update(frameDt, loop, playerCtrl);
       hud.update(director);
-      renderer.render(scene, chase.camera);
+      touch?.update(playerCtrl.speedKmh, playerCtrl.nitroActive);
+      post.render(scene, chase.camera);
     },
   });
 
@@ -184,9 +235,20 @@ async function boot() {
   (window as unknown as { __dust: object }).__dust = {
     car: playerCtrl, world, loop, input, terrain, fx, line, director, racers,
     track: trackDef,
+    // exposed so `tools/verify-mobile.mjs` can assert the controls exist and
+    // that a synthetic thumb drag reaches the car, rather than inferring it
+    sky, touch,
+    // The scene and the lights `buildWorld` made. A lighting tool that has to
+    // find the sun by traversing the graph and sniffing for `isDirectionalLight`
+    // is a tool that silently stops working the day a second light is added;
+    // handing it the objects costs nothing and cannot go stale.
+    scene, lights: built,
     // exposed for tools/: the renderer's own triangle and draw-call counters
     // are the only honest answer to "what did that cost"
     renderer,
+    // `post.setEnabled(false)` is the runtime escape hatch, for a tool that
+    // wants the cheap path without reloading with `?nopost`.
+    post,
     fastForward: (ticks: number) => { for (let i = 0; i < ticks; i++) fixedStep(FIXED_DT); },
   };
 }

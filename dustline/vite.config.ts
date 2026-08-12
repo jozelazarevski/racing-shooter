@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 
-// Built bundle lands at the repo root as /play-dustline so GitHub Pages
-// serves it at .../racing-shooter/play-dustline/ next to IGNITE RALLY.
+// Built bundle lands at the repo root as /V2 so GitHub Pages
+// serves it at .../racing-shooter/V2/ next to IGNITE RALLY.
 //
 // TWO ENTRY POINTS: the game and the track editor. The editor is a page of the
 // same app rather than a separate project on purpose — it imports the real
@@ -13,7 +13,7 @@ import { resolve } from 'node:path';
 export default defineConfig({
   base: './',
   build: {
-    outDir: '../play-dustline',
+    outDir: '../V2',
     emptyOutDir: true,
     target: 'es2022',
     rollupOptions: {

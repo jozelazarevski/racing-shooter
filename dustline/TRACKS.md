@@ -23,7 +23,7 @@ npm install
 npm run dev          # then open /editor.html
 ```
 
-Or in the published build: **`/racing-shooter/play-dustline/editor.html`**.
+Or in the published build: **`/racing-shooter/V2/editor.html`**.
 
 Two tracks ship: **DUSTBOWL LOOP**, the original world written out as data, and
 **PROVING GROUND**, a circuit carrying 114 placed components that exercises the
