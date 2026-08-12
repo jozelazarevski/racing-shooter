@@ -12,8 +12,21 @@ edits in place. So what you sculpt is what the car drives on — the physics,
 the tree scatter, the road drape, the waterline and the drawn ground all come
 from the same rebuilt world.
 
-That is why there is an **APPLY** button. Sculpting shows an immediate preview
-on the drawn ground; APPLY is the moment the whole world is rebuilt around it.
+That is why there is an **APPLY** button. APPLY is the moment the whole world
+is rebuilt around your edits.
+
+**You do not wait for it to see what you built.** A building or a plant you
+place stands up immediately, drawn from the real template with the real
+materials — the same object the rebuild will produce, down to the weathering
+shade, because an authored placement seeds its look from its own position.
+Sculpting previews on the drawn ground the same way, and deleting something
+takes it out of the world on the spot.
+
+What APPLY is actually for is the part a preview cannot fake: the world is
+rebuilt so the physics, the scatter, the road drape and the waterline all
+agree with the new ground, and your buildings join the shared instanced
+batches so they cost no draw calls. A preview costs a few draw calls each and
+is thrown away the moment the batch takes over.
 
 ## Tools
 

@@ -1066,27 +1066,65 @@ export class WorldEditor {
       this._ghosts.name = 'editor-ghosts';
       this.game.scene.add(this._ghosts);
     }
-    const y = this.game.track.terrainHeight(e.x, e.z) + this.delta.at(e.x, e.z);
+    const t = this.game.track;
     const nature = kind === 'prop';
     const color = nature ? 0x7dff9b : 0xffc14a;
-    let m;
-    if (e.built) {
-      const r = (nature ? 2.2 : 3.4) * (e.scale || 1);
-      m = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.5, 20),
-        new THREE.MeshBasicMaterial({ color, transparent: true,
-          opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
-      m.rotation.x = -Math.PI / 2;
-      m.position.set(e.x, y + 0.25, e.z);
-    } else {
+    const lift = this.delta.at(e.x, e.z);
+    const y = t.terrainHeight(e.x, e.z) + lift;
+
+    // WHAT YOU PLACED, VISIBLE NOW.
+    //
+    // This used to be a yellow wireframe crate until APPLY, which told you a
+    // building was coming but not what it looked like, how big it was, or
+    // whether it fitted between the two you already had — and APPLY costs a
+    // full world rebuild, so checking meant waiting. Reported exactly that
+    // way: "what I build needs to be visible in real time, not after apply".
+    //
+    // So the real thing is drawn immediately, from the real template and the
+    // real kit (Track.previewElement / previewProp). It is the same building
+    // the rebuild will produce down to the weathering shade, because an
+    // authored placement seeds its jitter from its own position.
+    //
+    // The preview costs a few draw calls each, which is the whole reason the
+    // built world batches instead — so at APPLY these are thrown away and the
+    // batched instance takes over. `built` is what marks that handover, and a
+    // built object keeps only a flat footprint ring: enough to see what you
+    // put there and to aim at, low enough that the house is what you look at.
+    if (!e.built) {
+      let g = null;
+      try {
+        g = nature ? t.previewProp(e.kind, e.x, e.z, e.rot || 0, e.scale || 1)
+          : t.previewElement(e.preset, e.x, e.z, e.rot || 0, e.scale || 1);
+      } catch { g = null; }
+      if (g) {
+        // the sculpt is previewed on the drawn ground but not yet in
+        // terrainHeight, so lift the object by the pending dab as well
+        if (lift) g.position.y += lift;
+        g.userData.el = e;
+        g.userData.kind = kind;
+        g.userData.preview = true;
+        this._ghosts.add(g);
+        return;
+      }
+      // NO TEMPLATE, NO SILENCE. An unknown preset (a scene from a later
+      // palette) still gets a marker, or it would look like the tap missed.
       const s = e.scale || 1;
-      m = nature
-        ? new THREE.Mesh(new THREE.ConeGeometry(2.2 * s, 7 * s, 6),
-          new THREE.MeshBasicMaterial({ color, wireframe: true }))
-        : new THREE.Mesh(new THREE.BoxGeometry(6 * s, 7 * s, 6 * s),
-          new THREE.MeshBasicMaterial({ color, wireframe: true }));
-      m.position.set(e.x, y + 3.5 * s, e.z);
-      m.rotation.y = e.rot || 0;
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(6 * s, 7 * s, 6 * s),
+        new THREE.MeshBasicMaterial({ color, wireframe: true }));
+      box.position.set(e.x, y + 3.5 * s, e.z);
+      box.rotation.y = e.rot || 0;
+      box.userData.el = e;
+      box.userData.kind = kind;
+      this._ghosts.add(box);
+      return;
     }
+    const r = (nature ? 2.2 : 3.4) * (e.scale || 1);
+    const m = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.5, 20),
+      new THREE.MeshBasicMaterial({ color, transparent: true,
+        opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(e.x, y + 0.25, e.z);
     m.userData.el = e;
     m.userData.kind = kind;
     this._ghosts.add(m);
@@ -1095,7 +1133,12 @@ export class WorldEditor {
   _clearGhosts() {
     if (!this._ghosts) return;
     for (const c of [...this._ghosts.children]) {
-      c.geometry.dispose(); c.material.dispose(); this._ghosts.remove(c);
+      // a preview is a Group of real meshes; a marker is a single mesh
+      c.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
+      this._ghosts.remove(c);
     }
   }
 
@@ -2870,7 +2913,12 @@ export class WorldEditor {
     this._unbindKeys();
     for (const grp of [this._ghosts, this._zones, this._routeGrp, this._selGroup, this._lineGrp]) {
       if (!grp) continue;
-      for (const c of [...grp.children]) { c.geometry.dispose(); c.material.dispose(); }
+      // walk it: a live preview is a GROUP of real meshes, not one mesh, and
+      // assuming otherwise threw on the first scene that had one
+      grp.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
       grp.parent?.remove(grp);
     }
     if (this.ring) {
