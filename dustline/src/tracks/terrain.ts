@@ -886,6 +886,38 @@ export class Terrain {
     const rtex = new THREE.CanvasTexture(rcv);
     rtex.wrapS = rtex.wrapT = THREE.RepeatWrapping;
     rtex.colorSpace = THREE.SRGBColorSpace;
+
+    /* THE ROAD WAS BLACK, AND IT WAS BLACK BECAUSE IT WAS PAINTED TWICE.
+     *
+     * `map` and `vertexColors` MULTIPLY. The map above is asphalt — a dark
+     * canvas of binder, aggregate and a worn crown — and the vertex tint below
+     * was the surface's own albedo, `SURF_COLORS.tarmac` (#494b4f) scaled by
+     * 1.7. Both are dark, and dark times dark is very dark: 0.11 linear from
+     * the tint against roughly 0.07 from the map is 0.008, which displays as
+     * about RGB 24. The road read as a black ribbon under every sky, which is
+     * exactly what it looked like, and no amount of relighting could fix it
+     * because the surface was reflecting under one per cent of what hit it.
+     *
+     * The two have different jobs and only one of them is albedo:
+     *   - the MAP carries DETAIL — grain, chips, patches, the polished crown
+     *   - the VERTEX COLOUR carries WHICH SURFACE this is — tarmac, gravel, snow
+     *
+     * So the map is normalised to a mean of 1 before it modulates anything.
+     * `mapMean` is measured off the canvas we just painted rather than typed in,
+     * which means editing the texture above cannot silently re-darken the road,
+     * and a future surface added to SURF_COLORS gets the same treatment for
+     * free. The product now has the mean value of the surface colour itself,
+     * with the map supplying variation around it instead of a second dimming.
+     */
+    const rpx = rctx.getImageData(0, 0, RTEX, RTEX).data;
+    const srgbToLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    let lum = 0;
+    for (let i = 0; i < rpx.length; i += 4) {
+      lum += 0.2126 * srgbToLinear(rpx[i] / 255)
+        + 0.7152 * srgbToLinear(rpx[i + 1] / 255)
+        + 0.0722 * srgbToLinear(rpx[i + 2] / 255);
+    }
+    const mapMean = Math.max(1e-4, lum / (rpx.length / 4));
     const NPTS = this.roadPts.length;
     // SEVEN COLUMNS, NOT FOUR. With four the ribbon is a flat plane between its
     // two inner edges, so the crown painted into the texture above has no
@@ -910,7 +942,12 @@ export class Terrain {
       const nl = Math.hypot(nx, nz) || 1;
       nx /= nl; nz /= nl;
       const id = this.surfaceIdAt(p.x, p.z);
-      tint.copy(SURF_COLORS[id]).multiplyScalar(1.7).offsetHSL(0, 0, 0.06);
+      // Divided by the map's own mean (see above), so map x tint has the mean
+      // value of the surface colour instead of the surface colour dimmed by the
+      // asphalt again. The 1.7 and the lightness nudge stay: they are what
+      // lifted the raw SURF_COLORS off the vertex-coloured terrain beside the
+      // road, and that relationship is unchanged by the normalisation.
+      tint.copy(SURF_COLORS[id]).multiplyScalar(1.7 / mapMean).offsetHSL(0, 0, 0.06);
       for (let cIdx = 0; cIdx < COLS; cIdx++) {
         const px = p.x + nx * lats[cIdx];
         const pz = p.z + nz * lats[cIdx];

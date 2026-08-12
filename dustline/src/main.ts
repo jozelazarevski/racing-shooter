@@ -238,6 +238,11 @@ async function boot() {
     // exposed so `tools/verify-mobile.mjs` can assert the controls exist and
     // that a synthetic thumb drag reaches the car, rather than inferring it
     sky, touch,
+    // The scene and the lights `buildWorld` made. A lighting tool that has to
+    // find the sun by traversing the graph and sniffing for `isDirectionalLight`
+    // is a tool that silently stops working the day a second light is added;
+    // handing it the objects costs nothing and cannot go stale.
+    scene, lights: built,
     // exposed for tools/: the renderer's own triangle and draw-call counters
     // are the only honest answer to "what did that cost"
     renderer,
