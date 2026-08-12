@@ -47,6 +47,14 @@ for (const lv of LEVELS) {
     if (!L) return null;
     g.state = 'title'; g.editScene = null;
     g.swapLevel(L, true, null);
+    // A MOUNTAIN IS NARROWER AT THE TOP, so "how far inside it did the car
+    // finish" has to be asked at the car's own height. The cones taper now
+    // (`Track._formProfile`, `solidRadiusAt`); measured against the base
+    // radius instead, a car that has simply climbed the foot of the flank
+    // reads as 2.3 u INSIDE the rock, which is what this test caught on
+    // TREMOLA the day the taper landed. Same function the game uses, so the
+    // two cannot describe different mountains.
+    const { solidRadiusAt } = await import('./src/vehicles.js');
     const t = g.track, p = g.player;
     if (!t.T.massif) return { name: g.level.name, none: true };
 
@@ -80,8 +88,8 @@ for (const lv of LEVELS) {
       step(420);                                   // 7 s flat out
       const d = Math.hypot(p.pos.x - c.x, p.pos.z - c.z);
       out.runs++;
-      // how far INSIDE the collider's own radius did it finish?
-      const depth = c.r - d;
+      // how far INSIDE the collider did it finish, at the height it is at?
+      const depth = solidRadiusAt(c, p.pos.y) - d;
       if (depth > 2) { out.entered++; out.worstDepth = Math.max(out.worstDepth, depth); }
       else out.stopped++;
     }

@@ -726,6 +726,25 @@ export function buildCarMesh(spec) { return buildVoxelRacer(spec); }
 
 
 // ---------- physics base ----------
+/** How wide is a solid at height `y` — the radius that actually bites.
+ *
+ *  A CONE IS NARROWER AT THE TOP. `ob.prof` is the drawn cross-section of the
+ *  form, band by band from its foot (`Track._formProfile`), and it is present
+ *  exactly on the things that taper: massif cones, skyline peaks, horizon
+ *  mesas. Without it a road passing a flank 70 u up met the full BASE radius —
+ *  118 u of collider against 96 u of rock on FURKA RIDGE, so 22 u of open
+ *  carriageway was walled off by nothing you could see.
+ *
+ *  Exported because a test that re-derives this arithmetic is testing its own
+ *  copy of it. `test-invisible-walls` calls this one. */
+export function solidRadiusAt(ob, y) {
+  if (!ob.prof || !ob.h) return ob.r;
+  const f = (y - ob.y) / ob.h;
+  if (f <= 0) return ob.r;
+  const k = Math.min(ob.prof.length - 1, Math.max(0, Math.floor(f * ob.prof.length)));
+  return ob.r * ob.prof[k];
+}
+
 export class Car {
   constructor(game, mesh, { maxSpeed = 52, accel = 34, grip = 5.2, steerRate = 2.5, driftLag = 0.22, steerTaper = 0.18 } = {}) {
     this.game = game;
@@ -1465,7 +1484,8 @@ export class Car {
     if (this === gm.player && t.solids && t.solids.length) {
       for (const ob of t.solids) {
         const dx = this.pos.x - ob.x, dz = this.pos.z - ob.z;
-        const rr = ob.r + 1.8;
+        // a tapering form is only as wide as it is drawn at our own height
+        const rr = solidRadiusAt(ob, this.pos.y) + 1.8;
         if (dx * dx + dz * dz >= rr * rr) continue;
         // A TALL THING IS SOLID ALL THE WAY UP.
         //
