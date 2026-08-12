@@ -57,7 +57,7 @@
  * 14 ms, with nothing else in the run changing. The sixth, the editor's double
  * build, is separate and is named where it is checked.
  *
- *   npx vite build                       # the tool serves ../play-dustline itself
+ *   npx vite build                       # the tool serves ../V2 itself
  *   node tools/verify-boot-state.mjs
  *   node tools/verify-boot-state.mjs --frames   # every composited frame, timed
  *
@@ -74,7 +74,7 @@ import { decode } from './png.mjs';
 
 const BASE = process.env.BASE || 'http://localhost:8909/';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const ROOT = process.env.DUSTLINE_ROOT || '../play-dustline';
+const ROOT = process.env.DUSTLINE_ROOT || '../V2';
 const DUMP = process.argv.includes('--frames');
 
 /* ---- the two numbers, and where they come from -----------------------------

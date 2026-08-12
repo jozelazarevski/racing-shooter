@@ -57,7 +57,7 @@ const check = (ok, label, detail = '') => {
 
 // THE TWO ESCAPES THAT ARE ALLOWED, and why each one is not a dependency on v1:
 //
-//   ../play-dustline   dustline's OWN build output. `vite.config.ts` writes the
+//   ../V2   dustline's OWN build output. `vite.config.ts` writes the
 //                      bundle there so GitHub Pages serves it next to the other
 //                      game, and the headless tools load it back to drive a
 //                      real build. Writing out is not reaching in.
@@ -68,7 +68,7 @@ const check = (ok, label, detail = '') => {
 //
 // Anything else that escapes is a new decision and should fail here until
 // somebody adds it to this list on purpose.
-const ALLOWED_ESCAPES = ['../play-dustline', '../ARCHITECTURE.md'];
+const ALLOWED_ESCAPES = ['../V2', '../ARCHITECTURE.md'];
 const allowed = (abs) => ALLOWED_ESCAPES.some((a) => {
   const p = resolve(ROOT, a);
   return abs === p || abs.startsWith(`${p}/`);

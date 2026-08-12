@@ -18,7 +18,7 @@ reviewing — could then break this one, and dustline could no longer be built,
 tested or moved on its own.
 
 **No file under `dustline/` may resolve a path outside `dustline/`.** Two escapes
-are allowed and both are named in the gate: `../play-dustline`, which is
+are allowed and both are named in the gate: `../V2`, which is
 dustline's own build output, and `../ARCHITECTURE.md`, which is a document that
 `verify-templates.mjs` cross-checks a count against. Neither is v1 code.
 

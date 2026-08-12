@@ -148,7 +148,7 @@
  *     between its runs. The two halves cover each other; neither alone is enough.
  *   - Materials and colours outside per-instance colour are not hashed.
  *
- *   npx vite build                                  # check 3 serves ../play-dustline itself
+ *   npx vite build                                  # check 3 serves ../V2 itself
  *   node tools/verify-regression-memory.mjs
  *   node tools/verify-regression-memory.mjs --static        # checks 1 and 2 only, no browser
  *   node tools/verify-regression-memory.mjs --fingerprints  # print the full vs golden hash per track
@@ -443,7 +443,7 @@ const { ensureServer } = await import('./serve.mjs');
 // them running at once on the same port serve each other's bundle.
 const BASE = process.env.BASE || 'http://localhost:8913/';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const stopServer = await ensureServer(BASE, '../play-dustline');
+const stopServer = await ensureServer(BASE, '../V2');
 
 const browser = await chromium.launch({
   executablePath: EXE,

@@ -566,14 +566,14 @@ check(ffFixed && dtFixed,
 // 6. THE BUILT BUNDLE THE BROWSER TOOLS SERVE CARRIES EVERY TRACK
 // ---------------------------------------------------------------------------
 //
-// Every browser tool reads `../play-dustline`, not `src/`. `builtInTracks()`
+// Every browser tool reads `../V2`, not `src/`. `builtInTracks()`
 // inside that page is the glob AS OF THE LAST `vite build`. So a track can be
 // committed, globbed by `registry.ts`, counted by every check above — and still
 // be absent from the world the browser tools actually measure, which would let
 // a glob-derived tool report a confident, complete-looking pass over a roster
 // short by one. That is BUGS.md #6 again, one level down, and nothing else here
 // would notice it.
-const DIST = '../play-dustline';
+const DIST = '../V2';
 const distAssets = existsSync(join(DIST, 'assets'))
   ? readdirSync(join(DIST, 'assets')).filter((f) => f.endsWith('.js')) : [];
 if (!distAssets.length) {

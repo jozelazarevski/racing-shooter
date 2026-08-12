@@ -87,7 +87,7 @@
  *     no collider on record (BUGS.md #2's four unexplained ones) is invisible
  *     to it.
  *
- *   npx vite build          # the tool serves ../play-dustline itself
+ *   npx vite build          # the tool serves ../V2 itself
  *   node tools/verify-clearance.mjs
  *   node tools/verify-clearance.mjs --table    # every offender, worst first
  */
@@ -134,7 +134,7 @@ const check = (ok, label, detail = '') => {
   if (!ok) fails++;
 };
 
-const stopServer = await ensureServer(BASE, '../play-dustline');
+const stopServer = await ensureServer(BASE, '../V2');
 const browser = await chromium.launch({
   executablePath: EXE,
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],

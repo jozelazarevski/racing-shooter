@@ -55,7 +55,7 @@ import { ensureServer } from './serve.mjs';
 const TABLE = process.argv.includes('--table');
 
 const BASE = process.env.BASE || 'http://localhost:8913/';
-const DIST = process.env.DIST || '../play-dustline';
+const DIST = process.env.DIST || '../V2';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 // Any track would do for a drive test; this one is the flat proving ground,
 // which is the one place a "did it move" measurement cannot be confounded by

@@ -64,7 +64,7 @@
  * definition of done. Checks 1-4, 7 and 8 are green and are the standing guard
  * over everything that is already right.
  *
- *   npx vite build          # the tool serves ../play-dustline itself
+ *   npx vite build          # the tool serves ../V2 itself
  *   node tools/verify-solidity.mjs
  *   node tools/verify-solidity.mjs --table   # the full census, per track
  *
@@ -76,7 +76,7 @@ import { ensureServer } from './serve.mjs';
 
 const TABLE = process.argv.includes('--table');
 const BASE = process.env.BASE || 'http://localhost:8911/';
-const DIST = process.env.DIST || '../play-dustline';
+const DIST = process.env.DIST || '../V2';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 // ---------------------------------------------------------------------------

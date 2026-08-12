@@ -66,7 +66,7 @@ const TALL_MIN = 0.5;    // fraction of visible height a full collider must reac
 
 const BASE = process.env.BASE || 'http://localhost:8906/';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const stopServer = await ensureServer(BASE, '../play-dustline');
+const stopServer = await ensureServer(BASE, '../V2');
 
 let fails = 0;
 const check = (ok, label, detail = '') => {

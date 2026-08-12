@@ -45,12 +45,12 @@ plainly as the passes — what it does not cover.
 
 Every runtime and every verdict below was measured on this machine on
 2026-08-11 by running the tool, not by reading it. Browser tools were run
-against the `../play-dustline` build of **22:27** (`main-DroMBSax.js`,
+against the `../V2` build of **22:27** (`main-DroMBSax.js`,
 md5 `875875a5…`) unless a line says otherwise. Two caveats that belong at the
 top rather than in a footnote:
 
 - **`src/` moved while this audit ran.** A concurrent workflow rebuilt
-  `../play-dustline` three times during the session (21:43, 21:53, 22:27), and
+  `../V2` three times during the session (21:43, 21:53, 22:27), and
   two of the numbers below are quoted from the 21:53 build precisely because
   they show a gate going red and then green on a real fix. Where that happens
   the build is named.
@@ -650,7 +650,7 @@ line the tool prints about itself.
 2. **`gate` runs the browser form of `verify:regressions`.** `package.json` has
    `"verify:regressions": "node tools/verify-regression-memory.mjs"` inside
    `gate`, which launches chromium against whatever build happens to be sitting
-   in `../play-dustline` — a check reporting on a build nobody made, which is
+   in `../V2` — a check reporting on a build nobody made, which is
    the exact shape of problem `REGRESSIONS.md` warns about in its own "How it
    runs" section. `gate` should run `--static` (**0.09 s**, measured) and
    `gate:full` the full form (**18.9 s**, after its build).
@@ -700,7 +700,7 @@ mutation. The check itself is correct; only its advice is out of date.
   `net::ERR_CONNECTION_REFUSED at http://localhost:8907/…` and, on another run,
   `window.__dust never appeared after 180 s` while the real cause was a dead
   server. Both runs were clean when given a server of their own.
-- **A concurrent `vite build` into `../play-dustline` breaks any browser tool
+- **A concurrent `vite build` into `../V2` breaks any browser tool
   mid-flight.** `verify-clearance` timed out after 200 s at 21:53 for exactly
   that reason: the hashed bundle it had been served was replaced underneath it.
   `verify-perf-budget` prints the right diagnosis for this case; the others do
@@ -749,7 +749,7 @@ being able to measure anything and one of them will say so.
 ```bash
 cd dustline
 npm run gate        # 15 s measured, source only — no build, no browser
-npx vite build      # gate:full builds first; it writes ../play-dustline
+npx vite build      # gate:full builds first; it writes ../V2
 npm run gate:full   # 842 s of checks measured, plus the build
 ```
 

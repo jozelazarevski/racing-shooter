@@ -94,7 +94,7 @@ const TRACK_DIR = 'src/data/tracks';
 const tracks = readdirSync(TRACK_DIR).filter((f) => f.endsWith('.json'))
   .map((f) => JSON.parse(readFileSync(join(TRACK_DIR, f), 'utf8')).id).sort();
 
-const stopServer = await ensureServer(BASE, '../play-dustline');
+const stopServer = await ensureServer(BASE, '../V2');
 const browser = await chromium.launch({
   executablePath: EXE,
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],

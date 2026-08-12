@@ -253,7 +253,7 @@
  * the renderer produced rather than a share this tool worked out.
  *
  * ---------------------------------------------------------------------------
- *   npx vite build                        # the tool serves ../play-dustline
+ *   npx vite build                        # the tool serves ../V2
  *   node tools/verify-perf-budget.mjs
  *   node tools/verify-perf-budget.mjs --stations 40      # finer lap sampling
  *   node tools/verify-perf-budget.mjs --track harbour    # one track
@@ -832,7 +832,7 @@ async function measureBuildCost(page, tracks) {
 }
 
 // ---- run -------------------------------------------------------------------
-const stopServer = await ensureServer(BASE, '../play-dustline');
+const stopServer = await ensureServer(BASE, '../V2');
 const browser = await chromium.launch({
   executablePath: EXE,
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'],

@@ -55,7 +55,7 @@ node tools/verify-regression-memory.mjs --fingerprints  # print the full vs gold
 ```
 
 `gate` does not run `npm run build`, so a plain invocation there measures
-whatever happens to be sitting in `../play-dustline` — which is a check
+whatever happens to be sitting in `../V2` — which is a check
 reporting on a build nobody made, the exact shape of problem this file is
 about. Wire the `--static` form into `gate` and the full form into `gate:full`,
 which builds first.
@@ -85,6 +85,7 @@ which builds first.
 | 19 | **On a phone, the car did not move.** dustline shipped with `core/input.ts` handling keyboard and gamepad and nothing else — no touch input at all — on a game aimed at a phone. "Was the code written" and "does a thumb move the car" are different questions, and only the second one is the one that gets asked when somebody picks up their phone. | — | `tools/verify-mobile.mjs` |
 | 20 | **A fidelity pass that quietly spends the frame budget.** `ART-DIRECTION.md` argues the flat-shaded look partly on cost and states the rule — "every change that raises geometry reports its measured triangle count and draw calls, per track, before and after" — which is worth nothing unless somebody takes the numbers. v1's own record shows how this goes wrong in both directions: ARCHITECTURE.md quotes a software-rasteriser figure as if it were performance, and BUGS.md #8 reports three worlds "lapping at half pace" that were not. | "the game is freezing" | `tools/verify-perf-budget.mjs` |
 | 21 | **A fix with no standing check behind it.** The class this whole file is about. v1 grew 56 test files, every one written after an incident, with no convention forcing it — so a fix applied to one code path and not its twin was reported again, with the same photograph. | "Still can enter." | `tools/verify-regression-memory.mjs` |
+| 22 | **A surface that is effectively black, and a diagnosis built on an unmeasured number.** The road read as a black ribbon and was diagnosed as a double multiply — `map` and `vertexColors` do multiply, and the road carried an asphalt map *and* a vertex tint of its own albedo. The stated product, 0.008 linear, assumed a map mean of 0.07 that was never measured; the real mean is 0.5 and the road sat at 0.094, an ordinary asphalt. Normalising the map lifted it to 0.18, which reads better and was kept **as an art decision, not a fix**. The registered defect is therefore the narrow real one — colour, map and tint combining into something no exposure can recover, invisible in source because each term looks fine alone. **The check does not catch a merely-dark surface and its header says so:** restoring the original tint leaves it green. | "Graphics don't look remotely good" | `tools/verify-legibility.mjs` |
 
 ## What this register does not do
 
