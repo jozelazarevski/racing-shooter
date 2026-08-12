@@ -9,7 +9,7 @@
  * Each shot names a track and an orbit — target, distance, pitch, yaw — and
  * nothing else. There is no hand-framing step to lose.
  *
- *   npx vite build          # the tool serves ../play-dustline itself
+ *   npx vite build          # the tool serves ../V2 itself
  *   node tools/make-shots.mjs
  */
 import { mkdirSync } from 'node:fs';
@@ -48,7 +48,7 @@ const SHOTS = [
 ];
 
 mkdirSync(OUT, { recursive: true });
-const stopServer = await ensureServer(BASE, '../play-dustline');
+const stopServer = await ensureServer(BASE, '../V2');
 
 const browser = await chromium.launch({
   executablePath: EXE,

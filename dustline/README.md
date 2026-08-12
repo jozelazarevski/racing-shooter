@@ -100,9 +100,9 @@ throttle catches it in ~1.3 s, staying on power holds the slide ~2.8 s.
 cd dustline
 npm install
 npm run dev        # dev server
-npm run build      # outputs ../play-dustline (served by GitHub Pages)
+npm run build      # outputs ../V2 (served by GitHub Pages)
 ```
 
-Play the built version: https://jozelazarevski.github.io/racing-shooter/play-dustline/
+Play the built version: https://jozelazarevski.github.io/racing-shooter/V2/
 
 All tunables live in `src/data/*.json` — zero magic numbers in code.

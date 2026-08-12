@@ -153,7 +153,7 @@ const VESSELS = new Set(['rowboat', 'sailboat', 'fishingBoat', 'launch', 'buoy',
 
 const BASE = process.env.BASE || 'http://localhost:8907/';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const stopServer = await ensureServer(BASE, '../play-dustline');
+const stopServer = await ensureServer(BASE, '../V2');
 
 let fails = 0;
 const check = (ok, label, detail = '') => {

@@ -310,6 +310,11 @@ export class WorldEditor {
     this.hardness = 0;              // 0 = soft hillside, 100 = terrace shoulder
     this.natureCount = 1;           // props per tap of the NATURE brush
     this.natureKind = 'pine';
+    // LINE: two taps and a run of objects between them. Off by default, so a
+    // single tap still means a single object.
+    this.lineMode = false;
+    this.spacing = 20;              // units between objects along a run
+    this._lineFrom = null;          // the anchor, once the first tap has landed
 
     this.delta = new TerrainDelta();
     this.elements = [];
@@ -699,6 +704,7 @@ export class WorldEditor {
     this._clearZoneMarks();
     this._clearRoadMarks();
     this._clearSelection();
+    this._cancelRun();
     if (this._routeGrp) this._routeGrp.visible = false;
     if (this.ring) this.ring.visible = false;
     this.root.classList.add('off');
@@ -935,6 +941,116 @@ export class WorldEditor {
       + `(${this.props.length} natural object${this.props.length === 1 ? '' : 's'}) — APPLY to grow`);
   }
 
+  /* --- runs of objects ----------------------------------------------------- */
+  /** A ROW, NOT A ROW OF TAPS.
+   *
+   *  A fence, an avenue, a village street and a line of pylons are all the
+   *  same gesture: the same object, repeated, evenly, along a line. Doing that
+   *  by hand is one tap per object plus a fight to keep the spacing even, and
+   *  the spacing is the only part that actually reads — an avenue with three
+   *  gaps in it does not look like an avenue.
+   *
+   *  TWO TAPS, NOT A DRAG. A drag already means "move the camera" everywhere
+   *  in this tool except the sculpt brushes, and the editor is used on a phone
+   *  as often as a desktop. So the first tap drops an anchor and the second
+   *  completes the run — which also means you can orbit the camera in between
+   *  to see where the far end ought to go. */
+  _lineTap(p) {
+    const q = this._snapped(p);
+    if (!this._lineFrom) {
+      this._lineFrom = { x: q.x, z: q.z };
+      this._lineMark();
+      this._status(`run started — tap the far end. SPACING ${this.spacing} u, `
+        + 'ESC to cancel');
+      return;
+    }
+    const from = this._lineFrom;
+    this._lineFrom = null;
+    this._clearLineMark();
+    this._placeRun(from, q);
+  }
+
+  /** Lay the run. Rotation follows the LINE, so a row of cottages fronts the
+   *  street it stands on rather than all facing north; the ROT slider is added
+   *  on top, which is how you turn a row of houses to face away from it. */
+  _placeRun(from, to) {
+    const dx = to.x - from.x, dz = to.z - from.z;
+    const len = Math.hypot(dx, dz);
+    const step = Math.max(2, this.spacing);
+    if (len < step * 0.5) {
+      this._status('too short for a run — tap further away, or lower SPACING');
+      return;
+    }
+    const n = Math.floor(len / step) + 1;
+    if (n > 120) { this._status('that run is too long — raise SPACING'); return; }
+    const ang = Math.atan2(dx, dz);          // world heading of the run
+    const ux = dx / len, uz = dz / len;
+    const nature = this.tool === 'nature';
+    if (!nature && !this.preset) { this._status('pick a preset first'); return; }
+    if (nature && !EDIT_PROP_KINDS[this.natureKind]) {
+      this._status('pick a tree or a rock first'); return;
+    }
+    const made = [];
+    this._act(`a run of ${n}`, () => {
+      for (let i = 0; i < n; i++) {
+        const d = i * step;
+        const s = this._snapped({ x: from.x + ux * d, z: from.z + uz * d });
+        const e = nature
+          ? { kind: this.natureKind, x: s.x, z: s.z,
+            rot: ang + (this._placeRot ?? 0), scale: this._placeScale ?? 1 }
+          : { preset: this.preset, x: s.x, z: s.z,
+            rot: ang + (this._placeRot ?? 0), scale: this._placeScale ?? 1 };
+        (nature ? this.props : this.elements).push(e);
+        made.push(e);
+      }
+    });
+    // the run becomes the selection, so it can be nudged or turned as one
+    const first = made[0];
+    this.sel = { kind: 'mine', el: first, x: first.x, z: first.z,
+      rot: first.rot, scale: first.scale, preset: first.preset || first.kind };
+    this.also = made.slice(1);
+    this._selMarkRefresh();
+    this._status(`ran ${n} ${nature ? this.natureKind : this.preset} `
+      + `${step} u apart over ${Math.round(len)} u — APPLY to build`);
+  }
+
+  /** Forget a half-made run. Anything that changes what the next tap means —
+   *  switching tool, switching ONE/RUN, ESC, leaving — has to call this, or
+   *  the next tap somewhere else completes a run you had abandoned. */
+  _cancelRun() {
+    if (!this._lineFrom) return;
+    this._lineFrom = null;
+    this._clearLineMark();
+  }
+
+  /** The anchor, while a run is half-made. Without it the first tap of a run
+   *  looks exactly like a tap that did nothing. */
+  _lineMark() {
+    this._clearLineMark();
+    if (!this._lineFrom) return;
+    if (!this._lineGrp) {
+      this._lineGrp = new THREE.Group();
+      this._lineGrp.name = 'editor-line';
+      this.game.scene.add(this._lineGrp);
+    }
+    const f = this._lineFrom;
+    const y = this.game.track.terrainHeight(f.x, f.z) + this.delta.at(f.x, f.z);
+    const g = new THREE.RingGeometry(3, 4.4, 20);
+    g.rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+      color: 0xffe066, transparent: true, opacity: 0.95, depthTest: false }));
+    m.position.set(f.x, y + 0.6, f.z);
+    m.renderOrder = 1001;
+    this._lineGrp.add(m);
+  }
+
+  _clearLineMark() {
+    if (!this._lineGrp) return;
+    for (const c of [...this._lineGrp.children]) {
+      c.geometry.dispose(); c.material.dispose(); this._lineGrp.remove(c);
+    }
+  }
+
   /** A placed building only becomes real at Apply (it has to join the batched
    *  instanced meshes). Until then it is a marker, so the layout can be seen.
    *
@@ -950,27 +1066,65 @@ export class WorldEditor {
       this._ghosts.name = 'editor-ghosts';
       this.game.scene.add(this._ghosts);
     }
-    const y = this.game.track.terrainHeight(e.x, e.z) + this.delta.at(e.x, e.z);
+    const t = this.game.track;
     const nature = kind === 'prop';
     const color = nature ? 0x7dff9b : 0xffc14a;
-    let m;
-    if (e.built) {
-      const r = (nature ? 2.2 : 3.4) * (e.scale || 1);
-      m = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.5, 20),
-        new THREE.MeshBasicMaterial({ color, transparent: true,
-          opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
-      m.rotation.x = -Math.PI / 2;
-      m.position.set(e.x, y + 0.25, e.z);
-    } else {
+    const lift = this.delta.at(e.x, e.z);
+    const y = t.terrainHeight(e.x, e.z) + lift;
+
+    // WHAT YOU PLACED, VISIBLE NOW.
+    //
+    // This used to be a yellow wireframe crate until APPLY, which told you a
+    // building was coming but not what it looked like, how big it was, or
+    // whether it fitted between the two you already had — and APPLY costs a
+    // full world rebuild, so checking meant waiting. Reported exactly that
+    // way: "what I build needs to be visible in real time, not after apply".
+    //
+    // So the real thing is drawn immediately, from the real template and the
+    // real kit (Track.previewElement / previewProp). It is the same building
+    // the rebuild will produce down to the weathering shade, because an
+    // authored placement seeds its jitter from its own position.
+    //
+    // The preview costs a few draw calls each, which is the whole reason the
+    // built world batches instead — so at APPLY these are thrown away and the
+    // batched instance takes over. `built` is what marks that handover, and a
+    // built object keeps only a flat footprint ring: enough to see what you
+    // put there and to aim at, low enough that the house is what you look at.
+    if (!e.built) {
+      let g = null;
+      try {
+        g = nature ? t.previewProp(e.kind, e.x, e.z, e.rot || 0, e.scale || 1)
+          : t.previewElement(e.preset, e.x, e.z, e.rot || 0, e.scale || 1);
+      } catch { g = null; }
+      if (g) {
+        // the sculpt is previewed on the drawn ground but not yet in
+        // terrainHeight, so lift the object by the pending dab as well
+        if (lift) g.position.y += lift;
+        g.userData.el = e;
+        g.userData.kind = kind;
+        g.userData.preview = true;
+        this._ghosts.add(g);
+        return;
+      }
+      // NO TEMPLATE, NO SILENCE. An unknown preset (a scene from a later
+      // palette) still gets a marker, or it would look like the tap missed.
       const s = e.scale || 1;
-      m = nature
-        ? new THREE.Mesh(new THREE.ConeGeometry(2.2 * s, 7 * s, 6),
-          new THREE.MeshBasicMaterial({ color, wireframe: true }))
-        : new THREE.Mesh(new THREE.BoxGeometry(6 * s, 7 * s, 6 * s),
-          new THREE.MeshBasicMaterial({ color, wireframe: true }));
-      m.position.set(e.x, y + 3.5 * s, e.z);
-      m.rotation.y = e.rot || 0;
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(6 * s, 7 * s, 6 * s),
+        new THREE.MeshBasicMaterial({ color, wireframe: true }));
+      box.position.set(e.x, y + 3.5 * s, e.z);
+      box.rotation.y = e.rot || 0;
+      box.userData.el = e;
+      box.userData.kind = kind;
+      this._ghosts.add(box);
+      return;
     }
+    const r = (nature ? 2.2 : 3.4) * (e.scale || 1);
+    const m = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.5, 20),
+      new THREE.MeshBasicMaterial({ color, transparent: true,
+        opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(e.x, y + 0.25, e.z);
     m.userData.el = e;
     m.userData.kind = kind;
     this._ghosts.add(m);
@@ -979,7 +1133,12 @@ export class WorldEditor {
   _clearGhosts() {
     if (!this._ghosts) return;
     for (const c of [...this._ghosts.children]) {
-      c.geometry.dispose(); c.material.dispose(); this._ghosts.remove(c);
+      // a preview is a Group of real meshes; a marker is a single mesh
+      c.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
+      this._ghosts.remove(c);
     }
   }
 
@@ -1269,7 +1428,8 @@ export class WorldEditor {
       case 'cam-home': this._camHome(); break;
       case 'cam-focus': this._focusSelection(); break;
       case 'esc':
-        if (!this.root.querySelector('#ed-modal').classList.contains('off')) this._closeModal();
+        if (this._lineFrom) { this._cancelRun(); this._status('run cancelled'); }
+        else if (!this.root.querySelector('#ed-modal').classList.contains('off')) this._closeModal();
         else if (S) { this._clearSelection(); this._syncInspector(); this._refreshMarkers(); }
         else this.exit();
         break;
@@ -1304,6 +1464,10 @@ export class WorldEditor {
     const p = this._pick(cx, cy);
     if (!p) { this._status('tap the ground, not the sky'); return; }
     if (add && this.tool === 'select') { this._addToSelection(p); return; }
+    if (this.lineMode && (this.tool === 'place' || this.tool === 'nature')) {
+      this._lineTap(p);
+      return;
+    }
     if (this.tool === 'place') this._place(p);
     else if (this.tool === 'nature') this._natureAt(p);
     else if (this.tool === 'erase') this._eraseAt(p);
@@ -2500,7 +2664,12 @@ export class WorldEditor {
         ${tool('lower', 'LOWER')}${tool('smooth', 'SMOOTH')}
         ${tool('flatten', 'FLATTEN')}${tool('noise', 'NOISE')}
         <div class="ed-tgroup">BUILD</div>
-        ${tool('place', 'PLACE')}${tool('nature', 'NATURE')}${tool('water', 'WATER')}
+        ${tool('place', 'PLACE')}${tool('nature', 'NATURE')}
+        <div id="ed-linesub"><div id="ed-linerow">
+          <button class="ed-mini current" data-line="one">ONE</button>
+          <button class="ed-mini" data-line="run">RUN</button>
+        </div><div class="ed-hint">RUN: tap each end. SPACING sets the gap</div></div>
+        ${tool('water', 'WATER')}
         ${tool('road', 'ROAD')}
         <div id="ed-roadsub"><div id="ed-roadrow">
           <button class="ed-mini current" data-road="tunnel">TUNNEL</button>
@@ -2526,6 +2695,7 @@ export class WorldEditor {
         <label>ROT <input id="ed-rot" type="range" min="0" max="345" step="15" value="0"><b id="ed-rot-v">0°</b></label>
         <label>SCALE <input id="ed-scale" type="range" min="50" max="220" step="5" value="100"><b id="ed-scale-v">1.0</b></label>
         <label>COUNT <input id="ed-count" type="range" min="1" max="40" value="1"><b id="ed-count-v">1</b></label>
+        <label>SPACING <input id="ed-spacing" type="range" min="4" max="90" step="2" value="20"><b id="ed-spacing-v">20</b></label>
         <label>SNAP <input id="ed-snap" type="range" min="0" max="20" step="1" value="0"><b id="ed-snap-v">OFF</b></label>
       </div>
       <div id="ed-changes">
@@ -2600,6 +2770,16 @@ export class WorldEditor {
       this._act('the sky', () => { this.weather = wx.value; });
       this._status(`sky: ${wx.value.toUpperCase()} — APPLY`);
     });
+    root.querySelector('#ed-linerow').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-line]');
+      if (!b) return;
+      this.lineMode = b.dataset.line === 'run';
+      root.querySelectorAll('#ed-linerow .ed-mini').forEach((x) => x.classList.toggle('current', x === b));
+      this._cancelRun();
+      this._status(this.lineMode
+        ? `RUN — tap each end of the line. SPACING ${this.spacing} u`
+        : 'ONE — a tap places a single object');
+    });
     this.roadMode = 'tunnel';
     root.querySelector('#ed-roadrow').addEventListener('click', (e) => {
       const b = e.target.closest('[data-road]');
@@ -2649,6 +2829,7 @@ export class WorldEditor {
       return this._placeScale.toFixed(2);
     });
     bind('ed-count', 'ed-count-v', (v) => { this.natureCount = v; return String(v); });
+    bind('ed-spacing', 'ed-spacing-v', (v) => { this.spacing = v; return `${v} u`; });
     bind('ed-snap', 'ed-snap-v', (v) => { this.snap = v; return v ? `${v} u` : 'OFF'; });
     this._pickTool('raise');
   }
@@ -2669,6 +2850,9 @@ export class WorldEditor {
     root.querySelector('#ed-roadsub').classList.toggle('open', t === 'road');
     // WIDEN and SELECT carry the same kind of sub-choice, under the same rule
     root.querySelector('#ed-widensub').classList.toggle('open', t === 'widen');
+    root.querySelector('#ed-linesub').classList.toggle('open', t === 'place' || t === 'nature');
+    // a half-made run belongs to the tool that started it
+    this._cancelRun();
     // a selection belongs to the SELECT tool: leaving it live under a brush
     // means the next DELETE key removes something you can no longer see picked
     if (t !== 'select') this._clearSelection();
@@ -2727,9 +2911,14 @@ export class WorldEditor {
   dispose() {
     this._unbindPointer();
     this._unbindKeys();
-    for (const grp of [this._ghosts, this._zones, this._routeGrp, this._selGroup]) {
+    for (const grp of [this._ghosts, this._zones, this._routeGrp, this._selGroup, this._lineGrp]) {
       if (!grp) continue;
-      for (const c of [...grp.children]) { c.geometry.dispose(); c.material.dispose(); }
+      // walk it: a live preview is a GROUP of real meshes, not one mesh, and
+      // assuming otherwise threw on the first scene that had one
+      grp.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
       grp.parent?.remove(grp);
     }
     if (this.ring) {
@@ -2737,7 +2926,7 @@ export class WorldEditor {
       this.ring.parent?.remove(this.ring);
       this.ring = null;
     }
-    this._ghosts = this._zones = this._routeGrp = this._selGroup = null;
+    this._ghosts = this._zones = this._routeGrp = this._selGroup = this._lineGrp = null;
     this.root?.remove();
     this.active = false;
   }

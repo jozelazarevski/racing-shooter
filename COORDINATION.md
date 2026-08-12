@@ -13,7 +13,7 @@ _Last updated: 2026-08-11, by the mainline session (r153)._
 |---|---|---|
 | Mainline (racing-shooter-game) | `claude/racing-shooter-game-0td0g7` → main | Menu/UX, economy, tyres, editor, releases rNNN. Shipped r152 (deferred track pick — `main.js` picker + `index.html` veil). Next after r153: world-build speed pass — **waiting for the scrutineering branch to merge first** to avoid track.js conflicts. |
 | Track scrutineering | `claude/agent-track-testing-bugs-f6jfms` | BUGS.md findings #1–#4: road-clearance gating at the eight placement call sites, MOUNTAIN TO SEA crossings, wall runs. agent-sweep + world-matrix harnesses. |
-| Dustline | `claude/codebase-architecture-refactor-eos0rs` | The `dustline/` TypeScript rewrite, self-contained, deploys to `/play-dustline/`. Normally no contention with `src/` — one exception below, shipped as r153b. |
+| Dustline | `claude/codebase-architecture-refactor-eos0rs` | The `dustline/` TypeScript rewrite, self-contained, deploys to `/V2/`. Normally no contention with `src/` — one exception below, shipped as r153b. |
 
 ## Measurements crossing lanes
 
@@ -200,6 +200,42 @@ an overpass, and it is the same geometry as the field-stall pile) an index
 that snaps to the wrong leg would clamp the car against a road edge belonging
 somewhere else. One mechanism that would explain both reports and the stalls.
 Fair game for whoever gets there first.
+
+**INVISIBLE WALLS: NOT REPRODUCED ON r158, everything cheap eliminated
+(dustline session, 2026-08-12).** Two reports, both photographed on **r153c**
+— which matters, because r153d then shipped the wedge rescue (full throttle +
+no motion for 5 s), and both screenshots show exactly that state: a car
+stationary with the field gone. Worth re-testing on r158 before hunting
+further. Measured across all 60 worlds on r158 and all clean:
+
+- no solid or obstacle blocking a road has a MISSING MESH
+  (`tests/tool-corridor-solids.mjs`, extended to check for a mesh within
+  r + 2.5 of every road-blocking collider — 0 worlds)
+- the lateral clamp never fires on open tarmac: sampling the corridor at
+  +-75% of `widthAt` across every station, with a warm hint, produced 0
+  clamp-firing points on 60 worlds
+- index tracking does not swap legs: walking the CENTRELINE with the game's
+  own hint-windowed `nearestIndex` reports |lateral| < 3 everywhere, 0 index
+  jumps — so the overpass-leg-swap hypothesis from the last round is WRONG
+- the clamp is not tighter than the drawn road either. It looks like it (the
+  ribbon is drawn to `widthAt + 2.0`, the clamp sits at `widthAt + 0.55`) but
+  the clamp is on the car's CENTRE and the car's radius is 1.8, so its flank
+  reaches `widthAt + 2.35` — slightly PAST the painted edge, which is right.
+
+ONE REAL DEFECT FOUND, minor: `tests/tool-ground-mismatch.mjs` (new) compares
+the terrain mesh against `terrainHeight()` near the road. Three worlds carry a
+step where the ground you HIT is above the ground you SEE — HEDGEROW DASH
++1.6 u, OULTON PARK +1.6 u, SILVERSTONE +1.5 u, all at d ~ 8.3, INSIDE the
+drivable half-width. That is an invisible lump at the carriageway edge on
+those three. Not claimed; small and self-contained.
+
+**ECONOMY / PLAYFULNESS PLAN — `ECONOMY-PLAN.md` (new).** A plan, not a
+change: contract rungs that escalate with the player, rival behavioural
+signatures, an unpaid daily line, and three cheap acknowledgement wins.
+Recommends NOT re-pricing anything (r148's curve is measured and test-locked).
+Written from the dustline lane and it stops short of the save schema —
+S2.1 needs the mainline session's call on where a rung level lives, since
+mainline owns the economy and the save format.
 
 **Unclaimed findings** (fair game for whoever gets there first, say so here):
 BUGS.md #2's two remaining unexplained stalls (NORDSCHLEIFE, DOLOMITI —

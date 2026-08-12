@@ -52,8 +52,12 @@ const R = await page.evaluate(async () => {
   const t = () => g.track;
   // a spot `d` units off the racing line at station `i` — well clear of the
   // carriageway, so nothing here is testing the road clamps by accident
+  // wraps, so a station index past the end of the lap is a point on the lap
+  // rather than a crash three tests later
   const off = (i, d) => {
-    const c = t().center[i], hd = t().headingAt(i);
+    const n = t().center.length;
+    const k = ((i % n) + n) % n;
+    const c = t().center[k], hd = t().headingAt(k);
     return { x: c.x + Math.sin(hd) * d, z: c.z + Math.cos(hd) * d };
   };
 
@@ -148,6 +152,146 @@ const R = await page.evaluate(async () => {
   ed._turnSelection(Math.PI / 2);
   out.builtScale = ed.sel.el.scale;
   out.builtRot = +ed.sel.el.rot.toFixed(3);
+
+  // ---- WHAT YOU BUILD IS VISIBLE NOW, NOT AFTER APPLY --------------------
+  {
+    const eV = new WorldEditor(g);
+    eV.enter();
+    const spot = off(660, 52);
+    eV._pickTool('place'); eV.preset = 'cottageA';
+    eV._place(spot);
+    // real geometry, standing before APPLY — not a wireframe stand-in
+    let meshes = 0, wires = 0;
+    eV._ghosts.traverse((o) => {
+      if (!o.isMesh) return;
+      meshes++;
+      if (o.material && o.material.wireframe) wires++;
+    });
+    out.previewMeshes = meshes;
+    out.previewNoWireframe = wires === 0;
+    out.previewIsGroup = eV._ghosts.children.some((c) => c.userData.preview);
+
+    // and it is THE SAME building the rebuild will make: an authored
+    // placement seeds its look from its own position, so two previews of the
+    // same thing are identical down to the colour
+    const shape = (grp) => grp.children.map((m) =>
+      [m.position.x.toFixed(3), m.position.y.toFixed(3), m.position.z.toFixed(3),
+        m.scale.x.toFixed(3), m.scale.y.toFixed(3), m.scale.z.toFixed(3),
+        m.material.color.getHexString()].join(',')).join('|');
+    const a1 = g.track.previewElement('cottageA', spot.x, spot.z, 0.4, 1.1);
+    const a2 = g.track.previewElement('cottageA', spot.x, spot.z, 0.4, 1.1);
+    out.previewDeterministic = shape(a1) === shape(a2);
+    out.previewHasParts = a1.children.length > 1;
+    // a preset this build has never heard of degrades to a marker, not a throw
+    out.previewUnknownIsNull = g.track.previewElement('nonesuch', 0, 0) === null;
+    // ...and a plant previews the same way
+    const pv = g.track.previewProp('pine', spot.x + 30, spot.z, 0, 1);
+    out.previewPlant = pv && pv.children.length > 1;
+
+    // APPLY hands over to the batch: the preview goes, a footprint ring stays
+    await new Promise((res) => eV.apply(res));
+    let afterMeshes = 0, rings = 0;
+    eV._ghosts.traverse((o) => {
+      if (!o.isMesh) return;
+      afterMeshes++;
+      if (o.geometry && o.geometry.type === 'RingGeometry') rings++;
+    });
+    out.afterApplyMeshes = afterMeshes;
+    out.afterApplyRings = rings;
+    eV.exit();
+    eV.dispose();
+  }
+
+  // ---- an authored building keeps its look, whatever is placed near it ----
+  // The jitter used to come off the build's single seeded stream in call
+  // order, so adding one cottage restyled every cottage placed after it, and
+  // no preview outside the build could ever draw the same numbers.
+  {
+    const mk = async (extraFirst) => {
+      const e = new WorldEditor(g);
+      const at = off(680, 60);
+      if (extraFirst) { e.preset = 'barn'; e.tool = 'place'; e._place(off(690, 60)); }
+      e.preset = 'cottageB'; e.tool = 'place';
+      e._place(at);
+      await new Promise((res) => { g.editScene = e.buildPayload(); g.rebuildWorld(); res(); });
+      const found = (g.track.placedElements || []).find((q) => q.authored
+        && q.type === 'cottageB' && Math.hypot(q.x - at.x, q.z - at.z) < 1);
+      e.dispose();
+      return found ? +found.r.toFixed(4) : null;
+    };
+    const alone = await mk(false);
+    const withNeighbour = await mk(true);
+    out.styleAlone = alone;
+    out.styleWithNeighbour = withNeighbour;
+    out.styleStable = alone !== null && alone === withNeighbour;
+    g.editScene = null;
+    g.rebuildWorld();
+  }
+
+  // ---- RUN: a row is two taps, not twenty --------------------------------
+  {
+    const eR = new WorldEditor(g);
+    eR.enter();
+    eR._pickTool('place');
+    eR.preset = 'cottageA';
+    eR.lineMode = true;
+    eR.spacing = 25;
+    const p0 = off(800, 40), p1 = off(860, 40);
+    const runLen = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+    // the first tap only arms it — nothing is placed yet, and it says so
+    eR._tapAtRunA = eR.elements.length;
+    eR._lineTap(p0);
+    out.runArmedPlaced = eR.elements.length;
+    out.runArmedMark = eR._lineGrp ? eR._lineGrp.children.length : 0;
+    out.runArmedSays = /tap the far end/i.test(eR.statusEl.textContent);
+    // the second tap lays the whole run
+    eR._lineTap(p1);
+    out.runCount = eR.elements.length;
+    out.runExpected = Math.floor(runLen / 25) + 1;
+    out.runAnchorGone = !eR._lineGrp || eR._lineGrp.children.length === 0;
+    // evenly spaced, and along the line
+    const gaps = [];
+    for (let i = 1; i < eR.elements.length; i++) {
+      const a = eR.elements[i - 1], b = eR.elements[i];
+      gaps.push(Math.hypot(b.x - a.x, b.z - a.z));
+    }
+    out.runEven = gaps.every((d) => Math.abs(d - 25) < 0.01);
+    // rotation follows the run, so a row fronts the street it stands on
+    const ang = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+    out.runAligned = eR.elements.every((e) => Math.abs(e.rot - ang) < 1e-6);
+    // the whole run is ONE undo, and it becomes the selection
+    out.runSelected = eR._selGroupEls().length === eR.elements.length;
+    eR._undo();
+    out.runUndone = eR.elements.length === 0;
+    eR._redoStep();
+    out.runRedone = eR.elements.length === out.runCount;
+
+    // ESC drops a half-made run instead of leaving it to ambush the next tap
+    eR._lineTap(off(900, 40));
+    out.runPending = !!eR._lineFrom;
+    eR._hotAct('esc');
+    out.runCancelled = !eR._lineFrom
+      && (!eR._lineGrp || eR._lineGrp.children.length === 0);
+    // and switching tool drops one too
+    eR._lineTap(off(900, 40));
+    eR._pickTool('nature');
+    out.runDroppedOnToolSwitch = !eR._lineFrom;
+
+    // NATURE runs the same way — an avenue of trees
+    eR.lineMode = true; eR.natureKind = 'slim'; eR.spacing = 12;
+    eR._lineTap(off(300, 34));
+    eR._lineTap(off(340, 34));
+    out.runPlants = eR.props.length;
+    out.runPlantsAreKind = eR.props.every((q) => q.kind === 'slim');
+
+    // a run too short to hold even two says so rather than placing nothing
+    eR.spacing = 90;
+    eR._lineTap(off(500, 30));
+    eR._lineTap(off(502, 30));
+    out.runTooShort = /too short/i.test(eR.statusEl.textContent);
+    eR.exit();
+    eR.dispose();
+  }
 
   // ---- WATER: a level you can set ----------------------------------------
   ed._pickTool('water'); ed.radius = 50;
@@ -399,6 +543,40 @@ ok(R.selBuilding, 'a placed building selects the same way');
 ok(R.builtScale === 1.8 && R.builtRot !== 0,
   'and the SCALE / ROT controls aim the object already down',
   `scale ${R.builtScale}, rot ${R.builtRot}`);
+
+console.log('\n--- what you build is visible NOW ---');
+ok(R.previewMeshes > 1,
+  'a placed building stands as real geometry before APPLY', `${R.previewMeshes} meshes`);
+ok(R.previewNoWireframe, 'and not as a wireframe stand-in');
+ok(R.previewIsGroup, 'drawn from the real template, as a group of real parts');
+ok(R.previewHasParts, 'which has more than one part to it');
+ok(R.previewDeterministic,
+  'two previews of the same placement are identical — the look is seeded by position');
+ok(R.styleStable,
+  'so a building keeps its look no matter what is placed before it',
+  `${R.styleAlone} vs ${R.styleWithNeighbour}`);
+ok(R.previewUnknownIsNull, 'an unknown preset previews as null, and gets a marker instead');
+ok(R.previewPlant, 'a plant previews the same way');
+ok(R.afterApplyRings > 0 && R.afterApplyMeshes === R.afterApplyRings,
+  'APPLY hands over to the batch: preview gone, footprint ring left',
+  `${R.afterApplyMeshes} meshes, ${R.afterApplyRings} rings`);
+
+console.log('\n--- RUN lays a row in two taps ---');
+ok(R.runArmedPlaced === 0, 'the first tap places nothing — it only anchors', R.runArmedPlaced);
+ok(R.runArmedMark === 1, 'and shows the anchor, so it does not look like a dud tap');
+ok(R.runArmedSays, 'and says what the second tap will do');
+ok(R.runCount === R.runExpected && R.runCount > 2,
+  'the second tap lays the whole run', `${R.runCount} of ${R.runExpected}`);
+ok(R.runAnchorGone, 'and the anchor marker goes with it');
+ok(R.runEven, 'every gap in the run is the SPACING');
+ok(R.runAligned, 'and each one is turned to face along the run');
+ok(R.runSelected, 'the run becomes the selection, so it can be nudged as one');
+ok(R.runUndone, 'the whole run is ONE undo');
+ok(R.runRedone, 'and it redoes');
+ok(R.runPending && R.runCancelled, 'ESC drops a half-made run');
+ok(R.runDroppedOnToolSwitch, 'and so does switching tool');
+ok(R.runPlants > 2 && R.runPlantsAreKind, 'NATURE runs an avenue the same way', R.runPlants);
+ok(R.runTooShort, 'a run shorter than one gap is refused with a reason');
 
 console.log('\n--- WATER has a level ---');
 ok(R.lakes === 1, 'the tool digs one lake', R.lakes);
