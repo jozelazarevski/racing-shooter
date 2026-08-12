@@ -40,7 +40,8 @@ per stroke, so a scene keeps the ground it was carved with.
 | Tool | What it does |
 |---|---|
 | **PLACE** | Drop the selected preset from the palette. Ghost markers show the layout; the real buildings appear at APPLY. |
-| **NATURE** | Plant trees, bushes and rocks by hand. Pick a kind, then tap. **COUNT** turns one tap into a whole copse scattered across the brush, with the sizes and angles jittered — nobody is tapping four hundred times for a wood. |
+| **RUN** (under PLACE and NATURE) | A fence, an avenue, a village street and a line of pylons are all one gesture: the same object, repeated evenly along a line. Switch the sub-panel from ONE to RUN, tap each end, and the whole row appears at **SPACING** units apart, each one turned to face along the run. Two taps rather than twenty — and the spacing is the part that actually reads, since an avenue with three gaps in it does not look like an avenue. It is two taps and not a drag because a drag already means *move the camera*, and because you can orbit between the two taps to see where the far end belongs. ESC drops a half-made run. |
+| **NATURE** | Plant trees, bushes and rocks by hand. Pick a kind, then tap. **COUNT** turns one tap into a whole copse scattered across the brush, with the sizes and angles jittered — nobody is tapping four hundred times for a wood. Switch to RUN for an avenue instead of a copse. |
 | **WATER** | Tap to sink a lake (SIZE sets it). The tool digs the bowl *and* stands the water in it; SELECT the lake afterwards to set its **level** and width, which is how you flood a valley rather than puddle a field. |
 | **ROAD** | Add a tunnel, a bridge or a river crossing. Pick TUNNEL, BRIDGE or RIVER under the ROAD button, then tap the road. These are built *by* the road system — they need a straight enough run and the right ground — so the tap means "about here" and the builder sites it at the nearest station that works, and says how far it had to go. |
 | **MOVE ROAD** | Drag a marker on the racing line and the lap bends to follow it. The pull is stored, not baked: the terrain blend, the scenery, the elevation and the overpasses all read the moved line, so the world follows the road rather than the road sliding across the old world. |
@@ -67,7 +68,8 @@ unit a press, ten with SHIFT held.
 
 One selection is described in **one** place — the panel on the right rail.
 
-**SNAP** puts every placement on a grid, in units. Off by default.
+**SPACING** is the gap along a RUN. **SNAP** puts every placement on a grid,
+in units. Off by default.
 
 The **CHANGES** panel on the right is a live itemised account of everything not
 yet applied — dabs, objects, plants, removals, road moves, width changes,

@@ -52,8 +52,12 @@ const R = await page.evaluate(async () => {
   const t = () => g.track;
   // a spot `d` units off the racing line at station `i` — well clear of the
   // carriageway, so nothing here is testing the road clamps by accident
+  // wraps, so a station index past the end of the lap is a point on the lap
+  // rather than a crash three tests later
   const off = (i, d) => {
-    const c = t().center[i], hd = t().headingAt(i);
+    const n = t().center.length;
+    const k = ((i % n) + n) % n;
+    const c = t().center[k], hd = t().headingAt(k);
     return { x: c.x + Math.sin(hd) * d, z: c.z + Math.cos(hd) * d };
   };
 
@@ -148,6 +152,71 @@ const R = await page.evaluate(async () => {
   ed._turnSelection(Math.PI / 2);
   out.builtScale = ed.sel.el.scale;
   out.builtRot = +ed.sel.el.rot.toFixed(3);
+
+  // ---- RUN: a row is two taps, not twenty --------------------------------
+  {
+    const eR = new WorldEditor(g);
+    eR.enter();
+    eR._pickTool('place');
+    eR.preset = 'cottageA';
+    eR.lineMode = true;
+    eR.spacing = 25;
+    const p0 = off(800, 40), p1 = off(860, 40);
+    const runLen = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+    // the first tap only arms it — nothing is placed yet, and it says so
+    eR._tapAtRunA = eR.elements.length;
+    eR._lineTap(p0);
+    out.runArmedPlaced = eR.elements.length;
+    out.runArmedMark = eR._lineGrp ? eR._lineGrp.children.length : 0;
+    out.runArmedSays = /tap the far end/i.test(eR.statusEl.textContent);
+    // the second tap lays the whole run
+    eR._lineTap(p1);
+    out.runCount = eR.elements.length;
+    out.runExpected = Math.floor(runLen / 25) + 1;
+    out.runAnchorGone = !eR._lineGrp || eR._lineGrp.children.length === 0;
+    // evenly spaced, and along the line
+    const gaps = [];
+    for (let i = 1; i < eR.elements.length; i++) {
+      const a = eR.elements[i - 1], b = eR.elements[i];
+      gaps.push(Math.hypot(b.x - a.x, b.z - a.z));
+    }
+    out.runEven = gaps.every((d) => Math.abs(d - 25) < 0.01);
+    // rotation follows the run, so a row fronts the street it stands on
+    const ang = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+    out.runAligned = eR.elements.every((e) => Math.abs(e.rot - ang) < 1e-6);
+    // the whole run is ONE undo, and it becomes the selection
+    out.runSelected = eR._selGroupEls().length === eR.elements.length;
+    eR._undo();
+    out.runUndone = eR.elements.length === 0;
+    eR._redoStep();
+    out.runRedone = eR.elements.length === out.runCount;
+
+    // ESC drops a half-made run instead of leaving it to ambush the next tap
+    eR._lineTap(off(900, 40));
+    out.runPending = !!eR._lineFrom;
+    eR._hotAct('esc');
+    out.runCancelled = !eR._lineFrom
+      && (!eR._lineGrp || eR._lineGrp.children.length === 0);
+    // and switching tool drops one too
+    eR._lineTap(off(900, 40));
+    eR._pickTool('nature');
+    out.runDroppedOnToolSwitch = !eR._lineFrom;
+
+    // NATURE runs the same way — an avenue of trees
+    eR.lineMode = true; eR.natureKind = 'slim'; eR.spacing = 12;
+    eR._lineTap(off(300, 34));
+    eR._lineTap(off(340, 34));
+    out.runPlants = eR.props.length;
+    out.runPlantsAreKind = eR.props.every((q) => q.kind === 'slim');
+
+    // a run too short to hold even two says so rather than placing nothing
+    eR.spacing = 90;
+    eR._lineTap(off(500, 30));
+    eR._lineTap(off(502, 30));
+    out.runTooShort = /too short/i.test(eR.statusEl.textContent);
+    eR.exit();
+    eR.dispose();
+  }
 
   // ---- WATER: a level you can set ----------------------------------------
   ed._pickTool('water'); ed.radius = 50;
@@ -399,6 +468,23 @@ ok(R.selBuilding, 'a placed building selects the same way');
 ok(R.builtScale === 1.8 && R.builtRot !== 0,
   'and the SCALE / ROT controls aim the object already down',
   `scale ${R.builtScale}, rot ${R.builtRot}`);
+
+console.log('\n--- RUN lays a row in two taps ---');
+ok(R.runArmedPlaced === 0, 'the first tap places nothing — it only anchors', R.runArmedPlaced);
+ok(R.runArmedMark === 1, 'and shows the anchor, so it does not look like a dud tap');
+ok(R.runArmedSays, 'and says what the second tap will do');
+ok(R.runCount === R.runExpected && R.runCount > 2,
+  'the second tap lays the whole run', `${R.runCount} of ${R.runExpected}`);
+ok(R.runAnchorGone, 'and the anchor marker goes with it');
+ok(R.runEven, 'every gap in the run is the SPACING');
+ok(R.runAligned, 'and each one is turned to face along the run');
+ok(R.runSelected, 'the run becomes the selection, so it can be nudged as one');
+ok(R.runUndone, 'the whole run is ONE undo');
+ok(R.runRedone, 'and it redoes');
+ok(R.runPending && R.runCancelled, 'ESC drops a half-made run');
+ok(R.runDroppedOnToolSwitch, 'and so does switching tool');
+ok(R.runPlants > 2 && R.runPlantsAreKind, 'NATURE runs an avenue the same way', R.runPlants);
+ok(R.runTooShort, 'a run shorter than one gap is refused with a reason');
 
 console.log('\n--- WATER has a level ---');
 ok(R.lakes === 1, 'the tool digs one lake', R.lakes);

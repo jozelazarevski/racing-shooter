@@ -906,6 +906,14 @@
     background:rgba(12,16,22,.86);border:1px solid #2c3a4a;max-width:150px}
   #ed-roadsub.open{display:block}
   #ed-roadsub .ed-hint{margin-top:4px}
+  /* ONE / RUN, shared by PLACE and NATURE — the same shape as ROAD's and
+     WIDEN's sub-choices, and under the same rule: the thing that changes what
+     the next tap means lives beside the button that armed the tap */
+  #ed-linerow{display:flex;gap:4px}
+  #ed-linesub{display:none;margin:2px 0 4px;padding:5px;border-radius:8px;
+    background:rgba(12,16,22,.86);border:1px solid #2c3a4a;max-width:150px}
+  #ed-linesub.open{display:block}
+  #ed-linesub .ed-hint{margin-top:4px}
   /* WIDEN's own sub-choice, same shape as ROAD's and under the same rule:
      the direction you are about to paint lives beside the button that arms it */
   #ed-widenrow{display:flex;gap:4px}
@@ -1079,7 +1087,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r157</div>
+<div id="build-tag">r158</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1299,10 +1307,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r157"></script>
+<script type="module" src="./src/main.js?v=r158"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r157"></script>
+<script src="./src/offline.js?v=r158"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r157"></script>
+<script type="module" src="./src/traffic.js?v=r158"></script>
 </body>
 </html>
