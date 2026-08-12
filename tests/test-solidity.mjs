@@ -106,7 +106,13 @@ else {
 // at the rock and the sweep is what gets measured.
 const shot = await p.evaluate(() => {
   const g = window.__game, car = g.player;
-  const ob = (g.track.solids ?? []).find((s) => s.mat === 'stone' && (s.y ?? -9999) > -1000 && (s.r ?? 0) > 1.5);
+  // A BOULDER, NOT A MOUNTAIN RANGE. The upper bound is the whole point: the
+  // round is placed 20 u from the rock's CENTRE, so the first match being a
+  // 174 u massif cone started it inside the rock, where the ground-impact test
+  // killed it on frame zero — "flew 0 frames, closest -1 u to a rock of radius
+  // 173.8", which reads as a broken sweep and is really a broken fixture.
+  const ob = (g.track.solids ?? []).find((s) => s.mat === 'stone'
+    && (s.y ?? -9999) > -1000 && (s.r ?? 0) > 1.5 && (s.r ?? 0) < 12);
   if (!ob) return { skip: true };
   g.state = 'race';
   (g.weapons.bullets ?? []).forEach((b) => { b.active = false; });

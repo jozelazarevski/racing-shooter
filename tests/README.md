@@ -30,9 +30,12 @@ Requires `playwright-core` and a Chromium at `/opt/pw-browsers/chromium`
 slipstream, big air, shield, treasure stars), `test-round-fixes.mjs`
 (mines on elevated roads, ramp launch cap, gating, economy),
 `test-menu-noreset.mjs` (live car swap + menu state restore),
-`test-roam.mjs`, `test-destruction.mjs`, `test-rungs.mjs` (contract rungs: the
-ladder hardens, the top rung is HARD-only, a sweep stays worth about one strong
-race, and climbing persists per contract).
+`test-roam.mjs`, `test-destruction.mjs`, `test-invisible-walls.mjs` (no
+mountain stands on any world's road; a car can leave every station on the
+racing line; the collider is as wide as the rock is drawn at the same height),
+`test-rungs.mjs` (contract rungs: the ladder hardens, the top rung is
+HARD-only, a sweep stays worth about one strong race, and climbing persists per
+contract).
 
 **The world editor** has eight, each pinning what the ones before it could not
 do: `test-editor.mjs` (the sculpt reaches both ground functions and the
@@ -46,6 +49,21 @@ pins, DUPLICATE, REDO, water levels, brush shape, SNAP, scene codes, the
 draft, and CHECK), `test-warp.mjs` (MOVE ROAD cannot knot a lap: the steering
 cap sees the warp, a pull is anchored to a station, and a road move can be
 selected and deleted).
+
+## Diagnostics — `tool-*.mjs`, not gates
+
+These print a census and exit 0. They exist to answer a question about all 60
+worlds at once, and several of them earned their keep by disagreeing with an
+assumption someone had already written down.
+
+| Tool | Question |
+|---|---|
+| `tool-corridor-blockers.mjs` | Walking the ROAD, what is solid at each station across the drivable width? This is the one that found the massif cones standing on FURKA RIDGE's carriageway. |
+| `tool-blocker-detail.mjs` | `WORLD="…"` — for one world, every distinct blocker: what it is, how much road it covers, and whether a mesh is drawn at the road's height where it bites. |
+| `tool-massif-road.mjs` | Where road runs inside a massif collider: distance from the axis against the width the rock is actually drawn at that height. |
+| `tool-corridor-solids.mjs` | The same territory asked the *other* way round — per collider, gated against its own nearest station. Kept as the worked example of a question that cannot find the bug; see its header. |
+| `tool-overlap-census.mjs` | Which worlds run two legs of a lap on shared tarmac at grade. |
+| `tool-ground-mismatch.mjs` | Where the terrain mesh and `terrainHeight()` disagree near the road — the ground you hit against the ground you see. |
 
 ## Writing new checks
 

@@ -4929,11 +4929,35 @@ export class Track {
   // ---- end width-variation -------------------------------------------------
 
   // ---------- queries ----------
-  nearestIndex(pos, hint = null) {
-    // XZ distance only — the elevated centerline must not bias index tracking
+  /** `useY`: break XZ ties with height. Off by default (and for every
+   *  build-time / one-shot caller), because a car in the AIR has an altitude
+   *  that matches nothing in particular — biasing toward "whichever station
+   *  happens to be that high" would be actively wrong mid-jump, which is
+   *  exactly why this stayed XZ-only originally.
+   *
+   *  But on the ground, XZ ALONE cannot tell two crossing legs apart — that
+   *  is what makes them a crossing: at an overpass their centrelines share
+   *  the same XZ point by construction, sometimes to the centimetre, so an
+   *  XZ-only metric sees a tie where the road plainly does not. A car
+   *  driving under a deck was measured pinned at trackIndex 199 for the
+   *  remainder of a 150 s drive: once the windowed search settled on the
+   *  deck's own station there (a legitimate tie, not a bug in the window),
+   *  next frame's hint was that answer, and nothing in an XZ-only distance
+   *  could ever prefer the ground leg over it again. Reported as the car
+   *  stopped dead beside a wall that, from the seat, was not there.
+   *
+   *  Grounded callers pass their own elevation and get the tie broken by it:
+   *  the two legs of a crossing differ in height by definition (that is what
+   *  the deck is FOR), so the leg matching where the car actually stands
+   *  wins outright. The player's own per-frame tracking is the one caller
+   *  that keeps a hint alive frame over frame and can therefore get stuck
+   *  this way; it passes `!airborne`. */
+  nearestIndex(pos, hint = null, useY = false) {
     const d2 = (i) => {
-      const dx = pos.x - this.center[i].x, dz = pos.z - this.center[i].z;
-      return dx * dx + dz * dz;
+      const c = this.center[i];
+      const dx = pos.x - c.x, dz = pos.z - c.z;
+      const dy = useY ? pos.y - c.y : 0;
+      return dx * dx + dz * dz + dy * dy;
     };
     let best = -1, bd = Infinity;
     if (hint === null) {
@@ -4947,6 +4971,50 @@ export class Track {
       const i = (hint + k + N) % N;
       const d = d2(i);
       if (d < bd) { bd = d; best = i; }
+    }
+    // HEIGHT CANNOT BREAK A TIE THE WINDOW NEVER OFFERED. useY penalises the
+    // wrong leg once both candidates are IN the +-30 window — but the two
+    // legs of a crossing sit >=40 apart by construction, so a hint seeded on
+    // one of them never has the other in reach at all: there is no tie to
+    // break, just one answer, and it is the wrong one. If `best` turned out
+    // to be on a crossing's ramp, also search the crossing's OTHER anchor's
+    // own window and take whichever genuinely matches (XZ AND height, once
+    // useY) better. This is what actually recovers a wrong-leg mis-seed;
+    // the >2500 fallback below only ever catches a hint stale enough to have
+    // left the map entirely.
+    if (useY && this._overpasses) {
+      for (const o of this._overpasses) {
+        const nearUp = this._circDist(best, o.up) <= o.half + 5;
+        const nearDown = !nearUp && this._circDist(best, o.down) <= o.half + 5;
+        if (!nearUp && !nearDown) continue;
+        const other = nearUp ? o.down : o.up;
+        const half = o.half + 5;
+        for (let k = -half; k <= half; k++) {
+          const i = (other + k + N) % N;
+          const d = d2(i);
+          if (d < bd) { bd = d; best = i; }
+        }
+      }
+    }
+    // BELT AND BRACES: a windowed search seeded far from anywhere plausible
+    // (a stale hint after a teleport, a jump that outran the +-30 window)
+    // has no way back on its own — the correct station lies outside its
+    // reach by definition. 50u is well past any legitimate pinch, verge or
+    // off-road excursion the window itself would still track correctly, so
+    // this only spends the coarse sweep the hint===null branch already pays
+    // on an actual mis-seed.
+    if (bd > 2500) {
+      let gBest = -1, gBd = Infinity;
+      for (let i = 0; i < N; i += 4) {
+        const d = d2(i);
+        if (d < gBd) { gBd = d; gBest = i; }
+      }
+      for (let k = -30; k <= 30; k++) {
+        const i = (gBest + k + N) % N;
+        const d = d2(i);
+        if (d < gBd) { gBd = d; gBest = i; }
+      }
+      if (gBd < bd) { best = gBest; bd = gBd; }
     }
     return best;
   }
@@ -9590,9 +9658,41 @@ export class Track {
     return geo;                                      // already non-indexed
   }
 
+  /** How wide is this form actually DRAWN, band by band up its own height?
+   *
+   *  Returns `bands` fractions of the base radius, bottom first, read off the
+   *  geometry rather than assumed: the crag is a heightfield with spurs,
+   *  gullies and a crest LINE, so no formula describes its cross-section.
+   *
+   *  Each band takes the widest vertex at or above it, which both fills the
+   *  bands that happen to contain no vertex (the mesh carries 8 rings, so
+   *  most bands are empty) and makes the profile monotone by construction —
+   *  a mountain never gets wider going up, and a collider that thought so
+   *  would be a new invisible wall of its own. */
+  _formProfile(geo, bands = 16) {
+    const p = geo.attributes.position;
+    const mx = new Array(bands).fill(0);
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i);
+      if (y < lo) lo = y;
+      if (y > hi) hi = y;
+    }
+    const span = hi - lo || 1;
+    for (let i = 0; i < p.count; i++) {
+      const k = Math.min(bands - 1, Math.max(0, Math.floor(((p.getY(i) - lo) / span) * bands)));
+      const rr = Math.hypot(p.getX(i), p.getZ(i));
+      if (rr > mx[k]) mx[k] = rr;
+    }
+    for (let k = bands - 2; k >= 0; k--) mx[k] = Math.max(mx[k], mx[k + 1]);
+    const base = mx[0] || 1;
+    return mx.map((v) => v / base);
+  }
+
   _buildMassif(m4) {
     const M = this.T.massif;
     const geo = this._cragGeo();
+    const prof = this._formProfile(geo);
     const pos = geo.attributes.position;
     const cols = new Float32Array(pos.count * 3);
     const rockA = new THREE.Color(M.color ?? this._massifRock());
@@ -9637,7 +9737,7 @@ export class Track {
       const a = M.az + (t - 0.5) * M.spread + (Math.random() - 0.5) * 0.1;
       const r = M.r0 + Math.random() * (M.r1 - M.r0);
       const h = M.h0 + Math.random() * (M.h1 - M.h0);
-      const w = M.w0 + Math.random() * (M.w1 - M.w0);
+      let w = M.w0 + Math.random() * (M.w1 - M.w0);
       let x = Math.cos(a) * r, z = Math.sin(a) * r;
       // "the dry inland range standing behind the terraces" — INLAND. On a
       // coast world the azimuth ring can land a peak in the bay, a cream
@@ -9653,6 +9753,41 @@ export class Track {
           const nx = abz / L, nz = -abx / L;       // seaward normal
           const back = sd + margin;
           x -= nx * back; z -= nz * back;
+        }
+      }
+      // A MOUNTAIN MUST NOT STAND ON THE ROAD. The azimuth ring is drawn with
+      // no knowledge of where the lap goes, and on FURKA RIDGE it planted a
+      // 138 u cone across 62 stations of carriageway — the road running
+      // literally inside the rock, with the collider reaching a further 30 u
+      // past the drawn flank as an invisible wall. Walk it out of the way,
+      // away from whatever road sample it is closest to, which is the
+      // shortest way clear; a few passes because stepping off one leg of a
+      // lap can walk onto another.
+      const clearance = (i) => w * 0.5 + (this.widthAt?.(i) ?? 9) + 24;
+      for (let pass = 0; pass < 8; pass++) {
+        const s = this._nearestSample(x, z);
+        const need = clearance(s.i);
+        if (s.d >= need) break;
+        const c = this.center[s.i];
+        let ox = x - c.x, oz = z - c.z;
+        const ol = Math.hypot(ox, oz);
+        if (ol < 1e-3) {                 // dead centre: leave along the ring
+          const rr = Math.hypot(x, z) || 1;
+          ox = x / rr; oz = z / rr;
+        } else { ox /= ol; oz /= ol; }
+        x += ox * (need - s.d + 4); z += oz * (need - s.d + 4);
+      }
+      // Still crowding the road after eight passes means the lap encircles
+      // this spot. Shrink to fit rather than shove a peak to the far horizon;
+      // below a real mountain's worth of base it is a boulder, so drop it out
+      // of sight and register nothing.
+      const fin = this._nearestSample(x, z);
+      if (fin.d < clearance(fin.i)) {
+        w = Math.max(0, (fin.d - (this.widthAt?.(fin.i) ?? 9) - 24) * 2);
+        if (w < 30) {
+          m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
+          rock.setMatrixAt(k, m4);
+          continue;
         }
       }
       q.setFromAxisAngle(up, Math.random() * Math.PI);
@@ -9677,7 +9812,14 @@ export class Track {
       // because a few metres of invisible margin on the short axis is a far
       // smaller lie than a mountain you can walk into. `h` makes it solid over
       // its whole height — see the height gate in Car.step.
-      this.solids.push({ x, z, r: w * 0.48, y: y + 2, h, mat: 'stone' });
+      //
+      // AND IT IS A MOUNTAIN, NOT A GRAIN SILO. `h` alone makes the disc solid
+      // at every height, so a road running past the flank 70 u up met the full
+      // BASE radius — measured at 22 u of invisible wall on FURKA RIDGE, where
+      // the rock is 96 u wide and the collider 118. `prof` carries the drawn
+      // cross-section band by band so the gate can ask how wide the rock is at
+      // the car's own height instead of assuming the widest it ever gets.
+      this.solids.push({ x, z, r: w * 0.48, y: y + 2, h, mat: 'stone', prof });
     }
     rock.name = 'massif';
     if (rock.instanceColor) rock.instanceColor.needsUpdate = true;
@@ -14215,6 +14357,7 @@ export class Track {
     const inSea = (x, z, w) => this.T.coast && this._coastSide(x, z) > -(w * 0.7);
     const jcol = new THREE.Color();
     const meshes = [];
+    const profOf = {};                 // drawn cross-section, one per form
     const layer = (forms, mat, cap) => {
       const per = {};
       for (const f of forms) {
@@ -14279,9 +14422,17 @@ export class Track {
           // worlds had EVERY horizon mountain bare. Same treatment as the
           // massif cones — the long axis of the (w x w*zs, yawed) footprint,
           // at the cone rule's 0.48, solid over the full height.
+          // ...and, like the massif cones, they taper. A skyline peak's
+          // collider used to be a cylinder of its base radius the whole way
+          // up; `prof` is the form's own drawn cross-section (see
+          // `_formProfile`), memoised per form since a whole ring shares one
+          // geometry. Out here it changes little — nothing drives at 900 u —
+          // but it keeps ONE rule for "how wide is this mountain at my
+          // height", and one rule is the only kind worth having.
+          if (!profOf[form]) profOf[form] = this._formProfile(F[form]);
           this.solids.push({
             x: px, z: pz, r: w * Math.max(1, zs) * 0.48,
-            y: seat(px, pz) + 2, h, mat: 'stone',
+            y: seat(px, pz) + 2, h, mat: 'stone', prof: profOf[form],
           });
         }
       }
@@ -14462,10 +14613,19 @@ export class Track {
     // double every outcrop. The base tier is a unit box scaled to w wide and
     // up to 1.2 w deep, rotated — 0.6 w covers the long axis, the cone rule's
     // trade of a little invisible margin on the short one.
+    // A mesa steps in as it rises, so its collider steps in too — same `prof`
+    // the massif and skyline cones carry, built from the tier table in
+    // `_addMesaTiers` rather than restated, so the two cannot drift apart.
+    const HR = [0.5, 0.32, 0.2], WR = [1, 0.74, 0.5];
+    const BANDS = 16, total = HR[0] + HR[1] + HR[2];
+    const prof = Array.from({ length: BANDS }, (_, k) => {
+      const f = ((k + 0.5) / BANDS) * total;
+      return f < HR[0] ? WR[0] : f < HR[0] + HR[1] ? WR[1] : WR[2];
+    });
     for (const s of specs) {
       this.solids.push({
         x: s.x, z: s.z, r: s.w * 0.6,
-        y: -2 + this._highland(s.x, s.z) + 2, h: s.h, mat: 'stone',
+        y: -2 + this._highland(s.x, s.z) + 2, h: s.h, mat: 'stone', prof,
       });
     }
   }

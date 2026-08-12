@@ -201,8 +201,58 @@ that snaps to the wrong leg would clamp the car against a road edge belonging
 somewhere else. One mechanism that would explain both reports and the stalls.
 Fair game for whoever gets there first.
 
-**INVISIBLE WALLS: NOT REPRODUCED ON r158, everything cheap eliminated
-(dustline session, 2026-08-12).** Two reports, both photographed on **r153c**
+**INVISIBLE WALLS: FOUND AND FIXED (dustline session, 2026-08-12).** Superseded
+the "not reproduced" entry below, which was wrong — not in any measurement it
+reported, but in the question it asked. Every sweep in it walked the COLLIDER
+list, found each collider's nearest centreline station and gated it against
+THAT station's height. A mountain standing on the road is legitimate against
+its own footprint; the road it blocks is on another leg, at another height, and
+is never consulted. Asking it the other way round — walk the ROAD, evaluate the
+vehicle's own predicates at each station across the drivable width
+(`tests/tool-corridor-blockers.mjs`) — found it on the first run:
+
+| world | what | how much road |
+|---|---|---|
+| FURKA RIDGE | massif cone, r = 138 | 58 stations, FULL width — 135 u of carriageway inside a mountain |
+| FURKA RIDGE | a second cone, r = 118 | 31 stations |
+| COL DE TURINI | one cone | 16 stations |
+
+Two independent faults; the fix needs both halves.
+
+1. **`_buildMassif` never looked at the lap.** Cones are placed on an azimuth
+   ring by radius and angle alone. They now walk clear of the corridor (the
+   same "push it back" shape the coast reflection above them already used),
+   shrinking to fit only if the lap encircles them. Measured: 101 cones over
+   14 worlds, **0 hidden, 0 shrunk** — every one of them just moved.
+2. **The collider was a cylinder of the BASE radius.** `h` makes a solid bite
+   over its whole span, which r148 got right for driving into a flank, and
+   wrong for a road passing one 70 u up: 118 u of collider against 96 u of
+   drawn rock on FURKA, so 22 u of open carriageway was walled off by nothing.
+   `Track._formProfile` reads the drawn cross-section off the geometry, band by
+   band, and `solidRadiusAt` (new export in `vehicles.js`) is the one place
+   that answers "how wide is this thing at my height". Massif cones, skyline
+   peaks and horizon mesas all carry it.
+
+`tests/test-invisible-walls.mjs` gates it, and every check was
+mutation-tested. Two results worth passing on:
+
+- **With the placement guard in, the taper is not load-bearing on any shipped
+  world** — flatten every profile to 1 and all 60 stay green, because the
+  guard's 24 u margin already keeps the base cylinder off the corridor. It is
+  kept because it is the honest model and the next world with a road up a
+  flank meets it first, and it gets its own check (collider radius vs the
+  drawn silhouette, read off the instance in the scene) rather than riding
+  along on the others.
+- **A ratio-based version of that check could not see a uniformly scaled
+  profile** — a hollow mountain reads as the same shape. The shipped check
+  compares absolute radii and holds a band, 0.55..1.05 of the drawn rock.
+
+The driven check independently reproduces the reported symptom: with the guard
+disabled, 3 stations of FURKA's racing line pin the car, the worst moving
+**2.7 u in two seconds at full throttle**.
+
+**Superseded — the "not reproduced" write-up (kept for the record):** Two
+reports, both photographed on **r153c**
 — which matters, because r153d then shipped the wedge rescue (full throttle +
 no motion for 5 s), and both screenshots show exactly that state: a car
 stationary with the field gone. Worth re-testing on r158 before hunting
@@ -242,6 +292,52 @@ BUGS.md #2's two remaining unexplained stalls (NORDSCHLEIFE, DOLOMITI —
 re-measure after r154, the under-gate/pit-lift fixes may have cleared them),
 #6 (roster-wide sweep in the standing suites), #7 (RED CENTRE RUN 7.4 u
 sink — mainline tracks it as its task #69/#82 family).
+
+**nearestIndex wrong-leg mis-seed — FIXED (r160, mainline session), the
+"live hypothesis" above is confirmed and closed.** `nearestIndex`'s hint-
+windowed search is seeded from last frame's own answer; where an overpass
+puts two legs of the same lap ≥40 stations apart at the same XZ, a hint that
+is EVER seeded on the wrong leg (a big single-frame jump, a stale hint after
+a reset) can only ever return points on that same leg forever after — the
+correct leg sits outside the ±30 window's reach by construction, and next
+frame's hint is this frame's answer. Fixed with two complementary pieces: a
+`useY` tie-break (gated `!airborne`) once both candidates ARE in the window,
+and — the piece that actually recovers a mis-seed, since height alone can't
+break a tie the window never offered — when the windowed answer lands near a
+known crossing's ramp, also search the crossing's OTHER anchor's own window
+and take whichever is genuinely closer. `tests/test-index-recovery.mjs`
+(new) adversarially mis-seeds the hint on the wrong leg for every overpass on
+every world that has one and asserts one-call recovery: 46/46. This is a
+real, narrow defensive fix (organic driving with a warm hint mostly never
+mis-seeds, matching the r158 "not reproduced with a warm hint" finding above)
+— it closes the mechanism, not necessarily either screenshot; keep it in mind
+if a THIRD invisible-wall report ever comes in with a description matching a
+big single-frame position jump (a reset, a rescue teleport, airborne landing
+near a crossing).
+
+**MOUNTAIN TO SEA field-stall rate — MEASURED, not caused by r159, not
+chased further this round.** Re-verifying the above fix on top of `main`'s
+r159 (`_element` authored-jitter/live-preview) turned up `test-field-stalls`
+failing on MOUNTAIN TO SEA more often than the pre-merge baseline in small
+samples (3/3 fail immediately post-merge). Isolated an A/B on identical code
+minus r159 (same nearestIndex fix both sides, `c003d07` vs `HEAD`, 8 fixed-
+step runs per side): pre-r159 3/8 fail (37.5%), post-r159 6/8 fail (75%) —
+looked real at first glance. But `git diff c003d07..HEAD -- src/*.js`
+outside editor.js is r159's entire track.js patch, and every world-gen
+`_element(` call site (all but the two editor/preview sites, which pass
+`authored=true` explicitly) still resolves to bare `Math.random` exactly as
+before — r159 cannot alter MOUNTAIN TO SEA's own generated geometry, only
+authored/previewed placements. No other src/*.js file changed in the merge
+range. The stall coordinates across BOTH sides of the A/B cluster in the same
+zone (roughly x:-85..-50, z:60..150 — CROWN/SLEEK/DUNE all stalled there on
+both premerge and postmerge runs), consistent with one pre-existing flaky
+danger zone rather than something new. A follow-up 5-run/5-run batch on the
+same A/B came back 40%/60% — within noise for n=5. Net read: this is
+pre-existing AI-driving flakiness at a specific MOUNTAIN TO SEA location, not
+a r159 regression, and not blocking r160's ship. Logged here rather than
+re-litigated: if someone has spare cycles, the zone above is where a kink-
+relaxation or route-authoring pass (same family as the SEA CLIFF RUN /
+chain-waist fix above) would most likely land.
 
 ## Rebase notes
 
