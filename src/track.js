@@ -4452,10 +4452,26 @@ export class Track {
     // under the cap are never touched, so the 57 healthy worlds are provably
     // unchanged (their kink census is zero). Tangents and normals are then
     // recomputed around whatever moved.
+    //
+    // AND THE WARP GOES THROUGH IT, NOT AROUND IT.
+    //
+    // `_applyRouteWarp` used to run AFTER this block, so the one thing in the
+    // game that can move the racing line at will was the one thing the rule
+    // never checked. Measured on a lap knotted with the editor's MOVE ROAD:
+    // per-station turns of 100.8 degrees, against a shipped roster whose
+    // census after r153c is zero worlds over 20. The pass that exists to stop
+    // cusps was running before the cusps were made.
+    this._applyRouteWarp(edit);
     {
       const MAX_TURN = (13 * Math.PI) / 180;
       const moved = new Uint8Array(N);
-      for (let pass = 0; pass < 80; pass++) {
+      // The budget was 80, which is ample for the hand-drawn Vs this was
+      // written for — a warped lap needs far more, because a warp cusp is
+      // deeper and has to be spread over many more stations. Measured: 318
+      // passes to bring 100.8 degrees down under the cap, and the loop already
+      // breaks the moment nothing moves, so a healthy world still exits on
+      // pass one and is provably untouched.
+      for (let pass = 0; pass < 600; pass++) {
         let any = 0;
         for (let i = 0; i < N; i++) {
           const p0 = this.center[(i - 1 + N) % N];
@@ -4483,7 +4499,6 @@ export class Track {
         this.nrm[i].set(tg.z, 0, -tg.x);
       }
     }
-    this._applyRouteWarp(edit);
     this._buildSampleGrid();
     // Elevation profile: the road climbs and descends over the lap (tan/nrm and
     // curvature stay XZ-based — heading math is unaffected by the y channel).
@@ -4914,11 +4929,35 @@ export class Track {
   // ---- end width-variation -------------------------------------------------
 
   // ---------- queries ----------
-  nearestIndex(pos, hint = null) {
-    // XZ distance only — the elevated centerline must not bias index tracking
+  /** `useY`: break XZ ties with height. Off by default (and for every
+   *  build-time / one-shot caller), because a car in the AIR has an altitude
+   *  that matches nothing in particular — biasing toward "whichever station
+   *  happens to be that high" would be actively wrong mid-jump, which is
+   *  exactly why this stayed XZ-only originally.
+   *
+   *  But on the ground, XZ ALONE cannot tell two crossing legs apart — that
+   *  is what makes them a crossing: at an overpass their centrelines share
+   *  the same XZ point by construction, sometimes to the centimetre, so an
+   *  XZ-only metric sees a tie where the road plainly does not. A car
+   *  driving under a deck was measured pinned at trackIndex 199 for the
+   *  remainder of a 150 s drive: once the windowed search settled on the
+   *  deck's own station there (a legitimate tie, not a bug in the window),
+   *  next frame's hint was that answer, and nothing in an XZ-only distance
+   *  could ever prefer the ground leg over it again. Reported as the car
+   *  stopped dead beside a wall that, from the seat, was not there.
+   *
+   *  Grounded callers pass their own elevation and get the tie broken by it:
+   *  the two legs of a crossing differ in height by definition (that is what
+   *  the deck is FOR), so the leg matching where the car actually stands
+   *  wins outright. The player's own per-frame tracking is the one caller
+   *  that keeps a hint alive frame over frame and can therefore get stuck
+   *  this way; it passes `!airborne`. */
+  nearestIndex(pos, hint = null, useY = false) {
     const d2 = (i) => {
-      const dx = pos.x - this.center[i].x, dz = pos.z - this.center[i].z;
-      return dx * dx + dz * dz;
+      const c = this.center[i];
+      const dx = pos.x - c.x, dz = pos.z - c.z;
+      const dy = useY ? pos.y - c.y : 0;
+      return dx * dx + dz * dz + dy * dy;
     };
     let best = -1, bd = Infinity;
     if (hint === null) {
@@ -4932,6 +4971,50 @@ export class Track {
       const i = (hint + k + N) % N;
       const d = d2(i);
       if (d < bd) { bd = d; best = i; }
+    }
+    // HEIGHT CANNOT BREAK A TIE THE WINDOW NEVER OFFERED. useY penalises the
+    // wrong leg once both candidates are IN the +-30 window — but the two
+    // legs of a crossing sit >=40 apart by construction, so a hint seeded on
+    // one of them never has the other in reach at all: there is no tie to
+    // break, just one answer, and it is the wrong one. If `best` turned out
+    // to be on a crossing's ramp, also search the crossing's OTHER anchor's
+    // own window and take whichever genuinely matches (XZ AND height, once
+    // useY) better. This is what actually recovers a wrong-leg mis-seed;
+    // the >2500 fallback below only ever catches a hint stale enough to have
+    // left the map entirely.
+    if (useY && this._overpasses) {
+      for (const o of this._overpasses) {
+        const nearUp = this._circDist(best, o.up) <= o.half + 5;
+        const nearDown = !nearUp && this._circDist(best, o.down) <= o.half + 5;
+        if (!nearUp && !nearDown) continue;
+        const other = nearUp ? o.down : o.up;
+        const half = o.half + 5;
+        for (let k = -half; k <= half; k++) {
+          const i = (other + k + N) % N;
+          const d = d2(i);
+          if (d < bd) { bd = d; best = i; }
+        }
+      }
+    }
+    // BELT AND BRACES: a windowed search seeded far from anywhere plausible
+    // (a stale hint after a teleport, a jump that outran the +-30 window)
+    // has no way back on its own — the correct station lies outside its
+    // reach by definition. 50u is well past any legitimate pinch, verge or
+    // off-road excursion the window itself would still track correctly, so
+    // this only spends the coarse sweep the hint===null branch already pays
+    // on an actual mis-seed.
+    if (bd > 2500) {
+      let gBest = -1, gBd = Infinity;
+      for (let i = 0; i < N; i += 4) {
+        const d = d2(i);
+        if (d < gBd) { gBd = d; gBest = i; }
+      }
+      for (let k = -30; k <= 30; k++) {
+        const i = (gBest + k + N) % N;
+        const d = d2(i);
+        if (d < gBd) { gBd = d; gBest = i; }
+      }
+      if (gBd < bd) { best = gBest; bd = gBd; }
     }
     return best;
   }
@@ -5064,7 +5147,26 @@ export class Track {
    *  keeping the originals would leave the road's cross-section pointing the
    *  way the lap used to go, which is how a widened bend ends up with its
    *  verge inside the carriageway. */
+  /** MOVE ROAD's pulls, replayed on the pristine spline.
+   *
+   *  A WARP IS ANCHORED TO A STATION, NOT TO A PLACE.
+   *
+   *  Each pull is measured from the untouched centreline — which is right, and
+   *  was the whole bug: the editor recorded the pull's centre from the road as
+   *  it stood on screen, which after the first drag is the WARPED road, and
+   *  this then looked for that point on the PRISTINE one. The two disagree by
+   *  more the more you drag. Measured over ten ordinary 120 u drags, the tenth
+   *  pull's stored centre sat 192 u from the spline it was replayed against:
+   *  aim at 72% of the lap, move 19% of it. That is how a lap ends up knotted
+   *  by nothing worse than using the tool as intended.
+   *
+   *  So a warp now carries the station it grabbed (`i`) and that is what is
+   *  resolved here. `x, z` stay in the format and are still honoured for
+   *  scenes saved before this, which is the best that can be done for them —
+   *  the information to place them correctly was never written down. */
   _applyRouteWarp(edit) {
+    // the pristine line, kept so the editor can anchor a new pull to it
+    this._preWarp = this.center.map((c) => ({ x: c.x, z: c.z }));
     const W = edit && edit.warp;
     if (!W || !W.length) return;
     const moved = [];
@@ -5072,7 +5174,8 @@ export class Track {
       const c = this.center[i];
       let mx = 0, mz = 0;
       for (const w of W) {
-        const d = Math.hypot(c.x - w.x, c.z - w.z);
+        const anchor = (w.i != null && this._preWarp[((w.i % N) + N) % N]) || w;
+        const d = Math.hypot(c.x - anchor.x, c.z - anchor.z);
         if (d >= w.r) continue;
         const t = Math.cos((d / w.r) * Math.PI * 0.5);
         const k = t * t;
@@ -6056,7 +6159,7 @@ export class Track {
       if (want && k >= want.length) break;
       for (let i0 = lo; i0 <= hi; i0 += want ? 1 : 2) {
         const i = (i0 + N) % N;
-        if (this._tunnels.some((t) => this._circDist(i, t.mid) < 170)) continue;
+        if (this._tunnels.some((t) => this._circDist(i, t.mid) < TUNNEL_SEP)) continue;
         const fit = this.tunnelFitAt(i, lenS);
         if (fit > bestFit) { bestFit = fit; best = i; }
       }
@@ -18053,6 +18156,12 @@ export function hashPlacement(type, x, z) {
 
 /** mulberry32: tiny, fast, well-distributed, and identical on every engine
  *  because it runs entirely on uint32 arithmetic. */
+/** How far apart two bores must sit, in centreline samples. Exported because
+ *  the EDITOR has to gate on the same number: it used to keep its own (92),
+ *  accept four taps, promise "4 total, APPLY to bore it", and then watch the
+ *  builder drop two of them without a word. One rule, one place. */
+export const TUNNEL_SEP = 170;
+
 export function seededRandom(seed) {
   let a = seed >>> 0;
   return function () {

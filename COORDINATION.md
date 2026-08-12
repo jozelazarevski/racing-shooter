@@ -13,7 +13,7 @@ _Last updated: 2026-08-11, by the mainline session (r153)._
 |---|---|---|
 | Mainline (racing-shooter-game) | `claude/racing-shooter-game-0td0g7` → main | Menu/UX, economy, tyres, editor, releases rNNN. Shipped r152 (deferred track pick — `main.js` picker + `index.html` veil). Next after r153: world-build speed pass — **waiting for the scrutineering branch to merge first** to avoid track.js conflicts. |
 | Track scrutineering | `claude/agent-track-testing-bugs-f6jfms` | BUGS.md findings #1–#4: road-clearance gating at the eight placement call sites, MOUNTAIN TO SEA crossings, wall runs. agent-sweep + world-matrix harnesses. |
-| Dustline | `claude/codebase-architecture-refactor-eos0rs` | The `dustline/` TypeScript rewrite, self-contained, deploys to `/play-dustline/`. Normally no contention with `src/` — one exception below, shipped as r153b. |
+| Dustline | `claude/codebase-architecture-refactor-eos0rs` | The `dustline/` TypeScript rewrite, self-contained, deploys to `/V2/`. Normally no contention with `src/` — one exception below, shipped as r153b. |
 
 ## Measurements crossing lanes
 
@@ -292,6 +292,52 @@ BUGS.md #2's two remaining unexplained stalls (NORDSCHLEIFE, DOLOMITI —
 re-measure after r154, the under-gate/pit-lift fixes may have cleared them),
 #6 (roster-wide sweep in the standing suites), #7 (RED CENTRE RUN 7.4 u
 sink — mainline tracks it as its task #69/#82 family).
+
+**nearestIndex wrong-leg mis-seed — FIXED (r160, mainline session), the
+"live hypothesis" above is confirmed and closed.** `nearestIndex`'s hint-
+windowed search is seeded from last frame's own answer; where an overpass
+puts two legs of the same lap ≥40 stations apart at the same XZ, a hint that
+is EVER seeded on the wrong leg (a big single-frame jump, a stale hint after
+a reset) can only ever return points on that same leg forever after — the
+correct leg sits outside the ±30 window's reach by construction, and next
+frame's hint is this frame's answer. Fixed with two complementary pieces: a
+`useY` tie-break (gated `!airborne`) once both candidates ARE in the window,
+and — the piece that actually recovers a mis-seed, since height alone can't
+break a tie the window never offered — when the windowed answer lands near a
+known crossing's ramp, also search the crossing's OTHER anchor's own window
+and take whichever is genuinely closer. `tests/test-index-recovery.mjs`
+(new) adversarially mis-seeds the hint on the wrong leg for every overpass on
+every world that has one and asserts one-call recovery: 46/46. This is a
+real, narrow defensive fix (organic driving with a warm hint mostly never
+mis-seeds, matching the r158 "not reproduced with a warm hint" finding above)
+— it closes the mechanism, not necessarily either screenshot; keep it in mind
+if a THIRD invisible-wall report ever comes in with a description matching a
+big single-frame position jump (a reset, a rescue teleport, airborne landing
+near a crossing).
+
+**MOUNTAIN TO SEA field-stall rate — MEASURED, not caused by r159, not
+chased further this round.** Re-verifying the above fix on top of `main`'s
+r159 (`_element` authored-jitter/live-preview) turned up `test-field-stalls`
+failing on MOUNTAIN TO SEA more often than the pre-merge baseline in small
+samples (3/3 fail immediately post-merge). Isolated an A/B on identical code
+minus r159 (same nearestIndex fix both sides, `c003d07` vs `HEAD`, 8 fixed-
+step runs per side): pre-r159 3/8 fail (37.5%), post-r159 6/8 fail (75%) —
+looked real at first glance. But `git diff c003d07..HEAD -- src/*.js`
+outside editor.js is r159's entire track.js patch, and every world-gen
+`_element(` call site (all but the two editor/preview sites, which pass
+`authored=true` explicitly) still resolves to bare `Math.random` exactly as
+before — r159 cannot alter MOUNTAIN TO SEA's own generated geometry, only
+authored/previewed placements. No other src/*.js file changed in the merge
+range. The stall coordinates across BOTH sides of the A/B cluster in the same
+zone (roughly x:-85..-50, z:60..150 — CROWN/SLEEK/DUNE all stalled there on
+both premerge and postmerge runs), consistent with one pre-existing flaky
+danger zone rather than something new. A follow-up 5-run/5-run batch on the
+same A/B came back 40%/60% — within noise for n=5. Net read: this is
+pre-existing AI-driving flakiness at a specific MOUNTAIN TO SEA location, not
+a r159 regression, and not blocking r160's ship. Logged here rather than
+re-litigated: if someone has spare cycles, the zone above is where a kink-
+relaxation or route-authoring pass (same family as the SEA CLIFF RUN /
+chain-waist fix above) would most likely land.
 
 ## Rebase notes
 

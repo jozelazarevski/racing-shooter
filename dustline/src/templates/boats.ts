@@ -130,17 +130,47 @@ export const cab = (y: number, z: number, sx: number, sy: number, sz: number) =>
   new THREE.BoxGeometry(sx, sy, sz).translate(0, DECK + y, z);
 
 /** Fenders and portholes down both topsides — the marina's `fendG`/`portG`,
- *  placed at its own offsets. */
+ *  placed at its own offsets.
+ *
+ *  THE POSITIONS AND SIZES ARE v1's, UNCHANGED. What changed is how finely
+ *  each one is divided, and the reason is measured: this bundle was 1,040
+ *  triangles — EIGHTY-EIGHT PER CENT of a moored hull, on top of the 67-triangle
+ *  lofted hull that is the thing making it read as a boat at all. A harbour of
+ *  forty hulls spent 41,600 triangles on six rubber rings and eight discs per
+ *  boat, and none of a fender's roundness survives the distance it is seen at:
+ *  a 0.7 m fender is 27 px across at 20 m, 13 px at 40 m and 1.5 px at 100 m.
+ *
+ *  ART-DIRECTION.md's surface decision is "flat-shaded faceted geometry
+ *  everywhere", so a fender that is visibly an octagon at 20 m is ON style, not
+ *  a defect. Losing the RING — the hole that says fender rather than blob — or
+ *  losing the porthole's disc would be a defect, so both survive. */
 export function trimGeo(): THREE.BufferGeometry {
   const out: THREE.BufferGeometry[] = [];
   for (const sg of [1, -1]) {
     for (const z of [-2.4, 0.2, 2.4]) {
-      const f = new THREE.TorusGeometry(0.26, 0.09, 6, 10);
+      // 120 -> 48 tris. `TorusGeometry(radius, tube, radialSegments,
+      // tubularSegments)`: the SECOND count is the one you can see. A fender
+      // hangs flat against the topside, so what reads is the outer circle —
+      // tubular — while radial only rounds off an 18 cm-thick rubber section
+      // that is never seen against the sky. So the section drops to a triangle
+      // (its outer vertex still sits on the true 0.35 m outer radius, so the
+      // fender's diameter is untouched) and the ring keeps eight sides, which
+      // holds the outer chord error to 2.7 cm — 1.1 px at 20 m, half of what
+      // six sides would cost for the same 48 triangles.
+      const f = new THREE.TorusGeometry(0.26, 0.09, 3, 8);
       f.rotateY(Math.PI / 2);
       out.push(f.translate(sg * 1.5, DECK - 0.35, z));
     }
     for (const z of [-2.6, -1.2, 0.4, 1.9]) {
-      const p = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 10);
+      // 40 -> 24 tris. A hexagon is the smallest polygon that still reads as a
+      // disc: chord error 2 cm on a 30 cm porthole, 0.8 px at 20 m.
+      //
+      // AND IT KEEPS ITS CAPS, deliberately, against the obvious further cut.
+      // An open-ended tube seen end-on — which is how a porthole is always seen,
+      // its axis pointing outboard — projects to a line: every side face is
+      // edge-on and the disc that IS the porthole disappears. Capless here does
+      // not simplify the porthole, it deletes it.
+      const p = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 6);
       p.rotateZ(Math.PI / 2);
       out.push(p.translate(sg * 1.44, DECK - 0.42, z));
     }

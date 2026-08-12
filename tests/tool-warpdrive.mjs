@@ -130,65 +130,114 @@ await page.evaluate(() => {
     return out;
   };
 
-  window.__probe.drive = async (seconds) => {
-    const g = window.__game, t = g.track, p = g.player;
-    const st = { steer: 0, throttle: 0, brake: 0 };
-    for (const k of ['steer', 'throttle', 'brake']) {
-      Object.defineProperty(g.input, k, { configurable: true, get: () => st[k] });
-    }
-    const tel = { state0: g.state, stuckSamples: 0, offRoadSamples: 0, sunkSamples: 0,
-      nan: false, samples: 0, minSpeed: 1e9, stalls: [], sunkWorst: 0, maxProg: 0 };
-    let lastIdx = -1, sameIdx = 0;
-    const t0 = performance.now();
-    let prevMove = { x: p.pos.x, z: p.pos.z };
-    const prog0 = p.lap + p.trackIndex / t.N;   // laps are 1-based in this game
-    while (performance.now() - t0 < seconds * 1000) {
-      await new Promise((r) => setTimeout(r, 100));
-      if (!Number.isFinite(p.pos.x) || !Number.isFinite(p.pos.z) || !Number.isFinite(p.pos.y)
-        || !Number.isFinite(p.vel.x)) { tel.nan = true; break; }
+  /* MEASURE FIXED-STEP OR MEASURE NOTHING — the method test-field-stalls.mjs
+   * documents: SwiftShader renders these worlds at a fraction of a frame per
+   * second and the clock is capped per frame, so a wall-clock probe runs the
+   * sim at ~1/8 speed and every "stall" it reports is an artifact. Stub the
+   * clock to a true 1/60, stub the compositor, and step `_frameBody` by hand.
+   * The player is driven through the REAL input object, so the whole player
+   * physics path (smoothing, clamps, recovery) runs exactly as it ships. */
+  window.__probe.drive = async (gameSeconds) => {
+    const g = window.__game, p = g.player;
+    const T0 = g.track;
+    // a lookahead pursuit driver, evaluated lazily when the frame reads input
+    const ctl = () => {
+      const t = g.track;
       const look = (p.trackIndex + 12) % t.N;
       const target = t.pointAt(look, 0);
       let dh = Math.atan2(target.x - p.pos.x, target.z - p.pos.z) - p.heading;
       while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
-      st.steer = Math.max(-1, Math.min(1, dh * 3));
-      const v = p.vel.length();
-      st.throttle = v < 30 ? 1 : 0.5;
-      st.brake = Math.abs(dh) > 1.2 && v > 12 ? 1 : 0;
+      const v = Math.hypot(p.vel.x, p.vel.z);
+      return { steer: Math.max(-1, Math.min(1, dh * 3)),
+        throttle: v < 34 ? 1 : 0.55,
+        brake: (Math.abs(dh) > 1.3 && v > 14) ? 1 : 0 };
+    };
+    for (const k of ['steer', 'throttle', 'brake']) {
+      Object.defineProperty(g.input, k, { configurable: true, get: () => ctl()[k] });
+    }
+    const oldRender = g.composer?.render?.bind(g.composer);
+    if (g.composer) g.composer.render = () => {};
+    const oldClock = g.clock;
+    let elapsed = oldClock.elapsedTime;
+    g.clock = { getDelta: () => { elapsed += 1 / 60; return 1 / 60; },
+      get elapsedTime() { return elapsed; } };
 
-      const prog = p.lap + (p.trackIndex / t.N) - prog0;
-      tel.samples++;
+    const tel = { gameSeconds, stuckFrames: 0, offRoadFrames: 0, sunkFrames: 0,
+      nan: false, frames: 0, minSpeed: 1e9, stalls: [], sunkWorst: 0, maxProg: 0,
+      backSteps: 0, metres: 0 };
+    // PROGRESS THE HONEST WAY. `lap` decrements when the car noses back over
+    // the line, so lap+frac is not monotonic and cannot measure a lap. Sum the
+    // WRAPPED station delta instead: it is the same number the AI's `progress`
+    // is built from, and it survives the counter going backwards.
+    let station = 0;                                 // signed stations covered
+    const aiStart = g.enemies.map((e) => e.progress ?? 0);
+    let lastIdx = p.trackIndex, sameIdx = 0, prev = { x: p.pos.x, z: p.pos.z };
+    let idxPrev = p.trackIndex;
+    void T0;
+    const FR = Math.round(gameSeconds * 60);
+    for (let f = 0; f < FR; f++) {
+      g._frameBody();
+      tel.frames++;
+      if (f % 300 === 0) await new Promise((res) => setTimeout(res, 0));
+      if (!Number.isFinite(p.pos.x) || !Number.isFinite(p.pos.y) || !Number.isFinite(p.pos.z)
+        || !Number.isFinite(p.vel.x)) { tel.nan = true; break; }
+      {
+        const NN = g.track.N;
+        let d = p.trackIndex - idxPrev;
+        if (d > NN / 2) d -= NN; else if (d < -NN / 2) d += NN;
+        station += d;
+        idxPrev = p.trackIndex;
+      }
+      if (f % 6) continue;                          // sample at 10 Hz
+      const t = g.track;
+      const prog = station / t.N;
       tel.maxProg = Math.max(tel.maxProg, prog);
-      const moved = Math.hypot(p.pos.x - prevMove.x, p.pos.z - prevMove.z);
-      prevMove = { x: p.pos.x, z: p.pos.z };
-      if (moved < 0.6) tel.stuckSamples++;
+      const moved = Math.hypot(p.pos.x - prev.x, p.pos.z - prev.z);
+      tel.metres += moved;
+      if (moved < 0.02) tel.backSteps++;
+      prev = { x: p.pos.x, z: p.pos.z };
+      if (moved < 0.5) tel.stuckFrames++;
       if (p.trackIndex === lastIdx) sameIdx++; else sameIdx = 0;
       lastIdx = p.trackIndex;
       const gy = t.terrainHeight(p.pos.x, p.pos.z);
       if (p.pos.y < gy - 3) {
-        tel.sunkSamples++;
+        tel.sunkFrames++;
         tel.sunkWorst = Math.min(tel.sunkWorst, +(p.pos.y - gy).toFixed(1));
       }
       const w = t.widthAt(p.trackIndex);
-      if (Math.abs(p.lateral) > w + 1) tel.offRoadSamples++;
+      if (Math.abs(p.lateral) > w + 1) tel.offRoadFrames++;
+      const v = Math.hypot(p.vel.x, p.vel.z);
       tel.minSpeed = Math.min(tel.minSpeed, v);
-      if (sameIdx === 25 && tel.stalls.length < 12) {
+      if (sameIdx === 20 && tel.stalls.length < 12) {
         tel.stalls.push({ idx: p.trackIndex, prog: +prog.toFixed(3),
           x: Math.round(p.pos.x), z: Math.round(p.pos.z),
           lat: +p.lateral.toFixed(1), w: +w.toFixed(1), v: +v.toFixed(1) });
       }
       if (tel.maxProg >= 1.0) break;
     }
-    tel.finalProg = +(p.lap + p.trackIndex / t.N - prog0).toFixed(3);
+    g.clock = oldClock;
+    if (g.composer && oldRender) g.composer.render = oldRender;
+
+    const t = g.track;
+    tel.finalProg = +(station / t.N).toFixed(3);
+    tel.playerLaps = +tel.maxProg.toFixed(3);
+    tel.playerMetres = Math.round(tel.metres);
+    tel.lapLen = Math.round(t.N * t.segLen);
     tel.lapDone = tel.maxProg >= 1.0;
-    tel.secs = +((performance.now() - t0) / 1000).toFixed(1);
-    tel.stuckPct = +(100 * tel.stuckSamples / Math.max(1, tel.samples)).toFixed(1);
-    tel.offRoadPct = +(100 * tel.offRoadSamples / Math.max(1, tel.samples)).toFixed(1);
-    tel.sunkPct = +(100 * tel.sunkSamples / Math.max(1, tel.samples)).toFixed(1);
+    const S = Math.max(1, Math.round(tel.frames / 6));
+    tel.stuckPct = +(100 * tel.stuckFrames / S).toFixed(1);
+    tel.offRoadPct = +(100 * tel.offRoadFrames / S).toFixed(1);
+    tel.sunkPct = +(100 * tel.sunkFrames / S).toFixed(1);
     tel.minSpeed = +tel.minSpeed.toFixed(1);
+    tel.gameTimeRan = +(tel.frames / 60).toFixed(1);
     // rivals drive themselves — the strongest "is this world drivable" signal
-    tel.aiLapsPerMin = g.enemies.map((e) => +(e.progress).toFixed(3));
+    tel.aiLaps = g.enemies.map((e, i) => +((e.progress ?? 0) - aiStart[i]).toFixed(2));
+    tel.aiMean = +(tel.aiLaps.reduce((a, b) => a + b, 0)
+      / Math.max(1, tel.aiLaps.length)).toFixed(3);
+    tel.aiStalled = tel.aiLaps.filter((v) => v < 0.8).length;
+    tel.aiWhere = g.enemies.map((e) => `${Math.round(e.pos.x)},${Math.round(e.pos.z)}`
+      + `@${(e.trackIndex / t.N).toFixed(2)}`);
     tel.state1 = g.state;
-    st.throttle = 0; st.brake = 1; st.steer = 0;
     return tel;
   };
 });
@@ -207,7 +256,7 @@ const race = async () => {
 await race();
 const base = await page.evaluate(() => window.__probe.measure());
 log('\n=== PHASE 0  PINE VALLEY as shipped ===\n', base);
-const baseDrive = await page.evaluate(() => window.__probe.drive(120));
+const baseDrive = await page.evaluate(() => window.__probe.drive(180));
 log('\n--- shipped: driven ---\n', baseDrive);
 
 // ---------------------------------------------------- PHASE 1: the knot -----
@@ -260,7 +309,7 @@ log('\n--- the knot, measured ---\n', knot);
 // ---------------------------------------------------- PHASE 2: drive it -----
 await page.evaluate(() => { window.__game.editor._quietExit(); });
 await race();
-const knotDrive = await page.evaluate(() => window.__probe.drive(120));
+const knotDrive = await page.evaluate(() => window.__probe.drive(180));
 log('\n=== PHASE 2  driving the knot ===\n', knotDrive);
 
 // ---------------------------------------------------- PHASE 3: repair -------
@@ -320,7 +369,7 @@ log('\n--- after repair, measured ---\n', fixed);
 
 await page.evaluate(() => { window.__game.editor._quietExit(); });
 await race();
-const fixedDrive = await page.evaluate(() => window.__probe.drive(120));
+const fixedDrive = await page.evaluate(() => window.__probe.drive(180));
 log('\n=== PHASE 4  driving the repaired knot ===\n', fixedDrive);
 
 // ---------------------------------------------------- summary ---------------
@@ -345,8 +394,12 @@ row('ambiguous idx', base.ambiguousStations, knot.ambiguousStations, fixed.ambig
 row('tunnels built', base.builtTunnels, knot.builtTunnels, fixed.builtTunnels);
 row('gorge built', base.builtGorge, knot.builtGorge, fixed.builtGorge);
 row('LAP COMPLETED', baseDrive.lapDone, knotDrive.lapDone, fixedDrive.lapDone);
+row('player laps/90s', baseDrive.playerLaps, knotDrive.playerLaps, fixedDrive.playerLaps);
+row('player metres', baseDrive.playerMetres, knotDrive.playerMetres, fixedDrive.playerMetres);
+row('AI metres', ...[baseDrive, knotDrive, fixedDrive].map((d) => Math.round(d.aiMean * d.lapLen)));
+row('AI stalled (<0.8)', baseDrive.aiStalled, knotDrive.aiStalled, fixedDrive.aiStalled);
 row('lap progress', baseDrive.finalProg, knotDrive.finalProg, fixedDrive.finalProg);
-row('drive secs', baseDrive.secs, knotDrive.secs, fixedDrive.secs);
+row('game-s simulated', baseDrive.gameTimeRan, knotDrive.gameTimeRan, fixedDrive.gameTimeRan);
 row('stuck %', baseDrive.stuckPct, knotDrive.stuckPct, fixedDrive.stuckPct);
 row('off-road %', baseDrive.offRoadPct, knotDrive.offRoadPct, fixedDrive.offRoadPct);
 row('sunk %', baseDrive.sunkPct, knotDrive.sunkPct, fixedDrive.sunkPct);
@@ -354,10 +407,11 @@ row('worst sink', baseDrive.sunkWorst, knotDrive.sunkWorst, fixedDrive.sunkWorst
 row('stall events', baseDrive.stalls.length, knotDrive.stalls.length, fixedDrive.stalls.length);
 row('min speed', baseDrive.minSpeed, knotDrive.minSpeed, fixedDrive.minSpeed);
 row('NaN', baseDrive.nan, knotDrive.nan, fixedDrive.nan);
-row('AI mean progress', ...[baseDrive, knotDrive, fixedDrive].map((d) =>
-  d.aiLapsPerMin.length
-    ? +(d.aiLapsPerMin.reduce((a, b) => a + b, 0) / d.aiLapsPerMin.length).toFixed(3) : 'n/a'));
+row('AI laps/90s (mean)', baseDrive.aiMean, knotDrive.aiMean, fixedDrive.aiMean);
 
+console.log('\nAI laps, shipped :', JSON.stringify(baseDrive.aiLaps));
+console.log('AI laps, warped  :', JSON.stringify(knotDrive.aiLaps), JSON.stringify(knotDrive.aiWhere));
+console.log('AI laps, repaired:', JSON.stringify(fixedDrive.aiLaps), JSON.stringify(fixedDrive.aiWhere));
 console.log('\nknot stalls:', JSON.stringify(knotDrive.stalls));
 console.log('repaired stalls:', JSON.stringify(fixedDrive.stalls));
 console.log('\npage errors:', errors.length);

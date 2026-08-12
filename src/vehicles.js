@@ -1245,7 +1245,10 @@ export class Car {
 
     // track constraint (free roam: no walls — the whole world is drivable)
     const t = this.game.track;
-    this.trackIndex = t.nearestIndex(this.pos, this.trackIndex);
+    // useY = grounded only: airborne, this.pos.y is a jump arc that matches
+    // no station in particular, and height would bias the pick toward
+    // whichever one happens to be that high right now (see nearestIndex).
+    this.trackIndex = t.nearestIndex(this.pos, this.trackIndex, !this.airborne);
     this.lateral = t.lateralOffset(this.pos, this.trackIndex);
     this.wallGrind = Math.max(0, this.wallGrind - dt);
     // There are no fences any more — the world is open and off-road slowness

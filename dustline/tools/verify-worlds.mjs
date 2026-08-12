@@ -16,7 +16,7 @@
  * reintroducing a world that cannot be rebuilt. Determinism that is true by
  * inspection stops being true the first time somebody adds a line.
  *
- *   npx vite build          # the tool serves ../play-dustline itself
+ *   npx vite build          # the tool serves ../V2 itself
  *   node tools/verify-worlds.mjs           # check against the golden file
  *   node tools/verify-worlds.mjs --update  # re-bless it, after an INTENDED change
  */
@@ -27,9 +27,9 @@ import { ensureServer } from './serve.mjs';
 const BASE = process.env.BASE || 'http://localhost:8903/';
 const EXE = process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
-// Serves ../play-dustline itself unless something already is, so the check
+// Serves ../V2 itself unless something already is, so the check
 // never fails because a server from an earlier session has gone away.
-const stopServer = await ensureServer(BASE, '../play-dustline');
+const stopServer = await ensureServer(BASE, '../V2');
 const GOLDEN = 'src/data/worlds.golden.json';
 const UPDATE = process.argv.includes('--update');
 

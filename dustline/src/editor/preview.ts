@@ -17,7 +17,9 @@ import * as THREE from 'three';
 import type { TrackDef } from '../tracks/trackDef';
 import { Terrain } from '../tracks/terrain';
 import { buildWorld } from '../render/scene';
-import { buildSky, buildClouds, buildMountains, buildVegetation } from '../render/scenery';
+import { buildMountains, buildVegetation } from '../render/scenery';
+import { Sky } from '../render/sky';
+import { buildEnvironment } from '../render/post';
 
 /** Orbit camera. Written here rather than pulled from three's examples because
  *  the whole editor is four files and a dependency for 60 lines of mouse maths
@@ -123,6 +125,11 @@ export class Preview {
   private scene = new THREE.Scene();
   orbit: Orbit;
   private built: THREE.Object3D[] = [];
+  // Held separately from `built` because it owns its own disposal: `Sky` clones
+  // its sprite maps precisely so `disposeDeep` cannot free a cached texture out
+  // from under the next rebuild, and routing it through that path would undo
+  // the reason it does that.
+  private sky: Sky | null = null;
   private carMarker: THREE.Mesh;
   /** wall-clock cost of the last rebuild, shown in the status bar */
   lastBuildMs = 0;
@@ -210,9 +217,21 @@ export class Preview {
     this.terrain = terrain;
     this.built.push(...buildWorld(this.scene, def, terrain.spawn.x, terrain.spawn.z));
     this.built.push(...terrain.build(this.scene, null as never, null as never));
-    this.built.push(buildSky(this.scene, def));
-    this.built.push(buildClouds(this.scene, def));
+    // THE PREVIEW DRAWS WHAT THE GAME DRAWS, which it did not until now: the
+    // game moved to the ported five-layer sky and an irradiance environment
+    // while this still built `scenery.ts`'s M1 mockup — a canvas gradient on a
+    // sphere and some emissive icosahedron puffs. An authoring preview that
+    // lights the world differently from the game is an authoring preview that
+    // teaches you the wrong colours, and the whole reason the 3D view builds
+    // the real `Terrain` is that a second implementation is always the one
+    // that is subtly wrong. Same argument, one layer up.
+    this.sky?.dispose();
+    this.sky = new Sky(this.scene, def);
     this.built.push(...buildMountains(this.scene, def));
+    // Image-based lighting, as the game has it. Without it every standard
+    // material reflects nothing, so metalness reads black — and a component
+    // judged against that in the editor looks different the moment it ships.
+    buildEnvironment(this.renderer, this.scene, def);
     const comps = buildVegetation(this.scene, terrain, null, null);
     this.built.push(...comps.objects);
     this.componentCounts = comps.counts;
