@@ -11,7 +11,8 @@ import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
 import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
-  tyreClass, tyreLevelFor, TYRE_LABEL, tyrePenalty } from './vehicles.js';
+  tyreClass, tyreMaxClass, tyreLevelFor, TYRE_LABEL, tyrePenalty,
+  applyUpgradeKit } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
 import { Weapons } from './weapons.js';
@@ -1335,6 +1336,7 @@ class Game {
         [document.getElementById('tab-btn-garage'), document.getElementById('tab-garage')],
         [document.getElementById('tab-btn-settings'), document.getElementById('tab-settings')],
         [document.getElementById('tab-btn-mode'), document.getElementById('tab-mode')],
+        [document.getElementById('tab-btn-jobs'), document.getElementById('tab-jobs')],
       ].filter(([b, p]) => b && p);
       for (const [btn, panel] of tabs) {
         btn.addEventListener('click', () => {
@@ -1343,6 +1345,7 @@ class Game {
             p2.classList.toggle('off', p2 !== panel);
           }
           // TRACKS is on screen: the deferred world art is wanted NOW
+          if (btn.id === 'tab-btn-jobs') this._renderJobs();
           if (btn.id === 'tab-btn-race') {
             this._loadAllShots();
             // ...and land on the rung the player is actually up to. Opening a
@@ -1957,7 +1960,7 @@ class Game {
     const lv = LEVELS.find((l) => l.id === levelId);
     if (!lv) return null;
     const need = surfaceClass(lv);
-    const have = tyreClass(carKey, (this.garage.upgrades || {})[carKey]);
+    const have = tyreClass(carKey, (this.garage.upgrades || {})[carKey], this.fittedTyre(carKey));
     // ONE CLASS EITHER SIDE IS THE IDEAL WINDOW, NOT A PERMISSION.
     //
     // If a bigger tyre always counted as ideal, the whole rule would collapse
@@ -1983,23 +1986,15 @@ class Game {
       return { ok: true, need, have, over: have - need, under: 0, pen };
     }
     if (have > need) {
-      // too much tyre: name the lightest thing that can do this properly
-      const fit = (k) => {
-        const c = tyreClass(k, (this.garage.upgrades || {})[k]);
-        return c >= need && c - need <= 1;
-      };
-      const owned = this.cars.owned.filter(fit);
-      const buy = CAR_CATALOG.filter((c) => {
-        const t = tyreClass(c.key, null);
-        return t >= need && t - need <= 1;
-      }).sort((a, b) => a.price - b.price)[0];
-      const fix = owned.length
-        ? { kind: 'own', car: owned[0],
-          text: `DRIVE YOUR ${CAR_CATALOG.find((c) => c.key === owned[0]).name}` }
-        : buy ? { kind: 'buy', car: buy.key,
-          text: `BUY THE ${buy.name} — ${buy.price.toLocaleString()} CR` }
-          : { kind: 'none', text: 'NOTHING IN THE GARAGE SUITS THIS SURFACE' };
-      return { ok: false, need, have, over: have - need, under: 0, pen, tooMuch: true, fix };
+      // TOO MUCH TYRE IS A FREE FIX NOW. Before the tyre bay existed, class
+      // could only go UP, so the only remedies on offer were "drive another
+      // car" or "buy one" — and both could name a machine you were already
+      // sitting in, which is how CANYON RUN came to advise BUY THE BRAWLER —
+      // 0 CR to somebody driving a BRAWLER. Fitting down is instant and costs
+      // nothing, so that is the advice.
+      return { ok: false, need, have, over: have - need, under: 0, pen, tooMuch: true,
+        fix: { kind: 'fit', cls: need,
+          text: `FIT ${TYRE_NAME[need]} IN THE TYRE BAY — FREE` } };
     }
     // cheapest route back to legal: an upgrade if one reaches, else a car
     const lvl = tyreLevelFor(carKey, (this.garage.upgrades || {})[carKey], need);
@@ -2012,7 +2007,7 @@ class Game {
         text: `FIT ${TYRE_NAME[need]} — ${cost.toLocaleString()} CR IN THE GARAGE` };
     } else {
       const owned = this.cars.owned
-        .filter((k) => tyreClass(k, (this.garage.upgrades || {})[k]) >= need);
+        .filter((k) => tyreMaxClass(k, (this.garage.upgrades || {})[k]) >= need);
       if (owned.length) {
         const name = CAR_CATALOG.find((c) => c.key === owned[0]).name;
         fix = { kind: 'own', car: owned[0], text: `DRIVE YOUR ${name}` };
@@ -2135,8 +2130,15 @@ class Game {
     const f = this.freeRoam ? null : this.carFitness(this.level.id);
     const warned = !!(f && !f.ok);
     start.classList.remove('blocked');
+    start.classList.toggle('warned', warned);
+    // ...AND IT SAYS WHAT TO DO ABOUT IT. "Misleading message, as there is no
+    // way to change tyres" — the button stated a penalty and named no remedy,
+    // and until the tyre bay existed there genuinely was none for an
+    // over-tyred car. It now carries the fix on a second line, which for the
+    // common case is one free tap in the garage.
+    const fixLine = f?.fix?.text ? `\n${f.fix.text}` : '';
     start.textContent = warned
-      ? `START — WRONG TYRES (−${f.pen}% GRIP)`
+      ? `START — WRONG TYRES (−${f.pen}% GRIP)${fixLine}`
       : this.missionMode ? 'START MISSION'
         : this.freeRoam ? 'START EXPLORING' : 'START RACE';
   }
@@ -3043,6 +3045,37 @@ class Game {
     return up;
   }
 
+  /** WHICH COMPOUND IS ON THIS CAR RIGHT NOW.
+   *
+   *  Stored per car in `garage.fitted`, defaulting to the best the car has
+   *  unlocked — which is exactly what every save written before this was doing
+   *  implicitly, so nobody's setup changes underneath them. Clamped on READ
+   *  rather than on write, because swapping cars and buying an upgrade can
+   *  both move the ceiling under a stored choice. */
+  fittedTyre(carKey = this.cars.selected) {
+    const g = this.garage;
+    g.fitted ??= {};
+    const max = tyreMaxClass(carKey, (g.upgrades || {})[carKey]);
+    const want = g.fitted[carKey];
+    return want == null ? max : Math.max(0, Math.min(max, want | 0));
+  }
+
+  /** Fit a compound and remember it. FREE, always — going down a class is
+   *  never a purchase; only unlocking a higher one costs money. */
+  fitTyre(cls, carKey = this.cars.selected) {
+    const g = this.garage;
+    g.fitted ??= {};
+    g.fitted[carKey] = Math.max(0,
+      Math.min(tyreMaxClass(carKey, (g.upgrades || {})[carKey]), cls | 0));
+    saveJSON(this._pkey('garage'), g);
+    this.applyUpgrades();
+    this.renderGarage();
+    this._renderLevelCards?.();
+    this._syncStartButton?.();
+    this.hud?.feed?.(`FITTED ${TYRE_LABEL[g.fitted[carKey]]} TYRES`, 'good');
+    return g.fitted[carKey];
+  }
+
   /** Tell the car how far its tyres miss this world's surface in BOTH
    *  directions — the physics prices over- and under-spec separately
    *  (see tyrePenalty in vehicles.js; nothing is refused since r151). */
@@ -3084,6 +3117,48 @@ class Game {
     p.damperLvl = g.dampers || 0;                // read by Car.onLand
     p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
     p.assist = { pro: 0, standard: 0.5, assist: 1 }[this.assistSetting] ?? 0.5;
+    // ...AND THE CAR LOOKS LIKE WHAT YOU BOUGHT. Every upgrade until now was
+    // an invisible multiplier: a fully built machine was identical to the one
+    // on the forecourt, so the money had nothing to show for itself. Rebuilt
+    // here rather than at purchase time because applyUpgrades() is already the
+    // one place that reads the garage row, so the mesh cannot drift from the
+    // numbers.
+    applyUpgradeKit(p.mesh, g);
+  }
+
+  /** THE TYRE BAY — the answer to "there is no way to change tyres".
+   *
+   *  Three compounds. Anything at or below the car's own class is always
+   *  available, because a machine can always run road rubber; anything above
+   *  is what the TIRES line unlocks. What is FITTED is a free choice, so
+   *  "WRONG TYRES" on a start button is now a thing you can act on rather
+   *  than a fact about a purchase you cannot undo. */
+  _renderTyreBay() {
+    const el = document.getElementById('tyre-bay');
+    if (!el) return;
+    const car = this.cars.selected;
+    const up = (this.garage.upgrades || {})[car];
+    const max = tyreMaxClass(car, up);
+    const now = this.fittedTyre(car);
+    const need = this.level ? surfaceClass(this.level) : null;
+    const ICON = ['🛣', '🪨', '❄'];
+    const btns = [0, 1, 2].map((c) => {
+      const locked = c > max;
+      const cls = ['tyre-opt', c === now ? 'on' : '', locked ? 'locked' : '',
+        need === c ? 'want' : ''].filter(Boolean).join(' ');
+      return `<button class="${cls}" data-tyre="${c}"${locked ? ' disabled' : ''}>`
+        + `${locked ? '🔒' : ICON[c]}<b>${TYRE_LABEL[c]}</b>`
+        + `<i>${locked ? 'BUY TIRES ' + (c >= 2 ? 3 : 1) : need === c ? 'IDEAL HERE' : ''}</i></button>`;
+    }).join('');
+    el.innerHTML = `<div class="panel-head">TYRE BAY${this.level
+      ? ` — ${this.level.name} WANTS ${TYRE_LABEL[need]}` : ''}</div>`
+      + `<div class="tyre-row">${btns}</div>`;
+    for (const b of el.querySelectorAll('.tyre-opt')) {
+      b.addEventListener('click', () => {
+        this.audio?.ui?.();
+        this.fitTyre(+b.dataset.tyre);
+      });
+    }
   }
 
   /** Draw a smoothed closed track outline on a world-card canvas. */
@@ -3194,7 +3269,7 @@ class Game {
     // that cannot take the start is not "three stars", it is not eligible.
     const f = this.carFitness(this.level.id, car.key);
     if (!f) return '';
-    const tc = tyreClass(car.key, (this.garage.upgrades || {})[car.key]);
+    const tc = tyreClass(car.key, (this.garage.upgrades || {})[car.key], this.fittedTyre(car.key));
     const badge = `<b>${TYRE_LABEL[tc]}</b> TYRES`;
     if (!f.ok) return `<div class="ctyre bad">${badge} · −${f.pen}% GRIP HERE</div>`;
     if (f.over > 0) return `<div class="ctyre over">${badge} · OVER-TYRED, −${f.pen}%</div>`;
@@ -3243,6 +3318,7 @@ class Game {
     const carName = CAR_CATALOG.find((c) => c.key === this.cars.selected)?.name ?? '';
     const head = document.getElementById('garage-up-head');
     if (head) head.textContent = `DETAILED UPGRADES — ${carName}`;
+    this._renderTyreBay();
     const rows = document.getElementById('garage-rows');
     rows.innerHTML = '';
     for (const u of UPGRADES) {
@@ -3801,6 +3877,13 @@ class Game {
   // 3 side objectives per race, seeded per level+day+difficulty so a given
   // world offers the same slate all day. Completions pay into contractCredits,
   // folded into `earned` at finishRace. Never offered in free roam.
+  /** Contracts you have turned down for this world, by id. Per world, because
+   *  the offer is per world; kept on the career so it survives a reload. */
+  _declined() {
+    const d = (this.career.declined ??= {});
+    return (d[this.level?.id] ??= []);
+  }
+
   _pickContracts() {
     const pool = CONTRACT_POOL.filter((c) => !c.gate || c.gate(this));
     const day = Math.floor(Date.now() / 864e5);
@@ -3822,7 +3905,63 @@ class Game {
       const sure = arr.slice(3).filter((c) => c.sure);
       if (sure.length) picks[2] = sure[(rnd() * sure.length) | 0];
     }
-    return picks.map(atRung);
+    // ...AND YOU CAN TURN THEM DOWN. "So I can choose to race them or not."
+    // A declined contract is not dealt at all, which matters because CLEAN LAP
+    // and PACIFIST pull in opposite directions from HEADHUNTER — being handed
+    // three you cannot hold at once made the row read as noise rather than as
+    // an offer.
+    const no = this._declined();
+    return picks.map(atRung).filter((c) => !no.includes(c.id));
+  }
+
+  /** The offer for this world, whether or not it has been accepted. Used by
+   *  the board — `_pickContracts` returns only what will actually run. */
+  _offeredContracts() {
+    const no = this._declined();
+    const keep = this.career.declined?.[this.level?.id];
+    if (keep) this.career.declined[this.level.id] = [];
+    const all = this._pickContracts();
+    if (keep) this.career.declined[this.level.id] = keep;
+    return all.map((c) => ({ ...c, declined: no.includes(c.id) }));
+  }
+
+  /** THE JOBS BOARD — the daily offer and the long chains, in one place.
+   *  Contracts pay credits and can be declined; quests pay PARTS and run in
+   *  the background. Seeing them together is the point: one is what to do in
+   *  THIS race, the other is what you are working toward. */
+  _renderJobs() {
+    const el = document.getElementById('contract-board');
+    if (!el) return;
+    if (this.freeRoam || !this.level) {
+      el.innerHTML = '<div class="cb-head">CONTRACTS</div>'
+        + '<div id="jobs-note">Contracts run in RACE mode only.</div>';
+      this._renderQuests();
+      return;
+    }
+    const offers = this._offeredContracts();
+    const rows = offers.map((c) => `<div class="jrow${c.declined ? ' off' : ''}">
+      <span class="jmain"><b>${c.label}</b><i>${
+  typeof c.desc === 'function' ? c.desc(c.need) : c.desc}</i></span>
+      <span class="jpay">+${c.pay} CR</span>
+      <button class="jbtn${c.declined ? ' declined' : ''}" data-cid="${c.id}">${
+  c.declined ? 'DECLINED' : 'ACCEPTED'}</button>
+    </div>`).join('');
+    el.innerHTML = `<div class="cb-head">CONTRACTS — ${this.level.name}</div>`
+      + `<div id="jobs-note">Today's offer for this world. Tap one to turn it down — `
+      + `a declined contract is not dealt at the start line, so you are not `
+      + `carrying an objective that fights the one you actually want.</div>${rows}`;
+    for (const b of el.querySelectorAll('.jbtn')) {
+      b.addEventListener('click', () => {
+        const no = this._declined();
+        const id = b.dataset.cid;
+        const at = no.indexOf(id);
+        if (at >= 0) no.splice(at, 1); else no.push(id);
+        saveJSON(this._pkey('career'), this.career);
+        this.audio?.ui?.();
+        this._renderJobs();
+      });
+    }
+    this._renderQuests();
   }
 
   /** Per-frame contract bookkeeping. Only ever OBSERVES state other systems
