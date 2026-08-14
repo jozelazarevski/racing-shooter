@@ -7,7 +7,7 @@ import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
 import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
-  HOUSE_TEMPLATES, worldFacets, surfaceClass, SURFACE_LABEL, TYRE_NAME } from './track.js';
+  HOUSE_TEMPLATES, worldFacets, surfaceClass, surfaceSlick, SURFACE_LABEL, TYRE_NAME } from './track.js';
 import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
@@ -21,8 +21,39 @@ import { AudioEngine } from './audio.js';
 import { Input } from './input.js';
 import { glowTexture } from './textures.js';
 
-const ENEMY_COUNT = 5;
+// EIGHT CARS ON THE GRID, NOT SIX. Reported as "it's 8 cars not 6, update
+// that across all game" — the field size leaked into a dozen literals: the
+// ordinal arrays stopped at '6TH', the finish bonus was a six-entry table,
+// and every piece of copy that said "of 6" said it in prose. There is now
+// exactly ONE number, and everything else is derived from it.
+const ENEMY_COUNT = 7;
+const FIELD = ENEMY_COUNT + 1;          // cars on the grid, player included
 const LAPS = 3;
+
+// THREE HULLS AND THE RACE IS OVER. Asked for as "if I get destroyed 3 times
+// it is game over, I need to restart the track."
+//
+// `deaths` was counted and then spent on nothing but a −300 score hit and the
+// CLEAN RUN bonus, so being wrecked cost a respawn wait and no more: you could
+// hand the car over to the scenery all afternoon and still finish the lap.
+// Three is the number because it leaves room for two genuine mistakes — the
+// automatic rescue nets and the UNSTUCK button both exist precisely so that
+// being STUCK never spends a hull — while making the third one matter.
+//
+// Free roam has no race to lose and missions run their own one-hull rule, so
+// the limit applies to races only.
+const HULL_LIVES = 3;
+
+/** "1ST".."8TH" — the ordinal for a finishing position. Was a literal array
+ *  in three places, each of which stopped at 6 and fell through to a bare
+ *  `${n}TH` for anything beyond, so a 7th place read "7TH" while 1st..6th
+ *  read from the table. One function now, correct for any field size. */
+const ordinal = (n) => {
+  const t = n % 100;
+  const suffix = t >= 11 && t <= 13 ? 'TH'
+    : ['TH', 'ST', 'ND', 'RD'][n % 10] || 'TH';
+  return `${n}${suffix}`;
+};
 
 // THE RUBBER BAND USED TO CANCEL THE DIFFICULTY KNOB.
 //
@@ -945,6 +976,11 @@ class Game {
   constructor() {
     this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
     if (this.isTouch) document.body.classList.add('touch');
+    // Published for the HUD and the suites: hud.js cannot import from main.js
+    // (main.js imports hud.js), so the rule travels on the game object rather
+    // than being written down a second time.
+    this.hullLives = HULL_LIVES;
+    this.fieldSize = FIELD;
 
     // level selection via URL (?level=N), with ?go=1 for seamless chained starts
     const params = new URLSearchParams(location.search);
@@ -1111,7 +1147,7 @@ class Game {
     const carEntry = CAR_CATALOG.find((c) => c.key === this.cars.selected) || CAR_CATALOG[0];
     this.player = new PlayerCar(this, carEntry);
     this.enemies = [];
-    for (let i = 0; i < ENEMY_COUNT; i++) this.enemies.push(new EnemyCar(this, i));
+    for (let i = 0; i < ENEMY_COUNT; i++) this.enemies.push(new EnemyCar(this, i, ENEMY_COUNT));
     this.weapons = new Weapons(this);
     this.hud = new Hud(this);
     this.choppers = [];
@@ -1835,7 +1871,12 @@ class Game {
     // grip instead (see tyrePenalty), and `pen` is that price as a percent so
     // every label can state it rather than assert a prohibition.
     const overC = Math.max(0, have - need), underC = Math.max(0, need - have);
-    const pen = Math.round((1 - tyrePenalty(overC, underC)) * 100);
+    // The quoted price is the price the PHYSICS will charge on this world, not
+    // a roster-wide average: since r172 the under-spec penalty is weighted by
+    // how slippery the road is, so the same road tyres cost a few percent on a
+    // dry gravel stage and most of the grip in a blizzard. A card that quoted
+    // one number for both would be lying about one of them.
+    const pen = Math.round((1 - tyrePenalty(overC, underC, surfaceSlick(lv))) * 100);
     if (have >= need && have - need <= 1) {
       return { ok: true, need, have, over: have - need, under: 0, pen };
     }
@@ -2727,7 +2768,7 @@ class Game {
       const starRow = '★'.repeat(got) + '☆'.repeat(3 - got);
       const bestTxt = unlocked
         ? (best
-          ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
+          ? `BEST: ${ordinal(best.place)}`
           : '★ UNRACED')
         : `NEEDS ${cost}★ — ${Math.max(0, cost - this.totalStars())} TO GO`;
       // THE LADDER, STATED ON THE CARD. `i` is the career rung — the same
@@ -6190,7 +6231,9 @@ class Game {
     this.deaths = 0;
     this.raceTime = 0;
     this.countdown = 0;
-    this.playerRank = ENEMY_COUNT + 1;
+    this.raceOver = false;
+    if (this.player) this.player.outOfHulls = false;
+    this.playerRank = FIELD;
     this.weapons.reset();
     this.hitStop = 0;
     this.fovKick = 0;
@@ -6282,6 +6325,12 @@ class Game {
         this.hud.feed(`${TYRE_LABEL[f.have]} TYRES ON A ${SURFACE_LABEL[f.need]} STAGE `
           + `— GRIP −${f.pen}%`, 'bad');
         if (f.fix && f.fix.text) this.hud.feed(f.fix.text, 'info');
+        // ...and if the road is slick as well as the wrong class, say the OTHER
+        // thing that can now happen to you, because a car being written off for
+        // sitting still is only fair if it was announced first.
+        if (f.under > 0 && surfaceSlick(this.level) > 0) {
+          this.hud.feed('DIG IN ON THESE AND THE CAR IS WRITTEN OFF — KEEP IT ROLLING', 'bad');
+        }
       }
     }
     this.audio.start();
@@ -6292,6 +6341,11 @@ class Game {
     // every race starts with the rescue in hand — a cooldown must never
     // carry across a restart, or a retry begins already punished
     this.player.unstuckCool = 0;
+    // ...and with all three hulls. Same argument: a retry must not begin
+    // already carrying the wrecks that ended the previous attempt.
+    this.deaths = 0;
+    this.raceOver = false;
+    this.player.outOfHulls = false;
     this.state = 'countdown';
     this.countdown = 3.6;
     this._lastCount = 4;
@@ -6382,18 +6436,94 @@ class Game {
     this.buzz([70, 40, 70]);
     this.shake = 1;
     this.hud.damageFlash(1.2);
+    if (this.missionMode) { // [MISSIONS] — one hull, its own rule
+      this.hud.centerMsg('WRECKED');
+      this.hud.feed(attacker ? `WRECKED BY ${attacker.name}  −300` : 'WRECKED  −300', 'bad');
+      this._missionEvent('wrecked');
+      return;
+    }
+    // ---- the three-hull rule ----
+    const counts = !this.freeRoam && (this.state === 'race' || this.state === 'countdown');
+    const left = HULL_LIVES - this.deaths;
+    if (counts && left <= 0) {
+      this.hud.centerMsg('DESTROYED');
+      this.hud.feed(attacker ? `WRECKED BY ${attacker.name} — NO HULLS LEFT` : 'WRECKED — NO HULLS LEFT', 'bad');
+      this._raceOver(attacker);
+      return;
+    }
     this.hud.centerMsg('WRECKED');
     this.hud.feed(attacker ? `WRECKED BY ${attacker.name}  −300` : 'WRECKED  −300', 'bad');
-    if (this.missionMode) this._missionEvent('wrecked'); // [MISSIONS]
+    if (counts) {
+      this.hud.feed(`${left} HULL${left === 1 ? '' : 'S'} LEFT — THEN THE RACE IS OVER`,
+        left === 1 ? 'bad' : 'info');
+      this.buzz([70, 40, 70, 40, 70]);
+    }
+  }
+
+  /** OUT OF HULLS. Not a finish — nothing is banked, no place is recorded, no
+   *  star is awarded and the world keeps whatever best it already had. The
+   *  results card is reused because it is the screen that already knows how to
+   *  offer RACE AGAIN and BACK TO GARAGE, but it is dressed as what this is.
+   *
+   *  Deliberately NOT routed through finishRace(): that function writes to
+   *  `career.finished`, pays credits and rolls contracts and feats. Being
+   *  destroyed out of the race must reward none of it, or the three-hull rule
+   *  is a slower way to collect the same prize. */
+  _raceOver(attacker) {
+    if (this.state === 'finished') return;
+    this.state = 'finished';
+    this.player.finished = true;
+    this.player.outOfHulls = true;      // stops the respawn tick in PlayerCar.update
+    this.raceOver = true;               // read by the HUD and by the results dressing
+    for (const e of this.enemies) e.finished = true;
+    document.getElementById('result-place').textContent = 'DESTROYED';
+    document.getElementById('r-score').textContent = this.score.toLocaleString();
+    document.getElementById('r-kills').textContent = this.kills;
+    document.getElementById('r-time').textContent = fmtTime(this.raceTime);
+    document.getElementById('r-best').textContent = fmtTime(this.player.bestLap);
+    document.getElementById('r-credits').textContent = '+0';
+    const sp = document.getElementById('star-panel');
+    if (sp) sp.style.display = 'none';
+    const box = document.getElementById('credit-breakdown');
+    const rowsEl = document.getElementById('cb-rows');
+    if (box && rowsEl) {
+      // Say WHY nothing was paid, in the place the payout normally appears.
+      // A silent +0 reads as a bug; an itemised zero reads as a rule.
+      rowsEl.innerHTML =
+        `<div class="cb-row missed"><span>✗ HULLS SPENT</span><b>${HULL_LIVES} / ${HULL_LIVES}</b></div>`
+        + `<div class="cb-row missed"><span>✗ RACE NOT FINISHED</span><b>—</b></div>`
+        + `<div class="cb-row missed"><span>✗ NO CREDITS, NO STARS</span><b>—</b></div>`
+        + `<div class="cb-row total"><span>RUN THE TRACK AGAIN</span><b>+0</b></div>`;
+      box.style.display = '';
+    }
+    document.querySelector('#results .game-sub').textContent =
+      `${this.level?.name ?? 'RACE'} — WRECKED OUT${attacker ? ` BY ${attacker.name}` : ''}`;
+    const nextBtn = document.getElementById('next-level-btn');
+    if (nextBtn) nextBtn.style.display = 'none';
+    const again = document.getElementById('restart-btn');
+    if (again) again.textContent = 'RESTART TRACK';
+    this.audio?.explosion?.(true);
+    setTimeout(() => {
+      if (this.state !== 'finished') return;   // left already — don't pop over the menu
+      document.getElementById('results').classList.remove('hidden');
+      this.hud.hide();
+      document.getElementById('touch-ui').classList.remove('on');
+    }, 1900);
   }
 
   finishRace() {
     this.state = 'finished';
     this.player.finished = true;
     const rank = this.playerRank;
-    const bonus = [2000, 1200, 800, 500, 300, 150][rank - 1] || 100;
+    // The finish bonus was a six-entry table for a six-car grid, so with eight
+    // on the line 7th and 8th both fell through to a flat 100. The old table
+    // was very close to a geometric decay from 2000 to 150 — 2000·0.075^r fits
+    // it to within 10 % at every entry — so that is what it is now, stretched
+    // across whatever FIELD holds. A win still pays 2000 and last still pays
+    // 150; the two new places land inside the curve instead of off the end.
+    const bonus = Math.round(2000 * (150 / 2000) ** ((rank - 1) / Math.max(1, FIELD - 1)) / 10) * 10;
     this.score += bonus;
-    const sfx = ['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][rank - 1] || `${rank}TH`;
+    const sfx = ordinal(rank);
     document.getElementById('result-place').textContent = sfx;
     document.getElementById('r-score').textContent = this.score.toLocaleString();
     document.getElementById('r-kills').textContent = this.kills;
@@ -6469,6 +6599,10 @@ class Game {
     this.hud.centerMsg('FINISH');
     this.audio.lap();
     document.querySelector('#results .game-sub').textContent = `${this.level.name} COMPLETE`;
+    // _raceOver relabels this button to RESTART TRACK; a real finish is a race
+    // you may repeat, not one you must, so put the word back.
+    const again = document.getElementById('restart-btn');
+    if (again) again.textContent = 'RACE AGAIN';
     const nextBtn = document.getElementById('next-level-btn');
     if (nextUnlocked) {
       nextBtn.style.display = '';

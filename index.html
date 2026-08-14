@@ -87,6 +87,11 @@
     background:linear-gradient(90deg,#2fb84a,#7de08a);
     transition:width .15s, background .3s}
   #shield-hits{margin-top:6px;font-size:11px;letter-spacing:2px;color:#e8c987}
+  /* two hulls left is a warning, one is an emergency — the pips say so
+     without needing a second glance at a number */
+  #shield-hits #deaths.low{color:#ffb52e}
+  #shield-hits #deaths.last{color:#ff5a3c;animation:hullPulse 1s ease-in-out infinite}
+  @keyframes hullPulse{0%,100%{opacity:1}50%{opacity:.45}}
 
   #weapon-box{position:absolute;bottom:16px;right:12px;padding:10px 14px;width:210px;text-align:left}
   #heat-fill{height:100%;width:0%;border-radius:6px;background:linear-gradient(90deg,#4dd06a,var(--yellow),var(--orange));
@@ -296,7 +301,12 @@
      observer first reports. */
   body.touch #health-box{bottom:auto;top:calc(12px + var(--info-h,86px) + 8px);
     left:12px;width:150px;padding:6px 10px}
-  body.touch #health-box #shield-hits{display:none}
+  /* THE HULL PIPS STAY ON PHONES. This row was hidden on touch when it read
+     "WRECKS: 0" — a rising tally of past mistakes, worth no screen space on a
+     390px display. Since r172 it is the three-strikes budget, which is the one
+     number you must be able to see before you spend the last of it, and as
+     three glyphs it costs a single 13px line. */
+  body.touch #health-box #shield-hits{margin-top:3px;font-size:13px;letter-spacing:3px}
   /* ...and the feed stacks under the hull panel for the same reason: at
      390px wide it is 274px of message reaching back under race-info, so a
      fixed top clipped its corner on every portrait size measured. */
@@ -1136,7 +1146,7 @@
 
 <div id="hud">
   <div id="race-info" class="panel">
-    <div class="pos"><span id="position">–</span><small id="position-suffix"></small> <small>/ <span id="racer-count">6</span></small></div>
+    <div class="pos"><span id="position">–</span><small id="position-suffix"></small> <small>/ <span id="racer-count">8</span></small></div>
     <div class="lap">LAP <span id="lap">1</span>/<span id="laps-total">3</span></div>
     <div class="time" id="race-time">0:00.0</div>
     <div id="standings"></div>
@@ -1152,7 +1162,7 @@
   <div id="health-box" class="panel">
     <div class="bar-label"><span>HULL INTEGRITY</span><span id="health-num">100</span></div>
     <div class="bar"><div id="health-fill"></div></div>
-    <div id="shield-hits">WRECKS: <span id="deaths">0</span></div>
+    <div id="shield-hits">HULLS: <span id="deaths">◆◆◆</span></div>
   </div>
 
   <div id="speed-box">
@@ -1180,7 +1190,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r171</div>
+<div id="build-tag">r172</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1401,10 +1411,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r171"></script>
+<script type="module" src="./src/main.js?v=r172"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r171"></script>
+<script src="./src/offline.js?v=r172"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r171"></script>
+<script type="module" src="./src/traffic.js?v=r172"></script>
 </body>
 </html>

@@ -5,6 +5,9 @@ import { numberPlateTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
 const SPRAY_SNOW = new THREE.Color(0xf4faff); // tire spray tints (snow / wet)
+/** Seconds of held throttle going nowhere, on a slick surface with the wrong
+ *  compound fitted, before the car is written off (see PlayerCar.update). */
+const BOG_WRECK_S = 5;
 const SPRAY_WET = new THREE.Color(0x9dbcd2);
 const FORD_FOAM = new THREE.Color(0xeef7fb); // ---- river-fords: bow-wave white
 const GRADE = 16;   // grade force: vf -= GRADE * slope * dt while grounded on-road
@@ -907,12 +910,24 @@ export class Car {
     // field that is already balanced by aiSpeed and the rubber band.
     const surf = this.game.track?.T?.surface;
     const loose = this === this.game.player ? (this.offroadSkill ?? 0.7) : 0.7;
-    const keep = (base) => base + (1 - base) * (0.62 * loose);
-    // wet dropped 0.78 -> 0.68: at 0.78 the player couldn't FEEL the rain.
-    // Braking and cornering now visibly run long on every downpour world.
-    let sGrip = keep(surf === 'snow' ? 0.55 : surf === 'wet' ? 0.68 : 1);
-    let sTract = keep(surf === 'snow' ? 0.72 : surf === 'wet' ? 0.88 : 1);
-    let sBrake = keep(surf === 'snow' ? 0.58 : surf === 'wet' ? 0.80 : 1);
+    // HOW MUCH THIS SURFACE ASKS OF THE TYRE — 1 on ice, 0.55 in the wet, 0 on
+    // a dry road. Everything below scales off this one number, so "slippery"
+    // is a property of the surface rather than three unrelated constants.
+    const slick = surf === 'snow' ? 1 : surf === 'wet' ? 0.55 : 0;
+    // The OFF-ROAD stat buys back part of the loss — the DUNE keeps most of its
+    // grip on FROST PEAK where the CROWN is a passenger — but it buys back LESS
+    // the slicker it gets. It used to return 62 % of the deficit on every
+    // surface, which meant an off-road machine on the wrong rubber was fine on
+    // sheet ice: the stat was doing the tyres' job. On ice it now returns 30 %,
+    // so ice is a question about what you FITTED, not what you bought.
+    const keep = (base) => base + (1 - base) * ((0.62 - 0.32 * slick) * loose);
+    // Deepened for r172, reported as "ice and water needs to feel slippery":
+    // snow 0.55 -> 0.40 and wet 0.68 -> 0.60. At 0.55 a snow stage was a
+    // slightly slower dry stage; the car now runs wide out of a corner it
+    // would have held, which is the whole texture of driving on ice.
+    let sGrip = keep(surf === 'snow' ? 0.40 : surf === 'wet' ? 0.60 : 1);
+    let sTract = keep(surf === 'snow' ? 0.60 : surf === 'wet' ? 0.82 : 1);
+    let sBrake = keep(surf === 'snow' ? 0.44 : surf === 'wet' ? 0.72 : 1);
 
     // THE WRONG TYRE HAS TO BE FELT, not just refused at the start line.
     //
@@ -920,8 +935,19 @@ export class Car {
     // under-specced — which the grid used to refuse outright — slides worse
     // and stops longer, so a snow stage on road tyres is drivable and clearly
     // a bad idea, which is the lesson the hard gate could only ever assert.
-    const f = tyrePenalty(this._tyreOver, this._tyreUnder);
+    //
+    // AND THE PRICE DEPENDS ON THE ROAD. A flat penalty said road rubber was
+    // equally wrong on a dry gravel stage and on sheet ice, which is not what
+    // a tyre is: on dry tarmac the compound barely matters, on ice it is the
+    // only thing that does. `slick` weights the under-spec term so the same
+    // two-class mismatch costs ~17 % on a dry stage and puts you on skates in
+    // a blizzard. Reported as "if I don't have the tires it should be super
+    // hard to drive" — and it should be hard THERE, not everywhere.
+    const f = tyrePenalty(this._tyreOver, this._tyreUnder, slick);
     if (f < 1) { sGrip *= f; sTract *= f; sBrake *= f; }
+    // Published for the HUD warning and the bog-down rule below.
+    this._slick = slick;
+    this._tyreFactor = f;
 
     const fwd = this.forward;
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
@@ -2460,7 +2486,15 @@ export class Car {
     this.respawnTimer = this.respawnDelay ?? 5;
     this.game.particles?.splash?.(this.pos, 2.2);
     this.game.audio?.splash?.();
-    if (this === this.game.player) this.game.hud?.feed?.('SUNK', 'bad');
+    // ...and it costs a hull like any other wreck. It did not, because the
+    // "presented as what it is" split above skipped `onPlayerDestroyed` along
+    // with the fireball — which was invisible while `deaths` only docked score,
+    // and is a hole in the three-hull rule the moment that rule exists: a coast
+    // road you can drive off the edge of, over and over, for free.
+    if (this === this.game.player) {
+      this.game.hud?.feed?.('SUNK', 'bad');
+      this.game.onPlayerDestroyed?.(null);
+    }
   }
 
   respawn() {
@@ -2594,18 +2628,33 @@ const AI_COLORS = [
   { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [0x4a9ad8], number: 12, brand: 'RAIDER' },
   { name: 'ALPINE', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [0x2f9e44, 0xd8342a], number: 4, brand: 'GEARHD' },
   { name: 'PIT-99', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [0xe8b83a], number: 99, brand: 'SCORP' },
+  // EIGHT ON THE GRID NEEDS SEVEN RIVALS. At five entries the roster wrapped
+  // — `slot % AI_COLORS.length` put a second CROWN and a second SLEEK on the
+  // line, identical in name, number and paint, which is exactly the thing a
+  // race result screen must never contain. These two take the last unused
+  // body styles in the catalogue, so no rival is a repaint of another.
+  { name: 'FLATSIX', style: 'flatsix', body: 0xc4342a, accent: 0x2a2d33, stripe: [0xf2f0e8], number: 23, brand: 'ZENITH' },
+  { name: 'BASTION', style: 'bastion', body: 0x1f6a4a, accent: 0xc8ccd2, stripe: [0xc8ccd2], number: 46, brand: 'ZENITH' },
 ];
 
 export class EnemyCar extends Car {
-  constructor(game, slot) {
+  constructor(game, slot, fieldSize = 5) {
     const spec = AI_COLORS[slot % AI_COLORS.length];
+    // THE SPREAD IS A FRACTION OF THE FIELD, NOT A MULTIPLE OF THE SLOT.
+    // It used to be `53 + slot * 1.1`, tuned when there were five rivals. Add
+    // two more and the same expression walks the quickest car up to 61 — a
+    // silent difficulty increase riding along with a grid-size change, and
+    // one that would have put the top rival above every car in the showroom.
+    // Normalising on the field keeps the band exactly where it was measured
+    // whatever the grid holds.
+    const f = fieldSize > 1 ? slot / (fieldSize - 1) : 0;
     super(game, buildCarMesh(spec), {
-      maxSpeed: 53 + slot * 1.1 + Math.random() * 1.4, // ~53..60 across the grid (player: 56..63)
+      maxSpeed: 53 + f * 4.4 + Math.random() * 1.4, // ~53..58.8 across the grid (player: 56..63)
       // ~34.5..39.2 — deliberately INSIDE the garage's range (player cars are
       // 36..40). The old 36..43 spread put the two quickest rivals above every
       // car you can buy, and they out-dragged the starter BRAWLER off the line
       // by 0.27s to 40 u/s (18%) — the grid must never beat the showroom.
-      accel: 34.5 + slot * 0.85 + Math.random() * 1.3,
+      accel: 34.5 + f * 3.4 + Math.random() * 1.3,
       grip: 5.8,
       steerRate: 3.0,
       driftLag: 0.12, // planted enough to hold the racing line
@@ -3364,9 +3413,21 @@ const GOLD = 0xe8b83a;
  *  point of the class system — the right machine is clearly, measurably
  *  faster — without forbidding anything: -17 % a class under, -34 % two
  *  under, stacking with the over-spec squirm. */
-export const tyrePenalty = (over, under = 0) =>
-  (1 - Math.min(0.20, 0.09 * Math.max(0, over | 0)))
-  * (1 - Math.min(0.34, 0.17 * Math.max(0, under | 0)));
+/** @param slick 0 on a dry road, 0.55 in the wet, 1 on ice — how much the
+ *  surface cares what compound is on the car. Defaults to 0.35 so the pure
+ *  function keeps its old mid-range answer for the menus, which quote a single
+ *  headline number before a world is even loaded. */
+export const tyrePenalty = (over, under = 0, slick = 0.35) => {
+  const s = Math.min(1, Math.max(0, slick));
+  // Under-spec was a flat 0.17/class capped at 0.34 — the same price for road
+  // rubber on a dry gravel stage as on sheet ice. It now runs 0.11/class on a
+  // dry road up to 0.36/class on ice, capped at 0.72 so a two-class mismatch
+  // in a blizzard leaves 28 % of the grip: still steerable at a crawl, hopeless
+  // at racing pace, which is the shape the complaint asked for.
+  const perClass = 0.11 + 0.25 * s;
+  return (1 - Math.min(0.20, 0.09 * Math.max(0, over | 0)))
+    * (1 - Math.min(0.72, perClass * Math.max(0, under | 0)));
+};
 
 export const TYRE_ROAD = 0, TYRE_GRAVEL = 1, TYRE_SNOW = 2;
 export const TYRE_LABEL = ['ROAD', 'GRAVEL', 'SNOW'];
@@ -3515,6 +3576,10 @@ export class PlayerCar extends Car {
   update(dt, input) {
     const g = this.game;
     if (!this.alive) {
+      // OUT OF HULLS: no redeploy. The three-wreck rule (main.js HULL_LIVES)
+      // sets this on the wreck that ends the race, and without it the car
+      // would pop back onto the road five seconds into the results screen.
+      if (this.outOfHulls) return;
       this.respawnTimer -= dt;
       if (this.respawnTimer <= 0) { this.respawn(); g.hud.feed('REDEPLOYED', 'info'); }
       return;
@@ -3550,7 +3615,48 @@ export class PlayerCar extends Car {
       // is long enough that anyone who could reverse out already has.
       // Player only — rivals carry their own staged recovery with the
       // off-camera deferral, and this simpler net would preempt it in view.
+      // BOGGED DOWN ON THE WRONG RUBBER IS NOT A RESCUE, IT IS A WRECK.
+      //
+      // Asked for as "if I get stuck in mud or snow cuz of wrong tires, car
+      // gets wrecked after no successful trial of 5s". The distinction that
+      // makes this fair rather than arbitrary is WHY you stopped: wedged
+      // against a rock is the world's fault and the net above pulls you out
+      // free; sitting in deep snow spinning road tyres is a decision you made
+      // in the garage, and the game already told you so on the track card, at
+      // the start line, and in the tyre warning. So this one costs a hull.
+      //
+      // It only exists where the compound matters (`_slick` > 0: snow and
+      // wet), only when you are genuinely under-tyred for it, and only under
+      // held throttle — an idle car is never destroyed for being parked. The
+      // UNSTUCK button still works throughout, which is the "successful trial"
+      // the request leaves room for.
+      const bogged = this === g.player && controlsLive && !this.airborne
+        && !g.freeRoam
+        && (this._tyreUnder | 0) > 0 && (this._slick ?? 0) > 0
+        && input.throttle > 0.5
+        && Math.hypot(this.vel.x, this.vel.z) < 2.0;
+      const wasBog = this._bogT ?? 0;
+      this._bogT = bogged ? wasBog + dt : 0;
+      if (bogged) {
+        // Count it down out loud from 2 s in, so the wreck is the end of a
+        // warning rather than a surprise. Once a second, not once a frame.
+        const left = Math.ceil(BOG_WRECK_S - this._bogT);
+        if (this._bogT > 1.6 && Math.ceil(BOG_WRECK_S - wasBog) !== left) {
+          g.hud?.feed?.(`DUG IN — WRONG TYRES — ${left}s`, 'bad');
+          g.buzz?.(40);
+        }
+        if (this._bogT >= BOG_WRECK_S) {
+          this._bogT = 0;
+          g.hud?.feed?.('BOGGED DOWN — HULL LOST', 'bad');
+          this.destroy(null);
+          return;
+        }
+      }
+      // The wedge net must not fire on a car that is BOGGING: both watch for
+      // held throttle and no motion at the same five seconds, and if the free
+      // rescue won that race the rule above could never fire at all.
       const wedged = this === g.player && controlsLive && !this.airborne
+        && !bogged
         && input.throttle > 0.5
         && Math.hypot(this.vel.x, this.vel.z) < 0.8;
       this._wedgeT = wedged ? (this._wedgeT ?? 0) + dt : 0;
@@ -3577,6 +3683,7 @@ export class PlayerCar extends Car {
       if (this._lostT > 2.5 || this._wedgeT > 5 || spend) {
         this._lostT = 0;
         this._wedgeT = 0;
+        this._bogT = 0;      // a rescue is a successful trial: the clock resets
         if (spend) { this.unstuckCool = 30; g.audio?.pickup?.(); }
         this.vel.set(0, 0, 0); this.vy = 0; this.airborne = false;
         this.placeAt(this.trackIndex, 0, true);
