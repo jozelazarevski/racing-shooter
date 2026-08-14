@@ -3462,7 +3462,7 @@ export const CAR_CATALOG = [
   {
     key: 'brawler', name: 'BRAWLER', price: 0, desc: 'All-rounder',
     spec: { name: 'BRAWLER', style: 'brawler', body: 0xff8c1a, accent: 0xe86a10, stripe: [0x241d16], number: 1, brand: 'APEX' },
-    stats: { maxSpeed: 58, accel: 38, grip: 5.00, health: 100, offroad: 0.80, nitroPower: 1.0, plating: 1.0 },
+    stats: { maxSpeed: 55.5, accel: 36.5, grip: 4.85, health: 96, offroad: 0.70, nitroPower: 0.98, plating: 1.02 },
   },
   {
     // Was quietly the best car in the game: the highest grip in the catalogue
@@ -3472,17 +3472,17 @@ export const CAR_CATALOG = [
     // on top end and hopeless once the surface turns.
     key: 'sleek', name: 'SLEEK', price: 4000, desc: 'Nimble hatch',
     spec: { name: 'SLEEK', style: 'sleek', body: 0xf2c81e, accent: 0xe8b83a, stripe: [0x241d16], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 54, accel: 40, grip: 5.60, health: 90, offroad: 0.45, nitroPower: 1.15, plating: 1.10 },
+    stats: { maxSpeed: 53, accel: 39, grip: 5.65, health: 84, offroad: 0.38, nitroPower: 1.12, plating: 1.10 },
   },
   {
     key: 'crown', name: 'CROWN', price: 8000, desc: 'Fast on tarmac',
     spec: { name: 'CROWN', style: 'crown', body: 0x2440b8, accent: 0x1a2c8a, stripe: [GOLD, 0xf2f0e8], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 63, accel: 37, grip: 4.60, health: 85, offroad: 0.42, nitroPower: 1.05, plating: 1.05 },
+    stats: { maxSpeed: 64, accel: 36, grip: 4.60, health: 82, offroad: 0.35, nitroPower: 1.02, plating: 1.06 },
   },
   {
     key: 'dune', name: 'DUNE', price: 13000, desc: 'Off-road king',
     spec: { name: 'DUNE', style: 'dune', body: 0xdce8f0, accent: 0x4a9ad8, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 56, accel: 38, grip: 5.15, health: 105, offroad: 1.00, nitroPower: 0.95, plating: 0.95 },
+    stats: { maxSpeed: 55, accel: 38, grip: 5.32, health: 110, offroad: 1.02, nitroPower: 0.92, plating: 0.95 },
   },
   {
     // A 911 IS A SEALED-SURFACE CAR, and the tyre rule means that is a real
@@ -3500,8 +3500,8 @@ export const CAR_CATALOG = [
     // it), so that is this car's identity: it leaves a corner harder than
     // anything else here. Deliberately NOT the grip or nitro leader; taking
     // either would have made an existing card lie about its own machine.
-    stats: { maxSpeed: 60, accel: 42, grip: 5.45, health: 82, offroad: 0.44,
-      nitroPower: 1.10, plating: 1.0 },
+    stats: { maxSpeed: 58, accel: 42, grip: 5.35, health: 84, offroad: 0.42,
+      nitroPower: 1.12, plating: 1.0 },
   },
   {
     // ...AND THE ESTATE ON THE SAME BADGE IS THE OPPOSITE ANSWER: offroad 0.88
@@ -3512,8 +3512,8 @@ export const CAR_CATALOG = [
     desc: 'Performance estate — loose and ice',
     spec: { name: 'BASTION', style: 'bastion', body: 0x1f2a38, accent: 0xc8ccd2,
       stripe: [0xc8ccd2], number: 9, brand: 'ZENITH', rims: GOLD },
-    stats: { maxSpeed: 59, accel: 38, grip: 5.20, health: 118, offroad: 0.88,
-      nitroPower: 1.0, plating: 1.12 },
+    stats: { maxSpeed: 58, accel: 38.5, grip: 5.15, health: 124, offroad: 0.92,
+      nitroPower: 1.0, plating: 1.10 },
   },
   {
     // The ALPINE was the one machine that was never the right answer: lowest
@@ -3525,7 +3525,7 @@ export const CAR_CATALOG = [
     // open circuits.
     key: 'alpine', name: 'ALPINE', price: 22000, desc: 'Mountain drifter',
     spec: { name: 'ALPINE', style: 'alpine', body: 0xf2f0e8, accent: 0xe8e2d4, stripe: [GOLD, 0xd8342a], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 57, accel: 39, grip: 5.25, health: 95, offroad: 0.85, nitroPower: 1.20, plating: 1.05 },
+    stats: { maxSpeed: 56, accel: 39, grip: 5.45, health: 98, offroad: 0.84, nitroPower: 1.20, plating: 1.04 },
   },
   {
     // The most expensive machine in the game could not win a lap anywhere — it
@@ -3534,7 +3534,7 @@ export const CAR_CATALOG = [
     // still takes the least damage doing it.
     key: 'pit', name: 'PIT-99', price: 32000, desc: 'Armored bruiser',
     spec: { name: 'PIT-99', style: 'pit', body: 0x1c1a18, accent: 0x2a2724, stripe: [GOLD], number: 1, brand: 'APEX', rims: GOLD },
-    stats: { maxSpeed: 60, accel: 36, grip: 5.05, health: 130, offroad: 0.55, nitroPower: 0.90, plating: 0.78 },
+    stats: { maxSpeed: 61, accel: 36, grip: 5.05, health: 132, offroad: 0.48, nitroPower: 0.85, plating: 0.78 },
   },
 ];
 
@@ -3559,14 +3559,23 @@ export class PlayerCar extends Car {
     this.respawnDelay = 2.5;
     this.heat = 0;        // 0..1
     this.overheated = false;
-    this.unstuckCool = 0;   // UNSTUCK button: 30 s between calls
-    this.missiles = 3;
-    this.maxMissiles = 5;
-    this.mines = 2;
-    this.maxMines = 4;
+    // ---- EVERYTHING ON THE CAR IS FINITE, AND THE LIMIT IS A PURCHASE.
+    // "Rockets and gun needs to have limited and upgradable slots. Same for
+    // the sos." Every one of these is now a per-race capacity the garage sets
+    // (see Game.applyUpgrades); the values here are the STOCK loadout, which
+    // is what a brand-new car turns up with before a credit is spent.
+    this.unstuckCool = 0;   // UNSTUCK: seconds until the next charge is usable
+    this.sos = 1;           // ...and how many charges the race started with
+    this.maxSos = 1;
+    this.rounds = 90;       // cannon magazine — was infinite, heat-limited only
+    this.maxRounds = 90;
+    this.missiles = 1;
+    this.maxMissiles = 1;
+    this.mines = 1;
+    this.maxMines = 1;
     this.nitro = 0.3;       // 0..1, charged by drifting, kills and pickups
     this.shockCooldown = 0; // seconds until the shockwave is ready
-    this.cannonDamage = 7;  // upgrade hook — garage sets this after resetRace
+    this.cannonDamage = 3.5; // upgrade hook — garage sets this after resetRace
     this.nitroRate = 1;     // upgrade hook — multiplies all nitro gains here
     this.glowColor = new THREE.Color(0x9a938a); // exhaust smoke tint
     this.bestLap = Infinity;
@@ -3672,23 +3681,37 @@ export class PlayerCar extends Car {
       // It costs 30 seconds of not having it. Free and instant, it is simply
       // a faster route through every corner; on a cooldown it stays what it
       // is for, and you think before spending it.
+      //
+      // ...AND IT IS FINITE. "Same for the sos. Limited and buyable." A pure
+      // cooldown made the rescue an unlimited resource on a long stage — wait
+      // half a minute and it is back, for ever — so on the wrong tyres, in
+      // the snow, it quietly cancelled the bog rule. A stock car carries ONE
+      // charge; the RECOVERY BEACON line sells up to four. The 30 s cooldown
+      // stays on top, so two charges are not two rescues in the same corner.
       this.unstuckCool = Math.max(0, (this.unstuckCool ?? 0) - dt);
       const called = this === g.player && controlsLive
         && (input.justPressed?.('KeyR') || this._unstuckReq);
       this._unstuckReq = false;
-      const spend = called && this.unstuckCool <= 0;
+      const spend = called && this.unstuckCool <= 0 && (this.sos ?? 0) > 0;
       if (called && !spend) {
-        g.hud.feed(`UNSTUCK RECHARGING — ${Math.ceil(this.unstuckCool)}s`, 'bad');
+        g.hud.feed((this.sos ?? 0) <= 0 ? 'NO RECOVERY CHARGES LEFT'
+          : `UNSTUCK RECHARGING — ${Math.ceil(this.unstuckCool)}s`, 'bad');
       }
       if (this._lostT > 2.5 || this._wedgeT > 5 || spend) {
         this._lostT = 0;
         this._wedgeT = 0;
         this._bogT = 0;      // a rescue is a successful trial: the clock resets
-        if (spend) { this.unstuckCool = 30; g.audio?.pickup?.(); }
+        if (spend) {
+          this.unstuckCool = 30;
+          this.sos = Math.max(0, (this.sos ?? 0) - 1);
+          g.audio?.pickup?.();
+        }
         this.vel.set(0, 0, 0); this.vy = 0; this.airborne = false;
         this.placeAt(this.trackIndex, 0, true);
         this.invuln = Math.max(this.invuln, 1.5);
-        g.hud.feed(spend ? 'UNSTUCK — back on the road' : 'RECOVERED', 'info');
+        g.hud.feed(spend
+          ? `UNSTUCK — back on the road (${this.sos} left)`
+          : 'RECOVERED', 'info');
       }
     }
 
@@ -3698,13 +3721,28 @@ export class PlayerCar extends Car {
     if (this.heat > 0) this.heat = Math.max(0, this.heat - dt * (this.overheated ? 0.35 : 0.5));
     if (this.overheated && this.heat < 0.25) this.overheated = false;
 
-    // machine gun
+    // ---- machine gun: FINITE NOW, and the magazine is a thing you buy.
+    //
+    // Asked for as "rockets and gun needs to have limited and upgradable
+    // slots". Heat alone was never a limit, only a rhythm: cool for a second
+    // and you had another belt, so the cannon was an infinite resource and the
+    // CANNON CORE upgrade bought nothing but a slightly shorter time-to-kill.
+    // A magazine makes every trigger pull a decision and turns MAGAZINE DRUM
+    // into the difference between one firefight and three.
     if (controlsLive && input.fire && !this.overheated && this.fireCooldown <= 0) {
-      this.fireCooldown = 0.085;
-      this.heat += 0.045;
-      if (this.heat >= 1) { this.overheated = true; g.hud.feed('CANNON OVERHEAT', 'bad'); }
-      g.weapons.fireBullet(this, this.cannonDamage, 0.022);
-      g.audio.shoot();
+      if (this.rounds > 0) {
+        this.rounds--;
+        this.fireCooldown = 0.085;
+        this.heat += 0.045;
+        if (this.heat >= 1) { this.overheated = true; g.hud.feed('CANNON OVERHEAT', 'bad'); }
+        g.weapons.fireBullet(this, this.cannonDamage, 0.022);
+        g.audio.shoot();
+        if (this.rounds === 0) g.hud.feed('MAGAZINE EMPTY', 'bad');
+      } else if (!this._dryFedAt || g.raceTime - this._dryFedAt > 3) {
+        // once every three seconds, not once per frame the trigger is held
+        this._dryFedAt = g.raceTime;
+        g.hud.feed('OUT OF AMMO — PICK UP A CRATE', 'bad');
+      }
     }
     // missile
     if (controlsLive && input.justPressed('KeyE')) {
@@ -3712,7 +3750,7 @@ export class PlayerCar extends Car {
         this.missiles--;
         g.weapons.fireMissile(this);
         g.audio.missile();
-      } else g.hud.feed('NO MISSILES', 'bad');
+      } else g.hud.feed('RACK EMPTY', 'bad');
     }
     // mine
     if (controlsLive && input.justPressed('KeyX')) {
@@ -3720,7 +3758,7 @@ export class PlayerCar extends Car {
         this.mines--;
         g.weapons.dropMine(this);
         g.hud.feed('MINE DEPLOYED', 'info');
-      } else g.hud.feed('NO MINES', 'bad');
+      } else g.hud.feed('NO MINES LEFT', 'bad');
     }
     // shockwave
     if (controlsLive && input.justPressed('KeyQ')) {
