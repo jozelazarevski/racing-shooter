@@ -2804,7 +2804,16 @@ export class EnemyCar extends Car {
     const engLvl = g.carUpgrades?.().engine ?? g.garage?.engine ?? 0;
     const engUp = (g.difficulty?.id ?? 'normal') === 'easy'
       ? 1 : 1 + Math.min(0.10, 0.02 * engLvl);
-    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * engUp * Math.max(0.7, band);
+    // TURN UP FOR A WORLD UNDERGEARED AND THE GRID WILL BURY YOU.
+    //
+    // Asked for plainly: if the world's requirements are not met, the player
+    // should not get anywhere near the podium — they should be destroyed in
+    // sixth. The yardstick is the world's own TRACK FEATS, because those are
+    // the parts it asks for BY NAME and they are already printed on the card,
+    // so the beating is legible rather than mysterious. Meet both gates and
+    // this is exactly 1 — the balance every other test was tuned against.
+    const kit = g.kitHandicap?.() ?? 1;
+    this.maxSpeed = this.baseMaxSpeed * D.aiSpeed * engUp * kit * Math.max(0.7, band);
 
     // THE BAND ALSO HAS TO REACH THE CORNERS, OR IT DOES NOTHING.
     //

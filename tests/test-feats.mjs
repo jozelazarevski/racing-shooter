@@ -114,5 +114,42 @@ ok(R.noDoublePay, 'and a banked feat never pays a second time');
 ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join('\n'));
 
 await browser.close();
+
+/* ---- and the world's demands have TEETH ---------------------------------
+ * "Make sure if those are not met I won't get anywhere near the podium but
+ * I'll be destroyed 6th." The feats name the parts a world wants; turning up
+ * without them puts a quicker, far more aggressive grid in front of you. Meet
+ * them all and the handicap is exactly 1, so every other suite's balance is
+ * untouched for a player who has done the work.
+ */
+const browser2 = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+  args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+const page2 = await browser2.newPage({ viewport: { width: 640, height: 420 } });
+page2.setDefaultTimeout(600000);
+await page2.goto(`${BASE}/?level=1&unlockall=1`, { waitUntil: 'load', timeout: 600000 });
+await page2.waitForFunction(() => window.__game?.track?.center, undefined, { timeout: 600000 });
+const H = await page2.evaluate(() => {
+  const g = window.__game, car = g.cars.selected;
+  g.garage.upgrades ??= {};
+  const set = (o) => { g.garage.upgrades[car] = o; };
+  const gates = g.featsOf(1).map((f) => f.need);
+  set({});
+  const none = { ready: g.kitReady(), hcap: +g.kitHandicap().toFixed(3) };
+  set({ [gates[0].key]: gates[0].lvl });
+  const half = { ready: g.kitReady(), hcap: +g.kitHandicap().toFixed(3) };
+  set(Object.fromEntries(gates.map((n) => [n.key, n.lvl])));
+  const full = { ready: g.kitReady(), hcap: +g.kitHandicap().toFixed(3) };
+  g.freeRoam = true; const roam = +g.kitHandicap().toFixed(3); g.freeRoam = false;
+  return { none, half, full, roam };
+});
+console.log(`  undergeared ${JSON.stringify(H.none)}  half ${JSON.stringify(H.half)}  kitted ${JSON.stringify(H.full)}`);
+ok(H.full.ready === 1 && H.full.hcap === 1,
+  'a fully kitted car races the grid the suites were tuned against', JSON.stringify(H.full));
+ok(H.none.hcap > H.half.hcap && H.half.hcap > H.full.hcap,
+  'every unmet gate makes the grid quicker', JSON.stringify(H));
+ok(H.none.hcap >= 1.15, 'turning up with neither part is a real pace deficit, not a nudge',
+  `${H.none.hcap}`);
+ok(H.roam === 1, 'free roam is exempt — there is no grid to lose to');
+await browser2.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
