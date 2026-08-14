@@ -3770,6 +3770,44 @@ class Game {
     ).join('')}</div>`;
   }
 
+  /** HOW READY THIS CAR IS FOR THIS WORLD — 0, 0.5 or 1.
+   *
+   *  The world's two feats name the parts it wants, at the levels it wants
+   *  them. Meeting neither is turning up underprepared; meeting both is being
+   *  kitted for the job. Nothing new to learn and nothing hidden: the same
+   *  two chips already printed on the track card are the measure. */
+  kitReady() {
+    const fs = this.featsOf();
+    if (!fs.length) return 1;
+    return fs.filter((f) => !f.locked).length / fs.length;
+  }
+
+  /** What that readiness does to the grid. At 1 this is exactly 1 — the
+   *  balance every other suite was tuned against is untouched for a player
+   *  who has done the work. Underprepared, the rivals are quicker AND far
+   *  more willing to lean on you, which is the difference between losing and
+   *  being destroyed in sixth.
+   *
+   *  Free roam and missions are exempt: there is no grid to lose to, and
+   *  punishing exploration for an unbought upgrade would be nonsense. */
+  kitHandicap() {
+    if (this.freeRoam || this.missionMode) return 1;
+    return 1 + 0.16 * (1 - this.kitReady());
+  }
+
+  /** Said out loud at the start line, once. A player who cannot podium needs
+   *  to know it is the garage and not the driving — otherwise the race just
+   *  reads as broken, which is worse than losing. */
+  _warnKit() {
+    const r = this.kitReady();
+    if (r >= 1) return;
+    const missing = this.featsOf().filter((f) => f.locked);
+    const part = (k) => (UPGRADES.find((u) => u.key === k)?.name || k).split(' ')[0];
+    const list = missing.map((f) => `${part(f.need.key)} ${f.need.lvl}`).join(' + ');
+    this.hud.feed(r <= 0 ? `UNDERGEARED FOR THIS WORLD — the grid will bury you (${list})`
+      : `HALF-KITTED — the grid has the edge here (${list})`, 'bad');
+  }
+
   /** The garage level THIS car brings to a feat's gate. Per-car, like every
    *  other upgrade read — a feat cleared in the brawler is not cleared by
    *  swapping to a stock machine. */
@@ -6260,6 +6298,12 @@ class Game {
       // contracts run in RACE only — roam money stays pure destruction rate
       this.contracts = this._pickContracts();
       this.hud.setContracts?.(this.contracts, this._ct);
+      // …and the grid is told how hard to lean on an underprepared driver
+      const kitGap = 1 - this.kitReady();
+      for (const e of this.enemies) {
+        e.aggression = (e.baseAggression ??= e.aggression) * (1 + 0.9 * kitGap);
+      }
+      this._warnKit();
     }
     if (this.missionMode) { // [MISSIONS] structured arena challenge, no grid
       this._missionLaunch();
@@ -6671,7 +6715,18 @@ class Game {
       // instead - a nearer, lower view still shows the car and the road,
       // where a high one shows neither - and it stops short of the bonnet so
       // the fix can never put the lens inside the car.
-      const MAX_UP = 13;
+      //
+      // THE CAP IS ON THE LIFT, NOT ON THE MODE. Written as a flat 13 it was
+      // sized for the chase family (h 11.5-17) and quietly demolished the
+      // overhead pair, whose entire reason to exist is to be 46 and 72 u up:
+      // measured, TOP-DOWN, TOP FAR, TRAIL and CHASE all sat at exactly 13 u
+      // above the car, so "top-down" was a chase camera with a worse angle
+      // and no amount of editing CAM_MODES.h could change it. The bug this
+      // guards against is the ground-clearance LIFT running away (car y 2,
+      // camera y 54), so the allowance is the mode's own height plus room for
+      // a reasonable lift — and never below the old 13, so the chase family
+      // keeps exactly the behaviour it was tuned with.
+      const MAX_UP = Math.max(13, (M.h || 0) + (lift > 0 ? 4 : 0.5));
       if (cp.y > pp.y + MAX_UP) {
         cp.y = pp.y + MAX_UP;
         for (let k = 0; k < 6; k++) {
