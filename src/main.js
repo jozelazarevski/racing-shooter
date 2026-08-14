@@ -122,9 +122,28 @@ const FILTER_GROUPS = [
 // always slightly too much, and you saw-saw down the road. The chase views
 // therefore drive on a calmer rack. Only the player is scaled; the AI keeps
 // its own rate so the field stays as quick as it ever was.
+// THE OVERHEAD VIEWS FOLLOW THE ROAD, NOT THE CAR.
+//
+// Both of them used to sit behind the car's RAW heading, which is the one
+// thing a top-down view must not do: from directly above there is no horizon
+// to steady the picture, so every flick of the wheel span the entire world
+// around a car that appeared not to move. The chase family was given a damped
+// travel-direction yaw for exactly this reason and these two were left behind
+// — which is why driving them felt worse the more you steered.
+//
+// `roadYaw` takes the CENTRELINE's heading instead. The road then runs
+// straight up the screen and stays there; the car visibly yaws against it,
+// which is the information you actually want (am I pointing where the road
+// goes?). The world only turns when the ROAD turns, and it turns at the rate
+// you drive into the corner rather than at the rate you move your thumb.
+//
+// `look` is the other half. It was 7 here and 1 on TOP FAR — from 56 and 87 u
+// away, so the car sat dead centre with half the screen showing tarmac
+// already driven, and the start gantry filling the rest. Pushed well out, the
+// car sits low in frame and the corner arrives on screen before you reach it.
 const CAM_MODES = [
-  { name: 'TOP-DOWN',  back: 20, h: 52, look: 7,  lookH: 0,   spdBack: 6, spdH: 10, steer: 1 },
-  { name: 'TOP FAR',   back: 24, h: 84, look: 1,  lookH: 0,   spdBack: 4, spdH: 10, steer: 1 },
+  { name: 'TOP-DOWN',  back: 16, h: 46, look: 22, lookH: 0,   spdBack: 6, spdH: 10, steer: 1, roadYaw: true },
+  { name: 'TOP FAR',   back: 20, h: 72, look: 30, lookH: 0,   spdBack: 4, spdH: 10, steer: 1, roadYaw: true },
   // CHASE sat at h 7.5 / back 13 / look 10 — down at bumper height and close
   // enough that the car filled the screen, so you could not see far enough up
   // the road to place the next corner ("super hard to drive in this camera
@@ -6387,7 +6406,19 @@ class Game {
     // of heading and actual travel direction, damped over time, so the view
     // stays settled and the road reads straight ahead.
     let fwd = p.forward;
-    if (M.chase) {
+    if (M.roadYaw && this.track?.headingAt && p.trackIndex !== undefined) {
+      // The road's own heading, damped the same way the chase yaw is. Damping
+      // still matters even though the road is smooth: `trackIndex` steps
+      // between samples, and an undamped step shows up as a visible jolt.
+      // Falls back to the car's heading if the lap index is not usable yet.
+      const wrap = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+      const road = this.track.headingAt(p.trackIndex);
+      if (Number.isFinite(road)) {
+        const cur = this._camYaw ?? road;
+        this._camYaw = cur + wrap(road - cur) * Math.min(1, 3.6 * dt);
+        fwd = new THREE.Vector3(Math.sin(this._camYaw), 0, Math.cos(this._camYaw));
+      }
+    } else if (M.chase) {
       const wrap = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
       let yaw = Math.atan2(fwd.x, fwd.z);
       const sp = Math.hypot(p.vel.x, p.vel.z);
