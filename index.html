@@ -552,7 +552,8 @@
   #level-select.tl-view .level-chip{align-items:center;text-align:left;
     gap:6px 10px;padding:8px 10px;display:grid;
     grid-template-columns:22px 64px 1fr auto;grid-template-areas:
-      'rung shot name  state' 'rung shot tags  stars' 'rung shot surf  best'}
+      'rung shot name  state' 'rung shot tags  stars' 'rung shot surf  best'
+      'rung feats feats feats'}
   #level-select.tl-view .wc-shot{grid-area:shot;width:64px;aspect-ratio:1/1;flex:none}
   #level-select.tl-view .wc-map{width:44px;height:32px;top:2px;right:2px}
   #level-select.tl-view .wc-name{grid-area:name;min-height:0;justify-content:flex-start;
@@ -565,6 +566,16 @@
   /* the affinity chip is the one thing with no room left in a rung, and it is
      the only one of these the GARAGE also states */
   #level-select.tl-view .wc-fit{display:none}
+  /* TRACK FEATS: what this world wants from the garage. A locked one names
+     the part and level that opens it — that is the point of showing it. */
+  .wc-feats{display:flex;flex-wrap:wrap;gap:3px;margin-top:2px;justify-content:center}
+  .wc-feat{font-size:8px;font-weight:800;letter-spacing:.6px;padding:2px 5px;
+    border-radius:5px;border:1px solid transparent;white-space:nowrap}
+  .wc-feat.done{color:#8de89a;background:rgba(77,208,106,.13);border-color:rgba(77,208,106,.35)}
+  .wc-feat.open{color:var(--yellow);background:rgba(255,212,0,.12);border-color:rgba(255,212,0,.35)}
+  .wc-feat.locked{color:#c0a375;background:rgba(120,100,70,.16);border-color:rgba(120,100,70,.4)}
+  #level-select.tl-view .wc-feats{grid-area:feats;justify-content:flex-start}
+
   /* THE RUNG ITSELF — the node on the spine and the career position in one
      mark, so the number and the dot cannot disagree */
   .tl-rung{display:none}
@@ -601,7 +612,7 @@
   @media (max-width:620px){
     #level-select.tl-view .level-chip{grid-template-columns:20px 52px 1fr auto;
       grid-template-areas:'rung shot name state' 'rung shot tags stars' 'rung shot surf surf'
-        'rung shot best best'}
+        'rung shot best best' 'rung feats feats feats'}
     #level-select.tl-view .region-row::before{left:21px}
     #level-select.tl-view .wc-shot{width:52px}
     #level-select.tl-view .tl-rung{width:18px;height:18px;font-size:8px}
@@ -1160,7 +1171,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r168</div>
+<div id="build-tag">r169</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1380,10 +1391,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r168"></script>
+<script type="module" src="./src/main.js?v=r169"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r168"></script>
+<script src="./src/offline.js?v=r169"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r168"></script>
+<script type="module" src="./src/traffic.js?v=r169"></script>
 </body>
 </html>
