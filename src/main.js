@@ -901,6 +901,7 @@ class Game {
     // rivals) but layers structured objectives on top — see the MISSIONS block.
     this.missionMode = params.get('mode') === 'missions';
     if (this.missionMode) this.freeRoam = true;
+    this.tracksView = this._loadTracksView();
     this.steerSetting = localStorage.getItem('ir-steer') || 'normal';
     this.controlScheme = localStorage.getItem('ir-controls') === 'two' ? 'two' : 'one';
     // touch players get the aid by default — thumbs are coarser than keys
@@ -1125,12 +1126,24 @@ class Game {
             p2.classList.toggle('off', p2 !== panel);
           }
           // TRACKS is on screen: the deferred world art is wanted NOW
-          if (btn.id === 'tab-btn-race') this._loadAllShots();
+          if (btn.id === 'tab-btn-race') {
+            this._loadAllShots();
+            // ...and land on the rung the player is actually up to. Opening a
+            // 60-world ladder at rung 1 makes them scroll past everything they
+            // have already cleared to find the one card that matters. After a
+            // frame, so the panel it lives in has been laid out and the card
+            // has a measurable position.
+            requestAnimationFrame(() => this._scrollToNextTrack('smooth'));
+          }
         });
       }
     }
 
     this._renderLevelCards();
+    // TRACKS is the tab the menu opens on, so the boot path needs the same
+    // landing the tab button gives. Two frames: one for the list to lay out,
+    // one for the fonts to settle the row heights it is measured against.
+    requestAnimationFrame(() => requestAnimationFrame(() => this._scrollToNextTrack('auto')));
 
     // mode chips: RACE | FREE ROAM | MISSIONS
     const msel = document.getElementById('mode-select');
@@ -2169,6 +2182,80 @@ class Game {
     return this.unlockAll || this.totalStars() >= this.starCost(id);
   }
 
+  /** WHERE YOU ARE UP TO — one answer, used by everything.
+   *
+   *  The roster is a ladder: career order is the LEVELS array and the price
+   *  rises exactly one star per rung (see `starCost`). That makes "the next
+   *  track" a real, derivable thing rather than a guess, and it is what the
+   *  timeline scrolls to, badges, and counts up to. Derived on every call,
+   *  never stored, so it cannot drift from the unlock rule.
+   *
+   *  Three answers in priority order, because they are three different
+   *  situations and a player in each wants a different card put in front of
+   *  them:
+   *    'unraced' — the first rung you can enter and have never driven. The
+   *                overwhelmingly common case, and the one people mean.
+   *    'stars'   — everything open has been driven, but one still has stars
+   *                on the table. Going back for those is now the way forward.
+   *    'locked'  — nothing open is outstanding, so the next thing that
+   *                matters is what you are working TOWARD. Showing a shut
+   *                gate is honest here; showing nothing is not.
+   */
+  nextTrack() {
+    const fin = this.career.finished;
+    let lv = LEVELS.find((l) => this.isLevelUnlocked(l.id) && !fin[l.id]);
+    if (lv) return { lv, why: 'unraced' };
+    lv = LEVELS.find((l) => this.isLevelUnlocked(l.id) && this.starsFor(fin[l.id]) < 3);
+    if (lv) return { lv, why: 'stars' };
+    lv = LEVELS.find((l) => !this.isLevelUnlocked(l.id));
+    if (lv) return { lv, why: 'locked' };
+    return null;
+  }
+
+  /** The one header the ladder gets, and it earns its line by counting: how
+   *  far along the roster you are, and how much of it is open to you. */
+  _ladderHeading() {
+    const open = LEVELS.filter((l) => this.isLevelUnlocked(l.id)).length;
+    const done = LEVELS.filter((l) => this.starsFor(this.career.finished[l.id]) >= 3).length;
+    return `CAREER LADDER · ${open} OF ${LEVELS.length} OPEN · ${done} CLEARED`;
+  }
+
+  /** REGIONS (the browsing view) or TIMELINE (the progression view).
+   *  Timeline is the default: on a 60-world roster the question a player
+   *  actually arrives with is "what do I race next", and only career order
+   *  answers it. */
+  _loadTracksView() {
+    try { return localStorage.getItem('ir-tracks-view') === 'regions' ? 'regions' : 'timeline'; }
+    catch { return 'timeline'; }
+  }
+
+  _setTracksView(v) {
+    this.tracksView = v === 'regions' ? 'regions' : 'timeline';
+    try { localStorage.setItem('ir-tracks-view', this.tracksView); } catch { /* private mode */ }
+    this._renderLevelCards();
+    this._scrollToNextTrack('auto');
+  }
+
+  /** Put the next rung in front of the player instead of making them hunt for
+   *  it. Lands the card a third of the way down rather than hard against the
+   *  top edge, so the rungs you already cleared stay visible above it — that
+   *  context is most of what a progression view is for. */
+  _scrollToNextTrack(behavior = 'smooth') {
+    const n = this.nextTrack();
+    if (!n) return null;
+    const card = document.querySelector(`#level-select .level-chip[data-lvid="${n.lv.id}"]`);
+    if (!card) return null;
+    // a card the current filter has hidden is not somewhere to scroll to
+    if (card.classList.contains('wf-out')) return null;
+    const scroller = card.closest('.screen');
+    if (!scroller) return null;
+    const cRect = card.getBoundingClientRect();
+    const sRect = scroller.getBoundingClientRect();
+    const top = scroller.scrollTop + (cRect.top - sRect.top) - scroller.clientHeight * 0.33;
+    scroller.scrollTo({ top: Math.max(0, top), behavior });
+    return n.lv.id;
+  }
+
   /** SAY HOW STARS ARE EARNED, WHERE THEY ARE SPENT.
    *
    *  The award rule — finish / podium / win — was only ever written on the
@@ -2364,7 +2451,28 @@ class Game {
       this._saveFilters();
       this._applyWorldFilter();
     });
-    top.append(search, fold, clear);
+    // VIEW SWITCH. Two genuinely different questions get asked of a 60-world
+    // roster, and one list cannot answer both: "what do I race next" is career
+    // order, "show me a night rally in the desert" is regions plus filters.
+    // Lives in the top row so it survives the fold — a view you cannot see you
+    // are in is worse than no switch at all.
+    const view = document.createElement('div');
+    view.id = 'wf-view';
+    for (const [key, label] of [['timeline', '⛳ TIMELINE'], ['regions', '🗺 REGIONS']]) {
+      const b = document.createElement('button');
+      b.className = 'wf-viewbtn' + (this.tracksView === key ? ' on' : '');
+      b.dataset.view = key;
+      b.textContent = label;
+      b.addEventListener('click', () => {
+        if (this.tracksView === key) return;
+        this._setTracksView(key);
+        for (const o of view.querySelectorAll('.wf-viewbtn')) {
+          o.classList.toggle('on', o.dataset.view === key);
+        }
+      });
+      view.appendChild(b);
+    }
+    top.append(search, view, fold, clear);
     host.appendChild(top);
 
     this._filterRows = new Map();
@@ -2473,13 +2581,21 @@ class Game {
     this._buildFilterBar();
     const regionRows = new Map();
     this._regionRows = regionRows;
+    const timeline = this.tracksView === 'timeline';
+    sel.classList.toggle('tl-view', timeline);
+    // THE LADDER IS ONE LADDER. Regions do not run in contiguous blocks of
+    // career order — PINE VALLEY owns rungs 1, 6, 11, 12, 13 — so grouping the
+    // timeline by region produces a "sequence" that counts 1, 6, 11, 3, and
+    // reads as broken. A progression view gets ONE unbroken run and carries
+    // the region on each card instead; the REGIONS view keeps the headers,
+    // which is the whole reason to have two views.
     const rowFor = (lv) => {
-      const rg = lv.region || 'CHAMPIONSHIP';
+      const rg = timeline ? '' : (lv.region || 'CHAMPIONSHIP');
       let pair = regionRows.get(rg);
       if (!pair) {
         const head = document.createElement('div');
         head.className = 'region-head';
-        head.textContent = rg;
+        head.textContent = rg || this._ladderHeading();
         sel.appendChild(head);
         const row = document.createElement('div');
         row.className = 'region-row';
@@ -2490,17 +2606,23 @@ class Game {
       return pair.row;
     };
     this._renderStarKey();
-    // FRESH REGIONS RENDER FIRST. Career order (pricing, progression) is the
-    // array and stays untouched — this is display order only. New content at
-    // the BOTTOM of a 32-card list is new content nobody sees: measured on a
-    // fresh save, the four newest worlds were the last four cards, locked at
-    // 26-29 stars. Reported as "I don't see the new tracks".
+    // FRESH REGIONS RENDER FIRST — in the REGIONS view only. Career order
+    // (pricing, progression) is the array and stays untouched; this is display
+    // order only. New content at the BOTTOM of a 32-card list is new content
+    // nobody sees: measured on a fresh save, the four newest worlds were the
+    // last four cards, locked at 26-29 stars. Reported as "I don't see the new
+    // tracks". The TIMELINE view deliberately does NOT do this: the whole
+    // point of a ladder is that rung 12 comes after rung 11, and re-ordering
+    // it to surface new content would make the ladder lie about the career.
     const freshRegions = new Set(LEVELS.filter((l) => l.fresh).map((l) => l.region));
     // while a picked world is still building, the highlight belongs to the pick
     const curId = this._pendingPick?.id ?? this.level?.id;
+    const nextUp = this.nextTrack();
     const rows = LEVELS.map((lv, i) => ({ lv, i }));
-    rows.sort((a, b) =>
-      (freshRegions.has(a.lv.region) ? 0 : 1) - (freshRegions.has(b.lv.region) ? 0 : 1) || a.i - b.i);
+    if (!timeline) {
+      rows.sort((a, b) =>
+        (freshRegions.has(a.lv.region) ? 0 : 1) - (freshRegions.has(b.lv.region) ? 0 : 1) || a.i - b.i);
+    }
     rows.forEach(({ lv, i }) => {
       const card = document.createElement('button');
       const unlocked = this.isLevelUnlocked(lv.id);
@@ -2529,14 +2651,28 @@ class Game {
           ? `BEST: ${['1ST', '2ND', '3RD', '4TH', '5TH', '6TH'][best.place - 1] || best.place + 'TH'}`
           : '★ UNRACED')
         : `NEEDS ${cost}★ — ${Math.max(0, cost - this.totalStars())} TO GO`;
-      card.innerHTML = `${lv.fresh ? '<div class="wc-new">NEW</div>' : ''}<div class="wc-shot" data-shot="assets/previews/w${lv.id}.jpg">
+      // THE LADDER, STATED ON THE CARD. `i` is the career rung — the same
+      // index `starCost` prices from — so the number, the gate and the lock
+      // are three faces of one rule rather than three things to keep in sync.
+      const isNext = nextUp && nextUp.lv.id === lv.id;
+      if (isNext) card.classList.add('next');
+      if (unlocked && got >= 3) card.classList.add('done');
+      else if (unlocked && best) card.classList.add('raced');
+      card.dataset.rung = i + 1;
+      const state = !unlocked ? 'LOCKED' : got >= 3 ? 'CLEARED' : best ? 'STARS LEFT' : 'OPEN';
+      const badge = isNext
+        ? `<div class="tl-next">${nextUp.why === 'locked' ? 'NEXT UNLOCK' : 'NEXT UP'}</div>` : '';
+      card.innerHTML = `${lv.fresh ? '<div class="wc-new">NEW</div>' : ''}${badge}<div class="wc-shot" data-shot="assets/previews/w${lv.id}.jpg">
           <canvas class="wc-map" width="72" height="52"></canvas>
         </div>
+        <div class="tl-rung">${i + 1}</div>
         <div class="wc-name">${unlocked ? '' : '🔒 '}${lv.name}</div>
         ${this._surfaceChip(lv)}
-        <div class="wc-tags">${WORLD_TAGS[lv.theme] || ''}</div>
+        <div class="wc-tags">${timeline && lv.region
+    ? `<b class="tl-rg">${lv.region}</b> · ` : ''}${WORLD_TAGS[lv.theme] || ''}</div>
         <div class="wc-stars${got ? '' : ' none'}">${starRow}</div>
         ${unlocked ? this._affinityChip(lv.id) : ''}
+        <div class="tl-state ${state.toLowerCase().replace(' ', '-')}">${state}</div>
         <div class="wc-best${best ? '' : ' new'}${unlocked ? '' : ' cost'}">${bestTxt}</div>`;
       this._drawCircuitMap(card.querySelector(".wc-map"), lv.route || lv.theme, !unlocked, lv.id === curId);
       card.dataset.lvid = lv.id;
