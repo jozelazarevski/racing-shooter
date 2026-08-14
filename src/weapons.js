@@ -61,6 +61,19 @@ export class Weapons {
     this._m = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
     this._zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    // PARK THE POOL BEFORE IT IS EVER SEEN.
+    //
+    // An InstancedMesh comes up with every slot at IDENTITY, which for a
+    // bullet means a full-size round sitting at the world origin — and the
+    // only code that parks unused slots is `update`, which main.js runs only
+    // while the state is 'race' or 'finished'. So on the title screen, in the
+    // garage, and all through the countdown, 220 additive-blended rounds sat
+    // stacked at (0,0,0): a saturated white sliver hanging in mid-air,
+    // measured at 798 px and pure-white saturation on TREMOLA DESCENT's menu
+    // backdrop, where the origin happens to be 39.5 u above the ground.
+    // A pool that has fired nothing must draw nothing.
+    for (let i = 0; i < MAX_BULLETS; i++) this.mesh.setMatrixAt(i, this._zero);
+    this.mesh.instanceMatrix.needsUpdate = true;
     this._colorPlayer = new THREE.Color('#ffe27d');
     this._colorEnemy = new THREE.Color('#ff5b3d');
     if (this.mesh.instanceColor === null) {

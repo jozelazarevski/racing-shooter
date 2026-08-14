@@ -377,6 +377,52 @@ latency (unrelated to the fix) and isn't a suite anyone wants in the regular
 gate. `location.reload()` itself is left real (Location objects refuse to
 have `reload` redefined) and counted from the Node side. 5/5.
 
+**"Remove all floating objects across the game" — one roster-wide cause found
+and fixed (r165, mainline session); the scenery sweep is STILL OPEN.**
+
+FIXED: the unfired bullet pool. An `InstancedMesh` comes up with every slot at
+IDENTITY, and `Weapons.update` — the only code that parks unused slots at zero
+scale — is called by main.js only while the state is `race` or `finished`. So
+on the title screen, in the garage, and all through every countdown, all 220
+additive-blended rounds sat stacked at world (0,0,0). Measured on TREMOLA
+DESCENT, whose origin happens to be 39.5 u above the ground: **798 px at
+max delta 252** (saturated white) hanging in clear air over the menu backdrop,
+confirmed by rendering the same frame twice with the pool hidden. Fixed by
+parking every slot in the constructor. `tests/test-floating.mjs` (new, 6/6)
+sweeps all 60 worlds for the SIGNATURE (an exact-identity instance matrix
+means "never written") and pixel-diffs the title backdrop; it also pins the
+obvious wrong fix — a live bullet must still get a drawable matrix. The
+roster sweep found no other pool with this mistake.
+
+STILL OPEN — the scenery half of the report (the photographed plank bridge).
+`tests/tool-float-census.mjs` is a working column-metric census: bucket every
+drawn part's footprint into a 2 u grid, keep the lowest geometry per cell, and
+flag parts that are the lowest thing in their own column AND clear of the
+ground. Per-PART height is useless (a roof legitimately sits 9 u up because
+its walls reach the ground); the column metric is what makes the output
+readable. Four probe traps already paid for, do not re-pay them:
+  1. measure AFTER a few frames — anything positioned in `update()` is still
+     at its constructor default before the first frame;
+  2. skip the instancing TEMPLATES — one trunk and one foliage cone per
+     species sit at the origin with identity transforms and share their
+     materials with the InstancedMesh (painting one magenta turns the whole
+     world magenta, which is how they were identified);
+  3. skip ZERO-EXTENT instances — a parked pool slot collapses to a point at
+     the origin and otherwise reports as one floater per unused slot;
+  4. near the carriageway the ROAD is the ground, not `terrainHeight` — on an
+     embankment or a shelf cut into a hillside the kerbs and retaining walls
+     are 30+ u above the valley floor and entirely correct.
+What remains is ~3k hits dominated by classes I have NOT yet separated and
+which are probably legitimate: boats/pontoons/`flotilla`/`marina-*` float on
+WATER (the probe compares against the seabed), `oldtown-strings` and
+`oldtown-lanterns` are bunting strung between buildings, and anything standing
+on another object whose supporting mesh was too large to stamp into the column
+grid. Two spot-checked worst offenders (CANYON RUN `inst:Cone` 57 u,
+`element-box` 35 u) photographed as fully grounded — i.e. false positives. NO
+second real scenery floater is confirmed yet, and the photographed bridge has
+not been located. Next step for whoever takes it: give the census a water-level
+reference and stamp large meshes by sampling, then re-triage.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
