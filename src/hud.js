@@ -23,6 +23,7 @@ export class Hud {
       wrongWay: $('wrong-way'), vignette: $('damage-vignette'),
       // touch button badges
       bMissile: $('b-missile'), bMine: $('b-mine'), bShock: $('b-shock'),
+      tUnstuck: $('t-unstuck'), bUnstuck: $('b-unstuck'),
       tFire: $('t-fire'), tShock: $('t-shock'), tNitro: $('t-nitro'),
     };
     this.speedo = $('speedo');
@@ -278,6 +279,14 @@ export class Hud {
       this.el.tShock.classList.toggle('cooling', !shockReady);
       this.el.bShock.style.display = shockReady ? 'none' : 'flex';
       if (!shockReady) this.el.bShock.textContent = Math.ceil(p.shockCooldown);
+      // UNSTUCK: dimmed and unpressable while it recharges, counting down on
+      // its own face so the wait is never a mystery
+      if (this.el.tUnstuck) {
+        const cool = p.unstuckCool ?? 0;
+        this.el.tUnstuck.classList.toggle('cooling', cool > 0);
+        this.el.bUnstuck.style.display = cool > 0 ? 'flex' : 'none';
+        if (cool > 0) this.el.bUnstuck.textContent = Math.ceil(cool);
+      }
       const nf = Math.round(p.nitro * 100);
       this.el.tNitro.style.background =
         `conic-gradient(rgba(127,212,255,${p.boostTimer > 0 ? 1 : 0.8}) ${nf}%, rgba(38,26,12,.6) 0)`;
