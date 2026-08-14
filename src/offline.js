@@ -95,6 +95,21 @@
   // So: the moment a new worker takes control, reload once. `hadController`
   // keeps this from firing on a first-ever visit, where there is no previous
   // build on screen to replace and a reload would just be a flicker.
+  //
+  // RELOAD STORMS. Several releases can land minutes apart (parallel sessions
+  // shipping independently), and each one is a fresh controllerchange. Reload
+  // reacting to every one of them the instant it arrives turns a burst of N
+  // deploys into N visible reloads on an open tab — the page appears to "keep
+  // refreshing itself", which reads as broken even though every reload was,
+  // individually, correct. COOLDOWN turns a burst into ONE reload: if we
+  // auto-reloaded recently, later updates in the same burst wait out the rest
+  // of the window instead of firing immediately, so whichever version is
+  // newest by the time the cooldown expires is the one the player lands on.
+  // Stamped in sessionStorage (survives the reload itself, per-tab) rather
+  // than a plain variable, since the reload wipes normal JS state.
+  const RELOAD_COOLDOWN_MS = 45000;
+  const STAMP_KEY = 'ignite-auto-reload-at';
+  const lastReload = (() => { try { return +sessionStorage.getItem(STAMP_KEY) || 0; } catch { return 0; } })();
   const hadController = !!navigator.serviceWorker.controller;
   let reloading = false;
   // ...but never yank the world out from under someone mid-race. If a new
@@ -103,12 +118,14 @@
     const g = window.__game;
     const racing = g && (g.state === 'race' || g.state === 'countdown');
     if (racing) { setTimeout(reloadWhenIdle, 2000); return; }
+    try { sessionStorage.setItem(STAMP_KEY, String(Date.now())); } catch { /* private mode */ }
     location.reload();
   };
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController || reloading) return;
     reloading = true;
-    reloadWhenIdle();
+    const wait = Math.max(0, RELOAD_COOLDOWN_MS - (Date.now() - lastReload));
+    if (wait) setTimeout(reloadWhenIdle, wait); else reloadWhenIdle();
   });
 
   // Register when the main thread is IDLE, not on `load`. Registering on load

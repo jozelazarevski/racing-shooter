@@ -339,6 +339,44 @@ re-litigated: if someone has spare cycles, the zone above is where a kink-
 relaxation or route-authoring pass (same family as the SEA CLIFF RUN /
 chain-waist fix above) would most likely land.
 
+**"163 is broken, keeps on refreshing" — fixed (r164, mainline session).**
+Reported plainly, no other detail, right in the middle of a shipping burst:
+r160 (twice, different title), r161 (economy), r162, r163 all landed inside
+about an hour, several from parallel sessions. `src/offline.js` reloads the
+page once whenever a new service-worker controller takes over — right,
+because the worker that just activated already skipped-waited and claimed,
+so the OLD code stays on screen until something reloads it — but the check
+that decides "new controller" runs once per navigation with no rate limit.
+A player who reopens or refreshes during a burst like that hits the check
+again each time, and if another deploy has landed since their last reload,
+gets reloaded again. Every individual reload is correct; a few of them in
+a short span reads as "it keeps refreshing on me".
+
+Fixed with a cooldown, stamped in `sessionStorage` (survives the reload
+itself — a plain variable wouldn't): an auto-reload won't fire again within
+`RELOAD_COOLDOWN_MS` (45 s) of the last one. A `controllerchange` inside that
+window is DELAYED to wait out the remainder rather than firing immediately —
+since the delayed reload re-registers and re-checks on the fresh load it
+lands on, it still converges to whatever is newest, it just stops stacking.
+
+Confirmed the mechanism against real deploys by hand (file-swapping the
+served build under a live tab, twice in quick succession) before writing it
+up — worth recording since the fix looks obvious in hindsight but the
+diagnosis wasn't: `?level=163` was checked and gracefully clamps to a valid
+world (not it), and a single continuously-open tab can trigger *at most one*
+auto-reload under the pre-fix code too (`reg.update()` only runs once, at
+boot) — the loop only shows up across SEPARATE reopens/refreshes landing on
+different deploys, which is exactly the shape a live shipping burst produces
+and a single steady-state test won't.
+
+`tests/test-reload-storm.mjs` (new) drives the real `src/offline.js`
+unmodified, in a real page, against a mocked `navigator.serviceWorker` whose
+events fire on command — deterministic, since a real end-to-end drive of
+this measured 30-100s+ per hop purely on Chromium's own SW update-check
+latency (unrelated to the fix) and isn't a suite anyone wants in the regular
+gate. `location.reload()` itself is left real (Location objects refuse to
+have `reload` redefined) and counted from the Node side. 5/5.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
