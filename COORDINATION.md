@@ -423,6 +423,54 @@ second real scenery floater is confirmed yet, and the photographed bridge has
 not been located. Next step for whoever takes it: give the census a water-level
 reference and stamp large meshes by sampling, then re-triage.
 
+**The track list is a CAREER LADDER now, and it opens where you left off
+(r166, mainline session).** Asked for as "track leveling and timeline; show
+available tracks; auto scroll to the available next track".
+
+Sixty worlds in a region-grouped grid answer "show me a night rally in the
+desert" well and "what do I race next" not at all. There are now two views,
+switched from a pair of chips in the filter bar's top row (so a fold can
+never hide which one you are in) and remembered in `ir-tracks-view`:
+
+- **TIMELINE** (the new default): the roster in CAREER order, which is
+  already the price order — `starCost` counts rungs, one star per rung — so
+  laid out in array order the list tells the progression story on its own. It
+  only needed a spine, a rung badge, and a word per row saying OPEN /
+  CLEARED / STARS LEFT / LOCKED.
+- **REGIONS**: the old grid, untouched. This is what the filters were built
+  for and it stays exactly as it was.
+
+**ONE LADDER, and this is the trap.** Regions do NOT own contiguous blocks of
+career order — PINE VALLEY holds rungs 1, 6, 11, 12, 13 — so the first cut,
+which kept the region headers, produced a "sequence" that counted 1, 6, 11,
+3 and read as broken. The timeline drops the headers entirely, runs 1..60
+unbroken, and carries the region on each card instead. It also does NOT apply
+the fresh-regions-first reorder the REGIONS view does: re-ordering a ladder to
+surface new content makes the ladder lie about the career.
+
+`nextTrack()` is the single derived answer to "where am I up to", used by the
+scroll, the NEXT badge and nothing else — three cases in priority order:
+first OPEN rung never driven ('unraced', the common one), else the first
+still holding stars ('stars'), else the gate you are working toward
+('locked'). Never stored, so it cannot drift from the unlock rule. Note the
+third case is only reachable with an explicit `lv.cost` override: at the
+default slope, clearing every open world always unlocks more than it clears.
+
+Auto-scroll fires on the TRACKS tab button and once on boot (two rAFs, so the
+fonts have settled the row heights it measures against) — deliberately NOT on
+every repaint, which would fight `_renderLevelCards`'s existing scroll-restore
+and yank the list while you browse. `test-menu-noreset`'s scroll-restore
+assertion still passes unchanged, which is the guard on that. A next track the
+current filter has hidden is left alone rather than scrolled to.
+
+If your lane touches `_renderLevelCards`: cards are still DIRECT children of
+`.region-row` in both views, and still carry `data-lvid` plus the filter
+datasets — `_applyWorldFilter`, `_markCurrentCard` and the lazy-art observer
+all work untouched. The timeline is layout (`#level-select.tl-view`), not a
+second card builder. `tests/test-timeline.mjs` (new, 24/24) pins the ladder
+being unbroken and in career order, all four `nextTrack` cases, the scroll
+actually moving and landing on screen, and REGIONS still being intact.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

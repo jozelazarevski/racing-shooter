@@ -535,6 +535,79 @@
   /* auto-FILL (not -fit): regions with fewer worlds keep the same card width,
      so every region shares one grid rhythm */
   .region-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%}
+
+  /* ---------- TIMELINE VIEW: the roster as a career ladder ----------
+     Career order IS the price order (starCost counts rungs), so laid out in
+     array order the list already tells the progression story — it only needed
+     a spine to read as one. Cards stay DIRECT children of .region-row so the
+     filter pass, the current-card highlight and the lazy art observer all keep
+     working untouched; everything below is layout. */
+  #level-select.tl-view .region-row{display:flex;flex-direction:column;gap:8px;position:relative}
+  /* THE SPINE runs behind the rung badges, which is why the rung lives in a
+     grid column of its own rather than hanging off the card's left edge: the
+     card clips its own overflow (the NEW ribbon depends on that), so anything
+     outside the border box is invisible. Inside the box it always draws. */
+  #level-select.tl-view .region-row::before{content:'';position:absolute;left:23px;top:10px;bottom:10px;
+    width:2px;background:linear-gradient(180deg,var(--line-soft),rgba(255,212,0,.20));border-radius:2px}
+  #level-select.tl-view .level-chip{align-items:center;text-align:left;
+    gap:6px 10px;padding:8px 10px;display:grid;
+    grid-template-columns:22px 64px 1fr auto;grid-template-areas:
+      'rung shot name  state' 'rung shot tags  stars' 'rung shot surf  best'}
+  #level-select.tl-view .wc-shot{grid-area:shot;width:64px;aspect-ratio:1/1;flex:none}
+  #level-select.tl-view .wc-map{width:44px;height:32px;top:2px;right:2px}
+  #level-select.tl-view .wc-name{grid-area:name;min-height:0;justify-content:flex-start;
+    font-size:12.5px;letter-spacing:1px}
+  #level-select.tl-view .wc-tags{grid-area:tags;text-align:left}
+  #level-select.tl-view .wc-stars{grid-area:stars;text-align:right;margin-top:0}
+  #level-select.tl-view .wc-surf{grid-area:surf;width:auto;justify-self:start}
+  #level-select.tl-view .wc-best{grid-area:best;margin-top:0;text-align:right;justify-self:end}
+  #level-select.tl-view .tl-state{grid-area:state}
+  /* the affinity chip is the one thing with no room left in a rung, and it is
+     the only one of these the GARAGE also states */
+  #level-select.tl-view .wc-fit{display:none}
+  /* THE RUNG ITSELF — the node on the spine and the career position in one
+     mark, so the number and the dot cannot disagree */
+  .tl-rung{display:none}
+  #level-select.tl-view .tl-rung{grid-area:rung;display:grid;place-items:center;
+    width:20px;height:20px;border-radius:50%;font-family:'Luckiest Guy';font-size:9px;
+    color:var(--ink);background:var(--line-strong);
+    box-shadow:0 0 0 2px rgba(38,26,12,.85)}
+  #level-select.tl-view .level-chip.done .tl-rung{background:#4dd06a}
+  #level-select.tl-view .level-chip.raced .tl-rung{background:var(--amber)}
+  #level-select.tl-view .level-chip.locked .tl-rung{background:rgba(150,128,92,.75)}
+  #level-select.tl-view .level-chip.next .tl-rung{background:var(--yellow);
+    box-shadow:0 0 0 2px rgba(38,26,12,.85),0 0 12px rgba(255,212,0,.85)}
+  /* what this rung IS, in one word */
+  .tl-state{font-size:8.5px;font-weight:800;letter-spacing:1.2px;padding:2px 6px;
+    border-radius:5px;border:1px solid transparent;white-space:nowrap}
+  #level-select:not(.tl-view) .tl-state{display:none}
+  .tl-state.open{color:var(--yellow);background:rgba(255,212,0,.12);border-color:rgba(255,212,0,.35)}
+  .tl-state.cleared{color:#8de89a;background:rgba(77,208,106,.12);border-color:rgba(77,208,106,.3)}
+  .tl-state.stars-left{color:#e8c987;background:rgba(232,201,135,.10);border-color:rgba(232,201,135,.3)}
+  .tl-state.locked{color:#c0a375;background:rgba(120,100,70,.14);border-color:rgba(120,100,70,.35)}
+  /* NEXT UP — the one card the view exists to put in front of you */
+  .tl-next{position:absolute;top:0;right:0;z-index:2;font-family:'Luckiest Guy';
+    font-size:8px;letter-spacing:2px;color:var(--ink);background:var(--yellow);
+    padding:2px 8px;border-bottom-left-radius:8px}
+  .level-chip.next{border-color:var(--yellow);background:rgba(255,212,0,.10)}
+  .level-chip.next.locked{opacity:.8}
+  /* REGIONS | TIMELINE — in the top row, so a fold never hides which view you
+     are in */
+  #wf-view{display:flex;gap:0;flex:none;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .wf-viewbtn{pointer-events:auto;cursor:pointer;border:0;background:rgba(38,26,12,.5);
+    color:var(--gold-dim);font-family:'Baloo 2';font-weight:800;font-size:9.5px;
+    letter-spacing:1.2px;padding:6px 9px;-webkit-tap-highlight-color:transparent}
+  .wf-viewbtn.on{background:var(--yellow);color:var(--ink)}
+  @media (max-width:620px){
+    #level-select.tl-view .level-chip{grid-template-columns:20px 52px 1fr auto;
+      grid-template-areas:'rung shot name state' 'rung shot tags stars' 'rung shot surf surf'
+        'rung shot best best'}
+    #level-select.tl-view .region-row::before{left:21px}
+    #level-select.tl-view .wc-shot{width:52px}
+    #level-select.tl-view .tl-rung{width:18px;height:18px;font-size:8px}
+    #level-select.tl-view .wc-best{text-align:left;justify-self:start}
+    .wf-viewbtn{font-size:9px;padding:6px 7px;letter-spacing:.8px}
+  }
   .level-chip{pointer-events:auto;cursor:pointer;padding:8px 8px 10px;font-family:'Baloo 2';
     position:relative;overflow:hidden;    /* anchors + clips the NEW ribbon */
     color:var(--cream);border-radius:var(--r-md);text-align:center;
@@ -1087,7 +1160,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r165</div>
+<div id="build-tag">r166</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1307,10 +1380,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r165"></script>
+<script type="module" src="./src/main.js?v=r166"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r165"></script>
+<script src="./src/offline.js?v=r166"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r165"></script>
+<script type="module" src="./src/traffic.js?v=r166"></script>
 </body>
 </html>
