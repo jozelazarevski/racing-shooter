@@ -5,7 +5,7 @@ blackboard: what each lane owns, and measurements one session made that
 another needs. Update it when you claim or finish a lane; read it before
 starting work that might be someone else's.
 
-_Last updated: 2026-08-11, by the mainline session (r153)._
+_Last updated: 2026-08-14, by the mainline session (r171)._
 
 ## Lanes
 
@@ -470,6 +470,100 @@ all work untouched. The timeline is layout (`#level-select.tl-view`), not a
 second card builder. `tests/test-timeline.mjs` (new, 24/24) pins the ladder
 being unbroken and in career order, all four `nextTrack` cases, the scroll
 actually moving and landing on screen, and REGIONS still being intact.
+
+**Road obstructions: THREE plausible theories measured and rejected before the
+one that worked (r167, mainline session).** Reported from a photograph — a car
+stopped dead in a forest with two pale bars laid across the carriageway. Census
+tool is committed as `tests/tool-lane-blockers.mjs`; it walks the roster and
+reports every collider whose footprint overlaps the driveable width, bucketed
+by kind.
+
+If your lane is tempted by any of these, the measurement is already done:
+
+| Theory | Result |
+|---|---|
+| Width-aware `_edgeOff(i, extra)` at the 6 placement sites | 342 → 340. No effect. |
+| `_clearCarriageway()` post-build collider nudge | **worse** — 140 → 152 barriers across 13 worlds. Moving a wall rigidly by its worst end swings the far end across a curving road. Per-end version: 342 → 313, still spread. |
+| Raising `WALL_OFF` 10.4 → 11.4 | 342 → 340. |
+
+None of the margin theories moved the number, and **that is still unexplained**
+— worth knowing before anyone spends another roster sweep on it. The actual fix
+came from asking *where* the blockers sit rather than why they might be
+misplaced: mean lateral 2.5 u, range down to 0.0 — dead centre, not near the
+edge, so no edge margin could ever have helped. The culvert parapet builder was
+offsetting along `(sin roadYaw, cos roadYaw)` — the **tangent** — where the
+normal was intended, laying its two parapets flat across the road instead of
+down either side. `nrm` is `(tan.z, 0, -tan.x)` and `headingAt` is
+`atan2(tan.x, tan.z)`, so the normal is `(cos y, -sin y)`; the fix is that one
+substitution, plus a compact round collider on the wall line.
+
+Also measured and rejected: modelling the parapet as a `_barrier` **segment**
+is the tidier model and is much worse (140 → 497) — a straight 20 u wall beside
+a curving road cuts the corner.
+
+**Culvert headwalls make the same tangent-for-normal substitution** and only
+escape because `_clearsRoad` discards the bad ones. Deliberately left alone:
+fixing it would start *building* stonework where none stands today, which is a
+world-content change, not a bug fix.
+
+Remaining after r167: 286 — `barrier:stone` 140 across 7 worlds (from the
+general wall builder), `solid:wood` 65, `solid:metal` 25, `solid:stone` 47,
+`solid:hut` 9. Unclaimed.
+
+**The overhead cameras were capped by a constant nobody was reading (r168 →
+r170, mainline session).** "Fix the top down camera" — TOP-DOWN and TOP FAR sat
+behind the car's RAW heading, which is the one thing an overhead view must not
+do: from directly above there is no horizon to steady the picture, so every
+flick of the wheel span the world around a car that appeared not to move.
+Steering felt worse the more of it you did, which is why "fix the top down
+camera" and "improve the steering" arrived as one complaint. They now take the
+centreline's heading (`roadYaw`), damped, ahead of the `M.chase` branch.
+
+The trap, and the reason r168 shipped a fix that did nothing: the
+ground-clearance guard held `const MAX_UP = 13`, which capped **every** mode's
+height above the car regardless of its config. Editing `CAM_MODES.h` was
+therefore inert — measured TOP-DOWN, TOP FAR, TRAIL and CHASE all sitting at
+exactly 13.0 u up. Now `Math.max(13, (M.h||0) + (lift>0?4:0.5))`; measured
+after: 46.5 / 72.5 / 26.5 / 12.4 / 17.5. **If you change a camera constant,
+measure `g.camPos`, not the config** — that is the whole lesson, and it cost a
+release. `tests/test-camera.mjs` (7/7) judges each family against what it
+follows: overhead against the road, chase against the car.
+
+**Feats: the garage is a set of keys now, not a slider (r169/r170, mainline
+session).** Asked for as "add more fun elements per track like I have to
+upgrade enough or buy elements". Contracts are the DAILY money game — three
+picks, rerolled, doable anywhere — so they never make one world feel different
+from the next nor give a reason to buy a PARTICULAR part. A feat is the other
+axis: fixed to the world, banked permanently in the career, and gated behind
+one named line of the garage at a named level. `TRACK_FEATS` holds seven
+archetypes, one per upgrade line, and `featsFor(levelId)` deals each world a
+seeded pair. A locked feat is SHOWN on the card — seeing "GORGE LEAP · needs
+DAMPERS 2" on a track you cannot yet beat is the mechanism, it turns credits
+you are saving into a thing you are saving FOR.
+
+Teeth, asked for separately as "if those are not met I won't get anywhere near
+the podium but I'll be destroyed 6th": `kitReady()` is the unlocked fraction
+and `kitHandicap()` is `1 + 0.16 * (1 - kitReady())`, folded into rival
+`maxSpeed` in `vehicles.js`, with rival aggression scaled by `1 + 0.9 * kitGap`
+in `startRace()`. **A fully kitted car gets exactly 1.0**, so every other
+suite's balance is untouched for a player who has done the work — that is the
+property to preserve if you touch it. Free roam and missions are exempt.
+`tests/test-feats.mjs` 14/14.
+
+**UNSTUCK button (r171, mainline session).** The automatic rescue nets are
+deliberately slow — five seconds of HELD throttle before the wedge net fires —
+so an idle car on a mountainside is never yanked off it. Right for a car the
+game can detect is stuck, useless for nose-in against a rock. The 🆘 button
+calls the SAME recovery branch, so a hand-called rescue can never diverge from
+an automatic one, and spends a 30 s cooldown — free and instant it is not a
+rescue, it is a faster line through every corner (aim at the apex, hit the
+wall, teleport to the centreline at zero lateral). A refused press does not
+extend the timer.
+
+One gotcha for anyone adding per-race state: **the reset belongs in
+`startRace()`, not `resetRace()`** — `startRace()` is the player-facing entry
+and does not call `resetRace()` in that order, so a reset placed there is never
+reached. Caught by `tests/test-unstuck.mjs` (9/9), not by reading.
 
 ## Rebase notes
 
