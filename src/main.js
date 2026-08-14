@@ -6289,6 +6289,9 @@ class Game {
     this.hud.show();
     document.getElementById('touch-ui').classList.add('on');
     if (this.input.resetJoystick) this.input.resetJoystick(); // zone has real bounds only once visible
+    // every race starts with the rescue in hand — a cooldown must never
+    // carry across a restart, or a retry begins already punished
+    this.player.unstuckCool = 0;
     this.state = 'countdown';
     this.countdown = 3.6;
     this._lastCount = 4;

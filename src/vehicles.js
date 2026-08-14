@@ -3498,6 +3498,7 @@ export class PlayerCar extends Car {
     this.respawnDelay = 2.5;
     this.heat = 0;        // 0..1
     this.overheated = false;
+    this.unstuckCool = 0;   // UNSTUCK button: 30 s between calls
     this.missiles = 3;
     this.maxMissiles = 5;
     this.mines = 2;
@@ -3553,13 +3554,34 @@ export class PlayerCar extends Car {
         && input.throttle > 0.5
         && Math.hypot(this.vel.x, this.vel.z) < 0.8;
       this._wedgeT = wedged ? (this._wedgeT ?? 0) + dt : 0;
-      if (this._lostT > 2.5 || this._wedgeT > 5) {
+      // UNSTUCK, ON DEMAND. The automatic nets above are deliberately slow —
+      // five seconds of held throttle, because an idle car parked on a
+      // mountainside must never be yanked off it. That is right for a car the
+      // game can TELL is stuck, and useless for the case the player can see
+      // and it cannot: nose-in against a rock, rolled into a ditch, facing a
+      // wall with the road behind you. So there is a button, and it is the
+      // same recovery the nets fire — one path, so a hand-called rescue can
+      // never behave differently from an automatic one.
+      //
+      // It costs 30 seconds of not having it. Free and instant, it is simply
+      // a faster route through every corner; on a cooldown it stays what it
+      // is for, and you think before spending it.
+      this.unstuckCool = Math.max(0, (this.unstuckCool ?? 0) - dt);
+      const called = this === g.player && controlsLive
+        && (input.justPressed?.('KeyR') || this._unstuckReq);
+      this._unstuckReq = false;
+      const spend = called && this.unstuckCool <= 0;
+      if (called && !spend) {
+        g.hud.feed(`UNSTUCK RECHARGING — ${Math.ceil(this.unstuckCool)}s`, 'bad');
+      }
+      if (this._lostT > 2.5 || this._wedgeT > 5 || spend) {
         this._lostT = 0;
         this._wedgeT = 0;
+        if (spend) { this.unstuckCool = 30; g.audio?.pickup?.(); }
         this.vel.set(0, 0, 0); this.vy = 0; this.airborne = false;
         this.placeAt(this.trackIndex, 0, true);
         this.invuln = Math.max(this.invuln, 1.5);
-        g.hud.feed('RECOVERED', 'info');
+        g.hud.feed(spend ? 'UNSTUCK — back on the road' : 'RECOVERED', 'info');
       }
     }
 
