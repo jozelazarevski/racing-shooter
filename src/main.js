@@ -4584,6 +4584,57 @@ class Game {
         desc: `Waves thicken until the sky is full. The clock only runs while they can reach you — ${fmtTime(b)} pays, ${fmtTime(g)} is extraction. One hull, no respawn.`,
       });
     }
+    /* ---- THE THREE THAT HAVE SOMETHING TO BEAT ------------------------
+     *
+     * Reported as "missions needs to be redesigned, they are boring now".
+     * The diagnosis is structural, not a matter of tuning: RAMPAGE, STAR RUSH
+     * and CHECKPOINT BLITZ are the SAME loop — collect N of X before a clock —
+     * with a different pickup mesh on it, and four of the five put you alone
+     * in an empty world. A mission with no antagonist is a time trial with
+     * extra steps, however well the clock is tuned.
+     *
+     * These three each have something on the road with you. They deliberately
+     * reuse the race machinery (the rival AI, the racing line, the standings)
+     * rather than inventing a new one, because that AI is the most interesting
+     * thing in the game and the arena modes were throwing it away.
+     */
+    {
+      // ONE RIVAL, ONE LAP, NO WEAPONS ON EITHER SIDE. The purest version of
+      // the thing missions were missing. Medals are MARGINS, not times, so the
+      // result reads as "I beat them by four seconds" rather than as a
+      // stopwatch number you have to know the track to interpret.
+      defs.push({
+        id: 'duel', icon: '⚔', name: 'DUEL', tip: 'BEAT YOUR RIVAL, ONE LAP',
+        goal: 1, time: Math.round(lapT * 2.6 + 14), bonus: 0, circuit: true, duel: true,
+        gold: 4, silver: 1.2, bronze: 0.01,   // seconds of margin at the flag
+        desc: 'One rival, one lap, wheel to wheel. No rockets, no mines — just '
+          + 'the pair of you and the road. Win by four seconds for gold.',
+      });
+    }
+    {
+      // THEY RUN, YOU CHASE, AND THEY SHOOT BACKWARDS. Rewards being CLOSE
+      // rather than being fast — a different skill from every other mission
+      // here, and the one that most rewards knowing a corner.
+      defs.push({
+        id: 'pursuit', icon: '🎯', name: 'PURSUIT', tip: 'HOLD THEM IN RANGE',
+        goal: 20, time: Math.round(lapT * 1.9 + 16), bonus: 0, circuit: false, pursuit: true,
+        gold: 20, silver: 13, bronze: 7,       // seconds banked inside 26 u
+        desc: 'A runner ahead, armed and unwilling. Time only banks while you '
+          + 'are within 26 u of them — close it down and keep it closed.',
+      });
+    }
+    {
+      // NO GUNS, LIVE HAZARDS. The world is the opponent. Every fall hazard,
+      // rockfall and burning treefall the theme carries is switched on and the
+      // cannon is switched off, so the only tool is the car.
+      defs.push({
+        id: 'gauntlet', icon: '☠', name: 'GAUNTLET', tip: 'ONE LAP, NO WEAPONS',
+        goal: 1, time: Math.round(lapT * 2.6 + 14), bonus: 0, circuit: true, gauntlet: true,
+        gold: lapT * 1.16 + 2, silver: lapT * 1.45 + 2,
+        desc: 'The road at its worst and nothing to shoot back with. Rockfall, '
+          + 'burning treefall, whatever this world throws — drive through it.',
+      });
+    }
     defs.push({
       id: 'hotlap', icon: '⏱', name: 'HOT LAP', tip: 'ONE LAP VS THE CLOCK',
       // Standing start off the grid, so the targets carry a ~2s launch tax on
@@ -4638,12 +4689,46 @@ class Game {
     this.state = 'race';
     this.startScore = this.score;
     this.track.setLights('green');
-    for (const e of this.enemies) { e.alive = false; e.mesh.visible = false; }
+    // THE GRID IS NOT ALWAYS SWEPT ANY MORE. Every mission used to begin by
+    // deleting the field, which is exactly what made four of the five lonely.
+    // DUEL and PURSUIT keep ONE rival and use the real race AI on it.
+    const keepsRival = def.duel || def.pursuit;
+    this.enemies.forEach((e, i) => {
+      const keep = keepsRival && i === 0;
+      e.alive = keep;
+      e.mesh.visible = keep;
+    });
     this._raceChopper = true; // blocks the final-lap race-chopper path
     this.mission = {
       def, count: 0, elapsed: 0, started: false, over: false,
       timed: def.time > 0, tLeft: def.time, warn10: false, spawnT: 0, tier: 0,
+      inRange: 0, bestGap: -999,
     };
+    if (keepsRival) {
+      const foe = this.enemies[0];
+      this.missionFoe = foe;
+      foe.health = foe.maxHealth;
+      // A DUEL IS A FAIR FIGHT: neither car shoots. `noGuns` is read by the
+      // rival's own weapon timers and by the player's fire path, so "no
+      // rockets, no mines" on the card is enforced rather than merely stated.
+      this.missionNoGuns = !!def.duel || !!def.gauntlet;
+      if (def.pursuit) {
+        // The runner starts a third of a lap up the road and drives its own
+        // race flat out; the mission is entirely about closing that down.
+        foe.aggression = Math.min(2, (foe.baseAggression ??= foe.aggression) * 1.4);
+        foe.placeAt((this.track.gridSlot(0).index + Math.round(this.track.N * 0.09)) % this.track.N, 0);
+      } else {
+        const s2 = this.track.gridSlot(1);
+        foe.placeAt(s2.index, s2.lateral);
+      }
+      foe.lap = 1;
+      foe.finished = false;
+      this.hud.feed(`⚔ ${foe.name} — ${def.duel ? 'BEAT THEM' : 'RUN THEM DOWN'}`, 'bad');
+    } else {
+      this.missionFoe = null;
+      this.missionNoGuns = !!def.gauntlet;
+    }
+    if (def.gauntlet) this.hud.feed('WEAPONS COLD — THE CAR IS THE ONLY TOOL', 'bad');
     if (def.id === 'starrush') this._buildRoamStars('mission');
     if (def.id === 'blitz') this._missionBuildGates(def);
     // SURVIVOR is the only mission that is about being shot at, so it is the
@@ -4755,6 +4840,12 @@ class Game {
       p.health = Math.min(p.maxHealth, p.health + p.maxHealth * 0.15);
       M.spawnT = Math.max(M.spawnT, 2.5);
       this.hud.feed(`🚁 ${M.count} DOWN — HULL PATCHED`, 'good');
+    } else if (kind === 'lap' && (def.duel || def.gauntlet)) {
+      // Same standing-start, one-lap shape as HOT LAP. A DUEL is won on the
+      // margin at this moment, which _missionMedal reads off M.bestGap.
+      M.count++;
+      this._missionFinish(true, def.duel
+        ? ((M.bestGap ?? 0) > 0 ? 'BEAT THEM' : 'BEATEN') : undefined);
     } else if (kind === 'lap' && def.id === 'hotlap') {
       // Standing start from the grid, exactly one lap. We never re-place the
       // car, so `placeAt(slot.index, slot.lateral)` (keepCP defaulting to
@@ -4863,6 +4954,38 @@ class Game {
     } else {
       M.elapsed += dt;
     }
+    // ---- PURSUIT: time only banks while you are actually on them ---------
+    if (M.def.pursuit) {
+      const foe = this.missionFoe;
+      if (!foe || !foe.alive) {          // wrecked them: that ends it, and well
+        this._missionFinish(true, 'RUNNER DOWN');
+        return;
+      }
+      const d = Math.hypot(foe.pos.x - p.pos.x, foe.pos.z - p.pos.z);
+      const close = d < 26;
+      if (close) M.inRange = (M.inRange ?? 0) + dt;
+      M.count = Math.floor(M.inRange ?? 0);
+      if (close !== M.wasClose) {
+        M.wasClose = close;
+        this.hud.feed(close ? '🎯 IN RANGE — BANKING' : '⚠ LOST THEM — CLOCK PAUSED',
+          close ? 'good' : 'bad');
+      }
+      if ((M.inRange ?? 0) >= M.def.gold) { this._missionFinish(true, 'RUN DOWN'); return; }
+    }
+    // ---- DUEL: the flag falls when EITHER car completes the lap ----------
+    if (M.def.duel) {
+      const foe = this.missionFoe;
+      if (foe) {
+        // margin in seconds, positive when the player is ahead: progress
+        // difference over the leader's speed is a fair reading of a gap that
+        // has to work at any point on the lap, not just at the line.
+        const gap = (p.progress - foe.progress) * (this.track.N * 0.9)
+          / Math.max(8, Math.abs(p.speedAlong));
+        M.count = Math.round(gap);
+        M.bestGap = gap;
+        if (!foe.alive) { this._missionFinish(true, 'RIVAL WRECKED'); return; }
+      }
+    }
     if (M.def.id === 'blitz' && this.missionGates) {
       const gate = this.missionGates[M.count];
       if (gate) {
@@ -4904,6 +5027,19 @@ class Game {
     const d = M.def;
     if (d.survive) {
       const t = M.elapsed;
+      return t >= d.gold ? 3 : t >= d.silver ? 2 : t >= d.bronze ? 1 : 0;
+    }
+    // DUEL and PURSUIT are scored on a MARGIN and on TIME-ON-TARGET, both of
+    // which are "more is better" — the opposite of every other mission here,
+    // where the medal is a lap time and less is better. Reading them through
+    // the `<=` below would award gold for losing by four seconds.
+    if (d.duel) {
+      const gap = M.bestGap ?? -999;
+      if (gap <= 0) return 0;                 // beaten is beaten, however close
+      return gap >= d.gold ? 3 : gap >= d.silver ? 2 : 1;
+    }
+    if (d.pursuit) {
+      const t = M.inRange ?? 0;
       return t >= d.gold ? 3 : t >= d.silver ? 2 : t >= d.bronze ? 1 : 0;
     }
     if (!win) return 0; // a race mission that ran out of clock earns nothing
@@ -4999,6 +5135,10 @@ class Game {
   _missionReset() {
     if (!this.missionMode) return;
     this.mission = null;
+    // ...and the two flags the rival-bearing missions set. Left standing,
+    // `missionNoGuns` would follow you out of a DUEL and disarm the next race.
+    this.missionFoe = null;
+    this.missionNoGuns = false;
     for (const gsp of this.missionGates ?? []) this.scene.remove(gsp.spr);
     this.missionGates = null;
     for (const s of this.roamStars ?? []) if (!s.got) this.scene.remove(s.spr);

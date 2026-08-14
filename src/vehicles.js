@@ -2667,6 +2667,7 @@ export class EnemyCar extends Car {
     this.cornerSkill = Math.random();    // 0..1 — how hard this driver leans on the tires
     this.lane = THREE.MathUtils.randFloatSpread(2.5); // small personal offset off the ideal line
     this.laneTimer = 3 + Math.random() * 4;
+
     this.aggression = 0.7 + Math.random() * 0.7; // angry grid: ~40% above the old 0.5..1.0
     this.mineCooldown = 4 + Math.random() * 5;  // stagger the first drops
     this.boostCooldown = 4 + Math.random() * 6; // stagger the first bursts
@@ -2926,6 +2927,32 @@ export class EnemyCar extends Car {
     const li = (this.trackIndex + look) % t.N;
     let targetLat = t._raceLine[li] + this.lane;
 
+    // ---- WHY THERE IS NO LATERAL 'PERSONAL LINE' HERE -------------------
+    //
+    // Measured first: over a 60 s race the field spends 26-34 % of its frames
+    // with three or more rivals inside 6 u of each other, and the spread of
+    // their lap progress is 0.035-0.089. That is a train, not a grid, and it
+    // is the most robotic thing on screen.
+    //
+    // The obvious fix — give each driver a personal lateral bias as a fraction
+    // of the half-width, plus a separation push away from anyone alongside —
+    // WAS BUILT AND MEASURED AND REVERTED. It broke up the pack (pack frames
+    // fell ~70 % on PINE VALLEY) and made the AI look considerably WORSE while
+    // doing it, because spreading a field sideways aims it at the edges and
+    // the edge is where the barrier is. Three runs a side, seconds spent
+    // within half a metre of a wall:
+    //
+    //     PINE VALLEY      1.6 / 1.6 / 1.2   ->   3.0 / 1.6 / 2.1
+    //     ROCKFALL RAVINE 19.6 / 14.4 / 17.6 ->  24.6 / 29.9 / 24.9
+    //     GOTTHARD CLIMB   8.6 / 15.5 / 18.5 ->  25.9 / 19.3 / 24.5
+    //
+    // Fading the bias out on narrow roads did not save it: `widthAt` returns
+    // ~9 almost everywhere, so the fade was inactive exactly where it was
+    // needed. A field that strings out ALONG the lap rather than across it is
+    // the version worth building next — vary braking points and corner speeds
+    // per driver, not lateral position. Do not re-add a lateral spread term
+    // without an A/B on tests/tool-ai-audit.mjs; the pack metric is far too
+    // noisy for single runs (the same build measured 258, 1206 and 1113).
     // (boost pads are gone — rivals no longer swerve across the road to farm
     //  chevrons, they just drive the racing line)
 
@@ -3089,7 +3116,19 @@ export class EnemyCar extends Car {
     // instead of grinding the narrowed edge; defensive on older track builds
     const wNow = t.widthAt?.(this.trackIndex) ?? ROAD_HALF;
     const wAhead = t.widthAt?.(li) ?? ROAD_HALF;
-    const latLim = Math.min(7.4, Math.min(wNow, wAhead) - 1.6);
+    // ---- AND THE MARGIN GROWS WITH SPEED, WHICH IS WHY THEY STOP SCRAPING.
+    //
+    // A fixed 1.6 u of edge margin is fine at 30 u/s and nowhere near enough
+    // at 55: the car is still carrying the last correction when the barrier
+    // arrives, so it arrives ON the barrier. Measured over a 60 s race, rivals
+    // spent 16.6 s within half a metre of the wall on GOTTHARD CLIMB and 9.6 s
+    // on ROCKFALL RAVINE — the mountain worlds, exactly where a watching
+    // player calls the AI stupid. A margin that scales with the speed being
+    // carried costs nothing on a straight (where the aim is near the middle
+    // anyway) and keeps a hand's width of road in reserve through a fast
+    // sweeper.
+    const edgeMargin = 1.6 + Math.min(1.9, Math.max(0, v - 26) * 0.07);
+    const latLim = Math.max(2.2, Math.min(7.4, Math.min(wNow, wAhead) - edgeMargin));
     targetLat = THREE.MathUtils.clamp(targetLat, -latLim, latLim);
 
     const target = t.pointAt(li, targetLat);
@@ -3729,7 +3768,11 @@ export class PlayerCar extends Car {
     // CANNON CORE upgrade bought nothing but a slightly shorter time-to-kill.
     // A magazine makes every trigger pull a decision and turns MAGAZINE DRUM
     // into the difference between one firefight and three.
-    if (controlsLive && input.fire && !this.overheated && this.fireCooldown <= 0) {
+    // A DUEL AND A GAUNTLET SAY "NO WEAPONS" ON THE CARD, so the card has to
+    // be true: this is the one gate, and it covers the cannon, the rockets and
+    // the mines below it. Cleared by _missionReset, never persisted.
+    const armed = !g.missionNoGuns;
+    if (armed && controlsLive && input.fire && !this.overheated && this.fireCooldown <= 0) {
       if (this.rounds > 0) {
         this.rounds--;
         this.fireCooldown = 0.085;
@@ -3745,7 +3788,7 @@ export class PlayerCar extends Car {
       }
     }
     // missile
-    if (controlsLive && input.justPressed('KeyE')) {
+    if (armed && controlsLive && input.justPressed('KeyE')) {
       if (this.missiles > 0) {
         this.missiles--;
         g.weapons.fireMissile(this);
@@ -3753,7 +3796,7 @@ export class PlayerCar extends Car {
       } else g.hud.feed('RACK EMPTY', 'bad');
     }
     // mine
-    if (controlsLive && input.justPressed('KeyX')) {
+    if (armed && controlsLive && input.justPressed('KeyX')) {
       if (this.mines > 0) {
         this.mines--;
         g.weapons.dropMine(this);

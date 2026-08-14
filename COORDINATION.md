@@ -5,7 +5,7 @@ blackboard: what each lane owns, and measurements one session made that
 another needs. Update it when you claim or finish a lane; read it before
 starting work that might be someone else's.
 
-_Last updated: 2026-08-14, by the mainline session (r172)._
+_Last updated: 2026-08-14, by the mainline session (r174)._
 
 ## Lanes
 
@@ -644,6 +644,99 @@ callbacks interleave, so a test-side clamp lands on the wrong side of the check
 and the physics has already accelerated away by the time the rule looks.
 
 `tests/test-hardmode.mjs` — 30/30 across all four.
+
+**r173/r174: the garage became the game, and the AI got one measured fix out of
+two attempts (mainline session).**
+
+**EVERY CONSUMABLE IS FINITE AND BOUGHT (r173).** Three new UPGRADES lines —
+`magazine` (90→240 cannon rounds), `rack` (1→6 rockets AND mines), `beacon`
+(1→4 SOS charges, capped at 3 levels). `PlayerCar.rounds` is new; the cannon
+was infinite because heat is a rhythm, not a limit. Capacity is set in
+`applyUpgrades` and FILLED in both `resetRace` and `startRace` — the r171
+lesson again: `startRace()` is the player-facing entry and does not call
+`resetRace()` in that order, so anything filled only there is never reached on
+a retry. `cannonDamage` 7·(1+0.18·lvl) → 3.5·(1+0.52·lvl).
+
+If your lane touches the SOS: the charge count is what makes r172's bog rule
+work at all. A pure 30 s cooldown is an UNLIMITED resource on a long stage, so
+a player on the wrong tyres in the snow could always wait it out.
+
+**THE PADLOCKS CHARGE YOU NOW (r173).** `kitPenalties()` returns a per-race
+multiplier set applied in `startRace` AFTER `applyUpgrades`, never stored —
+CANNON 2 unmet costs 45 % of the gun on that world, TIRES 2 costs 14 % grip,
+DAMPERS 2 zeroes `damperLvl`, ARMOR 2 takes 18 % hull. `LOCK_COST` mirrors it
+in words and must be edited with it. `kitHandicap` 0.16 → 0.32. **A fully
+kitted car still gets exactly 1.0 and zero penalties** — that is the invariant
+every other suite depends on.
+
+**CAR RETUNE, AND THE TOOL THAT MADE IT MEASURABLE (r173).** `test-affinity`
+had been failing on "every machine you can buy is the quickest somewhere" for
+some time — FLATSIX won 13 of 21 worlds and CROWN/DUNE/ALPINE/PIT never won
+anywhere. Retuned onto a strict speed/grip frontier (sleek 53/5.65, alpine
+56/5.45, flatsix 58/5.35, pit 61/5.05, crown 64/4.60; loose: dune 55/5.32/1.02,
+bastion 58/5.15/0.92). After: all seven paid machines win somewhere, BRAWLER
+wins nothing at mean place 7.19/8. 7/9 → 8/9.
+
+`tests/tool-pace-dump.mjs` + `tool-pace-rate.mjs` are the reason that was
+tunable at all: a world build is ~2 minutes headless, so rating 8 cars over 21
+worlds by page-load is a 40-minute loop. Dump the geometry once, re-rate any
+candidate table in milliseconds. The rater PARSES `CAR_CATALOG` out of
+`src/vehicles.js` rather than keeping a copy, and it reproduced the in-engine
+result exactly before it was trusted.
+
+**`test-affinity` HARD-CODED PORT 8901 AND IGNORED `BASE`** — fixed. A run
+believed to be against a second checkout was silently driving the first one,
+and aborted mid-sweep when that tree's files were edited under it. Cost a full
+21-world sweep and a wrong conclusion about which tree had been measured.
+Check any suite you plan to run against a worktree.
+
+**QUESTS (r173) — the only reward in the game paid in PARTS.** `QUESTS` +
+`Game.questState/_checkQuests/_renderQuests`, stored at `career.quests`, board
+rendered in the GARAGE tab. Licences count DIFFERENT worlds (keys, not a
+tally), so three podiums on the easiest world is worth one. A quest whose part
+is already maxed pays 3× credits instead.
+
+**MISSIONS GOT AN ANTAGONIST (r174).** `_missionLaunch` no longer always sweeps
+the field — `def.duel`/`def.pursuit` keep `enemies[0]` alive and drive it with
+the real race AI. DUEL is scored on MARGIN (`M.bestGap`) and PURSUIT on
+time-in-range (`M.inRange`), both "more is better", so `_missionMedal` has to
+branch before its `<=` lap-time comparison or a four-second defeat wins gold.
+`missionNoGuns` gates the cannon, rockets and mines in `PlayerCar.update` and
+MUST be cleared by `_missionReset` or it follows you into the next race.
+
+**VISIBLE UPGRADES (r174).** `applyUpgradeKit(mesh, upgrades)` in vehicles.js
+builds one named `upgradeKit` child group; `buildVoxelRacer` now publishes
+`userData.rig` (wheelR, baseY, capTop…) so the kit never guesses at a roofline
+that differs per body style. Called from `applyUpgrades`, which is the one
+place that reads the garage row. Stock 0 meshes, fully built 26.
+
+**AI: READ THIS BEFORE TOUCHING `EnemyCar` STEERING.** `tests/tool-ai-audit.mjs`
+drives a fixed-step race and counts wall time, stalls, off-road time, pack
+frames, reverse time, yaw jerk and progress spread. Two findings:
+
+- **the field is a train** — 26–34 % of frames have 3+ rivals inside 6 u, and
+  progress spread is 0.035–0.089. Every rival aims at the same `_raceLine`
+  with a ±1.25 u offset, so eight cars sit in a 2.5 u band on an 18 u road.
+- **they grind walls on mountain roads** — 17.2 s/race within half a metre of a
+  barrier on ROCKFALL RAVINE, 14.2 s on GOTTHARD CLIMB.
+
+**A lateral personal-line + separation-push fix for the first one was built,
+measured and REVERTED.** It broke the pack up (~70 % fewer pack frames on PINE
+VALLEY) and made the AI visibly worse doing it, because spreading a field
+sideways aims it at the edges. Three runs a side, seconds within 0.5 u of a
+wall: PINE 1.6/1.6/1.2 → 3.0/1.6/2.1; ROCKFALL 19.6/14.4/17.6 →
+24.6/29.9/24.9; GOTTHARD 8.6/15.5/18.5 → 25.9/19.3/24.5. Fading it on narrow
+roads did not save it — `widthAt` returns ~9 nearly everywhere. **Do not
+re-add a lateral spread term.** String the field out ALONG the lap instead:
+vary braking points and corner speeds per driver.
+
+What shipped is the speed-scaled edge margin (`1.6 + min(1.9, (v-26)·0.07)`):
+ROCKFALL 17.2 → 13.9 s (−19 %), GOTTHARD unchanged in mean but spread tightens
+8.6–18.5 → 13.6–15.6, PINE unchanged.
+
+**THE PACK METRIC IS FAR TOO NOISY FOR SINGLE RUNS** — the same build measured
+258, 1206 and 1113 pack-frames on GOTTHARD across three runs. Three runs a side
+minimum, or you are measuring rival `Math.random()`.
 
 ## Rebase notes
 
