@@ -17869,15 +17869,51 @@ export class Track {
         }
         this.solids.push({ x: hx, z: hz, r: hw + 1.5, y: bedY + 1, mat: 'stone' });
       }
-      // parapet on the road above the culvert - the giveaway from the car
+      // Parapet on the road above the culvert — the giveaway from the car.
+      //
+      // THIS IS THE ONE THAT WAS IN THE ROAD. The offset used
+      // (sin roadYaw, cos roadYaw), which is the road's own TANGENT — so the
+      // two parapets meant to stand one either side of the carriageway were
+      // laid one AHEAD and one BEHIND it, both straight down the middle, and
+      // the box was then rotated across the lane to match. Reported with a
+      // photograph of a car stopped dead at 0 km/h against the first of two
+      // stone bars lying across a forest road at a stream crossing; the
+      // census found the same shape on 20 worlds (`solid:stone` r 1.4 at a
+      // mean lateral of 2.5, ranging in to 0.0 — dead centre).
+      //
+      // The perpendicular is `nrm`, built as (tan.z, -tan.x) — so
+      // (cos roadYaw, -sin roadYaw). The headwalls above make the same
+      // substitution and get away with it only because `_clearsRoad` throws
+      // the bad ones away; they are dressing either side of the stream and
+      // are left alone here, noted rather than quietly re-sited.
+      //
+      // And it is a WALL, not a bollard: a 1.4 u circular collider parked at
+      // the road edge bites 3.2 u into the lane, which is the pinch even a
+      // correctly-sided parapet would leave. `_barrier` is what every other
+      // roadside wall on these levels uses — a segment running ALONG the
+      // road, with the same bite as its neighbours instead of a special case.
+      const parLen = hw * 2 + 9;
       for (const sg of [1, -1]) {
-        const px = c.p.x + Math.sin(roadYaw) * sg * (ROAD_HALF + 1.1);
-        const pz = c.p.z + Math.cos(roadYaw) * sg * (ROAD_HALF + 1.1);
-        const par = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.95, hw * 2 + 9), cap);
+        // ON THE WALL LINE, not the road edge. ROAD_HALF + 1.1 is 10.1, and a
+        // segment collider bites hw + 1.7 = 1.95, so a parapet there stops a
+        // car 8.15 u out on a road drivable to 9 — the correct side, still
+        // pinching the lane. WALL_OFF + 0.6 is where this level's other walls
+        // stand, and it clears.
+        const parOff = WALL_OFF + 0.6;
+        const px = c.p.x + Math.cos(roadYaw) * sg * parOff;
+        const pz = c.p.z - Math.sin(roadYaw) * sg * parOff;
+        const par = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.95, parLen), cap);
         par.position.set(px, deck + 0.45, pz);
-        par.rotation.y = roadYaw + Math.PI / 2;
+        par.rotation.y = roadYaw;
         par.castShadow = true;
         g.add(par);
+        // A COMPACT COLLIDER, not a long segment. Making the parapet a proper
+        // `_barrier` was the tidier model and measured worse: a straight
+        // 20 u wall laid beside a curving road cuts the corner, so its ends
+        // swing back over the lane its middle clears (barrier blockers 140 ->
+        // 497 across the roster). The stonework is dressing over a culvert —
+        // one round collider on the wall line stops you at the parapet
+        // without the segment's geometry fighting the bend.
         this.solids.push({ x: px, z: pz, r: 1.4, y: deck + 0.5, mat: 'stone' });
       }
     }
