@@ -211,8 +211,13 @@ ok(/DRIVE YOUR|GARAGE/.test(R.crownAdvice),
   'it points at a machine already owned rather than a shop', R.crownAdvice);
 ok(R.duneBlockedOnSealed,
   'an all-terrain car is outside the window on a sealed circuit — too much tyre');
-ok(/DRIVE YOUR|BUY THE/.test(R.duneAdvice),
-  'and it is told what to take instead', R.duneAdvice);
+// SINCE THE TYRE BAY, over-tyred is a FREE fix and the advice says so.
+// It used to read "DRIVE YOUR x" or "BUY THE x" — and both could name a
+// machine you were already sitting in, which is how CANYON RUN came to tell a
+// BRAWLER driver to BUY THE BRAWLER for 0 CR. The stronger claim now: the
+// remedy must be free and local, never a purchase, because class can go DOWN.
+ok(/TYRE BAY/.test(R.duneAdvice) && /FREE/.test(R.duneAdvice),
+  'and the remedy is a free refit, not a car you have to buy', R.duneAdvice);
 ok(R.penU1 < R.pen1 && R.penU2 < R.penU1 && R.penU2 <= 0.7,
   'under-spec costs MORE grip than over-spec, and two classes more than one',
   `under1 ${R.penU1}, under2 ${R.penU2}, over1 ${R.pen1}`);

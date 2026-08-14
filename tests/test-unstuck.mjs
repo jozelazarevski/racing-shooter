@@ -72,8 +72,14 @@ const R = await page.evaluate(async () => {
   const stillStranded = offRoad();
   const coolStill = p.unstuckCool;
 
-  // it recharges, and once recharged it works again
+  // It recharges — and since r173 it also needs a CHARGE, which the first
+  // rescue spent. A cooldown alone made the rescue an unlimited resource on a
+  // long stage (wait thirty seconds, forever), which quietly cancelled r172's
+  // bog rule; test-arsenal pins the "spent is spent" half of that. What this
+  // asserts is the other half: with both a charge and a cooled timer, the
+  // button behaves exactly as it always did.
   p.unstuckCool = 0;
+  p.sos = Math.max(1, p.sos ?? 0);
   p._unstuckReq = true;
   for (let i = 0; i < 4; i++) await frame();
   const rescuedAgain = offRoad();
@@ -92,16 +98,19 @@ ok(R.strandedAgain > 20 && R.stillStranded > 20,
   `${R.stillStranded.toFixed(1)} u`);
 ok(R.coolStill > 0 && R.coolStill <= 30,
   'and a refused press does not top the cooldown back up', `${R.coolStill.toFixed(1)} s`);
-ok(R.rescuedAgain < 3, 'once recharged it works again', `${R.rescuedAgain.toFixed(1)} u`);
+ok(R.rescuedAgain < 3, 'once recharged AND with a charge in hand it works again',
+  `${R.rescuedAgain.toFixed(1)} u`);
 
-// a fresh race hands it back
+// a fresh race hands it back — BOTH halves of it, since r173
 const fresh = await page.evaluate(() => {
   const g = window.__game;
   g.player.unstuckCool = 30;
+  g.player.sos = 0;
   g.startRace?.();
-  return g.player.unstuckCool;
+  return { cool: g.player.unstuckCool, sos: g.player.sos };
 });
-ok(fresh === 0, 'every race starts with the rescue in hand', `${fresh}`);
+ok(fresh.cool === 0 && fresh.sos >= 1,
+  'every race starts with the rescue in hand — cooled AND recharged', JSON.stringify(fresh));
 ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join('\n'));
 
 await browser.close();

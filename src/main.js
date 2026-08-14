@@ -11,7 +11,8 @@ import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
 import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
-  tyreClass, tyreLevelFor, TYRE_LABEL, tyrePenalty } from './vehicles.js';
+  tyreClass, tyreMaxClass, tyreLevelFor, TYRE_LABEL, tyrePenalty,
+  applyUpgradeKit } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
 import { Weapons } from './weapons.js';
@@ -1335,6 +1336,7 @@ class Game {
         [document.getElementById('tab-btn-garage'), document.getElementById('tab-garage')],
         [document.getElementById('tab-btn-settings'), document.getElementById('tab-settings')],
         [document.getElementById('tab-btn-mode'), document.getElementById('tab-mode')],
+        [document.getElementById('tab-btn-jobs'), document.getElementById('tab-jobs')],
       ].filter(([b, p]) => b && p);
       for (const [btn, panel] of tabs) {
         btn.addEventListener('click', () => {
@@ -1343,6 +1345,7 @@ class Game {
             p2.classList.toggle('off', p2 !== panel);
           }
           // TRACKS is on screen: the deferred world art is wanted NOW
+          if (btn.id === 'tab-btn-jobs') this._renderJobs();
           if (btn.id === 'tab-btn-race') {
             this._loadAllShots();
             // ...and land on the rung the player is actually up to. Opening a
@@ -1957,7 +1960,7 @@ class Game {
     const lv = LEVELS.find((l) => l.id === levelId);
     if (!lv) return null;
     const need = surfaceClass(lv);
-    const have = tyreClass(carKey, (this.garage.upgrades || {})[carKey]);
+    const have = tyreClass(carKey, (this.garage.upgrades || {})[carKey], this.fittedTyre(carKey));
     // ONE CLASS EITHER SIDE IS THE IDEAL WINDOW, NOT A PERMISSION.
     //
     // If a bigger tyre always counted as ideal, the whole rule would collapse
@@ -1983,23 +1986,15 @@ class Game {
       return { ok: true, need, have, over: have - need, under: 0, pen };
     }
     if (have > need) {
-      // too much tyre: name the lightest thing that can do this properly
-      const fit = (k) => {
-        const c = tyreClass(k, (this.garage.upgrades || {})[k]);
-        return c >= need && c - need <= 1;
-      };
-      const owned = this.cars.owned.filter(fit);
-      const buy = CAR_CATALOG.filter((c) => {
-        const t = tyreClass(c.key, null);
-        return t >= need && t - need <= 1;
-      }).sort((a, b) => a.price - b.price)[0];
-      const fix = owned.length
-        ? { kind: 'own', car: owned[0],
-          text: `DRIVE YOUR ${CAR_CATALOG.find((c) => c.key === owned[0]).name}` }
-        : buy ? { kind: 'buy', car: buy.key,
-          text: `BUY THE ${buy.name} — ${buy.price.toLocaleString()} CR` }
-          : { kind: 'none', text: 'NOTHING IN THE GARAGE SUITS THIS SURFACE' };
-      return { ok: false, need, have, over: have - need, under: 0, pen, tooMuch: true, fix };
+      // TOO MUCH TYRE IS A FREE FIX NOW. Before the tyre bay existed, class
+      // could only go UP, so the only remedies on offer were "drive another
+      // car" or "buy one" — and both could name a machine you were already
+      // sitting in, which is how CANYON RUN came to advise BUY THE BRAWLER —
+      // 0 CR to somebody driving a BRAWLER. Fitting down is instant and costs
+      // nothing, so that is the advice.
+      return { ok: false, need, have, over: have - need, under: 0, pen, tooMuch: true,
+        fix: { kind: 'fit', cls: need,
+          text: `FIT ${TYRE_NAME[need]} IN THE TYRE BAY — FREE` } };
     }
     // cheapest route back to legal: an upgrade if one reaches, else a car
     const lvl = tyreLevelFor(carKey, (this.garage.upgrades || {})[carKey], need);
@@ -2012,7 +2007,7 @@ class Game {
         text: `FIT ${TYRE_NAME[need]} — ${cost.toLocaleString()} CR IN THE GARAGE` };
     } else {
       const owned = this.cars.owned
-        .filter((k) => tyreClass(k, (this.garage.upgrades || {})[k]) >= need);
+        .filter((k) => tyreMaxClass(k, (this.garage.upgrades || {})[k]) >= need);
       if (owned.length) {
         const name = CAR_CATALOG.find((c) => c.key === owned[0]).name;
         fix = { kind: 'own', car: owned[0], text: `DRIVE YOUR ${name}` };
@@ -2135,8 +2130,15 @@ class Game {
     const f = this.freeRoam ? null : this.carFitness(this.level.id);
     const warned = !!(f && !f.ok);
     start.classList.remove('blocked');
+    start.classList.toggle('warned', warned);
+    // ...AND IT SAYS WHAT TO DO ABOUT IT. "Misleading message, as there is no
+    // way to change tyres" — the button stated a penalty and named no remedy,
+    // and until the tyre bay existed there genuinely was none for an
+    // over-tyred car. It now carries the fix on a second line, which for the
+    // common case is one free tap in the garage.
+    const fixLine = f?.fix?.text ? `\n${f.fix.text}` : '';
     start.textContent = warned
-      ? `START — WRONG TYRES (−${f.pen}% GRIP)`
+      ? `START — WRONG TYRES (−${f.pen}% GRIP)${fixLine}`
       : this.missionMode ? 'START MISSION'
         : this.freeRoam ? 'START EXPLORING' : 'START RACE';
   }
@@ -3043,6 +3045,37 @@ class Game {
     return up;
   }
 
+  /** WHICH COMPOUND IS ON THIS CAR RIGHT NOW.
+   *
+   *  Stored per car in `garage.fitted`, defaulting to the best the car has
+   *  unlocked — which is exactly what every save written before this was doing
+   *  implicitly, so nobody's setup changes underneath them. Clamped on READ
+   *  rather than on write, because swapping cars and buying an upgrade can
+   *  both move the ceiling under a stored choice. */
+  fittedTyre(carKey = this.cars.selected) {
+    const g = this.garage;
+    g.fitted ??= {};
+    const max = tyreMaxClass(carKey, (g.upgrades || {})[carKey]);
+    const want = g.fitted[carKey];
+    return want == null ? max : Math.max(0, Math.min(max, want | 0));
+  }
+
+  /** Fit a compound and remember it. FREE, always — going down a class is
+   *  never a purchase; only unlocking a higher one costs money. */
+  fitTyre(cls, carKey = this.cars.selected) {
+    const g = this.garage;
+    g.fitted ??= {};
+    g.fitted[carKey] = Math.max(0,
+      Math.min(tyreMaxClass(carKey, (g.upgrades || {})[carKey]), cls | 0));
+    saveJSON(this._pkey('garage'), g);
+    this.applyUpgrades();
+    this.renderGarage();
+    this._renderLevelCards?.();
+    this._syncStartButton?.();
+    this.hud?.feed?.(`FITTED ${TYRE_LABEL[g.fitted[carKey]]} TYRES`, 'good');
+    return g.fitted[carKey];
+  }
+
   /** Tell the car how far its tyres miss this world's surface in BOTH
    *  directions — the physics prices over- and under-spec separately
    *  (see tyrePenalty in vehicles.js; nothing is refused since r151). */
@@ -3084,6 +3117,48 @@ class Game {
     p.damperLvl = g.dampers || 0;                // read by Car.onLand
     p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
     p.assist = { pro: 0, standard: 0.5, assist: 1 }[this.assistSetting] ?? 0.5;
+    // ...AND THE CAR LOOKS LIKE WHAT YOU BOUGHT. Every upgrade until now was
+    // an invisible multiplier: a fully built machine was identical to the one
+    // on the forecourt, so the money had nothing to show for itself. Rebuilt
+    // here rather than at purchase time because applyUpgrades() is already the
+    // one place that reads the garage row, so the mesh cannot drift from the
+    // numbers.
+    applyUpgradeKit(p.mesh, g);
+  }
+
+  /** THE TYRE BAY — the answer to "there is no way to change tyres".
+   *
+   *  Three compounds. Anything at or below the car's own class is always
+   *  available, because a machine can always run road rubber; anything above
+   *  is what the TIRES line unlocks. What is FITTED is a free choice, so
+   *  "WRONG TYRES" on a start button is now a thing you can act on rather
+   *  than a fact about a purchase you cannot undo. */
+  _renderTyreBay() {
+    const el = document.getElementById('tyre-bay');
+    if (!el) return;
+    const car = this.cars.selected;
+    const up = (this.garage.upgrades || {})[car];
+    const max = tyreMaxClass(car, up);
+    const now = this.fittedTyre(car);
+    const need = this.level ? surfaceClass(this.level) : null;
+    const ICON = ['🛣', '🪨', '❄'];
+    const btns = [0, 1, 2].map((c) => {
+      const locked = c > max;
+      const cls = ['tyre-opt', c === now ? 'on' : '', locked ? 'locked' : '',
+        need === c ? 'want' : ''].filter(Boolean).join(' ');
+      return `<button class="${cls}" data-tyre="${c}"${locked ? ' disabled' : ''}>`
+        + `${locked ? '🔒' : ICON[c]}<b>${TYRE_LABEL[c]}</b>`
+        + `<i>${locked ? 'BUY TIRES ' + (c >= 2 ? 3 : 1) : need === c ? 'IDEAL HERE' : ''}</i></button>`;
+    }).join('');
+    el.innerHTML = `<div class="panel-head">TYRE BAY${this.level
+      ? ` — ${this.level.name} WANTS ${TYRE_LABEL[need]}` : ''}</div>`
+      + `<div class="tyre-row">${btns}</div>`;
+    for (const b of el.querySelectorAll('.tyre-opt')) {
+      b.addEventListener('click', () => {
+        this.audio?.ui?.();
+        this.fitTyre(+b.dataset.tyre);
+      });
+    }
   }
 
   /** Draw a smoothed closed track outline on a world-card canvas. */
@@ -3194,7 +3269,7 @@ class Game {
     // that cannot take the start is not "three stars", it is not eligible.
     const f = this.carFitness(this.level.id, car.key);
     if (!f) return '';
-    const tc = tyreClass(car.key, (this.garage.upgrades || {})[car.key]);
+    const tc = tyreClass(car.key, (this.garage.upgrades || {})[car.key], this.fittedTyre(car.key));
     const badge = `<b>${TYRE_LABEL[tc]}</b> TYRES`;
     if (!f.ok) return `<div class="ctyre bad">${badge} · −${f.pen}% GRIP HERE</div>`;
     if (f.over > 0) return `<div class="ctyre over">${badge} · OVER-TYRED, −${f.pen}%</div>`;
@@ -3243,6 +3318,7 @@ class Game {
     const carName = CAR_CATALOG.find((c) => c.key === this.cars.selected)?.name ?? '';
     const head = document.getElementById('garage-up-head');
     if (head) head.textContent = `DETAILED UPGRADES — ${carName}`;
+    this._renderTyreBay();
     const rows = document.getElementById('garage-rows');
     rows.innerHTML = '';
     for (const u of UPGRADES) {
@@ -3801,6 +3877,13 @@ class Game {
   // 3 side objectives per race, seeded per level+day+difficulty so a given
   // world offers the same slate all day. Completions pay into contractCredits,
   // folded into `earned` at finishRace. Never offered in free roam.
+  /** Contracts you have turned down for this world, by id. Per world, because
+   *  the offer is per world; kept on the career so it survives a reload. */
+  _declined() {
+    const d = (this.career.declined ??= {});
+    return (d[this.level?.id] ??= []);
+  }
+
   _pickContracts() {
     const pool = CONTRACT_POOL.filter((c) => !c.gate || c.gate(this));
     const day = Math.floor(Date.now() / 864e5);
@@ -3822,7 +3905,63 @@ class Game {
       const sure = arr.slice(3).filter((c) => c.sure);
       if (sure.length) picks[2] = sure[(rnd() * sure.length) | 0];
     }
-    return picks.map(atRung);
+    // ...AND YOU CAN TURN THEM DOWN. "So I can choose to race them or not."
+    // A declined contract is not dealt at all, which matters because CLEAN LAP
+    // and PACIFIST pull in opposite directions from HEADHUNTER — being handed
+    // three you cannot hold at once made the row read as noise rather than as
+    // an offer.
+    const no = this._declined();
+    return picks.map(atRung).filter((c) => !no.includes(c.id));
+  }
+
+  /** The offer for this world, whether or not it has been accepted. Used by
+   *  the board — `_pickContracts` returns only what will actually run. */
+  _offeredContracts() {
+    const no = this._declined();
+    const keep = this.career.declined?.[this.level?.id];
+    if (keep) this.career.declined[this.level.id] = [];
+    const all = this._pickContracts();
+    if (keep) this.career.declined[this.level.id] = keep;
+    return all.map((c) => ({ ...c, declined: no.includes(c.id) }));
+  }
+
+  /** THE JOBS BOARD — the daily offer and the long chains, in one place.
+   *  Contracts pay credits and can be declined; quests pay PARTS and run in
+   *  the background. Seeing them together is the point: one is what to do in
+   *  THIS race, the other is what you are working toward. */
+  _renderJobs() {
+    const el = document.getElementById('contract-board');
+    if (!el) return;
+    if (this.freeRoam || !this.level) {
+      el.innerHTML = '<div class="cb-head">CONTRACTS</div>'
+        + '<div id="jobs-note">Contracts run in RACE mode only.</div>';
+      this._renderQuests();
+      return;
+    }
+    const offers = this._offeredContracts();
+    const rows = offers.map((c) => `<div class="jrow${c.declined ? ' off' : ''}">
+      <span class="jmain"><b>${c.label}</b><i>${
+  typeof c.desc === 'function' ? c.desc(c.need) : c.desc}</i></span>
+      <span class="jpay">+${c.pay} CR</span>
+      <button class="jbtn${c.declined ? ' declined' : ''}" data-cid="${c.id}">${
+  c.declined ? 'DECLINED' : 'ACCEPTED'}</button>
+    </div>`).join('');
+    el.innerHTML = `<div class="cb-head">CONTRACTS — ${this.level.name}</div>`
+      + `<div id="jobs-note">Today's offer for this world. Tap one to turn it down — `
+      + `a declined contract is not dealt at the start line, so you are not `
+      + `carrying an objective that fights the one you actually want.</div>${rows}`;
+    for (const b of el.querySelectorAll('.jbtn')) {
+      b.addEventListener('click', () => {
+        const no = this._declined();
+        const id = b.dataset.cid;
+        const at = no.indexOf(id);
+        if (at >= 0) no.splice(at, 1); else no.push(id);
+        saveJSON(this._pkey('career'), this.career);
+        this.audio?.ui?.();
+        this._renderJobs();
+      });
+    }
+    this._renderQuests();
   }
 
   /** Per-frame contract bookkeeping. Only ever OBSERVES state other systems
@@ -4584,6 +4723,57 @@ class Game {
         desc: `Waves thicken until the sky is full. The clock only runs while they can reach you — ${fmtTime(b)} pays, ${fmtTime(g)} is extraction. One hull, no respawn.`,
       });
     }
+    /* ---- THE THREE THAT HAVE SOMETHING TO BEAT ------------------------
+     *
+     * Reported as "missions needs to be redesigned, they are boring now".
+     * The diagnosis is structural, not a matter of tuning: RAMPAGE, STAR RUSH
+     * and CHECKPOINT BLITZ are the SAME loop — collect N of X before a clock —
+     * with a different pickup mesh on it, and four of the five put you alone
+     * in an empty world. A mission with no antagonist is a time trial with
+     * extra steps, however well the clock is tuned.
+     *
+     * These three each have something on the road with you. They deliberately
+     * reuse the race machinery (the rival AI, the racing line, the standings)
+     * rather than inventing a new one, because that AI is the most interesting
+     * thing in the game and the arena modes were throwing it away.
+     */
+    {
+      // ONE RIVAL, ONE LAP, NO WEAPONS ON EITHER SIDE. The purest version of
+      // the thing missions were missing. Medals are MARGINS, not times, so the
+      // result reads as "I beat them by four seconds" rather than as a
+      // stopwatch number you have to know the track to interpret.
+      defs.push({
+        id: 'duel', icon: '⚔', name: 'DUEL', tip: 'BEAT YOUR RIVAL, ONE LAP',
+        goal: 1, time: Math.round(lapT * 2.6 + 14), bonus: 0, circuit: true, duel: true,
+        gold: 4, silver: 1.2, bronze: 0.01,   // seconds of margin at the flag
+        desc: 'One rival, one lap, wheel to wheel. No rockets, no mines — just '
+          + 'the pair of you and the road. Win by four seconds for gold.',
+      });
+    }
+    {
+      // THEY RUN, YOU CHASE, AND THEY SHOOT BACKWARDS. Rewards being CLOSE
+      // rather than being fast — a different skill from every other mission
+      // here, and the one that most rewards knowing a corner.
+      defs.push({
+        id: 'pursuit', icon: '🎯', name: 'PURSUIT', tip: 'HOLD THEM IN RANGE',
+        goal: 20, time: Math.round(lapT * 1.9 + 16), bonus: 0, circuit: false, pursuit: true,
+        gold: 20, silver: 13, bronze: 7,       // seconds banked inside 26 u
+        desc: 'A runner ahead, armed and unwilling. Time only banks while you '
+          + 'are within 26 u of them — close it down and keep it closed.',
+      });
+    }
+    {
+      // NO GUNS, LIVE HAZARDS. The world is the opponent. Every fall hazard,
+      // rockfall and burning treefall the theme carries is switched on and the
+      // cannon is switched off, so the only tool is the car.
+      defs.push({
+        id: 'gauntlet', icon: '☠', name: 'GAUNTLET', tip: 'ONE LAP, NO WEAPONS',
+        goal: 1, time: Math.round(lapT * 2.6 + 14), bonus: 0, circuit: true, gauntlet: true,
+        gold: lapT * 1.16 + 2, silver: lapT * 1.45 + 2,
+        desc: 'The road at its worst and nothing to shoot back with. Rockfall, '
+          + 'burning treefall, whatever this world throws — drive through it.',
+      });
+    }
     defs.push({
       id: 'hotlap', icon: '⏱', name: 'HOT LAP', tip: 'ONE LAP VS THE CLOCK',
       // Standing start off the grid, so the targets carry a ~2s launch tax on
@@ -4638,12 +4828,46 @@ class Game {
     this.state = 'race';
     this.startScore = this.score;
     this.track.setLights('green');
-    for (const e of this.enemies) { e.alive = false; e.mesh.visible = false; }
+    // THE GRID IS NOT ALWAYS SWEPT ANY MORE. Every mission used to begin by
+    // deleting the field, which is exactly what made four of the five lonely.
+    // DUEL and PURSUIT keep ONE rival and use the real race AI on it.
+    const keepsRival = def.duel || def.pursuit;
+    this.enemies.forEach((e, i) => {
+      const keep = keepsRival && i === 0;
+      e.alive = keep;
+      e.mesh.visible = keep;
+    });
     this._raceChopper = true; // blocks the final-lap race-chopper path
     this.mission = {
       def, count: 0, elapsed: 0, started: false, over: false,
       timed: def.time > 0, tLeft: def.time, warn10: false, spawnT: 0, tier: 0,
+      inRange: 0, bestGap: -999,
     };
+    if (keepsRival) {
+      const foe = this.enemies[0];
+      this.missionFoe = foe;
+      foe.health = foe.maxHealth;
+      // A DUEL IS A FAIR FIGHT: neither car shoots. `noGuns` is read by the
+      // rival's own weapon timers and by the player's fire path, so "no
+      // rockets, no mines" on the card is enforced rather than merely stated.
+      this.missionNoGuns = !!def.duel || !!def.gauntlet;
+      if (def.pursuit) {
+        // The runner starts a third of a lap up the road and drives its own
+        // race flat out; the mission is entirely about closing that down.
+        foe.aggression = Math.min(2, (foe.baseAggression ??= foe.aggression) * 1.4);
+        foe.placeAt((this.track.gridSlot(0).index + Math.round(this.track.N * 0.09)) % this.track.N, 0);
+      } else {
+        const s2 = this.track.gridSlot(1);
+        foe.placeAt(s2.index, s2.lateral);
+      }
+      foe.lap = 1;
+      foe.finished = false;
+      this.hud.feed(`⚔ ${foe.name} — ${def.duel ? 'BEAT THEM' : 'RUN THEM DOWN'}`, 'bad');
+    } else {
+      this.missionFoe = null;
+      this.missionNoGuns = !!def.gauntlet;
+    }
+    if (def.gauntlet) this.hud.feed('WEAPONS COLD — THE CAR IS THE ONLY TOOL', 'bad');
     if (def.id === 'starrush') this._buildRoamStars('mission');
     if (def.id === 'blitz') this._missionBuildGates(def);
     // SURVIVOR is the only mission that is about being shot at, so it is the
@@ -4755,6 +4979,12 @@ class Game {
       p.health = Math.min(p.maxHealth, p.health + p.maxHealth * 0.15);
       M.spawnT = Math.max(M.spawnT, 2.5);
       this.hud.feed(`🚁 ${M.count} DOWN — HULL PATCHED`, 'good');
+    } else if (kind === 'lap' && (def.duel || def.gauntlet)) {
+      // Same standing-start, one-lap shape as HOT LAP. A DUEL is won on the
+      // margin at this moment, which _missionMedal reads off M.bestGap.
+      M.count++;
+      this._missionFinish(true, def.duel
+        ? ((M.bestGap ?? 0) > 0 ? 'BEAT THEM' : 'BEATEN') : undefined);
     } else if (kind === 'lap' && def.id === 'hotlap') {
       // Standing start from the grid, exactly one lap. We never re-place the
       // car, so `placeAt(slot.index, slot.lateral)` (keepCP defaulting to
@@ -4863,6 +5093,38 @@ class Game {
     } else {
       M.elapsed += dt;
     }
+    // ---- PURSUIT: time only banks while you are actually on them ---------
+    if (M.def.pursuit) {
+      const foe = this.missionFoe;
+      if (!foe || !foe.alive) {          // wrecked them: that ends it, and well
+        this._missionFinish(true, 'RUNNER DOWN');
+        return;
+      }
+      const d = Math.hypot(foe.pos.x - p.pos.x, foe.pos.z - p.pos.z);
+      const close = d < 26;
+      if (close) M.inRange = (M.inRange ?? 0) + dt;
+      M.count = Math.floor(M.inRange ?? 0);
+      if (close !== M.wasClose) {
+        M.wasClose = close;
+        this.hud.feed(close ? '🎯 IN RANGE — BANKING' : '⚠ LOST THEM — CLOCK PAUSED',
+          close ? 'good' : 'bad');
+      }
+      if ((M.inRange ?? 0) >= M.def.gold) { this._missionFinish(true, 'RUN DOWN'); return; }
+    }
+    // ---- DUEL: the flag falls when EITHER car completes the lap ----------
+    if (M.def.duel) {
+      const foe = this.missionFoe;
+      if (foe) {
+        // margin in seconds, positive when the player is ahead: progress
+        // difference over the leader's speed is a fair reading of a gap that
+        // has to work at any point on the lap, not just at the line.
+        const gap = (p.progress - foe.progress) * (this.track.N * 0.9)
+          / Math.max(8, Math.abs(p.speedAlong));
+        M.count = Math.round(gap);
+        M.bestGap = gap;
+        if (!foe.alive) { this._missionFinish(true, 'RIVAL WRECKED'); return; }
+      }
+    }
     if (M.def.id === 'blitz' && this.missionGates) {
       const gate = this.missionGates[M.count];
       if (gate) {
@@ -4904,6 +5166,19 @@ class Game {
     const d = M.def;
     if (d.survive) {
       const t = M.elapsed;
+      return t >= d.gold ? 3 : t >= d.silver ? 2 : t >= d.bronze ? 1 : 0;
+    }
+    // DUEL and PURSUIT are scored on a MARGIN and on TIME-ON-TARGET, both of
+    // which are "more is better" — the opposite of every other mission here,
+    // where the medal is a lap time and less is better. Reading them through
+    // the `<=` below would award gold for losing by four seconds.
+    if (d.duel) {
+      const gap = M.bestGap ?? -999;
+      if (gap <= 0) return 0;                 // beaten is beaten, however close
+      return gap >= d.gold ? 3 : gap >= d.silver ? 2 : 1;
+    }
+    if (d.pursuit) {
+      const t = M.inRange ?? 0;
       return t >= d.gold ? 3 : t >= d.silver ? 2 : t >= d.bronze ? 1 : 0;
     }
     if (!win) return 0; // a race mission that ran out of clock earns nothing
@@ -4999,6 +5274,10 @@ class Game {
   _missionReset() {
     if (!this.missionMode) return;
     this.mission = null;
+    // ...and the two flags the rival-bearing missions set. Left standing,
+    // `missionNoGuns` would follow you out of a DUEL and disarm the next race.
+    this.missionFoe = null;
+    this.missionNoGuns = false;
     for (const gsp of this.missionGates ?? []) this.scene.remove(gsp.spr);
     this.missionGates = null;
     for (const s of this.roamStars ?? []) if (!s.got) this.scene.remove(s.spr);

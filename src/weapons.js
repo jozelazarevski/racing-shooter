@@ -38,10 +38,20 @@ const MISSILE_GLOW_GEO = new THREE.SphereGeometry(0.34, 8, 6);
 const MISSILE_GLOW_MAT = new THREE.MeshBasicMaterial({
   color: 0xffe9a0, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false,
 });
-const MINE_BODY_GEO = new THREE.SphereGeometry(0.5, 10, 8);
+const MINE_BODY_GEO = new THREE.SphereGeometry(0.78, 10, 8);
 const MINE_BODY_MAT = new THREE.MeshStandardMaterial({ color: 0x2a2622, metalness: 0.6, roughness: 0.4 });
-const MINE_LAMP_GEO = new THREE.SphereGeometry(0.14, 8, 6);
-const MINE_RING_GEO = new THREE.RingGeometry(0.55, 1.6, 24); // armed ground-glow
+const MINE_LAMP_GEO = new THREE.SphereGeometry(0.26, 8, 6);
+// A MINE HAS TO BE VISIBLE FROM THE CAMERA YOU ARE ACTUALLY USING.
+// Reported as "needs to be visible from top down or back — that is the
+// camera". The old body was a 0.5 u sphere squashed to 0.3 u tall with a
+// 1.6 u ground ring: from TOP-DOWN, 46 u up, that is a handful of pixels, and
+// from a chase camera it is hidden behind the car's own bodywork until you
+// are on top of it. The body is half again as wide, the ring is nearly three
+// times the radius, and there is a vertical beacon that reads from directly
+// above AND from behind at road level.
+const MINE_RING_GEO = new THREE.RingGeometry(1.6, 4.2, 28); // armed ground-glow
+const MINE_BEACON_GEO = new THREE.CylinderGeometry(0.16, 0.16, 5.2, 6);
+MINE_BEACON_GEO.translate(0, 2.6, 0);
 const SHOCK_RING_GEO = new THREE.TorusGeometry(1, 0.35, 8, 48);
 
 export class Weapons {
@@ -91,6 +101,7 @@ export class Weapons {
       this.game.scene.remove(old.mesh);
       old.lampMat.dispose();
       old.ringMat.dispose();
+      old.beaconMat?.dispose();
     }
     const g = new THREE.Group();
     const body = new THREE.Mesh(MINE_BODY_GEO, MINE_BODY_MAT);
@@ -113,6 +124,13 @@ export class Weapons {
     ring.position.y = -0.26; // just above the road surface (mine sits at +0.3)
     ring.renderOrder = 1;
     g.add(ring);
+    // the column: what you actually see from a chase camera at 40 u/s, and
+    // from directly overhead it is the ring that reads instead. Additive and
+    // depth-write-off so it glows rather than occluding the road.
+    const beacon = new THREE.Mesh(MINE_BEACON_GEO, new THREE.MeshBasicMaterial({
+      color: 0xff2a1a, transparent: true, opacity: 0.5,
+      blending: THREE.AdditiveBlending, depthWrite: false }));
+    g.add(beacon);
     const back = car.forward.multiplyScalar(-1);
     const gm = this.game, t = gm.track;
     const p = car.pos.clone().addScaledVector(back, 3.4);
@@ -128,7 +146,14 @@ export class Weapons {
     }
     g.position.copy(p);
     this.game.scene.add(g);
-    this.mines.push({ mesh: g, pos: g.position, lampMat, ringMat, owner: car, armTime: 0.8, life: 45, blink: 0 });
+    // ARMED ALMOST AT ONCE. It was 0.8 s, which at racing pace is FORTY UNITS
+    // of road: a rival tucked into your slipstream drove over the mine before
+    // it was live, every time, which is exactly the "doesn't explode on
+    // contact" that was reported. The dropper is excluded by owner anyway, so
+    // the delay was never protecting anybody — 0.12 s is just enough that the
+    // mine has left the car.
+    this.mines.push({ mesh: g, pos: g.position, lampMat, ringMat, beaconMat: beacon.material,
+      owner: car, armTime: 0.12, life: 45, blink: 0 });
   }
 
   fireShockwave(car) {
@@ -611,6 +636,14 @@ export class Weapons {
       let boom = m.life <= 0;
       if (m.armTime > 0) {
         m.armTime -= dt;
+        // ...BUT CONTACT ALWAYS COUNTS, armed or not. A car that physically
+        // drives into a mine sets it off; the arming delay only ever governs
+        // the wider proximity fuse. Without this an unarmed mine is a piece of
+        // scenery you can roll straight over, which is the report.
+        for (const car of [g.player, ...g.enemies, ...(g.hostiles ?? [])]) {
+          if (!car.alive || car === m.owner || car.invuln > 0 || car.airborne) continue;
+          if (m.pos.distanceToSquared(car.pos) < 9) { boom = true; break; }
+        }
       } else {
         // trigger check + telegraph: track the closest threat so the lamp
         // blink ramps up and the ground ring burns brighter as a car closes in
@@ -629,7 +662,8 @@ export class Weapons {
         m.blink += dt * THREE.MathUtils.lerp(5, 22, prox); // blink rate ramp
         const on = Math.floor(m.blink) % 2 === 0;
         m.lampMat.color.setHex(on ? 0xff2222 : 0x661111);
-        m.ringMat.opacity = on ? 0.22 + 0.3 * prox : 0.08;
+        m.ringMat.opacity = on ? 0.3 + 0.4 * prox : 0.12;
+        if (m.beaconMat) m.beaconMat.opacity = on ? 0.5 + 0.4 * prox : 0.22;
       }
       if (boom) {
         g.particles.detonation(m.pos);
@@ -654,6 +688,7 @@ export class Weapons {
         g.scene.remove(m.mesh);
         m.lampMat.dispose();
         m.ringMat.dispose();
+        m.beaconMat?.dispose();
         this.mines.splice(i, 1);
       }
     }

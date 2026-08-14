@@ -706,7 +706,129 @@ export function buildVoxelRacer(spec) {
   // body material handle for damage scorch tinting
   g.userData.bodyMat = bodyMat;
   g.userData.baseBodyColor = new THREE.Color(body);
+  // dimensions the upgrade kit bolts onto, so it never has to guess at a
+  // roofline or a wheelbase that differs per body style
+  g.userData.rig = { wheelR, wheelY, baseY, capTop };
   return g;
+}
+
+/** WHAT YOU BOUGHT, BOLTED ON WHERE YOU CAN SEE IT.
+ *
+ *  Asked for as "change the appearance of the car at every significant
+ *  upgrade". The garage sold ten invisible multipliers, so a fully built
+ *  machine looked exactly like the one that rolled off the forecourt and the
+ *  money had nothing to show for itself.
+ *
+ *  Every mod appears at level 2 and grows at 4, because a change at every
+ *  single level would be six near-identical silhouettes rather than a car
+ *  that visibly becomes something. The whole kit lives in ONE named child
+ *  group so a purchase can rebuild it without touching the body underneath.
+ */
+export function applyUpgradeKit(group, up = {}) {
+  const prev = group.getObjectByName('upgradeKit');
+  if (prev) { group.remove(prev); disposeKit(prev); }
+  const lv = (k) => (up?.[k] | 0);
+  if (!group.userData.rig) return null;
+  const { wheelY, baseY, capTop } = group.userData.rig;
+  const kit = new THREE.Group();
+  kit.name = 'upgradeKit';
+  const M = (color, opts = {}) => new THREE.MeshStandardMaterial({
+    color, roughness: 0.5, metalness: 0.45, envMapIntensity: 1.1, ...opts });
+  const steel = M(0x6a6e74);
+  const dark = M(0x2a2724, { metalness: 0.2, roughness: 0.8 });
+  const hot = new THREE.MeshBasicMaterial({ color: 0x7fd4ff });
+  const add = (geo, mat, x, y, z, rx = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.rotation.x = rx;
+    m.castShadow = true;
+    kit.add(m);
+    return m;
+  };
+
+  // ENGINE — a hood scoop, then a second one and a pair of stacks out the back
+  const eng = lv('engine');
+  if (eng >= 2) {
+    add(new THREE.BoxGeometry(0.9, 0.26, 1.1), dark, 0, capTop - 0.55, 1.15);
+    if (eng >= 4) {
+      add(new THREE.BoxGeometry(1.5, 0.2, 0.7), dark, 0, capTop - 0.42, 0.65);
+      for (const sx of [-0.55, 0.55]) {
+        add(new THREE.CylinderGeometry(0.14, 0.17, 0.9, 8), steel,
+          sx, baseY + 0.1, -2.15, Math.PI / 2);
+      }
+    }
+  }
+  // ARMOR — side skirts and a bull bar, then a roof plate
+  const arm = lv('armor');
+  if (arm >= 2) {
+    for (const sx of [-1, 1]) {
+      add(new THREE.BoxGeometry(0.16, 0.42, 2.6), steel, sx * 1.32, baseY + 0.05, 0);
+    }
+    add(new THREE.BoxGeometry(2.5, 0.3, 0.22), steel, 0, baseY + 0.16, 2.35);
+    if (arm >= 4) {
+      add(new THREE.BoxGeometry(2.1, 0.14, 1.7), steel, 0, capTop + 0.09, -0.1);
+      for (const sx of [-1, 1]) {
+        add(new THREE.BoxGeometry(0.18, 0.7, 0.18), steel, sx * 0.95, capTop - 0.28, 0.7);
+      }
+    }
+  }
+  // CANNON — a barrel over the nose, then a second one
+  const can = lv('cannon');
+  if (can >= 2) {
+    const barrel = (x) => add(new THREE.CylinderGeometry(0.11, 0.13, 1.6, 8), steel,
+      x, capTop - 0.5, 1.9, Math.PI / 2);
+    if (can >= 4) { barrel(-0.42); barrel(0.42); } else barrel(0);
+    add(new THREE.BoxGeometry(0.7, 0.24, 0.5), dark, 0, capTop - 0.5, 1.0);
+  }
+  // ORDNANCE RACK — rocket tubes on the roof, one per level
+  const rack = lv('rack');
+  if (rack >= 2) {
+    const n = Math.min(4, rack);
+    for (let i = 0; i < n; i++) {
+      add(new THREE.CylinderGeometry(0.15, 0.15, 1.3, 8), dark,
+        (i - (n - 1) / 2) * 0.42, capTop + 0.2, -0.4, Math.PI / 2);
+    }
+  }
+  // MAGAZINE — ammo boxes on the flanks
+  const mag = lv('magazine');
+  if (mag >= 2) {
+    add(new THREE.BoxGeometry(0.34, 0.5, 1.2), dark, -1.4, baseY + 0.55, -0.5);
+    if (mag >= 4) add(new THREE.BoxGeometry(0.34, 0.5, 1.2), dark, 1.4, baseY + 0.55, -0.5);
+  }
+  // NITRO — a bottle behind the cabin, glowing at high levels
+  const nit = lv('nitro');
+  if (nit >= 2) {
+    add(new THREE.CylinderGeometry(0.22, 0.22, 1.5, 10), M(0x2f6fd8),
+      0.55, capTop - 0.35, -1.15, Math.PI / 2);
+    if (nit >= 4) {
+      add(new THREE.CylinderGeometry(0.22, 0.22, 1.5, 10), M(0x2f6fd8),
+        -0.55, capTop - 0.35, -1.15, Math.PI / 2);
+      add(new THREE.SphereGeometry(0.13, 8, 6), hot, 0, capTop - 0.35, -1.95);
+    }
+  }
+  // DAMPERS — visible coilovers at each corner
+  if (lv('dampers') >= 2) {
+    for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
+      add(new THREE.CylinderGeometry(0.1, 0.1, 0.7, 8), M(0xd8342a),
+        sx * 1.15, wheelY + 0.45, sz * 1.5);
+    }
+  }
+  // TIRES — fatter rubber. Scaling the EXISTING wheels rather than adding new
+  // ones keeps the spin and steer bindings in userData intact.
+  const tir = lv('tires');
+  const wf = tir >= 4 ? 1.34 : tir >= 2 ? 1.16 : 1;
+  for (const w of group.userData.wheels ?? []) w.scale.set(wf, 1, wf);
+  group.add(kit);
+  return kit;
+}
+
+/** three does not free geometry for you; a kit is rebuilt on every purchase. */
+function disposeKit(node) {
+  node.traverse?.((o) => {
+    if (o.geometry) o.geometry.dispose?.();
+    if (o.material) (Array.isArray(o.material) ? o.material : [o.material])
+      .forEach((m) => m.dispose?.());
+  });
 }
 
 /** Weld several geometries into one, so a detailed part is still one draw
@@ -2667,6 +2789,7 @@ export class EnemyCar extends Car {
     this.cornerSkill = Math.random();    // 0..1 — how hard this driver leans on the tires
     this.lane = THREE.MathUtils.randFloatSpread(2.5); // small personal offset off the ideal line
     this.laneTimer = 3 + Math.random() * 4;
+
     this.aggression = 0.7 + Math.random() * 0.7; // angry grid: ~40% above the old 0.5..1.0
     this.mineCooldown = 4 + Math.random() * 5;  // stagger the first drops
     this.boostCooldown = 4 + Math.random() * 6; // stagger the first bursts
@@ -2926,6 +3049,32 @@ export class EnemyCar extends Car {
     const li = (this.trackIndex + look) % t.N;
     let targetLat = t._raceLine[li] + this.lane;
 
+    // ---- WHY THERE IS NO LATERAL 'PERSONAL LINE' HERE -------------------
+    //
+    // Measured first: over a 60 s race the field spends 26-34 % of its frames
+    // with three or more rivals inside 6 u of each other, and the spread of
+    // their lap progress is 0.035-0.089. That is a train, not a grid, and it
+    // is the most robotic thing on screen.
+    //
+    // The obvious fix — give each driver a personal lateral bias as a fraction
+    // of the half-width, plus a separation push away from anyone alongside —
+    // WAS BUILT AND MEASURED AND REVERTED. It broke up the pack (pack frames
+    // fell ~70 % on PINE VALLEY) and made the AI look considerably WORSE while
+    // doing it, because spreading a field sideways aims it at the edges and
+    // the edge is where the barrier is. Three runs a side, seconds spent
+    // within half a metre of a wall:
+    //
+    //     PINE VALLEY      1.6 / 1.6 / 1.2   ->   3.0 / 1.6 / 2.1
+    //     ROCKFALL RAVINE 19.6 / 14.4 / 17.6 ->  24.6 / 29.9 / 24.9
+    //     GOTTHARD CLIMB   8.6 / 15.5 / 18.5 ->  25.9 / 19.3 / 24.5
+    //
+    // Fading the bias out on narrow roads did not save it: `widthAt` returns
+    // ~9 almost everywhere, so the fade was inactive exactly where it was
+    // needed. A field that strings out ALONG the lap rather than across it is
+    // the version worth building next — vary braking points and corner speeds
+    // per driver, not lateral position. Do not re-add a lateral spread term
+    // without an A/B on tests/tool-ai-audit.mjs; the pack metric is far too
+    // noisy for single runs (the same build measured 258, 1206 and 1113).
     // (boost pads are gone — rivals no longer swerve across the road to farm
     //  chevrons, they just drive the racing line)
 
@@ -3089,7 +3238,19 @@ export class EnemyCar extends Car {
     // instead of grinding the narrowed edge; defensive on older track builds
     const wNow = t.widthAt?.(this.trackIndex) ?? ROAD_HALF;
     const wAhead = t.widthAt?.(li) ?? ROAD_HALF;
-    const latLim = Math.min(7.4, Math.min(wNow, wAhead) - 1.6);
+    // ---- AND THE MARGIN GROWS WITH SPEED, WHICH IS WHY THEY STOP SCRAPING.
+    //
+    // A fixed 1.6 u of edge margin is fine at 30 u/s and nowhere near enough
+    // at 55: the car is still carrying the last correction when the barrier
+    // arrives, so it arrives ON the barrier. Measured over a 60 s race, rivals
+    // spent 16.6 s within half a metre of the wall on GOTTHARD CLIMB and 9.6 s
+    // on ROCKFALL RAVINE — the mountain worlds, exactly where a watching
+    // player calls the AI stupid. A margin that scales with the speed being
+    // carried costs nothing on a straight (where the aim is near the middle
+    // anyway) and keeps a hand's width of road in reserve through a fast
+    // sweeper.
+    const edgeMargin = 1.6 + Math.min(1.9, Math.max(0, v - 26) * 0.07);
+    const latLim = Math.max(2.2, Math.min(7.4, Math.min(wNow, wAhead) - edgeMargin));
     targetLat = THREE.MathUtils.clamp(targetLat, -latLim, latLim);
 
     const target = t.pointAt(li, targetLat);
@@ -3436,13 +3597,36 @@ export const TYRE_LABEL = ['ROAD', 'GRAVEL', 'SNOW'];
 export const baseTyreClass = (offroad) =>
   (offroad < 0.5 ? TYRE_ROAD : offroad < 0.85 ? TYRE_GRAVEL : TYRE_SNOW);
 
-/** What this car is running, given its per-car upgrade row. */
-export function tyreClass(carKey, upgrades) {
+/** The BEST compound this car has unlocked — its own class plus whatever the
+ *  TIRES upgrade has bought. This is a ceiling, not a fitment. */
+export function tyreMaxClass(carKey, upgrades) {
   const c = CAR_CATALOG.find((x) => x.key === carKey);
   if (!c) return TYRE_ROAD;
   const lvl = (upgrades && upgrades.tires) | 0;
   const bump = lvl >= 3 ? 2 : lvl >= 1 ? 1 : 0;
   return Math.min(TYRE_SNOW, baseTyreClass(c.stats.offroad) + bump);
+}
+
+/** WHAT IS ACTUALLY BOLTED ON — a CHOICE now, not a ratchet.
+ *
+ *  Reported as "misleading message, as there is no way to change tyres", with
+ *  a screenshot of START — WRONG TYRES (−18% GRIP). The report was exactly
+ *  right and the bug was worse than the wording. Measured on a fresh career:
+ *  `tyreClass('brawler', {tires: n})` for n = 0..5 returned [1,2,2,2,2,2].
+ *  One 600 CR purchase of a line advertised as "+4% grip" moved the only car
+ *  you own to SNOW class PERMANENTLY, and every SEALED circuit in the game —
+ *  CANYON RUN, EMBER PASS, SUMMIT CLIMB, all of GRAND CIRCUITS — then read
+ *  WRONG TYRES with no route back, because class could only ever go up.
+ *
+ *  So the upgrade UNLOCKS compounds and the garage FITS one. Going DOWN is
+ *  always free and always available (any car can run road rubber); going UP
+ *  is what costs money, which is where the shopping decision belonged all
+ *  along. `fitted` undefined keeps the old answer, so every existing save and
+ *  every call site that has not been taught about fitment still works. */
+export function tyreClass(carKey, upgrades, fitted) {
+  const max = tyreMaxClass(carKey, upgrades);
+  if (fitted == null) return max;
+  return Math.max(TYRE_ROAD, Math.min(max, fitted | 0));
 }
 
 /** The tyre level that would first make `carKey` legal on `need`, or null if
@@ -3729,7 +3913,11 @@ export class PlayerCar extends Car {
     // CANNON CORE upgrade bought nothing but a slightly shorter time-to-kill.
     // A magazine makes every trigger pull a decision and turns MAGAZINE DRUM
     // into the difference between one firefight and three.
-    if (controlsLive && input.fire && !this.overheated && this.fireCooldown <= 0) {
+    // A DUEL AND A GAUNTLET SAY "NO WEAPONS" ON THE CARD, so the card has to
+    // be true: this is the one gate, and it covers the cannon, the rockets and
+    // the mines below it. Cleared by _missionReset, never persisted.
+    const armed = !g.missionNoGuns;
+    if (armed && controlsLive && input.fire && !this.overheated && this.fireCooldown <= 0) {
       if (this.rounds > 0) {
         this.rounds--;
         this.fireCooldown = 0.085;
@@ -3745,7 +3933,7 @@ export class PlayerCar extends Car {
       }
     }
     // missile
-    if (controlsLive && input.justPressed('KeyE')) {
+    if (armed && controlsLive && input.justPressed('KeyE')) {
       if (this.missiles > 0) {
         this.missiles--;
         g.weapons.fireMissile(this);
@@ -3753,7 +3941,7 @@ export class PlayerCar extends Car {
       } else g.hud.feed('RACK EMPTY', 'bad');
     }
     // mine
-    if (controlsLive && input.justPressed('KeyX')) {
+    if (armed && controlsLive && input.justPressed('KeyX')) {
       if (this.mines > 0) {
         this.mines--;
         g.weapons.dropMine(this);
