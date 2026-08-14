@@ -19,6 +19,7 @@ export class Hud {
       health: $('health-fill'), healthNum: $('health-num'), deaths: $('deaths'),
       heat: $('heat-fill'), heatNum: $('heat-num'),
       missiles: $('missile-icons'), mines: $('mine-icons'), shock: $('shock-status'),
+      rounds: $('round-count'), sos: $('sos-count'),
       nitro: $('nitro-fill'), feed: $('feed'), center: $('center-msg'),
       wrongWay: $('wrong-way'), vignette: $('damage-vignette'),
       // touch button badges
@@ -275,6 +276,22 @@ export class Hud {
     this.el.heat.classList.toggle('overheat', p.overheated);
     this.el.missiles.textContent = p.missiles > 0 ? '▲ '.repeat(p.missiles).trim() : '—';
     this.el.mines.textContent = p.mines > 0 ? '● '.repeat(p.mines).trim() : '—';
+    // FINITE AMMO HAS TO BE LEGIBLE BEFORE IT RUNS OUT (r173). Rounds are a
+    // number rather than pips — a full drum is 240 of them — and it ambers at
+    // a quarter left so the last firefight is a decision, not a surprise.
+    if (this.el.rounds) {
+      const rd = p.rounds ?? 0, mx = p.maxRounds || 1;
+      this.el.rounds.textContent = rd > 0 ? String(rd) : 'EMPTY';
+      this.el.rounds.classList.toggle('low', rd > 0 && rd / mx <= 0.25);
+      this.el.rounds.classList.toggle('out', rd <= 0);
+    }
+    if (this.el.sos) {
+      const n = p.sos ?? 0;
+      this.el.sos.textContent = n > 0
+        ? '🆘'.repeat(n) + (p.unstuckCool > 0 ? ` ${Math.ceil(p.unstuckCool)}s` : '')
+        : 'SPENT';
+      this.el.sos.classList.toggle('out', n <= 0);
+    }
     if (p.shockCooldown <= 0) {
       this.el.shock.textContent = 'READY';
       this.el.shock.className = 'ready';
@@ -295,17 +312,25 @@ export class Hud {
       if (!shockReady) this.el.bShock.textContent = Math.ceil(p.shockCooldown);
       // UNSTUCK: dimmed and unpressable while it recharges, counting down on
       // its own face so the wait is never a mystery
+      // ...and since r173 it is also FINITE, so the badge carries whichever
+      // number is currently stopping you: the seconds while it recharges, the
+      // charges left when it is ready, and a struck-through face at zero.
       if (this.el.tUnstuck) {
-        const cool = p.unstuckCool ?? 0;
-        this.el.tUnstuck.classList.toggle('cooling', cool > 0);
-        this.el.bUnstuck.style.display = cool > 0 ? 'flex' : 'none';
-        if (cool > 0) this.el.bUnstuck.textContent = Math.ceil(cool);
+        const cool = p.unstuckCool ?? 0, left = p.sos ?? 0;
+        const dead = left <= 0;
+        this.el.tUnstuck.classList.toggle('cooling', cool > 0 || dead);
+        this.el.bUnstuck.style.display = 'flex';
+        this.el.bUnstuck.textContent = dead ? '0' : cool > 0 ? Math.ceil(cool) : left;
       }
       const nf = Math.round(p.nitro * 100);
       this.el.tNitro.style.background =
         `conic-gradient(rgba(127,212,255,${p.boostTimer > 0 ? 1 : 0.8}) ${nf}%, rgba(38,26,12,.6) 0)`;
+      // The fire button carries the magazine, because on a phone the weapon
+      // panel is hidden entirely and this is the only place it can be read.
+      const rd = p.rounds ?? 0;
       this.el.tFire.classList.toggle('hot', p.overheated);
-      this.el.tFire.textContent = p.overheated ? 'HOT!' : 'FIRE';
+      this.el.tFire.classList.toggle('dry', rd <= 0);
+      this.el.tFire.textContent = rd <= 0 ? 'DRY' : p.overheated ? 'HOT!' : String(rd);
     }
 
     // wrong-way detection

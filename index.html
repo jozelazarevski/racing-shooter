@@ -87,6 +87,9 @@
     background:linear-gradient(90deg,#2fb84a,#7de08a);
     transition:width .15s, background .3s}
   #shield-hits{margin-top:6px;font-size:11px;letter-spacing:2px;color:#e8c987}
+  /* ammo that is running out has to say so before it is gone */
+  #weapon-box .icons.low{color:#ffb52e}
+  #weapon-box .icons.out{color:#ff5a3c}
   /* two hulls left is a warning, one is an emergency — the pips say so
      without needing a second glance at a number */
   #shield-hits #deaths.low{color:#ffb52e}
@@ -204,6 +207,8 @@
   /* weapon cluster, right thumb */
   #t-fire {right:calc(18px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));width:88px;height:88px;font-size:17px;background:rgba(140,90,20,.65)}
   #t-fire.hot{background:rgba(200,50,30,.7)}
+  /* an empty magazine reads as dead, not as a number you might still spend */
+  #t-fire.dry{background:rgba(60,48,36,.6);opacity:.45}
   #t-missile{right:calc(118px + env(safe-area-inset-right));bottom:calc(38px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
   #t-mine {right:calc(112px + env(safe-area-inset-right));bottom:calc(112px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
   #t-shock{right:calc(34px + env(safe-area-inset-right));bottom:calc(134px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
@@ -593,6 +598,23 @@
   .wc-feat.done{color:#8de89a;background:rgba(77,208,106,.13);border-color:rgba(77,208,106,.35)}
   .wc-feat.open{color:var(--yellow);background:rgba(255,212,0,.12);border-color:rgba(255,212,0,.35)}
   .wc-feat.locked{color:#c0a375;background:rgba(120,100,70,.16);border-color:rgba(120,100,70,.4)}
+  /* A padlock that only says LOCKED is a label. It has to name the price, so
+     the chip carries what this world takes off the car when the gate is unmet. */
+  .wc-feat.locked i{display:block;font-style:normal;font-size:7.5px;letter-spacing:.4px;
+    color:#ff8b6b;margin-top:1px}
+  /* ---- the quest board ---- */
+  #quest-board{margin-top:14px}
+  #quest-board .qrow{display:grid;grid-template-columns:26px 1fr 74px 40px;gap:8px;
+    align-items:center;padding:7px 9px;margin-bottom:5px;border-radius:9px;
+    background:rgba(40,30,16,.5);border:1px solid rgba(255,212,0,.18)}
+  #quest-board .qrow.done{opacity:.55;border-color:rgba(77,208,106,.4)}
+  #quest-board .qicon{font-size:16px;text-align:center}
+  #quest-board .qmain b{display:block;font-size:11px;letter-spacing:1px;color:var(--yellow)}
+  #quest-board .qmain i{display:block;font-style:normal;font-size:9.5px;color:#c8b48c;margin:1px 0 3px}
+  #quest-board .qbar{display:block;height:4px;border-radius:3px;background:rgba(0,0,0,.45);overflow:hidden}
+  #quest-board .qbar span{display:block;height:100%;background:linear-gradient(90deg,#ffb52e,#ffd400)}
+  #quest-board .qpay{font-size:8.5px;font-weight:800;letter-spacing:.5px;color:#8de89a;text-align:right;line-height:1.25}
+  #quest-board .qn{font-size:12px;font-weight:900;color:#fff8e0;text-align:right}
   #level-select.tl-view .wc-feats{grid-area:feats;justify-content:flex-start}
 
   /* THE RUNG ITSELF — the node on the spine and the career position in one
@@ -1176,8 +1198,10 @@
   <div id="weapon-box" class="panel">
     <div class="bar-label"><span>CANNON HEAT</span><span id="heat-num">0%</span></div>
     <div class="bar"><div id="heat-fill"></div></div>
-    <div class="wrow"><span>MISSILES</span><span class="icons" id="missile-icons">▲ ▲ ▲</span></div>
-    <div class="wrow"><span>MINES</span><span class="icons" id="mine-icons">● ●</span></div>
+    <div class="wrow"><span>ROUNDS</span><span class="icons" id="round-count">90</span></div>
+    <div class="wrow"><span>MISSILES</span><span class="icons" id="missile-icons">▲</span></div>
+    <div class="wrow"><span>MINES</span><span class="icons" id="mine-icons">●</span></div>
+    <div class="wrow"><span>RECOVERY</span><span class="icons" id="sos-count">🆘</span></div>
     <div class="wrow"><span>SHOCKWAVE</span><span id="shock-status" class="ready">READY</span></div>
   </div>
 
@@ -1190,7 +1214,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r172</div>
+<div id="build-tag">r173</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1294,6 +1318,10 @@
     <div class="shelf-wrap"><div id="car-shop"></div></div>
     <div class="panel-head" id="garage-up-head">DETAILED UPGRADES</div>
     <div id="garage-rows"></div>
+    <!-- QUESTS live in the GARAGE, not on the track list, because what they
+         pay is a PART. A board that promises a free MAGAZINE DRUM belongs
+         next to the row where you would otherwise buy one. -->
+    <div id="quest-board"></div>
   </div>
   <button id="start-btn" class="btn">START RACE</button>
   <!-- The owner's build tool. Sits beside START because it opens the world
@@ -1411,10 +1439,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r172"></script>
+<script type="module" src="./src/main.js?v=r173"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r172"></script>
+<script src="./src/offline.js?v=r173"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r172"></script>
+<script type="module" src="./src/traffic.js?v=r173"></script>
 </body>
 </html>

@@ -103,6 +103,20 @@ const UPGRADES = [
   // landing is free at AND halve what the rest of it costs, which turns "don't
   // jump that" into "buy the springs and jump it".
   { key: 'dampers',  name: 'LONG-TRAVEL DAMPERS', icon: '🪂', desc: 'survive bigger drops / lvl', max: 5 },
+  // ---- THE THREE THAT SELL CAPACITY, NOT PERFORMANCE (r173) ----
+  //
+  // "Rockets and gun needs to have limited and upgradable slots. Same for the
+  // sos. Limited and buyable." Everything above makes the car better at what
+  // it already does; these decide how much of a race you can spend fighting.
+  // A stock machine now leaves the line with 90 rounds, one rocket, one mine
+  // and one recovery charge, so the shooter half of the game is a resource to
+  // manage rather than a button that is always available.
+  { key: 'magazine', name: 'MAGAZINE DRUM',  icon: '📦', desc: '+30 cannon rounds / lvl', max: 5 },
+  { key: 'rack',     name: 'ORDNANCE RACK',  icon: '🚀', desc: '+1 rocket and +1 mine / lvl', max: 5 },
+  // Capped at 3 deliberately: four rescues is already a lot of get-out-of-jail
+  // on a three-hull race, and the 30 s cooldown still applies on top, so extra
+  // charges buy you SEPARATE incidents rather than a second try at one corner.
+  { key: 'beacon',   name: 'RECOVERY BEACON', icon: '🆘', desc: '+1 SOS charge / lvl', max: 3 },
 ];
 
 // world-card flavor lines (surface + signature hazards per theme)
@@ -290,6 +304,15 @@ const _dv = new THREE.Vector3();   // scratch for debris ground lookups
  * clearing a world's pair funds roughly the next level of the thing that
  * unlocked them.
  */
+/** What an unmet gate costs you HERE, in the words the chip prints. Kept
+ *  beside the feats themselves so a new archetype cannot ship a padlock with
+ *  nothing behind it. Mirrors Game.kitPenalties exactly. */
+const LOCK_COST = {
+  tires: 'GRIP −14%', cannon: 'GUN −45%', dampers: 'NO DAMPERS',
+  nitro: 'NITRO −40%', armor: 'HULL −18%', engine: 'TOP END −6%',
+  handling: 'GRIP −8%',
+};
+
 const TRACK_FEATS = [
   { id: 'leap', label: 'GORGE LEAP', icon: '🪂', need: { key: 'dampers', lvl: 2 }, pay: 420,
     desc: 'land 3 big airs and finish with the car in one piece',
@@ -327,6 +350,85 @@ function featsFor(levelId) {
   }
   return arr.slice(0, 2);
 }
+
+/* ==========================================================================
+ * QUESTS — the layer above contracts, and the only thing in the game that
+ * pays in PARTS.
+ *
+ * Asked for as "create quests or contracts that I have to race and achieve to
+ * earn bonus credits or some upgrades".
+ *
+ * The distinction that makes this worth having as a SEPARATE system rather
+ * than a fourth contract rung:
+ *
+ *   CONTRACTS are per-race, rerolled daily, and doable anywhere. They answer
+ *   "what shall I do in this race" and pay credits.
+ *   FEATS are fixed to a world, banked once, gated on a part. They answer
+ *   "why this world" and pay credits.
+ *   QUESTS span MANY races, persist in the career, and pay a free upgrade
+ *   LEVEL. They answer "what am I working toward", and they are the first
+ *   reward in the game that is not a number.
+ *
+ * A quest's `count` is how many qualifying races it needs; `test(g, rank)` is
+ * asked once per finished race and returns the key it should count under, or
+ * null. Counting by KEY rather than by tally is what stops "podium in three
+ * ALPINE worlds" being satisfied by winning the same world three times.
+ * ======================================================================== */
+const QUESTS = [
+  {
+    id: 'licence-alpine', name: 'ALPINE LICENCE', icon: '🏔',
+    desc: 'Podium in 3 different ALPINE PASSES worlds',
+    count: 3, reward: { part: 'handling', cr: 1200 },
+    test: (g, rank) => (rank <= 3 && g.level.region === 'ALPINE PASSES' ? `w${g.level.id}` : null),
+  },
+  {
+    id: 'licence-circuit', name: 'CIRCUIT LICENCE', icon: '🏁',
+    desc: 'Podium in 3 different GRAND CIRCUITS worlds',
+    count: 3, reward: { part: 'engine', cr: 1200 },
+    test: (g, rank) => (rank <= 3 && g.level.region === 'GRAND CIRCUITS' ? `w${g.level.id}` : null),
+  },
+  {
+    id: 'rally-school', name: 'RALLY SCHOOL', icon: '🌲',
+    desc: 'Podium on 3 different LOOSE or ICE stages',
+    count: 3, reward: { part: 'tires', cr: 1400 },
+    test: (g, rank) => (rank <= 3 && surfaceClass(g.level) > 0 ? `w${g.level.id}` : null),
+  },
+  {
+    id: 'gunsmith', name: 'GUNSMITH', icon: '🔥',
+    desc: 'Wreck 12 rivals with the guns, across any races',
+    // The only quest that counts EVENTS rather than worlds, so its key is the
+    // running total — which is exactly what makes a finite magazine matter.
+    count: 12, reward: { part: 'magazine', cr: 900 },
+    tally: (g) => g._ct?.rivalKills ?? 0,
+  },
+  {
+    id: 'ironman', name: 'IRONMAN', icon: '🛡',
+    desc: 'Finish 5 races in a row without ever being wrecked out',
+    count: 5, reward: { part: 'armor', cr: 1600 }, streak: true,
+    test: (g) => (g.raceOver ? false : `r${(g.career.questSeq = (g.career.questSeq ?? 0) + 1)}`),
+  },
+  {
+    id: 'marque-zenith', name: 'ZENITH CONTRACT', icon: '⚙',
+    desc: 'Win 3 different worlds in a ZENITH machine',
+    count: 3, reward: { part: 'nitro', cr: 1500 },
+    test: (g, rank) => {
+      const car = CAR_CATALOG.find((c) => c.key === g.cars.selected);
+      return rank === 1 && car?.spec?.brand === 'ZENITH' ? `w${g.level.id}` : null;
+    },
+  },
+  {
+    id: 'recovery', name: 'CLEAN HANDS', icon: '🆘',
+    desc: 'Finish 4 different worlds without ever calling the SOS',
+    count: 4, reward: { part: 'beacon', cr: 1000 },
+    test: (g) => (g.player.sos >= g.player.maxSos ? `w${g.level.id}` : null),
+  },
+  {
+    id: 'stuntman', name: 'STUNTMAN', icon: '🪂',
+    desc: 'Land 20 big airs, across any races',
+    count: 20, reward: { part: 'dampers', cr: 1100 },
+    tally: (g) => g._ct?.bigAirs ?? 0,
+  },
+];
 
 const CONTRACT_POOL = [
   { id: 'cleanlap', label: 'CLEAN LAP', desc: (n) => `${n} lap${n > 1 ? 's' : ''} without hull damage`,
@@ -2961,7 +3063,21 @@ class Game {
     p.maxSpeed = this._base.maxSpeed * (1 + 0.04 * g.engine);
     p.maxHealth = this._base.maxHealth + 15 * g.armor;
     p.health = p.maxHealth;
-    p.cannonDamage = 7 * (1 + 0.18 * g.cannon);
+    // THE CANNON IS THE UPGRADE NOW, not a stat the upgrade nudges.
+    //
+    // "Make the weapons significantly less powerful at the beginning." It was
+    // 7 * (1 + 0.18 * lvl): 7 stock and 13.3 maxed, a 1.9x curve over five
+    // levels costing ~9,000 CR — so the stock gun was already most of the gun,
+    // and CANNON CORE bought a rounding error. Against a 70-hull rival that is
+    // 10 hits stock and 6 maxed, which is not a decision.
+    // Now 3.5 -> 12.6, a 3.6x curve: 20 hits stock, 6 maxed. Same ceiling for
+    // a player who has paid; a chip weapon for one who has not.
+    p.cannonDamage = 3.5 * (1 + 0.52 * g.cannon);
+    // ---- capacity, which the race then spends (see PlayerCar) ----
+    p.maxRounds = 90 + 30 * (g.magazine || 0);
+    p.maxMissiles = 1 + (g.rack || 0);
+    p.maxMines = 1 + (g.rack || 0);
+    p.maxSos = 1 + (g.beacon || 0);
     p.nitroRate = 1 + 0.22 * g.nitro;
     p.handling = 0.2 * (g.handling || 0);
     p.gripBoost = 1 + 0.04 * (g.tires || 0);
@@ -3121,6 +3237,7 @@ class Game {
 
   renderGarage() {
     document.getElementById('credits').textContent = this.garage.credits.toLocaleString();
+    this._renderQuests();
     // the panel shows and edits the SELECTED car's own levels
     const up = this.carUpgrades();
     const carName = CAR_CATALOG.find((c) => c.key === this.cars.selected)?.name ?? '';
@@ -3579,7 +3696,12 @@ class Game {
           if (pl.health / pl.maxHealth > 0.66) this.restoreCarParts(pl);
         } else if (p.type === 'missile') {
           pl.missiles = Math.min(pl.maxMissiles, pl.missiles + 2);
-          this.hud.feed('+2 MISSILES', 'good');
+          // ...and a belt of cannon rounds with it. Since r173 the magazine is
+          // finite, so an ordnance pickup that refilled only the racks would
+          // leave a dry gun with no route back inside a race.
+          const belt = Math.round(pl.maxRounds * 0.34);
+          pl.rounds = Math.min(pl.maxRounds, (pl.rounds ?? 0) + belt);
+          this.hud.feed(`+2 MISSILES · +${belt} ROUNDS`, 'good');
         } else if (p.type === 'nitro') {
           pl.nitro = Math.min(1, pl.nitro + 0.45 * (pl.nitroRate || 1));
           this.hud.feed('+NITRO CHARGE', 'good');
@@ -3806,7 +3928,9 @@ class Game {
     return `<div class="wc-feats">${fs.map((f) => f.done
       ? `<span class="wc-feat done" title="${f.desc}">${f.icon} ${f.label} ✔</span>`
       : f.locked
-        ? `<span class="wc-feat locked" title="${f.desc}">🔒 ${f.label} · ${part(f.need.key)} ${f.need.lvl}</span>`
+        ? `<span class="wc-feat locked" title="${f.desc} — ${LOCK_COST[f.need.key] ?? 'the grid gets quicker'}">`
+          + `🔒 ${f.label} · ${part(f.need.key)} ${f.need.lvl}`
+          + `<i>${LOCK_COST[f.need.key] ?? 'GRID QUICKER'}</i></span>`
         : `<span class="wc-feat open" title="${f.desc}">${f.icon} ${f.label} · ${f.pay}CR</span>`
     ).join('')}</div>`;
   }
@@ -3833,7 +3957,42 @@ class Game {
    *  punishing exploration for an unbought upgrade would be nonsense. */
   kitHandicap() {
     if (this.freeRoam || this.missionMode) return 1;
-    return 1 + 0.16 * (1 - this.kitReady());
+    // 0.16 was a nudge, and the padlocks read as decoration because of it —
+    // "the locks with items mean nothing now". A full 8 % per unmet gate is
+    // most of the gap between a podium and the back of an eight-car grid, and
+    // it stacks with the aggression term in startRace().
+    return 1 + 0.32 * (1 - this.kitReady());
+  }
+
+  /** THE OTHER HALF OF THE LOCK, AND THE HALF THAT MAKES IT A LOCK.
+   *
+   *  A quicker grid alone is a difficulty knob: you lose by more. A lock has to
+   *  mean the world is asking for something you have not brought, so an unmet
+   *  gate ALSO takes it out of YOUR car, in the exact currency the gate names.
+   *  DAMPERS 2 unmet and the landings hurt; TIRES 2 unmet and the grip is
+   *  down; CANNON 2 unmet and the gun is weak here. The part you did not buy
+   *  is the part the world takes away.
+   *
+   *  Applied per-race in startRace(), reverted by applyUpgrades() on the next
+   *  one, so nothing here is persistent state that can drift.
+   */
+  kitPenalties() {
+    const out = { grip: 1, cannon: 1, dampers: 0, nitro: 1, hull: 1, speed: 1 };
+    if (this.freeRoam || this.missionMode) return out;
+    for (const f of this.featsOf()) {
+      if (!f.locked) continue;
+      switch (f.need.key) {
+        case 'tires':    out.grip *= 0.86; break;   // no grip for the loose stuff
+        case 'cannon':   out.cannon *= 0.55; break; // the gun this world wanted
+        case 'dampers':  out.dampers = 1; break;    // landings cost full price
+        case 'nitro':    out.nitro *= 0.6; break;
+        case 'armor':    out.hull *= 0.82; break;
+        case 'engine':   out.speed *= 0.94; break;
+        case 'handling': out.grip *= 0.92; break;
+        default: break;
+      }
+    }
+    return out;
   }
 
   /** Said out loud at the start line, once. A player who cannot podium needs
@@ -3847,6 +4006,17 @@ class Game {
     const list = missing.map((f) => `${part(f.need.key)} ${f.need.lvl}`).join(' + ');
     this.hud.feed(r <= 0 ? `UNDERGEARED FOR THIS WORLD — the grid will bury you (${list})`
       : `HALF-KITTED — the grid has the edge here (${list})`, 'bad');
+    // Say what it actually costs, not just that it costs. A player who can see
+    // "CANNON 2 — your gun is at 55% here" knows what to buy and why.
+    const kp = this.kitPenalties();
+    const bits = [];
+    if (kp.cannon < 1) bits.push(`GUN ${Math.round(kp.cannon * 100)}%`);
+    if (kp.grip < 1) bits.push(`GRIP ${Math.round(kp.grip * 100)}%`);
+    if (kp.hull < 1) bits.push(`HULL ${Math.round(kp.hull * 100)}%`);
+    if (kp.nitro < 1) bits.push(`NITRO ${Math.round(kp.nitro * 100)}%`);
+    if (kp.speed < 1) bits.push(`TOP END ${Math.round(kp.speed * 100)}%`);
+    if (kp.dampers) bits.push('NO DAMPERS — LANDINGS HURT');
+    if (bits.length) this.hud.feed(`THIS WORLD TAKES: ${bits.join(' · ')}`, 'bad');
   }
 
   /** The garage level THIS car brings to a feat's gate. Per-car, like every
@@ -3867,6 +4037,86 @@ class Game {
       have: this.featLevel(f.need.key),
       locked: this.featLevel(f.need.key) < f.need.lvl,
     }));
+  }
+
+  /* ---- QUESTS: the long game, and the only reward paid in parts ---------- */
+
+  /** Every quest, tagged with where this career has got to. One shape for the
+   *  menu list, the finish-line check and the award path. */
+  questState() {
+    const q = (this.career.quests ??= {});
+    return QUESTS.map((def) => {
+      const rec = q[def.id] ?? { keys: [], n: 0, done: false };
+      const have = def.tally ? (rec.n | 0) : (rec.keys?.length ?? 0);
+      return { ...def, have: Math.min(have, def.count), done: !!rec.done };
+    });
+  }
+
+  /** Asked once per finished race. Returns the quests that completed, so the
+   *  results screen can say so — and pays the part, which is the whole point:
+   *  every other reward in this game is a number.
+   *
+   *  A quest that pays a part the car has already maxed pays CREDITS instead
+   *  at three times the rate, so finishing one is never a null result. */
+  _checkQuests(rank) {
+    if (this.freeRoam || this.missionMode || !this.level) return [];
+    const q = (this.career.quests ??= {});
+    const won = [];
+    for (const def of QUESTS) {
+      const rec = (q[def.id] ??= { keys: [], n: 0, done: false });
+      if (rec.done) continue;
+      if (def.tally) {
+        rec.n = (rec.n | 0) + (def.tally(this) | 0);
+      } else {
+        const key = def.test(this, rank);
+        // A STREAK QUEST BREAKS. `false` is "you failed the condition this
+        // race", which is different from `null` ("this race did not count"):
+        // the first wipes the run, the second leaves it alone.
+        if (key === false && def.streak) rec.keys = [];
+        else if (key && !rec.keys.includes(key)) rec.keys.push(key);
+      }
+      const have = def.tally ? (rec.n | 0) : rec.keys.length;
+      if (have < def.count) continue;
+      rec.done = true;
+      won.push(def);
+      // ---- pay it ----
+      const up = this.carUpgrades();
+      const line = UPGRADES.find((u) => u.key === def.reward.part);
+      const maxed = !line || (up[def.reward.part] | 0) >= line.max;
+      if (maxed) {
+        this.contractCredits = (this.contractCredits ?? 0) + def.reward.cr * 3;
+        this.hud.feed(`QUEST: ${def.name} — ${line?.name ?? 'PART'} ALREADY MAXED, `
+          + `+${def.reward.cr * 3} CR INSTEAD`, 'good');
+      } else {
+        up[def.reward.part] = (up[def.reward.part] | 0) + 1;
+        this.contractCredits = (this.contractCredits ?? 0) + def.reward.cr;
+        this.hud.feed(`QUEST: ${def.name} — FREE ${line.name} ${up[def.reward.part]} `
+          + `+${def.reward.cr} CR`, 'good');
+        saveJSON(this._pkey('garage'), this.garage);
+      }
+    }
+    saveJSON(this._pkey('career'), this.career);
+    if (won.length) this._renderQuests?.();
+    return won;
+  }
+
+  /** The quest board, in the GARAGE tab beside the parts it pays for. */
+  _renderQuests() {
+    const el = document.getElementById('quest-board');
+    if (!el) return;
+    const rows = this.questState().map((q) => {
+      const pct = Math.round((q.have / q.count) * 100);
+      const part = UPGRADES.find((u) => u.key === q.reward.part)?.name ?? q.reward.part;
+      return `<div class="qrow${q.done ? ' done' : ''}">
+        <span class="qicon">${q.done ? '✔' : q.icon}</span>
+        <span class="qmain"><b>${q.name}</b><i>${q.desc}</i>
+          <span class="qbar"><span style="width:${pct}%"></span></span></span>
+        <span class="qpay">${q.done ? 'CLAIMED' : `FREE ${part.split(' ')[0]}<br>+${q.reward.cr} CR`}</span>
+        <span class="qn">${q.have}/${q.count}</span>
+      </div>`;
+    }).join('');
+    const open = this.questState().filter((q) => !q.done).length;
+    el.innerHTML = `<div class="cb-head">QUESTS <b>${open} OPEN</b></div>${rows}`;
   }
 
   /** Banked at the finish. Permanent, once per world, and never awarded for a
@@ -5633,7 +5883,12 @@ class Game {
         this.hud.feed('CRATE: +25 HULL', 'good');
         if (pl.health / pl.maxHealth > 0.66) this.restoreCarParts(pl);
       }
-      else if (pr.pickup === 'missile') { pl.missiles = Math.min(pl.maxMissiles, pl.missiles + 1); this.hud.feed('CRATE: +1 MISSILE', 'good'); }
+      else if (pr.pickup === 'missile') {
+        pl.missiles = Math.min(pl.maxMissiles, pl.missiles + 1);
+        const belt = Math.round(pl.maxRounds * 0.2);
+        pl.rounds = Math.min(pl.maxRounds, (pl.rounds ?? 0) + belt);
+        this.hud.feed(`CRATE: +1 MISSILE · +${belt} ROUNDS`, 'good');
+      }
       else if (pr.pickup === 'nitro') { pl.nitro = Math.min(1, pl.nitro + 0.35 * (pl.nitroRate || 1)); this.hud.feed('CRATE: NITRO CHARGE', 'good'); }
       else if (pr.pickup === 'mine') { pl.mines = Math.min(pl.maxMines, pl.mines + 1); this.hud.feed('CRATE: +1 MINE', 'good'); }
       else if (Math.random() < 0.35) this.hud.feed(`SMASHED  +${pr.scoreValue || 25}`, 'good');
@@ -6263,8 +6518,9 @@ class Game {
     this.player.health = this.player.maxHealth;
     this.player.alive = true;
     this.player.mesh.visible = true;
-    this.player.missiles = 3;
-    this.player.mines = 2;
+    // A RACE STARTS WITH FULL RACKS — capacity is bought once in the garage,
+    // not refilled with credits between rounds. applyUpgrades() below sets the
+    // maxima; these are filled from them a few lines later, once it has run.
     this.player.nitro = 0.3;
     this.player.shockCooldown = 0;
     this.player.heat = 0;
@@ -6272,6 +6528,11 @@ class Game {
     this.player.bestLap = Infinity;
     this.player.boostTimer = 0;
     this.applyUpgrades();
+    // ...and now the racks are full to whatever the garage just set.
+    this.player.rounds = this.player.maxRounds;
+    this.player.missiles = this.player.maxMissiles;
+    this.player.mines = this.player.maxMines;
+    this.player.sos = this.player.maxSos;
     const slot = this.track.gridSlot(0);
     this.player.placeAt(slot.index, slot.lateral);
 
@@ -6341,8 +6602,15 @@ class Game {
     // every race starts with the rescue in hand — a cooldown must never
     // carry across a restart, or a retry begins already punished
     this.player.unstuckCool = 0;
-    // ...and with all three hulls. Same argument: a retry must not begin
-    // already carrying the wrecks that ended the previous attempt.
+    // ...with full racks, and with all three hulls. Same argument each time,
+    // and the same trap: startRace() is the player-facing entry and does NOT
+    // call resetRace() in this order, so anything reset only there is never
+    // reached on a retry.
+    this.applyUpgrades();
+    this.player.rounds = this.player.maxRounds;
+    this.player.missiles = this.player.maxMissiles;
+    this.player.mines = this.player.maxMines;
+    this.player.sos = this.player.maxSos;
     this.deaths = 0;
     this.raceOver = false;
     this.player.outOfHulls = false;
@@ -6360,6 +6628,20 @@ class Game {
       for (const e of this.enemies) {
         e.aggression = (e.baseAggression ??= e.aggression) * (1 + 0.9 * kitGap);
       }
+      // ...and the world takes back the exact part you did not bring. This is
+      // what turns the padlock on the card from a label into a lock: it names
+      // a part, and racing without it is measurably a different car. Applied
+      // AFTER applyUpgrades() so it multiplies the finished figures, and never
+      // stored — the next applyUpgrades() rebuilds them from the garage.
+      const kp = this.kitPenalties();
+      const p = this.player;
+      p.gripBoost = (p.gripBoost ?? 1) * kp.grip;
+      p.cannonDamage *= kp.cannon;
+      p.nitroRate *= kp.nitro;
+      p.maxSpeed *= kp.speed;
+      p.maxHealth = Math.round(p.maxHealth * kp.hull);
+      p.health = p.maxHealth;
+      if (kp.dampers) p.damperLvl = 0;   // the springs this world wanted, gone
       this._warnKit();
     }
     if (this.missionMode) { // [MISSIONS] structured arena challenge, no grid
@@ -6542,6 +6824,8 @@ class Game {
     this._checkFinishContracts(rank);
     // …and the world's own feats, which pay into the same pot
     this._checkFeats(rank);
+    // …and the long chains, which are the only thing here that pays a PART
+    const questsWon = this._checkQuests(rank);
     const contractCr = this.contractCredits ?? 0;
     // Driving clean and sweeping all three contracts were stars in the first
     // cut of this system; they pay CREDITS instead, because the star ladder
@@ -6564,6 +6848,11 @@ class Game {
         let html = `<div class="cb-row"><span>RACE SCORE${diffMult !== 1 ? ` ×${diffMult}` : ''}</span><b>+${raceCr.toLocaleString()}</b></div>`;
         if (podium) html += `<div class="cb-row"><span>PODIUM — ${sfx}</span><b>+${podium}</b></div>`;
         if (firstClear) html += `<div class="cb-row"><span>FIRST CONQUEST</span><b>+${firstClear}</b></div>`;
+        for (const q of questsWon) {
+          const part = UPGRADES.find((u) => u.key === q.reward.part)?.name ?? q.reward.part;
+          html += `<div class="cb-row contract"><span>🏆 QUEST ${q.name} — FREE ${part}</span>`
+            + `<b>+${q.reward.cr}</b></div>`;
+        }
         if (cleanCr) html += `<div class="cb-row"><span>CLEAN RUN — NO WRECKS</span><b>+${cleanCr}</b></div>`;
         if (sweepCr) html += `<div class="cb-row"><span>CLEAN SWEEP — ALL CONTRACTS</span><b>+${sweepCr}</b></div>`;
         for (const c of this.contracts ?? []) {
