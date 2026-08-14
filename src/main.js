@@ -237,6 +237,66 @@ const _dv = new THREE.Vector3();   // scratch for debris ground lookups
  * strong race rather than three, and the side objectives cannot quietly become
  * the main way to earn.
  */
+/* ---------- TRACK FEATS: what this world wants from your garage ----------
+ *
+ * Contracts are the DAILY money game — three picks, reshuffled every day,
+ * doable in any world. They answer "what shall I do in this race". They do
+ * not answer "why should I buy the dampers", and they never make one world
+ * feel different from the next.
+ *
+ * A feat is the other axis. It is PERMANENT (once per world, banked in the
+ * career), it is FIXED to the world rather than rerolled, and every one of
+ * them is gated behind a specific line of the garage at a specific level.
+ * There is exactly one archetype per upgrade, which is the point: each thing
+ * you can buy has worlds that ask for it by name, so the garage stops being a
+ * flat "more is better" list and becomes a set of keys to specific doors.
+ *
+ * A locked feat is SHOWN, not hidden — seeing "GORGE LEAP · needs DAMPERS 2"
+ * on a track you cannot yet beat is the whole mechanism. It turns the credit
+ * you are saving into a named thing you are saving FOR.
+ *
+ * The pay is deliberately near a mid upgrade rung (upgradeCost(2) = 2600), so
+ * clearing a world's pair funds roughly the next level of the thing that
+ * unlocked them.
+ */
+const TRACK_FEATS = [
+  { id: 'leap', label: 'GORGE LEAP', icon: '🪂', need: { key: 'dampers', lvl: 2 }, pay: 420,
+    desc: 'land 3 big airs and finish with the car in one piece',
+    check: (g, ct) => ct.bigAirs >= 3 && g.deaths === 0 },
+  { id: 'flatout', label: 'FLAT OUT', icon: '🔧', need: { key: 'engine', lvl: 3 }, pay: 460,
+    desc: 'break 190 km/h on this circuit',
+    check: (g, ct) => (ct.topKph ?? 0) >= 190 },
+  { id: 'surefoot', label: 'SURE-FOOTED', icon: '🛞', need: { key: 'tires', lvl: 2 }, pay: 400,
+    desc: 'take two laps without a scratch',
+    check: (g, ct) => ct.cleanLaps >= 2 },
+  { id: 'boostrun', label: 'BOOST RUN', icon: '⚡', need: { key: 'nitro', lvl: 2 }, pay: 380,
+    desc: 'hold the boost for 6 seconds in one race',
+    check: (g, ct) => (ct.boostHeld ?? 0) >= 6 },
+  { id: 'ironhull', label: 'IRON HULL', icon: '🛡️', need: { key: 'armor', lvl: 2 }, pay: 400,
+    desc: 'finish on the podium with most of the hull left',
+    check: (g, ct, rank) => rank <= 3 && g.player.health >= g.player.maxHealth * 0.7 },
+  { id: 'gunnery', label: 'GUNNERY', icon: '🔥', need: { key: 'cannon', lvl: 2 }, pay: 440,
+    desc: 'wreck 3 rivals with the guns',
+    check: (g, ct) => ct.rivalKills >= 3 },
+  { id: 'onrails', label: 'ON RAILS', icon: '⚙️', need: { key: 'handling', lvl: 2 }, pay: 400,
+    desc: 'finish without once dropping a wheel off the road',
+    check: (g, ct) => !ct.leftRoad },
+];
+
+/** The two feats this world asks for — FIXED to the world, not rerolled.
+ *  Seeded from the id alone so a track's pair is part of its identity and can
+ *  be learned, printed on a card, and worked toward. */
+function featsFor(levelId) {
+  let s = ((levelId * 2654435761) ^ 0x9e3779b9) >>> 0;
+  const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+  const arr = [...TRACK_FEATS];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = (rnd() * (i + 1)) | 0;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, 2);
+}
+
 const CONTRACT_POOL = [
   { id: 'cleanlap', label: 'CLEAN LAP', desc: (n) => `${n} lap${n > 1 ? 's' : ''} without hull damage`,
     lap: true, rungs: [{ need: 1, pay: 100 }, { need: 2, pay: 220 }, { need: 3, pay: 400, hard: true }],
@@ -2692,6 +2752,7 @@ class Game {
         <div class="wc-stars${got ? '' : ' none'}">${starRow}</div>
         ${unlocked ? this._affinityChip(lv.id) : ''}
         <div class="tl-state ${state.toLowerCase().replace(' ', '-')}">${state}</div>
+        ${unlocked ? this._featChips(lv.id) : ''}
         <div class="wc-best${best ? '' : ' new'}${unlocked ? '' : ' cost'}">${bestTxt}</div>`;
       this._drawCircuitMap(card.querySelector(".wc-map"), lv.route || lv.theme, !unlocked, lv.id === curId);
       card.dataset.lvid = lv.id;
@@ -3616,6 +3677,18 @@ class Game {
     if (p.shockCooldown > (ct.prevShock ?? 0) + 1) ct.weaponFired = true;
     ct.prevHeat = p.heat; ct.prevMissiles = p.missiles;
     ct.prevMines = p.mines; ct.prevShock = p.shockCooldown;
+    // ---- TRACK FEATS need three things contracts never asked for ----
+    // Read off state the car already keeps, same as everything above it.
+    const kph = Math.hypot(p.vel.x, p.vel.z) * 3.6;
+    if (kph > (ct.topKph ?? 0)) ct.topKph = kph;
+    if (p.boosting || (p.nitroT ?? 0) > 0) ct.boostHeld = (ct.boostHeld ?? 0) + (this.clock?.lastDt ?? 1 / 60);
+    // ON RAILS: a wheel off the tarmac ends it. `lateral` against the world's
+    // own width profile, so a pinched section is judged by ITS width and not
+    // by a constant — and never while airborne, since a jump is not a mistake.
+    if (p.alive && !p.airborne) {
+      const halfW = this.track?.widthAt?.(p.trackIndex) ?? 9;
+      if (Math.abs(p.lateral ?? 0) > halfW) ct.leftRoad = true;
+    }
     // hull-damage detection for CLEAN LAP: any health drop marks the lap
     // (regen/pickups only ever raise it, so a drop is always damage)
     if (ct.prevHealth !== null && p.alive && p.health < ct.prevHealth - 1e-3) ct.lapDamaged = true;
@@ -3680,6 +3753,62 @@ class Game {
     for (const c of this.contracts) {
       if (!c.done && c.atFinish && c.check(this, this._ct, rank, c.need)) this._completeContract(c);
     }
+  }
+
+  /** The two feat chips on a world card. A LOCKED one names the part and the
+   *  level that opens it — that is the whole mechanism, and hiding it would
+   *  leave the player saving credits with nothing to save them for. */
+  _featChips(levelId) {
+    const fs = this.featsOf(levelId);
+    if (!fs.length) return '';
+    const part = (k) => (UPGRADES.find((u) => u.key === k)?.name || k).split(' ')[0];
+    return `<div class="wc-feats">${fs.map((f) => f.done
+      ? `<span class="wc-feat done" title="${f.desc}">${f.icon} ${f.label} ✔</span>`
+      : f.locked
+        ? `<span class="wc-feat locked" title="${f.desc}">🔒 ${f.label} · ${part(f.need.key)} ${f.need.lvl}</span>`
+        : `<span class="wc-feat open" title="${f.desc}">${f.icon} ${f.label} · ${f.pay}CR</span>`
+    ).join('')}</div>`;
+  }
+
+  /** The garage level THIS car brings to a feat's gate. Per-car, like every
+   *  other upgrade read — a feat cleared in the brawler is not cleared by
+   *  swapping to a stock machine. */
+  featLevel(key) {
+    return this.garage?.upgrades?.[this.cars.selected]?.[key] ?? 0;
+  }
+
+  /** Feats for a world, each tagged with whether the garage opens it and
+   *  whether it is already banked. One shape for the card, the pre-race panel
+   *  and the award path, so none of them can describe a different rule. */
+  featsOf(levelId = this.level.id) {
+    const done = (this.career.feats ??= {})[levelId] ?? [];
+    return featsFor(levelId).map((f) => ({
+      ...f,
+      done: done.includes(f.id),
+      have: this.featLevel(f.need.key),
+      locked: this.featLevel(f.need.key) < f.need.lvl,
+    }));
+  }
+
+  /** Banked at the finish. Permanent, once per world, and never awarded for a
+   *  run made in a car that did not meet the gate — otherwise the gate is
+   *  decoration and the whole mechanism is a lie. */
+  _checkFeats(rank) {
+    if (this.freeRoam || this.missionMode || !this._ct) return;
+    const done = (this.career.feats ??= {})[this.level.id] ?? [];
+    let banked = 0;
+    for (const f of this.featsOf()) {
+      if (f.done || f.locked) continue;
+      if (!f.check(this, this._ct, rank)) continue;
+      done.push(f.id);
+      this.contractCredits = (this.contractCredits ?? 0) + f.pay;
+      this.hud.feed(`FEAT: ${f.label}  +${f.pay} CR`, 'good');
+      banked++;
+    }
+    if (!banked) return;
+    this.career.feats[this.level.id] = done;
+    saveJSON(this._pkey('career'), this.career);
+    this._renderLevelCards?.();
   }
 
   // rivals have opinions: short barks when the position changes hands
@@ -6234,6 +6363,8 @@ class Game {
     // finish-line contracts resolve now (UNTOUCHABLE / PACIFIST / HERDSMAN /
     // PODIUM ON HARD), then the whole contract pot rides into `earned`
     this._checkFinishContracts(rank);
+    // …and the world's own feats, which pay into the same pot
+    this._checkFeats(rank);
     const contractCr = this.contractCredits ?? 0;
     // Driving clean and sweeping all three contracts were stars in the first
     // cut of this system; they pay CREDITS instead, because the star ladder
