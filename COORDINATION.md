@@ -5,7 +5,7 @@ blackboard: what each lane owns, and measurements one session made that
 another needs. Update it when you claim or finish a lane; read it before
 starting work that might be someone else's.
 
-_Last updated: 2026-08-14, by the mainline session (r174)._
+_Last updated: 2026-08-14, by the mainline session (r175)._
 
 ## Lanes
 
@@ -737,6 +737,71 @@ ROCKFALL 17.2 → 13.9 s (−19 %), GOTTHARD unchanged in mean but spread tighte
 **THE PACK METRIC IS FAR TOO NOISY FOR SINGLE RUNS** — the same build measured
 258, 1206 and 1113 pack-frames on GOTTHARD across three runs. Three runs a side
 minimum, or you are measuring rival `Math.random()`.
+
+**r175: TYRES ARE A FITTING NOW, NOT A RATCHET — read this before touching
+`tyreClass` (mainline session).**
+
+Reported as "misleading message, as there is no way to change tires", with a
+screenshot of `START — WRONG TYRES (−18% GRIP)`. Measured on a fresh career:
+
+    tyreClass('brawler', {tires: n}) for n = 0..5  ->  [1, 2, 2, 2, 2, 2]
+
+**One 600 CR purchase of a line advertised as "+4 % grip" moved the only car
+you own to SNOW class permanently**, and every SEALED world — CANYON RUN,
+EMBER PASS, SUMMIT CLIMB, all of GRAND CIRCUITS — then read WRONG TYRES with
+no route back, because class could only ever go UP. The over-tyred advice
+searched the catalogue by price without excluding cars you already own, so
+CANYON RUN told a BRAWLER driver to **BUY THE BRAWLER — 0 CR**.
+
+The API changed:
+
+- `tyreMaxClass(carKey, upgrades)` — what the car has UNLOCKED (its own class
+  from `offroad`, plus the TIRES bump). This is the old `tyreClass`.
+- `tyreClass(carKey, upgrades, fitted)` — what is BOLTED ON. `fitted`
+  undefined returns the max, so every pre-r175 call site and every existing
+  save behaves exactly as before.
+- `Game.fittedTyre(carKey)` / `Game.fitTyre(cls, carKey)`, stored at
+  `garage.fitted[carKey]`, **clamped on READ** — swapping cars or buying an
+  upgrade can otherwise strand a stored choice above the new ceiling.
+
+The rule: **fitting DOWN is always free and always available** (any machine
+can run road rubber); only unlocking a higher compound costs money. If you
+add a call site, decide deliberately whether you want the ceiling
+(`tyreMaxClass` — "could this car ever be legal here") or the fitment
+(`tyreClass(..., fittedTyre(k))` — "is it legal right now"). `carFitness`
+wants the fitment; the "which car should I drive" search wants the ceiling.
+
+**MINES: 0.8 s ARM DELAY WAS 40 UNITS OF ROAD.** At racing pace a rival in
+your slipstream drove over a mine before it was ever live — reported as "make
+mines explode at contact immediately". Now 0.12 s, and CONTACT ALWAYS COUNTS:
+an unarmed mine still detonates on physical contact, with the arming delay
+governing only the wider proximity fuse. The dropper is excluded by `owner`,
+so the delay was never protecting anybody.
+
+Visibility (asked for as "needs to be visible from top down or back — that is
+the camera"): body 0.5 → 0.78 u, ground ring 0.55–1.6 → 1.6–4.2 u, plus a
+5.2 u additive vertical beacon. From TOP-DOWN at 46 u the old mine was a
+handful of pixels; from a chase camera it hid behind the player's own
+bodywork. If you touch `dropMine`, the beacon material is per-mine and must be
+disposed alongside `lampMat`/`ringMat` in BOTH the boom path and the
+pool-recycle path.
+
+**JOBS TAB.** Contracts and quests now share one panel (`#tab-jobs`), and a
+contract can be DECLINED — `career.declined[levelId]` holds ids, and
+`_pickContracts()` filters by it, so a declined contract is not dealt at all.
+`_offeredContracts()` is the board's view (everything, tagged), `_pickContracts()`
+is what actually runs. Note for anyone rendering contracts: `c.desc` is a
+FUNCTION on several pool entries (`(n) => ...`), taking the rung's `need` —
+rendering it directly prints the arrow-function source, which shipped for
+about ten minutes in a screenshot.
+
+**A PROCESS FAILURE WORTH NOT REPEATING.** `applyUpgradeKit` was written and
+verified for r174 and did NOT ship in it: it was UNCOMMITTED in a worktree
+when the release patch was generated with `git diff <base>..HEAD`, which sees
+only committed history, and the worktree was then reset. r174's commit message
+claims a feature its diff does not contain. If you develop in a worktree and
+move work by patch, commit in the worktree FIRST and diff after — or use
+`git diff HEAD` so uncommitted work is included.
 
 ## Rebase notes
 
