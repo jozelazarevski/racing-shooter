@@ -5,7 +5,7 @@ blackboard: what each lane owns, and measurements one session made that
 another needs. Update it when you claim or finish a lane; read it before
 starting work that might be someone else's.
 
-_Last updated: 2026-08-14, by the mainline session (r171)._
+_Last updated: 2026-08-14, by the mainline session (r172)._
 
 ## Lanes
 
@@ -564,6 +564,86 @@ One gotcha for anyone adding per-race state: **the reset belongs in
 `startRace()`, not `resetRace()`** — `startRace()` is the player-facing entry
 and does not call `resetRace()` in that order, so a reset placed there is never
 reached. Caught by `tests/test-unstuck.mjs` (9/9), not by reading.
+
+**r172 makes a race cost something — four rules, one idea (mainline session).**
+Asked for in a single message: eight cars rather than six, three wrecks and the
+race is over, ice and water that actually feel slippery "especially with wrong
+tires — which I need to buy", and a car written off for sitting in the snow on
+road rubber. They ship together because separately each is a difficulty knob;
+together they are the reason to walk into the garage.
+
+**THE FIELD SIZE IS ONE NUMBER NOW.** `ENEMY_COUNT` is 7 and `FIELD` is derived
+from it. Six had leaked into a dozen literals: the ordinal arrays stopped at
+`'6TH'` in three places, the finish bonus was a six-entry table so 7th and 8th
+both fell through to a flat 100, and `racer-count` said 6 in the markup. There
+is now one `ordinal(n)` helper and a geometric finish-bonus curve (2000·0.075^r,
+which fits the old hand-written table to within 10 % at every entry) stretched
+across `FIELD`. **Two traps if you touch this:**
+
+- `AI_COLORS` had FIVE entries and `EnemyCar` indexes it `slot % length`, so a
+  seven-rival grid put a second CROWN and a second SLEEK on the line, identical
+  in name, number and paint. FLATSIX and BASTION were added — the last two
+  unused body styles — so every rival is a distinct machine.
+- rival pace was `53 + slot * 1.1`, tuned for five rivals. Adding two walked the
+  quickest car up to 61 — a silent difficulty increase riding along with a
+  grid-size change, and above every car in the showroom. It is a FRACTION of
+  the field now (`slot / (fieldSize - 1)`), so the band stays where it was
+  measured whatever the grid holds.
+
+**THREE HULLS (`HULL_LIVES`).** `deaths` was counted and spent on nothing but a
+−300 score hit. The third wreck now calls `_raceOver()`, which is deliberately
+NOT `finishRace()`: that function writes `career.finished`, pays credits and
+rolls contracts and feats, and being destroyed out of a race must reward none
+of it. Nothing banked, no place recorded, no star. `player.outOfHulls` stops the
+respawn tick — without it the car pops back onto the road five seconds into the
+results screen. Free roam is exempt and missions keep their own one-hull rule.
+The HUD row that said `WRECKS: 0` now counts DOWN in pips and — note for the
+mobile lane — **is no longer hidden on touch**: it was worth no screen space as
+a tally of past mistakes and is essential as a budget.
+
+**SURFACES: ONE NUMBER, `slick`.** 1 on ice, 0.55 in the wet, 0 on a dry road,
+derived from `T.surface` in the physics and exported from track.js as
+`surfaceSlick(level)` for the menus, so a track card and the car under the
+player quote the same rule. Three consequences:
+
+- snow grip 0.55 → 0.40 and wet 0.68 → 0.60. At 0.55 a snow stage was a
+  slightly slower dry stage.
+- the OFF-ROAD stat's buy-back is `(0.62 - 0.32 * slick)`. It used to return
+  62 % of the deficit on EVERY surface, which meant an off-road machine on the
+  wrong rubber was fine on sheet ice — the stat was doing the tyres' job.
+- `tyrePenalty(over, under, slick)` — the under-spec price is `0.11 + 0.25 *
+  slick` per class, capped at 0.72, replacing a flat 0.17 capped at 0.34.
+  Measured on FROST PEAK: two classes short takes lateral grip 2.72 → 0.69.
+  **The right tyres still pay exactly nothing, on every surface** — that is the
+  property to protect if you retune this, or it stops being a reason to shop
+  and becomes a tax.
+
+**FURKA WAS AN ICE STAGE THAT ISN'T.** `SURFACE_BY_THEME` still listed
+`furka: ICE` after the theme was remade as a bright SUMMER alpine pass against
+the player's own photograph — green slopes, dry asphalt — and its
+`surface: 'snow'` physics went with it. FURKA RIDGE was demanding SNOW TYRES
+for a dry tarmac climb and charging a grip penalty for road rubber on a road.
+It is `SEALED` now.
+
+**BOGGING DOWN COSTS A HULL.** Five seconds of held throttle going nowhere, on
+a slick surface, with the wrong class fitted. The distinction that makes it
+fair: wedged against a rock is the world's fault and the existing net pulls you
+out free; spinning road tyres in deep snow is a garage decision the game
+announced on the card, at the start line and in the tyre feed. The wedge net
+had to be taught to stand down (`!bogged`) — both watch for held throttle and
+no motion at the same five seconds, and the free rescue was winning that race.
+
+**TESTING NOTE THAT COST AN HOUR, worth knowing before you write a timed test.**
+Under swiftshader this page runs about **2.5 physics steps per second**. A test
+that waits nine seconds of WALL CLOCK for a five-second in-game timer gets 23
+steps and 1.05 s of game time, and reports a rule that is working perfectly as
+broken. Two fixes, both in `tests/test-hardmode.mjs`: drive `p.update(dt, stub)`
+directly at a fixed 1/60 for anything on a game-time clock, and pin the car by
+wrapping `step` rather than zeroing velocity from a competing rAF — the two
+callbacks interleave, so a test-side clamp lands on the wrong side of the check
+and the physics has already accelerated away by the time the rule looks.
+
+`tests/test-hardmode.mjs` — 30/30 across all four.
 
 ## Rebase notes
 

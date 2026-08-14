@@ -298,9 +298,25 @@ const SURFACE_BY_THEME = {
   forest: LOOSE, desert: LOOSE, dunes: LOOSE, oasis: LOOSE, redwood: LOOSE,
   flume: LOOSE, wildfire: LOOSE, jungle: LOOSE, savanna: LOOSE,
   outback: LOOSE, ravine: LOOSE, deepwood: LOOSE, farmland: LOOSE,
-  // ice: the surface the physics already calls 'snow', plus the high pass
-  snow: ICE, glacial: ICE, sheetice: ICE, avalanche: ICE, furka: ICE,
+  // ice: the surface the physics already calls 'snow'
+  snow: ICE, glacial: ICE, sheetice: ICE, avalanche: ICE,
+  // FURKA IS NOT AN ICE STAGE ANY MORE. The theme was remade as a bright
+  // SUMMER alpine pass against the player's own photograph — green slopes, dry
+  // asphalt, snow only on the high fields — and its `surface: 'snow'` physics
+  // went with it. This table was not updated, so FURKA RIDGE went on demanding
+  // SNOW TYRES for a dry tarmac climb and charging a grip penalty for road
+  // rubber on a road. It is a sealed pass, which is what it looks like.
+  furka: SEALED,
 };
+
+/** How much this world's road cares what compound is fitted: 1 on ice, 0.55 in
+ *  the wet, 0 on a dry road. The physics derives the same number from
+ *  `T.surface` (see Car.step); this is the menu-side answer, so a track card
+ *  and the car under the player quote the same rule. */
+export function surfaceSlick(level) {
+  const T = { ...(THEMES[level.theme] || {}), ...(level.tune || {}) };
+  return T.surface === 'snow' ? 1 : T.surface === 'wet' ? 0.55 : 0;
+}
 
 /** Which of the three surfaces this world is raced on. */
 export function surfaceClass(level) {

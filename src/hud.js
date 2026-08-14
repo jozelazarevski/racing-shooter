@@ -254,7 +254,21 @@ export class Hud {
     this.el.health.style.background = hp > 50
       ? 'linear-gradient(90deg,#2fb84a,#7de08a)'
       : hp > 25 ? 'linear-gradient(90deg,#ffb52e,#ffe86b)' : 'linear-gradient(90deg,#e8402a,#ff8b3b)';
-    this.el.deaths.textContent = g.deaths;
+    // HULLS, NOT WRECKS. A rising count of things that had already gone wrong
+    // told you nothing about what you had left; three-strikes needs the number
+    // you are about to run out of, and it needs to be alarming before it is
+    // spent, not after. Free roam and missions have no hull budget, so they
+    // keep the plain tally.
+    const lives = g.hullLives ?? 3;
+    if (g.freeRoam || g.missionMode) {
+      this.el.deaths.textContent = g.deaths;
+      this.el.deaths.classList.remove('low', 'last');
+    } else {
+      const left = Math.max(0, lives - g.deaths);
+      this.el.deaths.textContent = '◆'.repeat(left) + '◇'.repeat(Math.max(0, lives - left));
+      this.el.deaths.classList.toggle('low', left === 2);
+      this.el.deaths.classList.toggle('last', left <= 1);
+    }
 
     this.el.heat.style.width = Math.round(p.heat * 100) + '%';
     this.el.heatNum.textContent = p.overheated ? 'OVERHEAT' : Math.round(p.heat * 100) + '%';
