@@ -1205,6 +1205,47 @@ offscreen `WebGLRenderer`, `toDataURL('image/webp', 0.86)`, and call
 96 kits leak fast otherwise. `import('/lib/three.module.min.js')` is the path
 in the page (see the importmap); `/vendor/three.module.js` does not exist.
 
+**r187 — THE KIT FITS ALL EIGHT NOW, NOT THE ONE IT WAS TUNED ON.** Asked for
+as "apply for all cars".
+
+The upgrade kit was already BUILT for every car — identical part counts, 0 / 2 /
+24 / 41 / 60 / 73 across the tiers on all eight — so the honest first check said
+it applied everywhere. It did not FIT everywhere, and that is a different
+question that needed a different measurement.
+
+`capTop` was published back at r174 so bodywork could sit at each car's own roof
+height. That fixed the vertical axis and nothing else: every LONGITUDINAL offset
+stayed a constant tuned against the BRAWLER. Measured, the roster runs 5.6 u
+(SLEEK) to 6.4 u (BASTION) nose to tail, and the kit's reach past each end
+varied accordingly:
+
+    car        len   past TAIL   past NOSE        (negative = inside the body)
+    sleek      5.6      +0.10      +0.17
+    brawler    6.0      -0.10      -0.03          <- the one it was tuned on
+    crown      6.3      -0.25      -0.18
+    bastion    6.4      -0.30      -0.23
+    spread              0.40       0.40
+
+The sign flips: the same gun muzzle poked 0.17 u PAST the SLEEK's nose and sat
+0.23 u INSIDE the BASTION's.
+
+`buildVoxelRacer` now measures the finished object and publishes `zRear`,
+`zFront` and `halfW` alongside `capTop`. `applyUpgradeKit` gets two anchors —
+`T(o)` is `o` units forward of the TAIL, `Nz(o)` is `o` back from the NOSE — and
+all 25 lengthways offsets are expressed against them. The reference numbers are
+the old constants re-stated against the BRAWLER (tail -3.0, nose +3.0), so the
+car that always fitted is pixel-identical and the other seven now match it.
+After: spread 0.00 at both ends.
+
+`halfW` measured 1.8 on all eight, so the lateral offsets needed no change —
+published anyway, because the next part to be added should not have to
+rediscover that.
+
+RULE FOR ANYTHING ADDED TO THE KIT: heights hang off `capTop` / `baseY` /
+`wheelY`, lengths off `T()` / `Nz()`. A bare number on the z axis is the bug
+this release fixed. `tests/test-cars.mjs` pins the spread at <= 0.05 u on both
+ends, so a constant reintroduced later fails.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

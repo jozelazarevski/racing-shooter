@@ -148,6 +148,55 @@ for (const [id, name, surf] of WORLDS) {
 check('the generic fallback stays rare', generic <= cells * 0.1,
   `${generic} of ${cells} cells fell through to a generic caption`);
 
+// ---- THE KIT HAS TO FIT ALL EIGHT, NOT THE ONE IT WAS TUNED ON -------------
+// `capTop` was published so the bodywork could sit at each car's own roof
+// height, and every LENGTHWAYS offset stayed a constant tuned against the
+// BRAWLER. The roster runs 5.6 u (SLEEK) to 6.4 u (BASTION) nose to tail, so
+// the same gun muzzle poked 0.17 u PAST the SLEEK's nose and sat 0.23 u INSIDE
+// the BASTION's — a 0.4 u spread, and the sign flipped. Every part is anchored
+// to the car's own nose and tail now, so the fit is identical on all eight.
+{
+  const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
+  await p.goto(`${BASE}/?level=2&unlockall=1`, { waitUntil: 'load' });
+  const built = await p.waitForFunction(() => window.__game?.track?.center,
+    undefined, { timeout: 240000 }).then(() => 1).catch(() => 0);
+  if (!built) { console.log('SKIP  kit fit'); }
+  else {
+    const fit = await p.evaluate(async () => {
+      const THREE = await import('/lib/three.module.min.js');
+      const V = await import('/src/vehicles.js');
+      const KEYS = ['engine', 'handling', 'tires', 'nitro', 'armor', 'cannon',
+        'dampers', 'magazine', 'rack'];
+      const rows = [];
+      for (const car of V.CAR_CATALOG) {
+        const m = V.buildCarMesh(car.spec);
+        const bare = new THREE.Box3().setFromObject(m);
+        const up = {}; for (const k of KEYS) up[k] = 5;
+        up.beacon = 3;
+        V.applyUpgradeKit(m, up);
+        const kit = m.getObjectByName('upgradeKit');
+        const kb = new THREE.Box3().setFromObject(kit);
+        rows.push({ key: car.key, rig: !!m.userData.rig?.zRear,
+          tail: +(bare.min.z - kb.min.z).toFixed(2),
+          nose: +(kb.max.z - bare.max.z).toFixed(2) });
+        V.applyUpgradeKit(m, {});
+      }
+      return rows;
+    });
+    const spread = (k) => {
+      const v = fit.map((r) => r[k]);
+      return +(Math.max(...v) - Math.min(...v)).toFixed(2);
+    };
+    check('every rig publishes its own length', fit.every((r) => r.rig),
+      fit.filter((r) => !r.rig).map((r) => r.key).join(', ') || 'all eight');
+    check('the kit sits the same distance off every car\'s TAIL',
+      spread('tail') <= 0.05, `spread ${spread('tail')} u across ${fit.length} cars`);
+    check('...and the same distance off every NOSE',
+      spread('nose') <= 0.05, `spread ${spread('nose')} u`);
+  }
+  await p.close();
+}
+
 await browser.close();
 console.log(fail ? `\n${fail} FAILED` : '\nevery car reads as its own machine');
 process.exit(fail ? 1 : 0);
