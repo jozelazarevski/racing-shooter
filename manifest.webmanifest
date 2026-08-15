@@ -1,7 +1,7 @@
 {
   "name": "IGNITE RALLY",
   "short_name": "Ignite Rally",
-  "description": "Voxel combat racing — dirt, firepower, first place. Plays fully offline.",
+  "description": "Voxel combat racing — if you can't race them, shoot them. Plays fully offline.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",
