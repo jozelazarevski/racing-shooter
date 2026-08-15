@@ -829,13 +829,41 @@ export function applyUpgradeKit(group, up = {}) {
     }
     add(new THREE.BoxGeometry(1.5, 0.1, 0.06), brake, 0, capTop - 0.34, -1.62);
   }
-  // CANNON — a barrel over the nose, then a second one
+  // CANNON — ON THE ROOF, not over the nose.
+  //
+  // It used to be a barrel at `capTop - 0.5, z 1.9`: forward of the cabin and
+  // BELOW the roofline, which is to say in the one place a chase camera never
+  // looks. The gun is the loudest thing the player buys and it was invisible
+  // from the only angle the game is played at.
+  //
+  // Now the whole assembly sits on the roof and is silhouetted above it: the
+  // RECEIVER and its drum face straight back at the camera, and the barrel
+  // runs forward over the bonnet where it breaks the skyline. Everything is
+  // hung off `capTop`, which `buildVoxelRacer` publishes per car, so the eight
+  // rigs each get it at their own roof height rather than at one constant that
+  // would bury it in the CROWN's cabin and float it over the DUNE's.
   const can = lv('cannon');
   if (can >= 2) {
-    const barrel = (x) => add(new THREE.CylinderGeometry(0.11, 0.13, 1.6, 8), steel,
-      x, capTop - 0.5, 1.9, Math.PI / 2);
-    if (can >= 4) { barrel(-0.42); barrel(0.42); } else barrel(0);
-    add(new THREE.BoxGeometry(0.7, 0.24, 0.5), dark, 0, capTop - 0.5, 1.0);
+    const gunY = capTop + 0.32;
+    // receiver + ammo drum: the part that reads from directly astern
+    add(new THREE.BoxGeometry(0.82, 0.34, 0.9), dark, 0, gunY, 0.78);
+    add(new THREE.CylinderGeometry(0.26, 0.26, 0.34, 12), gold, 0, gunY + 0.06, 0.42);
+    // pintle down onto the roof, so it reads as MOUNTED rather than floating
+    add(new THREE.BoxGeometry(0.26, 0.4, 0.26), steel, 0, gunY - 0.34, 0.78);
+    const barrel = (x) => {
+      add(new THREE.CylinderGeometry(0.11, 0.13, 1.9, 8), steel, x, gunY, 1.95, Math.PI / 2);
+      add(new THREE.CylinderGeometry(0.16, 0.16, 0.3, 8), dark, x, gunY, 2.82, Math.PI / 2);
+    };
+    if (can >= 4) { barrel(-0.34); barrel(0.34); } else barrel(0);
+    // SPONSONS on the flanks at the top of the line — the same gun read from
+    // the side, which is the other angle the player actually has.
+    if (can >= 5) {
+      for (const sx of [-1, 1]) {
+        add(new THREE.BoxGeometry(0.3, 0.3, 0.7), dark, sx * 1.3, baseY + 0.95, 0.5);
+        add(new THREE.CylinderGeometry(0.09, 0.1, 1.3, 8), steel,
+          sx * 1.3, baseY + 0.95, 1.4, Math.PI / 2);
+      }
+    }
   }
   // ORDNANCE RACK — rocket tubes on the roof, one per level
   const rack = lv('rack');

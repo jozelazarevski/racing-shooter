@@ -1175,6 +1175,36 @@ than moving the game camera. Freezing `g.frame` to steal the camera renders
 black, and NOT freezing it means the chase camera is put back before the
 screenshot lands — both were tried.
 
+**r186 — THE GUN ON THE ROOF, AND THE WHOLE MATRIX RENDERED.** Asked for as
+"move the guns to a visible place, should apply to all 8".
+
+The cannon was a barrel at `capTop - 0.5, z 1.9`: forward of the cabin and
+BELOW the roofline — the one place a chase camera never looks. It is the
+loudest thing the player buys and it was invisible from the only angle the game
+is played at. The assembly now sits ON the roof: receiver and ammo drum facing
+straight back at the camera, barrel running forward over the bonnet where it
+breaks the skyline, and a pintle down onto the roof so it reads as mounted
+rather than floating. CANNON 5 adds flank SPONSONS for the side view.
+
+APPLIES TO ALL EIGHT BY CONSTRUCTION, and that is the reason it is hung off
+`capTop`: `buildVoxelRacer` publishes that per car, so each rig gets the gun at
+its own roof height. A constant would bury it in the CROWN's cabin and float it
+over the DUNE's. Anything else added to the kit should hang off the rig the
+same way.
+
+Rendered the full matrix to check it — 8 cars x 6 upgrade levels x 2 angles,
+96 renders. Kit part counts on the BRAWLER run 0 / 2 / 24 / 41 / 60 / 73 for
+L0..L5, so every level adds something. Note L1 is only 2 parts (the beacon bar
+and its first lamp): every other line starts at level 2, so level 1 is a thin
+step by design of the thresholds, not a bug.
+
+The render harness lives in the scratchpad, but the shape is worth repeating:
+build the mesh standalone with `buildCarMesh` + `applyUpgradeKit` into an
+offscreen `WebGLRenderer`, `toDataURL('image/webp', 0.86)`, and call
+`applyUpgradeKit(mesh, {})` afterwards so the kit's geometries are disposed —
+96 kits leak fast otherwise. `import('/lib/three.module.min.js')` is the path
+in the page (see the importmap); `/vendor/three.module.js` does not exist.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
