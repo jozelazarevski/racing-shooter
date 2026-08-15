@@ -88,6 +88,11 @@ export const LEVELS = [
   // as "I don't see the new tracks", twice. New regions now ship at
   // mid-career prices and announce themselves; the override never touches an
   // existing world's cost.
+  //
+  // `cost` IS A RUNG, NOT A STAR PRICE. `starCost` multiplies it by the
+  // ladder slope exactly as it does the index rung, so writing a number here
+  // says WHERE in the career the world sits and nothing about how steep the
+  // climb to it is — retuning the slope must never re-order the roster.
   { id: 29, name: 'OLIVE COAST', theme: 'medterrace', region: 'MEDITERRANEAN', cost: 6, fresh: true },
 
   // ---- OLD TOWN: the only urban region, and the only night stage that is not
@@ -96,7 +101,7 @@ export const LEVELS = [
   // re-prices every world after it in an existing save.
   { id: 30, name: 'LANTERN QUARTER', theme: 'oldtown', region: 'OLD TOWN', cost: 8, fresh: true },
   // ---- FARMLAND. Appended, so no existing world's star price moves (career
-  // order is this array; starCost() = index - 2).
+  // order is this array; the rung is index - 2, priced by starCost's slope).
   { id: 31, name: 'HEDGEROW DASH', theme: 'farmland', region: 'FARMLAND', cost: 10, fresh: true },
   // ---- OUTBACK RED DIRT. Appended at the END of the array on purpose: career
   // order is array position (starCost = index - 2), so anything inserted higher
