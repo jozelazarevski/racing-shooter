@@ -1025,6 +1025,10 @@
        has to honour the newline instead of collapsing it */
     white-space:pre-line;line-height:1.15}
   #start-btn.warned{font-size:clamp(15px,4.4vw,22px);padding-top:12px;padding-bottom:12px}
+  /* A JOB IN HAND FOR THIS WORLD is a reason to be standing here, so the
+     button says which job on its own line. Green edge, because the tyre
+     warning already owns the amber one and the two can appear together. */
+  #start-btn.has-job{box-shadow:0 6px 18px rgba(0,0,0,.5),0 0 0 2px rgba(77,208,106,.7) inset}
   #editor-btn{margin-top:10px;width:100%;background:#1d2530;border-color:#3a4a5e;color:#9fd3ff}
 
   /* ---- WORLD EDITOR ------------------------------------------------------
@@ -1292,7 +1296,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r181</div>
+<div id="build-tag">r182</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1528,10 +1532,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r181"></script>
+<script type="module" src="./src/main.js?v=r182"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r181"></script>
+<script src="./src/offline.js?v=r182"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r181"></script>
+<script type="module" src="./src/traffic.js?v=r182"></script>
 </body>
 </html>

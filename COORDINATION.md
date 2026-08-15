@@ -1001,6 +1001,32 @@ one-at-a-time hold, DRIVE IT actually swapping worlds and starting the race,
 the contract-plumbing ride, and that finishing pays / clears / closes for the
 day. test-rungs 28/28, test-quests 9/9, test-boot 7/7 unchanged.
 
+**r182 — JOBS, SECOND PASS.** Four things r181 left, one of them a bug r181
+itself introduced.
+
+- **TAKING WORK COST YOU MONEY.** r181 unshifted the held job into
+  `this.contracts` to reuse its plumbing — and `sweepCr` is
+  `contracts.every(c => c.done)`, so a missed JOB silently cancelled the 600 CR
+  all-contracts sweep bonus. Accepting work was a net loss whenever you did not
+  finish it. The sweep is now computed over `contracts.filter(c => !c.job)`.
+  ANY future code that reads `this.contracts` as "the slate" has the same trap:
+  the job is in that list and is not part of the slate.
+- **A MISSED JOB READ AS A LOST JOB.** The breakdown row was a bare
+  `✗ JOB · CLEAN SWEEP —`, identical to a forfeited contract, when in fact the
+  job is still held and RACE AGAIN is the retry. The row says so now.
+- **THE START BUTTON KNOWS ABOUT THE JOB.** On the job's world it names it
+  (`JOB: BOUNTY — destroy 2 rivals`) and takes a green inset edge; on any other
+  world it says `JOB IS AT <world> — THIS RACE WILL NOT COUNT FOR IT`. The
+  objective only rides on the world the job names (see `_jobContract`), so
+  without this a player can race all evening against a job that was never
+  running.
+- **`_flushPick` repaints the jobs board.** The CONTRACTS half of that tab is
+  per-world; swapping worlds from the tracks tab left it showing the previous
+  world's slate.
+
+`tests/test-jobs.mjs` 26/26 (was 22). test-rungs 28/28, test-boot 7/7,
+test-select 19/19.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

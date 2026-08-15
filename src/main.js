@@ -2275,10 +2275,19 @@ class Game {
     // over-tyred car. It now carries the fix on a second line, which for the
     // common case is one free tap in the garage.
     const fixLine = f?.fix?.text ? `\n${f.fix.text}` : '';
-    start.textContent = warned
+    // A JOB IN HAND IS A REASON TO BE HERE, and a job for SOMEWHERE ELSE is a
+    // reason not to be: the objective only rides on the world it names, so
+    // starting anywhere else silently does not count toward it. Saying which
+    // is the difference between a commitment and a thing you forgot you took.
+    const job = this.freeRoam || this.missionMode ? null : this.activeJob();
+    const jobLine = !job ? ''
+      : job.lvId === this.level?.id ? `\nJOB: ${job.label} — ${job.text}`
+        : `\nJOB IS AT ${job.lv.name} — THIS RACE WILL NOT COUNT FOR IT`;
+    start.classList.toggle('has-job', !!job && job.lvId === this.level?.id);
+    start.textContent = (warned
       ? `START — WRONG TYRES (−${f.pen}% GRIP)${fixLine}`
       : this.missionMode ? 'START MISSION'
-        : this.freeRoam ? 'START EXPLORING' : 'START RACE';
+        : this.freeRoam ? 'START EXPLORING' : 'START RACE') + jobLine;
   }
 
   /** Keep the address bar in step with the live state, without navigating, so
@@ -3177,6 +3186,7 @@ class Game {
       this.renderCarShop();          // the garage ratings are per-world
       this._syncStartButton();       // a new world can change the tyre price
       this._buildMissionPicker?.();  // missions are per-world
+      this._renderJobs?.();          // ...and so is the contract slate under the jobs
     } else {
       this.fadeTo(`?level=${lv.id}${this.unlockAll ? '&unlockall=1' : ''}`);
     }
@@ -7619,8 +7629,12 @@ class Game {
     // cannot carry a 5x spread between an ace and a finisher (see starsFor).
     // Credits can: nothing is gated on them.
     const cleanCr = (this.deaths ?? 0) === 0 ? CLEAN_RUN_CR : 0;
-    const sweepCr = (this.contracts ?? []).length > 0
-      && (this.contracts ?? []).every((c) => c.done) ? SWEEP_CR : 0;
+    // THE SWEEP IS THE THREE CONTRACTS, and a job is not one of them. r181
+    // unshifted the held job into this same list to reuse its plumbing, which
+    // quietly made taking a job cost you the 600 CR sweep bonus whenever the
+    // job itself was the thing you missed — a penalty for accepting work.
+    const slate = (this.contracts ?? []).filter((c) => !c.job);
+    const sweepCr = slate.length > 0 && slate.every((c) => c.done) ? SWEEP_CR : 0;
     const raceCr = Math.round(raceScore * CREDIT_RATE * diffMult);
     const earned = raceCr + podium + firstClear + contractCr + cleanCr + sweepCr;
     document.getElementById('r-credits').textContent = `+${earned.toLocaleString()}`;
@@ -7643,9 +7657,13 @@ class Game {
         if (cleanCr) html += `<div class="cb-row"><span>CLEAN RUN — NO WRECKS</span><b>+${cleanCr}</b></div>`;
         if (sweepCr) html += `<div class="cb-row"><span>CLEAN SWEEP — ALL CONTRACTS</span><b>+${sweepCr}</b></div>`;
         for (const c of this.contracts ?? []) {
+          // A MISSED JOB IS NOT A LOST JOB. A bare "✗ JOB · CLEAN SWEEP —"
+          // reads as forfeited, when in fact it is still in hand and RACE
+          // AGAIN is the retry — so the row says so.
           html += c.done
             ? `<div class="cb-row contract"><span>✓ ${c.label}</span><b>+${c.pay}</b></div>`
-            : `<div class="cb-row missed"><span>✗ ${c.label}</span><b>—</b></div>`;
+            : `<div class="cb-row missed"><span>✗ ${c.label}${
+  c.job ? ' — STILL YOURS, RACE AGAIN' : ''}</span><b>—</b></div>`;
         }
         html += `<div class="cb-row total"><span>TOTAL CREDITS</span><b>+${earned.toLocaleString()}</b></div>`;
         rowsEl.innerHTML = html;
