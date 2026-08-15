@@ -7131,12 +7131,32 @@ export class Track {
       // station on the whole lap, which is precisely the question sample 0's
       // normal cannot answer. The cluster spans +-0.8 about the base and each
       // leg carries r 0.6, so 1.8 covers the diagonal corner.
-      let off = 12.5;
-      for (let k = 0; k < 16; k++) {
-        if (this._clearsRoad(c.x + n.x * off * side, c.z + n.z * off * side, 1.8, 0.6)) break;
-        off += 1.0;
+      // AND IF NOTHING CLEARS, TAKE THE BEST SPOT — NOT THE LAST ONE TRIED.
+      //
+      // The first cut of this walked outward and broke on success, but built
+      // at wherever it had got to when it ran out of steps. On TOUR DE CORSE
+      // no offset clears — the lap comes back past the start line twice —
+      // so it marched the tower 16 u out and planted it on ANOTHER leg,
+      // measured DEEPER in the road than where it began: the census went from
+      // a 4.52 u bite at sample 890 to 7.59 u at 886. A fix that walks past
+      // the least-bad answer and stops at an arbitrary one is not a fix.
+      //
+      // So score every candidate by how far clear of the carriageway it
+      // actually is, stop early on the first that genuinely clears, and
+      // otherwise keep the best. This can never be worse than the original
+      // fixed offset, because that offset is the first candidate scored.
+      const _gp = new THREE.Vector3();
+      let best = null;
+      for (let k = 0; k < 18; k++) {
+        const off = 12.5 + k;
+        const px = c.x + n.x * off * side, pz = c.z + n.z * off * side;
+        const near = this.nearestIndex(_gp.set(px, 0, pz));
+        const half = this.widthAt ? this.widthAt(near) : ROAD_HALF;
+        const margin = this._distToTrack(px, pz) - 1.8 - half;
+        if (!best || margin > best.margin) best = { px, pz, margin };
+        if (margin >= 0.6) break;
       }
-      const bx = c.x + n.x * off * side, bz = c.z + n.z * off * side;
+      const bx = best.px, bz = best.pz;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
         const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 10, 8), steel);
         leg.position.set(bx + ox, 5, bz + oz);
