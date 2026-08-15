@@ -1598,6 +1598,26 @@ class Game {
       }
       paint();
     }
+    // TEST FUNDS. Deliberately a REAL credit, written to the garage the same way
+    // a race payout is — not a display-only fiction like OPEN ALL, because a
+    // fake balance that empties on reload is worse than no button at all. Also
+    // reachable as `?credits=300000` so a link can hand someone a test save.
+    const grantCr = (n, why) => {
+      this.garage.credits = Math.max(0, (this.garage.credits | 0) + n);
+      saveJSON(this._pkey('garage'), this.garage);
+      this.renderGarage?.();
+      this.renderCarShop?.();
+      this.hud?.feed?.(`${n > 0 ? '+' : ''}${n.toLocaleString()} CR — ${why}`, 'good');
+    };
+    document.getElementById('grant-cr')?.addEventListener('click', () => {
+      grantCr(300000, 'TEST FUNDS');
+      this.audio?.ui?.();
+    });
+    const wantCr = Number(new URLSearchParams(location.search).get('credits'));
+    if (Number.isFinite(wantCr) && wantCr > 0 && !this._creditsGranted) {
+      this._creditsGranted = true;
+      grantCr(Math.min(9e6, Math.round(wantCr)), 'FROM THE LINK');
+    }
     document.getElementById('pm-steer').addEventListener('click', () => {
       const ids = STEERS.map(([i]) => i);
       this.steerSetting = ids[(ids.indexOf(this.steerSetting) + 1) % ids.length];
