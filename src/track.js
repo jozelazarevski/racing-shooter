@@ -7162,6 +7162,21 @@ export class Track {
         leg.position.set(bx + ox, 5, bz + oz);
         leg.castShadow = true;
         this.group.add(leg);
+        // AND WHERE THE TOWER HAS NOWHERE TO STAND, IT STOPS BEING SOLID.
+        //
+        // Scoring the offsets above guarantees the best available spot, but
+        // on TOUR DE CORSE there is no good one: the lap comes back past its
+        // own start line twice and every candidate is in somebody's road, so
+        // the best is still a 4.52 u bite at sample 890. `gridSlot(0)` is
+        // {index: 890, lateral: -3.6} — the player begins the race 0.00 u
+        // from this leg, is shoved off their own grid box before lights-out,
+        // and loses 22.9 u/s here on every lap.
+        //
+        // A scaffold you clip is a great deal better than one that dead-stops
+        // you on the start straight, so a leg that cannot clear the road
+        // keeps its mesh and gives up its collider. This is exactly the rule
+        // the grandstand's own colliders have followed since r167.
+        if (!this._clearsRoad(bx + ox, bz + oz, 0.6, 0.4)) continue;
         this.solids.push({ x: bx + ox, z: bz + oz, r: 0.6, y: c.y, mat: 'metal' });
       }
       for (let ly = 2.5; ly <= 8.5; ly += 3) {
