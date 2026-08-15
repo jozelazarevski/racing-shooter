@@ -6078,12 +6078,50 @@ export class Track {
         if (v > lift[j]) lift[j] = v;
       }
     };
+    // WHICH LEG FLIES IS A QUESTION FOR THE GROUND, NOT FOR A COUNTER.
+    //
+    // This alternated by index — even crossings flew `ib`, odd ones `ia`.
+    // That reads as pleasing variety on a flat sketch and is nonsense on
+    // terrain: on OLIVE CROSSING, a world with exactly ONE crossing and so no
+    // knot to blame, it elected to fly the leg sitting 15.35 u BELOW the
+    // other. The full 11.5 u lift and the whole 4 u dig were then spent
+    // climbing out of that hole, and the finished "overpass" cleared by
+    // 0.15 u — two roads occupying the same air, which is also why
+    // `nearestIndex` could not tell its legs apart there (its useY tie-break
+    // assumes a crossing's legs differ in height "by definition"; at 0.15 u
+    // they do not, and the car was measured stopped dead against a wall that
+    // was not there).
+    //
+    // Fly whichever leg the ground already puts on top. Where the ground has
+    // no real opinion — under 1.5 u between them — keep alternating, because
+    // there the choice genuinely is free and the variety is worth having.
     this._overpasses.forEach((o, k) => {
-      o.up = (k % 2 === 0) ? o.ib : o.ia;
-      o.down = (k % 2 === 0) ? o.ia : o.ib;
+      const rise = this.center[o.ia].y - this.center[o.ib].y;
+      const flyA = Math.abs(rise) > 1.5 ? rise > 0 : (k % 2 !== 0);
+      o.up = flyA ? o.ia : o.ib;
+      o.down = flyA ? o.ib : o.ia;
       o.half = HALF;
-      bump(o.up, CLEAR);
     });
+    // AND THE RAMP IS SOLVED FOR, NOT ASSUMED.
+    //
+    // `bump(o.up, CLEAR)` added a constant to the up leg's own elevation, as
+    // though the only thing between the two legs were this crossing's ramp.
+    // It is not. `bump` takes the maximum over +-HALF, so on a lap with nine
+    // crossings one crossing's approach lands on ANOTHER's under-leg and
+    // lifts that too: MOUNTAIN TO SEA's crossing 506 has a ramp spanning
+    // 471-541, which contains samples 519 and 524 — the under-legs of two
+    // other crossings — and raised them by nearly the full 11.5 u. The dip is
+    // bounded at 4 u and cannot dig back out, so four of nine crossings
+    // finished under 6 u and two under 1.2 u.
+    //
+    // Each pass now measures the gap that ACTUALLY exists on the combined
+    // profile and asks only for the shortfall. Topping up blind is what
+    // compounded when this was last attempted; topping up against a
+    // re-measured gap cannot, because the measurement already contains every
+    // previous pass. Measured over the eight worlds that have an overpass:
+    // crossings under 6 u of clearance 5 -> 0, and the p90 grade FELL on
+    // every one of them (57: 20->16 %, 59: 21->14 %, 55: 21->16 %,
+    // 37: 20->15 %).
     // AND THEN LIMIT THE SLOPE, rather than trusting the shape.
     //
     // A bounded-slope ramp is only bounded on flat ground. Lay one on a road
@@ -6100,41 +6138,55 @@ export class Track {
     // than a bridge with a low deck.
     const CAP = 0.24;                       // 24 %, inside the roster's norm
     const run = Math.max(0.5, this.segLen);
-    for (let pass = 0; pass < 80; pass++) {
-      let moved = 0;
-      for (let i = 0; i < N; i++) {
-        if (lift[i] <= 0) continue;
-        const a = this.center[(i - 1 + N) % N].y + lift[(i - 1 + N) % N];
-        const b = this.center[(i + 1) % N].y + lift[(i + 1) % N];
-        const here = this.center[i].y + lift[i];
-        const ceil = Math.min(a, b) + CAP * run;
-        if (here > ceil + 1e-4) {
-          lift[i] = Math.max(0, lift[i] - (here - ceil));
-          moved++;
-        }
-      }
-      if (!moved) break;
-    }
-    // WHERE THE RAMP CANNOT GO HIGHER, THE UNDERPASS GOES LOWER.
-    //
-    // In a dense knot the eroder legitimately takes clearance back (that is
-    // its job — a wall of road is worse than a low deck), and topping the
-    // ramp back up is the fix that compounded last time. Digging the DOWN
-    // leg cannot compound: it is bounded at 4 u, it takes the minimum where
-    // dips overlap rather than the sum, and 4 u over an 82 u approach is a
-    // 5 % grade — far inside the cap the eroder enforces on the ramps.
-    const dip = new Float32Array(N);
-    for (const o of this._overpasses) {
-      const gap = (this.center[o.up].y + lift[o.up])
-        - (this.center[o.down].y + lift[o.down]);
-      const short = Math.min(4, CLEAR - 1 - gap);
-      if (short <= 0) continue;
+    const DIG_MAX = 4;
+    const dug = new Float32Array(N);        // how far the under-leg is sunk
+    const yAt = (i) => this.center[i].y + lift[i] - dug[i];
+    const sink = (at, depth) => {
       for (let sN = -HALF; sN <= HALF; sN++) {
-        const j = (o.down + sN + N) % N;
-        const v = -short * (0.5 + 0.5 * Math.cos((sN / HALF) * Math.PI));
-        if (v < dip[j]) dip[j] = v;
+        const j = (at + sN + N) % N;
+        const v = depth * (0.5 + 0.5 * Math.cos((sN / HALF) * Math.PI));
+        if (v > dug[j]) dug[j] = v;
       }
+    };
+    // THE ERODER HAS TO CUT BOTH WAYS. It only ever trimmed `lift`, because
+    // when it was written the only earthwork was a ramp. An excavation has
+    // flanks of its own, and they are just as steep from the driver's seat:
+    // measured on CLIFF KNOT, digging the under-legs took the worst grade on
+    // the lap from 27 % to 34 % while every crossing cleared. So a station
+    // that is too LOW for its neighbours gets its dig cut back too. Filling a
+    // hole in cannot create a wall either — both directions only ever move
+    // the road toward its neighbours — so the pass still converges.
+    const erode = () => {
+      for (let pass = 0; pass < 80; pass++) {
+        let moved = 0;
+        for (let i = 0; i < N; i++) {
+          const a = yAt((i - 1 + N) % N), c = yAt((i + 1) % N), here = yAt(i);
+          if (lift[i] > 0) {
+            const ceil = Math.min(a, c) + CAP * run;
+            if (here > ceil + 1e-4) { lift[i] = Math.max(0, lift[i] - (here - ceil)); moved++; }
+          }
+          if (dug[i] > 0) {
+            const floor = Math.max(a, c) - CAP * run;
+            if (here < floor - 1e-4) { dug[i] = Math.max(0, dug[i] - (floor - here)); moved++; }
+          }
+        }
+        if (!moved) break;
+      }
+    };
+    for (let pass = 0; pass < 8; pass++) {
+      let short = 0;
+      for (const o of this._overpasses) {
+        const need = CLEAR - (yAt(o.up) - yAt(o.down));
+        if (need <= 0.25) continue;
+        if (need > short) short = need;
+        const dig = Math.min(need * 0.5, Math.max(0, DIG_MAX - dug[o.down]));
+        if (dig > 0.01) sink(o.down, dug[o.down] + dig);
+        bump(o.up, lift[o.up] + (need - dig));
+      }
+      erode();
+      if (short <= 0.25) break;
     }
+    const dip = dug.map((v) => -v);
     for (let i = 0; i < N; i++) this.center[i].y += lift[i] + dip[i];
   }
 
@@ -17209,7 +17261,41 @@ export class Track {
   _buildGrandstand() {
     // stepped stand full of spectators near the start line
     const i = (N - 40 + N) % N;
-    const p = this.pointAt(i, WALL_OFF + 16);
+    // THE STAND ITSELF HAS TO CLEAR THE ROAD, not merely its colliders.
+    //
+    // The three colliders below already ask `_clearsRoad` and skip the ones
+    // that would sit in a carriageway. Nothing asked the same question of the
+    // thing you can SEE. So on a lap that doubles back — and 26 u sideways
+    // from a start line very often lands on another leg — the colliders were
+    // correctly withheld and a 21 u grandstand full of spectators was drawn
+    // straight across the road anyway. Reported from the track list, where
+    // the map thumbnails show it spanning the ribbon.
+    //
+    // Withholding the mesh too would leave the start line bare. Move it
+    // instead: try further out, then the other side, and take the first
+    // placement where the whole footprint — frontage and back row — is off
+    // the road everywhere on the lap. Only if no side and no distance works
+    // is the stand dropped, which is the honest outcome for a start line
+    // wedged between two legs of its own circuit.
+    const SPAN = 10.5;                       // half the 21 u frontage
+    const DEEP = 9;                          // rows climb this far back
+    let p = null, side = 1;
+    search:
+    for (const s of [1, -1]) {
+      for (let k = 0; k < 12; k++) {
+        const q = this.pointAt(i, (WALL_OFF + 16 + k * 3) * s);
+        let ok = true;
+        for (const off of [-SPAN, -SPAN / 2, 0, SPAN / 2, SPAN]) {
+          const fx = q.x + this.tan[i].x * off, fz = q.z + this.tan[i].z * off;
+          const bx = fx + this.nrm[i].x * DEEP * s, bz = fz + this.nrm[i].z * DEEP * s;
+          if (!this._clearsRoad(fx, fz, 1.0, 1.5) || !this._clearsRoad(bx, bz, 1.0, 1.5)) {
+            ok = false; break;
+          }
+        }
+        if (ok) { p = q; side = s; break search; }
+      }
+    }
+    if (!p) return;
     // STAND IT ON THE GROUND, not at road height. `pointAt` returns the ROAD's
     // elevation, and this sits 26 u off the centreline where the terrain has
     // usually fallen away — measured on FURKA RIDGE the stand and all three of
@@ -17243,8 +17329,10 @@ export class Track {
       g.add(leg);
     }
     g.position.copy(p);
-    // width runs along the track; step rows climb away from it
-    g.rotation.y = this.headingAt(i) + Math.PI / 2;
+    // width runs along the track; step rows climb away from it — and when the
+    // stand had to move to the other side, it turns to keep facing the racing
+    // it exists to watch rather than showing the crowd its own back
+    g.rotation.y = this.headingAt(i) + Math.PI / 2 + (side < 0 ? Math.PI : 0);
     this.group.add(g);
     // 3 solid colliders along the 20-unit front face (which runs with the track)
     for (const off of [-7, 0, 7]) {
