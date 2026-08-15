@@ -1074,6 +1074,56 @@ Four consecutive runs, 28/28 each, `droveOut` zero at every speed.
   sibling dossier project). Left alone deliberately — removing it is a call for
   whoever owns it, not a cleanup.
 
+**r184 — WHAT IS STANDING ON THE ROAD, ACROSS ALL SIXTY WORLDS.** Asked for as
+"clean the maps". `test-carriageway` measures the right quantity but only on
+the six worlds a census once found problems on — that guards those regressions,
+it does not answer "is the roster clean". The two have had different answers
+before: the gorge trench cut unramped holes for months while every carriageway
+assertion passed, because no test walked the worlds it happened on.
+
+`tests/tool-road-census.mjs` is new and walks ALL of them, reporting per world:
+solids reaching inside the drivable width (measured against that sample's OWN
+half-width — the roster runs 5 u pinches to 9 u boulevards), bare holes in the
+surface, floating solids, and the narrowest point on the lap.
+
+**BEFORE: 159 blockers across 43 of 60 worlds.** Two builders were more than
+half of them, and both placed by an offset that is only true at one sample:
+
+- **FORD DEPTH MARKERS** (`r 0.35`, mat `wood`) offset by the RIVER's
+  half-width along the RIVER's bearing, so where a ford crosses at a slant the
+  marker lands on the carriageway. **67 of the 159**, worst **0.23 u from the
+  centreline** on PIKES PEAK.
+- **NARROW-SECTION POSTS** (`r 0.45`, mat `metal`) offset by `widthAt(j)` at
+  the sample they flag — and a narrow section is by definition somewhere the
+  road is doing something, so a few samples on the centreline swings back under
+  them. Worst **1 u out** on RED CENTRE RUN.
+
+The stone teeth placed ten lines below those posts ALREADY carried
+`_clearsRoad`, with a comment saying exactly why. Both now do too.
+
+**AFTER: 82 blockers.** All 67 wood gone; metal 34 -> 24. Pinned in
+`test-carriageway` by material signature on the four worlds the census measured
+them worst on, so a future builder cannot quietly reintroduce them.
+
+**WHAT IS LEFT, HONESTLY.** 82 blockers remain, 57 of them `stone`, and the
+deepest readings are a KNOWN FALSE POSITIVE: a tunnel bore is narrower than the
+road it carries and its wall colliders sit at the bore half-width, so every
+tunnelled world (SUZUKA, HARBOR QUAY, COTE D AZUR, SILVERSTONE) reports them.
+That is the tunnel doing its job. The rest are stone set-pieces — quay cannons
+placed in citadel-local coordinates, culvert parapets — which need per-builder
+judgement rather than a blanket guard: several are colliders that stop you
+driving off a bridge or a quay, and deleting them would trade a blocker for a
+hole. Not attempted here; the tool makes it tractable.
+
+Also measured and unchanged by this: **bare holes 0 across all 60 worlds** —
+the r179/r183 gorge work holds roster-wide. **Floaters 162**, highest 41.8 u on
+CORNICHE; that is task #89 and a separate problem.
+
+Of 40 `solids.push` sites in track.js, 36 have no clearance guard. Most are
+fine because their placement rule keeps them off the road by construction. If
+you add a new one, ask `_clearsRoad` — and then run the census, because "it
+looked fine on the world I was testing" is exactly how both of these shipped.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

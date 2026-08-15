@@ -4935,6 +4935,14 @@ export class Track {
           const j = (sec.i0 + k) % N;
           const lat = (this.widthAt(j) + 0.45 + CAR_R + 0.2) * side;
           const p = this.pointAt(j, lat);
+          // THE SAME RULE THE TEETH BELOW ALREADY FOLLOW, and for the same
+          // reason: `pointAt(j, lat)` clears the road AT SAMPLE j, and a
+          // narrow section is by definition somewhere the road is doing
+          // something, so a few samples later the centreline can swing back
+          // underneath the post. Measured across the roster before this
+          // guard: RED CENTRE RUN had one of these standing 1 u from the
+          // centreline of a 9 u half-width road, and it is a hard collider.
+          if (!this._clearsRoad(p.x, p.z, 0.45, 0.9)) continue;
           const post = new THREE.Mesh(postGeo, postMat);
           post.position.set(p.x, p.y + 1.05, p.z);
           post.castShadow = true;
@@ -18011,6 +18019,15 @@ export class Track {
         for (const sg of [1, -1]) {
           const mx = c.p.x + Math.sin(rYaw) * sg * (hw + 1.0);
           const mz = c.p.z + Math.cos(rYaw) * sg * (hw + 1.0);
+          // OFFSET ALONG THE RIVER, PLACED ON THE ROAD. `hw` is the RIVER's
+          // half-width and `rYaw` the river's bearing, so where a ford crosses
+          // at a slant the marker lands wherever the channel puts it — which
+          // on a narrow crossing is the carriageway. It was the single
+          // commonest thing standing on the racing line: 67 of 159 blockers
+          // across the roster, the worst 0.23 u from the centreline on PIKES
+          // PEAK. A marker you cannot place clear of the road is a marker this
+          // ford does without.
+          if (!this._clearsRoad(mx, mz, 0.35, 0.8)) continue;
           const gy = this.terrainHeight(mx, mz);
           const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 2.2, 8),
             new THREE.MeshStandardMaterial({ color: 0xe8e4d8, roughness: 0.9 }));
