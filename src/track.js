@@ -5030,9 +5030,31 @@ export class Track {
     // the >2500 fallback below only ever catches a hint stale enough to have
     // left the map entirely.
     if (useY && this._overpasses) {
+      // GATE ON WHERE THE WINDOW LANDED, NOT ON WHATEVER THE LAST CROSSING
+      // DID TO `best`.
+      //
+      // This tested proximity against a `best` the loop itself had just
+      // moved, so the rescue was order-dependent: once an earlier crossing
+      // pulled `best` across the map, every later crossing measured its
+      // anchors against that new position, found them far away, and declined
+      // to search — including the crossing the car was actually standing on.
+      //
+      // MOUNTAIN TO SEA is where this bites, because samples 437, 519, 524
+      // and 650 all share very nearly the same XZ: it is one knot, not four
+      // places. Standing exactly on 650 with the hint on 524, the answer came
+      // back 436 — a third leg — because crossing 437/519's rescue ran first,
+      // captured `best`, and crossing 524/650 then measured circDist(436, 524)
+      // = 88, outside its window, and never searched 650 at all. A station the
+      // car is standing on cannot be beaten on distance; it just has to be
+      // looked at.
+      //
+      // Gating on the pre-rescue seed makes this order-independent: every
+      // crossing near the windowed answer offers its other anchor, and the
+      // genuine minimum wins. `best`/`bd` still only ever improve.
+      const seed = best;
       for (const o of this._overpasses) {
-        const nearUp = this._circDist(best, o.up) <= o.half + 5;
-        const nearDown = !nearUp && this._circDist(best, o.down) <= o.half + 5;
+        const nearUp = this._circDist(seed, o.up) <= o.half + 5;
+        const nearDown = !nearUp && this._circDist(seed, o.down) <= o.half + 5;
         if (!nearUp && !nearDown) continue;
         const other = nearUp ? o.down : o.up;
         const half = o.half + 5;
@@ -6078,12 +6100,50 @@ export class Track {
         if (v > lift[j]) lift[j] = v;
       }
     };
+    // WHICH LEG FLIES IS A QUESTION FOR THE GROUND, NOT FOR A COUNTER.
+    //
+    // This alternated by index — even crossings flew `ib`, odd ones `ia`.
+    // That reads as pleasing variety on a flat sketch and is nonsense on
+    // terrain: on OLIVE CROSSING, a world with exactly ONE crossing and so no
+    // knot to blame, it elected to fly the leg sitting 15.35 u BELOW the
+    // other. The full 11.5 u lift and the whole 4 u dig were then spent
+    // climbing out of that hole, and the finished "overpass" cleared by
+    // 0.15 u — two roads occupying the same air, which is also why
+    // `nearestIndex` could not tell its legs apart there (its useY tie-break
+    // assumes a crossing's legs differ in height "by definition"; at 0.15 u
+    // they do not, and the car was measured stopped dead against a wall that
+    // was not there).
+    //
+    // Fly whichever leg the ground already puts on top. Where the ground has
+    // no real opinion — under 1.5 u between them — keep alternating, because
+    // there the choice genuinely is free and the variety is worth having.
     this._overpasses.forEach((o, k) => {
-      o.up = (k % 2 === 0) ? o.ib : o.ia;
-      o.down = (k % 2 === 0) ? o.ia : o.ib;
+      const rise = this.center[o.ia].y - this.center[o.ib].y;
+      const flyA = Math.abs(rise) > 1.5 ? rise > 0 : (k % 2 !== 0);
+      o.up = flyA ? o.ia : o.ib;
+      o.down = flyA ? o.ib : o.ia;
       o.half = HALF;
-      bump(o.up, CLEAR);
     });
+    // AND THE RAMP IS SOLVED FOR, NOT ASSUMED.
+    //
+    // `bump(o.up, CLEAR)` added a constant to the up leg's own elevation, as
+    // though the only thing between the two legs were this crossing's ramp.
+    // It is not. `bump` takes the maximum over +-HALF, so on a lap with nine
+    // crossings one crossing's approach lands on ANOTHER's under-leg and
+    // lifts that too: MOUNTAIN TO SEA's crossing 506 has a ramp spanning
+    // 471-541, which contains samples 519 and 524 — the under-legs of two
+    // other crossings — and raised them by nearly the full 11.5 u. The dip is
+    // bounded at 4 u and cannot dig back out, so four of nine crossings
+    // finished under 6 u and two under 1.2 u.
+    //
+    // Each pass now measures the gap that ACTUALLY exists on the combined
+    // profile and asks only for the shortfall. Topping up blind is what
+    // compounded when this was last attempted; topping up against a
+    // re-measured gap cannot, because the measurement already contains every
+    // previous pass. Measured over the eight worlds that have an overpass:
+    // crossings under 6 u of clearance 5 -> 0, and the p90 grade FELL on
+    // every one of them (57: 20->16 %, 59: 21->14 %, 55: 21->16 %,
+    // 37: 20->15 %).
     // AND THEN LIMIT THE SLOPE, rather than trusting the shape.
     //
     // A bounded-slope ramp is only bounded on flat ground. Lay one on a road
@@ -6100,41 +6160,55 @@ export class Track {
     // than a bridge with a low deck.
     const CAP = 0.24;                       // 24 %, inside the roster's norm
     const run = Math.max(0.5, this.segLen);
-    for (let pass = 0; pass < 80; pass++) {
-      let moved = 0;
-      for (let i = 0; i < N; i++) {
-        if (lift[i] <= 0) continue;
-        const a = this.center[(i - 1 + N) % N].y + lift[(i - 1 + N) % N];
-        const b = this.center[(i + 1) % N].y + lift[(i + 1) % N];
-        const here = this.center[i].y + lift[i];
-        const ceil = Math.min(a, b) + CAP * run;
-        if (here > ceil + 1e-4) {
-          lift[i] = Math.max(0, lift[i] - (here - ceil));
-          moved++;
-        }
-      }
-      if (!moved) break;
-    }
-    // WHERE THE RAMP CANNOT GO HIGHER, THE UNDERPASS GOES LOWER.
-    //
-    // In a dense knot the eroder legitimately takes clearance back (that is
-    // its job — a wall of road is worse than a low deck), and topping the
-    // ramp back up is the fix that compounded last time. Digging the DOWN
-    // leg cannot compound: it is bounded at 4 u, it takes the minimum where
-    // dips overlap rather than the sum, and 4 u over an 82 u approach is a
-    // 5 % grade — far inside the cap the eroder enforces on the ramps.
-    const dip = new Float32Array(N);
-    for (const o of this._overpasses) {
-      const gap = (this.center[o.up].y + lift[o.up])
-        - (this.center[o.down].y + lift[o.down]);
-      const short = Math.min(4, CLEAR - 1 - gap);
-      if (short <= 0) continue;
+    const DIG_MAX = 4;
+    const dug = new Float32Array(N);        // how far the under-leg is sunk
+    const yAt = (i) => this.center[i].y + lift[i] - dug[i];
+    const sink = (at, depth) => {
       for (let sN = -HALF; sN <= HALF; sN++) {
-        const j = (o.down + sN + N) % N;
-        const v = -short * (0.5 + 0.5 * Math.cos((sN / HALF) * Math.PI));
-        if (v < dip[j]) dip[j] = v;
+        const j = (at + sN + N) % N;
+        const v = depth * (0.5 + 0.5 * Math.cos((sN / HALF) * Math.PI));
+        if (v > dug[j]) dug[j] = v;
       }
+    };
+    // THE ERODER HAS TO CUT BOTH WAYS. It only ever trimmed `lift`, because
+    // when it was written the only earthwork was a ramp. An excavation has
+    // flanks of its own, and they are just as steep from the driver's seat:
+    // measured on CLIFF KNOT, digging the under-legs took the worst grade on
+    // the lap from 27 % to 34 % while every crossing cleared. So a station
+    // that is too LOW for its neighbours gets its dig cut back too. Filling a
+    // hole in cannot create a wall either — both directions only ever move
+    // the road toward its neighbours — so the pass still converges.
+    const erode = () => {
+      for (let pass = 0; pass < 80; pass++) {
+        let moved = 0;
+        for (let i = 0; i < N; i++) {
+          const a = yAt((i - 1 + N) % N), c = yAt((i + 1) % N), here = yAt(i);
+          if (lift[i] > 0) {
+            const ceil = Math.min(a, c) + CAP * run;
+            if (here > ceil + 1e-4) { lift[i] = Math.max(0, lift[i] - (here - ceil)); moved++; }
+          }
+          if (dug[i] > 0) {
+            const floor = Math.max(a, c) - CAP * run;
+            if (here < floor - 1e-4) { dug[i] = Math.max(0, dug[i] - (floor - here)); moved++; }
+          }
+        }
+        if (!moved) break;
+      }
+    };
+    for (let pass = 0; pass < 8; pass++) {
+      let short = 0;
+      for (const o of this._overpasses) {
+        const need = CLEAR - (yAt(o.up) - yAt(o.down));
+        if (need <= 0.25) continue;
+        if (need > short) short = need;
+        const dig = Math.min(need * 0.5, Math.max(0, DIG_MAX - dug[o.down]));
+        if (dig > 0.01) sink(o.down, dug[o.down] + dig);
+        bump(o.up, lift[o.up] + (need - dig));
+      }
+      erode();
+      if (short <= 0.25) break;
     }
+    const dip = dug.map((v) => -v);
     for (let i = 0; i < N; i++) this.center[i].y += lift[i] + dip[i];
   }
 
@@ -6342,6 +6416,31 @@ export class Track {
     // exists, and on GOTTHARD CLIMB 150 samples either side of two gorges ruled
     // out 503 of 900 stations and left the tool with nowhere to put anything.
     if (this._nearGorge(i, Math.max(8, maxHalf))) return 0;
+    // AND CLEAR OF A CREST, for the same reason and with a worse consequence.
+    //
+    // `_buildCrests` runs first and refuses narrows and gorges; it cannot
+    // refuse tunnels, because none exist yet. This ran second and asked about
+    // the start gate, gorges and curvature — never about the humps already
+    // baked into the roadway. So a bore could be, and was, sited straight
+    // over a jump built expressly to throw the car.
+    //
+    // The bore has wall colliders and no roof, so the strike is silent: the
+    // car leaves through the ceiling into the empty slot `_tunnelRidge`
+    // leaves above the tube and drops back onto the road. Measured on
+    // TREMOLA DESCENT (bore 547-585, 6.48 u of rise inside it): clearance
+    // -0.07 u at i=575 at 46.2 u/s with maxSpeed 64 — the VIPER's STOCK
+    // figure, on the racing line, no nitro. GOTTHARD's two bores sit at 0.98
+    // and 1.52 u and COSTA BRAVA's AI field at 1.39 u: not yet through the
+    // rock, one tuning step away from it.
+    //
+    // Refuse the station. There is always another straight to put a tunnel
+    // in; there is no way to put a roof on this one.
+    for (const cr of (this.crests ?? [])) {
+      const ci = typeof cr === 'number' ? cr : (cr.i ?? cr.index);
+      if (ci == null) continue;
+      const len = (typeof cr === 'object' && cr.len) ? cr.len : 22;
+      if (this._circDist(i, ci) < maxHalf + len) return 0;
+    }
     let mc = 0, half = 0;
     for (let w = 1; w <= maxHalf; w++) {
       mc = Math.max(mc, this.curvature[(i + w + N) % N], this.curvature[(i - w + N) % N]);
@@ -7036,12 +7135,70 @@ export class Track {
       color: 0x4a4640, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
     });
     for (const side of [1, -1]) {
-      const bx = c.x + n.x * 12.5 * side, bz = c.z + n.z * 12.5 * side;
+      // 12.5 u OFF SAMPLE 0 IS NOT 12.5 u OFF THE ROAD.
+      //
+      // The tower is sited on sample 0's own normal, which is right for
+      // sample 0 and wrong for every other station the road brings past it.
+      // Where the circuit bends through start/finish, the carriageway curls
+      // back toward the tower and the legs end up ON it: TOUR DE CORSE
+      // measured the nearest leg at lateral -5.16/-5.06/-5.37 on samples
+      // 889-891, and `gridSlot(0)` is {index: 890, lateral: -3.6} — inside
+      // that. The player starts with a gap of 0.00 u to a scaffold leg, is
+      // shoved off their own grid box before lights-out, and loses 22.9 u/s
+      // crossing the line on the left-hand lane EVERY LAP. RALLYCROSS ARENA
+      // has the same builder in the road at samples 788-789.
+      //
+      // So walk it outward until the leg cluster clears the carriageway
+      // wherever the lap actually runs. `_clearsRoad` asks the nearest
+      // station on the whole lap, which is precisely the question sample 0's
+      // normal cannot answer. The cluster spans +-0.8 about the base and each
+      // leg carries r 0.6, so 1.8 covers the diagonal corner.
+      // AND IF NOTHING CLEARS, TAKE THE BEST SPOT — NOT THE LAST ONE TRIED.
+      //
+      // The first cut of this walked outward and broke on success, but built
+      // at wherever it had got to when it ran out of steps. On TOUR DE CORSE
+      // no offset clears — the lap comes back past the start line twice —
+      // so it marched the tower 16 u out and planted it on ANOTHER leg,
+      // measured DEEPER in the road than where it began: the census went from
+      // a 4.52 u bite at sample 890 to 7.59 u at 886. A fix that walks past
+      // the least-bad answer and stops at an arbitrary one is not a fix.
+      //
+      // So score every candidate by how far clear of the carriageway it
+      // actually is, stop early on the first that genuinely clears, and
+      // otherwise keep the best. This can never be worse than the original
+      // fixed offset, because that offset is the first candidate scored.
+      const _gp = new THREE.Vector3();
+      let best = null;
+      for (let k = 0; k < 18; k++) {
+        const off = 12.5 + k;
+        const px = c.x + n.x * off * side, pz = c.z + n.z * off * side;
+        const near = this.nearestIndex(_gp.set(px, 0, pz));
+        const half = this.widthAt ? this.widthAt(near) : ROAD_HALF;
+        const margin = this._distToTrack(px, pz) - 1.8 - half;
+        if (!best || margin > best.margin) best = { px, pz, margin };
+        if (margin >= 0.6) break;
+      }
+      const bx = best.px, bz = best.pz;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
         const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 10, 8), steel);
         leg.position.set(bx + ox, 5, bz + oz);
         leg.castShadow = true;
         this.group.add(leg);
+        // AND WHERE THE TOWER HAS NOWHERE TO STAND, IT STOPS BEING SOLID.
+        //
+        // Scoring the offsets above guarantees the best available spot, but
+        // on TOUR DE CORSE there is no good one: the lap comes back past its
+        // own start line twice and every candidate is in somebody's road, so
+        // the best is still a 4.52 u bite at sample 890. `gridSlot(0)` is
+        // {index: 890, lateral: -3.6} — the player begins the race 0.00 u
+        // from this leg, is shoved off their own grid box before lights-out,
+        // and loses 22.9 u/s here on every lap.
+        //
+        // A scaffold you clip is a great deal better than one that dead-stops
+        // you on the start straight, so a leg that cannot clear the road
+        // keeps its mesh and gives up its collider. This is exactly the rule
+        // the grandstand's own colliders have followed since r167.
+        if (!this._clearsRoad(bx + ox, bz + oz, 0.6, 0.4)) continue;
         this.solids.push({ x: bx + ox, z: bz + oz, r: 0.6, y: c.y, mat: 'metal' });
       }
       for (let ly = 2.5; ly <= 8.5; ly += 3) {
@@ -11493,7 +11650,24 @@ export class Track {
         const dx = x - c2.x, dz = z - c2.z;
         if (dx * dx + dz * dz > 400) continue;
         const dy = y - c2.y;
-        if (dy > 4.2 || dy < -1.5) continue;        // clear over (or under) it
+        // THE UNDER-BOUND HAS TO MATCH THE GATE THAT LETS THE CAR THROUGH.
+        //
+        // -1.5 said "the other road is far enough above this rail to ignore
+        // it". The car disagrees: the pass-over gate in vehicles.js needs
+        // `pos.y > q.y + q.h + 1.0`, which for a deck rail (base c.y - 0.2,
+        // h 1.5) is 2.3 u of road above the rail's own elevation. Everything
+        // in between built a rail the car could neither see nor cross — its
+        // top sits BELOW the other carriageway's tarmac, so it is buried
+        // masonry in the middle of a road. Measured on SEA CLIFF RUN samples
+        // 559-562 at dy -1.73: 46 -> 9 u/s and a 1.4 u shove sideways, with
+        // nothing on screen. CLIFF KNOT 528-530 and OLIVE CROSSING 229 are
+        // the same class.
+        //
+        // -2.5 covers the gate with margin. The cost of being wrong this way
+        // is a missing rail, which the planner already treats as a junction
+        // mouth and is drivable; the cost of being wrong the other way is an
+        // invisible wall.
+        if (dy > 4.2 || dy < -2.5) continue;        // clear over (or under) it
         const lat = Math.abs(dx * this.nrm[i].x + dz * this.nrm[i].z);
         if (lat < (this.widthAt ? this.widthAt(i) : 9) + 1.4) return true;
       }
@@ -17144,7 +17318,41 @@ export class Track {
   _buildGrandstand() {
     // stepped stand full of spectators near the start line
     const i = (N - 40 + N) % N;
-    const p = this.pointAt(i, WALL_OFF + 16);
+    // THE STAND ITSELF HAS TO CLEAR THE ROAD, not merely its colliders.
+    //
+    // The three colliders below already ask `_clearsRoad` and skip the ones
+    // that would sit in a carriageway. Nothing asked the same question of the
+    // thing you can SEE. So on a lap that doubles back — and 26 u sideways
+    // from a start line very often lands on another leg — the colliders were
+    // correctly withheld and a 21 u grandstand full of spectators was drawn
+    // straight across the road anyway. Reported from the track list, where
+    // the map thumbnails show it spanning the ribbon.
+    //
+    // Withholding the mesh too would leave the start line bare. Move it
+    // instead: try further out, then the other side, and take the first
+    // placement where the whole footprint — frontage and back row — is off
+    // the road everywhere on the lap. Only if no side and no distance works
+    // is the stand dropped, which is the honest outcome for a start line
+    // wedged between two legs of its own circuit.
+    const SPAN = 10.5;                       // half the 21 u frontage
+    const DEEP = 9;                          // rows climb this far back
+    let p = null, side = 1;
+    search:
+    for (const s of [1, -1]) {
+      for (let k = 0; k < 12; k++) {
+        const q = this.pointAt(i, (WALL_OFF + 16 + k * 3) * s);
+        let ok = true;
+        for (const off of [-SPAN, -SPAN / 2, 0, SPAN / 2, SPAN]) {
+          const fx = q.x + this.tan[i].x * off, fz = q.z + this.tan[i].z * off;
+          const bx = fx + this.nrm[i].x * DEEP * s, bz = fz + this.nrm[i].z * DEEP * s;
+          if (!this._clearsRoad(fx, fz, 1.0, 1.5) || !this._clearsRoad(bx, bz, 1.0, 1.5)) {
+            ok = false; break;
+          }
+        }
+        if (ok) { p = q; side = s; break search; }
+      }
+    }
+    if (!p) return;
     // STAND IT ON THE GROUND, not at road height. `pointAt` returns the ROAD's
     // elevation, and this sits 26 u off the centreline where the terrain has
     // usually fallen away — measured on FURKA RIDGE the stand and all three of
@@ -17178,8 +17386,10 @@ export class Track {
       g.add(leg);
     }
     g.position.copy(p);
-    // width runs along the track; step rows climb away from it
-    g.rotation.y = this.headingAt(i) + Math.PI / 2;
+    // width runs along the track; step rows climb away from it — and when the
+    // stand had to move to the other side, it turns to keep facing the racing
+    // it exists to watch rather than showing the crowd its own back
+    g.rotation.y = this.headingAt(i) + Math.PI / 2 + (side < 0 ? Math.PI : 0);
     this.group.add(g);
     // 3 solid colliders along the 20-unit front face (which runs with the track)
     for (const off of [-7, 0, 7]) {
@@ -18135,6 +18345,29 @@ export class Track {
         const parOff = WALL_OFF + 0.6;
         const px = c.p.x + Math.cos(roadYaw) * sg * parOff;
         const pz = c.p.z - Math.sin(roadYaw) * sg * parOff;
+        // AND THE OFFSET IS MEASURED FROM THE STREAM, NOT FROM THE ROAD.
+        //
+        // The axis was fixed in r184; the CENTRING was not. `c.p` is the
+        // crossing point, accepted anywhere within 16 u of the centreline
+        // (the `samp[i].d > 16` test upstream), so the pair straddles the
+        // WATER and only straddles the ROAD when the two happen to coincide.
+        // Measured across 16 pairs on 6 worlds, the pair's midpoint sat 0.06
+        // to 9.61 u off the centreline; the inner parapet clears only when
+        // that midpoint is within 0.6 u of it.
+        //
+        // Worst case SILVERSTONE sample 713: lateral -1.39 with r 1.4, i.e.
+        // a collider on the racing line under a 19 m stone bar drawn ALONG
+        // it — and PIKES PEAK 506 sits at +3.91 on the apex of the world's
+        // tightest hairpin, measured at -21.7 u/s and -22 HP through the
+        // middle of the road. Between them these account for 23 of the 25
+        // stone blockers one census slice found.
+        //
+        // The headwall above and the ford markers already ask `_clearsRoad`
+        // before committing. This one never did. Ask, and drop the parapet
+        // that would stand in the carriageway — a culvert with one visible
+        // parapet is dressing that reads slightly thin; one with a parapet
+        // in the road is a wall you hit at racing speed.
+        if (!this._clearsRoad(px, pz, 1.4, 0.4)) continue;
         const par = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.95, parLen), cap);
         par.position.set(px, deck + 0.45, pz);
         par.rotation.y = roadYaw;
