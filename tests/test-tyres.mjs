@@ -132,16 +132,33 @@ const R = await page.evaluate(async () => {
   const fL = g.carFitness(looseLv.id);
   out.crownAdvice = fL.fix.text;
 
-  // ---- TOO MUCH tyre is refused too: no car covers the whole roster -------
+  // ---- TOO MUCH TYRE IS NOT A STATE ANY MORE, AND THAT IS THE FIX --------
+  //
+  // This block used to assert that a DUNE is shut out of the sealed circuits
+  // because its all-terrain rubber is two classes over. That WAS true while
+  // the compound was a consequence of the car; it is false now, and being
+  // false is the whole point. AUTO fits what the world asks for, capped by
+  // what you own, so a car with a high ceiling simply fits DOWN and is ideal.
+  // Reported as "what's the point if I don't buy them?" — the answer has to
+  // be that owning a better compound widens where you are ideal and costs you
+  // nothing anywhere, which is only true if over-tyred stops being a trap.
   g.cars.owned = ['brawler', 'crown', 'dune'];
   g.cars.selected = 'dune';
   g.garage.upgrades = {};
+  g.garage.fitted = {};
   const fDuneSealed = g.carFitness(sealedLv.id);
-  out.duneBlockedOnSealed = !fDuneSealed.ok && !!fDuneSealed.tooMuch;
-  out.duneAdvice = fDuneSealed.fix.text;
-  // ...but one class over is still allowed, just slower
+  out.duneAutoSealed = fDuneSealed.ok && fDuneSealed.pen === 0;
+  out.duneAutoFits = V.TYRE_LABEL[g.fittedTyre('dune', T.LEVELS.find((l) => l.id === sealedLv.id))];
+  // ...and an EXPLICIT over-fit is still priced, and still tells you it is free to undo
+  g.garage.fitted = { dune: 2 };
+  const fDuneForced = g.carFitness(sealedLv.id);
+  out.duneForcedBlocked = !fDuneForced.ok && !!fDuneForced.tooMuch;
+  out.duneAdvice = fDuneForced.fix.text;
+  g.garage.fitted = {};
+  // ...and on a LOOSE stage the same car AUTO-fits gravel: the ideal window is
+  // "the compound the world asks for", and owning more never forces you past it.
   out.duneOnLoose = g.carFitness(looseLv.id).ok;
-  out.duneOverLoose = g.carFitness(looseLv.id).over;
+  out.duneAutoLoose = V.TYRE_LABEL[g.fittedTyre('dune', T.LEVELS.find((l) => l.id === looseLv.id))];
   // and nothing in the catalogue is legal everywhere
   out.coversAll = V.CAR_CATALOG.filter((c) =>
     T.LEVELS.every((l) => {
@@ -152,11 +169,16 @@ const R = await page.evaluate(async () => {
   // ---- over-tyred costs you -----------------------------------------------
   g.cars.selected = 'dune';
   g.cars.owned = ['brawler', 'crown', 'dune'];
-  g.swapLevel(looseLv, true, null);      // one over: legal, and penalised
+  // OVER-TYRED IS A CHOICE NOW, so it has to be chosen to be measured. The
+  // player deliberately fits SNOW on a loose stage — one class over, legal,
+  // and priced — and the number has to reach the car, not just the card.
+  g.garage.fitted = { dune: 2 };
+  g.swapLevel(looseLv, true, null);
   const fOver = g.carFitness(looseLv.id);
   out.overFlag = fOver.over;
   g._applyTyreClass();
   out.playerOver = g.player._tyreOver;
+  g.garage.fitted = {};
   // AND IT REACHES THE PHYSICS — asserted on the rule, not on a driven lap.
   // A driven A/B was tried first and abandoned: even with a fresh car per run
   // and six-run averages, the SAME configuration measured 14.114 then 12.666,
@@ -209,8 +231,11 @@ ok(R.crownOnLoose && R.crownOnSealed,
   'a road car pays on loose stages and is at home on the circuits');
 ok(/DRIVE YOUR|GARAGE/.test(R.crownAdvice),
   'it points at a machine already owned rather than a shop', R.crownAdvice);
-ok(R.duneBlockedOnSealed,
-  'an all-terrain car is outside the window on a sealed circuit — too much tyre');
+ok(R.duneAutoSealed && R.duneAutoFits === 'ROAD',
+  'an all-terrain car AUTO-fits road rubber on a sealed circuit and is ideal — owning '
+  + 'the best compound must never cost you anywhere', `fits ${R.duneAutoFits}`);
+ok(R.duneForcedBlocked,
+  'but choosing to run over-tyred on purpose is still priced');
 // SINCE THE TYRE BAY, over-tyred is a FREE fix and the advice says so.
 // It used to read "DRIVE YOUR x" or "BUY THE x" — and both could name a
 // machine you were already sitting in, which is how CANYON RUN came to tell a
@@ -221,17 +246,20 @@ ok(/TYRE BAY/.test(R.duneAdvice) && /FREE/.test(R.duneAdvice),
 ok(R.penU1 < R.pen1 && R.penU2 < R.penU1 && R.penU2 <= 0.7,
   'under-spec costs MORE grip than over-spec, and two classes more than one',
   `under1 ${R.penU1}, under2 ${R.penU2}, over1 ${R.pen1}`);
-ok(R.duneOnLoose && R.duneOverLoose === 1,
-  'one class over is still allowed, just penalised', R.duneOverLoose);
+ok(R.duneOnLoose && R.duneAutoLoose === 'GRAVEL',
+  'and on a loose stage it fits gravel — the window is what the world asks for, '
+  + 'never the most expensive thing you own', `fits ${R.duneAutoLoose}`);
 ok(R.coversAll.length === 0,
   'NO single car is legal on every world — the roster is mutually exclusive',
   R.coversAll.join(','));
 ok(R.overFlag > 0 && R.playerOver > 0,
-  'an all-terrain car on a circuit is flagged over-tyred', `${R.overFlag}/${R.playerOver}`);
+  'deliberately fitting more tyre than the world wants is still flagged over-tyred',
+  `${R.overFlag}/${R.playerOver}`);
 ok(R.pen0 === 1 && R.pen1 < 1 && R.pen2 < R.pen1,
   'over-tyred costs grip, and costs more the further over it is',
   `${R.pen0} / ${R.pen1} / ${R.pen2}`);
-ok(R.playerOver > 0, 'and the player car is handed that number', R.playerOver);
+ok(R.playerOver > 0,
+  'and the number reaches the CAR, not just the card', R.playerOver);
 ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '));
 
 await browser.close();
