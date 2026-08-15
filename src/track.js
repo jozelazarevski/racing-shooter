@@ -5902,10 +5902,26 @@ export class Track {
    *  This deliberately withdraws the old escape — `_gorgeCutOne` eases the
    *  chasm ends specifically so a fallen car could drive out along the floor.
    *  That easing still shapes the hole; it is simply no longer a way home. */
-  jumpChasmAt(x, z) {
+  jumpChasmAt(x, z, idx = null) {
     if (!this._jumpGorges?.length) return null;
     for (const G of this._jumpGorges) {
-      if (this._gorgeCutOne(G, x, z) < G.depth * 0.35) continue;
+      const inTrench = this._gorgeCutOne(G, x, z) >= G.depth * 0.35;
+      // ...OR STANDING OVER ROADWAY THIS GORGE REMOVED. The two tests disagree
+      // and neither is sufficient alone, because the trench is a SKEWED
+      // diagonal while `_jumpCut` — the thing that actually takes the surface
+      // away — is one number PER SAMPLE with no lateral variation. At the rim
+      // one edge of the carriageway is over the hole while the other is still
+      // on tarmac.
+      //
+      // r180 fixed the half where geometry said "in the hole" and the car was
+      // on tarmac. This is the other half: geometry says "clear" while the
+      // road under the car is gone, so it sank and drove out the far side.
+      // Measured, 3 of 14 at 24 u/s — intermittently, which is what made it a
+      // flake rather than a failure.
+      const overCut = idx != null
+        && this._circDist(idx, G.i) <= Math.max(G.rimA ?? 4, G.rimB ?? 4) + 1
+        && (this._jumpCut?.[idx] ?? 0) > 0.5;
+      if (!inTrench && !overCut) continue;
       // THE LOWER OF THE TWO LIPS, because the caller needs "is this car down
       // the hole" and the answer must not change with which way it is going.
       //

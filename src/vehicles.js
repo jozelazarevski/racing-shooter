@@ -2204,7 +2204,7 @@ export class Car {
     // watch itself fall — the wreck lands with it rather than snapping off in
     // mid-air.
     if (this.alive && !this.airborne && t.jumpChasmAt) {
-      const ch = t.jumpChasmAt(this.pos.x, this.pos.z);
+      const ch = t.jumpChasmAt(this.pos.x, this.pos.z, this.trackIndex);
       if (ch && this.y < ch.deckY - 3) this.intoChasm(ch.exit);
     }
     if (this._steepFed > 0) this._steepFed = Math.max(0, this._steepFed - dt);
