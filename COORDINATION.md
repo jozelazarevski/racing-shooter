@@ -1246,6 +1246,32 @@ RULE FOR ANYTHING ADDED TO THE KIT: heights hang off `capTop` / `baseY` /
 this release fixed. `tests/test-cars.mjs` pins the spread at <= 0.05 u on both
 ends, so a constant reintroduced later fails.
 
+**r188 — VERIFIED IN THE LIVE GAME, AND A TEST-FUNDS BUTTON.** Asked for as
+"make sure it is reflected in the game too / add 300k credits so I test it out".
+
+**IT IS REFLECTED, AND HERE IS THE CHECK.** Everything from r185-r187 had been
+verified by building the mesh STANDALONE in an offscreen renderer, which proves
+`applyUpgradeKit` works and proves nothing about the car the player drives.
+Measured in a live race instead: the player mesh carries the new rig
+(`zRear -3, zFront 3` on the BRAWLER) and 73 kit parts at max upgrades, and the
+kit reads in the CHASE view. Rivals carry rigs but 0 kit parts, which is the
+existing design — only the player buys bodywork.
+
+CAMERA INDICES, since two attempts were wasted on this: `camMode` 0 is
+TOP-DOWN and it is the DEFAULT. CHASE is index **3** (0 TOP-DOWN, 1 TOP FAR,
+2 TRAIL, 3 CHASE, 4 CHASE FAR). A screenshot taken without setting it is an
+overhead shot of the whole field, which is why the first two "chase" renders
+showed no car detail at all. Hide `#hud` as well — the speedometer sits over
+the car at the bottom of frame.
+
+**TEST FUNDS.** A `+300,000 CR` button in SETUP under OPEN ALL, and
+`?credits=300000` on the URL for handing someone a stocked save by link.
+Deliberately a REAL credit written to the garage the same way a race payout is,
+not a display-only fiction like OPEN ALL: a fake balance that empties on reload
+is worse than no button. Verified 0 -> 300,000, persisted to
+`ir-p<id>-garage`, and still there after a reload. The URL form is capped at
+9,000,000 and grants once per page load.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
