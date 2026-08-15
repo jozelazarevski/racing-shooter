@@ -1124,6 +1124,57 @@ fine because their placement rule keeps them off the road by construction. If
 you add a new one, ask `_clearsRoad` — and then run the census, because "it
 looked fine on the world I was testing" is exactly how both of these shipped.
 
+**r185 — OPEN ALL AS A SETTING, AND AN UPGRADE KIT THE CHASE CAMERA CAN SEE.**
+
+**OPEN ALL.** `?unlockall=1` has always existed and has always been the only
+way in — which means it lasts exactly as long as the browser tab and is gone
+the moment the game is opened from the home screen or as a PWA. It is now a
+remembered setting (`ir-openall`) with chips in SETUP beside DIFFICULTY. The URL
+flag still forces it on (every headless suite passes it) and now also WRITES
+the setting, so arriving by link and reloading keeps it.
+
+It lends the CAR CATALOGUE too, which it did not before: `renderCarShop` reads
+`owned || unlockAll`, and the click handler writes `cars.selected` to the save
+ONLY for a car you actually own — otherwise switching back would leave you
+driving something you never bought and `_loadProfileState` would bounce you to
+the starter. Career, stars and credits are untouched either way.
+Measured: 3 worlds -> 60, 0 of 8 cars locked, `cars.owned` still `[]` after.
+
+**THE UPGRADE KIT NOW FACES THE CAMERA.** r174 gave the car bodywork per
+upgrade and most of it pointed FORWARD — hood scoop, cannon barrels over the
+nose — which is the one part of the car the player never sees. A chase camera
+sees the tail and the flanks. New, all rear or side:
+
+- ENGINE 3/5: a **rear wing** on twin uprights, gaining a gold upper flap and
+  endplates at 5. The single biggest silhouette change available.
+- ARMOR 3/5: **wide-body flares** over all four wheels (reads from behind AND
+  down the side), then a rear bar with towing eyes and a **brake strip**.
+- NITRO 3/5: **side pipes** down the flanks with lit mouths, then twin
+  **afterburner cones** under the tail.
+- HANDLING 2/4: had NO bodywork at all on a five-level line. Now a **rear
+  diffuser** with strakes, dead centre of the chase view, plus dive planes and
+  a splitter.
+- BEACON 1+: an **amber roof bar**, one lamp per level.
+- TIRES 3: **mud flaps**. DAMPERS 4: a **spare** on the tail.
+  MAGAZINE 3: a belt feed down the flank.
+
+Emissive parts are `MeshBasicMaterial` on purpose — unlit, so they hold their
+colour in a tunnel and at dusk where a standard material goes to mud.
+
+TWO THINGS THE RENDERS CHANGED, and both were invisible in the source:
+the spare wheel dead centre on the tail was the biggest object in the chase
+camera and buried the diffuser, the brake strip and the afterburners behind it
+— it is offset to one side now, the way a rally car carries it. And the side
+pipes at x 1.36 sat exactly where a level-3 flare cants out over the tyre, so
+the whole run disappeared; 1.52 puts them proud of the widest bodywork.
+Kit mesh count 0 / 21 / 65 at upgrade level 0 / 2 / 5.
+
+To photograph the kit: build the mesh standalone with `buildCarMesh` +
+`applyUpgradeKit` in an offscreen renderer (see how `_carIcons` does it) rather
+than moving the game camera. Freezing `g.frame` to steal the camera renders
+black, and NOT freezing it means the chase camera is put back before the
+screenshot lands — both were tried.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

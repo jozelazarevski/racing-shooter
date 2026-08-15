@@ -1296,7 +1296,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r184</div>
+<div id="build-tag">r185</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1368,6 +1368,14 @@
       <div class="set-row"><span class="set-lbl">DIFFICULTY</span>
         <div><div id="diff-select"></div>
         <p class="set-help">Rival pace and aggression, and how hard they hit you. HARD pays ×1.5 credits.</p></div></div>
+      <!-- TEST MODE. `?unlockall=1` has always existed and has always been the
+           only way in, which means it survives exactly as long as the tab does
+           and is gone the moment the game is opened from the home screen. This
+           is the same switch, remembered. -->
+      <div class="set-row"><span class="set-lbl">OPEN ALL</span>
+        <div><div id="open-all-select"></div>
+        <p class="set-help">Unlocks every world and every car for testing. Your career, stars and
+        credits are untouched — turn it off and the ladder is exactly where you left it.</p></div></div>
       <!-- touch only: one thumb doing everything, or thumbs split between
            steering and pedals -->
       <div class="set-row" id="scheme-row"><span class="set-lbl">CONTROLS</span>
@@ -1532,10 +1540,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r184"></script>
+<script type="module" src="./src/main.js?v=r185"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r184"></script>
+<script src="./src/offline.js?v=r185"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r184"></script>
+<script type="module" src="./src/traffic.js?v=r185"></script>
 </body>
 </html>

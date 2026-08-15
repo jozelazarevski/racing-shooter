@@ -1262,7 +1262,16 @@ class Game {
     // touch players get the aid by default — thumbs are coarser than keys
     this.assistSetting = localStorage.getItem('ir-assist')
       || (matchMedia('(pointer: coarse)').matches ? 'assist' : 'standard');
-    this.unlockAll = params.get('unlockall') === '1';
+    // OPEN ALL — a REMEMBERED switch, not just a URL flag. `?unlockall=1` was
+    // the only way in, so it lasted exactly as long as the browser tab and was
+    // gone the moment the game was opened from the home screen or as a PWA.
+    // The flag still forces it on (every headless suite passes it), and it also
+    // WRITES the setting, so arriving by link and then reloading keeps it.
+    if (params.get('unlockall') === '1') {
+      try { localStorage.setItem('ir-openall', '1'); } catch { /* private mode */ }
+    }
+    this.unlockAll = params.get('unlockall') === '1'
+      || localStorage.getItem('ir-openall') === '1';
     const diffId = localStorage.getItem('ir-diff') || 'normal';
     this.difficulty = DIFFS[diffId] || DIFFS.normal;
     // guard: don't start a locked level via URL tampering
@@ -1560,6 +1569,34 @@ class Game {
         applySteerChips();
       });
       ssel.appendChild(chip);
+    }
+    // OPEN ALL chips. Rebuilding the track list and the car shop is the whole
+    // effect — everything else already asks `isLevelUnlocked` per call, so
+    // nothing needs reloading.
+    const oaSel = document.getElementById('open-all-select');
+    if (oaSel) {
+      const paint = () => {
+        for (const c of oaSel.children) c.classList.toggle('on', (c.dataset.id === '1') === !!this.unlockAll);
+      };
+      for (const [id, label] of [['0', 'CAREER'], ['1', 'OPEN ALL']]) {
+        const chip = document.createElement('button');
+        chip.className = 'diff-chip';
+        chip.dataset.id = id;
+        chip.textContent = label;
+        chip.addEventListener('click', () => {
+          this.unlockAll = id === '1';
+          try { localStorage.setItem('ir-openall', id); } catch { /* private mode */ }
+          paint();
+          this._renderLevelCards();
+          this.renderCarShop?.();
+          this._renderJobs?.();
+          this._syncStartButton?.();
+          this.audio?.ui?.();
+          this.hud?.feed?.(this.unlockAll ? 'EVERY WORLD AND CAR OPEN' : 'BACK TO THE CAREER LADDER', 'info');
+        });
+        oaSel.appendChild(chip);
+      }
+      paint();
     }
     document.getElementById('pm-steer').addEventListener('click', () => {
       const ids = STEERS.map(([i]) => i);
@@ -3505,7 +3542,11 @@ class Game {
     if (head) head.textContent = `RATED FOR ${this.level.name}`;
     const icons = this._carIcons();
     for (const car of CAR_CATALOG) {
-      const owned = this.cars.owned.includes(car.key);
+      // OPEN ALL lends you the whole catalogue without BUYING it: `owned` is
+      // read here and nothing is written to `cars.owned`, so switching the
+      // setting back leaves the garage exactly as it was — the cars you
+      // actually paid for, and no others.
+      const owned = this.cars.owned.includes(car.key) || !!this.unlockAll;
       const selected = this.cars.selected === car.key;
       const card = document.createElement('button');
       card.className = 'car-card' + (owned ? ' owned' : ' locked') + (selected ? ' selected' : '');
@@ -3564,7 +3605,10 @@ class Game {
           saveJSON(this._pkey('garage'), this.garage);
         }
         this.cars.selected = car.key;
-        saveJSON(this._pkey('cars'), this.cars);
+        // ...but a car you were only LENT is not written to the save, or
+        // turning OPEN ALL off would leave you driving something you never
+        // bought — and `_loadProfileState` would bounce you to the starter.
+        if (this.cars.owned.includes(car.key)) saveJSON(this._pkey('cars'), this.cars);
         // live swap — no reload, the menu stays exactly where you are
         this.swapPlayerCar(car);
         this.renderCarShop();
