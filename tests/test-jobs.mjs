@@ -178,6 +178,56 @@ ok(ride.doneToday && !ride.reposted,
   'and the board does not repost it today, so one job is not an unlimited tap',
   JSON.stringify({ done: ride.doneToday, reposted: ride.reposted }));
 
+// ---- taking work must never cost you money -------------------------------
+// r181 unshifted the held job into `this.contracts` to reuse its plumbing,
+// which quietly made the 600 CR all-contracts sweep bonus depend on the JOB
+// as well: miss the job, lose the sweep. A penalty for accepting work.
+const sweep = await page.evaluate(() => {
+  const g = window.__game;
+  const mk = (done, job) => ({ id: job ? 'job:x' : 'c', job, done, pay: 100, label: 'X' });
+  // three contracts all done, plus a job that was missed
+  g.contracts = [mk(false, true), mk(true), mk(true), mk(true)];
+  const slate = g.contracts.filter((c) => !c.job);
+  return { sweepEarned: slate.length > 0 && slate.every((c) => c.done),
+    naive: g.contracts.every((c) => c.done) };
+});
+console.log('\n--- taking work costs nothing ---');
+ok(sweep.sweepEarned && !sweep.naive,
+  'a missed JOB does not cost the all-contracts sweep bonus',
+  JSON.stringify(sweep));
+
+// ---- the button says where the job is ------------------------------------
+const btn = await page.evaluate(async () => {
+  const g = window.__game;
+  const { LEVELS } = await import('./src/track.js');
+  g.career.job = null; g._jobsCache = null; g.career.jobsDone = null;
+  g.state = 'title'; g.freeRoam = false; g.missionMode = false;
+  const el = document.getElementById('start-btn');
+  g._syncStartButton();
+  const bare = el.textContent;
+  // a job for THIS world
+  const here = { id: 'haul', lvId: g.level.id, need: 3, pay: 500, part: null };
+  g._takeJob(here);
+  g._syncStartButton();
+  const onIt = el.textContent;
+  const litHere = el.classList.contains('has-job');
+  // ...and one for somewhere else
+  const other = LEVELS.find((l) => l.id !== g.level.id && g.isLevelUnlocked(l.id));
+  g._takeJob({ id: 'haul', lvId: other.id, need: 3, pay: 500, part: null });
+  g._syncStartButton();
+  const elsewhere = el.textContent;
+  const litAway = el.classList.contains('has-job');
+  g.career.job = null; g._syncStartButton();
+  return { bare, onIt, elsewhere, litHere, litAway, otherName: other.name };
+});
+console.log('\n--- the start button ---');
+ok(!/JOB/.test(btn.bare), 'says nothing about jobs when you hold none', btn.bare);
+ok(/JOB: /.test(btn.onIt) && btn.litHere,
+  'names the job when you are standing on its world', JSON.stringify(btn.onIt));
+ok(btn.elsewhere.includes(btn.otherName) && /WILL NOT COUNT/.test(btn.elsewhere) && !btn.litAway,
+  'and warns you when the job is somewhere else — starting here would not count for it',
+  JSON.stringify(btn.elsewhere));
+
 ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '));
 
 await browser.close();
