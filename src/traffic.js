@@ -518,7 +518,10 @@ function install(game) {
   // ---------- posing ----------
   function roadPose(trk, fi, lat, group) {
     const N = trk.center.length;
-    const i0 = Math.floor(fi) % N;
+    // belt and braces behind the caller's normalisation: an out-of-range index
+    // here does not misplace one tractor, it takes the whole traffic system
+    // down for the race (see the latch on `warned`)
+    const i0 = ((Math.floor(fi) % N) + N) % N;
     const i1 = (i0 + 1) % N;
     const f = fi - Math.floor(fi);
     const c0 = trk.center[i0], c1 = trk.center[i1];
@@ -657,7 +660,19 @@ function install(game) {
     } else {
       const trk = S.track;
       const N = trk.center.length;
-      ent.fi = (ent.fi + (ent.speed * dt) / (trk.segLen || 2)) % N;
+      // NORMALISE, don't just take the remainder. `%` keeps the sign of its
+      // left operand, so a negative fi yields a negative index, `center[-1]`
+      // is undefined, and `roadPose` throws on its first dereference. The
+      // wagon path six hundred lines up already knew this and normalises
+      // properly; this one did not.
+      //
+      // The consequence was out of all proportion to the cause: the try/catch
+      // around the update loop wraps EVERY entity, and `warned` latches after
+      // the first message, so one bad entity stopped all traffic for the rest
+      // of the race — vehicles parked in the racing line — behind a single
+      // console line. Seen on PIKES PEAK and TOUR DE CORSE.
+      const step = (ent.fi + (ent.speed * dt) / (trk.segLen || 2)) % N;
+      ent.fi = ((step % N) + N) % N;
       poseRoad(ent, false);
     }
 

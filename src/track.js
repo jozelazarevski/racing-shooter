@@ -6342,6 +6342,31 @@ export class Track {
     // exists, and on GOTTHARD CLIMB 150 samples either side of two gorges ruled
     // out 503 of 900 stations and left the tool with nowhere to put anything.
     if (this._nearGorge(i, Math.max(8, maxHalf))) return 0;
+    // AND CLEAR OF A CREST, for the same reason and with a worse consequence.
+    //
+    // `_buildCrests` runs first and refuses narrows and gorges; it cannot
+    // refuse tunnels, because none exist yet. This ran second and asked about
+    // the start gate, gorges and curvature — never about the humps already
+    // baked into the roadway. So a bore could be, and was, sited straight
+    // over a jump built expressly to throw the car.
+    //
+    // The bore has wall colliders and no roof, so the strike is silent: the
+    // car leaves through the ceiling into the empty slot `_tunnelRidge`
+    // leaves above the tube and drops back onto the road. Measured on
+    // TREMOLA DESCENT (bore 547-585, 6.48 u of rise inside it): clearance
+    // -0.07 u at i=575 at 46.2 u/s with maxSpeed 64 — the VIPER's STOCK
+    // figure, on the racing line, no nitro. GOTTHARD's two bores sit at 0.98
+    // and 1.52 u and COSTA BRAVA's AI field at 1.39 u: not yet through the
+    // rock, one tuning step away from it.
+    //
+    // Refuse the station. There is always another straight to put a tunnel
+    // in; there is no way to put a roof on this one.
+    for (const cr of (this.crests ?? [])) {
+      const ci = typeof cr === 'number' ? cr : (cr.i ?? cr.index);
+      if (ci == null) continue;
+      const len = (typeof cr === 'object' && cr.len) ? cr.len : 22;
+      if (this._circDist(i, ci) < maxHalf + len) return 0;
+    }
     let mc = 0, half = 0;
     for (let w = 1; w <= maxHalf; w++) {
       mc = Math.max(mc, this.curvature[(i + w + N) % N], this.curvature[(i - w + N) % N]);
@@ -7036,7 +7061,30 @@ export class Track {
       color: 0x4a4640, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
     });
     for (const side of [1, -1]) {
-      const bx = c.x + n.x * 12.5 * side, bz = c.z + n.z * 12.5 * side;
+      // 12.5 u OFF SAMPLE 0 IS NOT 12.5 u OFF THE ROAD.
+      //
+      // The tower is sited on sample 0's own normal, which is right for
+      // sample 0 and wrong for every other station the road brings past it.
+      // Where the circuit bends through start/finish, the carriageway curls
+      // back toward the tower and the legs end up ON it: TOUR DE CORSE
+      // measured the nearest leg at lateral -5.16/-5.06/-5.37 on samples
+      // 889-891, and `gridSlot(0)` is {index: 890, lateral: -3.6} — inside
+      // that. The player starts with a gap of 0.00 u to a scaffold leg, is
+      // shoved off their own grid box before lights-out, and loses 22.9 u/s
+      // crossing the line on the left-hand lane EVERY LAP. RALLYCROSS ARENA
+      // has the same builder in the road at samples 788-789.
+      //
+      // So walk it outward until the leg cluster clears the carriageway
+      // wherever the lap actually runs. `_clearsRoad` asks the nearest
+      // station on the whole lap, which is precisely the question sample 0's
+      // normal cannot answer. The cluster spans +-0.8 about the base and each
+      // leg carries r 0.6, so 1.8 covers the diagonal corner.
+      let off = 12.5;
+      for (let k = 0; k < 16; k++) {
+        if (this._clearsRoad(c.x + n.x * off * side, c.z + n.z * off * side, 1.8, 0.6)) break;
+        off += 1.0;
+      }
+      const bx = c.x + n.x * off * side, bz = c.z + n.z * off * side;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
         const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 10, 8), steel);
         leg.position.set(bx + ox, 5, bz + oz);
@@ -11493,7 +11541,24 @@ export class Track {
         const dx = x - c2.x, dz = z - c2.z;
         if (dx * dx + dz * dz > 400) continue;
         const dy = y - c2.y;
-        if (dy > 4.2 || dy < -1.5) continue;        // clear over (or under) it
+        // THE UNDER-BOUND HAS TO MATCH THE GATE THAT LETS THE CAR THROUGH.
+        //
+        // -1.5 said "the other road is far enough above this rail to ignore
+        // it". The car disagrees: the pass-over gate in vehicles.js needs
+        // `pos.y > q.y + q.h + 1.0`, which for a deck rail (base c.y - 0.2,
+        // h 1.5) is 2.3 u of road above the rail's own elevation. Everything
+        // in between built a rail the car could neither see nor cross — its
+        // top sits BELOW the other carriageway's tarmac, so it is buried
+        // masonry in the middle of a road. Measured on SEA CLIFF RUN samples
+        // 559-562 at dy -1.73: 46 -> 9 u/s and a 1.4 u shove sideways, with
+        // nothing on screen. CLIFF KNOT 528-530 and OLIVE CROSSING 229 are
+        // the same class.
+        //
+        // -2.5 covers the gate with margin. The cost of being wrong this way
+        // is a missing rail, which the planner already treats as a junction
+        // mouth and is drivable; the cost of being wrong the other way is an
+        // invisible wall.
+        if (dy > 4.2 || dy < -2.5) continue;        // clear over (or under) it
         const lat = Math.abs(dx * this.nrm[i].x + dz * this.nrm[i].z);
         if (lat < (this.widthAt ? this.widthAt(i) : 9) + 1.4) return true;
       }
@@ -18135,6 +18200,29 @@ export class Track {
         const parOff = WALL_OFF + 0.6;
         const px = c.p.x + Math.cos(roadYaw) * sg * parOff;
         const pz = c.p.z - Math.sin(roadYaw) * sg * parOff;
+        // AND THE OFFSET IS MEASURED FROM THE STREAM, NOT FROM THE ROAD.
+        //
+        // The axis was fixed in r184; the CENTRING was not. `c.p` is the
+        // crossing point, accepted anywhere within 16 u of the centreline
+        // (the `samp[i].d > 16` test upstream), so the pair straddles the
+        // WATER and only straddles the ROAD when the two happen to coincide.
+        // Measured across 16 pairs on 6 worlds, the pair's midpoint sat 0.06
+        // to 9.61 u off the centreline; the inner parapet clears only when
+        // that midpoint is within 0.6 u of it.
+        //
+        // Worst case SILVERSTONE sample 713: lateral -1.39 with r 1.4, i.e.
+        // a collider on the racing line under a 19 m stone bar drawn ALONG
+        // it — and PIKES PEAK 506 sits at +3.91 on the apex of the world's
+        // tightest hairpin, measured at -21.7 u/s and -22 HP through the
+        // middle of the road. Between them these account for 23 of the 25
+        // stone blockers one census slice found.
+        //
+        // The headwall above and the ford markers already ask `_clearsRoad`
+        // before committing. This one never did. Ask, and drop the parapet
+        // that would stand in the carriageway — a culvert with one visible
+        // parapet is dressing that reads slightly thin; one with a parapet
+        // in the road is a wall you hit at racing speed.
+        if (!this._clearsRoad(px, pz, 1.4, 0.4)) continue;
         const par = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.95, parLen), cap);
         par.position.set(px, deck + 0.45, pz);
         par.rotation.y = roadYaw;
