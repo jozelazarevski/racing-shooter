@@ -5030,9 +5030,31 @@ export class Track {
     // the >2500 fallback below only ever catches a hint stale enough to have
     // left the map entirely.
     if (useY && this._overpasses) {
+      // GATE ON WHERE THE WINDOW LANDED, NOT ON WHATEVER THE LAST CROSSING
+      // DID TO `best`.
+      //
+      // This tested proximity against a `best` the loop itself had just
+      // moved, so the rescue was order-dependent: once an earlier crossing
+      // pulled `best` across the map, every later crossing measured its
+      // anchors against that new position, found them far away, and declined
+      // to search — including the crossing the car was actually standing on.
+      //
+      // MOUNTAIN TO SEA is where this bites, because samples 437, 519, 524
+      // and 650 all share very nearly the same XZ: it is one knot, not four
+      // places. Standing exactly on 650 with the hint on 524, the answer came
+      // back 436 — a third leg — because crossing 437/519's rescue ran first,
+      // captured `best`, and crossing 524/650 then measured circDist(436, 524)
+      // = 88, outside its window, and never searched 650 at all. A station the
+      // car is standing on cannot be beaten on distance; it just has to be
+      // looked at.
+      //
+      // Gating on the pre-rescue seed makes this order-independent: every
+      // crossing near the windowed answer offers its other anchor, and the
+      // genuine minimum wins. `best`/`bd` still only ever improve.
+      const seed = best;
       for (const o of this._overpasses) {
-        const nearUp = this._circDist(best, o.up) <= o.half + 5;
-        const nearDown = !nearUp && this._circDist(best, o.down) <= o.half + 5;
+        const nearUp = this._circDist(seed, o.up) <= o.half + 5;
+        const nearDown = !nearUp && this._circDist(seed, o.down) <= o.half + 5;
         if (!nearUp && !nearDown) continue;
         const other = nearUp ? o.down : o.up;
         const half = o.half + 5;
