@@ -1272,6 +1272,64 @@ is worse than no button. Verified 0 -> 300,000, persisted to
 `ir-p<id>-garage`, and still there after a reload. The URL form is capped at
 9,000,000 and grants once per page load.
 
+## r190 — the parallel track sweep
+
+Five read-only agents over all 60 worlds (overpasses, tunnels/bridges, the
+curviest, the field driving, the rest of the roster), then every finding
+re-measured here before anything was touched. What shipped, with numbers:
+
+**OVERPASSES THAT NEVER EARNED CLEARANCE.** Not the slope eroder — every
+crossing kept its full 11.5 u lift. Two causes: which leg flies was picked by
+a COUNTER (`k % 2`), which on OLIVE CROSSING elected to fly the leg sitting
+15.35 u BELOW the other; and `bump` takes the max over +-HALF, so one
+crossing's ramp lifts its neighbours' under-legs (MOUNTAIN TO SEA's crossing
+506 spans 471-541, containing 519 and 524 — two other crossings' under-legs).
+Now the ground picks the flying leg, and each pass asks only for the shortfall
+on a re-measured gap. Crossings under 6 u: 5 -> 0. p90 grade FELL on all eight
+overpass worlds.
+
+**THE ERODER NOW CUTS BOTH WAYS.** It only trimmed `lift`; excavations have
+flanks too. Digging under-legs took CLIFF KNOT 27 % -> 34 %; trimming digs as
+well gives 24 %, below where it started.
+
+**nearestIndex RESCUE WAS ORDER-DEPENDENT.** It gated each crossing's
+proximity test on a `best` the loop had already moved, so an earlier crossing
+could capture the answer and the crossing the car stood on was never searched.
+Latent in main; the r190 elevations exposed it. Gates on the pre-rescue seed
+now. test-index-recovery 46/46.
+
+**ROAD FURNITURE.** Culvert parapets are offset from the STREAM crossing point
+(accepted up to 16 u off the centreline), so they straddled the water and only
+straddled the road by luck — SILVERSTONE 713 put a collider at lateral -1.39
+under a 19 m bar drawn along the racing line. Now asks `_clearsRoad`, as the
+headwall and ford markers already did. Stone blockers 17 -> 2 across the
+census slice; the 2 left are HARBOR QUAY's quay cannons, a different builder.
+
+**START GANTRY + GRANDSTAND.** Both were sited off sample 0 / a fixed 26 u and
+never asked where the rest of the lap went. The gantry now scores candidates
+and keeps the best (a first cut that walked outward and built at the last spot
+tried made TOUR DE CORSE WORSE, 4.52 -> 7.59 u — the census caught it); a leg
+that still cannot clear keeps its mesh and drops its collider. The grandstand
+relocates: 7 of 60 worlds had spectators standing in the carriageway, all 7
+now clear, none dropped.
+
+**TUNNEL OVER A CREST.** `_buildCrests` runs before `_planTunnels` and cannot
+refuse tunnels; `tunnelFitAt` never asked about crests. TREMOLA's bore carried
+6.48 u of rise and the car left through the roof at -0.07 u clearance at the
+VIPER's STOCK top speed — silently, because the bore has wall colliders and no
+roof. Refused now, the way gorges already are.
+
+**TRAFFIC FREEZE.** `ent.fi` advanced with `%`, which keeps its left operand's
+sign; a negative index made `roadPose` throw, and the try/catch wraps every
+entity with a latching `warned`, so one bad tractor parked ALL traffic on the
+racing line for the rest of the race behind one console line.
+
+Rejected with measurements: capping the overpass ramp against the world's own
+terrain grade (the eroder was never the problem — measured 0 lift lost); and
+gating the grandstand by withholding its mesh (leaves the start line bare —
+moving it works on all 7).
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
