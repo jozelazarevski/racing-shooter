@@ -109,6 +109,60 @@ for (const [id, name] of WORLDS) {
   await p.close();
 }
 
+// ---- THE TWO BUILDERS THAT WERE PLACING WITHOUT ASKING ---------------------
+// A roster-wide census (tests/tool-road-census.mjs) found 159 solids reaching
+// inside the drivable width across 43 of 60 worlds. Two builders accounted for
+// more than half of them, and both were placing by an offset that is only true
+// at one sample:
+//
+//   FORD DEPTH MARKERS offset by the RIVER's half-width along the RIVER's
+//   bearing, so where a ford crosses at a slant the marker lands on the
+//   carriageway. 67 of the 159, worst 0.23 u from the centreline on PIKES PEAK.
+//
+//   NARROW-SECTION POSTS offset by `widthAt(j)` at the sample they flag — and
+//   a narrow section is by definition somewhere the road is doing something,
+//   so the centreline swings back under them. Worst 1 u out on RED CENTRE RUN.
+//
+// The stone teeth beside those posts already carried `_clearsRoad`, with a
+// comment saying exactly why. These two now do too. Pinned on the worlds the
+// census measured them worst on.
+const PLACED = [[25, 'PIKES PEAK'], [32, 'RED CENTRE RUN'], [1, 'PINE VALLEY'],
+  [13, 'LOG FLUME FURY']];
+for (const [id, name] of PLACED) {
+  const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
+  await p.goto(`${BASE}/?level=${id}&go=1&unlockall=1`, { waitUntil: 'load' });
+  const built = await p.waitForFunction(() => window.__game?.track?.center,
+    undefined, { timeout: 240000 }).then(() => 1).catch(() => 0);
+  if (!built) { console.log(`SKIP  ${name}`); await p.close(); continue; }
+  const r = await p.evaluate(() => {
+    const t = window.__game.track, N = t.center.length;
+    const nearest = (x, z) => {
+      let best = Infinity, at = 0;
+      for (let i = 0; i < N; i++) {
+        const c = t.center[i];
+        const d = (x - c.x) * (x - c.x) + (z - c.z) * (z - c.z);
+        if (d < best) { best = d; at = i; }
+      }
+      return { d: Math.sqrt(best), i: at };
+    };
+    // the two signatures: ford marker is wood r 0.35, narrow post is metal 0.45
+    const want = (s) => (s.mat === 'wood' && Math.abs(s.r - 0.35) < 0.01)
+      || (s.mat === 'metal' && Math.abs(s.r - 0.45) < 0.01);
+    let worst = Infinity, n = 0;
+    for (const s of (t.solids ?? [])) {
+      if (!want(s)) continue;
+      n++;
+      const { d, i } = nearest(s.x, s.z);
+      worst = Math.min(worst, d - s.r - t.widthAt(i));
+    }
+    return { n, worst: Number.isFinite(worst) ? +worst.toFixed(2) : null };
+  });
+  check(`${name}: ford markers and narrow-section posts clear the carriageway`,
+    r.worst === null || r.worst >= 0,
+    r.n ? `${r.n} of them, closest ${r.worst} u outside the drivable edge` : 'none on this world');
+  await p.close();
+}
+
 await browser.close();
 console.log(fail ? `\n${fail} FAILED` : '\nthe line is clear of everything');
 process.exit(fail ? 1 : 0);
