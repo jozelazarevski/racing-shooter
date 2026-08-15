@@ -77,7 +77,7 @@ for (const lv of WORLDS) {
         // not launch harder, it does not launch at all
         const prev = t.groundHeightAt((jA - 1 + N) % N, 0);
         return { i: x.i, rimA: x.rimA, rimB: x.rimB,
-          lipStep: +Math.abs(yA - yB).toFixed(2),
+          drop: +(yA - yB).toFixed(2),          // + = landing below take-off
           grade: +((yA - prev) / t.segLen).toFixed(3),
           gapU: +((x.rimA + x.rimB) * t.segLen).toFixed(1) };
       }),
@@ -90,9 +90,14 @@ for (const lv of WORLDS) {
     `${built.level}: the roadway is missing ONLY at the jumps`,
     built.stray.length ? `bare holes at samples ${built.stray.join(', ')}` : '');
   for (const G of built.gorges) {
-    console.log(`  gorge@${G.i}: ${G.gapU} u gap, lips level to ${G.lipStep} u, ${G.grade} into the lip`);
-    ok(G.lipStep < 0.35,
-      `  gorge@${G.i}: both lips stand at one height`, `${G.lipStep} u apart`);
+    console.log(`  gorge@${G.i}: ${G.gapU} u gap, landing ${G.drop} u below take-off, ${G.grade} into the lip`);
+    // The landing is BELOW the take-off on purpose. vy is capped, the gap is
+    // fixed, so how far the car may fall on the way over is the only margin
+    // the jump has left to give; a landing that stood higher than the take-off
+    // (2.9 u higher, as it did) is one no launch can pay for.
+    ok(G.drop > 1 && G.drop < 2.4,
+      `  gorge@${G.i}: the landing sits below the take-off, the way a jump is built`,
+      `${G.drop} u`);
     ok(G.grade > 0.04, `  gorge@${G.i}: the approach really is a ramp`, `${G.grade}`);
     // 62 u/s is what the field actually arrives at; grade x speed is the climb
     // rate the launch is refused above
@@ -173,6 +178,74 @@ const cost = await page.evaluate(async () => {
   out.hullsBefore = hullsBefore;
   return out;
 });
+// ---- you jump it, or you do not pass -----------------------------------
+// Asked for in exactly those terms: "can you jump, or if it doesn't jump it
+// should wreck — so it must jump to pass the road." r179 priced falling in at
+// nine metres under the lip, and nine metres was still a room to move about
+// in: with the field slowed to 31 u/s, twelve of fourteen dropped in and only
+// ONE wrecked. The rest bounced around inside the gorge. What this pins is
+// that DROVE OUT is no longer one of the outcomes, at any speed.
+const verdicts = await page.evaluate(async ({ scales }) => {
+  const g = window.__game, t = g.track, N = t.center.length;
+  g.clock.getDelta = () => 1 / 60;
+  if (g.composer) g.composer.render = () => {};
+  const base = g.enemies.map((e) => e.baseMaxSpeed);
+  const out = [];
+  for (const sc of scales) {
+    g.enemies.forEach((e, i) => { e.baseMaxSpeed = base[i] * sc; });
+    g.startRace();
+    const dOf = (i, gi) => ((i - gi + N + N / 2) % N) - N / 2;
+    const rec = new Map();
+    for (let f = 0; f < 9000; f++) {
+      g.frame();
+      for (let k = 0; k < g.enemies.length; k++) {
+        const c = g.enemies[k];
+        for (const G of t._jumpGorges) {
+          const key = `${k}:${G.i}`;
+          const r = rec.get(key);
+          const d = dOf(c.trackIndex, G.i);
+          if (!r) {
+            if (c.alive && d >= -G.rimA - 2 && d <= 0) {
+              rec.set(key, { sank: false, sp: Math.hypot(c.vel.x, c.vel.z) });
+            }
+            continue;
+          }
+          if (r.verdict) continue;
+          if (!c.alive) { r.verdict = 'wrecked'; continue; }
+          if (c.y < G.landY - 3) r.sank = true;
+          if (d > G.rimB + 6) r.verdict = r.sank ? 'drove out' : 'cleared';
+        }
+      }
+    }
+    const all = [...rec.values()];
+    out.push({ scale: sc, n: all.length,
+      speed: +(all.reduce((a, r) => a + r.sp, 0) / Math.max(1, all.length)).toFixed(1),
+      cleared: all.filter((r) => r.verdict === 'cleared').length,
+      wrecked: all.filter((r) => r.verdict === 'wrecked').length,
+      droveOut: all.filter((r) => r.verdict === 'drove out').length,
+      open: all.filter((r) => !r.verdict).length });
+  }
+  return out;
+}, { scales: [1.0, 0.62, 0.4] });
+
+console.log('\n===== jump it, or do not pass =====');
+for (const v of verdicts) {
+  console.log(`  at ${v.speed} u/s: ${v.cleared} cleared, ${v.wrecked} wrecked, ${v.droveOut} drove out`);
+}
+const fast = verdicts[0], mid = verdicts[1], slow = verdicts[2];
+ok(verdicts.every((v) => v.open === 0),
+  'every crossing reaches a verdict', JSON.stringify(verdicts.map((v) => v.open)));
+ok(verdicts.every((v) => v.droveOut === 0),
+  'NOBODY drives out of the gorge — that outcome does not exist any more',
+  JSON.stringify(verdicts.map((v) => `${v.speed}:${v.droveOut}`)));
+ok(fast.cleared === fast.n && fast.wrecked === 0,
+  'at racing pace the whole field jumps it', `${fast.cleared}/${fast.n} at ${fast.speed} u/s`);
+ok(mid.cleared === mid.n,
+  'and a mid-pack car still makes it', `${mid.cleared}/${mid.n} at ${mid.speed} u/s`);
+ok(slow.wrecked === slow.n,
+  'come at it too slowly and it wrecks you — every time, not sometimes',
+  `${slow.wrecked}/${slow.n} at ${slow.speed} u/s`);
+
 console.log(`\n===== missing it =====`);
 ok(cost.floorIsChasm && cost.roadIsNot,
   'the chasm footprint is the hole and not the road either side of it',

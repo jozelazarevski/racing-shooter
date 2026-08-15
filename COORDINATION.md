@@ -914,6 +914,49 @@ caused by this change: `test-jumps` 2 fail (FURKA RIDGE: 0 hops), `test-climb`
 2 fail (both slope assertions). `test-obstacles` times out only when four
 browsers share the box — it passes run alone.
 
+**r180 — JUMP IT OR DO NOT PASS.** Asked for in those terms: "falling and
+bouncing — can you jump, or if it doesn't jump it should wreck, so it must jump
+to pass the road." r179 priced falling in at NINE metres under the lip, and
+nine metres was still a room to move about in. Measured with the field slowed
+to 31 u/s: twelve of fourteen dropped into the gorge and only ONE wrecked. The
+rest bounced around inside it and drove out.
+
+Two changes, and one wrong turn worth not repeating:
+
+- **The wreck line is now 3 u under the LOWER lip**, not 9 under the upper one.
+- **The landing lip sits 1.6 u BELOW the take-off** (`LAND_DROP`), and the
+  take-off lip went 1.3 -> 2.2 u (`LAUNCH`). This is the only margin the jump
+  has left to give: vy is capped by VY_CAP and the gap width is fixed, so how
+  far the car is allowed to FALL on the way across is the last free variable.
+
+**REJECTED, WITH THE MEASUREMENT — "touch the footprint at all and wreck".**
+It is the obvious reading of the request and it is wrong, because the trench
+crosses the road at a SKEW (`J.skew`, 0.5 rad) so its edge is a diagonal across
+the carriageway, while `_jumpCut` — the thing that actually removes the roadway
+— is one number PER SAMPLE with no lateral variation. A car out at the edge of
+the road is therefore inside the geometric footprint while still on solid
+tarmac. Measured: 11 of 14 rivals who had cleared the jump cleanly were
+wrecked. If you touch this rule, the depth guard is what makes it safe; do not
+remove it.
+
+Every crossing now reaches one of two verdicts, and "drove out" is not one of
+them at any speed:
+
+    62 u/s   14 cleared,  0 wrecked, 0 drove out
+    39 u/s   14 cleared,  0 wrecked, 0 drove out
+    24 u/s    0 cleared, 14 wrecked, 0 drove out
+
+The failure band sits around 31 u/s (10 cleared, 4 wrecked) — half racing pace,
+so the stunt is still a stunt.
+
+A MEASUREMENT TRAP, since the same one will catch the next person: "fell in"
+cannot be `minY < lipY - 3` over the whole crossing window. The landing ramp
+DESCENDS on purpose, so that metric scores every clean jump a failure — it
+reported 14/14 falling in on a build where nothing fell in at all. Sample the
+minimum only between the rims, and compare against `landY`, not `lipY`.
+
+`tests/test-gorge.mjs` is 28/28.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
