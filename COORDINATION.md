@@ -803,6 +803,54 @@ claims a feature its diff does not contain. If you develop in a worktree and
 move work by patch, commit in the worktree FIRST and diff after — or use
 `git diff HEAD` so uncommitted work is included.
 
+**r178 — THE CAREER LADDER IS TWO THINGS NOW: A SLOPE AND A FLOOR.**
+Reported as "tracks are opening too fast". Measured on the real 60-world price
+table, a player winning every race had 19 worlds open after three races and 58
+of 60 after ten.
+
+The slope used to be pinned at exactly 1★ per rung and that was load-bearing:
+the ONLY thing stopping a permanent wall was "a finish banks 1★, so a finisher
+earns a rung a race". So the wall is now closed by a rule and the pace set by a
+number, instead of one number doing both jobs:
+
+- `LADDER_SLOPE` (main.js, exported) = 2.5, multiplying BOTH the index rung and
+  a level's own `cost:`. A `cost:` in the level table is a RUNG, not a star
+  price — scaling both is what keeps the running order fixed when the slope is
+  retuned. Do not "fix" this by hard-coding star prices in track.js.
+- `_freeUnlock()` — race everything you can afford and the cheapest world you
+  cannot opens anyway. Exactly one, and only while the debt stands.
+- `isLevelUnlocked` never re-locks a world you have RACED. This is half of the
+  same mechanism, not a nicety: without it a world opened at 15★ slams shut
+  when the ladder's own price passes your total, and `_freeUnlock` spends
+  forever re-offering a world already behind you. Measured: the career stalls
+  dead at 7 worlds.
+
+Worlds open after 3 / 10 / 20 races, simulated over the real table, for the
+three player profiles (win every race / podium / finish last):
+
+    slope 1.0 (r177)   19/58/60    12/43/60    6/22/43
+    slope 2.0           7/33/58     6/22/43    4/11/22
+    slope 2.5 (r178)    6/27/51     5/17/35    4/11/21
+    slope 3.0           6/22/43     5/12/29    4/11/21
+
+All three profiles still reach 60/60 at every slope — that is the floor doing
+its job, and it is why 3.0 buys almost nothing over 2.5 for a weak driver
+(their pace is pinned at one world a race by the floor, not by the price).
+2.5 was taken because it roughly doubles the time a winner spends unrolling the
+roster without touching the worst driver in the game at all.
+
+Knock-on: `nextTrack()`'s 'locked' answer ("here is the gate you are working
+toward") is now nearly unreachable, because there is essentially always
+something open and outstanding. The floor's world is deliberately offered LAST
+of the open ones, so it sits underneath the "go back for the stars you left"
+nudge rather than deleting it. `tests/test-timeline.mjs` case 4 was rewritten
+for this; `tests/test-ladder.mjs` (25 assertions) pins the pair.
+
+Pre-existing failures confirmed against clean `origin/main` at r177, NOT caused
+by this change: `test-round-fixes` 2/6 fail ("next world locked after 5th" —
+that assertion predates star pricing and levels 1-3 are free; and the economy
+figure), `test-pick` 1/12 fails (preview-watcher leak 58 -> 60).
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

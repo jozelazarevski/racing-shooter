@@ -108,23 +108,38 @@ const next = await page.evaluate(async () => {
   // 2. some cleared: the first OPEN rung you have never driven
   g.career.finished = { [LEVELS[0].id]: { place: 1, stars: 3 }, [LEVELS[1].id]: { place: 1, stars: 3 } };
   out.partway = { name: g.nextTrack()?.lv.name, why: g.nextTrack()?.why, expect: LEVELS[2].name };
-  // 3. everything open is raced, one still holding stars → go back for them
+  // 3. everything open is raced, one still holding stars → go back for them.
+  //    Note the `_freeUnlock` term: since r178 the floor keeps exactly one
+  //    priced-out world open at all times, so "nothing open is outstanding" is
+  //    never literally true and a loop that waited for it would never finish.
   g.career.finished = {};
-  for (const l of LEVELS) if (g.isLevelUnlocked(l.id)) g.career.finished[l.id] = { place: 1, stars: 3 };
   let guard = 0;
-  while (guard++ < 10) {
-    const missing = LEVELS.filter((l) => g.isLevelUnlocked(l.id) && !g.career.finished[l.id]);
+  while (guard++ < 80) {
+    const missing = LEVELS.filter((l) => g.isLevelUnlocked(l.id) && !g.career.finished[l.id]
+      && l.id !== g._freeUnlock());
     if (!missing.length) break;
     for (const l of missing) g.career.finished[l.id] = { place: 1, stars: 3 };
   }
   g.career.finished[LEVELS[4].id] = { place: 3, stars: 2 };   // one left unfinished
   out.starsLeft = { name: g.nextTrack()?.lv.name, why: g.nextTrack()?.why, expect: LEVELS[4].name };
-  // 4. a gate priced out of reach → the next thing is what you are working toward
-  const keep = LEVELS[6].cost;
-  LEVELS[6].cost = 99999;
-  g.career.finished[LEVELS[4].id] = { place: 1, stars: 3 };
-  out.locked = { name: g.nextTrack()?.lv.name, why: g.nextTrack()?.why, expect: LEVELS[6].name };
-  LEVELS[6].cost = keep;
+  // 4. THE FLOOR. This case used to be "a gate priced out of reach → point at
+  //    the gate you are working toward". Since r178 there is no such state to
+  //    point at: race everything you can afford and the cheapest world you
+  //    cannot opens by itself, so the answer is always something to drive.
+  //    Built on the driver the floor exists for — one who only ever finishes
+  //    last, and so can never buy their way up the ladder.
+  g.career.finished = {};
+  for (let i = 0; i < 400; i++) {
+    const todo = LEVELS.find((l) => g.starCost(l.id) <= g.totalStars() && !g.career.finished[l.id]);
+    if (!todo) break;
+    g.career.finished[todo.id] = { place: 6, stars: 1 };
+  }
+  const freeId = g._freeUnlock();
+  const free = LEVELS.find((l) => l.id === freeId);
+  out.floor = { why: g.nextTrack()?.why, name: g.nextTrack()?.lv.name,
+    granted: free?.name, open: !!freeId && g.isLevelUnlocked(freeId),
+    priced: !!freeId && g.starCost(freeId) > g.totalStars(),
+    stars: g.totalStars(), raced: Object.keys(g.career.finished).length };
   g.career.finished = {};
   return out;
 });
@@ -134,8 +149,12 @@ ok(next.partway.why === 'unraced' && next.partway.name === next.partway.expect,
   'partway through, it points at the first OPEN rung never driven', JSON.stringify(next.partway));
 ok(next.starsLeft.why === 'stars' && next.starsLeft.name === next.starsLeft.expect,
   'with everything driven, it points at the world still holding stars', JSON.stringify(next.starsLeft));
-ok(next.locked.why === 'locked' && next.locked.name === next.locked.expect,
-  'and with nothing open outstanding, at the gate you are working toward', JSON.stringify(next.locked));
+ok(next.floor.granted && next.floor.open && next.floor.priced,
+  'a driver who only ever finishes last still has a new world open to them',
+  JSON.stringify(next.floor));
+ok(next.floor.why && next.floor.why !== 'locked',
+  'so the answer is never a padlock to look at — there is no shut-gate state left',
+  JSON.stringify(next.floor));
 
 // ---- the auto-scroll actually moves, and lands the card on screen ---------
 const scroll = await page.evaluate(async () => {

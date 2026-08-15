@@ -45,6 +45,13 @@ const LAPS = 3;
 // the limit applies to races only.
 const HULL_LIVES = 3;
 
+// STARS PER RUNG on the career ladder — the pace at which the roster unrolls.
+// See `starCost` for the simulation this number came out of, and `_freeUnlock`
+// for the guarantee that makes any slope above 1 safe to ship. Exported so a
+// test can pin the arithmetic against the number itself rather than re-deriving
+// it from a rounded price and disagreeing by half a star.
+export const LADDER_SLOPE = 2.5;
+
 /** "1ST".."8TH" — the ordinal for a finishing position. Was a literal array
  *  in three places, each of which stopped at 6 and fell through to a bare
  *  `${n}TH` for anything beyond, so a 7th place read "7TH" while 1st..6th
@@ -2382,35 +2389,92 @@ class Game {
   /** What `id` costs to open — by CAREER POSITION, so the roster still unrolls
    *  in a sensible order while you choose the route through it.
    *
-   *  The slope is the whole design: EXACTLY one star per slot. That is
-   *  load-bearing, not a round number — a driver who only ever FINISHES banks
-   *  1★ a race, so at any slope above 1 they eventually hit a wall they can
-   *  never clear. Simulated over the roster, a 1.8 slope walled them in after
-   *  three worlds and a 1.25 slope after fifteen. At 1.0 nobody is ever stuck
-   *  again, which is the entire point of replacing the podium chain.
+   *  THE RUNG is the position; LADDER_SLOPE is what a rung costs. The slope
+   *  used to be exactly 1★ per rung and that was load-bearing, because the
+   *  ONLY guarantee against a wall was "a finish banks 1★, so a finisher
+   *  always earns a rung a race". Simulated over the real 60-world price
+   *  table, that slope opens 19 worlds after three races and 58 of 60 after
+   *  ten — the whole roster is on the table before the player has met a
+   *  quarter of it. Reported as "tracks are opening too fast".
+   *
+   *  The wall is now closed by a rule instead of by a number (see
+   *  `_freeUnlock`): clear everything that is open and the next world opens
+   *  regardless of stars, and a world you have already raced never re-locks.
+   *  With that floor underneath, the slope is free to be a difficulty knob.
+   *  Simulated across the three player profiles (win every race / podium
+   *  every race / finish last every race), worlds open after 3 / 6 / 10 / 20
+   *  races:
+   *      slope 1.0  19/39/58/60   12/27/43/60   6/12/22/43   ← shipped before
+   *      slope 2.0   7/19/33/58    6/12/22/43   4/ 7/11/22
+   *      slope 2.5   6/14/27/51    5/ 7/17/35   4/ 7/11/21   ← shipped now
+   *      slope 3.0   6/12/22/43    5/ 7/12/29   4/ 7/11/21
+   *  All three profiles still reach 60/60 at every slope — that is the floor
+   *  doing its job. 2.5 was taken because it is the point where a winner
+   *  spends about twenty races unrolling the roster instead of ten, while the
+   *  worst driver in the game is unaffected: their pace is pinned at one
+   *  world a race by the floor, not by the price.
    *
    *  The first three are free, so there is a real choice from the very first
-   *  race, and the last world costs (roster - 3) of a possible 3x roster — on
-   *  the 60 worlds that ship today, 57 of 180, so two thirds of the roster can
-   *  go unraced and the finale is still reachable. Deliberately written as a
-   *  relation and not the old fixed "19 of 63", which was true of a 21-world
-   *  roster and quietly stopped being true as worlds were appended. */
+   *  race. Deliberately written as a relation and not a fixed number, which
+   *  was true of a 21-world roster and quietly stopped being true as worlds
+   *  were appended.
+   *
+   *  The slope multiplies a level's OWN `cost` too. A per-level price is a
+   *  statement about where in the career that world sits (see the
+   *  MEDITERRANEAN note in the level table), not about how steep the ladder
+   *  is, so scaling both keeps the running order identical and moves only the
+   *  pace. */
   starCost(id) {
     const i = LEVELS.findIndex((l) => l.id === id);
-    // a level may carry its own price — see the MEDITERRANEAN note in the
+    // a level may carry its own rung — see the MEDITERRANEAN note in the
     // level table for why new regions must not inherit the append-only slope
-    if (LEVELS[i]?.cost != null) return LEVELS[i].cost;
-    return i < 3 ? 0 : i - 2;
+    const rung = LEVELS[i]?.cost != null ? LEVELS[i].cost : (i < 3 ? 0 : i - 2);
+    return Math.round(rung * LADDER_SLOPE);
+  }
+
+  /** THE FLOOR: the one world that opens for free because you have run out of
+   *  things to race. Returns a level id, or null when nothing is owed.
+   *
+   *  Without this, any slope above 1★ per rung eventually strands a player who
+   *  cannot podium — they bank 1★ a race against a gate that costs more than
+   *  that, and the career simply stops. Rather than pin the slope to the
+   *  weakest possible driver forever, the guarantee is stated directly: if
+   *  every world you can afford has been raced, the cheapest one you cannot
+   *  afford opens anyway. Progress can never be slower than one world a race.
+   *
+   *  It grants exactly one, and only while the debt stands — race it and the
+   *  next one is granted, leave an affordable world unraced and nothing is.
+   *  Worlds reached this way are skipped when choosing the next grant, and
+   *  `isLevelUnlocked` never re-locks a world that has been raced: without
+   *  that pair, a world opened at 6★ would slam shut again the moment the
+   *  ladder's own price passed the player's total, and the grant would keep
+   *  re-offering a world already behind them. */
+  _freeUnlock() {
+    const stars = this.totalStars();
+    const fin = this.career.finished;
+    let next = null, nextCost = Infinity;
+    for (const lv of LEVELS) {
+      const c = this.starCost(lv.id);
+      // something you can already afford is still unraced — no debt owed
+      if (c <= stars) { if (!fin[lv.id]) return null; continue; }
+      if (fin[lv.id]) continue;                 // already raced ahead of the ladder
+      if (c < nextCost) { next = lv.id; nextCost = c; }
+    }
+    return next;
   }
 
   isLevelUnlocked(id) {
-    return this.unlockAll || this.totalStars() >= this.starCost(id);
+    if (this.unlockAll) return true;
+    // a world you have raced is yours — it must never show a padlock again
+    if (this.career.finished[id]) return true;
+    if (this.totalStars() >= this.starCost(id)) return true;
+    return this._freeUnlock() === id;
   }
 
   /** WHERE YOU ARE UP TO — one answer, used by everything.
    *
    *  The roster is a ladder: career order is the LEVELS array and the price
-   *  rises exactly one star per rung (see `starCost`). That makes "the next
+   *  rises a fixed number of stars per rung (see `starCost`). That makes "the next
    *  track" a real, derivable thing rather than a guess, and it is what the
    *  timeline scrolls to, badges, and counts up to. Derived on every call,
    *  never stored, so it cannot drift from the unlock rule.
@@ -2428,10 +2492,23 @@ class Game {
    */
   nextTrack() {
     const fin = this.career.finished;
-    let lv = LEVELS.find((l) => this.isLevelUnlocked(l.id) && !fin[l.id]);
+    // The world the floor handed over is held back to LAST of the open ones.
+    // It is open precisely because nothing else is outstanding, so offering it
+    // ahead of a world still holding stars would make the floor delete the
+    // "go back for those" nudge rather than sit underneath it.
+    const freeId = this._freeUnlock();
+    const earned = (l) => l.id !== freeId && this.isLevelUnlocked(l.id);
+    let lv = LEVELS.find((l) => earned(l) && !fin[l.id]);
     if (lv) return { lv, why: 'unraced' };
-    lv = LEVELS.find((l) => this.isLevelUnlocked(l.id) && this.starsFor(fin[l.id]) < 3);
+    lv = LEVELS.find((l) => earned(l) && this.starsFor(fin[l.id]) < 3);
     if (lv) return { lv, why: 'stars' };
+    if (freeId != null) {
+      lv = LEVELS.find((l) => l.id === freeId);
+      if (lv) return { lv, why: 'unraced' };
+    }
+    // Defensive: with the floor in place there is normally always something
+    // open and outstanding, so a shut gate is only the answer in save states
+    // the floor cannot serve.
     lv = LEVELS.find((l) => !this.isLevelUnlocked(l.id));
     if (lv) return { lv, why: 'locked' };
     return null;
@@ -2508,6 +2585,10 @@ class Game {
       .length;
     const next = LEVELS.filter((lv) => this.starCost(lv.id) > now)
       .sort((a, c) => this.starCost(a.id) - this.starCost(c.id))[0];
+    // ...unless the floor has already handed that world over. Quoting a price
+    // at a player who can walk straight into the world is worse than silence.
+    const freeId = this._freeUnlock();
+    const free = freeId != null ? LEVELS.find((lv) => lv.id === freeId) : null;
     const RULES = [['★', 'FINISH — ANY PLACE'], ['★★', 'PODIUM — TOP 3'], ['★★★', 'WIN IT']];
     el.innerHTML = `
       <div class="sk-top">
@@ -2517,9 +2598,11 @@ class Game {
       <div class="sk-rules">
         ${RULES.map(([s, t]) => `<span class="sk-rule"><b>${s}</b>${t}</span>`).join('')}
       </div>
-      <div class="sk-next">${next
-    ? `EVERY WORLD KEEPS YOUR BEST RESULT — NEXT UNLOCK IS <b>${next.name}</b>, ${this.starCost(next.id) - now}★ TO GO`
-    : 'EVERY WORLD IS OPEN — THE REMAINING STARS ARE FOR THE RECORD'}${
+      <div class="sk-next">${free
+    ? `YOU HAVE RACED EVERYTHING OPEN — <b>${free.name}</b> IS OPEN ANYWAY`
+    : next
+      ? `EVERY WORLD KEEPS YOUR BEST RESULT — NEXT UNLOCK IS <b>${next.name}</b>, ${this.starCost(next.id) - now}★ TO GO`
+      : 'EVERY WORLD IS OPEN — THE REMAINING STARS ARE FOR THE RECORD'}${
   partial ? ` · ${partial} WORLD${partial === 1 ? '' : 'S'} STILL HOLDING STARS` : ''}</div>`;
   }
 
@@ -2843,6 +2926,8 @@ class Game {
     // while a picked world is still building, the highlight belongs to the pick
     const curId = this._pendingPick?.id ?? this.level?.id;
     const nextUp = this.nextTrack();
+    // the world (if any) the floor has handed over — priced out, open anyway
+    const freeId = this._freeUnlock();
     const rows = LEVELS.map((lv, i) => ({ lv, i }));
     if (!timeline) {
       rows.sort((a, b) =>
@@ -2874,7 +2959,9 @@ class Game {
       const bestTxt = unlocked
         ? (best
           ? `BEST: ${ordinal(best.place)}`
-          : '★ UNRACED')
+          // a world you cannot afford, standing open, needs to say WHY —
+          // otherwise the free grant reads as the padlock being broken
+          : lv.id === freeId ? `★ OPEN ANYWAY — ${cost}★ WORLD` : '★ UNRACED')
         : `NEEDS ${cost}★ — ${Math.max(0, cost - this.totalStars())} TO GO`;
       // THE LADDER, STATED ON THE CARD. `i` is the career rung — the same
       // index `starCost` prices from — so the number, the gate and the lock
@@ -7253,9 +7340,9 @@ class Game {
     if (!box || !rowsEl) return;
     // THE SAME WORDS AS THE MENU LEGEND, tier by tier. The reported mismatch:
     // a P6 (dead last) banked a star under a menu that reads like stars are
-    // competitive rewards. The award is BY DESIGN — the one-star finish is the
-    // floor that keeps any driver progressing (see starCost's slope note) —
-    // so the words on BOTH surfaces now say so explicitly.
+    // competitive rewards. The award is BY DESIGN — a finish always pays, and
+    // `_freeUnlock` guarantees the career cannot stall on top of that — so the
+    // words on BOTH surfaces now say so explicitly.
     const got = [['FINISH — ANY PLACE', rank > 0], ['PODIUM — TOP 3', rank <= 3], ['WIN', rank === 1]];
     let html = '';
     for (const [label, won] of got) {
@@ -7272,9 +7359,16 @@ class Game {
         this.hud.feed(`${lv.name} UNLOCKED`, 'good');
       }
     } else {
+      // The floor first: if that race cleared the last world you could afford,
+      // the next one is already yours and quoting a price at it would be a lie.
+      const freeId = this._freeUnlock();
+      const free = freeId != null ? LEVELS.find((lv) => lv.id === freeId) : null;
       const next = LEVELS.filter((lv) => this.starCost(lv.id) > now)
         .sort((a, c) => this.starCost(a.id) - this.starCost(c.id))[0];
-      if (next) {
+      if (free) {
+        html += `<div class="cb-row contract"><span>✓ OPEN ANYWAY — ${free.name}</span><b>NOTHING LEFT TO RACE</b></div>`;
+        this.hud.feed(`${free.name} OPEN`, 'good');
+      } else if (next) {
         html += `<div class="cb-row"><span>NEXT UNLOCK — ${next.name}</span><b>${this.starCost(next.id) - now}★ TO GO</b></div>`;
       }
     }
