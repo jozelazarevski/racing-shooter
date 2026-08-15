@@ -2183,15 +2183,29 @@ export class Car {
       const roof = this.y + (this.mesh?.userData?.hullHeight ?? 2.4);
       if (wt > -Infinity && roof < wt) this.drown();
     }
-    // MISSING THE JUMP IS SUPPOSED TO COST SOMETHING. The chasm carve is a
-    // hole in the road, but `groundHeightAt` follows it, so a car that came up
-    // short drove the U — down, along, and out the far side at unchanged speed.
-    // Nine metres under the lip is unambiguous: a car that CLEARED the gap
-    // never goes below its own take-off, and one that clipped the rim and
-    // dropped a few metres is left alone.
-    if (this.alive && t.jumpChasmAt) {
+    // YOU JUMP IT OR YOU DO NOT PASS. The chasm carve is a hole in the road,
+    // but `groundHeightAt` follows it, so a car that came up short did not
+    // fall — it drove the U, down and along and out the far side at unchanged
+    // speed. r179 priced that at nine metres under the lip, and nine metres was
+    // still a room to move about in: measured with the field slowed to 31 u/s,
+    // twelve of fourteen dropped in and only ONE of them wrecked. The rest
+    // bounced around inside the gorge, which is what was reported back as
+    // "falling and bouncing".
+    //
+    // So the room to move about in is gone: three metres under the LOWER lip
+    // and the run is over, against nine before. Three, and not zero, because
+    // the footprint is a skewed diagonal across a carriageway whose surface is
+    // removed square (see `jumpChasmAt`) — a car at the edge of the road can be
+    // inside the footprint and still on tarmac, and wrecking those took out 11
+    // of 14 rivals who had cleared the jump cleanly. Nothing can be three
+    // metres under the landing lip and still be on a road.
+    //
+    // Airborne is deliberately spared, so a car that comes up short gets to
+    // watch itself fall — the wreck lands with it rather than snapping off in
+    // mid-air.
+    if (this.alive && !this.airborne && t.jumpChasmAt) {
       const ch = t.jumpChasmAt(this.pos.x, this.pos.z);
-      if (ch && this.y < ch.rimY - 9) this.intoChasm(ch.exit);
+      if (ch && this.y < ch.deckY - 3) this.intoChasm(ch.exit);
     }
     if (this._steepFed > 0) this._steepFed = Math.max(0, this._steepFed - dt);
     if (this.airborne) {

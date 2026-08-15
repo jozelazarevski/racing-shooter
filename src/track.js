@@ -5906,7 +5906,20 @@ export class Track {
     if (!this._jumpGorges?.length) return null;
     for (const G of this._jumpGorges) {
       if (this._gorgeCutOne(G, x, z) < G.depth * 0.35) continue;
-      return { rimY: G.lipY ?? (this.center[G.i]?.y ?? 0), exit: (G.i + G.rimB + 3) % N };
+      // THE LOWER OF THE TWO LIPS, because the caller needs "is this car down
+      // the hole" and the answer must not change with which way it is going.
+      //
+      // The footprint alone is not that answer, and assuming it was cost a
+      // build: the trench crosses the road at a SKEW, so its edge is a
+      // diagonal across the carriageway, while `_jumpCut` — the thing that
+      // actually removes the roadway — is one number PER SAMPLE with no
+      // lateral variation. A car out at the edge of the road is therefore
+      // inside the footprint while still on solid tarmac. Measured, wrecking
+      // on the footprint alone took out 11 of 14 rivals who had cleared the
+      // jump cleanly.
+      const deck = Math.min(G.lipY ?? Infinity, G.landY ?? Infinity);
+      return { deckY: Number.isFinite(deck) ? deck : (this.center[G.i]?.y ?? 0),
+        rimY: G.lipY ?? (this.center[G.i]?.y ?? 0), exit: (G.i + G.rimB + 3) % N };
     }
     return null;
   }
@@ -6234,7 +6247,14 @@ export class Track {
     // racing speed — THE RAMP LEVELS THE RIMS instead, by building the low side
     // up. Longer on the low side, exactly like a jump built across a slope.
     const RAMP_GRADE = 0.15;   // stays under the launch-coherence cap
-    const LAUNCH = 1.3;        // u of lip over and above levelling the rims
+    const LAUNCH = 2.2;        // u of lip over and above levelling the rims
+    // AND THE LANDING SITS LOWER THAN THE TAKE-OFF, the way a jump is actually
+    // built. It is the only margin available: vy is capped, the gap is fixed,
+    // so the only free variable left is how far the car is allowed to FALL on
+    // the way over. Measured on CANYON RUN, it moves the speed a car must
+    // carry to clear from 38 u/s to 35 — a mid-pack car instead of a fast one,
+    // with the stunt still a stunt.
+    const LAND_DROP = 1.6;
     for (const G of this._jumpGorges) {
       // walk out to the last sample that still carries roadway
       const rimAt = (dir) => {
@@ -6252,9 +6272,12 @@ export class Track {
       // already climbs on its own (0.18 into the CANYON RUN lip, which is the
       // coherence cap all by itself), so a grade laid on top of that grade is
       // how you get a ramp too steep to launch from.
-      const lipY = Math.max(this.center[jA].y, this.center[jB].y) + LAUNCH;
+      const base = Math.max(this.center[jA].y, this.center[jB].y);
       const rungY = RAMP_GRADE * this.segLen;
-      for (const [dir, rim] of [[-1, G.rimA], [1, G.rimB]]) {
+      for (const [dir, rim, lipY] of [
+        [-1, G.rimA, base + LAUNCH],
+        [1, G.rimB, base + LAUNCH - LAND_DROP],
+      ]) {
         for (let sN = 0; sN < 60; sN++) {
           const want = lipY - sN * rungY;
           const j = (G.i + dir * (rim + sN) + N) % N;
@@ -6264,7 +6287,8 @@ export class Track {
           this.center[j].y = want;
         }
       }
-      G.lipY = lipY;
+      G.lipY = base + LAUNCH;                    // the take-off, the one you leave from
+      G.landY = base + LAUNCH - LAND_DROP;
     }
   }
 
