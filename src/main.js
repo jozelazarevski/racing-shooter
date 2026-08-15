@@ -1981,7 +1981,8 @@ class Game {
     // how slippery the road is, so the same road tyres cost a few percent on a
     // dry gravel stage and most of the grip in a blizzard. A card that quoted
     // one number for both would be lying about one of them.
-    const pen = Math.round((1 - tyrePenalty(overC, underC, surfaceSlick(lv))) * 100);
+    const pen = Math.round((1 - tyrePenalty(overC, underC, surfaceSlick(lv),
+      ((this.garage.upgrades || {})[carKey] || {}).tires | 0)) * 100);
     if (have >= need && have - need <= 1) {
       return { ok: true, need, have, over: have - need, under: 0, pen };
     }
@@ -3108,6 +3109,9 @@ class Game {
     const f = this.carFitness(this.level.id);
     this.player._tyreOver = f ? Math.max(0, f.over) : 0;
     this.player._tyreUnder = f ? Math.max(0, f.need - f.have) : 0;
+    // ...and how GOOD the set is, which is what levels 2-5 of TIRES now buy:
+    // a better tyre copes better with the wrong surface (see tyrePenalty).
+    this.player._tyreLevel = (this.carUpgrades()?.tires) | 0;
   }
 
   /** Apply the SELECTED car's purchased upgrades to the player (base stats

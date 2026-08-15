@@ -384,8 +384,17 @@
   #menu-tabs{margin-top:10px;display:flex;gap:5px;align-items:flex-end;flex-wrap:nowrap;
     justify-content:center;width:min(100%,660px);margin-left:auto;margin-right:auto}
   #menu-tabs .menu-tab{flex:1 1 0;min-width:0}
-  .menu-tab{pointer-events:auto;cursor:pointer;min-height:42px;padding:11px 10px;font-family:'Luckiest Guy';
-    font-size:clamp(11px,3.2vw,15px);letter-spacing:1.5px;white-space:nowrap;text-align:center;color:var(--gold-dim);border-radius:var(--r-md) var(--r-md) 0 0;
+  /* FIVE TABS, NOT FOUR. Adding JOBS pushed the row past its width and the
+     longest label was clipped mid-word by its own border — reported with a
+     screenshot of "GARAGI". `white-space:nowrap` with `min-width:0` clips
+     silently rather than wrapping or shrinking, so the padding and the
+     letter-spacing have to give instead: 10px -> 5px a side and 1.5 -> 0.8px
+     of tracking buys back ~14px per tab, which is more than GARAGE needs at
+     every size measured. `overflow:hidden` keeps a sixth tab from spilling
+     over the panel edge if one is ever added. */
+  .menu-tab{pointer-events:auto;cursor:pointer;min-height:42px;padding:11px 5px;font-family:'Luckiest Guy';
+    font-size:clamp(10px,2.7vw,15px);letter-spacing:.8px;white-space:nowrap;overflow:hidden;
+    text-align:center;color:var(--gold-dim);border-radius:var(--r-md) var(--r-md) 0 0;
     border:2px solid var(--line);border-bottom:none;background:rgba(24,16,6,.55);
     -webkit-tap-highlight-color:transparent}
   .menu-tab.current{color:var(--ink);background:var(--yellow);border-color:var(--ink);
@@ -1175,7 +1184,16 @@
     .game-sub{letter-spacing:3px}
     #menu-tabs{margin-top:8px;gap:4px}
     #menu-status{margin-top:12px}
-    .menu-tab{padding:11px 18px;font-size:14px;letter-spacing:2px}
+    /* the phone rule was written for four tabs at 18px of side padding; with
+       five that is 180px of padding alone on a 360px screen */
+    .menu-tab{padding:11px 4px;font-size:12px;letter-spacing:.4px}
+  }
+  /* iPhone SE and friends: at 320 px five tabs still clipped TRACKS by 1 px and
+     GARAGE by 3, because the clamp floor (10px) was binding before the vw term
+     could shrink anything. Measured at 320/360/390/460/700 — this is the only
+     width that needed it. */
+  @media (max-width:340px){
+    .menu-tab{padding:11px 2px;font-size:10px;letter-spacing:0}
     .set-row{grid-template-columns:1fr;padding:8px 0 9px}
     /* chips share the row evenly instead of wrapping unevenly */
     .mode-chip,.diff-chip{padding:0 8px;letter-spacing:1px;flex:1 1 0;min-width:0}
@@ -1248,7 +1266,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r176</div>
+<div id="build-tag">r177</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1483,10 +1501,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r176"></script>
+<script type="module" src="./src/main.js?v=r177"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r176"></script>
+<script src="./src/offline.js?v=r177"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r176"></script>
+<script type="module" src="./src/traffic.js?v=r177"></script>
 </body>
 </html>
