@@ -957,6 +957,50 @@ minimum only between the rims, and compare against `landY`, not `lipY`.
 
 `tests/test-gorge.mjs` is 28/28.
 
+**r181 — JOBS: THE BOARD YOU CHOOSE FROM.** Asked for as "expand the jobs, and
+I can take a job and start driving it to fulfil it". The second half is the
+feature. Everything the game had was handed to you for whatever world you
+happened to be standing on — contracts are dealt at the start line for the
+CURRENT world, quests tick along behind whatever you were going to do anyway,
+feats are stapled to a world you have to find first. None of them is a
+decision, because none of them sends you anywhere.
+
+A job is a named world, a named objective, a named price, and a button that
+takes you there. Three tiers now stack in the JOBS tab: **JOBS** (choose one,
+go there), **CONTRACTS** (this world's daily slate, opt-out), **QUESTS** (the
+long chains, passive).
+
+- `JOB_POOL` — twelve kinds. `where` gates the worlds a kind can post on,
+  `need` turns world + seeded roll into a target (null declines the world),
+  `extra` adds kind-specific data (FACTORY DRIVE picks a marque you actually
+  own), and the objective is checked by the SAME
+  `check`/`prog`/`atFinish`/`lap` shape the per-race contracts use.
+- `career.job` holds ONE, as plain data, rebuilt through the pool on every
+  read — a saved job can never carry a stale objective.
+- `_jobContract()` returns the job **as a contract**, and `startRace` unshifts
+  it into `this.contracts` only for the world the job names. That is what buys
+  it the per-frame progress, the lap/finish hooks and the HUD row without a
+  second copy of any of them. `job: true` is read in exactly ONE place
+  (`_completeContract`), where it takes the credit and returns BEFORE the rung
+  ladder — a job has no ladder to climb.
+- `career.jobsDone` closes a banked kind for the calendar day. Without it the
+  board reposts the kind you just cleared and one BOUNTY is an unlimited
+  credit tap.
+
+**PAY IS CAPPED AND THE CAP IS THE POINT.** `_jobPay` scales the kind's base by
+the world's ladder rung. Uncapped (`1 + rung/34`) rung 58 paid 2.7x and a
+single CLEAN SWEEP posting came to **2,970 CR plus a free part** — against the
+~1,800 CR ECONOMY-PLAN prices a strong race at, and the 2,200 ceiling
+`test-rungs` holds the whole contract sweep under. Capped at 1.9x with the
+CLEAN SWEEP base cut 1100 -> 900, the richest posting on a fresh career is
+930 CR and on a maxed one about 1,700. If you add a kind, keep it under that
+line or racing becomes the side activity.
+
+`tests/test-jobs.mjs` (22 assertions) pins the board's stability, the
+one-at-a-time hold, DRIVE IT actually swapping worlds and starting the race,
+the contract-plumbing ride, and that finishing pays / clears / closes for the
+day. test-rungs 28/28, test-quests 9/9, test-boot 7/7 unchanged.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

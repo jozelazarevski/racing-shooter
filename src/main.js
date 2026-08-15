@@ -486,6 +486,136 @@ const CONTRACT_POOL = [
     prog: (ct, need) => `${Math.min(ct.closeCalls, need)}/${need}` },
 ];
 
+/* ==========================================================================
+ * JOBS — the board you choose FROM, and the only objective in the game you
+ * go SOMEWHERE to do.
+ *
+ * Asked for as "expand the jobs, and I can take a job and start driving it to
+ * fulfil it". The second half is the whole feature: everything the game had
+ * until now was handed to you for whatever world you happened to be standing
+ * on. Contracts are dealt at the start line for the current world; quests tick
+ * along behind whatever you were going to do anyway; feats are stapled to a
+ * world you have to find first. None of them is a DECISION, because none of
+ * them is refusable in advance and none of them sends you anywhere.
+ *
+ * A job is: a named world, a named objective, a named price, and a button that
+ * takes you there. You hold ONE at a time — that is what makes taking it mean
+ * something — and it stays taken until you finish it or drop it, so a failed
+ * run is a retry rather than a lost offer.
+ *
+ * How a kind becomes an offer: `where` says which worlds it can be posted on,
+ * `need` turns the world and a seeded roll into a target (or null to decline
+ * the world), and `pay` prices it. The objective itself is checked by the
+ * SAME `check`/`prog`/`atFinish`/`lap` contract the per-race contracts use, so
+ * a job rides the existing per-frame bookkeeping and the existing HUD row
+ * rather than growing a second copy of both.
+ * ======================================================================== */
+const JOB_POOL = [
+  {
+    id: 'haul', label: 'HAULAGE RUN', icon: '📦', base: 460,
+    line: (n) => `finish inside the top ${n}`,
+    need: (g, lv, rnd) => 2 + ((rnd() * 3) | 0),
+    atFinish: true,
+    check: (g, ct, rank, need) => rank > 0 && rank <= need,
+  },
+  {
+    id: 'bounty', label: 'BOUNTY', icon: '🎯', base: 520,
+    line: (n) => `destroy ${n} rivals`,
+    need: (g, lv, rnd) => 2 + ((rnd() * 3) | 0),
+    check: (g, ct, rank, need) => ct.rivalKills >= need,
+    prog: (ct, need) => `${Math.min(ct.rivalKills, need)}/${need}`,
+  },
+  {
+    id: 'scrap', label: 'SCRAP RUN', icon: '🔩', base: 380,
+    line: (n) => `smash ${n} props`,
+    need: (g, lv, rnd) => 20 + ((rnd() * 4) | 0) * 5,
+    check: (g, ct, rank, need) => ct.props >= need,
+    prog: (ct, need) => `${Math.min(ct.props, need)}/${need}`,
+  },
+  {
+    // The only job whose target is YOUR OWN previous run, which is why it is
+    // only ever posted on a world you have already raced: "beat 1:42.6" is a
+    // number the player recognises, and "under 1:40" on a world they have
+    // never seen is a number nobody can judge before accepting.
+    id: 'pace', label: 'PACE NOTE', icon: '⏱', base: 700,
+    line: (n) => `set a lap under ${fmtTime(n)}`,
+    where: (g, lv) => (g.career.finished?.[lv.id]?.bestLap ?? 0) > 0,
+    need: (g, lv) => {
+      const best = g.career.finished?.[lv.id]?.bestLap ?? 0;
+      return best > 0 ? Math.round(best * 0.985 * 10) / 10 : null;
+    },
+    atFinish: true,
+    check: (g, ct, rank, need) => (g.player.bestLap ?? Infinity) <= need,
+  },
+  {
+    id: 'nofire', label: 'NO-FIRE CONTRACT', icon: '🕊', base: 640,
+    line: (n) => `top ${n}, and not one shot fired`,
+    need: (g, lv, rnd) => 3 + ((rnd() * 2) | 0),
+    atFinish: true,
+    check: (g, ct, rank, need) => rank > 0 && rank <= need && !ct.weaponFired,
+  },
+  {
+    id: 'iron', label: 'IRON RUN', icon: '🛡', base: 600,
+    line: () => 'finish it without being wrecked once',
+    atFinish: true,
+    check: (g) => g.deaths === 0,
+  },
+  {
+    id: 'solo', label: 'NO BEACON', icon: '🆘', base: 480,
+    line: () => 'finish without calling the rescue',
+    atFinish: true,
+    check: (g) => (g.player.sos ?? 0) >= (g.player.maxSos ?? 1),
+  },
+  {
+    id: 'reel', label: 'STUNT REEL', icon: '🪂', base: 440,
+    line: (n) => `land ${n} big airs`,
+    need: (g, lv, rnd) => 3 + ((rnd() * 3) | 0),
+    check: (g, ct, rank, need) => ct.bigAirs >= need,
+    prog: (ct, need) => `${Math.min(ct.bigAirs, need)}/${need}`,
+  },
+  {
+    id: 'tuck', label: 'SLIPSTREAM JOB', icon: '💨', base: 400,
+    line: (n) => `${n} slipstream tucks`,
+    need: (g, lv, rnd) => 5 + ((rnd() * 4) | 0),
+    check: (g, ct, rank, need) => ct.drafts >= need,
+    prog: (ct, need) => `${Math.min(ct.drafts, need)}/${need}`,
+  },
+  {
+    // Posted only where the surface actually punishes the wrong compound, and
+    // the tyre bay is the whole point: it asks you to go and FIT something.
+    id: 'boots', label: 'WRONG BOOTS', icon: '🛞', base: 900, part: 'tires',
+    line: (n) => `top ${n} on road tyres — on this`,
+    where: (g, lv) => surfaceClass(lv) > 0,
+    need: (g, lv, rnd) => 4 + ((rnd() * 2) | 0),
+    atFinish: true,
+    check: (g, ct, rank, need) => rank > 0 && rank <= need && (g.fittedTyre?.(g.cars?.selected, g.level) ?? 1) === 0,
+  },
+  {
+    id: 'sweep', label: 'CLEAN SWEEP', icon: '✨', base: 900, part: 'armor',
+    line: () => 'win it, and take no hull damage at all',
+    atFinish: true,
+    check: (g, ct, rank) => rank === 1 && g.deaths === 0 && !ct.lapDamaged && ct.cleanLaps >= 1,
+  },
+  {
+    // A marque job names the maker, so it is also the game telling you a
+    // showroom exists — the one place the car shop is advertised by a job.
+    id: 'marque', label: 'FACTORY DRIVE', icon: '⚙', base: 850, part: 'engine',
+    line: (n, lv, j) => `win it in ${/^[AEIOU]/.test(j.brand || '') ? 'an' : 'a'} ${j.brand} machine`,
+    where: (g) => CAR_CATALOG.some((c) => c.spec?.brand && g.cars?.owned?.includes?.(c.key)),
+    extra: (g, lv, rnd) => {
+      const brands = [...new Set(CAR_CATALOG
+        .filter((c) => c.spec?.brand && g.cars?.owned?.includes?.(c.key))
+        .map((c) => c.spec.brand))];
+      return brands.length ? { brand: brands[(rnd() * brands.length) | 0] } : null;
+    },
+    atFinish: true,
+    check: (g, ct, rank, need, j) => {
+      const car = CAR_CATALOG.find((c) => c.key === g.cars.selected);
+      return rank === 1 && car?.spec?.brand === j.brand;
+    },
+  },
+];
+
 /** Roman numerals for the three rungs, because "DEMOLITION II" reads as a
  *  standing at a glance and "DEMOLITION (rung 1)" does not. */
 const RUNG_NUMERAL = ['I', 'II', 'III'];
@@ -4056,6 +4186,148 @@ class Game {
     return picks.map(atRung).filter((c) => !no.includes(c.id));
   }
 
+  /* ---- JOBS: the board you choose from ---------------------------------- */
+
+  /** THE DAY'S POSTINGS. Five, seeded on the day and the profile so the board
+   *  is the same all day for this driver and different for the next one — a
+   *  board that rerolls on every repaint is a slot machine, not an offer.
+   *
+   *  Only worlds that are OPEN are posted, because a job you cannot drive is
+   *  an advert for a padlock. Each kind gets at most one posting, so five rows
+   *  are five different things to do rather than the same errand five times. */
+  _jobOffers() {
+    if (this._jobsDay === this._today() && this._jobsCache) return this._jobsCache;
+    const open = LEVELS.filter((lv) => this.isLevelUnlocked(lv.id));
+    if (!open.length) return [];
+    let s = ((this._today() * 19349663) ^ ((this.profile?.id ?? 1) * 83492791)) >>> 0;
+    const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+    const kinds = [...JOB_POOL];
+    for (let i = kinds.length - 1; i > 0; i--) {
+      const j = (rnd() * (i + 1)) | 0;
+      [kinds[i], kinds[j]] = [kinds[j], kinds[i]];
+    }
+    // A JOB YOU FINISHED TODAY DOES NOT COME BACK TODAY. Without this the
+    // board reposts the kind you just banked the moment it is cleared, and a
+    // single BOUNTY becomes an unlimited credit tap for the price of one race
+    // repeated — the day's board has to be a finite day's work.
+    const done = this._jobsDoneToday();
+    const out = [];
+    for (const k of kinds) {
+      if (out.length >= 5) break;
+      if (done.includes(k.id)) continue;
+      // try a few worlds before giving up on a kind: PACE NOTE only posts on a
+      // world you have already set a time on, WRONG BOOTS only where the
+      // surface is loose, and one unlucky draw should not drop the kind
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const lv = open[(rnd() * open.length) | 0];
+        if (k.where && !k.where(this, lv)) continue;
+        const need = k.need ? k.need(this, lv, rnd) : null;
+        if (k.need && (need == null || !Number.isFinite(need))) continue;
+        const extra = k.extra ? k.extra(this, lv, rnd) : {};
+        if (k.extra && !extra) continue;
+        out.push({ id: k.id, lvId: lv.id, need, ...extra,
+          pay: this._jobPay(k, lv), part: k.part ?? null });
+        break;
+      }
+    }
+    this._jobsDay = this._today();
+    this._jobsCache = out;
+    return out;
+  }
+
+  _today() { return Math.floor(Date.now() / 864e5); }
+
+  /** Kinds banked today, reset by the calendar rather than by the session so
+   *  a reload cannot re-open the board. */
+  _jobsDoneToday() {
+    const r = (this.career.jobsDone ??= { day: this._today(), ids: [] });
+    if (r.day !== this._today()) { r.day = this._today(); r.ids = []; }
+    return r.ids;
+  }
+
+  /** WHAT A JOB IS WORTH. The kind's base, scaled by how far down the ladder
+   *  the world sits — a bounty on rung 50 is a harder night's work than the
+   *  same bounty on rung 4, and paying both the same is what makes a board
+   *  stop being worth reading once you are past the first region. */
+  _jobPay(k, lv) {
+    const rung = Math.max(0, LEVELS.findIndex((l) => l.id === lv.id));
+    // CAPPED, and the cap is the point. Uncapped, rung 58 paid 2.7x and a
+    // single CLEAN SWEEP posting came to 2,970 CR plus a free part — against
+    // the ~1,800 CR of a strong race that ECONOMY-PLAN prices everything
+    // against, and the 2,200 ceiling test-rungs holds the contract sweep to.
+    // A job should be worth about one good race, not three.
+    const scale = Math.min(1.9, 1 + rung / 34);
+    const hard = this.difficulty?.id === 'hard' ? 1.25 : this.difficulty?.id === 'easy' ? 0.8 : 1;
+    return Math.round((k.base * scale * hard) / 10) * 10;
+  }
+
+  /** The job in hand, resolved against the pool — or null. Stored on the
+   *  career as plain data (kind id, world id, target) and rebuilt through the
+   *  pool on every read, so a saved job can never carry a stale objective. */
+  activeJob() {
+    const j = this.career.job;
+    if (!j) return null;
+    const k = JOB_POOL.find((x) => x.id === j.id);
+    const lv = LEVELS.find((l) => l.id === j.lvId);
+    if (!k || !lv) return null;
+    return { ...j, kind: k, lv,
+      label: k.label, icon: k.icon,
+      text: k.line(j.need, lv, j) };
+  }
+
+  _takeJob(o) {
+    this.career.job = { id: o.id, lvId: o.lvId, need: o.need, pay: o.pay,
+      part: o.part, brand: o.brand, day: this._today() };
+    saveJSON(this._pkey('career'), this.career);
+    this.audio?.ui?.();
+    this._renderJobs();
+  }
+
+  _dropJob() {
+    this.career.job = null;
+    saveJSON(this._pkey('career'), this.career);
+    this.audio?.ui?.();
+    this._renderJobs();
+  }
+
+  /** The job as a CONTRACT — the same shape `_updateContracts`, the HUD and
+   *  the finish check already understand. Only ever returned for the world the
+   *  job names, which is what makes "go there" the point of taking it. */
+  _jobContract() {
+    const j = this.activeJob();
+    if (!j || !this.level || j.lvId !== this.level.id) return null;
+    const k = j.kind;
+    return { id: `job:${k.id}`, job: true, part: j.part, brand: j.brand,
+      label: `JOB · ${k.label}`, need: j.need, pay: j.pay, done: false,
+      atFinish: !!k.atFinish, lap: !!k.lap,
+      prog: k.prog, check: (g, ct, rank, need) => k.check(g, ct, rank, need, j) };
+  }
+
+  /** Paid at the moment the objective is met, and cleared from the career the
+   *  same instant — a job cannot be banked twice, and the board is free to
+   *  post the next one. */
+  _payJob(c) {
+    const kindId = String(c.id).replace(/^job:/, '');
+    const done = this._jobsDoneToday();
+    if (!done.includes(kindId)) done.push(kindId);
+    this._jobsCache = null;                 // the board has one fewer posting
+    this.career.job = null;
+    if (c.part) {
+      const up = this.carUpgrades();
+      const line = UPGRADES.find((u) => u.key === c.part);
+      if (line && (up[c.part] | 0) < line.max) {
+        up[c.part] = (up[c.part] | 0) + 1;
+        saveJSON(this._pkey('garage'), this.garage);
+        this.hud.feed(`JOB PAID — FREE ${line.name} ${up[c.part]}`, 'good');
+      } else {
+        this.contractCredits = (this.contractCredits ?? 0) + c.pay;
+        this.hud.feed(`JOB PAID — ${line?.name ?? 'PART'} MAXED, DOUBLE PAY INSTEAD`, 'good');
+      }
+    }
+    saveJSON(this._pkey('career'), this.career);
+    this._renderJobs?.();
+  }
+
   /** The offer for this world, whether or not it has been accepted. Used by
    *  the board — `_pickContracts` returns only what will actually run. */
   _offeredContracts() {
@@ -4071,7 +4343,83 @@ class Game {
    *  Contracts pay credits and can be declined; quests pay PARTS and run in
    *  the background. Seeing them together is the point: one is what to do in
    *  THIS race, the other is what you are working toward. */
+  /** THE JOB BOARD. Five postings, one held at a time, and a button on the
+   *  held one that goes and drives it — which is the entire reason the board
+   *  exists rather than another row of things handed to you where you stand.
+   *
+   *  A held job is drawn FIRST and separately, because it is not an offer any
+   *  more: it is the thing you are doing, and the only two questions about it
+   *  are "where" and "how do I get there". */
+  _renderJobBoard() {
+    const el = document.getElementById('job-board');
+    if (!el) return;
+    const held = this.activeJob();
+    let html = `<div class="cb-head">JOBS <b>${held ? 'ONE IN HAND' : 'TAKE ONE'}</b></div>`;
+    if (held) {
+      const done = this.career.finished?.[held.lvId];
+      html += `<div class="jobrow held">
+        <span class="jicon">${held.icon}</span>
+        <span class="jmain"><b>${held.label} — ${held.lv.name}</b>
+          <i>${held.text}</i>
+          <u>${done ? `your best here: ${ordinal(done.place)}` : 'never raced here'}</u></span>
+        <span class="jpay">+${held.pay} CR${held.part
+    ? `<br><em>+ FREE ${(UPGRADES.find((u) => u.key === held.part)?.name ?? held.part).split(' ')[0]}</em>` : ''}</span>
+      </div>
+      <div class="jobact">
+        <button id="job-drive">DRIVE IT — ${held.lv.name}</button>
+        <button id="job-drop" class="ghost">DROP</button>
+      </div>`;
+    } else {
+      const offers = this._jobOffers();
+      if (!offers.length) {
+        html += '<div id="jobs-note">No postings — open a world first.</div>';
+      } else {
+        html += '<div id="jobs-note">One job at a time. Take it and the board '
+          + 'hands you the world it is on; finish it and the next posting is yours.</div>';
+        for (const o of offers) {
+          const k = JOB_POOL.find((x) => x.id === o.id);
+          const lv = LEVELS.find((l) => l.id === o.lvId);
+          if (!k || !lv) continue;
+          html += `<div class="jobrow">
+            <span class="jicon">${k.icon}</span>
+            <span class="jmain"><b>${k.label} — ${lv.name}</b>
+              <i>${k.line(o.need, lv, o)}</i></span>
+            <span class="jpay">+${o.pay} CR${o.part
+    ? `<br><em>+ FREE ${(UPGRADES.find((u) => u.key === o.part)?.name ?? o.part).split(' ')[0]}</em>` : ''}</span>
+            <button class="jtake" data-job="${o.id}">TAKE</button>
+          </div>`;
+        }
+      }
+    }
+    el.innerHTML = html;
+    for (const b of el.querySelectorAll('.jtake')) {
+      b.addEventListener('click', () => {
+        const o = this._jobOffers().find((x) => x.id === b.dataset.job);
+        if (o) this._takeJob(o);
+      });
+    }
+    document.getElementById('job-drop')?.addEventListener('click', () => this._dropJob());
+    document.getElementById('job-drive')?.addEventListener('click', () => {
+      const j = this.activeJob();
+      if (!j) return;
+      this.audio?.ui?.();
+      // Already standing on it: nothing to swap, just go. Otherwise take the
+      // same route the track list takes and flush it synchronously, so the
+      // race that starts is the world the job names and not the one that
+      // happened to be under the menu.
+      if (this.level?.id !== j.lvId) { this._pickLevel(j.lv); this._flushPick(); }
+      if (this.level?.id !== j.lvId) {
+        // the swap declined (mid-race): fall back to a reload that lands on
+        // the world, and let the player press START themselves
+        this.fadeTo(`?level=${j.lvId}${this.unlockAll ? '&unlockall=1' : ''}`);
+        return;
+      }
+      this.startRace();
+    });
+  }
+
   _renderJobs() {
+    this._renderJobBoard();
     const el = document.getElementById('contract-board');
     if (!el) return;
     if (this.freeRoam || !this.level) {
@@ -4153,6 +4501,17 @@ class Game {
     if (c.done) return;
     c.done = true;
     this.contractCredits = (this.contractCredits ?? 0) + c.pay;
+    // A JOB IS NOT A CONTRACT RUNG. It rides in the same list for the plumbing
+    // (see startRace) but it has no ladder to climb and it is spent on
+    // completion, so it takes the credit and leaves before any of that.
+    if (c.job) {
+      this.hud.feed(`JOB DONE: ${c.label.replace(/^JOB · /, '')}  +${c.pay} CR`, 'good');
+      this._payJob(c);
+      this.hud.setContracts?.(this.contracts, this._ct);
+      this.audio.pickup?.();
+      this.buzz([30, 40, 30, 40, 30]);
+      return;
+    }
     // THE RUNG YOU CLIMBED STAYS CLIMBED. Only this contract advances, and
     // only past the rung that was actually completed — so a player who is
     // handed rung I because HARD was not selected cannot skip II by winning it.
@@ -7043,6 +7402,13 @@ class Game {
     if (!this.freeRoam) {
       // contracts run in RACE only — roam money stays pure destruction rate
       this.contracts = this._pickContracts();
+      // THE JOB RIDES WITH THEM, and only on the world it names. Slotting it
+      // into the same list is what buys it the per-frame progress, the lap and
+      // finish hooks and the HUD row without a second copy of any of them —
+      // `job: true` is the only thing that tells them apart, and it is read in
+      // exactly one place (`_completeContract`).
+      const jc = this._jobContract();
+      if (jc) this.contracts.unshift(jc);
       this.hud.setContracts?.(this.contracts, this._ct);
       // …and the grid is told how hard to lean on an underprepared driver
       const kitGap = 1 - this.kitReady();
