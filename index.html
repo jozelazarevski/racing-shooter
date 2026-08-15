@@ -377,6 +377,8 @@
     filter:drop-shadow(0 10px 24px rgba(0,0,0,.5))}
   .game-sub{margin-top:12px;font-size:clamp(12px,2vw,18px);letter-spacing:8px;color:#ffe9a8;text-transform:uppercase;
     text-shadow:1px 1px 0 var(--ink);text-align:center}
+  /* a clause of the tagline: breaks between clauses, never inside one */
+  .game-sub .nb{white-space:nowrap}
   /* ---------- MENU TABS + PANELS ---------- */
   /* the four tabs must fit ONE line at 390px: no wrap, and they share the
      width evenly rather than each sizing to its own label */
@@ -1296,7 +1298,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r188</div>
+<div id="build-tag">r189</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1319,7 +1321,15 @@
 
 <div id="title-screen" class="screen">
   <div class="game-title">IGNITE&nbsp;RALLY</div>
-  <div class="game-sub">Dirt &nbsp;//&nbsp; Firepower &nbsp;//&nbsp; First Place</div>
+  <!-- A THREE-WORD TAGLINE COULD WRAP ANYWHERE; A SENTENCE CANNOT. The old
+       "Dirt // Firepower // First Place" was short enough to sit on one line
+       and harmless wherever it broke. This one needs 307 px at the narrow
+       breakpoint's own type size and only gets 288 px inside a 320 px phone,
+       so it wraps — and left to itself it wrapped into THREE ragged lines.
+       Each clause is held together instead: one line where it fits, a clean
+       break at the comma where it does not. -->
+  <div class="game-sub"><span class="nb">If you can&rsquo;t race them,</span>
+    <span class="nb">shoot them</span></div>
   <!-- Status chips sit ABOVE the tabs, not in the same row. Sharing the row
        meant a fourth tab pushed the whole strip onto two lines on a phone. -->
   <div id="menu-status">
@@ -1545,10 +1555,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r188"></script>
+<script type="module" src="./src/main.js?v=r189"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r188"></script>
+<script src="./src/offline.js?v=r189"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r188"></script>
+<script type="module" src="./src/traffic.js?v=r189"></script>
 </body>
 </html>
