@@ -1027,6 +1027,53 @@ itself introduced.
 `tests/test-jobs.mjs` 26/26 (was 22). test-rungs 28/28, test-boot 7/7,
 test-select 19/19.
 
+**r183 — THE OTHER HALF OF THE SKEW, AND A FLAKY TEST THAT WAS RIGHT TO
+COMPLAIN.** Found while re-running the suites after a repo cleanup: `test-gorge`
+had gone intermittent, failing "NOBODY drives out of the gorge" on some runs.
+
+- **THE RULE HAD A REVERSE GAP.** r180 fixed the half where the geometric
+  footprint said "in the hole" and the car was on tarmac. This is the other
+  half: the footprint said "clear" while the roadway UNDER the car was gone.
+  Same cause — the trench is a skewed diagonal, `_jumpCut` is one number per
+  sample with no lateral variation — so neither test is sufficient alone.
+  `jumpChasmAt(x, z, idx)` now takes the car's trackIndex and fires on EITHER
+  the footprint or a cut sample near that gorge. If you touch it, both halves
+  are load-bearing and each one alone has shipped a bug.
+
+- **AND THE TEST'S OWN THRESHOLD WAS TOO TIGHT** — the same trap already
+  recorded once at r180, in a new place. "Sank" was `y < landY - 3`, three
+  metres under the landing lip, which flags a car that dips 3.1 u WHILE FLYING.
+  Measured, the flagged cars crossed on the racing line (lateral 1.2-1.8 u) in
+  1.9 s — identical to a clean jump — and twenty metres above the floor. They
+  never entered the gorge. Now `landY - 8`: nothing that clears goes eight
+  metres under the far lip, anything that falls goes twenty.
+
+- **TWO ASSERTIONS WERE OVER-FITTED.** Demanding 14/14 from eight cars fighting
+  over one ramp fails on a legitimate racing incident — occasionally a rival
+  goes off it sideways, which is the jump working. Now `>= n - 1` at both ends,
+  with `droveOut === 0` doing the actual pinning. The slow sweep also moved
+  0.40 -> 0.35: the failure band sits near 31 u/s and cars vary about +/-3
+  around the field mean, so a mean of 24 put the fastest car ON the threshold.
+
+Four consecutive runs, 28/28 each, `droveOut` zero at every speed.
+
+### Repo cleanup done at the same time
+
+- **11 stale agent/workflow worktrees removed** (9-12 days old, 243 MB). Every
+  one had its uncommitted state COMMITTED TO ITS OWN BRANCH first, so nothing
+  was discarded — the refs are `worktree-agent-*`, `worktree-wf_*` and
+  `archive/gfx`, and the commit message on each says it is an archive and not
+  for merge. Three of those branches carry merge commits that are not in main;
+  all three are far BEHIND main (they would delete ~47k lines) and their
+  features shipped long ago.
+- Local `main` fast-forwarded from two weeks stale to `origin/main`.
+- Five gitignored probe screenshots removed from the repo root (2.5 MB).
+- `git gc` was NOT run — blocked in this environment. `.git` is 166 MB and
+  would repack smaller; worth doing where it is permitted.
+- **`dustline/` is 104 MB of tracked files in this repo** (240 files, a
+  sibling dossier project). Left alone deliberately — removing it is a call for
+  whoever owns it, not a cleanup.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
