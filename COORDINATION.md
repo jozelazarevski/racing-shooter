@@ -851,6 +851,69 @@ by this change: `test-round-fixes` 2/6 fail ("next world locked after 5th" —
 that assertion predates star pricing and levels 1-3 are free; and the economy
 figure), `test-pick` 1/12 fails (preview-watcher leak 58 -> 60).
 
+**r179 — GORGE JUMPS: THE RAMP, THE PRICE OF MISSING, AND THREE HOLES NOBODY
+PUT THERE.** Reported as "jumping the gorge is not good, needs fixing",
+alongside "canyon run is not playable, too many bugs on the road" and a
+photograph of a car standing inside a canyon wall. Driving the shipped AI over
+CANYON RUN at r177 and logging every crossing found all three in one feature.
+
+1. **THE RAMP CRESTED SHORT OF THE EDGE.** The lip was baked at `gapS`
+   (derived from `spanU * 0.61`) while the surface actually fell away wherever
+   `_gorgeCutOne >= depth*0.35` said it did. The two disagreed by two samples,
+   leaving a **2.1 u drop between the crest and the rim**. Whether a car flew
+   came down to whether it happened to still be airborne when it reached the
+   edge: measured, **5 of 7 rivals fell in every lap** at gorge 110, and the
+   two that cleared were the two that went airborne one sample earlier.
+   Fixed by computing `_jumpCut` FIRST (it only reads x/z) and deriving the
+   crest from it — `G.rimA`/`G.rimB` are now the last samples that still carry
+   roadway, and the ramp crests on them by construction.
+
+2. **THE RAMP MAY NOT EXCEED VY_CAP.** vehicles.js refuses to launch a car
+   while the ground under it rises faster than 11 u/s. At 62 u/s that caps the
+   grade near 0.18, so a STEEPER ramp does not launch harder — it does not
+   launch at all, and the car rides it up and follows the road down the hole.
+   The ramp now lays a constant 0.15 grade and is FILLED UP TO an absolute
+   height, never added on top: the CANYON RUN approach already climbs at 0.18
+   on its own, which is the cap by itself.
+   Corollary: the launch cannot pay for a climb, because vy is capped whatever
+   the ramp does. The far rim stood **2.9 u above the near one** — 0.65 u more
+   than VY_CAP buys at racing speed — so the ramp now **levels the two lips**
+   by building the low side up. After: 14/14 crossings clear on CANYON RUN,
+   7/7 on RED CENTRE RUN, all airborne.
+
+3. **THE TRENCH CUT THE ROAD WHERE NOBODY PUT A JUMP.** `_gorgeCutOne` carves
+   `len` (190 u) either side of the crossing — that length is what makes the
+   chasm read as a canyon — and on a closed circuit it crosses other legs of
+   the same lap. Measured at r177, identical in both builds before the fix:
+   CANYON RUN had **three unramped holes** besides its two jumps (samples
+   40-44, 238-241, 492-497 of 900) and RED CENTRE RUN a 32 u one at 95-106.
+   `_planJumpGorges` now walks EVERY eligible station straightest-first and
+   takes the first whose trench touches the centreline only at the jump
+   (`_trenchClearsRoad`, the `_clearsRoad` rule applied to chasms), shortening
+   `len` to 0.62 then 0.40 before giving up on a station. Both worlds keep
+   their full complement of gorges and have zero stray holes.
+
+4. **MISSING IT NOW COSTS SOMETHING.** `groundHeightAt` follows the carve, so a
+   car that came up short did not fall — it DROVE the U, 26 m down, along, and
+   out the far side at 62-66 u/s unchanged. `track.jumpChasmAt(x, z)` plus
+   `Car.intoChasm(exit)` make it a wreck. NOTE THE HAND-OFF: `respawn()` puts a
+   car down at its own `trackIndex`, which over a chasm is mid-air, so
+   `intoChasm` sets the index to the far rim first — without that the car
+   respawns in the hole and burns all three hulls in under a second. This
+   deliberately withdraws the old "drive out along the chasm floor" escape that
+   `_gorgeCutOne`'s end easing was shaped for; the easing still shapes the
+   hole, it is just no longer a way home.
+
+`tests/test-gorge.mjs` (23 assertions) pins all four. ROCKFALL RAVINE asks for
+a gorge jump and gets none — its straightest run fails the 0.009 curvature
+test. Pre-existing, unchanged, and correct: it is the twistiest world on the
+roster.
+
+Pre-existing failures confirmed against clean `origin/main` at r177 and NOT
+caused by this change: `test-jumps` 2 fail (FURKA RIDGE: 0 hops), `test-climb`
+2 fail (both slope assertions). `test-obstacles` times out only when four
+browsers share the box — it passes run alone.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
