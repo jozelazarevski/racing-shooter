@@ -104,8 +104,9 @@ export const LEVELS = [
   // order is this array; the rung is index - 2, priced by starCost's slope).
   { id: 31, name: 'HEDGEROW DASH', theme: 'farmland', region: 'FARMLAND', cost: 10, fresh: true },
   // ---- OUTBACK RED DIRT. Appended at the END of the array on purpose: career
-  // order is array position (starCost = index - 2), so anything inserted higher
-  // re-prices every world after it in a save that already exists.
+  // order is array position (the rung is index - 2, priced by starCost's slope),
+  // so anything inserted higher re-prices every world after it in a save that
+  // already exists.
   { id: 32, name: 'RED CENTRE RUN', theme: 'outback', region: 'OUTBACK', cost: 12, fresh: true,
     tune: { gorgeJump: { count: 1 } } },
 
@@ -5885,6 +5886,31 @@ export class Track {
     return false;
   }
 
+  /** IS THIS POINT DOWN A JUMP CHASM, and where does a car put back on the
+   *  road belong? Returns `{ rimY, exit }` inside one, null everywhere else.
+   *
+   *  A gorge jump is a hole in the road, and until r179 falling in it cost
+   *  nothing whatever: `groundHeightAt` follows the carve, so a car that came
+   *  up short simply DROVE the U — down twenty-six metres, along, and back out
+   *  the far side at unchanged speed. Measured on CANYON RUN before the ramp
+   *  fix, five of seven rivals took that line every lap at 62-66 u/s, which
+   *  made the chasm a free alternative to the jump rather than the price of
+   *  missing it, and is what was photographed as a car standing inside the
+   *  canyon wall. The rim height is what `_planJumpGorges` levelled both lips
+   *  to, so "well below the lip" is one number for both sides.
+   *
+   *  This deliberately withdraws the old escape — `_gorgeCutOne` eases the
+   *  chasm ends specifically so a fallen car could drive out along the floor.
+   *  That easing still shapes the hole; it is simply no longer a way home. */
+  jumpChasmAt(x, z) {
+    if (!this._jumpGorges?.length) return null;
+    for (const G of this._jumpGorges) {
+      if (this._gorgeCutOne(G, x, z) < G.depth * 0.35) continue;
+      return { rimY: G.lipY ?? (this.center[G.i]?.y ?? 0), exit: (G.i + G.rimB + 3) % N };
+    }
+    return null;
+  }
+
   _gorgeCutOne(G, x, z) {
     const dx = x - G.x, dz = z - G.z;
     const u = dx * G.ax + dz * G.az;          // along the gorge
@@ -6083,52 +6109,97 @@ export class Track {
     return false;
   }
 
+  /** A GORGE IS A TRENCH, AND THE TRENCH IS `len` LONG EITHER SIDE OF THE ROAD.
+   *  That length is what makes the chasm read as a canyon running off into the
+   *  distance rather than a slot cut to size for the carriageway — but on a
+   *  closed circuit inside a bounded map, a 190 u trench very often crosses
+   *  ANOTHER LEG of the same lap. Where it does, it takes the roadway out with
+   *  no ramp, no rim, and nothing to tell the driver.
+   *
+   *  Measured at r177: CANYON RUN carried THREE such holes besides its two
+   *  jumps (samples 40-44, 238-241 and 492-497 of 900), and RED CENTRE RUN a
+   *  32 u one at 95-106. Reported as "canyon run is not playable, too many bugs
+   *  on the road", with a photograph of a car standing inside a canyon wall.
+   *
+   *  So a station is only usable when its trench touches the centreline AT THE
+   *  JUMP and nowhere else. Same rule, and the same reason, as `_clearsRoad`. */
+  _trenchClearsRoad(G, at) {
+    for (let i = 0; i < N; i++) {
+      if (this._circDist(i, at) <= 10) continue;
+      if (this._gorgeCutOne(G, this.center[i].x, this.center[i].z) >= G.depth * 0.35) return false;
+    }
+    return true;
+  }
+
   _planJumpGorges() {
     const J = this.T.gorgeJump;
     const count = J.count ?? 1;
     const half = J.half ?? 14, len = J.len ?? 190, depth = J.depth ?? 24;
     const taken = this._gorge ? [this._gorge.i] : [];
+    const th = J.skew ?? 0.5;
+    const cs = Math.cos(th), sn = Math.sin(th);
+    // A trial gorge at a station, so the clearance rule can be asked BEFORE
+    // anything is carved — the same object the real one is built from.
+    const trial = (i, L) => {
+      const c = this.center[i], t = this.tan[i], n = this.nrm[i];
+      const ax = n.x * cs + t.x * sn, az = n.z * cs + t.z * sn;
+      const vx = -n.x * sn + t.x * cs, vz = -n.z * sn + t.z * cs;
+      return {
+        i, x: c.x, z: c.z, ax, az, vx, vz, half, len: L, depth,
+        spanU: half / Math.max(0.35, Math.abs(t.x * vx + t.z * vz)),
+        floorY: c.y - depth,
+      };
+    };
     for (let k = 0; k < count; k++) {
-      let best = -1, bc = Infinity;
+      // EVERY eligible station, straightest first — not just the straightest.
+      // The clearance rule can reject the best one, and "the best station is
+      // unusable" must not mean "this world gets no jump".
+      const stations = [];
       for (let i = 0; i < N; i += 2) {
         if (this._circDist(i, 0) < 90) continue;
         if (taken.some((t) => this._circDist(i, t) < 140)) continue;
         let mc = 0;
         for (let w = -16; w <= 16; w++) mc = Math.max(mc, this.curvature[(i + w + N) % N]);
-        if (mc < bc) { bc = mc; best = i; }
+        // a jump needs a genuine straight: launching mid-corner throws the car
+        // off the far rim sideways, which is a trap rather than a stunt
+        if (mc > 0.009) continue;
+        stations.push({ i, mc });
       }
-      // a jump needs a genuine straight: launching mid-corner throws the car
-      // off the far rim sideways, which is a trap rather than a stunt
-      if (best < 0 || bc > 0.009) break;
-      taken.push(best);
-      const c = this.center[best], t = this.tan[best], n = this.nrm[best];
-      const th = J.skew ?? 0.5;
-      const cs = Math.cos(th), sn = Math.sin(th);
-      const ax = n.x * cs + t.x * sn, az = n.z * cs + t.z * sn;
-      const vx = -n.x * sn + t.x * cs, vz = -n.z * sn + t.z * cs;
-      this._jumpGorges.push({
-        i: best, x: c.x, z: c.z, ax, az, vx, vz, half, len, depth,
-        spanU: half / Math.max(0.35, Math.abs(t.x * vx + t.z * vz)),
-        floorY: c.y - depth,
-      });
+      stations.sort((a, b) => a.mc - b.mc);
+      let G = null;
+      for (const s of stations) {
+        // A SHORTER TRENCH IS BETTER THAN A HOLE IN THE ROAD. Try the full
+        // canyon first and shorten only when it will not fit — the art is
+        // worth keeping wherever the geometry allows it.
+        for (const L of [len, len * 0.62, len * 0.40]) {
+          const t = trial(s.i, L);
+          if (!this._trenchClearsRoad(t, s.i)) continue;
+          G = t; break;
+        }
+        if (G) break;
+      }
+      // No station on this circuit can hold a chasm that stays out of its own
+      // way. A world with no jump is a world with no jump; a world with an
+      // unmarked twenty-metre hole across the racing line is a broken one.
+      if (!G) break;
+      taken.push(G.i);
+      this._jumpGorges.push(G);
     }
     if (!this._jumpGorges.length) return;
-    // launch kickers: a rising lip baked into the roadway short of each rim,
-    // on BOTH sides - the race runs one way, but a spun car crosses back.
-    // The physical GAP is only the deep middle of the carve (the rest keeps
-    // full-grade roadway right up to a SHARP lip), and the kicker slope is
-    // real: ~0.19, worth ~8 u/s of launch at racing speed - the math that
-    // clears a ~21 u gap at 40+ u/s and drops anything slower in.
-    for (const G of this._jumpGorges) {
-      G.gapS = Math.ceil((G.spanU * 0.61 + 1) / this.segLen);
-      for (const dir of [1, -1]) {
-        for (let sN = 0; sN < 5; sN++) {
-          const j = (G.i + dir * (G.gapS + 1 + sN) + N) % N;
-          this.center[j].y += 2.3 * Math.pow(1 - sN / 5, 1.4);
-        }
-      }
-    }
-    // the collapse itself, per sample: the ribbon, the physics and the AI all
+
+    // THE HOLE IS CUT BEFORE THE RAMP IS BUILT, and that order is the whole
+    // fix. `_jumpCut` only reads x/z, so it can be computed first — and it MUST
+    // be, because the ramp has to know where the roadway actually ends.
+    //
+    // It used to be the other way round, with the ramp placed at `gapS`, a
+    // count derived from `spanU * 0.61`, while the surface fell away wherever
+    // the geometric test below said it did. The two disagreed. Measured on
+    // CANYON RUN: the ramp crested at 6 samples from the centre and the road
+    // ended at 4, leaving a 2.1 u DROP between the crest and the lip. So the
+    // car was thrown up 8 u short of the edge, came back down into the dip,
+    // and left the rim with no upward speed at all.
+    //
+    // The collapse itself, per sample: the ribbon, the physics and the AI all
     // read the road surface through groundHeightAt, so one array does it all.
     // Shallow rim-cut is ZEROED - the roadway holds grade to the lip, then
     // the surface is simply out.
@@ -6140,6 +6211,60 @@ export class Track {
         cut += c1 >= G.depth * 0.35 ? c1 : 0;
       }
       this._jumpCut[i] = cut;
+    }
+
+    // LAUNCH RAMPS, CRESTING ON THE RIM ITSELF.
+    //
+    // Two rules set the shape, and both are the car's, not the scenery's:
+    //
+    //  1. THE CREST IS THE LAST SAMPLE THAT STILL HAS ROADWAY. Anything else
+    //     and the launch happens somewhere other than the edge, which is how
+    //     the old ramp failed.
+    //  2. THE SLOPE MAY NOT EXCEED VY_CAP. vehicles.js refuses to launch a car
+    //     while the ground under it is rising faster than 11 u/s ("coherence",
+    //     and it is right to: an uncapped ramp on nitro threw cars 100 u into
+    //     the infield). At racing pace that caps the grade at about 0.18, so a
+    //     STEEPER ramp does not launch harder — it does not launch AT ALL, and
+    //     the car rides the ramp up and then follows the road straight down
+    //     into the chasm. 0.15 sits under the cap up to 73 u/s.
+    //
+    // Rule 2 means the launch cannot be made to pay for a climb: vy is capped
+    // whatever the ramp does. So where the far rim stands higher than the near
+    // one — 2.9 u on CANYON RUN, which is 0.65 u more than VY_CAP can buy at
+    // racing speed — THE RAMP LEVELS THE RIMS instead, by building the low side
+    // up. Longer on the low side, exactly like a jump built across a slope.
+    const RAMP_GRADE = 0.15;   // stays under the launch-coherence cap
+    const LAUNCH = 1.3;        // u of lip over and above levelling the rims
+    for (const G of this._jumpGorges) {
+      // walk out to the last sample that still carries roadway
+      const rimAt = (dir) => {
+        for (let s = 1; s < 60; s++) {
+          if (this._jumpCut[(G.i + dir * s + N) % N] < 0.5) return s;
+        }
+        return 6;
+      };
+      G.rimA = rimAt(-1);                       // approach side (racing order)
+      G.rimB = rimAt(1);                        // landing side
+      G.gapS = Math.max(G.rimA, G.rimB) - 1;    // still the count the rest reads
+      const jA = (G.i - G.rimA + N) % N, jB = (G.i + G.rimB) % N;
+      // BOTH LIPS AT ONE HEIGHT, the higher rim plus the launch. Stated as an
+      // absolute height and FILLED UP TO, never added on top: the approach here
+      // already climbs on its own (0.18 into the CANYON RUN lip, which is the
+      // coherence cap all by itself), so a grade laid on top of that grade is
+      // how you get a ramp too steep to launch from.
+      const lipY = Math.max(this.center[jA].y, this.center[jB].y) + LAUNCH;
+      const rungY = RAMP_GRADE * this.segLen;
+      for (const [dir, rim] of [[-1, G.rimA], [1, G.rimB]]) {
+        for (let sN = 0; sN < 60; sN++) {
+          const want = lipY - sN * rungY;
+          const j = (G.i + dir * (rim + sN) + N) % N;
+          // filling stops where the ground already stands above the ramp line;
+          // past that the road is doing the climb by itself
+          if (want <= this.center[j].y) break;
+          this.center[j].y = want;
+        }
+      }
+      G.lipY = lipY;
     }
   }
 

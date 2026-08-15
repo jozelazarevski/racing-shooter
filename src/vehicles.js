@@ -2183,6 +2183,16 @@ export class Car {
       const roof = this.y + (this.mesh?.userData?.hullHeight ?? 2.4);
       if (wt > -Infinity && roof < wt) this.drown();
     }
+    // MISSING THE JUMP IS SUPPOSED TO COST SOMETHING. The chasm carve is a
+    // hole in the road, but `groundHeightAt` follows it, so a car that came up
+    // short drove the U — down, along, and out the far side at unchanged speed.
+    // Nine metres under the lip is unambiguous: a car that CLEARED the gap
+    // never goes below its own take-off, and one that clipped the rim and
+    // dropped a few metres is left alone.
+    if (this.alive && t.jumpChasmAt) {
+      const ch = t.jumpChasmAt(this.pos.x, this.pos.z);
+      if (ch && this.y < ch.rimY - 9) this.intoChasm(ch.exit);
+    }
     if (this._steepFed > 0) this._steepFed = Math.max(0, this._steepFed - dt);
     if (this.airborne) {
       this.vy -= 26 * dt;
@@ -2615,6 +2625,27 @@ export class Car {
     // road you can drive off the edge of, over and over, for free.
     if (this === this.game.player) {
       this.game.hud?.feed?.('SUNK', 'bad');
+      this.game.onPlayerDestroyed?.(null);
+    }
+  }
+
+  /** DOWN THE GORGE. The same wreck as drowning, and for the same reason —
+   *  the car is somewhere the race does not continue from — but it must also
+   *  say WHERE to come back, because `respawn` puts a car down at its own
+   *  `trackIndex` and that index is in mid-air over the chasm. Without the
+   *  hand-off the car respawns in the hole, falls again on the next frame, and
+   *  burns all three hulls in under a second. */
+  intoChasm(exitIndex) {
+    if (!this.alive) return;
+    if (exitIndex != null) this.trackIndex = exitIndex;
+    this.health = 0;
+    this.alive = false;
+    this.mesh.visible = false;
+    this.respawnTimer = this.respawnDelay ?? 5;
+    this.game.particles?.explosion?.(this.pos, true);
+    this.game.audio?.explosion?.(true);
+    if (this === this.game.player) {
+      this.game.hud?.feed?.('INTO THE GORGE', 'bad');
       this.game.onPlayerDestroyed?.(null);
     }
   }
