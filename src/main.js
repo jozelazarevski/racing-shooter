@@ -1960,7 +1960,7 @@ class Game {
     const lv = LEVELS.find((l) => l.id === levelId);
     if (!lv) return null;
     const need = surfaceClass(lv);
-    const have = tyreClass(carKey, (this.garage.upgrades || {})[carKey], this.fittedTyre(carKey));
+    const have = tyreClass(carKey, (this.garage.upgrades || {})[carKey], this.fittedTyre(carKey, lv));
     // ONE CLASS EITHER SIDE IS THE IDEAL WINDOW, NOT A PERMISSION.
     //
     // If a bigger tyre always counted as ideal, the whole rule would collapse
@@ -3052,12 +3052,30 @@ class Game {
    *  implicitly, so nobody's setup changes underneath them. Clamped on READ
    *  rather than on write, because swapping cars and buying an upgrade can
    *  both move the ceiling under a stored choice. */
-  fittedTyre(carKey = this.cars.selected) {
+  fittedTyre(carKey = this.cars.selected, lv = this.level) {
     const g = this.garage;
     g.fitted ??= {};
     const max = tyreMaxClass(carKey, (g.upgrades || {})[carKey]);
     const want = g.fitted[carKey];
-    return want == null ? max : Math.max(0, Math.min(max, want | 0));
+    if (want != null) return Math.max(0, Math.min(max, want | 0));
+    // ---- AUTO: THE RIGHT COMPOUND FOR THE WORLD YOU ARE ABOUT TO RACE ----
+    //
+    // The first cut defaulted to the BEST compound owned, which is the worst
+    // possible default and was reported as "what's the point if I don't buy
+    // them?". Measured: of 60 worlds, 40 are SEALED, 16 LOOSE and 4 ICE. So a
+    // player who bought SNOW tyres — the expensive end of the line — was
+    // handed a −18 % liability on FORTY worlds and had to walk into the
+    // garage and undo their own purchase before each one. Owning the best
+    // tyre made you worse by default, which is an indefensible thing for a
+    // shop to sell.
+    //
+    // Fitting the compound the world asks for, capped by what you own, makes
+    // the purchase do what a purchase should: buying SNOW means "I am now
+    // ideal on the ice too", automatically, and it never costs you anywhere
+    // else. The bay stays as an override for anyone who wants to run
+    // deliberately over- or under-tyred.
+    const need = lv ? surfaceClass(lv) : max;
+    return Math.max(0, Math.min(max, need));
   }
 
   /** Fit a compound and remember it. FREE, always — going down a class is
@@ -3065,15 +3083,21 @@ class Game {
   fitTyre(cls, carKey = this.cars.selected) {
     const g = this.garage;
     g.fitted ??= {};
-    g.fitted[carKey] = Math.max(0,
-      Math.min(tyreMaxClass(carKey, (g.upgrades || {})[carKey]), cls | 0));
+    // `null` means AUTO — clear the override and let the world decide again.
+    if (cls == null) delete g.fitted[carKey];
+    else {
+      g.fitted[carKey] = Math.max(0,
+        Math.min(tyreMaxClass(carKey, (g.upgrades || {})[carKey]), cls | 0));
+    }
     saveJSON(this._pkey('garage'), g);
     this.applyUpgrades();
     this.renderGarage();
     this._renderLevelCards?.();
     this._syncStartButton?.();
-    this.hud?.feed?.(`FITTED ${TYRE_LABEL[g.fitted[carKey]]} TYRES`, 'good');
-    return g.fitted[carKey];
+    this.hud?.feed?.(cls == null
+      ? `AUTO — FITTING ${TYRE_LABEL[this.fittedTyre(carKey)]} FOR THIS WORLD`
+      : `FITTED ${TYRE_LABEL[g.fitted[carKey]]} TYRES`, 'good');
+    return this.fittedTyre(carKey);
   }
 
   /** Tell the car how far its tyres miss this world's surface in BOTH
@@ -3142,21 +3166,33 @@ class Game {
     const now = this.fittedTyre(car);
     const need = this.level ? surfaceClass(this.level) : null;
     const ICON = ['🛣', '🪨', '❄'];
+    const auto = this.garage.fitted?.[car] == null;
     const btns = [0, 1, 2].map((c) => {
       const locked = c > max;
-      const cls = ['tyre-opt', c === now ? 'on' : '', locked ? 'locked' : '',
+      const cls = ['tyre-opt', !auto && c === now ? 'on' : '', locked ? 'locked' : '',
         need === c ? 'want' : ''].filter(Boolean).join(' ');
       return `<button class="${cls}" data-tyre="${c}"${locked ? ' disabled' : ''}>`
         + `${locked ? '🔒' : ICON[c]}<b>${TYRE_LABEL[c]}</b>`
         + `<i>${locked ? 'BUY TIRES ' + (c >= 2 ? 3 : 1) : need === c ? 'IDEAL HERE' : ''}</i></button>`;
     }).join('');
+    // AUTO IS THE DEFAULT AND IT IS THE POINT OF BUYING TYRES AT ALL: it fits
+    // the compound each world asks for, capped by what you own, so a purchase
+    // widens where you are ideal instead of handing you something to undo.
+    const autoBtn = `<button class="tyre-opt tyre-auto${auto ? ' on' : ''}" data-tyre="auto">`
+      + `⚙<b>AUTO</b><i>${auto ? `FITTED ${TYRE_LABEL[now]}` : 'FIT PER WORLD'}</i></button>`;
     el.innerHTML = `<div class="panel-head">TYRE BAY${this.level
       ? ` — ${this.level.name} WANTS ${TYRE_LABEL[need]}` : ''}</div>`
-      + `<div class="tyre-row">${btns}</div>`;
+      + `<div class="tyre-row">${autoBtn}${btns}</div>`
+      + (max < 2
+        ? `<div id="jobs-note">You own up to ${TYRE_LABEL[max]}. `
+          + `TIRES STACK ${max < 1 ? 1 : 3} unlocks ${TYRE_LABEL[max + 1]}, `
+          + `which is what the ${TYRE_LABEL[2] === TYRE_LABEL[max + 1] ? 'ICE' : 'LOOSE'} `
+          + `stages want.</div>`
+        : '');
     for (const b of el.querySelectorAll('.tyre-opt')) {
       b.addEventListener('click', () => {
         this.audio?.ui?.();
-        this.fitTyre(+b.dataset.tyre);
+        this.fitTyre(b.dataset.tyre === 'auto' ? null : +b.dataset.tyre);
       });
     }
   }
@@ -3327,8 +3363,23 @@ class Game {
       row.className = 'up-row';
       const pips = Array.from({ length: u.max },
         (_, i) => `<span class="${i < lvl ? '' : 'off'}">●</span>`).join('');
+      // WHAT THE NEXT LEVEL ACTUALLY BUYS, not what the line buys on average.
+      // TIRES STACK advertised "+4% grip / lvl" at every rung, so a player who
+      // spent 5,100 CR reaching level 3 on a car that already reached SNOW at
+      // level 1 had no way to know two of those rungs bought no compound at
+      // all. The line still sells grip; it now says out loud on which rung it
+      // also opens a tyre, and stops implying it on the rungs where it does
+      // not.
+      let extra = u.desc;
+      if (u.key === 'tires') {
+        const nowMax = tyreMaxClass(this.cars.selected, up);
+        const nextMax = tyreMaxClass(this.cars.selected, { ...up, tires: lvl + 1 });
+        extra = nextMax > nowMax
+          ? `NEXT LEVEL UNLOCKS ${TYRE_LABEL[nextMax]} TYRES · +4% grip`
+          : `+4% grip / lvl · ${TYRE_LABEL[nowMax]} IS YOUR BEST COMPOUND`;
+      }
       row.innerHTML = `<div class="ic">${u.icon}</div>
-        <div class="nm">${u.name}<small class="up-lvl">LEVEL ${lvl}/${u.max}</small><small>${u.desc}</small></div>
+        <div class="nm">${u.name}<small class="up-lvl">LEVEL ${lvl}/${u.max}</small><small>${extra}</small></div>
         <div class="pips">${pips}</div>`;
       const btn = document.createElement('button');
       btn.className = 'up-buy' + (lvl >= u.max ? ' maxed' : '');

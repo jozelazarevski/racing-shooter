@@ -619,7 +619,7 @@
 
   /* ---- tyre bay ---- */
   #tyre-bay{margin:10px 0 4px}
-  .tyre-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .tyre-row{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
   .tyre-opt{display:flex;flex-direction:column;align-items:center;gap:1px;
     padding:8px 4px;border-radius:10px;cursor:pointer;font-family:inherit;
     background:rgba(40,30,16,.5);border:1px solid rgba(255,212,0,.22);color:#c8b48c;font-size:15px}
@@ -629,6 +629,10 @@
   .tyre-opt.want{box-shadow:0 0 0 1px rgba(77,208,106,.55) inset}
   .tyre-opt.locked{opacity:.42;cursor:not-allowed}
   .tyre-opt.locked i{color:#ffb52e}
+  /* AUTO is the default and the recommended setting, so it reads as the
+     positive choice rather than as a fourth compound */
+  .tyre-opt.tyre-auto.on{background:rgba(77,208,106,.16);border-color:#4dd06a;color:#8de89a}
+  .tyre-opt.tyre-auto.on i{color:#8de89a}
   #quest-board{margin-top:14px}
   #quest-board .qrow{display:grid;grid-template-columns:26px 1fr 74px 40px;gap:8px;
     align-items:center;padding:7px 9px;margin-bottom:5px;border-radius:9px;
@@ -1244,7 +1248,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r175</div>
+<div id="build-tag">r176</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1479,10 +1483,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r175"></script>
+<script type="module" src="./src/main.js?v=r176"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r175"></script>
+<script src="./src/offline.js?v=r176"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r175"></script>
+<script type="module" src="./src/traffic.js?v=r176"></script>
 </body>
 </html>
