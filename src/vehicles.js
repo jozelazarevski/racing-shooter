@@ -737,6 +737,16 @@ export function applyUpgradeKit(group, up = {}) {
   const steel = M(0x6a6e74);
   const dark = M(0x2a2724, { metalness: 0.2, roughness: 0.8 });
   const hot = new THREE.MeshBasicMaterial({ color: 0x7fd4ff });
+  // THE PARTS THAT FACE THE CAMERA GET THEIR OWN LOOK. A chase camera sees the
+  // tail and the flanks and nothing else, so anything meant to READ as an
+  // upgrade is either back there or down the side, and the emissive pieces are
+  // MeshBasic — unlit, so they hold their colour in a tunnel and at dusk where
+  // a standard material goes to mud.
+  const carbon = M(0x1b1b1e, { metalness: 0.3, roughness: 0.45 });
+  const gold = M(0xc9922e, { metalness: 0.85, roughness: 0.3 });
+  const ember = new THREE.MeshBasicMaterial({ color: 0xff7a2a });
+  const amber = new THREE.MeshBasicMaterial({ color: 0xffb52e });
+  const brake = new THREE.MeshBasicMaterial({ color: 0xff2f2f });
   const add = (geo, mat, x, y, z, rx = 0) => {
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
@@ -755,6 +765,32 @@ export function applyUpgradeKit(group, up = {}) {
       for (const sx of [-0.55, 0.55]) {
         add(new THREE.CylinderGeometry(0.14, 0.17, 0.9, 8), steel,
           sx, baseY + 0.1, -2.15, Math.PI / 2);
+        add(new THREE.CylinderGeometry(0.1, 0.1, 0.1, 8), ember,
+          sx, baseY + 0.1, -2.58, Math.PI / 2);      // lit pipe mouths
+      }
+    }
+  }
+  // ...AND THE REAR WING, which is the whole point of the exercise. One
+  // silhouette change at the top of the tail is worth more than five details
+  // on the nose, because the nose is the one part of the car the player never
+  // sees. Level 3 so it lands BETWEEN the two hood tiers rather than with them.
+  if (eng >= 3) {
+    const wide = eng >= 5;
+    const span = wide ? 2.9 : 2.4;
+    for (const sx of [-1, 1]) {
+      add(new THREE.BoxGeometry(0.12, 0.62, 0.34), carbon,
+        sx * (span * 0.36), capTop + 0.28, -1.72);
+    }
+    const plane = add(new THREE.BoxGeometry(span, 0.09, 0.62), carbon,
+      0, capTop + 0.6, -1.78);
+    plane.rotation.x = -0.16;                        // angle of attack, visible in profile
+    if (wide) {
+      const flap = add(new THREE.BoxGeometry(span, 0.07, 0.34), gold,
+        0, capTop + 0.78, -1.98);
+      flap.rotation.x = -0.3;
+      for (const sx of [-1, 1]) {                    // endplates
+        add(new THREE.BoxGeometry(0.07, 0.42, 0.9), gold,
+          sx * (span * 0.5), capTop + 0.66, -1.84);
       }
     }
   }
@@ -771,6 +807,27 @@ export function applyUpgradeKit(group, up = {}) {
         add(new THREE.BoxGeometry(0.18, 0.7, 0.18), steel, sx * 0.95, capTop - 0.28, 0.7);
       }
     }
+  }
+  // WIDE-BODY FLARES — the one change that reads from BOTH the camera angles
+  // the player actually has: they break the silhouette at the back and they
+  // run the whole length of the flank. Placed over the wheels, so they also
+  // explain the fatter rubber the TIRES line fits.
+  if (arm >= 3) {
+    for (const sz of [1.5, -1.5]) {
+      for (const sx of [-1, 1]) {
+        const f = add(new THREE.BoxGeometry(0.34, 0.2, 1.35), steel,
+          sx * 1.24, wheelY + 0.62, sz);
+        f.rotation.z = sx * 0.42;                    // cants out over the tyre
+      }
+    }
+  }
+  if (arm >= 5) {
+    // rear bar with towing eyes, and a brake strip across the tail
+    add(new THREE.BoxGeometry(2.4, 0.22, 0.2), steel, 0, baseY + 0.3, -2.3);
+    for (const sx of [-0.75, 0.75]) {
+      add(new THREE.TorusGeometry(0.14, 0.05, 6, 10), gold, sx, baseY + 0.3, -2.42);
+    }
+    add(new THREE.BoxGeometry(1.5, 0.1, 0.06), brake, 0, capTop - 0.34, -1.62);
   }
   // CANNON — a barrel over the nose, then a second one
   const can = lv('cannon');
@@ -806,6 +863,29 @@ export function applyUpgradeKit(group, up = {}) {
       add(new THREE.SphereGeometry(0.13, 8, 6), hot, 0, capTop - 0.35, -1.95);
     }
   }
+  // SIDE PIPES down the flanks, capped with a glowing mouth that points back
+  // at the camera. The bottle behind the cabin was the only nitro tell and it
+  // sits where the roofline hides it from directly astern.
+  if (nit >= 3) {
+    // OUTBOARD OF THE ARMOUR FLARES, not under them. At 1.36 the pipe sits
+    // exactly where a level-3 flare cants out over the tyre and the whole run
+    // disappears; 1.52 puts it proud of the widest bodywork on the car, which
+    // is the only place a side pipe is worth drawing.
+    for (const sx of [-1, 1]) {
+      add(new THREE.CylinderGeometry(0.14, 0.16, 2.3, 8), steel,
+        sx * 1.52, baseY + 0.46, -0.35, Math.PI / 2);
+      add(new THREE.ConeGeometry(0.23, 0.6, 8), ember,
+        sx * 1.52, baseY + 0.46, -1.72, -Math.PI / 2);
+    }
+  }
+  if (nit >= 5) {
+    // twin afterburner cones under the tail — unlit material, so they stay
+    // this colour in a tunnel and at dusk
+    for (const sx of [-0.5, 0.5]) {
+      add(new THREE.ConeGeometry(0.24, 0.8, 10), ember,
+        sx, baseY + 0.24, -2.5, -Math.PI / 2);
+    }
+  }
   // DAMPERS — visible coilovers at each corner
   if (lv('dampers') >= 2) {
     for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
@@ -813,11 +893,72 @@ export function applyUpgradeKit(group, up = {}) {
         sx * 1.15, wheelY + 0.45, sz * 1.5);
     }
   }
+  // HANDLING — had NO bodywork at all, on a five-level line. A rear diffuser
+  // and a set of canards, because a suspension upgrade you cannot see is one
+  // the player has no reason to believe in. The diffuser sits dead centre of
+  // the chase camera's view of the tail.
+  const han = lv('handling');
+  if (han >= 2) {
+    const diff = add(new THREE.BoxGeometry(2.0, 0.16, 0.8), carbon,
+      0, baseY - 0.02, -2.05);
+    diff.rotation.x = 0.28;
+    for (const sx of [-0.62, 0, 0.62]) {             // strakes, readable head-on
+      add(new THREE.BoxGeometry(0.08, 0.3, 0.8), carbon, sx, baseY + 0.06, -2.05);
+    }
+  }
+  if (han >= 4) {
+    for (const sx of [-1, 1]) {                      // dive planes on the nose corners
+      const c = add(new THREE.BoxGeometry(0.62, 0.06, 0.3), carbon,
+        sx * 1.14, baseY + 0.5, 1.95);
+      c.rotation.z = sx * 0.22;
+    }
+    // ...and a splitter lip, which is what you see of a low car from behind
+    // when it lifts over a crest
+    add(new THREE.BoxGeometry(2.5, 0.07, 0.5), carbon, 0, baseY - 0.06, 2.3);
+  }
+  // RECOVERY BEACON — an amber bar on the roof. Three levels, three lamps, and
+  // it is the one upgrade that is legible from every angle including directly
+  // behind, which is the point of a beacon.
+  const bea = lv('beacon');
+  if (bea >= 1) {
+    add(new THREE.BoxGeometry(1.1, 0.1, 0.26), dark, 0, capTop + 0.14, -0.95);
+    for (let i = 0; i < Math.min(3, bea); i++) {
+      add(new THREE.BoxGeometry(0.26, 0.14, 0.22), amber,
+        (i - (Math.min(3, bea) - 1) / 2) * 0.38, capTop + 0.25, -0.95);
+    }
+  }
+  // MAGAZINE — a belt feed running the flank between the boxes and the gun,
+  // so the ammo upgrade reads as a system rather than two crates.
+  if (lv('magazine') >= 3) {
+    for (const sx of [-1, 1]) {
+      add(new THREE.BoxGeometry(0.16, 0.16, 1.6), gold, sx * 1.32, baseY + 0.62, 0.4);
+    }
+  }
   // TIRES — fatter rubber. Scaling the EXISTING wheels rather than adding new
   // ones keeps the spin and steer bindings in userData intact.
   const tir = lv('tires');
   const wf = tir >= 4 ? 1.34 : tir >= 2 ? 1.16 : 1;
   for (const w of group.userData.wheels ?? []) w.scale.set(wf, 1, wf);
+  // MUD FLAPS behind the rear wheels — a rally tell, and the last thing in
+  // shot when the car is throwing a rooster tail at the camera.
+  if (tir >= 3) {
+    for (const sx of [-1, 1]) {
+      add(new THREE.BoxGeometry(0.5, 0.55, 0.06), dark, sx * 1.24, wheelY + 0.02, -2.02);
+    }
+  }
+  // DAMPERS at the top of the line get a spare strapped to the tail — the
+  // silhouette of a car built to land on things.
+  if (lv('dampers') >= 4) {
+    // OFF TO ONE SIDE, the way a rally car carries it — and for a reason the
+    // render made obvious: dead centre on the tail it is the biggest thing in
+    // the chase camera and it buries the diffuser, the brake strip and the
+    // afterburners behind it. Everything back there has to share the frame.
+    const spare = add(new THREE.CylinderGeometry(0.46, 0.46, 0.26, 14), dark,
+      -0.86, baseY + 0.78, -2.26);
+    spare.rotation.z = Math.PI / 2;
+    spare.rotation.y = Math.PI / 2;
+    add(new THREE.TorusGeometry(0.22, 0.055, 6, 14), steel, -0.86, baseY + 0.78, -2.39);
+  }
   group.add(kit);
   return kit;
 }
