@@ -290,10 +290,27 @@ const SURFACE_BY_THEME = {
   // sealed: tarmac passes, corniches, town streets, the Mediterranean coast
   canyon: SEALED, volcano: SEALED, alpine: SEALED, pass: SEALED,
   tremola: SEALED, dolomiti: SEALED, neon: SEALED, undercity: SEALED,
-  oldtown: SEALED, monteCarlo: SEALED, medterrace: SEALED, vineyard: SEALED,
+  oldtown: SEALED, monteCarlo: SEALED,
   harbor: SEALED, liguria: SEALED, aegean: SEALED, brava: SEALED,
-  dalmatia: SEALED, azur: SEALED, olivecountry: SEALED, mountainsea: SEALED,
+  dalmatia: SEALED, azur: SEALED, mountainsea: SEALED,
   citadel: SEALED,
+  // ---- COUNTRY ROADS, NOT CIRCUITS ----
+  //
+  // Reported as "change tire level ideal on 60/60 makes no difference — needs
+  // better distribution". Measured, the roster was 40 SEALED / 16 LOOSE /
+  // 4 ICE, so owning GRAVEL already made you ideal on 56 of 60 and the tyre
+  // line had almost nothing left to sell.
+  //
+  // These three were labelled SEALED against their own flavour text — the
+  // card for `medterrace` has always read "stone walls · GRAVEL ON THE EXITS"
+  // — and they are farm and olive-grove lanes, not tarmac. Reclassifying them
+  // is honest rather than a thumb on the scale, and it does NOT create the
+  // r172 FURKA contradiction: LOOSE implies nothing about the physics
+  // surface, and plenty of LOOSE worlds are bone dry (desert, dunes, outback).
+  // The GRAND CIRCUITS override in surfaceClass keeps MONZA and TOUR DE CORSE
+  // sealed, which is right — they are real circuits that happen to sit on
+  // these themes.
+  medterrace: LOOSE, vineyard: LOOSE, olivecountry: LOOSE,
   // loose: rally stages, dirt, sand, forest track, farm lane
   forest: LOOSE, desert: LOOSE, dunes: LOOSE, oasis: LOOSE, redwood: LOOSE,
   flume: LOOSE, wildfire: LOOSE, jungle: LOOSE, savanna: LOOSE,
@@ -16990,6 +17007,19 @@ export class Track {
     for (const off of [-7, 0, 7]) {
       const cx = p.x + this.tan[i].x * off;
       const cz = p.z + this.tan[i].z * off;
+      // ...AND NOT ONE OF THEM STANDS IN A CARRIAGEWAY. `p` is 26 u off the
+      // centreline, which is correct in isolation and wrong on a switchback:
+      // reported as "CANYON RUN is not playable, too many bugs on the road",
+      // where 26 u sideways from the start line lands squarely on ANOTHER LEG
+      // of the same lap. The census found all three colliders biting the
+      // middle of the road — a 2.5 u steel post you cannot see, because the
+      // stand you can see is over on the hillside where it belongs.
+      //
+      // Same family as the r154 deck rails ("a rail that would stand in
+      // another stretch's lane is not built") and the r167 culvert parapets.
+      // `_clearsRoad` is the rule those use and it tests the WHOLE centreline,
+      // which is exactly what a placement anchored to one station cannot do.
+      if (!this._clearsRoad(cx, cz, 2.5, 1.0)) continue;
       // Each collider takes the ground under ITSELF — the stand is 20 u wide
       // and the hillside under it is not level.
       this.solids.push({ x: cx, z: cz, r: 2.5, y: this.terrainHeight(cx, cz), mat: 'metal' });

@@ -1065,7 +1065,7 @@ export class Car {
     // two-class mismatch costs ~17 % on a dry stage and puts you on skates in
     // a blizzard. Reported as "if I don't have the tires it should be super
     // hard to drive" — and it should be hard THERE, not everywhere.
-    const f = tyrePenalty(this._tyreOver, this._tyreUnder, slick);
+    const f = tyrePenalty(this._tyreOver, this._tyreUnder, slick, this._tyreLevel ?? 0);
     if (f < 1) { sGrip *= f; sTract *= f; sBrake *= f; }
     // Published for the HUD warning and the bog-down rule below.
     this._slick = slick;
@@ -3578,16 +3578,34 @@ const GOLD = 0xe8b83a;
  *  surface cares what compound is on the car. Defaults to 0.35 so the pure
  *  function keeps its old mid-range answer for the menus, which quote a single
  *  headline number before a world is even loaded. */
-export const tyrePenalty = (over, under = 0, slick = 0.35) => {
+export const tyrePenalty = (over, under = 0, slick = 0.35, quality = 0) => {
   const s = Math.min(1, Math.max(0, slick));
+  // TYRE LEVEL IS QUALITY, NOT JUST RANGE.
+  //
+  // Reported as "change tire level ideal on 60/60 makes no difference — needs
+  // better distribution". Measured: of 60 worlds 40 are SEALED, 16 LOOSE and
+  // only 4 ICE, so a car that owns GRAVEL is already ideal on 56 and the
+  // CLASS half of the line is worth four worlds, all of it at level 1. Levels
+  // 2-5 bought nothing but a grip trickle.
+  //
+  // The roster cannot simply be re-labelled to fix that: a world's tyre demand
+  // has to match its PHYSICS, or you recreate the r172 FURKA bug where a dry
+  // summer pass demanded snow tyres. Only four worlds are actually snowy.
+  //
+  // So the levels buy something else real: a better set copes better with the
+  // wrong surface. Each level takes 12 % off whatever the mismatch costs, so a
+  // maxed set on the wrong compound loses 40 % of what a stock set loses. That
+  // is a reason to keep buying after level 1, and it does nothing at all to a
+  // correctly-shod car — the mismatch is zero there, and 12 % of zero is zero.
+  const q = 1 - 0.12 * Math.min(5, Math.max(0, quality | 0));
   // Under-spec was a flat 0.17/class capped at 0.34 — the same price for road
   // rubber on a dry gravel stage as on sheet ice. It now runs 0.11/class on a
   // dry road up to 0.36/class on ice, capped at 0.72 so a two-class mismatch
   // in a blizzard leaves 28 % of the grip: still steerable at a crawl, hopeless
   // at racing pace, which is the shape the complaint asked for.
   const perClass = 0.11 + 0.25 * s;
-  return (1 - Math.min(0.20, 0.09 * Math.max(0, over | 0)))
-    * (1 - Math.min(0.72, perClass * Math.max(0, under | 0)));
+  return (1 - Math.min(0.20, 0.09 * Math.max(0, over | 0)) * q)
+    * (1 - Math.min(0.72, perClass * Math.max(0, under | 0)) * q);
 };
 
 export const TYRE_ROAD = 0, TYRE_GRAVEL = 1, TYRE_SNOW = 2;
