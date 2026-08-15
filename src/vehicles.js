@@ -708,7 +708,21 @@ export function buildVoxelRacer(spec) {
   g.userData.baseBodyColor = new THREE.Color(body);
   // dimensions the upgrade kit bolts onto, so it never has to guess at a
   // roofline or a wheelbase that differs per body style
-  g.userData.rig = { wheelR, wheelY, baseY, capTop };
+  // THE RIG CARRIES LENGTH NOW, NOT JUST HEIGHT.
+  //
+  // `capTop` was published so the kit could sit at each car's own roof height,
+  // and that worked — but every LONGITUDINAL offset in the kit stayed a
+  // constant, tuned against the BRAWLER. Measured across the roster the cars
+  // run 5.6 u (SLEEK) to 6.4 u (BASTION) nose to tail, so a wing pinned at
+  // z -1.78 sits 1.0 u inboard of one tail and 1.4 u inboard of another, and a
+  // gun muzzle at z 2.82 clears the SLEEK's nose by 0.02 u while sitting
+  // 0.38 u INSIDE the BASTION's. Same part, eight different fits.
+  //
+  // Measured off the finished object rather than declared, so a car whose
+  // bodywork changes cannot leave the number behind.
+  const _box = new THREE.Box3().setFromObject(g);
+  g.userData.rig = { wheelR, wheelY, baseY, capTop,
+    zRear: _box.min.z, zFront: _box.max.z, halfW: _box.max.x };
   return g;
 }
 
@@ -730,6 +744,17 @@ export function applyUpgradeKit(group, up = {}) {
   const lv = (k) => (up?.[k] | 0);
   if (!group.userData.rig) return null;
   const { wheelY, baseY, capTop } = group.userData.rig;
+  // ANCHOR EVERY LENGTHWAYS PART TO AN END OF THE CAR, not to a number.
+  // `T(o)` is `o` units forward of the TAIL, `Nz(o)` is `o` back from the NOSE.
+  // The reference offsets below are the old constants re-expressed against the
+  // BRAWLER they were tuned on (tail -3.0, nose +3.0), so the car that always
+  // fitted is unchanged and the other seven now fit the same way.
+  // Falls back to the BRAWLER's extents for any mesh built before the rig
+  // carried them.
+  const tail = group.userData.rig.zRear ?? -3.0;
+  const nose = group.userData.rig.zFront ?? 3.0;
+  const T = (o) => tail + o;
+  const Nz = (o) => nose - o;
   const kit = new THREE.Group();
   kit.name = 'upgradeKit';
   const M = (color, opts = {}) => new THREE.MeshStandardMaterial({
@@ -759,14 +784,14 @@ export function applyUpgradeKit(group, up = {}) {
   // ENGINE — a hood scoop, then a second one and a pair of stacks out the back
   const eng = lv('engine');
   if (eng >= 2) {
-    add(new THREE.BoxGeometry(0.9, 0.26, 1.1), dark, 0, capTop - 0.55, 1.15);
+    add(new THREE.BoxGeometry(0.9, 0.26, 1.1), dark, 0, capTop - 0.55, Nz(1.85));
     if (eng >= 4) {
-      add(new THREE.BoxGeometry(1.5, 0.2, 0.7), dark, 0, capTop - 0.42, 0.65);
+      add(new THREE.BoxGeometry(1.5, 0.2, 0.7), dark, 0, capTop - 0.42, Nz(2.35));
       for (const sx of [-0.55, 0.55]) {
         add(new THREE.CylinderGeometry(0.14, 0.17, 0.9, 8), steel,
-          sx, baseY + 0.1, -2.15, Math.PI / 2);
+          sx, baseY + 0.1, T(0.85), Math.PI / 2);
         add(new THREE.CylinderGeometry(0.1, 0.1, 0.1, 8), ember,
-          sx, baseY + 0.1, -2.58, Math.PI / 2);      // lit pipe mouths
+          sx, baseY + 0.1, T(0.42), Math.PI / 2);      // lit pipe mouths
       }
     }
   }
@@ -779,18 +804,18 @@ export function applyUpgradeKit(group, up = {}) {
     const span = wide ? 2.9 : 2.4;
     for (const sx of [-1, 1]) {
       add(new THREE.BoxGeometry(0.12, 0.62, 0.34), carbon,
-        sx * (span * 0.36), capTop + 0.28, -1.72);
+        sx * (span * 0.36), capTop + 0.28, T(1.28));
     }
     const plane = add(new THREE.BoxGeometry(span, 0.09, 0.62), carbon,
-      0, capTop + 0.6, -1.78);
+      0, capTop + 0.6, T(1.22));
     plane.rotation.x = -0.16;                        // angle of attack, visible in profile
     if (wide) {
       const flap = add(new THREE.BoxGeometry(span, 0.07, 0.34), gold,
-        0, capTop + 0.78, -1.98);
+        0, capTop + 0.78, T(1.02));
       flap.rotation.x = -0.3;
       for (const sx of [-1, 1]) {                    // endplates
         add(new THREE.BoxGeometry(0.07, 0.42, 0.9), gold,
-          sx * (span * 0.5), capTop + 0.66, -1.84);
+          sx * (span * 0.5), capTop + 0.66, T(1.16));
       }
     }
   }
@@ -800,7 +825,7 @@ export function applyUpgradeKit(group, up = {}) {
     for (const sx of [-1, 1]) {
       add(new THREE.BoxGeometry(0.16, 0.42, 2.6), steel, sx * 1.32, baseY + 0.05, 0);
     }
-    add(new THREE.BoxGeometry(2.5, 0.3, 0.22), steel, 0, baseY + 0.16, 2.35);
+    add(new THREE.BoxGeometry(2.5, 0.3, 0.22), steel, 0, baseY + 0.16, Nz(0.65));
     if (arm >= 4) {
       add(new THREE.BoxGeometry(2.1, 0.14, 1.7), steel, 0, capTop + 0.09, -0.1);
       for (const sx of [-1, 1]) {
@@ -823,11 +848,11 @@ export function applyUpgradeKit(group, up = {}) {
   }
   if (arm >= 5) {
     // rear bar with towing eyes, and a brake strip across the tail
-    add(new THREE.BoxGeometry(2.4, 0.22, 0.2), steel, 0, baseY + 0.3, -2.3);
+    add(new THREE.BoxGeometry(2.4, 0.22, 0.2), steel, 0, baseY + 0.3, T(0.7));
     for (const sx of [-0.75, 0.75]) {
-      add(new THREE.TorusGeometry(0.14, 0.05, 6, 10), gold, sx, baseY + 0.3, -2.42);
+      add(new THREE.TorusGeometry(0.14, 0.05, 6, 10), gold, sx, baseY + 0.3, T(0.58));
     }
-    add(new THREE.BoxGeometry(1.5, 0.1, 0.06), brake, 0, capTop - 0.34, -1.62);
+    add(new THREE.BoxGeometry(1.5, 0.1, 0.06), brake, 0, capTop - 0.34, T(1.38));
   }
   // CANNON — ON THE ROOF, not over the nose.
   //
@@ -851,8 +876,8 @@ export function applyUpgradeKit(group, up = {}) {
     // pintle down onto the roof, so it reads as MOUNTED rather than floating
     add(new THREE.BoxGeometry(0.26, 0.4, 0.26), steel, 0, gunY - 0.34, 0.78);
     const barrel = (x) => {
-      add(new THREE.CylinderGeometry(0.11, 0.13, 1.9, 8), steel, x, gunY, 1.95, Math.PI / 2);
-      add(new THREE.CylinderGeometry(0.16, 0.16, 0.3, 8), dark, x, gunY, 2.82, Math.PI / 2);
+      add(new THREE.CylinderGeometry(0.11, 0.13, 1.9, 8), steel, x, gunY, Nz(1.05), Math.PI / 2);
+      add(new THREE.CylinderGeometry(0.16, 0.16, 0.3, 8), dark, x, gunY, Nz(0.18), Math.PI / 2);
     };
     if (can >= 4) { barrel(-0.34); barrel(0.34); } else barrel(0);
     // SPONSONS on the flanks at the top of the line — the same gun read from
@@ -861,7 +886,7 @@ export function applyUpgradeKit(group, up = {}) {
       for (const sx of [-1, 1]) {
         add(new THREE.BoxGeometry(0.3, 0.3, 0.7), dark, sx * 1.3, baseY + 0.95, 0.5);
         add(new THREE.CylinderGeometry(0.09, 0.1, 1.3, 8), steel,
-          sx * 1.3, baseY + 0.95, 1.4, Math.PI / 2);
+          sx * 1.3, baseY + 0.95, Nz(1.6), Math.PI / 2);
       }
     }
   }
@@ -888,7 +913,7 @@ export function applyUpgradeKit(group, up = {}) {
     if (nit >= 4) {
       add(new THREE.CylinderGeometry(0.22, 0.22, 1.5, 10), M(0x2f6fd8),
         -0.55, capTop - 0.35, -1.15, Math.PI / 2);
-      add(new THREE.SphereGeometry(0.13, 8, 6), hot, 0, capTop - 0.35, -1.95);
+      add(new THREE.SphereGeometry(0.13, 8, 6), hot, 0, capTop - 0.35, T(1.05));
     }
   }
   // SIDE PIPES down the flanks, capped with a glowing mouth that points back
@@ -903,7 +928,7 @@ export function applyUpgradeKit(group, up = {}) {
       add(new THREE.CylinderGeometry(0.14, 0.16, 2.3, 8), steel,
         sx * 1.52, baseY + 0.46, -0.35, Math.PI / 2);
       add(new THREE.ConeGeometry(0.23, 0.6, 8), ember,
-        sx * 1.52, baseY + 0.46, -1.72, -Math.PI / 2);
+        sx * 1.52, baseY + 0.46, T(1.28), -Math.PI / 2);
     }
   }
   if (nit >= 5) {
@@ -911,7 +936,7 @@ export function applyUpgradeKit(group, up = {}) {
     // this colour in a tunnel and at dusk
     for (const sx of [-0.5, 0.5]) {
       add(new THREE.ConeGeometry(0.24, 0.8, 10), ember,
-        sx, baseY + 0.24, -2.5, -Math.PI / 2);
+        sx, baseY + 0.24, T(0.5), -Math.PI / 2);
     }
   }
   // DAMPERS — visible coilovers at each corner
@@ -928,21 +953,21 @@ export function applyUpgradeKit(group, up = {}) {
   const han = lv('handling');
   if (han >= 2) {
     const diff = add(new THREE.BoxGeometry(2.0, 0.16, 0.8), carbon,
-      0, baseY - 0.02, -2.05);
+      0, baseY - 0.02, T(0.95));
     diff.rotation.x = 0.28;
     for (const sx of [-0.62, 0, 0.62]) {             // strakes, readable head-on
-      add(new THREE.BoxGeometry(0.08, 0.3, 0.8), carbon, sx, baseY + 0.06, -2.05);
+      add(new THREE.BoxGeometry(0.08, 0.3, 0.8), carbon, sx, baseY + 0.06, T(0.95));
     }
   }
   if (han >= 4) {
     for (const sx of [-1, 1]) {                      // dive planes on the nose corners
       const c = add(new THREE.BoxGeometry(0.62, 0.06, 0.3), carbon,
-        sx * 1.14, baseY + 0.5, 1.95);
+        sx * 1.14, baseY + 0.5, Nz(1.05));
       c.rotation.z = sx * 0.22;
     }
     // ...and a splitter lip, which is what you see of a low car from behind
     // when it lifts over a crest
-    add(new THREE.BoxGeometry(2.5, 0.07, 0.5), carbon, 0, baseY - 0.06, 2.3);
+    add(new THREE.BoxGeometry(2.5, 0.07, 0.5), carbon, 0, baseY - 0.06, Nz(0.7));
   }
   // RECOVERY BEACON — an amber bar on the roof. Three levels, three lamps, and
   // it is the one upgrade that is legible from every angle including directly
@@ -971,7 +996,7 @@ export function applyUpgradeKit(group, up = {}) {
   // shot when the car is throwing a rooster tail at the camera.
   if (tir >= 3) {
     for (const sx of [-1, 1]) {
-      add(new THREE.BoxGeometry(0.5, 0.55, 0.06), dark, sx * 1.24, wheelY + 0.02, -2.02);
+      add(new THREE.BoxGeometry(0.5, 0.55, 0.06), dark, sx * 1.24, wheelY + 0.02, T(0.98));
     }
   }
   // DAMPERS at the top of the line get a spare strapped to the tail — the
@@ -982,10 +1007,10 @@ export function applyUpgradeKit(group, up = {}) {
     // the chase camera and it buries the diffuser, the brake strip and the
     // afterburners behind it. Everything back there has to share the frame.
     const spare = add(new THREE.CylinderGeometry(0.46, 0.46, 0.26, 14), dark,
-      -0.86, baseY + 0.78, -2.26);
+      -0.86, baseY + 0.78, T(0.74));
     spare.rotation.z = Math.PI / 2;
     spare.rotation.y = Math.PI / 2;
-    add(new THREE.TorusGeometry(0.22, 0.055, 6, 14), steel, -0.86, baseY + 0.78, -2.39);
+    add(new THREE.TorusGeometry(0.22, 0.055, 6, 14), steel, -0.86, baseY + 0.78, T(0.61));
   }
   group.add(kit);
   return kit;
