@@ -208,6 +208,20 @@ export const LEVELS = [
   // straight rather than the 60-90 CLIFF KNOT keeps — because the drawing
   // writes "sharp cliff NEXT TO the sea", and a corniche you cannot see the
   // water from is just a road. Whales breach out past it.
+  // OLIVE PASS: the olive country asked for again, but pointed AT the massif
+  // instead of across the terraces — the road leaves the groves and climbs
+  // into the mountains, and where the ridge is in the way it goes through it.
+  //
+  // Theme and route are independent (SEA CLIFF RUN and MOUNTAIN TO SEA share a
+  // theme and run different routes), so this keeps OLIVE CROSSING's exact
+  // dressing — `olivecountry`, its palette, its groves and terraces — and
+  // borrows the pass route that climbs. Three bores rather than the roster's
+  // usual one, because "with tunnels" is the whole request; `tunnelFitAt`
+  // still refuses any station that is too curved, too near a gorge, too near
+  // the start gate or (since r190) sitting on a crest, so asking for three is
+  // asking for AT MOST three — the planner places what the mountain allows.
+  { id: 61, name: 'OLIVE PASS', theme: 'olivecountry', region: 'MEDITERRANEAN',
+    cost: 33, fresh: true, route: 'turini', tune: { tunnels: { count: 3 } } },
   { id: 60, name: 'SEA CLIFF RUN', theme: 'mountainsea', region: 'MEDITERRANEAN',
     cost: 32, fresh: true, route: 'seaCliffRun',
     tune: {
