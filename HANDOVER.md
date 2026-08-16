@@ -157,19 +157,49 @@ the guard exists for.
 
 ## THE THREE THINGS THAT MATTER NEXT, IN ORDER
 
-### 1. SEA CLIFF RUN (level 60) — 80 u of road stacked on road, STILL OPEN
-Untouched, and only its SYMPTOMS were cleared this session. Measured:
-- samples **530-566 run directly over 655-682**
-- centreline gap falls to **1.91 u**; under 18 u for ~80 u of lap
-- vertical separation only 1.48-6.35 u
-- both legs are on the racing line (~60% and ~74% of the lap)
+### 1. ROAD STACKED ON ROAD — STILL OPEN, and it is TWO worlds, not one
+`tools-scratch/stacked.mjs` is the measurement that was missing. `_checkLayout`
+asks a version of this question and cannot answer it: it keeps the SINGLE
+global minimum self-approach and IGNORES Y, so on a world with a legitimate
+flyover the flyover IS the minimum and every other overlap hides behind it.
 
-`_planOverpasses` only fires on a true XZ segment INTERSECTION; this is a
-near-parallel pass, so no crossing is registered and the two carriageways
-interpenetrate. `_checkLayout` prints only the single global minimum, which
-here is the legitimate overpass elsewhere on the lap. FIX SHAPE: register
-near-miss pairs as crossings. Measure all eight overpass worlds with
-`tools-scratch/gaps.mjs` before and after.
+Two carriageways need 18 u between centrelines not to overlap. Below that only
+the vertical gap decides what the player meets — over ~6 u is a flyover, under
+it the roadways interpenetrate. Measured, and IDENTICAL on pristine
+`origin/main`, so both are pre-existing:
+
+    SEA CLIFF RUN     538-566  <-> 658-685   ~60 u of lap
+                      1.91 u apart, 1.08-2.36 u vertically
+    MOUNTAIN TO SEA   135-154  <-> 356-371   ~48 u of lap
+                      1.35 u apart, 0.05 u vertically
+    MOUNTAIN TO SEA   418-434  <-> 631-647   ~41 u of lap
+                      5.18 u apart, 0.01 u vertically
+
+**MOUNTAIN TO SEA was never in any handover** and is level with the tarmac to
+within 5 cm across two separate stretches. Every one of its clashes sits inside
+a REGISTERED overpass whose crossing clearance is healthy (`gaps.mjs`: 10.48 to
+15.04 u, none under 6) — so the deck rises correctly at the intersection and the
+legs come back together at the ramp ends, still inside a road width of each
+other. That is the shape of the bug.
+
+CAUSE: `_planOverpasses` fires on a true XZ segment INTERSECTION and sizes its
+ramp span around that point. A near-parallel pass either registers no crossing
+at all (SEA CLIFF RUN, 7% covered) or registers one whose ramps end while the
+overlap continues (MOUNTAIN TO SEA, 100% covered).
+
+FIX SHAPE: the clearance requirement has to cover the whole stretch where the
+legs are within a road width, not just the intersection point. **Do not start
+this at the end of a session.** It is the area r197 changed, two documented
+dead ends are already recorded in this file, and the acceptance test is
+`gaps.mjs` on all eight overpass worlds plus `stacked.mjs` before and after.
+
+WHEN YOU RUN `stacked.mjs`, KNOW WHAT ITS FIRST VERSION GOT WRONG: it marked a
+sample "close in XZ", grouped contiguous samples into runs, and reported each
+run's smallest gap and smallest dy — which came from DIFFERENT sub-stretches. It
+read "MOUNTAIN TO SEA: 141 u of lap 0.6 u apart and 0.05 u vertically" when the
+0.6 u belonged to a stretch with 11 u of clearance over it. A clash is ONE
+sample that is close in XZ **and** level in Y; the run must also break when the
+partner index jumps, or two encounters merge into one fictitious monster.
 
 ### 2. Finish the census backlog — it is now a short list
 Everything above 6 u is cleared. What is left:

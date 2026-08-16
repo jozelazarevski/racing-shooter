@@ -27,6 +27,15 @@ real time to get right and the next session should not rebuild them.
                 rails, their tyre-stack markers, stone-bridge arch faces and
                 parapets — so "the pier is gone" can be told from "the bridge
                 is gone".
+- `stacked.mjs` where a lap runs over ITSELF and whether there is a bridge
+                there. `_checkLayout` keeps only the global minimum
+                self-approach and ignores Y, so one legitimate flyover hides
+                every other overlap on the world. This tests both per sample —
+                under 18 u apart in XZ AND under 6 u vertically — and groups
+                runs, breaking them when the partner index jumps. Both of those
+                were learned the hard way: the first cut reported "141 u of lap
+                0.6 u apart and 0.05 u vertically" on MOUNTAIN TO SEA, with the
+                two numbers coming from stretches 30 u apart.
 - `ab.mjs`      before/after across two builds on two ports: clearance, grade,
                 and nearestIndex correctness together.
 - `piers.mjs`   finds pier-shaped meshes standing in a road.
