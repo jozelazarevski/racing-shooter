@@ -64,10 +64,25 @@ removed** — do not remove them without reading why:
 
 ## SCORE, PRISTINE origin/main vs THIS BRANCH, SAME TOOL
 
-                      before    after
-    blockers              60       48
-    intruders            196       see census-final.txt
-    trees in a lane       23        0
+Both runs are the same tool: pristine `origin/main` served on 8930, this branch
+on 8920.
+
+                          before   after
+    worlds dirty           36/61   33/61
+    blockers                  60      48
+    intruders                196      47
+      with no collider       179      29
+    trees in a lane           23       0
+    bare holes                 0       0
+
+Deepest thing left in any carriageway is 6.28 u and it is a rock; everything
+above that is cleared. FLOATERS went 116 -> 152 and that is NOT a regression —
+see COORDINATION r199c/d: every one of the extra is a TUNNEL WALL COLLIDER on
+the three worlds that gained a bore, the same blind spot the BLOCKERS measure
+already documents for tunnels.
+
+Suites on this build: test-carriageway 49/49, test-invisible-walls 13/13,
+test-tunnels 26/26, test-obstacles 46/46.
 
 **THE ONE DEFECT THIS SESSION KEPT FINDING**, in nine builders now — props,
 tire stacks, road cabins, quay guns, arch faces, deck rails, cacti, hoardings,
