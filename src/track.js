@@ -5120,9 +5120,32 @@ export class Track {
     if (this._jumpCut) roadY -= this._jumpCut[i];
     for (const r of this.ramps) {
       const di = (i - r.index + N) % N;
-      if (di < r.len && Math.abs(lateral - r.lateral) < r.halfW) {
-        return roadY + r.height * (di / r.len);
-      }
+      if (di >= r.len) continue;
+      const off = Math.abs(lateral - r.lateral);
+      if (off >= r.halfW) continue;
+      // A RAMP IS A WEDGE ALONG THE ROAD AND WAS A CLIFF ACROSS IT.
+      //
+      // Lengthwise this eases in properly: `di / r.len` is 0 at the foot.
+      // Sideways it did not. One frame you were beside the ramp at road
+      // height, the next you were inside its band at full ramp height, with
+      // nothing in between — a step of up to the ramp's whole height, taken
+      // in 16 ms. The jump detector in vehicles.js differentiates ground
+      // height TWICE, so a step like that is indistinguishable from a launch
+      // lip, and it is worst exactly where a player drifts wide, because the
+      // band edge is what they cross.
+      //
+      // Taper the outer 1.5 u of the band. Driving onto a ramp from the side
+      // becomes a ramp instead of a step; driving up the middle of one is
+      // arithmetically unchanged (edge clamps to 1), which is what the jumps
+      // are tuned on — verified by tracing a launch before and after: same
+      // take-off, vy 8.9 either way.
+      //
+      // NOTE this is NOT the fix for the reported "I jump straight up": that
+      // trace showed an ordinary ramp launch, and the report is still
+      // unreproduced. This is a real discontinuity found while looking, and
+      // worth removing on its own account.
+      const edge = Math.min(1, (r.halfW - off) / 1.5);
+      return roadY + r.height * (di / r.len) * edge;
     }
     return roadY;
   }
