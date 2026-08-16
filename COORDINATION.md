@@ -1623,6 +1623,175 @@ BRIDGE RUN, SEA CLIFF RUN and OLIVE CROSSING are byte-identical. CLIFF KNOT
 test-index-recovery 10/10 — the guard that matters here, since every gap moved.
 
 
+## r199 — the census learns to see, and "posts in the carriageway" turns out not to exist
+
+### THE POSTS WERE NEVER THERE. `fence.mjs` HAD A NaN HOLE.
+
+HANDOVER.md item 1 asked for ~15 trackside posts to be cleared out of rural
+carriageways — "PINE VALLEY 3, HEDGEROW DASH 12, worst bite 9.5 u into a 9 u
+half-width, i.e. dead centre of the road", builder unidentified, computed
+dimensions, a literal grep will not find it.
+
+There is no such builder. The numbers came from `scratchpad/fence.mjs`, whose
+post filter was
+
+    if (!q || Math.abs(q.width - 0.18) > 0.005 || Math.abs(q.height - 1.05) > 0.005) return;
+
+A geometry with no `width`/`height` parameters — a Sphere, a Cone, a Cylinder,
+a Circle — gives `Math.abs(undefined - 0.18)` = NaN, and **`NaN > 0.005` is
+false**, so every one of them PASSED the post filter. The tool was not counting
+posts. It was counting everything that was not a Box.
+
+Measured on r198, the same worlds, loose filter vs a filter that first checks
+the value EXISTS:
+
+| World | fence.mjs "posts" | "on the road" | real 0.18x1.05 boxes | on the road |
+|---|---|---|---|---|
+| PINE VALLEY | 63 | **3** | 15 | **0** |
+| HEDGEROW DASH | 69 | **12** | 18 | **0** |
+| FROST PEAK | 116 | **43** | 10 | **0** |
+| REDWOOD RAMPAGE | 54 | **6** | 7 | **0** |
+
+The 3 and the 12 are the handover's own numbers, reproduced exactly — and 15
+and 18 are r195's own "+15 posts on PINE VALLEY, +18 on HEDGEROW DASH, and ZERO
+of them in a carriageway". `_buildJunctionFences` was right all along and r195
+said so.
+
+What the phantom 43 on FROST PEAK actually were, identified by walking the
+scene with real bounding boxes: the 9000 u world skirt, the sky dome, two haze
+bands, the road ribbon and its skirt, the start gantry's banner and its three
+traffic-light spheres, and the baked contact shadows. The "9.5 u bite into a
+9 u half-width, dead centre" is the START GANTRY — a banner over the start
+line, which is where a start gantry goes.
+
+`fence.mjs` is fixed (it now requires `BoxGeometry` and finite dimensions) and
+carries this story in its header. **A test for a value must first test that the
+value exists.** That is the fifth confident-wrong probe in two sessions.
+
+### THE CENSUS NOW WALKS THE SCENE GRAPH — WITH GATES THAT ARE COUNTED
+
+The blind spot was real even though this instance of it was not.
+`tool-road-census` read `track.solids`, i.e. COLLIDERS, and three defect
+classes have hidden in the gap between "has a collider" and "is drawn in the
+road" (barriers r191, bridge piers r193, and whatever r195's audit thought it
+had found). It now also walks `track.group.traverse` — every mesh and every
+INSTANCE of every InstancedMesh — as a BODIES section.
+
+Walking "every mesh" naively is useless: the first attempt reported the sky
+dome biting 8982 u into a 5.34 u half-width. What makes it usable:
+
+- **exact point-to-OBB distance in XZ**, not a bounding disc. A long thin wall
+  must measure by its nearest FACE — r191's "walls are segments, not dots",
+  one dimension further out. A culvert parapet 1 x 0.95 x 19.4 measures 7.73 u
+  of bite as a disc and clears the road as an OBB.
+- **the game's own height numbers**, not invented ones: 2.4 u is `hullHeight`
+  from vehicles.js (the car's roof), 1.2 u is the headroom line `deckOverhead`
+  already uses. Survivors are STANDING (below the headroom line) or GRAZING.
+- **four suppression classes, every one of them COUNTED and printed** —
+  `scenery` (footprint > 60 u), `surface` (a sheet, or a mesh the builder named
+  as roadway), `overhead` (underside clears the roof), `prop` (it belongs to
+  `track.props`). A filter that is not printed reads as "nothing there", which
+  is exactly how the piers survived two censuses.
+
+The `prop` class matters and is not a fudge: `_buildProps` stands crates, cones
+and barrels on the drivable surface ON PURPOSE — "the stuff you are MEANT to
+smash" — and its own comment records that this was asked for three times and
+that rocks and timber already take the trackside-only branch. Roster-wide that
+is 2038 bodies. Counting them as intrusions is what buries the real ones.
+
+Roster-wide on r198: 399 bodies in a carriageway across 61 worlds, against
+2038 intended props, 4168 road surfaces, 2515 overhead, 120 under the kerb and
+5472 scenery suppressed.
+
+### AND IT FOUND A REAL ONE ON ITS FIRST RUN: THE SPONSOR BOARDS
+
+`_buildBanners` placed each board at `pointAt(i, boardOff * side)` and built
+it. **No `_clearsRoad`, no `_distToTrack`, no check of any kind.** It is the
+defect `_buildProps` documents at length — "an offset is not a distance": the
+cabin on FURKA RIDGE's centreline, the 38 tyre stacks — and the one r191 fixed
+for the quay guns.
+
+Measured on r198, sponsor boards only:
+
+    68 of 419 boards stood inside a drivable width, on 15 of 61 worlds
+    worst   BRIDGE RUN       8.58 u into a 9 u half-width — 0.42 u off centre
+            MONACO STREETS   8.25 u  (0.75 u off centre)
+            MOUNTAIN TO SEA  7.87 u  (1.13 u off centre)
+
+On the cliff-walled worlds it was systematic rather than incidental:
+`WALL_OFF + 0.75` leaves EVERY board 6.65 u from the road against a 9 u
+half-width, so all nine of CANYON RUN's stood in the carriageway, and so did
+GLACIAL PASS's, GLACIER'S GRIND's, CORNICHE's, LAGUNA SECA's, ROCKFALL
+RAVINE's and UNDERCITY SLIPSTREAM's.
+
+The board now tries its designed spot, then steps out 3/6/9/12 u, then the same
+ladder on the other side of the road, and **a board with nowhere clear is not
+built** — r191's answer for the quay guns, for the same reason: one missing
+advertisement is invisible, one standing in the racing line is not. The whole
+9 u SPAN is measured, not the centre, or a board pivoted across the road reads
+as clear on its midpoint.
+
+    68 of 419 in the carriageway  ->  0 of 411
+    boards lost roster-wide: 8 of 419. The ladder RELOCATED the other 60.
+
+### MEASURING TRAP, cost an hour: `track.banners` IS TWO THINGS
+
+`_buildGuardFence` pushes its bays into `this.banners` with `kind: 'fence'`.
+The first pass over that array reported "199 of 558 boards in a carriageway,
+FURKA RIDGE 88 of 101" — but FURKA RIDGE has 10 sponsor boards and 91 fence
+bays, and **a guard rail belongs at the road edge; that is what it is for.**
+Filtering `kind === 'fence'` gives the real 68 of 419. FURKA RIDGE and DOLOMITI
+CORSA drop off the offender list entirely. A fix aimed at the first number
+would have moved guard rails away from the drops they exist to guard.
+
+### WHAT THE CENSUS FOUND AND THIS RELEASE DID NOT CLEAR
+
+Reported by builder signature so none of these needs a fresh hunt. Not
+investigated; the counts are roster-wide, the worst bite and its world named.
+
+- `Cylinder(0.34,0.66,5.4)` x14 + `Sphere(3.6)` x2 STANDING, **SUZUKA** —
+  brown boles and green crowns, i.e. TREES, worst 8.76 u into 9 u. The most
+  likely real defect left.
+- `Cylinder(0.18,0.22,10)` x14, **RED CENTRE RUN**, worst 5.11 u — the pylon
+  legs from ~7300. That call site DOES gate on `_clearsRoad(bx+ox, bz+oz, 0.6,
+  0.4)`; r 0.6 and margin 0.4 look too small for a 10 u pylon leg.
+- `Box(0.15,0.85,0.15)` x12 + `Box(0.18,0.22,0.18)` x11, **CLIFF KNOT**,
+  worst 7.91 u.
+- `Box(2.2,9,3.2)` x4, **SEA CLIFF RUN**, worst 5.87 u — probably a SYMPTOM of
+  handover item 2 (80 u of road stacked on road) rather than its own bug:
+  buildings placed beside one leg standing in the other.
+- `Cone(3.1,4.8)` x15 STANDING, **SUMMIT CLIMB**, worst 4.11 u — conifers whose
+  base is under the headroom line. The 104 GRAZING cones on PINE VALLEY are
+  canopy overhang at 2.39 u above the road and are almost certainly fine.
+- `Capsule(0.5,3.6)` + `Cone(0.85,1.4)`, **CANYON RUN**, worst 8.82 u.
+- `Dodecahedron` singletons on CINQUE TERRE, PIKES PEAK, OLIVE COAST, MOUNT
+  PANORAMA, REDWOOD RAMPAGE, worst 6.28 u.
+
+Anything at `sample 0` in that report is start-line furniture — the gantry and
+its traffic lights — and is not a defect.
+
+### NOT RE-INVESTIGATED, ON PURPOSE
+
+`Car.damage()`'s 0.62x player discount. The handover says do not go there and
+nothing here contradicts it.
+
+But the framing that road furniture IS the difficulty curve does not survive
+this pass, and the next session should not build on it: the one instance it
+named did not exist, and the objects that ARE in rural carriageways are the
+props `_buildProps` puts there deliberately, which its own comment records are
+"NOT blockers — a car drives straight through one and accelerates". The
+sponsor boards were real and are fixed, but 68 boards across 15 worlds is not
+an explanation for finishing 8th of 8 on every screenshot. **Handover item 3 —
+nobody has ever measured a competent human lap time — is still the thing
+blocking any difficulty conclusion, and it is now the first thing to do.**
+
+### VERIFIED
+
+test-carriageway ("the line is clear of everything"), test-invisible-walls
+13/0, plus the suites listed in the release commit. Baselined against pristine
+`origin/main` on a second port.
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

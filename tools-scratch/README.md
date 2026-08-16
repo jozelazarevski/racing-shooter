@@ -5,9 +5,18 @@ real time to get right and the next session should not rebuild them.
 
 - `gaps.mjs`    every overpass crossing's clearance + grade p90/max, per world.
                 The acceptance test for ANY change to `_planOverpasses`.
-- `fence.mjs`   walks the built scene graph and measures meshes against the
-                carriageway. The road census only sees `track.solids`; this is
-                the basis for extending it (see HANDOVER.md item 1).
+- `fence.mjs`   counts `_buildJunctionFences`' posts and checks none stands in
+                a carriageway. SUPERSEDED for general "what is in the road"
+                work by `tests/tool-road-census.mjs`, which walks the whole
+                scene graph as of r199. It had a NaN hole until r199 and
+                invented the phantom posts HANDOVER.md item 1 chased — its
+                header tells that story, and it is worth reading before
+                writing any other filter over `geometry.parameters`.
+- `banners.mjs` every sponsor board measured across its full 9 u span against
+                the carriageway, per world. The acceptance test for any change
+                to `_buildBanners`. Skips `kind: 'fence'`, because
+                `_buildGuardFence` pushes its bays into the SAME array and a
+                guard rail belongs at the road edge.
 - `ab.mjs`      before/after across two builds on two ports: clearance, grade,
                 and nearestIndex correctness together.
 - `piers.mjs`   finds pier-shaped meshes standing in a road.

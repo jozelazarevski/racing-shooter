@@ -17497,9 +17497,40 @@ export class Track {
     const boardOff = this.T.cliffWalls ? WALL_OFF + 0.75
       : (this.T.retainingWalls || this.T.guardFence || this.T.hedgeBanks)
         ? WALL_OFF + 6.4 : WALL_OFF + 3.6;
+    // A BOARD IS NINE UNITS WIDE, AND AN OFFSET IS NOT A DISTANCE.
+    //
+    // `boardOff` is measured along sample `i`'s own normal. Where the lap
+    // comes back on itself that offset says nothing about the distance to the
+    // NEAREST leg, so a board correctly placed beside its own carriageway can
+    // stand in the middle of another one. It is the defect `_buildProps`
+    // documents at length (the cabin on FURKA RIDGE's centreline, the 38 tyre
+    // stacks) and the one r191 fixed for the quay guns — and this builder had
+    // no distance check of any kind.
+    //
+    // Measured on r198 before this gate existed: 68 of 419 boards stood inside
+    // a drivable width across 15 of 61 worlds. Worst was BRIDGE RUN at 8.58 u
+    // into a 9 u half-width — 0.42 u off the centreline — with MOUNTAIN TO SEA
+    // at 7.87 and MONACO STREETS at 8.25. On the cliff-walled worlds it was
+    // systematic rather than incidental: `WALL_OFF + 0.75` leaves EVERY board
+    // 6.65 u from the road against a 9 u half-width, so all nine of CANYON
+    // RUN's stood in the carriageway.
+    //
+    // The whole SPAN has to clear, not the centre: a board pivoted across the
+    // road has its midpoint on the verge and its ends over both lanes.
+    const spanClearance = (p, yaw) => {
+      let worst = -Infinity;
+      for (const o of [-4.5, -2.25, 0, 2.25, 4.5]) {
+        const x = p.x + Math.cos(yaw) * o, z = p.z - Math.sin(yaw) * o;
+        _clearV.set(x, 0, z);
+        const need = this.widthAt(this.nearestIndex(_clearV)) + 1.6;
+        worst = Math.max(worst, need - this._distToTrack(x, z));
+      }
+      return worst;                       // <= 0 means the whole board is clear
+    };
     for (let b = 0; b < 10; b++) {
       const i = ((b + 0.5) * N / 10) | 0;
       if (this.curvature[i] > this.T.boardMaxCurv) continue; // keep boards off tight corners
+      const yaw = this.headingAt(i) + Math.PI;
       let side = b % 2 === 0 ? 1 : -1;
       let p = this.pointAt(i, boardOff * side);
       // a harbour quay is not an ad site: a board between the seafront road
@@ -17509,6 +17540,24 @@ export class Track {
         side = -side;
         p = this.pointAt(i, boardOff * side);
         if (this._onQuayStrip(p.x, p.z)) continue;
+      }
+      // Try the designed spot, then step further out, then the other side of
+      // the road on the same ladder. A board with nowhere clear is NOT built —
+      // the same answer r191 gave the quay guns, and for the same reason: one
+      // missing advertisement is invisible, one standing in the racing line is
+      // not.
+      if (spanClearance(p, yaw) > 0) {
+        let placed = null;
+        for (const sd of [side, -side]) {
+          for (const extra of [3, 6, 9, 12]) {
+            const q2 = this.pointAt(i, (boardOff + extra) * sd);
+            if (this._onQuayStrip(q2.x, q2.z)) continue;
+            if (spanClearance(q2, yaw) <= 0) { placed = q2; side = sd; break; }
+          }
+          if (placed) break;
+        }
+        if (!placed) continue;
+        p = placed;
       }
       const g = new THREE.Group();
       const board = new THREE.Mesh(boardGeo, mats[b % mats.length]);
