@@ -6152,7 +6152,29 @@ export class Track {
     // the raised-cosine's peak slope at 11.5*pi/(2*82) = 22 %, inside the
     // 24 % cap the eroder enforces anyway.
     const CLEAR = 11.5;
-    const HALF = Math.ceil(82 / this.segLen);
+    // THE RAMP LENGTH IS WHAT MAKES THE RAMPS OVERLAP.
+    //
+    // 82 u either side is right for a world with two or three crossings and
+    // wrong for one with nine: at that density the approaches cannot help but
+    // share stations, each crossing inherits its neighbours' lift, and the
+    // finished decks stack into one continuous elevated roadway — a motorway
+    // viaduct over a village, which is how MOUNTAIN TO SEA was reported.
+    //
+    // Two attempts to take that height back AFTER the fact both failed, and
+    // failed informatively (see COORDINATION.md): the inherited height is
+    // load-bearing for the neighbour, so lowering a shared station costs
+    // somebody their bridge — one attempt produced a 4.1 u crossing. The
+    // height cannot be removed downstream, so it must not be created upstream.
+    //
+    // Shorten the approach as the lap gets busier. A shorter ramp for the same
+    // clearance is STEEPER, so this trades against the 24% cap and the eroder
+    // — which is exactly why it is measured rather than assumed, and why the
+    // floor stays at 0.72 (about 59 u): at 0.62 the shortest ramp left one
+    // MOUNTAIN TO SEA crossing at 9.53 u, under the 9.65 u the overpass audit
+    // measured as the point where nearestIndex can capture the wrong leg.
+    const dense = Math.max(0, this._overpasses.length - 3);
+    const span = 82 * Math.max(0.72, 1 - 0.05 * dense);
+    const HALF = Math.ceil(span / this.segLen);
     const lift = new Float32Array(N);
     const bump = (up, height) => {
       for (let sN = -HALF; sN <= HALF; sN++) {
