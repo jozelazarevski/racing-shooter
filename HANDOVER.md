@@ -1,36 +1,36 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r198, deployed and live, tree clean.
+State at handover: `main` = r199, deployed and live, tree clean.
 Live: https://jozelazarevski.github.io/racing-shooter/
 
 ## THE THREE THINGS THAT MATTER, IN ORDER
 
-### 1. Road furniture IS the difficulty curve — finish clearing it
-The single most important realisation of the last session, and it reframes
-everything else.
+### 1. RESOLVED IN r199 — and the premise was wrong. Read this before reusing it.
+The "~15 posts standing in rural carriageways" DID NOT EXIST. The numbers came
+from `fence.mjs`, whose filter let every geometry with no `width`/`height`
+parameter through (`Math.abs(undefined - 0.18) > 0.005` is false, because NaN
+comparisons are false). It was counting the sky dome, the world skirt, the haze
+bands, the road itself and the start gantry. Real 0.18x1.05 posts on the two
+named worlds: PINE VALLEY 15, HEDGEROW DASH 18, **0 on the road** — exactly what
+r195 already claimed. Full numbers in COORDINATION.md r199.
 
-The AI follows a precomputed racing line and never touches trackside furniture.
-The player does. So every object standing in a carriageway is a penalty applied
-ONLY to the human. That is most of why the owner finishes 8th of 8 on every
-screenshot (12:53, 12:56, 12:58, 13:59, 14:23 — five sessions, five last
-places, different tracks) while rivals finish 8/8 alive.
+`tool-road-census` now walks `track.group.traverse` as asked, with exact
+point-to-OBB distances, the game's own height constants, and four suppression
+classes that are all COUNTED and printed. It found a real defect on its first
+run — `_buildBanners` had no road-distance check at all, and 68 of 419 sponsor
+boards stood in a carriageway across 15 worlds, worst 0.42 u off the centreline
+on BRIDGE RUN. Fixed; 0 of 411 now.
 
-It is NOT a damage bug. `Car.damage()` gives the PLAYER a discount (0.62x on
-normal, 0.45x easy); AI cars take full damage. Do not go looking there again.
+The census's remaining findings are listed by builder signature in
+COORDINATION.md r199 — SUZUKA's trees (worst 8.76 u) are the most likely real
+one left. None of them was cleared in r199.
 
-STILL BROKEN: ~15 posts stand in rural carriageways — PINE VALLEY 3,
-HEDGEROW DASH 12, worst bite **9.5 u into a 9 u half-width**, i.e. dead centre.
-The builder is UNIDENTIFIED. A literal grep for `0.18 x 1.05` finds only
-`_buildJunctionFences` (mine, and it is clean — proven by stashing it and
-re-counting), so the offenders build with COMPUTED dimensions and text search
-will not find them.
-
-THE JOB: `tests/tool-road-census.mjs` only walks `track.solids`. That blind
-spot has now hidden three separate defect classes — barriers (fixed r191),
-bridge piers (r193), and these posts. Extend it to walk the built scene graph
-(`track.group.traverse`) and measure every mesh against the carriageway, then
-clear what it finds. `scratchpad/fence.mjs` already does exactly this walk and
-is the starting point.
+**Do not rebuild on "road furniture is the difficulty curve".** The instance
+that theory named was a measurement artifact, and the objects that really do
+stand in rural carriageways are the crates, cones and barrels `_buildProps`
+puts there ON PURPOSE — its own comment records that they are "NOT blockers —
+a car drives straight through one and accelerates". Item 3 below is now the
+first thing to do, not the third.
 
 ### 2. SEA CLIFF RUN (level 60) — 80 u of road stacked on road
 Measured, specific, untouched:
@@ -49,10 +49,11 @@ FIX SHAPE: register near-miss pairs as crossings so the clearance solver
 handles them. This touches the code r197 just changed — measure all eight
 overpass worlds with `scratchpad/gaps.mjs` before and after.
 
-### 3. Rival pace — and the number that does not exist
+### 3. Rival pace — and the number that does not exist. NOW THE TOP ITEM.
 Nobody has ever measured a competent HUMAN lap time on any world. Without it
 there is no baseline to tune difficulty against. Measure that first; tuning
-before you have it is guessing.
+before you have it is guessing. r199 removed the theory that was standing in
+for this measurement, so there is nothing left to hide behind.
 Rivals circulate 0.5-0.9 laps/30 s and never wreck (8/8 alive, every run).
 
 ## MEASUREMENT DISCIPLINE — earned the hard way, do not skip
@@ -63,6 +64,12 @@ shipped a fix for a bug that did not exist:
 - comparing a start index with an end index cannot tell +500 forward through
   the wrap from -400 backward — accumulate PER FRAME
 - a parked player is not a stuck player; give it throttle AND steering
+- `fence.mjs` counted everything that was not a Box, because `NaN > 0.005` is
+  false, and its output was quoted into this file as a defect (r199). A test
+  for a value must first test that the value EXISTS.
+- `track.banners` holds sponsor boards AND guard-fence bays. Measuring the
+  array without filtering `kind` reported 199 intrusions instead of 68 and
+  would have moved guard rails away from the drops they exist to guard.
 - traffic owns its own `requestAnimationFrame`. The fixed-step `g.frame()`
   harness NEVER drives it, and its clock runs ~0.125 s per real second under
   swiftshader — a 9 s crossroad wait needs ~75 s of wall clock. A 20 s sample
