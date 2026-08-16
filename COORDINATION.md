@@ -1548,6 +1548,48 @@ NOTE the entry sits before id 60 in the array. Harmless: it carries an explicit
 order.
 
 
+## MOUNTAIN TO SEA's viaduct — TWO approaches tried, BOTH rejected, with numbers
+
+The complaint: on a world with nine crossings the decks read as one continuous
+elevated roadway on piers — a motorway viaduct over a village. The finished
+gaps after r190 are
+    12.29  11.5  11.67  11.5  14.56  11.5  11.26  14.06  17.39
+against a CLEAR target of 11.5. Three crossings are over 14 u and one is half
+again as tall as asked.
+
+**REJECTED 1 — rebuild the ramp from requirement, then re-erode.** Recompute
+each crossing's own need over the bare profile, take the max of those shapes,
+discard everything above it. Measured: crossings over 14 u went 3 -> 0 and the
+grade improved (p90 16% -> 12%), but one crossing dropped to **4.1 u** — a
+bridge you cannot drive under, exactly the defect r190 exists to prevent. The
+re-erosion removed the support the trimmed ramp had been leaning on. Height is
+cosmetic, clearance is not; reverted.
+
+**REJECTED 2 — the same trim, but only accepted if every crossing still
+clears.** Propose keep-fractions of the inherited excess (0, 0.3, 0.6), erode,
+measure the worst gap, and accept the first that holds a 10.5 u floor;
+otherwise keep the solved profile. Measured: **all three levels failed the
+floor**, so it fell back every time and MOUNTAIN TO SEA came out byte-identical
+— a no-op on all five overpass worlds. Reverted rather than ship dead code.
+
+**WHAT THIS PROVES, and it refutes the original theory.** The excess height is
+NOT free inheritance that can be handed back. Those tall stations are
+LOAD-BEARING for neighbouring crossings: remove them and a neighbour loses its
+clearance. Any future attempt that works by lowering shared lift will hit the
+same wall.
+
+**WHERE TO GO NEXT (untested).** The overlap itself is the cause, so attack the
+overlap, not the height: `HALF = ceil(82 / segLen)` gives an 82 u approach ramp
+at every crossing, and on a nine-crossing lap those ramps cannot help but
+share stations. A shorter ramp on dense worlds — scale HALF down as crossing
+count rises — reduces overlap at source. It costs grade (a shorter ramp for
+the same clearance is steeper), so it must be measured against the 24% cap and
+the eroder, and against `gaps.mjs` for clearance, in the same run.
+
+Tools: `scratchpad/gaps.mjs` prints every crossing's gap plus grade p90/max per
+world in one pass — that is the acceptance test for any attempt here.
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
