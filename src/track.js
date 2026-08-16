@@ -7281,7 +7281,36 @@ export class Track {
     strip.rotation.order = 'YXZ';
     strip.rotation.y = heading;
     strip.rotation.x = -Math.PI / 2;
-    strip.position.set(c.x, c.y + 0.04, c.z);  // start area is flat (c.y = 0)
+    strip.position.set(c.x, c.y + 0.04, c.z);
+    // THE START AREA IS NOT FLAT, AND IS NOT AT ZERO.
+    //
+    // This line used to carry the comment "start area is flat (c.y = 0)" and
+    // it was the only part of the gantry that read `c.y` at all — every mesh
+    // below was positioned at an ABSOLUTE height, which is the same thing as
+    // asserting the start line sits at y = 0 on every world. It does not.
+    // Measured on the pristine build, two worlds start off zero and both are
+    // wrong because of it:
+    //
+    //   CLIFF KNOT      start line at y = 3.57. The starting-lights housing is
+    //                   a 7.4 x 2.6 x 1.2 steel box at an absolute 6.6, so it
+    //                   spanned 5.30-7.90 with its UNDERSIDE 1.73 u above the
+    //                   tarmac it hangs over — windscreen height, across the
+    //                   full width of the grid. The census caught it biting
+    //                   9 u into a 9 u half-width, dead centre, with no
+    //                   collider: you drive through the start lights.
+    //   RED CENTRE RUN  start line at y = -3.99, so the whole gantry floated
+    //                   about four metres over its own grid — 16 pieces of it —
+    //                   while another leg of the lap passes 10.2 u away at
+    //                   y = 8.78 (sample 126) for the tall parts to foul.
+    //
+    // Most of the roster DOES start at zero, which is exactly why this
+    // survived: an assumption that holds almost everywhere is the hardest kind
+    // to see, and the two worlds that break it are late additions.
+    //
+    // Everything the gantry hangs over the road is now referenced to `y0`, the
+    // road at the start line, which is the surface the structure spans and the
+    // one the heights were always chosen against.
+    const y0 = c.y;
     this.group.add(strip);
 
     // scaffold towers + banner
@@ -7337,8 +7366,12 @@ export class Track {
       }
       const bx = best.px, bz = best.pz;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 10, 8), steel);
-        leg.position.set(bx + ox, 5, bz + oz);
+        // and a leg reaches the GROUND under its own tower, which on a world
+        // that starts on a shelf is not the road's height either
+        const gy = Math.min(y0, this.terrainHeight(bx + ox, bz + oz));
+        const legH = (y0 + 10) - gy;
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, legH, 8), steel);
+        leg.position.set(bx + ox, gy + legH / 2, bz + oz);
         leg.castShadow = true;
         this.group.add(leg);
         // AND WHERE THE TOWER HAS NOWHERE TO STAND, IT STOPS BEING SOLID.
@@ -7360,17 +7393,17 @@ export class Track {
       }
       for (let ly = 2.5; ly <= 8.5; ly += 3) {
         const brace = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.22, 2.1), wood);
-        brace.position.set(bx, ly, bz);
+        brace.position.set(bx, y0 + ly, bz);
         brace.castShadow = true;
         this.group.add(brace);
       }
       const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.7, 2.6), wood);
-      cabin.position.set(bx, 10, bz);
+      cabin.position.set(bx, y0 + 10, bz);
       cabin.castShadow = true;
       this.group.add(cabin);
       this._addShadow(bx, bz, 2.6, c.y);        // grounds the gantry legs
       // waving checkered flags on the towers
-      this._checkerFlag(bx, 11.8, bz);
+      this._checkerFlag(bx, y0 + 11.8, bz);
     }
     const banner = new THREE.Mesh(
       new THREE.BoxGeometry(26, 2.4, 0.5),
@@ -7378,7 +7411,7 @@ export class Track {
     );
     banner.material.map = wallTexture();
     banner.material.map.repeat.set(6, 1);
-    banner.position.set(c.x, 9, c.z);
+    banner.position.set(c.x, y0 + 9, c.z);
     banner.rotation.y = heading;
     banner.castShadow = true;
     this.group.add(banner);
@@ -7390,7 +7423,7 @@ export class Track {
         new THREE.PlaneGeometry(24, 2.15),
         new THREE.MeshStandardMaterial({ map: finTex, roughness: 0.85 })
       );
-      fin.position.set(c.x, 9, c.z);
+      fin.position.set(c.x, y0 + 9, c.z);
       fin.rotation.y = heading + flip;
       fin.translateZ(0.32);
       this.group.add(fin);
@@ -7403,7 +7436,7 @@ export class Track {
         color: 0x24211c, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
       })
     );
-    housing.position.set(c.x, 6.6, c.z);
+    housing.position.set(c.x, y0 + 6.6, c.z);
     housing.rotation.y = heading;
     housing.castShadow = true;
     this.group.add(housing);
@@ -7414,7 +7447,7 @@ export class Track {
       mat.userData = { lit: new THREE.Color(lit), dim: new THREE.Color(lit).multiplyScalar(0.12) };
       mat.color.copy(mat.userData.dim);
       const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.85, 14, 10), mat);
-      lamp.position.set(c.x, 6.6, c.z);
+      lamp.position.set(c.x, y0 + 6.6, c.z);
       lamp.rotation.y = heading;
       lamp.translateX(off);
       this.group.add(lamp);
@@ -8268,6 +8301,24 @@ export class Track {
           const sc = 1.15 + hash(j * 9.1 - side) * 0.75;      // big canopy pines
           const lat = (this.widthAt(j) + 0.75 * sc + 2.0 + row * 3.2 + h1 * 1.4) * side;
           const p = this.pointAt(j, lat);
+          // AND THAT CLEARANCE IS ONLY TRUE OF SAMPLE j. `lat` is measured
+          // along j's own normal and reads `widthAt(j)`, so the trunk clears
+          // the road THERE by construction — and says nothing about a second
+          // leg passing underneath. SUZUKA is a figure-of-eight: measured on
+          // the pristine build, 14 trunks stood inside a carriageway around
+          // samples 19-24 and 76, the worst 3.0 u past the drivable edge with
+          // a 1.16 u trunk on it. These are `solid: true` pines — hitting one
+          // stops a car dead — so this is the worst-consequence version of the
+          // defect the props, the tire stacks, the cabins and (r199b) the cacti
+          // each had fixed in their own builder.
+          //
+          // `_distToTrack` searches the whole lap and sees the near leg
+          // whichever one it is. The margin matches the design above: trunk
+          // radius plus the 2.0 u the offset already reserves, less a little,
+          // so a straight still plants both rows and only a leg crossing
+          // underneath takes a tree out. A missing tree is a gap in a corridor;
+          // a present one is a wall in a lane.
+          if (!this._clearsRoad(p.x, p.z, 0.75 * sc, 1.6)) continue;
           const ty = this.terrainHeight(p.x, p.z) - 0.2;
           // lean the whole tree inward over the road (rotation about the tangent)
           const lean = (0.10 + hash(j * 3.3 + side) * 0.12) * side;
@@ -17675,6 +17726,24 @@ export class Track {
         const outX = nr.x * side, outZ = nr.z * side;
         const yaw = head + Math.PI / 2;
         g.rotation.y = (Math.sin(yaw) * outX + Math.cos(yaw) * outZ) < 0 ? yaw : head - Math.PI / 2;
+        // AND TURNING IT ONLY HELPS WHEN THE PROBLEM IS ITS OWN ROAD.
+        //
+        // Broadside, the board reaches 4.5 u ACROSS the road; parallel, it
+        // reaches 4.5 u ALONG it — and where a lap doubles back or crosses
+        // itself, along is straight at the other leg. Measured after the turn
+        // went in: BRIDGE RUN still had a board biting 8.23 u and MONACO
+        // STREETS a post at 5.7 u, both from a second carriageway the first
+        // orientation was never asked about.
+        //
+        // So ask about the ends the turn actually creates, and if they are in
+        // somebody's lane too, build nothing. That is the rule the quay guns
+        // (r191), the deck rails and the arch faces all follow: a thing with
+        // nowhere clear does not get built. A missing hoarding is a gap in the
+        // advertising; a present one is a wall in a lane.
+        const t2 = this.tan[i];
+        const clearEnds = [-4.6, 4.6].every((d) =>
+          this._clearsRoad(p.x + t2.x * d, p.z + t2.z * d, 0.3, 0.3));
+        if (!clearEnds) continue;
       }
       this.group.add(g);
       this.banners.push({
