@@ -1454,6 +1454,28 @@ that approach is what any "is something standing in the road" question needs
 now, because three separate object classes have hidden in this gap.
 
 
+## V2/ IS NOT MAINTAINED — do not sync it
+
+`V2/` on `main` is a second, self-contained build (~2.9 MB, bundled and
+minified, with its own `editor.html`), live at
+`https://jozelazarevski.github.io/racing-shooter/V2/`. It arrived in 069ee7f
+("The playable build moves to /V2, and gets its own Pages link") and has not
+been edited since; the only later commit touching it is the gh-pages deploy
+sync carrying it along.
+
+DECISION, from the owner: **it is deliberately NOT kept in sync.** None of
+r182-r194 exists in it — not the overpass clearance work, the piers, the
+culvert parapets, the river, the ladder, the list sorting, none of it. Do not
+port fixes into it, do not "bring it up to date", and do not treat a defect
+found there as a defect in this game. It is a different lineage and a compiled
+artifact: the only meaningful comparison with it is behavioural, not textual.
+
+(Asked whether "kimi" had deployed anything: no. Every commit on every ref is
+authored by `Claude <noreply@anthropic.com>` or the owner's two GitHub
+identities; no branch, PR or commit trailer mentions it. The one textual hit
+was a chance byte sequence inside V2's minified bundle.)
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
