@@ -11745,11 +11745,31 @@ export class Track {
             this.tan[j].x, this.tan[j].z, 2 * this.segLen + 0.8, 0.7,
             c.y - 0.2, 1.5, 'stone', true);   // a deck rail: cars pass under it
         }
+        // PIERS GO BESIDE THE ROAD, NOT DOWN THE MIDDLE OF IT.
+        //
+        // This stood one pier on `c.x, c.z` — the FLYOVER's own centreline —
+        // and asked nothing about what was underneath. Directly over the
+        // crossing that centreline IS the lower carriageway, so the bridge
+        // planted a column in the middle of the road it was bridging.
+        // Photographed from the driver's seat on a phone: two grey columns
+        // straight ahead in the lane, deck overhead. r190 made it worse by
+        // earning these decks their full clearance — a taller deck clears the
+        // `> 2.5` test at more stations, so more columns, each of them longer.
+        //
+        // A viaduct carries its deck on PAIRS of piers at the edges anyway,
+        // and that is also what keeps the span open: offset both, ask
+        // `_clearsRoad` for each, and where the answer is no — precisely over
+        // the crossing — neither is built and the road runs clear underneath,
+        // which is what a flyover is for. Each pier takes the ground under
+        // ITSELF, since the two sides of a viaduct are rarely level.
         if (Math.abs(sN) % 8 === 0) {
-          const ground = this.terrainHeight(c.x, c.z);
-          if (c.y - ground > 2.5) {
-            const pier = new THREE.Mesh(new THREE.BoxGeometry(2.6, c.y - ground + 1, 3.4), stone);
-            pier.position.set(c.x, (c.y + ground) / 2 - 0.4, c.z);
+          for (const off of [-6, 6]) {
+            const px = c.x + n.x * off, pz = c.z + n.z * off;
+            if (!this._clearsRoad(px, pz, 1.7, 1.0)) continue;
+            const gnd = this.terrainHeight(px, pz);
+            if (c.y - gnd <= 2.5) continue;
+            const pier = new THREE.Mesh(new THREE.BoxGeometry(2.2, c.y - gnd + 1, 3.0), stone);
+            pier.position.set(px, (c.y + gnd) / 2 - 0.4, pz);
             pier.rotation.y = this.headingAt(j);
             g.add(pier);
           }

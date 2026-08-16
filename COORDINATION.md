@@ -1422,6 +1422,38 @@ worlds), the touch pad (drag up -> throttle 0.96), page errors (none), and any
 r190 vs r191 difference (identical). The original report is still unreproduced.
 
 
+## r193 — the bridge stops putting columns in the road it bridges
+
+`_buildOverpassDecks` stood one pier at `c.x, c.z` — the FLYOVER's own
+centreline — and asked nothing about what was underneath. Directly over a
+crossing that centreline IS the lower carriageway, so the bridge planted a
+column in the middle of the road it was there to span. Photographed from the
+driver's seat: two grey columns dead ahead in the lane, deck overhead.
+
+r190 made it worse. Earning those decks their full clearance means a taller
+deck, a taller deck clears the `c.y - ground > 2.5` test at more stations, so
+more columns and each of them longer.
+
+Piers now build in PAIRS offset +-6 u to the deck edges — which is how a
+viaduct carries its deck anyway — and each asks `_clearsRoad` first. Over the
+crossing neither qualifies, so the span stays open, which is the point of a
+flyover. Each pier takes the ground under ITSELF; the two sides of a viaduct
+are rarely level.
+
+Measured, OLIVE CROSSING: **8 pier meshes with 4 in the road, worst biting
+10.1 u into the lane at sample 205 -> 4 meshes, 0 in the road.** MOUNTAIN TO
+SEA clean before and after.
+
+**WHY NO CENSUS EVER CAUGHT THIS.** Piers are meshes with NO collider — you
+drive through them — so `tool-road-census` (which walks `solids`) and
+`test-carriageway` both scored these worlds clean while a column stood in the
+racing line. Same blind spot as the barriers (see r190, task #109), one layer
+further out: the census sees colliders, not geometry. `scratchpad/piers.mjs`
+walks `track.group` and measures pier-shaped meshes against `widthAt` instead;
+that approach is what any "is something standing in the road" question needs
+now, because three separate object classes have hidden in this gap.
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
