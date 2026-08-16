@@ -1752,6 +1752,124 @@ nothing looks like it should have changed. World generation is seeded, so this
 is deterministic, not noise — but it means a before/after diff of raw counts
 is not a defect count. Compare CLASSES.
 
+## r199c/d — tunnels through the mountains, and the test that drives them
+
+### THE ASK, AND WHY A COUNT WOULD NOT HAVE ANSWERED IT
+
+"Create in mountain tunnels tracks and drive in drive out." Eight mountain
+worlds had no bore: FROST PEAK, SUMMIT CLIMB, GLACIAL PASS, GLACIER'S GRIND,
+AVALANCHE ALLEY, COL DE TURINI (2), PIKES PEAK, DOLOMITI CORSA (2). The roster
+went from 15 worlds asking for a tunnel to 23.
+
+`tests/test-tunnels.mjs` is the half of this that matters. Counting
+`track._tunnels` proves the PLANNER ran and says nothing about whether what it
+planned can be driven through — and every tunnel defect this game has had is
+invisible to a count: a bore over a crest, where the car launches off the hump
+and leaves through the crown into the empty slot `_tunnelRidge` keeps above the
+tube (TREMOLA, -0.07 u); wall solids that become a wall if the roadway is wider
+than the tube; a portal in a hillside the road never reaches.
+
+So it drives the real car with real physics from outside one portal to outside
+the other and asserts ENTERED, EXITED THE FAR PORTAL (not backed out the way it
+came), never above the crown, never stopped dead. The car is steered to the
+centreline — an unsteered car at full throttle just drives off the road and its
+damage is crash damage. The world list comes from the roster's own
+`tune.tunnels`, so a world gaining or losing a bore stays covered.
+
+**26 of 26 bores drive in one portal and out the other**, 8.07-8.60 u of
+headroom throughout.
+
+### WHAT IT FOUND ON ITS FIRST RUN — A BORE REACHES HALF ITS LENGTH
+
+Two worlds ASK for a bore and silently had none: GLACIAL PASS, and TREMOLA
+DESCENT, which has been that way ever since the crest guard went in because
+nothing tested that a requested tunnel exists.
+
+Both callers — `_planTunnels` and the editor — pass `lenS`, the requested bore
+LENGTH in samples, into a parameter named `maxHalf`. `_planTunnels` then sites
+the bore as `half = min(fit, lenS >> 1)` either side of the station, so a bore
+centred at i never reaches further than `lenS >> 1`. The gorge and crest
+exclusions reserved `lenS` — twice the ground, on both sides. Measured before:
+
+    GLACIAL PASS      CREST refused 701 of 900, start gate 199. 0 eligible.
+                      Six crests ate the entire lap.
+    TREMOLA DESCENT   CREST 512, the rest too twisty. 0 eligible.
+
+Sizing the reach to the bore keeps the guard exactly as strong — it still asks
+"does the tube I would build cross a crest or a chasm" — and asks it about the
+tube that would actually be built. GLACIAL PASS: 29 eligible stations, an 81 u
+bore at 111-173, driven in and out with 8.57 u of headroom.
+
+**TREMOLA DESCENT STILL FITS NOWHERE AND THAT IS RIGHT.** Its longest straight
+half-run is 10 samples against a 12-sample minimum, and the one long straight it
+does have carries the crest the guard was written for — the 547-585 bore that
+measured -0.07 u. Twenty-four hairpins on a cobbled descent have nowhere to put
+a tunnel. The test NAMES it rather than letting "the planner found nowhere" read
+the same as "nobody asked".
+
+**STILL OPEN — `MIN` is probably the same units error.**
+`MIN = Math.max(6, Math.round(26 / segLen))` is compared against a HALF-run, so
+the real minimum bore is ~52 u against a documented "~26 u of bore". Correcting
+it would give TREMOLA a short gallery and let short bores onto twisty worlds,
+but it moves tunnel sizing on all 23 worlds and wants its own measured pass.
+Not folded in here.
+
+**BORES MOVED on worlds that already had them**, because more stations are now
+eligible: CANYON RUN 437-467 -> 233-263, SUMMIT CLIMB 557-599 -> 535-577,
+GOTTHARD's first 129-163 -> 113-147, CLIFF KNOT 671-705 -> 329-363. All still
+drive in and out, which is the property that matters.
+
+### FLOATERS WENT UP, AND IT IS NOT A DEFECT
+
+Roster floaters 116 -> 152. Every one of the +36 is on the three worlds that
+gained a bore (PIKES PEAK +17, DOLOMITI CORSA +16, COL DE TURINI +4) and every
+one is a TUNNEL WALL COLLIDER: `mat 'stone'`, air 2.6-2.8 u, all at bore
+samples. `_buildTunnel` pushes them at `groundHeightAt(i, 0) + 1` while
+`terrainHeight` at the wall lateral reads lower, so the census's FLOATERS
+measure has the same tunnel blind spot its BLOCKERS measure already documents.
+GOTTHARD CLIMB has carried two bores for ages and reads clean, so it is
+terrain-dependent, not new. PIKES PEAK's WORST floater improved, 21.3 -> 9.7 u.
+Portals on DOLOMITI and GOTTHARD were photographed side by side and are
+indistinguishable — no gap, no anomaly.
+
+### THE ROSTER-WIDE SCORE FOR THE WHOLE SESSION
+
+Pristine `origin/main` on port 8930 against this branch on 8920, same tool:
+
+                      before    after
+    worlds dirty       36/61    34/61
+    blockers              60       48
+    intruders            196       73
+      with no collider   179       53
+    trees in a lane       23       14
+    bare holes             0        0
+
+The sponsor-board fix was much wider than the two worlds it was found on: the
+2.35 u signature repeats on CANYON RUN, GLACIAL PASS, GLACIER'S GRIND,
+UNDERCITY SLIPSTREAM, ROCKFALL RAVINE, CORNICHE, LAGUNA SECA and RED CENTRE RUN.
+
+Suites on the changed build: test-carriageway 49/49, test-invisible-walls 13/13,
+test-index-recovery 10/10, test-newworlds 193 pass / 1 fail. That one failure —
+"the new worlds are appended at the END of the array, in order — tail is
+56,57,58,59,61,60" — is BYTE-IDENTICAL on pristine `origin/main`. It is the
+r196 OLIVE PASS array-order note, pre-existing, and not caused by anything here.
+
+### WHAT THE CENSUS STILL SHOWS, FOR WHOEVER PICKS THIS UP
+
+    SUZUKA           14 tree TRUNKS inside the lane, worst 4.15 u, samples
+                     19-24 and 76. `kind: 'pine'`, r 1.06-1.38. NOT from
+                     `_buildRedwoods` — its giants use `_trackSidePos(17, 60)`
+                     and its saplings (12.5, 26), both of which consult
+                     `_distToTrack`. Another builder puts pines there and it
+                     has not been identified. Same shape as the cacti fixed
+                     in r199b; probably the same missing check.
+    RED CENTRE RUN   Box 7.4x2.6x1.2 #24211c biting 8.78 u, 2.5 u proud, bare
+    MONACO STREETS   an intruder biting 8.9 u
+    CLIFF KNOT       9.0 u
+    COTE D AZUR      30 stone blockers at 9.27 u — READ THIS AS THE TUNNEL
+                     doing its job (documented false positive), not a defect
+    ESTONIA CRESTS   Cylinder 6.5x0.55 #5a3a22 biting 6.95 u
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

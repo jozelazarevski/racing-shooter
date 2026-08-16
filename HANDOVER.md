@@ -1,124 +1,215 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r198, deployed and live, tree clean.
-Live: https://jozelazarevski.github.io/racing-shooter/
+State at handover: branch `claude/handover-continuation-wrq47s` = r199, four
+commits on top of r198, pushed. Tree clean.
+Live (still r198 until this merges): https://jozelazarevski.github.io/racing-shooter/
 
-## THE THREE THINGS THAT MATTER, IN ORDER
+## WHAT HAPPENED LAST SESSION, IN ONE LINE
 
-### 1. Road furniture IS the difficulty curve — finish clearing it
-The single most important realisation of the last session, and it reframes
-everything else.
+The previous handover's number one priority was a bug in the PROBE, not in the
+game. Extending the census properly found four real defects instead, and a
+drive-through test for tunnels found a fifth.
 
-The AI follows a precomputed racing line and never touches trackside furniture.
-The player does. So every object standing in a carriageway is a penalty applied
-ONLY to the human. That is most of why the owner finishes 8th of 8 on every
-screenshot (12:53, 12:56, 12:58, 13:59, 14:23 — five sessions, five last
-places, different tracks) while rivals finish 8/8 alive.
+## READ THIS FIRST: THE FENCE POSTS NEVER EXISTED
 
-It is NOT a damage bug. `Car.damage()` gives the PLAYER a discount (0.62x on
-normal, 0.45x easy); AI cars take full damage. Do not go looking there again.
+The last handover opened with "~15 posts of 0.18 x 1.05 stand in rural
+carriageways, worst bite **9.5 u into a 9 u half-width**, the builder is
+UNIDENTIFIED". Three sessions of grep failed to find that builder because
+there is nothing to find.
 
-STILL BROKEN: ~15 posts stand in rural carriageways — PINE VALLEY 3,
-HEDGEROW DASH 12, worst bite **9.5 u into a 9 u half-width**, i.e. dead centre.
-The builder is UNIDENTIFIED. A literal grep for `0.18 x 1.05` finds only
-`_buildJunctionFences` (mine, and it is clean — proven by stashing it and
-re-counting), so the offenders build with COMPUTED dimensions and text search
-will not find them.
+`fence.mjs` rejected non-posts with
 
-THE JOB: `tests/tool-road-census.mjs` only walks `track.solids`. That blind
-spot has now hidden three separate defect classes — barriers (fixed r191),
-bridge piers (r193), and these posts. Extend it to walk the built scene graph
-(`track.group.traverse`) and measure every mesh against the carriageway, then
-clear what it finds. `scratchpad/fence.mjs` already does exactly this walk and
-is the starting point.
+    Math.abs(q.width - 0.18) > 0.005
 
-### 2. SEA CLIFF RUN (level 60) — 80 u of road stacked on road
-Measured, specific, untouched:
+A sphere has no `q.width`. `Math.abs(undefined - 0.18)` is `NaN`, `NaN > 0.005`
+is **false**, so the guard never fired and every sphere, torus, circle and
+cylinder fell through as a "fence post" — including the pickups on the racing
+line and the 9000 u world skirt. That is where 9.5 u came from.
+
+Measured with the keys required to exist: FROST PEAK 10 posts, REDWOOD RAMPAGE
+7, every one at 10.3 u lateral against a 9 u half-width — **1.21 u OUTSIDE the
+drivable edge**. `test-carriageway` independently agrees ("narrow-section posts
+clear the carriageway, closest 2 u outside the drivable edge").
+
+**THE LESSON, and it is sharper than "measure twice": a filter that can be
+defeated by a MISSING FIELD fails OPEN, and a probe that fails open reports
+work that does not exist.** `NaN` comparisons are always false, so
+`Math.abs(a - b) > eps` is not a rejection test unless `a` is known to exist.
+
+## THE TOOL THAT NOW ANSWERS "WHAT IS ON THE ROAD"
+
+`tests/tool-road-census.mjs` walks `track.group` and measures transformed
+geometry, so a mesh with NO COLLIDER is counted like any other — the blind spot
+that hid the barriers (r191), the bridge piers (r193) and the culvert parapets.
+Ones with no collider within 1.5 u are flagged BARE.
+
+Five filters keep it readable, and **every one was earned by a false positive it
+removed** — do not remove them without reading why:
+
+- the drive band, measured PER FOOTPRINT POINT against the road height at that
+  point. Judged per object, every grade-pitched puddle decal in the game
+  reported an 8 u bite.
+- `track.props` — crates, cones, snowmen are on the drivable surface ON PURPOSE
+  and carry no collider. Forty per world.
+- decals — zero-thickness sheets LYING DOWN, judged by the sheet's NORMAL. An
+  aspect-ratio test called an upright 9 x 2.2 sponsor board a puddle and hid a
+  real defect for a while.
+- foliage over a registered `track.trees` trunk. PINE VALLEY reported 29
+  canopies; 743 trees and not one trunk on the road. Trunks are measured
+  separately, so a tree PLANTED in the road still shows.
+- landforms over 40 u. Counted and LISTED, never silently dropped.
+
+`HITS=1` prints every hit, `BULK=1` the 12-40 u meshes.
+
+## SCORE, PRISTINE origin/main vs THIS BRANCH, SAME TOOL
+
+                      before    after
+    worlds dirty       36/61    34/61
+    blockers              60       48
+    intruders            196       73
+      with no collider   179       53
+    trees in a lane       23       14
+
+Four defects fixed, all the same shape — **an anchor placed clear, and nobody
+asked how far the thing reaches from it**:
+
+1. SEA CLIFF RUN's stone-bridge arch face: 9 u of masonry 5.2 u proud of the
+   road, biting 5.87 u, no collider. Offset along the SPAN's normal instead of
+   its own, and never asked what ran underneath. Now uses `nrm[j]` and
+   `_pierInRoad` — the 3-D question `_clearsRoad` cannot answer, since that one
+   is flat and would refuse every arch face for standing under its own deck.
+2. SEA CLIFF RUN's overpass deck rails, 4 of them up to 4.25 u in. `railBlocked`
+   exempted 76 samples as "its own deck run" and the lap doubles back inside
+   that window. The exemption now relaxes the BUFFER instead of skipping the
+   road.
+3. Sponsor boards — a 9 u hoarding broadside to the road with 1.4 u of room
+   beside it. On cliff worlds it now stands ALONG the road. **This was on 8
+   worlds**, not the 2 it was found on.
+4. Cacti — three cacti and an acacia with their TRUNKS in the carriageway on
+   CANYON RUN, worst 1.01 u from the centreline. `_buildCacti` never called
+   `_distToTrack`.
+
+## TUNNELS: 26 OF 26 BORES DRIVE IN ONE PORTAL AND OUT THE OTHER
+
+Eight mountain worlds gained bores (FROST PEAK, SUMMIT CLIMB, GLACIAL PASS,
+GLACIER'S GRIND, AVALANCHE ALLEY, COL DE TURINI x2, PIKES PEAK, DOLOMITI CORSA
+x2); the roster went 15 -> 23 worlds asking.
+
+`tests/test-tunnels.mjs` drives the real car from outside one portal to outside
+the other and asserts ENTERED, EXITED THE FAR PORTAL, never above the crown,
+never stopped dead. **A count cannot answer any of those** — see COORDINATION
+for the three tunnel defect classes that are invisible to one.
+
+It earned itself immediately: GLACIAL PASS and TREMOLA DESCENT both ASK for a
+bore and had none, TREMOLA ever since the crest guard shipped. Cause was a
+units error — `lenS` (a LENGTH) passed into a parameter named `maxHalf`, so the
+gorge and crest exclusions reserved twice the ground a bore can occupy. On
+GLACIAL PASS that refused 701 of 900 stations on the crest rule alone.
+
+TREMOLA still fits nowhere and that is correct: its longest straight is 10
+samples against a 12 minimum, and its one long straight carries the very crest
+the guard exists for.
+
+## THE THREE THINGS THAT MATTER NEXT, IN ORDER
+
+### 1. SEA CLIFF RUN (level 60) — 80 u of road stacked on road, STILL OPEN
+Untouched, and only its SYMPTOMS were cleared this session. Measured:
 - samples **530-566 run directly over 655-682**
 - centreline gap falls to **1.91 u**; under 18 u for ~80 u of lap
 - vertical separation only 1.48-6.35 u
 - both legs are on the racing line (~60% and ~74% of the lap)
 
-Cause: `_planOverpasses` only fires on a true XZ segment INTERSECTION. This is
-a near-parallel pass, so no crossing is registered, no deck, no ramp — the two
-carriageways simply interpenetrate. `_checkLayout` does not warn because it
-prints only the single global minimum, which here is the legitimate overpass
-at 610/707 elsewhere on the lap.
+`_planOverpasses` only fires on a true XZ segment INTERSECTION; this is a
+near-parallel pass, so no crossing is registered and the two carriageways
+interpenetrate. `_checkLayout` prints only the single global minimum, which
+here is the legitimate overpass elsewhere on the lap. FIX SHAPE: register
+near-miss pairs as crossings. Measure all eight overpass worlds with
+`tools-scratch/gaps.mjs` before and after.
 
-FIX SHAPE: register near-miss pairs as crossings so the clearance solver
-handles them. This touches the code r197 just changed — measure all eight
-overpass worlds with `scratchpad/gaps.mjs` before and after.
+### 2. Finish the census backlog — it is now a list, not a hunt
+    SUZUKA           14 tree TRUNKS in the lane, worst 4.15 u, samples 19-24
+                     and 76, `kind: 'pine'`, r 1.06-1.38. NOT `_buildRedwoods`
+                     (its giants and saplings both consult `_distToTrack`).
+                     Builder UNIDENTIFIED — instrument it, do not grep.
+                     Almost certainly the same missing check as the cacti.
+    RED CENTRE RUN   Box 7.4x2.6x1.2 #24211c biting 8.78 u, 2.5 u proud, bare
+    MONACO STREETS   8.9 u    CLIFF KNOT 9.0 u
+    ESTONIA CRESTS   Cylinder 6.5x0.55 #5a3a22 biting 6.95 u
+    COTE D AZUR      30 stone blockers at 9.27 u — that is the TUNNEL doing its
+                     job, a documented false positive. Not a defect.
 
-### 3. Rival pace — and the number that does not exist
-Nobody has ever measured a competent HUMAN lap time on any world. Without it
-there is no baseline to tune difficulty against. Measure that first; tuning
-before you have it is guessing.
-Rivals circulate 0.5-0.9 laps/30 s and never wreck (8/8 alive, every run).
+### 3. Rival pace — the number that still does not exist
+Nobody has measured a competent HUMAN lap time on any world. Without it there
+is no baseline to tune difficulty against; tuning before you have it is
+guessing. Rivals circulate 0.5-0.9 laps/30 s and never wreck (8/8 alive).
+
+## SMALLER OPEN ITEMS
+- **`MIN` in `tunnelFitAt` is probably the same units error as the reach was**:
+  `Math.round(26 / segLen)` compared against a HALF, so the real minimum bore
+  is ~52 u against a documented "~26 u of bore". Fixing it would give TREMOLA a
+  short gallery, but it moves tunnel sizing on all 23 worlds — its own pass.
+- `test-newworlds` has ONE failure, "the new worlds are appended at the END of
+  the array — tail is 56,57,58,59,61,60". **PRE-EXISTING and byte-identical on
+  pristine `origin/main`** — the r196 OLIVE PASS array-order note. Not a
+  regression; do not chase it as one.
+- `test-jumps`: 2 pre-existing FURKA RIDGE failures, "0 jumps in 90 s" on a
+  stage whose whole point is crests.
+- The "I jump straight up" report is UNREPRODUCED. Needs the track name and
+  whether it happens driving INTO a bank or sitting on one.
+- iOS cannot lock orientation from a manifest. Landscape lock needs an in-page
+  portrait prompt — a design call.
 
 ## MEASUREMENT DISCIPLINE — earned the hard way, do not skip
-Four probes last session produced CONFIDENT WRONG ANSWERS. Each one nearly
-shipped a fix for a bug that did not exist:
-- an unsteered car at full throttle just drives off the road; its damage is
-  crash damage, not a stall
-- comparing a start index with an end index cannot tell +500 forward through
-  the wrap from -400 backward — accumulate PER FRAME
-- a parked player is not a stuck player; give it throttle AND steering
-- traffic owns its own `requestAnimationFrame`. The fixed-step `g.frame()`
-  harness NEVER drives it, and its clock runs ~0.125 s per real second under
-  swiftshader — a 9 s crossroad wait needs ~75 s of wall clock. A 20 s sample
-  proves nothing.
-
-ALWAYS baseline against pristine `origin/main` served on a second port. Two
-regressions last session were caught only that way (the gantry that moved
-DEEPER into the road, 4.52 -> 7.59 u; and `test-jumps`' FURKA failures, which
-turned out to be pre-existing).
+- **A filter that fails OPEN invents work.** See the fence posts above.
+- **Instrument the BUILDER, not the built scene.** Recovering "which sample does
+  this mesh belong to" is guesswork on a hairpin and gave two wrong answers
+  before the right one. `tools-scratch/railtrace.mjs` rewrites `src/track.js` in
+  flight with `page.route` so the builder records what it decided. Reach for
+  this whenever the question is "why did the generator do that".
+- **ALWAYS baseline against pristine `origin/main` on a second port.**
+  `srv.mjs` now takes a ROOT: `node srv.mjs 8930 /path/to/worktree`. This is how
+  the `test-newworlds` failure was proved pre-existing in one run.
+- Four probes two sessions ago produced CONFIDENT WRONG ANSWERS: an unsteered
+  car at full throttle just drives off the road; a start index minus an end
+  index cannot see a wrap, so accumulate PER FRAME; a parked player is not a
+  stuck player; traffic owns its own `requestAnimationFrame` and its clock runs
+  ~0.125 s per real second under swiftshader, so a 20 s sample proves nothing.
 
 ## TRAPS
-- `git reset --hard origin/main` to realign the branch DISCARDS uncommitted
-  work. It ate two edits last session. Commit first, always.
+- **A withheld barrier grows an edge rail.** `_buildEdgeRails` consults
+  `this.barriers` ("already walled?"), so withholding a deck rail changes what
+  gets built elsewhere and `solids` moves on worlds that look untouched. World
+  gen is SEEDED, so this is deterministic, not noise — but a raw count diff is
+  not a defect count. **Compare CLASSES.** Adding a tunnel does the same thing:
+  it raises a 13 u ridge and shifts the RNG downstream.
+- `git reset --hard origin/main` DISCARDS uncommitted work. Commit first.
 - `test-surface.mjs` and `test-menu-noreset.mjs` HARDCODE port 8901 and ignore
   `BASE`. They fail to connect silently and read as "not run".
-- `pgrep -f 'ab\.mjs'` also matches `srvlab.mjs`. Killing probes has killed the
-  static server mid-run more than once. Use `scratchpad/keep.sh` to hold a
-  server up across tool-call timeouts.
+- `pgrep -f 'ab\.mjs'` also matches `srvlab.mjs`. Use `tools-scratch/keep.sh`.
 - Version bump is 4 sites in index.html + 1 in sw.js: `sed -i 's/rNNN/rNNN+1/g'`
+- `playwright-core` is not vendored, and ESM ignores NODE_PATH — install it
+  anywhere and SYMLINK `node_modules` into the repo root.
 
 ## POLICY, SET BY THE OWNER
 - `V2/` is a SEPARATE bundled build, live at `/racing-shooter/V2/`.
   **Deliberately NOT kept in sync.** Do not port fixes into it. A defect found
   there is not a defect in this game.
 - `origin/kimi-overpass-3052a9a` holds a third-party commit that briefly
-  replaced `main` (force-pushed back at the owner's instruction, after saving
-  it). It claims to fix "overpass terrain clipping and detection bugs" — the
-  same area as r190-r197. If it is ever revived, DIFF IT FIRST; otherwise the
-  same bug gets solved twice, incompatibly.
+  replaced `main`. It claims to fix "overpass terrain clipping and detection
+  bugs" — the same area as r190-r199. If it is ever revived, DIFF IT FIRST.
 
 ## MOUNTAIN TO SEA'S VIADUCT — two dead ends, do not repeat them
-Both tried to remove deck height AFTER the solve. Both failed the same way:
-the inherited height is LOAD-BEARING for the neighbouring crossing.
-- rebuild-from-requirement + re-erode: over-14 u went 3 -> 0, but one crossing
-  fell to **4.1 u** — undriveable.
-- the same trim gated on a 10.5 u floor: all keep-levels failed the floor, a
-  no-op on all five overpass worlds.
-r197 solved it from the other end — shorten the ramp so they never overlap
-(`HALF` scales with crossing count). Peak 17.39 -> 15.04, over-14 3 -> 1, none
-undriveable. The 0.72 floor is deliberate: at 0.62 a crossing hit 9.53 u, under
-the 9.65 u where `nearestIndex` can capture the wrong leg.
+Both tried to remove deck height AFTER the solve; the inherited height is
+LOAD-BEARING for the neighbouring crossing. r197 solved it from the other end —
+shorten the ramp so they never overlap. The 0.72 floor is deliberate: at 0.62 a
+crossing hit 9.53 u, under the 9.65 u where `nearestIndex` can capture the
+wrong leg.
 
-## TOOLS (in the session scratchpad — copy anything you want to keep)
-`gaps.mjs` every crossing's clearance + grade p90/max, per world — the
-            acceptance test for any overpass change
-`fence.mjs` walks scene meshes and measures them against the carriageway —
-            the basis for the census extension in item 1
-`ab.mjs`    before/after across both builds: clearance, grade, index correctness
-`srv.mjs`   plain static server; `keep.sh` keeps it alive across timeouts
-
-## OPEN, LOWER PRIORITY
-- `test-jumps`: 2 pre-existing FURKA RIDGE failures — "0 jumps in 90 s" on a
-  stage whose whole point is crests. Suspicious in its own right.
-- The "I jump straight up" report is UNREPRODUCED. The trace showed an ordinary
-  ramp launch (ground rising 12 u/s for 10 frames, vy 8.9, under the cap).
-  Needs the track name and whether it happens driving INTO a bank or sitting on
-  one.
-- iOS cannot lock orientation from a manifest and has no meta equivalent. If
-  landscape lock matters it needs an in-page portrait prompt — a design call.
+## TOOLS (`tools-scratch/`, committed)
+`gaps.mjs`      every crossing's clearance + grade p90/max — the acceptance
+                test for ANY `_planOverpasses` change. Honours BASE now.
+`railtrace.mjs` patches the builder on the wire. See discipline above.
+`postid.mjs`    the CORRECTED geometry measurement (keys required, instances
+                handled). `fence.mjs` is kept only as the broken one.
+`deckcount.mjs` counts what the clearance guards can withhold.
+`piers.mjs` `ab.mjs` `launch.mjs` `offroad.mjs` `srv.mjs` `keep.sh`
