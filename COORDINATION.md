@@ -1590,6 +1590,39 @@ Tools: `scratchpad/gaps.mjs` prints every crossing's gap plus grade p90/max per
 world in one pass — that is the acceptance test for any attempt here.
 
 
+## r197 — the viaduct comes down by shortening the ramps, not by trimming them
+
+The third attempt at MOUNTAIN TO SEA's viaduct, and the one that worked. The
+two rejected above both tried to take the height back AFTER the solve and both
+failed the same way: the inherited height is LOAD-BEARING for the neighbouring
+crossing, so lowering a shared station costs somebody their bridge (one attempt
+produced a 4.1 u crossing).
+
+So stop creating it. `HALF` was a flat `ceil(82 / segLen)` — an 82 u approach
+at every crossing, which is right at two or three and impossible at nine,
+because the ramps cannot help but share stations. It now shrinks with density:
+`82 * max(0.72, 1 - 0.05 * (crossings - 3))`.
+
+MOUNTAIN TO SEA, gaps before -> after:
+    12.29 11.5 11.67 11.5 14.56 11.5 11.26 14.06 17.39
+    12.33 10.48 11.59 11.5 11.5 11.36 11.35 11.5 15.04
+  tallest deck   17.39 -> 15.04      over 14 u   3 -> 1
+  lowest deck    11.26 -> 10.48      under 6 u   0 -> 0
+  grade p90 16% -> 17%, max 24% unchanged
+
+The floor is 0.72 and not lower for a measured reason: at 0.62 the peak came
+down further (14.5) but one crossing landed at **9.53**, under the 9.65 u the
+overpass audit measured as the point where `nearestIndex` can capture the wrong
+leg on the drivable width. Two and a bit units of deck height is not worth
+reopening the invisible-wall family.
+
+Untouched by design: worlds with three or fewer crossings (dense = 0), so
+BRIDGE RUN, SEA CLIFF RUN and OLIVE CROSSING are byte-identical. CLIFF KNOT
+(five) tightened to a uniform 11.5.
+
+test-index-recovery 10/10 — the guard that matters here, since every gap moved.
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
