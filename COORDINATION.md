@@ -1522,6 +1522,32 @@ see them because they are meshes with no collider entry, the same blind spot
 that hid the bridge piers until r193.
 
 
+## r196 — OLIVE PASS (level 61)
+
+Asked for: "a track that drives into mountains with tunnels, same theme as
+OLIVE CROSSING."
+
+Theme and route are INDEPENDENT in this table — SEA CLIFF RUN and MOUNTAIN TO
+SEA share `mountainsea` and run different routes — so OLIVE PASS keeps OLIVE
+CROSSING's exact dressing (`olivecountry`: groves, terraces, the hill towns)
+and borrows `turini`, a pass route that climbs. That is the whole trick; no new
+terrain code.
+
+`tunnels: { count: 3 }` is a REQUEST, not a promise: `tunnelFitAt` refuses a
+station that is too curved, too near a gorge, too near the start gate, or
+(since r190) sitting on a crest. The planner placed TWO. That is the guard
+working, not a shortfall.
+
+Built and driven before shipping: builds with no page errors, 2 bores, 0 bare
+holes, grid clear of solids, 37.6 u of relief (a real climb), lap driveable.
+The theme/route pairing was the risk — a mismatch is what caused the GOTTHARD
+road-into-void — so it was measured rather than assumed.
+
+NOTE the entry sits before id 60 in the array. Harmless: it carries an explicit
+`cost: 33`, and since r192 the board sorts by open-then-cost rather than array
+order.
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
