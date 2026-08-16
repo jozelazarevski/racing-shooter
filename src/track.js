@@ -6513,12 +6513,32 @@ export class Track {
   tunnelFitAt(i, maxHalf) {
     const MIN = Math.max(6, Math.round(26 / this.segLen));   // ~26 u of bore
     if (this._circDist(i, 0) < 100) return 0;
+    // HOW FAR A BORE REACHES IS HALF ITS LENGTH, NOT ALL OF IT.
+    //
+    // Both callers pass `lenS` — the requested bore length in samples — into a
+    // parameter named `maxHalf`, and `_planTunnels` then sites the bore as
+    // `half = min(fit, lenS >> 1)` either side of the station. So a bore
+    // centred here NEVER reaches further than `lenS >> 1`, while the two
+    // exclusions below reserved `lenS`: twice the ground, on both sides.
+    //
+    // That is not a conservative margin, it is a world with no tunnel in it.
+    // Measured: GLACIAL PASS refused 701 of 900 stations on the crest rule and
+    // 199 on the start gate — the whole lap, from six crests — and TREMOLA
+    // DESCENT 512 on crests with the rest too twisty. Both ASK for a bore in
+    // the roster and both silently had none, TREMOLA ever since the crest
+    // guard went in, because nothing tested that a requested tunnel exists.
+    // `tests/test-tunnels.mjs` does now, and this is what it found first.
+    //
+    // Sizing the reach to the bore keeps the guard exactly as strong — the
+    // question it asks is still "does the tube I would build cross a crest or
+    // a chasm" — and asks it about the tube that would actually be built.
+    const reach = Math.max(8, maxHalf >> 1);
     // Clear of a chasm by the BORE'S OWN LENGTH plus a margin, not by a flat
     // 150 samples. The planner runs before the gorges are cut, so that constant
     // never bit there — but the editor asks the same question after the world
     // exists, and on GOTTHARD CLIMB 150 samples either side of two gorges ruled
     // out 503 of 900 stations and left the tool with nowhere to put anything.
-    if (this._nearGorge(i, Math.max(8, maxHalf))) return 0;
+    if (this._nearGorge(i, reach)) return 0;
     // AND CLEAR OF A CREST, for the same reason and with a worse consequence.
     //
     // `_buildCrests` runs first and refuses narrows and gorges; it cannot
@@ -6542,7 +6562,7 @@ export class Track {
       const ci = typeof cr === 'number' ? cr : (cr.i ?? cr.index);
       if (ci == null) continue;
       const len = (typeof cr === 'object' && cr.len) ? cr.len : 22;
-      if (this._circDist(i, ci) < maxHalf + len) return 0;
+      if (this._circDist(i, ci) < reach + len) return 0;
     }
     let mc = 0, half = 0;
     for (let w = 1; w <= maxHalf; w++) {
