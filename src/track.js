@@ -5863,41 +5863,65 @@ export class Track {
     return R.depth * across * (0.12 + 0.88 * (1 - near));
   }
 
+  /** A RIVER IS A LINE, NOT A STRING OF BEADS.
+   *
+   *  This measured the distance to the polyline's POINTS. Those points are
+   *  `curve.getLength() / 11` apart — measured 10.98 to 11.05 u on average,
+   *  up to 20.47 u — and the channel's half-width is 4.0. So the water was
+   *  only ever 4 u wide around each dot, and dry in between: on PINE VALLEY
+   *  all 615 polyline points read wet and 612 of the 615 MIDPOINTS read dry.
+   *  FAFE LEAP, MOUNT PANORAMA and RALLYCROSS had no wet midpoint at all.
+   *
+   *  On the road that turned every ford into a row of puddles. Sampling
+   *  across OUNINPOHJA's ford at 519 gave wet from lateral -9 to -3.5, DRY
+   *  from -2.5 to +0.5 — straddling the racing line — and wet again past +1.
+   *  Eleven fords across one census slice read completely dry at the exact
+   *  centreline. The player saw none of this, because the visible water is a
+   *  continuous ribbon off the curve and the ford wash is its own mesh: you
+   *  drive through an unbroken sheet of water and get splash, drag and wet
+   *  tyres over roughly two thirds of it.
+   *
+   *  Measure the SEGMENTS between the points and the channel is continuous at
+   *  any spacing. Same lesson the barrier runs already carry ("walls are
+   *  segments, not dots"), same fix. `k` still comes back a point index —
+   *  `R.bed[k]` and the ford code index off it — now the nearer end of the
+   *  winning segment. */
   _riverNearest(x, z) {
     const R = this._river;
     const cx = Math.floor(x / R.CELL), cz = Math.floor(z / R.CELL);
+    const L = R.line;
     let best = Infinity, bk = -1;
+    const seg = (k) => {
+      const a = L[k], b = L[k + 1];
+      if (!a || !b) return;
+      const ex = b.x - a.x, ez = b.z - a.z;
+      const len2 = ex * ex + ez * ez || 1;
+      let t = ((x - a.x) * ex + (z - a.z) * ez) / len2;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const px = a.x + ex * t - x, pz = a.z + ez * t - z;
+      const d = px * px + pz * pz;
+      if (d < best) { best = d; bk = t < 0.5 ? k : k + 1; }
+    };
     for (let a = -1; a <= 1; a++) {
       for (let b = -1; b <= 1; b++) {
         const arr = R.grid.get(`${cx + a},${cz + b}`);
         if (!arr) continue;
-        for (const k of arr) {
-          const p = R.line[k];
-          const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
-          if (d < best) { best = d; bk = k; }
-        }
+        // the segment LEAVING each candidate point and the one ARRIVING at it,
+        // so a query beside a segment whose far end sits in another cell still
+        // measures against the segment rather than falling back to its dot
+        for (const k of arr) { seg(k); if (k > 0) seg(k - 1); }
       }
     }
     return { d: best === Infinity ? Infinity : Math.sqrt(best), k: bk };
   }
 
-  /** Distance from (x, z) to the river centreline, or Infinity past the bed. */
+  /** Distance from (x, z) to the river centreline, or Infinity past the bed.
+   *
+   *  This was a byte-for-byte copy of `_riverNearest` that threw the index
+   *  away — so it carried the bead bug too, and would have had to be fixed
+   *  twice. One implementation, one behaviour. */
   _riverDist(x, z) {
-    const R = this._river;
-    const cx = Math.floor(x / R.CELL), cz = Math.floor(z / R.CELL);
-    let best = Infinity;
-    for (let a = -1; a <= 1; a++) {
-      for (let b = -1; b <= 1; b++) {
-        const arr = R.grid.get(`${cx + a},${cz + b}`);
-        if (!arr) continue;
-        for (const k of arr) {
-          const p = R.line[k];
-          const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
-          if (d < best) best = d;
-        }
-      }
-    }
-    return best === Infinity ? Infinity : Math.sqrt(best);
+    return this._riverNearest(x, z).d;
   }
 
   // ---- end continuous river --------------------------------------------------
@@ -11281,7 +11305,29 @@ export class Track {
     gunIron.castShadow = gunWood.castShadow = true;
     let cgk = 0;
     for (const cn of [[-SPAN * 0.62, 1], [SPAN * 0.18, -1], [SPAN * 0.72, 1]]) {
-      const p = at(cn[0], -19);        // up by the wall, not out on the sand
+      // A GUN ON THE QUAY, NOT IN THE ROAD.
+      //
+      // `at(u, -19)` puts the piece up by the wall rather than out on the
+      // sand, which is right about the QUAY and says nothing about where the
+      // carriageway runs. Two of these three landed on it, and one of them is
+      // the deepest intrusion in the whole roster census: sample 328, lateral
+      // -0.47 with r 1.5 — a cannon parked on the centreline, biting 10 u
+      // into a 9 u half-width. The second sits at 6.31 where the road pinches
+      // to 5.96.
+      //
+      // Try the designed spot first, then nudge along the quay and in toward
+      // the wall. A gun that finds nowhere clear is not built at all: two
+      // cannons on a seafront read exactly as well as three, and the third
+      // was never worth a dead stop.
+      let p = null;
+      for (const dv of [0, -3, 3, -6, 6, -9]) {
+        for (const du of [0, -5, 5, -10, 10]) {
+          const c = at(cn[0] + du, -19 + dv);
+          if (this._clearsRoad(c.x, c.z, 1.5, 0.5)) { p = c; break; }
+        }
+        if (p) break;
+      }
+      if (!p) continue;
       const gy = this.terrainHeight(p.x, p.z);
       // A GUN POINTS OUT TO SEA. `yaw` maps local +X seaward, so the +-PI/2 the
       // first version used laid the barrel ALONG the quay, aimed at the next
@@ -11293,6 +11339,10 @@ export class Track {
       cgk++;
       this.solids.push({ x: p.x, z: p.z, r: 1.5, y: gy + 0.5, mat: 'stone' });
     }
+    // an InstancedMesh draws every slot it was allocated, and an unwritten
+    // matrix is the identity — so a skipped gun would otherwise appear at the
+    // world origin rather than not at all
+    gunIron.count = gunWood.count = cgk;
     g.add(gunIron, gunWood);
     // the slipway: from the quay lip down under the water, corners placed
     // explicitly so the top meets the ground and the bottom meets the seabed

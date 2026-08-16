@@ -1330,6 +1330,46 @@ gating the grandstand by withholding its mesh (leaves the start line bare —
 moving it works on all 7).
 
 
+## r191 — the river is a line, and the guns are off the road
+
+**A RIVER IS A LINE, NOT A STRING OF BEADS.** `_riverNearest` measured the
+distance to the polyline's POINTS. Those sit `curve.getLength() / 11` apart —
+10.98 to 11.05 u typical, up to 20.47 — against a channel half-width of 4.0,
+so the water existed in 4 u discs around each dot and nowhere between them.
+Measured on r190: of 4661 polyline midpoints across eight worlds, **31 read
+wet**. PINE VALLEY managed 3 of 615. Eleven of sixteen fords were bone dry at
+the exact centreline while the visible water — a continuous ribbon off the
+curve, plus the ford's own wash mesh — showed an unbroken sheet. You drove
+through solid water and got splash, drag and wet tyres over about two thirds
+of it, in a pattern nothing on screen explained.
+
+Measuring the SEGMENTS instead makes the channel continuous at any spacing.
+Midpoints wet **31 -> 4661**, fords dry at the centreline **11 of 16 -> 0**,
+wet span across the carriageway **0.62-0.84 -> 1.0**. Same lesson the barrier
+runs already carry ("walls are segments, not dots").
+
+`_riverDist` was a byte-for-byte copy of `_riverNearest` that discarded the
+index, so it carried the same bug and would have needed the same fix twice.
+It delegates now — one implementation, one behaviour.
+
+**THE QUAY GUNS.** `at(u, -19)` puts a cannon up by the wall rather than out
+on the sand, which is a fact about the QUAY and says nothing about where the
+carriageway runs. Two of three landed on it, one of them the deepest single
+intrusion in the roster census: HARBOR QUAY sample 328, lateral -0.47 with
+r 1.5, biting 10 u into a 9 u half-width — a cannon on the centreline. They
+now try the designed spot, then nudge along the quay and in toward the wall,
+and a gun with nowhere clear is not built. Census on HARBOR QUAY: **2 blockers
+-> 0**.
+
+Note for anyone touching instanced dressing: `gunIron.count` has to follow the
+number actually placed. An InstancedMesh draws every slot it was allocated and
+an unwritten matrix is the identity, so a skipped gun appears at the world
+origin instead of not at all.
+
+Verified: test-water, test-river, test-carriageway all pass; test-surface
+20/20. (test-surface hardcodes port 8901 and ignores BASE — serve there.)
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
