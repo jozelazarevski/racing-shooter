@@ -11688,8 +11688,30 @@ export class Track {
         for (const k of [-span * 0.55, span * 0.55]) {
           const j = (i + Math.round(k) + N) % N;
           const c = this.center[j];
+          // ITS OWN NORMAL, NOT THE SPAN'S. `nn` is the normal at the middle
+          // of the bridge and belongs to the parapet, which is positioned
+          // there. An arch face stands a third of the span away, and offsetting
+          // it along a normal borrowed from somewhere else is the same "an
+          // offset is not a distance" error the props and the tyre stacks
+          // already carry a comment about.
+          const nj = this.nrm[j];
+          const px = c.x + nj.x * 8.5 * side, pz = c.z + nj.z * 8.5 * side;
+          // AND ASK WHAT ELSE RUNS UNDER IT — the r193 rule, which the
+          // overpass piers follow and these never did. An arch face is 9 u of
+          // masonry hanging below its own deck, and 8.5 u off the centreline
+          // is INSIDE a 9 u half-width: harmless under its own bridge, where
+          // its top sits 0.1 u below the tarmac, and a grey column in the
+          // racing line wherever another leg passes lower. Measured on SEA
+          // CLIFF RUN, whose two legs run 1.91 u apart: one pier stood 5.2 u
+          // proud of the road at sample 660, biting 5.87 u into a 9 u
+          // half-width, with no collider — you drive straight through it.
+          //
+          // `_clearsRoad` cannot answer this: it is flat, so it would refuse
+          // every arch face for standing under its own deck. The question is
+          // three-dimensional — does this masonry rise out of anybody's road.
+          if (this._pierInRoad(px, pz, c.y - 0.1)) continue;
           const pier = new THREE.Mesh(new THREE.BoxGeometry(2.2, 9, 3.2), stone);
-          pier.position.set(c.x + nn.x * 8.5 * side, c.y - 4.6, c.z + nn.z * 8.5 * side);
+          pier.position.set(px, c.y - 4.6, pz);
           pier.rotation.y = yaw;
           g.add(pier);
         }
@@ -11788,8 +11810,6 @@ export class Track {
     // them now (see the barrier under-gate in vehicles.js).
     const railBlocked = (x, z, y, jSelf, half) => {
       for (let i = 0; i < N; i++) {
-        const dLap = Math.min((i - jSelf + N) % N, (jSelf - i + N) % N);
-        if (dLap <= half + 4) continue;             // its own deck run
         const c2 = this.center[i];
         const dx = x - c2.x, dz = z - c2.z;
         if (dx * dx + dz * dz > 400) continue;
@@ -11812,8 +11832,28 @@ export class Track {
         // mouth and is drivable; the cost of being wrong the other way is an
         // invisible wall.
         if (dy > 4.2 || dy < -2.5) continue;        // clear over (or under) it
+        // THE OWN-DECK EXEMPTION RELAXES THE BUFFER; IT DOES NOT SKIP THE ROAD.
+        //
+        // This used to `continue` outright for every sample within `half + 4`
+        // of the rail's own, so that a rail would not block itself: at 10.2 u
+        // off its own centreline it sits only 1.2 u outside a 9 u half-width,
+        // and the 1.4 u buffer below reaches past it. But `half` is the whole
+        // DECK RUN — 38 samples on SEA CLIFF RUN — and the exemption was
+        // spent on lap INDEX, not on distance. Where a lap doubles back inside
+        // its own span the returning leg is a few samples away and a few
+        // metres below, so the window that exists to ignore this rail's own
+        // road swallowed the other one. Measured on SEA CLIFF RUN: rails at
+        // samples 731 and 733 stand 7.12 and 8.33 u from the centreline at
+        // sample 740 — inside a 9 u half-width — 1.7 and 1.2 u ABOVE that
+        // road, and the census found four of them biting up to 4.25 u.
+        //
+        // Its own deck is now measured against the BARE half-width, which
+        // 10.2 clears, and every other stretch keeps the buffer. Same intent,
+        // and it can no longer be bought with a low index distance.
+        const dLap = Math.min((i - jSelf + N) % N, (jSelf - i + N) % N);
+        const pad = dLap <= half + 4 ? 0 : 1.4;     // its own deck run
         const lat = Math.abs(dx * this.nrm[i].x + dz * this.nrm[i].z);
-        if (lat < (this.widthAt ? this.widthAt(i) : 9) + 1.4) return true;
+        if (lat < (this.widthAt ? this.widthAt(i) : 9) + pad) return true;
       }
       return false;
     };
@@ -15404,6 +15444,26 @@ export class Track {
     const i = this.nearestIndex(_clearV);          // no hint: search the whole lap
     const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;
     return this._distToTrack(x, z) - r >= half + margin;
+  }
+
+  /** Does a block of masonry whose top sits at `top` rise out of somebody's
+   *  carriageway? The question a BRIDGE PIER has to answer, and `_clearsRoad`
+   *  cannot: that one is flat, so it refuses every pier for standing under the
+   *  deck it holds up. A pier is beneath its own road by design. What makes
+   *  one an obstacle is rising above ANOTHER stretch's tarmac — which is what
+   *  the overpass piers ask (r193) and the stone bridges' arch faces did not.
+   *
+   *  Within reach in XZ, and standing proud of that stretch's surface. Its own
+   *  deck answers no on the height test, since the top is under it. */
+  _pierInRoad(x, z, top, r = 1.6, margin = 1.0) {
+    for (let i = 0; i < N; i++) {
+      const c = this.center[i];
+      if (top < c.y + 0.35) continue;              // buried under that carriageway
+      const dx = x - c.x, dz = z - c.z;
+      const reach = (this.widthAt ? this.widthAt(i) : ROAD_HALF) + r + margin;
+      if (dx * dx + dz * dz <= reach * reach) return true;
+    }
+    return false;
   }
 
   _trackSidePos(minD, maxD) {

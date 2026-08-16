@@ -1,9 +1,11 @@
 import { chromium } from 'playwright-core';
+// BASE, not a hardcoded port: the baseline lives on another one.
+const BASE = process.env.BASE ?? 'http://localhost:8920';
 const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const page = await b.newPage({ viewport:{width:640,height:400} }); page.setDefaultTimeout(300000);
 for (const id of process.argv.slice(2).map(Number)) {
-  await page.goto(`http://localhost:8920/?level=${id}&go=1&unlockall=1`,{waitUntil:'load',timeout:300000});
+  await page.goto(`${BASE}/?level=${id}&go=1&unlockall=1`,{waitUntil:'load',timeout:300000});
   const ok = await page.waitForFunction(()=>window.__game?.track?.center&&window.__game.player,undefined,{timeout:300000}).then(()=>1).catch(()=>0);
   if(!ok){console.log(`SKIP ${id}`);continue;}
   const r = await page.evaluate(()=>{
