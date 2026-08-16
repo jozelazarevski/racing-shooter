@@ -1370,6 +1370,58 @@ Verified: test-water, test-river, test-carriageway all pass; test-surface
 20/20. (test-surface hardcodes port 8901 and ignores BASE — serve there.)
 
 
+## r192 — the board reads in the order you can drive it
+
+**OPEN WORLDS SORT FIRST.** The career array is rung order and the PRICES are
+not monotonic with it — a world may carry its own `cost` — so the board ran
+58, 60, 63 and then 20 a few cards later. Add the free-unlock floor on top and
+OLIVE COAST sat OPEN underneath three padlocks: the one world the player could
+actually race, buried below three they could not. Unlocked now sort first and
+the locked half is ordered by star cost, which is the order a wall is read in.
+Display only — pricing, progression and `nextTrack` still read the array. This
+does override the timeline view's old "rung 12 follows rung 11" rule, which
+assumed prices rise with the array; they do not.
+
+**LADDER_SLOPE 2.5 -> 0.5.** A rung cost two and a half stars, so a star
+bought less than half a world: 16 stars in hand against neighbours priced
+55/58/60/63, "39 TO GO" on the very next card. At 0.5 one star opens about two
+worlds and those same neighbours price at 11/12/12/13. Measured pace, three
+profiles, worlds open after 3/10/20 races:
+    winner   39/60/60      podium 27/60/60      finisher 12/43/60
+This deliberately REVERSES r178, which set the same number the other way after
+"tracks are opening too fast". The roster has grown since and the report
+reversed; a knob set by report is reset by report.
+
+**AND THE LADDER SUITE HAD TO BE RE-AIMED, NOT SILENCED.** Eleven assertions
+failed because they encoded r178's intent — `a3 <= 10`, `a10 <= 40`, "the
+roster is not fully open even at twenty races". Keeping them would have had
+the suite defend a decision the player had just asked to reverse, which is how
+a test stops being a spec and becomes a fossil. They now assert the opposite
+property: that the board is never a wall.
+
+The floor needed different handling. At slope 0.5 `_freeUnlock` CANNOT fire —
+a finisher banks a whole star per race against rungs costing half of one, so
+affordability outruns racing and nothing is ever owed. Rather than delete the
+seven floor assertions, that block now runs against a deliberately steep price
+(`starCost * 6`), so the safety-net logic stays covered whatever the slope is
+set to next. 24/24.
+
+### Traffic: measured, NOT a defect (recorded so it is not re-hunted)
+
+Chasing "cars are stuck", traffic looked frozen: 1-2 of 6-7 vehicles at
+exactly 0.0 u after 20 real seconds, on every world. They are crossroad
+shuttles mid-wait. Traffic owns its own rAF and its clock advances ~0.125 s
+per real second under swiftshader, so the 9 s look-both-ways pause takes ~75 s
+of wall clock to expire — the trace shows `wait` 9.43 -> 6.83 across the
+window. Any traffic probe needs a MINUTES-long window or a driven rAF; a
+20 s sample proves nothing.
+
+Ruled out in the same hunt, all measured: physics, tracks, the AI field
+(0.5-0.9 laps/30 s, 8/8 alive), the driven player (0.44-0.93 laps/30 s on six
+worlds), the touch pad (drag up -> throttle 0.96), page errors (none), and any
+r190 vs r191 difference (identical). The original report is still unreproduced.
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

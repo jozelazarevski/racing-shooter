@@ -108,6 +108,20 @@ const R = await page.evaluate(async () => {
   out.worlds = LEVELS.length;
 
   // ---- the floor, on its own ---------------------------------------------
+  //
+  // THE FLOOR HAS TO BE TESTED AGAINST A PRICE THAT CAN STRAND SOMEBODY, and
+  // the shipped slope no longer can. At 0.5 a rung costs half a star while a
+  // finisher banks a whole one per race, so affordability outruns racing and
+  // `_freeUnlock` is never owed anything — it returned null here and took
+  // seven assertions down with it. That is the slope doing its job, not the
+  // floor failing.
+  //
+  // So price the ladder steeply for this block only. It exercises exactly the
+  // logic the floor exists for — priced out, cheapest first, granted once,
+  // never re-locked — and it keeps doing so whatever LADDER_SLOPE is set to
+  // next, which is the whole reason the floor is a rule and not a number.
+  const _realCost = g.starCost.bind(g);
+  g.starCost = (id) => _realCost(id) * 6;
   g.career.finished = {};
   out.freshOwesNothing = g._freeUnlock() === null;     // three free worlds unraced
   raceAllAffordable(1);                                // the worst driver in the game
@@ -129,6 +143,8 @@ const R = await page.evaluate(async () => {
   out.unracedCancelsTheDebt = g._freeUnlock() === null;
 
   // ---- a world you raced never re-locks ----------------------------------
+  // (still on the steep price — re-locking is a pricing question, and the
+  // steep table is the only one that can price a raced world back out)
   g.career.finished = {};
   const dear = LEVELS.find((l) => g.starCost(l.id) > 0);
   g.career.finished[dear.id] = { place: 6, stars: 1 };   // raced it via the floor
@@ -152,9 +168,15 @@ const R = await page.evaluate(async () => {
 
 console.log('\n--- the price table ---');
 ok(R.free === 3, 'three worlds are free, so there is a choice from the first race', `${R.free}`);
-ok(R.firstPriced > 1,
-  'the ladder costs more than one star a rung — the report was that it did not',
-  `${R.firstPriced}★ for the first priced rung`);
+// A RUNG COSTS HALF A STAR, WHICH IS THE POINT. The old assertion here was
+// `firstPriced > 1` — written when the report was "tracks are opening too
+// fast". The report reversed ("open a few tracks per star earned, not five,
+// six"), so what needs defending is the opposite: a star must buy MORE than
+// one world, or the board goes back to being a row of walls.
+ok(R.worlds / Math.max(1, R.maxCost) >= 1.5,
+  'one star opens at least a world and a half — the wall was the complaint',
+  `${R.worlds} worlds priced up to ${R.maxCost}★ `
+  + `= ${(R.worlds / Math.max(1, R.maxCost)).toFixed(2)} worlds per star`);
 ok(R.maxCost < R.maxStars * 0.6,
   'and the dearest world is still well inside what the roster can pay',
   `${R.maxCost}★ of ${R.maxStars}`);
@@ -166,17 +188,20 @@ console.log('\n--- how fast the roster unrolls ---');
 console.log(`  winner   open after 3/10/20 races: ${R.winner.a3}/${R.winner.a10}/${R.winner.a20}`);
 console.log(`  podium   open after 3/10/20 races: ${R.podium.a3}/${R.podium.a10}/${R.podium.a20}`);
 console.log(`  finisher open after 3/10/20 races: ${R.finisher.a3}/${R.finisher.a10}/${R.finisher.a20}`);
-ok(R.winner.a3 <= 10,
-  'winning your first three races does not put a sixth of the roster on the table',
+// THESE THREE USED TO ASSERT THE CEILING AND NOW ASSERT THE FLOOR. They read
+// `a3 <= 10`, `a10 <= 40`, `a20 < worlds` — the shape of the r178 slowdown.
+// Keeping them would have meant the suite defending a decision the player had
+// already asked to have reversed, which is how a test stops being a spec and
+// starts being a fossil. What matters now is that the board is never a wall.
+ok(R.winner.a3 >= 12,
+  'three races in, there is a real spread of worlds to choose from',
   `${R.winner.a3} of ${R.worlds} open`);
-ok(R.winner.a10 <= 40,
-  'and ten races in, most of the roster is still ahead of you',
+ok(R.finisher.a3 >= 6,
+  'and that is true for the worst driver in the game, not just the winner',
+  `${R.finisher.a3} of ${R.worlds} open`);
+ok(R.winner.a10 >= 30,
+  'ten races in, a winner is deep into the roster',
   `${R.winner.a10} of ${R.worlds} open`);
-ok(R.winner.a20 < R.worlds,
-  'the roster is not fully open even at twenty races', `${R.winner.a20} of ${R.worlds}`);
-ok(R.winner.a3 >= 4 && R.winner.a10 >= 15,
-  'but a winner is always visibly ahead of where they started',
-  `${R.winner.a3} / ${R.winner.a10}`);
 ok(R.winner.a3 >= R.podium.a3 && R.podium.a3 >= R.finisher.a3
   && R.winner.a10 >= R.podium.a10 && R.podium.a10 >= R.finisher.a10,
   'and racing better opens the roster faster, at every checkpoint',
