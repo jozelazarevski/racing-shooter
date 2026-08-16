@@ -16,7 +16,7 @@
  * CACHE is bumped by the release version. Bump it whenever ?v= in index.html
  * is bumped, or phones will keep serving the previous build forever.
  */
-const CACHE = 'ignite-rally-r197';
+const CACHE = 'ignite-rally-r198';
 
 // ---- CORE vs EXTRA ---------------------------------------------------------
 // CORE is everything the game needs to RUN with the radio off: the shell, the
@@ -59,6 +59,12 @@ const CORE = [
   './lib/shaders/OutputShader.js',
   './assets/fonts/baloo2-latin.woff2',
   './assets/fonts/luckiestguy-latin.woff2',
+  // THE HOME-SCREEN ICONS BELONG IN THE PRECACHE TOO. The manifest and
+  // iOS's apple-touch-icon both point at these, and an installed app that
+  // cannot serve its own icon offline is the one asset the launcher asks
+  // for when there is no radio. Two files, ~320 KB, fetched once.
+  './assets/icon-192.png',
+  './assets/icon-512.png',
 ];
 
 // 32, and read from one place: this list was hardcoded at 21 when the roster
