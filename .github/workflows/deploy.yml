@@ -1,0 +1,29 @@
+name: Deploy to GitHub Pages
+
+# Publishes the repo root to the gh-pages branch, which GitHub Pages serves.
+# (The artifact-based Pages deploy needs repo-admin rights to create the site,
+# which GITHUB_TOKEN doesn't have — the gh-pages branch flow works without it.)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          force_orphan: true

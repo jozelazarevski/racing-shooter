@@ -1,0 +1,8 @@
+node_modules/
+.claude/
+
+# transient headless probe screenshots (design/QA passes, not assets)
+/harbor-sea*.png
+/oldtown-*.png
+/olive-sea*.png
+/vine-*.png

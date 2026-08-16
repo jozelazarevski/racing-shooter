@@ -1,0 +1,25 @@
+{
+  "name": "IGNITE RALLY",
+  "short_name": "Ignite Rally",
+  "description": "Voxel combat racing — if you can't race them, shoot them. Plays fully offline.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#2b1c0e",
+  "theme_color": "#ffd400",
+  "icons": [
+    {
+      "src": "./assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
