@@ -6802,6 +6802,40 @@ export class Track {
     return null;
   }
 
+  /** UNDER A FLYOVER, THE CAMERA HAS A CEILING TOO.
+   *
+   *  A bore gets this right through `tunnelAt`: over the roadway, under the
+   *  crown, inside the walls. An overpass is the same situation with the same
+   *  failure — a chase camera that floats where it likes ends up ABOVE the
+   *  deck, so the driver spends the pass looking at the top of a bridge while
+   *  the car runs underneath it, invisible. The r190 clearance work made this
+   *  more common by giving every crossing a real deck to hide behind.
+   *
+   *  Returns the soffit height and the span's half-width when `pos` is under a
+   *  crossing's flying leg, or null. Same shape as `tunnelAt` so main.js can
+   *  clamp against either with one code path.
+   *
+   *  `pad` reaches a little past the deck, because the camera trails the car:
+   *  the car is out from under before the camera is, and the hand-off must not
+   *  flick the view up through the deck on the way out. */
+  deckOverhead(pos, hint = null, pad = 6) {
+    if (!this._overpasses?.length) return null;
+    const bi = this.nearestIndex(pos, hint, true);
+    for (const o of this._overpasses) {
+      // on the UNDER leg of this crossing (its own span, plus the pad)
+      if (this._circDist(bi, o.down) > 12 + pad) continue;
+      const up = this.center[o.up], here = this.center[bi];
+      // and actually beneath the deck, not merely near the crossing: the two
+      // legs share an XZ point by construction, so measure against THAT point
+      const dx = pos.x - up.x, dz = pos.z - up.z;
+      if (dx * dx + dz * dz > 20 * 20) continue;
+      const soffit = up.y - 1.0;                 // deck underside
+      if (soffit <= here.y + 1.2) continue;      // no headroom: not a flyover here
+      return { i: bi, floorY: here.y, deckY: soffit, half: 10.2 };
+    }
+    return null;
+  }
+
   /** Terrain-MESH vertex height: same blend as terrainHeight but with an
    *  EXACT full-resolution nearest scan (build-time only) — the coarse
    *  bilinear field mixes y values of different strands where two road
@@ -8518,6 +8552,7 @@ export class Track {
     this._buildWorldElements(m4);                    // farms, chapels, fences, dressing
     this._buildPastures();                           // grazing spots for the animal system
     this._buildCrossroads();                         // dirt side-road junctions (rural worlds)
+    this._buildJunctionFences();                     // and the fences flanking their mouths
     // FARMLAND: the banks that line every lane. AFTER the crossroads, the
     // props and the tire stacks, because it leaves a gap wherever one of them
     // already occupies the verge — a hedge cannot grow across a field gate.
@@ -11753,7 +11788,46 @@ export class Track {
         const c = this.center[j], n = this.nrm[j];
         for (const side of [1, -1]) {
           const rx = c.x + n.x * 10.2 * side, rz = c.z + n.z * 10.2 * side;
-          if (railBlocked(rx, rz, c.y, j, o.half)) continue;
+          if (railBlocked(rx, rz, c.y, j, o.half)) {
+            // A JUNCTION MOUTH IS STILL AN EDGE.
+            //
+            // The rail is withheld here because it would stand in ANOTHER
+            // stretch's lane, and that is right — but the reason the rail was
+            // wanted has not gone away: the deck edge is still an edge, and on
+            // a raised span there is still a drop past it. So the gap was left
+            // completely open, which is what a player meets at a joint.
+            //
+            // Put a marker line in instead, pulled in until it clears every
+            // carriageway on the lap. Tyre stacks, not masonry: they read as
+            // "edge of the road" at a glance, they are what a rally circuit
+            // actually uses at a junction mouth, and if one is clipped it
+            // costs a scrape rather than the race. If nothing clears, nothing
+            // is built — the same rule the rail itself follows.
+            // OUTWARD, not inward. Pulling the marker IN puts it on this
+            // deck's own carriageway — 10.2 is already the innermost offset
+            // that clears a 9 u half-width, which is why the rail lives there.
+            // The thing in the way is the OTHER road, so step away from both.
+            for (const pull of [0, 1.5, 3.0, 4.5]) {
+              const fx = c.x + n.x * (10.2 + pull) * side;
+              const fz = c.z + n.z * (10.2 + pull) * side;
+              if (!this._clearsRoad(fx, fz, 0.6, 0.6)) continue;
+              const yaw = this.headingAt(j);
+              // post-and-rail, deliberately slim and deliberately NOT a
+              // collider: it marks the edge of the deck through the junction
+              // without putting anything solid in the mouth of a junction that
+              // cars are entitled to drive through
+              const post = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.0, 0.2), stone);
+              post.position.set(fx, c.y + 0.5, fz);
+              post.rotation.y = yaw;
+              const bar = new THREE.Mesh(
+                new THREE.BoxGeometry(0.14, 0.14, 2 * this.segLen + 0.4), stone);
+              bar.position.set(fx, c.y + 0.82, fz);
+              bar.rotation.y = yaw;
+              g.add(post, bar);
+              break;
+            }
+            continue;
+          }
           const rail = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.1, 2 * this.segLen + 0.4), stone);
           rail.position.set(rx, c.y + 0.45, rz);
           rail.rotation.y = this.headingAt(j);
@@ -13114,6 +13188,77 @@ export class Track {
    *    y        road centerline height at the junction
    *  The first four are the canonical schema; the rest are derived
    *  conveniences (dx,dz === tan*cos(angle) + nrm*side*sin(angle)). */
+  /** FENCES FLANKING A ROAD JOINT.
+   *
+   *  A crossroad is a hole deliberately cut in the roadside dressing: the spur
+   *  mouth flares to 5.4 u and everything that would normally line the verge
+   *  is suppressed around it, because a fence across a junction mouth is a
+   *  fence across a road. The result is that a joint reads as the verge simply
+   *  STOPPING for twenty metres, with nothing to say where the carriageway
+   *  ends and the field begins — which is what a driver meets at speed, and
+   *  what was asked for: "add fences on road joints."
+   *
+   *  So put the fence back on either SIDE of the mouth, not across it. Each
+   *  post is gated on `_clearsRoad`, so it can never stand in the main road,
+   *  and the run starts clear of the flare so it never stands in the spur
+   *  either. Post-and-rail with no collider: at a junction the driver is
+   *  entitled to cross this line, and it is there to tell them where they are,
+   *  not to stop them. */
+  _buildJunctionFences() {
+    if (!this.crossroads?.length) return;
+    const wood = new THREE.MeshStandardMaterial({
+      color: 0x6b5334, roughness: 0.95, flatShading: true,
+    });
+    const g = new THREE.Group();
+    const FLARE = 5.4;                 // the mouth's own half-width
+    let built = 0;
+    for (const cr of this.crossroads) {
+      const i = cr.index;
+      if (i == null || !this.center[i]) continue;
+      const n = this.nrm[i], side = cr.side ?? 1;
+      const off = (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 1.3;
+      // walk out along the road from the mouth, both ways, starting past the
+      // flare so the junction itself stays open
+      for (const dir of [1, -1]) {
+        for (let s = 0; s < 4; s++) {
+          const along = (FLARE + 2.2 + s * 2.6) * dir;
+          const j = (i + Math.round(along / Math.max(0.5, this.segLen)) + N) % N;
+          const c = this.center[j], nj = this.nrm[j];
+          const fx = c.x + nj.x * off * side, fz = c.z + nj.z * off * side;
+          // MEASURE AGAINST EVERY SAMPLE, not the cached road field.
+          //
+          // `_clearsRoad` was letting these through: the first cut of this
+          // builder put 24 posts of 290 in a carriageway across four worlds,
+          // the worst 9.5 u in — dead centre of a road. Whatever the cached
+          // field is doing at these positions, a fence post is a build-time,
+          // once-per-junction decision and there is no reason to trust an
+          // approximation for it. A full scan is ~900 comparisons per post and
+          // happens once per world.
+          let dmin = Infinity, at = 0;
+          for (let q = 0; q < N; q++) {
+            const cc = this.center[q];
+            const dd = (fx - cc.x) * (fx - cc.x) + (fz - cc.z) * (fz - cc.z);
+            if (dd < dmin) { dmin = dd; at = q; }
+          }
+          const halfAt = this.widthAt ? this.widthAt(at) : ROAD_HALF;
+          if (Math.sqrt(dmin) - 0.5 < halfAt + 0.8) continue;
+          const gy = this.terrainHeight(fx, fz);
+          const yaw = this.headingAt(j);
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.05, 0.18), wood);
+          post.position.set(fx, gy + 0.52, fz);
+          post.rotation.y = yaw;
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 2.7), wood);
+          bar.position.set(fx, gy + 0.8, fz);
+          bar.rotation.y = yaw;
+          post.castShadow = bar.castShadow = true;
+          g.add(post, bar);
+          built++;
+        }
+      }
+    }
+    if (built) this.group.add(g);
+  }
+
   _buildCrossroads() {
     const want = Math.min(4,
       (this.T.crossroads ?? THEME_CROSSROADS[this.level && this.level.theme] ?? 0) | 0);

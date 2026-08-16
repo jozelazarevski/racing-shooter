@@ -21,6 +21,11 @@ const MAX_GRADE = 0.45;
  *  gravity 26 this is 0.85 s of hang time and 2.3 u of height before the road
  *  falls away underneath. A car may not launch while the ground is rising
  *  faster than this — see the coherence check in the crest branch. */
+// Lap gates as fractions of the lap, armed strictly in order — see checkLap.
+// Quarter points rather than more: every extra gate is another place a legal
+// racing line can be judged illegal, and four already makes the infield
+// uncuttable on every layout in the roster.
+const LAP_GATES = [0.2, 0.4, 0.6, 0.8];
 const VY_CAP = 11;
 
 const SCORCH = new THREE.Color(0x1c1a18); // damage tint target
@@ -1114,6 +1119,8 @@ export class Car {
     // earns none either), while `_wraps` must rise on every crossing so
     // `progress` — which orders the standings — never goes backwards.
     this._wraps = 0;
+    this._cpMask = 0;          // which lap gates are down, in order
+    this._missedCP = false;
     this.lateral = 0;
     this.finished = false;
     this.wallGrind = 0;
@@ -1153,6 +1160,8 @@ export class Car {
     // must earn it. The grid sits just BEFORE the line at ~0.99N, so the window
     // stops at 0.85N — without that upper bound the first line crossing after
     // GO banks a free lap and a "3 lap" race is really two.
+    // gates reset with the checkpoint they belong to
+    this._cpMask = keepCP ? (this._cpMask ?? 0) : 0;
     this._midCP = keepCP
       ? (this._midCP ?? false)
       : (index > this.game.track.N * 0.4 && index < this.game.track.N * 0.85);
@@ -2874,10 +2883,40 @@ export class Car {
    *  cutting straight across the map earns nothing. */
   checkLap(prevIndex) {
     const n = this.game.track.N;
+    // FOUR GATES, IN ORDER, AND YOU CANNOT SKIP ONE.
+    //
+    // There was exactly ONE checkpoint, at mid-lap, so a lap was legal if you
+    // touched anywhere between 40% and 60% of the distance. On a circuit that
+    // doubles back — and most of this roster does — that is reachable by
+    // cutting across the infield from near the line and back, which is a lap
+    // the driver never drove. Asked for directly: "add checkpoints that I
+    // can't skip."
+    //
+    // Four gates at the quarter points, armed STRICTLY IN ORDER: gate k only
+    // arms if gate k-1 is already down. Order is what makes them unskippable —
+    // a bare set of flags can be collected by wandering, a sequence cannot,
+    // because reaching gate 3 without gate 2 leaves gate 3 shut no matter how
+    // many times you drive over it.
+    const f = this.trackIndex / n;
+    for (let k = 0; k < LAP_GATES.length; k++) {
+      const a = LAP_GATES[k];
+      if (f < a || f > a + 0.14) continue;
+      if (k === 0 || (this._cpMask & (1 << (k - 1)))) this._cpMask |= 1 << k;
+    }
     if (this.trackIndex > n * 0.4 && this.trackIndex < n * 0.6) this._midCP = true;
     if (prevIndex > n * 0.85 && this.trackIndex < n * 0.15) {
       this._wraps++;                           // distance always counts...
-      if (this._midCP === false) return false; // ...but a cut earns no lap
+      const ALL = (1 << LAP_GATES.length) - 1;
+      // ...but a cut earns no lap. `_missedCP` is left for the HUD to read, so
+      // the driver is told WHY the lap did not count instead of watching the
+      // counter silently refuse to move.
+      if (this._midCP === false || (this._cpMask & ALL) !== ALL) {
+        this._missedCP = true;
+        this._cpMask = 0;
+        this._midCP = false;
+        return false;
+      }
+      this._cpMask = 0;
       this._midCP = false;
       this.lap++;
       return true;
@@ -4157,6 +4196,17 @@ export class PlayerCar extends Car {
     }
 
     if (this.checkLap(prevIndex) && controlsLive) g.onPlayerLap();
+    // A REFUSED LAP HAS TO SAY SO. Crossing the line and watching the counter
+    // not move is indistinguishable from a bug — the driver has no way to know
+    // a gate was missed, or which. Tell them at the line, once per crossing.
+    if (this._missedCP) {
+      this._missedCP = false;
+      if (controlsLive && this === g.player) {
+        g.hud?.centerMsg?.('CHECKPOINT MISSED — LAP NOT COUNTED');
+        g.hud?.feed?.('YOU MUST PASS EVERY CHECKPOINT', 'warn');
+        g.buzz?.(40);
+      }
+    }
 
     // cannon heat
     if (this.heat > 0) this.heat = Math.max(0, this.heat - dt * (this.overheated ? 0.35 : 0.5));
