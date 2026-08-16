@@ -7288,24 +7288,32 @@ export class Track {
     // it was the only part of the gantry that read `c.y` at all — every mesh
     // below was positioned at an ABSOLUTE height, which is the same thing as
     // asserting the start line sits at y = 0 on every world. It does not.
-    // Measured on the pristine build, two worlds start off zero and both are
-    // wrong because of it:
+    // MEASURED, not inferred — an earlier draft of this comment carried two
+    // start heights worked back from census arithmetic and both were wrong.
+    // Sweeping `center[0].y` across the roster: 11 of 61 worlds do NOT start
+    // at zero. Eight of them are the Mediterranean set at 0.20-0.78 u, which
+    // is a sag nobody would notice. Three are not:
     //
-    //   CLIFF KNOT      start line at y = 3.57. The starting-lights housing is
-    //                   a 7.4 x 2.6 x 1.2 steel box at an absolute 6.6, so it
-    //                   spanned 5.30-7.90 with its UNDERSIDE 1.73 u above the
-    //                   tarmac it hangs over — windscreen height, across the
-    //                   full width of the grid. The census caught it biting
-    //                   9 u into a 9 u half-width, dead centre, with no
-    //                   collider: you drive through the start lights.
-    //   RED CENTRE RUN  start line at y = -3.99, so the whole gantry floated
-    //                   about four metres over its own grid — 16 pieces of it —
-    //                   while another leg of the lap passes 10.2 u away at
-    //                   y = 8.78 (sample 126) for the tall parts to foul.
+    //   PINE VALLEY     y = 0. The control, and the intended geometry: the
+    //                   lights housing's underside sits 5.30 u over the grid.
+    //   SUZUKA          y = 7.87 — the largest on the roster. The housing is a
+    //                   7.4 x 2.6 x 1.2 steel box at an ABSOLUTE 6.6, so its
+    //                   underside sat 2.57 u UNDER the tarmac and the 26 u
+    //                   crossbar 1.13 u over it: the start gantry buried to
+    //                   its shoulders in its own start line. The census never
+    //                   saw this one, and could not — a buried object is not
+    //                   standing proud of the road, which is exactly the test.
+    //                   It took measuring the assumption itself to find it.
+    //   RED CENTRE RUN  y = -3.99. The same structure floating 9.29 u up, four
+    //                   metres clear of where it belongs, 16 pieces of it.
+    //   CLIFF KNOT      y = 3.57. Underside 1.73 u over the tarmac —
+    //                   windscreen height, across the full width of the grid.
+    //                   The census DID catch this one, biting 9 u into a 9 u
+    //                   half-width with no collider: you drive through the
+    //                   start lights.
     //
-    // Most of the roster DOES start at zero, which is exactly why this
-    // survived: an assumption that holds almost everywhere is the hardest kind
-    // to see, and the two worlds that break it are late additions.
+    // Most of the roster starts at zero, which is why this survived. An
+    // assumption that holds almost everywhere is the hardest kind to see.
     //
     // Everything the gantry hangs over the road is now referenced to `y0`, the
     // road at the start line, which is the surface the structure spans and the
@@ -9044,7 +9052,12 @@ export class Track {
     {
       const K = ELEMENT_KITS[this.T.elements || 'alpine'];
       const B = this._elemB();          // shared — see the note on _elemB
-      const c = this.center[(gi + Math.round(16 / this.segLen)) % N], n = this.nrm[gi];
+      // ITS OWN NORMAL AGAIN. `c` is the sample 16 u past the gorge and `n`
+      // was `nrm[gi]`, the normal 16 u back up the road — the same mismatch
+      // the stone-bridge arch faces carried, and it biases everything below
+      // toward one side of the carriageway.
+      const ci = (gi + Math.round(16 / this.segLen)) % N;
+      const c = this.center[ci], n = this.nrm[ci];
       for (const [off, side] of [[15, 1], [19, -1]]) {
         const px = c.x + n.x * off * side, pz = c.z + n.z * off * side;
         if (!this._buildableSpot(px, pz, 4, 3.2)) continue;
@@ -9056,6 +9069,15 @@ export class Track {
       for (let k = 0; k < 3; k++) {
         const off = (13 + Math.random() * 9) * (k % 2 ? 1 : -1);
         const px = c.x + n.x * off, pz = c.z + n.z * off;
+        // AND A LOG IS 6.5 u LONG. `off` positions its CENTRE, `rotation.y` is
+        // random, so it sweeps 3.25 u from that point in whatever direction it
+        // lands — and nothing here asked. Measured on ESTONIA CRESTS: two of
+        // them lying at lateral 2.05 and 2.26 u on a 9 u half-width, timber
+        // across the racing line at the exit of the hero bridge, with no
+        // collider. Same family as the props, the cacti, the corridor pines
+        // and the hoardings: the anchor was placed clear and the reach was
+        // never counted.
+        if (!this._clearsRoad(px, pz, 3.25, 0.6)) continue;
         const log = new THREE.Mesh(logGeo, wood);
         log.position.set(px, this.terrainHeight(px, pz) + 0.5, pz);
         log.rotation.y = Math.random() * Math.PI;

@@ -1,14 +1,15 @@
 # HANDOVER — read this before touching anything
 
-State at handover: branch `claude/handover-continuation-wrq47s` = r199, four
+State at handover: branch `claude/handover-continuation-wrq47s` = r199, eight
 commits on top of r198, pushed. Tree clean.
 Live (still r198 until this merges): https://jozelazarevski.github.io/racing-shooter/
 
 ## WHAT HAPPENED LAST SESSION, IN ONE LINE
 
 The previous handover's number one priority was a bug in the PROBE, not in the
-game. Extending the census properly found four real defects instead, and a
-drive-through test for tunnels found a fifth.
+game. Extending the census properly found eight real defects instead; a
+drive-through test for the tunnels found a ninth; and measuring an ASSUMPTION
+the census cannot see — that every world starts at y = 0 — found a tenth.
 
 ## READ THIS FIRST: THE FENCE POSTS NEVER EXISTED
 
@@ -64,14 +65,18 @@ removed** — do not remove them without reading why:
 ## SCORE, PRISTINE origin/main vs THIS BRANCH, SAME TOOL
 
                       before    after
-    worlds dirty       36/61    34/61
     blockers              60       48
-    intruders            196       73
-      with no collider   179       53
-    trees in a lane       23       14
+    intruders            196       see census-final.txt
+    trees in a lane       23        0
 
-Four defects fixed, all the same shape — **an anchor placed clear, and nobody
-asked how far the thing reaches from it**:
+**THE ONE DEFECT THIS SESSION KEPT FINDING**, in nine builders now — props,
+tire stacks, road cabins, quay guns, arch faces, deck rails, cacti, hoardings,
+corridor pines, fallen logs. Always the same sentence: *something computes a
+position that clears the road AT ONE SAMPLE, and nothing asks how far the thing
+reaches from it.* `_distToTrack` searches the whole lap and answers it.
+**When you meet new scenery on the road, look for this first.**
+
+Fixed here:
 
 1. SEA CLIFF RUN's stone-bridge arch face: 9 u of masonry 5.2 u proud of the
    road, biting 5.87 u, no collider. Offset along the SPAN's normal instead of
@@ -88,6 +93,31 @@ asked how far the thing reaches from it**:
 4. Cacti — three cacti and an acacia with their TRUNKS in the carriageway on
    CANYON RUN, worst 1.01 u from the centreline. `_buildCacti` never called
    `_distToTrack`.
+5. SUZUKA's tree corridor — 14 trunks in the lane on a figure-of-eight, and
+   these are `solid: true` pines, so hitting one stops a car dead. 14 -> 0, at
+   a cost of 28 trees out of 800.
+6. ESTONIA CRESTS' fallen logs — a 6.5 u log positioned by its CENTRE with a
+   random yaw sweeps 3.25 u, and it was offset along the normal of a sample
+   16 u away. Two lay 2.05 u from the centreline. 2 -> 0.
+7. THE START GANTRY WAS BUILT AT ABSOLUTE HEIGHTS — legs, braces, cabin,
+   banner, flags, lights — while only the checkered strip read `c.y`, carrying
+   the comment "start area is flat (c.y = 0)". Measuring THAT assumption:
+   **11 of 61 worlds do not start at y = 0.** SUZUKA (7.87) had its lights
+   housing 2.57 u UNDER the tarmac and its crossbar 1.13 u over it — the gantry
+   buried to its shoulders. RED CENTRE RUN (-3.99) floated it 9.29 u up. CLIFF
+   KNOT (3.57) put it at windscreen height across the grid. All now measure the
+   intended 5.30 u, PINE VALLEY (y = 0) unchanged as the control.
+
+   **NOTE WHICH ONE THE CENSUS COULD NOT FIND.** SUZUKA's was the worst and the
+   census never reported it: a BURIED object is not standing proud of the road,
+   which is exactly the test INTRUDERS is built on. Only measuring the
+   ASSUMPTION found it. A census answers the question it was given — when
+   something looks wrong and the census says clean, suspect the question.
+8. The census learned that an OVERLAY announces itself. COTE D AZUR's deepest
+   remaining hit at 7.71 u was SEA FOAM. Anything drawn with
+   `depthWrite: false` is a visual layer by construction — foam, puddles,
+   tunnel light pools, contact shadows. No thickness heuristic needed; the
+   material carries the answer. COTE D AZUR 9 -> 0.
 
 ## TUNNELS: 26 OF 26 BORES DRIVE IN ONE PORTAL AND OUT THE OTHER
 
@@ -126,16 +156,22 @@ here is the legitimate overpass elsewhere on the lap. FIX SHAPE: register
 near-miss pairs as crossings. Measure all eight overpass worlds with
 `tools-scratch/gaps.mjs` before and after.
 
-### 2. Finish the census backlog — it is now a list, not a hunt
-    SUZUKA           14 tree TRUNKS in the lane, worst 4.15 u, samples 19-24
-                     and 76, `kind: 'pine'`, r 1.06-1.38. NOT `_buildRedwoods`
-                     (its giants and saplings both consult `_distToTrack`).
-                     Builder UNIDENTIFIED — instrument it, do not grep.
-                     Almost certainly the same missing check as the cacti.
-    RED CENTRE RUN   Box 7.4x2.6x1.2 #24211c biting 8.78 u, 2.5 u proud, bare
-    MONACO STREETS   8.9 u    CLIFF KNOT 9.0 u
-    ESTONIA CRESTS   Cylinder 6.5x0.55 #5a3a22 biting 6.95 u
-    COTE D AZUR      30 stone blockers at 9.27 u — that is the TUNNEL doing its
+### 2. Finish the census backlog — it is now a short list
+Everything above 6 u is cleared. What is left:
+
+    RED CENTRE RUN   the gantry CABIN and BRACES, ~5.5 u, bare. The tower spot
+                     is scored by `_clearsRoad`, which is FLAT, so it cannot
+                     know another leg passes at the cabin's own height 10 u up.
+                     Same 3-D question `_pierInRoad` answers for arch faces —
+                     that is the fix shape. NOTE the builder already documents
+                     a deliberate compromise here (TOUR DE CORSE, RALLYCROSS
+                     ARENA): where nothing clears, the mesh stays and the
+                     COLLIDER is dropped. Do not undo that; extend the scoring.
+    rocks            `Dodecahedron 1` on CINQUE TERRE (6.28 u, instanced,
+                     #807d70), PIKES PEAK (4.03, #7a9a6c), MOUNTAIN TO SEA
+                     (1.34, #8e8a7a) — three different builders by colour and
+                     instancing. Almost certainly the same missing check again.
+    COTE D AZUR      14 stone blockers at 9.27 u — that is the TUNNEL doing its
                      job, a documented false positive. Not a defect.
 
 ### 3. Rival pace — the number that still does not exist

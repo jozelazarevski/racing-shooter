@@ -332,6 +332,15 @@ for (const lv of worlds) {
         // span, so the ratio called an advertising hoarding a puddle. Take the
         // axis the sheet has no thickness on, rotate it into world space, and
         // ask which way it faces.
+        // AN OVERLAY IS NOT AN OBSTACLE, AND IT SAYS SO ITSELF. Anything drawn
+        // with `depthWrite: false` is a visual layer by construction — sea
+        // foam, puddles, the tunnel light pools, contact shadows. COTE D AZUR's
+        // deepest remaining "intruder" was a surf dash: a 3.4 x 0.05 x 0.32
+        // `MeshBasicMaterial` box at opacity 0.4 on the water beside a
+        // seafront road, reported at 7.71 u. A thickness heuristic would have
+        // needed a magic number and would still have missed the thick ones;
+        // the material already carries the answer.
+        if (m.material && m.material.depthWrite === false) { decals++; continue; }
         const flat = ex < 1e-6 ? 0 : ey < 1e-6 ? 1 : ez < 1e-6 ? 2 : -1;
         if (flat >= 0) {
           const e = mm.elements, o = flat * 4;

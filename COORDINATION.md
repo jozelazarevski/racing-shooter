@@ -1870,6 +1870,91 @@ r196 OLIVE PASS array-order note, pre-existing, and not caused by anything here.
                      doing its job (documented false positive), not a defect
     ESTONIA CRESTS   Cylinder 6.5x0.55 #5a3a22 biting 6.95 u
 
+## r199e/f/g — the anchor is placed clear, the reach is never counted
+
+Four more of the same defect, found by the extended census and each fixed in
+its own builder. The shape has now appeared in NINE places (props, tire stacks,
+road cabins, quay guns, arch faces, deck rails, cacti, hoardings, corridor
+pines, fallen logs) and it is always the same sentence: **something computes a
+position that clears the road AT ONE SAMPLE, and nothing asks how far the thing
+reaches from it.** `_distToTrack` searches the whole lap and answers it.
+
+### SUZUKA — 14 trunks in the lane, and they stop a car dead
+
+The tree-corridor builder computes `lat = widthAt(j) + 0.75*sc + 2.0 + …` and
+offsets along sample j's own normal. That clearance is true of sample j by
+construction and says nothing about a second leg — and SUZUKA is a
+figure-of-eight. 14 trunks stood inside a carriageway around samples 19-24 and
+76, worst 3.0 u past the drivable edge on a 1.16 u trunk. These are
+`solid: true` pines: hitting one stops a car dead, so this was the
+worst-consequence version of the family. **14 -> 0**, at a cost of 28 trees out
+of 800. `part.count = k` already, so a skipped station leaves no orphan
+instance at the origin (the r191 trap).
+
+### THE HOARDING TURN WAS HALF A FIX
+
+r199b turned a board to stand ALONG the road where it would otherwise hang over
+it. That only helps when the problem is its OWN road: parallel, the board still
+reaches 4.5 u along the lap, and where a lap crosses itself, along points
+straight at the other leg. Measured after the turn shipped: BRIDGE RUN still
+had a board at 8.23 u and MONACO STREETS a post at 5.7 u. Both orientations are
+now checked and a board with nowhere clear is not built — the quay-gun rule.
+MONACO **3 -> 0**, BRIDGE RUN **4 -> 1**.
+
+### THE START GANTRY WAS BUILT AT ABSOLUTE HEIGHTS
+
+The `Box 7.4x2.6x1.2 #24211c` the census kept reporting is the starting-lights
+housing. Every mesh in the gantry — legs, braces, cabin, banner, finish flags,
+housing, lamps — sat at a literal `y`, and only the checkered strip read `c.y`,
+carrying the comment "start area is flat (c.y = 0)". Measuring the assumption
+itself: **11 of 61 worlds do not start at zero.**
+
+    PINE VALLEY      y = 0      control: housing underside 5.30 u over the grid
+    SUZUKA           y = 7.87   underside 2.57 u UNDER the tarmac, crossbar
+                                1.13 u over it — the gantry buried to its
+                                shoulders in its own start line
+    RED CENTRE RUN   y = -3.99  the same structure floating 9.29 u up
+    CLIFF KNOT       y = 3.57   underside 1.73 u over the grid — windscreen
+                                height, across the full width of it
+    + 7 more at 0.20-0.78 u
+
+All four now measure exactly 5.30 u, PINE VALLEY unchanged. Photographed on
+SUZUKA before and after: no lights over the grid, then lights.
+
+**AND NOTE WHICH ONE THE CENSUS COULD NOT FIND.** SUZUKA's was the worst and
+the census never reported it, because a buried object is not standing proud of
+the road — which is precisely the test the INTRUDERS measure is built on. Only
+measuring the ASSUMPTION found it. A census answers the question it was given.
+
+### ESTONIA CRESTS — a 6.5 m log across the racing line
+
+`_buildHeroBridge`'s loose fallen logs took `c` at the sample 16 u past the
+gorge and `n` at `nrm[gi]`, 16 u back up the road — the arch-face mismatch
+again — and `off` positions the log's CENTRE while `rotation.y` is random, so a
+6.5 u log sweeps 3.25 u in whatever direction it lands. Two lay at lateral 2.05
+and 2.26 u on a 9 u half-width, timber across the racing line at the exit of
+the hero bridge, no collider. **2 -> 0.**
+
+### THE CENSUS LEARNS THAT AN OVERLAY ANNOUNCES ITSELF
+
+COTE D AZUR's deepest remaining "intruder" at 7.71 u was SEA FOAM — a
+3.4 x 0.05 x 0.32 `MeshBasicMaterial` box at opacity 0.4 on the water beside a
+seafront road. Anything drawn with `depthWrite: false` is a visual layer by
+construction: foam, puddles, the tunnel light pools, contact shadows. The
+material already carries the answer, so no thickness heuristic and no magic
+number. COTE D AZUR **9 intruders -> 0**; its remaining 14 "blockers" are the
+documented tunnel-bore false positive.
+
+### A COMMENT THAT WAS WRONG, AND HOW
+
+The first draft of the gantry comment carried two start heights **worked back
+from census arithmetic** — "RED CENTRE RUN starts at y = 5.4" — and the direct
+sweep said -3.99. The census reports the road height at the sample NEAREST the
+offending mesh, which on a lap that doubles back is a different leg entirely.
+Inference from a derived number is not a measurement, and a wrong number in a
+comment outlives the session that wrote it. Corrected against
+`scratchpad/startY.mjs`, which reads `center[0].y` directly.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
