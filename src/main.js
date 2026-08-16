@@ -8016,6 +8016,32 @@ class Game {
       }
       const fy = tk.center[ci].y;
       cp.y = Math.max(fy + 1.9, Math.min(cp.y, fy + tun.apex - 1.3));
+    } else if (tk?.deckOverhead
+      && (tk.deckOverhead(p.pos, p.trackIndex) || tk.deckOverhead(this.camPos, p.trackIndex))) {
+      // UNDER A BRIDGE, OBEY THE BRIDGE — the same rule as the bore above.
+      //
+      // Without this the chase camera rises over the deck on the approach and
+      // the driver watches the top of a flyover while the car runs underneath
+      // it, out of sight, at speed. Asked for directly: "when under bridge,
+      // change the camera to same camera mode like in tunnels."
+      //
+      // Same clamp shape as the tunnel branch: keep the eye above the road and
+      // below the soffit, and hold it inside the span so it cannot swing out
+      // through a pier. Either the car or the camera being under the deck
+      // counts, because the camera trails and neither hand-off may flick the
+      // view through the deck.
+      const dk = tk.deckOverhead(p.pos, p.trackIndex) || tk.deckOverhead(this.camPos, p.trackIndex);
+      const cp = this.camPos;
+      const ci = tk.nearestIndex(cp, dk.i, true);
+      const lat = tk.lateralOffset(cp, ci);
+      const lim = dk.half - 2.4;
+      if (Math.abs(lat) > lim) {
+        const n = tk.nrm[ci];
+        const over = lat - Math.sign(lat) * lim;
+        cp.x -= n.x * over;
+        cp.z -= n.z * over;
+      }
+      cp.y = Math.max(dk.floorY + 1.9, Math.min(cp.y, dk.deckY - 0.8));
     } else if (tk?.terrainHeight) {
       const cp = this.camPos, pp = p.pos;
       const dx = pp.x - cp.x, dz = pp.z - cp.z, dy = pp.y - cp.y;

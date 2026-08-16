@@ -1476,6 +1476,52 @@ identities; no branch, PR or commit trailer mentions it. The one textual hit
 was a chance byte sequence inside V2's minified bundle.)
 
 
+## r195 — joints get fences, bridges get the tunnel camera, laps get gates
+
+**FENCES AT ROAD JOINTS.** A crossroad is a hole deliberately cut in the
+roadside dressing — the spur mouth flares to 5.4 u and the verge furniture is
+suppressed around it, because a fence ACROSS a junction is a fence across a
+road. So a joint read as the verge simply stopping for twenty metres.
+`_buildJunctionFences` puts post-and-rail back on either SIDE of each mouth,
+starting past the flare, no collider (the driver is entitled to cross it).
+Measured: +15 posts on PINE VALLEY, +18 on HEDGEROW DASH, and ZERO of them in
+a carriageway.
+
+The gate is a FULL SCAN, not `_clearsRoad`. The first cut used `_clearsRoad`
+and the audit still showed posts on the road — which turned out to be
+pre-existing furniture, not these (see below) — but the scan is right anyway:
+this is a once-per-junction build-time decision and ~900 comparisons per post
+costs nothing.
+
+**THE CAMERA OBEYS A DECK LIKE IT OBEYS A BORE.** `tunnelAt` already keeps the
+eye over the roadway and under the crown; `deckOverhead` now answers the same
+question for an overpass, and main.js clamps against either with one code
+path. Without it the chase camera floats over the deck on the approach and the
+driver watches the top of a bridge while the car runs underneath it. Verified
+on MOUNTAIN TO SEA: 16 under-deck samples, camera never above the soffit
+(worst -0.8 u, i.e. always below).
+
+**FOUR LAP GATES, IN ORDER.** There was ONE checkpoint, at mid-lap, so any lap
+that touched 40-60% of the distance was legal — reachable by cutting the
+infield from near the line and back. `LAP_GATES = [0.2, 0.4, 0.6, 0.8]`, armed
+strictly in sequence: gate k only arms if k-1 is down. ORDER is what makes them
+unskippable; a bare set of flags can be collected by wandering. A refused lap
+now says so (`CHECKPOINT MISSED - LAP NOT COUNTED`) rather than silently
+failing to increment. Asserted three ways: the cut does not count, the honest
+lap does, gates collected BACKWARDS do not.
+
+### PRE-EXISTING, found while auditing the above — posts on the racing line
+
+Meshes of 0.18 x 1.05 (trackside posts) stand in the carriageway on rural
+worlds, INDEPENDENT of the new fences: PINE VALLEY 3, HEDGEROW DASH 12, worst
+bite 9.5 u into a 9 u half-width — dead centre of the road. Confirmed
+pre-existing by stashing `_buildJunctionFences` and re-counting: identical
+numbers. Same class as the culvert parapets (r191) and the quay guns (r191);
+the builder has not been identified yet. `tests/tool-road-census.mjs` cannot
+see them because they are meshes with no collider entry, the same blind spot
+that hid the bridge piers until r193.
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
