@@ -325,8 +325,20 @@ for (const lv of worlds) {
         // and the per-point band test — rightly — calls that proud. It is
         // still a texture. Skip sheets that are LYING DOWN; a sheet standing up
         // is a billboard or a panel and stays counted.
-        const sheet = ex < 1e-6 || ey < 1e-6 || ez < 1e-6;
-        if (sheet && (ymax - ymin) < 0.35 * Math.max(xmax - xmin, zmax - zmin)) { decals++; continue; }
+        //
+        // LYING DOWN MEANS ITS NORMAL POINTS UP, not "it is wider than it is
+        // tall". Judging it by aspect ratio hid the sponsor boards: a
+        // PlaneGeometry(9, 2.2) standing upright is 2.2 u tall across a 9 u
+        // span, so the ratio called an advertising hoarding a puddle. Take the
+        // axis the sheet has no thickness on, rotate it into world space, and
+        // ask which way it faces.
+        const flat = ex < 1e-6 ? 0 : ey < 1e-6 ? 1 : ez < 1e-6 ? 2 : -1;
+        if (flat >= 0) {
+          const e = mm.elements, o = flat * 4;
+          const ax = e[o], ay = e[o + 1], az = e[o + 2];
+          const len = Math.hypot(ax, ay, az) || 1;
+          if (Math.abs(ay / len) > 0.87) { decals++; continue; }   // faces the sky
+        }
         // Deepest reach into a carriageway, over the whole footprint, counting
         // only the points that are BOTH inside a drivable width and standing
         // proud of the road at that point.

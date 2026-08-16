@@ -15959,6 +15959,26 @@ export class Track {
     const ks = { saguaro: 0, barrel: 0, acacia: 0, agave: 0, ocotillo: 0 };
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
+    // AN OFFSET IS NOT A DISTANCE. Every branch below measures `lateral` along
+    // sample i's OWN normal, and on a canyon hairpin the road's other leg
+    // swings underneath it — the same defect that put a cabin on FURKA
+    // RIDGE's centreline, 38 tire stacks inside the road, and 674 props on
+    // the racing line, each fixed in its own builder and never here.
+    // Measured on CANYON RUN: three cacti and an acacia stood with their
+    // TRUNKS in the carriageway around samples 371-391, the worst 1.01 u from
+    // the centreline — a saguaro on the racing line, on a world whose whole
+    // difficulty is the width of the canyon.
+    //
+    // `_distToTrack` searches the whole lap, so it sees the near leg whichever
+    // one it is. Returning null RETRIES the spot rather than spending it, the
+    // way the hay bales already handle a wet one. The radius is the trunk's,
+    // not the canopy's: desert scrub yields, and what must not happen is the
+    // STEM standing where a car is entitled to be.
+    const clearOfRoad = (spot) => {
+      if (!spot) return null;
+      const p = this.pointAt(spot.i, spot.lateral);
+      return this._clearsRoad(p.x, p.z, 0.8, 0.4) ? spot : null;
+    };
     this._scatter(COUNT,
       () => {
         const roll = Math.random();
@@ -15966,21 +15986,21 @@ export class Track {
         const side = Math.random() < 0.5 ? 1 : -1;
         if (roll < 0.5) {
           // roadside, hugging the cliff base (small ones); dy is relative to road y
-          return { i, lateral: side * (10.55 + Math.random() * 0.35), dy: 0, s: 0.5 + Math.random() * 0.35 };
+          return clearOfRoad({ i, lateral: side * (10.55 + Math.random() * 0.35), dy: 0, s: 0.5 + Math.random() * 0.35 });
         }
         if (roll < 0.8 && this.T.cliffWalls) {
           // silhouetted on the canyon rim (cliff heights are relative to road y)
           const prof = this._cliffProfile(i, side);
           if (prof.h < 7) return null;
-          return {
+          return clearOfRoad({
             i, lateral: side * (prof.base + prof.l2 + 1 + Math.random() * 3.5),
             dy: prof.h * 0.97 - 0.35, s: 0.7 + Math.random() * 0.6,
-          };
+          });
         }
         // open bowl around the start line — absolute terrain height
         const gi = ((Math.random() * 140 - 70 | 0) + N) % N;
         const lat = side * (13 + Math.random() * 22);
-        return { i: gi, lateral: lat, terrain: true, s: 0.8 + Math.random() * 0.7 };
+        return clearOfRoad({ i: gi, lateral: lat, terrain: true, s: 0.8 + Math.random() * 0.7 });
       },
       (spot, k) => {
         const p = this.pointAt(spot.i, spot.lateral);
@@ -17585,7 +17605,37 @@ export class Track {
       // used to depend on which side the board stood, so every board on one
       // side presented its back - and because the material is DoubleSide you
       // read the lettering mirrored rather than seeing nothing.
-      g.rotation.y = this.headingAt(i) + Math.PI;
+      const head = this.headingAt(i);
+      // A 9 u HOARDING BROADSIDE TO THE ROAD NEEDS 9 u OF ROOM BESIDE IT.
+      //
+      // `boardOff` places the board's CENTRE, and a board standing across the
+      // road spans +-4.5 u of it with its posts at +-4. On a cliff-walled
+      // world the designed offset is `WALL_OFF + 0.75` = 11.15, so the inner
+      // edge lands at 6.65 — 2.35 u inside a 9 u half-width — and the inner
+      // post at 6.99. Measured on CANYON RUN and GLACIAL PASS: nine boards and
+      // nine posts each, every one over the carriageway, not one with a
+      // collider. Same shape of error as the arch faces and the tire stacks:
+      // the anchor was placed clear and nobody asked how far the thing
+      // reaches from it.
+      //
+      // A canyon has no outward to give — the rock face is AT `WALL_OFF`, and
+      // pushing the board past it is what the offset above exists to prevent.
+      // So a board that would hang over the road stands ALONG it instead,
+      // parallel to the wall, where only the posts occupy any width at all.
+      // That is how trackside advertising is really mounted, and it costs the
+      // head-on read only on the worlds that cannot afford one.
+      const inner = this.pointAt(i, (boardOff - 4.6) * side);
+      if (this._clearsRoad(inner.x, inner.z, 0.3, 0.3)) {
+        g.rotation.y = head + Math.PI;
+      } else {
+        // turn it the way that leaves the lettering facing the road rather
+        // than the rock — derived from the geometry, not from a guess about
+        // which sign of PI/2 the yaw convention wants
+        const nr = this.nrm[i];
+        const outX = nr.x * side, outZ = nr.z * side;
+        const yaw = head + Math.PI / 2;
+        g.rotation.y = (Math.sin(yaw) * outX + Math.cos(yaw) * outZ) < 0 ? yaw : head - Math.PI / 2;
+      }
       this.group.add(g);
       this.banners.push({
         x: p.x, z: p.z, y: g.position.y, r: 1.3, dead: false,

@@ -1623,6 +1623,135 @@ BRIDGE RUN, SEA CLIFF RUN and OLIVE CROSSING are byte-identical. CLIFF KNOT
 test-index-recovery 10/10 — the guard that matters here, since every gap moved.
 
 
+## r199 — the census learns to see geometry, and the fence posts were never there
+
+### THE HANDOVER'S NUMBER ONE PRIORITY WAS A PROBE BUG
+
+Reported: "~15 posts of 0.18 x 1.05 stand in rural carriageways, worst bite
+**9.5 u into a 9 u half-width**, i.e. dead centre. The builder is
+UNIDENTIFIED." Three sessions of grep had failed to find a builder because
+there is nothing to find.
+
+`scratchpad/fence.mjs` rejected non-posts with
+
+    if (!q || Math.abs(q.width - 0.18) > 0.005 || Math.abs(q.height - 1.05) > 0.005) return;
+
+A SphereGeometry has no `q.width`. `Math.abs(undefined - 0.18)` is `NaN`, and
+`NaN > 0.005` is **false**, so the guard never fired and every sphere, torus,
+circle and cylinder in the scene fell through as a "fence post" — including
+the pickups sitting on the racing line and the 9000 u world skirt. That is
+where 9.5 u came from; it was never a post.
+
+Measured with the keys required to exist, and with InstancedMesh handled
+per-instance rather than by reading an InstancedMesh's own origin (which is
+always 0,0,0 and measures nothing):
+
+    FROST PEAK        10 posts, all at 10.3 u lateral vs a 9 u half-width
+    REDWOOD RAMPAGE    7 posts, all at 10.3 u lateral vs a 9 u half-width
+
+Every one is **1.21 u OUTSIDE the drivable edge**. `_buildJunctionFences` is
+clean, exactly as stashing it had already suggested — the earlier session read
+that result as "the offenders are somewhere else" when it meant "there are no
+offenders".
+
+This is the fifth confident-wrong-answer from a hand-rolled probe in two
+sessions. The lesson has a sharper edge than "measure twice": a filter that
+can be defeated by a MISSING FIELD fails OPEN, and a probe that fails open
+reports work that does not exist. `NaN` comparisons are always false, so
+`Math.abs(a - b) > eps` is not a rejection test unless `a` is known to exist.
+
+### WHAT THE JOB ACTUALLY WAS, AND WHAT IT FOUND
+
+The handover was right about the blind spot even though it was wrong about the
+posts. `tool-road-census` walked `track.solids` only, and three defect classes
+have now hidden in that gap. It walks `track.group` now and measures
+transformed geometry, so a mesh with no collider entry is counted like any
+other; ones with no collider within 1.5 u are flagged BARE, which is the pier
+class exactly.
+
+Making it READABLE was most of the work, and every filter was earned by a
+false positive it removed rather than chosen up front:
+
+  - **the drive band, measured PER FOOTPRINT POINT.** Judging a whole mesh
+    against its nearest sample's road height reported every puddle in the game.
+    A puddle decal is a `CircleGeometry` scaled to 4 u and pitched to
+    `-atan(slopeAt(i))`: flat against the road, 0.8 u tall in world axes. Point
+    by point it is 0.04 u proud, which is what it is. Same test also drops
+    bridge decks (overhead) and footings (sunk) without naming them.
+  - **`track.props`.** Crates, cones, barrels and snowmen are put on the
+    drivable surface deliberately — `_buildProps` carries three paragraphs
+    about why — and carry no collider. Forty per world, all bare, all correct.
+  - **decals**: zero-thickness sheets lying down have no volume to drive into.
+  - **foliage**: a conifer is one ground-to-tip cone whose skirt is far wider
+    than anything the car collides with. PINE VALLEY reported 29 canopies in
+    the lane; measured against `track.trees`, which is the radius the game
+    itself uses, **743 trees and not one trunk inside a carriageway**. Foliage
+    over a registered trunk is skipped and the trunks are counted separately,
+    so a tree PLANTED in the road would still show.
+  - **landforms** over 40 u across, and the 12-40 u bulk, are counted and
+    LISTED rather than dropped — a cap that hides what it dropped reads as
+    coverage it never gave.
+
+### SEA CLIFF RUN: TWO COLUMNS IN A LANE, NEITHER WITH A COLLIDER
+
+Both on the world the handover already flagged for stacking 80 u of road on
+road — the same defect wearing a second face.
+
+**The stone bridge's arch face.** `_buildStoneBridges` built a 2.2 x 9 x 3.2
+block of masonry at `8.5 * side` along `nn`, and `nn` is `this.nrm[i]`, the
+normal at the MIDDLE of the span — while the pier stands at `j`, a third of
+the span away. The same "an offset is not a distance" error the props and the
+tire stacks already carry comments about, and 8.5 u is inside a 9 u half-width
+to begin with. Under its own deck that is harmless: the top sits 0.1 u below
+the tarmac. Where another leg passes lower it is a grey column in the racing
+line — **5.2 u proud of the road at sample 660, biting 5.87 u into a 9 u
+half-width**, and you drive straight through it.
+
+It takes `nrm[j]` now and asks `_pierInRoad` first. That guard exists because
+`_clearsRoad` cannot answer this question: `_clearsRoad` is flat, so it would
+refuse every arch face in the game for standing under the bridge it holds up.
+The question is three-dimensional — does this masonry rise out of anybody's
+road — and its own deck answers no on the height test.
+
+**Four overpass deck rails**, up to 4.25 u into the lane at sample 740.
+`railBlocked` exists to prevent precisely this and was bought off with a low
+index distance:
+
+    const dLap = Math.min((i - jSelf + N) % N, (jSelf - i + N) % N);
+    if (dLap <= half + 4) continue;             // its own deck run
+
+`half` is the whole DECK RUN — 38 samples on this world, so 76 samples of lap
+were exempt. Where a lap doubles back inside its own span the returning leg is
+a few samples away and a couple of metres below, so the window that exists to
+ignore this rail's own road swallowed the other one. Traced from the builder:
+rails at samples 731 and 733 stand 7.12 and 8.33 u from the centreline at
+sample 740, inside a 9 u half-width, 1.7 and 1.2 u ABOVE that road.
+
+The exemption relaxes the BUFFER now instead of skipping the road: its own
+deck is measured against the bare half-width, which the 10.2 u offset clears
+by 1.2 u, and every other stretch keeps its 1.4 u. Same intent, and it can no
+longer be bought with an index.
+
+### HOW IT WAS PINNED — instrument the BUILDER, not the built scene
+
+Recovering "which sample does this rail belong to" from a finished mesh is
+guesswork on a hairpin, and guessing it produced two wrong answers before the
+right one. `tools-scratch/railtrace.mjs` uses `page.route` to rewrite
+`src/track.js` in flight, injecting one line that makes `_buildOverpassDecks`
+record `{j, side, rx, rz, up, half}` for every rail it lays. Nothing on disk
+changes and the answer is the builder's own. Worth reaching for whenever the
+question is "why did the generator decide that".
+
+### A CASCADE WORTH KNOWING ABOUT
+
+Withholding a deck rail also removes its `_barrier` entry, and the edge-rail
+builder consults `this.barriers` ("already walled? the masonry went in before
+this did") to decide where to put its own rails. So a withheld deck rail can
+grow an edge rail somewhere near it, and `solids` moves on worlds where
+nothing looks like it should have changed. World generation is seeded, so this
+is deterministic, not noise — but it means a before/after diff of raw counts
+is not a defect count. Compare CLASSES.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
