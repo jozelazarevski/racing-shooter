@@ -16,20 +16,36 @@ import {
 export const LEVELS = [
   { id: 1, name: 'PINE VALLEY',  theme: 'forest',  region: 'PINE VALLEY' },
   { id: 2, name: 'DUST CANYON',  theme: 'desert',  region: 'DUST CANYON' },
-  { id: 3, name: 'FROST PEAK',   theme: 'snow',    region: 'FROST PEAK' },
+  // ---- MOUNTAINS GET TUNNELS. Asked for directly: bores through the mountain
+  // worlds, driven in one portal and out the other. Every world below is a
+  // mountain that had none — the ALPINE PASSES and FROST PEAK regions, the two
+  // alpine climbs, and the col. `count` is a REQUEST and not a promise:
+  // `tunnelFitAt` refuses a station that is curved, near a gorge, near the
+  // start gate or sitting on a crest, so a world may end up with fewer, and
+  // that is the guard working rather than a shortfall (the same thing happened
+  // to OLIVE PASS in r196, which asked for three and got two). What each of
+  // them DID get is measured in tests/test-tunnels.mjs, which drives a car in
+  // one end and out the other.
+  { id: 3, name: 'FROST PEAK',   theme: 'snow',    region: 'FROST PEAK',
+    tune: { tunnels: { count: 1 } } },
   { id: 4, name: 'CANYON RUN',   theme: 'canyon',  region: 'DUST CANYON',
     tune: { gorgeJump: { count: 2, depth: 26 }, tunnels: { count: 1 } } },
   { id: 5, name: 'EMBER PASS',   theme: 'volcano', region: 'EMBER RIDGE' },
-  { id: 6, name: 'SUMMIT CLIMB', theme: 'alpine',  region: 'PINE VALLEY' },
-  { id: 7, name: 'GLACIAL PASS', theme: 'glacial', region: 'FROST PEAK' },
+  { id: 6, name: 'SUMMIT CLIMB', theme: 'alpine',  region: 'PINE VALLEY',
+    tune: { tunnels: { count: 1 } } },
+  { id: 7, name: 'GLACIAL PASS', theme: 'glacial', region: 'FROST PEAK',
+    tune: { tunnels: { count: 1 } } },
   { id: 8, name: 'AMAZON RAPIDS', theme: 'jungle', region: 'AMAZON' },
   { id: 9, name: 'THE DUNE SERPENT', theme: 'dunes', region: 'DUST CANYON' },
   { id: 11, name: 'OASIS AMBUSH', theme: 'oasis', region: 'DUST CANYON' },
   { id: 12, name: 'REDWOOD RAMPAGE', theme: 'redwood', region: 'PINE VALLEY' },
   { id: 13, name: 'LOG FLUME FURY', theme: 'flume', region: 'PINE VALLEY' },
   { id: 14, name: 'FOREST FIRE ESCAPE', theme: 'wildfire', region: 'PINE VALLEY' },
-  { id: 15, name: "GLACIER'S GRIND", theme: 'sheetice', region: 'FROST PEAK' },
-  { id: 16, name: 'AVALANCHE ALLEY', theme: 'avalanche', region: 'FROST PEAK' },
+  { id: 15, name: "GLACIER'S GRIND", theme: 'sheetice', region: 'FROST PEAK',
+    tune: { tunnels: { count: 1 } } },
+  // a gallery through the slope is exactly what avalanche country builds
+  { id: 16, name: 'AVALANCHE ALLEY', theme: 'avalanche', region: 'FROST PEAK',
+    tune: { tunnels: { count: 1 } } },
   { id: 17, name: 'NEON GRID EXPRESSWAY', theme: 'neon', region: 'NEO-KYOTO' },
   { id: 18, name: 'UNDERCITY SLIPSTREAM', theme: 'undercity', region: 'NEO-KYOTO' },
   // ---- CAREER ORDER IS THIS ARRAY, NOT THE ids. ROCKFALL RAVINE sat at slot
@@ -56,7 +72,8 @@ export const LEVELS = [
   // hero bridge. Career order is this array; ids are stable and never reused.
   { id: 22, name: 'COL DE TURINI', theme: 'pass', route: 'turini', region: 'WORLD RALLY',
     // relentless short hairpins, and jumps would be absurd on a tarmac col
-    tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0 } },
+    // the real col runs through galleries; two of them here
+    tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0, tunnels: { count: 2 } } },
   { id: 23, name: 'OUNINPOHJA', theme: 'forest', route: 'ouninpohja', region: 'WORLD RALLY',
     // the fastest stage in the sport: everything is crests and yumps
     tune: { elev: { amp: 4, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
@@ -64,7 +81,7 @@ export const LEVELS = [
     tune: { elev: { amp: 8, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
   { id: 25, name: 'PIKES PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
     // the tallest climb on the roster, and nothing but the climb
-    tune: { elev: { amp: 27, ph: [1.7, 0.3, 2.8] }, rampCount: 0 } },
+    tune: { elev: { amp: 27, ph: [1.7, 0.3, 2.8] }, rampCount: 0, tunnels: { count: 1 } } },
   { id: 26, name: 'SAFARI PLAINS', theme: 'savanna', route: 'safari', region: 'WORLD RALLY',
     tune: { elev: { amp: 4, ph: [0.9, 2.6, 1.2] }, rampCount: 5 } },
   { id: 27, name: 'CORNICHE', theme: 'canyon', route: 'corniche', region: 'WORLD RALLY',
@@ -156,7 +173,10 @@ export const LEVELS = [
   // the vineyard lap tracing their third hand-drawn loop
   { id: 46, name: 'VINEYARD VELOCE', theme: 'vineyard', region: 'HEARTLAND', cost: 18, fresh: true },
   { id: 47, name: 'DEEPWOOD TRAIL', theme: 'deepwood', region: 'HEARTLAND', cost: 19, fresh: true },
-  { id: 48, name: 'DOLOMITI CORSA', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true },
+  { id: 48, name: 'DOLOMITI CORSA', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true,
+    // the Dolomites are more tunnel than road; this is the world that most
+    // obviously should have had them and did not
+    tune: { tunnels: { count: 2 } } },
   { id: 49, name: 'HARBOR QUAY', theme: 'harbor', region: 'HEARTLAND', cost: 21, fresh: true },
   // THE MEDITERRANEAN FIVE - one coast each, all with bridges where the route
   // crosses itself and tunnels where a headland gets in the way.
