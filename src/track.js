@@ -274,16 +274,69 @@ export const LEVELS = [
   // APPENDED, never inserted, with ascending ids.
   { id: 62, name: 'CAPE OLIVETO', theme: 'medterrace', region: 'MEDITERRANEAN',
     cost: 34, fresh: true, route: 'liguriaRun',
-    // THE HEADLAND ONE. Same coast road, but the capes get bored through
-    // instead of driven around: two tunnels, and a longer sea leg to reach
-    // them. Elevation stays low — this is the fast one, and a tunnel at speed
-    // is the whole point of it.
+    // THE MOUNTAIN ONE. Asked for directly: "change cape oliveto to run inside
+    // mountains." It was the headland world — a coast road boring through the
+    // capes — and the sea is gone, because you cannot be inside a mountain
+    // range and on the shore at the same time.
+    //
+    // "INSIDE" IS THE WHOLE INSTRUCTION, AND IT IS NOT THE SAME AS "UPHILL".
+    // TERRAZZA ALTA is already the climbing one; making this a second climber
+    // would spend a world to say something the family already says. So the
+    // road keeps its pace and its `liguriaRun` shape, and what changes is what
+    // stands around it: the massif is drawn as a near-full RING (`spread` 6.0
+    // against the roster's usual 1.5-2.4, which fan a range across one
+    // horizon) so peaks close the view on every side rather than sitting in
+    // front of you. The elevation rises 14 -> 19 so the lap rides over the
+    // spurs between them instead of running along a flat valley floor, which
+    // is what would have made it a picture of mountains rather than a drive
+    // through them.
+    //
+    // Three bores rather than two: a road that goes THROUGH the rock is the
+    // strongest thing a track can say about being inside a mountain, and it
+    // was already this world's identity when the rock was a headland. `count`
+    // is a REQUEST — `tunnelFitAt` refuses any station too curved, too near a
+    // gorge, too near the gate or sitting on a crest, so three is at most
+    // three.
+    //
+    // The massif builder walks a peak clear of the carriageway and shrinks or
+    // drops one the lap encircles, so a ring drawn with no knowledge of the
+    // road cannot plant a mountain on it (the FURKA RIDGE defect). That is why
+    // `r0` can come in to 360 without the road ending up inside the rock.
     tune: {
-      tunnels: { count: 2 },
+      tunnels: { count: 3 },
       stoneBridges: { count: 1 },
-      elev: { amp: 14, ph: [0.6, 2.1, 1.4] },
-      coast: { a: [-220, -320], b: [380, -170], level: -2.1, floor: -8, beach: 60 },
-    } },
+      elev: { amp: 19, ph: [0.6, 2.1, 1.4] },
+      coast: undefined,          // no shore: the range closes the horizon
+      massif: { az: 0, spread: 6.0, count: 14, r0: 360, r1: 640,
+        h0: 120, h1: 255, w0: 175, w1: 320 },
+      // AND THE GROUND HAS TO RISE, OR THE PEAKS ARE WALLPAPER. Measured with
+      // the ring in and this out: 12 of 12 compass sectors held a peak and 0%
+      // of the lap had ground standing 25 u above it within 300 u — the road
+      // ran across a plain with a mountain range painted round the edge. The
+      // control is worth recording: SUMMIT CLIMB, an alpine world, measures
+      // the same 0% at 7 u of mean rise, so no world on this roster ran inside
+      // mountains before this one. `hillAmp` scales the long octaves of the
+      // open-ground noise, which is the only thing that puts a hillside on
+      // BOTH sides of a closed lap — a radial massif can only close it from
+      // outside. At 4.5 it bought 4.9 -> 9.2 u of mean rise and 2% enclosure
+      // while taking open-ground grade to 65% max, so it is turned down to a
+      // texture here and the valley does the work.
+      hillAmp: 2.2,
+      // THE VALLEY. Ground that climbs with distance FROM THE ROAD, which is
+      // the only shape that walls a closed lap on both sides — see
+      // `_valleyWall`. 78 u over a 240 u run is a 33% flank: steeper than the
+      // massif's ~15% so it reads as mountain rather than meadow, and far
+      // shallower than the rim wall's ~100%, so it is ground you can attack
+      // and lose speed on rather than an invisible fence. For scale, SUMMIT
+      // CLIMB's open ground already measures 61% at p90.
+      valleyWalls: { h: 78, run: 240 },
+    },
+    // THE FACET HAS TO AGREE WITH THE WORLD. `SCENERY` is keyed by THEME, and
+    // `medterrace` is tagged COAST + FARMLAND — true of OLIVE COAST, and now a
+    // lie here twice over: this world has no sea and is ringed by mountains.
+    // A player filtering MOUNTAIN would not find it and a player filtering
+    // COAST would be sent to a world with no water.
+    scenery: ['MOUNTAIN', 'FARMLAND'] },
   { id: 63, name: 'TERRAZZA ALTA', theme: 'medterrace', region: 'MEDITERRANEAN',
     cost: 35, fresh: true, route: 'corse',
     // THE CLIMBING ONE. OLIVE COAST's terraces seen from above: triple the
@@ -296,7 +349,12 @@ export const LEVELS = [
       tunnels: { count: 1 },
       rampCount: 0,
       coast: undefined,          // inland: the terraces run to the skyline
-    } },
+    },
+    // Same correction as CAPE OLIVETO's, for the same reason: this world
+    // deletes its coast, so the theme's COAST tag describes water that is not
+    // there. It keeps FARMLAND and gains nothing else — it is a hill climb
+    // through terraces, not a mountain world.
+    scenery: ['FARMLAND'] },
   { id: 64, name: 'SALINE SPRINT', theme: 'medterrace', region: 'MEDITERRANEAN',
     cost: 36, fresh: true, route: 'monza',
     // THE FLAT ONE. The salt flats behind the olive coast: almost no
@@ -501,7 +559,13 @@ export function worldFacets(level) {
   return {
     time: [time],
     weather,
-    scenery: SCENERY[level.theme] || [],
+    // A LEVEL MAY OVERRIDE ITS THEME'S SCENERY. The theme table is the right
+    // default — the dressing does say what the world looks like — but a `tune`
+    // can move a world out from under its theme's tags, and CAPE OLIVETO does:
+    // `medterrace` means COAST + FARMLAND, and that world deletes its coast
+    // and rings itself with a massif. The facet has to describe the world the
+    // player drives, not the palette it borrowed.
+    scenery: level.scenery ?? SCENERY[level.theme] ?? [],
     road: [T.surface === 'wet' ? 'WET' : T.surface === 'snow' ? 'SNOW' : 'DRY'],
   };
 }
@@ -5626,10 +5690,26 @@ export class Track {
     // the SAME function feeds prop placement (terrainHeight) and the mesh, so
     // nothing floats. `relief` lets a theme dial it out (neon grid, salt flats).
     const rel = this.T.relief !== undefined ? this.T.relief : 1;
+    // `hillAmp` SCALES THE THREE LONG OCTAVES — the landform, not the facets.
+    //
+    // `relief` dials the FOURTH octave (λ ≈ 55 u), which is there so flat
+    // shading has tone to give; scaling it up gives a rough field, not hills.
+    // A world that has to read as MOUNTAINOUS needs the long wavelengths
+    // (λ ≈ 520 / 210 / 90 u), because those are what put a hillside on both
+    // sides of the road rather than a ring of peaks on the horizon. Measured
+    // on CAPE OLIVETO before this existed: a full 12-of-12 compass ring of
+    // massif peaks, and 0% of the lap with ground standing 25 u above it
+    // within 300 u — a picture of mountains you drive past.
+    //
+    // The road stays drivable by construction: `_blendHeight` pulls the ground
+    // to the road datum inside the corridor, and `_roadClampY`/`_roadCeil`
+    // keep the road as the floor regardless. Raising this does not put a hill
+    // through the carriageway; it cuts the carriageway INTO the hill.
+    const amp = this.T.hillAmp ?? 1;
     return (
-      Math.sin(x * 0.012) * Math.cos(z * 0.010) * 3.4 +
-      Math.sin(x * 0.030 + 1.7) * Math.cos(z * 0.026 + 0.6) * 1.7 +
-      Math.sin(x * 0.070 + 3.1) * Math.cos(z * 0.062 + 2.2) * 0.7 +
+      Math.sin(x * 0.012) * Math.cos(z * 0.010) * 3.4 * amp +
+      Math.sin(x * 0.030 + 1.7) * Math.cos(z * 0.026 + 0.6) * 1.7 * amp +
+      Math.sin(x * 0.070 + 3.1) * Math.cos(z * 0.062 + 2.2) * 0.7 * amp +
       Math.sin(x * 0.114 + 5.3) * Math.cos(z * 0.101 + 1.4) * 2.2 * rel
       - (this.T.hillDrop || 0)
       + this._highland(x, z)
@@ -5748,6 +5828,46 @@ export class Track {
     return clamp;
   }
 
+  /** GROUND THAT RISES WITH DISTANCE FROM THE ROAD — the thing that makes a
+   *  lap run INSIDE mountains instead of across a plain with a range painted
+   *  round the edge.
+   *
+   *  THE MEASUREMENT THAT FORCED THIS. CAPE OLIVETO was asked to "run inside
+   *  mountains". A full ring massif got it 12 of 12 compass sectors holding a
+   *  peak — and 0% of the lap with ground standing 25 u above it within 300 u.
+   *  The control says that is not a CAPE OLIVETO problem: SUMMIT CLIMB, an
+   *  alpine world, measures the same 0% at 7 u of mean rise. NOTHING on this
+   *  roster ran inside mountains, because two things that look like they
+   *  should deliver it cannot:
+   *
+   *   - A MASSIF IS RADIAL. `az`/`spread` fan peaks around the world centre,
+   *     so it can only close a closed lap from the OUTSIDE. The infield, and
+   *     the inboard flank of every corner, stay open by construction.
+   *   - GLOBAL NOISE IS NOT A CORRIDOR. Scaling `_hillNoise` raises broad
+   *     swells whose longest wavelength (~520 u) barely changes across the
+   *     300 u beside the road. Measured at `hillAmp` 4.5: mean rise only
+   *     4.9 -> 9.2 u, enclosure 0% -> 2%, and open-ground grade already at
+   *     65% max. It buys unclimbable ground before it buys a valley.
+   *
+   *  A valley is a function of DISTANCE FROM THE ROAD, so that is what this
+   *  is. Zero inside the corridor blend, then a smoothstep up to `h` over
+   *  `run`, which makes the grade `h / run` by construction and lets the
+   *  slope be chosen rather than discovered.
+   *
+   *  Three things fall out of using nearest-sample distance, all of them
+   *  wanted. Where two legs of a lap run close, `d` stays small between them
+   *  and no wall grows, so a pass does not wall itself off from its own next
+   *  leg. In the middle of a wide loop `d` is large, so the infield rises into
+   *  a mountain — which is also the shortcut across it closing. And the road
+   *  is untouched: this is added OUTSIDE the blend, and `_roadClampY` /
+   *  `_roadCeil` still hold the road as the floor regardless. */
+  _valleyWall(d) {
+    const V = this.T.valleyWalls;
+    if (!V) return 0;
+    const far = this.T.blend ? this.T.blend.far : 70;
+    return (V.h ?? 60) * smoothstep01((d - far) / (V.run ?? 240));
+  }
+
   /** Shared road→hills height blend. `tuck` eases the corridor slightly UNDER
    *  the ribbon (full 0.45 by d=14, zero at the drivable edge) so residual
    *  mesh interpolation error stays hidden below the road surface. */
@@ -5780,6 +5900,9 @@ export class Track {
         h = (roadY - tuck) * (1 - f) + n * f;
       }
     }
+    // THE VALLEY WALLS, added outside the corridor blend so the road never
+    // sees them. See `_valleyWall`.
+    h += this._valleyWall(d);
     // the hero gorge is carved out of whatever the ground would otherwise be,
     // road corridor included — that is the hole the suspension bridge spans
     if (this._gorge || this._jumpGorges?.length) h -= this._gorgeCut(x, z);

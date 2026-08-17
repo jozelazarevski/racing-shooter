@@ -83,6 +83,8 @@ unnoticed.
 
     tests/test-roadclear.mjs     4 laws about what may stand near a carriageway
     tests/test-cornerwalls.mjs   3 laws about whether a corner can be cut
+    tests/test-mountainrun.mjs   CAPE OLIVETO is enclosed, and OLIVE COAST is
+                                 the CONTROL that must stay open ground
     tests/test-tunnels.mjs       every bore driven in one portal and out the other
     tests/test-carriageway.mjs   the r199/r200 clearance fixes, pinned
     tests/test-edgerails.mjs     rails are solid, one draw call, off the road
@@ -157,9 +159,17 @@ only that way: the gantry that moved DEEPER into the road (4.52 -> 7.59 u), and
 The owner named OLIVE COAST (id 29) as the world he enjoys most. r205 added
 three siblings; r207 had to fix them, because a sibling needs its own ROAD:
 
-    62 CAPE OLIVETO   route liguriaRun  relief 14.5 u  2 bores   the fast headland one
+    62 CAPE OLIVETO   route liguriaRun  relief 32.9 u  3 bores   INSIDE MOUNTAINS
     63 TERRAZZA ALTA  route corse       relief 27.5 u  42% tight the hill climb
     64 SALINE SPRINT  route monza       relief  5.3 u  no bores  the flat one
+
+r208 turned 62 from the headland one into the mountain one, on request. Read
+`_valleyWall` before touching terrain: a MASSIF IS RADIAL and can only close a
+closed lap from outside, and global `_hillNoise` has no wavelength short enough
+to be a corridor — so neither produces a valley, and both look like they should.
+Measured, no world on this roster ran inside mountains before it; SUMMIT CLIMB,
+an alpine world, scores 0 walled flanks of 156. `valleyWalls` is opt-in and
+`tests/test-mountainrun.mjs` keeps OLIVE COAST as the control that it stays so.
 
 The first cut gave all three a `tune` — elevation, tunnels, bridges, coast —
 and left the plan alone, so all four worlds shared OLIVE COAST's exact

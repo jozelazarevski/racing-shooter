@@ -2089,6 +2089,79 @@ every world with a gorge and wants its own before/after sweep.
 larger cap: 420 bays x 48 tris = 20,160, under the 26,000 line),
 `test-tunnels 62 63` 3/3, `test-roadclear` 48p/0f.
 
+## r208 — CAPE OLIVETO runs inside mountains, which nothing on this roster did
+
+Asked for directly: "change cape oliveto to run inside mountains."
+
+### THE OBVIOUS VERSION OF THIS IS WALLPAPER
+
+First cut: delete the coast, draw the massif as a near-full ring (`spread` 6.0
+against the roster's usual 1.5-2.4), raise the elevation, ask for a third bore.
+It satisfied every check you would think to run, and it put the road on a plain:
+
+    12 of 12 compass sectors held a massif peak
+    nearest peak 128 u from the road
+    lap with ground standing 25 u above it within 300 u:   0%,  mean rise 4.9 u
+
+The control is what makes that a finding rather than an opinion. SUMMIT CLIMB
+is an ALPINE world and measures **0 walled flanks of 156, mean rise 0.8 u**.
+OLIVE COAST measures 0 of 219. **Nothing on this roster ran inside mountains.**
+Two things that look like they should deliver it cannot:
+
+- **A massif is RADIAL.** `az`/`spread` fan peaks about the world centre, so it
+  closes a closed lap from the OUTSIDE only. The infield and the inboard flank
+  of every corner stay open by construction.
+- **Global noise is not a corridor.** `_hillNoise`'s longest octave is ~520 u,
+  which barely changes across the 300 u beside the road. A new `hillAmp` knob
+  scaling its three long octaves was tried at 4.5: mean rise 4.9 -> 9.2 u,
+  enclosure 0 -> 2%, and open-ground grade already at 65% max. It buys
+  unclimbable ground before it buys a valley.
+
+### A VALLEY IS A FUNCTION OF DISTANCE FROM THE ROAD
+
+`_valleyWall(d)` — zero inside the corridor blend, then a smoothstep to `h`
+over `run`, so the flank's grade is `h / run` BY CONSTRUCTION rather than
+discovered after the fact. CAPE OLIVETO takes `{ h: 78, run: 240 }`, a 33%
+flank: steeper than the massif's ~15% so it reads as mountain, far shallower
+than the rim wall's ~100% so it is ground you can attack and lose speed on.
+
+Three things fall out of keying on nearest-sample distance, all wanted. Where
+two legs run close `d` stays small and no wall grows, so a pass cannot wall
+itself off from its own next leg. In the middle of a wide loop `d` is large, so
+the infield rises into a mountain — which is also the shortcut across it
+closing. And the road is untouched: it is added OUTSIDE the blend, and
+`_roadClampY`/`_roadCeil` still hold the road as the floor.
+
+    CAPE OLIVETO   flanks walled            0 -> 188   (17 still open)
+                   mean rise beside road  4.9 -> 68.6 u,  max 105 u
+                   open-ground grade p90         50%  (SUMMIT CLIMB runs 61%)
+                   bores asked 3, sited 3, all three driven in and out
+
+### THE METRIC WAS WRONG BEFORE THE WORLD WAS RIGHT
+
+The first honest-looking number was 16% "enclosed on both sides", and it was
+the probe's fault: on a closed circuit the inboard flank of a corner is often
+ANOTHER LEG OF THE LAP, which cannot be a mountain. Excluding those (155 of 360
+flanks here) the same world reads 92%. Worth naming — a metric that punishes a
+world for being a circuit would have sent someone tuning terrain that was
+already right.
+
+### TWO SMALLER CORRECTIONS THAT FELL OUT OF IT
+
+`worldFacets` now honours a per-level `scenery` override
+(`level.scenery ?? SCENERY[level.theme]`). `SCENERY` is keyed by THEME, and
+`medterrace` means COAST + FARMLAND — true of OLIVE COAST, and a lie twice over
+for a world that deletes its coast and rings itself with a massif. CAPE OLIVETO
+declares MOUNTAIN + FARMLAND; TERRAZZA ALTA, which also sets `coast: undefined`,
+drops COAST and keeps FARMLAND.
+
+### VERIFIED
+
+`test-mountainrun` 6/6 (new — two laws and a CONTROL: OLIVE COAST must still
+measure as open ground, or the terrain change has leaked onto worlds that never
+asked for it), `test-cornerwalls` 24/24, `test-tunnels 62` 3/3,
+`test-roadclear` exit 0.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

@@ -34,6 +34,12 @@ real time to get right and the next session should not rebuild them.
                 into a named defect at SEA CLIFF RUN sample 749.
 - `railbudget.mjs` how many rail bays a world ASKS for versus how many it gets.
                 Found `MAXBAY` truncating TERRAZZA ALTA by 34 bays in silence.
+- `mountains.mjs` does the road run INSIDE mountains or past them: compass
+                spread of the massif's PLACED instances (not its spec), how far
+                the ground rises beside the lap, and the open-ground grade that
+                comes with it. Its lesson is that a flank which is another leg
+                of the lap is not an open flank — counting those as misses read
+                16% where 92% of the flanks that could be mountain already were.
 - `srv.mjs`     plain static server (`node srv.mjs 8920`).
 - `keep.sh`     keeps a server alive across tool-call timeouts:
                 `setsid ./keep.sh srv.mjs 8920 &`
