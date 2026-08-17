@@ -48,8 +48,12 @@ const OFF_FADE = 0.08;
  *
  *  The off-road race modes, when they land, take this exemption on purpose and
  *  belong in this predicate (`|| g.offRoadRace`) — NOT in a loosened OFF_CLIMB,
- *  which would put the goat back on every road world at once. */
-const openCourse = (g) => !!(g && g.freeRoam && !g.missionMode);
+ *  which would put the goat back on every road world at once.
+ *
+ *  EXPORTED so there is exactly one definition. weapons.js asks the same
+ *  question about the same cliff faces, and a second inline copy of
+ *  `freeRoam && !missionMode` is how the two drift apart. */
+export const openCourse = (g) => !!(g && g.freeRoam && !g.missionMode);
 /** Fastest a crest may throw the car upward, u/s. Uncapped, a steep ramp taken
  *  on nitro sent cars 100+ u into the infield. It also bounds a jump: against
  *  gravity 26 this is 0.85 s of hang time and 2.3 u of height before the road

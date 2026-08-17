@@ -1,5 +1,8 @@
 // Pulse-cannon tracers (instanced pool) + homing missiles.
 import * as THREE from 'three';
+// ONE definition of "is the course an open world" — see its header in
+// vehicles.js. Imported rather than re-inlined so the two cannot drift.
+import { openCourse } from './vehicles.js';
 
 const MAX_BULLETS = 220;
 const BULLET_SPEED = 130;
@@ -569,7 +572,15 @@ export class Weapons {
       // beyond killed the missile in ONE frame — it detonated on the player's
       // own bumper and burned the ammo, for going off-road, which the rules
       // call legal.
-      if (!g.freeRoam && g.track.T?.cliffWalls
+      //
+      // `openCourse`, NOT `freeRoam`. This is world GEOMETRY — the rock face is
+      // physically there — and `mode=missions` sets `freeRoam = true`, so a
+      // HOT LAP or GAUNTLET missile flew THROUGH the cliff that stops it in a
+      // race, on all 5 cliffWalls worlds. Same class and same cause as the
+      // cliff-wall release in vehicles.js. Note the direction is inverted from
+      // the other two sites: the mission had the PERMISSIVE behaviour, so this
+      // makes missions stricter rather than freer.
+      if (!openCourse(g) && g.track.T?.cliffWalls
           && Math.abs(g.track.lateralOffset(m.pos, m.ti)) > 10.2) detonate = true;
       // ...and real world geometry stops them anywhere: boulders, hoodoos,
       // gantry legs, the grandstand frame. `solids` was absent from this test
