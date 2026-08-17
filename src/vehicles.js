@@ -1609,6 +1609,7 @@ export class Car {
     //    damage on hard hits (RULES.md material law)
     const cliffy = !!t.T?.cliffWalls;
     let wallHere = false;
+    let cliffProf = null;                // the face we are being held off, if any
     const fside = Math.sign(this.lateral) || 1;
     // ---- width-variation: the clamp line follows the pinched road width
     // (cliff worlds have no narrows, so this equals WALL_LIMIT there)
@@ -1619,6 +1620,7 @@ export class Car {
         // canyon: rock walls are solid — except the low berm near the start
         // bowl, where the cliffs open up and free-roamers can drive out
         const prof = t._cliffProfile ? t._cliffProfile(this.trackIndex, fside) : null;
+        cliffProf = prof;
         wallHere = !prof || prof.h > 2.5;
         // deep-valley worlds (cliffSetback) stand their faces well off the
         // verge: the player may roam the valley floor and only the ROCK is
@@ -1650,7 +1652,24 @@ export class Car {
       // as a crash. Everything below is scaled by it.
       const spIn = Math.hypot(this.vel.x, this.vel.z);
       const square = THREE.MathUtils.clamp(Math.abs(vn) / Math.max(3, spIn), 0, 1);
-      const over = this.lateral - fside * wallLim; // ---- width-variation
+      // HOLD THE CAR AT THE FACE IT HIT, NOT AT THE ROAD EDGE.
+      //
+      // On a slot canyon (no `cliffSetback`) the rock IS the verge and the two
+      // agree to within ~0.3 u, which is what this line was written for. But
+      // `cliffSetback` moved the TRIGGER out to `prof.base - 1.2` and left the
+      // TARGET at the verge, so a car that touched LAGUNA SECA's face at
+      // lateral 36.3 was put back at 9.55. Measured single-frame teleport at
+      // five stations, both sides: 26.5 26.6 26.6 26.8 26.8 26.9 26.9 27.3
+      // 27.6 u, entering at 109.5 km/h and leaving at 5.1 — and it repeats,
+      // because the player drives straight back at the road he can see. That
+      // is the reported screenshot: last place, mid-race, 8 km/h against a
+      // rock face.
+      //
+      // AI cars keep `wallLim`: they race the racing line and are clamped at
+      // the road edge on every world, and `cliffProf` is null on that branch.
+      const stand = (cliffy && t.T?.cliffSetback && cliffProf)
+        ? Math.max(wallLim, cliffProf.base - 1.2) : wallLim;
+      const over = this.lateral - fside * stand; // ---- width-variation
       this.pos.addScaledVector(n, -over);
       // absorb, don't bounce: kill the into-wall velocity (5% rebound)
       this.vel.addScaledVector(n, -vn * 1.05);
@@ -1674,7 +1693,7 @@ export class Car {
       const outward = -fside * this.vel.dot(n);
       const wantOut = 1.4;
       if (outward < wantOut) this.vel.addScaledVector(n, -fside * (wantOut - outward));
-      this.lateral = fside * wallLim; // ---- width-variation
+      this.lateral = fside * stand; // ---- width-variation
       // opt-in wall instrument (headless): set __game.__wallProbe = {} and every
       // contact records what the peel-off actually did — `inward` and
       // `pingPong` must both stay 0 (no shove back into the rock, and no
