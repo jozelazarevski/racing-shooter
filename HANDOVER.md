@@ -157,6 +157,20 @@ only that way: the gantry that moved DEEPER into the road (4.52 -> 7.59 u), and
   GitHub outage, and the owner had to correct it. The ONLY proof is fetching a
   path that exists in the new build and not the old one — a 404 there means
   unpublished, and no amount of waiting for a CDN changes that.
+- **`node --check src/foo.js` IS NOT A SYNTAX CHECK IN THIS REPO, AND EXITS 0
+  ON GARBAGE.** There is no `package.json`, so node parses `.js` as CommonJS,
+  hits the ESM `import` on line 1, retries as ESM, and on that fallback path
+  prints nothing and EXITS 0. Verified: append a literal `@@@garbage@@@` line to
+  `src/vehicles.js` and `node --check` passes it. It was passing a file whose
+  block comment closed twice. Copy to `.mjs` and check THAT — and read node's
+  own exit status, not a pipeline's (`node --check x.mjs | head` reports
+  `head`'s 0 and hides the error, which cost a second round here):
+
+      cp src/foo.js /tmp/s.mjs && node --check /tmp/s.mjs; echo $?
+
+  `.mjs` files under `tests/` are checked correctly as they are. Any check of a
+  `.js` file needs a POSITIVE CONTROL — break a copy on purpose and require the
+  checker to say so — because this one failed silently for a whole session.
 - **A GATE READ THROUGH `| tail` IS NOT A GATE RUN.** A capture of
   `test-goat.mjs` ended `23 passed, 3 failed` with exactly ONE `FAIL` line in
   the file, because the runner tailed it — the other two scrolled off and the

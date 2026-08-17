@@ -376,6 +376,15 @@
        up under the camera and pause buttons in the top-right corner */
     #t-drift{right:calc(190px + env(safe-area-inset-right));
       bottom:calc(120px + env(safe-area-inset-bottom))}
+    /* ...AND THREE ICON BUTTONS DO NOT STACK ON A 390px TALL SCREEN EITHER.
+       Adding 👁 pushed ⏸ from top:124 to top:178, and measured at 844x390 that
+       landed it 24x32 INSIDE the 💥 button — the same corner, the same squeeze,
+       one row further down. Portrait has the height for a column; landscape's
+       spare real estate is the band across the TOP, so the column becomes a row
+       under the score box, reading 📷 👁 ⏸ left to right. */
+    #cam-btn{top:60px;right:calc(120px + env(safe-area-inset-right))}
+    #view-btn{top:60px;right:calc(66px + env(safe-area-inset-right))}
+    #pause-btn{top:60px;right:calc(12px + env(safe-area-inset-right))}
   }
 
   /* ---------- SCREENS ---------- */
