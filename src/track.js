@@ -9400,7 +9400,26 @@ export class Track {
         const p = this.pointAt(i, (half + 1.8) * side);
         const out = this.pointAt(i, (half + 7.0) * side);
         const drop = this.center[i].y - this.terrainHeight(out.x, out.z);
-        if (drop < DROP) { hits.push(false); continue; }
+        // A TIGHT CORNER IS WORTH WALLING EVEN ON FLAT GROUND.
+        //
+        // Asked for directly: "steep curves need to be fully walled so one
+        // can't skip them." Until now the ONLY reason to build a rail was a
+        // FALL — `drop < DROP` and the station was dropped — so a hairpin on
+        // level ground got nothing, and the whole apex was open scenery you
+        // could drive straight across. The AI follows a precomputed racing
+        // line and never does this; the player does, which makes an
+        // uncuttable corner a difficulty the human alone was paying for in
+        // reverse.
+        //
+        // The threshold is the roster's own: `boardMaxCurv` and the ramp
+        // rules already treat ~0.02 as "too bent to put anything on", and
+        // `tool-road-census` counts a sample tight at the same figure. Both
+        // sides get it, which is what "fully walled" means — cutting happens
+        // on the inside of a bend, but a car that runs wide out of one on
+        // loose verge is just as gone.
+        const TIGHT = 0.02;
+        const tightHere = this.curvature[i] > TIGHT;
+        if (drop < DROP && !tightHere) { hits.push(false); continue; }
         // AN OFFSET IS NOT A DISTANCE — the same trap the hedge banks document.
         // `pointAt` steps along ONE sample's normal, and on the inside of a
         // bend the lap swings back underneath it, so "1.8 u outside the edge"
