@@ -1,6 +1,6 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r209, deployed and live, tree clean.
+State at handover: `main` = r210, deployed and live, tree clean.
 Live: https://jozelazarevski.github.io/racing-shooter/
 
 ## THE ONE DEFECT THIS REPO KEEPS SHIPPING
@@ -215,6 +215,21 @@ the 9.65 u where `nearestIndex` can capture the wrong leg.
 Related, same lesson: clamping the sea floor AFTER the overpass solve cost COTE
 D AZUR 11.5 -> 7.5 u of clearance. Moving the clamp INSIDE `sink()` restored
 11.25.
+
+## `roadWidth` — MOUNTAIN TO SEA IS 5x AND THE CASCADE IS NOT FINISHED
+`tune.roadWidth` multiplies the one profile `widthAt(i)` serves. MOUNTAIN TO
+SEA runs at 5 (45 u half-width, 90 u road) on request. It drives, and its bore
+is clean, but the width found constants standing in for it:
+- FIXED: `_buildOliveGrove` gated on `_distToTrack < 14` — 179 of 377 trees in
+  the carriageway, 40 SOLID. Now `widthAt + 5`, giving 10. Default-width worlds
+  measured unchanged at 0.
+- OPEN: **35 untagged barriers inside the carriageway, deepest 25.1 u, solid.**
+  World masonry placed off its own offsets. Edge rails are clean (0 of 65).
+- OPEN: corner walling is 0% both-sides / 171 open. `_buildEdgeRails` needs the
+  bay `half + 0.25` from the lap by `_distToTrack`, and at 45 u a point 46.8 u
+  out along a normal is nearer than that on almost any curve.
+Anything else that widens must be measured the same way — `tools-scratch/
+wide.mjs` asks the game's own collider lists what the road has swallowed.
 
 ## OPEN, LOWER PRIORITY
 - **`MIN` in `tunnelFitAt` is probably the same units error `reach` was.** The

@@ -198,7 +198,12 @@ export const LEVELS = [
   { id: 56, name: 'OLIVE CROSSING', theme: 'olivecountry', region: 'MEDITERRANEAN',
     cost: 28, fresh: true, route: 'oliveCross', tune: { tunnels: { count: 1 } } },
   { id: 57, name: 'MOUNTAIN TO SEA', theme: 'mountainsea', region: 'MEDITERRANEAN',
-    cost: 29, fresh: true, route: 'mountainSea', tune: { tunnels: { count: 1 } } },
+    // FIVE TIMES WIDER, asked for directly. `roadWidth` multiplies the one
+    // width profile `widthAt(i)` serves, so the ribbon, the verges, the AI's
+    // lateral clamp, the scenery clearance and the rail placement all widen
+    // together — 9 u of half-width becomes 45, a 90 u carriageway.
+    cost: 29, fresh: true, route: 'mountainSea',
+    tune: { tunnels: { count: 1 }, roadWidth: 5 } },
   // CITADEL BAY: the player's harbour reference - a turquoise bay, the quay
   // and its marina along the shore, and a walled hill town with a keep
   // standing over the whole thing. Shares the Aegean route because that lap
@@ -5246,7 +5251,23 @@ export class Track {
    *  on straights/mild curves where the road pinches to `min`×ROAD_HALF with
    *  smooth cosine shoulders. Off for cliff-walled corridors (already tight). */
   _buildWidthProfile() {
-    this._width = new Float32Array(N).fill(ROAD_HALF);
+    // A WHOLE-WORLD WIDTH MULTIPLIER. Asked for directly: "mountain to sea
+    // needs to be 5x wider."
+    //
+    // It lands HERE and nowhere else on purpose. `widthAt(i)` is the single
+    // profile every consumer already reads — the ribbon mesh and its verges,
+    // the AI's lateral clamp and its pinch braking, the scenery clearance
+    // rules, the rail and wall placement, the census gates — so widening the
+    // profile widens all of them together. Scaling `ROAD_HALF` instead would
+    // move a constant that other geometry is measured against, and multiplying
+    // at the call sites would need every one of them found.
+    //
+    // The narrow-section pinches below scale with it rather than staying at
+    // their absolute width, so a wide world keeps the same SHAPE of pinch
+    // instead of having its narrows vanish into the extra tarmac.
+    const wide = this.T.roadWidth ?? 1;
+    const HALF = ROAD_HALF * wide;
+    this._width = new Float32Array(N).fill(HALF);
     this._narrowSecs = [];
     const T = this.T;
     const themeKey = (this.level && this.level.theme) || 'forest';
@@ -5278,14 +5299,14 @@ export class Track {
       const half = len / 2;
       if (this._narrowSecs.some((s) => this._circDist(mid, s.mid) < s.half + half + 110)) continue;
       // pinch floor ≈ 55–65% of ROAD_HALF (never below 5u half-width)
-      const minW = Math.max(5, ROAD_HALF * (spec.min ?? 0.6) * (0.95 + rnd() * 0.12));
+      const minW = Math.max(5 * wide, HALF * (spec.min ?? 0.6) * (0.95 + rnd() * 0.12));
       this._narrowSecs.push({ i0, len, mid, half, minW });
       for (let k = 0; k <= len; k++) {
         // cosine shoulders over the outer 35% each side, flat floor between
         const edge = Math.min(k, len - k) / (len * 0.35);
         const f = THREE.MathUtils.smoothstep(Math.min(1, edge), 0, 1);
         const j = (i0 + k) % N;
-        this._width[j] = Math.min(this._width[j], ROAD_HALF + (minW - ROAD_HALF) * f);
+        this._width[j] = Math.min(this._width[j], HALF + (minW - HALF) * f);
       }
     }
     this._applyWidenEdits();
@@ -7066,7 +7087,11 @@ export class Track {
       for (let j = s0; j <= e0; j += 3) {
         pts.push([this.center[j].x, this.center[j].z, this.center[j].y]);
       }
-      this._tunnels.push({ mid: best, s: s0, e: e0, pts, h: S.ridge ?? 13 });
+      // `ridge` 13 built a berm, not a mountain — see `_tunnelRidge`. 62 puts
+      // the crown roughly where the near massif peaks sit, so a portal reads
+      // as a hole in a mountainside instead of a pipe through a bank. It stays
+      // a per-theme knob for the worlds that want a smaller one.
+      this._tunnels.push({ mid: best, s: s0, e: e0, pts, h: S.ridge ?? 62 });
     }
   }
 
@@ -7082,7 +7107,23 @@ export class Track {
         if (d < bd) { bd = d; by = p[2]; bi = k; }
       }
       bd = Math.sqrt(bd);
-      if (bd > 34) continue;
+      // THE HILL HAS TO BE A MOUNTAIN, OR THE BORE IS A CULVERT.
+      //
+      // Reported with a photograph: "none of the tunnels are within the
+      // mountains." They were not. The ridge was 13 u tall with a hard-coded
+      // 34 u falloff, so every bore in the game ran through a low flat-topped
+      // BERM while the real mountains stood on the horizon behind it — and the
+      // berm's own numbers say so, against a massif peak of 120-300 u and
+      // valley walls of 78-135 u.
+      //
+      // The reach now scales with the height. Raising `ridge` alone would only
+      // have built a 13 u-wide spike: what makes a hillside read as a mountain
+      // is the RATIO of its height to how far it takes to come down, and 2.4
+      // holds that at roughly a 40% flank — steeper than the massif's ~15%,
+      // because a portal wants rock standing over it rather than a slope you
+      // could drive up and round.
+      const REACH = Math.max(34, (T.h ?? 13) * 2.4);
+      if (bd > REACH) continue;
       // THE BORE IS A HOLE, AND A HEIGHTFIELD CANNOT HOLD A HOLE.
       //
       // This raised the ground to roof height for ANY point within 34 u of the
@@ -7098,7 +7139,7 @@ export class Track {
       const CORR = TUNNEL_HW + 2.0, FLANK = TUNNEL_HW + 14.0;
       if (bd < CORR) { h = Math.min(h, by - 1.2); continue; }
       const open = Math.min(1, (bd - CORR) / (FLANK - CORR));
-      const across = Math.pow(Math.cos((bd / 34) * Math.PI * 0.5), 1.3);
+      const across = Math.pow(Math.cos((bd / REACH) * Math.PI * 0.5), 1.3);
       const ease = Math.min(1, Math.min(bi, T.pts.length - 1 - bi) / 3);
       const w = across * ease * open;
       if (w < 0.06) continue;
@@ -17638,6 +17679,20 @@ export class Track {
       if (p) anchors.push({ x: p.x, z: p.z, rot: Math.random() * Math.PI * 2 });
     }
     const GRID = 7;                                   // the Bible's 7 m spacing
+    // CLEAR THE ROAD THAT IS ACTUALLY THERE, not the one the constant assumed.
+    //
+    // Every spot below used to be gated on `_distToTrack(x, z) < 14`. Fourteen
+    // units clears a 9 u half-width with five to spare, and it is DEEP INSIDE a
+    // 45 u one — so the first world to ask for a wider road (MOUNTAIN TO SEA,
+    // `roadWidth: 5`) put 179 of its 377 olives in the carriageway, 40 of them
+    // `solid`, which stop a car dead. `_buildForest` never had the bug: it asks
+    // `widthAt` and adds a margin, and this now does the same.
+    //
+    // The margin is 5 u, which is what 14 gave the default road, so nothing
+    // moves on any world that has not asked to be widened.
+    const wide = this.T.roadWidth ?? 1;
+    const clear = (x, z) => this.widthAt(this.nearestIndex(
+      { x, y: 0, z, isVector3: true })) + 5;
     this._scatter(COUNT - Math.round(cypWt * COUNT),
       () => {
         if (anchors.length && Math.random() < 0.45) {
@@ -17647,15 +17702,15 @@ export class Track {
           const gz = (((Math.random() * 9) | 0) - 4) * GRID;
           const x = an.x + gx * cs - gz * sn + (Math.random() - 0.5) * 0.7;
           const z = an.z + gx * sn + gz * cs + (Math.random() - 0.5) * 0.7;
-          return this._distToTrack(x, z) < 14 ? null : { x, z, grid: true };
+          return this._distToTrack(x, z) < clear(x, z) ? null : { x, z, grid: true };
         }
         const p = Math.random() < 0.55
-          ? this._trackSidePos(15, 48)
+          ? this._trackSidePos(Math.max(15, ROAD_HALF * wide + 6), 48 + ROAD_HALF * (wide - 1))
           : (() => {
             const ang = Math.random() * Math.PI * 2;
             const r = 80 + Math.random() * 540;
             const x = Math.cos(ang) * r, z = Math.sin(ang) * r;
-            return this._distToTrack(x, z) < 14 ? null : { x, z };
+            return this._distToTrack(x, z) < clear(x, z) ? null : { x, z };
           })();
         // no olives rooted in the bay: the ring branch bypasses _trackSidePos
         return p && !this._inWater(p.x, p.z) && this._altOK(p.x, p.z) ? p : null;

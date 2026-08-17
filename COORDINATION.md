@@ -2279,6 +2279,65 @@ The genuine remainder is a 13-station bare run at 863-875.
 narrowed), `test-cornerwalls` with all three added, every floor raised to its
 new measurement and SUMMIT CLIMB added as an older-world regression witness.
 
+## r210 — the tunnels get mountains, and one world gets a 5x road
+
+### "NONE OF THE TUNNELS ARE WITHIN THE MOUNTAINS"
+
+Reported with a photograph, and true. The bore's hill was `ridge ?? 13` with a
+hard-coded 34 u falloff, so every tunnel in the game ran through a low
+flat-topped BERM while the real mountains stood on the horizon behind it. Its
+own numbers say so: 13 u against massif peaks of 120-300 u and valley walls of
+78-135 u.
+
+The reach now scales with the height (`max(34, h * 2.4)`) — raising `ridge`
+alone would have built a 13 u-wide spike, because what makes a hillside read as
+a mountain is the RATIO of height to how far it takes to come down. Default
+13 -> 62, a ~40% flank: steeper than the massif's ~15%, because a portal wants
+rock standing over it rather than a slope you could drive round.
+
+    ground standing over the road at a bore, CAPE OLIVETO
+      before   13 u at the crown, nothing past 34 u
+      after    33 u at 20 u out, 55 u at 40 u, 36 u at 80 u
+
+Roster-wide `test-tunnels`: **34 of 34 bores** still driven in one portal and
+out the other. (TREMOLA DESCENT still sites none — pre-existing, its nine
+hairpins leave no straight enough station.)
+
+### MOUNTAIN TO SEA, FIVE TIMES WIDER — AND WHAT THAT COST
+
+Asked for directly. `roadWidth` multiplies the ONE width profile `widthAt(i)`
+serves, so the ribbon, verges, AI lateral clamp, scenery clearance and rail
+placement widen together; 9 u of half-width becomes 45, a 90 u carriageway. Its
+bore still drives clean.
+
+**It also found a constant that had been standing in for the road width.**
+`_buildOliveGrove` gated every spot on `_distToTrack < 14` — five units of
+margin against a 9 u half-width, and DEEP INSIDE a 45 u one:
+
+    trees inside the carriageway   179 of 377, deepest 32 u, 40 of them SOLID
+    after teaching it widthAt + 5   10 of 384
+    CAPE OLIVETO and OLIVE COAST    0 of 514, 0 of 500 — unchanged
+
+`_buildForest` never had the bug; it asks `widthAt` and adds a margin, which is
+what the olive grove does now.
+
+**STILL OPEN AT 5x, and honest about it.** The width cascades further than one
+builder:
+- **35 untagged barriers stand inside the carriageway**, deepest 25.1 u. These
+  are the world's own masonry, placed by builders that use their own offsets
+  rather than `widthAt`. They are SOLID. The edge rails are clean (0 of 65).
+- **Corner walling collapses**: 0% of tight stations walled both sides, 171 of
+  283 fully open, 65 rails. `_buildEdgeRails` requires the bay to sit
+  `half + 0.25` from the lap BY `_distToTrack`, and at 45 u a point 46.8 u out
+  along a normal is nearer than that to some part of the lap on almost any
+  curve. A wide road can barely take rails.
+- 10 trees remain inside, from the branches of the olive scatter that take a
+  fixed corridor.
+
+The multiplier is delivered as asked and the world drives; a 5x road on this
+roster needs the masonry builders taught `widthAt` as well. Around 2x would sit
+inside what the existing builders already tolerate.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
