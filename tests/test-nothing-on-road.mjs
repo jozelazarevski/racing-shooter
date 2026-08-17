@@ -108,6 +108,10 @@ const KNOWN_HARD = {
   'CINQUE TERRE': { max: 2, why: 'the 1.95 u stone r199 could not attribute — colours are computed, grep does not reach it' },
   'CLIFF KNOT': { max: 4, why: 'a knotted lap: masonry beside one leg reaches the next' },
   'BRIDGE RUN': { max: 3, why: '2 bridge parapet segments at the deck edge' },
+  // measured 1 and PRE-EXISTING: the same 1.37 u stone at sample 370 was there
+  // before the spur-farmstead fix. The BUILDING that stood at 5.33 u on this
+  // world — the reported chalet — is gone; this is what is left.
+  'GLACIER COL': { max: 2, why: 'one 1.37 u stone at sample 370, pre-existing' },
   'SEA CLIFF RUN': { max: 4, why: '80 u of road stacked on road (HANDOVER item 3) — placement beside one leg lands in the other' },
 };
 
