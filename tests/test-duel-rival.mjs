@@ -64,18 +64,14 @@
  *
  *   node tests/test-duel-rival.mjs
  *
- * PATCH=1 serves a patched `src/main.js` through request interception instead
- * of the tree's own. It exists for one reason: the fix belongs in main.js,
- * this gate was written in a session that did not own that file, and a gate
- * nobody has ever seen go green is not evidence of anything. It is a
- * PROOF-OF-FIX switch, not an escape hatch — it never loosens a threshold,
- * and once the patch is in the tree it should be deleted along with this
- * paragraph.
+ * This gate was written in a session that did not own main.js, so it carried a
+ * PATCH=1 switch that served the pending fix by request interception — a gate
+ * nobody has ever seen go green is not evidence of anything. The fix landed in
+ * 9b1ca7c and the scaffold was removed; the gate now reads the tree.
  */
 import { chromium } from 'playwright-core';
 
 const BASE = process.env.BASE ?? 'http://localhost:8901';
-const PATCH = process.env.PATCH === '1';
 const LEVEL = process.env.LEVEL ?? '1';
 // 30 s of GAME time. At the measured 48.9 fps with the render stubbed that is
 // ~30 s of wall clock too, and it is comfortably more than the ~8 s the AI
@@ -88,15 +84,6 @@ const ok = (cond, msg, extra = '') => {
   else { fail++; console.log('FAIL ', msg, extra); }
 };
 
-// ---- THE PENDING main.js PATCH, for PATCH=1 -------------------------------
-const PATCH_FROM = `      if (!this.freeRoam && (this.state === 'race' || this.state === 'finished' || this.state === 'countdown')) {
-        for (const e of this.enemies) {`;
-const PATCH_TO = `      const rivals = this.freeRoam
-        ? (this.missionFoe?.alive ? [this.missionFoe] : [])
-        : this.enemies;
-      if (rivals.length && (this.state === 'race' || this.state === 'finished' || this.state === 'countdown')) {
-        for (const e of rivals) {`;
-
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 
@@ -106,28 +93,6 @@ async function run(mode) {
   page.setDefaultTimeout(600000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e.message)));
-
-  let patched = null;
-  if (PATCH) {
-    // A REGEX, NOT A GLOB. index.html asks for `./src/main.js?v=r211`, and `?`
-    // is a glob metacharacter in some matchers — a pattern that quietly failed
-    // to match would leave the tree's own main.js in place and report the fix
-    // as not working. The `patched` assertion below is the belt to this brace.
-    await page.route(/\/src\/main\.js/, async (route) => {
-      const res = await route.fetch();
-      const body = await res.text();
-      patched = body.includes(PATCH_FROM);
-      // DROP content-length AND content-encoding. The patched body is ~1.9 kB
-      // longer than the original, so reusing the upstream content-length
-      // truncates the module mid-statement — and a truncated module fails as
-      // a syntax error at load, which would look exactly like "the fix broke
-      // the game" rather than like a bug in this harness.
-      const h = { ...res.headers(), 'content-type': 'text/javascript' };
-      delete h['content-length']; delete h['content-encoding'];
-      route.fulfill({ status: res.status(), headers: h,
-        body: patched ? body.replace(PATCH_FROM, PATCH_TO) : body });
-    });
-  }
 
   const urlMode = mode === 'race' ? 'race' : 'missions';
   await page.goto(`${BASE}/?level=${LEVEL}&mode=${urlMode}&unlockall=1`,
@@ -218,13 +183,11 @@ async function run(mode) {
   }, { mode, SECONDS });
 
   R.errors = errors;
-  R.patched = patched;
   await page.close();
   return R;
 }
 
-console.log(`duel-rival: BASE=${BASE} level=${LEVEL} ${SECONDS}s per run`
-  + (PATCH ? '  [PATCH=1 — pending main.js fix served by interception]' : ''));
+console.log(`duel-rival: BASE=${BASE} level=${LEVEL} ${SECONDS}s per run`);
 
 const race = await run('race');
 const duel = await run('duel');
@@ -239,12 +202,6 @@ console.log('');
 for (const R of [race, duel, pursuit]) show(R);
 console.log('');
 
-if (PATCH) {
-  ok(duel.patched === true,
-    'PATCH=1 actually found and replaced the gate it targets — a patch that '
-    + 'matched nothing would make every law below meaningless',
-    `matched=${duel.patched}`);
-}
 
 // ---- LAW 0: POSITIVE CONTROL ---------------------------------------------
 // Measured on PINE VALLEY, 30 s: 1203 steps in 1399 frames (0.86 — the
