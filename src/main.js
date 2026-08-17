@@ -50,7 +50,7 @@ const HULL_LIVES = 3;
 // for the guarantee that makes any slope above 1 safe to ship. Exported so a
 // test can pin the arithmetic against the number itself rather than re-deriving
 // it from a rounded price and disagreeing by half a star.
-export const LADDER_SLOPE = 2.5;
+export const LADDER_SLOPE = 0.5;
 
 /** "1ST".."8TH" — the ordinal for a finishing position. Was a literal array
  *  in three places, each of which stopped at 6 and fell through to a bare
@@ -2610,6 +2610,21 @@ class Game {
    *  worst driver in the game is unaffected: their pace is pinned at one
    *  world a race by the floor, not by the price.
    *
+   *  AND THEN 2.5 WAS ASKED FOR BACK THE OTHER WAY. At 2.5 a rung costs two
+   *  and a half stars, so a star buys less than half a world and the board
+   *  reads as a row of four-figure walls: on the save that prompted this,
+   *  16 stars against neighbours priced 55, 58, 60 and 63 — "39 TO GO" on the
+   *  very next card. Asked for directly: "open a few tracks per star earned,
+   *  not five, six like we're doing now."
+   *
+   *  0.5 inverts the unit. A rung costs half a star, so ONE star opens about
+   *  TWO worlds, and the same neighbours price at 11, 12, 12 and 13. This is
+   *  deliberately the opposite call to the one r178 made on the same number
+   *  after "tracks are opening too fast" — the roster has since grown and the
+   *  complaint reversed, and a knob that was set by report is being reset by
+   *  report. The floor and the never-re-lock rule are untouched, so nothing
+   *  below depends on the value.
+   *
    *  The first three are free, so there is a real choice from the very first
    *  race. Deliberately written as a relation and not a fixed number, which
    *  was true of a 21-world roster and quietly stopped being true as worlds
@@ -3124,11 +3139,33 @@ class Game {
     const nextUp = this.nextTrack();
     // the world (if any) the floor has handed over — priced out, open anyway
     const freeId = this._freeUnlock();
-    const rows = LEVELS.map((lv, i) => ({ lv, i }));
-    if (!timeline) {
-      rows.sort((a, b) =>
-        (freshRegions.has(a.lv.region) ? 0 : 1) - (freshRegions.has(b.lv.region) ? 0 : 1) || a.i - b.i);
-    }
+    // WHAT YOU CAN DRIVE COMES FIRST. ALWAYS.
+    //
+    // The career array is in rung order and the PRICES are not monotonic with
+    // it — a world can carry its own `cost`, so the board ran 58, 60, 63 and
+    // then 20 a few cards later. Add the floor handing a world over for free
+    // and the result was OLIVE COAST sitting OPEN underneath three padlocks,
+    // with the one thing the player could actually race buried below the
+    // things they could not. Reported from the phone with a screenshot of
+    // exactly that.
+    //
+    // So: unlocked first, locked after, and the locked half ordered by what it
+    // COSTS rather than by where it happens to sit in the array — that is the
+    // order a player reads a wall in ("what's next?"), and it is the order the
+    // prices were always trying to express.
+    //
+    // Career order (pricing, progression, `nextTrack`) is the array and is
+    // untouched; this is display only. It does override the timeline view's
+    // old rule that rung 12 must follow rung 11 — that rule assumed prices
+    // rose with the array, and they do not.
+    const rows = LEVELS.map((lv, i) => ({ lv, i, open: this.isLevelUnlocked(lv.id) }));
+    rows.sort((a, b) =>
+      (a.open ? 0 : 1) - (b.open ? 0 : 1)
+      || (!timeline
+        ? (freshRegions.has(a.lv.region) ? 0 : 1) - (freshRegions.has(b.lv.region) ? 0 : 1)
+        : 0)
+      || (a.open ? 0 : this.starCost(a.lv.id) - this.starCost(b.lv.id))
+      || a.i - b.i);
     rows.forEach(({ lv, i }) => {
       const card = document.createElement('button');
       const unlocked = this.isLevelUnlocked(lv.id);
@@ -7979,6 +8016,32 @@ class Game {
       }
       const fy = tk.center[ci].y;
       cp.y = Math.max(fy + 1.9, Math.min(cp.y, fy + tun.apex - 1.3));
+    } else if (tk?.deckOverhead
+      && (tk.deckOverhead(p.pos, p.trackIndex) || tk.deckOverhead(this.camPos, p.trackIndex))) {
+      // UNDER A BRIDGE, OBEY THE BRIDGE — the same rule as the bore above.
+      //
+      // Without this the chase camera rises over the deck on the approach and
+      // the driver watches the top of a flyover while the car runs underneath
+      // it, out of sight, at speed. Asked for directly: "when under bridge,
+      // change the camera to same camera mode like in tunnels."
+      //
+      // Same clamp shape as the tunnel branch: keep the eye above the road and
+      // below the soffit, and hold it inside the span so it cannot swing out
+      // through a pier. Either the car or the camera being under the deck
+      // counts, because the camera trails and neither hand-off may flick the
+      // view through the deck.
+      const dk = tk.deckOverhead(p.pos, p.trackIndex) || tk.deckOverhead(this.camPos, p.trackIndex);
+      const cp = this.camPos;
+      const ci = tk.nearestIndex(cp, dk.i, true);
+      const lat = tk.lateralOffset(cp, ci);
+      const lim = dk.half - 2.4;
+      if (Math.abs(lat) > lim) {
+        const n = tk.nrm[ci];
+        const over = lat - Math.sign(lat) * lim;
+        cp.x -= n.x * over;
+        cp.z -= n.z * over;
+      }
+      cp.y = Math.max(dk.floorY + 1.9, Math.min(cp.y, dk.deckY - 0.8));
     } else if (tk?.terrainHeight) {
       const cp = this.camPos, pp = p.pos;
       const dx = pp.x - cp.x, dz = pp.z - cp.z, dy = pp.y - cp.y;

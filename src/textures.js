@@ -743,6 +743,44 @@ export function groundTexture(palette = {}) {
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
     }
+    // STONES THAT READ AS STONES. A speck of flat colour is a pixel; a pebble
+    // with a lit crown and a shadow under it is an object, and at gameplay
+    // distance that difference is most of what separates "green plane" from
+    // "ground". Same trick the roof tiles use — the shadow is what sells it.
+    for (let i = 0; i < 150; i++) {
+      const x = Math.random() * w, y = Math.random() * h;
+      const rr = 1.6 + Math.random() * 4.4;
+      const gr = 96 + Math.random() * 60 | 0;
+      g.fillStyle = `rgba(0,0,0,${0.14 + Math.random() * 0.12})`;      // contact shadow
+      g.beginPath();
+      g.ellipse(x + rr * 0.32, y + rr * 0.34, rr * 1.02, rr * 0.72, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = `rgba(${gr},${gr - 6},${gr - 16},${0.55 + Math.random() * 0.35})`;
+      g.beginPath();
+      g.ellipse(x, y, rr, rr * 0.74, Math.random() * 3, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = `rgba(255,252,240,${0.14 + Math.random() * 0.18})`; // lit crown
+      g.beginPath();
+      g.ellipse(x - rr * 0.24, y - rr * 0.26, rr * 0.5, rr * 0.34, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+    // tufts: a few short blades from one root, so growth has direction rather
+    // than being an even stipple
+    for (let i = 0; i < 90; i++) {
+      const x = Math.random() * w, y = Math.random() * h;
+      const dark = Math.random() < 0.5;
+      g.strokeStyle = dark ? 'rgba(38,74,26,0.55)' : 'rgba(122,168,74,0.5)';
+      g.lineWidth = 1.1;
+      for (let k = 0; k < 4 + (Math.random() * 4 | 0); k++) {
+        const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.5;
+        const len = 3 + Math.random() * 6;
+        g.beginPath();
+        g.moveTo(x, y);
+        g.quadraticCurveTo(x + Math.cos(a) * len * 0.5, y + Math.sin(a) * len * 0.6,
+          x + Math.cos(a) * len, y + Math.sin(a) * len);
+        g.stroke();
+      }
+    }
     // large-scale drift: a few very soft wide blotches so the tiled ground
     // reads patchy at gameplay distance instead of uniformly stippled
     for (let i = 0; i < 26; i++) {
@@ -1923,4 +1961,70 @@ export function townhouseGlowTexture(palette = {}, variant = 0, litFrac = 0.55) 
   t.wrapS = THREE.ClampToEdgeWrapping;
   t.wrapT = THREE.ClampToEdgeWrapping;
   return t;
+}
+
+/** ROOFS WERE THE ONE BIG SURFACE WITH NO TEXTURE ON IT.
+ *
+ *  Thirty-eight texture functions in this file and not one of them was a roof:
+ *  every roof in the game — town frontages, farmhouses, barns, the whole
+ *  element kit — was a flat colour with `flatShading`. From the chase camera,
+ *  which looks DOWN on a village, roof is the largest share of the frame a
+ *  building gets, so it was also the largest untextured area on screen.
+ *
+ *  `kind` picks the coursing: 'pantile' for the Mediterranean barrel tile,
+ *  'slate' for the flatter northern courses. The base colour is passed in so
+ *  every theme keeps the roof colour it already chose — this adds relief to
+ *  that colour, it does not repaint the roofs.
+ */
+export function roofTileTexture(base = '#8a3a2a', kind = 'pantile') {
+  const [r, g0, b] = hexRgb(base);
+  const shade = (f, a = 1) => `rgba(${Math.min(255, r * f) | 0},${Math.min(255, g0 * f) | 0},${Math.min(255, b * f) | 0},${a})`;
+  return make(256, 256, (g, w, h) => {
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    const rows = kind === 'slate' ? 16 : 11;
+    const rh = h / rows;
+    for (let ry = 0; ry < rows; ry++) {
+      const y = ry * rh;
+      // each course is a shade of its own so the roof reads as laid, not poured
+      g.fillStyle = shade(0.88 + Math.random() * 0.24, 1);
+      g.fillRect(0, y, w, rh - 1);
+      // the shadow the course above casts on this one — the line that makes it
+      // read as tile rather than as a stripe
+      g.fillStyle = shade(0.42, 0.55);
+      g.fillRect(0, y, w, kind === 'slate' ? 1.6 : 2.4);
+      if (kind === 'pantile') {
+        // barrel tiles: a run of half-round ridges down the course
+        const cols = 16, cw = w / cols;
+        for (let cx = 0; cx < cols; cx++) {
+          const x = cx * cw + (ry & 1 ? cw * 0.5 : 0);
+          g.fillStyle = shade(1.16, 0.5);
+          g.fillRect(x, y + 2.4, cw * 0.34, rh - 3.4);      // lit crown
+          g.fillStyle = shade(0.62, 0.42);
+          g.fillRect(x + cw * 0.62, y + 2.4, cw * 0.3, rh - 3.4);  // pan shadow
+        }
+      } else {
+        // slate: staggered joints, no relief, just the seams
+        const cols = 9, cw = w / cols;
+        g.fillStyle = shade(0.55, 0.5);
+        for (let cx = 0; cx < cols; cx++) {
+          const x = cx * cw + (ry & 1 ? cw * 0.5 : 0);
+          g.fillRect(x, y + 1.6, 1.4, rh - 2.6);
+        }
+      }
+      // a few slipped or replaced tiles per roof
+      if (Math.random() < 0.3) {
+        g.fillStyle = shade(0.6 + Math.random() * 0.9, 0.6);
+        g.fillRect(Math.random() * w, y + 2, 6 + Math.random() * 10, rh - 3);
+      }
+    }
+    // weathering: moss and soot gathering toward the eaves
+    for (let i = 0; i < 40; i++) {
+      const y = h - Math.pow(Math.random(), 1.7) * h;
+      g.fillStyle = `rgba(${70 + Math.random() * 40 | 0},${76 + Math.random() * 40 | 0},${58 + Math.random() * 30 | 0},${0.05 + Math.random() * 0.10})`;
+      g.beginPath();
+      g.arc(Math.random() * w, y, 3 + Math.random() * 9, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
 }

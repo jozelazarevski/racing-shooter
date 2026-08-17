@@ -4,6 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<!-- IOS DOES NOT READ THE MANIFEST FOR ANY OF THIS.
+     `manifest.webmanifest` already declares icons, a name and a theme colour,
+     and Safari's Add to Home Screen ignores all three: it wants its own
+     `apple-touch-icon`, its own title, and its own status-bar style, or the
+     home screen gets a screenshot of the page under a truncated <title> and
+     the standalone app opens with a white bar over the sky. The manifest
+     entries stay for every other platform; these are the iOS half.
+     A PNG, not the SVG favicon above — iOS has never supported SVG here. -->
+<link rel="apple-touch-icon" href="./assets/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="./assets/icon-512.png">
+<meta name="apple-mobile-web-app-title" content="Ignite Rally">
+<!-- black-translucent lets the canvas paint under the status bar, which is the
+     point of viewport-fit=cover above; the safe-area insets the layout already
+     uses are what keep the HUD out from under it. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>IGNITE RALLY — Racing Shooter</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
 <link rel="manifest" href="./manifest.webmanifest">
@@ -1298,7 +1313,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r191</div>
+<div id="build-tag">r199</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1555,10 +1570,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r191"></script>
+<script type="module" src="./src/main.js?v=r199"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r191"></script>
+<script src="./src/offline.js?v=r199"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r191"></script>
+<script type="module" src="./src/traffic.js?v=r199"></script>
 </body>
 </html>

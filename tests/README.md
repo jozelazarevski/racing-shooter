@@ -33,6 +33,15 @@ slipstream, big air, shield, treasure stars), `test-round-fixes.mjs`
 `test-roam.mjs`, `test-destruction.mjs`, `test-invisible-walls.mjs` (no
 mountain stands on any world's road; a car can leave every station on the
 racing line; the collider is as wide as the rock is drawn at the same height),
+`test-roadclear.mjs` (four laws about what may stand near a carriageway:
+nothing BARE deep in a lane, no tree TRUNK in one, the start gantry hangs at
+its designed height on every world however high that world starts, and road is
+not stacked on road — the known-open entries are listed by name and measured
+value, so shrinking that list is the work and growing it fails),
+`test-tunnels.mjs` (drives the real car in one portal and out the other on
+every world that asks for a bore, asserting it entered, exited the FAR portal,
+never left through the crown and never stopped dead — none of which a count of
+`track._tunnels` can answer),
 `test-rungs.mjs` (contract rungs: the ladder hardens, the top rung is
 HARD-only, a sweep stays worth about one strong race, and climbing persists per
 contract).
@@ -62,7 +71,7 @@ assumption someone had already written down.
 | `tool-blocker-detail.mjs` | `WORLD="…"` — for one world, every distinct blocker: what it is, how much road it covers, and whether a mesh is drawn at the road's height where it bites. |
 | `tool-massif-road.mjs` | Where road runs inside a massif collider: distance from the axis against the width the rock is actually drawn at that height. |
 | `tool-corridor-solids.mjs` | The same territory asked the *other* way round — per collider, gated against its own nearest station. Kept as the worked example of a question that cannot find the bug; see its header. |
-| `tool-overlap-census.mjs` | Which worlds run two legs of a lap on shared tarmac at grade. |
+| `tool-overlap-census.mjs` | Which worlds run two legs of a lap on shared tarmac at grade, how level they are, and **whether an overpass covers it** — the column that turns the fact into a diagnosis. Sharpened in r199; its header records the two ways a rewrite of it got the answer wrong. Gated by `test-roadclear.mjs` LAW 4. |
 | `tool-ground-mismatch.mjs` | Where the terrain mesh and `terrainHeight()` disagree near the road — the ground you hit against the ground you see. |
 
 ## Writing new checks

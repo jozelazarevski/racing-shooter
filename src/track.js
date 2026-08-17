@@ -10,26 +10,42 @@ import {
   crateTexture, coneTexture, barrelTexture, riverTexture, riverBankTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
-  townhouseTexture, townhouseGlowTexture,
+  townhouseTexture, townhouseGlowTexture, roofTileTexture,
 } from './textures.js';
 
 export const LEVELS = [
   { id: 1, name: 'PINE VALLEY',  theme: 'forest',  region: 'PINE VALLEY' },
   { id: 2, name: 'DUST CANYON',  theme: 'desert',  region: 'DUST CANYON' },
-  { id: 3, name: 'FROST PEAK',   theme: 'snow',    region: 'FROST PEAK' },
+  // ---- MOUNTAINS GET TUNNELS. Asked for directly: bores through the mountain
+  // worlds, driven in one portal and out the other. Every world below is a
+  // mountain that had none — the ALPINE PASSES and FROST PEAK regions, the two
+  // alpine climbs, and the col. `count` is a REQUEST and not a promise:
+  // `tunnelFitAt` refuses a station that is curved, near a gorge, near the
+  // start gate or sitting on a crest, so a world may end up with fewer, and
+  // that is the guard working rather than a shortfall (the same thing happened
+  // to OLIVE PASS in r196, which asked for three and got two). What each of
+  // them DID get is measured in tests/test-tunnels.mjs, which drives a car in
+  // one end and out the other.
+  { id: 3, name: 'FROST PEAK',   theme: 'snow',    region: 'FROST PEAK',
+    tune: { tunnels: { count: 1 } } },
   { id: 4, name: 'CANYON RUN',   theme: 'canyon',  region: 'DUST CANYON',
     tune: { gorgeJump: { count: 2, depth: 26 }, tunnels: { count: 1 } } },
   { id: 5, name: 'EMBER PASS',   theme: 'volcano', region: 'EMBER RIDGE' },
-  { id: 6, name: 'SUMMIT CLIMB', theme: 'alpine',  region: 'PINE VALLEY' },
-  { id: 7, name: 'GLACIAL PASS', theme: 'glacial', region: 'FROST PEAK' },
+  { id: 6, name: 'SUMMIT CLIMB', theme: 'alpine',  region: 'PINE VALLEY',
+    tune: { tunnels: { count: 1 } } },
+  { id: 7, name: 'GLACIAL PASS', theme: 'glacial', region: 'FROST PEAK',
+    tune: { tunnels: { count: 1 } } },
   { id: 8, name: 'AMAZON RAPIDS', theme: 'jungle', region: 'AMAZON' },
   { id: 9, name: 'THE DUNE SERPENT', theme: 'dunes', region: 'DUST CANYON' },
   { id: 11, name: 'OASIS AMBUSH', theme: 'oasis', region: 'DUST CANYON' },
   { id: 12, name: 'REDWOOD RAMPAGE', theme: 'redwood', region: 'PINE VALLEY' },
   { id: 13, name: 'LOG FLUME FURY', theme: 'flume', region: 'PINE VALLEY' },
   { id: 14, name: 'FOREST FIRE ESCAPE', theme: 'wildfire', region: 'PINE VALLEY' },
-  { id: 15, name: "GLACIER'S GRIND", theme: 'sheetice', region: 'FROST PEAK' },
-  { id: 16, name: 'AVALANCHE ALLEY', theme: 'avalanche', region: 'FROST PEAK' },
+  { id: 15, name: "GLACIER'S GRIND", theme: 'sheetice', region: 'FROST PEAK',
+    tune: { tunnels: { count: 1 } } },
+  // a gallery through the slope is exactly what avalanche country builds
+  { id: 16, name: 'AVALANCHE ALLEY', theme: 'avalanche', region: 'FROST PEAK',
+    tune: { tunnels: { count: 1 } } },
   { id: 17, name: 'NEON GRID EXPRESSWAY', theme: 'neon', region: 'NEO-KYOTO' },
   { id: 18, name: 'UNDERCITY SLIPSTREAM', theme: 'undercity', region: 'NEO-KYOTO' },
   // ---- CAREER ORDER IS THIS ARRAY, NOT THE ids. ROCKFALL RAVINE sat at slot
@@ -56,7 +72,8 @@ export const LEVELS = [
   // hero bridge. Career order is this array; ids are stable and never reused.
   { id: 22, name: 'COL DE TURINI', theme: 'pass', route: 'turini', region: 'WORLD RALLY',
     // relentless short hairpins, and jumps would be absurd on a tarmac col
-    tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0 } },
+    // the real col runs through galleries; two of them here
+    tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0, tunnels: { count: 2 } } },
   { id: 23, name: 'OUNINPOHJA', theme: 'forest', route: 'ouninpohja', region: 'WORLD RALLY',
     // the fastest stage in the sport: everything is crests and yumps
     tune: { elev: { amp: 4, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
@@ -64,7 +81,7 @@ export const LEVELS = [
     tune: { elev: { amp: 8, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
   { id: 25, name: 'PIKES PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
     // the tallest climb on the roster, and nothing but the climb
-    tune: { elev: { amp: 27, ph: [1.7, 0.3, 2.8] }, rampCount: 0 } },
+    tune: { elev: { amp: 27, ph: [1.7, 0.3, 2.8] }, rampCount: 0, tunnels: { count: 1 } } },
   { id: 26, name: 'SAFARI PLAINS', theme: 'savanna', route: 'safari', region: 'WORLD RALLY',
     tune: { elev: { amp: 4, ph: [0.9, 2.6, 1.2] }, rampCount: 5 } },
   { id: 27, name: 'CORNICHE', theme: 'canyon', route: 'corniche', region: 'WORLD RALLY',
@@ -156,7 +173,10 @@ export const LEVELS = [
   // the vineyard lap tracing their third hand-drawn loop
   { id: 46, name: 'VINEYARD VELOCE', theme: 'vineyard', region: 'HEARTLAND', cost: 18, fresh: true },
   { id: 47, name: 'DEEPWOOD TRAIL', theme: 'deepwood', region: 'HEARTLAND', cost: 19, fresh: true },
-  { id: 48, name: 'DOLOMITI CORSA', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true },
+  { id: 48, name: 'DOLOMITI CORSA', theme: 'dolomiti', region: 'ALPINE PASSES', cost: 20, fresh: true,
+    // the Dolomites are more tunnel than road; this is the world that most
+    // obviously should have had them and did not
+    tune: { tunnels: { count: 2 } } },
   { id: 49, name: 'HARBOR QUAY', theme: 'harbor', region: 'HEARTLAND', cost: 21, fresh: true },
   // THE MEDITERRANEAN FIVE - one coast each, all with bridges where the route
   // crosses itself and tunnels where a headland gets in the way.
@@ -208,6 +228,20 @@ export const LEVELS = [
   // straight rather than the 60-90 CLIFF KNOT keeps — because the drawing
   // writes "sharp cliff NEXT TO the sea", and a corniche you cannot see the
   // water from is just a road. Whales breach out past it.
+  // OLIVE PASS: the olive country asked for again, but pointed AT the massif
+  // instead of across the terraces — the road leaves the groves and climbs
+  // into the mountains, and where the ridge is in the way it goes through it.
+  //
+  // Theme and route are independent (SEA CLIFF RUN and MOUNTAIN TO SEA share a
+  // theme and run different routes), so this keeps OLIVE CROSSING's exact
+  // dressing — `olivecountry`, its palette, its groves and terraces — and
+  // borrows the pass route that climbs. Three bores rather than the roster's
+  // usual one, because "with tunnels" is the whole request; `tunnelFitAt`
+  // still refuses any station that is too curved, too near a gorge, too near
+  // the start gate or (since r190) sitting on a crest, so asking for three is
+  // asking for AT MOST three — the planner places what the mountain allows.
+  { id: 61, name: 'OLIVE PASS', theme: 'olivecountry', region: 'MEDITERRANEAN',
+    cost: 33, fresh: true, route: 'turini', tune: { tunnels: { count: 3 } } },
   { id: 60, name: 'SEA CLIFF RUN', theme: 'mountainsea', region: 'MEDITERRANEAN',
     cost: 32, fresh: true, route: 'seaCliffRun',
     tune: {
@@ -3673,6 +3707,25 @@ export const HOUSE_TEMPLATES = {
     ['box', 0, 5.9, 2.6, 3.9, 0.5, 0.22, 'trim'],
     ['box', 0, 8.8, 2.6, 3.9, 0.5, 0.22, 'trim'],
     ['box', 0, 0.5, 2.6, 1.5, 2.4, 0.2, 'trim'],             // street door
+    // WHAT READS AT 150 km/h IS DEPTH, NOT TEXTURE. A painted window is flat
+    // under every light in the game; a reveal, a sill and a shutter each catch
+    // their own shadow and give the face relief from the driving seat.
+    ['box', -1.6, 3.3, 2.72, 1.0, 1.3, 0.16, 'wall2'],       // window reveals
+    ['box', 1.6, 3.3, 2.72, 1.0, 1.3, 0.16, 'wall2'],
+    ['box', -1.6, 6.2, 2.72, 1.0, 1.3, 0.16, 'wall2'],
+    ['box', 1.6, 6.2, 2.72, 1.0, 1.3, 0.16, 'wall2'],
+    ['box', -1.6, 9.1, 2.72, 1.0, 1.3, 0.16, 'wall2'],
+    ['box', 1.6, 9.1, 2.72, 1.0, 1.3, 0.16, 'wall2'],
+    ['box', 0, 6.05, 2.95, 4.6, 0.18, 0.7, 'trim'],          // first-floor balcony slab
+    ['cyl', -2.0, 6.23, 3.2, 0.09, 0.85, 0.09, 'trim'],      // its balustrade
+    ['cyl', -0.7, 6.23, 3.2, 0.09, 0.85, 0.09, 'trim'],
+    ['cyl', 0.7, 6.23, 3.2, 0.09, 0.85, 0.09, 'trim'],
+    ['cyl', 2.0, 6.23, 3.2, 0.09, 0.85, 0.09, 'trim'],
+    ['box', 0, 7.05, 3.2, 4.3, 0.1, 0.12, 'trim'],           // handrail
+    ['cyl', 2.55, 0.5, 2.45, 0.11, 11.0, 0.11, 'trim'],      // rainwater downpipe
+    ['cyl', -1.7, 13.0, 0, 0.55, 1.9, 0.55, 'stone'],        // chimney + pot
+    ['cyl', -1.7, 14.7, 0, 0.26, 0.5, 0.26, 'roof'],
+    ['box', 0, 13.35, 0, 6.4, 0.22, 0.5, 'trim'],            // ridge cap
   ] },
   // AEGEAN: a whitewashed cube with a parapet instead of eaves, an outside
   // stair, and one painted door.
@@ -3684,6 +3737,21 @@ export const HOUSE_TEMPLATES = {
     ['box', -2.6, 0, 3.7, 2.6, 2.6, 0.55, 'trim'],           // outside stair
     ['box', 0.9, 0, 3.7, 1.5, 2.5, 0.22, 'trim'],            // blue door
     ['box', -2.8, 3.2, 3.7, 1.2, 1.1, 0.2, 'trim'],          // shutter
+    // The Aegean cube is a plain white box by design, so its detail is what
+    // hangs OFF it: deep window reveals, a stair rail, a vine pergola over the
+    // terrace and the roof water tank every one of these actually carries.
+    ['box', -2.4, 2.6, 3.65, 1.1, 1.2, 0.18, 'wall2'],       // window reveals
+    ['box', 2.4, 2.6, 3.65, 1.1, 1.2, 0.18, 'wall2'],
+    ['box', 3.9, 2.6, 0, 0.18, 1.2, 1.1, 'wall2'],
+    ['box', 0, 3.35, 3.75, 1.4, 0.14, 0.5, 'trim'],          // shutter hood
+    ['cyl', -1.3, 2.6, 3.9, 0.08, 2.6, 0.08, 'trim'],        // stair handrail
+    ['cyl', -3.9, 0.6, 3.9, 0.08, 2.2, 0.08, 'trim'],
+    ['box', -2.6, 3.3, 3.9, 2.9, 0.1, 0.1, 'trim'],
+    ['cyl', 2.4, 5.95, 3.1, 0.1, 2.2, 0.1, 'trim'],          // pergola posts
+    ['cyl', -2.4, 5.95, 3.1, 0.1, 2.2, 0.1, 'trim'],
+    ['box', 0, 8.05, 3.1, 5.6, 0.12, 0.12, 'trim'],          // pergola beam
+    ['box', 0, 8.0, 2.2, 5.4, 0.08, 0.08, 'trim'],
+    ['cyl', -2.6, 5.95, -2.4, 1.0, 0.9, 1.0, 'trim'],        // roof water tank
   ] },
   // AEGEAN, the one with the dome: same cube, a drum and a blue cap.
   domed: { r: 4.8, parts: [
@@ -3693,6 +3761,13 @@ export const HOUSE_TEMPLATES = {
     ['cone', 0, 6.8, 0, 3.8, 2.2, 3.8, 'roof'],              // the blue cap
     ['box', 0, 0, 3.6, 1.5, 2.5, 0.22, 'trim'],
     ['box', -2.4, 2.6, 3.6, 1.1, 1.0, 0.2, 'trim'],
+    ['box', -2.3, 2.4, 3.55, 1.0, 1.1, 0.18, 'wall2'],       // window reveals
+    ['box', 2.3, 2.4, 3.55, 1.0, 1.1, 0.18, 'wall2'],
+    ['box', 0, 3.15, 3.7, 1.3, 0.13, 0.45, 'trim'],
+    ['cyl', 0, 9.0, 0, 0.14, 1.1, 0.14, 'trim'],             // cross on the cap
+    ['box', 0, 9.7, 0, 0.7, 0.13, 0.13, 'trim'],
+    ['cyl', 3.4, 0, 3.2, 0.1, 4.8, 0.1, 'trim'],             // downpipe
+    ['box', -3.4, 0.1, 2.0, 1.6, 0.35, 2.2, 'stone'],        // terrace step
   ] },
   // ANDALUSIA: the house is half the object - the other half is the walled
   // patio it sits behind, which is what makes the street read as a street.
@@ -3706,6 +3781,14 @@ export const HOUSE_TEMPLATES = {
     ['box', 4.6, 2.6, 2.9, 4.5, 0.35, 1.0, 'roof'],          // coping tiles
     ['box', 6.4, 2.6, 0, 1.0, 0.35, 6.8, 'roof'],
     ['box', -1.6, 0.6, 3.5, 1.6, 2.6, 0.22, 'trim'],
+    ['box', -3.8, 2.2, 3.6, 1.1, 1.2, 0.18, 'wall2'],        // reveals
+    ['box', 0.4, 2.2, 3.6, 1.1, 1.2, 0.18, 'wall2'],
+    ['box', -1.6, 3.0, 3.72, 4.4, 0.14, 0.45, 'trim'],       // string course
+    ['cyl', -5.3, 0.6, 3.5, 0.1, 5.0, 0.1, 'trim'],          // downpipe
+    ['cyl', 4.6, 0, 1.0, 0.12, 2.5, 0.12, 'trim'],           // patio gate posts
+    ['cyl', 4.6, 0, -1.0, 0.12, 2.5, 0.12, 'trim'],
+    ['cyl', -3.6, 6.0, -1.4, 0.65, 2.1, 0.65, 'stone'],      // chimney
+    ['box', 4.6, 0.9, 2.2, 0.9, 0.9, 0.12, 'trim'],          // wall lantern
   ] },
 
   // ---- FARMSTEAD AND VILLAGE ----
@@ -3716,6 +3799,19 @@ export const HOUSE_TEMPLATES = {
     ['box', 0, 4.9, 4.35, 1.6, 1.4, 0.3, 'trim'],            // hay loft hatch
     ['box', -6.05, 0, 0, 0.4, 6.0, 8.4, 'trim'],
     ['box', 6.05, 0, 0, 0.4, 6.0, 8.4, 'trim'],
+    // A working barn is never a clean box: bracing, a lean-to, a hay hoist
+    // and a vent gable are what say "farm" from the road.
+    ['box', -3.0, 0.2, 4.25, 0.28, 5.6, 0.3, 'trim'],        // door frame posts
+    ['box', 3.0, 0.2, 4.25, 0.28, 5.6, 0.3, 'trim'],
+    ['box', 0, 5.9, 4.25, 6.6, 0.3, 0.3, 'trim'],            // header beam
+    ['box', 0, 6.3, 4.9, 0.9, 0.5, 1.4, 'trim'],             // hay hoist beam
+    ['box', -6.6, 0, -2.4, 3.2, 3.2, 4.0, 'wall2'],          // lean-to
+    ['box', -6.6, 3.2, -2.4, 3.6, 0.3, 4.4, 'roof'],
+    ['box', 0, 7.6, -4.5, 1.6, 1.2, 0.22, 'trim'],           // gable vent
+    ['box', 4.4, 0.15, 4.3, 1.8, 1.9, 0.24, 'trim'],         // side door
+    ['box', 0, 9.25, 0, 13.0, 0.26, 0.6, 'trim'],            // ridge cap
+    ['box', -3.4, 8.6, 0, 1.0, 1.0, 1.0, 'trim'],            // roof vents
+    ['box', 3.4, 8.6, 0, 1.0, 1.0, 1.0, 'trim'],
   ] },
   // A FARMHOUSE, NOT A BOX WITH A LID. What makes a small rural house read at
   // a glance is not detail, it is MASSING: a stone footing so it sits IN the
@@ -3734,6 +3830,21 @@ export const HOUSE_TEMPLATES = {
     ['cyl', 0.7, 0.75, 4.0, 0.24, 2.4, 0.24, 'trim'],
     ['box', -0.6, 0.8, 3.05, 1.4, 2.6, 0.28, 'trim'],        // door
     ['cyl', -2.6, 5.4, 0, 0.95, 3.4, 0.95, 'stone'],         // chimney on the ridge
+    ['box', -2.3, 2.3, 3.25, 1.0, 1.1, 0.16, 'wall2'],       // window reveals
+    ['box', 1.1, 2.3, 3.25, 1.0, 1.1, 0.16, 'wall2'],
+    ['box', -3.7, 2.3, 0, 0.16, 1.1, 1.0, 'wall2'],
+    ['box', -2.3, 3.0, 3.35, 1.3, 0.13, 0.4, 'trim'],        // window hoods
+    ['box', 1.1, 3.0, 3.35, 1.3, 0.13, 0.4, 'trim'],
+    ['cyl', 3.55, 0.75, 3.2, 0.1, 4.7, 0.1, 'trim'],         // downpipe
+    ['cyl', -2.6, 8.8, 0, 0.4, 0.55, 0.4, 'roof'],           // chimney pot
+    ['box', -0.6, 0.1, 4.3, 2.2, 0.35, 1.2, 'stone'],        // doorstep
+    // THE ROOF IS THE BIGGEST SURFACE THE PLAYER SEES. A chase camera looks
+    // down on a village, so a house is mostly roof from the driving seat, and
+    // it was one flat prism. A ridge cap and a dormer cost two parts and break
+    // both the silhouette and the shading.
+    ['box', 0, 9.1, 0, 8.8, 0.24, 0.55, 'trim'],             // ridge cap
+    ['box', -1.7, 6.6, 1.9, 1.7, 1.3, 1.7, 'wall'],          // dormer
+    ['prism', -1.7, 7.9, 1.9, 2.0, 0.8, 2.0, 'roof'],
   ] },
   chapel: { r: 4.8, parts: [
     ['wall', 0, 0, 0, 5.6, 5.4, 8.0, 'wall'],
@@ -3743,11 +3854,24 @@ export const HOUSE_TEMPLATES = {
     ['box', 0, 13.4, -4.6, 0.22, 1.6, 0.22, 0xf0e6c8],       // cross
     ['box', 0, 14.2, -4.6, 1.0, 0.22, 0.22, 0xf0e6c8],
     ['box', 0, 0.1, 4.1, 1.4, 3.0, 0.3, 'trim'],
+    ['box', -1.5, 2.6, 4.05, 0.9, 1.8, 0.18, 'wall2'],       // nave windows
+    ['box', 1.5, 2.6, 4.05, 0.9, 1.8, 0.18, 'wall2'],
+    ['box', 2.85, 2.6, 0, 0.18, 1.8, 0.9, 'wall2'],
+    ['box', -2.85, 2.6, 0, 0.18, 1.8, 0.9, 'wall2'],
+    ['box', 0, 6.4, -2.85, 1.1, 1.6, 0.2, 'wall2'],          // belfry opening
+    ['box', 0, 3.3, 4.2, 2.0, 0.16, 0.5, 'trim'],            // door hood
+    ['cyl', 0, 8.4, -4.6, 0.4, 0.5, 0.4, 'trim'],            // the bell
+    ['box', 0, 8.3, 0, 6.4, 0.24, 0.5, 'trim'],              // ridge cap
   ] },
   shed: { r: 3.4, parts: [
     ['wall', 0, 0, 0, 5.2, 3.2, 4.2, 'wall2'],
     ['box', 0, 3.2, 0.35, 5.8, 0.35, 4.9, 'roof'],           // lean-to roof
     ['box', 0, 0.1, 2.2, 1.3, 2.4, 0.28, 'trim'],
+    ['box', -2.7, 0, 0, 0.22, 3.2, 4.2, 'trim'],             // corner posts
+    ['box', 2.7, 0, 0, 0.22, 3.2, 4.2, 'trim'],
+    ['box', 0, 3.05, 2.4, 5.6, 0.16, 0.5, 'trim'],           // gutter
+    ['box', 1.6, 1.4, 2.15, 1.1, 1.0, 0.16, 'wall2'],        // small window
+    ['box', -2.0, 0.1, 2.3, 1.0, 1.2, 0.5, 'stone'],         // stacked crates
   ] },
   // PUEBLO RUIN: the broken fortress silhouette from the player's canyon
   // reference, standing on the mesa rim. All masonry is kind 'box'/'cyl' -
@@ -3781,6 +3905,13 @@ export const HOUSE_TEMPLATES = {
     ['cyl', -2.2, 3.6, 4.1, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],
     ['cyl', 0, 3.6, 4.1, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],
     ['cyl', 2.2, 3.6, 4.1, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],
+    ['box', -2.7, 2.0, 3.65, 1.0, 1.0, 0.18, 'wall2'],       // deep reveals
+    ['box', 2.7, 2.0, 3.65, 1.0, 1.0, 0.18, 'wall2'],
+    ['box', 0, 3.0, 3.8, 2.2, 0.14, 0.5, 'trim'],            // door hood
+    ['cyl', -4.0, 3.6, 0, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],  // side vigas
+    ['cyl', 4.0, 3.6, 0, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],
+    ['box', 0, 0.1, 4.2, 3.0, 0.4, 1.3, 'stone'],            // mud-brick stoop
+    ['cyl', 3.2, 4.9, -2.4, 0.5, 1.3, 0.5, 'stone'],         // corner chimney
   ] },
 
   // ---- COTTAGES ----
@@ -3796,6 +3927,12 @@ export const HOUSE_TEMPLATES = {
     ['prism', 0, 4.2, 0, 7.7, 2.6, 6.1, 'roof'],
     ['box', 0, 0.6, 2.6, 1.2, 2.2, 0.26, 'trim'],            // door
     ['cyl', 2.2, 4.1, 0, 0.8, 2.6, 0.8, 'stone'],            // chimney
+    ['box', -1.9, 1.6, 2.6, 0.9, 1.0, 0.16, 'wall2'],        // reveals
+    ['box', 1.9, 1.6, 2.6, 0.9, 1.0, 0.16, 'wall2'],
+    ['box', 0, 3.0, 2.85, 2.2, 0.14, 0.45, 'trim'],          // door hood
+    ['cyl', 3.1, 0.5, 2.4, 0.09, 3.5, 0.09, 'trim'],         // downpipe
+    ['cyl', 2.2, 6.6, 0, 0.36, 0.5, 0.36, 'roof'],           // chimney pot
+    ['box', 0, 6.75, 0, 7.9, 0.22, 0.5, 'trim'],             // ridge cap
   ] },
   cottageB: { r: 4.2, parts: [
     ['box', 0, 0, 0, 5.6, 0.6, 5.6, 'stone'],
@@ -3804,6 +3941,12 @@ export const HOUSE_TEMPLATES = {
     ['cone', 0, 5.8, 0, 6.4, 3.0, 6.4, 'roof'],              // hipped pyramid roof
     ['box', 0, 0.7, 2.7, 1.1, 2.2, 0.26, 'trim'],
     ['cyl', -1.7, 5.7, 1.2, 0.7, 2.4, 0.7, 'stone'],
+    ['box', -1.5, 2.2, 2.7, 0.9, 1.1, 0.16, 'wall2'],
+    ['box', 1.5, 2.2, 2.7, 0.9, 1.1, 0.16, 'wall2'],
+    ['box', -1.5, 4.0, 2.7, 0.9, 0.9, 0.16, 'wall2'],
+    ['box', 1.5, 4.0, 2.7, 0.9, 0.9, 0.16, 'wall2'],
+    ['cyl', 2.6, 0.6, 2.4, 0.09, 5.0, 0.09, 'trim'],         // downpipe
+    ['cyl', -1.7, 8.0, 1.2, 0.32, 0.5, 0.32, 'roof'],        // pot
   ] },
   cottageC: { r: 5.0, parts: [
     ['box', 0, 0, 0, 8.0, 0.45, 5.0, 'stone'],
@@ -3937,6 +4080,12 @@ export const HOUSE_TEMPLATES = {
     ['box', -2.4, 10.0, 2.4, 0.28, 1.7, 0.28, 'trim'],
     ['box', 2.4, 10.0, 2.4, 0.28, 1.7, 0.28, 'trim'],
     ['cone', 0, 11.7, 0, 6.0, 2.2, 6.0, 'roof'],
+    ['box', 0, 3.0, 1.85, 0.7, 1.2, 0.18, 'wall2'],          // slit windows
+    ['box', 0, 6.4, 1.85, 0.7, 1.2, 0.18, 'wall2'],
+    ['box', 1.85, 4.7, 0, 0.18, 1.2, 0.7, 'wall2'],
+    ['box', 0, 10.6, -2.4, 4.8, 0.12, 0.12, 'trim'],         // platform rails
+    ['box', 0, 10.6, 2.4, 4.8, 0.12, 0.12, 'trim'],
+    ['box', 0, 0.1, 1.95, 1.1, 2.2, 0.24, 'trim'],           // door
   ] },
   stilt: { r: 3.8, parts: [
     ['cyl', -2.4, 0, -1.9, 0.5, 3.0, 0.5, 'trim'],
@@ -3955,6 +4104,10 @@ export const HOUSE_TEMPLATES = {
     ['box', 0, 2.0, 2.1, 4.8, 0.2, 1.6, 'trim'],             // awning
     ['box', 0, 3.7, 0, 3.2, 1.1, 0.24, 'trim'],              // sign board
     ['box', -1.7, 1.9, 1.75, 0.2, 0.2, 1.5, 'trim'],
+    ['cyl', -2.2, 2.0, 2.0, 0.09, 2.0, 0.09, 'trim'],        // awning props
+    ['cyl', 2.2, 2.0, 2.0, 0.09, 2.0, 0.09, 'trim'],
+    ['box', 0, 1.55, 1.75, 3.6, 0.5, 0.14, 'trim'],          // counter shelf
+    ['box', 1.8, 0.1, 1.9, 0.9, 1.0, 0.7, 'stone'],          // stacked crates
   ] },
   signalhut: { r: 3.2, parts: [
     ['wall', 0, 0, 0, 4.6, 3.4, 4.2, 'wall'],
@@ -3969,6 +4122,9 @@ export const HOUSE_TEMPLATES = {
     ['cyl', 0, 2.2, 0, 4.6, 0.3, 4.6, 'trim'],
     ['cyl', 0, 4.4, 0, 4.6, 0.3, 4.6, 'trim'],
     ['cyl', 0, 6.6, 0, 4.6, 0.3, 4.6, 'trim'],
+    ['box', 2.3, 0, 0, 0.5, 8.4, 0.5, 'trim'],               // service ladder
+    ['cyl', 0, 11.4, 0, 0.6, 1.1, 0.6, 'trim'],              // filler cap
+    ['box', 0, 0.1, 2.2, 1.4, 2.0, 0.3, 'trim'],             // hatch
   ] },
   windmill: { r: 2.0, mat: 'stone', parts: [
     ['cyl', 0, 0, 0, 3.0, 8.4, 2.4, 'wall'],
@@ -5120,9 +5276,32 @@ export class Track {
     if (this._jumpCut) roadY -= this._jumpCut[i];
     for (const r of this.ramps) {
       const di = (i - r.index + N) % N;
-      if (di < r.len && Math.abs(lateral - r.lateral) < r.halfW) {
-        return roadY + r.height * (di / r.len);
-      }
+      if (di >= r.len) continue;
+      const off = Math.abs(lateral - r.lateral);
+      if (off >= r.halfW) continue;
+      // A RAMP IS A WEDGE ALONG THE ROAD AND WAS A CLIFF ACROSS IT.
+      //
+      // Lengthwise this eases in properly: `di / r.len` is 0 at the foot.
+      // Sideways it did not. One frame you were beside the ramp at road
+      // height, the next you were inside its band at full ramp height, with
+      // nothing in between — a step of up to the ramp's whole height, taken
+      // in 16 ms. The jump detector in vehicles.js differentiates ground
+      // height TWICE, so a step like that is indistinguishable from a launch
+      // lip, and it is worst exactly where a player drifts wide, because the
+      // band edge is what they cross.
+      //
+      // Taper the outer 1.5 u of the band. Driving onto a ramp from the side
+      // becomes a ramp instead of a step; driving up the middle of one is
+      // arithmetically unchanged (edge clamps to 1), which is what the jumps
+      // are tuned on — verified by tracing a launch before and after: same
+      // take-off, vy 8.9 either way.
+      //
+      // NOTE this is NOT the fix for the reported "I jump straight up": that
+      // trace showed an ordinary ramp launch, and the report is still
+      // unreproduced. This is a real discontinuity found while looking, and
+      // worth removing on its own account.
+      const edge = Math.min(1, (r.halfW - off) / 1.5);
+      return roadY + r.height * (di / r.len) * edge;
     }
     return roadY;
   }
@@ -6115,7 +6294,29 @@ export class Track {
     // the raised-cosine's peak slope at 11.5*pi/(2*82) = 22 %, inside the
     // 24 % cap the eroder enforces anyway.
     const CLEAR = 11.5;
-    const HALF = Math.ceil(82 / this.segLen);
+    // THE RAMP LENGTH IS WHAT MAKES THE RAMPS OVERLAP.
+    //
+    // 82 u either side is right for a world with two or three crossings and
+    // wrong for one with nine: at that density the approaches cannot help but
+    // share stations, each crossing inherits its neighbours' lift, and the
+    // finished decks stack into one continuous elevated roadway — a motorway
+    // viaduct over a village, which is how MOUNTAIN TO SEA was reported.
+    //
+    // Two attempts to take that height back AFTER the fact both failed, and
+    // failed informatively (see COORDINATION.md): the inherited height is
+    // load-bearing for the neighbour, so lowering a shared station costs
+    // somebody their bridge — one attempt produced a 4.1 u crossing. The
+    // height cannot be removed downstream, so it must not be created upstream.
+    //
+    // Shorten the approach as the lap gets busier. A shorter ramp for the same
+    // clearance is STEEPER, so this trades against the 24% cap and the eroder
+    // — which is exactly why it is measured rather than assumed, and why the
+    // floor stays at 0.72 (about 59 u): at 0.62 the shortest ramp left one
+    // MOUNTAIN TO SEA crossing at 9.53 u, under the 9.65 u the overpass audit
+    // measured as the point where nearestIndex can capture the wrong leg.
+    const dense = Math.max(0, this._overpasses.length - 3);
+    const span = 82 * Math.max(0.72, 1 - 0.05 * dense);
+    const HALF = Math.ceil(span / this.segLen);
     const lift = new Float32Array(N);
     const bump = (up, height) => {
       for (let sN = -HALF; sN <= HALF; sN++) {
@@ -6187,10 +6388,32 @@ export class Track {
     const DIG_MAX = 4;
     const dug = new Float32Array(N);        // how far the under-leg is sunk
     const yAt = (i) => this.center[i].y + lift[i] - dug[i];
+    // AND THE SEA DOES NOT MOVE OUT OF THE WAY FOR A FLYOVER.
+    //
+    // The coast road is lifted above the waterline while the elevation profile
+    // is built — "the road is the one thing in this world that is never allowed
+    // to be wrong, so it wins" — and then THIS runs, hundreds of lines later,
+    // and digs the lower leg of every crossing to buy clearance. Nothing
+    // re-asked the sea. Measured on COTE D AZUR, whose sea plane sits at y = 0:
+    // the dig took the carriageway to -3.51 and the tunnel sited on that
+    // stretch was flooded for over half its length — you drive into a lit bore
+    // and through three and a half metres of Mediterranean.
+    //
+    // The floor belongs INSIDE `sink`, not as a clamp after the solve. Each
+    // pass re-measures the gap that actually exists and asks only for the
+    // shortfall, so a dig the sea refuses simply leaves the shortfall standing
+    // and the NEXT pass buys it with `bump` instead — the solver's own split
+    // between digging below and lifting above, doing what it already knows how
+    // to do. Clamping afterwards cannot do that: measured, it held the road up
+    // but cost COTE D AZUR 11.5 u of clearance -> 7.5 and CLIFF KNOT 11.5 ->
+    // 7.5, because nothing was left to compensate.
+    const seaFloor = this.T.coast ? (this.T.coast.level ?? -2) + 1.6 : -Infinity;
     const sink = (at, depth) => {
       for (let sN = -HALF; sN <= HALF; sN++) {
         const j = (at + sN + N) % N;
-        const v = depth * (0.5 + 0.5 * Math.cos((sN / HALF) * Math.PI));
+        let v = depth * (0.5 + 0.5 * Math.cos((sN / HALF) * Math.PI));
+        // never below the waterline, counting the lift this station already has
+        v = Math.min(v, Math.max(0, this.center[j].y + lift[j] - seaFloor));
         if (v > dug[j]) dug[j] = v;
       }
     };
@@ -6434,12 +6657,32 @@ export class Track {
   tunnelFitAt(i, maxHalf) {
     const MIN = Math.max(6, Math.round(26 / this.segLen));   // ~26 u of bore
     if (this._circDist(i, 0) < 100) return 0;
+    // HOW FAR A BORE REACHES IS HALF ITS LENGTH, NOT ALL OF IT.
+    //
+    // Both callers pass `lenS` — the requested bore length in samples — into a
+    // parameter named `maxHalf`, and `_planTunnels` then sites the bore as
+    // `half = min(fit, lenS >> 1)` either side of the station. So a bore
+    // centred here NEVER reaches further than `lenS >> 1`, while the two
+    // exclusions below reserved `lenS`: twice the ground, on both sides.
+    //
+    // That is not a conservative margin, it is a world with no tunnel in it.
+    // Measured: GLACIAL PASS refused 701 of 900 stations on the crest rule and
+    // 199 on the start gate — the whole lap, from six crests — and TREMOLA
+    // DESCENT 512 on crests with the rest too twisty. Both ASK for a bore in
+    // the roster and both silently had none, TREMOLA ever since the crest
+    // guard went in, because nothing tested that a requested tunnel exists.
+    // `tests/test-tunnels.mjs` does now, and this is what it found first.
+    //
+    // Sizing the reach to the bore keeps the guard exactly as strong — the
+    // question it asks is still "does the tube I would build cross a crest or
+    // a chasm" — and asks it about the tube that would actually be built.
+    const reach = Math.max(8, maxHalf >> 1);
     // Clear of a chasm by the BORE'S OWN LENGTH plus a margin, not by a flat
     // 150 samples. The planner runs before the gorges are cut, so that constant
     // never bit there — but the editor asks the same question after the world
     // exists, and on GOTTHARD CLIMB 150 samples either side of two gorges ruled
     // out 503 of 900 stations and left the tool with nowhere to put anything.
-    if (this._nearGorge(i, Math.max(8, maxHalf))) return 0;
+    if (this._nearGorge(i, reach)) return 0;
     // AND CLEAR OF A CREST, for the same reason and with a worse consequence.
     //
     // `_buildCrests` runs first and refuses narrows and gorges; it cannot
@@ -6463,7 +6706,7 @@ export class Track {
       const ci = typeof cr === 'number' ? cr : (cr.i ?? cr.index);
       if (ci == null) continue;
       const len = (typeof cr === 'object' && cr.len) ? cr.len : 22;
-      if (this._circDist(i, ci) < maxHalf + len) return 0;
+      if (this._circDist(i, ci) < reach + len) return 0;
     }
     let mc = 0, half = 0;
     for (let w = 1; w <= maxHalf; w++) {
@@ -6775,6 +7018,40 @@ export class Track {
       if (bi < T.s - pad || bi > T.e + pad) continue;
       if (Math.abs(this.lateralOffset(pos, bi)) > TUNNEL_HW) continue;
       return { i: bi, floorY: this.center[bi].y, apex: TUNNEL_APEX, half: TUNNEL_HW };
+    }
+    return null;
+  }
+
+  /** UNDER A FLYOVER, THE CAMERA HAS A CEILING TOO.
+   *
+   *  A bore gets this right through `tunnelAt`: over the roadway, under the
+   *  crown, inside the walls. An overpass is the same situation with the same
+   *  failure — a chase camera that floats where it likes ends up ABOVE the
+   *  deck, so the driver spends the pass looking at the top of a bridge while
+   *  the car runs underneath it, invisible. The r190 clearance work made this
+   *  more common by giving every crossing a real deck to hide behind.
+   *
+   *  Returns the soffit height and the span's half-width when `pos` is under a
+   *  crossing's flying leg, or null. Same shape as `tunnelAt` so main.js can
+   *  clamp against either with one code path.
+   *
+   *  `pad` reaches a little past the deck, because the camera trails the car:
+   *  the car is out from under before the camera is, and the hand-off must not
+   *  flick the view up through the deck on the way out. */
+  deckOverhead(pos, hint = null, pad = 6) {
+    if (!this._overpasses?.length) return null;
+    const bi = this.nearestIndex(pos, hint, true);
+    for (const o of this._overpasses) {
+      // on the UNDER leg of this crossing (its own span, plus the pad)
+      if (this._circDist(bi, o.down) > 12 + pad) continue;
+      const up = this.center[o.up], here = this.center[bi];
+      // and actually beneath the deck, not merely near the crossing: the two
+      // legs share an XZ point by construction, so measure against THAT point
+      const dx = pos.x - up.x, dz = pos.z - up.z;
+      if (dx * dx + dz * dz > 20 * 20) continue;
+      const soffit = up.y - 1.0;                 // deck underside
+      if (soffit <= here.y + 1.2) continue;      // no headroom: not a flyover here
+      return { i: bi, floorY: here.y, deckY: soffit, half: 10.2 };
     }
     return null;
   }
@@ -7148,7 +7425,44 @@ export class Track {
     strip.rotation.order = 'YXZ';
     strip.rotation.y = heading;
     strip.rotation.x = -Math.PI / 2;
-    strip.position.set(c.x, c.y + 0.04, c.z);  // start area is flat (c.y = 0)
+    strip.position.set(c.x, c.y + 0.04, c.z);
+    // THE START AREA IS NOT FLAT, AND IS NOT AT ZERO.
+    //
+    // This line used to carry the comment "start area is flat (c.y = 0)" and
+    // it was the only part of the gantry that read `c.y` at all — every mesh
+    // below was positioned at an ABSOLUTE height, which is the same thing as
+    // asserting the start line sits at y = 0 on every world. It does not.
+    // MEASURED, not inferred — an earlier draft of this comment carried two
+    // start heights worked back from census arithmetic and both were wrong.
+    // Sweeping `center[0].y` across the roster: 11 of 61 worlds do NOT start
+    // at zero. Eight of them are the Mediterranean set at 0.20-0.78 u, which
+    // is a sag nobody would notice. Three are not:
+    //
+    //   PINE VALLEY     y = 0. The control, and the intended geometry: the
+    //                   lights housing's underside sits 5.30 u over the grid.
+    //   SUZUKA          y = 7.87 — the largest on the roster. The housing is a
+    //                   7.4 x 2.6 x 1.2 steel box at an ABSOLUTE 6.6, so its
+    //                   underside sat 2.57 u UNDER the tarmac and the 26 u
+    //                   crossbar 1.13 u over it: the start gantry buried to
+    //                   its shoulders in its own start line. The census never
+    //                   saw this one, and could not — a buried object is not
+    //                   standing proud of the road, which is exactly the test.
+    //                   It took measuring the assumption itself to find it.
+    //   RED CENTRE RUN  y = -3.99. The same structure floating 9.29 u up, four
+    //                   metres clear of where it belongs, 16 pieces of it.
+    //   CLIFF KNOT      y = 3.57. Underside 1.73 u over the tarmac —
+    //                   windscreen height, across the full width of the grid.
+    //                   The census DID catch this one, biting 9 u into a 9 u
+    //                   half-width with no collider: you drive through the
+    //                   start lights.
+    //
+    // Most of the roster starts at zero, which is why this survived. An
+    // assumption that holds almost everywhere is the hardest kind to see.
+    //
+    // Everything the gantry hangs over the road is now referenced to `y0`, the
+    // road at the start line, which is the surface the structure spans and the
+    // one the heights were always chosen against.
+    const y0 = c.y;
     this.group.add(strip);
 
     // scaffold towers + banner
@@ -7204,8 +7518,12 @@ export class Track {
       }
       const bx = best.px, bz = best.pz;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 10, 8), steel);
-        leg.position.set(bx + ox, 5, bz + oz);
+        // and a leg reaches the GROUND under its own tower, which on a world
+        // that starts on a shelf is not the road's height either
+        const gy = Math.min(y0, this.terrainHeight(bx + ox, bz + oz));
+        const legH = (y0 + 10) - gy;
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, legH, 8), steel);
+        leg.position.set(bx + ox, gy + legH / 2, bz + oz);
         leg.castShadow = true;
         this.group.add(leg);
         // AND WHERE THE TOWER HAS NOWHERE TO STAND, IT STOPS BEING SOLID.
@@ -7227,17 +7545,17 @@ export class Track {
       }
       for (let ly = 2.5; ly <= 8.5; ly += 3) {
         const brace = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.22, 2.1), wood);
-        brace.position.set(bx, ly, bz);
+        brace.position.set(bx, y0 + ly, bz);
         brace.castShadow = true;
         this.group.add(brace);
       }
       const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.7, 2.6), wood);
-      cabin.position.set(bx, 10, bz);
+      cabin.position.set(bx, y0 + 10, bz);
       cabin.castShadow = true;
       this.group.add(cabin);
       this._addShadow(bx, bz, 2.6, c.y);        // grounds the gantry legs
       // waving checkered flags on the towers
-      this._checkerFlag(bx, 11.8, bz);
+      this._checkerFlag(bx, y0 + 11.8, bz);
     }
     const banner = new THREE.Mesh(
       new THREE.BoxGeometry(26, 2.4, 0.5),
@@ -7245,7 +7563,7 @@ export class Track {
     );
     banner.material.map = wallTexture();
     banner.material.map.repeat.set(6, 1);
-    banner.position.set(c.x, 9, c.z);
+    banner.position.set(c.x, y0 + 9, c.z);
     banner.rotation.y = heading;
     banner.castShadow = true;
     this.group.add(banner);
@@ -7257,7 +7575,7 @@ export class Track {
         new THREE.PlaneGeometry(24, 2.15),
         new THREE.MeshStandardMaterial({ map: finTex, roughness: 0.85 })
       );
-      fin.position.set(c.x, 9, c.z);
+      fin.position.set(c.x, y0 + 9, c.z);
       fin.rotation.y = heading + flip;
       fin.translateZ(0.32);
       this.group.add(fin);
@@ -7270,7 +7588,7 @@ export class Track {
         color: 0x24211c, roughness: 0.35, metalness: 0.7, envMapIntensity: 0.5,
       })
     );
-    housing.position.set(c.x, 6.6, c.z);
+    housing.position.set(c.x, y0 + 6.6, c.z);
     housing.rotation.y = heading;
     housing.castShadow = true;
     this.group.add(housing);
@@ -7281,7 +7599,7 @@ export class Track {
       mat.userData = { lit: new THREE.Color(lit), dim: new THREE.Color(lit).multiplyScalar(0.12) };
       mat.color.copy(mat.userData.dim);
       const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.85, 14, 10), mat);
-      lamp.position.set(c.x, 6.6, c.z);
+      lamp.position.set(c.x, y0 + 6.6, c.z);
       lamp.rotation.y = heading;
       lamp.translateX(off);
       this.group.add(lamp);
@@ -8135,6 +8453,24 @@ export class Track {
           const sc = 1.15 + hash(j * 9.1 - side) * 0.75;      // big canopy pines
           const lat = (this.widthAt(j) + 0.75 * sc + 2.0 + row * 3.2 + h1 * 1.4) * side;
           const p = this.pointAt(j, lat);
+          // AND THAT CLEARANCE IS ONLY TRUE OF SAMPLE j. `lat` is measured
+          // along j's own normal and reads `widthAt(j)`, so the trunk clears
+          // the road THERE by construction — and says nothing about a second
+          // leg passing underneath. SUZUKA is a figure-of-eight: measured on
+          // the pristine build, 14 trunks stood inside a carriageway around
+          // samples 19-24 and 76, the worst 3.0 u past the drivable edge with
+          // a 1.16 u trunk on it. These are `solid: true` pines — hitting one
+          // stops a car dead — so this is the worst-consequence version of the
+          // defect the props, the tire stacks, the cabins and (r199b) the cacti
+          // each had fixed in their own builder.
+          //
+          // `_distToTrack` searches the whole lap and sees the near leg
+          // whichever one it is. The margin matches the design above: trunk
+          // radius plus the 2.0 u the offset already reserves, less a little,
+          // so a straight still plants both rows and only a leg crossing
+          // underneath takes a tree out. A missing tree is a gap in a corridor;
+          // a present one is a wall in a lane.
+          if (!this._clearsRoad(p.x, p.z, 0.75 * sc, 1.6)) continue;
           const ty = this.terrainHeight(p.x, p.z) - 0.2;
           // lean the whole tree inward over the road (rotation about the tangent)
           const lean = (0.10 + hash(j * 3.3 + side) * 0.12) * side;
@@ -8495,6 +8831,7 @@ export class Track {
     this._buildWorldElements(m4);                    // farms, chapels, fences, dressing
     this._buildPastures();                           // grazing spots for the animal system
     this._buildCrossroads();                         // dirt side-road junctions (rural worlds)
+    this._buildJunctionFences();                     // and the fences flanking their mouths
     // FARMLAND: the banks that line every lane. AFTER the crossroads, the
     // props and the tire stacks, because it leaves a gap wherever one of them
     // already occupies the verge — a hedge cannot grow across a field gate.
@@ -8859,7 +9196,12 @@ export class Track {
     {
       const K = ELEMENT_KITS[this.T.elements || 'alpine'];
       const B = this._elemB();          // shared — see the note on _elemB
-      const c = this.center[(gi + Math.round(16 / this.segLen)) % N], n = this.nrm[gi];
+      // ITS OWN NORMAL AGAIN. `c` is the sample 16 u past the gorge and `n`
+      // was `nrm[gi]`, the normal 16 u back up the road — the same mismatch
+      // the stone-bridge arch faces carried, and it biases everything below
+      // toward one side of the carriageway.
+      const ci = (gi + Math.round(16 / this.segLen)) % N;
+      const c = this.center[ci], n = this.nrm[ci];
       for (const [off, side] of [[15, 1], [19, -1]]) {
         const px = c.x + n.x * off * side, pz = c.z + n.z * off * side;
         if (!this._buildableSpot(px, pz, 4, 3.2)) continue;
@@ -8871,6 +9213,15 @@ export class Track {
       for (let k = 0; k < 3; k++) {
         const off = (13 + Math.random() * 9) * (k % 2 ? 1 : -1);
         const px = c.x + n.x * off, pz = c.z + n.z * off;
+        // AND A LOG IS 6.5 u LONG. `off` positions its CENTRE, `rotation.y` is
+        // random, so it sweeps 3.25 u from that point in whatever direction it
+        // lands — and nothing here asked. Measured on ESTONIA CRESTS: two of
+        // them lying at lateral 2.05 and 2.26 u on a 9 u half-width, timber
+        // across the racing line at the exit of the hero bridge, with no
+        // collider. Same family as the props, the cacti, the corridor pines
+        // and the hoardings: the anchor was placed clear and the reach was
+        // never counted.
+        if (!this._clearsRoad(px, pz, 3.25, 0.6)) continue;
         const log = new THREE.Mesh(logGeo, wood);
         log.position.set(px, this.terrainHeight(px, pz) + 0.5, pz);
         log.rotation.y = Math.random() * Math.PI;
@@ -11594,8 +11945,30 @@ export class Track {
         for (const k of [-span * 0.55, span * 0.55]) {
           const j = (i + Math.round(k) + N) % N;
           const c = this.center[j];
+          // ITS OWN NORMAL, NOT THE SPAN'S. `nn` is the normal at the middle
+          // of the bridge and belongs to the parapet, which is positioned
+          // there. An arch face stands a third of the span away, and offsetting
+          // it along a normal borrowed from somewhere else is the same "an
+          // offset is not a distance" error the props and the tyre stacks
+          // already carry a comment about.
+          const nj = this.nrm[j];
+          const px = c.x + nj.x * 8.5 * side, pz = c.z + nj.z * 8.5 * side;
+          // AND ASK WHAT ELSE RUNS UNDER IT — the r193 rule, which the
+          // overpass piers follow and these never did. An arch face is 9 u of
+          // masonry hanging below its own deck, and 8.5 u off the centreline
+          // is INSIDE a 9 u half-width: harmless under its own bridge, where
+          // its top sits 0.1 u below the tarmac, and a grey column in the
+          // racing line wherever another leg passes lower. Measured on SEA
+          // CLIFF RUN, whose two legs run 1.91 u apart: one pier stood 5.2 u
+          // proud of the road at sample 660, biting 5.87 u into a 9 u
+          // half-width, with no collider — you drive straight through it.
+          //
+          // `_clearsRoad` cannot answer this: it is flat, so it would refuse
+          // every arch face for standing under its own deck. The question is
+          // three-dimensional — does this masonry rise out of anybody's road.
+          if (this._pierInRoad(px, pz, c.y - 0.1)) continue;
           const pier = new THREE.Mesh(new THREE.BoxGeometry(2.2, 9, 3.2), stone);
-          pier.position.set(c.x + nn.x * 8.5 * side, c.y - 4.6, c.z + nn.z * 8.5 * side);
+          pier.position.set(px, c.y - 4.6, pz);
           pier.rotation.y = yaw;
           g.add(pier);
         }
@@ -11694,8 +12067,6 @@ export class Track {
     // them now (see the barrier under-gate in vehicles.js).
     const railBlocked = (x, z, y, jSelf, half) => {
       for (let i = 0; i < N; i++) {
-        const dLap = Math.min((i - jSelf + N) % N, (jSelf - i + N) % N);
-        if (dLap <= half + 4) continue;             // its own deck run
         const c2 = this.center[i];
         const dx = x - c2.x, dz = z - c2.z;
         if (dx * dx + dz * dz > 400) continue;
@@ -11718,8 +12089,28 @@ export class Track {
         // mouth and is drivable; the cost of being wrong the other way is an
         // invisible wall.
         if (dy > 4.2 || dy < -2.5) continue;        // clear over (or under) it
+        // THE OWN-DECK EXEMPTION RELAXES THE BUFFER; IT DOES NOT SKIP THE ROAD.
+        //
+        // This used to `continue` outright for every sample within `half + 4`
+        // of the rail's own, so that a rail would not block itself: at 10.2 u
+        // off its own centreline it sits only 1.2 u outside a 9 u half-width,
+        // and the 1.4 u buffer below reaches past it. But `half` is the whole
+        // DECK RUN — 38 samples on SEA CLIFF RUN — and the exemption was
+        // spent on lap INDEX, not on distance. Where a lap doubles back inside
+        // its own span the returning leg is a few samples away and a few
+        // metres below, so the window that exists to ignore this rail's own
+        // road swallowed the other one. Measured on SEA CLIFF RUN: rails at
+        // samples 731 and 733 stand 7.12 and 8.33 u from the centreline at
+        // sample 740 — inside a 9 u half-width — 1.7 and 1.2 u ABOVE that
+        // road, and the census found four of them biting up to 4.25 u.
+        //
+        // Its own deck is now measured against the BARE half-width, which
+        // 10.2 clears, and every other stretch keeps the buffer. Same intent,
+        // and it can no longer be bought with a low index distance.
+        const dLap = Math.min((i - jSelf + N) % N, (jSelf - i + N) % N);
+        const pad = dLap <= half + 4 ? 0 : 1.4;     // its own deck run
         const lat = Math.abs(dx * this.nrm[i].x + dz * this.nrm[i].z);
-        if (lat < (this.widthAt ? this.widthAt(i) : 9) + 1.4) return true;
+        if (lat < (this.widthAt ? this.widthAt(i) : 9) + pad) return true;
       }
       return false;
     };
@@ -11730,7 +12121,46 @@ export class Track {
         const c = this.center[j], n = this.nrm[j];
         for (const side of [1, -1]) {
           const rx = c.x + n.x * 10.2 * side, rz = c.z + n.z * 10.2 * side;
-          if (railBlocked(rx, rz, c.y, j, o.half)) continue;
+          if (railBlocked(rx, rz, c.y, j, o.half)) {
+            // A JUNCTION MOUTH IS STILL AN EDGE.
+            //
+            // The rail is withheld here because it would stand in ANOTHER
+            // stretch's lane, and that is right — but the reason the rail was
+            // wanted has not gone away: the deck edge is still an edge, and on
+            // a raised span there is still a drop past it. So the gap was left
+            // completely open, which is what a player meets at a joint.
+            //
+            // Put a marker line in instead, pulled in until it clears every
+            // carriageway on the lap. Tyre stacks, not masonry: they read as
+            // "edge of the road" at a glance, they are what a rally circuit
+            // actually uses at a junction mouth, and if one is clipped it
+            // costs a scrape rather than the race. If nothing clears, nothing
+            // is built — the same rule the rail itself follows.
+            // OUTWARD, not inward. Pulling the marker IN puts it on this
+            // deck's own carriageway — 10.2 is already the innermost offset
+            // that clears a 9 u half-width, which is why the rail lives there.
+            // The thing in the way is the OTHER road, so step away from both.
+            for (const pull of [0, 1.5, 3.0, 4.5]) {
+              const fx = c.x + n.x * (10.2 + pull) * side;
+              const fz = c.z + n.z * (10.2 + pull) * side;
+              if (!this._clearsRoad(fx, fz, 0.6, 0.6)) continue;
+              const yaw = this.headingAt(j);
+              // post-and-rail, deliberately slim and deliberately NOT a
+              // collider: it marks the edge of the deck through the junction
+              // without putting anything solid in the mouth of a junction that
+              // cars are entitled to drive through
+              const post = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.0, 0.2), stone);
+              post.position.set(fx, c.y + 0.5, fz);
+              post.rotation.y = yaw;
+              const bar = new THREE.Mesh(
+                new THREE.BoxGeometry(0.14, 0.14, 2 * this.segLen + 0.4), stone);
+              bar.position.set(fx, c.y + 0.82, fz);
+              bar.rotation.y = yaw;
+              g.add(post, bar);
+              break;
+            }
+            continue;
+          }
           const rail = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.1, 2 * this.segLen + 0.4), stone);
           rail.position.set(rx, c.y + 0.45, rz);
           rail.rotation.y = this.headingAt(j);
@@ -11745,11 +12175,31 @@ export class Track {
             this.tan[j].x, this.tan[j].z, 2 * this.segLen + 0.8, 0.7,
             c.y - 0.2, 1.5, 'stone', true);   // a deck rail: cars pass under it
         }
+        // PIERS GO BESIDE THE ROAD, NOT DOWN THE MIDDLE OF IT.
+        //
+        // This stood one pier on `c.x, c.z` — the FLYOVER's own centreline —
+        // and asked nothing about what was underneath. Directly over the
+        // crossing that centreline IS the lower carriageway, so the bridge
+        // planted a column in the middle of the road it was bridging.
+        // Photographed from the driver's seat on a phone: two grey columns
+        // straight ahead in the lane, deck overhead. r190 made it worse by
+        // earning these decks their full clearance — a taller deck clears the
+        // `> 2.5` test at more stations, so more columns, each of them longer.
+        //
+        // A viaduct carries its deck on PAIRS of piers at the edges anyway,
+        // and that is also what keeps the span open: offset both, ask
+        // `_clearsRoad` for each, and where the answer is no — precisely over
+        // the crossing — neither is built and the road runs clear underneath,
+        // which is what a flyover is for. Each pier takes the ground under
+        // ITSELF, since the two sides of a viaduct are rarely level.
         if (Math.abs(sN) % 8 === 0) {
-          const ground = this.terrainHeight(c.x, c.z);
-          if (c.y - ground > 2.5) {
-            const pier = new THREE.Mesh(new THREE.BoxGeometry(2.6, c.y - ground + 1, 3.4), stone);
-            pier.position.set(c.x, (c.y + ground) / 2 - 0.4, c.z);
+          for (const off of [-6, 6]) {
+            const px = c.x + n.x * off, pz = c.z + n.z * off;
+            if (!this._clearsRoad(px, pz, 1.7, 1.0)) continue;
+            const gnd = this.terrainHeight(px, pz);
+            if (c.y - gnd <= 2.5) continue;
+            const pier = new THREE.Mesh(new THREE.BoxGeometry(2.2, c.y - gnd + 1, 3.0), stone);
+            pier.position.set(px, (c.y + gnd) / 2 - 0.4, pz);
             pier.rotation.y = this.headingAt(j);
             g.add(pier);
           }
@@ -13071,6 +13521,77 @@ export class Track {
    *    y        road centerline height at the junction
    *  The first four are the canonical schema; the rest are derived
    *  conveniences (dx,dz === tan*cos(angle) + nrm*side*sin(angle)). */
+  /** FENCES FLANKING A ROAD JOINT.
+   *
+   *  A crossroad is a hole deliberately cut in the roadside dressing: the spur
+   *  mouth flares to 5.4 u and everything that would normally line the verge
+   *  is suppressed around it, because a fence across a junction mouth is a
+   *  fence across a road. The result is that a joint reads as the verge simply
+   *  STOPPING for twenty metres, with nothing to say where the carriageway
+   *  ends and the field begins — which is what a driver meets at speed, and
+   *  what was asked for: "add fences on road joints."
+   *
+   *  So put the fence back on either SIDE of the mouth, not across it. Each
+   *  post is gated on `_clearsRoad`, so it can never stand in the main road,
+   *  and the run starts clear of the flare so it never stands in the spur
+   *  either. Post-and-rail with no collider: at a junction the driver is
+   *  entitled to cross this line, and it is there to tell them where they are,
+   *  not to stop them. */
+  _buildJunctionFences() {
+    if (!this.crossroads?.length) return;
+    const wood = new THREE.MeshStandardMaterial({
+      color: 0x6b5334, roughness: 0.95, flatShading: true,
+    });
+    const g = new THREE.Group();
+    const FLARE = 5.4;                 // the mouth's own half-width
+    let built = 0;
+    for (const cr of this.crossroads) {
+      const i = cr.index;
+      if (i == null || !this.center[i]) continue;
+      const n = this.nrm[i], side = cr.side ?? 1;
+      const off = (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 1.3;
+      // walk out along the road from the mouth, both ways, starting past the
+      // flare so the junction itself stays open
+      for (const dir of [1, -1]) {
+        for (let s = 0; s < 4; s++) {
+          const along = (FLARE + 2.2 + s * 2.6) * dir;
+          const j = (i + Math.round(along / Math.max(0.5, this.segLen)) + N) % N;
+          const c = this.center[j], nj = this.nrm[j];
+          const fx = c.x + nj.x * off * side, fz = c.z + nj.z * off * side;
+          // MEASURE AGAINST EVERY SAMPLE, not the cached road field.
+          //
+          // `_clearsRoad` was letting these through: the first cut of this
+          // builder put 24 posts of 290 in a carriageway across four worlds,
+          // the worst 9.5 u in — dead centre of a road. Whatever the cached
+          // field is doing at these positions, a fence post is a build-time,
+          // once-per-junction decision and there is no reason to trust an
+          // approximation for it. A full scan is ~900 comparisons per post and
+          // happens once per world.
+          let dmin = Infinity, at = 0;
+          for (let q = 0; q < N; q++) {
+            const cc = this.center[q];
+            const dd = (fx - cc.x) * (fx - cc.x) + (fz - cc.z) * (fz - cc.z);
+            if (dd < dmin) { dmin = dd; at = q; }
+          }
+          const halfAt = this.widthAt ? this.widthAt(at) : ROAD_HALF;
+          if (Math.sqrt(dmin) - 0.5 < halfAt + 0.8) continue;
+          const gy = this.terrainHeight(fx, fz);
+          const yaw = this.headingAt(j);
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.05, 0.18), wood);
+          post.position.set(fx, gy + 0.52, fz);
+          post.rotation.y = yaw;
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 2.7), wood);
+          bar.position.set(fx, gy + 0.8, fz);
+          bar.rotation.y = yaw;
+          post.castShadow = bar.castShadow = true;
+          g.add(post, bar);
+          built++;
+        }
+      }
+    }
+    if (built) this.group.add(g);
+  }
+
   _buildCrossroads() {
     const want = Math.min(4,
       (this.T.crossroads ?? THEME_CROSSROADS[this.level && this.level.theme] ?? 0) | 0);
@@ -13285,10 +13806,16 @@ export class Track {
       emissive: 0xffffff, emissiveMap: buildingGlowTexture(),
       emissiveIntensity: T.hutGlow !== undefined ? T.hutGlow : 0.45,
     });
+    // a shade deeper than the cottage roofs so the barn reads as its own
+    // building rather than a bright plate dropped on the field — and tiled,
+    // because a barn roof is a big plate and it was a flat colour
+    const barnRoofHex = '#' + new THREE.Color(T.hutRoof).multiplyScalar(0.78).getHexString();
+    const barnRoofTex = roofTileTexture(barnRoofHex, T.roofKind ?? 'pantile');
+    barnRoofTex.wrapS = barnRoofTex.wrapT = THREE.RepeatWrapping;
+    barnRoofTex.repeat.set(3.0, 1.8);
+    barnRoofTex.anisotropy = 4;
     const roofMat = new THREE.MeshStandardMaterial({
-      // a shade deeper than the cottage roofs so the barn reads as its own
-      // building rather than a bright plate dropped on the field
-      color: new THREE.Color(T.hutRoof).multiplyScalar(0.78),
+      map: barnRoofTex,
       flatShading: true, roughness: 0.85,
     });
     const siloMat = new THREE.MeshStandardMaterial({
@@ -13790,8 +14317,17 @@ export class Track {
       emissive: 0xffffff,
       emissiveIntensity: this.T.hutGlow ?? 1,
     });
+    // A ROOF IS THE LARGEST SHARE OF A BUILDING THE CHASE CAMERA SEES, and
+    // this was a flat colour. The tile map keeps the theme's own roof colour
+    // and adds the coursing to it; `repeat` is set from the roof's own size so
+    // a wide three-bay block does not get stretched tiles.
+    const roofHex = '#' + new THREE.Color(F.roof ?? this.T.hutRoof ?? 0x33363c).getHexString();
+    const roofTex = roofTileTexture(roofHex, this.T.roofKind ?? 'pantile');
+    roofTex.wrapS = roofTex.wrapT = THREE.RepeatWrapping;
+    roofTex.repeat.set(2.2, 1.6);
+    roofTex.anisotropy = 4;
     const roofMat = new THREE.MeshStandardMaterial({
-      color: F.roof ?? this.T.hutRoof ?? 0x33363c, flatShading: true,
+      map: roofTex, flatShading: true,
       roughness: 0.72, envMapIntensity: 0.4,
     });
     const bodySet = [];
@@ -13926,6 +14462,69 @@ export class Track {
       chims.setMatrixAt(ck++, m4);
     };
 
+    // BALCONIES AND AWNINGS, ON THE SIDE YOU DRIVE PAST.
+    //
+    // A chimney breaks the roofline; nothing broke the FACE. A terrace seen
+    // from a car is a wall of flat render with a window texture on it, and the
+    // one thing every Mediterranean street actually has hanging off it is
+    // balconies — a slab, a rail, and a shadow under both. They go on the ROAD
+    // side only, which is the only side a driver ever sees, so the cost buys
+    // nothing that faces away.
+    //
+    // Three instanced meshes for the whole world, on top of the eight the
+    // frontage already uses. The slab and the awning share one box; the rail
+    // is a thinner one.
+    const BALC = 520;
+    const slabGeo = new THREE.BoxGeometry(1, 1, 1);
+    const balcMat = new THREE.MeshStandardMaterial({
+      color: 0xb9b0a0, flatShading: true, roughness: 0.9, envMapIntensity: 0.35,
+    });
+    const railMat = new THREE.MeshStandardMaterial({
+      color: 0x3a3630, flatShading: true, roughness: 0.7, metalness: 0.35,
+    });
+    const awnMat = new THREE.MeshStandardMaterial({
+      map: awningTexture(), roughness: 0.92, side: THREE.DoubleSide,
+    });
+    const balcSlabs = new THREE.InstancedMesh(slabGeo, balcMat, BALC);
+    const balcRails = new THREE.InstancedMesh(slabGeo, railMat, BALC);
+    const awnings = new THREE.InstancedMesh(slabGeo, awnMat, BALC);
+    balcSlabs.name = 'frontage-balconies';
+    awnings.name = 'frontage-awnings';
+    for (const m of [balcSlabs, balcRails, awnings]) { m.castShadow = m.receiveShadow = true; }
+    let balK = 0, awnK = 0;
+    const faceOff = new THREE.Vector3();
+    const faceAt = (i, side, lat, dAcross, wAlong, baseY, hh) => {
+      const p = this.pointAt(i, lat * side);
+      q.setFromAxisAngle(up, this.headingAt(i));
+      // local +X is the road normal, so the face the driver sees is the one
+      // toward the centreline: -side in world terms, which after the yaw is
+      // simply -X scaled by the block's own half depth.
+      const out = -Math.sign(lat * side) * dAcross * 0.5;
+      // a balcony at first-floor level on taller blocks only — a one-storey
+      // cottage with a balcony on it reads as a mistake
+      if (hh > 6.2 && balK < BALC) {
+        const by = baseY + hh * 0.52;
+        faceOff.set(out * 1.14, 0, (Math.random() - 0.5) * wAlong * 0.3).applyQuaternion(q);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, by, p.z + faceOff.z), q,
+          new THREE.Vector3(0.85, 0.16, wAlong * 0.42));
+        balcSlabs.setMatrixAt(balK, m4);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x * 1.18, by + 0.5, p.z + faceOff.z * 1.18), q,
+          new THREE.Vector3(0.1, 0.9, wAlong * 0.42));
+        balcRails.setMatrixAt(balK, m4);
+        balK++;
+      }
+      // and an awning over the ground floor on about half of them
+      if (Math.random() < 0.5 && awnK < BALC) {
+        faceOff.set(out * 1.3, 0, (Math.random() - 0.5) * wAlong * 0.25).applyQuaternion(q);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, baseY + 2.9, p.z + faceOff.z), q,
+          new THREE.Vector3(1.5, 0.12, wAlong * 0.38));
+        awnings.setMatrixAt(awnK, m4);
+        col.setHSL(0.02 + Math.random() * 0.12, 0.35, 0.44 + Math.random() * 0.16);
+        awnings.setColorAt(awnK, col);
+        awnK++;
+      }
+    };
+
     // ---- 1 + 2: the frontage and the rank behind it ----
     //
     // A DESIGNED STREET, NOT A ROW OF BOXES. Three stacked sources of
@@ -13963,6 +14562,7 @@ export class Track {
         if (!placed) { run = 0; continue; }
         placedS[side].add(i);
         if (Math.random() < 0.62) chimAt(i, side, placed.lat, F.depth, ww, placed.y + hh, roofH);
+        faceAt(i, side, placed.lat, F.depth, ww, placed.y, hh);
         // A LANTERN ON THE BRACKET, every third house. Anchored to the FRONT
         // FACE, not the block centre — the arm only reaches 0.72 u and a
         // 8 u-deep building would have swallowed the bulb whole.
@@ -14051,6 +14651,11 @@ export class Track {
       if (kv[v]) this.group.add(bodySet[v], roofSet[v]);
     }
     if (ck) this.group.add(chims);
+    balcSlabs.count = balcRails.count = balK;
+    awnings.count = awnK;
+    if (awnings.instanceColor) awnings.instanceColor.needsUpdate = true;
+    if (balK) this.group.add(balcSlabs, balcRails);
+    if (awnK) this.group.add(awnings);
     if (lk) this.group.add(arms, bulbs);
 
     // ---- string lights over the street (night quarters only): warm bulb
@@ -15182,6 +15787,26 @@ export class Track {
     return this._distToTrack(x, z) - r >= half + margin;
   }
 
+  /** Does a block of masonry whose top sits at `top` rise out of somebody's
+   *  carriageway? The question a BRIDGE PIER has to answer, and `_clearsRoad`
+   *  cannot: that one is flat, so it refuses every pier for standing under the
+   *  deck it holds up. A pier is beneath its own road by design. What makes
+   *  one an obstacle is rising above ANOTHER stretch's tarmac — which is what
+   *  the overpass piers ask (r193) and the stone bridges' arch faces did not.
+   *
+   *  Within reach in XZ, and standing proud of that stretch's surface. Its own
+   *  deck answers no on the height test, since the top is under it. */
+  _pierInRoad(x, z, top, r = 1.6, margin = 1.0) {
+    for (let i = 0; i < N; i++) {
+      const c = this.center[i];
+      if (top < c.y + 0.35) continue;              // buried under that carriageway
+      const dx = x - c.x, dz = z - c.z;
+      const reach = (this.widthAt ? this.widthAt(i) : ROAD_HALF) + r + margin;
+      if (dx * dx + dz * dz <= reach * reach) return true;
+    }
+    return false;
+  }
+
   _trackSidePos(minD, maxD) {
     const i = (Math.random() * N) | 0;
     const side = Math.random() < 0.5 ? 1 : -1;
@@ -15675,6 +16300,26 @@ export class Track {
     const ks = { saguaro: 0, barrel: 0, acacia: 0, agave: 0, ocotillo: 0 };
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const color = new THREE.Color();
+    // AN OFFSET IS NOT A DISTANCE. Every branch below measures `lateral` along
+    // sample i's OWN normal, and on a canyon hairpin the road's other leg
+    // swings underneath it — the same defect that put a cabin on FURKA
+    // RIDGE's centreline, 38 tire stacks inside the road, and 674 props on
+    // the racing line, each fixed in its own builder and never here.
+    // Measured on CANYON RUN: three cacti and an acacia stood with their
+    // TRUNKS in the carriageway around samples 371-391, the worst 1.01 u from
+    // the centreline — a saguaro on the racing line, on a world whose whole
+    // difficulty is the width of the canyon.
+    //
+    // `_distToTrack` searches the whole lap, so it sees the near leg whichever
+    // one it is. Returning null RETRIES the spot rather than spending it, the
+    // way the hay bales already handle a wet one. The radius is the trunk's,
+    // not the canopy's: desert scrub yields, and what must not happen is the
+    // STEM standing where a car is entitled to be.
+    const clearOfRoad = (spot) => {
+      if (!spot) return null;
+      const p = this.pointAt(spot.i, spot.lateral);
+      return this._clearsRoad(p.x, p.z, 0.8, 0.4) ? spot : null;
+    };
     this._scatter(COUNT,
       () => {
         const roll = Math.random();
@@ -15682,21 +16327,21 @@ export class Track {
         const side = Math.random() < 0.5 ? 1 : -1;
         if (roll < 0.5) {
           // roadside, hugging the cliff base (small ones); dy is relative to road y
-          return { i, lateral: side * (10.55 + Math.random() * 0.35), dy: 0, s: 0.5 + Math.random() * 0.35 };
+          return clearOfRoad({ i, lateral: side * (10.55 + Math.random() * 0.35), dy: 0, s: 0.5 + Math.random() * 0.35 });
         }
         if (roll < 0.8 && this.T.cliffWalls) {
           // silhouetted on the canyon rim (cliff heights are relative to road y)
           const prof = this._cliffProfile(i, side);
           if (prof.h < 7) return null;
-          return {
+          return clearOfRoad({
             i, lateral: side * (prof.base + prof.l2 + 1 + Math.random() * 3.5),
             dy: prof.h * 0.97 - 0.35, s: 0.7 + Math.random() * 0.6,
-          };
+          });
         }
         // open bowl around the start line — absolute terrain height
         const gi = ((Math.random() * 140 - 70 | 0) + N) % N;
         const lat = side * (13 + Math.random() * 22);
-        return { i: gi, lateral: lat, terrain: true, s: 0.8 + Math.random() * 0.7 };
+        return clearOfRoad({ i: gi, lateral: lat, terrain: true, s: 0.8 + Math.random() * 0.7 });
       },
       (spot, k) => {
         const p = this.pointAt(spot.i, spot.lateral);
@@ -17301,7 +17946,55 @@ export class Track {
       // used to depend on which side the board stood, so every board on one
       // side presented its back - and because the material is DoubleSide you
       // read the lettering mirrored rather than seeing nothing.
-      g.rotation.y = this.headingAt(i) + Math.PI;
+      const head = this.headingAt(i);
+      // A 9 u HOARDING BROADSIDE TO THE ROAD NEEDS 9 u OF ROOM BESIDE IT.
+      //
+      // `boardOff` places the board's CENTRE, and a board standing across the
+      // road spans +-4.5 u of it with its posts at +-4. On a cliff-walled
+      // world the designed offset is `WALL_OFF + 0.75` = 11.15, so the inner
+      // edge lands at 6.65 — 2.35 u inside a 9 u half-width — and the inner
+      // post at 6.99. Measured on CANYON RUN and GLACIAL PASS: nine boards and
+      // nine posts each, every one over the carriageway, not one with a
+      // collider. Same shape of error as the arch faces and the tire stacks:
+      // the anchor was placed clear and nobody asked how far the thing
+      // reaches from it.
+      //
+      // A canyon has no outward to give — the rock face is AT `WALL_OFF`, and
+      // pushing the board past it is what the offset above exists to prevent.
+      // So a board that would hang over the road stands ALONG it instead,
+      // parallel to the wall, where only the posts occupy any width at all.
+      // That is how trackside advertising is really mounted, and it costs the
+      // head-on read only on the worlds that cannot afford one.
+      const inner = this.pointAt(i, (boardOff - 4.6) * side);
+      if (this._clearsRoad(inner.x, inner.z, 0.3, 0.3)) {
+        g.rotation.y = head + Math.PI;
+      } else {
+        // turn it the way that leaves the lettering facing the road rather
+        // than the rock — derived from the geometry, not from a guess about
+        // which sign of PI/2 the yaw convention wants
+        const nr = this.nrm[i];
+        const outX = nr.x * side, outZ = nr.z * side;
+        const yaw = head + Math.PI / 2;
+        g.rotation.y = (Math.sin(yaw) * outX + Math.cos(yaw) * outZ) < 0 ? yaw : head - Math.PI / 2;
+        // AND TURNING IT ONLY HELPS WHEN THE PROBLEM IS ITS OWN ROAD.
+        //
+        // Broadside, the board reaches 4.5 u ACROSS the road; parallel, it
+        // reaches 4.5 u ALONG it — and where a lap doubles back or crosses
+        // itself, along is straight at the other leg. Measured after the turn
+        // went in: BRIDGE RUN still had a board biting 8.23 u and MONACO
+        // STREETS a post at 5.7 u, both from a second carriageway the first
+        // orientation was never asked about.
+        //
+        // So ask about the ends the turn actually creates, and if they are in
+        // somebody's lane too, build nothing. That is the rule the quay guns
+        // (r191), the deck rails and the arch faces all follow: a thing with
+        // nowhere clear does not get built. A missing hoarding is a gap in the
+        // advertising; a present one is a wall in a lane.
+        const t2 = this.tan[i];
+        const clearEnds = [-4.6, 4.6].every((d) =>
+          this._clearsRoad(p.x + t2.x * d, p.z + t2.z * d, 0.3, 0.3));
+        if (!clearEnds) continue;
+      }
       this.group.add(g);
       this.banners.push({
         x: p.x, z: p.z, y: g.position.y, r: 1.3, dead: false,

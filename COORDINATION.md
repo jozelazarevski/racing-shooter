@@ -1370,6 +1370,591 @@ Verified: test-water, test-river, test-carriageway all pass; test-surface
 20/20. (test-surface hardcodes port 8901 and ignores BASE — serve there.)
 
 
+## r192 — the board reads in the order you can drive it
+
+**OPEN WORLDS SORT FIRST.** The career array is rung order and the PRICES are
+not monotonic with it — a world may carry its own `cost` — so the board ran
+58, 60, 63 and then 20 a few cards later. Add the free-unlock floor on top and
+OLIVE COAST sat OPEN underneath three padlocks: the one world the player could
+actually race, buried below three they could not. Unlocked now sort first and
+the locked half is ordered by star cost, which is the order a wall is read in.
+Display only — pricing, progression and `nextTrack` still read the array. This
+does override the timeline view's old "rung 12 follows rung 11" rule, which
+assumed prices rise with the array; they do not.
+
+**LADDER_SLOPE 2.5 -> 0.5.** A rung cost two and a half stars, so a star
+bought less than half a world: 16 stars in hand against neighbours priced
+55/58/60/63, "39 TO GO" on the very next card. At 0.5 one star opens about two
+worlds and those same neighbours price at 11/12/12/13. Measured pace, three
+profiles, worlds open after 3/10/20 races:
+    winner   39/60/60      podium 27/60/60      finisher 12/43/60
+This deliberately REVERSES r178, which set the same number the other way after
+"tracks are opening too fast". The roster has grown since and the report
+reversed; a knob set by report is reset by report.
+
+**AND THE LADDER SUITE HAD TO BE RE-AIMED, NOT SILENCED.** Eleven assertions
+failed because they encoded r178's intent — `a3 <= 10`, `a10 <= 40`, "the
+roster is not fully open even at twenty races". Keeping them would have had
+the suite defend a decision the player had just asked to reverse, which is how
+a test stops being a spec and becomes a fossil. They now assert the opposite
+property: that the board is never a wall.
+
+The floor needed different handling. At slope 0.5 `_freeUnlock` CANNOT fire —
+a finisher banks a whole star per race against rungs costing half of one, so
+affordability outruns racing and nothing is ever owed. Rather than delete the
+seven floor assertions, that block now runs against a deliberately steep price
+(`starCost * 6`), so the safety-net logic stays covered whatever the slope is
+set to next. 24/24.
+
+### Traffic: measured, NOT a defect (recorded so it is not re-hunted)
+
+Chasing "cars are stuck", traffic looked frozen: 1-2 of 6-7 vehicles at
+exactly 0.0 u after 20 real seconds, on every world. They are crossroad
+shuttles mid-wait. Traffic owns its own rAF and its clock advances ~0.125 s
+per real second under swiftshader, so the 9 s look-both-ways pause takes ~75 s
+of wall clock to expire — the trace shows `wait` 9.43 -> 6.83 across the
+window. Any traffic probe needs a MINUTES-long window or a driven rAF; a
+20 s sample proves nothing.
+
+Ruled out in the same hunt, all measured: physics, tracks, the AI field
+(0.5-0.9 laps/30 s, 8/8 alive), the driven player (0.44-0.93 laps/30 s on six
+worlds), the touch pad (drag up -> throttle 0.96), page errors (none), and any
+r190 vs r191 difference (identical). The original report is still unreproduced.
+
+
+## r193 — the bridge stops putting columns in the road it bridges
+
+`_buildOverpassDecks` stood one pier at `c.x, c.z` — the FLYOVER's own
+centreline — and asked nothing about what was underneath. Directly over a
+crossing that centreline IS the lower carriageway, so the bridge planted a
+column in the middle of the road it was there to span. Photographed from the
+driver's seat: two grey columns dead ahead in the lane, deck overhead.
+
+r190 made it worse. Earning those decks their full clearance means a taller
+deck, a taller deck clears the `c.y - ground > 2.5` test at more stations, so
+more columns and each of them longer.
+
+Piers now build in PAIRS offset +-6 u to the deck edges — which is how a
+viaduct carries its deck anyway — and each asks `_clearsRoad` first. Over the
+crossing neither qualifies, so the span stays open, which is the point of a
+flyover. Each pier takes the ground under ITSELF; the two sides of a viaduct
+are rarely level.
+
+Measured, OLIVE CROSSING: **8 pier meshes with 4 in the road, worst biting
+10.1 u into the lane at sample 205 -> 4 meshes, 0 in the road.** MOUNTAIN TO
+SEA clean before and after.
+
+**WHY NO CENSUS EVER CAUGHT THIS.** Piers are meshes with NO collider — you
+drive through them — so `tool-road-census` (which walks `solids`) and
+`test-carriageway` both scored these worlds clean while a column stood in the
+racing line. Same blind spot as the barriers (see r190, task #109), one layer
+further out: the census sees colliders, not geometry. `scratchpad/piers.mjs`
+walks `track.group` and measures pier-shaped meshes against `widthAt` instead;
+that approach is what any "is something standing in the road" question needs
+now, because three separate object classes have hidden in this gap.
+
+
+## V2/ IS NOT MAINTAINED — do not sync it
+
+`V2/` on `main` is a second, self-contained build (~2.9 MB, bundled and
+minified, with its own `editor.html`), live at
+`https://jozelazarevski.github.io/racing-shooter/V2/`. It arrived in 069ee7f
+("The playable build moves to /V2, and gets its own Pages link") and has not
+been edited since; the only later commit touching it is the gh-pages deploy
+sync carrying it along.
+
+DECISION, from the owner: **it is deliberately NOT kept in sync.** None of
+r182-r194 exists in it — not the overpass clearance work, the piers, the
+culvert parapets, the river, the ladder, the list sorting, none of it. Do not
+port fixes into it, do not "bring it up to date", and do not treat a defect
+found there as a defect in this game. It is a different lineage and a compiled
+artifact: the only meaningful comparison with it is behavioural, not textual.
+
+(Asked whether "kimi" had deployed anything: no. Every commit on every ref is
+authored by `Claude <noreply@anthropic.com>` or the owner's two GitHub
+identities; no branch, PR or commit trailer mentions it. The one textual hit
+was a chance byte sequence inside V2's minified bundle.)
+
+
+## r195 — joints get fences, bridges get the tunnel camera, laps get gates
+
+**FENCES AT ROAD JOINTS.** A crossroad is a hole deliberately cut in the
+roadside dressing — the spur mouth flares to 5.4 u and the verge furniture is
+suppressed around it, because a fence ACROSS a junction is a fence across a
+road. So a joint read as the verge simply stopping for twenty metres.
+`_buildJunctionFences` puts post-and-rail back on either SIDE of each mouth,
+starting past the flare, no collider (the driver is entitled to cross it).
+Measured: +15 posts on PINE VALLEY, +18 on HEDGEROW DASH, and ZERO of them in
+a carriageway.
+
+The gate is a FULL SCAN, not `_clearsRoad`. The first cut used `_clearsRoad`
+and the audit still showed posts on the road — which turned out to be
+pre-existing furniture, not these (see below) — but the scan is right anyway:
+this is a once-per-junction build-time decision and ~900 comparisons per post
+costs nothing.
+
+**THE CAMERA OBEYS A DECK LIKE IT OBEYS A BORE.** `tunnelAt` already keeps the
+eye over the roadway and under the crown; `deckOverhead` now answers the same
+question for an overpass, and main.js clamps against either with one code
+path. Without it the chase camera floats over the deck on the approach and the
+driver watches the top of a bridge while the car runs underneath it. Verified
+on MOUNTAIN TO SEA: 16 under-deck samples, camera never above the soffit
+(worst -0.8 u, i.e. always below).
+
+**FOUR LAP GATES, IN ORDER.** There was ONE checkpoint, at mid-lap, so any lap
+that touched 40-60% of the distance was legal — reachable by cutting the
+infield from near the line and back. `LAP_GATES = [0.2, 0.4, 0.6, 0.8]`, armed
+strictly in sequence: gate k only arms if k-1 is down. ORDER is what makes them
+unskippable; a bare set of flags can be collected by wandering. A refused lap
+now says so (`CHECKPOINT MISSED - LAP NOT COUNTED`) rather than silently
+failing to increment. Asserted three ways: the cut does not count, the honest
+lap does, gates collected BACKWARDS do not.
+
+### PRE-EXISTING, found while auditing the above — posts on the racing line
+
+Meshes of 0.18 x 1.05 (trackside posts) stand in the carriageway on rural
+worlds, INDEPENDENT of the new fences: PINE VALLEY 3, HEDGEROW DASH 12, worst
+bite 9.5 u into a 9 u half-width — dead centre of the road. Confirmed
+pre-existing by stashing `_buildJunctionFences` and re-counting: identical
+numbers. Same class as the culvert parapets (r191) and the quay guns (r191);
+the builder has not been identified yet. `tests/tool-road-census.mjs` cannot
+see them because they are meshes with no collider entry, the same blind spot
+that hid the bridge piers until r193.
+
+
+## r196 — OLIVE PASS (level 61)
+
+Asked for: "a track that drives into mountains with tunnels, same theme as
+OLIVE CROSSING."
+
+Theme and route are INDEPENDENT in this table — SEA CLIFF RUN and MOUNTAIN TO
+SEA share `mountainsea` and run different routes — so OLIVE PASS keeps OLIVE
+CROSSING's exact dressing (`olivecountry`: groves, terraces, the hill towns)
+and borrows `turini`, a pass route that climbs. That is the whole trick; no new
+terrain code.
+
+`tunnels: { count: 3 }` is a REQUEST, not a promise: `tunnelFitAt` refuses a
+station that is too curved, too near a gorge, too near the start gate, or
+(since r190) sitting on a crest. The planner placed TWO. That is the guard
+working, not a shortfall.
+
+Built and driven before shipping: builds with no page errors, 2 bores, 0 bare
+holes, grid clear of solids, 37.6 u of relief (a real climb), lap driveable.
+The theme/route pairing was the risk — a mismatch is what caused the GOTTHARD
+road-into-void — so it was measured rather than assumed.
+
+NOTE the entry sits before id 60 in the array. Harmless: it carries an explicit
+`cost: 33`, and since r192 the board sorts by open-then-cost rather than array
+order.
+
+
+## MOUNTAIN TO SEA's viaduct — TWO approaches tried, BOTH rejected, with numbers
+
+The complaint: on a world with nine crossings the decks read as one continuous
+elevated roadway on piers — a motorway viaduct over a village. The finished
+gaps after r190 are
+    12.29  11.5  11.67  11.5  14.56  11.5  11.26  14.06  17.39
+against a CLEAR target of 11.5. Three crossings are over 14 u and one is half
+again as tall as asked.
+
+**REJECTED 1 — rebuild the ramp from requirement, then re-erode.** Recompute
+each crossing's own need over the bare profile, take the max of those shapes,
+discard everything above it. Measured: crossings over 14 u went 3 -> 0 and the
+grade improved (p90 16% -> 12%), but one crossing dropped to **4.1 u** — a
+bridge you cannot drive under, exactly the defect r190 exists to prevent. The
+re-erosion removed the support the trimmed ramp had been leaning on. Height is
+cosmetic, clearance is not; reverted.
+
+**REJECTED 2 — the same trim, but only accepted if every crossing still
+clears.** Propose keep-fractions of the inherited excess (0, 0.3, 0.6), erode,
+measure the worst gap, and accept the first that holds a 10.5 u floor;
+otherwise keep the solved profile. Measured: **all three levels failed the
+floor**, so it fell back every time and MOUNTAIN TO SEA came out byte-identical
+— a no-op on all five overpass worlds. Reverted rather than ship dead code.
+
+**WHAT THIS PROVES, and it refutes the original theory.** The excess height is
+NOT free inheritance that can be handed back. Those tall stations are
+LOAD-BEARING for neighbouring crossings: remove them and a neighbour loses its
+clearance. Any future attempt that works by lowering shared lift will hit the
+same wall.
+
+**WHERE TO GO NEXT (untested).** The overlap itself is the cause, so attack the
+overlap, not the height: `HALF = ceil(82 / segLen)` gives an 82 u approach ramp
+at every crossing, and on a nine-crossing lap those ramps cannot help but
+share stations. A shorter ramp on dense worlds — scale HALF down as crossing
+count rises — reduces overlap at source. It costs grade (a shorter ramp for
+the same clearance is steeper), so it must be measured against the 24% cap and
+the eroder, and against `gaps.mjs` for clearance, in the same run.
+
+Tools: `scratchpad/gaps.mjs` prints every crossing's gap plus grade p90/max per
+world in one pass — that is the acceptance test for any attempt here.
+
+
+## r197 — the viaduct comes down by shortening the ramps, not by trimming them
+
+The third attempt at MOUNTAIN TO SEA's viaduct, and the one that worked. The
+two rejected above both tried to take the height back AFTER the solve and both
+failed the same way: the inherited height is LOAD-BEARING for the neighbouring
+crossing, so lowering a shared station costs somebody their bridge (one attempt
+produced a 4.1 u crossing).
+
+So stop creating it. `HALF` was a flat `ceil(82 / segLen)` — an 82 u approach
+at every crossing, which is right at two or three and impossible at nine,
+because the ramps cannot help but share stations. It now shrinks with density:
+`82 * max(0.72, 1 - 0.05 * (crossings - 3))`.
+
+MOUNTAIN TO SEA, gaps before -> after:
+    12.29 11.5 11.67 11.5 14.56 11.5 11.26 14.06 17.39
+    12.33 10.48 11.59 11.5 11.5 11.36 11.35 11.5 15.04
+  tallest deck   17.39 -> 15.04      over 14 u   3 -> 1
+  lowest deck    11.26 -> 10.48      under 6 u   0 -> 0
+  grade p90 16% -> 17%, max 24% unchanged
+
+The floor is 0.72 and not lower for a measured reason: at 0.62 the peak came
+down further (14.5) but one crossing landed at **9.53**, under the 9.65 u the
+overpass audit measured as the point where `nearestIndex` can capture the wrong
+leg on the drivable width. Two and a bit units of deck height is not worth
+reopening the invisible-wall family.
+
+Untouched by design: worlds with three or fewer crossings (dense = 0), so
+BRIDGE RUN, SEA CLIFF RUN and OLIVE CROSSING are byte-identical. CLIFF KNOT
+(five) tightened to a uniform 11.5.
+
+test-index-recovery 10/10 — the guard that matters here, since every gap moved.
+
+
+## r199 — the census learns to see geometry, and the fence posts were never there
+
+### THE HANDOVER'S NUMBER ONE PRIORITY WAS A PROBE BUG
+
+Reported: "~15 posts of 0.18 x 1.05 stand in rural carriageways, worst bite
+**9.5 u into a 9 u half-width**, i.e. dead centre. The builder is
+UNIDENTIFIED." Three sessions of grep had failed to find a builder because
+there is nothing to find.
+
+`scratchpad/fence.mjs` rejected non-posts with
+
+    if (!q || Math.abs(q.width - 0.18) > 0.005 || Math.abs(q.height - 1.05) > 0.005) return;
+
+A SphereGeometry has no `q.width`. `Math.abs(undefined - 0.18)` is `NaN`, and
+`NaN > 0.005` is **false**, so the guard never fired and every sphere, torus,
+circle and cylinder in the scene fell through as a "fence post" — including
+the pickups sitting on the racing line and the 9000 u world skirt. That is
+where 9.5 u came from; it was never a post.
+
+Measured with the keys required to exist, and with InstancedMesh handled
+per-instance rather than by reading an InstancedMesh's own origin (which is
+always 0,0,0 and measures nothing):
+
+    FROST PEAK        10 posts, all at 10.3 u lateral vs a 9 u half-width
+    REDWOOD RAMPAGE    7 posts, all at 10.3 u lateral vs a 9 u half-width
+
+Every one is **1.21 u OUTSIDE the drivable edge**. `_buildJunctionFences` is
+clean, exactly as stashing it had already suggested — the earlier session read
+that result as "the offenders are somewhere else" when it meant "there are no
+offenders".
+
+This is the fifth confident-wrong-answer from a hand-rolled probe in two
+sessions. The lesson has a sharper edge than "measure twice": a filter that
+can be defeated by a MISSING FIELD fails OPEN, and a probe that fails open
+reports work that does not exist. `NaN` comparisons are always false, so
+`Math.abs(a - b) > eps` is not a rejection test unless `a` is known to exist.
+
+### WHAT THE JOB ACTUALLY WAS, AND WHAT IT FOUND
+
+The handover was right about the blind spot even though it was wrong about the
+posts. `tool-road-census` walked `track.solids` only, and three defect classes
+have now hidden in that gap. It walks `track.group` now and measures
+transformed geometry, so a mesh with no collider entry is counted like any
+other; ones with no collider within 1.5 u are flagged BARE, which is the pier
+class exactly.
+
+Making it READABLE was most of the work, and every filter was earned by a
+false positive it removed rather than chosen up front:
+
+  - **the drive band, measured PER FOOTPRINT POINT.** Judging a whole mesh
+    against its nearest sample's road height reported every puddle in the game.
+    A puddle decal is a `CircleGeometry` scaled to 4 u and pitched to
+    `-atan(slopeAt(i))`: flat against the road, 0.8 u tall in world axes. Point
+    by point it is 0.04 u proud, which is what it is. Same test also drops
+    bridge decks (overhead) and footings (sunk) without naming them.
+  - **`track.props`.** Crates, cones, barrels and snowmen are put on the
+    drivable surface deliberately — `_buildProps` carries three paragraphs
+    about why — and carry no collider. Forty per world, all bare, all correct.
+  - **decals**: zero-thickness sheets lying down have no volume to drive into.
+  - **foliage**: a conifer is one ground-to-tip cone whose skirt is far wider
+    than anything the car collides with. PINE VALLEY reported 29 canopies in
+    the lane; measured against `track.trees`, which is the radius the game
+    itself uses, **743 trees and not one trunk inside a carriageway**. Foliage
+    over a registered trunk is skipped and the trunks are counted separately,
+    so a tree PLANTED in the road would still show.
+  - **landforms** over 40 u across, and the 12-40 u bulk, are counted and
+    LISTED rather than dropped — a cap that hides what it dropped reads as
+    coverage it never gave.
+
+### SEA CLIFF RUN: TWO COLUMNS IN A LANE, NEITHER WITH A COLLIDER
+
+Both on the world the handover already flagged for stacking 80 u of road on
+road — the same defect wearing a second face.
+
+**The stone bridge's arch face.** `_buildStoneBridges` built a 2.2 x 9 x 3.2
+block of masonry at `8.5 * side` along `nn`, and `nn` is `this.nrm[i]`, the
+normal at the MIDDLE of the span — while the pier stands at `j`, a third of
+the span away. The same "an offset is not a distance" error the props and the
+tire stacks already carry comments about, and 8.5 u is inside a 9 u half-width
+to begin with. Under its own deck that is harmless: the top sits 0.1 u below
+the tarmac. Where another leg passes lower it is a grey column in the racing
+line — **5.2 u proud of the road at sample 660, biting 5.87 u into a 9 u
+half-width**, and you drive straight through it.
+
+It takes `nrm[j]` now and asks `_pierInRoad` first. That guard exists because
+`_clearsRoad` cannot answer this question: `_clearsRoad` is flat, so it would
+refuse every arch face in the game for standing under the bridge it holds up.
+The question is three-dimensional — does this masonry rise out of anybody's
+road — and its own deck answers no on the height test.
+
+**Four overpass deck rails**, up to 4.25 u into the lane at sample 740.
+`railBlocked` exists to prevent precisely this and was bought off with a low
+index distance:
+
+    const dLap = Math.min((i - jSelf + N) % N, (jSelf - i + N) % N);
+    if (dLap <= half + 4) continue;             // its own deck run
+
+`half` is the whole DECK RUN — 38 samples on this world, so 76 samples of lap
+were exempt. Where a lap doubles back inside its own span the returning leg is
+a few samples away and a couple of metres below, so the window that exists to
+ignore this rail's own road swallowed the other one. Traced from the builder:
+rails at samples 731 and 733 stand 7.12 and 8.33 u from the centreline at
+sample 740, inside a 9 u half-width, 1.7 and 1.2 u ABOVE that road.
+
+The exemption relaxes the BUFFER now instead of skipping the road: its own
+deck is measured against the bare half-width, which the 10.2 u offset clears
+by 1.2 u, and every other stretch keeps its 1.4 u. Same intent, and it can no
+longer be bought with an index.
+
+### HOW IT WAS PINNED — instrument the BUILDER, not the built scene
+
+Recovering "which sample does this rail belong to" from a finished mesh is
+guesswork on a hairpin, and guessing it produced two wrong answers before the
+right one. `tools-scratch/railtrace.mjs` uses `page.route` to rewrite
+`src/track.js` in flight, injecting one line that makes `_buildOverpassDecks`
+record `{j, side, rx, rz, up, half}` for every rail it lays. Nothing on disk
+changes and the answer is the builder's own. Worth reaching for whenever the
+question is "why did the generator decide that".
+
+### A CASCADE WORTH KNOWING ABOUT
+
+Withholding a deck rail also removes its `_barrier` entry, and the edge-rail
+builder consults `this.barriers` ("already walled? the masonry went in before
+this did") to decide where to put its own rails. So a withheld deck rail can
+grow an edge rail somewhere near it, and `solids` moves on worlds where
+nothing looks like it should have changed. World generation is seeded, so this
+is deterministic, not noise — but it means a before/after diff of raw counts
+is not a defect count. Compare CLASSES.
+
+## r199c/d — tunnels through the mountains, and the test that drives them
+
+### THE ASK, AND WHY A COUNT WOULD NOT HAVE ANSWERED IT
+
+"Create in mountain tunnels tracks and drive in drive out." Eight mountain
+worlds had no bore: FROST PEAK, SUMMIT CLIMB, GLACIAL PASS, GLACIER'S GRIND,
+AVALANCHE ALLEY, COL DE TURINI (2), PIKES PEAK, DOLOMITI CORSA (2). The roster
+went from 15 worlds asking for a tunnel to 23.
+
+`tests/test-tunnels.mjs` is the half of this that matters. Counting
+`track._tunnels` proves the PLANNER ran and says nothing about whether what it
+planned can be driven through — and every tunnel defect this game has had is
+invisible to a count: a bore over a crest, where the car launches off the hump
+and leaves through the crown into the empty slot `_tunnelRidge` keeps above the
+tube (TREMOLA, -0.07 u); wall solids that become a wall if the roadway is wider
+than the tube; a portal in a hillside the road never reaches.
+
+So it drives the real car with real physics from outside one portal to outside
+the other and asserts ENTERED, EXITED THE FAR PORTAL (not backed out the way it
+came), never above the crown, never stopped dead. The car is steered to the
+centreline — an unsteered car at full throttle just drives off the road and its
+damage is crash damage. The world list comes from the roster's own
+`tune.tunnels`, so a world gaining or losing a bore stays covered.
+
+**26 of 26 bores drive in one portal and out the other**, 8.07-8.60 u of
+headroom throughout.
+
+### WHAT IT FOUND ON ITS FIRST RUN — A BORE REACHES HALF ITS LENGTH
+
+Two worlds ASK for a bore and silently had none: GLACIAL PASS, and TREMOLA
+DESCENT, which has been that way ever since the crest guard went in because
+nothing tested that a requested tunnel exists.
+
+Both callers — `_planTunnels` and the editor — pass `lenS`, the requested bore
+LENGTH in samples, into a parameter named `maxHalf`. `_planTunnels` then sites
+the bore as `half = min(fit, lenS >> 1)` either side of the station, so a bore
+centred at i never reaches further than `lenS >> 1`. The gorge and crest
+exclusions reserved `lenS` — twice the ground, on both sides. Measured before:
+
+    GLACIAL PASS      CREST refused 701 of 900, start gate 199. 0 eligible.
+                      Six crests ate the entire lap.
+    TREMOLA DESCENT   CREST 512, the rest too twisty. 0 eligible.
+
+Sizing the reach to the bore keeps the guard exactly as strong — it still asks
+"does the tube I would build cross a crest or a chasm" — and asks it about the
+tube that would actually be built. GLACIAL PASS: 29 eligible stations, an 81 u
+bore at 111-173, driven in and out with 8.57 u of headroom.
+
+**TREMOLA DESCENT STILL FITS NOWHERE AND THAT IS RIGHT.** Its longest straight
+half-run is 10 samples against a 12-sample minimum, and the one long straight it
+does have carries the crest the guard was written for — the 547-585 bore that
+measured -0.07 u. Twenty-four hairpins on a cobbled descent have nowhere to put
+a tunnel. The test NAMES it rather than letting "the planner found nowhere" read
+the same as "nobody asked".
+
+**STILL OPEN — `MIN` is probably the same units error.**
+`MIN = Math.max(6, Math.round(26 / segLen))` is compared against a HALF-run, so
+the real minimum bore is ~52 u against a documented "~26 u of bore". Correcting
+it would give TREMOLA a short gallery and let short bores onto twisty worlds,
+but it moves tunnel sizing on all 23 worlds and wants its own measured pass.
+Not folded in here.
+
+**BORES MOVED on worlds that already had them**, because more stations are now
+eligible: CANYON RUN 437-467 -> 233-263, SUMMIT CLIMB 557-599 -> 535-577,
+GOTTHARD's first 129-163 -> 113-147, CLIFF KNOT 671-705 -> 329-363. All still
+drive in and out, which is the property that matters.
+
+### FLOATERS WENT UP, AND IT IS NOT A DEFECT
+
+Roster floaters 116 -> 152. Every one of the +36 is on the three worlds that
+gained a bore (PIKES PEAK +17, DOLOMITI CORSA +16, COL DE TURINI +4) and every
+one is a TUNNEL WALL COLLIDER: `mat 'stone'`, air 2.6-2.8 u, all at bore
+samples. `_buildTunnel` pushes them at `groundHeightAt(i, 0) + 1` while
+`terrainHeight` at the wall lateral reads lower, so the census's FLOATERS
+measure has the same tunnel blind spot its BLOCKERS measure already documents.
+GOTTHARD CLIMB has carried two bores for ages and reads clean, so it is
+terrain-dependent, not new. PIKES PEAK's WORST floater improved, 21.3 -> 9.7 u.
+Portals on DOLOMITI and GOTTHARD were photographed side by side and are
+indistinguishable — no gap, no anomaly.
+
+### THE ROSTER-WIDE SCORE FOR THE WHOLE SESSION
+
+Pristine `origin/main` on port 8930 against this branch on 8920, same tool:
+
+                      before    after
+    worlds dirty       36/61    34/61
+    blockers              60       48
+    intruders            196       73
+      with no collider   179       53
+    trees in a lane       23       14
+    bare holes             0        0
+
+The sponsor-board fix was much wider than the two worlds it was found on: the
+2.35 u signature repeats on CANYON RUN, GLACIAL PASS, GLACIER'S GRIND,
+UNDERCITY SLIPSTREAM, ROCKFALL RAVINE, CORNICHE, LAGUNA SECA and RED CENTRE RUN.
+
+Suites on the changed build: test-carriageway 49/49, test-invisible-walls 13/13,
+test-index-recovery 10/10, test-newworlds 193 pass / 1 fail. That one failure —
+"the new worlds are appended at the END of the array, in order — tail is
+56,57,58,59,61,60" — is BYTE-IDENTICAL on pristine `origin/main`. It is the
+r196 OLIVE PASS array-order note, pre-existing, and not caused by anything here.
+
+### WHAT THE CENSUS STILL SHOWS, FOR WHOEVER PICKS THIS UP
+
+    SUZUKA           14 tree TRUNKS inside the lane, worst 4.15 u, samples
+                     19-24 and 76. `kind: 'pine'`, r 1.06-1.38. NOT from
+                     `_buildRedwoods` — its giants use `_trackSidePos(17, 60)`
+                     and its saplings (12.5, 26), both of which consult
+                     `_distToTrack`. Another builder puts pines there and it
+                     has not been identified. Same shape as the cacti fixed
+                     in r199b; probably the same missing check.
+    RED CENTRE RUN   Box 7.4x2.6x1.2 #24211c biting 8.78 u, 2.5 u proud, bare
+    MONACO STREETS   an intruder biting 8.9 u
+    CLIFF KNOT       9.0 u
+    COTE D AZUR      30 stone blockers at 9.27 u — READ THIS AS THE TUNNEL
+                     doing its job (documented false positive), not a defect
+    ESTONIA CRESTS   Cylinder 6.5x0.55 #5a3a22 biting 6.95 u
+
+## r199e/f/g — the anchor is placed clear, the reach is never counted
+
+Four more of the same defect, found by the extended census and each fixed in
+its own builder. The shape has now appeared in NINE places (props, tire stacks,
+road cabins, quay guns, arch faces, deck rails, cacti, hoardings, corridor
+pines, fallen logs) and it is always the same sentence: **something computes a
+position that clears the road AT ONE SAMPLE, and nothing asks how far the thing
+reaches from it.** `_distToTrack` searches the whole lap and answers it.
+
+### SUZUKA — 14 trunks in the lane, and they stop a car dead
+
+The tree-corridor builder computes `lat = widthAt(j) + 0.75*sc + 2.0 + …` and
+offsets along sample j's own normal. That clearance is true of sample j by
+construction and says nothing about a second leg — and SUZUKA is a
+figure-of-eight. 14 trunks stood inside a carriageway around samples 19-24 and
+76, worst 3.0 u past the drivable edge on a 1.16 u trunk. These are
+`solid: true` pines: hitting one stops a car dead, so this was the
+worst-consequence version of the family. **14 -> 0**, at a cost of 28 trees out
+of 800. `part.count = k` already, so a skipped station leaves no orphan
+instance at the origin (the r191 trap).
+
+### THE HOARDING TURN WAS HALF A FIX
+
+r199b turned a board to stand ALONG the road where it would otherwise hang over
+it. That only helps when the problem is its OWN road: parallel, the board still
+reaches 4.5 u along the lap, and where a lap crosses itself, along points
+straight at the other leg. Measured after the turn shipped: BRIDGE RUN still
+had a board at 8.23 u and MONACO STREETS a post at 5.7 u. Both orientations are
+now checked and a board with nowhere clear is not built — the quay-gun rule.
+MONACO **3 -> 0**, BRIDGE RUN **4 -> 1**.
+
+### THE START GANTRY WAS BUILT AT ABSOLUTE HEIGHTS
+
+The `Box 7.4x2.6x1.2 #24211c` the census kept reporting is the starting-lights
+housing. Every mesh in the gantry — legs, braces, cabin, banner, finish flags,
+housing, lamps — sat at a literal `y`, and only the checkered strip read `c.y`,
+carrying the comment "start area is flat (c.y = 0)". Measuring the assumption
+itself: **11 of 61 worlds do not start at zero.**
+
+    PINE VALLEY      y = 0      control: housing underside 5.30 u over the grid
+    SUZUKA           y = 7.87   underside 2.57 u UNDER the tarmac, crossbar
+                                1.13 u over it — the gantry buried to its
+                                shoulders in its own start line
+    RED CENTRE RUN   y = -3.99  the same structure floating 9.29 u up
+    CLIFF KNOT       y = 3.57   underside 1.73 u over the grid — windscreen
+                                height, across the full width of it
+    + 7 more at 0.20-0.78 u
+
+All four now measure exactly 5.30 u, PINE VALLEY unchanged. Photographed on
+SUZUKA before and after: no lights over the grid, then lights.
+
+**AND NOTE WHICH ONE THE CENSUS COULD NOT FIND.** SUZUKA's was the worst and
+the census never reported it, because a buried object is not standing proud of
+the road — which is precisely the test the INTRUDERS measure is built on. Only
+measuring the ASSUMPTION found it. A census answers the question it was given.
+
+### ESTONIA CRESTS — a 6.5 m log across the racing line
+
+`_buildHeroBridge`'s loose fallen logs took `c` at the sample 16 u past the
+gorge and `n` at `nrm[gi]`, 16 u back up the road — the arch-face mismatch
+again — and `off` positions the log's CENTRE while `rotation.y` is random, so a
+6.5 u log sweeps 3.25 u in whatever direction it lands. Two lay at lateral 2.05
+and 2.26 u on a 9 u half-width, timber across the racing line at the exit of
+the hero bridge, no collider. **2 -> 0.**
+
+### THE CENSUS LEARNS THAT AN OVERLAY ANNOUNCES ITSELF
+
+COTE D AZUR's deepest remaining "intruder" at 7.71 u was SEA FOAM — a
+3.4 x 0.05 x 0.32 `MeshBasicMaterial` box at opacity 0.4 on the water beside a
+seafront road. Anything drawn with `depthWrite: false` is a visual layer by
+construction: foam, puddles, the tunnel light pools, contact shadows. The
+material already carries the answer, so no thickness heuristic and no magic
+number. COTE D AZUR **9 intruders -> 0**; its remaining 14 "blockers" are the
+documented tunnel-bore false positive.
+
+### A COMMENT THAT WAS WRONG, AND HOW
+
+The first draft of the gantry comment carried two start heights **worked back
+from census arithmetic** — "RED CENTRE RUN starts at y = 5.4" — and the direct
+sweep said -3.99. The census reports the road height at the sample NEAREST the
+offending mesh, which on a lap that doubles back is a different leg entirely.
+Inference from a derived number is not a measurement, and a wrong number in a
+comment outlives the session that wrote it. Corrected against
+`scratchpad/startY.mjs`, which reads `center[0].y` directly.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),
