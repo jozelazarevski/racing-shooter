@@ -14427,8 +14427,22 @@ export class Track {
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(dAcross, vh, wAlong));
       bm.setMatrixAt(kv[vi], m4);
       m4.compose(new THREE.Vector3(p.x, y + vh, p.z), q,
-        new THREE.Vector3(dAcross * 1.06, roofH, wAlong * 1.04));
+        new THREE.Vector3(dAcross * 1.16, roofH, wAlong * 1.08));
       rm.setMatrixAt(kv[vi], m4);
+      if (trimK + 1 < TRIMMAX) {
+        // plinth: a course at the kerb, a touch proud of the wall
+        m4.compose(new THREE.Vector3(p.x, y + 0.28, p.z), q,
+          new THREE.Vector3(dAcross * 1.07, 0.56, wAlong * 1.05));
+        houseTrim.setMatrixAt(trimK, m4);
+        trimCol.copy(tint).multiplyScalar(0.52 + Math.random() * 0.1);
+        houseTrim.setColorAt(trimK++, trimCol);
+        // fascia: the band the eaves sit on, wider again so it casts down the wall
+        m4.compose(new THREE.Vector3(p.x, y + vh - 0.16, p.z), q,
+          new THREE.Vector3(dAcross * 1.13, 0.32, wAlong * 1.07));
+        houseTrim.setMatrixAt(trimK, m4);
+        trimCol.copy(tint).multiplyScalar(1.12 + Math.random() * 0.12);
+        houseTrim.setColorAt(trimK++, trimCol);
+      }
       col.copy(tint).multiplyScalar(0.86 + Math.random() * 0.26);
       bm.setColorAt(kv[vi], col);
       rm.setColorAt(kv[vi], col.setScalar(0.8 + Math.random() * 0.4));
@@ -14490,6 +14504,27 @@ export class Track {
     // Three instanced meshes for the whole world, on top of the eight the
     // frontage already uses. The slab and the awning share one box; the rail
     // is a thinner one.
+    // A HOUSE IS NOT A BOX WITH A HAT ON IT.
+    //
+    // The frontage draws one body box and one gable prism, and no amount of
+    // facade texture fixes that silhouette: a real house SITS on something and
+    // its roof OVERSAILS the walls, and both of those read as shadow lines
+    // long before any window does. Two thin boxes per house buy exactly that —
+    // a plinth at the kerb and a fascia band at the eaves — off ONE instanced
+    // mesh with per-instance colour, so it costs two instances and no draw
+    // call. The roof oversail goes with them: 1.06 across was a rim, not an
+    // eave, and at 1.16 the shadow it throws is what makes the wall below read
+    // as being in the shade of a roof.
+    const TRIMMAX = 1400;
+    const houseTrim = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.92, envMapIntensity: 0.3 }),
+      TRIMMAX);
+    houseTrim.name = 'frontage-trim';
+    houseTrim.castShadow = houseTrim.receiveShadow = true;
+    let trimK = 0;
+    const trimCol = new THREE.Color();
+
     const BALC = 520;
     const slabGeo = new THREE.BoxGeometry(1, 1, 1);
     const balcMat = new THREE.MeshStandardMaterial({
@@ -14670,6 +14705,9 @@ export class Track {
     balcSlabs.count = balcRails.count = balK;
     awnings.count = awnK;
     if (awnings.instanceColor) awnings.instanceColor.needsUpdate = true;
+    houseTrim.count = trimK;
+    if (houseTrim.instanceColor) houseTrim.instanceColor.needsUpdate = true;
+    if (trimK) this.group.add(houseTrim);
     if (balK) this.group.add(balcSlabs, balcRails);
     if (awnK) this.group.add(awnings);
     if (lk) this.group.add(arms, bulbs);
