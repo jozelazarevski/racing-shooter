@@ -41,7 +41,7 @@
  *              decided with a measurement (r200), same rule the grandstand
  *              followed since r167.
  *
- * FIVE LAWS:
+ * SIX LAWS:
  *   1. THE INSTRUMENT WORKS. Every world built, every world's scene walked,
  *      and each suppression class matched real geometry. A clearance check
  *      that matches nothing passes forever (tests/README.md rule 4).
@@ -53,6 +53,8 @@
  *   5. WHAT IS DRAWN IN A CARRIAGEWAY STAYS WHERE IT WAS MEASURED. Per-world
  *      caps, with every known-open world PINNED BY NAME with its number and
  *      its reason. Shrinking that list is the work; growing it fails.
+ *   6. NOR DOES A COLLIDER YOU CANNOT SEE. Boulders, hut solids and masonry
+ *      runs — the same test and the same kind of pinned list.
  *
  *   node tests/test-nothing-on-road.mjs
  *   node tests/test-nothing-on-road.mjs 57 66     # only these worlds
@@ -87,6 +89,16 @@ const KNOWN_BODY = {
   'SEA CLIFF RUN': { max: 8, why: '80 u of road stacked on road (HANDOVER item 3)' },
   'MOUNTAIN TO SEA': { max: 60, why: 'roadWidth 5 (45 u half-width): 1159 before the width cascade fix' },
   'GLACIER COL': { max: 4, why: 'a hero-bridge cable descending to road level over the deck it carries' },
+};
+
+// LAW 6's known-open list — the colliders that are still inside a drivable
+// width, each by name, with its measured value and why it is there.
+const KNOWN_HARD = {
+  'HEDGEROW DASH': { max: 2, why: 'a stone-bridge parapet block, 1.55 u — the arch face r199 identified and nobody has moved' },
+  'MOUNTAIN TO SEA': { max: 40, why: 'roadWidth 5: world masonry placed off its own offsets, not off widthAt (HANDOVER)' },
+  'CINQUE TERRE': { max: 2, why: 'the 1.95 u stone r199 could not attribute — colours are computed, grep does not reach it' },
+  'CLIFF KNOT': { max: 4, why: 'a knotted lap: masonry beside one leg reaches the next' },
+  'SEA CLIFF RUN': { max: 6, why: '80 u of road stacked on road (HANDOVER item 3) — placement beside one leg lands in the other' },
 };
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -355,6 +367,21 @@ for (const r of results) {
 for (const r of results) {
   check(`LAW 4  ${r.name}: no tree trunk is in a carriageway`, r.trees.length === 0,
     r.trees.slice(0, 3).map((q) => `${q.kind}${q.solid ? ' SOLID' : ''} bite ${q.bite} @${q.i}`).join(', '));
+}
+
+// ---- LAW 6: nor does a collider you cannot see ------------------------------
+// Buildings and trunks are the two the report named; these are the rest of the
+// collider lists — the boulder, the hut solid, the masonry run. A barrier is
+// only counted when it also rises above the carriageway it reaches (see the
+// scan): without that test CLIFF KNOT reads 87 intrusions that are all
+// retaining walls UNDER the leg above them, and RED CENTRE RUN 15.
+for (const r of results) {
+  const k = KNOWN_HARD[r.name];
+  const n = r.solids.length + r.barriers.length;
+  const cap = k ? k.max : 0;
+  check(`LAW 6  ${r.name}: at most ${cap} solid/barrier colliders in a carriageway`, n <= cap,
+    n ? `${r.solids.map((q) => `${q.mat} ${q.bite}u@${q.i}`).concat(r.barriers.map((q) => `barrier(${q.kind}) ${q.bite}u@${q.i}`)).slice(0, 4).join(', ')}`
+      + (k ? `  [known: ${k.why}]` : '') : 'clean');
 }
 
 // ---- LAW 5: what is drawn in a carriageway stays where it was measured -------
