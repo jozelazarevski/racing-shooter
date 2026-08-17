@@ -10,7 +10,7 @@ import {
   crateTexture, coneTexture, barrelTexture, riverTexture, riverBankTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
-  townhouseTexture, townhouseGlowTexture,
+  townhouseTexture, townhouseGlowTexture, roofTileTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -3725,6 +3725,7 @@ export const HOUSE_TEMPLATES = {
     ['cyl', 2.55, 0.5, 2.45, 0.11, 11.0, 0.11, 'trim'],      // rainwater downpipe
     ['cyl', -1.7, 13.0, 0, 0.55, 1.9, 0.55, 'stone'],        // chimney + pot
     ['cyl', -1.7, 14.7, 0, 0.26, 0.5, 0.26, 'roof'],
+    ['box', 0, 13.35, 0, 6.4, 0.22, 0.5, 'trim'],            // ridge cap
   ] },
   // AEGEAN: a whitewashed cube with a parapet instead of eaves, an outside
   // stair, and one painted door.
@@ -3808,6 +3809,9 @@ export const HOUSE_TEMPLATES = {
     ['box', -6.6, 3.2, -2.4, 3.6, 0.3, 4.4, 'roof'],
     ['box', 0, 7.6, -4.5, 1.6, 1.2, 0.22, 'trim'],           // gable vent
     ['box', 4.4, 0.15, 4.3, 1.8, 1.9, 0.24, 'trim'],         // side door
+    ['box', 0, 9.25, 0, 13.0, 0.26, 0.6, 'trim'],            // ridge cap
+    ['box', -3.4, 8.6, 0, 1.0, 1.0, 1.0, 'trim'],            // roof vents
+    ['box', 3.4, 8.6, 0, 1.0, 1.0, 1.0, 'trim'],
   ] },
   // A FARMHOUSE, NOT A BOX WITH A LID. What makes a small rural house read at
   // a glance is not detail, it is MASSING: a stone footing so it sits IN the
@@ -3834,6 +3838,13 @@ export const HOUSE_TEMPLATES = {
     ['cyl', 3.55, 0.75, 3.2, 0.1, 4.7, 0.1, 'trim'],         // downpipe
     ['cyl', -2.6, 8.8, 0, 0.4, 0.55, 0.4, 'roof'],           // chimney pot
     ['box', -0.6, 0.1, 4.3, 2.2, 0.35, 1.2, 'stone'],        // doorstep
+    // THE ROOF IS THE BIGGEST SURFACE THE PLAYER SEES. A chase camera looks
+    // down on a village, so a house is mostly roof from the driving seat, and
+    // it was one flat prism. A ridge cap and a dormer cost two parts and break
+    // both the silhouette and the shading.
+    ['box', 0, 9.1, 0, 8.8, 0.24, 0.55, 'trim'],             // ridge cap
+    ['box', -1.7, 6.6, 1.9, 1.7, 1.3, 1.7, 'wall'],          // dormer
+    ['prism', -1.7, 7.9, 1.9, 2.0, 0.8, 2.0, 'roof'],
   ] },
   chapel: { r: 4.8, parts: [
     ['wall', 0, 0, 0, 5.6, 5.4, 8.0, 'wall'],
@@ -3850,6 +3861,7 @@ export const HOUSE_TEMPLATES = {
     ['box', 0, 6.4, -2.85, 1.1, 1.6, 0.2, 'wall2'],          // belfry opening
     ['box', 0, 3.3, 4.2, 2.0, 0.16, 0.5, 'trim'],            // door hood
     ['cyl', 0, 8.4, -4.6, 0.4, 0.5, 0.4, 'trim'],            // the bell
+    ['box', 0, 8.3, 0, 6.4, 0.24, 0.5, 'trim'],              // ridge cap
   ] },
   shed: { r: 3.4, parts: [
     ['wall', 0, 0, 0, 5.2, 3.2, 4.2, 'wall2'],
@@ -3920,6 +3932,7 @@ export const HOUSE_TEMPLATES = {
     ['box', 0, 3.0, 2.85, 2.2, 0.14, 0.45, 'trim'],          // door hood
     ['cyl', 3.1, 0.5, 2.4, 0.09, 3.5, 0.09, 'trim'],         // downpipe
     ['cyl', 2.2, 6.6, 0, 0.36, 0.5, 0.36, 'roof'],           // chimney pot
+    ['box', 0, 6.75, 0, 7.9, 0.22, 0.5, 'trim'],             // ridge cap
   ] },
   cottageB: { r: 4.2, parts: [
     ['box', 0, 0, 0, 5.6, 0.6, 5.6, 'stone'],
@@ -13793,10 +13806,16 @@ export class Track {
       emissive: 0xffffff, emissiveMap: buildingGlowTexture(),
       emissiveIntensity: T.hutGlow !== undefined ? T.hutGlow : 0.45,
     });
+    // a shade deeper than the cottage roofs so the barn reads as its own
+    // building rather than a bright plate dropped on the field — and tiled,
+    // because a barn roof is a big plate and it was a flat colour
+    const barnRoofHex = '#' + new THREE.Color(T.hutRoof).multiplyScalar(0.78).getHexString();
+    const barnRoofTex = roofTileTexture(barnRoofHex, T.roofKind ?? 'pantile');
+    barnRoofTex.wrapS = barnRoofTex.wrapT = THREE.RepeatWrapping;
+    barnRoofTex.repeat.set(3.0, 1.8);
+    barnRoofTex.anisotropy = 4;
     const roofMat = new THREE.MeshStandardMaterial({
-      // a shade deeper than the cottage roofs so the barn reads as its own
-      // building rather than a bright plate dropped on the field
-      color: new THREE.Color(T.hutRoof).multiplyScalar(0.78),
+      map: barnRoofTex,
       flatShading: true, roughness: 0.85,
     });
     const siloMat = new THREE.MeshStandardMaterial({
@@ -14298,8 +14317,17 @@ export class Track {
       emissive: 0xffffff,
       emissiveIntensity: this.T.hutGlow ?? 1,
     });
+    // A ROOF IS THE LARGEST SHARE OF A BUILDING THE CHASE CAMERA SEES, and
+    // this was a flat colour. The tile map keeps the theme's own roof colour
+    // and adds the coursing to it; `repeat` is set from the roof's own size so
+    // a wide three-bay block does not get stretched tiles.
+    const roofHex = '#' + new THREE.Color(F.roof ?? this.T.hutRoof ?? 0x33363c).getHexString();
+    const roofTex = roofTileTexture(roofHex, this.T.roofKind ?? 'pantile');
+    roofTex.wrapS = roofTex.wrapT = THREE.RepeatWrapping;
+    roofTex.repeat.set(2.2, 1.6);
+    roofTex.anisotropy = 4;
     const roofMat = new THREE.MeshStandardMaterial({
-      color: F.roof ?? this.T.hutRoof ?? 0x33363c, flatShading: true,
+      map: roofTex, flatShading: true,
       roughness: 0.72, envMapIntensity: 0.4,
     });
     const bodySet = [];
