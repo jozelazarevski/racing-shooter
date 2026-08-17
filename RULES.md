@@ -701,6 +701,14 @@ What it does instead:
   chest height and a SLEEK driver through the roof. 0.42 u ahead of the car's
   centre, i.e. in the cabin. `h`/`back` in `CAM_MODES` are the fallback and what
   `_watchCarVisible` re-seats with.
+- **The player's own car is not drawn.** Measured at 430x932 on PINE VALLEY in
+  a BRAWLER, the bodywork filled the bottom **32%** of the frame — a black bar,
+  a white sponsor decal reading APEX in mirror writing, then the bonnet — and
+  the road vanished behind it at 68% of screen height. The bodies are authored
+  to be seen from outside: the decals are one-sided and face away, and the
+  styles carry roll cages, roof spares, jerry cans, exhaust stacks and a ladder,
+  none of which have an inside. Only the PLAYER's mesh is hidden; every rival
+  stays drawn, and `syncMesh` restores it on the next frame after a view change.
 - **Rigid mount, no positional lerp.** A lerped eye inside a cabin swims, and
   swimming at 55 u/s on a 430 px screen is nausea. Everything that moves is a
   small bounded offset on top: ±0.16 u fore/aft and ±0.10 u vertical of head
