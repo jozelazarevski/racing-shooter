@@ -3707,6 +3707,24 @@ export const HOUSE_TEMPLATES = {
     ['box', 0, 5.9, 2.6, 3.9, 0.5, 0.22, 'trim'],
     ['box', 0, 8.8, 2.6, 3.9, 0.5, 0.22, 'trim'],
     ['box', 0, 0.5, 2.6, 1.5, 2.4, 0.2, 'trim'],             // street door
+    // WHAT READS AT 150 km/h IS DEPTH, NOT TEXTURE. A painted window is flat
+    // under every light in the game; a reveal, a sill and a shutter each catch
+    // their own shadow and give the face relief from the driving seat.
+    ['box', -1.6, 3.3, 2.72, 1.0, 1.3, 0.16, 'wall2'],       // window reveals
+    ['box', 1.6, 3.3, 2.72, 1.0, 1.3, 0.16, 'wall2'],
+    ['box', -1.6, 6.2, 2.72, 1.0, 1.3, 0.16, 'wall2'],
+    ['box', 1.6, 6.2, 2.72, 1.0, 1.3, 0.16, 'wall2'],
+    ['box', -1.6, 9.1, 2.72, 1.0, 1.3, 0.16, 'wall2'],
+    ['box', 1.6, 9.1, 2.72, 1.0, 1.3, 0.16, 'wall2'],
+    ['box', 0, 6.05, 2.95, 4.6, 0.18, 0.7, 'trim'],          // first-floor balcony slab
+    ['cyl', -2.0, 6.23, 3.2, 0.09, 0.85, 0.09, 'trim'],      // its balustrade
+    ['cyl', -0.7, 6.23, 3.2, 0.09, 0.85, 0.09, 'trim'],
+    ['cyl', 0.7, 6.23, 3.2, 0.09, 0.85, 0.09, 'trim'],
+    ['cyl', 2.0, 6.23, 3.2, 0.09, 0.85, 0.09, 'trim'],
+    ['box', 0, 7.05, 3.2, 4.3, 0.1, 0.12, 'trim'],           // handrail
+    ['cyl', 2.55, 0.5, 2.45, 0.11, 11.0, 0.11, 'trim'],      // rainwater downpipe
+    ['cyl', -1.7, 13.0, 0, 0.55, 1.9, 0.55, 'stone'],        // chimney + pot
+    ['cyl', -1.7, 14.7, 0, 0.26, 0.5, 0.26, 'roof'],
   ] },
   // AEGEAN: a whitewashed cube with a parapet instead of eaves, an outside
   // stair, and one painted door.
@@ -3718,6 +3736,21 @@ export const HOUSE_TEMPLATES = {
     ['box', -2.6, 0, 3.7, 2.6, 2.6, 0.55, 'trim'],           // outside stair
     ['box', 0.9, 0, 3.7, 1.5, 2.5, 0.22, 'trim'],            // blue door
     ['box', -2.8, 3.2, 3.7, 1.2, 1.1, 0.2, 'trim'],          // shutter
+    // The Aegean cube is a plain white box by design, so its detail is what
+    // hangs OFF it: deep window reveals, a stair rail, a vine pergola over the
+    // terrace and the roof water tank every one of these actually carries.
+    ['box', -2.4, 2.6, 3.65, 1.1, 1.2, 0.18, 'wall2'],       // window reveals
+    ['box', 2.4, 2.6, 3.65, 1.1, 1.2, 0.18, 'wall2'],
+    ['box', 3.9, 2.6, 0, 0.18, 1.2, 1.1, 'wall2'],
+    ['box', 0, 3.35, 3.75, 1.4, 0.14, 0.5, 'trim'],          // shutter hood
+    ['cyl', -1.3, 2.6, 3.9, 0.08, 2.6, 0.08, 'trim'],        // stair handrail
+    ['cyl', -3.9, 0.6, 3.9, 0.08, 2.2, 0.08, 'trim'],
+    ['box', -2.6, 3.3, 3.9, 2.9, 0.1, 0.1, 'trim'],
+    ['cyl', 2.4, 5.95, 3.1, 0.1, 2.2, 0.1, 'trim'],          // pergola posts
+    ['cyl', -2.4, 5.95, 3.1, 0.1, 2.2, 0.1, 'trim'],
+    ['box', 0, 8.05, 3.1, 5.6, 0.12, 0.12, 'trim'],          // pergola beam
+    ['box', 0, 8.0, 2.2, 5.4, 0.08, 0.08, 'trim'],
+    ['cyl', -2.6, 5.95, -2.4, 1.0, 0.9, 1.0, 'trim'],        // roof water tank
   ] },
   // AEGEAN, the one with the dome: same cube, a drum and a blue cap.
   domed: { r: 4.8, parts: [
@@ -3727,6 +3760,13 @@ export const HOUSE_TEMPLATES = {
     ['cone', 0, 6.8, 0, 3.8, 2.2, 3.8, 'roof'],              // the blue cap
     ['box', 0, 0, 3.6, 1.5, 2.5, 0.22, 'trim'],
     ['box', -2.4, 2.6, 3.6, 1.1, 1.0, 0.2, 'trim'],
+    ['box', -2.3, 2.4, 3.55, 1.0, 1.1, 0.18, 'wall2'],       // window reveals
+    ['box', 2.3, 2.4, 3.55, 1.0, 1.1, 0.18, 'wall2'],
+    ['box', 0, 3.15, 3.7, 1.3, 0.13, 0.45, 'trim'],
+    ['cyl', 0, 9.0, 0, 0.14, 1.1, 0.14, 'trim'],             // cross on the cap
+    ['box', 0, 9.7, 0, 0.7, 0.13, 0.13, 'trim'],
+    ['cyl', 3.4, 0, 3.2, 0.1, 4.8, 0.1, 'trim'],             // downpipe
+    ['box', -3.4, 0.1, 2.0, 1.6, 0.35, 2.2, 'stone'],        // terrace step
   ] },
   // ANDALUSIA: the house is half the object - the other half is the walled
   // patio it sits behind, which is what makes the street read as a street.
@@ -3740,6 +3780,14 @@ export const HOUSE_TEMPLATES = {
     ['box', 4.6, 2.6, 2.9, 4.5, 0.35, 1.0, 'roof'],          // coping tiles
     ['box', 6.4, 2.6, 0, 1.0, 0.35, 6.8, 'roof'],
     ['box', -1.6, 0.6, 3.5, 1.6, 2.6, 0.22, 'trim'],
+    ['box', -3.8, 2.2, 3.6, 1.1, 1.2, 0.18, 'wall2'],        // reveals
+    ['box', 0.4, 2.2, 3.6, 1.1, 1.2, 0.18, 'wall2'],
+    ['box', -1.6, 3.0, 3.72, 4.4, 0.14, 0.45, 'trim'],       // string course
+    ['cyl', -5.3, 0.6, 3.5, 0.1, 5.0, 0.1, 'trim'],          // downpipe
+    ['cyl', 4.6, 0, 1.0, 0.12, 2.5, 0.12, 'trim'],           // patio gate posts
+    ['cyl', 4.6, 0, -1.0, 0.12, 2.5, 0.12, 'trim'],
+    ['cyl', -3.6, 6.0, -1.4, 0.65, 2.1, 0.65, 'stone'],      // chimney
+    ['box', 4.6, 0.9, 2.2, 0.9, 0.9, 0.12, 'trim'],          // wall lantern
   ] },
 
   // ---- FARMSTEAD AND VILLAGE ----
@@ -3750,6 +3798,16 @@ export const HOUSE_TEMPLATES = {
     ['box', 0, 4.9, 4.35, 1.6, 1.4, 0.3, 'trim'],            // hay loft hatch
     ['box', -6.05, 0, 0, 0.4, 6.0, 8.4, 'trim'],
     ['box', 6.05, 0, 0, 0.4, 6.0, 8.4, 'trim'],
+    // A working barn is never a clean box: bracing, a lean-to, a hay hoist
+    // and a vent gable are what say "farm" from the road.
+    ['box', -3.0, 0.2, 4.25, 0.28, 5.6, 0.3, 'trim'],        // door frame posts
+    ['box', 3.0, 0.2, 4.25, 0.28, 5.6, 0.3, 'trim'],
+    ['box', 0, 5.9, 4.25, 6.6, 0.3, 0.3, 'trim'],            // header beam
+    ['box', 0, 6.3, 4.9, 0.9, 0.5, 1.4, 'trim'],             // hay hoist beam
+    ['box', -6.6, 0, -2.4, 3.2, 3.2, 4.0, 'wall2'],          // lean-to
+    ['box', -6.6, 3.2, -2.4, 3.6, 0.3, 4.4, 'roof'],
+    ['box', 0, 7.6, -4.5, 1.6, 1.2, 0.22, 'trim'],           // gable vent
+    ['box', 4.4, 0.15, 4.3, 1.8, 1.9, 0.24, 'trim'],         // side door
   ] },
   // A FARMHOUSE, NOT A BOX WITH A LID. What makes a small rural house read at
   // a glance is not detail, it is MASSING: a stone footing so it sits IN the
@@ -3768,6 +3826,14 @@ export const HOUSE_TEMPLATES = {
     ['cyl', 0.7, 0.75, 4.0, 0.24, 2.4, 0.24, 'trim'],
     ['box', -0.6, 0.8, 3.05, 1.4, 2.6, 0.28, 'trim'],        // door
     ['cyl', -2.6, 5.4, 0, 0.95, 3.4, 0.95, 'stone'],         // chimney on the ridge
+    ['box', -2.3, 2.3, 3.25, 1.0, 1.1, 0.16, 'wall2'],       // window reveals
+    ['box', 1.1, 2.3, 3.25, 1.0, 1.1, 0.16, 'wall2'],
+    ['box', -3.7, 2.3, 0, 0.16, 1.1, 1.0, 'wall2'],
+    ['box', -2.3, 3.0, 3.35, 1.3, 0.13, 0.4, 'trim'],        // window hoods
+    ['box', 1.1, 3.0, 3.35, 1.3, 0.13, 0.4, 'trim'],
+    ['cyl', 3.55, 0.75, 3.2, 0.1, 4.7, 0.1, 'trim'],         // downpipe
+    ['cyl', -2.6, 8.8, 0, 0.4, 0.55, 0.4, 'roof'],           // chimney pot
+    ['box', -0.6, 0.1, 4.3, 2.2, 0.35, 1.2, 'stone'],        // doorstep
   ] },
   chapel: { r: 4.8, parts: [
     ['wall', 0, 0, 0, 5.6, 5.4, 8.0, 'wall'],
@@ -3777,11 +3843,23 @@ export const HOUSE_TEMPLATES = {
     ['box', 0, 13.4, -4.6, 0.22, 1.6, 0.22, 0xf0e6c8],       // cross
     ['box', 0, 14.2, -4.6, 1.0, 0.22, 0.22, 0xf0e6c8],
     ['box', 0, 0.1, 4.1, 1.4, 3.0, 0.3, 'trim'],
+    ['box', -1.5, 2.6, 4.05, 0.9, 1.8, 0.18, 'wall2'],       // nave windows
+    ['box', 1.5, 2.6, 4.05, 0.9, 1.8, 0.18, 'wall2'],
+    ['box', 2.85, 2.6, 0, 0.18, 1.8, 0.9, 'wall2'],
+    ['box', -2.85, 2.6, 0, 0.18, 1.8, 0.9, 'wall2'],
+    ['box', 0, 6.4, -2.85, 1.1, 1.6, 0.2, 'wall2'],          // belfry opening
+    ['box', 0, 3.3, 4.2, 2.0, 0.16, 0.5, 'trim'],            // door hood
+    ['cyl', 0, 8.4, -4.6, 0.4, 0.5, 0.4, 'trim'],            // the bell
   ] },
   shed: { r: 3.4, parts: [
     ['wall', 0, 0, 0, 5.2, 3.2, 4.2, 'wall2'],
     ['box', 0, 3.2, 0.35, 5.8, 0.35, 4.9, 'roof'],           // lean-to roof
     ['box', 0, 0.1, 2.2, 1.3, 2.4, 0.28, 'trim'],
+    ['box', -2.7, 0, 0, 0.22, 3.2, 4.2, 'trim'],             // corner posts
+    ['box', 2.7, 0, 0, 0.22, 3.2, 4.2, 'trim'],
+    ['box', 0, 3.05, 2.4, 5.6, 0.16, 0.5, 'trim'],           // gutter
+    ['box', 1.6, 1.4, 2.15, 1.1, 1.0, 0.16, 'wall2'],        // small window
+    ['box', -2.0, 0.1, 2.3, 1.0, 1.2, 0.5, 'stone'],         // stacked crates
   ] },
   // PUEBLO RUIN: the broken fortress silhouette from the player's canyon
   // reference, standing on the mesa rim. All masonry is kind 'box'/'cyl' -
@@ -3815,6 +3893,13 @@ export const HOUSE_TEMPLATES = {
     ['cyl', -2.2, 3.6, 4.1, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],
     ['cyl', 0, 3.6, 4.1, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],
     ['cyl', 2.2, 3.6, 4.1, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],
+    ['box', -2.7, 2.0, 3.65, 1.0, 1.0, 0.18, 'wall2'],       // deep reveals
+    ['box', 2.7, 2.0, 3.65, 1.0, 1.0, 0.18, 'wall2'],
+    ['box', 0, 3.0, 3.8, 2.2, 0.14, 0.5, 'trim'],            // door hood
+    ['cyl', -4.0, 3.6, 0, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],  // side vigas
+    ['cyl', 4.0, 3.6, 0, 0.35, 1.4, 0.35, 'trim', Math.PI / 2],
+    ['box', 0, 0.1, 4.2, 3.0, 0.4, 1.3, 'stone'],            // mud-brick stoop
+    ['cyl', 3.2, 4.9, -2.4, 0.5, 1.3, 0.5, 'stone'],         // corner chimney
   ] },
 
   // ---- COTTAGES ----
@@ -3830,6 +3915,11 @@ export const HOUSE_TEMPLATES = {
     ['prism', 0, 4.2, 0, 7.7, 2.6, 6.1, 'roof'],
     ['box', 0, 0.6, 2.6, 1.2, 2.2, 0.26, 'trim'],            // door
     ['cyl', 2.2, 4.1, 0, 0.8, 2.6, 0.8, 'stone'],            // chimney
+    ['box', -1.9, 1.6, 2.6, 0.9, 1.0, 0.16, 'wall2'],        // reveals
+    ['box', 1.9, 1.6, 2.6, 0.9, 1.0, 0.16, 'wall2'],
+    ['box', 0, 3.0, 2.85, 2.2, 0.14, 0.45, 'trim'],          // door hood
+    ['cyl', 3.1, 0.5, 2.4, 0.09, 3.5, 0.09, 'trim'],         // downpipe
+    ['cyl', 2.2, 6.6, 0, 0.36, 0.5, 0.36, 'roof'],           // chimney pot
   ] },
   cottageB: { r: 4.2, parts: [
     ['box', 0, 0, 0, 5.6, 0.6, 5.6, 'stone'],
@@ -3838,6 +3928,12 @@ export const HOUSE_TEMPLATES = {
     ['cone', 0, 5.8, 0, 6.4, 3.0, 6.4, 'roof'],              // hipped pyramid roof
     ['box', 0, 0.7, 2.7, 1.1, 2.2, 0.26, 'trim'],
     ['cyl', -1.7, 5.7, 1.2, 0.7, 2.4, 0.7, 'stone'],
+    ['box', -1.5, 2.2, 2.7, 0.9, 1.1, 0.16, 'wall2'],
+    ['box', 1.5, 2.2, 2.7, 0.9, 1.1, 0.16, 'wall2'],
+    ['box', -1.5, 4.0, 2.7, 0.9, 0.9, 0.16, 'wall2'],
+    ['box', 1.5, 4.0, 2.7, 0.9, 0.9, 0.16, 'wall2'],
+    ['cyl', 2.6, 0.6, 2.4, 0.09, 5.0, 0.09, 'trim'],         // downpipe
+    ['cyl', -1.7, 8.0, 1.2, 0.32, 0.5, 0.32, 'roof'],        // pot
   ] },
   cottageC: { r: 5.0, parts: [
     ['box', 0, 0, 0, 8.0, 0.45, 5.0, 'stone'],
@@ -3971,6 +4067,12 @@ export const HOUSE_TEMPLATES = {
     ['box', -2.4, 10.0, 2.4, 0.28, 1.7, 0.28, 'trim'],
     ['box', 2.4, 10.0, 2.4, 0.28, 1.7, 0.28, 'trim'],
     ['cone', 0, 11.7, 0, 6.0, 2.2, 6.0, 'roof'],
+    ['box', 0, 3.0, 1.85, 0.7, 1.2, 0.18, 'wall2'],          // slit windows
+    ['box', 0, 6.4, 1.85, 0.7, 1.2, 0.18, 'wall2'],
+    ['box', 1.85, 4.7, 0, 0.18, 1.2, 0.7, 'wall2'],
+    ['box', 0, 10.6, -2.4, 4.8, 0.12, 0.12, 'trim'],         // platform rails
+    ['box', 0, 10.6, 2.4, 4.8, 0.12, 0.12, 'trim'],
+    ['box', 0, 0.1, 1.95, 1.1, 2.2, 0.24, 'trim'],           // door
   ] },
   stilt: { r: 3.8, parts: [
     ['cyl', -2.4, 0, -1.9, 0.5, 3.0, 0.5, 'trim'],
@@ -3989,6 +4091,10 @@ export const HOUSE_TEMPLATES = {
     ['box', 0, 2.0, 2.1, 4.8, 0.2, 1.6, 'trim'],             // awning
     ['box', 0, 3.7, 0, 3.2, 1.1, 0.24, 'trim'],              // sign board
     ['box', -1.7, 1.9, 1.75, 0.2, 0.2, 1.5, 'trim'],
+    ['cyl', -2.2, 2.0, 2.0, 0.09, 2.0, 0.09, 'trim'],        // awning props
+    ['cyl', 2.2, 2.0, 2.0, 0.09, 2.0, 0.09, 'trim'],
+    ['box', 0, 1.55, 1.75, 3.6, 0.5, 0.14, 'trim'],          // counter shelf
+    ['box', 1.8, 0.1, 1.9, 0.9, 1.0, 0.7, 'stone'],          // stacked crates
   ] },
   signalhut: { r: 3.2, parts: [
     ['wall', 0, 0, 0, 4.6, 3.4, 4.2, 'wall'],
@@ -4003,6 +4109,9 @@ export const HOUSE_TEMPLATES = {
     ['cyl', 0, 2.2, 0, 4.6, 0.3, 4.6, 'trim'],
     ['cyl', 0, 4.4, 0, 4.6, 0.3, 4.6, 'trim'],
     ['cyl', 0, 6.6, 0, 4.6, 0.3, 4.6, 'trim'],
+    ['box', 2.3, 0, 0, 0.5, 8.4, 0.5, 'trim'],               // service ladder
+    ['cyl', 0, 11.4, 0, 0.6, 1.1, 0.6, 'trim'],              // filler cap
+    ['box', 0, 0.1, 2.2, 1.4, 2.0, 0.3, 'trim'],             // hatch
   ] },
   windmill: { r: 2.0, mat: 'stone', parts: [
     ['cyl', 0, 0, 0, 3.0, 8.4, 2.4, 'wall'],
@@ -6266,10 +6375,32 @@ export class Track {
     const DIG_MAX = 4;
     const dug = new Float32Array(N);        // how far the under-leg is sunk
     const yAt = (i) => this.center[i].y + lift[i] - dug[i];
+    // AND THE SEA DOES NOT MOVE OUT OF THE WAY FOR A FLYOVER.
+    //
+    // The coast road is lifted above the waterline while the elevation profile
+    // is built — "the road is the one thing in this world that is never allowed
+    // to be wrong, so it wins" — and then THIS runs, hundreds of lines later,
+    // and digs the lower leg of every crossing to buy clearance. Nothing
+    // re-asked the sea. Measured on COTE D AZUR, whose sea plane sits at y = 0:
+    // the dig took the carriageway to -3.51 and the tunnel sited on that
+    // stretch was flooded for over half its length — you drive into a lit bore
+    // and through three and a half metres of Mediterranean.
+    //
+    // The floor belongs INSIDE `sink`, not as a clamp after the solve. Each
+    // pass re-measures the gap that actually exists and asks only for the
+    // shortfall, so a dig the sea refuses simply leaves the shortfall standing
+    // and the NEXT pass buys it with `bump` instead — the solver's own split
+    // between digging below and lifting above, doing what it already knows how
+    // to do. Clamping afterwards cannot do that: measured, it held the road up
+    // but cost COTE D AZUR 11.5 u of clearance -> 7.5 and CLIFF KNOT 11.5 ->
+    // 7.5, because nothing was left to compensate.
+    const seaFloor = this.T.coast ? (this.T.coast.level ?? -2) + 1.6 : -Infinity;
     const sink = (at, depth) => {
       for (let sN = -HALF; sN <= HALF; sN++) {
         const j = (at + sN + N) % N;
-        const v = depth * (0.5 + 0.5 * Math.cos((sN / HALF) * Math.PI));
+        let v = depth * (0.5 + 0.5 * Math.cos((sN / HALF) * Math.PI));
+        // never below the waterline, counting the lift this station already has
+        v = Math.min(v, Math.max(0, this.center[j].y + lift[j] - seaFloor));
         if (v > dug[j]) dug[j] = v;
       }
     };
