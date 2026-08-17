@@ -8032,7 +8032,14 @@ class Game {
     // machinery on it would lift the eye over the hill ahead, slide it off a
     // trunk it is nowhere near, and lerp it out of the cabin on every corner.
     if (M.driver) { this._driverCamera(dt, M); this._applyCamera(dt, speedZoom, M); return; }
-    this._dWasDriver = false;   // so a return to the seat re-seeds from the car
+    // Leaving the seat: re-seed the smoothed state next time, and hand the
+    // bodywork back. `syncMesh` would do it on the next frame anyway, but only
+    // for a car that is alive — a player who switches view while wrecked would
+    // otherwise watch the husk's own mesh stay hidden until they respawn.
+    if (this._dWasDriver) {
+      this._dWasDriver = false;
+      if (p.mesh) p.mesh.visible = p.alive;
+    }
     // Chase views used to sit rigidly behind the car's RAW heading, so every
     // steering flick and every drift whipped the whole view sideways — that
     // is what made driving in 3D so hard. The chase yaw now follows a blend
@@ -8349,6 +8356,28 @@ class Game {
       this._dYaw = undefined; this._dSpd = undefined;
       this._dSurge = 0; this._dLean = 0;
     }
+    // THE PLAYER'S OWN CAR COMES OFF THE SCREEN, AND THAT IS A MEASUREMENT.
+    //
+    // The first cut left it drawn, on the theory that a bonnet in the lower
+    // frame is what makes a cockpit view read as a cockpit. Shot at 430x932
+    // (PINE VALLEY, BRAWLER): the bodywork filled the bottom 32% of the frame —
+    // a black bar, then a WHITE sponsor decal reading APEX in mirror writing,
+    // then the orange bonnet — and the road vanished behind it at 68% of screen
+    // height. On a portrait phone the HUD already owns the top ~240 px and the
+    // bottom ~200 px; spending another third of what is left on the roof of
+    // your own car leaves a letterbox, and R12 says the road is the thing that
+    // has to stay readable a long way out.
+    //
+    // It is not a tuning problem either. These bodies are authored to be seen
+    // from OUTSIDE: the decals are one-sided and face away, and the styles
+    // carry roll cages, roof spares, jerry cans, exhaust stacks and a ladder,
+    // none of which have an inside. Eight body styles would each need their own
+    // eye to look right, and the tall ones could not be made to work at all.
+    //
+    // So the whole group goes. Only the PLAYER's — every rival stays drawn, and
+    // `syncMesh` puts this back to `alive` on the next frame the moment the
+    // view changes, with the explicit restore below as the belt to that brace.
+    if (p.mesh) p.mesh.visible = false;
 
     // ---- where the head is pointed -----------------------------------------
     // The car's own heading leads, because that is what a driver's head does.
