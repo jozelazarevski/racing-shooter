@@ -247,6 +247,45 @@ is clean, but the width found constants standing in for it:
 Anything else that widens must be measured the same way — `tools-scratch/
 wide.mjs` asks the game's own collider lists what the road has swallowed.
 
+## THE OFF-COURSE RULE AND THE OFF-ROAD RACES — A COUPLING, NOT A DETAIL
+The owner has asked for "races that are purely off the roads … in the wild
+terrain not on the road itself". The rule that fixed the goat climb is the
+DIRECT OBSTACLE to that feature, and whoever builds it must know before they
+start rather than discover it when the mode feels dead:
+
+`climbAuth` (src/vehicles.js) fades the throttle's authority to nothing past
+the 70 u off-course band. FREE ROAM IS ALREADY EXEMPT — `_strayed` is forced
+to 0 for `game.freeRoam` and for every AI car, which is why law 2's control
+still climbs +38.9 u in 2.5 s while the racing rig is held to 28.6 u in 30 s.
+An off-road race mode must take THE SAME EXEMPTION. It is one condition in one
+place, but a mode built without it will read as "the car cannot drive on the
+terrain" and the natural next move — loosening OFF_CLIMB/OFF_FADE — puts the
+goat back on every road world at once.
+
+Corollary: do NOT tighten OFF_CLIMB/OFF_FADE to chase the last unit of the
+goat gate. See the residuals below; the cost lands on the unbuilt mode.
+
+## GOAT GATE — THE THREE RESIDUALS, MEASURED
+`test-goat.mjs` stands at 23 passed, 3 failed. None is a regression; all three
+are recorded here so the next session does not re-derive them.
+- **GRANITE NARROWS 30.3 u against a ceiling of 30** — 1% over, from 74.5 u
+  before the fix, and the PACE has gone 19.3 -> 1.5 u/s against a ceiling of 4.
+  The gate's own header calls pace "where the defect shows plainest". The two
+  laws disagree by 4x on the same run (30 u over 30 s is 1.0 u/s, the pace law
+  allows 4), so the height ceiling is the cruder instrument. Left RED rather
+  than relaxed: moving a threshold to make a gate green is how this repo got
+  its worst habits, and the physics fix is barred by the coupling above.
+- **CANYON RUN: 0 climbable start points** — the gate correctly refuses a law
+  that measured nothing (tests/README rule 4). The rig excludes everything
+  within 90 u of the road and looks in two families (radial r=380..900, lateral
+  +-90/140/220). The "was 40.3 u" figure in its header came from the earlier
+  scratchpad probe, NOT from this rig, so this is very likely a candidate set
+  that never matched this world rather than a change in the world.
+- **GLACIER COL: ONE grounded frame stepped 0.3 u** against a 0.27 threshold,
+  from 1.4 u worst. At lateral -10.4 — the ROAD EDGE, not the open terrain the
+  shelf clamp addressed. A different discontinuity; the other three worlds
+  measure exactly 0.
+
 ## OPEN, LOWER PRIORITY
 - **`MIN` in `tunnelFitAt` is probably the same units error `reach` was.** The
   real minimum bore measures ~52 u against a documented ~26 u. Nothing depends
