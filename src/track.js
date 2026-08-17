@@ -249,6 +249,61 @@ export const LEVELS = [
       coast: { a: [128, -260], b: [140, 300], level: -3.0, floor: -13, beach: 18 },
       whaleCount: 5,
     } },
+
+  // ---- THE OLIVE COAST FAMILY. Asked for directly: "Olive coast is by far
+  // the most I enjoy, replicate similar tracks with differences."
+  //
+  // OLIVE COAST is the `medterrace` theme with NO tune at all — the pure
+  // article: fast sunlit tarmac, olive terraces, one stone bridge, a coast.
+  // So these three keep that theme exactly, which is what makes them feel like
+  // it, and each changes ONE thing about how it drives. A retint would be a
+  // different-looking track that drove the same; the difference has to be in
+  // the road or it is not a different track.
+  //
+  // Career order is this array and `starCost` prices by INDEX, so they are
+  // APPENDED, never inserted, with ascending ids.
+  { id: 62, name: 'CAPE OLIVETO', theme: 'medterrace', region: 'MEDITERRANEAN',
+    cost: 34, fresh: true,
+    // THE HEADLAND ONE. Same coast road, but the capes get bored through
+    // instead of driven around: two tunnels, and a longer sea leg to reach
+    // them. Elevation stays low — this is the fast one, and a tunnel at speed
+    // is the whole point of it.
+    tune: {
+      tunnels: { count: 2 },
+      stoneBridges: { count: 1 },
+      elev: { amp: 14, ph: [0.6, 2.1, 1.4] },
+      coast: { a: [-220, -320], b: [380, -170], level: -2.1, floor: -8, beach: 60 },
+    } },
+  { id: 63, name: 'TERRAZZA ALTA', theme: 'medterrace', region: 'MEDITERRANEAN',
+    cost: 35, fresh: true,
+    // THE CLIMBING ONE. OLIVE COAST's terraces seen from above: triple the
+    // elevation amplitude, three stone bridges where the road crosses the
+    // gullies between terraces, and no jumps — a tarmac hill climb does not
+    // need ramps, it needs corners that arrive uphill.
+    tune: {
+      elev: { amp: 21, ph: [1.3, 0.4, 2.6] },
+      stoneBridges: { count: 3 },
+      tunnels: { count: 1 },
+      rampCount: 0,
+      coast: undefined,          // inland: the terraces run to the skyline
+    } },
+  { id: 64, name: 'SALINE SPRINT', theme: 'medterrace', region: 'MEDITERRANEAN',
+    cost: 36, fresh: true,
+    // THE FLAT ONE. The salt flats behind the olive coast: almost no
+    // elevation, no bridges, no bores — the fastest thing in the family,
+    // where the corners arrive with no hill to help you slow down.
+    //
+    // It asked for ramps first and did not get them: `rampCount: 6` built
+    // ZERO, because placement on this theme starves on its own
+    // straightness and flatness rules long before the count matters. The
+    // request is gone rather than sitting in the config looking honoured —
+    // measured, this world's identity is its FLATNESS, so that is what the
+    // tune says.
+    tune: {
+      elev: { amp: 3, ph: [2.4, 1.1, 0.5] },
+      stoneBridges: undefined,
+      coast: { a: [-200, -338.6], b: [400, -183.8], level: -2.1, floor: -7, beach: 90 },
+    } },
 ];
 
 /* ==========================================================================
