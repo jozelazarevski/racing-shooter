@@ -14646,9 +14646,34 @@ export class Track {
           }
         }
         // --- destination: barn + silo + trough, squared up at the far end ---
+        //
+        // A FARMSTEAD IS A BUILDING, AND A BUILDING NEVER STANDS ON A ROAD.
+        //
+        // This is the "remove the house, remove all obstruction from the
+        // roads" report. `len + 15` is measured along the SPUR — an offset
+        // from one junction, which says nothing about where the rest of the
+        // lap runs. On GLACIER COL the spur pointed straight back at the
+        // carriageway and a 8 x 5 u barn was drawn across it, with its 4.96 u
+        // 'hut' collider biting 5.33 u into a 9 u half-width at sample 42:
+        // a solid wall in the racing line, invisible until it stops you.
+        // Roster-wide sweep, all 68 worlds: this was the ONLY building
+        // standing in a carriageway anywhere.
+        //
+        // `_buildHuts` has asked `_clearsRoad` since the last time this exact
+        // report came in ("Measured, FURKA RIDGE and ESTONIA CRESTS each had
+        // FOUR huts whose footprint overlapped the road"). This builder never
+        // did. Same rule, same generous margin, and the farmstead is withheld
+        // as ONE unit — barn, silo and trough together, because a silo and a
+        // water trough standing beside nothing reads as a bug of its own. The
+        // junction dressing above (cattle grid, gate, fence) belongs to the
+        // spur, is on the spur, and stays.
         const ex = p0.x + ux * (len + 15), ez = p0.z + uz * (len + 15);
         const ey = gy(ex, ez);
         const bw = 8.0, bh = 5.0;
+        // bw * 0.62 is the barn's own collider radius; the silo stands
+        // 7.5 u across from it, so the pair is checked as one footprint.
+        if (!this._clearsRoad(ex, ez, bw * 0.62, 3.5)
+            || !this._clearsRoad(ex + px * 7.5, ez + pz * 7.5, 2.2, 3.5)) return;
         // instance slots have to be grabbed BEFORE the push — `push` bumps
         // im.count itself, so afterwards the index is already gone
         const bi = M.barn.count, bri = M.barnRoof.count;
@@ -16596,7 +16621,20 @@ export class Track {
    *  breaks the Law of Solidity just as badly.
    */
   _stoneFit(x, z, want) {
-    const room = this._distToTrack(x, z) - (ROAD_HALF + 2.4);
+    // ROAD_HALF IS A CONSTANT AND THE ROAD IS NOT. `tune.roadWidth` scales the
+    // one width profile `widthAt` serves, so on MOUNTAIN TO SEA (5x, a 45 u
+    // half-width) this measured every boulder against a 9 u road and let 185
+    // of them stand up to 45.4 u inside the carriageway. Take whichever is
+    // WIDER — the constant or the road's own width at the nearest leg — so a
+    // default-width world is bit-for-bit unchanged (a pinch may be narrower
+    // than 9 and must not be allowed to pull stone in) and a widened one is
+    // measured against the road it actually has.
+    let half = ROAD_HALF;
+    if (this.widthAt) {
+      _clearV.set(x, 0, z);
+      half = Math.max(half, this.widthAt(this.nearestIndex(_clearV)));
+    }
+    const room = this._distToTrack(x, z) - (half + 2.4);
     return room <= 0.4 ? 0 : Math.min(want, room);
   }
 
@@ -16637,13 +16675,40 @@ export class Track {
     return false;
   }
 
+  /** A SPOT ON THE VERGE — measured from the ROAD EDGE, not from a constant.
+   *
+   *  `minD`/`maxD` are the belt every scatter builder in the game asks for,
+   *  and every one of those numbers was authored against the single 9 u
+   *  half-width the whole roster used to have. `tune.roadWidth` broke that
+   *  assumption: MOUNTAIN TO SEA runs at 5x — a 45 u half-width, a 90 u
+   *  carriageway — and then "11.2 to 32 u from the centreline" names a belt
+   *  that is entirely INSIDE the road. Measured there before this fix: 776
+   *  grass tufts, 167 boulders, 122 bushes and 8 hay bales drawn on the
+   *  tarmac, 1159 bodies in the carriageway against 0-10 on every other world.
+   *
+   *  Two changes, and both are no-ops on a default-width world by
+   *  construction, because the seeded RNG stream runs through every accept and
+   *  reject in this function:
+   *    - the belt is pushed OUT by however much wider this world's road is
+   *      than the 9 u it was written for (`grow`, clamped at 0, so a pinch
+   *      never pulls scenery in);
+   *    - the rejection asks the road's OWN width at the nearest leg anywhere
+   *      on the lap, `widthAt + 1`. At the default width that is 10.0 against
+   *      the existing `minD - 1` of 10.2 for the tightest belt in the game,
+   *      so it cannot reject anything the old test accepted. */
   _trackSidePos(minD, maxD) {
     const i = (Math.random() * N) | 0;
     const side = Math.random() < 0.5 ? 1 : -1;
-    const dist = minD + Math.random() * (maxD - minD);
+    const grow = Math.max(0, (this.widthAt ? this.widthAt(i) : ROAD_HALF) - ROAD_HALF);
+    const dist = minD + grow + Math.random() * (maxD - minD);
     const x = this.center[i].x + this.nrm[i].x * side * dist;
     const z = this.center[i].z + this.nrm[i].z * side * dist;
-    if (this._distToTrack(x, z) < minD - 1) return null;
+    const d = this._distToTrack(x, z);
+    if (d < minD - 1) return null;
+    if (this.widthAt) {
+      _clearV.set(x, 0, z);
+      if (d < this.widthAt(this.nearestIndex(_clearV)) + 1) return null;
+    }
     if (this._underwater(x, z)) return null;
     return { x, z };
   }
@@ -16655,10 +16720,17 @@ export class Track {
     const span = (f1 - f0 + 1) % 1 || 1;
     const i = (((f0 + Math.random() * span) % 1) * N) | 0;
     const side = Math.random() < 0.5 ? 1 : -1;
-    const dist = minD + Math.random() * (maxD - minD);
+    // the same width correction `_trackSidePos` carries, for the same reason
+    const grow = Math.max(0, (this.widthAt ? this.widthAt(i) : ROAD_HALF) - ROAD_HALF);
+    const dist = minD + grow + Math.random() * (maxD - minD);
     const x = this.center[i].x + this.nrm[i].x * side * dist;
     const z = this.center[i].z + this.nrm[i].z * side * dist;
-    if (this._distToTrack(x, z) < minD - 1) return null;
+    const d = this._distToTrack(x, z);
+    if (d < minD - 1) return null;
+    if (this.widthAt) {
+      _clearV.set(x, 0, z);
+      if (d < this.widthAt(this.nearestIndex(_clearV)) + 1) return null;
+    }
     return { x, z };
   }
 
@@ -18789,7 +18861,7 @@ export class Track {
       return p && !this._inWater(p.x, p.z) ? p : null;
     }, (p) => {
       q.setFromAxisAngle(up, Math.random() * Math.PI);
-      m4.compose(new THREE.Vector3(p.x, this.terrainHeight(p.x, p.z) + 0.8, p.z), q, new THREE.Vector3(1, 1, 1));
+      m4.compose(new THREE.Vector3(p.x, this._seatY(p.x, p.z) + 0.8, p.z), q, new THREE.Vector3(1, 1, 1));
       hay.setMatrixAt(hk++, m4);
       this._addShadow(p.x, p.z, 1.6);
     });

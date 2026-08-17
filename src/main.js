@@ -6506,22 +6506,36 @@ class Game {
    *  inside cannon range of it, so they threaten the fast line without ever
    *  blocking it, and spaced around the lap so you meet them one at a time. */
   _buildGunNests() {
+    // FREE ROAM HAS NO ENEMIES. Asked for directly: "remove the enemies from
+    // free roam." Roam is exploration and destruction-scoring now — the stars,
+    // the props, the world — and nothing in it shoots back.
+    //
+    // This function survives as the AUTOMATIC path and now builds nothing at
+    // all, because the automatic path only ever fired for plain roam: a race
+    // was excluded by `!this.freeRoam` and every mission by `!this.missionMode`
+    // (SURVIVOR calls `_digGunNests` directly, below). Deleting it outright
+    // would mean deleting three call sites that also mean "reset the mode
+    // furniture" — the level swap, the mode swap and the boot — and one of them
+    // is the cleanup that stops roam turrets haunting a rally stage. It keeps
+    // the list allocated and does nothing else, so those three sites stay
+    // honest without a fourth reader having to know why.
+    //
+    // The reason the old rule existed is unchanged and worth keeping: combat
+    // furniture belongs in the combat modes. Being shot at by scenery you
+    // cannot answer is not difficulty, it is noise. Roam has simply joined the
+    // rally stage on the other side of that line.
     this.hostiles = this.hostiles || [];
-    const t = this.track;
-    // Combat furniture belongs in the combat modes. A rally is a rally: there
-    // is nothing to shoot at you on a stage, and being shot at by scenery you
-    // cannot answer is not difficulty, it is noise.
-    if (!t || !this.freeRoam) return;
-    // Same argument one level down. Four of the five missions are driving
-    // tests against a clock — a HOT LAP or a RAMPAGE run does not want roadside
-    // machine guns any more than a rally stage does. Only SURVIVOR, which is
-    // explicitly an assault, gets them; they are built when it launches.
-    if (this.missionMode) return;
-    this._digGunNests(5);
   }
 
-  /** Place n nests around the circuit, off the racing line. Bypasses the mode
-   *  gate above — SURVIVOR calls it directly when the assault mission starts. */
+  /** Place n nests around the circuit, off the racing line.
+   *
+   *  THE ONLY THING THAT DIGS A NEST NOW. It was always the unconditional half
+   *  of the pair — `_buildGunNests` carried the mode gate and this carried the
+   *  placement — and SURVIVOR has always called it directly, because SURVIVOR
+   *  is the one mission that is explicitly an assault rather than a driving
+   *  test against a clock. With roam disarmed that direct call is the whole
+   *  story: no gate above it fires any more, so anything that wants guns by the
+   *  road has to ask for them here, by name. */
   _digGunNests(count) {
     const t = this.track;
     if (!t) return;
@@ -6536,7 +6550,13 @@ class Game {
   }
 
   /** Send a raider after the player. Spawns behind and to one side so it
-   *  arrives in the mirrors rather than materialising in front of you. */
+   *  arrives in the mirrors rather than materialising in front of you.
+   *
+   *  NOTHING CALLS THIS ANY MORE. The roam timer that did was removed when free
+   *  roam was disarmed, and it is kept for the same reason `_digGunNests` is:
+   *  it is the placement, not the policy, and a mission that wants a car-shaped
+   *  hostile should be able to ask for one by name rather than re-derive where
+   *  a fair spawn is. Delete it only together with the `Raider` class. */
   _spawnRaider() {
     const p = this.player, f = p.forward;
     const s = Math.random() < 0.5 ? -1 : 1;
@@ -6549,33 +6569,31 @@ class Game {
   }
 
   _updateHostiles(dt) {
-    // ...and raiders likewise: they hunt in free roam, not down a rally stage
-    if (this.state === 'race' && this.freeRoam && !this.missionMode) {
-      this._raiderTimer = (this._raiderTimer ?? 25) - dt;
-      const live = this.hostiles.filter((h) => h.alive && h instanceof Raider).length;
-      if (this._raiderTimer <= 0 && live < 2) {
-        this._raiderTimer = 45;
-        this._spawnRaider();
-      }
-    }
+    // NO RAIDER SPAWNER. It ran on `freeRoam && !missionMode` — plain roam and
+    // nowhere else — and plain roam is exploration now. Nothing replaces it:
+    // missions that want a hostile spawn it themselves.
+    //
+    // The step below stays, and must: SURVIVOR's nests are hostiles and they
+    // still have to shoot, take damage and be cleared from the list when they
+    // die. An empty list simply costs two no-op loops.
     for (const h of this.hostiles) if (h.alive) h.update(dt);
     this.hostiles = this.hostiles.filter((h) => h.alive);
   }
 
   _updateChoppers(dt) {
-    if (this.state === 'race') {
-      if (this.freeRoam && !this.missionMode) { // [MISSIONS] missions run their own spawner
-        this.chopperTimer -= dt;
-        if (this.chopperTimer <= 0 && this.choppers.filter((c) => c.alive).length < 3) {
-          this._spawnChopper();
-          this.chopperTimer = 40;
-        }
-      }
-      // No air support in a plain race. A rally is a rally — the same rule the
-      // gun nests follow. "Final-lap air support keeps the leaders honest" read
-      // as being jumped by a helicopter you never asked to fight, on the lap
-      // that actually decides the race.
-    }
+    // NO GUNSHIP SPAWNER EITHER, on the same reasoning: the 40-second timer
+    // here was gated on `freeRoam && !missionMode`, which is plain roam, and
+    // plain roam no longer fights anything.
+    //
+    // No air support in a plain race, unchanged — a rally is a rally, and
+    // "final-lap air support keeps the leaders honest" read as being jumped by
+    // a helicopter you never asked to fight on the lap that decides the race.
+    //
+    // SURVIVOR is untouched. It runs its own escalating spawner out of
+    // `_updateMission` (waves, the redeploy on a break of contact, the cap that
+    // climbs with the tier) and calls `_spawnChopper(true)` directly, so it
+    // never depended on this timer. The step and the sweep below are what keep
+    // those gunships flying.
     for (const c of this.choppers) if (c.alive) c.update(dt);
     this.choppers = this.choppers.filter((c) => c.alive);
   }
@@ -7627,12 +7645,14 @@ class Game {
     if (this.missionMode) { // [MISSIONS] structured arena challenge, no grid
       this._missionLaunch();
     } else if (this.freeRoam) {
-      // no grid, no countdown — the world is yours (and the choppers')
+      // no grid, no countdown, and since the roam spawners were removed, no
+      // gunships and no raiders either — the world is yours, full stop
       this.state = 'race';
       this.startScore = this.score;
       this.track.setLights('green');
       this.hud.centerMsg('EXPLORE!');
-      this.hud.feed('SMASH EVERYTHING · WATCH THE SKIES', 'info');
+      // ...so the opening line no longer promises a fight that will not arrive
+      this.hud.feed('SMASH EVERYTHING · FIND THE STARS', 'info');
       for (const e of this.enemies) { e.alive = false; e.mesh.visible = false; }
       this.chopperTimer = 15;
     }

@@ -104,16 +104,29 @@ const measure = async (lv) => page.evaluate(async ({ lv, MODE }) => {
     push('trees', 'tree', (o) => o.r ?? 0.6);
     push('solids', 'solid', (o) => o.r ?? Math.max(o.halfX ?? 0, o.halfZ ?? 0));
     push('props', 'prop', (o) => o.r ?? 0.6);
-    // barriers are SEGMENTS, not dots — measure both ends and the middle
+    // Barriers are SEGMENTS, not dots — measure both ends and the middle.
+    // AND A WALL UNDER A CARRIAGEWAY IS NOT IN IT: a retaining wall holding up
+    // the shelf that the NEXT leg of the lap runs along is doing its job. That
+    // is `_pierInRoad`'s whole point, and without the height test CLIFF KNOT
+    // reports 87 barriers "in the road" that are all beneath one.
+    let barSkipLow = 0, barSkipHigh = 0;
     for (const q of (t.barriers ?? [])) {
       if (!Number.isFinite(q?.x1)) continue;
       let worst = -Infinity, at = -1;
       for (const f of [0, 0.25, 0.5, 0.75, 1]) {
-        const { bite, i } = biteAt(q.x1 + (q.x2 - q.x1) * f, q.z1 + (q.z2 - q.z1) * f, 0);
+        const { bite, i } = biteAt(q.x1 + (q.x2 - q.x1) * f, q.z1 + (q.z2 - q.z1) * f, q.hw ?? 0);
         if (bite > worst) { worst = bite; at = i; }
       }
-      if (worst > 0.3) col.push({ kind: `barrier:${q.kind ?? '?'}`, bite: +worst.toFixed(2), i: at, n: 1 });
+      if (worst <= 0.3) continue;
+      const roadY = t.center[at].y;
+      const base = Number.isFinite(q.y) ? q.y : null, h = Number.isFinite(q.h) ? q.h : null;
+      if (base !== null && h !== null) {
+        if (base + h < roadY + 0.35) { barSkipLow++; continue; }     // buried under it
+        if (base > roadY + 2.4) { barSkipHigh++; continue; }         // clears the roof
+      }
+      col.push({ kind: `barrier:${q.kind ?? '?'}`, bite: +worst.toFixed(2), i: at, n: 1 });
     }
+    out.barSkip = { under: barSkipLow, over: barSkipHigh };
     const byKind = new Map();
     for (const c of col) {
       const k = byKind.get(c.kind) ?? { kind: c.kind, n: 0, worst: 0, i: 0 };
