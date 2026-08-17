@@ -7170,13 +7170,50 @@ export class Track {
    *  height fields, so physics and the visible mesh agree. */
   _tunnelRidge(x, z, h) {
     for (const T of this._tunnels) {
-      let bd = 1e9, by = 0, bi = 0;
-      for (let k = 0; k < T.pts.length; k++) {
-        const p = T.pts[k];
-        const d = (x - p[0]) * (x - p[0]) + (z - p[1]) * (z - p[1]);
-        if (d < bd) { bd = d; by = p[2]; bi = k; }
+      // ---- THE HILL MUST BE A SURFACE, NOT A STAIRCASE ---------------------
+      //
+      // This used to take the nearest VERTEX of the tunnel line and taper the
+      // ridge on that vertex's INDEX (`min(bi, len - 1 - bi) / 3`). An index
+      // is a STEP FUNCTION: two points either side of a Voronoi boundary
+      // differ by a THIRD OF THE RIDGE HEIGHT, so the height field carried a
+      // vertical cliff every ~6 u near each portal. At r210's 62 u ridge that
+      // step is 20.7 u, and the terrain mesh samples every 10 u — it cannot
+      // draw a cliff, so it interpolates straight across it. Everything seated
+      // on the analytic ground was then left hanging over the drawn hillside.
+      //
+      // Measured on SUMMIT CLIMB, the reported world, at the worst floater:
+      //   terrainHeight(-18,-30)  49.18      drawn mesh there  ~21.8  (27.0 u)
+      //   the four surrounding mesh vertices: 10.52, 18.57, 66.75, 69.13
+      // i.e. one 10 u cell spanning 56 u of terrain. Reported as "levitating
+      // grass and stone".
+      //
+      // So project onto the LINE, not onto its vertices: `bd` is the true
+      // perpendicular distance and `u` the CONTINUOUS arc position along the
+      // bore, which is what the portal taper has to be a function of.
+      if (!T.cum) {
+        T.cum = [0];
+        for (let k = 0; k + 1 < T.pts.length; k++) {
+          T.cum.push(T.cum[k] + Math.hypot(T.pts[k + 1][0] - T.pts[k][0], T.pts[k + 1][1] - T.pts[k][1]));
+        }
+        T.len = T.cum[T.cum.length - 1];
       }
-      bd = Math.sqrt(bd);
+      let bd2 = Infinity, by = 0, u = 0;
+      if (T.pts.length < 2) {
+        const p = T.pts[0];
+        bd2 = (x - p[0]) * (x - p[0]) + (z - p[1]) * (z - p[1]); by = p[2]; u = 0;
+      } else {
+        for (let k = 0; k + 1 < T.pts.length; k++) {
+          const a = T.pts[k], b = T.pts[k + 1];
+          const dx = b[0] - a[0], dz = b[1] - a[1];
+          const seg2 = dx * dx + dz * dz;
+          let s = seg2 > 0 ? ((x - a[0]) * dx + (z - a[1]) * dz) / seg2 : 0;
+          s = s < 0 ? 0 : s > 1 ? 1 : s;
+          const px = a[0] + dx * s, pz = a[1] + dz * s;
+          const d2 = (x - px) * (x - px) + (z - pz) * (z - pz);
+          if (d2 < bd2) { bd2 = d2; by = a[2] + (b[2] - a[2]) * s; u = T.cum[k] + Math.sqrt(seg2) * s; }
+        }
+      }
+      let bd = Math.sqrt(bd2);
       // THE HILL HAS TO BE A MOUNTAIN, OR THE BORE IS A CULVERT.
       //
       // Reported with a photograph: "none of the tunnels are within the
@@ -7206,14 +7243,46 @@ export class Track {
       // is held at or below the roadway, and the flank ramps up over the next
       // dozen units, which is what makes the hillside close in beside the road
       // instead of standing as a wall on the verge.
-      const CORR = TUNNEL_HW + 2.0, FLANK = TUNNEL_HW + 14.0;
+      // ---- AND IT MUST BE A HILL THE MESH CAN DRAW -------------------------
+      //
+      // The near terrain patch samples every 10 u (`_buildTerrain`: SIZE 2000,
+      // SEG 200 — and that 10 u is load-bearing, it is what stops a triangle
+      // spanning the road ribbon). Linear interpolation across a cell of size
+      // c misses a smoothstep of height H over length L by at most
+      //     0.75 * H * c^2 / L^2
+      // so a ramp shorter than `c * sqrt(0.75 H / E)` cannot be drawn to
+      // within E. At H = 62 and E = 2 u that is 48 u. The old ramps were 12 u
+      // laterally and ~18 u along the bore: 32 u and 14 u of unrepresentable
+      // terrain respectively, which is what the scenery was left standing on.
+      // Widening them costs the hillside nothing it can actually show — the
+      // ridge is still 62 u tall and still closes in over the portal, it just
+      // no longer rises faster than the ground can be drawn.
+      const RAMP = Math.max(24, 10 * Math.sqrt(0.75 * (T.h ?? 13) / 2));
+      const CORR = TUNNEL_HW + 2.0, FLANK = CORR + RAMP;
       if (bd < CORR) { h = Math.min(h, by - 1.2); continue; }
-      const open = Math.min(1, (bd - CORR) / (FLANK - CORR));
+      const open = smoothstep01((bd - CORR) / (FLANK - CORR));
       const across = Math.pow(Math.cos((bd / REACH) * Math.PI * 0.5), 1.3);
-      const ease = Math.min(1, Math.min(bi, T.pts.length - 1 - bi) / 3);
+      // the portal taper, now a distance along the bore instead of a vertex
+      // index — same job, no staircase
+      const ease = smoothstep01(Math.min(u, T.len - u) / RAMP);
       const w = across * ease * open;
-      if (w < 0.06) continue;
-      h = Math.max(h, by + T.h * w);
+      // ---- AND IT MUST START FROM THE GROUND IT STANDS ON ------------------
+      //
+      // This was `h = max(h, by + T.h * w)`. `w` scaled the ridge HEIGHT but
+      // not its FLOOR, so the moment w rose off zero the ground jumped to the
+      // TUNNEL ROAD's elevation `by` — and a bore is usually well above the
+      // country around it. Measured on SUMMIT CLIMB at (25,-115), 68 u from
+      // the road and 148 u from a bore whose road sits at y = 32: w crossed
+      // the old 0.06 cutoff and the ground went from -1.66 to 36.54 between
+      // two mesh vertices 10 u apart. A 38 u cliff, drawn as a smooth slope,
+      // with grass and boulders standing on the analytic side of it.
+      //
+      // Lerping from whatever the ground already was to the ridge crest makes
+      // the whole flank continuous: at w = 0 it is exactly the untouched
+      // ground, at w = 1 exactly `by + T.h`. `max` still guards the case where
+      // the land is already higher than the ridge would make it.
+      if (w <= 0) continue;
+      h = Math.max(h, h + (by + T.h - h) * w);
     }
     return h;
   }
