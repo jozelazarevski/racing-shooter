@@ -824,7 +824,17 @@ const DEMANDS = {
   22: { loose: 0.12, twist: 0.73, fast: 0.35, climb: 0.66 }, // COL DE TURINI
   23: { loose: 0.55, twist: 0.00, fast: 0.95, climb: 0.90 }, // OUNINPOHJA
   24: { loose: 0.12, twist: 0.52, fast: 0.34, climb: 0.80 }, // FAFE LEAP
-  25: { loose: 0.12, twist: 0.77, fast: 0.32, climb: 1.00 }, // PIKES PEAK
+  // PIKES PEAK's `twist` is RE-MEASURED, because its road changed. It used to
+  // be COL DE TURINI's switchback stack with two numbers moved, and the two
+  // cards read the same TWISTY · STEEP because the two roads were the same —
+  // 52% of Turini's lap sat inside Pikes' carriageway. r210b re-authored it
+  // into two bursts of corners at different scales; measured on the new
+  // geometry with the same expression this table's other rows use, twist is
+  // 0.55, which is under WORLD_TRAITS' 0.6 line, so the card now reads
+  // FAST · STEEP and stops impersonating its neighbour. Only `twist` is taken
+  // from that measurement — `fast` for this block is assigned by the different
+  // method the comment above describes, so it is left alone.
+  25: { loose: 0.12, twist: 0.55, fast: 0.32, climb: 1.00 }, // PIKES PEAK
   26: { loose: 0.12, twist: 0.00, fast: 0.88, climb: 0.35 }, // SAFARI PLAINS
   27: { loose: 0.12, twist: 0.88, fast: 0.06, climb: 0.48 }, // CORNICHE
   28: { loose: 0.55, twist: 0.09, fast: 0.78, climb: 0.69 }, // ESTONIA CRESTS

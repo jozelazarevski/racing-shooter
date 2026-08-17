@@ -137,8 +137,11 @@ only that way: the gantry that moved DEEPER into the road (4.52 -> 7.59 u), and
 ## TRAPS
 - `git reset --hard origin/main` to realign the branch DISCARDS uncommitted
   work. It has eaten edits twice. Commit first, always.
-- `test-surface.mjs` and `test-menu-noreset.mjs` HARDCODE port 8901 and ignore
-  `BASE`. They fail to connect silently and read as "not run".
+- `test-surface.mjs`, `test-menu-noreset.mjs` and `test-affinity.mjs` HARDCODE
+  port 8901 (affinity uses `127.0.0.1:8901`) and ignore `BASE`. They do not
+  fail loudly — they throw a connection error that scrolls past and reads as
+  "not run", and `| tail` hides it completely. Serve the tree on 8901 as well
+  (`setsid node tools-scratch/srv.mjs 8901 &`) before believing any of them.
 - `pgrep -f 'ab\.mjs'` also matches `srvlab.mjs`. Killing probes has killed the
   static server mid-run more than once. Use `scratchpad/keep.sh`.
 - **Version bump is 4 sites in index.html + 1 in sw.js**: `sed -i
