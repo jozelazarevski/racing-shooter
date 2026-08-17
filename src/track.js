@@ -8227,7 +8227,30 @@ export class Track {
           const row = h1 < 0.55 ? 0 : 1;
           const sc = 1.15 + hash(j * 9.1 - side) * 0.75;      // big canopy pines
           const lat = (this.widthAt(j) + 0.75 * sc + 2.0 + row * 3.2 + h1 * 1.4) * side;
-          const p = this.pointAt(j, lat);
+          // AND THAT LATERAL IS AN OFFSET, NOT A DISTANCE — which matters more
+          // here than almost anywhere, because these trunks are SOLID (s >= 1.0
+          // per the material law) and they line the racing line for the whole
+          // length of a forest zone. `lat` is measured along sample j's own
+          // normal; where the lap comes back on itself it says nothing about
+          // the nearest leg, so a trunk correctly spaced off ITS carriageway
+          // stands in the middle of another one. Measured on r199: SUZUKA — a
+          // figure-of-eight, so the crossover legs run close — had 10 solid
+          // trunks ON the drivable surface, the worst 4.44 u inside a 9 u
+          // half-width, plus 18 inside the clearance margin.
+          //
+          // Same ladder the sponsor boards got in r199: try the designed spot,
+          // step outward, and if the whole row is blocked plant nothing. One
+          // missing pine in a dense corridor is invisible; one standing in the
+          // road is a wall the AI's precomputed line never meets.
+          const trunkR = 0.75 * sc;
+          let p = null;
+          for (const extra of [0, 2, 4, 7, 10]) {
+            const cand = this.pointAt(j, lat + extra * side);
+            _clearV.set(cand.x, 0, cand.z);
+            const need = this.widthAt(this.nearestIndex(_clearV)) + trunkR + 1.8;
+            if (this._distToTrack(cand.x, cand.z) >= need) { p = cand; break; }
+          }
+          if (!p) continue;
           const ty = this.terrainHeight(p.x, p.z) - 0.2;
           // lean the whole tree inward over the road (rotation about the tangent)
           const lean = (0.10 + hash(j * 3.3 + side) * 0.12) * side;
@@ -13691,6 +13714,17 @@ export class Track {
       const a = this.tan[i], b = this.tan[(i + 12) % N];
       const side = (a.x * b.z - a.z * b.x) > 0 ? -1 : 1;
       const p = this.pointAt(i, (WALL_OFF + 1.7) * side);
+      // A MARKER POST GOES ON THE OUTSIDE OF THE CORNER, NOT IN THE NEXT ONE.
+      // `WALL_OFF + 1.7` is an offset along sample i's normal, and this
+      // builder picks CORNERS on purpose — precisely where the lap is most
+      // likely to have another leg on the far side of the apex. Measured on
+      // r199: CLIFF KNOT, whose lap ties around itself, stood 23 posts and
+      // bands in a carriageway, the worst 7.91 u into a 9 u half-width. They
+      // carry no collider, so this is the bridge-pier defect — a reflector
+      // post in the middle of the road that you drive straight through.
+      // A corner that cannot take a marker simply does not get one.
+      _clearV.set(p.x, 0, p.z);
+      if (this._distToTrack(p.x, p.z) < this.widthAt(this.nearestIndex(_clearV)) + 1.2) continue;
       const y = this.terrainHeight(p.x, p.z);
       q.setFromAxisAngle(up, this.headingAt(i));
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(1, 1, 1));
@@ -15643,8 +15677,19 @@ export class Track {
         }
         // the ring branch skips _trackSidePos and with it the underwater
         // check — on a coast world it was planting conifers IN the sea
-        return p && !this._inWater(p.x, p.z) && !this._onQuayStrip(p.x, p.z)
-          && this._altOK(p.x, p.z) ? p : null;
+        if (!p || this._inWater(p.x, p.z) || this._onQuayStrip(p.x, p.z)
+          || !this._altOK(p.x, p.z)) return null;
+        // NOR DOES ANY BRANCH ASK WHETHER A TRUNK FITS. `_trackSidePos` only
+        // promises `belt[0] - 1`, and a theme may run its belt close: on
+        // DEEPWOOD TRAIL solid boles stood 10.75 u out against a 9 u
+        // half-width plus the 1.7 u car radius RULES.md asks of a tree. Reject
+        // a spot that could not carry even the smallest trunk — `_scatter`
+        // re-rolls a null, so this costs a sample rather than a tree — and let
+        // the placer shrink the ones that merely fit tightly.
+        _clearV.set(p.x, 0, p.z);
+        if (this._distToTrack(p.x, p.z)
+            < this.widthAt(this.nearestIndex(_clearV)) + 1.7 + 0.35) return null;
+        return p;
       },
       (p) => {
         const name = pick();
@@ -15658,7 +15703,15 @@ export class Track {
         const rr2 = Math.random();
         const dRoad2 = this._distToTrack(p.x, p.z);
         const sMax = dRoad2 < 26 ? 1.35 : 2.5;
-        const s = Math.min(sMax, 0.6 + rr2 * rr2 * 1.9);
+        // `sMax` keeps a HERO CANOPY away from the chase camera; it never asked
+        // whether the trunk clears the road, and the two are different
+        // questions — 1.35 is small for a camera and still 1.35 u of solid bole
+        // for a car. Bound the scale by the room actually there, measured to
+        // the nearest leg, so a tree beside a tight belt gets smaller instead
+        // of standing inside the clearance.
+        _clearV.set(p.x, 0, p.z);
+        const room = dRoad2 - (this.widthAt(this.nearestIndex(_clearV)) + 1.7);
+        const s = Math.min(sMax, room / spec.rFac, 0.6 + rr2 * rr2 * 1.9);
         const ty = this.terrainHeight(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.45), s);
         m4.setPosition(p.x, ty, p.z);
@@ -15904,9 +15957,29 @@ export class Track {
         const roll = Math.random();
         const i = (Math.random() * N) | 0;
         const side = Math.random() < 0.5 ? 1 : -1;
+        // A ROADSIDE OFFSET IS NOT A ROADSIDE DISTANCE. 10.55 u along sample
+        // i's normal is the right spacing beside i's own leg — a 9 u half-width
+        // plus the 1.7 u car radius RULES.md asks of a tree — but on the inside
+        // of a bend, or where the lap doubles back, the nearest leg is closer
+        // than that and nothing here was measuring it. Measured on r199:
+        // CANYON RUN had 6 cacti standing ON the drivable surface, the worst
+        // 1.01 u from the centreline. Desert scrub is `solid: false`, so this
+        // is the bridge-pier defect rather than the boulder one — you drive
+        // THROUGH a saguaro in the middle of the road, which reads worse than
+        // hitting it. `_scatter` re-rolls a null, so a rejected spot costs a
+        // sample, not a plant.
+        const clearRoadside = (lateral, s) => {
+          const p = this.pointAt(i, lateral);
+          _clearV.set(p.x, 0, p.z);
+          const need = this.widthAt(this.nearestIndex(_clearV)) + 0.75 * s + 1.7;
+          return this._distToTrack(p.x, p.z) >= need;
+        };
         if (roll < 0.5) {
           // roadside, hugging the cliff base (small ones); dy is relative to road y
-          return { i, lateral: side * (10.55 + Math.random() * 0.35), dy: 0, s: 0.5 + Math.random() * 0.35 };
+          const s = 0.5 + Math.random() * 0.35;
+          const lateral = side * (10.55 + Math.random() * 0.35);
+          if (!clearRoadside(lateral, s)) return null;
+          return { i, lateral, dy: 0, s };
         }
         if (roll < 0.8 && this.T.cliffWalls) {
           // silhouetted on the canyon rim (cliff heights are relative to road y)
@@ -15920,7 +15993,15 @@ export class Track {
         // open bowl around the start line — absolute terrain height
         const gi = ((Math.random() * 140 - 70 | 0) + N) % N;
         const lat = side * (13 + Math.random() * 22);
-        return { i: gi, lateral: lat, terrain: true, s: 0.8 + Math.random() * 0.7 };
+        const gs = 0.8 + Math.random() * 0.7;
+        // 13-35 u along ONE normal is the widest throw in this builder and so
+        // the likeliest to land on another leg; it seats on the terrain, i.e.
+        // at road level, so it gets the same measured check as the roadside row
+        const gp = this.pointAt(gi, lat);
+        _clearV.set(gp.x, 0, gp.z);
+        if (this._distToTrack(gp.x, gp.z)
+            < this.widthAt(this.nearestIndex(_clearV)) + 0.75 * gs + 1.7) return null;
+        return { i: gi, lateral: lat, terrain: true, s: gs };
       },
       (spot, k) => {
         const p = this.pointAt(spot.i, spot.lateral);

@@ -1,36 +1,44 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r199, deployed and live, tree clean.
+State at handover: `main` = r200, deployed and live, tree clean.
 Live: https://jozelazarevski.github.io/racing-shooter/
 
 ## THE THREE THINGS THAT MATTER, IN ORDER
 
-### 1. RESOLVED IN r199 — and the premise was wrong. Read this before reusing it.
+### 1. DONE (r199 + r200). The premise was wrong; read this before reusing it.
 The "~15 posts standing in rural carriageways" DID NOT EXIST. The numbers came
 from `fence.mjs`, whose filter let every geometry with no `width`/`height`
 parameter through (`Math.abs(undefined - 0.18) > 0.005` is false, because NaN
 comparisons are false). It was counting the sky dome, the world skirt, the haze
 bands, the road itself and the start gantry. Real 0.18x1.05 posts on the two
 named worlds: PINE VALLEY 15, HEDGEROW DASH 18, **0 on the road** — exactly what
-r195 already claimed. Full numbers in COORDINATION.md r199.
+r195 already claimed.
 
-`tool-road-census` now walks `track.group.traverse` as asked, with exact
-point-to-OBB distances, the game's own height constants, and four suppression
-classes that are all COUNTED and printed. It found a real defect on its first
-run — `_buildBanners` had no road-distance check at all, and 68 of 419 sponsor
-boards stood in a carriageway across 15 worlds, worst 0.42 u off the centreline
-on BRIDGE RUN. Fixed; 0 of 411 now.
+`tool-road-census` now walks `track.group.traverse` with exact point-to-OBB
+distances, the game's own height constants, and SIX counted suppression classes.
+It found four real defects, all the same one — **an offset is not a distance**,
+the fifth and sixth times this repo has met it:
 
-The census's remaining findings are listed by builder signature in
-COORDINATION.md r199 — SUZUKA's trees (worst 8.76 u) are the most likely real
-one left. None of them was cleared in r199.
+    sponsor boards   (r199)  68 of 419 in a carriageway, 15 worlds  -> 0
+    forest corridors (r200)  SUZUKA: 14 SOLID boles on the road     -> 0
+    cacti            (r200)  CANYON RUN: 6 on the road              -> 0
+    flora mix        (r200)  DEEPWOOD: solid boles inside clearance -> 0
+    marker posts     (r200)  CLIFF KNOT: 23 in a carriageway        -> 0
+
+    roster bodies 399 -> 46      trunks inside clearance 482 -> 0
+
+**The 46 that remain are all identified in COORDINATION.md r200 and none of
+them needs a hunt.** 14 are RED CENTRE RUN's pylon legs, which are DELIBERATE
+(the leg keeps its mesh and drops its collider — do not "fix" it); 8 are start
+gantries; 8 are SEA CLIFF RUN / MOUNTAIN TO SEA, which is item 2 below showing
+through; the rest are singletons under 6.8 u.
 
 **Do not rebuild on "road furniture is the difficulty curve".** The instance
-that theory named was a measurement artifact, and the objects that really do
-stand in rural carriageways are the crates, cones and barrels `_buildProps`
-puts there ON PURPOSE — its own comment records that they are "NOT blockers —
-a car drives straight through one and accelerates". Item 3 below is now the
-first thing to do, not the third.
+that theory named was a measurement artifact, and what really does stand in
+rural carriageways is the crates, cones and barrels `_buildProps` puts there ON
+PURPOSE — "NOT blockers — a car drives straight through one and accelerates".
+The real finds above are worth having, but 68 boards and 14 trunks do not
+explain finishing 8th of 8. Item 3 is now the first thing to do.
 
 ### 2. SEA CLIFF RUN (level 60) — 80 u of road stacked on road
 Measured, specific, untouched:

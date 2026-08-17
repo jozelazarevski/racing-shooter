@@ -12,6 +12,12 @@ real time to get right and the next session should not rebuild them.
                 invented the phantom posts HANDOVER.md item 1 chased — its
                 header tells that story, and it is worth reading before
                 writing any other filter over `geometry.parameters`.
+- `trees.mjs`   every TRUNK measured against RULES.md's clearance for a tree
+                (`widthAt + r + 1.7`), per world, with a HEIGHT gate first so
+                the saguaros `_buildCacti` silhouettes on the canyon rim are
+                not read as intrusions. The acceptance test for any tree
+                placement change. Foliage is deliberately not measured: a
+                tree's collider is its trunk.
 - `banners.mjs` every sponsor board measured across its full 9 u span against
                 the carriageway, per world. The acceptance test for any change
                 to `_buildBanners`. Skips `kind: 'fence'`, because

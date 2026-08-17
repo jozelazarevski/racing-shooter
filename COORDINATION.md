@@ -1792,6 +1792,121 @@ test-carriageway ("the line is clear of everything"), test-invisible-walls
 `origin/main` on a second port.
 
 
+## r200 — clearing what the census found: the trees come off the road
+
+r199 built the scene-graph census and fixed the one defect it found on its
+first run (the sponsor boards). This is the follow-through: 399 bodies in a
+carriageway roster-wide -> **46**, and every one of the 46 is now accounted
+for by name.
+
+### THE TREES, WHICH WERE MOST OF IT
+
+Three builders placed trees by an OFFSET along one sample's normal and never
+asked the distance to the nearest leg. The same defect as the sponsor boards,
+as the quay guns (r191), as the FURKA RIDGE cabin: **an offset is not a
+distance.**
+
+Measured on r199 with `tools-scratch/trees.mjs`, against RULES.md's clearance
+for a tree (`widthAt + r + 1.7 car radius`):
+
+    482 of 44544 trunks inside their clearance, on 8 worlds
+     25 of them ON the drivable surface
+
+- `_buildVizCorridors` — the dense forest corridors. Its own comment promises
+  the trunks are pushed out until they clear ("the canopy leans in over the
+  road, the trunks never do") but measured `lat` along sample j's normal.
+  **SUZUKA is a figure-of-eight**, so its crossover legs run close: 14 SOLID
+  boles stood ON the drivable surface, worst 4.44 u inside a 9 u half-width.
+- `_buildCacti` — the roadside row (10.55 u) and the wide open-bowl throw
+  (13-35 u). **CANYON RUN had 6 cacti on the drivable surface, the worst
+  1.01 u from the centreline.** Desert scrub is `solid: false`, so this is the
+  bridge-pier defect rather than the boulder one: you drive THROUGH a saguaro
+  standing in the middle of the road, which reads worse than hitting it.
+- the flora mix (`SPECIES`/`floraMix`) — its placer already measured
+  `dRoad2` but only used it to cap the tree's SIZE (`sMax`, so a hero canopy
+  does not park in front of the chase camera). It never asked whether the
+  trunk FITS. `_trackSidePos` only promises `belt[0] - 1`, and a theme may run
+  its belt close: DEEPWOOD TRAIL had solid boles 10.75 u out.
+
+All three now measure. Corridor trees walk a ladder (0/2/4/7/10 u) and plant
+nothing if the whole row is blocked; cacti reject the spot so `_scatter`
+re-rolls; the flora mix rejects hopeless spots and BOUNDS THE SCALE by the room
+actually there, so a tree beside a tight belt gets smaller instead of standing
+inside the clearance.
+
+    482 of 44544 trunks inside their clearance  ->  0 of 44516, on 0 worlds
+    trees lost roster-wide: 28, all SUZUKA corridor pines. Every desert
+    world kept its exact count — the re-roll found clear ground.
+
+### THE REFLECTOR MARKER POSTS
+
+`_buildRoadsideDetail`'s corner markers used `pointAt(i, (WALL_OFF + 1.7) *
+side)`, and this builder picks CORNERS on purpose — precisely where the lap is
+most likely to have another leg past the apex. **CLIFF KNOT, whose lap ties
+around itself, stood 23 posts and bands in a carriageway, worst 7.91 u into a
+9 u half-width.** No collider, so again the pier defect. A corner that cannot
+take a marker now does not get one.
+
+### AND THE CENSUS LEARNED THAT A CROWN IS NOT A TRUNK
+
+After the above, ~170 of the remaining bodies were tree FOLIAGE — PINE VALLEY
+alone contributed 104 crowns while every one of its trunks was clear. That is
+the design working: a canopy leaning over a rural road is what makes a forest
+read as a tunnel, and the game says so itself where it plants them —
+"collision r tracks the TRUNK, not the canopy". A census that reports it
+buries the trunks, which are the part that can stop a car.
+
+`parts[1..]` of every `track.trees` entry is now a **counted** suppression
+class, `foliage`, alongside `prop`. `parts[0]` — the trunk — is still measured
+like anything else, and `tools-scratch/trees.mjs` is its acceptance test.
+
+### ALSO FIXED: THE CENSUS WAS A BINARY FILE
+
+r199 keyed its body map on `kind + '\0' + sig`, using a literal NUL because a
+signature contains spaces and a space separator truncates it. It worked, and
+it made `grep` report `tests/tool-road-census.mjs` as "binary file matches" —
+which would have silently cost the next session a search. Kind and signature
+are carried as FIELDS on the value now; no packing, no control characters.
+
+### THE 46 THAT REMAIN, ALL ACCOUNTED FOR
+
+Nothing here is an unexplained residue. Listed so no one hunts them again:
+
+- **14, RED CENTRE RUN pylon legs** (worst 5.11 u) — DELIBERATE, and do not
+  "fix" it. Where the tower has nowhere to stand, the leg keeps its mesh and
+  gives up its collider, decided with a measurement: on TOUR DE CORSE every
+  candidate is in somebody's road, `gridSlot(0)` puts the player 0.00 u from a
+  leg, and they lose 22.9 u/s on every lap. Same rule the grandstand has
+  followed since r167.
+- **8, start gantry** — SUZUKA's finish banner and boards, CLIFF KNOT's light
+  housing and lamps, all at sample 0, which is where a start gantry goes.
+  RED CENTRE RUN's two lamps report at samples 129/130 rather than 0 because
+  its lap passes back beside its own start line at a higher elevation, so the
+  gantry hangs at bonnet height for the road that passes it. That is a
+  two-roads-too-close symptom, not a placement bug.
+- **8, SEA CLIFF RUN / MOUNTAIN TO SEA / CLIFF KNOT** — 4 building blocks
+  (worst 5.87 u) and 4 deck parapets (0.31-4.25 u). SEA CLIFF RUN's are almost
+  certainly HANDOVER ITEM 2 showing through: 80 u of road stacked on road means
+  anything placed beside one leg stands in the other. Fix the overlap, not the
+  buildings.
+- **6 rocks** (Dodecahedron, 0.43-6.28 u), **2 guard-fence bays** (1.78, 0.34 —
+  a guard rail belongs at the road edge), and single instances on ESTONIA
+  CRESTS (6.74), CINQUE TERRE (4.18), HEDGEROW DASH (1.55), PIKES PEAK's
+  culvert parapet (1.42) and one FURKA RIDGE contact shadow on a slope steep
+  enough to defeat the sheet test (0.89).
+
+### VERIFIED
+
+test-carriageway ("the line is clear of everything"), test-invisible-walls
+13/0, test-boot 7/7, test-obstacles, test-buildings. test-rules (2) and
+test-nature (1) fail IDENTICALLY on pristine `origin/main` on a second port —
+pre-existing, and unchanged by the CANYON RUN cactus move.
+
+Roster census: **bodies 399 -> 46, dirty worlds 44 -> 35.** Blockers (60,
+all stone, the known tunnel-bore false positive among them) and floaters (116)
+are UNCHANGED — this release did not touch colliders.
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

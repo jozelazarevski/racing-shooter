@@ -56,6 +56,12 @@
  *             are MEANT to smash"); they are not blockers and a car drives
  *             through one and accelerates. Rocks and timber already take the
  *             trackside-only branch.
+ *   foliage   a tree's crown, i.e. `parts[1..]` of an entry in `track.trees`.
+ *             A TREE'S COLLIDER IS ITS TRUNK — "collision r tracks the TRUNK,
+ *             not the canopy" — and a crown leaning over a rural road is what
+ *             makes a forest read as a tunnel. The trunk itself, `parts[0]`,
+ *             is measured like anything else, and `tools-scratch/trees.mjs`
+ *             is its dedicated acceptance test.
  *
  * The thresholds are the GAME'S OWN numbers, not invented ones: 2.4 u is
  * `hullHeight` from vehicles.js (the car's roof) and 1.2 u is the headroom
@@ -99,7 +105,7 @@ const worlds = only.length ? roster.filter((l) => only.includes(l.id)) : roster;
 const totals = { blockers: 0, holes: 0, floaters: 0, worlds: 0, dirty: 0, bodies: 0 };
 const byKind = new Map();
 const byBuilder = new Map();
-const suppTotal = { scenery: 0, surface: 0, overhead: 0, prop: 0, buried: 0 };
+const suppTotal = { scenery: 0, surface: 0, overhead: 0, prop: 0, foliage: 0, buried: 0 };
 const rows = [];
 
 for (const lv of worlds) {
@@ -201,6 +207,26 @@ for (const lv of worlds) {
     for (const p of (t.props ?? [])) if (p.mesh) propRoots.add(p.mesh);
     const isProp = (o) => { let p = o; while (p) { if (propRoots.has(p)) return true; p = p.parent; } return false; };
 
+    // A TREE'S COLLIDER IS ITS TRUNK, and the game says so where it plants the
+    // forest corridors: "collision r tracks the TRUNK, not the canopy (the
+    // canopy overhangs the road; only the trunk is solid)". A crown leaning
+    // over a rural road is the design working — it is what makes a forest read
+    // as a tunnel through the woods — so counting foliage as an intrusion
+    // buries the trunks, which are the part that can stop a car. Measured on
+    // r199: of 287 bodies roster-wide, ~170 were crowns, and PINE VALLEY alone
+    // contributed 104 while every one of its trunks was clear.
+    // Each tree records its meshes in `parts`, TRUNK FIRST, so suppress
+    // parts[1..] and leave parts[0] to be measured like anything else.
+    // `tools-scratch/trees.mjs` is the acceptance test for the trunks
+    // themselves, against RULES.md's `widthAt + r + car radius`.
+    const foliage = new Set();
+    for (const tr of (t.trees ?? [])) {
+      const parts = tr.parts;
+      if (!Array.isArray(parts)) continue;
+      for (let pi = 1; pi < parts.length; pi++) if (parts[pi]) foliage.add(parts[pi]);
+    }
+    const isFoliage = (o) => { let p = o; while (p) { if (foliage.has(p)) return true; p = p.parent; } return false; };
+
     const chain = (o) => { const s = []; let p = o;
       while (p && p !== t.group) { s.push(p.name || p.type); p = p.parent; }
       return s.join(' < ') || 'group'; };
@@ -219,7 +245,7 @@ for (const lv of worlds) {
     const M = new Mat4(), INV = new Mat4();
 
     const bodyHits = new Map();
-    const supp = { scenery: 0, surface: 0, overhead: 0, prop: 0, buried: 0 };
+    const supp = { scenery: 0, surface: 0, overhead: 0, prop: 0, foliage: 0, buried: 0 };
     let bodies = 0;
 
     const worldAABB = (bb, m) => {
@@ -239,7 +265,7 @@ for (const lv of worlds) {
       return { x0, x1, y0, y1, z0, z1 };
     };
 
-    const consider = (m, bb, sig, prop, road) => {
+    const consider = (m, bb, sig, prop, road, leaf) => {
       bodies++;
       const A = worldAABB(bb, m);
       const fx = A.x1 - A.x0, fz = A.z1 - A.z0, fy = A.y1 - A.y0;
@@ -273,13 +299,19 @@ for (const lv of worlds) {
       // is a defect. Each verdict is counted so no class is dropped silently.
       const roadY = t.center[at].y;
       if (prop) { supp.prop++; return; }
+      if (leaf) { supp.foliage++; return; }
       if (road || fy < 0.5 * Math.min(fx, fz)) { supp.surface++; return; }
       if (A.y1 < roadY + KERB) { supp.buried++; return; }   // top under the kerb
       if (A.y0 > roadY + ROOF) { supp.overhead++; return; }
 
       const kind = A.y0 < roadY + HEAD ? 'STANDING' : 'GRAZING';
-      const hk = kind + ' ' + sig;
-      const h = bodyHits.get(hk) ?? { n: 0, worst: -Infinity, at: 0, half: 0, y0: 0, y1: 0, roadY: 0 };
+      // keyed by kind+signature, but the two are kept as FIELDS rather than
+      // packed into the key: a signature contains spaces, so splitting one
+      // back apart needs a separator that cannot occur in it, and reaching
+      // for a control character to get one leaves a source file that `grep`
+      // reports as binary.
+      const hk = kind + '\u0000' + sig;
+      const h = bodyHits.get(hk) ?? { kind, sig, n: 0, worst: -Infinity, at: 0, half: 0, y0: 0, y1: 0, roadY: 0 };
       h.n++;
       if (best > h.worst) { h.worst = best; h.at = at; h.half = t.widthAt(at);
         h.y0 = A.y0; h.y1 = A.y1; h.roadY = roadY; }
@@ -296,16 +328,15 @@ for (const lv of worlds) {
         .map(([k, v]) => `${k}=${+v.toFixed(2)}`).join(',') + ')';
       const mm = Array.isArray(o.material) ? o.material[0] : o.material;
       const sig = `${chain(o)} | ${gtype} | ${mm?.color ? '#' + mm.color.getHexString() : '?'}`;
-      const prop = isProp(o), road = namedRoad(o);
+      const prop = isProp(o), road = namedRoad(o), leaf = isFoliage(o);
       o.updateWorldMatrix(true, false);
       if (o.isInstancedMesh) {
-        for (let k = 0; k < o.count; k++) { o.getMatrixAt(k, M); M.premultiply(o.matrixWorld); consider(M, bb, sig, prop, road); }
-      } else { M.copy(o.matrixWorld); consider(M, bb, sig, prop, road); }
+        for (let k = 0; k < o.count; k++) { o.getMatrixAt(k, M); M.premultiply(o.matrixWorld); consider(M, bb, sig, prop, road, leaf); }
+      } else { M.copy(o.matrixWorld); consider(M, bb, sig, prop, road, leaf); }
     });
 
-    const bodyRows = [...bodyHits].map(([hk, h]) => {
-      const [kind, sig] = hk.split(' ');
-      return { kind, sig, n: h.n, bite: +h.worst.toFixed(2), i: h.at, half: +h.half.toFixed(2),
+    const bodyRows = [...bodyHits.values()].map((h) => {
+      return { kind: h.kind, sig: h.sig, n: h.n, bite: +h.worst.toFixed(2), i: h.at, half: +h.half.toFixed(2),
         lo: +(h.y0 - h.roadY).toFixed(2), hi: +(h.y1 - h.roadY).toFixed(2) };
     }).sort((a, b) => b.bite - a.bite);
 
@@ -324,8 +355,8 @@ for (const lv of worlds) {
   for (const b of r.blockers) byKind.set(b.mat, (byKind.get(b.mat) ?? 0) + 1);
   for (const k of Object.keys(suppTotal)) suppTotal[k] += r.supp[k];
   for (const h of r.bodyRows) {
-    const bk = `${h.kind} ${h.sig}`;
-    const e = byBuilder.get(bk) ?? { n: 0, worst: 0, where: '' };
+    const bk = `${h.kind}\u0000${h.sig}`;
+    const e = byBuilder.get(bk) ?? { kind: h.kind, sig: h.sig, n: 0, worst: 0, where: '' };
     e.n += h.n;
     if (h.bite > e.worst) { e.worst = h.bite; e.where = `${lv.name} sample ${h.i}`; }
     byBuilder.set(bk, e);
@@ -352,8 +383,9 @@ console.log(`   blockers ${totals.blockers}   bare holes ${totals.holes}   float
   + `   bodies ${totals.bodies}`);
 // THE SUPPRESSED COUNTS ARE PART OF THE ANSWER. A filter that is not printed
 // reads as "nothing there", which is how the piers survived two censuses.
-console.log(`   bodies suppressed: ${suppTotal.prop} intended props, ${suppTotal.surface} road surfaces, `
-  + `${suppTotal.overhead} overhead, ${suppTotal.buried} under the kerb, ${suppTotal.scenery} scenery`);
+console.log(`   bodies suppressed: ${suppTotal.prop} intended props, ${suppTotal.foliage} tree foliage, `
+  + `${suppTotal.surface} road surfaces, ${suppTotal.overhead} overhead, `
+  + `${suppTotal.buried} under the kerb, ${suppTotal.scenery} scenery`);
 if (byKind.size) {
   console.log('\n--- blockers by material ---');
   for (const [k, n] of [...byKind].sort((a, b) => b[1] - a[1])) console.log(`   ${k.padEnd(14)} ${n}`);
@@ -371,10 +403,9 @@ if (worst.length) {
 
 if (byBuilder.size) {
   console.log('\n--- bodies in the carriageway, by builder signature ---');
-  for (const [bk, e] of [...byBuilder].sort((a, b) => b[1].worst - a[1].worst)) {
-    const [kind, ...rest] = bk.split(' ');
-    console.log(`   ${kind.padEnd(8)} x${String(e.n).padStart(4)}  worst ${String(e.worst).padStart(6)} u  (${e.where})`);
-    console.log(`          ${rest.join(' ')}`);
+  for (const e of [...byBuilder.values()].sort((a, b) => b.worst - a.worst)) {
+    console.log(`   ${e.kind.padEnd(8)} x${String(e.n).padStart(4)}  worst ${String(e.worst).padStart(6)} u  (${e.where})`);
+    console.log(`          ${e.sig}`);
   }
 }
 
