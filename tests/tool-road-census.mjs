@@ -20,43 +20,55 @@
  *   FLOATERS   solids whose base sits well above the ground under them.
  *   NARROWS    the tightest drivable width on the lap, so a world that is
  *              merely hard to thread is not confused with one that is blocked.
- *   INTRUDERS  GEOMETRY standing in the carriageway, collider or not. The
- *              three above all read `track.solids`, and things that are in
- *              the way without being in that list have hidden from it three
- *              times now — the barriers (r191), the bridge piers (r193, a
- *              grey column in the racing line you drive straight through),
- *              and the culvert parapets. This walks `track.group` and
- *              measures the transformed geometry, so a mesh with no collider
- *              entry is counted like any other. Ones with no collider within
- *              1.5 u are flagged BARE — that is the pier class exactly.
+ *   BODIES     what you can SEE standing in the road — see below.
  *
- *              Five filters keep it honest rather than loud, and each one is
- *              a class that is on the road ON PURPOSE or is not an object at
- *              all. Geometry must stand in the DRIVE BAND — 0.35 u proud of
- *              the road and starting under 2.8 u, measured PER FOOTPRINT
- *              POINT against the road height at that point. Smashable
- *              `track.props` are excluded, the way traffic already is.
- *              Zero-thickness sheets lying down are decals. Foliage over a
- *              registered `track.trees` trunk is canopy, measured as TREES
- *              instead. And anything over 40 u across in XZ is the ground the
- *              road is drawn on. Every one of them is counted, and the bulk
- *              and the skipped are LISTED at the end — a cap that hides what
- *              it dropped reads as coverage it never gave.
+ * ---- WHY BODIES EXISTS: THE COLLIDER BLIND SPOT ---------------------------
+ * Everything above reads `track.solids`, i.e. COLLIDERS. Three separate defect
+ * classes have now hidden in the gap between "has a collider" and "is drawn in
+ * the road": the barrier runs (r191), the bridge piers (r193 — meshes with no
+ * collider at all, so both this census and test-carriageway scored those
+ * worlds clean while a grey column stood in the racing line), and the trackside
+ * furniture audit that followed r195. So BODIES walks the BUILT SCENE GRAPH —
+ * `track.group.traverse`, every mesh and every INSTANCE of every InstancedMesh
+ * — and measures each one against the carriageway.
  *
- *              `HITS=1` prints every hit, `BULK=1` the 12–40 u meshes that
- *              reach the band (hillsides the road climbs, mostly).
+ * Measuring "every mesh" naively is useless: the sky dome, the world skirt and
+ * the road ribbon itself all overlap every carriageway trivially. So a body is
+ * measured with an exact point-to-OBB distance in XZ (a long thin wall must
+ * measure by its NEAREST FACE, not by a bounding disc — r191's "walls are
+ * segments, not dots", one dimension further out) and then classified. Four
+ * classes are SUPPRESSED, and every one of them is COUNTED and printed, because
+ * a silent filter reads as "nothing there" — which is exactly how the piers
+ * survived two censuses:
  *
- * A FALSE ALARM RECORDED SO IT IS NOT RE-HUNTED: the handover reported ~15
- * fence posts of 0.18 x 1.05 biting 9.5 u into a 9 u half-width on rural
- * worlds. They do not exist. The probe that found them filtered with
- * `Math.abs(q.width - 0.18) > 0.005`, and for a sphere or a torus `q.width`
- * is undefined, so the test is `NaN > 0.005` === false and EVERY such
- * geometry fell through the filter and was counted as a post — including the
- * 9000 u world skirt and the pickups, which is where 9.5 u came from.
- * Measured with the keys required to exist: FROST PEAK has 10 posts and
- * REDWOOD RAMPAGE 7, every one of them at 10.3 u lateral against a 9 u
- * half-width, i.e. 1.21 u OUTSIDE the drivable edge. `_buildJunctionFences`
- * was clean, as stashing it already suggested.
+ *   scenery   footprint > 60 u. Landscape, not furniture: terrain, horizon
+ *             rings, haze bands, the 9000 u world skirt, the road ribbon.
+ *   surface   a SHEET — wide in both horizontal axes, thin vertically, or a
+ *             mesh the builder named as roadway. Road patches, crossroad
+ *             spurs, ford washes, contact shadows, a traffic cone's base
+ *             plate. These lie ON the carriageway by design. A wall or parapet
+ *             is thin in ONE axis and so is not caught by this.
+ *   overhead  its underside clears the car's roof. Gantries, bridge soffits,
+ *             tunnel crowns, tree canopies — all of which are SUPPOSED to span
+ *             a road.
+ *   prop      it belongs to `track.props`. `_buildProps` puts crates, cones
+ *             and barrels on the drivable surface ON PURPOSE ("the stuff you
+ *             are MEANT to smash"); they are not blockers and a car drives
+ *             through one and accelerates. Rocks and timber already take the
+ *             trackside-only branch.
+ *   foliage   a tree's crown, i.e. `parts[1..]` of an entry in `track.trees`.
+ *             A TREE'S COLLIDER IS ITS TRUNK — "collision r tracks the TRUNK,
+ *             not the canopy" — and a crown leaning over a rural road is what
+ *             makes a forest read as a tunnel. The trunk itself, `parts[0]`,
+ *             is measured like anything else, and `tools-scratch/trees.mjs`
+ *             is its dedicated acceptance test.
+ *
+ * The thresholds are the GAME'S OWN numbers, not invented ones: 2.4 u is
+ * `hullHeight` from vehicles.js (the car's roof) and 1.2 u is the headroom
+ * line `deckOverhead` already uses. What survives is reported as STANDING (it
+ * stands in the road) or GRAZING (it clears the bonnet but not the roof), with
+ * the ancestor chain, geometry and colour of each one, so a finding names its
+ * builder instead of starting another hunt.
  *
  * KNOWN FALSE POSITIVE, not filtered because filtering it would hide real
  * ones: a TUNNEL BORE is narrower than the road it carries, and its wall
@@ -90,8 +102,10 @@ const roster = await page.evaluate(async () => {
 });
 const worlds = only.length ? roster.filter((l) => only.includes(l.id)) : roster;
 
-const totals = { blockers: 0, holes: 0, floaters: 0, intruders: 0, bare: 0, trees: 0, worlds: 0, dirty: 0 };
+const totals = { blockers: 0, holes: 0, floaters: 0, worlds: 0, dirty: 0, bodies: 0 };
 const byKind = new Map();
+const byBuilder = new Map();
+const suppTotal = { scenery: 0, surface: 0, overhead: 0, prop: 0, foliage: 0, buried: 0 };
 const rows = [];
 
 for (const lv of worlds) {
@@ -167,261 +181,186 @@ for (const lv of worlds) {
     }
     floaters.sort((a, b) => b.air - a.air);
 
-    return { solids: (t.solids ?? []).length, blockers, stray, floaters,
-      narrowest: +narrowest.toFixed(1) };
-  });
+    // ---- BODIES -----------------------------------------------------------
+    // The collider blind spot: walk what was BUILT, not what was registered.
+    const SIZE_CAP = 60;    // wider than this is landscape, not furniture
+    const ROOF = 2.40;      // vehicles.js hullHeight default — the car's roof
+    const HEAD = 1.20;      // the headroom line deckOverhead already uses
+    const KERB = 0.25;      // below this a body's top cannot obstruct anything
+    const MIN_BITE = 0.30;
 
-  // ---- INTRUDERS: what is STANDING there, collider or not -----------------
-  // Everything above reads `track.solids`. Three separate defect classes have
-  // now hidden from that: the barriers (r191), the bridge piers (r193) and a
-  // false alarm about fence posts (see the note at the top). A pier has no
-  // collider at all — you drive through the column — so a census of colliders
-  // scores the world clean while a grey pillar stands in the racing line.
-  // This walks the built scene instead and measures GEOMETRY.
-  const scene = await page.evaluate(() => {
-    const t = window.__game.track, N = t.center.length;
-    const THREEV = window.__game.player.mesh.position.constructor;
-    const M4 = window.__game.player.mesh.matrixWorld.constructor;
-
-    // Nearest centreline sample via a hash grid. CELL must be >= the widest
-    // half-width plus a margin so the 3x3 neighbourhood cannot miss a sample
-    // that is genuinely close; anything with no sample in those nine cells is
-    // more than a cell away from any road and is rejected without a search.
-    const CELL = 16, grid = new Map();
+    // broad phase over the centreline, so this is not 900 x every instance
+    const CELL = 24, grid = new Map();
+    const gkey = (cx, cz) => cx * 100003 + cz;
     for (let i = 0; i < N; i++) {
       const c = t.center[i];
-      const k = `${Math.floor(c.x / CELL)},${Math.floor(c.z / CELL)}`;
+      const k = gkey(Math.floor(c.x / CELL), Math.floor(c.z / CELL));
       let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(i);
     }
-    const near = (x, z) => {
-      const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
-      let best = Infinity, at = -1;
-      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
-        const cell = grid.get(`${cx + a},${cz + b}`); if (!cell) continue;
-        for (const i of cell) { const c = t.center[i];
-          const d = (x - c.x) * (x - c.x) + (z - c.z) * (z - c.z);
-          if (d < best) { best = d; at = i; } }
-      }
-      return at < 0 ? null : { d: Math.sqrt(best), i: at };
-    };
+    let maxHalf = 0;
+    for (let i = 0; i < N; i++) maxHalf = Math.max(maxHalf, t.widthAt(i));
 
-    // THE DRIVE BAND, MEASURED WHERE THE THING ACTUALLY STANDS. A deck eleven
-    // metres up is a bridge, not an obstacle, and a slab whose top sits level
-    // with the tarmac is the ground. To be in the way a thing must STAND OUT
-    // of the road (PROUD) and start below the roof of a car (ABOVE).
-    //
-    // The band is tested PER FOOTPRINT POINT against the road height at that
-    // point, not once for the whole mesh against its nearest sample. Puddle
-    // decals are the reason: `CircleGeometry` scaled to 4 u and pitched to
-    // `-atan(slopeAt(i))` hugs the grade, so it is flat relative to the road
-    // and 0.8 u tall in world axes. Judged as one object it looks like it
-    // rears half a metre above the tarmac, and every sloped road decal in the
-    // game reported as an obstacle biting 8 u into its own lane. Judged point
-    // by point it is 0.04 u proud everywhere, which is what it is.
-    const PROUD = 0.35, ABOVE = 2.8;
-    // Anything this wide in XZ is scenery the road is drawn ON — the ribbon
-    // itself, terrain, water, the world skirt, the sky dome. Skipped, and
-    // COUNTED, because a silent cap reads as "nothing there".
-    const BIG = 40;
+    // `_buildProps` deliberately stands crates, cones and barrels on the
+    // drivable surface. Mark their subtrees so intended clutter is separated
+    // from the unexplained kind rather than burying it.
+    const propRoots = new Set();
+    for (const p of (t.props ?? [])) if (p.mesh) propRoots.add(p.mesh);
+    const isProp = (o) => { let p = o; while (p) { if (propRoots.has(p)) return true; p = p.parent; } return false; };
 
-    const sig = (m, g) => {
-      const p = g.parameters ?? {};
-      // A BufferGeometry carries no parameters — lathes, extrusions and every
-      // hand-built prop land there — so fall back to its own box, which is
-      // what actually identifies it in the source.
-      const dims = ['width', 'height', 'depth', 'radius', 'radiusTop', 'length']
-        .filter((k) => p[k] != null).map((k) => +Number(p[k]).toFixed(2)).join('x')
-        || (g.boundingBox ? [g.boundingBox.max.x - g.boundingBox.min.x,
-          g.boundingBox.max.y - g.boundingBox.min.y,
-          g.boundingBox.max.z - g.boundingBox.min.z].map((e) => +e.toFixed(1)).join('x') : '');
-      const col = m.material?.color?.getHexString?.() ?? '??';
-      return `${g.type.replace('Geometry', '')}${dims ? ' ' + dims : ''} #${col}`
-        + (m.isInstancedMesh ? ' [inst]' : '');
-    };
-
-    // SMASHABLE PROPS BELONG ON THE ROAD, the same way traffic does.
-    // `_buildProps` puts crates, cones, barrels and snowmen deliberately on
-    // the drivable surface just outside the obstacle corridor — "run wide,
-    // clip an apex, and you will still smash them, which is the whole point
-    // of them being there". They carry no collider (you drive through one and
-    // accelerate), so every one of them reads as a bare intruder. Counting
-    // them buries the real ones under forty per world.
-    const props = new Set();
-    for (const p of (t.props ?? [])) if (p.mesh) p.mesh.traverse((c) => props.add(c));
-
-    // A TREE IS ITS TRUNK, NOT ITS CANOPY. A conifer is one ground-to-tip cone
-    // whose skirt is far wider than anything the car can hit, and `track.trees`
-    // carries the radius the game itself collides against. Measured on the
-    // pristine build: PINE VALLEY 743 trees and REDWOOD RAMPAGE 792, and NOT
-    // ONE has its trunk — or even its collision radius — inside a carriageway,
-    // while the canopy boxes reported 29 intruders on PINE VALLEY alone. So
-    // foliage sitting over a registered tree is skipped here and the trunks are
-    // measured against the registry instead, which is the quantity that means
-    // something. A tree PLANTED in the road still shows, in `treesOnRoad`.
-    const treeAt = new Map();                       // 8 u buckets, XZ
-    const tkey = (x, z) => `${Math.floor(x / 8)},${Math.floor(z / 8)}`;
-    for (const q of (t.trees ?? [])) {
-      const k = tkey(q.x, q.z); let a = treeAt.get(k); if (!a) treeAt.set(k, a = []); a.push(q);
+    // A TREE'S COLLIDER IS ITS TRUNK, and the game says so where it plants the
+    // forest corridors: "collision r tracks the TRUNK, not the canopy (the
+    // canopy overhangs the road; only the trunk is solid)". A crown leaning
+    // over a rural road is the design working — it is what makes a forest read
+    // as a tunnel through the woods — so counting foliage as an intrusion
+    // buries the trunks, which are the part that can stop a car. Measured on
+    // r199: of 287 bodies roster-wide, ~170 were crowns, and PINE VALLEY alone
+    // contributed 104 while every one of its trunks was clear.
+    // Each tree records its meshes in `parts`, TRUNK FIRST, so suppress
+    // parts[1..] and leave parts[0] to be measured like anything else.
+    // `tools-scratch/trees.mjs` is the acceptance test for the trunks
+    // themselves, against RULES.md's `widthAt + r + car radius`.
+    const foliage = new Set();
+    for (const tr of (t.trees ?? [])) {
+      const parts = tr.parts;
+      if (!Array.isArray(parts)) continue;
+      for (let pi = 1; pi < parts.length; pi++) if (parts[pi]) foliage.add(parts[pi]);
     }
-    const onTree = (x, z) => {
-      const cx = Math.floor(x / 8), cz = Math.floor(z / 8);
-      for (let a = -1; a <= 1; a++) for (let b2 = -1; b2 <= 1; b2++) {
-        for (const q of (treeAt.get(`${cx + a},${cz + b2}`) ?? [])) {
-          const rr = (q.r ?? 1) + 1.5;
-          if ((x - q.x) ** 2 + (z - q.z) ** 2 < rr * rr) return true;
-        }
+    const isFoliage = (o) => { let p = o; while (p) { if (foliage.has(p)) return true; p = p.parent; } return false; };
+
+    const chain = (o) => { const s = []; let p = o;
+      while (p && p !== t.group) { s.push(p.name || p.type); p = p.parent; }
+      return s.join(' < ') || 'group'; };
+    // a mesh the builder NAMED as roadway is roadway, whatever shape it is:
+    // a crossroad spur dropping down a hillside is not a thin sheet by AABB
+    const ROADNAME = /^road|^crossroad|ford-wash|skirt$/;
+    const namedRoad = (o) => { let p = o;
+      while (p && p !== t.group) { if (ROADNAME.test(p.name || '')) return true; p = p.parent; }
+      return false; };
+
+    const bbCache = new Map();
+    const bbOf = (g) => { let bb = bbCache.get(g.uuid);
+      if (!bb) { if (!g.boundingBox) g.computeBoundingBox(); bb = g.boundingBox; bbCache.set(g.uuid, bb); }
+      return bb; };
+    const Mat4 = t.group.matrixWorld.constructor;
+    const M = new Mat4(), INV = new Mat4();
+
+    const bodyHits = new Map();
+    const supp = { scenery: 0, surface: 0, overhead: 0, prop: 0, foliage: 0, buried: 0 };
+    let bodies = 0;
+
+    const worldAABB = (bb, m) => {
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      const e = m.elements;
+      for (let c = 0; c < 8; c++) {
+        const lx = (c & 1) ? bb.max.x : bb.min.x;
+        const ly = (c & 2) ? bb.max.y : bb.min.y;
+        const lz = (c & 4) ? bb.max.z : bb.min.z;
+        const wx = e[0] * lx + e[4] * ly + e[8] * lz + e[12];
+        const wy = e[1] * lx + e[5] * ly + e[9] * lz + e[13];
+        const wz = e[2] * lx + e[6] * ly + e[10] * lz + e[14];
+        if (wx < x0) x0 = wx; if (wx > x1) x1 = wx;
+        if (wy < y0) y0 = wy; if (wy > y1) y1 = wy;
+        if (wz < z0) z0 = wz; if (wz > z1) z1 = wz;
       }
-      return false;
+      return { x0, x1, y0, y1, z0, z1 };
     };
-    let treesOnRoad = 0, treeWorst = 0;
-    for (const q of (t.trees ?? [])) {
-      let bd = Infinity, at = 0;
-      for (let i = 0; i < N; i++) { const c = t.center[i];
-        const d = (q.x - c.x) ** 2 + (q.z - c.z) ** 2; if (d < bd) { bd = d; at = i; } }
-      const bite = t.widthAt(at) - (Math.sqrt(bd) - (q.r ?? 0.5));
-      if (bite > 0.15) { treesOnRoad++; treeWorst = Math.max(treeWorst, bite); }
-    }
 
-    const hits = [], bulk = [], skipped = new Map();
-    const v = new THREEV(), mm = new M4();
-    let propHits = 0, decals = 0, foliage = 0;
+    const consider = (m, bb, sig, prop, road, leaf) => {
+      bodies++;
+      const A = worldAABB(bb, m);
+      const fx = A.x1 - A.x0, fz = A.z1 - A.z0, fy = A.y1 - A.y0;
+      if (fx > SIZE_CAP || fz > SIZE_CAP) { supp.scenery++; return; }
 
-    t.group.traverse((m) => {
-      if (!m.isMesh || !m.geometry || m.visible === false) return;
-      if (props.has(m)) { propHits++; return; }
-      const g = m.geometry;
-      if (!g.boundingBox) g.computeBoundingBox();
-      const bb = g.boundingBox; if (!bb) return;
-      const ex = bb.max.x - bb.min.x, ey = bb.max.y - bb.min.y, ez = bb.max.z - bb.min.z;
-      if (!Number.isFinite(ex) || !Number.isFinite(ez)) return;
-
-      const count = m.isInstancedMesh ? m.count : 1;
-      // sample the footprint rather than trust one origin: a long low wall's
-      // centre can sit clear while its end reaches into the lane
-      const step = (e) => Math.min(m.isInstancedMesh ? 4 : 6, Math.max(2, Math.ceil(e / 2)));
-      const sx = step(ex), sz = step(ez);
-
-      for (let k = 0; k < count; k++) {
-        if (m.isInstancedMesh) { m.getMatrixAt(k, mm); mm.premultiply(m.matrixWorld); }
-        else mm.copy(m.matrixWorld);
-
-        // world extent of this instance, from the transformed corners
-        let xmin = Infinity, xmax = -Infinity, zmin = Infinity, zmax = -Infinity;
-        let ymin = Infinity, ymax = -Infinity;
-        for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) for (let c = 0; c < 2; c++) {
-          v.set(a ? bb.max.x : bb.min.x, b ? bb.max.y : bb.min.y, c ? bb.max.z : bb.min.z)
-            .applyMatrix4(mm);
-          xmin = Math.min(xmin, v.x); xmax = Math.max(xmax, v.x);
-          zmin = Math.min(zmin, v.z); zmax = Math.max(zmax, v.z);
-          ymin = Math.min(ymin, v.y); ymax = Math.max(ymax, v.y);
+      // narrow phase: exact point-to-OBB distance in XZ
+      INV.copy(m).invert();
+      const ie = INV.elements, e = m.elements, reach = maxHalf + 1;
+      let best = -Infinity, at = -1;
+      const cx0 = Math.floor((A.x0 - reach) / CELL), cx1 = Math.floor((A.x1 + reach) / CELL);
+      const cz0 = Math.floor((A.z0 - reach) / CELL), cz1 = Math.floor((A.z1 + reach) / CELL);
+      for (let cx = cx0; cx <= cx1; cx++) for (let cz = cz0; cz <= cz1; cz++) {
+        const cell = grid.get(gkey(cx, cz)); if (!cell) continue;
+        for (const i of cell) {
+          const c = t.center[i];
+          const lx = ie[0] * c.x + ie[4] * c.y + ie[8] * c.z + ie[12];
+          const ly = ie[1] * c.x + ie[5] * c.y + ie[9] * c.z + ie[13];
+          const lz = ie[2] * c.x + ie[6] * c.y + ie[10] * c.z + ie[14];
+          const qx = Math.min(Math.max(lx, bb.min.x), bb.max.x);
+          const qy = Math.min(Math.max(ly, bb.min.y), bb.max.y);
+          const qz = Math.min(Math.max(lz, bb.min.z), bb.max.z);
+          const wx = e[0] * qx + e[4] * qy + e[8] * qz + e[12];
+          const wz = e[2] * qx + e[6] * qy + e[10] * qz + e[14];
+          const bite = t.widthAt(i) - Math.hypot(wx - c.x, wz - c.z);
+          if (bite > best) { best = bite; at = i; }
         }
-        if (xmax - xmin > BIG || zmax - zmin > BIG) {
-          const s = sig(m, g); skipped.set(s, (skipped.get(s) ?? 0) + 1); continue;
-        }
-        // A DECAL HAS NO VOLUME TO DRIVE INTO. Puddles, bulldust holes, skid
-        // marks and the batched prop shadows are zero-thickness sheets laid on
-        // the tarmac. A puddle is pitched to the LONGITUDINAL grade only, so on
-        // a banked corner its outer edge lifts 0.4–0.6 u clear of the surface
-        // and the per-point band test — rightly — calls that proud. It is
-        // still a texture. Skip sheets that are LYING DOWN; a sheet standing up
-        // is a billboard or a panel and stays counted.
-        //
-        // LYING DOWN MEANS ITS NORMAL POINTS UP, not "it is wider than it is
-        // tall". Judging it by aspect ratio hid the sponsor boards: a
-        // PlaneGeometry(9, 2.2) standing upright is 2.2 u tall across a 9 u
-        // span, so the ratio called an advertising hoarding a puddle. Take the
-        // axis the sheet has no thickness on, rotate it into world space, and
-        // ask which way it faces.
-        // AN OVERLAY IS NOT AN OBSTACLE, AND IT SAYS SO ITSELF. Anything drawn
-        // with `depthWrite: false` is a visual layer by construction — sea
-        // foam, puddles, the tunnel light pools, contact shadows. COTE D AZUR's
-        // deepest remaining "intruder" was a surf dash: a 3.4 x 0.05 x 0.32
-        // `MeshBasicMaterial` box at opacity 0.4 on the water beside a
-        // seafront road, reported at 7.71 u. A thickness heuristic would have
-        // needed a magic number and would still have missed the thick ones;
-        // the material already carries the answer.
-        if (m.material && m.material.depthWrite === false) { decals++; continue; }
-        const flat = ex < 1e-6 ? 0 : ey < 1e-6 ? 1 : ez < 1e-6 ? 2 : -1;
-        if (flat >= 0) {
-          const e = mm.elements, o = flat * 4;
-          const ax = e[o], ay = e[o + 1], az = e[o + 2];
-          const len = Math.hypot(ax, ay, az) || 1;
-          if (Math.abs(ay / len) > 0.87) { decals++; continue; }   // faces the sky
-        }
-        // Deepest reach into a carriageway, over the whole footprint, counting
-        // only the points that are BOTH inside a drivable width and standing
-        // proud of the road at that point.
-        let bite = -Infinity, at = -1, lat = 0, proud = 0;
-        for (let a = 0; a <= sx; a++) for (let c = 0; c <= sz; c++) {
-          const lx = bb.min.x + (ex * a) / sx, lz = bb.min.z + (ez * c) / sz;
-          v.set(lx, bb.min.y, lz).applyMatrix4(mm);
-          const px = v.x, pz = v.z, y0 = v.y;
-          const n = near(px, pz); if (!n) continue;
-          const b = t.widthAt(n.i) - n.d;
-          // NOT `|| b <= bite`: the deepest point of a footprint can be the one
-          // that fails the band test — the buried end of a pier under its own
-          // deck — while a shallower one stands proud of the road next door.
-          // Short-circuiting on depth alone loses exactly that case.
-          if (b <= 0.15) continue;
-          v.set(lx, bb.max.y, lz).applyMatrix4(mm);          // the same column, up top
-          const lo = Math.min(y0, v.y), hi = Math.max(y0, v.y);
-          const roadY = t.center[n.i].y;
-          if (hi < roadY + PROUD || lo > roadY + ABOVE) continue;   // sunk, or overhead
-          if (b > bite) { bite = b; at = n.i; lat = n.d; proud = hi - roadY; }
-        }
-        if (at < 0) continue;
-
-        // Does anything in `solids` already stand here? If not, this is the
-        // pier class: visible, in the way, and invisible to every collider
-        // census we have.
-        let cd = Infinity;
-        const mx = (xmin + xmax) / 2, mz = (zmin + zmax) / 2;
-        for (const s of (t.solids ?? [])) {
-          if (s.mat === 'traffic') continue;
-          const dd = Math.hypot(s.x - mx, s.z - mz) - (s.r ?? 1);
-          if (dd < cd) cd = dd;
-        }
-        // A LANDFORM IS NOT AN OBSTACLE. Hillsides, snowbanks and cuttings are
-        // tens of metres across and the road is drawn OVER them, so where it
-        // climbs one its surface grazes the mesh and every such hill reports a
-        // deep bite. Everything that has ever actually stood in a carriageway
-        // — piers, parapets, quay guns, gantry legs, posts — is small. Split
-        // on span rather than drop the big ones, so the bulk stays readable.
-        const span = Math.max(xmax - xmin, zmax - zmin);
-        const mx0 = (xmin + xmax) / 2, mz0 = (zmin + zmax) / 2;
-        if (onTree(mx0, mz0)) { foliage++; continue; }
-        (span > 12 ? bulk : hits).push({ sig: sig(m, g), i: at, bite: +bite.toFixed(2),
-          lat: +lat.toFixed(2), span: +span.toFixed(1),
-          half: +t.widthAt(at).toFixed(2), h: +proud.toFixed(1),
-          bare: cd > 1.5, pos: [+mx.toFixed(0), +mz.toFixed(0)].join(',') });
       }
+      if (at < 0 || best <= MIN_BITE) return;   // not in a carriageway at all
+
+      // Everything past here IS in a carriageway; the rest says whether that
+      // is a defect. Each verdict is counted so no class is dropped silently.
+      const roadY = t.center[at].y;
+      if (prop) { supp.prop++; return; }
+      if (leaf) { supp.foliage++; return; }
+      if (road || fy < 0.5 * Math.min(fx, fz)) { supp.surface++; return; }
+      if (A.y1 < roadY + KERB) { supp.buried++; return; }   // top under the kerb
+      if (A.y0 > roadY + ROOF) { supp.overhead++; return; }
+
+      const kind = A.y0 < roadY + HEAD ? 'STANDING' : 'GRAZING';
+      // keyed by kind+signature, but the two are kept as FIELDS rather than
+      // packed into the key: a signature contains spaces, so splitting one
+      // back apart needs a separator that cannot occur in it, and reaching
+      // for a control character to get one leaves a source file that `grep`
+      // reports as binary.
+      const hk = kind + '\u0000' + sig;
+      const h = bodyHits.get(hk) ?? { kind, sig, n: 0, worst: -Infinity, at: 0, half: 0, y0: 0, y1: 0, roadY: 0 };
+      h.n++;
+      if (best > h.worst) { h.worst = best; h.at = at; h.half = t.widthAt(at);
+        h.y0 = A.y0; h.y1 = A.y1; h.roadY = roadY; }
+      bodyHits.set(hk, h);
+    };
+
+    t.group.traverse((o) => {
+      if (!o.visible) return;
+      const g = o.geometry; if (!g || (!o.isMesh && !o.isInstancedMesh)) return;
+      const bb = bbOf(g);
+      const q = g.parameters ?? {};
+      const gtype = g.type.replace('Geometry', '') + '(' + Object.entries(q)
+        .filter(([k, v]) => typeof v === 'number' && !/segment/i.test(k))
+        .map(([k, v]) => `${k}=${+v.toFixed(2)}`).join(',') + ')';
+      const mm = Array.isArray(o.material) ? o.material[0] : o.material;
+      const sig = `${chain(o)} | ${gtype} | ${mm?.color ? '#' + mm.color.getHexString() : '?'}`;
+      const prop = isProp(o), road = namedRoad(o), leaf = isFoliage(o);
+      o.updateWorldMatrix(true, false);
+      if (o.isInstancedMesh) {
+        for (let k = 0; k < o.count; k++) { o.getMatrixAt(k, M); M.premultiply(o.matrixWorld); consider(M, bb, sig, prop, road, leaf); }
+      } else { M.copy(o.matrixWorld); consider(M, bb, sig, prop, road, leaf); }
     });
 
-    const group = (list) => { const kinds = new Map();
-      for (const h of list) { const e = kinds.get(h.sig) ?? { n: 0, bare: 0, worst: 0 };
-        e.n++; if (h.bare) e.bare++; e.worst = Math.max(e.worst, h.bite); kinds.set(h.sig, e); }
-      return [...kinds].map(([k, e]) => ({ k, ...e })).sort((a, b) => b.worst - a.worst); };
-    hits.sort((a, b) => b.bite - a.bite);
-    bulk.sort((a, b) => b.bite - a.bite);
-    return { hits: hits.slice(0, 8), n: hits.length, bare: hits.filter((h) => h.bare).length,
-      kinds: group(hits), props: propHits, decals, foliage,
-      trees: (t.trees ?? []).length, treesOnRoad, treeWorst: +treeWorst.toFixed(2),
-      bulkN: bulk.length, bulkKinds: group(bulk).slice(0, 6),
-      skipped: [...skipped].map(([k, n]) => `${k} x${n}`) };
-  });
-  r.scene = scene;
+    const bodyRows = [...bodyHits.values()].map((h) => {
+      return { kind: h.kind, sig: h.sig, n: h.n, bite: +h.worst.toFixed(2), i: h.at, half: +h.half.toFixed(2),
+        lo: +(h.y0 - h.roadY).toFixed(2), hi: +(h.y1 - h.roadY).toFixed(2) };
+    }).sort((a, b) => b.bite - a.bite);
 
+    return { solids: (t.solids ?? []).length, blockers, stray, floaters,
+      narrowest: +narrowest.toFixed(1), bodies, bodyRows, supp };
+  });
+
+  const nBodies = r.bodyRows.reduce((a, h) => a + h.n, 0);
   totals.worlds++;
   totals.blockers += r.blockers.length;
   totals.holes += r.stray.length;
   totals.floaters += r.floaters.length;
-  totals.intruders += r.scene.n;
-  totals.bare += r.scene.bare;
-  totals.trees += r.scene.treesOnRoad;
-  const dirty = r.blockers.length || r.stray.length || r.floaters.length
-    || r.scene.bare || r.scene.treesOnRoad;
+  totals.bodies += nBodies;
+  const dirty = r.blockers.length || r.stray.length || r.floaters.length || nBodies;
   if (dirty) totals.dirty++;
   for (const b of r.blockers) byKind.set(b.mat, (byKind.get(b.mat) ?? 0) + 1);
+  for (const k of Object.keys(suppTotal)) suppTotal[k] += r.supp[k];
+  for (const h of r.bodyRows) {
+    const bk = `${h.kind}\u0000${h.sig}`;
+    const e = byBuilder.get(bk) ?? { kind: h.kind, sig: h.sig, n: 0, worst: 0, where: '' };
+    e.n += h.n;
+    if (h.bite > e.worst) { e.worst = h.bite; e.where = `${lv.name} sample ${h.i}`; }
+    byBuilder.set(bk, e);
+  }
 
   const bits = [];
   if (r.blockers.length) {
@@ -432,34 +371,21 @@ for (const lv of worlds) {
   }
   if (r.stray.length) bits.push(`${r.stray.length} BARE HOLES at ${r.stray.join(', ')}`);
   if (r.floaters.length) bits.push(`${r.floaters.length} FLOATERS, highest ${r.floaters[0].air} u`);
-  if (r.scene.n) bits.push(`${r.scene.n} INTRUDERS (${r.scene.bare} with NO COLLIDER) `
-    + `worst bite ${r.scene.hits[0].bite} u`);
-  if (r.scene.treesOnRoad) bits.push(`${r.scene.treesOnRoad} TREES in the lane, `
-    + `worst ${r.scene.treeWorst} u`);
+  if (nBodies) bits.push(`${nBodies} BODIES in the carriageway, worst bite ${r.bodyRows[0].bite} u`);
   console.log(`${dirty ? '••' : '  '} ${String(lv.id).padStart(2)} ${lv.name.padEnd(22)}`
     + `${String(r.solids).padStart(5)} solids  narrowest ${String(r.narrowest).padStart(5)} u  `
     + (bits.length ? bits.join(' | ') : 'clean'));
-  if (r.scene.n) for (const k of r.scene.kinds) {
-    console.log(`        ${String(k.n).padStart(4)}x ${k.k.padEnd(40)} worst ${k.worst.toFixed(2)} u`
-      + (k.bare ? `   ${k.bare} BARE` : '   (has colliders)'));
-  }
-  if (process.env.HITS) for (const h of r.scene.hits) {
-    console.log(`        @${String(h.i).padStart(4)} ${h.sig.padEnd(34)} bite ${String(h.bite).padStart(5)} u `
-      + `lat ${h.lat}/${h.half}  top ${h.h} u over road  span ${h.span} u  at ${h.pos}${h.bare ? '  BARE' : ''}`);
-  }
-  if (process.env.BULK && r.scene.bulkN) {
-    console.log(`     ~~ ${r.scene.bulkN} bulk meshes over 12 u across also reach the band:`);
-    for (const k of r.scene.bulkKinds) {
-      console.log(`        ${String(k.n).padStart(4)}x ${k.k.padEnd(40)} worst ${k.worst.toFixed(2)} u`);
-    }
-  }
   rows.push({ id: lv.id, name: lv.name, ...r });
 }
 
 console.log(`\n===== ${totals.dirty} of ${totals.worlds} worlds have something on the road =====`);
 console.log(`   blockers ${totals.blockers}   bare holes ${totals.holes}   floaters ${totals.floaters}`
-  + `   intruders ${totals.intruders} (${totals.bare} with no collider)`
-  + `   trees in a lane ${totals.trees}`);
+  + `   bodies ${totals.bodies}`);
+// THE SUPPRESSED COUNTS ARE PART OF THE ANSWER. A filter that is not printed
+// reads as "nothing there", which is how the piers survived two censuses.
+console.log(`   bodies suppressed: ${suppTotal.prop} intended props, ${suppTotal.foliage} tree foliage, `
+  + `${suppTotal.surface} road surfaces, ${suppTotal.overhead} overhead, `
+  + `${suppTotal.buried} under the kerb, ${suppTotal.scenery} scenery`);
 if (byKind.size) {
   console.log('\n--- blockers by material ---');
   for (const [k, n] of [...byKind].sort((a, b) => b[1] - a[1])) console.log(`   ${k.padEnd(14)} ${n}`);
@@ -475,28 +401,11 @@ if (worst.length) {
   }
 }
 
-const scenic = rows.filter((r) => r.scene.n)
-  .sort((a, b) => b.scene.hits[0].bite - a.scene.hits[0].bite).slice(0, 10);
-if (scenic.length) {
-  console.log('\n--- deepest geometry in a carriageway (collider or not) ---');
-  for (const w of scenic) {
-    const h = w.scene.hits[0];
-    console.log(`   ${w.name.padEnd(22)} ${h.sig.padEnd(34)} bites ${h.bite} u into ${h.half} u `
-      + `at sample ${h.i} (${h.pos}), top ${h.h} u over the road${h.bare ? '  NO COLLIDER' : ''}`);
-  }
-}
-const skipped = new Map();
-for (const w of rows) for (const s of w.scene.skipped) {
-  const [k, n] = [s.slice(0, s.lastIndexOf(' x')), +s.slice(s.lastIndexOf(' x') + 2)];
-  skipped.set(k, (skipped.get(k) ?? 0) + n);
-}
-if (skipped.size) {
-  // NOT silent: a cap that hides what it dropped reads as coverage it did not
-  // give. Everything here was too wide in XZ to be anything but the ground
-  // the road is drawn on — check the list, do not assume it.
-  console.log(`\n--- too large to be an obstacle (> 40 u across), skipped ---`);
-  for (const [k, n] of [...skipped].sort((a, b) => b[1] - a[1]).slice(0, 12)) {
-    console.log(`   ${k.padEnd(46)} x${n}`);
+if (byBuilder.size) {
+  console.log('\n--- bodies in the carriageway, by builder signature ---');
+  for (const e of [...byBuilder.values()].sort((a, b) => b.worst - a.worst)) {
+    console.log(`   ${e.kind.padEnd(8)} x${String(e.n).padStart(4)}  worst ${String(e.worst).padStart(6)} u  (${e.where})`);
+    console.log(`          ${e.sig}`);
   }
 }
 

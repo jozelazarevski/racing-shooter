@@ -8452,25 +8452,30 @@ export class Track {
           const row = h1 < 0.55 ? 0 : 1;
           const sc = 1.15 + hash(j * 9.1 - side) * 0.75;      // big canopy pines
           const lat = (this.widthAt(j) + 0.75 * sc + 2.0 + row * 3.2 + h1 * 1.4) * side;
-          const p = this.pointAt(j, lat);
-          // AND THAT CLEARANCE IS ONLY TRUE OF SAMPLE j. `lat` is measured
-          // along j's own normal and reads `widthAt(j)`, so the trunk clears
-          // the road THERE by construction — and says nothing about a second
-          // leg passing underneath. SUZUKA is a figure-of-eight: measured on
-          // the pristine build, 14 trunks stood inside a carriageway around
-          // samples 19-24 and 76, the worst 3.0 u past the drivable edge with
-          // a 1.16 u trunk on it. These are `solid: true` pines — hitting one
-          // stops a car dead — so this is the worst-consequence version of the
-          // defect the props, the tire stacks, the cabins and (r199b) the cacti
-          // each had fixed in their own builder.
+          // AND THAT LATERAL IS AN OFFSET, NOT A DISTANCE — which matters more
+          // here than almost anywhere, because these trunks are SOLID (s >= 1.0
+          // per the material law) and they line the racing line for the whole
+          // length of a forest zone. `lat` is measured along sample j's own
+          // normal; where the lap comes back on itself it says nothing about
+          // the nearest leg, so a trunk correctly spaced off ITS carriageway
+          // stands in the middle of another one. Measured on r199: SUZUKA — a
+          // figure-of-eight, so the crossover legs run close — had 10 solid
+          // trunks ON the drivable surface, the worst 4.44 u inside a 9 u
+          // half-width, plus 18 inside the clearance margin.
           //
-          // `_distToTrack` searches the whole lap and sees the near leg
-          // whichever one it is. The margin matches the design above: trunk
-          // radius plus the 2.0 u the offset already reserves, less a little,
-          // so a straight still plants both rows and only a leg crossing
-          // underneath takes a tree out. A missing tree is a gap in a corridor;
-          // a present one is a wall in a lane.
-          if (!this._clearsRoad(p.x, p.z, 0.75 * sc, 1.6)) continue;
+          // Same ladder the sponsor boards got in r199: try the designed spot,
+          // step outward, and if the whole row is blocked plant nothing. One
+          // missing pine in a dense corridor is invisible; one standing in the
+          // road is a wall the AI's precomputed line never meets.
+          const trunkR = 0.75 * sc;
+          let p = null;
+          for (const extra of [0, 2, 4, 7, 10]) {
+            const cand = this.pointAt(j, lat + extra * side);
+            _clearV.set(cand.x, 0, cand.z);
+            const need = this.widthAt(this.nearestIndex(_clearV)) + trunkR + 1.8;
+            if (this._distToTrack(cand.x, cand.z) >= need) { p = cand; break; }
+          }
+          if (!p) continue;
           const ty = this.terrainHeight(p.x, p.z) - 0.2;
           // lean the whole tree inward over the road (rotation about the tangent)
           const lean = (0.10 + hash(j * 3.3 + side) * 0.12) * side;
@@ -13994,6 +13999,17 @@ export class Track {
       const a = this.tan[i], b = this.tan[(i + 12) % N];
       const side = (a.x * b.z - a.z * b.x) > 0 ? -1 : 1;
       const p = this.pointAt(i, (WALL_OFF + 1.7) * side);
+      // A MARKER POST GOES ON THE OUTSIDE OF THE CORNER, NOT IN THE NEXT ONE.
+      // `WALL_OFF + 1.7` is an offset along sample i's normal, and this
+      // builder picks CORNERS on purpose — precisely where the lap is most
+      // likely to have another leg on the far side of the apex. Measured on
+      // r199: CLIFF KNOT, whose lap ties around itself, stood 23 posts and
+      // bands in a carriageway, the worst 7.91 u into a 9 u half-width. They
+      // carry no collider, so this is the bridge-pier defect — a reflector
+      // post in the middle of the road that you drive straight through.
+      // A corner that cannot take a marker simply does not get one.
+      _clearV.set(p.x, 0, p.z);
+      if (this._distToTrack(p.x, p.z) < this.widthAt(this.nearestIndex(_clearV)) + 1.2) continue;
       const y = this.terrainHeight(p.x, p.z);
       q.setFromAxisAngle(up, this.headingAt(i));
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(1, 1, 1));
@@ -15745,7 +15761,17 @@ export class Track {
       // every other generated dressing goes through here, and clearing a
       // building site by hand while the wood grew back over it would make the
       // tool feel broken
-      if (this._erased(p.x, p.z)) continue;
+      //
+      // AND A SPOT NEED NOT CARRY COORDINATES. `_buildCacti` describes its
+      // spot as {i, lateral} and resolves the point in `place`, so this was
+      // calling `_erased(undefined, undefined)` — and `NaN < r * r` is FALSE,
+      // so the answer came back "not erased" every time and the eraser did not
+      // reach the desert at all. Same family as `fence.mjs`'s post filter
+      // (r199): a comparison against a value that is not there does not fail
+      // loudly, it quietly says no.
+      const ep = p.x != null ? p
+        : (p.i != null ? this.pointAt(p.i, p.lateral ?? 0) : null);
+      if (ep && this._erased(ep.x, ep.z)) continue;
       place(p, placed);
       placed++;
     }
@@ -16044,8 +16070,25 @@ export class Track {
         }
         // the ring branch skips _trackSidePos and with it the underwater
         // check — on a coast world it was planting conifers IN the sea
-        return p && !this._inWater(p.x, p.z) && !this._onQuayStrip(p.x, p.z)
-          && this._altOK(p.x, p.z) ? p : null;
+        if (!p || this._inWater(p.x, p.z) || this._onQuayStrip(p.x, p.z)
+          || !this._altOK(p.x, p.z)) return null;
+        // NOR DOES ANY BRANCH ASK WHETHER A TRUNK FITS. `_trackSidePos` only
+        // promises `belt[0] - 1`, and a theme may run its belt close: on
+        // DEEPWOOD TRAIL solid boles stood 10.75 u out against a 9 u
+        // half-width plus the 1.7 u car radius RULES.md asks of a tree. Reject
+        // a spot that could not carry even the smallest trunk — `_scatter`
+        // re-rolls a null, so this costs a sample rather than a tree — and let
+        // the placer shrink the ones that merely fit tightly.
+        // The floor is 0.85 and not a hair over zero so that any spot which
+        // survives can still carry a NORMAL tree: the placer below bounds the
+        // scale by the room, and the smallest scale this builder has ever
+        // produced is 0.6, which at the widest trunk factor (kapok, 1.25)
+        // needs 0.75 u of room plus the margin. Accepting tighter spots would
+        // trade trunks in the road for bonsai beside it.
+        _clearV.set(p.x, 0, p.z);
+        if (this._distToTrack(p.x, p.z)
+            < this.widthAt(this.nearestIndex(_clearV)) + 1.7 + 0.85) return null;
+        return p;
       },
       (p) => {
         const name = pick();
@@ -16059,7 +16102,17 @@ export class Track {
         const rr2 = Math.random();
         const dRoad2 = this._distToTrack(p.x, p.z);
         const sMax = dRoad2 < 26 ? 1.35 : 2.5;
-        const s = Math.min(sMax, 0.6 + rr2 * rr2 * 1.9);
+        // `sMax` keeps a HERO CANOPY away from the chase camera; it never asked
+        // whether the trunk clears the road, and the two are different
+        // questions — 1.35 is small for a camera and still 1.35 u of solid bole
+        // for a car. Bound the scale by the room actually there, measured to
+        // the nearest leg, so a tree beside a tight belt gets smaller instead
+        // of standing inside the clearance.
+        // the 0.05 is deliberate slack: a builder that plants EXACTLY on its
+        // limit leaves the clearance test riding on floating-point noise
+        _clearV.set(p.x, 0, p.z);
+        const room = dRoad2 - (this.widthAt(this.nearestIndex(_clearV)) + 1.7);
+        const s = Math.min(sMax, (room - 0.05) / spec.rFac, 0.6 + rr2 * rr2 * 1.9);
         const ty = this.terrainHeight(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.45), s);
         m4.setPosition(p.x, ty, p.z);
@@ -16325,9 +16378,29 @@ export class Track {
         const roll = Math.random();
         const i = (Math.random() * N) | 0;
         const side = Math.random() < 0.5 ? 1 : -1;
+        // A ROADSIDE OFFSET IS NOT A ROADSIDE DISTANCE. 10.55 u along sample
+        // i's normal is the right spacing beside i's own leg — a 9 u half-width
+        // plus the 1.7 u car radius RULES.md asks of a tree — but on the inside
+        // of a bend, or where the lap doubles back, the nearest leg is closer
+        // than that and nothing here was measuring it. Measured on r199:
+        // CANYON RUN had 6 cacti standing ON the drivable surface, the worst
+        // 1.01 u from the centreline. Desert scrub is `solid: false`, so this
+        // is the bridge-pier defect rather than the boulder one — you drive
+        // THROUGH a saguaro in the middle of the road, which reads worse than
+        // hitting it. `_scatter` re-rolls a null, so a rejected spot costs a
+        // sample, not a plant.
+        const clearRoadside = (lateral, s) => {
+          const p = this.pointAt(i, lateral);
+          _clearV.set(p.x, 0, p.z);
+          const need = this.widthAt(this.nearestIndex(_clearV)) + 0.75 * s + 1.7;
+          return this._distToTrack(p.x, p.z) >= need;
+        };
         if (roll < 0.5) {
           // roadside, hugging the cliff base (small ones); dy is relative to road y
-          return clearOfRoad({ i, lateral: side * (10.55 + Math.random() * 0.35), dy: 0, s: 0.5 + Math.random() * 0.35 });
+          const s = 0.5 + Math.random() * 0.35;
+          const lateral = side * (10.55 + Math.random() * 0.35);
+          if (!clearRoadside(lateral, s)) return null;
+          return { i, lateral, dy: 0, s };
         }
         if (roll < 0.8 && this.T.cliffWalls) {
           // silhouetted on the canyon rim (cliff heights are relative to road y)
@@ -16341,7 +16414,15 @@ export class Track {
         // open bowl around the start line — absolute terrain height
         const gi = ((Math.random() * 140 - 70 | 0) + N) % N;
         const lat = side * (13 + Math.random() * 22);
-        return clearOfRoad({ i: gi, lateral: lat, terrain: true, s: 0.8 + Math.random() * 0.7 });
+        const gs = 0.8 + Math.random() * 0.7;
+        // 13-35 u along ONE normal is the widest throw in this builder and so
+        // the likeliest to land on another leg; it seats on the terrain, i.e.
+        // at road level, so it gets the same measured check as the roadside row
+        const gp = this.pointAt(gi, lat);
+        _clearV.set(gp.x, 0, gp.z);
+        if (this._distToTrack(gp.x, gp.z)
+            < this.widthAt(this.nearestIndex(_clearV)) + 0.75 * gs + 1.7) return null;
+        return { i: gi, lateral: lat, terrain: true, s: gs };
       },
       (spot, k) => {
         const p = this.pointAt(spot.i, spot.lateral);
@@ -17918,9 +17999,40 @@ export class Track {
     const boardOff = this.T.cliffWalls ? WALL_OFF + 0.75
       : (this.T.retainingWalls || this.T.guardFence || this.T.hedgeBanks)
         ? WALL_OFF + 6.4 : WALL_OFF + 3.6;
+    // A BOARD IS NINE UNITS WIDE, AND AN OFFSET IS NOT A DISTANCE.
+    //
+    // `boardOff` is measured along sample `i`'s own normal. Where the lap
+    // comes back on itself that offset says nothing about the distance to the
+    // NEAREST leg, so a board correctly placed beside its own carriageway can
+    // stand in the middle of another one. It is the defect `_buildProps`
+    // documents at length (the cabin on FURKA RIDGE's centreline, the 38 tyre
+    // stacks) and the one r191 fixed for the quay guns — and this builder had
+    // no distance check of any kind.
+    //
+    // Measured on r198 before this gate existed: 68 of 419 boards stood inside
+    // a drivable width across 15 of 61 worlds. Worst was BRIDGE RUN at 8.58 u
+    // into a 9 u half-width — 0.42 u off the centreline — with MOUNTAIN TO SEA
+    // at 7.87 and MONACO STREETS at 8.25. On the cliff-walled worlds it was
+    // systematic rather than incidental: `WALL_OFF + 0.75` leaves EVERY board
+    // 6.65 u from the road against a 9 u half-width, so all nine of CANYON
+    // RUN's stood in the carriageway.
+    //
+    // The whole SPAN has to clear, not the centre: a board pivoted across the
+    // road has its midpoint on the verge and its ends over both lanes.
+    const spanClearance = (p, yaw) => {
+      let worst = -Infinity;
+      for (const o of [-4.5, -2.25, 0, 2.25, 4.5]) {
+        const x = p.x + Math.cos(yaw) * o, z = p.z - Math.sin(yaw) * o;
+        _clearV.set(x, 0, z);
+        const need = this.widthAt(this.nearestIndex(_clearV)) + 1.6;
+        worst = Math.max(worst, need - this._distToTrack(x, z));
+      }
+      return worst;                       // <= 0 means the whole board is clear
+    };
     for (let b = 0; b < 10; b++) {
       const i = ((b + 0.5) * N / 10) | 0;
       if (this.curvature[i] > this.T.boardMaxCurv) continue; // keep boards off tight corners
+      const yaw = this.headingAt(i) + Math.PI;
       let side = b % 2 === 0 ? 1 : -1;
       let p = this.pointAt(i, boardOff * side);
       // a harbour quay is not an ad site: a board between the seafront road
@@ -17930,6 +18042,24 @@ export class Track {
         side = -side;
         p = this.pointAt(i, boardOff * side);
         if (this._onQuayStrip(p.x, p.z)) continue;
+      }
+      // Try the designed spot, then step further out, then the other side of
+      // the road on the same ladder. A board with nowhere clear is NOT built —
+      // the same answer r191 gave the quay guns, and for the same reason: one
+      // missing advertisement is invisible, one standing in the racing line is
+      // not.
+      if (spanClearance(p, yaw) > 0) {
+        let placed = null;
+        for (const sd of [side, -side]) {
+          for (const extra of [3, 6, 9, 12]) {
+            const q2 = this.pointAt(i, (boardOff + extra) * sd);
+            if (this._onQuayStrip(q2.x, q2.z)) continue;
+            if (spanClearance(q2, yaw) <= 0) { placed = q2; side = sd; break; }
+          }
+          if (placed) break;
+        }
+        if (!placed) continue;
+        p = placed;
       }
       const g = new THREE.Group();
       const board = new THREE.Mesh(boardGeo, mats[b % mats.length]);

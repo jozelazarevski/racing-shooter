@@ -1623,337 +1623,386 @@ BRIDGE RUN, SEA CLIFF RUN and OLIVE CROSSING are byte-identical. CLIFF KNOT
 test-index-recovery 10/10 — the guard that matters here, since every gap moved.
 
 
-## r199 — the census learns to see geometry, and the fence posts were never there
+## r199 — the census learns to see, and "posts in the carriageway" turns out not to exist
 
-### THE HANDOVER'S NUMBER ONE PRIORITY WAS A PROBE BUG
+### THE POSTS WERE NEVER THERE. `fence.mjs` HAD A NaN HOLE.
 
-Reported: "~15 posts of 0.18 x 1.05 stand in rural carriageways, worst bite
-**9.5 u into a 9 u half-width**, i.e. dead centre. The builder is
-UNIDENTIFIED." Three sessions of grep had failed to find a builder because
-there is nothing to find.
+HANDOVER.md item 1 asked for ~15 trackside posts to be cleared out of rural
+carriageways — "PINE VALLEY 3, HEDGEROW DASH 12, worst bite 9.5 u into a 9 u
+half-width, i.e. dead centre of the road", builder unidentified, computed
+dimensions, a literal grep will not find it.
 
-`scratchpad/fence.mjs` rejected non-posts with
+There is no such builder. The numbers came from `scratchpad/fence.mjs`, whose
+post filter was
 
     if (!q || Math.abs(q.width - 0.18) > 0.005 || Math.abs(q.height - 1.05) > 0.005) return;
 
-A SphereGeometry has no `q.width`. `Math.abs(undefined - 0.18)` is `NaN`, and
-`NaN > 0.005` is **false**, so the guard never fired and every sphere, torus,
-circle and cylinder in the scene fell through as a "fence post" — including
-the pickups sitting on the racing line and the 9000 u world skirt. That is
-where 9.5 u came from; it was never a post.
+A geometry with no `width`/`height` parameters — a Sphere, a Cone, a Cylinder,
+a Circle — gives `Math.abs(undefined - 0.18)` = NaN, and **`NaN > 0.005` is
+false**, so every one of them PASSED the post filter. The tool was not counting
+posts. It was counting everything that was not a Box.
 
-Measured with the keys required to exist, and with InstancedMesh handled
-per-instance rather than by reading an InstancedMesh's own origin (which is
-always 0,0,0 and measures nothing):
+Measured on r198, the same worlds, loose filter vs a filter that first checks
+the value EXISTS:
 
-    FROST PEAK        10 posts, all at 10.3 u lateral vs a 9 u half-width
-    REDWOOD RAMPAGE    7 posts, all at 10.3 u lateral vs a 9 u half-width
+| World | fence.mjs "posts" | "on the road" | real 0.18x1.05 boxes | on the road |
+|---|---|---|---|---|
+| PINE VALLEY | 63 | **3** | 15 | **0** |
+| HEDGEROW DASH | 69 | **12** | 18 | **0** |
+| FROST PEAK | 116 | **43** | 10 | **0** |
+| REDWOOD RAMPAGE | 54 | **6** | 7 | **0** |
 
-Every one is **1.21 u OUTSIDE the drivable edge**. `_buildJunctionFences` is
-clean, exactly as stashing it had already suggested — the earlier session read
-that result as "the offenders are somewhere else" when it meant "there are no
-offenders".
+The 3 and the 12 are the handover's own numbers, reproduced exactly — and 15
+and 18 are r195's own "+15 posts on PINE VALLEY, +18 on HEDGEROW DASH, and ZERO
+of them in a carriageway". `_buildJunctionFences` was right all along and r195
+said so.
 
-This is the fifth confident-wrong-answer from a hand-rolled probe in two
-sessions. The lesson has a sharper edge than "measure twice": a filter that
-can be defeated by a MISSING FIELD fails OPEN, and a probe that fails open
-reports work that does not exist. `NaN` comparisons are always false, so
-`Math.abs(a - b) > eps` is not a rejection test unless `a` is known to exist.
+What the phantom 43 on FROST PEAK actually were, identified by walking the
+scene with real bounding boxes: the 9000 u world skirt, the sky dome, two haze
+bands, the road ribbon and its skirt, the start gantry's banner and its three
+traffic-light spheres, and the baked contact shadows. The "9.5 u bite into a
+9 u half-width, dead centre" is the START GANTRY — a banner over the start
+line, which is where a start gantry goes.
 
-### WHAT THE JOB ACTUALLY WAS, AND WHAT IT FOUND
+`fence.mjs` is fixed (it now requires `BoxGeometry` and finite dimensions) and
+carries this story in its header. **A test for a value must first test that the
+value exists.** That is the fifth confident-wrong probe in two sessions.
 
-The handover was right about the blind spot even though it was wrong about the
-posts. `tool-road-census` walked `track.solids` only, and three defect classes
-have now hidden in that gap. It walks `track.group` now and measures
-transformed geometry, so a mesh with no collider entry is counted like any
-other; ones with no collider within 1.5 u are flagged BARE, which is the pier
-class exactly.
+### THE CENSUS NOW WALKS THE SCENE GRAPH — WITH GATES THAT ARE COUNTED
 
-Making it READABLE was most of the work, and every filter was earned by a
-false positive it removed rather than chosen up front:
+The blind spot was real even though this instance of it was not.
+`tool-road-census` read `track.solids`, i.e. COLLIDERS, and three defect
+classes have hidden in the gap between "has a collider" and "is drawn in the
+road" (barriers r191, bridge piers r193, and whatever r195's audit thought it
+had found). It now also walks `track.group.traverse` — every mesh and every
+INSTANCE of every InstancedMesh — as a BODIES section.
 
-  - **the drive band, measured PER FOOTPRINT POINT.** Judging a whole mesh
-    against its nearest sample's road height reported every puddle in the game.
-    A puddle decal is a `CircleGeometry` scaled to 4 u and pitched to
-    `-atan(slopeAt(i))`: flat against the road, 0.8 u tall in world axes. Point
-    by point it is 0.04 u proud, which is what it is. Same test also drops
-    bridge decks (overhead) and footings (sunk) without naming them.
-  - **`track.props`.** Crates, cones, barrels and snowmen are put on the
-    drivable surface deliberately — `_buildProps` carries three paragraphs
-    about why — and carry no collider. Forty per world, all bare, all correct.
-  - **decals**: zero-thickness sheets lying down have no volume to drive into.
-  - **foliage**: a conifer is one ground-to-tip cone whose skirt is far wider
-    than anything the car collides with. PINE VALLEY reported 29 canopies in
-    the lane; measured against `track.trees`, which is the radius the game
-    itself uses, **743 trees and not one trunk inside a carriageway**. Foliage
-    over a registered trunk is skipped and the trunks are counted separately,
-    so a tree PLANTED in the road would still show.
-  - **landforms** over 40 u across, and the 12-40 u bulk, are counted and
-    LISTED rather than dropped — a cap that hides what it dropped reads as
-    coverage it never gave.
+Walking "every mesh" naively is useless: the first attempt reported the sky
+dome biting 8982 u into a 5.34 u half-width. What makes it usable:
 
-### SEA CLIFF RUN: TWO COLUMNS IN A LANE, NEITHER WITH A COLLIDER
+- **exact point-to-OBB distance in XZ**, not a bounding disc. A long thin wall
+  must measure by its nearest FACE — r191's "walls are segments, not dots",
+  one dimension further out. A culvert parapet 1 x 0.95 x 19.4 measures 7.73 u
+  of bite as a disc and clears the road as an OBB.
+- **the game's own height numbers**, not invented ones: 2.4 u is `hullHeight`
+  from vehicles.js (the car's roof), 1.2 u is the headroom line `deckOverhead`
+  already uses. Survivors are STANDING (below the headroom line) or GRAZING.
+- **four suppression classes, every one of them COUNTED and printed** —
+  `scenery` (footprint > 60 u), `surface` (a sheet, or a mesh the builder named
+  as roadway), `overhead` (underside clears the roof), `prop` (it belongs to
+  `track.props`). A filter that is not printed reads as "nothing there", which
+  is exactly how the piers survived two censuses.
 
-Both on the world the handover already flagged for stacking 80 u of road on
-road — the same defect wearing a second face.
+The `prop` class matters and is not a fudge: `_buildProps` stands crates, cones
+and barrels on the drivable surface ON PURPOSE — "the stuff you are MEANT to
+smash" — and its own comment records that this was asked for three times and
+that rocks and timber already take the trackside-only branch. Roster-wide that
+is 2038 bodies. Counting them as intrusions is what buries the real ones.
 
-**The stone bridge's arch face.** `_buildStoneBridges` built a 2.2 x 9 x 3.2
-block of masonry at `8.5 * side` along `nn`, and `nn` is `this.nrm[i]`, the
-normal at the MIDDLE of the span — while the pier stands at `j`, a third of
-the span away. The same "an offset is not a distance" error the props and the
-tire stacks already carry comments about, and 8.5 u is inside a 9 u half-width
-to begin with. Under its own deck that is harmless: the top sits 0.1 u below
-the tarmac. Where another leg passes lower it is a grey column in the racing
-line — **5.2 u proud of the road at sample 660, biting 5.87 u into a 9 u
-half-width**, and you drive straight through it.
+Roster-wide on r198: 399 bodies in a carriageway across 61 worlds, against
+2038 intended props, 4168 road surfaces, 2515 overhead, 120 under the kerb and
+5472 scenery suppressed.
 
-It takes `nrm[j]` now and asks `_pierInRoad` first. That guard exists because
-`_clearsRoad` cannot answer this question: `_clearsRoad` is flat, so it would
-refuse every arch face in the game for standing under the bridge it holds up.
-The question is three-dimensional — does this masonry rise out of anybody's
-road — and its own deck answers no on the height test.
+### AND IT FOUND A REAL ONE ON ITS FIRST RUN: THE SPONSOR BOARDS
 
-**Four overpass deck rails**, up to 4.25 u into the lane at sample 740.
-`railBlocked` exists to prevent precisely this and was bought off with a low
-index distance:
+`_buildBanners` placed each board at `pointAt(i, boardOff * side)` and built
+it. **No `_clearsRoad`, no `_distToTrack`, no check of any kind.** It is the
+defect `_buildProps` documents at length — "an offset is not a distance": the
+cabin on FURKA RIDGE's centreline, the 38 tyre stacks — and the one r191 fixed
+for the quay guns.
 
-    const dLap = Math.min((i - jSelf + N) % N, (jSelf - i + N) % N);
-    if (dLap <= half + 4) continue;             // its own deck run
+Measured on r198, sponsor boards only:
 
-`half` is the whole DECK RUN — 38 samples on this world, so 76 samples of lap
-were exempt. Where a lap doubles back inside its own span the returning leg is
-a few samples away and a couple of metres below, so the window that exists to
-ignore this rail's own road swallowed the other one. Traced from the builder:
-rails at samples 731 and 733 stand 7.12 and 8.33 u from the centreline at
-sample 740, inside a 9 u half-width, 1.7 and 1.2 u ABOVE that road.
+    68 of 419 boards stood inside a drivable width, on 15 of 61 worlds
+    worst   BRIDGE RUN       8.58 u into a 9 u half-width — 0.42 u off centre
+            MONACO STREETS   8.25 u  (0.75 u off centre)
+            MOUNTAIN TO SEA  7.87 u  (1.13 u off centre)
 
-The exemption relaxes the BUFFER now instead of skipping the road: its own
-deck is measured against the bare half-width, which the 10.2 u offset clears
-by 1.2 u, and every other stretch keeps its 1.4 u. Same intent, and it can no
-longer be bought with an index.
+On the cliff-walled worlds it was systematic rather than incidental:
+`WALL_OFF + 0.75` leaves EVERY board 6.65 u from the road against a 9 u
+half-width, so all nine of CANYON RUN's stood in the carriageway, and so did
+GLACIAL PASS's, GLACIER'S GRIND's, CORNICHE's, LAGUNA SECA's, ROCKFALL
+RAVINE's and UNDERCITY SLIPSTREAM's.
 
-### HOW IT WAS PINNED — instrument the BUILDER, not the built scene
+The board now tries its designed spot, then steps out 3/6/9/12 u, then the same
+ladder on the other side of the road, and **a board with nowhere clear is not
+built** — r191's answer for the quay guns, for the same reason: one missing
+advertisement is invisible, one standing in the racing line is not. The whole
+9 u SPAN is measured, not the centre, or a board pivoted across the road reads
+as clear on its midpoint.
 
-Recovering "which sample does this rail belong to" from a finished mesh is
-guesswork on a hairpin, and guessing it produced two wrong answers before the
-right one. `tools-scratch/railtrace.mjs` uses `page.route` to rewrite
-`src/track.js` in flight, injecting one line that makes `_buildOverpassDecks`
-record `{j, side, rx, rz, up, half}` for every rail it lays. Nothing on disk
-changes and the answer is the builder's own. Worth reaching for whenever the
-question is "why did the generator decide that".
+    68 of 419 in the carriageway  ->  0 of 411
+    boards lost roster-wide: 8 of 419. The ladder RELOCATED the other 60.
 
-### A CASCADE WORTH KNOWING ABOUT
+### MEASURING TRAP, cost an hour: `track.banners` IS TWO THINGS
 
-Withholding a deck rail also removes its `_barrier` entry, and the edge-rail
-builder consults `this.barriers` ("already walled? the masonry went in before
-this did") to decide where to put its own rails. So a withheld deck rail can
-grow an edge rail somewhere near it, and `solids` moves on worlds where
-nothing looks like it should have changed. World generation is seeded, so this
-is deterministic, not noise — but it means a before/after diff of raw counts
-is not a defect count. Compare CLASSES.
+`_buildGuardFence` pushes its bays into `this.banners` with `kind: 'fence'`.
+The first pass over that array reported "199 of 558 boards in a carriageway,
+FURKA RIDGE 88 of 101" — but FURKA RIDGE has 10 sponsor boards and 91 fence
+bays, and **a guard rail belongs at the road edge; that is what it is for.**
+Filtering `kind === 'fence'` gives the real 68 of 419. FURKA RIDGE and DOLOMITI
+CORSA drop off the offender list entirely. A fix aimed at the first number
+would have moved guard rails away from the drops they exist to guard.
 
-## r199c/d — tunnels through the mountains, and the test that drives them
+### WHAT THE CENSUS FOUND AND THIS RELEASE DID NOT CLEAR
 
-### THE ASK, AND WHY A COUNT WOULD NOT HAVE ANSWERED IT
+Reported by builder signature so none of these needs a fresh hunt. Not
+investigated; the counts are roster-wide, the worst bite and its world named.
 
-"Create in mountain tunnels tracks and drive in drive out." Eight mountain
-worlds had no bore: FROST PEAK, SUMMIT CLIMB, GLACIAL PASS, GLACIER'S GRIND,
-AVALANCHE ALLEY, COL DE TURINI (2), PIKES PEAK, DOLOMITI CORSA (2). The roster
-went from 15 worlds asking for a tunnel to 23.
+- `Cylinder(0.34,0.66,5.4)` x14 + `Sphere(3.6)` x2 STANDING, **SUZUKA** —
+  brown boles and green crowns, i.e. TREES, worst 8.76 u into 9 u. The most
+  likely real defect left.
+- `Cylinder(0.18,0.22,10)` x14, **RED CENTRE RUN**, worst 5.11 u — the pylon
+  legs from ~7300. That call site DOES gate on `_clearsRoad(bx+ox, bz+oz, 0.6,
+  0.4)`; r 0.6 and margin 0.4 look too small for a 10 u pylon leg.
+- `Box(0.15,0.85,0.15)` x12 + `Box(0.18,0.22,0.18)` x11, **CLIFF KNOT**,
+  worst 7.91 u.
+- `Box(2.2,9,3.2)` x4, **SEA CLIFF RUN**, worst 5.87 u — probably a SYMPTOM of
+  handover item 2 (80 u of road stacked on road) rather than its own bug:
+  buildings placed beside one leg standing in the other.
+- `Cone(3.1,4.8)` x15 STANDING, **SUMMIT CLIMB**, worst 4.11 u — conifers whose
+  base is under the headroom line. The 104 GRAZING cones on PINE VALLEY are
+  canopy overhang at 2.39 u above the road and are almost certainly fine.
+- `Capsule(0.5,3.6)` + `Cone(0.85,1.4)`, **CANYON RUN**, worst 8.82 u.
+- `Dodecahedron` singletons on CINQUE TERRE, PIKES PEAK, OLIVE COAST, MOUNT
+  PANORAMA, REDWOOD RAMPAGE, worst 6.28 u.
 
-`tests/test-tunnels.mjs` is the half of this that matters. Counting
-`track._tunnels` proves the PLANNER ran and says nothing about whether what it
-planned can be driven through — and every tunnel defect this game has had is
-invisible to a count: a bore over a crest, where the car launches off the hump
-and leaves through the crown into the empty slot `_tunnelRidge` keeps above the
-tube (TREMOLA, -0.07 u); wall solids that become a wall if the roadway is wider
-than the tube; a portal in a hillside the road never reaches.
+Anything at `sample 0` in that report is start-line furniture — the gantry and
+its traffic lights — and is not a defect.
 
-So it drives the real car with real physics from outside one portal to outside
-the other and asserts ENTERED, EXITED THE FAR PORTAL (not backed out the way it
-came), never above the crown, never stopped dead. The car is steered to the
-centreline — an unsteered car at full throttle just drives off the road and its
-damage is crash damage. The world list comes from the roster's own
-`tune.tunnels`, so a world gaining or losing a bore stays covered.
+### NOT RE-INVESTIGATED, ON PURPOSE
 
-**26 of 26 bores drive in one portal and out the other**, 8.07-8.60 u of
-headroom throughout.
+`Car.damage()`'s 0.62x player discount. The handover says do not go there and
+nothing here contradicts it.
 
-### WHAT IT FOUND ON ITS FIRST RUN — A BORE REACHES HALF ITS LENGTH
+But the framing that road furniture IS the difficulty curve does not survive
+this pass, and the next session should not build on it: the one instance it
+named did not exist, and the objects that ARE in rural carriageways are the
+props `_buildProps` puts there deliberately, which its own comment records are
+"NOT blockers — a car drives straight through one and accelerates". The
+sponsor boards were real and are fixed, but 68 boards across 15 worlds is not
+an explanation for finishing 8th of 8 on every screenshot. **Handover item 3 —
+nobody has ever measured a competent human lap time — is still the thing
+blocking any difficulty conclusion, and it is now the first thing to do.**
 
-Two worlds ASK for a bore and silently had none: GLACIAL PASS, and TREMOLA
-DESCENT, which has been that way ever since the crest guard went in because
-nothing tested that a requested tunnel exists.
+### VERIFIED
 
-Both callers — `_planTunnels` and the editor — pass `lenS`, the requested bore
-LENGTH in samples, into a parameter named `maxHalf`. `_planTunnels` then sites
-the bore as `half = min(fit, lenS >> 1)` either side of the station, so a bore
-centred at i never reaches further than `lenS >> 1`. The gorge and crest
-exclusions reserved `lenS` — twice the ground, on both sides. Measured before:
+test-carriageway ("the line is clear of everything"), test-invisible-walls
+13/0, plus the suites listed in the release commit. Baselined against pristine
+`origin/main` on a second port.
 
-    GLACIAL PASS      CREST refused 701 of 900, start gate 199. 0 eligible.
-                      Six crests ate the entire lap.
-    TREMOLA DESCENT   CREST 512, the rest too twisty. 0 eligible.
 
-Sizing the reach to the bore keeps the guard exactly as strong — it still asks
-"does the tube I would build cross a crest or a chasm" — and asks it about the
-tube that would actually be built. GLACIAL PASS: 29 eligible stations, an 81 u
-bore at 111-173, driven in and out with 8.57 u of headroom.
+## r200 — clearing what the census found: the trees come off the road
 
-**TREMOLA DESCENT STILL FITS NOWHERE AND THAT IS RIGHT.** Its longest straight
-half-run is 10 samples against a 12-sample minimum, and the one long straight it
-does have carries the crest the guard was written for — the 547-585 bore that
-measured -0.07 u. Twenty-four hairpins on a cobbled descent have nowhere to put
-a tunnel. The test NAMES it rather than letting "the planner found nowhere" read
-the same as "nobody asked".
+r199 built the scene-graph census and fixed the one defect it found on its
+first run (the sponsor boards). This is the follow-through: 399 bodies in a
+carriageway roster-wide -> **46**, and every one of the 46 is now accounted
+for by name.
 
-**STILL OPEN — `MIN` is probably the same units error.**
-`MIN = Math.max(6, Math.round(26 / segLen))` is compared against a HALF-run, so
-the real minimum bore is ~52 u against a documented "~26 u of bore". Correcting
-it would give TREMOLA a short gallery and let short bores onto twisty worlds,
-but it moves tunnel sizing on all 23 worlds and wants its own measured pass.
-Not folded in here.
+### THE TREES, WHICH WERE MOST OF IT
 
-**BORES MOVED on worlds that already had them**, because more stations are now
-eligible: CANYON RUN 437-467 -> 233-263, SUMMIT CLIMB 557-599 -> 535-577,
-GOTTHARD's first 129-163 -> 113-147, CLIFF KNOT 671-705 -> 329-363. All still
-drive in and out, which is the property that matters.
+Three builders placed trees by an OFFSET along one sample's normal and never
+asked the distance to the nearest leg. The same defect as the sponsor boards,
+as the quay guns (r191), as the FURKA RIDGE cabin: **an offset is not a
+distance.**
 
-### FLOATERS WENT UP, AND IT IS NOT A DEFECT
+Measured on r199 with `tools-scratch/trees.mjs`, against RULES.md's clearance
+for a tree (`widthAt + r + 1.7 car radius`):
 
-Roster floaters 116 -> 152. Every one of the +36 is on the three worlds that
-gained a bore (PIKES PEAK +17, DOLOMITI CORSA +16, COL DE TURINI +4) and every
-one is a TUNNEL WALL COLLIDER: `mat 'stone'`, air 2.6-2.8 u, all at bore
-samples. `_buildTunnel` pushes them at `groundHeightAt(i, 0) + 1` while
-`terrainHeight` at the wall lateral reads lower, so the census's FLOATERS
-measure has the same tunnel blind spot its BLOCKERS measure already documents.
-GOTTHARD CLIMB has carried two bores for ages and reads clean, so it is
-terrain-dependent, not new. PIKES PEAK's WORST floater improved, 21.3 -> 9.7 u.
-Portals on DOLOMITI and GOTTHARD were photographed side by side and are
-indistinguishable — no gap, no anomaly.
+    482 of 44544 trunks inside their clearance, on 8 worlds
+     25 of them ON the drivable surface
 
-### THE ROSTER-WIDE SCORE FOR THE WHOLE SESSION
+- `_buildVizCorridors` — the dense forest corridors. Its own comment promises
+  the trunks are pushed out until they clear ("the canopy leans in over the
+  road, the trunks never do") but measured `lat` along sample j's normal.
+  **SUZUKA is a figure-of-eight**, so its crossover legs run close: 14 SOLID
+  boles stood ON the drivable surface, worst 4.44 u inside a 9 u half-width.
+- `_buildCacti` — the roadside row (10.55 u) and the wide open-bowl throw
+  (13-35 u). **CANYON RUN had 6 cacti on the drivable surface, the worst
+  1.01 u from the centreline.** Desert scrub is `solid: false`, so this is the
+  bridge-pier defect rather than the boulder one: you drive THROUGH a saguaro
+  standing in the middle of the road, which reads worse than hitting it.
+- the flora mix (`SPECIES`/`floraMix`) — its placer already measured
+  `dRoad2` but only used it to cap the tree's SIZE (`sMax`, so a hero canopy
+  does not park in front of the chase camera). It never asked whether the
+  trunk FITS. `_trackSidePos` only promises `belt[0] - 1`, and a theme may run
+  its belt close: DEEPWOOD TRAIL had solid boles 10.75 u out.
 
-Pristine `origin/main` on port 8930 against this branch on 8920, same tool:
+All three now measure. Corridor trees walk a ladder (0/2/4/7/10 u) and plant
+nothing if the whole row is blocked; cacti reject the spot so `_scatter`
+re-rolls; the flora mix rejects hopeless spots and BOUNDS THE SCALE by the room
+actually there, so a tree beside a tight belt gets smaller instead of standing
+inside the clearance.
 
-                      before    after
-    worlds dirty       36/61    34/61
-    blockers              60       48
-    intruders            196       73
-      with no collider   179       53
-    trees in a lane       23       14
-    bare holes             0        0
+    482 of 44544 trunks inside their clearance  ->  0 of 44516, on 0 worlds
+    trees lost roster-wide: 28, all SUZUKA corridor pines. Every desert
+    world kept its exact count — the re-roll found clear ground.
 
-The sponsor-board fix was much wider than the two worlds it was found on: the
-2.35 u signature repeats on CANYON RUN, GLACIAL PASS, GLACIER'S GRIND,
-UNDERCITY SLIPSTREAM, ROCKFALL RAVINE, CORNICHE, LAGUNA SECA and RED CENTRE RUN.
+### THE REFLECTOR MARKER POSTS
 
-Suites on the changed build: test-carriageway 49/49, test-invisible-walls 13/13,
-test-index-recovery 10/10, test-newworlds 193 pass / 1 fail. That one failure —
-"the new worlds are appended at the END of the array, in order — tail is
-56,57,58,59,61,60" — is BYTE-IDENTICAL on pristine `origin/main`. It is the
-r196 OLIVE PASS array-order note, pre-existing, and not caused by anything here.
+`_buildRoadsideDetail`'s corner markers used `pointAt(i, (WALL_OFF + 1.7) *
+side)`, and this builder picks CORNERS on purpose — precisely where the lap is
+most likely to have another leg past the apex. **CLIFF KNOT, whose lap ties
+around itself, stood 23 posts and bands in a carriageway, worst 7.91 u into a
+9 u half-width.** No collider, so again the pier defect. A corner that cannot
+take a marker now does not get one.
 
-### WHAT THE CENSUS STILL SHOWS, FOR WHOEVER PICKS THIS UP
+### AND THE CENSUS LEARNED THAT A CROWN IS NOT A TRUNK
 
-    SUZUKA           14 tree TRUNKS inside the lane, worst 4.15 u, samples
-                     19-24 and 76. `kind: 'pine'`, r 1.06-1.38. NOT from
-                     `_buildRedwoods` — its giants use `_trackSidePos(17, 60)`
-                     and its saplings (12.5, 26), both of which consult
-                     `_distToTrack`. Another builder puts pines there and it
-                     has not been identified. Same shape as the cacti fixed
-                     in r199b; probably the same missing check.
-    RED CENTRE RUN   Box 7.4x2.6x1.2 #24211c biting 8.78 u, 2.5 u proud, bare
-    MONACO STREETS   an intruder biting 8.9 u
-    CLIFF KNOT       9.0 u
-    COTE D AZUR      30 stone blockers at 9.27 u — READ THIS AS THE TUNNEL
-                     doing its job (documented false positive), not a defect
-    ESTONIA CRESTS   Cylinder 6.5x0.55 #5a3a22 biting 6.95 u
+After the above, ~170 of the remaining bodies were tree FOLIAGE — PINE VALLEY
+alone contributed 104 crowns while every one of its trunks was clear. That is
+the design working: a canopy leaning over a rural road is what makes a forest
+read as a tunnel, and the game says so itself where it plants them —
+"collision r tracks the TRUNK, not the canopy". A census that reports it
+buries the trunks, which are the part that can stop a car.
 
-## r199e/f/g — the anchor is placed clear, the reach is never counted
+`parts[1..]` of every `track.trees` entry is now a **counted** suppression
+class, `foliage`, alongside `prop`. `parts[0]` — the trunk — is still measured
+like anything else, and `tools-scratch/trees.mjs` is its acceptance test.
 
-Four more of the same defect, found by the extended census and each fixed in
-its own builder. The shape has now appeared in NINE places (props, tire stacks,
-road cabins, quay guns, arch faces, deck rails, cacti, hoardings, corridor
-pines, fallen logs) and it is always the same sentence: **something computes a
-position that clears the road AT ONE SAMPLE, and nothing asks how far the thing
-reaches from it.** `_distToTrack` searches the whole lap and answers it.
+### ALSO FIXED: THE CENSUS WAS A BINARY FILE
 
-### SUZUKA — 14 trunks in the lane, and they stop a car dead
+r199 keyed its body map on `kind + '\0' + sig`, using a literal NUL because a
+signature contains spaces and a space separator truncates it. It worked, and
+it made `grep` report `tests/tool-road-census.mjs` as "binary file matches" —
+which would have silently cost the next session a search. Kind and signature
+are carried as FIELDS on the value now; no packing, no control characters.
 
-The tree-corridor builder computes `lat = widthAt(j) + 0.75*sc + 2.0 + …` and
-offsets along sample j's own normal. That clearance is true of sample j by
-construction and says nothing about a second leg — and SUZUKA is a
-figure-of-eight. 14 trunks stood inside a carriageway around samples 19-24 and
-76, worst 3.0 u past the drivable edge on a 1.16 u trunk. These are
-`solid: true` pines: hitting one stops a car dead, so this was the
-worst-consequence version of the family. **14 -> 0**, at a cost of 28 trees out
-of 800. `part.count = k` already, so a skipped station leaves no orphan
-instance at the origin (the r191 trap).
+### THE 46 THAT REMAIN, ALL ACCOUNTED FOR
 
-### THE HOARDING TURN WAS HALF A FIX
+Nothing here is an unexplained residue. Listed so no one hunts them again:
 
-r199b turned a board to stand ALONG the road where it would otherwise hang over
-it. That only helps when the problem is its OWN road: parallel, the board still
-reaches 4.5 u along the lap, and where a lap crosses itself, along points
-straight at the other leg. Measured after the turn shipped: BRIDGE RUN still
-had a board at 8.23 u and MONACO STREETS a post at 5.7 u. Both orientations are
-now checked and a board with nowhere clear is not built — the quay-gun rule.
-MONACO **3 -> 0**, BRIDGE RUN **4 -> 1**.
+- **14, RED CENTRE RUN pylon legs** (worst 5.11 u) — DELIBERATE, and do not
+  "fix" it. Where the tower has nowhere to stand, the leg keeps its mesh and
+  gives up its collider, decided with a measurement: on TOUR DE CORSE every
+  candidate is in somebody's road, `gridSlot(0)` puts the player 0.00 u from a
+  leg, and they lose 22.9 u/s on every lap. Same rule the grandstand has
+  followed since r167.
+- **8, start gantry** — SUZUKA's finish banner and boards, CLIFF KNOT's light
+  housing and lamps, all at sample 0, which is where a start gantry goes.
+  RED CENTRE RUN's two lamps report at samples 129/130 rather than 0 because
+  its lap passes back beside its own start line at a higher elevation, so the
+  gantry hangs at bonnet height for the road that passes it. That is a
+  two-roads-too-close symptom, not a placement bug.
+- **8, SEA CLIFF RUN / MOUNTAIN TO SEA / CLIFF KNOT** — 4 building blocks
+  (worst 5.87 u) and 4 deck parapets (0.31-4.25 u). SEA CLIFF RUN's are almost
+  certainly HANDOVER ITEM 2 showing through: 80 u of road stacked on road means
+  anything placed beside one leg stands in the other. Fix the overlap, not the
+  buildings.
+- **6 rocks** (Dodecahedron, 0.43-6.28 u), **2 guard-fence bays** (1.78, 0.34 —
+  a guard rail belongs at the road edge), and single instances on ESTONIA
+  CRESTS (6.74), CINQUE TERRE (4.18), HEDGEROW DASH (1.55), PIKES PEAK's
+  culvert parapet (1.42) and one FURKA RIDGE contact shadow on a slope steep
+  enough to defeat the sheet test (0.89).
 
-### THE START GANTRY WAS BUILT AT ABSOLUTE HEIGHTS
+### VERIFIED
 
-The `Box 7.4x2.6x1.2 #24211c` the census kept reporting is the starting-lights
-housing. Every mesh in the gantry — legs, braces, cabin, banner, finish flags,
-housing, lamps — sat at a literal `y`, and only the checkered strip read `c.y`,
-carrying the comment "start area is flat (c.y = 0)". Measuring the assumption
-itself: **11 of 61 worlds do not start at zero.**
+test-carriageway ("the line is clear of everything"), test-invisible-walls
+13/0, test-boot 7/7, test-obstacles, test-buildings. test-rules (2) and
+test-nature (1) fail IDENTICALLY on pristine `origin/main` on a second port —
+pre-existing, and unchanged by the CANYON RUN cactus move.
 
-    PINE VALLEY      y = 0      control: housing underside 5.30 u over the grid
-    SUZUKA           y = 7.87   underside 2.57 u UNDER the tarmac, crossbar
-                                1.13 u over it — the gantry buried to its
-                                shoulders in its own start line
-    RED CENTRE RUN   y = -3.99  the same structure floating 9.29 u up
-    CLIFF KNOT       y = 3.57   underside 1.73 u over the grid — windscreen
-                                height, across the full width of it
-    + 7 more at 0.20-0.78 u
+Roster census: **bodies 399 -> 46, dirty worlds 44 -> 35.** Blockers (60,
+all stone, the known tunnel-bore false positive among them) and floaters (116)
+are UNCHANGED — this release did not touch colliders.
 
-All four now measure exactly 5.30 u, PINE VALLEY unchanged. Photographed on
-SUZUKA before and after: no lights over the grid, then lights.
 
-**AND NOTE WHICH ONE THE CENSUS COULD NOT FIND.** SUZUKA's was the worst and
-the census never reported it, because a buried object is not standing proud of
-the road — which is precisely the test the INTRUDERS measure is built on. Only
-measuring the ASSUMPTION found it. A census answers the question it was given.
+## r201 — the fixes get a pass/fail line, and the tools graduate
 
-### ESTONIA CRESTS — a 6.5 m log across the racing line
+r199 built the census, r200 cleared what it found. Neither put a GATE on any of
+it: four defect classes were fixed and the only thing standing between them and
+a silent return was somebody remembering to run a scratch probe. This release
+is the maturation — no new findings, no new placement behaviour except one
+hardening, and everything now guarded.
 
-`_buildHeroBridge`'s loose fallen logs took `c` at the sample 16 u past the
-gorge and `n` at `nrm[gi]`, 16 u back up the road — the arch-face mismatch
-again — and `off` positions the log's CENTRE while `rotation.y` is random, so a
-6.5 u log sweeps 3.25 u in whatever direction it lands. Two lay at lateral 2.05
-and 2.26 u on a 9 u half-width, timber across the racing line at the exit of
-the hero bridge, no collider. **2 -> 0.**
+### THE PASS/FAIL LINE GOES WHERE THIS REPO SAYS IT GOES
 
-### THE CENSUS LEARNS THAT AN OVERLAY ANNOUNCES ITSELF
+`tool-road-census`'s own header has said it since it was written: "A TOOL, not
+a test... The pass/fail line belongs in test-carriageway, which is where a fix
+gets pinned once this has found something." It has now found something four
+times, so `test-carriageway` gains a third section pinning all of it on the
+worlds each defect was measured worst on:
 
-COTE D AZUR's deepest remaining "intruder" at 7.71 u was SEA FOAM — a
-3.4 x 0.05 x 0.32 `MeshBasicMaterial` box at opacity 0.4 on the water beside a
-seafront road. Anything drawn with `depthWrite: false` is a visual layer by
-construction: foam, puddles, the tunnel light pools, contact shadows. The
-material already carries the answer, so no thickness heuristic and no magic
-number. COTE D AZUR **9 intruders -> 0**; its remaining 14 "blockers" are the
-documented tunnel-bore false positive.
+    BRIDGE RUN, MONACO STREETS, MOUNTAIN TO SEA, CANYON RUN,
+    SUZUKA, DEEPWOOD TRAIL, CLIFF KNOT
 
-### A COMMENT THAT WAS WRONG, AND HOW
+with three checks per world — no sponsor board in a carriageway, every tree
+trunk clearing `widthAt + r + 1.7`, no reflector marker post in a carriageway.
+Each carries the measured "before" number in its header so a failure reads as a
+regression against a known figure rather than a bare assertion.
 
-The first draft of the gantry comment carried two start heights **worked back
-from census arithmetic** — "RED CENTRE RUN starts at y = 5.4" — and the direct
-sweep said -3.99. The census reports the road height at the sample NEAREST the
-offending mesh, which on a lap that doubles back is a different leg entirely.
-Inference from a derived number is not a measurement, and a wrong number in a
-comment outlives the session that wrote it. Corrected against
-`scratchpad/startY.mjs`, which reads `center[0].y` directly.
+Boards are measured across their full 9 u SPAN (a board pivoted across the road
+has its midpoint on the verge and its ends over both lanes) and skip
+`kind: 'fence'`. Trunks apply the HEIGHT gate first, or the saguaros
+`_buildCacti` silhouettes on the canyon rim fail the suite for doing their job.
+Marker posts are found by geometry, because they carry no collider and no
+registry — with the filter checking the parameters EXIST before comparing them.
+
+### AND A GUARD ON THE GUARDS
+
+Every one of those checks is conditional on having found something to measure,
+which means a renamed field or a changed geometry makes the whole section go
+quiet and GREEN. So the section ends with an assertion that it matched real
+geometry at all:
+
+    PASS  the r199/r200 filters still match real geometry
+          boards 49, trunks 8670, marker posts 94 across the pinned worlds
+
+That is the direct lesson of `fence.mjs`: a clearance test that matches nothing
+passes forever.
+
+### THE TOOLS GRADUATE OUT OF SCRATCH
+
+`tools-scratch/trees.mjs` and `tools-scratch/banners.mjs` are the acceptance
+tests for shipped fixes now, not session scratch. They are
+`tests/tool-tree-clearance.mjs` and `tests/tool-banner-clearance.mjs`, listed in
+tests/README.md with the rest of the diagnostics, and they answer the
+roster-wide question the pinned worlds deliberately do not:
+
+    0 of 44516 trunks inside their clearance, on 0 worlds
+    0 of 411 sponsor boards in a carriageway, on 0 worlds
+
+tests/README.md's "Writing new checks" grew from two rules to four, the two new
+ones being the two this family of bug taught: test that the value EXISTS before
+comparing it, and assert that a clearance check matched something.
+
+### ONE HARDENING, MEASURED: THE FLORA FIX WAS PLANTING ON ITS OWN LIMIT
+
+r200 bounded tree scale by `room / spec.rFac`, which puts the tightest tree
+EXACTLY on the clearance line — DEEPWOOD TRAIL's worst trunk measured 0.00 u,
+so the new suite was riding on floating-point noise. The bound is now
+`(room - 0.05) / spec.rFac`, and the spot rejection floor rises from 0.35 to
+0.85 so that any spot which survives can still carry a NORMAL tree: the
+smallest scale this builder produces is 0.6, which at the widest trunk factor
+(kapok, 1.25) needs 0.75 u of room. Accepting tighter spots would have traded
+trunks in the road for bonsai beside it.
+
+    DEEPWOOD TRAIL worst trunk clearance   0.00 u -> -0.13 u
+    roster trunks inside clearance         0 -> 0     tree counts unchanged
+
+### A SECOND NaN-COMPARISON BUG, FOUND AND FIXED
+
+`_scatter` runs every generated dressing past the editor's eraser, with a
+comment explaining that it must: "clearing a building site by hand while the
+wood grew back over it would make the tool feel broken". But `_buildCacti`
+describes its spot as `{i, lateral}` and resolves the point later in `place`,
+so the call was `_erased(undefined, undefined)` — and `NaN < r * r` is FALSE,
+so the answer came back "not erased" every time. **The eraser has never reached
+the desert.** `_scatter` now resolves `{i, lateral}` to a point before asking.
+
+This is the same shape as `fence.mjs`'s post filter and it is worth naming as a
+pattern, because the repo has now hit it three times in two sessions: a
+comparison against a value that is not there does not fail loudly. It says no.
+
+### VERIFIED
+
+test-carriageway ("the line is clear of everything", now including the 21 new
+checks), test-editor 15/15, test-editor2 13/13, test-editor4 19/19,
+test-select 19/19, test-editor5 94/94 — the five that cover the eraser —
+test-buildings, and both roster sweeps at zero. test-nature's single PINE
+VALLEY river failure is unchanged and pre-existing (identical on pristine
+`origin/main`, second port).
+
 
 ## Rebase notes
 

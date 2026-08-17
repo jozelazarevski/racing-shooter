@@ -73,10 +73,13 @@ assumption someone had already written down.
 | `tool-corridor-solids.mjs` | The same territory asked the *other* way round — per collider, gated against its own nearest station. Kept as the worked example of a question that cannot find the bug; see its header. |
 | `tool-overlap-census.mjs` | Which worlds run two legs of a lap on shared tarmac at grade, how level they are, and **whether an overpass covers it** — the column that turns the fact into a diagnosis. Sharpened in r199; its header records the two ways a rewrite of it got the answer wrong. Gated by `test-roadclear.mjs` LAW 4. |
 | `tool-ground-mismatch.mjs` | Where the terrain mesh and `terrainHeight()` disagree near the road — the ground you hit against the ground you see. |
+| `tool-road-census.mjs` | The roster-wide answer to "is anything on the road". Reads `solids` for BLOCKERS/HOLES/FLOATERS **and walks the built scene graph** for BODIES — every mesh and every instance, measured by exact point-to-OBB distance. Its suppression classes (`prop`, `foliage`, `surface`, `overhead`, `buried`, `scenery`) are all COUNTED and printed, because a filter that is not printed reads as "nothing there". |
+| `tool-tree-clearance.mjs` | Every tree TRUNK against RULES.md's `widthAt + r + 1.7`, per world, with a height gate first so the saguaros silhouetted on the canyon rim are not read as intrusions. The acceptance test for any tree-placement change. |
+| `tool-banner-clearance.mjs` | Every sponsor board measured across its full 9 u span. The acceptance test for `_buildBanners`. Skips `kind: 'fence'` — `_buildGuardFence` shares the array and a guard rail belongs at the road edge. |
 
 ## Writing new checks
 
-Two rules learned the hard way:
+Four rules learned the hard way:
 
 1. **Be condition-driven, not time-driven.** Headless frame rate swings
    wildly; poll for the outcome (`for (…; !thing.dead; …) await sleep(200)`)
@@ -84,3 +87,13 @@ Two rules learned the hard way:
 2. **Drive, don't teleport.** Setting `player.pos` doesn't stick — physics
    moves the car straight off again, so proximity triggers (pickups, stars)
    never fire. Rail the car along the road through the target instead.
+3. **Test that the value EXISTS before you compare it.** `fence.mjs` filtered
+   posts with `Math.abs(q.width - 0.18) > 0.005`, and a geometry with no
+   `width` gives `Math.abs(undefined - 0.18)` = NaN — and `NaN > 0.005` is
+   **false**, so every sphere, cone and cylinder passed the post filter. It
+   reported 43 phantom posts on FROST PEAK (the sky dome, the 9000 u world
+   skirt, the start gantry) and those numbers were written into a handover as
+   a defect. See its header; it cost a session.
+4. **A clearance check that matches nothing passes forever.** If a check is
+   conditional on finding something to measure, assert separately that it DID.
+   `test-carriageway` ends with exactly that guard on its own filters.
