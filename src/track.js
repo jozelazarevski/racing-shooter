@@ -14462,6 +14462,69 @@ export class Track {
       chims.setMatrixAt(ck++, m4);
     };
 
+    // BALCONIES AND AWNINGS, ON THE SIDE YOU DRIVE PAST.
+    //
+    // A chimney breaks the roofline; nothing broke the FACE. A terrace seen
+    // from a car is a wall of flat render with a window texture on it, and the
+    // one thing every Mediterranean street actually has hanging off it is
+    // balconies — a slab, a rail, and a shadow under both. They go on the ROAD
+    // side only, which is the only side a driver ever sees, so the cost buys
+    // nothing that faces away.
+    //
+    // Three instanced meshes for the whole world, on top of the eight the
+    // frontage already uses. The slab and the awning share one box; the rail
+    // is a thinner one.
+    const BALC = 520;
+    const slabGeo = new THREE.BoxGeometry(1, 1, 1);
+    const balcMat = new THREE.MeshStandardMaterial({
+      color: 0xb9b0a0, flatShading: true, roughness: 0.9, envMapIntensity: 0.35,
+    });
+    const railMat = new THREE.MeshStandardMaterial({
+      color: 0x3a3630, flatShading: true, roughness: 0.7, metalness: 0.35,
+    });
+    const awnMat = new THREE.MeshStandardMaterial({
+      map: awningTexture(), roughness: 0.92, side: THREE.DoubleSide,
+    });
+    const balcSlabs = new THREE.InstancedMesh(slabGeo, balcMat, BALC);
+    const balcRails = new THREE.InstancedMesh(slabGeo, railMat, BALC);
+    const awnings = new THREE.InstancedMesh(slabGeo, awnMat, BALC);
+    balcSlabs.name = 'frontage-balconies';
+    awnings.name = 'frontage-awnings';
+    for (const m of [balcSlabs, balcRails, awnings]) { m.castShadow = m.receiveShadow = true; }
+    let balK = 0, awnK = 0;
+    const faceOff = new THREE.Vector3();
+    const faceAt = (i, side, lat, dAcross, wAlong, baseY, hh) => {
+      const p = this.pointAt(i, lat * side);
+      q.setFromAxisAngle(up, this.headingAt(i));
+      // local +X is the road normal, so the face the driver sees is the one
+      // toward the centreline: -side in world terms, which after the yaw is
+      // simply -X scaled by the block's own half depth.
+      const out = -Math.sign(lat * side) * dAcross * 0.5;
+      // a balcony at first-floor level on taller blocks only — a one-storey
+      // cottage with a balcony on it reads as a mistake
+      if (hh > 6.2 && balK < BALC) {
+        const by = baseY + hh * 0.52;
+        faceOff.set(out * 1.14, 0, (Math.random() - 0.5) * wAlong * 0.3).applyQuaternion(q);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, by, p.z + faceOff.z), q,
+          new THREE.Vector3(0.85, 0.16, wAlong * 0.42));
+        balcSlabs.setMatrixAt(balK, m4);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x * 1.18, by + 0.5, p.z + faceOff.z * 1.18), q,
+          new THREE.Vector3(0.1, 0.9, wAlong * 0.42));
+        balcRails.setMatrixAt(balK, m4);
+        balK++;
+      }
+      // and an awning over the ground floor on about half of them
+      if (Math.random() < 0.5 && awnK < BALC) {
+        faceOff.set(out * 1.3, 0, (Math.random() - 0.5) * wAlong * 0.25).applyQuaternion(q);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, baseY + 2.9, p.z + faceOff.z), q,
+          new THREE.Vector3(1.5, 0.12, wAlong * 0.38));
+        awnings.setMatrixAt(awnK, m4);
+        col.setHSL(0.02 + Math.random() * 0.12, 0.35, 0.44 + Math.random() * 0.16);
+        awnings.setColorAt(awnK, col);
+        awnK++;
+      }
+    };
+
     // ---- 1 + 2: the frontage and the rank behind it ----
     //
     // A DESIGNED STREET, NOT A ROW OF BOXES. Three stacked sources of
@@ -14499,6 +14562,7 @@ export class Track {
         if (!placed) { run = 0; continue; }
         placedS[side].add(i);
         if (Math.random() < 0.62) chimAt(i, side, placed.lat, F.depth, ww, placed.y + hh, roofH);
+        faceAt(i, side, placed.lat, F.depth, ww, placed.y, hh);
         // A LANTERN ON THE BRACKET, every third house. Anchored to the FRONT
         // FACE, not the block centre — the arm only reaches 0.72 u and a
         // 8 u-deep building would have swallowed the bulb whole.
@@ -14587,6 +14651,11 @@ export class Track {
       if (kv[v]) this.group.add(bodySet[v], roofSet[v]);
     }
     if (ck) this.group.add(chims);
+    balcSlabs.count = balcRails.count = balK;
+    awnings.count = awnK;
+    if (awnings.instanceColor) awnings.instanceColor.needsUpdate = true;
+    if (balK) this.group.add(balcSlabs, balcRails);
+    if (awnK) this.group.add(awnings);
     if (lk) this.group.add(arms, bulbs);
 
     // ---- string lights over the street (night quarters only): warm bulb
