@@ -158,10 +158,12 @@ the guard exists for.
 ## THE THREE THINGS THAT MATTER NEXT, IN ORDER
 
 ### 1. ROAD STACKED ON ROAD — STILL OPEN, and it is TWO worlds, not one
-`tools-scratch/stacked.mjs` is the measurement that was missing. `_checkLayout`
-asks a version of this question and cannot answer it: it keeps the SINGLE
-global minimum self-approach and IGNORES Y, so on a world with a legitimate
-flyover the flyover IS the minimum and every other overlap hides behind it.
+`tests/tool-overlap-census.mjs` is the measurement, sharpened in r199 (18 u
+rather than 14, both tests on the SAME sample, runs broken when the partner
+index jumps, and a "% bridged" column). `_checkLayout` asks a version of this
+question and cannot answer it: it keeps the SINGLE global minimum
+self-approach and IGNORES Y, so on a world with a legitimate flyover the
+flyover IS the minimum and every other overlap hides behind it.
 
 Two carriageways need 18 u between centrelines not to overlap. Below that only
 the vertical gap decides what the player meets — over ~6 u is a flyover, under
@@ -175,12 +177,21 @@ it the roadways interpenetrate. Measured, and IDENTICAL on pristine
     MOUNTAIN TO SEA   418-434  <-> 631-647   ~41 u of lap
                       5.18 u apart, 0.01 u vertically
 
-**MOUNTAIN TO SEA was never in any handover** and is level with the tarmac to
-within 5 cm across two separate stretches. Every one of its clashes sits inside
-a REGISTERED overpass whose crossing clearance is healthy (`gaps.mjs`: 10.48 to
-15.04 u, none under 6) — so the deck rises correctly at the intersection and the
-legs come back together at the ramp ends, still inside a road width of each
-other. That is the shape of the bug.
+**CORRECTION, and it matters for how you read this file.** An earlier draft of
+this section said MOUNTAIN TO SEA "was never in any handover", which is true of
+this file and beside the point: `tests/tool-overlap-census.mjs` has carried the
+finding in its own header since **r153b** — "MOUNTAIN TO SEA (5 stretches, legs
+down to 1.3 u apart) and SEA CLIFF RUN (2)". The fact was known and written
+down; what nobody had done was DIAGNOSE it or GATE it. Before adding a probe,
+read `tests/tool-*.mjs` — this session briefly had two tools answering the same
+question, which is how the same bug gets solved twice, incompatibly.
+
+What IS new is the diagnosis. Every MOUNTAIN TO SEA clash sits inside a
+REGISTERED overpass whose crossing clearance is healthy (`tools-scratch/gaps.mjs`:
+10.48 to 15.04 u, none under 6) — so the deck rises correctly at the
+intersection and the legs come back together at the RAMP ENDS, still inside a
+road width of each other. SEA CLIFF RUN's is barely covered at all: a
+near-parallel pass registers no crossing. Same defect, two ways of reaching it.
 
 CAUSE: `_planOverpasses` fires on a true XZ segment INTERSECTION and sizes its
 ramp span around that point. A near-parallel pass either registers no crossing
@@ -191,15 +202,20 @@ FIX SHAPE: the clearance requirement has to cover the whole stretch where the
 legs are within a road width, not just the intersection point. **Do not start
 this at the end of a session.** It is the area r197 changed, two documented
 dead ends are already recorded in this file, and the acceptance test is
-`gaps.mjs` on all eight overpass worlds plus `stacked.mjs` before and after.
+`tools-scratch/gaps.mjs` on all eight overpass worlds plus
+`tool-overlap-census.mjs` before and after.
 
-WHEN YOU RUN `stacked.mjs`, KNOW WHAT ITS FIRST VERSION GOT WRONG: it marked a
-sample "close in XZ", grouped contiguous samples into runs, and reported each
-run's smallest gap and smallest dy — which came from DIFFERENT sub-stretches. It
-read "MOUNTAIN TO SEA: 141 u of lap 0.6 u apart and 0.05 u vertically" when the
+KNOW WHAT THE REWRITE GOT WRONG FIRST: it marked a sample "close in XZ",
+grouped contiguous samples into runs, and reported each run's smallest gap
+beside its smallest dy — two numbers from DIFFERENT sub-stretches. It read
+"MOUNTAIN TO SEA: 141 u of lap 0.6 u apart and 0.05 u vertically" when the
 0.6 u belonged to a stretch with 11 u of clearance over it. A clash is ONE
 sample that is close in XZ **and** level in Y; the run must also break when the
-partner index jumps, or two encounters merge into one fictitious monster.
+partner index jumps, or two encounters merge into one fictitious monster. Both
+lessons are in the tool's header now.
+
+GATED BY `tests/test-roadclear.mjs` LAW 4, which pins the count per world — a
+fourth stretch, or a new world, fails.
 
 ### 2. Finish the census backlog — it is now a short list
 Everything above 6 u is cleared. What is left:
