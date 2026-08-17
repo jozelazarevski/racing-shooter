@@ -518,7 +518,17 @@
     margin:8px 0 6px;text-shadow:1px 1px 0 var(--ink);white-space:nowrap}
   /* the garage head carries a world name now, which can be longer than the
      panel — let that one wrap instead of running off the edge */
-  #garage-shop-head{white-space:normal;text-align:center;line-height:1.35}
+  /* A HEAD THAT CARRIES A NAME IS AS LONG AS THE NAME, and this fix was given
+     to ONE of the four heads that carry one: the shop head names the world,
+     the tyre bay names the world, the upgrade head names the CAR, the ladder
+     head names the REGION. Left nowrap they do not merely run off the right —
+     .menu-panel centres its children, so a block wider than the panel hangs
+     off BOTH edges and takes the boxes under it with it. Measured at 320:
+     "TYRE BAY — AVALANCHE ALLEY WANTS SNOW" is 449.9 px inside a 252 px panel,
+     which put the AUTO box at x=-64.9 and the SNOW box 64.9 px past the right
+     edge of the screen, and gave the whole page 65 px of sideways scroll. */
+  #garage-shop-head,#garage-up-head,#tyre-bay .panel-head,.region-head{
+    white-space:normal;text-align:center;line-height:1.35}
   .panel-head::before,.panel-head::after{content:'';flex:1;height:1px;background:var(--line-soft)}
 
   /* ---------- WORLD CARDS (track selection) ---------- */
@@ -713,9 +723,15 @@
     color:#e6d2a8}
 
   /* ---- tyre bay ---- */
-  #tyre-bay{margin:10px 0 4px}
-  .tyre-row{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
-  .tyre-opt{display:flex;flex-direction:column;align-items:center;gap:1px;
+  /* full width, not shrink-to-fit: as a flex item of a centring column this
+     block would otherwise size itself to its widest line and hang off both
+     edges of the screen */
+  #tyre-bay{margin:10px 0 4px;width:100%}
+  /* 1fr floors at the column's MIN-CONTENT, so "BUY TIRES 3" and "FITTED SNOW"
+     set the width of the row instead of wrapping inside it. minmax(0,1fr) plus
+     min-width:0 lets the four boxes share whatever the panel actually has. */
+  .tyre-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+  .tyre-opt{min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;
     padding:8px 4px;border-radius:10px;cursor:pointer;font-family:inherit;
     background:rgba(40,30,16,.5);border:1px solid rgba(255,212,0,.22);color:#c8b48c;font-size:15px}
   .tyre-opt b{font-size:10px;letter-spacing:1px}

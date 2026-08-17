@@ -3360,6 +3360,15 @@ class Game {
     if (this.swapLevel(lv, !!this.editScene)) {
       this._markCurrentCard();       // highlight now backed by the real world
       this.renderCarShop();          // the garage ratings are per-world
+      // ...AND SO IS THE TYRE BAY, which was left naming the world you LEFT.
+      // Measured after waiting for the swap to settle: `game.level.name` and
+      // `#garage-shop-head` both read AVALANCHE ALLEY while the bay's own head
+      // still read "TYRE BAY — PINE VALLEY WANTS GRAVEL" and put "IDEAL HERE"
+      // on the wrong compound — so the one panel whose entire job is telling
+      // you which tyre this world wants was advising you about a different
+      // world. The GARAGE tab's click handler does not render either, so
+      // nothing else caught it up.
+      this.renderGarage?.();
       this._syncStartButton();       // a new world can change the tyre price
       this._buildMissionPicker?.();  // missions are per-world
       this._renderJobs?.();          // ...and so is the contract slate under the jobs
