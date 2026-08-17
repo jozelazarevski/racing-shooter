@@ -1263,6 +1263,62 @@
 </style>
 </head>
 <body>
+<!-- FIRST PAINT IS A LOADING SCREEN, NOT A BLACK RECTANGLE.
+     `#build-veil` covers a level PICK, but it lives inside the app and needs
+     main.js to have run. On a cold load the module graph, the canvas textures
+     and the first world build are all ahead of that, and until they land the
+     player is looking at an empty page with no way to tell loading from broken.
+     This is plain markup with INLINE styles so it paints on the first frame the
+     browser draws — before the stylesheet, before the import map, before any
+     script — and the script that removes it makes no assumptions about main.js
+     beyond `window.__game` eventually existing. -->
+<div id="boot-screen" style="position:fixed;inset:0;z-index:200;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  background:radial-gradient(circle at 50% 42%,#2a1a10 0%,#140c07 62%,#0a0605 100%);
+  color:#ffe9a8;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  transition:opacity .35s ease">
+  <div style="font-size:clamp(22px,6vw,40px);font-weight:800;letter-spacing:.14em">IGNITE RALLY</div>
+  <div style="font-size:clamp(11px,2.6vw,14px);letter-spacing:.22em;opacity:.75">
+    IF YOU CAN'T RACE THEM, SHOOT THEM</div>
+  <div style="width:min(280px,62vw);height:5px;border-radius:3px;overflow:hidden;
+    background:rgba(255,233,168,.16)">
+    <div id="boot-bar" style="width:35%;height:100%;border-radius:3px;
+      background:linear-gradient(90deg,#ffb347,#ffe9a8);
+      animation:bootslide 1.15s ease-in-out infinite"></div>
+  </div>
+  <div id="boot-msg" style="font-size:clamp(10px,2.4vw,12px);letter-spacing:.18em;
+    opacity:.7">LOADING …</div>
+</div>
+<script>
+  // the bar is decoration; the MESSAGE is the useful part, so it names the
+  // stage rather than showing a fake percentage
+  (function () {
+    var st = document.createElement('style');
+    st.textContent = '@keyframes bootslide{0%{transform:translateX(-100%)}'
+      + '50%{transform:translateX(180%)}100%{transform:translateX(-100%)}}';
+    document.head.appendChild(st);
+    var msg = document.getElementById('boot-msg');
+    var stage = 0;
+    var stages = ['LOADING …', 'DRAWING TEXTURES …', 'BUILDING THE WORLD …',
+      'PLACING THE SCENERY …', 'ALMOST THERE …'];
+    var tick = setInterval(function () {
+      if (stage < stages.length - 1 && msg) msg.textContent = stages[++stage];
+    }, 1400);
+    // gone as soon as the game object exists — no guesses about main.js beyond
+    // that, and a hard cap so a failed boot still shows the game's own error
+    // surface rather than this screen forever
+    var t0 = Date.now();
+    var poll = setInterval(function () {
+      if (window.__game || Date.now() - t0 > 40000) {
+        clearInterval(poll); clearInterval(tick);
+        var el = document.getElementById('boot-screen');
+        if (!el) return;
+        el.style.opacity = '0';
+        setTimeout(function () { el.remove(); }, 380);
+      }
+    }, 60);
+  })();
+</script>
 <canvas id="game-canvas"></canvas>
 
 <div id="hud">
@@ -1313,7 +1369,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r203</div>
+<div id="build-tag">r204</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1570,10 +1626,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r203"></script>
+<script type="module" src="./src/main.js?v=r204"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r203"></script>
+<script src="./src/offline.js?v=r204"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r203"></script>
+<script type="module" src="./src/traffic.js?v=r204"></script>
 </body>
 </html>
