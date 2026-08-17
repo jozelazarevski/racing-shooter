@@ -183,7 +183,13 @@ const CLIMB_RIG = ({ secs, roam }) => {
 // same probe with the proposed patch: 28.6 u at 1.0 u/s.
 const GOAT_CEIL = 30;
 const GOAT_PACE = 4;
-for (const [id, was] of [[6, '70.7 u at 26.2 u/s'], [65, '74.5 u at 19.3 u/s'], [4, '40.3 u']]) {
+// GOATWORLDS=66 baselines a world on a tree without editing this file — the
+// point being that a "was" figure has to be MEASURED on a defective tree, and
+// editing the list to do that is how a baseline ends up being a guess.
+const GOAT_LIST = process.env.GOATWORLDS
+  ? process.env.GOATWORLDS.split(',').map((s) => [+s, 'NOT BASELINED'])
+  : [[6, '70.7 u at 26.2 u/s'], [65, '74.5 u at 19.3 u/s'], [4, '40.3 u']];
+for (const [id, was] of GOAT_LIST) {
   if (!await load(id)) { ok(false, `world ${id} did not build`); continue; }
   const r = await page.evaluate(CLIMB_RIG, { secs: 30, roam: false });
   ok(r.starts > 0, `${r.name}: the rig found ${r.starts} climbable start points`,

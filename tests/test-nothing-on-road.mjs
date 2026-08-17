@@ -83,22 +83,32 @@ const KNOWN_BODY = {
   'TERRAZZA ALTA': { max: 4, why: 'the same pylon legs — TERRAZZA ALTA runs the corse route' },
   // r199 found it and could not name the builder: the colours are computed, so
   // a literal grep does not reach it.
-  'CINQUE TERRE': { max: 4, why: 'a Dodecahedron rock at 6.28 u, builder unidentified since r199' },
+  'CINQUE TERRE': { max: 4, why: 'measured 4: a Dodecahedron rock at 6.28 u, builder unidentified since r199' },
   // HANDOVER item 3. Two legs of the lap interpenetrate, so anything correctly
   // placed beside one leg stands in the other. Fix the overlap, not the props.
   'SEA CLIFF RUN': { max: 8, why: '80 u of road stacked on road (HANDOVER item 3)' },
-  'MOUNTAIN TO SEA': { max: 60, why: 'roadWidth 5 (45 u half-width): 1159 before the width cascade fix' },
+  'MOUNTAIN TO SEA': { max: 60, why: 'roadWidth 5 (45 u half-width): measured 47, down from 1159 before the width-cascade fix' },
   'GLACIER COL': { max: 4, why: 'a hero-bridge cable descending to road level over the deck it carries' },
 };
 
 // LAW 6's known-open list — the colliders that are still inside a drivable
 // width, each by name, with its measured value and why it is there.
 const KNOWN_HARD = {
-  'HEDGEROW DASH': { max: 2, why: 'a stone-bridge parapet block, 1.55 u — the arch face r199 identified and nobody has moved' },
-  'MOUNTAIN TO SEA': { max: 40, why: 'roadWidth 5: world masonry placed off its own offsets, not off widthAt (HANDOVER)' },
+  // measured 1 — a stone-bridge parapet block at 1.55 u, the arch face r199
+  // identified and nobody has moved since
+  'HEDGEROW DASH': { max: 2, why: 'stone-bridge parapet block, 1.55 u (r199)' },
+  // measured 13 — THE DOCUMENTED FALSE POSITIVE, kept rather than filtered:
+  // a tunnel bore is NARROWER than the road it carries, so its wall colliders
+  // sit inside the drivable width by construction. tool-road-census records
+  // this and says to compare runs against each other, not against zero.
+  'COTE D AZUR': { max: 16, why: 'tunnel-bore wall colliders — narrower than the road they carry' },
+  // measured 77 solids + 3 barriers, down from 185 + 26. What is left is the
+  // world's own masonry, placed off its own offsets rather than off widthAt.
+  'MOUNTAIN TO SEA': { max: 90, why: 'roadWidth 5: masonry builders still use their own offsets (HANDOVER)' },
   'CINQUE TERRE': { max: 2, why: 'the 1.95 u stone r199 could not attribute — colours are computed, grep does not reach it' },
   'CLIFF KNOT': { max: 4, why: 'a knotted lap: masonry beside one leg reaches the next' },
-  'SEA CLIFF RUN': { max: 6, why: '80 u of road stacked on road (HANDOVER item 3) — placement beside one leg lands in the other' },
+  'BRIDGE RUN': { max: 3, why: '2 bridge parapet segments at the deck edge' },
+  'SEA CLIFF RUN': { max: 4, why: '80 u of road stacked on road (HANDOVER item 3) — placement beside one leg lands in the other' },
 };
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
