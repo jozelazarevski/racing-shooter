@@ -8593,8 +8593,36 @@ class Game {
         pl.health = Math.min(pl.maxHealth * 0.6, pl.health + 3 * dt);
       }
       this.player.update(dt, this.input);
-      if (!this.freeRoam && (this.state === 'race' || this.state === 'finished' || this.state === 'countdown')) {
-        for (const e of this.enemies) {
+      // A MISSION RIVAL IS DRAWN EVERY FRAME AND WAS STEPPED NEVER.
+      //
+      // Reported as "mission duel is broken, opponent cars are frozen", and it
+      // was exactly that. `mode=missions` sets `freeRoam = true` — missions
+      // ride on the roam machinery — and this step was gated on
+      // `!this.freeRoam`. So the ONE rival a DUEL deliberately keeps, makes
+      // alive, makes visible and names in the HUD feed never had `update`
+      // called on it. Measured in a real rAF run: 0 of 1535 frames stepped,
+      // 0.000 lap travelled, against a race control of 1036 of 1216 frames and
+      // +0.451 lap. PURSUIT — the other `keepsRival` mode — was identically
+      // broken, which is what proves the fault is in the SHARED path and not
+      // in the duel branch.
+      //
+      // `_raceLine` reading 0 on those runs is a CONSEQUENCE, not the cause:
+      // the racing line is built lazily inside `EnemyCar.update`, so a car
+      // that is never stepped never gets one.
+      //
+      // DO NOT SIMPLY DROP THE `!freeRoam` GATE. `_missionLaunch` culls the
+      // other six with `e.alive = false` and never touches `respawnTimer`,
+      // which the constructor leaves at 0 — and the dead branch of
+      // `EnemyCar.update` is `respawnTimer -= dt; if (<= 0) respawn()`.
+      // Measured: stepping the whole field puts ALL SEVEN back on the road
+      // within 12 s and a duel silently becomes a race. So step the mission
+      // foe and nothing else. `_missionReset` nulls `missionFoe`, so this
+      // expires by itself.
+      const rivals = this.freeRoam
+        ? (this.missionFoe?.alive ? [this.missionFoe] : [])
+        : this.enemies;
+      if (rivals.length && (this.state === 'race' || this.state === 'finished' || this.state === 'countdown')) {
+        for (const e of rivals) {
           // rivals hold on the grid during countdown
           if (this.state === 'countdown') e.syncMesh(0);
           else e.update(dt);
