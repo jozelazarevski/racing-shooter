@@ -260,10 +260,20 @@ export const LEVELS = [
   // different-looking track that drove the same; the difference has to be in
   // the road or it is not a different track.
   //
+  // AND EACH ONE NEEDS ITS OWN ROAD. The first cut of these three gave them
+  // tunes only — elevation, tunnels, bridges, coast — and left the plan alone,
+  // which produced three worlds carrying OLIVE COAST's exact centreline:
+  // measured, identical plan digest and identical sample-100 coordinates, and
+  // all four reporting the same 93 tight stations. Same corners in the same
+  // order is the same track wearing a different hat, however different the
+  // profile over it. Each takes a distinct authored route now, which is the
+  // pattern the roster already uses to make one road serve two worlds —
+  // CITADEL BAY on AEGEAN BLUE's route, OLIVE PASS on COL DE TURINI's.
+  //
   // Career order is this array and `starCost` prices by INDEX, so they are
   // APPENDED, never inserted, with ascending ids.
   { id: 62, name: 'CAPE OLIVETO', theme: 'medterrace', region: 'MEDITERRANEAN',
-    cost: 34, fresh: true,
+    cost: 34, fresh: true, route: 'liguriaRun',
     // THE HEADLAND ONE. Same coast road, but the capes get bored through
     // instead of driven around: two tunnels, and a longer sea leg to reach
     // them. Elevation stays low — this is the fast one, and a tunnel at speed
@@ -275,7 +285,7 @@ export const LEVELS = [
       coast: { a: [-220, -320], b: [380, -170], level: -2.1, floor: -8, beach: 60 },
     } },
   { id: 63, name: 'TERRAZZA ALTA', theme: 'medterrace', region: 'MEDITERRANEAN',
-    cost: 35, fresh: true,
+    cost: 35, fresh: true, route: 'corse',
     // THE CLIMBING ONE. OLIVE COAST's terraces seen from above: triple the
     // elevation amplitude, three stone bridges where the road crosses the
     // gullies between terraces, and no jumps — a tarmac hill climb does not
@@ -288,7 +298,7 @@ export const LEVELS = [
       coast: undefined,          // inland: the terraces run to the skyline
     } },
   { id: 64, name: 'SALINE SPRINT', theme: 'medterrace', region: 'MEDITERRANEAN',
-    cost: 36, fresh: true,
+    cost: 36, fresh: true, route: 'monza',
     // THE FLAT ONE. The salt flats behind the olive coast: almost no
     // elevation, no bridges, no bores — the fastest thing in the family,
     // where the corners arrive with no hill to help you slow down.
@@ -9383,19 +9393,34 @@ export class Track {
     // off rather than a fall you go over.
     const DROP = 2.5;                 // a fall worth stopping, not a verge
     const MINRUN = 3;                 // consecutive stations before it is a rail
-    const MAXBAY = 340;               // hard ceiling on the instance count
+    // HARD CEILING, SIZED FROM THE WORLD THAT ASKS FOR THE MOST.
+    // 340 was set when SEA CLIFF RUN wanted 300 — the roster's high-water mark
+    // at the time, and it still is among the older worlds. TERRAZZA ALTA wants
+    // 374 (359 of them for tight corners), so it was the first world to touch
+    // the ceiling, and touching it cost 34 bays of walling on a stage whose
+    // whole character is hairpins. 420 clears that demand with ~12% headroom.
+    //
+    // What the ceiling actually protects is NOT the instance count — the bays
+    // are one InstancedMesh, so they are one draw call at any number. It is
+    // `barriers`, which `vehicles.js` walks in full for every car, twice per
+    // frame. The worst world goes 645 -> 679 entries, ~5%; that is the price,
+    // and it is worth paying for corners you cannot cut.
+    const MAXBAY = 420;
     const LIFT = 0.35;                // rail foot sits just below the road plane
     const step = Math.max(1, Math.round(4.5 / this.segLen));   // one bay ~4.5 u
 
     // ---- where does the ground fall away, and is it already guarded? ----
-    const want = [];                  // [i, side] stations that need a rail
+    const want = [];                  // [i, side, tight] stations that need a rail
     for (const side of [1, -1]) {
+      // 0 = no rail, 1 = rail because the ground falls away, 2 = rail because
+      // the corner is tight. Truthiness still reads as "wanted", so the run
+      // detector below is unchanged; the distinction only matters at the cap.
       const hits = [];
       for (let i = 0; i < N; i += step) {
-        if (this._circDist(i, 0) < 30) { hits.push(false); continue; }
-        if (this._nearGorge(i, 40)) { hits.push(false); continue; }  // its own rails
-        if (this.fords.some((f) => this._circDist(i, f.i) < 14)) { hits.push(false); continue; }
-        if (this._tunnels.some((t) => i >= t.s - 6 && i <= t.e + 6)) { hits.push(false); continue; }
+        if (this._circDist(i, 0) < 30) { hits.push(0); continue; }
+        if (this._nearGorge(i, 40)) { hits.push(0); continue; }  // its own rails
+        if (this.fords.some((f) => this._circDist(i, f.i) < 14)) { hits.push(0); continue; }
+        if (this._tunnels.some((t) => i >= t.s - 6 && i <= t.e + 6)) { hits.push(0); continue; }
         const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;
         const p = this.pointAt(i, (half + 1.8) * side);
         const out = this.pointAt(i, (half + 7.0) * side);
@@ -9419,7 +9444,7 @@ export class Track {
         // loose verge is just as gone.
         const TIGHT = 0.02;
         const tightHere = this.curvature[i] > TIGHT;
-        if (drop < DROP && !tightHere) { hits.push(false); continue; }
+        if (drop < DROP && !tightHere) { hits.push(0); continue; }
         // AN OFFSET IS NOT A DISTANCE — the same trap the hedge banks document.
         // `pointAt` steps along ONE sample's normal, and on the inside of a
         // bend the lap swings back underneath it, so "1.8 u outside the edge"
@@ -9439,7 +9464,7 @@ export class Track {
         // sample is nearer than that, so a rail never keeps its whole offset.
         const clearAll = [[0, 0], [ex, ez], [-ex, -ez]].every(([ox, oz]) =>
           this._distToTrack(p.x + ox, p.z + oz) >= half + 0.25);
-        if (!clearAll) { hits.push(false); continue; }
+        if (!clearAll) { hits.push(0); continue; }
         // already walled? the masonry went in before this did
         let guarded = false;
         for (let b = 0; b < this.barriers.length && !guarded; b++) {
@@ -9453,19 +9478,41 @@ export class Track {
           // guard; this only fills the stretches that have none.
           if ((mx - p.x) * (mx - p.x) + (mz - p.z) * (mz - p.z) < 144) guarded = true;
         }
-        hits.push(!guarded);
+        hits.push(guarded ? 0 : tightHere ? 2 : 1);
       }
       // keep only runs long enough to read as a rail
       let run = 0;
       for (let k = 0; k <= hits.length; k++) {
         if (hits[k]) { run++; continue; }
         if (run >= MINRUN) {
-          for (let j = k - run; j < k; j++) want.push([j * step, side]);
+          for (let j = k - run; j < k; j++) want.push([j * step, side, hits[j] === 2]);
         }
         run = 0;
       }
     }
     if (!want.length) return;
+
+    // A CAP THAT BITES MUST BITE THE RIGHT END.
+    //
+    // `want` is filled one side at a time — every station on side +1, then
+    // every station on side -1 — so truncating it at MAXBAY does not drop the
+    // least useful bays, it AMPUTATES THE SECOND SIDE. Measured on TERRAZZA
+    // ALTA, which wanted more bays than the cap allows and reported exactly
+    // `rails 340`: 63 of its 377 tight stations came back guarded on one side
+    // and bare on the other, in runs up to 17 stations long. A corner walled
+    // on the outside and open on the inside is the exact thing "fully walled
+    // so one can't skip them" rules out — the inside is the side you cut.
+    //
+    // So order by WHY the bay was wanted before the cap is applied: tight
+    // corners first, fall-away verges after. The secondary key is the station
+    // index, which interleaves the two sides at the same corner so a partial
+    // budget still leaves both flanks of it standing rather than one. Sort is
+    // stable in JS, so equal keys keep lap order and a run stays contiguous.
+    want.sort((a, b) => (b[2] ? 1 : 0) - (a[2] ? 1 : 0) || a[0] - b[0]);
+    // NO SILENT CAPS. If the budget bit, say by how much and on what — a world
+    // that quietly builds 340 of the 500 walls it asked for reads as "walled".
+    this._edgeRailWant = want.length;
+    this._edgeRailTightWant = want.filter((w) => w[2]).length;
 
     // ---- one bay: two posts and two rails, merged --------------------------
     // THE BAY RUNS ALONG LOCAL Z, AND IT MUST.
@@ -9523,6 +9570,7 @@ export class Track {
     mesh.instanceMatrix.needsUpdate = true;
     this.group.add(mesh);
     this._edgeRailCount = n;
+    this._edgeRailDropped = want.length - n;
   }
 
   _buildGuardFence() {

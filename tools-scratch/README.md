@@ -24,6 +24,16 @@ real time to get right and the next session should not rebuild them.
                 caused them.
 - `offroad.mjs` drives deliberately off the racing line, where players go and
                 line-holding harnesses never do.
+- `walls.mjs`   corner-cutting coverage: of the TIGHT stations on a lap, how
+                many are guarded on both sides, one side, neither. Counting
+                rails does not answer this — the gate it grew into is
+                `tests/test-cornerwalls.mjs`.
+- `open.mjs`    the follow-up question: for each open station, WHICH of the
+                rail builder's exemptions covers it (tunnel, gorge, ford,
+                start gate) or none of them. This is what turned "8% open"
+                into a named defect at SEA CLIFF RUN sample 749.
+- `railbudget.mjs` how many rail bays a world ASKS for versus how many it gets.
+                Found `MAXBAY` truncating TERRAZZA ALTA by 34 bays in silence.
 - `srv.mjs`     plain static server (`node srv.mjs 8920`).
 - `keep.sh`     keeps a server alive across tool-call timeouts:
                 `setsid ./keep.sh srv.mjs 8920 &`

@@ -2004,6 +2004,91 @@ VALLEY river failure is unchanged and pre-existing (identical on pristine
 `origin/main`, second port).
 
 
+## r207 — three new worlds get their own road, and the wall budget stops lying
+
+### THE THREE NEW WORLDS WERE ONE WORLD
+
+r205 added CAPE OLIVETO, TERRAZZA ALTA and SALINE SPRINT as siblings of OLIVE
+COAST, the world the owner said he enjoys most. Each got its own `tune` —
+elevation amplitude, tunnels, bridges, coast — and none got its own PLAN. The
+result was three worlds carrying OLIVE COAST's exact centreline:
+
+    plan digest (x,z only)   all four   c4260efb
+    sample 100               all four   186,-217
+    tight stations           all four   93
+
+Same corners in the same order is the same track wearing a different hat,
+however different the profile laid over it. Each now takes a distinct authored
+route, which is the pattern the roster already uses to let one road serve two
+worlds (CITADEL BAY on AEGEAN BLUE's route, OLIVE PASS on COL DE TURINI's):
+
+    62 CAPE OLIVETO   route liguriaRun  plan 7494656c  relief 14.5 u  2 bores
+    63 TERRAZZA ALTA  route corse       plan a3b4862c  relief 27.5 u  42% tight
+    64 SALINE SPRINT  route monza       plan 4dcd5815  relief  5.3 u  grade p90 5%
+
+All three boot clean, and `test-tunnels` drives 3 of 3 re-sited bores in one
+portal and out the other.
+
+### THE RAIL CAP WAS AMPUTATING ONE SIDE OF THE ROAD
+
+r206 walled tight corners so they cannot be cut. TERRAZZA ALTA — 42% of its lap
+tight, the hardest case in the roster — still came back with 63 tight stations
+guarded on ONE side and bare on the other, in runs up to 17 long. The tell was
+that it reported exactly `rails 340`, which is `MAXBAY`.
+
+`want` is filled one side at a time, every station on side +1 and then every
+station on side -1, so truncating it at the cap does not drop the least useful
+bays. It cuts the second side off the end of the lap. Two changes:
+
+1. **Order before you truncate.** Each wanted bay now records WHY it was wanted
+   — a fall-away verge or a tight corner — and the list is sorted tight-first,
+   station-index second, so a partial budget leaves both flanks of a corner
+   standing rather than one. (Sort is stable, so runs stay contiguous.)
+2. **Size the cap from the world that asks for the most.** 340 was set when SEA
+   CLIFF RUN's 300 was the high-water mark. TERRAZZA ALTA wants 374. Raised to
+   420. The ceiling does not protect draw calls — the bays are one
+   InstancedMesh at any count — it protects `barriers`, which `vehicles.js`
+   walks in full for every car twice a frame. Worst world 645 -> 679, ~5%.
+
+`_edgeRailWant`, `_edgeRailTightWant` and `_edgeRailDropped` are now build
+stats, because a world that quietly builds 340 of the 374 walls it asked for
+reads as "walled" from every angle except the one that matters.
+
+    TERRAZZA ALTA  tight stations walled both sides   73% -> 82%
+                   longest fully-open run             17 -> 4 stations
+                   bays built                        340 -> 374 (0 dropped)
+
+### THE GATE, AND WHAT IT CAUGHT ON ITS FIRST RUN
+
+`tests/test-cornerwalls.mjs` promotes the scratchpad probe into three laws:
+no cap bites in silence; tight stations are guarded on both sides to a
+per-world measured floor; no long run of lap is fully open at a tight corner.
+It asks `barriers` — the list the car cannot pass — not the scene graph, since
+a rail you can drive through is not a wall.
+
+    29 OLIVE COAST    96%    61 OLIVE PASS    71%    62 CAPE OLIVETO   92%
+    63 TERRAZZA ALTA  82%    64 SALINE SPRINT 97%    60 SEA CLIFF RUN  64%
+
+It immediately failed on a world nobody was looking at. SEA CLIFF RUN leaves 13
+consecutive tight stations bare from sample 749, and NOT because of the cap —
+it builds every bay it asks for. `_buildEdgeRails` skips any station within 40
+samples of a gorge, overpass or tunnel because those build "its own rails"; at
+749-761 nothing does, on either side.
+
+**That is this session's defect again, in a new place: a promise made over a
+wider span than the thing that keeps it.** It is pinned by name at its measured
+13 rather than absorbed by raising the limit for everyone, because the proper
+fix — narrow the exemption to where a barrier actually stands, which the
+`guarded` test three lines below already asks, and the deck and bridge builders
+run before the rail builder so their barriers are in the list by then — touches
+every world with a gorge and wants its own before/after sweep.
+
+### VERIFIED
+
+`test-cornerwalls` 24/24, `test-edgerails` (the triangle budget survives the
+larger cap: 420 bays x 48 tris = 20,160, under the 26,000 line),
+`test-tunnels 62 63` 3/3, `test-roadclear` 48p/0f.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

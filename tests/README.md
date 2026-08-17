@@ -97,3 +97,15 @@ Four rules learned the hard way:
 4. **A clearance check that matches nothing passes forever.** If a check is
    conditional on finding something to measure, assert separately that it DID.
    `test-carriageway` ends with exactly that guard on its own filters.
+5. **Count coverage, not objects.** "How many rails did it build" is not "can
+   you cut the corner". TERRAZZA ALTA carried 340 bays — the most of any world
+   in the roster — and still had 63 tight stations walled on one side and bare
+   on the other. `test-cornerwalls` measures the fraction of TIGHT STATIONS
+   guarded on both sides, which is the question the player actually asks.
+6. **A cap that bites in silence reads as success.** If a builder bounds
+   anything — top-N, a hard ceiling, a sampling stride — publish what it
+   refused, and assert it refused nothing. `_buildEdgeRails` truncated its
+   wish-list at `MAXBAY` and a world that built 340 of the 374 walls it asked
+   for looked fully walled from every angle except the one that mattered. Worse,
+   the list was filled one side at a time, so the truncation did not drop the
+   least useful bays — it amputated the second side.
