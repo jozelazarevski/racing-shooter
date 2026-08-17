@@ -743,6 +743,44 @@ export function groundTexture(palette = {}) {
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
     }
+    // STONES THAT READ AS STONES. A speck of flat colour is a pixel; a pebble
+    // with a lit crown and a shadow under it is an object, and at gameplay
+    // distance that difference is most of what separates "green plane" from
+    // "ground". Same trick the roof tiles use — the shadow is what sells it.
+    for (let i = 0; i < 150; i++) {
+      const x = Math.random() * w, y = Math.random() * h;
+      const rr = 1.6 + Math.random() * 4.4;
+      const gr = 96 + Math.random() * 60 | 0;
+      g.fillStyle = `rgba(0,0,0,${0.14 + Math.random() * 0.12})`;      // contact shadow
+      g.beginPath();
+      g.ellipse(x + rr * 0.32, y + rr * 0.34, rr * 1.02, rr * 0.72, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = `rgba(${gr},${gr - 6},${gr - 16},${0.55 + Math.random() * 0.35})`;
+      g.beginPath();
+      g.ellipse(x, y, rr, rr * 0.74, Math.random() * 3, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = `rgba(255,252,240,${0.14 + Math.random() * 0.18})`; // lit crown
+      g.beginPath();
+      g.ellipse(x - rr * 0.24, y - rr * 0.26, rr * 0.5, rr * 0.34, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+    // tufts: a few short blades from one root, so growth has direction rather
+    // than being an even stipple
+    for (let i = 0; i < 90; i++) {
+      const x = Math.random() * w, y = Math.random() * h;
+      const dark = Math.random() < 0.5;
+      g.strokeStyle = dark ? 'rgba(38,74,26,0.55)' : 'rgba(122,168,74,0.5)';
+      g.lineWidth = 1.1;
+      for (let k = 0; k < 4 + (Math.random() * 4 | 0); k++) {
+        const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.5;
+        const len = 3 + Math.random() * 6;
+        g.beginPath();
+        g.moveTo(x, y);
+        g.quadraticCurveTo(x + Math.cos(a) * len * 0.5, y + Math.sin(a) * len * 0.6,
+          x + Math.cos(a) * len, y + Math.sin(a) * len);
+        g.stroke();
+      }
+    }
     // large-scale drift: a few very soft wide blotches so the tiled ground
     // reads patchy at gameplay distance instead of uniformly stippled
     for (let i = 0; i < 26; i++) {
@@ -1941,7 +1979,7 @@ export function townhouseGlowTexture(palette = {}, variant = 0, litFrac = 0.55) 
 export function roofTileTexture(base = '#8a3a2a', kind = 'pantile') {
   const [r, g0, b] = hexRgb(base);
   const shade = (f, a = 1) => `rgba(${Math.min(255, r * f) | 0},${Math.min(255, g0 * f) | 0},${Math.min(255, b * f) | 0},${a})`;
-  return make(128, 128, (g, w, h) => {
+  return make(256, 256, (g, w, h) => {
     g.fillStyle = base;
     g.fillRect(0, 0, w, h);
     const rows = kind === 'slate' ? 16 : 11;
