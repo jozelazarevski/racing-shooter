@@ -12,11 +12,11 @@
  * normal, which on a lap that comes back on itself says nothing about the
  * distance to the nearest leg — the "an offset is not a distance" defect.
  *
- *   node tools-scratch/trees.mjs             # every world
- *   node tools-scratch/trees.mjs 37 6        # only these
+ *   node tests/tool-tree-clearance.mjs             # every world
+ *   node tests/tool-tree-clearance.mjs 37 6        # only these
  */
 import { chromium } from 'playwright-core';
-const BASE = process.env.BASE ?? 'http://127.0.0.1:8901';
+const BASE = process.env.BASE ?? 'http://localhost:8901';
 const only = process.argv.slice(2).map(Number).filter(Boolean);
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',

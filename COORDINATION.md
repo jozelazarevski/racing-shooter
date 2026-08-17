@@ -1907,6 +1907,103 @@ all stone, the known tunnel-bore false positive among them) and floaters (116)
 are UNCHANGED — this release did not touch colliders.
 
 
+## r201 — the fixes get a pass/fail line, and the tools graduate
+
+r199 built the census, r200 cleared what it found. Neither put a GATE on any of
+it: four defect classes were fixed and the only thing standing between them and
+a silent return was somebody remembering to run a scratch probe. This release
+is the maturation — no new findings, no new placement behaviour except one
+hardening, and everything now guarded.
+
+### THE PASS/FAIL LINE GOES WHERE THIS REPO SAYS IT GOES
+
+`tool-road-census`'s own header has said it since it was written: "A TOOL, not
+a test... The pass/fail line belongs in test-carriageway, which is where a fix
+gets pinned once this has found something." It has now found something four
+times, so `test-carriageway` gains a third section pinning all of it on the
+worlds each defect was measured worst on:
+
+    BRIDGE RUN, MONACO STREETS, MOUNTAIN TO SEA, CANYON RUN,
+    SUZUKA, DEEPWOOD TRAIL, CLIFF KNOT
+
+with three checks per world — no sponsor board in a carriageway, every tree
+trunk clearing `widthAt + r + 1.7`, no reflector marker post in a carriageway.
+Each carries the measured "before" number in its header so a failure reads as a
+regression against a known figure rather than a bare assertion.
+
+Boards are measured across their full 9 u SPAN (a board pivoted across the road
+has its midpoint on the verge and its ends over both lanes) and skip
+`kind: 'fence'`. Trunks apply the HEIGHT gate first, or the saguaros
+`_buildCacti` silhouettes on the canyon rim fail the suite for doing their job.
+Marker posts are found by geometry, because they carry no collider and no
+registry — with the filter checking the parameters EXIST before comparing them.
+
+### AND A GUARD ON THE GUARDS
+
+Every one of those checks is conditional on having found something to measure,
+which means a renamed field or a changed geometry makes the whole section go
+quiet and GREEN. So the section ends with an assertion that it matched real
+geometry at all:
+
+    PASS  the r199/r200 filters still match real geometry
+          boards 49, trunks 8670, marker posts 94 across the pinned worlds
+
+That is the direct lesson of `fence.mjs`: a clearance test that matches nothing
+passes forever.
+
+### THE TOOLS GRADUATE OUT OF SCRATCH
+
+`tools-scratch/trees.mjs` and `tools-scratch/banners.mjs` are the acceptance
+tests for shipped fixes now, not session scratch. They are
+`tests/tool-tree-clearance.mjs` and `tests/tool-banner-clearance.mjs`, listed in
+tests/README.md with the rest of the diagnostics, and they answer the
+roster-wide question the pinned worlds deliberately do not:
+
+    0 of 44516 trunks inside their clearance, on 0 worlds
+    0 of 411 sponsor boards in a carriageway, on 0 worlds
+
+tests/README.md's "Writing new checks" grew from two rules to four, the two new
+ones being the two this family of bug taught: test that the value EXISTS before
+comparing it, and assert that a clearance check matched something.
+
+### ONE HARDENING, MEASURED: THE FLORA FIX WAS PLANTING ON ITS OWN LIMIT
+
+r200 bounded tree scale by `room / spec.rFac`, which puts the tightest tree
+EXACTLY on the clearance line — DEEPWOOD TRAIL's worst trunk measured 0.00 u,
+so the new suite was riding on floating-point noise. The bound is now
+`(room - 0.05) / spec.rFac`, and the spot rejection floor rises from 0.35 to
+0.85 so that any spot which survives can still carry a NORMAL tree: the
+smallest scale this builder produces is 0.6, which at the widest trunk factor
+(kapok, 1.25) needs 0.75 u of room. Accepting tighter spots would have traded
+trunks in the road for bonsai beside it.
+
+    DEEPWOOD TRAIL worst trunk clearance   0.00 u -> -0.13 u
+    roster trunks inside clearance         0 -> 0     tree counts unchanged
+
+### A SECOND NaN-COMPARISON BUG, FOUND AND FIXED
+
+`_scatter` runs every generated dressing past the editor's eraser, with a
+comment explaining that it must: "clearing a building site by hand while the
+wood grew back over it would make the tool feel broken". But `_buildCacti`
+describes its spot as `{i, lateral}` and resolves the point later in `place`,
+so the call was `_erased(undefined, undefined)` — and `NaN < r * r` is FALSE,
+so the answer came back "not erased" every time. **The eraser has never reached
+the desert.** `_scatter` now resolves `{i, lateral}` to a point before asking.
+
+This is the same shape as `fence.mjs`'s post filter and it is worth naming as a
+pattern, because the repo has now hit it three times in two sessions: a
+comparison against a value that is not there does not fail loudly. It says no.
+
+### VERIFIED
+
+test-carriageway ("the line is clear of everything", now including the 21 new
+checks), test-editor 15/15, test-editor2 13/13, test-editor4 19/19,
+test-select 19/19, test-editor5 94/94 — the five that cover the eraser —
+test-buildings, and both roster sweeps at zero. test-nature's single PINE
+VALLEY river failure is unchanged and pre-existing (identical on pristine
+`origin/main`, second port).
+
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

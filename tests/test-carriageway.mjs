@@ -163,6 +163,134 @@ for (const [id, name] of PLACED) {
   await p.close();
 }
 
+// ---- AN OFFSET IS NOT A DISTANCE: THE r199/r200 CLASS ----------------------
+// The scene-graph census (tool-road-census's BODIES section) found four more
+// builders doing exactly what the two above were doing — placing at
+// `pointAt(i, someOffset)` and never asking how far the NEAREST leg is. Where a
+// lap comes back on itself, an offset that is right beside its own carriageway
+// lands in another one. Measured before the fixes:
+//
+//   SPONSOR BOARDS  `_buildBanners` had no road check of any kind. 68 of 419
+//                   boards inside a drivable width across 15 of 61 worlds;
+//                   worst BRIDGE RUN 8.58 u into a 9 u half-width — 0.42 u off
+//                   the centreline. On cliff-walled worlds it was systematic,
+//                   not incidental: WALL_OFF + 0.75 leaves EVERY board 6.65 u
+//                   from the road against a 9 u half-width.
+//   TREE TRUNKS     three builders — the forest corridors (whose own comment
+//                   promised the trunks were pushed clear), the cacti, and the
+//                   flora mix, which measured the distance but spent it on
+//                   capping tree SIZE and never asked whether the trunk FITS.
+//                   482 of 44544 trunks inside their clearance on 8 worlds, 25
+//                   of them ON the drivable surface. SUZUKA is a
+//                   figure-of-eight, so its crossover legs run close: 14 SOLID
+//                   boles on the road, worst 4.44 u inside a 9 u half-width.
+//   MARKER POSTS    the reflector markers pick CORNERS on purpose, which is
+//                   exactly where the lap is likeliest to have another leg past
+//                   the apex. CLIFF KNOT, whose lap ties around itself, stood
+//                   23 posts and bands in a carriageway, worst 7.91 u.
+//
+// Pinned on the worlds each was measured worst on.
+const OFFSETS = [[55, 'BRIDGE RUN'], [34, 'MONACO STREETS'], [57, 'MOUNTAIN TO SEA'],
+  [4, 'CANYON RUN'], [37, 'SUZUKA'], [47, 'DEEPWOOD TRAIL'], [59, 'CLIFF KNOT']];
+const seen = { boards: 0, trunks: 0, posts: 0 };
+for (const [id, name] of OFFSETS) {
+  const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
+  await p.goto(`${BASE}/?level=${id}&go=1&unlockall=1`, { waitUntil: 'load' });
+  const built = await p.waitForFunction(() => window.__game?.track?.center && window.__game.player,
+    undefined, { timeout: 240000 }).then(() => 1).catch(() => 0);
+  if (!built) { console.log(`SKIP  ${name}`); await p.close(); continue; }
+  const r = await p.evaluate(() => {
+    const t = window.__game.track;
+    const V = new (t.center[0].constructor)();
+    const halfAt = (x, z) => { V.set(x, 0, z); return t.widthAt(t.nearestIndex(V)); };
+
+    // ---- sponsor boards: measure the whole 9 u SPAN ------------------------
+    // A board pivoted across the road has its midpoint on the verge and its
+    // ends over both lanes, so the centre alone reads as clear. `banners` also
+    // holds `_buildGuardFence`'s bays (kind 'fence'), and a guard rail BELONGS
+    // at the road edge — counting those buries the boards under them.
+    let boards = 0, boardWorst = -Infinity;
+    for (const bn of (t.banners ?? [])) {
+      if (bn.kind === 'fence') continue;
+      boards++;
+      const h = bn.heading ?? 0;
+      for (const off of [-4.5, -2.25, 0, 2.25, 4.5]) {
+        const x = bn.x + Math.cos(h) * off, z = bn.z - Math.sin(h) * off;
+        boardWorst = Math.max(boardWorst, halfAt(x, z) - t._distToTrack(x, z));
+      }
+    }
+
+    // ---- tree trunks: RULES.md's `widthAt + r + car radius` (1.7 for a tree)
+    // Only the TRUNK is solid — "collision r tracks the TRUNK, not the canopy"
+    // — so a crown leaning over the road is the design working, not a defect.
+    // And HEIGHT comes first: `_buildCacti` silhouettes saguaros on the canyon
+    // RIM twenty units up, and judging those on XZ distance alone would fail
+    // this test for the skyline doing its job.
+    let trunks = 0, trunkWorst = -Infinity;
+    for (const tr of (t.trees ?? [])) {
+      V.set(tr.x, 0, tr.z);
+      const i = t.nearestIndex(V);
+      const dy = (tr.y ?? 0) - t.center[i].y;
+      if (dy > 3 || dy < -4) continue;
+      trunks++;
+      trunkWorst = Math.max(trunkWorst,
+        (t.widthAt(i) + (tr.r ?? 0.75) + 1.7) - t._distToTrack(tr.x, tr.z));
+    }
+
+    // ---- reflector marker posts -------------------------------------------
+    // These carry no collider and no registry, so they are found by geometry.
+    // A signature filter MUST check the values exist before comparing them, or
+    // every geometry lacking those parameters passes on a NaN comparison —
+    // which is how `fence.mjs` invented phantom posts for a whole session.
+    let posts = 0, postWorst = -Infinity;
+    const M = new (t.group.matrixWorld.constructor)();
+    t.group.traverse((o) => {
+      if (!o.isInstancedMesh) return;
+      const g = o.geometry, q = g?.parameters;
+      if (g?.type !== 'BoxGeometry' || !q) return;
+      if (!Number.isFinite(q.width) || !Number.isFinite(q.height)) return;
+      if (Math.abs(q.width - 0.15) > 0.005 || Math.abs(q.height - 0.85) > 0.005) return;
+      o.updateWorldMatrix(true, false);
+      for (let k = 0; k < o.count; k++) {
+        o.getMatrixAt(k, M); M.premultiply(o.matrixWorld);
+        const x = M.elements[12], z = M.elements[14];
+        posts++;
+        postWorst = Math.max(postWorst, halfAt(x, z) - (t._distToTrack(x, z) - 0.075));
+      }
+    });
+
+    const fin = (v) => (Number.isFinite(v) ? +v.toFixed(2) : null);
+    return { boards, boardWorst: fin(boardWorst), trunks, trunkWorst: fin(trunkWorst),
+      posts, postWorst: fin(postWorst) };
+  });
+  seen.boards += r.boards; seen.trunks += r.trunks; seen.posts += r.posts;
+
+  if (r.boards) {
+    check(`${name}: no sponsor board stands in a carriageway`, r.boardWorst <= 0,
+      `${r.boards} boards, deepest span reach ${r.boardWorst} u past the drivable edge`);
+  } else console.log(`NOTE  ${name}: no sponsor boards`);
+
+  if (r.trunks) {
+    check(`${name}: every tree trunk clears widthAt + r + 1.7`, r.trunkWorst <= 0,
+      `${r.trunks} trunks at road level, worst ${r.trunkWorst} u inside the clearance`);
+  } else console.log(`NOTE  ${name}: no trees at road level`);
+
+  if (r.posts) {
+    check(`${name}: no reflector marker post stands in a carriageway`, r.postWorst <= 0,
+      `${r.posts} posts, worst ${r.postWorst} u inside the drivable edge`);
+  } else console.log(`NOTE  ${name}: no reflector marker posts`);
+
+  await p.close();
+}
+
+// A CLEARANCE TEST THAT MATCHES NOTHING PASSES FOREVER. Every check above is
+// conditional on having found something to measure, so rename a field or
+// change a geometry and the whole section goes quiet and green. This is the
+// guard on the guards.
+check('the r199/r200 filters still match real geometry',
+  seen.boards > 0 && seen.trunks > 0 && seen.posts > 0,
+  `boards ${seen.boards}, trunks ${seen.trunks}, marker posts ${seen.posts} measured across the pinned worlds`);
+
 await browser.close();
 console.log(fail ? `\n${fail} FAILED` : '\nthe line is clear of everything');
 process.exit(fail ? 1 : 0);

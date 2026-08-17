@@ -1,6 +1,6 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r200, deployed and live, tree clean.
+State at handover: `main` = r201, deployed and live, tree clean.
 Live: https://jozelazarevski.github.io/racing-shooter/
 
 ## THE THREE THINGS THAT MATTER, IN ORDER
@@ -26,6 +26,12 @@ the fifth and sixth times this repo has met it:
     marker posts     (r200)  CLIFF KNOT: 23 in a carriageway        -> 0
 
     roster bodies 399 -> 46      trunks inside clearance 482 -> 0
+
+**All four fixes are now PINNED** in `tests/test-carriageway.mjs` (r201), on
+the worlds each was measured worst on, and the section ends with a guard that
+its own filters still match real geometry — a clearance test that matches
+nothing passes forever. The roster-wide sweeps live in `tests/` now:
+`tool-tree-clearance.mjs` and `tool-banner-clearance.mjs`.
 
 **The 46 that remain are all identified in COORDINATION.md r200 and none of
 them needs a hunt.** 14 are RED CENTRE RUN's pylon legs, which are DELIBERATE

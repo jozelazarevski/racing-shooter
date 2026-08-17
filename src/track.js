@@ -15398,7 +15398,17 @@ export class Track {
       // every other generated dressing goes through here, and clearing a
       // building site by hand while the wood grew back over it would make the
       // tool feel broken
-      if (this._erased(p.x, p.z)) continue;
+      //
+      // AND A SPOT NEED NOT CARRY COORDINATES. `_buildCacti` describes its
+      // spot as {i, lateral} and resolves the point in `place`, so this was
+      // calling `_erased(undefined, undefined)` — and `NaN < r * r` is FALSE,
+      // so the answer came back "not erased" every time and the eraser did not
+      // reach the desert at all. Same family as `fence.mjs`'s post filter
+      // (r199): a comparison against a value that is not there does not fail
+      // loudly, it quietly says no.
+      const ep = p.x != null ? p
+        : (p.i != null ? this.pointAt(p.i, p.lateral ?? 0) : null);
+      if (ep && this._erased(ep.x, ep.z)) continue;
       place(p, placed);
       placed++;
     }
@@ -15686,9 +15696,15 @@ export class Track {
         // a spot that could not carry even the smallest trunk — `_scatter`
         // re-rolls a null, so this costs a sample rather than a tree — and let
         // the placer shrink the ones that merely fit tightly.
+        // The floor is 0.85 and not a hair over zero so that any spot which
+        // survives can still carry a NORMAL tree: the placer below bounds the
+        // scale by the room, and the smallest scale this builder has ever
+        // produced is 0.6, which at the widest trunk factor (kapok, 1.25)
+        // needs 0.75 u of room plus the margin. Accepting tighter spots would
+        // trade trunks in the road for bonsai beside it.
         _clearV.set(p.x, 0, p.z);
         if (this._distToTrack(p.x, p.z)
-            < this.widthAt(this.nearestIndex(_clearV)) + 1.7 + 0.35) return null;
+            < this.widthAt(this.nearestIndex(_clearV)) + 1.7 + 0.85) return null;
         return p;
       },
       (p) => {
@@ -15709,9 +15725,11 @@ export class Track {
         // for a car. Bound the scale by the room actually there, measured to
         // the nearest leg, so a tree beside a tight belt gets smaller instead
         // of standing inside the clearance.
+        // the 0.05 is deliberate slack: a builder that plants EXACTLY on its
+        // limit leaves the clearance test riding on floating-point noise
         _clearV.set(p.x, 0, p.z);
         const room = dRoad2 - (this.widthAt(this.nearestIndex(_clearV)) + 1.7);
-        const s = Math.min(sMax, room / spec.rFac, 0.6 + rr2 * rr2 * 1.9);
+        const s = Math.min(sMax, (room - 0.05) / spec.rFac, 0.6 + rr2 * rr2 * 1.9);
         const ty = this.terrainHeight(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.45), s);
         m4.setPosition(p.x, ty, p.z);
