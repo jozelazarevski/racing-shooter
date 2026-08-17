@@ -712,16 +712,20 @@ export function worldFacets(level) {
  *  the gap between ribbons and trips the self-approach check); the variety
  *  comes from `jag`, which lengthens/shortens each leg instead.
  *  `dir` +1 = the first leg runs east, -1 = west. An ODD leg count exits on the
- *  opposite side of the face from the entry. */
-function switchbackStack({ legs, z0, dz, halfX, hp, dir = 1,
+ *  opposite side of the face from the entry.
+ *  `x0` centres the stack somewhere other than the map's spine, which is what
+ *  lets a lap carry SEVERAL small bursts of hairpins in different places
+ *  instead of one comb through the middle — see `pikes`. x0 = 0 is the old
+ *  behaviour exactly, so `turini` is byte-for-byte unchanged by it. */
+function switchbackStack({ legs, z0, dz, halfX, hp, dir = 1, x0 = 0,
   jag = [0, 4, -3, 2, -5, 3, -2, 5, -4, 1] }) {
   const out = [];
   for (let k = 0; k < legs; k++) {
     const s = (k % 2 === 0 ? 1 : -1) * dir;
     const z = z0 + k * dz;
     const hx = halfX + jag[k % jag.length];
-    out.push([-s * hx, z], [0, z], [s * hx, z]);
-    if (k < legs - 1) out.push([s * (hx + hp), z + dz / 2]);
+    out.push([x0 - s * hx, z], [x0, z], [x0 + s * hx, z]);
+    if (k < legs - 1) out.push([x0 + s * (hx + hp), z + dz / 2]);
   }
   return out;
 }
@@ -1175,19 +1179,82 @@ const CIRCUITS = {
     [-235.0, -60.0], [-232.0, 60.0],
   ],
 
-  // PIKES PEAK — one sustained climb, nothing else. A long approach across the
-  // apron, then eleven legs up the mountain with no respite, finishing on the
-  // summit shelf. The tune gives it the tallest elevation range on the roster.
+  // PIKES PEAK — one sustained climb, and NOT a second COL DE TURINI.
+  //
+  // REPORTED as "identical tracks", the two cards side by side. MEASURED, the
+  // report was right about the road and wrong about the artwork:
+  //
+  //   the preview photos ARE different files (w22 tarmac, w25 gravel; all 58
+  //   shots checksum unique) and the badge is drawn from each world's own
+  //   route, so nothing was literally shared. What was shared was the SHAPE.
+  //
+  //   The first cut of this route was `turini`'s call to `switchbackStack`
+  //   with two numbers moved: legs 11 vs 9, halfX 37 vs 36, and the same
+  //   dz 27, hp 16, dir -1, between the same south-east apron approach and
+  //   the same west-rim plunge. That passes a digest test — the two plan
+  //   digests genuinely differ (579fe6f5 / 66a36365) — and fails the player:
+  //
+  //     card badge IoU, the real _drawCircuitMap at 72x52 px      67 %
+  //         roster median 14 %, next-highest distinct pair 54 %
+  //         (the eight 100 % pairs are deliberate route sharing —
+  //          OLIVE PASS on this route, CITADEL BAY on AEGEAN BLUE's)
+  //     nearest station of one lap to the other, median      8.8 / 9.5 u
+  //         ROAD_HALF is 9, so half of each lap lay INSIDE the other's
+  //         carriageway; every genuinely distinct pair measures 24-66 u
+  //
+  //   Same corners in the same order is the same track wearing a different
+  //   hat — and two worlds spun out of one helper on one set of numbers are
+  //   the same corners however far apart the hashes land.
+  //
+  // So the climb is authored the way the real hill climb reads: the corners
+  // arrive in TWO BURSTS AT DIFFERENT SCALES rather than one relentless comb.
+  // The W's come first, WIDE legs (halfX 74 against Turini's 36) low on the
+  // east flank; then a quarter-lap of committed traverse; then the short tight
+  // ones under the summit. Turini's whole character is that its nine short
+  // legs never let up, and this one has to be able to say something else.
+  //
+  //     badge IoU vs turini        67 % -> 28 %, and 31 % against the worst
+  //         route anywhere on the roster (redwood) — an ordinary card
+  //     median station distance    8.8 u -> 56.7 u, and the share of the lap
+  //         inside the other's carriageway 52 % -> 10 %
+  //     tight stations             191 -> 88, against Turini's 146: this
+  //         world now has FEWER corners than Turini and bigger ones
+  //     plan digest                579fe6f5 -> 68c88d8a (turini untouched at
+  //         66a36365 — `x0` defaults to 0, so its call is unchanged)
+  //     closest self-approach      23.7 u -> 27.0 u, over the 22.0 u
+  //         `_checkLayout` demands; test-roadclear LAW 4 counts 0 stretches
+  //     the climb is not spent doing it: relief stays 41 u, grade p90 15 ->
+  //         17 %, max 26 -> 30 % on a lap 2464 -> 2232 u long
+  //
+  // The descent is the other half of the fix. Turini owns the west rim, so
+  // this drops down the corridor Turini leaves EMPTY between its comb and that
+  // plunge (x -150 to -186), zigging gently rather than retracing it.
+  //
+  // ONE THING THIS CANNOT FIX FROM HERE: `DEMANDS[25]` in main.js still reads
+  // twist 0.77, which is what prints TWISTY · STEEP on the card — the same two
+  // chips as Turini, and part of what the report saw. Measured on this road
+  // with tests/test-affinity.mjs' own expression, live twist is 0.55 (climb
+  // still 1.00), which trips WORLD_TRAITS' 0.6 threshold the other way. That
+  // row wants re-measuring in the file that owns it.
   pikes: [
-    [-30, -246], [50, -252], [130, -238], [196, -206], [230, -168],
-    // 11 legs from the RIGHT (see the note on turini), exiting left at
-    // z = -150 + 10*27 = 120
-    ...switchbackStack({ legs: 11, z0: -150, dz: 27, halfX: 37, hp: 16, dir: -1,
-      jag: [0, 6, -5, 4, -7, 5, -4, 7, -6, 3, -2] }),
-    // summit shelf, then the long run back down the shoulder to the apron
-    [-96, 134], [-166, 150],
-    [-228, 176], [-252, 108], [-240, 30], [-252, -50],
-    [-222, -130], [-164, -190], [-88, -228],
+    // the apron: the fast run east along the foot of the mountain
+    [46, -244], [140, -250], [214, -226], [250, -168],
+    // the east flank, open and committed
+    [248, -96], [232, -28],
+    // THE W'S — first burst, wide legs, entered from the RIGHT (dir -1, see
+    // the note on turini) and exiting left at z = 34 + 2*34 = 102
+    ...switchbackStack({ legs: 3, z0: 34, dz: 34, halfX: 74, hp: 24, dir: -1,
+      x0: 124, jag: [0, -6, 4] }),
+    // the traverse across the face — the long committed part of the climb
+    [10, 122], [-40, 138],
+    // DEVIL'S PLAYGROUND — second burst, short legs under the summit. dz 33
+    // and not Turini's 27: measured, 27 here closed to 22.1 u between ribbons
+    // once the spline eased the leg ends, and the layout check wants 22.0
+    ...switchbackStack({ legs: 3, z0: 182, dz: 33, halfX: 46, hp: 16, dir: -1,
+      x0: -72, jag: [0, 4, -3] }),
+    // the descent: one long open zig down the inside of the mountain
+    [-166, 226], [-186, 150], [-150, 84], [-178, 14], [-152, -62],
+    [-176, -132], [-124, -186], [-52, -216],
   ],
 
   // SAFARI — Kenya. Enormous, open, fast. The slowest corner here is faster
@@ -7631,6 +7698,7 @@ export class Track {
       // Slot-canyon look: tall stratified cliff ribbons just outside the road.
       // Purely visual — the physics clamp stays at WALL_OFF like every level.
       // T.cliffPalette re-skins the face per theme (glacial blue-white ice).
+      this._buildCliffCaps();          // …but not across another leg of the lap
       const tex = cliffTexture(this.T.cliffPalette);
       tex.anisotropy = 4;
       this._cliffRibbon(1, tex);
@@ -7645,6 +7713,84 @@ export class Track {
   /** Deterministic canyon-wall profile at sample j (independent of Math.random
    *  so cactus/rim placement can query the same shape). All frequencies are
    *  integer multiples of one lap, so the ribbon closes seamlessly. */
+  /** A WALL 37 U OFF ITS OWN STATION IS NOT 37 U OFF THE LAP.
+   *
+   *  `_cliffProfile`'s `base` is a constant setback measured from ONE sample,
+   *  and nothing asks how far the ribbon reaches from it — the defect this
+   *  repo keeps shipping, wearing the cliff builder's clothes. LAGUNA SECA
+   *  (44) is where it bites: the two Andretti hairpin legs pass 44.33 u apart
+   *  (stations 330 <-> 428), `cliffSetback: 26` puts the foot at 37.3, so the
+   *  face stands 6.87 u from the FAR leg's centreline on a 9 u road. Measured
+   *  on the built world: 327 face rows inside a carriageway over 116 of 900
+   *  stations, a 15-38 u rock drawn across the other leg's tarmac.
+   *
+   *  The physics clamp is derived from the same `base`, so the INVISIBLE wall
+   *  stood on that tarmac too. A car driven across the hairpin was stopped at
+   *  a true distance of 8.22 u from station 427, thrown 26.65 u sideways in
+   *  ONE frame and cut from 109.5 km/h to 5.1 — four times in a six-second
+   *  run, because it drives straight back at the road it can see. That is the
+   *  reported screenshot: last place, mid-race, 8 km/h against a rock face.
+   *
+   *  So walk outward and stop where the FACE would reach another part of the
+   *  lap. Face rows only (foot, mid-lean, rim edge): those are the wall you
+   *  drive into and the one `base` hands the physics. Capping on the outer rim
+   *  skirt as well was measured and is WORSE — it floors the cap on CORNICHE
+   *  and ROCKFALL RAVINE for a distant silhouette and leaves MORE face in the
+   *  road, not less (CORNICHE 0 -> 17 rows, ROCKFALL 22 -> 78).
+   *
+   *  What it refused is published, because a cap that bites in silence reads
+   *  as success. `tightest === floor` means a lap that doubles back inside the
+   *  verge itself — UNDERCITY SLIPSTREAM does, and no setback can fix that.
+   */
+  _buildCliffCaps() {
+    const CLEAR = 2.3;                 // car half-width 1.7, plus a hand's breadth
+    const STEP = 0.5;
+    const cap = new Float32Array(N * 2);
+    let capped = 0, floored = 0, tightest = Infinity;
+    for (let j = 0; j < N; j++) {
+      const c = this.center[j], n = this.nrm[j];
+      const floor = this.widthAt(j) + CLEAR;
+      for (let s = 0; s < 2; s++) {
+        const side = s ? -1 : 1;
+        const P = this._cliffProfile(j, side);      // uncapped: `_cliffCap` is unset
+        const rows = [0, P.l1, P.l2];
+        const clearAt = (lb) => {
+          for (const r of rows) {
+            const lat = lb + r;
+            const ns = this._nearestSample(c.x + n.x * lat * side, c.z + n.z * lat * side);
+            if (ns.d < this.widthAt(ns.i) + CLEAR) return false;
+          }
+          return true;
+        };
+        let out = P.base;
+        if (!clearAt(P.base)) {                     // fast path: nearly always clear
+          out = floor;
+          for (let lb = floor; lb <= P.base; lb += STEP) {
+            if (clearAt(lb)) out = lb; else break;
+          }
+          // COUNT ONLY WHERE THE CAP ACTUALLY BINDS. On a slot canyon `base`
+          // is 11.05 and `floor` is widthAt + 2.3 = 11.3, so `floor` is already
+          // OUTSIDE `base` and the `Math.min` downstream makes this a no-op —
+          // but the naive counter called it capped-and-floored anyway and
+          // reported 923 of 1800 sides on GLACIAL PASS, a world the cap does
+          // not touch. A statistic that cries wolf on the worlds it leaves
+          // alone is worse than none, because the one world it should shout
+          // about (UNDERCITY SLIPSTREAM, whose lap folds back inside its own
+          // verge) stops standing out.
+          if (out < P.base - 1e-6) {
+            capped++;
+            if (out <= floor + 1e-6) floored++;
+            if (out < tightest) tightest = out;
+          }
+        }
+        cap[j * 2 + s] = out;
+      }
+    }
+    this._cliffCap = cap;
+    this._cliffCapped = { sides: capped, of: N * 2, floored,
+      tightest: capped ? +tightest.toFixed(2) : null };
+  }
+
   _cliffProfile(j, side) {
     const t = (j % N) * (Math.PI * 2 / N);
     const ph = side * 2.13;                      // asymmetric left/right walls
@@ -7670,8 +7816,15 @@ export class Track {
     // cliffSetback pushes the faces off the verge: the corridor becomes a
     // DEEP VALLEY with a drivable floor, not a walled slot ("don't build
     // walled track in desert - or make it look like a deep valley")
-    const base = WALL_OFF + 0.65 + (this.T.cliffSetback ?? 0)
+    let base = WALL_OFF + 0.65 + (this.T.cliffSetback ?? 0)
       + 0.24 * (Math.sin(31 * t + 2.2 + ph) + 1);
+    // …but never further out than the lap leaves room for. See _buildCliffCaps:
+    // the setback is measured from THIS station and the lap comes back past it.
+    // Guarded index — a negative `j % N` would read undefined and Math.min it
+    // to NaN, and every NaN comparison downstream is false.
+    if (this._cliffCap) {
+      base = Math.min(base, this._cliffCap[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)]);
+    }
     const l1 = 0.85 + 0.5 * Math.sin(17 * t + 0.7 - ph);   // mid-face lean
     const l2 = 2.0 + 0.85 * Math.sin(13 * t + 2.9 + ph) + 0.4 * Math.sin(47 * t - ph);
     return { h, base, l1, l2 };
