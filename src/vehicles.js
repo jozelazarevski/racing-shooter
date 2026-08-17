@@ -27,8 +27,8 @@ const MAX_GRADE = 0.45;
  *  OFF_CLIMB + OFF_FADE. NOTHING IS SCRUBBED: momentum you brought is
  *  momentum you keep, so a bank taken with speed is still a line and a
  *  mountain taken from rest is still a wall. */
-const OFF_CLIMB = 0.06;
-const OFF_FADE = 0.12;
+const OFF_CLIMB = 0.03;
+const OFF_FADE = 0.08;
 /** Fastest a crest may throw the car upward, u/s. Uncapped, a steep ramp taken
  *  on nitro sent cars 100+ u into the infield. It also bounds a jump: against
  *  gravity 26 this is 0.85 s of hang time and 2.3 u of height before the road
