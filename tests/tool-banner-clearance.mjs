@@ -10,11 +10,11 @@
  * This measures the banners directly rather than by walking the scene, so it
  * is cheap enough to run over the whole roster as an acceptance test.
  *
- *   node tools-scratch/banners.mjs             # every world
- *   node tools-scratch/banners.mjs 34 37       # only these
+ *   node tests/tool-banner-clearance.mjs             # every world
+ *   node tests/tool-banner-clearance.mjs 34 37       # only these
  */
 import { chromium } from 'playwright-core';
-const BASE = process.env.BASE ?? 'http://127.0.0.1:8901';
+const BASE = process.env.BASE ?? 'http://localhost:8901';
 const only = process.argv.slice(2).map(Number).filter(Boolean);
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
