@@ -213,6 +213,35 @@ const CAM_MODES = [
   { name: 'TRAIL',     back: 21, h: 26,   look: 15, lookH: 1.6, spdBack: 5, spdH: 6, chase: true, steer: 0.9, cliffLift: 11 },
   { name: 'CHASE',     back: 17, h: 11.5, look: 19, lookH: 3.2, spdBack: 4, spdH: 2, chase: true, steer: 0.76 },
   { name: 'CHASE FAR', back: 26, h: 17,   look: 22, lookH: 3.4, spdBack: 4, spdH: 2, chase: true, steer: 0.84 },
+  // DRIVER'S VIEW — the eye where the driver's head is, riding the car rather
+  // than a boom behind it. It is LAST in the list on purpose: every mode above
+  // it is a variation on "watch your car", this one is not, and the cycle
+  // button should reach the familiar ones first.
+  //
+  // `driver: true` sends `_updateCamera` down a completely separate path
+  // (`_driverCamera`). None of the chase machinery applies: there is no boom to
+  // damp, no sightline to the car to keep clear, and the "lift over the hill in
+  // front" rule would put the lens on the roof.
+  //
+  // The numbers are NOT a chase mode with small values. `h` is the eye height
+  // above the contact patch and is only a FALLBACK — the real one is read off
+  // the car's own roofline (`userData.rig.capTop`), because the roster runs
+  // 2.5 to 3.5 u tall and a constant would sit a BRAWLER driver at chest
+  // height and a SLEEK driver through the roof. `back` is negative: the head
+  // sits AHEAD of the car's centre, in the cabin. They are also what
+  // `_watchCarVisible` re-seats with, so they have to be honest.
+  //
+  // `steer` is the lowest on the roster (0.70). This view yaws WITH the car
+  // more completely than any chase camera does — there is no boom lagging
+  // behind to steady it — so the same rack that reads calm from behind reads
+  // twitchy from the seat.
+  //
+  // `fov` widens the base by 6 and `spdFov` nearly doubles the speed stretch
+  // (11 against the 6 every other view gets). From a fixed eye with no boom,
+  // pace has to be sold by the frame itself, and a wide lens is also what buys
+  // back the peripheral road a cockpit loses by being 12 u closer to it.
+  { name: 'DRIVER', driver: true, back: -0.42, h: 2.30, look: 34, lookH: 1.15,
+    steer: 0.70, fov: 6, spdFov: 11 },
 ];
 // ---- economy ----
 // Score is the arcade number (it inflates fast: 500/lap, big rank bonus,
@@ -1480,6 +1509,7 @@ class Game {
 
     // camera + pause buttons (work with mouse and touch)
     document.getElementById('cam-btn').addEventListener('click', () => this.cycleCamera());
+    document.getElementById('view-btn')?.addEventListener('click', () => this.setDriverView());
     document.getElementById('pause-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       this.togglePause();
@@ -1758,6 +1788,7 @@ class Game {
       if (this.state === 'paused') { this.state = 'race'; this.hud.centerMsg('GO'); }
     });
     document.getElementById('pm-camera').addEventListener('click', () => this.cycleCamera());
+    document.getElementById('pm-driver')?.addEventListener('click', () => this.setDriverView());
     document.getElementById('pm-restart').addEventListener('click', () => {
       closeMenu();
       this.resetRace();
@@ -1839,7 +1870,48 @@ class Game {
 
   cycleCamera() {
     this.camMode = (this.camMode + 1) % CAM_MODES.length;
+    this._syncViewBtn();
     if (this.state !== 'title') this.hud.feed(`CAMERA: ${CAM_MODES[this.camMode].name}`, 'info');
+  }
+
+  /** Index of the driver's view in CAM_MODES, found by its flag rather than
+   *  written down as a 5 — the list is edited often and a stale constant here
+   *  would silently switch you to CHASE FAR. */
+  static get DRIVER_MODE() {
+    const i = CAM_MODES.findIndex((m) => m.driver);
+    return i < 0 ? 0 : i;
+  }
+
+  /** THE DRIVER'S VIEW IS A TOGGLE, NOT A STOP ON THE CYCLE.
+   *
+   *  It is on the cycle too — it has to be, or the pause menu and the C key
+   *  could not reach it — but six taps to get into the seat and four more to
+   *  get out is not a switch you use mid-corner. This is one thumb press each
+   *  way, and it remembers which boom you came from so pressing it twice puts
+   *  you back exactly where you were rather than at the top of the list.
+   *
+   *  `on` omitted toggles; passing it explicitly is for the pause menu, which
+   *  wants a checkbox rather than a flip. */
+  setDriverView(on) {
+    const D = Game.DRIVER_MODE;
+    const isOn = this.camMode === D;
+    const want = on === undefined ? !isOn : !!on;
+    if (want === isOn) return;
+    if (want) { this._preDriverMode = this.camMode; this.camMode = D; }
+    else this.camMode = (this._preDriverMode ?? 3) === D ? 3 : (this._preDriverMode ?? 3);
+    this._syncViewBtn();
+    if (this.state !== 'title') {
+      this.hud.feed(want ? "DRIVER'S VIEW" : `CAMERA: ${CAM_MODES[this.camMode].name}`, 'info');
+    }
+  }
+
+  /** Paint the driver-view button's on/off state. Called from every path that
+   *  can change camMode, so the button cannot disagree with the camera. */
+  _syncViewBtn() {
+    const b = document.getElementById('view-btn');
+    if (b) b.classList.toggle('on', this.camMode === Game.DRIVER_MODE);
+    const pb = document.getElementById('pm-driver');
+    if (pb) pb.textContent = this.camMode === Game.DRIVER_MODE ? "CHASE VIEW 📷" : "DRIVER'S VIEW 👁";
   }
 
   /** Compile every shader the world can need BEFORE anyone is driving.
@@ -7924,6 +7996,13 @@ class Game {
     const p = this.player;
     const speedZoom = Math.min(1, Math.abs(p.speedAlong) / p.maxSpeed);
     const M = CAM_MODES[this.camMode] || CAM_MODES[0];
+    // THE DRIVER'S VIEW IS NOT A SHORT BOOM. Everything below this line exists
+    // to place a camera some distance behind the car and keep the line between
+    // the two clear — of hillsides, of cliff faces, of pine trunks. From the
+    // driver's seat there is no such line: the lens is the car. Running that
+    // machinery on it would lift the eye over the hill ahead, slide it off a
+    // trunk it is nowhere near, and lerp it out of the cabin on every corner.
+    if (M.driver) { this._driverCamera(dt, M); this._applyCamera(dt, speedZoom, M); return; }
     // Chase views used to sit rigidly behind the car's RAW heading, so every
     // steering flick and every drift whipped the whole view sideways — that
     // is what made driving in 3D so hard. The chase yaw now follows a blend
@@ -8140,9 +8219,23 @@ class Game {
         }
       }
     }
+    this._applyCamera(dt, speedZoom, M);
+  }
+
+  /** Everything every view does once its eye and its look-point are decided:
+   *  the impact shake, the aim, the corner lean, and the shadow rig follow.
+   *  Split out so the driver's view can share it without also inheriting the
+   *  boom, the ground-clearance lift and the sightline guards above, none of
+   *  which mean anything from inside the car. */
+  _applyCamera(dt, speedZoom, M) {
+    const p = this.player;
     // screen shake
     this.shake = Math.max(0, this.shake - dt * 2.2);
-    const s = this.shake * this.shake;
+    // FROM THE SEAT, THE SHAKE IS THE CAR'S, NOT THE CAMERA OPERATOR'S. A boom
+    // 20 u out turns 1.6 u of jitter into a small wobble; the same figure on an
+    // eye that is already inside the cabin throws the whole world about and
+    // makes the road unreadable exactly when you have just been hit. Halved.
+    const s = this.shake * this.shake * (M?.driver ? 0.45 : 1);
     this.camera.position.copy(this.camPos).add(new THREE.Vector3(
       (Math.random() - 0.5) * s * 1.6, (Math.random() - 0.5) * s * 1.2, (Math.random() - 0.5) * s * 1.6
     ));
@@ -8150,10 +8243,150 @@ class Game {
     // lean into corners
     const rollTarget = this.state === 'race' ? -this.input.steer * speedZoom * 0.045 : 0;
     this._camRoll = (this._camRoll ?? 0) + (rollTarget - (this._camRoll ?? 0)) * Math.min(1, 4 * dt);
-    this.camera.rotation.z += this._camRoll;
+    // ...and from the seat you also lean with the BODY. `mesh.rotation.z` is
+    // the cornering lean plus the camber of the ground under the wheels, which
+    // is the one cue a fixed eye loses when the bodywork stops being on screen:
+    // without it a car sitting across a slope reads as a level one.
+    this.camera.rotation.z += this._camRoll
+      + (M?.driver ? (p.mesh?.rotation.z ?? 0) * 0.55 + (this._dLean ?? 0) * 0.05 : 0);
     // keep the shadow light rig centered on the player (offset = theme sun dir)
     this.moon.position.copy(p.pos).add(this._sunOffset);
     this.moon.target.position.copy(p.pos);
+  }
+
+  /** THE DRIVER'S VIEW.
+   *
+   *  An eye at the driver's head, rigidly attached to the car — no boom, no
+   *  positional smoothing. "Planted" is the whole point: a lerped eye inside a
+   *  cabin swims, and swimming at 55 u/s on a 430 px screen is nausea.
+   *  Everything that DOES move is a small, bounded offset on top of a rigid
+   *  mount: head mass under acceleration, a lean under lateral load, and a yaw
+   *  that leads the slide. All three are clamped, because the thing this view
+   *  is worst at is showing you the next corner and none of them may spend the
+   *  frame on drama.
+   *
+   *  WHY THE EYE IS WHERE IT IS. Three numbers were tried on a 430x932 phone:
+   *
+   *    bumper (1.1 u)  the road ahead compresses into a band a few pixels
+   *                    tall — a crest 40 u out hides the whole corner behind it
+   *    seat   (2.3 u)  read off the car's OWN roofline, `capTop - 0.25`, so a
+   *                    tall truck sits high and a coupe sits low, which is the
+   *                    difference between the two bodies and worth keeping
+   *    roof   (3.2 u)  more road, but the bonnet drops out of frame and the
+   *                    view stops reading as a car at all
+   *
+   *  The middle one, with the pitch below doing the work the height was being
+   *  asked to do.
+   *
+   *  THE PITCH FOLLOWS THE ROAD, NOT THE CAR. A fixed downward tilt is right on
+   *  the flat and wrong everywhere else: over a crest it aims at sky, into a
+   *  dip it aims at tarmac 8 u away. The look-point instead takes the HEIGHT of
+   *  the centreline `look` metres up the lap, so the frame stays full of road
+   *  through a crest and a compression alike — and is then clamped to a sane
+   *  cone so a broken lap index or a car pointing off a cliff cannot spin the
+   *  horizon out of frame.
+   */
+  _driverCamera(dt, M) {
+    const p = this.player, tk = this.track;
+    const wrap = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+    const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+    const step = Math.min(1, dt > 0 ? dt : 1 / 60);
+
+    // ---- where the head is pointed -----------------------------------------
+    // The car's own heading leads, because that is what a driver's head does.
+    // A THIRD of the way toward the travel direction on top of it, so a slide
+    // shows you where the car is actually going instead of where its nose
+    // happens to be — the one piece of information a fixed forward eye loses,
+    // and the reason a cockpit view is normally hopeless in a drift.
+    let yaw = Math.atan2(p.forward.x, p.forward.z);
+    const sp = Math.hypot(p.vel.x, p.vel.z);
+    if (sp > 5) yaw += wrap(Math.atan2(p.vel.x, p.vel.z) - yaw) * 0.34;
+    // Damped at 14/s, not the chase family's 3.6: a boom is allowed to lag
+    // turn-in because you can see the car rotate under it. From the seat, lag
+    // reads as the steering not being connected to anything.
+    const cur = this._dYaw ?? yaw;
+    this._dYaw = cur + wrap(yaw - cur) * Math.min(1, 14 * step);
+    const fwd = (this._dFwd ??= new THREE.Vector3()).set(Math.sin(this._dYaw), 0, Math.cos(this._dYaw));
+    const side = (this._dSide ??= new THREE.Vector3()).set(fwd.z, 0, -fwd.x);
+
+    // ---- head movement ------------------------------------------------------
+    // Longitudinal g, measured off the car's own speed rather than the throttle
+    // so a nitro burst, a boost pad and a wall all move the head. Braking
+    // throws it forward and down, power settles it back and up.
+    const sa = p.speedAlong;
+    const acc = dt > 0 ? (sa - (this._dSpd ?? sa)) / dt : 0;
+    this._dSpd = sa;
+    const gz = clamp(acc / 26, -1, 1);
+    this._dSurge = (this._dSurge ?? 0) + (gz - (this._dSurge ?? 0)) * Math.min(1, 7 * step);
+    // Lateral load, taken from the sideways component of the velocity — which
+    // is the drift, not the steering angle, so it only fires when the car is
+    // genuinely sliding.
+    const gx = clamp(p.vel.dot(side) / 13, -1, 1);
+    this._dLean = (this._dLean ?? 0) + (gx - (this._dLean ?? 0)) * Math.min(1, 6 * step);
+
+    // ---- the eye ------------------------------------------------------------
+    // Read off this car's own roofline: the roster runs 2.5-3.5 u tall, so a
+    // constant seats a truck driver at chest height and a coupe driver through
+    // the roof. `p.pos.y` is the contact patch, so this is height above tarmac.
+    const capTop = p.mesh?.userData?.rig?.capTop;
+    const eyeH = capTop ? clamp(capTop - 0.25, 1.75, 3.0) : (M.h ?? 2.3);
+    const cp = this.camPos;
+    cp.set(p.pos.x, p.pos.y + eyeH, p.pos.z)
+      .addScaledVector(fwd, -(M.back ?? -0.42) - this._dSurge * 0.16)
+      .addScaledVector(side, this._dLean * 0.20);
+    cp.y += this._dSurge * 0.10;
+
+    // ---- the look-point -----------------------------------------------------
+    const look = M.look ?? 34;
+    let roadY = p.pos.y;
+    if (tk?.center && tk.center.length && p.trackIndex !== undefined && tk.segLen > 0) {
+      const N = tk.center.length;
+      const j = ((Math.round(p.trackIndex + look / tk.segLen) % N) + N) % N;
+      const cy = tk.center[j]?.y;
+      // Weighted toward the road but never entirely: off the carriageway the
+      // lap index is a guess and the car's own height is the honest number.
+      if (Number.isFinite(cy)) roadY = p.pos.y * 0.35 + cy * 0.65;
+    }
+    let lookY = roadY + (M.lookH ?? 1.15);
+    // The cone. Up is tight (5.9°) because sky is never information; down is
+    // looser (17.7°) because that is where a compression puts the road.
+    lookY = clamp(lookY, cp.y - look * 0.32, cp.y + look * 0.104);
+    this.camLook.set(cp.x, lookY, cp.z)
+      .addScaledVector(fwd, look)
+      // lead the slide by a little more than the yaw blend already does: at
+      // full lateral load the aim point walks ~2.4 u toward the outside of the
+      // corner, which is where the road you are about to need actually is.
+      .addScaledVector(side, this._dLean * 2.4);
+
+    // ---- and never inside anything -----------------------------------------
+    // Short, because the eye rides the car and the car has its own collision.
+    // The cases that remain are the ones where the CAR is momentarily wrong:
+    // half-buried on a bank, mid-landing, or wedged into a cliff.
+    // Order matters and is the same as the chase path's: over a bore
+    // `terrainHeight` returns the RIDGE, so asking it first would put the eye
+    // through the tunnel roof and out the mountainside.
+    if (tk) {
+      const tun = tk.tunnelAt ? tk.tunnelAt(cp, p.trackIndex, 4) : null;
+      if (tun) {
+        const ci = tk.nearestIndex(cp, tun.i);
+        const lat = tk.lateralOffset(cp, ci);
+        const lim = Math.max(1.2, tun.half - 1.0);
+        if (Math.abs(lat) > lim) {
+          const n = tk.nrm[ci];
+          const over = lat - Math.sign(lat) * lim;
+          cp.x -= n.x * over;
+          cp.z -= n.z * over;
+        }
+        const fy = tk.center[ci].y;
+        cp.y = Math.max(fy + 0.8, Math.min(cp.y, fy + tun.apex - 0.5));
+      } else if (tk.deckOverhead && tk.deckOverhead(cp, p.trackIndex)) {
+        const dk = tk.deckOverhead(cp, p.trackIndex);
+        cp.y = Math.max(dk.floorY + 0.8, Math.min(cp.y, dk.deckY - 0.5));
+      } else if (tk.terrainHeight) {
+        const gy = tk.terrainHeight(cp.x, cp.z) + 0.7;
+        if (cp.y < gy) cp.y = gy;
+      }
+    }
   }
 
   /** WATCHDOG: you must always be able to see your own car.
@@ -8172,6 +8405,21 @@ class Game {
   _watchCarVisible(dt) {
     const p = this.player;
     if (this.state !== 'race' || !p || !p.alive) { this._blindT = 0; return; }
+    // ...EXCEPT FROM THE DRIVER'S SEAT, where not seeing your own car is the
+    // feature. The eye sits at the driver's head, so the car's origin projects
+    // to somewhere behind the near plane every single frame and this watchdog
+    // would fire once a second forever, spamming the feed and yanking the eye
+    // out of the cabin onto a chase boom.
+    //
+    // The half of it that still means something is the BURIED test — it is
+    // about where the car is, not where the lens is — so that is kept, and the
+    // camera's own floor guard in `_driverCamera` covers the rest.
+    if ((CAM_MODES[this.camMode] || CAM_MODES[0]).driver) {
+      this._blindT = 0;
+      const g0 = this.track.terrainHeight(p.pos.x, p.pos.z);
+      if (p.y < g0 - 1.2) { p.y = g0; p.pos.y = g0; p.vy = Math.max(0, p.vy); }
+      return;
+    }
     const v = p.mesh.position.clone().project(this.camera);
     const onScreen = v.x > -1.05 && v.x < 1.05 && v.y > -1.05 && v.y < 1.05 && v.z < 1;
     const gy = this.track.terrainHeight(p.pos.x, p.pos.z);
@@ -8240,7 +8488,15 @@ class Game {
       const speedN = this.state === 'race'
         ? Math.min(1, Math.hypot(p.vel.x, p.vel.z) / (p.maxSpeed * 1.2)) : 0;
       this._fovSpeed = (this._fovSpeed ?? 0) + (speedN - (this._fovSpeed ?? 0)) * Math.min(1, 3 * dt);
-      const fov = (this.baseFov ?? 56) + this.fovKick * 8 + this._fovSpeed * 6;
+      // THE LENS BELONGS TO THE VIEW. Every boom camera shares one base and one
+      // speed stretch because they all see the car against a lot of world. The
+      // driver's view sees neither: it is 12 u closer to the road than CHASE
+      // and has no boom to sell pace with, so it takes a wider base (+6) and
+      // nearly double the speed stretch. Read off CAM_MODES so a view that
+      // wants its own lens says so in one place instead of here.
+      const MF = CAM_MODES[this.camMode] || CAM_MODES[0];
+      const fov = (this.baseFov ?? 56) + (MF.fov ?? 0)
+        + this.fovKick * 8 + this._fovSpeed * (MF.spdFov ?? 6);
       if (Math.abs(fov - this.camera.fov) > 0.01) {
         this.camera.fov = fov;
         this.camera.updateProjectionMatrix();
@@ -8250,6 +8506,7 @@ class Game {
     this._updateVizZones(dt); // ---- viz-zones: sectional fog / gloom / squall
 
     if (this.input.justPressed('KeyC')) this.cycleCamera();
+    if (this.input.justPressed('KeyV')) this.setDriverView();
     if (this.input.justPressed('KeyP') && (this.state === 'race' || this.state === 'paused')) {
       this.togglePause();
     }

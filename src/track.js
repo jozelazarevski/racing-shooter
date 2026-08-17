@@ -5,7 +5,10 @@ import * as THREE from 'three';
 import {
   roadTexture, wallTexture, groundTexture, buildingTexture, buildingGlowTexture,
   chevronTexture, checkerTexture, glowTexture, cloudTexture,
-  grassTexture, bannerTexture, hazardTexture, crowdTexture, awningTexture,
+  // `crowdTexture` is no longer imported: the spectator stand was the only
+  // consumer, and it was removed on request. The texture itself stays in
+  // src/textures.js — deleting it is that file's call, not this one's.
+  grassTexture, bannerTexture, hazardTexture, awningTexture,
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
   crateTexture, coneTexture, barrelTexture, riverTexture, riverBankTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
@@ -9324,7 +9327,18 @@ export class Track {
     this._buildHuts(m4);
     this._buildTrackside(m4);
     this._buildBanners();
-    this._buildGrandstand();
+    // THE SPECTATOR STAND IS GONE, ON EVERY WORLD. Asked for directly:
+    // "remove the spectators stand from all races". `_buildGrandstand` was
+    // called unconditionally here, so it stood on all 68. The builder is
+    // deleted rather than gated, because a half-referenced corpse is how a
+    // removed feature comes back — and with it went the three 2.5 u 'metal'
+    // colliders it pushed into `this.solids` near the start line, which is
+    // the thing to check: a solid outliving its mesh is exactly the BARE
+    // INTRUDER class `test-roadclear` LAW 1 exists to catch.
+    // The start line is NOT left bare: the start gate, the grid boxes and the
+    // cliff-wall opening at `_cliffProfile` are all still there, and the
+    // ±40-sample exclusions that mention the stand (`_buildTrackside`, the
+    // frontage terraces) were always shared with the gate and the grid.
     if (this.T.outcrops) this._buildOutcrops(m4);    // mesas + hoodoos beyond the canyon
     if (this.T.bridgeCount) this._buildBridges();
     if (this.T.oasis) {
@@ -18838,105 +18852,6 @@ export class Track {
       m.position.set(st.x, st.y + 0.32 + k * 0.62, st.z);
       return m;
     });
-  }
-
-  _buildGrandstand() {
-    // stepped stand full of spectators near the start line
-    const i = (N - 40 + N) % N;
-    // THE STAND ITSELF HAS TO CLEAR THE ROAD, not merely its colliders.
-    //
-    // The three colliders below already ask `_clearsRoad` and skip the ones
-    // that would sit in a carriageway. Nothing asked the same question of the
-    // thing you can SEE. So on a lap that doubles back — and 26 u sideways
-    // from a start line very often lands on another leg — the colliders were
-    // correctly withheld and a 21 u grandstand full of spectators was drawn
-    // straight across the road anyway. Reported from the track list, where
-    // the map thumbnails show it spanning the ribbon.
-    //
-    // Withholding the mesh too would leave the start line bare. Move it
-    // instead: try further out, then the other side, and take the first
-    // placement where the whole footprint — frontage and back row — is off
-    // the road everywhere on the lap. Only if no side and no distance works
-    // is the stand dropped, which is the honest outcome for a start line
-    // wedged between two legs of its own circuit.
-    const SPAN = 10.5;                       // half the 21 u frontage
-    const DEEP = 9;                          // rows climb this far back
-    let p = null, side = 1;
-    search:
-    for (const s of [1, -1]) {
-      for (let k = 0; k < 12; k++) {
-        const q = this.pointAt(i, (WALL_OFF + 16 + k * 3) * s);
-        let ok = true;
-        for (const off of [-SPAN, -SPAN / 2, 0, SPAN / 2, SPAN]) {
-          const fx = q.x + this.tan[i].x * off, fz = q.z + this.tan[i].z * off;
-          const bx = fx + this.nrm[i].x * DEEP * s, bz = fz + this.nrm[i].z * DEEP * s;
-          if (!this._clearsRoad(fx, fz, 1.0, 1.5) || !this._clearsRoad(bx, bz, 1.0, 1.5)) {
-            ok = false; break;
-          }
-        }
-        if (ok) { p = q; side = s; break search; }
-      }
-    }
-    if (!p) return;
-    // STAND IT ON THE GROUND, not at road height. `pointAt` returns the ROAD's
-    // elevation, and this sits 26 u off the centreline where the terrain has
-    // usually fallen away — measured on FURKA RIDGE the stand and all three of
-    // its colliders hovered 2.0 to 2.3 u in the air. NATURE.md rule 6:
-    // everything that stands, stands ON the ground.
-    p.y = this.terrainHeight(p.x, p.z);
-    const g = new THREE.Group();
-    const crowd = crowdTexture();
-    const frame = new THREE.MeshStandardMaterial({ color: 0x5d4426, roughness: 0.9 });
-    for (let row = 0; row < 3; row++) {
-      const step = new THREE.Mesh(
-        new THREE.BoxGeometry(20, 2.2, 3.2),
-        new THREE.MeshStandardMaterial({ map: crowd, roughness: 1 })
-      );
-      step.position.set(0, 1.1 + row * 1.9, row * 3.0);
-      step.castShadow = true;
-      g.add(step);
-    }
-    const roof = new THREE.Mesh(
-      new THREE.BoxGeometry(21, 0.35, 9),
-      new THREE.MeshStandardMaterial({ map: awningTexture(), roughness: 0.9 })
-    );
-    roof.material.map.repeat.set(6, 1);
-    roof.position.set(0, 8.6, 3.2);
-    roof.rotation.x = 0.14;
-    roof.castShadow = true;
-    g.add(roof);
-    for (const [ox, oz] of [[-9.8, -0.5], [9.8, -0.5], [-9.8, 7.2], [9.8, 7.2]]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 8.6, 0.5), frame);
-      leg.position.set(ox, 4.3, oz);
-      g.add(leg);
-    }
-    g.position.copy(p);
-    // width runs along the track; step rows climb away from it — and when the
-    // stand had to move to the other side, it turns to keep facing the racing
-    // it exists to watch rather than showing the crowd its own back
-    g.rotation.y = this.headingAt(i) + Math.PI / 2 + (side < 0 ? Math.PI : 0);
-    this.group.add(g);
-    // 3 solid colliders along the 20-unit front face (which runs with the track)
-    for (const off of [-7, 0, 7]) {
-      const cx = p.x + this.tan[i].x * off;
-      const cz = p.z + this.tan[i].z * off;
-      // ...AND NOT ONE OF THEM STANDS IN A CARRIAGEWAY. `p` is 26 u off the
-      // centreline, which is correct in isolation and wrong on a switchback:
-      // reported as "CANYON RUN is not playable, too many bugs on the road",
-      // where 26 u sideways from the start line lands squarely on ANOTHER LEG
-      // of the same lap. The census found all three colliders biting the
-      // middle of the road — a 2.5 u steel post you cannot see, because the
-      // stand you can see is over on the hillside where it belongs.
-      //
-      // Same family as the r154 deck rails ("a rail that would stand in
-      // another stretch's lane is not built") and the r167 culvert parapets.
-      // `_clearsRoad` is the rule those use and it tests the WHOLE centreline,
-      // which is exactly what a placement anchored to one station cannot do.
-      if (!this._clearsRoad(cx, cz, 2.5, 1.0)) continue;
-      // Each collider takes the ground under ITSELF — the stand is 20 u wide
-      // and the hillside under it is not level.
-      this.solids.push({ x: cx, z: cz, r: 2.5, y: this.terrainHeight(cx, cz), mat: 'metal' });
-    }
   }
 
   /** Wooden plank foot-bridges spanning the canyon overhead. Deck sits at

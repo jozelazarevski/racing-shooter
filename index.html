@@ -183,7 +183,14 @@
     box-shadow:0 3px 0 rgba(0,0,0,.25);-webkit-tap-highlight-color:transparent}
   .icon-btn:active{transform:scale(.93);background:rgba(255,212,0,.4)}
   #cam-btn{top:70px;right:12px}
-  #pause-btn{top:124px;right:12px}
+  #view-btn{top:124px;right:12px}
+  #pause-btn{top:178px;right:12px}
+  /* THE DRIVER'S VIEW BUTTON LIGHTS UP WHILE YOU ARE IN IT. 📷 cycles blind —
+     you find out which of six views you landed on from the feed line — but 👁
+     is a toggle, and a toggle with no state is a coin flip every time you
+     reach for it. Same yellow the .tbtn cluster uses for a held button, so it
+     is the language already on screen rather than a new one. */
+  #view-btn.on{background:rgba(255,212,0,.55);color:var(--ink);border-color:var(--ink)}
   #wrong-way{position:absolute;top:18%;left:50%;transform:translateX(-50%);
     font-family:'Luckiest Guy';font-size:26px;color:#ff4a2e;
     text-shadow:2px 2px 0 var(--ink);letter-spacing:4px;display:none;
@@ -1415,6 +1422,7 @@
   <div id="combo"><span id="combo-x">×2</span><span id="combo-lbl">COMBO</span><i id="combo-bar"><b></b></i></div>
   <div id="wrong-way">▼ WRONG WAY ▼</div>
   <button id="cam-btn" class="icon-btn" title="Camera view">📷</button>
+  <button id="view-btn" class="icon-btn" title="Driver's view">👁</button>
   <button id="pause-btn" class="icon-btn" title="Pause">⏸</button>
 </div>
 <div id="damage-vignette"></div>
@@ -1622,6 +1630,10 @@
     <button id="pm-resume" class="btn">RESUME</button>
     <div class="pm-group">
       <button id="pm-camera" class="btn secondary">CAMERA VIEW 📷</button>
+      <!-- The same toggle as the 👁 button on the HUD, for the player who paused
+           to go looking for it. Its label flips with the state, so pausing tells
+           you which view you are in without having to resume to find out. -->
+      <button id="pm-driver" class="btn secondary">DRIVER'S VIEW 👁</button>
       <button id="pm-steer" class="btn secondary">STEERING: NORMAL</button>
       <!-- switchable mid-race: you find out a scheme is wrong while driving -->
       <button id="pm-scheme" class="btn secondary">CONTROLS: ONE THUMB</button>
