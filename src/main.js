@@ -8003,6 +8003,7 @@ class Game {
     // machinery on it would lift the eye over the hill ahead, slide it off a
     // trunk it is nowhere near, and lerp it out of the cabin on every corner.
     if (M.driver) { this._driverCamera(dt, M); this._applyCamera(dt, speedZoom, M); return; }
+    this._dWasDriver = false;   // so a return to the seat re-seeds from the car
     // Chase views used to sit rigidly behind the car's RAW heading, so every
     // steering flick and every drift whipped the whole view sideways — that
     // is what made driving in 3D so hard. The chase yaw now follows a blend
@@ -8243,12 +8244,31 @@ class Game {
     // lean into corners
     const rollTarget = this.state === 'race' ? -this.input.steer * speedZoom * 0.045 : 0;
     this._camRoll = (this._camRoll ?? 0) + (rollTarget - (this._camRoll ?? 0)) * Math.min(1, 4 * dt);
-    // ...and from the seat you also lean with the BODY. `mesh.rotation.z` is
-    // the cornering lean plus the camber of the ground under the wheels, which
-    // is the one cue a fixed eye loses when the bodywork stops being on screen:
-    // without it a car sitting across a slope reads as a level one.
-    this.camera.rotation.z += this._camRoll
-      + (M?.driver ? (p.mesh?.rotation.z ?? 0) * 0.55 + (this._dLean ?? 0) * 0.05 : 0);
+    // ...and from the seat you also lean with the BODY. That lean is the
+    // cornering roll plus the CAMBER of the ground under the wheels, and it is
+    // the one cue a fixed eye loses the moment the bodywork stops being on
+    // screen: without it a car sitting across a slope reads as a level one.
+    //
+    // Taken as a measured angle rather than read off `mesh.rotation.z`, which
+    // is an Euler component in the car's own frame and means nothing until it
+    // has been through the yaw. How far the car's up-vector leans toward the
+    // camera's right is the honest number, and it is sign-correct by
+    // construction: +rotation.z tilts the camera's up to the LEFT, so banking
+    // WITH a car whose roof has gone right is a negative roll.
+    let bank = 0;
+    if (M?.driver && p.mesh) {
+      const up = (this._dUp ??= new THREE.Vector3()).set(0, 1, 0).applyQuaternion(p.mesh.quaternion);
+      const dir = (this._dDir ??= new THREE.Vector3()).subVectors(this.camLook, this.camPos);
+      // right = forward x worldUp = (-fz, 0, fx). Note this is the OPPOSITE of
+      // the `side` vector used elsewhere in the codebase, which is (fz,0,-fx)
+      // and points left; the sign of the bank hangs on getting this one right.
+      const rgt = (this._dRgt ??= new THREE.Vector3()).set(-dir.z, 0, dir.x);
+      if (rgt.lengthSq() > 1e-6) {
+        rgt.normalize();
+        bank = -Math.asin(Math.max(-1, Math.min(1, up.dot(rgt)))) * 0.55;
+      }
+    }
+    this.camera.rotation.z += this._camRoll + bank;
     // keep the shadow light rig centered on the player (offset = theme sun dir)
     this.moon.position.copy(p.pos).add(this._sunOffset);
     this.moon.target.position.copy(p.pos);
@@ -8291,6 +8311,16 @@ class Game {
     const wrap = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
     const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
     const step = Math.min(1, dt > 0 ? dt : 1 / 60);
+    // FIRST FRAME BACK IN THE SEAT STARTS FROM THE CAR, NOT FROM MEMORY. All
+    // the smoothed state below persists across a mode switch, so a player who
+    // drops to CHASE for half a lap and comes back would otherwise arrive with
+    // a yaw and a g-load from wherever they were when they left, and watch the
+    // view swing into place over the next quarter second.
+    if (!this._dWasDriver) {
+      this._dWasDriver = true;
+      this._dYaw = undefined; this._dSpd = undefined;
+      this._dSurge = 0; this._dLean = 0;
+    }
 
     // ---- where the head is pointed -----------------------------------------
     // The car's own heading leads, because that is what a driver's head does.

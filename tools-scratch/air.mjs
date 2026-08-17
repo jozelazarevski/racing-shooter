@@ -105,6 +105,32 @@ const measure = async (lv) => page.evaluate(async ({ lv, MIN }) => {
   // ---- what is legitimately airborne, exempted BY NAME ---------------------
   const AIRBORNE = /^(sky|horizon|cloud|bird|sea|water|river|lake|rain|snow|dust|spark|smoke|fog|particle|chopper|heli|banner|gantry|start-lights|world-skirt|contact-shadows|.*-lightpool|.*shadow|edit-|preview|hud|arrow|marker|.*-veil|bridge|deck|overpass|tunnel|gallery|rail|parapet|lamp|wire|cable|pylon|whale|pontoon|buoy|arch|crane|cablecar|ropeway|zip|net|flag|bunting)/i;
 
+  // ---- what is HELD UP by something the 2 u column grid cannot see --------
+  // Exempted BY MEMBERSHIP of the game's own lists, never by shape, and every
+  // class is COUNTED and printed — a silent filter reads as "nothing there",
+  // which is how bridge piers survived two censuses (r199).
+  //   foliage   parts[1..] of a `track.trees` entry. A TREE'S COLLIDER IS ITS
+  //             TRUNK; a crown translated 1.35 u off its own stem lands in a
+  //             different 2 u cell from the trunk holding it up, so the column
+  //             rule reports a perfectly seated olive as 13.58 u of air.
+  //             parts[0] — the trunk — is measured like anything else.
+  //   prop      `track.props`: `_buildProps` stands crates, cones and barrels
+  //             ON the drivable surface on purpose.
+  //   banner    `track.banners`: a sponsor board is a hoarding on posts and a
+  //             guard-fence bay is a rail on posts. Both belong in the air.
+  //   tires     `track.tireStacks`: a stack is tyres on top of tyres.
+  const exempt = new Map();
+  const tag = (o, k) => { if (o) exempt.set(o, k); };
+  for (const tr of (t.trees ?? [])) {
+    if (!Array.isArray(tr.parts)) continue;
+    for (let i = 1; i < tr.parts.length; i++) tag(tr.parts[i], 'foliage');
+  }
+  for (const pr of (t.props ?? [])) tag(pr.mesh, 'prop');
+  for (const bn of (t.banners ?? [])) { tag(bn.group, 'banner'); tag(bn.board, 'banner'); }
+  for (const st of (t.tireStacks ?? [])) tag(st.mesh, 'tires');
+  const exemptOf = (o) => { for (let p = o; p; p = p.parent) { const k = exempt.get(p); if (k) return k; } return null; };
+  const supp = { foliage: 0, prop: 0, banner: 0, tires: 0 };
+
   const CELL = 2;
   const col = new Map();
   const parts = [];
@@ -146,6 +172,19 @@ const measure = async (lv) => page.evaluate(async ({ lv, MIN }) => {
     if (!name) { const ch = []; for (let p = o.parent; p && ch.length < 3; p = p.parent) if (p.name) ch.push(p.name);
       name = (ch[0] ? ch[0] + '/' : '') + geo.type.replace('Geometry', ''); }
     if (AIRBORNE.test(name)) return;
+    const ex = exemptOf(o);
+    if (ex) { supp[ex] += o.isInstancedMesh ? o.count : 1; return; }
+    // the ANCESTOR CHAIN, so a finding names a builder instead of a shape:
+    // "Sphere x19" starts another hunt, "olive/Sphere" ends one
+    { const ch = []; for (let p = o; p && p !== t.group && ch.length < 4; p = p.parent) if (p.name) ch.push(p.name);
+      const q = geo.parameters ?? {};
+      const mm = Array.isArray(o.material) ? o.material[0] : o.material;
+      const own = (t.trees ?? []).some((r) => Array.isArray(r.parts) && r.parts.includes(o)) ? ' TREE'
+        : (t.props ?? []).some((r) => r.mesh === o) ? ' PROP' : '';
+      name = (ch.length ? ch.join('<') + ' ' : '') + geo.type.replace('Geometry', '')
+        + '(' + Object.entries(q).filter(([k, v]) => typeof v === 'number' && !/segment/i.test(k))
+          .map(([k, v]) => +v.toFixed(2)).join(',') + ')'
+        + (mm?.color ? ' #' + mm.color.getHexString() : '') + own; }
     for (let p = o; p; p = p.parent) if (!p.visible) return;
     let bb = bbc.get(geo.uuid);
     if (!bb) { geo.computeBoundingBox(); bb = geo.boundingBox; bbc.set(geo.uuid, bb); }
@@ -207,7 +246,7 @@ const measure = async (lv) => page.evaluate(async ({ lv, MIN }) => {
   // ~0 analytic gap and a large mesh gap, the drawn 10 u grid is the cause.
   const meshOnly = gaps.filter((q) => Math.abs(q.agap) < 0.75).length;
   return { id: lv.id, name: level.name, theme: level.theme, vertsFound: filled,
-    parts: parts.length, tested, seated, over: tested - seated, rows: list,
+    parts: parts.length, tested, seated, over: tested - seated, rows: list, supp,
     tunnels: (t._tunnels ?? []).length, valleyWalls: !!t.T?.valleyWalls,
     gradeFloat: { p50: pct(grades, 0.5), p90: pct(grades, 0.9), max: pct(grades, 0.999) },
     gradeSeated: { p50: pct(seatedGrades, 0.5), p90: pct(seatedGrades, 0.9) },
@@ -222,10 +261,11 @@ for (const lv of worlds) {
   if (r.error) { console.log(`\n=== ${r.id} ${r.name}: ${r.error}`); continue; }
   console.log(`\n=== ${String(r.id).padStart(2)} ${r.name} (${r.theme})  ground verts ${r.vertsFound}/40401 ===`);
   console.log(`  ${r.over} of ${r.tested} column-bottom parts stand over ${MIN} u above the DRAWN ground (${r.parts} parts scanned)`);
+  console.log(`  exempt: foliage ${r.supp.foliage} prop ${r.supp.prop} banner ${r.supp.banner} tires ${r.supp.tires}`);
   console.log(`  bores ${r.tunnels}  valleyWalls ${r.valleyWalls}  |  grade under FLOATERS p50 ${r.gradeFloat.p50} p90 ${r.gradeFloat.p90} max ${r.gradeFloat.max}`
     + `   under SEATED p50 ${r.gradeSeated.p50} p90 ${r.gradeSeated.p90}   mesh-only ${r.meshOnly}/${r.over}`);
   for (const row of r.rows.slice(0, 12)) {
-    console.log(`    ${row.name.padEnd(28)} ${String(row.over).padStart(5)}/${String(row.n).padEnd(6)}`
+    console.log(`    ${row.name.slice(0, 60).padEnd(60)} ${String(row.over).padStart(5)}/${String(row.n).padEnd(6)}`
       + ` worst ${String(row.worst).padStart(7)} u  (analytic ${String(row.worstA).padStart(7)}) grade ${row.grade} at (${row.x},${row.z}) h=${row.h}`);
   }
 }

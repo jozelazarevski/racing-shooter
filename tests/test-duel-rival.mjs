@@ -109,12 +109,23 @@ async function run(mode) {
 
   let patched = null;
   if (PATCH) {
-    await page.route('**/src/main.js*', async (route) => {
+    // A REGEX, NOT A GLOB. index.html asks for `./src/main.js?v=r211`, and `?`
+    // is a glob metacharacter in some matchers — a pattern that quietly failed
+    // to match would leave the tree's own main.js in place and report the fix
+    // as not working. The `patched` assertion below is the belt to this brace.
+    await page.route(/\/src\/main\.js/, async (route) => {
       const res = await route.fetch();
       const body = await res.text();
       patched = body.includes(PATCH_FROM);
-      route.fulfill({ response: res, body: patched ? body.replace(PATCH_FROM, PATCH_TO) : body,
-        headers: { ...res.headers(), 'content-type': 'text/javascript' } });
+      // DROP content-length AND content-encoding. The patched body is ~1.9 kB
+      // longer than the original, so reusing the upstream content-length
+      // truncates the module mid-statement — and a truncated module fails as
+      // a syntax error at load, which would look exactly like "the fix broke
+      // the game" rather than like a bug in this harness.
+      const h = { ...res.headers(), 'content-type': 'text/javascript' };
+      delete h['content-length']; delete h['content-encoding'];
+      route.fulfill({ status: res.status(), headers: h,
+        body: patched ? body.replace(PATCH_FROM, PATCH_TO) : body });
     });
   }
 
@@ -265,10 +276,11 @@ ok(duel.foeSteps > duel.frames * 0.5,
   `${duel.foeSteps}/${duel.frames} frames`);
 
 // ---- LAW 2: AND IT COVERS GROUND -----------------------------------------
-// Measured WITH the fix, 40 s: max 45.89 u/s, avg 36.58, 0.778 lap — which is
-// 0.58 lap per 30 s, and in line with the race control's 0.462. The floors are
-// 0.2 lap and 20 u/s: far enough below to survive a slow world or an unlucky
-// first corner, far enough above zero that a frozen car cannot reach them.
+// Measured WITH the fix over 40 s: max 45.89 u/s, avg 36.58, 0.778 lap of
+// travel = 0.0195 lap per second of race time, against the race control's
+// 0.0154. The floors are 0.006 lap/s and 20 u/s — roughly a third of both
+// measurements, far enough below to survive a slower world or a first-corner
+// mistake, and nowhere a frozen car can reach.
 ok(duel.lapPerSec > 0.006,
   'LAW 2: and it covers ground — distance ALONG THE LAP, accumulated per '
   + 'frame (measured 0.0195 lap/s with the fix, 0.0000 without; the race '

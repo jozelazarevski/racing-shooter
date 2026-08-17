@@ -7425,6 +7425,86 @@ export class Track {
     return Math.min(h, this._roadCeil(bi, nd));
   }
 
+  /** THE HEIGHT THE GROUND IS ACTUALLY DRAWN AT, at any (x, z).
+   *
+   *  `terrainHeight` is a CONTINUOUS function. The ground the player looks at
+   *  is a 10 u triangle mesh built by sampling `_terrainMeshHeight` at a
+   *  lattice and drawing flat facets between those samples (`_buildTerrain`:
+   *  SIZE 2000, SEG 200, `pos.setY(i, h - 0.12)`). Between two vertices the
+   *  drawn surface is the CHORD, and where the field bends faster than a 10 u
+   *  cell can follow, the chord runs well below the curve. That is the whole
+   *  of the "levitating grass and stone" report: every scatter builder in the
+   *  game seats its items on `terrainHeight`, which is exactly right and still
+   *  leaves them hanging over the hillside that gets drawn.
+   *
+   *  Measured on SUMMIT CLIMB before this existed: 27.02 u of air under a
+   *  boulder whose analytic seating error was 0.00 u.
+   *
+   *  Reproduces the patch's own arithmetic — same lattice, same 0.12 u drop,
+   *  same far-branch switch to raw hill noise past the 900 u ring, and the
+   *  same triangle split PlaneGeometry uses (a-b-d / b-c-d, i.e. the
+   *  fx + fz = 1 diagonal). Bilinear here would average away the very error
+   *  being corrected. Returns null outside the near patch, where there is no
+   *  drawn near ground to be seated on.
+   *
+   *  The lattice is memoized and cleared by `_buildTerrain`, which is the one
+   *  place the drawn ground is (re)made. */
+  _drawnGroundY(x, z) {
+    const STEP = 10, HALF = 1000, W = 201;
+    const gx = (x + HALF) / STEP, gz = (z + HALF) / STEP;
+    const i0 = Math.floor(gx), j0 = Math.floor(gz);
+    if (!(i0 >= 0 && j0 >= 0 && i0 + 1 < W && j0 + 1 < W)) return null;
+    const cache = this._meshLattice || (this._meshLattice = new Map());
+    const vert = (i, j) => {
+      const k = j * W + i;
+      let v = cache.get(k);
+      if (v === undefined) {
+        const vx = i * STEP - HALF, vz = j * STEP - HALF;
+        const far = Math.max(Math.abs(vx), Math.abs(vz)) > 900;
+        let h = far ? this._hillNoise(vx, vz) : this._terrainMeshHeight(vx, vz);
+        if (far && this.T.coast) h = this._coastDepress(vx, vz, h, 9999);
+        if (far && this._delta) h += this._delta.at(vx, vz);
+        cache.set(k, v = h - 0.12);
+      }
+      return v;
+    };
+    const fx = gx - i0, fz = gz - j0;
+    const h00 = vert(i0, j0), h10 = vert(i0 + 1, j0);
+    const h01 = vert(i0, j0 + 1), h11 = vert(i0 + 1, j0 + 1);
+    return (fx + fz <= 1)
+      ? h00 + (h10 - h00) * fx + (h01 - h00) * fz
+      : h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz);
+  }
+
+  /** WHERE A SCATTERED THING SITS: the ground you can stand on and the ground
+   *  you can see, whichever is LOWER.
+   *
+   *  NATURE.md rule 6 — everything that stands, stands ON the ground — is
+   *  about the picture, and the picture is the mesh. Taking the minimum means
+   *  this can only ever push an item DOWN onto the surface that gets drawn; it
+   *  never lifts anything, so it cannot raise a boulder through a road or a
+   *  roof through its own walls.
+   *
+   *  Use it for the Y of a PLACEMENT, never inside a placement's accept/reject
+   *  test: the world is seeded, and changing how many of anything a builder
+   *  makes moves every later scatter through the shared RNG stream. */
+  _seatY(x, z) {
+    const a = this.terrainHeight(x, z);
+    const d = this._drawnGroundY(x, z);
+    if (d === null || d >= a) return a;
+    // UNDER THE RIBBON ITSELF, THE ROAD IS THE SURFACE YOU SEE.
+    // `_blendHeight` tucks the ground up to 0.55 u UNDER the carriageway on
+    // purpose (plus the patch's own 0.12 u drop) so the two can never z-fight,
+    // and the road is drawn over the result — so there the tucked mesh is not
+    // what anybody looks at. OUTSIDE the ribbon it is: the shoulder you can
+    // see is the terrain patch, tuck and all, and something standing on it
+    // belongs on it. 12 u is inside the widest ribbon fringe on the roster
+    // (widthAt + WALL_OFF + 0.6 - ROAD_HALF), so nothing that scatters to the
+    // verge is caught by this.
+    const ns = this._nearestSample(x, z);
+    return ns.d < 12 ? Math.max(d, Math.min(a, this.center[ns.i].y - 0.8)) : d;
+  }
+
   /** THE ROAD IS THE FLOOR — the hard guarantee, applied last.
    *
    *  Everything above works off a COARSE road field, which bilinearly mixes
@@ -9060,7 +9140,7 @@ export class Track {
             if (this._distToTrack(cand.x, cand.z) >= need) { p = cand; break; }
           }
           if (!p) continue;
-          const ty = this.terrainHeight(p.x, p.z) - 0.2;
+          const ty = this._seatY(p.x, p.z) - 0.2;
           // lean the whole tree inward over the road (rotation about the tangent)
           const lean = (0.10 + hash(j * 3.3 + side) * 0.12) * side;
           q.setFromAxisAngle(this.tan[j], lean);
@@ -9486,7 +9566,7 @@ export class Track {
         const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
         const w = (a.w + b.w) / 2;
         // the bed lies just under the plain — a channel, not a painted stripe
-        const y = this.terrainHeight(mx, mz) + 0.06;
+        const y = this._seatY(mx, mz) + 0.06;
         q.setFromAxisAngle(up, Math.atan2(dx, dz));
         m4.compose(new THREE.Vector3(mx, y, mz), q, new THREE.Vector3(w, 0.55, len * 1.06));
         bedMesh.setMatrixAt(k, m4);
@@ -9520,7 +9600,7 @@ export class Track {
           const s = 0.22 + Math.random() * 0.4;
           if (!this._clearsRoad(px, pz, s, 0.8)) continue;
           m4.makeScale(s, s * 0.6, s);
-          m4.setPosition(px, this.terrainHeight(px, pz) + s * 0.2, pz);
+          m4.setPosition(px, this._seatY(px, pz) + s * 0.2, pz);
           gravel.setMatrixAt(gk++, m4);
         }
       }
@@ -10871,7 +10951,7 @@ export class Track {
       return this.terrainHeight(p.x, p.z) >= S.minY ? p : null;
     }, (p) => {
       const r = 2.2 + Math.random() * 5.5;
-      const y = this.terrainHeight(p.x, p.z);
+      const y = this._seatY(p.x, p.z);
       const e = r * 0.7;
       const hx = this.terrainHeight(p.x + e, p.z) - this.terrainHeight(p.x - e, p.z);
       const hz = this.terrainHeight(p.x, p.z + e) - this.terrainHeight(p.x, p.z - e);
@@ -13300,7 +13380,7 @@ export class Track {
   _element(B, type, x, z, rot, K, scale = 1, yOverride = null, authored = false) {
     if (!authored && this._erased(x, z)) return;
     // == null catches undefined too - a caller passing undefined must not NaN
-    const y = (yOverride == null ? this.terrainHeight(x, z) : yOverride) - 0.25;
+    const y = (yOverride == null ? this._seatY(x, z) : yOverride) - 0.25;
     const cs = Math.cos(rot), sn = Math.sin(rot);
     const T = HOUSE_TEMPLATES[type] ?? HOUSE_TEMPLATES.logpile;
     // A HOUSE DOES NOT STAND IN THE CARRIAGEWAY. Placement callers are meant
@@ -13748,7 +13828,7 @@ export class Track {
           const e = items[k];
           const s = (e.scale || 1) * spec.size;
           const sy = s * spec.squash;
-          const y = this.terrainHeight(e.x, e.z) + s * 0.25;
+          const y = this._seatY(e.x, e.z) + s * 0.25;
           q.setFromAxisAngle(up, e.rot || 0);
           m4.compose(new THREE.Vector3(e.x, y, e.z), q, new THREE.Vector3(s, sy, s));
           im.setMatrixAt(k, m4);
@@ -13780,7 +13860,7 @@ export class Track {
       for (let k = 0; k < n; k++) {
         const e = items[k];
         const s = (e.scale || 1) * spec.size;
-        const ty = this.terrainHeight(e.x, e.z) - 0.25;
+        const ty = this._seatY(e.x, e.z) - 0.25;
         q.setFromAxisAngle(up, e.rot || 0);
         m4.compose(new THREE.Vector3(e.x, ty, e.z), q, new THREE.Vector3(s, s, s));
         for (const part of parts) part.setMatrixAt(k, m4);
@@ -14176,7 +14256,7 @@ export class Track {
     if (!this._fieldMat) {
       this._fieldMat = new THREE.MeshStandardMaterial({ color: K.trim, roughness: 0.95 });
     }
-    const y = this.terrainHeight(x, z) - 0.1;
+    const y = this._seatY(x, z) - 0.1;
     const mesh = new THREE.Mesh(cache[type], this._fieldMat);
     mesh.name = 'field-prop';
     mesh.position.set(x, y, z);
@@ -14648,7 +14728,7 @@ export class Track {
         for (let c = 0; c < 3; c++) {
           const ox = (Math.random() - 0.5) * 1.6, oz = (Math.random() - 0.5) * 1.6;
           const s = 0.16 + Math.random() * 0.26;
-          const gy = this.terrainHeight(p.x + ox, p.z + oz) + s * 0.2;
+          const gy = this._seatY(p.x + ox, p.z + oz) + s * 0.2;
           q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
           m4.compose(new THREE.Vector3(p.x + ox, gy, p.z + oz), q, new THREE.Vector3(s, s * 0.55, s));
           gravel.setMatrixAt(gk, m4);
@@ -14693,7 +14773,7 @@ export class Track {
       // A corner that cannot take a marker simply does not get one.
       _clearV.set(p.x, 0, p.z);
       if (this._distToTrack(p.x, p.z) < this.widthAt(this.nearestIndex(_clearV)) + 1.2) continue;
-      const y = this.terrainHeight(p.x, p.z);
+      const y = this._seatY(p.x, p.z);
       q.setFromAxisAngle(up, this.headingAt(i));
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(1, 1, 1));
       posts.setMatrixAt(mk, m4);
@@ -14784,7 +14864,7 @@ export class Track {
       return this._trackSidePos(13, 26);
     };
     this._scatter(count, makePos, (p) => {
-      const y = this.terrainHeight(p.x, p.z);
+      const y = this._seatY(p.x, p.z);
       const rot = Math.random() * Math.PI;
       const len = 4 + Math.random() * 2;
       q.setFromAxisAngle(up, rot);
@@ -15602,6 +15682,9 @@ export class Track {
 
   _buildTerrain() {
     const T = this.T;
+    // the drawn ground is being (re)made, so any memo of it is stale — see
+    // `_drawnGroundY`, which every scatter builder seats against
+    this._meshLattice = null;
     const STRATA = ['#c98b52', '#a45f34', '#b5764a', '#8d4c2a', '#cfa06a', '#96552f']
       .map((c) => new THREE.Color(c));
     // TWO PATCHES, not one 4200 u plane at a uniform 10 u.
@@ -16424,7 +16507,7 @@ export class Track {
     // box scaled to w wide, so base footprint radius ≈ w/2)
     for (const s of mesaSpecs) {
       this.solids.push({
-        x: s.x, z: s.z, r: s.w * 0.5 * 0.85, y: this.terrainHeight(s.x, s.z), mat: 'stone',
+        x: s.x, z: s.z, r: s.w * 0.5 * 0.85, y: this._seatY(s.x, s.z), mat: 'stone',
       });
     }
 
@@ -16452,7 +16535,7 @@ export class Track {
       if (d < 26 || d > 140) continue;
       const r0 = 1.4 + Math.random() * 1.2;
       const hTot = 7 + Math.random() * 9;
-      let y = this.terrainHeight(x, z) - 0.4;
+      let y = this._seatY(x, z) - 0.4;
       for (let s = 0; s < SEGS; s++) {
         const rad = r0 * wr[s] * (0.9 + Math.random() * 0.2);
         const hh = (hTot / SEGS) * (0.8 + Math.random() * 0.4);
@@ -16834,7 +16917,7 @@ export class Track {
         _clearV.set(p.x, 0, p.z);
         const room = dRoad2 - (this.widthAt(this.nearestIndex(_clearV)) + 1.7);
         const s = Math.min(sMax, (room - 0.05) / spec.rFac, 0.6 + rr2 * rr2 * 1.9);
-        const ty = this.terrainHeight(p.x, p.z) - 0.25;
+        const ty = this._seatY(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.45), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of parts) part.setMatrixAt(k, m4);
@@ -16915,7 +16998,7 @@ export class Track {
       const s = 0.8 + Math.random() * 0.7;
       q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
       m4.compose(
-        new THREE.Vector3(p.x, this.terrainHeight(p.x, p.z) - 0.04, p.z),
+        new THREE.Vector3(p.x, this._seatY(p.x, p.z) - 0.04, p.z),
         q, new THREE.Vector3(s, s * 0.9, s * 0.9)
       );
       logs.setMatrixAt(lk, m4);
@@ -16971,7 +17054,7 @@ export class Track {
           };
           const x2 = gx + (hh(0.7) - 0.5) * 150, z2 = gz + (hh(1.9) - 0.5) * 150;
           if (this._inWater(x2, z2)) continue;
-          const gy2 = this.terrainHeight(x2, z2);
+          const gy2 = this._seatY(x2, z2);
           const sw2 = 4.5 + hh(2.9) * 4.5, sh2 = 5.5 + hh(4.1) * 5.5;
           bq.setFromAxisAngle(bup, hh(5.3) * Math.PI * 2);
           m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
@@ -16992,7 +17075,7 @@ export class Track {
       const s = 0.7 + Math.random() * 0.7;
       q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
       m4.compose(
-        new THREE.Vector3(p.x, this.terrainHeight(p.x, p.z) - 0.04, p.z),
+        new THREE.Vector3(p.x, this._seatY(p.x, p.z) - 0.04, p.z),
         q, new THREE.Vector3(s, s, s)
       );
       stumps.setMatrixAt(sk++, m4);
@@ -17147,7 +17230,7 @@ export class Track {
       },
       (spot, k) => {
         const p = this.pointAt(spot.i, spot.lateral);
-        const y = spot.terrain ? this.terrainHeight(p.x, p.z) : p.y + spot.dy;
+        const y = spot.terrain ? this._seatY(p.x, p.z) : p.y + spot.dy;
         // rim spots stay mostly saguaro (the skyline silhouette) with the odd
         // leaning ocotillo fan; ground spots run the full five-species mix
         const roll = spot.dy ? (Math.random() < 0.8 ? 0 : 0.99) : Math.random();
@@ -17340,7 +17423,7 @@ export class Track {
         const s = sp === 'gum' ? 0.9 + Math.random() * 0.85
           : sp === 'oak' ? 0.8 + Math.random() * 0.6
             : 0.7 + Math.random() * 0.9;
-        const ty = this.terrainHeight(p.x, p.z) - 0.2;
+        const ty = this._seatY(p.x, p.z) - 0.2;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(new THREE.Vector3(p.x, ty, p.z), q,
           new THREE.Vector3(s, s * (0.88 + Math.random() * 0.36), s));
@@ -17418,7 +17501,7 @@ export class Track {
         const sp = stump ? stumpParts : parts;
         const k = stump ? stumps++ : snags++;
         const s = stump ? 0.8 + Math.random() * 0.9 : 0.7 + Math.random() * 1.1;
-        const ty = this.terrainHeight(p.x, p.z) - 0.2;
+        const ty = this._seatY(p.x, p.z) - 0.2;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
           new THREE.Vector3(p.x, ty, p.z),
@@ -17573,7 +17656,7 @@ export class Track {
         const [kind, parts, tintIdx, rad, [s0, sVar]] = sp;
         const k = ks[SLOT[kind]]++;
         const s = s0 + Math.random() * sVar;
-        const ty = this.terrainHeight(p.x, p.z) - 0.25;
+        const ty = this._seatY(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of parts) part.setMatrixAt(k, m4);
@@ -17614,7 +17697,7 @@ export class Track {
       () => this._trackSidePos(11.2, 17),
       (p, k) => {
         const s = 0.55 + Math.random() * 0.4;            // small → always smashable
-        const py = this.terrainHeight(p.x, p.z) - 0.05;
+        const py = this._seatY(p.x, p.z) - 0.05;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
           new THREE.Vector3(p.x, py, p.z),
@@ -17711,7 +17794,7 @@ export class Track {
         const sp = doum ? doumParts : parts;
         const k = doum ? doums++ : dates++;
         const s = doum ? 0.75 + Math.random() * 0.6 : 0.8 + Math.random() * 0.75;
-        const ty = this.terrainHeight(p.x, p.z) - 0.2;
+        const ty = this._seatY(p.x, p.z) - 0.2;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
           new THREE.Vector3(p.x, ty, p.z),
@@ -17869,7 +17952,7 @@ export class Track {
       const spec = SPECIES[name];
       const k = counts[name]++;
       if (k >= COUNT) { counts[name]--; return; }
-      const ty = this.terrainHeight(x, z) - 0.2;
+      const ty = this._seatY(x, z) - 0.2;
       q.setFromAxisAngle(up, rot);
       m4.compose(new THREE.Vector3(x, ty, z), q,
         new THREE.Vector3(s, s * (0.9 + Math.random() * 0.3), s));
@@ -18021,7 +18104,7 @@ export class Track {
       },
       (p, k) => {
         const s = 2.2 + Math.random() * 1.0;             // 46–67u tall — gargantuan
-        const ty = this.terrainHeight(p.x, p.z) - 0.4;
+        const ty = this._seatY(p.x, p.z) - 0.4;
         m4.makeScale(s, s * (0.9 + Math.random() * 0.25), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of giantParts) part.setMatrixAt(k, m4);
@@ -18051,7 +18134,7 @@ export class Track {
       () => this._trackSidePos(12.5, 26),
       (p, k) => {
         const s = 0.22 + Math.random() * 0.2;            // 4.5–9u saplings
-        const ty = this.terrainHeight(p.x, p.z) - 0.15;
+        const ty = this._seatY(p.x, p.z) - 0.15;
         m4.makeScale(s, s * (0.9 + Math.random() * 0.3), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of sapParts) part.setMatrixAt(k, m4);
@@ -18088,7 +18171,7 @@ export class Track {
       () => (Math.random() < 0.7 ? this._trackSidePos(13, 45) : this._trackSidePos(45, 130)),
       (p, k) => {
         const s = 0.7 + Math.random() * 0.7;
-        const ty = this.terrainHeight(p.x, p.z) - 0.2;
+        const ty = this._seatY(p.x, p.z) - 0.2;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of oakParts) part.setMatrixAt(k, m4);
@@ -18140,7 +18223,7 @@ export class Track {
       },
       (p, k) => {
         const s = 0.7 + Math.random() * 1.1;
-        const ty = this.terrainHeight(p.x, p.z) - 0.2;
+        const ty = this._seatY(p.x, p.z) - 0.2;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(new THREE.Vector3(p.x, ty, p.z), q, new THREE.Vector3(s, s * (0.8 + Math.random() * 0.5), s));
         color.setHSL(0.05 + Math.random() * 0.03, 0.14 + Math.random() * 0.1, 0.07 + Math.random() * 0.05);
@@ -18187,7 +18270,7 @@ export class Track {
       },
       (p, k) => {
         const s = 0.75 + Math.random() * 1.1;
-        const ty = this.terrainHeight(p.x, p.z) - 0.25;
+        const ty = this._seatY(p.x, p.z) - 0.25;
         m4.makeScale(s, s * (0.85 + Math.random() * 0.4), s);
         m4.setPosition(p.x, ty, p.z);
         for (const part of pineParts) part.setMatrixAt(k, m4);
@@ -18223,7 +18306,7 @@ export class Track {
         return p && !this._onQuayStrip(p.x, p.z) ? p : null;
       },
       (p) => {
-        const y = this.terrainHeight(p.x, p.z) - 0.05;
+        const y = this._seatY(p.x, p.z) - 0.05;
         const s = 0.7 + Math.random() * 1.1;
         const rot = Math.random() * Math.PI;
         for (const dr of [0, Math.PI / 2]) {
@@ -18283,7 +18366,7 @@ export class Track {
       return p && !this._onQuayStrip(p.x, p.z) ? p : null;
     }, (p) => {
       const s = 0.7 + Math.random() * 1.5;
-      const by = this.terrainHeight(p.x, p.z) + s * 0.3;
+      const by = this._seatY(p.x, p.z) + s * 0.3;
       m4.makeScale(s, s, s);
       m4.setPosition(p.x, by, p.z);
       bushes.setMatrixAt(bk, m4);
@@ -18336,7 +18419,7 @@ export class Track {
       if (fit <= 0) return;
       s = Math.min(s, fit / 0.9);
       const sy = s * (0.6 + Math.random() * 0.5);
-      const y = this.terrainHeight(p.x, p.z) + s * 0.25;
+      const y = this._seatY(p.x, p.z) + s * 0.25;
       // big boulders are SOLID (geometry base radius 1 × instance scale s)
       // carry the instance so a knocked-loose stone can actually be SEEN to go
       if (s > 0.9) this.solids.push({ x: p.x, z: p.z, r: s * 0.9, y: y - s * 0.25, mat: 'stone',
@@ -18362,7 +18445,7 @@ export class Track {
         const lx = p.x + Math.cos(la) * s * 0.95, lz = p.z + Math.sin(la) * s * 0.95;
         q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
         m4.compose(
-          new THREE.Vector3(lx, this.terrainHeight(lx, lz) + ls * 0.3, lz),
+          new THREE.Vector3(lx, this._seatY(lx, lz) + ls * 0.3, lz),
           q, new THREE.Vector3(ls, ls * (0.6 + Math.random() * 0.4), ls)
         );
         lumps.setMatrixAt(lk, m4);
@@ -18385,7 +18468,7 @@ export class Track {
       const s = 0.12 + Math.random() * 0.32;
       q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
       m4.compose(
-        new THREE.Vector3(p.x, this.terrainHeight(p.x, p.z) + s * 0.3, p.z),
+        new THREE.Vector3(p.x, this._seatY(p.x, p.z) + s * 0.3, p.z),
         q, new THREE.Vector3(s, s * 0.7, s)
       );
       pebbles.setMatrixAt(pk, m4);
@@ -18407,11 +18490,11 @@ export class Track {
     const hero = new THREE.Mesh(this._topLitRockGeo(1), rockMat);
     hero.scale.set(4.6, 3.3, 4.1);
     hero.rotation.y = 1.3;
-    hero.position.set(hp.x, this.terrainHeight(hp.x, hp.z) + 0.9, hp.z);
+    hero.position.set(hp.x, this._seatY(hp.x, hp.z) + 0.9, hp.z);
     hero.castShadow = true;
     this.group.add(hero);
     // hero boulder is solid too: footprint radius ≈ (4.6 + 4.1) / 2 = 4.35
-    this.solids.push({ x: hp.x, z: hp.z, r: Math.min(4.35 * 0.9, Math.max(0.5, this._stoneFit(hp.x, hp.z, 4.35 * 0.9))), y: this.terrainHeight(hp.x, hp.z), mat: 'stone' });
+    this.solids.push({ x: hp.x, z: hp.z, r: Math.min(4.35 * 0.9, Math.max(0.5, this._stoneFit(hp.x, hp.z, 4.35 * 0.9))), y: this._seatY(hp.x, hp.z), mat: 'stone' });
     this._addShadow(hp.x, hp.z, 5.8);
     if (T.rockSnowCap) {
       const heroCap = new THREE.Mesh(
@@ -18438,7 +18521,7 @@ export class Track {
       return p && !this._onQuayStrip(p.x, p.z) ? p : null;
     }, (p) => {
       m4.makeScale(1, 1, 1);
-      m4.setPosition(p.x, this.terrainHeight(p.x, p.z) + 0.22, p.z);
+      m4.setPosition(p.x, this._seatY(p.x, p.z) + 0.22, p.z);
       flowers.setMatrixAt(fk, m4);
       fc.set(fcolors[(Math.random() * fcolors.length) | 0]);
       flowers.setColorAt(fk++, fc);

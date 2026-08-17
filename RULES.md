@@ -670,7 +670,7 @@ The chase cameras additionally damp their own yaw (3.6/s) toward a blend of
 heading and travel direction, so flicks and drifts no longer whip the view —
 that whip was what made the 3D views hard to drive.
 
-### The five camera views
+### The six camera views
 
 | View | back | height | elevation | distance | notes |
 |---|---|---|---|---|---|
@@ -679,10 +679,61 @@ that whip was what made the 3D views hard to drive.
 | **TRAIL** | 21 | 26 | 51° | 33 u | **for spotting solids.** From overhead a boulder is a flat disc — no side face, no useful shadow, and the car is small enough that judging a gap is guesswork. At 51° every solid shows its side and its cast shadow, and the car is roughly twice the size |
 | **CHASE** | 17 | 11.5 | 34° | 21 u | bumper height |
 | **CHASE FAR** | 26 | 17 | 33° | 31 u | bumper height, further out |
+| **DRIVER** | −0.42 | the car's own roofline | — | 0 u | the driver's seat |
 
 `chase: true` (TRAIL and both CHASE views) takes the damped travel-direction
 yaw; without it the camera sits on the RAW heading and whips on every flick,
 which is only tolerable from near-overhead.
+
+### DRIVER'S VIEW is not a short boom
+
+`driver: true` sends `_updateCamera` down a separate path (`_driverCamera`).
+None of the machinery the five boom views share applies to it, because all of
+that machinery exists to keep the line between a distant lens and the car clear
+— of hillsides, cliff faces and pine trunks. From the seat there is no such
+line: the lens *is* the car. Run on it, the ground-clearance rule lifts the eye
+over the hill in front and puts it on the roof.
+
+What it does instead:
+
+- **The eye is read off the car, not written down.** `userData.rig.capTop − 0.25`
+  — the roster runs 2.5–3.5 u tall, so a constant seats a BRAWLER driver at
+  chest height and a SLEEK driver through the roof. 0.42 u ahead of the car's
+  centre, i.e. in the cabin. `h`/`back` in `CAM_MODES` are the fallback and what
+  `_watchCarVisible` re-seats with.
+- **Rigid mount, no positional lerp.** A lerped eye inside a cabin swims, and
+  swimming at 55 u/s on a 430 px screen is nausea. Everything that moves is a
+  small bounded offset on top: ±0.16 u fore/aft and ±0.10 u vertical of head
+  mass under acceleration, ±0.20 u of lean under lateral load.
+- **Yaw is the car's heading**, a third of the way blended toward the travel
+  direction so a slide shows where the car is actually going, damped at **14/s**
+  — not the chase family's 3.6. A boom may lag turn-in because you can watch the
+  car rotate under it; from the seat, lag reads as disconnected steering.
+- **Pitch follows the ROAD.** The look-point takes the height of the centreline
+  34 u up the lap, so a crest and a compression both stay full of road, then is
+  clamped to a cone of 5.9° up / 17.7° down. Up is tight because sky is never
+  information.
+- **Its own lens**: base FOV +6 and nearly double the speed stretch
+  (`spdFov` 11 against 6). With no boom, pace has to be sold by the frame, and
+  the width buys back the peripheral road a cockpit loses by sitting 12 u
+  closer to it than CHASE.
+- **Bank comes from the body**, measured as how far the car's up-vector leans
+  toward the camera's right rather than read off `mesh.rotation.z`, which is an
+  Euler component in the car's own frame. That carries the ground camber, which
+  is the one cue a fixed eye loses when the bodywork leaves the screen.
+- **Impact shake is halved.** 1.6 u of jitter on a 20 u boom is a wobble; the
+  same figure on an eye already inside the cabin makes the road unreadable
+  exactly when you have just been hit.
+- **`_watchCarVisible` skips it.** Not seeing your own car is the feature here,
+  and the watchdog would otherwise fire once a second forever and yank the eye
+  back onto a boom. The half of it that still means something — the car being
+  under the ground — is kept.
+
+**Switching**: the 👁 button on the HUD (`.icon-btn`, third in the top-right
+stack, lit while active), `V` on a keyboard, `DRIVER'S VIEW` in the pause menu,
+or the 📷 cycle, which reaches it last. The button is a *toggle* and remembers
+which boom you came from, because six taps in and four out is not a switch you
+use mid-corner.
 
 **`cliffLift`** — any low view is a poor fit for a walled canyon: `clampCam`
 stops the camera passing *through* rock, but on the outside of a bend the face
