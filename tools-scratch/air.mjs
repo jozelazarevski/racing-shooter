@@ -196,6 +196,16 @@ const measure = async (lv) => page.evaluate(async ({ lv, MIN }) => {
   });
 
   // ---- pass 2: only the lowest thing in its own column can be floating -----
+  const THREE = await import('three');
+  const rc = new THREE.Raycaster();
+  const down0 = new THREE.Vector3(), down = new THREE.Vector3(0, -1, 0);
+  // An explicit list, not `intersectObject(group, true)`: the scene carries
+  // objects the raycaster chokes on (a null material, a detached parent), and
+  // one of them aborts the whole cast.
+  const rayList = [];
+  t.group.traverse((o) => {
+    if ((o.isMesh || o.isInstancedMesh) && o.geometry && o.material && o.visible) rayList.push(o);
+  });
   const rows = new Map();
   const grades = [], seatedGrades = [], gaps = [];
   let seated = 0, tested = 0;
@@ -219,7 +229,23 @@ const measure = async (lv) => page.evaluate(async ({ lv, MIN }) => {
       ay = Math.max(ay, t.center[idx].y - 1.0);
     }
     tested++;
-    const gap = p.y0 - gy, agap = p.y0 - ay;
+    let gap = p.y0 - gy;
+    const agap = p.y0 - ay;
+    // ---- THE ARBITER: IS THERE ANYTHING DRAWN UNDER IT? --------------------
+    // The 2 u column grid cannot answer that for geometry with a huge
+    // footprint — a canyon CLIFF RIBBON or a mesa flank is skipped by the
+    // 4000-cell cap, so every saguaro standing on CANYON RUN's rim measured as
+    // 47 u of air. Cast a ray straight down from the part's own base instead:
+    // if it lands on drawn geometry before it reaches the terrain patch, the
+    // thing is standing on something and is not floating. Only the candidates
+    // pay for this.
+    if (gap > MIN && rc) {
+      rc.set(down0.set(p.cx, p.y0 - 0.02, p.cz), down.set(0, -1, 0));
+      rc.near = 0; rc.far = gap;
+      let hit = null;
+      try { hit = rc.intersectObjects(rayList, false)[0]; } catch (e) { hit = null; }
+      if (hit && hit.distance < gap - 0.4) gap = hit.distance;
+    }
     // THE SLOPE UNDER IT, because two causes look identical in a photograph:
     // a height MISMATCH (the drawn ground is not the ground the placer asked)
     // and a FOOTPRINT artefact (a flat-based object seated at its centre

@@ -16,6 +16,19 @@ const DOWNHILL_CAP = 1.12; // downhill overspeed ceiling (× topSpeed)
 // near 24%, so this leaves all of it alone and only ever engages on the border
 // wall, which runs an order of magnitude steeper.
 const MAX_GRADE = 0.45;
+/** OFF THE COURSE, THE ENGINE STOPS PULLING YOU UPHILL.
+ *
+ *  Not a gradient gate — that was tried and reverted. Measured on SUMMIT
+ *  CLIMB, open-ground grade p90 is 95% on the VERGE (12-40 u off the road)
+ *  and 25% on the MASSIF (r > 400): the mountain is GENTLER than the
+ *  roadside, so no threshold separates them in either direction. What does
+ *  separate them is the rule already in the code — the 70 u off-course band.
+ *  Beyond it the throttle's authority fades out from OFF_CLIMB and is gone by
+ *  OFF_CLIMB + OFF_FADE. NOTHING IS SCRUBBED: momentum you brought is
+ *  momentum you keep, so a bank taken with speed is still a line and a
+ *  mountain taken from rest is still a wall. */
+const OFF_CLIMB = 0.06;
+const OFF_FADE = 0.12;
 /** Fastest a crest may throw the car upward, u/s. Uncapped, a steep ramp taken
  *  on nitro sent cars 100+ u into the infield. It also bounds a jump: against
  *  gravity 26 this is 0.85 s of hang time and 2.3 u of height before the road
@@ -1219,6 +1232,27 @@ export class Car {
     const roadHalfHere = this.game.track?.widthAt?.(this.trackIndex) ?? ROAD_HALF;
     const offRoad = this === this.game.player && Math.abs(this.lateral) > roadHalfHere + 1;
     const offMult = offRoad ? 0.55 + 0.45 * this.offroadSkill : 1;
+    // The ground's slope along the direction of travel: the off-road
+    // counterpart of `slopeAt`, which only knows about the road. Computed once
+    // and used twice below — by the grade force and by the climb authority.
+    let terrGrade = 0;
+    if (offRoad && !this.airborne) {
+      const tk = this.game.track;
+      const v2h = this.vel.x * this.vel.x + this.vel.z * this.vel.z;
+      if (v2h > 1 && tk?.terrainHeight) {
+        const inv = 1 / Math.sqrt(v2h), LOOK = 4;
+        terrGrade = THREE.MathUtils.clamp(
+          (tk.terrainHeight(this.pos.x + this.vel.x * inv * LOOK,
+            this.pos.z + this.vel.z * inv * LOOK)
+            - tk.terrainHeight(this.pos.x, this.pos.z)) / LOOK, -1.2, 1.2);
+      }
+    }
+    // See OFF_CLIMB. `_strayed` is published by the off-course rule further
+    // down and is one frame stale, which at 60 Hz is 17 ms and nothing here
+    // changes that fast. On the course, in free roam, and for every AI car it
+    // is 0, so this is exactly 1 and no rival is ever touched.
+    const climbAuth = ((this._strayed ?? 0) > 0 && terrGrade > OFF_CLIMB)
+      ? Math.max(0, 1 - (terrGrade - OFF_CLIMB) / OFF_FADE) : 1;
 
     // surface conditions: snow and rain-wet worlds drive differently — less
     // brake bite, wheelspin on throttle, and a much earlier, longer slide.
@@ -1320,7 +1354,7 @@ export class Car {
         // not in the standing start.
         const ref = (this.baseMaxSpeed ?? this.maxSpeed) * 0.5;
         const punch = 1 + 0.55 * (1 - THREE.MathUtils.clamp(Math.abs(vf) / ref, 0, 1));
-        vf += this.accel * punch * sTract * inputs.throttle * dt;
+        vf += this.accel * punch * sTract * inputs.throttle * climbAuth * dt;
         this.reverseTimer = 0;
       }
       if (inputs.brake > 0.05) {
@@ -1353,8 +1387,17 @@ export class Car {
     // ---- grade force: uphill saps speed, downhill feeds it (elevated roads).
     // Guarded — flat tracks / older track builds simply report slope 0.
     let slope = 0;
-    if (!inputs.hold && !this.airborne && !offRoad) {
-      slope = this.game.track.slopeAt?.(this.trackIndex) ?? 0;
+    if (!inputs.hold && !this.airborne) {
+      // OFF THE ROAD THERE WAS NO GRAVITY AT ALL. This block was gated
+      // `!offRoad`, so the instant the car left the carriageway a hill cost
+      // exactly what flat ground cost, and the only thing opposing a climb was
+      // drag. Measured before this line changed, full throttle from a
+      // standstill up the fall line, 30 s: SUMMIT CLIMB +70.7 u of altitude at
+      // 26.2 u/s, GRANITE NARROWS +74.5 u at 19.3 u/s, CANYON RUN +40.3 u.
+      // That is the goat. The terrain's gradient is the same quantity
+      // `slopeAt` reports for the road, so it feeds the same term and the same
+      // `vCap` below, and it is symmetric — downhill still pays out.
+      slope = offRoad ? terrGrade : (this.game.track.slopeAt?.(this.trackIndex) ?? 0);
       if (slope !== 0) vf -= GRADE * slope * dt;
     }
     // drag (eased while drifting: slides keep speed; rough going adds a bit off-road)
@@ -2280,7 +2323,8 @@ export class Car {
     //
     // FREE ROAM is exempt on purpose: out there the world is the point, and the
     // rim wall is what bounds it.
-    if (!this.game.freeRoam && this === this.game.player && this.speedAlong > 0.5) {
+    if (this.game.freeRoam || this !== this.game.player) this._strayed = 0;
+    else if (this.speedAlong > 0.5) {
       // `lateral` is measured against the TRACKED index, and index tracking only
       // searches +/-30 samples around where the car was. Where the loop doubles
       // back on itself the tracker can stay locked to the far branch, so a car
@@ -2297,11 +2341,24 @@ export class Car {
       // brake — at full strength this now bleeds speed roughly as fast as
       // deep sand does, which is the right feel for "you have left the road
       // and the ground does not want you here".
-      let strayed = Math.abs(this.lateral) - 70;
-      if (strayed > 0 && t.nearestIndex && t.lateralOffset) {
+      // TRUE DISTANCE, NOT THE NORMAL PROJECTION. `lateralOffset` projects
+      // onto the sample's normal, so a car parked well past the END of a
+      // straight projects to nearly zero and reads as ON the road — measured
+      // on SUMMIT CLIMB, whose outermost road sample is at r = 262: a car at
+      // r = 430 was taken for a car on the carriageway. The nearest sample is
+      // a road sample, so its plain distance is the honest answer, and the
+      // cheap first test can only ever over-estimate it, which is what makes
+      // it safe to skip the sweep on.
+      const ci = t.center[this.trackIndex];
+      let strayed = Math.hypot(this.pos.x - ci.x, this.pos.z - ci.z) - 70;
+      if (strayed > 0 && t.nearestIndex) {
         const gi = t.nearestIndex(this.pos);          // no hint: search the lap
-        strayed = Math.abs(t.lateralOffset(this.pos, gi)) - 70;
+        const c0 = t.center[gi];
+        strayed = Math.hypot(this.pos.x - c0.x, this.pos.z - c0.z) - 70;
       }
+      // PUBLISHED FOR THE CLIMB AUTHORITY, which runs at the top of the next
+      // frame and cannot afford this global search a second time.
+      this._strayed = strayed;
       if (strayed > 0) {
         const over = Math.min(1, strayed / 30);
         this.vel.multiplyScalar(Math.max(0, 1 - over * 1.2 * dt));
@@ -2347,54 +2404,28 @@ export class Car {
         }
       }
     }
-    // CLIMBING IS A FUNCTION OF INCLINATION — everywhere, not just the rim.
+    // THE CLIMB LIMIT IS NOT A BRAKE, AND IT IS NOT A GRADIENT GATE.
     //
-    // The gate above stops the border wall; this one is the report "climbing
-    // the hills needs to be appropriate with the inclination — too steep
-    // can't be climbed". The physics: driving force is capped by traction,
-    // traction by the normal force, so past tan(θ) ≈ μ the wheels cannot hold
-    // and gravity takes the rest. 0.40 (~22°) is the budget — every ROAD in
-    // the game grades under 24 % and is exempt anyway (this is off-road only),
-    // so nothing on a racing line changes.
+    // A block stood here that scrubbed velocity wherever off-road ground ahead
+    // graded over 0.40 outside a 14 u corridor. It was measured doing both
+    // halves of its job wrong:
     //
-    // THE REGRESSION THIS MUST NOT RE-SHIP (see the rim gate's history): the
-    // banks beside a switchback stack read near-vertical, and braking there
-    // stranded players scrambling BACK to the road. So the rejoin corridor is
-    // exempt — this only engages beyond 14 u of lateral, confirmed by a
-    // global search before it is believed (the tracked index lies exactly on
-    // stacked legs), and the whole check runs only on frames already moving
-    // uphill off-road, which is nowhere on a clean lap.
-    const CLIMB_MAX = 0.40;
-    if (!this.airborne && offRoad && this.alive && this === this.game.player) {
-      const v2h = this.vel.x * this.vel.x + this.vel.z * this.vel.z;
-      if (v2h > 1) {
-        const inv = 1 / Math.sqrt(v2h);
-        const dxh = this.vel.x * inv, dzh = this.vel.z * inv;
-        const LOOK = 4;
-        const gradeUp = (t.terrainHeight(this.pos.x + dxh * LOOK, this.pos.z + dzh * LOOK) - gY) / LOOK;
-        if (gradeUp > CLIMB_MAX && Math.abs(this.lateral) > 14) {
-          let lat = Math.abs(this.lateral);
-          if (t.nearestIndex && t.lateralOffset) {
-            const gi = t.nearestIndex(this.pos);   // no hint: search the lap
-            lat = Math.abs(t.lateralOffset(this.pos, gi));
-          }
-          if (lat > 14) {
-            const over = Math.min(1, (gradeUp - CLIMB_MAX) / 0.30);
-            // traction fades out...
-            this.vel.multiplyScalar(Math.max(0, 1 - over * 3.5 * dt));
-            // ...and gravity's slope component pushes back down. 26 is the
-            // game's own g (the airborne branch integrates with it).
-            const gPush = 26 * Math.min(1.2, gradeUp) * over * 0.55;
-            this.vel.x -= dxh * gPush * dt;
-            this.vel.z -= dzh * gPush * dt;
-            if (over > 0.4 && !this._steepFed) {
-              this._steepFed = 1.5;
-              this.game.hud?.feed?.('TOO STEEP', 'bad');
-            }
-          }
-        }
-      }
-    }
+    //   it did not stop the climb — GRANITE NARROWS was climbed 74.5 u in
+    //   24 s at 19.3 u/s with "TOO STEEP" firing on 96-99% of the frames,
+    //   because a multiplicative scrub of 3.5/s cannot hold against 36 u/s^2
+    //   of thrust re-applied every frame;
+    //
+    //   and it re-shipped the reverted regression — arriving at 40 u/s up a
+    //   60-120% bank between 12 and 30 u of the road, "TOO STEEP" fired on
+    //   5 of 6 banks on SUMMIT CLIMB and 4 of 6 on FURKA RIDGE, which is
+    //   exactly the rejoin corridor the revert was about, and 2 of 10 hairpin
+    //   cuts on CAPE OLIVETO were scolded mid-corner.
+    //
+    // The climb limit now lives where a climb limit belongs: on the DRIVE
+    // FORCE, at the throttle, gated on the off-course band rather than on the
+    // gradient (see OFF_CLIMB and `climbAuth`), with the ground's own gravity
+    // in the grade term above. Nothing here touches velocity, so nothing can
+    // brake a player on a bank ever again.
     // FULLY SUBMERGED = SUNK. Measured at the ROOF, not the floor: a car
     // fording a stream is wet, a car whose roof is under the surface is gone.
     // `waterTopAt` deliberately excludes the river (2.6 u deep, forded on
@@ -2454,7 +2485,32 @@ export class Car {
       }
     } else if (offRoad) {
       // grounded on open terrain: ease onto the rolling hills, no ramp launches
-      this.y += (gY - this.y) * Math.min(1, 12 * dt);
+      //
+      // THE EASE IS PROPORTIONAL, AND THAT IS THE JUMP.
+      //
+      // `gY` is DISCONTINUOUS in `lateral`: inside SHELF_REACH the roadbed
+      // holds the car up and outside it the raw terrain does, and on a shelf
+      // road those are tens of units apart — measured 36.8 u on SUMMIT CLIMB,
+      // 33.4 on FURKA RIDGE, 28.4 on GLACIER COL, 26.2 on COL DE TURINI, all
+      // at 30 u off the centreline. Crossing that edge makes `gY - this.y` a
+      // 31 u gap, and 12/s of 31 u is 6.2 u in ONE FRAME: 372 u/s, thirty-four
+      // times the cap on a real launch, with `airborne` never set so no cap
+      // applies at all. Reproduced on FURKA RIDGE sample 815 driving BACK
+      // toward the road at lateral 15.9 (road 3.4 u over terrain -27.8 u):
+      // +6.2, +5.0, +4.0, +3.2, +2.5 u on consecutive frames, 31 u in 0.4 s.
+      // That is the standing "I jump straight up" report.
+      //
+      // `terrainHeight` has steps of its own for the same kind of reason —
+      // sampled along a straight 40 u/s traverse it moves 1.10 u per frame at
+      // p99 and 14.04 u at worst — so the bound belongs HERE, on the car's
+      // response, where it covers every source at once.
+      //
+      // The law is the one the crest branch already states: nothing moves the
+      // car vertically faster than a jump may throw it. Below about 0.9 u of
+      // gap the proportional ease is already inside the cap, so ordinary
+      // rolling ground drives exactly as before.
+      const lift = VY_CAP * dt;
+      this.y += THREE.MathUtils.clamp((gY - this.y) * Math.min(1, 12 * dt), -lift, lift);
       this._climbRate = 0;
       this._lastGY = this.y;
     } else {
