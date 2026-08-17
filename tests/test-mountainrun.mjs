@@ -14,9 +14,9 @@
  * lap from the outside; nothing on this roster ran inside mountains until
  * `valleyWalls` was built for it.
  *
- * TWO LAWS:
+ * TWO LAWS, applied to every world in the family:
  *
- *   1. CAPE OLIVETO IS ENCLOSED. Of the flanks that are not simply another leg
+ *   1. THE WORLD IS ENCLOSED. Of the flanks that are not simply another leg
  *      of the lap, the overwhelming majority must have ground standing well
  *      above the road within 300 u.
  *   2. THE MOUNTAINS ARE STILL GROUND, NOT A FENCE. Open-ground grade stays in
@@ -98,27 +98,42 @@ const measure = async (lv) => {
   return { ...R, errors };
 };
 
-// ---- CAPE OLIVETO: the world that was asked to run inside mountains -------
-const M = await measure(62);
-ok(!M.errors.length, 'CAPE OLIVETO builds without a page error', M.errors[0] ?? '');
-ok(!M.coast, 'CAPE OLIVETO has no coast — it is inland now');
+// ---- THE IN-MOUNTAIN WORLDS ----------------------------------------------
+// Each row is [level, name, flank floor %, mean-rise floor u, grade ceiling %],
+// and every threshold is set just under (or over) THAT WORLD'S measurement, so
+// a regression fails and a tuning nudge does not. The measured figures are in
+// the comment beside each row; if a change moves one, move the threshold with
+// it rather than widening the loosest number for everybody.
+//
+// The grade ceilings differ ON PURPOSE, because the valley shapes do. GRANITE
+// NARROWS buys its slot with `run: 130`, and a close wall is a steep wall —
+// 69% at p90 against TIMBER GORGE's 42%. Holding all three to one number would
+// either forbid the tight world or excuse the shallow one. For scale, SUMMIT
+// CLIMB's open ground already measures 61% p90 and 190% max.
+const WORLDS = [
+  [62, 'CAPE OLIVETO',    78, 45, 62],   // measured 92%, 68.6 u, p90 50%
+  [65, 'GRANITE NARROWS', 92, 55, 78],   // measured 100% (180 walled, 0 open), 66.0 u, p90 69%
+  [66, 'GLACIER COL',     88, 62, 70],   // measured 96%, 76.5 u, p90 61%
+  [67, 'TIMBER GORGE',    88, 55, 52],   // measured 96%, 65.1 u, p90 42%
+];
 
-// LAW 1. Measured 92% — 188 walled flanks against 17 open, with 155 excluded
-// as another leg of the lap. (Counted per STATION rather than per flank the
-// same world scores 86%; both are honest, and this asserts the per-flank one.)
-// The floor sits under that so a regression fails and a tuning nudge does not.
-ok(M.pct >= 78,
-  `CAPE OLIVETO: ${M.pct}% of its non-road flanks have ground standing over the road (floor 78%)`,
-  `${M.walled} walled, ${M.open} open, ${M.road} excluded as another leg`);
-ok(M.meanRise >= 45,
-  `CAPE OLIVETO: mean rise beside the road is ${M.meanRise} u (floor 45)`, `max ${M.maxRise} u`);
+for (const [lv, name, floor, riseFloor, gradeCap] of WORLDS) {
+  const M = await measure(lv);
+  ok(!M.errors.length, `${name} builds without a page error`, M.errors[0] ?? '');
+  ok(!M.coast, `${name} has no coast — it is inland`);
 
-// LAW 2. Measured p90 50%. SUMMIT CLIMB's open ground already runs at 61% and
-// the rim wall is deliberately ~100%, so the ceiling sits between them: steep
-// enough to read as mountain, not so steep the flank becomes an invisible
-// fence that happens to be made of terrain.
-ok(M.gradeP90 <= 62,
-  `CAPE OLIVETO: open-ground grade p90 is ${M.gradeP90}% (ceiling 62%)`);
+  // LAW 1 — the flanks that COULD be mountain are.
+  ok(M.pct >= floor,
+    `${name}: ${M.pct}% of its non-road flanks have ground standing over the road (floor ${floor}%)`,
+    `${M.walled} walled, ${M.open} open, ${M.road} excluded as another leg`);
+  ok(M.meanRise >= riseFloor,
+    `${name}: mean rise beside the road is ${M.meanRise} u (floor ${riseFloor})`, `max ${M.maxRise} u`);
+
+  // LAW 2 — the mountains are still ground, not a fence. This is the law that
+  // stops law 1 being satisfied by turning the verge into a cliff.
+  ok(M.gradeP90 <= gradeCap,
+    `${name}: open-ground grade p90 is ${M.gradeP90}% (ceiling ${gradeCap}%)`);
+}
 
 // ---- THE CONTROL: the same family, the same theme, no valley walls --------
 // A coverage test that would pass on any world proves nothing.

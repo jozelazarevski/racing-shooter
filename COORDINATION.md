@@ -2162,6 +2162,123 @@ measure as open ground, or the terrain change has leaked onto worlds that never
 asked for it), `test-cornerwalls` 24/24, `test-tunnels 62` 3/3,
 `test-roadclear` exit 0.
 
+## r209 — three more in-mountain drives, and three configs that were lying
+
+Asked for: "create few of the In mountain drives." r208 built the mechanism;
+this is the family.
+
+    65 GRANITE NARROWS  dolomiti  ouninpohja  walls  64/130 = 49%  the slot
+    66 GLACIER COL      furka     panorama    walls 135/360 = 38%  the bowl
+    67 TIMBER GORGE     deepwood  estonia     walls  74/250 = 30%  the wooded one
+
+`h / run` IS the flank's grade and `run` is how far off the road the wall
+stands, so the three differ in the SHAPE of the valley rather than in how tall
+it is — a slot you thread, a bowl you are lost in, a valley you can see out of.
+Each takes its own authored route, which is the r207 lesson: a `tune` without a
+route is the same track wearing a different hat.
+
+    world             enclosed flanks   mean rise   grade p90   bores
+    GRANITE NARROWS   180/180  100%      66.0 u       69%        2/2
+    GLACIER COL       170/177   96%      76.5 u       61%        1/1
+    TIMBER GORGE      110/114   96%      65.1 u       42%        1/1
+
+All four bores drive in one portal and out the other. `test-mountainrun` covers
+all four in-mountain worlds now, 21/21, per-world thresholds set just under
+each world's own measurement — the grade ceilings DIFFER on purpose, because a
+close wall is a steep wall and holding the slot and the wooded valley to one
+number would either forbid one or excuse the other.
+
+### THREE CONFIGS THAT ASKED FOR THINGS THEY DID NOT GET
+
+Every one of these was written by me in this session or the last, and every one
+was caught by measuring the claim instead of trusting the knob.
+
+**1. `tunnels: { count: 3 }` on GLACIER COL sited ONE.** Not a bug — `panorama`
+refuses 212 of its 900 stations as too curved, against CAPE OLIVETO's 59, and
+`tunnelFitAt` turns away 357 more. The request now says one.
+
+**2. `stoneBridges` BUILDS NOTHING, ANYWHERE.** `_buildStoneBridges` made an
+unnamed group, so no probe could tell request from result; naming it
+`stone-bridge` made the answer visible immediately:
+
+    OLIVE COAST asked 1 -> 0    CAPE OLIVETO asked 1 -> 0
+    TERRAZZA ALTA asked 3 -> 0  GLACIER COL asked 2 -> 0
+
+There is no positive control on the roster — the placement wants a 4.5 u drop
+beside a station under 0.01 curvature and nothing offers one. GLACIER COL's
+request is gone; the older worlds keep theirs with the measurement written
+beside them, because the fix belongs in the builder, not in four call sites.
+
+**3. `rampCount: 0` IS THE DEFAULT, NOT "NO JUMPS".** Prop ramps were deleted
+game-wide — `_buildRamps` opens `this.ramps = []` and returns — and the knob now
+only feeds the crest count, read as `(this.T.rampCount || 3) + 3`. **0 is
+falsy**, so it requests the same 6 as leaving it out:
+
+    rampCount unset  ->  6 wanted   TIMBER GORGE 5, DEEPWOOD TRAIL 5 built
+    rampCount 0      ->  6 wanted   TERRAZZA ALTA 4 built
+    rampCount 7      -> 10 wanted   FAFE LEAP 6 built
+
+FAFE LEAP, the jump world, builds 0 ramps and asks for 7. Worlds across the
+roster set `rampCount: 0` meaning to remove air and got the standard crests.
+None of the three new worlds writes the knob. Fixing the `||` to `??` would
+change crest counts on every world that sets 0, so it wants its own measured
+pass rather than riding along here.
+
+### THE MEASUREMENT LESSON, AGAIN
+
+The first bridge count said "1 of 2" and was wrong: the filter matched mesh
+names containing "bridge", which caught the rope bridge's `bridge-deck` and no
+stone at all. The first ramp count said 0 everywhere, which looked like a
+finding until FAFE LEAP — the JUMP world — also said 0 and revealed the probe
+was reading a feature that no longer exists. **Both were caught by a control,
+not by inspection.** A count with no positive control is a number, not a
+measurement.
+
+### THE GORGE EXEMPTION IS FIXED, NOT PINNED
+
+The two new worlds failed `test-cornerwalls` on their first run with 22- and
+24-station open runs, and the cause was the item HANDOVER had been carrying
+since r207: `_buildEdgeRails` skipped anything within 40 samples of a gorge,
+overpass or bore because those "build its own rails". A promise 40 samples
+wide, kept by something much narrower. Pinning a third and fourth world would
+have made it permanent, so it is fixed at the source.
+
+Only a JUMP GORGE is exempt now, at full width — a rail across a launch or a
+landing is a wall in the flight path, not a guard. The hero gorge and the
+overpass decks fall through to the `guarded` test, which skips a station only
+where masonry ACTUALLY stands; it can, because the deck and bridge builders run
+before the rail builder (8872 and 8895 against 8898), so their barriers are
+already in the list. Swept across eleven worlds, no regressions:
+
+    GLACIER COL      76% -> 90%   the 22-station run at 753 closed
+    TIMBER GORGE     78% -> 94%   the 24-station run at 307 closed
+    OLIVE PASS       71% -> 88%   SEA CLIFF RUN  64% -> 71% (rails 300 -> 328)
+    TERRAZZA ALTA    82% -> 85%   SUMMIT CLIMB 92%, PIKES PEAK 95%
+    OLIVE COAST 96%, SALINE SPRINT 97%, CAPE OLIVETO 92%, GRANITE NARROWS 35%
+      — all unchanged, which is right: none of them has a gorge in the way
+
+`KNOWN_OPEN` in `test-cornerwalls` is now empty. The entry went because the
+hole did, not because the limit moved.
+
+### AND THE VALLEY DOES NOT WALL A CORNER
+
+Worth stating because it is the obvious wrong inference: GRANITE NARROWS scores
+35% on `test-cornerwalls` against the family's 90-94%, and it would be easy to
+say the mountain walls it so rails do not matter. It does not. `_valleyWall`
+returns ZERO inside the corridor blend, so for the first ~70 u either side the
+ground is still at road height. Valley walls enclose a LAP; only rails stop a
+CORNER being cut. The 35% is real and mostly the start-gate exclusion — 32 of
+its 45 open stations are within 30 samples of the line, on a route that puts
+its tightest section there, against a denominator of only 69 tight stations.
+The genuine remainder is a 13-station bare run at 863-875.
+
+### VERIFIED
+
+`test-mountainrun` 21/21, `test-tunnels 65 66 67` 4/4, `test-edgerails` 24/24
+(no rail moved onto a carriageway or lost its collider when the exemption
+narrowed), `test-cornerwalls` with all three added, every floor raised to its
+new measurement and SUMMIT CLIMB added as an older-world regression witness.
+
 ## Rebase notes
 
 - r151/r152/r153 touch `src/main.js` (tyre fitness, picker, boot),

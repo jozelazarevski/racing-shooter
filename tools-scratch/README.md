@@ -40,6 +40,19 @@ real time to get right and the next session should not rebuild them.
                 comes with it. Its lesson is that a flank which is another leg
                 of the lap is not an open flank — counting those as misses read
                 16% where 92% of the flanks that could be mountain already were.
+- `claims.mjs`  every `count` in a tune is a REQUEST — this reports what the
+                world actually BUILT against what it asked for (bores, stone
+                bridges, crests, massif, trees). It found `stoneBridges`
+                building zero everywhere and `rampCount` being a dead knob.
+                Read its history before trusting a count: its first bridge
+                filter matched mesh names containing "bridge" and counted the
+                rope bridge's deck, and its first ramp count read a feature
+                that no longer exists. BOTH were caught by a control, not by
+                inspection — always measure a world you KNOW has the thing.
+- `bores.mjs`   why a world got fewer tunnels than it asked for, bucketed by
+                which gate refused each station (start gate / gorge / curvature
+                / tunnelFitAt). Turned "asked 3, got 1" into "panorama refuses
+                212 stations as too curved against CAPE OLIVETO's 59".
 - `srv.mjs`     plain static server (`node srv.mjs 8920`).
 - `keep.sh`     keeps a server alive across tool-call timeouts:
                 `setsid ./keep.sh srv.mjs 8920 &`

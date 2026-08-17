@@ -1,6 +1,6 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r207, deployed and live, tree clean.
+State at handover: `main` = r209, deployed and live, tree clean.
 Live: https://jozelazarevski.github.io/racing-shooter/
 
 ## THE ONE DEFECT THIS REPO KEEPS SHIPPING
@@ -18,10 +18,12 @@ builders, one bug. `_distToTrack` searches the whole lap and answers it;
 `_pierInRoad` exists for.
 
 r207 found the same shape one level up, in an EXEMPTION rather than a
-placement: `_buildEdgeRails` skips any station within 40 samples of a gorge,
-overpass or tunnel on the grounds that those build "its own rails". The
-exemption is 40 samples wide; the thing it defers to is not. **A promise made
-over a wider span than the thing that keeps it.** See item 2.
+placement, and r209 fixed it: `_buildEdgeRails` skipped any station within 40
+samples of a gorge, overpass or tunnel on the grounds that those build "its own
+rails". The exemption was 40 samples wide; the thing it defers to is not. **A
+promise made over a wider span than the thing that keeps it.** See item 2 — and
+look for the same shape next in `tunnelFitAt`, `_buildStoneBridges` and the
+26-30 sample start-gate skip every builder carries.
 
 ## THE THREE THINGS THAT MATTER, IN ORDER
 
@@ -43,22 +45,25 @@ racing line and never touches trackside furniture. The player does. So every
 obstacle, and every open corner, is a penalty or an advantage applied to the
 human alone.
 
-### 2. SEA CLIFF RUN's gorge exemption — measured, named, and open
-`tests/test-cornerwalls.mjs` failed on its first run and the failure is real:
-SEA CLIFF RUN leaves **13 consecutive tight stations bare from sample 749**,
-on both sides. Not the rail cap — the world builds every bay it asks for.
-`_nearGorge(i, 40)` exempts the station; nothing rails it.
+### 2. DONE (r209). The gorge exemption is fixed; do not re-add it.
+`_buildEdgeRails` used to skip any station within 40 samples of a gorge,
+overpass or bore because those "build its own rails" — a promise 40 samples
+wide kept by something much narrower, and it was every long unwalled corner in
+the game (SEA CLIFF RUN 749-761, GLACIER COL 753-774, TIMBER GORGE 307-330).
 
-It is PINNED at 13 by name in that gate, not absorbed by raising the limit,
-so a fourteenth station or the same hole elsewhere fails.
+Now only a JUMP GORGE is exempt, at full width, because a rail across a launch
+or a landing is a wall in the flight path. The hero gorge and overpass decks
+fall through to the `guarded` test, which skips only where masonry actually
+stands — it can, because the deck and bridge builders run BEFORE the rail
+builder (8872 and 8895 against 8898). Swept over eleven worlds, no regressions:
 
-FIX SHAPE: narrow the exemption to where a barrier ACTUALLY stands. The
-`guarded` test three lines below in `_buildEdgeRails` already asks exactly
-that, and the deck and bridge builders run BEFORE the rail builder (8872 and
-8895 against 8898), so their barriers are in the list by then. Careful: a jump
-gorge probably SHOULD stay exempt — a rail across a launch is wrong — so this
-wants splitting by exemption kind, and a before/after sweep with
-`tests/test-cornerwalls.mjs` on every world with a gorge.
+    GLACIER COL   76 -> 90%    TIMBER GORGE  78 -> 94%    OLIVE PASS  71 -> 88%
+    SEA CLIFF RUN 64 -> 71%    TERRAZZA ALTA 82 -> 85%
+    the four with no gorge in the way: unchanged, as they should be
+
+`test-cornerwalls`' `KNOWN_OPEN` list is EMPTY as a result. Keep it that way —
+adding to it needs a name, a measured number and a reason, and raising
+`MAXOPENRUN` instead would hide the next one on every world at once.
 
 ### 3. SEA CLIFF RUN (level 60) — 80 u of road stacked on road
 Measured, specific, untouched:
@@ -83,8 +88,8 @@ unnoticed.
 
     tests/test-roadclear.mjs     4 laws about what may stand near a carriageway
     tests/test-cornerwalls.mjs   3 laws about whether a corner can be cut
-    tests/test-mountainrun.mjs   CAPE OLIVETO is enclosed, and OLIVE COAST is
-                                 the CONTROL that must stay open ground
+    tests/test-mountainrun.mjs   the four in-mountain worlds are enclosed, and
+                                 OLIVE COAST is the CONTROL that must stay open
     tests/test-tunnels.mjs       every bore driven in one portal and out the other
     tests/test-carriageway.mjs   the r199/r200 clearance fixes, pinned
     tests/test-edgerails.mjs     rails are solid, one draw call, off the road
@@ -171,6 +176,21 @@ Measured, no world on this roster ran inside mountains before it; SUMMIT CLIMB,
 an alpine world, scores 0 walled flanks of 156. `valleyWalls` is opt-in and
 `tests/test-mountainrun.mjs` keeps OLIVE COAST as the control that it stays so.
 
+## THE IN-MOUNTAIN FAMILY (62, 65, 66, 67)
+r209 added three more on request. `h / run` is the flank's GRADE and `run` is
+how far off the road the wall stands, so they differ in the SHAPE of the
+valley, not its height:
+
+    65 GRANITE NARROWS  dolomiti  ouninpohja   64/130 = 49%  100% enclosed, 2 bores
+    66 GLACIER COL      furka     panorama    135/360 = 38%   96% enclosed, 1 bore
+    67 TIMBER GORGE     deepwood  estonia      74/250 = 30%   96% enclosed, 1 bore
+
+**`valleyWalls` DOES NOT WALL A CORNER, and assuming it does is the trap.**
+`_valleyWall` returns ZERO inside the corridor blend, so the first ~70 u either
+side of the road stays at road height. It encloses a LAP; only edge rails stop
+a corner being cut. GRANITE NARROWS scores 35% on `test-cornerwalls` against
+the family's 76-78% and that is real, not covered by its mountains.
+
 The first cut gave all three a `tune` — elevation, tunnels, bridges, coast —
 and left the plan alone, so all four worlds shared OLIVE COAST's exact
 centreline: identical plan digest, identical sample-100 coordinates, the same
@@ -205,9 +225,27 @@ D AZUR 11.5 -> 7.5 u of clearance. Moving the clamp INSIDE `sink()` restored
   r202/r203 detail pass; trees did not.
 - **`element-prism` bucket roof tiling** needs a neutral-map and gamma decision
   before `roofTileTexture` can be wired into it.
+- **`stoneBridges` BUILDS NOTHING ON ANY WORLD.** Measured once
+  `_buildStoneBridges` tagged its group `stone-bridge`: OLIVE COAST asked 1,
+  CAPE OLIVETO 1, TERRAZZA ALTA 3, GLACIER COL 2 — all built ZERO, and there is
+  no positive control anywhere on the roster. The placement wants a 4.5 u drop
+  beside a station under 0.01 curvature, 60 clear of a gorge and 90 clear of
+  the gate. Fix belongs in the builder (loosen the drop, or take the best
+  candidate rather than a threshold), not in the four call sites.
+- **`rampCount: 0` MEANS "DEFAULT", NOT "NO JUMPS".** Prop ramps are gone
+  game-wide (`_buildRamps` sets `this.ramps = []` and returns). The knob now
+  only feeds `_buildCrests`, read as `(this.T.rampCount || 3) + 3` — and 0 is
+  falsy, so it requests the same 6 as omitting it. Measured: FAFE LEAP asks
+  `rampCount: 7` and builds 0 ramps and 6 crests; TERRAZZA ALTA asks 0 and gets
+  4 crests, DEEPWOOD TRAIL unset gets 5. Several worlds set 0 meaning to remove
+  air. Changing `||` to `??` moves crest counts on all of them, so it needs its
+  own before/after sweep.
 - **The start-gate exclusion is 26-30 samples in every builder.** On TERRAZZA
   ALTA that leaves genuinely tight corners (curv 0.049) bare either side of the
-  line. Consistent, deliberate-looking, and never justified by a measurement.
+  line. GRANITE NARROWS shows it worst: 32 of its 45 open tight stations are
+  this exclusion, which alone costs 46 points of corner coverage because the
+  world only has 69 tight stations. Consistent, deliberate-looking, and never
+  justified by a measurement.
 - **`_buildEdgeRails`' `guarded` radius is 12 u, the probe's is 4 u.** The 12
   came from a real measurement (GOTTHARD: a rail beside a parapet gave the car
   two overlapping barriers and it ended 0.35 u from a wall it should have been

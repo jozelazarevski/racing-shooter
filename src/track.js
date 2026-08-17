@@ -340,9 +340,19 @@ export const LEVELS = [
   { id: 63, name: 'TERRAZZA ALTA', theme: 'medterrace', region: 'MEDITERRANEAN',
     cost: 35, fresh: true, route: 'corse',
     // THE CLIMBING ONE. OLIVE COAST's terraces seen from above: triple the
-    // elevation amplitude, three stone bridges where the road crosses the
-    // gullies between terraces, and no jumps — a tarmac hill climb does not
-    // need ramps, it needs corners that arrive uphill.
+    // elevation amplitude, and corners that arrive uphill.
+    //
+    // TWO LINES BELOW ARE KNOWN NOT TO DO ANYTHING, and are left with their
+    // measurement rather than quietly deleted, because the cause is a builder
+    // both of them share with older worlds and it wants its own fix:
+    //   `stoneBridges: { count: 3 }` builds ZERO. So does every world that
+    //   asks — OLIVE COAST 1, CAPE OLIVETO 1, GLACIER COL 2 — measured once
+    //   `_buildStoneBridges` tagged its group. The placement needs a 4.5 u
+    //   drop beside a station under 0.01 curvature, and nothing on the roster
+    //   offers one.
+    //   `rampCount: 0` reads as "no jumps" and is the DEFAULT: prop ramps were
+    //   deleted game-wide, and the crest count reads `(rampCount || 3) + 3`,
+    //   where 0 is falsy. See the note on TIMBER GORGE.
     tune: {
       elev: { amp: 21, ph: [1.3, 0.4, 2.6] },
       stoneBridges: { count: 3 },
@@ -372,6 +382,126 @@ export const LEVELS = [
       stoneBridges: undefined,
       coast: { a: [-200, -338.6], b: [400, -183.8], level: -2.1, floor: -7, beach: 90 },
     } },
+
+  // ---- THE IN-MOUNTAIN DRIVES. Asked for after CAPE OLIVETO: "create a few
+  // of the in mountain drives."
+  //
+  // WHAT MAKES ONE. r208 established that a massif does NOT make a world run
+  // inside mountains — it is radial, so it closes a closed lap from the
+  // outside only, and the infield and the inboard flank of every corner stay
+  // open. `valleyWalls` is the thing that does it: ground that climbs with
+  // distance FROM THE ROAD, which walls both flanks by construction. Measured
+  // before it existed, SUMMIT CLIMB — an ALPINE world — had 0 walled flanks of
+  // 156. So every world below carries `valleyWalls`, and that is what the
+  // family IS; the massif ring is only the skyline behind it.
+  //
+  // AND EACH ONE DRIVES DIFFERENTLY. The olive family cost a whole revision to
+  // learn that a `tune` without its own ROUTE is the same track wearing a
+  // different hat, so these take three distinct authored routes chosen for
+  // what they do to a car, and the walls are tuned to three different SHAPES
+  // of valley rather than three heights of the same one:
+  //
+  //   h / run is the flank's GRADE, and `run` is how far away the wall is.
+  //   65   64 / 130  = 49%   close and steep — a slot you thread
+  //   66  135 / 360  = 38%   far and enormous — a bowl you are lost in
+  //   67   74 / 250  = 30%   middle distance — a valley you can see out of
+  //
+  // Career order is this array and `starCost` prices by INDEX, so they are
+  // APPENDED, never inserted, with ascending ids.
+  { id: 65, name: 'GRANITE NARROWS', theme: 'dolomiti', region: 'ALPINE PASSES',
+    cost: 37, fresh: true, route: 'ouninpohja',
+    // THE TIGHT ONE. `ouninpohja` is the roster's fastest shape — "almost no
+    // slow corners" — and it is put in the narrowest valley in the game. The
+    // whole character is that the walls are RIGHT THERE at speed: 130 u of run
+    // rather than CAPE OLIVETO's 240 means the rock starts climbing barely
+    // past the verge, so there is nowhere to run wide to and a mistake is
+    // taken by the mountain rather than by a gravel trap.
+    //
+    // Elevation stays modest on purpose. A fast road that also climbs is world
+    // 66's job; here the speed and the squeeze are the whole idea, and adding
+    // hills would only take the speed away that the tightness is meant to test.
+    tune: {
+      elev: { amp: 11, ph: [0.9, 2.4, 1.7] },
+      tunnels: { count: 2 },
+      // NO `rampCount` HERE, AND THAT IS DELIBERATE — see the note on world 67.
+      // It reads as "no jumps" and does not do that; prop ramps were deleted
+      // from the whole game, and the knob now only feeds `_buildCrests`, where
+      // `(rampCount || 3) + 3` makes 0 and unset the SAME NUMBER. Writing it
+      // would have been decoration.
+      massif: { az: 0, spread: 6.0, count: 12, r0: 340, r1: 600,
+        h0: 130, h1: 250, w0: 160, w1: 300 },
+      hillAmp: 2.0,
+      valleyWalls: { h: 64, run: 130 },
+    } },
+  { id: 66, name: 'GLACIER COL', theme: 'furka', region: 'ALPINE PASSES',
+    cost: 38, fresh: true, route: 'panorama',
+    // THE HIGH ONE, and the biggest thing in the family. `panorama` climbs a
+    // mountain and comes back down the far side — the one route on the roster
+    // whose SHAPE is already a col — and the walls are pushed out to 360 u and
+    // up to 135, so what encloses you is a range rather than a cutting. 35.1 u
+    // of road relief, the most of the three.
+    //
+    // ONE BORE, AND IT ASKED FOR THREE FIRST. Measured, and recorded because
+    // the number looks arbitrary otherwise: this route refuses 212 of its 900
+    // stations as TOO CURVED, against 59 on CAPE OLIVETO, and `tunnelFitAt`
+    // turns away 357 more. `panorama` simply bends too hard, too often, to
+    // take a second bore — the planner places what the mountain allows and no
+    // config can argue with it. So the request says one, because a `count: 3`
+    // that yields one is a config that lies about the world (the same tidy-up
+    // SALINE SPRINT's `rampCount: 6` got when it built zero ramps).
+    //
+    // `furka` sets `blend: { near: 14, far: 62 }`, so the wall starts climbing
+    // at 62 u here rather than the default 70 — that is `_valleyWall` reading
+    // the theme's own corridor width, not a number to copy.
+    tune: {
+      elev: { amp: 26, ph: [1.6, 0.7, 2.9] },
+      tunnels: { count: 1 },
+      // NO STONE BRIDGES EITHER, and it asked for two. Measured with the
+      // builder's group finally named (`stone-bridge`, added for this): it
+      // built ZERO. The placement wants a 4.5 u drop at a station under 0.01
+      // curvature, 60 clear of a gorge and 90 clear of the gate, and `furka`
+      // plus `panorama` is too bent to offer one — the same reason the bores
+      // stop at one. A `count: 2` that builds none is worse than no line at
+      // all, so there is no line.
+      massif: { az: 0, spread: 6.0, count: 16, r0: 400, r1: 700,
+        h0: 170, h1: 300, w0: 190, w1: 350 },
+      hillAmp: 2.4,
+      valleyWalls: { h: 135, run: 360 },
+    } },
+  { id: 67, name: 'TIMBER GORGE', theme: 'deepwood', region: 'ALPINE PASSES',
+    cost: 39, fresh: true, route: 'estonia',
+    // THE WOODED ONE, and the one that still lets you off the ground.
+    // `estonia` is the crest route, and the flanks here are forest rather than
+    // rock — far enough out (250 u) and shallow enough (30%) that you can see
+    // over them at the top of a crest. A valley you can see out of drives
+    // differently from one you cannot, which is the difference being bought.
+    //
+    // WHAT MAKES THE AIR IS `_buildCrests`, NOT RAMPS, and that matters
+    // because the obvious knob is a trap. Prop launch ramps were deleted from
+    // the entire game — `_buildRamps` opens with `this.ramps = []` and returns
+    // immediately, keeping the array only so the "stay clear of a ramp"
+    // guards elsewhere still resolve. Measured: FAFE LEAP, the jump world,
+    // asks `rampCount: 7` and builds 0 ramps, like everything else.
+    //
+    // `rampCount` survives as the input to the CREST count, where it is read
+    // as `(this.T.rampCount || 3) + 3` — so `rampCount: 0` is not "no jumps",
+    // it is THE DEFAULT, because 0 is falsy. Worlds on the roster set it to 0
+    // meaning to remove air and got the standard six crests. None of the three
+    // worlds here writes it, since the only honest values are "leave it alone"
+    // or a number bigger than the default.
+    //
+    // `deepwood` is tagged FOREST alone, which was true of DEEPWOOD TRAIL and
+    // is half the story once the trees are standing on a mountainside — so the
+    // facet is overridden below rather than left describing flat woodland.
+    tune: {
+      elev: { amp: 17, ph: [2.2, 1.0, 0.4] },
+      tunnels: { count: 1 },
+      massif: { az: 0, spread: 6.0, count: 13, r0: 380, r1: 640,
+        h0: 120, h1: 240, w0: 170, w1: 310 },
+      hillAmp: 2.2,
+      valleyWalls: { h: 74, run: 250 },
+    },
+    scenery: ['MOUNTAIN', 'FOREST'] },
 ];
 
 /* ==========================================================================
@@ -9541,7 +9671,31 @@ export class Track {
       const hits = [];
       for (let i = 0; i < N; i += step) {
         if (this._circDist(i, 0) < 30) { hits.push(0); continue; }
-        if (this._nearGorge(i, 40)) { hits.push(0); continue; }  // its own rails
+        // AN EXEMPTION MUST BE AS WIDE AS THE THING THAT KEEPS IT.
+        //
+        // This was `_nearGorge(i, 40)`, on the stated grounds that a gorge,
+        // overpass or bore "builds its own rails". The promise is 40 samples
+        // wide either side; what keeps it is not, and the gap was every long
+        // unwalled corner in the game:
+        //
+        //   SEA CLIFF RUN   749-761   13 stations bare, both sides
+        //   GLACIER COL     753-774   22 stations
+        //   TIMBER GORGE    307-330   24 stations, and 410-430
+        //
+        // A JUMP GORGE genuinely must stay clear — a rail across a launch or a
+        // landing is a wall in the flight path, not a guard — so that arm of
+        // the old test is kept, and kept at its full width.
+        //
+        // The hero gorge and the overpass decks are NOT exempt any more. They
+        // are only skipped where their masonry actually stands, which the
+        // `guarded` test below already asks, and asks correctly: the deck and
+        // bridge builders run BEFORE this one (8872 and 8895 against 8898), so
+        // their barriers are in `this.barriers` by the time it looks. Where
+        // they built something the rail is still skipped; where they did not,
+        // the corner now gets walled instead of being left open on a promise.
+        if ((this._jumpGorges ?? []).some((G) => this._circDist(i, G.i) < 40)) {
+          hits.push(0); continue;
+        }
         if (this.fords.some((f) => this._circDist(i, f.i) < 14)) { hits.push(0); continue; }
         if (this._tunnels.some((t) => i >= t.s - 6 && i <= t.e + 6)) { hits.push(0); continue; }
         const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;
@@ -12223,6 +12377,13 @@ export class Track {
           g.add(pier);
         }
       }
+      // TAG IT, so "asked for two bridges, got one" is answerable. `count` is
+      // a request — the placement wants a 4.5 u drop, curvature under 0.01 and
+      // 120 samples between picks — and an unnamed group made the difference
+      // between request and result invisible to every probe. Measuring it by
+      // mesh name without this counted the rope bridge's `bridge-deck` and
+      // reported a number that had nothing to do with stone.
+      g.name = 'stone-bridge';
       this.group.add(g);
     }
   }

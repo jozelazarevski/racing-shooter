@@ -38,13 +38,38 @@ const BASE = process.env.BASE ?? 'http://localhost:8901';
 // regression without being a target to code towards. The measured value is in
 // the comment; if a change moves the number up, move the floor up with it.
 const WORLDS = [
-  [29, 'OLIVE COAST',   92],   // measured 96 — the reference world
-  [61, 'OLIVE PASS',    67],   // measured 71 — masonry world, much guarding is stone
-  [62, 'CAPE OLIVETO',  88],   // measured 92
-  [63, 'TERRAZZA ALTA', 78],   // measured 82 — 42% of its lap is tight, the hardest case
-  [64, 'SALINE SPRINT', 93],   // measured 97
-  [60, 'SEA CLIFF RUN', 60],   // measured 64 — cliff world, see the note below
+  [29, 'OLIVE COAST',     92],  // measured 96 — the reference world
+  [61, 'OLIVE PASS',      84],  // measured 88  (71 before the exemption fix)
+  [62, 'CAPE OLIVETO',    88],  // measured 92
+  [63, 'TERRAZZA ALTA',   81],  // measured 85  (82 before) — 42% of its lap is tight
+  [64, 'SALINE SPRINT',   93],  // measured 97
+  [60, 'SEA CLIFF RUN',   66],  // measured 71  (64 before) — cliff world
+  [66, 'GLACIER COL',     86],  // measured 90  (76 before)
+  [67, 'TIMBER GORGE',    90],  // measured 94  (78 before)
+  [65, 'GRANITE NARROWS', 30],  // measured 35 — the low number is real, see below
+  [6,  'SUMMIT CLIMB',    88],  // measured 92 — an older world, as a regression witness
 ];
+
+// WHY GRANITE NARROWS' FLOOR IS 30 AND NOT A DEFECT.
+//
+// It measures 35% against the family's 76-78%, which looks like a hole until
+// the stations are counted rather than the percentage read. It has only 69
+// tight stations — a fast route has few — and 45 of them come back open in
+// THREE runs: 0-9, 878-899 and 863-875. The first two are the start gate,
+// which EVERY builder in the file clears (26-30 samples), and `ouninpohja`
+// happens to put its tightest section across the start line. So 32 of the 45
+// are the roster's own deliberate exclusion, and the denominator is small
+// enough that they alone cost 46 points of coverage.
+//
+// The genuine item is 863-875: 13 stations, bare, adjacent to that exclusion
+// zone and not covered by it. That is the same start-gate question already
+// open in HANDOVER, arriving on a world whose route makes it visible.
+//
+// AND THE VALLEY DOES NOT COVER FOR IT. It would be easy to say the mountain
+// walls this world so it needs no rails — it does not. `_valleyWall` returns
+// ZERO inside the corridor blend, so for the first ~70 u either side of the
+// road the ground is still at road height. Valley walls enclose a lap; they
+// do not stop a corner being cut. Rails are still the only thing that does.
 
 // The longest fully-open run any world may have at a tight corner, away from
 // the start gate, in stations. Every world above measures 0-5 except one.
@@ -52,23 +77,25 @@ const MAXOPENRUN = 12;
 
 // KNOWN AND OPEN, PINNED BY NAME AND BY NUMBER.
 //
-// SEA CLIFF RUN leaves 13 consecutive tight stations bare from sample 749.
-// The cause is measured and is NOT the rail cap — the world builds every bay
-// it asks for. `_buildEdgeRails` skips any station within 40 samples of a
-// gorge, overpass or tunnel, on the stated grounds that those build "its own
-// rails"; at 749-761 nothing does, on either side. The exemption is 40 samples
-// wide and the thing it defers to is not, which is the same shape as every
-// other defect in this area: A PROMISE MADE OVER A WIDER SPAN THAN THE THING
-// THAT KEEPS IT.
+// This list held SEA CLIFF RUN at 13 stations from sample 749, with a note
+// that the cause was `_buildEdgeRails` skipping anything within 40 samples of
+// a gorge, overpass or bore on the grounds that those "build its own rails" —
+// a promise 40 samples wide kept by something much narrower. r209 fixed that
+// at the source: only a JUMP GORGE is exempt now (a rail across a launch is a
+// wall in the flight path), and the hero gorge and overpass decks fall through
+// to the `guarded` test, which skips a station only where masonry actually
+// stands. The entry is gone because the hole is, not because the limit moved:
 //
-// It is pinned rather than absorbed: raising MAXOPENRUN to 13 for every world
-// would hide the next one. Fixing it properly means narrowing the exemption to
-// where a barrier actually stands — the `guarded` test three lines further
-// down already asks exactly that, and the deck and bridge builders run BEFORE
-// the rail builder (8872 and 8895, against 8898), so their barriers are in the
-// list by then. That change touches every world with a gorge, so it wants its
-// own before/after sweep rather than riding along with this one.
-const KNOWN_OPEN = { 'SEA CLIFF RUN': 13 };
+//   SEA CLIFF RUN   64% -> 71% walled both sides, rails 300 -> 328
+//   GLACIER COL     76% -> 90%, its 22-station run at 753 closed
+//   TIMBER GORGE    78% -> 94%, its 24-station run at 307 closed
+//   OLIVE PASS      71% -> 88%     TERRAZZA ALTA  82% -> 85%
+//   OLIVE COAST, SALINE SPRINT, CAPE OLIVETO, GRANITE NARROWS  unchanged
+//
+// Anything added here again needs the same treatment: a name, a measured
+// number, and the reason — never a raised MAXOPENRUN, which would hide the
+// next one for every world at once.
+const KNOWN_OPEN = {};
 
 let pass = 0, fail = 0;
 const ok = (cond, msg, extra = '') => {
