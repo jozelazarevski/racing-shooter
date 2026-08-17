@@ -8305,18 +8305,17 @@ class Game {
    *  is worst at is showing you the next corner and none of them may spend the
    *  frame on drama.
    *
-   *  WHY THE EYE IS WHERE IT IS. Three numbers were tried on a 430x932 phone:
+   *  WHY THE EYE IS WHERE IT IS. Not a bumper cam: at 1.1 u the road ahead
+   *  compresses into a band a few pixels tall and a crest 40 u out hides the
+   *  whole corner behind it, which on a 430x932 portrait phone — where the HUD
+   *  already owns the top and the bottom of the screen — leaves nothing to
+   *  drive by. Not a roof cam either: high enough for a good sightline and the
+   *  bonnet leaves the frame and the view stops reading as a car at all.
    *
-   *    bumper (1.1 u)  the road ahead compresses into a band a few pixels
-   *                    tall — a crest 40 u out hides the whole corner behind it
-   *    seat   (2.3 u)  read off the car's OWN roofline, `capTop - 0.25`, so a
-   *                    tall truck sits high and a coupe sits low, which is the
-   *                    difference between the two bodies and worth keeping
-   *    roof   (3.2 u)  more road, but the bonnet drops out of frame and the
-   *                    view stops reading as a car at all
-   *
-   *  The middle one, with the pitch below doing the work the height was being
-   *  asked to do.
+   *  So: the seat, read off the car's OWN roofline (`capTop - 0.25`), with the
+   *  pitch below doing the work the height would otherwise be asked to do.
+   *  Reading it off the rig rather than writing a constant keeps the difference
+   *  between a tall truck and a low coupe, which is worth having.
    *
    *  THE PITCH FOLLOWS THE ROAD, NOT THE CAR. A fixed downward tilt is right on
    *  the flat and wrong everywhere else: over a crest it aims at sky, into a

@@ -103,7 +103,7 @@ const measure = async (lv) => page.evaluate(async ({ lv, MIN }) => {
   };
 
   // ---- what is legitimately airborne, exempted BY NAME ---------------------
-  const AIRBORNE = /^(sky|horizon|cloud|bird|sea|water|river|lake|rain|snow|dust|spark|smoke|fog|particle|chopper|heli|banner|gantry|start-lights|world-skirt|contact-shadows|.*-lightpool|.*shadow|edit-|preview|hud|arrow|marker|.*-veil|bridge|deck|overpass|tunnel|gallery|rail|parapet|lamp|wire|cable|pylon|whale|pontoon|buoy|arch|crane|cablecar|ropeway|zip|net|flag|bunting)/i;
+  const AIRBORNE = /^(sky|horizon|cloud|bird|sea|water|river|lake|rain|snow|dust|spark|smoke|fog|particle|chopper|heli|banner|gantry|start-lights|world-skirt|contact-shadows|.*-lightpool|.*shadow|edit-|preview|hud|arrow|marker|.*-veil|bridge|deck|overpass|tunnel|gallery|rail|parapet|lamp|wire|cable|pylon|whale|pontoon|buoy|arch|crane|cablecar|ropeway|zip|net|flag|bunting|edge-rail|guard-fence|foot-bridge|hollow-arch|stone-bridge)/i;
 
   // ---- what is HELD UP by something the 2 u column grid cannot see --------
   // Exempted BY MEMBERSHIP of the game's own lists, never by shape, and every

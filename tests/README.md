@@ -42,9 +42,32 @@ value, so shrinking that list is the work and growing it fails),
 every world that asks for a bore, asserting it entered, exited the FAR portal,
 never left through the crown and never stopped dead — none of which a count of
 `track._tunnels` can answer),
+`test-nothing-on-road.mjs` (the ROSTER-WIDE half of `test-roadclear`: all 68
+worlds, five laws — the instrument works, a building planted on the centreline
+is detected, no building and no tree trunk stands in any carriageway, and what
+is DRAWN in one stays at the number it was measured at, with every known-open
+world pinned by name. Found the reported chalet: GLACIER COL's crossroad-spur
+barn, sited `len + 15` along the SPUR with no road test at all),
+`test-nothing-floats.mjs` (nothing stands on nothing, all 68 worlds, measured
+against the ground that is DRAWN rather than `terrainHeight` — every scatter
+builder seats on the latter, so a check against it computes 0 by construction
+and cannot see the defect. Carries the positive control that lifts one instance
+6 u and requires the sweep to notice),
 `test-rungs.mjs` (contract rungs: the ladder hardens, the top rung is
 HARD-only, a sweep stays worth about one strong race, and climbing persists per
-contract).
+contract),
+`test-missions-duel.mjs` (the SHAPE of the three antagonist missions: one rival
+in a DUEL, nobody armed, the runner starts up the road in a PURSUIT, and the
+medal is a margin rather than a lap time),
+`test-duel-rival.mjs` (the MOTION the one above cannot see. `test-missions-duel`
+passed 14/14 while the duel rival stood still, because "alive" is a flag and
+"moving" is a measurement. This drives a REAL rAF run — a fixed-step `g.frame()`
+harness cannot answer the question — counts the calls to `EnemyCar.update`
+rather than inferring them from position, and accumulates distance along the lap
+PER FRAME. An ordinary race is the positive control, PURSUIT is the second
+`keepsRival` mode, and one law pins that exactly ONE rival is on the road for the
+whole run, because the culled six carry `respawnTimer` 0 and the obvious fix
+respawns all seven).
 
 **The world editor** has eight, each pinning what the ones before it could not
 do: `test-editor.mjs` (the sculpt reaches both ground functions and the
@@ -75,6 +98,9 @@ assumption someone had already written down.
 | `tool-ground-mismatch.mjs` | Where the terrain mesh and `terrainHeight()` disagree near the road — the ground you hit against the ground you see. |
 | `tool-road-census.mjs` | The roster-wide answer to "is anything on the road". Reads `solids` for BLOCKERS/HOLES/FLOATERS **and walks the built scene graph** for BODIES — every mesh and every instance, measured by exact point-to-OBB distance. Its suppression classes (`prop`, `foliage`, `surface`, `overhead`, `buried`, `scenery`) are all COUNTED and printed, because a filter that is not printed reads as "nothing there". |
 | `tool-tree-clearance.mjs` | Every tree TRUNK against RULES.md's `widthAt + r + 1.7`, per world, with a height gate first so the saguaros silhouetted on the canyon rim are not read as intrusions. The acceptance test for any tree-placement change. |
+| `tools-scratch/air.mjs` | What hangs in the air, measured against the ground the PLAYER SEES — the near terrain patch's own vertex buffer, read out of the live scene — with the analytic gap printed beside it so a height MISMATCH and a genuinely airborne object are told apart in the numbers. Reports the GRADE under every floater, because a flat-based object on a steep face hangs on its downhill side even when its centre height is exact, and that needs a different fix. `tool-float-census.mjs` asks the same question of `terrainHeight` and therefore cannot see this class at all. |
+| `tools-scratch/onroad.mjs` | The road and air sweeps over all 68 worlds in ONE browser session (`swapLevel`, not a reload per world: 68 reloads is 35 minutes). |
+| `tools-scratch/probe-ground.mjs` | One point, the height function taken apart term by term, beside the four mesh vertices that actually surround it. This is what identified `_tunnelRidge`'s staircase. |
 | `tool-banner-clearance.mjs` | Every sponsor board measured across its full 9 u span. The acceptance test for `_buildBanners`. Skips `kind: 'fence'` — `_buildGuardFence` shares the array and a guard rail belongs at the road edge. |
 
 ## Writing new checks

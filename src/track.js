@@ -14933,6 +14933,9 @@ export class Track {
     const barkDark = new THREE.MeshStandardMaterial({ color: 0x4a2716, roughness: 1 });
     const cut = new THREE.MeshStandardMaterial({ color: 0xb88a54, roughness: 0.9 });
     const g = new THREE.Group();
+    // named for the same reason as the foot-bridges: a drive-THROUGH trunk is
+    // an arch, and an arch stands over the road on purpose
+    g.name = 'hollow-arch';
     for (const side of [1, -1]) {
       // shattered trunk halves the fallen giant rests on
       const stump = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3.3, 12, 10), bark);
@@ -19104,6 +19107,11 @@ export class Track {
     for (const i of chosen) {
       const c = this.center[i];
       const g = new THREE.Group();
+      // NAMED, so "nothing floats" can exempt it EXPLICITLY. A plank
+      // foot-bridge spanning a canyon at y = 9 is supposed to be in the air,
+      // and an exemption that works by accident (a size threshold, a material
+      // guess) is one that stops working the day the bridge changes shape.
+      g.name = 'foot-bridge';
       const deck = new THREE.Mesh(new THREE.BoxGeometry(span, 0.35, 3.2), deckMat);
       deck.position.y = 9;
       deck.castShadow = deck.receiveShadow = true;

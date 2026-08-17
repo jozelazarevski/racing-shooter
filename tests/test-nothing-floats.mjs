@@ -93,7 +93,8 @@ await page.waitForFunction(() => window.__game?.track?.center, undefined, { time
 // The measurement runs INSIDE the page, once per world, driven by swapLevel:
 // 68 page reloads is forty minutes of build time and 68 swaps is under ten.
 await page.evaluate(() => {
-  window.__seatScan = ({ lift }) => {
+  window.__seatScan = async ({ MINGAP }) => {
+    const THREE = await import('three');
     const g = window.__game, t = g.track;
     g.scene.updateMatrixWorld(true);
 
@@ -148,7 +149,7 @@ await page.evaluate(() => {
     // and every structure that SPANS something — a bridge deck, an overpass,
     // a tunnel crown, a gantry, a lamp arm, a cable. Named, so the exemption
     // is auditable rather than an accident of some size threshold.
-    const AIRBORNE = /^(sky|horizon|cloud|bird|sea|water|river|lake|rain|snow|dust|spark|smoke|fog|particle|chopper|heli|banner|gantry|start-lights|world-skirt|contact-shadows|.*-lightpool|.*shadow|edit-|preview|hud|arrow|marker|.*-veil|bridge|deck|overpass|tunnel|gallery|rail|parapet|lamp|wire|cable|pylon|whale|pontoon|buoy|arch|crane|cablecar|ropeway|zip|net|flag|bunting)/i;
+    const AIRBORNE = /^(sky|horizon|cloud|bird|sea|water|river|lake|rain|snow|dust|spark|smoke|fog|particle|chopper|heli|banner|gantry|start-lights|world-skirt|contact-shadows|.*-lightpool|.*shadow|edit-|preview|hud|arrow|marker|.*-veil|bridge|deck|overpass|tunnel|gallery|rail|parapet|lamp|wire|cable|pylon|whale|pontoon|buoy|arch|crane|cablecar|ropeway|zip|net|flag|bunting|edge-rail|guard-fence|foot-bridge|hollow-arch|stone-bridge)/i;
 
     // ---- held up by something the 2 u column grid cannot see, BY MEMBERSHIP -
     //   foliage  parts[1..] of a `track.trees` entry. A TREE'S COLLIDER IS ITS
@@ -239,6 +240,22 @@ await page.evaluate(() => {
       } else { MM.copy(o.matrixWorld); consider(MM, bb, sig); }
     });
 
+    // ---- THE ARBITER: is anything DRAWN under it? --------------------------
+    // The 2 u column grid cannot answer that for geometry with a huge
+    // footprint — a canyon cliff ribbon, a mesa flank, a quay wall are all
+    // skipped by the 4000-cell cap — so a ray is cast straight down from a
+    // candidate's own base and, if it lands on drawn geometry before it
+    // reaches the terrain patch, the thing is standing on something. Only the
+    // candidates pay for it. An explicit mesh list, not `intersectObject(group,
+    // true)`: the scene carries objects the raycaster chokes on and one of
+    // them aborts the whole cast.
+    const rc = new THREE.Raycaster();
+    const from = new THREE.Vector3(), dn = new THREE.Vector3(0, -1, 0);
+    const rayList = [];
+    t.group.traverse((o) => {
+      if ((o.isMesh || o.isInstancedMesh) && o.geometry && o.material && o.visible) rayList.push(o);
+    });
+
     // ---- only the lowest thing in its own column can be floating -----------
     const rows = new Map();
     let tested = 0, over = 0, worst = 0, worstSig = '', wx = 0, wz = 0;
@@ -268,8 +285,15 @@ await page.evaluate(() => {
       // than report the hole as a floating object.
       if ((t._gorgeCut?.(p.cx, p.cz) ?? 0) > 1) continue;
       tested++;
-      const gap = p.y0 - gy;
-      if (gap > 1.0) {
+      let gap = p.y0 - gy;
+      if (gap > MINGAP) {
+        rc.set(from.set(p.cx, p.y0 - 0.02, p.cz), dn);
+        rc.near = 0; rc.far = gap;
+        let hit = null;
+        try { hit = rc.intersectObjects(rayList, false)[0]; } catch (e) { hit = null; }
+        if (hit && hit.distance < gap - 0.4) gap = hit.distance;
+      }
+      if (gap > MINGAP) {
         over++;
         const r = rows.get(p.name) ?? { name: p.name, n: 0, worst: 0, x: 0, z: 0 };
         r.n++; if (gap > r.worst) { r.worst = gap; r.x = Math.round(p.cx); r.z = Math.round(p.cz); }
@@ -302,8 +326,8 @@ for (const lv of worlds) {
     // a frame has run, and measuring before that reports a pile of parts at
     // the world origin that no player ever sees.
     for (let f = 0; f < 8; f++) await new Promise((res) => requestAnimationFrame(res));
-    return window.__seatScan({});
-  }, { id: lv.id });
+    return window.__seatScan({ MINGAP });
+  }, { id: lv.id, MINGAP: MIN });
   results.push({ ...lv, ...r });
   console.log(`  ${String(lv.id).padStart(3)} ${lv.name.padEnd(22)} floating ${String(r.over).padStart(4)} / ${r.tested}`
     + `   worst ${String(r.worst).padStart(6)} u  ${r.worst > MIN ? `${r.worstSig.slice(0, 44)} at (${r.wx},${r.wz})` : ''}`);
@@ -326,13 +350,13 @@ for (const k of ['foliage', 'prop', 'banner']) {
 // air and require the sweep to notice. Without this the suite could be green
 // because it is measuring nothing at all — the failure mode that cost this
 // repo a whole session (tests/README.md rule 4).
-const ctrl = await page.evaluate(async () => {
+const ctrl = await page.evaluate(async ({ MINGAP }) => {
   const g = window.__game;
   const { LEVELS } = await import('./src/track.js');
   g.state = 'title'; g.editScene = null;
   g.swapLevel(LEVELS.find((l) => l.id === 1), true, null);   // PINE VALLEY
   for (let f = 0; f < 8; f++) await new Promise((res) => requestAnimationFrame(res));
-  const before = window.__seatScan({}).over;
+  const before = (await window.__seatScan({ MINGAP })).over;
   // find the biggest instanced scatter that is not exempt, and lift slot 0
   const t = g.track;
   let victim = null;
@@ -348,9 +372,9 @@ const ctrl = await page.evaluate(async () => {
   M.elements[13] += 6;
   victim.setMatrixAt(0, M);
   victim.instanceMatrix.needsUpdate = true;
-  const after = window.__seatScan({}).over;
+  const after = (await window.__seatScan({ MINGAP })).over;
   return { before, after, lifted: true, what: victim.geometry.type, n: victim.count };
-});
+}, { MINGAP: MIN });
 check('LAW 2  a deliberately unseated instance is DETECTED (positive control)',
   ctrl.lifted && ctrl.after > ctrl.before,
   `PINE VALLEY ${ctrl.what} x${ctrl.n}: ${ctrl.before} floating -> ${ctrl.after} after lifting one slot 6 u`);
