@@ -150,6 +150,19 @@ only that way: the gantry that moved DEEPER into the road (4.52 -> 7.59 u), and
   bundle and the change looks like it did nothing. This has happened.
 - Deploy runs ONLY on push to `main` (`.github/workflows/deploy.yml`). Work
   sitting on the feature branch is not live, however green it is.
+- **A GREEN WORKFLOW IS NOT A DEPLOY.** Pages publishing is TWO workflows: ours
+  ("Deploy to GitHub Pages") only pushes the `gh-pages` branch, and GitHub's own
+  "pages build and deployment" is what actually serves it. r208 was reported as
+  live on the strength of the first one while the second had failed 503 in a
+  GitHub outage, and the owner had to correct it. The ONLY proof is fetching a
+  path that exists in the new build and not the old one — a 404 there means
+  unpublished, and no amount of waiting for a CDN changes that.
+- **A GATE READ THROUGH `| tail` IS NOT A GATE RUN.** A capture of
+  `test-goat.mjs` ended `23 passed, 3 failed` with exactly ONE `FAIL` line in
+  the file, because the runner tailed it — the other two scrolled off and the
+  fragment read like a single near-miss. Related: `| grep PASS` with no
+  `--line-buffered` writes NOTHING until the process exits, so a long gate looks
+  hung. Capture whole, filter after.
 - World generation is seeded (`Math.random = seededRandom(seed)`). Changing how
   many of ANYTHING a builder makes cascades through the RNG stream and moves
   unrelated scenery. Diff what you did not mean to change.
