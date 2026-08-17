@@ -316,7 +316,7 @@ const worlds = only.length ? roster.filter((l) => only.includes(l.id)) : roster;
 
 const results = [];
 for (const lv of worlds) {
-  const r = await page.evaluate(async ({ id }) => {
+  const r = await page.evaluate(async ({ id, MINGAP }) => {
     const g = window.__game;
     const { LEVELS } = await import('./src/track.js');
     g.state = 'title'; g.editScene = null;
