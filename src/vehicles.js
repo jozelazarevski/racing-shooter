@@ -29,6 +29,27 @@ const MAX_GRADE = 0.45;
  *  mountain taken from rest is still a wall. */
 const OFF_CLIMB = 0.03;
 const OFF_FADE = 0.08;
+/** IS THE COURSE AN OPEN WORLD, OR A ROAD?
+ *
+ *  `game.freeRoam` was answering this, and it is not the same question. That
+ *  flag carries TWO meanings and main.js:1297 (`if (this.missionMode)
+ *  this.freeRoam = true`) only ever intended one of them:
+ *
+ *    PRESENTATION — open world, no grid, roam HUD and camera. Missions want
+ *    this, and setting the flag is the right way to get it.
+ *    PHYSICS PREDICATE — "the course is not a road, so the rules that keep you
+ *    ON one do not apply." Missions must NOT get this, and were.
+ *
+ *  MEASURED on SUMMIT CLIMB, patched tree, one start point, real rAF loop:
+ *  a race climbs 29.1 u with the off-course band engaging (max strayed 70);
+ *  a HOT LAP mission climbs 46.8 u with it never engaging at all (max strayed
+ *  0), which is free roam's own 46.3 u. Every mission is a ROAD event with a
+ *  clock, so the goat fix simply never applied to any of the four.
+ *
+ *  The off-road race modes, when they land, take this exemption on purpose and
+ *  belong in this predicate (`|| g.offRoadRace`) — NOT in a loosened OFF_CLIMB,
+ *  which would put the goat back on every road world at once. */
+const openCourse = (g) => !!(g && g.freeRoam && !g.missionMode);
 /** Fastest a crest may throw the car upward, u/s. Uncapped, a steep ramp taken
  *  on nitro sent cars 100+ u into the infield. It also bounds a jump: against
  *  gravity 26 this is 0.85 s of hang time and 2.3 u of height before the road
@@ -1226,7 +1247,9 @@ export class Car {
 
     // ---- open world (player only): terrain driving off the road, any mode.
     // The road is fastest; rough ground is the natural boundary (no fences).
-    const freeRoam = !!(this.game.freeRoam && this === this.game.player);
+    // `openCourse`, NOT `freeRoam` — a mission is a road event (see the header
+    // on openCourse). This local feeds the cliff-wall release below.
+    const freeRoam = openCourse(this.game) && this === this.game.player;
     // ---- width-variation: the road edge follows the (possibly pinched)
     // per-sample width profile; defensive — old track builds report ROAD_HALF
     const roadHalfHere = this.game.track?.widthAt?.(this.trackIndex) ?? ROAD_HALF;
@@ -2321,9 +2344,11 @@ export class Car {
     // matter how far it is from the branch you left, so it never registers,
     // while driving into the hinterland climbs away from everything.
     //
-    // FREE ROAM is exempt on purpose: out there the world is the point, and the
-    // rim wall is what bounds it.
-    if (this.game.freeRoam || this !== this.game.player) this._strayed = 0;
+    // AN OPEN COURSE is exempt on purpose: out there the world is the point,
+    // and the rim wall is what bounds it. That is PLAIN roam — a mission is a
+    // road event with a clock and is not exempt, though `game.freeRoam` is true
+    // throughout one. See the header on `openCourse` for the measurement.
+    if (openCourse(this.game) || this !== this.game.player) this._strayed = 0;
     else if (this.speedAlong > 0.5) {
       // `lateral` is measured against the TRACKED index, and index tracking only
       // searches +/-30 samples around where the car was. Where the loop doubles
@@ -4195,6 +4220,14 @@ export class PlayerCar extends Car {
       // UNSTUCK button still works throughout, which is the "successful trial"
       // the request leaves room for.
       const bogged = this === g.player && controlsLive && !this.airborne
+        // DELIBERATELY `freeRoam`, NOT `openCourse`. The other two reads of
+        // this flag are BOUNDARY rules — they decide where you may drive — and
+        // a mission is a road event, so they were wrong to exempt it. This one
+        // is a PENALTY: it costs a hull. Switching it to `openCourse` would not
+        // fix a defect, it would newly start wrecking cars in HOT LAP and
+        // GAUNTLET on snow worlds, which is a gameplay call and the owner's to
+        // make. Left as it is, on purpose, and recorded rather than silently
+        // swept in with the boundary fix.
         && !g.freeRoam
         && (this._tyreUnder | 0) > 0 && (this._slick ?? 0) > 0
         && input.throttle > 0.5
