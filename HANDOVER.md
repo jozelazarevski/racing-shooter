@@ -300,6 +300,26 @@ are recorded here so the next session does not re-derive them.
   shelf clamp addressed. A different discontinuity; the other three worlds
   measure exactly 0.
 
+## DRIVER'S VIEW — ONE UNDIAGNOSED COST, AND IT IS PHONE-RELEVANT
+The cockpit view is usually CHEAPER than chase (renderer.info, same spot, car
+recentred): PINE VALLEY 226 -> 132 calls (-42%), SAFARI PLAINS 195 -> 115
+(-41%), GOTTHARD in-bore 235 -> 202 (-14%).
+
+**COL DE TURINI goes 170 -> 331 (+95%)** and nobody has diagnosed why. The
+standing hypothesis is that a low wide eye in a steep valley pulls near-field
+scenery into the frustum that an overhead boom looks past — untested. 331 draw
+calls is a number that matters on a phone. Check this before the view is
+promoted from opt-in.
+
+Not a defect, and not a reason to hold the feature: it is opt-in, the terrain
+sweep is clean (0 of 2,700 sampled camera positions below ground per world,
+worst clearance 3.03 u inside a bore), and a mid-race switch was measured
+byte-identical on state, lap, raceTime, rank, trackIndex, health and all three
+contract rows. It is simply the one measured number that got worse.
+
+Also honest, and by design: on a bend the cockpit shows materially LESS of the
+corner than chase. That is inherent to a 2.7 u eye and is why it is a toggle.
+
 ## OPEN, LOWER PRIORITY
 - **`MIN` in `tunnelFitAt` is probably the same units error `reach` was.** The
   real minimum bore measures ~52 u against a documented ~26 u. Nothing depends

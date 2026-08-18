@@ -97,8 +97,27 @@ for (const [w, h, tag] of SIZES) {
       }
     }
     const off = boxes.filter((b) => b.r > innerWidth + 2 || b.b > innerHeight + 2 || b.l < -2 || b.t < -2);
-    return { n: boxes.length, overlaps, off: off.map((b) => b.id), touch: document.body.classList.contains('touch') };
+    // WHAT WAS NOT LOOKED AT, AND WHY. The loop above `continue`s past anything
+    // missing or hidden, so "all clear" can mean "not measured" — the failure
+    // this suite already had once (see the IDS note). Reported, never silent.
+    const skipped = IDS.filter((id) => !boxes.some((b) => b.id === id));
+    return { n: boxes.length, overlaps, skipped,
+      off: off.map((b) => b.id), touch: document.body.classList.contains('touch') };
   }, IDS);
+
+  // A CLEARANCE CHECK THAT MATCHES NOTHING PASSES FOREVER (tests/README rule 4).
+  // Two elements are legitimately absent mid-race and are named here with the
+  // reason; anything else missing means the gate stopped watching something.
+  // Measured at 844x390: 16 ids, 14 boxes, and these are the two.
+  const EXPECT_ABSENT = {
+    'weapon-box': 'hidden until a weapon is held',
+    't-brake': 'hidden — the brake pedal is not in the touch cluster on this layout',
+  };
+  const unexpected = r.skipped.filter((id) => !(id in EXPECT_ABSENT));
+  check(`${tag}: every element the player must press was actually measured`,
+    unexpected.length === 0,
+    unexpected.length ? `not measured: ${unexpected.join(', ')}`
+      : `${r.n} of ${IDS.length} measured; absent by design: ${r.skipped.join(', ') || 'none'}`);
 
   check(`${tag} (${w}x${h}): touch layout is active`, r.touch);
   check(`${tag}: no two HUD elements overlap`, r.overlaps.length === 0,
