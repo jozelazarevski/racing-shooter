@@ -83,8 +83,31 @@
     text-shadow:2px 2px 0 var(--ink)}
 
 
-  /* circular speedometer */
-  #speed-box{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  /* CIRCULAR SPEEDOMETER — AND WHY IT IS NOT CENTRED.
+     The player's car sits at the bottom CENTRE of the frame in every camera
+     the game ships except the driver's seat, so a dial centred at 50% is a lid
+     over the one object the player is steering. MEASURED by rendering each
+     view twice, once with the car's materials keyed, and counting the pixels
+     that changed inside the dial's own DOM rect (tools-scratch/dialcover.mjs):
+
+       1440x810   TOP-DOWN (the default view)  100% of the car behind the dial
+        800x460   TOP-DOWN 66%  TOP FAR 100%  TRAIL 59%  CHASE 100%  FAR 100%
+
+     The car's footprint is a fixed FRACTION of the viewport (x 0.478-0.521 W,
+     y 0.78-0.914 H, identical at both sizes) while the dial is a fixed 132 px,
+     which is why a short window loses the chase views as well as the default.
+     So the dial moves by the same currency the car is measured in — a
+     percentage — into the gap between the car and the weapon panel:
+
+       left 62%  ->  dial spans 0.62W +- 66px
+       clear of the car   while 0.62W - 66 > 0.521W  ->  W > 667
+       clear of #weapon-box (210px + 12px) while 0.62W + 66 < W - 222 -> W > 758
+
+     Every desktop width is past both. Narrower than that is the phone layout,
+     which overrides this rule below and is hand-tuned against the joystick and
+     the weapon buttons — there is no room to the right of the car at 390 px,
+     so that one is deliberately left where it is. */
+  #speed-box{position:absolute;bottom:16px;left:62%;transform:translateX(-50%);
     display:flex;flex-direction:column;align-items:center;gap:5px}
   #speedo{width:132px;height:132px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.4))}
   #nitro-wrap{width:130px;background:var(--panel);border:2px solid var(--edge);border-radius:8px;padding:4px 8px}
