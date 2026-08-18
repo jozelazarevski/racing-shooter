@@ -445,3 +445,23 @@ measures directly and which is intact — GRANITE NARROWS 100% of flanks standin
 over the road, GLACIER COL 96%, TIMBER GORGE 96%, CAPE OLIVETO 92%, mean rise
 65-76 u, with OLIVE COAST holding at 0% as the control. 21/0. Reshaping worlds
 to chase a number no gate is failing is a change with no defect behind it.
+
+## test-final-integration — TWO FINISH-FLOW FAILURES, PRE-EXISTING
+`race finishes -> results screen` and `FINAL LAP banner shown` FAIL. Baselined
+against pristine `origin/main` (r211, f693f04) served on its own port: **r211
+fails the same two and passes the same three after them**, so this is not a
+regression and no branch introduced it.
+
+The likely cause is the third instance of the trap that also bit the hazard and
+chopper checks in `playtest-modes`: the rail is `setInterval(..., 30)` moving
+the car +5 samples a tick, and the wait is 300 x 500 ms of WALL CLOCK. At the
+~1.28 fps this game renders under swiftshader the interval is starved by the
+render loop, so the car cannot complete the laps in the budget. NOT PROVEN —
+proving it means driving the lap in game time the way the hazard checks now do,
+and if it still does not finish, there is a real finish-flow bug underneath.
+
+There is other coverage meanwhile: `playtest-systems.mjs` carries "a full race
+to the results screen" by its own route.
+
+This gate now takes `BASE`, which is what made the baseline possible at all —
+it hardcoded `localhost:8901` in SEVEN places.
