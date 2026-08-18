@@ -8032,10 +8032,10 @@ class Game {
     // machinery on it would lift the eye over the hill ahead, slide it off a
     // trunk it is nowhere near, and lerp it out of the cabin on every corner.
     if (M.driver) { this._driverCamera(dt, M); this._applyCamera(dt, speedZoom, M); return; }
-    // Leaving the seat: re-seed the smoothed state next time, and hand the
-    // bodywork back. `syncMesh` would do it on the next frame anyway, but only
-    // for a car that is alive — a player who switches view while wrecked would
-    // otherwise watch the husk's own mesh stay hidden until they respawn.
+    // Leaving the seat: re-seed the smoothed state next time. The visibility
+    // line is no longer undoing anything (the seat draws the car now that the
+    // eye is inside it) — it is kept because it asserts the correct state for
+    // a WRECKED player, whose husk `syncMesh` will not touch until respawn.
     if (this._dWasDriver) {
       this._dWasDriver = false;
       if (p.mesh) p.mesh.visible = p.alive;
@@ -8356,28 +8356,24 @@ class Game {
       this._dYaw = undefined; this._dSpd = undefined;
       this._dSurge = 0; this._dLean = 0;
     }
-    // THE PLAYER'S OWN CAR COMES OFF THE SCREEN, AND THAT IS A MEASUREMENT.
+    // THE CAR STAYS ON SCREEN. It used to be hidden here, and the reasoning
+    // was sound for the eye it had: the first cut seated the head at
+    // `capTop - 0.25`, and `capTop` is the top of the ROOF CAP — so the camera
+    // sat ON the roof. From up there the body really did fill the bottom third
+    // of a 430x932 frame with roof, and a sponsor decal read as APEX in mirror
+    // writing, because those decals are one-sided and face away from a lens
+    // that is outside the car.
     //
-    // The first cut left it drawn, on the theory that a bonnet in the lower
-    // frame is what makes a cockpit view read as a cockpit. Shot at 430x932
-    // (PINE VALLEY, BRAWLER): the bodywork filled the bottom 32% of the frame —
-    // a black bar, then a WHITE sponsor decal reading APEX in mirror writing,
-    // then the orange bonnet — and the road vanished behind it at 68% of screen
-    // height. On a portrait phone the HUD already owns the top ~240 px and the
-    // bottom ~200 px; spending another third of what is left on the roof of
-    // your own car leaves a letterbox, and R12 says the road is the thing that
-    // has to stay readable a long way out.
+    // The eye is now INSIDE the glasshouse (see below), and every one of those
+    // problems is a property of being outside it. Three.js defaults to
+    // FrontSide, and nothing in `buildVoxelRacer` asks for DoubleSide, so from
+    // within the cabin the greenhouse box, the roof cap's underside and the
+    // far side of every panel are back-facing and cull. What is left in frame
+    // is the bonnet ahead — top face pointed straight at the eye — which is
+    // exactly the thing a cockpit view is supposed to have.
     //
-    // It is not a tuning problem either. These bodies are authored to be seen
-    // from OUTSIDE: the decals are one-sided and face away, and the styles
-    // carry roll cages, roof spares, jerry cans, exhaust stacks and a ladder,
-    // none of which have an inside. Eight body styles would each need their own
-    // eye to look right, and the tall ones could not be made to work at all.
-    //
-    // So the whole group goes. Only the PLAYER's — every rival stays drawn, and
-    // `syncMesh` puts this back to `alive` on the next frame the moment the
-    // view changes, with the explicit restore below as the belt to that brace.
-    if (p.mesh) p.mesh.visible = false;
+    // Reported as "drivers view should be looking from inside the car".
+    if (p.mesh) p.mesh.visible = true;
 
     // ---- where the head is pointed -----------------------------------------
     // The car's own heading leads, because that is what a driver's head does.
@@ -8415,11 +8411,29 @@ class Game {
     // Read off this car's own roofline: the roster runs 2.5-3.5 u tall, so a
     // constant seats a truck driver at chest height and a coupe driver through
     // the roof. `p.pos.y` is the contact patch, so this is height above tarmac.
-    const capTop = p.mesh?.userData?.rig?.capTop;
-    const eyeH = capTop ? clamp(capTop - 0.25, 1.75, 3.0) : (M.h ?? 2.3);
+    // INSIDE THE GREENHOUSE, not on top of it. The rig publishes the cabin the
+    // body was actually built with, so this lands in the driver's seat on all
+    // eight styles rather than at one constant that suits none of them: `cabY`
+    // is the cabin's centre and `cabH` its height, so a fifth of the way up
+    // from centre is head height, and `cabZ` is where that cabin sits fore and
+    // aft (it ranges -0.45 on the sleek to +0.1 on the dune). Being inside is
+    // what makes the body safe to draw — see the note above.
+    //
+    // The clamps keep the eye strictly within the glasshouse even if a future
+    // body reports something odd: outside it, the box stops culling and the
+    // player is looking at the inside of a dark panel.
+    const rig = p.mesh?.userData?.rig;
+    const cabY = rig?.cabY, cabH = rig?.cabH ?? 0.7, cabL = rig?.cabL ?? 2.0;
+    const eyeH = cabY !== undefined
+      ? clamp(cabY + cabH * 0.20, cabY - cabH * 0.35, cabY + cabH * 0.38)
+      : (M.h ?? 2.3);
+    // Sit a little forward of the cabin's centre, the way a driver does, but
+    // never out through the windscreen.
+    const eyeZ = rig?.cabZ !== undefined
+      ? rig.cabZ + Math.min(0.30, cabL * 0.14) : -(M.back ?? -0.42);
     const cp = this.camPos;
     cp.set(p.pos.x, p.pos.y + eyeH, p.pos.z)
-      .addScaledVector(fwd, -(M.back ?? -0.42) - this._dSurge * 0.16)
+      .addScaledVector(fwd, eyeZ - this._dSurge * 0.16)
       .addScaledVector(side, this._dLean * 0.20);
     cp.y += this._dSurge * 0.10;
 

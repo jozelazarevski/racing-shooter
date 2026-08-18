@@ -764,7 +764,16 @@ export function buildVoxelRacer(spec) {
   // Measured off the finished object rather than declared, so a car whose
   // bodywork changes cannot leave the number behind.
   const _box = new THREE.Box3().setFromObject(g);
+  // THE CABIN IS PUBLISHED because the driver's view has to seat an eye INSIDE
+  // it. `capTop` is the top of the ROOF CAP, so a camera hung off it sits on
+  // the roof — which is what the first cut did, and why the body had to be
+  // hidden to stop the roof and its mirror-writing decals filling the frame.
+  // From inside the glasshouse none of that is a problem: the greenhouse box
+  // is FrontSide like everything else, so its faces are back-facing from in
+  // there and cull, while the bonnet ahead keeps its top face pointed at the
+  // eye and draws. The car can stay on screen.
   g.userData.rig = { wheelR, wheelY, baseY, capTop,
+    cabY, cabZ, cabH, cabW, cabL,
     zRear: _box.min.z, zFront: _box.max.z, halfW: _box.max.x };
   return g;
 }
