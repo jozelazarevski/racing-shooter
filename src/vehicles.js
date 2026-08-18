@@ -322,9 +322,14 @@ export function buildVoxelRacer(spec) {
   const topY = baseY + 0.12 + bodyH;    // flat deck height
 
   // ---- chassis + wedge hull (flat deck aft, hood sloping to the nose) ----
+  // THE BODY'S OWN WIDTH, published on the rig below. `halfW` is the bounding
+  // box and includes the WHEELS (1.8 against the body's 1.3), so anything
+  // mounted "on the flank" off halfW ends up outboard of the bodywork, floating
+  // over the arches — which is exactly what happened to the cannon pods.
+  const BODY_W = 2.6;
   box(2.5, 0.4, bodyLen - 0.3, darkMat, 0, baseY, 0); // chassis
-  box(2.6, bodyH, bodyLen - noseLen, bodyMat, 0, baseY + bodyH / 2 + 0.12, -noseLen / 2, true);
-  const nose = new THREE.Mesh(_wedgeGeo(2.6, bodyH, noseLen, { frontDrop, frontBack: 0.14 }), bodyMat);
+  box(BODY_W, bodyH, bodyLen - noseLen, bodyMat, 0, baseY + bodyH / 2 + 0.12, -noseLen / 2, true);
+  const nose = new THREE.Mesh(_wedgeGeo(BODY_W, bodyH, noseLen, { frontDrop, frontBack: 0.14 }), bodyMat);
   nose.position.set(0, baseY + bodyH / 2 + 0.12, (bodyLen - noseLen) / 2);
   nose.castShadow = true;
   g.add(nose);
@@ -850,7 +855,9 @@ export function buildVoxelRacer(spec) {
   // eye and draws. The car can stay on screen.
   g.userData.rig = { wheelR, wheelY, baseY, capTop,
     cabY, cabZ, cabH, cabW, cabL,
-    zRear: _box.min.z, zFront: _box.max.z, halfW: _box.max.x };
+    zRear: _box.min.z, zFront: _box.max.z,
+    halfW: _box.max.x,          // bounding box — INCLUDES THE WHEELS
+    bodyHalf: BODY_W / 2 };     // the bodywork itself, for flank mounts
   return g;
 }
 
@@ -872,8 +879,10 @@ export function applyUpgradeKit(group, up = {}) {
   const lv = (k) => (up?.[k] | 0);
   if (!group.userData.rig) return null;
   const { wheelY, baseY, capTop } = group.userData.rig;
-  // Half-width, for anything mounted on the FLANKS rather than the centreline.
-  const halfW = group.userData.rig.halfW ?? 1.3;
+  // Half-width for FLANK mounts — the BODYWORK's, not the bounding box's.
+  // `halfW` includes the wheels (1.8 vs the body's 1.3): hanging the cannon
+  // pods off it put them outboard of the car, floating over the arches.
+  const bodyHalf = group.userData.rig.bodyHalf ?? 1.3;
   // ANCHOR EVERY LENGTHWAYS PART TO AN END OF THE CAR, not to a number.
   // `T(o)` is `o` units forward of the TAIL, `Nz(o)` is `o` back from the NOSE.
   // The reference offsets below are the old constants re-expressed against the
@@ -1005,7 +1014,7 @@ export function applyUpgradeKit(group, up = {}) {
   const can = lv('cannon');
   if (can >= 2) {
     const gunY = baseY + 0.95;              // shoulder line, above the sill
-    const gx = Math.max(0.85, halfW - 0.16); // hugging the body, not floating
+    const gx = bodyHalf - 0.17;             // hugging the body, not floating
     for (const sx of [-1, 1]) {
       // receiver pod
       add(new THREE.BoxGeometry(0.30, 0.30, 0.86), dark, sx * gx, gunY, 0.55);
