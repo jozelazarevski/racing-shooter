@@ -222,14 +222,40 @@ export class Weapons {
     b.owner = car;
     b.dmg = dmg;
     b.life = b.maxLife = 1.1;
+    // WHAT YOU SEE IS WHAT YOU SHOOT — in the seat, at least.
+    //
+    // Reported as "the cannon and the place where it's being shot from are
+    // different". The gun has always fired along the CAR'S HEADING while the
+    // driver's-view camera looks somewhere else: its yaw is blended 34% toward
+    // the direction of TRAVEL (so a slide shows you where the car is actually
+    // going) and it aims at a raised look-point up the road. Those differ by
+    // the whole slip angle in a drift. From a chase boom the gap is behind you
+    // and invisible; from the seat the tracers leave at an angle to the view
+    // and the cannon reads as pointing somewhere you are not.
+    //
+    // So for the PLAYER IN THE SEAT the shot takes the camera's own horizontal
+    // heading. Every other view, and every AI car, keeps firing along the car —
+    // that is what makes a rival's tracer read as coming out of ITS nose.
     const fwd = car.forward;
-    _side.set(fwd.z, 0, -fwd.x);
+    let aimX = fwd.x, aimZ = fwd.z;
+    const gm = this.game;
+    if (car === gm.player && gm.camMode === gm.constructor.DRIVER_MODE && gm.camLook && gm.camPos) {
+      const dx = gm.camLook.x - gm.camPos.x, dz = gm.camLook.z - gm.camPos.z;
+      const m = Math.hypot(dx, dz);
+      if (m > 1e-3) { aimX = dx / m; aimZ = dz / m; }
+    }
+    _side.set(aimZ, 0, -aimX);
     const muzzleSide = (this.head % 2 === 0 ? 0.7 : -0.7);
-    b.pos.copy(car.pos).addScaledVector(fwd, 2.6).addScaledVector(_side, muzzleSide).setY(car.pos.y + 0.85);
+    // The muzzle stays ON THE CAR — tracers leaving the bonnet is correct and
+    // is what sells the gun as bolted to the machine — but it now sits along
+    // the AIM, so the line out of the nose is the line you are pointing.
+    b.pos.copy(car.pos).addScaledVector(_side, muzzleSide)
+      .setY(car.pos.y + 0.85);
+    b.pos.x += aimX * 2.6; b.pos.z += aimZ * 2.6;
     const a = (Math.random() - 0.5) * 2 * spread;
     _bdir.set(
-      fwd.x * Math.cos(a) + fwd.z * Math.sin(a), 0,
-      -fwd.x * Math.sin(a) + fwd.z * Math.cos(a)
+      aimX * Math.cos(a) + aimZ * Math.sin(a), 0,
+      -aimX * Math.sin(a) + aimZ * Math.cos(a)
     );
     b.vel.copy(_bdir).multiplyScalar(BULLET_SPEED).addScaledVector(car.vel, 0.6);
     const player = car === this.game.player;
