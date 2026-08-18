@@ -7,6 +7,13 @@ const check = (n, pass, d = '') => { (pass ? ok : bugs).push(`${n} :: ${d}`); co
 
 const race = async (q) => {
   const page = await b.newPage({ viewport: { width: 820, height: 540 } });
+  // EVERY OTHER CALL IN THIS FILE CARRIES A GENEROUS EXPLICIT TIMEOUT; the
+  // clicks did not, so they used Playwright's 30 s default and this suite died
+  // on `#start-btn` before it ever reached the free-roam assertions. It is not
+  // a slow click — the log shows the button visible, enabled and stable and the
+  // action begun — it is the main thread building a world at the ~1.28 fps this
+  // game renders under swiftshader, with roam's own furniture on top of it.
+  page.setDefaultTimeout(180000);
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto(`http://localhost:8901/${q}`, { waitUntil: 'load', timeout: 45000 });
   await page.waitForFunction(() => window.__game, null, { timeout: 30000 });
@@ -141,6 +148,7 @@ for (const [lvl, what] of [[10, 'rockfall'], [14, 'burning treefall'], [15, 'ici
 {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const page = await ctx.newPage();
+  page.setDefaultTimeout(180000);          // see the note in `race()`
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('http://localhost:8901/?level=1&unlockall=1', { waitUntil: 'load', timeout: 45000 });
   await page.waitForFunction(() => window.__game, null, { timeout: 30000 });
