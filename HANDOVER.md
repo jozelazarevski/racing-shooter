@@ -300,6 +300,24 @@ are recorded here so the next session does not re-derive them.
   shelf clamp addressed. A different discontinuity; the other three worlds
   measure exactly 0.
 
+## DRIVER'S VIEW HAS NO GATE IN THE REPO
+`tests/test-camera.mjs` passes 7/7 with the cockpit shipped, and that is worth
+exactly what it says: the new mode did not break the five old ones. It walks a
+HARDCODED list — `['TOP-DOWN', 'TOP FAR', 'TRAIL', 'CHASE', 'CHASE FAR']`, line
+56 — so it never evaluates DRIVER at all. Do not read that 7/7 as cover for the
+cockpit.
+
+What DOES exist is in the scratchpad, not in `tests/`: a rail sweep of the whole
+lap at three lateral lines, camera equation evaluated at every sample, 2,700
+samples per world on four worlds, 0 below ground (worst clearance 3.03 u, inside
+a bore); and a mid-race switch measured byte-identical on state, lap, raceTime,
+rank, trackIndex, health and all three contract rows.
+
+That sweep is the gate, and it needs porting into `tests/`. Note that DRIVER
+cannot simply be appended to the list above — the existing laws are about
+chase-versus-overhead framing, and "keeps the car at a sane distance" is
+meaningless for an eye inside a car whose mesh is hidden. It wants its own file.
+
 ## DRIVER'S VIEW — ONE UNDIAGNOSED COST, AND IT IS PHONE-RELEVANT
 The cockpit view is usually CHEAPER than chase (renderer.info, same spot, car
 recentred): PINE VALLEY 226 -> 132 calls (-42%), SAFARI PLAINS 195 -> 115
