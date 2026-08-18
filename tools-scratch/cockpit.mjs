@@ -38,7 +38,9 @@ for (const car of (process.env.CARS ?? '0,1,2,3').split(',')) {
     const cam = g.camera, rig = pl.mesh?.userData?.rig;
     // Project every vertex of the player's own meshes and find the topmost
     // one that lands on screen — that is the bodywork horizon.
-    const v = new (window.THREE ?? g.THREE).Vector3();
+    // THREE is a module import, not a global. Borrow the constructor from a
+    // vector the game already owns rather than reaching for window.THREE.
+    const v = new (pl.pos.constructor)();
     let topFrac = 0, onScreen = 0, total = 0;
     pl.mesh.updateWorldMatrix(true, true);
     pl.mesh.traverse((o) => {
