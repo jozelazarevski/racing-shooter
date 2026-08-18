@@ -53,6 +53,59 @@ real time to get right and the next session should not rebuild them.
                 which gate refused each station (start gate / gorge / curvature
                 / tunnelFitAt). Turned "asked 3, got 1" into "panorama refuses
                 212 stations as too curved against CAPE OLIVETO's 59".
+- `tour.mjs`    THE DRIVING TOUR: one shot every 5 s of sim time from the seat
+                the player occupies, HUD included, any world list. The composer
+                is stubbed between shots and restored only for the frame that is
+                captured, so 40 s of driving costs 8 renders and not 2400. Set
+                the camera by NAME (`CAM_NAMES.indexOf('CHASE')`) — CAM_MODES has
+                been reordered before, and the default TOP-DOWN view looks almost
+                straight down, which hides the whole class of defect a tour is
+                looking for.
+- `dialcover.mjs` how much of the player's CAR the speedo dial covers, per camera
+                mode, in PIXELS. Read its header before writing any other
+                screen-space probe: keying the car and thresholding the canvas
+                failed twice in opposite directions — a loose key swallowed PINE
+                VALLEY's lavender sky and reported a car 305 px wide, a tight one
+                reported zero pixels everywhere because tone mapping never emits
+                the key colour. The car is found by DIFFERENCE now (same frame
+                rendered twice, once keyed), which no colour pipeline can defeat.
+- `startlap.mjs` does the start line scold you for crossing it? Hooks
+                `hud.centerMsg` rather than polling `_missedCP`, which is cleared
+                in the frame it is read. Carries its own CONTROL: it cuts a lap
+                on purpose afterwards and asserts that one IS still refused and
+                still scolded.
+- `treegap.mjs` / `standcheck.mjs` — DOES IT STAND ON ANYTHING, by raycast. Both
+                exist because `tests/tool-float-census.mjs` answers a different
+                question (is any geometry in this 2 u column?) and on this roster
+                answers it wrongly three ways: one ribbon mesh spanning a canyon
+                covers every column beneath it, a boat on the sea has only
+                excluded water under it, and a foot-bridge is MEANT to be in the
+                air. All three read as defects. Swept with the ray instead the
+                roster is clean — PINE VALLEY 15 of 743 plants off by more than
+                1 u and every one of them SUNK rather than floating; the named
+                structures left over are start gantries, arch checkpoints,
+                campanile belfries and bridge decks, all of which belong
+                overhead. Read both headers before trusting any floater count:
+                each carries the three wrong answers it produced first, and each
+                was only caught by LOOKING at the picture the number described.
+- `lookat.mjs`  park the camera off a coordinate and render it, so a number can be
+                confirmed by eye before anything is changed on it. Two traps are
+                baked in: `setAnimationLoop` is stopped first (the first cut set
+                the camera and the next rAF handed it back to `_updateCamera`, so
+                every shot came out of the start gantry whatever was asked for),
+                and the eye is seated ABOVE the terrain (a lens buried in a
+                hillside sees culled back faces, and produced a picture of OLIVE
+                PASS with houses and boulders hanging in the sky on a world that
+                turned out to be fine).
+- `groundgap.mjs` the drawn ground against `terrainHeight()` by distance from the
+                road — out where the flora is, not at the carriageway where
+                `tests/tool-ground-mismatch.mjs` asks it. They agree to ~0.5 u
+                mean at every distance out to 1200 u.
+- `similar.py`  WHICH WORLDS LOOK THE SAME, measured (python3, Pillow): each world
+                reduced to a 6x6x6 RGB histogram over the non-HUD part of its
+                tour frames, every pair ranked by 1 - intersection. Median over
+                the 2211 pairs is 0.631; anything under ~0.15 is not a family
+                resemblance, it is one world wearing another's light.
 - `srv.mjs`     plain static server (`node srv.mjs 8920`).
 - `keep.sh`     keeps a server alive across tool-call timeouts:
                 `setsid ./keep.sh srv.mjs 8920 &`
