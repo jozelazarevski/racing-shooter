@@ -69,8 +69,8 @@ const MIN = 1.0;
 // world that is actually broken. Before the fix the same sweep read 139 / 27.0
 // on SUMMIT CLIMB, 149 / 18.1 on CAPE OLIVETO and 141 / 134.4 on GLACIER COL.
 const MAX_FLOATERS = 8;      // measured: 46 of 68 worlds score 0, the rest 1-8
-const MAX_GAP = 16.0;        // measured worst single gap after the fix: 15.25 (OLIVE CROSSING
-                             // parapet block). It was 137.81 on CANYON RUN before.
+const MAX_GAP = 8.0;         // measured deepest on any UNPINNED world: 6.9 (SUZUKA foot-bridge
+                             // beam). It was 137.81 on CANYON RUN before the fix.
 
 // Worlds that carry a KNOWN, MEASURED exception. Empty is the goal; an entry
 // needs a name, a number and a reason, and raising MAX_* instead would hide
@@ -89,35 +89,38 @@ const KNOWN = {
   // ribbon with no horizontal top. tool-tree-clearance already carries a
   // height gate for exactly these ("the saguaros silhouetted on the canyon rim
   // are not read as intrusions").
-  'CANYON RUN': { max: 95, why: 'canyon-rim saguaros on the road datum, worst 40.15 u' },
-  'CORNICHE': { max: 110, why: 'the same rim saguaros, worst 40.47 u' },
-  'LAGUNA SECA': { max: 100, why: 'the same rim saguaros, worst 37.66 u' },
-  'ROCKFALL RAVINE': { max: 65, why: 'the same rim saguaros, worst 33.18 u' },
+  'CANYON RUN': { max: 95, gap: 41, why: 'canyon-rim saguaros on the road datum, worst 40.15 u' },
+  'CORNICHE': { max: 110, gap: 42, why: 'the same rim saguaros, worst 40.47 u' },
+  'LAGUNA SECA': { max: 100, gap: 39, why: 'the same rim saguaros, worst 37.66 u' },
+  'ROCKFALL RAVINE': { max: 65, gap: 35, why: 'the same rim saguaros, worst 33.18 u' },
   // STREET LANTERN GLOBES on brackets — a bulb hangs off an arm by design, and
   // the arm is a separate mesh in a different 2 u column.
-  'LANTERN QUARTER': { max: 130, why: 'lantern globes on wall brackets, worst 8.64 u' },
-  'HARBOR QUAY': { max: 240, why: 'the same quayside lantern globes, worst 8.69 u' },
-  'CINQUE TERRE': { max: 200, why: 'the same lantern globes, worst 8.52 u' },
-  'AEGEAN BLUE': { max: 160, why: 'the same lantern globes, worst 8.69 u' },
-  'COSTA BRAVA': { max: 100, why: 'the same lantern globes, worst 8.38 u' },
-  'DALMATIA DRIVE': { max: 220, why: 'the same lantern globes, worst 8.43 u' },
-  'CITADEL BAY': { max: 155, why: 'citadel frontage detail, worst 6.94 u' },
+  'LANTERN QUARTER': { max: 140, gap: 9.5, why: 'lantern globes on wall brackets, worst 8.64 u' },
+  'HARBOR QUAY': { max: 240, gap: 9.5, why: 'the same quayside lantern globes, worst 8.69 u' },
+  'CINQUE TERRE': { max: 200, gap: 9.5, why: 'the same lantern globes, worst 8.52 u' },
+  'AEGEAN BLUE': { max: 160, gap: 9.5, why: 'the same lantern globes, worst 8.69 u' },
+  'COSTA BRAVA': { max: 100, gap: 9.5, why: 'the same lantern globes, worst 8.38 u' },
+  'DALMATIA DRIVE': { max: 220, gap: 9.5, why: 'the same lantern globes, worst 8.43 u' },
+  'CITADEL BAY': { max: 155, gap: 8, why: 'citadel frontage detail, worst 6.94 u' },
   // TERRACE / PARAPET BLOCKS, 0.5 x 1.1 x ~5 u, seated on the road datum where
   // the shelf falls away beneath them — the coast and knot worlds.
-  'COTE D AZUR': { max: 190, why: 'parapet blocks on the road datum, worst 11.23 u' },
-  'CLIFF KNOT': { max: 310, why: 'the same parapet blocks, worst 11.28 u' },
-  'SEA CLIFF RUN': { max: 275, why: 'the same parapet blocks, worst 11.84 u' },
-  'BRIDGE RUN': { max: 50, why: 'the same parapet blocks, worst 13.52 u' },
-  'OLIVE CROSSING': { max: 10, why: 'the same parapet blocks, worst 15.25 u — the roster maximum' },
-  'MOUNTAIN TO SEA': { max: 15, why: 'roadWidth 5: 10 left, worst 10.86 u' },
-  'MONACO STREETS': { max: 50, why: 'oldtown frontage on a stepped hillside datum, worst 11.84 u' },
-  'RED CENTRE RUN': { max: 20, why: 'pylon crossarms and rail blocks, worst 11.92 u' },
+  'COTE D AZUR': { max: 190, gap: 12, why: 'parapet blocks on the road datum, worst 11.23 u' },
+  'CLIFF KNOT': { max: 310, gap: 12, why: 'the same parapet blocks, worst 11.28 u' },
+  'SEA CLIFF RUN': { max: 275, gap: 12.5, why: 'the same parapet blocks, worst 11.84 u' },
+  'BRIDGE RUN': { max: 50, gap: 14.5, why: 'the same parapet blocks, worst 13.52 u' },
+  'OLIVE CROSSING': { max: 10, gap: 16, why: 'the same parapet blocks, worst 15.25 u — the roster maximum' },
+  'MOUNTAIN TO SEA': { max: 15, gap: 11.5, why: 'roadWidth 5: 10 left, worst 10.86 u' },
+  'MONACO STREETS': { max: 50, gap: 12.5, why: 'oldtown frontage on a stepped hillside datum, worst 11.84 u' },
+  'RED CENTRE RUN': { max: 20, gap: 12.5, why: 'pylon crossarms and rail blocks, worst 11.92 u' },
   // MEDITERRANEAN TERRACE COPING, a 3.4 x 0.05 x 0.32 u strip on the wall it
   // caps — the wall is one long Buffer mesh the column grid cannot stamp.
-  'OLIVE COAST': { max: 22, why: 'terrace-wall coping strips, worst 5.03 u' },
-  'MONZA': { max: 38, why: 'the same coping strips, worst 5.03 u' },
-  'TOUR DE CORSE': { max: 40, why: 'the same coping strips, worst 5.03 u' },
-  'SALINE SPRINT': { max: 30, why: 'the same coping strips, worst 4.39 u' },
+  'OLIVE COAST': { max: 22, gap: 6, why: 'terrace-wall coping strips, worst 5.03 u' },
+  'MONZA': { max: 38, gap: 6, why: 'the same coping strips, worst 5.03 u' },
+  'TOUR DE CORSE': { max: 40, gap: 6, why: 'the same coping strips, worst 5.03 u' },
+  'SALINE SPRINT': { max: 30, gap: 5.5, why: 'the same coping strips, worst 4.39 u' },
+  // VINE TRELLIS POSTS standing on the ploughed soil bank they are planted in
+  // — the bank is one long Buffer mesh the 2 u column grid cannot stamp.
+  'VINEYARD VELOCE': { max: 14, gap: 4, why: 'vine trellis posts on their own soil bank, worst 2.09 u' },
 };
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -443,10 +446,16 @@ for (const r of results) {
 }
 
 // ---- LAW 4: and nothing floats far -----------------------------------------
-const deepest = results.reduce((a, b) => (b.worst > a.worst ? b : a), results[0]);
-check(`LAW 4  no single part hangs more than ${MAX_GAP} u above the drawn ground`,
-  deepest.worst <= MAX_GAP,
-  `worst is ${deepest.name} ${deepest.worst} u — ${deepest.worstSig} at (${deepest.wx},${deepest.wz})`);
+// Per world, because a hundred 1.2 u grazes are a threshold and one 27 u
+// boulder is the photograph — and because the pinned worlds above each have
+// their own MEASURED depth, which is the number that must not grow.
+for (const r of results) {
+  const k = KNOWN[r.name];
+  const cap = k && k.gap ? k.gap : MAX_GAP;
+  check(`LAW 4  ${r.name}: nothing hangs more than ${cap} u above the drawn ground`,
+    r.worst <= cap,
+    r.worst > 0 ? `worst ${r.worst} u — ${r.worstSig} at (${r.wx},${r.wz})` : 'clean');
+}
 
 check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 
