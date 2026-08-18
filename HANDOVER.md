@@ -1,6 +1,6 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r210, deployed and live, tree clean.
+State at handover: `main` = r219, deployed and live, tree clean.
 Live: https://jozelazarevski.github.io/racing-shooter/
 
 ## THE ONE DEFECT THIS REPO KEEPS SHIPPING
@@ -144,6 +144,15 @@ only that way: the gantry that moved DEEPER into the road (4.52 -> 7.59 u), and
   (`setsid node tools-scratch/srv.mjs 8901 &`) before believing any of them.
 - `pgrep -f 'ab\.mjs'` also matches `srvlab.mjs`. Killing probes has killed the
   static server mid-run more than once. Use `scratchpad/keep.sh`.
+  The same trap in its other form: `pkill -f "test-river.mjs|..."` matches the
+  SHELL RUNNING THAT VERY COMMAND, so it kills the run it just started along
+  with every wait-loop watching for it. Don't reach for `pkill` with a pattern
+  that could match your own command line.
+- **`kill -0 $!` after `nohup ... &` races.** `$!` is the wrapper, not node, so
+  an `until ! kill -0 $PID` loop can fall through while the test is still
+  running — it reported test-river "finished" with 15 PASS and no closing line,
+  which reads exactly like a crash. Wait on a marker file the job writes when
+  it is genuinely done (`... ; echo ALLDONE > sweep.done`).
 - **Version bump is 4 sites in index.html + 1 in sw.js**: `sed -i
   's/rNNN/rNNN+1/g' index.html && sed -i 's/rNNN/rNNN+1/' sw.js`. The service
   worker caches by version name; without the bump the deploy serves the old
@@ -360,6 +369,79 @@ PINE VALLEY sample 600.
 Also honest, and by design: on a bend the cockpit shows materially LESS of the
 corner than chase. That is inherent to a 2.7 u eye and is why it is a toggle.
 
+## THE RIVER LAY ACROSS THE ROAD ("River in the bridge??")
+
+A river crosses a road in exactly two ways and the game modelled one of them.
+At a planned FORD the wash sits on the deck; everywhere else it must pass UNDER
+the embankment. `_buildRiver`'s culvert rule suppressed the containment RAISE
+at a non-ford crossing — so nothing LIFTED the water onto the tarmac — but
+nothing pushed it down either, so wherever the reach's own level already sat
+above the road, the ribbon simply lay across it. Measured over the roster as
+water standing proud of the carriageway far from any ford:
+
+    PIKES PEAK       +5.24 u   293 u from a ford   73 water verts on the road
+    REDWOOD RAMPAGE  +2.45 u    73 u               34
+    SUZUKA           +1.72 u    35 u              103
+    SPA              +0.89 u   204 u               22
+
+Everything else measured 0.1-0.3 u over the deck within 3-7 u of a ford, which
+is the wash doing its job. Fixed in `_planRiver` by capping the BED under the
+road at genuine crossings — the bed is the one array the carve, the stepped
+rock faces and the water profile all derive from, so they move together.
+After: PIKES PEAK -1.80, SPA -1.69, REDWOOD and SUZUKA's worst points are now
+inside 22 u of a planned ford. Nothing on the roster stands over a road it does
+not ford.
+
+### What this cost, and three wrong answers on the way
+
+- **"Distance to the road < 30" is not a crossing.** It caught the reach
+  running ALONGSIDE the PIKES PEAK switchbacks and capped the bed to a lower
+  leg's deck.
+- **Nor is "a LOCAL MINIMUM of that distance".** Measured, that reach hugs the
+  road from station 328 to 376 at 3-28 u, dipping in and out a dozen times,
+  while the legs it passes sit between -22.7 and +10.1. **A local minimum of a
+  distance is still a proximity.** The test that works is a SIGN CHANGE in the
+  offset along the road normal — did the river go from one side to the other —
+  which is the same reasoning `_planOverpasses` uses.
+- **The descent must be graded on distance to the ROAD, not to the crossing.**
+  The carve fades over `smoothstep(dRoad, 9, 22)` so the roadbed survives, so a
+  bed step inside 22 u of the road is a step the ground does NOT take: water
+  with daylight under its lip. Grading on distance-from-crossing failed PINE
+  VALLEY at 4.5 u proud, and the `rd: 22` in that failure was the whole
+  explanation.
+
+`UNDER` is 0.5 and should stay small. At 1.2 it deepened an EXISTING waterfall
+on PINE VALLEY — the cap lowered the reach below the fall and the ground with
+it, but not the reach above — so the fall grew 2.04 -> 2.97 u and its lip
+measured 4.59 u proud against test-river's 4.1 u ceiling. Every extra unit of
+clearance is paid for at some fall downstream.
+
+### The one regression, accepted deliberately
+
+PIKES PEAK's ford 0 was wet by 0.11 u and now reads dry. The reach crosses the
+road at a deck of -22.7 (verified a real crossing: the signed offset flips
++6.8 -> -4.1 between stations 374 and 373) and that ford was planned 47
+stations downstream on a deck at -9.9. Water cannot be under the first and on
+top of the second. It was only ever wet because the river had been hoisted over
+that road — an 11 u wall of water — to reach it.
+
+Nothing applies river physics to dry tarmac (`vehicles.js` asks the WATER, not
+`track.fords`). What remains is the ford's foam and apron furniture on a
+crossing with no water in it, which is the pre-existing condition already
+recorded against `_buildFords`. **The fix belongs in the ford PLANNER — it
+should not site a crossing the river cannot reach** — and NOT by dropping fords
+after the fact, because the editor's authored crossings are contractually
+guaranteed to exist (`tests/test-river-tool.mjs` asserts `fordsAfter === 2`).
+
+### The gates for this area
+`tests/test-river.mjs` and `tests/test-water.mjs` are the guards and both are
+sensitive to it — test-river caught two of the three wrong answers above.
+`tools-scratch/waterroad.mjs` measures the property roster-wide (water inside
+the carriageway, at or above the deck, with distance to the nearest ford and
+stone bridge); `tools-scratch/fordwet.mjs` diffs ford wetness against a
+pristine worktree on a second port, which is the only thing that separates
+"this ford is dry now" from "this ford was always dry".
+
 ## OPEN, LOWER PRIORITY
 - **`MIN` in `tunnelFitAt` is probably the same units error `reach` was.** The
   real minimum bore measures ~52 u against a documented ~26 u. Nothing depends
@@ -369,13 +451,28 @@ corner than chase. That is inherent to a 2.7 u eye and is why it is a toggle.
   r202/r203 detail pass; trees did not.
 - **`element-prism` bucket roof tiling** needs a neutral-map and gamma decision
   before `roofTileTexture` can be wired into it.
-- **`stoneBridges` BUILDS NOTHING ON ANY WORLD.** Measured once
-  `_buildStoneBridges` tagged its group `stone-bridge`: OLIVE COAST asked 1,
-  CAPE OLIVETO 1, TERRAZZA ALTA 3, GLACIER COL 2 — all built ZERO, and there is
-  no positive control anywhere on the roster. The placement wants a 4.5 u drop
-  beside a station under 0.01 curvature, 60 clear of a gorge and 90 clear of
-  the gate. Fix belongs in the builder (loosen the drop, or take the best
-  candidate rather than a threshold), not in the four call sites.
+- **`stoneBridges` BUILDS NOTHING ON *THOSE* WORLDS — but the roster does have
+  a positive control.** The old entry here said it built zero everywhere and
+  that no positive control existed. That is wrong: measured by counting
+  `stone-bridge` groups, the three FARMLAND worlds each build both bridges they
+  ask for — HEDGEROW DASH 2, SILVERSTONE 2, OULTON PARK 2. The worlds that
+  build zero are OLIVE COAST (asked 1), CAPE OLIVETO (1), TERRAZZA ALTA (3),
+  GLACIER COL (2). The placement wants a 4.5 u drop beside a station under 0.01
+  curvature, 60 clear of a gorge and 90 clear of the gate.
+  AND THE REASON MATTERS, because it kills the obvious fix. On the worlds that
+  DO build, the 4.5 u dip is the RIVER VALLEY — measured, the deepest non-river
+  candidate on HEDGEROW DASH is 2.2 u, on SILVERSTONE 2.0, on CAPE OLIVETO 1.3.
+  So "loosen the drop until every world gets its bridges" buys bridges over
+  nothing. A stone bridge belongs over the river; the thing worth fixing is
+  that those four worlds have no river valley near a straight, and that is a
+  ROUTE question, not a threshold.
+  Note also that every farmland bridge lands ON a planned ford (2.0-5.4 u).
+  That reads like a contradiction — a ford is a wash, a bridge is a span — and
+  it was tried as one: excluding ford sites took HEDGEROW DASH and SILVERSTONE
+  from two bridges to ZERO, for the reason above. It is not a contradiction on
+  those worlds, because the road there genuinely bridges a 35-38 u ravine with
+  the river at the bottom; what is wrong is that the FORD PLANNER sited a
+  crossing on a deck 38 u above the water. See the river section.
 - **`rampCount: 0` MEANS "DEFAULT", NOT "NO JUMPS".** Prop ramps are gone
   game-wide (`_buildRamps` sets `this.ramps = []` and returns). The knob now
   only feeds `_buildCrests`, read as `(this.T.rampCount || 3) + 3` — and 0 is

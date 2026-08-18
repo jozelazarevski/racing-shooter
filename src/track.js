@@ -6451,6 +6451,156 @@ export class Track {
       }
       return s / n;
     });
+    // AWAY FROM A FORD, THE RIVER GOES UNDER THE ROAD — AND THE BED IS WHAT
+    // PUTS IT THERE.
+    //
+    // A river crosses a road in exactly two ways: at a planned FORD the wash
+    // sits on the deck, and everywhere else it passes UNDER the embankment.
+    // Only the first of those was ever built. `_buildRiver`'s culvert rule
+    // suppresses the containment RAISE at a non-ford crossing, which stops the
+    // water being lifted onto the carriageway — but nothing pushed it down, so
+    // wherever the reach's own level already sat above the road, the ribbon
+    // simply lay across the tarmac. Reported as "River in the bridge??", and
+    // measured over the roster as water standing proud of the carriageway at a
+    // crossing hundreds of units from the nearest ford:
+    //
+    //     PIKES PEAK       +5.24 u   293 u from a ford   73 verts on the road
+    //     REDWOOD RAMPAGE  +2.45 u    73 u               34
+    //     SUZUKA           +1.72 u    35 u              103
+    //     SPA              +0.89 u   204 u               22
+    //
+    // (Everything else on the roster measured 0.1-0.3 u over the deck within
+    // 3-7 u of a planned ford, which is the wash doing exactly its job.)
+    //
+    // THE CAP BELONGS HERE, ON THE BED, not on the finished water. The bed is
+    // the one array the carve, the stepped rock faces and the water profile
+    // are all derived from, so lowering it takes the channel, the fall's rock
+    // face and the surface down together — they cannot disagree. Clamping the
+    // surface in `_buildRiver` instead would drop the water and leave the rock
+    // where it was, which is the "lip hanging in the air with daylight under
+    // it" defect this file has already been through twice.
+    //
+    // WHY 0.5 u, AND NOT MORE. The staircase below quantises the bed upward by
+    // up to FALL (a station holds its reach until the bed has fallen 1.1 u
+    // beneath it) and the water then sits `depth * 0.58` = 1.51 u under that,
+    // so a cap of deck - UNDER puts the surface at worst UNDER + 0.41 below
+    // the deck — 0.9 u here, which is inside the embankment and invisible.
+    //
+    // Every extra unit is paid for somewhere else. This shipped at 1.2 and the
+    // extra 0.7 u deepened an EXISTING waterfall on PINE VALLEY: the cap
+    // lowered the reach below the fall (and the ground with it, correctly) but
+    // not the reach above it, so the fall grew 2.04 -> 2.97 u and its lip —
+    // which by construction stands at the upstream level over downstream
+    // ground — measured 4.59 u proud against test-river's 4.1 u ceiling
+    // (2.6 of channel depth plus 1.5 of step). The cap only has to hide the
+    // water under the road, so it is sized for exactly that and no more.
+    //
+    // The window reaches past the carve's own fade (`smoothstep(d, 9, 22)` on
+    // distance to the road): the bed steps down where the cap starts biting,
+    // and out there the carve is still at full strength, so those steps get a
+    // real rock face. Bring them inside the fade and the falls would stand
+    // with nothing behind them.
+    //
+    // AND A CROSSING IS A PLACE, NOT A PROXIMITY — the same distinction PASS 2
+    // of _buildRiver had to learn, in the other direction, and it took two
+    // wrong answers here before the right test.
+    //
+    //   "distance to the road < 30" caught the river running ALONGSIDE the
+    //   switchbacks on PIKES PEAK and dragged the bed down to a lower leg.
+    //
+    //   "a LOCAL MINIMUM of that distance" was no better: measured, the reach
+    //   hugs that road from station 328 to 376 at 3-28 u without ever leaving
+    //   it, dipping in and out a dozen times, while the legs it passes sit
+    //   anywhere from -22.7 to +10.1. Every dip read as a crossing, the cap
+    //   took the lowest of them, and the running minimum carried -23.9 into a
+    //   genuine ford 46 u downstream — ford 0 wet at -0.11 u before, dry at
+    //   -15.5 u after. A local minimum of a distance is still a proximity.
+    //
+    // The question is not how close the river gets. It is whether the river
+    // goes from ONE SIDE OF THE ROAD TO THE OTHER, so the test is a sign
+    // change in the signed offset along the road normal — the same
+    // side-of-the-line reasoning `_planOverpasses` uses to find where the
+    // circuit crosses itself. A reach running parallel keeps its sign however
+    // near it comes; a reach that crosses cannot help but flip it.
+    // WHAT THIS COSTS, STATED. The cap can only ever LOWER the bed, and the
+    // running minimum then carries it downstream — water that has dropped
+    // cannot climb back. On PIKES PEAK the road descends into a hollow at
+    // -22.7 where the reach crosses it (verified as a real crossing: the
+    // signed offset flips +6.8 -> -4.1 between stations 374 and 373), while a
+    // ford was planned 47 stations downstream on a deck at -9.9. The water
+    // cannot be under the first and on top of the second, so that ford now
+    // reads dry where it used to be wet by 0.11 u.
+    //
+    // That trade is deliberate. What it replaced was an 11 u wall of water
+    // standing over the carriageway at the crossing — the reported defect —
+    // and the ford was only ever wet because the river had been hoisted over
+    // that road to reach it. A dry crossing is also the condition the rest of
+    // the machinery already expects: the wet-tyre and splash handling asks the
+    // WATER rather than this list (see vehicles.js), so nothing applies river
+    // physics to dry tarmac. What remains is the ford's own foam and apron
+    // furniture on a crossing with no water in it, which is the pre-existing
+    // condition already recorded against `_buildFords` — worth fixing at the
+    // ford PLANNER (it should not site a crossing the river cannot reach), and
+    // not by dropping fords here, because the editor's authored crossings are
+    // contractually guaranteed to exist (tests/test-river-tool.mjs).
+    const FORD_KEEP = 46;             // matches _buildRiver's own ford window
+    const UNDER = 0.5;
+    const CULV = 90;                  // room for the graded approach below
+    const dRoad = line.map((q) => this._distToTrackCoarse(q.x, q.z));
+    const _capV = new THREE.Vector3();
+    const sideAt = (q) => {
+      _capV.set(q.x, 0, q.z);
+      const i = this.nearestIndex(_capV);
+      const c = this.center[i], n = this.nrm[i];
+      return { i, s: (q.x - c.x) * n.x + (q.z - c.z) * n.z };
+    };
+    let prev = sideAt(line[0]);
+    for (let k0 = 1; k0 < line.length; k0++) {
+      const cur = sideAt(line[k0]);
+      const was = prev;
+      prev = cur;
+      // both ends must belong to the SAME piece of road: where the nearest
+      // sample jumps to another leg the sign change is bookkeeping, not a
+      // crossing
+      if (this._circDist(was.i, cur.i) > 20) continue;
+      if (was.s === 0 || was.s * cur.s > 0) continue;            // same side: alongside
+      const p0 = line[k0];
+      // a planned ford is the declared exception: there the wash IS the deck
+      let fd = Infinity;
+      for (const fdd of order) {
+        const c = this.center[fdd.i];
+        if (c) fd = Math.min(fd, Math.hypot(p0.x - c.x, p0.z - c.z));
+      }
+      if (fd < FORD_KEEP) continue;
+      const cap = this.center[cur.i].y - UNDER;                  // the leg actually crossed
+      // AND THE DESCENT IS GRADED ON DISTANCE TO THE ROAD, because that is
+      // what decides whether the GROUND follows the bed down.
+      //
+      // Applying `cap` flat over the window put the whole descent into ONE
+      // fall, and a fall's lip may stand a channel depth plus a step above the
+      // ground: a 14 u step measured 4.13 u proud on LOG FLUME FURY against
+      // the 4.1 u ceiling tests/test-river.mjs enforces. Grading it lets the
+      // staircase below split the descent into FALL-sized steps instead.
+      //
+      // Grading on distance from the CROSSING then failed PINE VALLEY at 4.5 u
+      // proud, and the `rd: 22` in that failure is the whole explanation: the
+      // carve fades out over `smoothstep(dRoad, 9, 22)` so the roadbed
+      // survives, so a bed step inside 22 u of the road is a step the ground
+      // does not take — water with daylight under its lip. The steps have to
+      // land where the carve is at full strength, which is a statement about
+      // distance to the ROAD, not distance to the crossing.
+      //
+      // So: full cap inside 26 u of the road (clear of the fade, and wide
+      // enough to cover the carriageway itself, which is where the water must
+      // be under the deck), then graded out to 60 u where every step gets a
+      // real rock face behind it.
+      for (let k = 0; k < smooth.length; k++) {
+        if (Math.hypot(line[k].x - p0.x, line[k].z - p0.z) > CULV) continue;
+        const ramp = 1 - THREE.MathUtils.smoothstep(dRoad[k], 26, 60);
+        smooth[k] = Math.min(smooth[k], smooth[k] * (1 - ramp) + cap * ramp);
+      }
+    }
+
     // walk downhill from whichever end is higher so the profile never climbs
     const flowsForward = smooth[0] >= smooth[smooth.length - 1];
     const bed = smooth.slice();
