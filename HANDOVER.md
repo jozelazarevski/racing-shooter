@@ -433,6 +433,24 @@ should not site a crossing the river cannot reach** — and NOT by dropping ford
 after the fact, because the editor's authored crossings are contractually
 guaranteed to exist (`tests/test-river-tool.mjs` asserts `fordsAfter === 2`).
 
+### The residual, from the full 67-world census after the fix
+
+Nothing on the roster stands over a road it does not ford. Every remaining
+positive is inside a planned ford's own approach, and all but one are 0.1-0.3 u
+— the wash lying on the deck, which is the feature:
+
+    AMAZON RAPIDS +0.14 @5u   REDWOOD +0.23 @22u   FAFE LEAP +0.27 @6u
+    RED CENTRE   +0.10 @7u    RED BULL +0.21 @4u   NORDSCHLEIFE +0.45 @6u
+    RALLYCROSS   +0.19 @7u
+
+The one outlier is **SUZUKA, +1.72 u at 35 u from its ford** — unchanged by
+this work (the before and after renders at (-176,-45) are pixel-identical), so
+it is pre-existing, not a regression. 35 u is inside `FORD_KEEP`, so the ford
+lift is still 84 % applied there and the cap deliberately does not touch it.
+Whether a ford approach should be allowed to stand 1.7 u proud of the deck 35 u
+out is a question for the FORD LIFT's own blend (`smoothstep(fordDist, 30, 46)`
+in `_buildRiver` PASS 2), not for the culvert cap.
+
 ### The gates for this area
 `tests/test-river.mjs` and `tests/test-water.mjs` are the guards and both are
 sensitive to it — test-river caught two of the three wrong answers above.
