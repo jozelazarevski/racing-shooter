@@ -381,8 +381,14 @@ export function buildVoxelRacer(spec) {
   // ABOVE, the header from BELOW, the pillars edge-on. Nothing needs
   // DoubleSide, so nothing can leak out through the shell from a chase camera.
   {
-    const inner = mat(0x141210, { roughness: 0.85, metalness: 0.05 });
-    const trim = mat(0x2a2622, { roughness: 0.7, metalness: 0.12 });
+    // NOT NEAR-BLACK. At 0x141210 under an overcast sky the dash rendered as a
+    // VOID: measured on REDWOOD RAMPAGE, the frame simply stopped at the
+    // scuttle line and rows 67-100% were flat black, which reads as a hole in
+    // the picture rather than as the inside of a car. A real dash top is matte
+    // mid-grey that catches the sky, so these sit at roughly the road's own
+    // brightness and the lower frame becomes part of the car.
+    const inner = mat(0x4a463f, { roughness: 0.92, metalness: 0.02 });
+    const trim = mat(0x5d564c, { roughness: 0.8, metalness: 0.08 });
     const cockpit = new THREE.Group();
     cockpit.name = 'cockpit';
     const put = (w, h, d, m, x, y, z, rx = 0) => {

@@ -9959,7 +9959,10 @@ export class Track {
       // and ESTONIA CRESTS. The gate's AIRBORNE list already covers `arch`;
       // it simply had no name to match.
       const arch = new THREE.Group();
-      arch.name = 'checkpoint-arch';
+      // `arch-` PREFIXED, because the census's AIRBORNE pattern is ANCHORED
+      // (`/^(...|arch|...)/`): 'checkpoint-arch' starts with 'checkpoint' and
+      // matched nothing, which is how it stayed on the list after being named.
+      arch.name = 'arch-checkpoint';
       for (const side of [1, -1]) {
         const px = c.x + n.x * (deckW + 0.9) * side, pz = c.z + n.z * (deckW + 0.9) * side;
         const post = new THREE.Mesh(new THREE.BoxGeometry(1.3, 8.6, 1.3), darkWood);
