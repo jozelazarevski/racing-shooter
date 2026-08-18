@@ -9,7 +9,13 @@ import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
-const p = await b.newPage({ viewport: { width: 430, height: 932 } });
+// THE GAME AREA, NOT THE DEVICE. Safari's address bar and toolbar take ~130 px
+// of a 430x932 phone, so the canvas the player actually sees is about 430x800.
+// Every shot so far was taken at the full device height, which is NOT what is
+// on the phone — a taller frame flatters a view whose furniture sits at the
+// bottom, because there is more middle for the road to live in.
+const VW = +(process.env.VW ?? 430), VH = +(process.env.VH ?? 800);
+const p = await b.newPage({ viewport: { width: VW, height: VH } });
 p.setDefaultTimeout(600000);
 await p.goto(`${BASE}/?level=1&go=1&unlockall=1`, { waitUntil: 'load', timeout: 600000 });
 await p.waitForFunction(() => window.__game?.track?.center && window.__game.player, undefined, { timeout: 600000 });
@@ -37,7 +43,7 @@ for (const add of (process.env.FOVS ?? '6,12,18,24').split(',')) {
     const grab = () => {
       const src = g.renderer?.domElement ?? document.querySelector('canvas');
       const c2 = document.createElement('canvas');
-      c2.width = 215; c2.height = 466;
+      c2.width = 215; c2.height = Math.round(215 * (window.innerHeight / window.innerWidth));
       const cx = c2.getContext('2d');
       cx.drawImage(src, 0, 0, c2.width, c2.height);
       return { d: cx.getImageData(0, 0, c2.width, c2.height).data, w: c2.width, h: c2.height };
