@@ -396,35 +396,50 @@ export function buildVoxelRacer(spec) {
       q.position.set(x, y, z); if (rx) q.rotation.x = rx;
       cockpit.add(q); return q;
     };
-    const fz = cabZ + cabL / 2;          // the windscreen end of the cabin
-    // THE APERTURE. Everything below frames this rectangle and nothing crosses
-    // it: half-width 0.44 of the cabin, from 0.06 below centre to 0.42 above.
-    const apW = cabW * 0.44, apLo = cabY - cabH * 0.06, apHi = cabY + cabH * 0.42;
-    // DASH — a shallow lip along the BOTTOM edge of the aperture, tilted away.
-    // Deep dashes are what buried the road last time; this is 0.09 thick.
-    put(apW * 2, 0.09, 0.30, inner, 0, apLo - 0.045, fz - 0.20, -0.22);
-    // the scuttle line that makes it read as a windscreen rather than a hole
-    put(apW * 2 + 0.04, 0.045, 0.07, trim, 0, apLo + 0.01, fz - 0.05);
-    // A-PILLARS down the two SIDE edges, raked with the screen
+    // ---- PLACED AROUND THE EYE, NOT AROUND THE CABIN BOX ------------------
+    //
+    // The previous cut hung everything off the windscreen end of the cabin
+    // (`fz`), and the eye sits at `cabZ + cabL * 0.38`. On a 2 u cabin that put
+    // the dash 0.04 u in front of the driver's face — closer than the near
+    // plane — so the entire interior was clipped away every frame and hiding it
+    // changed the render by exactly nothing. Measured twice before that was
+    // noticed.
+    //
+    // These proportions are STYLISED: the cabin is 0.74 u tall on a 6 u car,
+    // where a real greenhouse is nearer a fifth of the body. So the furniture
+    // cannot sit at scale distances from a scale eye — it is placed at the
+    // distances that READ, forward of the eye and clear of the near plane,
+    // which is what a cockpit view needs to be built from in the first place.
+    const eyeZ = cabZ + cabL * 0.38;       // the seat (see _driverTune, main.js)
+    const eyeY = cabY + cabH * 0.18;
+    const AHEAD = 0.85;                    // well clear of the 0.12 near plane
+    // DASH — a wide, shallow slab under the sight line, tilted away.
+    put(cabW * 1.02, 0.14, 0.62, inner, 0, eyeY - 0.34, eyeZ + AHEAD, -0.20);
+    // the scuttle lip along its far edge: the line that reads as a windscreen
+    put(cabW * 1.02, 0.06, 0.10, trim, 0, eyeY - 0.26, eyeZ + AHEAD + 0.30);
+    // instrument binnacle, on the driver's side
+    put(cabW * 0.36, 0.10, 0.30, trim, -cabW * 0.17, eyeY - 0.26, eyeZ + AHEAD - 0.12, -0.30);
+    // A-PILLARS — brought inboard so they frame the aperture at this FOV
+    // instead of sitting outside it, and raked back the way a screen is.
     for (const sgn of [-1, 1]) {
-      put(0.085, (apHi - apLo) + 0.10, 0.10, inner, sgn * apW, (apLo + apHi) / 2, fz - 0.10, 0.26);
+      put(0.09, cabH * 0.98, 0.10, inner, sgn * cabW * 0.40, eyeY + 0.12, eyeZ + AHEAD + 0.18, 0.24);
     }
-    // HEADER along the TOP edge only. NOTHING is modelled behind it: a roof
-    // lining sits directly above a seated eye and fills the upper third.
-    put(apW * 2 + 0.04, 0.075, 0.12, inner, 0, apHi + 0.04, fz - 0.09);
-    // STEERING WHEEL — low and offset, so it sits under the road rather than
-    // across it. Turned each frame by the camera (see _driverCamera).
+    // HEADER along the top of the screen. Nothing behind it: a roof lining over
+    // a seated eye fills the upper third (measured, first cut).
+    put(cabW * 0.94, 0.08, 0.14, inner, 0, eyeY + cabH * 0.52, eyeZ + AHEAD + 0.10);
+    // STEERING WHEEL — closer than the dash and lower, so it sits under the
+    // road rather than across it. Turned each frame by the camera.
     const wheel = new THREE.Group();
     wheel.name = 'wheel';
-    wheel.add(new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.026, 8, 20), inner));
+    wheel.add(new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.025, 8, 20), inner));
     for (const a of [0, 2.094, 4.189]) {
-      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.024, 0.024), trim);
-      spoke.position.set(Math.cos(a) * 0.11, Math.sin(a) * 0.11, 0);
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.022, 0.022), trim);
+      spoke.position.set(Math.cos(a) * 0.10, Math.sin(a) * 0.10, 0);
       spoke.rotation.z = a;
       wheel.add(spoke);
     }
-    wheel.position.set(-cabW * 0.17, apLo - 0.20, fz - 0.52);
-    wheel.rotation.x = Math.PI / 2 - 0.38;
+    wheel.position.set(-cabW * 0.17, eyeY - 0.46, eyeZ + 0.42);
+    wheel.rotation.x = Math.PI / 2 - 0.40;
     cockpit.add(wheel);
     cockpit.visible = false;                    // the seat turns it on
     g.userData.cockpit = cockpit;
