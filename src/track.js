@@ -162,11 +162,25 @@ export const LEVELS = [
       hemiSky: 0xdcd0e4, hemiGround: 0x7a8a62,
       fogColor: 0xe4e0da, fogNear: 170, fogFar: 1150, cloudCount: 14, cloudOpacity: 0.55, japan: { torii: 5, pagodas: 3 }, elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
   { id: 38, name: 'NORDSCHLEIFE', theme: 'forest', route: 'nordschleife', region: 'GRAND CIRCUITS',
-    cost: 10, fresh: true, tune: { // EIFEL FIRST LIGHT: cold mist in the hollows
-      sunColor: 0xffdcae, sunIntensity: 2.0, sunEl: 0.17, sunAz: 2.05,
+    // EIFEL FIRST LIGHT: cold mist in the hollows.
+    //
+    // AND EARLY IS NOT UNLIT. The first cut of this took the "first light" idea
+    // literally — sun 18 u up the sky at `sunEl` 0.17, the roster's lowest, and
+    // a 0.72 hemisphere under it — and a sun that low delivers almost nothing
+    // to a horizontal surface, which is every surface you drive on. Measured
+    // at eight fixed stations on a phone, road luminance fell 91.7 -> 55.1
+    // against pristine, and the darkest station went to 14.5. The picture was
+    // a lit tree line over a road you could not see.
+    //
+    // The dawn is in the COLOUR and the mist, not in the exposure: the sun
+    // keeps its warm low-angle tint and comes up to a real morning angle, and
+    // the hemisphere carries the shadow side the way `farmland`'s note above
+    // says an overcast sky does. Re-measured after: see the commit.
+    cost: 10, fresh: true, tune: {
+      sunColor: 0xffdcae, sunIntensity: 2.35, sunEl: 0.34, sunAz: 2.05,
       skyTop: '#39628f', skyHorizon: '#f0d6b4', sunGlow: 0xffd9a0,
-      hemiSky: 0x8fa8c4, hemiGround: 0x4e6440, hemiIntensity: 0.72,
-      fogColor: 0xc8d2c8, fogNear: 130, fogFar: 900, cloudCount: 18, cloudOpacity: 0.95, elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
+      hemiSky: 0x9fb6d0, hemiGround: 0x5c7450, hemiIntensity: 1.0,
+      fogColor: 0xc8d2c8, fogNear: 190, fogFar: 1100, cloudCount: 18, cloudOpacity: 0.95, elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
   { id: 39, name: 'MONZA', theme: 'medterrace', route: 'monza', region: 'GRAND CIRCUITS',
     cost: 11, fresh: true, tune: { // LOMBARDY IN SEPTEMBER: hot, hazy, bleached
       sunColor: 0xfff0cc, sunIntensity: 2.9, sunEl: 0.58,
@@ -3527,11 +3541,38 @@ const THEMES = {
     road: {
       // patched tarmac (35% of the Bible surface mix) with the dirt and mud
       // that make up another 45% of it dragged across the top
-      base: '#4c4a44', mottleA: [62, 54, 42], mottleB: [110, 108, 102],
-      rut: 'rgba(46,38,26,0.5)', rutCore: 'rgba(32,26,18,0.45)', tread: 'rgba(18,14,10,0.4)',
-      stoneA: 'rgba(178,174,164,0.55)', stoneB: 'rgba(52,48,42,0.7)',
+      //
+      // THE ROAD WAS MISSED WHEN THE PALETTE CAME UP. The note above records
+      // this world being rescued from "essentially black" by lifting the
+      // TERRAIN palette and the hemisphere — and it worked, on the terrain.
+      // The carriageway was left where it was, and it is the one surface a
+      // driver has to read. Reported from a phone with a screenshot of a black
+      // strip between two lit green hedges; measured at eight fixed stations on
+      // a 390x844 viewport, road luminance out of 255:
+      //
+      //   HEDGEROW DASH   19.6 median, 11.8 at its darkest, 5 of 8 under 25
+      //   SILVERSTONE     34.8 median,  9.8 at its darkest
+      //   OULTON PARK     54.5 median, 14.1 at its darkest
+      //   every other tarmac world on the roster: 86 - 125
+      //     (TREMOLA 86.3, MONACO 106.2, GOTTHARD 110.9, FURKA 119.2, MONZA
+      //      125.3 — and those are the CONTROL, not an aspiration)
+      //
+      // Four things compounded, and no single one of them looks wrong alone:
+      // the darkest road base on the roster (#4c4a44 against pass #6f6a63 and
+      // tremola #5f5b54), a brown mottle under it, three dark overlays stacked
+      // at 0.5/0.45/0.4, and then `wet.darken` taking another third off the
+      // result — the only tarmac theme in the game that carries one.
+      //
+      // So each comes up a little rather than one being flattened: the base
+      // into the band its neighbours occupy, the mottle out of brown, the
+      // overlays softened, and the wet darkening down to `undercity`'s 0.2,
+      // which is a wet road nobody has ever called unlit. Still the greyest,
+      // least saturated carriageway in the game, which is the point of it.
+      base: '#6a655c', mottleA: [86, 80, 68], mottleB: [140, 136, 128],
+      rut: 'rgba(58,48,34,0.38)', rutCore: 'rgba(42,34,24,0.34)', tread: 'rgba(26,21,15,0.3)',
+      stoneA: 'rgba(190,186,176,0.55)', stoneB: 'rgba(62,58,50,0.7)',
       fringe: [58, 92, 40], fringeVar: [28, 38, 22],    // grass right to the edge
-      wet: { darken: 0.32, gleam: 9, pools: 5 },
+      wet: { darken: 0.2, gleam: 9, pools: 5 },
     },
     // no mountains anywhere: a low green ridge line, sunk and half-eaten by fog
     hillColor: 0x54664a, peakColor: 0x8a94a0, hillDrop: 34,
