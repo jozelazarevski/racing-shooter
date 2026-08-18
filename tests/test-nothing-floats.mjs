@@ -96,7 +96,14 @@ const KNOWN = {
   // STREET LANTERN GLOBES on brackets — a bulb hangs off an arm by design, and
   // the arm is a separate mesh in a different 2 u column.
   'LANTERN QUARTER': { max: 140, gap: 9.5, why: 'lantern globes on wall brackets, worst 8.64 u' },
-  'HARBOR QUAY': { max: 240, gap: 9.5, why: 'the same quayside lantern globes, worst 8.69 u' },
+  // 240 -> 248 for the building dressing (r218), and the DEPTH is what says
+  // this is not a regression: LAW 4 still measures 8.69 u here, the same
+  // lantern globes, unchanged to the centimetre. LAW 3 counts parts clearing
+  // 1 u, and a gutter at 4 u or a shutter at 1.6 u is ON A WALL — the dressing
+  // adds ~21 such parts per dwelling and this world's kit builds `house`
+  // twice. Measured 241; rounded a little, as this file's own note requires,
+  // and NOT raised to cover anything that is actually in the air.
+  'HARBOR QUAY': { max: 248, gap: 9.5, why: 'the same quayside lantern globes, worst 8.69 u' },
   'CINQUE TERRE': { max: 200, gap: 9.5, why: 'the same lantern globes, worst 8.52 u' },
   'AEGEAN BLUE': { max: 160, gap: 9.5, why: 'the same lantern globes, worst 8.69 u' },
   'COSTA BRAVA': { max: 100, gap: 9.5, why: 'the same lantern globes, worst 8.38 u' },
