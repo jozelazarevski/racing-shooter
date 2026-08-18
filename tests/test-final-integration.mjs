@@ -5,6 +5,11 @@
 import { chromium } from 'playwright-core';
 
 const LAUNCH = { executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] };
+// BASE, so this can be pointed at a pristine baseline on another port. It
+// hardcoded localhost:8901 in seven places — the fourth file in this suite with
+// that defect, and HANDOVER lists it as a trap precisely because a gate you
+// cannot baseline cannot tell a regression from a pre-existing failure.
+const BASE = process.env.BASE ?? BASE;
 const results = [];
 const check = (name, ok, detail = '') => { results.push({ name, ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  ${detail}`); };
 
@@ -14,7 +19,7 @@ const browser = await chromium.launch(LAUNCH);
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:8901/', { waitUntil: 'load' });
+  await page.goto(`${BASE}/`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__game, { timeout: 15000 });
   await page.evaluate(() => { localStorage.setItem('ir-mode', 'roam'); }); // stale legacy key
   await page.reload({ waitUntil: 'load' });
@@ -34,7 +39,7 @@ const browser = await chromium.launch(LAUNCH);
 // ---------- 2. SHARP steering setting flows into player.steerSense ----------
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
-  await page.goto('http://localhost:8901/', { waitUntil: 'load' });
+  await page.goto(`${BASE}/`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__game, { timeout: 15000 });
   await page.evaluate(() => {
     [...document.querySelectorAll('#steer-select .diff-chip')].find(c => /SHARP/i.test(c.textContent)).click();
@@ -52,7 +57,7 @@ const browser = await chromium.launch(LAUNCH);
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:8901/', { waitUntil: 'load' });
+  await page.goto(`${BASE}/`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__game, { timeout: 15000 });
   await page.click('#start-btn');
   await page.evaluate(() => { window.__game.countdown = 0.01; });
@@ -108,7 +113,7 @@ const browser = await chromium.launch(LAUNCH);
 {
   const page = await browser.newPage({ viewport: { width: 1000, height: 640 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:8901/?level=3&unlockall=1', { waitUntil: 'load' });
+  await page.goto(`${BASE}/?level=3&unlockall=1`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__game, { timeout: 15000 });
   await page.evaluate(() => { localStorage.setItem('ir-diff', 'hard'); });
   await page.reload({ waitUntil: 'load' });
@@ -146,14 +151,14 @@ const browser = await chromium.launch(LAUNCH);
 // ---------- 5. Every roster level boots into race without errors ----------
 {
   const probe = await browser.newPage({ viewport: { width: 400, height: 300 } });
-  await probe.goto('http://localhost:8901/', { waitUntil: 'load' });
+  await probe.goto(`${BASE}/`, { waitUntil: 'load' });
   await probe.waitForFunction(() => window.__LEVELS, null, { timeout: 15000 });
   const ids = await probe.evaluate(() => window.__LEVELS.map(l => l.id));
   await probe.close();
   for (const lvl of ids) {
     const page = await browser.newPage({ viewport: { width: 900, height: 600 } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.goto(`http://localhost:8901/?level=${lvl}&unlockall=1`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/?level=${lvl}&unlockall=1`, { waitUntil: 'load' });
     await page.waitForFunction(() => window.__game, { timeout: 15000 });
     await page.click('#start-btn');
     await page.waitForFunction(() => ['countdown', 'race'].includes(window.__game.state), { timeout: 15000 });
@@ -175,7 +180,7 @@ const browser = await chromium.launch(LAUNCH);
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' });
   const page = await ctx.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:8901/', { waitUntil: 'load' });
+  await page.goto(`${BASE}/`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__game, { timeout: 15000 });
   await page.tap('#start-btn');
   await page.evaluate(() => { window.__game.countdown = 0.01; });
