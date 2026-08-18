@@ -318,22 +318,44 @@ cannot simply be appended to the list above — the existing laws are about
 chase-versus-overhead framing, and "keeps the car at a sane distance" is
 meaningless for an eye inside a car whose mesh is hidden. It wants its own file.
 
-## DRIVER'S VIEW — ONE UNDIAGNOSED COST, AND IT IS PHONE-RELEVANT
-The cockpit view is usually CHEAPER than chase (renderer.info, same spot, car
-recentred): PINE VALLEY 226 -> 132 calls (-42%), SAFARI PLAINS 195 -> 115
-(-41%), GOTTHARD in-bore 235 -> 202 (-14%).
+## DRIVER'S VIEW — THE FRAME COST IS POSITIONAL, NOT PER-WORLD
+**An earlier version of this section said COL DE TURINI cost +95% draw calls in
+the cockpit. THAT WAS WRONG and it is recorded here because it was committed as
+fact.** The numbers compared a CHASE frame against a DRIVER frame taken ~15
+samples apart — the settle that recentres the car also drives it down the road —
+so it was two different places, not two different cameras.
 
-**COL DE TURINI goes 170 -> 331 (+95%)** and nobody has diagnosed why. The
-standing hypothesis is that a low wide eye in a steep valley pulls near-field
-scenery into the frustum that an overhead boom looks past — untested. 331 draw
-calls is a number that matters on a phone. Check this before the view is
-promoted from opt-in.
+Re-measured with the car parked at a fixed sample and both views rendered from
+THERE, 12 samples around each lap:
 
-Not a defect, and not a reason to hold the feature: it is opt-in, the terrain
-sweep is clean (0 of 2,700 sampled camera positions below ground per world,
-worst clearance 3.03 u inside a bore), and a mid-race switch was measured
-byte-identical on state, lap, raceTime, rank, trackIndex, health and all three
-contract rows. It is simply the one measured number that got worse.
+| world | mean calls CHASE -> DRIVER | dearer at |
+|---|---|---|
+| PINE VALLEY | 211 -> 249 (+18%) | 4/12 samples |
+| SAFARI PLAINS | 218 -> 168 (-23%) | 5/12 |
+| COL DE TURINI | 196 -> 192 (**-2%**) | 5/12 |
+| GOTTHARD CLIMB | 242 -> 211 (-13%) | 4/12 |
+
+No systematic penalty in the mean, and no systematic saving either. The original
+"-40% on PINE and SAFARI" was equally unreliable — PINE is actually +18%.
+
+**WHAT IS REAL:** both views swing enormously with POSITION (chase 120-737 calls,
+driver 88-661), and at particular spots the low eye is far dearer at the SAME
+place. Worst measured: **PINE VALLEY sample 600, 152 -> 543 calls.** The frustum
+census there names the mechanism:
+
+    meshes in frustum                     CHASE 149   DRIVER 472
+    loose BoxGeometry/MeshStandardMaterial CHASE  54   DRIVER 254
+
+A boom 15 u up tilted ~34 degrees down clips the far ground out of frame; an eye
+at 2.7 u looks along a long shallow wedge that sweeps in every piece of
+un-instanced roadside furniture — fence posts, crates, rails, marker posts,
+everything the `box()` helper builds — for hundreds of units.
+
+This is a CONTENT-DENSITY property the view surfaces, not one it creates, and
+every camera-side lever is bad: pulling `far` in would cull the mountains and the
+haze band, which is exactly the readability the view exists to protect. The fix
+is BATCHING that furniture, in `src/track.js` / `src/world/flora.js`. Start at
+PINE VALLEY sample 600.
 
 Also honest, and by design: on a bend the cockpit shows materially LESS of the
 corner than chase. That is inherent to a 2.7 u eye and is why it is a toggle.

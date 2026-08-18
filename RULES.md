@@ -736,6 +736,19 @@ What it does instead:
   and the watchdog would otherwise fire once a second forever and yank the eye
   back onto a boom. The half of it that still means something — the car being
   under the ground — is kept.
+- **It costs what the scenery costs, and that is worth watching on a phone.**
+  Draw calls, 12 matched samples a lap, CHASE -> DRIVER: PINE VALLEY 211 -> 249,
+  SAFARI PLAINS 218 -> 168, COL DE TURINI 196 -> 192, GOTTHARD CLIMB 242 -> 211.
+  No systematic penalty in the mean — but both views are wildly position
+  dependent (chase spans 120-737 calls, driver 88-661), and at a few specific
+  places the low eye is much dearer: PINE VALLEY sample 600 is 152 -> 543.
+  Cause, measured by frustum census at that sample: meshes in frustum 149 ->
+  472, of which loose `BoxGeometry`/`MeshStandardMaterial` scenery goes 54 ->
+  254. A boom 15 u up and tilted 34 degrees down clips the far ground out of
+  frame; an eye at 2.7 u looks along a long shallow wedge that sweeps in every
+  piece of un-instanced roadside furniture for hundreds of units. This is a
+  content-density property the view SURFACES rather than one it creates — the
+  fix is batching that furniture, not moving the camera.
 
 **Switching**: the 👁 button on the HUD (`.icon-btn`, third in the top-right
 stack, lit while active), `V` on a keyboard, `DRIVER'S VIEW` in the pause menu,
