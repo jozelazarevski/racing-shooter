@@ -1,7 +1,10 @@
 // LEAD FINAL INTEGRATION — full-game wiring checks for this round.
 // Physics/AI internals already verified in depth by Agent B; this validates
 // the assembled game: finish flow, elevation, steering setting, weather,
-// angry AI presence, mode-from-URL fix, mobile UI, all 5 levels boot.
+// angry AI presence, mode-from-URL fix, mobile UI, and EVERY level in the
+// roster boots and races — the loop reads window.__LEVELS, so it grew from 5
+// to 67 with the roster while this line still said 5. A header that states a
+// count it does not compute is the same defect as a gate that does.
 import { chromium } from 'playwright-core';
 
 const LAUNCH = { executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] };
