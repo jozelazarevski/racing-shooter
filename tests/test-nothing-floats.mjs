@@ -68,7 +68,7 @@ const MIN = 1.0;
 // little so a re-seed does not fail the suite — never rounded up to cover a
 // world that is actually broken. Before the fix the same sweep read 139 / 27.0
 // on SUMMIT CLIMB, 149 / 18.1 on CAPE OLIVETO and 141 / 134.4 on GLACIER COL.
-const MAX_FLOATERS = 8;      // measured: 46 of 68 worlds score 0, the rest 1-8
+const MAX_FLOATERS = 8;      // measured: 46 of 67 worlds score 0, the rest 1-8
 const MAX_GAP = 8.0;         // measured deepest on any UNPINNED world: 6.9 (SUZUKA foot-bridge
                              // beam). It was 137.81 on CANYON RUN before the fix.
 

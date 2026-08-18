@@ -433,7 +433,7 @@ index); lerp from the ground the ridge stands on, not from `by`; widen both
 ramps to what a 10 u mesh can draw, `RAMP = cell * sqrt(0.75*h/E)` (48 u at
 h=62). Then `_drawnGroundY` + `_seatY` seat 38 scatter call sites on the
 surface that is DRAWN. Floaters: SUMMIT CLIMB 139 -> 2, CAPE OLIVETO 149 -> 0,
-GLACIER COL 141 -> 5; 46 of 68 worlds score 0.
+GLACIER COL 141 -> 5; 46 of 67 worlds score 0.
 
 **THE COST, AND WHY IT WAS NOT PAID BACK.** Making the ridge drawable made it
 smaller — GLACIER COL's crown 60.6 -> 34.5, SUMMIT CLIMB's 58.7 -> 16.4.

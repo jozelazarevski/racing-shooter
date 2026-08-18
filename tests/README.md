@@ -48,7 +48,7 @@ is detected, no building and no tree trunk stands in any carriageway, and what
 is DRAWN in one stays at the number it was measured at, with every known-open
 world pinned by name. Found the reported chalet: GLACIER COL's crossroad-spur
 barn, sited `len + 15` along the SPUR with no road test at all),
-`test-nothing-floats.mjs` (nothing stands on nothing, all 68 worlds, measured
+`test-nothing-floats.mjs` (nothing stands on nothing, all 67 worlds, measured
 against the ground that is DRAWN rather than `terrainHeight` — every scatter
 builder seats on the latter, so a check against it computes 0 by construction
 and cannot see the defect. Carries the positive control that lifts one instance
@@ -99,7 +99,7 @@ assumption someone had already written down.
 | `tool-road-census.mjs` | The roster-wide answer to "is anything on the road". Reads `solids` for BLOCKERS/HOLES/FLOATERS **and walks the built scene graph** for BODIES — every mesh and every instance, measured by exact point-to-OBB distance. Its suppression classes (`prop`, `foliage`, `surface`, `overhead`, `buried`, `scenery`) are all COUNTED and printed, because a filter that is not printed reads as "nothing there". |
 | `tool-tree-clearance.mjs` | Every tree TRUNK against RULES.md's `widthAt + r + 1.7`, per world, with a height gate first so the saguaros silhouetted on the canyon rim are not read as intrusions. The acceptance test for any tree-placement change. |
 | `tools-scratch/air.mjs` | What hangs in the air, measured against the ground the PLAYER SEES — the near terrain patch's own vertex buffer, read out of the live scene — with the analytic gap printed beside it so a height MISMATCH and a genuinely airborne object are told apart in the numbers. Reports the GRADE under every floater, because a flat-based object on a steep face hangs on its downhill side even when its centre height is exact, and that needs a different fix. `tool-float-census.mjs` asks the same question of `terrainHeight` and therefore cannot see this class at all. |
-| `tools-scratch/onroad.mjs` | The road and air sweeps over all 68 worlds in ONE browser session (`swapLevel`, not a reload per world: 68 reloads is 35 minutes). |
+| `tools-scratch/onroad.mjs` | The road and air sweeps over all 67 worlds in ONE browser session (`swapLevel`, not a reload per world: 68 reloads is 35 minutes). |
 | `tools-scratch/probe-ground.mjs` | One point, the height function taken apart term by term, beside the four mesh vertices that actually surround it. This is what identified `_tunnelRidge`'s staircase. |
 | `tool-banner-clearance.mjs` | Every sponsor board measured across its full 9 u span. The acceptance test for `_buildBanners`. Skips `kind: 'fence'` — `_buildGuardFence` shares the array and a guard rail belongs at the road edge. |
 
