@@ -103,7 +103,7 @@ const measure = async (lv) => page.evaluate(async ({ lv, MIN }) => {
   };
 
   // ---- what is legitimately airborne, exempted BY NAME ---------------------
-  const AIRBORNE = /^(sky|horizon|cloud|bird|sea|water|river|lake|rain|snow|dust|spark|smoke|fog|particle|chopper|heli|banner|gantry|start-lights|world-skirt|contact-shadows|.*-lightpool|.*shadow|edit-|preview|hud|arrow|marker|.*-veil|bridge|deck|overpass|tunnel|gallery|rail|parapet|lamp|wire|cable|pylon|whale|pontoon|buoy|arch|crane|cablecar|ropeway|zip|net|flag|bunting|edge-rail|guard-fence|foot-bridge|hollow-arch|stone-bridge)/i;
+  const AIRBORNE = /^(sky|horizon|cloud|bird|sea|water|river|lake|rain|snow|dust|spark|smoke|fog|particle|chopper|heli|banner|gantry|start-lights|world-skirt|contact-shadows|.*-lightpool|.*shadow|edit-|preview|hud|arrow|marker|.*-veil|bridge|deck|overpass|tunnel|gallery|rail|parapet|lamp|wire|cable|pylon|whale|pontoon|buoy|arch|crane|cablecar|ropeway|zip|net|flag|bunting|edge-rail|guard-fence|foot-bridge|hollow-arch|stone-bridge|tyre-stack|retaining-wall|oldtown-strings|hedge-bank|.*-strings|heroBridge|hero-bridge)/i;
 
   // ---- what is HELD UP by something the 2 u column grid cannot see --------
   // Exempted BY MEMBERSHIP of the game's own lists, never by shape, and every
@@ -152,6 +152,13 @@ const measure = async (lv) => page.evaluate(async ({ lv, MIN }) => {
     if (!Number.isFinite(y0)) return;
     if (y1 - y0 < 1e-4 && x1 - x0 < 1e-4 && z1 - z0 < 1e-4) return;   // parked pool slot
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    // THE FAR SKYLINE SITS ON ITS OWN HIGHLAND, BY DESIGN — the same 420 u
+    // horizon rule `tool-float-census` uses. The horizon rings, mesas and
+    // distant blocks past that radius are drawn against fog to give the world
+    // an edge; they are not scenery anybody drives past, and measuring them
+    // against the near terrain patch reports 82 u of air under a mountain
+    // that is supposed to be on the skyline.
+    if (Math.hypot(cx, cz) > 420) return;
     if (Math.abs(cx) > 940 || Math.abs(cz) > 940) return;             // outside the near patch
     parts.push({ name, y0, cx, cz, h: y1 - y0 });
     const i0 = Math.floor(x0 / CELL), i1 = Math.floor(x1 / CELL);

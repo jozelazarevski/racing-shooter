@@ -18839,6 +18839,11 @@ export class Track {
       }
     }
     tires.count = tk;
+    // NAMED, so the seating gate can exempt it EXPLICITLY. A stack of tyres
+    // sits at ROAD level at the road edge (`pointAt` returns the road's
+    // elevation, not the ground's), which is where a tyre wall belongs — on a
+    // shelf road the valley floor under it is a long way down.
+    tires.name = 'tyre-stack';
     this._tireMesh = tires;
     this.group.add(tires);
 
