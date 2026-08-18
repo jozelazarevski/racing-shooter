@@ -872,6 +872,8 @@ export function applyUpgradeKit(group, up = {}) {
   const lv = (k) => (up?.[k] | 0);
   if (!group.userData.rig) return null;
   const { wheelY, baseY, capTop } = group.userData.rig;
+  // Half-width, for anything mounted on the FLANKS rather than the centreline.
+  const halfW = group.userData.rig.halfW ?? 1.3;
   // ANCHOR EVERY LENGTHWAYS PART TO AN END OF THE CAR, not to a number.
   // `T(o)` is `o` units forward of the TAIL, `Nz(o)` is `o` back from the NOSE.
   // The reference offsets below are the old constants re-expressed against the
@@ -982,39 +984,55 @@ export function applyUpgradeKit(group, up = {}) {
     }
     add(new THREE.BoxGeometry(1.5, 0.1, 0.06), brake, 0, capTop - 0.34, T(1.38));
   }
-  // CANNON — ON THE ROOF, not over the nose.
+  // CANNON — ON THE FLANKS, not on the roof.
   //
-  // It used to be a barrel at `capTop - 0.5, z 1.9`: forward of the cabin and
-  // BELOW the roofline, which is to say in the one place a chase camera never
-  // looks. The gun is the loudest thing the player buys and it was invisible
-  // from the only angle the game is played at.
+  // Asked for as "modify the design, move the canons in the sides". It used to
+  // be a receiver, drum and pintle standing on `capTop + 0.32` with the barrel
+  // running forward over the bonnet — from a chase camera that silhouettes as
+  // a pale mast sticking straight up out of the car, which is what the report
+  // is about. (It was put there deliberately once, to fix a gun mounted so low
+  // it was invisible; the answer to that was height, and the answer to THIS is
+  // width. Both are the same requirement — the gun has to read from astern.)
   //
-  // Now the whole assembly sits on the roof and is silhouetted above it: the
-  // RECEIVER and its drum face straight back at the camera, and the barrel
-  // runs forward over the bonnet where it breaks the skyline. Everything is
-  // hung off `capTop`, which `buildVoxelRacer` publishes per car, so the eight
-  // rigs each get it at their own roof height rather than at one constant that
-  // would bury it in the CROWN's cabin and float it over the DUNE's.
+  // Now it is a pod on each flank with the barrel running forward beside the
+  // bonnet: visible from directly behind as two hard edges either side of the
+  // body, visible from the side as the whole gun, and never breaking the
+  // skyline. Everything hangs off `halfW` and `baseY` from the rig, so the
+  // eight bodies each get it at their own shoulder rather than at a constant.
+  //
+  // It also now matches where the shot COMES FROM: fireBullet puts the muzzle
+  // at +-0.7 lateral, 0.85 above the car. A roof gun never agreed with that.
   const can = lv('cannon');
   if (can >= 2) {
-    const gunY = capTop + 0.32;
-    // receiver + ammo drum: the part that reads from directly astern
-    add(new THREE.BoxGeometry(0.82, 0.34, 0.9), dark, 0, gunY, 0.78);
-    add(new THREE.CylinderGeometry(0.26, 0.26, 0.34, 12), gold, 0, gunY + 0.06, 0.42);
-    // pintle down onto the roof, so it reads as MOUNTED rather than floating
-    add(new THREE.BoxGeometry(0.26, 0.4, 0.26), steel, 0, gunY - 0.34, 0.78);
-    const barrel = (x) => {
-      add(new THREE.CylinderGeometry(0.11, 0.13, 1.9, 8), steel, x, gunY, Nz(1.05), Math.PI / 2);
-      add(new THREE.CylinderGeometry(0.16, 0.16, 0.3, 8), dark, x, gunY, Nz(0.18), Math.PI / 2);
-    };
-    if (can >= 4) { barrel(-0.34); barrel(0.34); } else barrel(0);
-    // SPONSONS on the flanks at the top of the line — the same gun read from
-    // the side, which is the other angle the player actually has.
+    const gunY = baseY + 0.95;              // shoulder line, above the sill
+    const gx = Math.max(0.85, halfW - 0.16); // hugging the body, not floating
+    for (const sx of [-1, 1]) {
+      // receiver pod
+      add(new THREE.BoxGeometry(0.30, 0.30, 0.86), dark, sx * gx, gunY, 0.55);
+      // barrel forward along the flank, and its muzzle collar
+      add(new THREE.CylinderGeometry(0.10, 0.115, 1.7, 8), steel,
+        sx * gx, gunY, Nz(1.15), Math.PI / 2);
+      add(new THREE.CylinderGeometry(0.145, 0.145, 0.26, 8), dark,
+        sx * gx, gunY, Nz(0.30), Math.PI / 2);
+      // bracket down onto the body, so it reads as BOLTED ON rather than stuck
+      add(new THREE.BoxGeometry(0.10, 0.28, 0.34), steel,
+        sx * (gx - 0.14), gunY - 0.28, 0.55);
+    }
+    // TWIN barrels at level 4: the second sits outboard and slightly low, so
+    // the pair reads as two guns from behind instead of one thick one.
+    if (can >= 4) {
+      for (const sx of [-1, 1]) {
+        add(new THREE.CylinderGeometry(0.085, 0.095, 1.4, 8), steel,
+          sx * (gx + 0.17), gunY - 0.12, Nz(1.35), Math.PI / 2);
+      }
+    }
+    // Top of the line: ammo drums on the outer face and muzzle brakes — the
+    // detail that was on the roof assembly, kept, just moved outboard.
     if (can >= 5) {
       for (const sx of [-1, 1]) {
-        add(new THREE.BoxGeometry(0.3, 0.3, 0.7), dark, sx * 1.3, baseY + 0.95, 0.5);
-        add(new THREE.CylinderGeometry(0.09, 0.1, 1.3, 8), steel,
-          sx * 1.3, baseY + 0.95, Nz(1.6), Math.PI / 2);
+        add(new THREE.CylinderGeometry(0.19, 0.19, 0.22, 12), gold,
+          sx * (gx + 0.13), gunY + 0.05, 0.50, Math.PI / 2);
+        add(new THREE.BoxGeometry(0.24, 0.24, 0.22), gold, sx * gx, gunY, Nz(0.10));
       }
     }
   }

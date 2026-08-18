@@ -46,6 +46,11 @@ const r = await p.evaluate(async () => {
       seat,
       camVsBullet: +(Math.abs(wrap(camH - bulH)) * 180 / Math.PI).toFixed(2),
       camVsCar: +(Math.abs(wrap(camH - carH)) * 180 / Math.PI).toFixed(2),
+      // THE DIRECT QUESTION for the chase case. Asserting "the bullet does NOT
+      // follow the camera" is not testable when the chase camera happens to be
+      // pointed along the car anyway (measured: 0.39 deg apart), because then
+      // both rules predict the same shot. Bullet-vs-CAR discriminates always.
+      bulletVsCar: +(Math.abs(wrap(bulH - carH)) * 180 / Math.PI).toFixed(2),
       slip: +(Math.abs(wrap(Math.atan2(pl.vel.x, pl.vel.z) - carH)) * 180 / Math.PI).toFixed(1),
       muzzleY: +(bl.pos.y - pl.pos.y).toFixed(2), eyeY: +(g.camPos.y - pl.pos.y).toFixed(2),
     });
@@ -58,8 +63,9 @@ const r = await p.evaluate(async () => {
 let fail = 0;
 const ok = (n, c, d = '') => { if (!c) fail++; console.log(`${c ? 'PASS' : 'FAIL'}  ${n}${d ? '  ' + d : ''}`); };
 for (const q of r) {
-  console.log(`${q.seat ? 'SEAT ' : 'CHASE'}  slip ${q.slip}deg | camera-vs-bullet ${q.camVsBullet}deg`
-    + ` | camera-vs-car ${q.camVsCar}deg | muzzle ${q.muzzleY} u, eye ${q.eyeY} u above the car`);
+  console.log(`${q.seat ? 'SEAT ' : 'CHASE'}  slip ${q.slip}deg | cam-vs-bullet ${q.camVsBullet}deg`
+    + ` | cam-vs-car ${q.camVsCar}deg | bullet-vs-CAR ${q.bulletVsCar}deg`
+    + ` | muzzle ${q.muzzleY} u, eye ${q.eyeY} u above the car`);
 }
 const seat = r.find((q) => q.seat), chase = r.find((q) => !q.seat);
 ok('the slide really was a slide — otherwise nothing below discriminates',
@@ -68,8 +74,11 @@ ok('IN THE SEAT the cannon fires where the camera looks', seat.camVsBullet < 1.0
   `${seat.camVsBullet}deg off`);
 ok('and the camera genuinely was NOT pointed along the car (else this is vacuous)',
   seat.camVsCar > 3, `${seat.camVsCar}deg between camera and car`);
-ok('CHASE still fires along the CAR, not the camera — rivals must look right',
-  chase.camVsBullet > 3, `${chase.camVsBullet}deg off, camera-vs-car ${chase.camVsCar}deg`);
+ok('CHASE still fires along the CAR — the shot is unchanged outside the seat',
+  chase.bulletVsCar < 1.0, `bullet is ${chase.bulletVsCar}deg off the car`);
+ok('and in the SEAT the shot leaves the car heading by the camera\'s own offset',
+  Math.abs(seat.bulletVsCar - seat.camVsCar) < 1.0,
+  `bullet-vs-car ${seat.bulletVsCar}deg against camera-vs-car ${seat.camVsCar}deg`);
 ok('no page errors', errs.length === 0, errs[0] ?? '');
 await b.close();
 console.log(fail ? `\n${fail} FAILED` : '\nthe cannon and the view agree in the seat');
