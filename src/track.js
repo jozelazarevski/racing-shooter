@@ -13567,12 +13567,19 @@ export class Track {
     // corners rather than the centre, because the centre is the one point that
     // is never the problem. Cheap — one box, and only where the fall is real.
     {
-      const fr = T.r * scale * 0.78;
+      // THE TEMPLATE'S OWN EXTENT, not a guess at a fraction of `r`. The first
+      // cut sampled 0.78 * r and left REDWOOD RAMPAGE's element-box hanging
+      // 4.64 u, because the part that hung was FURTHER OUT than the ring being
+      // measured. `r` is a placement radius (how much room the structure needs)
+      // and is not the same as how far its widest part actually reaches, so the
+      // reach is computed from the part list once and cached on the template.
+      const ext = (T._ext ??= T.parts.reduce((m2, q) => Math.max(m2,
+        Math.abs(q[1]) + q[4] / 2, Math.abs(q[3]) + q[6] / 2), 0));
+      const fr = ext * scale * Math.max(wS, dS);
       let low = y;
-      for (const [ddx, ddz] of [[fr, 0], [-fr, 0], [0, fr], [0, -fr],
-        [fr * 0.7, fr * 0.7], [-fr * 0.7, -fr * 0.7],
-        [fr * 0.7, -fr * 0.7], [-fr * 0.7, fr * 0.7]]) {
-        const g2 = this._seatY(x + ddx, z + ddz);
+      for (let a2 = 0; a2 < 12; a2++) {
+        const th = a2 * Math.PI / 6;
+        const g2 = this._seatY(x + Math.cos(th) * fr, z + Math.sin(th) * fr);
         if (Number.isFinite(g2) && g2 - 0.25 < low) low = g2 - 0.25;
       }
       const drop = y - low;
@@ -13581,7 +13588,7 @@ export class Track {
         // the plinth is the footprint's own size so it reads as masonry rather
         // than as a box the house is standing on.
         B.box.push({
-          x, y: low, z, sx: fr * 2.0, sy: drop + 0.4, sz: fr * 2.0,
+          x, y: low, z, sx: fr * 2.05, sy: drop + 0.4, sz: fr * 2.05,
           rot, roll: 0, color: tinted(slot('stone')),
         });
       }
