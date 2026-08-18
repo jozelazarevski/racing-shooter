@@ -26,10 +26,11 @@ await p.evaluate((raced) => {
     g.career.finished[ch[0].levels[i].id] = { place: i === 0 ? 1 : 3, stars: i === 0 ? 3 : 2 };
   }
   g._chapterIn = null;
-  g.state = 'menu';
-  document.getElementById('menu')?.classList.remove('hidden');
-  document.getElementById('tab-btn-race')?.click();
-  g._renderLevelCards();
+  // showMenu(), not `state = 'menu'` — the game's menu state is called
+  // 'title', and setting a state name it does not use left the BACK button
+  // hidden in a probe while the real menu showed it perfectly well.
+  g.showMenu();
+  g._syncBackBtn?.();
 }, RACED);
 // ENTER a chapter if asked, exactly as a tap would
 if (process.env.ENTER) {
@@ -38,6 +39,7 @@ if (process.env.ENTER) {
       .find((e) => e.dataset.chn === String(n));
     if (c) c.click();
   }, process.env.ENTER);
+  await p.evaluate(() => window.__game._syncBackBtn?.());
 }
 if (process.env.SEARCH) {
   await p.evaluate((q) => {

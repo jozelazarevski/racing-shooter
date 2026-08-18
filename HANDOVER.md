@@ -1,6 +1,6 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r221, deployed and live, tree clean.
+State at handover: `main` = r222, deployed and live, tree clean.
 Live: https://jozelazarevski.github.io/racing-shooter/
 
 ## THE ONE DEFECT THIS REPO KEEPS SHIPPING
@@ -657,6 +657,55 @@ would leave a real, clickable, keyboard-reachable control in the tab order of
 every player's menu, and a tab-stop that sculpts terrain is worse than a
 visible one because nobody can see what they just hit. Verified: on a plain
 visit `#editor-btn` is not in the DOM at all.
+
+## BACK — ONE LADDER, THREE WAYS TO PULL IT
+
+Asked for as: *"I need back button."* There was no back ANYWHERE — not a
+button, not Escape, and nothing on the browser's own back gesture, so the only
+way out of a garage tab or a chapter was to find the control that happened to
+lead there, and a swipe-back left the game.
+
+`backTarget()` names where BACK goes from here and `goBack()` takes the step.
+Naming it separately from acting on it is what lets the button HIDE when there
+is nothing above you — **a back button that sometimes does nothing is how a
+player stops trusting it.** The ladder is deepest-first, because the states
+nest: editor over menu, chapter inside the tracks tab.
+
+    editor -> menu        results -> menu       pause -> resume
+    racing -> pause       chapter -> index      tab -> TRACKS
+
+Three things pull it: the button in the menu header (labelled with its
+destination), Escape, and — the one that matters on a phone — `popstate`.
+
+### The popstate rule, and the trap it avoids
+A single-page game gets ONE history entry, so the first swipe-back leaves the
+site mid-race. `_wireBack` keeps a spare entry on the stack and consumes it:
+while there is somewhere to go, back goes there and the entry is re-armed.
+
+**It deliberately stops trapping at the top of the ladder.** Re-pushing forever
+would make the game impossible to leave, which is a worse bug than the one this
+fixes — so when `backTarget()` returns null the entry is not replaced and the
+next back does what the player expects. Do not "fix" that by always re-arming.
+
+The button is menu-only: mid-race the pause button is already the way out and a
+second control would be clutter over the road.
+
+### A probe bug worth remembering
+The first screenshot of this showed no button, and the code was fine — the
+probe set `state = 'menu'`, and the game's menu state is called `'title'`.
+`_syncBackBtn` gates on `'title'`, so a state name the game never uses hid the
+button in the probe while the real menu showed it. **Drive the game's own
+entry point (`showMenu()`), not a state string you assumed.**
+
+## test-mobile-hud WAS MEASURING THE HARNESS
+
+It began failing `not measured: feed` on three of four device sizes. Nothing
+had touched the HUD. A feed message removes itself after 3.3 s, and the six
+test messages were pushed BEFORE a six-frame settle — 100 ms on a desktop,
+nearer five seconds under swiftshader — so the feed was empty by the time it
+was measured. It broke when the roster grew 67 -> 72 worlds and frames got
+slower. The feed is now filled AFTER the settle and measured on the next
+frame, so its lifetime cannot expire underneath the assertion.
 
 ## OPEN, LOWER PRIORITY
 - **`MIN` in `tunnelFitAt` is probably the same units error `reach` was.** The

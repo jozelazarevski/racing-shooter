@@ -71,11 +71,23 @@ for (const [w, h, tag] of SIZES) {
   // Race state, so the contracts list is populated — the whole point. Then a
   // full feed, because the feed grows with messages and that is what pushed it
   // into the controls at 320px.
+  await p.evaluate(() => { window.__game.state = 'race'; });
+  // SETTLE FIRST, THEN FILL THE FEED — in that order, and the order is the
+  // whole point. A feed message removes itself after 3.3 s, and these six were
+  // pushed BEFORE a six-frame settle: on a desktop that is 100 ms and on
+  // swiftshader it is nearer five seconds, so the feed was empty by the time
+  // it was measured and reported as "not measured: feed". It failed the day
+  // the roster grew from 67 worlds to 72 and the frames got slower, which is a
+  // test measuring the harness rather than the layout.
+  //
+  // The feed is filled last and measured on the very next frame, so its
+  // lifetime cannot expire underneath the assertion however slow the renderer
+  // is. The messages are still real ones through the real `hud.feed`.
+  for (let f = 0; f < 6; f++) await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
   await p.evaluate(() => {
-    window.__game.state = 'race';
     for (let i = 0; i < 6; i++) window.__game.hud.feed(`TEST MESSAGE ${i} — LONGER TEXT`, 'info');
   });
-  for (let f = 0; f < 6; f++) await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
+  await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
 
   const r = await p.evaluate((IDS) => {
     const boxes = [];

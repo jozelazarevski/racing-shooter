@@ -1522,6 +1522,7 @@ class Game {
       if (document.hidden && this.state === 'race') this.togglePause();
     });
     document.getElementById('start-btn').addEventListener('click', () => this.startRace());
+    this._wireBack();
     // THE WORLD EDITOR — ADMIN ONLY. Mounted lazily on first use: it builds
     // its own DOM and takes the pointer, and a player who never opens it
     // should pay nothing.
@@ -1582,6 +1583,8 @@ class Game {
             // has a measurable position.
             requestAnimationFrame(() => this._scrollToNextTrack('smooth'));
           }
+          // the tab IS a level on the back ladder, so the label moves with it
+          this._syncBackBtn();
         });
       }
     }
@@ -2493,6 +2496,109 @@ class Game {
   /** Come back to the title screen IN PLACE — the counterpart to startRace().
    *  Every exit path (pause > exit, results > garage, mission debrief, next
    *  level) routes through here instead of reloading the page. */
+  /* ---- BACK ---------------------------------------------------------------
+   *
+   * ASKED FOR AS: "I need back button."
+   *
+   * There was no back ANYWHERE. Not a button, not Escape, and — the part that
+   * actually bites on a phone — nothing on the browser's own back gesture, so
+   * the only way out of a garage tab or a chapter was to find the control that
+   * happened to lead there, and a swipe-back left the game entirely.
+   *
+   * One ladder, one handler, three ways to pull it: the button, the phone's
+   * back gesture, and Escape. Naming the target separately from acting on it
+   * is what lets the button HIDE when there is nothing above you, rather than
+   * sitting there doing nothing — a back button that sometimes does nothing is
+   * how a player stops trusting it.
+   */
+
+  /** Where does BACK go from here — a label, or null at the top. Ordered
+   *  deepest-first, because these states nest: the editor sits over the menu,
+   *  a chapter sits inside the tracks tab. */
+  backTarget() {
+    if (this.editor?.active) return { at: 'editor', label: 'LEAVE EDITOR' };
+    if (this.state === 'finished') return { at: 'results', label: 'MENU' };
+    if (!document.getElementById('pause-menu')?.classList.contains('hidden')) {
+      return { at: 'pause', label: 'RESUME' };
+    }
+    // racing, or out in free roam: back is the pause menu, which is the screen
+    // that holds every real exit
+    if (this.state === 'race' || this.state === 'countdown') {
+      return { at: 'racing', label: 'PAUSE' };
+    }
+    if (this.state === 'title') {
+      const tab = ['mode', 'jobs', 'garage', 'settings']
+        .find((t) => document.getElementById(`tab-btn-${t}`)?.classList.contains('current'));
+      // inside a chapter, back is the chapter index — checked BEFORE the tab,
+      // because the chapter is a level deeper than the tab that holds it
+      if (!tab && this.tracksView === 'timeline' && this._chapterIn != null) {
+        return { at: 'chapter', label: 'ALL CHAPTERS' };
+      }
+      if (tab) return { at: 'tab', label: 'TRACKS' };
+    }
+    return null;
+  }
+
+  /** Take one step up the ladder. Safe to call when there is nowhere to go. */
+  goBack() {
+    const t = this.backTarget();
+    if (!t) return false;
+    switch (t.at) {
+      case 'editor': this.editor.exit(); break;
+      case 'results': this.showMenu(); break;
+      // there is no separate resume — the pause menu is a toggle
+      case 'pause': case 'racing': this.togglePause?.(); break;
+      case 'chapter': this._chapterIn = null; this._renderLevelCards(); break;
+      case 'tab': document.getElementById('tab-btn-race')?.click(); break;
+      default: return false;
+    }
+    this._syncBackBtn();
+    return true;
+  }
+
+  /** Show the button only when it leads somewhere, and say where. */
+  _syncBackBtn() {
+    const b = document.getElementById('back-btn');
+    if (!b) return;
+    const t = this.backTarget();
+    // In the MENU only: mid-race the screen belongs to the HUD and the pause
+    // button is already the way out, so a second control would be clutter over
+    // the road.
+    const show = !!t && this.state === 'title';
+    b.classList.toggle('hidden', !show);
+    if (show) b.innerHTML = `‹&nbsp;${t.label}`;
+  }
+
+  /** THE PHONE'S OWN BACK GESTURE, which is the one people actually use.
+   *
+   *  A single-page game gets ONE history entry, so the first swipe-back leaves
+   *  the site — mid-race, mid-chapter, whatever. This keeps a spare entry on
+   *  the stack and consumes it: while there is somewhere to go, back goes
+   *  there and the entry is replaced.
+   *
+   *  IT DELIBERATELY STOPS TRAPPING at the top of the ladder. Re-pushing
+   *  forever would make the game impossible to leave, which is a worse bug
+   *  than the one this fixes — so when `backTarget` returns null the entry is
+   *  not replaced and the next back does what the player expects.
+   */
+  _wireBack() {
+    const btn = document.getElementById('back-btn');
+    btn?.addEventListener('click', () => this.goBack());
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (document.activeElement?.tagName === 'INPUT') return;   // fields own Escape
+      if (this.goBack()) e.preventDefault();
+    });
+    const arm = () => {
+      try { history.pushState({ ir: 1 }, ''); } catch { /* file:// */ }
+    };
+    window.addEventListener('popstate', () => {
+      if (this.goBack()) arm();     // consumed it — keep one in hand
+    });
+    arm();
+    this._syncBackBtn();
+  }
+
   showMenu(tab = null) {
     document.getElementById('results')?.classList.add('hidden');
     document.getElementById('pause-menu')?.classList.add('hidden');
@@ -2510,6 +2616,7 @@ class Game {
     if (tab) document.getElementById(`tab-btn-${tab}`)?.click();
     else document.getElementById('tab-btn-race')?.click();
     if (ts) ts.scrollTop = 0;
+    this._syncBackBtn();
     this._softURL();
   }
 
@@ -3376,6 +3483,7 @@ class Game {
         // more use than a card that refuses to be tapped.
         this._chapterIn = c.n;
         this._renderLevelCards();
+        this._syncBackBtn();
         const sc = sel.closest('.screen');
         if (sc) sc.scrollTop = 0;
       });
@@ -3395,6 +3503,7 @@ class Game {
     back.addEventListener('click', () => {
       this._chapterIn = null;
       this._renderLevelCards();
+      this._syncBackBtn();
       const sc = bar.closest('.screen');
       if (sc) sc.scrollTop = 0;
     });

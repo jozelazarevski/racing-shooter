@@ -695,6 +695,16 @@
   /* inside a chapter the bar IS the header — this is the placeholder the row
      builder emits in its place, and it must take up no room at all */
   .chapter-head-none{display:none}
+  /* ---- BACK ---------------------------------------------------------------
+     Sits at the head of the menu, left of the credits chip, and only appears
+     when `backTarget` finds a level above the one you are on. Same visual
+     family as the chapter bar's own back control. */
+  #back-btn{font-family:'Luckiest Guy';font-size:11px;letter-spacing:2px;
+    padding:6px 12px;border-radius:9px;cursor:pointer;color:var(--gold);
+    background:rgba(0,0,0,.32);border:1px solid var(--line-soft);
+    margin-right:auto}
+  #back-btn:hover,#back-btn:focus-visible{border-color:var(--gold)}
+  #back-btn.hidden{display:none}
   /* auto-FILL (not -fit): regions with fewer worlds keep the same card width,
      so every region shares one grid rhythm */
   .region-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%}
@@ -1527,7 +1537,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r221</div>
+<div id="build-tag">r222</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1562,6 +1572,11 @@
   <!-- Status chips sit ABOVE the tabs, not in the same row. Sharing the row
        meant a fourth tab pushed the whole strip onto two lines on a phone. -->
   <div id="menu-status">
+    <!-- BACK. One button for the whole game, shown only when there is
+         somewhere to go (see `backTarget` in main.js). It is also what the
+         phone's own back gesture drives, so leaving a chapter or a tab no
+         longer means leaving the game. -->
+    <button id="back-btn" class="hidden" aria-label="Back">‹&nbsp;BACK</button>
     <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
     <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
   </div>
@@ -1797,10 +1812,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r221"></script>
+<script type="module" src="./src/main.js?v=r222"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r221"></script>
+<script src="./src/offline.js?v=r222"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r221"></script>
+<script type="module" src="./src/traffic.js?v=r222"></script>
 </body>
 </html>
