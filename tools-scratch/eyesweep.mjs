@@ -12,6 +12,11 @@
  *    the world — the first cut reported eye heights of -1.56 and +9.56 on a
  *    cabin that sits at 2.4, i.e. every number came from a car in freefall.
  *    pointAt carries the road's y; the car is seated on it each step.
+ *
+ * 3. EVERY TUNE IS MEASURED AT THE SAME PLACE ON THE LAP. The second cut railed
+ *    the car onward between rows, so each tune was read at a different road
+ *    pitch and crest — the comparison was confounded and its ordering meant
+ *    nothing. The car is now returned to a FIXED station before each reading.
  */
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
@@ -79,22 +84,43 @@ const rows = await p.evaluate(async () => {
       top: +(top / c2.height * 100).toFixed(1) };
   };
 
+  // FIXED STATION for every reading — a straight, mid-lap, away from the grid.
+  const HOME = Math.floor(t.N * 0.18);
+  const park = async () => {
+    pl.trackIndex = HOME;
+    for (let k = 0; k < 12; k++) {
+      const c = t.pointAt(HOME, 0);
+      pl.heading = t.headingAt(HOME);
+      pl.pos.x = c.x; pl.pos.z = c.z;
+      if (Number.isFinite(c.y)) { pl.pos.y = c.y; pl.y = c.y; }
+      pl.vy = 0; pl.airborne = false;
+      pl.vel.copy(pl.forward).multiplyScalar(38);
+      pl.trackIndex = HOME;
+      await frame();
+    }
+  };
   const out = [];
-  for (const up of [0.20, 0.35, 0.50]) {
-    for (const fwd of [0.14, 0.34, 0.55]) {
+  for (const up of [0.20, 0.35, 0.50, 0.65]) {
+    for (const fwd of [0.14, 0.40, 0.70, 1.00]) {
       g._driverTune = { up, fwd, lookH: 1.15 };
-      await rail(8);
+      await park();
       const c = await cover();
-      out.push({ up, fwd, ...c, eye: +g.camera.position.y.toFixed(2), carY: +pl.pos.y.toFixed(2) });
+      out.push({ up, fwd, ...c, eye: +g.camera.position.y.toFixed(2), carY: +pl.pos.y.toFixed(2),
+        idx: pl.trackIndex });
     }
   }
   return out;
 });
-console.log('  up   fwd | bonnet covers  horizon at  eyeY  carY   (eye must sit ~0.2-0.5 above carY)');
+console.log('  up   fwd | bonnet covers  horizon at  eyeY  carY  idx   (target 12-18%)');
+const idx = new Set(rows.map((r) => r.idx));
 for (const r of rows) {
   const sane = Math.abs(r.eye - r.carY) < 4;
+  const target = r.cover >= 12 && r.cover <= 18 ? '  <-- target' : '';
   console.log(`  ${r.up.toFixed(2)} ${r.fwd.toFixed(2)} | ${String(r.cover).padStart(6)}% `
-    + ` ${String(r.top).padStart(9)}%  ${String(r.eye).padStart(5)} ${String(r.carY).padStart(5)}`
-    + (sane ? '' : '   <-- IMPLAUSIBLE, car not seated'));
+    + ` ${String(r.top).padStart(9)}%  ${String(r.eye).padStart(6)} ${String(r.carY).padStart(6)} ${r.idx}`
+    + (sane ? target : '   <-- IMPLAUSIBLE, car not seated'));
 }
+console.log(idx.size === 1
+  ? `\nall rows measured at station ${[...idx][0]} — comparable`
+  : `\nWARNING: rows span ${idx.size} stations, the comparison is confounded`);
 await b.close();
