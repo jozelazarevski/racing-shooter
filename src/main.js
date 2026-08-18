@@ -8447,19 +8447,26 @@ class Game {
     // coverage of the player's own bodywork at a fixed station on PINE VALLEY,
     // 430x932, at speed:
     //
-    //     up    lookH   bonnet covers   its horizon
-    //     0.20  1.15        27.0%          63.9%     <- shipped in r213
-    //     0.45  1.15        21.4%          68.5%
-    //     0.20  6.00        20.8%          69.5%
-    //     0.45  6.00        18.7%          74.5%     <- this
+    // BONNET IS NOT THE ONLY WASTED FRAME — SKY IS TOO, and optimising on bonnet
+    // alone picks the wrong seat. Measured at one mid-lap station, 430x932, at
+    // speed, counting the player's own bodywork in pixels and the sky above the
+    // horizon in pixels; what is left is the world you are driving through:
     //
-    // 18.7% is the FLOOR, not a preference: `lookH` 6 and 8 measure identically
-    // because the pitch cone caps upward aim at 0.104 * look (5.9 degrees), and
-    // that cap is deliberate — sky is never information. Eye height and forward
-    // offset are NOT levers here at all; both saturate against their own clamps
-    // (a 3x and a 7x sweep moved coverage by 4 points and returned an identical
-    // eyeY), which is why the r213 pass got nowhere by moving the seat around.
-    const T = (this._driverTune ??= { up: 0.45, fwd: 0.14, lookH: 6.0 });
+    //     up    lookH    bonnet    sky     ROAD
+    //     0.20  1.15      27.0%   32.4%   40.6%   <- shipped in r213
+    //     0.45  1.15      21.4%   32.4%   46.2%   <- this
+    //     0.45  2.50      21.8%   35.1%   43.1%
+    //     0.45  4.00      22.4%   38.2%   39.4%
+    //     0.45  6.00      18.7%   41.6%   39.7%
+    //
+    // Raising the aim LOSES road: the bonnet it saves is handed straight back
+    // as sky, and 6.00 buys the smallest bonnet on the board while showing less
+    // of the road than 1.15 does. The lever that worked is the EYE HEIGHT, and
+    // an earlier sweep missed it by testing 0.50 and 0.65 — both ABOVE the
+    // clamp at cabY + cabH * 0.45, so they returned an identical eyeY and read
+    // as "this parameter does nothing". 0.45 is the ceiling: higher puts the
+    // eye through the roof and out of the glasshouse that culls it.
+    const T = (this._driverTune ??= { up: 0.45, fwd: 0.14, lookH: 1.15 });
     const eyeH = cabY !== undefined
       ? clamp(cabY + cabH * T.up, cabY - cabH * 0.35, cabY + cabH * 0.45)
       : (M.h ?? 2.3);
