@@ -4526,6 +4526,7 @@ for (const [name, d] of Object.entries(DRESS)) {
   if (!tpl) continue;                       // a renamed template must not throw
   const [halfW, wallTop, fz, winY, winX, doorX] = d;
   const P = tpl.parts;
+  const FOOT_Q = 0.7;                        // lowest quoin, clear of the plinth
   // GUTTER along the eaves — one thin box, and the shadow line under it is
   // what separates roof from wall at any distance.
   P.push(['box', 0, wallTop - 0.16, fz + 0.10, halfW * 2 + 0.3, 0.14, 0.18, 'trim']);
@@ -4537,21 +4538,30 @@ for (const [name, d] of Object.entries(DRESS)) {
     P.push(['box', sx * winX, winY - 0.44, fz + 0.14, 0.86, 0.22, 0.24, 'roof']);
     // corner quoins, alternating up the angle of the wall
     for (let k = 0; k < 3; k++) {
-      P.push(['box', sx * halfW, 0.7 + k * 1.1, fz - 0.25, 0.34, 0.42, 0.30, 'stone']);
+      P.push(['box', sx * (halfW - 0.05), FOOT_Q + k * 1.1, fz - 0.30, 0.34, 0.42, 0.30, 'stone']);
     }
   }
   // lamp beside the door, on its bracket
   P.push(['cyl', doorX + 0.95, winY + 0.75, fz + 0.10, 0.06, 0.36, 0.06, 'trim']);
   P.push(['box', doorX + 0.95, winY + 1.02, fz + 0.10, 0.26, 0.22, 0.26, 'wall2']);
-  // water butt under the downpipe corner, and a woodpile along the flank
-  P.push(['cyl', halfW - 0.35, 0.0, fz - 0.55, 0.36, 0.95, 0.36, 'wall2']);
+  // ANYTHING THAT TOUCHES THE GROUND STANDS ON THE BUILDING'S OWN FOOTING.
+  //
+  // The first cut put the woodpile at `-halfW - 0.28` and the bench at
+  // `fz + 0.35` — both OUTSIDE the plinth every one of these templates starts
+  // with — and rested them at y 0. A building is seated as a unit on one
+  // ground height, so a part beyond its footprint hangs the moment the ground
+  // falls away, and the float census immediately picked them up as
+  // `element-cyl` / `element-box` on the sloping worlds. Inside the footprint
+  // and on top of the footing, they are seated by the same number the house is.
+  const FOOT = 0.5;                          // the plinth every template lays first
+  P.push(['cyl', halfW - 0.55, FOOT, fz - 0.75, 0.36, 0.95, 0.36, 'wall2']);
   for (let k = 0; k < 3; k++) {
-    P.push(['cyl', -halfW - 0.28, 0.28 + k * 0.5, -0.6, 0.26, 2.3, 0.26, 'trim', Math.PI / 2]);
+    P.push(['cyl', -(halfW - 0.30), FOOT + 0.28 + k * 0.5, -0.6, 0.26, 2.1, 0.26, 'trim', Math.PI / 2]);
   }
   // a bench against the front wall — small, but it puts something at human
   // height beside a door that is otherwise a flat panel
-  P.push(['box', doorX - 1.5, 0.42, fz + 0.35, 1.30, 0.14, 0.42, 'trim']);
-  P.push(['box', doorX - 1.5, 0.20, fz + 0.35, 1.10, 0.40, 0.10, 'trim']);
+  P.push(['box', doorX - 1.5, FOOT + 0.42, fz - 0.12, 1.30, 0.14, 0.42, 'trim']);
+  P.push(['box', doorX - 1.5, FOOT + 0.20, fz - 0.12, 1.10, 0.40, 0.10, 'trim']);
 }
 
 
