@@ -8466,7 +8466,7 @@ class Game {
     // clamp at cabY + cabH * 0.45, so they returned an identical eyeY and read
     // as "this parameter does nothing". 0.45 is the ceiling: higher puts the
     // eye through the roof and out of the glasshouse that culls it.
-    const T = (this._driverTune ??= { up: 0.45, fwd: 0.14, lookH: 1.15 });
+    const T = (this._driverTune ??= { up: 0.45, fwd: 0.14, lookH: 1.15, fov: 6 });
     const eyeH = cabY !== undefined
       ? clamp(cabY + cabH * T.up, cabY - cabH * 0.35, cabY + cabH * 0.45)
       : (M.h ?? 2.3);
@@ -8639,7 +8639,10 @@ class Game {
       // nearly double the speed stretch. Read off CAM_MODES so a view that
       // wants its own lens says so in one place instead of here.
       const MF = CAM_MODES[this.camMode] || CAM_MODES[0];
-      const fov = (this.baseFov ?? 56) + (MF.fov ?? 0)
+      // The seat's own widening is tunable at runtime so it can be SWEPT and
+      // measured (tools-scratch/fovshot.mjs) rather than picked by eye.
+      const modeFov = MF.driver ? (this._driverTune?.fov ?? MF.fov ?? 0) : (MF.fov ?? 0);
+      const fov = (this.baseFov ?? 56) + modeFov
         + this.fovKick * 8 + this._fovSpeed * (MF.spdFov ?? 6);
       if (Math.abs(fov - this.camera.fov) > 0.01) {
         this.camera.fov = fov;
