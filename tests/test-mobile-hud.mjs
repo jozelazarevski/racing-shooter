@@ -46,8 +46,15 @@ const SIZES = [
 // Everything the player has to be able to read or press. `contracts` is a
 // child of race-info and `joy-zone` is a deliberately huge invisible capture
 // area, so both are measured but excluded from the intersection test.
+//
+// THE TOP-RIGHT ICON BUTTONS WERE NEVER IN THIS LIST, and that is why this
+// suite passed while `#pause-btn` sat 24 x 32 px INSIDE `#t-shock` at 844x390.
+// Adding the driver's-view button pushed pause down into the weapon cluster and
+// nothing here noticed — a list of "everything the player has to be able to
+// press" that omits three buttons is a list that agrees with itself.
 const IDS = ['race-info', 'health-box', 'score-box', 'speed-box', 'feed', 'weapon-box',
-             't-fire', 't-missile', 't-mine', 't-shock', 't-nitro', 't-drift', 't-brake'];
+             't-fire', 't-missile', 't-mine', 't-shock', 't-nitro', 't-drift', 't-brake',
+             'cam-btn', 'view-btn', 'pause-btn'];
 
 for (const [w, h, tag] of SIZES) {
   const ctx = await browser.newContext({

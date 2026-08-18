@@ -84,10 +84,21 @@ for (const [lvl, what] of [[10, 'rockfall'], [14, 'burning treefall'], [15, 'ici
     for (let w = 0; w < 25 && !s.got; w++) await new Promise(r2 => setTimeout(r2, 180));
     clearInterval(iv);
     out.starGot = s.got === true;
-    // choppers spawn in roam
+    // FREE ROAM NO LONGER FIGHTS ANYTHING. The 40 s gunship timer and the 45 s
+    // raider timer were both gated on `freeRoam && !missionMode` — plain roam —
+    // and both were removed when roam became exploration and destruction-scoring
+    // ("remove the enemies from free roam").
+    //
+    // WALL-CLOCK WAITING CANNOT PROVE AN ABSENCE HERE. The old form waited 25 x
+    // 250 ms for a spawn; at the ~1.28 fps this game renders under swiftshader
+    // that is barely a dozen frames of GAME time, so it would have reported
+    // "no choppers" against the old code too, and passed the new code for the
+    // wrong reason. Game time is driven directly instead: ten simulated
+    // minutes of both spawners, during which nothing may appear.
     g.chopperTimer = 0;
-    for (let w = 0; w < 25 && g.choppers.length === 0; w++) await new Promise(r2 => setTimeout(r2, 250));
+    for (let k = 0; k < 60 * 600; k++) { g._updateChoppers(1 / 60); g._updateHostiles(1 / 60); }
     out.choppers = g.choppers.length;
+    out.hostiles = g.hostiles.length;
     // banking credits on exit
     const cr0 = g.garage.credits;
     g.score = 800;
@@ -97,7 +108,8 @@ for (const [lvl, what] of [[10, 'rockfall'], [14, 'burning treefall'], [15, 'ici
   });
   check('free roam active with 12 treasure stars', r.roam && r.stars === 12, JSON.stringify({ roam: r.roam, stars: r.stars }));
   check('star collectable by driving', r.starGot);
-  check('choppers spawn in free roam', r.choppers > 0, `${r.choppers}`);
+  check('free roam spawns no enemies at all', r.choppers === 0 && r.hostiles === 0,
+    `${r.choppers} choppers, ${r.hostiles} hostiles after 10 simulated minutes`);
   check('roam score banks into credits on exit', r.banked > 0, `+${r.banked}`);
   check('roam no errors', errors.length === 0, errors.slice(0, 2).join('|'));
   await page.close();
