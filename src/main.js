@@ -8466,7 +8466,22 @@ class Game {
     // clamp at cabY + cabH * 0.45, so they returned an identical eyeY and read
     // as "this parameter does nothing". 0.45 is the ceiling: higher puts the
     // eye through the roof and out of the glasshouse that culls it.
-    const T = (this._driverTune ??= { up: 0.45, fwd: 0.14, lookH: 1.15, fov: 6 });
+    // WIDER, asked for as "make the view a bit wider" — but widening ALONE makes
+    // the seat worse, because at 74 degrees the bonnet's edges are already off
+    // the frame and a wider lens pulls them back IN. Measured, mid-lap, at
+    // speed, as shares of the frame:
+    //
+    //     fov+  fwd    lens   bonnet    sky    ROAD
+    //      6   0.14     74     21.4%   32.4%   46.2%   <- r214
+    //     12   0.14     80     24.5%   34.0%   41.5%   widening alone: worse
+    //     12   0.42     80     19.3%   34.1%   46.6%   <- this
+    //     18   0.42     86     22.1%   35.5%   42.4%
+    //     24   0.14     92     29.6%   36.8%   33.6%
+    //
+    // So the widening is paid for by sliding the eye forward in the cabin: the
+    // extra bonnet the lens reveals ends up BEHIND the camera. 12/0.42 is wider
+    // than r214 and shows less bodywork and more road than it did.
+    const T = (this._driverTune ??= { up: 0.45, fwd: 0.42, lookH: 1.15, fov: 12 });
     const eyeH = cabY !== undefined
       ? clamp(cabY + cabH * T.up, cabY - cabH * 0.35, cabY + cabH * 0.45)
       : (M.h ?? 2.3);
