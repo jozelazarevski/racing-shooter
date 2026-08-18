@@ -72,6 +72,12 @@ for (const add of (process.env.FOVS ?? '6,12,18,24').split(',')) {
   const road = +(100 - r.body - r.sky).toFixed(1);
   console.log(` ${String(r.add).padStart(8)} | ${String(r.fov).padStart(10)} | `
     + `${String(r.body).padStart(5)}%  ${String(r.sky).padStart(5)}%  ${String(road).padStart(5)}%`);
-  await p.screenshot({ path: `/tmp/claude-0/-home-user-racing-shooter/5dbf1129-99d6-5790-8c20-c8eb78d4cc72/scratchpad/fov-${add}.png` });
+  // SANITISE THE NAME. `add` can be "12/-0.10" and a slash in the path made
+  // Playwright write into a directory that does not exist — the shot silently
+  // never landed and a STALE fov-12.png was read as the new one.
+  const tag = String(add).replace(/[^0-9a-zA-Z.-]/g, '_');
+  const shot = `/tmp/claude-0/-home-user-racing-shooter/5dbf1129-99d6-5790-8c20-c8eb78d4cc72/scratchpad/fov-${tag}.png`;
+  await p.screenshot({ path: shot });
+  console.log(`          shot: ${shot}`);
 }
 await b.close();
