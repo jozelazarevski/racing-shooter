@@ -8443,7 +8443,23 @@ class Game {
     // much bonnet a cockpit shows is the whole difference between "in the car"
     // and "behind a wall", and it is a screen-coverage question that cannot be
     // answered by reading numbers in this file — see tools-scratch/eyesweep.mjs.
-    const T = (this._driverTune ??= { up: 0.20, fwd: 0.14, lookH: 1.15 });
+    // MEASURED, NOT CHOSEN. Reported as the bonnet filling the screen. Pixel
+    // coverage of the player's own bodywork at a fixed station on PINE VALLEY,
+    // 430x932, at speed:
+    //
+    //     up    lookH   bonnet covers   its horizon
+    //     0.20  1.15        27.0%          63.9%     <- shipped in r213
+    //     0.45  1.15        21.4%          68.5%
+    //     0.20  6.00        20.8%          69.5%
+    //     0.45  6.00        18.7%          74.5%     <- this
+    //
+    // 18.7% is the FLOOR, not a preference: `lookH` 6 and 8 measure identically
+    // because the pitch cone caps upward aim at 0.104 * look (5.9 degrees), and
+    // that cap is deliberate — sky is never information. Eye height and forward
+    // offset are NOT levers here at all; both saturate against their own clamps
+    // (a 3x and a 7x sweep moved coverage by 4 points and returned an identical
+    // eyeY), which is why the r213 pass got nowhere by moving the seat around.
+    const T = (this._driverTune ??= { up: 0.45, fwd: 0.14, lookH: 6.0 });
     const eyeH = cabY !== undefined
       ? clamp(cabY + cabH * T.up, cabY - cabH * 0.35, cabY + cabH * 0.45)
       : (M.h ?? 2.3);
