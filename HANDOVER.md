@@ -707,6 +707,31 @@ was measured. It broke when the roster grew 67 -> 72 worlds and frames got
 slower. The feed is now filled AFTER the settle and measured on the next
 frame, so its lifetime cannot expire underneath the assertion.
 
+## test-nature's SEVEN FAILURES ARE PRE-EXISTING — MEASURED, NOT ASSUMED
+
+`test-nature` fails 7 assertions and it is tempting to pin them on r219's
+riverbed change, since one of them is literally about a river. It is not.
+Run against an r218 worktree (before that change) on a second port, the SAME
+SEVEN fail with numbers that barely move:
+
+    assertion                        r218                 r222
+    PINE VALLEY river uphill         1 rise, 0.36 u       1 rise, 0.37 u
+    PINE VALLEY trees buried         12/683, -3.08 u      12/683, -3.1 u
+    PINE VALLEY solids buried         6/183, -2.38 u       6/183, -2.4 u
+    LOG FLUME trees                  10/639, -3.6  u       9/639, -3.65 u
+    LOG FLUME solids                  1/160, -1.58 u       1/160, -1.64 u
+    FURKA RIDGE trees                10/735, -2.68 u      10/735, -2.68 u
+    FURKA RIDGE solids                8/469, -5.56 u       8/469, -5.56 u
+
+FURKA RIDGE settles it on its own: the water census records that world with
+NO RIVER AT ALL (`rivY null..null`), so buried trees and solids there cannot
+be anything to do with a riverbed. The drift on the PINE VALLEY and LOG FLUME
+rows is the culvert cap moving the bed a few centimetres, not the cause.
+
+They are real defects worth fixing — scenery placed below the ground it stands
+on — but they belong to the PLACEMENT builders, not to the river, and they
+predate every change in this session. Do not spend another round proving that.
+
 ## OPEN, LOWER PRIORITY
 - **`MIN` in `tunnelFitAt` is probably the same units error `reach` was.** The
   real minimum bore measures ~52 u against a documented ~26 u. Nothing depends
