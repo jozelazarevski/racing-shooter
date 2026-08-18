@@ -405,3 +405,43 @@ corner than chase. That is inherent to a 2.7 u eye and is why it is a toggle.
   flat world. The lying config was deleted rather than left in.
 - iOS cannot lock orientation from a manifest and has no meta equivalent. If
   landscape lock matters it needs an in-page portrait prompt — a design call.
+
+## r212 — THE TUNNEL RIDGE WAS BROKEN, AND FIXING IT MADE IT SMALLER
+r210 put mountains around the bores. `_tunnelRidge` had TWO bugs doing it, and
+they are the reported "levitating trees and rocks":
+
+1. The portal taper was `min(bi, len-1-bi)/3` on the nearest vertex INDEX — a
+   step function. Adjacent Voronoi cells differed by a third of the ridge
+   height: at 62 u that is a **20.7 u vertical cliff** in the height field every
+   ~6 u near each portal.
+2. `h = max(h, by + T.h * w)` scaled the ridge's HEIGHT but not its FLOOR, so
+   the instant `w` lifted off zero the ground jumped to the TUNNEL ROAD's
+   elevation. Measured on SUMMIT CLIMB at (25,-115), 68 u off the road: ground
+   went **-1.66 -> 36.54 between two mesh vertices 10 u apart**. The "mountain"
+   was largely a 148 u-radius PLATEAU at bore height.
+
+Nothing was actually floating: every scatter builder seats on `terrainHeight`
+and is right to. The ground the PLAYER SEES is a 10 u lattice of flat triangles,
+and where the field bends faster than a cell can follow, the chord runs far
+below the curve. Worst measured: `terrainHeight(-18,-30) = 49.18` against a
+drawn 21.8 — one cell spanning 56 u. This is why `tool-float-census` reports 0
+by construction: it compares against `terrainHeight`, the very function the
+placement already used.
+
+Fixes: project onto the tunnel LINE (continuous arc position, not a vertex
+index); lerp from the ground the ridge stands on, not from `by`; widen both
+ramps to what a 10 u mesh can draw, `RAMP = cell * sqrt(0.75*h/E)` (48 u at
+h=62). Then `_drawnGroundY` + `_seatY` seat 38 scatter call sites on the
+surface that is DRAWN. Floaters: SUMMIT CLIMB 139 -> 2, CAPE OLIVETO 149 -> 0,
+GLACIER COL 141 -> 5; 46 of 68 worlds score 0.
+
+**THE COST, AND WHY IT WAS NOT PAID BACK.** Making the ridge drawable made it
+smaller — GLACIER COL's crown 60.6 -> 34.5, SUMMIT CLIMB's 58.7 -> 16.4.
+`tune.tunnels.ridge` is the knob and raising it also widens RAMP (∝ sqrt h), so
+~140 would restore a ~70 u crown while staying drawable. IT WAS LEFT ALONE
+DELIBERATELY: the ridge is only the mound the bore passes through, and the
+enclosure the owner asked for comes from `valleyWalls`, which `test-mountainrun`
+measures directly and which is intact — GRANITE NARROWS 100% of flanks standing
+over the road, GLACIER COL 96%, TIMBER GORGE 96%, CAPE OLIVETO 92%, mean rise
+65-76 u, with OLIVE COAST holding at 0% as the control. 21/0. Reshaping worlds
+to chase a number no gate is failing is a change with no defect behind it.
