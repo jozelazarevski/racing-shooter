@@ -79,7 +79,11 @@ export const LEVELS = [
     tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0, tunnels: { count: 2 } } },
   { id: 23, name: 'OUNINPOHJA', theme: 'forest', route: 'ouninpohja', region: 'WORLD RALLY',
     // the fastest stage in the sport: everything is crests and yumps
-    tune: { elev: { amp: 4, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
+    tune: { // FINNISH HIGH SUMMER: a sun that barely sets, hard and colourless
+      sunColor: 0xfffaf0, sunIntensity: 3.2, sunEl: 0.44, sunAz: 1.15,
+      skyTop: '#1f6ad2', skyHorizon: '#e6f2fb', hemiSky: 0xc4e0fa, hemiIntensity: 0.95,
+      fogColor: 0xdcecf6, fogNear: 420, fogFar: 2000, cloudCount: 5, cloudOpacity: 0.7,
+      terrainLow: '#5c9a3c', terrainHigh: '#9cc464', elev: { amp: 4, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
   { id: 24, name: 'FAFE LEAP', theme: 'redwood', route: 'fafe', region: 'WORLD RALLY',
     tune: { elev: { amp: 8, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
   { id: 25, name: 'PIKES PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
@@ -135,7 +139,10 @@ export const LEVELS = [
   // circuit's). Appended, priced with explicit `cost` like every fresh
   // region, laddered so the collection spans a career.
   { id: 33, name: 'RED BULL RING', theme: 'alpine', route: 'rbring', region: 'GRAND CIRCUITS',
-    cost: 5, fresh: true, tune: { elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
+    cost: 5, fresh: true, tune: { // STYRIAN NOON: thin high-altitude air, hard shadows
+      sunColor: 0xfff4de, sunIntensity: 3.1, sunEl: 0.62, sunAz: 1.4,
+      skyTop: '#1c62c8', skyHorizon: '#cfe4f2', hemiSky: 0xa8ccf4, hemiIntensity: 0.7,
+      fogColor: 0xd2e4f0, fogNear: 480, fogFar: 2200, cloudCount: 6, cloudOpacity: 0.7, elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
   { id: 34, name: 'MONACO STREETS', theme: 'monteCarlo', route: 'monaco', region: 'GRAND CIRCUITS',
     cost: 6, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
   { id: 35, name: 'SILVERSTONE', theme: 'farmland', route: 'silverstone', region: 'GRAND CIRCUITS',
@@ -143,21 +150,52 @@ export const LEVELS = [
       sunColor: 0xe8e8e8, sunIntensity: 1.7, hemiIntensity: 1.05,
       skyTop: '#7a8a9a', skyHorizon: '#d8dde2', fogColor: 0xd0d6da, cloudCount: 22, cloudOpacity: 1, elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
   { id: 36, name: 'SPA-FRANCORCHAMPS', theme: 'forest', route: 'spa', region: 'GRAND CIRCUITS',
-    cost: 8, fresh: true, tune: { elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
+    cost: 8, fresh: true, tune: { // ARDENNES WEATHER: low cloud in the trees, no sun
+      sunColor: 0xdde6ec, sunIntensity: 1.55, hemiIntensity: 1.2,
+      hemiSky: 0x9db2c2, hemiGround: 0x54684e,
+      skyTop: '#65798c', skyHorizon: '#c6d3d9', sunGlow: 0xc8d4dc,
+      fogColor: 0xc0ccd2, fogNear: 190, fogFar: 1050, cloudCount: 26, cloudOpacity: 1, elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
   { id: 37, name: 'SUZUKA', theme: 'redwood', route: 'suzuka', region: 'GRAND CIRCUITS',
-    cost: 9, fresh: true, tune: { japan: { torii: 5, pagodas: 3 }, elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
+    cost: 9, fresh: true, tune: { // SPRING HAZE: a pale warm sky and soft shadows
+      sunColor: 0xffe4c0, sunIntensity: 2.15, sunEl: 0.52, sunAz: 2.4,
+      skyTop: '#79b2dc', skyHorizon: '#f6ead8', sunGlow: 0xffe8c8, hemiIntensity: 1.5,
+      hemiSky: 0xdcd0e4, hemiGround: 0x7a8a62,
+      fogColor: 0xe4e0da, fogNear: 170, fogFar: 1150, cloudCount: 14, cloudOpacity: 0.55, japan: { torii: 5, pagodas: 3 }, elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
   { id: 38, name: 'NORDSCHLEIFE', theme: 'forest', route: 'nordschleife', region: 'GRAND CIRCUITS',
-    cost: 10, fresh: true, tune: { elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
+    cost: 10, fresh: true, tune: { // EIFEL FIRST LIGHT: cold mist in the hollows
+      sunColor: 0xffdcae, sunIntensity: 2.0, sunEl: 0.17, sunAz: 2.05,
+      skyTop: '#39628f', skyHorizon: '#f0d6b4', sunGlow: 0xffd9a0,
+      hemiSky: 0x8fa8c4, hemiGround: 0x4e6440, hemiIntensity: 0.72,
+      fogColor: 0xc8d2c8, fogNear: 130, fogFar: 900, cloudCount: 18, cloudOpacity: 0.95, elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
   { id: 39, name: 'MONZA', theme: 'medterrace', route: 'monza', region: 'GRAND CIRCUITS',
-    cost: 11, fresh: true, tune: { elev: { amp: 1.5, ph: [1, 2, 3] }, rampCount: 0 } },
+    cost: 11, fresh: true, tune: { // LOMBARDY IN SEPTEMBER: hot, hazy, bleached
+      sunColor: 0xfff0cc, sunIntensity: 2.9, sunEl: 0.58,
+      skyTop: '#5f9ad2', skyHorizon: '#f4ecd6', hemiSky: 0xe0dcc8, hemiIntensity: 1.25,
+      fogColor: 0xe6ded0, fogNear: 240, fogFar: 1500, cloudCount: 4, cloudOpacity: 0.45,
+      terrainLow: '#6f8a44', terrainHigh: '#9aa864', elev: { amp: 1.5, ph: [1, 2, 3] }, rampCount: 0 } },
   { id: 40, name: 'MARINA BAY', theme: 'neon', route: 'marina', region: 'GRAND CIRCUITS',
-    cost: 12, fresh: true, tune: { rampCount: 0 } },
+    // FLOODLIT, NOT CYBERPUNK. This carried `{ rampCount: 0 }` and nothing
+    // else, so it was NEON GRID EXPRESSWAY's world with a different centreline
+    // — and measured as the most alike pair on the whole roster (0.098 against
+    // a 0.631 median, see the colour-signature sweep). The real race is run
+    // under warm-white floodlights over harbour water, which is the opposite
+    // end of the night from a magenta-and-cyan expressway.
+    cost: 12, fresh: true, tune: {
+      sunColor: 0xffeccc, sunIntensity: 2.4,             // floodlight, not moonlight
+      skyTop: '#0a1626', skyHorizon: '#28527e', sunGlow: 0xffe0a8,
+      hemiSky: 0x2e5680, hemiGround: 0x1a2634, hemiIntensity: 2.2,
+      hazeColor: 0xffc060, hazeOpacity: 0.3,             // sodium glow off the bay
+      fogColor: 0x10263c, fogNear: 300, fogFar: 1600, rampCount: 0 } },
   { id: 41, name: 'MOUNT PANORAMA', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
     cost: 13, fresh: true, tune: { // DUSK over the mountain: ember sky, violet ranges
       sunColor: 0xffb078, sunIntensity: 1.9, sunEl: 0.18, sunAz: 5.6,
       dusk: true, skyTop: '#6b62a0', skyHorizon: '#ffc79c', fogColor: 0xdec4b6, hemiIntensity: 0.9, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
   { id: 42, name: 'RALLYCROSS ARENA', theme: 'flume', route: 'rallyx', region: 'GRAND CIRCUITS',
-    cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
+    cost: 14, fresh: true, tune: { // LATE-AFTERNOON RALLYCROSS: raking backlight, long shadows
+      sunColor: 0xffd9a4, sunIntensity: 2.6, sunEl: 0.21, sunAz: 4.3,
+      skyTop: '#3d76b4', skyHorizon: '#f2d9b0', sunGlow: 0xffdca6,
+      hemiSky: 0xc8b8c8, hemiGround: 0x6a6248, hemiIntensity: 0.85,
+      fogColor: 0xdccdb4, fogNear: 260, fogFar: 1400, cloudCount: 12, cloudOpacity: 0.8, elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
   { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
     cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0,
       // AUTUMN: copper woods under a low golden sun
@@ -167,7 +205,11 @@ export const LEVELS = [
       skyTop: '#4a7ab8', skyHorizon: '#f0d8a8', fogColor: 0xe8d8b0,
       terrainLow: '#8a7a3e', terrainHigh: '#b89a58' } },
   { id: 44, name: 'LAGUNA SECA', theme: 'canyon', route: 'laguna', region: 'GRAND CIRCUITS',
-    cost: 16, fresh: true, tune: { elev: { amp: 9, ph: [1.9, 0.4, 2.6] }, rampCount: 0 } },
+    cost: 16, fresh: true, tune: { // MONTEREY MARINE LAYER burning off dry gold hills
+      sunColor: 0xfff2dc, sunIntensity: 2.5, sunEl: 0.46,
+      skyTop: '#7fa8c4', skyHorizon: '#e8eaea', hemiSky: 0xcdd8dc, hemiIntensity: 1.3,
+      fogColor: 0xdde2e0, fogNear: 200, fogFar: 1300, cloudCount: 16, cloudOpacity: 0.75,
+      terrainLow: '#9a8a4c', terrainHigh: '#c4b276', elev: { amp: 9, ph: [1.9, 0.4, 2.6] }, rampCount: 0 } },
   // the 25.8 km Corsican tarmac stage from the player's card: a 3000 u lap,
   // hairpin over hairpin, on the Mediterranean island theme
   { id: 45, name: 'TOUR DE CORSE', theme: 'medterrace', route: 'corse', region: 'GRAND CIRCUITS',
