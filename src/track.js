@@ -20322,6 +20322,58 @@ export class Track {
       const mesh = new THREE.Mesh(geo, mat);
       mesh.receiveShadow = true;
       this.group.add(mesh);
+
+      // ---- BANKS: A RIVER SITS IN THE GROUND, IT DOES NOT LIE ON IT --------
+      //
+      // Reported as "river is floating too", and it was: everything above
+      // builds the WATER SURFACE and nothing joined its edge to the ground.
+      // The surface is deliberately LEVEL along a reach (NATURE rule 3, and
+      // the fix for "waterfalls should fall vertically"), so the moment the
+      // bed falls under a held reach — or the stream crosses a slope, where
+      // one edge is simply lower than the other — the slab stands proud with
+      // daylight under it, and a DoubleSide material renders its underside.
+      //
+      // Draping the water on the terrain would fix the gap and reintroduce the
+      // sloping-water bug it was written to cure. So the water keeps its level
+      // and the BANK closes the gap: an upright skirt from each water edge
+      // down to the ground beneath THAT edge, which is what a cut bank is.
+      // Emitted only where the ground is actually lower — on the uphill side
+      // the terrain already meets the water and a skirt would poke through it.
+      const bv = [], bu = [], bi = [];
+      let bbase = 0;
+      const bank = (ax, az, bx, bz, topA, topB, u0, u1) => {
+        const gA = this.terrainHeight(ax, az) - 0.35;
+        const gB = this.terrainHeight(bx, bz) - 0.35;
+        if (topA - gA < 0.05 && topB - gB < 0.05) return;      // ground is already there
+        bv.push(ax, topA, az, ax, Math.min(gA, topA), az,
+          bx, topB, bz, bx, Math.min(gB, topB), bz);
+        bu.push(u0, 1, u0, 0, u1, 1, u1, 0);
+        bi.push(bbase, bbase + 1, bbase + 2, bbase + 1, bbase + 3, bbase + 2);
+        bbase += 4;
+      };
+      for (let s2 = 0; s2 < SEGS; s2++) {
+        const a = path[s2], b2 = path[s2 + 1];
+        for (const sgn of [1, -1]) {
+          bank(a.x + a.nx * sgn, a.z + a.nz * sgn,
+            b2.x + b2.nx * sgn, b2.z + b2.nz * sgn,
+            a.y, Math.min(a.y, b2.y), a.t * 6, b2.t * 6);
+        }
+      }
+      if (bbase) {
+        const bgeo = new THREE.BufferGeometry();
+        bgeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bv), 3));
+        bgeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(bu), 2));
+        bgeo.setIndex(bi);
+        bgeo.computeVertexNormals();
+        const btex = riverBankTexture(this.T.riverBank);   // a PALETTE, not a colour string
+        btex.anisotropy = 4;
+        const bmesh = new THREE.Mesh(bgeo, new THREE.MeshStandardMaterial({
+          map: btex, roughness: 1, metalness: 0, side: THREE.DoubleSide,
+        }));
+        bmesh.receiveShadow = true;
+        bmesh.name = 'river-bank';
+        this.group.add(bmesh);
+      }
     }
   }
 
