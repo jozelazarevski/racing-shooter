@@ -8045,8 +8045,11 @@ class Game {
     if (this._dWasDriver) {
       this._dWasDriver = false;
       if (p.mesh) p.mesh.visible = p.alive;
-      // and the brand comes back the moment you are outside the car again
+      // and the brand comes back the moment you are outside the car again,
+      // while the interior goes away — it would show through the windows
       for (const d of p.mesh?.userData?.outwardDecals ?? []) d.visible = true;
+      const pit = p.mesh?.userData?.cockpit;
+      if (pit) pit.visible = false;
     }
     // Chase views used to sit rigidly behind the car's RAW heading, so every
     // steering flick and every drift whipped the whole view sideways — that
@@ -8389,6 +8392,17 @@ class Game {
     // and it is the APEX-in-mirror-writing in the report. Back-face culling
     // cannot help: this is the decal's front face. Hidden for the seat only.
     for (const d of p.mesh?.userData?.outwardDecals ?? []) d.visible = false;
+    // AND THE INSIDE OF THE CAR COMES ON. Built with the body (vehicles.js) and
+    // hidden everywhere else, because from a chase camera a dashboard sitting
+    // in the middle of the shell is visible through the windows.
+    const pit = p.mesh?.userData?.cockpit;
+    if (pit) pit.visible = true;
+    // The wheel is the one piece that is not furniture: it answers the steering
+    // the way the car does, off the SMOOTHED input rather than the raw axis, so
+    // it does not twitch. ~1.6 rad of lock each way reads as a wheel being
+    // turned rather than a dial being spun.
+    const w = p.mesh?.userData?.wheel;
+    if (w) w.rotation.y = -(p.steerSmooth ?? 0) * 1.6;
 
     // ---- where the head is pointed -----------------------------------------
     // The car's own heading leads, because that is what a driver's head does.
@@ -8481,7 +8495,13 @@ class Game {
     // So the widening is paid for by sliding the eye forward in the cabin: the
     // extra bonnet the lens reveals ends up BEHIND the camera. 12/0.42 is wider
     // than r214 and shows less bodywork and more road than it did.
-    const T = (this._driverTune ??= { up: 0.45, fwd: 0.42, lookH: 1.15, fov: 12 });
+    // RE-SEATED FOR THE INTERIOR. The numbers above were found with the cabin
+    // EMPTY, and they do not survive furnishing it: fwd 0.42 puts the eye
+    // inside the dash slab (which spans cabZ + 0.03..0.45 of cabL) and up 0.45
+    // puts it level with the header. The eye now sits BEHIND the dash and at a
+    // driver's eye line, which is what makes the dash, the pillars and the
+    // wheel read as a car around you rather than clip through the lens.
+    const T = (this._driverTune ??= { up: 0.18, fwd: -0.10, lookH: 1.15, fov: 12 });
     const eyeH = cabY !== undefined
       ? clamp(cabY + cabH * T.up, cabY - cabH * 0.35, cabY + cabH * 0.45)
       : (M.h ?? 2.3);

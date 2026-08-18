@@ -354,6 +354,74 @@ export function buildVoxelRacer(spec) {
   box(cabW - 0.15, 0.1, capL + 0.1, capMat, 0, cabY + cabH / 2 + 0.05, capZ);
   const capTop = cabY + cabH / 2 + 0.1;
 
+  // ---- THE INSIDE OF THE CAR --------------------------------------------
+  //
+  // Asked for as "as with real car": from the seat you should see a car around
+  // you, not a bonnet floating in front of open air. None of the bodywork above
+  // has an inside — the greenhouse is a closed box whose faces all cull when
+  // you are within it — so the cabin gets its own furniture, built to the SAME
+  // cabW/cabH/cabL the glasshouse used, which is what makes it fit all eight
+  // body styles instead of one.
+  //
+  // It is hidden by default and shown only by the driver's view. Every other
+  // camera is outside the car, where a dashboard floating in the middle of the
+  // shell would be visible through the windows.
+  //
+  // Plain FrontSide boxes are enough, and deliberately so: the dash is seen
+  // from ABOVE (its top face points at the eye), the header from BELOW, the
+  // pillars edge-on. Nothing here needs DoubleSide, so nothing here can leak
+  // out through the bodywork when seen from a chase camera.
+  {
+    const inner = mat(0x141210, { roughness: 0.85, metalness: 0.05 });
+    const trim = mat(0x2a2622, { roughness: 0.7, metalness: 0.12 });
+    const cockpit = new THREE.Group();
+    cockpit.name = 'cockpit';
+    const put = (w, h, d, m, x, y, z, rx = 0) => {
+      const q = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+      q.position.set(x, y, z); if (rx) q.rotation.x = rx;
+      cockpit.add(q); return q;
+    };
+    const fz = cabZ + cabL / 2;          // the windscreen end of the cabin
+    // DASH: a slab across the cabin, dropping away from the screen base. Its
+    // top is what you look over, so it sits well below the eye line.
+    put(cabW * 0.94, 0.16, cabL * 0.42, inner, 0, cabY - cabH * 0.30, fz - cabL * 0.26, -0.18);
+    // instrument binnacle, offset to the driver's side
+    put(cabW * 0.34, 0.10, 0.34, trim, -cabW * 0.18, cabY - cabH * 0.20, fz - cabL * 0.30, -0.30);
+    // SCUTTLE: the lip where the dash meets the screen, the thing that makes a
+    // windscreen read as a windscreen rather than as a hole.
+    put(cabW * 0.96, 0.07, 0.10, trim, 0, cabY - cabH * 0.16, fz - 0.06);
+    // A-PILLARS, raked back with the screen
+    for (const sgn of [-1, 1]) {
+      put(0.10, cabH * 0.95, 0.12, inner, sgn * cabW * 0.45, cabY + cabH * 0.06, fz - 0.16, 0.30);
+      // door top / shoulder line, running back from the pillar
+      put(0.08, 0.09, cabL * 0.72, trim, sgn * cabW * 0.47, cabY - cabH * 0.26, cabZ - cabL * 0.06);
+    }
+    // HEADER above the screen, and the roof lining behind it
+    put(cabW * 0.94, 0.10, 0.16, inner, 0, cabY + cabH * 0.44, fz - 0.12);
+    put(cabW * 0.90, 0.06, cabL * 0.55, inner, 0, cabY + cabH * 0.47, cabZ - cabL * 0.12);
+    // STEERING WHEEL — a ring on a short column, tilted toward the driver. It
+    // is turned by the camera each frame (see _driverCamera), which is the one
+    // piece of this that is not static furniture.
+    const wheel = new THREE.Group();
+    wheel.name = 'wheel';
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.030, 8, 22), inner);
+    wheel.add(rim);
+    for (const a of [0, 2.094, 4.189]) {
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.028, 0.028), trim);
+      spoke.position.set(Math.cos(a) * 0.12, Math.sin(a) * 0.12, 0);
+      spoke.rotation.z = a;
+      wheel.add(spoke);
+    }
+    wheel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.10, 8), trim));
+    wheel.position.set(-cabW * 0.18, cabY - cabH * 0.34, fz - cabL * 0.40);
+    wheel.rotation.x = Math.PI / 2 - 0.42;      // tilted, not flat
+    cockpit.add(wheel);
+    cockpit.visible = false;                    // the seat turns it on
+    g.userData.cockpit = cockpit;
+    g.userData.wheel = wheel;
+    g.add(cockpit);
+  }
+
   // ---- livery: stripes running deck -> hood slope -> roof cap ----
   if (stripe) {
     const sm = mat(stripe[0]);
