@@ -8037,6 +8037,25 @@ class Game {
     // driver's seat there is no such line: the lens is the car. Running that
     // machinery on it would lift the eye over the hill ahead, slide it off a
     // trunk it is nowhere near, and lerp it out of the cabin on every corner.
+    // THE SEAT NEEDS A CLOSER NEAR PLANE THAN A BOOM DOES, and this is the
+    // whole of "there is the bug in the view".
+    //
+    // Measured on REDWOOD RAMPAGE by unprojecting the frame's own pixels: at
+    // 70% down the ray meets bodywork at 2.1 u, and at 80% and 92% it meets
+    // bodywork at 0.3 u — INSIDE the 0.5 near plane the chase cameras use. So
+    // the bottom third of the seat's view was not a dark object, it was
+    // geometry CLIPPED AWAY, rendering as background. That is why hiding the
+    // cockpit, the whole car, the shadows and even the road changed the black
+    // by nothing: there was never anything being drawn there to hide.
+    //
+    // 0.12 clears the closest bodywork with room to spare. It is restored to
+    // 0.5 the moment any other view is selected, because a near plane that
+    // small costs depth precision at distance and no boom needs it.
+    const wantNear = M.driver ? 0.12 : 0.5;
+    if (this.camera.near !== wantNear) {
+      this.camera.near = wantNear;
+      this.camera.updateProjectionMatrix();
+    }
     if (M.driver) { this._driverCamera(dt, M); this._applyCamera(dt, speedZoom, M); return; }
     // Leaving the seat: re-seed the smoothed state next time. The visibility
     // line is no longer undoing anything (the seat draws the car now that the
