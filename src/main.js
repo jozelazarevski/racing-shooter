@@ -8472,8 +8472,13 @@ class Game {
       : (M.h ?? 2.3);
     // Sit a little forward of the cabin's centre, the way a driver does, but
     // never out through the windscreen.
+    // The cap was 0.45 and it bound at almost every setting, which is why an
+    // earlier sweep of `fwd` returned identical rows. It is now bounded by the
+    // CABIN the eye has to stay inside — 42% of the cabin's length forward of
+    // its centre is still well within the glasshouse whose back faces cull, and
+    // that is what keeps the body drawable from in here.
     const eyeZ = rig?.cabZ !== undefined
-      ? rig.cabZ + Math.min(0.45, cabL * T.fwd) : -(M.back ?? -0.42);
+      ? rig.cabZ + Math.min(cabL * 0.42, cabL * T.fwd) : -(M.back ?? -0.42);
     const cp = this.camPos;
     cp.set(p.pos.x, p.pos.y + eyeH, p.pos.z)
       .addScaledVector(fwd, eyeZ - this._dSurge * 0.16)
