@@ -346,11 +346,22 @@ await page.evaluate(() => {
       tested++;
       let gap = p.y0 - gy;
       if (gap > MINGAP) {
-        rc.set(from.set(p.cx, p.y0 - 0.02, p.cz), dn);
-        rc.near = 0; rc.far = gap;
+        // START THE RAY ABOVE THE BASE, NOT BELOW IT. It used to launch from
+        // `y0 - 0.02`, so a part resting EXACTLY on a surface had that surface
+        // behind the ray and got no hit at all — the arbiter could only ever
+        // confirm things that were already floating. That is why 87 saguaros
+        // standing on CANYON RUN's cliff ribbon were reported at 40 u: the
+        // ribbon was 0.5 u ABOVE each ray's origin. Launching from y0 + LIFT
+        // and subtracting it back measures the real gap either way.
+        const LIFT = 1.0;
+        rc.set(from.set(p.cx, p.y0 + LIFT, p.cz), dn);
+        rc.near = 0; rc.far = gap + LIFT;
         let hit = null;
         try { hit = rc.intersectObjects(rayList, false)[0]; } catch (e) { hit = null; }
-        if (hit && hit.distance < gap - 0.4) gap = hit.distance;
+        if (hit) {
+          const rayGap = hit.distance - LIFT;      // negative = its base is buried
+          if (rayGap < gap) gap = Math.max(0, rayGap);
+        }
       }
       if (gap > MINGAP) {
         over++;
