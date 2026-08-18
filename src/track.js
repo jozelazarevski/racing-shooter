@@ -4489,6 +4489,72 @@ export const HOUSE_TEMPLATES = {
 export const COTTAGES = ['cottageA', 'cottageB', 'cottageC',
   'cottageD', 'cottageE', 'cottageF', 'cottageG', 'cottageH'];
 
+// ---- DRESSING: the details that make a dwelling read as LIVED IN ----------
+//
+// Asked for as "add more details to the building". The templates above already
+// carry the STRUCTURE — reveals, hoods, downpipes, ridge caps, chimney pots —
+// and the thing they were missing is everything a person puts on a house
+// afterwards. That is a different kind of part: it is small, it is off-axis,
+// and there is a lot of it, which is exactly the sort of list nobody should
+// hand-write eight times. So it is generated from the few numbers that differ
+// per dwelling instead of transcribed into each one.
+//
+// WHY THIS IS SAFE TO ADD. A template is a static part list, so nothing here
+// touches the seeded RNG stream and no scenery anywhere moves — the trap
+// recorded in HANDOVER about builder counts cascading does not apply. And
+// every part is anchored to the template's OWN wall face and eaves height, so
+// a cottage with a 3.6 u wall and one with a 5.2 u wall each get their shutters
+// at their own window height rather than at a constant that suits neither.
+//
+// WHAT EARNS ITS PLACE AT 150 km/h is depth and colour, not texture: shutters
+// and sills throw their own shadow, a woodpile and a water butt break the
+// ground line, and a lamp by the door is the one warm accent on a cold wall.
+const DRESS = {
+  //          halfW  wallTop  frontZ  winY  winX  doorX
+  cottageA: [ 3.25,  4.00,    2.60,   1.60, 1.90, 0.00 ],
+  cottageB: [ 2.55,  5.60,    2.70,   2.20, 1.50, 0.00 ],
+  cottageC: [ 3.30,  4.20,    2.80,   1.70, 1.95, 0.00 ],
+  cottageD: [ 3.10,  4.30,    2.70,   1.75, 1.80, 0.00 ],
+  cottageE: [ 3.00,  4.10,    2.65,   1.65, 1.75, 0.00 ],
+  cottageF: [ 3.20,  4.40,    2.75,   1.80, 1.85, 0.00 ],
+  cottageG: [ 3.15,  4.20,    2.70,   1.70, 1.80, 0.00 ],
+  cottageH: [ 3.05,  4.60,    2.70,   1.85, 1.75, 0.00 ],
+  house:    [ 3.60,  5.35,    3.10,   2.30, 2.30, -0.60 ],
+};
+for (const [name, d] of Object.entries(DRESS)) {
+  const tpl = ELEMENTS[name];
+  if (!tpl) continue;                       // a renamed template must not throw
+  const [halfW, wallTop, fz, winY, winX, doorX] = d;
+  const P = tpl.parts;
+  // GUTTER along the eaves — one thin box, and the shadow line under it is
+  // what separates roof from wall at any distance.
+  P.push(['box', 0, wallTop - 0.16, fz + 0.10, halfW * 2 + 0.3, 0.14, 0.18, 'trim']);
+  for (const sx of [-1, 1]) {
+    // shutters flanking each front window, and a sill under it
+    P.push(['box', sx * (winX + 0.62), winY, fz + 0.02, 0.30, 1.05, 0.10, 'wall2']);
+    P.push(['box', sx * winX, winY - 0.60, fz + 0.08, 1.20, 0.12, 0.30, 'trim']);
+    // window box on the sill: the only saturated colour on the face
+    P.push(['box', sx * winX, winY - 0.44, fz + 0.14, 0.86, 0.22, 0.24, 'roof']);
+    // corner quoins, alternating up the angle of the wall
+    for (let k = 0; k < 3; k++) {
+      P.push(['box', sx * halfW, 0.7 + k * 1.1, fz - 0.25, 0.34, 0.42, 0.30, 'stone']);
+    }
+  }
+  // lamp beside the door, on its bracket
+  P.push(['cyl', doorX + 0.95, winY + 0.75, fz + 0.10, 0.06, 0.36, 0.06, 'trim']);
+  P.push(['box', doorX + 0.95, winY + 1.02, fz + 0.10, 0.26, 0.22, 0.26, 'wall2']);
+  // water butt under the downpipe corner, and a woodpile along the flank
+  P.push(['cyl', halfW - 0.35, 0.0, fz - 0.55, 0.36, 0.95, 0.36, 'wall2']);
+  for (let k = 0; k < 3; k++) {
+    P.push(['cyl', -halfW - 0.28, 0.28 + k * 0.5, -0.6, 0.26, 2.3, 0.26, 'trim', Math.PI / 2]);
+  }
+  // a bench against the front wall — small, but it puts something at human
+  // height beside a door that is otherwise a flat panel
+  P.push(['box', doorX - 1.5, 0.42, fz + 0.35, 1.30, 0.14, 0.42, 'trim']);
+  P.push(['box', doorX - 1.5, 0.20, fz + 0.35, 1.10, 0.40, 0.10, 'trim']);
+}
+
+
 const ELEMENT_KITS = {
   alpine: {
     wall: 0xe2d6bc, wall2: 0x9c6c40, roof: 0x7a4630, trim: 0x5d4426, stone: 0x9a978e,
