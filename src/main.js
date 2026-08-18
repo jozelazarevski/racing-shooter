@@ -8039,6 +8039,8 @@ class Game {
     if (this._dWasDriver) {
       this._dWasDriver = false;
       if (p.mesh) p.mesh.visible = p.alive;
+      // and the brand comes back the moment you are outside the car again
+      for (const d of p.mesh?.userData?.outwardDecals ?? []) d.visible = true;
     }
     // Chase views used to sit rigidly behind the car's RAW heading, so every
     // steering flick and every drift whipped the whole view sideways — that
@@ -8374,6 +8376,13 @@ class Game {
     //
     // Reported as "drivers view should be looking from inside the car".
     if (p.mesh) p.mesh.visible = true;
+    // ONE THING DOES HAVE TO GO, AND IT IS NOT BODYWORK. The brand decal is a
+    // textured plane laid on the hood slope "reading right-side-up from the
+    // car's FRONT" (vehicles.js). A driver sits behind it and reads it
+    // backwards — measured as a white mapped plane at 71% of a 430x932 frame,
+    // and it is the APEX-in-mirror-writing in the report. Back-face culling
+    // cannot help: this is the decal's front face. Hidden for the seat only.
+    for (const d of p.mesh?.userData?.outwardDecals ?? []) d.visible = false;
 
     // ---- where the head is pointed -----------------------------------------
     // The car's own heading leads, because that is what a driver's head does.

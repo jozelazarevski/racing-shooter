@@ -700,6 +700,15 @@ export function buildVoxelRacer(spec) {
       decal.position.set(0, capTop + 0.045, style === 'dune' ? capZ - 0.2 : capZ);
       if (style === 'dune') decal.scale.set(0.85, 0.85, 1);
     }
+    // READ FROM OUTSIDE, SO IT COMES OFF FROM INSIDE. The comment above says it
+    // exactly: this reads right-side-up FROM THE CAR'S FRONT. A driver is
+    // behind it, so from the seat the brand renders in mirror writing — which
+    // is what "APEX" across the bottom of the driver's-view screenshot was.
+    // Culling does not save us here: we are looking at the decal's FRONT face.
+    // Tagged rather than hidden outright, because from every other camera it is
+    // correct and wanted.
+    decal.name = 'brand-decal';
+    (g.userData.outwardDecals ??= []).push(decal);
     g.add(decal);
   }
 
