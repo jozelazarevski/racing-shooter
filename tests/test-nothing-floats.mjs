@@ -435,7 +435,7 @@ const ctrl = await page.evaluate(async ({ MINGAP }) => {
 }, { MINGAP: MIN });
 check('LAW 2  a deliberately unseated instance is DETECTED (positive control)',
   ctrl.lifted && ctrl.after > ctrl.before,
-  `PINE VALLEY ${ctrl.what} x${ctrl.n}: ${ctrl.before} floating -> ${ctrl.after} after lifting one slot 6 u`);
+  `PINE VALLEY ${ctrl.what} x${ctrl.n}: ${ctrl.before} floating -> ${ctrl.after} after lifting every slot 6 u`);
 
 // ---- LAW 3: nothing floats, roster-wide ------------------------------------
 for (const r of results) {

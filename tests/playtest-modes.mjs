@@ -42,14 +42,31 @@ for (const [lvl, what] of [[10, 'rockfall'], [14, 'burning treefall'], [15, 'ici
       p.pos.x = c.x; p.pos.z = c.z;
       p.vel.copy(p.forward).multiplyScalar(34);
     }, 45);
-    let spawned = 0, landed = 0;
-    for (let w = 0; w < 70; w++) {
-      await new Promise(r2 => setTimeout(r2, 400));
+    // GAME TIME, NOT WALL CLOCK. This loop used to be 70 x 400 ms of wall clock,
+    // which at the ~1.28 fps this game renders under swiftshader is a second or
+    // two of GAME time — against a hazard whose `period` is 6. Whether an icicle
+    // had landed yet was therefore a coin flip, and it flipped: two runs of the
+    // SAME code 20 minutes apart reported landed 1 (pass) and landed 0 (fail).
+    // The other two worlds passed for the same accidental reason, not a better
+    // one. `_updateWorldHazards` both spawns fallers and lands them, so it is
+    // driven directly for 120 simulated seconds — twenty of the longest period
+    // on the roster — and the rail moves the player in the SAME loop so spawn
+    // placement still tracks a moving car. Same trap as the chopper check below.
+    clearInterval(rail);
+    let spawned = 0, landed = 0, simT = 0;
+    for (let k = 0; k < 60 * 120; k++) {
+      const next = (p.trackIndex + 4) % t.N;
+      const c = t.pointAt(next, 0);
+      p.heading = t.headingAt(next);
+      p.pos.x = c.x; p.pos.z = c.z;
+      p.vel.copy(p.forward).multiplyScalar(34);
+      p.trackIndex = next;
+      simT += 1 / 60;
+      g._updateWorldHazards(1 / 60, simT);
       spawned = Math.max(spawned, g.fallers.length);
-      landed += g.fallers.filter(f => f.landed && !f._counted && (f._counted = 1)).length;
+      landed += g.fallers.filter((f) => f.landed && !f._counted && (f._counted = 1)).length;
       if (spawned > 0 && (landed > 0 || shatters > 0)) break;
     }
-    clearInterval(rail);
     return { spawned, landed: landed || shatters, period: t.T.fallHazard?.period };
   });
   check(`L${lvl} ${what} spawns and lands during a race`, r.spawned > 0 && r.landed > 0, JSON.stringify(r));
