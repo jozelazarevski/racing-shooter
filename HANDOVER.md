@@ -25,6 +25,72 @@ promise made over a wider span than the thing that keeps it.** See item 2 — an
 look for the same shape next in `tunnelFitAt`, `_buildStoneBridges` and the
 26-30 sample start-gate skip every builder carries.
 
+## THE r219 VISUAL SWEEP — what was driven, what was found, what was NOT there
+
+Every one of the 67 worlds was DRIVEN for 40 s and shot every 5 s from the
+CHASE camera with the HUD on (`tools-scratch/tour.mjs`, 536 frames). Read this
+before spending a session hunting any of it again.
+
+**Three defects, all fixed, all measured either side:**
+
+1. THE SPEEDOMETER WAS A LID OVER THE CAR. The dial is a fixed 132 px at
+   `left:50%` and the player's car sits at the bottom CENTRE of the frame in
+   every camera but the driver's seat. Measured in pixels by rendering each
+   view twice, once with the car keyed: at 1440x810 the DEFAULT view had 100%
+   of the car behind the dial; at 800x460 it was TOP-DOWN 66, TOP FAR 100,
+   TRAIL 59, CHASE 100, CHASE FAR 100. The car's footprint is a fixed FRACTION
+   of the viewport (x 0.478-0.521 W, y 0.78-0.914 H) and the dial is fixed px,
+   which is why a short window loses the chase views too. `left:62%` now; 0% at
+   both sizes. THE PHONE LAYOUT IS DELIBERATELY UNTOUCHED — at 390 px there is
+   no room to the right of the car, and `body.touch` is hand-tuned against the
+   joystick and the weapon buttons.
+2. THE START LINE SCOLDED YOU FOR CROSSING IT. `gridSlot(0)` is index N-10, so
+   every race begins BEHIND the line and crosses it about a second after "GO!"
+   — with `_cpMask` at 0, which `checkLap` could not tell from an infield cut.
+   Every world, every race, opened with a full-screen "CHECKPOINT MISSED — LAP
+   NOT COUNTED" (PINE VALLEY 1.10 s, EMBER PASS 0.93 s, TREMOLA 0.98 s).
+   `_gridStart` now absorbs exactly that one crossing. The lap arithmetic never
+   changed — it never earned a lap and still does not.
+3. NINE WORLDS WERE ANOTHER WORLD'S PICTURE. Each world reduced to a 6x6x6 RGB
+   histogram over the non-HUD frame, every pair ranked (`similar.py`). Median
+   over 2211 pairs 0.631; the head of the list was duplication, not family
+   resemblance — NEON GRID vs MARINA BAY at **0.098**, four `forest` worlds at
+   0.126-0.137, MONZA/SALINE 0.137, REDWOOD/SUZUKA 0.142, FLUME/RALLYCROSS
+   0.163, CANYON RUN/LAGUNA SECA 0.205. All nine carried elevation and ramp
+   counts and no light of their own, while SILVERSTONE, MOUNT PANORAMA, OULTON
+   PARK and ESTONIA CRESTS already had one. Nine named weathers later, the
+   worst pair on the roster is 0.152 and every one of those pairs is out of the
+   top 25. Per-world mean luminance is unchanged (MARINA BAY 27.4 -> 28.1, the
+   darkest either way).
+
+**And the thing that is NOT there, so nobody re-hunts it: THE ROSTER HAS NO
+FLOATERS.** `tests/tool-float-census.mjs` still reports thousands, and on this
+roster it is answering a different question wrongly three ways — one ribbon
+mesh spanning a canyon covers every column under it, a boat on the sea has only
+excluded water beneath it, and a foot-bridge is MEANT to be in the air. Swept
+by RAYCAST instead (`treegap.mjs`, `standcheck.mjs`): PINE VALLEY has 15 of 743
+plants off by more than 1 u and every one of them is SUNK, not floating;
+CANYON RUN and ROCKFALL RAVINE — the census's worst offenders at 51 u — are
+clean. What survives the ray is start gantries, arch checkpoints, campanile
+belfries, tyre stacks and bridge decks, every one of them overhead on purpose.
+r218's "floaters killed at source" did the job.
+
+**Reported, not fixed — each one is a judgement call, not a defect:**
+- MOUNTAIN TO SEA's `roadWidth: 5` reads as a cobbled plain rather than a road.
+  The road UV maps u = 0..1 across the FULL ribbon width whatever it is, so a
+  95 u carriageway stretches one texture across all of it. It cannot simply be
+  tiled: `roadTexture` bakes the verge fringe into the u extremes and wraps
+  ClampToEdge, so tiling u would draw five sets of verges across the road.
+  Fixing it properly means separating the fringe from the surface.
+- The Mediterranean set (CINQUE TERRE, AEGEAN, BRAVA, DALMATIA, AZUR, CITADEL,
+  CLIFF KNOT, SEA CLIFF RUN, HARBOR QUAY) still reads as one place from the
+  seat — cobbles, orange roofs, a hill town. themes.js says that cloning was
+  deliberate and gives each its own element kit and frontage tints; what they
+  share is the ROAD SURFACE and the composition, not the palette. HARBOR QUAY
+  vs CITADEL BAY at 0.152 is now the closest pair on the roster.
+- CANYON RUN's bore interior is near-black from the seat. Every other tunnel
+  world reads the same way. Nothing measures tunnel-interior luminance yet.
+
 ## THE THREE THINGS THAT MATTER, IN ORDER
 
 ### 1. Rival pace — and the number that does not exist. STILL THE TOP ITEM.
