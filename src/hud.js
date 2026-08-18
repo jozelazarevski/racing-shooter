@@ -370,9 +370,38 @@ export class Hud {
   damageFlash(strength = 0.7) { this.vignetteLevel = Math.min(1.2, this.vignetteLevel + strength); }
 
   feed(text, kind = 'info') {
+    // A REPEAT IS A COUNT, NOT ANOTHER ROW.
+    //
+    // Nothing here asked what was already on screen, so any message that fires
+    // faster than its own 3.3 s life stacked. Driving 500 u off the course
+    // photographed FIVE identical "OFF THE COURSE — TURN BACK" rows filling
+    // the right-hand column, and the same shape shows up on the racing line
+    // with SLIPSTREAM, WET TIRES and TIMBER! (measured: 2 of 4 worlds hold a
+    // duplicate pair within one lap). The warning still nags — it just nags
+    // in one row, with a tally, which is also how you can tell nine of them
+    // from two.
+    // ...and it searches EVERY row on screen, not just the newest. Matching
+    // only the last one collapsed A A but not A B A, which is the common case
+    // once two systems are talking at once: PINE VALLEY still held three
+    // "WET TIRES" rows with the last-only test, because a TIMBER! landed
+    // between them.
+    let dupe = null;
+    for (const row of this.el.feed.children) {
+      if (row.dataset.feedText === text && row.dataset.feedKind === kind) { dupe = row; break; }
+    }
+    if (dupe) {
+      const n = (+dupe.dataset.feedN || 1) + 1;
+      dupe.dataset.feedN = n;
+      dupe.textContent = `${text}  ×${n}`;
+      clearTimeout(+dupe.dataset.feedTimer);
+      dupe.dataset.feedTimer = setTimeout(() => dupe.remove(), 3300);
+      return;
+    }
     const div = document.createElement('div');
     div.className = `feed-msg ${kind}`;
     div.textContent = text;
+    div.dataset.feedText = text;
+    div.dataset.feedKind = kind;
     this.el.feed.appendChild(div);
     // FIVE MESSAGES DO NOT FIT ON A SMALL PHONE. The cap used to be a flat 5,
     // which is about 160px of stacked rows — fine on a desktop, but on a
@@ -383,7 +412,7 @@ export class Hud {
     // control. Oldest rows go first, so the newest message is always the one
     // that survives.
     while (this.el.feed.children.length > this._feedRows()) this.el.feed.firstChild.remove();
-    setTimeout(() => div.remove(), 3300);
+    div.dataset.feedTimer = setTimeout(() => div.remove(), 3300);
   }
 
   centerMsg(text) {

@@ -144,7 +144,26 @@
   #shock-status{color:#d8c090}
   #shock-status.ready{color:#7fd4ff;text-shadow:1px 1px 0 var(--ink);animation:blink 1.2s steps(2) infinite}
 
-  #feed{position:absolute;top:104px;right:12px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  /* THE FEED RAN UNDER THE BUTTONS. `#cam-btn` is top:70 right:12 and
+     `#pause-btn` top:124 right:12, both 46px square, so the two of them own a
+     70px-wide column down the right edge from y=70 to y=170 — and the feed was
+     anchored at right:12px top:104px, straight into it. MEASURED as real
+     overlapping pixels between the live rects, not read off this stylesheet:
+     828 px² of a feed row behind a button on 4 of 4 worlds sampled, and it is
+     not an edge case — the row it eats is the one that fires first every race
+     ("WET ROAD — SLICK UNDER BRAKING", "SNOW ROAD — LOW GRIP, LONG SLIDES")
+     and every contract line after it. Cleared by the button column's width
+     plus its own margin. The touch layouts below re-anchor the feed for
+     themselves (portrait stacks it well under the buttons, landscape moves it
+     to the top centre), so this is the desktop rule only.
+
+     THE INSET IS 92px, NOT 70, BECAUSE THE ROW MOVES. `feedin` starts at
+     translateX(30px) and `feedout` ends at translateX(20px), so a row is 30px
+     right of its resting place for the quarter second it arrives. At right:70
+     the resting edge cleared 📷 by 12px and the ARRIVING edge still ran 486 px²
+     under it — measured at 1440x810, on every message. The button column's
+     left edge is W-58, so the inset has to be 58 + 30 + a few: 92. */
+  #feed{position:absolute;top:104px;right:92px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
   .feed-msg{padding:4px 12px;font-weight:800;letter-spacing:1px;font-size:13px;border-radius:8px;
     background:rgba(38,26,12,.85);border:2px solid rgba(255,255,255,.15);
     animation:feedin .25s ease-out, feedout .5s ease-in 2.6s forwards}
@@ -357,7 +376,11 @@
   /* ...and the feed stacks under the hull panel for the same reason: at
      390px wide it is 274px of message reaching back under race-info, so a
      fixed top clipped its corner on every portrait size measured. */
-  body.touch #feed{top:calc(12px + var(--info-h,86px) + var(--hull-h,47px) + 16px)}
+  /* ...and it keeps the full width on a phone: portrait already stacks it well
+     below the button row (which sits side by side at top:60px there, not in a
+     column), so the desktop right:70px inset would only cost 58px of message
+     on the narrowest screen that has the least to spare. */
+  body.touch #feed{top:calc(12px + var(--info-h,86px) + var(--hull-h,47px) + 16px);right:12px}
   /* very narrow phones: nudge the inner weapon column out of the speedo's way */
   @media (max-width:380px){
     /* moving these inward to clear the speedo pushed them into FIRE, so the
@@ -378,6 +401,15 @@
     /* landscape has less height to give away, so the gaps tighten — but the
        stacking is still measured, never a constant */
     body.touch #health-box{top:calc(8px + var(--info-h,86px) + 6px);width:132px}
+    /* THE BUTTONS TURN SIDEWAYS HERE, so clearing them sideways does not work.
+       Portrait stacks 📷 and ⏸ in one 46px column at right:12 and the base
+       rule's right:70px clears that. Short screens lay them SIDE BY SIDE at
+       top:60 (see below), which owns x from W-112 to W-12 — measured at
+       800x460, the feed row ran 410..760 x 88..116 straight under 📷 at
+       688..734 x 60..106, 828 px² of it, on every world sampled. Sideways has
+       nowhere left to go on a screen this narrow, so the feed drops BELOW the
+       button row instead. */
+    #feed{top:114px}
     /* LANDSCAPE HAS NO ROOM TO STACK. At 390px tall the left column already
        reaches y=223, so continuing the stack put the feed straight through the
        DRIFT button — measured, not guessed, once the probe was widened to
