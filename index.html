@@ -613,8 +613,88 @@
   .region-head{display:flex;align-items:center;gap:10px;margin:16px 0 8px;
     font-family:'Luckiest Guy';font-size:12px;letter-spacing:5px;
     color:var(--gold-dim);text-shadow:1px 1px 0 var(--ink);white-space:nowrap}
+  /* The chapter index's heading is a sentence, not a region name — it says
+     which chapter you are in AND how much of the roster is open, and at 5px
+     of letter-spacing that runs off a phone. Let this one wrap. */
+  .tl-view > .region-head{white-space:normal;letter-spacing:3px;line-height:1.5}
+  .tl-view > .region-head::before,.tl-view > .region-head::after{display:none}
   .region-head::before,.region-head::after{content:'';flex:1;height:1px;background:var(--line-soft)}
   .region-head:first-child{margin-top:2px}
+  /* ---- CHAPTER HEADERS (the timeline/progression view) -------------------
+     A chapter is a part of the career, so its header is a BLOCK with a name,
+     a line of flavour and a star bar — not the thin rule a region gets. The
+     bar carries two marks: the fill is what you have banked in this chapter,
+     the notch is where the gate sits, so "how much further" is a distance you
+     can see rather than a number you have to do arithmetic on. */
+  .chapter-head{margin:20px 0 10px;padding:10px 12px;border-radius:10px;
+    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.16));
+    border:1px solid var(--line-soft);border-left:3px solid var(--gold-dim)}
+  .chapter-head:first-child{margin-top:2px}
+  .chapter-head.locked{opacity:.62;border-left-color:var(--line-soft)}
+  .ch-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .ch-n{font-family:'Luckiest Guy';font-size:10px;letter-spacing:3px;
+    color:var(--ink-soft,#9aa)}
+  .ch-name{font-family:'Luckiest Guy';font-size:14px;letter-spacing:3px;
+    color:var(--gold);text-shadow:1px 1px 0 var(--ink)}
+  .ch-gate{margin-left:auto;font-size:10px;letter-spacing:1px;color:var(--gold-dim);
+    white-space:nowrap}
+  .ch-blurb{margin-top:3px;font-size:11px;line-height:1.35;color:var(--ink-soft,#9aa);
+    opacity:.9}
+  .ch-bar{position:relative;height:4px;margin-top:8px;border-radius:3px;
+    background:rgba(0,0,0,.3);overflow:hidden}
+  .ch-bar i{display:block;height:100%;background:var(--gold-dim);border-radius:3px}
+  .ch-bar u{position:absolute;top:-2px;width:2px;height:8px;background:var(--gold);
+    opacity:.85;text-decoration:none}
+  @media (max-width:420px){
+    .ch-name{font-size:12px;letter-spacing:2px}
+    .ch-gate{margin-left:0;width:100%}
+  }
+  /* ---- THE CHAPTER INDEX -------------------------------------------------
+     Twelve cards instead of seventy-two: the tracks tab opens on a map of the
+     career, and you ENTER a chapter to see its worlds. Reported as "package
+     them in separate sections that I can enter ... no endless scrolling".
+     Two columns from 520px up, one below — a chapter card is a block of text
+     and text wants a readable measure, not the widest box available. */
+  .chapter-grid{display:grid;grid-template-columns:1fr;gap:10px;width:100%}
+  @media (min-width:520px){.chapter-grid{grid-template-columns:1fr 1fr}}
+  .chapter-card{display:block;width:100%;text-align:left;cursor:pointer;
+    padding:12px 14px;border-radius:12px;font:inherit;color:inherit;
+    background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(0,0,0,.2));
+    border:1px solid var(--line-soft);border-left:3px solid var(--gold-dim);
+    transition:transform .12s ease,border-color .12s ease}
+  .chapter-card:hover,.chapter-card:focus-visible{transform:translateY(-2px);
+    border-color:var(--gold)}
+  .chapter-card.locked{opacity:.6;border-left-color:var(--line-soft)}
+  .chapter-card.here{border-left-color:var(--gold);
+    box-shadow:0 0 0 1px var(--gold-dim) inset}
+  .cc-top{display:flex;align-items:baseline;gap:9px}
+  .cc-n{font-family:'Luckiest Guy';font-size:16px;color:var(--gold-dim);
+    min-width:22px}
+  .cc-name{font-family:'Luckiest Guy';font-size:15px;letter-spacing:2px;
+    color:var(--gold);text-shadow:1px 1px 0 var(--ink)}
+  .cc-blurb{margin:4px 0 8px;font-size:11px;line-height:1.4;
+    color:var(--ink-soft,#9aa);opacity:.9}
+  .cc-foot{display:flex;align-items:baseline;gap:10px;font-size:10px;
+    letter-spacing:1px;color:var(--gold-dim)}
+  .cc-stars{margin-left:auto;white-space:nowrap}
+  .chapter-card .ch-bar{margin-top:7px}
+  /* the bar at the top of a chapter you have entered */
+  .chapter-bar{display:flex;align-items:center;gap:10px;margin:2px 0 10px;
+    padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.22);
+    border:1px solid var(--line-soft);position:sticky;top:0;z-index:3}
+  .ch-back{font-family:'Luckiest Guy';font-size:11px;letter-spacing:2px;
+    padding:5px 10px;border-radius:8px;cursor:pointer;
+    color:var(--gold);background:rgba(0,0,0,.3);border:1px solid var(--line-soft)}
+  .ch-back:hover{border-color:var(--gold)}
+  .ch-here{font-size:11px;letter-spacing:1px;color:var(--ink-soft,#9aa);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ch-here b{font-family:'Luckiest Guy';color:var(--gold);letter-spacing:2px;
+    margin-right:6px}
+  .ch-here-stars{margin-left:auto;font-size:11px;color:var(--gold-dim);
+    white-space:nowrap}
+  /* inside a chapter the bar IS the header — this is the placeholder the row
+     builder emits in its place, and it must take up no room at all */
+  .chapter-head-none{display:none}
   /* auto-FILL (not -fit): regions with fewer worlds keep the same card width,
      so every region shares one grid rhythm */
   .region-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%}
@@ -1447,7 +1527,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r219</div>
+<div id="build-tag">r220</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1708,10 +1788,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r219"></script>
+<script type="module" src="./src/main.js?v=r220"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r219"></script>
+<script src="./src/offline.js?v=r220"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r219"></script>
+<script type="module" src="./src/traffic.js?v=r220"></script>
 </body>
 </html>

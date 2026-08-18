@@ -1,6 +1,6 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r219, deployed and live, tree clean.
+State at handover: `main` = r220, deployed and live, tree clean.
 Live: https://jozelazarevski.github.io/racing-shooter/
 
 ## THE ONE DEFECT THIS REPO KEEPS SHIPPING
@@ -148,6 +148,12 @@ only that way: the gantry that moved DEEPER into the road (4.52 -> 7.59 u), and
   SHELL RUNNING THAT VERY COMMAND, so it kills the run it just started along
   with every wait-loop watching for it. Don't reach for `pkill` with a pattern
   that could match your own command line.
+- **A DOUBLE COMMA IN AN ARRAY LITERAL IS NOT A SYNTAX ERROR.** Appending to
+  `LEVELS` produced `] },,` — a HOLE, which `node --check` accepts happily
+  because `[a, , b]` is valid JS. The game then died on
+  `Cannot read properties of undefined (reading 'id')` from `totalStars`. Same
+  lesson as the `ELEMENTS`/`HOUSE_TEMPLATES` break: a syntax check is necessary
+  and never sufficient — boot the game.
 - **`kill -0 $!` after `nohup ... &` races.** `$!` is the wrapper, not node, so
   an `until ! kill -0 $PID` loop can fall through while the test is still
   running — it reported test-river "finished" with 15 PASS and no closing line,
@@ -459,6 +465,131 @@ the carriageway, at or above the deck, with distance to the nearest ford and
 stone bridge); `tools-scratch/fordwet.mjs` diffs ford wetness against a
 pristine worktree on a second port, which is the only thing that separates
 "this ford is dry now" from "this ford was always dry".
+
+## THE CAREER IS CHAPTERS NOW — AND THEY ARE ROOMS YOU ENTER
+
+Asked for as: *"Create chapters for the trails. So it is progress and more
+structured. I unlock Chapter by chapter."* and then, on seeing the first cut:
+*"Package them in separate sections that I can enter. Like this the screen is
+cleaner and no endless scrolling."*
+
+### The rule
+`CHAPTERS` in track.js declares a chapter by the level id it STARTS at;
+`chapterSpans()` derives the rest, so a chapter cannot omit or double-count a
+world and inserting a world into career order files it automatically. Twelve
+chapters over 72 worlds.
+
+**A chapter opens when the previous one has paid its gate — 60 % of its stars
+(`CHAPTER_GATE`) — OR when the previous one has been RACED OUT.** Inside an
+open chapter every world is raceable immediately, in any order.
+
+That second clause is not optional and must never be removed. The gate asks
+1.8 stars a world; a driver who only ever FINISHES banks exactly 1, so the gate
+alone walls that player in permanently at chapter 2. It is the same guarantee
+the old per-world `_freeUnlock` made, restated: **drive well and move on early,
+or drive everything and move on anyway.** Measured, all three player profiles
+(win / podium / finish-last every race) reach 72 of 72.
+
+### What was deleted, and what must not come back
+The per-world star ladder no longer gates anything. `_freeUnlock` is gone.
+`starCost` and `LADDER_SLOPE` survive as a statement about where in the career
+a world sits (the level table's own `cost` leans on it) but **nothing reads
+them to decide a padlock**. Do not reintroduce a per-world grant on top of the
+chapter gate: two floors under one career is how a player ends up looking at a
+card that is open for a reason the board cannot explain.
+
+### The board is two levels deep
+The TIMELINE view is a drill-down, not a list:
+
+  - **The index** — twelve chapter cards, one screenful. `_renderChapterIndex`.
+  - **Inside a chapter** — that chapter's worlds and nothing else, under a
+    sticky back bar. `_chapterBar`.
+
+`_chapterIn` holds the chapter's stable `n` (not its array index, so a roster
+edit cannot teleport a player into a different chapter). It is remembered
+across repaints but deliberately NOT persisted: arriving at the tracks tab
+should show you the map, not the room you were last standing in.
+
+**A shut chapter is still enterable.** You may look at what you are working
+toward; its worlds stay locked and say which chapter they are waiting on.
+
+**Search and filters override all of it.** A filter is a question about the
+whole roster, so it flattens across every chapter — answering it inside one
+chapter would answer a question nobody asked. Clearing it puts you back where
+you searched FROM. `_filtersActive()` is the single definition both the
+renderer and the matcher use; two definitions would be a bug, because a board
+that flattens without matching is showing the wrong list.
+
+### Traps this cost
+- **`_applyWorldFilter` only hides cards that are already on the page.** At the
+  index there are none, so typing filtered nothing and showed nothing. A
+  filter state change now triggers a re-render, not a class toggle.
+- **The early return skipped the page furniture.** The star legend, the filter
+  chips and the count are all set on the way OUT of the card render; returning
+  before them left the index with an empty legend and unlabelled chips.
+- **`_scrollToNextTrack` has no world card to aim at** at the index. It aims at
+  the chapter card holding the next track and still returns the world id —
+  callers ask it for the id, and what is next does not change with which page
+  is showing. It does NOT enter a chapter on the player's behalf.
+
+### The gates
+`tests/test-ladder.mjs` was rewritten wholesale: its subject (per-world prices)
+no longer exists, but every property it defended does. It now drives the
+chapter table — partition, contiguity, gate scaling, the three career profiles,
+the floor, and the surfaces. `tests/test-timeline.mjs` asserts the two-level
+board and that every world is reachable by entering some chapter.
+`tests/test-filters.mjs` measures the flat REGIONS view — its assertions are
+all "with nothing set, all N worlds show", which was true of both views until
+TIMELINE became a drill-down — and asserts the drill-down's own behaviour
+separately.
+
+Two hardcoded constants in that suite had to go, and both were the same defect:
+`groups === 4` and `emptyRows === 3` were counts of the filter bar masquerading
+as statements about it, and both failed the day a fifth facet shipped. They now
+derive from `worldFacets`' own keys.
+
+## AUTUMN — THREE THEMES AND A CHAPTER OF FIVE WORLDS
+
+Asked for as *"Add autumn themes too."*
+
+Autumn is **not a palette swap**. What changes is the SPECIES MIX and the
+LIGHT; the palette follows. `FLORA_MIX` is the load-bearing half: the tree
+builder already carries `birch`, `oak` and `larch`, and `_buildTrees` gives
+each a different tint shift (birch h+0.02 and a much lighter crown, oak +0.12
+saturation and a darker dome, larch h−0.045). Feed those one amber `foliage`
+band and you get pale gold, deep russet and red — a wood, rather than three
+thousand identical orange blobs. **A conifer-weighted mix cannot read as autumn
+at any palette**, because an evergreen is evergreen.
+
+The other half is `sunEl` at 0.30–0.42 against a summer world's 0.62–0.78 —
+the single most autumn-looking number in a theme block — and it comes with a
+warning learned by measuring: a low sun is not a BRIGHT sun. Both wood and
+harvest themes shipped at `sunIntensity` 2.7+ and the warm key washed the
+ground out to bare sand, putting the season in the canopy and nowhere else.
+2.45.
+
+  - `autumnwood` — deciduous wood at peak colour. The showcase.
+  - `harvestvale` — orchard and stubble country, the lowest sun on the roster.
+  - `mistfell` — bracken moor, 780 u of fog, nearly treeless. The bleak one.
+
+All three declare `season: 'AUTUMN'` and drift `weather: { type: 'leaves' }`.
+Chapter 12 is five worlds on them (ids 68–72), each BORROWING an existing
+route: a route is 900 stations of measured road and the shapes on this roster
+are good — what makes these worlds new is the season standing on them, which is
+a theme question.
+
+**A new theme must be added to five tables**, or something fails quietly:
+`THEMES`, `SCENERY` (tests/test-filters fails loudly on this one — it is the
+only one that does), `SURFACE_BY_THEME`, `FLORA_MIX`, `ELEMENT_KIT_BY_THEME`,
+plus `WORLD_TAGS` in main.js.
+
+### The SEASON facet
+A fifth filter row, because a season cuts ACROSS scenery — autumn is a wood AND
+farm country AND a moor, and filing it under any one hides the other two.
+WINTER is DERIVED (a world with a snowfield is a winter world; there is no
+other kind) and AUTUMN is DECLARED, for the same reason `dusk` is: warm colours
+happen at sunset, in a desert, and over a burning forest, none of which is
+October.
 
 ## OPEN, LOWER PRIORITY
 - **`MIN` in `tunnelFitAt` is probably the same units error `reach` was.** The

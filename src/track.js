@@ -510,7 +510,171 @@ export const LEVELS = [
       valleyWalls: { h: 74, run: 250 },
     },
     scenery: ['MOUNTAIN', 'FOREST'] },
+
+  /* ---- CHAPTER 12 · AUTUMN -----------------------------------------------
+   * Five worlds on the three autumn themes, appended in career order so they
+   * form the roster's last chapter (see CHAPTERS, keyed from id 68).
+   *
+   * Each one BORROWS A ROUTE that already exists and is already tuned. That is
+   * deliberate and it is the cheap half of the work: a route is a racing line
+   * with a shape, and the shapes on this roster are good — what makes these
+   * five new is the season standing on them, which is a theme question. A new
+   * spline per world would buy variety this chapter does not need and cost the
+   * one thing it cannot afford, which is 900 stations of unmeasured road.
+   *
+   * `cost` is a career RUNG. Nothing gates on it any more (worlds open by
+   * chapter), but the rungs stay monotonic so the board's numbering and the
+   * career order keep agreeing with each other.
+   * -------------------------------------------------------------------- */
+
+  { id: 68, name: 'LARCH GOLD', theme: 'autumnwood', region: 'AUTUMN',
+    cost: 41, fresh: true, route: 'deepwood',
+    // THE ONE THAT INTRODUCES THE SEASON, so it is the friendliest shape in
+    // the chapter: `deepwood`'s flowing woodland esses, which never leave the
+    // trees. That matters here more than on the world it was written for —
+    // the trees ARE the content, and a route that keeps you among them shows
+    // the most of it.
+    tune: {
+      // A shade denser than the theme, because this is the showcase.
+      treeCount: 1150,
+      elev: { amp: 11, ph: [0.7, 2.1, 2.6] },
+    } },
+
+  { id: 69, name: 'MAPLE MILE', theme: 'autumnwood', region: 'AUTUMN',
+    cost: 42, fresh: true, route: 'estonia',
+    // AND THE ONE THAT GETS YOU OFF THE GROUND. `estonia` is the crest route,
+    // and a blind crest through a wood at peak colour is the single best thing
+    // this palette can be pointed at — you land looking at it.
+    //
+    // NOT `rampCount`. Prop launch ramps are gone game-wide (`_buildRamps`
+    // returns immediately); the air here comes from `_buildCrests`, and its
+    // input reads `(rampCount || 3) + 3`, so 0 is the DEFAULT rather than
+    // "no jumps". The elevation amplitude is the honest knob and it is what
+    // this sets.
+    tune: {
+      elev: { amp: 15, ph: [2.2, 1.0, 0.4] },
+      hillAmp: 2.0,
+    } },
+
+  { id: 70, name: 'HARVEST RUN', theme: 'harvestvale', region: 'AUTUMN',
+    cost: 43, fresh: true, route: 'farmland',
+    // STUBBLE COUNTRY WITH THE CROP IN. `farmland` is the hedgerow-banked lane
+    // route, which is the right shape for a world whose identity is that you
+    // cannot see over the sides — and in autumn the banks are cut and the
+    // fields behind them are bare, so the same road reads open where the
+    // summer one reads blind.
+    tune: {
+      fords: { count: 1 },                    // the lane drops through a wash
+      hayCount: 64,
+    } },
+
+  { id: 71, name: 'CIDER LANE', theme: 'harvestvale', region: 'AUTUMN',
+    cost: 44, fresh: true, route: 'vineyard',
+    // ORCHARD ROWS. `vineyard` carpets its slopes with planted rows and that
+    // machinery does not care what is planted in them — so the route that was
+    // written for vines lays out an orchard, in a season when an orchard is
+    // the reason to be there.
+    tune: {
+      vineRows: { count: 70 },
+      stoneBridges: { count: 1 },
+    } },
+
+  { id: 72, name: 'BRACKEN MOOR', theme: 'mistfell', region: 'AUTUMN',
+    cost: 45, fresh: true, route: 'corse',
+    // THE HARD ONE, AND THE BLEAK ONE. `corse` is a tight unforgiving lap and
+    // `mistfell` is the least forgiving air on the roster — 780 u of fog, three
+    // fog banks, and almost no canopy to give you a reference. The chapter
+    // ends where you cannot see.
+    //
+    // The moor is nearly treeless by theme (260 trees against autumnwood's
+    // 950); what stands in for scenery is rock, and there is a lot of it.
+    tune: {
+      rockCount: 520,
+      elev: { amp: 14, ph: [1.8, 0.9, 2.4] },
+    } }
 ];
+
+/* ==========================================================================
+ * CHAPTERS — the roster as a story with parts, not one 67-rung ladder.
+ *
+ * THE COMPLAINT: "Create chapters for the trails. So it is progress and more
+ * structured. I unlock Chapter by chapter."
+ *
+ * What shipped before was a single ladder priced per world: every card carried
+ * its own star price and they opened one at a time, in price order. That is a
+ * progression, but it has no SHAPE — 67 rungs with nothing to tell you where
+ * one part of the career ends and the next begins, and no moment that feels
+ * like finishing something.
+ *
+ * A chapter is a contiguous run of career order with one gate in front of it.
+ * Contiguous is the load-bearing word. Regions are NOT contiguous — PINE
+ * VALLEY owns rungs 1, 6, 11, 12, 13 — so chapters cut by region would make
+ * the gate and the ladder disagree about what comes next, which is the exact
+ * defect the TIMELINE view was built to avoid (see `_renderLevelCards`).
+ *
+ * Each entry names the level id its chapter STARTS at; the chapter runs to the
+ * rung before the next chapter's start. Declaring boundaries rather than
+ * memberships means a chapter cannot accidentally omit or double-count a
+ * world, and inserting a world into career order puts it in the right chapter
+ * with no edit here.
+ *
+ * INSIDE an open chapter every world is raceable immediately, in any order.
+ * The gate is `need` stars banked in the PREVIOUS chapter — see `chapterNeed`
+ * in main.js for why it is a fraction of the chapter rather than a constant,
+ * and `isChapterOpen` for the floor that keeps a weak driver moving.
+ */
+export const CHAPTER_GATE = 0.6;     // of a chapter's stars, to open the next
+
+export const CHAPTERS = [
+  { n: 1, from: 1, name: 'FIRST LIGHT',
+    blurb: 'Three valleys, a canyon and a climb. Learn the car.' },
+  { n: 2, from: 7, name: 'INTO THE WILD',
+    blurb: 'Ice, jungle, dune and redwood — the roster stops being gentle.' },
+  { n: 3, from: 16, name: 'NIGHT AND STONE',
+    blurb: 'Neon city runs and the first of the Alpine passes.' },
+  { n: 4, from: 22, name: 'THE WORLD RALLY',
+    blurb: 'The famous stages: Turini, Ouninpohja, Fafe, Pikes Peak.' },
+  { n: 5, from: 29, name: 'HOME GROUND',
+    blurb: 'Olive terraces, lantern-lit old town, hedgerows and red dirt.' },
+  { n: 6, from: 33, name: 'GRAND CIRCUITS',
+    blurb: 'Tarmac, kerbs and pit walls. The circuits everybody knows.' },
+  { n: 7, from: 40, name: 'THE LONG CIRCUITS',
+    blurb: 'Bay lights, a mountain course, and the long ones.' },
+  { n: 8, from: 46, name: 'THE HEARTLAND',
+    blurb: 'Vineyard, deepwood, dolomite and a working harbour.' },
+  { n: 9, from: 50, name: 'THE MEDITERRANEAN',
+    blurb: 'Coast roads, headlands and the crossings between them.' },
+  { n: 10, from: 58, name: 'THE OLIVE COAST',
+    blurb: 'Citadel, cliffs and terraces — the family built from one world.' },
+  { n: 11, from: 65, name: 'IN THE MOUNTAIN',
+    blurb: 'Narrows, col and gorge. The hardest driving on the roster.' },
+  { n: 12, from: 68, name: 'AUTUMN',
+    blurb: 'The season turns: gold woodland, harvest country, russet moor.' },
+];
+
+/** Career-order index ranges per chapter, derived once from `from`.
+ *  Returns [{ ...chapter, start, end, levels }] with `end` EXCLUSIVE.
+ *  Derived rather than written down, so the boundaries cannot drift from the
+ *  roster the way a hand-kept membership list would. */
+export function chapterSpans() {
+  const starts = CHAPTERS.map((c) => {
+    const i = LEVELS.findIndex((l) => l.id === c.from);
+    return i < 0 ? null : i;
+  });
+  const out = [];
+  for (let k = 0; k < CHAPTERS.length; k++) {
+    if (starts[k] == null) continue;                  // chapter's worlds not shipped yet
+    let end = LEVELS.length;
+    for (let j = k + 1; j < CHAPTERS.length; j++) {
+      if (starts[j] != null) { end = starts[j]; break; }
+    }
+    const levels = LEVELS.slice(starts[k], end);
+    if (!levels.length) continue;
+    out.push({ ...CHAPTERS[k], start: starts[k], end, levels });
+  }
+  return out;
+}
+
 
 /* ==========================================================================
  * WORLD FACETS — what a world IS, so the track list can be filtered.
@@ -553,6 +717,11 @@ const SCENERY = {
   canyon: ['CANYON'], ravine: ['CANYON'],
   volcano: ['VOLCANIC', 'MOUNTAIN'],
   farmland: ['FARMLAND'], vineyard: ['FARMLAND'],
+  // AUTUMN. Scenery is what you SEE, not what season it is, so the autumn
+  // themes file under the terrain they actually are — a wood, farm country
+  // and a moor. The season shows up as its own filter chip instead (see
+  // FILTER_GROUPS), which is what lets "autumn coast" ever mean something.
+  autumnwood: ['FOREST'], harvestvale: ['FARMLAND'], mistfell: ['MOUNTAIN'],
   medterrace: ['COAST', 'FARMLAND'], olivecountry: ['COAST', 'FARMLAND'],
   harbor: ['COAST'], liguria: ['COAST'], aegean: ['COAST'], brava: ['COAST'],
   dalmatia: ['COAST'], azur: ['COAST'],
@@ -616,6 +785,9 @@ const SURFACE_BY_THEME = {
   forest: LOOSE, desert: LOOSE, dunes: LOOSE, oasis: LOOSE, redwood: LOOSE,
   flume: LOOSE, wildfire: LOOSE, jungle: LOOSE, savanna: LOOSE,
   outback: LOOSE, ravine: LOOSE, deepwood: LOOSE, farmland: LOOSE,
+  // autumn: woodland track, farm lane and moor road — none of them tarmac,
+  // and all three race on wet leaves or wet peat, which is the point of them
+  autumnwood: LOOSE, harvestvale: LOOSE, mistfell: LOOSE,
   // ice: the surface the physics already calls 'snow'
   snow: ICE, glacial: ICE, sheetice: ICE, avalanche: ICE,
   // FURKA IS NOT AN ICE STAGE ANY MORE. The theme was remade as a bright
@@ -705,6 +877,19 @@ export function worldFacets(level) {
     // player drives, not the palette it borrowed.
     scenery: level.scenery ?? SCENERY[level.theme] ?? [],
     road: [T.surface === 'wet' ? 'WET' : T.surface === 'snow' ? 'SNOW' : 'DRY'],
+    // SEASON. DECLARED for autumn, DERIVED for winter, and the split is
+    // deliberate. Winter is already unambiguous in the data — a world with a
+    // snowfield is a winter world, there is no other kind — while autumn is
+    // exactly the property a palette cannot prove: warm colours happen at
+    // sunset, in a desert, and over a burning forest, none of which is
+    // October. So the autumn themes say so, for the same reason `dusk` does
+    // (see above): a property this deliberate should be stated, not deduced.
+    //
+    // A world with no season returns an EMPTY list and therefore matches no
+    // season chip, which is the right answer — "show me autumn" should show
+    // autumn, not everything that failed to be winter.
+    season: T.season ? [T.season]
+      : (SCENERY[level.theme] || []).includes('SNOWFIELD') ? ['WINTER'] : [],
   };
 }
 
@@ -3681,6 +3866,186 @@ const THEMES = {
     massif: { az: 0.9, spread: 2.4, count: 7, r0: 460, r1: 720,
       h0: 90, h1: 165, w0: 260, w1: 430 },
   },
+
+  /* ========================================================================
+   * AUTUMN — three themes, because one is not a season.
+   *
+   * THE ASK: "Add autumn themes too."
+   *
+   * Autumn is not a palette swap on a summer world. What actually changes is
+   * the SPECIES MIX and the LIGHT, and the palette follows from those:
+   *
+   *   - Broadleaf, not conifer. The tree builder already carries `birch`,
+   *     `oak` and `larch`, and the per-species tint shifts in `_buildTrees`
+   *     do the rest of the work for free: birch takes h+0.02 and a much
+   *     lighter crown (pale gold), oak takes +0.12 saturation and a darker
+   *     dome (deep russet), larch takes h-0.045 (red-shifted). Feed those the
+   *     same amber band and one `foliage` block produces a whole autumn wood
+   *     rather than three thousand identical orange blobs. A conifer-weighted
+   *     mix cannot do this at any palette: an evergreen is evergreen.
+   *
+   *   - A LOW SUN. `sunEl` drops to 0.30-0.42 against a summer world's 0.62-0.78,
+   *     which is what makes the light rake and the shadows run long. It is the
+   *     single most autumn-looking number in the block.
+   *
+   *   - The ground is LITTER, not grass. `ground.base` goes to leaf-mould
+   *     brown and the speckles to fallen colour, and `grass.blade*` goes to
+   *     bronze and straw — dead stems, not green ones.
+   *
+   * They are separate themes rather than one with `tune` overrides because
+   * the species mixes genuinely differ (wood / orchard / bare moor) and
+   * FLORA_MIX is keyed by theme.
+   * ====================================================================== */
+
+  // AUTUMNWOOD: deciduous woodland at peak colour, in raking afternoon light.
+  // The dense one — this is the world the season is FOR.
+  autumnwood: {
+    fogColor: 0xe8d4b4, fogNear: 190, fogFar: 1100,
+    hemiSky: 0xd8c8a8, hemiGround: 0x6a4c2c, hemiIntensity: 0.86,
+    // 2.45, not the 2.7 a summer world runs. A low sun is not a BRIGHT sun,
+    // and at 2.7 the warm key washed the leaf-mould ground out to bare sand —
+    // the season was in the canopy and nowhere else.
+    sunColor: 0xffd89a, sunIntensity: 2.45,
+    skyTop: '#4f7fae', skyHorizon: '#f0dcb8', sunGlow: 0xffd07a,
+    sunAz: 2.1, sunEl: 0.34,                 // low and raking — see the note above
+    cloudCount: 7, cloudOpacity: 0.82, cloudTint: 0xffeed8,
+    terrainLow: '#6a6234', terrainHigh: '#9a7c40', terrainDirt: '#7a5c34',
+    terrainScree: '#8a7a58', hutGlow: 0.62,
+    skirtColor: '#6a5436',
+    ground: {
+      base: '#7d6236',                                  // leaf mould
+      bandLight: 'rgba(226,178,96,0.10)', bandDark: 'rgba(62,42,22,0.09)',
+      patchA: 'rgba(186,104,42,0.26)',                  // drifts of fallen maple
+      patchB: 'rgba(140,124,58,0.22)',                  // still-green hollows
+      speckA: 'rgba(214,142,58,0.75)', speckB: 'rgba(242,206,132,0.8)', speckCount: 150,
+    },
+    road: {
+      base: '#6f5c42', mottleA: [92, 74, 52], mottleB: [148, 124, 90],
+      rut: 'rgba(62,48,30,0.55)', rutCore: 'rgba(42,32,20,0.5)', tread: 'rgba(26,18,10,0.5)',
+      stoneA: 'rgba(198,180,148,0.6)', stoneB: 'rgba(76,60,40,0.7)',
+      // the fringe is the leaf line along the verge, not grass
+      fringe: [150, 100, 44], fringeVar: [44, 34, 20],
+    },
+    hillColor: 0x6a5a30, peakColor: 0x8a7a52,
+    treeCount: 950, trunkColor: 0x5a4028,
+    foliageLow: 0x9a4a1c, foliageTop: 0xd8922c,
+    // amber centre, wide hue band: 0.055 -> 0.125 is rust through to gold, and
+    // the species shifts push birch past that and larch back under it
+    foliage: { h: 0.055, hVar: 0.07, s: 0.72, sVar: 0.14, l: 0.40, lVar: 0.13 },
+    treeSnowCap: false,
+    treeBelt: [10.4, 52],
+    tuftCount: 720, grass: { bladeA: '#9a7a3a', bladeB: '#c8a656' },
+    bushCount: 420, bushColor: 0x8a4a22,
+    bush: { h: 0.06, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.3, lVar: 0.1 },
+    rockCount: 220, pebbleCount: 250, rockColor: 0x6e6658, rockSnowCap: false,
+    flowerCount: 120, flowerColors: ['#c8442a', '#e8a83a', '#f0e0c0'],   // hips and haws
+    hutRoof: 0x5a3020, hayColor: 0xc8a860,
+    hutCount: 9, hutZone: [0.9, 0.1], hayCount: 10,
+    splinter: [0x5a4028, 0xd8a860],
+    elev: { amp: 10, ph: [0.7, 2.1, 2.6] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    elements: 'alpine',
+    vizZoneSpec: { count: 2, kind: 'fogbank' },          // morning mist in the hollows
+    season: 'AUTUMN',
+    weather: { type: 'leaves', color: 0xd8863a },        // the wood is shedding
+  },
+
+  // HARVESTVALE: orchard and stubble country after the harvest. Open, gold,
+  // and worked — hay, hedges and a long low sun down the lane.
+  harvestvale: {
+    fogColor: 0xf0e0c0, fogNear: 300, fogFar: 1450,
+    hemiSky: 0xd8d0b0, hemiGround: 0x8a7444, hemiIntensity: 0.82,
+    sunColor: 0xffe0a8, sunIntensity: 2.45,          // see the note in autumnwood
+    skyTop: '#4a86bc', skyHorizon: '#f4e4c0', sunGlow: 0xffd88c,
+    sunAz: 3.7, sunEl: 0.30,                 // lowest on the roster: long shadows
+    cloudCount: 9, cloudOpacity: 0.86, cloudTint: 0xfff0dc,
+    // the high ground was reading as DUNE at #c4a860 under a warm key — this
+    // is cut stubble on a hillside, and stubble is duller than sand
+    terrainLow: '#7e7038', terrainHigh: '#a89050', terrainDirt: '#8a6c40',
+    terrainScree: '#9a8858', hutGlow: 0.5,
+    skirtColor: '#9a8450',
+    ground: {
+      base: '#9c8a4e',                                  // cut stubble
+      bandLight: 'rgba(240,220,150,0.10)', bandDark: 'rgba(110,92,44,0.08)',
+      patchA: 'rgba(206,160,70,0.28)',                  // ploughed strips
+      patchB: 'rgba(132,120,58,0.20)',                  // aftermath grass
+      speckA: 'rgba(170,146,88,0.7)', speckB: 'rgba(238,216,160,0.8)', speckCount: 120,
+    },
+    road: {
+      base: '#8a7856', mottleA: [112, 94, 66], mottleB: [162, 144, 108],
+      rut: 'rgba(86,70,46,0.5)', rutCore: 'rgba(62,50,32,0.45)', tread: 'rgba(36,28,16,0.45)',
+      stoneA: 'rgba(216,202,168,0.65)', stoneB: 'rgba(98,82,56,0.7)',
+      fringe: [156, 128, 60], fringeVar: [40, 34, 22],
+    },
+    hillColor: 0x6e5f2e, peakColor: 0x8f8058,
+    treeCount: 780, trunkColor: 0x6b4a28,
+    foliageLow: 0xa8641c, foliageTop: 0xe0b040,
+    foliage: { h: 0.075, hVar: 0.055, s: 0.68, sVar: 0.14, l: 0.42, lVar: 0.12 },
+    treeSnowCap: false,
+    treeBelt: [40, 140],
+    tuftCount: 1500, grass: { bladeA: '#c8a850', bladeB: '#e6cc84' },
+    bushCount: 180, bushColor: 0x7a5a26,
+    bush: { h: 0.08, hVar: 0.05, s: 0.5, sVar: 0.1, l: 0.32, lVar: 0.1 },
+    rockCount: 80, pebbleCount: 150, rockColor: 0x9a9080, rockSnowCap: false,
+    flowerCount: 150, flowerColors: ['#c8402c', '#e8c040', '#e0d8c0'],
+    hutRoof: 0x8a4630, hayColor: 0xe8c874,
+    hutCount: 16, hutZone: [0.8, 0.2], hayCount: 52,     // the harvest is IN
+    splinter: [0x8a5a32, 0xe0d4a8],
+    windmill: true,
+    elev: { amp: 7, ph: [1.3, 2.0, 0.5] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    elements: 'hedgerow',
+    crossroads: 2,
+    season: 'AUTUMN',
+    weather: { type: 'leaves', color: 0xc8a044 },        // chaff and orchard leaf
+  },
+
+  // MISTFELL: high moor in late autumn — dead bracken over bare grey rock,
+  // almost no canopy, and mist sitting in the folds. The bleak one.
+  mistfell: {
+    fogColor: 0xc8c4bc, fogNear: 120, fogFar: 780,       // the tightest fog here
+    hemiSky: 0xb8bcc0, hemiGround: 0x6a5030, hemiIntensity: 0.9,
+    sunColor: 0xf4dcc0, sunIntensity: 1.95,              // sun through cloud
+    skyTop: '#63788c', skyHorizon: '#d4cec4', sunGlow: 0xe8d4b0,
+    sunAz: 1.5, sunEl: 0.42,
+    cloudCount: 12, cloudOpacity: 0.92, cloudTint: 0xe4e0d8,
+    terrainLow: '#6a5232', terrainHigh: '#8a7a5e', terrainDirt: '#6e5838',
+    terrainScree: '#8a8880', hutGlow: 0.7,
+    skirtColor: '#5e4c32',
+    ground: {
+      base: '#7a5c34',                                  // dead bracken
+      bandLight: 'rgba(200,160,96,0.08)', bandDark: 'rgba(56,44,28,0.10)',
+      patchA: 'rgba(150,96,44,0.26)',                    // bracken stands
+      patchB: 'rgba(104,104,86,0.24)',                   // wet peat and stone
+      speckA: 'rgba(140,120,84,0.7)', speckB: 'rgba(198,190,172,0.7)', speckCount: 130,
+    },
+    road: {
+      base: '#6a645c', mottleA: [86, 82, 76], mottleB: [140, 134, 126],
+      rut: 'rgba(56,50,42,0.55)', rutCore: 'rgba(38,34,28,0.5)', tread: 'rgba(24,20,16,0.5)',
+      stoneA: 'rgba(196,192,182,0.6)', stoneB: 'rgba(70,66,58,0.7)',
+      fringe: [128, 92, 46], fringeVar: [36, 28, 18],
+    },
+    hillColor: 0x5a4a34, peakColor: 0x807868,
+    treeCount: 260, trunkColor: 0x4a3826,                // barely wooded
+    foliageLow: 0x8a4a1c, foliageTop: 0xc07c28,
+    foliage: { h: 0.045, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.34, lVar: 0.1 },
+    treeSnowCap: false,
+    treeBelt: [12, 60],
+    tuftCount: 1700, grass: { bladeA: '#8a6a32', bladeB: '#b09052' },
+    bushCount: 520, bushColor: 0x6a4620,                 // the bracken itself
+    bush: { h: 0.05, hVar: 0.04, s: 0.55, sVar: 0.1, l: 0.26, lVar: 0.08 },
+    rockCount: 420, pebbleCount: 340, rockColor: 0x8a8880, rockSnowCap: false,
+    flowerCount: 40, flowerColors: ['#a8446a', '#c8b8a0'],   // last of the heather
+    hutRoof: 0x4a3830, hayColor: 0xa89058,
+    hutCount: 6, hutZone: [0.92, 0.08], hayCount: 4,
+    splinter: [0x4a3826, 0xb09068],
+    elev: { amp: 13, ph: [1.8, 0.9, 2.4] },
+    rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
+    elements: 'alpine',
+    vizZoneSpec: { count: 3, kind: 'fogbank' },          // the mist that names it
+    season: 'AUTUMN',
+    weather: { type: 'leaves', color: 0xa06838 },        // bracken litter on the wind
+  },
 };
 
 /** THE MEDITERRANEAN FIVE.
@@ -4749,6 +5114,16 @@ export const EDIT_PROP_KINDS = {
 // mix via T.floraMix.
 const FLORA_MIX = {
   forest: [['pineA', 0.34], ['pineB', 0.22], ['birch', 0.24], ['oak', 0.20]],
+  // AUTUMN: BROADLEAF-WEIGHTED, and that is the whole trick. An evergreen is
+  // evergreen at any palette, so a conifer mix cannot read as autumn however
+  // the colours are set. Birch, oak and larch each take a different tint shift
+  // in `_buildTrees`, so one amber `foliage` band comes out as pale gold,
+  // deep russet and red — a wood, not three thousand orange copies.
+  autumnwood: [['oak', 0.34], ['birch', 0.30], ['larch', 0.24], ['pineA', 0.12]],
+  // orchard country: standards in the fields, a few conifers in the shelter belts
+  harvestvale: [['oak', 0.42], ['birch', 0.28], ['larch', 0.16], ['pineA', 0.14]],
+  // the moor is nearly treeless, and what stands there is bare or wind-bitten
+  mistfell: [['birchBare', 0.44], ['birch', 0.24], ['larch', 0.20], ['pineA', 0.12]],
   // Amazon: emergents over a closed mid-storey over tree ferns. Weighted so the
   // emergents are the minority they are in life — they read because they tower,
   // not because there are many of them.
@@ -4803,6 +5178,7 @@ const ELEMENT_KIT_BY_THEME = {
   pass: 'alpine', tremola: 'alpine', furka: 'alpine', oldtown: 'oldtown',
   medterrace: 'medhill', farmland: 'hedgerow', outback: 'outback',
   citadel: 'medhill',
+  autumnwood: 'farm', harvestvale: 'hedgerow', mistfell: 'alpine',
 };
 
 /** Unit gable-roof prism: 1×1×1, base at y=0, ridge running along local X at
