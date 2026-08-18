@@ -363,14 +363,18 @@ export function buildVoxelRacer(spec) {
   // cabW/cabH/cabL the glasshouse used, which is what makes it fit all eight
   // body styles instead of one.
   //
-  // It is hidden by default and shown only by the driver's view. Every other
-  // camera is outside the car, where a dashboard floating in the middle of the
-  // shell would be visible through the windows.
+  // IT IS A FRAME, NOT A ROOM, and that is the whole lesson of the first cut.
+  // A literal interior — roof lining overhead, deep dash, shoulder lines —
+  // turned the view into horizontal black bands with a slot of road between
+  // them, because this cabin is 0.74 u tall on a 2.6 u wide body: stylised
+  // proportions in which a seated eye is a hand's breadth from every panel, so
+  // anything modelled at real scale subtends an enormous angle. So: only the
+  // pieces that READ as a car from the seat, all of them thin, all of them
+  // around the EDGE of the windscreen aperture, and nothing directly overhead.
   //
-  // Plain FrontSide boxes are enough, and deliberately so: the dash is seen
-  // from ABOVE (its top face points at the eye), the header from BELOW, the
-  // pillars edge-on. Nothing here needs DoubleSide, so nothing here can leak
-  // out through the bodywork when seen from a chase camera.
+  // Plain FrontSide boxes throughout, deliberately: the dash is seen from
+  // ABOVE, the header from BELOW, the pillars edge-on. Nothing needs
+  // DoubleSide, so nothing can leak out through the shell from a chase camera.
   {
     const inner = mat(0x141210, { roughness: 0.85, metalness: 0.05 });
     const trim = mat(0x2a2622, { roughness: 0.7, metalness: 0.12 });
@@ -382,39 +386,34 @@ export function buildVoxelRacer(spec) {
       cockpit.add(q); return q;
     };
     const fz = cabZ + cabL / 2;          // the windscreen end of the cabin
-    // DASH: a slab across the cabin, dropping away from the screen base. Its
-    // top is what you look over, so it sits well below the eye line.
-    put(cabW * 0.94, 0.16, cabL * 0.42, inner, 0, cabY - cabH * 0.30, fz - cabL * 0.26, -0.18);
-    // instrument binnacle, offset to the driver's side
-    put(cabW * 0.34, 0.10, 0.34, trim, -cabW * 0.18, cabY - cabH * 0.20, fz - cabL * 0.30, -0.30);
-    // SCUTTLE: the lip where the dash meets the screen, the thing that makes a
-    // windscreen read as a windscreen rather than as a hole.
-    put(cabW * 0.96, 0.07, 0.10, trim, 0, cabY - cabH * 0.16, fz - 0.06);
-    // A-PILLARS, raked back with the screen
+    // THE APERTURE. Everything below frames this rectangle and nothing crosses
+    // it: half-width 0.44 of the cabin, from 0.06 below centre to 0.42 above.
+    const apW = cabW * 0.44, apLo = cabY - cabH * 0.06, apHi = cabY + cabH * 0.42;
+    // DASH — a shallow lip along the BOTTOM edge of the aperture, tilted away.
+    // Deep dashes are what buried the road last time; this is 0.09 thick.
+    put(apW * 2, 0.09, 0.30, inner, 0, apLo - 0.045, fz - 0.20, -0.22);
+    // the scuttle line that makes it read as a windscreen rather than a hole
+    put(apW * 2 + 0.04, 0.045, 0.07, trim, 0, apLo + 0.01, fz - 0.05);
+    // A-PILLARS down the two SIDE edges, raked with the screen
     for (const sgn of [-1, 1]) {
-      put(0.10, cabH * 0.95, 0.12, inner, sgn * cabW * 0.45, cabY + cabH * 0.06, fz - 0.16, 0.30);
-      // door top / shoulder line, running back from the pillar
-      put(0.08, 0.09, cabL * 0.72, trim, sgn * cabW * 0.47, cabY - cabH * 0.26, cabZ - cabL * 0.06);
+      put(0.085, (apHi - apLo) + 0.10, 0.10, inner, sgn * apW, (apLo + apHi) / 2, fz - 0.10, 0.26);
     }
-    // HEADER above the screen, and the roof lining behind it
-    put(cabW * 0.94, 0.10, 0.16, inner, 0, cabY + cabH * 0.44, fz - 0.12);
-    put(cabW * 0.90, 0.06, cabL * 0.55, inner, 0, cabY + cabH * 0.47, cabZ - cabL * 0.12);
-    // STEERING WHEEL — a ring on a short column, tilted toward the driver. It
-    // is turned by the camera each frame (see _driverCamera), which is the one
-    // piece of this that is not static furniture.
+    // HEADER along the TOP edge only. NOTHING is modelled behind it: a roof
+    // lining sits directly above a seated eye and fills the upper third.
+    put(apW * 2 + 0.04, 0.075, 0.12, inner, 0, apHi + 0.04, fz - 0.09);
+    // STEERING WHEEL — low and offset, so it sits under the road rather than
+    // across it. Turned each frame by the camera (see _driverCamera).
     const wheel = new THREE.Group();
     wheel.name = 'wheel';
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.030, 8, 22), inner);
-    wheel.add(rim);
+    wheel.add(new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.026, 8, 20), inner));
     for (const a of [0, 2.094, 4.189]) {
-      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.028, 0.028), trim);
-      spoke.position.set(Math.cos(a) * 0.12, Math.sin(a) * 0.12, 0);
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.024, 0.024), trim);
+      spoke.position.set(Math.cos(a) * 0.11, Math.sin(a) * 0.11, 0);
       spoke.rotation.z = a;
       wheel.add(spoke);
     }
-    wheel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.10, 8), trim));
-    wheel.position.set(-cabW * 0.18, cabY - cabH * 0.34, fz - cabL * 0.40);
-    wheel.rotation.x = Math.PI / 2 - 0.42;      // tilted, not flat
+    wheel.position.set(-cabW * 0.17, apLo - 0.20, fz - 0.52);
+    wheel.rotation.x = Math.PI / 2 - 0.38;
     cockpit.add(wheel);
     cockpit.visible = false;                    // the seat turns it on
     g.userData.cockpit = cockpit;

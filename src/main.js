@@ -8501,7 +8501,12 @@ class Game {
     // puts it level with the header. The eye now sits BEHIND the dash and at a
     // driver's eye line, which is what makes the dash, the pillars and the
     // wheel read as a car around you rather than clip through the lens.
-    const T = (this._driverTune ??= { up: 0.18, fwd: -0.10, lookH: 1.15, fov: 12 });
+    // SEATED WELL BACK IN THE CABIN. With furniture in it, the eye's distance
+    // from the windscreen frame is what decides how much of the frame that
+    // furniture eats — at fwd -0.10 the pillars and header were a hand's
+    // breadth away and became bands across the view. Back at -0.34 the whole
+    // aperture is roughly a cabin-length ahead and reads as a windscreen.
+    const T = (this._driverTune ??= { up: 0.10, fwd: -0.34, lookH: 1.15, fov: 12 });
     const eyeH = cabY !== undefined
       ? clamp(cabY + cabH * T.up, cabY - cabH * 0.35, cabY + cabH * 0.45)
       : (M.h ?? 2.3);
