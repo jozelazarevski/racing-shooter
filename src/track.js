@@ -8048,6 +8048,33 @@ export class Track {
     return { h, base, l1, l2 };
   }
 
+  /** WHERE THE RIM PLATEAU ACTUALLY IS, for anything that wants to stand on it.
+   *
+   *  `_cliffRibbon` draws the rim from `rowSpec`; `_buildCacti` used to compute
+   *  a PARALLEL approximation of the same thing (`prof.base + prof.l2 + 1..4.5`
+   *  at `prof.h * 0.97 - 0.35`) and the two drifted: raycasting down from the
+   *  saguaros on CANYON RUN found 4 of 10 hanging 26-34 u over the valley floor
+   *  with no ribbon under them at all, while the other 6 stood correctly.
+   *  Two formulas for one surface is the same defect this repo keeps shipping,
+   *  one level down — so there is now one formula and both callers read it.
+   *
+   *  Returns the plateau's inner and outer lateral offsets and its top height
+   *  above the road, all in the ribbon's own terms, jitter included. */
+  _cliffRimTop(j, side) {
+    const P = this._cliffProfile(j, side);
+    const hash = (n) => { const s2 = Math.sin(n) * 43758.5453; return s2 - Math.floor(s2); };
+    const jt = (k) => hash(j * 12.9898 + k * 78.233 + side * 37.719) - 0.5;
+    const tt = j * (Math.PI * 2 / N);
+    return {
+      h: P.h,
+      // row 2 (the noisy rim edge) out to row 3 (the plateau proper)
+      latIn: P.base + P.l2 + jt(3) * 0.55,
+      latOut: P.base + P.l2 + 5.5 + Math.sin(29 * tt + side) * 1.2,
+      yEdge: P.h + jt(4) * 0.8,
+      yTop: Math.max(0.9, P.h * 0.97 + jt(9) * 0.5),
+    };
+  }
+
   _cliffRibbon(side, tex) {
     const rows = 5;                       // base, mid, rim edge, rim plateau, outer ground
     const verts = new Float32Array((N + 1) * rows * 3);
@@ -8078,12 +8105,15 @@ export class Track {
       const P = this._cliffProfile(j, side);
       const jt = (k) => hash(j * 12.9898 + k * 78.233 + side * 37.719) - 0.5;
       const tt = j * (Math.PI * 2 / N);
-      const rimY = Math.max(0.9, P.h * 0.97 + jt(9) * 0.5);
+      // rows 2 and 3 come from `_cliffRimTop`, which is also what the cacti
+      // stand on — one formula, so a plant cannot be placed on a rim that is
+      // not drawn here.
+      const R = this._cliffRimTop(j, side);
       const rowSpec = [                            // [lateral, y, v]
         [P.base + jt(0) * 0.14, 0, 0.02],
         [P.base + P.l1 + jt(1) * 0.55, P.h * 0.52 + jt(2) * 0.7, 0.5],
-        [P.base + P.l2 + jt(3) * 0.55, P.h + jt(4) * 0.8, 0.985],  // noisy rim edge
-        [P.base + P.l2 + 5.5 + Math.sin(29 * tt + side) * 1.2, rimY, 0.94],
+        [R.latIn, R.yEdge, 0.985],                 // noisy rim edge
+        [R.latOut, R.yTop, 0.94],
         [P.base + P.l2 + 12.5 + Math.sin(19 * tt - side) * 2.0, 0, 0.10],
       ];
       const u = (i * this.segLen) / 20;
@@ -17348,12 +17378,20 @@ export class Track {
           return { i, lateral, dy: 0, s };
         }
         if (roll < 0.8 && this.T.cliffWalls) {
-          // silhouetted on the canyon rim (cliff heights are relative to road y)
-          const prof = this._cliffProfile(i, side);
-          if (prof.h < 7) return null;
+          // SILHOUETTED ON THE RIM, standing on the rim the ribbon actually
+          // draws. This used to approximate it (`l2 + 1..4.5` at `h*0.97-0.35`)
+          // and 4 of 10 sampled saguaros were left hanging 26-34 u over the
+          // valley floor. `_cliffRimTop` is the ribbon's own geometry, so the
+          // plant is now placed BETWEEN the two rows it has to sit on, at the
+          // height interpolated between them.
+          const R = this._cliffRimTop(i, side);
+          if (R.h < 7) return null;
+          const f = 0.15 + Math.random() * 0.7;    // across the plateau, not past it
+          const lat = R.latIn + (R.latOut - R.latIn) * f;
+          const y = R.yEdge + (R.yTop - R.yEdge) * f;
           return clearOfRoad({
-            i, lateral: side * (prof.base + prof.l2 + 1 + Math.random() * 3.5),
-            dy: prof.h * 0.97 - 0.35, s: 0.7 + Math.random() * 0.6,
+            i, lateral: side * lat,
+            dy: y - 0.35, s: 0.7 + Math.random() * 0.6,
           });
         }
         // open bowl around the start line — absolute terrain height

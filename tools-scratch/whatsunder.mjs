@@ -47,6 +47,16 @@ const r = await p.evaluate(async () => {
   // resolves by name here exactly as it does for the game's own files.
   const THREE = await import('three');
   const RC = new THREE.Raycaster();
+  // INTERSECT A CURATED LIST, NOT THE WHOLE GROUP. Raycasting the group throws
+  // inside three (`Cannot read properties of null (reading 'matrixWorld')`) —
+  // something in there is a sprite or an LOD without the members raycast wants.
+  // Only real, drawable, non-instanced meshes can be ground anyway.
+  const targets = [];
+  t.group.traverse((o) => {
+    if (o.isMesh && !o.isInstancedMesh && o.geometry?.attributes?.position && o.material) {
+      targets.push(o);
+    }
+  });
   const out = [];
   const probe = found.slice(0, 10);
   const down = new (g.player.pos.constructor)(0, -1, 0);
@@ -58,7 +68,7 @@ const r = await p.evaluate(async () => {
       origin.set(f.x, f.y + 1.0, f.z);
       RC.set(origin, down);
       RC.far = 400;
-      const hits = RC.intersectObject(t.group, true) ?? [];
+      const hits = RC.intersectObjects(targets, false) ?? [];
       for (const h of hits) {
         // ignore the cactus instances themselves
         if (h.object.isInstancedMesh) continue;
@@ -70,9 +80,10 @@ const r = await p.evaluate(async () => {
       groundBelow: hitY, gapVsGround: hitY === null ? null : +(f.y - hitY).toFixed(2),
       owner: hitName });
   }
-  return { total: found.length, out, rayOk: true };
+  return { total: found.length, out, rayOk: true, targets: targets.length };
 });
-console.log(`saguaro instances found: ${r.total}` + (r.rayOk ? '' : '   (NO RAYCASTER — results below are meaningless)') + '\n');
+console.log(`saguaro instances found: ${r.total}, ray targets ${r.targets}`
+  + (r.targets ? '' : '   (NO TARGETS — every result below would read as floating)') + '\n');
 for (const q of r.out) {
   const verdict = q.gapVsGround === null ? 'NOTHING BELOW IT AT ALL'
     : q.gapVsGround > 1.5 ? `FLOATING ${q.gapVsGround} u` : 'standing on something';
