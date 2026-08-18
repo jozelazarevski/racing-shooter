@@ -1304,6 +1304,10 @@ export class Car {
     this._wraps = 0;
     this._cpMask = 0;          // which lap gates are down, in order
     this._missedCP = false;
+    // THE GRID IS BEHIND THE LINE, so the first thing every race does is cross
+    // it. Set by whoever seats the car on its grid box; cleared by the first
+    // crossing, which is that one and is not a lap attempt. See `checkLap`.
+    this._gridStart = false;
     this.lateral = 0;
     this.finished = false;
     this.wallGrind = 0;
@@ -3155,6 +3159,26 @@ export class Car {
     if (this.trackIndex > n * 0.4 && this.trackIndex < n * 0.6) this._midCP = true;
     if (prevIndex > n * 0.85 && this.trackIndex < n * 0.15) {
       this._wraps++;                           // distance always counts...
+      // THE CROSSING OFF THE GRID IS NOT A LAP ATTEMPT.
+      //
+      // `gridSlot(0)` is {index: N-10}: every car starts BEHIND the start
+      // line and crosses it within a second of "GO!". That crossing arrives
+      // here with `_cpMask` at 0 and `_midCP` false — indistinguishable, to
+      // the code below, from a driver who cut the whole infield — so every
+      // race on every world opened with a full-screen "CHECKPOINT MISSED —
+      // LAP NOT COUNTED". Measured: PINE VALLEY t=1.10 s, EMBER PASS 0.93 s,
+      // TREMOLA DESCENT 0.98 s, from a standing start on the grid.
+      //
+      // The lap arithmetic was already right — this crossing has never earned
+      // a lap and must not start earning one — so this changes nothing but
+      // the accusation. `_wraps` still rises above, because `progress` orders
+      // the standings and must never go backwards.
+      if (this._gridStart) {
+        this._gridStart = false;
+        this._cpMask = 0;
+        this._midCP = false;
+        return false;
+      }
       const ALL = (1 << LAP_GATES.length) - 1;
       // ...but a cut earns no lap. `_missedCP` is left for the HUD to read, so
       // the driver is told WHY the lap did not count instead of watching the

@@ -7541,6 +7541,9 @@ class Game {
     this.player.sos = this.player.maxSos;
     const slot = this.track.gridSlot(0);
     this.player.placeAt(slot.index, slot.lateral);
+    // Seated BEHIND the start line (gridSlot is N-10), so the first crossing
+    // of the race is this one and `checkLap` must not read it as a cut lap.
+    this.player._gridStart = true;
 
     this.enemies.forEach((e, i) => {
       e.lap = 1;
@@ -7551,6 +7554,7 @@ class Game {
       e.boostTimer = 0;
       const s = this.track.gridSlot(i + 1);
       e.placeAt(s.index, s.lateral);
+      e._gridStart = true;
     });
     for (const p of this.pickups) { p.active = true; p.mesh.visible = true; }
     this.track.setLights('red');
