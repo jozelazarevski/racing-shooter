@@ -412,21 +412,25 @@ export function buildVoxelRacer(spec) {
     // which is what a cockpit view needs to be built from in the first place.
     const eyeZ = cabZ + cabL * 0.38;       // the seat (see _driverTune, main.js)
     const eyeY = cabY + cabH * 0.18;
-    const AHEAD = 0.85;                    // well clear of the 0.12 near plane
-    // DASH — a wide, shallow slab under the sight line, tilted away.
-    put(cabW * 1.02, 0.14, 0.62, inner, 0, eyeY - 0.34, eyeZ + AHEAD, -0.20);
+    // HOW FAR DOWN THE FRAME A PIECE LANDS IS drop/distance, NOTHING ELSE, and
+    // that ratio is the only number that matters here. At AHEAD 0.85 with a
+    // 0.34 drop the dash sat 22 degrees below the axis and — with a header to
+    // match above it — squeezed the world into a 30% letterbox band. Shot and
+    // seen, after a black-pixel metric stopped tracking it (the interior had
+    // been lightened, so "near-black" no longer matched the thing filling the
+    // screen).
+    //
+    // A cockpit needs ONE piece: a dash across the bottom. No header — the top
+    // of the frame is where the road you are about to need lives. No pillars —
+    // at this FOV they are outside the frame or across it, never at its edge.
+    const AHEAD = 1.55;
+    // dash top edge at ~atan(0.72/1.55) = 25 degrees below the axis, which puts
+    // it in the bottom fifth and leaves the road the rest.
+    put(cabW * 1.05, 0.16, 0.40, inner, 0, eyeY - 0.72, eyeZ + AHEAD, -0.16);
     // the scuttle lip along its far edge: the line that reads as a windscreen
-    put(cabW * 1.02, 0.06, 0.10, trim, 0, eyeY - 0.26, eyeZ + AHEAD + 0.30);
+    put(cabW * 1.05, 0.06, 0.10, trim, 0, eyeY - 0.64, eyeZ + AHEAD + 0.19);
     // instrument binnacle, on the driver's side
-    put(cabW * 0.36, 0.10, 0.30, trim, -cabW * 0.17, eyeY - 0.26, eyeZ + AHEAD - 0.12, -0.30);
-    // A-PILLARS — brought inboard so they frame the aperture at this FOV
-    // instead of sitting outside it, and raked back the way a screen is.
-    for (const sgn of [-1, 1]) {
-      put(0.09, cabH * 0.98, 0.10, inner, sgn * cabW * 0.40, eyeY + 0.12, eyeZ + AHEAD + 0.18, 0.24);
-    }
-    // HEADER along the top of the screen. Nothing behind it: a roof lining over
-    // a seated eye fills the upper third (measured, first cut).
-    put(cabW * 0.94, 0.08, 0.14, inner, 0, eyeY + cabH * 0.52, eyeZ + AHEAD + 0.10);
+    put(cabW * 0.34, 0.09, 0.24, trim, -cabW * 0.17, eyeY - 0.63, eyeZ + AHEAD - 0.10, -0.26);
     // STEERING WHEEL — closer than the dash and lower, so it sits under the
     // road rather than across it. Turned each frame by the camera.
     const wheel = new THREE.Group();
@@ -438,7 +442,9 @@ export function buildVoxelRacer(spec) {
       spoke.rotation.z = a;
       wheel.add(spoke);
     }
-    wheel.position.set(-cabW * 0.17, eyeY - 0.46, eyeZ + 0.42);
+    // the wheel sits just inside the dash's own line, so it reads without
+    // taking a second slice of frame
+    wheel.position.set(-cabW * 0.17, eyeY - 0.80, eyeZ + 1.05);
     wheel.rotation.x = Math.PI / 2 - 0.40;
     cockpit.add(wheel);
     cockpit.visible = false;                    // the seat turns it on
