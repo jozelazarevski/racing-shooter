@@ -423,9 +423,15 @@ export function buildVoxelRacer(spec) {
     // A cockpit needs ONE piece: a dash across the bottom. No header — the top
     // of the frame is where the road you are about to need lives. No pillars —
     // at this FOV they are outside the frame or across it, never at its edge.
-    const AHEAD = 1.55;
-    // dash top edge at ~atan(0.72/1.55) = 25 degrees below the axis, which puts
-    // it in the bottom fifth and leaves the road the rest.
+    // 2.1, not 1.55. THE CAMERA'S OWN PITCH ADDS TO THE GEOMETRIC ANGLE: the
+    // seat aims at a look-point up the road, so it is already tilted down ~8
+    // degrees, and a dash computed to sit 25 degrees below the AXIS arrives
+    // ~33 degrees below the horizon — measured at 68% of frame against the 80%
+    // it was sized for. Pushing it out trades angle for distance and lands it
+    // where it was meant to be.
+    const AHEAD = 2.1;
+    // dash top edge at ~atan(0.72/2.1) = 19 degrees below the axis, plus the
+    // camera's own pitch, which puts it in the bottom fifth.
     put(cabW * 1.05, 0.16, 0.40, inner, 0, eyeY - 0.72, eyeZ + AHEAD, -0.16);
     // the scuttle lip along its far edge: the line that reads as a windscreen
     put(cabW * 1.05, 0.06, 0.10, trim, 0, eyeY - 0.64, eyeZ + AHEAD + 0.19);
