@@ -136,22 +136,30 @@ for (const id of ids) {
       p._lostT = 0; p._wedgeT = 0; p._bogT = 0;
       for (let f = 0; f < 150; f++) { g.input.analog.throttle = 0; g.input.analog.steer = 0; g.frame(); }
       g.__want = 1; g.frame(); g.__want = 0;
-      // A BORE IS MEANT TO BE DARK. A station inside one is skipped with the
-      // reason attached rather than silently filtered.
+      // A BORE IS MEANT TO BE DARK, and the track is asked directly rather
+      // than inferred from `vizZones`. The first cut read the zone list and
+      // let GLACIER COL 450 and TIMBER GORGE 338 through as offenders — the
+      // two stations a separate probe had already tagged ':bore'. Bore
+      // placement runs through `tunnelFitAt` over a world built with bare
+      // `Math.random()`, so a zone list read on one load does not describe the
+      // next one. `tunnelAt` is the same call `_updateCamera` uses to decide a
+      // sample is roof rather than obstacle, and it answers for THIS load.
+      const inBore = !!(t.tunnelAt && t.tunnelAt(p.pos, i, 10));
       const zone = (t.vizZones ?? []).find((z) => ((i - z.i0 + N) % N) <= z.len);
-      rows.push({ i, road: +lum().toFixed(1), zone: zone ? zone.kind : '' });
+      rows.push({ i, road: +lum().toFixed(1), bore: inBore, zone: zone ? zone.kind : '' });
     }
-    return { name: t.level?.name ?? '?', rows };
+    return { name: t.level?.name ?? '?', rows, bores: rows.filter((x) => x.bore).map((x) => x.i) };
   }, STATIONS);
-  const usable = r.rows.filter((x) => x.zone !== 'bore');
+  const usable = r.rows.filter((x) => !x.bore && x.zone !== 'bore');
   const worst = usable.reduce((a, x) => (x.road < a.road ? x : a), usable[0]);
   const med = usable.map((x) => x.road).sort((a, c) => a - c)[usable.length >> 1];
-  dark.push({ id, name: r.name, worst: worst.road, at: worst.i, med });
+  dark.push({ id, name: r.name, worst: worst.road, at: worst.i, med, bores: r.bores });
 }
 
 console.log('\n road luminance at 8 fixed stations, 390x844, out of 255\n');
 for (const d of [...dark].sort((a, b) => a.worst - b.worst)) {
-  const tag = NIGHT.has(d.id) ? '  (night stage — exempt)' : '';
+  const tag = (NIGHT.has(d.id) ? '  (night stage — exempt)' : '')
+    + (d.bores?.length ? `  [station${d.bores.length > 1 ? 's' : ''} ${d.bores.join(',')} inside a bore — skipped]` : '');
   console.log(`   L${String(d.id).padStart(2, '0')} ${d.name.padEnd(22)} median ${String(d.med).padStart(6)}`
     + `   darkest ${String(d.worst).padStart(6)} at ${d.at}${tag}`);
 }
