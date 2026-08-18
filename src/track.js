@@ -5546,11 +5546,19 @@ export class Track {
           const rock = new THREE.Mesh(rockGeo, rockMat);
           rock.scale.set(s, s * 0.75, s * 0.9);
           rock.rotation.y = hash(j * 1.3) * Math.PI * 2;
-          rock.position.set(p.x, p.y + s * 0.3, p.z);
+          // ON THE GROUND BESIDE THE ROAD, not at road level. `p.y` is the
+          // CARRIAGEWAY's height at this lateral, so on any embankment the
+          // marker rock stood in the air off the shoulder — measured 2.25 u on
+          // OLIVE COAST and 2.33 u on MONACO STREETS. `_seatY` is the drawn
+          // ground and already keeps the road as the floor within 12 u, which
+          // is exactly the band these sit in.
+          const gy = this._seatY(p.x, p.z);
+          const ry = (Number.isFinite(gy) ? gy : p.y);
+          rock.position.set(p.x, ry + s * 0.3, p.z);
           rock.castShadow = true;
           this.group.add(rock);
-          this.solids.push({ x: p.x, z: p.z, r: s * 0.95, y: p.y, mat: 'stone' });
-          this._addShadow(p.x, p.z, s * 1.3, p.y);
+          this.solids.push({ x: p.x, z: p.z, r: s * 0.95, y: ry, mat: 'stone' });
+          this._addShadow(p.x, p.z, s * 1.3, ry);
         }
       }
     }
@@ -9943,7 +9951,15 @@ export class Track {
     const gi = (i1 + Math.round(11 / this.segLen)) % N;
     {
       const c = this.center[gi], n = this.nrm[gi];
+      // NAMED so the float census can tell a SUSPENDED sign from a fallen one.
+      // The CHECKPOINT plank hangs at +6.6 between posts that stand either side
+      // of the carriageway, so nothing is under its centre and nothing should
+      // be — but with the group unnamed it fell back to its geometry type
+      // (`Plane(15.56,2.2)`) and was reported as 5.5 u of air on FURKA RIDGE
+      // and ESTONIA CRESTS. The gate's AIRBORNE list already covers `arch`;
+      // it simply had no name to match.
       const arch = new THREE.Group();
+      arch.name = 'checkpoint-arch';
       for (const side of [1, -1]) {
         const px = c.x + n.x * (deckW + 0.9) * side, pz = c.z + n.z * (deckW + 0.9) * side;
         const post = new THREE.Mesh(new THREE.BoxGeometry(1.3, 8.6, 1.3), darkWood);
@@ -15350,7 +15366,13 @@ export class Track {
       for (const pr of this.props) {
         if ((pr.x - p.x) ** 2 + (pr.z - p.z) ** 2 < (r + 1.0) ** 2) return null;
       }
-      const y = this.terrainHeight(p.x, p.z) - 0.5;
+      // THE DRAWN GROUND, not the analytic field. `terrainHeight` is the curve;
+      // the mesh under it is a 10 u lattice of chords that runs BELOW that
+      // curve wherever it bends, so a frontage seated on the analytic value
+      // hangs over the surface the player sees — measured 1.26 u on LANTERN
+      // QUARTER. `_seatY` is min(analytic, drawn) with the road as the floor.
+      const sy = this._seatY(p.x, p.z);
+      const y = (Number.isFinite(sy) ? sy : this.terrainHeight(p.x, p.z)) - 0.5;
       q.setFromAxisAngle(up, this.headingAt(i));
       // local +X is the road normal and local +Z runs along the street, so the
       // GABLE END faces the road: the Baltic gable-fronted terrace, and the
