@@ -91,6 +91,67 @@ r218's "floaters killed at source" did the job.
 - CANYON RUN's bore interior is near-black from the seat. Every other tunnel
   world reads the same way. Nothing measures tunnel-interior luminance yet.
 
+## THE OFF-ROAD HALF OF THE r219 SWEEP — up the hills, into the water
+
+Asked for directly: "Do climb mountains and hills off-road. Go into rivers and
+waters." `tools-scratch/wild.mjs` did it on all 67 worlds — each one seated at
+the foot of its highest DRIVABLE ground and driven up it, then seated at its
+water and driven into it, chase camera, a shot every 5 s. 402 more frames, no
+page errors.
+
+**Two defects found and fixed, both in the HUD, both measured:**
+
+1. THE FEED SAID THE SAME THING FIVE TIMES. `hud.feed` appended a row and
+   removed it 3.3 s later without ever asking what was already on screen. 500 u
+   off the course on SEA CLIFF RUN the right-hand column was five identical
+   "OFF THE COURSE — TURN BACK" rows; on the racing line the same shape turns
+   up with SLIPSTREAM, WET TIRES and TIMBER! (2 of 4 worlds held a duplicate
+   pair within a lap). Repeats collapse into one row with a ×N tally now — and
+   the check reads EVERY row, because matching only the newest still left PINE
+   VALLEY with three "WET TIRES" when a TIMBER! landed between them.
+
+2. THE BUTTONS SAT ON THE FEED. `#cam-btn` and `#pause-btn` are 46 px squares
+   at right:12 and `#feed` was anchored into their column: 828 px² of a row
+   behind a button at 800x460, 486 px² at 1440x810, on every world — and the
+   row it ate is the one that fires first in every race ("WET ROAD — SLICK
+   UNDER BRAKING") plus every contract line. Two corrections, and the obvious
+   version of each was wrong: right:70px clears the column in PORTRAIT but the
+   buttons turn SIDEWAYS under 560 px of height (the feed drops below them
+   there instead), and 70 px still measured 486 px² at desktop size because the
+   ROW MOVES — `feedin` starts at translateX(30px), so the resting edge cleared
+   the button and the arriving edge did not.
+
+**Three things measured and deliberately NOT changed — each is the next
+session's call, not a slip to fix at the end of a sweep:**
+
+- **5.04% of off-road frames have the car UNDER THE GROUND**, and the screen is
+  a void for as long as it lasts: 23,040 frames over four worlds, worst 11.84%
+  on SILVERSTONE, longest single void 1.22 s (`blindtime.mjs`). The state is
+  already handled — `_watchCarVisible` lifts the car and re-seats the boom —
+  but only after `_blindT` reaches 1.0 s. Shortening that dwell is NOT a
+  one-liner: `terrainHeight` returns the RIDGE over a bore, so a car in a
+  tunnel reads as buried, and the dwell is part of what stops the watchdog
+  teleporting it onto the mountain. Measure `test-tunnels` before touching it.
+- **6.5% of off-road frames are ≥75% ONE COLOUR against 3.2% on-road** — the
+  chase camera against a slope, which main.js already names ("a single
+  featureless slab of hillside... exactly what the player photographed and
+  called a void") and bounds with the MAX_UP cap. The cap is doing its job;
+  what is left is the honest cost of a boom behind a car parked against a bank.
+- **The far field is undressed.** Past roughly 300 u the ground carries no
+  trees, no rocks and no props on most worlds, and the horizon highland is a
+  flat-shaded plateau at a fixed 28 u that 18 of 31 worlds share (an identical
+  (674,-566) — it is the silhouette's own ground, not a mountain). Nothing is
+  broken; there is simply nothing out there, and a player who drives out finds
+  that out.
+
+**And two theories killed by measurement, recorded so they are not re-run:**
+- The lens is NEVER under the ground: 0 of 10,080 off-road frames (`camdig.mjs`).
+  The MAX_UP pull-in loop looks like it can exit with the camera buried. It
+  cannot.
+- SILVERSTONE's -39 u readings are NOT a river carve gone wrong. The ground
+  really is 40 u down out there; `terrainHeight` and the drawn mesh agree to
+  0.35-2.0 u mean in every distance band out to 1200 u.
+
 ## THE THREE THINGS THAT MATTER, IN ORDER
 
 ### 1. Rival pace — and the number that does not exist. STILL THE TOP ITEM.

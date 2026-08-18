@@ -106,6 +106,56 @@ real time to get right and the next session should not rebuild them.
                 tour frames, every pair ranked by 1 - intersection. Median over
                 the 2211 pairs is 0.631; anything under ~0.15 is not a family
                 resemblance, it is one world wearing another's light.
+- `wild.mjs`    OFF THE ROAD ON PURPOSE: takes each world up its highest
+                DRIVABLE ground and into its water (river line, creek, or the
+                sea's own level), shooting from the chase camera every 5 s.
+                Three traps are written into it, each having wasted a run:
+                seating the car ON the road and steering off it just grinds
+                along an edge rail (`_buildEdgeRails` guards ~90% of the tight
+                stations by design, so the tour photographed the rail);
+                re-asking "highest ground within 460 u" every second never
+                reaches anything, because the massif sits 430-700 u out and
+                20 s of driving covers 330; and seating at radius
+                (|target| - back) is fine for a summit 840 u out and puts the
+                car on the start straight for water 180 u out. It also COUNTS
+                the recovery net firing rather than suppressing it — a rescue
+                out here means the car wedged on ground too steep to climb,
+                which is the answer to "can you climb this", not noise.
+                NOTE its summit search finds the far HIGHLAND on 18 of 31
+                worlds — an identical (674,-566) at h 28.0 — which is the
+                horizon silhouette's own plateau, not a mountain. The massif is
+                scenery and is not in `terrainHeight`; what IS climbable is the
+                terrain, bounded by the traction limit `test-climb` pins.
+- `feedstack.mjs` two questions about the message feed at once, both in live
+                DOM rects rather than off the stylesheet: how many IDENTICAL
+                rows are on screen at the same moment, and how many pixels of a
+                row sit under the 📷/⏸ buttons. Both were defects; both are
+                fixed. Keep it pointed at more than one viewport — the buttons
+                stack in portrait and turn sideways under 560px of height, and
+                the two cases need opposite corrections.
+- `blindtime.mjs` how long the screen is a VOID: the share of off-road frames
+                with the car under the ground, and the longest unbroken run of
+                them. Measured 5.04% of 23,040 frames across four worlds, worst
+                11.84% on SILVERSTONE, longest single void 1.22 s.
+                `_watchCarVisible` already fixes the state — it lifts the car
+                and re-seats the boom — but only after `_blindT` reaches 1.0 s,
+                and that second is the void. SHORTENING THAT DWELL IS NOT A
+                ONE-LINE CHANGE: `terrainHeight` returns the RIDGE over a bore,
+                so a car in a tunnel reads as buried, and the dwell is part of
+                what stops the watchdog teleporting it onto the mountain.
+                Measure `test-tunnels` before touching it.
+- `camdig.mjs`  is the lens ever under the ground? 0 of 10,080 off-road frames
+                across three worlds — so a black frame is NOT the camera being
+                buried, and the theory that the MAX_UP pull-in loop could exit
+                with the lens underground is WRONG. It was checked because the
+                loop looks like it can; it cannot, and the number says so.
+- `terrainrange.mjs` / `riverprofile.mjs` the world's height range against the
+                DRAWN ground, and a cross-section anywhere. Between them they
+                killed the theory that SILVERSTONE's -39 u readings were a
+                river carve gone wrong: the ground really is 40 u down out
+                there, `terrainHeight` and the mesh agree to 0.35-2.0 u mean
+                across every distance band, and the black frame was a car in a
+                hollow, not a hole in the terrain.
 - `srv.mjs`     plain static server (`node srv.mjs 8920`).
 - `keep.sh`     keeps a server alive across tool-call timeouts:
                 `setsid ./keep.sh srv.mjs 8920 &`
