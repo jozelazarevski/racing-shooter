@@ -1324,6 +1324,26 @@ class Game {
     }
     this.unlockAll = params.get('unlockall') === '1'
       || localStorage.getItem('ir-openall') === '1';
+    // ADMIN — the owner's build tools, off the main game.
+    //
+    // The WORLD EDITOR used to sit under START RACE on the tracks tab, which
+    // put a level-sculpting tool in front of every player who ever opened the
+    // menu. Asked for as: "Place the world editor under a admin link and
+    // remove it from the main game."
+    //
+    // Same REMEMBERED-SWITCH shape as `unlockall` directly above, and for the
+    // same reason: a URL-only flag lasts exactly as long as the browser tab
+    // and is gone the moment the game is opened from the home screen or as a
+    // PWA, which is how the owner actually opens it. `?admin=1` turns it on
+    // and writes it; `?admin=0` turns it off again, because a switch you
+    // cannot unset is a trap — without it the only way back would be clearing
+    // site data, which also throws away the career.
+    const adminParam = params.get('admin');
+    if (adminParam === '1' || adminParam === '0') {
+      try { localStorage.setItem('ir-admin', adminParam); } catch { /* private mode */ }
+    }
+    this.adminMode = adminParam === '1'
+      || (adminParam !== '0' && localStorage.getItem('ir-admin') === '1');
     const diffId = localStorage.getItem('ir-diff') || 'normal';
     this.difficulty = DIFFS[diffId] || DIFFS.normal;
     // guard: don't start a locked level via URL tampering
@@ -1502,9 +1522,18 @@ class Game {
       if (document.hidden && this.state === 'race') this.togglePause();
     });
     document.getElementById('start-btn').addEventListener('click', () => this.startRace());
-    // THE WORLD EDITOR. Mounted lazily on first use: it builds its own DOM and
-    // takes the pointer, and a player who never opens it should pay nothing.
-    document.getElementById('editor-btn')?.addEventListener('click', () => {
+    // THE WORLD EDITOR — ADMIN ONLY. Mounted lazily on first use: it builds
+    // its own DOM and takes the pointer, and a player who never opens it
+    // should pay nothing.
+    //
+    // The button is REMOVED from the document rather than hidden with CSS.
+    // Hiding it would leave a real, clickable, keyboard-reachable control in
+    // the tab order of every player's menu — "not visible" is not "not there",
+    // and a tab-stop that sculpts terrain is worse than a visible one because
+    // nobody can see what they just hit.
+    const edBtn = document.getElementById('editor-btn');
+    if (!this.adminMode) document.getElementById('admin-panel')?.remove();
+    else edBtn?.addEventListener('click', () => {
       this._flushPick?.();   // the editor must open on the world that was picked
       if (!this.editor) this.editor = new WorldEditor(this);
       this.editor.enter();
@@ -8404,6 +8433,10 @@ class Game {
       for (const d of p.mesh?.userData?.outwardDecals ?? []) d.visible = true;
       const pit = p.mesh?.userData?.cockpit;
       if (pit) pit.visible = false;
+      // ...and the hood comes back. It is removed for the seat only (see
+      // `_driverCamera`); a chase camera looking at a car with no front half
+      // would be a far worse bug than the one that removal fixes.
+      for (const c of p.mesh?.userData?._hoodParts ?? []) c.visible = true;
     }
     // Chase views used to sit rigidly behind the car's RAW heading, so every
     // steering flick and every drift whipped the whole view sideways — that
@@ -8739,6 +8772,41 @@ class Game {
     //
     // Reported as "drivers view should be looking from inside the car".
     if (p.mesh) p.mesh.visible = true;
+    // AND THE HOOD COMES OFF, BECAUSE ON A PHONE IT IS THE VIEW.
+    //
+    // Measured on PINE VALLEY, portrait, 430x830: the car's own bodywork fills
+    // 26-33% of the frame, and on a -13% grade the render contains grass,
+    // trees and a house but NOT ONE PIXEL OF ROAD — which is the phone
+    // screenshot in the report. It is not the aim pitching into the metal (the
+    // hood grazes at 23 degrees against an aim capped at 17.8; clamping to the
+    // silhouette was tried and changed nothing on any car). It is simply that
+    // a hood two and a half metres long, seen from a head sitting 0.4 m above
+    // it, subtends about thirty degrees — and thirty degrees of an 82 degree
+    // vertical lens is a third of the screen. No eye height or dash placement
+    // inside the cabin gets that back; the hood has to not be drawn.
+    //
+    // Everything AHEAD of the eye goes; the cabin, pillars, roof and tail stay,
+    // and so does the cockpit below. That is a cockpit view: you see the car
+    // you are sitting in, not the car you are sitting on.
+    //
+    // The split is computed ONCE per mesh and cached — it is a question about
+    // the model, which does not change — and it is stored as the parts to hide
+    // rather than the parts to show, so anything added to the car later shows
+    // by default instead of silently vanishing.
+    if (p.mesh && !p.mesh.userData._hoodParts) {
+      const eyeCut = (p.mesh.userData.rig?.cabZ ?? 0) + (p.mesh.userData.rig?.cabL ?? 2) * 0.30;
+      const bb = new THREE.Box3();
+      p.mesh.userData._hoodParts = p.mesh.children.filter((c) => {
+        if (c === p.mesh.userData.cockpit) return false;
+        bb.setFromObject(c);
+        if (!Number.isFinite(bb.min.z)) return false;
+        // the local box is in world space here; fall back to the object's own
+        // position when the mesh has not been placed yet
+        const z = c.position.z;
+        return z > eyeCut;
+      });
+    }
+    for (const c of p.mesh?.userData?._hoodParts ?? []) c.visible = false;
     // ONE THING DOES HAVE TO GO, AND IT IS NOT BODYWORK. The brand decal is a
     // textured plane laid on the hood slope "reading right-side-up from the
     // car's FRONT" (vehicles.js). A driver sits behind it and reads it
@@ -8900,6 +8968,14 @@ class Game {
       if (Number.isFinite(cy)) roadY = p.pos.y * 0.35 + cy * 0.65;
     }
     let lookY = roadY + (this._driverTune?.lookH ?? M.lookH ?? 1.15);
+    // THE HOOD SILHOUETTE IS NOT THE BINDING CONSTRAINT — MEASURED, AND
+    // RECORDED SO IT IS NOT TRIED AGAIN. The obvious reading of "the frame
+    // fills with bodywork on a descent" is that the aim pitches into the hood,
+    // so the aim was clamped to the ray grazing it (`deckY`/`noseY`, published
+    // on the rig for this). It changed nothing, on any car: the tightest hood
+    // on the roster grazes at 23 degrees and the aim is already capped at
+    // 17.8, so the clamp could never bind. What actually sets the top edge of
+    // the interior is the DASH — see `_driverTune` and vehicles.js.
     // The cone. Up is tight (5.9°) because sky is never information; down is
     // looser (17.7°) because that is where a compression puts the road.
     lookY = clamp(lookY, cp.y - look * 0.32, cp.y + look * 0.104);

@@ -423,12 +423,23 @@ export function buildVoxelRacer(spec) {
     // A cockpit needs ONE piece: a dash across the bottom. No header — the top
     // of the frame is where the road you are about to need lives. No pillars —
     // at this FOV they are outside the frame or across it, never at its edge.
-    // 2.1, not 1.55. THE CAMERA'S OWN PITCH ADDS TO THE GEOMETRIC ANGLE: the
-    // seat aims at a look-point up the road, so it is already tilted down ~8
-    // degrees, and a dash computed to sit 25 degrees below the AXIS arrives
-    // ~33 degrees below the horizon — measured at 68% of frame against the 80%
-    // it was sized for. Pushing it out trades angle for distance and lands it
-    // where it was meant to be.
+    // 2.1, and BRINGING IT IN WAS TRIED AND REVERTED — recorded because the
+    // reasoning for trying it is sound and somebody will have it again.
+    //
+    // THE CAMERA'S OWN PITCH ADDS TO THE GEOMETRIC ANGLE: the seat aims at a
+    // look-point up the road, so it is already tilted down ~8 degrees, and a
+    // dash computed to sit 25 degrees below the AXIS arrives ~33 degrees below
+    // the horizon — measured at 68% of frame against the 80% it was sized for.
+    // Pushing it out trades angle for distance and lands it where it was meant
+    // to be.
+    //
+    // Once the hood stopped being drawn (see `_driverCamera`) 2.1 left the dash
+    // floating a car's length out with daylight under it, so it was brought
+    // back to 1.15. That is worse, and the render says why: at 1.15 the dash's
+    // 0.40-deep top face is nearly edge-on to the eye and reads as a WALL —
+    // measured filling the bottom 26% of the frame, against 20% at 2.1 with a
+    // clear band of road under it. A shallow surface seen edge-on is all
+    // thickness and no surface.
     const AHEAD = 2.1;
     // dash top edge at ~atan(0.72/2.1) = 19 degrees below the axis, plus the
     // camera's own pitch, which puts it in the bottom fifth.
@@ -890,7 +901,19 @@ export function buildVoxelRacer(spec) {
     cabY, cabZ, cabH, cabW, cabL,
     zRear: _box.min.z, zFront: _box.max.z,
     halfW: _box.max.x,          // bounding box — INCLUDES THE WHEELS
-    bodyHalf: BODY_W / 2 };     // the bodywork itself, for flank mounts
+    bodyHalf: BODY_W / 2,       // the bodywork itself, for flank mounts
+    // THE BONNET'S SILHOUETTE, for the driver's view to aim over.
+    //
+    // From the seat, the lowest thing worth looking at is the road, and the
+    // road is behind the bonnet for every aim steeper than the line grazing
+    // this metal. The camera had no idea any of it was there — it clamped its
+    // aim to a flat 17.8 degrees down — so on a descent it looked THROUGH the
+    // bonnet and the frame filled with bodywork. Two points define the
+    // silhouette because either can be the binding one: the front edge of the
+    // flat deck (near, high) and the nose tip (far, lower for a car whose hood
+    // drops away). See `_driverCamera` in main.js.
+    deckY: topY, deckZ: noseZ0,
+    noseY: topY - frontDrop, noseZ: bodyLen / 2 };
   return g;
 }
 

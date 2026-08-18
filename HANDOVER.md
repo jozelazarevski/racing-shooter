@@ -1,6 +1,6 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r220, deployed and live, tree clean.
+State at handover: `main` = r221, deployed and live, tree clean.
 Live: https://jozelazarevski.github.io/racing-shooter/
 
 ## THE ONE DEFECT THIS REPO KEEPS SHIPPING
@@ -590,6 +590,73 @@ WINTER is DERIVED (a world with a snowfield is a winter world; there is no
 other kind) and AUTUMN is DECLARED, for the same reason `dusk` is: warm colours
 happen at sunset, in a desert, and over a burning forest, none of which is
 October.
+
+## THE DRIVER'S VIEW WAS THE HOOD, AND THE HOOD IS NOT DRAWN NOW
+
+Reported from a phone with a screenshot: the bottom half of the frame black,
+sky and hills above it, no road anywhere. *"Fix driver view."*
+
+### What it actually was
+Not the near plane (that was r217), not the eye height, not the aim. It was
+simply that **a hood two and a half metres long, seen from a head sitting 0.4 m
+above it, subtends about thirty degrees** — and thirty degrees of an 82 degree
+vertical lens is a third of a portrait screen. Measured on PINE VALLEY at
+430x830: bodywork 26–33% of frame, and at a **-13% grade the render contains
+grass, trees and a house but NOT ONE PIXEL OF ROAD.**
+
+The seat now hides everything AHEAD of the eye and keeps the cabin, pillars,
+roof, tail and the cockpit below. Measured across grades, interior fell
+25.7% → 18.5% mean, and every sample has road in it.
+
+    grade    -13.1   -2.6      0    +2.3   +16.3
+    before    32.6   27.8   25.9    24.7    17.4   %interior
+    after     25.9   20.5   19.0    17.5     9.7
+
+The split is computed once per mesh and cached, and stored as **the parts to
+HIDE** rather than the parts to show — so anything added to the car later shows
+by default instead of silently vanishing. It is restored on leaving the seat; a
+chase camera looking at a car with no front half would be a worse bug than the
+one this fixes.
+
+### Two things tried that did NOT work — do not repeat them
+- **Clamping the aim to the hood's silhouette.** The obvious reading is that
+  the aim pitches into the metal on a descent, so the down-limit was derived
+  from the hood (`deckY`/`noseY`, still published on the rig for it). It
+  changed nothing on any car: the tightest hood on the roster grazes at 23°
+  against an aim already capped at 17.8°, so the clamp could never bind.
+- **Bringing the dash in from 2.1 to 1.15** once the hood stopped being drawn,
+  because at 2.1 it floats a car's length out with daylight under it. Worse:
+  at 1.15 the dash's 0.40-deep top face is nearly edge-on and reads as a WALL,
+  filling the bottom 26% against 20% at 2.1 with a clear band of road under it.
+  **A shallow surface seen edge-on is all thickness and no surface.**
+
+### And a measurement trap worth keeping
+The first metric counted "rows between the horizon and the interior" as road.
+It reported a healthy 28.7% on the very frame that contained no road at all —
+grass and trees are not tarmac. **Parking on the start line cannot find this
+defect either**: the grade is what moves the aim, and every previous
+measurement of this view was taken stationary at the line. `seatgrade.mjs`
+places the car at the steepest crest and dip on the lap instead.
+
+## ADMIN — THE WORLD EDITOR IS OFF THE MAIN GAME
+
+Asked for as: *"Place the world editor under a admin link and remove it from
+the main game."* It used to sit under START RACE on the tracks tab, in front of
+every player who opened the menu.
+
+It now lives in an `#admin-panel` block in SETUP, reached with `?admin=1` and
+left with `?admin=0`. Same REMEMBERED-SWITCH shape as `unlockall`, and for the
+same reason: a URL-only flag lasts exactly as long as the browser tab and is
+gone the moment the game is opened from the home screen or as a PWA, which is
+how the owner actually opens it. The `admin=0` half is not optional — a switch
+you cannot unset is a trap, and without it the only way back would be clearing
+site data, which also throws away the career.
+
+**The panel is REMOVED from the document, not hidden with CSS.** Hiding it
+would leave a real, clickable, keyboard-reachable control in the tab order of
+every player's menu, and a tab-stop that sculpts terrain is worse than a
+visible one because nobody can see what they just hit. Verified: on a plain
+visit `#editor-btn` is not in the DOM at all.
 
 ## OPEN, LOWER PRIORITY
 - **`MIN` in `tunnelFitAt` is probably the same units error `reach` was.** The

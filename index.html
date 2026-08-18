@@ -1527,7 +1527,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r220</div>
+<div id="build-tag">r221</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1599,6 +1599,18 @@
        the track list — the thing you actually come here to do — down the page
        on a phone. -->
   <div id="tab-settings" class="menu-panel off">
+    <!-- ADMIN — the owner's build tools, and nothing a player needs.
+         The WORLD EDITOR used to sit under START RACE on the tracks tab, in
+         front of everyone who opened the menu. It lives here now, behind
+         `?admin=1`, and main.js REMOVES this whole block when that is not set
+         — hiding it with CSS would leave a live tab-stop that sculpts terrain
+         in every player's menu. -->
+    <div id="admin-panel">
+      <div class="panel-head">ADMIN</div>
+      <p class="set-help" style="margin:0 0 8px">Build tools. Not part of the
+        game — reached with <b>?admin=1</b>, left with <b>?admin=0</b>.</p>
+      <button id="editor-btn" class="btn btn-alt">🛠 WORLD EDITOR</button>
+    </div>
     <div id="race-settings">
       <div class="panel-head">RACE SETTINGS</div>
       <!-- Every setting says what it actually does. "STEERING: SHARP" and
@@ -1669,9 +1681,6 @@
     <div id="garage-rows"></div>
   </div>
   <button id="start-btn" class="btn">START RACE</button>
-  <!-- The owner's build tool. Sits beside START because it opens the world
-       you have selected above — the editor always edits the current pick. -->
-  <button id="editor-btn" class="btn btn-alt">🛠 WORLD EDITOR</button>
   <div class="controls">
     <b>W / ↑</b><span>Throttle</span>
     <b>S / ↓</b><span>Brake / Reverse</span>
@@ -1788,10 +1797,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r220"></script>
+<script type="module" src="./src/main.js?v=r221"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r220"></script>
+<script src="./src/offline.js?v=r221"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r220"></script>
+<script type="module" src="./src/traffic.js?v=r221"></script>
 </body>
 </html>
