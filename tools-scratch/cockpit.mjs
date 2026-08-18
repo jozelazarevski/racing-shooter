@@ -21,19 +21,32 @@ const W = 430, H = 932;
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 
-for (const car of (process.env.CARS ?? '0,1,2,3').split(',')) {
+// BODY STYLES BY CATALOG KEY. There is no `car=` URL param — selection lives in
+// localStorage under `ir-p<profile>-cars` — and the first cut of this probe
+// passed `car=0..3`, got the same car four times, and would have reported one
+// body's numbers as if they covered the roster. The styles differ in exactly
+// the way that matters: cabZ runs -0.45 (sleek) to +0.1 (dune) and the tall
+// bodies sit a driver much higher.
+for (const car of (process.env.CARS ?? 'brawler,sleek,dune,bastion').split(',')) {
   const p = await b.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 2 });
   p.setDefaultTimeout(600000);
   const errs = []; p.on('pageerror', (e) => errs.push(String(e.message)));
-  await p.goto(`${BASE}/?level=1&go=1&unlockall=1&car=${car}`, { waitUntil: 'load', timeout: 600000 });
+  await p.addInitScript((key) => {
+    for (const id of [1, 2, 3]) {
+      localStorage.setItem(`ir-p${id}-cars`, JSON.stringify({ owned: [key], selected: key }));
+    }
+  }, car);
+  await p.goto(`${BASE}/?level=1&go=1&unlockall=1`, { waitUntil: 'load', timeout: 600000 });
   await p.waitForFunction(() => window.__game?.track?.center && window.__game.player,
     undefined, { timeout: 600000 });
   const r = await p.evaluate(async (car) => {
     const g = window.__game, pl = g.player;
-    // DRIVER view by name, not by index — the cycle order is not a contract.
-    const i = g.CAM_MODES ? g.CAM_MODES.findIndex((m) => m.driver) : -1;
-    if (i >= 0) g.camMode = i;
+    // THE PUBLIC TOGGLE. `CAM_MODES` is a module const and is NOT on the game
+    // object, so the first cut's `g.CAM_MODES.findIndex(...)` silently left the
+    // camera on the chase boom — the run reported view=undefined and an eye 46 u
+    // up, which is the only reason it was caught.
     g.startRace?.();
+    g.setDriverView(true);
     for (let k = 0; k < 40; k++) await new Promise((r2) => requestAnimationFrame(r2));
     const cam = g.camera, rig = pl.mesh?.userData?.rig;
     // Project every vertex of the player's own meshes and find the topmost
@@ -54,15 +67,15 @@ for (const car of (process.env.CARS ?? '0,1,2,3').split(',')) {
         if (frac > 0 && (topFrac === 0 || frac < topFrac)) topFrac = frac;
       }
     });
-    return { car, name: pl.spec?.name ?? pl.mesh?.name ?? '?', style: pl.spec?.style ?? '?',
-      camMode: g.CAM_MODES?.[g.camMode]?.name, visible: pl.mesh.visible,
+    return { car, name: pl.spec?.name ?? '?', style: pl.spec?.style ?? '?',
+      driverOn: g.camMode === g.constructor.DRIVER_MODE, visible: pl.mesh.visible,
       eyeY: +g.camera.position.y.toFixed(2), carY: +pl.pos.y.toFixed(2),
       cabY: rig?.cabY !== undefined ? +rig.cabY.toFixed(2) : null,
       capTop: rig?.capTop !== undefined ? +rig.capTop.toFixed(2) : null,
       onScreen, total, bodyTopPct: +(topFrac * 100).toFixed(1) };
   }, car);
-  console.log(`car ${r.car} ${String(r.name).padEnd(12)} style=${String(r.style).padEnd(8)} `
-    + `view=${r.camMode} shown=${r.visible} eye=${r.eyeY} (cabY ${r.cabY}, capTop ${r.capTop}) `
+  console.log(`${String(r.car).padEnd(9)} ${String(r.name).padEnd(9)} style=${String(r.style).padEnd(8)} `
+    + `driverView=${r.driverOn} shown=${r.visible} eye=${r.eyeY} (cabY ${r.cabY}, capTop ${r.capTop}) `
     + `bodywork verts on screen ${r.onScreen}/${r.total}, highest at ${r.bodyTopPct}% of frame`
     + (errs.length ? `  ERR ${errs[0]}` : ''));
   await p.screenshot({ path: `/tmp/claude-0/-home-user-racing-shooter/5dbf1129-99d6-5790-8c20-c8eb78d4cc72/scratchpad/cockpit-${car}.png` });
