@@ -8433,13 +8433,18 @@ class Game {
     // player is looking at the inside of a dark panel.
     const rig = p.mesh?.userData?.rig;
     const cabY = rig?.cabY, cabH = rig?.cabH ?? 0.7, cabL = rig?.cabL ?? 2.0;
+    // TUNABLE AT RUNTIME so the seat can be SWEPT rather than guessed at. How
+    // much bonnet a cockpit shows is the whole difference between "in the car"
+    // and "behind a wall", and it is a screen-coverage question that cannot be
+    // answered by reading numbers in this file — see tools-scratch/eyesweep.mjs.
+    const T = (this._driverTune ??= { up: 0.20, fwd: 0.14, lookH: 1.15 });
     const eyeH = cabY !== undefined
-      ? clamp(cabY + cabH * 0.20, cabY - cabH * 0.35, cabY + cabH * 0.38)
+      ? clamp(cabY + cabH * T.up, cabY - cabH * 0.35, cabY + cabH * 0.45)
       : (M.h ?? 2.3);
     // Sit a little forward of the cabin's centre, the way a driver does, but
     // never out through the windscreen.
     const eyeZ = rig?.cabZ !== undefined
-      ? rig.cabZ + Math.min(0.30, cabL * 0.14) : -(M.back ?? -0.42);
+      ? rig.cabZ + Math.min(0.45, cabL * T.fwd) : -(M.back ?? -0.42);
     const cp = this.camPos;
     cp.set(p.pos.x, p.pos.y + eyeH, p.pos.z)
       .addScaledVector(fwd, eyeZ - this._dSurge * 0.16)
@@ -8457,7 +8462,7 @@ class Game {
       // lap index is a guess and the car's own height is the honest number.
       if (Number.isFinite(cy)) roadY = p.pos.y * 0.35 + cy * 0.65;
     }
-    let lookY = roadY + (M.lookH ?? 1.15);
+    let lookY = roadY + (this._driverTune?.lookH ?? M.lookH ?? 1.15);
     // The cone. Up is tight (5.9°) because sky is never information; down is
     // looser (17.7°) because that is where a compression puts the road.
     lookY = clamp(lookY, cp.y - look * 0.32, cp.y + look * 0.104);
