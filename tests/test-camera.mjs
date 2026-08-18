@@ -53,8 +53,16 @@ const R = await page.evaluate(async () => {
     }
   };
   const out = [];
-  const names = ['TOP-DOWN', 'TOP FAR', 'TRAIL', 'CHASE', 'CHASE FAR'];
-  for (let m = 0; m < 5; m++) {
+  // NAMES COME FROM THE GAME, NOT FROM HERE. This list used to be hardcoded and
+  // indexed 0..4, so moving DRIVER up the cycle (it now sits after CHASE) would
+  // have had this testing the SEAT while printing "CHASE FAR" — a gate quietly
+  // measuring the wrong thing under the right label. The seat is a different
+  // animal with its own laws in test-goat/cockpit probes, so it is skipped here
+  // BY ITS FLAG rather than by position.
+  const names = g.constructor.CAM_NAMES;
+  const DRIVER = g.constructor.DRIVER_MODE;
+  for (let m = 0; m < names.length; m++) {
+    if (m === DRIVER) continue;
     g.camMode = m;
     await step(50, 0);                       // settle
     const carA = g.player.heading;

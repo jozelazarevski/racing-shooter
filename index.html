@@ -183,14 +183,11 @@
     box-shadow:0 3px 0 rgba(0,0,0,.25);-webkit-tap-highlight-color:transparent}
   .icon-btn:active{transform:scale(.93);background:rgba(255,212,0,.4)}
   #cam-btn{top:70px;right:12px}
-  #view-btn{top:124px;right:12px}
-  #pause-btn{top:178px;right:12px}
-  /* THE DRIVER'S VIEW BUTTON LIGHTS UP WHILE YOU ARE IN IT. 📷 cycles blind —
-     you find out which of six views you landed on from the feed line — but 👁
-     is a toggle, and a toggle with no state is a coin flip every time you
-     reach for it. Same yellow the .tbtn cluster uses for a held button, so it
-     is the language already on screen rather than a new one. */
-  #view-btn.on{background:rgba(255,212,0,.55);color:var(--ink);border-color:var(--ink)}
+  /* TWO ICON BUTTONS, NOT THREE. The driver's view had its own 👁 toggle; it is
+     a stop on the 📷 cycle now ("remove the eye and integrate the switch as
+     part of the camera"), which also gives ⏸ its old slot back at 124px and
+     removes the landscape squeeze that pushed it into the 💥 button. */
+  #pause-btn{top:124px;right:12px}
   #wrong-way{position:absolute;top:18%;left:50%;transform:translateX(-50%);
     font-family:'Luckiest Guy';font-size:26px;color:#ff4a2e;
     text-shadow:2px 2px 0 var(--ink);letter-spacing:4px;display:none;
@@ -376,14 +373,13 @@
        up under the camera and pause buttons in the top-right corner */
     #t-drift{right:calc(190px + env(safe-area-inset-right));
       bottom:calc(120px + env(safe-area-inset-bottom))}
-    /* ...AND THREE ICON BUTTONS DO NOT STACK ON A 390px TALL SCREEN EITHER.
-       Adding 👁 pushed ⏸ from top:124 to top:178, and measured at 844x390 that
-       landed it 24x32 INSIDE the 💥 button — the same corner, the same squeeze,
-       one row further down. Portrait has the height for a column; landscape's
-       spare real estate is the band across the TOP, so the column becomes a row
-       under the score box, reading 📷 👁 ⏸ left to right. */
-    #cam-btn{top:60px;right:calc(120px + env(safe-area-inset-right))}
-    #view-btn{top:60px;right:calc(66px + env(safe-area-inset-right))}
+    /* ICON BUTTONS DO NOT STACK ON A 390px TALL SCREEN. Portrait has the height
+       for a column; landscape's spare real estate is the band across the TOP,
+       so the column becomes a row under the score box, reading 📷 ⏸ left to
+       right. (This was three buttons while 👁 existed, and the third landed
+       24x32 INSIDE the 💥 button at 844x390 — the row is what fixed it, and it
+       is kept now there are two.) */
+    #cam-btn{top:60px;right:calc(66px + env(safe-area-inset-right))}
     #pause-btn{top:60px;right:calc(12px + env(safe-area-inset-right))}
   }
 
@@ -1447,7 +1443,6 @@
   <div id="combo"><span id="combo-x">×2</span><span id="combo-lbl">COMBO</span><i id="combo-bar"><b></b></i></div>
   <div id="wrong-way">▼ WRONG WAY ▼</div>
   <button id="cam-btn" class="icon-btn" title="Camera view">📷</button>
-  <button id="view-btn" class="icon-btn" title="Driver's view">👁</button>
   <button id="pause-btn" class="icon-btn" title="Pause">⏸</button>
 </div>
 <div id="damage-vignette"></div>

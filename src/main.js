@@ -212,6 +212,8 @@ const CAM_MODES = [
   // whips on every steering flick, so it takes the damped travel-direction yaw.
   { name: 'TRAIL',     back: 21, h: 26,   look: 15, lookH: 1.6, spdBack: 5, spdH: 6, chase: true, steer: 0.9, cliffLift: 11 },
   { name: 'CHASE',     back: 17, h: 11.5, look: 19, lookH: 3.2, spdBack: 4, spdH: 2, chase: true, steer: 0.76 },
+  { name: 'DRIVER', driver: true, back: -0.42, h: 2.30, look: 34, lookH: 1.15,
+    steer: 0.70, fov: 6, spdFov: 11 },
   { name: 'CHASE FAR', back: 26, h: 17,   look: 22, lookH: 3.4, spdBack: 4, spdH: 2, chase: true, steer: 0.84 },
   // DRIVER'S VIEW — the eye where the driver's head is, riding the car rather
   // than a boom behind it. It is LAST in the list on purpose: every mode above
@@ -240,8 +242,6 @@ const CAM_MODES = [
   // (11 against the 6 every other view gets). From a fixed eye with no boom,
   // pace has to be sold by the frame itself, and a wide lens is also what buys
   // back the peripheral road a cockpit loses by being 12 u closer to it.
-  { name: 'DRIVER', driver: true, back: -0.42, h: 2.30, look: 34, lookH: 1.15,
-    steer: 0.70, fov: 6, spdFov: 11 },
 ];
 // ---- economy ----
 // Score is the arcade number (it inflates fast: 500/lap, big rank bonus,
@@ -1509,7 +1509,6 @@ class Game {
 
     // camera + pause buttons (work with mouse and touch)
     document.getElementById('cam-btn').addEventListener('click', () => this.cycleCamera());
-    document.getElementById('view-btn')?.addEventListener('click', () => this.setDriverView());
     document.getElementById('pause-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       this.togglePause();
@@ -1877,18 +1876,22 @@ class Game {
   /** Index of the driver's view in CAM_MODES, found by its flag rather than
    *  written down as a 5 — the list is edited often and a stale constant here
    *  would silently switch you to CHASE FAR. */
+  /** The view names in cycle order. Published so a gate does not hardcode the
+   *  list — `test-camera` did, BY INDEX, so moving DRIVER up the cycle would
+   *  have had it testing the seat while calling it CHASE FAR. */
+  static get CAM_NAMES() { return CAM_MODES.map((m) => m.name); }
+
   static get DRIVER_MODE() {
     const i = CAM_MODES.findIndex((m) => m.driver);
     return i < 0 ? 0 : i;
   }
 
-  /** THE DRIVER'S VIEW IS A TOGGLE, NOT A STOP ON THE CYCLE.
+  /** THE ONE-PRESS TOGGLE — now for the KEYBOARD and the PAUSE MENU only.
    *
-   *  It is on the cycle too — it has to be, or the pause menu and the C key
-   *  could not reach it — but six taps to get into the seat and four more to
-   *  get out is not a switch you use mid-corner. This is one thumb press each
-   *  way, and it remembers which boom you came from so pressing it twice puts
-   *  you back exactly where you were rather than at the top of the list.
+   *  The 👁 button is gone by request and 📷 cycles to the seat like any other
+   *  view. This stays because V and the pause menu are single presses already,
+   *  and because it remembers which boom you came from, so leaving the seat
+   *  returns you where you were rather than to the top of the list.
    *
    *  `on` omitted toggles; passing it explicitly is for the pause menu, which
    *  wants a checkbox rather than a flip. */
@@ -1905,11 +1908,14 @@ class Game {
     }
   }
 
-  /** Paint the driver-view button's on/off state. Called from every path that
-   *  can change camMode, so the button cannot disagree with the camera. */
+  /** Paint the pause menu's driver-view entry. Called from every path that can
+   *  change camMode, so the label cannot disagree with the camera.
+   *
+   *  The 👁 HUD button this also used to paint is gone — "remove the eye and
+   *  integrate the switch as part of the camera". The seat was always a stop on
+   *  the 📷 cycle as well as a toggle, so the cycle is now the on-screen route
+   *  and the HUD is back to two icon buttons. */
   _syncViewBtn() {
-    const b = document.getElementById('view-btn');
-    if (b) b.classList.toggle('on', this.camMode === Game.DRIVER_MODE);
     const pb = document.getElementById('pm-driver');
     if (pb) pb.textContent = this.camMode === Game.DRIVER_MODE ? "CHASE VIEW 📷" : "DRIVER'S VIEW 👁";
   }

@@ -49,12 +49,14 @@ const SIZES = [
 //
 // THE TOP-RIGHT ICON BUTTONS WERE NEVER IN THIS LIST, and that is why this
 // suite passed while `#pause-btn` sat 24 x 32 px INSIDE `#t-shock` at 844x390.
-// Adding the driver's-view button pushed pause down into the weapon cluster and
-// nothing here noticed — a list of "everything the player has to be able to
-// press" that omits three buttons is a list that agrees with itself.
+// A third icon button pushed pause down into the weapon cluster and nothing
+// here noticed — a list of "everything the player has to be able to press" that
+// omits the buttons is a list that agrees with itself. (That third button, the
+// driver's-view 👁, has since been removed and the seat is a stop on the 📷
+// cycle; the two that remain stay listed, because the lesson is the omission.)
 const IDS = ['race-info', 'health-box', 'score-box', 'speed-box', 'feed', 'weapon-box',
              't-fire', 't-missile', 't-mine', 't-shock', 't-nitro', 't-drift', 't-brake',
-             'cam-btn', 'view-btn', 'pause-btn'];
+             'cam-btn', 'pause-btn'];
 
 for (const [w, h, tag] of SIZES) {
   const ctx = await browser.newContext({
@@ -108,7 +110,7 @@ for (const [w, h, tag] of SIZES) {
   // A CLEARANCE CHECK THAT MATCHES NOTHING PASSES FOREVER (tests/README rule 4).
   // Two elements are legitimately absent mid-race and are named here with the
   // reason; anything else missing means the gate stopped watching something.
-  // Measured at 844x390: 16 ids, 14 boxes, and these are the two.
+  // Measured at 844x390: 15 ids, 13 boxes, and these are the two.
   const EXPECT_ABSENT = {
     'weapon-box': 'hidden until a weapon is held',
     't-brake': 'hidden — the brake pedal is not in the touch cluster on this layout',
