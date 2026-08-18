@@ -13553,6 +13553,39 @@ export class Track {
       if (key === 'roof' && roofC !== null) return roofC;
       return K[key];
     };
+    // ---- A BUILDING GETS A FOUNDATION THAT REACHES THE GROUND -------------
+    //
+    // "Kill all floaters in the design." A structure is seated by ONE number —
+    // `_seatY` at its centre — so on any slope its downhill side hangs, and
+    // that is the whole `element-*` floater class the census keeps finding
+    // (grade under floaters p50 1.76 against 0.13 under seated ones: they are
+    // not badly placed, they are on hills). Moving the building down instead
+    // would bury its uphill wall.
+    //
+    // So it gets what a real building on a slope gets: a plinth carried down
+    // to the LOWEST ground under its own footprint. Measured at the footprint
+    // corners rather than the centre, because the centre is the one point that
+    // is never the problem. Cheap — one box, and only where the fall is real.
+    {
+      const fr = T.r * scale * 0.78;
+      let low = y;
+      for (const [ddx, ddz] of [[fr, 0], [-fr, 0], [0, fr], [0, -fr],
+        [fr * 0.7, fr * 0.7], [-fr * 0.7, -fr * 0.7],
+        [fr * 0.7, -fr * 0.7], [-fr * 0.7, fr * 0.7]]) {
+        const g2 = this._seatY(x + ddx, z + ddz);
+        if (Number.isFinite(g2) && g2 - 0.25 < low) low = g2 - 0.25;
+      }
+      const drop = y - low;
+      if (drop > 0.25) {
+        // 0.4 u of overlap into the body above so there is never a seam, and
+        // the plinth is the footprint's own size so it reads as masonry rather
+        // than as a box the house is standing on.
+        B.box.push({
+          x, y: low, z, sx: fr * 2.0, sy: drop + 0.4, sz: fr * 2.0,
+          rot, roll: 0, color: tinted(slot('stone')),
+        });
+      }
+    }
     for (const [kind, dx, dy, dz, sx, sy, sz, colKey, roll = 0] of T.parts) {
       const ox = dx * scale * wS, oy = dy * scale * hS, oz = dz * scale * dS * mir;
       B[kind].push({
