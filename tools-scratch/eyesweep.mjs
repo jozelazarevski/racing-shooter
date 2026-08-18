@@ -15,8 +15,16 @@
  *
  * 3. EVERY TUNE IS MEASURED AT THE SAME PLACE ON THE LAP. The second cut railed
  *    the car onward between rows, so each tune was read at a different road
- *    pitch and crest — the comparison was confounded and its ordering meant
- *    nothing. The car is now returned to a FIXED station before each reading.
+ *    pitch and crest. The car is now pinned to a FIXED station on every frame
+ *    INCLUDING the measurement frames — parking once was not enough, physics
+ *    carried it three stations on before the pixels were read.
+ *
+ * 4. SWEEP WHAT THE CODE ACTUALLY USES. The third cut swept eye height and
+ *    forward offset across 3x and 7x ranges and moved coverage by 4 points,
+ *    because BOTH SATURATE AGAINST THEIR OWN CLAMPS: eyeY read an identical
+ *    2.51 for up=0.50 and up=0.65, and fwd 0.40/0.70/1.00 produced byte-
+ *    identical rows (Math.min(0.45, cabL * fwd)). Sweeping a value the code
+ *    throws away measures nothing. The lever is where the camera AIMS.
  */
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:8901';
@@ -62,9 +70,9 @@ const rows = await p.evaluate(async () => {
     });
     if (!on) { for (const [o, m] of saved) o.material = m; saved.length = 0; }
   };
-  const cover = async () => {
+  const cover = async (pin) => {
     paint(true);
-    await frame(); await frame();
+    await pin(); await frame(); await pin(); await frame();
     const src = g.renderer?.domElement ?? document.querySelector('canvas');
     const c2 = document.createElement('canvas');
     c2.width = 215; c2.height = 466;                    // half res is plenty
@@ -86,32 +94,31 @@ const rows = await p.evaluate(async () => {
 
   // FIXED STATION for every reading — a straight, mid-lap, away from the grid.
   const HOME = Math.floor(t.N * 0.18);
-  const park = async () => {
+  const pin = async () => {
+    const c = t.pointAt(HOME, 0);
+    pl.heading = t.headingAt(HOME);
+    pl.pos.x = c.x; pl.pos.z = c.z;
+    if (Number.isFinite(c.y)) { pl.pos.y = c.y; pl.y = c.y; }
+    pl.vy = 0; pl.airborne = false;
+    pl.vel.copy(pl.forward).multiplyScalar(38);
     pl.trackIndex = HOME;
-    for (let k = 0; k < 12; k++) {
-      const c = t.pointAt(HOME, 0);
-      pl.heading = t.headingAt(HOME);
-      pl.pos.x = c.x; pl.pos.z = c.z;
-      if (Number.isFinite(c.y)) { pl.pos.y = c.y; pl.y = c.y; }
-      pl.vy = 0; pl.airborne = false;
-      pl.vel.copy(pl.forward).multiplyScalar(38);
-      pl.trackIndex = HOME;
-      await frame();
-    }
   };
+  const settle = async (n) => { for (let k = 0; k < n; k++) { await pin(); await frame(); } };
   const out = [];
-  for (const up of [0.20, 0.35, 0.50, 0.65]) {
-    for (const fwd of [0.14, 0.40, 0.70, 1.00]) {
-      g._driverTune = { up, fwd, lookH: 1.15 };
-      await park();
-      const c = await cover();
-      out.push({ up, fwd, ...c, eye: +g.camera.position.y.toFixed(2), carY: +pl.pos.y.toFixed(2),
-        idx: pl.trackIndex });
+  // lookH is the height above the road the view aims at, and it is the only one
+  // of the three that is not clamped into irrelevance.
+  for (const lookH of [1.15, 2.5, 4.0, 6.0, 8.0]) {
+    for (const up of [0.20, 0.45]) {
+      g._driverTune = { up, fwd: 0.14, lookH };
+      await settle(12);
+      const c = await cover(pin);
+      out.push({ up, fwd: lookH, ...c, eye: +g.camera.position.y.toFixed(2),
+        carY: +pl.pos.y.toFixed(2), idx: pl.trackIndex });
     }
   }
   return out;
 });
-console.log('  up   fwd | bonnet covers  horizon at  eyeY  carY  idx   (target 12-18%)');
+console.log('  up  lookH | bonnet covers  horizon at  eyeY  carY  idx   (target 12-18%)');
 const idx = new Set(rows.map((r) => r.idx));
 for (const r of rows) {
   const sane = Math.abs(r.eye - r.carY) < 4;
