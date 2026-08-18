@@ -4522,7 +4522,7 @@ const DRESS = {
   house:    [ 3.60,  5.35,    3.10,   2.30, 2.30, -0.60 ],
 };
 for (const [name, d] of Object.entries(DRESS)) {
-  const tpl = ELEMENTS[name];
+  const tpl = HOUSE_TEMPLATES[name];
   if (!tpl) continue;                       // a renamed template must not throw
   const [halfW, wallTop, fz, winY, winX, doorX] = d;
   const P = tpl.parts;

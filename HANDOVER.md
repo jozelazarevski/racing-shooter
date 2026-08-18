@@ -465,3 +465,16 @@ to the results screen" by its own route.
 
 This gate now takes `BASE`, which is what made the baseline possible at all —
 it hardcoded `localhost:8901` in SEVEN places.
+
+## `node --check` PASSES AN UNDEFINED NAME — BOOT THE GAME
+Already recorded for `Identifier 'bk' has already been declared`; it happened
+again and is worth the second entry because the blast radius is total. A
+module-level loop referencing `ELEMENTS[...]` when the object is called
+`HOUSE_TEMPLATES` parses cleanly, throws at MODULE LOAD, and `src/track.js`
+then evaluates for NO world — every level times out waiting for
+`track.center`, which reads as "the box is slow" rather than "the build is
+broken". It was committed and pushed.
+
+The rule: a syntax check is necessary and never sufficient. `tools-scratch/
+boot.mjs` boots four worlds and fails loudly on any page error; run it after
+every edit to `src/` before committing. It takes about a minute.
