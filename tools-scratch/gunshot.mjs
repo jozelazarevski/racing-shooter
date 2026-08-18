@@ -16,9 +16,17 @@ const r = await p.evaluate(async (lvl) => {
   // CHASE VIEW. The first run of this shot came back TOP-DOWN — the probe never
   // set a camera, and camMode starts at 0 — so it could not show the silhouette
   // the whole report is about. Set by NAME, not by index.
+  // Cycle until the camera is ACTUALLY down at car level. Breaking on "not the
+  // driver's view" was not enough: modes 0 and 1 are the overhead pair, so the
+  // probe stopped at mode 1 and reported a 72 u camera as a chase boom. The
+  // test is the boom HEIGHT, which is the thing that matters here.
   const D = g.constructor.DRIVER_MODE;
   g.camMode = 0;
-  for (let i = 0; i < 8; i++) { g.cycleCamera(); if (g.camMode !== D) break; }
+  for (let i = 0; i < 8; i++) {
+    g.cycleCamera();
+    await new Promise((r2) => requestAnimationFrame(r2));
+    if (g.camMode !== D && g.camPos.y - pl.pos.y < 20) break;
+  }
   // FIT THE GUN. Without this the kit builds nothing and the shot proves
   // nothing — the report is about a cannon that is actually on the car.
   g.garage.upgrades = g.garage.upgrades || {};
@@ -42,14 +50,17 @@ const r = await p.evaluate(async (lvl) => {
   });
   return { parts: n, kitFound: !!kit, topY: +top.toFixed(2), outX: +out.toFixed(2),
     capTop: +(rig.capTop ?? 0).toFixed(2), halfW: +(rig.halfW ?? 0).toFixed(2),
-    bodyHalf: +(rig.bodyHalf ?? 0).toFixed(2), camY: +g.camPos.y.toFixed(1) };
+    bodyHalf: +(rig.bodyHalf ?? 0).toFixed(2),
+    camY: +(g.camPos.y - pl.pos.y).toFixed(1) };
 }, 1);
 console.log(`upgrade kit: ${r.kitFound ? r.parts + ' parts' : 'NOT FOUND'}`);
 console.log(`highest kit part ${r.topY} u vs roof ${r.capTop} u  ->  `
   + (r.topY > r.capTop ? `${(r.topY - r.capTop).toFixed(2)} u ABOVE the roof (a mast)` : 'below the roofline'));
 console.log(`outermost kit part ${r.outX} u vs BODY half ${r.bodyHalf} u `
   + `(bounding box, with wheels, is ${r.halfW} u)  ->  `
-  + (r.outX > r.bodyHalf + 0.05 ? 'OUTBOARD of the bodywork' : 'on the bodywork'));
-console.log(`camera height ${r.camY} u — a chase boom, not the top-down view`);
+  + `stands ${(r.outX - r.bodyHalf).toFixed(2)} u proud of the flank`
+  + (r.outX > r.bodyHalf + 0.4 ? '  <-- floating off the car' : ''));
+console.log(`camera ${r.camY} u above the car`
+  + (r.camY < 20 ? ' — a chase boom' : ' — STILL AN OVERHEAD VIEW, the shot proves nothing'));
 await p.screenshot({ path: '/tmp/claude-0/-home-user-racing-shooter/5dbf1129-99d6-5790-8c20-c8eb78d4cc72/scratchpad/gun-side.png' });
 await b.close();
