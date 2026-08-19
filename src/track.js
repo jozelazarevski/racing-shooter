@@ -17590,9 +17590,107 @@ export class Track {
     return Math.random() > THREE.MathUtils.smoothstep(this.terrainHeight(x, z), fade[0], fade[1]);
   }
 
+
+  /** THE DISTANT STAND — the mid-distance tree line, as its own method.
+   *
+   *  IT ONLY EVER RAN ON ONE KIND OF WORLD. It lived in the tail of
+   *  `_buildForest`, and `_buildForest` DISPATCHES: cactus, outback, charred,
+   *  jungle, palm, redwood, burnt and olive each `return` a specialised
+   *  builder before the generic conifer path is reached. So every world whose
+   *  trees are not plain conifers built none of it. Counted across the roster:
+   *
+   *    300 clumps   PINE VALLEY, PIKES PEAK, SPA, OUNINPOHJA, FROST PEAK,
+   *                 LOG FLUME FURY, RALLYCROSS ARENA, HEDGEROW DASH,
+   *                 DEEPWOOD TRAIL, TIMBER GORGE
+   *      0 clumps   REDWOOD RAMPAGE (792 trees), FAFE LEAP (798),
+   *                 SUZUKA (772), FOREST FIRE ESCAPE (586)
+   *
+   *  Four heavily wooded worlds with a bare mid-distance, which is exactly
+   *  what the comment below says this was built to stop.
+   *
+   *  NOT every vegetation type gets it. The clump is three welded cones — a
+   *  conifer silhouette — so it is called for the tall-forest builders and NOT
+   *  for olive, palm, cactus or outback, where a distant fir line would be a
+   *  different lie from the one it fixes.
+   *
+   *  It stays NON-COLLIDABLE and it stays far out. Measured, its nearest clump
+   *  on any world sits 282 u from the carriageway, so nothing here is a tree a
+   *  car can drive through at speed — which is the reason not to simply pull
+   *  the inner radius in when the playfield scatter thins (it does so at about
+   *  160 u, not the ~640 u the note below assumes). */
+  _buildDistantStand(m4) {
+    const T = this.T;
+    // THE DISTANT STAND. Between the playfield scatter (out to ~640 u) and
+    // the horizon rings (900 u+) there was an empty ring - the mid-distance
+    // read as bare lawn on every wooded world, which is most of why the
+    // scene lacked depth.
+    //
+    // A STAND OF TREES IS NOT ONE CONE. The first cut was a single 6-sided
+    // cone per copy, 5-12 u wide and up to 21 u tall, scattered evenly and
+    // washed 40 % toward the fog: from the road that is a field of pale
+    // pyramids sitting on the grass, which is what the player photographed.
+    // Three faults, all fixed here:
+    //   - SHAPE: a clump of three offset crowns at different heights, welded
+    //     into one geometry, so the silhouette is a lumpy tree-line rather
+    //     than a triangle.
+    //   - GROUPING: clumps are drawn in GROVES of five to nine, because a
+    //     wood is a mass with edges, not evenly spaced dots.
+    //   - TONE: half the fog wash, so they read as trees in haze instead of
+    //     ghosts, and none of them stands taller than a real tree.
+    if (T.treeCount >= 150) {
+      const crown = (r, h, y, dx, dz) => new THREE.ConeGeometry(r, h, 5)
+        .translate(dx, y + h / 2, dz);
+      const bandGeo = this._bundle([
+        crown(1.00, 1.70, 0, 0, 0),
+        crown(0.78, 1.25, 0, -0.95, 0.42),
+        crown(0.66, 1.00, 0, 0.82, -0.55),
+      ]);
+      const band = new THREE.InstancedMesh(bandGeo, new THREE.MeshStandardMaterial({
+        color: 0xffffff, vertexColors: false, flatShading: true, roughness: 1,
+      }), 300);
+      const bandCol = new THREE.Color(), fogC2 = new THREE.Color(T.fogColor ?? 0xcccccc);
+      const baseC2 = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
+      const bq = new THREE.Quaternion(), bup = new THREE.Vector3(0, 1, 0);
+      let bk3 = 0;
+      for (let gv = 0; gv < 46 && bk3 < 300; gv++) {
+        const gh = (n) => { const v = Math.sin((gv + n) * 12.9898) * 43758.5453; return v - Math.floor(v); };
+        const aG = gh(0.1) * Math.PI * 2;
+        const rG = 640 + gh(1.7) * 260;
+        const gx = Math.cos(aG) * rG, gz = Math.sin(aG) * rG;
+        const n = 5 + Math.floor(gh(2.3) * 5);
+        for (let k = 0; k < n && bk3 < 300; k++) {
+          const hh = (m) => {
+            const v = Math.sin((gv * 13 + k + m) * 12.9898) * 43758.5453;
+            return v - Math.floor(v);
+          };
+          const x2 = gx + (hh(0.7) - 0.5) * 150, z2 = gz + (hh(1.9) - 0.5) * 150;
+          if (this._inWater(x2, z2)) continue;
+          const gy2 = this._seatY(x2, z2);
+          const sw2 = 4.5 + hh(2.9) * 4.5, sh2 = 5.5 + hh(4.1) * 5.5;
+          bq.setFromAxisAngle(bup, hh(5.3) * Math.PI * 2);
+          m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
+            new THREE.Vector3(sw2, sh2, sw2 * 0.9));
+          band.setMatrixAt(bk3, m4);
+          bandCol.copy(baseC2).multiplyScalar(0.72 + hh(6.7) * 0.36)
+            .lerp(fogC2, 0.12 + hh(8.3) * 0.10);
+          band.setColorAt(bk3++, bandCol);
+        }
+      }
+      band.count = bk3;
+      if (band.instanceColor) band.instanceColor.needsUpdate = true;
+      band.name = 'distant-stand';
+      this.group.add(band);
+    }
+  }
+
   _buildForest(m4) {
     const T = this.T;
     if (T.vegetation === 'none' || !T.treeCount) return;
+    // BEFORE THE DISPATCH, because every branch below it returns. See
+    // `_buildDistantStand`: it used to sit in this method's tail and so only
+    // ever ran for plain conifers.
+    const TALL = ['redwood', 'jungle', 'charred', 'burnt', undefined];
+    if (TALL.includes(T.vegetation)) this._buildDistantStand(m4);
     if (T.vegetation === 'cactus') return this._buildCacti(m4);
     if (T.vegetation === 'outback') return this._buildOutbackScrub(m4);
     if (T.vegetation === 'charred') return this._buildCharredTrees(m4);
@@ -17927,67 +18025,6 @@ export class Track {
     });
     logs.count = lk;
     let sk = 0;
-    // THE DISTANT STAND. Between the playfield scatter (out to ~640 u) and
-    // the horizon rings (900 u+) there was an empty ring - the mid-distance
-    // read as bare lawn on every wooded world, which is most of why the
-    // scene lacked depth.
-    //
-    // A STAND OF TREES IS NOT ONE CONE. The first cut was a single 6-sided
-    // cone per copy, 5-12 u wide and up to 21 u tall, scattered evenly and
-    // washed 40 % toward the fog: from the road that is a field of pale
-    // pyramids sitting on the grass, which is what the player photographed.
-    // Three faults, all fixed here:
-    //   - SHAPE: a clump of three offset crowns at different heights, welded
-    //     into one geometry, so the silhouette is a lumpy tree-line rather
-    //     than a triangle.
-    //   - GROUPING: clumps are drawn in GROVES of five to nine, because a
-    //     wood is a mass with edges, not evenly spaced dots.
-    //   - TONE: half the fog wash, so they read as trees in haze instead of
-    //     ghosts, and none of them stands taller than a real tree.
-    if (T.treeCount >= 150) {
-      const crown = (r, h, y, dx, dz) => new THREE.ConeGeometry(r, h, 5)
-        .translate(dx, y + h / 2, dz);
-      const bandGeo = this._bundle([
-        crown(1.00, 1.70, 0, 0, 0),
-        crown(0.78, 1.25, 0, -0.95, 0.42),
-        crown(0.66, 1.00, 0, 0.82, -0.55),
-      ]);
-      const band = new THREE.InstancedMesh(bandGeo, new THREE.MeshStandardMaterial({
-        color: 0xffffff, vertexColors: false, flatShading: true, roughness: 1,
-      }), 300);
-      const bandCol = new THREE.Color(), fogC2 = new THREE.Color(T.fogColor ?? 0xcccccc);
-      const baseC2 = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
-      const bq = new THREE.Quaternion(), bup = new THREE.Vector3(0, 1, 0);
-      let bk3 = 0;
-      for (let gv = 0; gv < 46 && bk3 < 300; gv++) {
-        const gh = (n) => { const v = Math.sin((gv + n) * 12.9898) * 43758.5453; return v - Math.floor(v); };
-        const aG = gh(0.1) * Math.PI * 2;
-        const rG = 640 + gh(1.7) * 260;
-        const gx = Math.cos(aG) * rG, gz = Math.sin(aG) * rG;
-        const n = 5 + Math.floor(gh(2.3) * 5);
-        for (let k = 0; k < n && bk3 < 300; k++) {
-          const hh = (m) => {
-            const v = Math.sin((gv * 13 + k + m) * 12.9898) * 43758.5453;
-            return v - Math.floor(v);
-          };
-          const x2 = gx + (hh(0.7) - 0.5) * 150, z2 = gz + (hh(1.9) - 0.5) * 150;
-          if (this._inWater(x2, z2)) continue;
-          const gy2 = this._seatY(x2, z2);
-          const sw2 = 4.5 + hh(2.9) * 4.5, sh2 = 5.5 + hh(4.1) * 5.5;
-          bq.setFromAxisAngle(bup, hh(5.3) * Math.PI * 2);
-          m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
-            new THREE.Vector3(sw2, sh2, sw2 * 0.9));
-          band.setMatrixAt(bk3, m4);
-          bandCol.copy(baseC2).multiplyScalar(0.72 + hh(6.7) * 0.36)
-            .lerp(fogC2, 0.12 + hh(8.3) * 0.10);
-          band.setColorAt(bk3++, bandCol);
-        }
-      }
-      band.count = bk3;
-      if (band.instanceColor) band.instanceColor.needsUpdate = true;
-      band.name = 'distant-stand';
-      this.group.add(band);
-    }
 
     this._scatter(STUMPS, () => this._trackSidePos(12, 34), (p) => {
       const s = 0.7 + Math.random() * 0.7;
