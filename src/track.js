@@ -262,7 +262,19 @@ export const LEVELS = [
     // lateral clamp, the scenery clearance and the rail placement all widen
     // together — 9 u of half-width becomes 45, a 90 u carriageway.
     cost: 29, fresh: true, route: 'mountainSea',
-    tune: { tunnels: { count: 1 }, roadWidth: 5 } },
+    tune: { tunnels: { count: 1 }, roadWidth: 5,
+      // SEA HAZE OFF THE WATER, first thing. Three worlds ride `mountainsea`
+      // and the theme alone cannot separate them from each other — measured,
+      // CLIFF KNOT against SEA CLIFF RUN was 0.334 and against this world
+      // 0.431, on a set whose median pair is 0.390. So each takes an hour of
+      // the day, the same device the nine relit worlds use. This one is the
+      // earliest: low sun straight off the water, the mountain flank still
+      // cold and blue behind it, and haze pulled well in.
+      sunColor: 0xffe6c4, sunIntensity: 2.4, sunEl: 0.26, sunAz: 1.35,
+      skyTop: '#4a86bc', skyHorizon: '#e8dcc8', sunGlow: 0xffe0b4,
+      hemiSky: 0xbcd0e0, hemiGround: 0x525c56, hemiIntensity: 1.05,
+      fogColor: 0xd6dce0, fogNear: 150, fogFar: 1100,
+      cloudCount: 12, cloudOpacity: 0.7 } },
   // CITADEL BAY: the player's harbour reference - a turquoise bay, the quay
   // and its marina along the shore, and a walled hill town with a keep
   // standing over the whole thing. Shares the Aegean route because that lap
@@ -287,6 +299,17 @@ export const LEVELS = [
     tune: {
       tunnels: { count: 1 },
       coast: { a: [176, -300], b: [206, 320], level: -2.6, floor: -11, beach: 30 },
+      // LATE AFTERNOON on the headland: the sun already round to the west and
+      // low enough to rake the cliff faces, which is the hour that makes a
+      // knotted coast road read as one — every spur throws a shadow across the
+      // next. Warm on the rock, and the water goes green where the light comes
+      // off it at an angle.
+      sunColor: 0xffd9a2, sunIntensity: 2.7, sunEl: 0.3, sunAz: 4.4,
+      skyTop: '#2f74b8', skyHorizon: '#f4dcb8', sunGlow: 0xffd49a,
+      hemiSky: 0xa8bcd0, hemiGround: 0x60604a, hemiIntensity: 0.8,
+      seaColor: 0x17707e,
+      fogColor: 0xd8cdb8, fogNear: 340, fogFar: 1900,
+      cloudCount: 7, cloudOpacity: 0.6,
     } },
   // SKETCH E: the cliff run. The sea sits close on the east — 30 u off the
   // straight rather than the 60-90 CLIFF KNOT keeps — because the drawing
@@ -312,6 +335,17 @@ export const LEVELS = [
       tunnels: { count: 1 },
       coast: { a: [128, -260], b: [140, 300], level: -3.0, floor: -13, beach: 18 },
       whaleCount: 5,
+      // HARD NOON over deep water. The drawing writes "sharp cliff NEXT TO the
+      // sea" and the whales breach out past it — both want the sun overhead
+      // and the air clear, so the drop reads as a drop and you can see far
+      // enough out to catch one. The other end of the day from CLIFF KNOT,
+      // which shares this theme and this coast.
+      sunColor: 0xfffaf0, sunIntensity: 3.3, sunEl: 0.72, sunAz: 2.1,
+      skyTop: '#0f63c0', skyHorizon: '#d8ecf4',
+      hemiSky: 0x86b4dc, hemiGround: 0x4a5c52, hemiIntensity: 0.7,
+      seaColor: 0x0d5a86,
+      fogColor: 0xcadfe8, fogNear: 520, fogFar: 2400,
+      cloudCount: 4, cloudOpacity: 0.5,
     } },
 
   // ---- THE OLIVE COAST FAMILY. Asked for directly: "Olive coast is by far
@@ -4237,6 +4271,35 @@ THEMES.mountainsea = {
   coast: { a: [255, -580], b: [285, 580], level: -11, beach: 14 },
   massif: { az: 3.14, spread: 1.9, count: 8, r0: 430, r1: 700,
     h0: 110, h1: 200, w0: 200, w1: 340 },
+  // ---- AND A COAST OF ITS OWN, because three worlds ride on this theme.
+  //
+  // It was `{...THEMES.dalmatia}` with a waterline and a massif changed, which
+  // is the exact shape SAFARI PLAINS was pulled out of `dunes` for two blocks
+  // below. Measured the same way — eight driving frames per world reduced to a
+  // 6x6x6 RGB histogram over the non-HUD frame, ranked by 1 - intersection —
+  // DALMATIA DRIVE against CLIFF KNOT came back at 0.216, the closest pair in
+  // the Mediterranean set against a median of 0.390 across its 36 pairs.
+  //
+  // The difference is in the rock. Dalmatia is white Adriatic limestone under
+  // a high clear sun: pale ground, terracotta roofs, cypress. This theme is
+  // the drawing's headland coast — a mountain on one flank and the sea on the
+  // other — so it takes SLATE. Grey-blue schist instead of limestone, a
+  // colder deeper water off a steep shore rather than a bright shelf sea,
+  // dark pine-green scrub instead of olive-silver, and a harder light with
+  // more contrast in it because the massif stands over the whole lap.
+  seaColor: 0x14607e,
+  sunColor: 0xfff4e2, sunIntensity: 3.0, sunEl: 0.5,
+  skyTop: '#1f6fb4', skyHorizon: '#cfdde4',
+  hemiSky: 0x9cbcd4, hemiGround: 0x4e5a50, hemiIntensity: 0.82,
+  fogColor: 0xc6d4d8, fogNear: 300, fogFar: 1700,
+  terrainLow: '#55684e', terrainHigh: '#8d9184',
+  terrainScree: '#6b7078', skirtColor: '#5a6068',
+  hillColor: 0x6e7a72, peakColor: 0x9aa2a4,
+  frontage: { ...THEMES.dalmatia.frontage,
+    tints: ['#dcd8cc', '#cfcdc4', '#e4e0d4', '#c8c6bc', '#d6d2c6'],
+    roof: 0x8f5a44,
+    face: { render: '#e2ded2', plinth: '#a8a89e', trim: '#f0ece0',
+      frame: '#3d5560', shutter: '#3d5560' } },
 };
 
 
