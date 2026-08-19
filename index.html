@@ -719,16 +719,17 @@
     letter-spacing:1px;color:var(--gold-dim)}
   .cc-stars{margin-left:auto;white-space:nowrap}
   .chapter-card .ch-bar{margin-top:7px}
-  /* THE BAR AT THE TOP OF A CHAPTER — see the markup note by #topbar.
-     Fixed across the top of the viewport, outside the scroller, opaque
-     because the list runs underneath it. */
-  .chapter-bar{display:flex;align-items:center;gap:10px;
-    padding:8px 10px;background:#171310;
-    border-bottom:1px solid var(--line-soft);z-index:30;
+  /* THE BACK BAR — see the markup note by #topbar. Fixed across the top of the
+     viewport, outside the scroller, opaque because the list runs underneath. */
+  #topbar{position:fixed;top:0;left:0;right:0;z-index:30;
+    display:flex;align-items:center;gap:10px;
+    padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));
+    background:#171310;border-bottom:1px solid var(--line-soft);
     box-shadow:0 3px 12px rgba(0,0,0,.55)}
-  #topbar{position:fixed;top:0;left:0;right:0;
-    padding-top:max(8px,env(safe-area-inset-top))}
   #topbar.hidden{display:none}
+  /* BACK is the biggest thing in the bar, because it is the only thing in the
+     bar you can press. The rest is a label. */
+  #topbar-back{font-size:13px;padding:7px 13px}
   .ch-back{font-family:'Luckiest Guy';font-size:11px;letter-spacing:2px;
     padding:5px 10px;border-radius:8px;cursor:pointer;
     color:var(--gold);background:rgba(0,0,0,.3);border:1px solid var(--line-soft)}
@@ -742,16 +743,6 @@
   /* inside a chapter the bar IS the header — this is the placeholder the row
      builder emits in its place, and it must take up no room at all */
   .chapter-head-none{display:none}
-  /* ---- BACK ---------------------------------------------------------------
-     Sits at the head of the menu, left of the credits chip, and only appears
-     when `backTarget` finds a level above the one you are on. Same visual
-     family as the chapter bar's own back control. */
-  #back-btn{font-family:'Luckiest Guy';font-size:11px;letter-spacing:2px;
-    padding:6px 12px;border-radius:9px;cursor:pointer;color:var(--gold);
-    background:rgba(0,0,0,.32);border:1px solid var(--line-soft);
-    margin-right:auto}
-  #back-btn:hover,#back-btn:focus-visible{border-color:var(--gold)}
-  #back-btn.hidden{display:none}
   /* THE TOP BAR OWNS THE ROOM IT TAKES. It is fixed, so it is out of flow and
      would otherwise print over the game title; the screen it covers gets that
      height back as padding while the bar is up. */
@@ -1596,7 +1587,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r224</div>
+<div id="build-tag">r225</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1617,11 +1608,20 @@
   <button class="tbtn pedal" id="t-brake" data-key="ArrowDown">BRAKE</button>
 </div>
 
-<!-- THE CHAPTER BAR — one control, fixed to the top of the viewport.
-     There used to be THREE ways back out of a chapter on screen at once: this
-     one as a bottom-left pill, a sticky bar in the list, and the header BACK
-     button — reported with a screenshot showing all three. They are one thing
-     now, and it is this.
+<!-- THE BACK BUTTON. One button, one place, one word, everywhere in the menu
+     there is somewhere to go.
+     It took four goes to get here, and the failures are the point:
+       r222  a button in the header, which scrolls away
+       r223  plus a fixed pill bottom-left, which sat on the world cards
+       r225  merged into a top bar, but only INSIDE A CHAPTER, and labelled
+             ALL CHAPTERS — so on the tabs the header button was still the one
+             in charge, at y=92 (y=152 on MODE), and the control had three
+             addresses and two names depending on where you stood. Reported,
+             fairly, as "I miss the back button".
+     Now: this bar carries it in every menu state that has a level above it,
+     it always says BACK, and the label beside it says where you are. The
+     header button is gone rather than hidden — a second one is how this got
+     out of hand in the first place.
      FIXED, not sticky: sticky measures fine in Chromium and quietly stops
      sticking under a number of ancestor conditions that iOS Safari is
      stricter about. Living OUTSIDE the scrolling element is what makes fixed
@@ -1629,8 +1629,8 @@
      which are the properties that turn `fixed` back into `absolute`.
      TOP, not bottom: the bottom belongs to START RACE, and a pill down there
      sat on top of the world cards. -->
-<div id="topbar" class="chapter-bar hidden">
-  <button id="topbar-back" class="ch-back">‹&nbsp;ALL&nbsp;CHAPTERS</button>
+<div id="topbar" class="hidden">
+  <button id="topbar-back" class="ch-back" aria-label="Back">‹&nbsp;BACK</button>
   <div id="topbar-where" class="ch-here"></div>
   <div id="topbar-stars" class="ch-here-stars"></div>
 </div>
@@ -1647,12 +1647,12 @@
     <span class="nb">shoot them</span></div>
   <!-- Status chips sit ABOVE the tabs, not in the same row. Sharing the row
        meant a fourth tab pushed the whole strip onto two lines on a phone. -->
+  <!-- NO BACK BUTTON HERE ANY MORE. It used to sit left of the credits chip,
+       which put it at y=92 on most tabs, y=152 on MODE, and nowhere at all
+       inside a chapter — where a DIFFERENTLY WORDED one appeared at y=8. Three
+       addresses and two labels for one control, reported as "I miss the back
+       button". There is one now and it lives in #topbar. -->
   <div id="menu-status">
-    <!-- BACK. One button for the whole game, shown only when there is
-         somewhere to go (see `backTarget` in main.js). It is also what the
-         phone's own back gesture drives, so leaving a chapter or a tab no
-         longer means leaving the game. -->
-    <button id="back-btn" class="hidden" aria-label="Back">‹&nbsp;BACK</button>
     <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
     <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
   </div>
@@ -1891,10 +1891,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r224"></script>
+<script type="module" src="./src/main.js?v=r225"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r224"></script>
+<script src="./src/offline.js?v=r225"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r224"></script>
+<script type="module" src="./src/traffic.js?v=r225"></script>
 </body>
 </html>

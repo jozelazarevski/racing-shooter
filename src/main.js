@@ -2562,13 +2562,18 @@ class Game {
     return true;
   }
 
-  /** Show the button only when it leads somewhere, and say where.
+  /** ONE BACK BUTTON, IN ONE PLACE, SAYING ONE WORD.
    *
-   *  ONE BACK CONTROL AT A TIME. There were three on screen together —
-   *  reported with a screenshot of a chapter carrying a header BACK, a sticky
-   *  bar and a fixed pill, all saying ALL CHAPTERS. Inside a chapter the fixed
-   *  top bar is the one that wins, because it is the one that cannot scroll
-   *  away, and the header button stands down under it.
+   *  It used to be two: a header button on the tabs and a differently-worded
+   *  bar inside a chapter. Measured, that put the control at y=92 on GARAGE,
+   *  y=152 on MODE, y=8 inside a chapter, and nowhere at the chapter index —
+   *  and the first two scrolled away with the page. A control that moves is a
+   *  control you have to hunt for, which is what "I miss the back button" was
+   *  about.
+   *
+   *  So the bar is up in EVERY menu state that has a level above it, the
+   *  button always reads BACK, and the label beside it says where you are —
+   *  `backTarget` already knows where the tap lands.
    */
   _syncBackBtn() {
     const t = this.backTarget();
@@ -2576,20 +2581,25 @@ class Game {
     // button is already the way out, so a second control would be clutter over
     // the road.
     const show = !!t && this.state === 'title';
-    const inChapter = show && t.at === 'chapter';
-    const b = document.getElementById('back-btn');
-    if (b) {
-      b.classList.toggle('hidden', !show || inChapter);
-      if (show) b.innerHTML = `‹&nbsp;${t.label}`;
-    }
     const bar = document.getElementById('topbar');
-    if (bar) bar.classList.toggle('hidden', !inChapter);
+    if (bar) bar.classList.toggle('hidden', !show);
+    // WHERE YOU ARE, not where the button goes — the button says BACK. Inside
+    // a chapter `_fillTopbar` has already written the chapter and its stars,
+    // so only the tab case is left to name.
+    if (show && t.at !== 'chapter') {
+      const tab = document.querySelector('#menu-tabs .menu-tab.current');
+      const where = document.getElementById('topbar-where');
+      const stars = document.getElementById('topbar-stars');
+      if (where) where.innerHTML = `<b>${tab ? tab.textContent.trim() : ''}</b>`;
+      if (stars) stars.textContent = '';
+    }
     // The bar is fixed, so it is out of flow: the screen under it owes it the
-    // height, and gives up the logo for it (see .compact).
+    // height, and gives up the logo for it (see .compact). Full branding is
+    // for the front door — the one screen with no way back.
     const ts = document.getElementById('title-screen');
     if (ts) {
-      ts.classList.toggle('with-topbar', inChapter);
-      ts.classList.toggle('compact', inChapter);
+      ts.classList.toggle('with-topbar', show);
+      ts.classList.toggle('compact', show);
     }
   }
 
@@ -2606,8 +2616,6 @@ class Game {
    *  not replaced and the next back does what the player expects.
    */
   _wireBack() {
-    const btn = document.getElementById('back-btn');
-    btn?.addEventListener('click', () => this.goBack());
     document.getElementById('topbar-back')?.addEventListener('click', () => this.goBack());
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;

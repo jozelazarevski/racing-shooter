@@ -961,3 +961,40 @@ child of the panel outside the viewport).
 
 Probes: `redesign.mjs` (every back control on screen, at each scroll depth),
 `chrome.mjs`, `wf.mjs`, `lastcard.mjs`, `toppos.mjs`, `redesignshot.mjs`.
+
+## r225 — THE BACK BUTTON, FOURTH ATTEMPT, AND WHY THE FIRST THREE FAILED
+"I miss the back button 🤯", one build after r224 removed the header one.
+Nothing was broken. `tools-scratch/whereback.mjs` walks every menu state and
+prints what takes you back from it; on r224 that read:
+
+    TRACKS, chapter index    (nothing)
+    TRACKS, in a chapter     topbar "‹ ALL CHAPTERS" @10,8
+    MODE tab                 header "‹ TRACKS"       @21,152
+    JOBS/GARAGE/SETTINGS     header "‹ TRACKS"       @21,92
+                                                       ^^^ in the page, so it
+                                                           scrolls away
+
+Three addresses, two labels, and on four of the five screens it scrolled off
+with the content. The player was right and the measurement is what shows it: a
+control that MOVES is a control you have to hunt for, and hunting for it reads
+as missing.
+
+The rule now, and do not break it again: **one back control, one place, one
+word.** `#topbar` is up in every menu state `backTarget()` finds a level above,
+the button always reads BACK, and the label beside it says WHERE YOU ARE (the
+chapter and its stars, or the tab name) — never where the tap lands. The header
+`#back-btn` is DELETED, markup and CSS both, not hidden: a second control is
+exactly how this got to three.
+
+    TRACKS, chapter index    (nothing — it is the front door)
+    everywhere else          topbar "‹ BACK" @10,8, at every scroll depth
+
+The front door keeps the full logo; `.compact` now follows the bar rather than
+the chapter, so every screen with a way back trades the branding for the room.
+
+The four goes, kept because each was a plausible fix that made it worse:
+  r222  a button in the header — scrolls away
+  r223  plus a fixed pill bottom-left — sat on top of the world cards
+  r224  merged into a top bar, but only inside a chapter and labelled ALL
+        CHAPTERS, leaving the header button in charge on the tabs
+  r225  one bar, every state, says BACK
