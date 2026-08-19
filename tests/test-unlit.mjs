@@ -57,23 +57,40 @@ const NIGHT = new Map([
   [40, 'MARINA BAY — a night harbour circuit under floodlight'],
 ]);
 
-// ONE STATION THAT IS STILL DARK AND IS NOT UNDERSTOOD. Listed with its number
-// and what has been RULED OUT, because a filter with no reason behind it is how
-// the next one gets hidden too:
+// ONE STATION THAT IS DARK ON PURPOSE, AND NOW SAYS WHY.
 //
-//   AMAZON RAPIDS station 675 — road luminance 20.2 against that world's own
-//   48.4 median. A black ellipse in the middle of the carriageway, the road
-//   plainly readable on either side of it. NOT the contact-shadow decals
-//   (hidden: 21.1 -> 21.1, and only 2 of the world's 1152 reach the station)
-//   and NOT obviously the shadow map (toggling `shadowMap.enabled` at runtime
-//   moved neither this world nor PINE VALLEY, which has visible tree shadows —
-//   so that probe proved nothing and is recorded as inconclusive, not as an
-//   answer). `jungle` carries the roster's heaviest wet road — darken 0.38 and
-//   six puddle pools — which is the next thing to measure.
+//   AMAZON RAPIDS station 675 — road luminance 21.1 against that world's own
+//   48.4 median. A black ellipse in the middle of the carriageway with the road
+//   plainly readable on either side of it.
 //
-// This is a TOLERANCE, not an exemption: the station must not get darker.
+//   It is a CAST SHADOW from the jungle canopy. Measured by turning `castShadow`
+//   off on all 169 casters and re-rendering the same parked frame:
+//
+//       station 675   21.1  ->  34.8      the shadow is worth 13.7
+//       station 225  135.1  -> 134.7      the control: not shadowed at all
+//
+//   Two other candidates were eliminated first, and the SECOND elimination of
+//   the first one is the reason this note exists. The contact-shadow decals are
+//   not it (hidden: 21.1 -> 21.1, and only 2 of the world's 1152 reach the
+//   station). The under-canopy gloom ribbon is not it either — `_buildVizZones`
+//   puts its nearest forest zone at 624+46, which ENDS at 670, five stations
+//   short. An earlier pass thought it had cleared the gloom by hiding it on
+//   NORDSCHLEIFE and re-measuring NORDSCHLEIFE, then carried the result to this
+//   world; that proved nothing about this world and the ribbon had to be
+//   eliminated again, here, properly.
+//
+//   Every one of those checks now carries a POSITIVE CONTROL, because an
+//   earlier `shadowMap.enabled` toggle moved neither this world nor PINE
+//   VALLEY — it was not doing anything, and its null result meant nothing.
+//   The control is hiding the ROAD: 135.1 -> 46.8 at station 225, so the
+//   hiding mechanism demonstrably works before any null result is believed.
+//
+//   So this is a jungle doing what a jungle does, and the floor below is a
+//   TOLERANCE rather than an admission: unshadowed the station measures 34.8,
+//   comfortably clear, and it must not get darker than the shadow alone
+//   explains.
 const KNOWN = new Map([
-  [8, { at: 675, floor: 18, why: 'AMAZON RAPIDS — an unexplained dark patch mid-carriageway; see the note above' }],
+  [8, { at: 675, floor: 18, why: 'AMAZON RAPIDS — canopy shadow, measured: 21.1 shadowed, 34.8 with nothing casting' }],
 ]);
 
 let pass = 0, fail = 0;
