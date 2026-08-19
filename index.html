@@ -719,10 +719,23 @@
     letter-spacing:1px;color:var(--gold-dim)}
   .cc-stars{margin-left:auto;white-space:nowrap}
   .chapter-card .ch-bar{margin-top:7px}
-  /* THE BACK BAR — see the markup note by #topbar. Fixed across the top of the
-     viewport, outside the scroller, opaque because the list runs underneath. */
-  #topbar{position:fixed;top:0;left:0;right:0;z-index:30;
+  /* THE BACK BAR — see the markup note by #topbar.
+     STICKY AND IN THE FLOW, not fixed, and the reason is the FAILURE MODE
+     rather than the happy path. Fixed measured perfectly here and was reported
+     invisible on the reporter's iPhone; a fixed element that does not paint
+     leaves NOTHING on screen anywhere. In flow, the worst sticky can do is
+     scroll away with the page — the button is still there when you arrive at
+     the top of a chapter, which is where a player looks for it. A smaller
+     failure beats a total one, and this is the same trade r223 made in the
+     other direction on a guess. */
+  #topbar{position:sticky;top:-16px;z-index:30;align-self:stretch;
     display:flex;align-items:center;gap:10px;
+    /* -16px BOTH TIMES IS .screen's OWN PADDING, and the two are coupled: the
+       margin cancels it so the bar spans edge to edge rather than reading as a
+       floating chip, and the negative `top` above lands it flush with the top
+       of the scrollport instead of 16px down with the list showing over it.
+       If .screen's padding ever changes, change both. */
+    margin:-16px -16px 10px;
     padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));
     background:#171310;border-bottom:1px solid var(--line-soft);
     box-shadow:0 3px 12px rgba(0,0,0,.55)}
@@ -730,6 +743,9 @@
   /* BACK is the biggest thing in the bar, because it is the only thing in the
      bar you can press. The rest is a label. */
   #topbar-back{font-size:13px;padding:7px 13px}
+  /* The screen centres short content with auto-margin spacers (.screen::before).
+     A header must not be centred — with the bar up the page starts at the top. */
+  .screen.with-topbar::before{display:none}
   .ch-back{font-family:'Luckiest Guy';font-size:11px;letter-spacing:2px;
     padding:5px 10px;border-radius:8px;cursor:pointer;
     color:var(--gold);background:rgba(0,0,0,.3);border:1px solid var(--line-soft)}
@@ -743,12 +759,9 @@
   /* inside a chapter the bar IS the header — this is the placeholder the row
      builder emits in its place, and it must take up no room at all */
   .chapter-head-none{display:none}
-  /* THE TOP BAR OWNS THE ROOM IT TAKES. It is fixed, so it is out of flow and
-     would otherwise print over the game title; the screen it covers gets that
-     height back as padding while the bar is up. */
-  /* the notch term has to appear in BOTH or they disagree: the bar grows by
-     the inset and the room made for it would not */
-  .screen.with-topbar{padding-top:calc(52px + env(safe-area-inset-top,0px))}
+  /* NO padding-top HERE ANY MORE. The bar was fixed and out of flow, so the
+     screen had to buy back its height; in flow it takes its own room and a
+     second allowance would just be a gap. */
   /* AND THE BRANDING STANDS DOWN once you are inside a chapter. The title and
      the tagline are the front door; two levels in they are 110 px of a phone
      spent on a logo, above the list the player came to read. */
@@ -1587,7 +1600,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r225</div>
+<div id="build-tag">r226</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1610,31 +1623,38 @@
 
 <!-- THE BACK BUTTON. One button, one place, one word, everywhere in the menu
      there is somewhere to go.
-     It took four goes to get here, and the failures are the point:
+     It took five goes to get here, and the failures are the point. (Do NOT
+     renumber these when bumping the build — a blanket sed over this file
+     rewrote them twice, which is how r224 came to be labelled r226 below.)
        r222  a button in the header, which scrolls away
        r223  plus a fixed pill bottom-left, which sat on the world cards
-       r225  merged into a top bar, but only INSIDE A CHAPTER, and labelled
+       r224  merged into a top bar, but only INSIDE A CHAPTER, and labelled
              ALL CHAPTERS — so on the tabs the header button was still the one
              in charge, at y=92 (y=152 on MODE), and the control had three
              addresses and two names depending on where you stood. Reported,
              fairly, as "I miss the back button".
+       r225  one bar, every state, saying BACK — and FIXED to the viewport.
+             Reported as "No back button still", on an iPhone, on the one
+             screen it had been measured working.
      Now: this bar carries it in every menu state that has a level above it,
      it always says BACK, and the label beside it says where you are. The
      header button is gone rather than hidden — a second one is how this got
      out of hand in the first place.
-     FIXED, not sticky: sticky measures fine in Chromium and quietly stops
-     sticking under a number of ancestor conditions that iOS Safari is
-     stricter about. Living OUTSIDE the scrolling element is what makes fixed
-     safe here — no ancestor of this node can carry a transform or a filter,
-     which are the properties that turn `fixed` back into `absolute`.
+     STICKY AND IN THE FLOW, after r225 shipped it FIXED and outside the
+     scroller and the reporter said it was still not there on their iPhone —
+     on the one screen it was measured working. Chromium cannot see whatever
+     that is, so the fix is to change what happens WHEN IT GOES WRONG rather
+     than to keep guessing at why: a fixed bar that does not paint leaves
+     nothing on screen at all, while a sticky one that stops sticking is still
+     sitting at the top of the chapter where you arrive.
      TOP, not bottom: the bottom belongs to START RACE, and a pill down there
      sat on top of the world cards. -->
-<div id="topbar" class="hidden">
-  <button id="topbar-back" class="ch-back" aria-label="Back">‹&nbsp;BACK</button>
-  <div id="topbar-where" class="ch-here"></div>
-  <div id="topbar-stars" class="ch-here-stars"></div>
-</div>
 <div id="title-screen" class="screen">
+  <div id="topbar" class="hidden">
+    <button id="topbar-back" class="ch-back" aria-label="Back">‹&nbsp;BACK</button>
+    <div id="topbar-where" class="ch-here"></div>
+    <div id="topbar-stars" class="ch-here-stars"></div>
+  </div>
   <div class="game-title">IGNITE&nbsp;RALLY</div>
   <!-- A THREE-WORD TAGLINE COULD WRAP ANYWHERE; A SENTENCE CANNOT. The old
        "Dirt // Firepower // First Place" was short enough to sit on one line
@@ -1891,10 +1911,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r225"></script>
+<script type="module" src="./src/main.js?v=r226"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r225"></script>
+<script src="./src/offline.js?v=r226"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r225"></script>
+<script type="module" src="./src/traffic.js?v=r226"></script>
 </body>
 </html>
