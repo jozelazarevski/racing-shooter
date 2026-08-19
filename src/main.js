@@ -7688,7 +7688,31 @@ class Game {
   spawnHusk(car) {
     if (this.husks.length >= 6) return;
     const husk = car.mesh.clone(true);
-    this._huskMat ??= new THREE.MeshStandardMaterial({ color: 0x1d1a16, roughness: 1 });
+    // A WRECK, NOT A HOLE IN THE GROUND.
+    //
+    // This was 0x1d1a16 — albedo 0.11 — on one smooth material across the
+    // whole shell. Measured by differencing the frame with the husk hidden
+    // against the frame with it shown, and reading the pixels that changed:
+    //
+    //   DUST CANYON   husk mean luminance 11.4, p10 0.2   scene around it 152.6
+    //   PINE VALLEY   husk mean 12.1,           p10 0.0   scene 105.3
+    //   NEON GRID     husk mean 11.7                      scene  16.1
+    //
+    // Thirteen times darker than everything around it on a daylight world,
+    // with a tenth of its pixels at literal zero and no facet variation to
+    // read a shape from — which is why the screenshot that found this looks
+    // like a car-shaped hole in the sand rather than a burnt car. (The night
+    // world is the control: there the same material is right, because there
+    // the whole scene is 16.)
+    //
+    // Twice the albedo and FLAT SHADING. The flat shading is the half that
+    // matters: a low-poly shell with shared normals has almost no light
+    // variation across it at this albedo, so it reads as a silhouette however
+    // dark it is. Facets give it form. Still unmistakably charred — this is
+    // darker than any drivable surface on the roster.
+    this._huskMat ??= new THREE.MeshStandardMaterial({
+      color: 0x3d3630, roughness: 1, flatShading: true,
+    });
     husk.traverse((o) => { if (o.isMesh) o.material = this._huskMat; });
     husk.position.copy(car.mesh.position);
     husk.rotation.copy(car.mesh.rotation);
