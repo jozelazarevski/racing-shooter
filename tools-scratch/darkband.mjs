@@ -34,6 +34,13 @@ for (const id of process.argv.slice(2)) {
     const g = window.__game;
     g.clock.getDelta = () => 1 / 60;
     g.__realRender = g.composer.render.bind(g.composer);
+      // AUTO-QUALITY OFF: it resizes the composer when it drops a tier, a
+      // resize EMPTIES the canvas until the next render, and the stub below
+      // swallows that render. Cost 52 blank frames of 432 in one sweep and
+      // looked exactly like a severe rendering bug — see tour.mjs's note and
+      // tools-scratch/resizeblank.mjs. The fps it measures is a number about
+      // the harness anyway: these files step a fixed clock.
+      g._autoQuality = () => {};
     g.composer.render = () => { if (g.__want) g.__realRender(); };
     g.__drive = (n) => {
       const t = g.track, N = t.center.length, p = g.player;

@@ -40,6 +40,13 @@ for (const id of process.argv.slice(2)) {
     // lerp and the camera boom are sim state and run whether or not anything
     // is drawn. Only the measured frame is rendered.
     g.__realRender = g.composer.render.bind(g.composer);
+      // AUTO-QUALITY OFF: it resizes the composer when it drops a tier, a
+      // resize EMPTIES the canvas until the next render, and the stub below
+      // swallows that render. Cost 52 blank frames of 432 in one sweep and
+      // looked exactly like a severe rendering bug — see tour.mjs's note and
+      // tools-scratch/resizeblank.mjs. The fps it measures is a number about
+      // the harness anyway: these files step a fixed clock.
+      g._autoQuality = () => {};
     g.composer.render = () => { if (g.__want) g.__realRender(); };
     const lum = (x0, y0, x1, y1) => {
       const cv = g.renderer.domElement;

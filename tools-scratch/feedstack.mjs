@@ -20,6 +20,13 @@ for (const id of process.argv.slice(2)) {
   const r = await page.evaluate(() => {
     const g = window.__game, t = g.track, p = g.player, N = t.center.length;
     g.clock.getDelta = () => 1 / 60;
+      // AUTO-QUALITY OFF: it resizes the composer when it drops a tier, a
+      // resize EMPTIES the canvas until the next render, and the stub below
+      // swallows that render. Cost 52 blank frames of 432 in one sweep and
+      // looked exactly like a severe rendering bug — see tour.mjs's note and
+      // tools-scratch/resizeblank.mjs. The fps it measures is a number about
+      // the harness anyway: these files step a fixed clock.
+      g._autoQuality = () => {};
     if (g.composer) g.composer.render = () => {};
     // COUNT THE ROWS THAT ARE ACTUALLY ON SCREEN. Counting calls would answer a
     // different question — a message repeated once a minute is not a stack.
