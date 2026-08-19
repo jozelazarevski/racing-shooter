@@ -36,6 +36,22 @@
  *                   GOTTHARD 110.9, FURKA 119.2, MONZA 125.3
  *   after           61.5 / 32.4,  65.6 / 50.8,  86.8 / 60.1,  76.5 / 41.0
  *
+ * AND EVERY STATION CARRIES ITS OWN POSITIVE CONTROL. The sample window is a
+ * fixed rectangle where the road ahead usually is — and on a narrow enclosed
+ * world it is not always road at all. ROCKFALL RAVINE, a ravine with cliff
+ * walls on both sides, failed this gate at 18.8 on one run and measured 44.2 at
+ * the same station on the next: what fills that window there is cliff, and
+ * which cliff depends on scatter that runs on bare `Math.random()`. A reading
+ * of a surface that is not the carriageway is not a measurement of the
+ * carriageway, however repeatable it looks.
+ *
+ * So each station is measured TWICE — once as it is, once with the road mesh
+ * hidden. If hiding the road does not change the window, the window was not
+ * looking at road, and the station is reported as UNMEASURABLE rather than
+ * judged. This is the same discipline the AMAZON RAPIDS note below records
+ * paying for: a probe that cannot demonstrate it is doing anything cannot be
+ * believed when it says nothing is wrong.
+ *
  * FLOOR is 25 — comfortably under the fixed worlds' worst stations and well
  * over the 9.8-14.5 the defect produced. Raising it to hide a future find
  * would defeat the point; add a NAMED exemption with a reason instead, the way
@@ -143,6 +159,8 @@ for (const id of ids) {
       for (let i = 0; i < px.length; i += 4) s += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
       return s / (px.length / 4);
     };
+    const roads = [];
+    t.group.traverse((o) => { if (o.name === 'road') roads.push(o); });
     const rows = [];
     for (let k = 0; k < S; k++) {
       const i = Math.round(N * k / S), c = t.center[i];
@@ -163,20 +181,35 @@ for (const id of ids) {
       // sample is roof rather than obstacle, and it answers for THIS load.
       const inBore = !!(t.tunnelAt && t.tunnelAt(p.pos, i, 10));
       const zone = (t.vizZones ?? []).find((z) => ((i - z.i0 + N) % N) <= z.len);
-      rows.push({ i, road: +lum().toFixed(1), bore: inBore, zone: zone ? zone.kind : '' });
+      const on = lum();
+      // the control: if hiding the road does not move the window, the window
+      // is not on the road
+      roads.forEach((o) => { o.visible = false; });
+      g.__want = 1; g.frame(); g.__want = 0;
+      const off = lum();
+      roads.forEach((o) => { o.visible = true; });
+      g.__want = 1; g.frame(); g.__want = 0;
+      rows.push({ i, road: +on.toFixed(1), bore: inBore, zone: zone ? zone.kind : '',
+        sees: +Math.abs(on - off).toFixed(1) });
     }
     return { name: t.level?.name ?? '?', rows, bores: rows.filter((x) => x.bore).map((x) => x.i) };
   }, STATIONS);
-  const usable = r.rows.filter((x) => !x.bore && x.zone !== 'bore');
+  const SEES = 3;            // the window must respond to the road being there
+  const usable = r.rows.filter((x) => !x.bore && x.zone !== 'bore' && x.sees >= SEES);
+  const blind = r.rows.filter((x) => !x.bore && x.zone !== 'bore' && x.sees < SEES);
   const worst = usable.reduce((a, x) => (x.road < a.road ? x : a), usable[0]);
   const med = usable.map((x) => x.road).sort((a, c) => a - c)[usable.length >> 1];
-  dark.push({ id, name: r.name, worst: worst.road, at: worst.i, med, bores: r.bores });
+  if (!usable.length) { dark.push({ id, name: r.name, worst: -2, at: null, med: null,
+    bores: r.bores, blind: blind.map((x) => x.i) }); continue; }
+  dark.push({ id, name: r.name, worst: worst.road, at: worst.i, med,
+    bores: r.bores, blind: blind.map((x) => x.i) });
 }
 
 console.log('\n road luminance at 8 fixed stations, 390x844, out of 255\n');
 for (const d of [...dark].sort((a, b) => a.worst - b.worst)) {
   const tag = (NIGHT.has(d.id) ? '  (night stage — exempt)' : '')
-    + (d.bores?.length ? `  [station${d.bores.length > 1 ? 's' : ''} ${d.bores.join(',')} inside a bore — skipped]` : '');
+    + (d.bores?.length ? `  [station${d.bores.length > 1 ? 's' : ''} ${d.bores.join(',')} inside a bore — skipped]` : '')
+    + (d.blind?.length ? `  [station${d.blind.length > 1 ? 's' : ''} ${d.blind.join(',')} not looking at road — unmeasurable]` : '');
   console.log(`   L${String(d.id).padStart(2, '0')} ${d.name.padEnd(22)} median ${String(d.med).padStart(6)}`
     + `   darkest ${String(d.worst).padStart(6)} at ${d.at}${tag}`);
 }
@@ -193,7 +226,9 @@ for (const [id, k] of KNOWN) {
     `the known dark station on ${k.why.split(' —')[0]} has not got darker (floor ${k.floor})`,
     d ? `it now measures ${d.worst} at ${d.at}` : 'world missing');
 }
-ok(dark.every((d) => d.worst >= 0), 'every world booted', dark.filter((d) => d.worst < 0).map((d) => d.name).join(', '));
+ok(dark.every((d) => d.worst !== -1), 'every world booted', dark.filter((d) => d.worst === -1).map((d) => d.name).join(', '));
+ok(dark.every((d) => d.worst !== -2), 'every world had at least one measurable station',
+  dark.filter((d) => d.worst === -2).map((d) => d.name).join(', '));
 for (const [id, why] of NIGHT) {
   const d = dark.find((x) => x.id === id);
   ok(d && d.worst < FLOOR,
