@@ -2548,7 +2548,13 @@ class Game {
       case 'results': this.showMenu(); break;
       // there is no separate resume — the pause menu is a toggle
       case 'pause': case 'racing': this.togglePause?.(); break;
-      case 'chapter': this._chapterIn = null; this._renderLevelCards(); break;
+      // back to the index lands you at the TOP of it — leaving a chapter from
+      // 900px down and arriving 900px down a different list is a lost player
+      case 'chapter':
+        this._chapterIn = null;
+        this._renderLevelCards();
+        { const sc = document.getElementById('title-screen'); if (sc) sc.scrollTop = 0; }
+        break;
       case 'tab': document.getElementById('tab-btn-race')?.click(); break;
       default: return false;
     }
@@ -2556,26 +2562,45 @@ class Game {
     return true;
   }
 
-  /** Show the button only when it leads somewhere, and say where. */
+  /** ONE BACK BUTTON, IN ONE PLACE, SAYING ONE WORD.
+   *
+   *  It used to be two: a header button on the tabs and a differently-worded
+   *  bar inside a chapter. Measured, that put the control at y=92 on GARAGE,
+   *  y=152 on MODE, y=8 inside a chapter, and nowhere at the chapter index —
+   *  and the first two scrolled away with the page. A control that moves is a
+   *  control you have to hunt for, which is what "I miss the back button" was
+   *  about.
+   *
+   *  So the bar is up in EVERY menu state that has a level above it, the
+   *  button always reads BACK, and the label beside it says where you are —
+   *  `backTarget` already knows where the tap lands.
+   */
   _syncBackBtn() {
-    const b = document.getElementById('back-btn');
     const t = this.backTarget();
     // In the MENU only: mid-race the screen belongs to the HUD and the pause
     // button is already the way out, so a second control would be clutter over
     // the road.
     const show = !!t && this.state === 'title';
-    if (b) {
-      b.classList.toggle('hidden', !show);
-      if (show) b.innerHTML = `‹&nbsp;${t.label}`;
+    const bar = document.getElementById('topbar');
+    if (bar) bar.classList.toggle('hidden', !show);
+    // WHERE YOU ARE, not where the button goes — the button says BACK. Inside
+    // a chapter `_fillTopbar` has already written the chapter and its stars,
+    // so only the tab case is left to name.
+    if (show && t.at !== 'chapter') {
+      const tab = document.querySelector('#menu-tabs .menu-tab.current');
+      const where = document.getElementById('topbar-where');
+      const stars = document.getElementById('topbar-stars');
+      if (where) where.innerHTML = `<b>${tab ? tab.textContent.trim() : ''}</b>`;
+      if (stars) stars.textContent = '';
     }
-    // AND THE ONE THAT CANNOT SCROLL AWAY. The header button above sits in the
-    // page and is gone the moment you scroll — measured at -798px once 40% of
-    // the way down a chapter, which is exactly where a player wants it. The
-    // chapter bar is sticky and holds up in Chromium, but sticky is the one
-    // thing here that cannot be relied on across phones. So being INSIDE A
-    // CHAPTER gets its own fixed control, outside the scrolling element.
-    const f = document.getElementById('ch-back-float');
-    if (f) f.classList.toggle('hidden', !(show && t.at === 'chapter'));
+    // The bar is fixed, so it is out of flow: the screen under it owes it the
+    // height, and gives up the logo for it (see .compact). Full branding is
+    // for the front door — the one screen with no way back.
+    const ts = document.getElementById('title-screen');
+    if (ts) {
+      ts.classList.toggle('with-topbar', show);
+      ts.classList.toggle('compact', show);
+    }
   }
 
   /** THE PHONE'S OWN BACK GESTURE, which is the one people actually use.
@@ -2591,9 +2616,7 @@ class Game {
    *  not replaced and the next back does what the player expects.
    */
   _wireBack() {
-    const btn = document.getElementById('back-btn');
-    btn?.addEventListener('click', () => this.goBack());
-    document.getElementById('ch-back-float')?.addEventListener('click', () => this.goBack());
+    document.getElementById('topbar-back')?.addEventListener('click', () => this.goBack());
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
       if (document.activeElement?.tagName === 'INPUT') return;   // fields own Escape
@@ -3141,18 +3164,42 @@ class Game {
     // price any more. `chapterGateLine` is the one sentence that is still true.
     const gate = this.chapterGateLine();
     const RULES = [['★', 'FINISH — ANY PLACE'], ['★★', 'PODIUM — TOP 3'], ['★★★', 'WIN IT']];
+    // FOLDED BY DEFAULT, because a legend is read once and then it is furniture:
+    // five lines of it sat between the tabs and the first world card on every
+    // visit. What stays up is the running total and the gate line — the two
+    // numbers that actually move. The rules are one tap below.
+    if (this._starKeyOpen == null) {
+      try { this._starKeyOpen = localStorage.getItem('ir-starkey') === '1'; } catch { this._starKeyOpen = false; }
+    }
+    const open = this._starKeyOpen;
+    el.className = open ? 'open' : '';
     el.innerHTML = `
       <div class="sk-top">
-        <span class="sk-title">RALLY STARS — HOW THEY ARE EARNED</span>
-        <span class="sk-total">${now}<span style="font-size:11px">/${max}★</span></span>
+        <span class="sk-total">${now}<small>/${max}★</small></span>
+        <span class="sk-brief"><b>★</b> FINISH · <b>★★</b> PODIUM · <b>★★★</b> WIN</span>
+        <span class="sk-more">${open ? 'LESS ▴' : 'HOW ▾'}</span>
       </div>
-      <div class="sk-rules">
-        ${RULES.map(([s, t]) => `<span class="sk-rule"><b>${s}</b>${t}</span>`).join('')}
+      <div class="sk-full">
+        <span class="sk-title">RALLY STARS — HOW THEY ARE EARNED</span>
+        <div class="sk-rules">
+          ${RULES.map(([s, t]) => `<span class="sk-rule"><b>${s}</b>${t}</span>`).join('')}
+        </div>
       </div>
       <div class="sk-next">${gate
     ? gate
     : 'EVERY CHAPTER IS OPEN — THE REMAINING STARS ARE FOR THE RECORD'}${
   partial ? ` · ${partial} WORLD${partial === 1 ? '' : 'S'} STILL HOLDING STARS` : ''}</div>`;
+    // The whole box is the hit target — a 10px chevron is not a phone control.
+    // Bound here rather than once at boot because this method replaces the
+    // innerHTML, but the listener is on `el` itself, which survives that.
+    if (!el.dataset.wired) {
+      el.dataset.wired = '1';
+      el.addEventListener('click', () => {
+        this._starKeyOpen = !this._starKeyOpen;
+        try { localStorage.setItem('ir-starkey', this._starKeyOpen ? '1' : '0'); } catch { /* private mode */ }
+        this._renderStarKey();
+      });
+    }
   }
 
   /** World cards: static circuit-outline badge + flavor + career best per
@@ -3501,30 +3548,18 @@ class Game {
     }
   }
 
-  /** The bar at the top of a chapter: back out, and where you are. */
-  _chapterBar(c) {
-    const bar = document.createElement('div');
-    bar.className = 'chapter-bar';
-    const have = this.chapterStars(c._k);
-    const max = c.levels.length * 3;
-    const back = document.createElement('button');
-    back.className = 'ch-back';
-    back.textContent = '‹ ALL CHAPTERS';
-    back.addEventListener('click', () => {
-      this._chapterIn = null;
-      this._renderLevelCards();
-      this._syncBackBtn();
-      const sc = bar.closest('.screen');
-      if (sc) sc.scrollTop = 0;
-    });
-    const label = document.createElement('div');
-    label.className = 'ch-here';
-    label.innerHTML = `<b>CHAPTER ${c.n}</b> ${c.name}`;
-    const stars = document.createElement('div');
-    stars.className = 'ch-here-stars';
-    stars.textContent = `${have}/${max}★`;
-    bar.append(back, label, stars);
-    return bar;
+  /** Where you are, written into the fixed top bar.
+   *
+   *  This USED TO BUILD A NODE and hand it to the list, which put a third back
+   *  control on a screen that already had two — the header BACK button and the
+   *  bottom-left pill. The bar is a single element in the page now (`#topbar`)
+   *  and this fills it; `_syncBackBtn` is what shows and hides it.
+   */
+  _fillTopbar(c) {
+    const where = document.getElementById('topbar-where');
+    const stars = document.getElementById('topbar-stars');
+    if (where) where.innerHTML = `<b>CHAPTER ${c.n}</b> ${c.name}`;
+    if (stars) stars.textContent = `${this.chapterStars(c._k)}/${c.levels.length * 3}★`;
   }
 
   /*  Rebuildable, because a career reset changes every lock and every best. */
@@ -3601,7 +3636,7 @@ class Game {
       return;
     }
     sel.classList.toggle('ch-inside', !!inChapter);
-    if (inChapter) sel.appendChild(this._chapterBar(inChapter));
+    if (inChapter) this._fillTopbar(inChapter);
     // THE LADDER IS ONE LADDER. Regions do not run in contiguous blocks of
     // career order — PINE VALLEY owns rungs 1, 6, 11, 12, 13 — so grouping the
     // timeline by region produces a "sequence" that counts 1, 6, 11, 3, and

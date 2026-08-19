@@ -593,19 +593,49 @@
 
   /* ---------- WORLD CARDS (track selection) ---------- */
   #level-select{margin-top:8px;width:100%}
-  #star-key{margin:2px 0 10px;padding:8px 12px;border:1px solid var(--line-soft);
-    border-radius:10px;background:rgba(255,212,0,.05)}
-  #star-key .sk-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-  #star-key .sk-title{font-size:10px;letter-spacing:3px;color:#e8c987}
-  #star-key .sk-total{font-family:'Luckiest Guy';font-size:17px;color:var(--yellow)}
-  #star-key .sk-rules{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:5px}
+  /* THE STAR KEY, FOLDED. Open, this was five lines and 105 px — a legend
+     three times the height of the card it sits above, re-read by nobody after
+     the first time. Folded it is the two facts that change: the running total,
+     and what the next chapter costs. The rules are one tap away and the fold
+     state is remembered. */
+  /* WIDTH:100% IS LOAD-BEARING, not tidiness. .menu-panel is a centring flex
+     column, so a child with no width sizes to its CONTENT — and a nowrap line
+     longer than the panel then hangs off BOTH edges and takes the page's
+     sideways scroll with it. Same trap the region heads hit above. */
+  #star-key{width:100%;margin:2px 0 8px;padding:6px 10px;border:1px solid var(--line-soft);
+    border-radius:10px;background:rgba(255,212,0,.05);cursor:pointer;
+    pointer-events:auto;-webkit-tap-highlight-color:transparent}
+  #star-key .sk-top{display:flex;align-items:center;gap:10px;min-width:0}
+  #star-key .sk-total{flex:none;font-family:'Luckiest Guy';font-size:16px;color:var(--yellow);
+    white-space:nowrap}
+  #star-key .sk-total small{font-size:10px}
+  /* the folded one-liner, and the full list — exactly one is ever up.
+     min-width:0 is what lets it ellipsise: a flex item defaults to
+     min-width:auto, which refuses to shrink below its own nowrap content. */
+  #star-key .sk-brief{flex:1 1 auto;min-width:0;font-size:10px;font-weight:700;
+    letter-spacing:.8px;color:#d8c090;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  #star-key .sk-brief b{color:var(--yellow)}
+  #star-key .sk-more{flex:none;margin-left:auto;font-size:10px;color:var(--gold-dim);
+    letter-spacing:1px;white-space:nowrap}
+  #star-key .sk-full{display:none;margin-top:6px}
+  #star-key.open .sk-brief{display:none}
+  #star-key.open .sk-full{display:block}
+  #star-key .sk-title{font-size:10px;letter-spacing:3px;color:#e8c987;display:block;
+    margin-bottom:5px}
+  #star-key .sk-rules{display:flex;flex-wrap:wrap;gap:5px 16px}
   #star-key .sk-rule{font-size:11px;font-weight:700;letter-spacing:.6px;color:#d8c090;
     white-space:nowrap}
   #star-key .sk-rule b{color:var(--yellow);font-weight:700;margin-right:5px}
-  #star-key .sk-next{margin-top:6px;font-size:10.5px;letter-spacing:1px;color:#c9a86a}
+  /* THE GATE LINE IS THE ONE SENTENCE WORTH KEEPING UP, so it stays visible
+     folded — but clamped to a single line. Unclamped it wrapped to three on a
+     phone, which is how a two-line legend became a five-line one. */
+  #star-key .sk-next{margin-top:5px;font-size:10.5px;letter-spacing:1px;color:#c9a86a;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #star-key.open .sk-next{white-space:normal;line-height:1.4}
   #star-key .sk-next b{color:#8de89a}
   @media (max-width:460px){
-    #star-key{padding:6px 9px}
+    #star-key{padding:5px 9px}
     #star-key .sk-rule{font-size:10px}
     #star-key .sk-rules{gap:4px 10px}
   }
@@ -626,6 +656,13 @@
     color:var(--gold-dim);white-space:nowrap;-webkit-tap-highlight-color:transparent}
   #wf-clear.on,#wf-toggle.on{border-color:var(--yellow);color:var(--yellow);
     background:rgba(255,212,0,.14)}
+  /* CLEAR ONLY EXISTS WHEN THERE IS SOMETHING TO CLEAR. Dark, it was a dead
+     control that still cost a whole row: search / view+FILTERS / CLEAR came to
+     three wrapped lines and 109 px at 390 px wide, with the third holding one
+     button nobody could use. `.on` is already set by _applyWorldFilter the
+     moment any chip or search term bites. */
+  #wf-clear{display:none}
+  #wf-clear.on{display:inline-block}
   /* folded: keep the search, the count and whatever is switched ON */
   .wf-collapsed .wf-chip:not(.on){display:none}
   .wf-collapsed .wf-group.wf-empty{display:none}
@@ -649,8 +686,12 @@
     .wf-chip{font-size:9.5px;padding:3px 8px}
     /* three controls on one phone row squeezes the search to a stub — give it
        its own line above the two buttons */
-    .wf-top{flex-wrap:wrap}
+    .wf-top{flex-wrap:wrap;gap:6px}
     #wf-search{flex:1 0 100%;order:-1}
+    /* AND THE TWO BUTTONS SHARE THAT SECOND ROW. At 320px the view switch and
+       FILTERS came to 238px inside 234px — four pixels over, which cost a
+       whole third row and 38px of the shortest phone there is. */
+    #wf-clear,#wf-toggle{padding:6px 7px}
   }
   /* MY SCENES: a world you made is yours to throw away. Two taps, because it
      cannot be undone and the target is small. */
@@ -733,14 +774,17 @@
     letter-spacing:1px;color:var(--gold-dim)}
   .cc-stars{margin-left:auto;white-space:nowrap}
   .chapter-card .ch-bar{margin-top:7px}
-  /* the bar at the top of a chapter you have entered */
-  /* OPAQUE, because it is STICKY. At rgba(0,0,0,.22) the cards scrolled
-     visibly through it and the chapter name came out overprinted with
-     whatever row was passing underneath. A sticky bar has to occlude. */
-  .chapter-bar{display:flex;align-items:center;gap:10px;margin:2px 0 10px;
-    padding:8px 10px;border-radius:10px;background:#171310;
-    border:1px solid var(--line-soft);position:sticky;top:0;z-index:8;
-    box-shadow:0 3px 10px rgba(0,0,0,.5)}
+  /* THE BACK BAR — see the markup note by #topbar. Fixed across the top of the
+     viewport, outside the scroller, opaque because the list runs underneath. */
+  #topbar{position:fixed;top:0;left:0;right:0;z-index:30;
+    display:flex;align-items:center;gap:10px;
+    padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));
+    background:#171310;border-bottom:1px solid var(--line-soft);
+    box-shadow:0 3px 12px rgba(0,0,0,.55)}
+  #topbar.hidden{display:none}
+  /* BACK is the biggest thing in the bar, because it is the only thing in the
+     bar you can press. The rest is a label. */
+  #topbar-back{font-size:13px;padding:7px 13px}
   .ch-back{font-family:'Luckiest Guy';font-size:11px;letter-spacing:2px;
     padding:5px 10px;border-radius:8px;cursor:pointer;
     color:var(--gold);background:rgba(0,0,0,.3);border:1px solid var(--line-soft)}
@@ -754,24 +798,18 @@
   /* inside a chapter the bar IS the header — this is the placeholder the row
      builder emits in its place, and it must take up no room at all */
   .chapter-head-none{display:none}
-  /* ---- BACK ---------------------------------------------------------------
-     Sits at the head of the menu, left of the credits chip, and only appears
-     when `backTarget` finds a level above the one you are on. Same visual
-     family as the chapter bar's own back control. */
-  #back-btn{font-family:'Luckiest Guy';font-size:11px;letter-spacing:2px;
-    padding:6px 12px;border-radius:9px;cursor:pointer;color:var(--gold);
-    background:rgba(0,0,0,.32);border:1px solid var(--line-soft);
-    margin-right:auto}
-  #back-btn:hover,#back-btn:focus-visible{border-color:var(--gold)}
-  #back-btn.hidden{display:none}
-  #ch-back-float{position:fixed;left:10px;bottom:14px;z-index:30;
-    font-family:'Luckiest Guy';font-size:12px;letter-spacing:2px;
-    padding:10px 14px;border-radius:11px;cursor:pointer;color:var(--gold);
-    background:rgba(12,10,8,.92);border:1px solid var(--gold-dim);
-    box-shadow:0 4px 14px rgba(0,0,0,.55)}
-  #ch-back-float:hover,#ch-back-float:focus-visible{border-color:var(--gold)}
-  #ch-back-float.hidden{display:none}
-  @media (max-width:420px){#ch-back-float{font-size:11px;padding:9px 12px}}
+  /* THE TOP BAR OWNS THE ROOM IT TAKES. It is fixed, so it is out of flow and
+     would otherwise print over the game title; the screen it covers gets that
+     height back as padding while the bar is up. */
+  /* the notch term has to appear in BOTH or they disagree: the bar grows by
+     the inset and the room made for it would not */
+  .screen.with-topbar{padding-top:calc(52px + env(safe-area-inset-top,0px))}
+  /* AND THE BRANDING STANDS DOWN once you are inside a chapter. The title and
+     the tagline are the front door; two levels in they are 110 px of a phone
+     spent on a logo, above the list the player came to read. */
+  #title-screen.compact .game-title{font-size:clamp(22px,5vw,34px);letter-spacing:2px;
+    text-shadow:3px 3px 0 var(--ink);filter:none}
+  #title-screen.compact .game-sub{display:none}
   /* auto-FILL (not -fit): regions with fewer worlds keep the same card width,
      so every region shares one grid rhythm */
   .region-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%}
@@ -1604,7 +1642,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r224</div>
+<div id="build-tag">r226</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1625,16 +1663,32 @@
   <button class="tbtn pedal" id="t-brake" data-key="ArrowDown">BRAKE</button>
 </div>
 
-<!-- ALL CHAPTERS — a control that CANNOT scroll away.
-     The chapter bar at the top of a chapter is `position: sticky`, which
-     measures fine in Chromium and is the one thing here that cannot be
-     trusted on every phone: sticky quietly stops sticking under a number of
-     ancestor conditions, and iOS Safari is stricter than Chromium about them.
-     Reported as "I need a back to all chapters button once I'm in chapter" —
-     about a build that already had one. So this one is FIXED to the viewport
-     and lives outside the scrolling element entirely. Bottom-left keeps it
-     clear of START RACE (bottom-centre) and in thumb reach on a phone. -->
-<button id="ch-back-float" class="hidden">‹&nbsp;ALL&nbsp;CHAPTERS</button>
+<!-- THE BACK BUTTON. One button, one place, one word, everywhere in the menu
+     there is somewhere to go.
+     It took four goes to get here, and the failures are the point:
+       r222  a button in the header, which scrolls away
+       r223  plus a fixed pill bottom-left, which sat on the world cards
+       r225  merged into a top bar, but only INSIDE A CHAPTER, and labelled
+             ALL CHAPTERS — so on the tabs the header button was still the one
+             in charge, at y=92 (y=152 on MODE), and the control had three
+             addresses and two names depending on where you stood. Reported,
+             fairly, as "I miss the back button".
+     Now: this bar carries it in every menu state that has a level above it,
+     it always says BACK, and the label beside it says where you are. The
+     header button is gone rather than hidden — a second one is how this got
+     out of hand in the first place.
+     FIXED, not sticky: sticky measures fine in Chromium and quietly stops
+     sticking under a number of ancestor conditions that iOS Safari is
+     stricter about. Living OUTSIDE the scrolling element is what makes fixed
+     safe here — no ancestor of this node can carry a transform or a filter,
+     which are the properties that turn `fixed` back into `absolute`.
+     TOP, not bottom: the bottom belongs to START RACE, and a pill down there
+     sat on top of the world cards. -->
+<div id="topbar" class="hidden">
+  <button id="topbar-back" class="ch-back" aria-label="Back">‹&nbsp;BACK</button>
+  <div id="topbar-where" class="ch-here"></div>
+  <div id="topbar-stars" class="ch-here-stars"></div>
+</div>
 <div id="title-screen" class="screen">
   <div class="game-title">IGNITE&nbsp;RALLY</div>
   <!-- A THREE-WORD TAGLINE COULD WRAP ANYWHERE; A SENTENCE CANNOT. The old
@@ -1648,12 +1702,12 @@
     <span class="nb">shoot them</span></div>
   <!-- Status chips sit ABOVE the tabs, not in the same row. Sharing the row
        meant a fourth tab pushed the whole strip onto two lines on a phone. -->
+  <!-- NO BACK BUTTON HERE ANY MORE. It used to sit left of the credits chip,
+       which put it at y=92 on most tabs, y=152 on MODE, and nowhere at all
+       inside a chapter — where a DIFFERENTLY WORDED one appeared at y=8. Three
+       addresses and two labels for one control, reported as "I miss the back
+       button". There is one now and it lives in #topbar. -->
   <div id="menu-status">
-    <!-- BACK. One button for the whole game, shown only when there is
-         somewhere to go (see `backTarget` in main.js). It is also what the
-         phone's own back gesture drives, so leaving a chapter or a tab no
-         longer means leaving the game. -->
-    <button id="back-btn" class="hidden" aria-label="Back">‹&nbsp;BACK</button>
     <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
     <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
   </div>
@@ -1665,7 +1719,10 @@
     <button id="tab-btn-settings" class="menu-tab">SETUP</button>
   </div>
   <div id="tab-race" class="menu-panel">
-    <div class="panel-head">MAP &amp; TRACK SELECTION</div>
+    <!-- NO "MAP & TRACK SELECTION" HEAD HERE. The TRACKS tab immediately above
+         is lit yellow and says the same word; the head was 35 px of the phone
+         spent restating the tab you just pressed. Measured on a 390x830 phone,
+         the chrome above the first world card came to 515 px of 745 usable. -->
     <!-- HOW STARS ARE EARNED, on the screen that spends them. The rule was
          only ever stated on the post-race panel, which you see AFTER the
          decision it informs; the track list just said "NEEDS 27 STARS" at a
@@ -1889,10 +1946,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r224"></script>
+<script type="module" src="./src/main.js?v=r226"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r224"></script>
+<script src="./src/offline.js?v=r226"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r224"></script>
+<script type="module" src="./src/traffic.js?v=r226"></script>
 </body>
 </html>
