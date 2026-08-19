@@ -34,7 +34,8 @@ for (const id of process.argv.slice(2)) {
       .then(() => 1).catch(() => 0);
     if (!ok) { console.log(`${id} SKIP never booted`); page.off('pageerror', onErr); continue; }
     // hand the sim a fixed clock and take the renderer away from it
-    await page.evaluate(() => {
+    await page.evaluate((ns) => {
+      window.__NOSTUB = ns;
       const g = window.__game;
       // THE ACTION CAMERA. The default view is TOP-DOWN (camMode 0), which is
       // 46 u up and looks almost straight down: a floater reads as a dot on
@@ -47,7 +48,7 @@ for (const id of process.argv.slice(2)) {
       if (ci >= 0) g.camMode = ci;
       g.clock.getDelta = () => 1 / 60;
       g.__realRender = g.composer.render.bind(g.composer);
-      g.composer.render = () => { if (g.__want) g.__realRender(); };
+      if (!window.__NOSTUB) g.composer.render = () => { if (g.__want) g.__realRender(); };
       // A DRIVER THAT STAYS ON THE ROAD. The first cut aimed a fixed 10
       // samples ahead at full throttle and put the car in the scenery inside
       // ten seconds — hull 6 of 70 by the second shot, and every frame after
@@ -75,7 +76,18 @@ for (const id of process.argv.slice(2)) {
       const info = await page.evaluate((n) => {
         const g = window.__game;
         g.__drive(n);
-        g.__want = 1; g.frame(); g.__want = 0;      // the one rendered frame
+        // TWO RENDERED FRAMES, NOT ONE — and this is a harness bug that nearly
+        // shipped as a game one. `_autoQuality` resizes the composer and the
+        // renderer when it drops a tier, and a resize EMPTIES the canvas:
+        // measured, 99.2% of the canvas has content, 0% straight after the
+        // resize, 99.2% again after a single render. The game is fine, because
+        // `_autoQuality()` is called on the line directly above
+        // `composer.render()` and so always repaints in the same frame — but
+        // the stub above swallows that repaint, and the screenshot then
+        // captures the page background with a live HUD over it. It cost 52 of
+        // 432 frames in one sweep, on the worlds where a starved CPU tripped
+        // the quality drop, and it looks exactly like a severe rendering bug.
+        g.__want = 1; g.frame(); g.frame(); g.__want = 0;
         const p = g.player, t = g.track;
         return { name: t.level?.name ?? '?', ti: p.trackIndex,
           pos: [p.pos.x, p.pos.y, p.pos.z].map((v) => +v.toFixed(1)),
