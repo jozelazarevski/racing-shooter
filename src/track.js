@@ -19604,6 +19604,41 @@ export class Track {
       // a jump gorge the ribbon pinches to nothing, so the water stops at the
       // rim instead of laying a blue plank over the gap.
       if (this._inJumpGorge(p.x, p.z, 6)) w = 0;
+      // ...AND A RIBBON THAT CANNOT REACH ITS OWN BED IS NOT DRAWN EITHER.
+      //
+      // THE DEFECT: flat slabs of water hanging in the air over a hillside,
+      // one of them across the road, on PIKES PEAK and REDWOOD RAMPAGE —
+      // photographed from the chase camera on the racing line, not inferred.
+      //
+      // THE MECHANISM, and it is not the river's fault. `_planRiver` forces
+      // the bed profile monotonically downhill, so on a long reach it can sit
+      // well above the local hillside; `_blendHeight` then blends the ground
+      // TOWARD that profile, which near a road means RAISING it. It cannot:
+      // `terrainHeight` ends with `Math.min(h, _roadCeil(...))` and, inside
+      // 27 u, `Math.min(h, _roadClampY(...) - 0.45)`, both of which exist so
+      // the ground can never stand over the carriageway. Measured at REDWOOD
+      // RAMPAGE (91, 90): bed -6.45, channel floor -9.05, road -11.14, and the
+      // ground clamped to -11.69 — 0.45 under the road, exactly as the clamp
+      // says. The water is drawn at the bed and the ground is held five metres
+      // below it.
+      //
+      // Two things were tried against the carve first and BOTH measured as
+      // doing nothing, which is why neither shipped: keying the ford fade to
+      // the fords instead of to every road (REDWOOD 37.9% -> 36.4% of its
+      // near-road vertices still hanging), and removing the road guard
+      // entirely (36.4%, unchanged). They could not work — the clamp is
+      // downstream of all of them, and it is right to be.
+      //
+      // So the water yields instead. Where the bed sits above the ground that
+      // will actually be drawn, the ribbon tapers out rather than laying a
+      // plank over the gap — the same rule, and the same mechanism, as the
+      // jump-gorge line above it. A river with a gap in it reads as a river
+      // that goes underground; a river in mid-air reads as a bug.
+      const gy = this._drawnGroundY ? (this._drawnGroundY(p.x, p.z)
+        ?? this.terrainHeight(p.x, p.z)) : this.terrainHeight(p.x, p.z);
+      const bedY = R.bed ? R.bed[kk] : gy;
+      const over = bedY - gy;
+      if (over > 0.8) w *= Math.max(0, 1 - (over - 0.8) / 1.2);
       F.push({ t, x: p.x, z: p.z, nx, nz, w, df });
     }
 
