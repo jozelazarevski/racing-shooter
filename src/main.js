@@ -2559,14 +2559,23 @@ class Game {
   /** Show the button only when it leads somewhere, and say where. */
   _syncBackBtn() {
     const b = document.getElementById('back-btn');
-    if (!b) return;
     const t = this.backTarget();
     // In the MENU only: mid-race the screen belongs to the HUD and the pause
     // button is already the way out, so a second control would be clutter over
     // the road.
     const show = !!t && this.state === 'title';
-    b.classList.toggle('hidden', !show);
-    if (show) b.innerHTML = `‹&nbsp;${t.label}`;
+    if (b) {
+      b.classList.toggle('hidden', !show);
+      if (show) b.innerHTML = `‹&nbsp;${t.label}`;
+    }
+    // AND THE ONE THAT CANNOT SCROLL AWAY. The header button above sits in the
+    // page and is gone the moment you scroll — measured at -798px once 40% of
+    // the way down a chapter, which is exactly where a player wants it. The
+    // chapter bar is sticky and holds up in Chromium, but sticky is the one
+    // thing here that cannot be relied on across phones. So being INSIDE A
+    // CHAPTER gets its own fixed control, outside the scrolling element.
+    const f = document.getElementById('ch-back-float');
+    if (f) f.classList.toggle('hidden', !(show && t.at === 'chapter'));
   }
 
   /** THE PHONE'S OWN BACK GESTURE, which is the one people actually use.
@@ -2584,6 +2593,7 @@ class Game {
   _wireBack() {
     const btn = document.getElementById('back-btn');
     btn?.addEventListener('click', () => this.goBack());
+    document.getElementById('ch-back-float')?.addEventListener('click', () => this.goBack());
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
       if (document.activeElement?.tagName === 'INPUT') return;   // fields own Escape

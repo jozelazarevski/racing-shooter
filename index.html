@@ -679,9 +679,13 @@
   .cc-stars{margin-left:auto;white-space:nowrap}
   .chapter-card .ch-bar{margin-top:7px}
   /* the bar at the top of a chapter you have entered */
+  /* OPAQUE, because it is STICKY. At rgba(0,0,0,.22) the cards scrolled
+     visibly through it and the chapter name came out overprinted with
+     whatever row was passing underneath. A sticky bar has to occlude. */
   .chapter-bar{display:flex;align-items:center;gap:10px;margin:2px 0 10px;
-    padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.22);
-    border:1px solid var(--line-soft);position:sticky;top:0;z-index:3}
+    padding:8px 10px;border-radius:10px;background:#171310;
+    border:1px solid var(--line-soft);position:sticky;top:0;z-index:8;
+    box-shadow:0 3px 10px rgba(0,0,0,.5)}
   .ch-back{font-family:'Luckiest Guy';font-size:11px;letter-spacing:2px;
     padding:5px 10px;border-radius:8px;cursor:pointer;
     color:var(--gold);background:rgba(0,0,0,.3);border:1px solid var(--line-soft)}
@@ -705,6 +709,14 @@
     margin-right:auto}
   #back-btn:hover,#back-btn:focus-visible{border-color:var(--gold)}
   #back-btn.hidden{display:none}
+  #ch-back-float{position:fixed;left:10px;bottom:14px;z-index:30;
+    font-family:'Luckiest Guy';font-size:12px;letter-spacing:2px;
+    padding:10px 14px;border-radius:11px;cursor:pointer;color:var(--gold);
+    background:rgba(12,10,8,.92);border:1px solid var(--gold-dim);
+    box-shadow:0 4px 14px rgba(0,0,0,.55)}
+  #ch-back-float:hover,#ch-back-float:focus-visible{border-color:var(--gold)}
+  #ch-back-float.hidden{display:none}
+  @media (max-width:420px){#ch-back-float{font-size:11px;padding:9px 12px}}
   /* auto-FILL (not -fit): regions with fewer worlds keep the same card width,
      so every region shares one grid rhythm */
   .region-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%}
@@ -1537,7 +1549,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r222</div>
+<div id="build-tag">r223</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1558,6 +1570,16 @@
   <button class="tbtn pedal" id="t-brake" data-key="ArrowDown">BRAKE</button>
 </div>
 
+<!-- ALL CHAPTERS — a control that CANNOT scroll away.
+     The chapter bar at the top of a chapter is `position: sticky`, which
+     measures fine in Chromium and is the one thing here that cannot be
+     trusted on every phone: sticky quietly stops sticking under a number of
+     ancestor conditions, and iOS Safari is stricter than Chromium about them.
+     Reported as "I need a back to all chapters button once I'm in chapter" —
+     about a build that already had one. So this one is FIXED to the viewport
+     and lives outside the scrolling element entirely. Bottom-left keeps it
+     clear of START RACE (bottom-centre) and in thumb reach on a phone. -->
+<button id="ch-back-float" class="hidden">‹&nbsp;ALL&nbsp;CHAPTERS</button>
 <div id="title-screen" class="screen">
   <div class="game-title">IGNITE&nbsp;RALLY</div>
   <!-- A THREE-WORD TAGLINE COULD WRAP ANYWHERE; A SENTENCE CANNOT. The old
@@ -1812,10 +1834,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r222"></script>
+<script type="module" src="./src/main.js?v=r223"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r222"></script>
+<script src="./src/offline.js?v=r223"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r222"></script>
+<script type="module" src="./src/traffic.js?v=r223"></script>
 </body>
 </html>

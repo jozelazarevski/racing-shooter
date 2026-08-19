@@ -61,7 +61,8 @@ await p.evaluate((n) => {
   const head = card || [...document.querySelectorAll('.chapter-head')]
     .find((h) => (h.querySelector('.ch-n')?.textContent || '').trim() === `CHAPTER ${n}`);
   if (head) sc.scrollTop = head.offsetTop - sc.offsetTop - 8;
-}, +(process.env.SCROLL_TO ?? 0));
+  if (n === 'bottom') sc.scrollTop = sc.scrollHeight;
+}, process.env.SCROLL_TO === 'bottom' ? 'bottom' : +(process.env.SCROLL_TO ?? 0));
 for (let f = 0; f < 4; f++) await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
 await p.screenshot({ path: OUT, fullPage: !!process.env.FULL });
 const info = await p.evaluate(() => ({

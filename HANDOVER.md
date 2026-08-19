@@ -1,6 +1,6 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r222, deployed and live, tree clean.
+State at handover: `main` = r223, deployed and live, tree clean.
 Live: https://jozelazarevski.github.io/racing-shooter/
 
 ## THE ONE DEFECT THIS REPO KEEPS SHIPPING
@@ -657,6 +657,35 @@ would leave a real, clickable, keyboard-reachable control in the tab order of
 every player's menu, and a tab-stop that sculpts terrain is worse than a
 visible one because nobody can see what they just hit. Verified: on a plain
 visit `#editor-btn` is not in the DOM at all.
+
+## "ALL CHAPTERS" IS A FIXED CONTROL, NOT A STICKY ONE
+
+Reported as *"I need a back to all chapters button once I'm in chapter"* —
+about a build that already had one, twice over. Both were measurably present
+and both were unreachable where it mattered:
+
+    scroll        chapter bar      header BACK btn
+    top             on screen        on screen
+    40% down        on screen        off, at -798px
+    bottom          on screen        off, at -1302px
+
+The header button lives in the page and scrolls away. The chapter bar is
+`position: sticky` and holds up fine in Chromium — but sticky is the one thing
+here that cannot be relied on across phones: it stops sticking under a number
+of ancestor conditions and iOS Safari is stricter about them than Chromium is.
+Since the report came from an iPhone and the measurement says Chromium is
+happy, **the sensible conclusion is not to trust sticky for this at all.**
+
+So being inside a chapter now gets `#ch-back-float`: fixed to the VIEWPORT,
+declared OUTSIDE the scrolling element entirely, bottom-left where a thumb is
+and clear of START RACE at bottom-centre. Measured at top:782 of an 830px
+viewport at every scroll position, and it is shown only when `backTarget()`
+returns the chapter step — not at the index, not on another tab, not mid-race.
+
+And the sticky bar was made OPAQUE (`#171310`, was `rgba(0,0,0,.22)`). At 22%
+the cards scrolled visibly through it and the chapter name came out
+overprinted with whatever row was passing underneath. **A sticky bar has to
+occlude.**
 
 ## BACK — ONE LADDER, THREE WAYS TO PULL IT
 
