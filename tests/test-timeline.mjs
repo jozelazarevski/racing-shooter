@@ -81,10 +81,10 @@ const ladder = await page.evaluate(async () => {
   out.inIds = cards.map((c) => +c.dataset.lvid);
   out.inWant = mid.levels.map((l) => l.id);
   out.inChapterCards = sel.querySelectorAll('.chapter-card').length;
-  out.inBar = !!sel.querySelector('.chapter-bar');
+  out.inBar = !!document.querySelector('#topbar:not(.hidden)');
   out.inRungs = cards.map((c) => +c.dataset.rung);
   // BACK OUT again
-  sel.querySelector('.ch-back')?.click();
+  document.getElementById('topbar-back')?.click();
   out.backToIndex = sel.querySelectorAll('.chapter-card').length === out.idxChapterCards
     && sel.querySelectorAll('.level-chip').length === 0;
   // ...and the whole roster is still reachable, chapter by chapter

@@ -894,3 +894,70 @@ broken". It was committed and pushed.
 The rule: a syntax check is necessary and never sufficient. `tools-scratch/
 boot.mjs` boots four worlds and fails loudly on any page error; run it after
 every edit to `src/` before committing. It takes about a minute.
+
+## r224 — THE MENU WAS MOSTLY CHROME, AND THE WAY BACK WAS THREE BUTTONS
+Reported as one word, "Redesign", with a phone screenshot of the tracks tab.
+What the screenshot actually showed, measured afterwards at 390x830:
+
+  - THREE controls saying ALL CHAPTERS on one screen. The header `#back-btn`
+    (r222), the sticky `.chapter-bar` in the list, and the fixed bottom-left
+    pill `#ch-back-float` (r223). Each was added to fix the previous one and
+    none removed it. The pill also sat on top of the world cards.
+  - 620px of a 830px phone was chrome before the first world card — 75% of the
+    screen spent on a logo, a tagline, a legend and a filter box.
+
+Both are the same failure: things were ADDED for each report and nothing was
+ever taken away.
+
+### One back control, and it is the top bar
+`#topbar` is a single element in `index.html`, OUTSIDE `#title-screen`, fixed
+to the top of the viewport. `_fillTopbar` writes the chapter into it (it used
+to be `_chapterBar`, which BUILT a node and handed it to the list) and
+`_syncBackBtn` shows it — and hides the header button while it is up, which is
+the part that had been missing. `.ch-back` / `.ch-here` / `.ch-here-stars` and
+the `.chapter-bar` class are all still the same CSS; only the ownership moved.
+
+Why fixed and not sticky: sticky measures fine in Chromium and quietly stops
+sticking under ancestor conditions iOS Safari is stricter about. Fixed is only
+safe because no ancestor of `#topbar` carries a transform or a filter — those
+turn `fixed` back into `absolute`. Keep it a sibling of the screens.
+
+`.screen.with-topbar` pays the height back as padding, since a fixed bar is out
+of flow. The notch term appears in BOTH the bar's padding and the screen's, or
+they disagree on a notched phone.
+
+### What went, and what each one cost
+Measured with `tools-scratch/chrome.mjs` (takes `W` and `BASE`, so it diffs two
+ports), against r223 on a second worktree:
+
+    chrome above the first card    390px wide      320px wide
+    r223, chapter index               557             593
+    r223, inside a chapter            620             638
+    r224, chapter index               409             446
+    r224, inside a chapter            363             363
+
+  - `MAP & TRACK SELECTION` (14px + margins): the TRACKS tab above it is lit
+    yellow and says the same word.
+  - the star key, 128 -> 50: folded to the two numbers that move (the running
+    total, and the gate line), with the rules a tap below. State persists in
+    `ir-starkey`. The whole box is the hit target.
+  - the in-list chapter bar, 52 -> 0: it is the top bar now.
+  - the logo, inside a chapter only (`#title-screen.compact`): 32+38 -> 21 and
+    the tagline hidden. Two levels in, the branding is not what you came for.
+  - CLEAR, when nothing is filtering: it was a dead control that still cost a
+    whole wrapped row. `.on` is already set by `_applyWorldFilter`.
+  - the FILTERS row at 320px: the view switch and FILTERS came to 238px inside
+    234 — FOUR pixels over, which bought a third row and 38px. Trimmed padding.
+
+### The trap this screen keeps setting
+`#star-key` had no `width`, and `.menu-panel` is a CENTRING flex column: a
+child with no width sizes to its content, so the new nowrap one-liner hung off
+BOTH edges of the panel. It is the same trap already recorded for the region
+heads. Anything dropped into `.menu-panel` needs `width:100%`, and any flex
+child meant to ellipsise needs `min-width:0` — `min-width:auto` is the default
+and refuses to shrink below its own nowrap content.
+`tools-scratch/lastcard.mjs` checks for it directly (sideways scroll, and any
+child of the panel outside the viewport).
+
+Probes: `redesign.mjs` (every back control on screen, at each scroll depth),
+`chrome.mjs`, `wf.mjs`, `lastcard.mjs`, `toppos.mjs`, `redesignshot.mjs`.
