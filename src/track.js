@@ -17620,6 +17620,10 @@ export class Track {
    *  160 u, not the ~640 u the note below assumes). */
   _buildDistantStand(m4) {
     const T = this.T;
+    // How close a non-collidable clump may come to a carriageway. 220 u is
+    // three times the widest road on the roster and well past anywhere a car
+    // reaches without deliberately leaving the course.
+    const STAND_STANDOFF = 220;
     // THE DISTANT STAND. Between the playfield scatter (out to ~640 u) and
     // the horizon rings (900 u+) there was an empty ring - the mid-distance
     // read as bare lawn on every wooded world, which is most of why the
@@ -17655,8 +17659,39 @@ export class Track {
       for (let gv = 0; gv < 46 && bk3 < 300; gv++) {
         const gh = (n) => { const v = Math.sin((gv + n) * 12.9898) * 43758.5453; return v - Math.floor(v); };
         const aG = gh(0.1) * Math.PI * 2;
-        const rG = 640 + gh(1.7) * 260;
-        const gx = Math.cos(aG) * rG, gz = Math.sin(aG) * rG;
+        // PLACED BY DISTANCE FROM THE ROAD, NOT RADIUS FROM THE ORIGIN.
+        //
+        // It used to sit at r 640-900 from the world centre, which is only a
+        // proxy for "far from the driver" and a poor one — a lap is not a
+        // circle. Two things followed from that, measured:
+        //
+        //   THE GAP IT EXISTS TO FILL WAS NOT WHERE IT WAS LOOKING. Scatter
+        //   density falls off a cliff at about 160 u from the carriageway
+        //   (15.4 items per 10,000 u² in the 80-160 band, 1.6 beyond it), and
+        //   the stand started at 640. The 300-640 band — which is exactly what
+        //   an off-road climb photographs — got 9 items in a 440 u-wide
+        //   corridor on PINE VALLEY and nothing else.
+        //
+        //   AND ITS STANDOFF WAS LUCK. These clumps are deliberately NOT
+        //   collidable; nothing that far out is meant to be hit. Whether any
+        //   of them landed beside a carriageway depended entirely on the shape
+        //   of the lap. Measured before this change the nearest sat 282 u out,
+        //   which is fine — and nothing in the code was making it so.
+        //
+        // So the grove centre is rejection-sampled against the real distance
+        // to the road: far enough that a clump can never be a tree a car
+        // drives through, near enough to fill the band that was empty. The
+        // radius sweep stays as the candidate generator, widened inward.
+        let gx = 0, gz = 0, sited = false;
+        for (let att = 0; att < 12 && !sited; att++) {
+          const rTry = 360 + ((gh(1.7) + att * 0.19) % 1) * 540;
+          const aTry = aG + att * 0.53;
+          const cx2 = Math.cos(aTry) * rTry, cz2 = Math.sin(aTry) * rTry;
+          const dRoad = this._distToTrack(cx2, cz2);
+          if (dRoad < STAND_STANDOFF || dRoad > 1000) continue;
+          gx = cx2; gz = cz2; sited = true;
+        }
+        if (!sited) continue;
         const n = 5 + Math.floor(gh(2.3) * 5);
         for (let k = 0; k < n && bk3 < 300; k++) {
           const hh = (m) => {
@@ -17665,6 +17700,9 @@ export class Track {
           };
           const x2 = gx + (hh(0.7) - 0.5) * 150, z2 = gz + (hh(1.9) - 0.5) * 150;
           if (this._inWater(x2, z2)) continue;
+          // the 150 u jitter can walk a clump back toward the road the grove
+          // centre was sited clear of — check the clump itself, not the grove
+          if (this._distToTrack(x2, z2) < STAND_STANDOFF) continue;
           const gy2 = this._seatY(x2, z2);
           const sw2 = 4.5 + hh(2.9) * 4.5, sh2 = 5.5 + hh(4.1) * 5.5;
           bq.setFromAxisAngle(bup, hh(5.3) * Math.PI * 2);
