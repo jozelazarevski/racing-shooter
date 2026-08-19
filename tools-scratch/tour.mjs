@@ -47,6 +47,29 @@ for (const id of process.argv.slice(2)) {
       const ci = CN.indexOf('CHASE');
       if (ci >= 0) g.camMode = ci;
       g.clock.getDelta = () => 1 / 60;
+      // AUTO-QUALITY IS MEANINGLESS HERE, AND IT BLANKS THE SHOT.
+      //
+      // `_autoQuality` drops a tier when measured wall-clock fps falls under
+      // 26, and it resizes the composer and the renderer to do it. A resize
+      // EMPTIES the canvas — measured, 99.2% of the canvas has content, 0.0%
+      // straight after the resize, 99.2% again after one render
+      // (tools-scratch/resizeblank.mjs). The GAME is fine, because
+      // `_autoQuality()` is called on the line directly above
+      // `composer.render()` and repaints in the same frame.
+      //
+      // This harness is not fine: it steps a FIXED 1/60 clock and renders six
+      // frames in thirty seconds of sim time, so the fps it measures is a
+      // number about the harness, not about the game, and it trips the tier
+      // drop constantly. The resize then lands between the render and the
+      // screenshot. It cost 52 frames of pure page background under a live
+      // HUD in one sweep, and it looks exactly like a severe rendering bug.
+      //
+      // So the adaptation is held off rather than worked around. Nothing is
+      // hidden by that: the tiers only change pixel ratio, shadow-map size and
+      // bloom, and a defect hunt wants full quality anyway. The phone-sized
+      // measurements that DO care live in tests/test-unlit.mjs, which renders
+      // every frame and never trips it.
+      g._autoQuality = () => {};
       g.__realRender = g.composer.render.bind(g.composer);
       if (!window.__NOSTUB) g.composer.render = () => { if (g.__want) g.__realRender(); };
       // A DRIVER THAT STAYS ON THE ROAD. The first cut aimed a fixed 10
@@ -76,8 +99,12 @@ for (const id of process.argv.slice(2)) {
       const info = await page.evaluate((n) => {
         const g = window.__game;
         g.__drive(n);
-        // TWO RENDERED FRAMES, NOT ONE — and this is a harness bug that nearly
-        // shipped as a game one. `_autoQuality` resizes the composer and the
+        // ONE RENDERED FRAME, and `_autoQuality` held off entirely — see the
+        // setup above. Rendering TWO frames was the first attempt and it made
+        // the artefact WORSE and deterministic: 52 blank frames out of 432
+        // became exactly 72, one per world, always the first shot. Two renders
+        // simply gave the resize two chances to be the last thing that
+        // happened. `_autoQuality` resizes the composer and the
         // renderer when it drops a tier, and a resize EMPTIES the canvas:
         // measured, 99.2% of the canvas has content, 0% straight after the
         // resize, 99.2% again after a single render. The game is fine, because
@@ -87,7 +114,7 @@ for (const id of process.argv.slice(2)) {
         // captures the page background with a live HUD over it. It cost 52 of
         // 432 frames in one sweep, on the worlds where a starved CPU tripped
         // the quality drop, and it looks exactly like a severe rendering bug.
-        g.__want = 1; g.frame(); g.frame(); g.__want = 0;
+        g.__want = 1; g.frame(); g.__want = 0;
         const p = g.player, t = g.track;
         return { name: t.level?.name ?? '?', ti: p.trackIndex,
           pos: [p.pos.x, p.pos.y, p.pos.z].map((v) => +v.toFixed(1)),
