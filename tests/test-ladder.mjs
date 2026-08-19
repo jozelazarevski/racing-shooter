@@ -1,29 +1,34 @@
-/* HOW FAST THE ROSTER UNROLLS, AND THE FLOOR UNDER IT.
+/* HOW THE ROSTER UNROLLS, AND THE FLOOR UNDER IT.
  *
- * Reported as "tracks are opening too fast". Measured on the shipped ladder,
- * a player who wins every race had 19 of the 60 worlds open after three races
- * and 58 of 60 after ten — the entire roster on the table before they had met
- * a quarter of it. The price was one star per rung, and that number was
- * load-bearing for a reason: a driver who only ever FINISHES banks exactly 1★
- * a race, so any steeper slope eventually walls them in permanently.
+ * This suite used to defend a PER-WORLD STAR LADDER: every world carried a
+ * price, `_freeUnlock` handed over the cheapest one you could not afford once
+ * you had raced everything you could, and LADDER_SLOPE set the pace. That
+ * mechanism is gone. Worlds now open by CHAPTER (see CHAPTERS in track.js):
+ * one gate in front of each chapter, and every world inside an open chapter is
+ * raceable immediately, in any order.
  *
- * So the wall is closed by a RULE and the pace is set by a NUMBER, instead of
- * one number doing both jobs badly:
- *   - `_freeUnlock` — clear everything you can afford and the cheapest world
- *     you cannot opens anyway. Progress is never slower than one world a race,
- *     whatever the price.
- *   - `isLevelUnlocked` never re-locks a world you have raced, without which
- *     a world opened by the floor slams shut the moment the ladder's own price
- *     overtakes your total, and the floor spends forever re-offering a world
- *     that is already behind you.
- *   - LADDER_SLOPE — free to be a difficulty knob now that nothing depends on
- *     it for safety.
+ * THE PROPERTIES ARE THE SAME PROPERTIES. That is the point of rewriting this
+ * file rather than deleting it — the mechanism changed, the guarantees did
+ * not, and a suite that only ever knew how to check prices would have gone
+ * green on a career that could strand a player:
  *
- * What this suite defends is the PAIR. Either half alone is a bug: the slope
- * without the floor strands the weakest driver, the floor without the slope
- * changes nothing. Both halves are asserted against the real 60-world price
- * table, by driving the game's own `starCost` / `isLevelUnlocked`, so a change
- * to the table cannot quietly invalidate the numbers here.
+ *   - NOBODY IS EVER WALLED IN. The gate asks for 1.8 stars a world while a
+ *     driver who only ever FINISHES banks exactly 1, so the gate alone strands
+ *     that player permanently at chapter 2. The floor in `isChapterOpen` is
+ *     what closes it: race a chapter OUT and the next opens regardless. Both
+ *     halves are asserted, because either alone is a bug — the gate without
+ *     the floor is a wall, the floor without the gate is no structure at all.
+ *
+ *   - A WORLD YOU HAVE RACED NEVER RE-LOCKS.
+ *
+ *   - DRIVING BETTER GETS YOU THROUGH FASTER, at every checkpoint.
+ *
+ *   - THE SURFACES SAY WHAT THE RULE IS. A shut chapter has to state its price
+ *     somewhere a player can read it, or the padlock is just a padlock.
+ *
+ * Everything is driven through the game's own `chapters` / `chapterNeed` /
+ * `isChapterOpen` / `isLevelUnlocked`, so a change to the chapter table cannot
+ * quietly invalidate the numbers here.
  */
 import { chromium } from 'playwright-core';
 
@@ -46,166 +51,151 @@ await page.waitForFunction(() => window.__game?.track?.center, undefined, { time
 
 const R = await page.evaluate(async () => {
   const g = window.__game;
-  const { LEVELS } = await import('./src/track.js');
-  const { LADDER_SLOPE } = await import('./src/main.js');
+  const { LEVELS, CHAPTER_GATE } = await import('./src/track.js');
   const out = {};
   const save = g.career.finished;
-  g.career.finished = {};
-  out.slope = LADDER_SLOPE;
+  g.unlockAll = false;
+  out.gate = CHAPTER_GATE;
+  out.worlds = LEVELS.length;
 
-  /** Race, badly or well, every world you can currently AFFORD — the state the
-   *  floor is defined against. Racing the free three is not enough: at any
-   *  slope the stars they bank immediately buy the next rung. */
-  const raceAllAffordable = (starsPer) => {
-    for (let i = 0; i < 400; i++) {
-      const todo = LEVELS.find((l) => g.starCost(l.id) <= g.totalStars() && !g.career.finished[l.id]);
-      if (!todo) return;
-      g.career.finished[todo.id] = { place: starsPer === 3 ? 1 : 6, stars: starsPer };
-    }
-  };
-
-  // ---- the shape of the price table --------------------------------------
-  const costs = LEVELS.map((l) => g.starCost(l.id));
-  out.free = costs.filter((c) => c === 0).length;
-  out.maxCost = Math.max(...costs);
-  out.maxStars = LEVELS.length * 3;
-  out.firstPriced = costs[3];
-  // every price is its RUNG times the slope — including a level carrying its
-  // own `cost`, which is a rung too. Without that, retuning the slope silently
-  // re-orders the roster around the hand-priced regions.
-  out.everyPriceIsScaled = LEVELS.every((l, i) => {
-    const rung = l.cost != null ? l.cost : (i < 3 ? 0 : i - 2);
-    return g.starCost(l.id) === Math.round(rung * LADDER_SLOPE);
-  });
-  const owned = LEVELS.filter((l) => l.cost != null);
-  out.ownedCount = owned.length;
-  out.ownedScaled = owned.every((l) => g.starCost(l.id) === Math.round(l.cost * LADDER_SLOPE));
+  // ---- the shape of the chapter table ------------------------------------
+  const chs = g.chapters();
+  out.n = chs.length;
+  out.sizes = chs.map((c) => c.levels.length);
+  out.needs = chs.map((c) => g.chapterNeed(c._k));
+  // partition: every world in exactly one chapter, and chapters run in career
+  // order without gaps — a chapter that is not a contiguous slice of the
+  // career would put one chapter's worlds under another chapter's header
+  out.covered = chs.reduce((n, c) => n + c.levels.length, 0);
+  out.everyWorldPlaced = LEVELS.every((l) => g.chapterOf(l.id) >= 0);
+  out.contiguous = chs.every((c, k) => k === 0 || c.start === chs[k - 1].end);
+  out.startsAtZero = chs[0].start === 0;
+  out.endsAtRoster = chs[chs.length - 1].end === LEVELS.length;
+  // every gate is its chapter's size times the fraction, so retuning the
+  // fraction cannot silently make one chapter unreachable
+  out.everyGateIsScaled = chs.every((c) =>
+    g.chapterNeed(c._k) === Math.ceil(c.levels.length * 3 * CHAPTER_GATE));
+  // the gate must be reachable at all: you cannot need more stars than the
+  // chapter can hold
+  out.everyGateFits = chs.every((c) => g.chapterNeed(c._k) <= c.levels.length * 3);
 
   // ---- a full career, played three ways ----------------------------------
-  // Every race takes the cheapest OPEN world never raced, exactly as the
-  // ladder intends it to be walked, and banks a fixed result. `openAfter` is
-  // the metric the report was about: how much of the roster is on the table.
+  // Every race takes the first open world never raced — the board's own
+  // reading order. `openAfter` is the pacing metric.
   const career = (starsPer) => {
     g.career.finished = {};
     const trace = [];
     let races = 0;
-    for (; races < 400; races++) {
+    for (; races < 500; races++) {
       const open = LEVELS.filter((l) => g.isLevelUnlocked(l.id));
       trace.push(open.length);
-      const todo = open.filter((l) => !g.career.finished[l.id])
-        .sort((a, b) => g.starCost(a.id) - g.starCost(b.id))[0];
+      const todo = open.find((l) => !g.career.finished[l.id]);
       if (!todo) break;
       g.career.finished[todo.id] = { place: starsPer === 3 ? 1 : starsPer === 2 ? 3 : 6,
         stars: starsPer };
     }
-    const reached = LEVELS.filter((l) => g.isLevelUnlocked(l.id)).length;
     const at = (n) => trace[n] ?? trace[trace.length - 1];
-    return { races, reached, a3: at(3), a10: at(10), a20: at(20) };
+    return { races, reached: LEVELS.filter((l) => g.isLevelUnlocked(l.id)).length,
+      a3: at(3), a6: at(6), a10: at(10), a20: at(20) };
   };
   out.winner = career(3);
   out.podium = career(2);
   out.finisher = career(1);
-  out.worlds = LEVELS.length;
+
+  // ---- the gate, on its own ----------------------------------------------
+  // podium every world in chapter 1 and the gate is paid without racing it out
+  g.career.finished = {};
+  const c0 = chs[0], c1 = chs[1];
+  let banked = 0;
+  for (const l of c0.levels) {
+    if (banked >= g.chapterNeed(0)) break;
+    g.career.finished[l.id] = { place: 1, stars: 3 };
+    banked += 3;
+  }
+  out.paidEarly = g.isChapterOpen(1);
+  out.paidEarlyUnraced = c0.levels.filter((l) => !g.career.finished[l.id]).length;
+  out.paidEarlyDoesNotSkip = !g.isChapterOpen(2);
 
   // ---- the floor, on its own ---------------------------------------------
-  //
-  // THE FLOOR HAS TO BE TESTED AGAINST A PRICE THAT CAN STRAND SOMEBODY, and
-  // the shipped slope no longer can. At 0.5 a rung costs half a star while a
-  // finisher banks a whole one per race, so affordability outruns racing and
-  // `_freeUnlock` is never owed anything — it returned null here and took
-  // seven assertions down with it. That is the slope doing its job, not the
-  // floor failing.
-  //
-  // So price the ladder steeply for this block only. It exercises exactly the
-  // logic the floor exists for — priced out, cheapest first, granted once,
-  // never re-locked — and it keeps doing so whatever LADDER_SLOPE is set to
-  // next, which is the whole reason the floor is a rule and not a number.
-  const _realCost = g.starCost.bind(g);
-  g.starCost = (id) => _realCost(id) * 6;
+  // THE FLOOR HAS TO BE TESTED AGAINST A DRIVER THE GATE CAN STRAND, and that
+  // is the whole reason it exists: 1 star a world against a gate wanting 1.8.
   g.career.finished = {};
-  out.freshOwesNothing = g._freeUnlock() === null;     // three free worlds unraced
-  raceAllAffordable(1);                                // the worst driver in the game
-  out.finisherStars = g.totalStars();
-  const owed = g._freeUnlock();
-  out.owedAfterFree = owed;
-  out.owedIsPricedOut = owed != null && g.starCost(owed) > g.totalStars();
-  out.owedIsCheapestLocked = owed != null && LEVELS
-    .filter((l) => g.starCost(l.id) > g.totalStars())
-    .every((l) => g.starCost(l.id) >= g.starCost(owed));
-  out.owedIsOpen = owed != null && g.isLevelUnlocked(owed);
-  // and it grants exactly ONE — everything dearer stays shut
-  out.grantsExactlyOne = LEVELS
-    .filter((l) => l.id !== owed && g.starCost(l.id) > g.totalStars())
-    .every((l) => !g.isLevelUnlocked(l.id));
-  // leave one affordable world unraced and the debt is cancelled
-  const cheap = LEVELS.find((l) => g.starCost(l.id) === 0);
-  delete g.career.finished[cheap.id];
-  out.unracedCancelsTheDebt = g._freeUnlock() === null;
+  for (const l of c0.levels) g.career.finished[l.id] = { place: 6, stars: 1 };
+  out.floorStars = g.chapterStars(0);
+  out.floorNeed = g.chapterNeed(0);
+  out.floorIsShortOfGate = out.floorStars < out.floorNeed;
+  out.floorOpensAnyway = g.isChapterOpen(1);
+  out.floorGrantsExactlyOne = !g.isChapterOpen(2);
+  // leave ONE world in the chapter unraced and the floor is not owed
+  const last = c0.levels[c0.levels.length - 1];
+  delete g.career.finished[last.id];
+  out.unracedHoldsTheGate = !g.isChapterOpen(1);
+  out.unracedLevelsShut = c1.levels.every((l) => !g.isLevelUnlocked(l.id));
 
   // ---- a world you raced never re-locks ----------------------------------
-  // (still on the steep price — re-locking is a pricing question, and the
-  // steep table is the only one that can price a raced world back out)
   g.career.finished = {};
-  const dear = LEVELS.find((l) => g.starCost(l.id) > 0);
-  g.career.finished[dear.id] = { place: 6, stars: 1 };   // raced it via the floor
-  out.racedStaysOpen = g.isLevelUnlocked(dear.id) && g.starCost(dear.id) > g.totalStars();
-  out.racedNotReOffered = g._freeUnlock() !== dear.id;
+  const deep = chs[Math.min(4, chs.length - 1)].levels[0];
+  g.career.finished[deep.id] = { place: 6, stars: 1 };
+  out.racedStaysOpen = g.isLevelUnlocked(deep.id);
+  out.racedChapterStillShut = !g.isChapterOpen(g.chapterOf(deep.id));
+
+  // ---- a fresh career ----------------------------------------------------
+  g.career.finished = {};
+  out.freshOpen = LEVELS.filter((l) => g.isLevelUnlocked(l.id)).length;
+  out.freshIsChapterOne = out.freshOpen === c0.levels.length;
+  out.freshNext = g.nextTrack()?.lv?.id;
+  out.freshNextIsFirst = out.freshNext === c0.levels[0].id;
 
   // ---- the surfaces say what the rule is ---------------------------------
-  g.career.finished = {};
-  raceAllAffordable(1);
-  const freeId = g._freeUnlock();
+  // Read at BOTH levels of the board, because they say different halves of it:
+  // the chapter INDEX has to price the gate, and the world cards inside a shut
+  // chapter have to say which chapter they are waiting on.
+  g._chapterIn = null;
   g._renderLevelCards();
-  const card = document.querySelector(`#level-select .level-chip[data-lvid="${freeId}"]`);
-  out.cardOpen = !!card && !card.classList.contains('locked');
-  out.cardSays = card?.querySelector('.wc-best')?.textContent || '';
   out.keySays = document.getElementById('star-key')?.textContent || '';
+  out.heading = g._ladderHeading();
+  const cards = [...document.querySelectorAll('.chapter-card')];
+  out.headCount = cards.length;
+  out.indexHasNoWorlds = document.querySelectorAll('#level-select .level-chip').length === 0;
+  out.shutHeadSays = cards[1]?.textContent?.replace(/\s+/g, ' ') || '';
+  out.shutHeadIsLocked = !!cards[1]?.classList.contains('locked');
+  // ...then enter the shut chapter — you are allowed to look at what you are
+  // working toward, and what you see there must still read as locked
+  g._chapterIn = c1.n;
+  g._renderLevelCards();
+  const shutCard = document.querySelector(`#level-select .level-chip[data-lvid="${c1.levels[0].id}"]`);
+  out.shutCardLocked = !!shutCard && shutCard.classList.contains('locked');
+  out.shutCardSays = shutCard?.querySelector('.wc-best')?.textContent || '';
+  out.shutChapterEnterable = !!shutCard;
+  g._chapterIn = null;
 
   g.career.finished = save;
   g._renderLevelCards();
   return out;
 });
 
-console.log('\n--- the price table ---');
-ok(R.free === 3, 'three worlds are free, so there is a choice from the first race', `${R.free}`);
-// A RUNG COSTS HALF A STAR, WHICH IS THE POINT. The old assertion here was
-// `firstPriced > 1` — written when the report was "tracks are opening too
-// fast". The report reversed ("open a few tracks per star earned, not five,
-// six"), so what needs defending is the opposite: a star must buy MORE than
-// one world, or the board goes back to being a row of walls.
-ok(R.worlds / Math.max(1, R.maxCost) >= 1.5,
-  'one star opens at least a world and a half — the wall was the complaint',
-  `${R.worlds} worlds priced up to ${R.maxCost}★ `
-  + `= ${(R.worlds / Math.max(1, R.maxCost)).toFixed(2)} worlds per star`);
-ok(R.maxCost < R.maxStars * 0.6,
-  'and the dearest world is still well inside what the roster can pay',
-  `${R.maxCost}★ of ${R.maxStars}`);
-ok(R.everyPriceIsScaled, `every price is its rung times the slope (${R.slope})`);
-ok(R.ownedCount > 0 && R.ownedScaled,
-  `including all ${R.ownedCount} hand-priced worlds, so the running order cannot shift`);
+console.log('\n--- the shape of the chapter table ---');
+console.log(`  ${R.n} chapters over ${R.worlds} worlds: sizes ${R.sizes.join('/')}`);
+console.log(`  gates: ${R.needs.join('/')}★  (fraction ${R.gate})`);
+ok(R.covered === R.worlds && R.everyWorldPlaced,
+  'every world is in exactly one chapter', `${R.covered} of ${R.worlds}`);
+ok(R.contiguous && R.startsAtZero && R.endsAtRoster,
+  'and the chapters are contiguous slices of career order, covering all of it');
+ok(R.n >= 6, 'the roster is broken into enough parts to read as chapters', `${R.n}`);
+ok(R.everyGateIsScaled,
+  `every gate is its chapter's stars times the fraction (${R.gate})`);
+ok(R.everyGateFits, 'and no gate asks for more stars than its chapter can hold');
 
 console.log('\n--- how fast the roster unrolls ---');
-console.log(`  winner   open after 3/10/20 races: ${R.winner.a3}/${R.winner.a10}/${R.winner.a20}`);
-console.log(`  podium   open after 3/10/20 races: ${R.podium.a3}/${R.podium.a10}/${R.podium.a20}`);
-console.log(`  finisher open after 3/10/20 races: ${R.finisher.a3}/${R.finisher.a10}/${R.finisher.a20}`);
-// THESE THREE USED TO ASSERT THE CEILING AND NOW ASSERT THE FLOOR. They read
-// `a3 <= 10`, `a10 <= 40`, `a20 < worlds` — the shape of the r178 slowdown.
-// Keeping them would have meant the suite defending a decision the player had
-// already asked to have reversed, which is how a test stops being a spec and
-// starts being a fossil. What matters now is that the board is never a wall.
-ok(R.winner.a3 >= 12,
-  'three races in, there is a real spread of worlds to choose from',
-  `${R.winner.a3} of ${R.worlds} open`);
-ok(R.finisher.a3 >= 6,
-  'and that is true for the worst driver in the game, not just the winner',
-  `${R.finisher.a3} of ${R.worlds} open`);
-ok(R.winner.a10 >= 30,
-  'ten races in, a winner is deep into the roster',
-  `${R.winner.a10} of ${R.worlds} open`);
-ok(R.winner.a3 >= R.podium.a3 && R.podium.a3 >= R.finisher.a3
-  && R.winner.a10 >= R.podium.a10 && R.podium.a10 >= R.finisher.a10,
-  'and racing better opens the roster faster, at every checkpoint',
-  JSON.stringify({ w: R.winner.a10, p: R.podium.a10, f: R.finisher.a10 }));
+console.log(`  winner   open after 3/6/10/20 races: ${R.winner.a3}/${R.winner.a6}/${R.winner.a10}/${R.winner.a20}`);
+console.log(`  podium   open after 3/6/10/20 races: ${R.podium.a3}/${R.podium.a6}/${R.podium.a10}/${R.podium.a20}`);
+console.log(`  finisher open after 3/6/10/20 races: ${R.finisher.a3}/${R.finisher.a6}/${R.finisher.a10}/${R.finisher.a20}`);
+ok(R.winner.a20 >= R.podium.a20 && R.podium.a20 >= R.finisher.a20,
+  'racing better opens the roster faster, or at least never slower',
+  JSON.stringify({ w: R.winner.a20, p: R.podium.a20, f: R.finisher.a20 }));
+ok(R.winner.a20 > R.finisher.a20,
+  'and by twenty races a winner is genuinely ahead of a last-place finisher',
+  `${R.winner.a20} vs ${R.finisher.a20}`);
 
 console.log('\n--- nobody is ever walled in ---');
 for (const [name, r] of [['winner', R.winner], ['podium', R.podium], ['finisher', R.finisher]]) {
@@ -214,27 +204,48 @@ for (const [name, r] of [['winner', R.winner], ['podium', R.podium], ['finisher'
     `reached ${r.reached}, raced ${r.races}`);
 }
 
+console.log('\n--- the gate ---');
+ok(R.paidEarly, 'pay the gate and the next chapter opens with worlds still unraced behind you',
+  `${R.paidEarlyUnraced} left unraced in chapter 1`);
+ok(R.paidEarlyUnraced > 0, 'and that is a real shortcut, not a full clear in disguise',
+  `${R.paidEarlyUnraced} unraced`);
+ok(R.paidEarlyDoesNotSkip, 'paying one gate opens ONE chapter, not the rest of the roster');
+
 console.log('\n--- the floor ---');
-ok(R.freshOwesNothing, 'a fresh career is owed nothing — the free worlds are unraced');
-ok(R.owedAfterFree != null && R.owedIsPricedOut,
-  'race everything you can afford and a world you cannot afford opens',
-  `id ${R.owedAfterFree} at ${R.finisherStars}★ in hand`);
-ok(R.owedIsCheapestLocked, 'and it is the cheapest one, not an arbitrary one');
-ok(R.owedIsOpen, 'the unlock check agrees with the grant');
-ok(R.grantsExactlyOne, 'exactly one is granted — the rest of the ladder is untouched');
-ok(R.unracedCancelsTheDebt,
-  'leave one affordable world unraced and nothing is granted');
+ok(R.floorIsShortOfGate,
+  'the worst driver in the game cannot pay the gate — which is why there is a floor',
+  `${R.floorStars}★ banked against ${R.floorNeed}★ wanted`);
+ok(R.floorOpensAnyway, 'race the chapter out and the next one opens regardless of stars');
+ok(R.floorGrantsExactlyOne, 'exactly one chapter is granted — the rest stay shut');
+ok(R.unracedHoldsTheGate, 'leave one world in the chapter unraced and nothing is granted');
+ok(R.unracedLevelsShut, 'and every world of the next chapter is still locked');
 
 console.log('\n--- a world you have raced is yours ---');
-ok(R.racedStaysOpen, 'it stays open even when the ladder prices it above your total');
-ok(R.racedNotReOffered, 'and the floor does not keep re-offering it');
+ok(R.racedStaysOpen, 'it stays open even though its chapter has not been reached');
+ok(R.racedChapterStillShut, 'and racing it does not open the chapter around it');
+
+console.log('\n--- a fresh career ---');
+ok(R.freshIsChapterOne, 'opens exactly chapter one', `${R.freshOpen} worlds open`);
+ok(R.freshNextIsFirst, 'and points at its first world');
 
 console.log('\n--- and the surfaces say so ---');
-ok(R.cardOpen, 'the granted world draws as open, not locked');
-ok(/OPEN ANYWAY/.test(R.cardSays), 'its card explains why it is open', R.cardSays);
-ok(/RACED EVERYTHING OPEN/.test(R.keySays),
-  'and the star key stops quoting a price at a world you can already drive',
-  R.keySays.slice(0, 160));
+ok(R.headCount === R.n && R.indexHasNoWorlds,
+  'the board opens on an index — one card per chapter, no world cards',
+  `${R.headCount} chapter cards of ${R.n}`);
+ok(/CHAPTER 1 OF /.test(R.heading), 'the heading says which chapter you are in', R.heading);
+ok(/CHAPTER 2/.test(R.keySays) && /★/.test(R.keySays),
+  'the star key names the next chapter and what it costs', R.keySays.slice(0, 170));
+ok(/OR RACE ALL/.test(R.keySays),
+  'and states the floor too — a player who cannot podium must be told the other way through',
+  R.keySays.slice(0, 170));
+ok(R.shutHeadIsLocked && /NEEDS \d+★/.test(R.shutHeadSays),
+  'a shut chapter draws as shut and prices its gate', R.shutHeadSays.slice(0, 120));
+ok(R.shutChapterEnterable,
+  'you can still enter a shut chapter to see what you are working toward');
+ok(R.shutCardLocked, 'and its worlds draw as locked');
+ok(/CHAPTER/.test(R.shutCardSays),
+  'each naming the chapter it is waiting on, not a per-world price that no longer exists',
+  R.shutCardSays);
 
 ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '));
 

@@ -668,8 +668,110 @@
   .region-head{display:flex;align-items:center;gap:10px;margin:16px 0 8px;
     font-family:'Luckiest Guy';font-size:12px;letter-spacing:5px;
     color:var(--gold-dim);text-shadow:1px 1px 0 var(--ink);white-space:nowrap}
+  /* The chapter index's heading is a sentence, not a region name — it says
+     which chapter you are in AND how much of the roster is open, and at 5px
+     of letter-spacing that runs off a phone. Let this one wrap. */
+  .tl-view > .region-head{white-space:normal;letter-spacing:3px;line-height:1.5}
+  .tl-view > .region-head::before,.tl-view > .region-head::after{display:none}
   .region-head::before,.region-head::after{content:'';flex:1;height:1px;background:var(--line-soft)}
   .region-head:first-child{margin-top:2px}
+  /* ---- CHAPTER HEADERS (the timeline/progression view) -------------------
+     A chapter is a part of the career, so its header is a BLOCK with a name,
+     a line of flavour and a star bar — not the thin rule a region gets. The
+     bar carries two marks: the fill is what you have banked in this chapter,
+     the notch is where the gate sits, so "how much further" is a distance you
+     can see rather than a number you have to do arithmetic on. */
+  .chapter-head{margin:20px 0 10px;padding:10px 12px;border-radius:10px;
+    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.16));
+    border:1px solid var(--line-soft);border-left:3px solid var(--gold-dim)}
+  .chapter-head:first-child{margin-top:2px}
+  .chapter-head.locked{opacity:.62;border-left-color:var(--line-soft)}
+  .ch-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .ch-n{font-family:'Luckiest Guy';font-size:10px;letter-spacing:3px;
+    color:var(--ink-soft,#9aa)}
+  .ch-name{font-family:'Luckiest Guy';font-size:14px;letter-spacing:3px;
+    color:var(--gold);text-shadow:1px 1px 0 var(--ink)}
+  .ch-gate{margin-left:auto;font-size:10px;letter-spacing:1px;color:var(--gold-dim);
+    white-space:nowrap}
+  .ch-blurb{margin-top:3px;font-size:11px;line-height:1.35;color:var(--ink-soft,#9aa);
+    opacity:.9}
+  .ch-bar{position:relative;height:4px;margin-top:8px;border-radius:3px;
+    background:rgba(0,0,0,.3);overflow:hidden}
+  .ch-bar i{display:block;height:100%;background:var(--gold-dim);border-radius:3px}
+  .ch-bar u{position:absolute;top:-2px;width:2px;height:8px;background:var(--gold);
+    opacity:.85;text-decoration:none}
+  @media (max-width:420px){
+    .ch-name{font-size:12px;letter-spacing:2px}
+    .ch-gate{margin-left:0;width:100%}
+  }
+  /* ---- THE CHAPTER INDEX -------------------------------------------------
+     Twelve cards instead of seventy-two: the tracks tab opens on a map of the
+     career, and you ENTER a chapter to see its worlds. Reported as "package
+     them in separate sections that I can enter ... no endless scrolling".
+     Two columns from 520px up, one below — a chapter card is a block of text
+     and text wants a readable measure, not the widest box available. */
+  .chapter-grid{display:grid;grid-template-columns:1fr;gap:10px;width:100%}
+  @media (min-width:520px){.chapter-grid{grid-template-columns:1fr 1fr}}
+  .chapter-card{display:block;width:100%;text-align:left;cursor:pointer;
+    padding:12px 14px;border-radius:12px;font:inherit;color:inherit;
+    background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(0,0,0,.2));
+    border:1px solid var(--line-soft);border-left:3px solid var(--gold-dim);
+    transition:transform .12s ease,border-color .12s ease}
+  .chapter-card:hover,.chapter-card:focus-visible{transform:translateY(-2px);
+    border-color:var(--gold)}
+  .chapter-card.locked{opacity:.6;border-left-color:var(--line-soft)}
+  .chapter-card.here{border-left-color:var(--gold);
+    box-shadow:0 0 0 1px var(--gold-dim) inset}
+  .cc-top{display:flex;align-items:baseline;gap:9px}
+  .cc-n{font-family:'Luckiest Guy';font-size:16px;color:var(--gold-dim);
+    min-width:22px}
+  .cc-name{font-family:'Luckiest Guy';font-size:15px;letter-spacing:2px;
+    color:var(--gold);text-shadow:1px 1px 0 var(--ink)}
+  .cc-blurb{margin:4px 0 8px;font-size:11px;line-height:1.4;
+    color:var(--ink-soft,#9aa);opacity:.9}
+  .cc-foot{display:flex;align-items:baseline;gap:10px;font-size:10px;
+    letter-spacing:1px;color:var(--gold-dim)}
+  .cc-stars{margin-left:auto;white-space:nowrap}
+  .chapter-card .ch-bar{margin-top:7px}
+  /* the bar at the top of a chapter you have entered */
+  /* OPAQUE, because it is STICKY. At rgba(0,0,0,.22) the cards scrolled
+     visibly through it and the chapter name came out overprinted with
+     whatever row was passing underneath. A sticky bar has to occlude. */
+  .chapter-bar{display:flex;align-items:center;gap:10px;margin:2px 0 10px;
+    padding:8px 10px;border-radius:10px;background:#171310;
+    border:1px solid var(--line-soft);position:sticky;top:0;z-index:8;
+    box-shadow:0 3px 10px rgba(0,0,0,.5)}
+  .ch-back{font-family:'Luckiest Guy';font-size:11px;letter-spacing:2px;
+    padding:5px 10px;border-radius:8px;cursor:pointer;
+    color:var(--gold);background:rgba(0,0,0,.3);border:1px solid var(--line-soft)}
+  .ch-back:hover{border-color:var(--gold)}
+  .ch-here{font-size:11px;letter-spacing:1px;color:var(--ink-soft,#9aa);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ch-here b{font-family:'Luckiest Guy';color:var(--gold);letter-spacing:2px;
+    margin-right:6px}
+  .ch-here-stars{margin-left:auto;font-size:11px;color:var(--gold-dim);
+    white-space:nowrap}
+  /* inside a chapter the bar IS the header — this is the placeholder the row
+     builder emits in its place, and it must take up no room at all */
+  .chapter-head-none{display:none}
+  /* ---- BACK ---------------------------------------------------------------
+     Sits at the head of the menu, left of the credits chip, and only appears
+     when `backTarget` finds a level above the one you are on. Same visual
+     family as the chapter bar's own back control. */
+  #back-btn{font-family:'Luckiest Guy';font-size:11px;letter-spacing:2px;
+    padding:6px 12px;border-radius:9px;cursor:pointer;color:var(--gold);
+    background:rgba(0,0,0,.32);border:1px solid var(--line-soft);
+    margin-right:auto}
+  #back-btn:hover,#back-btn:focus-visible{border-color:var(--gold)}
+  #back-btn.hidden{display:none}
+  #ch-back-float{position:fixed;left:10px;bottom:14px;z-index:30;
+    font-family:'Luckiest Guy';font-size:12px;letter-spacing:2px;
+    padding:10px 14px;border-radius:11px;cursor:pointer;color:var(--gold);
+    background:rgba(12,10,8,.92);border:1px solid var(--gold-dim);
+    box-shadow:0 4px 14px rgba(0,0,0,.55)}
+  #ch-back-float:hover,#ch-back-float:focus-visible{border-color:var(--gold)}
+  #ch-back-float.hidden{display:none}
+  @media (max-width:420px){#ch-back-float{font-size:11px;padding:9px 12px}}
   /* auto-FILL (not -fit): regions with fewer worlds keep the same card width,
      so every region shares one grid rhythm */
   .region-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%}
@@ -1502,7 +1604,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r219</div>
+<div id="build-tag">r224</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1523,6 +1625,16 @@
   <button class="tbtn pedal" id="t-brake" data-key="ArrowDown">BRAKE</button>
 </div>
 
+<!-- ALL CHAPTERS — a control that CANNOT scroll away.
+     The chapter bar at the top of a chapter is `position: sticky`, which
+     measures fine in Chromium and is the one thing here that cannot be
+     trusted on every phone: sticky quietly stops sticking under a number of
+     ancestor conditions, and iOS Safari is stricter than Chromium about them.
+     Reported as "I need a back to all chapters button once I'm in chapter" —
+     about a build that already had one. So this one is FIXED to the viewport
+     and lives outside the scrolling element entirely. Bottom-left keeps it
+     clear of START RACE (bottom-centre) and in thumb reach on a phone. -->
+<button id="ch-back-float" class="hidden">‹&nbsp;ALL&nbsp;CHAPTERS</button>
 <div id="title-screen" class="screen">
   <div class="game-title">IGNITE&nbsp;RALLY</div>
   <!-- A THREE-WORD TAGLINE COULD WRAP ANYWHERE; A SENTENCE CANNOT. The old
@@ -1537,6 +1649,11 @@
   <!-- Status chips sit ABOVE the tabs, not in the same row. Sharing the row
        meant a fourth tab pushed the whole strip onto two lines on a phone. -->
   <div id="menu-status">
+    <!-- BACK. One button for the whole game, shown only when there is
+         somewhere to go (see `backTarget` in main.js). It is also what the
+         phone's own back gesture drives, so leaving a chapter or a tab no
+         longer means leaving the game. -->
+    <button id="back-btn" class="hidden" aria-label="Back">‹&nbsp;BACK</button>
     <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
     <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
   </div>
@@ -1574,6 +1691,18 @@
        the track list — the thing you actually come here to do — down the page
        on a phone. -->
   <div id="tab-settings" class="menu-panel off">
+    <!-- ADMIN — the owner's build tools, and nothing a player needs.
+         The WORLD EDITOR used to sit under START RACE on the tracks tab, in
+         front of everyone who opened the menu. It lives here now, behind
+         `?admin=1`, and main.js REMOVES this whole block when that is not set
+         — hiding it with CSS would leave a live tab-stop that sculpts terrain
+         in every player's menu. -->
+    <div id="admin-panel">
+      <div class="panel-head">ADMIN</div>
+      <p class="set-help" style="margin:0 0 8px">Build tools. Not part of the
+        game — reached with <b>?admin=1</b>, left with <b>?admin=0</b>.</p>
+      <button id="editor-btn" class="btn btn-alt">🛠 WORLD EDITOR</button>
+    </div>
     <div id="race-settings">
       <div class="panel-head">RACE SETTINGS</div>
       <!-- Every setting says what it actually does. "STEERING: SHARP" and
@@ -1644,9 +1773,6 @@
     <div id="garage-rows"></div>
   </div>
   <button id="start-btn" class="btn">START RACE</button>
-  <!-- The owner's build tool. Sits beside START because it opens the world
-       you have selected above — the editor always edits the current pick. -->
-  <button id="editor-btn" class="btn btn-alt">🛠 WORLD EDITOR</button>
   <div class="controls">
     <b>W / ↑</b><span>Throttle</span>
     <b>S / ↓</b><span>Brake / Reverse</span>
@@ -1763,10 +1889,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r219"></script>
+<script type="module" src="./src/main.js?v=r224"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r219"></script>
+<script src="./src/offline.js?v=r224"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r219"></script>
+<script type="module" src="./src/traffic.js?v=r224"></script>
 </body>
 </html>

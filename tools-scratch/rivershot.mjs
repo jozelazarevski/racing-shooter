@@ -1,78 +1,89 @@
-/* LOOK AT THE STATION THE NUMBER CAME FROM.
- * Argument is level:k, where k indexes `track._river.line`. The camera stands
- * off to the side at a low angle, which is the only angle a floating ribbon or
- * a spilling bank is visible from — from above, water and ground are both just
- * a colour. */
+/* PICTURES OF THE RIVER — framed from the river, not from a guess.
+ *
+ * Picks its own viewpoints out of the water mesh: a FALL (the biggest level
+ * change in the ribbon, which is the thing the level-reach/vertical-drop work
+ * was for), a CROSSING (where the reach meets the road — the culvert or the
+ * ford, which is what r219 changed), and a REACH out in open country. The
+ * camera stands off to the side of the water and slightly above it, because a
+ * river photographed from directly overhead is a blue line.
+ *
+ * Pixels are grabbed in the SAME TICK (hillshot.mjs's rule).
+ */
 import { chromium } from 'playwright-core';
-import fs from 'node:fs';
-const BASE = process.env.BASE ?? 'http://127.0.0.1:8920';
-const OUT = process.env.OUT ?? '/tmp/river';
-const BACK = Number(process.env.BACK ?? 48), UP = Number(process.env.UP ?? 14);
-fs.mkdirSync(OUT, { recursive: true });
+import { promises as fs } from 'node:fs';
+const BASE = process.env.BASE ?? 'http://localhost:8901';
+const DIR = process.env.DIR ?? '/tmp';
+const W = +(process.env.W ?? 900), H = +(process.env.H ?? 560);
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
-const page = await b.newPage({ viewport: { width: 900, height: 520 } });
-page.setDefaultTimeout(600000);
-for (const arg of process.argv.slice(2)) {
-  // `level:k` indexes the river line; `level@x,z` aims at a world point, which
-  // is what a vertex-level finding gives you.
-  const atPoint = arg.includes('@');
-  const id = Number(arg.split(/[:@]/)[0]);
-  const k = atPoint ? null : Number(arg.split(':')[1]);
-  const XZ = atPoint ? arg.split('@')[1].split(',').map(Number) : null;
-  await page.goto(`${BASE}/?level=${id}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 600000 });
-  await page.waitForFunction(() => window.__game?.track?.center && window.__game.player, undefined, { timeout: 600000 });
-  const info = await page.evaluate(([k, back, up, XZ]) => {
+const p = await b.newPage({ viewport: { width: W, height: H } });
+p.setDefaultTimeout(900000);
+for (const spec of (process.env.SHOTS ?? '1:fall,12:cross,25:cross').split(',')) {
+  const [id, kind] = spec.split(':');
+  await p.goto(`${BASE}/?level=${id}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 900000 });
+  const ok = await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout: 900000 })
+    .then(() => 1).catch(() => 0);
+  if (!ok) { console.log(`level ${id}: did not build`); continue; }
+  const r = await p.evaluate(async (kind) => {
+    const THREE = await import('three');
     const g = window.__game, t = g.track, R = t._river;
-    if (!R) return { err: 'no river' };
-    const kk = XZ ? t._riverNearest(XZ[0], XZ[1]).k
-      : Math.max(1, Math.min(R.line.length - 2, k));
-    const p = R.line[kk], a = R.line[kk - 1], c = R.line[kk + 1];
-    let tx = c.x - a.x, tz = c.z - a.z;
-    const L = Math.hypot(tx, tz) || 1; tx /= L; tz /= L;
-    const nx = tz, nz = -tx;
-    // FRAME OFF THE WATER, NOT OFF THE PLAN. `R.bed[kk]` is the carved bed
-    // profile, and where the finding IS that the water and the ground disagree
-    // it is exactly the wrong number to build a camera on — three shots framed
-    // a start gantry 20 u above the point they were aiming at. Take the real
-    // water vertices near the target instead, and fall back to the ground.
-    const ax0 = XZ ? XZ[0] : p.x, az0 = XZ ? XZ[1] : p.z;
-    let wy = null;
-    let wmesh = null;
-    t.group.traverse((o) => { if (o.name === 'river-water' && o.geometry) wmesh = o; });
-    if (wmesh) {
-      wmesh.updateMatrixWorld(true);
-      const pa = wmesh.geometry.attributes.position, m = wmesh.matrixWorld.elements;
-      for (let i = 0; i < pa.count; i++) {
-        const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i);
-        const wx = m[0] * x + m[4] * y + m[8] * z + m[12];
-        const wyy = m[1] * x + m[5] * y + m[9] * z + m[13];
-        const wz = m[2] * x + m[6] * y + m[10] * z + m[14];
-        if (Math.hypot(wx - ax0, wz - az0) < 8) wy = wy == null ? wyy : Math.max(wy, wyy);
-      }
+    if (!R?.line) return { none: true, name: g.level?.name };
+    // the water's own surface, station by station, from the built mesh
+    let mesh = null;
+    t.group.traverse((o) => { if (/river-water/i.test(o.name || '') && o.geometry) mesh = o; });
+    if (!mesh) return { none: true, name: g.level?.name };
+    const pos = mesh.geometry.attributes.position;
+    const V = new THREE.Vector3();
+    // centre-line height per row, and where the biggest drop is
+    const rows = [];
+    const C = 7;                                   // columns per station in the strip
+    for (let i = 0; i < pos.count; i += C) {
+      V.fromBufferAttribute(pos, i + Math.floor(C / 2)); mesh.localToWorld(V);
+      if (Math.hypot(V.x, V.z) > 1400) continue;   // the tails run past the world
+      rows.push({ x: V.x, y: V.y, z: V.z, d: t._distToTrackCoarse(V.x, V.z) });
     }
-    const bedY = wy != null ? wy : t.terrainHeight(ax0, az0);
-    const ax = XZ ? XZ[0] : p.x, az = XZ ? XZ[1] : p.z;
-    g.camera.position.set(ax + nx * back, bedY + up, az + nz * back);
-    g.camera.lookAt(ax, bedY, az);
-    g.hud?.hide?.();
-    g.composer.render();
-    const off = R.half * 1.36 + R.bank + 1.5;
-    return { name: t.level?.name, k: kk,
-      at: [Math.round(p.x), Math.round(p.z)],
-      framedOn: wy != null ? 'water' : 'ground', bed: +bedY.toFixed(2),
-      waterY: wy == null ? null : +wy.toFixed(2),
-      roadY: +t.groundHeightAt(t.nearestIndex(new p.constructor(ax0, 0, az0)),
-        t.lateralOffset(new p.constructor(ax0, 0, az0), t.nearestIndex(new p.constructor(ax0, 0, az0)))).toFixed(2),
-      groundUnder: +t.terrainHeight(p.x, p.z).toFixed(2),
-      bankA: +t.terrainHeight(p.x + nx * off, p.z + nz * off).toFixed(2),
-      bankB: +t.terrainHeight(p.x - nx * off, p.z - nz * off).toFixed(2),
-      road: Math.round(t._distToTrack(p.x, p.z)) };
-  }, [k, BACK, UP, XZ]);
-  if (info.err) { console.log(`${id}:${k} ${info.err}`); continue; }
-  await page.screenshot({ path: `${OUT}/L${String(id).padStart(2, '0')}-${atPoint ? 'at' + XZ.join('_') : 'k' + k}.png` });
-  console.log(`${id}:${k} ${info.name}  at ${JSON.stringify(info.at)}  bed ${info.bed}  `
-    + `ground under ${info.groundUnder}  banks ${info.bankA} / ${info.bankB}  ${info.road} u from the road`
-    + `  | water ${info.waterY} vs road ${info.roadY} (framed on ${info.framedOn})`);
+    if (rows.length < 4) return { none: true, name: g.level?.name };
+    let pick = rows[Math.floor(rows.length / 2)];
+    if (kind === 'fall') {
+      let best = 0;
+      for (let k = 1; k < rows.length; k++) {
+        const drop = Math.abs(rows[k - 1].y - rows[k].y);
+        if (drop > best) { best = drop; pick = rows[k]; }
+      }
+      pick.note = `fall of ${best.toFixed(1)} u`;
+    } else if (kind === 'cross') {
+      let best = Infinity;
+      for (const q of rows) if (q.d < best) { best = q.d; pick = q; }
+      pick.note = `crossing, ${best.toFixed(1)} u from the road`;
+    } else {
+      let best = 0;
+      for (const q of rows) if (q.d > best && q.d < 300) { best = q.d; pick = q; }
+      pick.note = `open reach, ${best.toFixed(1)} u from the road`;
+    }
+    // stand off to the side, above the water, looking down the valley
+    const near = R.line.reduce((bst, q, k) => {
+      const dd = Math.hypot(q.x - pick.x, q.z - pick.z);
+      return dd < bst.dd ? { k, dd } : bst;
+    }, { k: 0, dd: Infinity }).k;
+    const a = R.line[Math.max(0, near - 2)], c2 = R.line[Math.min(R.line.length - 1, near + 2)];
+    let tx = c2.x - a.x, tz = c2.z - a.z;
+    const m = Math.hypot(tx, tz) || 1; tx /= m; tz /= m;
+    const nx = tz, nz = -tx;                       // the water's own normal
+    const OFF = 34, UP = 16, BACK = 26;
+    const ex = pick.x + nx * OFF - tx * BACK;
+    const ez = pick.z + nz * OFF - tz * BACK;
+    const ey = Math.max(t.terrainHeight(ex, ez), pick.y) + UP;
+    g.camera.near = 0.5; g.camera.fov = 55; g.camera.updateProjectionMatrix();
+    g.camera.position.set(ex, ey, ez);
+    g.camera.lookAt(pick.x, pick.y + 1.5, pick.z);
+    g.renderer.render(g.scene, g.camera);
+    return { name: g.level?.name, note: pick.note,
+      at: `${Math.round(pick.x)},${Math.round(pick.z)}`,
+      png: g.renderer.domElement.toDataURL('image/png') };
+  }, kind);
+  if (r.none) { console.log(`${r.name}: no river mesh`); continue; }
+  const f = `${DIR}/river-${String(r.name).replace(/[^A-Z]/g, '')}-${kind}.png`;
+  await fs.writeFile(f, Buffer.from(r.png.split(',')[1], 'base64'));
+  console.log(`${String(r.name).padEnd(18)} ${kind.padEnd(6)} ${r.note.padEnd(34)} @${r.at}  -> ${f}`);
 }
 await b.close();

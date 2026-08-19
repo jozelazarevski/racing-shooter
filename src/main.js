@@ -7,7 +7,8 @@ import { OutputPass } from '../lib/postprocessing/OutputPass.js';
 import { ShaderPass } from '../lib/postprocessing/ShaderPass.js';
 
 import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
-  HOUSE_TEMPLATES, worldFacets, surfaceClass, surfaceSlick, SURFACE_LABEL, TYRE_NAME } from './track.js';
+  HOUSE_TEMPLATES, worldFacets, surfaceClass, surfaceSlick, SURFACE_LABEL, TYRE_NAME,
+  CHAPTERS, CHAPTER_GATE, chapterSpans } from './track.js';
 import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
@@ -45,11 +46,15 @@ const LAPS = 3;
 // the limit applies to races only.
 const HULL_LIVES = 3;
 
-// STARS PER RUNG on the career ladder — the pace at which the roster unrolls.
-// See `starCost` for the simulation this number came out of, and `_freeUnlock`
-// for the guarantee that makes any slope above 1 safe to ship. Exported so a
-// test can pin the arithmetic against the number itself rather than re-deriving
-// it from a rounded price and disagreeing by half a star.
+// STARS PER RUNG on the old per-world career ladder.
+//
+// IT NO LONGER GATES ANYTHING. Worlds open by CHAPTER now (see CHAPTERS in
+// track.js and `isChapterOpen`), and every world inside an open chapter is
+// raceable immediately. `starCost` is kept because a rung is still a useful
+// statement about where in the career a world sits — the level table's own
+// `cost` overrides lean on it — but nothing reads it to decide a padlock.
+// Left exported so the arithmetic stays pinnable by a test rather than
+// re-derived from a rounded price and disagreeing by half a star.
 export const LADDER_SLOPE = 0.5;
 
 /** "1ST".."8TH" — the ordinal for a finishing position. Was a literal array
@@ -142,6 +147,9 @@ const WORLD_TAGS = {
   oldtown: '💧 wet cobbles · no runoff',
   farmland: '🌧 hedge banks · mud · blind crests',
   outback: 'bulldust holes · creek jumps · 🦘',
+  autumnwood: '🍂 wet leaves · low sun',
+  harvestvale: '🍂 stubble fields · long shadows',
+  mistfell: '🌫 bracken moor · mist banks',
 };
 
 // TRACK-LIST FILTERS. The vocabulary lives here and the facets themselves are
@@ -166,6 +174,11 @@ const FILTER_GROUPS = [
   // promises a road that actually behaves wet.
   { key: 'road', label: 'ROAD', tags: [
     ['DRY', 'DRY'], ['WET', '💧 WET'], ['SNOW', '❄ SNOW/ICE']] },
+  // SEASON. Worth its own row rather than a scenery tag, because a season cuts
+  // ACROSS scenery: autumn is a wood AND farm country AND a moor, and filing
+  // it under any one of those hides the other two.
+  { key: 'season', label: 'SEASON', tags: [
+    ['AUTUMN', '🍂 AUTUMN'], ['WINTER', '❄ WINTER']] },
 ];
 
 // steer: how much of the car's steering rate the player gets in this view.
@@ -1311,6 +1324,26 @@ class Game {
     }
     this.unlockAll = params.get('unlockall') === '1'
       || localStorage.getItem('ir-openall') === '1';
+    // ADMIN — the owner's build tools, off the main game.
+    //
+    // The WORLD EDITOR used to sit under START RACE on the tracks tab, which
+    // put a level-sculpting tool in front of every player who ever opened the
+    // menu. Asked for as: "Place the world editor under a admin link and
+    // remove it from the main game."
+    //
+    // Same REMEMBERED-SWITCH shape as `unlockall` directly above, and for the
+    // same reason: a URL-only flag lasts exactly as long as the browser tab
+    // and is gone the moment the game is opened from the home screen or as a
+    // PWA, which is how the owner actually opens it. `?admin=1` turns it on
+    // and writes it; `?admin=0` turns it off again, because a switch you
+    // cannot unset is a trap — without it the only way back would be clearing
+    // site data, which also throws away the career.
+    const adminParam = params.get('admin');
+    if (adminParam === '1' || adminParam === '0') {
+      try { localStorage.setItem('ir-admin', adminParam); } catch { /* private mode */ }
+    }
+    this.adminMode = adminParam === '1'
+      || (adminParam !== '0' && localStorage.getItem('ir-admin') === '1');
     const diffId = localStorage.getItem('ir-diff') || 'normal';
     this.difficulty = DIFFS[diffId] || DIFFS.normal;
     // guard: don't start a locked level via URL tampering
@@ -1489,9 +1522,19 @@ class Game {
       if (document.hidden && this.state === 'race') this.togglePause();
     });
     document.getElementById('start-btn').addEventListener('click', () => this.startRace());
-    // THE WORLD EDITOR. Mounted lazily on first use: it builds its own DOM and
-    // takes the pointer, and a player who never opens it should pay nothing.
-    document.getElementById('editor-btn')?.addEventListener('click', () => {
+    this._wireBack();
+    // THE WORLD EDITOR — ADMIN ONLY. Mounted lazily on first use: it builds
+    // its own DOM and takes the pointer, and a player who never opens it
+    // should pay nothing.
+    //
+    // The button is REMOVED from the document rather than hidden with CSS.
+    // Hiding it would leave a real, clickable, keyboard-reachable control in
+    // the tab order of every player's menu — "not visible" is not "not there",
+    // and a tab-stop that sculpts terrain is worse than a visible one because
+    // nobody can see what they just hit.
+    const edBtn = document.getElementById('editor-btn');
+    if (!this.adminMode) document.getElementById('admin-panel')?.remove();
+    else edBtn?.addEventListener('click', () => {
       this._flushPick?.();   // the editor must open on the world that was picked
       if (!this.editor) this.editor = new WorldEditor(this);
       this.editor.enter();
@@ -1540,6 +1583,8 @@ class Game {
             // has a measurable position.
             requestAnimationFrame(() => this._scrollToNextTrack('smooth'));
           }
+          // the tab IS a level on the back ladder, so the label moves with it
+          this._syncBackBtn();
         });
       }
     }
@@ -2451,6 +2496,119 @@ class Game {
   /** Come back to the title screen IN PLACE — the counterpart to startRace().
    *  Every exit path (pause > exit, results > garage, mission debrief, next
    *  level) routes through here instead of reloading the page. */
+  /* ---- BACK ---------------------------------------------------------------
+   *
+   * ASKED FOR AS: "I need back button."
+   *
+   * There was no back ANYWHERE. Not a button, not Escape, and — the part that
+   * actually bites on a phone — nothing on the browser's own back gesture, so
+   * the only way out of a garage tab or a chapter was to find the control that
+   * happened to lead there, and a swipe-back left the game entirely.
+   *
+   * One ladder, one handler, three ways to pull it: the button, the phone's
+   * back gesture, and Escape. Naming the target separately from acting on it
+   * is what lets the button HIDE when there is nothing above you, rather than
+   * sitting there doing nothing — a back button that sometimes does nothing is
+   * how a player stops trusting it.
+   */
+
+  /** Where does BACK go from here — a label, or null at the top. Ordered
+   *  deepest-first, because these states nest: the editor sits over the menu,
+   *  a chapter sits inside the tracks tab. */
+  backTarget() {
+    if (this.editor?.active) return { at: 'editor', label: 'LEAVE EDITOR' };
+    if (this.state === 'finished') return { at: 'results', label: 'MENU' };
+    if (!document.getElementById('pause-menu')?.classList.contains('hidden')) {
+      return { at: 'pause', label: 'RESUME' };
+    }
+    // racing, or out in free roam: back is the pause menu, which is the screen
+    // that holds every real exit
+    if (this.state === 'race' || this.state === 'countdown') {
+      return { at: 'racing', label: 'PAUSE' };
+    }
+    if (this.state === 'title') {
+      const tab = ['mode', 'jobs', 'garage', 'settings']
+        .find((t) => document.getElementById(`tab-btn-${t}`)?.classList.contains('current'));
+      // inside a chapter, back is the chapter index — checked BEFORE the tab,
+      // because the chapter is a level deeper than the tab that holds it
+      if (!tab && this.tracksView === 'timeline' && this._chapterIn != null) {
+        return { at: 'chapter', label: 'ALL CHAPTERS' };
+      }
+      if (tab) return { at: 'tab', label: 'TRACKS' };
+    }
+    return null;
+  }
+
+  /** Take one step up the ladder. Safe to call when there is nowhere to go. */
+  goBack() {
+    const t = this.backTarget();
+    if (!t) return false;
+    switch (t.at) {
+      case 'editor': this.editor.exit(); break;
+      case 'results': this.showMenu(); break;
+      // there is no separate resume — the pause menu is a toggle
+      case 'pause': case 'racing': this.togglePause?.(); break;
+      case 'chapter': this._chapterIn = null; this._renderLevelCards(); break;
+      case 'tab': document.getElementById('tab-btn-race')?.click(); break;
+      default: return false;
+    }
+    this._syncBackBtn();
+    return true;
+  }
+
+  /** Show the button only when it leads somewhere, and say where. */
+  _syncBackBtn() {
+    const b = document.getElementById('back-btn');
+    const t = this.backTarget();
+    // In the MENU only: mid-race the screen belongs to the HUD and the pause
+    // button is already the way out, so a second control would be clutter over
+    // the road.
+    const show = !!t && this.state === 'title';
+    if (b) {
+      b.classList.toggle('hidden', !show);
+      if (show) b.innerHTML = `‹&nbsp;${t.label}`;
+    }
+    // AND THE ONE THAT CANNOT SCROLL AWAY. The header button above sits in the
+    // page and is gone the moment you scroll — measured at -798px once 40% of
+    // the way down a chapter, which is exactly where a player wants it. The
+    // chapter bar is sticky and holds up in Chromium, but sticky is the one
+    // thing here that cannot be relied on across phones. So being INSIDE A
+    // CHAPTER gets its own fixed control, outside the scrolling element.
+    const f = document.getElementById('ch-back-float');
+    if (f) f.classList.toggle('hidden', !(show && t.at === 'chapter'));
+  }
+
+  /** THE PHONE'S OWN BACK GESTURE, which is the one people actually use.
+   *
+   *  A single-page game gets ONE history entry, so the first swipe-back leaves
+   *  the site — mid-race, mid-chapter, whatever. This keeps a spare entry on
+   *  the stack and consumes it: while there is somewhere to go, back goes
+   *  there and the entry is replaced.
+   *
+   *  IT DELIBERATELY STOPS TRAPPING at the top of the ladder. Re-pushing
+   *  forever would make the game impossible to leave, which is a worse bug
+   *  than the one this fixes — so when `backTarget` returns null the entry is
+   *  not replaced and the next back does what the player expects.
+   */
+  _wireBack() {
+    const btn = document.getElementById('back-btn');
+    btn?.addEventListener('click', () => this.goBack());
+    document.getElementById('ch-back-float')?.addEventListener('click', () => this.goBack());
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (document.activeElement?.tagName === 'INPUT') return;   // fields own Escape
+      if (this.goBack()) e.preventDefault();
+    });
+    const arm = () => {
+      try { history.pushState({ ir: 1 }, ''); } catch { /* file:// */ }
+    };
+    window.addEventListener('popstate', () => {
+      if (this.goBack()) arm();     // consumed it — keep one in hand
+    });
+    arm();
+    this._syncBackBtn();
+  }
+
   showMenu(tab = null) {
     document.getElementById('results')?.classList.add('hidden');
     document.getElementById('pause-menu')?.classList.add('hidden');
@@ -2468,6 +2626,7 @@ class Game {
     if (tab) document.getElementById(`tab-btn-${tab}`)?.click();
     else document.getElementById('tab-btn-race')?.click();
     if (ts) ts.scrollTop = 0;
+    this._syncBackBtn();
     this._softURL();
   }
 
@@ -2731,43 +2890,102 @@ class Game {
     return Math.round(rung * LADDER_SLOPE);
   }
 
-  /** THE FLOOR: the one world that opens for free because you have run out of
-   *  things to race. Returns a level id, or null when nothing is owed.
+  /* THE OLD PER-WORLD FLOOR (`_freeUnlock`) LIVED HERE and is gone with the
+   * price ladder it propped up. Its guarantee is not gone: it was "clear
+   * everything you can afford and the cheapest world you cannot opens anyway",
+   * and it is now "race a chapter out and the next chapter opens anyway" —
+   * see `isChapterOpen`. Do not reintroduce a per-world grant on top of the
+   * chapter gate: two floors under one career is how a player ends up looking
+   * at a card that is open for a reason the board cannot explain.
+   */
+
+  /* ---- CHAPTERS ---------------------------------------------------------
    *
-   *  Without this, any slope above 1★ per rung eventually strands a player who
-   *  cannot podium — they bank 1★ a race against a gate that costs more than
-   *  that, and the career simply stops. Rather than pin the slope to the
-   *  weakest possible driver forever, the guarantee is stated directly: if
-   *  every world you can afford has been raced, the cheapest one you cannot
-   *  afford opens anyway. Progress can never be slower than one world a race.
+   * The career is read in parts now (see CHAPTERS in track.js). One gate per
+   * chapter; inside an open chapter every world is raceable immediately.
    *
-   *  It grants exactly one, and only while the debt stands — race it and the
-   *  next one is granted, leave an affordable world unraced and nothing is.
-   *  Worlds reached this way are skipped when choosing the next grant, and
-   *  `isLevelUnlocked` never re-locks a world that has been raced: without
-   *  that pair, a world opened at 6★ would slam shut again the moment the
-   *  ladder's own price passed the player's total, and the grant would keep
-   *  re-offering a world already behind them. */
-  _freeUnlock() {
-    const stars = this.totalStars();
-    const fin = this.career.finished;
-    let next = null, nextCost = Infinity;
-    for (const lv of LEVELS) {
-      const c = this.starCost(lv.id);
-      // something you can already afford is still unraced — no debt owed
-      if (c <= stars) { if (!fin[lv.id]) return null; continue; }
-      if (fin[lv.id]) continue;                 // already raced ahead of the ladder
-      if (c < nextCost) { next = lv.id; nextCost = c; }
+   * Everything below is DERIVED on every call from `career.finished`, never
+   * stored. That is what lets an existing save carry straight over: a player
+   * mid-way up the old star ladder already has the finishes, so their chapter
+   * standing computes without a migration step.
+   */
+
+  /** The chapter spans, computed once per session — `chapterSpans` walks the
+   *  whole roster and this is called from render loops and card builders. */
+  chapters() {
+    return (this._chapterCache ??= chapterSpans().map((c, k) => ({ ...c, _k: k })));
+  }
+
+  /** Which chapter a world belongs to, as an index into `chapters()`.
+   *  -1 for a level not on the roster (the editor can stand one up). */
+  chapterOf(id) {
+    const ch = this.chapters();
+    for (let k = 0; k < ch.length; k++) {
+      if (ch[k].levels.some((l) => l.id === id)) return k;
     }
-    return next;
+    return -1;
+  }
+
+  /** Stars banked inside one chapter, and the most it can hold. */
+  chapterStars(k) {
+    const c = this.chapters()[k];
+    if (!c) return 0;
+    return c.levels.reduce((n, l) => n + this.starsFor(this.career.finished[l.id]), 0);
+  }
+
+  /** WHAT THE NEXT CHAPTER COSTS — a FRACTION of the chapter you are in, not
+   *  a constant.
+   *
+   *  A flat number cannot serve both a 3-world chapter and a 15-world one: set
+   *  it for the small one and the big one opens after a fifth of its content,
+   *  set it for the big one and the small one is a wall. Scaling with the
+   *  chapter keeps the ASK the same everywhere — "take about 60 % of what is
+   *  on this table" — which is roughly two podiums in three starts, and reads
+   *  the same on every chapter of the roster. */
+  chapterNeed(k) {
+    const c = this.chapters()[k];
+    if (!c) return 0;
+    return Math.ceil(c.levels.length * 3 * CHAPTER_GATE);
+  }
+
+  /** IS THIS CHAPTER OPEN — and the floor that stops the career stalling.
+   *
+   *  The first chapter is always open. After that a chapter opens when the
+   *  previous one has paid its gate.
+   *
+   *  ...OR when the previous chapter has been RACED OUT. This is the same
+   *  guarantee the old star ladder's `_freeUnlock` made, restated for
+   *  chapters, and it is not optional: the gate asks for 1.8 stars a world
+   *  while a driver who only ever FINISHES banks exactly 1, so without a floor
+   *  that player is walled in permanently at chapter 2. With it, the rule a
+   *  player can actually feel is: drive well and move on early, or drive
+   *  EVERYTHING and move on anyway. Progress is never slower than one chapter
+   *  per full chapter raced. */
+  isChapterOpen(k) {
+    if (this.unlockAll) return true;
+    if (k <= 0) return true;
+    const prev = this.chapters()[k - 1];
+    if (!prev) return true;
+    if (this.chapterStars(k - 1) >= this.chapterNeed(k - 1)) return true;
+    return prev.levels.every((l) => this.career.finished[l.id]);   // the floor
+  }
+
+  /** The furthest chapter currently open, as an index. */
+  currentChapter() {
+    const ch = this.chapters();
+    let last = 0;
+    for (let k = 0; k < ch.length; k++) if (this.isChapterOpen(k)) last = k;
+    return last;
   }
 
   isLevelUnlocked(id) {
     if (this.unlockAll) return true;
     // a world you have raced is yours — it must never show a padlock again
     if (this.career.finished[id]) return true;
-    if (this.totalStars() >= this.starCost(id)) return true;
-    return this._freeUnlock() === id;
+    const k = this.chapterOf(id);
+    // a world off the roster (an editor scene) is not gated by a chapter
+    if (k < 0) return true;
+    return this.isChapterOpen(k);
   }
 
   /** WHERE YOU ARE UP TO — one answer, used by everything.
@@ -2791,34 +3009,60 @@ class Game {
    */
   nextTrack() {
     const fin = this.career.finished;
-    // The world the floor handed over is held back to LAST of the open ones.
-    // It is open precisely because nothing else is outstanding, so offering it
-    // ahead of a world still holding stars would make the floor delete the
-    // "go back for those" nudge rather than sit underneath it.
-    const freeId = this._freeUnlock();
-    const earned = (l) => l.id !== freeId && this.isLevelUnlocked(l.id);
-    let lv = LEVELS.find((l) => earned(l) && !fin[l.id]);
-    if (lv) return { lv, why: 'unraced' };
-    lv = LEVELS.find((l) => earned(l) && this.starsFor(fin[l.id]) < 3);
-    if (lv) return { lv, why: 'stars' };
-    if (freeId != null) {
-      lv = LEVELS.find((l) => l.id === freeId);
+    // WITHIN THE CURRENT CHAPTER FIRST. The chapter is the unit of progress
+    // now, so "what next" is a question about the chapter you are standing in
+    // — offering a world from three chapters back because it happens to sit
+    // earlier in the array would undo the structure the chapters exist for.
+    const ch = this.chapters();
+    const here = this.currentChapter();
+    const scan = [ch[here], ...ch.slice(0, here)].filter(Boolean);
+    for (const c of scan) {
+      const lv = c.levels.find((l) => this.isLevelUnlocked(l.id) && !fin[l.id]);
       if (lv) return { lv, why: 'unraced' };
     }
-    // Defensive: with the floor in place there is normally always something
-    // open and outstanding, so a shut gate is only the answer in save states
-    // the floor cannot serve.
-    lv = LEVELS.find((l) => !this.isLevelUnlocked(l.id));
-    if (lv) return { lv, why: 'locked' };
+    // everything open has been driven — the way forward is back, for stars
+    for (const c of scan) {
+      const lv = c.levels.find((l) => this.isLevelUnlocked(l.id)
+        && this.starsFor(fin[l.id]) < 3);
+      if (lv) return { lv, why: 'stars' };
+    }
+    // nothing outstanding: show the gate being worked toward. With the floor
+    // in place this is only reachable once a chapter is fully three-starred.
+    const shut = ch[here + 1];
+    if (shut) return { lv: shut.levels[0], why: 'locked' };
     return null;
   }
 
-  /** The one header the ladder gets, and it earns its line by counting: how
-   *  far along the roster you are, and how much of it is open to you. */
+  /** The one header the board gets, and it earns its line by counting: which
+   *  chapter you are in, how far through the roster that puts you, and how
+   *  much of it you have actually cleared. */
   _ladderHeading() {
+    const ch = this.chapters();
+    const here = this.currentChapter();
+    const c = ch[here];
     const open = LEVELS.filter((l) => this.isLevelUnlocked(l.id)).length;
     const done = LEVELS.filter((l) => this.starsFor(this.career.finished[l.id]) >= 3).length;
-    return `CAREER LADDER · ${open} OF ${LEVELS.length} OPEN · ${done} CLEARED`;
+    return `CHAPTER ${c ? c.n : 1} OF ${ch.length} · ${c ? c.name : ''}`
+      + ` · ${open} OF ${LEVELS.length} WORLDS OPEN · ${done} CLEARED`;
+  }
+
+  /** The one line that says where the next gate is and what it costs, in the
+   *  chapter's own terms. Returns null once every chapter is open. */
+  chapterGateLine() {
+    const ch = this.chapters();
+    const here = this.currentChapter();
+    const next = ch[here + 1];
+    if (!next) return null;
+    const have = this.chapterStars(here);
+    const need = this.chapterNeed(here);
+    const left = Math.max(0, need - have);
+    const unraced = ch[here].levels.filter((l) => !this.career.finished[l.id]).length;
+    // Both ways through the gate are stated, because both are real and a
+    // player who cannot podium needs to know the second one exists.
+    return left === 0
+      ? `CHAPTER ${next.n} · ${next.name} IS OPEN`
+      : `${left}★ MORE IN THIS CHAPTER OPENS CHAPTER ${next.n} · ${next.name}`
+        + (unraced ? ` — OR RACE ALL ${unraced} LEFT HERE` : '');
   }
 
   /** REGIONS (the browsing view) or TIMELINE (the progression view).
@@ -2844,7 +3088,16 @@ class Game {
   _scrollToNextTrack(behavior = 'smooth') {
     const n = this.nextTrack();
     if (!n) return null;
-    const card = document.querySelector(`#level-select .level-chip[data-lvid="${n.lv.id}"]`);
+    // AT THE CHAPTER INDEX THERE IS NO WORLD CARD TO SCROLL TO, and the right
+    // answer is not to enter a chapter on the player's behalf — arriving at
+    // the tracks tab should show them the map. The index's equivalent of "your
+    // next track is here" is the chapter that holds it, so scroll to THAT card
+    // and return the world id anyway: callers ask this for the id, and the
+    // answer to "what is next" does not change with which page is showing.
+    const k = this.chapterOf(n.lv.id);
+    const card = document.querySelector(`#level-select .level-chip[data-lvid="${n.lv.id}"]`)
+      || (k >= 0 ? document.querySelector(
+        `#level-select .chapter-card[data-chn="${this.chapters()[k]?.n}"]`) : null);
     if (!card) return null;
     // a card the current filter has hidden is not somewhere to scroll to
     if (card.classList.contains('wf-out')) return null;
@@ -2882,12 +3135,11 @@ class Game {
     const partial = LEVELS
       .filter((lv) => this.career.finished[lv.id] && this.starsFor(this.career.finished[lv.id]) < 3)
       .length;
-    const next = LEVELS.filter((lv) => this.starCost(lv.id) > now)
-      .sort((a, c) => this.starCost(a.id) - this.starCost(c.id))[0];
-    // ...unless the floor has already handed that world over. Quoting a price
-    // at a player who can walk straight into the world is worse than silence.
-    const freeId = this._freeUnlock();
-    const free = freeId != null ? LEVELS.find((lv) => lv.id === freeId) : null;
+    // WHAT THE STARS ARE FOR, NOW THAT THEY BUY CHAPTERS AND NOT WORLDS.
+    // This used to quote the next world's price, which was the truth under the
+    // old per-world ladder and is a lie under chapters — no single world has a
+    // price any more. `chapterGateLine` is the one sentence that is still true.
+    const gate = this.chapterGateLine();
     const RULES = [['★', 'FINISH — ANY PLACE'], ['★★', 'PODIUM — TOP 3'], ['★★★', 'WIN IT']];
     el.innerHTML = `
       <div class="sk-top">
@@ -2897,11 +3149,9 @@ class Game {
       <div class="sk-rules">
         ${RULES.map(([s, t]) => `<span class="sk-rule"><b>${s}</b>${t}</span>`).join('')}
       </div>
-      <div class="sk-next">${free
-    ? `YOU HAVE RACED EVERYTHING OPEN — <b>${free.name}</b> IS OPEN ANYWAY`
-    : next
-      ? `EVERY WORLD KEEPS YOUR BEST RESULT — NEXT UNLOCK IS <b>${next.name}</b>, ${this.starCost(next.id) - now}★ TO GO`
-      : 'EVERY WORLD IS OPEN — THE REMAINING STARS ARE FOR THE RECORD'}${
+      <div class="sk-next">${gate
+    ? gate
+    : 'EVERY CHAPTER IS OPEN — THE REMAINING STARS ARE FOR THE RECORD'}${
   partial ? ` · ${partial} WORLD${partial === 1 ? '' : 'S'} STILL HOLDING STARS` : ''}</div>`;
   }
 
@@ -3117,12 +3367,33 @@ class Game {
 
   /** Show/hide the already-rendered cards. Region headers go with their rows,
    *  so a filtered list never leaves a heading standing over nothing. */
+  /** Is anything filtering the board — a search term or any chip. ONE
+   *  definition, because two would be a bug: the renderer uses it to decide
+   *  whether to flatten the chapters and the matcher uses it to decide whether
+   *  to hide cards, and a board that flattens without matching (or matches
+   *  without flattening) is a board showing the wrong list. */
+  _filtersActive() {
+    if (!this.filters) this.filters = this._loadFilters();
+    return !!this.filters.q.trim()
+      || FILTER_GROUPS.some((g) => this.filters[g.key]?.size);
+  }
+
   _applyWorldFilter() {
     if (!this.filters) this.filters = this._loadFilters();
     const F = this.filters;
     const q = F.q.trim().toLowerCase();
     let shown = 0, total = 0, filtering = !!q;
     for (const g of FILTER_GROUPS) if (F[g.key].size) filtering = true;
+
+    // A SEARCH HAS TO BREAK OUT OF THE CHAPTER YOU ARE STANDING IN, and that
+    // is a re-render, not a class toggle. This function only ever hides cards
+    // that are already on the page, so at the chapter INDEX — where there are
+    // no world cards at all — typing would have filtered nothing and shown
+    // nothing. When the filtered/unfiltered state flips, rebuild first.
+    if (this.tracksView === 'timeline' && filtering !== !!this._flatRender) {
+      this._renderLevelCards();
+      return;
+    }
 
     for (const { head, row } of (this._regionRows || new Map()).values()) {
       let live = 0;
@@ -3169,6 +3440,93 @@ class Game {
     }
   }
 
+  /** THE CHAPTER INDEX — the top level of the tracks tab.
+   *
+   *  Twelve cards instead of seventy-two, so the screen is a map of the career
+   *  rather than a scroll through it. Each states the one thing you would have
+   *  had to scroll to find out: how far into that chapter you are, and — if it
+   *  is shut — exactly what opens it.
+   */
+  _renderChapterIndex(sel) {
+    this._flatRender = false;
+    const chs = this.chapters();
+    const here = this.currentChapter();
+    const head = document.createElement('div');
+    head.className = 'region-head';
+    head.textContent = this._ladderHeading();
+    sel.appendChild(head);
+    const grid = document.createElement('div');
+    grid.className = 'chapter-grid';
+    sel.appendChild(grid);
+    for (const c of chs) {
+      const open = this.isChapterOpen(c._k);
+      const have = this.chapterStars(c._k);
+      const max = c.levels.length * 3;
+      const need = this.chapterNeed(c._k);
+      const done = c.levels.filter((l) => this.starsFor(this.career.finished[l.id]) >= 3).length;
+      const raced = c.levels.filter((l) => this.career.finished[l.id]).length;
+      const prev = chs[c._k - 1];
+      const short = Math.max(0, this.chapterNeed(c._k - 1) - this.chapterStars(c._k - 1));
+      const card = document.createElement('button');
+      card.className = `chapter-card${open ? '' : ' locked'}${c._k === here ? ' here' : ''}`;
+      card.dataset.chn = c.n;
+      // The shut card names its price in the PREVIOUS chapter's terms, because
+      // that is where the player has to go and do something about it.
+      const line = open
+        ? `${raced}/${c.levels.length} RACED · ${done} CLEARED`
+        : `NEEDS ${short}★ MORE IN CHAPTER ${prev ? prev.n : ''}`;
+      card.innerHTML = `
+        <div class="cc-top">
+          <span class="cc-n">${open ? c.n : '🔒'}</span>
+          <span class="cc-name">${c.name}</span>
+        </div>
+        <div class="cc-blurb">${c.blurb}</div>
+        <div class="cc-foot">
+          <span class="cc-line">${line}</span>
+          <span class="cc-stars">${have}/${max}★</span>
+        </div>
+        <div class="ch-bar"><i style="width:${max ? Math.round(100 * have / max) : 0}%"></i>
+          <u style="left:${max ? Math.min(100, Math.round(100 * need / max)) : 0}%"></u></div>`;
+      card.addEventListener('click', () => {
+        // A SHUT CHAPTER STILL OPENS — you may look at what you are working
+        // toward. Every world inside it stays locked and says so, which is
+        // more use than a card that refuses to be tapped.
+        this._chapterIn = c.n;
+        this._renderLevelCards();
+        this._syncBackBtn();
+        const sc = sel.closest('.screen');
+        if (sc) sc.scrollTop = 0;
+      });
+      grid.appendChild(card);
+    }
+  }
+
+  /** The bar at the top of a chapter: back out, and where you are. */
+  _chapterBar(c) {
+    const bar = document.createElement('div');
+    bar.className = 'chapter-bar';
+    const have = this.chapterStars(c._k);
+    const max = c.levels.length * 3;
+    const back = document.createElement('button');
+    back.className = 'ch-back';
+    back.textContent = '‹ ALL CHAPTERS';
+    back.addEventListener('click', () => {
+      this._chapterIn = null;
+      this._renderLevelCards();
+      this._syncBackBtn();
+      const sc = bar.closest('.screen');
+      if (sc) sc.scrollTop = 0;
+    });
+    const label = document.createElement('div');
+    label.className = 'ch-here';
+    label.innerHTML = `<b>CHAPTER ${c.n}</b> ${c.name}`;
+    const stars = document.createElement('div');
+    stars.className = 'ch-here-stars';
+    stars.textContent = `${have}/${max}★`;
+    bar.append(back, label, stars);
+    return bar;
+  }
+
   /*  Rebuildable, because a career reset changes every lock and every best. */
   _renderLevelCards() {
     const sel = document.getElementById('level-select');
@@ -3190,25 +3548,126 @@ class Game {
     this._regionRows = regionRows;
     const timeline = this.tracksView === 'timeline';
     sel.classList.toggle('tl-view', timeline);
+
+    /* ---- CHAPTERS ARE ROOMS YOU ENTER, NOT HEADINGS YOU SCROLL PAST -------
+     *
+     * REPORTED: "Package them in separate sections that I can enter. Like this
+     * the screen is cleaner and no endless scrolling."
+     *
+     * The first cut at chapters put a header above each chapter's cards and
+     * left all 72 worlds on one page. That gives the career a SHAPE but does
+     * nothing about its LENGTH — the thing you actually do on that screen is
+     * still scroll past sixty worlds you are not going to race.
+     *
+     * So the timeline view is now two screens deep. The top level is the
+     * chapter index: twelve cards, one screenful, each stating where you are
+     * in it. Entering one shows that chapter's worlds AND NOTHING ELSE.
+     *
+     * `_chapterIn` is null at the index and a chapter key inside one. It is
+     * keyed by the chapter's stable `n`, not by its array position, so a
+     * roster edit that inserts a chapter cannot silently teleport a player
+     * into a different one. It is remembered across repaints (the board
+     * rebuilds on every star earned) but deliberately NOT persisted to disk:
+     * arriving at the tracks tab should show you the map, not the room you
+     * were last standing in.
+     *
+     * SEARCH AND FILTERS OVERRIDE ALL OF IT. A filter is a question about the
+     * WHOLE roster — "show me the night rallies" — and answering it inside one
+     * chapter would answer a question nobody asked. When either is active the
+     * board flattens to every matching world, across every chapter.
+     */
+    const chs = this.chapters();
+    const searching = this._filtersActive();
+    const inChapter = timeline && !searching && this._chapterIn != null
+      ? chs.find((c) => c.n === this._chapterIn) : null;
+    if (timeline && !searching && !inChapter) {
+      this._renderChapterIndex(sel);
+      // The index is a different page, not a shorter one — so it still owes
+      // the player everything the board owes them. Skipping these was the
+      // first cut's bug: the star legend vanished, the filter chips came up
+      // unlabelled and the count read nothing, because all three are set on
+      // the way OUT of the card render this path returns before reaching.
+      this._renderStarKey();
+      this._applyWorldFilter();
+      const n = document.getElementById('wf-count');
+      // ...and the count has to count what is ON SCREEN. `_applyWorldFilter`
+      // walks the world cards, and at the index there are none, so it would
+      // announce "0 WORLDS" over a full page of chapters.
+      if (n) {
+        n.textContent = `${this.chapters().length} CHAPTERS · ${LEVELS.length} WORLDS`;
+        n.classList.remove('none');
+      }
+      if (scroller) scroller.scrollTop = keepScroll;
+      return;
+    }
+    sel.classList.toggle('ch-inside', !!inChapter);
+    if (inChapter) sel.appendChild(this._chapterBar(inChapter));
     // THE LADDER IS ONE LADDER. Regions do not run in contiguous blocks of
     // career order — PINE VALLEY owns rungs 1, 6, 11, 12, 13 — so grouping the
     // timeline by region produces a "sequence" that counts 1, 6, 11, 3, and
     // reads as broken. A progression view gets ONE unbroken run and carries
     // the region on each card instead; the REGIONS view keeps the headers,
     // which is the whole reason to have two views.
+    // THE TIMELINE VIEW IS NOW THE CHAPTER VIEW. It used to be one unbroken
+    // run of 67 cards under a single header — a progression with no shape,
+    // which is what "make it more structured" was about. Each chapter gets its
+    // own header carrying its number, name, blurb and a star bar, so the board
+    // reads as parts of a career instead of a wall.
+    //
+    // The REGIONS view is untouched and still groups by region: the two views
+    // answer different questions ("where am I up to" vs "show me the coast"),
+    // which is the whole reason there are two.
+    const chapterHead = (c) => {
+      const have = this.chapterStars(c._k);
+      const max = c.levels.length * 3;
+      const need = this.chapterNeed(c._k);
+      const open = this.isChapterOpen(c._k);
+      const done = c.levels.filter((l) => this.starsFor(this.career.finished[l.id]) >= 3).length;
+      const head = document.createElement('div');
+      head.className = `chapter-head${open ? '' : ' locked'}`;
+      // A shut chapter says what opens it — in the PREVIOUS chapter's terms,
+      // because that is where the player has to go and do something about it.
+      const prev = this.chapters()[c._k - 1];
+      const short = Math.max(0, this.chapterNeed(c._k - 1) - this.chapterStars(c._k - 1));
+      const gate = open
+        ? `${have}/${max}★ · ${done} CLEARED`
+        : `🔒 ${short}★ MORE IN CHAPTER ${prev ? prev.n : ''}`;
+      head.innerHTML = `
+        <div class="ch-top">
+          <span class="ch-n">CHAPTER ${c.n}</span>
+          <span class="ch-name">${c.name}</span>
+          <span class="ch-gate">${gate}</span>
+        </div>
+        <div class="ch-blurb">${c.blurb}</div>
+        <div class="ch-bar"><i style="width:${max ? Math.round(100 * have / max) : 0}%"></i>
+          <u style="left:${max ? Math.min(100, Math.round(100 * need / max)) : 0}%"></u></div>`;
+      return head;
+    };
     const rowFor = (lv) => {
-      const rg = timeline ? '' : (lv.region || 'CHAMPIONSHIP');
-      let pair = regionRows.get(rg);
+      const key = timeline ? `ch${this.chapterOf(lv.id)}` : (lv.region || 'CHAMPIONSHIP');
+      let pair = regionRows.get(key);
       if (!pair) {
-        const head = document.createElement('div');
-        head.className = 'region-head';
-        head.textContent = rg || this._ladderHeading();
+        let head;
+        if (inChapter) {
+          // the chapter bar at the top of the page already says which chapter
+          // this is; a second header under it would be the same words twice
+          head = document.createElement('div');
+          head.className = 'chapter-head-none';
+        } else if (timeline) {
+          const c = this.chapters()[this.chapterOf(lv.id)];
+          head = c ? chapterHead(c) : document.createElement('div');
+          if (!c) { head.className = 'region-head'; head.textContent = this._ladderHeading(); }
+        } else {
+          head = document.createElement('div');
+          head.className = 'region-head';
+          head.textContent = key;
+        }
         sel.appendChild(head);
         const row = document.createElement('div');
         row.className = 'region-row';
         sel.appendChild(row);
         pair = { head, row };
-        regionRows.set(rg, pair);
+        regionRows.set(key, pair);
       }
       return pair.row;
     };
@@ -3225,8 +3684,6 @@ class Game {
     // while a picked world is still building, the highlight belongs to the pick
     const curId = this._pendingPick?.id ?? this.level?.id;
     const nextUp = this.nextTrack();
-    // the world (if any) the floor has handed over — priced out, open anyway
-    const freeId = this._freeUnlock();
     // WHAT YOU CAN DRIVE COMES FIRST. ALWAYS.
     //
     // The career array is in rung order and the PRICES are not monotonic with
@@ -3246,14 +3703,23 @@ class Game {
     // untouched; this is display only. It does override the timeline view's
     // old rule that rung 12 must follow rung 11 — that rule assumed prices
     // rose with the array, and they do not.
-    const rows = LEVELS.map((lv, i) => ({ lv, i, open: this.isLevelUnlocked(lv.id) }));
-    rows.sort((a, b) =>
-      (a.open ? 0 : 1) - (b.open ? 0 : 1)
-      || (!timeline
-        ? (freshRegions.has(a.lv.region) ? 0 : 1) - (freshRegions.has(b.lv.region) ? 0 : 1)
-        : 0)
-      || (a.open ? 0 : this.starCost(a.lv.id) - this.starCost(b.lv.id))
-      || a.i - b.i);
+    this._flatRender = searching;
+    // INSIDE A CHAPTER, THE BOARD IS THAT CHAPTER. This is the whole point of
+    // the drill-down: sixty worlds you are not going to race are not made
+    // better by a header above them, they are made better by not being there.
+    const rows = LEVELS
+      .map((lv, i) => ({ lv, i, open: this.isLevelUnlocked(lv.id) }))
+      .filter(({ lv }) => !inChapter || inChapter.levels.some((l) => l.id === lv.id));
+    rows.sort((a, b) => (timeline
+      // CHAPTER VIEW RUNS IN CAREER ORDER, FULL STOP. The old rule floated
+      // every open world above every shut one, which was right when worlds
+      // opened individually in price order and is wrong now: a chapter is a
+      // CONTIGUOUS run, and re-ordering across it would scatter one chapter's
+      // worlds under another chapter's header.
+      ? a.i - b.i
+      : (a.open ? 0 : 1) - (b.open ? 0 : 1)
+        || (freshRegions.has(a.lv.region) ? 0 : 1) - (freshRegions.has(b.lv.region) ? 0 : 1)
+        || a.i - b.i));
     rows.forEach(({ lv, i }) => {
       const card = document.createElement('button');
       const unlocked = this.isLevelUnlocked(lv.id);
@@ -3269,21 +3735,27 @@ class Game {
       for (const g of FILTER_GROUPS) card.dataset[g.key] = F[g.key].join(' ');
       card.dataset.q = [lv.name, lv.region, lv.theme, lv.route || '',
         WORLD_TAGS[lv.theme] || '', F.time.join(' '), F.weather.join(' '),
-        F.scenery.join(' '), F.road.join(' ')].join(' ').toLowerCase();
+        F.scenery.join(' '), F.road.join(' '), F.season.join(' ')].join(' ').toLowerCase();
       const best = this.career.finished[lv.id];
       // Stars carry both halves of the story: how much of this world you have
       // taken, and — when it is shut — exactly what it costs to open. A bare
       // padlock tells you nothing you can act on.
       const got = this.starsFor(best);
-      const cost = this.starCost(lv.id);
       const starRow = '★'.repeat(got) + '☆'.repeat(3 - got);
+      // A SHUT WORLD NAMES ITS CHAPTER, NOT A PRICE. Under chapters no world
+      // has a price of its own, so "NEEDS 27★" was quoting a number that no
+      // longer decides anything. What a player can act on is which chapter the
+      // world is behind and how far off that chapter's gate they are.
+      const ck = this.chapterOf(lv.id);
+      const ch = this.chapters()[ck];
+      // The chapter's HEADER carries the price, once. Repeating it on every
+      // card underneath stacked the same sentence eight times down a shut
+      // chapter — so the card names the chapter it is waiting on and stops
+      // there, which is the part a player tapping THIS card does not already
+      // have on screen.
       const bestTxt = unlocked
-        ? (best
-          ? `BEST: ${ordinal(best.place)}`
-          // a world you cannot afford, standing open, needs to say WHY —
-          // otherwise the free grant reads as the padlock being broken
-          : lv.id === freeId ? `★ OPEN ANYWAY — ${cost}★ WORLD` : '★ UNRACED')
-        : `NEEDS ${cost}★ — ${Math.max(0, cost - this.totalStars())} TO GO`;
+        ? (best ? `BEST: ${ordinal(best.place)}` : '★ UNRACED')
+        : `CHAPTER ${ch ? ch.n : '?'} · ${ch ? ch.name : ''}`;
       // THE LADDER, STATED ON THE CARD. `i` is the career rung — the same
       // index `starCost` prices from — so the number, the gate and the lock
       // are three faces of one rule rather than three things to keep in sync.
@@ -7899,13 +8371,18 @@ class Game {
     const hadStars = this.starsFor(prev);
     const bestStars = Math.max(runStars, hadStars);
     const starsBefore = this.totalStars();
+    // Which chapter stood open BEFORE this result was banked. `_showStars`
+    // compares it with the state afterwards, which is the only honest way to
+    // say "this race opened a chapter" — a star total cannot, now that the
+    // gate is a fraction of one chapter rather than a price per world.
+    const chapBefore = this.currentChapter();
     this.career.finished[this.level.id] = {
       place: Math.min(rank, prev?.place ?? 99),
       bestScore: Math.max(earned, prev?.bestScore ?? 0),
       stars: bestStars,
     };
     saveJSON(this._pkey('career'), this.career);
-    this._showStars(bestStars, hadStars, starsBefore, rank);
+    this._showStars(bestStars, hadStars, starsBefore, rank, chapBefore);
     this.renderGarage();
     const hasNext = this.levelIndex < LEVELS.length - 1;
     const nextUnlocked = hasNext && this.isLevelUnlocked(LEVELS[this.levelIndex + 1].id);
@@ -7940,15 +8417,15 @@ class Game {
   /** The star panel on the results screen: which of the five you took, what
    *  your best on this world now is, and — the part that makes a star mean
    *  something — exactly which worlds the new total just opened. */
-  _showStars(best, had, before, rank) {
+  _showStars(best, had, before, rank, chapBefore = 0) {
     const box = document.getElementById('star-panel');
     const rowsEl = document.getElementById('sp-rows');
     if (!box || !rowsEl) return;
     // THE SAME WORDS AS THE MENU LEGEND, tier by tier. The reported mismatch:
     // a P6 (dead last) banked a star under a menu that reads like stars are
     // competitive rewards. The award is BY DESIGN — a finish always pays, and
-    // `_freeUnlock` guarantees the career cannot stall on top of that — so the
-    // words on BOTH surfaces now say so explicitly.
+    // the chapter floor in `isChapterOpen` guarantees the career cannot stall
+    // on top of that — so the words on BOTH surfaces now say so explicitly.
     const got = [['FINISH — ANY PLACE', rank > 0], ['PODIUM — TOP 3', rank <= 3], ['WIN', rank === 1]];
     let html = '';
     for (const [label, won] of got) {
@@ -7957,25 +8434,31 @@ class Game {
     const now = this.totalStars();
     const gained = now - before;
     html += `<div class="cb-row total"><span>${best > had ? `NEW BEST HERE — ${best}/3` : `BEST HERE — ${best}/3`}</span><b>${gained > 0 ? `+${gained}★` : 'NO GAIN'}</b></div>`;
-    // what did that buy? name it — a threshold you cannot see is not a goal
-    const opened = LEVELS.filter((lv) => this.starCost(lv.id) > before && this.starCost(lv.id) <= now);
-    if (opened.length) {
-      for (const lv of opened) {
-        html += `<div class="cb-row contract"><span>✓ UNLOCKED — ${lv.name}</span><b>★${this.starCost(lv.id)}</b></div>`;
-        this.hud.feed(`${lv.name} UNLOCKED`, 'good');
+    // WHAT DID THAT BUY? A CHAPTER, OR PROGRESS TOWARD ONE.
+    //
+    // This used to diff the per-world price table across the new star total,
+    // which was exactly right while worlds had prices. Under chapters the only
+    // thing a race can open is the next chapter, so the panel compares the
+    // chapter that stood open before the result was banked with the one that
+    // stands open now — and when nothing opened, says how far the gate is in
+    // the chapter's own terms, including the "race them all" route.
+    const chapNow = this.currentChapter();
+    const chs = this.chapters();
+    if (chapNow > chapBefore) {
+      for (let k = chapBefore + 1; k <= chapNow; k++) {
+        const c = chs[k];
+        if (!c) continue;
+        html += `<div class="cb-row contract"><span>✓ CHAPTER ${c.n} OPEN — ${c.name}</span>`
+          + `<b>${c.levels.length} WORLDS</b></div>`;
+        this.hud.feed(`CHAPTER ${c.n} — ${c.name} UNLOCKED`, 'good');
       }
     } else {
-      // The floor first: if that race cleared the last world you could afford,
-      // the next one is already yours and quoting a price at it would be a lie.
-      const freeId = this._freeUnlock();
-      const free = freeId != null ? LEVELS.find((lv) => lv.id === freeId) : null;
-      const next = LEVELS.filter((lv) => this.starCost(lv.id) > now)
-        .sort((a, c) => this.starCost(a.id) - this.starCost(c.id))[0];
-      if (free) {
-        html += `<div class="cb-row contract"><span>✓ OPEN ANYWAY — ${free.name}</span><b>NOTHING LEFT TO RACE</b></div>`;
-        this.hud.feed(`${free.name} OPEN`, 'good');
-      } else if (next) {
-        html += `<div class="cb-row"><span>NEXT UNLOCK — ${next.name}</span><b>${this.starCost(next.id) - now}★ TO GO</b></div>`;
+      const gate = this.chapterGateLine();
+      const nx = chs[chapNow + 1];
+      if (gate && nx) {
+        const left = Math.max(0, this.chapterNeed(chapNow) - this.chapterStars(chapNow));
+        html += `<div class="cb-row"><span>NEXT CHAPTER — ${nx.name}</span>`
+          + `<b>${left}★ TO GO</b></div>`;
       }
     }
     document.getElementById('sp-total').textContent = `${now}★`;
@@ -8073,6 +8556,10 @@ class Game {
       for (const d of p.mesh?.userData?.outwardDecals ?? []) d.visible = true;
       const pit = p.mesh?.userData?.cockpit;
       if (pit) pit.visible = false;
+      // ...and the hood comes back. It is removed for the seat only (see
+      // `_driverCamera`); a chase camera looking at a car with no front half
+      // would be a far worse bug than the one that removal fixes.
+      for (const c of p.mesh?.userData?._hoodParts ?? []) c.visible = true;
     }
     // Chase views used to sit rigidly behind the car's RAW heading, so every
     // steering flick and every drift whipped the whole view sideways — that
@@ -8408,6 +8895,41 @@ class Game {
     //
     // Reported as "drivers view should be looking from inside the car".
     if (p.mesh) p.mesh.visible = true;
+    // AND THE HOOD COMES OFF, BECAUSE ON A PHONE IT IS THE VIEW.
+    //
+    // Measured on PINE VALLEY, portrait, 430x830: the car's own bodywork fills
+    // 26-33% of the frame, and on a -13% grade the render contains grass,
+    // trees and a house but NOT ONE PIXEL OF ROAD — which is the phone
+    // screenshot in the report. It is not the aim pitching into the metal (the
+    // hood grazes at 23 degrees against an aim capped at 17.8; clamping to the
+    // silhouette was tried and changed nothing on any car). It is simply that
+    // a hood two and a half metres long, seen from a head sitting 0.4 m above
+    // it, subtends about thirty degrees — and thirty degrees of an 82 degree
+    // vertical lens is a third of the screen. No eye height or dash placement
+    // inside the cabin gets that back; the hood has to not be drawn.
+    //
+    // Everything AHEAD of the eye goes; the cabin, pillars, roof and tail stay,
+    // and so does the cockpit below. That is a cockpit view: you see the car
+    // you are sitting in, not the car you are sitting on.
+    //
+    // The split is computed ONCE per mesh and cached — it is a question about
+    // the model, which does not change — and it is stored as the parts to hide
+    // rather than the parts to show, so anything added to the car later shows
+    // by default instead of silently vanishing.
+    if (p.mesh && !p.mesh.userData._hoodParts) {
+      const eyeCut = (p.mesh.userData.rig?.cabZ ?? 0) + (p.mesh.userData.rig?.cabL ?? 2) * 0.30;
+      const bb = new THREE.Box3();
+      p.mesh.userData._hoodParts = p.mesh.children.filter((c) => {
+        if (c === p.mesh.userData.cockpit) return false;
+        bb.setFromObject(c);
+        if (!Number.isFinite(bb.min.z)) return false;
+        // the local box is in world space here; fall back to the object's own
+        // position when the mesh has not been placed yet
+        const z = c.position.z;
+        return z > eyeCut;
+      });
+    }
+    for (const c of p.mesh?.userData?._hoodParts ?? []) c.visible = false;
     // ONE THING DOES HAVE TO GO, AND IT IS NOT BODYWORK. The brand decal is a
     // textured plane laid on the hood slope "reading right-side-up from the
     // car's FRONT" (vehicles.js). A driver sits behind it and reads it
@@ -8569,6 +9091,14 @@ class Game {
       if (Number.isFinite(cy)) roadY = p.pos.y * 0.35 + cy * 0.65;
     }
     let lookY = roadY + (this._driverTune?.lookH ?? M.lookH ?? 1.15);
+    // THE HOOD SILHOUETTE IS NOT THE BINDING CONSTRAINT — MEASURED, AND
+    // RECORDED SO IT IS NOT TRIED AGAIN. The obvious reading of "the frame
+    // fills with bodywork on a descent" is that the aim pitches into the hood,
+    // so the aim was clamped to the ray grazing it (`deckY`/`noseY`, published
+    // on the rig for this). It changed nothing, on any car: the tightest hood
+    // on the roster grazes at 23 degrees and the aim is already capped at
+    // 17.8, so the clamp could never bind. What actually sets the top edge of
+    // the interior is the DASH — see `_driverTune` and vehicles.js.
     // The cone. Up is tight (5.9°) because sky is never information; down is
     // looser (17.7°) because that is where a compression puts the road.
     lookY = clamp(lookY, cp.y - look * 0.32, cp.y + look * 0.104);

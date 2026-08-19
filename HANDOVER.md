@@ -1,6 +1,6 @@
 # HANDOVER — read this before touching anything
 
-State at handover: `main` = r210, deployed and live, tree clean.
+State at handover: `main` = r223, deployed and live, tree clean.
 Live: https://jozelazarevski.github.io/racing-shooter/
 
 ## THE ONE DEFECT THIS REPO KEEPS SHIPPING
@@ -271,6 +271,21 @@ only that way: the gantry that moved DEEPER into the road (4.52 -> 7.59 u), and
   (`setsid node tools-scratch/srv.mjs 8901 &`) before believing any of them.
 - `pgrep -f 'ab\.mjs'` also matches `srvlab.mjs`. Killing probes has killed the
   static server mid-run more than once. Use `scratchpad/keep.sh`.
+  The same trap in its other form: `pkill -f "test-river.mjs|..."` matches the
+  SHELL RUNNING THAT VERY COMMAND, so it kills the run it just started along
+  with every wait-loop watching for it. Don't reach for `pkill` with a pattern
+  that could match your own command line.
+- **A DOUBLE COMMA IN AN ARRAY LITERAL IS NOT A SYNTAX ERROR.** Appending to
+  `LEVELS` produced `] },,` — a HOLE, which `node --check` accepts happily
+  because `[a, , b]` is valid JS. The game then died on
+  `Cannot read properties of undefined (reading 'id')` from `totalStars`. Same
+  lesson as the `ELEMENTS`/`HOUSE_TEMPLATES` break: a syntax check is necessary
+  and never sufficient — boot the game.
+- **`kill -0 $!` after `nohup ... &` races.** `$!` is the wrapper, not node, so
+  an `until ! kill -0 $PID` loop can fall through while the test is still
+  running — it reported test-river "finished" with 15 PASS and no closing line,
+  which reads exactly like a crash. Wait on a marker file the job writes when
+  it is genuinely done (`... ; echo ALLDONE > sweep.done`).
 - **Version bump is 4 sites in index.html + 1 in sw.js**: `sed -i
   's/rNNN/rNNN+1/g' index.html && sed -i 's/rNNN/rNNN+1/' sw.js`. The service
   worker caches by version name; without the bump the deploy serves the old
@@ -487,6 +502,392 @@ PINE VALLEY sample 600.
 Also honest, and by design: on a bend the cockpit shows materially LESS of the
 corner than chase. That is inherent to a 2.7 u eye and is why it is a toggle.
 
+## THE RIVER LAY ACROSS THE ROAD ("River in the bridge??")
+
+A river crosses a road in exactly two ways and the game modelled one of them.
+At a planned FORD the wash sits on the deck; everywhere else it must pass UNDER
+the embankment. `_buildRiver`'s culvert rule suppressed the containment RAISE
+at a non-ford crossing — so nothing LIFTED the water onto the tarmac — but
+nothing pushed it down either, so wherever the reach's own level already sat
+above the road, the ribbon simply lay across it. Measured over the roster as
+water standing proud of the carriageway far from any ford:
+
+    PIKES PEAK       +5.24 u   293 u from a ford   73 water verts on the road
+    REDWOOD RAMPAGE  +2.45 u    73 u               34
+    SUZUKA           +1.72 u    35 u              103
+    SPA              +0.89 u   204 u               22
+
+Everything else measured 0.1-0.3 u over the deck within 3-7 u of a ford, which
+is the wash doing its job. Fixed in `_planRiver` by capping the BED under the
+road at genuine crossings — the bed is the one array the carve, the stepped
+rock faces and the water profile all derive from, so they move together.
+After: PIKES PEAK -1.80, SPA -1.69, REDWOOD and SUZUKA's worst points are now
+inside 22 u of a planned ford. Nothing on the roster stands over a road it does
+not ford.
+
+### What this cost, and three wrong answers on the way
+
+- **"Distance to the road < 30" is not a crossing.** It caught the reach
+  running ALONGSIDE the PIKES PEAK switchbacks and capped the bed to a lower
+  leg's deck.
+- **Nor is "a LOCAL MINIMUM of that distance".** Measured, that reach hugs the
+  road from station 328 to 376 at 3-28 u, dipping in and out a dozen times,
+  while the legs it passes sit between -22.7 and +10.1. **A local minimum of a
+  distance is still a proximity.** The test that works is a SIGN CHANGE in the
+  offset along the road normal — did the river go from one side to the other —
+  which is the same reasoning `_planOverpasses` uses.
+- **The descent must be graded on distance to the ROAD, not to the crossing.**
+  The carve fades over `smoothstep(dRoad, 9, 22)` so the roadbed survives, so a
+  bed step inside 22 u of the road is a step the ground does NOT take: water
+  with daylight under its lip. Grading on distance-from-crossing failed PINE
+  VALLEY at 4.5 u proud, and the `rd: 22` in that failure was the whole
+  explanation.
+
+`UNDER` is 0.5 and should stay small. At 1.2 it deepened an EXISTING waterfall
+on PINE VALLEY — the cap lowered the reach below the fall and the ground with
+it, but not the reach above — so the fall grew 2.04 -> 2.97 u and its lip
+measured 4.59 u proud against test-river's 4.1 u ceiling. Every extra unit of
+clearance is paid for at some fall downstream.
+
+### The one regression, accepted deliberately
+
+PIKES PEAK's ford 0 was wet by 0.11 u and now reads dry. The reach crosses the
+road at a deck of -22.7 (verified a real crossing: the signed offset flips
++6.8 -> -4.1 between stations 374 and 373) and that ford was planned 47
+stations downstream on a deck at -9.9. Water cannot be under the first and on
+top of the second. It was only ever wet because the river had been hoisted over
+that road — an 11 u wall of water — to reach it.
+
+Nothing applies river physics to dry tarmac (`vehicles.js` asks the WATER, not
+`track.fords`). What remains is the ford's foam and apron furniture on a
+crossing with no water in it, which is the pre-existing condition already
+recorded against `_buildFords`. **The fix belongs in the ford PLANNER — it
+should not site a crossing the river cannot reach** — and NOT by dropping fords
+after the fact, because the editor's authored crossings are contractually
+guaranteed to exist (`tests/test-river-tool.mjs` asserts `fordsAfter === 2`).
+
+### The residual, from the full 67-world census after the fix
+
+Nothing on the roster stands over a road it does not ford. Every remaining
+positive is inside a planned ford's own approach, and all but one are 0.1-0.3 u
+— the wash lying on the deck, which is the feature:
+
+    AMAZON RAPIDS +0.14 @5u   REDWOOD +0.23 @22u   FAFE LEAP +0.27 @6u
+    RED CENTRE   +0.10 @7u    RED BULL +0.21 @4u   NORDSCHLEIFE +0.45 @6u
+    RALLYCROSS   +0.19 @7u
+
+The one outlier is **SUZUKA, +1.72 u at 35 u from its ford** — unchanged by
+this work (the before and after renders at (-176,-45) are pixel-identical), so
+it is pre-existing, not a regression. 35 u is inside `FORD_KEEP`, so the ford
+lift is still 84 % applied there and the cap deliberately does not touch it.
+Whether a ford approach should be allowed to stand 1.7 u proud of the deck 35 u
+out is a question for the FORD LIFT's own blend (`smoothstep(fordDist, 30, 46)`
+in `_buildRiver` PASS 2), not for the culvert cap.
+
+### The gates for this area
+`tests/test-river.mjs` and `tests/test-water.mjs` are the guards and both are
+sensitive to it — test-river caught two of the three wrong answers above.
+`tools-scratch/waterroad.mjs` measures the property roster-wide (water inside
+the carriageway, at or above the deck, with distance to the nearest ford and
+stone bridge); `tools-scratch/fordwet.mjs` diffs ford wetness against a
+pristine worktree on a second port, which is the only thing that separates
+"this ford is dry now" from "this ford was always dry".
+
+## THE CAREER IS CHAPTERS NOW — AND THEY ARE ROOMS YOU ENTER
+
+Asked for as: *"Create chapters for the trails. So it is progress and more
+structured. I unlock Chapter by chapter."* and then, on seeing the first cut:
+*"Package them in separate sections that I can enter. Like this the screen is
+cleaner and no endless scrolling."*
+
+### The rule
+`CHAPTERS` in track.js declares a chapter by the level id it STARTS at;
+`chapterSpans()` derives the rest, so a chapter cannot omit or double-count a
+world and inserting a world into career order files it automatically. Twelve
+chapters over 72 worlds.
+
+**A chapter opens when the previous one has paid its gate — 60 % of its stars
+(`CHAPTER_GATE`) — OR when the previous one has been RACED OUT.** Inside an
+open chapter every world is raceable immediately, in any order.
+
+That second clause is not optional and must never be removed. The gate asks
+1.8 stars a world; a driver who only ever FINISHES banks exactly 1, so the gate
+alone walls that player in permanently at chapter 2. It is the same guarantee
+the old per-world `_freeUnlock` made, restated: **drive well and move on early,
+or drive everything and move on anyway.** Measured, all three player profiles
+(win / podium / finish-last every race) reach 72 of 72.
+
+### What was deleted, and what must not come back
+The per-world star ladder no longer gates anything. `_freeUnlock` is gone.
+`starCost` and `LADDER_SLOPE` survive as a statement about where in the career
+a world sits (the level table's own `cost` leans on it) but **nothing reads
+them to decide a padlock**. Do not reintroduce a per-world grant on top of the
+chapter gate: two floors under one career is how a player ends up looking at a
+card that is open for a reason the board cannot explain.
+
+### The board is two levels deep
+The TIMELINE view is a drill-down, not a list:
+
+  - **The index** — twelve chapter cards, one screenful. `_renderChapterIndex`.
+  - **Inside a chapter** — that chapter's worlds and nothing else, under a
+    sticky back bar. `_chapterBar`.
+
+`_chapterIn` holds the chapter's stable `n` (not its array index, so a roster
+edit cannot teleport a player into a different chapter). It is remembered
+across repaints but deliberately NOT persisted: arriving at the tracks tab
+should show you the map, not the room you were last standing in.
+
+**A shut chapter is still enterable.** You may look at what you are working
+toward; its worlds stay locked and say which chapter they are waiting on.
+
+**Search and filters override all of it.** A filter is a question about the
+whole roster, so it flattens across every chapter — answering it inside one
+chapter would answer a question nobody asked. Clearing it puts you back where
+you searched FROM. `_filtersActive()` is the single definition both the
+renderer and the matcher use; two definitions would be a bug, because a board
+that flattens without matching is showing the wrong list.
+
+### Traps this cost
+- **`_applyWorldFilter` only hides cards that are already on the page.** At the
+  index there are none, so typing filtered nothing and showed nothing. A
+  filter state change now triggers a re-render, not a class toggle.
+- **The early return skipped the page furniture.** The star legend, the filter
+  chips and the count are all set on the way OUT of the card render; returning
+  before them left the index with an empty legend and unlabelled chips.
+- **`_scrollToNextTrack` has no world card to aim at** at the index. It aims at
+  the chapter card holding the next track and still returns the world id —
+  callers ask it for the id, and what is next does not change with which page
+  is showing. It does NOT enter a chapter on the player's behalf.
+
+### The gates
+`tests/test-ladder.mjs` was rewritten wholesale: its subject (per-world prices)
+no longer exists, but every property it defended does. It now drives the
+chapter table — partition, contiguity, gate scaling, the three career profiles,
+the floor, and the surfaces. `tests/test-timeline.mjs` asserts the two-level
+board and that every world is reachable by entering some chapter.
+`tests/test-filters.mjs` measures the flat REGIONS view — its assertions are
+all "with nothing set, all N worlds show", which was true of both views until
+TIMELINE became a drill-down — and asserts the drill-down's own behaviour
+separately.
+
+Two hardcoded constants in that suite had to go, and both were the same defect:
+`groups === 4` and `emptyRows === 3` were counts of the filter bar masquerading
+as statements about it, and both failed the day a fifth facet shipped. They now
+derive from `worldFacets`' own keys.
+
+## AUTUMN — THREE THEMES AND A CHAPTER OF FIVE WORLDS
+
+Asked for as *"Add autumn themes too."*
+
+Autumn is **not a palette swap**. What changes is the SPECIES MIX and the
+LIGHT; the palette follows. `FLORA_MIX` is the load-bearing half: the tree
+builder already carries `birch`, `oak` and `larch`, and `_buildTrees` gives
+each a different tint shift (birch h+0.02 and a much lighter crown, oak +0.12
+saturation and a darker dome, larch h−0.045). Feed those one amber `foliage`
+band and you get pale gold, deep russet and red — a wood, rather than three
+thousand identical orange blobs. **A conifer-weighted mix cannot read as autumn
+at any palette**, because an evergreen is evergreen.
+
+The other half is `sunEl` at 0.30–0.42 against a summer world's 0.62–0.78 —
+the single most autumn-looking number in a theme block — and it comes with a
+warning learned by measuring: a low sun is not a BRIGHT sun. Both wood and
+harvest themes shipped at `sunIntensity` 2.7+ and the warm key washed the
+ground out to bare sand, putting the season in the canopy and nowhere else.
+2.45.
+
+  - `autumnwood` — deciduous wood at peak colour. The showcase.
+  - `harvestvale` — orchard and stubble country, the lowest sun on the roster.
+  - `mistfell` — bracken moor, 780 u of fog, nearly treeless. The bleak one.
+
+All three declare `season: 'AUTUMN'` and drift `weather: { type: 'leaves' }`.
+Chapter 12 is five worlds on them (ids 68–72), each BORROWING an existing
+route: a route is 900 stations of measured road and the shapes on this roster
+are good — what makes these worlds new is the season standing on them, which is
+a theme question.
+
+**A new theme must be added to five tables**, or something fails quietly:
+`THEMES`, `SCENERY` (tests/test-filters fails loudly on this one — it is the
+only one that does), `SURFACE_BY_THEME`, `FLORA_MIX`, `ELEMENT_KIT_BY_THEME`,
+plus `WORLD_TAGS` in main.js.
+
+### The SEASON facet
+A fifth filter row, because a season cuts ACROSS scenery — autumn is a wood AND
+farm country AND a moor, and filing it under any one hides the other two.
+WINTER is DERIVED (a world with a snowfield is a winter world; there is no
+other kind) and AUTUMN is DECLARED, for the same reason `dusk` is: warm colours
+happen at sunset, in a desert, and over a burning forest, none of which is
+October.
+
+## THE DRIVER'S VIEW WAS THE HOOD, AND THE HOOD IS NOT DRAWN NOW
+
+Reported from a phone with a screenshot: the bottom half of the frame black,
+sky and hills above it, no road anywhere. *"Fix driver view."*
+
+### What it actually was
+Not the near plane (that was r217), not the eye height, not the aim. It was
+simply that **a hood two and a half metres long, seen from a head sitting 0.4 m
+above it, subtends about thirty degrees** — and thirty degrees of an 82 degree
+vertical lens is a third of a portrait screen. Measured on PINE VALLEY at
+430x830: bodywork 26–33% of frame, and at a **-13% grade the render contains
+grass, trees and a house but NOT ONE PIXEL OF ROAD.**
+
+The seat now hides everything AHEAD of the eye and keeps the cabin, pillars,
+roof, tail and the cockpit below. Measured across grades, interior fell
+25.7% → 18.5% mean, and every sample has road in it.
+
+    grade    -13.1   -2.6      0    +2.3   +16.3
+    before    32.6   27.8   25.9    24.7    17.4   %interior
+    after     25.9   20.5   19.0    17.5     9.7
+
+The split is computed once per mesh and cached, and stored as **the parts to
+HIDE** rather than the parts to show — so anything added to the car later shows
+by default instead of silently vanishing. It is restored on leaving the seat; a
+chase camera looking at a car with no front half would be a worse bug than the
+one this fixes.
+
+### Two things tried that did NOT work — do not repeat them
+- **Clamping the aim to the hood's silhouette.** The obvious reading is that
+  the aim pitches into the metal on a descent, so the down-limit was derived
+  from the hood (`deckY`/`noseY`, still published on the rig for it). It
+  changed nothing on any car: the tightest hood on the roster grazes at 23°
+  against an aim already capped at 17.8°, so the clamp could never bind.
+- **Bringing the dash in from 2.1 to 1.15** once the hood stopped being drawn,
+  because at 2.1 it floats a car's length out with daylight under it. Worse:
+  at 1.15 the dash's 0.40-deep top face is nearly edge-on and reads as a WALL,
+  filling the bottom 26% against 20% at 2.1 with a clear band of road under it.
+  **A shallow surface seen edge-on is all thickness and no surface.**
+
+### And a measurement trap worth keeping
+The first metric counted "rows between the horizon and the interior" as road.
+It reported a healthy 28.7% on the very frame that contained no road at all —
+grass and trees are not tarmac. **Parking on the start line cannot find this
+defect either**: the grade is what moves the aim, and every previous
+measurement of this view was taken stationary at the line. `seatgrade.mjs`
+places the car at the steepest crest and dip on the lap instead.
+
+## ADMIN — THE WORLD EDITOR IS OFF THE MAIN GAME
+
+Asked for as: *"Place the world editor under a admin link and remove it from
+the main game."* It used to sit under START RACE on the tracks tab, in front of
+every player who opened the menu.
+
+It now lives in an `#admin-panel` block in SETUP, reached with `?admin=1` and
+left with `?admin=0`. Same REMEMBERED-SWITCH shape as `unlockall`, and for the
+same reason: a URL-only flag lasts exactly as long as the browser tab and is
+gone the moment the game is opened from the home screen or as a PWA, which is
+how the owner actually opens it. The `admin=0` half is not optional — a switch
+you cannot unset is a trap, and without it the only way back would be clearing
+site data, which also throws away the career.
+
+**The panel is REMOVED from the document, not hidden with CSS.** Hiding it
+would leave a real, clickable, keyboard-reachable control in the tab order of
+every player's menu, and a tab-stop that sculpts terrain is worse than a
+visible one because nobody can see what they just hit. Verified: on a plain
+visit `#editor-btn` is not in the DOM at all.
+
+## "ALL CHAPTERS" IS A FIXED CONTROL, NOT A STICKY ONE
+
+Reported as *"I need a back to all chapters button once I'm in chapter"* —
+about a build that already had one, twice over. Both were measurably present
+and both were unreachable where it mattered:
+
+    scroll        chapter bar      header BACK btn
+    top             on screen        on screen
+    40% down        on screen        off, at -798px
+    bottom          on screen        off, at -1302px
+
+The header button lives in the page and scrolls away. The chapter bar is
+`position: sticky` and holds up fine in Chromium — but sticky is the one thing
+here that cannot be relied on across phones: it stops sticking under a number
+of ancestor conditions and iOS Safari is stricter about them than Chromium is.
+Since the report came from an iPhone and the measurement says Chromium is
+happy, **the sensible conclusion is not to trust sticky for this at all.**
+
+So being inside a chapter now gets `#ch-back-float`: fixed to the VIEWPORT,
+declared OUTSIDE the scrolling element entirely, bottom-left where a thumb is
+and clear of START RACE at bottom-centre. Measured at top:782 of an 830px
+viewport at every scroll position, and it is shown only when `backTarget()`
+returns the chapter step — not at the index, not on another tab, not mid-race.
+
+And the sticky bar was made OPAQUE (`#171310`, was `rgba(0,0,0,.22)`). At 22%
+the cards scrolled visibly through it and the chapter name came out
+overprinted with whatever row was passing underneath. **A sticky bar has to
+occlude.**
+
+## BACK — ONE LADDER, THREE WAYS TO PULL IT
+
+Asked for as: *"I need back button."* There was no back ANYWHERE — not a
+button, not Escape, and nothing on the browser's own back gesture, so the only
+way out of a garage tab or a chapter was to find the control that happened to
+lead there, and a swipe-back left the game.
+
+`backTarget()` names where BACK goes from here and `goBack()` takes the step.
+Naming it separately from acting on it is what lets the button HIDE when there
+is nothing above you — **a back button that sometimes does nothing is how a
+player stops trusting it.** The ladder is deepest-first, because the states
+nest: editor over menu, chapter inside the tracks tab.
+
+    editor -> menu        results -> menu       pause -> resume
+    racing -> pause       chapter -> index      tab -> TRACKS
+
+Three things pull it: the button in the menu header (labelled with its
+destination), Escape, and — the one that matters on a phone — `popstate`.
+
+### The popstate rule, and the trap it avoids
+A single-page game gets ONE history entry, so the first swipe-back leaves the
+site mid-race. `_wireBack` keeps a spare entry on the stack and consumes it:
+while there is somewhere to go, back goes there and the entry is re-armed.
+
+**It deliberately stops trapping at the top of the ladder.** Re-pushing forever
+would make the game impossible to leave, which is a worse bug than the one this
+fixes — so when `backTarget()` returns null the entry is not replaced and the
+next back does what the player expects. Do not "fix" that by always re-arming.
+
+The button is menu-only: mid-race the pause button is already the way out and a
+second control would be clutter over the road.
+
+### A probe bug worth remembering
+The first screenshot of this showed no button, and the code was fine — the
+probe set `state = 'menu'`, and the game's menu state is called `'title'`.
+`_syncBackBtn` gates on `'title'`, so a state name the game never uses hid the
+button in the probe while the real menu showed it. **Drive the game's own
+entry point (`showMenu()`), not a state string you assumed.**
+
+## test-mobile-hud WAS MEASURING THE HARNESS
+
+It began failing `not measured: feed` on three of four device sizes. Nothing
+had touched the HUD. A feed message removes itself after 3.3 s, and the six
+test messages were pushed BEFORE a six-frame settle — 100 ms on a desktop,
+nearer five seconds under swiftshader — so the feed was empty by the time it
+was measured. It broke when the roster grew 67 -> 72 worlds and frames got
+slower. The feed is now filled AFTER the settle and measured on the next
+frame, so its lifetime cannot expire underneath the assertion.
+
+## test-nature's SEVEN FAILURES ARE PRE-EXISTING — MEASURED, NOT ASSUMED
+
+`test-nature` fails 7 assertions and it is tempting to pin them on r219's
+riverbed change, since one of them is literally about a river. It is not.
+Run against an r218 worktree (before that change) on a second port, the SAME
+SEVEN fail with numbers that barely move:
+
+    assertion                        r218                 r222
+    PINE VALLEY river uphill         1 rise, 0.36 u       1 rise, 0.37 u
+    PINE VALLEY trees buried         12/683, -3.08 u      12/683, -3.1 u
+    PINE VALLEY solids buried         6/183, -2.38 u       6/183, -2.4 u
+    LOG FLUME trees                  10/639, -3.6  u       9/639, -3.65 u
+    LOG FLUME solids                  1/160, -1.58 u       1/160, -1.64 u
+    FURKA RIDGE trees                10/735, -2.68 u      10/735, -2.68 u
+    FURKA RIDGE solids                8/469, -5.56 u       8/469, -5.56 u
+
+FURKA RIDGE settles it on its own: the water census records that world with
+NO RIVER AT ALL (`rivY null..null`), so buried trees and solids there cannot
+be anything to do with a riverbed. The drift on the PINE VALLEY and LOG FLUME
+rows is the culvert cap moving the bed a few centimetres, not the cause.
+
+They are real defects worth fixing — scenery placed below the ground it stands
+on — but they belong to the PLACEMENT builders, not to the river, and they
+predate every change in this session. Do not spend another round proving that.
+
 ## OPEN, LOWER PRIORITY
 - **`MIN` in `tunnelFitAt` is probably the same units error `reach` was.** The
   real minimum bore measures ~52 u against a documented ~26 u. Nothing depends
@@ -496,13 +897,28 @@ corner than chase. That is inherent to a 2.7 u eye and is why it is a toggle.
   r202/r203 detail pass; trees did not.
 - **`element-prism` bucket roof tiling** needs a neutral-map and gamma decision
   before `roofTileTexture` can be wired into it.
-- **`stoneBridges` BUILDS NOTHING ON ANY WORLD.** Measured once
-  `_buildStoneBridges` tagged its group `stone-bridge`: OLIVE COAST asked 1,
-  CAPE OLIVETO 1, TERRAZZA ALTA 3, GLACIER COL 2 — all built ZERO, and there is
-  no positive control anywhere on the roster. The placement wants a 4.5 u drop
-  beside a station under 0.01 curvature, 60 clear of a gorge and 90 clear of
-  the gate. Fix belongs in the builder (loosen the drop, or take the best
-  candidate rather than a threshold), not in the four call sites.
+- **`stoneBridges` BUILDS NOTHING ON *THOSE* WORLDS — but the roster does have
+  a positive control.** The old entry here said it built zero everywhere and
+  that no positive control existed. That is wrong: measured by counting
+  `stone-bridge` groups, the three FARMLAND worlds each build both bridges they
+  ask for — HEDGEROW DASH 2, SILVERSTONE 2, OULTON PARK 2. The worlds that
+  build zero are OLIVE COAST (asked 1), CAPE OLIVETO (1), TERRAZZA ALTA (3),
+  GLACIER COL (2). The placement wants a 4.5 u drop beside a station under 0.01
+  curvature, 60 clear of a gorge and 90 clear of the gate.
+  AND THE REASON MATTERS, because it kills the obvious fix. On the worlds that
+  DO build, the 4.5 u dip is the RIVER VALLEY — measured, the deepest non-river
+  candidate on HEDGEROW DASH is 2.2 u, on SILVERSTONE 2.0, on CAPE OLIVETO 1.3.
+  So "loosen the drop until every world gets its bridges" buys bridges over
+  nothing. A stone bridge belongs over the river; the thing worth fixing is
+  that those four worlds have no river valley near a straight, and that is a
+  ROUTE question, not a threshold.
+  Note also that every farmland bridge lands ON a planned ford (2.0-5.4 u).
+  That reads like a contradiction — a ford is a wash, a bridge is a span — and
+  it was tried as one: excluding ford sites took HEDGEROW DASH and SILVERSTONE
+  from two bridges to ZERO, for the reason above. It is not a contradiction on
+  those worlds, because the road there genuinely bridges a 35-38 u ravine with
+  the river at the bottom; what is wrong is that the FORD PLANNER sited a
+  crossing on a deck 38 u above the water. See the river section.
 - **`rampCount: 0` MEANS "DEFAULT", NOT "NO JUMPS".** Prop ramps are gone
   game-wide (`_buildRamps` sets `this.ramps = []` and returns). The knob now
   only feeds `_buildCrests`, read as `(this.T.rampCount || 3) + 3` — and 0 is
