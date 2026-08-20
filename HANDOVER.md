@@ -1593,3 +1593,21 @@ The scatter puts the town to ONE SIDE of the road with bare ground opposite —
 see the r237 screenshot of IL BUDELLO. A budello should be walled both sides.
 That is `_element`'s road-clearance gate and the `_zonePos` scatter, not the
 templates, and it is the next thing worth doing on these worlds.
+
+## r238 — THE SEGMENT BUMP THAT DID NOT SHIP IN r237
+r237 claimed `element-cyl` went to 16 segments. It did not: there are TWO
+`_realizeElements`-style sites building `gCyl`/`gCone`, the edit asserted
+`count == 1`, the assert threw, and the file was never written. The assert did
+its job — the failure was invisible because that command was backgrounded and
+its output was never read.
+
+TWO LESSONS, both cheap:
+  - `grep -c` the thing you changed before believing it shipped. The r237
+    deploy check did exactly that and printed `rounder primitives: 0`, which is
+    the only reason this was caught.
+  - Do not background a command whose output is the proof it worked.
+
+Applied at both sites now: cylinders 10 -> 16 segments, cones 10 -> 14.
+IL BUDELLO: 464k -> 503k triangles, draw calls still 319. element-cyl 64k ->
+102k, which is what a hundred buildings' worth of balusters, downpipes, chimney
+pots, arcade columns and corner drums costs to stop being decagons.

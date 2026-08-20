@@ -15180,8 +15180,13 @@ export class Track {
     g.name = 'edit-preview';
     const gWall = new THREE.BoxGeometry(1, 1, 1); gWall.translate(0, 0.5, 0);
     const gBox = new THREE.BoxGeometry(1, 1, 1); gBox.translate(0, 0.5, 0);
-    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); gCyl.translate(0, 0.5, 0);
-    const gCone = new THREE.ConeGeometry(0.5, 1, 10); gCone.translate(0, 0.5, 0);
+    // ROUNDER, GAME-WIDE (r238). Ten segments is visibly a decagon on anything
+    // wider than a downpipe, and the Ligurian corner blocks are DRUMS three
+    // metres across — at 10 they read as folded card. Both are single shared
+    // geometries feeding one InstancedMesh each, so the cost is paid once per
+    // world rather than per building.
+    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 16); gCyl.translate(0, 0.5, 0);
+    const gCone = new THREE.ConeGeometry(0.5, 1, 14); gCone.translate(0, 0.5, 0);
     const specs = {
       wall: [gWall, () => new THREE.MeshStandardMaterial({
         map: buildingTexture(), roughness: 0.85, envMapIntensity: 0.45,
@@ -15269,8 +15274,13 @@ export class Track {
   _realizeElements(B, m4) {
     const gWall = new THREE.BoxGeometry(1, 1, 1); gWall.translate(0, 0.5, 0);
     const gBox = new THREE.BoxGeometry(1, 1, 1); gBox.translate(0, 0.5, 0);
-    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); gCyl.translate(0, 0.5, 0);
-    const gCone = new THREE.ConeGeometry(0.5, 1, 10); gCone.translate(0, 0.5, 0);
+    // ROUNDER, GAME-WIDE (r238). Ten segments is visibly a decagon on anything
+    // wider than a downpipe, and the Ligurian corner blocks are DRUMS three
+    // metres across — at 10 they read as folded card. Both are single shared
+    // geometries feeding one InstancedMesh each, so the cost is paid once per
+    // world rather than per building.
+    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 16); gCyl.translate(0, 0.5, 0);
+    const gCone = new THREE.ConeGeometry(0.5, 1, 14); gCone.translate(0, 0.5, 0);
     const specs = [
       // The emissive window map came across from `_buildHuts` when the
       // cottages moved onto the shared templates. It is not a port for its own
