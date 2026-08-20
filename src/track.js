@@ -591,6 +591,88 @@ export const LEVELS = [
     tune: {
       rockCount: 520,
       elev: { amp: 14, ph: [1.8, 0.9, 2.4] },
+    } },
+
+  /* ---- THE ITALIAN RIVIERA (73-76) --------------------------------------
+   * Alassio, Liguria, asked for with a photograph out of a shuttered window
+   * over the old town and a render of a street circuit cut through it.
+   *
+   * Four worlds because the town has four distinct kinds of road and mixing
+   * them into one lap would waste all of them:
+   *   the seafront    long, open, fast, sea on your shoulder
+   *   the budello     the famous lane — one car wide, walls both sides
+   *   the harbour     stop-start around the moorings
+   *   the capo        the headland climb, hairpin on hairpin
+   * All four run SEALED on `riviera`, and every one of them borrows a route
+   * shape that already exists rather than inventing a fifth.
+   * ---------------------------------------------------------------------- */
+
+  { id: 73, name: 'ALASSIO SEAFRONT', theme: 'riviera', region: 'RIVIERA',
+    cost: 46, fresh: true, route: 'corniche',
+    // THE POSTCARD, and the introduction. `corniche` is the coast-road shape:
+    // long open sweeps with the water on one side, which is exactly the
+    // four-kilometre arc of sand the town is built along. Nothing technical —
+    // this world exists to establish the place.
+    tune: {
+      // the bay is the content, so the town thins out and the view opens
+      hutCount: 52, treeCount: 380,
+      elev: { amp: 7, ph: [0.4, 1.2, 2.0] },
+    } },
+
+  { id: 74, name: 'IL BUDELLO', theme: 'riviera', region: 'RIVIERA',
+    cost: 47, fresh: true, route: 'monaco',
+    // THE LANE. Alassio's budello — "the gut" — is a straight kilometre of
+    // shopfront barely wide enough for a car, and `monaco` is the roster's
+    // street shape: barriers close, corners slow, no run-off anywhere.
+    //
+    // The houses are the walls, so the hut count goes UP and the trees nearly
+    // vanish: on this lap there is no verge for anything to grow in.
+    tune: {
+      hutCount: 96, hutZone: [0, 1], treeCount: 120,
+      bushCount: 120, rockCount: 90,
+      // shade between four-storey terraces: the light barely reaches the road
+      hemiIntensity: 0.7, sunIntensity: 2.15,
+      elev: { amp: 5, ph: [1.1, 2.4, 0.6] },
+    } },
+
+  { id: 75, name: 'PORTO MOLO', theme: 'riviera', region: 'RIVIERA',
+    cost: 48, fresh: true, route: 'marina',
+    // THE HARBOUR. `marina` runs the quays, which is stop-start by nature —
+    // and the one lap on the coast where the sea is on BOTH sides of you.
+    tune: {
+      hutCount: 44, treeCount: 300,
+      flowerCount: 180,
+      elev: { amp: 4, ph: [2.2, 0.5, 1.7] },
+    } },
+
+  { id: 76, name: 'CAPO MELE', theme: 'riviera', region: 'RIVIERA',
+    cost: 49, fresh: true, route: 'turini',
+    // THE HEADLAND, and the hard one. Capo Mele is the cape at the east end of
+    // the bay and the road over it stacks hairpins the whole way up; `turini`
+    // is the roster's hairpin ladder. The render sent with the report is this
+    // world — a street circuit climbing away from the sea between buildings.
+    //
+    // Up here the town has run out and the terraces take over, so the houses
+    // thin and the olives come back.
+    tune: {
+      hutCount: 26, hutZone: [0.1, 0.5], treeCount: 620,
+      // above the haze, and looking down on it
+      fogNear: 460, fogFar: 2100, hemiIntensity: 0.92,
+      // `profile: 'ascent'` IS HAND-SHAPED AND REQUIRES `keys` — it reads
+      // E.keys directly (see the ascent branch in the elevation builder), so
+      // an ascent without them throws "reading 'length'" at world build and
+      // the level never appears. The sine form (amp + ph) is the one that
+      // works without a key list; the other three Riviera worlds use it.
+      //
+      // The shape is the cape itself: out of the town at sea level, a hard
+      // climb over the headland peaking just past half distance, then the
+      // drop back down the far side to the water.
+      elev: {
+        amp: 42, profile: 'ascent', ph: [0, 0, 0],
+        keys: [[0, 0], [0.08, 2], [0.18, 11], [0.29, 22], [0.38, 30],
+          [0.47, 37], [0.55, 42], [0.62, 40], [0.71, 31], [0.8, 19],
+          [0.89, 8], [0.96, 1], [1, 0]],
+      },
     } }
 ];
 
@@ -650,6 +732,8 @@ export const CHAPTERS = [
     blurb: 'Narrows, col and gorge. The hardest driving on the roster.' },
   { n: 12, from: 68, name: 'AUTUMN',
     blurb: 'The season turns: gold woodland, harvest country, russet moor.' },
+  { n: 13, from: 73, name: 'THE ITALIAN RIVIERA',
+    blurb: 'Alassio: the seafront, the budello, the harbour and the cape.' },
 ];
 
 /** Career-order index ranges per chapter, derived once from `from`.
@@ -723,6 +807,8 @@ const SCENERY = {
   // FILTER_GROUPS), which is what lets "autumn coast" ever mean something.
   autumnwood: ['FOREST'], harvestvale: ['FARMLAND'], mistfell: ['MOUNTAIN'],
   medterrace: ['COAST', 'FARMLAND'], olivecountry: ['COAST', 'FARMLAND'],
+  // a seaside TOWN: coast and buildings, not coast and farmland
+  riviera: ['COAST', 'CITY'],
   harbor: ['COAST'], liguria: ['COAST'], aegean: ['COAST'], brava: ['COAST'],
   dalmatia: ['COAST'], azur: ['COAST'],
   mountainsea: ['COAST', 'MOUNTAIN'],
@@ -781,6 +867,11 @@ const SURFACE_BY_THEME = {
   // sealed, which is right — they are real circuits that happen to sit on
   // these themes.
   medterrace: LOOSE, vineyard: LOOSE, olivecountry: LOOSE,
+  // RIVIERA IS THE EXCEPTION and stays SEALED. The other three are farm and
+  // olive-grove lanes; this is a seafront promenade and a town's own streets,
+  // which are tarmac in a way an olive terrace never is. It also gives the
+  // ROAD tyre a home — 40 SEALED / 16 LOOSE was already the roster's balance
+  // problem, but a street circuit racing on gravel would be a worse lie.
   // loose: rally stages, dirt, sand, forest track, farm lane
   forest: LOOSE, desert: LOOSE, dunes: LOOSE, oasis: LOOSE, redwood: LOOSE,
   flume: LOOSE, wildfire: LOOSE, jungle: LOOSE, savanna: LOOSE,
@@ -4146,6 +4237,63 @@ THEMES.olivecountry = { ...THEMES.medterrace, coast: undefined, quay: false,
   fogColor: 0xc4d2d6, fogNear: 520, fogFar: 2200,
   hillColor: 0x7c8a58, peakColor: 0x9aa886,
   treeCount: Math.round((THEMES.medterrace.treeCount ?? 500) * 1.35) };
+// ---------------------------------------------------------------------------
+// RIVIERA — ALASSIO, LIGURIA. Asked for with a photograph taken from a shuttered
+// window over the old town, and a render of a street circuit cut through it.
+//
+// What makes that coast look like itself, in the order it matters from a car:
+//   1. THE PAINT. Ligurian terraces are ochre, apricot, rose and cream with
+//      dark green shutters — not the bleached limestone `medterrace` is built
+//      from. That palette is the single biggest tell and it costs one line.
+//   2. THE BAY. Alassio is a four-kilometre arc of sand: the sea is wide, near
+//      and calm, and it is on your shoulder for most of a lap rather than
+//      glimpsed at the top of a climb.
+//   3. THE AIR IS SOFTER. The reference photo is hazy and overcast-bright, not
+//      the hard high sun of the olive terraces — a lower, warmer key and more
+//      haze, which also keeps the pastel walls from blowing out.
+//   4. IT IS A TOWN, not a hamlet. Houses run the length of the front and pile
+//      up the hill behind it, so the hut count triples and its zone covers most
+//      of the lap instead of one ridge shoulder.
+// Everything else — olive hills, pantile roofs, cypress, the sea machinery —
+// `medterrace` already has right, which is why this is a derive and not a
+// fourth copy of a 60-line theme.
+THEMES.riviera = {
+  ...THEMES.medterrace,
+  // softer, damper air off a big bay; the sun sits lower and further round so
+  // the seafront run is side-lit rather than flattened from overhead
+  fogColor: 0xd6dfe4, fogNear: 340, fogFar: 1720,
+  hemiSky: 0xc8dcf0, hemiGround: 0xb0a894, hemiIntensity: 0.86,
+  sunColor: 0xfff2dc, sunIntensity: 2.6,
+  skyTop: '#3f8ed6', skyHorizon: '#d4e2e8', sunGlow: 0xfff0d8,
+  sunAz: 3.95, sunEl: 0.82,
+  cloudCount: 9, cloudOpacity: 0.6, cloudTint: 0xfffaf0,
+  hazeColor: 0xdde6e8, hazeOpacity: 0.9,
+  // sand, not limestone dust: the beach is the ground colour here
+  terrainLow: '#8a9159', terrainHigh: '#d8c9a4', terrainDirt: '#c2ad82',
+  terrainScree: '#e0d6bc', skirtColor: '#cfc3a4',
+  ground: {
+    ...THEMES.medterrace.ground,
+    base: '#cdbe9c',
+    patchB: 'rgba(232,222,196,0.24)',
+    speckB: 'rgba(240,232,212,0.85)',
+  },
+  hillColor: 0x87905c, peakColor: 0xc6bfa4,
+  // THE PASTELS. `splinter` is what flies off a wall when you hit it, so it is
+  // also the most direct statement of what the walls are made of.
+  splinter: [0xe8c88a, 0xd9866a, 0x3f5f46],
+  hutRoof: 0xb85a30,
+  hutCount: 64, hutZone: [0.05, 0.86],
+  hayCount: 6,
+  // cypress up, olive down: on the front it is palms and pines, and the
+  // cypress silhouette is what says "this coast" from a moving car
+  treeCount: 430,
+  flowerCount: 300,
+  flowerColors: ['#f2f0e4', '#d4453c', '#e07a2c', '#b76fb0'],
+  // an onshore breeze carries sea haze, not verge dust
+  weather: { type: 'dust', color: 0xe4ded0, rate: 16 },
+  quay: true,
+};
+
 THEMES.mountainsea = {
   ...THEMES.dalmatia,
   // The sea sits BELOW the road's lowest point, not at the harbour's default.
@@ -4320,6 +4468,8 @@ const PROP_SPECS = {
   // OLIVE COAST: the Bible's roadside kit is blue plastic harvest crates,
   // rolled olive nets (the hay rolls) and stones off the terrace walls
   medterrace: [['crate', 20], ['hay', 14], ['cone', 12], ['rock', 8]],
+  // street furniture, not farm clutter: barriers and cones down a closed town
+  riviera: [['cone', 26], ['crate', 16], ['rock', 6]],
   // OLD TOWN: market stall crates packed away at the kerb, street-works cones
   // and steel drums. No rocks and no hay — the region's negative list rules
   // out gravel, dirt and anything that is not architectural.
@@ -5144,6 +5294,12 @@ const FLORA_MIX = {
   // scatter still sums to 1.0 (checklist R04).
   medterrace: [['oliveOld', 0.344], ['oliveRow', 0.281], ['corkOak', 0.156],
     ['umbrellaPine', 0.125], ['cypress', 0.094]],
+  // ALASSIO'S OWN MIX. The umbrella pine is the tree on the promenade and the
+  // cypress is the one climbing the hill behind it, so those two carry the
+  // silhouette; the olives stay because the terraces above the town are full
+  // of them. Weighted the opposite way round to `medterrace` on purpose.
+  riviera: [['umbrellaPine', 0.34], ['cypress', 0.28], ['oliveOld', 0.2],
+    ['oliveRow', 0.12], ['corkOak', 0.06]],
   // THE MEDITERRANEAN FIVE inherit the harbour's machinery but must not
   // inherit a northern forest with it: olive, cypress and umbrella pine, with
   // the cypress weighted up because it is the species that says "this coast"

@@ -252,6 +252,7 @@ const WORLD_TAGS = {
   farmland: '🌧 hedge banks · mud · blind crests',
   outback: 'bulldust holes · creek jumps · 🦘',
   autumnwood: '🍂 wet leaves · low sun',
+  riviera: '🌊 seafront tarmac · town walls',
   harvestvale: '🍂 stubble fields · long shadows',
   mistfell: '🌫 bracken moor · mist banks',
 };
@@ -2158,6 +2159,8 @@ class Game {
     const earned = Math.round(raw * CREDIT_RATE);
     if (earned > 0) {
       this.garage.credits += earned;
+    this._syncCredits();
+      this._syncCredits();
       saveJSON(this._pkey('garage'), this.garage);
     }
   }
@@ -2686,35 +2689,51 @@ class Game {
    *  button always reads BACK, and the label beside it says where you are —
    *  `backTarget` already knows where the tap lands.
    */
+  /** THE BALANCE, wherever it is being shown. It lives in the top bar now, so
+   *  it is on screen during a race debrief and every menu tab — and a stale
+   *  number there is worse than the old one that scrolled away, because this
+   *  one is always in view. Called from every path that moves it. */
+  _syncCredits() {
+    const el = document.getElementById('credits');
+    if (el) el.textContent = this.garage.credits.toLocaleString();
+  }
+
   _syncBackBtn() {
     const t = this.backTarget();
-    // In the MENU only: mid-race the screen belongs to the HUD and the pause
-    // button is already the way out, so a second control would be clutter over
-    // the road.
-    const show = !!t && this.state === 'title';
+    // THE BAR IS UP FOR THE WHOLE MENU, not only when there is a way back. It
+    // carries the wordmark and the credit balance now, and both were asked for
+    // as "always visible" — a balance you have to scroll up to read is no use
+    // on a screen whose whole job is spending it.
+    const inMenu = this.state === 'title';
+    const canBack = !!t && inMenu;
+    const inChapter = canBack && t.at === 'chapter';
     const bar = document.getElementById('topbar');
-    if (bar) bar.classList.toggle('hidden', !show);
-    // WHERE YOU ARE, not where the button goes — the button says BACK. Inside
-    // a chapter `_fillTopbar` has already written the chapter and its stars,
-    // so only the tab case is left to name.
-    if (show && t.at !== 'chapter') {
+    if (bar) bar.classList.toggle('hidden', !inMenu);
+    const back = document.getElementById('topbar-back');
+    // BACK still comes and goes — it is the one thing here that leads
+    // somewhere, and a dead one at the front door is a button that lies.
+    if (back) back.classList.toggle('hidden', !canBack);
+    const where = document.getElementById('topbar-where');
+    const stars = document.getElementById('topbar-stars');
+    if (inMenu && !inChapter && where) {
       const tab = document.querySelector('#menu-tabs .menu-tab.current');
-      const where = document.getElementById('topbar-where');
-      const stars = document.getElementById('topbar-stars');
-      if (where) where.innerHTML = `<b>${tab ? tab.textContent.trim() : ''}</b>`;
+      const onTracks = !tab || tab.id === 'tab-btn-race';
+      // WHERE YOU ARE, and at the front door that is the game itself — which
+      // is why the wordmark lives in this slot rather than in a fourth one the
+      // 320px phone has no room for.
+      where.innerHTML = canBack && tab && !onTracks
+        ? `<b>${tab.textContent.trim()}</b>`
+        : '<b class="tb-brand">IGNITE RALLY</b>';
       if (stars) stars.textContent = '';
     }
-    // The bar is fixed, so it is out of flow: the screen under it owes it the
-    // height, and gives up the logo for it (see .compact). Full branding is
-    // for the front door — the one screen with no way back.
     const ts = document.getElementById('title-screen');
     if (ts) {
-      ts.classList.toggle('with-topbar', show);
-      ts.classList.toggle('compact', show);
+      ts.classList.toggle('with-topbar', inMenu);
+      ts.classList.toggle('compact', inMenu);
     }
   }
 
-  /** THE PHONE'S OWN BACK GESTURE, which is the one people actually use.
+  /** THE PHONE'S OWN BACK GESTURE  /** THE PHONE'S OWN BACK GESTURE, which is the one people actually use.
    *
    *  A single-page game gets ONE history entry, so the first swipe-back leaves
    *  the site — mid-race, mid-chapter, whatever. This keeps a spare entry on
@@ -5106,7 +5125,7 @@ class Game {
   }
 
   renderGarage() {
-    document.getElementById('credits').textContent = this.garage.credits.toLocaleString();
+    this._syncCredits();
     this._renderQuests();
     // ONE CALL. This used to render a build bay, a tyre bay and then ten grey
     // upgrade rows into three separate containers; the bays own all of it now,
@@ -7200,6 +7219,7 @@ class Game {
     const cr = MISSION_CR[medal] | 0;
     if (cr > 0) {
       this.garage.credits += cr;
+      this._syncCredits();
       saveJSON(this._pkey('garage'), this.garage); // per-profile purse (economy agent)
       this.renderGarage();
     }

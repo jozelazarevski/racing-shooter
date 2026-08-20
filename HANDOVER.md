@@ -1372,3 +1372,65 @@ ladder drops (while staying owned), and going back on when allowed.
 test-cars 28/0, test-filters 35/0, test-boot 7/0, test-ladder 31/0,
 test-timeline 33/0, boot.mjs 4/4, and 320/390/430 clean — the ceiling chip
 wraps rather than running 379px wide out of a 320px panel.
+
+## r234 — HEADER PINNED, START RACE CHARGED, AND ALASSIO
+Three asks in one report: "Move title name and credits at the top, make them
+always visible. Make start race sparkly electric as in the screen. Create race
+tracks inspired by this city Alassio Italy."
+
+### The bar carries the wordmark and the balance
+Both were in the page and scrolled away, and the balance is the number every
+purchase in the garage below is measured against. The bar is up for the WHOLE
+menu now (it used to appear only when there was a way back) with three slots:
+BACK when there is somewhere to go, WHERE YOU ARE in the middle — the wordmark
+at the front door, since there is nowhere more specific to name — and CREDITS
+pinned right, which never shrinks. The in-page hero title and credits chip are
+deleted; keeping both is the duplication that made this header 500px tall.
+`_syncCredits()` is called from every path that moves the balance, because a
+stale number in a bar that is ALWAYS on screen is worse than one that scrolled
+away.
+
+### START RACE, charged
+Three composited layers, no JS and no extra elements: a sheen travelling across
+the face (::before), a spark field drifting up (::after), and a breathing glow
+on the box-shadow. Silenced under `prefers-reduced-motion`, and killed on
+`.blocked` so a button that cannot be pressed does not advertise.
+
+TRAP, AND IT COST A BUILD: the new rule opened with `position:relative`, which
+silently overrode the `position:sticky` the footer runs on. The button dropped
+out of its pinned spot into the flow and was only visible at the very bottom of
+the page. Sticky already establishes the containing block the pseudo-elements
+need — do not re-declare position on `#start-btn`.
+
+### ALASSIO — chapter 13, worlds 73-76
+`THEMES.riviera` is DERIVED from `medterrace`, because that theme already has
+the sea machinery, the pantile roofs and the olive hills right. What Alassio
+needs on top is: the Ligurian pastel palette (ochre/apricot/rose with green
+shutters — `splinter` is the most direct statement of what the walls are made
+of), sand rather than limestone dust underfoot, softer hazier air than the hard
+olive-terrace sun, and three times the houses over most of the lap because it
+is a TOWN.
+
+It is also the one Mediterranean theme that is genuinely SEALED — a promenade
+and a town's own streets are tarmac in a way an olive terrace is not, and it
+gives the ROAD compound a home.
+
+Four worlds, because the town has four kinds of road and one lap would waste
+all of them. Every one borrows an existing route shape:
+    73 ALASSIO SEAFRONT  corniche  the four-kilometre arc of sand
+    74 IL BUDELLO        monaco    the lane — walls both sides, no run-off
+    75 PORTO MOLO        marina    the quays, sea on both sides
+    76 CAPO MELE         turini    the headland, hairpin on hairpin
+
+TRAP: `elev.profile: 'ascent'` IS HAND-SHAPED AND REQUIRES `elev.keys`. The
+ascent branch reads `E.keys` directly, so an ascent without them throws
+"Cannot read properties of undefined (reading 'length')" during world build and
+the level never appears — `node --check` cannot see it and the other three
+worlds booted fine. CAPO MELE has its key list now. Use the sine form
+(amp + ph) unless you are hand-shaping a climb.
+
+Built and measured: 73 len 1881u / tightest 19u, 74 len 1370u / tightest 13u
+(the tightest lap on the roster), 75 len 1541u / 16u, 76 N=900 on turini.
+
+test-parts 30/0, test-cars 28/0, test-filters 35/0, test-boot 7/0,
+test-ladder 31/0, test-timeline 33/0, test-mobile-hud green, boot.mjs 4/4.

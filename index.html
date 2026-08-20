@@ -752,6 +752,30 @@
      touch-target guideline there is — and "make it more obvious" is a size
      argument as much as a colour one. inline-flex so the min-height cannot
      fight the padding. */
+  #topbar-back.hidden{display:none}
+  /* THE WORDMARK, at bar size. It was a 96px hero that scrolled away; here it
+     is a 13px display face that never does. */
+  #topbar .tb-brand{font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.6px;
+    color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
+  /* THE BALANCE IS PINNED RIGHT and never shrinks — it is the number the whole
+     garage below is spending, so it is the one thing in the bar that must not
+     give way when a chapter name gets long. */
+  #topbar-cred{flex:0 0 auto;margin-left:auto;font-family:'Baloo 2';font-weight:800;
+    font-size:10px;letter-spacing:1px;color:var(--gold-dim);white-space:nowrap;
+    padding:5px 9px;border-radius:8px;background:rgba(0,0,0,.4);
+    border:1px solid var(--line-soft)}
+  #topbar-cred b{font-family:'Luckiest Guy';font-size:13px;letter-spacing:.5px;
+    color:var(--yellow);margin-left:3px;text-shadow:1px 1px 0 var(--ink)}
+  /* the where-slot yields first when the bar is tight */
+  #topbar .ch-here{flex:1 1 auto;min-width:0}
+  #topbar .ch-here-stars{flex:0 0 auto;margin-left:0}
+  @media (max-width:389px){
+    #topbar{gap:7px;padding-left:8px;padding-right:8px}
+    #topbar-back{font-size:12px;padding:7px 10px}
+    #topbar-cred{font-size:9px;padding:4px 7px}
+    #topbar-cred b{font-size:12px}
+    #topbar .tb-brand{font-size:11.5px;letter-spacing:1px}
+  }
   #topbar-back{font-size:13px;padding:7px 14px;border-radius:10px;
     min-height:40px;display:inline-flex;align-items:center;
     color:#fff8e0;background:linear-gradient(180deg,#ff9d2e,#e8402a);
@@ -1524,6 +1548,69 @@
     white-space:pre-line;line-height:1.15}
   /* the lift-on-hover of .btn would peel a flush footer off its own edge */
   #start-btn:hover{transform:none;box-shadow:0 -6px 18px rgba(0,0,0,.55)}
+
+  /* ---- START RACE, CHARGED --------------------------------------------
+     Asked for as "make start race sparkly electric as in the screen". Three
+     layers, all of them transform/opacity so the phone composites them on the
+     GPU and the main thread pays nothing:
+       1. a SHEEN that travels across the face, like light down a wet bar
+       2. a GLOW that breathes at the top edge, where the button meets the list
+       3. SPARKS drifting up off it
+     No JS and no extra elements — ::before is the sheen, ::after is the spark
+     field, and the glow rides the box-shadow. The button already carries
+     `white-space:pre-line` for the wrong-tyre warning, so nothing here may
+     touch layout: everything is painted, nothing reflows. */
+  /* NO `position:relative` HERE. The button is already `position:sticky`, and
+     re-declaring position in a later rule silently overrode it — the footer
+     dropped out of its pinned spot and back into the flow, where it is only
+     visible at the very bottom of the page. Sticky already establishes the
+     containing block the ::before/::after need. */
+  #start-btn{overflow:hidden;isolation:isolate}
+  #start-btn > *{position:relative;z-index:2}
+  #start-btn::before{
+    content:'';position:absolute;z-index:1;top:0;bottom:0;left:-40%;width:34%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.62),transparent);
+    transform:skewX(-18deg);pointer-events:none;
+    animation:startSheen 3.4s cubic-bezier(.5,0,.3,1) infinite}
+  @keyframes startSheen{
+    0%{left:-45%}
+    55%,100%{left:125%}
+  }
+  /* the sparks: one repeating-gradient of tiny dots, drifting up and fading.
+     A field beats individual elements — it is a single composited layer. */
+  #start-btn::after{
+    content:'';position:absolute;z-index:1;inset:-30% -5% -5%;pointer-events:none;
+    background:
+      radial-gradient(1.6px 1.6px at 12% 82%, rgba(255,246,214,.95), transparent 60%),
+      radial-gradient(1.3px 1.3px at 28% 92%, rgba(255,214,120,.9), transparent 60%),
+      radial-gradient(1.8px 1.8px at 47% 78%, rgba(255,255,255,.85), transparent 60%),
+      radial-gradient(1.2px 1.2px at 63% 95%, rgba(255,226,150,.9), transparent 60%),
+      radial-gradient(1.7px 1.7px at 78% 84%, rgba(255,250,226,.95), transparent 60%),
+      radial-gradient(1.3px 1.3px at 91% 90%, rgba(255,206,110,.9), transparent 60%);
+    animation:startSparks 2.6s linear infinite}
+  @keyframes startSparks{
+    0%{transform:translateY(14%) scale(1);opacity:0}
+    18%{opacity:1}
+    100%{transform:translateY(-46%) scale(1.1);opacity:0}
+  }
+  /* the charge at the edge — same amber the button is made of, so it reads as
+     the button glowing rather than as a ring drawn around it */
+  #start-btn{animation:startCharge 2.2s ease-in-out infinite}
+  @keyframes startCharge{
+    0%,100%{box-shadow:0 -6px 18px rgba(0,0,0,.55),0 0 0 rgba(255,180,70,0),
+      inset 0 2px 0 rgba(255,240,200,.35)}
+    50%{box-shadow:0 -6px 22px rgba(0,0,0,.55),0 -2px 26px rgba(255,170,60,.55),
+      inset 0 2px 0 rgba(255,246,220,.6)}
+  }
+  /* A BUTTON THAT CANNOT BE PRESSED MUST NOT LOOK CHARGED. The blocked state
+     already recolours it; killing the animation is what stops it advertising. */
+  #start-btn.blocked{animation:none}
+  #start-btn.blocked::before,#start-btn.blocked::after{display:none}
+  /* MOTION IS A SETTING, NOT A DECISION WE GET TO MAKE FOR EVERYONE. */
+  @media (prefers-reduced-motion:reduce){
+    #start-btn,#start-btn::before,#start-btn::after{animation:none}
+    #start-btn::before,#start-btn::after{display:none}
+  }
   #start-btn.warned{font-size:clamp(15px,4.4vw,22px);padding-top:12px;padding-bottom:12px}
   /* A JOB IN HAND FOR THIS WORLD is a reason to be standing here, so the
      button says which job on its own line. Green edge, because the tyre
@@ -1863,7 +1950,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r233</div>
+<div id="build-tag">r234</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1913,19 +2000,23 @@
      TOP, not bottom: the bottom belongs to START RACE, and a pill down there
      sat on top of the world cards. -->
 <div id="title-screen" class="screen">
+  <!-- THE BAR IS ALWAYS UP IN THE MENU NOW. Asked for as "move title name and
+       credits at the top, make them always visible" — both used to sit in the
+       page and scroll away, and the credit balance is the number you check
+       before every purchase in the garage below.
+       Three slots: BACK when there is somewhere to go, WHERE YOU ARE in the
+       middle (the wordmark at the front door, since there is nowhere more
+       specific to name), and the balance pinned right. -->
   <div id="topbar" class="hidden">
     <button id="topbar-back" class="ch-back" aria-label="Back">‹&nbsp;BACK</button>
     <div id="topbar-where" class="ch-here"></div>
     <div id="topbar-stars" class="ch-here-stars"></div>
+    <div id="topbar-cred">CREDITS&nbsp;<b id="credits">0</b></div>
   </div>
-  <div class="game-title">IGNITE&nbsp;RALLY</div>
-  <!-- A THREE-WORD TAGLINE COULD WRAP ANYWHERE; A SENTENCE CANNOT. The old
-       "Dirt // Firepower // First Place" was short enough to sit on one line
-       and harmless wherever it broke. This one needs 307 px at the narrow
-       breakpoint's own type size and only gets 288 px inside a 320 px phone,
-       so it wraps — and left to itself it wrapped into THREE ragged lines.
-       Each clause is held together instead: one line where it fits, a clean
-       break at the comma where it does not. -->
+  <!-- The tagline stays: it is the one line of character on the front door,
+       and it is the only thing left above the tabs now that the wordmark has
+       moved into the bar. Each clause is held together so it breaks at the
+       comma and never mid-phrase. -->
   <div class="game-sub"><span class="nb">If you can&rsquo;t race them,</span>
     <span class="nb">shoot them</span></div>
   <!-- Status chips sit ABOVE the tabs, not in the same row. Sharing the row
@@ -1936,7 +2027,6 @@
        addresses and two labels for one control, reported as "I miss the back
        button". There is one now and it lives in #topbar. -->
   <div id="menu-status">
-    <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
     <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
   </div>
   <div id="menu-tabs">
@@ -2187,10 +2277,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r233"></script>
+<script type="module" src="./src/main.js?v=r234"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r233"></script>
+<script src="./src/offline.js?v=r234"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r233"></script>
+<script type="module" src="./src/traffic.js?v=r234"></script>
 </body>
 </html>
