@@ -1644,6 +1644,8 @@ class Game {
           }
           // the tab IS a level on the back ladder, so the label moves with it
           this._syncBackBtn();
+          // ...and the shop floor only turns while you are standing in it
+          this._stageRun(btn.id === 'tab-btn-garage');
         });
       }
     }
@@ -2716,6 +2718,10 @@ class Game {
     this._syncBackBtn();
     this._softURL();
   }
+
+  /** Stop anything the menu was animating. Called on the way into a race —
+   *  the shop floor must not keep drawing behind a world. */
+  _menuIdle() { this._stageRun(false); }
 
   /** Push the current track's theme into the renderer: fog, the two lights,
    *  the key direction and the IBL dome. Split out of the constructor because
@@ -4408,18 +4414,199 @@ class Game {
     return card;
   }
 
+  /** THE SHOP FLOOR — a live view of the car you are building.
+   *
+   *  "Match the graphics and change the look realtime." The still picture was
+   *  honest but dead: you fitted a wing and a new JPEG appeared. This is the
+   *  real car on a real floor, turning, and a part lands on it the instant you
+   *  buy it.
+   *
+   *  IT COSTS A SECOND WebGL CONTEXT, so it earns it back three ways:
+   *    - it only ever runs while the GARAGE tab is actually on screen. Leaving
+   *      the tab, opening a race, or backgrounding the page stops the loop
+   *      dead (see _stageRun).
+   *    - it renders at 30fps, not 60. Nothing here moves fast enough to tell,
+   *      and this is a menu on a phone that has a world drawing behind it.
+   *    - the canvas is small and the pixel ratio is capped at 2.
+   *  The still-picture path is kept for the car SHELF, which needs 6 pictures
+   *  at once and must not animate.
+   */
+  _stage() {
+    if (this.__stage) return this.__stage;
+    const cvs = document.createElement('canvas');
+    cvs.className = 'bp-stage';
+    const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: cvs });
+    r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    r.toneMapping = THREE.ACESFilmicToneMapping;
+    r.toneMappingExposure = 1.28;
+    r.shadowMap.enabled = true;
+    r.shadowMap.type = THREE.PCFSoftShadowMap;
+    const scene = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(32, 1.6, 0.1, 120);
+
+    // ---- THE WORKSHOP. The mockup's car sits on a shop floor with light
+    // coming down on it, and that is most of why it reads as a garage rather
+    // than as a product shot. A floor, a back wall and a bay stripe are enough
+    // — anything more is scenery nobody looks at behind a car they do.
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(46, 46),
+      new THREE.MeshStandardMaterial({ color: 0x2b2018, roughness: 0.95, metalness: 0.05 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.02;
+    floor.receiveShadow = true;
+    scene.add(floor);
+    // the painted bay outline the car is parked inside
+    for (const sx of [-3.4, 3.4]) {
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 15),
+        new THREE.MeshBasicMaterial({ color: 0xc9922e, transparent: true, opacity: 0.5 }));
+      line.rotation.x = -Math.PI / 2;
+      line.position.set(sx, 0.01, 0);
+      scene.add(line);
+    }
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(46, 18),
+      new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 1 }));
+    wall.position.set(0, 9, -13);
+    scene.add(wall);
+
+    scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x6a5238, 1.15));
+    const key = new THREE.DirectionalLight(0xfff3d6, 2.3);
+    key.position.set(5, 9, 6);
+    key.castShadow = true;
+    key.shadow.mapSize.set(512, 512);   // a phone, at 30fps, behind a menu
+    key.shadow.camera.left = -8; key.shadow.camera.right = 8;
+    key.shadow.camera.top = 8; key.shadow.camera.bottom = -8;
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0x9fc8ff, 0.6);
+    fill.position.set(-6, 4, -5);
+    scene.add(fill);
+    // the shop lamp above the bay, which is what puts the warm pool on the roof
+    const lamp = new THREE.PointLight(0xffcf8a, 40, 18, 2);
+    lamp.position.set(0, 5.2, 1.5);
+    scene.add(lamp);
+
+    const pivot = new THREE.Group();
+    scene.add(pivot);
+    this.__stage = { cvs, r, scene, cam, pivot, spin: 0, sig: null, raf: 0, last: 0 };
+    return this.__stage;
+  }
+
+  /** Throw away a stage car.
+   *
+   *  GEOMETRY ALWAYS; MATERIALS ONLY OUTSIDE THE KIT. The upgrade kit's
+   *  materials are shared module-level singletons — disposing one blanks the
+   *  kit on every car in the game and can pull a material out from under an
+   *  in-flight compile (see disposeKit in vehicles.js, and r230). The BODY's
+   *  materials are built per mesh, so those are ours to free, and a player who
+   *  fits fifty parts in a session would otherwise leave fifty bodies' worth
+   *  of them behind.
+   */
+  _dropCarMesh(mesh) {
+    const kit = mesh.getObjectByName('upgradeKit');
+    const inKit = (o) => { for (let n = o; n; n = n.parent) if (n === kit) return true; return false; };
+    mesh.traverse((o) => {
+      if (o.geometry) o.geometry.dispose?.();
+      if (!o.material || (kit && inKit(o))) return;
+      for (const m of (Array.isArray(o.material) ? o.material : [o.material])) m.dispose?.();
+    });
+  }
+
+  /** Put the current build on the stage — only when it has actually changed. */
+  _stageSync() {
+    const st = this._stage();
+    const car = CAR_CATALOG.find((c) => c.key === this.cars.selected);
+    if (!car) return;
+    const up = this.carUpgrades();
+    const sig = JSON.stringify([car.key, up, this.carParts().fitted]);
+    if (st.sig === sig) return;
+    st.sig = sig;
+    if (st.car) { st.pivot.remove(st.car); this._dropCarMesh(st.car); }
+    const mesh = buildCarMesh(car.spec);
+    applyUpgradeKit(mesh, up, {
+      engine: this.fittedPart('engine'), spoiler: this.fittedPart('spoiler') });
+    mesh.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+    st.car = mesh;
+    st.pivot.add(mesh);
+    if (st.cam.aspect) this._frameStage(st);
+  }
+
+  /** FRAME THE CAR FROM THE CAR, not from a guessed number.
+   *
+   *  The first cut divided a constant by the aspect ratio and put the camera
+   *  6 units from a 6.5-unit-long car — the shot came out inside the door.
+   *  Measure the build's bounding sphere and back off far enough that it fits
+   *  the TIGHTER of the two fields of view, which is the vertical one on a
+   *  phone and the horizontal one on a wide canvas. Self-tuning: it holds for
+   *  any car in the catalogue, any wing, and any canvas the layout hands it.
+   */
+  _frameStage(st) {
+    if (!st.car) return;
+    const box = new THREE.Box3().setFromObject(st.car);
+    const size = box.getSize(new THREE.Vector3());
+    const mid = box.getCenter(new THREE.Vector3());
+    // A BOUNDING SPHERE IS THE WRONG SHAPE FOR A CAR. It has to contain the
+    // diagonal, so a 6.5-long, 1.6-tall machine gets a radius set by its
+    // LENGTH and the framing leaves half the canvas empty above and below it.
+    // Fit the box instead: the widest silhouette it can turn to is its length,
+    // and the height is just its height.
+    const vfov = (st.cam.fov * Math.PI) / 180;
+    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * st.cam.aspect);
+    const halfW = 0.5 * Math.max(size.x, size.z);      // worst case as it spins
+    const halfH = 0.5 * size.y;
+    const dist = Math.max(halfW / Math.tan(hfov / 2), halfH / Math.tan(vfov / 2)) * 1.5;
+    st.cam.position.set(6.4, 3.4, 7.6).normalize().multiplyScalar(dist);
+    st.cam.lookAt(0, mid.y * 0.9, 0);
+    st.cam.updateProjectionMatrix();
+  }
+
+  /** Start or stop the loop. The ONLY thing that should ever keep it running
+   *  is the garage tab being visible on the title screen. */
+  _stageRun(on) {
+    const st = this.__stage;
+    if (!st) return;
+    if (!on) {
+      if (st.raf) cancelAnimationFrame(st.raf);
+      st.raf = 0;
+      return;
+    }
+    if (st.raf) return;
+    const tick = (t) => {
+      st.raf = requestAnimationFrame(tick);
+      const vis = this.state === 'title'
+        && !document.getElementById('title-screen')?.classList.contains('hidden')
+        && document.getElementById('tab-btn-garage')?.classList.contains('current')
+        && st.cvs.isConnected;
+      if (!vis) { this._stageRun(false); return; }
+      if (t - st.last < 33) return;                    // 30fps is plenty for a turntable
+      const dt = Math.min(0.1, (t - st.last) / 1000);
+      st.last = t;
+      st.spin += dt * 0.42;
+      st.pivot.rotation.y = st.spin;
+      const w = st.cvs.clientWidth || 300;
+      const h = st.cvs.clientHeight || 190;
+      if (st.w !== w || st.h !== h || st.framedFor !== st.sig) {
+        st.w = w; st.h = h; st.framedFor = st.sig;
+        st.r.setSize(w, h, false);
+        st.cam.aspect = w / h;
+        st.cam.updateProjectionMatrix();
+        this._frameStage(st);
+      }
+      st.r.render(st.scene, st.cam);
+    };
+    st.last = performance.now();
+    st.raf = requestAnimationFrame(tick);
+  }
+
   /** THE MACHINE YOU HAVE BUILT, at the top of its own garage. */
   _renderBuildPreview() {
     const el = document.getElementById('build-preview');
     if (!el) return;
-    const url = this._buildPreview();
-    if (!url) return;
     const car = CAR_CATALOG.find((c) => c.key === this.cars.selected);
+    if (!car) return;
     const eng = this.fittedPart('engine');
     const wing = this.fittedPart('spoiler');
     const p = this.player;
     const tc = tyreClass(this.cars.selected, this.carUpgrades(), this.fittedTyre());
-    el.innerHTML = `<img class="bp-art" src="${url}" alt="${car?.name ?? ''}">
+    el.innerHTML = `<div class="bp-shop"></div>
       <div class="bp-side">
         <div class="bp-name">${car?.name ?? ''}</div>
         <div class="bp-spec"><span>${eng.name}</span><span>${wing.name}</span>
@@ -4431,6 +4618,14 @@ class Game {
           <span><i>DOWN</i><b>${Math.round((p?.downforce ?? 0) * 100)}%</b></span>
         </div>
       </div>`;
+    // THE LIVE CANVAS IS MOVED, NEVER REBUILT. innerHTML above throws away
+    // whatever was in the box, so the stage is re-attached afterwards — a new
+    // WebGL context per repaint of the garage would be a context leak, and
+    // browsers cap how many a page may hold.
+    const st = this._stage();
+    el.querySelector('.bp-shop')?.appendChild(st.cvs);
+    this._stageSync();
+    this._stageRun(true);
   }
 
   /** Tap a part: fit it if it is yours, buy it if you can afford it, and say
@@ -4646,37 +4841,12 @@ class Game {
     return out;
   }
 
-  /** [PARTS] THE CAR YOU HAVE ACTUALLY BUILT, as a picture.
-   *
-   *  The selected machine wearing its fitted parts AND its upgrade kit —
-   *  every scoop, skirt, pipe and wing the money has bought. Re-rendered
-   *  whenever the build changes, which is the point: the money now has
-   *  something to show for itself on the screen where it is spent, not only
-   *  out on the road behind you.
-   *
-   *  Cached against the build it was drawn from, so a repaint of the garage
-   *  (which happens on every tab switch) does not re-render the car.
-   */
-  _buildPreview() {
-    const car = CAR_CATALOG.find((c) => c.key === this.cars.selected);
-    if (!car) return null;
-    const up = this.carUpgrades();
-    const parts = this.carParts();
-    const sig = JSON.stringify([car.key, up, parts.fitted]);
-    if (this.__previewSig === sig) return this.__previewURL;
-    const mesh = buildCarMesh(car.spec);
-    applyUpgradeKit(mesh, up, {
-      engine: this.fittedPart('engine'), spoiler: this.fittedPart('spoiler') });
-    // THREE-QUARTERS FROM BEHIND, not from the front. Everything the garage
-    // sells lives on the tail and the flanks — pipes, wing, skirts, pods — and
-    // the nose is the one part of the car a player never sees anyway.
-    mesh.rotation.y = Math.PI * 0.17;
-    this.__previewSig = sig;
-    // wider frame than the shelf card and a whole kit to fit in it, so further
-    // back and aimed a little higher than the sills
-    this.__previewURL = this._shoot(mesh, 300, 190, { dist: 10.2, look: 0.7 });
-    return this.__previewURL;
-  }
+  // THE STILL BUILD PICTURE IS GONE (r232). It rendered the built car to a
+  // data URL and swapped an <img> — honest, but dead: you fitted a wing and a
+  // new JPEG appeared. `_stage` shows the real car on a real floor, turning,
+  // and the part lands on it as you buy it. The still path survives only for
+  // the car SHELF (`_carIcons`), which needs six pictures at once and must not
+  // animate.
 
   _carIcons() {
     if (this.__carIcons) return this.__carIcons;
@@ -8544,6 +8714,7 @@ class Game {
   }
 
   startRace() {
+    this._menuIdle();      // the shop floor stops turning the moment you leave it
     this._flushPick?.();   // a tapped card whose build hasn't run yet — build it now
     // NO GATE — A WARNING WITH A NUMBER ON IT. The start line used to refuse
     // the wrong tyres outright, and with one eligible car per surface that

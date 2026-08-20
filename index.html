@@ -1172,19 +1172,36 @@
      the car, because 390px cannot hold a ring of panels. */
   /* THE CAR YOU BUILT. The picture is rendered from the real mesh wearing the
      real kit (see _buildPreview), so it is the machine, not an illustration. */
-  #build-preview{width:100%;display:flex;gap:11px;align-items:center;
+  /* THE CAR IS THE CENTREPIECE, so on a phone it gets the full width and the
+     spec sits under it. Side by side, the floor was 156px on a 390px screen —
+     a stamp, when the whole point of the demo is the machine on the shop
+     floor. Wide screens keep the two-column layout, where there is room. */
+  #build-preview{width:100%;display:flex;flex-direction:column;gap:8px;
     margin:4px 0 8px;padding:9px 10px;border-radius:var(--r-md);
     border:1px solid var(--line-soft);
     background:linear-gradient(180deg,rgba(60,40,16,.55),rgba(12,8,3,.5))}
-  #build-preview .bp-art{width:52%;max-width:300px;height:auto;flex:0 0 auto;
-    filter:drop-shadow(0 8px 14px rgba(0,0,0,.55))}
-  #build-preview .bp-side{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
+  @media (min-width:620px){
+    #build-preview{flex-direction:row;align-items:center;gap:12px}
+    #build-preview .bp-shop{width:56%;flex:0 0 auto}
+    #build-preview .bp-side{flex:1 1 auto;min-width:0}
+  }
+  /* THE SHOP FLOOR. A live canvas, not a picture — the car turns and a part
+     lands on it the moment you buy it. The box owns the size so the renderer
+     can read it back and frame the car for whatever width the phone gave us. */
+  #build-preview .bp-shop{width:100%;max-width:none;
+    aspect-ratio:16/9;border-radius:var(--r-sm);overflow:hidden;
+    background:radial-gradient(ellipse at 50% 120%,rgba(255,180,90,.2),rgba(10,7,4,.85) 70%);
+    box-shadow:inset 0 0 22px rgba(0,0,0,.6)}
+  #build-preview .bp-shop canvas{width:100%;height:100%;display:block}
+  #build-preview .bp-side{min-width:0;display:flex;flex-direction:column;gap:5px}
   #build-preview .bp-name{font-family:'Luckiest Guy';font-size:15px;letter-spacing:1px;
     color:var(--yellow);line-height:1.1}
-  #build-preview .bp-spec{display:flex;flex-direction:column;gap:1px;
+  #build-preview .bp-spec{display:flex;flex-wrap:wrap;gap:3px 6px;
     font-size:10px;font-weight:700;letter-spacing:.6px;color:#e2c9a2}
+  #build-preview .bp-spec span{padding:2px 7px;border-radius:5px;
+    background:rgba(0,0,0,.35);border:1px solid var(--line-soft)}
   /* the four numbers the whole screen exists to move */
-  #build-preview .bp-nums{display:grid;grid-template-columns:1fr 1fr;gap:3px 6px;margin-top:2px}
+  #build-preview .bp-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:3px 6px;margin-top:2px}
   #build-preview .bp-nums span{display:flex;align-items:baseline;gap:4px}
   #build-preview .bp-nums i{font-style:normal;font-size:8.5px;font-weight:800;
     letter-spacing:1px;color:var(--gold-dim)}
@@ -1266,7 +1283,7 @@
   .tyre-opt.locked .tyre-art{filter:grayscale(.9) brightness(.6)}
   @media (max-width:389px){
     #build-preview{gap:8px;padding:7px 8px}
-    #build-preview .bp-art{width:48%}
+    #build-preview .bp-nums{grid-template-columns:repeat(2,1fr)}
     #build-preview .bp-name{font-size:13px}
     .bay-grid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:5px}
     .part-card .pc-name{font-size:9.5px}
@@ -1795,7 +1812,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r231</div>
+<div id="build-tag">r232</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2119,10 +2136,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r231"></script>
+<script type="module" src="./src/main.js?v=r232"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r231"></script>
+<script src="./src/offline.js?v=r232"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r231"></script>
+<script type="module" src="./src/traffic.js?v=r232"></script>
 </body>
 </html>

@@ -106,7 +106,13 @@ const R = await page.evaluate(() => {
   out.everyPartHasArt = art.length > 0 && art.every((i) => (i.getAttribute('src') || '').length > 2000);
   out.partCount = art.length;
   out.distinctArt = new Set(art.map((i) => i.getAttribute('src'))).size;
-  out.previewDrawn = (document.querySelector('.bp-art')?.getAttribute('src') || '').length > 5000;
+  // r232: the preview is a LIVE canvas, not an image — mounted, sized, and
+  // carrying the build that is actually fitted
+  const st = g.__stage;
+  const cv = document.querySelector('.bp-shop canvas');
+  out.stageMounted = !!cv && cv.isConnected && cv.width > 80;
+  out.stageCarIsTheBuild = st?.sig === JSON.stringify(
+    [g.cars.selected, g.carUpgrades(), g.carParts().fitted]);
   out.bays = document.querySelectorAll('.bay').length;
   out.ladders = document.querySelectorAll('.up-card').length;
 
@@ -139,7 +145,8 @@ check('the GT wing opens once three medals are held', R.gtOpensOnMedals);
 check('every part in the shop is a rendered picture', R.everyPartHasArt, `${R.partCount} parts`);
 check('...and no two parts share a picture', R.distinctArt === R.partCount,
   `${R.distinctArt} distinct of ${R.partCount}`);
-check('the preview shows the car you actually built', R.previewDrawn);
+check('the shop floor is a live canvas, mounted and sized', R.stageMounted);
+check('...showing the build that is actually fitted', R.stageCarIsTheBuild);
 check('every upgrade ladder found a bay', R.ladders === 10, `${R.ladders} of 10 in ${R.bays} bays`);
 check('an earned part is announced on the debrief', R.bannerFirst);
 check('...and only the once', !R.bannerRepeat);

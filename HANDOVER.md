@@ -1262,3 +1262,49 @@ test-mobile-hud green, boot.mjs 4/4.
 0 tap targets under 34px, 0 sideways scroll. It skips `.shelf-wrap`, because
 the car shelf scrolls sideways on purpose and counting its children reported
 200 false positives.
+
+## r232 — THE SHOP FLOOR IS LIVE
+"Match the graphics u sent and change the look realtime."
+
+The still picture was honest and dead: you fitted a wing and a new data URL
+appeared. `_stage()` is a real WebGL view — the car you have built, turning, on
+a workshop floor with a painted bay outline, a back wall, a shop lamp and a
+cast shadow. Fitting a part rebuilds the car on the stage in place, so the
+hardware lands as you buy it.
+
+### A SECOND WebGL CONTEXT HAS TO EARN ITS KEEP, and this one does it three
+ways. Break any of them and the phone pays for a menu it is not looking at:
+  - the loop runs ONLY while the GARAGE tab is on screen. `_stageRun(false)` on
+    every other tab, and `_menuIdle()` from `startRace`. The tick itself
+    re-checks visibility each frame and stops dead if it is wrong.
+  - 30fps, not 60. It is a turntable.
+  - small canvas, pixel ratio capped at 2, 512px shadow map.
+The canvas is MOVED between repaints, never rebuilt — `_renderBuildPreview`
+sets innerHTML, so the stage is re-appended afterwards. A context per repaint
+would hit the browser's cap in a dozen tab switches.
+
+### TWO FRAMING BUGS, both from guessing instead of measuring
+  - The first cut divided a constant by the aspect ratio and put the camera 6
+    units from a 6.5-unit car: the shot came out inside the door.
+  - The fix used the bounding SPHERE, which is the wrong shape for a car — it
+    has to contain the diagonal, so a long low machine got a radius set by its
+    LENGTH and half the canvas was empty above and below it.
+  `_frameStage` fits the BOX: the widest silhouette it can turn to is its
+  length, the height is its height, and the distance is whichever of the two
+  fields of view is tighter. Self-tuning for any car, any wing, any canvas.
+
+### Also
+`_dropCarMesh` frees a stage car: geometry always, materials only OUTSIDE the
+upgrade kit — the kit's are shared singletons and disposing one blanks every
+car in the game (r230). The still-preview path is deleted; `_carIcons` keeps it
+for the car SHELF, which needs six pictures at once and must not animate.
+
+On a phone the floor is full width with the spec underneath — side by side it
+was 156px of a 390px screen, a stamp, when the machine on the shop floor is the
+whole point. Two columns return at 620px.
+
+test-parts 23/0 (now pins that the stage is a live mounted canvas carrying the
+fitted build), test-cars 28/0, test-filters 35/0, test-boot 7/0, test-ladder
+31/0, test-timeline 33/0, test-mobile-hud green, boot.mjs 4/4.
+`tools-scratch/stage.mjs` proves it turns, that a fitted V8 adds hardware with
+no reload, and that the loop STOPS on another tab and mid-race.
