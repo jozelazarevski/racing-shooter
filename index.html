@@ -741,8 +741,27 @@
     box-shadow:0 3px 12px rgba(0,0,0,.55)}
   #topbar.hidden{display:none}
   /* BACK is the biggest thing in the bar, because it is the only thing in the
-     bar you can press. The rest is a label. */
-  #topbar-back{font-size:13px;padding:7px 13px}
+     bar you can press. The rest is a label.
+     ORANGE, THE SAME ORANGE AS START RACE — the two bars are now the two ends
+     of the screen, and giving them one colour says "these are the buttons" and
+     leaves everything else as text. Gold-on-dark read as another chip in a
+     menu already full of gold-on-dark chips, which is a large part of why the
+     control was hard to find at all. Same gradient, same ink border, sized for
+     a header rather than a footer. */
+  /* 40px MINIMUM, because it is a phone control and 31px was under every
+     touch-target guideline there is — and "make it more obvious" is a size
+     argument as much as a colour one. inline-flex so the min-height cannot
+     fight the padding. */
+  #topbar-back{font-size:13px;padding:7px 14px;border-radius:10px;
+    min-height:40px;display:inline-flex;align-items:center;
+    color:#fff8e0;background:linear-gradient(180deg,#ff9d2e,#e8402a);
+    border:2px solid var(--ink);
+    text-shadow:1px 1px 0 rgba(0,0,0,.35);
+    box-shadow:0 3px 0 var(--ink),0 6px 14px rgba(0,0,0,.45)}
+  #topbar-back:hover,#topbar-back:focus-visible{border-color:var(--ink);
+    filter:brightness(1.08)}
+  #topbar-back:active{transform:translateY(2px);
+    box-shadow:0 1px 0 var(--ink),0 3px 8px rgba(0,0,0,.45)}
   /* The screen centres short content with auto-margin spacers (.screen::before).
      A header must not be centred — with the bar up the page starts at the top. */
   .screen.with-topbar::before{display:none}
@@ -1623,7 +1642,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r227</div>
+<div id="build-tag">r228</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1934,10 +1953,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r227"></script>
+<script type="module" src="./src/main.js?v=r228"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r227"></script>
+<script src="./src/offline.js?v=r228"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r227"></script>
+<script type="module" src="./src/traffic.js?v=r228"></script>
 </body>
 </html>

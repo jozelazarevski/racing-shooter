@@ -1077,3 +1077,21 @@ have settled — and faint white on the new orange footer was unreadable.
 too, and it had already silently corrupted the back-button changelog twice.
 Bump exactly: `#build-tag`, the three `?v=`, and CACHE in sw.js. r227 did it
 with a python replace asserting each of the five strings was found once.
+
+## r228 — BACK IS ORANGE, THE SAME ORANGE AS START RACE
+"Make the back button orange als the start race."
+
+The two bars are the two ends of the screen now, so one colour across both says
+"these are the buttons" and leaves everything between them as text. Gold-on-dark
+read as one more chip in a menu already full of gold-on-dark chips — CREDITS,
+the profile, the tabs, the filter chips, the world badges — which is a large
+part of why the control was hard to find in the first place. Same gradient,
+same ink border, same press-down as `.btn`, sized for a header not a footer.
+
+Grown to a 40px minimum while there: it measured 31px, under every touch-target
+guideline going, and "more obvious" is a size argument as much as a colour one.
+`display:inline-flex` so `min-height` cannot fight the padding. The bar goes
+48 -> 57px for it.
+
+Measured at 320 and 390: button 81x40, fully inside the bar, label 10px clear,
+bar flush top=0 edge to edge at 0/25/60/100% scroll. `tools-scratch/backfit.mjs`.
