@@ -1165,6 +1165,78 @@
   .diff-chip.current.hard{background:#ff8a75}
   .diff-chip.current.normal{background:var(--yellow)}
 
+  /* ---------- BUILD BAY (parts you choose, not levels you climb) ---------- */
+  /* A SLOT IS A LINE UNTIL YOU OPEN IT — the same shape as the mission list,
+     for the same reason: two slots of four parts is eight cards permanently on
+     a screen that already carries the shelf, the tyre bay and ten upgrade
+     rows, and you change an engine about as often as you change cars. */
+  #build-bay{width:100%;display:flex;flex-direction:column;gap:6px;margin:2px 0 4px}
+  .bb-slot{border:1px solid var(--line-soft);border-radius:var(--r-sm);
+    background:rgba(12,8,3,.35);overflow:hidden}
+  .bb-slot.open{border-color:var(--orange);background:rgba(255,140,26,.07)}
+  .bb-head{pointer-events:auto;cursor:pointer;width:100%;display:flex;align-items:center;gap:9px;
+    padding:9px 11px;min-height:44px;background:none;border:none;text-align:left;
+    font-family:'Baloo 2';-webkit-tap-highlight-color:transparent}
+  .bb-head .bb-ic{font-size:17px;flex:0 0 auto}
+  .bb-head .bb-nm{font-family:'Luckiest Guy';font-size:12px;letter-spacing:1px;color:var(--cream);
+    flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* WHAT IS BOLTED ON is the fact the row exists to state, so it is the one
+     thing in it that is lit */
+  .bb-head .bb-fit{margin-left:auto;font-size:11px;font-weight:800;letter-spacing:.6px;
+    color:var(--yellow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bb-head .bb-caret{flex:0 0 auto;font-size:11px;color:var(--gold-dim)}
+  .bb-body{display:none;padding:0 9px 9px;flex-direction:column;gap:5px}
+  .bb-slot.open .bb-body{display:flex}
+  .bb-blurb{margin:0 2px 3px;font-size:10.5px;line-height:1.45;color:#c8b48a}
+  .bb-msg{margin:0 2px 3px;padding:6px 8px;border-radius:7px;font-size:10.5px;
+    line-height:1.45;font-weight:700;letter-spacing:.3px;color:var(--yellow);
+    background:rgba(255,212,0,.1);border:1px solid rgba(255,212,0,.3)}
+  /* a part card: name + what it costs on line one, the pitch and the numbers
+     under it. Two columns so the price never wanders into the middle. */
+  .bb-part{pointer-events:auto;cursor:pointer;display:grid;
+    grid-template-columns:1fr auto;gap:2px 8px;width:100%;text-align:left;
+    padding:8px 10px;border-radius:var(--r-sm);border:2px solid var(--line);
+    background:rgba(38,26,12,.5);font-family:'Baloo 2';color:var(--cream);
+    -webkit-tap-highlight-color:transparent}
+  .bb-part.on{border-color:var(--orange);background:rgba(255,140,26,.18);
+    box-shadow:0 2px 0 var(--ink)}
+  .bb-part.locked{opacity:.72}
+  .bb-part .bb-pn{font-family:'Luckiest Guy';font-size:12px;letter-spacing:.8px;
+    color:var(--cream);display:flex;align-items:center;gap:7px;min-width:0}
+  .bb-part.on .bb-pn{color:var(--yellow)}
+  /* the pipe count, drawn — "V8" means nothing until you see four stacks */
+  .bb-part .bb-pipes{font-style:normal;font-size:8px;letter-spacing:1px;color:var(--gold-dim)}
+  .bb-part .bb-sub,.bb-part .bb-deltas{grid-column:1 / -1}
+  .bb-part .bb-sub{font-size:10.5px;line-height:1.4;color:#e2c9a2}
+  .bb-part.locked .bb-sub{color:var(--amber);font-weight:700;letter-spacing:.4px}
+  .bb-part .bb-deltas{display:flex;flex-wrap:wrap;gap:3px 5px;margin-top:3px}
+  .bb-d{font-size:9.5px;font-weight:800;letter-spacing:.4px;padding:2px 6px;border-radius:5px;
+    background:rgba(12,8,3,.45);border:1px solid var(--line-soft);color:#d8c090;white-space:nowrap}
+  .bb-d.up{color:#8de89a}
+  .bb-d.dn{color:#e8946a}
+  .bb-part b{font-size:10.5px;font-weight:800;letter-spacing:1px;white-space:nowrap;align-self:start}
+  .bb-on{color:var(--orange)}
+  .bb-own{color:#8de89a}
+  .bb-buy{color:var(--yellow)}
+  .bb-lock{color:var(--gold-dim)}
+  @media (max-width:389px){
+    .bb-head .bb-nm{font-size:11px;letter-spacing:.4px}
+    .bb-head .bb-fit{font-size:10px}
+    .bb-part .bb-pn{font-size:11px;letter-spacing:.4px}
+  }
+  /* the debrief banner for a part the race just opened */
+  #part-unlock{width:min(100%,520px);margin:10px auto 0;padding:10px 13px;
+    border-radius:var(--r-sm);border:2px solid var(--yellow);
+    background:linear-gradient(180deg,rgba(255,212,0,.16),rgba(255,140,26,.12));
+    font-family:'Baloo 2';text-align:center}
+  #part-unlock .pu-top{font-family:'Luckiest Guy';font-size:12px;letter-spacing:2px;
+    color:var(--yellow)}
+  #part-unlock .pu-name{display:block;margin-top:3px;font-family:'Luckiest Guy';
+    font-size:15px;letter-spacing:1px;color:var(--cream)}
+  #part-unlock .pu-sub{display:block;margin-top:3px;font-size:10.5px;letter-spacing:.6px;
+    color:#e2c9a2}
+  /* ---------- end BUILD BAY ---------- */
+
   /* ---------- CAR SHOP (horizontal shelf with visible scroll affordance) ---------- */
   .shelf-wrap{position:relative;width:100%;margin-top:4px}
   .shelf-wrap::before,.shelf-wrap::after{content:'';position:absolute;top:0;bottom:10px;width:22px;
@@ -1682,7 +1754,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r229</div>
+<div id="build-tag">r230</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1869,6 +1941,14 @@
   <div id="tab-garage" class="menu-panel off">
     <div class="panel-head" id="garage-shop-head">YOUR MACHINES</div>
     <div class="shelf-wrap"><div id="car-shop"></div></div>
+    <!-- BUILD BAY — the hardware you CHOOSE, above the ladders you climb.
+         Asked for as "create a garage where I can custom build the car …
+         engine v4-8-12, add spoilers … purchase parts and race for other
+         parts". Each slot holds exactly one part and the options trade against
+         each other, which is what makes it a build rather than a shopping
+         list. Sits directly under the car shelf because it is about the
+         machine you just picked; TYRE BAY and DETAILED UPGRADES follow. -->
+    <div id="build-bay"></div>
     <!-- TYRE BAY: what is fitted is a CHOICE, not a consequence of a purchase.
          Sits above the upgrade list because it is free and instant, and the
          list below is what unlocks its top row. -->
@@ -1968,6 +2048,11 @@
     <div class="cb-head">RALLY STARS <b id="sp-total">0★</b></div>
     <div id="sp-rows"></div>
   </div>
+  <!-- [PARTS] A PART YOU JUST EARNED IS THE HEADLINE OF THE DEBRIEF, not a
+       line in a credits table: it is the one thing on this screen you cannot
+       buy. Filled by _announcePartUnlocks() on both the race and the mission
+       finish, and hidden whenever nothing opened. -->
+  <div id="part-unlock" style="display:none"></div>
   <div id="credit-breakdown" style="display:none">
     <div class="cb-head">CREDITS BREAKDOWN</div>
     <div id="cb-rows"></div>
@@ -1993,10 +2078,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r229"></script>
+<script type="module" src="./src/main.js?v=r230"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r229"></script>
+<script src="./src/offline.js?v=r230"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r229"></script>
+<script type="module" src="./src/traffic.js?v=r230"></script>
 </body>
 </html>

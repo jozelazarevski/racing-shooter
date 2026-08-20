@@ -1132,3 +1132,75 @@ behaviour: tapping row 5 selects DUEL, exactly one card is open, and START
 MISSION launches DUEL. Mission definitions, medal maths and payouts are
 untouched — if "reworked" meant the missions themselves rather than the screen
 they are chosen on, that work has NOT been done.
+
+## r230 — THE BUILD BAY: PARTS YOU CHOOSE, BUY AND EARN
+"Create a garage where I can custom build the car. Shows the tires, weapons,
+looks engine v4-8-12, add spoilers etc. … I would purchase parts and race for
+other parts."
+
+### What already existed, and what actually had to be built
+The ten UPGRADES were already a per-car credit economy, jobs and quests already
+granted upgrade levels as race rewards, and `applyUpgradeKit` already drew
+VISIBLE hardware for every line — scoops, skirts, flares, cannon pods, pipes.
+None of that was the ask. What was missing is CHOICE: every upgrade is a ladder
+where each rung beats the last, so there is no build to get wrong.
+
+`PART_SLOTS` is the other half. A slot holds exactly ONE part, the options TRADE
+against each other, and every one is visible from the chase camera:
+  ENGINE BLOCK  V4 / V6 TURBO / V8 / V12 MONSTER — speed and accel up, grip
+                down, and 2 / 2 / 4 / 6 exhaust stacks out of the tail
+  REAR WING     NO WING / LIP / DUCKTAIL / GT WING — downforce up, top speed
+                down, and the silhouette changes
+
+Fitment is PER CAR, like upgrade levels. `carParts()` defaults every slot to its
+stock part, owned and fitted, so a save written before this reads as a stock car
+and no migration pass is needed.
+
+### The wing moved slots
+`applyUpgradeKit` used to draw a rear wing at ENGINE level 3 (wide at 5). That
+was the only wing in the game and it appeared as a SIDE EFFECT of buying top
+speed — nobody chose it. The ENGINE line no longer draws a wing at all, so the
+two cannot stack on the same tail.
+
+### DOWNFORCE is why a wing is a trade
+`Car.update` multiplies grip by `1 + downforce * speedN`. A wing costs top speed
+outright and pays it back only once the car is moving, so a GT wing is worth
+nothing at a standstill and 40% more grip flat out. Without that a wing is just
+another purchase.
+
+### Race for the part
+The top part in each slot cannot be bought at any price. `partLock` reads career
+data the game already keeps — worlds won outright, mission medals held — so no
+new counter rides along, and the card shows PROGRESS (0/6) rather than a bare
+padlock. `_announcePartUnlocks()` banners it on the debrief, once, keyed in
+`garage.partSeen`.
+
+### THE BUG THIS UNCOVERED — read this before touching applyUpgradeKit
+`test-filters` went 35/0 -> 34/1 with "Cannot read properties of undefined
+(reading 'isReady')", proven mine by running the same test against an r229
+worktree on 8958 (clean) and bisected to the one line that passes parts to the
+mesh.
+
+`applyUpgradeKit` BUILT TEN MATERIALS PER CALL and `disposeKit` disposed them.
+That is the documented three.js hazard: `compileAsync` polls its captured
+material list from its own timer, and disposing one mid-poll throws from inside
+that timer where no `.catch()` of ours can reach it. It had gone unnoticed only
+because a stock car's kit was nearly EMPTY — the moment the ENGINE slot gave
+every car a pair of pipes from the first frame, a menu-time rebuild started
+landing on the boot compile every single run.
+
+Fixed at the root: the palette is now module-level singletons (`kitMats()`),
+built once and shared by every car and every rebuild, and `disposeKit` disposes
+GEOMETRY ONLY. Do not reintroduce a per-call material factory — `tests/
+test-parts.mjs` has a check that fails if the kit stops sharing.
+
+### Gates
+`tests/test-parts.mjs` (new, 18/0) covers: stock defaults, the stat climb, the
+grip and top-speed costs, pipes and wing appearing on the mesh, credits taken
+once, the build surviving a save, a locked part refusing at any price and
+explaining itself, both unlock conditions opening, the banner firing once, and
+the shared-material check. It drives the REAL UI path — open the slot, tap the
+row — so it cannot pass on a path no player reaches.
+test-cars 28/0, test-filters 35/0, test-boot 7/0, test-ladder 31/0,
+test-timeline 33/0, test-mobile-hud green, boot.mjs 4/4.
+Widths 320/390/430: nothing clipped, nothing overflowing.

@@ -929,7 +929,43 @@ export function buildVoxelRacer(spec) {
  *  that visibly becomes something. The whole kit lives in ONE named child
  *  group so a purchase can rebuild it without touching the body underneath.
  */
-export function applyUpgradeKit(group, up = {}) {
+/** The upgrade kit's palette, built once and shared by every car.
+ *
+ *  THE PARTS THAT FACE THE CAMERA GET THEIR OWN LOOK. A chase camera sees the
+ *  tail and the flanks and nothing else, so anything meant to READ as an
+ *  upgrade is either back there or down the side, and the emissive pieces are
+ *  MeshBasic — unlit, so they hold their colour in a tunnel and at dusk where
+ *  a standard material goes to mud.
+ *
+ *  Lazily built rather than at module load so importing this file costs
+ *  nothing; never disposed, because they outlive every kit that uses them.
+ */
+let _kitMats = null;
+function kitMats() {
+  if (_kitMats) return _kitMats;
+  const M = (color, opts = {}) => new THREE.MeshStandardMaterial({
+    color, roughness: 0.5, metalness: 0.45, envMapIntensity: 1.1, ...opts });
+  _kitMats = {
+    steel: M(0x6a6e74),
+    dark: M(0x2a2724, { metalness: 0.2, roughness: 0.8 }),
+    carbon: M(0x1b1b1e, { metalness: 0.3, roughness: 0.45 }),
+    gold: M(0xc9922e, { metalness: 0.85, roughness: 0.3 }),
+    hot: new THREE.MeshBasicMaterial({ color: 0x7fd4ff }),
+    ember: new THREE.MeshBasicMaterial({ color: 0xff7a2a }),
+    amber: new THREE.MeshBasicMaterial({ color: 0xffb52e }),
+    brake: new THREE.MeshBasicMaterial({ color: 0xff2f2f }),
+    // one-off colours used by single parts; here so that NOTHING in the kit
+    // builds a material per call any more
+    blue: M(0x2f6fd8),
+    red: M(0xd8342a),
+  };
+  return _kitMats;
+}
+
+/** @param parts [PARTS] the fitted build — { engine, spoiler } part objects
+ *  from PART_SLOTS. Optional: called without it (the editor, the shop
+ *  portraits) a car simply wears its stock block and no wing. */
+export function applyUpgradeKit(group, up = {}, parts = null) {
   const prev = group.getObjectByName('upgradeKit');
   if (prev) { group.remove(prev); disposeKit(prev); }
   const lv = (k) => (up?.[k] | 0);
@@ -952,21 +988,11 @@ export function applyUpgradeKit(group, up = {}) {
   const Nz = (o) => nose - o;
   const kit = new THREE.Group();
   kit.name = 'upgradeKit';
-  const M = (color, opts = {}) => new THREE.MeshStandardMaterial({
-    color, roughness: 0.5, metalness: 0.45, envMapIntensity: 1.1, ...opts });
-  const steel = M(0x6a6e74);
-  const dark = M(0x2a2724, { metalness: 0.2, roughness: 0.8 });
-  const hot = new THREE.MeshBasicMaterial({ color: 0x7fd4ff });
-  // THE PARTS THAT FACE THE CAMERA GET THEIR OWN LOOK. A chase camera sees the
-  // tail and the flanks and nothing else, so anything meant to READ as an
-  // upgrade is either back there or down the side, and the emissive pieces are
-  // MeshBasic — unlit, so they hold their colour in a tunnel and at dusk where
-  // a standard material goes to mud.
-  const carbon = M(0x1b1b1e, { metalness: 0.3, roughness: 0.45 });
-  const gold = M(0xc9922e, { metalness: 0.85, roughness: 0.3 });
-  const ember = new THREE.MeshBasicMaterial({ color: 0xff7a2a });
-  const amber = new THREE.MeshBasicMaterial({ color: 0xffb52e });
-  const brake = new THREE.MeshBasicMaterial({ color: 0xff2f2f });
+  // ONE SET OF MATERIALS FOR THE WHOLE GAME, built once. They were rebuilt on
+  // every call — ten new materials per car per rebuild, each needing its own
+  // shader program — and then disposed on the next call, which is what made
+  // the kit a hazard to an in-flight async compile (see disposeKit).
+  const { steel, dark, hot, carbon, gold, ember, amber, brake, blue, red } = kitMats();
   const add = (geo, mat, x, y, z, rx = 0) => {
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
@@ -976,27 +1002,69 @@ export function applyUpgradeKit(group, up = {}) {
     return m;
   };
 
-  // ENGINE — a hood scoop, then a second one and a pair of stacks out the back
+  // ENGINE — a hood scoop, then a second one, from the TUNING level.
   const eng = lv('engine');
   if (eng >= 2) {
     add(new THREE.BoxGeometry(0.9, 0.26, 1.1), dark, 0, capTop - 0.55, Nz(1.85));
-    if (eng >= 4) {
-      add(new THREE.BoxGeometry(1.5, 0.2, 0.7), dark, 0, capTop - 0.42, Nz(2.35));
-      for (const sx of [-0.55, 0.55]) {
-        add(new THREE.CylinderGeometry(0.14, 0.17, 0.9, 8), steel,
+    if (eng >= 4) add(new THREE.BoxGeometry(1.5, 0.2, 0.7), dark, 0, capTop - 0.42, Nz(2.35));
+  }
+  // [PARTS] ...AND THE PIPES COME FROM THE BLOCK YOU FITTED, which is the one
+  // part of "V4 / V6 / V8 / V12" a player can actually SEE from a chase
+  // camera. Two stacks for the small blocks, four for the V8, six for the V12,
+  // laid out symmetrically about the centreline so an odd count never looks
+  // like a missing pipe. A bigger block also gets a taller plenum on the hood,
+  // so the change reads from in front as well as from behind.
+  const block = parts?.engine;
+  const pipes = block?.pipes ?? (eng >= 4 ? 2 : 0);
+  if (pipes > 0) {
+    const per = pipes / 2;                               // per side
+    const r = pipes >= 6 ? 0.115 : pipes >= 4 ? 0.13 : 0.14;
+    const step = r * 2.35;
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < per; i++) {
+        // centred on the same shoulder every time: 0.55 for a single pipe,
+        // spreading outward in pairs as the count grows
+        const sx = side * (0.55 + (i - (per - 1) / 2) * step * 1.15);
+        add(new THREE.CylinderGeometry(r, r * 1.2, 0.9, 8), steel,
           sx, baseY + 0.1, T(0.85), Math.PI / 2);
-        add(new THREE.CylinderGeometry(0.1, 0.1, 0.1, 8), ember,
-          sx, baseY + 0.1, T(0.42), Math.PI / 2);      // lit pipe mouths
+        add(new THREE.CylinderGeometry(r * 0.72, r * 0.72, 0.1, 8), ember,
+          sx, baseY + 0.1, T(0.42), Math.PI / 2);        // lit pipe mouths
       }
     }
+    if (pipes >= 4) {
+      add(new THREE.BoxGeometry(pipes >= 6 ? 1.15 : 0.95, 0.2, 0.85), steel,
+        0, capTop - 0.34, Nz(1.95));                     // plenum, visible over the nose
+    }
   }
-  // ...AND THE REAR WING, which is the whole point of the exercise. One
+  // [PARTS] THE REAR WING, which is the whole point of the exercise. One
   // silhouette change at the top of the tail is worth more than five details
   // on the nose, because the nose is the one part of the car the player never
-  // sees. Level 3 so it lands BETWEEN the two hood tiers rather than with them.
-  if (eng >= 3) {
-    const wide = eng >= 5;
-    const span = wide ? 2.9 : 2.4;
+  // sees.
+  //
+  // IT USED TO BE DRAWN BY THE ENGINE LEVEL (eng >= 3, wide at 5). That was
+  // the only wing the game had, and it appeared as a side effect of buying
+  // top speed — nobody chose it. It is a SLOT now, with four options that
+  // trade downforce against top end, and the ENGINE line no longer draws a
+  // wing at all so the two cannot stack up on the same tail. A save that had
+  // reached engine 3 keeps a wing only if it fits one, which is the honest
+  // reading of "the wing is a part now".
+  const wing = parts?.spoiler?.id ?? 'none';
+  if (wing === 'lip') {
+    // a lip is a LID, not a plane on stalks: it follows the tail rather than
+    // standing off it, which is exactly what makes it read as the modest one
+    const lip = add(new THREE.BoxGeometry(2.05, 0.1, 0.44), carbon,
+      0, capTop + 0.12, T(1.12));
+    lip.rotation.x = -0.34;
+  } else if (wing === 'duck') {
+    const lip = add(new THREE.BoxGeometry(2.25, 0.12, 0.62), carbon,
+      0, capTop + 0.2, T(1.16));
+    lip.rotation.x = -0.42;
+    for (const sx of [-1, 1]) {                      // small endplates
+      add(new THREE.BoxGeometry(0.08, 0.24, 0.5), carbon,
+        sx * 1.11, capTop + 0.22, T(1.16));
+    }
+  } else if (wing === 'gt') {
+    const span = 2.9;
     for (const sx of [-1, 1]) {
       add(new THREE.BoxGeometry(0.12, 0.62, 0.34), carbon,
         sx * (span * 0.36), capTop + 0.28, T(1.28));
@@ -1004,14 +1072,12 @@ export function applyUpgradeKit(group, up = {}) {
     const plane = add(new THREE.BoxGeometry(span, 0.09, 0.62), carbon,
       0, capTop + 0.6, T(1.22));
     plane.rotation.x = -0.16;                        // angle of attack, visible in profile
-    if (wide) {
-      const flap = add(new THREE.BoxGeometry(span, 0.07, 0.34), gold,
-        0, capTop + 0.78, T(1.02));
-      flap.rotation.x = -0.3;
-      for (const sx of [-1, 1]) {                    // endplates
-        add(new THREE.BoxGeometry(0.07, 0.42, 0.9), gold,
-          sx * (span * 0.5), capTop + 0.66, T(1.16));
-      }
+    const flap = add(new THREE.BoxGeometry(span, 0.07, 0.34), gold,
+      0, capTop + 0.78, T(1.02));
+    flap.rotation.x = -0.3;
+    for (const sx of [-1, 1]) {                      // endplates
+      add(new THREE.BoxGeometry(0.07, 0.42, 0.9), gold,
+        sx * (span * 0.5), capTop + 0.66, T(1.16));
     }
   }
   // ARMOR — side skirts and a bull bar, then a roof plate
@@ -1119,10 +1185,10 @@ export function applyUpgradeKit(group, up = {}) {
   // NITRO — a bottle behind the cabin, glowing at high levels
   const nit = lv('nitro');
   if (nit >= 2) {
-    add(new THREE.CylinderGeometry(0.22, 0.22, 1.5, 10), M(0x2f6fd8),
+    add(new THREE.CylinderGeometry(0.22, 0.22, 1.5, 10), blue,
       0.55, capTop - 0.35, -1.15, Math.PI / 2);
     if (nit >= 4) {
-      add(new THREE.CylinderGeometry(0.22, 0.22, 1.5, 10), M(0x2f6fd8),
+      add(new THREE.CylinderGeometry(0.22, 0.22, 1.5, 10), blue,
         -0.55, capTop - 0.35, -1.15, Math.PI / 2);
       add(new THREE.SphereGeometry(0.13, 8, 6), hot, 0, capTop - 0.35, T(1.05));
     }
@@ -1153,7 +1219,7 @@ export function applyUpgradeKit(group, up = {}) {
   // DAMPERS — visible coilovers at each corner
   if (lv('dampers') >= 2) {
     for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
-      add(new THREE.CylinderGeometry(0.1, 0.1, 0.7, 8), M(0xd8342a),
+      add(new THREE.CylinderGeometry(0.1, 0.1, 0.7, 8), red,
         sx * 1.15, wheelY + 0.45, sz * 1.5);
     }
   }
@@ -1228,12 +1294,21 @@ export function applyUpgradeKit(group, up = {}) {
 }
 
 /** three does not free geometry for you; a kit is rebuilt on every purchase. */
+/** GEOMETRY ONLY, NEVER MATERIALS.
+ *
+ *  The kit's materials are the module-level singletons in `KIT_MATS` — shared
+ *  by every car and every rebuild — so disposing one here would blank the kit
+ *  on every OTHER car and, worse, pull a material out from under a
+ *  `renderer.compileAsync` that is still polling it. That is the documented
+ *  "Cannot read properties of undefined (reading 'isReady')" throw, from
+ *  inside three's own timer where no .catch() of ours can reach it.
+ *
+ *  It went unnoticed while a stock car's kit was nearly empty; the moment the
+ *  ENGINE BLOCK slot gave every car a pair of exhaust stacks from the first
+ *  frame, a menu-time rebuild started landing on the boot compile every run.
+ */
 function disposeKit(node) {
-  node.traverse?.((o) => {
-    if (o.geometry) o.geometry.dispose?.();
-    if (o.material) (Array.isArray(o.material) ? o.material : [o.material])
-      .forEach((m) => m.dispose?.());
-  });
+  node.traverse?.((o) => { if (o.geometry) o.geometry.dispose?.(); });
 }
 
 /** Weld several geometries into one, so a detailed part is still one draw
@@ -1633,7 +1708,12 @@ export class Car {
     if (inputs.drift) slipTarget = 1; // handbrake forces a full slide
     const slipRate = slipTarget > this.slip ? 7 : 3.2; // break loose fast, recover smoothly
     this.slip += (slipTarget - this.slip) * Math.min(1, slipRate * dt);
-    let grip = this.grip * (1 + 0.08 * hnd) * (1 - 0.78 * this.slip) * sGrip * (this.gripBoost || 1);
+    // [PARTS] DOWNFORCE — the rear wing. Grip that only exists once the car is
+    // moving, which is what makes a wing a TRADE: it costs top speed outright
+    // and pays it back only in the fast corners. At a standstill a GT wing does
+    // nothing at all; flat out it is worth 40% more grip than no wing.
+    let grip = this.grip * (1 + 0.08 * hnd) * (1 - 0.78 * this.slip) * sGrip * (this.gripBoost || 1)
+      * (1 + (this.downforce || 0) * speedN);
     if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
     if (this.landGrip > 0) { this.landGrip -= dt; grip *= 0.4; } // loose for ~0.4s after landing
     // ---- river-fords: wet tires. Ford crossings set _wetT=3.5 with a gentle
