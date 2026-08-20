@@ -53,9 +53,12 @@ const R = await page.evaluate(() => {
   // Everything below goes through the REAL UI path — open the slot, tap the
   // row — so the test cannot pass on a code path a player never reaches.
   document.getElementById('tab-btn-garage').click();
+  // r231: every bay is open at once now — the cards are pictures in a grid,
+  // not rows behind a fold — so a part is addressed by its own data-attrs
   const fitByIndex = (slotKey, i) => {
-    g._buildOpen = slotKey; g.renderGarage();
-    [...document.querySelectorAll('#build-bay .bb-slot.open .bb-part')][i].click();
+    g.renderGarage();
+    const cards = [...document.querySelectorAll(`.part-card[data-slot="${slotKey}"]`)];
+    cards[i].click();
     return snap();
   };
   const v6 = fitByIndex('engine', 1);
@@ -83,7 +86,7 @@ const R = await page.evaluate(() => {
   const gt = fitByIndex('spoiler', 3);
   out.lockedStayed = g.fittedPart('spoiler').id !== 'gt';
   out.lockedUntouchedCredits = g.garage.credits === 999999;
-  out.lockedExplains = (document.querySelector('#build-bay .bb-msg')?.textContent || '')
+  out.lockedExplains = (document.querySelector('.bay-msg')?.textContent || '')
     .includes('TAKE 3 MISSION MEDALS');
 
   // ...and OPENS on the race it names
@@ -95,6 +98,17 @@ const R = await page.evaluate(() => {
   localStorage.setItem(g._missionStoreKey(), JSON.stringify(best));
   out.v12OpensOnSixWins = g.partLock({ lock: { kind: 'cleared', n: 6 } }).open;
   out.gtOpensOnMedals = g.partLock({ lock: { kind: 'medals', n: 3 } }).open;
+
+  // ---- r231: THE GARAGE IS GRAPHICAL. Every part shows a picture rendered
+  // from its own mesh, and the preview shows the car actually built.
+  g.renderGarage();
+  const art = [...document.querySelectorAll('.part-card .pc-art')];
+  out.everyPartHasArt = art.length > 0 && art.every((i) => (i.getAttribute('src') || '').length > 2000);
+  out.partCount = art.length;
+  out.distinctArt = new Set(art.map((i) => i.getAttribute('src'))).size;
+  out.previewDrawn = (document.querySelector('.bp-art')?.getAttribute('src') || '').length > 5000;
+  out.bays = document.querySelectorAll('.bay').length;
+  out.ladders = document.querySelectorAll('.up-card').length;
 
   // ---- the banner, once
   delete g.garage.partSeen;
@@ -122,6 +136,11 @@ check('a locked part cannot be bought at any price', R.lockedStayed && R.lockedU
 check('...and says which race opens it', R.lockedExplains);
 check('the V12 opens once six worlds are won outright', R.v12OpensOnSixWins);
 check('the GT wing opens once three medals are held', R.gtOpensOnMedals);
+check('every part in the shop is a rendered picture', R.everyPartHasArt, `${R.partCount} parts`);
+check('...and no two parts share a picture', R.distinctArt === R.partCount,
+  `${R.distinctArt} distinct of ${R.partCount}`);
+check('the preview shows the car you actually built', R.previewDrawn);
+check('every upgrade ladder found a bay', R.ladders === 10, `${R.ladders} of 10 in ${R.bays} bays`);
 check('an earned part is announced on the debrief', R.bannerFirst);
 check('...and only the once', !R.bannerRepeat);
 

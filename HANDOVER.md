@@ -1204,3 +1204,61 @@ row — so it cannot pass on a path no player reaches.
 test-cars 28/0, test-filters 35/0, test-boot 7/0, test-ladder 31/0,
 test-timeline 33/0, test-mobile-hud green, boot.mjs 4/4.
 Widths 320/390/430: nothing clipped, nothing overflowing.
+
+## r231 — THE GARAGE IS A WORKSHOP, AND THE TWO SYSTEMS ARE ONE
+"Make it graphical as in the demo. Marry the existing upgrades mode vs this",
+with a mockup of a workshop: a car on the floor and part shops around it, every
+part a PICTURE with a price and an INSTALL button.
+
+### The marriage
+The mockup's panels map almost 1:1 onto systems that already existed, which is
+why this is a merge and not a rewrite. Every one of the ten UPGRADES lands in
+exactly one bay — nothing is orphaned by the regrouping:
+
+    ENGINE SHOP     the four blocks + ENGINE WRENCH
+    BODY KIT        the four wings + SUSPENSION SPRING
+    TIRE BAY        the three compounds + TIRES STACK
+    WEAPONS CACHE   CANNON CORE, ORDNANCE RACK, MAGAZINE DRUM
+    CHASSIS & CREW  ARMOR, NITRO, DAMPERS, RECOVERY BEACON
+
+A bay sells CHOICES (one at a time, trading against each other) or LADDERS
+(each rung better than the last) and both wear the same card: picture, bar,
+price, one button that says what tapping does. `renderGarage()` is four lines
+now; it used to fill three separate containers with three different layouts.
+
+### Pictures, from the real meshes
+`buildPartIcon(kind, id)` in vehicles.js builds a showroom model from the SAME
+primitives and the SAME palette the part uses on the car, so the picture in the
+shop is the thing you bolt on. `_studio` / `_shoot` in main.js is the one
+off-screen renderer, extracted from `_carIcons`, and every picture is rendered
+ONCE to a data URL and then it is an `<img>` — no second live WebGL context
+animating behind a menu that already has a world rendering behind it.
+
+`_buildPreview()` is the centrepiece: the selected car wearing its fitted parts
+AND its whole upgrade kit, re-rendered only when the build signature changes.
+
+### THREE FRAMING BUGS WORTH REMEMBERING
+  - `_shoot` first took `dist` and scaled a hardcoded (5.2, 3.2, 6.2) rig by
+    `dist / 8.86`. That rig is 8.70 long, not 8.86 — and passing "6.2" for the
+    car shelf (meaning "the old z") moved the camera 30% closer and cropped
+    every car on the shelf. `dist` is the TRUE camera distance now.
+  - The studio camera looks in from +X/+Y/+Z and the exhaust stacks are built
+    on +X. The blocks were first shot at `ry = 0.62π`, which put every pipe
+    behind the block: a V4 and a V8 rendered as the same black box. They face
+    their pipe side now.
+  - A V4 and a V6 both have two pipes, so pipe count alone cannot separate
+    them. The V6 wears the turbo its name promises — and it had to move to the
+    FRONT face, because on the far flank it was hidden by the block.
+  The icon meshes put every pipe on the camera side. On the car they are split
+  across two banks, which is right there and useless in a 128px picture.
+
+### Gates
+test-parts 22/0 — now also pins that every part shows a rendered picture, that
+no two parts share one (which is what proves the blocks read apart), that the
+preview draws, and that all ten ladders find a bay. test-cars 28/0,
+test-filters 35/0, test-boot 7/0, test-ladder 31/0, test-timeline 33/0,
+test-mobile-hud green, boot.mjs 4/4.
+`tools-scratch/garagefit.mjs` at 320/390/430: 0 overflowing, 0 clipped labels,
+0 tap targets under 34px, 0 sideways scroll. It skips `.shelf-wrap`, because
+the car shelf scrolls sideways on purpose and counting its children reported
+200 false positives.

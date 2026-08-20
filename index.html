@@ -1165,77 +1165,118 @@
   .diff-chip.current.hard{background:#ff8a75}
   .diff-chip.current.normal{background:var(--yellow)}
 
-  /* ---------- BUILD BAY (parts you choose, not levels you climb) ---------- */
-  /* A SLOT IS A LINE UNTIL YOU OPEN IT — the same shape as the mission list,
-     for the same reason: two slots of four parts is eight cards permanently on
-     a screen that already carries the shelf, the tyre bay and ten upgrade
-     rows, and you change an engine about as often as you change cars. */
-  #build-bay{width:100%;display:flex;flex-direction:column;gap:6px;margin:2px 0 4px}
-  .bb-slot{border:1px solid var(--line-soft);border-radius:var(--r-sm);
-    background:rgba(12,8,3,.35);overflow:hidden}
-  .bb-slot.open{border-color:var(--orange);background:rgba(255,140,26,.07)}
-  .bb-head{pointer-events:auto;cursor:pointer;width:100%;display:flex;align-items:center;gap:9px;
-    padding:9px 11px;min-height:44px;background:none;border:none;text-align:left;
-    font-family:'Baloo 2';-webkit-tap-highlight-color:transparent}
-  .bb-head .bb-ic{font-size:17px;flex:0 0 auto}
-  .bb-head .bb-nm{font-family:'Luckiest Guy';font-size:12px;letter-spacing:1px;color:var(--cream);
-    flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  /* WHAT IS BOLTED ON is the fact the row exists to state, so it is the one
-     thing in it that is lit */
-  .bb-head .bb-fit{margin-left:auto;font-size:11px;font-weight:800;letter-spacing:.6px;
-    color:var(--yellow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .bb-head .bb-caret{flex:0 0 auto;font-size:11px;color:var(--gold-dim)}
-  .bb-body{display:none;padding:0 9px 9px;flex-direction:column;gap:5px}
-  .bb-slot.open .bb-body{display:flex}
-  .bb-blurb{margin:0 2px 3px;font-size:10.5px;line-height:1.45;color:#c8b48a}
-  .bb-msg{margin:0 2px 3px;padding:6px 8px;border-radius:7px;font-size:10.5px;
+  /* ---------- THE GARAGE, AS A WORKSHOP ----------
+     A mockup was sent: a car on the shop floor with part shops floating around
+     it, every part a PICTURE with a price and an INSTALL button. This is that,
+     laid out for a phone in portrait — the bays stack instead of surrounding
+     the car, because 390px cannot hold a ring of panels. */
+  /* THE CAR YOU BUILT. The picture is rendered from the real mesh wearing the
+     real kit (see _buildPreview), so it is the machine, not an illustration. */
+  #build-preview{width:100%;display:flex;gap:11px;align-items:center;
+    margin:4px 0 8px;padding:9px 10px;border-radius:var(--r-md);
+    border:1px solid var(--line-soft);
+    background:linear-gradient(180deg,rgba(60,40,16,.55),rgba(12,8,3,.5))}
+  #build-preview .bp-art{width:52%;max-width:300px;height:auto;flex:0 0 auto;
+    filter:drop-shadow(0 8px 14px rgba(0,0,0,.55))}
+  #build-preview .bp-side{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
+  #build-preview .bp-name{font-family:'Luckiest Guy';font-size:15px;letter-spacing:1px;
+    color:var(--yellow);line-height:1.1}
+  #build-preview .bp-spec{display:flex;flex-direction:column;gap:1px;
+    font-size:10px;font-weight:700;letter-spacing:.6px;color:#e2c9a2}
+  /* the four numbers the whole screen exists to move */
+  #build-preview .bp-nums{display:grid;grid-template-columns:1fr 1fr;gap:3px 6px;margin-top:2px}
+  #build-preview .bp-nums span{display:flex;align-items:baseline;gap:4px}
+  #build-preview .bp-nums i{font-style:normal;font-size:8.5px;font-weight:800;
+    letter-spacing:1px;color:var(--gold-dim)}
+  #build-preview .bp-nums b{font-family:'Luckiest Guy';font-size:13px;color:var(--cream)}
+
+  #garage-bays{width:100%;display:flex;flex-direction:column;gap:8px}
+  .bay{border:1px solid var(--line-soft);border-radius:var(--r-md);
+    background:rgba(12,8,3,.4);padding:8px 9px 9px}
+  .bay-head{display:flex;align-items:center;gap:7px;margin:0 0 7px;
+    font-family:'Luckiest Guy';font-size:12px;letter-spacing:2px;color:var(--cream)}
+  .bay-msg{margin:6px 2px 0;padding:6px 8px;border-radius:7px;font-size:10.5px;
     line-height:1.45;font-weight:700;letter-spacing:.3px;color:var(--yellow);
     background:rgba(255,212,0,.1);border:1px solid rgba(255,212,0,.3)}
-  /* a part card: name + what it costs on line one, the pitch and the numbers
-     under it. Two columns so the price never wanders into the middle. */
-  .bb-part{pointer-events:auto;cursor:pointer;display:grid;
-    grid-template-columns:1fr auto;gap:2px 8px;width:100%;text-align:left;
-    padding:8px 10px;border-radius:var(--r-sm);border:2px solid var(--line);
-    background:rgba(38,26,12,.5);font-family:'Baloo 2';color:var(--cream);
-    -webkit-tap-highlight-color:transparent}
-  .bb-part.on{border-color:var(--orange);background:rgba(255,140,26,.18);
+  /* PARTS AS PICTURES. auto-fill (not -fit) so a bay with three parts keeps the
+     same card width as one with four — every shop shares a rhythm. */
+  .bay-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+  .part-card{pointer-events:auto;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;gap:3px;padding:6px 5px 7px;border-radius:var(--r-sm);
+    border:2px solid var(--line);background:rgba(38,26,12,.55);
+    font-family:'Baloo 2';color:var(--cream);text-align:center;
+    -webkit-tap-highlight-color:transparent;transition:transform .1s}
+  .part-card:active{transform:scale(.97)}
+  .part-card.on{border-color:var(--orange);background:rgba(255,140,26,.2);
     box-shadow:0 2px 0 var(--ink)}
-  .bb-part.locked{opacity:.72}
-  .bb-part .bb-pn{font-family:'Luckiest Guy';font-size:12px;letter-spacing:.8px;
-    color:var(--cream);display:flex;align-items:center;gap:7px;min-width:0}
-  .bb-part.on .bb-pn{color:var(--yellow)}
-  /* the pipe count, drawn — "V8" means nothing until you see four stacks */
-  .bb-part .bb-pipes{font-style:normal;font-size:8px;letter-spacing:1px;color:var(--gold-dim)}
-  .bb-part .bb-sub,.bb-part .bb-deltas{grid-column:1 / -1}
-  .bb-part .bb-sub{font-size:10.5px;line-height:1.4;color:#e2c9a2}
-  .bb-part.locked .bb-sub{color:var(--amber);font-weight:700;letter-spacing:.4px}
-  .bb-part .bb-deltas{display:flex;flex-wrap:wrap;gap:3px 5px;margin-top:3px}
-  .bb-d{font-size:9.5px;font-weight:800;letter-spacing:.4px;padding:2px 6px;border-radius:5px;
-    background:rgba(12,8,3,.45);border:1px solid var(--line-soft);color:#d8c090;white-space:nowrap}
-  .bb-d.up{color:#8de89a}
-  .bb-d.dn{color:#e8946a}
-  .bb-part b{font-size:10.5px;font-weight:800;letter-spacing:1px;white-space:nowrap;align-self:start}
-  .bb-on{color:var(--orange)}
-  .bb-own{color:#8de89a}
-  .bb-buy{color:var(--yellow)}
-  .bb-lock{color:var(--gold-dim)}
+  .part-card.locked{opacity:.66}
+  .part-card .pc-art{width:100%;max-width:104px;height:auto;
+    filter:drop-shadow(0 3px 5px rgba(0,0,0,.5))}
+  .part-card.locked .pc-art{filter:grayscale(.85) brightness(.75)}
+  .part-card .pc-name{font-family:'Luckiest Guy';font-size:10px;letter-spacing:.4px;
+    line-height:1.15;color:var(--cream)}
+  .part-card.on .pc-name{color:var(--yellow)}
+  /* the POWER bar from the mockup — normalised inside its own slot, so a full
+     bar means "the strongest thing in this shop" */
+  .part-card .pc-bar{width:100%;height:4px;border-radius:3px;background:rgba(0,0,0,.5);
+    overflow:hidden}
+  .part-card .pc-bar i{display:block;height:100%;border-radius:3px;
+    background:linear-gradient(90deg,#ffb52e,#ff6a2a)}
+  .part-card .pc-act{font-size:9.5px;font-weight:800;letter-spacing:.8px;
+    padding:3px 7px;border-radius:6px;white-space:nowrap}
+  .pc-act.fitted{color:var(--ink);background:var(--orange)}
+  .pc-act.own{color:#8de89a;border:1px solid rgba(141,232,154,.5)}
+  .pc-act.buy{color:var(--yellow);border:1px solid rgba(255,212,0,.45)}
+  .pc-act.lock{color:var(--gold-dim);border:1px solid var(--line-soft)}
+  .part-card .pc-sub{font-size:9px;line-height:1.3;color:#c8b48a}
+  .part-card.locked .pc-sub{color:var(--amber);font-weight:700}
+
+  /* AN UPGRADE LINE IN THE SAME CLOTHES. A player does not care which of the
+     game's two systems a thing came out of, so a ladder rung is a card with a
+     bar and a price, exactly like a part. */
+  .up-card{display:grid;grid-template-columns:30px 1fr auto;gap:3px 8px;align-items:center;
+    margin-top:6px;padding:7px 9px;border-radius:var(--r-sm);
+    border:1px solid var(--line-soft);background:rgba(38,26,12,.4)}
+  .up-card.maxed{opacity:.72}
+  .up-card{grid-template-columns:46px 1fr auto}
+  .up-card .uc-ic{font-size:17px;text-align:center;line-height:1}
+  .up-card .uc-ic img{width:100%;height:auto;display:block;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+  .up-card .uc-main{min-width:0;display:flex;flex-direction:column;gap:2px}
+  .up-card .uc-nm{font-family:'Luckiest Guy';font-size:10.5px;letter-spacing:.6px;
+    color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .up-card .uc-pips{display:flex;align-items:center;gap:3px}
+  .up-card .uc-pips b{width:13px;height:4px;border-radius:2px;background:var(--yellow)}
+  .up-card .uc-pips b.off{background:rgba(255,255,255,.16)}
+  .up-card .uc-pips i{font-style:normal;margin-left:4px;font-size:8.5px;font-weight:800;
+    letter-spacing:.8px;color:var(--gold-dim)}
+  .up-card .uc-desc{font-size:9.5px;line-height:1.35;color:#c8b48a}
+  .up-buy{pointer-events:auto;cursor:pointer;font-family:'Baloo 2';font-weight:800;
+    font-size:10px;letter-spacing:.8px;padding:7px 10px;min-height:34px;border-radius:7px;
+    border:1px solid rgba(255,212,0,.45);background:rgba(255,212,0,.1);color:var(--yellow);
+    white-space:nowrap;-webkit-tap-highlight-color:transparent}
+  .up-buy:disabled{opacity:.45;cursor:default;color:var(--gold-dim);
+    border-color:var(--line-soft);background:rgba(0,0,0,.25)}
+  .up-buy.maxed{color:#8de89a;border-color:rgba(141,232,154,.4)}
+  /* the tyre bay is a bay now, so it loses its own outer box */
+  .bay #tyre-bay{margin:0;padding:0;border:none;background:none}
+  .bay #tyre-bay .panel-head{display:none}
+  .tyre-opt .tyre-art{width:38px;height:auto;display:block;margin:0 auto;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+  .tyre-opt.locked .tyre-art{filter:grayscale(.9) brightness(.6)}
   @media (max-width:389px){
-    .bb-head .bb-nm{font-size:11px;letter-spacing:.4px}
-    .bb-head .bb-fit{font-size:10px}
-    .bb-part .bb-pn{font-size:11px;letter-spacing:.4px}
+    #build-preview{gap:8px;padding:7px 8px}
+    #build-preview .bp-art{width:48%}
+    #build-preview .bp-name{font-size:13px}
+    .bay-grid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:5px}
+    .part-card .pc-name{font-size:9.5px}
+    /* AT 320 THE LADDER NAMES ELLIPSISED — "LONG-TRAVEL DAMP…", which loses the
+       half of the name that says what it is. Let them wrap instead; a card is
+       tall enough for two lines and nothing below it is fighting for the room. */
+    .up-card{grid-template-columns:40px 1fr auto}
+    .up-card .uc-nm{white-space:normal;overflow:visible;line-height:1.2}
   }
-  /* the debrief banner for a part the race just opened */
-  #part-unlock{width:min(100%,520px);margin:10px auto 0;padding:10px 13px;
-    border-radius:var(--r-sm);border:2px solid var(--yellow);
-    background:linear-gradient(180deg,rgba(255,212,0,.16),rgba(255,140,26,.12));
-    font-family:'Baloo 2';text-align:center}
-  #part-unlock .pu-top{font-family:'Luckiest Guy';font-size:12px;letter-spacing:2px;
-    color:var(--yellow)}
-  #part-unlock .pu-name{display:block;margin-top:3px;font-family:'Luckiest Guy';
-    font-size:15px;letter-spacing:1px;color:var(--cream)}
-  #part-unlock .pu-sub{display:block;margin-top:3px;font-size:10.5px;letter-spacing:.6px;
-    color:#e2c9a2}
-  /* ---------- end BUILD BAY ---------- */
+  /* ---------- end THE GARAGE ---------- */
 
   /* ---------- CAR SHOP (horizontal shelf with visible scroll affordance) ---------- */
   .shelf-wrap{position:relative;width:100%;margin-top:4px}
@@ -1754,7 +1795,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r230</div>
+<div id="build-tag">r231</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1941,20 +1982,20 @@
   <div id="tab-garage" class="menu-panel off">
     <div class="panel-head" id="garage-shop-head">YOUR MACHINES</div>
     <div class="shelf-wrap"><div id="car-shop"></div></div>
-    <!-- BUILD BAY — the hardware you CHOOSE, above the ladders you climb.
-         Asked for as "create a garage where I can custom build the car …
-         engine v4-8-12, add spoilers … purchase parts and race for other
-         parts". Each slot holds exactly one part and the options trade against
-         each other, which is what makes it a build rather than a shopping
-         list. Sits directly under the car shelf because it is about the
-         machine you just picked; TYRE BAY and DETAILED UPGRADES follow. -->
-    <div id="build-bay"></div>
-    <!-- TYRE BAY: what is fitted is a CHOICE, not a consequence of a purchase.
-         Sits above the upgrade list because it is free and instant, and the
-         list below is what unlocks its top row. -->
-    <div id="tyre-bay"></div>
-    <div class="panel-head" id="garage-up-head">DETAILED UPGRADES</div>
-    <div id="garage-rows"></div>
+    <!-- THE CAR YOU BUILT, and the shops that built it.
+         Asked for as "make it graphical as in the demo — marry the existing
+         upgrades mode vs this", with a mockup of a workshop: a car in the
+         middle and part shops around it, each part a PICTURE with a price and
+         an INSTALL button.
+         So the garage is one screen now, not four stacked lists. The preview
+         is the selected machine wearing everything it owns, and every bay
+         below speaks the same card language whether it is selling a CHOICE
+         (a block, a wing, a compound — one at a time, trading against each
+         other) or a LADDER (the ten upgrade lines, each rung better than the
+         last). That is the marriage: the two systems were never in conflict,
+         they were just wearing different clothes. -->
+    <div id="build-preview"></div>
+    <div id="garage-bays"></div>
   </div>
   <button id="start-btn" class="btn">START RACE</button>
   <div class="controls">
@@ -2078,10 +2119,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r230"></script>
+<script type="module" src="./src/main.js?v=r231"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r230"></script>
+<script src="./src/offline.js?v=r231"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r230"></script>
+<script type="module" src="./src/traffic.js?v=r231"></script>
 </body>
 </html>
