@@ -8735,25 +8735,56 @@ export class Track {
     const CLEAR = 2.3;                 // car half-width 1.7, plus a hand's breadth
     const STEP = 0.5;
     const cap = new Float32Array(N * 2);
+    // 1 = the wall stands as the theme drew it; 0 = it opens to a berm because
+    // no setback keeps it out of a road. Smoothed below like `cap` itself.
+    const open = new Float32Array(N * 2).fill(1);
     let capped = 0, floored = 0, tightest = Infinity;
+    /** Would a face at lateral `lb` clear every leg's carriageway? Face rows
+     *  only (foot, mid-lean, rim edge) — the same three the setback governs.
+     *  Hoisted so the check can be made twice: once to CHOOSE the setback, and
+     *  again on the value actually built after smoothing. */
+    const clearFor = (j, side, lb) => {
+      const c = this.center[j], n = this.nrm[j];
+      const P = this._cliffProfile(j, side);
+      for (const r of [0, P.l1, P.l2]) {
+        const lat = lb + r;
+        const ns = this._nearestSample(c.x + n.x * lat * side, c.z + n.z * lat * side);
+        if (ns.d < this.widthAt(ns.i) + CLEAR) return false;
+      }
+      return true;
+    };
     for (let j = 0; j < N; j++) {
       const c = this.center[j], n = this.nrm[j];
       const floor = this.widthAt(j) + CLEAR;
       for (let s = 0; s < 2; s++) {
         const side = s ? -1 : 1;
         const P = this._cliffProfile(j, side);      // uncapped: `_cliffCap` is unset
-        const rows = [0, P.l1, P.l2];
-        const clearAt = (lb) => {
-          for (const r of rows) {
-            const lat = lb + r;
-            const ns = this._nearestSample(c.x + n.x * lat * side, c.z + n.z * lat * side);
-            if (ns.d < this.widthAt(ns.i) + CLEAR) return false;
-          }
-          return true;
-        };
+        const clearAt = (lb) => clearFor(j, side, lb);
         let out = P.base;
         if (!clearAt(P.base)) {                     // fast path: nearly always clear
           out = floor;
+          // A WALL THAT CANNOT GET OUT OF THE ROAD MUST STOP BEING A WALL.
+          //
+          // If even the floor does not clear, the loop below finds nothing and
+          // the face is built at the floor ANYWAY — inside somebody's
+          // carriageway. That is not hypothetical: UNDERCITY SLIPSTREAM's two
+          // legs pass about 20 u apart, so a face at its natural 11.4 u
+          // setback lands 8.6 u from the other leg's centreline, inside its
+          // 9 u half-width, and 30 of 1800 sides are built there. Measured,
+          // and the only world on the roster where it happens.
+          //
+          // A bore would be the right answer and cannot be built here:
+          // `tunnelFitAt` returns 0 at all 51 stations around both crossings
+          // (curvature 0.0378 and 0.0205 against a 0.013 limit, and a crest at
+          // 600). This world is hairpin folds end to end and a bore through a
+          // corner cuts its own mouth open.
+          //
+          // So the rock opens instead. `open` drops the wall to the same low
+          // berm the start-line gap uses, which is under the 2.5 u threshold
+          // `Vehicle` treats as solid — so the face stops blocking a road it
+          // was never meant to be in, rather than standing in it invisibly
+          // wrecking whoever drives that leg.
+          if (!clearAt(floor)) open[j * 2 + s] = 0;
           for (let lb = floor; lb <= P.base; lb += STEP) {
             if (clearAt(lb)) out = lb; else break;
           }
@@ -8797,6 +8828,7 @@ export class Track {
     // intrude anywhere — and floored at each station's own floor so the
     // smoothing cannot walk a wall into its own carriageway. Circular, and
     // both directions, or the seam at sample 0 becomes the new step.
+    const preSmooth = Float32Array.from(cap);    // what each station chose alone
     const SLOPE = Math.max(0.6, this.segLen * 0.5);
     for (let s = 0; s < 2; s++) {
       const fl = (j) => this.widthAt(j) + CLEAR;
@@ -8813,6 +8845,68 @@ export class Track {
         }
       }
     }
+    // ---- AND NOW CHECK WHAT WAS ACTUALLY BUILT --------------------------
+    //
+    // The smoothing above pulls caps IN, and the first version of it shipped
+    // with the claim that pulling in "can never newly intrude". That is
+    // FALSE, and measurably so: the cap is a distance from ITS OWN
+    // centreline, and where another leg lies on the inside of the bend,
+    // moving a wall toward its own road moves it toward that leg's road too.
+    // CANYON RUN went from 0 wall-sides inside a carriageway to 50, biting up
+    // to 8.9 u with walls 11-24 u tall — a solid wall in a road, which is
+    // worse than the slab over it that the smoothing was written to remove.
+    //
+    // So the clearance question is asked again, of the setback that will
+    // actually be built rather than of the candidate that was considered. Any
+    // face that still cannot get clear opens to a berm, which is the same
+    // answer the pre-smoothing pass gives and costs nothing where it never
+    // fires.
+    // OPENING IS THE LAST RESORT, NOT THE FIRST ANSWER. Where the smoothed
+    // setback fails, walk back OUT toward the value this station had before
+    // smoothing and take the first that clears: that keeps the wall, keeps
+    // most of the smoothing, and only gives up where nothing in the range
+    // works. Opening 50 sides on CANYON RUN to save it from 50 solid walls in
+    // a road is right; opening them when a setback two steps out would have
+    // cleared is just losing canyon.
+    for (let j = 0; j < N; j++) {
+      for (let s = 0; s < 2; s++) {
+        if (open[j * 2 + s] === 0) continue;              // already opened
+        const side = s ? -1 : 1;
+        if (clearFor(j, side, cap[j * 2 + s])) continue;  // fine as built
+        let fixed = -1;
+        for (let lb = cap[j * 2 + s] + STEP; lb <= preSmooth[j * 2 + s] + 1e-6; lb += STEP) {
+          if (clearFor(j, side, lb)) { fixed = lb; break; }
+        }
+        // ...but only if the walk back out is SHORT. Restoring a wall that
+        // needs 26 u to clear puts the step straight back — measured, station
+        // 821 on CANYON RUN went to 25.8 u again the moment the restore was
+        // unconditional, which is the exact slab this pass exists to remove.
+        // Smoothness and clearance genuinely conflict there, and the way out
+        // is that a face which can only clear by jumping must not be a face.
+        if (fixed > 0 && fixed - cap[j * 2 + s] <= SLOPE * 2) cap[j * 2 + s] = fixed;
+        else open[j * 2 + s] = 0;
+      }
+    }
+    // AND THE OPENING RAMPS TOO, for the same reason the setback does: a wall
+    // that drops to a berm for fifteen stations and springs back to full
+    // height at the sixteenth puts a stretched triangle across the road, which
+    // is the defect this whole pass exists to remove. Ramp over ~8 stations.
+    for (let s = 0; s < 2; s++) {
+      const RAMP = 1 / 8;
+      for (let pass = 0; pass < 2; pass++) {
+        for (let k = 0; k < N * 2; k++) {
+          const j = k % N, i0 = (j - 1 + N) % N;
+          const lim = open[i0 * 2 + s] + RAMP;
+          if (open[j * 2 + s] > lim) open[j * 2 + s] = lim;
+        }
+        for (let k = N * 2 - 1; k >= 0; k--) {
+          const j = k % N, i1 = (j + 1) % N;
+          const lim = open[i1 * 2 + s] + RAMP;
+          if (open[j * 2 + s] > lim) open[j * 2 + s] = lim;
+        }
+      }
+    }
+    this._cliffOpen = open;
     // the published statistic has to describe what was BUILT, so recount after
     // the smoothing rather than before it
     capped = 0; floored = 0; tightest = Infinity;
@@ -8869,7 +8963,13 @@ export class Track {
       const tw = THREE.MathUtils.smoothstep(Math.sin(53 * t - 1.7 * ph), 0.78, 0.97);
       h += notch * tw * tw * 5;
     }
-    h = Math.max(1.7, h * gap);                  // low stone berm through the gap
+    // ...and the same berm where the wall had to open because no setback kept
+    // it out of a carriageway (see `_buildCliffCaps`). Guarded index: the
+    // caps are built by a pass that calls this function before `_cliffOpen`
+    // exists, and an undefined here would make every height NaN.
+    const open = this._cliffOpen
+      ? this._cliffOpen[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)] : 1;
+    h = Math.max(1.7, h * gap * open);           // low stone berm through the gap
     // cliffSetback pushes the faces off the verge: the corridor becomes a
     // DEEP VALLEY with a drivable floor, not a walled slot ("don't build
     // walled track in desert - or make it look like a deep valley")
