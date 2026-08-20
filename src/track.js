@@ -4292,6 +4292,34 @@ THEMES.riviera = {
   // an onshore breeze carries sea haze, not verge dust
   weather: { type: 'dust', color: 0xe4ded0, rate: 16 },
   quay: true,
+
+  // ---- THE BUILDINGS, WHICH ARE THE WHOLE POINT --------------------------
+  // Reported as "make sure it's matching my reference — meaning new buildings
+  // needs to be designed", with a photograph out of a shuttered window in
+  // Alassio. They were wrong, and the reason is one inherited word: deriving
+  // from `medterrace` also inherited `elements: 'medhill'`, which is the
+  // generic Mediterranean HILL kit — squat farm houses on an olive terrace.
+  // Alassio is not a hill village. It is four and five storeys of painted
+  // render standing shoulder to shoulder along a seafront.
+  //
+  // The kit that draws that already exists: `liguria` builds TOWERHOUSE twice
+  // out of every four — the tall narrow terrace house with a shutter band per
+  // floor, a first-floor balcony on iron balusters, a downpipe and a pantile
+  // roof. Nothing needed designing; it needed POINTING AT.
+  elements: 'alassio',
+  hutGlow: 0.12,
+  seaColor: 0x2f7fa8,
+  // ...and its own paint. `frontage` is the painted face the town presents to
+  // the road, which is what you actually drive past in the budello. Alassio
+  // sits a shade softer and pinker than Cinque Terre's saturated coral — more
+  // apricot and rose, more cream between them — and the shutters are the dark
+  // green of the reference photograph, on both the frame and the louvre.
+  frontage: {
+    tints: ['#e9a86a', '#efc07e', '#dd8f7e', '#f0d9ac', '#d98a6e', '#f4e6cc', '#e2b48c'],
+    roof: 0xb85a30,
+    face: { render: '#f2e7d2', plinth: '#b09070', trim: '#f8efdc',
+      frame: '#3d6b47', shutter: '#3d6b47' },
+  },
 };
 
 THEMES.mountainsea = {
@@ -4576,6 +4604,90 @@ export const HOUSE_TEMPLATES = {
     ['cyl', -1.7, 14.7, 0, 0.26, 0.5, 0.26, 'roof'],
     ['box', 0, 13.35, 0, 6.4, 0.22, 0.5, 'trim'],            // ridge cap
   ] },
+  // ---- ALASSIO, DESIGNED FROM THE REFERENCE PHOTOGRAPH -------------------
+  // The existing `towerhouse` is a Cinque Terre hill house: four storeys on a
+  // small square footprint. The photograph sent from Alassio is a different
+  // building and the difference is what the town looks like — a FIVE storey
+  // seafront palazzina, wider than it is deep because it is one of a terrace,
+  // with a shop arcade at street level under a canvas awning, a stone string
+  // course between every floor, and a balcony on each of the middle three.
+  //
+  // WHAT READS FROM A CAR is the order of horizontals: awning, then three
+  // balconies stacked, then the eaves. That rhythm is the whole silhouette,
+  // so everything else here is in service of keeping it legible.
+  palazzina: { r: 5.6, parts: [
+    ['box', 0, 0, 0, 8.2, 0.45, 5.6, 'stone'],               // pavement plinth
+    ['wall', 0, 0.45, 0, 7.8, 14.6, 5.2, 'wall'],            // the terrace block
+    // GROUND-FLOOR ARCADE: three piers with the shopfront recessed behind
+    // them, which is what makes the street level read as shops and not as a
+    // blank wall with a door in it.
+    ['box', -3.1, 0.45, 2.5, 0.55, 3.4, 0.55, 'stone'],
+    ['box', 0, 0.45, 2.5, 0.5, 3.4, 0.5, 'stone'],
+    ['box', 3.1, 0.45, 2.5, 0.55, 3.4, 0.55, 'stone'],
+    ['box', 0, 0.45, 2.15, 6.6, 3.2, 0.2, 'wall2'],          // recessed shop face
+    ['box', 0, 3.85, 2.45, 7.4, 0.24, 0.6, 'stone'],         // lintel over the arcade
+    ['prism', 0, 4.05, 2.95, 7.2, 0.5, 1.5, 'roof'],         // the canvas awning
+    // STRING COURSES — a stone band at every floor. Cheap, and it is the one
+    // detail that makes render read as five storeys rather than one tall wall.
+    ['box', 0, 6.6, 2.62, 8.0, 0.18, 0.18, 'trim'],
+    ['box', 0, 9.2, 2.62, 8.0, 0.18, 0.18, 'trim'],
+    ['box', 0, 11.8, 2.62, 8.0, 0.18, 0.18, 'trim'],
+    // THREE STACKED BALCONIES with iron balusters, one per middle floor
+    ...[5.0, 7.6, 10.2].flatMap((y) => [
+      ['box', 0, y, 2.95, 6.4, 0.16, 0.72, 'trim'],
+      ['cyl', -2.6, y + 0.16, 3.22, 0.075, 0.8, 0.075, 'trim'],
+      ['cyl', -1.3, y + 0.16, 3.22, 0.075, 0.8, 0.075, 'trim'],
+      ['cyl', 0, y + 0.16, 3.22, 0.075, 0.8, 0.075, 'trim'],
+      ['cyl', 1.3, y + 0.16, 3.22, 0.075, 0.8, 0.075, 'trim'],
+      ['cyl', 2.6, y + 0.16, 3.22, 0.075, 0.8, 0.075, 'trim'],
+      ['box', 0, y + 0.96, 3.22, 6.2, 0.09, 0.11, 'trim'],   // handrail
+    ]),
+    // SHUTTERED WINDOWS, in pairs, on the three upper floors. A reveal cut
+    // into the render catches its own shadow — a painted rectangle does not.
+    ...[5.4, 8.0, 10.6, 12.9].flatMap((y) => [
+      ['box', -2.3, y, 2.72, 1.15, 1.5, 0.16, 'wall2'],
+      ['box', 2.3, y, 2.72, 1.15, 1.5, 0.16, 'wall2'],
+      ['box', -3.05, y, 2.78, 0.34, 1.5, 0.14, 'trim'],      // the green shutters
+      ['box', -1.55, y, 2.78, 0.34, 1.5, 0.14, 'trim'],
+      ['box', 1.55, y, 2.78, 0.34, 1.5, 0.14, 'trim'],
+      ['box', 3.05, y, 2.78, 0.34, 1.5, 0.14, 'trim'],
+    ]),
+    ['box', 0, 15.05, 0, 8.6, 0.3, 5.9, 'trim'],             // eaves
+    ['prism', 0, 15.35, 0, 8.8, 1.5, 6.1, 'roof'],           // shallow pantile
+    ['cyl', 3.6, 0.45, 2.5, 0.1, 14.4, 0.1, 'trim'],         // downpipe
+    ['cyl', -2.4, 16.5, 0, 0.5, 1.7, 0.5, 'stone'],          // chimney
+    ['cyl', -2.4, 18.0, 0, 0.24, 0.45, 0.24, 'roof'],
+  ] },
+  // IL BUDELLO'S OWN BUILDING: the lane is one car wide with shops the whole
+  // way down, so this is narrow, only three storeys, and almost entirely
+  // shopfront at the bottom. Shorter than the palazzina ON PURPOSE — a lane
+  // where every building is the same height reads as a corridor, and the
+  // variation is what makes it read as a street.
+  shopfront: { r: 3.4, parts: [
+    ['box', 0, 0, 0, 4.6, 0.4, 4.2, 'stone'],
+    ['wall', 0, 0.4, 0, 4.3, 8.4, 3.9, 'wall'],
+    ['box', 0, 0.4, 1.75, 3.5, 3.0, 0.22, 'wall2'],          // the shop window
+    ['box', 0, 3.4, 1.95, 4.2, 0.22, 0.45, 'stone'],         // fascia board
+    ['prism', 0, 3.6, 2.4, 4.0, 0.44, 1.3, 'roof'],          // awning over the pavement
+    ['box', 0, 5.9, 2.05, 4.5, 0.16, 0.16, 'trim'],          // string course
+    ['box', 0, 4.6, 2.3, 3.6, 0.14, 0.6, 'trim'],            // one small balcony
+    ['cyl', -1.5, 4.74, 2.55, 0.07, 0.7, 0.07, 'trim'],
+    ['cyl', 0, 4.74, 2.55, 0.07, 0.7, 0.07, 'trim'],
+    ['cyl', 1.5, 4.74, 2.55, 0.07, 0.7, 0.07, 'trim'],
+    ['box', 0, 5.44, 2.55, 3.4, 0.08, 0.1, 'trim'],
+    ...[4.9, 7.0].flatMap((y) => [
+      ['box', -1.05, y, 2.02, 0.95, 1.35, 0.14, 'wall2'],
+      ['box', 1.05, y, 2.02, 0.95, 1.35, 0.14, 'wall2'],
+      ['box', -1.7, y, 2.08, 0.3, 1.35, 0.12, 'trim'],
+      ['box', -0.4, y, 2.08, 0.3, 1.35, 0.12, 'trim'],
+      ['box', 0.4, y, 2.08, 0.3, 1.35, 0.12, 'trim'],
+      ['box', 1.7, y, 2.08, 0.3, 1.35, 0.12, 'trim'],
+    ]),
+    ['box', 0, 8.8, 0, 4.9, 0.24, 4.5, 'trim'],
+    ['prism', 0, 9.04, 0, 5.1, 1.15, 4.7, 'roof'],
+    ['cyl', 1.9, 0.4, 1.9, 0.09, 8.3, 0.09, 'trim'],
+  ] },
+
   // AEGEAN: a whitewashed cube with a parapet instead of eaves, an outside
   // stair, and one painted door.
   cube: { r: 4.6, parts: [
@@ -5167,6 +5279,18 @@ const ELEMENT_KITS = {
     roofs: [0xb4552e, 0xa74a2c, 0xc06238],
     builds: ['towerhouse', 'towerhouse', 'house', 'shed'], landmarks: ['chapel'],
     dress: ['well'], fenceColor: 0xc8bb96, stoneWalls: 6,
+  },
+  // ALASSIO (Italy) — the same coast as `liguria` but a TOWN on it rather than
+  // a village above it, so the build list is the two new archetypes with the
+  // Cinque Terre tower house behind them for variety. No farm shed: there is
+  // no farm on a seafront.
+  alassio: {
+    wall: 0xefc07e, wall2: 0xdba86a, roof: 0xb85a30, trim: 0x3d6b47, stone: 0xd0c0a2,
+    palette: [0xe9a86a, 0xefc07e, 0xdd8f7e, 0xf0d9ac, 0xd98a6e, 0xf4e6cc, 0xe2b48c],
+    roofs: [0xb85a30, 0xa9502c, 0xc46638],
+    builds: ['palazzina', 'shopfront', 'palazzina', 'towerhouse'],
+    landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xd6c8a8, stoneWalls: 4,
   },
   // AEGEAN (Greece) - whitewashed cubes, flat roofs, one blue dome, and blue
   // joinery. The palette is deliberately nearly monochrome WHITE, because

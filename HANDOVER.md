@@ -1434,3 +1434,52 @@ Built and measured: 73 len 1881u / tightest 19u, 74 len 1370u / tightest 13u
 
 test-parts 30/0, test-cars 28/0, test-filters 35/0, test-boot 7/0,
 test-ladder 31/0, test-timeline 33/0, test-mobile-hud green, boot.mjs 4/4.
+
+## r235 — ALASSIO'S BUILDINGS, DESIGNED
+"Screenshots. Make sure it's matching my reference meaning new buildings needs
+to be designed."
+
+### The bug was one inherited word
+`THEMES.riviera` derives from `medterrace`, and that inheritance brought
+`elements: 'medhill'` with it — the generic Mediterranean HILL kit, squat farm
+houses on an olive terrace. Alassio is not a hill village; it is four and five
+storeys of painted render standing shoulder to shoulder along a seafront. The
+worlds shipped in r234 with the wrong town in them and nothing failed, because
+a theme that picks a real kit is never wrong, only wrong-looking.
+
+WATCH THIS WHEN DERIVING A THEME: `elements` selects from `ELEMENT_KITS`, and
+an unknown name falls back to `farm` SILENTLY. Deriving a coastal theme from an
+inland one and forgetting `elements` gives you farm buildings on a promenade
+with no error anywhere.
+
+### Two new archetypes
+The existing `towerhouse` is a Cinque Terre hill house — four storeys on a
+small square footprint. The reference photograph is a different building, so:
+
+  palazzina  FIVE storeys, wider than deep because it is one of a terrace: a
+             three-pier shop arcade at street level under a canvas awning, a
+             stone string course between every floor, a balcony on each of the
+             three middle floors, shuttered pairs above. What reads from a car
+             is the ORDER OF HORIZONTALS — awning, three balconies, eaves — so
+             everything else serves keeping that rhythm legible.
+  shopfront  the budello's own building: narrow, three storeys, almost all
+             shop at the bottom. Deliberately SHORTER than the palazzina — a
+             lane where every building is the same height reads as a corridor.
+
+`ELEMENT_KITS.alassio` builds palazzina / shopfront / palazzina / towerhouse
+and drops the farm shed, because there is no farm on a seafront. `frontage`
+gives the town its own paint — apricot and rose against Cinque Terre's
+saturated coral, with the dark green of the photograph on both frame and
+shutter.
+
+### THE SCREENSHOT PROBE, AND TWO WAYS IT LIED
+  - It first searched the scene for objects named like buildings and reported
+    "0 buildings" on a world holding 12,632 instanced objects. Houses land in
+    SHARED InstancedMeshes; there is no per-building node to find. Park the
+    camera on the road at a fraction of the lap instead.
+  - It then wrote a 12KB blank. `render()` and `toDataURL()` MUST HAPPEN IN
+    ONE `evaluate`: the drawing buffer is not preserved and the game's own rAF
+    loop re-renders from the car's camera the moment the call returns. Same
+    rule already recorded for hillshot.mjs — third time this has been paid for.
+    A real frame weighs ~900KB.
+`tools-scratch/townshot.mjs` takes LV and F.
