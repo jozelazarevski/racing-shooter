@@ -1659,3 +1659,40 @@ to the same class of mistake in the other direction.
 
 boot.mjs 4/4, test-boot 7/0, test-buildings green, test-ladder 31/0,
 test-timeline 33/0.
+
+## r240 — THE ROAD WAS THE PROBLEM
+"Change the design drastically to look 1:1."
+
+Four passes had gone into buildings. The buildings were never the problem.
+
+### A 9 u HALF-WIDTH ROAD CANNOT HAVE A STREET WALL
+`_clearsRoad` refuses any frontage block whose face lands inside
+`widthAt(i) + 1.6`. On a default road that is 10.6 u from the centreline, and
+with `lateral 15 / depth 8.5` the face sat at 10.75 — passing by 15 cm on a
+straight and FAILING everywhere the road widened or turned. That is why the
+terrace kept coming out sparse and one-sided, and no amount of detailing a
+template could have fixed it.
+
+    roadWidth: 0.55   IL BUDELLO — "the gut" is one car wide
+    roadWidth: 0.7    GENOVA — a caruggio, barely wider
+    lateral: 9.6, depth: 7.0, height: 17.0
+
+`height: 17` is the number that turns a road with houses beside it into a
+STREET: it is what encloses the view.
+
+### AND A STREET HAS NO COUNTRYSIDE IN IT
+Rocks, scrub, tufts and wildflowers between kerb and wall are what kept reading
+as "road through a field". All zeroed on the two town worlds, and the ground is
+`TOWN_GROUND` — worn paving, not the beach sand `riviera` inherits from
+`medterrace`. The ground is most of the frame from a chase camera; a
+sand-coloured one puts the town in a desert.
+
+### CHECK THE SHOT YOU ARE JUDGING FROM
+Every screenshot up to here was taken at the START LINE, from above. The grid
+is deliberately open ground on every world in the game, so it is the one place
+a street world looks least like a street — four rounds of "it still doesn't
+match" were partly me judging from the worst possible camera.
+`tools-scratch/lapshot.mjs` stands on the road at driver height at a given lap
+fraction. Use it for anything about how a world LOOKS.
+
+boot.mjs 4/4, test-boot 7/0, test-buildings green, test-ladder 31/0.

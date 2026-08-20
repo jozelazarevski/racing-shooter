@@ -628,12 +628,45 @@ export const LEVELS = [
     // The houses are the walls, so the hut count goes UP and the trees nearly
     // vanish: on this lap there is no verge for anything to grow in.
     tune: {
-      // THE FRONTAGE IS THE STREET, so the scatter stands down (r239). With
-      // both running you get a continuous terrace along the road AND a field
-      // of free-standing towers behind it — two systems drawing the same town
-      // in two different arrangements. The handful left are the backland
-      // buildings you glimpse over the roofline.
-      hutCount: 14, hutZone: [0, 1], treeCount: 120,
+      // IL BUDELLO IS A LANE (r240). "The gut" is one car wide with four
+      // storeys either side of it, and everything below follows from that one
+      // fact rather than from any building being redesigned again:
+      //
+      //   roadWidth 0.55  a 9 u half-width is a dual carriageway. At 0.55 the
+      //                   carriageway is 10 u across, which is a lane — AND it
+      //                   is what lets the terrace stand on the kerb at all,
+      //                   because the frontage refuses any block whose face is
+      //                   inside `widthAt + 1.6`. On a wide road every block
+      //                   was silently REJECTED, which is why the street wall
+      //                   came out sparse and one-sided.
+      //   lateral 9.6     block centres 9.6 u out with a 7 u depth puts the
+      //                   facade 6.1 u from the middle of a 5 u half-road —
+      //                   a metre of pavement, which is what a budello has.
+      //   height 17       tall enough to ENCLOSE. This is the number that
+      //                   turns a road with houses beside it into a street.
+      roadWidth: 0.55,
+      frontage: {
+        lateral: 9.6, depth: 7.0, unit: 6.4, height: 17.0, run: [10, 20], rows: 6,
+        bayset: 'liguria',
+        tints: ['#f0d98a', '#e8b45c', '#e8a2a6', '#c4655a', '#f4e6cc', '#bccbb0', '#e2ac7c'],
+        roof: 0xb85a30,
+        face: { render: '#ecd79b', plinth: '#cfc3a4', trim: '#f6efdd',
+          frame: '#2b2b26', shutter: '#3d6b47', pane: '#1b2028' },
+      },
+      // A STREET HAS NO COUNTRYSIDE IN IT. Rocks, scrub, tufts and wildflowers
+      // between the kerb and the wall are what kept reading as "road through a
+      // field" no matter what the buildings did.
+      rockCount: 0, pebbleCount: 0, bushCount: 0, tuftCount: 0, flowerCount: 0,
+      hutCount: 8, hutZone: [0, 1], treeCount: 26,
+      // paved to the building line — see TOWN_GROUND
+      terrainLow: '#6b6a62', terrainHigh: '#8e8b80', terrainDirt: '#7c7970',
+      terrainScree: '#9a978c', skirtColor: '#8a8880',
+      ground: {
+        base: '#84817a',
+        bandLight: 'rgba(240,238,230,0.06)', bandDark: 'rgba(40,38,34,0.10)',
+        patchA: 'rgba(120,118,110,0.26)', patchB: 'rgba(158,154,144,0.20)',
+        speckA: 'rgba(60,58,54,0.7)', speckB: 'rgba(196,192,182,0.7)', speckCount: 150,
+      },
       bushCount: 120, rockCount: 90,
       // shade between four-storey terraces: the light barely reaches the road
       hemiIntensity: 0.7, sunIntensity: 2.15,
@@ -4368,11 +4401,32 @@ THEMES.riviera = {
 // GENOVA — the port city. Same coast, opposite character: `riviera` is a
 // resort in the sun and this is a working harbour under it. Denser, dirtier,
 // redder, and the light is bounced back off stone rather than off sand.
+// PAVING, NOT BEACH (r240). `riviera` inherits its ground from `medterrace`,
+// which is limestone dust and maquis — correct for an olive terrace and wrong
+// for anything with a kerb on it. The two town worlds get worn stone instead,
+// and it matters more than any building detail: the ground is most of the
+// frame from a chase camera, and a sand-coloured one puts the town in a desert.
+const TOWN_GROUND = {
+  terrainLow: '#6b6a62', terrainHigh: '#8e8b80', terrainDirt: '#7c7970',
+  terrainScree: '#9a978c', skirtColor: '#8a8880',
+  ground: {
+    base: '#84817a',                                   // worn paving
+    bandLight: 'rgba(240,238,230,0.06)', bandDark: 'rgba(40,38,34,0.10)',
+    patchA: 'rgba(120,118,110,0.26)',                  // patched asphalt
+    patchB: 'rgba(158,154,144,0.20)',                  // swept stone
+    speckA: 'rgba(60,58,54,0.7)', speckB: 'rgba(196,192,182,0.7)', speckCount: 150,
+  },
+};
+
 THEMES.genova = {
   ...THEMES.riviera,
+  ...TOWN_GROUND,
   elements: 'genova',
-  // same as the budello: a city is its street walls, not a scatter
-  hutCount: 18, hutZone: [0, 1],
+  // same as the budello: a city is its street walls, not a scatter — and a
+  // caruggio is barely wider than the lane at Alassio
+  roadWidth: 0.7,
+  rockCount: 0, pebbleCount: 0, bushCount: 30, tuftCount: 0, flowerCount: 0,
+  hutCount: 10, hutZone: [0, 1],
   treeCount: 190, bushCount: 200, flowerCount: 120,
   // a city ground: worn stone and asphalt, not beach sand
   terrainLow: '#6e6a56', terrainHigh: '#9a9182', terrainDirt: '#87806f',
