@@ -1735,3 +1735,46 @@ version had a dark frame on dark glass and the grid dissolved past ~40 u.
     for — say so if the colour should come back.
 
 boot.mjs 4/4, test-boot 7/0, test-buildings green.
+
+## r242 — HALF-TIMBERING, WHICH IS WHAT THE HOUSE DESIGN ACTUALLY IS
+"Follow the design I sent you. Focus on the house design." The second reference
+is a Fachwerk street: dark timber framing with diagonal braces over light
+infill, warm rust and tan, steep street-facing gables, a flower box under
+nearly every window.
+
+`applyHalfTimber` paints the frame into the facade texture — a sill and head
+beam per storey, posts between the bays, and the DIAGONAL BRACES that are the
+whole reason the style reads. Without the diagonals it is a grid of lines and
+the eye takes it for a modern curtain wall.
+
+Painted, not modelled, and deliberately: this is one texture on a frontage
+block, so the alternative is a hundred slender boxes per building. It is drawn
+over the render and UNDER the joinery, so sashes still sit proud of the frame
+as they do on a real one. `townhouseBays` returns `rows`/`xs`/`bh` now, or the
+posts land through the windows.
+
+### THREE THINGS THAT WERE WRONG ON THE FIRST TRY, all worth keeping
+  1. TINTS MULTIPLY THE WHOLE FACE, so they are the INFILL colour and must stay
+     LIGHT. The first cut used the reference's rust and brick reds as tints and
+     got dark-on-dark: a near-black frame over a dark red panel, pattern
+     invisible. On a timbered building the panel is limewash and the frame is
+     the dark thing — the CONTRAST is the style. The reds live in the roofs.
+  2. CORRECT SCALE IS INVISIBLE. At `w/32` the beam is a true 25 cm and gone
+     past twenty units. This texture is read at speed from the far end of a
+     street; `w/22` is a heavy oak frame and is also what the reference draws.
+  3. ONE DIAGONAL READS AS A MISTAKE. It needs the opposing pair to close the
+     panel into the "Mann" figure before it reads as a frame at all.
+
+Also: `hemiIntensity` 0.7 -> 1.15. "Shade between four-storey terraces" was
+true and wrong — once the buildings grew to 17 u they shadowed each other and
+the whole frame went to mud. A street like this is lit by bounce off pale
+render, so the ambient carries it rather than the key.
+
+Flower boxes are painted under every upper bay (`boxes` in the face palette).
+Most of the colour in the reference street comes from them.
+
+STILL SHORT: the walls sit darker and browner than the reference's sunlit cream
+and rust, and there is no jettying (the upper storeys overhang in the
+reference; ours are flush).
+
+boot.mjs 4/4, test-boot 7/0, test-buildings green.

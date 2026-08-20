@@ -648,17 +648,30 @@ export const LEVELS = [
       frontage: {
         lateral: 9.6, depth: 7.0, unit: 6.4, height: 17.0, run: [10, 20], rows: 6,
         bayset: 'liguria',
-        // THE REFERENCE PALETTE (r241), and it is deliberately NOT the pastel
-        // Alassio was built on. The image sent as the target is a muted street:
-        // taupe, warm stone, grey-brown, ox-blood and cream, with PALE window
-        // frames against dark glass — that light frame is what makes the window
-        // grid read from the far end of the street, and it is the detail the
-        // saturated version was losing.
-        tints: ['#b6a894', '#a3907a', '#8f8478', '#c4b6a2', '#8a6a52',
-          '#7c5a4a', '#cfc4b2', '#9a8e80'],
-        roof: 0xa8563a,
-        face: { render: '#b8ab98', plinth: '#8e8578', trim: '#efe9dc',
-          frame: '#efe9dc', shutter: '#4a4038', pane: '#1e232b' },
+        // THE HOUSES ARE HALF-TIMBERED NOW (r242), which is what the second
+        // reference is actually about. Everything here serves that:
+        //   tints    warm rust, brick red, tan and cream — the INFILL between
+        //            the beams, not the whole wall. The grey taupe of r241 was
+        //            read from the first image's shadowed side and it kills a
+        //            timbered facade, which needs the panel to be lighter than
+        //            the frame or the pattern vanishes.
+        //   timber   the frame itself: oiled oak, near-black at distance.
+        //   boxes    a flower box under nearly every upper window — most of the
+        //            colour in that street comes from them.
+        // TINTS MULTIPLY THE WHOLE FACE, so they are the INFILL colour and they
+        // have to stay LIGHT. The first cut used the reference's rust and
+        // brick reds here and the result was dark-on-dark: a near-black timber
+        // frame over a dark red panel, with the pattern invisible. On a
+        // timbered building the panel is limewash and the frame is the dark
+        // thing — the contrast IS the style, so the reds live in the ROOFS and
+        // the deepest tint here is still lighter than the beams.
+        tints: ['#efdcb8', '#e6cb9e', '#dcbb8a', '#f2e6ce', '#e0c09c',
+          '#d8ae82', '#ead6b0', '#cfa878'],
+        roof: 0xb5563a,
+        face: { render: '#f2e6d0', plinth: '#8a7259', trim: '#fbf3e2',
+          frame: '#4a3323', shutter: '#7a3f2a', pane: '#232830',
+          timber: { beam: '#6b4630' },
+          boxes: { wood: '#6b4630', blooms: ['#c8402f', '#e0644a', '#d8869a', '#f0e2d0'] } },
       },
       // A STREET HAS NO COUNTRYSIDE IN IT. Rocks, scrub, tufts and wildflowers
       // between the kerb and the wall are what kept reading as "road through a
@@ -690,8 +703,12 @@ export const LEVELS = [
         speckA: 'rgba(60,58,54,0.7)', speckB: 'rgba(196,192,182,0.7)', speckCount: 150,
       },
       bushCount: 120, rockCount: 90,
-      // shade between four-storey terraces: the light barely reaches the road
-      hemiIntensity: 0.7, sunIntensity: 2.15,
+      // SUN DOWN THE STREET. Shade between four-storey terraces was true and
+      // wrong: the reference is a bright street, and at 0.7 hemi the whole
+      // frame went to mud once the buildings grew to 17 u and started
+      // shadowing each other. The bounce off pale render is what lights a
+      // street like this, so the ambient carries it rather than the key.
+      hemiIntensity: 1.15, sunIntensity: 2.7,
       elev: { amp: 5, ph: [1.1, 2.4, 0.6] },
     } },
 

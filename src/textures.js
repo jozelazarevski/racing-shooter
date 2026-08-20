@@ -1894,8 +1894,91 @@ export function townhouseBays(variant = 0, set = null) {
   // a five-storey face has to fit its openings into the same panel, so the
   // opening HEIGHT comes off the row count rather than being a constant
   const bh = V.rows.length >= 5 ? 34 : V.rows.length === 4 ? 40 : 52;
-  for (const y of V.rows) for (const x of V.xs) bays.push([x, y, V.xs.length > 2 ? 38 : 48, bh]);
-  return { bays, shop: V.shop };
+  const bw = V.xs.length > 2 ? 38 : 48;
+  for (const y of V.rows) for (const x of V.xs) bays.push([x, y, bw, bh]);
+  // rows/xs/bh come back out too: the half-timber frame has to know where the
+  // storeys and the bays are, or its posts land through the windows
+  return { bays, shop: V.shop, rows: V.rows, xs: V.xs, bh, bw };
+}
+
+/** HALF-TIMBERING (Fachwerk) — the defining feature of the reference street.
+ *
+ *  Dark timber over a lighter infill: a sill beam and a head beam per storey,
+ *  posts dividing the bays, and the diagonal BRACES that are the whole reason
+ *  the style reads at a glance. Without the diagonals it is just a grid of
+ *  lines and the eye takes it for a modern curtain wall.
+ *
+ *  Painted rather than modelled, and deliberately: this is a facade texture on
+ *  a frontage block, so the alternative is a hundred slender boxes per
+ *  building. At 192 px across the panel the timber lands at 5-7 px, which is
+ *  about a 25 cm beam on a 7 u unit — right, and it survives the mip chain.
+ *
+ *  Drawn over the render and UNDER the windows, so joinery still sits proud of
+ *  the frame exactly as it does on a real one.
+ */
+function applyHalfTimber(g, w, h, VB, spec) {
+  const S = {
+    beam: '#6b4630',              // oiled oak, near-black at distance
+    edge: 'rgba(38,24,16,0.55)',  // the shadow line under every beam
+    braces: true,
+    ...(spec === true ? {} : spec),
+  };
+  const rows = VB.rows || [];
+  if (!rows.length) return;
+  const bh = VB.bh ?? 40;
+  // BOLDER THAN LOOKS RIGHT UP CLOSE. At w/32 the frame was correct-scale and
+  // invisible past twenty units — this texture is read at speed from the far
+  // end of a street, where a 25 cm beam is sub-pixel. w/22 is a heavy oak
+  // frame, which is also what the reference draws.
+  const tw = Math.max(5, Math.round(w / 22));     // beam width
+  const bar = (x, y, ww, hh) => {
+    g.fillStyle = S.beam;
+    g.fillRect(x, y, ww, hh);
+    g.fillStyle = S.edge;
+    g.fillRect(x, y + hh - Math.max(1, hh * 0.22), ww, Math.max(1, hh * 0.22));
+  };
+  // a brace is a rotated bar; canvas has no skew primitive worth the trouble,
+  // so it is drawn as a filled parallelogram
+  const brace = (x1, y1, x2, y2) => {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = (-dy / len) * (tw * 0.5), ny = (dx / len) * (tw * 0.5);
+    g.fillStyle = S.beam;
+    g.beginPath();
+    g.moveTo(x1 + nx, y1 + ny);
+    g.lineTo(x2 + nx, y2 + ny);
+    g.lineTo(x2 - nx, y2 - ny);
+    g.lineTo(x1 - nx, y1 - ny);
+    g.closePath();
+    g.fill();
+  };
+  const xs = VB.xs || [];
+  for (let i = 0; i < rows.length; i++) {
+    const top = rows[i] - Math.round(bh * 0.34);
+    const bot = rows[i] + bh + Math.round(bh * 0.34);
+    bar(0, top, w, tw);                             // head beam
+    bar(0, bot, w, tw);                             // sill beam
+    // POSTS: one at each edge and one between every pair of bays, which is
+    // where a real frame puts them — the bays sit in the panels, not on them
+    const posts = [0, w - tw];
+    for (let k = 0; k < xs.length - 1; k++) {
+      posts.push(Math.round((xs[k] + 48 + xs[k + 1]) / 2) - tw / 2);
+    }
+    for (const px of posts) bar(px, top, tw, bot - top + tw);
+    if (!S.braces) continue;
+    // DIAGONALS in the outer panels, rising toward the centre — the plain
+    // "Mann" figure, and the shape that says Fachwerk from the far end of a
+    // street. Only the outer panels, or a three-bay face turns into a lattice.
+    const inset = tw * 1.1;
+    const midL = Math.min(xs[0] ?? w * 0.2, w * 0.3);
+    const midR = Math.max((xs[xs.length - 1] ?? w * 0.8) + 48, w * 0.7);
+    brace(inset, bot, midL, top + tw);
+    brace(w - inset, bot, midR, top + tw);
+    // ...and the opposing pair, which closes each outer panel into the "Mann"
+    // figure. One diagonal alone reads as a mistake; the pair reads as a frame.
+    brace(inset, top + tw, midL, bot);
+    brace(w - inset, top + tw, midR, bot);
+  }
 }
 
 export function townhouseTexture(palette = {}, variant = 0, set = null) {
@@ -1929,6 +2012,10 @@ export function townhouseTexture(palette = {}, variant = 0, set = null) {
       g.fillStyle = grd;
       g.fillRect(x - 4, y + bh, bw + 8, 34);
     }
+    // THE FRAME, before any joinery: on a real building the windows sit inside
+    // the panels the frame makes, so the timber goes down first and the sashes
+    // are drawn proud of it below.
+    if (P.timber) applyHalfTimber(g, w, h, VB, P.timber);
     // cornice, string courses between storeys, and the plinth
     g.fillStyle = P.trim;
     g.fillRect(0, 2, w, 9);                         // cornice
@@ -1959,6 +2046,29 @@ export function townhouseTexture(palette = {}, variant = 0, set = null) {
       for (let sy = y + 3; sy < y + bh; sy += 6) {
         g.fillRect(x - 12, sy, 9, 2);
         g.fillRect(x + bw + 3, sy, 9, 2);
+      }
+    }
+    // FLOWER BOXES, which the reference puts under nearly every upper window and
+    // which are most of the colour in that street. Painted here rather than
+    // modelled for the same reason as the frame: this is one texture on a
+    // frontage block, and geometry would mean a hundred boxes per building.
+    if (P.boxes) {
+      const B = (P.boxes === true ? {} : P.boxes);
+      const wood = B.wood || '#6b4630';
+      const blooms = B.blooms || ['#c8402f', '#e0644a', '#d8869a', '#efe3d2'];
+      for (const [x, y, bw2, bh2] of TH_BAYS) {
+        if (y + bh2 > h - 60) continue;               // not on the shopfront
+        const by = y + bh2 + 3;
+        g.fillStyle = wood;
+        g.fillRect(x - 3, by, bw2 + 6, 7);
+        g.fillStyle = 'rgba(30,18,12,0.45)';
+        g.fillRect(x - 3, by + 5, bw2 + 6, 2);
+        for (let k = 0; k < 14; k++) {
+          g.fillStyle = blooms[(Math.random() * blooms.length) | 0];
+          const fx = x - 2 + Math.random() * (bw2 + 4);
+          const fy = by - 1 - Math.random() * 4;
+          g.beginPath(); g.arc(fx, fy, 1.3 + Math.random() * 1.4, 0, 7); g.fill();
+        }
       }
     }
     // GROUND FLOOR. A shopfront where the variant asks for one; otherwise a
