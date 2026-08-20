@@ -9236,6 +9236,23 @@ export class Track {
         if (!best || margin > best.margin) best = { px, pz, margin };
         if (margin >= 0.6) break;
       }
+      // ...AND WHERE THERE IS NOWHERE AT ALL, BUILD NOTHING.
+      //
+      // Giving up the collider stops a tower dead-stopping anyone, but it does
+      // not stop four poles standing on the tarmac, which is what MOUNTAIN TO
+      // SEA has: its start line runs alongside ANOTHER LEG of its own lap and
+      // both roads are 90 u wide, so walking out from sample 0 the nearest
+      // carriageway switches from sample 0 to 338, 336, 334, 331 — a 21 u
+      // corridor where 46.8 u is needed. Nothing clears until 122 u out, which
+      // is two and a half road-widths from the line it is meant to mark.
+      //
+      // So apply the law the census applies: a bare thing may not stand deeper
+      // than 3 u in a lane. `best.margin` is distance minus the leg cluster's
+      // 1.8 u reach minus that stretch's half-width, and a leg carries r 0.6,
+      // so its bite is -(margin) - 1.2. Past 3 u the tower is not sited badly,
+      // it is unsiteable, and the honest build is none. The banner is hung
+      // from the start line itself and is unaffected.
+      if (-best.margin - 1.2 > 3) continue;
       const bx = best.px, bz = best.pz;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
         // and a leg reaches the GROUND under its own tower, which on a world
