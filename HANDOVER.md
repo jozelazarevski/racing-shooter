@@ -1696,3 +1696,42 @@ match" were partly me judging from the worst possible camera.
 fraction. Use it for anything about how a world LOOKS.
 
 boot.mjs 4/4, test-boot 7/0, test-buildings green, test-ladder 31/0.
+
+## r241 — THE STREET SURFACE AND THE PALETTE, FROM THE TARGET IMAGE
+A render was sent with "this is how I want it to look, anything else won't be
+acceptable". Compared against r240 the gaps were mostly NOT the buildings:
+
+  1. THE ROAD IS ~40% OF THAT FRAME. Theirs is large irregular setts in pale
+     greys, beiges and a faint lilac, with a TRAM LINE bedded in tan running
+     down it. Mine was speckle noise on grey.
+  2. The palette is muted taupe / stone / ox-blood with PALE window frames
+     against dark glass — not saturated pastel.
+
+### Tram rails are a texture pass, not geometry
+The road canvas maps its WIDTH across the 22 u ribbon and its HEIGHT along the
+direction of travel (see RUT_CX), so a vertical stripe on that canvas is a line
+running down the road. `applyTramRails` paints two bedded rails for the cost of
+a few fills — a mile of rail geometry would have been absurd for the same
+result. Drawn AFTER the cobbles, which is the right order: track is laid INTO a
+street, not under it.
+
+`TOWN_ROAD` sets the setts at `rows: 20, per: 26` — 22 u across 26 stones is
+~0.85 u each, about a dinner plate, roughly twice Tremola's hand-laid sett and
+what the reference shows.
+
+### The pale window frame is doing more work than it looks
+`frame: '#efe9dc'` against `pane: '#1e232b'`. A light frame on dark glass is
+what makes a window grid read from the far end of a street; the saturated
+version had a dark frame on dark glass and the grid dissolved past ~40 u.
+
+### STILL SHORT OF THE TARGET
+  - NO HALF-TIMBERING. The reference has dark timber framing over cream infill
+    on several facades and it is a strong part of that look. It wants a facade
+    variant in townhouseTexture, not a new building.
+  - The setts are more REGULAR than the reference's, which vary in size and
+    shape as well as tone. `applyCobbleRoad` lays a strict staggered grid.
+  - That reference is a northern/Hanseatic street, not a Ligurian one. The
+    palette now follows the image rather than Alassio, which is what was asked
+    for — say so if the colour should come back.
+
+boot.mjs 4/4, test-boot 7/0, test-buildings green.

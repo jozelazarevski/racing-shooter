@@ -310,6 +310,61 @@ function applySandRipples(g, w, h, spec) {
  *  then polished down the two wheel tracks. An ellipse is a pebble, and a
  *  road surfaced in pebbles is what the old pass drew.
  */
+/** TRAM RAILS DOWN THE STREET.
+ *
+ *  The single most distinctive thing in the reference: two rails running the
+ *  length of the street, each bedded in a band of tan setts that reads quite
+ *  differently from the grey cobbles around it.
+ *
+ *  IT IS PAINTED, NOT BUILT. The road canvas maps its WIDTH across the 22 u
+ *  ribbon and its HEIGHT along the direction of travel (see RUT_CX), so a
+ *  vertical stripe here is a line running down the road — which makes rails a
+ *  texture pass costing nothing rather than a mile of extra geometry.
+ *
+ *  Drawn AFTER the cobbles so the setts are interrupted by the rail bed, which
+ *  is the right order: the track was laid into the street, not under it.
+ */
+function applyTramRails(g, w, h, spec) {
+  const S = {
+    gauge: 3.2,               // u between rail centres — a wide street tramway
+    bed: '#c9b08a',           // tan setts the rail is bedded in
+    bedEdge: 'rgba(120,100,74,0.55)',
+    rail: '#5d5a55',          // worn steel
+    head: 'rgba(246,242,230,0.55)',   // the polished top, catching the sky
+    ...(spec === true ? {} : spec),
+  };
+  const U = w / 22;                       // pixels per world unit across the road
+  const half = (S.gauge / 2) * U;
+  const bedW = 1.15 * U;
+  const railW = Math.max(2, 0.16 * U);
+  for (const dir of [-1, 1]) {
+    const cx = w * 0.5 + dir * half;
+    // the bed: tan setts, drawn as a band with its own coursing so it does not
+    // read as a flat painted stripe
+    g.fillStyle = S.bed;
+    g.fillRect(cx - bedW / 2, 0, bedW, h);
+    g.strokeStyle = S.bedEdge;
+    g.lineWidth = Math.max(1, 0.06 * U);
+    g.beginPath();
+    g.moveTo(cx - bedW / 2, 0); g.lineTo(cx - bedW / 2, h);
+    g.moveTo(cx + bedW / 2, 0); g.lineTo(cx + bedW / 2, h);
+    g.stroke();
+    // coursing across the bed, so it matches the cobble scale beside it
+    g.strokeStyle = 'rgba(120,100,74,0.32)';
+    g.lineWidth = 1;
+    const step = h / 46;
+    for (let y = 0; y < h; y += step) {
+      g.beginPath(); g.moveTo(cx - bedW / 2, y); g.lineTo(cx + bedW / 2, y); g.stroke();
+    }
+    // the rail itself, with a lit head — the head is what the eye tracks and
+    // the reason a rail reads as steel rather than as a dark line
+    g.fillStyle = S.rail;
+    g.fillRect(cx - railW / 2, 0, railW, h);
+    g.fillStyle = S.head;
+    g.fillRect(cx - railW * 0.22, 0, railW * 0.44, h);
+  }
+}
+
 function applyCobbleRoad(g, w, h, spec) {
   const S = {
     stones: ['#8f8b84', '#7d7a75', '#9a958c', '#6f6d69', '#a29c92', '#85837e'],
@@ -531,7 +586,7 @@ export function roadTexture(palette = {}) {
   // A SETT NEEDS TEXELS: 48 stones across a 512 px tile is ten pixels each,
   // and the joint and bevel both vanish into the mip chain. Cobbled roads get
   // a 1024 px tile; every other surface is broad mottle and stays at 512.
-  const RES = P.cobbles ? 1024 : 512;
+  const RES = (P.cobbles || P.rails) ? 1024 : 512;
   const t = make(RES, RES, (g, w, h) => {
     g.fillStyle = P.base;
     g.fillRect(0, 0, w, h);
@@ -614,6 +669,7 @@ export function roadTexture(palette = {}) {
     // cobbled setts are laid ON TOP of the dirt/rut base (the ruts still read
     // through as worn wheel tracks) but UNDER the verge fringe below
     if (P.cobbles) applyCobbleRoad(g, w, h, P.cobbles);
+    if (P.rails) applyTramRails(g, w, h, P.rails);
     // fine multi-octave grain over the whole surface (build-time, palette-safe)
     noiseOverlay(g, w, h, 0.11);
     // dry surfaces pick up faint oily wear sheen down the driving lines —

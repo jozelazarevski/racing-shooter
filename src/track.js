@@ -648,17 +648,39 @@ export const LEVELS = [
       frontage: {
         lateral: 9.6, depth: 7.0, unit: 6.4, height: 17.0, run: [10, 20], rows: 6,
         bayset: 'liguria',
-        tints: ['#f0d98a', '#e8b45c', '#e8a2a6', '#c4655a', '#f4e6cc', '#bccbb0', '#e2ac7c'],
-        roof: 0xb85a30,
-        face: { render: '#ecd79b', plinth: '#cfc3a4', trim: '#f6efdd',
-          frame: '#2b2b26', shutter: '#3d6b47', pane: '#1b2028' },
+        // THE REFERENCE PALETTE (r241), and it is deliberately NOT the pastel
+        // Alassio was built on. The image sent as the target is a muted street:
+        // taupe, warm stone, grey-brown, ox-blood and cream, with PALE window
+        // frames against dark glass — that light frame is what makes the window
+        // grid read from the far end of the street, and it is the detail the
+        // saturated version was losing.
+        tints: ['#b6a894', '#a3907a', '#8f8478', '#c4b6a2', '#8a6a52',
+          '#7c5a4a', '#cfc4b2', '#9a8e80'],
+        roof: 0xa8563a,
+        face: { render: '#b8ab98', plinth: '#8e8578', trim: '#efe9dc',
+          frame: '#efe9dc', shutter: '#4a4038', pane: '#1e232b' },
       },
       // A STREET HAS NO COUNTRYSIDE IN IT. Rocks, scrub, tufts and wildflowers
       // between the kerb and the wall are what kept reading as "road through a
       // field" no matter what the buildings did.
       rockCount: 0, pebbleCount: 0, bushCount: 0, tuftCount: 0, flowerCount: 0,
       hutCount: 8, hutZone: [0, 1], treeCount: 26,
-      // paved to the building line — see TOWN_GROUND
+      // paved to the building line, and the street itself is setts with a
+      // tram line in it — see TOWN_ROAD
+      road: {
+        base: '#8e8a82', mottleA: [128, 124, 116], mottleB: [176, 172, 163],
+        rut: 'rgba(70,68,63,0.32)', rutCore: 'rgba(52,50,46,0.3)', tread: 'rgba(30,29,26,0.3)',
+        stoneA: 'rgba(206,202,192,0.5)', stoneB: 'rgba(84,81,76,0.55)',
+        fringe: [150, 146, 136], fringeVar: [26, 25, 22],
+        ruts: false,
+        cobbles: {
+          stones: ['#c9c5bc', '#b6b1a7', '#d2ccc0', '#a9a49b', '#c3bcc2', '#dad4c8',
+            '#b0aca6', '#cfc8b8'],
+          mortar: 'rgba(96,92,85,0.85)', lip: 'rgba(255,252,244,0.2)',
+          rows: 20, per: 26,
+        },
+        rails: { gauge: 3.4 },
+      },
       terrainLow: '#6b6a62', terrainHigh: '#8e8b80', terrainDirt: '#7c7970',
       terrainScree: '#9a978c', skirtColor: '#8a8880',
       ground: {
@@ -4406,6 +4428,29 @@ THEMES.riviera = {
 // for anything with a kerb on it. The two town worlds get worn stone instead,
 // and it matters more than any building detail: the ground is most of the
 // frame from a chase camera, and a sand-coloured one puts the town in a desert.
+// THE STREET SURFACE, from the reference image (r241). It is ~40% of that
+// frame and it was the biggest single thing still wrong: mine was speckle
+// noise on grey, and theirs is LARGE irregular setts in pale greys, beiges
+// and a faint lilac, with a tram line bedded in tan running down it.
+//
+// `rows`/`per` set the sett SIZE: 22 u of road across 26 stones is ~0.85 u
+// each — roughly a dinner plate, which is what the reference shows and about
+// twice the Tremola hand-laid sett.
+const TOWN_ROAD = {
+  base: '#8e8a82', mottleA: [128, 124, 116], mottleB: [176, 172, 163],
+  rut: 'rgba(70,68,63,0.32)', rutCore: 'rgba(52,50,46,0.3)', tread: 'rgba(30,29,26,0.3)',
+  stoneA: 'rgba(206,202,192,0.5)', stoneB: 'rgba(84,81,76,0.55)',
+  fringe: [150, 146, 136], fringeVar: [26, 25, 22],
+  ruts: false,                       // setts do not rut
+  cobbles: {
+    stones: ['#c9c5bc', '#b6b1a7', '#d2ccc0', '#a9a49b', '#c3bcc2', '#dad4c8',
+      '#b0aca6', '#cfc8b8'],
+    mortar: 'rgba(96,92,85,0.85)', lip: 'rgba(255,252,244,0.2)',
+    rows: 20, per: 26,               // ~0.85 u setts, twice Tremola's
+  },
+  rails: { gauge: 3.4 },
+};
+
 const TOWN_GROUND = {
   terrainLow: '#6b6a62', terrainHigh: '#8e8b80', terrainDirt: '#7c7970',
   terrainScree: '#9a978c', skirtColor: '#8a8880',
@@ -4421,6 +4466,7 @@ const TOWN_GROUND = {
 THEMES.genova = {
   ...THEMES.riviera,
   ...TOWN_GROUND,
+  road: TOWN_ROAD,
   elements: 'genova',
   // same as the budello: a city is its street walls, not a scatter — and a
   // caruggio is barely wider than the lane at Alassio
