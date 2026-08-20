@@ -253,6 +253,8 @@ const WORLD_TAGS = {
   outback: 'bulldust holes · creek jumps · 🦘',
   autumnwood: '🍂 wet leaves · low sun',
   riviera: '🌊 seafront tarmac · town walls',
+  genova: '🏙 port city · caruggi and docks',
+  sanremo: '⛰ mountain stage · olive terraces',
   harvestvale: '🍂 stubble fields · long shadows',
   mistfell: '🌫 bracken moor · mist banks',
 };

@@ -1483,3 +1483,56 @@ shutter.
     rule already recorded for hillshot.mjs — third time this has been paid for.
     A real frame weighs ~900KB.
 `tools-scratch/townshot.mjs` takes LV and F.
+
+## r236 — THE LIGURIAN MODULE SET, AND TWO MORE DISTRICTS
+"Add Sanremo mountains and Genova. Make sure they are all unique looking. Don't
+use that template. Create a Ligurian template that will match the designs."
+Sent with village-builder sheets naming the archetypes.
+
+### The four modules
+r235's `palazzina` and `shopfront` were a GUESS at a Ligurian building. The
+sheets name the real ones and are specific about what separates them, so the
+guess is gone and these are modelled instead. One of each on a street reads as
+a town; four of one reads as a texture.
+
+  ligSlender   six storeys on 4.6u — three times taller than it is wide. The
+               PROPORTION is the design; no balconies, a strict jalousie grid.
+  ligTwin      two bays sharing a party wall at DIFFERENT heights and colours.
+               The height step is the whole tell — level, it is one fat house.
+  ligCorner    the block that turns a junction: stepped chamfer, shop arcade
+               under two awnings on each street face, heavy cornice, parapet.
+  ligRural     the hinterland house: low, wide, stone ground floor, and GREEN
+               SLATE rather than pantile. The sheets treat that one material
+               swap as what separates a mountain village from a seafront, and
+               they are right — it does more work than any other single change.
+
+TRAP: the ninth element of a part tuple is `roll`, a rotation about Z, NOT a
+yaw. The corner's 45-degree chamfer was first written as a rotated slab and
+would have come out lying on its side. It is four stepped boxes now, which
+makes the same silhouette with no rotation at all.
+
+### Three districts off one module set
+Same modules, different weights and paint — which is how three towns on one
+coast stop looking like one town:
+  alassio  slender/twin/slender/corner  Golfo Paradiso pastels, pantile
+  genova   corner/slender/corner/twin   deep reds and burnt ochre, urban,
+                                        10 stone walls, a working port
+  sanremo  rural/rural/slender/twin     cream render, GREEN SLATE, drystone
+
+### The two new worlds
+  77 GENOVA PORTO   `panorama` — flat-then-mountain, which is Genova exactly:
+                    the docks, then straight up into the hills the city is
+                    stacked on. 118 buildings, the most built-up lap on the
+                    roster.
+  78 SANREMO STAGE  `corse` — the rally runs in the mountains BEHIND the town,
+                    so this world has `coast: undefined` and no sea in it at
+                    all. Cold high sun (el 1.02 against the coast's 0.82),
+                    880 trees, 720 rocks.
+
+### NOT DONE, and it is the larger half of the request
+"Re design all templates according" was sent with WINE REGION and SCOTTISH
+HIGHLANDS sheets. Those are different regions entirely — Alsace/Burgundy wine
+villages, Scottish crofts under heavy slate — and the roster has a dozen more
+building kits besides (alpine, medhill, oldtown, hedgerow, outback, farm...).
+Redesigning every one of them from those sheets is a much bigger piece of work
+than this commit. Only the LIGURIAN set is redesigned here.

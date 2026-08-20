@@ -673,6 +673,28 @@ export const LEVELS = [
           [0.47, 37], [0.55, 42], [0.62, 40], [0.71, 31], [0.8, 19],
           [0.89, 8], [0.96, 1], [1, 0]],
       },
+    } },
+
+  { id: 77, name: 'GENOVA PORTO', theme: 'genova', region: 'RIVIERA',
+    cost: 50, fresh: true, route: 'panorama',
+    // THE CITY. `panorama` is the roster's flat-then-mountain shape, which is
+    // Genova exactly: a long fast run along the docks and then straight up
+    // into the hills the city is stacked on. The most built-up world on the
+    // roster — corner blocks at every junction and 108 buildings on the lap.
+    tune: {
+      hutCount: 118,
+      elev: { amp: 30, ph: [0.6, 1.9, 2.8] },
+    } },
+
+  { id: 78, name: 'SANREMO STAGE', theme: 'sanremo', region: 'RIVIERA',
+    cost: 51, fresh: true, route: 'corse',
+    // THE RALLY. Sanremo's stages run in the mountains BEHIND the town, not
+    // along the front, and `corse` is the roster's tight unforgiving mountain
+    // lap. The one world in this chapter with no sea in it at all — which is
+    // the point of including it.
+    tune: {
+      treeCount: 880, rockCount: 720,
+      elev: { amp: 26, ph: [1.4, 0.7, 2.2] },
     } }
 ];
 
@@ -809,6 +831,8 @@ const SCENERY = {
   medterrace: ['COAST', 'FARMLAND'], olivecountry: ['COAST', 'FARMLAND'],
   // a seaside TOWN: coast and buildings, not coast and farmland
   riviera: ['COAST', 'CITY'],
+  genova: ['COAST', 'CITY'],            // a port city — the most urban on the roster
+  sanremo: ['MOUNTAIN', 'FOREST'],      // the rally runs BEHIND the coast, not on it
   harbor: ['COAST'], liguria: ['COAST'], aegean: ['COAST'], brava: ['COAST'],
   dalmatia: ['COAST'], azur: ['COAST'],
   mountainsea: ['COAST', 'MOUNTAIN'],
@@ -867,6 +891,7 @@ const SURFACE_BY_THEME = {
   // sealed, which is right — they are real circuits that happen to sit on
   // these themes.
   medterrace: LOOSE, vineyard: LOOSE, olivecountry: LOOSE,
+  genova: SEALED, sanremo: SEALED,
   // RIVIERA IS THE EXCEPTION and stays SEALED. The other three are farm and
   // olive-grove lanes; this is a seafront promenade and a town's own streets,
   // which are tarmac in a way an olive terrace never is. It also gives the
@@ -4322,6 +4347,68 @@ THEMES.riviera = {
   },
 };
 
+// GENOVA — the port city. Same coast, opposite character: `riviera` is a
+// resort in the sun and this is a working harbour under it. Denser, dirtier,
+// redder, and the light is bounced back off stone rather than off sand.
+THEMES.genova = {
+  ...THEMES.riviera,
+  elements: 'genova',
+  hutCount: 108, hutZone: [0, 1],
+  treeCount: 190, bushCount: 200, flowerCount: 120,
+  // a city ground: worn stone and asphalt, not beach sand
+  terrainLow: '#6e6a56', terrainHigh: '#9a9182', terrainDirt: '#87806f',
+  terrainScree: '#a9a294', skirtColor: '#9c9486',
+  ground: { ...THEMES.riviera.ground, base: '#8e877a',
+    patchA: 'rgba(120,112,96,0.24)', patchB: 'rgba(168,160,144,0.2)' },
+  hillColor: 0x74795a, peakColor: 0x9a9a86,
+  // harbour air: warmer haze, shorter view, and a lower sun off the water
+  fogColor: 0xcfd2cc, fogNear: 260, fogFar: 1350,
+  hemiIntensity: 0.8, sunIntensity: 2.35, sunEl: 0.7,
+  skyTop: '#3a7fb8', skyHorizon: '#cdd6d4',
+  splinter: [0xc86a4a, 0xb8ac96, 0x35583c],
+  hutRoof: 0x9c4628,
+  frontage: {
+    tints: ['#c86a4a', '#b2543c', '#d08a56', '#9e4a34', '#c4926a', '#d9a878'],
+    roof: 0x9c4628,
+    face: { render: '#d9b894', plinth: '#8e8272', trim: '#e8d6bc',
+      frame: '#35583c', shutter: '#35583c' },
+  },
+};
+
+// SANREMO — the mountains BEHIND the coast, which is where the rally actually
+// runs. The sea is gone, the town thins to hinterland houses under green
+// slate, and the air is the thin cool air of altitude rather than sea haze.
+THEMES.sanremo = {
+  ...THEMES.riviera,
+  elements: 'sanremo',
+  coast: undefined, quay: false,
+  hutCount: 30, hutZone: [0.2, 0.55],
+  treeCount: 780, bushCount: 520, rockCount: 640, flowerCount: 260,
+  // COLD LIGHT AT HEIGHT. The riviera key is a warm 2.6 at 47 degrees; up here
+  // it is whiter, harder and higher, and the ground is limestone and maquis
+  // rather than sand — this world must not read as the seafront with hills
+  // pasted behind it.
+  sunColor: 0xfff6e8, sunIntensity: 2.75, sunEl: 1.02, sunAz: 4.3,
+  hemiSky: 0xb6d4f4, hemiGround: 0x7a7a5c, hemiIntensity: 0.78,
+  skyTop: '#2a74cc', skyHorizon: '#c4d6dc',
+  fogColor: 0xc2d0d4, fogNear: 520, fogFar: 2300,
+  hazeColor: 0xccdadc, hazeOpacity: 0.6,
+  terrainLow: '#6c7a44', terrainHigh: '#a99c78', terrainDirt: '#94855f',
+  terrainScree: '#c0b79c', skirtColor: '#b2a888',
+  ground: { ...THEMES.riviera.ground, base: '#9e9670',
+    patchA: 'rgba(122,132,78,0.26)', patchB: 'rgba(196,186,156,0.2)' },
+  hillColor: 0x76804e, peakColor: 0xb4ac90,
+  splinter: [0xdcd2ba, 0xa8a294, 0x5c6f58],
+  hutRoof: 0x5c6f58,
+  weather: { type: 'dust', color: 0xd0c8ac, rate: 22 },
+  frontage: {
+    tints: ['#dcd2ba', '#c8bda2', '#e4dcc6', '#d0bb98', '#bfae90'],
+    roof: 0x5c6f58,
+    face: { render: '#e0d6bf', plinth: '#9c9484', trim: '#efe6d2',
+      frame: '#4a6b4a', shutter: '#4a6b4a' },
+  },
+};
+
 THEMES.mountainsea = {
   ...THEMES.dalmatia,
   // The sea sits BELOW the road's lowest point, not at the harbour's default.
@@ -4498,6 +4585,8 @@ const PROP_SPECS = {
   medterrace: [['crate', 20], ['hay', 14], ['cone', 12], ['rock', 8]],
   // street furniture, not farm clutter: barriers and cones down a closed town
   riviera: [['cone', 26], ['crate', 16], ['rock', 6]],
+  genova: [['cone', 30], ['crate', 26], ['barrel', 14]],   // a working dock
+  sanremo: [['rock', 30], ['cone', 14], ['hay', 8]],       // a mountain stage
   // OLD TOWN: market stall crates packed away at the kerb, street-works cones
   // and steel drums. No rocks and no hay — the region's negative list rules
   // out gravel, dirt and anything that is not architectural.
@@ -4604,88 +4693,164 @@ export const HOUSE_TEMPLATES = {
     ['cyl', -1.7, 14.7, 0, 0.26, 0.5, 0.26, 'roof'],
     ['box', 0, 13.35, 0, 6.4, 0.22, 0.5, 'trim'],            // ridge cap
   ] },
-  // ---- ALASSIO, DESIGNED FROM THE REFERENCE PHOTOGRAPH -------------------
-  // The existing `towerhouse` is a Cinque Terre hill house: four storeys on a
-  // small square footprint. The photograph sent from Alassio is a different
-  // building and the difference is what the town looks like — a FIVE storey
-  // seafront palazzina, wider than it is deep because it is one of a terrace,
-  // with a shop arcade at street level under a canvas awning, a stone string
-  // course between every floor, and a balcony on each of the middle three.
+  // ---- THE LIGURIAN MODULE SET ------------------------------------------
+  // Built from the village-builder sheets, which name the archetypes and are
+  // specific about what separates them. The first cut here (a "palazzina" and
+  // a "shopfront") was a guess at a Ligurian building; these are the four the
+  // sheets actually draw, and the differences between them are the point —
+  // one of each on a street reads as a town, four of one reads as a texture.
   //
-  // WHAT READS FROM A CAR is the order of horizontals: awning, then three
-  // balconies stacked, then the eaves. That rhythm is the whole silhouette,
-  // so everything else here is in service of keeping it legible.
-  palazzina: { r: 5.6, parts: [
-    ['box', 0, 0, 0, 8.2, 0.45, 5.6, 'stone'],               // pavement plinth
-    ['wall', 0, 0.45, 0, 7.8, 14.6, 5.2, 'wall'],            // the terrace block
-    // GROUND-FLOOR ARCADE: three piers with the shopfront recessed behind
-    // them, which is what makes the street level read as shops and not as a
-    // blank wall with a door in it.
-    ['box', -3.1, 0.45, 2.5, 0.55, 3.4, 0.55, 'stone'],
-    ['box', 0, 0.45, 2.5, 0.5, 3.4, 0.5, 'stone'],
-    ['box', 3.1, 0.45, 2.5, 0.55, 3.4, 0.55, 'stone'],
-    ['box', 0, 0.45, 2.15, 6.6, 3.2, 0.2, 'wall2'],          // recessed shop face
-    ['box', 0, 3.85, 2.45, 7.4, 0.24, 0.6, 'stone'],         // lintel over the arcade
-    ['prism', 0, 4.05, 2.95, 7.2, 0.5, 1.5, 'roof'],         // the canvas awning
-    // STRING COURSES — a stone band at every floor. Cheap, and it is the one
-    // detail that makes render read as five storeys rather than one tall wall.
-    ['box', 0, 6.6, 2.62, 8.0, 0.18, 0.18, 'trim'],
-    ['box', 0, 9.2, 2.62, 8.0, 0.18, 0.18, 'trim'],
-    ['box', 0, 11.8, 2.62, 8.0, 0.18, 0.18, 'trim'],
-    // THREE STACKED BALCONIES with iron balusters, one per middle floor
-    ...[5.0, 7.6, 10.2].flatMap((y) => [
-      ['box', 0, y, 2.95, 6.4, 0.16, 0.72, 'trim'],
-      ['cyl', -2.6, y + 0.16, 3.22, 0.075, 0.8, 0.075, 'trim'],
-      ['cyl', -1.3, y + 0.16, 3.22, 0.075, 0.8, 0.075, 'trim'],
-      ['cyl', 0, y + 0.16, 3.22, 0.075, 0.8, 0.075, 'trim'],
-      ['cyl', 1.3, y + 0.16, 3.22, 0.075, 0.8, 0.075, 'trim'],
-      ['cyl', 2.6, y + 0.16, 3.22, 0.075, 0.8, 0.075, 'trim'],
-      ['box', 0, y + 0.96, 3.22, 6.2, 0.09, 0.11, 'trim'],   // handrail
+  //   SINGLE SLENDER    very tall on a very small footprint, no balconies, a
+  //                     strict grid of shuttered openings. The tallest thing
+  //                     in a Ligurian street and the narrowest.
+  //   TWIN-CONNECTED    two bays sharing a party wall at DIFFERENT heights and
+  //                     DIFFERENT colours. The height step is the whole tell —
+  //                     without it, it is one fat building.
+  //   CORNER            the terracotta block that turns a junction: chamfered
+  //                     corner, shop arcade under awnings, heavy cornice.
+  //   HINTERLAND        the rural house behind the coast: low, wide, stone
+  //                     base, GREEN SLATE roof rather than pantile.
+  //
+  // Colour comes from the kit palette per building; what is modelled here is
+  // the SHAPE, because at speed the silhouette is all that survives.
+
+  // SINGLE SLENDER HOUSE — six storeys, 4.6 u wide. The proportion is the
+  // design: nothing about the detailing says "Liguria" as loudly as a building
+  // three times taller than it is wide.
+  ligSlender: { r: 3.6, parts: [
+    ['box', 0, 0, 0, 5.0, 0.4, 4.6, 'stone'],                // plinth
+    ['wall', 0, 0.4, 0, 4.6, 16.4, 4.2, 'wall'],             // the shaft
+    ['box', 0, 0.4, 2.0, 1.4, 2.5, 0.2, 'trim'],             // street door
+    ['box', -1.35, 0.5, 2.12, 1.3, 2.0, 0.14, 'wall2'],      // ground window
+    // FIVE FLOORS OF A STRICT GRID. Two openings per floor, each a reveal with
+    // a shutter leaf either side — the sheet's "pre-set jalousie layout".
+    ...[3.6, 6.2, 8.8, 11.4, 14.0].flatMap((y) => [
+      ['box', -1.15, y, 2.14, 1.0, 1.45, 0.14, 'wall2'],
+      ['box', 1.15, y, 2.14, 1.0, 1.45, 0.14, 'wall2'],
+      ['box', -1.78, y, 2.2, 0.28, 1.45, 0.12, 'trim'],
+      ['box', -0.52, y, 2.2, 0.28, 1.45, 0.12, 'trim'],
+      ['box', 0.52, y, 2.2, 0.28, 1.45, 0.12, 'trim'],
+      ['box', 1.78, y, 2.2, 0.28, 1.45, 0.12, 'trim'],
+      ['box', 0, y - 0.82, 2.22, 2.9, 0.12, 0.16, 'trim'],   // sill band
     ]),
-    // SHUTTERED WINDOWS, in pairs, on the three upper floors. A reveal cut
-    // into the render catches its own shadow — a painted rectangle does not.
-    ...[5.4, 8.0, 10.6, 12.9].flatMap((y) => [
-      ['box', -2.3, y, 2.72, 1.15, 1.5, 0.16, 'wall2'],
-      ['box', 2.3, y, 2.72, 1.15, 1.5, 0.16, 'wall2'],
-      ['box', -3.05, y, 2.78, 0.34, 1.5, 0.14, 'trim'],      // the green shutters
-      ['box', -1.55, y, 2.78, 0.34, 1.5, 0.14, 'trim'],
-      ['box', 1.55, y, 2.78, 0.34, 1.5, 0.14, 'trim'],
-      ['box', 3.05, y, 2.78, 0.34, 1.5, 0.14, 'trim'],
-    ]),
-    ['box', 0, 15.05, 0, 8.6, 0.3, 5.9, 'trim'],             // eaves
-    ['prism', 0, 15.35, 0, 8.8, 1.5, 6.1, 'roof'],           // shallow pantile
-    ['cyl', 3.6, 0.45, 2.5, 0.1, 14.4, 0.1, 'trim'],         // downpipe
-    ['cyl', -2.4, 16.5, 0, 0.5, 1.7, 0.5, 'stone'],          // chimney
-    ['cyl', -2.4, 18.0, 0, 0.24, 0.45, 0.24, 'roof'],
+    ['box', 0, 16.8, 0, 5.3, 0.26, 4.9, 'trim'],             // cornice
+    ['prism', 0, 17.06, 0, 5.5, 1.15, 5.1, 'roof'],
+    ['cyl', 2.05, 0.4, 1.95, 0.09, 16.2, 0.09, 'trim'],      // downpipe
+    ['cyl', -1.3, 18.2, 0, 0.42, 1.5, 0.42, 'stone'],        // chimney
   ] },
-  // IL BUDELLO'S OWN BUILDING: the lane is one car wide with shops the whole
-  // way down, so this is narrow, only three storeys, and almost entirely
-  // shopfront at the bottom. Shorter than the palazzina ON PURPOSE — a lane
-  // where every building is the same height reads as a corridor, and the
-  // variation is what makes it read as a street.
-  shopfront: { r: 3.4, parts: [
-    ['box', 0, 0, 0, 4.6, 0.4, 4.2, 'stone'],
-    ['wall', 0, 0.4, 0, 4.3, 8.4, 3.9, 'wall'],
-    ['box', 0, 0.4, 1.75, 3.5, 3.0, 0.22, 'wall2'],          // the shop window
-    ['box', 0, 3.4, 1.95, 4.2, 0.22, 0.45, 'stone'],         // fascia board
-    ['prism', 0, 3.6, 2.4, 4.0, 0.44, 1.3, 'roof'],          // awning over the pavement
-    ['box', 0, 5.9, 2.05, 4.5, 0.16, 0.16, 'trim'],          // string course
-    ['box', 0, 4.6, 2.3, 3.6, 0.14, 0.6, 'trim'],            // one small balcony
-    ['cyl', -1.5, 4.74, 2.55, 0.07, 0.7, 0.07, 'trim'],
-    ['cyl', 0, 4.74, 2.55, 0.07, 0.7, 0.07, 'trim'],
-    ['cyl', 1.5, 4.74, 2.55, 0.07, 0.7, 0.07, 'trim'],
-    ['box', 0, 5.44, 2.55, 3.4, 0.08, 0.1, 'trim'],
-    ...[4.9, 7.0].flatMap((y) => [
-      ['box', -1.05, y, 2.02, 0.95, 1.35, 0.14, 'wall2'],
-      ['box', 1.05, y, 2.02, 0.95, 1.35, 0.14, 'wall2'],
-      ['box', -1.7, y, 2.08, 0.3, 1.35, 0.12, 'trim'],
-      ['box', -0.4, y, 2.08, 0.3, 1.35, 0.12, 'trim'],
-      ['box', 0.4, y, 2.08, 0.3, 1.35, 0.12, 'trim'],
-      ['box', 1.7, y, 2.08, 0.3, 1.35, 0.12, 'trim'],
+
+  // TWIN-CONNECTED HOUSE — two bays, one four storeys and one five, sharing a
+  // wall. The STEP is modelled, not implied: different heights, different
+  // roofs, one shopfront at the foot of the taller bay.
+  ligTwin: { r: 5.2, parts: [
+    ['box', 0, 0, 0, 9.6, 0.4, 5.0, 'stone'],
+    // LEFT BAY — the lower one, plain render
+    ['wall', -2.5, 0.4, 0, 4.4, 11.0, 4.6, 'wall2'],
+    ['box', -2.5, 11.4, 0, 5.0, 0.24, 5.0, 'trim'],
+    ['prism', -2.5, 11.64, 0, 5.2, 1.1, 5.2, 'roof'],
+    ['box', -2.5, 0.4, 2.2, 1.3, 2.4, 0.18, 'trim'],         // its own door
+    ...[3.4, 6.0, 8.6].flatMap((y) => [
+      ['box', -3.5, y, 2.32, 0.9, 1.35, 0.13, 'wall2'],
+      ['box', -1.5, y, 2.32, 0.9, 1.35, 0.13, 'wall2'],
+      ['box', -4.06, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
+      ['box', -2.94, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
+      ['box', -2.06, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
+      ['box', -0.94, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
     ]),
-    ['box', 0, 8.8, 0, 4.9, 0.24, 4.5, 'trim'],
-    ['prism', 0, 9.04, 0, 5.1, 1.15, 4.7, 'roof'],
-    ['cyl', 1.9, 0.4, 1.9, 0.09, 8.3, 0.09, 'trim'],
+    // RIGHT BAY — taller, its own colour, and it carries the shop
+    ['wall', 2.5, 0.4, 0, 4.4, 13.8, 4.6, 'wall'],
+    ['box', 2.5, 14.2, 0, 5.0, 0.24, 5.0, 'trim'],
+    ['prism', 2.5, 14.44, 0, 5.2, 1.15, 5.2, 'roof'],
+    ['box', 2.5, 0.4, 2.15, 3.6, 2.9, 0.2, 'wall2'],         // shop face
+    ['box', 2.5, 3.3, 2.4, 4.2, 0.2, 0.5, 'stone'],          // fascia
+    ['prism', 2.5, 3.5, 2.85, 4.0, 0.42, 1.2, 'roof'],       // awning
+    ...[5.4, 8.0, 10.6].flatMap((y) => [
+      ['box', 1.5, y, 2.32, 0.9, 1.35, 0.13, 'wall2'],
+      ['box', 3.5, y, 2.32, 0.9, 1.35, 0.13, 'wall2'],
+      ['box', 0.94, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
+      ['box', 2.06, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
+      ['box', 2.94, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
+      ['box', 4.06, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
+    ]),
+    ['box', 2.5, 6.9, 2.6, 4.0, 0.14, 0.6, 'trim'],          // one balcony
+    ['cyl', 1.0, 7.04, 2.85, 0.07, 0.72, 0.07, 'trim'],
+    ['cyl', 2.5, 7.04, 2.85, 0.07, 0.72, 0.07, 'trim'],
+    ['cyl', 4.0, 7.04, 2.85, 0.07, 0.72, 0.07, 'trim'],
+    ['box', 2.5, 7.76, 2.85, 3.8, 0.08, 0.1, 'trim'],
+    ['cyl', 0, 0.4, 2.2, 0.1, 13.4, 0.1, 'trim'],            // party-wall pipe
+  ] },
+
+  // CORNER BUILDING — the terracotta block that turns a junction. The chamfer
+  // is the module's identity, so it is real geometry: a 45-degree face carrying
+  // its own windows, arcade bay and awning, not a box with a painted corner.
+  ligCorner: { r: 6.2, parts: [
+    ['box', 0, 0, 0, 10.4, 0.45, 9.0, 'stone'],
+    ['wall', 0, 0.45, 0, 10.0, 13.4, 8.6, 'wall'],
+    // THE CHAMFER, AS A STAIR. The ninth element of a part tuple is `roll` —
+    // a rotation about Z, not a yaw — so a slab "turned 45 degrees across the
+    // corner" would have come out lying on its side. Four stepped boxes make
+    // the same silhouette, need no rotation at all, and sit comfortably inside
+    // a low-poly street where a true bevel would read as a smudge anyway.
+    ...[0, 1, 2, 3].map((k) => ['box', 4.9 - k * 0.42, 0.45, 3.1 + k * 0.42,
+      0.9 - k * 0.02, 13.4, 0.9 - k * 0.02, 'wall2']),
+    // GROUND-FLOOR ARCADE on both street faces, under awnings
+    ...[-3.2, 0, 3.2].flatMap((x) => [
+      ['box', x, 0.45, 4.3, 0.5, 3.5, 0.5, 'stone'],
+    ]),
+    ['box', 0, 0.45, 3.95, 8.6, 3.3, 0.2, 'wall2'],
+    ['box', 0, 3.95, 4.25, 9.8, 0.26, 0.6, 'stone'],
+    ['prism', -2.6, 4.21, 4.8, 4.2, 0.46, 1.4, 'roof'],      // two awnings, a gap between
+    ['prism', 2.6, 4.21, 4.8, 4.2, 0.46, 1.4, 'roof'],
+    ['box', 4.6, 0.45, 0, 0.2, 3.3, 7.2, 'wall2'],           // the side street's shop face
+    ['box', 4.9, 3.95, 0, 0.6, 0.26, 8.4, 'stone'],
+    ['prism', 5.35, 4.21, 0, 1.4, 0.46, 6.8, 'roof'],
+    // FOUR FLOORS of ornate balconies over the arcade — the "belle epoque"
+    // rhythm the sheets draw on the corner block
+    ...[6.2, 8.8, 11.4].flatMap((y) => [
+      ['box', 0, y, 4.55, 8.2, 0.16, 0.7, 'trim'],
+      ['cyl', -3.2, y + 0.16, 4.82, 0.07, 0.78, 0.07, 'trim'],
+      ['cyl', -1.6, y + 0.16, 4.82, 0.07, 0.78, 0.07, 'trim'],
+      ['cyl', 0, y + 0.16, 4.82, 0.07, 0.78, 0.07, 'trim'],
+      ['cyl', 1.6, y + 0.16, 4.82, 0.07, 0.78, 0.07, 'trim'],
+      ['cyl', 3.2, y + 0.16, 4.82, 0.07, 0.78, 0.07, 'trim'],
+      ['box', 0, y + 0.94, 4.82, 8.0, 0.09, 0.11, 'trim'],
+      ['box', -2.4, y + 0.5, 4.36, 1.0, 1.4, 0.14, 'wall2'],
+      ['box', 2.4, y + 0.5, 4.36, 1.0, 1.4, 0.14, 'wall2'],
+    ]),
+    ['box', 0, 13.9, 0, 11.0, 0.42, 9.6, 'trim'],            // heavy cornice
+    ['box', 0, 14.32, 0, 10.4, 0.5, 9.0, 'stone'],           // parapet
+    ['cyl', -3.4, 14.8, -2.6, 0.46, 1.6, 0.46, 'stone'],     // chimneys
+    ['cyl', 3.4, 14.8, -2.6, 0.46, 1.6, 0.46, 'stone'],
+  ] },
+
+  // HINTERLAND RURAL HOUSE — the one behind the coast. Low, wide, a stone
+  // ground floor under render, and a GREEN SLATE roof: the sheets are explicit
+  // that the hinterland roof is slate where the coast is pantile, and that one
+  // swap is what separates a mountain village from a seafront.
+  ligRural: { r: 5.0, parts: [
+    ['box', 0, 0, 0, 9.0, 0.5, 6.6, 'stone'],
+    ['wall', 0, 0.5, 0, 8.4, 3.4, 6.2, 'stone'],             // stone ground floor
+    ['wall', 0, 3.9, 0, 8.2, 3.6, 6.0, 'wall'],              // rendered upper
+    ['box', 0, 3.75, 3.05, 8.6, 0.2, 0.24, 'trim'],          // floor band
+    ['box', -2.6, 0.5, 3.05, 1.3, 2.3, 0.2, 'trim'],         // barn door
+    ['box', 0.8, 0.6, 3.12, 1.1, 1.2, 0.14, 'wall2'],
+    ['box', 2.9, 0.6, 3.12, 1.1, 1.2, 0.14, 'wall2'],
+    ...[5.3].flatMap((y) => [
+      ['box', -2.6, y, 3.02, 1.0, 1.3, 0.14, 'wall2'],
+      ['box', 0, y, 3.02, 1.0, 1.3, 0.14, 'wall2'],
+      ['box', 2.6, y, 3.02, 1.0, 1.3, 0.14, 'wall2'],
+      ['box', -3.22, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
+      ['box', -1.98, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
+      ['box', -0.62, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
+      ['box', 0.62, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
+      ['box', 1.98, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
+      ['box', 3.22, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
+    ]),
+    ['box', 0, 7.5, 0, 9.4, 0.24, 7.0, 'trim'],
+    // DEEP EAVES AND A SHALLOW SLATE PITCH — a mountain roof, not a coastal one
+    ['prism', 0, 7.74, 0, 9.8, 1.9, 7.4, 'roof'],
+    ['cyl', -2.8, 9.3, -1.4, 0.44, 1.5, 0.44, 'stone'],
+    ['box', 0, 0.5, -3.2, 3.0, 2.2, 0.3, 'stone'],           // lean-to at the back
   ] },
 
   // AEGEAN: a whitewashed cube with a parapet instead of eaves, an outside
@@ -5280,17 +5445,44 @@ const ELEMENT_KITS = {
     builds: ['towerhouse', 'towerhouse', 'house', 'shed'], landmarks: ['chapel'],
     dress: ['well'], fenceColor: 0xc8bb96, stoneWalls: 6,
   },
-  // ALASSIO (Italy) — the same coast as `liguria` but a TOWN on it rather than
-  // a village above it, so the build list is the two new archetypes with the
-  // Cinque Terre tower house behind them for variety. No farm shed: there is
-  // no farm on a seafront.
+  // ---- THE LIGURIAN DISTRICTS -------------------------------------------
+  // The sheets are organised as DISTRICTS, not as one regional style, and that
+  // is the useful idea: same module set, different weights and different
+  // paint, and three towns on one coast stop looking like one town.
+  //
+  // ALASSIO — Golfo Paradiso pastels. Slender and twin houses along a
+  // seafront, one corner block per junction. Yellow, ochre, pink, cream.
   alassio: {
     wall: 0xefc07e, wall2: 0xdba86a, roof: 0xb85a30, trim: 0x3d6b47, stone: 0xd0c0a2,
-    palette: [0xe9a86a, 0xefc07e, 0xdd8f7e, 0xf0d9ac, 0xd98a6e, 0xf4e6cc, 0xe2b48c],
+    palette: [0xf0d98a, 0xefc07e, 0xe8a2a6, 0xf4e6cc, 0xe2b48c, 0xdd9a72, 0xf2d2b0],
     roofs: [0xb85a30, 0xa9502c, 0xc46638],
-    builds: ['palazzina', 'shopfront', 'palazzina', 'towerhouse'],
+    builds: ['ligSlender', 'ligTwin', 'ligSlender', 'ligCorner'],
     landmarks: ['chapel'],
     dress: ['well'], fenceColor: 0xd6c8a8, stoneWalls: 4,
+  },
+  // GENOVA — the port city, and the only URBAN entry on this coast. Corner
+  // blocks dominate because a city is made of junctions, the palette drops to
+  // the deep reds and burnt ochres of the caruggi, and the render is dirtier:
+  // this is a working port, not a resort.
+  genova: {
+    wall: 0xc86a4a, wall2: 0xa8543a, roof: 0x9c4628, trim: 0x35583c, stone: 0xb8ac96,
+    palette: [0xc86a4a, 0xb2543c, 0xd08a56, 0x9e4a34, 0xc4926a, 0xa8603e, 0xd9a878],
+    roofs: [0x9c4628, 0x8e3f24, 0xaa5230],
+    builds: ['ligCorner', 'ligSlender', 'ligCorner', 'ligTwin'],
+    landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xb4a890, stoneWalls: 10,
+  },
+  // SANREMO — the mountains behind the coast. The hinterland house takes over
+  // and the roof goes GREEN SLATE, which the sheets treat as the hinterland's
+  // defining material. Colder stone, less paint, and almost no shopfront:
+  // there are no shops on a mountain stage.
+  sanremo: {
+    wall: 0xdcd2ba, wall2: 0xc2b79c, roof: 0x5c6f58, trim: 0x4a6b4a, stone: 0xa8a294,
+    palette: [0xdcd2ba, 0xc8bda2, 0xe4dcc6, 0xd0bb98, 0xbfae90, 0xe8dfc8],
+    roofs: [0x5c6f58, 0x506250, 0x687a60],
+    builds: ['ligRural', 'ligRural', 'ligSlender', 'ligTwin'],
+    landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xb0a894, stoneWalls: 12,
   },
   // AEGEAN (Greece) - whitewashed cubes, flat roofs, one blue dome, and blue
   // joinery. The palette is deliberately nearly monochrome WHITE, because
@@ -5424,6 +5616,12 @@ const FLORA_MIX = {
   // of them. Weighted the opposite way round to `medterrace` on purpose.
   riviera: [['umbrellaPine', 0.34], ['cypress', 0.28], ['oliveOld', 0.2],
     ['oliveRow', 0.12], ['corkOak', 0.06]],
+  // a city has street trees, not a grove: pines and the odd cypress
+  genova: [['umbrellaPine', 0.46], ['cypress', 0.34], ['oliveOld', 0.2]],
+  // and the hinterland is olive terraces under pine, which is what the hills
+  // above Sanremo actually are
+  sanremo: [['oliveOld', 0.36], ['oliveRow', 0.26], ['umbrellaPine', 0.2],
+    ['cypress', 0.1], ['corkOak', 0.08]],
   // THE MEDITERRANEAN FIVE inherit the harbour's machinery but must not
   // inherit a northern forest with it: olive, cypress and umbrella pine, with
   // the cypress weighted up because it is the species that says "this coast"
