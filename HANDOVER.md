@@ -1043,3 +1043,37 @@ the ones inside comments that record history. The back-button changelog by
 and then r226 — silently, because a version bump is never re-read. Bump the
 four real sites (`build-tag`, three `?v=`) deliberately, or check
 `grep -n 'r2[0-9][0-9]' index.html` afterwards and repair the prose.
+
+## r227 — START IS THE FOOTER NOW
+"Move the start on the tip of the screen to make the back button more obvious",
+sent with a screenshot of r226 working (the BACK bar was there, corner read
+r226 — the sticky change in r226 fixed the iPhone case).
+
+START RACE floated 10px off the bottom with 14px corners, which read as a loose
+orange slab lying ON the world cards: the loudest object on the screen, sitting
+in the middle of the list, competing with the control the player was hunting
+for. Flush to the bottom edge and edge to edge it reads as the bottom bar of
+the page and pairs with the BACK bar at the top — header, list, footer — so
+BACK reads as a control rather than as one more thing floating.
+
+Measured at 390x830, in a chapter: BACK top=0 and START 0..390 bottom=0 at 0%
+and 50% scroll. At 100% the footer lifts 198px as sticky reaches its natural
+position above the keyboard help — that is the end of the page and has always
+been so. The last card clears the button by 42px there, and there is no
+sideways scroll.
+
+`padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))` — the home
+indicator strip on a notched phone is not tappable, so the label sits above it.
+`#start-btn:hover{transform:none}` — .btn lifts on hover, which would peel a
+flush footer off its own edge.
+The `-16px` pair is `.screen`'s own padding, same coupling as `#topbar`.
+
+`#build-tag` gained a dark chip. It is how a report gets pinned to a build —
+"no back button still" cost two builds of guesswork that this one line would
+have settled — and faint white on the new orange footer was unreadable.
+
+### THE VERSION BUMP IS FOUR NAMED SITES, NOT A BLANKET sed
+`sed -i 's/r226/r227/g' index.html` rewrites version numbers inside COMMENTS
+too, and it had already silently corrupted the back-button changelog twice.
+Bump exactly: `#build-tag`, the three `?v=`, and CACHE in sw.js. r227 did it
+with a python replace asserting each of the five strings was found once.

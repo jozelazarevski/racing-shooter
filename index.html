@@ -1240,8 +1240,14 @@
      report came from the build I had just shipped or one the service worker
      was still serving from cache. Small, dim, always on screen: now every
      screenshot says which build it is. */
+  /* THE BUILD TAG IS HOW A REPORT GETS PINNED TO A BUILD — "no back button
+     still" was two builds of guesswork that this one line would have settled.
+     Now that START RACE is a flush orange footer, faint white sat ON it and
+     was barely readable, so the tag carries its own dark chip and stops
+     depending on what happens to be behind it. */
   #build-tag{position:fixed;left:6px;bottom:4px;z-index:35;pointer-events:none;
-    font-size:9px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,.34);
+    font-size:9px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,.62);
+    background:rgba(0,0,0,.55);border-radius:5px;padding:2px 5px;
     text-shadow:0 1px 2px rgba(0,0,0,.6)}
   #offline-badge{margin-top:10px;font-size:10px;font-weight:800;letter-spacing:2px;text-align:center;
     padding:4px 12px;border-radius:20px;border:2px solid var(--line-soft);color:var(--gold-dim);
@@ -1258,10 +1264,27 @@
   #loading-note{margin-top:24px;font-size:12px;letter-spacing:3px;color:var(--gold-dim);text-align:center}
   /* START is the one action that must never be out of reach: pin it to the
      bottom of the scrollport whenever its natural spot is below the fold */
-  #start-btn{margin-top:24px;position:sticky;bottom:10px;z-index:6;box-shadow:0 6px 18px rgba(0,0,0,.5);
+  /* START IS THE FOOTER. It used to float 10px off the bottom with rounded
+     corners, which read as a loose orange slab lying ON TOP of the world
+     cards — the loudest thing on the screen, competing with the one control
+     the player was hunting for. Flush to the bottom edge, edge to edge, it
+     reads as the bottom bar of the page and pairs with the BACK bar at the
+     top: header, list, footer. Asked for as "move the start to the tip of the
+     screen to make the back button more obvious".
+     The -16px pair is .screen's own padding, exactly as in #topbar — the
+     margin spans it edge to edge, the negative `bottom` lands it flush. */
+  #start-btn{align-self:stretch;margin:24px -16px -16px;
+    position:sticky;bottom:-16px;z-index:6;border-radius:0;border-left:none;
+    border-right:none;border-bottom:none;
+    /* the home-indicator strip on a notched phone is not tappable, so the
+       label has to sit above it rather than under it */
+    padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));
+    box-shadow:0 -6px 18px rgba(0,0,0,.55);
     /* the wrong-tyre label carries its remedy on a second line, so the button
        has to honour the newline instead of collapsing it */
     white-space:pre-line;line-height:1.15}
+  /* the lift-on-hover of .btn would peel a flush footer off its own edge */
+  #start-btn:hover{transform:none;box-shadow:0 -6px 18px rgba(0,0,0,.55)}
   #start-btn.warned{font-size:clamp(15px,4.4vw,22px);padding-top:12px;padding-bottom:12px}
   /* A JOB IN HAND FOR THIS WORLD is a reason to be standing here, so the
      button says which job on its own line. Green edge, because the tyre
@@ -1600,7 +1623,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r226</div>
+<div id="build-tag">r227</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1911,10 +1934,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r226"></script>
+<script type="module" src="./src/main.js?v=r227"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r226"></script>
+<script src="./src/offline.js?v=r227"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r226"></script>
+<script type="module" src="./src/traffic.js?v=r227"></script>
 </body>
 </html>
