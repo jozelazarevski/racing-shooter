@@ -3461,7 +3461,20 @@ const THEMES = {
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'medhill',
     frontage: {
-      lateral: 15.5, depth: 8, unit: 7.2, height: 9.5, run: [6, 12], rows: 6,
+      // A WALLED HILL TOWN, not the quay. See the note on the Mediterranean
+      // block below: ten coastal worlds were building the IDENTICAL street —
+      // same setback, same house width, same height, same terrace length,
+      // same depth of town — and no amount of retinting reaches that. This
+      // one is compact and tall and stacks back up the hill under the keep.
+      // Tightest street of the ten and the deepest, but not tighter than the
+      // harbour it is measured against: at `lateral: 13` the campanile — which
+      // stands at `lateral + 1.5` and rises to 2.05x the street height —
+      // measured 29.3 u tall with its face 12.1 u off the centreline, and in
+      // a chase frame that is a dark slab filling a third of the screen with
+      // the road behind it. 15/11.5 keeps the near face at 11.25 (the harbour
+      // is 11.5) and brings the tower to 23.6 u at 16.5, still the tallest
+      // and closest of any coast but no longer a wall.
+      lateral: 15, depth: 7.5, unit: 6, height: 11.5, run: [6, 14], rows: 9,
       // WARM RENDER, NOT GREY. The shared default paints a muted stone/slate
       // street, which is right for a northern old town and wrong for this
       // one: the reference quay is limewash and painted render, ochre through
@@ -3533,6 +3546,9 @@ const THEMES = {
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'medhill',
     frontage: {
+      // THE REFERENCE STREET, and deliberately unchanged: every other coast
+      // now varies AGAINST this one. A working quay — two storeys and a loft,
+      // plain frontages, long terraces.
       lateral: 15.5, depth: 8, unit: 7.2, height: 9.5, run: [6, 12], rows: 6,
       // WARM RENDER, NOT GREY. The shared default paints a muted stone/slate
       // street, which is right for a northern old town and wrong for this
@@ -4177,13 +4193,45 @@ const THEMES = {
  *  Each names its own ELEMENT KIT (different house SHAPES, not a retint) and
  *  its own frontage tints, so a street in Liguria and a street in the Aegean
  *  cannot be mistaken for one another from the driving seat.
+ *
+ *  ...EXCEPT THAT THE STREET ITSELF WAS ONE STREET. The frontage patch used to
+ *  carry only colour, so every one of these inherited the harbour's GEOMETRY,
+ *  and so did CITADEL BAY and the three `mountainsea` worlds. Measured off the
+ *  built themes, ten coastal worlds reported the identical row:
+ *
+ *      lateral 15.5   depth 8   unit 7.2   height 9.5   run 6-12   rows 6
+ *
+ *  Same distance from the road, same house width, same height, same terrace
+ *  length before a gap, same number of ranks back. Different paint on one
+ *  building, repeated ten times. (MONACO STREETS is the control that shows
+ *  the knobs matter: 16.5 / 9 / 7.5 / 12.5 / 5-10, and nobody has ever said
+ *  Monaco looks like the Aegean.)
+ *
+ *  So each coast now gets the street form its building culture actually has,
+ *  and they differ in SEVERAL knobs at once — one number moved is a variation,
+ *  four moved is a different place:
+ *
+ *    LIGURIA    tall, narrow, stacked hard against the lane and ranked deep
+ *               up the cliff. The Cinque Terre silhouette is height and
+ *               narrowness: 5 u frontages under 15 u walls.
+ *    AEGEAN     low cubic houses with air between them — the opposite shape.
+ *               Wide units, half the height, runs of two or three so the gaps
+ *               read as lanes down to the water.
+ *    BRAVA      a seafront promenade: everything set well back behind an
+ *               esplanade, mid-rise, long blocks, shallow town.
+ *    DALMATIA   dense stone old town hard on the street, near-continuous
+ *               terraces of ten to twenty.
+ *    AZUR       villas. Few, wide, deep, detached — runs of one or two — and
+ *               set a long way back behind their gardens.
  */
 for (const [key, over] of [
   ['liguria', {
     vegetation: 'olive',
     hutGlow: 0.12,                                   // ITALY - Cinque Terre
     elements: 'liguria',
-    frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f0e4cf', plinth: '#a98a68', trim: '#f6ecd8', frame: '#3f6b46', shutter: '#3f6b46' } },
+    frontage: {
+      lateral: 12, depth: 7, unit: 5.2, height: 15, run: [8, 16], rows: 8,
+      tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f0e4cf', plinth: '#a98a68', trim: '#f6ecd8', frame: '#3f6b46', shutter: '#3f6b46' } },
     seaColor: 0x2f7fa8, sunColor: 0xffe8c0, sunIntensity: 2.7,
     skyTop: '#2f7fd1', skyHorizon: '#e8ddc6',
     terrainLow: '#7d8a4e', terrainHigh: '#a89a68',
@@ -4193,7 +4241,9 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                    // GREECE
     elements: 'aegean',
-    frontage: { tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6, face: { render: '#f7f5ef', plinth: '#e2ded4', trim: '#ffffff', frame: '#2f6fae', shutter: '#2f6fae' } },
+    frontage: {
+      lateral: 19, depth: 9.5, unit: 8.5, height: 6.5, run: [2, 4], rows: 5,
+      tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6, face: { render: '#f7f5ef', plinth: '#e2ded4', trim: '#ffffff', frame: '#2f6fae', shutter: '#2f6fae' } },
     seaColor: 0x1f7fc4, sunColor: 0xfff4d8, sunIntensity: 3.0,
     skyTop: '#2a86dc', skyHorizon: '#eaf1f4',
     terrainLow: '#9a9a6a', terrainHigh: '#c0b489',
@@ -4203,7 +4253,9 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                     // SPAIN - Costa Brava
     elements: 'andalusia',
-    frontage: { tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33, face: { render: '#f4ecda', plinth: '#c9b592', trim: '#fdf6e8', frame: '#7a5a34', shutter: '#8a5a2c' } },
+    frontage: {
+      lateral: 24, depth: 11, unit: 9, height: 11.5, run: [7, 14], rows: 4,
+      tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33, face: { render: '#f4ecda', plinth: '#c9b592', trim: '#fdf6e8', frame: '#7a5a34', shutter: '#8a5a2c' } },
     seaColor: 0x2b6f9c, sunColor: 0xffe6b4, sunIntensity: 2.9,
     skyTop: '#3182cc', skyHorizon: '#efe2c6',
     terrainLow: '#8a8a52', terrainHigh: '#c2ad78',
@@ -4213,7 +4265,9 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                  // CROATIA
     elements: 'dalmatia',
-    frontage: { tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a, face: { render: '#f0ead9', plinth: '#c2b9a2', trim: '#f8f2e4', frame: '#4a6b4a', shutter: '#4a6b4a' } },
+    frontage: {
+      lateral: 11.5, depth: 8.5, unit: 6.2, height: 11, run: [10, 20], rows: 7,
+      tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a, face: { render: '#f0ead9', plinth: '#c2b9a2', trim: '#f8f2e4', frame: '#4a6b4a', shutter: '#4a6b4a' } },
     seaColor: 0x1c86ae, sunColor: 0xfff0d4, sunIntensity: 2.8,
     skyTop: '#2f8ad4', skyHorizon: '#e6eee8',
     terrainLow: '#6f8450', terrainHigh: '#a8a276',
@@ -4223,7 +4277,9 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                      // FRANCE - Cote d'Azur
     elements: 'azur',
-    frontage: { tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52, face: { render: '#f6e7d6', plinth: '#d8c4ae', trim: '#fbf0e2', frame: '#8fb4cc', shutter: '#8fb4cc' } },
+    frontage: {
+      lateral: 26, depth: 14, unit: 13, height: 10.5, run: [1, 2], rows: 3,
+      tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52, face: { render: '#f6e7d6', plinth: '#d8c4ae', trim: '#fbf0e2', frame: '#8fb4cc', shutter: '#8fb4cc' } },
     seaColor: 0x2f74a6, sunColor: 0xffeccc, sunIntensity: 2.6,
     skyTop: '#3a86c8', skyHorizon: '#eee4d2',
     terrainLow: '#7f8a58', terrainHigh: '#b0a478',
@@ -4233,8 +4289,10 @@ for (const [key, over] of [
   THEMES[key] = {
     ...THEMES.harbor,
     ...over,
-    // the frontage override is a PATCH, not a replacement: geometry (lateral,
-    // depth, unit, height, run, seaOpen, side) stays the harbour's
+    // The frontage override is still a PATCH — `seaOpen` and `side` stay the
+    // harbour's, because "no house between the seafront road and the water"
+    // is what makes any of these read as a coast. But the STREET FORM no
+    // longer does. See the note above this loop.
     frontage: { ...THEMES.harbor.frontage, ...(over.frontage || {}) },
   };
 }
@@ -4296,6 +4354,13 @@ THEMES.mountainsea = {
   terrainScree: '#6b7078', skirtColor: '#5a6068',
   hillColor: 0x6e7a72, peakColor: 0x9aa2a4,
   frontage: { ...THEMES.dalmatia.frontage,
+    // ...AND NOT DALMATIA'S STREET EITHER. This theme spreads from that one,
+    // so it would otherwise inherit the dense stone old town — hard on the
+    // lane, terraces of ten to twenty — which is the wrong shape entirely for
+    // a headland where the road runs between a mountain and a drop. There is
+    // no town here: a few small places set well back, in ones and twos, two
+    // ranks at most. The opposite end of the same knobs.
+    lateral: 21, depth: 7, unit: 6.8, height: 8, run: [1, 3], rows: 2,
     tints: ['#dcd8cc', '#cfcdc4', '#e4e0d4', '#c8c6bc', '#d6d2c6'],
     roof: 0x8f5a44,
     face: { render: '#e2ded2', plinth: '#a8a89e', trim: '#f0ece0',
@@ -12443,8 +12508,12 @@ export class Track {
   _buildStreetLife() {
     const F = this.T.frontage || {};
     const SIDES = F.side ? [F.side] : [1, -1];
-    const inner = ROAD_HALF + 2.2;                       // clear of the road
-    const outer = Math.max(inner + 1.5, (F.lateral ?? 15.5) - 2.4);
+    // the pavement band is beside the KERB, and on a five-lane boulevard the
+    // kerb is 45 u out — the same reason the frontage itself vanished there
+    const KERB = this._kerbHalf();
+    const inner = KERB + 2.2;                            // clear of the road
+    const outer = Math.max(inner + 1.5,
+      (F.lateral ?? 15.5) + (KERB - ROAD_HALF) - 2.4);
     const A = propAssets();
     const awnMat = new THREE.MeshStandardMaterial({
       color: 0xffffff, vertexColors: true, roughness: 0.9, side: THREE.DoubleSide,
@@ -15912,6 +15981,13 @@ export class Track {
       tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
       ...this.T.frontage,
     };
+    // THE SETBACK IS FROM THE KERB, NOT FROM THE CENTRELINE. Every lateral
+    // below — the terrace, the ranks behind it, the tower, the arch springing
+    // line — is quoted against a normal road. On the one world with a wide
+    // one that put the whole town under the tarmac and `_clearsRoad` threw all
+    // of it away in silence. Shift the whole street out by the extra width the
+    // road carries and every consumer follows; see `_kerbHalf`.
+    F.lateral += this._kerbHalf() - ROAD_HALF;
     // THE SKYLINE MUST BE ROOFTOPS. The shared horizon builder rings every
     // world with cone hills and a farther ring of peaks. Behind an old town
     // that is a mountain range, which the region's negative list forbids
@@ -17494,6 +17570,20 @@ export class Track {
    *  It is the difference that matters on a hairpin. A block placed along one
    *  sample's normal is fine at that sample and inside the road two samples
    *  later, where the centreline has swung under it. */
+  /** Half-width of the widest carriageway this world carries.
+   *
+   *  `ROAD_HALF` is the drivable half-width of a NORMAL road, and a town's
+   *  setback is quoted against it. One world is not normal: MOUNTAIN TO SEA
+   *  asks for `roadWidth: 5`, a 45 u half-width boulevard, and every frontage
+   *  setback in the table then falls INSIDE its own carriageway. `_clearsRoad`
+   *  refused all 900 candidates and the world built a town of nothing —
+   *  measured 0 instances, with `seaOpen` refusing none of them, so the sea
+   *  was never the reason. A setback is measured from the KERB; this returns
+   *  where the kerb is. `roadWidth` is absent on 71 of 72 worlds, so this is
+   *  `ROAD_HALF` and no other street moves by a millimetre.
+   */
+  _kerbHalf() { return ROAD_HALF * (this.T.roadWidth ?? 1); }
+
   _clearsRoad(x, z, r, margin = 1.2) {
     _clearV.set(x, 0, z);
     const i = this.nearestIndex(_clearV);          // no hint: search the whole lap

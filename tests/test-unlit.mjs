@@ -133,6 +133,11 @@ const ids = await page.evaluate(async () => {
   const { LEVELS } = await import('./src/track.js');
   return LEVELS.map((l) => l.id);
 });
+// ONLY runs what you name, when you name it. A gate that costs forty minutes
+// gets skipped, and a skipped gate proves nothing; `ONLY=57,58` narrows it to
+// the worlds a change could have touched so it actually gets run.
+const only = process.env.ONLY ? new Set(process.env.ONLY.split(',').map(Number)) : null;
+if (only) for (let i = ids.length - 1; i >= 0; i--) if (!only.has(ids[i])) ids.splice(i, 1);
 
 const dark = [];
 for (const id of ids) {
@@ -220,8 +225,12 @@ console.log('');
 ok(offenders.length === 0,
   `every daylight world's road stays over ${FLOOR}/255 at all ${STATIONS} stations`,
   offenders.map((d) => `${d.name} ${d.worst} at ${d.at}`).join(', '));
+// A WORLD THAT WAS NOT RUN IS NOT A WORLD THAT FAILED. Under `ONLY` these
+// per-world laws have nothing to judge, and reporting them as failures buries
+// the real result in noise that reads exactly like a regression.
 for (const [id, k] of KNOWN) {
   const d = dark.find((x) => x.id === id);
+  if (!d && only) continue;
   ok(d && d.worst >= k.floor,
     `the known dark station on ${k.why.split(' —')[0]} has not got darker (floor ${k.floor})`,
     d ? `it now measures ${d.worst} at ${d.at}` : 'world missing');
@@ -231,6 +240,7 @@ ok(dark.every((d) => d.worst !== -2), 'every world had at least one measurable s
   dark.filter((d) => d.worst === -2).map((d) => d.name).join(', '));
 for (const [id, why] of NIGHT) {
   const d = dark.find((x) => x.id === id);
+  if (!d && only) continue;
   ok(d && d.worst < FLOOR,
     `the exemption for ${why.split(' —')[0]} still earns its place`,
     d ? `it now measures ${d.worst}, over the floor — drop it from NIGHT` : 'world missing');
