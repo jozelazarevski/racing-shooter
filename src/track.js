@@ -9109,6 +9109,13 @@ export class Track {
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
       map: tex, roughness: 1, side: THREE.DoubleSide, vertexColors: true,
     }));
+    // NAME IT. `road`, `road-skirt` and `oldtown-frontage` all carry names and
+    // the cliff did not, so anything looking for it had to guess — "unnamed,
+    // textured, over 2000 verts" also selects the massif and the TERRAIN, and
+    // a probe built on that guess reported CORNICHE's road as 100% hidden by
+    // cliff at a station where the road is a viaduct over open ground and
+    // there is no cliff over it at all. It was hiding the ground.
+    mesh.name = 'cliff-ribbon';
     mesh.receiveShadow = true;
     this.group.add(mesh);
   }

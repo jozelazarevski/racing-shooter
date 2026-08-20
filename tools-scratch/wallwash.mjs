@@ -46,8 +46,7 @@ for (const id of IDS) {
     // the cliff ribbons: the big textured buffer geometries the walls are made of
     const ribbons = [];
     t.group.traverse((o) => {
-      if (o.isMesh && o.material?.map && o.geometry?.attributes?.position?.count > 2000
-          && o.name !== 'road-skirt') ribbons.push(o);
+      if (o.name === 'cliff-ribbon') ribbons.push(o);
     });
     const grab = () => {
       const cv = g.renderer.domElement;

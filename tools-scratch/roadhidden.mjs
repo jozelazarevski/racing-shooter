@@ -36,8 +36,14 @@ for (const id of IDS) {
     // the two ribbons: the big unnamed textured buffers that span the lap
     const ribbons = [];
     t.group.traverse((o) => {
-      if (o.isMesh && !o.isInstancedMesh && o.material?.map && !o.name
-          && o.geometry?.attributes?.position?.count > 2000) ribbons.push(o);
+      // by name where the build has one; otherwise by the ribbon's exact
+      // vertex count, (N+1) rows of 5. NOT "unnamed and textured and big",
+      // which also selects the massif and the terrain — that filter is what
+      // reported CORNICHE's road 100% hidden by cliff at a viaduct station
+      // with no cliff over it, because it was hiding the ground.
+      if (o.name === 'cliff-ribbon'
+          || (!o.name && o.material?.map
+              && o.geometry?.attributes?.position?.count === (N + 1) * 5)) ribbons.push(o);
     });
     const road = t.group.getObjectByName('road');
     if (!ribbons.length || !road) return { err: `ribbons ${ribbons.length}, road ${!!road}` };
