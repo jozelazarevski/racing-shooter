@@ -5155,12 +5155,28 @@ class Game {
     this._renderGarageBays();
   }
 
+  /** The top-bar avatar: the driver's initial, or a bullet if the name starts
+   *  with something that has no letter in it. `profile-name` is the old
+   *  full-name node and is updated too where it still exists, so nothing that
+   *  reads it goes stale. */
+  _setProfileChip(name) {
+    const initial = (String(name ?? '').trim().match(/[\p{L}\p{N}]/u) ?? ['•'])[0].toUpperCase();
+    const av = document.getElementById('topbar-prof');
+    if (av) { av.textContent = initial; av.title = `Driver: ${name}`; }
+    const full = document.getElementById('profile-name');
+    if (full) full.textContent = name;
+  }
+
   // ---------- player profiles (menu header chip + panel) ----------
   _initProfileUI() {
-    const chip = document.getElementById('profile-chip');
+    // The chip lives in the top bar now and shows ONE LETTER. Both ids are
+    // looked up because the panel this opens still carries the full name, and
+    // a build that has only one of them must not throw on the other.
+    const chip = document.getElementById('topbar-prof')
+      || document.getElementById('profile-chip');
     const screenEl = document.getElementById('profile-screen');
     if (!chip || !screenEl) return;
-    document.getElementById('profile-name').textContent = this.profile.name;
+    this._setProfileChip(this.profile.name);
     chip.addEventListener('click', () => {
       this._renderProfiles();
       screenEl.classList.remove('hidden');
@@ -5426,8 +5442,7 @@ class Game {
     saveJSON('ir-profiles', this.profiles);
     if (id === this.profile.id) {
       this.profile.name = name;
-      const chip = document.getElementById('profile-name');
-      if (chip) chip.textContent = name;
+      this._setProfileChip(name);          // avatar letter + the panel's name
     }
     return true;
   }

@@ -490,6 +490,15 @@
   #credits-chip b{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
 
   /* ---------- PLAYER PROFILES (local careers on one device) ---------- */
+  /* One round letter, sized to the same rhythm as the credits chip beside it
+     so the bar reads as three controls and not two plus an ornament. */
+  #topbar-prof{flex:none;width:30px;height:30px;padding:0;cursor:pointer;
+    display:grid;place-items:center;font-family:'Luckiest Guy';font-size:15px;
+    line-height:1;color:#7fd4ff;background:rgba(0,0,0,.4);
+    border:1px solid rgba(255,233,168,.30);border-radius:50%;
+    -webkit-tap-highlight-color:transparent;transition:transform .1s}
+  #topbar-prof:active{transform:scale(.92)}
+  @media (max-width:389px){ #topbar-prof{width:26px;height:26px;font-size:13px} }
   #profile-chip{pointer-events:auto;cursor:pointer;margin-left:6px;padding:7px 16px;font-size:12px;
     letter-spacing:2px;font-weight:800;font-family:'Baloo 2';color:#ffe9a8;
     border:2px solid rgba(255,233,168,.35);border-radius:20px;background:rgba(24,16,6,.7);
@@ -569,7 +578,14 @@
      NOT backdrop-filter: this panel is up to 67 world cards tall and the
      scene behind it animates, so a blur layer would be re-sampled every
      frame on the phone this game is for. Opacity costs nothing. */
-  .menu-panel{margin-top:0;width:min(100%,660px);background:rgba(22,14,5,.96);
+    /* 520, NOT 660. Asked for directly — "make it less wide, like it was
+     before" — against a card that had grown a thumbnail, a tag line, a
+     surface chip, a star row and two locked-perk boxes, so at 660 the name
+     sat a long way from the OPEN button with a lane of empty brown between
+     them. `min()` means every phone is UNDER the cap and does not move a
+     pixel: this only ever narrows the tablet and desktop layouts, which are
+     the ones the report came from. */
+  .menu-panel{margin-top:0;width:min(100%,520px);background:rgba(22,14,5,.96);
     border:2px solid var(--line);border-radius:0 var(--r-lg) var(--r-lg) var(--r-lg);
     padding:12px 16px 16px;display:flex;flex-direction:column;align-items:center}
   .menu-panel.off{display:none}
@@ -2066,6 +2082,13 @@
     <button id="topbar-back" class="ch-back" aria-label="Back">‹&nbsp;BACK</button>
     <div id="topbar-where" class="ch-here"></div>
     <div id="topbar-stars" class="ch-here-stars"></div>
+    <!-- THE DRIVER, AS ONE LETTER. It used to be a full-width pill under the
+         header carrying "👤 JOSIP", which spent a whole row of the phone on a
+         name the owner already knows. Asked for directly: on the top bar, as
+         one letter. The initial is enough to tell two local careers apart,
+         which is the only job it has; the full name is on the panel it
+         opens. -->
+    <button id="topbar-prof" title="Driver profiles" aria-label="Driver profile">P</button>
     <div id="topbar-cred">CREDITS&nbsp;<b id="credits">0</b></div>
   </div>
   <!-- The tagline stays: it is the one line of character on the front door,
@@ -2081,9 +2104,9 @@
        inside a chapter — where a DIFFERENTLY WORDED one appeared at y=8. Three
        addresses and two labels for one control, reported as "I miss the back
        button". There is one now and it lives in #topbar. -->
-  <div id="menu-status">
-    <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
-  </div>
+  <!-- The driver chip moved into #topbar as a one-letter avatar; this row
+       held nothing else, so it goes with it rather than staying as an empty
+       band of margin above the tabs. -->
   <div id="menu-tabs">
     <button id="tab-btn-race" class="menu-tab current">TRACKS</button>
     <button id="tab-btn-mode" class="menu-tab">MODE</button>
