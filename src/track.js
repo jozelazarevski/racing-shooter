@@ -8775,9 +8775,77 @@ export class Track {
         cap[j * 2 + s] = out;
       }
     }
+    // ---- AND THE CAP MUST BE A SURFACE, NOT A SET OF STEPS ----------------
+    //
+    // Everything above decides each station on its own, and the ribbon is a
+    // STRIP BETWEEN CONSECUTIVE STATIONS. So where the cap engages abruptly the
+    // quad joining two neighbours is a stretched triangle. Measured on CANYON
+    // RUN's left wall:
+    //
+    //     820   base 11.3   height  5.8
+    //     821   base 37.2   height 14.4
+    //
+    // 25.9 u sideways and 8.6 u up in ONE segment. That triangle sweeps across
+    // whatever lies between its ends, and what lies between is the road: a
+    // raycast straight down from the top-down camera over station 819 hits
+    // cliff geometry 24.8 u ABOVE the tarmac. On screen it is a slab of rock
+    // lying across the middle of the frame with the road behind it, which is
+    // exactly what was reported, twice.
+    //
+    // Limit how fast the cap may open out along the lap. Only ever pulling
+    // DOWN, never pushing a wall back out, so nothing this touches can newly
+    // intrude anywhere — and floored at each station's own floor so the
+    // smoothing cannot walk a wall into its own carriageway. Circular, and
+    // both directions, or the seam at sample 0 becomes the new step.
+    const SLOPE = Math.max(0.6, this.segLen * 0.5);
+    for (let s = 0; s < 2; s++) {
+      const fl = (j) => this.widthAt(j) + CLEAR;
+      for (let pass = 0; pass < 2; pass++) {
+        for (let k = 0; k < N * 2; k++) {                  // forward
+          const j = k % N, i0 = (j - 1 + N) % N;
+          const lim = cap[i0 * 2 + s] + SLOPE;
+          if (cap[j * 2 + s] > lim) cap[j * 2 + s] = Math.max(fl(j), lim);
+        }
+        for (let k = N * 2 - 1; k >= 0; k--) {             // and back
+          const j = k % N, i1 = (j + 1) % N;
+          const lim = cap[i1 * 2 + s] + SLOPE;
+          if (cap[j * 2 + s] > lim) cap[j * 2 + s] = Math.max(fl(j), lim);
+        }
+      }
+    }
+    // the published statistic has to describe what was BUILT, so recount after
+    // the smoothing rather than before it
+    capped = 0; floored = 0; tightest = Infinity;
+    for (let j = 0; j < N; j++) {
+      const fl = this.widthAt(j) + CLEAR;
+      for (let s = 0; s < 2; s++) {
+        const side = s ? -1 : 1;
+        const raw = this._cliffProfileBase(j, side);
+        const got = cap[j * 2 + s];
+        if (got < raw - 1e-6) {
+          capped++;
+          if (got <= fl + 1e-6) floored++;
+          if (got < tightest) tightest = got;
+        }
+      }
+    }
     this._cliffCap = cap;
     this._cliffCapped = { sides: capped, of: N * 2, floored,
       tightest: capped ? +tightest.toFixed(2) : null };
+  }
+
+  /** The wall's setback BEFORE the cap — the theme's own number.
+   *
+   *  Two callers need it and it used to be spelled out in one of them, so the
+   *  other (the census that asks "did the cap bind here?") carried a copy, and
+   *  a probe that re-derived it a third time reported 900 refusals for a world
+   *  that had just built 88 houses. One formula, every caller.
+   */
+  _cliffProfileBase(j, side) {
+    const t = (j % N) * (Math.PI * 2 / N);
+    const ph = side * 2.13;
+    return WALL_OFF + 0.65 + (this.T.cliffSetback ?? 0)
+      + 0.24 * (Math.sin(31 * t + 2.2 + ph) + 1);
   }
 
   _cliffProfile(j, side) {
@@ -8805,8 +8873,7 @@ export class Track {
     // cliffSetback pushes the faces off the verge: the corridor becomes a
     // DEEP VALLEY with a drivable floor, not a walled slot ("don't build
     // walled track in desert - or make it look like a deep valley")
-    let base = WALL_OFF + 0.65 + (this.T.cliffSetback ?? 0)
-      + 0.24 * (Math.sin(31 * t + 2.2 + ph) + 1);
+    let base = this._cliffProfileBase(j, side);
     // …but never further out than the lap leaves room for. See _buildCliffCaps:
     // the setback is measured from THIS station and the lap comes back past it.
     // Guarded index — a negative `j % N` would read undefined and Math.min it
