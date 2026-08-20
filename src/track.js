@@ -615,7 +615,7 @@ export const LEVELS = [
     // this world exists to establish the place.
     tune: {
       // the bay is the content, so the town thins out and the view opens
-      hutCount: 52, treeCount: 380,
+      hutCount: 20, treeCount: 380,
       elev: { amp: 7, ph: [0.4, 1.2, 2.0] },
     } },
 
@@ -628,7 +628,12 @@ export const LEVELS = [
     // The houses are the walls, so the hut count goes UP and the trees nearly
     // vanish: on this lap there is no verge for anything to grow in.
     tune: {
-      hutCount: 96, hutZone: [0, 1], treeCount: 120,
+      // THE FRONTAGE IS THE STREET, so the scatter stands down (r239). With
+      // both running you get a continuous terrace along the road AND a field
+      // of free-standing towers behind it — two systems drawing the same town
+      // in two different arrangements. The handful left are the backland
+      // buildings you glimpse over the roofline.
+      hutCount: 14, hutZone: [0, 1], treeCount: 120,
       bushCount: 120, rockCount: 90,
       // shade between four-storey terraces: the light barely reaches the road
       hemiIntensity: 0.7, sunIntensity: 2.15,
@@ -640,7 +645,7 @@ export const LEVELS = [
     // THE HARBOUR. `marina` runs the quays, which is stop-start by nature —
     // and the one lap on the coast where the sea is on BOTH sides of you.
     tune: {
-      hutCount: 44, treeCount: 300,
+      hutCount: 18, treeCount: 300,
       flowerCount: 180,
       elev: { amp: 4, ph: [2.2, 0.5, 1.7] },
     } },
@@ -4339,11 +4344,24 @@ THEMES.riviera = {
   // sits a shade softer and pinker than Cinque Terre's saturated coral — more
   // apricot and rose, more cream between them — and the shutters are the dark
   // green of the reference photograph, on both the frame and the louvre.
+  // THE PROPORTION IS THE DESIGN (r239). The frontage was inheriting the
+  // default street: two-storey market-town units, seven metres tall. The
+  // reference sheets are FOUR AND FIVE STOREYS OF THREE BAYS, and that ratio —
+  // tall, narrow, many windows — is what the eye reads from a car long before
+  // any moulding does. It is why three passes of detailing the models did not
+  // move it: the units were the wrong SHAPE and there were not enough windows
+  // in them.
+  //
+  // `bayset: 'liguria'` (see townhouseBays) is the window grid; `height` and
+  // `unit` are the block it is painted on. 14 u over a 7.2 u unit is very
+  // nearly 2:1, which is the sheet's own proportion.
   frontage: {
-    tints: ['#e9a86a', '#efc07e', '#dd8f7e', '#f0d9ac', '#d98a6e', '#f4e6cc', '#e2b48c'],
+    lateral: 15.0, depth: 8.5, unit: 7.2, height: 14.0, run: [6, 12], rows: 5,
+    bayset: 'liguria',
+    tints: ['#f0d98a', '#e8b45c', '#e8a2a6', '#c4655a', '#f4e6cc', '#bccbb0', '#e2ac7c'],
     roof: 0xb85a30,
-    face: { render: '#f2e7d2', plinth: '#b09070', trim: '#f8efdc',
-      frame: '#3d6b47', shutter: '#3d6b47' },
+    face: { render: '#ecd79b', plinth: '#cfc3a4', trim: '#f6efdd',
+      frame: '#2b2b26', shutter: '#3d6b47', pane: '#1b2028' },
   },
 };
 
@@ -4353,7 +4371,8 @@ THEMES.riviera = {
 THEMES.genova = {
   ...THEMES.riviera,
   elements: 'genova',
-  hutCount: 108, hutZone: [0, 1],
+  // same as the budello: a city is its street walls, not a scatter
+  hutCount: 18, hutZone: [0, 1],
   treeCount: 190, bushCount: 200, flowerCount: 120,
   // a city ground: worn stone and asphalt, not beach sand
   terrainLow: '#6e6a56', terrainHigh: '#9a9182', terrainDirt: '#87806f',
@@ -16387,7 +16406,7 @@ export class Track {
     const VARIANTS = 4;
     const SLOTS = VARIANTS * 2;
     const faceTexes = [];
-    for (let v = 0; v < VARIANTS; v++) faceTexes.push(townhouseTexture(F.face, v));
+    for (let v = 0; v < VARIANTS; v++) faceTexes.push(townhouseTexture(F.face, v, F.bayset));
     const faceTex = faceTexes[0];
     faceTex.anisotropy = 4;
     const bodyMat = new THREE.MeshStandardMaterial({
@@ -16417,7 +16436,7 @@ export class Track {
       const m = bodyMat.clone();
       m.map = tex;
       tex.anisotropy = 4;
-      m.emissiveMap = townhouseGlowTexture(F.glow, v, dark ? 0.13 : 0.6);
+      m.emissiveMap = townhouseGlowTexture(F.glow, v, dark ? 0.13 : 0.6, F.bayset);
       m.emissiveIntensity = (this.T.hutGlow ?? 1) * (dark ? 0.75 : 1);
       const im = new THREE.InstancedMesh(bodyGeo, m, Math.ceil(MAX / 3));
       im.name = 'oldtown-frontage';

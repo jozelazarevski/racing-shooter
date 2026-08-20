@@ -1800,8 +1800,34 @@ const TH_SHOP = [22, 200, 148, 44];        // ground-floor glazing
  *  several hundred times. A variant picks how many storeys and how many bays
  *  per storey, and whether the ground floor is a shop or a plain wall with a
  *  door, which is the difference between a merchant terrace and a cottage. */
-export function townhouseBays(variant = 0) {
-  const V = [
+/** LIGURIA IS ITS OWN SET OF BAYS.
+ *
+ *  The default variants are a northern market town: one to three storeys, two
+ *  bays, a shop at the foot. A Ligurian seafront terrace is FOUR AND FIVE
+ *  storeys of three bays, which is the single biggest reason the first Alassio
+ *  did not look like the reference — the proportion and the window COUNT are
+ *  what the eye reads from a car, long before any moulding does.
+ *
+ *  Kept as a separate set rather than added to the list, because the default
+ *  variants are shared with the old town and Monte Carlo and those are not
+ *  Ligurian towns.
+ */
+const BAYSETS = {
+  liguria: [
+    // 4 storeys, 3 bays, shop — the standard terrace unit
+    { rows: [56, 106, 156, 206], xs: [22, 78, 134], shop: true },
+    // 5 storeys, 3 bays — the tall one in the run
+    { rows: [40, 84, 128, 172, 214], xs: [22, 78, 134], shop: true },
+    // 4 storeys, 2 bays — the narrow infill between two wider neighbours
+    { rows: [56, 106, 156, 206], xs: [40, 106], shop: false },
+    // 5 storeys, 3 bays, no shop — the residential end of the street
+    { rows: [40, 84, 128, 172, 214], xs: [22, 78, 134], shop: false },
+  ],
+};
+
+export function townhouseBays(variant = 0, set = null) {
+  const list = BAYSETS[set];
+  const V = list ? list[variant % list.length] : [
     { rows: [96, 164], xs: [30, 114], shop: true },        // 2 storeys, 2 bays, shop
     { rows: [110], xs: [30, 114], shop: false },           // cottage: 1 storey, no shop
     { rows: [72, 132, 190], xs: [40, 106], shop: true },   // tall merchant house
@@ -1809,11 +1835,14 @@ export function townhouseBays(variant = 0) {
     { rows: [120], xs: [66], shop: true },                 // narrow single-bay shop
   ][variant % 5];
   const bays = [];
-  for (const y of V.rows) for (const x of V.xs) bays.push([x, y, V.xs.length > 2 ? 38 : 48, 52]);
+  // a five-storey face has to fit its openings into the same panel, so the
+  // opening HEIGHT comes off the row count rather than being a constant
+  const bh = V.rows.length >= 5 ? 34 : V.rows.length === 4 ? 40 : 52;
+  for (const y of V.rows) for (const x of V.xs) bays.push([x, y, V.xs.length > 2 ? 38 : 48, bh]);
   return { bays, shop: V.shop };
 }
 
-export function townhouseTexture(palette = {}, variant = 0) {
+export function townhouseTexture(palette = {}, variant = 0, set = null) {
   const P = {
     render: '#b9ad98',            // limewashed render (tinted per instance)
     plinth: '#6e6a63',            // granite plinth + shopfront surround
@@ -1823,7 +1852,7 @@ export function townhouseTexture(palette = {}, variant = 0) {
     pane: '#171c26',              // unlit glass — never transparent (G7)
     ...palette,
   };
-  const VB = townhouseBays(variant);
+  const VB = townhouseBays(variant, set);
   const TH_BAYS = VB.bays;
   const t = make(TH_W, TH_H, (g, w, h) => {
     g.fillStyle = P.render;
@@ -1931,9 +1960,14 @@ export function townhouseTexture(palette = {}, variant = 0) {
  *  Per variant now, and `litFrac` sets how much of the building is awake, so a
  *  street can hold dark houses next to lit ones.
  */
-export function townhouseGlowTexture(palette = {}, variant = 0, litFrac = 0.55) {
+export function townhouseGlowTexture(palette = {}, variant = 0, litFrac = 0.55, set = null) {
   const P = { warm: '#ffb347', hot: '#ffd489', shop: '#f2a93b', ...palette };
-  const VB = townhouseBays(variant);
+  // THE SET HAS TO COME THROUGH HERE TOO. This texture's whole job is to light
+  // the SAME openings the facade drew, and its own note above records what
+  // happens when the two disagree: lit rectangles that land on blank wall. A
+  // Ligurian facade has five rows of three where the default has two of two,
+  // so passing the set to one and not the other is that bug, restaged.
+  const VB = townhouseBays(variant, set);
   const BAYS = VB.bays;
   const t = make(TH_W, TH_H, (g, w, h) => {
     g.fillStyle = '#000000';

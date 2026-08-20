@@ -6,7 +6,7 @@ const p = await ctx.newPage(); p.setDefaultTimeout(120000);
 const errs = [];
 p.on('pageerror', e => errs.push('PAGEERR ' + e.message));
 p.on('console', m => { if (m.type() === 'error') errs.push('CONSOLE ' + m.text().slice(0,200)); });
-await p.goto('http://localhost:8901/?level=76&unlockall=1', { waitUntil:'load', timeout:120000 });
+await p.goto('http://localhost:8901/?level=74&unlockall=1', { waitUntil:'load', timeout:120000 });
 let built = false;
 try {
   await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout: 150000 });

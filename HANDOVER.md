@@ -1611,3 +1611,51 @@ Applied at both sites now: cylinders 10 -> 16 segments, cones 10 -> 14.
 IL BUDELLO: 464k -> 503k triangles, draw calls still 319. element-cyl 64k ->
 102k, which is what a hundred buildings' worth of balusters, downpipes, chimney
 pots, arcade columns and corner drums costs to stop being decagons.
+
+## r239 — THE ARRANGEMENT WAS THE PROBLEM, NOT THE MODELS
+"It is nothing like the screenshots I sent. Follow those 1:1."
+
+Fair. Three passes had gone into DETAILING buildings and none into how they are
+ARRANGED, and the reference sheets are about arrangement: their subject is
+TERRACES — houses sharing party walls in a continuous run down both sides of a
+street, four and five storeys, three bays each, shops at the foot. Free-standing
+towers scattered in a field cannot look like that however good each one is.
+
+Three concrete gaps, all now closed:
+  1. PROPORTION AND WINDOW COUNT. The frontage inherited the default street:
+     two-storey market-town units. `BAYSETS.liguria` in textures.js is four and
+     five storeys of three bays, and `height: 14 / unit: 7.2` is the sheet's
+     own near-2:1 block. This is the one the eye reads first, from a car, long
+     before any moulding.
+  2. THE GREEN PERSIANE. Every building on every sheet shares one colour: the
+     dark green shutter. It is now the frontage's `shutter` AND the tint list
+     is the sheet's own stucco swatches in order.
+  3. TWO SYSTEMS DRAWING THE SAME TOWN. `frontage` builds the street wall and
+     `_buildHuts` scattered 96 free-standing houses behind it, so the budello
+     had a terrace along the road AND a field of towers. The scatter stands
+     down to a handful of backland buildings where a frontage exists.
+
+### THE BUG: `str.replace` REPLACES EVERY OCCURRENCE
+Threading `set` into `townhouseBays` was written as a plain Python replace of
+`const VB = townhouseBays(variant);` — which hit TWO call sites. The second is
+`townhouseGlowTexture`, which has no `set` in scope, so every Riviera world
+died at build with "set is not defined" and `node --check` saw nothing wrong.
+The fix is not just scoping: the glow texture MUST take the same bayset as the
+facade, because its whole job is lighting the same openings — its own header
+records the earlier bug where lit rectangles landed on blank wall.
+
+Use an explicit count assertion on every replace. r237's segment bump was lost
+to the same class of mistake in the other direction.
+
+### STILL NOT 1:1, and worth naming
+  - The street wall is ONE-SIDED at the start line. The frontage validates each
+    block against the carriageway and the grid start is open ground, so the
+    inside of that corner stays bare.
+  - The ground is still sand. A town street should be paved to the building
+    line; `riviera` inherits a beach ground from `medterrace`.
+  - The corner building is a drum (r237). The sheets draw a CHAMFERED corner
+    with a ground-floor arcade. There is no per-part yaw, so a true chamfer
+    needs either a new primitive or a yawed sub-group.
+
+boot.mjs 4/4, test-boot 7/0, test-buildings green, test-ladder 31/0,
+test-timeline 33/0.
