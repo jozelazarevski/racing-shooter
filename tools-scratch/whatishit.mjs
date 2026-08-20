@@ -3,6 +3,7 @@
  * actually in front of the camera. */
 import { chromium } from 'playwright-core';
 const LV = process.env.LV ?? '75', F = +(process.env.F ?? 0.35);
+const PLACE = process.env.PLACE === '1';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await (await b.newContext({ viewport:{width:900,height:520} })).newPage();
@@ -11,12 +12,24 @@ await p.goto(`http://localhost:8901/?level=${LV}&go=1&unlockall=1`, { waitUntil:
 await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout:600000 });
 await p.evaluate(() => new Promise(r => { let n=0; const f=()=>(++n>24?r():requestAnimationFrame(f)); requestAnimationFrame(f); }));
 const PT = (process.env.PT||'').split(',').map(Number);
-const r = await p.evaluate(async ({F, PT}) => {
+const r = await p.evaluate(async ({F, PT, PLACE}) => {
   const g = window.__game, t = g.track;
   const THREE = await import('./lib/three.module.min.js');
   const i = Math.floor(t.N * F), c = t.center[i], c2 = t.center[(i + 12) % t.N];
+  if (PLACE) {
+    const pl = g.player;
+    pl.index = i; pl.progress = i;
+    pl.mesh.position.set(c.x, c.y + 0.4, c.z);
+    pl.heading = Math.atan2(c2.x - c.x, c2.z - c.z);
+    pl.mesh.rotation.y = pl.heading;
+    g._syncHeadlights?.();
+    const f = { x: Math.sin(pl.heading), z: Math.cos(pl.heading) };
+    g.camera.position.set(c.x - f.x * 11, c.y + 4.4, c.z - f.z * 11);
+    g.camera.lookAt(c.x + f.x * 14, c.y + 1.0, c.z + f.z * 14);
+  } else {
   g.camera.position.set(c.x, c.y + 2.6, c.z);
   g.camera.lookAt(c2.x, c2.y + 1.9, c2.z);
+  }
   g.camera.updateProjectionMatrix();
   g.renderer.render(g.scene, g.camera);
   // read the framebuffer, find the darkest non-sky pixels in the upper half,
@@ -49,6 +62,6 @@ const r = await p.evaluate(async ({F, PT}) => {
     }
   }
   return hits.sort((a,b) => b.count - a.count);
-}, {F, PT});
+}, {F, PT, PLACE});
 for (const h of r) console.log(String(h.count).padStart(4), h.key, ` @${h.x},${h.y} d=${h.dist}`);
 await b.close();

@@ -1499,6 +1499,58 @@ export function puddleTexture(palette = {}) {
 
 /** Wooden shipping-crate face: planked boards inside a nailed frame with an
  *  X of diagonal cross braces. Shared by every destructible crate prop. */
+/** RETROREFLECTIVE TAPE — why road furniture is visible at night.
+ *
+ *  A cone at the kerb of an unlit expressway is not lit; the tape on it throws
+ *  the headlights straight back at you, so what you see in the dark is two
+ *  bright bands with a cone-shaped hole between them. That is the whole read,
+ *  and it works at any range, well beyond where a headlight beam has spread
+ *  itself thin.
+ *
+ *  Black everywhere except the bands, used as an `emissiveMap`: the diffuse
+ *  texture is untouched, so the prop still looks like a wooden crate by day
+ *  and it is only the tape that glows. Bands are placed on the same UV rows
+ *  the day texture paints them, so the tape sits ON the marking rather than
+ *  beside it.
+ */
+export function reflectiveTapeTexture(kind) {
+  const size = kind === 'cone' ? 64 : 128;
+  const t = make(size, size, (g, w, h) => {
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, w, h);
+    if (kind === 'cone') {
+      // the band coneTexture already paints, lit
+      g.fillStyle = '#fffdf2';
+      g.fillRect(0, h * 0.30, w, h * 0.24);
+    } else if (kind === 'barrel') {
+      // two hoop bands, where a drum carries its markings
+      g.fillStyle = '#fff6d8';
+      g.fillRect(0, h * 0.18, w, h * 0.11);
+      g.fillRect(0, h * 0.70, w, h * 0.11);
+    } else {
+      // CRATE and anything else: hazard chevrons along the bottom edge, which
+      // is what gets taped on site furniture. Diagonal, because a diagonal
+      // reads as a warning and a plain bar reads as a highlight.
+      const bh = h * 0.16, y0 = h - bh;
+      g.fillStyle = '#0a0a0a';
+      g.fillRect(0, y0, w, bh);
+      g.fillStyle = '#fff2c4';
+      const step = w / 6;
+      for (let i = -1; i < 7; i++) {
+        g.beginPath();
+        g.moveTo(i * step, h);
+        g.lineTo(i * step + step * 0.5, h);
+        g.lineTo(i * step + step * 0.5 + bh, y0);
+        g.lineTo(i * step + bh, y0);
+        g.closePath();
+        g.fill();
+      }
+    }
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
 export function crateTexture() {
   return make(128, 128, (g, w, h) => {
     // horizontal planks

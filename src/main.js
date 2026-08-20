@@ -28,6 +28,7 @@ import { glowTexture } from './textures.js';
 // ordinal arrays stopped at '6TH', the finish bonus was a six-entry table,
 // and every piece of copy that said "of 6" said it in prose. There is now
 // exactly ONE number, and everything else is derived from it.
+const HEADLIGHT_CD = 3400;   // see _initHeadlights
 const ENEMY_COUNT = 7;
 const FIELD = ENEMY_COUNT + 1;          // cars on the grid, player included
 const LAPS = 3;
@@ -1593,6 +1594,7 @@ class Game {
     this._buildLivestock();
     this._buildGunNests();
     this._initFlashPool();
+    this._initHeadlights();
     this.camMode = 0; // 0 = top-down, 1 = low chase
     this.camPos = new THREE.Vector3();
     this.camLook = new THREE.Vector3();
@@ -8758,6 +8760,110 @@ class Game {
     pick.intensity = 60;
   }
 
+  /** HEADLIGHTS.
+   *
+   *  Built ONCE, exactly like the flash pool above and for the same reason:
+   *  the number of lights in the scene is part of every material's shader
+   *  cache key, so adding one on the night worlds and not on the others would
+   *  throw away the whole scene's programs and recompile them on the main
+   *  thread. The rig is always present; on a daylit world its intensity is
+   *  zero, which costs a multiply.
+   *
+   *  ONE spotlight, not two. A pair is what a car has, but the second one
+   *  doubles the per-fragment lighting cost across the whole frame to widen a
+   *  pool by a car's width. The lamps on the bodywork say there are two.
+   */
+  _initHeadlights() {
+    // candela, not a 0-1 dial: three measures spot and point intensity in
+    // physical units, so a light that has to still read on tarmac thirty
+    // metres out needs a number in the thousands, not the hundreds.
+    // A HEADLIGHT IS NOT A FLOODLIGHT. At a 35° half-angle aimed 4° down, the
+    // top half of the cone goes ABOVE horizontal and lights the hillside on
+    // the outside of every corner — the frame reads as a searchlight sweeping
+    // scenery rather than a car lighting the road in front of it. 19° with a
+    // soft edge, aimed properly down, and a throw that dies at seventy metres
+    // so nothing across the valley lights up.
+    const hl = new THREE.SpotLight(0xfff2d4, 0, 72, 0.34, 0.55, 1.0);
+    hl.castShadow = false;              // a shadow map per frame for this is not worth it
+    hl.target.position.set(0, 0, 1);
+    this.scene.add(hl, hl.target);
+    this._headlight = hl;
+    this._headOn = false;
+    // NO VISIBLE BEAM CONE. Every camera in this game sits BEHIND the car, so
+    // a volumetric beam would be seen down its own axis, where a cone is just
+    // a filled polygon — and the one view that would sell it, a car coming the
+    // other way, does not exist in a race. It would cost a transparent draw
+    // call per car to be either invisible or a blob. The pool of light on the
+    // road is what a player behind a car at night actually sees, and the
+    // spotlight above draws it for real.
+    this._lampMat = new THREE.MeshBasicMaterial({ color: 0xfff6de });
+    this._tailMat = new THREE.MeshBasicMaterial({ color: 0xff2a1e });
+  }
+
+  /** Hang two lamps, two beam cones and two tail lights off a car. Everything
+   *  is merged per car into as few meshes as the materials allow, so a full
+   *  grid of eight costs three draw calls each rather than six. */
+  _dressCarLights(car) {
+    if (!car || !car.mesh || car.mesh.userData.lit) return;
+    const g = car.mesh;
+    // the rig publishes its own nose and tail — every car in the catalog is a
+    // different length, and lamps guessed off a constant end up inside the
+    // bumper on the short ones and floating off the long ones
+    const rig = g.userData.rig || {};
+    const nose = rig.zFront ?? 2.1;
+    const tail = rig.zRear ?? -2.1;
+    const halfW = (rig.bodyHalf ?? 1.3) * 0.52;
+    // HEIGHT OFF THE RIG TOO. A constant 0.54 is on the bodywork of a saloon
+    // and under the sills of a truck — the lamps hung in mid-air below the
+    // buggy. baseY is where the body starts and capTop where it ends; a lamp
+    // sits low in that band, which is true of every car in the catalog.
+    const y0 = rig.baseY ?? 0.4, y1 = rig.capTop ?? (y0 + 1.2);
+    const lampY = y0 + (y1 - y0) * 0.30;
+    const lampGeo = new THREE.SphereGeometry(0.15, 8, 6);
+    const lamps = new THREE.Group(); lamps.name = 'car-lights';
+    for (const sx of [-halfW, halfW]) {
+      const l = new THREE.Mesh(lampGeo, this._lampMat);
+      l.position.set(sx, lampY, nose - 0.04);
+      lamps.add(l);
+      const t = new THREE.Mesh(lampGeo, this._tailMat);
+      t.scale.set(1.1, 0.7, 0.7);
+      t.position.set(sx, lampY + 0.06, tail + 0.04);
+      lamps.add(t);
+    }
+    g.add(lamps);
+    g.userData.lit = lamps;
+  }
+
+  /** Turn the whole rig on for a night world and off for a day one, and keep
+   *  the spotlight sitting on the player's nose pointing where they are going. */
+  _syncHeadlights() {
+    const hl = this._headlight;
+    if (!hl) return;
+    const on = !!(this.track && this.track.T && this.track.T.night);
+    if (on !== this._headOn) {
+      this._headOn = on;
+      hl.intensity = on ? HEADLIGHT_CD : 0;
+    }
+    if (!on) return;
+    // dressed every frame, not once on the flag flip: swapping cars in the
+    // garage builds a NEW mesh, and a one-shot pass leaves that one dark for
+    // the rest of the session. `_dressCarLights` returns immediately on a car
+    // it has already done, so this is a property check per car.
+    for (const c of [this.player, ...(this.enemies ?? [])]) {
+      if (c) this._dressCarLights(c);
+    }
+    const p = this.player;
+    if (!p || !p.mesh) return;
+    const f = p.forward;
+    // the lamp sits at the nose, and the beam is aimed a little down the road
+    // rather than at the horizon — a headlight lights tarmac, not sky
+    hl.position.set(
+      p.mesh.position.x + f.x * 2.0, p.mesh.position.y + 0.75, p.mesh.position.z + f.z * 2.0);
+    hl.target.position.set(
+      p.mesh.position.x + f.x * 24, p.mesh.position.y - 2.6, p.mesh.position.z + f.z * 24);
+    hl.target.updateMatrixWorld();
+  }
+
   _updateFlashes(dt) {
     for (const l of this._flashPool ?? []) {
       if (l.userData.life <= 0) continue;
@@ -10200,6 +10306,7 @@ class Game {
       this.particles.update(dt);
       this.skids.update(dt);
       this._updateFlashes(dt);
+      this._syncHeadlights();
       this._updateHusks(dt);
       this.hud.update(dt);
       this.audio.engine(
