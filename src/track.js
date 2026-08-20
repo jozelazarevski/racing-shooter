@@ -4655,6 +4655,76 @@ const BARREL_PALETTES = {
  *
  * `r` is the collider radius the car pushes off, and `mat` its solidity class.
  */
+/* ---- LIGURIAN DETAIL KIT (r237) ------------------------------------------
+ *
+ * "Make it high poly." The buildings were boxes with flat rectangles painted
+ * on for windows, which is exactly what reads as low-poly from a car: a facade
+ * with no DEPTH is a texture, and this engine has no normal maps to fake one.
+ *
+ * WHY THIS IS AFFORDABLE, measured before a triangle was added: every building
+ * part in the game lands in one of five InstancedMeshes (`element-wall`,
+ * `-box`, `-cyl`, `-cone`, `-prism`), so adding parts to a template costs
+ * INSTANCES and never DRAW CALLS. IL BUDELLO drew 326k triangles across 313
+ * calls with 96 buildings; a box is 12 triangles, so forty more parts per
+ * building is ~46k triangles and zero extra calls. Depth is the cheap axis
+ * here — it is silhouette and self-shadowing that sell it, not resolution.
+ *
+ * These helpers exist so the templates stay READABLE at this detail level.
+ * Written as functions rather than inlined arrays because a window is the same
+ * assembly eighty times over, and eighty hand-written copies is where the
+ * transcription errors live.
+ */
+// One opening, built as a real hole would be: a recessed pane, a reveal that
+// casts into it, a projecting sill, a lintel over, and a shutter leaf hinged
+// either side. Six parts and every one of them catches its own shadow.
+const ligWin = (x, y, z, w = 1.0, h = 1.45, o = {}) => {
+  const d = o.d ?? 0.14;          // how far the frame stands off the wall
+  const sw = w * 0.55;            // a leaf is a little over half the opening
+  const out = [
+    ['box', x, y, z + d * 0.35, w, h, d * 0.5, o.glass ?? 'wall2'],   // recessed pane
+    ['box', x - w / 2 - 0.07, y, z + d, 0.14, h + 0.1, d, 'trim'],    // reveal, left
+    ['box', x + w / 2 + 0.07, y, z + d, 0.14, h + 0.1, d, 'trim'],    // reveal, right
+    ['box', x, y + h / 2 + 0.07, z + d, w + 0.36, 0.14, d * 1.2, 'trim'],  // lintel
+    ['box', x, y - h / 2 - 0.06, z + d + 0.04, w + 0.44, 0.12, d * 1.8, 'trim'], // sill
+  ];
+  if (o.shutters !== false) {
+    out.push(['box', x - w / 2 - 0.09 - sw / 2, y, z + d + 0.05, sw, h, 0.07, 'trim']);
+    out.push(['box', x + w / 2 + 0.09 + sw / 2, y, z + d + 0.05, sw, h, 0.07, 'trim']);
+  }
+  return out;
+};
+// Wrought iron, as the sheets draw it: a slab, a run of balusters and a rail.
+// The balusters are where the triangles go and they are worth it — a railing
+// is the one thing on a facade you see THROUGH, so a solid box reads as a wall.
+const ligRail = (x, y, z, span, n = 7, mat = 'trim') => {
+  const out = [['box', x, y, z, span, 0.14, 0.66, mat]];
+  for (let i = 0; i < n; i++) {
+    const bx = x - span / 2 + 0.18 + (i * (span - 0.36)) / (n - 1);
+    out.push(['cyl', bx, y + 0.07, z + 0.2, 0.075, 0.78, 0.075, mat]);
+  }
+  out.push(['box', x, y + 0.85, z + 0.2, span, 0.1, 0.14, mat]);
+  return out;
+};
+// A cornice is a PROFILE, not an edge: three courses stepping out, which is
+// what gives the top of a facade its shadow line from below.
+const ligCornice = (y, w, dp, mat = 'trim') => [
+  ['box', 0, y, 0, w + 0.18, 0.13, dp + 0.18, mat],
+  ['box', 0, y + 0.13, 0, w + 0.42, 0.16, dp + 0.42, mat],
+  ['box', 0, y + 0.29, 0, w + 0.3, 0.12, dp + 0.3, mat],
+];
+// Terracotta courses over the prism, so a roof has steps in it rather than
+// being one smooth wedge.
+const ligTiles = (y, w, dp, n = 3, mat = 'roof') => Array.from({ length: n }, (_, i) => [
+  'box', 0, y + 0.12 + i * 0.34, 0, w - i * 0.5, 0.1, dp - i * 0.5, mat]);
+// A chimney with a cap and two pots — the Ligurian roofline detail from the
+// sheet, and the thing that breaks a flat ridge against the sky.
+const ligChimney = (x, y, z, h = 1.8) => [
+  ['box', x, y, z, 0.62, h, 0.62, 'stone'],
+  ['box', x, y + h, z, 0.86, 0.16, 0.86, 'trim'],
+  ['cyl', x - 0.16, y + h + 0.16, z, 0.24, 0.42, 0.24, 'roof'],
+  ['cyl', x + 0.16, y + h + 0.16, z, 0.24, 0.42, 0.24, 'roof'],
+];
+
 export const HOUSE_TEMPLATES = {
   // ---- THE MEDITERRANEAN COASTS ----
   // Four archetypes that are genuinely different SHAPES, not the farmhouse
@@ -4719,24 +4789,38 @@ export const HOUSE_TEMPLATES = {
   // three times taller than it is wide.
   ligSlender: { r: 3.6, parts: [
     ['box', 0, 0, 0, 5.0, 0.4, 4.6, 'stone'],                // plinth
+    ['box', 0, 0.4, 0, 4.9, 0.5, 4.5, 'trim'],               // plinth moulding
     ['wall', 0, 0.4, 0, 4.6, 16.4, 4.2, 'wall'],             // the shaft
-    ['box', 0, 0.4, 2.0, 1.4, 2.5, 0.2, 'trim'],             // street door
-    ['box', -1.35, 0.5, 2.12, 1.3, 2.0, 0.14, 'wall2'],      // ground window
-    // FIVE FLOORS OF A STRICT GRID. Two openings per floor, each a reveal with
-    // a shutter leaf either side — the sheet's "pre-set jalousie layout".
-    ...[3.6, 6.2, 8.8, 11.4, 14.0].flatMap((y) => [
-      ['box', -1.15, y, 2.14, 1.0, 1.45, 0.14, 'wall2'],
-      ['box', 1.15, y, 2.14, 1.0, 1.45, 0.14, 'wall2'],
-      ['box', -1.78, y, 2.2, 0.28, 1.45, 0.12, 'trim'],
-      ['box', -0.52, y, 2.2, 0.28, 1.45, 0.12, 'trim'],
-      ['box', 0.52, y, 2.2, 0.28, 1.45, 0.12, 'trim'],
-      ['box', 1.78, y, 2.2, 0.28, 1.45, 0.12, 'trim'],
-      ['box', 0, y - 0.82, 2.22, 2.9, 0.12, 0.16, 'trim'],   // sill band
+    // GROUND FLOOR: a recessed doorway with its own surround and a step, not
+    // a flat panel. The door is the only opening you ever see up close.
+    ['box', 0, 0.4, 1.95, 1.5, 2.6, 0.18, 'stone'],          // reveal
+    ['box', 0, 0.5, 2.06, 1.24, 2.4, 0.12, 'trim'],          // leaf
+    ['box', 0, 3.0, 2.14, 1.9, 0.18, 0.3, 'trim'],           // door hood
+    ['box', 0, 0.28, 2.2, 1.8, 0.16, 0.6, 'stone'],          // step
+    ...ligWin(-1.5, 1.5, 2.1, 0.95, 1.3, { shutters: false }),
+    // FIVE FLOORS OF A STRICT GRID, each opening a full assembly: pane,
+    // reveals, lintel, sill and two shutter leaves.
+    ...[3.9, 6.4, 8.9, 11.4, 13.9].flatMap((y, i) => [
+      ...ligWin(-1.15, y, 2.1),
+      ...ligWin(1.15, y, 2.1),
+      // string course between floors — the horizontal that makes a tall
+      // facade read as STOREYS rather than as one painted slab
+      ['box', 0, y - 1.05, 2.14, 4.7, 0.12, 0.16, 'trim'],
+      // one balcony, on the first floor only, as the sheet draws it
+      ...(i === 0 ? ligRail(0, y - 0.86, 2.34, 3.4, 8) : []),
     ]),
-    ['box', 0, 16.8, 0, 5.3, 0.26, 4.9, 'trim'],             // cornice
-    ['prism', 0, 17.06, 0, 5.5, 1.15, 5.1, 'roof'],
+    // side elevation gets openings too: at 4.6 u wide this building is seen
+    // end-on down a narrow lane as often as face-on
+    ...[6.4, 11.4].flatMap((y) => [
+      ['box', -2.32, y, 0.9, 0.12, 1.3, 0.85, 'wall2'],
+      ['box', -2.32, y, -0.9, 0.12, 1.3, 0.85, 'wall2'],
+    ]),
+    ...ligCornice(16.8, 4.6, 4.2),
+    ['prism', 0, 17.1, 0, 5.5, 1.15, 5.1, 'roof'],
+    ...ligTiles(17.1, 5.5, 5.1, 2),
     ['cyl', 2.05, 0.4, 1.95, 0.09, 16.2, 0.09, 'trim'],      // downpipe
-    ['cyl', -1.3, 18.2, 0, 0.42, 1.5, 0.42, 'stone'],        // chimney
+    ['box', 2.05, 16.7, 0, 0.16, 0.16, 4.2, 'trim'],         // and its gutter
+    ...ligChimney(-1.3, 18.1, 0, 1.6),
   ] },
 
   // TWIN-CONNECTED HOUSE — two bays, one four storeys and one five, sharing a
@@ -4744,113 +4828,123 @@ export const HOUSE_TEMPLATES = {
   // roofs, one shopfront at the foot of the taller bay.
   ligTwin: { r: 5.2, parts: [
     ['box', 0, 0, 0, 9.6, 0.4, 5.0, 'stone'],
-    // LEFT BAY — the lower one, plain render
-    ['wall', -2.5, 0.4, 0, 4.4, 11.0, 4.6, 'wall2'],
-    ['box', -2.5, 11.4, 0, 5.0, 0.24, 5.0, 'trim'],
-    ['prism', -2.5, 11.64, 0, 5.2, 1.1, 5.2, 'roof'],
-    ['box', -2.5, 0.4, 2.2, 1.3, 2.4, 0.18, 'trim'],         // its own door
-    ...[3.4, 6.0, 8.6].flatMap((y) => [
-      ['box', -3.5, y, 2.32, 0.9, 1.35, 0.13, 'wall2'],
-      ['box', -1.5, y, 2.32, 0.9, 1.35, 0.13, 'wall2'],
-      ['box', -4.06, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
-      ['box', -2.94, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
-      ['box', -2.06, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
-      ['box', -0.94, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
+    ['box', 0, 0.4, 0, 9.5, 0.44, 4.9, 'trim'],
+    // --- taller bay, left
+    ['wall', -2.5, 0.4, 0, 4.5, 13.6, 4.6, 'wall'],
+    ...[3.7, 6.5, 9.3, 12.1].flatMap((y) => [
+      ...ligWin(-3.5, y, 2.3, 0.95, 1.35),
+      ...ligWin(-1.5, y, 2.3, 0.95, 1.35),
+      ['box', -2.5, y - 1.15, 2.32, 4.5, 0.11, 0.15, 'trim'],
     ]),
-    // RIGHT BAY — taller, its own colour, and it carries the shop
-    ['wall', 2.5, 0.4, 0, 4.4, 13.8, 4.6, 'wall'],
-    ['box', 2.5, 14.2, 0, 5.0, 0.24, 5.0, 'trim'],
-    ['prism', 2.5, 14.44, 0, 5.2, 1.15, 5.2, 'roof'],
-    ['box', 2.5, 0.4, 2.15, 3.6, 2.9, 0.2, 'wall2'],         // shop face
-    ['box', 2.5, 3.3, 2.4, 4.2, 0.2, 0.5, 'stone'],          // fascia
-    ['prism', 2.5, 3.5, 2.85, 4.0, 0.42, 1.2, 'roof'],       // awning
-    ...[5.4, 8.0, 10.6].flatMap((y) => [
-      ['box', 1.5, y, 2.32, 0.9, 1.35, 0.13, 'wall2'],
-      ['box', 3.5, y, 2.32, 0.9, 1.35, 0.13, 'wall2'],
-      ['box', 0.94, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
-      ['box', 2.06, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
-      ['box', 2.94, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
-      ['box', 4.06, y, 2.38, 0.26, 1.35, 0.11, 'trim'],
+    // the shopfront: a recessed glazed front under a fascia and an awning
+    ['box', -2.5, 0.4, 2.18, 4.1, 2.7, 0.14, 'wall2'],
+    ['box', -2.5, 3.2, 2.34, 4.5, 0.42, 0.34, 'trim'],       // fascia board
+    ['box', -2.5, 3.05, 2.72, 4.3, 0.12, 1.0, 'roof'],       // awning
+    ['box', -2.5, 2.6, 3.2, 4.3, 0.6, 0.1, 'roof'],          // its valance
+    ['cyl', -4.4, 0.4, 2.6, 0.1, 2.7, 0.1, 'trim'],          // awning posts
+    ['cyl', -0.6, 0.4, 2.6, 0.1, 2.7, 0.1, 'trim'],
+    ...ligCornice(14.0, 4.5, 4.6),
+    ['prism', -2.5, 14.3, 0, 5.2, 1.1, 5.0, 'roof'],
+    ...ligChimney(-4.0, 15.3, 0, 1.5),
+    // --- shorter bay, right, and a whole storey lower so the party wall shows
+    ['wall', 2.6, 0.4, 0, 4.4, 10.9, 4.5, 'wall2'],
+    ['box', 2.6, 0.4, 2.16, 1.4, 2.5, 0.18, 'trim'],         // its own street door
+    ...[3.7, 6.5, 9.3].flatMap((y) => [
+      ...ligWin(1.6, y, 2.26, 0.9, 1.3),
+      ...ligWin(3.6, y, 2.26, 0.9, 1.3),
+      ['box', 2.6, y - 1.1, 2.28, 4.4, 0.11, 0.15, 'trim'],
+      ...(y === 3.7 ? ligRail(2.6, y - 0.92, 2.5, 3.6, 8) : []),
     ]),
-    ['box', 2.5, 6.9, 2.6, 4.0, 0.14, 0.6, 'trim'],          // one balcony
-    ['cyl', 1.0, 7.04, 2.85, 0.07, 0.72, 0.07, 'trim'],
-    ['cyl', 2.5, 7.04, 2.85, 0.07, 0.72, 0.07, 'trim'],
-    ['cyl', 4.0, 7.04, 2.85, 0.07, 0.72, 0.07, 'trim'],
-    ['box', 2.5, 7.76, 2.85, 3.8, 0.08, 0.1, 'trim'],
-    ['cyl', 0, 0.4, 2.2, 0.1, 13.4, 0.1, 'trim'],            // party-wall pipe
+    ...ligCornice(11.3, 4.4, 4.5),
+    ['prism', 2.6, 11.6, 0, 5.0, 1.0, 4.9, 'roof'],
+    ...ligChimney(4.0, 12.5, 0, 1.4),
+    // the party wall itself, standing proud of both roofs — the detail that
+    // says TWO HOUSES rather than one wide one
+    ['box', 0.1, 0.4, 0, 0.32, 14.4, 4.7, 'stone'],
   ] },
 
-  // CORNER BUILDING — the terracotta block that turns a junction. The chamfer
-  // is the module's identity, so it is real geometry: a 45-degree face carrying
-  // its own windows, arcade bay and awning, not a box with a painted corner.
-  ligCorner: { r: 6.2, parts: [
-    ['box', 0, 0, 0, 10.4, 0.45, 9.0, 'stone'],
-    ['wall', 0, 0.45, 0, 10.0, 13.4, 8.6, 'wall'],
-    // THE CHAMFER, AS A STAIR. The ninth element of a part tuple is `roll` —
-    // a rotation about Z, not a yaw — so a slab "turned 45 degrees across the
-    // corner" would have come out lying on its side. Four stepped boxes make
-    // the same silhouette, need no rotation at all, and sit comfortably inside
-    // a low-poly street where a true bevel would read as a smudge anyway.
-    ...[0, 1, 2, 3].map((k) => ['box', 4.9 - k * 0.42, 0.45, 3.1 + k * 0.42,
-      0.9 - k * 0.02, 13.4, 0.9 - k * 0.02, 'wall2']),
-    // GROUND-FLOOR ARCADE on both street faces, under awnings
-    ...[-3.2, 0, 3.2].flatMap((x) => [
-      ['box', x, 0.45, 4.3, 0.5, 3.5, 0.5, 'stone'],
+  // CORNER BUILDING — the terracotta block from the sheets. Five storeys, a
+  // CHAMFERED corner with its own window stack, a ground-floor arcade, and a
+  // heavy cornice. The chamfer is the whole point: it is what a building does
+  // where two streets meet, and it is the one shape in the set that is not a
+  // rectangle from above.
+  ligCorner: { r: 6.4, parts: [
+    ['box', 0, 0, 0, 11.4, 0.5, 9.4, 'stone'],
+    ['box', 0, 0.5, 0, 11.2, 0.5, 9.2, 'trim'],
+    ['wall', 0, 0.5, 0, 10.8, 15.5, 8.8, 'wall'],
+    // THE ROUNDED CORNER, which is what a building does where two streets meet
+    // and the one shape in the set that is not a rectangle in plan.
+    //
+    // IT IS A CYLINDER, NOT A ROTATED SLAB. The 9th element of a part is
+    // `roll` — a rotation about the FORWARD axis — so using it as a yaw tips
+    // the wall onto its side instead of turning it in plan. There is no
+    // per-part yaw, and a drum needs none: it looks the same from every
+    // approach, which is exactly what a corner has to do.
+    ['cyl', -4.3, 0.5, 3.4, 3.4, 15.5, 3.4, 'wall'],
+    // banding rings pick out each floor around the drum, since flat window
+    // boxes cannot sit on a curve without a yaw to turn them
+    ...[4.2, 7.2, 10.2, 13.2].map((y) => ['cyl', -4.3, y - 1.35, 3.4, 3.6, 0.16, 3.6, 'trim']),
+    ['cyl', -4.3, 16.0, 3.4, 3.9, 0.4, 3.9, 'trim'],         // its own cornice ring
+    ['cone', -4.3, 16.4, 3.4, 3.7, 1.7, 3.7, 'roof'],        // and a turret cap
+    ...[4.2, 7.2, 10.2, 13.2].flatMap((y) => [
+      // the two street elevations
+      ...ligWin(-1.2, y, 4.5, 1.0, 1.5),
+      ...ligWin(1.6, y, 4.5, 1.0, 1.5),
+      ...ligWin(4.2, y, 4.5, 1.0, 1.5),
+      ['box', 1.5, y - 1.3, 4.52, 7.4, 0.13, 0.17, 'trim'],
+      ...(y === 4.2 ? ligRail(1.6, y - 1.05, 4.72, 3.4, 8) : []),
+      ...(y === 4.2 ? ligRail(-1.2, y - 1.05, 4.72, 2.6, 6) : []),
     ]),
-    ['box', 0, 0.45, 3.95, 8.6, 3.3, 0.2, 'wall2'],
-    ['box', 0, 3.95, 4.25, 9.8, 0.26, 0.6, 'stone'],
-    ['prism', -2.6, 4.21, 4.8, 4.2, 0.46, 1.4, 'roof'],      // two awnings, a gap between
-    ['prism', 2.6, 4.21, 4.8, 4.2, 0.46, 1.4, 'roof'],
-    ['box', 4.6, 0.45, 0, 0.2, 3.3, 7.2, 'wall2'],           // the side street's shop face
-    ['box', 4.9, 3.95, 0, 0.6, 0.26, 8.4, 'stone'],
-    ['prism', 5.35, 4.21, 0, 1.4, 0.46, 6.8, 'roof'],
-    // FOUR FLOORS of ornate balconies over the arcade — the "belle epoque"
-    // rhythm the sheets draw on the corner block
-    ...[6.2, 8.8, 11.4].flatMap((y) => [
-      ['box', 0, y, 4.55, 8.2, 0.16, 0.7, 'trim'],
-      ['cyl', -3.2, y + 0.16, 4.82, 0.07, 0.78, 0.07, 'trim'],
-      ['cyl', -1.6, y + 0.16, 4.82, 0.07, 0.78, 0.07, 'trim'],
-      ['cyl', 0, y + 0.16, 4.82, 0.07, 0.78, 0.07, 'trim'],
-      ['cyl', 1.6, y + 0.16, 4.82, 0.07, 0.78, 0.07, 'trim'],
-      ['cyl', 3.2, y + 0.16, 4.82, 0.07, 0.78, 0.07, 'trim'],
-      ['box', 0, y + 0.94, 4.82, 8.0, 0.09, 0.11, 'trim'],
-      ['box', -2.4, y + 0.5, 4.36, 1.0, 1.4, 0.14, 'wall2'],
-      ['box', 2.4, y + 0.5, 4.36, 1.0, 1.4, 0.14, 'wall2'],
+    // GROUND-FLOOR ARCADE: columns with arch springs between them, glazed
+    // back. Five columns is nine extra parts and it is the difference between
+    // a shop and a painted stripe.
+    ['box', 0, 0.5, 4.1, 10.4, 3.6, 0.2, 'wall2'],           // glazed back
+    ...[-4.6, -2.3, 0, 2.3, 4.6].flatMap((x) => [
+      ['cyl', x, 0.5, 4.55, 0.62, 3.4, 0.62, 'trim'],
+      ['box', x, 3.9, 4.55, 0.86, 0.24, 0.86, 'trim'],       // capital
+      ['box', x, 0.42, 4.55, 0.9, 0.2, 0.9, 'stone'],        // base
     ]),
-    ['box', 0, 13.9, 0, 11.0, 0.42, 9.6, 'trim'],            // heavy cornice
-    ['box', 0, 14.32, 0, 10.4, 0.5, 9.0, 'stone'],           // parapet
-    ['cyl', -3.4, 14.8, -2.6, 0.46, 1.6, 0.46, 'stone'],     // chimneys
-    ['cyl', 3.4, 14.8, -2.6, 0.46, 1.6, 0.46, 'stone'],
+    ['box', 0, 4.14, 4.5, 10.8, 0.5, 0.9, 'trim'],           // arcade entablature
+    ['box', 0, 3.6, 5.1, 10.6, 0.14, 1.2, 'roof'],           // awning over it
+    ...ligCornice(16.0, 10.8, 8.8),
+    // a shallow hipped cap rather than a gable — a corner block is flat-topped
+    ['box', 0, 16.3, 0, 10.4, 0.7, 8.4, 'roof'],
+    ['box', 0, 17.0, 0, 9.6, 0.34, 7.6, 'trim'],             // parapet
+    ...ligChimney(-3.2, 17.3, -2.4, 1.7),
+    ...ligChimney(3.4, 17.3, 1.8, 1.5),
   ] },
 
-  // HINTERLAND RURAL HOUSE — the one behind the coast. Low, wide, a stone
-  // ground floor under render, and a GREEN SLATE roof: the sheets are explicit
-  // that the hinterland roof is slate where the coast is pantile, and that one
-  // swap is what separates a mountain village from a seafront.
+  // HINTERLAND RURAL HOUSE — the green-slate one from the regional sheet, for
+  // the hills behind the coast. Two storeys, wide, stone below and render
+  // above, deep eaves, an outside stair and a lean-to.
   ligRural: { r: 5.0, parts: [
     ['box', 0, 0, 0, 9.0, 0.5, 6.6, 'stone'],
     ['wall', 0, 0.5, 0, 8.4, 3.4, 6.2, 'stone'],             // stone ground floor
     ['wall', 0, 3.9, 0, 8.2, 3.6, 6.0, 'wall'],              // rendered upper
-    ['box', 0, 3.75, 3.05, 8.6, 0.2, 0.24, 'trim'],          // floor band
-    ['box', -2.6, 0.5, 3.05, 1.3, 2.3, 0.2, 'trim'],         // barn door
-    ['box', 0.8, 0.6, 3.12, 1.1, 1.2, 0.14, 'wall2'],
-    ['box', 2.9, 0.6, 3.12, 1.1, 1.2, 0.14, 'wall2'],
-    ...[5.3].flatMap((y) => [
-      ['box', -2.6, y, 3.02, 1.0, 1.3, 0.14, 'wall2'],
-      ['box', 0, y, 3.02, 1.0, 1.3, 0.14, 'wall2'],
-      ['box', 2.6, y, 3.02, 1.0, 1.3, 0.14, 'wall2'],
-      ['box', -3.22, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
-      ['box', -1.98, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
-      ['box', -0.62, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
-      ['box', 0.62, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
-      ['box', 1.98, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
-      ['box', 3.22, y, 3.08, 0.26, 1.3, 0.11, 'trim'],
+    ['box', 0, 3.75, 3.05, 8.6, 0.24, 0.28, 'trim'],         // floor band
+    ['box', -2.6, 0.5, 3.0, 1.5, 2.5, 0.2, 'stone'],         // barn door reveal
+    ['box', -2.6, 0.6, 3.12, 1.24, 2.3, 0.12, 'trim'],       // its leaf
+    ...ligWin(0.8, 1.7, 3.05, 0.95, 1.2),
+    ...ligWin(2.9, 1.7, 3.05, 0.95, 1.2),
+    ...[5.4].flatMap((y) => [
+      ...ligWin(-2.6, y, 3.0, 0.95, 1.25),
+      ...ligWin(0, y, 3.0, 0.95, 1.25),
+      ...ligWin(2.6, y, 3.0, 0.95, 1.25),
     ]),
-    ['box', 0, 7.5, 0, 9.4, 0.24, 7.0, 'trim'],
+    // THE OUTSIDE STAIR from the sheet — five treads and a rail up the flank,
+    // which is the detail that makes it rural rather than a small townhouse.
+    ...Array.from({ length: 5 }, (_, i) => [
+      'box', -4.5, 0.5 + i * 0.66, 1.6 - i * 0.5, 1.3, 0.2, 0.9, 'stone']),
+    ['cyl', -4.5, 3.6, -0.5, 0.09, 0.95, 0.09, 'trim'],
+    ['cyl', -4.5, 2.0, 1.1, 0.09, 0.95, 0.09, 'trim'],
+    ['box', -4.5, 3.3, 0.3, 0.1, 0.1, 2.6, 'trim'],
+    ...ligCornice(7.5, 8.6, 6.4),
     // DEEP EAVES AND A SHALLOW SLATE PITCH — a mountain roof, not a coastal one
-    ['prism', 0, 7.74, 0, 9.8, 1.9, 7.4, 'roof'],
-    ['cyl', -2.8, 9.3, -1.4, 0.44, 1.5, 0.44, 'stone'],
+    ['prism', 0, 7.86, 0, 9.8, 1.9, 7.4, 'roof'],
+    ...ligTiles(7.86, 9.8, 7.4, 3),
+    ...ligChimney(-2.8, 9.2, -1.4, 1.7),
     ['box', 0, 0.5, -3.2, 3.0, 2.2, 0.3, 'stone'],           // lean-to at the back
+    ['prism', 0, 2.7, -3.4, 3.4, 0.7, 1.4, 'roof'],          // its roof
   ] },
 
   // AEGEAN: a whitewashed cube with a parapet instead of eaves, an outside
@@ -19826,8 +19920,23 @@ export class Track {
       const p = raw();
       return p && !this._inWater(p.x, p.z) && !this._onQuayStrip(p.x, p.z) ? p : null;
     };
+    // A DISTRICT'S OWN BUILDINGS, IF IT HAS ANY (r237).
+    //
+    // This scatter placed the ~96 dwellings that MAKE a town, and it always
+    // drew them from the global COTTAGES list — eight generic cottages — while
+    // the district kit's `builds` list was read by nothing but the three-house
+    // village layout. So the whole Ligurian module set shipped in r236 stood
+    // in three buildings out of a hundred, and Alassio was a coast of English
+    // cottages with a pastel palette on them. Measured on IL BUDELLO: 156 wall
+    // instances (about a hundred dwellings) against a box count that did not
+    // move when the Ligurian templates tripled in detail — which is how the
+    // gap was found at all.
+    //
+    // A kit that names its own buildings gets them. Everything else keeps
+    // COTTAGES, so no existing world changes.
+    const houses = (K.builds && K.builds.length) ? K.builds : COTTAGES;
     this._scatter(COUNT, makePos, (p) => {
-      const type = COTTAGES[(Math.random() * COTTAGES.length) | 0];
+      const type = houses[(Math.random() * houses.length) | 0];
       // SCALE. The car is 4.4 u long and 2.6 u wide; a cottage is a bit wider
       // than a car is long. The templates are authored at that size, so this
       // is variation, not sizing — keep it narrow or the village stops looking

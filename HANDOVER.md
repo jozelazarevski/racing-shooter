@@ -1536,3 +1536,60 @@ villages, Scottish crofts under heavy slate — and the roster has a dozen more
 building kits besides (alpine, medhill, oldtown, hedgerow, outback, farm...).
 Redesigning every one of them from those sheets is a much bigger piece of work
 than this commit. Only the LIGURIAN set is redesigned here.
+
+## r237 — HIGH POLY, AND THE BUG THAT FOUND
+"Make it high poli."
+
+### THE REAL FINDING: r236's buildings were not being placed
+Measuring the budget before adding a triangle is what caught it. IL BUDELLO
+reported 156 wall instances — about a hundred dwellings — but its box count did
+NOT move when the four Ligurian templates tripled in detail. That can only mean
+one thing: the buildings standing in Alassio were not the Ligurian ones.
+
+`_buildHuts` places the ~96 dwellings that MAKE a town, and it always drew them
+from the global `COTTAGES` list — eight generic cottages — while the district
+kit's own `builds` list was read by nothing but a three-house village layout.
+So the whole module set shipped in r236 stood in three buildings out of a
+hundred, and Alassio was a coast of English cottages wearing a pastel palette.
+
+`_buildHuts` prefers `K.builds` now and falls back to COTTAGES, so no existing
+world changes. Measured on IL BUDELLO: box instances 2,478 -> 10,997.
+
+LESSON, AND IT IS THE SAME ONE AS THE MISSIONS SCREEN: shipping a template is
+not shipping a building. Check the instance count, not the diff.
+
+### The detail itself
+`ligWin` / `ligRail` / `ligCornice` / `ligTiles` / `ligChimney` are a shared kit
+above HOUSE_TEMPLATES, because a window is the same assembly eighty times over
+and eighty hand-written copies is where transcription errors live. A window is
+now a recessed pane, two reveals, a lintel, a projecting sill and two shutter
+leaves — six parts that each catch their own shadow. This engine has no normal
+maps, so DEPTH is the only way a facade stops reading as a texture.
+
+`element-cyl` went 10 segments to 16 and `element-cone` to 14 — both are single
+shared geometries feeding one InstancedMesh each, so it is paid once per world.
+
+### THE 9TH ELEMENT OF A PART IS `roll`, NOT A YAW
+It rotates about the FORWARD axis. The corner building's chamfer was authored
+as `['wall', ..., 0.785]` expecting a plan rotation, which would have tipped the
+wall onto its side. There is no per-part yaw. The corner is a DRUM now — a
+cylinder with banding rings and a turret cap — which needs no rotation and
+looks the same from every approach, which is what a corner has to do.
+
+### The budget, measured either side
+    before  326k tris / 313 draw calls   (and the wrong buildings)
+    after   464k tris / 319 draw calls   IL BUDELLO, the densest town
+            514k tris / 270 draw calls   SANREMO
+DRAW CALLS ARE FLAT — that is the number that matters on a phone, and it holds
+because every building part lands in one of five InstancedMeshes. Triangles are
+the cheap axis here; calls are not. Do not add a building part that needs its
+own material.
+
+test-buildings green (66 destructible buildings, 0 unresolved parts), test-boot
+7/0, test-ladder 31/0, test-timeline 33/0, boot.mjs 4/4.
+
+### STILL OPEN
+The scatter puts the town to ONE SIDE of the road with bare ground opposite —
+see the r237 screenshot of IL BUDELLO. A budello should be walled both sides.
+That is `_element`'s road-clearance gate and the `_zonePos` scatter, not the
+templates, and it is the next thing worth doing on these worlds.
