@@ -665,11 +665,14 @@ export const LEVELS = [
         // timbered building the panel is limewash and the frame is the dark
         // thing — the contrast IS the style, so the reds live in the ROOFS and
         // the deepest tint here is still lighter than the beams.
-        tints: ['#efdcb8', '#e6cb9e', '#dcbb8a', '#f2e6ce', '#e0c09c',
-          '#d8ae82', '#ead6b0', '#cfa878'],
+        tints: ['#f6e8c6', '#f0d9ac', '#e8c795', '#faf0d8', '#eccfa4',
+          '#e3bd8c', '#f2e2be', '#dcb684'],
         roof: 0xb5563a,
         face: { render: '#f2e6d0', plinth: '#8a7259', trim: '#fbf3e2',
-          frame: '#4a3323', shutter: '#7a3f2a', pane: '#232830',
+          // GLASS CATCHES THE SKY. #232830 is a hole in the wall, and fifteen
+          // holes is a third of the face reading as void; a cool blue-grey
+          // reads as a lit pane at the same value and lifts the whole terrace.
+          frame: '#4a3323', shutter: '#7a3f2a', pane: '#3d4a5c',
           timber: { beam: '#6b4630' },
           boxes: { wood: '#6b4630', blooms: ['#c8402f', '#e0644a', '#d8869a', '#f0e2d0'] } },
       },
@@ -16635,7 +16638,7 @@ export class Track {
       m4.compose(new THREE.Vector3(p.x, y + vh, p.z), q,
         new THREE.Vector3(dAcross * 1.16, roofH, wAlong * 1.08));
       rm.setMatrixAt(kv[vi], m4);
-      if (trimK + 1 < TRIMMAX) {
+      if (trimK + 2 < TRIMMAX) {
         // plinth: a course at the kerb, a touch proud of the wall
         m4.compose(new THREE.Vector3(p.x, y + 0.28, p.z), q,
           new THREE.Vector3(dAcross * 1.07, 0.56, wAlong * 1.05));
@@ -16647,6 +16650,30 @@ export class Track {
           new THREE.Vector3(dAcross * 1.13, 0.32, wAlong * 1.07));
         houseTrim.setMatrixAt(trimK, m4);
         trimCol.copy(tint).multiplyScalar(1.12 + Math.random() * 0.12);
+        houseTrim.setColorAt(trimK++, trimCol);
+        // THE JETTY (r243). In the reference the upper storeys stand PROUD of
+        // the ground floor — the medieval overhang — and that step is a big
+        // part of the silhouette from the street.
+        //
+        // A true overhang wants a second body per house. This is one course
+        // instead: a band at the first-floor line, wider across the street
+        // than the wall it sits on. From a car you are looking UP at it, so
+        // what you actually read is the projecting edge and the shadow under
+        // it — which is exactly what this draws, for one instance and no draw
+        // call.
+        //
+        // PAINTED AS WALL, NOT AS SHADOW. The first cut tinted the band down
+        // to half the wall colour on the theory that a jetty's underside is
+        // always in shade — but a box has one colour on every face, so what
+        // that actually produced was a black shelf running across the front of
+        // every house at first-floor level. The face of a jetty is the same
+        // limewash as the wall above it; the dark underside is a lighting
+        // result, and the renderer already gives it for nothing, because the
+        // soffit points at the ground.
+        m4.compose(new THREE.Vector3(p.x, y + vh * 0.34, p.z), q,
+          new THREE.Vector3(dAcross * 1.16, 0.34, wAlong * 1.04));
+        houseTrim.setMatrixAt(trimK, m4);
+        trimCol.copy(tint).multiplyScalar(0.94 + Math.random() * 0.1);
         houseTrim.setColorAt(trimK++, trimCol);
       }
       col.copy(tint).multiplyScalar(0.86 + Math.random() * 0.26);
@@ -16721,7 +16748,9 @@ export class Track {
     // call. The roof oversail goes with them: 1.06 across was a rim, not an
     // eave, and at 1.16 the shadow it throws is what makes the wall below read
     // as being in the shade of a roof.
-    const TRIMMAX = 1400;
+    // 2600, not 1400: the jetty course below is a THIRD band per house, and a
+    // long Ligurian terrace was measured at 2055 of them.
+    const TRIMMAX = 2600;
     const houseTrim = new THREE.InstancedMesh(
       new THREE.BoxGeometry(1, 1, 1),
       new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.92, envMapIntensity: 0.3 }),
@@ -16750,6 +16779,10 @@ export class Track {
     for (const m of [balcSlabs, balcRails, awnings]) { m.castShadow = m.receiveShadow = true; }
     let balK = 0, awnK = 0;
     const faceOff = new THREE.Vector3();
+    // the awning's tilt is a roll about the block's own forward axis, applied
+    // before the street yaw — so it leans out over the kerb on both sides
+    const qa = new THREE.Quaternion();
+    const fwd = new THREE.Vector3(0, 0, 1);
     const faceAt = (i, side, lat, dAcross, wAlong, baseY, hh) => {
       const p = this.pointAt(i, lat * side);
       q.setFromAxisAngle(up, this.headingAt(i));
@@ -16757,24 +16790,48 @@ export class Track {
       // toward the centreline: -side in world terms, which after the yaw is
       // simply -X scaled by the block's own half depth.
       const out = -Math.sign(lat * side) * dAcross * 0.5;
-      // a balcony at first-floor level on taller blocks only — a one-storey
-      // cottage with a balcony on it reads as a mistake
+      // ...and the face is AT `out`. Everything hung on it is measured from
+      // there in metres, never as a multiple of `out`.
+      //
+      // This is what put black slabs in the sky. The rail used to sit at
+      // `faceOff.x * 1.18` and the awning at `out * 1.3` — fractions that were
+      // picked against a shallow block, where 18% of the half-depth is a few
+      // centimetres. On the budello the blocks are 7 u deep, so 18% is 0.6 u
+      // and the rail hung two thirds of a metre past the end of the slab it is
+      // supposed to stand on, with clear daylight between the awning and the
+      // wall. A ledge is attached to a building or it is not a ledge.
+      const proud = Math.sign(out);                     // +1 if the face is +X
       if (hh > 6.2 && balK < BALC) {
         const by = baseY + hh * 0.52;
-        faceOff.set(out * 1.14, 0, (Math.random() - 0.5) * wAlong * 0.3).applyQuaternion(q);
+        const SD = 0.85;                                // how far the slab reaches out
+        const sx = out + proud * SD * 0.5;              // slab centred on the lip
+        const zj = (Math.random() - 0.5) * wAlong * 0.3;
+        faceOff.set(sx, 0, zj).applyQuaternion(q);
         m4.compose(new THREE.Vector3(p.x + faceOff.x, by, p.z + faceOff.z), q,
-          new THREE.Vector3(0.85, 0.16, wAlong * 0.42));
+          new THREE.Vector3(SD, 0.16, wAlong * 0.42));
         balcSlabs.setMatrixAt(balK, m4);
-        m4.compose(new THREE.Vector3(p.x + faceOff.x * 1.18, by + 0.5, p.z + faceOff.z * 1.18), q,
+        // the rail stands ON the slab's outer lip, not past it
+        const rx = out + proud * (SD - 0.05);
+        faceOff.set(rx, 0, zj).applyQuaternion(q);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, by + 0.5, p.z + faceOff.z), q,
           new THREE.Vector3(0.1, 0.9, wAlong * 0.42));
         balcRails.setMatrixAt(balK, m4);
         balK++;
       }
       // and an awning over the ground floor on about half of them
       if (Math.random() < 0.5 && awnK < BALC) {
-        faceOff.set(out * 1.3, 0, (Math.random() - 0.5) * wAlong * 0.25).applyQuaternion(q);
-        m4.compose(new THREE.Vector3(p.x + faceOff.x, baseY + 2.9, p.z + faceOff.z), q,
-          new THREE.Vector3(1.5, 0.12, wAlong * 0.38));
+        const AD = 1.6;                                 // awning reach
+        faceOff.set(out + proud * AD * 0.48, 0,
+          (Math.random() - 0.5) * wAlong * 0.25).applyQuaternion(q);
+        // AN AWNING SLOPES. Flat, it is a horizontal plate 2.9 u up and the
+        // driver only ever sees its UNDERSIDE — which faces away from the sun
+        // and renders black, so every shopfront on the street had a dark slab
+        // hanging over it. Tilted down toward the kerb, the top face is what
+        // you look at and the stripes on it are what you see.
+        qa.setFromAxisAngle(fwd, -proud * 0.42);
+        qa.premultiply(q);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, baseY + 2.95, p.z + faceOff.z),
+          qa, new THREE.Vector3(AD, 0.1, wAlong * 0.38));
         awnings.setMatrixAt(awnK, m4);
         col.setHSL(0.02 + Math.random() * 0.12, 0.35, 0.44 + Math.random() * 0.16);
         awnings.setColorAt(awnK, col);
