@@ -28,6 +28,7 @@ import { glowTexture } from './textures.js';
 // ordinal arrays stopped at '6TH', the finish bonus was a six-entry table,
 // and every piece of copy that said "of 6" said it in prose. There is now
 // exactly ONE number, and everything else is derived from it.
+const HEADLIGHT_CD = 3400;   // see _initHeadlights
 const ENEMY_COUNT = 7;
 const FIELD = ENEMY_COUNT + 1;          // cars on the grid, player included
 const LAPS = 3;
@@ -157,14 +158,18 @@ const PART_SLOTS = [
   {
     key: 'engine', name: 'ENGINE BLOCK', icon: '🔩',
     blurb: 'Power against grip. Bigger blocks pull harder and slide sooner.',
+    // WHAT RAISES THE CEILING. A bay is only so big and a chassis only so
+    // stiff: `mount` is the ladder that lets this car carry a bigger one, the
+    // same way TIRES STACK opens a compound.
+    mount: 'engine', mountName: 'ENGINE WRENCH',
     parts: [
-      { id: 'v4', name: 'V4 INLINE', sub: 'Stock. Honest and tidy.',
+      { id: 'v4', name: 'V4 INLINE', sub: 'Stock. Honest and tidy.', tier: 0,
         cost: 0, stock: true, speed: 1, accel: 1, grip: 1, pipes: 2 },
-      { id: 'v6', name: 'V6 TURBO', sub: 'A real shove out of slow corners.',
+      { id: 'v6', name: 'V6 TURBO', sub: 'A real shove out of slow corners.', tier: 1,
         cost: 1800, speed: 1.06, accel: 1.10, grip: 0.97, pipes: 2 },
-      { id: 'v8', name: 'V8 BLOCK', sub: 'Fast everywhere, loose everywhere.',
+      { id: 'v8', name: 'V8 BLOCK', sub: 'Fast everywhere, loose everywhere.', tier: 2,
         cost: 4200, speed: 1.14, accel: 1.18, grip: 0.93, pipes: 4 },
-      { id: 'v12', name: 'V12 MONSTER', sub: 'More engine than tyre. Fit a wing.',
+      { id: 'v12', name: 'V12 MONSTER', sub: 'More engine than tyre. Fit a wing.', tier: 3,
         cost: 9000, speed: 1.24, accel: 1.24, grip: 0.86, pipes: 6,
         lock: { kind: 'cleared', n: 6, label: 'WIN 6 WORLDS OUTRIGHT' } },
     ],
@@ -172,20 +177,61 @@ const PART_SLOTS = [
   {
     key: 'spoiler', name: 'REAR WING', icon: '🪽',
     blurb: 'Downforce: grip that arrives with speed, paid for in top end.',
+    mount: 'handling', mountName: 'SUSPENSION SPRING',
     parts: [
-      { id: 'none', name: 'NO WING', sub: 'Nothing to slow you down.',
+      { id: 'none', name: 'NO WING', sub: 'Nothing to slow you down.', tier: 0,
         cost: 0, stock: true, speed: 1, down: 0 },
-      { id: 'lip', name: 'LIP SPOILER', sub: 'A little stability, barely a cost.',
+      { id: 'lip', name: 'LIP SPOILER', sub: 'A little stability, barely a cost.', tier: 1,
         cost: 900, speed: 0.99, down: 0.10 },
-      { id: 'duck', name: 'DUCKTAIL', sub: 'Planted through the quick stuff.',
+      { id: 'duck', name: 'DUCKTAIL', sub: 'Planted through the quick stuff.', tier: 2,
         cost: 2200, speed: 0.975, down: 0.22 },
-      { id: 'gt', name: 'GT WING', sub: 'Enormous. Corners like it is on rails.',
+      { id: 'gt', name: 'GT WING', sub: 'Enormous. Corners like it is on rails.', tier: 3,
         cost: 5000, speed: 0.95, down: 0.40,
         lock: { kind: 'medals', n: 3, label: 'TAKE 3 MISSION MEDALS' } },
     ],
   },
 ];
 const PART_SLOT = Object.fromEntries(PART_SLOTS.map((s) => [s.key, s]));
+
+// WHAT EACH CHASSIS CAN CARRY BEFORE ANY MONEY IS SPENT.
+//
+// "Not all elements should be available for all chassis. That's the reason for
+// upgrades on chassis." Exactly the shape the TYRE system already has: a car
+// has a class of its own, and a ladder raises it. So a bay is only so big and
+// a body only so stiff — engine tier is what the ENGINE WRENCH opens up, wing
+// tier is what the SUSPENSION SPRING opens up, and a maxed ladder adds +2.
+//
+// The numbers come from what each machine IS, so the roster reads as eight
+// different cars rather than eight price points:
+//   BASTION and PIT are heavy haulers — huge engine bays, bodies too soft and
+//     too tall to ever carry a GT wing
+//   SLEEK is a little hatch — the wing bolts straight on, the big blocks never
+//     will
+//   FLATSIX and CROWN are the tarmac cars: room for both, at a price
+//   DUNE is built to climb, not to corner — big lump, no aero
+// A car can therefore be the ONLY home for a part, which is the point: the
+// V12 lives in the heavy cars, the GT wing in the light ones, and no single
+// machine in the game can wear both.
+const CHASSIS_MOUNT = {
+  brawler: { engine: 1, spoiler: 1 },
+  sleek: { engine: 0, spoiler: 2 },
+  crown: { engine: 1, spoiler: 2 },
+  dune: { engine: 2, spoiler: 0 },
+  flatsix: { engine: 1, spoiler: 2 },   // light coupe: big wing, never a big block
+  bastion: { engine: 3, spoiler: 0 },
+  alpine: { engine: 1, spoiler: 2 },
+  pit: { engine: 3, spoiler: 1 },
+};
+const MOUNT_MAX = 3;
+/** A LADDER IS WORTH EXACTLY ONE MOUNT CLASS, at level 3.
+ *
+ *  It was two (one every other rung), and that let six of the eight chassis
+ *  reach the top class — which makes "not every part fits every chassis" true
+ *  on paper and meaningless in play. One class means the CAR decides what it
+ *  can ever wear and the ladder only ever moves you one step, so the roster
+ *  splits cleanly: the heavy machines take the big blocks, the light ones take
+ *  the big wings, and NO CAR IN THE GAME CAN WEAR BOTH. */
+const mountFromLevel = (lvl) => ((lvl | 0) >= 3 ? 1 : 0);
 /** The stock part of a slot — what an unbuilt car is wearing, and the thing
  *  every save written before parts existed is treated as having. */
 const stockPart = (slot) => slot.parts.find((p) => p.stock) || slot.parts[0];
@@ -207,6 +253,9 @@ const WORLD_TAGS = {
   farmland: '🌧 hedge banks · mud · blind crests',
   outback: 'bulldust holes · creek jumps · 🦘',
   autumnwood: '🍂 wet leaves · low sun',
+  riviera: '🌊 seafront tarmac · town walls',
+  genova: '🏙 port city · caruggi and docks',
+  sanremo: '⛰ mountain stage · olive terraces',
   harvestvale: '🍂 stubble fields · long shadows',
   mistfell: '🌫 bracken moor · mist banks',
 };
@@ -1563,6 +1612,7 @@ class Game {
     this._buildLivestock();
     this._buildGunNests();
     this._initFlashPool();
+    this._initHeadlights();
     this.camMode = 0; // 0 = top-down, 1 = low chase
     this.camPos = new THREE.Vector3();
     this.camLook = new THREE.Vector3();
@@ -2131,6 +2181,8 @@ class Game {
     const earned = Math.round(raw * CREDIT_RATE);
     if (earned > 0) {
       this.garage.credits += earned;
+    this._syncCredits();
+      this._syncCredits();
       saveJSON(this._pkey('garage'), this.garage);
     }
   }
@@ -2659,35 +2711,51 @@ class Game {
    *  button always reads BACK, and the label beside it says where you are —
    *  `backTarget` already knows where the tap lands.
    */
+  /** THE BALANCE, wherever it is being shown. It lives in the top bar now, so
+   *  it is on screen during a race debrief and every menu tab — and a stale
+   *  number there is worse than the old one that scrolled away, because this
+   *  one is always in view. Called from every path that moves it. */
+  _syncCredits() {
+    const el = document.getElementById('credits');
+    if (el) el.textContent = this.garage.credits.toLocaleString();
+  }
+
   _syncBackBtn() {
     const t = this.backTarget();
-    // In the MENU only: mid-race the screen belongs to the HUD and the pause
-    // button is already the way out, so a second control would be clutter over
-    // the road.
-    const show = !!t && this.state === 'title';
+    // THE BAR IS UP FOR THE WHOLE MENU, not only when there is a way back. It
+    // carries the wordmark and the credit balance now, and both were asked for
+    // as "always visible" — a balance you have to scroll up to read is no use
+    // on a screen whose whole job is spending it.
+    const inMenu = this.state === 'title';
+    const canBack = !!t && inMenu;
+    const inChapter = canBack && t.at === 'chapter';
     const bar = document.getElementById('topbar');
-    if (bar) bar.classList.toggle('hidden', !show);
-    // WHERE YOU ARE, not where the button goes — the button says BACK. Inside
-    // a chapter `_fillTopbar` has already written the chapter and its stars,
-    // so only the tab case is left to name.
-    if (show && t.at !== 'chapter') {
+    if (bar) bar.classList.toggle('hidden', !inMenu);
+    const back = document.getElementById('topbar-back');
+    // BACK still comes and goes — it is the one thing here that leads
+    // somewhere, and a dead one at the front door is a button that lies.
+    if (back) back.classList.toggle('hidden', !canBack);
+    const where = document.getElementById('topbar-where');
+    const stars = document.getElementById('topbar-stars');
+    if (inMenu && !inChapter && where) {
       const tab = document.querySelector('#menu-tabs .menu-tab.current');
-      const where = document.getElementById('topbar-where');
-      const stars = document.getElementById('topbar-stars');
-      if (where) where.innerHTML = `<b>${tab ? tab.textContent.trim() : ''}</b>`;
+      const onTracks = !tab || tab.id === 'tab-btn-race';
+      // WHERE YOU ARE, and at the front door that is the game itself — which
+      // is why the wordmark lives in this slot rather than in a fourth one the
+      // 320px phone has no room for.
+      where.innerHTML = canBack && tab && !onTracks
+        ? `<b>${tab.textContent.trim()}</b>`
+        : '<b class="tb-brand">IGNITE RALLY</b>';
       if (stars) stars.textContent = '';
     }
-    // The bar is fixed, so it is out of flow: the screen under it owes it the
-    // height, and gives up the logo for it (see .compact). Full branding is
-    // for the front door — the one screen with no way back.
     const ts = document.getElementById('title-screen');
     if (ts) {
-      ts.classList.toggle('with-topbar', show);
-      ts.classList.toggle('compact', show);
+      ts.classList.toggle('with-topbar', inMenu);
+      ts.classList.toggle('compact', inMenu);
     }
   }
 
-  /** THE PHONE'S OWN BACK GESTURE, which is the one people actually use.
+  /** THE PHONE'S OWN BACK GESTURE  /** THE PHONE'S OWN BACK GESTURE, which is the one people actually use.
    *
    *  A single-page game gets ONE history entry, so the first swipe-back leaves
    *  the site — mid-race, mid-chapter, whatever. This keeps a spare entry on
@@ -4078,7 +4146,12 @@ class Game {
       const stock = stockPart(slot);
       rec.owned[`${slot.key}:${stock.id}`] = 1;             // stock is never bought
       const fit = rec.fitted[slot.key];
-      if (!slot.parts.some((pt) => pt.id === fit)) rec.fitted[slot.key] = stock.id;
+      const pt = slot.parts.find((x) => x.id === fit);
+      // CLAMPED ON READ, exactly like the tyre compound, and for the same
+      // reason: the ceiling moves. Swapping to a smaller chassis — or a career
+      // reset dropping the ladder back to zero — must not leave a V12 bolted
+      // into a bay that cannot hold one. Owning it is kept; wearing it is not.
+      if (!pt || (pt.tier | 0) > this.mountMax(slot.key, carKey)) rec.fitted[slot.key] = stock.id;
     }
     return rec;
   }
@@ -4111,6 +4184,48 @@ class Game {
       have = Object.values(this._missionBest?.() || {}).filter((m) => m > 0).length;
     }
     return { open: have >= n, have, need: n };
+  }
+
+  /** THE HIGHEST MOUNT CLASS THIS CAR CAN CARRY IN A SLOT, right now. */
+  mountMax(slotKey, carKey = this.cars.selected, up = null) {
+    const base = CHASSIS_MOUNT[carKey]?.[slotKey] ?? 1;
+    const slot = PART_SLOT[slotKey];
+    const lv = (up ?? this.carUpgrades(carKey))[slot.mount] | 0;
+    return Math.min(MOUNT_MAX, base + mountFromLevel(lv));
+  }
+
+  /** CAN THIS CAR TAKE THIS PART, and if not, is that a thing money can fix?
+   *
+   *  Three outcomes, and the difference between the last two is the whole
+   *  reason this exists — one is a purchase, the other is a different car:
+   *    ok        it fits
+   *    !ok       the ladder is not high enough YET (`via` names it, `need` is
+   *              the level required)
+   *    capped    even a maxed ladder cannot get there on this chassis
+   */
+  /** WHICH MACHINES COULD EVER WEAR THIS PART. A "won't fit" with no way
+   *  forward is a dead end; naming the chassis that can turns it into a
+   *  reason to own another car, which is what the gating is for. */
+  partHomes(slot, part) {
+    const tier = part.tier | 0;
+    return CAR_CATALOG.filter((c) => {
+      const base = CHASSIS_MOUNT[c.key]?.[slot.key] ?? 1;
+      return Math.min(MOUNT_MAX, base + mountFromLevel(5)) >= tier;
+    }).map((c) => c.name);
+  }
+
+  partFits(slot, part, carKey = this.cars.selected) {
+    const tier = part.tier | 0;
+    const have = this.mountMax(slot.key, carKey);
+    if (tier <= have) return { ok: true };
+    const base = CHASSIS_MOUNT[carKey]?.[slot.key] ?? 1;
+    const ceiling = Math.min(MOUNT_MAX, base + mountFromLevel(5));
+    if (tier > ceiling) return { ok: false, capped: true, via: slot.mountName };
+    // the lowest ladder level whose mount class reaches this tier
+    let need = 0;
+    while (need <= 5 && Math.min(MOUNT_MAX, base + mountFromLevel(need)) < tier) need++;
+    return { ok: false, capped: false, via: slot.mountName, need,
+      at: this.carUpgrades(carKey)[slot.mount] | 0 };
   }
 
   /** WHICH COMPOUND IS ON THIS CAR RIGHT NOW.
@@ -4313,7 +4428,13 @@ class Game {
     for (const bay of BAYS) {
       const box = document.createElement('div');
       box.className = 'bay';
-      box.innerHTML = `<div class="bay-head"><span>${bay.icon}</span>${bay.name}</div>`;
+      // A SLOT BAY SAYS WHAT THIS CHASSIS CAN TAKE, up front, so the greyed
+      // cards below are explained before they are met.
+      const cap = bay.slot
+        ? `<b class="bay-cap">CHASSIS CLASS ${this.mountMax(bay.slot)}${
+  this.mountMax(bay.slot) < MOUNT_MAX ? ` · ${PART_SLOT[bay.slot].mountName} RAISES IT` : ' · MAXED'}</b>`
+        : '';
+      box.innerHTML = `<div class="bay-head"><span>${bay.icon}</span>${bay.name}${cap}</div>`;
 
       // ---- the CHOICE half: parts, as pictures
       if (bay.slot) {
@@ -4333,18 +4454,39 @@ class Game {
           const owned = !!rec.owned[`${slot.key}:${pt.id}`];
           const on = pt.id === fit.id;
           const lock = this.partLock(pt);
+          const mount = this.partFits(slot, pt);
+          // A CARD HAS TO SAY WHICH OF THREE WALLS IS IN THE WAY, because they
+          // want three different things from the player: a race, a chassis
+          // ladder, or a different car entirely. Lumping them into one padlock
+          // is what makes a shop feel arbitrary.
+          const wall = !mount.ok ? (mount.capped ? 'capped' : 'mount')
+            : !lock.open && !owned ? 'earn' : null;
           const card = document.createElement('button');
-          card.className = 'part-card' + (on ? ' on' : '') + (!lock.open && !owned ? ' locked' : '');
+          card.className = 'part-card' + (on ? ' on' : '')
+            + (wall ? ` blocked ${wall}` : '') + (owned && !on ? ' owned' : '');
           card.dataset.slot = slot.key;
           card.dataset.part = pt.id;
+          card.dataset.tier = pt.tier | 0;
           const pct = Math.round((power(pt) / top) * 100);
-          card.innerHTML = `<img class="pc-art" src="${icons[`${slot.key}:${pt.id}`]}" alt="">
+          const act = on ? ['fitted', 'FITTED']
+            : wall === 'capped' ? ['lock', '⛔ WON\u2019T FIT']
+              : wall === 'mount' ? ['lock', `🔧 ${mount.via.split(' ')[0]} ${mount.need}`]
+                : wall === 'earn' ? ['lock', `🔒 ${lock.have}/${lock.need}`]
+                  : owned ? ['own', 'INSTALL'] : ['buy', `${pt.cost.toLocaleString()} CR`];
+          const why = wall === 'capped'
+            ? `This body tops out at class ${this.mountMax(slot.key)}. Fits: ${
+  this.partHomes(slot, pt).join(', ') || 'nothing in the catalogue'}`
+            : wall === 'mount' ? `Needs ${mount.via} ${mount.need} (you are at ${mount.at})`
+              : wall === 'earn' ? pt.lock.label : pt.sub;
+          // MOUNT CLASS, ON EVERY CARD. It is the number the whole bay turns
+          // on, so it is stated even when the part fits — otherwise a player
+          // only ever meets it as a refusal.
+          card.innerHTML = `<span class="pc-cls">CLASS ${pt.tier | 0}</span>
+            <img class="pc-art" src="${icons[`${slot.key}:${pt.id}`]}" alt="">
             <span class="pc-name">${pt.name}</span>
             <span class="pc-bar"><i style="width:${pct}%"></i></span>
-            <span class="pc-act ${on ? 'fitted' : owned ? 'own' : lock.open ? 'buy' : 'lock'}">${
-  on ? 'FITTED' : owned ? 'INSTALL'
-    : lock.open ? `${pt.cost.toLocaleString()} CR` : `🔒 ${lock.have}/${lock.need}`}</span>
-            <span class="pc-sub">${!lock.open && !owned ? pt.lock.label : pt.sub}</span>`;
+            <span class="pc-act ${act[0]}">${act[1]}</span>
+            <span class="pc-sub">${why}</span>`;
           card.addEventListener('click', () => this._partAction(slot, pt));
           grid.appendChild(card);
         }
@@ -4624,17 +4766,38 @@ class Game {
     const wing = this.fittedPart('spoiler');
     const p = this.player;
     const tc = tyreClass(this.cars.selected, this.carUpgrades(), this.fittedTyre());
+    // WHAT IS UPGRADED, SAID OUT LOUD. A spec chip is lit when it is above
+    // the stock part and dim when it is not, every stat carries its delta
+    // against a STOCK example of the same chassis, and the mods strip counts
+    // what the money has actually bought. Before this the panel showed four
+    // numbers with nothing to compare them to — "TOP 56" tells a player
+    // nothing about whether 56 is what they started with.
+    const up = this.carUpgrades();
+    const engStock = stockPart(PART_SLOT.engine);
+    const wingStock = stockPart(PART_SLOT.spoiler);
+    const base = this._base ?? { maxSpeed: p?.maxSpeed ?? 0, accel: p?.accel ?? 0, maxHealth: p?.maxHealth ?? 0 };
+    const chip = (label, mod) => `<span class="${mod ? 'up' : ''}">${mod ? '▲ ' : ''}${label}</span>`;
+    const num = (label, now, was, unit = '') => {
+      const d = Math.round(now) - Math.round(was);
+      return `<span><i>${label}</i><b>${Math.round(now)}${unit}</b>${
+  d ? `<u class="${d > 0 ? 'up' : 'dn'}">${d > 0 ? '+' : ''}${d}</u>` : ''}</span>`;
+    };
+    const ladders = UPGRADES.reduce((n, u) => n + (up[u.key] | 0), 0);
+    const swapped = (eng.id !== engStock.id ? 1 : 0) + (wing.id !== wingStock.id ? 1 : 0);
     el.innerHTML = `<div class="bp-shop"></div>
       <div class="bp-side">
-        <div class="bp-name">${car?.name ?? ''}</div>
-        <div class="bp-spec"><span>${eng.name}</span><span>${wing.name}</span>
-          <span>${TYRE_LABEL[tc]} TYRES</span></div>
+        <div class="bp-name">${car?.name ?? ''}${
+  ladders || swapped ? '<b class="bp-tag">MODIFIED</b>' : '<b class="bp-tag stock">STOCK</b>'}</div>
+        <div class="bp-spec">${chip(eng.name, eng.id !== engStock.id)}${
+  chip(wing.name, wing.id !== wingStock.id)}${chip(`${TYRE_LABEL[tc]} TYRES`, tc > 0)}</div>
         <div class="bp-nums">
-          <span><i>TOP</i><b>${Math.round(p?.maxSpeed ?? 0)}</b></span>
-          <span><i>PULL</i><b>${Math.round(p?.accel ?? 0)}</b></span>
-          <span><i>HULL</i><b>${Math.round(p?.maxHealth ?? 0)}</b></span>
-          <span><i>DOWN</i><b>${Math.round((p?.downforce ?? 0) * 100)}%</b></span>
+          ${num('TOP', p?.maxSpeed ?? 0, base.maxSpeed)}
+          ${num('PULL', p?.accel ?? 0, base.accel)}
+          ${num('HULL', p?.maxHealth ?? 0, base.maxHealth)}
+          ${num('DOWN', (p?.downforce ?? 0) * 100, 0, '%')}
         </div>
+        <div class="bp-mods">${swapped} PART${swapped === 1 ? '' : 'S'} SWAPPED ·
+          ${ladders} UPGRADE${ladders === 1 ? '' : 'S'} FITTED</div>
       </div>`;
     // THE LIVE CANVAS IS MOVED, NEVER REBUILT. innerHTML above throws away
     // whatever was in the box, so the stage is re-attached afterwards — a new
@@ -4655,6 +4818,18 @@ class Game {
     const rec = this.carParts(carKey);
     const key = `${slot.key}:${part.id}`;
     const say = (text) => { this._buildMsg = { slot: slot.key, text }; };
+    // THE CHASSIS IS CHECKED BEFORE THE WALLET. Buying a part you cannot bolt
+    // on is the worst outcome available here, so the bay says no first.
+    const fit = this.partFits(slot, part, carKey);
+    if (!fit.ok) {
+      say(fit.capped
+        ? `${part.name} WILL NOT GO ON A ${(CAR_CATALOG.find((c) => c.key === carKey)?.name) || 'THIS'}`
+          + ` — THIS CHASSIS TOPS OUT BELOW IT. IT FITS: ${this.partHomes(slot, part).join(', ')}.`
+        : `${part.name} NEEDS ${fit.via} LEVEL ${fit.need} — YOU ARE AT ${fit.at}.`
+          + ` THE CHASSIS CANNOT CARRY IT YET.`);
+      this._renderGarageBays();
+      return;
+    }
     if (!rec.owned[key]) {
       const lock = this.partLock(part);
       if (!lock.open) {
@@ -4793,7 +4968,7 @@ class Game {
       const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       r.setPixelRatio(2);
       r.toneMapping = THREE.ACESFilmicToneMapping;
-      r.toneMappingExposure = 1.12;
+      r.toneMappingExposure = 1.24;
       const scene = new THREE.Scene();
       scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x6a5a44, 1.15));
       const sun = new THREE.DirectionalLight(0xfff3d6, 2.2);
@@ -4804,6 +4979,12 @@ class Game {
       const fill = new THREE.DirectionalLight(0x9fc8ff, 0.55);
       fill.position.set(-5, 3, -4);
       scene.add(fill);
+      // A RIM FROM BEHIND is what separates a chrome part from a dark card.
+      // Without it the polished faces have nothing to catch and every block
+      // came out as a silhouette.
+      const rim = new THREE.DirectionalLight(0xffd9a0, 1.5);
+      rim.position.set(-3, 5, -7);
+      scene.add(rim);
       st = this.__studio = { r, scene, sun, cam: null };
     }
     st.r.setSize(w, h);
@@ -4843,7 +5024,7 @@ class Game {
     const shoot = (kind, id, ry, dist, look = 0) => {
       const m = buildPartIcon(kind, id);
       m.rotation.y = ry;
-      out[`${kind}:${id}`] = this._shoot(m, 128, 96, { dist, look });
+      out[`${kind}:${id}`] = this._shoot(m, 168, 126, { dist, look });
     };
     // each part is turned to the angle that shows what makes it different: a
     // block from its pipe side, a wing from behind so the span reads
@@ -4851,7 +5032,7 @@ class Game {
     // are on. The studio camera looks in from +X/+Y/+Z, and the stacks are
     // built on +X: rotating the block away hid every one of them and left a
     // V4 and a V8 as the same black box.
-    for (const p of PART_SLOT.engine.parts) shoot('engine', p.id, -Math.PI * 0.13, 4.6, 0.05);
+    for (const p of PART_SLOT.engine.parts) shoot('engine', p.id, -Math.PI * 0.13, 4.5, 0.22);
     for (const p of PART_SLOT.spoiler.parts) shoot('spoiler', p.id, Math.PI * 0.9, 4.4);
     for (const id of ['road', 'gravel', 'snow']) shoot('tyre', id, Math.PI * 0.5, 4.2);
     for (const id of ['cannon', 'rack', 'magazine']) shoot('weapon', id, Math.PI * 0.78, 4.2);
@@ -4966,7 +5147,7 @@ class Game {
   }
 
   renderGarage() {
-    document.getElementById('credits').textContent = this.garage.credits.toLocaleString();
+    this._syncCredits();
     this._renderQuests();
     // ONE CALL. This used to render a build bay, a tyre bay and then ten grey
     // upgrade rows into three separate containers; the bays own all of it now,
@@ -7060,6 +7241,7 @@ class Game {
     const cr = MISSION_CR[medal] | 0;
     if (cr > 0) {
       this.garage.credits += cr;
+      this._syncCredits();
       saveJSON(this._pkey('garage'), this.garage); // per-profile purse (economy agent)
       this.renderGarage();
     }
@@ -8620,6 +8802,110 @@ class Game {
     pick.intensity = 60;
   }
 
+  /** HEADLIGHTS.
+   *
+   *  Built ONCE, exactly like the flash pool above and for the same reason:
+   *  the number of lights in the scene is part of every material's shader
+   *  cache key, so adding one on the night worlds and not on the others would
+   *  throw away the whole scene's programs and recompile them on the main
+   *  thread. The rig is always present; on a daylit world its intensity is
+   *  zero, which costs a multiply.
+   *
+   *  ONE spotlight, not two. A pair is what a car has, but the second one
+   *  doubles the per-fragment lighting cost across the whole frame to widen a
+   *  pool by a car's width. The lamps on the bodywork say there are two.
+   */
+  _initHeadlights() {
+    // candela, not a 0-1 dial: three measures spot and point intensity in
+    // physical units, so a light that has to still read on tarmac thirty
+    // metres out needs a number in the thousands, not the hundreds.
+    // A HEADLIGHT IS NOT A FLOODLIGHT. At a 35° half-angle aimed 4° down, the
+    // top half of the cone goes ABOVE horizontal and lights the hillside on
+    // the outside of every corner — the frame reads as a searchlight sweeping
+    // scenery rather than a car lighting the road in front of it. 19° with a
+    // soft edge, aimed properly down, and a throw that dies at seventy metres
+    // so nothing across the valley lights up.
+    const hl = new THREE.SpotLight(0xfff2d4, 0, 72, 0.34, 0.55, 1.0);
+    hl.castShadow = false;              // a shadow map per frame for this is not worth it
+    hl.target.position.set(0, 0, 1);
+    this.scene.add(hl, hl.target);
+    this._headlight = hl;
+    this._headOn = false;
+    // NO VISIBLE BEAM CONE. Every camera in this game sits BEHIND the car, so
+    // a volumetric beam would be seen down its own axis, where a cone is just
+    // a filled polygon — and the one view that would sell it, a car coming the
+    // other way, does not exist in a race. It would cost a transparent draw
+    // call per car to be either invisible or a blob. The pool of light on the
+    // road is what a player behind a car at night actually sees, and the
+    // spotlight above draws it for real.
+    this._lampMat = new THREE.MeshBasicMaterial({ color: 0xfff6de });
+    this._tailMat = new THREE.MeshBasicMaterial({ color: 0xff2a1e });
+  }
+
+  /** Hang two lamps, two beam cones and two tail lights off a car. Everything
+   *  is merged per car into as few meshes as the materials allow, so a full
+   *  grid of eight costs three draw calls each rather than six. */
+  _dressCarLights(car) {
+    if (!car || !car.mesh || car.mesh.userData.lit) return;
+    const g = car.mesh;
+    // the rig publishes its own nose and tail — every car in the catalog is a
+    // different length, and lamps guessed off a constant end up inside the
+    // bumper on the short ones and floating off the long ones
+    const rig = g.userData.rig || {};
+    const nose = rig.zFront ?? 2.1;
+    const tail = rig.zRear ?? -2.1;
+    const halfW = (rig.bodyHalf ?? 1.3) * 0.52;
+    // HEIGHT OFF THE RIG TOO. A constant 0.54 is on the bodywork of a saloon
+    // and under the sills of a truck — the lamps hung in mid-air below the
+    // buggy. baseY is where the body starts and capTop where it ends; a lamp
+    // sits low in that band, which is true of every car in the catalog.
+    const y0 = rig.baseY ?? 0.4, y1 = rig.capTop ?? (y0 + 1.2);
+    const lampY = y0 + (y1 - y0) * 0.30;
+    const lampGeo = new THREE.SphereGeometry(0.15, 8, 6);
+    const lamps = new THREE.Group(); lamps.name = 'car-lights';
+    for (const sx of [-halfW, halfW]) {
+      const l = new THREE.Mesh(lampGeo, this._lampMat);
+      l.position.set(sx, lampY, nose - 0.04);
+      lamps.add(l);
+      const t = new THREE.Mesh(lampGeo, this._tailMat);
+      t.scale.set(1.1, 0.7, 0.7);
+      t.position.set(sx, lampY + 0.06, tail + 0.04);
+      lamps.add(t);
+    }
+    g.add(lamps);
+    g.userData.lit = lamps;
+  }
+
+  /** Turn the whole rig on for a night world and off for a day one, and keep
+   *  the spotlight sitting on the player's nose pointing where they are going. */
+  _syncHeadlights() {
+    const hl = this._headlight;
+    if (!hl) return;
+    const on = !!(this.track && this.track.T && this.track.T.night);
+    if (on !== this._headOn) {
+      this._headOn = on;
+      hl.intensity = on ? HEADLIGHT_CD : 0;
+    }
+    if (!on) return;
+    // dressed every frame, not once on the flag flip: swapping cars in the
+    // garage builds a NEW mesh, and a one-shot pass leaves that one dark for
+    // the rest of the session. `_dressCarLights` returns immediately on a car
+    // it has already done, so this is a property check per car.
+    for (const c of [this.player, ...(this.enemies ?? [])]) {
+      if (c) this._dressCarLights(c);
+    }
+    const p = this.player;
+    if (!p || !p.mesh) return;
+    const f = p.forward;
+    // the lamp sits at the nose, and the beam is aimed a little down the road
+    // rather than at the horizon — a headlight lights tarmac, not sky
+    hl.position.set(
+      p.mesh.position.x + f.x * 2.0, p.mesh.position.y + 0.75, p.mesh.position.z + f.z * 2.0);
+    hl.target.position.set(
+      p.mesh.position.x + f.x * 24, p.mesh.position.y - 2.6, p.mesh.position.z + f.z * 24);
+    hl.target.updateMatrixWorld();
+  }
+
   _updateFlashes(dt) {
     for (const l of this._flashPool ?? []) {
       if (l.userData.life <= 0) continue;
@@ -10066,6 +10352,7 @@ class Game {
       this.particles.update(dt);
       this.skids.update(dt);
       this._updateFlashes(dt);
+      this._syncHeadlights();
       this._updateHusks(dt);
       this.hud.update(dt);
       this.audio.engine(

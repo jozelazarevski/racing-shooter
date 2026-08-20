@@ -8,9 +8,10 @@ import {
   // `crowdTexture` is no longer imported: the spectator stand was the only
   // consumer, and it was removed on request. The texture itself stays in
   // src/textures.js — deleting it is that file's call, not this one's.
-  grassTexture, bannerTexture, hazardTexture, awningTexture,
+  grassTexture, bannerTexture, hazardTexture, awningTexture, balconyRailTexture,
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
-  crateTexture, coneTexture, barrelTexture, riverTexture, riverBankTexture, iglooTexture,
+  crateTexture, coneTexture, barrelTexture, reflectiveTapeTexture,
+  riverTexture, riverBankTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
   townhouseTexture, townhouseGlowTexture, roofTileTexture,
@@ -681,6 +682,190 @@ export const LEVELS = [
     tune: {
       rockCount: 520,
       elev: { amp: 14, ph: [1.8, 0.9, 2.4] },
+    } },
+
+  /* ---- THE ITALIAN RIVIERA (73-76) --------------------------------------
+   * Alassio, Liguria, asked for with a photograph out of a shuttered window
+   * over the old town and a render of a street circuit cut through it.
+   *
+   * Four worlds because the town has four distinct kinds of road and mixing
+   * them into one lap would waste all of them:
+   *   the seafront    long, open, fast, sea on your shoulder
+   *   the budello     the famous lane — one car wide, walls both sides
+   *   the harbour     stop-start around the moorings
+   *   the capo        the headland climb, hairpin on hairpin
+   * All four run SEALED on `riviera`, and every one of them borrows a route
+   * shape that already exists rather than inventing a fifth.
+   * ---------------------------------------------------------------------- */
+
+  { id: 73, name: 'ALASSIO SEAFRONT', theme: 'riviera', region: 'RIVIERA',
+    cost: 46, fresh: true, route: 'corniche',
+    // THE POSTCARD, and the introduction. `corniche` is the coast-road shape:
+    // long open sweeps with the water on one side, which is exactly the
+    // four-kilometre arc of sand the town is built along. Nothing technical —
+    // this world exists to establish the place.
+    tune: {
+      // the bay is the content, so the town thins out and the view opens
+      hutCount: 20, treeCount: 380,
+      elev: { amp: 7, ph: [0.4, 1.2, 2.0] },
+    } },
+
+  { id: 74, name: 'IL BUDELLO', theme: 'riviera', region: 'RIVIERA',
+    cost: 47, fresh: true, route: 'monaco',
+    // THE LANE. Alassio's budello — "the gut" — is a straight kilometre of
+    // shopfront barely wide enough for a car, and `monaco` is the roster's
+    // street shape: barriers close, corners slow, no run-off anywhere.
+    //
+    // The houses are the walls, so the hut count goes UP and the trees nearly
+    // vanish: on this lap there is no verge for anything to grow in.
+    tune: {
+      // IL BUDELLO IS A LANE (r240). "The gut" is one car wide with four
+      // storeys either side of it, and everything below follows from that one
+      // fact rather than from any building being redesigned again:
+      //
+      //   roadWidth 0.55  a 9 u half-width is a dual carriageway. At 0.55 the
+      //                   carriageway is 10 u across, which is a lane — AND it
+      //                   is what lets the terrace stand on the kerb at all,
+      //                   because the frontage refuses any block whose face is
+      //                   inside `widthAt + 1.6`. On a wide road every block
+      //                   was silently REJECTED, which is why the street wall
+      //                   came out sparse and one-sided.
+      //   lateral 9.6     block centres 9.6 u out with a 7 u depth puts the
+      //                   facade 6.1 u from the middle of a 5 u half-road —
+      //                   a metre of pavement, which is what a budello has.
+      //   height 17       tall enough to ENCLOSE. This is the number that
+      //                   turns a road with houses beside it into a street.
+      roadWidth: 0.55,
+      frontage: {
+        lateral: 9.6, depth: 7.0, unit: 6.4, height: 17.0, run: [10, 20], rows: 6,
+        bayset: 'liguria',
+        // THE HOUSES ARE HALF-TIMBERED NOW (r242), which is what the second
+        // reference is actually about. Everything here serves that:
+        //   tints    warm rust, brick red, tan and cream — the INFILL between
+        //            the beams, not the whole wall. The grey taupe of r241 was
+        //            read from the first image's shadowed side and it kills a
+        //            timbered facade, which needs the panel to be lighter than
+        //            the frame or the pattern vanishes.
+        //   timber   the frame itself: oiled oak, near-black at distance.
+        //   boxes    a flower box under nearly every upper window — most of the
+        //            colour in that street comes from them.
+        // TINTS MULTIPLY THE WHOLE FACE, so they are the INFILL colour and they
+        // have to stay LIGHT. The first cut used the reference's rust and
+        // brick reds here and the result was dark-on-dark: a near-black timber
+        // frame over a dark red panel, with the pattern invisible. On a
+        // timbered building the panel is limewash and the frame is the dark
+        // thing — the contrast IS the style, so the reds live in the ROOFS and
+        // the deepest tint here is still lighter than the beams.
+        tints: ['#f6e8c6', '#f0d9ac', '#e8c795', '#faf0d8', '#eccfa4',
+          '#e3bd8c', '#f2e2be', '#dcb684'],
+        roof: 0xb5563a,
+        face: { render: '#f2e6d0', plinth: '#8a7259', trim: '#fbf3e2',
+          // GLASS CATCHES THE SKY. #232830 is a hole in the wall, and fifteen
+          // holes is a third of the face reading as void; a cool blue-grey
+          // reads as a lit pane at the same value and lifts the whole terrace.
+          frame: '#4a3323', shutter: '#7a3f2a', pane: '#3d4a5c',
+          timber: { beam: '#6b4630' },
+          boxes: { wood: '#6b4630', blooms: ['#c8402f', '#e0644a', '#d8869a', '#f0e2d0'] } },
+      },
+      // A STREET HAS NO COUNTRYSIDE IN IT. Rocks, scrub, tufts and wildflowers
+      // between the kerb and the wall are what kept reading as "road through a
+      // field" no matter what the buildings did.
+      rockCount: 0, pebbleCount: 0, bushCount: 0, tuftCount: 0, flowerCount: 0,
+      hutCount: 8, hutZone: [0, 1], treeCount: 26,
+      // paved to the building line, and the street itself is setts with a
+      // tram line in it — see TOWN_ROAD
+      road: {
+        base: '#8e8a82', mottleA: [128, 124, 116], mottleB: [176, 172, 163],
+        rut: 'rgba(70,68,63,0.32)', rutCore: 'rgba(52,50,46,0.3)', tread: 'rgba(30,29,26,0.3)',
+        stoneA: 'rgba(206,202,192,0.5)', stoneB: 'rgba(84,81,76,0.55)',
+        fringe: [150, 146, 136], fringeVar: [26, 25, 22],
+        ruts: false,
+        cobbles: {
+          stones: ['#c9c5bc', '#b6b1a7', '#d2ccc0', '#a9a49b', '#c3bcc2', '#dad4c8',
+            '#b0aca6', '#cfc8b8'],
+          mortar: 'rgba(96,92,85,0.85)', lip: 'rgba(255,252,244,0.2)',
+          rows: 20, per: 26,
+        },
+        rails: { gauge: 3.4 },
+      },
+      terrainLow: '#6b6a62', terrainHigh: '#8e8b80', terrainDirt: '#7c7970',
+      terrainScree: '#9a978c', skirtColor: '#8a8880',
+      ground: {
+        base: '#84817a',
+        bandLight: 'rgba(240,238,230,0.06)', bandDark: 'rgba(40,38,34,0.10)',
+        patchA: 'rgba(120,118,110,0.26)', patchB: 'rgba(158,154,144,0.20)',
+        speckA: 'rgba(60,58,54,0.7)', speckB: 'rgba(196,192,182,0.7)', speckCount: 150,
+      },
+      bushCount: 120, rockCount: 90,
+      // SUN DOWN THE STREET. Shade between four-storey terraces was true and
+      // wrong: the reference is a bright street, and at 0.7 hemi the whole
+      // frame went to mud once the buildings grew to 17 u and started
+      // shadowing each other. The bounce off pale render is what lights a
+      // street like this, so the ambient carries it rather than the key.
+      hemiIntensity: 1.15, sunIntensity: 2.7,
+      elev: { amp: 5, ph: [1.1, 2.4, 0.6] },
+    } },
+
+  { id: 75, name: 'PORTO MOLO', theme: 'riviera', region: 'RIVIERA',
+    cost: 48, fresh: true, route: 'marina',
+    // THE HARBOUR. `marina` runs the quays, which is stop-start by nature —
+    // and the one lap on the coast where the sea is on BOTH sides of you.
+    tune: {
+      hutCount: 18, treeCount: 300,
+      flowerCount: 180,
+      elev: { amp: 4, ph: [2.2, 0.5, 1.7] },
+    } },
+
+  { id: 76, name: 'CAPO MELE', theme: 'riviera', region: 'RIVIERA',
+    cost: 49, fresh: true, route: 'turini',
+    // THE HEADLAND, and the hard one. Capo Mele is the cape at the east end of
+    // the bay and the road over it stacks hairpins the whole way up; `turini`
+    // is the roster's hairpin ladder. The render sent with the report is this
+    // world — a street circuit climbing away from the sea between buildings.
+    //
+    // Up here the town has run out and the terraces take over, so the houses
+    // thin and the olives come back.
+    tune: {
+      hutCount: 26, hutZone: [0.1, 0.5], treeCount: 620,
+      // above the haze, and looking down on it
+      fogNear: 460, fogFar: 2100, hemiIntensity: 0.92,
+      // `profile: 'ascent'` IS HAND-SHAPED AND REQUIRES `keys` — it reads
+      // E.keys directly (see the ascent branch in the elevation builder), so
+      // an ascent without them throws "reading 'length'" at world build and
+      // the level never appears. The sine form (amp + ph) is the one that
+      // works without a key list; the other three Riviera worlds use it.
+      //
+      // The shape is the cape itself: out of the town at sea level, a hard
+      // climb over the headland peaking just past half distance, then the
+      // drop back down the far side to the water.
+      elev: {
+        amp: 42, profile: 'ascent', ph: [0, 0, 0],
+        keys: [[0, 0], [0.08, 2], [0.18, 11], [0.29, 22], [0.38, 30],
+          [0.47, 37], [0.55, 42], [0.62, 40], [0.71, 31], [0.8, 19],
+          [0.89, 8], [0.96, 1], [1, 0]],
+      },
+    } },
+
+  { id: 77, name: 'GENOVA PORTO', theme: 'genova', region: 'RIVIERA',
+    cost: 50, fresh: true, route: 'panorama',
+    // THE CITY. `panorama` is the roster's flat-then-mountain shape, which is
+    // Genova exactly: a long fast run along the docks and then straight up
+    // into the hills the city is stacked on. The most built-up world on the
+    // roster — corner blocks at every junction and 108 buildings on the lap.
+    tune: {
+      hutCount: 118,
+      elev: { amp: 30, ph: [0.6, 1.9, 2.8] },
+    } },
+
+  { id: 78, name: 'SANREMO STAGE', theme: 'sanremo', region: 'RIVIERA',
+    cost: 51, fresh: true, route: 'corse',
+    // THE RALLY. Sanremo's stages run in the mountains BEHIND the town, not
+    // along the front, and `corse` is the roster's tight unforgiving mountain
+    // lap. The one world in this chapter with no sea in it at all — which is
+    // the point of including it.
+    tune: {
+      treeCount: 880, rockCount: 720,
+      elev: { amp: 26, ph: [1.4, 0.7, 2.2] },
     } }
 ];
 
@@ -740,6 +925,8 @@ export const CHAPTERS = [
     blurb: 'Narrows, col and gorge. The hardest driving on the roster.' },
   { n: 12, from: 68, name: 'AUTUMN',
     blurb: 'The season turns: gold woodland, harvest country, russet moor.' },
+  { n: 13, from: 73, name: 'THE ITALIAN RIVIERA',
+    blurb: 'Alassio: the seafront, the budello, the harbour and the cape.' },
 ];
 
 /** Career-order index ranges per chapter, derived once from `from`.
@@ -813,6 +1000,10 @@ const SCENERY = {
   // FILTER_GROUPS), which is what lets "autumn coast" ever mean something.
   autumnwood: ['FOREST'], harvestvale: ['FARMLAND'], mistfell: ['MOUNTAIN'],
   medterrace: ['COAST', 'FARMLAND'], olivecountry: ['COAST', 'FARMLAND'],
+  // a seaside TOWN: coast and buildings, not coast and farmland
+  riviera: ['COAST', 'CITY'],
+  genova: ['COAST', 'CITY'],            // a port city — the most urban on the roster
+  sanremo: ['MOUNTAIN', 'FOREST'],      // the rally runs BEHIND the coast, not on it
   harbor: ['COAST'], liguria: ['COAST'], aegean: ['COAST'], brava: ['COAST'],
   dalmatia: ['COAST'], azur: ['COAST'],
   mountainsea: ['COAST', 'MOUNTAIN'],
@@ -871,6 +1062,12 @@ const SURFACE_BY_THEME = {
   // sealed, which is right — they are real circuits that happen to sit on
   // these themes.
   medterrace: LOOSE, vineyard: LOOSE, olivecountry: LOOSE,
+  genova: SEALED, sanremo: SEALED,
+  // RIVIERA IS THE EXCEPTION and stays SEALED. The other three are farm and
+  // olive-grove lanes; this is a seafront promenade and a town's own streets,
+  // which are tarmac in a way an olive terrace never is. It also gives the
+  // ROAD tyre a home — 40 SEALED / 16 LOOSE was already the roster's balance
+  // problem, but a street circuit racing on gravel would be a worse lie.
   // loose: rally stages, dirt, sand, forest track, farm lane
   forest: LOOSE, desert: LOOSE, dunes: LOOSE, oasis: LOOSE, redwood: LOOSE,
   flume: LOOSE, wildfire: LOOSE, jungle: LOOSE, savanna: LOOSE,
@@ -2757,6 +2954,7 @@ const THEMES = {
     sunColor: 0x8a9aff, sunIntensity: 2.0,               // cold moonlight
     skyTop: '#16162a', skyHorizon: '#5c2a86', sunGlow: 0xff40c0, skyCurve: 0.8,
     sunAz: 0.6, sunEl: 0.5, sunSprite: false, stars: true,
+    night: true,                                        // headlights on, tape on the props
     hazeColor: 0xb93ee8, hazeOpacity: 0.4,              // city glow ringing the horizon
     cloudCount: 0, cloudOpacity: 0,
     terrainLow: '#32324a', terrainHigh: '#4a4a66', terrainDirt: '#483c66',
@@ -2840,6 +3038,7 @@ const THEMES = {
     // so roughly half the screen stayed at zero however bright the road got.
     skyTop: '#222c1e', skyHorizon: '#3e4a2e', sunGlow: 0x9aa858, skyCurve: 0.8,
     sunAz: 0.4, sunEl: 0.6, sunSprite: false,
+    night: true,
     hazeColor: 0x4a5436, hazeOpacity: 0.32,
     cloudCount: 0, cloudOpacity: 0,
     terrainLow: '#4e5442', terrainHigh: '#6e745c', terrainDirt: '#5e4e36',
@@ -3620,6 +3819,7 @@ const THEMES = {
     // and raking, so the frontage on one side is lit and the other is in
     // silhouette — the "extreme local contrast" the region is graded for.
     sunColor: 0xffb45e, sunIntensity: 2.3,
+    night: true,                                        // sodium street, but still a night
     // skyCurve WELL ABOVE 1 on purpose: `mix(horizon, top, pow(smoothstep, curve))`
     // means a high exponent holds the horizon colour — which IS the fog colour —
     // far up the dome, so the roofline meets a sky of its own fog value and the
@@ -4337,6 +4537,212 @@ THEMES.olivecountry = { ...THEMES.medterrace, coast: undefined, quay: false,
   fogColor: 0xc4d2d6, fogNear: 520, fogFar: 2200,
   hillColor: 0x7c8a58, peakColor: 0x9aa886,
   treeCount: Math.round((THEMES.medterrace.treeCount ?? 500) * 1.35) };
+// ---------------------------------------------------------------------------
+// RIVIERA — ALASSIO, LIGURIA. Asked for with a photograph taken from a shuttered
+// window over the old town, and a render of a street circuit cut through it.
+//
+// What makes that coast look like itself, in the order it matters from a car:
+//   1. THE PAINT. Ligurian terraces are ochre, apricot, rose and cream with
+//      dark green shutters — not the bleached limestone `medterrace` is built
+//      from. That palette is the single biggest tell and it costs one line.
+//   2. THE BAY. Alassio is a four-kilometre arc of sand: the sea is wide, near
+//      and calm, and it is on your shoulder for most of a lap rather than
+//      glimpsed at the top of a climb.
+//   3. THE AIR IS SOFTER. The reference photo is hazy and overcast-bright, not
+//      the hard high sun of the olive terraces — a lower, warmer key and more
+//      haze, which also keeps the pastel walls from blowing out.
+//   4. IT IS A TOWN, not a hamlet. Houses run the length of the front and pile
+//      up the hill behind it, so the hut count triples and its zone covers most
+//      of the lap instead of one ridge shoulder.
+// Everything else — olive hills, pantile roofs, cypress, the sea machinery —
+// `medterrace` already has right, which is why this is a derive and not a
+// fourth copy of a 60-line theme.
+THEMES.riviera = {
+  ...THEMES.medterrace,
+  // softer, damper air off a big bay; the sun sits lower and further round so
+  // the seafront run is side-lit rather than flattened from overhead
+  fogColor: 0xd6dfe4, fogNear: 340, fogFar: 1720,
+  hemiSky: 0xc8dcf0, hemiGround: 0xb0a894, hemiIntensity: 0.86,
+  sunColor: 0xfff2dc, sunIntensity: 2.6,
+  skyTop: '#3f8ed6', skyHorizon: '#d4e2e8', sunGlow: 0xfff0d8,
+  sunAz: 3.95, sunEl: 0.82,
+  cloudCount: 9, cloudOpacity: 0.6, cloudTint: 0xfffaf0,
+  hazeColor: 0xdde6e8, hazeOpacity: 0.9,
+  // sand, not limestone dust: the beach is the ground colour here
+  terrainLow: '#8a9159', terrainHigh: '#d8c9a4', terrainDirt: '#c2ad82',
+  terrainScree: '#e0d6bc', skirtColor: '#cfc3a4',
+  ground: {
+    ...THEMES.medterrace.ground,
+    base: '#cdbe9c',
+    patchB: 'rgba(232,222,196,0.24)',
+    speckB: 'rgba(240,232,212,0.85)',
+  },
+  hillColor: 0x87905c, peakColor: 0xc6bfa4,
+  // THE PASTELS. `splinter` is what flies off a wall when you hit it, so it is
+  // also the most direct statement of what the walls are made of.
+  splinter: [0xe8c88a, 0xd9866a, 0x3f5f46],
+  hutRoof: 0xb85a30,
+  hutCount: 64, hutZone: [0.05, 0.86],
+  hayCount: 6,
+  // cypress up, olive down: on the front it is palms and pines, and the
+  // cypress silhouette is what says "this coast" from a moving car
+  treeCount: 430,
+  flowerCount: 300,
+  flowerColors: ['#f2f0e4', '#d4453c', '#e07a2c', '#b76fb0'],
+  // an onshore breeze carries sea haze, not verge dust
+  weather: { type: 'dust', color: 0xe4ded0, rate: 16 },
+  quay: true,
+
+  // ---- THE BUILDINGS, WHICH ARE THE WHOLE POINT --------------------------
+  // Reported as "make sure it's matching my reference — meaning new buildings
+  // needs to be designed", with a photograph out of a shuttered window in
+  // Alassio. They were wrong, and the reason is one inherited word: deriving
+  // from `medterrace` also inherited `elements: 'medhill'`, which is the
+  // generic Mediterranean HILL kit — squat farm houses on an olive terrace.
+  // Alassio is not a hill village. It is four and five storeys of painted
+  // render standing shoulder to shoulder along a seafront.
+  //
+  // The kit that draws that already exists: `liguria` builds TOWERHOUSE twice
+  // out of every four — the tall narrow terrace house with a shutter band per
+  // floor, a first-floor balcony on iron balusters, a downpipe and a pantile
+  // roof. Nothing needed designing; it needed POINTING AT.
+  elements: 'alassio',
+  hutGlow: 0.12,
+  seaColor: 0x2f7fa8,
+  // ...and its own paint. `frontage` is the painted face the town presents to
+  // the road, which is what you actually drive past in the budello. Alassio
+  // sits a shade softer and pinker than Cinque Terre's saturated coral — more
+  // apricot and rose, more cream between them — and the shutters are the dark
+  // green of the reference photograph, on both the frame and the louvre.
+  // THE PROPORTION IS THE DESIGN (r239). The frontage was inheriting the
+  // default street: two-storey market-town units, seven metres tall. The
+  // reference sheets are FOUR AND FIVE STOREYS OF THREE BAYS, and that ratio —
+  // tall, narrow, many windows — is what the eye reads from a car long before
+  // any moulding does. It is why three passes of detailing the models did not
+  // move it: the units were the wrong SHAPE and there were not enough windows
+  // in them.
+  //
+  // `bayset: 'liguria'` (see townhouseBays) is the window grid; `height` and
+  // `unit` are the block it is painted on. 14 u over a 7.2 u unit is very
+  // nearly 2:1, which is the sheet's own proportion.
+  frontage: {
+    lateral: 15.0, depth: 8.5, unit: 7.2, height: 14.0, run: [6, 12], rows: 5,
+    bayset: 'liguria',
+    tints: ['#f0d98a', '#e8b45c', '#e8a2a6', '#c4655a', '#f4e6cc', '#bccbb0', '#e2ac7c'],
+    roof: 0xb85a30,
+    face: { render: '#ecd79b', plinth: '#cfc3a4', trim: '#f6efdd',
+      frame: '#2b2b26', shutter: '#3d6b47', pane: '#1b2028' },
+  },
+};
+
+// GENOVA — the port city. Same coast, opposite character: `riviera` is a
+// resort in the sun and this is a working harbour under it. Denser, dirtier,
+// redder, and the light is bounced back off stone rather than off sand.
+// PAVING, NOT BEACH (r240). `riviera` inherits its ground from `medterrace`,
+// which is limestone dust and maquis — correct for an olive terrace and wrong
+// for anything with a kerb on it. The two town worlds get worn stone instead,
+// and it matters more than any building detail: the ground is most of the
+// frame from a chase camera, and a sand-coloured one puts the town in a desert.
+// THE STREET SURFACE, from the reference image (r241). It is ~40% of that
+// frame and it was the biggest single thing still wrong: mine was speckle
+// noise on grey, and theirs is LARGE irregular setts in pale greys, beiges
+// and a faint lilac, with a tram line bedded in tan running down it.
+//
+// `rows`/`per` set the sett SIZE: 22 u of road across 26 stones is ~0.85 u
+// each — roughly a dinner plate, which is what the reference shows and about
+// twice the Tremola hand-laid sett.
+const TOWN_ROAD = {
+  base: '#8e8a82', mottleA: [128, 124, 116], mottleB: [176, 172, 163],
+  rut: 'rgba(70,68,63,0.32)', rutCore: 'rgba(52,50,46,0.3)', tread: 'rgba(30,29,26,0.3)',
+  stoneA: 'rgba(206,202,192,0.5)', stoneB: 'rgba(84,81,76,0.55)',
+  fringe: [150, 146, 136], fringeVar: [26, 25, 22],
+  ruts: false,                       // setts do not rut
+  cobbles: {
+    stones: ['#c9c5bc', '#b6b1a7', '#d2ccc0', '#a9a49b', '#c3bcc2', '#dad4c8',
+      '#b0aca6', '#cfc8b8'],
+    mortar: 'rgba(96,92,85,0.85)', lip: 'rgba(255,252,244,0.2)',
+    rows: 20, per: 26,               // ~0.85 u setts, twice Tremola's
+  },
+  rails: { gauge: 3.4 },
+};
+
+const TOWN_GROUND = {
+  terrainLow: '#6b6a62', terrainHigh: '#8e8b80', terrainDirt: '#7c7970',
+  terrainScree: '#9a978c', skirtColor: '#8a8880',
+  ground: {
+    base: '#84817a',                                   // worn paving
+    bandLight: 'rgba(240,238,230,0.06)', bandDark: 'rgba(40,38,34,0.10)',
+    patchA: 'rgba(120,118,110,0.26)',                  // patched asphalt
+    patchB: 'rgba(158,154,144,0.20)',                  // swept stone
+    speckA: 'rgba(60,58,54,0.7)', speckB: 'rgba(196,192,182,0.7)', speckCount: 150,
+  },
+};
+
+THEMES.genova = {
+  ...THEMES.riviera,
+  ...TOWN_GROUND,
+  road: TOWN_ROAD,
+  elements: 'genova',
+  // same as the budello: a city is its street walls, not a scatter — and a
+  // caruggio is barely wider than the lane at Alassio
+  roadWidth: 0.7,
+  rockCount: 0, pebbleCount: 0, bushCount: 30, tuftCount: 0, flowerCount: 0,
+  hutCount: 10, hutZone: [0, 1],
+  treeCount: 190, bushCount: 200, flowerCount: 120,
+  // a city ground: worn stone and asphalt, not beach sand
+  terrainLow: '#6e6a56', terrainHigh: '#9a9182', terrainDirt: '#87806f',
+  terrainScree: '#a9a294', skirtColor: '#9c9486',
+  ground: { ...THEMES.riviera.ground, base: '#8e877a',
+    patchA: 'rgba(120,112,96,0.24)', patchB: 'rgba(168,160,144,0.2)' },
+  hillColor: 0x74795a, peakColor: 0x9a9a86,
+  // harbour air: warmer haze, shorter view, and a lower sun off the water
+  fogColor: 0xcfd2cc, fogNear: 260, fogFar: 1350,
+  hemiIntensity: 0.8, sunIntensity: 2.35, sunEl: 0.7,
+  skyTop: '#3a7fb8', skyHorizon: '#cdd6d4',
+  splinter: [0xc86a4a, 0xb8ac96, 0x35583c],
+  hutRoof: 0x9c4628,
+  frontage: {
+    tints: ['#c86a4a', '#b2543c', '#d08a56', '#9e4a34', '#c4926a', '#d9a878'],
+    roof: 0x9c4628,
+    face: { render: '#d9b894', plinth: '#8e8272', trim: '#e8d6bc',
+      frame: '#35583c', shutter: '#35583c' },
+  },
+};
+
+// SANREMO — the mountains BEHIND the coast, which is where the rally actually
+// runs. The sea is gone, the town thins to hinterland houses under green
+// slate, and the air is the thin cool air of altitude rather than sea haze.
+THEMES.sanremo = {
+  ...THEMES.riviera,
+  elements: 'sanremo',
+  coast: undefined, quay: false,
+  hutCount: 30, hutZone: [0.2, 0.55],
+  treeCount: 780, bushCount: 520, rockCount: 640, flowerCount: 260,
+  // COLD LIGHT AT HEIGHT. The riviera key is a warm 2.6 at 47 degrees; up here
+  // it is whiter, harder and higher, and the ground is limestone and maquis
+  // rather than sand — this world must not read as the seafront with hills
+  // pasted behind it.
+  sunColor: 0xfff6e8, sunIntensity: 2.75, sunEl: 1.02, sunAz: 4.3,
+  hemiSky: 0xb6d4f4, hemiGround: 0x7a7a5c, hemiIntensity: 0.78,
+  skyTop: '#2a74cc', skyHorizon: '#c4d6dc',
+  fogColor: 0xc2d0d4, fogNear: 520, fogFar: 2300,
+  hazeColor: 0xccdadc, hazeOpacity: 0.6,
+  terrainLow: '#6c7a44', terrainHigh: '#a99c78', terrainDirt: '#94855f',
+  terrainScree: '#c0b79c', skirtColor: '#b2a888',
+  ground: { ...THEMES.riviera.ground, base: '#9e9670',
+    patchA: 'rgba(122,132,78,0.26)', patchB: 'rgba(196,186,156,0.2)' },
+  hillColor: 0x76804e, peakColor: 0xb4ac90,
+  splinter: [0xdcd2ba, 0xa8a294, 0x5c6f58],
+  hutRoof: 0x5c6f58,
+  weather: { type: 'dust', color: 0xd0c8ac, rate: 22 },
+  frontage: {
+    tints: ['#dcd2ba', '#c8bda2', '#e4dcc6', '#d0bb98', '#bfae90'],
+    roof: 0x5c6f58,
+    face: { render: '#e0d6bf', plinth: '#9c9484', trim: '#efe6d2',
+      frame: '#4a6b4a', shutter: '#4a6b4a' },
+  },
+};
+
 THEMES.mountainsea = {
   ...THEMES.dalmatia,
   // The sea sits BELOW the road's lowest point, not at the harbour's default.
@@ -4547,6 +4953,10 @@ const PROP_SPECS = {
   // OLIVE COAST: the Bible's roadside kit is blue plastic harvest crates,
   // rolled olive nets (the hay rolls) and stones off the terrace walls
   medterrace: [['crate', 20], ['hay', 14], ['cone', 12], ['rock', 8]],
+  // street furniture, not farm clutter: barriers and cones down a closed town
+  riviera: [['cone', 26], ['crate', 16], ['rock', 6]],
+  genova: [['cone', 30], ['crate', 26], ['barrel', 14]],   // a working dock
+  sanremo: [['rock', 30], ['cone', 14], ['hay', 8]],       // a mountain stage
   // OLD TOWN: market stall crates packed away at the kerb, street-works cones
   // and steel drums. No rocks and no hay — the region's negative list rules
   // out gravel, dirt and anything that is not architectural.
@@ -4615,6 +5025,76 @@ const BARREL_PALETTES = {
  *
  * `r` is the collider radius the car pushes off, and `mat` its solidity class.
  */
+/* ---- LIGURIAN DETAIL KIT (r237) ------------------------------------------
+ *
+ * "Make it high poly." The buildings were boxes with flat rectangles painted
+ * on for windows, which is exactly what reads as low-poly from a car: a facade
+ * with no DEPTH is a texture, and this engine has no normal maps to fake one.
+ *
+ * WHY THIS IS AFFORDABLE, measured before a triangle was added: every building
+ * part in the game lands in one of five InstancedMeshes (`element-wall`,
+ * `-box`, `-cyl`, `-cone`, `-prism`), so adding parts to a template costs
+ * INSTANCES and never DRAW CALLS. IL BUDELLO drew 326k triangles across 313
+ * calls with 96 buildings; a box is 12 triangles, so forty more parts per
+ * building is ~46k triangles and zero extra calls. Depth is the cheap axis
+ * here — it is silhouette and self-shadowing that sell it, not resolution.
+ *
+ * These helpers exist so the templates stay READABLE at this detail level.
+ * Written as functions rather than inlined arrays because a window is the same
+ * assembly eighty times over, and eighty hand-written copies is where the
+ * transcription errors live.
+ */
+// One opening, built as a real hole would be: a recessed pane, a reveal that
+// casts into it, a projecting sill, a lintel over, and a shutter leaf hinged
+// either side. Six parts and every one of them catches its own shadow.
+const ligWin = (x, y, z, w = 1.0, h = 1.45, o = {}) => {
+  const d = o.d ?? 0.14;          // how far the frame stands off the wall
+  const sw = w * 0.55;            // a leaf is a little over half the opening
+  const out = [
+    ['box', x, y, z + d * 0.35, w, h, d * 0.5, o.glass ?? 'wall2'],   // recessed pane
+    ['box', x - w / 2 - 0.07, y, z + d, 0.14, h + 0.1, d, 'trim'],    // reveal, left
+    ['box', x + w / 2 + 0.07, y, z + d, 0.14, h + 0.1, d, 'trim'],    // reveal, right
+    ['box', x, y + h / 2 + 0.07, z + d, w + 0.36, 0.14, d * 1.2, 'trim'],  // lintel
+    ['box', x, y - h / 2 - 0.06, z + d + 0.04, w + 0.44, 0.12, d * 1.8, 'trim'], // sill
+  ];
+  if (o.shutters !== false) {
+    out.push(['box', x - w / 2 - 0.09 - sw / 2, y, z + d + 0.05, sw, h, 0.07, 'trim']);
+    out.push(['box', x + w / 2 + 0.09 + sw / 2, y, z + d + 0.05, sw, h, 0.07, 'trim']);
+  }
+  return out;
+};
+// Wrought iron, as the sheets draw it: a slab, a run of balusters and a rail.
+// The balusters are where the triangles go and they are worth it — a railing
+// is the one thing on a facade you see THROUGH, so a solid box reads as a wall.
+const ligRail = (x, y, z, span, n = 7, mat = 'trim') => {
+  const out = [['box', x, y, z, span, 0.14, 0.66, mat]];
+  for (let i = 0; i < n; i++) {
+    const bx = x - span / 2 + 0.18 + (i * (span - 0.36)) / (n - 1);
+    out.push(['cyl', bx, y + 0.07, z + 0.2, 0.075, 0.78, 0.075, mat]);
+  }
+  out.push(['box', x, y + 0.85, z + 0.2, span, 0.1, 0.14, mat]);
+  return out;
+};
+// A cornice is a PROFILE, not an edge: three courses stepping out, which is
+// what gives the top of a facade its shadow line from below.
+const ligCornice = (y, w, dp, mat = 'trim') => [
+  ['box', 0, y, 0, w + 0.18, 0.13, dp + 0.18, mat],
+  ['box', 0, y + 0.13, 0, w + 0.42, 0.16, dp + 0.42, mat],
+  ['box', 0, y + 0.29, 0, w + 0.3, 0.12, dp + 0.3, mat],
+];
+// Terracotta courses over the prism, so a roof has steps in it rather than
+// being one smooth wedge.
+const ligTiles = (y, w, dp, n = 3, mat = 'roof') => Array.from({ length: n }, (_, i) => [
+  'box', 0, y + 0.12 + i * 0.34, 0, w - i * 0.5, 0.1, dp - i * 0.5, mat]);
+// A chimney with a cap and two pots — the Ligurian roofline detail from the
+// sheet, and the thing that breaks a flat ridge against the sky.
+const ligChimney = (x, y, z, h = 1.8) => [
+  ['box', x, y, z, 0.62, h, 0.62, 'stone'],
+  ['box', x, y + h, z, 0.86, 0.16, 0.86, 'trim'],
+  ['cyl', x - 0.16, y + h + 0.16, z, 0.24, 0.42, 0.24, 'roof'],
+  ['cyl', x + 0.16, y + h + 0.16, z, 0.24, 0.42, 0.24, 'roof'],
+];
+
 export const HOUSE_TEMPLATES = {
   // ---- THE MEDITERRANEAN COASTS ----
   // Four archetypes that are genuinely different SHAPES, not the farmhouse
@@ -4653,6 +5133,190 @@ export const HOUSE_TEMPLATES = {
     ['cyl', -1.7, 14.7, 0, 0.26, 0.5, 0.26, 'roof'],
     ['box', 0, 13.35, 0, 6.4, 0.22, 0.5, 'trim'],            // ridge cap
   ] },
+  // ---- THE LIGURIAN MODULE SET ------------------------------------------
+  // Built from the village-builder sheets, which name the archetypes and are
+  // specific about what separates them. The first cut here (a "palazzina" and
+  // a "shopfront") was a guess at a Ligurian building; these are the four the
+  // sheets actually draw, and the differences between them are the point —
+  // one of each on a street reads as a town, four of one reads as a texture.
+  //
+  //   SINGLE SLENDER    very tall on a very small footprint, no balconies, a
+  //                     strict grid of shuttered openings. The tallest thing
+  //                     in a Ligurian street and the narrowest.
+  //   TWIN-CONNECTED    two bays sharing a party wall at DIFFERENT heights and
+  //                     DIFFERENT colours. The height step is the whole tell —
+  //                     without it, it is one fat building.
+  //   CORNER            the terracotta block that turns a junction: chamfered
+  //                     corner, shop arcade under awnings, heavy cornice.
+  //   HINTERLAND        the rural house behind the coast: low, wide, stone
+  //                     base, GREEN SLATE roof rather than pantile.
+  //
+  // Colour comes from the kit palette per building; what is modelled here is
+  // the SHAPE, because at speed the silhouette is all that survives.
+
+  // SINGLE SLENDER HOUSE — six storeys, 4.6 u wide. The proportion is the
+  // design: nothing about the detailing says "Liguria" as loudly as a building
+  // three times taller than it is wide.
+  ligSlender: { r: 3.6, parts: [
+    ['box', 0, 0, 0, 5.0, 0.4, 4.6, 'stone'],                // plinth
+    ['box', 0, 0.4, 0, 4.9, 0.5, 4.5, 'trim'],               // plinth moulding
+    ['wall', 0, 0.4, 0, 4.6, 16.4, 4.2, 'wall'],             // the shaft
+    // GROUND FLOOR: a recessed doorway with its own surround and a step, not
+    // a flat panel. The door is the only opening you ever see up close.
+    ['box', 0, 0.4, 1.95, 1.5, 2.6, 0.18, 'stone'],          // reveal
+    ['box', 0, 0.5, 2.06, 1.24, 2.4, 0.12, 'trim'],          // leaf
+    ['box', 0, 3.0, 2.14, 1.9, 0.18, 0.3, 'trim'],           // door hood
+    ['box', 0, 0.28, 2.2, 1.8, 0.16, 0.6, 'stone'],          // step
+    ...ligWin(-1.5, 1.5, 2.1, 0.95, 1.3, { shutters: false }),
+    // FIVE FLOORS OF A STRICT GRID, each opening a full assembly: pane,
+    // reveals, lintel, sill and two shutter leaves.
+    ...[3.9, 6.4, 8.9, 11.4, 13.9].flatMap((y, i) => [
+      ...ligWin(-1.15, y, 2.1),
+      ...ligWin(1.15, y, 2.1),
+      // string course between floors — the horizontal that makes a tall
+      // facade read as STOREYS rather than as one painted slab
+      ['box', 0, y - 1.05, 2.14, 4.7, 0.12, 0.16, 'trim'],
+      // one balcony, on the first floor only, as the sheet draws it
+      ...(i === 0 ? ligRail(0, y - 0.86, 2.34, 3.4, 8) : []),
+    ]),
+    // side elevation gets openings too: at 4.6 u wide this building is seen
+    // end-on down a narrow lane as often as face-on
+    ...[6.4, 11.4].flatMap((y) => [
+      ['box', -2.32, y, 0.9, 0.12, 1.3, 0.85, 'wall2'],
+      ['box', -2.32, y, -0.9, 0.12, 1.3, 0.85, 'wall2'],
+    ]),
+    ...ligCornice(16.8, 4.6, 4.2),
+    ['prism', 0, 17.1, 0, 5.5, 1.15, 5.1, 'roof'],
+    ...ligTiles(17.1, 5.5, 5.1, 2),
+    ['cyl', 2.05, 0.4, 1.95, 0.09, 16.2, 0.09, 'trim'],      // downpipe
+    ['box', 2.05, 16.7, 0, 0.16, 0.16, 4.2, 'trim'],         // and its gutter
+    ...ligChimney(-1.3, 18.1, 0, 1.6),
+  ] },
+
+  // TWIN-CONNECTED HOUSE — two bays, one four storeys and one five, sharing a
+  // wall. The STEP is modelled, not implied: different heights, different
+  // roofs, one shopfront at the foot of the taller bay.
+  ligTwin: { r: 5.2, parts: [
+    ['box', 0, 0, 0, 9.6, 0.4, 5.0, 'stone'],
+    ['box', 0, 0.4, 0, 9.5, 0.44, 4.9, 'trim'],
+    // --- taller bay, left
+    ['wall', -2.5, 0.4, 0, 4.5, 13.6, 4.6, 'wall'],
+    ...[3.7, 6.5, 9.3, 12.1].flatMap((y) => [
+      ...ligWin(-3.5, y, 2.3, 0.95, 1.35),
+      ...ligWin(-1.5, y, 2.3, 0.95, 1.35),
+      ['box', -2.5, y - 1.15, 2.32, 4.5, 0.11, 0.15, 'trim'],
+    ]),
+    // the shopfront: a recessed glazed front under a fascia and an awning
+    ['box', -2.5, 0.4, 2.18, 4.1, 2.7, 0.14, 'wall2'],
+    ['box', -2.5, 3.2, 2.34, 4.5, 0.42, 0.34, 'trim'],       // fascia board
+    ['box', -2.5, 3.05, 2.72, 4.3, 0.12, 1.0, 'roof'],       // awning
+    ['box', -2.5, 2.6, 3.2, 4.3, 0.6, 0.1, 'roof'],          // its valance
+    ['cyl', -4.4, 0.4, 2.6, 0.1, 2.7, 0.1, 'trim'],          // awning posts
+    ['cyl', -0.6, 0.4, 2.6, 0.1, 2.7, 0.1, 'trim'],
+    ...ligCornice(14.0, 4.5, 4.6),
+    ['prism', -2.5, 14.3, 0, 5.2, 1.1, 5.0, 'roof'],
+    ...ligChimney(-4.0, 15.3, 0, 1.5),
+    // --- shorter bay, right, and a whole storey lower so the party wall shows
+    ['wall', 2.6, 0.4, 0, 4.4, 10.9, 4.5, 'wall2'],
+    ['box', 2.6, 0.4, 2.16, 1.4, 2.5, 0.18, 'trim'],         // its own street door
+    ...[3.7, 6.5, 9.3].flatMap((y) => [
+      ...ligWin(1.6, y, 2.26, 0.9, 1.3),
+      ...ligWin(3.6, y, 2.26, 0.9, 1.3),
+      ['box', 2.6, y - 1.1, 2.28, 4.4, 0.11, 0.15, 'trim'],
+      ...(y === 3.7 ? ligRail(2.6, y - 0.92, 2.5, 3.6, 8) : []),
+    ]),
+    ...ligCornice(11.3, 4.4, 4.5),
+    ['prism', 2.6, 11.6, 0, 5.0, 1.0, 4.9, 'roof'],
+    ...ligChimney(4.0, 12.5, 0, 1.4),
+    // the party wall itself, standing proud of both roofs — the detail that
+    // says TWO HOUSES rather than one wide one
+    ['box', 0.1, 0.4, 0, 0.32, 14.4, 4.7, 'stone'],
+  ] },
+
+  // CORNER BUILDING — the terracotta block from the sheets. Five storeys, a
+  // CHAMFERED corner with its own window stack, a ground-floor arcade, and a
+  // heavy cornice. The chamfer is the whole point: it is what a building does
+  // where two streets meet, and it is the one shape in the set that is not a
+  // rectangle from above.
+  ligCorner: { r: 6.4, parts: [
+    ['box', 0, 0, 0, 11.4, 0.5, 9.4, 'stone'],
+    ['box', 0, 0.5, 0, 11.2, 0.5, 9.2, 'trim'],
+    ['wall', 0, 0.5, 0, 10.8, 15.5, 8.8, 'wall'],
+    // THE ROUNDED CORNER, which is what a building does where two streets meet
+    // and the one shape in the set that is not a rectangle in plan.
+    //
+    // IT IS A CYLINDER, NOT A ROTATED SLAB. The 9th element of a part is
+    // `roll` — a rotation about the FORWARD axis — so using it as a yaw tips
+    // the wall onto its side instead of turning it in plan. There is no
+    // per-part yaw, and a drum needs none: it looks the same from every
+    // approach, which is exactly what a corner has to do.
+    ['cyl', -4.3, 0.5, 3.4, 3.4, 15.5, 3.4, 'wall'],
+    // banding rings pick out each floor around the drum, since flat window
+    // boxes cannot sit on a curve without a yaw to turn them
+    ...[4.2, 7.2, 10.2, 13.2].map((y) => ['cyl', -4.3, y - 1.35, 3.4, 3.6, 0.16, 3.6, 'trim']),
+    ['cyl', -4.3, 16.0, 3.4, 3.9, 0.4, 3.9, 'trim'],         // its own cornice ring
+    ['cone', -4.3, 16.4, 3.4, 3.7, 1.7, 3.7, 'roof'],        // and a turret cap
+    ...[4.2, 7.2, 10.2, 13.2].flatMap((y) => [
+      // the two street elevations
+      ...ligWin(-1.2, y, 4.5, 1.0, 1.5),
+      ...ligWin(1.6, y, 4.5, 1.0, 1.5),
+      ...ligWin(4.2, y, 4.5, 1.0, 1.5),
+      ['box', 1.5, y - 1.3, 4.52, 7.4, 0.13, 0.17, 'trim'],
+      ...(y === 4.2 ? ligRail(1.6, y - 1.05, 4.72, 3.4, 8) : []),
+      ...(y === 4.2 ? ligRail(-1.2, y - 1.05, 4.72, 2.6, 6) : []),
+    ]),
+    // GROUND-FLOOR ARCADE: columns with arch springs between them, glazed
+    // back. Five columns is nine extra parts and it is the difference between
+    // a shop and a painted stripe.
+    ['box', 0, 0.5, 4.1, 10.4, 3.6, 0.2, 'wall2'],           // glazed back
+    ...[-4.6, -2.3, 0, 2.3, 4.6].flatMap((x) => [
+      ['cyl', x, 0.5, 4.55, 0.62, 3.4, 0.62, 'trim'],
+      ['box', x, 3.9, 4.55, 0.86, 0.24, 0.86, 'trim'],       // capital
+      ['box', x, 0.42, 4.55, 0.9, 0.2, 0.9, 'stone'],        // base
+    ]),
+    ['box', 0, 4.14, 4.5, 10.8, 0.5, 0.9, 'trim'],           // arcade entablature
+    ['box', 0, 3.6, 5.1, 10.6, 0.14, 1.2, 'roof'],           // awning over it
+    ...ligCornice(16.0, 10.8, 8.8),
+    // a shallow hipped cap rather than a gable — a corner block is flat-topped
+    ['box', 0, 16.3, 0, 10.4, 0.7, 8.4, 'roof'],
+    ['box', 0, 17.0, 0, 9.6, 0.34, 7.6, 'trim'],             // parapet
+    ...ligChimney(-3.2, 17.3, -2.4, 1.7),
+    ...ligChimney(3.4, 17.3, 1.8, 1.5),
+  ] },
+
+  // HINTERLAND RURAL HOUSE — the green-slate one from the regional sheet, for
+  // the hills behind the coast. Two storeys, wide, stone below and render
+  // above, deep eaves, an outside stair and a lean-to.
+  ligRural: { r: 5.0, parts: [
+    ['box', 0, 0, 0, 9.0, 0.5, 6.6, 'stone'],
+    ['wall', 0, 0.5, 0, 8.4, 3.4, 6.2, 'stone'],             // stone ground floor
+    ['wall', 0, 3.9, 0, 8.2, 3.6, 6.0, 'wall'],              // rendered upper
+    ['box', 0, 3.75, 3.05, 8.6, 0.24, 0.28, 'trim'],         // floor band
+    ['box', -2.6, 0.5, 3.0, 1.5, 2.5, 0.2, 'stone'],         // barn door reveal
+    ['box', -2.6, 0.6, 3.12, 1.24, 2.3, 0.12, 'trim'],       // its leaf
+    ...ligWin(0.8, 1.7, 3.05, 0.95, 1.2),
+    ...ligWin(2.9, 1.7, 3.05, 0.95, 1.2),
+    ...[5.4].flatMap((y) => [
+      ...ligWin(-2.6, y, 3.0, 0.95, 1.25),
+      ...ligWin(0, y, 3.0, 0.95, 1.25),
+      ...ligWin(2.6, y, 3.0, 0.95, 1.25),
+    ]),
+    // THE OUTSIDE STAIR from the sheet — five treads and a rail up the flank,
+    // which is the detail that makes it rural rather than a small townhouse.
+    ...Array.from({ length: 5 }, (_, i) => [
+      'box', -4.5, 0.5 + i * 0.66, 1.6 - i * 0.5, 1.3, 0.2, 0.9, 'stone']),
+    ['cyl', -4.5, 3.6, -0.5, 0.09, 0.95, 0.09, 'trim'],
+    ['cyl', -4.5, 2.0, 1.1, 0.09, 0.95, 0.09, 'trim'],
+    ['box', -4.5, 3.3, 0.3, 0.1, 0.1, 2.6, 'trim'],
+    ...ligCornice(7.5, 8.6, 6.4),
+    // DEEP EAVES AND A SHALLOW SLATE PITCH — a mountain roof, not a coastal one
+    ['prism', 0, 7.86, 0, 9.8, 1.9, 7.4, 'roof'],
+    ...ligTiles(7.86, 9.8, 7.4, 3),
+    ...ligChimney(-2.8, 9.2, -1.4, 1.7),
+    ['box', 0, 0.5, -3.2, 3.0, 2.2, 0.3, 'stone'],           // lean-to at the back
+    ['prism', 0, 2.7, -3.4, 3.4, 0.7, 1.4, 'roof'],          // its roof
+  ] },
+
   // AEGEAN: a whitewashed cube with a parapet instead of eaves, an outside
   // stair, and one painted door.
   cube: { r: 4.6, parts: [
@@ -5245,6 +5909,45 @@ const ELEMENT_KITS = {
     builds: ['towerhouse', 'towerhouse', 'house', 'shed'], landmarks: ['chapel'],
     dress: ['well'], fenceColor: 0xc8bb96, stoneWalls: 6,
   },
+  // ---- THE LIGURIAN DISTRICTS -------------------------------------------
+  // The sheets are organised as DISTRICTS, not as one regional style, and that
+  // is the useful idea: same module set, different weights and different
+  // paint, and three towns on one coast stop looking like one town.
+  //
+  // ALASSIO — Golfo Paradiso pastels. Slender and twin houses along a
+  // seafront, one corner block per junction. Yellow, ochre, pink, cream.
+  alassio: {
+    wall: 0xefc07e, wall2: 0xdba86a, roof: 0xb85a30, trim: 0x3d6b47, stone: 0xd0c0a2,
+    palette: [0xf0d98a, 0xefc07e, 0xe8a2a6, 0xf4e6cc, 0xe2b48c, 0xdd9a72, 0xf2d2b0],
+    roofs: [0xb85a30, 0xa9502c, 0xc46638],
+    builds: ['ligSlender', 'ligTwin', 'ligSlender', 'ligCorner'],
+    landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xd6c8a8, stoneWalls: 4,
+  },
+  // GENOVA — the port city, and the only URBAN entry on this coast. Corner
+  // blocks dominate because a city is made of junctions, the palette drops to
+  // the deep reds and burnt ochres of the caruggi, and the render is dirtier:
+  // this is a working port, not a resort.
+  genova: {
+    wall: 0xc86a4a, wall2: 0xa8543a, roof: 0x9c4628, trim: 0x35583c, stone: 0xb8ac96,
+    palette: [0xc86a4a, 0xb2543c, 0xd08a56, 0x9e4a34, 0xc4926a, 0xa8603e, 0xd9a878],
+    roofs: [0x9c4628, 0x8e3f24, 0xaa5230],
+    builds: ['ligCorner', 'ligSlender', 'ligCorner', 'ligTwin'],
+    landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xb4a890, stoneWalls: 10,
+  },
+  // SANREMO — the mountains behind the coast. The hinterland house takes over
+  // and the roof goes GREEN SLATE, which the sheets treat as the hinterland's
+  // defining material. Colder stone, less paint, and almost no shopfront:
+  // there are no shops on a mountain stage.
+  sanremo: {
+    wall: 0xdcd2ba, wall2: 0xc2b79c, roof: 0x5c6f58, trim: 0x4a6b4a, stone: 0xa8a294,
+    palette: [0xdcd2ba, 0xc8bda2, 0xe4dcc6, 0xd0bb98, 0xbfae90, 0xe8dfc8],
+    roofs: [0x5c6f58, 0x506250, 0x687a60],
+    builds: ['ligRural', 'ligRural', 'ligSlender', 'ligTwin'],
+    landmarks: ['chapel'],
+    dress: ['well'], fenceColor: 0xb0a894, stoneWalls: 12,
+  },
   // AEGEAN (Greece) - whitewashed cubes, flat roofs, one blue dome, and blue
   // joinery. The palette is deliberately nearly monochrome WHITE, because
   // that is the region's identity; the colour lives in the roofs and doors.
@@ -5371,6 +6074,18 @@ const FLORA_MIX = {
   // scatter still sums to 1.0 (checklist R04).
   medterrace: [['oliveOld', 0.344], ['oliveRow', 0.281], ['corkOak', 0.156],
     ['umbrellaPine', 0.125], ['cypress', 0.094]],
+  // ALASSIO'S OWN MIX. The umbrella pine is the tree on the promenade and the
+  // cypress is the one climbing the hill behind it, so those two carry the
+  // silhouette; the olives stay because the terraces above the town are full
+  // of them. Weighted the opposite way round to `medterrace` on purpose.
+  riviera: [['umbrellaPine', 0.34], ['cypress', 0.28], ['oliveOld', 0.2],
+    ['oliveRow', 0.12], ['corkOak', 0.06]],
+  // a city has street trees, not a grove: pines and the odd cypress
+  genova: [['umbrellaPine', 0.46], ['cypress', 0.34], ['oliveOld', 0.2]],
+  // and the hinterland is olive terraces under pine, which is what the hills
+  // above Sanremo actually are
+  sanremo: [['oliveOld', 0.36], ['oliveRow', 0.26], ['umbrellaPine', 0.2],
+    ['cypress', 0.1], ['corkOak', 0.08]],
   // THE MEDITERRANEAN FIVE inherit the harbour's machinery but must not
   // inherit a northern forest with it: olive, cypress and umbrella pine, with
   // the cypress weighted up because it is the species that says "this coast"
@@ -10282,6 +10997,24 @@ export class Track {
    *  most materials are shared; only theme tints (hay color, barrel wrap) vary. */
   _makeProp(type) {
     const A = propAssets();
+    // ON AN UNLIT ROAD THE PROPS ARE THE HAZARD YOU CANNOT SEE. Headlights
+    // reach maybe forty metres and spread thin at the edges; the tape on real
+    // road furniture works at any range because it throws the beam straight
+    // back. Same diffuse texture, an emissive map that is black except the
+    // bands, so a crate is still a wooden crate by day. Cached per track: one
+    // material per prop type, so this costs no draw calls at all.
+    const tape = (key, base) => {
+      this._tapeMats = this._tapeMats || {};
+      if (!this._tapeMats[key]) {
+        const m = base.clone();
+        m.emissiveMap = reflectiveTapeTexture(key);
+        m.emissive = new THREE.Color(0xffffff);
+        m.emissiveIntensity = 1.35;
+        this._tapeMats[key] = m;
+      }
+      return this._tapeMats[key];
+    };
+    const NIGHT = !!(this.T && this.T.night);
     switch (type) {
       case 'hay': {
         if (!this._hayPropMat) {
@@ -10292,14 +11025,14 @@ export class Track {
         return { mesh: m, r: 1.5 };
       }
       case 'crate': {
-        const m = new THREE.Mesh(A.geo.crate, A.mat.crate);
+        const m = new THREE.Mesh(A.geo.crate, NIGHT ? tape('crate', A.mat.crate) : A.mat.crate);
         m.castShadow = true;
         return { mesh: m, r: 1.6 };
       }
       case 'cone': {
         const g = new THREE.Group();
         g.add(new THREE.Mesh(A.geo.coneBase, A.mat.coneBase));
-        const c = new THREE.Mesh(A.geo.cone, A.mat.cone);
+        const c = new THREE.Mesh(A.geo.cone, NIGHT ? tape('cone', A.mat.cone) : A.mat.cone);
         c.castShadow = true;
         g.add(c);
         return { mesh: g, r: 1.0 };
@@ -10311,7 +11044,8 @@ export class Track {
             map: barrelTexture(pal), roughness: 0.9,
           });
         }
-        const m = new THREE.Mesh(A.geo.barrel, [this._barrelPropMat, A.mat.barrelCap, A.mat.barrelCap]);
+        const side = NIGHT ? tape('barrel', this._barrelPropMat) : this._barrelPropMat;
+        const m = new THREE.Mesh(A.geo.barrel, [side, A.mat.barrelCap, A.mat.barrelCap]);
         m.castShadow = true;
         return { mesh: m, r: 1.3 };
       }
@@ -15052,8 +15786,13 @@ export class Track {
     g.name = 'edit-preview';
     const gWall = new THREE.BoxGeometry(1, 1, 1); gWall.translate(0, 0.5, 0);
     const gBox = new THREE.BoxGeometry(1, 1, 1); gBox.translate(0, 0.5, 0);
-    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); gCyl.translate(0, 0.5, 0);
-    const gCone = new THREE.ConeGeometry(0.5, 1, 10); gCone.translate(0, 0.5, 0);
+    // ROUNDER, GAME-WIDE (r238). Ten segments is visibly a decagon on anything
+    // wider than a downpipe, and the Ligurian corner blocks are DRUMS three
+    // metres across — at 10 they read as folded card. Both are single shared
+    // geometries feeding one InstancedMesh each, so the cost is paid once per
+    // world rather than per building.
+    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 16); gCyl.translate(0, 0.5, 0);
+    const gCone = new THREE.ConeGeometry(0.5, 1, 14); gCone.translate(0, 0.5, 0);
     const specs = {
       wall: [gWall, () => new THREE.MeshStandardMaterial({
         map: buildingTexture(), roughness: 0.85, envMapIntensity: 0.45,
@@ -15141,8 +15880,13 @@ export class Track {
   _realizeElements(B, m4) {
     const gWall = new THREE.BoxGeometry(1, 1, 1); gWall.translate(0, 0.5, 0);
     const gBox = new THREE.BoxGeometry(1, 1, 1); gBox.translate(0, 0.5, 0);
-    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); gCyl.translate(0, 0.5, 0);
-    const gCone = new THREE.ConeGeometry(0.5, 1, 10); gCone.translate(0, 0.5, 0);
+    // ROUNDER, GAME-WIDE (r238). Ten segments is visibly a decagon on anything
+    // wider than a downpipe, and the Ligurian corner blocks are DRUMS three
+    // metres across — at 10 they read as folded card. Both are single shared
+    // geometries feeding one InstancedMesh each, so the cost is paid once per
+    // world rather than per building.
+    const gCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 16); gCyl.translate(0, 0.5, 0);
+    const gCone = new THREE.ConeGeometry(0.5, 1, 14); gCone.translate(0, 0.5, 0);
     const specs = [
       // The emissive window map came across from `_buildHuts` when the
       // cottages moved onto the shared templates. It is not a port for its own
@@ -16256,7 +17000,7 @@ export class Track {
     const VARIANTS = 4;
     const SLOTS = VARIANTS * 2;
     const faceTexes = [];
-    for (let v = 0; v < VARIANTS; v++) faceTexes.push(townhouseTexture(F.face, v));
+    for (let v = 0; v < VARIANTS; v++) faceTexes.push(townhouseTexture(F.face, v, F.bayset));
     const faceTex = faceTexes[0];
     faceTex.anisotropy = 4;
     const bodyMat = new THREE.MeshStandardMaterial({
@@ -16286,7 +17030,7 @@ export class Track {
       const m = bodyMat.clone();
       m.map = tex;
       tex.anisotropy = 4;
-      m.emissiveMap = townhouseGlowTexture(F.glow, v, dark ? 0.13 : 0.6);
+      m.emissiveMap = townhouseGlowTexture(F.glow, v, dark ? 0.13 : 0.6, F.bayset);
       m.emissiveIntensity = (this.T.hutGlow ?? 1) * (dark ? 0.75 : 1);
       const im = new THREE.InstancedMesh(bodyGeo, m, Math.ceil(MAX / 3));
       im.name = 'oldtown-frontage';
@@ -16368,7 +17112,7 @@ export class Track {
       m4.compose(new THREE.Vector3(p.x, y + vh, p.z), q,
         new THREE.Vector3(dAcross * 1.16, roofH, wAlong * 1.08));
       rm.setMatrixAt(kv[vi], m4);
-      if (trimK + 1 < TRIMMAX) {
+      if (trimK + 2 < TRIMMAX) {
         // plinth: a course at the kerb, a touch proud of the wall
         m4.compose(new THREE.Vector3(p.x, y + 0.28, p.z), q,
           new THREE.Vector3(dAcross * 1.07, 0.56, wAlong * 1.05));
@@ -16380,6 +17124,30 @@ export class Track {
           new THREE.Vector3(dAcross * 1.13, 0.32, wAlong * 1.07));
         houseTrim.setMatrixAt(trimK, m4);
         trimCol.copy(tint).multiplyScalar(1.12 + Math.random() * 0.12);
+        houseTrim.setColorAt(trimK++, trimCol);
+        // THE JETTY (r243). In the reference the upper storeys stand PROUD of
+        // the ground floor — the medieval overhang — and that step is a big
+        // part of the silhouette from the street.
+        //
+        // A true overhang wants a second body per house. This is one course
+        // instead: a band at the first-floor line, wider across the street
+        // than the wall it sits on. From a car you are looking UP at it, so
+        // what you actually read is the projecting edge and the shadow under
+        // it — which is exactly what this draws, for one instance and no draw
+        // call.
+        //
+        // PAINTED AS WALL, NOT AS SHADOW. The first cut tinted the band down
+        // to half the wall colour on the theory that a jetty's underside is
+        // always in shade — but a box has one colour on every face, so what
+        // that actually produced was a black shelf running across the front of
+        // every house at first-floor level. The face of a jetty is the same
+        // limewash as the wall above it; the dark underside is a lighting
+        // result, and the renderer already gives it for nothing, because the
+        // soffit points at the ground.
+        m4.compose(new THREE.Vector3(p.x, y + vh * 0.34, p.z), q,
+          new THREE.Vector3(dAcross * 1.16, 0.34, wAlong * 1.04));
+        houseTrim.setMatrixAt(trimK, m4);
+        trimCol.copy(tint).multiplyScalar(0.94 + Math.random() * 0.1);
         houseTrim.setColorAt(trimK++, trimCol);
       }
       col.copy(tint).multiplyScalar(0.86 + Math.random() * 0.26);
@@ -16454,7 +17222,9 @@ export class Track {
     // call. The roof oversail goes with them: 1.06 across was a rim, not an
     // eave, and at 1.16 the shadow it throws is what makes the wall below read
     // as being in the shade of a roof.
-    const TRIMMAX = 1400;
+    // 2600, not 1400: the jetty course below is a THIRD band per house, and a
+    // long Ligurian terrace was measured at 2055 of them.
+    const TRIMMAX = 2600;
     const houseTrim = new THREE.InstancedMesh(
       new THREE.BoxGeometry(1, 1, 1),
       new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.92, envMapIntensity: 0.3 }),
@@ -16469,8 +17239,14 @@ export class Track {
     const balcMat = new THREE.MeshStandardMaterial({
       color: 0xb9b0a0, flatShading: true, roughness: 0.9, envMapIntensity: 0.35,
     });
+    // BALUSTERS, NOT A PARAPET. A solid box in 0x3a3630 read as a black slab
+    // over every shopfront; alpha-tested ironwork lets the wall through and
+    // costs the same one draw call.
+    const railTex = balconyRailTexture();
+    railTex.repeat.set(3, 1);
     const railMat = new THREE.MeshStandardMaterial({
-      color: 0x3a3630, flatShading: true, roughness: 0.7, metalness: 0.35,
+      map: railTex, color: 0x8e968c, transparent: true, alphaTest: 0.5,
+      side: THREE.DoubleSide, roughness: 0.6, metalness: 0.4,
     });
     const awnMat = new THREE.MeshStandardMaterial({
       map: awningTexture(), roughness: 0.92, side: THREE.DoubleSide,
@@ -16479,10 +17255,17 @@ export class Track {
     const balcRails = new THREE.InstancedMesh(slabGeo, railMat, BALC);
     const awnings = new THREE.InstancedMesh(slabGeo, awnMat, BALC);
     balcSlabs.name = 'frontage-balconies';
+    // NAMED, so it can be measured and hidden. Unnamed, it survived every
+    // bracket-by-hiding pass while being the thing that was actually wrong.
+    balcRails.name = 'frontage-balcony-rails';
     awnings.name = 'frontage-awnings';
     for (const m of [balcSlabs, balcRails, awnings]) { m.castShadow = m.receiveShadow = true; }
     let balK = 0, awnK = 0;
     const faceOff = new THREE.Vector3();
+    // the awning's tilt is a roll about the block's own forward axis, applied
+    // before the street yaw — so it leans out over the kerb on both sides
+    const qa = new THREE.Quaternion();
+    const fwd = new THREE.Vector3(0, 0, 1);
     const faceAt = (i, side, lat, dAcross, wAlong, baseY, hh) => {
       const p = this.pointAt(i, lat * side);
       q.setFromAxisAngle(up, this.headingAt(i));
@@ -16490,24 +17273,48 @@ export class Track {
       // toward the centreline: -side in world terms, which after the yaw is
       // simply -X scaled by the block's own half depth.
       const out = -Math.sign(lat * side) * dAcross * 0.5;
-      // a balcony at first-floor level on taller blocks only — a one-storey
-      // cottage with a balcony on it reads as a mistake
+      // ...and the face is AT `out`. Everything hung on it is measured from
+      // there in metres, never as a multiple of `out`.
+      //
+      // This is what put black slabs in the sky. The rail used to sit at
+      // `faceOff.x * 1.18` and the awning at `out * 1.3` — fractions that were
+      // picked against a shallow block, where 18% of the half-depth is a few
+      // centimetres. On the budello the blocks are 7 u deep, so 18% is 0.6 u
+      // and the rail hung two thirds of a metre past the end of the slab it is
+      // supposed to stand on, with clear daylight between the awning and the
+      // wall. A ledge is attached to a building or it is not a ledge.
+      const proud = Math.sign(out);                     // +1 if the face is +X
       if (hh > 6.2 && balK < BALC) {
         const by = baseY + hh * 0.52;
-        faceOff.set(out * 1.14, 0, (Math.random() - 0.5) * wAlong * 0.3).applyQuaternion(q);
+        const SD = 0.85;                                // how far the slab reaches out
+        const sx = out + proud * SD * 0.5;              // slab centred on the lip
+        const zj = (Math.random() - 0.5) * wAlong * 0.3;
+        faceOff.set(sx, 0, zj).applyQuaternion(q);
         m4.compose(new THREE.Vector3(p.x + faceOff.x, by, p.z + faceOff.z), q,
-          new THREE.Vector3(0.85, 0.16, wAlong * 0.42));
+          new THREE.Vector3(SD, 0.16, wAlong * 0.42));
         balcSlabs.setMatrixAt(balK, m4);
-        m4.compose(new THREE.Vector3(p.x + faceOff.x * 1.18, by + 0.5, p.z + faceOff.z * 1.18), q,
-          new THREE.Vector3(0.1, 0.9, wAlong * 0.42));
+        // the rail stands ON the slab's outer lip, not past it
+        const rx = out + proud * (SD - 0.05);
+        faceOff.set(rx, 0, zj).applyQuaternion(q);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, by + 0.34, p.z + faceOff.z), q,
+          new THREE.Vector3(0.06, 0.62, wAlong * 0.42));
         balcRails.setMatrixAt(balK, m4);
         balK++;
       }
       // and an awning over the ground floor on about half of them
       if (Math.random() < 0.5 && awnK < BALC) {
-        faceOff.set(out * 1.3, 0, (Math.random() - 0.5) * wAlong * 0.25).applyQuaternion(q);
-        m4.compose(new THREE.Vector3(p.x + faceOff.x, baseY + 2.9, p.z + faceOff.z), q,
-          new THREE.Vector3(1.5, 0.12, wAlong * 0.38));
+        const AD = 1.6;                                 // awning reach
+        faceOff.set(out + proud * AD * 0.48, 0,
+          (Math.random() - 0.5) * wAlong * 0.25).applyQuaternion(q);
+        // AN AWNING SLOPES. Flat, it is a horizontal plate 2.9 u up and the
+        // driver only ever sees its UNDERSIDE — which faces away from the sun
+        // and renders black, so every shopfront on the street had a dark slab
+        // hanging over it. Tilted down toward the kerb, the top face is what
+        // you look at and the stripes on it are what you see.
+        qa.setFromAxisAngle(fwd, -proud * 0.42);
+        qa.premultiply(q);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, baseY + 2.95, p.z + faceOff.z),
+          qa, new THREE.Vector3(AD, 0.1, wAlong * 0.38));
         awnings.setMatrixAt(awnK, m4);
         col.setHSL(0.02 + Math.random() * 0.12, 0.35, 0.44 + Math.random() * 0.16);
         awnings.setColorAt(awnK, col);
@@ -16551,8 +17358,17 @@ export class Track {
         }
         if (!placed) { run = 0; continue; }
         placedS[side].add(i);
-        if (Math.random() < 0.62) chimAt(i, side, placed.lat, F.depth, ww, placed.y + hh, roofH);
-        faceAt(i, side, placed.lat, F.depth, ww, placed.y, hh);
+        // `placed.h`, NOT `hh`. `put` scales the requested height by the
+        // variant's own storey count — 0.62 for the low one, 1.24 for the tall
+        // — and hands the real height back precisely so that anything hung on
+        // the building can find it. Both of these read the request instead, so
+        // on a low variant the stack was placed a third of a storey above its
+        // own roof and stood in the sky with nothing under it, and the balcony
+        // and awning went up the wall with it.
+        if (Math.random() < 0.62) {
+          chimAt(i, side, placed.lat, F.depth, ww, placed.y + placed.h, roofH);
+        }
+        faceAt(i, side, placed.lat, F.depth, ww, placed.y, placed.h);
         // A LANTERN ON THE BRACKET, every third house. Anchored to the FRONT
         // FACE, not the block centre — the arm only reaches 0.72 u and a
         // 8 u-deep building would have swallowed the bulb whole.
@@ -19888,8 +20704,23 @@ export class Track {
       const p = raw();
       return p && !this._inWater(p.x, p.z) && !this._onQuayStrip(p.x, p.z) ? p : null;
     };
+    // A DISTRICT'S OWN BUILDINGS, IF IT HAS ANY (r237).
+    //
+    // This scatter placed the ~96 dwellings that MAKE a town, and it always
+    // drew them from the global COTTAGES list — eight generic cottages — while
+    // the district kit's `builds` list was read by nothing but the three-house
+    // village layout. So the whole Ligurian module set shipped in r236 stood
+    // in three buildings out of a hundred, and Alassio was a coast of English
+    // cottages with a pastel palette on them. Measured on IL BUDELLO: 156 wall
+    // instances (about a hundred dwellings) against a box count that did not
+    // move when the Ligurian templates tripled in detail — which is how the
+    // gap was found at all.
+    //
+    // A kit that names its own buildings gets them. Everything else keeps
+    // COTTAGES, so no existing world changes.
+    const houses = (K.builds && K.builds.length) ? K.builds : COTTAGES;
     this._scatter(COUNT, makePos, (p) => {
-      const type = COTTAGES[(Math.random() * COTTAGES.length) | 0];
+      const type = houses[(Math.random() * houses.length) | 0];
       // SCALE. The car is 4.4 u long and 2.6 u wide; a cottage is a bit wider
       // than a car is long. The templates are authored at that size, so this
       // is variation, not sizing — keep it narrow or the village stops looking
@@ -20072,7 +20903,12 @@ export class Track {
         for (let s = 0; s < stack && tk < 180; s++) {
           m4.makeTranslation(p.x + (Math.random() - 0.5) * 0.4, p.y + 0.32 + s * 0.62, p.z + (Math.random() - 0.5) * 0.4);
           tires.setMatrixAt(tk, m4);
-          tcolor.set(s === stack - 1 && Math.random() < 0.5 ? 0xd8d2c2 : 0x22201c);
+          // A TYRE WALL IS PAINTED WHITE ON AN UNLIT ROAD, for the same reason
+          // the cones carry tape: black rubber at the edge of a night circuit
+          // is a hazard you meet rather than see. Half of them by day, the
+          // whole top course after dark.
+          const cap = s === stack - 1 && (this.T.night || Math.random() < 0.5);
+          tcolor.set(cap ? (this.T.night ? 0xf2eee2 : 0xd8d2c2) : 0x22201c);
           ids.push(tk);
           tires.setColorAt(tk++, tcolor);
         }

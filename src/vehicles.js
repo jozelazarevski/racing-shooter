@@ -972,8 +972,33 @@ function kitMats() {
  *  Returns a Group centred on the origin and scaled to sit inside a ~2.4 unit
  *  cube, so one camera rig frames every part without per-part tuning.
  */
+/** SHOWROOM PAINT. The kit's own palette is deliberately dark — those parts
+ *  live on a car at speed, where a bright block would read as damage. A shop
+ *  photograph has the opposite job: it has to be legible at 100px and make you
+ *  want the thing. So the icons get their own richer materials — red crackle
+ *  cam covers, polished chrome, brass headers — and the car is untouched. */
+let _iconMats = null;
+function iconMats() {
+  if (_iconMats) return _iconMats;
+  const M = (color, opts = {}) => new THREE.MeshStandardMaterial({
+    color, roughness: 0.42, metalness: 0.6, envMapIntensity: 1.2, ...opts });
+  _iconMats = {
+    chrome: M(0xd8dde4, { roughness: 0.16, metalness: 0.95 }),
+    crackle: M(0xd8402f, { roughness: 0.5, metalness: 0.3 }),   // cam covers
+    brass: M(0xd8a43a, { roughness: 0.28, metalness: 0.9 }),      // headers
+    block: M(0x59626e, { roughness: 0.58, metalness: 0.45 }),
+    rubber: M(0x24262a, { roughness: 0.95, metalness: 0.05 }),
+    alloy: M(0xc8ccd2, { roughness: 0.25, metalness: 0.9 }),
+    carbonI: M(0x24262c, { roughness: 0.35, metalness: 0.45 }),
+    gunmetal: M(0x585f68, { roughness: 0.4, metalness: 0.8 }),
+    hot: new THREE.MeshBasicMaterial({ color: 0xff8a3a }),
+    warn: new THREE.MeshBasicMaterial({ color: 0xff3b30 }),
+  };
+  return _iconMats;
+}
+
 export function buildPartIcon(kind, id) {
-  const M = kitMats();
+  const M = { ...kitMats(), ...iconMats() };
   const g = new THREE.Group();
   const add = (geo, mat, x, y, z, rx = 0, ry = 0) => {
     const m = new THREE.Mesh(geo, mat);
@@ -991,12 +1016,22 @@ export function buildPartIcon(kind, id) {
     const pipes = { v4: 2, v6: 2, v8: 4, v12: 6 }[id] ?? 2;
     const big = pipes >= 4;
     const len = 0.5 + pipes * 0.26;                   // a bigger block IS bigger
-    add(new THREE.BoxGeometry(1.15, 1.0, len), M.dark, 0, 0.1, 0);
-    add(new THREE.BoxGeometry(1.28, 0.16, len + 0.12), M.steel, 0, 0.64, 0);
+    add(new THREE.BoxGeometry(1.15, 1.0, len), M.block, 0, 0.1, 0);
+    // NARROWER THAN THE CAM COVERS ON PURPOSE. At 1.28 the plenum was a lid:
+    // it sat over the red covers and every block rendered as a black box with
+    // gold pipes. At 0.62 the covers show either side of it, which is the
+    // colour that makes the thumbnail read as an engine.
+    add(new THREE.BoxGeometry(0.62, 0.18, len - 0.05), M.chrome, 0, 0.68, 0);
+    // RED CRACKLE CAM COVERS — the one detail that makes a lump of geometry
+    // read as an engine at thumbnail size
     for (const sx of [-1, 1]) {
-      const cam = add(new THREE.BoxGeometry(0.36, 0.3, len - 0.1), M.steel, sx * 0.3, 0.48, 0);
-      cam.rotation.z = sx * (big ? 0.34 : 0.2);
+      const cam = add(new THREE.BoxGeometry(0.44, 0.32, len - 0.06), M.crackle, sx * 0.42, 0.56, 0);
+      cam.rotation.z = sx * (big ? 0.36 : 0.22);
     }
+    // sump and belt drive, so the bottom of the block is not a flat void
+    add(new THREE.BoxGeometry(1.0, 0.22, len - 0.24), M.gunmetal, 0, -0.42, 0);
+    const pulley = add(new THREE.CylinderGeometry(0.26, 0.26, 0.12, 14), M.chrome, 0, 0.05, len / 2 + 0.08);
+    pulley.rotation.x = Math.PI / 2;
     // ...AND A V4 AND A V6 BOTH HAVE TWO PIPES, so the pipe count alone cannot
     // tell them apart. The V6 is a TURBO and wears one: a snail on the flank
     // with its own feed pipe, which is the difference the name promises.
@@ -1004,62 +1039,69 @@ export function buildPartIcon(kind, id) {
       // ON THE FRONT FACE, not the far flank. The block is photographed from
       // its pipe side, so anything on -X is behind the block and a V6 came out
       // looking exactly like a V4.
-      const snail = add(new THREE.CylinderGeometry(0.33, 0.33, 0.24, 14), M.steel, 0.2, 0.05, len / 2 + 0.28);
+      const snail = add(new THREE.CylinderGeometry(0.33, 0.33, 0.24, 16), M.chrome, 0.2, 0.05, len / 2 + 0.28);
       snail.rotation.z = Math.PI / 2;
-      add(new THREE.CylinderGeometry(0.1, 0.1, 0.44, 8), M.steel, -0.2, 0.05, len / 2 + 0.28, 0, Math.PI / 2)
+      add(new THREE.CylinderGeometry(0.1, 0.1, 0.44, 10), M.chrome, -0.2, 0.05, len / 2 + 0.28, 0, Math.PI / 2)
         .rotation.z = Math.PI / 2;
-      add(new THREE.BoxGeometry(0.5, 0.3, 0.16), M.gold, 0.2, 0.46, len / 2 + 0.28);
+      add(new THREE.BoxGeometry(0.5, 0.3, 0.16), M.brass, 0.2, 0.46, len / 2 + 0.28);
     }
-    if (id === 'v12') add(new THREE.BoxGeometry(0.9, 0.28, len - 0.2), M.gold, 0, 0.84, 0);
+    if (id === 'v12') add(new THREE.BoxGeometry(0.9, 0.28, len - 0.2), M.brass, 0, 0.84, 0);
     for (let i = 0; i < pipes; i++) {
       const z = (i - (pipes - 1) / 2) * (len / Math.max(1, pipes)) * 0.95;
-      const st = add(new THREE.CylinderGeometry(0.1, 0.12, 0.7, 8), M.steel, 0.85, -0.16, z);
+      const st = add(new THREE.CylinderGeometry(0.1, 0.12, 0.7, 10), M.brass, 0.85, -0.16, z);
       st.rotation.z = Math.PI / 2;
-      const mouth = add(new THREE.CylinderGeometry(0.095, 0.095, 0.07, 8), M.ember, 1.19, -0.16, z);
+      const mouth = add(new THREE.CylinderGeometry(0.095, 0.095, 0.07, 10), M.hot, 1.19, -0.16, z);
       mouth.rotation.z = Math.PI / 2;
     }
     return g;
   }
   if (kind === 'spoiler') {
     if (id === 'none') {                             // an empty mount, honestly
-      add(new THREE.BoxGeometry(1.9, 0.12, 0.5), M.dark, 0, 0, 0);
+      add(new THREE.BoxGeometry(1.9, 0.12, 0.5), M.gunmetal, 0, 0, 0);
       return g;
     }
     if (id === 'lip') {
-      add(new THREE.BoxGeometry(2.0, 0.12, 0.5), M.carbon, 0, 0, 0, -0.34);
+      add(new THREE.BoxGeometry(2.0, 0.12, 0.5), M.carbonI, 0, 0, 0, -0.34);
       return g;
     }
     if (id === 'duck') {
-      add(new THREE.BoxGeometry(2.05, 0.14, 0.66), M.carbon, 0, 0.05, 0, -0.42);
-      for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.09, 0.26, 0.52), M.carbon, sx, 0.06, 0);
+      add(new THREE.BoxGeometry(2.05, 0.14, 0.66), M.carbonI, 0, 0.05, 0, -0.42);
+      for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.09, 0.26, 0.52), M.chrome, sx, 0.06, 0);
       return g;
     }
     const span = 2.3;                                 // GT
-    for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.12, 0.6, 0.3), M.carbon, sx * 0.8, -0.3, 0.06);
-    add(new THREE.BoxGeometry(span, 0.09, 0.6), M.carbon, 0, 0.06, 0, -0.16);
-    add(new THREE.BoxGeometry(span, 0.07, 0.32), M.gold, 0, 0.26, -0.2, -0.3);
-    for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.07, 0.42, 0.86), M.gold, sx * (span * 0.5), 0.12, 0);
+    for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.12, 0.6, 0.3), M.chrome, sx * 0.8, -0.3, 0.06);
+    add(new THREE.BoxGeometry(span, 0.09, 0.6), M.carbonI, 0, 0.06, 0, -0.16);
+    add(new THREE.BoxGeometry(span, 0.07, 0.32), M.brass, 0, 0.26, -0.2, -0.3);
+    for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.07, 0.42, 0.86), M.chrome, sx * (span * 0.5), 0.12, 0);
     return g;
   }
   if (kind === 'tyre') {
     // ROAD / GRAVEL / SNOW read apart by TREAD, which is the thing that
     // actually differs — a slick band, chunky blocks, or a fine sipe pattern
     const cls = { road: 0, gravel: 1, snow: 2 }[id] ?? 0;
-    const tyre = add(new THREE.CylinderGeometry(1.0, 1.0, 0.62, 22), M.dark, 0, 0, 0);
+    const tyre = add(new THREE.CylinderGeometry(1.0, 1.0, 0.62, 26), M.rubber, 0, 0, 0);
     tyre.rotation.z = Math.PI / 2;
-    const hub = add(new THREE.CylinderGeometry(0.44, 0.44, 0.66, 14),
-      cls === 2 ? M.steel : M.gold, 0, 0, 0);
+    const hub = add(new THREE.CylinderGeometry(0.44, 0.44, 0.66, 16),
+      cls === 2 ? M.chrome : M.alloy, 0, 0, 0);
+    // five spokes, so a wheel reads as a wheel and not as a washer
+    for (let i = 0; i < 5; i++) {
+      const a2 = (i / 5) * Math.PI * 2;
+      const sp = add(new THREE.BoxGeometry(0.7, 0.12, 0.24), M.alloy,
+        Math.cos(a2) * 0.34, Math.sin(a2) * 0.34, 0);
+      sp.rotation.z = a2;
+    }
     hub.rotation.z = Math.PI / 2;
     const blocks = cls === 0 ? 0 : cls === 1 ? 12 : 22;
     for (let i = 0; i < blocks; i++) {
       const a = (i / blocks) * Math.PI * 2;
       const t = add(new THREE.BoxGeometry(cls === 1 ? 0.3 : 0.16, cls === 1 ? 0.16 : 0.1, 0.7),
-        cls === 2 ? M.steel : M.dark,
+        cls === 2 ? M.chrome : M.rubber,
         Math.cos(a) * 1.02, Math.sin(a) * 1.02, 0);
       t.rotation.z = a;
     }
     if (cls === 0) {                                  // a slick band, so ROAD is not a bare disc
-      const band = add(new THREE.CylinderGeometry(1.03, 1.03, 0.2, 22), M.steel, 0, 0, 0);
+      const band = add(new THREE.CylinderGeometry(1.03, 1.03, 0.2, 26), M.gunmetal, 0, 0, 0);
       band.rotation.z = Math.PI / 2;
     }
     return g;

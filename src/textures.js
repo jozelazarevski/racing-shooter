@@ -310,6 +310,61 @@ function applySandRipples(g, w, h, spec) {
  *  then polished down the two wheel tracks. An ellipse is a pebble, and a
  *  road surfaced in pebbles is what the old pass drew.
  */
+/** TRAM RAILS DOWN THE STREET.
+ *
+ *  The single most distinctive thing in the reference: two rails running the
+ *  length of the street, each bedded in a band of tan setts that reads quite
+ *  differently from the grey cobbles around it.
+ *
+ *  IT IS PAINTED, NOT BUILT. The road canvas maps its WIDTH across the 22 u
+ *  ribbon and its HEIGHT along the direction of travel (see RUT_CX), so a
+ *  vertical stripe here is a line running down the road — which makes rails a
+ *  texture pass costing nothing rather than a mile of extra geometry.
+ *
+ *  Drawn AFTER the cobbles so the setts are interrupted by the rail bed, which
+ *  is the right order: the track was laid into the street, not under it.
+ */
+function applyTramRails(g, w, h, spec) {
+  const S = {
+    gauge: 3.2,               // u between rail centres — a wide street tramway
+    bed: '#c9b08a',           // tan setts the rail is bedded in
+    bedEdge: 'rgba(120,100,74,0.55)',
+    rail: '#5d5a55',          // worn steel
+    head: 'rgba(246,242,230,0.55)',   // the polished top, catching the sky
+    ...(spec === true ? {} : spec),
+  };
+  const U = w / 22;                       // pixels per world unit across the road
+  const half = (S.gauge / 2) * U;
+  const bedW = 1.15 * U;
+  const railW = Math.max(2, 0.16 * U);
+  for (const dir of [-1, 1]) {
+    const cx = w * 0.5 + dir * half;
+    // the bed: tan setts, drawn as a band with its own coursing so it does not
+    // read as a flat painted stripe
+    g.fillStyle = S.bed;
+    g.fillRect(cx - bedW / 2, 0, bedW, h);
+    g.strokeStyle = S.bedEdge;
+    g.lineWidth = Math.max(1, 0.06 * U);
+    g.beginPath();
+    g.moveTo(cx - bedW / 2, 0); g.lineTo(cx - bedW / 2, h);
+    g.moveTo(cx + bedW / 2, 0); g.lineTo(cx + bedW / 2, h);
+    g.stroke();
+    // coursing across the bed, so it matches the cobble scale beside it
+    g.strokeStyle = 'rgba(120,100,74,0.32)';
+    g.lineWidth = 1;
+    const step = h / 46;
+    for (let y = 0; y < h; y += step) {
+      g.beginPath(); g.moveTo(cx - bedW / 2, y); g.lineTo(cx + bedW / 2, y); g.stroke();
+    }
+    // the rail itself, with a lit head — the head is what the eye tracks and
+    // the reason a rail reads as steel rather than as a dark line
+    g.fillStyle = S.rail;
+    g.fillRect(cx - railW / 2, 0, railW, h);
+    g.fillStyle = S.head;
+    g.fillRect(cx - railW * 0.22, 0, railW * 0.44, h);
+  }
+}
+
 function applyCobbleRoad(g, w, h, spec) {
   const S = {
     stones: ['#8f8b84', '#7d7a75', '#9a958c', '#6f6d69', '#a29c92', '#85837e'],
@@ -531,7 +586,7 @@ export function roadTexture(palette = {}) {
   // A SETT NEEDS TEXELS: 48 stones across a 512 px tile is ten pixels each,
   // and the joint and bevel both vanish into the mip chain. Cobbled roads get
   // a 1024 px tile; every other surface is broad mottle and stays at 512.
-  const RES = P.cobbles ? 1024 : 512;
+  const RES = (P.cobbles || P.rails) ? 1024 : 512;
   const t = make(RES, RES, (g, w, h) => {
     g.fillStyle = P.base;
     g.fillRect(0, 0, w, h);
@@ -614,6 +669,7 @@ export function roadTexture(palette = {}) {
     // cobbled setts are laid ON TOP of the dirt/rut base (the ruts still read
     // through as worn wheel tracks) but UNDER the verge fringe below
     if (P.cobbles) applyCobbleRoad(g, w, h, P.cobbles);
+    if (P.rails) applyTramRails(g, w, h, P.rails);
     // fine multi-octave grain over the whole surface (build-time, palette-safe)
     noiseOverlay(g, w, h, 0.11);
     // dry surfaces pick up faint oily wear sheen down the driving lines —
@@ -1130,6 +1186,31 @@ export function crowdTexture() {
 }
 
 /** Red/white awning stripes. */
+/** A BALCONY RAIL YOU CAN SEE THROUGH.
+ *
+ *  The rail was a solid box 0.9 u tall in near-black, which is a parapet, not
+ *  a railing — from the street every balcony on the terrace read as a black
+ *  slab hanging off the wall, and because the mesh carried no name it survived
+ *  every attempt to bracket it by hiding things.
+ *
+ *  Balusters with gaps between them, alpha-tested so the wall shows through.
+ *  Same instanced mesh, same draw call, and at distance the gaps average out
+ *  into the grey haze that ironwork actually reads as.
+ */
+export function balconyRailTexture() {
+  const t = make(64, 32, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = '#4a4f4a';
+    g.fillRect(0, 0, w, 4);                       // top rail
+    g.fillRect(0, h - 3, w, 3);                   // bottom rail
+    for (let x = 3; x < w - 2; x += 8) {          // balusters
+      g.fillRect(x, 3, 3, h - 5);
+    }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
 export function awningTexture() {
   const t = make(128, 64, (g, w, h) => {
     for (let x = 0, i = 0; x < w; x += 16, i++) {
@@ -1418,6 +1499,58 @@ export function puddleTexture(palette = {}) {
 
 /** Wooden shipping-crate face: planked boards inside a nailed frame with an
  *  X of diagonal cross braces. Shared by every destructible crate prop. */
+/** RETROREFLECTIVE TAPE — why road furniture is visible at night.
+ *
+ *  A cone at the kerb of an unlit expressway is not lit; the tape on it throws
+ *  the headlights straight back at you, so what you see in the dark is two
+ *  bright bands with a cone-shaped hole between them. That is the whole read,
+ *  and it works at any range, well beyond where a headlight beam has spread
+ *  itself thin.
+ *
+ *  Black everywhere except the bands, used as an `emissiveMap`: the diffuse
+ *  texture is untouched, so the prop still looks like a wooden crate by day
+ *  and it is only the tape that glows. Bands are placed on the same UV rows
+ *  the day texture paints them, so the tape sits ON the marking rather than
+ *  beside it.
+ */
+export function reflectiveTapeTexture(kind) {
+  const size = kind === 'cone' ? 64 : 128;
+  const t = make(size, size, (g, w, h) => {
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, w, h);
+    if (kind === 'cone') {
+      // the band coneTexture already paints, lit
+      g.fillStyle = '#fffdf2';
+      g.fillRect(0, h * 0.30, w, h * 0.24);
+    } else if (kind === 'barrel') {
+      // two hoop bands, where a drum carries its markings
+      g.fillStyle = '#fff6d8';
+      g.fillRect(0, h * 0.18, w, h * 0.11);
+      g.fillRect(0, h * 0.70, w, h * 0.11);
+    } else {
+      // CRATE and anything else: hazard chevrons along the bottom edge, which
+      // is what gets taped on site furniture. Diagonal, because a diagonal
+      // reads as a warning and a plain bar reads as a highlight.
+      const bh = h * 0.16, y0 = h - bh;
+      g.fillStyle = '#0a0a0a';
+      g.fillRect(0, y0, w, bh);
+      g.fillStyle = '#fff2c4';
+      const step = w / 6;
+      for (let i = -1; i < 7; i++) {
+        g.beginPath();
+        g.moveTo(i * step, h);
+        g.lineTo(i * step + step * 0.5, h);
+        g.lineTo(i * step + step * 0.5 + bh, y0);
+        g.lineTo(i * step + bh, y0);
+        g.closePath();
+        g.fill();
+      }
+    }
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
 export function crateTexture() {
   return make(128, 128, (g, w, h) => {
     // horizontal planks
@@ -1800,8 +1933,43 @@ const TH_SHOP = [22, 200, 148, 44];        // ground-floor glazing
  *  several hundred times. A variant picks how many storeys and how many bays
  *  per storey, and whether the ground floor is a shop or a plain wall with a
  *  door, which is the difference between a merchant terrace and a cottage. */
-export function townhouseBays(variant = 0) {
-  const V = [
+/** LIGURIA IS ITS OWN SET OF BAYS.
+ *
+ *  The default variants are a northern market town: one to three storeys, two
+ *  bays, a shop at the foot. A Ligurian seafront terrace is FOUR AND FIVE
+ *  storeys of three bays, which is the single biggest reason the first Alassio
+ *  did not look like the reference — the proportion and the window COUNT are
+ *  what the eye reads from a car, long before any moulding does.
+ *
+ *  Kept as a separate set rather than added to the list, because the default
+ *  variants are shared with the old town and Monte Carlo and those are not
+ *  Ligurian towns.
+ */
+// A WALL NEEDS WALL ON IT.
+//
+// These carried the default 38 px opening, which on a 192 px face is three
+// windows and 59% glass, leaving an 18 px pier between bays — narrower than
+// the pair of shutters that has to fit in it. The shutters duly overlapped
+// each other across every pier and the render never showed at all: the whole
+// terrace read as dark brown boxes with holes, which is nothing like the
+// reference's cream wall. `bw` is explicit here so the pier is a decision
+// rather than a leftover.
+const BAYSETS = {
+  liguria: [
+    // 4 storeys, 3 bays, shop — the standard terrace unit
+    { rows: [56, 106, 156, 206], xs: [30, 81, 132], shop: true, bw: 30 },
+    // 5 storeys, 3 bays — the tall one in the run
+    { rows: [40, 84, 128, 172, 214], xs: [30, 81, 132], shop: true, bw: 30 },
+    // 4 storeys, 2 bays — the narrow infill between two wider neighbours
+    { rows: [56, 106, 156, 206], xs: [44, 110], shop: false, bw: 38 },
+    // 5 storeys, 3 bays, no shop — the residential end of the street
+    { rows: [40, 84, 128, 172, 214], xs: [30, 81, 132], shop: false, bw: 30 },
+  ],
+};
+
+export function townhouseBays(variant = 0, set = null) {
+  const list = BAYSETS[set];
+  const V = list ? list[variant % list.length] : [
     { rows: [96, 164], xs: [30, 114], shop: true },        // 2 storeys, 2 bays, shop
     { rows: [110], xs: [30, 114], shop: false },           // cottage: 1 storey, no shop
     { rows: [72, 132, 190], xs: [40, 106], shop: true },   // tall merchant house
@@ -1809,11 +1977,122 @@ export function townhouseBays(variant = 0) {
     { rows: [120], xs: [66], shop: true },                 // narrow single-bay shop
   ][variant % 5];
   const bays = [];
-  for (const y of V.rows) for (const x of V.xs) bays.push([x, y, V.xs.length > 2 ? 38 : 48, 52]);
-  return { bays, shop: V.shop };
+  // a five-storey face has to fit its openings into the same panel, so the
+  // opening HEIGHT comes off the row count rather than being a constant
+  const bh = V.rows.length >= 5 ? 34 : V.rows.length === 4 ? 40 : 52;
+  const bw = V.bw ?? (V.xs.length > 2 ? 38 : 48);
+  for (const y of V.rows) for (const x of V.xs) bays.push([x, y, bw, bh]);
+  // rows/xs/bh come back out too: the half-timber frame has to know where the
+  // storeys and the bays are, or its posts land through the windows
+  return { bays, shop: V.shop, rows: V.rows, xs: V.xs, bh, bw };
 }
 
-export function townhouseTexture(palette = {}, variant = 0) {
+/** HALF-TIMBERING (Fachwerk) — the defining feature of the reference street.
+ *
+ *  Dark timber over a lighter infill: a sill beam and a head beam per storey,
+ *  posts dividing the bays, and the diagonal BRACES that are the whole reason
+ *  the style reads at a glance. Without the diagonals it is just a grid of
+ *  lines and the eye takes it for a modern curtain wall.
+ *
+ *  Painted rather than modelled, and deliberately: this is a facade texture on
+ *  a frontage block, so the alternative is a hundred slender boxes per
+ *  building. At 192 px across the panel the timber lands at 5-7 px, which is
+ *  about a 25 cm beam on a 7 u unit — right, and it survives the mip chain.
+ *
+ *  Drawn over the render and UNDER the windows, so joinery still sits proud of
+ *  the frame exactly as it does on a real one.
+ */
+function applyHalfTimber(g, w, h, VB, spec) {
+  const S = {
+    // SUNLIT OAK, NOT A BURNT BEAM. #6b4630 is near-black once the sun hits
+    // it, and with the frame covering most of a panel the whole terrace read
+    // as brown-black instead of the reference's cream wall with a dark frame
+    // on it. The contrast that makes the style is frame-vs-infill, and it
+    // survives perfectly well at a weathered oak that still reads as wood
+    // — once the frame stops covering the whole panel, which it now doesn't.
+    beam: '#6f4a30',
+    edge: 'rgba(46,30,20,0.40)',  // the shadow line under every beam
+    braces: true,
+    ...(spec === true ? {} : spec),
+  };
+  const rows = VB.rows || [];
+  if (!rows.length) return;
+  const bh = VB.bh ?? 40;
+  const bw = VB.bw ?? 48;
+  const xs = VB.xs || [];
+  // BOLD ENOUGH TO READ, NOT SO BOLD IT IS THE WALL. At w/32 the frame was
+  // correct-scale and invisible past twenty units; w/22 was legible but, with
+  // the bands below overlapping, it painted the whole face oak.
+  const tw = Math.max(4, Math.round(w / 26));    // beam width
+  const bar = (x, y, ww, hh) => {
+    g.fillStyle = S.beam;
+    g.fillRect(x, y, ww, hh);
+    g.fillStyle = S.edge;
+    g.fillRect(x, y + hh - Math.max(1, hh * 0.22), ww, Math.max(1, hh * 0.22));
+  };
+  // a brace is a rotated bar; canvas has no skew primitive worth the trouble,
+  // so it is drawn as a filled parallelogram
+  const brace = (x1, y1, x2, y2) => {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = (-dy / len) * (tw * 0.5), ny = (dx / len) * (tw * 0.5);
+    g.fillStyle = S.beam;
+    g.beginPath();
+    g.moveTo(x1 + nx, y1 + ny);
+    g.lineTo(x2 + nx, y2 + ny);
+    g.lineTo(x2 - nx, y2 - ny);
+    g.lineTo(x1 - nx, y1 - ny);
+    g.closePath();
+    g.fill();
+  };
+
+  // THE BANDS HAVE TO TILE, NOT OVERLAP.
+  //
+  // Each storey used to pad its frame by a fixed 0.34 of the opening height
+  // above and below the bay. On the five-storey Ligurian face the rows sit 44
+  // px apart with a 34 px opening, so that pad made a 57 px band on a 44 px
+  // pitch: every storey's frame reached a third of the way into its
+  // neighbour's, the full-height posts merged into unbroken columns, and five
+  // storeys of braces stacked in the same two strips. The result was a solid
+  // oak wall with windows punched in it — no infill left to be the colour of
+  // the building, which is the entire point of the style.
+  //
+  // So the pad comes off the ACTUAL row pitch and is clamped to leave the
+  // storeys clear of each other.
+  const pitch = rows.length > 1 ? rows[1] - rows[0] : Math.round(bh * 1.9);
+  const pad = Math.max(3, Math.min(Math.round(bh * 0.3),
+    Math.round((pitch - bh) / 2) - 1));
+
+  for (let i = 0; i < rows.length; i++) {
+    const top = rows[i] - pad;
+    const bot = rows[i] + bh + pad;
+    bar(0, top, w, tw);                             // head beam
+    bar(0, bot, w, tw);                             // sill beam
+    // POSTS: one at each edge and one between every pair of bays, which is
+    // where a real frame puts them — the bays sit in the panels, not on them.
+    // The gap is measured with THIS set's bay width; a hardcoded 48 put the
+    // mid-posts through the windows of any set whose bays are narrower.
+    const posts = [0, w - tw];
+    for (let k = 0; k < xs.length - 1; k++) {
+      posts.push(Math.round((xs[k] + bw + xs[k + 1] - tw) / 2));
+    }
+    for (const px of posts) bar(px, top, tw, bot - top + tw);
+    if (!S.braces) continue;
+    // DIAGONALS IN THE END PANELS — the strip between the corner post and the
+    // first bay is the only wall on this face tall and clear enough to carry
+    // one, which is also where a real frame braces: at the corners, taking the
+    // rack out of the building. Upper storeys only; braced all the way down
+    // and a three-bay face turns back into a lattice.
+    if (i > rows.length - 3) continue;
+    const lIn = tw, lOut = Math.max(lIn + tw, (xs[0] ?? w * 0.16) - 2);
+    const rIn = w - tw, rOut = Math.min(rIn - tw,
+      (xs[xs.length - 1] ?? w * 0.84) + bw + 2);
+    if (lOut - lIn > tw) brace(lIn, bot, lOut, top + tw);
+    if (rIn - rOut > tw) brace(rIn, bot, rOut, top + tw);
+  }
+}
+
+export function townhouseTexture(palette = {}, variant = 0, set = null) {
   const P = {
     render: '#b9ad98',            // limewashed render (tinted per instance)
     plinth: '#6e6a63',            // granite plinth + shopfront surround
@@ -1823,7 +2102,7 @@ export function townhouseTexture(palette = {}, variant = 0) {
     pane: '#171c26',              // unlit glass — never transparent (G7)
     ...palette,
   };
-  const VB = townhouseBays(variant);
+  const VB = townhouseBays(variant, set);
   const TH_BAYS = VB.bays;
   const t = make(TH_W, TH_H, (g, w, h) => {
     g.fillStyle = P.render;
@@ -1836,27 +2115,54 @@ export function townhouseTexture(palette = {}, variant = 0) {
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();
     }
-    // rain staining below every sill — a wet town wears its water marks
+    // Rain staining below every sill — a wet town wears its water marks. The
+    // run is capped against the STOREY PITCH: a fixed 34 px reaches most of
+    // the way to the window below on a five-storey face, so fifteen stains
+    // merged into a wash that greyed out the whole wall.
+    // the clear wall between one sill and the head of the window below is
+    // exactly how far a stain can run without painting over that window
+    const STAIN = Math.max(8, Math.min(30,
+      (VB.rows?.length > 1 ? VB.rows[1] - VB.rows[0] : 60) - VB.bh));
     for (const [x, y, bw, bh] of TH_BAYS) {
-      const grd = g.createLinearGradient(0, y + bh, 0, y + bh + 34);
-      grd.addColorStop(0, 'rgba(46,42,38,0.30)');
+      const grd = g.createLinearGradient(0, y + bh, 0, y + bh + STAIN);
+      grd.addColorStop(0, 'rgba(46,42,38,0.20)');
       grd.addColorStop(1, 'rgba(46,42,38,0)');
       g.fillStyle = grd;
-      g.fillRect(x - 4, y + bh, bw + 8, 34);
+      g.fillRect(x - 4, y + bh, bw + 8, STAIN);
     }
+    // THE FRAME, before any joinery: on a real building the windows sit inside
+    // the panels the frame makes, so the timber goes down first and the sashes
+    // are drawn proud of it below.
+    if (P.timber) applyHalfTimber(g, w, h, VB, P.timber);
     // cornice, string courses between storeys, and the plinth
     g.fillStyle = P.trim;
     g.fillRect(0, 2, w, 9);                         // cornice
-    g.fillRect(0, 84, w, 4);                        // string course, 1st floor
-    g.fillRect(0, 152, w, 4);                       // string course, 2nd floor
+    // String courses at a fixed 84 and 152 belong to the DEFAULT bay layout.
+    // On a set whose storeys sit elsewhere they land through the windows — and
+    // on a timbered face the rails are already the string courses, so drawing
+    // both gives every storey two lines where a building has one.
+    if (!P.timber) {
+      g.fillRect(0, 84, w, 4);                      // string course, 1st floor
+      g.fillRect(0, 152, w, 4);                     // string course, 2nd floor
+    }
     g.fillStyle = 'rgba(0,0,0,0.30)';
     g.fillRect(0, 11, w, 4);
     g.fillStyle = P.plinth;
     g.fillRect(0, h - 12, w, 12);                   // granite plinth at the kerb
+    // the narrowest gap between two openings on this face, and the wall edge
+    const SH_PIER = (() => {
+      const cols = VB.xs || [];
+      if (cols.length < 2) return 24;
+      let g0 = Infinity;
+      for (let i = 0; i < cols.length - 1; i++) {
+        g0 = Math.min(g0, cols[i + 1] - (cols[i] + VB.bw));
+      }
+      return Math.min(g0, cols[0] * 2);
+    })();
     // upper-storey windows: recess, joinery, glazing bar, sill, folded shutters
     for (const [x, y, bw, bh] of TH_BAYS) {
-      g.fillStyle = 'rgba(0,0,0,0.35)';
-      g.fillRect(x - 3, y - 3, bw + 6, bh + 6);     // reveal shadow
+      g.fillStyle = 'rgba(0,0,0,0.26)';
+      g.fillRect(x - 2, y - 2, bw + 4, bh + 4);     // reveal shadow
       g.fillStyle = P.pane;
       g.fillRect(x, y, bw, bh);
       g.strokeStyle = P.frame;
@@ -1867,13 +2173,56 @@ export function townhouseTexture(palette = {}, variant = 0) {
       g.fillRect(x, y + bh * 0.42, bw, 4);          // transom
       g.fillStyle = P.trim;
       g.fillRect(x - 6, y + bh, bw + 12, 6);        // sill
-      g.fillStyle = P.shutter;
-      g.fillRect(x - 12, y - 1, 9, bh + 2);
-      g.fillRect(x + bw + 3, y - 1, 9, bh + 2);
+        // FOLDED SHUTTERS, SIZED TO THE PIER THEY FOLD BACK ONTO.
+      //
+      // A fixed 9 px leaf 3 px clear of the reveal needs 24 px of pier for the
+      // pair, and a three-bay Ligurian face has 18. Every pair overlapped its
+      // neighbour's across the pier, so the wall between two windows was
+      // solid shutter and the render underneath was never visible. Take the
+      // real gap, give the leaf at most a third of it, and drop the shutters
+      // entirely where even that will not fit — a window with no shutters
+      // reads as a window; a wall made of shutters reads as nothing.
+      // a fifth of the pier each, so the wall between two windows is still
+      // mostly wall: at (pier-6)/2 the pair plus their clearances used 20 px
+      // of a 21 px pier and the render was a one-pixel line
+      const leaf = Math.floor(Math.min(9, SH_PIER * 0.22));
+      if (leaf >= 3) {
+        g.fillStyle = P.shutter;
+        g.fillRect(x - 3 - leaf, y - 1, leaf, bh + 2);
+        g.fillRect(x + bw + 3, y - 1, leaf, bh + 2);
+      }
       g.fillStyle = 'rgba(0,0,0,0.28)';
       for (let sy = y + 3; sy < y + bh; sy += 6) {
         g.fillRect(x - 12, sy, 9, 2);
         g.fillRect(x + bw + 3, sy, 9, 2);
+      }
+    }
+    // FLOWER BOXES, which the reference puts under nearly every upper window and
+    // which are most of the colour in that street. Painted here rather than
+    // modelled for the same reason as the frame: this is one texture on a
+    // frontage block, and geometry would mean a hundred boxes per building.
+    if (P.boxes) {
+      const B = (P.boxes === true ? {} : P.boxes);
+      const wood = B.wood || '#6b4630';
+      const blooms = B.blooms || ['#c8402f', '#e0644a', '#d8869a', '#efe3d2'];
+      for (const [x, y, bw2, bh2] of TH_BAYS) {
+        if (y + bh2 > h - 60) continue;               // not on the shopfront
+        // NOT ON EVERY WINDOW. A box under all fifteen openings turned into
+        // four unbroken bands of dark wood and red across the face, which
+        // read as stripes on the building rather than as flowers on it. On
+        // roughly half, the way a street actually does it.
+        if (Math.random() < 0.45) continue;
+        const by = y + bh2 + 3;
+        g.fillStyle = wood;
+        g.fillRect(x - 3, by, bw2 + 6, 7);
+        g.fillStyle = 'rgba(30,18,12,0.45)';
+        g.fillRect(x - 3, by + 5, bw2 + 6, 2);
+        for (let k = 0; k < 14; k++) {
+          g.fillStyle = blooms[(Math.random() * blooms.length) | 0];
+          const fx = x - 2 + Math.random() * (bw2 + 4);
+          const fy = by - 1 - Math.random() * 4;
+          g.beginPath(); g.arc(fx, fy, 1.3 + Math.random() * 1.4, 0, 7); g.fill();
+        }
       }
     }
     // GROUND FLOOR. A shopfront where the variant asks for one; otherwise a
@@ -1931,9 +2280,14 @@ export function townhouseTexture(palette = {}, variant = 0) {
  *  Per variant now, and `litFrac` sets how much of the building is awake, so a
  *  street can hold dark houses next to lit ones.
  */
-export function townhouseGlowTexture(palette = {}, variant = 0, litFrac = 0.55) {
+export function townhouseGlowTexture(palette = {}, variant = 0, litFrac = 0.55, set = null) {
   const P = { warm: '#ffb347', hot: '#ffd489', shop: '#f2a93b', ...palette };
-  const VB = townhouseBays(variant);
+  // THE SET HAS TO COME THROUGH HERE TOO. This texture's whole job is to light
+  // the SAME openings the facade drew, and its own note above records what
+  // happens when the two disagree: lit rectangles that land on blank wall. A
+  // Ligurian facade has five rows of three where the default has two of two,
+  // so passing the set to one and not the other is that bug, restaged.
+  const VB = townhouseBays(variant, set);
   const BAYS = VB.bays;
   const t = make(TH_W, TH_H, (g, w, h) => {
     g.fillStyle = '#000000';

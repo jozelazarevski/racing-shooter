@@ -807,6 +807,30 @@
      touch-target guideline there is — and "make it more obvious" is a size
      argument as much as a colour one. inline-flex so the min-height cannot
      fight the padding. */
+  #topbar-back.hidden{display:none}
+  /* THE WORDMARK, at bar size. It was a 96px hero that scrolled away; here it
+     is a 13px display face that never does. */
+  #topbar .tb-brand{font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.6px;
+    color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
+  /* THE BALANCE IS PINNED RIGHT and never shrinks — it is the number the whole
+     garage below is spending, so it is the one thing in the bar that must not
+     give way when a chapter name gets long. */
+  #topbar-cred{flex:0 0 auto;margin-left:auto;font-family:'Baloo 2';font-weight:800;
+    font-size:10px;letter-spacing:1px;color:var(--gold-dim);white-space:nowrap;
+    padding:5px 9px;border-radius:8px;background:rgba(0,0,0,.4);
+    border:1px solid var(--line-soft)}
+  #topbar-cred b{font-family:'Luckiest Guy';font-size:13px;letter-spacing:.5px;
+    color:var(--yellow);margin-left:3px;text-shadow:1px 1px 0 var(--ink)}
+  /* the where-slot yields first when the bar is tight */
+  #topbar .ch-here{flex:1 1 auto;min-width:0}
+  #topbar .ch-here-stars{flex:0 0 auto;margin-left:0}
+  @media (max-width:389px){
+    #topbar{gap:7px;padding-left:8px;padding-right:8px}
+    #topbar-back{font-size:12px;padding:7px 10px}
+    #topbar-cred{font-size:9px;padding:4px 7px}
+    #topbar-cred b{font-size:12px}
+    #topbar .tb-brand{font-size:11.5px;letter-spacing:1px}
+  }
   #topbar-back{font-size:13px;padding:7px 14px;border-radius:10px;
     min-height:40px;display:inline-flex;align-items:center;
     color:#fff8e0;background:linear-gradient(180deg,#ff9d2e,#e8402a);
@@ -1261,6 +1285,54 @@
   #build-preview .bp-nums i{font-style:normal;font-size:8.5px;font-weight:800;
     letter-spacing:1px;color:var(--gold-dim)}
   #build-preview .bp-nums b{font-family:'Luckiest Guy';font-size:13px;color:var(--cream)}
+  /* THE DELTA IS THE POINT. "TOP 56" says nothing; "TOP 63 +7" says the money
+     worked. Green up, amber down — a wing costs top speed and should look
+     like it costs something. */
+  #build-preview .bp-nums u{text-decoration:none;font-size:9px;font-weight:800;
+    letter-spacing:.3px;padding:1px 4px;border-radius:4px}
+  #build-preview .bp-nums u.up{color:#8de89a;background:rgba(141,232,154,.14)}
+  #build-preview .bp-nums u.dn{color:#e8946a;background:rgba(232,148,106,.14)}
+  /* a spec chip is LIT when it is above the stock part and dim when it is not */
+  #build-preview .bp-spec span.up{color:var(--ink);background:var(--yellow);
+    border-color:var(--ink);font-weight:800}
+  #build-preview .bp-name{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  #build-preview .bp-tag{font-family:'Baloo 2';font-size:9px;font-weight:800;
+    letter-spacing:1.4px;padding:2px 7px;border-radius:5px;
+    color:var(--ink);background:var(--orange)}
+  #build-preview .bp-tag.stock{color:var(--gold-dim);background:rgba(0,0,0,.4);
+    border:1px solid var(--line-soft)}
+  #build-preview .bp-mods{font-size:9.5px;font-weight:700;letter-spacing:.8px;
+    color:var(--gold-dim)}
+  /* the chassis ceiling, stated on the bay that it gates */
+  /* THE CEILING CHIP WRAPS RATHER THAN RUNNING OFF. "CHASSIS CLASS 1 ·
+     SUSPENSION SPRING RAISES IT" is 379px of a 320px phone with nowrap on, and
+     since .bay-head is a flex ROW it pushed straight out of the panel. The head
+     wraps and the chip takes a line of its own when it has to. */
+  .bay-head{flex-wrap:wrap}
+  .bay-head .bay-cap{margin-left:auto;font-family:'Baloo 2';font-size:8.5px;
+    font-weight:800;letter-spacing:.8px;color:var(--gold-dim);
+    padding:2px 7px;border-radius:5px;background:rgba(0,0,0,.35);
+    border:1px solid var(--line-soft);min-width:0}
+  @media (max-width:389px){
+    .bay-head .bay-cap{margin-left:0;flex:1 1 100%;text-align:center}
+  }
+  /* MOUNT CLASS on every part, so it is met as a fact and not only as a
+     refusal */
+  .part-card{position:relative}
+  .part-card .pc-cls{position:absolute;top:4px;left:5px;font-size:7.5px;font-weight:800;
+    letter-spacing:.6px;color:var(--gold-dim);background:rgba(0,0,0,.5);
+    padding:1px 4px;border-radius:4px}
+  .part-card.on .pc-cls{color:var(--ink);background:var(--orange)}
+  /* THREE WALLS, THREE LOOKS. A race you have not run, a ladder you have not
+     climbed, and a chassis that will never take it are different problems and
+     must not share one grey padlock. */
+  .part-card.blocked{opacity:.7}
+  .part-card.blocked.capped{opacity:.5}
+  .part-card.blocked.capped .pc-art{filter:grayscale(1) brightness(.5)}
+  .part-card.blocked.mount{border-color:rgba(127,212,255,.4)}
+  .part-card.blocked.mount .pc-sub{color:#7fd4ff;font-weight:700}
+  .part-card.blocked.capped .pc-sub{color:#e8946a;font-weight:700}
+  .part-card.owned{border-color:rgba(141,232,154,.45)}
 
   #garage-bays{width:100%;display:flex;flex-direction:column;gap:8px}
   .bay{border:1px solid var(--line-soft);border-radius:var(--r-md);
@@ -1272,19 +1344,22 @@
     background:rgba(255,212,0,.1);border:1px solid rgba(255,212,0,.3)}
   /* PARTS AS PICTURES. auto-fill (not -fit) so a bay with three parts keeps the
      same card width as one with four — every shop shares a rhythm. */
-  .bay-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+  .bay-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
   .part-card{pointer-events:auto;cursor:pointer;display:flex;flex-direction:column;
     align-items:center;gap:3px;padding:6px 5px 7px;border-radius:var(--r-sm);
-    border:2px solid var(--line);background:rgba(38,26,12,.55);
+    border:2px solid var(--line);
+    background:linear-gradient(180deg,rgba(64,46,24,.6),rgba(24,16,8,.6));
     font-family:'Baloo 2';color:var(--cream);text-align:center;
     -webkit-tap-highlight-color:transparent;transition:transform .1s}
   .part-card:active{transform:scale(.97)}
-  .part-card.on{border-color:var(--orange);background:rgba(255,140,26,.2);
-    box-shadow:0 2px 0 var(--ink)}
-  .part-card.locked{opacity:.66}
-  .part-card .pc-art{width:100%;max-width:104px;height:auto;
-    filter:drop-shadow(0 3px 5px rgba(0,0,0,.5))}
-  .part-card.locked .pc-art{filter:grayscale(.85) brightness(.75)}
+  .part-card.on{border-color:var(--orange);
+    background:linear-gradient(180deg,rgba(255,140,26,.3),rgba(255,140,26,.1));
+    box-shadow:0 2px 0 var(--ink),0 0 16px rgba(255,140,26,.35),
+      inset 0 0 18px rgba(255,180,90,.18)}
+
+  .part-card .pc-art{width:100%;max-width:132px;height:auto;
+    filter:drop-shadow(0 4px 7px rgba(0,0,0,.6))}
+  .part-card.blocked.earn .pc-art{filter:grayscale(.85) brightness(.75)}
   .part-card .pc-name{font-family:'Luckiest Guy';font-size:10px;letter-spacing:.4px;
     line-height:1.15;color:var(--cream)}
   .part-card.on .pc-name{color:var(--yellow)}
@@ -1301,7 +1376,7 @@
   .pc-act.buy{color:var(--yellow);border:1px solid rgba(255,212,0,.45)}
   .pc-act.lock{color:var(--gold-dim);border:1px solid var(--line-soft)}
   .part-card .pc-sub{font-size:9px;line-height:1.3;color:#c8b48a}
-  .part-card.locked .pc-sub{color:var(--amber);font-weight:700}
+  .part-card.blocked.earn .pc-sub{color:var(--amber);font-weight:700}
 
   /* AN UPGRADE LINE IN THE SAME CLOTHES. A player does not care which of the
      game's two systems a thing came out of, so a ladder rung is a card with a
@@ -1528,6 +1603,69 @@
     white-space:pre-line;line-height:1.15}
   /* the lift-on-hover of .btn would peel a flush footer off its own edge */
   #start-btn:hover{transform:none;box-shadow:0 -6px 18px rgba(0,0,0,.55)}
+
+  /* ---- START RACE, CHARGED --------------------------------------------
+     Asked for as "make start race sparkly electric as in the screen". Three
+     layers, all of them transform/opacity so the phone composites them on the
+     GPU and the main thread pays nothing:
+       1. a SHEEN that travels across the face, like light down a wet bar
+       2. a GLOW that breathes at the top edge, where the button meets the list
+       3. SPARKS drifting up off it
+     No JS and no extra elements — ::before is the sheen, ::after is the spark
+     field, and the glow rides the box-shadow. The button already carries
+     `white-space:pre-line` for the wrong-tyre warning, so nothing here may
+     touch layout: everything is painted, nothing reflows. */
+  /* NO `position:relative` HERE. The button is already `position:sticky`, and
+     re-declaring position in a later rule silently overrode it — the footer
+     dropped out of its pinned spot and back into the flow, where it is only
+     visible at the very bottom of the page. Sticky already establishes the
+     containing block the ::before/::after need. */
+  #start-btn{overflow:hidden;isolation:isolate}
+  #start-btn > *{position:relative;z-index:2}
+  #start-btn::before{
+    content:'';position:absolute;z-index:1;top:0;bottom:0;left:-40%;width:34%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.62),transparent);
+    transform:skewX(-18deg);pointer-events:none;
+    animation:startSheen 3.4s cubic-bezier(.5,0,.3,1) infinite}
+  @keyframes startSheen{
+    0%{left:-45%}
+    55%,100%{left:125%}
+  }
+  /* the sparks: one repeating-gradient of tiny dots, drifting up and fading.
+     A field beats individual elements — it is a single composited layer. */
+  #start-btn::after{
+    content:'';position:absolute;z-index:1;inset:-30% -5% -5%;pointer-events:none;
+    background:
+      radial-gradient(1.6px 1.6px at 12% 82%, rgba(255,246,214,.95), transparent 60%),
+      radial-gradient(1.3px 1.3px at 28% 92%, rgba(255,214,120,.9), transparent 60%),
+      radial-gradient(1.8px 1.8px at 47% 78%, rgba(255,255,255,.85), transparent 60%),
+      radial-gradient(1.2px 1.2px at 63% 95%, rgba(255,226,150,.9), transparent 60%),
+      radial-gradient(1.7px 1.7px at 78% 84%, rgba(255,250,226,.95), transparent 60%),
+      radial-gradient(1.3px 1.3px at 91% 90%, rgba(255,206,110,.9), transparent 60%);
+    animation:startSparks 2.6s linear infinite}
+  @keyframes startSparks{
+    0%{transform:translateY(14%) scale(1);opacity:0}
+    18%{opacity:1}
+    100%{transform:translateY(-46%) scale(1.1);opacity:0}
+  }
+  /* the charge at the edge — same amber the button is made of, so it reads as
+     the button glowing rather than as a ring drawn around it */
+  #start-btn{animation:startCharge 2.2s ease-in-out infinite}
+  @keyframes startCharge{
+    0%,100%{box-shadow:0 -6px 18px rgba(0,0,0,.55),0 0 0 rgba(255,180,70,0),
+      inset 0 2px 0 rgba(255,240,200,.35)}
+    50%{box-shadow:0 -6px 22px rgba(0,0,0,.55),0 -2px 26px rgba(255,170,60,.55),
+      inset 0 2px 0 rgba(255,246,220,.6)}
+  }
+  /* A BUTTON THAT CANNOT BE PRESSED MUST NOT LOOK CHARGED. The blocked state
+     already recolours it; killing the animation is what stops it advertising. */
+  #start-btn.blocked{animation:none}
+  #start-btn.blocked::before,#start-btn.blocked::after{display:none}
+  /* MOTION IS A SETTING, NOT A DECISION WE GET TO MAKE FOR EVERYONE. */
+  @media (prefers-reduced-motion:reduce){
+    #start-btn,#start-btn::before,#start-btn::after{animation:none}
+    #start-btn::before,#start-btn::after{display:none}
+  }
   #start-btn.warned{font-size:clamp(15px,4.4vw,22px);padding-top:12px;padding-bottom:12px}
   /* A JOB IN HAND FOR THIS WORLD is a reason to be standing here, so the
      button says which job on its own line. Green edge, because the tyre
@@ -1867,7 +2005,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r232</div>
+<div id="build-tag">r245</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1917,19 +2055,23 @@
      TOP, not bottom: the bottom belongs to START RACE, and a pill down there
      sat on top of the world cards. -->
 <div id="title-screen" class="screen">
+  <!-- THE BAR IS ALWAYS UP IN THE MENU NOW. Asked for as "move title name and
+       credits at the top, make them always visible" — both used to sit in the
+       page and scroll away, and the credit balance is the number you check
+       before every purchase in the garage below.
+       Three slots: BACK when there is somewhere to go, WHERE YOU ARE in the
+       middle (the wordmark at the front door, since there is nowhere more
+       specific to name), and the balance pinned right. -->
   <div id="topbar" class="hidden">
     <button id="topbar-back" class="ch-back" aria-label="Back">‹&nbsp;BACK</button>
     <div id="topbar-where" class="ch-here"></div>
     <div id="topbar-stars" class="ch-here-stars"></div>
+    <div id="topbar-cred">CREDITS&nbsp;<b id="credits">0</b></div>
   </div>
-  <div class="game-title">IGNITE&nbsp;RALLY</div>
-  <!-- A THREE-WORD TAGLINE COULD WRAP ANYWHERE; A SENTENCE CANNOT. The old
-       "Dirt // Firepower // First Place" was short enough to sit on one line
-       and harmless wherever it broke. This one needs 307 px at the narrow
-       breakpoint's own type size and only gets 288 px inside a 320 px phone,
-       so it wraps — and left to itself it wrapped into THREE ragged lines.
-       Each clause is held together instead: one line where it fits, a clean
-       break at the comma where it does not. -->
+  <!-- The tagline stays: it is the one line of character on the front door,
+       and it is the only thing left above the tabs now that the wordmark has
+       moved into the bar. Each clause is held together so it breaks at the
+       comma and never mid-phrase. -->
   <div class="game-sub"><span class="nb">If you can&rsquo;t race them,</span>
     <span class="nb">shoot them</span></div>
   <!-- Status chips sit ABOVE the tabs, not in the same row. Sharing the row
@@ -1940,7 +2082,6 @@
        addresses and two labels for one control, reported as "I miss the back
        button". There is one now and it lives in #topbar. -->
   <div id="menu-status">
-    <span id="credits-chip">CREDITS&nbsp;<b id="credits">0</b></span>
     <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
   </div>
   <div id="menu-tabs">
@@ -2191,10 +2332,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r232"></script>
+<script type="module" src="./src/main.js?v=r245"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r232"></script>
+<script src="./src/offline.js?v=r245"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r232"></script>
+<script type="module" src="./src/traffic.js?v=r245"></script>
 </body>
 </html>

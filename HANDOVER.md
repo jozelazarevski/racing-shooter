@@ -1435,3 +1435,473 @@ fitted build), test-cars 28/0, test-filters 35/0, test-boot 7/0, test-ladder
 31/0, test-timeline 33/0, test-mobile-hud green, boot.mjs 4/4.
 `tools-scratch/stage.mjs` proves it turns, that a fitted V8 adds hardware with
 no reload, and that the loop STOPS on another tab and mid-race.
+
+## r233 — THE CHASSIS DECIDES WHAT IT CAN WEAR
+"Improve the designs. Make the elements more visible and exciting. Not all
+elements should be available for all chassis. That's the reason for upgrades on
+chassis. Add more explicit ways to signify what's upgraded."
+
+Note for whoever reads the report images: the screenshot sent alongside showed
+a "BODY KIT (STAGE 1)" card and coin icons that have never existed in this
+repo — checked against the live bundle before building anything. Both images
+were TARGETS, not bug reports. Do not go hunting for that card.
+
+### Mount classes — the same shape the tyres already had
+`CHASSIS_MOUNT` gives every car a base class per slot; a ladder raises it, and
+which ladder is declared on the slot (`mount`, `mountName`). ENGINE WRENCH
+opens engine bays, SUSPENSION SPRING opens wings — which is the answer to
+"that's the reason for upgrades on chassis": those two lines now have a second
+job, exactly like TIRES STACK opening a compound.
+
+A LADDER IS WORTH EXACTLY ONE CLASS, at level 3. It was one per two rungs
+first, and that let six of eight chassis reach the top class — true on paper,
+meaningless in play. At one class the roster splits and stays split:
+
+    V12 (class 3)   DUNE, BASTION, PIT      the heavy machines
+    GT WING         SLEEK, CROWN, FLATSIX, ALPINE   the light ones
+    NO CAR IN THE GAME CAN WEAR BOTH, and the starter BRAWLER can wear
+    neither — which is a reason to buy a second machine.
+
+Fitment is clamped ON READ, like the tyre compound: drop the ladder or swap to
+a smaller chassis and a V12 comes off the car but stays OWNED.
+
+### Three walls, told apart
+A part can be out of reach three ways and they want three different things, so
+they must not share one padlock:
+    earn    a race you have not run          "🔒 2/3", amber
+    mount   a ladder you have not climbed    "🔧 ENGINE 3", blue, names the
+                                             level AND where you are
+    capped  a chassis that will never take it "⛔ WON'T FIT", greyscaled, and
+                                             it NAMES the cars that can
+`partHomes()` is what makes the last one actionable — a dead end becomes a
+reason to own another car.
+
+### Saying what is upgraded
+Spec chips light up when they are above the stock part; every stat carries its
+delta against the chassis baseline (TOP 63 +7); the name carries STOCK or
+MODIFIED; a mods line counts parts swapped and upgrades fitted; every part card
+shows its CLASS; and each slot bay states the chassis ceiling and which ladder
+raises it.
+
+### Showroom paint
+`iconMats()` is a SECOND palette, for shop pictures only. The kit's own palette
+is deliberately dark because those parts live on a car at speed where bright
+reads as damage; a thumbnail has the opposite job. Red crackle cam covers,
+chrome, brass headers, alloy wheels with spokes.
+THE PLENUM WAS A LID: at 1.28 wide it covered the cam covers and every block
+rendered as a black box with gold pipes. It is 0.62 now and the red shows either
+side — that one change is most of why the engines read at 100px.
+
+### Gates
+test-parts 30/0 — adds the capped refusal, that it names compatible machines,
+the mount refusal naming its ladder and level, the part falling off when the
+ladder drops (while staying owned), and going back on when allowed.
+test-cars 28/0, test-filters 35/0, test-boot 7/0, test-ladder 31/0,
+test-timeline 33/0, boot.mjs 4/4, and 320/390/430 clean — the ceiling chip
+wraps rather than running 379px wide out of a 320px panel.
+
+## r234 — HEADER PINNED, START RACE CHARGED, AND ALASSIO
+Three asks in one report: "Move title name and credits at the top, make them
+always visible. Make start race sparkly electric as in the screen. Create race
+tracks inspired by this city Alassio Italy."
+
+### The bar carries the wordmark and the balance
+Both were in the page and scrolled away, and the balance is the number every
+purchase in the garage below is measured against. The bar is up for the WHOLE
+menu now (it used to appear only when there was a way back) with three slots:
+BACK when there is somewhere to go, WHERE YOU ARE in the middle — the wordmark
+at the front door, since there is nowhere more specific to name — and CREDITS
+pinned right, which never shrinks. The in-page hero title and credits chip are
+deleted; keeping both is the duplication that made this header 500px tall.
+`_syncCredits()` is called from every path that moves the balance, because a
+stale number in a bar that is ALWAYS on screen is worse than one that scrolled
+away.
+
+### START RACE, charged
+Three composited layers, no JS and no extra elements: a sheen travelling across
+the face (::before), a spark field drifting up (::after), and a breathing glow
+on the box-shadow. Silenced under `prefers-reduced-motion`, and killed on
+`.blocked` so a button that cannot be pressed does not advertise.
+
+TRAP, AND IT COST A BUILD: the new rule opened with `position:relative`, which
+silently overrode the `position:sticky` the footer runs on. The button dropped
+out of its pinned spot into the flow and was only visible at the very bottom of
+the page. Sticky already establishes the containing block the pseudo-elements
+need — do not re-declare position on `#start-btn`.
+
+### ALASSIO — chapter 13, worlds 73-76
+`THEMES.riviera` is DERIVED from `medterrace`, because that theme already has
+the sea machinery, the pantile roofs and the olive hills right. What Alassio
+needs on top is: the Ligurian pastel palette (ochre/apricot/rose with green
+shutters — `splinter` is the most direct statement of what the walls are made
+of), sand rather than limestone dust underfoot, softer hazier air than the hard
+olive-terrace sun, and three times the houses over most of the lap because it
+is a TOWN.
+
+It is also the one Mediterranean theme that is genuinely SEALED — a promenade
+and a town's own streets are tarmac in a way an olive terrace is not, and it
+gives the ROAD compound a home.
+
+Four worlds, because the town has four kinds of road and one lap would waste
+all of them. Every one borrows an existing route shape:
+    73 ALASSIO SEAFRONT  corniche  the four-kilometre arc of sand
+    74 IL BUDELLO        monaco    the lane — walls both sides, no run-off
+    75 PORTO MOLO        marina    the quays, sea on both sides
+    76 CAPO MELE         turini    the headland, hairpin on hairpin
+
+TRAP: `elev.profile: 'ascent'` IS HAND-SHAPED AND REQUIRES `elev.keys`. The
+ascent branch reads `E.keys` directly, so an ascent without them throws
+"Cannot read properties of undefined (reading 'length')" during world build and
+the level never appears — `node --check` cannot see it and the other three
+worlds booted fine. CAPO MELE has its key list now. Use the sine form
+(amp + ph) unless you are hand-shaping a climb.
+
+Built and measured: 73 len 1881u / tightest 19u, 74 len 1370u / tightest 13u
+(the tightest lap on the roster), 75 len 1541u / 16u, 76 N=900 on turini.
+
+test-parts 30/0, test-cars 28/0, test-filters 35/0, test-boot 7/0,
+test-ladder 31/0, test-timeline 33/0, test-mobile-hud green, boot.mjs 4/4.
+
+## r235 — ALASSIO'S BUILDINGS, DESIGNED
+"Screenshots. Make sure it's matching my reference meaning new buildings needs
+to be designed."
+
+### The bug was one inherited word
+`THEMES.riviera` derives from `medterrace`, and that inheritance brought
+`elements: 'medhill'` with it — the generic Mediterranean HILL kit, squat farm
+houses on an olive terrace. Alassio is not a hill village; it is four and five
+storeys of painted render standing shoulder to shoulder along a seafront. The
+worlds shipped in r234 with the wrong town in them and nothing failed, because
+a theme that picks a real kit is never wrong, only wrong-looking.
+
+WATCH THIS WHEN DERIVING A THEME: `elements` selects from `ELEMENT_KITS`, and
+an unknown name falls back to `farm` SILENTLY. Deriving a coastal theme from an
+inland one and forgetting `elements` gives you farm buildings on a promenade
+with no error anywhere.
+
+### Two new archetypes
+The existing `towerhouse` is a Cinque Terre hill house — four storeys on a
+small square footprint. The reference photograph is a different building, so:
+
+  palazzina  FIVE storeys, wider than deep because it is one of a terrace: a
+             three-pier shop arcade at street level under a canvas awning, a
+             stone string course between every floor, a balcony on each of the
+             three middle floors, shuttered pairs above. What reads from a car
+             is the ORDER OF HORIZONTALS — awning, three balconies, eaves — so
+             everything else serves keeping that rhythm legible.
+  shopfront  the budello's own building: narrow, three storeys, almost all
+             shop at the bottom. Deliberately SHORTER than the palazzina — a
+             lane where every building is the same height reads as a corridor.
+
+`ELEMENT_KITS.alassio` builds palazzina / shopfront / palazzina / towerhouse
+and drops the farm shed, because there is no farm on a seafront. `frontage`
+gives the town its own paint — apricot and rose against Cinque Terre's
+saturated coral, with the dark green of the photograph on both frame and
+shutter.
+
+### THE SCREENSHOT PROBE, AND TWO WAYS IT LIED
+  - It first searched the scene for objects named like buildings and reported
+    "0 buildings" on a world holding 12,632 instanced objects. Houses land in
+    SHARED InstancedMeshes; there is no per-building node to find. Park the
+    camera on the road at a fraction of the lap instead.
+  - It then wrote a 12KB blank. `render()` and `toDataURL()` MUST HAPPEN IN
+    ONE `evaluate`: the drawing buffer is not preserved and the game's own rAF
+    loop re-renders from the car's camera the moment the call returns. Same
+    rule already recorded for hillshot.mjs — third time this has been paid for.
+    A real frame weighs ~900KB.
+`tools-scratch/townshot.mjs` takes LV and F.
+
+## r236 — THE LIGURIAN MODULE SET, AND TWO MORE DISTRICTS
+"Add Sanremo mountains and Genova. Make sure they are all unique looking. Don't
+use that template. Create a Ligurian template that will match the designs."
+Sent with village-builder sheets naming the archetypes.
+
+### The four modules
+r235's `palazzina` and `shopfront` were a GUESS at a Ligurian building. The
+sheets name the real ones and are specific about what separates them, so the
+guess is gone and these are modelled instead. One of each on a street reads as
+a town; four of one reads as a texture.
+
+  ligSlender   six storeys on 4.6u — three times taller than it is wide. The
+               PROPORTION is the design; no balconies, a strict jalousie grid.
+  ligTwin      two bays sharing a party wall at DIFFERENT heights and colours.
+               The height step is the whole tell — level, it is one fat house.
+  ligCorner    the block that turns a junction: stepped chamfer, shop arcade
+               under two awnings on each street face, heavy cornice, parapet.
+  ligRural     the hinterland house: low, wide, stone ground floor, and GREEN
+               SLATE rather than pantile. The sheets treat that one material
+               swap as what separates a mountain village from a seafront, and
+               they are right — it does more work than any other single change.
+
+TRAP: the ninth element of a part tuple is `roll`, a rotation about Z, NOT a
+yaw. The corner's 45-degree chamfer was first written as a rotated slab and
+would have come out lying on its side. It is four stepped boxes now, which
+makes the same silhouette with no rotation at all.
+
+### Three districts off one module set
+Same modules, different weights and paint — which is how three towns on one
+coast stop looking like one town:
+  alassio  slender/twin/slender/corner  Golfo Paradiso pastels, pantile
+  genova   corner/slender/corner/twin   deep reds and burnt ochre, urban,
+                                        10 stone walls, a working port
+  sanremo  rural/rural/slender/twin     cream render, GREEN SLATE, drystone
+
+### The two new worlds
+  77 GENOVA PORTO   `panorama` — flat-then-mountain, which is Genova exactly:
+                    the docks, then straight up into the hills the city is
+                    stacked on. 118 buildings, the most built-up lap on the
+                    roster.
+  78 SANREMO STAGE  `corse` — the rally runs in the mountains BEHIND the town,
+                    so this world has `coast: undefined` and no sea in it at
+                    all. Cold high sun (el 1.02 against the coast's 0.82),
+                    880 trees, 720 rocks.
+
+### NOT DONE, and it is the larger half of the request
+"Re design all templates according" was sent with WINE REGION and SCOTTISH
+HIGHLANDS sheets. Those are different regions entirely — Alsace/Burgundy wine
+villages, Scottish crofts under heavy slate — and the roster has a dozen more
+building kits besides (alpine, medhill, oldtown, hedgerow, outback, farm...).
+Redesigning every one of them from those sheets is a much bigger piece of work
+than this commit. Only the LIGURIAN set is redesigned here.
+
+## r237 — HIGH POLY, AND THE BUG THAT FOUND
+"Make it high poli."
+
+### THE REAL FINDING: r236's buildings were not being placed
+Measuring the budget before adding a triangle is what caught it. IL BUDELLO
+reported 156 wall instances — about a hundred dwellings — but its box count did
+NOT move when the four Ligurian templates tripled in detail. That can only mean
+one thing: the buildings standing in Alassio were not the Ligurian ones.
+
+`_buildHuts` places the ~96 dwellings that MAKE a town, and it always drew them
+from the global `COTTAGES` list — eight generic cottages — while the district
+kit's own `builds` list was read by nothing but a three-house village layout.
+So the whole module set shipped in r236 stood in three buildings out of a
+hundred, and Alassio was a coast of English cottages wearing a pastel palette.
+
+`_buildHuts` prefers `K.builds` now and falls back to COTTAGES, so no existing
+world changes. Measured on IL BUDELLO: box instances 2,478 -> 10,997.
+
+LESSON, AND IT IS THE SAME ONE AS THE MISSIONS SCREEN: shipping a template is
+not shipping a building. Check the instance count, not the diff.
+
+### The detail itself
+`ligWin` / `ligRail` / `ligCornice` / `ligTiles` / `ligChimney` are a shared kit
+above HOUSE_TEMPLATES, because a window is the same assembly eighty times over
+and eighty hand-written copies is where transcription errors live. A window is
+now a recessed pane, two reveals, a lintel, a projecting sill and two shutter
+leaves — six parts that each catch their own shadow. This engine has no normal
+maps, so DEPTH is the only way a facade stops reading as a texture.
+
+`element-cyl` went 10 segments to 16 and `element-cone` to 14 — both are single
+shared geometries feeding one InstancedMesh each, so it is paid once per world.
+
+### THE 9TH ELEMENT OF A PART IS `roll`, NOT A YAW
+It rotates about the FORWARD axis. The corner building's chamfer was authored
+as `['wall', ..., 0.785]` expecting a plan rotation, which would have tipped the
+wall onto its side. There is no per-part yaw. The corner is a DRUM now — a
+cylinder with banding rings and a turret cap — which needs no rotation and
+looks the same from every approach, which is what a corner has to do.
+
+### The budget, measured either side
+    before  326k tris / 313 draw calls   (and the wrong buildings)
+    after   464k tris / 319 draw calls   IL BUDELLO, the densest town
+            514k tris / 270 draw calls   SANREMO
+DRAW CALLS ARE FLAT — that is the number that matters on a phone, and it holds
+because every building part lands in one of five InstancedMeshes. Triangles are
+the cheap axis here; calls are not. Do not add a building part that needs its
+own material.
+
+test-buildings green (66 destructible buildings, 0 unresolved parts), test-boot
+7/0, test-ladder 31/0, test-timeline 33/0, boot.mjs 4/4.
+
+### STILL OPEN
+The scatter puts the town to ONE SIDE of the road with bare ground opposite —
+see the r237 screenshot of IL BUDELLO. A budello should be walled both sides.
+That is `_element`'s road-clearance gate and the `_zonePos` scatter, not the
+templates, and it is the next thing worth doing on these worlds.
+
+## r238 — THE SEGMENT BUMP THAT DID NOT SHIP IN r237
+r237 claimed `element-cyl` went to 16 segments. It did not: there are TWO
+`_realizeElements`-style sites building `gCyl`/`gCone`, the edit asserted
+`count == 1`, the assert threw, and the file was never written. The assert did
+its job — the failure was invisible because that command was backgrounded and
+its output was never read.
+
+TWO LESSONS, both cheap:
+  - `grep -c` the thing you changed before believing it shipped. The r237
+    deploy check did exactly that and printed `rounder primitives: 0`, which is
+    the only reason this was caught.
+  - Do not background a command whose output is the proof it worked.
+
+Applied at both sites now: cylinders 10 -> 16 segments, cones 10 -> 14.
+IL BUDELLO: 464k -> 503k triangles, draw calls still 319. element-cyl 64k ->
+102k, which is what a hundred buildings' worth of balusters, downpipes, chimney
+pots, arcade columns and corner drums costs to stop being decagons.
+
+## r239 — THE ARRANGEMENT WAS THE PROBLEM, NOT THE MODELS
+"It is nothing like the screenshots I sent. Follow those 1:1."
+
+Fair. Three passes had gone into DETAILING buildings and none into how they are
+ARRANGED, and the reference sheets are about arrangement: their subject is
+TERRACES — houses sharing party walls in a continuous run down both sides of a
+street, four and five storeys, three bays each, shops at the foot. Free-standing
+towers scattered in a field cannot look like that however good each one is.
+
+Three concrete gaps, all now closed:
+  1. PROPORTION AND WINDOW COUNT. The frontage inherited the default street:
+     two-storey market-town units. `BAYSETS.liguria` in textures.js is four and
+     five storeys of three bays, and `height: 14 / unit: 7.2` is the sheet's
+     own near-2:1 block. This is the one the eye reads first, from a car, long
+     before any moulding.
+  2. THE GREEN PERSIANE. Every building on every sheet shares one colour: the
+     dark green shutter. It is now the frontage's `shutter` AND the tint list
+     is the sheet's own stucco swatches in order.
+  3. TWO SYSTEMS DRAWING THE SAME TOWN. `frontage` builds the street wall and
+     `_buildHuts` scattered 96 free-standing houses behind it, so the budello
+     had a terrace along the road AND a field of towers. The scatter stands
+     down to a handful of backland buildings where a frontage exists.
+
+### THE BUG: `str.replace` REPLACES EVERY OCCURRENCE
+Threading `set` into `townhouseBays` was written as a plain Python replace of
+`const VB = townhouseBays(variant);` — which hit TWO call sites. The second is
+`townhouseGlowTexture`, which has no `set` in scope, so every Riviera world
+died at build with "set is not defined" and `node --check` saw nothing wrong.
+The fix is not just scoping: the glow texture MUST take the same bayset as the
+facade, because its whole job is lighting the same openings — its own header
+records the earlier bug where lit rectangles landed on blank wall.
+
+Use an explicit count assertion on every replace. r237's segment bump was lost
+to the same class of mistake in the other direction.
+
+### STILL NOT 1:1, and worth naming
+  - The street wall is ONE-SIDED at the start line. The frontage validates each
+    block against the carriageway and the grid start is open ground, so the
+    inside of that corner stays bare.
+  - The ground is still sand. A town street should be paved to the building
+    line; `riviera` inherits a beach ground from `medterrace`.
+  - The corner building is a drum (r237). The sheets draw a CHAMFERED corner
+    with a ground-floor arcade. There is no per-part yaw, so a true chamfer
+    needs either a new primitive or a yawed sub-group.
+
+boot.mjs 4/4, test-boot 7/0, test-buildings green, test-ladder 31/0,
+test-timeline 33/0.
+
+## r240 — THE ROAD WAS THE PROBLEM
+"Change the design drastically to look 1:1."
+
+Four passes had gone into buildings. The buildings were never the problem.
+
+### A 9 u HALF-WIDTH ROAD CANNOT HAVE A STREET WALL
+`_clearsRoad` refuses any frontage block whose face lands inside
+`widthAt(i) + 1.6`. On a default road that is 10.6 u from the centreline, and
+with `lateral 15 / depth 8.5` the face sat at 10.75 — passing by 15 cm on a
+straight and FAILING everywhere the road widened or turned. That is why the
+terrace kept coming out sparse and one-sided, and no amount of detailing a
+template could have fixed it.
+
+    roadWidth: 0.55   IL BUDELLO — "the gut" is one car wide
+    roadWidth: 0.7    GENOVA — a caruggio, barely wider
+    lateral: 9.6, depth: 7.0, height: 17.0
+
+`height: 17` is the number that turns a road with houses beside it into a
+STREET: it is what encloses the view.
+
+### AND A STREET HAS NO COUNTRYSIDE IN IT
+Rocks, scrub, tufts and wildflowers between kerb and wall are what kept reading
+as "road through a field". All zeroed on the two town worlds, and the ground is
+`TOWN_GROUND` — worn paving, not the beach sand `riviera` inherits from
+`medterrace`. The ground is most of the frame from a chase camera; a
+sand-coloured one puts the town in a desert.
+
+### CHECK THE SHOT YOU ARE JUDGING FROM
+Every screenshot up to here was taken at the START LINE, from above. The grid
+is deliberately open ground on every world in the game, so it is the one place
+a street world looks least like a street — four rounds of "it still doesn't
+match" were partly me judging from the worst possible camera.
+`tools-scratch/lapshot.mjs` stands on the road at driver height at a given lap
+fraction. Use it for anything about how a world LOOKS.
+
+boot.mjs 4/4, test-boot 7/0, test-buildings green, test-ladder 31/0.
+
+## r241 — THE STREET SURFACE AND THE PALETTE, FROM THE TARGET IMAGE
+A render was sent with "this is how I want it to look, anything else won't be
+acceptable". Compared against r240 the gaps were mostly NOT the buildings:
+
+  1. THE ROAD IS ~40% OF THAT FRAME. Theirs is large irregular setts in pale
+     greys, beiges and a faint lilac, with a TRAM LINE bedded in tan running
+     down it. Mine was speckle noise on grey.
+  2. The palette is muted taupe / stone / ox-blood with PALE window frames
+     against dark glass — not saturated pastel.
+
+### Tram rails are a texture pass, not geometry
+The road canvas maps its WIDTH across the 22 u ribbon and its HEIGHT along the
+direction of travel (see RUT_CX), so a vertical stripe on that canvas is a line
+running down the road. `applyTramRails` paints two bedded rails for the cost of
+a few fills — a mile of rail geometry would have been absurd for the same
+result. Drawn AFTER the cobbles, which is the right order: track is laid INTO a
+street, not under it.
+
+`TOWN_ROAD` sets the setts at `rows: 20, per: 26` — 22 u across 26 stones is
+~0.85 u each, about a dinner plate, roughly twice Tremola's hand-laid sett and
+what the reference shows.
+
+### The pale window frame is doing more work than it looks
+`frame: '#efe9dc'` against `pane: '#1e232b'`. A light frame on dark glass is
+what makes a window grid read from the far end of a street; the saturated
+version had a dark frame on dark glass and the grid dissolved past ~40 u.
+
+### STILL SHORT OF THE TARGET
+  - NO HALF-TIMBERING. The reference has dark timber framing over cream infill
+    on several facades and it is a strong part of that look. It wants a facade
+    variant in townhouseTexture, not a new building.
+  - The setts are more REGULAR than the reference's, which vary in size and
+    shape as well as tone. `applyCobbleRoad` lays a strict staggered grid.
+  - That reference is a northern/Hanseatic street, not a Ligurian one. The
+    palette now follows the image rather than Alassio, which is what was asked
+    for — say so if the colour should come back.
+
+boot.mjs 4/4, test-boot 7/0, test-buildings green.
+
+## r242 — HALF-TIMBERING, WHICH IS WHAT THE HOUSE DESIGN ACTUALLY IS
+"Follow the design I sent you. Focus on the house design." The second reference
+is a Fachwerk street: dark timber framing with diagonal braces over light
+infill, warm rust and tan, steep street-facing gables, a flower box under
+nearly every window.
+
+`applyHalfTimber` paints the frame into the facade texture — a sill and head
+beam per storey, posts between the bays, and the DIAGONAL BRACES that are the
+whole reason the style reads. Without the diagonals it is a grid of lines and
+the eye takes it for a modern curtain wall.
+
+Painted, not modelled, and deliberately: this is one texture on a frontage
+block, so the alternative is a hundred slender boxes per building. It is drawn
+over the render and UNDER the joinery, so sashes still sit proud of the frame
+as they do on a real one. `townhouseBays` returns `rows`/`xs`/`bh` now, or the
+posts land through the windows.
+
+### THREE THINGS THAT WERE WRONG ON THE FIRST TRY, all worth keeping
+  1. TINTS MULTIPLY THE WHOLE FACE, so they are the INFILL colour and must stay
+     LIGHT. The first cut used the reference's rust and brick reds as tints and
+     got dark-on-dark: a near-black frame over a dark red panel, pattern
+     invisible. On a timbered building the panel is limewash and the frame is
+     the dark thing — the CONTRAST is the style. The reds live in the roofs.
+  2. CORRECT SCALE IS INVISIBLE. At `w/32` the beam is a true 25 cm and gone
+     past twenty units. This texture is read at speed from the far end of a
+     street; `w/22` is a heavy oak frame and is also what the reference draws.
+  3. ONE DIAGONAL READS AS A MISTAKE. It needs the opposing pair to close the
+     panel into the "Mann" figure before it reads as a frame at all.
+
+Also: `hemiIntensity` 0.7 -> 1.15. "Shade between four-storey terraces" was
+true and wrong — once the buildings grew to 17 u they shadowed each other and
+the whole frame went to mud. A street like this is lit by bounce off pale
+render, so the ambient carries it rather than the key.
+
+Flower boxes are painted under every upper bay (`boxes` in the face palette).
+Most of the colour in the reference street comes from them.
+
+STILL SHORT: the walls sit darker and browner than the reference's sunlit cream
+and rust, and there is no jettying (the upper storeys overhang in the
+reference; ours are flush).
+
+boot.mjs 4/4, test-boot 7/0, test-buildings green.
