@@ -1308,3 +1308,67 @@ fitted build), test-cars 28/0, test-filters 35/0, test-boot 7/0, test-ladder
 31/0, test-timeline 33/0, test-mobile-hud green, boot.mjs 4/4.
 `tools-scratch/stage.mjs` proves it turns, that a fitted V8 adds hardware with
 no reload, and that the loop STOPS on another tab and mid-race.
+
+## r233 — THE CHASSIS DECIDES WHAT IT CAN WEAR
+"Improve the designs. Make the elements more visible and exciting. Not all
+elements should be available for all chassis. That's the reason for upgrades on
+chassis. Add more explicit ways to signify what's upgraded."
+
+Note for whoever reads the report images: the screenshot sent alongside showed
+a "BODY KIT (STAGE 1)" card and coin icons that have never existed in this
+repo — checked against the live bundle before building anything. Both images
+were TARGETS, not bug reports. Do not go hunting for that card.
+
+### Mount classes — the same shape the tyres already had
+`CHASSIS_MOUNT` gives every car a base class per slot; a ladder raises it, and
+which ladder is declared on the slot (`mount`, `mountName`). ENGINE WRENCH
+opens engine bays, SUSPENSION SPRING opens wings — which is the answer to
+"that's the reason for upgrades on chassis": those two lines now have a second
+job, exactly like TIRES STACK opening a compound.
+
+A LADDER IS WORTH EXACTLY ONE CLASS, at level 3. It was one per two rungs
+first, and that let six of eight chassis reach the top class — true on paper,
+meaningless in play. At one class the roster splits and stays split:
+
+    V12 (class 3)   DUNE, BASTION, PIT      the heavy machines
+    GT WING         SLEEK, CROWN, FLATSIX, ALPINE   the light ones
+    NO CAR IN THE GAME CAN WEAR BOTH, and the starter BRAWLER can wear
+    neither — which is a reason to buy a second machine.
+
+Fitment is clamped ON READ, like the tyre compound: drop the ladder or swap to
+a smaller chassis and a V12 comes off the car but stays OWNED.
+
+### Three walls, told apart
+A part can be out of reach three ways and they want three different things, so
+they must not share one padlock:
+    earn    a race you have not run          "🔒 2/3", amber
+    mount   a ladder you have not climbed    "🔧 ENGINE 3", blue, names the
+                                             level AND where you are
+    capped  a chassis that will never take it "⛔ WON'T FIT", greyscaled, and
+                                             it NAMES the cars that can
+`partHomes()` is what makes the last one actionable — a dead end becomes a
+reason to own another car.
+
+### Saying what is upgraded
+Spec chips light up when they are above the stock part; every stat carries its
+delta against the chassis baseline (TOP 63 +7); the name carries STOCK or
+MODIFIED; a mods line counts parts swapped and upgrades fitted; every part card
+shows its CLASS; and each slot bay states the chassis ceiling and which ladder
+raises it.
+
+### Showroom paint
+`iconMats()` is a SECOND palette, for shop pictures only. The kit's own palette
+is deliberately dark because those parts live on a car at speed where bright
+reads as damage; a thumbnail has the opposite job. Red crackle cam covers,
+chrome, brass headers, alloy wheels with spokes.
+THE PLENUM WAS A LID: at 1.28 wide it covered the cam covers and every block
+rendered as a black box with gold pipes. It is 0.62 now and the red shows either
+side — that one change is most of why the engines read at 100px.
+
+### Gates
+test-parts 30/0 — adds the capped refusal, that it names compatible machines,
+the mount refusal naming its ladder and level, the part falling off when the
+ladder drops (while staying owned), and going back on when allowed.
+test-cars 28/0, test-filters 35/0, test-boot 7/0, test-ladder 31/0,
+test-timeline 33/0, boot.mjs 4/4, and 320/390/430 clean — the ceiling chip
+wraps rather than running 379px wide out of a 320px panel.

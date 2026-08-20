@@ -157,14 +157,18 @@ const PART_SLOTS = [
   {
     key: 'engine', name: 'ENGINE BLOCK', icon: '🔩',
     blurb: 'Power against grip. Bigger blocks pull harder and slide sooner.',
+    // WHAT RAISES THE CEILING. A bay is only so big and a chassis only so
+    // stiff: `mount` is the ladder that lets this car carry a bigger one, the
+    // same way TIRES STACK opens a compound.
+    mount: 'engine', mountName: 'ENGINE WRENCH',
     parts: [
-      { id: 'v4', name: 'V4 INLINE', sub: 'Stock. Honest and tidy.',
+      { id: 'v4', name: 'V4 INLINE', sub: 'Stock. Honest and tidy.', tier: 0,
         cost: 0, stock: true, speed: 1, accel: 1, grip: 1, pipes: 2 },
-      { id: 'v6', name: 'V6 TURBO', sub: 'A real shove out of slow corners.',
+      { id: 'v6', name: 'V6 TURBO', sub: 'A real shove out of slow corners.', tier: 1,
         cost: 1800, speed: 1.06, accel: 1.10, grip: 0.97, pipes: 2 },
-      { id: 'v8', name: 'V8 BLOCK', sub: 'Fast everywhere, loose everywhere.',
+      { id: 'v8', name: 'V8 BLOCK', sub: 'Fast everywhere, loose everywhere.', tier: 2,
         cost: 4200, speed: 1.14, accel: 1.18, grip: 0.93, pipes: 4 },
-      { id: 'v12', name: 'V12 MONSTER', sub: 'More engine than tyre. Fit a wing.',
+      { id: 'v12', name: 'V12 MONSTER', sub: 'More engine than tyre. Fit a wing.', tier: 3,
         cost: 9000, speed: 1.24, accel: 1.24, grip: 0.86, pipes: 6,
         lock: { kind: 'cleared', n: 6, label: 'WIN 6 WORLDS OUTRIGHT' } },
     ],
@@ -172,20 +176,61 @@ const PART_SLOTS = [
   {
     key: 'spoiler', name: 'REAR WING', icon: '🪽',
     blurb: 'Downforce: grip that arrives with speed, paid for in top end.',
+    mount: 'handling', mountName: 'SUSPENSION SPRING',
     parts: [
-      { id: 'none', name: 'NO WING', sub: 'Nothing to slow you down.',
+      { id: 'none', name: 'NO WING', sub: 'Nothing to slow you down.', tier: 0,
         cost: 0, stock: true, speed: 1, down: 0 },
-      { id: 'lip', name: 'LIP SPOILER', sub: 'A little stability, barely a cost.',
+      { id: 'lip', name: 'LIP SPOILER', sub: 'A little stability, barely a cost.', tier: 1,
         cost: 900, speed: 0.99, down: 0.10 },
-      { id: 'duck', name: 'DUCKTAIL', sub: 'Planted through the quick stuff.',
+      { id: 'duck', name: 'DUCKTAIL', sub: 'Planted through the quick stuff.', tier: 2,
         cost: 2200, speed: 0.975, down: 0.22 },
-      { id: 'gt', name: 'GT WING', sub: 'Enormous. Corners like it is on rails.',
+      { id: 'gt', name: 'GT WING', sub: 'Enormous. Corners like it is on rails.', tier: 3,
         cost: 5000, speed: 0.95, down: 0.40,
         lock: { kind: 'medals', n: 3, label: 'TAKE 3 MISSION MEDALS' } },
     ],
   },
 ];
 const PART_SLOT = Object.fromEntries(PART_SLOTS.map((s) => [s.key, s]));
+
+// WHAT EACH CHASSIS CAN CARRY BEFORE ANY MONEY IS SPENT.
+//
+// "Not all elements should be available for all chassis. That's the reason for
+// upgrades on chassis." Exactly the shape the TYRE system already has: a car
+// has a class of its own, and a ladder raises it. So a bay is only so big and
+// a body only so stiff — engine tier is what the ENGINE WRENCH opens up, wing
+// tier is what the SUSPENSION SPRING opens up, and a maxed ladder adds +2.
+//
+// The numbers come from what each machine IS, so the roster reads as eight
+// different cars rather than eight price points:
+//   BASTION and PIT are heavy haulers — huge engine bays, bodies too soft and
+//     too tall to ever carry a GT wing
+//   SLEEK is a little hatch — the wing bolts straight on, the big blocks never
+//     will
+//   FLATSIX and CROWN are the tarmac cars: room for both, at a price
+//   DUNE is built to climb, not to corner — big lump, no aero
+// A car can therefore be the ONLY home for a part, which is the point: the
+// V12 lives in the heavy cars, the GT wing in the light ones, and no single
+// machine in the game can wear both.
+const CHASSIS_MOUNT = {
+  brawler: { engine: 1, spoiler: 1 },
+  sleek: { engine: 0, spoiler: 2 },
+  crown: { engine: 1, spoiler: 2 },
+  dune: { engine: 2, spoiler: 0 },
+  flatsix: { engine: 1, spoiler: 2 },   // light coupe: big wing, never a big block
+  bastion: { engine: 3, spoiler: 0 },
+  alpine: { engine: 1, spoiler: 2 },
+  pit: { engine: 3, spoiler: 1 },
+};
+const MOUNT_MAX = 3;
+/** A LADDER IS WORTH EXACTLY ONE MOUNT CLASS, at level 3.
+ *
+ *  It was two (one every other rung), and that let six of the eight chassis
+ *  reach the top class — which makes "not every part fits every chassis" true
+ *  on paper and meaningless in play. One class means the CAR decides what it
+ *  can ever wear and the ladder only ever moves you one step, so the roster
+ *  splits cleanly: the heavy machines take the big blocks, the light ones take
+ *  the big wings, and NO CAR IN THE GAME CAN WEAR BOTH. */
+const mountFromLevel = (lvl) => ((lvl | 0) >= 3 ? 1 : 0);
 /** The stock part of a slot — what an unbuilt car is wearing, and the thing
  *  every save written before parts existed is treated as having. */
 const stockPart = (slot) => slot.parts.find((p) => p.stock) || slot.parts[0];
@@ -4060,7 +4105,12 @@ class Game {
       const stock = stockPart(slot);
       rec.owned[`${slot.key}:${stock.id}`] = 1;             // stock is never bought
       const fit = rec.fitted[slot.key];
-      if (!slot.parts.some((pt) => pt.id === fit)) rec.fitted[slot.key] = stock.id;
+      const pt = slot.parts.find((x) => x.id === fit);
+      // CLAMPED ON READ, exactly like the tyre compound, and for the same
+      // reason: the ceiling moves. Swapping to a smaller chassis — or a career
+      // reset dropping the ladder back to zero — must not leave a V12 bolted
+      // into a bay that cannot hold one. Owning it is kept; wearing it is not.
+      if (!pt || (pt.tier | 0) > this.mountMax(slot.key, carKey)) rec.fitted[slot.key] = stock.id;
     }
     return rec;
   }
@@ -4093,6 +4143,48 @@ class Game {
       have = Object.values(this._missionBest?.() || {}).filter((m) => m > 0).length;
     }
     return { open: have >= n, have, need: n };
+  }
+
+  /** THE HIGHEST MOUNT CLASS THIS CAR CAN CARRY IN A SLOT, right now. */
+  mountMax(slotKey, carKey = this.cars.selected, up = null) {
+    const base = CHASSIS_MOUNT[carKey]?.[slotKey] ?? 1;
+    const slot = PART_SLOT[slotKey];
+    const lv = (up ?? this.carUpgrades(carKey))[slot.mount] | 0;
+    return Math.min(MOUNT_MAX, base + mountFromLevel(lv));
+  }
+
+  /** CAN THIS CAR TAKE THIS PART, and if not, is that a thing money can fix?
+   *
+   *  Three outcomes, and the difference between the last two is the whole
+   *  reason this exists — one is a purchase, the other is a different car:
+   *    ok        it fits
+   *    !ok       the ladder is not high enough YET (`via` names it, `need` is
+   *              the level required)
+   *    capped    even a maxed ladder cannot get there on this chassis
+   */
+  /** WHICH MACHINES COULD EVER WEAR THIS PART. A "won't fit" with no way
+   *  forward is a dead end; naming the chassis that can turns it into a
+   *  reason to own another car, which is what the gating is for. */
+  partHomes(slot, part) {
+    const tier = part.tier | 0;
+    return CAR_CATALOG.filter((c) => {
+      const base = CHASSIS_MOUNT[c.key]?.[slot.key] ?? 1;
+      return Math.min(MOUNT_MAX, base + mountFromLevel(5)) >= tier;
+    }).map((c) => c.name);
+  }
+
+  partFits(slot, part, carKey = this.cars.selected) {
+    const tier = part.tier | 0;
+    const have = this.mountMax(slot.key, carKey);
+    if (tier <= have) return { ok: true };
+    const base = CHASSIS_MOUNT[carKey]?.[slot.key] ?? 1;
+    const ceiling = Math.min(MOUNT_MAX, base + mountFromLevel(5));
+    if (tier > ceiling) return { ok: false, capped: true, via: slot.mountName };
+    // the lowest ladder level whose mount class reaches this tier
+    let need = 0;
+    while (need <= 5 && Math.min(MOUNT_MAX, base + mountFromLevel(need)) < tier) need++;
+    return { ok: false, capped: false, via: slot.mountName, need,
+      at: this.carUpgrades(carKey)[slot.mount] | 0 };
   }
 
   /** WHICH COMPOUND IS ON THIS CAR RIGHT NOW.
@@ -4295,7 +4387,13 @@ class Game {
     for (const bay of BAYS) {
       const box = document.createElement('div');
       box.className = 'bay';
-      box.innerHTML = `<div class="bay-head"><span>${bay.icon}</span>${bay.name}</div>`;
+      // A SLOT BAY SAYS WHAT THIS CHASSIS CAN TAKE, up front, so the greyed
+      // cards below are explained before they are met.
+      const cap = bay.slot
+        ? `<b class="bay-cap">CHASSIS CLASS ${this.mountMax(bay.slot)}${
+  this.mountMax(bay.slot) < MOUNT_MAX ? ` · ${PART_SLOT[bay.slot].mountName} RAISES IT` : ' · MAXED'}</b>`
+        : '';
+      box.innerHTML = `<div class="bay-head"><span>${bay.icon}</span>${bay.name}${cap}</div>`;
 
       // ---- the CHOICE half: parts, as pictures
       if (bay.slot) {
@@ -4315,18 +4413,39 @@ class Game {
           const owned = !!rec.owned[`${slot.key}:${pt.id}`];
           const on = pt.id === fit.id;
           const lock = this.partLock(pt);
+          const mount = this.partFits(slot, pt);
+          // A CARD HAS TO SAY WHICH OF THREE WALLS IS IN THE WAY, because they
+          // want three different things from the player: a race, a chassis
+          // ladder, or a different car entirely. Lumping them into one padlock
+          // is what makes a shop feel arbitrary.
+          const wall = !mount.ok ? (mount.capped ? 'capped' : 'mount')
+            : !lock.open && !owned ? 'earn' : null;
           const card = document.createElement('button');
-          card.className = 'part-card' + (on ? ' on' : '') + (!lock.open && !owned ? ' locked' : '');
+          card.className = 'part-card' + (on ? ' on' : '')
+            + (wall ? ` blocked ${wall}` : '') + (owned && !on ? ' owned' : '');
           card.dataset.slot = slot.key;
           card.dataset.part = pt.id;
+          card.dataset.tier = pt.tier | 0;
           const pct = Math.round((power(pt) / top) * 100);
-          card.innerHTML = `<img class="pc-art" src="${icons[`${slot.key}:${pt.id}`]}" alt="">
+          const act = on ? ['fitted', 'FITTED']
+            : wall === 'capped' ? ['lock', '⛔ WON\u2019T FIT']
+              : wall === 'mount' ? ['lock', `🔧 ${mount.via.split(' ')[0]} ${mount.need}`]
+                : wall === 'earn' ? ['lock', `🔒 ${lock.have}/${lock.need}`]
+                  : owned ? ['own', 'INSTALL'] : ['buy', `${pt.cost.toLocaleString()} CR`];
+          const why = wall === 'capped'
+            ? `This body tops out at class ${this.mountMax(slot.key)}. Fits: ${
+  this.partHomes(slot, pt).join(', ') || 'nothing in the catalogue'}`
+            : wall === 'mount' ? `Needs ${mount.via} ${mount.need} (you are at ${mount.at})`
+              : wall === 'earn' ? pt.lock.label : pt.sub;
+          // MOUNT CLASS, ON EVERY CARD. It is the number the whole bay turns
+          // on, so it is stated even when the part fits — otherwise a player
+          // only ever meets it as a refusal.
+          card.innerHTML = `<span class="pc-cls">CLASS ${pt.tier | 0}</span>
+            <img class="pc-art" src="${icons[`${slot.key}:${pt.id}`]}" alt="">
             <span class="pc-name">${pt.name}</span>
             <span class="pc-bar"><i style="width:${pct}%"></i></span>
-            <span class="pc-act ${on ? 'fitted' : owned ? 'own' : lock.open ? 'buy' : 'lock'}">${
-  on ? 'FITTED' : owned ? 'INSTALL'
-    : lock.open ? `${pt.cost.toLocaleString()} CR` : `🔒 ${lock.have}/${lock.need}`}</span>
-            <span class="pc-sub">${!lock.open && !owned ? pt.lock.label : pt.sub}</span>`;
+            <span class="pc-act ${act[0]}">${act[1]}</span>
+            <span class="pc-sub">${why}</span>`;
           card.addEventListener('click', () => this._partAction(slot, pt));
           grid.appendChild(card);
         }
@@ -4606,17 +4725,38 @@ class Game {
     const wing = this.fittedPart('spoiler');
     const p = this.player;
     const tc = tyreClass(this.cars.selected, this.carUpgrades(), this.fittedTyre());
+    // WHAT IS UPGRADED, SAID OUT LOUD. A spec chip is lit when it is above
+    // the stock part and dim when it is not, every stat carries its delta
+    // against a STOCK example of the same chassis, and the mods strip counts
+    // what the money has actually bought. Before this the panel showed four
+    // numbers with nothing to compare them to — "TOP 56" tells a player
+    // nothing about whether 56 is what they started with.
+    const up = this.carUpgrades();
+    const engStock = stockPart(PART_SLOT.engine);
+    const wingStock = stockPart(PART_SLOT.spoiler);
+    const base = this._base ?? { maxSpeed: p?.maxSpeed ?? 0, accel: p?.accel ?? 0, maxHealth: p?.maxHealth ?? 0 };
+    const chip = (label, mod) => `<span class="${mod ? 'up' : ''}">${mod ? '▲ ' : ''}${label}</span>`;
+    const num = (label, now, was, unit = '') => {
+      const d = Math.round(now) - Math.round(was);
+      return `<span><i>${label}</i><b>${Math.round(now)}${unit}</b>${
+  d ? `<u class="${d > 0 ? 'up' : 'dn'}">${d > 0 ? '+' : ''}${d}</u>` : ''}</span>`;
+    };
+    const ladders = UPGRADES.reduce((n, u) => n + (up[u.key] | 0), 0);
+    const swapped = (eng.id !== engStock.id ? 1 : 0) + (wing.id !== wingStock.id ? 1 : 0);
     el.innerHTML = `<div class="bp-shop"></div>
       <div class="bp-side">
-        <div class="bp-name">${car?.name ?? ''}</div>
-        <div class="bp-spec"><span>${eng.name}</span><span>${wing.name}</span>
-          <span>${TYRE_LABEL[tc]} TYRES</span></div>
+        <div class="bp-name">${car?.name ?? ''}${
+  ladders || swapped ? '<b class="bp-tag">MODIFIED</b>' : '<b class="bp-tag stock">STOCK</b>'}</div>
+        <div class="bp-spec">${chip(eng.name, eng.id !== engStock.id)}${
+  chip(wing.name, wing.id !== wingStock.id)}${chip(`${TYRE_LABEL[tc]} TYRES`, tc > 0)}</div>
         <div class="bp-nums">
-          <span><i>TOP</i><b>${Math.round(p?.maxSpeed ?? 0)}</b></span>
-          <span><i>PULL</i><b>${Math.round(p?.accel ?? 0)}</b></span>
-          <span><i>HULL</i><b>${Math.round(p?.maxHealth ?? 0)}</b></span>
-          <span><i>DOWN</i><b>${Math.round((p?.downforce ?? 0) * 100)}%</b></span>
+          ${num('TOP', p?.maxSpeed ?? 0, base.maxSpeed)}
+          ${num('PULL', p?.accel ?? 0, base.accel)}
+          ${num('HULL', p?.maxHealth ?? 0, base.maxHealth)}
+          ${num('DOWN', (p?.downforce ?? 0) * 100, 0, '%')}
         </div>
+        <div class="bp-mods">${swapped} PART${swapped === 1 ? '' : 'S'} SWAPPED ·
+          ${ladders} UPGRADE${ladders === 1 ? '' : 'S'} FITTED</div>
       </div>`;
     // THE LIVE CANVAS IS MOVED, NEVER REBUILT. innerHTML above throws away
     // whatever was in the box, so the stage is re-attached afterwards — a new
@@ -4637,6 +4777,18 @@ class Game {
     const rec = this.carParts(carKey);
     const key = `${slot.key}:${part.id}`;
     const say = (text) => { this._buildMsg = { slot: slot.key, text }; };
+    // THE CHASSIS IS CHECKED BEFORE THE WALLET. Buying a part you cannot bolt
+    // on is the worst outcome available here, so the bay says no first.
+    const fit = this.partFits(slot, part, carKey);
+    if (!fit.ok) {
+      say(fit.capped
+        ? `${part.name} WILL NOT GO ON A ${(CAR_CATALOG.find((c) => c.key === carKey)?.name) || 'THIS'}`
+          + ` — THIS CHASSIS TOPS OUT BELOW IT. IT FITS: ${this.partHomes(slot, part).join(', ')}.`
+        : `${part.name} NEEDS ${fit.via} LEVEL ${fit.need} — YOU ARE AT ${fit.at}.`
+          + ` THE CHASSIS CANNOT CARRY IT YET.`);
+      this._renderGarageBays();
+      return;
+    }
     if (!rec.owned[key]) {
       const lock = this.partLock(part);
       if (!lock.open) {
@@ -4775,7 +4927,7 @@ class Game {
       const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       r.setPixelRatio(2);
       r.toneMapping = THREE.ACESFilmicToneMapping;
-      r.toneMappingExposure = 1.12;
+      r.toneMappingExposure = 1.24;
       const scene = new THREE.Scene();
       scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x6a5a44, 1.15));
       const sun = new THREE.DirectionalLight(0xfff3d6, 2.2);
@@ -4786,6 +4938,12 @@ class Game {
       const fill = new THREE.DirectionalLight(0x9fc8ff, 0.55);
       fill.position.set(-5, 3, -4);
       scene.add(fill);
+      // A RIM FROM BEHIND is what separates a chrome part from a dark card.
+      // Without it the polished faces have nothing to catch and every block
+      // came out as a silhouette.
+      const rim = new THREE.DirectionalLight(0xffd9a0, 1.5);
+      rim.position.set(-3, 5, -7);
+      scene.add(rim);
       st = this.__studio = { r, scene, sun, cam: null };
     }
     st.r.setSize(w, h);
@@ -4825,7 +4983,7 @@ class Game {
     const shoot = (kind, id, ry, dist, look = 0) => {
       const m = buildPartIcon(kind, id);
       m.rotation.y = ry;
-      out[`${kind}:${id}`] = this._shoot(m, 128, 96, { dist, look });
+      out[`${kind}:${id}`] = this._shoot(m, 168, 126, { dist, look });
     };
     // each part is turned to the angle that shows what makes it different: a
     // block from its pipe side, a wing from behind so the span reads
@@ -4833,7 +4991,7 @@ class Game {
     // are on. The studio camera looks in from +X/+Y/+Z, and the stacks are
     // built on +X: rotating the block away hid every one of them and left a
     // V4 and a V8 as the same black box.
-    for (const p of PART_SLOT.engine.parts) shoot('engine', p.id, -Math.PI * 0.13, 4.6, 0.05);
+    for (const p of PART_SLOT.engine.parts) shoot('engine', p.id, -Math.PI * 0.13, 4.5, 0.22);
     for (const p of PART_SLOT.spoiler.parts) shoot('spoiler', p.id, Math.PI * 0.9, 4.4);
     for (const id of ['road', 'gravel', 'snow']) shoot('tyre', id, Math.PI * 0.5, 4.2);
     for (const id of ['cannon', 'rack', 'magazine']) shoot('weapon', id, Math.PI * 0.78, 4.2);
