@@ -1778,3 +1778,85 @@ and rust, and there is no jettying (the upper storeys overhang in the
 reference; ours are flush).
 
 boot.mjs 4/4, test-boot 7/0, test-buildings green.
+
+## r244 — THE REFERENCE IS LIGURIAN, AND HAS BEEN ALL ALONG
+Six sheets: two Monte Carlo renders, a WINE REGION and a SCOTTISH HIGHLANDS
+builder, and THE LIGURIAN VILLAGE BUILDER — sent twice, which is the one that
+says what the houses are. Ochre and yellow stucco, a pale architrave round
+every opening, dark green louvred shutters, wrought iron across the upper
+windows, terracotta pantile.
+
+r242 built a Fachwerk street. That reference was northern and it is not in
+this brief; almost everything this round is undoing it.
+
+### THE FOUR THINGS THAT WERE NORTHERN
+  1. HALF-TIMBERING. Gone from the coast. `applyHalfTimber` stays in
+     src/textures.js — the wine-region sheet IS timbered and will want it.
+  2. THE GABLE END TO THE STREET. Every roof in every Ligurian reference runs
+     its RIDGE ALONG THE STREET and shows the road its eaves. `ridge: 'along'`
+     on a frontage turns the prism a quarter turn and swaps its scale with it;
+     the terrace is then capped by one continuous line of tile instead of a
+     sawtooth. It is a rotation, not a model, and it is the largest single
+     change in the silhouette.
+  3. THE JETTY. The medieval overhang was r243's read of the Fachwerk street.
+     A Ligurian facade is flush from pavement to cornice, so the course is
+     `F.jetty` now and the riviera does not ask for it.
+  4. THE TRAM. Two tan stripes down the middle of the road, from r241's
+     Hanseatic image. There is no tramway anywhere in these references.
+
+### THE THREE THINGS THAT ARE LIGURIAN, all painted into townhouseTexture
+`surround`, `jalousie` and `iron` — each off by default, so a world that does
+not ask keeps the facade it had.
+
+  - JALOUSIE, and it is drawn INSIDE ITS OWN REVEAL. r243 had to shrink the
+    old folded leaves to a fifth of the pier because three bays leave 18 px
+    between windows and a pair either side ate all of it. A shutter folded
+    back into its reveal takes no pier at all and is the same green block in
+    the same place from a car. A third are shut; the rest leave the middle
+    glazed.
+  - SURROUND, and it is a LINE, NOT A PANEL. The first cut filled the
+    architrave and it made 40 px of white per column out of a 192 px face:
+    three columns merged into pilasters and the stucco, which is the whole
+    colour of the building, was left as a margin. Same failure as the r243
+    shutters, in the same 18 px, and the same fix.
+  - IRON at the SILL, not across the middle of the opening, where it read as a
+    bar through the window and took the glass with it.
+
+### TINTS ARE SAMPLED UNIFORMLY, SO THE PALETTE IS A WEIGHTING
+Eight swatches with three dark ones builds a street that is three-eighths
+dark. The reference terrace is overwhelmingly yellow, ochre and cream with the
+deep red as punctuation — one corner building in a block — so the pale entries
+repeat in the list and each red appears once.
+
+### MEASURE THE LIGHT, DO NOT LOOK AT IT
+`tools-scratch/roadlum.mjs` prints the mean colour of the carriageway and of
+both walls from the driver's shot, and it overturned two things three passes
+of squinting had "established":
+  - the paving was never blown out. 0% above 240 at any setting tried, mean
+    158. It looks white in a 900 px screenshot next to a shaded wall at 67.
+  - the sun barely reaches a wall in a lane this narrow: 2.4 -> 3.0 moves the
+    shaded wall by nothing and the sunlit one by two units, and everything
+    else it touches is the road. So the key came DOWN and the ambient, which
+    is what actually lights these facades, carries the street.
+`tools-scratch/roadtex.mjs` is the companion: it prints the cobble palette the
+RUNNING theme is using and dumps the road mesh's own map. Between them, three
+rounds of "the road is too bright" became one measurement.
+
+### A CHIMNEY WAS FLOATING OVER MOST OF THE GAME'S COTTAGES
+Not from this round. `chimAt` was handed `placed.y + hh` — the height the
+terrace ASKED for — while `put` builds the body at `hh * [1, .62, 1.24, .94]`
+for its variant. On the cottage, which is weighted heaviest and is therefore
+most of every street, that is 38% of the wall height of clear sky between the
+roof and its stack: the dark boxes hanging over the seafront in every shot
+since r238. It takes `placed.h` and `placed.rh` now, and the stack is rendered
+masonry rather than a near-black bar.
+
+Gates: boot 4/4, test-boot 7/0, test-buildings green, test-carriageway green,
+test-floating 6/0, test-cars green.
+
+STILL SHORT: the sky. Both Monte Carlo renders sit under a faceted grey
+overcast and every riviera world is under a deep blue one. That is a mood
+change for six worlds rather than a facade fix, so it was left alone
+deliberately — say the word and it is a `skyTop`/`skyHorizon` pass. The
+sheet's palms, cypresses and standing street lamps are the other half of its
+street-level panel and are flora/props work, not frontage.

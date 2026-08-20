@@ -53,6 +53,20 @@ real time to get right and the next session should not rebuild them.
                 which gate refused each station (start gate / gorge / curvature
                 / tunnelFitAt). Turned "asked 3, got 1" into "panorama refuses
                 212 stations as too curved against CAPE OLIVETO's 59".
+- `roadlum.mjs` the mean colour of the carriageway and of BOTH walls from the
+                driver's shot, plus how much of each is above 240. Written
+                because "the road is blown out" was wrong three times running:
+                it sits at 158 with nothing clipped, and only looks white
+                beside a shaded wall at 67. Run it before touching a light or
+                a surface palette.
+- `roadtex.mjs` what the RUNNING theme's road spec is, and the road mesh's own
+                map dumped per mesh. Companion to `facetex.mjs`, same rule: if
+                an edit does not show up here it is not reaching the render.
+- `skyjunk.mjs` anything hanging in the sky near the camera - name, height,
+                size, parent, material. It named the floating chimneys r244
+                fixed, which had been in every seafront shot since r238.
+- `lightprobe.mjs` the lights, the tone mapping and the road material the
+                running world actually has, when a tune edit seems not to land.
 - `srv.mjs`     plain static server (`node srv.mjs 8920`).
 - `keep.sh`     keeps a server alive across tool-call timeouts:
                 `setsid ./keep.sh srv.mjs 8920 &`

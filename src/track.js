@@ -13,7 +13,7 @@ import {
   crateTexture, coneTexture, barrelTexture, riverTexture, riverBankTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
-  townhouseTexture, townhouseGlowTexture, roofTileTexture,
+  townhouseTexture, townhouseGlowTexture, roofTileTexture, ironRailTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -647,55 +647,73 @@ export const LEVELS = [
       roadWidth: 0.55,
       frontage: {
         lateral: 9.6, depth: 7.0, unit: 6.4, height: 17.0, run: [10, 20], rows: 6,
-        bayset: 'liguria',
-        // THE HOUSES ARE HALF-TIMBERED NOW (r242), which is what the second
-        // reference is actually about. Everything here serves that:
-        //   tints    warm rust, brick red, tan and cream — the INFILL between
-        //            the beams, not the whole wall. The grey taupe of r241 was
-        //            read from the first image's shadowed side and it kills a
-        //            timbered facade, which needs the panel to be lighter than
-        //            the frame or the pattern vanishes.
-        //   timber   the frame itself: oiled oak, near-black at distance.
-        //   boxes    a flower box under nearly every upper window — most of the
-        //            colour in that street comes from them.
-        // TINTS MULTIPLY THE WHOLE FACE, so they are the INFILL colour and they
-        // have to stay LIGHT. The first cut used the reference's rust and
-        // brick reds here and the result was dark-on-dark: a near-black timber
-        // frame over a dark red panel, with the pattern invisible. On a
-        // timbered building the panel is limewash and the frame is the dark
-        // thing — the contrast IS the style, so the reds live in the ROOFS and
-        // the deepest tint here is still lighter than the beams.
-        tints: ['#f6e8c6', '#f0d9ac', '#e8c795', '#faf0d8', '#eccfa4',
-          '#e3bd8c', '#f2e2be', '#dcb684'],
-        roof: 0xb5563a,
-        face: { render: '#f2e6d0', plinth: '#8a7259', trim: '#fbf3e2',
+        bayset: 'liguria', ridge: 'along',
+        // THE HOUSES ARE LIGURIAN AGAIN (r244), which is what the reference
+        // sheet and both Monte Carlo renders actually show. The half-timbering
+        // of r242 came from a northern street that is not in this brief at
+        // all: a Fachwerk frame here was the single largest thing making the
+        // budello read brown and German instead of painted and Italian. The
+        // frame is gone from this world (the code stays in townhouseTexture
+        // for the wine-region kit, which really is timbered), and what takes
+        // its place is the three features the sheet gives a panel each:
+        //
+        //   tints      THE FACADE STUCCO PALETTE, straight off the sheet:
+        //              yellow, ochre, pink, stucco red, deep red, sage. These
+        //              MULTIPLY the render, so this list IS the street's
+        //              colour and it is the reason a Ligurian terrace never
+        //              reads as one building repeated.
+        //   surround   the pale architrave and cornice around every opening.
+        //              A strong ochre wall with dark holes in it is a warehouse;
+        //              the same wall with white joinery drawn round each window
+        //              is the terrace in the first render.
+        //   jalousie   dark green louvred shutters, a third of them shut. The
+        //              green-on-ochre pairing is what says RIVIERA at a
+        //              distance no moulding survives.
+        //   iron       a French balcony across most upper openings, which that
+        //              terrace has on nearly every window.
+        //
+        // No flower boxes on this world: they hang at exactly the height the
+        // balcony rail does, and the two together turned the openings to mush.
+        // They stay on the hinterland worlds, which have no ironwork.
+        // WEIGHTED PALE. The tint list is sampled uniformly, so a palette with
+        // three dark swatches in eight builds a street that is three-eighths
+        // dark — and the reference terrace is overwhelmingly yellow, ochre and
+        // cream with the deep red as PUNCTUATION, one corner building in a
+        // block. The pale entries repeat; the reds appear once each.
+        tints: ['#f2d67a', '#f6dc8c', '#e8b45c', '#eec98a', '#f4e8d2',
+          '#f8eeda', '#eaa9a4', '#e2a06a', '#b9c4a4', '#d0685c', '#c2604e'],
+        roof: 0xc4603a,
+        face: { render: '#f4ead8', plinth: '#b7ae9c', trim: '#fdf7ea',
           // GLASS CATCHES THE SKY. #232830 is a hole in the wall, and fifteen
           // holes is a third of the face reading as void; a cool blue-grey
           // reads as a lit pane at the same value and lifts the whole terrace.
-          frame: '#4a3323', shutter: '#7a3f2a', pane: '#3d4a5c',
-          timber: { beam: '#6b4630' },
-          boxes: { wood: '#6b4630', blooms: ['#c8402f', '#e0644a', '#d8869a', '#f0e2d0'] } },
+          frame: '#3a3630', shutter: '#2f5d3f', pane: '#3d4a5c',
+          surround: true, jalousie: { shut: 0.34 }, iron: '#241f1c' },
       },
       // A STREET HAS NO COUNTRYSIDE IN IT. Rocks, scrub, tufts and wildflowers
       // between the kerb and the wall are what kept reading as "road through a
       // field" no matter what the buildings did.
       rockCount: 0, pebbleCount: 0, bushCount: 0, tuftCount: 0, flowerCount: 0,
       hutCount: 8, hutZone: [0, 1], treeCount: 26,
-      // paved to the building line, and the street itself is setts with a
-      // tram line in it — see TOWN_ROAD
+      // paved to the building line, and the street itself is setts — see
+      // TOWN_ROAD. NO TRAM (r244): the rails came off the northern reference
+      // and there is not a metre of tramway anywhere in the Ligurian sheet or
+      // in either Monte Carlo render. Two tan stripes down the middle of the
+      // road were the second-biggest northern tell after the timber.
       road: {
-        base: '#8e8a82', mottleA: [128, 124, 116], mottleB: [176, 172, 163],
+        base: '#7b756a', mottleA: [110, 104, 94], mottleB: [150, 143, 130],
         rut: 'rgba(70,68,63,0.32)', rutCore: 'rgba(52,50,46,0.3)', tread: 'rgba(30,29,26,0.3)',
-        stoneA: 'rgba(206,202,192,0.5)', stoneB: 'rgba(84,81,76,0.55)',
-        fringe: [150, 146, 136], fringeVar: [26, 25, 22],
+        stoneA: 'rgba(190,184,170,0.5)', stoneB: 'rgba(76,72,66,0.55)',
+        // the pavement in both Monte Carlo renders is a warm red-brown flag, not
+    // grey concrete, and it is the strip right beside the racing line
+    fringe: [148, 126, 110], fringeVar: [24, 20, 18],
         ruts: false,
         cobbles: {
-          stones: ['#c9c5bc', '#b6b1a7', '#d2ccc0', '#a9a49b', '#c3bcc2', '#dad4c8',
-            '#b0aca6', '#cfc8b8'],
-          mortar: 'rgba(96,92,85,0.85)', lip: 'rgba(255,252,244,0.2)',
+          stones: ['#928878', '#827a6a', '#9c9280', '#786f61', '#8a8070', '#a09682',
+            '#7d7466', '#948a7a'],
+          mortar: 'rgba(88,80,70,0.85)', lip: 'rgba(255,250,238,0.16)',
           rows: 20, per: 26,
         },
-        rails: { gauge: 3.4 },
       },
       terrainLow: '#6b6a62', terrainHigh: '#8e8b80', terrainDirt: '#7c7970',
       terrainScree: '#9a978c', skirtColor: '#8a8880',
@@ -711,7 +729,22 @@ export const LEVELS = [
       // frame went to mud once the buildings grew to 17 u and started
       // shadowing each other. The bounce off pale render is what lights a
       // street like this, so the ambient carries it rather than the key.
-      hemiIntensity: 1.15, sunIntensity: 2.7,
+      // AND THE STREET IS LIT BY THE AMBIENT, WHICH IS MEASURABLE (r244).
+      // `tools-scratch/roadlum.mjs` prints the mean colour of the carriageway
+      // and of both walls from the driver's shot, and it says two things that
+      // guessing said wrong:
+      //   - the paving was never blown out. 0% of it is above 240 at any
+      //     setting tried and it sits at a mean 158 — it just LOOKS white in a
+      //     900 px screenshot beside a shaded wall sitting at 67. Three passes
+      //     of darkening the sett palette moved the TEXTURE every time
+      //     (tools-scratch/roadtex.mjs proves it) and the render barely at all.
+      //   - the key barely reaches the walls in a lane this narrow. Between
+      //     2.4 and 3.0 the shaded wall does not move one unit and the sunlit
+      //     one moves two; everything that extra sun touches is the road,
+      //     which is already the brightest thing in the frame. So it comes
+      //     DOWN, and the ambient — which IS what lights the facades here —
+      //     stays at the 1.15 that keeps them out of the mud.
+      hemiIntensity: 1.15, sunIntensity: 2.4,
       elev: { amp: 5, ph: [1.1, 2.4, 0.6] },
     } },
 
@@ -4262,7 +4295,11 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                   // ITALY - Cinque Terre
     elements: 'liguria',
-    frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f0e4cf', plinth: '#a98a68', trim: '#f6ecd8', frame: '#3f6b46', shutter: '#3f6b46' } },
+    // The sheet is titled THE LIGURIAN VILLAGE BUILDER, so the village worlds
+    // get the same joinery as the coast: architrave, louvred shutter, iron.
+    // Their ROOFS stay gable-fronted — a Cinque Terre house stands in a stack
+    // up a cliff, not shoulder to shoulder along a street.
+    frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f2e8d4', plinth: '#a98a68', trim: '#f6ecd8', frame: '#34332c', shutter: '#3f6b46', pane: '#39465a', surround: true, jalousie: { shut: 0.38 }, iron: '#26221e' } },
     seaColor: 0x2f7fa8, sunColor: 0xffe8c0, sunIntensity: 2.7,
     skyTop: '#2f7fd1', skyHorizon: '#e8ddc6',
     terrainLow: '#7d8a4e', terrainHigh: '#a89a68',
@@ -4432,11 +4469,19 @@ THEMES.riviera = {
   // nearly 2:1, which is the sheet's own proportion.
   frontage: {
     lateral: 15.0, depth: 8.5, unit: 7.2, height: 14.0, run: [6, 12], rows: 5,
-    bayset: 'liguria',
-    tints: ['#f0d98a', '#e8b45c', '#e8a2a6', '#c4655a', '#f4e6cc', '#bccbb0', '#e2ac7c'],
-    roof: 0xb85a30,
-    face: { render: '#ecd79b', plinth: '#cfc3a4', trim: '#f6efdd',
-      frame: '#2b2b26', shutter: '#3d6b47', pane: '#1b2028' },
+    bayset: 'liguria', ridge: 'along',
+    // THE SHEET'S OWN STUCCO PALETTE — yellow, ochre, pink, stucco red, cream,
+    // sage — and it multiplies a near-white render, so the tint IS the paint.
+    tints: ['#f0d98a', '#f4e2a2', '#e8b45c', '#e8a2a6', '#c4655a', '#f4e6cc',
+      '#f8f0dc', '#bccbb0', '#e2ac7c'],
+    roof: 0xc4603a,
+    // WHITE JOINERY ROUND EVERY OPENING, GREEN LOUVRES IN IT, IRON ACROSS IT
+    // (r244). The render goes near-white so the tints carry the colour: at
+    // #ecd79b the wall was yellow BEFORE the tint and every house came out a
+    // shade of the same yellow, whatever the palette said.
+    face: { render: '#f4ead8', plinth: '#c3baa6', trim: '#f9f2e2',
+      frame: '#33322c', shutter: '#3d6b47', pane: '#39465a',
+      surround: true, jalousie: { shut: 0.3 }, iron: '#26221e' },
   },
 };
 
@@ -4450,25 +4495,32 @@ THEMES.riviera = {
 // frame from a chase camera, and a sand-coloured one puts the town in a desert.
 // THE STREET SURFACE, from the reference image (r241). It is ~40% of that
 // frame and it was the biggest single thing still wrong: mine was speckle
-// noise on grey, and theirs is LARGE irregular setts in pale greys, beiges
-// and a faint lilac, with a tram line bedded in tan running down it.
+// noise on grey, and theirs is LARGE irregular setts in warm stone — beige
+// and buff with grey in it. (r244: the tram line that came with the northern
+// reference is gone, and the lilac in the palette with it.)
 //
 // `rows`/`per` set the sett SIZE: 22 u of road across 26 stones is ~0.85 u
 // each — roughly a dinner plate, which is what the reference shows and about
 // twice the Tremola hand-laid sett.
 const TOWN_ROAD = {
-  base: '#8e8a82', mottleA: [128, 124, 116], mottleB: [176, 172, 163],
+  base: '#7b756a', mottleA: [110, 104, 94], mottleB: [150, 143, 130],
   rut: 'rgba(70,68,63,0.32)', rutCore: 'rgba(52,50,46,0.3)', tread: 'rgba(30,29,26,0.3)',
-  stoneA: 'rgba(206,202,192,0.5)', stoneB: 'rgba(84,81,76,0.55)',
-  fringe: [150, 146, 136], fringeVar: [26, 25, 22],
+  stoneA: 'rgba(190,184,170,0.5)', stoneB: 'rgba(76,72,66,0.55)',
+  // the pavement in both Monte Carlo renders is a warm red-brown flag, not
+    // grey concrete, and it is the strip right beside the racing line
+    fringe: [148, 126, 110], fringeVar: [24, 20, 18],
   ruts: false,                       // setts do not rut
   cobbles: {
-    stones: ['#c9c5bc', '#b6b1a7', '#d2ccc0', '#a9a49b', '#c3bcc2', '#dad4c8',
-      '#b0aca6', '#cfc8b8'],
-    mortar: 'rgba(96,92,85,0.85)', lip: 'rgba(255,252,244,0.2)',
+    // WARMER THAN r241's. That grey-lilac was read off a northern reference;
+    // the sheet's paving and both Monte Carlo renders are a warm stone —
+    // beige and buff with the grey in it, not the other way round.
+    stones: ['#928878', '#827a6a', '#9c9280', '#786f61', '#8a8070', '#a09682',
+      '#7d7466', '#948a7a'],
+    mortar: 'rgba(88,80,70,0.85)', lip: 'rgba(255,250,238,0.16)',
     rows: 20, per: 26,               // ~0.85 u setts, twice Tremola's
   },
-  rails: { gauge: 3.4 },
+  // NO TRAM RAILS (r244). They were the right call for the Hanseatic street
+  // of r241 and there is no tramway in any of the Ligurian references.
 };
 
 const TOWN_GROUND = {
@@ -4506,11 +4558,18 @@ THEMES.genova = {
   skyTop: '#3a7fb8', skyHorizon: '#cdd6d4',
   splinter: [0xc86a4a, 0xb8ac96, 0x35583c],
   hutRoof: 0x9c4628,
+  // A WORKING HARBOUR IS THE SAME ARCHITECTURE IN DIRTIER PAINT: the same
+  // architrave, the same green louvre, the same iron — over the port's reds
+  // and ochres rather than the resort's yellows and pinks.
   frontage: {
+    // eaves to the street, like the rest of the coast — a port terrace is the
+    // same building as a seafront one under dirtier paint
+    ridge: 'along',
     tints: ['#c86a4a', '#b2543c', '#d08a56', '#9e4a34', '#c4926a', '#d9a878'],
-    roof: 0x9c4628,
-    face: { render: '#d9b894', plinth: '#8e8272', trim: '#e8d6bc',
-      frame: '#35583c', shutter: '#35583c' },
+    roof: 0xa8502c,
+    face: { render: '#efe2cc', plinth: '#8e8272', trim: '#ecdcc2',
+      frame: '#33322c', shutter: '#35583c', pane: '#39465a',
+      surround: true, jalousie: { shut: 0.42 }, iron: '#26221e' },
   },
 };
 
@@ -4540,11 +4599,20 @@ THEMES.sanremo = {
   splinter: [0xdcd2ba, 0xa8a294, 0x5c6f58],
   hutRoof: 0x5c6f58,
   weather: { type: 'dust', color: 0xd0c8ac, rate: 22 },
+  // HINTERLAND: the same green louvre because it is the same region, but no
+  // ironwork — a village house has a window box where a seafront terrace has
+  // a balcony, and the sheet draws exactly that.
   frontage: {
+    // NO `ridge: 'along'` here. Up in the hinterland the houses stand apart
+    // rather than in a terrace, and a detached village house presents its
+    // gable — which is also what keeps this world from reading as the
+    // seafront with hills behind it.
     tints: ['#dcd2ba', '#c8bda2', '#e4dcc6', '#d0bb98', '#bfae90'],
     roof: 0x5c6f58,
-    face: { render: '#e0d6bf', plinth: '#9c9484', trim: '#efe6d2',
-      frame: '#4a6b4a', shutter: '#4a6b4a' },
+    face: { render: '#e8dfc9', plinth: '#9c9484', trim: '#efe6d2',
+      frame: '#3a3a30', shutter: '#4a6b4a', pane: '#39465a',
+      surround: true, jalousie: { shut: 0.5 },
+      boxes: { wood: '#5a4632', blooms: ['#c8402f', '#e0644a', '#d8869a', '#efe3d2'] } },
   },
 };
 
@@ -16593,6 +16661,9 @@ export class Track {
     let lk = 0;
 
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    // eaves to the street rather than the gable end — see `put`
+    const RIDGE_ALONG = F.ridge === 'along';
+    const qr = new THREE.Quaternion();
     const col = new THREE.Color();
     const tints = F.tints.map((c) => new THREE.Color(c));
     let k = 0;
@@ -16624,9 +16695,19 @@ export class Track {
       const sy = this._seatY(p.x, p.z);
       const y = (Number.isFinite(sy) ? sy : this.terrainHeight(p.x, p.z)) - 0.5;
       q.setFromAxisAngle(up, this.headingAt(i));
-      // local +X is the road normal and local +Z runs along the street, so the
-      // GABLE END faces the road: the Baltic gable-fronted terrace, and the
-      // one roof orientation that still reads as separate houses in a row
+      // local +X is the road normal and local +Z runs along the street, so by
+      // default the GABLE END faces the road: the Baltic gable-fronted
+      // terrace, and the one roof orientation that still reads as separate
+      // houses in a row.
+      //
+      // THE RIVIERA IS THE OTHER ONE (r244). Every roof in the Ligurian sheet
+      // and in both Monte Carlo renders runs its RIDGE ALONG THE STREET and
+      // presents its eaves and gutter to the road — the terrace is capped by
+      // one continuous line of pantile, not by a sawtooth of gable ends. That
+      // sawtooth was the loudest northern thing left in the silhouette after
+      // the timber came off, and it is a rotation, not a model: turn the prism
+      // a quarter turn and the span it pitches over becomes the depth of the
+      // block instead of its frontage, so the scale swaps with it.
       const vi = pickSlot();
       const bm = bodySet[vi], rm = roofSet[vi];
       if (kv[vi] >= bm.count) return null;
@@ -16635,8 +16716,23 @@ export class Track {
       const vh = h * [1, 0.62, 1.24, 0.94][vi >> 1];
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(dAcross, vh, wAlong));
       bm.setMatrixAt(kv[vi], m4);
-      m4.compose(new THREE.Vector3(p.x, y + vh, p.z), q,
-        new THREE.Vector3(dAcross * 1.16, roofH, wAlong * 1.08));
+      // the pitch a Ligurian pantile roof actually has is shallower than a
+      // northern gable's, and the chimney has to be told the height that was
+      // USED, not the one that was asked for
+      const effRoofH = RIDGE_ALONG ? roofH * 0.72 : roofH;
+      if (RIDGE_ALONG) {
+        qr.setFromAxisAngle(up, this.headingAt(i) + Math.PI * 0.5);
+        // 1.02 along the street, not 1.08: neighbours in a terrace share a
+        // party wall and their roofs meet on it — an oversail at that end is
+        // two roofs growing through each other. The oversail that matters is
+        // the one over the FACE, and it is what throws the eaves shadow the
+        // reference has under every gutter.
+        m4.compose(new THREE.Vector3(p.x, y + vh, p.z), qr,
+          new THREE.Vector3(wAlong * 1.02, effRoofH, dAcross * 1.18));
+      } else {
+        m4.compose(new THREE.Vector3(p.x, y + vh, p.z), q,
+          new THREE.Vector3(dAcross * 1.16, roofH, wAlong * 1.08));
+      }
       rm.setMatrixAt(kv[vi], m4);
       if (trimK + 2 < TRIMMAX) {
         // plinth: a course at the kerb, a touch proud of the wall
@@ -16651,9 +16747,14 @@ export class Track {
         houseTrim.setMatrixAt(trimK, m4);
         trimCol.copy(tint).multiplyScalar(1.12 + Math.random() * 0.12);
         houseTrim.setColorAt(trimK++, trimCol);
-        // THE JETTY (r243). In the reference the upper storeys stand PROUD of
-        // the ground floor — the medieval overhang — and that step is a big
-        // part of the silhouette from the street.
+        // THE JETTY (r243), WHICH IS A NORTHERN BUILDING (r244). The medieval
+        // overhang belongs to the Fachwerk street the r242 reference showed
+        // and to nothing on this coast: a Ligurian terrace is flush from
+        // pavement to cornice, and running a proud band across every facade at
+        // first-floor level was reading as a shelf bolted to the front of the
+        // town. Opt-in per frontage now, and the riviera does not opt in.
+        //
+        // Where it IS wanted, the note from r243 still holds:
         //
         // A true overhang wants a second body per house. This is one course
         // instead: a band at the first-floor line, wider across the street
@@ -16670,11 +16771,13 @@ export class Track {
         // limewash as the wall above it; the dark underside is a lighting
         // result, and the renderer already gives it for nothing, because the
         // soffit points at the ground.
-        m4.compose(new THREE.Vector3(p.x, y + vh * 0.34, p.z), q,
-          new THREE.Vector3(dAcross * 1.16, 0.34, wAlong * 1.04));
-        houseTrim.setMatrixAt(trimK, m4);
-        trimCol.copy(tint).multiplyScalar(0.94 + Math.random() * 0.1);
-        houseTrim.setColorAt(trimK++, trimCol);
+        if (F.jetty) {
+          m4.compose(new THREE.Vector3(p.x, y + vh * 0.34, p.z), q,
+            new THREE.Vector3(dAcross * 1.16, 0.34, wAlong * 1.04));
+          houseTrim.setMatrixAt(trimK, m4);
+          trimCol.copy(tint).multiplyScalar(0.94 + Math.random() * 0.1);
+          houseTrim.setColorAt(trimK++, trimCol);
+        }
       }
       col.copy(tint).multiplyScalar(0.86 + Math.random() * 0.26);
       bm.setColorAt(kv[vi], col);
@@ -16685,7 +16788,10 @@ export class Track {
       h = vh;
       const solid = { x: p.x, z: p.z, r, y: y + 0.6, mat: 'hut' };
       this.solids.push(solid);
-      return { solid, p, y, h, r, lat, mesh: myMesh, roof: myRoof, idx: myIdx };
+      // `h` is the height the block was BUILT at (the variant scales it), and
+      // `rh` the height its roof was built at — anything hung off the roofline
+      // has to measure from these and not from what was asked for.
+      return { solid, p, y, h, r, lat, rh: effRoofH, mesh: myMesh, roof: myRoof, idx: myIdx };
     };
 
     // chimney stacks: a small dark box riding most ridges. The cheapest thing
@@ -16694,8 +16800,12 @@ export class Track {
     const CMAX = 640;
     const chimGeo = new THREE.BoxGeometry(0.62, 1.7, 0.62);
     chimGeo.translate(0, 0.85, 0);
+    // A CHIMNEY IS RENDERED MASONRY, not a black box. At 0x4c4642 every stack
+    // on the street read as a dark bar against the sky — which is what makes
+    // one look like it is floating even when it is sitting on its tiles. The
+    // sheet draws them as the wall's own stone with a terracotta pot.
     const chims = new THREE.InstancedMesh(chimGeo, new THREE.MeshStandardMaterial({
-      color: 0x4c4642, flatShading: true, roughness: 0.95,
+      color: this.T.chimneyColor ?? 0x9a8d7e, flatShading: true, roughness: 0.95,
     }), CMAX);
     let ck = 0;
     const chimOff = new THREE.Vector3();
@@ -16765,8 +16875,15 @@ export class Track {
     const balcMat = new THREE.MeshStandardMaterial({
       color: 0xb9b0a0, flatShading: true, roughness: 0.9, envMapIntensity: 0.35,
     });
+    // WROUGHT IRON, NOT A PARAPET. A solid 10 cm box painted near-black reads
+    // as a dark dash on every balcony in the street; the alpha-cut baluster
+    // map (see ironRailTexture) puts daylight back between the bars, which is
+    // most of what says "iron balcony" from a car.
+    const railTex = ironRailTexture();
+    railTex.repeat.set(3, 1);
     const railMat = new THREE.MeshStandardMaterial({
-      color: 0x3a3630, flatShading: true, roughness: 0.7, metalness: 0.35,
+      map: railTex, color: 0x3a3630, transparent: false, alphaTest: 0.5,
+      side: THREE.DoubleSide, flatShading: true, roughness: 0.7, metalness: 0.35,
     });
     const awnMat = new THREE.MeshStandardMaterial({
       map: awningTexture(), roughness: 0.92, side: THREE.DoubleSide,
@@ -16875,7 +16992,17 @@ export class Track {
         }
         if (!placed) { run = 0; continue; }
         placedS[side].add(i);
-        if (Math.random() < 0.62) chimAt(i, side, placed.lat, F.depth, ww, placed.y + hh, roofH);
+        // A CHIMNEY FLOATED OVER EVERY COTTAGE IN THE GAME, and it predates
+        // this round: the eaves were handed in as `placed.y + hh`, the height
+        // the terrace ASKED for, while `put` builds the body at
+        // `hh * [1, 0.62, 1.24, 0.94][variant]`. On the cottage — the variant
+        // weighted heaviest, so most of the street — that is 38% of the wall
+        // height of clear sky between the roof and its stack, which from the
+        // road reads as a dark box hanging over the town. `placed.h` is what
+        // was built, and `placed.rh` the roof that went on it.
+        if (Math.random() < 0.62) {
+          chimAt(i, side, placed.lat, F.depth, ww, placed.y + placed.h, placed.rh);
+        }
         faceAt(i, side, placed.lat, F.depth, ww, placed.y, hh);
         // A LANTERN ON THE BRACKET, every third house. Anchored to the FRONT
         // FACE, not the block centre — the arm only reaches 0.72 u and a

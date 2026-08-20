@@ -1200,6 +1200,38 @@ export function awningTexture() {
 }
 
 /** Yellow/black hazard stripes for ramp sides. */
+/** WROUGHT IRON, WITH DAYLIGHT THROUGH IT.
+ *
+ *  The balcony rails on the frontage were solid boxes 10 cm thick painted near
+ *  black: from the street a terrace of them is a row of dark dashes, which is
+ *  the one thing a railing must never look like. A railing is mostly AIR — the
+ *  balusters are what you see and the gaps between them are what make it read
+ *  as iron rather than as a parapet.
+ *
+ *  So the same box carries an alpha-cut texture instead: top rail, bottom
+ *  rail, and a baluster every few pixels with the reference sheet's belly in
+ *  the middle. Alpha-TEST rather than blending, because these are instanced
+ *  and sorted transparency across a street of them is not worth the cost.
+ */
+export function ironRailTexture(hex = '#241f1c') {
+  const t = make(64, 32, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = hex;
+    g.fillRect(0, 1, w, 4);                          // handrail
+    g.fillRect(0, h - 4, w, 3);                      // bottom rail
+    for (let x = 3; x < w; x += 6) {
+      g.fillRect(x, 4, 2, h - 7);                    // baluster
+      // the belly: a wrought baluster is bowed, and two pixels of it at the
+      // waist is the whole difference between iron and a picket fence
+      g.fillRect(x - 1, h * 0.42, 4, 4);
+    }
+    g.fillStyle = 'rgba(255,248,232,0.35)';
+    g.fillRect(0, 1, w, 1);                          // light off the top edge
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
 export function hazardTexture() {
   const t = make(128, 64, (g, w, h) => {
     g.fillStyle = '#e8b83a';
@@ -2015,6 +2047,103 @@ function applyHalfTimber(g, w, h, VB, spec) {
   }
 }
 
+/** THE JALOUSIE — the louvred shutter, and the single loudest thing on a
+ *  Ligurian facade. The reference sheet gives it a panel of its own ("PRE-SET
+ *  JALOUSIE LAYOUTS") and the Monte Carlo street is a yellow wall with dark
+ *  green shutters at every opening; that pairing is what says RIVIERA before
+ *  any moulding, tile or railing gets a chance to.
+ *
+ *  DRAWN INSIDE THE OPENING, NOT ON THE WALL BESIDE IT. r243 had to shrink
+ *  the old folded leaves to a fifth of the pier because a three-bay Ligurian
+ *  face leaves 18 px between two windows and a pair of leaves either side ate
+ *  all of it — the shutters covered the render and the wall stopped being a
+ *  wall. A shutter folded back into its own reveal takes no pier at all, and
+ *  from a car it is the same green block in the same place.
+ *
+ *  Two states, because a street where every shutter is shut is a street with
+ *  nobody in it: CLOSED covers the pane, OPEN leaves the middle glazed with a
+ *  leaf standing in each reveal.
+ */
+function applyJalousie(g, x, y, bw, bh, S) {
+  const leaf = (lx, lw) => {
+    if (lw < 2) return;
+    g.fillStyle = S.color;
+    g.fillRect(lx, y, lw, bh);
+    // LOUVRES ARE THE POINT. A flat green rectangle is a hole with paint in
+    // it; the slat lines are what make the eye read a shutter, and at 3 px
+    // they survive down to the mip level a far-end-of-the-street house is
+    // sampled at.
+    g.fillStyle = S.slat;
+    for (let sy = y + 2; sy < y + bh - 1; sy += 3) g.fillRect(lx, sy, lw, 1);
+    g.fillStyle = S.rail;
+    g.fillRect(lx, y + bh * 0.46, lw, 2);          // mid rail
+    g.fillRect(lx, y, 1.5, bh);                    // stiles
+    g.fillRect(lx + lw - 1.5, y, 1.5, bh);
+  };
+  if (S.closed) {
+    leaf(x, bw / 2 - 0.5);
+    leaf(x + bw / 2 + 0.5, bw / 2 - 0.5);
+    g.fillStyle = 'rgba(0,0,0,0.35)';
+    g.fillRect(x + bw / 2 - 1, y, 2, bh);          // the meeting stile
+  } else {
+    const lw = Math.max(3, Math.round(bw * 0.23));
+    leaf(x, lw);
+    leaf(x + bw - lw, lw);
+    // the leaf stands proud of the reveal, so it throws a line onto the glass
+    g.fillStyle = 'rgba(0,0,0,0.30)';
+    g.fillRect(x + lw, y, 2, bh);
+    g.fillRect(x + bw - lw - 2, y, 2, bh);
+  }
+}
+
+/** THE PAINTED SURROUND. Every classical facade in the reference — the ochre
+ *  terrace, the white corner block at the hairpin — is a coloured wall with
+ *  PALE joinery drawn around each opening: an architrave, a cornice over it,
+ *  a sill under it. It is what stops fifteen dark rectangles from reading as
+ *  holes punched in a slab, and it is cheap: three fills per bay.
+ *
+ *  It is also the reason the stucco palette can go as strong as the sheet's
+ *  deep red and still read as a building rather than as a red box.
+ */
+function applyArchitrave(g, x, y, bw, bh, S) {
+  // A BAND ROUND THE OPENING, NOT A PANEL BEHIND IT. Filled, the surround was
+  // 40 px of a 192 px face per column and 5 px of every 10 px of clear wall
+  // between the storeys: three columns of it merged into white pilasters and
+  // the stucco — which is the entire colour of the building — was reduced to
+  // a margin. This is the same failure r243 found in the shutters, in the
+  // same 18 px of pier, and it has the same fix: the ornament is a LINE.
+  const o = S.side, t = S.width;
+  g.fillStyle = S.trim;
+  g.fillRect(x - o, y - o, bw + o * 2, t);                    // head
+  g.fillRect(x - o, y - o, t, bh + o * 2);                    // jambs
+  g.fillRect(x + bw + o - t, y - o, t, bh + o * 2);
+  g.fillRect(x - o, y + bh + o - t, bw + o * 2, t);           // apron
+  g.fillRect(x - o - 2, y - o - 4, bw + o * 2 + 4, 3);        // cornice over it
+  g.fillStyle = 'rgba(0,0,0,0.20)';
+  g.fillRect(x - o - 2, y - o - 1, bw + o * 2 + 4, 1);        // its shadow
+}
+
+/** THE WROUGHT-IRON BALCONY, painted. The sheet devotes a swatch to the
+ *  patterns and the Monte Carlo terrace has one across nearly every upper
+ *  window — a French balcony, which is a railing on the opening rather than a
+ *  slab to stand on. Modelled, that is a dozen balusters per window and a
+ *  hundred windows in shot; painted into the facade it is a handful of fills
+ *  and it reads at the distance that matters.
+ */
+function applyIronRail(g, x, y, bw, bh, S) {
+  // AT THE SILL, WHICH IS WHERE A FRENCH BALCONY IS. Across the middle of
+  // the opening it read as a bar through the window rather than a rail in
+  // front of it, and it took the glass with it.
+  const top = y + bh * 0.62, bot = y + bh + 2;
+  const x0 = x - 4, x1 = x + bw + 4;
+  g.fillStyle = S.iron;
+  g.fillRect(x0, top, x1 - x0, 2);                  // handrail
+  g.fillRect(x0, bot - 2, x1 - x0, 2);              // bottom rail
+  for (let bx = x0 + 2; bx < x1 - 1; bx += 4) g.fillRect(bx, top, 1.5, bot - top);
+  g.fillStyle = 'rgba(255,250,238,0.28)';           // the light off the top edge
+  g.fillRect(x0, top - 1, x1 - x0, 1);
+}
+
 export function townhouseTexture(palette = {}, variant = 0, set = null) {
   const P = {
     render: '#b9ad98',            // limewashed render (tinted per instance)
@@ -2023,6 +2152,12 @@ export function townhouseTexture(palette = {}, variant = 0, set = null) {
     frame: '#2e2a26',             // window joinery
     shutter: '#6b5a52',           // dusty-rose shutters, under 45% saturation
     pane: '#171c26',              // unlit glass — never transparent (G7)
+    // REGIONAL FACADE FLAGS, all off by default so no world changes unless it
+    // asks. `surround` paints the architrave and cornice around every opening,
+    // `jalousie` swaps the folded leaf for the Ligurian louvred pair, `iron`
+    // hangs a French balcony on the upper openings, `timber` is the Fachwerk
+    // frame. A region picks the ones its buildings actually have.
+    surround: false, jalousie: false, iron: false,
     ...palette,
   };
   const VB = townhouseBays(variant, set);
@@ -2064,7 +2199,17 @@ export function townhouseTexture(palette = {}, variant = 0, set = null) {
     // On a set whose storeys sit elsewhere they land through the windows — and
     // on a timbered face the rails are already the string courses, so drawing
     // both gives every storey two lines where a building has one.
-    if (!P.timber) {
+    // On an ARCHITRAVED face the cornice over every opening already gives the
+    // storeys their horizontal rhythm, and a band between them would land in
+    // the 10 px of clear wall the surrounds leave — two lines where the
+    // building has one. What that face wants instead is the single strong
+    // course over the shopfront that the reference terrace carries.
+    if (P.surround) {
+      g.fillRect(0, 186, w, 5);                     // first-floor band
+      g.fillStyle = 'rgba(0,0,0,0.22)';
+      g.fillRect(0, 191, w, 2);
+      g.fillStyle = P.trim;
+    } else if (!P.timber) {
       g.fillRect(0, 84, w, 4);                      // string course, 1st floor
       g.fillRect(0, 152, w, 4);                     // string course, 2nd floor
     }
@@ -2082,8 +2227,14 @@ export function townhouseTexture(palette = {}, variant = 0, set = null) {
       }
       return Math.min(g0, cols[0] * 2);
     })();
-    // upper-storey windows: recess, joinery, glazing bar, sill, folded shutters
+    // upper-storey windows: recess, joinery, glazing bar, sill, shutters
     for (const [x, y, bw, bh] of TH_BAYS) {
+      // THE SURROUND GOES DOWN FIRST, because on a real facade it is a band of
+      // stone or stucco laid ON the wall and the window is set INTO it.
+      if (P.surround) applyArchitrave(g, x, y, bw, bh, {
+        trim: P.trim, side: 4, width: 3,
+        ...(P.surround === true ? {} : P.surround),
+      });
       g.fillStyle = 'rgba(0,0,0,0.26)';
       g.fillRect(x - 2, y - 2, bw + 4, bh + 4);     // reveal shadow
       g.fillStyle = P.pane;
@@ -2096,28 +2247,49 @@ export function townhouseTexture(palette = {}, variant = 0, set = null) {
       g.fillRect(x, y + bh * 0.42, bw, 4);          // transom
       g.fillStyle = P.trim;
       g.fillRect(x - 6, y + bh, bw + 12, 6);        // sill
+      // SHUTTERS. `jalousie` is the Ligurian louvred pair drawn inside its own
+      // reveal (see applyJalousie); without it, the older folded leaf that
+      // stands on the pier beside the window.
+      if (P.jalousie) {
+        const J = (P.jalousie === true ? {} : P.jalousie);
+        applyJalousie(g, x, y, bw, bh, {
+          color: J.color || P.shutter,
+          slat: J.slat || 'rgba(0,0,0,0.30)',
+          rail: J.rail || 'rgba(0,0,0,0.22)',
+          // MOST OF A STREET IS OPEN IN THE DAY, and a wall of shut green
+          // panels loses every pane of glass on the building.
+          closed: Math.random() < (J.shut ?? 0.32),
+          ...J,
+        });
+      } else {
         // FOLDED SHUTTERS, SIZED TO THE PIER THEY FOLD BACK ONTO.
-      //
-      // A fixed 9 px leaf 3 px clear of the reveal needs 24 px of pier for the
-      // pair, and a three-bay Ligurian face has 18. Every pair overlapped its
-      // neighbour's across the pier, so the wall between two windows was
-      // solid shutter and the render underneath was never visible. Take the
-      // real gap, give the leaf at most a third of it, and drop the shutters
-      // entirely where even that will not fit — a window with no shutters
-      // reads as a window; a wall made of shutters reads as nothing.
-      // a fifth of the pier each, so the wall between two windows is still
-      // mostly wall: at (pier-6)/2 the pair plus their clearances used 20 px
-      // of a 21 px pier and the render was a one-pixel line
-      const leaf = Math.floor(Math.min(9, SH_PIER * 0.22));
-      if (leaf >= 3) {
-        g.fillStyle = P.shutter;
-        g.fillRect(x - 3 - leaf, y - 1, leaf, bh + 2);
-        g.fillRect(x + bw + 3, y - 1, leaf, bh + 2);
+        //
+        // A fixed 9 px leaf 3 px clear of the reveal needs 24 px of pier for the
+        // pair, and a three-bay Ligurian face has 18. Every pair overlapped its
+        // neighbour's across the pier, so the wall between two windows was
+        // solid shutter and the render underneath was never visible. Take the
+        // real gap, give the leaf at most a third of it, and drop the shutters
+        // entirely where even that will not fit — a window with no shutters
+        // reads as a window; a wall made of shutters reads as nothing.
+        // a fifth of the pier each, so the wall between two windows is still
+        // mostly wall: at (pier-6)/2 the pair plus their clearances used 20 px
+        // of a 21 px pier and the render was a one-pixel line
+        const leaf = Math.floor(Math.min(9, SH_PIER * 0.22));
+        if (leaf >= 3) {
+          g.fillStyle = P.shutter;
+          g.fillRect(x - 3 - leaf, y - 1, leaf, bh + 2);
+          g.fillRect(x + bw + 3, y - 1, leaf, bh + 2);
+        }
+        g.fillStyle = 'rgba(0,0,0,0.28)';
+        for (let sy = y + 3; sy < y + bh; sy += 6) {
+          g.fillRect(x - 12, sy, 9, 2);
+          g.fillRect(x + bw + 3, sy, 9, 2);
+        }
       }
-      g.fillStyle = 'rgba(0,0,0,0.28)';
-      for (let sy = y + 3; sy < y + bh; sy += 6) {
-        g.fillRect(x - 12, sy, 9, 2);
-        g.fillRect(x + bw + 3, sy, 9, 2);
+      // A FRENCH BALCONY ON THE UPPER OPENINGS — never on the ground floor,
+      // where a railing across a doorway is nonsense.
+      if (P.iron && y + bh < h - 74 && Math.random() < (P.ironFrac ?? 0.62)) {
+        applyIronRail(g, x, y, bw, bh, { iron: P.iron === true ? '#2a2622' : P.iron });
       }
     }
     // FLOWER BOXES, which the reference puts under nearly every upper window and
