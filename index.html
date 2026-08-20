@@ -1,0 +1,2286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- IOS DOES NOT READ THE MANIFEST FOR ANY OF THIS.
+     `manifest.webmanifest` already declares icons, a name and a theme colour,
+     and Safari's Add to Home Screen ignores all three: it wants its own
+     `apple-touch-icon`, its own title, and its own status-bar style, or the
+     home screen gets a screenshot of the page under a truncated <title> and
+     the standalone app opens with a white bar over the sky. The manifest
+     entries stay for every other platform; these are the iOS half.
+     A PNG, not the SVG favicon above — iOS has never supported SVG here. -->
+<link rel="apple-touch-icon" href="./assets/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="./assets/icon-512.png">
+<meta name="apple-mobile-web-app-title" content="Ignite Rally">
+<!-- black-translucent lets the canvas paint under the status bar, which is the
+     point of viewport-fit=cover above; the safe-area insets the layout already
+     uses are what keep the HUD out from under it. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>IGNITE RALLY — Racing Shooter</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#ffd400">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+  /* Fonts are VENDORED, not fetched from Google. The game must boot with the
+     radio off (see sw.js) — one remote stylesheet would leave a phone at
+     30,000 ft staring at fallback type while it waited for a timeout. */
+  @font-face{font-family:'Luckiest Guy';font-style:normal;font-weight:400;font-display:swap;
+    src:url('./assets/fonts/luckiestguy-latin.woff2') format('woff2')}
+  @font-face{font-family:'Baloo 2';font-style:normal;font-weight:500 800;font-display:swap;
+    src:url('./assets/fonts/baloo2-latin.woff2') format('woff2')}
+  :root{
+    --yellow:#ffd400; --orange:#ff8c1a; --amber:#ffb52e; --green:#4dd06a; --red:#e8402a;
+    --ink:#2b1c0e;
+    --panel:rgba(38,26,12,.72); --edge:rgba(255,212,0,.5);
+    /* menu design tokens: one radius scale + shared hairline/label colors.
+       three border weights only: strong = pickable card, line = panel/chip,
+       soft = hairline rule inside a panel. */
+    --r-lg:16px; --r-md:12px; --r-sm:8px;
+    --line-strong:rgba(255,233,168,.38); --line:rgba(255,233,168,.3);
+    --line-soft:rgba(255,233,168,.14);
+    --gold-dim:#c9a86a; --cream:#ffe9a8;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#7fb85c;
+    font-family:'Baloo 2','Segoe UI',system-ui,sans-serif;color:#fff3d0;
+    -webkit-user-select:none;user-select:none;touch-action:none;overscroll-behavior:none}
+  #game-canvas{position:fixed;inset:0;display:block;touch-action:none}
+  .titlefont{font-family:'Luckiest Guy','Baloo 2',sans-serif}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .5s}
+  #hud.on{opacity:1}
+  .panel{background:var(--panel);border:2px solid var(--edge);border-radius:12px;
+    backdrop-filter:blur(6px);box-shadow:0 3px 0 rgba(0,0,0,.25)}
+
+  #race-info{position:absolute;top:12px;left:12px;padding:8px 14px;min-width:150px}
+  #race-info .pos{font-family:'Luckiest Guy';font-size:30px;color:var(--yellow);
+    text-shadow:2px 2px 0 var(--ink);line-height:1}
+  #race-info .pos small{font-size:15px;color:#ffe9a8;font-weight:500}
+  #race-info .lap{font-size:16px;font-weight:800;letter-spacing:1px;color:#fff3d0;margin-top:2px}
+  #race-info .time{font-size:13px;color:#e8c987;letter-spacing:2px}
+  #standings{margin-top:6px;border-top:1px solid rgba(255,212,0,.25);padding-top:5px}
+  #standings .srow{font-size:12px;font-weight:700;letter-spacing:1px;color:#d8c090;line-height:1.5}
+  #standings .srow.me{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
+  #standings .srow.dead{opacity:.45;text-decoration:line-through}
+  /* race contracts: compact readout under the standings (no map — ever) */
+  #contracts{margin-top:6px;border-top:1px solid rgba(255,212,0,.25);padding-top:5px}
+  #contracts:empty{display:none}
+  #contracts .clabel{font-size:9px;letter-spacing:3px;color:#e8c987;margin-bottom:1px}
+  #contracts .crow{display:flex;justify-content:space-between;gap:10px;font-size:10.5px;
+    font-weight:700;letter-spacing:.6px;color:#d8c090;line-height:1.55;white-space:nowrap}
+  #contracts .crow .cpay{color:#c9a86a}
+  #contracts .crow.done{color:#8de89a}
+  #contracts .crow.done .cpay{color:#8de89a}
+
+  #score-box{position:absolute;top:12px;right:12px;padding:8px 16px;text-align:right}
+  #score-box .label{font-size:10px;letter-spacing:3px;color:#e8c987}
+  #score-box .val{font-family:'Luckiest Guy';font-size:22px;color:var(--yellow);
+    text-shadow:2px 2px 0 var(--ink)}
+
+
+  /* circular speedometer */
+  #speed-box{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+    display:flex;flex-direction:column;align-items:center;gap:5px}
+  #speedo{width:132px;height:132px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.4))}
+  #nitro-wrap{width:130px;background:var(--panel);border:2px solid var(--edge);border-radius:8px;padding:4px 8px}
+  #nitro-wrap .bar-label{margin-bottom:2px}
+  #nitro-bar{width:100%;height:7px;background:#20160a;border-radius:4px;overflow:hidden}
+  #nitro-fill{height:100%;width:0%;background:linear-gradient(90deg,#7fd4ff,#2e9de8);transition:width .12s}
+  #nitro-fill.boosting{background:linear-gradient(90deg,#fff,#7fd4ff);animation:blink .3s steps(2) infinite}
+
+  #health-box{position:absolute;bottom:16px;left:12px;padding:10px 14px;width:210px}
+  .bar-label{display:flex;justify-content:space-between;font-size:10px;letter-spacing:2px;color:#e8c987;margin-bottom:3px}
+  .bar{height:12px;background:#20160a;border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.14);position:relative}
+  .bar::after{content:'';position:absolute;inset:0;
+    background:repeating-linear-gradient(90deg,transparent 0 8px,rgba(0,0,0,.4) 8px 10px)}
+  #health-fill{height:100%;width:100%;border-radius:6px;
+    background:linear-gradient(90deg,#2fb84a,#7de08a);
+    transition:width .15s, background .3s}
+  #shield-hits{margin-top:6px;font-size:11px;letter-spacing:2px;color:#e8c987}
+  /* ammo that is running out has to say so before it is gone */
+  #weapon-box .icons.low{color:#ffb52e}
+  #weapon-box .icons.out{color:#ff5a3c}
+  /* two hulls left is a warning, one is an emergency — the pips say so
+     without needing a second glance at a number */
+  #shield-hits #deaths.low{color:#ffb52e}
+  #shield-hits #deaths.last{color:#ff5a3c;animation:hullPulse 1s ease-in-out infinite}
+  @keyframes hullPulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+  #weapon-box{position:absolute;bottom:16px;right:12px;padding:10px 14px;width:210px;text-align:left}
+  #heat-fill{height:100%;width:0%;border-radius:6px;background:linear-gradient(90deg,#4dd06a,var(--yellow),var(--orange));
+    transition:width .08s}
+  #heat-fill.overheat{background:linear-gradient(90deg,#e8402a,#ff8b3b)}
+  .wrow{display:flex;justify-content:space-between;align-items:baseline;margin-top:5px;
+    font-size:13px;font-weight:800;letter-spacing:1px;color:#e8c987}
+  .wrow .icons{color:var(--amber);text-shadow:1px 1px 0 var(--ink);font-size:12px}
+  #shock-status{color:#d8c090}
+  #shock-status.ready{color:#7fd4ff;text-shadow:1px 1px 0 var(--ink);animation:blink 1.2s steps(2) infinite}
+
+  #feed{position:absolute;top:104px;right:12px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  .feed-msg{padding:4px 12px;font-weight:800;letter-spacing:1px;font-size:13px;border-radius:8px;
+    background:rgba(38,26,12,.85);border:2px solid rgba(255,255,255,.15);
+    animation:feedin .25s ease-out, feedout .5s ease-in 2.6s forwards}
+  .feed-msg.good{color:#8de89a;border-color:rgba(77,208,106,.5)}
+  .feed-msg.bad{color:#ff8a75;border-color:rgba(232,64,42,.5)}
+  .feed-msg.info{color:var(--yellow);border-color:var(--edge)}
+  @keyframes feedin{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+  @keyframes feedout{to{opacity:0;transform:translateX(20px)}}
+
+  #center-msg{position:absolute;top:32%;left:50%;transform:translate(-50%,-50%);
+    font-family:'Luckiest Guy';font-size:clamp(54px,12vw,96px);color:var(--yellow);text-align:center;
+    text-shadow:5px 5px 0 var(--ink), -2px -2px 0 var(--ink), 2px -2px 0 var(--ink), -2px 2px 0 var(--ink);
+    opacity:0;pointer-events:none;white-space:nowrap}
+  #center-msg.pop{animation:msgpop .9s ease-out}
+  /* style-combo chip: appears under the center line while a chain is alive */
+  #combo{position:absolute;top:44%;left:50%;transform:translate(-50%,-50%);text-align:center;
+    opacity:0;transition:opacity .25s;pointer-events:none}
+  #combo.on{opacity:1}
+  #combo #combo-x{display:block;font-family:'Luckiest Guy';font-size:clamp(30px,6vw,44px);
+    color:#7fd4ff;text-shadow:3px 3px 0 var(--ink), -2px 2px 0 var(--ink)}
+  #combo #combo-lbl{display:block;font-size:11px;letter-spacing:5px;font-weight:800;color:#ffe9a8;
+    text-shadow:1px 1px 0 var(--ink)}
+  #combo #combo-bar{display:block;width:110px;height:5px;margin:4px auto 0;border-radius:3px;
+    background:rgba(0,0,0,.45);overflow:hidden}
+  #combo #combo-bar b{display:block;height:100%;background:linear-gradient(90deg,#7fd4ff,#ffd400);
+    border-radius:3px;transform-origin:left;width:100%}
+  #combo.hot #combo-x{color:var(--yellow);animation:combopulse .5s infinite alternate}
+  @keyframes combopulse{from{transform:scale(1)}to{transform:scale(1.12)}}
+  @keyframes msgpop{0%{opacity:0;transform:translate(-50%,-50%) scale(1.8)}
+    18%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    75%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(.92)}}
+
+  #damage-vignette{position:fixed;inset:0;pointer-events:none;opacity:0;
+    background:radial-gradient(ellipse at center, transparent 55%, rgba(255,25,60,.55) 100%)}
+  #polish-vignette{position:fixed;inset:0;pointer-events:none;z-index:2;
+    background:radial-gradient(ellipse at center, transparent 62%, rgba(20,12,4,.28) 100%)}
+  /* The fade is DECORATION. It must never take pointer events: it used to
+     capture them while dark, so any path that left it up also silently ate
+     every touch — a dimmed screen you cannot steer, which reads as a freeze. */
+  #fade{position:fixed;inset:0;background:#0d0805;z-index:40;pointer-events:none;
+    opacity:0;transition:opacity .45s ease}
+  #fade.dark{opacity:1}
+
+  /* Raised while a picked world builds (a synchronous, seconds-long job): the
+     tap paints the highlight and THIS before the freeze, so the wait reads as
+     loading instead of a hang. pointer-events stays off — the menu remains
+     browsable in the beat before the build lands, and a further tap simply
+     re-aims the pending build. */
+  #build-veil{position:fixed;inset:0;display:grid;place-items:center;z-index:35;
+    background:rgba(13,8,5,.55);color:#ffe9a8;font-weight:700;font-size:17px;
+    letter-spacing:.1em;text-shadow:0 2px 8px rgba(0,0,0,.8);
+    opacity:0;pointer-events:none;transition:opacity .12s ease}
+  #build-veil.on{opacity:1}
+
+  /* camera + pause buttons */
+  .icon-btn{pointer-events:auto;position:absolute;width:46px;height:46px;border-radius:12px;
+    border:2px solid var(--edge);background:var(--panel);color:#ffe9a8;font-size:22px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 3px 0 rgba(0,0,0,.25);-webkit-tap-highlight-color:transparent}
+  .icon-btn:active{transform:scale(.93);background:rgba(255,212,0,.4)}
+  #cam-btn{top:70px;right:12px}
+  /* TWO ICON BUTTONS, NOT THREE. The driver's view had its own 👁 toggle; it is
+     a stop on the 📷 cycle now ("remove the eye and integrate the switch as
+     part of the camera"), which also gives ⏸ its old slot back at 124px and
+     removes the landscape squeeze that pushed it into the 💥 button. */
+  #pause-btn{top:124px;right:12px}
+  #wrong-way{position:absolute;top:18%;left:50%;transform:translateX(-50%);
+    font-family:'Luckiest Guy';font-size:26px;color:#ff4a2e;
+    text-shadow:2px 2px 0 var(--ink);letter-spacing:4px;display:none;
+    animation:blink .6s steps(2) infinite;white-space:nowrap}
+  @keyframes blink{50%{opacity:.25}}
+
+  /* ---------- TOUCH CONTROLS ---------- */
+  #touch-ui{position:fixed;inset:0;pointer-events:none;display:none;z-index:5}
+  body.touch #touch-ui.on{display:block}
+  .tbtn{pointer-events:auto;position:absolute;border:3px solid rgba(43,28,14,.9);border-radius:50%;
+    background:rgba(38,26,12,.6);color:#ffe9a8;font-family:'Luckiest Guy';
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 4px 0 rgba(0,0,0,.35);backdrop-filter:blur(3px);
+    -webkit-tap-highlight-color:transparent;touch-action:none}
+  .tbtn.active{background:rgba(255,212,0,.5);color:var(--ink);transform:scale(.94)}
+  .tbtn .badge{position:absolute;top:-5px;right:-5px;min-width:22px;height:22px;border-radius:11px;
+    background:var(--yellow);color:var(--ink);border:2px solid var(--ink);
+    font-family:'Baloo 2';font-size:13px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;padding:0 4px}
+  .tbtn.cooling{opacity:.45}
+  /* one-thumb driving pad, left side; right hand stays free for weapons */
+  #joy-zone{pointer-events:auto;position:absolute;left:0;bottom:0;
+    width:46%;height:62%;touch-action:none}
+  #joy-base{position:absolute;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;
+    background:rgba(38,26,12,.4);border:3px solid rgba(255,233,168,.45);
+    box-shadow:inset 0 0 22px rgba(0,0,0,.35);backdrop-filter:blur(2px);transition:opacity .2s}
+  #joy-base.live{background:rgba(38,26,12,.55);border-color:rgba(255,212,0,.7)}
+  #joy-base::before{content:'◀ ▲ ▶';position:absolute;top:50%;left:50%;transform:translate(-50%,-140%);
+    font-size:11px;letter-spacing:2px;color:rgba(255,233,168,.6)}
+  #joy-base::after{content:'▼';position:absolute;top:50%;left:50%;transform:translate(-50%,60%);
+    font-size:11px;color:rgba(255,233,168,.6)}
+  #joy-knob{position:absolute;left:50%;top:50%;width:58px;height:58px;border-radius:50%;
+    transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 35% 30%, #ffe9a8, var(--orange));
+    border:3px solid var(--ink);box-shadow:0 4px 8px rgba(0,0,0,.45)}
+  /* weapon cluster, right thumb */
+  #t-fire {right:calc(18px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));width:88px;height:88px;font-size:17px;background:rgba(140,90,20,.65)}
+  #t-fire.hot{background:rgba(200,50,30,.7)}
+  /* an empty magazine reads as dead, not as a number you might still spend */
+  #t-fire.dry{background:rgba(60,48,36,.6);opacity:.45}
+  #t-missile{right:calc(118px + env(safe-area-inset-right));bottom:calc(38px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
+  #t-mine {right:calc(112px + env(safe-area-inset-right));bottom:calc(112px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
+  #t-shock{right:calc(34px + env(safe-area-inset-right));bottom:calc(134px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
+  #t-drift{right:calc(24px + env(safe-area-inset-right));bottom:calc(214px + env(safe-area-inset-bottom));
+    width:64px;height:64px;font-size:13px;letter-spacing:1px;background:rgba(30,70,130,.55)}
+  /* UNSTUCK. Left of the pack and clear of everything you press while
+     racing — a rescue you fire by accident mid-corner is a punishment, and
+     this one costs you 30 s of not having it when you next need it. Dimmed
+     and unpressable while it recharges, with the wait on its face. */
+  #t-unstuck{left:calc(24px + env(safe-area-inset-left));bottom:calc(214px + env(safe-area-inset-bottom));
+    width:56px;height:56px;font-size:22px;background:rgba(150,60,30,.6)}
+  #t-unstuck.cooling{opacity:.42;background:rgba(60,48,36,.6)}
+  body.two-thumb #t-unstuck{left:auto;right:calc(24px + env(safe-area-inset-right));
+    bottom:calc(282px + env(safe-area-inset-bottom))}
+  #t-nitro{right:calc(96px + env(safe-area-inset-right));bottom:calc(190px + env(safe-area-inset-bottom));width:62px;height:62px;font-size:25px;
+    background:conic-gradient(rgba(127,212,255,.8) 0%, rgba(38,26,12,.6) 0)}
+
+  /* ---------- TWO-THUMB scheme ----------
+     Both thumbs steer: a LEFT button under one and a RIGHT button under the
+     other, the throttle held open for you, and BRAKE in the middle where
+     either thumb can reach it. The joystick has no job here, so it goes. */
+  .pedal{display:none}
+  body.two-thumb #joy-zone{display:none}
+  body.two-thumb .pedal{display:flex}
+  body.two-thumb #t-left{left:calc(16px + env(safe-area-inset-left));
+    bottom:calc(24px + env(safe-area-inset-bottom));width:100px;height:100px;font-size:34px;
+    background:rgba(38,26,12,.62)}
+  body.two-thumb #t-right{right:calc(16px + env(safe-area-inset-right));
+    bottom:calc(24px + env(safe-area-inset-bottom));width:100px;height:100px;font-size:34px;
+    background:rgba(38,26,12,.62)}
+  body.two-thumb #t-brake{left:calc(50% - 42px);
+    bottom:calc(20px + env(safe-area-inset-bottom));width:84px;height:84px;font-size:12px;
+    background:rgba(150,45,30,.62)}
+  /* weapons lift clear into a band above the driving row */
+  body.two-thumb #t-fire{right:calc(16px + env(safe-area-inset-right));
+    bottom:calc(140px + env(safe-area-inset-bottom));width:86px;height:86px}
+  body.two-thumb #t-missile{right:calc(112px + env(safe-area-inset-right));
+    bottom:calc(214px + env(safe-area-inset-bottom))}
+  body.two-thumb #t-mine{right:calc(26px + env(safe-area-inset-right));
+    bottom:calc(238px + env(safe-area-inset-bottom))}
+  body.two-thumb #t-nitro{right:calc(108px + env(safe-area-inset-right));
+    bottom:calc(288px + env(safe-area-inset-bottom))}
+  body.two-thumb #t-drift{left:calc(20px + env(safe-area-inset-left));right:auto;
+    bottom:calc(140px + env(safe-area-inset-bottom))}
+  body.two-thumb #t-shock{left:calc(20px + env(safe-area-inset-left));right:auto;
+    bottom:calc(216px + env(safe-area-inset-bottom))}
+  /* the speedo sits above BRAKE rather than under a thumb */
+  body.two-thumb.touch #speed-box{bottom:calc(112px + env(safe-area-inset-bottom));left:50%}
+  @media (max-height:560px){
+    body.two-thumb #t-left,body.two-thumb #t-right{width:86px;height:86px;
+      bottom:calc(18px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-brake{width:72px;height:72px;left:calc(50% - 36px)}
+    body.two-thumb #t-fire{bottom:calc(118px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-missile{right:calc(112px + env(safe-area-inset-right));
+      bottom:calc(126px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-mine{right:calc(186px + env(safe-area-inset-right));
+      bottom:calc(120px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-nitro{right:calc(184px + env(safe-area-inset-right));
+      bottom:calc(24px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-drift{bottom:calc(118px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-shock{bottom:calc(186px + env(safe-area-inset-bottom))}
+    body.two-thumb.touch #speed-box{bottom:calc(96px + env(safe-area-inset-bottom))}
+  }
+
+  /* ---------- compact / phone layout ---------- */
+  @media (max-width: 820px), (max-height: 560px){
+    #race-info{padding:6px 10px;min-width:112px}
+    #race-info .pos{font-size:22px}
+    #race-info .lap{font-size:13px}
+    #race-info .time{font-size:11px}
+    #standings{display:none}
+    /* the standings list is too tall for a phone, but the three contract rows
+       are the money game — they stay, just tighter */
+    #contracts{margin-top:4px;padding-top:4px}
+    #contracts .clabel{font-size:8px;letter-spacing:2px}
+    #contracts .crow{font-size:9.5px;gap:6px}
+    #score-box{padding:5px 10px}
+    #score-box .val{font-size:16px}
+    #feed{top:88px}
+    .feed-msg{font-size:11px;padding:3px 9px}
+  }
+  /* The bottom edge of a phone holds three things: the steering pad on the
+     left, the weapon cluster on the right, and the speedo between them. At
+     96px centred it reached under the 🚀 button — the one number you steer by,
+     with a thumb parked on it. Smaller, and biased into the actual gap. */
+  body.touch #speed-box{bottom:14px;left:calc(50% - 26px)}
+  body.touch #speedo{width:86px;height:86px}
+  body.touch #nitro-wrap{display:none}  /* nitro lives on the ⚡ button */
+  body.touch #weapon-box{display:none}  /* ammo counts live on the buttons */
+  /* Stacked off the MEASURED height of the panel above (see hud.js
+     _watchLeftColumn), not a constant: race-info grows by ~60px once the
+     contracts list appears mid-race, which is exactly what the old top:96px
+     could not know. The fallback in var() is the panel's height WITHOUT
+     contracts, so the layout is still sane for the one frame before the
+     observer first reports. */
+  body.touch #health-box{bottom:auto;top:calc(12px + var(--info-h,86px) + 8px);
+    left:12px;width:150px;padding:6px 10px}
+  /* THE HULL PIPS STAY ON PHONES. This row was hidden on touch when it read
+     "WRECKS: 0" — a rising tally of past mistakes, worth no screen space on a
+     390px display. Since r172 it is the three-strikes budget, which is the one
+     number you must be able to see before you spend the last of it, and as
+     three glyphs it costs a single 13px line. */
+  body.touch #health-box #shield-hits{margin-top:3px;font-size:13px;letter-spacing:3px}
+  /* ...and the feed stacks under the hull panel for the same reason: at
+     390px wide it is 274px of message reaching back under race-info, so a
+     fixed top clipped its corner on every portrait size measured. */
+  body.touch #feed{top:calc(12px + var(--info-h,86px) + var(--hull-h,47px) + 16px)}
+  /* very narrow phones: nudge the inner weapon column out of the speedo's way */
+  @media (max-width:380px){
+    /* moving these inward to clear the speedo pushed them into FIRE, so the
+       whole right cluster tightens together rather than one column sliding */
+    #t-fire{width:78px;height:78px}
+    #t-missile{right:calc(100px + env(safe-area-inset-right));width:54px;height:54px}
+    #t-mine{right:calc(96px + env(safe-area-inset-right));width:54px;height:54px;
+      bottom:calc(104px + env(safe-area-inset-bottom))}
+    /* At 320px the gap the speedo was biased into is no longer wide enough for
+       it: measured, the dial ran 11px under the 🚀 button. Shrink and shift it
+       further into the gap rather than move the button, which has nowhere left
+       to go without reaching FIRE. */
+    body.touch #speed-box{left:calc(50% - 38px)}
+    body.touch #speedo{width:76px;height:76px}
+  }
+  /* landscape phones: everything anchors to corners, panels stay top */
+  @media (max-height: 560px){
+    /* landscape has less height to give away, so the gaps tighten — but the
+       stacking is still measured, never a constant */
+    body.touch #health-box{top:calc(8px + var(--info-h,86px) + 6px);width:132px}
+    /* LANDSCAPE HAS NO ROOM TO STACK. At 390px tall the left column already
+       reaches y=223, so continuing the stack put the feed straight through the
+       DRIFT button — measured, not guessed, once the probe was widened to
+       include the touch controls it had been ignoring. The band across the top
+       middle is the only real estate a landscape phone has spare: the left
+       column ends at x=163 and the score box starts at x=764. */
+    body.touch #feed{top:10px;right:auto;left:50%;transform:translateX(-50%);
+      align-items:center}
+    body.touch #speed-box{bottom:10px}
+    body.touch #speedo{width:84px;height:84px}
+    #joy-zone{width:40%;height:80%}
+    #t-nitro{right:calc(200px + env(safe-area-inset-right));bottom:calc(42px + env(safe-area-inset-bottom))}
+    #t-mine{bottom:calc(118px + env(safe-area-inset-bottom))}
+    #t-shock{bottom:calc(140px + env(safe-area-inset-bottom))}
+    /* a short screen has no room to stack DRIFT above the weapons — it ended
+       up under the camera and pause buttons in the top-right corner */
+    #t-drift{right:calc(190px + env(safe-area-inset-right));
+      bottom:calc(120px + env(safe-area-inset-bottom))}
+    /* ICON BUTTONS DO NOT STACK ON A 390px TALL SCREEN. Portrait has the height
+       for a column; landscape's spare real estate is the band across the TOP,
+       so the column becomes a row under the score box, reading 📷 ⏸ left to
+       right. (This was three buttons while 👁 existed, and the third landed
+       24x32 INSIDE the 💥 button at 844x390 — the row is what fixed it, and it
+       is kept now there are two.) */
+    #cam-btn{top:60px;right:calc(66px + env(safe-area-inset-right))}
+    #pause-btn{top:60px;right:calc(12px + env(safe-area-inset-right))}
+  }
+
+  /* ---------- SCREENS ---------- */
+  .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    background:radial-gradient(ellipse at 50% 120%, rgba(90,60,10,.45), rgba(24,16,6,.82) 68%);
+    z-index:10;transition:opacity .45s, visibility 0s;padding:16px;overflow-y:auto;
+    touch-action:pan-y;overscroll-behavior:contain}
+  /* auto-margin spacers center short content but, unlike justify-content:center,
+     never push overflowing content out of the scrollable area on either end */
+  .screen::before,.screen::after{content:'';flex:0 0 auto;margin:auto}
+  .screen::-webkit-scrollbar{display:none}
+  .screen > *{flex-shrink:0} /* children keep natural size; the screen scrolls instead */
+  /* visibility (not just pointer-events) — child buttons set pointer-events:auto,
+     which would otherwise keep swallowing taps while the screen is invisible */
+  .screen.hidden{opacity:0;visibility:hidden;
+    transition:opacity .45s, visibility 0s .45s}
+  .screen.hidden, .screen.hidden *{pointer-events:none!important}
+  .game-title{font-family:'Luckiest Guy';font-size:clamp(44px,9vw,96px);line-height:.95;
+    text-align:center;letter-spacing:4px;color:var(--yellow);
+    text-shadow:6px 6px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink);
+    filter:drop-shadow(0 10px 24px rgba(0,0,0,.5))}
+  .game-sub{margin-top:12px;font-size:clamp(12px,2vw,18px);letter-spacing:8px;color:#ffe9a8;text-transform:uppercase;
+    text-shadow:1px 1px 0 var(--ink);text-align:center}
+  /* a clause of the tagline: breaks between clauses, never inside one */
+  .game-sub .nb{white-space:nowrap}
+  /* ---------- MENU TABS + PANELS ---------- */
+  /* the four tabs must fit ONE line at 390px: no wrap, and they share the
+     width evenly rather than each sizing to its own label */
+  #menu-status{margin-top:16px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap}
+  #menu-tabs{margin-top:10px;display:flex;gap:5px;align-items:flex-end;flex-wrap:nowrap;
+    justify-content:center;width:min(100%,660px);margin-left:auto;margin-right:auto}
+  #menu-tabs .menu-tab{flex:1 1 0;min-width:0}
+  /* FIVE TABS, NOT FOUR. Adding JOBS pushed the row past its width and the
+     longest label was clipped mid-word by its own border — reported with a
+     screenshot of "GARAGI". `white-space:nowrap` with `min-width:0` clips
+     silently rather than wrapping or shrinking, so the padding and the
+     letter-spacing have to give instead: 10px -> 5px a side and 1.5 -> 0.8px
+     of tracking buys back ~14px per tab, which is more than GARAGE needs at
+     every size measured. `overflow:hidden` keeps a sixth tab from spilling
+     over the panel edge if one is ever added. */
+  .menu-tab{pointer-events:auto;cursor:pointer;min-height:42px;padding:11px 5px;font-family:'Luckiest Guy';
+    font-size:clamp(10px,2.7vw,15px);letter-spacing:.8px;white-space:nowrap;overflow:hidden;
+    text-align:center;color:var(--gold-dim);border-radius:var(--r-md) var(--r-md) 0 0;
+    border:2px solid var(--line);border-bottom:none;background:rgba(24,16,6,.55);
+    -webkit-tap-highlight-color:transparent}
+  .menu-tab.current{color:var(--ink);background:var(--yellow);border-color:var(--ink);
+    box-shadow:0 -3px 0 rgba(0,0,0,.15) inset}
+  /* the credits read-out is a chip, not a tab — same row, same height, pill shape */
+  #credits-chip{display:inline-flex;align-items:center;min-height:36px;margin-bottom:3px;
+    padding:0 16px;font-size:12px;letter-spacing:2px;font-weight:800;
+    color:var(--cream);border:2px solid var(--line-strong);border-radius:20px;background:rgba(24,16,6,.7)}
+  #credits-chip b{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
+
+  /* ---------- PLAYER PROFILES (local careers on one device) ---------- */
+  #profile-chip{pointer-events:auto;cursor:pointer;margin-left:6px;padding:7px 16px;font-size:12px;
+    letter-spacing:2px;font-weight:800;font-family:'Baloo 2';color:#ffe9a8;
+    border:2px solid rgba(255,233,168,.35);border-radius:20px;background:rgba(24,16,6,.7);
+    -webkit-tap-highlight-color:transparent;transition:transform .1s}
+  #profile-chip b{color:#7fd4ff;text-shadow:1px 1px 0 var(--ink)}
+  #profile-chip:active{transform:scale(.95)}
+  #profile-screen{z-index:30}
+  #profile-panel{border-radius:14px;margin-top:16px;width:min(94vw,430px)}
+  .prof-row{display:flex;align-items:center;gap:10px;align-self:stretch;
+    padding:8px 4px;border-top:1px solid rgba(255,233,168,.12)}
+  #profile-list .prof-row:first-child{border-top:none}
+  .prof-dot{flex:0 0 auto;width:16px;height:16px;border-radius:50%;border:2px solid var(--ink);
+    box-shadow:0 0 0 1px rgba(255,233,168,.35)}
+  .prof-info{flex:1;min-width:0;text-align:left}
+  .prof-info b{display:block;font-family:'Luckiest Guy';font-size:14px;letter-spacing:1.5px;
+    color:#ffe9c9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prof-row.active .prof-info b{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
+  .prof-info small{display:block;font-size:9.5px;font-weight:700;letter-spacing:1px;color:#c9a86a}
+  .prof-active{font-size:10px;font-weight:800;letter-spacing:2px;color:#8de89a;white-space:nowrap}
+  .prof-btn.danger{background:linear-gradient(180deg,#ff8a75,#e8402a);color:#fff8e0}
+  .prof-rename{pointer-events:auto;width:100%;padding:3px 7px;border-radius:7px;
+    font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.5px;color:var(--yellow);
+    background:rgba(12,8,3,.7);border:2px solid var(--yellow);outline:none;
+    text-transform:uppercase;-webkit-user-select:text;user-select:text}
+  #profile-list{align-self:stretch}
+  #profile-create{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;
+    align-self:stretch;padding-top:4px}
+  #profile-name-input{pointer-events:auto;width:150px;padding:7px 10px;border-radius:8px;
+    font-family:'Baloo 2';font-weight:800;font-size:13px;letter-spacing:2px;color:#fff3d0;
+    background:rgba(12,8,3,.6);border:2px solid rgba(255,233,168,.35);outline:none;
+    text-transform:uppercase;-webkit-user-select:text;user-select:text}
+  #profile-name-input:focus{border-color:var(--yellow)}
+  #profile-name-input::placeholder{color:rgba(255,233,168,.4)}
+  #profile-swatches{display:flex;gap:6px}
+  .prof-swatch{pointer-events:auto;cursor:pointer;width:24px;height:24px;border-radius:50%;
+    border:2px solid rgba(255,233,168,.3);-webkit-tap-highlight-color:transparent}
+  .prof-swatch.sel{border-color:var(--yellow);box-shadow:0 0 8px rgba(255,212,0,.6)}
+  /* row buttons must NOT inherit .up-buy's width:100% — that stole the whole
+     row and squeezed the driver's name into a four-line sliver */
+  .prof-row .prof-btn{width:auto;flex:0 0 auto;min-width:42px;min-height:34px;
+    padding:0 11px;font-size:11px;letter-spacing:1px}
+  .prof-row{overflow:hidden}
+  .prof-row .prof-info{flex:1 1 auto;min-width:0}
+  .prof-info small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* danger zone: reset (empties this driver) sits apart from ✕ (deletes them) */
+  .danger-head{color:#ff9d86 !important}
+  #profile-sync{display:flex;flex-direction:column;align-items:center;gap:7px;align-self:stretch;
+    border-top:1px solid var(--line-soft);padding-top:10px;margin-top:4px}
+  #profile-sync .sync-head{font-size:10px;letter-spacing:3px;color:#e8c987}
+  #profile-sync .sync-status{font-size:9px;font-weight:800;letter-spacing:1.6px;color:#c9a86a;min-height:12px}
+  #profile-sync .sync-row{display:flex;gap:8px}
+  #sync-code-box{width:100%;display:none;background:rgba(0,0,0,.35);color:#ffe9a8;
+    border:1px solid var(--line-soft);border-radius:8px;font-size:10px;padding:6px 8px;
+    font-family:monospace;word-break:break-all;resize:none;pointer-events:auto}
+  #sync-code-box.open{display:block}
+  #profile-sync .sync-note{font-size:9px;font-weight:700;letter-spacing:1.6px;color:#b8a284;text-align:center}
+  #profile-reset{display:flex;flex-direction:column;align-items:center;gap:7px;align-self:stretch}
+  #profile-reset-loss{font-size:10px;font-weight:800;letter-spacing:1.4px;color:#e8a08c;
+    text-align:center;line-height:1.5}
+  #profile-reset .reset-note{font-size:9px;font-weight:700;letter-spacing:1.6px;
+    color:var(--gold-dim);text-align:center}
+  .up-buy.danger{background:linear-gradient(180deg,#ff8a75,#e8402a);color:#fff8e0}
+  #profile-reset-btn{padding:9px 22px;font-size:13px;letter-spacing:2px}
+  /* armed = one tap away from destroying something; it must look like it */
+  .up-buy.armed{background:linear-gradient(180deg,#ffd400,#e8402a);color:#2b1c0e;
+    animation:armpulse .7s ease-in-out infinite alternate}
+  @keyframes armpulse{from{box-shadow:0 0 0 0 rgba(232,64,42,.6)}
+    to{box-shadow:0 0 0 7px rgba(232,64,42,0)}}
+  /* THE PANEL IS THE PAGE'S PAPER, so it has to behave like paper. At .66 the
+     attract camera drew straight through it: the JOBS tab a phone reported as
+     "hard to read" had a rival car and a checkered gantry sitting inside the
+     contract rows. Measured, the screen's own .82 scrim was already eating
+     most of the luminance — the leak costs body copy less than a stop of
+     contrast — but SHAPES with edges are what fight glyphs, and no colour
+     choice wins against a tree branch running through a word. .96 ends the
+     argument, and it is the same warm brown behind the same border.
+     NOT backdrop-filter: this panel is up to 67 world cards tall and the
+     scene behind it animates, so a blur layer would be re-sampled every
+     frame on the phone this game is for. Opacity costs nothing. */
+  .menu-panel{margin-top:0;width:min(100%,660px);background:rgba(22,14,5,.96);
+    border:2px solid var(--line);border-radius:0 var(--r-lg) var(--r-lg) var(--r-lg);
+    padding:12px 16px 16px;display:flex;flex-direction:column;align-items:center}
+  .menu-panel.off{display:none}
+  .panel-head{align-self:stretch;display:flex;align-items:center;gap:12px;
+    font-family:'Luckiest Guy';font-size:14px;letter-spacing:4px;color:var(--cream);
+    margin:8px 0 6px;text-shadow:1px 1px 0 var(--ink);white-space:nowrap}
+  /* the garage head carries a world name now, which can be longer than the
+     panel — let that one wrap instead of running off the edge */
+  /* A HEAD THAT CARRIES A NAME IS AS LONG AS THE NAME, and this fix was given
+     to ONE of the four heads that carry one: the shop head names the world,
+     the tyre bay names the world, the upgrade head names the CAR, the ladder
+     head names the REGION. Left nowrap they do not merely run off the right —
+     .menu-panel centres its children, so a block wider than the panel hangs
+     off BOTH edges and takes the boxes under it with it. Measured at 320:
+     "TYRE BAY — AVALANCHE ALLEY WANTS SNOW" is 449.9 px inside a 252 px panel,
+     which put the AUTO box at x=-64.9 and the SNOW box 64.9 px past the right
+     edge of the screen, and gave the whole page 65 px of sideways scroll. */
+  #garage-shop-head,#garage-up-head,#tyre-bay .panel-head,.region-head{
+    white-space:normal;text-align:center;line-height:1.35}
+  .panel-head::before,.panel-head::after{content:'';flex:1;height:1px;background:var(--line-soft)}
+
+  /* ---------- WORLD CARDS (track selection) ---------- */
+  #level-select{margin-top:8px;width:100%}
+  /* THE STAR KEY, FOLDED. Open, this was five lines and 105 px — a legend
+     three times the height of the card it sits above, re-read by nobody after
+     the first time. Folded it is the two facts that change: the running total,
+     and what the next chapter costs. The rules are one tap away and the fold
+     state is remembered. */
+  /* WIDTH:100% IS LOAD-BEARING, not tidiness. .menu-panel is a centring flex
+     column, so a child with no width sizes to its CONTENT — and a nowrap line
+     longer than the panel then hangs off BOTH edges and takes the page's
+     sideways scroll with it. Same trap the region heads hit above. */
+  #star-key{width:100%;margin:2px 0 8px;padding:6px 10px;border:1px solid var(--line-soft);
+    border-radius:10px;background:rgba(255,212,0,.05);cursor:pointer;
+    pointer-events:auto;-webkit-tap-highlight-color:transparent}
+  #star-key .sk-top{display:flex;align-items:center;gap:10px;min-width:0}
+  #star-key .sk-total{flex:none;font-family:'Luckiest Guy';font-size:16px;color:var(--yellow);
+    white-space:nowrap}
+  #star-key .sk-total small{font-size:10px}
+  /* the folded one-liner, and the full list — exactly one is ever up.
+     min-width:0 is what lets it ellipsise: a flex item defaults to
+     min-width:auto, which refuses to shrink below its own nowrap content. */
+  #star-key .sk-brief{flex:1 1 auto;min-width:0;font-size:10px;font-weight:700;
+    letter-spacing:.8px;color:#d8c090;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  #star-key .sk-brief b{color:var(--yellow)}
+  #star-key .sk-more{flex:none;margin-left:auto;font-size:10px;color:var(--gold-dim);
+    letter-spacing:1px;white-space:nowrap}
+  #star-key .sk-full{display:none;margin-top:6px}
+  #star-key.open .sk-brief{display:none}
+  #star-key.open .sk-full{display:block}
+  #star-key .sk-title{font-size:10px;letter-spacing:3px;color:#e8c987;display:block;
+    margin-bottom:5px}
+  #star-key .sk-rules{display:flex;flex-wrap:wrap;gap:5px 16px}
+  #star-key .sk-rule{font-size:11px;font-weight:700;letter-spacing:.6px;color:#d8c090;
+    white-space:nowrap}
+  #star-key .sk-rule b{color:var(--yellow);font-weight:700;margin-right:5px}
+  /* THE GATE LINE IS THE ONE SENTENCE WORTH KEEPING UP, so it stays visible
+     folded — but clamped to a single line. Unclamped it wrapped to three on a
+     phone, which is how a two-line legend became a five-line one. */
+  #star-key .sk-next{margin-top:5px;font-size:10.5px;letter-spacing:1px;color:#c9a86a;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #star-key.open .sk-next{white-space:normal;line-height:1.4}
+  #star-key .sk-next b{color:#8de89a}
+  @media (max-width:460px){
+    #star-key{padding:5px 9px}
+    #star-key .sk-rule{font-size:10px}
+    #star-key .sk-rules{gap:4px 10px}
+  }
+  /* ---------- WORLD FILTERS ---------- */
+  #world-filters{width:100%;display:flex;flex-direction:column;gap:5px;
+    margin:0 0 4px;padding:8px 10px;border:1px solid var(--line-soft);
+    border-radius:10px;background:rgba(12,8,3,.35)}
+  .wf-top{display:flex;gap:8px;align-items:center}
+  #wf-search{flex:1;min-width:0;background:rgba(0,0,0,.4);border:1px solid var(--line-soft);
+    border-radius:8px;color:var(--cream);font-family:'Baloo 2';font-weight:700;
+    font-size:12px;letter-spacing:1.2px;padding:6px 10px;pointer-events:auto;
+    -webkit-appearance:none;appearance:none}
+  #wf-search::placeholder{color:var(--gold-dim);letter-spacing:1px}
+  #wf-search:focus{outline:none;border-color:var(--yellow)}
+  #wf-clear,#wf-toggle{pointer-events:auto;cursor:pointer;font-family:'Baloo 2';font-weight:800;
+    font-size:10px;letter-spacing:1.6px;padding:6px 11px;border-radius:8px;
+    border:1px solid var(--line-soft);background:rgba(255,255,255,.04);
+    color:var(--gold-dim);white-space:nowrap;-webkit-tap-highlight-color:transparent}
+  #wf-clear.on,#wf-toggle.on{border-color:var(--yellow);color:var(--yellow);
+    background:rgba(255,212,0,.14)}
+  /* CLEAR ONLY EXISTS WHEN THERE IS SOMETHING TO CLEAR. Dark, it was a dead
+     control that still cost a whole row: search / view+FILTERS / CLEAR came to
+     three wrapped lines and 109 px at 390 px wide, with the third holding one
+     button nobody could use. `.on` is already set by _applyWorldFilter the
+     moment any chip or search term bites. */
+  #wf-clear{display:none}
+  #wf-clear.on{display:inline-block}
+  /* folded: keep the search, the count and whatever is switched ON */
+  .wf-collapsed .wf-chip:not(.on){display:none}
+  .wf-collapsed .wf-group.wf-empty{display:none}
+  .wf-group{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+  .wf-glabel{font-size:9px;font-weight:800;letter-spacing:1.6px;color:var(--gold-dim);
+    width:58px;flex:0 0 58px}
+  .wf-chip{pointer-events:auto;cursor:pointer;font-family:'Baloo 2';font-weight:700;
+    font-size:10px;letter-spacing:.7px;padding:3px 9px;border-radius:999px;
+    border:1px solid var(--line-soft);background:rgba(255,255,255,.05);
+    color:#d8cbb0;-webkit-tap-highlight-color:transparent;transition:transform .08s}
+  .wf-chip:active{transform:scale(.94)}
+  .wf-chip.on{background:rgba(255,212,0,.18);border-color:var(--yellow);color:var(--yellow)}
+  #wf-count{font-size:10px;font-weight:700;letter-spacing:1.4px;color:var(--gold-dim);
+    padding-top:2px}
+  #wf-count.none{color:#e8946a}
+  /* the one thing a filter does to the list */
+  .wf-out{display:none!important}
+  @media (max-width:460px){
+    #world-filters{padding:6px 8px;gap:4px}
+    .wf-glabel{width:100%;flex:0 0 100%;letter-spacing:1.2px}
+    .wf-chip{font-size:9.5px;padding:3px 8px}
+    /* three controls on one phone row squeezes the search to a stub — give it
+       its own line above the two buttons */
+    .wf-top{flex-wrap:wrap;gap:6px}
+    #wf-search{flex:1 0 100%;order:-1}
+    /* AND THE TWO BUTTONS SHARE THAT SECOND ROW. At 320px the view switch and
+       FILTERS came to 238px inside 234px — four pixels over, which cost a
+       whole third row and 38px of the shortest phone there is. */
+    #wf-clear,#wf-toggle{padding:6px 7px}
+  }
+  /* MY SCENES: a world you made is yours to throw away. Two taps, because it
+     cannot be undone and the target is small. */
+  .scene-chip{padding-top:14px}
+  .wc-del{position:absolute;top:3px;right:5px;z-index:3;pointer-events:auto;cursor:pointer;
+    font-size:11px;font-weight:900;letter-spacing:1px;line-height:1;padding:3px 6px;
+    border-radius:6px;color:var(--gold-dim);background:rgba(0,0,0,.35);
+    border:1px solid var(--line-soft)}
+  .scene-chip.confirm .wc-del{color:#1a1208;background:#e8946a;border-color:#e8946a}
+  .scene-chip.confirm{border-color:#e8946a}
+  .wc-new{position:absolute;top:8px;left:-26px;transform:rotate(-35deg);z-index:2;
+    background:linear-gradient(180deg,#ffd400,#f0a020);color:#241d16;font-weight:900;
+    font-size:10px;letter-spacing:3px;padding:3px 30px;box-shadow:0 2px 4px rgba(0,0,0,.35);
+    pointer-events:none}
+  .region-head{display:flex;align-items:center;gap:10px;margin:16px 0 8px;
+    font-family:'Luckiest Guy';font-size:12px;letter-spacing:5px;
+    color:var(--gold-dim);text-shadow:1px 1px 0 var(--ink);white-space:nowrap}
+  /* The chapter index's heading is a sentence, not a region name — it says
+     which chapter you are in AND how much of the roster is open, and at 5px
+     of letter-spacing that runs off a phone. Let this one wrap. */
+  .tl-view > .region-head{white-space:normal;letter-spacing:3px;line-height:1.5}
+  .tl-view > .region-head::before,.tl-view > .region-head::after{display:none}
+  .region-head::before,.region-head::after{content:'';flex:1;height:1px;background:var(--line-soft)}
+  .region-head:first-child{margin-top:2px}
+  /* ---- CHAPTER HEADERS (the timeline/progression view) -------------------
+     A chapter is a part of the career, so its header is a BLOCK with a name,
+     a line of flavour and a star bar — not the thin rule a region gets. The
+     bar carries two marks: the fill is what you have banked in this chapter,
+     the notch is where the gate sits, so "how much further" is a distance you
+     can see rather than a number you have to do arithmetic on. */
+  .chapter-head{margin:20px 0 10px;padding:10px 12px;border-radius:10px;
+    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.16));
+    border:1px solid var(--line-soft);border-left:3px solid var(--gold-dim)}
+  .chapter-head:first-child{margin-top:2px}
+  .chapter-head.locked{opacity:.62;border-left-color:var(--line-soft)}
+  .ch-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .ch-n{font-family:'Luckiest Guy';font-size:10px;letter-spacing:3px;
+    color:var(--ink-soft,#9aa)}
+  .ch-name{font-family:'Luckiest Guy';font-size:14px;letter-spacing:3px;
+    color:var(--gold);text-shadow:1px 1px 0 var(--ink)}
+  .ch-gate{margin-left:auto;font-size:10px;letter-spacing:1px;color:var(--gold-dim);
+    white-space:nowrap}
+  .ch-blurb{margin-top:3px;font-size:11px;line-height:1.35;color:var(--ink-soft,#9aa);
+    opacity:.9}
+  .ch-bar{position:relative;height:4px;margin-top:8px;border-radius:3px;
+    background:rgba(0,0,0,.3);overflow:hidden}
+  .ch-bar i{display:block;height:100%;background:var(--gold-dim);border-radius:3px}
+  .ch-bar u{position:absolute;top:-2px;width:2px;height:8px;background:var(--gold);
+    opacity:.85;text-decoration:none}
+  @media (max-width:420px){
+    .ch-name{font-size:12px;letter-spacing:2px}
+    .ch-gate{margin-left:0;width:100%}
+  }
+  /* ---- THE CHAPTER INDEX -------------------------------------------------
+     Twelve cards instead of seventy-two: the tracks tab opens on a map of the
+     career, and you ENTER a chapter to see its worlds. Reported as "package
+     them in separate sections that I can enter ... no endless scrolling".
+     Two columns from 520px up, one below — a chapter card is a block of text
+     and text wants a readable measure, not the widest box available. */
+  .chapter-grid{display:grid;grid-template-columns:1fr;gap:10px;width:100%}
+  @media (min-width:520px){.chapter-grid{grid-template-columns:1fr 1fr}}
+  .chapter-card{display:block;width:100%;text-align:left;cursor:pointer;
+    padding:12px 14px;border-radius:12px;font:inherit;color:inherit;
+    background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(0,0,0,.2));
+    border:1px solid var(--line-soft);border-left:3px solid var(--gold-dim);
+    transition:transform .12s ease,border-color .12s ease}
+  .chapter-card:hover,.chapter-card:focus-visible{transform:translateY(-2px);
+    border-color:var(--gold)}
+  .chapter-card.locked{opacity:.6;border-left-color:var(--line-soft)}
+  .chapter-card.here{border-left-color:var(--gold);
+    box-shadow:0 0 0 1px var(--gold-dim) inset}
+  .cc-top{display:flex;align-items:baseline;gap:9px}
+  .cc-n{font-family:'Luckiest Guy';font-size:16px;color:var(--gold-dim);
+    min-width:22px}
+  .cc-name{font-family:'Luckiest Guy';font-size:15px;letter-spacing:2px;
+    color:var(--gold);text-shadow:1px 1px 0 var(--ink)}
+  .cc-blurb{margin:4px 0 8px;font-size:11px;line-height:1.4;
+    color:var(--ink-soft,#9aa);opacity:.9}
+  .cc-foot{display:flex;align-items:baseline;gap:10px;font-size:10px;
+    letter-spacing:1px;color:var(--gold-dim)}
+  .cc-stars{margin-left:auto;white-space:nowrap}
+  .chapter-card .ch-bar{margin-top:7px}
+  /* THE BACK BAR — see the markup note by #topbar.
+     STICKY AND IN THE FLOW, not fixed, and the reason is the FAILURE MODE
+     rather than the happy path. Fixed measured perfectly here and was reported
+     invisible on the reporter's iPhone; a fixed element that does not paint
+     leaves NOTHING on screen anywhere. In flow, the worst sticky can do is
+     scroll away with the page — the button is still there when you arrive at
+     the top of a chapter, which is where a player looks for it. A smaller
+     failure beats a total one, and this is the same trade r223 made in the
+     other direction on a guess. */
+  #topbar{position:sticky;top:-16px;z-index:30;align-self:stretch;
+    display:flex;align-items:center;gap:10px;
+    /* -16px BOTH TIMES IS .screen's OWN PADDING, and the two are coupled: the
+       margin cancels it so the bar spans edge to edge rather than reading as a
+       floating chip, and the negative `top` above lands it flush with the top
+       of the scrollport instead of 16px down with the list showing over it.
+       If .screen's padding ever changes, change both. */
+    margin:-16px -16px 10px;
+    padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));
+    background:#171310;border-bottom:1px solid var(--line-soft);
+    box-shadow:0 3px 12px rgba(0,0,0,.55)}
+  #topbar.hidden{display:none}
+  /* BACK is the biggest thing in the bar, because it is the only thing in the
+     bar you can press. The rest is a label.
+     ORANGE, THE SAME ORANGE AS START RACE — the two bars are now the two ends
+     of the screen, and giving them one colour says "these are the buttons" and
+     leaves everything else as text. Gold-on-dark read as another chip in a
+     menu already full of gold-on-dark chips, which is a large part of why the
+     control was hard to find at all. Same gradient, same ink border, sized for
+     a header rather than a footer. */
+  /* 40px MINIMUM, because it is a phone control and 31px was under every
+     touch-target guideline there is — and "make it more obvious" is a size
+     argument as much as a colour one. inline-flex so the min-height cannot
+     fight the padding. */
+  #topbar-back.hidden{display:none}
+  /* THE WORDMARK, at bar size. It was a 96px hero that scrolled away; here it
+     is a 13px display face that never does. */
+  #topbar .tb-brand{font-family:'Luckiest Guy';font-size:13px;letter-spacing:1.6px;
+    color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
+  /* THE BALANCE IS PINNED RIGHT and never shrinks — it is the number the whole
+     garage below is spending, so it is the one thing in the bar that must not
+     give way when a chapter name gets long. */
+  #topbar-cred{flex:0 0 auto;margin-left:auto;font-family:'Baloo 2';font-weight:800;
+    font-size:10px;letter-spacing:1px;color:var(--gold-dim);white-space:nowrap;
+    padding:5px 9px;border-radius:8px;background:rgba(0,0,0,.4);
+    border:1px solid var(--line-soft)}
+  #topbar-cred b{font-family:'Luckiest Guy';font-size:13px;letter-spacing:.5px;
+    color:var(--yellow);margin-left:3px;text-shadow:1px 1px 0 var(--ink)}
+  /* the where-slot yields first when the bar is tight */
+  #topbar .ch-here{flex:1 1 auto;min-width:0}
+  #topbar .ch-here-stars{flex:0 0 auto;margin-left:0}
+  @media (max-width:389px){
+    #topbar{gap:7px;padding-left:8px;padding-right:8px}
+    #topbar-back{font-size:12px;padding:7px 10px}
+    #topbar-cred{font-size:9px;padding:4px 7px}
+    #topbar-cred b{font-size:12px}
+    #topbar .tb-brand{font-size:11.5px;letter-spacing:1px}
+  }
+  #topbar-back{font-size:13px;padding:7px 14px;border-radius:10px;
+    min-height:40px;display:inline-flex;align-items:center;
+    color:#fff8e0;background:linear-gradient(180deg,#ff9d2e,#e8402a);
+    border:2px solid var(--ink);
+    text-shadow:1px 1px 0 rgba(0,0,0,.35);
+    box-shadow:0 3px 0 var(--ink),0 6px 14px rgba(0,0,0,.45)}
+  #topbar-back:hover,#topbar-back:focus-visible{border-color:var(--ink);
+    filter:brightness(1.08)}
+  #topbar-back:active{transform:translateY(2px);
+    box-shadow:0 1px 0 var(--ink),0 3px 8px rgba(0,0,0,.45)}
+  /* The screen centres short content with auto-margin spacers (.screen::before).
+     A header must not be centred — with the bar up the page starts at the top. */
+  .screen.with-topbar::before{display:none}
+  .ch-back{font-family:'Luckiest Guy';font-size:11px;letter-spacing:2px;
+    padding:5px 10px;border-radius:8px;cursor:pointer;
+    color:var(--gold);background:rgba(0,0,0,.3);border:1px solid var(--line-soft)}
+  .ch-back:hover{border-color:var(--gold)}
+  .ch-here{font-size:11px;letter-spacing:1px;color:var(--ink-soft,#9aa);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ch-here b{font-family:'Luckiest Guy';color:var(--gold);letter-spacing:2px;
+    margin-right:6px}
+  .ch-here-stars{margin-left:auto;font-size:11px;color:var(--gold-dim);
+    white-space:nowrap}
+  /* inside a chapter the bar IS the header — this is the placeholder the row
+     builder emits in its place, and it must take up no room at all */
+  .chapter-head-none{display:none}
+  /* NO padding-top HERE ANY MORE. The bar was fixed and out of flow, so the
+     screen had to buy back its height; in flow it takes its own room and a
+     second allowance would just be a gap. */
+  /* AND THE BRANDING STANDS DOWN once you are inside a chapter. The title and
+     the tagline are the front door; two levels in they are 110 px of a phone
+     spent on a logo, above the list the player came to read. */
+  #title-screen.compact .game-title{font-size:clamp(22px,5vw,34px);letter-spacing:2px;
+    text-shadow:3px 3px 0 var(--ink);filter:none}
+  #title-screen.compact .game-sub{display:none}
+  /* auto-FILL (not -fit): regions with fewer worlds keep the same card width,
+     so every region shares one grid rhythm */
+  .region-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%}
+
+  /* ---------- TIMELINE VIEW: the roster as a career ladder ----------
+     Career order IS the price order (starCost counts rungs), so laid out in
+     array order the list already tells the progression story — it only needed
+     a spine to read as one. Cards stay DIRECT children of .region-row so the
+     filter pass, the current-card highlight and the lazy art observer all keep
+     working untouched; everything below is layout. */
+  #level-select.tl-view .region-row{display:flex;flex-direction:column;gap:8px;position:relative}
+  /* THE SPINE runs behind the rung badges, which is why the rung lives in a
+     grid column of its own rather than hanging off the card's left edge: the
+     card clips its own overflow (the NEW ribbon depends on that), so anything
+     outside the border box is invisible. Inside the box it always draws. */
+  #level-select.tl-view .region-row::before{content:'';position:absolute;left:23px;top:10px;bottom:10px;
+    width:2px;background:linear-gradient(180deg,var(--line-soft),rgba(255,212,0,.20));border-radius:2px}
+  #level-select.tl-view .level-chip{align-items:center;text-align:left;
+    gap:6px 10px;padding:8px 10px;display:grid;
+    grid-template-columns:22px 64px 1fr auto;grid-template-areas:
+      'rung shot name  state' 'rung shot tags  stars' 'rung shot surf  best'
+      'rung feats feats feats'}
+  #level-select.tl-view .wc-shot{grid-area:shot;width:64px;aspect-ratio:1/1;flex:none}
+  #level-select.tl-view .wc-map{width:44px;height:32px;top:2px;right:2px}
+  #level-select.tl-view .wc-name{grid-area:name;min-height:0;justify-content:flex-start;
+    font-size:14.5px;letter-spacing:1px}
+  #level-select.tl-view .wc-tags{grid-area:tags;text-align:left}
+  #level-select.tl-view .wc-stars{grid-area:stars;text-align:right;margin-top:0}
+  #level-select.tl-view .wc-surf{grid-area:surf;width:auto;justify-self:start}
+  #level-select.tl-view .wc-best{grid-area:best;margin-top:0;text-align:right;justify-self:end}
+  #level-select.tl-view .tl-state{grid-area:state}
+  /* the affinity chip is the one thing with no room left in a rung, and it is
+     the only one of these the GARAGE also states */
+  #level-select.tl-view .wc-fit{display:none}
+  /* TRACK FEATS: what this world wants from the garage. A locked one names
+     the part and level that opens it — that is the point of showing it. */
+  .wc-feats{display:flex;flex-wrap:wrap;gap:3px;margin-top:2px;justify-content:center}
+  .wc-feat{font-size:9.5px;font-weight:800;letter-spacing:.6px;padding:2px 5px;
+    border-radius:5px;border:1px solid transparent;white-space:nowrap}
+  .wc-feat.done{color:#8de89a;background:rgba(77,208,106,.13);border-color:rgba(77,208,106,.35)}
+  .wc-feat.open{color:var(--yellow);background:rgba(255,212,0,.12);border-color:rgba(255,212,0,.35)}
+  .wc-feat.locked{color:#c0a375;background:rgba(120,100,70,.16);border-color:rgba(120,100,70,.4)}
+  /* A padlock that only says LOCKED is a label. It has to name the price, so
+     the chip carries what this world takes off the car when the gate is unmet. */
+  .wc-feat.locked i{display:block;font-style:normal;font-size:9px;letter-spacing:.4px;
+    color:#ff8b6b;margin-top:1px}
+  /* ---- the quest board ---- */
+  /* ---- the jobs board: contracts you can decline, quests you work toward ---- */
+  /* SIZE FIRST, THEN COLOUR. Measured on a 430px phone the contrast ratios on
+     this tab were mostly fine (7-11:1 body copy) — what was actually failing
+     was 9.5px of 400-weight text, and one line at 8.5px that no ratio saves.
+     Secondary copy is 11px/600 here and everywhere below; the muted brown is
+     lifted a step so it clears 4.5:1 against the brightest backdrop the panel
+     can ever admit rather than only against the dark one it usually has. */
+  /* 78/84 was sized for 11px labels; at 12px "COMBO ARTIST I" dropped its
+     numeral onto a line of its own at 360px. The payout is never wider than
+     "+180 CR" and the chip never wider than "DECLINED", so the 14px they were
+     hoarding goes to the name column instead. */
+  #contract-board .jrow{display:grid;grid-template-columns:1fr 70px 80px;gap:8px;
+    align-items:center;padding:9px 10px;margin-bottom:5px;border-radius:9px;
+    background:rgba(38,27,11,.86);border:1px solid rgba(255,212,0,.22)}
+  /* a declined contract still has to be READ — .42 opacity took the row below
+     every threshold at once. The DECLINED chip is what says it is off. */
+  #contract-board .jrow.off{opacity:.66}
+  #contract-board .jmain b{display:block;font-size:12px;letter-spacing:.9px;color:var(--yellow)}
+  #contract-board .jmain i{display:block;font-style:normal;font-size:11px;font-weight:600;
+    color:#e5d1a6;line-height:1.4;margin-top:2px}
+  #contract-board .jpay{font-size:11.5px;font-weight:900;color:#8de89a;text-align:right}
+  #contract-board .jbtn{padding:7px 4px;border-radius:8px;font-family:inherit;font-size:10px;
+    font-weight:800;letter-spacing:.8px;cursor:pointer;border:1px solid rgba(255,212,0,.35);
+    background:rgba(255,212,0,.14);color:var(--yellow)}
+  #contract-board .jbtn.declined{background:rgba(58,44,26,.9);border-color:rgba(196,170,118,.5);color:#e0cb9f}
+  /* the one paragraph of prose in the whole menu, and it was the smallest,
+     lightest thing on the tab: 9.5px/400 with .4px of tracking, which on a
+     phone is the definition of "hard to read". Bigger, heavier, more leading,
+     less tracking — none of which changes a word of what it says. */
+  #jobs-note{font-size:11.5px;font-weight:600;color:#ddc79a;letter-spacing:.1px;
+    margin:3px 2px 11px;line-height:1.6}
+
+  /* ---- the job board: postings you choose, not offers handed to you ---- */
+  #job-board{margin-bottom:16px}
+  #job-board .jobrow{display:grid;grid-template-columns:24px 1fr 84px 62px;gap:8px;
+    align-items:center;padding:9px 9px;margin-bottom:5px;border-radius:9px;
+    background:rgba(38,27,11,.86);border:1px solid rgba(255,212,0,.22)}
+  /* the held job is not an offer any more — it is the thing you are doing */
+  #job-board .jobrow.held{grid-template-columns:24px 1fr 84px;
+    background:rgba(255,212,0,.10);border-color:var(--yellow)}
+  #job-board .jicon{font-size:16px;text-align:center}
+  #job-board .jmain b{display:block;font-size:12.5px;letter-spacing:.8px;color:var(--yellow);
+    line-height:1.35}
+  #job-board .jmain i{display:block;font-style:normal;font-size:11px;font-weight:600;
+    color:#e5d1a6;line-height:1.4;margin-top:2px}
+  /* "never raced here" measured 3.0:1 — the ONE line on this tab that failed
+     WCAG outright, at 8.5px/400 in a brown two shades off the row it sat in.
+     De-emphasised has to mean quieter than the title, not invisible. */
+  #job-board .jmain u{display:block;text-decoration:none;font-size:10px;font-weight:600;
+    letter-spacing:.3px;color:#d0ba8e;margin-top:3px}
+  #job-board .jpay{font-size:11.5px;font-weight:900;color:#8de89a;text-align:right;line-height:1.3}
+  #job-board .jpay em{font-style:normal;font-size:9px;letter-spacing:.3px;color:#ffb52e}
+  #job-board .jtake{padding:7px 4px;border-radius:8px;font-family:inherit;font-size:9px;
+    font-weight:800;letter-spacing:.8px;cursor:pointer;border:1px solid rgba(255,212,0,.35);
+    background:rgba(255,212,0,.14);color:var(--yellow)}
+  #job-board .jobact{display:grid;grid-template-columns:1fr 76px;gap:6px;margin-top:2px}
+  #job-board .jobact button{padding:11px 6px;border-radius:9px;font-family:inherit;font-size:10.5px;
+    font-weight:900;letter-spacing:1px;cursor:pointer;border:1px solid var(--yellow);
+    background:var(--yellow);color:#1a1206}
+  /* DROP is the quiet half of the pair, but it was 4.79:1 against the panel's
+     usual dark and 3.01:1 against its brightest patch — a button whose label
+     goes when the scene behind it goes light is not a button. */
+  #job-board .jobact button.ghost{background:rgba(58,44,26,.9);border-color:rgba(196,170,118,.5);
+    color:#e6d2a8}
+
+  /* ---- tyre bay ---- */
+  /* full width, not shrink-to-fit: as a flex item of a centring column this
+     block would otherwise size itself to its widest line and hang off both
+     edges of the screen */
+  #tyre-bay{margin:10px 0 4px;width:100%}
+  /* 1fr floors at the column's MIN-CONTENT, so "BUY TIRES 3" and "FITTED SNOW"
+     set the width of the row instead of wrapping inside it. minmax(0,1fr) plus
+     min-width:0 lets the four boxes share whatever the panel actually has. */
+  .tyre-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+  .tyre-opt{min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;
+    padding:8px 4px;border-radius:10px;cursor:pointer;font-family:inherit;
+    background:rgba(40,30,16,.5);border:1px solid rgba(255,212,0,.22);color:#c8b48c;font-size:15px}
+  .tyre-opt b{font-size:10px;letter-spacing:1px}
+  .tyre-opt i{font-style:normal;font-size:7.5px;letter-spacing:.4px;color:#8de89a;min-height:9px}
+  .tyre-opt.on{background:rgba(255,212,0,.16);border-color:var(--yellow);color:var(--yellow)}
+  .tyre-opt.want{box-shadow:0 0 0 1px rgba(77,208,106,.55) inset}
+  .tyre-opt.locked{opacity:.42;cursor:not-allowed}
+  .tyre-opt.locked i{color:#ffb52e}
+  /* AUTO is the default and the recommended setting, so it reads as the
+     positive choice rather than as a fourth compound */
+  .tyre-opt.tyre-auto.on{background:rgba(77,208,106,.16);border-color:#4dd06a;color:#8de89a}
+  .tyre-opt.tyre-auto.on i{color:#8de89a}
+  #quest-board{margin-top:14px}
+  /* the quest rows sit on the same tab and share the same type, so they get
+     the same treatment — a JOBS tab legible down to the contracts and then
+     mouse-print again from the quests down would be half a fix */
+  #quest-board .qrow{display:grid;grid-template-columns:26px 1fr 74px 40px;gap:8px;
+    align-items:center;padding:8px 9px;margin-bottom:5px;border-radius:9px;
+    background:rgba(38,27,11,.86);border:1px solid rgba(255,212,0,.22)}
+  #quest-board .qrow.done{opacity:.72;border-color:rgba(77,208,106,.4)}
+  #quest-board .qicon{font-size:16px;text-align:center}
+  #quest-board .qmain b{display:block;font-size:12px;letter-spacing:.9px;color:var(--yellow)}
+  #quest-board .qmain i{display:block;font-style:normal;font-size:11px;font-weight:600;
+    color:#e5d1a6;line-height:1.4;margin:2px 0 4px}
+  #quest-board .qbar{display:block;height:4px;border-radius:3px;background:rgba(0,0,0,.45);overflow:hidden}
+  #quest-board .qbar span{display:block;height:100%;background:linear-gradient(90deg,#ffb52e,#ffd400)}
+  #quest-board .qpay{font-size:9.5px;font-weight:800;letter-spacing:.4px;color:#8de89a;text-align:right;line-height:1.3}
+  #quest-board .qn{font-size:12px;font-weight:900;color:#fff8e0;text-align:right}
+  #level-select.tl-view .wc-feats{grid-area:feats;justify-content:flex-start}
+
+  /* THE RUNG ITSELF — the node on the spine and the career position in one
+     mark, so the number and the dot cannot disagree */
+  .tl-rung{display:none}
+  #level-select.tl-view .tl-rung{grid-area:rung;display:grid;place-items:center;
+    width:20px;height:20px;border-radius:50%;font-family:'Luckiest Guy';font-size:9px;
+    color:var(--ink);background:var(--line-strong);
+    box-shadow:0 0 0 2px rgba(38,26,12,.85)}
+  #level-select.tl-view .level-chip.done .tl-rung{background:#4dd06a}
+  #level-select.tl-view .level-chip.raced .tl-rung{background:var(--amber)}
+  #level-select.tl-view .level-chip.locked .tl-rung{background:rgba(150,128,92,.75)}
+  #level-select.tl-view .level-chip.next .tl-rung{background:var(--yellow);
+    box-shadow:0 0 0 2px rgba(38,26,12,.85),0 0 12px rgba(255,212,0,.85)}
+  /* what this rung IS, in one word */
+  .tl-state{font-size:10px;font-weight:800;letter-spacing:1.2px;padding:2px 6px;
+    border-radius:5px;border:1px solid transparent;white-space:nowrap}
+  #level-select:not(.tl-view) .tl-state{display:none}
+  .tl-state.open{color:var(--yellow);background:rgba(255,212,0,.12);border-color:rgba(255,212,0,.35)}
+  .tl-state.cleared{color:#8de89a;background:rgba(77,208,106,.12);border-color:rgba(77,208,106,.3)}
+  .tl-state.stars-left{color:#e8c987;background:rgba(232,201,135,.10);border-color:rgba(232,201,135,.3)}
+  .tl-state.locked{color:#c0a375;background:rgba(120,100,70,.14);border-color:rgba(120,100,70,.35)}
+  /* NEXT UP — the one card the view exists to put in front of you */
+  .tl-next{position:absolute;top:0;right:0;z-index:2;font-family:'Luckiest Guy';
+    font-size:8px;letter-spacing:2px;color:var(--ink);background:var(--yellow);
+    padding:2px 8px;border-bottom-left-radius:8px}
+  .level-chip.next{border-color:var(--yellow);background:rgba(255,212,0,.10)}
+  .level-chip.next.locked{opacity:.8}
+  /* REGIONS | TIMELINE — in the top row, so a fold never hides which view you
+     are in */
+  #wf-view{display:flex;gap:0;flex:none;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .wf-viewbtn{pointer-events:auto;cursor:pointer;border:0;background:rgba(38,26,12,.5);
+    color:var(--gold-dim);font-family:'Baloo 2';font-weight:800;font-size:9.5px;
+    letter-spacing:1.2px;padding:6px 9px;-webkit-tap-highlight-color:transparent}
+  .wf-viewbtn.on{background:var(--yellow);color:var(--ink)}
+  @media (max-width:620px){
+    #level-select.tl-view .level-chip{grid-template-columns:20px 52px 1fr auto;
+      grid-template-areas:'rung shot name state' 'rung shot tags stars' 'rung shot surf surf'
+        'rung shot best best' 'rung feats feats feats'}
+    #level-select.tl-view .region-row::before{left:21px}
+    #level-select.tl-view .wc-shot{width:52px}
+    #level-select.tl-view .tl-rung{width:18px;height:18px;font-size:8px}
+    #level-select.tl-view .wc-best{text-align:left;justify-self:start}
+    .wf-viewbtn{font-size:9px;padding:6px 7px;letter-spacing:.8px}
+  }
+  .level-chip{pointer-events:auto;cursor:pointer;padding:8px 8px 10px;font-family:'Baloo 2';
+    position:relative;overflow:hidden;    /* anchors + clips the NEW ribbon */
+    color:var(--cream);border-radius:var(--r-md);text-align:center;
+    border:2px solid var(--line-strong);background:rgba(38,26,12,.6);
+    transition:transform .1s;-webkit-tap-highlight-color:transparent;display:flex;
+    flex-direction:column;align-items:center;gap:3px}
+  .level-chip:active{transform:scale(.96)}
+  .level-chip.current{background:rgba(255,212,0,.16);border-color:var(--yellow);
+    box-shadow:0 3px 0 var(--ink), 0 0 18px rgba(255,212,0,.25)}
+  .level-chip.locked{opacity:.45;cursor:not-allowed}
+  .wc-shot{position:relative;width:100%;aspect-ratio:16/10;border-radius:var(--r-sm);overflow:hidden;
+    background-size:cover;background-position:center;background-color:rgba(12,8,3,.65);
+    border:1px solid var(--line-soft)}
+  .wc-shot::after{content:'';position:absolute;inset:0;
+    background:linear-gradient(180deg,transparent 55%,rgba(12,8,3,.5));pointer-events:none}
+  .wc-map{position:absolute;top:4px;right:4px;width:64px;height:46px;border-radius:6px;
+    background:rgba(12,8,3,.55);border:1px solid var(--line);z-index:1}
+  .level-chip.locked .wc-shot{filter:grayscale(.75) brightness(.7)}
+  /* reserve two lines for the name and pin the best-time line to the card
+     foot, so one- and two-line worlds still line up across a region row */
+  .wc-name{font-family:'Luckiest Guy';font-size:15px;letter-spacing:1.5px;line-height:1.1;
+    min-height:2.2em;display:flex;align-items:center;justify-content:center}
+  .level-chip.current .wc-name{color:var(--yellow)}
+  /* ---------- SURFACE / TYRE REQUIREMENT ---------- */
+  /* The loudest thing on a card after the name: a world you cannot enter has
+     to say so where you are looking, not in a tooltip. */
+  .wc-surf{font-size:11px;font-weight:800;letter-spacing:.9px;line-height:1.3;
+    border-radius:6px;padding:2px 6px;width:100%;box-sizing:border-box}
+  .wc-surf.ok{color:#9fd8a4;background:rgba(90,200,110,.10);border:1px solid rgba(90,200,110,.30)}
+  .wc-surf.bad{color:#ffb38a;background:rgba(232,120,60,.14);border:1px solid rgba(232,120,60,.45)}
+  .wc-surf .wc-fitok{color:#8de89a}
+  .wc-surf .wc-over{color:#e8c987}
+  .wc-surf .wc-fix{display:block;font-weight:700;font-size:8.5px;letter-spacing:.6px;
+    color:var(--yellow);margin-top:1px}
+  .level-chip:has(.wc-surf.bad){border-color:rgba(232,120,60,.55)}
+  /* garage: what this machine is shod with */
+  .ctyre{font-size:9.5px;font-weight:800;letter-spacing:.8px;padding:2px 5px;
+    border-radius:5px;margin-top:2px}
+  .ctyre b{color:inherit}
+  .ctyre.ok{color:#9fd8a4;background:rgba(90,200,110,.10)}
+  .ctyre.over{color:#e8c987;background:rgba(232,201,135,.10)}
+  .ctyre.bad{color:#ffb38a;background:rgba(232,120,60,.16)}
+  /* a start button that will refuse should not look armed */
+  #start-btn.blocked{background:linear-gradient(180deg,#6a5442,#4a3a2c);
+    color:#e8c0a0;box-shadow:0 3px 0 var(--ink)}
+  .wc-tags{font-size:11px;letter-spacing:.6px;color:var(--gold-dim);line-height:1.25}
+  .wc-best{margin-top:auto;padding-top:2px;font-size:11.5px;font-weight:800;letter-spacing:1px;color:#8de89a}
+  /* "is my car right for this world" — on the track card and in the garage */
+  .wc-fit{font-size:8.5px;font-weight:800;letter-spacing:.4px;line-height:1.25;margin-top:2px;
+    padding:2px 4px;border-radius:5px;border:1px solid transparent}
+  .wc-fit.strong{color:#8de89a;background:rgba(77,208,106,.12);border-color:rgba(77,208,106,.3)}
+  .wc-fit.fair{color:var(--gold-dim);background:rgba(255,233,168,.07)}
+  .wc-fit.weak{color:#ffb07a;background:rgba(232,110,42,.14);border-color:rgba(232,110,42,.35)}
+  .cfit{margin-top:4px;font-size:10px;font-weight:800;letter-spacing:1px;line-height:1.3}
+  .cfit span{display:block;font-size:8.5px;letter-spacing:.4px;opacity:.85}
+  .cfit.strong{color:#8de89a}
+  .cfit.fair{color:var(--gold-dim)}
+  .cfit.weak{color:#ffb07a}
+  .wc-best.new{color:var(--amber)}
+  /* how much of a world you have taken (★★★☆☆), and on a locked card what it
+     costs — the two things you actually choose a race on */
+  .wc-stars{font-size:13.5px;letter-spacing:2px;line-height:1;color:var(--yellow);margin-top:2px}
+  .wc-stars.none{color:rgba(255,233,168,.28)}
+  .wc-best.cost{color:var(--amber);opacity:.9}
+  #star-panel{width:min(560px,92vw);margin:14px auto 0;background:rgba(12,8,3,.5);
+    border:1px solid var(--line-soft);border-radius:var(--r-md);padding:10px 14px 12px}
+  #star-panel .cb-head b{float:right;color:var(--yellow);font-family:'Luckiest Guy';letter-spacing:1px}
+  /* ---------- SETTINGS SUB-PANEL (mode / difficulty / steering as labeled rows) ---------- */
+  #race-settings,#mode-settings{margin-top:16px;width:100%;background:rgba(12,8,3,.35);
+    border:1px solid var(--line-soft);border-radius:var(--r-md);padding:2px 14px 12px}
+  #race-settings .panel-head,#mode-settings .panel-head{margin:10px 0 4px}
+  .set-row{display:grid;grid-template-columns:96px 1fr;gap:6px 12px;align-items:center;padding:6px 0}
+  .set-row + .set-row{border-top:1px solid var(--line-soft)}
+  .set-lbl{font-size:10px;font-weight:800;letter-spacing:2px;color:var(--gold-dim);align-self:start;padding-top:10px}
+  .set-help{margin:5px 2px 1px;font-size:10.5px;line-height:1.45;color:#c8b48a;letter-spacing:.2px;font-weight:500}
+  .set-help b{color:var(--cream);font-weight:800;letter-spacing:.6px}
+  .set-help i{color:#c8b48a}
+  #mode-select,#diff-select,#steer-select,#assist-select{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  /* THE MODE ROW IS THREE SEGMENTS, NOT A STACK. .set-row hands its label a
+     96px column, which left 258px of a 430px phone for three chips needing
+     ~430 — so each wrapped onto its own line and the row came out as a
+     vertical list. The label was repeating the GAME MODE head directly above
+     it, so it goes, and the three chips share the full width evenly. */
+  #mode-settings .set-row{grid-template-columns:1fr}
+  #mode-settings .set-row .set-lbl{display:none}
+  #mode-select{flex-wrap:nowrap;width:100%}
+  #mode-select .mode-chip{flex:1 1 0;min-width:0;padding:0 6px;white-space:nowrap;
+    letter-spacing:1px;font-size:12.5px;gap:5px}
+  /* below 430 a chip is 93px and "🌍 FREE ROAM" wants a few more, so the icon
+     goes rather than the word — see the mode-chip note in main.js */
+  @media (max-width:429px){ #mode-select .mc-ico{display:none} }
+  /* one chip size across all settings rows: 40px tall (touch target), one radius */
+  .mode-chip,.diff-chip{pointer-events:auto;cursor:pointer;min-height:40px;padding:0 16px;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-family:'Baloo 2';font-weight:800;font-size:13px;letter-spacing:2px;color:#d8c090;
+    border-radius:var(--r-sm);border:2px solid var(--line);background:rgba(38,26,12,.5);
+    -webkit-tap-highlight-color:transparent}
+  .mode-chip.current{color:var(--ink);background:#7fd4ff;border-color:var(--ink);box-shadow:0 3px 0 var(--ink)}
+  /* joystick sensitivity slider (touch devices only — hidden on desktop) */
+  #joy-row,#scheme-row{display:none}
+  #joy-row.on,#scheme-row.on{display:grid}
+  #joy-val{color:var(--yellow);font-size:13px;letter-spacing:1px}
+  #joy-sens-wrap{display:flex;flex-direction:column;gap:2px;width:100%;pointer-events:auto}
+  #joy-sens{-webkit-appearance:none;appearance:none;width:100%;height:26px;background:transparent;
+    pointer-events:auto;touch-action:pan-y}
+  #joy-sens::-webkit-slider-runnable-track{height:8px;border-radius:4px;
+    background:linear-gradient(90deg,#3f8fbf,#7fd4ff,var(--amber));border:2px solid var(--line)}
+  #joy-sens::-moz-range-track{height:8px;border-radius:4px;
+    background:linear-gradient(90deg,#3f8fbf,#7fd4ff,var(--amber));border:2px solid var(--line)}
+  #joy-sens::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;
+    margin-top:-11px;border-radius:50%;background:var(--yellow);border:2px solid var(--ink);
+    box-shadow:0 2px 0 rgba(0,0,0,.35)}
+  #joy-sens::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:var(--yellow);
+    border:2px solid var(--ink)}
+  .set-hint{display:flex;justify-content:space-between;font-size:9px;letter-spacing:2px;color:var(--gold-dim)}
+  /* ---------- ARENA MISSIONS picker (missions agent) ----------
+     A full-width card list under RACE SETTINGS, shown only in missions mode.
+     Uses the same tokens as the settings rows so it reads as one panel. */
+  #mission-select{display:none;margin-top:16px;width:100%;flex-direction:column;gap:8px;
+    background:rgba(12,8,3,.35);border:1px solid var(--line-soft);
+    border-radius:var(--r-md);padding:2px 14px 14px}
+  #mission-select.on{display:flex}
+  #mission-select .panel-head{margin:10px 0 4px}
+  /* the payout, said once, instead of on all eight cards */
+  #mission-select .ms-note{font-size:10px;font-weight:700;letter-spacing:1.1px;
+    color:var(--gold-dim);line-height:1.5;margin:0 0 6px}
+  #mission-select .ms-note b{color:var(--yellow);font-weight:800}
+  /* A MISSION IS A LINE UNTIL YOU PICK IT. Eight cards each carrying a
+     paragraph and its own payout made a 1369px list on a 390px phone — you
+     could see two at a time. Collapsed, a row is icon / name / gold target /
+     the medal you hold. The prose and the full medal ladder open on the ONE
+     you have selected, which is the only one you are about to play. */
+  .mission-chip{pointer-events:auto;cursor:pointer;display:flex;align-items:flex-start;gap:11px;
+    width:100%;text-align:left;padding:9px 12px;min-height:40px;font-family:'Baloo 2';color:var(--cream);
+    border-radius:var(--r-sm);border:2px solid var(--line);background:rgba(38,26,12,.5);
+    transition:transform .1s;-webkit-tap-highlight-color:transparent}
+  .mission-chip .mopen{display:none}
+  .mission-chip.current .mopen{display:flex;flex-direction:column;gap:5px;margin-top:5px}
+  /* the gold target rides the name line while the card is shut, and stands
+     down when the full ladder opens underneath it */
+  .mission-chip .mgoal{flex:0 0 auto;margin-left:auto;font-size:10.5px;font-weight:800;
+    letter-spacing:.4px;color:#f0dcb4;background:rgba(12,8,3,.45);
+    border:1px solid var(--line-soft);border-radius:6px;padding:2px 7px;white-space:nowrap}
+  .mission-chip.current .mgoal{display:none}
+  /* Below 390 the row cannot hold icon + name + target + medal: the target chip
+     wins the space fight and "CHECKPOINT BLITZ" ellipsises. The NAME is what you
+     scan the list by, so the chip is what goes — the target is one tap away on
+     the open card. */
+  @media (max-width:389px){ .mission-chip .mgoal{display:none} }
+  .mission-chip:active{transform:scale(.98)}
+  .mission-chip.current{background:rgba(255,140,26,.18);border-color:var(--orange);
+    box-shadow:0 3px 0 var(--ink), 0 0 14px rgba(255,140,26,.25)}
+  .mission-chip .mi{font-size:19px;flex:0 0 auto;width:26px;text-align:center;line-height:1.25;
+    filter:drop-shadow(1px 1px 0 rgba(0,0,0,.5))}
+  .mission-chip.current .mi{font-size:24px;width:32px;line-height:1.1}
+  .mission-chip .mtext{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:0}
+  /* name and badge share the top line, so the badge can't float mid-paragraph */
+  .mission-chip .mhead{display:flex;align-items:center;gap:8px;min-width:0}
+  .mission-chip .mname{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* a shut row spends its width on the NAME: "CHECKPOINT BLITZ" is the longest
+     on the roster and was the one that ellipsised. Open, it gets the full
+     display size back because it has the row to itself. */
+  .mission-chip .mname{font-family:'Luckiest Guy';font-size:12.5px;letter-spacing:.6px;
+    color:var(--cream);line-height:1.15}
+  .mission-chip.current .mname{font-size:14px;letter-spacing:1.5px}
+  .mission-chip.current .mname{color:var(--yellow)}
+  .mission-chip .mdesc{display:block;font-size:11.5px;color:#e2c9a2;letter-spacing:.2px;line-height:1.45}
+  .mission-chip .mstats{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:1px}
+  .mission-chip .mstat{white-space:nowrap;font-size:10.5px;font-weight:800;letter-spacing:.5px;
+    color:#f0dcb4;background:rgba(12,8,3,.45);border:1px solid var(--line-soft);
+    border-radius:6px;padding:2px 7px}
+  .mission-chip .mstat.mpay{color:var(--amber)}
+  .mission-chip .mmedal{flex:0 0 auto;font-size:16px;font-weight:800;letter-spacing:1px;
+    color:var(--green);text-align:right;width:20px}
+  .mission-chip.current .mmedal{margin-left:auto}
+  .mission-chip .mmedal.none{color:var(--gold-dim);font-size:9.5px;letter-spacing:1.5px}
+  /* medal row on the results card — a .rrow like every other results stat */
+  #r-medal{font-family:'Luckiest Guy';color:var(--yellow)}
+  /* ---------- end ARENA MISSIONS ---------- */
+  .diff-chip.current{color:var(--ink);background:#8de89a;border-color:var(--ink)}
+  .diff-chip.current.hard{background:#ff8a75}
+  .diff-chip.current.normal{background:var(--yellow)}
+
+  /* ---------- THE GARAGE, AS A WORKSHOP ----------
+     A mockup was sent: a car on the shop floor with part shops floating around
+     it, every part a PICTURE with a price and an INSTALL button. This is that,
+     laid out for a phone in portrait — the bays stack instead of surrounding
+     the car, because 390px cannot hold a ring of panels. */
+  /* THE CAR YOU BUILT. The picture is rendered from the real mesh wearing the
+     real kit (see _buildPreview), so it is the machine, not an illustration. */
+  /* THE CAR IS THE CENTREPIECE, so on a phone it gets the full width and the
+     spec sits under it. Side by side, the floor was 156px on a 390px screen —
+     a stamp, when the whole point of the demo is the machine on the shop
+     floor. Wide screens keep the two-column layout, where there is room. */
+  #build-preview{width:100%;display:flex;flex-direction:column;gap:8px;
+    margin:4px 0 8px;padding:9px 10px;border-radius:var(--r-md);
+    border:1px solid var(--line-soft);
+    background:linear-gradient(180deg,rgba(60,40,16,.55),rgba(12,8,3,.5))}
+  @media (min-width:620px){
+    #build-preview{flex-direction:row;align-items:center;gap:12px}
+    #build-preview .bp-shop{width:56%;flex:0 0 auto}
+    #build-preview .bp-side{flex:1 1 auto;min-width:0}
+  }
+  /* THE SHOP FLOOR. A live canvas, not a picture — the car turns and a part
+     lands on it the moment you buy it. The box owns the size so the renderer
+     can read it back and frame the car for whatever width the phone gave us. */
+  #build-preview .bp-shop{width:100%;max-width:none;
+    aspect-ratio:16/9;border-radius:var(--r-sm);overflow:hidden;
+    background:radial-gradient(ellipse at 50% 120%,rgba(255,180,90,.2),rgba(10,7,4,.85) 70%);
+    box-shadow:inset 0 0 22px rgba(0,0,0,.6)}
+  #build-preview .bp-shop canvas{width:100%;height:100%;display:block}
+  #build-preview .bp-side{min-width:0;display:flex;flex-direction:column;gap:5px}
+  #build-preview .bp-name{font-family:'Luckiest Guy';font-size:15px;letter-spacing:1px;
+    color:var(--yellow);line-height:1.1}
+  #build-preview .bp-spec{display:flex;flex-wrap:wrap;gap:3px 6px;
+    font-size:10px;font-weight:700;letter-spacing:.6px;color:#e2c9a2}
+  #build-preview .bp-spec span{padding:2px 7px;border-radius:5px;
+    background:rgba(0,0,0,.35);border:1px solid var(--line-soft)}
+  /* the four numbers the whole screen exists to move */
+  #build-preview .bp-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:3px 6px;margin-top:2px}
+  #build-preview .bp-nums span{display:flex;align-items:baseline;gap:4px}
+  #build-preview .bp-nums i{font-style:normal;font-size:8.5px;font-weight:800;
+    letter-spacing:1px;color:var(--gold-dim)}
+  #build-preview .bp-nums b{font-family:'Luckiest Guy';font-size:13px;color:var(--cream)}
+  /* THE DELTA IS THE POINT. "TOP 56" says nothing; "TOP 63 +7" says the money
+     worked. Green up, amber down — a wing costs top speed and should look
+     like it costs something. */
+  #build-preview .bp-nums u{text-decoration:none;font-size:9px;font-weight:800;
+    letter-spacing:.3px;padding:1px 4px;border-radius:4px}
+  #build-preview .bp-nums u.up{color:#8de89a;background:rgba(141,232,154,.14)}
+  #build-preview .bp-nums u.dn{color:#e8946a;background:rgba(232,148,106,.14)}
+  /* a spec chip is LIT when it is above the stock part and dim when it is not */
+  #build-preview .bp-spec span.up{color:var(--ink);background:var(--yellow);
+    border-color:var(--ink);font-weight:800}
+  #build-preview .bp-name{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  #build-preview .bp-tag{font-family:'Baloo 2';font-size:9px;font-weight:800;
+    letter-spacing:1.4px;padding:2px 7px;border-radius:5px;
+    color:var(--ink);background:var(--orange)}
+  #build-preview .bp-tag.stock{color:var(--gold-dim);background:rgba(0,0,0,.4);
+    border:1px solid var(--line-soft)}
+  #build-preview .bp-mods{font-size:9.5px;font-weight:700;letter-spacing:.8px;
+    color:var(--gold-dim)}
+  /* the chassis ceiling, stated on the bay that it gates */
+  /* THE CEILING CHIP WRAPS RATHER THAN RUNNING OFF. "CHASSIS CLASS 1 ·
+     SUSPENSION SPRING RAISES IT" is 379px of a 320px phone with nowrap on, and
+     since .bay-head is a flex ROW it pushed straight out of the panel. The head
+     wraps and the chip takes a line of its own when it has to. */
+  .bay-head{flex-wrap:wrap}
+  .bay-head .bay-cap{margin-left:auto;font-family:'Baloo 2';font-size:8.5px;
+    font-weight:800;letter-spacing:.8px;color:var(--gold-dim);
+    padding:2px 7px;border-radius:5px;background:rgba(0,0,0,.35);
+    border:1px solid var(--line-soft);min-width:0}
+  @media (max-width:389px){
+    .bay-head .bay-cap{margin-left:0;flex:1 1 100%;text-align:center}
+  }
+  /* MOUNT CLASS on every part, so it is met as a fact and not only as a
+     refusal */
+  .part-card{position:relative}
+  .part-card .pc-cls{position:absolute;top:4px;left:5px;font-size:7.5px;font-weight:800;
+    letter-spacing:.6px;color:var(--gold-dim);background:rgba(0,0,0,.5);
+    padding:1px 4px;border-radius:4px}
+  .part-card.on .pc-cls{color:var(--ink);background:var(--orange)}
+  /* THREE WALLS, THREE LOOKS. A race you have not run, a ladder you have not
+     climbed, and a chassis that will never take it are different problems and
+     must not share one grey padlock. */
+  .part-card.blocked{opacity:.7}
+  .part-card.blocked.capped{opacity:.5}
+  .part-card.blocked.capped .pc-art{filter:grayscale(1) brightness(.5)}
+  .part-card.blocked.mount{border-color:rgba(127,212,255,.4)}
+  .part-card.blocked.mount .pc-sub{color:#7fd4ff;font-weight:700}
+  .part-card.blocked.capped .pc-sub{color:#e8946a;font-weight:700}
+  .part-card.owned{border-color:rgba(141,232,154,.45)}
+
+  #garage-bays{width:100%;display:flex;flex-direction:column;gap:8px}
+  .bay{border:1px solid var(--line-soft);border-radius:var(--r-md);
+    background:rgba(12,8,3,.4);padding:8px 9px 9px}
+  .bay-head{display:flex;align-items:center;gap:7px;margin:0 0 7px;
+    font-family:'Luckiest Guy';font-size:12px;letter-spacing:2px;color:var(--cream)}
+  .bay-msg{margin:6px 2px 0;padding:6px 8px;border-radius:7px;font-size:10.5px;
+    line-height:1.45;font-weight:700;letter-spacing:.3px;color:var(--yellow);
+    background:rgba(255,212,0,.1);border:1px solid rgba(255,212,0,.3)}
+  /* PARTS AS PICTURES. auto-fill (not -fit) so a bay with three parts keeps the
+     same card width as one with four — every shop shares a rhythm. */
+  .bay-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
+  .part-card{pointer-events:auto;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;gap:3px;padding:6px 5px 7px;border-radius:var(--r-sm);
+    border:2px solid var(--line);
+    background:linear-gradient(180deg,rgba(64,46,24,.6),rgba(24,16,8,.6));
+    font-family:'Baloo 2';color:var(--cream);text-align:center;
+    -webkit-tap-highlight-color:transparent;transition:transform .1s}
+  .part-card:active{transform:scale(.97)}
+  .part-card.on{border-color:var(--orange);
+    background:linear-gradient(180deg,rgba(255,140,26,.3),rgba(255,140,26,.1));
+    box-shadow:0 2px 0 var(--ink),0 0 16px rgba(255,140,26,.35),
+      inset 0 0 18px rgba(255,180,90,.18)}
+
+  .part-card .pc-art{width:100%;max-width:132px;height:auto;
+    filter:drop-shadow(0 4px 7px rgba(0,0,0,.6))}
+  .part-card.blocked.earn .pc-art{filter:grayscale(.85) brightness(.75)}
+  .part-card .pc-name{font-family:'Luckiest Guy';font-size:10px;letter-spacing:.4px;
+    line-height:1.15;color:var(--cream)}
+  .part-card.on .pc-name{color:var(--yellow)}
+  /* the POWER bar from the mockup — normalised inside its own slot, so a full
+     bar means "the strongest thing in this shop" */
+  .part-card .pc-bar{width:100%;height:4px;border-radius:3px;background:rgba(0,0,0,.5);
+    overflow:hidden}
+  .part-card .pc-bar i{display:block;height:100%;border-radius:3px;
+    background:linear-gradient(90deg,#ffb52e,#ff6a2a)}
+  .part-card .pc-act{font-size:9.5px;font-weight:800;letter-spacing:.8px;
+    padding:3px 7px;border-radius:6px;white-space:nowrap}
+  .pc-act.fitted{color:var(--ink);background:var(--orange)}
+  .pc-act.own{color:#8de89a;border:1px solid rgba(141,232,154,.5)}
+  .pc-act.buy{color:var(--yellow);border:1px solid rgba(255,212,0,.45)}
+  .pc-act.lock{color:var(--gold-dim);border:1px solid var(--line-soft)}
+  .part-card .pc-sub{font-size:9px;line-height:1.3;color:#c8b48a}
+  .part-card.blocked.earn .pc-sub{color:var(--amber);font-weight:700}
+
+  /* AN UPGRADE LINE IN THE SAME CLOTHES. A player does not care which of the
+     game's two systems a thing came out of, so a ladder rung is a card with a
+     bar and a price, exactly like a part. */
+  .up-card{display:grid;grid-template-columns:30px 1fr auto;gap:3px 8px;align-items:center;
+    margin-top:6px;padding:7px 9px;border-radius:var(--r-sm);
+    border:1px solid var(--line-soft);background:rgba(38,26,12,.4)}
+  .up-card.maxed{opacity:.72}
+  .up-card{grid-template-columns:46px 1fr auto}
+  .up-card .uc-ic{font-size:17px;text-align:center;line-height:1}
+  .up-card .uc-ic img{width:100%;height:auto;display:block;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+  .up-card .uc-main{min-width:0;display:flex;flex-direction:column;gap:2px}
+  .up-card .uc-nm{font-family:'Luckiest Guy';font-size:10.5px;letter-spacing:.6px;
+    color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .up-card .uc-pips{display:flex;align-items:center;gap:3px}
+  .up-card .uc-pips b{width:13px;height:4px;border-radius:2px;background:var(--yellow)}
+  .up-card .uc-pips b.off{background:rgba(255,255,255,.16)}
+  .up-card .uc-pips i{font-style:normal;margin-left:4px;font-size:8.5px;font-weight:800;
+    letter-spacing:.8px;color:var(--gold-dim)}
+  .up-card .uc-desc{font-size:9.5px;line-height:1.35;color:#c8b48a}
+  .up-buy{pointer-events:auto;cursor:pointer;font-family:'Baloo 2';font-weight:800;
+    font-size:10px;letter-spacing:.8px;padding:7px 10px;min-height:34px;border-radius:7px;
+    border:1px solid rgba(255,212,0,.45);background:rgba(255,212,0,.1);color:var(--yellow);
+    white-space:nowrap;-webkit-tap-highlight-color:transparent}
+  .up-buy:disabled{opacity:.45;cursor:default;color:var(--gold-dim);
+    border-color:var(--line-soft);background:rgba(0,0,0,.25)}
+  .up-buy.maxed{color:#8de89a;border-color:rgba(141,232,154,.4)}
+  /* the tyre bay is a bay now, so it loses its own outer box */
+  .bay #tyre-bay{margin:0;padding:0;border:none;background:none}
+  .bay #tyre-bay .panel-head{display:none}
+  .tyre-opt .tyre-art{width:38px;height:auto;display:block;margin:0 auto;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+  .tyre-opt.locked .tyre-art{filter:grayscale(.9) brightness(.6)}
+  @media (max-width:389px){
+    #build-preview{gap:8px;padding:7px 8px}
+    #build-preview .bp-nums{grid-template-columns:repeat(2,1fr)}
+    #build-preview .bp-name{font-size:13px}
+    .bay-grid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:5px}
+    .part-card .pc-name{font-size:9.5px}
+    /* AT 320 THE LADDER NAMES ELLIPSISED — "LONG-TRAVEL DAMP…", which loses the
+       half of the name that says what it is. Let them wrap instead; a card is
+       tall enough for two lines and nothing below it is fighting for the room. */
+    .up-card{grid-template-columns:40px 1fr auto}
+    .up-card .uc-nm{white-space:normal;overflow:visible;line-height:1.2}
+  }
+  /* ---------- end THE GARAGE ---------- */
+
+  /* ---------- CAR SHOP (horizontal shelf with visible scroll affordance) ---------- */
+  .shelf-wrap{position:relative;width:100%;margin-top:4px}
+  .shelf-wrap::before,.shelf-wrap::after{content:'';position:absolute;top:0;bottom:10px;width:22px;
+    z-index:1;pointer-events:none}
+  .shelf-wrap::before{left:0;background:linear-gradient(90deg,rgba(24,16,6,.85),transparent)}
+  .shelf-wrap::after{right:0;background:linear-gradient(270deg,rgba(24,16,6,.85),transparent)}
+  #car-shop{display:flex;gap:10px;overflow-x:auto;width:100%;
+    padding:4px 4px 10px;scrollbar-width:thin;scrollbar-color:rgba(255,212,0,.45) rgba(255,233,168,.08)}
+  #car-shop::-webkit-scrollbar{height:7px}
+  #car-shop::-webkit-scrollbar-thumb{background:rgba(255,212,0,.55);border-radius:4px}
+  #car-shop::-webkit-scrollbar-track{background:rgba(255,233,168,.1);border-radius:4px}
+  /* every card the same width + padding — the shelf reads as one row of equal tiles */
+  .car-card{pointer-events:auto;cursor:pointer;flex:0 0 140px;width:140px;text-align:center;
+    padding:10px;border-radius:var(--r-md);border:2px solid var(--line);
+    background:rgba(38,26,12,.6);-webkit-tap-highlight-color:transparent}
+  .car-card .car-icon{width:96px;height:62px;object-fit:contain;display:block;margin:0 auto 4px;
+    filter:drop-shadow(0 4px 6px rgba(0,0,0,.45))}
+  .car-card.locked .car-icon{filter:grayscale(.85) brightness(.75)}
+  .car-card .cname{font-family:'Luckiest Guy';font-size:12px;letter-spacing:1px;color:var(--cream)}
+  .car-card .cdesc{font-size:9px;color:var(--gold-dim);letter-spacing:.5px}
+  .car-card .cstats{margin:5px 2px 0;display:grid;gap:2px}
+  .car-card .cs-row{display:grid;grid-template-columns:26px 1fr;gap:5px;align-items:center}
+  .car-card .cs-row span{font-size:8px;font-weight:800;letter-spacing:1px;color:var(--gold-dim);text-align:left}
+  .car-card .cs-row i{display:block;height:5px;border-radius:3px;background:rgba(255,233,168,.14);overflow:hidden}
+  .car-card .cs-row b{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#ffd400,#ff9d2e)}
+  /* the price is the whole decision on a locked card, so it reads as a chip
+     rather than a caption — green when you can afford it, padlocked when not */
+  .car-card .cprice{font-size:12px;font-weight:800;color:var(--amber);margin-top:5px;
+    padding:3px 9px;border-radius:20px;background:rgba(12,8,3,.5);
+    border:1px solid var(--line-soft);white-space:nowrap;letter-spacing:.5px}
+  .car-card .cprice.afford{color:#8de89a;border-color:rgba(141,232,154,.45)}
+  .car-card .cprice.short{color:var(--gold-dim)}
+  .car-card.owned .cprice{color:#8de89a}
+  .car-card.selected{border-color:var(--yellow);background:rgba(255,212,0,.18);box-shadow:0 3px 0 var(--ink)}
+  .car-card.locked{opacity:.7}
+
+  /* ---------- PAUSE MENU (proper panel: title + grouped, uniform buttons) ---------- */
+  #pause-menu{z-index:30}
+  .pm-panel{width:min(92vw,340px);background:rgba(24,16,6,.82);border:2px solid var(--line);
+    border-radius:var(--r-lg);padding:18px 18px 20px;display:flex;flex-direction:column;gap:10px;
+    box-shadow:0 18px 40px rgba(0,0,0,.5);backdrop-filter:blur(6px)}
+  .pm-title{font-family:'Luckiest Guy';font-size:24px;letter-spacing:8px;color:var(--yellow);
+    text-align:center;text-shadow:3px 3px 0 var(--ink);margin-bottom:4px}
+  .pm-group{display:flex;flex-direction:column;gap:10px;padding-top:12px;
+    border-top:1px solid var(--line-soft)}
+  #pause-menu .btn{margin:0;width:100%;padding:12px 0;font-size:16px;letter-spacing:2px;
+    border-radius:var(--r-md)}
+  .btn.secondary{background:linear-gradient(180deg,#8a6a42,#5d4426)}
+  /* full-bleed buttons lift but never scale — scaling a 100%-wide button
+     inside a fixed panel pushes it past the panel edge on hover */
+  #pause-menu .btn:hover,.results-actions .btn:hover{transform:translateY(-2px)}
+  @media (max-height:480px){
+    .pm-panel{padding:12px 14px 14px;gap:7px}
+    .pm-title{font-size:19px;margin-bottom:0}
+    .pm-group{gap:7px;padding-top:8px}
+    #pause-menu .btn{padding:9px 0;font-size:14px}
+  }
+
+  /* ---------- GARAGE (detailed upgrades — fixed columns keep every row aligned) ---------- */
+  #garage-rows{margin-top:2px;width:100%}
+  .up-row{display:grid;grid-template-columns:40px 1fr 66px 88px;gap:10px;align-items:center;
+    padding:7px 0;border-top:1px solid var(--line-soft)}
+  .up-row:first-child{border-top:none}
+  .up-row .ic{font-size:18px;text-align:center;background:rgba(255,233,168,.08);
+    border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:7px 0}
+  .up-row .up-lvl{display:block;font-size:9.5px;font-weight:800;color:var(--yellow);letter-spacing:1px}
+  .up-row .nm{font-size:13px;font-weight:800;letter-spacing:1px;color:#ffe9c9;line-height:1.15}
+  .up-row .nm small{display:block;font-size:10px;font-weight:600;color:var(--gold-dim);letter-spacing:.5px}
+  .up-row .pips{font-size:11px;letter-spacing:2px;color:var(--yellow);text-align:center}
+  .up-row .pips .off{color:rgba(255,233,168,.25)}
+  .up-buy{pointer-events:auto;cursor:pointer;font-family:'Baloo 2';font-weight:800;font-size:12px;
+    min-height:40px;width:100%;padding:0 8px;border-radius:var(--r-sm);border:2px solid var(--ink);
+    color:var(--ink);background:linear-gradient(180deg,#ffd400,#ff9d2e);box-shadow:0 2px 0 var(--ink);
+    -webkit-tap-highlight-color:transparent;white-space:nowrap}
+  .up-buy:disabled{opacity:.4;cursor:not-allowed}
+  .up-buy.maxed{background:#4dd06a}
+  .btn{pointer-events:auto;cursor:pointer;margin-top:36px;padding:16px 64px;font-family:'Luckiest Guy';
+    font-size:22px;letter-spacing:3px;color:#fff8e0;border:3px solid var(--ink);border-radius:14px;
+    background:linear-gradient(180deg,#ff9d2e,#e8402a);
+    box-shadow:0 6px 0 var(--ink), 0 14px 30px rgba(0,0,0,.45);
+    text-shadow:2px 2px 0 rgba(0,0,0,.4);
+    transition:transform .12s, box-shadow .12s;touch-action:manipulation}
+  .btn:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 8px 0 var(--ink), 0 18px 36px rgba(0,0,0,.5)}
+  .controls{margin-top:32px;display:grid;grid-template-columns:auto auto;gap:6px 22px;
+    font-size:14px;letter-spacing:1px;color:#ffe9c9}
+  .controls b{color:var(--yellow);font-weight:800;text-align:right;text-shadow:1px 1px 0 var(--ink)}
+  body.touch .controls{display:none}
+  #touch-note{display:none;margin-top:26px;font-size:14px;letter-spacing:2px;color:#ffe9c9;text-align:center;line-height:1.8}
+  body.touch #touch-note{display:block}
+  .result-place{font-family:'Luckiest Guy';font-size:clamp(56px,10vw,110px);color:var(--yellow);
+    text-shadow:6px 6px 0 var(--ink), -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink)}
+  /* itemized credits breakdown on the results screen */
+  /* shares the results card's 380px edge so card, breakdown and buttons line up */
+  #credit-breakdown{margin-top:14px;width:min(92vw,380px);background:rgba(24,16,6,.55);
+    border:2px solid var(--line);border-radius:var(--r-lg);padding:10px 20px 12px}
+  #credit-breakdown .cb-head{font-family:'Luckiest Guy';font-size:12px;letter-spacing:4px;color:#ffe9a8;
+    text-align:center;margin-bottom:6px;text-shadow:1px 1px 0 var(--ink)}
+  /* shared by the credits breakdown AND the rally-star panel: the star rows
+     reused the class but not the scope, so they rendered as unstyled glued
+     text — the screenshot reads "FINISH+1 / TOP 3— / WIN—" as one word each,
+     which is half of why the panel looked like it disagreed with the menu */
+  #credit-breakdown .cb-row,#star-panel .cb-row{display:flex;justify-content:space-between;gap:18px;font-size:12.5px;
+    font-weight:700;letter-spacing:1px;color:#d8c090;line-height:1.75}
+  #credit-breakdown .cb-row b,#star-panel .cb-row b{color:var(--amber);font-weight:800}
+  #credit-breakdown .cb-row.contract b,#star-panel .cb-row.contract b{color:#8de89a}
+  #credit-breakdown .cb-row.missed,#star-panel .cb-row.missed{opacity:.45}
+  #credit-breakdown .cb-row.total{border-top:1px solid rgba(255,233,168,.25);margin-top:5px;padding-top:5px;color:#ffe9a8}
+  #credit-breakdown .cb-row.total b{color:var(--yellow)}
+  /* results: one stats card, label left / value right, ruled rows.
+     (a credits-breakdown block can slot into .results-card after .result-stats) */
+  .results-card{margin-top:18px;width:min(92vw,380px);background:rgba(24,16,6,.72);
+    border:2px solid var(--line);border-radius:var(--r-lg);padding:8px 20px;
+    backdrop-filter:blur(4px)}
+  .result-stats{display:flex;flex-direction:column;width:100%}
+  .result-stats .rrow{display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+    padding:9px 0;border-top:1px solid var(--line-soft)}
+  .result-stats .rrow:first-child{border-top:none}
+  .result-stats .rrow span{font-size:11px;font-weight:800;letter-spacing:2px;color:var(--gold-dim)}
+  .result-stats .rrow b{font-family:'Luckiest Guy';font-size:18px;color:#fff;
+    text-shadow:2px 2px 0 var(--ink);white-space:nowrap}
+  .result-stats .rrow.credits b{color:var(--amber)}
+  /* actions track the stats card width so the card + both buttons share one edge */
+  .results-actions{width:min(92vw,380px);display:flex;flex-direction:column;align-items:stretch;gap:12px;
+    margin-top:18px}
+  .results-actions .btn{margin:0;width:100%;padding:14px 20px;font-size:18px;letter-spacing:2px;
+    border-radius:var(--r-md)}
+  #results .game-sub{letter-spacing:6px}
+  .footnote{margin-top:16px;font-size:11px;letter-spacing:2px;color:var(--gold-dim);text-align:center;width:100%}
+  /* flight badge: says plainly whether the game is safe to take on a plane */
+  /* BUILD STAMP. Three rounds of this were spent unable to tell whether a
+     report came from the build I had just shipped or one the service worker
+     was still serving from cache. Small, dim, always on screen: now every
+     screenshot says which build it is. */
+  /* THE BUILD TAG IS HOW A REPORT GETS PINNED TO A BUILD — "no back button
+     still" was two builds of guesswork that this one line would have settled.
+     Now that START RACE is a flush orange footer, faint white sat ON it and
+     was barely readable, so the tag carries its own dark chip and stops
+     depending on what happens to be behind it. */
+  #build-tag{position:fixed;left:6px;bottom:4px;z-index:35;pointer-events:none;
+    font-size:9px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,.62);
+    background:rgba(0,0,0,.55);border-radius:5px;padding:2px 5px;
+    text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  #offline-badge{margin-top:10px;font-size:10px;font-weight:800;letter-spacing:2px;text-align:center;
+    padding:4px 12px;border-radius:20px;border:2px solid var(--line-soft);color:var(--gold-dim);
+    background:rgba(12,8,3,.4)}
+  #offline-badge.ready{color:#8de89a;border-color:rgba(141,232,154,.45)}
+  #offline-badge.partial{color:var(--amber);border-color:rgba(255,181,46,.4)}
+  /* the game already runs offline and the ~1 MB of world art is optional —
+     this state is a BUTTON, so it has to look like one */
+  /* a world with no hand-shot preview: a themed wash, with the circuit outline
+     the .wc-map canvas draws sitting on top of it */
+  .wc-shot.no-shot{background:linear-gradient(150deg,#3a2a16 0%,#6b4a22 45%,#2a1c0e 100%)}
+  #offline-badge.offer{color:var(--yellow);border-color:rgba(255,213,74,.55);cursor:pointer}
+  #offline-badge.offer:active{transform:scale(.96)}
+  #loading-note{margin-top:24px;font-size:12px;letter-spacing:3px;color:var(--gold-dim);text-align:center}
+  /* START is the one action that must never be out of reach: pin it to the
+     bottom of the scrollport whenever its natural spot is below the fold */
+  /* START IS THE FOOTER. It used to float 10px off the bottom with rounded
+     corners, which read as a loose orange slab lying ON TOP of the world
+     cards — the loudest thing on the screen, competing with the one control
+     the player was hunting for. Flush to the bottom edge, edge to edge, it
+     reads as the bottom bar of the page and pairs with the BACK bar at the
+     top: header, list, footer. Asked for as "move the start to the tip of the
+     screen to make the back button more obvious".
+     The -16px pair is .screen's own padding, exactly as in #topbar — the
+     margin spans it edge to edge, the negative `bottom` lands it flush. */
+  #start-btn{align-self:stretch;margin:24px -16px -16px;
+    position:sticky;bottom:-16px;z-index:6;border-radius:0;border-left:none;
+    border-right:none;border-bottom:none;
+    /* the home-indicator strip on a notched phone is not tappable, so the
+       label has to sit above it rather than under it */
+    padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));
+    box-shadow:0 -6px 18px rgba(0,0,0,.55);
+    /* the wrong-tyre label carries its remedy on a second line, so the button
+       has to honour the newline instead of collapsing it */
+    white-space:pre-line;line-height:1.15}
+  /* the lift-on-hover of .btn would peel a flush footer off its own edge */
+  #start-btn:hover{transform:none;box-shadow:0 -6px 18px rgba(0,0,0,.55)}
+
+  /* ---- START RACE, CHARGED --------------------------------------------
+     Asked for as "make start race sparkly electric as in the screen". Three
+     layers, all of them transform/opacity so the phone composites them on the
+     GPU and the main thread pays nothing:
+       1. a SHEEN that travels across the face, like light down a wet bar
+       2. a GLOW that breathes at the top edge, where the button meets the list
+       3. SPARKS drifting up off it
+     No JS and no extra elements — ::before is the sheen, ::after is the spark
+     field, and the glow rides the box-shadow. The button already carries
+     `white-space:pre-line` for the wrong-tyre warning, so nothing here may
+     touch layout: everything is painted, nothing reflows. */
+  /* NO `position:relative` HERE. The button is already `position:sticky`, and
+     re-declaring position in a later rule silently overrode it — the footer
+     dropped out of its pinned spot and back into the flow, where it is only
+     visible at the very bottom of the page. Sticky already establishes the
+     containing block the ::before/::after need. */
+  #start-btn{overflow:hidden;isolation:isolate}
+  #start-btn > *{position:relative;z-index:2}
+  #start-btn::before{
+    content:'';position:absolute;z-index:1;top:0;bottom:0;left:-40%;width:34%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.62),transparent);
+    transform:skewX(-18deg);pointer-events:none;
+    animation:startSheen 3.4s cubic-bezier(.5,0,.3,1) infinite}
+  @keyframes startSheen{
+    0%{left:-45%}
+    55%,100%{left:125%}
+  }
+  /* the sparks: one repeating-gradient of tiny dots, drifting up and fading.
+     A field beats individual elements — it is a single composited layer. */
+  #start-btn::after{
+    content:'';position:absolute;z-index:1;inset:-30% -5% -5%;pointer-events:none;
+    background:
+      radial-gradient(1.6px 1.6px at 12% 82%, rgba(255,246,214,.95), transparent 60%),
+      radial-gradient(1.3px 1.3px at 28% 92%, rgba(255,214,120,.9), transparent 60%),
+      radial-gradient(1.8px 1.8px at 47% 78%, rgba(255,255,255,.85), transparent 60%),
+      radial-gradient(1.2px 1.2px at 63% 95%, rgba(255,226,150,.9), transparent 60%),
+      radial-gradient(1.7px 1.7px at 78% 84%, rgba(255,250,226,.95), transparent 60%),
+      radial-gradient(1.3px 1.3px at 91% 90%, rgba(255,206,110,.9), transparent 60%);
+    animation:startSparks 2.6s linear infinite}
+  @keyframes startSparks{
+    0%{transform:translateY(14%) scale(1);opacity:0}
+    18%{opacity:1}
+    100%{transform:translateY(-46%) scale(1.1);opacity:0}
+  }
+  /* the charge at the edge — same amber the button is made of, so it reads as
+     the button glowing rather than as a ring drawn around it */
+  #start-btn{animation:startCharge 2.2s ease-in-out infinite}
+  @keyframes startCharge{
+    0%,100%{box-shadow:0 -6px 18px rgba(0,0,0,.55),0 0 0 rgba(255,180,70,0),
+      inset 0 2px 0 rgba(255,240,200,.35)}
+    50%{box-shadow:0 -6px 22px rgba(0,0,0,.55),0 -2px 26px rgba(255,170,60,.55),
+      inset 0 2px 0 rgba(255,246,220,.6)}
+  }
+  /* A BUTTON THAT CANNOT BE PRESSED MUST NOT LOOK CHARGED. The blocked state
+     already recolours it; killing the animation is what stops it advertising. */
+  #start-btn.blocked{animation:none}
+  #start-btn.blocked::before,#start-btn.blocked::after{display:none}
+  /* MOTION IS A SETTING, NOT A DECISION WE GET TO MAKE FOR EVERYONE. */
+  @media (prefers-reduced-motion:reduce){
+    #start-btn,#start-btn::before,#start-btn::after{animation:none}
+    #start-btn::before,#start-btn::after{display:none}
+  }
+  #start-btn.warned{font-size:clamp(15px,4.4vw,22px);padding-top:12px;padding-bottom:12px}
+  /* A JOB IN HAND FOR THIS WORLD is a reason to be standing here, so the
+     button says which job on its own line. Green edge, because the tyre
+     warning already owns the amber one and the two can appear together. */
+  #start-btn.has-job{box-shadow:0 6px 18px rgba(0,0,0,.5),0 0 0 2px rgba(77,208,106,.7) inset}
+  #editor-btn{margin-top:10px;width:100%;background:#1d2530;border-color:#3a4a5e;color:#9fd3ff}
+
+  /* ---- WORLD EDITOR ------------------------------------------------------
+     Full-screen chrome over the live renderer. Panels hug the edges so the
+     middle of the screen — the ground being sculpted — stays clear, and every
+     control is thumb-sized because the tool is used on a phone as often as a
+     desktop. */
+  #editor-ui{position:fixed;inset:0;z-index:40;pointer-events:none;
+    font-family:inherit;color:#e8eef6}
+  #editor-ui.off{display:none}
+  #editor-ui > *{pointer-events:auto}
+  #ed-top{position:absolute;top:8px;left:8px;right:8px;display:flex;gap:8px;
+    align-items:center;background:rgba(12,16,22,.86);border:1px solid #2c3a4a;
+    border-radius:10px;padding:7px 9px}
+  #ed-status{flex:1;font-size:12px;letter-spacing:.04em;color:#9fd3ff;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ed-btn{background:#1b2430;border:1px solid #35485c;color:#dce8f4;
+    border-radius:8px;padding:8px 11px;font:inherit;font-size:12px;cursor:pointer}
+  .ed-btn:active{background:#26374a}
+  .ed-btn.ed-go{background:#2b6d3f;border-color:#3f9159;color:#eafff0}
+  #ed-counts{font-size:10px;letter-spacing:.08em;color:#6d8299;white-space:nowrap}
+  /* THE TOOL RAIL SCROLLS. It carries fourteen tools in three named groups now,
+     and on a laptop in landscape the last of them used to sit below the bottom
+     of the window with no way to reach it. */
+  #ed-tools{position:absolute;left:8px;top:56px;bottom:52px;display:flex;
+    flex-direction:column;gap:4px;overflow-y:auto;padding-right:2px;
+    scrollbar-width:thin}
+  /* flex:none, or the rail's own overflow squashes these to nothing and their
+     text prints straight through the button below — the group headings were
+     the only rows without it, and they were the only rows that broke */
+  /* and a ground of their own: grey-blue text straight over sunlit grass is
+     the one label in this UI that had nothing behind it, and on a green world
+     it simply disappeared */
+  .ed-tgroup{flex:none;font-size:8px;letter-spacing:.16em;color:#8fa4b8;
+    margin:6px 0 1px;padding:2px 5px;align-self:flex-start;border-radius:4px;
+    background:rgba(12,16,22,.8)}
+  .ed-tgroup:first-child{margin-top:0}
+  .ed-tool{background:rgba(12,16,22,.86);border:1px solid #2c3a4a;color:#c8d6e4;
+    border-radius:8px;padding:7px 10px;font:inherit;font-size:11px;letter-spacing:.05em;
+    cursor:pointer;min-width:78px;text-align:left;flex:none}
+  .ed-tool.current{background:#2a5f8a;border-color:#4d92c8;color:#fff}
+  /* ONE RIGHT-HAND RAIL, stacked and scrolling. The panels used to be pinned at
+     hand-measured `top:` offsets, so every row added to the sliders pushed the
+     WORLD RECIPE down under the fold and the two eventually overlapped. */
+  #ed-right{position:absolute;right:8px;top:56px;bottom:8px;width:186px;
+    display:flex;flex-direction:column;gap:8px;overflow-y:auto;scrollbar-width:thin}
+  #ed-sliders{display:flex;flex-direction:column;flex:none;
+    gap:8px;background:rgba(12,16,22,.86);border:1px solid #2c3a4a;border-radius:10px;padding:9px}
+  #ed-sliders label{display:flex;align-items:center;gap:7px;font-size:10px;
+    letter-spacing:.06em;color:#9fb4c8}
+  #ed-sliders input{width:82px;flex:1;min-width:0}
+  #ed-sliders b{color:#9fd3ff;min-width:32px;text-align:right}
+  #ed-world{flex:none;background:rgba(12,16,22,.9);
+    border:1px solid #2c3a4a;border-radius:10px;padding:8px}
+  /* the SELECTION panel: only there when something is selected */
+  #ed-inspect{flex:none;background:rgba(12,16,22,.92);border:1px solid #3a5c78;
+    border-radius:10px;padding:8px}
+  #ed-inspect.off{display:none}
+  #ed-insp-name{color:#9fd3ff;letter-spacing:.06em}
+  .ed-krow{display:flex;justify-content:space-between;gap:8px;font-size:10px;
+    color:#8fa4b8;padding:2px 0}
+  .ed-krow b{color:#cfe0f0}
+  .ed-insprow,.ed-inspow{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+  .ed-mini.ed-danger{border-color:#7a3a3a;color:#ffc9c1}
+  .ed-mini.ed-danger:active{background:#5a2626}
+  #ed-world label{display:flex;flex-direction:column;gap:3px;font-size:9px;
+    letter-spacing:.08em;color:#8fa4b8;margin-bottom:6px}
+  #ed-world select{background:#18212c;border:1px solid #2c3a4a;color:#cfe0f0;
+    border-radius:6px;padding:5px;font:inherit;font-size:11px}
+  #ed-roadrow{display:flex;gap:4px}
+  /* the ROAD tool's own sub-choice, tucked under the button that arms it */
+  #ed-roadsub{display:none;margin:2px 0 4px;padding:5px;border-radius:8px;
+    background:rgba(12,16,22,.86);border:1px solid #2c3a4a;max-width:150px}
+  #ed-roadsub.open{display:block}
+  #ed-roadsub .ed-hint{margin-top:4px}
+  /* ONE / RUN, shared by PLACE and NATURE — the same shape as ROAD's and
+     WIDEN's sub-choices, and under the same rule: the thing that changes what
+     the next tap means lives beside the button that armed the tap */
+  #ed-linerow{display:flex;gap:4px}
+  #ed-linesub{display:none;margin:2px 0 4px;padding:5px;border-radius:8px;
+    background:rgba(12,16,22,.86);border:1px solid #2c3a4a;max-width:150px}
+  #ed-linesub.open{display:block}
+  #ed-linesub .ed-hint{margin-top:4px}
+  /* WIDEN's own sub-choice, same shape as ROAD's and under the same rule:
+     the direction you are about to paint lives beside the button that arms it */
+  #ed-widenrow{display:flex;gap:4px}
+  #ed-widensub{display:none;margin:2px 0 4px;padding:5px;border-radius:8px;
+    background:rgba(12,16,22,.86);border:1px solid #2c3a4a;max-width:150px}
+  #ed-widensub.open{display:block}
+  #ed-widensub .ed-hint{margin-top:4px}
+  /* SELECT describes itself in ONE place — the inspector on the right rail.
+     It briefly had two: a sub-panel under the tool button and the inspector,
+     both naming the selection and both carrying DELETE. */
+  /* the running account of everything not yet applied. It used to be pinned
+     at a measured `top:364px` — the one offset that cleared the slider stack —
+     which is exactly the arrangement #ed-right replaced: it is a row in the
+     right-hand column now, so it cannot collide with a panel that grows. */
+  #ed-changes{flex:none;background:rgba(12,16,22,.86);
+    border:1px solid #2c3a4a;border-radius:8px;padding:6px}
+  #ed-changelist{font-size:10px;color:#9fb4c8;line-height:1.45}
+  .ed-chg b{color:#ffd98a;font-weight:700}
+  .ed-chg.pend{color:#7fe08a;margin-top:3px}
+  .ed-mini{flex:1;background:#18212c;border:1px solid #2c3a4a;color:#cfe0f0;
+    border-radius:6px;padding:5px;font:inherit;font-size:10px;cursor:pointer}
+  .ed-mini.current{background:#2a5f8a;border-color:#4d92c8;color:#fff}
+  .ed-hint{font-size:9px;color:#6d8299;margin-top:5px;line-height:1.3}
+  /* Wider, because the presets are pictures now — two to a row. And parked
+     CLEAR OF THE RIGHT-HAND COLUMN: at 236 px it grew tall enough to reach up
+     under #ed-world and cover the ROAD row, so TUNNEL and BRIDGE could not be
+     reached at all while the palette was open. */
+  #ed-palette,#ed-nature{position:absolute;right:202px;bottom:58px;width:236px;max-height:52vh;
+    overflow-y:auto;background:rgba(12,16,22,.92);border:1px solid #2c3a4a;
+    border-radius:10px;padding:8px;display:none}
+  #ed-palette.open,#ed-nature.open{display:block}
+  #ed-nature .ed-preset{padding:8px 2px}
+  .ed-pgroup{font-size:9px;letter-spacing:.12em;color:#6d8299;margin:7px 0 4px}
+  .ed-pgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  .ed-preset{display:block;width:100%;text-align:center;background:#18212c;
+    border:1px solid #2c3a4a;color:#cfe0f0;border-radius:6px;padding:0 0 4px;
+    font:inherit;font-size:10px;cursor:pointer;overflow:hidden}
+  .ed-pshot{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;
+    border-radius:5px 5px 0 0;background:#0e141b}
+  .ed-plabel{display:block;padding:3px 2px 0;letter-spacing:.04em;line-height:1.15}
+  .ed-preset.current{background:#2a5f8a;border-color:#4d92c8;color:#fff}
+  .ed-preset.current .ed-pshot{outline:1px solid #4d92c8;outline-offset:-1px}
+  #ed-bottom{position:absolute;left:8px;bottom:8px;display:flex;gap:6px}
+  /* SCENES / CHECK / KEYS all land in the same card, because they are all
+     "read this, then get back to building" and none of them is worth a screen. */
+  #ed-modal{position:absolute;inset:0;background:rgba(6,9,13,.72);display:flex;
+    align-items:center;justify-content:center;padding:16px;z-index:5}
+  #ed-modal.off{display:none}
+  #ed-modal-card{background:#101720;border:1px solid #35485c;border-radius:12px;
+    width:min(560px,100%);max-height:82vh;display:flex;flex-direction:column}
+  #ed-modal-head{display:flex;align-items:center;gap:8px;padding:9px 11px;
+    border-bottom:1px solid #22303d}
+  #ed-modal-title{flex:1;font-size:12px;letter-spacing:.14em;color:#9fd3ff}
+  #ed-modal-body{overflow-y:auto;padding:11px 13px;font-size:11px;line-height:1.5;
+    color:#c8d6e4}
+  #ed-modal-body ul{margin:4px 0 0;padding-left:18px}
+  #ed-modal-body li{margin:4px 0}
+  #ed-modal-body p{margin:6px 0}
+  .ed-warn{color:#ffc14a}
+  .ed-good{color:#7dff9b}
+  .ed-note{color:#6d8299}
+  .ed-scene{border:1px solid #22303d;border-radius:9px;padding:8px;margin-bottom:7px;
+    background:#0d141c}
+  .ed-scene-h{display:flex;justify-content:space-between;gap:8px}
+  .ed-scene-h b{color:#e8eef6;letter-spacing:.04em}
+  .ed-scene-h span{color:#6d8299;font-size:10px}
+  .ed-scene-s{color:#8fa4b8;font-size:10px;margin-top:2px}
+  #ed-code{width:100%;height:64px;margin-top:6px;background:#0b1119;color:#9fd3ff;
+    border:1px solid #2c3a4a;border-radius:8px;padding:6px;font:inherit;font-size:10px;
+    resize:vertical;word-break:break-all}
+  @media (max-width:520px){
+    .ed-tool{min-width:0;padding:7px;font-size:10px}
+    /* #ed-world and #ed-changes are sized by the rail they now sit in */
+    #ed-right{width:142px}
+    #ed-sliders input{width:56px}
+    #ed-sliders label{font-size:9px;gap:4px}
+    #ed-palette,#ed-nature{width:150px;right:158px}
+    /* the edit counter is the first thing to go when the bar runs out of room:
+       it is a glance, and EXIT / APPLY / TEST DRIVE are the buttons */
+    #ed-counts{display:none}
+    #ed-top{gap:5px;padding:5px 6px}
+    .ed-btn{padding:7px 8px;font-size:11px}
+    #ed-status{font-size:10px}
+  }
+  #car-shop{touch-action:pan-x pan-y}
+  /* compact menu on short viewports (phones, small laptops) */
+  @media (max-height:1000px){
+    .game-title{font-size:clamp(34px,7vw,64px)}
+    .game-sub{margin-top:6px;letter-spacing:5px}
+    #level-select{margin-top:6px}
+    .level-chip{padding:7px 8px 9px}
+    #race-settings,#mode-settings{margin-top:12px}
+    .up-row{padding:5px 0}
+    .controls{margin-top:16px;font-size:12px;gap:4px 16px}
+    #touch-note{margin-top:14px;font-size:12px;line-height:1.6}
+    #loading-note{margin-top:12px}
+  }
+  /* narrow phones: settings labels stack above their chips; tighter columns */
+  @media (max-width:460px){
+    .game-sub{letter-spacing:3px}
+    #menu-tabs{margin-top:8px;gap:4px}
+    #menu-status{margin-top:12px}
+    /* the phone rule was written for four tabs at 18px of side padding; with
+       five that is 180px of padding alone on a 360px screen */
+    .menu-tab{padding:11px 4px;font-size:12px;letter-spacing:.4px}
+  }
+  /* iPhone SE and friends: at 320 px five tabs still clipped TRACKS by 1 px and
+     GARAGE by 3, because the clamp floor (10px) was binding before the vw term
+     could shrink anything. Measured at 320/360/390/460/700 — this is the only
+     width that needed it. */
+  @media (max-width:340px){
+    .menu-tab{padding:11px 2px;font-size:10px;letter-spacing:0}
+    /* the JOBS type is sized for the 390-430px phone the report came from; at
+       320 that last step turns "ALPINE LICENCE" into two lines and the quest
+       line into five. Half a step back here — still well clear of the 9.5px
+       it started at, and still above 4.5:1. */
+    #contract-board .jrow{grid-template-columns:1fr 62px 74px;gap:6px}
+    #quest-board .qrow{grid-template-columns:22px 1fr 68px 34px;gap:6px}
+    #contract-board .jmain b,#quest-board .qmain b{font-size:11px;letter-spacing:.4px}
+    #job-board .jmain b{font-size:11.5px;letter-spacing:.4px}
+    #contract-board .jmain i,#job-board .jmain i,#quest-board .qmain i{font-size:10px}
+    #jobs-note{font-size:11px}
+    .set-row{grid-template-columns:1fr;padding:8px 0 9px}
+    /* chips share the row evenly instead of wrapping unevenly */
+    .mode-chip,.diff-chip{padding:0 8px;letter-spacing:1px;flex:1 1 0;min-width:0}
+    /* ...and the mode chips are three equal 73px segments at this width, so the
+       TYPE gives rather than the row: the alternative is "FREE ROAM" clipped
+       mid-word. The icon is already dropped by the 429px rule above. */
+    #mode-select .mode-chip{font-size:11px;letter-spacing:0;padding:0 4px}
+    /* phone: pips drop under the name instead of stealing a column, so every
+       upgrade description fits on one line and all six rows are the same height */
+    .up-row{grid-template-columns:36px 1fr 76px;gap:2px 8px;
+      grid-template-areas:'ic nm buy' 'ic pips buy'}
+    .up-row .ic{grid-area:ic;align-self:stretch;display:flex;align-items:center;
+      justify-content:center;padding:0}
+    .up-row .nm{grid-area:nm;font-size:12px}
+    .up-row .pips{grid-area:pips;font-size:10px;letter-spacing:1px;text-align:left}
+    .up-buy{grid-area:buy}
+    .results-card,.results-actions{width:100%}
+    .results-card{padding:6px 16px}
+    .results-actions .btn{font-size:16px;letter-spacing:1px}
+  }
+</style>
+</head>
+<body>
+<!-- FIRST PAINT IS A LOADING SCREEN, NOT A BLACK RECTANGLE.
+     `#build-veil` covers a level PICK, but it lives inside the app and needs
+     main.js to have run. On a cold load the module graph, the canvas textures
+     and the first world build are all ahead of that, and until they land the
+     player is looking at an empty page with no way to tell loading from broken.
+     This is plain markup with INLINE styles so it paints on the first frame the
+     browser draws — before the stylesheet, before the import map, before any
+     script — and the script that removes it makes no assumptions about main.js
+     beyond `window.__game` eventually existing. -->
+<div id="boot-screen" style="position:fixed;inset:0;z-index:200;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  background:radial-gradient(circle at 50% 42%,#2a1a10 0%,#140c07 62%,#0a0605 100%);
+  color:#ffe9a8;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  transition:opacity .35s ease">
+  <div style="font-size:clamp(22px,6vw,40px);font-weight:800;letter-spacing:.14em">IGNITE RALLY</div>
+  <div style="font-size:clamp(11px,2.6vw,14px);letter-spacing:.22em;opacity:.75">
+    IF YOU CAN'T RACE THEM, SHOOT THEM</div>
+  <div style="width:min(280px,62vw);height:5px;border-radius:3px;overflow:hidden;
+    background:rgba(255,233,168,.16)">
+    <div id="boot-bar" style="width:35%;height:100%;border-radius:3px;
+      background:linear-gradient(90deg,#ffb347,#ffe9a8);
+      animation:bootslide 1.15s ease-in-out infinite"></div>
+  </div>
+  <div id="boot-msg" style="font-size:clamp(10px,2.4vw,12px);letter-spacing:.18em;
+    opacity:.7">LOADING …</div>
+</div>
+<script>
+  // the bar is decoration; the MESSAGE is the useful part, so it names the
+  // stage rather than showing a fake percentage
+  (function () {
+    var st = document.createElement('style');
+    st.textContent = '@keyframes bootslide{0%{transform:translateX(-100%)}'
+      + '50%{transform:translateX(180%)}100%{transform:translateX(-100%)}}';
+    document.head.appendChild(st);
+    var msg = document.getElementById('boot-msg');
+    var stage = 0;
+    var stages = ['LOADING …', 'DRAWING TEXTURES …', 'BUILDING THE WORLD …',
+      'PLACING THE SCENERY …', 'ALMOST THERE …'];
+    var tick = setInterval(function () {
+      if (stage < stages.length - 1 && msg) msg.textContent = stages[++stage];
+    }, 1400);
+    // gone as soon as the game object exists — no guesses about main.js beyond
+    // that, and a hard cap so a failed boot still shows the game's own error
+    // surface rather than this screen forever
+    var t0 = Date.now();
+    var poll = setInterval(function () {
+      if (window.__game || Date.now() - t0 > 40000) {
+        clearInterval(poll); clearInterval(tick);
+        var el = document.getElementById('boot-screen');
+        if (!el) return;
+        el.style.opacity = '0';
+        setTimeout(function () { el.remove(); }, 380);
+      }
+    }, 60);
+  })();
+</script>
+<canvas id="game-canvas"></canvas>
+
+<div id="hud">
+  <div id="race-info" class="panel">
+    <div class="pos"><span id="position">–</span><small id="position-suffix"></small> <small>/ <span id="racer-count">8</span></small></div>
+    <div class="lap">LAP <span id="lap">1</span>/<span id="laps-total">3</span></div>
+    <div class="time" id="race-time">0:00.0</div>
+    <div id="standings"></div>
+    <div id="contracts"></div>
+  </div>
+
+  <div id="score-box" class="panel">
+    <div class="label">SCORE</div>
+    <div class="val" id="score">0</div>
+  </div>
+
+
+  <div id="health-box" class="panel">
+    <div class="bar-label"><span>HULL INTEGRITY</span><span id="health-num">100</span></div>
+    <div class="bar"><div id="health-fill"></div></div>
+    <div id="shield-hits">HULLS: <span id="deaths">◆◆◆</span></div>
+  </div>
+
+  <div id="speed-box">
+    <canvas id="speedo" width="300" height="300"></canvas>
+    <div id="nitro-wrap">
+      <div class="bar-label"><span>NITRO&nbsp;(F)</span></div>
+      <div id="nitro-bar"><div id="nitro-fill"></div></div>
+    </div>
+  </div>
+
+  <div id="weapon-box" class="panel">
+    <div class="bar-label"><span>CANNON HEAT</span><span id="heat-num">0%</span></div>
+    <div class="bar"><div id="heat-fill"></div></div>
+    <div class="wrow"><span>ROUNDS</span><span class="icons" id="round-count">90</span></div>
+    <div class="wrow"><span>MISSILES</span><span class="icons" id="missile-icons">▲</span></div>
+    <div class="wrow"><span>MINES</span><span class="icons" id="mine-icons">●</span></div>
+    <div class="wrow"><span>RECOVERY</span><span class="icons" id="sos-count">🆘</span></div>
+    <div class="wrow"><span>SHOCKWAVE</span><span id="shock-status" class="ready">READY</span></div>
+  </div>
+
+  <div id="feed"></div>
+  <div id="center-msg" class="titlefont"></div>
+  <div id="combo"><span id="combo-x">×2</span><span id="combo-lbl">COMBO</span><i id="combo-bar"><b></b></i></div>
+  <div id="wrong-way">▼ WRONG WAY ▼</div>
+  <button id="cam-btn" class="icon-btn" title="Camera view">📷</button>
+  <button id="pause-btn" class="icon-btn" title="Pause">⏸</button>
+</div>
+<div id="damage-vignette"></div>
+<div id="polish-vignette"></div>
+<div id="build-tag">r245</div>
+<div id="fade"></div>
+<div id="build-veil"></div>
+
+<div id="touch-ui">
+  <div id="joy-zone"><div id="joy-base"><div id="joy-knob"></div></div></div>
+  <button class="tbtn" id="t-unstuck" data-key="KeyR">🆘<span class="badge" id="b-unstuck" style="display:none">0</span></button>
+  <button class="tbtn" id="t-drift" data-key="ShiftLeft">DRIFT</button>
+  <button class="tbtn" id="t-nitro" data-key="KeyF">⚡</button>
+  <button class="tbtn" id="t-shock" data-key="KeyQ">💥<span class="badge" id="b-shock" style="display:none">0</span></button>
+  <button class="tbtn" id="t-mine"  data-key="KeyX">💣<span class="badge" id="b-mine">2</span></button>
+  <button class="tbtn" id="t-missile" data-key="KeyE">🚀<span class="badge" id="b-missile">3</span></button>
+  <button class="tbtn" id="t-fire"  data-key="Space">FIRE</button>
+  <!-- TWO-THUMB pedals. They ride the same data-key plumbing as every other
+       touch button, and ArrowUp/ArrowDown are already throttle/brake, so the
+       scheme needs no new input path. Hidden unless body.two-thumb. -->
+  <button class="tbtn pedal" id="t-left"  data-key="ArrowLeft">◀</button>
+  <button class="tbtn pedal" id="t-right" data-key="ArrowRight">▶</button>
+  <button class="tbtn pedal" id="t-brake" data-key="ArrowDown">BRAKE</button>
+</div>
+
+<!-- THE BACK BUTTON. One button, one place, one word, everywhere in the menu
+     there is somewhere to go.
+     It took five goes to get here, and the failures are the point. (Do NOT
+     renumber these when bumping the build — a blanket sed over this file
+     rewrote them twice, which is how r224 came to be labelled r226 below.)
+       r222  a button in the header, which scrolls away
+       r223  plus a fixed pill bottom-left, which sat on the world cards
+       r224  merged into a top bar, but only INSIDE A CHAPTER, and labelled
+             ALL CHAPTERS — so on the tabs the header button was still the one
+             in charge, at y=92 (y=152 on MODE), and the control had three
+             addresses and two names depending on where you stood. Reported,
+             fairly, as "I miss the back button".
+       r225  one bar, every state, saying BACK — and FIXED to the viewport.
+             Reported as "No back button still", on an iPhone, on the one
+             screen it had been measured working.
+     Now: this bar carries it in every menu state that has a level above it,
+     it always says BACK, and the label beside it says where you are. The
+     header button is gone rather than hidden — a second one is how this got
+     out of hand in the first place.
+     STICKY AND IN THE FLOW, after r225 shipped it FIXED and outside the
+     scroller and the reporter said it was still not there on their iPhone —
+     on the one screen it was measured working. Chromium cannot see whatever
+     that is, so the fix is to change what happens WHEN IT GOES WRONG rather
+     than to keep guessing at why: a fixed bar that does not paint leaves
+     nothing on screen at all, while a sticky one that stops sticking is still
+     sitting at the top of the chapter where you arrive.
+     TOP, not bottom: the bottom belongs to START RACE, and a pill down there
+     sat on top of the world cards. -->
+<div id="title-screen" class="screen">
+  <!-- THE BAR IS ALWAYS UP IN THE MENU NOW. Asked for as "move title name and
+       credits at the top, make them always visible" — both used to sit in the
+       page and scroll away, and the credit balance is the number you check
+       before every purchase in the garage below.
+       Three slots: BACK when there is somewhere to go, WHERE YOU ARE in the
+       middle (the wordmark at the front door, since there is nowhere more
+       specific to name), and the balance pinned right. -->
+  <div id="topbar" class="hidden">
+    <button id="topbar-back" class="ch-back" aria-label="Back">‹&nbsp;BACK</button>
+    <div id="topbar-where" class="ch-here"></div>
+    <div id="topbar-stars" class="ch-here-stars"></div>
+    <div id="topbar-cred">CREDITS&nbsp;<b id="credits">0</b></div>
+  </div>
+  <!-- The tagline stays: it is the one line of character on the front door,
+       and it is the only thing left above the tabs now that the wordmark has
+       moved into the bar. Each clause is held together so it breaks at the
+       comma and never mid-phrase. -->
+  <div class="game-sub"><span class="nb">If you can&rsquo;t race them,</span>
+    <span class="nb">shoot them</span></div>
+  <!-- Status chips sit ABOVE the tabs, not in the same row. Sharing the row
+       meant a fourth tab pushed the whole strip onto two lines on a phone. -->
+  <!-- NO BACK BUTTON HERE ANY MORE. It used to sit left of the credits chip,
+       which put it at y=92 on most tabs, y=152 on MODE, and nowhere at all
+       inside a chapter — where a DIFFERENTLY WORDED one appeared at y=8. Three
+       addresses and two labels for one control, reported as "I miss the back
+       button". There is one now and it lives in #topbar. -->
+  <div id="menu-status">
+    <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
+  </div>
+  <div id="menu-tabs">
+    <button id="tab-btn-race" class="menu-tab current">TRACKS</button>
+    <button id="tab-btn-mode" class="menu-tab">MODE</button>
+    <button id="tab-btn-jobs" class="menu-tab">JOBS</button>
+    <button id="tab-btn-garage" class="menu-tab">GARAGE</button>
+    <button id="tab-btn-settings" class="menu-tab">SETUP</button>
+  </div>
+  <div id="tab-race" class="menu-panel">
+    <!-- NO "MAP & TRACK SELECTION" HEAD HERE. The TRACKS tab immediately above
+         is lit yellow and says the same word; the head was 35 px of the phone
+         spent restating the tab you just pressed. Measured on a 390x830 phone,
+         the chrome above the first world card came to 515 px of 745 usable. -->
+    <!-- HOW STARS ARE EARNED, on the screen that spends them. The rule was
+         only ever stated on the post-race panel, which you see AFTER the
+         decision it informs; the track list just said "NEEDS 27 STARS" at a
+         player with no way to know what a star costs to get. -->
+    <div id="star-key"></div>
+    <!-- FILTERS. Fifty-eight cards is a list you hunt through; the chips and
+         the count line are built in main.js from FILTER_GROUPS. -->
+    <div id="world-filters"></div>
+    <div id="level-select"></div>
+  </div>
+  <!-- MODE picks what you are playing — race, free roam or an arena mission —
+       so the mission cards belong here beside it rather than buried under the
+       track list. Everything on this tab answers "what am I doing"; SETTINGS
+       answers "how does it handle". -->
+  <div id="tab-mode" class="menu-panel off">
+    <div id="mode-settings">
+      <div class="panel-head">GAME MODE</div>
+      <div class="set-row"><span class="set-lbl">MODE</span><div id="mode-select"></div></div>
+    </div>
+    <div id="mission-select"></div>
+  </div>
+  <!-- Handling options are set once and rarely changed, so they were pushing
+       the track list — the thing you actually come here to do — down the page
+       on a phone. -->
+  <div id="tab-settings" class="menu-panel off">
+    <!-- ADMIN — the owner's build tools, and nothing a player needs.
+         The WORLD EDITOR used to sit under START RACE on the tracks tab, in
+         front of everyone who opened the menu. It lives here now, behind
+         `?admin=1`, and main.js REMOVES this whole block when that is not set
+         — hiding it with CSS would leave a live tab-stop that sculpts terrain
+         in every player's menu. -->
+    <div id="admin-panel">
+      <div class="panel-head">ADMIN</div>
+      <p class="set-help" style="margin:0 0 8px">Build tools. Not part of the
+        game — reached with <b>?admin=1</b>, left with <b>?admin=0</b>.</p>
+      <button id="editor-btn" class="btn btn-alt">🛠 WORLD EDITOR</button>
+    </div>
+    <div id="race-settings">
+      <div class="panel-head">RACE SETTINGS</div>
+      <!-- Every setting says what it actually does. "STEERING: SHARP" and
+           "DRIVING AID: PRO" meant nothing without being told, and a player who
+           does not know what a setting does will not touch it. -->
+      <div class="set-row"><span class="set-lbl">DIFFICULTY</span>
+        <div><div id="diff-select"></div>
+        <p class="set-help">Rival pace and aggression, and how hard they hit you. HARD pays ×1.5 credits.</p></div></div>
+      <!-- TEST MODE. `?unlockall=1` has always existed and has always been the
+           only way in, which means it survives exactly as long as the tab does
+           and is gone the moment the game is opened from the home screen. This
+           is the same switch, remembered. -->
+      <div class="set-row"><span class="set-lbl">OPEN ALL</span>
+        <div><div id="open-all-select"></div>
+        <p class="set-help">Unlocks every world and every car for testing. Your career, stars and
+        credits are untouched — turn it off and the ladder is exactly where you left it.</p></div></div>
+      <div class="set-row"><span class="set-lbl">TEST FUNDS</span>
+        <div><button id="grant-cr" class="diff-chip">+300,000 CR</button>
+        <p class="set-help">Drops 300,000 credits into this profile so the garage can be filled in
+        one sitting. Unlike OPEN ALL this is a REAL change to your save — the credits are yours and
+        stay yours.</p></div></div>
+      <!-- touch only: one thumb doing everything, or thumbs split between
+           steering and pedals -->
+      <div class="set-row" id="scheme-row"><span class="set-lbl">CONTROLS</span>
+        <div><div id="scheme-select"></div>
+        <p class="set-help"><b>ONE THUMB</b> — the left pad does everything: sideways steers, up is gas, down is brake.<br>
+        <b>TWO THUMB</b> — steer with a button under each thumb, gas is automatic, and BRAKE sits in the middle. Squeeze <i>both</i> steer buttons to brake without reaching for it.</p></div></div>
+      <div class="set-row"><span class="set-lbl">STEERING</span>
+        <div><div id="steer-select"></div>
+        <p class="set-help">How quickly the car answers the wheel. <b>RELAXED</b> turns slower and is easier to hold
+        straight at speed; <b>SHARP</b> turns harder for the same input — quicker into a hairpin, twitchier everywhere else.</p></div></div>
+      <div class="set-row"><span class="set-lbl">DRIVING AID</span>
+        <div><div id="assist-select"></div>
+        <p class="set-help">A gentle nudge back in line when you are <i>not</i> steering, so the car stops wandering.
+        It never fights your input and never takes a corner for you. <b>PRO</b> off · <b>STANDARD</b> half · <b>ASSIST</b> full.</p></div></div>
+      <!-- Touch only: how far the thumb has to travel for full lock, and how
+           gentle the middle of that travel is. The chips above are coarse
+           presets; this is the fine adjustment for a specific thumb. -->
+      <div class="set-row" id="joy-row">
+        <span class="set-lbl">JOYSTICK<br><span id="joy-val">100%</span></span>
+        <div id="joy-sens-wrap">
+          <input id="joy-sens" type="range" min="50" max="180" step="5" value="100">
+          <div class="set-hint"><span>CALM</span><span>TWITCHY</span></div>
+          <p class="set-help">How far your thumb travels for full lock. Lower means more travel and finer control;
+          higher means less travel and a faster turn-in.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- JOBS: the money game in one place. Contracts are the DAILY offer for the
+       world you have picked and each one can be turned down; quests are the
+       long chains that pay PARTS. Asked for as "quests and contracts needs to
+       be under contracts, so I can choose to race them or not". -->
+  <div id="tab-jobs" class="menu-panel off">
+    <div id="job-board"></div>
+    <div id="contract-board"></div>
+    <div id="quest-board"></div>
+  </div>
+
+  <div id="tab-garage" class="menu-panel off">
+    <div class="panel-head" id="garage-shop-head">YOUR MACHINES</div>
+    <div class="shelf-wrap"><div id="car-shop"></div></div>
+    <!-- THE CAR YOU BUILT, and the shops that built it.
+         Asked for as "make it graphical as in the demo — marry the existing
+         upgrades mode vs this", with a mockup of a workshop: a car in the
+         middle and part shops around it, each part a PICTURE with a price and
+         an INSTALL button.
+         So the garage is one screen now, not four stacked lists. The preview
+         is the selected machine wearing everything it owns, and every bay
+         below speaks the same card language whether it is selling a CHOICE
+         (a block, a wing, a compound — one at a time, trading against each
+         other) or a LADDER (the ten upgrade lines, each rung better than the
+         last). That is the marriage: the two systems were never in conflict,
+         they were just wearing different clothes. -->
+    <div id="build-preview"></div>
+    <div id="garage-bays"></div>
+  </div>
+  <button id="start-btn" class="btn">START RACE</button>
+  <div class="controls">
+    <b>W / ↑</b><span>Throttle</span>
+    <b>S / ↓</b><span>Brake / Reverse</span>
+    <b>A D / ← →</b><span>Steer</span>
+    <b>SPACE</b><span>Cannon</span>
+    <b>E</b><span>Homing missile</span>
+    <b>X</b><span>Drop mine</span>
+    <b>Q</b><span>Shockwave</span>
+    <b>F</b><span>Nitro (charge by drifting)</span>
+    <b>SHIFT</b><span>Drift</span>
+    <b>C</b><span>Camera &nbsp;·&nbsp; <b style="display:inline">P</b> Pause</span>
+  </div>
+  <div id="touch-note">LEFT THUMB — driving pad: drag to steer, up for gas, down for brake<br>
+    RIGHT THUMB — FIRE cannon &nbsp;·&nbsp; 🚀 missile &nbsp;·&nbsp; 💣 mine &nbsp;·&nbsp; 💥 shockwave &nbsp;·&nbsp; ⚡ nitro
+    &nbsp;·&nbsp; hold DRIFT to slide</div>
+  <div id="loading-note">3 LAPS · 5 RIVALS · JUMPS · MINES · DESTROY OR BE DESTROYED</div>
+  <div id="offline-badge" class="arming">✈ STORING…</div>
+</div>
+
+<div id="profile-screen" class="screen hidden">
+  <div class="game-sub" style="letter-spacing:10px">DRIVER PROFILES</div>
+  <div id="profile-panel" class="menu-panel">
+    <div class="panel-head">WHO'S DRIVING</div>
+    <div id="profile-list"></div>
+    <div class="panel-head">NEW PROFILE</div>
+    <div id="profile-create">
+      <input id="profile-name-input" maxlength="10" placeholder="NAME" autocomplete="off" spellcheck="false">
+      <div id="profile-swatches"></div>
+      <button id="profile-create-btn" class="up-buy">CREATE</button>
+    </div>
+    <div id="profile-cap-note" class="footnote" style="display:none">PROFILE LIMIT REACHED — DELETE ONE TO ADD ANOTHER</div>
+    <div class="panel-head danger-head">DANGER ZONE</div>
+    <div id="profile-sync">
+      <div class="sync-head">CROSS-DEVICE SYNC</div>
+      <div id="sync-status" class="sync-status"></div>
+      <div class="sync-row">
+        <button id="sync-export" class="up-buy prof-btn">COPY SYNC CODE</button>
+        <button id="sync-import" class="up-buy prof-btn">ENTER SYNC CODE</button>
+      </div>
+      <textarea id="sync-code-box" rows="3" spellcheck="false"
+        placeholder="PASTE A SYNC CODE FROM YOUR OTHER DEVICE HERE"></textarea>
+      <div class="sync-note">A SYNC CODE CARRIES THIS WHOLE CAREER · IMPORTING MERGES, NEVER ERASES</div>
+    </div>
+    <div id="profile-reset">
+      <div id="profile-reset-loss"></div>
+      <button id="profile-reset-btn" class="up-buy danger">RESET CAREER</button>
+      <div class="reset-note">RESET EMPTIES THIS DRIVER · ✕ DELETES THEM</div>
+    </div>
+  </div>
+  <button id="profile-close" class="btn" style="margin-top:22px;padding:13px 54px;font-size:17px">CLOSE</button>
+</div>
+
+<div id="pause-menu" class="screen hidden">
+  <div class="pm-panel">
+    <div class="pm-title">PAUSED</div>
+    <button id="pm-resume" class="btn">RESUME</button>
+    <div class="pm-group">
+      <button id="pm-camera" class="btn secondary">CAMERA VIEW 📷</button>
+      <!-- The same toggle as the 👁 button on the HUD, for the player who paused
+           to go looking for it. Its label flips with the state, so pausing tells
+           you which view you are in without having to resume to find out. -->
+      <button id="pm-driver" class="btn secondary">DRIVER'S VIEW 👁</button>
+      <button id="pm-steer" class="btn secondary">STEERING: NORMAL</button>
+      <!-- switchable mid-race: you find out a scheme is wrong while driving -->
+      <button id="pm-scheme" class="btn secondary">CONTROLS: ONE THUMB</button>
+    </div>
+    <div class="pm-group">
+      <button id="pm-restart" class="btn secondary">RESTART</button>
+      <button id="pm-exit" class="btn secondary">EXIT TO MENU</button>
+    </div>
+  </div>
+</div>
+
+<div id="results" class="screen hidden">
+  <div class="game-sub">RACE COMPLETE</div>
+  <div class="result-place titlefont" id="result-place">1ST</div>
+  <div class="results-card">
+    <div class="result-stats">
+      <div class="rrow"><span>FINAL SCORE</span><b id="r-score">0</b></div>
+      <div class="rrow"><span>RIVALS DESTROYED</span><b id="r-kills">0</b></div>
+      <div class="rrow"><span>RACE TIME</span><b id="r-time">0:00.0</b></div>
+      <div class="rrow"><span>BEST LAP</span><b id="r-best">0:00.0</b></div>
+      <!-- MEDAL is an arena-missions row; hidden for races (missions agent) -->
+      <div class="rrow" id="rrow-medal" style="display:none"><span>MEDAL</span><b id="r-medal">—</b></div>
+      <div class="rrow credits"><span>CREDITS EARNED</span><b id="r-credits">+0</b></div>
+    </div>
+  </div>
+  <div id="star-panel" style="display:none">
+    <div class="cb-head">RALLY STARS <b id="sp-total">0★</b></div>
+    <div id="sp-rows"></div>
+  </div>
+  <!-- [PARTS] A PART YOU JUST EARNED IS THE HEADLINE OF THE DEBRIEF, not a
+       line in a credits table: it is the one thing on this screen you cannot
+       buy. Filled by _announcePartUnlocks() on both the race and the mission
+       finish, and hidden whenever nothing opened. -->
+  <div id="part-unlock" style="display:none"></div>
+  <div id="credit-breakdown" style="display:none">
+    <div class="cb-head">CREDITS BREAKDOWN</div>
+    <div id="cb-rows"></div>
+  </div>
+  <div class="results-actions">
+    <button id="next-level-btn" class="btn" style="display:none">NEXT LEVEL ▶</button>
+    <button id="restart-btn" class="btn">RACE AGAIN</button>
+    <!-- without this the results screen is a dead end: finish off the podium
+         and RACE AGAIN was the only way out, with no route to the credits you
+         just earned, another car or another track -->
+    <button id="garage-btn" class="btn secondary">🔧 BACK TO GARAGE</button>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.min.js" } }
+</script>
+<!-- bump v on EVERY release so cached phones pull the fresh module graph -->
+<script>
+  // CLOUD SYNC (optional). The game is fully playable without this — sync
+  // codes move careers between devices by hand. To make it automatic, create
+  // the one-table database in db/README.md (five minutes, free tier) and put
+  // its URL + anon key here. Leave empty to keep sync codes only.
+  window.IGNITE_SYNC = { url: '', key: '' };
+</script>
+<script type="module" src="./src/main.js?v=r245"></script>
+<!-- offline arming: registers sw.js and drives the flight badge -->
+<script src="./src/offline.js?v=r245"></script>
+<!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
+<script type="module" src="./src/traffic.js?v=r245"></script>
+</body>
+</html>

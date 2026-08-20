@@ -1,0 +1,61 @@
+{
+  "name": "Striker Test Mule",
+  "chassis": {
+    "mass": 1200,
+    "halfExtents": [0.95, 0.34, 1.95],
+    "comOffsetY": -0.25,
+    "linearDamping": 0.02,
+    "angularDamping": 0.9
+  },
+  "suspension": {
+    "restLength": 0.45,
+    "maxTravel": 0.25,
+    "sagRatio": 0.5,
+    "dampingRatio": 0.4,
+    "mounts": [
+      [-0.82, -0.1, 1.35],
+      [0.82, -0.1, 1.35],
+      [-0.82, -0.1, -1.35],
+      [0.82, -0.1, -1.35]
+    ]
+  },
+  "tire": {
+    "lat": { "B": 10.0, "C": 1.6, "D": 1.08 },
+    "long": { "B": 10.0, "C": 1.65, "D": 1.0 },
+    "lowSpeedFade": 2.5,
+    "wheelRadius": 0.36
+  },
+  "engine": {
+    "force": 9200,
+    "brakeForce": 11000,
+    "reverseForce": 4200,
+    "dragCoeff": 3.2,
+    "awdFrontShare": 0.42
+  },
+  "steering": {
+    "maxAngleDegLow": 35,
+    "maxAngleDegHigh": 8,
+    "falloffTopSpeedKmh": 200,
+    "rateUp": 7.5,
+    "rateDown": 10.0
+  },
+  "assists": {
+    "driftRearMuScale": 0.65,
+    "driftYawTorque": 2200,
+    "yawDamping": 1500,
+    "yawDampingDrift": 380,
+    "driftSlipAngleDeg": 15,
+    "downforceCoeff": 4.2,
+    "airPitchTorque": 3400,
+    "airYawTorque": 2200,
+    "antiFlipRollDeg": 60,
+    "antiFlipTorque": 5200,
+    "autoFlipAfterSec": 2.0,
+    "magneticLandingSec": 0.4,
+    "magneticTorque": 2800
+  },
+  "nitro": {
+    "engineForceScale": 1.4,
+    "fovBoostDeg": 12
+  }
+}
