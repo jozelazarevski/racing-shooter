@@ -1133,6 +1133,83 @@ export function buildPartIcon(kind, id) {
     }
     return g;
   }
+  // ---- THE UPGRADE LADDERS ------------------------------------------------
+  //
+  // Six of the ten ladders were still a glyph in the row — a wrench, a cog, a
+  // lightning bolt, a shield, a PARACHUTE for the dampers and a red SOS
+  // square — sitting beside four that render real hardware. Asked for
+  // directly: more detail, better graphics, "like engine". They share the
+  // studio, the materials and the shooter the shop parts already use, so each
+  // one costs a model and nothing else.
+  if (kind === 'up') {
+    if (id === 'engine') {
+      // a wrench ON a cam cover: the ladder tunes an engine, so show one
+      add(new THREE.BoxGeometry(0.95, 0.62, 1.05), M.block, 0, 0.05, 0);
+      add(new THREE.BoxGeometry(0.46, 0.3, 1.0), M.crackle, 0, 0.44, 0, 0, 0);
+      add(new THREE.BoxGeometry(0.16, 0.09, 1.15), M.chrome, 0, 0.62, 0);
+      const shaft = add(new THREE.BoxGeometry(0.13, 0.9, 0.13), M.chrome, 0.52, 0.72, 0.34);
+      shaft.rotation.z = -0.5;
+      const jaw = add(new THREE.TorusGeometry(0.19, 0.06, 6, 10, Math.PI * 1.45),
+        M.chrome, 0.79, 1.08, 0.34);
+      jaw.rotation.z = -0.5 + Math.PI * 0.75;
+      return g;
+    }
+    if (id === 'handling') {
+      // a coil-over: spring around a damper rod, which is what "suspension" is
+      add(new THREE.CylinderGeometry(0.1, 0.1, 1.5, 10), M.chrome, 0, 0.1, 0);
+      add(new THREE.CylinderGeometry(0.26, 0.26, 0.5, 12), M.gunmetal, 0, -0.42, 0);
+      for (let i = 0; i < 9; i++) {
+        const t2 = i / 8;
+        add(new THREE.TorusGeometry(0.3, 0.055, 5, 14), M.crackle,
+          0, -0.18 + t2 * 1.0, 0, Math.PI / 2);
+      }
+      add(new THREE.CylinderGeometry(0.3, 0.3, 0.1, 12), M.alloy, 0, 0.86, 0);
+      return g;
+    }
+    if (id === 'nitro') {
+      // a jerry can, per the reference sheet: a body, a cap, a strap handle
+      add(new THREE.BoxGeometry(0.78, 1.05, 0.42), M.crackle, 0, 0.05, 0);
+      add(new THREE.BoxGeometry(0.8, 0.16, 0.14), M.gunmetal, 0, 0.34, 0.22);
+      add(new THREE.BoxGeometry(0.8, 0.16, 0.14), M.gunmetal, 0, -0.16, 0.22);
+      add(new THREE.CylinderGeometry(0.13, 0.13, 0.16, 10), M.chrome, 0.22, 0.65, 0);
+      const handle = add(new THREE.TorusGeometry(0.2, 0.05, 5, 10, Math.PI),
+        M.gunmetal, -0.16, 0.62, 0);
+      handle.rotation.set(Math.PI / 2, 0, 0);
+      return g;
+    }
+    if (id === 'armor') {
+      // a heater shield: a plate with a chevron, not a flat emoji
+      const plate = add(new THREE.CylinderGeometry(0.86, 0.3, 0.2, 3, 1), M.alloy, 0, 0, 0);
+      plate.rotation.set(Math.PI / 2, 0, Math.PI);
+      add(new THREE.BoxGeometry(0.17, 1.16, 0.08), M.crackle, 0, 0.02, 0.14);
+      add(new THREE.BoxGeometry(0.86, 0.17, 0.08), M.crackle, 0, 0.42, 0.14);
+      return g;
+    }
+    if (id === 'dampers') {
+      // TWO of them, because a pair is what a car is sprung on, and because it
+      // separates this row from the single coil-over above it
+      for (const sx of [-1, 1]) {
+        const x = sx * 0.46;                       // clear of each other on screen
+        add(new THREE.CylinderGeometry(0.08, 0.08, 1.25, 9), M.chrome, x, 0.1, 0);
+        add(new THREE.CylinderGeometry(0.2, 0.2, 0.44, 10), M.gunmetal, x, -0.38, 0);
+        for (let i = 0; i < 7; i++) {
+          add(new THREE.TorusGeometry(0.24, 0.05, 5, 12), M.brass,
+            x, -0.16 + (i / 6) * 0.82, 0, Math.PI / 2);
+        }
+      }
+      return g;
+    }
+    if (id === 'beacon') {
+      // a rotating beacon on a base: a lamp, and the light IS the point, so it
+      // is unlit material (`warn`) and reads at thumbnail size
+      add(new THREE.CylinderGeometry(0.34, 0.4, 0.2, 12), M.gunmetal, 0, -0.5, 0);
+      add(new THREE.CylinderGeometry(0.26, 0.26, 0.46, 12), M.warn, 0, -0.16, 0);
+      add(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 12), M.chrome, 0, 0.1, 0);
+      add(new THREE.SphereGeometry(0.24, 12, 8), M.warn, 0, 0.2, 0);
+      return g;
+    }
+    return g;
+  }
   return g;
 }
 

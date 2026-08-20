@@ -4539,8 +4539,12 @@ class Game {
     // ladders sell hardware the shop already has a model of — the gun, the
     // rocket rail, the drum — and the tyre ladder sells rubber. The rest are
     // tools and fluids with nothing to photograph, and keep their glyph.
+    // Every ladder has a model now — the four that sell hardware the shop
+    // already photographs, and the six that had to have one built.
     const ART = { cannon: 'weapon:cannon', rack: 'weapon:rack',
-      magazine: 'weapon:magazine', tires: 'tyre:gravel' };
+      magazine: 'weapon:magazine', tires: 'tyre:gravel',
+      engine: 'up:engine', handling: 'up:handling', nitro: 'up:nitro',
+      armor: 'up:armor', dampers: 'up:dampers', beacon: 'up:beacon' };
     const art = icons?.[ART[u.key]];
     card.innerHTML = `<span class="uc-ic">${
   art ? `<img src="${art}" alt="">` : u.icon}</span>
@@ -5036,6 +5040,23 @@ class Game {
     for (const p of PART_SLOT.spoiler.parts) shoot('spoiler', p.id, Math.PI * 0.9, 4.4);
     for (const id of ['road', 'gravel', 'snow']) shoot('tyre', id, Math.PI * 0.5, 4.2);
     for (const id of ['cannon', 'rack', 'magazine']) shoot('weapon', id, Math.PI * 0.78, 4.2);
+    // THE UPGRADE LADDERS, which were the six rows still showing a glyph.
+    //
+    // EACH ONE IS TURNED TO ITS OWN ANGLE, because one angle for six shapes is
+    // how the shield came out as a red sliver: the studio camera sits at
+    // (5.2, 3.2, 6.2), so a flat face only reads when its normal is turned to
+    // atan2(5.2, 6.2) = 0.70 rad, and a PAIR only separates when the axis it is
+    // offset along is turned to that same angle — otherwise the two dampers
+    // stack into one spring, which they did.
+    const UP_SHOT = {
+      engine:   { ry: -Math.PI * 0.16, dist: 3.6 },
+      handling: { ry: 0, dist: 3.2 },              // radial: any angle reads
+      nitro:    { ry: -Math.PI * 0.16, dist: 3.2 },
+      armor:    { ry: 0.70, dist: 3.4 },           // face-on to the camera
+      dampers:  { ry: 0.70, dist: 3.6 },           // pair across the view
+      beacon:   { ry: 0, dist: 3.0 },
+    };
+    for (const [id, o] of Object.entries(UP_SHOT)) shoot('up', id, o.ry, o.dist, 0.05);
     this.__partIcons = out;
     return out;
   }
