@@ -2817,8 +2817,24 @@ const THEMES = {
     // doubled frame luminance, so the walls were simply under-lit, not shadowed
     // or mis-normalled. The slot canyon is most of what you look at here, and
     // vertical faces get almost nothing but this term.
-    hemiSky: 0x8a9a5c, hemiGround: 0x5a5e46, hemiIntensity: 5.5,
-    sunColor: 0xd8e87a, sunIntensity: 3.0,               // sickly grate-light shafts
+    // THE FILL WAS DOING THE WORK OF THE ATMOSPHERE, AND IT ATE THE WALLS.
+    //
+    // This world's cliff face is stained concrete: `cliffPalette` is five
+    // greys and the generated texture measures RGB (97,103,88) at saturation
+    // 0.145 on its own canvas. On screen it was (39,61,4) at 0.979 — a flat
+    // green wash with no blue in it. Half of that was the grade pass pivoting
+    // its contrast in the wrong space (fixed in main.js); the other half was
+    // here: a 5.5 hemisphere in a saturated yellow-green, against 0.8 on every
+    // other cliff-walled world, plus a 3.0 sun in another one.
+    //
+    // The green belongs to the AIR, not to the stone. Fog, haze and sky keep
+    // their sodium-sick cast untouched; the fill is desaturated and the wall
+    // is allowed to be concrete again. Measured on the driven frame: wall
+    // saturation 0.897 -> 0.523 (the reference cliff world reads 0.384) and
+    // the road came out BRIGHTER, 68.7 -> 63.1 against a gate floor of 25 —
+    // so the original "darkest world in the game" fault stays fixed.
+    hemiSky: 0x9aa598, hemiGround: 0x5c5e54, hemiIntensity: 3.6,
+    sunColor: 0xeef2d8, sunIntensity: 2.8,               // sickly grate-light shafts
     // The sky was the other half of it. Lighting the ground does nothing for
     // the top half of a chase-camera frame, and skyTop '#05070a' is black —
     // so roughly half the screen stayed at zero however bright the road got.

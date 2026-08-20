@@ -1431,7 +1431,25 @@ class Game {
           c.b = texture2D(tDiffuse, vUv + off).b;
           float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
           c.rgb = mix(vec3(l), c.rgb, uSat);
-          c.rgb = (c.rgb - 0.5) * uCon + 0.5;
+          // A CONTRAST PIVOT OF 0.5 IS A DISPLAY-SPACE NUMBER, AND THIS PASS
+          // RUNS IN LINEAR SPACE (it is placed before OutputPass on purpose,
+          // to grade under the tone map). Linear mid-grey is 0.214, not 0.5,
+          // so pivoting at 0.5 put the "no change" point up among the
+          // highlights and pushed EVERYTHING below it down — and a channel
+          // that was already near zero went to zero.
+          //
+          // Measured on UNDERCITY SLIPSTREAM, the darkest world in the game,
+          // where it is most visible: the cliff wall's own texture is grey
+          // concrete, RGB (97,103,88) at saturation 0.145, and it rendered as
+          // (39,61,4) at saturation 0.979 — a flat green wash with no blue
+          // left in it at all. Setting uCon to 1.0, which makes the pivot
+          // irrelevant, restored it to (66,83,27) at 0.688, while uSat and
+          // uVig moved nothing: the pivot, and only the pivot.
+          //
+          // Pivoting where mid-grey actually is keeps the gentle lift the
+          // grade was always meant to be, and stops it crushing shadows.
+          const float PIVOT = 0.2140;               // linear value of sRGB 0.5
+          c.rgb = (c.rgb - PIVOT) * uCon + PIVOT;
           c.rgb *= 1.0 - uVig * smoothstep(0.35, 0.95, r2 * 2.6);
           gl_FragColor = c;
         }`,
