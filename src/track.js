@@ -8,7 +8,7 @@ import {
   // `crowdTexture` is no longer imported: the spectator stand was the only
   // consumer, and it was removed on request. The texture itself stays in
   // src/textures.js — deleting it is that file's call, not this one's.
-  grassTexture, bannerTexture, hazardTexture, awningTexture,
+  grassTexture, bannerTexture, hazardTexture, awningTexture, balconyRailTexture,
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
   crateTexture, coneTexture, barrelTexture, riverTexture, riverBankTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
@@ -16765,8 +16765,14 @@ export class Track {
     const balcMat = new THREE.MeshStandardMaterial({
       color: 0xb9b0a0, flatShading: true, roughness: 0.9, envMapIntensity: 0.35,
     });
+    // BALUSTERS, NOT A PARAPET. A solid box in 0x3a3630 read as a black slab
+    // over every shopfront; alpha-tested ironwork lets the wall through and
+    // costs the same one draw call.
+    const railTex = balconyRailTexture();
+    railTex.repeat.set(3, 1);
     const railMat = new THREE.MeshStandardMaterial({
-      color: 0x3a3630, flatShading: true, roughness: 0.7, metalness: 0.35,
+      map: railTex, color: 0x8e968c, transparent: true, alphaTest: 0.5,
+      side: THREE.DoubleSide, roughness: 0.6, metalness: 0.4,
     });
     const awnMat = new THREE.MeshStandardMaterial({
       map: awningTexture(), roughness: 0.92, side: THREE.DoubleSide,
@@ -16775,6 +16781,9 @@ export class Track {
     const balcRails = new THREE.InstancedMesh(slabGeo, railMat, BALC);
     const awnings = new THREE.InstancedMesh(slabGeo, awnMat, BALC);
     balcSlabs.name = 'frontage-balconies';
+    // NAMED, so it can be measured and hidden. Unnamed, it survived every
+    // bracket-by-hiding pass while being the thing that was actually wrong.
+    balcRails.name = 'frontage-balcony-rails';
     awnings.name = 'frontage-awnings';
     for (const m of [balcSlabs, balcRails, awnings]) { m.castShadow = m.receiveShadow = true; }
     let balK = 0, awnK = 0;
@@ -16813,8 +16822,8 @@ export class Track {
         // the rail stands ON the slab's outer lip, not past it
         const rx = out + proud * (SD - 0.05);
         faceOff.set(rx, 0, zj).applyQuaternion(q);
-        m4.compose(new THREE.Vector3(p.x + faceOff.x, by + 0.5, p.z + faceOff.z), q,
-          new THREE.Vector3(0.1, 0.9, wAlong * 0.42));
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, by + 0.34, p.z + faceOff.z), q,
+          new THREE.Vector3(0.06, 0.62, wAlong * 0.42));
         balcRails.setMatrixAt(balK, m4);
         balK++;
       }
@@ -16875,8 +16884,17 @@ export class Track {
         }
         if (!placed) { run = 0; continue; }
         placedS[side].add(i);
-        if (Math.random() < 0.62) chimAt(i, side, placed.lat, F.depth, ww, placed.y + hh, roofH);
-        faceAt(i, side, placed.lat, F.depth, ww, placed.y, hh);
+        // `placed.h`, NOT `hh`. `put` scales the requested height by the
+        // variant's own storey count — 0.62 for the low one, 1.24 for the tall
+        // — and hands the real height back precisely so that anything hung on
+        // the building can find it. Both of these read the request instead, so
+        // on a low variant the stack was placed a third of a storey above its
+        // own roof and stood in the sky with nothing under it, and the balcony
+        // and awning went up the wall with it.
+        if (Math.random() < 0.62) {
+          chimAt(i, side, placed.lat, F.depth, ww, placed.y + placed.h, roofH);
+        }
+        faceAt(i, side, placed.lat, F.depth, ww, placed.y, placed.h);
         // A LANTERN ON THE BRACKET, every third house. Anchored to the FRONT
         // FACE, not the block centre — the arm only reaches 0.72 u and a
         // 8 u-deep building would have swallowed the bulb whole.

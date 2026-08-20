@@ -1186,6 +1186,31 @@ export function crowdTexture() {
 }
 
 /** Red/white awning stripes. */
+/** A BALCONY RAIL YOU CAN SEE THROUGH.
+ *
+ *  The rail was a solid box 0.9 u tall in near-black, which is a parapet, not
+ *  a railing — from the street every balcony on the terrace read as a black
+ *  slab hanging off the wall, and because the mesh carried no name it survived
+ *  every attempt to bracket it by hiding things.
+ *
+ *  Balusters with gaps between them, alpha-tested so the wall shows through.
+ *  Same instanced mesh, same draw call, and at distance the gaps average out
+ *  into the grey haze that ironwork actually reads as.
+ */
+export function balconyRailTexture() {
+  const t = make(64, 32, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = '#4a4f4a';
+    g.fillRect(0, 0, w, 4);                       // top rail
+    g.fillRect(0, h - 3, w, 3);                   // bottom rail
+    for (let x = 3; x < w - 2; x += 8) {          // balusters
+      g.fillRect(x, 3, 3, h - 5);
+    }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
 export function awningTexture() {
   const t = make(128, 64, (g, w, h) => {
     for (let x = 0, i = 0; x < w; x += 16, i++) {
