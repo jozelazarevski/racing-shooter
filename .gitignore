@@ -6,3 +6,8 @@ node_modules
 /oldtown-*.png
 /olive-sea*.png
 /vine-*.png
+
+# raw texture dumps from tools-scratch/facetex.mjs. Regenerated on every run and
+# overwritten several times WITHIN one run — every instanced mesh sharing a name
+# writes the same file — so they are a live read-out, never a record.
+tools-scratch/tex-*.png
