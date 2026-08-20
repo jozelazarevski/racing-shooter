@@ -4660,10 +4660,40 @@ export class PlayerCar extends Car {
       // The wedge net must not fire on a car that is BOGGING: both watch for
       // held throttle and no motion at the same five seconds, and if the free
       // rescue won that race the rule above could never fire at all.
-      const wedged = this === g.player && controlsLive && !this.airborne
-        && !bogged
-        && input.throttle > 0.5
-        && Math.hypot(this.vel.x, this.vel.z) < 0.8;
+      // PROGRESS, NOT SPEED. "< 0.8 u/s" asks whether the car is MOVING, and
+      // a car pinned against a canyon face is moving — it grinds along the
+      // rock. Measured on CANYON RUN: drive out through the low berm at the
+      // start line and the car settles at lateral -35.9 against a face
+      // standing at 37.06 and creeps at a steady 1.2 u/s. That is over the
+      // threshold, so `_wedgeT` sat at 0 for a full 55 seconds of held
+      // throttle and the free rescue never came. 1.2 u/s is about 4 km/h,
+      // which is the 2 and the 6 km/h in the two reports.
+      //
+      // The question is not "is it moving" but "is it getting anywhere". Hold
+      // an anchor on the lap position and reset it whenever the car actually
+      // advances; if the throttle is down and the anchor has not moved in five
+      // seconds, it is stuck whatever the speedometer says.
+      const sp2 = Math.hypot(this.vel.x, this.vel.z);
+      const pushing = this === g.player && controlsLive && !this.airborne
+        && !bogged && input.throttle > 0.5;
+      const trk = g.track;
+      if (!pushing
+          || trk._circDist(this.trackIndex, this._wedgeAnchor ?? this.trackIndex) > 3) {
+        this._wedgeAnchor = this.trackIndex;
+        this._wedgeAnchorT = 0;
+      } else {
+        this._wedgeAnchorT = (this._wedgeAnchorT ?? 0) + dt;
+      }
+      // ...but only OFF the carriageway. A car that is on the road and not
+      // getting anywhere is spun, or boxed in by traffic, and hauling it out
+      // of that would be its own bug — as would hauling a driver out of
+      // donuts, which the speed cap also excludes. The defect being fixed is a
+      // car held OUTSIDE the road by scenery it cannot get around, so that is
+      // what the no-progress branch asks for.
+      const offRoad = Math.abs(this.lateral)
+        > (trk.widthAt?.(this.trackIndex) ?? ROAD_HALF) + 2;
+      const wedged = pushing
+        && (sp2 < 0.8 || (sp2 < 4 && offRoad && (this._wedgeAnchorT ?? 0) > 5));
       this._wedgeT = wedged ? (this._wedgeT ?? 0) + dt : 0;
       // UNSTUCK, ON DEMAND. The automatic nets above are deliberately slow —
       // five seconds of held throttle, because an idle car parked on a
