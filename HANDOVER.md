@@ -1125,3 +1125,82 @@ The four goes, kept because each was a plausible fix that made it worse:
   r224  merged into a top bar, but only inside a chapter and labelled ALL
         CHAPTERS, leaving the header button in charge on the tabs
   r225  one bar, every state, says BACK
+
+## r226 — THE BACK BUTTON, FIFTH GO: STOP GUESSING WHY, CHANGE WHAT HAPPENS WHEN IT BREAKS
+r225 put ONE back button in a `position:fixed` bar and measured it at @10,8 in
+every menu state, at every scroll depth, in Chromium. Reported as "No back
+button still", on an iPhone, INSIDE A CHAPTER — the exact case that measured
+clean. The reporter confirmed the screen when asked.
+
+Everything checkable was checked and was fine: `#topbar` is a real element in
+the shipped bundle, a direct child of `<body>`, no ancestor with a transform or
+a filter; the service worker bumps its cache, `skipWaiting`s, claims clients
+and `src/offline.js` already auto-reloads on `controllerchange`; the results
+screen has its own way out (RACE AGAIN / BACK TO GARAGE) so it was never the
+missing one. `tools-scratch/allstates.mjs` prints `state`, `backTarget()` and
+the button for every state — the only one with no button is the chapter index,
+which is the top of the menu and correct.
+
+So the cause is something iOS Safari does that swiftshader Chromium does not,
+and it is not reproducible in this box. **The fix is therefore not a better
+guess at the cause — it is a better failure mode.**
+
+    position:fixed  fails -> NOTHING on screen, anywhere.
+    position:sticky fails -> the bar is still in the flow at the top of the
+                             chapter, which is where a player looks for it.
+
+The bar is now `position:sticky` INSIDE `#title-screen`, first child. Worst
+case it scrolls away with the page — the r223 complaint — which is a far
+smaller failure than invisible. r223 made this same trade in the other
+direction, on a guess about sticky, with no evidence; this one has evidence.
+
+Two couplings to keep:
+  - `top:-16px` and `margin:-16px -16px 10px` are both `.screen`'s own 16px
+    padding. The margin makes the bar span edge to edge; the negative `top`
+    lands it flush with the scrollport instead of 16px down with the list
+    showing over it. Measured top=0 at 0/25/60/100% scroll. Change both if
+    `.screen`'s padding changes.
+  - `.screen.with-topbar::before{display:none}` — `.screen` centres short
+    content with auto-margin spacers, and a header must not be centred.
+
+### AND A REAL BUG IN HOW THIS REPO BUMPS VERSIONS
+`sed -i 's/r224/r225/g' index.html` rewrites EVERY r224 in the file, including
+the ones inside comments that record history. The back-button changelog by
+`#topbar` had already been corrupted twice this way — r224 was relabelled r225
+and then r226 — silently, because a version bump is never re-read. Bump the
+four real sites (`build-tag`, three `?v=`) deliberately, or check
+`grep -n 'r2[0-9][0-9]' index.html` afterwards and repair the prose.
+
+## r227 — START IS THE FOOTER NOW
+"Move the start on the tip of the screen to make the back button more obvious",
+sent with a screenshot of r226 working (the BACK bar was there, corner read
+r226 — the sticky change in r226 fixed the iPhone case).
+
+START RACE floated 10px off the bottom with 14px corners, which read as a loose
+orange slab lying ON the world cards: the loudest object on the screen, sitting
+in the middle of the list, competing with the control the player was hunting
+for. Flush to the bottom edge and edge to edge it reads as the bottom bar of
+the page and pairs with the BACK bar at the top — header, list, footer — so
+BACK reads as a control rather than as one more thing floating.
+
+Measured at 390x830, in a chapter: BACK top=0 and START 0..390 bottom=0 at 0%
+and 50% scroll. At 100% the footer lifts 198px as sticky reaches its natural
+position above the keyboard help — that is the end of the page and has always
+been so. The last card clears the button by 42px there, and there is no
+sideways scroll.
+
+`padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))` — the home
+indicator strip on a notched phone is not tappable, so the label sits above it.
+`#start-btn:hover{transform:none}` — .btn lifts on hover, which would peel a
+flush footer off its own edge.
+The `-16px` pair is `.screen`'s own padding, same coupling as `#topbar`.
+
+`#build-tag` gained a dark chip. It is how a report gets pinned to a build —
+"no back button still" cost two builds of guesswork that this one line would
+have settled — and faint white on the new orange footer was unreadable.
+
+### THE VERSION BUMP IS FOUR NAMED SITES, NOT A BLANKET sed
+`sed -i 's/r226/r227/g' index.html` rewrites version numbers inside COMMENTS
+too, and it had already silently corrupted the back-button changelog twice.
+Bump exactly: `#build-tag`, the three `?v=`, and CACHE in sw.js. r227 did it
+with a python replace asserting each of the five strings was found once.
