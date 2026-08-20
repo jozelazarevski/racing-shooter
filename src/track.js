@@ -8811,8 +8811,30 @@ export class Track {
     // the setback is measured from THIS station and the lap comes back past it.
     // Guarded index — a negative `j % N` would read undefined and Math.min it
     // to NaN, and every NaN comparison downstream is false.
+    // A WALL THAT IS PULLED IN MUST ALSO COME DOWN.
+    //
+    // The cap moves the face sideways and never touches its height, so where
+    // it bound hard the theme's full cliff ended up standing on the kerb:
+    // measured on ROCKFALL RAVINE, a 32.5 u face at 11.3 u off the centreline
+    // wrapped round a 19 u radius corner, and on CANYON RUN 38.5 u at the same
+    // 11.3. Three times taller than it is distant, curved round the car — from
+    // the top-down camera that is not a canyon, it is a closed drum with the
+    // road invisible inside it, which is exactly what was reported. 137 such
+    // sides across four worlds (LAGUNA SECA 54, ROCKFALL 44, CORNICHE 26,
+    // CANYON RUN 13).
+    //
+    // Scale the height by how far the cap actually pulled the base in. Where
+    // it did not bind the wall is untouched, so GLACIAL PASS and UNDERCITY —
+    // whose caps never bind, or bind by a hand's breadth — do not move at all,
+    // and a slot canyon that is NATURALLY close-in keeps its full height. The
+    // floor of 0.42 stops a hairpin becoming a kerbstone: what is left is a
+    // steep bank you can see over, not a wall you are sealed inside.
     if (this._cliffCap) {
-      base = Math.min(base, this._cliffCap[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)]);
+      const capped = this._cliffCap[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)];
+      if (capped < base) {
+        h *= THREE.MathUtils.clamp(capped / base, 0.42, 1);
+        base = capped;
+      }
     }
     const l1 = 0.85 + 0.5 * Math.sin(17 * t + 0.7 - ph);   // mid-face lean
     const l2 = 2.0 + 0.85 * Math.sin(13 * t + 2.9 + ph) + 0.4 * Math.sin(47 * t - ph);
