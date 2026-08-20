@@ -1599,11 +1599,16 @@ class Game {
     const msel = document.getElementById('mode-select');
     msel.innerHTML = ''; // never append into a row that might already hold chips
     const curMode = this.missionMode ? 'missions' : this.freeRoam ? 'roam' : 'race';
-    for (const [id, label] of [['race', '🏁 RACE'], ['roam', '🌍 FREE ROAM'], ['missions', '🎯 MISSIONS']]) {
+    // ICON AND WORD ARE SEPARATE SPANS because the three chips share one row
+    // now, and at 93px a chip "🌍 FREE ROAM" is a couple of pixels too wide and
+    // clips. The word is the information and the icon is decoration, so below
+    // 430px the CSS drops the icon rather than truncating the label.
+    for (const [id, icon, label] of [['race', '🏁', 'RACE'], ['roam', '🌍', 'FREE ROAM'],
+      ['missions', '🎯', 'MISSIONS']]) {
       const chip = document.createElement('button');
       chip.className = 'mode-chip' + (id === curMode ? ' current' : '');
       chip.dataset.mode = id;
-      chip.textContent = label;
+      chip.innerHTML = `<span class="mc-ico">${icon}</span><span class="mc-lbl">${label}</span>`;
       chip.addEventListener('click', () => {
         // in place; the reload is only a fallback for the mid-race case, which
         // the menu cannot actually reach
@@ -6014,18 +6019,37 @@ class Game {
     let saved = null;
     try { saved = sessionStorage.getItem('ir-mission-sel'); } catch { /* private mode */ }
     this.missionSel = defs.some((d) => d.id === saved) ? saved : defs[0].id;
-    sel.innerHTML = '<div class="panel-head">ARENA MISSIONS</div>';
+    // ONE SCREEN, NOT FOUR AND A HALF. Eight missions each carrying a full
+    // paragraph and its own copy of the payout came to a 1369px list on a
+    // 390x830 phone — the same wall the track list was before chapters, and
+    // reported the same way. Every row is now a LINE: icon, name, the medal you
+    // hold, and the one number you are chasing. The prose and the full medal
+    // ladder belong to the mission you have actually selected, which is the
+    // only one you are about to play.
+    //
+    // The payout is identical on all eight, so it is stated ONCE in the head
+    // instead of eight times in the cards.
+    const medalsHeld = defs.filter((d) => best[`${this.level.id}:${d.id}`]).length;
+    sel.innerHTML = `<div class="panel-head">ARENA MISSIONS</div>
+      <div class="ms-note"><b>${medalsHeld}/${defs.length}</b> MEDALLED HERE ·
+        EVERY MISSION PAYS <b>${MISSION_CR[1]}–${MISSION_CR[3]} CR</b> BY MEDAL</div>`;
     for (const d of defs) {
       const b = best[`${this.level.id}:${d.id}`] | 0;
       const chip = document.createElement('button');
       chip.className = 'mission-chip' + (d.id === this.missionSel ? ' current' : '');
-      const chips = missionTargetChips(d).map((c) => `<span class="mstat">${c}</span>`).join('');
+      const targets = missionTargetChips(d).map((c) => `<span class="mstat">${c}</span>`).join('');
+      // the collapsed line quotes GOLD only — the number you are actually
+      // chasing. Silver and bronze are in the ladder on the open card.
+      const goldOnly = missionTargetChips(d)[0];
       chip.innerHTML = `<span class="mi">${d.icon}</span>
         <span class="mtext">
           <span class="mhead"><span class="mname">${d.name}</span>
-            <span class="mmedal${b ? '' : ' none'}">${b ? MISSION_MEDAL[b] : 'NEW'}</span></span>
-          <span class="mdesc">${d.desc}</span>
-          <span class="mstats">${chips}<span class="mstat mpay">🎖 ${MISSION_CR[1]}–${MISSION_CR[3]} CR</span></span>
+            <span class="mgoal">${goldOnly}</span>
+            <span class="mmedal${b ? '' : ' none'}">${b ? MISSION_MEDAL[b] : '—'}</span></span>
+          <span class="mopen">
+            <span class="mdesc">${d.desc}</span>
+            <span class="mstats">${targets}</span>
+          </span>
         </span>`;
       chip.addEventListener('click', () => {
         this.missionSel = d.id;

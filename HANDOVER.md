@@ -1095,3 +1095,40 @@ guideline going, and "more obvious" is a size argument as much as a colour one.
 
 Measured at 320 and 390: button 81x40, fully inside the bar, label 10px clear,
 bar flush top=0 edge to edge at 0/25/60/100% scroll. `tools-scratch/backfit.mjs`.
+
+## r229 — THE MODE ROW IS HORIZONTAL, AND THE MISSION LIST IS A LIST
+"Make this horizontal alignment. Work on the missions. It has to be reworked",
+with a screenshot of the MODE tab showing RACE / FREE ROAM / MISSIONS stacked
+one per line.
+
+### Why the chips stacked
+`.set-row` is `grid-template-columns:96px 1fr` and hands its label the 96px.
+That left 258px of a 430px phone for three chips wanting ~430, so each wrapped
+onto its own line and the "row" came out a vertical list. The label said MODE
+directly under a panel head saying GAME MODE, so the label goes and the three
+chips share the full width as equal segments.
+
+Then the labels had to fit: "🌍 FREE ROAM" clips at 93px. The icon and the word
+are separate spans now, the icon drops below 430px, and the type steps down
+again at 340. `tools-scratch/moderow.mjs` checks all three across five widths —
+one row, equal widths, nothing clipped, 320px to desktop.
+
+### The mission list was the track list before chapters
+Eight missions, each with a full paragraph AND its own copy of a payout that is
+identical on all eight: a 1369px list on an 830px phone. You could see two.
+
+A mission is a LINE until you pick it — icon, name, the gold target, the medal
+you hold. The prose and the full medal ladder open on the selected one, which
+is the only one you are about to play. The payout is stated once in the head,
+with a `n/8 MEDALLED HERE` count. 1369px -> 596px, all eight on one screen.
+
+Widths fought over the collapsed row: at 320 it cannot hold icon + name +
+target + medal, so the target chip drops below 390 and the NAME keeps the
+space, because the name is what you scan by. Verified no name ellipsises at
+320/360/390/430.
+
+THE REWORK IS PRESENTATIONAL. `tools-scratch/missionrun.mjs` pins the
+behaviour: tapping row 5 selects DUEL, exactly one card is open, and START
+MISSION launches DUEL. Mission definitions, medal maths and payouts are
+untouched — if "reworked" meant the missions themselves rather than the screen
+they are chosen on, that work has NOT been done.

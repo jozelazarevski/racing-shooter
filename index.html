@@ -1060,6 +1060,19 @@
   .set-help b{color:var(--cream);font-weight:800;letter-spacing:.6px}
   .set-help i{color:#c8b48a}
   #mode-select,#diff-select,#steer-select,#assist-select{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  /* THE MODE ROW IS THREE SEGMENTS, NOT A STACK. .set-row hands its label a
+     96px column, which left 258px of a 430px phone for three chips needing
+     ~430 — so each wrapped onto its own line and the row came out as a
+     vertical list. The label was repeating the GAME MODE head directly above
+     it, so it goes, and the three chips share the full width evenly. */
+  #mode-settings .set-row{grid-template-columns:1fr}
+  #mode-settings .set-row .set-lbl{display:none}
+  #mode-select{flex-wrap:nowrap;width:100%}
+  #mode-select .mode-chip{flex:1 1 0;min-width:0;padding:0 6px;white-space:nowrap;
+    letter-spacing:1px;font-size:12.5px;gap:5px}
+  /* below 430 a chip is 93px and "🌍 FREE ROAM" wants a few more, so the icon
+     goes rather than the word — see the mode-chip note in main.js */
+  @media (max-width:429px){ #mode-select .mc-ico{display:none} }
   /* one chip size across all settings rows: 40px tall (touch target), one radius */
   .mode-chip,.diff-chip{pointer-events:auto;cursor:pointer;min-height:40px;padding:0 16px;
     display:inline-flex;align-items:center;justify-content:center;
@@ -1092,23 +1105,48 @@
     border-radius:var(--r-md);padding:2px 14px 14px}
   #mission-select.on{display:flex}
   #mission-select .panel-head{margin:10px 0 4px}
-  /* Mission cards are READ, not skimmed: the body copy sits at a real reading
-     size and contrast, and the medal targets are discrete chips so a time can
-     never break in half or orphan "CR" onto a line of its own. */
+  /* the payout, said once, instead of on all eight cards */
+  #mission-select .ms-note{font-size:10px;font-weight:700;letter-spacing:1.1px;
+    color:var(--gold-dim);line-height:1.5;margin:0 0 6px}
+  #mission-select .ms-note b{color:var(--yellow);font-weight:800}
+  /* A MISSION IS A LINE UNTIL YOU PICK IT. Eight cards each carrying a
+     paragraph and its own payout made a 1369px list on a 390px phone — you
+     could see two at a time. Collapsed, a row is icon / name / gold target /
+     the medal you hold. The prose and the full medal ladder open on the ONE
+     you have selected, which is the only one you are about to play. */
   .mission-chip{pointer-events:auto;cursor:pointer;display:flex;align-items:flex-start;gap:11px;
-    width:100%;text-align:left;padding:11px 13px;min-height:40px;font-family:'Baloo 2';color:var(--cream);
+    width:100%;text-align:left;padding:9px 12px;min-height:40px;font-family:'Baloo 2';color:var(--cream);
     border-radius:var(--r-sm);border:2px solid var(--line);background:rgba(38,26,12,.5);
     transition:transform .1s;-webkit-tap-highlight-color:transparent}
+  .mission-chip .mopen{display:none}
+  .mission-chip.current .mopen{display:flex;flex-direction:column;gap:5px;margin-top:5px}
+  /* the gold target rides the name line while the card is shut, and stands
+     down when the full ladder opens underneath it */
+  .mission-chip .mgoal{flex:0 0 auto;margin-left:auto;font-size:10.5px;font-weight:800;
+    letter-spacing:.4px;color:#f0dcb4;background:rgba(12,8,3,.45);
+    border:1px solid var(--line-soft);border-radius:6px;padding:2px 7px;white-space:nowrap}
+  .mission-chip.current .mgoal{display:none}
+  /* Below 390 the row cannot hold icon + name + target + medal: the target chip
+     wins the space fight and "CHECKPOINT BLITZ" ellipsises. The NAME is what you
+     scan the list by, so the chip is what goes — the target is one tap away on
+     the open card. */
+  @media (max-width:389px){ .mission-chip .mgoal{display:none} }
   .mission-chip:active{transform:scale(.98)}
   .mission-chip.current{background:rgba(255,140,26,.18);border-color:var(--orange);
     box-shadow:0 3px 0 var(--ink), 0 0 14px rgba(255,140,26,.25)}
-  .mission-chip .mi{font-size:24px;flex:0 0 auto;width:32px;text-align:center;line-height:1.1;
+  .mission-chip .mi{font-size:19px;flex:0 0 auto;width:26px;text-align:center;line-height:1.25;
     filter:drop-shadow(1px 1px 0 rgba(0,0,0,.5))}
-  .mission-chip .mtext{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+  .mission-chip.current .mi{font-size:24px;width:32px;line-height:1.1}
+  .mission-chip .mtext{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:0}
   /* name and badge share the top line, so the badge can't float mid-paragraph */
-  .mission-chip .mhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-  .mission-chip .mname{font-family:'Luckiest Guy';font-size:14px;letter-spacing:1.5px;
+  .mission-chip .mhead{display:flex;align-items:center;gap:8px;min-width:0}
+  .mission-chip .mname{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* a shut row spends its width on the NAME: "CHECKPOINT BLITZ" is the longest
+     on the roster and was the one that ellipsised. Open, it gets the full
+     display size back because it has the row to itself. */
+  .mission-chip .mname{font-family:'Luckiest Guy';font-size:12.5px;letter-spacing:.6px;
     color:var(--cream);line-height:1.15}
+  .mission-chip.current .mname{font-size:14px;letter-spacing:1.5px}
   .mission-chip.current .mname{color:var(--yellow)}
   .mission-chip .mdesc{display:block;font-size:11.5px;color:#e2c9a2;letter-spacing:.2px;line-height:1.45}
   .mission-chip .mstats{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:1px}
@@ -1117,7 +1155,8 @@
     border-radius:6px;padding:2px 7px}
   .mission-chip .mstat.mpay{color:var(--amber)}
   .mission-chip .mmedal{flex:0 0 auto;font-size:16px;font-weight:800;letter-spacing:1px;
-    color:var(--green);text-align:right}
+    color:var(--green);text-align:right;width:20px}
+  .mission-chip.current .mmedal{margin-left:auto}
   .mission-chip .mmedal.none{color:var(--gold-dim);font-size:9.5px;letter-spacing:1.5px}
   /* medal row on the results card — a .rrow like every other results stat */
   #r-medal{font-family:'Luckiest Guy';color:var(--yellow)}
@@ -1517,9 +1556,10 @@
     .set-row{grid-template-columns:1fr;padding:8px 0 9px}
     /* chips share the row evenly instead of wrapping unevenly */
     .mode-chip,.diff-chip{padding:0 8px;letter-spacing:1px;flex:1 1 0;min-width:0}
-    /* ...except the mode chips: "FREE ROAM" broke over two lines and made that
-       one chip taller than its neighbours. Size them to their label instead. */
-    .mode-chip{flex:1 1 auto;white-space:nowrap;padding:0 8px;font-size:12px;letter-spacing:.5px}
+    /* ...and the mode chips are three equal 73px segments at this width, so the
+       TYPE gives rather than the row: the alternative is "FREE ROAM" clipped
+       mid-word. The icon is already dropped by the 429px rule above. */
+    #mode-select .mode-chip{font-size:11px;letter-spacing:0;padding:0 4px}
     /* phone: pips drop under the name instead of stealing a column, so every
        upgrade description fits on one line and all six rows are the same height */
     .up-row{grid-template-columns:36px 1fr 76px;gap:2px 8px;
@@ -1642,7 +1682,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r228</div>
+<div id="build-tag">r229</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1953,10 +1993,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r228"></script>
+<script type="module" src="./src/main.js?v=r229"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r228"></script>
+<script src="./src/offline.js?v=r229"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r228"></script>
+<script type="module" src="./src/traffic.js?v=r229"></script>
 </body>
 </html>
