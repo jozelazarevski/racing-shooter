@@ -796,8 +796,27 @@
     box-shadow:0 3px 12px rgba(0,0,0,.55)}
   #topbar.hidden{display:none}
   /* BACK is the biggest thing in the bar, because it is the only thing in the
-     bar you can press. The rest is a label. */
-  #topbar-back{font-size:13px;padding:7px 13px}
+     bar you can press. The rest is a label.
+     ORANGE, THE SAME ORANGE AS START RACE — the two bars are now the two ends
+     of the screen, and giving them one colour says "these are the buttons" and
+     leaves everything else as text. Gold-on-dark read as another chip in a
+     menu already full of gold-on-dark chips, which is a large part of why the
+     control was hard to find at all. Same gradient, same ink border, sized for
+     a header rather than a footer. */
+  /* 40px MINIMUM, because it is a phone control and 31px was under every
+     touch-target guideline there is — and "make it more obvious" is a size
+     argument as much as a colour one. inline-flex so the min-height cannot
+     fight the padding. */
+  #topbar-back{font-size:13px;padding:7px 14px;border-radius:10px;
+    min-height:40px;display:inline-flex;align-items:center;
+    color:#fff8e0;background:linear-gradient(180deg,#ff9d2e,#e8402a);
+    border:2px solid var(--ink);
+    text-shadow:1px 1px 0 rgba(0,0,0,.35);
+    box-shadow:0 3px 0 var(--ink),0 6px 14px rgba(0,0,0,.45)}
+  #topbar-back:hover,#topbar-back:focus-visible{border-color:var(--ink);
+    filter:brightness(1.08)}
+  #topbar-back:active{transform:translateY(2px);
+    box-shadow:0 1px 0 var(--ink),0 3px 8px rgba(0,0,0,.45)}
   /* The screen centres short content with auto-margin spacers (.screen::before).
      A header must not be centred — with the bar up the page starts at the top. */
   .screen.with-topbar::before{display:none}
@@ -1096,6 +1115,19 @@
   .set-help b{color:var(--cream);font-weight:800;letter-spacing:.6px}
   .set-help i{color:#c8b48a}
   #mode-select,#diff-select,#steer-select,#assist-select{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  /* THE MODE ROW IS THREE SEGMENTS, NOT A STACK. .set-row hands its label a
+     96px column, which left 258px of a 430px phone for three chips needing
+     ~430 — so each wrapped onto its own line and the row came out as a
+     vertical list. The label was repeating the GAME MODE head directly above
+     it, so it goes, and the three chips share the full width evenly. */
+  #mode-settings .set-row{grid-template-columns:1fr}
+  #mode-settings .set-row .set-lbl{display:none}
+  #mode-select{flex-wrap:nowrap;width:100%}
+  #mode-select .mode-chip{flex:1 1 0;min-width:0;padding:0 6px;white-space:nowrap;
+    letter-spacing:1px;font-size:12.5px;gap:5px}
+  /* below 430 a chip is 93px and "🌍 FREE ROAM" wants a few more, so the icon
+     goes rather than the word — see the mode-chip note in main.js */
+  @media (max-width:429px){ #mode-select .mc-ico{display:none} }
   /* one chip size across all settings rows: 40px tall (touch target), one radius */
   .mode-chip,.diff-chip{pointer-events:auto;cursor:pointer;min-height:40px;padding:0 16px;
     display:inline-flex;align-items:center;justify-content:center;
@@ -1128,23 +1160,48 @@
     border-radius:var(--r-md);padding:2px 14px 14px}
   #mission-select.on{display:flex}
   #mission-select .panel-head{margin:10px 0 4px}
-  /* Mission cards are READ, not skimmed: the body copy sits at a real reading
-     size and contrast, and the medal targets are discrete chips so a time can
-     never break in half or orphan "CR" onto a line of its own. */
+  /* the payout, said once, instead of on all eight cards */
+  #mission-select .ms-note{font-size:10px;font-weight:700;letter-spacing:1.1px;
+    color:var(--gold-dim);line-height:1.5;margin:0 0 6px}
+  #mission-select .ms-note b{color:var(--yellow);font-weight:800}
+  /* A MISSION IS A LINE UNTIL YOU PICK IT. Eight cards each carrying a
+     paragraph and its own payout made a 1369px list on a 390px phone — you
+     could see two at a time. Collapsed, a row is icon / name / gold target /
+     the medal you hold. The prose and the full medal ladder open on the ONE
+     you have selected, which is the only one you are about to play. */
   .mission-chip{pointer-events:auto;cursor:pointer;display:flex;align-items:flex-start;gap:11px;
-    width:100%;text-align:left;padding:11px 13px;min-height:40px;font-family:'Baloo 2';color:var(--cream);
+    width:100%;text-align:left;padding:9px 12px;min-height:40px;font-family:'Baloo 2';color:var(--cream);
     border-radius:var(--r-sm);border:2px solid var(--line);background:rgba(38,26,12,.5);
     transition:transform .1s;-webkit-tap-highlight-color:transparent}
+  .mission-chip .mopen{display:none}
+  .mission-chip.current .mopen{display:flex;flex-direction:column;gap:5px;margin-top:5px}
+  /* the gold target rides the name line while the card is shut, and stands
+     down when the full ladder opens underneath it */
+  .mission-chip .mgoal{flex:0 0 auto;margin-left:auto;font-size:10.5px;font-weight:800;
+    letter-spacing:.4px;color:#f0dcb4;background:rgba(12,8,3,.45);
+    border:1px solid var(--line-soft);border-radius:6px;padding:2px 7px;white-space:nowrap}
+  .mission-chip.current .mgoal{display:none}
+  /* Below 390 the row cannot hold icon + name + target + medal: the target chip
+     wins the space fight and "CHECKPOINT BLITZ" ellipsises. The NAME is what you
+     scan the list by, so the chip is what goes — the target is one tap away on
+     the open card. */
+  @media (max-width:389px){ .mission-chip .mgoal{display:none} }
   .mission-chip:active{transform:scale(.98)}
   .mission-chip.current{background:rgba(255,140,26,.18);border-color:var(--orange);
     box-shadow:0 3px 0 var(--ink), 0 0 14px rgba(255,140,26,.25)}
-  .mission-chip .mi{font-size:24px;flex:0 0 auto;width:32px;text-align:center;line-height:1.1;
+  .mission-chip .mi{font-size:19px;flex:0 0 auto;width:26px;text-align:center;line-height:1.25;
     filter:drop-shadow(1px 1px 0 rgba(0,0,0,.5))}
-  .mission-chip .mtext{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+  .mission-chip.current .mi{font-size:24px;width:32px;line-height:1.1}
+  .mission-chip .mtext{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:0}
   /* name and badge share the top line, so the badge can't float mid-paragraph */
-  .mission-chip .mhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-  .mission-chip .mname{font-family:'Luckiest Guy';font-size:14px;letter-spacing:1.5px;
+  .mission-chip .mhead{display:flex;align-items:center;gap:8px;min-width:0}
+  .mission-chip .mname{flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* a shut row spends its width on the NAME: "CHECKPOINT BLITZ" is the longest
+     on the roster and was the one that ellipsised. Open, it gets the full
+     display size back because it has the row to itself. */
+  .mission-chip .mname{font-family:'Luckiest Guy';font-size:12.5px;letter-spacing:.6px;
     color:var(--cream);line-height:1.15}
+  .mission-chip.current .mname{font-size:14px;letter-spacing:1.5px}
   .mission-chip.current .mname{color:var(--yellow)}
   .mission-chip .mdesc{display:block;font-size:11.5px;color:#e2c9a2;letter-spacing:.2px;line-height:1.45}
   .mission-chip .mstats{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:1px}
@@ -1153,7 +1210,8 @@
     border-radius:6px;padding:2px 7px}
   .mission-chip .mstat.mpay{color:var(--amber)}
   .mission-chip .mmedal{flex:0 0 auto;font-size:16px;font-weight:800;letter-spacing:1px;
-    color:var(--green);text-align:right}
+    color:var(--green);text-align:right;width:20px}
+  .mission-chip.current .mmedal{margin-left:auto}
   .mission-chip .mmedal.none{color:var(--gold-dim);font-size:9.5px;letter-spacing:1.5px}
   /* medal row on the results card — a .rrow like every other results stat */
   #r-medal{font-family:'Luckiest Guy';color:var(--yellow)}
@@ -1161,6 +1219,136 @@
   .diff-chip.current{color:var(--ink);background:#8de89a;border-color:var(--ink)}
   .diff-chip.current.hard{background:#ff8a75}
   .diff-chip.current.normal{background:var(--yellow)}
+
+  /* ---------- THE GARAGE, AS A WORKSHOP ----------
+     A mockup was sent: a car on the shop floor with part shops floating around
+     it, every part a PICTURE with a price and an INSTALL button. This is that,
+     laid out for a phone in portrait — the bays stack instead of surrounding
+     the car, because 390px cannot hold a ring of panels. */
+  /* THE CAR YOU BUILT. The picture is rendered from the real mesh wearing the
+     real kit (see _buildPreview), so it is the machine, not an illustration. */
+  /* THE CAR IS THE CENTREPIECE, so on a phone it gets the full width and the
+     spec sits under it. Side by side, the floor was 156px on a 390px screen —
+     a stamp, when the whole point of the demo is the machine on the shop
+     floor. Wide screens keep the two-column layout, where there is room. */
+  #build-preview{width:100%;display:flex;flex-direction:column;gap:8px;
+    margin:4px 0 8px;padding:9px 10px;border-radius:var(--r-md);
+    border:1px solid var(--line-soft);
+    background:linear-gradient(180deg,rgba(60,40,16,.55),rgba(12,8,3,.5))}
+  @media (min-width:620px){
+    #build-preview{flex-direction:row;align-items:center;gap:12px}
+    #build-preview .bp-shop{width:56%;flex:0 0 auto}
+    #build-preview .bp-side{flex:1 1 auto;min-width:0}
+  }
+  /* THE SHOP FLOOR. A live canvas, not a picture — the car turns and a part
+     lands on it the moment you buy it. The box owns the size so the renderer
+     can read it back and frame the car for whatever width the phone gave us. */
+  #build-preview .bp-shop{width:100%;max-width:none;
+    aspect-ratio:16/9;border-radius:var(--r-sm);overflow:hidden;
+    background:radial-gradient(ellipse at 50% 120%,rgba(255,180,90,.2),rgba(10,7,4,.85) 70%);
+    box-shadow:inset 0 0 22px rgba(0,0,0,.6)}
+  #build-preview .bp-shop canvas{width:100%;height:100%;display:block}
+  #build-preview .bp-side{min-width:0;display:flex;flex-direction:column;gap:5px}
+  #build-preview .bp-name{font-family:'Luckiest Guy';font-size:15px;letter-spacing:1px;
+    color:var(--yellow);line-height:1.1}
+  #build-preview .bp-spec{display:flex;flex-wrap:wrap;gap:3px 6px;
+    font-size:10px;font-weight:700;letter-spacing:.6px;color:#e2c9a2}
+  #build-preview .bp-spec span{padding:2px 7px;border-radius:5px;
+    background:rgba(0,0,0,.35);border:1px solid var(--line-soft)}
+  /* the four numbers the whole screen exists to move */
+  #build-preview .bp-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:3px 6px;margin-top:2px}
+  #build-preview .bp-nums span{display:flex;align-items:baseline;gap:4px}
+  #build-preview .bp-nums i{font-style:normal;font-size:8.5px;font-weight:800;
+    letter-spacing:1px;color:var(--gold-dim)}
+  #build-preview .bp-nums b{font-family:'Luckiest Guy';font-size:13px;color:var(--cream)}
+
+  #garage-bays{width:100%;display:flex;flex-direction:column;gap:8px}
+  .bay{border:1px solid var(--line-soft);border-radius:var(--r-md);
+    background:rgba(12,8,3,.4);padding:8px 9px 9px}
+  .bay-head{display:flex;align-items:center;gap:7px;margin:0 0 7px;
+    font-family:'Luckiest Guy';font-size:12px;letter-spacing:2px;color:var(--cream)}
+  .bay-msg{margin:6px 2px 0;padding:6px 8px;border-radius:7px;font-size:10.5px;
+    line-height:1.45;font-weight:700;letter-spacing:.3px;color:var(--yellow);
+    background:rgba(255,212,0,.1);border:1px solid rgba(255,212,0,.3)}
+  /* PARTS AS PICTURES. auto-fill (not -fit) so a bay with three parts keeps the
+     same card width as one with four — every shop shares a rhythm. */
+  .bay-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+  .part-card{pointer-events:auto;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;gap:3px;padding:6px 5px 7px;border-radius:var(--r-sm);
+    border:2px solid var(--line);background:rgba(38,26,12,.55);
+    font-family:'Baloo 2';color:var(--cream);text-align:center;
+    -webkit-tap-highlight-color:transparent;transition:transform .1s}
+  .part-card:active{transform:scale(.97)}
+  .part-card.on{border-color:var(--orange);background:rgba(255,140,26,.2);
+    box-shadow:0 2px 0 var(--ink)}
+  .part-card.locked{opacity:.66}
+  .part-card .pc-art{width:100%;max-width:104px;height:auto;
+    filter:drop-shadow(0 3px 5px rgba(0,0,0,.5))}
+  .part-card.locked .pc-art{filter:grayscale(.85) brightness(.75)}
+  .part-card .pc-name{font-family:'Luckiest Guy';font-size:10px;letter-spacing:.4px;
+    line-height:1.15;color:var(--cream)}
+  .part-card.on .pc-name{color:var(--yellow)}
+  /* the POWER bar from the mockup — normalised inside its own slot, so a full
+     bar means "the strongest thing in this shop" */
+  .part-card .pc-bar{width:100%;height:4px;border-radius:3px;background:rgba(0,0,0,.5);
+    overflow:hidden}
+  .part-card .pc-bar i{display:block;height:100%;border-radius:3px;
+    background:linear-gradient(90deg,#ffb52e,#ff6a2a)}
+  .part-card .pc-act{font-size:9.5px;font-weight:800;letter-spacing:.8px;
+    padding:3px 7px;border-radius:6px;white-space:nowrap}
+  .pc-act.fitted{color:var(--ink);background:var(--orange)}
+  .pc-act.own{color:#8de89a;border:1px solid rgba(141,232,154,.5)}
+  .pc-act.buy{color:var(--yellow);border:1px solid rgba(255,212,0,.45)}
+  .pc-act.lock{color:var(--gold-dim);border:1px solid var(--line-soft)}
+  .part-card .pc-sub{font-size:9px;line-height:1.3;color:#c8b48a}
+  .part-card.locked .pc-sub{color:var(--amber);font-weight:700}
+
+  /* AN UPGRADE LINE IN THE SAME CLOTHES. A player does not care which of the
+     game's two systems a thing came out of, so a ladder rung is a card with a
+     bar and a price, exactly like a part. */
+  .up-card{display:grid;grid-template-columns:30px 1fr auto;gap:3px 8px;align-items:center;
+    margin-top:6px;padding:7px 9px;border-radius:var(--r-sm);
+    border:1px solid var(--line-soft);background:rgba(38,26,12,.4)}
+  .up-card.maxed{opacity:.72}
+  .up-card{grid-template-columns:46px 1fr auto}
+  .up-card .uc-ic{font-size:17px;text-align:center;line-height:1}
+  .up-card .uc-ic img{width:100%;height:auto;display:block;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+  .up-card .uc-main{min-width:0;display:flex;flex-direction:column;gap:2px}
+  .up-card .uc-nm{font-family:'Luckiest Guy';font-size:10.5px;letter-spacing:.6px;
+    color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .up-card .uc-pips{display:flex;align-items:center;gap:3px}
+  .up-card .uc-pips b{width:13px;height:4px;border-radius:2px;background:var(--yellow)}
+  .up-card .uc-pips b.off{background:rgba(255,255,255,.16)}
+  .up-card .uc-pips i{font-style:normal;margin-left:4px;font-size:8.5px;font-weight:800;
+    letter-spacing:.8px;color:var(--gold-dim)}
+  .up-card .uc-desc{font-size:9.5px;line-height:1.35;color:#c8b48a}
+  .up-buy{pointer-events:auto;cursor:pointer;font-family:'Baloo 2';font-weight:800;
+    font-size:10px;letter-spacing:.8px;padding:7px 10px;min-height:34px;border-radius:7px;
+    border:1px solid rgba(255,212,0,.45);background:rgba(255,212,0,.1);color:var(--yellow);
+    white-space:nowrap;-webkit-tap-highlight-color:transparent}
+  .up-buy:disabled{opacity:.45;cursor:default;color:var(--gold-dim);
+    border-color:var(--line-soft);background:rgba(0,0,0,.25)}
+  .up-buy.maxed{color:#8de89a;border-color:rgba(141,232,154,.4)}
+  /* the tyre bay is a bay now, so it loses its own outer box */
+  .bay #tyre-bay{margin:0;padding:0;border:none;background:none}
+  .bay #tyre-bay .panel-head{display:none}
+  .tyre-opt .tyre-art{width:38px;height:auto;display:block;margin:0 auto;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+  .tyre-opt.locked .tyre-art{filter:grayscale(.9) brightness(.6)}
+  @media (max-width:389px){
+    #build-preview{gap:8px;padding:7px 8px}
+    #build-preview .bp-nums{grid-template-columns:repeat(2,1fr)}
+    #build-preview .bp-name{font-size:13px}
+    .bay-grid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:5px}
+    .part-card .pc-name{font-size:9.5px}
+    /* AT 320 THE LADDER NAMES ELLIPSISED — "LONG-TRAVEL DAMP…", which loses the
+       half of the name that says what it is. Let them wrap instead; a card is
+       tall enough for two lines and nothing below it is fighting for the room. */
+    .up-card{grid-template-columns:40px 1fr auto}
+    .up-card .uc-nm{white-space:normal;overflow:visible;line-height:1.2}
+  }
+  /* ---------- end THE GARAGE ---------- */
 
   /* ---------- CAR SHOP (horizontal shelf with visible scroll affordance) ---------- */
   .shelf-wrap{position:relative;width:100%;margin-top:4px}
@@ -1553,9 +1741,10 @@
     .set-row{grid-template-columns:1fr;padding:8px 0 9px}
     /* chips share the row evenly instead of wrapping unevenly */
     .mode-chip,.diff-chip{padding:0 8px;letter-spacing:1px;flex:1 1 0;min-width:0}
-    /* ...except the mode chips: "FREE ROAM" broke over two lines and made that
-       one chip taller than its neighbours. Size them to their label instead. */
-    .mode-chip{flex:1 1 auto;white-space:nowrap;padding:0 8px;font-size:12px;letter-spacing:.5px}
+    /* ...and the mode chips are three equal 73px segments at this width, so the
+       TYPE gives rather than the row: the alternative is "FREE ROAM" clipped
+       mid-word. The icon is already dropped by the 429px rule above. */
+    #mode-select .mode-chip{font-size:11px;letter-spacing:0;padding:0 4px}
     /* phone: pips drop under the name instead of stealing a column, so every
        upgrade description fits on one line and all six rows are the same height */
     .up-row{grid-template-columns:36px 1fr 76px;gap:2px 8px;
@@ -1678,7 +1867,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r228</div>
+<div id="build-tag">r232</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -1865,12 +2054,20 @@
   <div id="tab-garage" class="menu-panel off">
     <div class="panel-head" id="garage-shop-head">YOUR MACHINES</div>
     <div class="shelf-wrap"><div id="car-shop"></div></div>
-    <!-- TYRE BAY: what is fitted is a CHOICE, not a consequence of a purchase.
-         Sits above the upgrade list because it is free and instant, and the
-         list below is what unlocks its top row. -->
-    <div id="tyre-bay"></div>
-    <div class="panel-head" id="garage-up-head">DETAILED UPGRADES</div>
-    <div id="garage-rows"></div>
+    <!-- THE CAR YOU BUILT, and the shops that built it.
+         Asked for as "make it graphical as in the demo — marry the existing
+         upgrades mode vs this", with a mockup of a workshop: a car in the
+         middle and part shops around it, each part a PICTURE with a price and
+         an INSTALL button.
+         So the garage is one screen now, not four stacked lists. The preview
+         is the selected machine wearing everything it owns, and every bay
+         below speaks the same card language whether it is selling a CHOICE
+         (a block, a wing, a compound — one at a time, trading against each
+         other) or a LADDER (the ten upgrade lines, each rung better than the
+         last). That is the marriage: the two systems were never in conflict,
+         they were just wearing different clothes. -->
+    <div id="build-preview"></div>
+    <div id="garage-bays"></div>
   </div>
   <button id="start-btn" class="btn">START RACE</button>
   <div class="controls">
@@ -1964,6 +2161,11 @@
     <div class="cb-head">RALLY STARS <b id="sp-total">0★</b></div>
     <div id="sp-rows"></div>
   </div>
+  <!-- [PARTS] A PART YOU JUST EARNED IS THE HEADLINE OF THE DEBRIEF, not a
+       line in a credits table: it is the one thing on this screen you cannot
+       buy. Filled by _announcePartUnlocks() on both the race and the mission
+       finish, and hidden whenever nothing opened. -->
+  <div id="part-unlock" style="display:none"></div>
   <div id="credit-breakdown" style="display:none">
     <div class="cb-head">CREDITS BREAKDOWN</div>
     <div id="cb-rows"></div>
@@ -1989,10 +2191,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r228"></script>
+<script type="module" src="./src/main.js?v=r232"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r228"></script>
+<script src="./src/offline.js?v=r232"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r228"></script>
+<script type="module" src="./src/traffic.js?v=r232"></script>
 </body>
 </html>

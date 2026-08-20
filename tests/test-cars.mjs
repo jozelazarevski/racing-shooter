@@ -173,7 +173,7 @@ check('the generic fallback stays rare', generic <= cells * 0.1,
         const bare = new THREE.Box3().setFromObject(m);
         const up = {}; for (const k of KEYS) up[k] = 5;
         up.beacon = 3;
-        V.applyUpgradeKit(m, up);
+        V.applyUpgradeKit(m, up, null);
         const kit = m.getObjectByName('upgradeKit');
         const kb = new THREE.Box3().setFromObject(kit);
         rows.push({ key: car.key, rig: !!m.userData.rig?.zRear,

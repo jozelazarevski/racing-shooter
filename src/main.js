@@ -13,7 +13,7 @@ import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
   tyreClass, tyreMaxClass, tyreLevelFor, TYRE_LABEL, tyrePenalty,
-  applyUpgradeKit } from './vehicles.js';
+  applyUpgradeKit, buildPartIcon } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
 import { Weapons } from './weapons.js';
@@ -131,6 +131,65 @@ const UPGRADES = [
   // charges buy you SEPARATE incidents rather than a second try at one corner.
   { key: 'beacon',   name: 'RECOVERY BEACON', icon: '🆘', desc: '+1 SOS charge / lvl', max: 3 },
 ];
+
+// ===== [PARTS] THE BUILD BAY — hardware you CHOOSE, not levels you climb =====
+//
+// Asked for as: "Create a garage where I can custom build the car. Shows the
+// tires, weapons, looks engine v4-8-12, add spoilers etc. I would purchase
+// parts and race for other parts."
+//
+// The ten UPGRADES above are TUNING: one ladder per line, every rung strictly
+// better than the last, no decision to make beyond what to spend next. Parts
+// are the other half — a SLOT holds exactly one part, the options TRADE
+// against each other rather than stacking, and picking one is a real choice
+// about how the car drives. A V12 is not "a better engine"; it is more power
+// than the tyres can put down, and you buy a wing to get it back.
+//
+// Every part is visible from the chase camera (see applyUpgradeKit): the
+// engine sets how many pipes come out of the tail, the spoiler is the
+// silhouette. Money buys most of them; the top part in each slot is EARNED,
+// which is the "race for other parts" half.
+//
+// Fitment is PER CAR, exactly like upgrade levels — buying a V8 for the
+// BRAWLER does not put one in the SLEEK. `lock` is evaluated against career
+// data the game already keeps, so no new tracking rides along.
+const PART_SLOTS = [
+  {
+    key: 'engine', name: 'ENGINE BLOCK', icon: '🔩',
+    blurb: 'Power against grip. Bigger blocks pull harder and slide sooner.',
+    parts: [
+      { id: 'v4', name: 'V4 INLINE', sub: 'Stock. Honest and tidy.',
+        cost: 0, stock: true, speed: 1, accel: 1, grip: 1, pipes: 2 },
+      { id: 'v6', name: 'V6 TURBO', sub: 'A real shove out of slow corners.',
+        cost: 1800, speed: 1.06, accel: 1.10, grip: 0.97, pipes: 2 },
+      { id: 'v8', name: 'V8 BLOCK', sub: 'Fast everywhere, loose everywhere.',
+        cost: 4200, speed: 1.14, accel: 1.18, grip: 0.93, pipes: 4 },
+      { id: 'v12', name: 'V12 MONSTER', sub: 'More engine than tyre. Fit a wing.',
+        cost: 9000, speed: 1.24, accel: 1.24, grip: 0.86, pipes: 6,
+        lock: { kind: 'cleared', n: 6, label: 'WIN 6 WORLDS OUTRIGHT' } },
+    ],
+  },
+  {
+    key: 'spoiler', name: 'REAR WING', icon: '🪽',
+    blurb: 'Downforce: grip that arrives with speed, paid for in top end.',
+    parts: [
+      { id: 'none', name: 'NO WING', sub: 'Nothing to slow you down.',
+        cost: 0, stock: true, speed: 1, down: 0 },
+      { id: 'lip', name: 'LIP SPOILER', sub: 'A little stability, barely a cost.',
+        cost: 900, speed: 0.99, down: 0.10 },
+      { id: 'duck', name: 'DUCKTAIL', sub: 'Planted through the quick stuff.',
+        cost: 2200, speed: 0.975, down: 0.22 },
+      { id: 'gt', name: 'GT WING', sub: 'Enormous. Corners like it is on rails.',
+        cost: 5000, speed: 0.95, down: 0.40,
+        lock: { kind: 'medals', n: 3, label: 'TAKE 3 MISSION MEDALS' } },
+    ],
+  },
+];
+const PART_SLOT = Object.fromEntries(PART_SLOTS.map((s) => [s.key, s]));
+/** The stock part of a slot — what an unbuilt car is wearing, and the thing
+ *  every save written before parts existed is treated as having. */
+const stockPart = (slot) => slot.parts.find((p) => p.stock) || slot.parts[0];
+// ===== end [PARTS] =====
 
 // world-card flavor lines (surface + signature hazards per theme)
 const WORLD_TAGS = {
@@ -1603,6 +1662,8 @@ class Game {
           }
           // the tab IS a level on the back ladder, so the label moves with it
           this._syncBackBtn();
+          // ...and the shop floor only turns while you are standing in it
+          this._stageRun(btn.id === 'tab-btn-garage');
         });
       }
     }
@@ -1617,11 +1678,16 @@ class Game {
     const msel = document.getElementById('mode-select');
     msel.innerHTML = ''; // never append into a row that might already hold chips
     const curMode = this.missionMode ? 'missions' : this.freeRoam ? 'roam' : 'race';
-    for (const [id, label] of [['race', '🏁 RACE'], ['roam', '🌍 FREE ROAM'], ['missions', '🎯 MISSIONS']]) {
+    // ICON AND WORD ARE SEPARATE SPANS because the three chips share one row
+    // now, and at 93px a chip "🌍 FREE ROAM" is a couple of pixels too wide and
+    // clips. The word is the information and the icon is decoration, so below
+    // 430px the CSS drops the icon rather than truncating the label.
+    for (const [id, icon, label] of [['race', '🏁', 'RACE'], ['roam', '🌍', 'FREE ROAM'],
+      ['missions', '🎯', 'MISSIONS']]) {
       const chip = document.createElement('button');
       chip.className = 'mode-chip' + (id === curMode ? ' current' : '');
       chip.dataset.mode = id;
-      chip.textContent = label;
+      chip.innerHTML = `<span class="mc-ico">${icon}</span><span class="mc-lbl">${label}</span>`;
       chip.addEventListener('click', () => {
         // in place; the reload is only a fallback for the mid-race case, which
         // the menu cannot actually reach
@@ -2670,6 +2736,10 @@ class Game {
     this._syncBackBtn();
     this._softURL();
   }
+
+  /** Stop anything the menu was animating. Called on the way into a race —
+   *  the shop floor must not keep drawing behind a world. */
+  _menuIdle() { this._stageRun(false); }
 
   /** Push the current track's theme into the renderer: fog, the two lights,
    *  the key direction and the IBL dome. Split out of the constructor because
@@ -3989,6 +4059,60 @@ class Game {
     return up;
   }
 
+  /** WHAT THIS CAR IS BUILT FROM — the fitted part per slot, and what it owns.
+   *
+   *  Per car, like upgrade levels: a V8 bought for the BRAWLER stays in the
+   *  BRAWLER. Defaults are the STOCK part of every slot, owned and fitted, so
+   *  a save written before the build bay existed reads as a stock car rather
+   *  than as a car with holes in it — and nothing needs a migration pass.
+   *  Clamped on READ: a fitted id that no longer exists (a part renamed, a
+   *  save hand-edited) falls back to stock instead of throwing.
+   */
+  carParts(carKey = this.cars.selected) {
+    const g = this.garage;
+    g.parts ??= {};
+    const rec = g.parts[carKey] ??= { fitted: {}, owned: {} };
+    rec.fitted ??= {};
+    rec.owned ??= {};
+    for (const slot of PART_SLOTS) {
+      const stock = stockPart(slot);
+      rec.owned[`${slot.key}:${stock.id}`] = 1;             // stock is never bought
+      const fit = rec.fitted[slot.key];
+      if (!slot.parts.some((pt) => pt.id === fit)) rec.fitted[slot.key] = stock.id;
+    }
+    return rec;
+  }
+
+  /** The part object fitted in a slot right now. Never null. */
+  fittedPart(slotKey, carKey = this.cars.selected) {
+    const slot = PART_SLOT[slotKey];
+    const rec = this.carParts(carKey);
+    return slot.parts.find((p) => p.id === rec.fitted[slot.key]) || stockPart(slot);
+  }
+
+  ownsPart(slotKey, partId, carKey = this.cars.selected) {
+    return !!this.carParts(carKey).owned[`${slotKey}:${partId}`];
+  }
+
+  /** RACE FOR THE PART. The top item in each slot cannot be bought at any
+   *  price until it is earned, and both conditions read data the career
+   *  already keeps rather than adding a counter to maintain:
+   *    cleared — worlds taken outright (a win, which is what 3 stars means)
+   *    medals  — arena-mission medals held, of any colour, across the roster
+   *  Returns { open, have, need } so the card can show progress, not just a
+   *  padlock. A part with no `lock` is always open. */
+  partLock(part) {
+    if (!part.lock) return { open: true, have: 0, need: 0 };
+    const { kind, n } = part.lock;
+    let have = 0;
+    if (kind === 'cleared') {
+      have = LEVELS.filter((l) => this.starsFor(this.career.finished[l.id]) >= 3).length;
+    } else if (kind === 'medals') {
+      have = Object.values(this._missionBest?.() || {}).filter((m) => m > 0).length;
+    }
+    return { open: have >= n, have, need: n };
+  }
+
   /** WHICH COMPOUND IS ON THIS CAR RIGHT NOW.
    *
    *  Stored per car in `garage.fitted`, defaulting to the best the car has
@@ -4062,9 +4186,16 @@ class Game {
   applyUpgrades() {
     this._applyTyreClass();
     const p = this.player;
-    if (!this._base) this._base = { maxSpeed: p.maxSpeed, maxHealth: p.maxHealth };
+    if (!this._base) this._base = { maxSpeed: p.maxSpeed, maxHealth: p.maxHealth, accel: p.accel };
     const g = this.carUpgrades();
-    p.maxSpeed = this._base.maxSpeed * (1 + 0.04 * g.engine);
+    // [PARTS] The fitted block and wing multiply what the tuning ladder has
+    // already bought, rather than replacing it: ENGINE WRENCH still buys its
+    // 4% a rung, and the block decides what that 4% is 4% OF. A V12 on a maxed
+    // engine is the fastest thing in the game and the hardest to hold.
+    const eng = this.fittedPart('engine');
+    const wing = this.fittedPart('spoiler');
+    p.maxSpeed = this._base.maxSpeed * (1 + 0.04 * g.engine) * eng.speed * wing.speed;
+    p.accel = this._base.accel * eng.accel;
     p.maxHealth = this._base.maxHealth + 15 * g.armor;
     p.health = p.maxHealth;
     // THE CANNON IS THE UPGRADE NOW, not a stat the upgrade nudges.
@@ -4084,7 +4215,11 @@ class Game {
     p.maxSos = 1 + (g.beacon || 0);
     p.nitroRate = 1 + 0.22 * g.nitro;
     p.handling = 0.2 * (g.handling || 0);
-    p.gripBoost = 1 + 0.04 * (g.tires || 0);
+    // The block's grip cost is constant; the wing's grip GAIN arrives with
+    // speed (see `downforce` in Car.update), which is the whole reason a wing
+    // is a trade and not simply a purchase.
+    p.gripBoost = (1 + 0.04 * (g.tires || 0)) * eng.grip;
+    p.downforce = wing.down || 0;
     p.damperLvl = g.dampers || 0;                // read by Car.onLand
     p.steerSense = { relaxed: 0.8, normal: 1.0, sharp: 1.25 }[this.steerSetting] || 1.0;
     p.assist = { pro: 0, standard: 0.5, assist: 1 }[this.assistSetting] ?? 0.5;
@@ -4094,7 +4229,458 @@ class Game {
     // here rather than at purchase time because applyUpgrades() is already the
     // one place that reads the garage row, so the mesh cannot drift from the
     // numbers.
-    applyUpgradeKit(p.mesh, g);
+    applyUpgradeKit(p.mesh, g, { engine: eng, spoiler: wing });
+  }
+
+  /** RACE FOR THE PART, ANNOUNCED. The locks read live career data, so a part
+   *  opens the instant the sixth world falls or the third medal lands — but a
+   *  thing that silently becomes buyable in a menu two taps away is a thing
+   *  nobody finds. Called on every finish, race and mission alike: any part
+   *  whose lock has just come open gets the banner, once.
+   *
+   *  `garage.partSeen` is the "once". It is written the first time a part is
+   *  announced, so re-racing does not re-announce, and it is keyed by
+   *  slot:part rather than by car — you earn the RIGHT to the part, and every
+   *  car in the collection can then buy one.
+   */
+  _announcePartUnlocks() {
+    const el = document.getElementById('part-unlock');
+    if (el) el.style.display = 'none';
+    const g = this.garage;
+    g.partSeen ??= {};
+    const fresh = [];
+    for (const slot of PART_SLOTS) {
+      for (const part of slot.parts) {
+        if (!part.lock) continue;
+        const key = `${slot.key}:${part.id}`;
+        if (g.partSeen[key]) continue;
+        if (!this.partLock(part).open) continue;
+        g.partSeen[key] = 1;
+        fresh.push({ slot, part });
+      }
+    }
+    if (!fresh.length) return;
+    saveJSON(this._pkey('garage'), g);
+    if (!el) return;
+    // One banner even if two open at once — the second line names the rest
+    // rather than stacking a second box on a screen that is already full.
+    const first = fresh[0];
+    el.innerHTML = `<span class="pu-top">🔧 PART EARNED</span>
+      <span class="pu-name">${first.part.name}</span>
+      <span class="pu-sub">${first.slot.name} · ${first.part.cost.toLocaleString()} CR IN THE BUILD BAY${
+  fresh.length > 1 ? ` · AND ${fresh.length - 1} MORE` : ''}</span>`;
+    el.style.display = '';
+  }
+
+  /** THE GARAGE, AS A WORKSHOP.
+   *
+   *  One screen: the machine you have built, then the bays that built it.
+   *  Every bay speaks the same card language whether it sells a CHOICE (one
+   *  part at a time, the options trading against each other) or a LADDER (an
+   *  upgrade line, each rung better than the last) — picture, name, a bar for
+   *  how much of it you have, and one button that says what tapping does.
+   *
+   *  That is the marriage the report asked for. The two systems were never in
+   *  conflict; they were wearing different clothes, and the upgrade ladders
+   *  were a wall of grey rows underneath a shop that had pictures.
+   *
+   *  Every one of the ten UPGRADES lands in exactly one bay, so nothing is
+   *  orphaned by the regrouping:
+   *    ENGINE SHOP   the blocks, and the ENGINE WRENCH that tunes whichever
+   *                  one is in
+   *    BODY KIT      the wings, and the suspension that makes them worth it
+   *    TIRE BAY      the compounds, and the TIRES ladder that unlocks them
+   *    WEAPONS CACHE cannon, rockets, drums
+   *    CHASSIS       armour, nitro, dampers, the recovery beacon
+   */
+  _renderGarageBays() {
+    this._renderBuildPreview();
+    const host = document.getElementById('garage-bays');
+    if (!host) return;
+    const icons = this._partIcons();
+    const up = this.carUpgrades();
+    const rec = this.carParts();
+    host.innerHTML = '';
+
+    const BAYS = [
+      { name: 'ENGINE SHOP', icon: '🔩', slot: 'engine', ups: ['engine'] },
+      { name: 'BODY KIT & SPOILERS', icon: '🪽', slot: 'spoiler', ups: ['handling'] },
+      { name: 'TIRE BAY', icon: '🛞', tyres: true, ups: ['tires'] },
+      { name: 'WEAPONS CACHE', icon: '🔫', ups: ['cannon', 'rack', 'magazine'] },
+      { name: 'CHASSIS & CREW', icon: '🛡️', ups: ['armor', 'nitro', 'dampers', 'beacon'] },
+    ];
+
+    for (const bay of BAYS) {
+      const box = document.createElement('div');
+      box.className = 'bay';
+      box.innerHTML = `<div class="bay-head"><span>${bay.icon}</span>${bay.name}</div>`;
+
+      // ---- the CHOICE half: parts, as pictures
+      if (bay.slot) {
+        const slot = PART_SLOT[bay.slot];
+        const fit = this.fittedPart(slot.key);
+        const grid = document.createElement('div');
+        grid.className = 'bay-grid';
+        // POWER is what the mockup's bars promise, so it has to mean
+        // something: for a block it is speed x pull, for a wing it is the
+        // downforce it makes. Both normalised against the best in the slot, so
+        // a full bar is "the strongest thing here" rather than an arbitrary
+        // number that looks precise and is not.
+        const power = (pt) => (slot.key === 'engine'
+          ? (pt.speed ?? 1) * (pt.accel ?? 1) : 1 + (pt.down ?? 0) * 2);
+        const top = Math.max(...slot.parts.map(power));
+        for (const pt of slot.parts) {
+          const owned = !!rec.owned[`${slot.key}:${pt.id}`];
+          const on = pt.id === fit.id;
+          const lock = this.partLock(pt);
+          const card = document.createElement('button');
+          card.className = 'part-card' + (on ? ' on' : '') + (!lock.open && !owned ? ' locked' : '');
+          card.dataset.slot = slot.key;
+          card.dataset.part = pt.id;
+          const pct = Math.round((power(pt) / top) * 100);
+          card.innerHTML = `<img class="pc-art" src="${icons[`${slot.key}:${pt.id}`]}" alt="">
+            <span class="pc-name">${pt.name}</span>
+            <span class="pc-bar"><i style="width:${pct}%"></i></span>
+            <span class="pc-act ${on ? 'fitted' : owned ? 'own' : lock.open ? 'buy' : 'lock'}">${
+  on ? 'FITTED' : owned ? 'INSTALL'
+    : lock.open ? `${pt.cost.toLocaleString()} CR` : `🔒 ${lock.have}/${lock.need}`}</span>
+            <span class="pc-sub">${!lock.open && !owned ? pt.lock.label : pt.sub}</span>`;
+          card.addEventListener('click', () => this._partAction(slot, pt));
+          grid.appendChild(card);
+        }
+        box.appendChild(grid);
+        const msg = this._buildMsg?.slot === slot.key ? this._buildMsg.text : '';
+        if (msg) box.insertAdjacentHTML('beforeend', `<p class="bay-msg">${msg}</p>`);
+      }
+
+      // ---- the TYRE BAY keeps its own renderer; it already knows about
+      // compounds, what this world wants and what the ladder has unlocked
+      if (bay.tyres) {
+        const slotEl = document.createElement('div');
+        slotEl.id = 'tyre-bay';
+        box.appendChild(slotEl);
+      }
+
+      // ---- the LADDER half: upgrade lines, in the same clothes
+      for (const key of bay.ups) {
+        const u = UPGRADES.find((x) => x.key === key);
+        if (!u) continue;
+        box.appendChild(this._upgradeCard(u, up, icons));
+      }
+      host.appendChild(box);
+    }
+    this._renderTyreBay();
+  }
+
+  /** One upgrade line as a card — the same shape as a part card, because a
+   *  player does not care which of the game's two systems a thing came out of.
+   *  The bar is the LEVEL, the button is the next rung's price. */
+  _upgradeCard(u, up, icons = null) {
+    const lvl = up[u.key] | 0;
+    const card = document.createElement('div');
+    card.className = 'up-card' + (lvl >= u.max ? ' maxed' : '');
+    card.dataset.up = u.key;
+    // TIRES says which rung opens a compound rather than repeating "+4% grip"
+    // on the rungs where it opens nothing — kept from the old row renderer,
+    // because it is the one line here that was ever misleading.
+    let desc = u.desc;
+    if (u.key === 'tires') {
+      const nowMax = tyreMaxClass(this.cars.selected, up);
+      const nextMax = tyreMaxClass(this.cars.selected, { ...up, tires: lvl + 1 });
+      desc = nextMax > nowMax
+        ? `NEXT LEVEL UNLOCKS ${TYRE_LABEL[nextMax]} TYRES · +4% grip`
+        : `+4% grip / lvl · ${TYRE_LABEL[nowMax]} IS YOUR BEST COMPOUND`;
+    }
+    const pips = Array.from({ length: u.max },
+      (_, i) => `<b class="${i < lvl ? '' : 'off'}"></b>`).join('');
+    // A RENDERED PART BEATS AN EMOJI wherever one exists. Three of the ten
+    // ladders sell hardware the shop already has a model of — the gun, the
+    // rocket rail, the drum — and the tyre ladder sells rubber. The rest are
+    // tools and fluids with nothing to photograph, and keep their glyph.
+    const ART = { cannon: 'weapon:cannon', rack: 'weapon:rack',
+      magazine: 'weapon:magazine', tires: 'tyre:gravel' };
+    const art = icons?.[ART[u.key]];
+    card.innerHTML = `<span class="uc-ic">${
+  art ? `<img src="${art}" alt="">` : u.icon}</span>
+      <span class="uc-main"><span class="uc-nm">${u.name}</span>
+        <span class="uc-pips">${pips}<i>LVL ${lvl}/${u.max}</i></span>
+        <span class="uc-desc">${desc}</span></span>`;
+    const btn = document.createElement('button');
+    btn.className = 'up-buy' + (lvl >= u.max ? ' maxed' : '');
+    if (lvl >= u.max) {
+      btn.textContent = 'MAX';
+      btn.disabled = true;
+    } else {
+      const cost = upgradeCost(lvl);
+      btn.textContent = `${cost.toLocaleString()} CR`;
+      btn.disabled = this.garage.credits < cost;
+      btn.addEventListener('click', () => {
+        if (this.garage.credits < cost) return;
+        this.garage.credits -= cost;
+        up[u.key]++;  // this car only — every other machine keeps its own build
+        saveJSON(this._pkey('garage'), this.garage);
+        this.applyUpgrades();
+        this.renderGarage();
+        // a TIRES level can change which worlds this car may enter, so the
+        // track list, the shop and the start button all have to be retold
+        this.renderCarShop();
+        this._renderLevelCards();
+        this._syncStartButton();
+      });
+    }
+    card.appendChild(btn);
+    return card;
+  }
+
+  /** THE SHOP FLOOR — a live view of the car you are building.
+   *
+   *  "Match the graphics and change the look realtime." The still picture was
+   *  honest but dead: you fitted a wing and a new JPEG appeared. This is the
+   *  real car on a real floor, turning, and a part lands on it the instant you
+   *  buy it.
+   *
+   *  IT COSTS A SECOND WebGL CONTEXT, so it earns it back three ways:
+   *    - it only ever runs while the GARAGE tab is actually on screen. Leaving
+   *      the tab, opening a race, or backgrounding the page stops the loop
+   *      dead (see _stageRun).
+   *    - it renders at 30fps, not 60. Nothing here moves fast enough to tell,
+   *      and this is a menu on a phone that has a world drawing behind it.
+   *    - the canvas is small and the pixel ratio is capped at 2.
+   *  The still-picture path is kept for the car SHELF, which needs 6 pictures
+   *  at once and must not animate.
+   */
+  _stage() {
+    if (this.__stage) return this.__stage;
+    const cvs = document.createElement('canvas');
+    cvs.className = 'bp-stage';
+    const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: cvs });
+    r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    r.toneMapping = THREE.ACESFilmicToneMapping;
+    r.toneMappingExposure = 1.28;
+    r.shadowMap.enabled = true;
+    r.shadowMap.type = THREE.PCFSoftShadowMap;
+    const scene = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(32, 1.6, 0.1, 120);
+
+    // ---- THE WORKSHOP. The mockup's car sits on a shop floor with light
+    // coming down on it, and that is most of why it reads as a garage rather
+    // than as a product shot. A floor, a back wall and a bay stripe are enough
+    // — anything more is scenery nobody looks at behind a car they do.
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(46, 46),
+      new THREE.MeshStandardMaterial({ color: 0x2b2018, roughness: 0.95, metalness: 0.05 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.02;
+    floor.receiveShadow = true;
+    scene.add(floor);
+    // the painted bay outline the car is parked inside
+    for (const sx of [-3.4, 3.4]) {
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 15),
+        new THREE.MeshBasicMaterial({ color: 0xc9922e, transparent: true, opacity: 0.5 }));
+      line.rotation.x = -Math.PI / 2;
+      line.position.set(sx, 0.01, 0);
+      scene.add(line);
+    }
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(46, 18),
+      new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 1 }));
+    wall.position.set(0, 9, -13);
+    scene.add(wall);
+
+    scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x6a5238, 1.15));
+    const key = new THREE.DirectionalLight(0xfff3d6, 2.3);
+    key.position.set(5, 9, 6);
+    key.castShadow = true;
+    key.shadow.mapSize.set(512, 512);   // a phone, at 30fps, behind a menu
+    key.shadow.camera.left = -8; key.shadow.camera.right = 8;
+    key.shadow.camera.top = 8; key.shadow.camera.bottom = -8;
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0x9fc8ff, 0.6);
+    fill.position.set(-6, 4, -5);
+    scene.add(fill);
+    // the shop lamp above the bay, which is what puts the warm pool on the roof
+    const lamp = new THREE.PointLight(0xffcf8a, 40, 18, 2);
+    lamp.position.set(0, 5.2, 1.5);
+    scene.add(lamp);
+
+    const pivot = new THREE.Group();
+    scene.add(pivot);
+    this.__stage = { cvs, r, scene, cam, pivot, spin: 0, sig: null, raf: 0, last: 0 };
+    return this.__stage;
+  }
+
+  /** Throw away a stage car.
+   *
+   *  GEOMETRY ALWAYS; MATERIALS ONLY OUTSIDE THE KIT. The upgrade kit's
+   *  materials are shared module-level singletons — disposing one blanks the
+   *  kit on every car in the game and can pull a material out from under an
+   *  in-flight compile (see disposeKit in vehicles.js, and r230). The BODY's
+   *  materials are built per mesh, so those are ours to free, and a player who
+   *  fits fifty parts in a session would otherwise leave fifty bodies' worth
+   *  of them behind.
+   */
+  _dropCarMesh(mesh) {
+    const kit = mesh.getObjectByName('upgradeKit');
+    const inKit = (o) => { for (let n = o; n; n = n.parent) if (n === kit) return true; return false; };
+    mesh.traverse((o) => {
+      if (o.geometry) o.geometry.dispose?.();
+      if (!o.material || (kit && inKit(o))) return;
+      for (const m of (Array.isArray(o.material) ? o.material : [o.material])) m.dispose?.();
+    });
+  }
+
+  /** Put the current build on the stage — only when it has actually changed. */
+  _stageSync() {
+    const st = this._stage();
+    const car = CAR_CATALOG.find((c) => c.key === this.cars.selected);
+    if (!car) return;
+    const up = this.carUpgrades();
+    const sig = JSON.stringify([car.key, up, this.carParts().fitted]);
+    if (st.sig === sig) return;
+    st.sig = sig;
+    if (st.car) { st.pivot.remove(st.car); this._dropCarMesh(st.car); }
+    const mesh = buildCarMesh(car.spec);
+    applyUpgradeKit(mesh, up, {
+      engine: this.fittedPart('engine'), spoiler: this.fittedPart('spoiler') });
+    mesh.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+    st.car = mesh;
+    st.pivot.add(mesh);
+    if (st.cam.aspect) this._frameStage(st);
+  }
+
+  /** FRAME THE CAR FROM THE CAR, not from a guessed number.
+   *
+   *  The first cut divided a constant by the aspect ratio and put the camera
+   *  6 units from a 6.5-unit-long car — the shot came out inside the door.
+   *  Measure the build's bounding sphere and back off far enough that it fits
+   *  the TIGHTER of the two fields of view, which is the vertical one on a
+   *  phone and the horizontal one on a wide canvas. Self-tuning: it holds for
+   *  any car in the catalogue, any wing, and any canvas the layout hands it.
+   */
+  _frameStage(st) {
+    if (!st.car) return;
+    const box = new THREE.Box3().setFromObject(st.car);
+    const size = box.getSize(new THREE.Vector3());
+    const mid = box.getCenter(new THREE.Vector3());
+    // A BOUNDING SPHERE IS THE WRONG SHAPE FOR A CAR. It has to contain the
+    // diagonal, so a 6.5-long, 1.6-tall machine gets a radius set by its
+    // LENGTH and the framing leaves half the canvas empty above and below it.
+    // Fit the box instead: the widest silhouette it can turn to is its length,
+    // and the height is just its height.
+    const vfov = (st.cam.fov * Math.PI) / 180;
+    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * st.cam.aspect);
+    const halfW = 0.5 * Math.max(size.x, size.z);      // worst case as it spins
+    const halfH = 0.5 * size.y;
+    const dist = Math.max(halfW / Math.tan(hfov / 2), halfH / Math.tan(vfov / 2)) * 1.5;
+    st.cam.position.set(6.4, 3.4, 7.6).normalize().multiplyScalar(dist);
+    st.cam.lookAt(0, mid.y * 0.9, 0);
+    st.cam.updateProjectionMatrix();
+  }
+
+  /** Start or stop the loop. The ONLY thing that should ever keep it running
+   *  is the garage tab being visible on the title screen. */
+  _stageRun(on) {
+    const st = this.__stage;
+    if (!st) return;
+    if (!on) {
+      if (st.raf) cancelAnimationFrame(st.raf);
+      st.raf = 0;
+      return;
+    }
+    if (st.raf) return;
+    const tick = (t) => {
+      st.raf = requestAnimationFrame(tick);
+      const vis = this.state === 'title'
+        && !document.getElementById('title-screen')?.classList.contains('hidden')
+        && document.getElementById('tab-btn-garage')?.classList.contains('current')
+        && st.cvs.isConnected;
+      if (!vis) { this._stageRun(false); return; }
+      if (t - st.last < 33) return;                    // 30fps is plenty for a turntable
+      const dt = Math.min(0.1, (t - st.last) / 1000);
+      st.last = t;
+      st.spin += dt * 0.42;
+      st.pivot.rotation.y = st.spin;
+      const w = st.cvs.clientWidth || 300;
+      const h = st.cvs.clientHeight || 190;
+      if (st.w !== w || st.h !== h || st.framedFor !== st.sig) {
+        st.w = w; st.h = h; st.framedFor = st.sig;
+        st.r.setSize(w, h, false);
+        st.cam.aspect = w / h;
+        st.cam.updateProjectionMatrix();
+        this._frameStage(st);
+      }
+      st.r.render(st.scene, st.cam);
+    };
+    st.last = performance.now();
+    st.raf = requestAnimationFrame(tick);
+  }
+
+  /** THE MACHINE YOU HAVE BUILT, at the top of its own garage. */
+  _renderBuildPreview() {
+    const el = document.getElementById('build-preview');
+    if (!el) return;
+    const car = CAR_CATALOG.find((c) => c.key === this.cars.selected);
+    if (!car) return;
+    const eng = this.fittedPart('engine');
+    const wing = this.fittedPart('spoiler');
+    const p = this.player;
+    const tc = tyreClass(this.cars.selected, this.carUpgrades(), this.fittedTyre());
+    el.innerHTML = `<div class="bp-shop"></div>
+      <div class="bp-side">
+        <div class="bp-name">${car?.name ?? ''}</div>
+        <div class="bp-spec"><span>${eng.name}</span><span>${wing.name}</span>
+          <span>${TYRE_LABEL[tc]} TYRES</span></div>
+        <div class="bp-nums">
+          <span><i>TOP</i><b>${Math.round(p?.maxSpeed ?? 0)}</b></span>
+          <span><i>PULL</i><b>${Math.round(p?.accel ?? 0)}</b></span>
+          <span><i>HULL</i><b>${Math.round(p?.maxHealth ?? 0)}</b></span>
+          <span><i>DOWN</i><b>${Math.round((p?.downforce ?? 0) * 100)}%</b></span>
+        </div>
+      </div>`;
+    // THE LIVE CANVAS IS MOVED, NEVER REBUILT. innerHTML above throws away
+    // whatever was in the box, so the stage is re-attached afterwards — a new
+    // WebGL context per repaint of the garage would be a context leak, and
+    // browsers cap how many a page may hold.
+    const st = this._stage();
+    el.querySelector('.bp-shop')?.appendChild(st.cvs);
+    this._stageSync();
+    this._stageRun(true);
+  }
+
+  /** Tap a part: fit it if it is yours, buy it if you can afford it, and say
+   *  why not if neither. Buying FITS immediately — nobody buys a wing to leave
+   *  it on the shelf, and a second tap to wear it is a step with no decision
+   *  in it. */
+  _partAction(slot, part) {
+    const carKey = this.cars.selected;
+    const rec = this.carParts(carKey);
+    const key = `${slot.key}:${part.id}`;
+    const say = (text) => { this._buildMsg = { slot: slot.key, text }; };
+    if (!rec.owned[key]) {
+      const lock = this.partLock(part);
+      if (!lock.open) {
+        say(`🔒 ${part.name} IS EARNED, NOT BOUGHT — ${part.lock.label}`
+          + ` · YOU ARE AT ${lock.have} OF ${lock.need}`);
+        this._renderGarageBays();
+        return;
+      }
+      if (this.garage.credits < part.cost) {
+        say(`${part.name} COSTS ${part.cost.toLocaleString()} CR — YOU HAVE `
+          + `${this.garage.credits.toLocaleString()} CR. RACE FOR THE REST.`);
+        this._renderGarageBays();
+        return;
+      }
+      this.garage.credits -= part.cost;
+      rec.owned[key] = 1;
+      say(`🔧 BOUGHT AND FITTED ${part.name}`);
+    } else {
+      say(`🔧 FITTED ${part.name}`);
+    }
+    rec.fitted[slot.key] = part.id;
+    saveJSON(this._pkey('garage'), this.garage);
+    this.applyUpgrades();          // stats AND the mesh, in one place
+    this.renderGarage();           // rebuilds every bay, and the preview
+    this.renderCarShop();          // the shelf quotes this car's ratings
+    this._syncStartButton();
   }
 
   /** THE TYRE BAY — the answer to "there is no way to change tyres".
@@ -4112,7 +4698,11 @@ class Game {
     const max = tyreMaxClass(car, up);
     const now = this.fittedTyre(car);
     const need = this.level ? surfaceClass(this.level) : null;
-    const ICON = ['🛣', '🪨', '❄'];
+    // REAL RUBBER, not three glyphs. The compounds differ by TREAD and the
+    // shop already renders each one — a slick band, chunky blocks, fine sipes.
+    const art = this._partIcons();
+    const ICON = ['road', 'gravel', 'snow'].map(
+      (id) => `<img class="tyre-art" src="${art[`tyre:${id}`]}" alt="">`);
     const auto = this.garage.fitted?.[car] == null;
     const btns = [0, 1, 2].map((c) => {
       const locked = c > max;
@@ -4183,32 +4773,107 @@ class Game {
   }
 
   /** Render each catalog car's real voxel mesh to a 3/4-view icon (cached). */
+  /** ONE OFF-SCREEN STUDIO, borrowed by everything that needs a picture of a
+   *  mesh: the car shelf, the part shop and the build preview.
+   *
+   *  It was inlined in `_carIcons` and rendered six cars once at boot. The
+   *  graphical garage asks for a picture of every PART as well, and of the
+   *  player's own car every time the build changes, so the renderer, the
+   *  lights and the camera are set up once and handed out.
+   *
+   *  DELIBERATELY NOT A LIVE CANVAS. A second WebGL context animating behind
+   *  the menu costs a frame budget on the phone this game is for, and the menu
+   *  already has a world rendering behind it. Every picture here is rendered
+   *  ONCE to a data URL and then it is an `<img>` — free to scroll, free to
+   *  re-layout, and gone from the GPU the moment it is drawn.
+   */
+  _studio(w, h, dist = 6.2) {
+    let st = this.__studio;
+    if (!st) {
+      const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      r.setPixelRatio(2);
+      r.toneMapping = THREE.ACESFilmicToneMapping;
+      r.toneMappingExposure = 1.12;
+      const scene = new THREE.Scene();
+      scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x6a5a44, 1.15));
+      const sun = new THREE.DirectionalLight(0xfff3d6, 2.2);
+      sun.position.set(4, 7, 5);
+      scene.add(sun);
+      // a second, colder key from the far side stops the dark parts of a black
+      // carbon wing reading as a hole in the picture
+      const fill = new THREE.DirectionalLight(0x9fc8ff, 0.55);
+      fill.position.set(-5, 3, -4);
+      scene.add(fill);
+      st = this.__studio = { r, scene, sun, cam: null };
+    }
+    st.r.setSize(w, h);
+    return st;
+  }
+
+  /** Render one mesh to a data URL and take it back out of the scene.
+   *
+   *  `dist` is the camera's TRUE distance from the origin along the original
+   *  three-quarter rig, and `look` is the height it aims at. Both are spelled
+   *  out because the first cut scaled a hardcoded (5.2, 3.2, 6.2) by
+   *  `dist / 8.86` — and that rig is 8.70 long, not 8.86, so every call was
+   *  framed slightly wrong and passing "6.2" for the car shelf (meaning "the
+   *  old z") silently moved the camera 30% closer and cropped the cars.
+   */
+  _shoot(mesh, w, h, { dist = 8.7, look = 0.55 } = {}) {
+    const st = this._studio(w, h);
+    const cam = new THREE.PerspectiveCamera(30, w / h, 0.1, 120);
+    cam.position.set(5.2, 3.2, 6.2).normalize().multiplyScalar(dist);
+    cam.lookAt(0, look, 0);
+    st.scene.add(mesh);
+    st.r.render(st.scene, cam);
+    const url = st.r.domElement.toDataURL();
+    st.scene.remove(mesh);
+    return url;
+  }
+
+  /** [PARTS] A PICTURE OF EVERY PART, rendered once and cached.
+   *
+   *  Keyed `kind:id`. Same studio as the car shelf, closer in, and each part
+   *  is turned to the angle that shows what makes it different: a block from
+   *  the side so the pipes count, a wing from behind so the span reads.
+   */
+  _partIcons() {
+    if (this.__partIcons) return this.__partIcons;
+    const out = {};
+    const shoot = (kind, id, ry, dist, look = 0) => {
+      const m = buildPartIcon(kind, id);
+      m.rotation.y = ry;
+      out[`${kind}:${id}`] = this._shoot(m, 128, 96, { dist, look });
+    };
+    // each part is turned to the angle that shows what makes it different: a
+    // block from its pipe side, a wing from behind so the span reads
+    // THE PIPES ARE THE POINT, so the block is turned to show the flank they
+    // are on. The studio camera looks in from +X/+Y/+Z, and the stacks are
+    // built on +X: rotating the block away hid every one of them and left a
+    // V4 and a V8 as the same black box.
+    for (const p of PART_SLOT.engine.parts) shoot('engine', p.id, -Math.PI * 0.13, 4.6, 0.05);
+    for (const p of PART_SLOT.spoiler.parts) shoot('spoiler', p.id, Math.PI * 0.9, 4.4);
+    for (const id of ['road', 'gravel', 'snow']) shoot('tyre', id, Math.PI * 0.5, 4.2);
+    for (const id of ['cannon', 'rack', 'magazine']) shoot('weapon', id, Math.PI * 0.78, 4.2);
+    this.__partIcons = out;
+    return out;
+  }
+
+  // THE STILL BUILD PICTURE IS GONE (r232). It rendered the built car to a
+  // data URL and swapped an <img> — honest, but dead: you fitted a wing and a
+  // new JPEG appeared. `_stage` shows the real car on a real floor, turning,
+  // and the part lands on it as you buy it. The still path survives only for
+  // the car SHELF (`_carIcons`), which needs six pictures at once and must not
+  // animate.
+
   _carIcons() {
     if (this.__carIcons) return this.__carIcons;
-    const W = 148, H = 96;
-    const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    r.setSize(W, H);
-    r.setPixelRatio(2);
-    r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.12;
-    const scene = new THREE.Scene();
-    const cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 60);
-    cam.position.set(5.2, 3.2, 6.2);
-    cam.lookAt(0, 0.55, 0);
-    scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x6a5a44, 1.15));
-    const sun = new THREE.DirectionalLight(0xfff3d6, 2.2);
-    sun.position.set(4, 7, 5);
-    scene.add(sun);
     const icons = {};
     for (const car of CAR_CATALOG) {
       const mesh = buildCarMesh(car.spec);
       mesh.rotation.y = Math.PI * 0.82; // 3/4 front view
-      scene.add(mesh);
-      r.render(scene, cam);
-      icons[car.key] = r.domElement.toDataURL();
-      scene.remove(mesh);
+      icons[car.key] = this._shoot(mesh, 148, 96);   // the original 8.70 rig
     }
-    r.dispose();
     this.__carIcons = icons;
     return icons;
   }
@@ -4303,68 +4968,10 @@ class Game {
   renderGarage() {
     document.getElementById('credits').textContent = this.garage.credits.toLocaleString();
     this._renderQuests();
-    // the panel shows and edits the SELECTED car's own levels
-    const up = this.carUpgrades();
-    const carName = CAR_CATALOG.find((c) => c.key === this.cars.selected)?.name ?? '';
-    const head = document.getElementById('garage-up-head');
-    if (head) head.textContent = `DETAILED UPGRADES — ${carName}`;
-    this._renderTyreBay();
-    const rows = document.getElementById('garage-rows');
-    rows.innerHTML = '';
-    for (const u of UPGRADES) {
-      const lvl = up[u.key];
-      const row = document.createElement('div');
-      row.className = 'up-row';
-      const pips = Array.from({ length: u.max },
-        (_, i) => `<span class="${i < lvl ? '' : 'off'}">●</span>`).join('');
-      // WHAT THE NEXT LEVEL ACTUALLY BUYS, not what the line buys on average.
-      // TIRES STACK advertised "+4% grip / lvl" at every rung, so a player who
-      // spent 5,100 CR reaching level 3 on a car that already reached SNOW at
-      // level 1 had no way to know two of those rungs bought no compound at
-      // all. The line still sells grip; it now says out loud on which rung it
-      // also opens a tyre, and stops implying it on the rungs where it does
-      // not.
-      let extra = u.desc;
-      if (u.key === 'tires') {
-        const nowMax = tyreMaxClass(this.cars.selected, up);
-        const nextMax = tyreMaxClass(this.cars.selected, { ...up, tires: lvl + 1 });
-        extra = nextMax > nowMax
-          ? `NEXT LEVEL UNLOCKS ${TYRE_LABEL[nextMax]} TYRES · +4% grip`
-          : `+4% grip / lvl · ${TYRE_LABEL[nowMax]} IS YOUR BEST COMPOUND`;
-      }
-      row.innerHTML = `<div class="ic">${u.icon}</div>
-        <div class="nm">${u.name}<small class="up-lvl">LEVEL ${lvl}/${u.max}</small><small>${extra}</small></div>
-        <div class="pips">${pips}</div>`;
-      const btn = document.createElement('button');
-      btn.className = 'up-buy' + (lvl >= u.max ? ' maxed' : '');
-      if (lvl >= u.max) {
-        btn.textContent = 'MAX';
-        btn.disabled = true;
-      } else {
-        const cost = upgradeCost(lvl);
-        btn.textContent = `${cost} CR`;
-        btn.disabled = this.garage.credits < cost;
-        btn.addEventListener('click', () => {
-          if (this.garage.credits < cost) return;
-          this.garage.credits -= cost;
-          up[u.key]++; // this car only — every other machine keeps its own build
-          saveJSON(this._pkey('garage'), this.garage);
-          this.applyUpgrades();
-          this.renderGarage();
-          // a TIRES level can change which worlds this car may enter, so the
-          // track list, the shop and the start button all have to be retold
-          this.renderCarShop();
-          this._renderLevelCards();
-          this._syncStartButton();
-          if (u.key === 'tires') {
-            this.hud.feed?.(`${TYRE_LABEL[tyreClass(this.cars.selected,
-              (this.garage.upgrades || {})[this.cars.selected])]} TYRES FITTED`, 'good');
-          }
-        });
-      }
-      row.appendChild(btn);
-      rows.appendChild(row);
-    }
+    // ONE CALL. This used to render a build bay, a tyre bay and then ten grey
+    // upgrade rows into three separate containers; the bays own all of it now,
+    // including the preview at the top and the tyre bay nested inside its own.
+    this._renderGarageBays();
   }
 
   // ---------- player profiles (menu header chip + panel) ----------
@@ -6032,18 +6639,37 @@ class Game {
     let saved = null;
     try { saved = sessionStorage.getItem('ir-mission-sel'); } catch { /* private mode */ }
     this.missionSel = defs.some((d) => d.id === saved) ? saved : defs[0].id;
-    sel.innerHTML = '<div class="panel-head">ARENA MISSIONS</div>';
+    // ONE SCREEN, NOT FOUR AND A HALF. Eight missions each carrying a full
+    // paragraph and its own copy of the payout came to a 1369px list on a
+    // 390x830 phone — the same wall the track list was before chapters, and
+    // reported the same way. Every row is now a LINE: icon, name, the medal you
+    // hold, and the one number you are chasing. The prose and the full medal
+    // ladder belong to the mission you have actually selected, which is the
+    // only one you are about to play.
+    //
+    // The payout is identical on all eight, so it is stated ONCE in the head
+    // instead of eight times in the cards.
+    const medalsHeld = defs.filter((d) => best[`${this.level.id}:${d.id}`]).length;
+    sel.innerHTML = `<div class="panel-head">ARENA MISSIONS</div>
+      <div class="ms-note"><b>${medalsHeld}/${defs.length}</b> MEDALLED HERE ·
+        EVERY MISSION PAYS <b>${MISSION_CR[1]}–${MISSION_CR[3]} CR</b> BY MEDAL</div>`;
     for (const d of defs) {
       const b = best[`${this.level.id}:${d.id}`] | 0;
       const chip = document.createElement('button');
       chip.className = 'mission-chip' + (d.id === this.missionSel ? ' current' : '');
-      const chips = missionTargetChips(d).map((c) => `<span class="mstat">${c}</span>`).join('');
+      const targets = missionTargetChips(d).map((c) => `<span class="mstat">${c}</span>`).join('');
+      // the collapsed line quotes GOLD only — the number you are actually
+      // chasing. Silver and bronze are in the ladder on the open card.
+      const goldOnly = missionTargetChips(d)[0];
       chip.innerHTML = `<span class="mi">${d.icon}</span>
         <span class="mtext">
           <span class="mhead"><span class="mname">${d.name}</span>
-            <span class="mmedal${b ? '' : ' none'}">${b ? MISSION_MEDAL[b] : 'NEW'}</span></span>
-          <span class="mdesc">${d.desc}</span>
-          <span class="mstats">${chips}<span class="mstat mpay">🎖 ${MISSION_CR[1]}–${MISSION_CR[3]} CR</span></span>
+            <span class="mgoal">${goldOnly}</span>
+            <span class="mmedal${b ? '' : ' none'}">${b ? MISSION_MEDAL[b] : '—'}</span></span>
+          <span class="mopen">
+            <span class="mdesc">${d.desc}</span>
+            <span class="mstats">${targets}</span>
+          </span>
         </span>`;
       chip.addEventListener('click', () => {
         this.missionSel = d.id;
@@ -6498,6 +7124,7 @@ class Game {
     document.getElementById('restart-btn').textContent = win ? 'RUN IT AGAIN' : 'RETRY MISSION';
     setTimeout(() => {
       if (this.state !== 'finished') return; // player already restarted
+      this._announcePartUnlocks();   // [PARTS] a part the race just opened
       document.getElementById('results').classList.remove('hidden');
       this.hud.hide();
       document.getElementById('touch-ui').classList.remove('on');
@@ -8133,6 +8760,7 @@ class Game {
   }
 
   startRace() {
+    this._menuIdle();      // the shop floor stops turning the moment you leave it
     this._flushPick?.();   // a tapped card whose build hasn't run yet — build it now
     // NO GATE — A WARNING WITH A NUMBER ON IT. The start line used to refuse
     // the wrong tyres outright, and with one eligible car per surface that
@@ -8355,6 +8983,7 @@ class Game {
     this.audio?.explosion?.(true);
     setTimeout(() => {
       if (this.state !== 'finished') return;   // left already — don't pop over the menu
+      this._announcePartUnlocks();   // [PARTS] a part the race just opened
       document.getElementById('results').classList.remove('hidden');
       this.hud.hide();
       document.getElementById('touch-ui').classList.remove('on');
@@ -8485,6 +9114,7 @@ class Game {
       // podium inside this 1.6 s window — restart, or straight to the garage —
       // let the results card pop back up OVER the menu you had just reached.
       if (this.state !== 'finished') return;
+      this._announcePartUnlocks();   // [PARTS] a part the race just opened
       document.getElementById('results').classList.remove('hidden');
       this.hud.hide();
       document.getElementById('touch-ui').classList.remove('on');

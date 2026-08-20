@@ -1204,3 +1204,234 @@ have settled — and faint white on the new orange footer was unreadable.
 too, and it had already silently corrupted the back-button changelog twice.
 Bump exactly: `#build-tag`, the three `?v=`, and CACHE in sw.js. r227 did it
 with a python replace asserting each of the five strings was found once.
+
+## r228 — BACK IS ORANGE, THE SAME ORANGE AS START RACE
+"Make the back button orange als the start race."
+
+The two bars are the two ends of the screen now, so one colour across both says
+"these are the buttons" and leaves everything between them as text. Gold-on-dark
+read as one more chip in a menu already full of gold-on-dark chips — CREDITS,
+the profile, the tabs, the filter chips, the world badges — which is a large
+part of why the control was hard to find in the first place. Same gradient,
+same ink border, same press-down as `.btn`, sized for a header not a footer.
+
+Grown to a 40px minimum while there: it measured 31px, under every touch-target
+guideline going, and "more obvious" is a size argument as much as a colour one.
+`display:inline-flex` so `min-height` cannot fight the padding. The bar goes
+48 -> 57px for it.
+
+Measured at 320 and 390: button 81x40, fully inside the bar, label 10px clear,
+bar flush top=0 edge to edge at 0/25/60/100% scroll. `tools-scratch/backfit.mjs`.
+
+## r229 — THE MODE ROW IS HORIZONTAL, AND THE MISSION LIST IS A LIST
+"Make this horizontal alignment. Work on the missions. It has to be reworked",
+with a screenshot of the MODE tab showing RACE / FREE ROAM / MISSIONS stacked
+one per line.
+
+### Why the chips stacked
+`.set-row` is `grid-template-columns:96px 1fr` and hands its label the 96px.
+That left 258px of a 430px phone for three chips wanting ~430, so each wrapped
+onto its own line and the "row" came out a vertical list. The label said MODE
+directly under a panel head saying GAME MODE, so the label goes and the three
+chips share the full width as equal segments.
+
+Then the labels had to fit: "🌍 FREE ROAM" clips at 93px. The icon and the word
+are separate spans now, the icon drops below 430px, and the type steps down
+again at 340. `tools-scratch/moderow.mjs` checks all three across five widths —
+one row, equal widths, nothing clipped, 320px to desktop.
+
+### The mission list was the track list before chapters
+Eight missions, each with a full paragraph AND its own copy of a payout that is
+identical on all eight: a 1369px list on an 830px phone. You could see two.
+
+A mission is a LINE until you pick it — icon, name, the gold target, the medal
+you hold. The prose and the full medal ladder open on the selected one, which
+is the only one you are about to play. The payout is stated once in the head,
+with a `n/8 MEDALLED HERE` count. 1369px -> 596px, all eight on one screen.
+
+Widths fought over the collapsed row: at 320 it cannot hold icon + name +
+target + medal, so the target chip drops below 390 and the NAME keeps the
+space, because the name is what you scan by. Verified no name ellipsises at
+320/360/390/430.
+
+THE REWORK IS PRESENTATIONAL. `tools-scratch/missionrun.mjs` pins the
+behaviour: tapping row 5 selects DUEL, exactly one card is open, and START
+MISSION launches DUEL. Mission definitions, medal maths and payouts are
+untouched — if "reworked" meant the missions themselves rather than the screen
+they are chosen on, that work has NOT been done.
+
+## r230 — THE BUILD BAY: PARTS YOU CHOOSE, BUY AND EARN
+"Create a garage where I can custom build the car. Shows the tires, weapons,
+looks engine v4-8-12, add spoilers etc. … I would purchase parts and race for
+other parts."
+
+### What already existed, and what actually had to be built
+The ten UPGRADES were already a per-car credit economy, jobs and quests already
+granted upgrade levels as race rewards, and `applyUpgradeKit` already drew
+VISIBLE hardware for every line — scoops, skirts, flares, cannon pods, pipes.
+None of that was the ask. What was missing is CHOICE: every upgrade is a ladder
+where each rung beats the last, so there is no build to get wrong.
+
+`PART_SLOTS` is the other half. A slot holds exactly ONE part, the options TRADE
+against each other, and every one is visible from the chase camera:
+  ENGINE BLOCK  V4 / V6 TURBO / V8 / V12 MONSTER — speed and accel up, grip
+                down, and 2 / 2 / 4 / 6 exhaust stacks out of the tail
+  REAR WING     NO WING / LIP / DUCKTAIL / GT WING — downforce up, top speed
+                down, and the silhouette changes
+
+Fitment is PER CAR, like upgrade levels. `carParts()` defaults every slot to its
+stock part, owned and fitted, so a save written before this reads as a stock car
+and no migration pass is needed.
+
+### The wing moved slots
+`applyUpgradeKit` used to draw a rear wing at ENGINE level 3 (wide at 5). That
+was the only wing in the game and it appeared as a SIDE EFFECT of buying top
+speed — nobody chose it. The ENGINE line no longer draws a wing at all, so the
+two cannot stack on the same tail.
+
+### DOWNFORCE is why a wing is a trade
+`Car.update` multiplies grip by `1 + downforce * speedN`. A wing costs top speed
+outright and pays it back only once the car is moving, so a GT wing is worth
+nothing at a standstill and 40% more grip flat out. Without that a wing is just
+another purchase.
+
+### Race for the part
+The top part in each slot cannot be bought at any price. `partLock` reads career
+data the game already keeps — worlds won outright, mission medals held — so no
+new counter rides along, and the card shows PROGRESS (0/6) rather than a bare
+padlock. `_announcePartUnlocks()` banners it on the debrief, once, keyed in
+`garage.partSeen`.
+
+### THE BUG THIS UNCOVERED — read this before touching applyUpgradeKit
+`test-filters` went 35/0 -> 34/1 with "Cannot read properties of undefined
+(reading 'isReady')", proven mine by running the same test against an r229
+worktree on 8958 (clean) and bisected to the one line that passes parts to the
+mesh.
+
+`applyUpgradeKit` BUILT TEN MATERIALS PER CALL and `disposeKit` disposed them.
+That is the documented three.js hazard: `compileAsync` polls its captured
+material list from its own timer, and disposing one mid-poll throws from inside
+that timer where no `.catch()` of ours can reach it. It had gone unnoticed only
+because a stock car's kit was nearly EMPTY — the moment the ENGINE slot gave
+every car a pair of pipes from the first frame, a menu-time rebuild started
+landing on the boot compile every single run.
+
+Fixed at the root: the palette is now module-level singletons (`kitMats()`),
+built once and shared by every car and every rebuild, and `disposeKit` disposes
+GEOMETRY ONLY. Do not reintroduce a per-call material factory — `tests/
+test-parts.mjs` has a check that fails if the kit stops sharing.
+
+### Gates
+`tests/test-parts.mjs` (new, 18/0) covers: stock defaults, the stat climb, the
+grip and top-speed costs, pipes and wing appearing on the mesh, credits taken
+once, the build surviving a save, a locked part refusing at any price and
+explaining itself, both unlock conditions opening, the banner firing once, and
+the shared-material check. It drives the REAL UI path — open the slot, tap the
+row — so it cannot pass on a path no player reaches.
+test-cars 28/0, test-filters 35/0, test-boot 7/0, test-ladder 31/0,
+test-timeline 33/0, test-mobile-hud green, boot.mjs 4/4.
+Widths 320/390/430: nothing clipped, nothing overflowing.
+
+## r231 — THE GARAGE IS A WORKSHOP, AND THE TWO SYSTEMS ARE ONE
+"Make it graphical as in the demo. Marry the existing upgrades mode vs this",
+with a mockup of a workshop: a car on the floor and part shops around it, every
+part a PICTURE with a price and an INSTALL button.
+
+### The marriage
+The mockup's panels map almost 1:1 onto systems that already existed, which is
+why this is a merge and not a rewrite. Every one of the ten UPGRADES lands in
+exactly one bay — nothing is orphaned by the regrouping:
+
+    ENGINE SHOP     the four blocks + ENGINE WRENCH
+    BODY KIT        the four wings + SUSPENSION SPRING
+    TIRE BAY        the three compounds + TIRES STACK
+    WEAPONS CACHE   CANNON CORE, ORDNANCE RACK, MAGAZINE DRUM
+    CHASSIS & CREW  ARMOR, NITRO, DAMPERS, RECOVERY BEACON
+
+A bay sells CHOICES (one at a time, trading against each other) or LADDERS
+(each rung better than the last) and both wear the same card: picture, bar,
+price, one button that says what tapping does. `renderGarage()` is four lines
+now; it used to fill three separate containers with three different layouts.
+
+### Pictures, from the real meshes
+`buildPartIcon(kind, id)` in vehicles.js builds a showroom model from the SAME
+primitives and the SAME palette the part uses on the car, so the picture in the
+shop is the thing you bolt on. `_studio` / `_shoot` in main.js is the one
+off-screen renderer, extracted from `_carIcons`, and every picture is rendered
+ONCE to a data URL and then it is an `<img>` — no second live WebGL context
+animating behind a menu that already has a world rendering behind it.
+
+`_buildPreview()` is the centrepiece: the selected car wearing its fitted parts
+AND its whole upgrade kit, re-rendered only when the build signature changes.
+
+### THREE FRAMING BUGS WORTH REMEMBERING
+  - `_shoot` first took `dist` and scaled a hardcoded (5.2, 3.2, 6.2) rig by
+    `dist / 8.86`. That rig is 8.70 long, not 8.86 — and passing "6.2" for the
+    car shelf (meaning "the old z") moved the camera 30% closer and cropped
+    every car on the shelf. `dist` is the TRUE camera distance now.
+  - The studio camera looks in from +X/+Y/+Z and the exhaust stacks are built
+    on +X. The blocks were first shot at `ry = 0.62π`, which put every pipe
+    behind the block: a V4 and a V8 rendered as the same black box. They face
+    their pipe side now.
+  - A V4 and a V6 both have two pipes, so pipe count alone cannot separate
+    them. The V6 wears the turbo its name promises — and it had to move to the
+    FRONT face, because on the far flank it was hidden by the block.
+  The icon meshes put every pipe on the camera side. On the car they are split
+  across two banks, which is right there and useless in a 128px picture.
+
+### Gates
+test-parts 22/0 — now also pins that every part shows a rendered picture, that
+no two parts share one (which is what proves the blocks read apart), that the
+preview draws, and that all ten ladders find a bay. test-cars 28/0,
+test-filters 35/0, test-boot 7/0, test-ladder 31/0, test-timeline 33/0,
+test-mobile-hud green, boot.mjs 4/4.
+`tools-scratch/garagefit.mjs` at 320/390/430: 0 overflowing, 0 clipped labels,
+0 tap targets under 34px, 0 sideways scroll. It skips `.shelf-wrap`, because
+the car shelf scrolls sideways on purpose and counting its children reported
+200 false positives.
+
+## r232 — THE SHOP FLOOR IS LIVE
+"Match the graphics u sent and change the look realtime."
+
+The still picture was honest and dead: you fitted a wing and a new data URL
+appeared. `_stage()` is a real WebGL view — the car you have built, turning, on
+a workshop floor with a painted bay outline, a back wall, a shop lamp and a
+cast shadow. Fitting a part rebuilds the car on the stage in place, so the
+hardware lands as you buy it.
+
+### A SECOND WebGL CONTEXT HAS TO EARN ITS KEEP, and this one does it three
+ways. Break any of them and the phone pays for a menu it is not looking at:
+  - the loop runs ONLY while the GARAGE tab is on screen. `_stageRun(false)` on
+    every other tab, and `_menuIdle()` from `startRace`. The tick itself
+    re-checks visibility each frame and stops dead if it is wrong.
+  - 30fps, not 60. It is a turntable.
+  - small canvas, pixel ratio capped at 2, 512px shadow map.
+The canvas is MOVED between repaints, never rebuilt — `_renderBuildPreview`
+sets innerHTML, so the stage is re-appended afterwards. A context per repaint
+would hit the browser's cap in a dozen tab switches.
+
+### TWO FRAMING BUGS, both from guessing instead of measuring
+  - The first cut divided a constant by the aspect ratio and put the camera 6
+    units from a 6.5-unit car: the shot came out inside the door.
+  - The fix used the bounding SPHERE, which is the wrong shape for a car — it
+    has to contain the diagonal, so a long low machine got a radius set by its
+    LENGTH and half the canvas was empty above and below it.
+  `_frameStage` fits the BOX: the widest silhouette it can turn to is its
+  length, the height is its height, and the distance is whichever of the two
+  fields of view is tighter. Self-tuning for any car, any wing, any canvas.
+
+### Also
+`_dropCarMesh` frees a stage car: geometry always, materials only OUTSIDE the
+upgrade kit — the kit's are shared singletons and disposing one blanks every
+car in the game (r230). The still-preview path is deleted; `_carIcons` keeps it
+for the car SHELF, which needs six pictures at once and must not animate.
+
+On a phone the floor is full width with the spec underneath — side by side it
+was 156px of a 390px screen, a stamp, when the machine on the shop floor is the
+whole point. Two columns return at 620px.
+
+test-parts 23/0 (now pins that the stage is a live mounted canvas carrying the
+fitted build), test-cars 28/0, test-filters 35/0, test-boot 7/0, test-ladder
+31/0, test-timeline 33/0, test-mobile-hud green, boot.mjs 4/4.
+`tools-scratch/stage.mjs` proves it turns, that a fitted V8 adds hardware with
+no reload, and that the loop STOPS on another tab and mid-race.
