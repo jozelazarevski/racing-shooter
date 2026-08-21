@@ -153,12 +153,27 @@ const r = await page.evaluate(async () => {
   const parkedRescues = rescues;
 
   // ---- and normal racing must never trip it --------------------------------
+  //
+  // NORMAL RACING MEANS STEERING. This phase used to hold full throttle with
+  // the wheel dead centre for thirty seconds, which on a track with corners is
+  // not racing — it is driving into the scenery, and the car ended up parked
+  // off the road with the throttle down, which is precisely the state the net
+  // exists to rescue. It only ever passed because the net could not see a car
+  // that grinds along a rock face at 1.2 u/s instead of stopping dead; the
+  // moment that hole was closed, this "normal racing" earned a rescue and was
+  // right to. So drive the car: a proportional correction toward the road's
+  // own heading, which is what a driver does.
   p.placeAt(0, 0, true);
   p.vel.set(0, 0, 0); p._wedgeT = 0;
-  hold(1);
   rescues = 0;
   let maxWedgeT = 0;
   for (let f = 0; f < 1800; f++) {           // 30 game-seconds of driving
+    let d = t.headingAt(p.trackIndex) - p.heading;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    g.input.analog.throttle = 1;
+    g.input.analog.brake = 0;
+    g.input.analog.steer = Math.max(-1, Math.min(1, d * 2.2 - p.lateral * 0.06));
     g._frameBody();
     maxWedgeT = Math.max(maxWedgeT, p._wedgeT ?? 0);
     if (f % 120 === 0) await new Promise((rs) => setTimeout(rs, 0));

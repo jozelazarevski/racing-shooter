@@ -18,6 +18,13 @@ for (const id of process.argv.slice(2).map(Number)) {
   const r = await page.evaluate(() => {
     const g = window.__game, t = g.track, N = t.center.length, p = g.player;
     g.clock.getDelta = () => 1 / 60;
+      // AUTO-QUALITY OFF: it resizes the composer when it drops a tier, a
+      // resize EMPTIES the canvas until the next render, and the stub below
+      // swallows that render. Cost 52 blank frames of 432 in one sweep and
+      // looked exactly like a severe rendering bug — see tour.mjs's note and
+      // tools-scratch/resizeblank.mjs. The fps it measures is a number about
+      // the harness anyway: these files step a fixed clock.
+      g._autoQuality = () => {};
     if (g.composer) g.composer.render = () => {};
     let big = 0, air = 0, worst = null, wasAir = false;
     // start each excursion from a fresh point on the lap, drive out and back

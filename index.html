@@ -83,8 +83,31 @@
     text-shadow:2px 2px 0 var(--ink)}
 
 
-  /* circular speedometer */
-  #speed-box{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  /* CIRCULAR SPEEDOMETER — AND WHY IT IS NOT CENTRED.
+     The player's car sits at the bottom CENTRE of the frame in every camera
+     the game ships except the driver's seat, so a dial centred at 50% is a lid
+     over the one object the player is steering. MEASURED by rendering each
+     view twice, once with the car's materials keyed, and counting the pixels
+     that changed inside the dial's own DOM rect (tools-scratch/dialcover.mjs):
+
+       1440x810   TOP-DOWN (the default view)  100% of the car behind the dial
+        800x460   TOP-DOWN 66%  TOP FAR 100%  TRAIL 59%  CHASE 100%  FAR 100%
+
+     The car's footprint is a fixed FRACTION of the viewport (x 0.478-0.521 W,
+     y 0.78-0.914 H, identical at both sizes) while the dial is a fixed 132 px,
+     which is why a short window loses the chase views as well as the default.
+     So the dial moves by the same currency the car is measured in — a
+     percentage — into the gap between the car and the weapon panel:
+
+       left 62%  ->  dial spans 0.62W +- 66px
+       clear of the car   while 0.62W - 66 > 0.521W  ->  W > 667
+       clear of #weapon-box (210px + 12px) while 0.62W + 66 < W - 222 -> W > 758
+
+     Every desktop width is past both. Narrower than that is the phone layout,
+     which overrides this rule below and is hand-tuned against the joystick and
+     the weapon buttons — there is no room to the right of the car at 390 px,
+     so that one is deliberately left where it is. */
+  #speed-box{position:absolute;bottom:16px;left:62%;transform:translateX(-50%);
     display:flex;flex-direction:column;align-items:center;gap:5px}
   #speedo{width:132px;height:132px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.4))}
   #nitro-wrap{width:130px;background:var(--panel);border:2px solid var(--edge);border-radius:8px;padding:4px 8px}
@@ -121,7 +144,26 @@
   #shock-status{color:#d8c090}
   #shock-status.ready{color:#7fd4ff;text-shadow:1px 1px 0 var(--ink);animation:blink 1.2s steps(2) infinite}
 
-  #feed{position:absolute;top:104px;right:12px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  /* THE FEED RAN UNDER THE BUTTONS. `#cam-btn` is top:70 right:12 and
+     `#pause-btn` top:124 right:12, both 46px square, so the two of them own a
+     70px-wide column down the right edge from y=70 to y=170 — and the feed was
+     anchored at right:12px top:104px, straight into it. MEASURED as real
+     overlapping pixels between the live rects, not read off this stylesheet:
+     828 px² of a feed row behind a button on 4 of 4 worlds sampled, and it is
+     not an edge case — the row it eats is the one that fires first every race
+     ("WET ROAD — SLICK UNDER BRAKING", "SNOW ROAD — LOW GRIP, LONG SLIDES")
+     and every contract line after it. Cleared by the button column's width
+     plus its own margin. The touch layouts below re-anchor the feed for
+     themselves (portrait stacks it well under the buttons, landscape moves it
+     to the top centre), so this is the desktop rule only.
+
+     THE INSET IS 92px, NOT 70, BECAUSE THE ROW MOVES. `feedin` starts at
+     translateX(30px) and `feedout` ends at translateX(20px), so a row is 30px
+     right of its resting place for the quarter second it arrives. At right:70
+     the resting edge cleared 📷 by 12px and the ARRIVING edge still ran 486 px²
+     under it — measured at 1440x810, on every message. The button column's
+     left edge is W-58, so the inset has to be 58 + 30 + a few: 92. */
+  #feed{position:absolute;top:104px;right:92px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
   .feed-msg{padding:4px 12px;font-weight:800;letter-spacing:1px;font-size:13px;border-radius:8px;
     background:rgba(38,26,12,.85);border:2px solid rgba(255,255,255,.15);
     animation:feedin .25s ease-out, feedout .5s ease-in 2.6s forwards}
@@ -334,7 +376,11 @@
   /* ...and the feed stacks under the hull panel for the same reason: at
      390px wide it is 274px of message reaching back under race-info, so a
      fixed top clipped its corner on every portrait size measured. */
-  body.touch #feed{top:calc(12px + var(--info-h,86px) + var(--hull-h,47px) + 16px)}
+  /* ...and it keeps the full width on a phone: portrait already stacks it well
+     below the button row (which sits side by side at top:60px there, not in a
+     column), so the desktop right:70px inset would only cost 58px of message
+     on the narrowest screen that has the least to spare. */
+  body.touch #feed{top:calc(12px + var(--info-h,86px) + var(--hull-h,47px) + 16px);right:12px}
   /* very narrow phones: nudge the inner weapon column out of the speedo's way */
   @media (max-width:380px){
     /* moving these inward to clear the speedo pushed them into FIRE, so the
@@ -355,6 +401,15 @@
     /* landscape has less height to give away, so the gaps tighten — but the
        stacking is still measured, never a constant */
     body.touch #health-box{top:calc(8px + var(--info-h,86px) + 6px);width:132px}
+    /* THE BUTTONS TURN SIDEWAYS HERE, so clearing them sideways does not work.
+       Portrait stacks 📷 and ⏸ in one 46px column at right:12 and the base
+       rule's right:70px clears that. Short screens lay them SIDE BY SIDE at
+       top:60 (see below), which owns x from W-112 to W-12 — measured at
+       800x460, the feed row ran 410..760 x 88..116 straight under 📷 at
+       688..734 x 60..106, 828 px² of it, on every world sampled. Sideways has
+       nowhere left to go on a screen this narrow, so the feed drops BELOW the
+       button row instead. */
+    #feed{top:114px}
     /* LANDSCAPE HAS NO ROOM TO STACK. At 390px tall the left column already
        reaches y=223, so continuing the stack put the feed straight through the
        DRIFT button — measured, not guessed, once the probe was widened to
@@ -435,6 +490,15 @@
   #credits-chip b{color:var(--yellow);text-shadow:1px 1px 0 var(--ink)}
 
   /* ---------- PLAYER PROFILES (local careers on one device) ---------- */
+  /* One round letter, sized to the same rhythm as the credits chip beside it
+     so the bar reads as three controls and not two plus an ornament. */
+  #topbar-prof{flex:none;width:30px;height:30px;padding:0;cursor:pointer;
+    display:grid;place-items:center;font-family:'Luckiest Guy';font-size:15px;
+    line-height:1;color:#7fd4ff;background:rgba(0,0,0,.4);
+    border:1px solid rgba(255,233,168,.30);border-radius:50%;
+    -webkit-tap-highlight-color:transparent;transition:transform .1s}
+  #topbar-prof:active{transform:scale(.92)}
+  @media (max-width:389px){ #topbar-prof{width:26px;height:26px;font-size:13px} }
   #profile-chip{pointer-events:auto;cursor:pointer;margin-left:6px;padding:7px 16px;font-size:12px;
     letter-spacing:2px;font-weight:800;font-family:'Baloo 2';color:#ffe9a8;
     border:2px solid rgba(255,233,168,.35);border-radius:20px;background:rgba(24,16,6,.7);
@@ -514,7 +578,14 @@
      NOT backdrop-filter: this panel is up to 67 world cards tall and the
      scene behind it animates, so a blur layer would be re-sampled every
      frame on the phone this game is for. Opacity costs nothing. */
-  .menu-panel{margin-top:0;width:min(100%,660px);background:rgba(22,14,5,.96);
+    /* 520, NOT 660. Asked for directly — "make it less wide, like it was
+     before" — against a card that had grown a thumbnail, a tag line, a
+     surface chip, a star row and two locked-perk boxes, so at 660 the name
+     sat a long way from the OPEN button with a lane of empty brown between
+     them. `min()` means every phone is UNDER the cap and does not move a
+     pixel: this only ever narrows the tablet and desktop layouts, which are
+     the ones the report came from. */
+  .menu-panel{margin-top:0;width:min(100%,520px);background:rgba(22,14,5,.96);
     border:2px solid var(--line);border-radius:0 var(--r-lg) var(--r-lg) var(--r-lg);
     padding:12px 16px 16px;display:flex;flex-direction:column;align-items:center}
   .menu-panel.off{display:none}
@@ -760,6 +831,17 @@
   /* THE BALANCE IS PINNED RIGHT and never shrinks — it is the number the whole
      garage below is spending, so it is the one thing in the bar that must not
      give way when a chapter name gets long. */
+  /* THE WORD "CREDITS" IS 55 PX OF A PHONE. The balance is a number with a
+     coin on it; the word only ever restated what the gold colour and the coin
+     already say, and it was taking the room the chapter name needed to finish
+     its sentence. Hidden under 430 px, where the bar is tightest — the coin
+     stays, so the number is never a bare figure. */
+  #topbar-cred .cr-word{display:none}
+  /* 520, not 430. At 430 the word came back before the room did and the title
+     went from 1 truncated in 8 to 3 — the word costs about 55 px and the
+     longest title needs 149, so it may only return once the bar can pay for
+     both. Measured, not guessed. */
+  @media (min-width:520px){ #topbar-cred .cr-word{display:inline} }
   #topbar-cred{flex:0 0 auto;margin-left:auto;font-family:'Baloo 2';font-weight:800;
     font-size:10px;letter-spacing:1px;color:var(--gold-dim);white-space:nowrap;
     padding:5px 9px;border-radius:8px;background:rgba(0,0,0,.4);
@@ -769,6 +851,26 @@
   /* the where-slot yields first when the bar is tight */
   #topbar .ch-here{flex:1 1 auto;min-width:0}
   #topbar .ch-here-stars{flex:0 0 auto;margin-left:0}
+  /* The smallest phones cannot buy the room with layout alone: at 320 the
+     title slot is 96 px and the longest chapter needs 142. A point of type is
+     the last thing to give, so it gives here and nowhere else. */
+  /* Letter-spacing is the cheapest room in the bar: the longest title is 22
+     characters, so a point of tracking is 11 px — more than the 9 px that
+     "CH 7 THE LONG CIRCUITS" was short by at 390. */
+  @media (max-width:429px){
+    #topbar .ch-here{letter-spacing:.3px}
+    #topbar .ch-here b{letter-spacing:1px}
+  }
+  @media (max-width:360px){
+    #topbar .ch-here{font-size:9px;letter-spacing:.2px}
+    #topbar{gap:6px}
+  }
+  /* THE STAR COUNT GIVES WAY BEFORE THE NAME DOES. On a 320 px phone the bar
+     cannot carry five things, and of the five this is the only one repeated
+     elsewhere on the same screen — the star key states the running total two
+     rows below, and every world card carries its own three. The name is not
+     repeated anywhere. */
+  @media (max-width:340px){ #topbar .ch-here-stars{display:none} }
   @media (max-width:389px){
     #topbar{gap:7px;padding-left:8px;padding-right:8px}
     #topbar-back{font-size:12px;padding:7px 10px}
@@ -2011,7 +2113,14 @@
     <button id="topbar-back" class="ch-back" aria-label="Back">‹&nbsp;BACK</button>
     <div id="topbar-where" class="ch-here"></div>
     <div id="topbar-stars" class="ch-here-stars"></div>
-    <div id="topbar-cred">CREDITS&nbsp;<b id="credits">0</b></div>
+    <!-- THE DRIVER, AS ONE LETTER. It used to be a full-width pill under the
+         header carrying "👤 JOSIP", which spent a whole row of the phone on a
+         name the owner already knows. Asked for directly: on the top bar, as
+         one letter. The initial is enough to tell two local careers apart,
+         which is the only job it has; the full name is on the panel it
+         opens. -->
+    <button id="topbar-prof" title="Driver profiles" aria-label="Driver profile">P</button>
+    <div id="topbar-cred" title="Credits"><span class="cr-word">CREDITS&nbsp;</span>🪙&nbsp;<b id="credits">0</b></div>
   </div>
   <!-- The tagline stays: it is the one line of character on the front door,
        and it is the only thing left above the tabs now that the wordmark has
@@ -2026,9 +2135,9 @@
        inside a chapter — where a DIFFERENTLY WORDED one appeared at y=8. Three
        addresses and two labels for one control, reported as "I miss the back
        button". There is one now and it lives in #topbar. -->
-  <div id="menu-status">
-    <button id="profile-chip" title="Driver profiles">👤&nbsp;<b id="profile-name">PLAYER 01</b></button>
-  </div>
+  <!-- The driver chip moved into #topbar as a one-letter avatar; this row
+       held nothing else, so it goes with it rather than staying as an empty
+       band of margin above the tabs. -->
   <div id="menu-tabs">
     <button id="tab-btn-race" class="menu-tab current">TRACKS</button>
     <button id="tab-btn-mode" class="menu-tab">MODE</button>
@@ -2119,7 +2228,8 @@
       <div class="set-row" id="joy-row">
         <span class="set-lbl">JOYSTICK<br><span id="joy-val">100%</span></span>
         <div id="joy-sens-wrap">
-          <input id="joy-sens" type="range" min="50" max="180" step="5" value="100">
+          <input id="joy-sens" type="range" min="50" max="180" step="5" value="100"
+            aria-label="Joystick travel for full lock">
           <div class="set-hint"><span>CALM</span><span>TWITCHY</span></div>
           <p class="set-help">How far your thumb travels for full lock. Lower means more travel and finer control;
           higher means less travel and a faster turn-in.</p>
@@ -2182,7 +2292,8 @@
     <div id="profile-list"></div>
     <div class="panel-head">NEW PROFILE</div>
     <div id="profile-create">
-      <input id="profile-name-input" maxlength="10" placeholder="NAME" autocomplete="off" spellcheck="false">
+      <input id="profile-name-input" maxlength="10" placeholder="NAME" autocomplete="off"
+        spellcheck="false" aria-label="Driver name">
       <div id="profile-swatches"></div>
       <button id="profile-create-btn" class="up-buy">CREATE</button>
     </div>

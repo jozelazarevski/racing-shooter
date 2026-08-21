@@ -25,6 +25,133 @@ promise made over a wider span than the thing that keeps it.** See item 2 — an
 look for the same shape next in `tunnelFitAt`, `_buildStoneBridges` and the
 26-30 sample start-gate skip every builder carries.
 
+## THE r219 VISUAL SWEEP — what was driven, what was found, what was NOT there
+
+Every one of the 67 worlds was DRIVEN for 40 s and shot every 5 s from the
+CHASE camera with the HUD on (`tools-scratch/tour.mjs`, 536 frames). Read this
+before spending a session hunting any of it again.
+
+**Three defects, all fixed, all measured either side:**
+
+1. THE SPEEDOMETER WAS A LID OVER THE CAR. The dial is a fixed 132 px at
+   `left:50%` and the player's car sits at the bottom CENTRE of the frame in
+   every camera but the driver's seat. Measured in pixels by rendering each
+   view twice, once with the car keyed: at 1440x810 the DEFAULT view had 100%
+   of the car behind the dial; at 800x460 it was TOP-DOWN 66, TOP FAR 100,
+   TRAIL 59, CHASE 100, CHASE FAR 100. The car's footprint is a fixed FRACTION
+   of the viewport (x 0.478-0.521 W, y 0.78-0.914 H) and the dial is fixed px,
+   which is why a short window loses the chase views too. `left:62%` now; 0% at
+   both sizes. THE PHONE LAYOUT IS DELIBERATELY UNTOUCHED — at 390 px there is
+   no room to the right of the car, and `body.touch` is hand-tuned against the
+   joystick and the weapon buttons.
+2. THE START LINE SCOLDED YOU FOR CROSSING IT. `gridSlot(0)` is index N-10, so
+   every race begins BEHIND the line and crosses it about a second after "GO!"
+   — with `_cpMask` at 0, which `checkLap` could not tell from an infield cut.
+   Every world, every race, opened with a full-screen "CHECKPOINT MISSED — LAP
+   NOT COUNTED" (PINE VALLEY 1.10 s, EMBER PASS 0.93 s, TREMOLA 0.98 s).
+   `_gridStart` now absorbs exactly that one crossing. The lap arithmetic never
+   changed — it never earned a lap and still does not.
+3. NINE WORLDS WERE ANOTHER WORLD'S PICTURE. Each world reduced to a 6x6x6 RGB
+   histogram over the non-HUD frame, every pair ranked (`similar.py`). Median
+   over 2211 pairs 0.631; the head of the list was duplication, not family
+   resemblance — NEON GRID vs MARINA BAY at **0.098**, four `forest` worlds at
+   0.126-0.137, MONZA/SALINE 0.137, REDWOOD/SUZUKA 0.142, FLUME/RALLYCROSS
+   0.163, CANYON RUN/LAGUNA SECA 0.205. All nine carried elevation and ramp
+   counts and no light of their own, while SILVERSTONE, MOUNT PANORAMA, OULTON
+   PARK and ESTONIA CRESTS already had one. Nine named weathers later, the
+   worst pair on the roster is 0.152 and every one of those pairs is out of the
+   top 25. Per-world mean luminance is unchanged (MARINA BAY 27.4 -> 28.1, the
+   darkest either way).
+
+**And the thing that is NOT there, so nobody re-hunts it: THE ROSTER HAS NO
+FLOATERS.** `tests/tool-float-census.mjs` still reports thousands, and on this
+roster it is answering a different question wrongly three ways — one ribbon
+mesh spanning a canyon covers every column under it, a boat on the sea has only
+excluded water beneath it, and a foot-bridge is MEANT to be in the air. Swept
+by RAYCAST instead (`treegap.mjs`, `standcheck.mjs`): PINE VALLEY has 15 of 743
+plants off by more than 1 u and every one of them is SUNK, not floating;
+CANYON RUN and ROCKFALL RAVINE — the census's worst offenders at 51 u — are
+clean. What survives the ray is start gantries, arch checkpoints, campanile
+belfries, tyre stacks and bridge decks, every one of them overhead on purpose.
+r218's "floaters killed at source" did the job.
+
+**Reported, not fixed — each one is a judgement call, not a defect:**
+- MOUNTAIN TO SEA's `roadWidth: 5` reads as a cobbled plain rather than a road.
+  The road UV maps u = 0..1 across the FULL ribbon width whatever it is, so a
+  95 u carriageway stretches one texture across all of it. It cannot simply be
+  tiled: `roadTexture` bakes the verge fringe into the u extremes and wraps
+  ClampToEdge, so tiling u would draw five sets of verges across the road.
+  Fixing it properly means separating the fringe from the surface.
+- The Mediterranean set (CINQUE TERRE, AEGEAN, BRAVA, DALMATIA, AZUR, CITADEL,
+  CLIFF KNOT, SEA CLIFF RUN, HARBOR QUAY) still reads as one place from the
+  seat — cobbles, orange roofs, a hill town. themes.js says that cloning was
+  deliberate and gives each its own element kit and frontage tints; what they
+  share is the ROAD SURFACE and the composition, not the palette. HARBOR QUAY
+  vs CITADEL BAY at 0.152 is now the closest pair on the roster.
+- CANYON RUN's bore interior is near-black from the seat. Every other tunnel
+  world reads the same way. Nothing measures tunnel-interior luminance yet.
+
+## THE OFF-ROAD HALF OF THE r219 SWEEP — up the hills, into the water
+
+Asked for directly: "Do climb mountains and hills off-road. Go into rivers and
+waters." `tools-scratch/wild.mjs` did it on all 67 worlds — each one seated at
+the foot of its highest DRIVABLE ground and driven up it, then seated at its
+water and driven into it, chase camera, a shot every 5 s. 402 more frames, no
+page errors.
+
+**Two defects found and fixed, both in the HUD, both measured:**
+
+1. THE FEED SAID THE SAME THING FIVE TIMES. `hud.feed` appended a row and
+   removed it 3.3 s later without ever asking what was already on screen. 500 u
+   off the course on SEA CLIFF RUN the right-hand column was five identical
+   "OFF THE COURSE — TURN BACK" rows; on the racing line the same shape turns
+   up with SLIPSTREAM, WET TIRES and TIMBER! (2 of 4 worlds held a duplicate
+   pair within a lap). Repeats collapse into one row with a ×N tally now — and
+   the check reads EVERY row, because matching only the newest still left PINE
+   VALLEY with three "WET TIRES" when a TIMBER! landed between them.
+
+2. THE BUTTONS SAT ON THE FEED. `#cam-btn` and `#pause-btn` are 46 px squares
+   at right:12 and `#feed` was anchored into their column: 828 px² of a row
+   behind a button at 800x460, 486 px² at 1440x810, on every world — and the
+   row it ate is the one that fires first in every race ("WET ROAD — SLICK
+   UNDER BRAKING") plus every contract line. Two corrections, and the obvious
+   version of each was wrong: right:70px clears the column in PORTRAIT but the
+   buttons turn SIDEWAYS under 560 px of height (the feed drops below them
+   there instead), and 70 px still measured 486 px² at desktop size because the
+   ROW MOVES — `feedin` starts at translateX(30px), so the resting edge cleared
+   the button and the arriving edge did not.
+
+**Three things measured and deliberately NOT changed — each is the next
+session's call, not a slip to fix at the end of a sweep:**
+
+- **5.04% of off-road frames have the car UNDER THE GROUND**, and the screen is
+  a void for as long as it lasts: 23,040 frames over four worlds, worst 11.84%
+  on SILVERSTONE, longest single void 1.22 s (`blindtime.mjs`). The state is
+  already handled — `_watchCarVisible` lifts the car and re-seats the boom —
+  but only after `_blindT` reaches 1.0 s. Shortening that dwell is NOT a
+  one-liner: `terrainHeight` returns the RIDGE over a bore, so a car in a
+  tunnel reads as buried, and the dwell is part of what stops the watchdog
+  teleporting it onto the mountain. Measure `test-tunnels` before touching it.
+- **6.5% of off-road frames are ≥75% ONE COLOUR against 3.2% on-road** — the
+  chase camera against a slope, which main.js already names ("a single
+  featureless slab of hillside... exactly what the player photographed and
+  called a void") and bounds with the MAX_UP cap. The cap is doing its job;
+  what is left is the honest cost of a boom behind a car parked against a bank.
+- **The far field is undressed.** Past roughly 300 u the ground carries no
+  trees, no rocks and no props on most worlds, and the horizon highland is a
+  flat-shaded plateau at a fixed 28 u that 18 of 31 worlds share (an identical
+  (674,-566) — it is the silhouette's own ground, not a mountain). Nothing is
+  broken; there is simply nothing out there, and a player who drives out finds
+  that out.
+
+**And two theories killed by measurement, recorded so they are not re-run:**
+- The lens is NEVER under the ground: 0 of 10,080 off-road frames (`camdig.mjs`).
+  The MAX_UP pull-in loop looks like it can exit with the camera buried. It
+  cannot.
+- SILVERSTONE's -39 u readings are NOT a river carve gone wrong. The ground
+  really is 40 u down out there; `terrainHeight` and the drawn mesh agree to
+  0.35-2.0 u mean in every distance band out to 1200 u.
+
 ## THE THREE THINGS THAT MATTER, IN ORDER
 
 ### 1. Rival pace — and the number that does not exist. STILL THE TOP ITEM.

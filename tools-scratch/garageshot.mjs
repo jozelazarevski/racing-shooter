@@ -1,29 +1,36 @@
+/* THE GARAGE, PHONE-SIZED, SCROLLED TO THE UPGRADE LADDERS.
+ * The report is about the rows' artwork, so the shot has to be of the rows —
+ * the tab opens on the build bay and the ladders are below the fold. */
 import { chromium } from 'playwright-core';
-const W = +(process.env.W ?? 390);
+import fs from 'node:fs';
+const BASE = process.env.BASE ?? 'http://127.0.0.1:8901';
+const OUT = process.env.OUT ?? '/tmp/garage';
+fs.mkdirSync(OUT, { recursive: true });
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
-  args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
-const ctx = await b.newContext({ viewport: { width: W, height: 830 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
-const p = await ctx.newPage(); p.setDefaultTimeout(600000);
-const errs = []; p.on('pageerror', e => errs.push(String(e.message)));
-await p.goto('http://localhost:8901/?level=1', { waitUntil:'load', timeout:600000 });
-await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout:600000 });
-await p.evaluate(() => { const g = window.__game; g.garage.credits = 12500;
-  g.showMenu(); document.getElementById('tab-btn-garage').click(); g.renderGarage(); });
-await new Promise(r => setTimeout(r, 2500));   // let the shop floor draw
-console.log(await p.evaluate(() => {
-  const art = [...document.querySelectorAll('#garage-bays .pc-art')];
-  return { bays: document.querySelectorAll('.bay').length,
-    partCards: document.querySelectorAll('.part-card').length,
-    upCards: document.querySelectorAll('.up-card').length,
-    thumbsDrawn: art.filter(i => (i.getAttribute('src')||'').length > 2000).length,
-    stageLive: !!window.__game.__stage?.raf,
-    tyreBay: !!document.querySelector('.bay #tyre-bay .tyre-opt') };
-}));
-await p.evaluate(() => { const el = document.getElementById('build-preview');
-  const s = document.getElementById('title-screen'); s.scrollTop += el.getBoundingClientRect().top - 60; });
-await p.screenshot({ path: `tools-scratch/shot-garage-top.png` });
-await p.evaluate(() => { const el = document.querySelectorAll('.bay')[2];
-  const s = document.getElementById('title-screen'); s.scrollTop += el.getBoundingClientRect().top - 60; });
-await p.screenshot({ path: `tools-scratch/shot-garage-mid.png` });
-if (errs.length) console.log('ERR ' + errs.slice(0,3).join(' | '));
+  args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
+const page = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 2 });
+page.setDefaultTimeout(600000);
+const errs = [];
+page.on('pageerror', (e) => errs.push(String(e.message)));
+await page.goto(`${BASE}/?unlockall=1`, { waitUntil: 'load', timeout: 600000 });
+await page.waitForFunction(() => window.__game, undefined, { timeout: 600000 });
+await page.waitForTimeout(1500);
+await page.evaluate(() => { document.getElementById('tab-btn-garage')?.click(); });
+await page.waitForTimeout(2500);
+const info = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.up-card, .upgrade-card, [class*=uc-]')].length;
+  const imgs = [...document.querySelectorAll('.uc-ic img')].length;
+  const glyphs = [...document.querySelectorAll('.uc-ic')]
+    .filter((e) => !e.querySelector('img')).map((e) => e.textContent.trim());
+  const first = document.querySelector('.uc-ic');
+  return { rows, imgs, glyphs, hasIcHost: !!first };
+});
+console.log(JSON.stringify(info));
+// scroll to the ladders and shoot
+for (const y of [0, 900, 1800, 2700]) {
+  await page.evaluate((yy) => { document.getElementById('title-screen').scrollTo(0, yy); }, y);
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: `${OUT}/garage-${y}.png` });
+}
+console.log('page errors:', errs.slice(0, 3).join(' | ') || 'none');
 await b.close();

@@ -1133,6 +1133,83 @@ export function buildPartIcon(kind, id) {
     }
     return g;
   }
+  // ---- THE UPGRADE LADDERS ------------------------------------------------
+  //
+  // Six of the ten ladders were still a glyph in the row — a wrench, a cog, a
+  // lightning bolt, a shield, a PARACHUTE for the dampers and a red SOS
+  // square — sitting beside four that render real hardware. Asked for
+  // directly: more detail, better graphics, "like engine". They share the
+  // studio, the materials and the shooter the shop parts already use, so each
+  // one costs a model and nothing else.
+  if (kind === 'up') {
+    if (id === 'engine') {
+      // a wrench ON a cam cover: the ladder tunes an engine, so show one
+      add(new THREE.BoxGeometry(0.95, 0.62, 1.05), M.block, 0, 0.05, 0);
+      add(new THREE.BoxGeometry(0.46, 0.3, 1.0), M.crackle, 0, 0.44, 0, 0, 0);
+      add(new THREE.BoxGeometry(0.16, 0.09, 1.15), M.chrome, 0, 0.62, 0);
+      const shaft = add(new THREE.BoxGeometry(0.13, 0.9, 0.13), M.chrome, 0.52, 0.72, 0.34);
+      shaft.rotation.z = -0.5;
+      const jaw = add(new THREE.TorusGeometry(0.19, 0.06, 6, 10, Math.PI * 1.45),
+        M.chrome, 0.79, 1.08, 0.34);
+      jaw.rotation.z = -0.5 + Math.PI * 0.75;
+      return g;
+    }
+    if (id === 'handling') {
+      // a coil-over: spring around a damper rod, which is what "suspension" is
+      add(new THREE.CylinderGeometry(0.1, 0.1, 1.5, 10), M.chrome, 0, 0.1, 0);
+      add(new THREE.CylinderGeometry(0.26, 0.26, 0.5, 12), M.gunmetal, 0, -0.42, 0);
+      for (let i = 0; i < 9; i++) {
+        const t2 = i / 8;
+        add(new THREE.TorusGeometry(0.3, 0.055, 5, 14), M.crackle,
+          0, -0.18 + t2 * 1.0, 0, Math.PI / 2);
+      }
+      add(new THREE.CylinderGeometry(0.3, 0.3, 0.1, 12), M.alloy, 0, 0.86, 0);
+      return g;
+    }
+    if (id === 'nitro') {
+      // a jerry can, per the reference sheet: a body, a cap, a strap handle
+      add(new THREE.BoxGeometry(0.78, 1.05, 0.42), M.crackle, 0, 0.05, 0);
+      add(new THREE.BoxGeometry(0.8, 0.16, 0.14), M.gunmetal, 0, 0.34, 0.22);
+      add(new THREE.BoxGeometry(0.8, 0.16, 0.14), M.gunmetal, 0, -0.16, 0.22);
+      add(new THREE.CylinderGeometry(0.13, 0.13, 0.16, 10), M.chrome, 0.22, 0.65, 0);
+      const handle = add(new THREE.TorusGeometry(0.2, 0.05, 5, 10, Math.PI),
+        M.gunmetal, -0.16, 0.62, 0);
+      handle.rotation.set(Math.PI / 2, 0, 0);
+      return g;
+    }
+    if (id === 'armor') {
+      // a heater shield: a plate with a chevron, not a flat emoji
+      const plate = add(new THREE.CylinderGeometry(0.86, 0.3, 0.2, 3, 1), M.alloy, 0, 0, 0);
+      plate.rotation.set(Math.PI / 2, 0, Math.PI);
+      add(new THREE.BoxGeometry(0.17, 1.16, 0.08), M.crackle, 0, 0.02, 0.14);
+      add(new THREE.BoxGeometry(0.86, 0.17, 0.08), M.crackle, 0, 0.42, 0.14);
+      return g;
+    }
+    if (id === 'dampers') {
+      // TWO of them, because a pair is what a car is sprung on, and because it
+      // separates this row from the single coil-over above it
+      for (const sx of [-1, 1]) {
+        const x = sx * 0.46;                       // clear of each other on screen
+        add(new THREE.CylinderGeometry(0.08, 0.08, 1.25, 9), M.chrome, x, 0.1, 0);
+        add(new THREE.CylinderGeometry(0.2, 0.2, 0.44, 10), M.gunmetal, x, -0.38, 0);
+        for (let i = 0; i < 7; i++) {
+          add(new THREE.TorusGeometry(0.24, 0.05, 5, 12), M.brass,
+            x, -0.16 + (i / 6) * 0.82, 0, Math.PI / 2);
+        }
+      }
+      return g;
+    }
+    if (id === 'beacon') {
+      // a rotating beacon on a base: a lamp, and the light IS the point, so it
+      // is unlit material (`warn`) and reads at thumbnail size
+      add(new THREE.CylinderGeometry(0.34, 0.4, 0.2, 12), M.gunmetal, 0, -0.5, 0);
+      add(new THREE.CylinderGeometry(0.26, 0.26, 0.46, 12), M.warn, 0, -0.16, 0);
+      add(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 12), M.chrome, 0, 0.1, 0);
+      add(new THREE.SphereGeometry(0.24, 12, 8), M.warn, 0, 0.2, 0);
+      return g;
+    }
+    return g;
+  }
   return g;
 }
 
@@ -1576,6 +1653,10 @@ export class Car {
     this._wraps = 0;
     this._cpMask = 0;          // which lap gates are down, in order
     this._missedCP = false;
+    // THE GRID IS BEHIND THE LINE, so the first thing every race does is cross
+    // it. Set by whoever seats the car on its grid box; cleared by the first
+    // crossing, which is that one and is not a lap attempt. See `checkLap`.
+    this._gridStart = false;
     this.lateral = 0;
     this.finished = false;
     this.wallGrind = 0;
@@ -3432,6 +3513,26 @@ export class Car {
     if (this.trackIndex > n * 0.4 && this.trackIndex < n * 0.6) this._midCP = true;
     if (prevIndex > n * 0.85 && this.trackIndex < n * 0.15) {
       this._wraps++;                           // distance always counts...
+      // THE CROSSING OFF THE GRID IS NOT A LAP ATTEMPT.
+      //
+      // `gridSlot(0)` is {index: N-10}: every car starts BEHIND the start
+      // line and crosses it within a second of "GO!". That crossing arrives
+      // here with `_cpMask` at 0 and `_midCP` false — indistinguishable, to
+      // the code below, from a driver who cut the whole infield — so every
+      // race on every world opened with a full-screen "CHECKPOINT MISSED —
+      // LAP NOT COUNTED". Measured: PINE VALLEY t=1.10 s, EMBER PASS 0.93 s,
+      // TREMOLA DESCENT 0.98 s, from a standing start on the grid.
+      //
+      // The lap arithmetic was already right — this crossing has never earned
+      // a lap and must not start earning one — so this changes nothing but
+      // the accusation. `_wraps` still rises above, because `progress` orders
+      // the standings and must never go backwards.
+      if (this._gridStart) {
+        this._gridStart = false;
+        this._cpMask = 0;
+        this._midCP = false;
+        return false;
+      }
       const ALL = (1 << LAP_GATES.length) - 1;
       // ...but a cut earns no lap. `_missedCP` is left for the HUD to read, so
       // the driver is told WHY the lap did not count instead of watching the
@@ -4678,10 +4779,52 @@ export class PlayerCar extends Car {
       // The wedge net must not fire on a car that is BOGGING: both watch for
       // held throttle and no motion at the same five seconds, and if the free
       // rescue won that race the rule above could never fire at all.
-      const wedged = this === g.player && controlsLive && !this.airborne
-        && !bogged
-        && input.throttle > 0.5
-        && Math.hypot(this.vel.x, this.vel.z) < 0.8;
+      // PROGRESS, NOT SPEED. "< 0.8 u/s" asks whether the car is MOVING, and
+      // a car pinned against a canyon face is moving — it grinds along the
+      // rock. Measured on CANYON RUN: drive out through the low berm at the
+      // start line and the car settles at lateral -35.9 against a face
+      // standing at 37.06 and creeps at a steady 1.2 u/s. That is over the
+      // threshold, so `_wedgeT` sat at 0 for a full 55 seconds of held
+      // throttle and the free rescue never came. 1.2 u/s is about 4 km/h,
+      // which is the 2 and the 6 km/h in the two reports.
+      //
+      // The question is not "is it moving" but "is it getting anywhere". Hold
+      // an anchor on the lap position and reset it whenever the car actually
+      // advances; if the throttle is down and the anchor has not moved in five
+      // seconds, it is stuck whatever the speedometer says.
+      const sp2 = Math.hypot(this.vel.x, this.vel.z);
+      const pushing = this === g.player && controlsLive && !this.airborne
+        && !bogged && input.throttle > 0.5;
+      // CLIMBING IS PROGRESS TOO, and leaving it out broke the one rule this
+      // net was written to respect. A car grinding up a steep hillside is
+      // off the road, under 4 u/s and gaining no LAP position — every clause
+      // of the no-progress test — so it was being rescued off the mountain.
+      // Measured: `test-climb`'s "a steep hillside cannot be climbed" passes on
+      // main (rose -20.3 u) and failed here (rose 14.5 u), because the rescue
+      // teleported the car and the test read the jump as a climb.
+      //
+      // Height is the other axis of getting somewhere. Gaining a metre resets
+      // the clock exactly as advancing along the lap does.
+      const trk = g.track;
+      if (!pushing
+          || trk._circDist(this.trackIndex, this._wedgeAnchor ?? this.trackIndex) > 3
+          || this.pos.y - (this._wedgeAnchorY ?? this.pos.y) > 1.0) {
+        this._wedgeAnchor = this.trackIndex;
+        this._wedgeAnchorY = this.pos.y;
+        this._wedgeAnchorT = 0;
+      } else {
+        this._wedgeAnchorT = (this._wedgeAnchorT ?? 0) + dt;
+      }
+      // ...but only OFF the carriageway. A car that is on the road and not
+      // getting anywhere is spun, or boxed in by traffic, and hauling it out
+      // of that would be its own bug — as would hauling a driver out of
+      // donuts, which the speed cap also excludes. The defect being fixed is a
+      // car held OUTSIDE the road by scenery it cannot get around, so that is
+      // what the no-progress branch asks for.
+      const offRoad = Math.abs(this.lateral)
+        > (trk.widthAt?.(this.trackIndex) ?? ROAD_HALF) + 2;
+      const wedged = pushing
+        && (sp2 < 0.8 || (sp2 < 4 && offRoad && (this._wedgeAnchorT ?? 0) > 5));
       this._wedgeT = wedged ? (this._wedgeT ?? 0) + dt : 0;
       // UNSTUCK, ON DEMAND. The automatic nets above are deliberately slow —
       // five seconds of held throttle, because an idle car parked on a

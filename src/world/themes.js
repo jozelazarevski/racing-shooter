@@ -1709,11 +1709,38 @@ export const THEMES = {
     road: {
       // patched tarmac (35% of the Bible surface mix) with the dirt and mud
       // that make up another 45% of it dragged across the top
-      base: '#4c4a44', mottleA: [62, 54, 42], mottleB: [110, 108, 102],
-      rut: 'rgba(46,38,26,0.5)', rutCore: 'rgba(32,26,18,0.45)', tread: 'rgba(18,14,10,0.4)',
-      stoneA: 'rgba(178,174,164,0.55)', stoneB: 'rgba(52,48,42,0.7)',
+      //
+      // THE ROAD WAS MISSED WHEN THE PALETTE CAME UP. The note above records
+      // this world being rescued from "essentially black" by lifting the
+      // TERRAIN palette and the hemisphere — and it worked, on the terrain.
+      // The carriageway was left where it was, and it is the one surface a
+      // driver has to read. Reported from a phone with a screenshot of a black
+      // strip between two lit green hedges; measured at eight fixed stations on
+      // a 390x844 viewport, road luminance out of 255:
+      //
+      //   HEDGEROW DASH   19.6 median, 11.8 at its darkest, 5 of 8 under 25
+      //   SILVERSTONE     34.8 median,  9.8 at its darkest
+      //   OULTON PARK     54.5 median, 14.1 at its darkest
+      //   every other tarmac world on the roster: 86 - 125
+      //     (TREMOLA 86.3, MONACO 106.2, GOTTHARD 110.9, FURKA 119.2, MONZA
+      //      125.3 — and those are the CONTROL, not an aspiration)
+      //
+      // Four things compounded, and no single one of them looks wrong alone:
+      // the darkest road base on the roster (#4c4a44 against pass #6f6a63 and
+      // tremola #5f5b54), a brown mottle under it, three dark overlays stacked
+      // at 0.5/0.45/0.4, and then `wet.darken` taking another third off the
+      // result — the only tarmac theme in the game that carries one.
+      //
+      // So each comes up a little rather than one being flattened: the base
+      // into the band its neighbours occupy, the mottle out of brown, the
+      // overlays softened, and the wet darkening down to `undercity`'s 0.2,
+      // which is a wet road nobody has ever called unlit. Still the greyest,
+      // least saturated carriageway in the game, which is the point of it.
+      base: '#6a655c', mottleA: [86, 80, 68], mottleB: [140, 136, 128],
+      rut: 'rgba(58,48,34,0.38)', rutCore: 'rgba(42,34,24,0.34)', tread: 'rgba(26,21,15,0.3)',
+      stoneA: 'rgba(190,186,176,0.55)', stoneB: 'rgba(62,58,50,0.7)',
       fringe: [58, 92, 40], fringeVar: [28, 38, 22],    // grass right to the edge
-      wet: { darken: 0.32, gleam: 9, pools: 5 },
+      wet: { darken: 0.2, gleam: 9, pools: 5 },
     },
     // no mountains anywhere: a low green ridge line, sunk and half-eaten by fog
     hillColor: 0x54664a, peakColor: 0x8a94a0, hillDrop: 34,

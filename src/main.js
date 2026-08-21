@@ -840,6 +840,12 @@ const saveJSON = (key, obj) => {
 // device-wide settings (ir-steer / ir-assist / ir-diff) stay shared.
 const PROFILE_KEYS = ['career', 'garage', 'cars'];
 const PROFILE_COLORS = ['#ff8c1a', '#f2c81e', '#2440b8', '#4a9ad8', '#2f9e44', '#1c1a18']; // car livery hexes
+// ...and what to CALL each of them, because a swatch cannot say its own colour
+// to anyone who cannot see it, and a hex code is not a name.
+const PROFILE_COLOR_NAMES = {
+  '#ff8c1a': 'Orange', '#f2c81e': 'Yellow', '#2440b8': 'Blue',
+  '#4a9ad8': 'Sky', '#2f9e44': 'Green', '#1c1a18': 'Black',
+};
 const MAX_PROFILES = 6;
 const CONFIRM_MS = 3000;          // how long a two-tap destructive button stays armed
 const STARTER_CAR = 'brawler';    // the free machine every career begins with
@@ -1539,7 +1545,25 @@ class Game {
           c.b = texture2D(tDiffuse, vUv + off).b;
           float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
           c.rgb = mix(vec3(l), c.rgb, uSat);
-          c.rgb = (c.rgb - 0.5) * uCon + 0.5;
+          // A CONTRAST PIVOT OF 0.5 IS A DISPLAY-SPACE NUMBER, AND THIS PASS
+          // RUNS IN LINEAR SPACE (it is placed before OutputPass on purpose,
+          // to grade under the tone map). Linear mid-grey is 0.214, not 0.5,
+          // so pivoting at 0.5 put the "no change" point up among the
+          // highlights and pushed EVERYTHING below it down — and a channel
+          // that was already near zero went to zero.
+          //
+          // Measured on UNDERCITY SLIPSTREAM, the darkest world in the game,
+          // where it is most visible: the cliff wall's own texture is grey
+          // concrete, RGB (97,103,88) at saturation 0.145, and it rendered as
+          // (39,61,4) at saturation 0.979 — a flat green wash with no blue
+          // left in it at all. Setting uCon to 1.0, which makes the pivot
+          // irrelevant, restored it to (66,83,27) at 0.688, while uSat and
+          // uVig moved nothing: the pivot, and only the pivot.
+          //
+          // Pivoting where mid-grey actually is keeps the gentle lift the
+          // grade was always meant to be, and stops it crushing shadows.
+          const float PIVOT = 0.2140;               // linear value of sRGB 0.5
+          c.rgb = (c.rgb - PIVOT) * uCon + PIVOT;
           c.rgb *= 1.0 - uVig * smoothstep(0.35, 0.95, r2 * 2.6);
           gl_FragColor = c;
         }`,
@@ -3324,8 +3348,13 @@ class Game {
         </div>
       </div>
       <div class="sk-next">${gate
+    // FOLDED, THIS LINE IS ONE LINE — `sk-next` is nowrap with an ellipsis
+    // until the key is opened, so anything that does not fit is not shortened,
+    // it is CUT. Measured at 390: the old wording needed 393 px in a 302 px
+    // box and stopped at "THE REMAINING STARS ARE", which reads as a sentence
+    // someone forgot to finish. Same meaning, inside the box.
     ? gate
-    : 'EVERY CHAPTER IS OPEN — THE REMAINING STARS ARE FOR THE RECORD'}${
+    : 'ALL CHAPTERS OPEN — STARS ARE FOR THE RECORD'}${
   partial ? ` · ${partial} WORLD${partial === 1 ? '' : 'S'} STILL HOLDING STARS` : ''}</div>`;
     // The whole box is the hit target — a 10px chevron is not a phone control.
     // Bound here rather than once at boot because this method replaces the
@@ -3463,6 +3492,9 @@ class Game {
     search.id = 'wf-search';
     search.type = 'search';
     search.placeholder = 'SEARCH WORLDS, REGIONS, ROUTES';
+    // A PLACEHOLDER IS NOT A LABEL. It disappears the moment you type, and a
+    // screen reader announces an unlabelled search box as "edit text".
+    search.setAttribute('aria-label', 'Search worlds, regions and routes');
     search.autocomplete = 'off';
     search.value = this.filters.q;
     search.addEventListener('input', () => {
@@ -3696,7 +3728,17 @@ class Game {
   _fillTopbar(c) {
     const where = document.getElementById('topbar-where');
     const stars = document.getElementById('topbar-stars');
-    if (where) where.innerHTML = `<b>CHAPTER ${c.n}</b> ${c.name}`;
+    // "CH 4", NOT "CHAPTER 4". The bar's one job is to say where you are, and
+    // it could not: measured, EVERY chapter title was ellipsised on EVERY phone
+    // width — 8 of 8 at 320, 360 and 390, 7 of 8 at 430 — because BACK, the
+    // title, the star count, the driver and the balance all share one row. At
+    // 320 the title got 67 px to say 146 px of "CHAPTER 1 FIRST LIGHT".
+    //
+    // The number is a breadcrumb; the NAME is the information, and the word
+    // "CHAPTER" is 55 px of a phone spent on a word the screen below already
+    // says. Shortening it and slimming the balance chip (see index.html) buys
+    // the name enough room to finish.
+    if (where) where.innerHTML = `<b>CH ${c.n}</b> ${c.name}`;
     if (stars) stars.textContent = `${this.chapterStars(c._k)}/${c.levels.length * 3}★`;
   }
 
@@ -4521,8 +4563,12 @@ class Game {
     // ladders sell hardware the shop already has a model of — the gun, the
     // rocket rail, the drum — and the tyre ladder sells rubber. The rest are
     // tools and fluids with nothing to photograph, and keep their glyph.
+    // Every ladder has a model now — the four that sell hardware the shop
+    // already photographs, and the six that had to have one built.
     const ART = { cannon: 'weapon:cannon', rack: 'weapon:rack',
-      magazine: 'weapon:magazine', tires: 'tyre:gravel' };
+      magazine: 'weapon:magazine', tires: 'tyre:gravel',
+      engine: 'up:engine', handling: 'up:handling', nitro: 'up:nitro',
+      armor: 'up:armor', dampers: 'up:dampers', beacon: 'up:beacon' };
     const art = icons?.[ART[u.key]];
     card.innerHTML = `<span class="uc-ic">${
   art ? `<img src="${art}" alt="">` : u.icon}</span>
@@ -5018,6 +5064,23 @@ class Game {
     for (const p of PART_SLOT.spoiler.parts) shoot('spoiler', p.id, Math.PI * 0.9, 4.4);
     for (const id of ['road', 'gravel', 'snow']) shoot('tyre', id, Math.PI * 0.5, 4.2);
     for (const id of ['cannon', 'rack', 'magazine']) shoot('weapon', id, Math.PI * 0.78, 4.2);
+    // THE UPGRADE LADDERS, which were the six rows still showing a glyph.
+    //
+    // EACH ONE IS TURNED TO ITS OWN ANGLE, because one angle for six shapes is
+    // how the shield came out as a red sliver: the studio camera sits at
+    // (5.2, 3.2, 6.2), so a flat face only reads when its normal is turned to
+    // atan2(5.2, 6.2) = 0.70 rad, and a PAIR only separates when the axis it is
+    // offset along is turned to that same angle — otherwise the two dampers
+    // stack into one spring, which they did.
+    const UP_SHOT = {
+      engine:   { ry: -Math.PI * 0.16, dist: 3.6 },
+      handling: { ry: 0, dist: 3.2 },              // radial: any angle reads
+      nitro:    { ry: -Math.PI * 0.16, dist: 3.2 },
+      armor:    { ry: 0.70, dist: 3.4 },           // face-on to the camera
+      dampers:  { ry: 0.70, dist: 3.6 },           // pair across the view
+      beacon:   { ry: 0, dist: 3.0 },
+    };
+    for (const [id, o] of Object.entries(UP_SHOT)) shoot('up', id, o.ry, o.dist, 0.05);
     this.__partIcons = out;
     return out;
   }
@@ -5137,12 +5200,28 @@ class Game {
     this._renderGarageBays();
   }
 
+  /** The top-bar avatar: the driver's initial, or a bullet if the name starts
+   *  with something that has no letter in it. `profile-name` is the old
+   *  full-name node and is updated too where it still exists, so nothing that
+   *  reads it goes stale. */
+  _setProfileChip(name) {
+    const initial = (String(name ?? '').trim().match(/[\p{L}\p{N}]/u) ?? ['•'])[0].toUpperCase();
+    const av = document.getElementById('topbar-prof');
+    if (av) { av.textContent = initial; av.title = `Driver: ${name}`; }
+    const full = document.getElementById('profile-name');
+    if (full) full.textContent = name;
+  }
+
   // ---------- player profiles (menu header chip + panel) ----------
   _initProfileUI() {
-    const chip = document.getElementById('profile-chip');
+    // The chip lives in the top bar now and shows ONE LETTER. Both ids are
+    // looked up because the panel this opens still carries the full name, and
+    // a build that has only one of them must not throw on the other.
+    const chip = document.getElementById('topbar-prof')
+      || document.getElementById('profile-chip');
     const screenEl = document.getElementById('profile-screen');
     if (!chip || !screenEl) return;
-    document.getElementById('profile-name').textContent = this.profile.name;
+    this._setProfileChip(this.profile.name);
     chip.addEventListener('click', () => {
       this._renderProfiles();
       screenEl.classList.remove('hidden');
@@ -5360,6 +5439,12 @@ class Game {
       const b = document.createElement('button');
       b.className = 'prof-swatch' + (c === this._newColor ? ' sel' : '');
       b.style.background = c;
+      // A BARE COLOURED CIRCLE HAS NO NAME. Six of them in a row is six
+      // controls a screen reader calls "button", and colour is the one thing
+      // it cannot read out. Name the livery and say which is chosen.
+      b.setAttribute('aria-label', `${PROFILE_COLOR_NAMES[c] ?? c} livery`);
+      b.setAttribute('aria-pressed', c === this._newColor ? 'true' : 'false');
+      b.title = `${PROFILE_COLOR_NAMES[c] ?? c} livery`;
       b.addEventListener('click', () => { this._newColor = c; this._renderSwatches(); });
       sw.appendChild(b);
     }
@@ -5408,8 +5493,7 @@ class Game {
     saveJSON('ir-profiles', this.profiles);
     if (id === this.profile.id) {
       this.profile.name = name;
-      const chip = document.getElementById('profile-name');
-      if (chip) chip.textContent = name;
+      this._setProfileChip(name);          // avatar letter + the panel's name
     }
     return true;
   }
@@ -8497,7 +8581,31 @@ class Game {
   spawnHusk(car) {
     if (this.husks.length >= 6) return;
     const husk = car.mesh.clone(true);
-    this._huskMat ??= new THREE.MeshStandardMaterial({ color: 0x1d1a16, roughness: 1 });
+    // A WRECK, NOT A HOLE IN THE GROUND.
+    //
+    // This was 0x1d1a16 — albedo 0.11 — on one smooth material across the
+    // whole shell. Measured by differencing the frame with the husk hidden
+    // against the frame with it shown, and reading the pixels that changed:
+    //
+    //   DUST CANYON   husk mean luminance 11.4, p10 0.2   scene around it 152.6
+    //   PINE VALLEY   husk mean 12.1,           p10 0.0   scene 105.3
+    //   NEON GRID     husk mean 11.7                      scene  16.1
+    //
+    // Thirteen times darker than everything around it on a daylight world,
+    // with a tenth of its pixels at literal zero and no facet variation to
+    // read a shape from — which is why the screenshot that found this looks
+    // like a car-shaped hole in the sand rather than a burnt car. (The night
+    // world is the control: there the same material is right, because there
+    // the whole scene is 16.)
+    //
+    // Twice the albedo and FLAT SHADING. The flat shading is the half that
+    // matters: a low-poly shell with shared normals has almost no light
+    // variation across it at this albedo, so it reads as a silhouette however
+    // dark it is. Facets give it form. Still unmistakably charred — this is
+    // darker than any drivable surface on the roster.
+    this._huskMat ??= new THREE.MeshStandardMaterial({
+      color: 0x3d3630, roughness: 1, flatShading: true,
+    });
     husk.traverse((o) => { if (o.isMesh) o.material = this._huskMat; });
     husk.position.copy(car.mesh.position);
     husk.rotation.copy(car.mesh.rotation);
@@ -8961,6 +9069,9 @@ class Game {
     this.player.sos = this.player.maxSos;
     const slot = this.track.gridSlot(0);
     this.player.placeAt(slot.index, slot.lateral);
+    // Seated BEHIND the start line (gridSlot is N-10), so the first crossing
+    // of the race is this one and `checkLap` must not read it as a cut lap.
+    this.player._gridStart = true;
 
     this.enemies.forEach((e, i) => {
       e.lap = 1;
@@ -8971,6 +9082,7 @@ class Game {
       e.boostTimer = 0;
       const s = this.track.gridSlot(i + 1);
       e.placeAt(s.index, s.lateral);
+      e._gridStart = true;
     });
     for (const p of this.pickups) { p.active = true; p.mesh.visible = true; }
     this.track.setLights('red');

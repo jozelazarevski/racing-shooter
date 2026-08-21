@@ -80,7 +80,11 @@ export const LEVELS = [
     tune: { elev: { amp: 19, ph: [1.1, 2.4, 0.7] }, rampCount: 0, tunnels: { count: 2 } } },
   { id: 23, name: 'OUNINPOHJA', theme: 'forest', route: 'ouninpohja', region: 'WORLD RALLY',
     // the fastest stage in the sport: everything is crests and yumps
-    tune: { elev: { amp: 4, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
+    tune: { // FINNISH HIGH SUMMER: a sun that barely sets, hard and colourless
+      sunColor: 0xfffaf0, sunIntensity: 3.2, sunEl: 0.44, sunAz: 1.15,
+      skyTop: '#1f6ad2', skyHorizon: '#e6f2fb', hemiSky: 0xc4e0fa, hemiIntensity: 0.95,
+      fogColor: 0xdcecf6, fogNear: 420, fogFar: 2000, cloudCount: 5, cloudOpacity: 0.7,
+      terrainLow: '#5c9a3c', terrainHigh: '#9cc464', elev: { amp: 4, ph: [0.4, 1.9, 3.3] }, rampCount: 9, rampMaxCurv: 0.02 } },
   { id: 24, name: 'FAFE LEAP', theme: 'redwood', route: 'fafe', region: 'WORLD RALLY',
     tune: { elev: { amp: 8, ph: [2.2, 0.6, 1.4] }, rampCount: 7, rampMaxCurv: 0.022 } },
   { id: 25, name: 'PIKES PEAK', theme: 'alpine', route: 'pikes', region: 'WORLD RALLY',
@@ -136,7 +140,10 @@ export const LEVELS = [
   // circuit's). Appended, priced with explicit `cost` like every fresh
   // region, laddered so the collection spans a career.
   { id: 33, name: 'RED BULL RING', theme: 'alpine', route: 'rbring', region: 'GRAND CIRCUITS',
-    cost: 5, fresh: true, tune: { elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
+    cost: 5, fresh: true, tune: { // STYRIAN NOON: thin high-altitude air, hard shadows
+      sunColor: 0xfff4de, sunIntensity: 3.1, sunEl: 0.62, sunAz: 1.4,
+      skyTop: '#1c62c8', skyHorizon: '#cfe4f2', hemiSky: 0xa8ccf4, hemiIntensity: 0.7,
+      fogColor: 0xd2e4f0, fogNear: 480, fogFar: 2200, cloudCount: 6, cloudOpacity: 0.7, elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
   { id: 34, name: 'MONACO STREETS', theme: 'monteCarlo', route: 'monaco', region: 'GRAND CIRCUITS',
     cost: 6, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
   { id: 35, name: 'SILVERSTONE', theme: 'farmland', route: 'silverstone', region: 'GRAND CIRCUITS',
@@ -144,21 +151,66 @@ export const LEVELS = [
       sunColor: 0xe8e8e8, sunIntensity: 1.7, hemiIntensity: 1.05,
       skyTop: '#7a8a9a', skyHorizon: '#d8dde2', fogColor: 0xd0d6da, cloudCount: 22, cloudOpacity: 1, elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
   { id: 36, name: 'SPA-FRANCORCHAMPS', theme: 'forest', route: 'spa', region: 'GRAND CIRCUITS',
-    cost: 8, fresh: true, tune: { elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
+    cost: 8, fresh: true, tune: { // ARDENNES WEATHER: low cloud in the trees, no sun
+      sunColor: 0xdde6ec, sunIntensity: 1.55, hemiIntensity: 1.2,
+      hemiSky: 0x9db2c2, hemiGround: 0x54684e,
+      skyTop: '#65798c', skyHorizon: '#c6d3d9', sunGlow: 0xc8d4dc,
+      fogColor: 0xc0ccd2, fogNear: 190, fogFar: 1050, cloudCount: 26, cloudOpacity: 1, elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
   { id: 37, name: 'SUZUKA', theme: 'redwood', route: 'suzuka', region: 'GRAND CIRCUITS',
-    cost: 9, fresh: true, tune: { japan: { torii: 5, pagodas: 3 }, elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
+    cost: 9, fresh: true, tune: { // SPRING HAZE: a pale warm sky and soft shadows
+      sunColor: 0xffe4c0, sunIntensity: 2.15, sunEl: 0.52, sunAz: 2.4,
+      skyTop: '#79b2dc', skyHorizon: '#f6ead8', sunGlow: 0xffe8c8, hemiIntensity: 1.5,
+      hemiSky: 0xdcd0e4, hemiGround: 0x7a8a62,
+      fogColor: 0xe4e0da, fogNear: 170, fogFar: 1150, cloudCount: 14, cloudOpacity: 0.55, japan: { torii: 5, pagodas: 3 }, elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
   { id: 38, name: 'NORDSCHLEIFE', theme: 'forest', route: 'nordschleife', region: 'GRAND CIRCUITS',
-    cost: 10, fresh: true, tune: { elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
+    // EIFEL FIRST LIGHT: cold mist in the hollows.
+    //
+    // AND EARLY IS NOT UNLIT. The first cut of this took the "first light" idea
+    // literally — sun 18 u up the sky at `sunEl` 0.17, the roster's lowest, and
+    // a 0.72 hemisphere under it — and a sun that low delivers almost nothing
+    // to a horizontal surface, which is every surface you drive on. Measured
+    // at eight fixed stations on a phone, road luminance fell 91.7 -> 55.1
+    // against pristine, and the darkest station went to 14.5. The picture was
+    // a lit tree line over a road you could not see.
+    //
+    // The dawn is in the COLOUR and the mist, not in the exposure: the sun
+    // keeps its warm low-angle tint and comes up to a real morning angle, and
+    // the hemisphere carries the shadow side the way `farmland`'s note above
+    // says an overcast sky does. Re-measured after: see the commit.
+    cost: 10, fresh: true, tune: {
+      sunColor: 0xffdcae, sunIntensity: 2.35, sunEl: 0.34, sunAz: 2.05,
+      skyTop: '#39628f', skyHorizon: '#f0d6b4', sunGlow: 0xffd9a0,
+      hemiSky: 0x9fb6d0, hemiGround: 0x5c7450, hemiIntensity: 1.0,
+      fogColor: 0xc8d2c8, fogNear: 190, fogFar: 1100, cloudCount: 18, cloudOpacity: 0.95, elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
   { id: 39, name: 'MONZA', theme: 'medterrace', route: 'monza', region: 'GRAND CIRCUITS',
-    cost: 11, fresh: true, tune: { elev: { amp: 1.5, ph: [1, 2, 3] }, rampCount: 0 } },
+    cost: 11, fresh: true, tune: { // LOMBARDY IN SEPTEMBER: hot, hazy, bleached
+      sunColor: 0xfff0cc, sunIntensity: 2.9, sunEl: 0.58,
+      skyTop: '#5f9ad2', skyHorizon: '#f4ecd6', hemiSky: 0xe0dcc8, hemiIntensity: 1.25,
+      fogColor: 0xe6ded0, fogNear: 240, fogFar: 1500, cloudCount: 4, cloudOpacity: 0.45,
+      terrainLow: '#6f8a44', terrainHigh: '#9aa864', elev: { amp: 1.5, ph: [1, 2, 3] }, rampCount: 0 } },
   { id: 40, name: 'MARINA BAY', theme: 'neon', route: 'marina', region: 'GRAND CIRCUITS',
-    cost: 12, fresh: true, tune: { rampCount: 0 } },
+    // FLOODLIT, NOT CYBERPUNK. This carried `{ rampCount: 0 }` and nothing
+    // else, so it was NEON GRID EXPRESSWAY's world with a different centreline
+    // — and measured as the most alike pair on the whole roster (0.098 against
+    // a 0.631 median, see the colour-signature sweep). The real race is run
+    // under warm-white floodlights over harbour water, which is the opposite
+    // end of the night from a magenta-and-cyan expressway.
+    cost: 12, fresh: true, tune: {
+      sunColor: 0xffeccc, sunIntensity: 2.4,             // floodlight, not moonlight
+      skyTop: '#0a1626', skyHorizon: '#28527e', sunGlow: 0xffe0a8,
+      hemiSky: 0x2e5680, hemiGround: 0x1a2634, hemiIntensity: 2.2,
+      hazeColor: 0xffc060, hazeOpacity: 0.3,             // sodium glow off the bay
+      fogColor: 0x10263c, fogNear: 300, fogFar: 1600, rampCount: 0 } },
   { id: 41, name: 'MOUNT PANORAMA', theme: 'outback', route: 'panorama', region: 'GRAND CIRCUITS',
     cost: 13, fresh: true, tune: { // DUSK over the mountain: ember sky, violet ranges
       sunColor: 0xffb078, sunIntensity: 1.9, sunEl: 0.18, sunAz: 5.6,
       dusk: true, skyTop: '#6b62a0', skyHorizon: '#ffc79c', fogColor: 0xdec4b6, hemiIntensity: 0.9, hemiSky: 0x8a80b8, hemiGround: 0x6a5464, elev: { amp: 11, ph: [2.4, 1.1, 0.5] }, rampCount: 2 } },
   { id: 42, name: 'RALLYCROSS ARENA', theme: 'flume', route: 'rallyx', region: 'GRAND CIRCUITS',
-    cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
+    cost: 14, fresh: true, tune: { // LATE-AFTERNOON RALLYCROSS: raking backlight, long shadows
+      sunColor: 0xffd9a4, sunIntensity: 2.6, sunEl: 0.21, sunAz: 4.3,
+      skyTop: '#3d76b4', skyHorizon: '#f2d9b0', sunGlow: 0xffdca6,
+      hemiSky: 0xc8b8c8, hemiGround: 0x6a6248, hemiIntensity: 0.85,
+      fogColor: 0xdccdb4, fogNear: 260, fogFar: 1400, cloudCount: 12, cloudOpacity: 0.8, elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
   { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
     cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0,
       // AUTUMN: copper woods under a low golden sun
@@ -168,7 +220,11 @@ export const LEVELS = [
       skyTop: '#4a7ab8', skyHorizon: '#f0d8a8', fogColor: 0xe8d8b0,
       terrainLow: '#8a7a3e', terrainHigh: '#b89a58' } },
   { id: 44, name: 'LAGUNA SECA', theme: 'canyon', route: 'laguna', region: 'GRAND CIRCUITS',
-    cost: 16, fresh: true, tune: { elev: { amp: 9, ph: [1.9, 0.4, 2.6] }, rampCount: 0 } },
+    cost: 16, fresh: true, tune: { // MONTEREY MARINE LAYER burning off dry gold hills
+      sunColor: 0xfff2dc, sunIntensity: 2.5, sunEl: 0.46,
+      skyTop: '#7fa8c4', skyHorizon: '#e8eaea', hemiSky: 0xcdd8dc, hemiIntensity: 1.3,
+      fogColor: 0xdde2e0, fogNear: 200, fogFar: 1300, cloudCount: 16, cloudOpacity: 0.75,
+      terrainLow: '#9a8a4c', terrainHigh: '#c4b276', elev: { amp: 9, ph: [1.9, 0.4, 2.6] }, rampCount: 0 } },
   // the 25.8 km Corsican tarmac stage from the player's card: a 3000 u lap,
   // hairpin over hairpin, on the Mediterranean island theme
   { id: 45, name: 'TOUR DE CORSE', theme: 'medterrace', route: 'corse', region: 'GRAND CIRCUITS',
@@ -207,7 +263,19 @@ export const LEVELS = [
     // lateral clamp, the scenery clearance and the rail placement all widen
     // together — 9 u of half-width becomes 45, a 90 u carriageway.
     cost: 29, fresh: true, route: 'mountainSea',
-    tune: { tunnels: { count: 1 }, roadWidth: 5 } },
+    tune: { tunnels: { count: 1 }, roadWidth: 5,
+      // SEA HAZE OFF THE WATER, first thing. Three worlds ride `mountainsea`
+      // and the theme alone cannot separate them from each other — measured,
+      // CLIFF KNOT against SEA CLIFF RUN was 0.334 and against this world
+      // 0.431, on a set whose median pair is 0.390. So each takes an hour of
+      // the day, the same device the nine relit worlds use. This one is the
+      // earliest: low sun straight off the water, the mountain flank still
+      // cold and blue behind it, and haze pulled well in.
+      sunColor: 0xffe6c4, sunIntensity: 2.4, sunEl: 0.26, sunAz: 1.35,
+      skyTop: '#4a86bc', skyHorizon: '#e8dcc8', sunGlow: 0xffe0b4,
+      hemiSky: 0xbcd0e0, hemiGround: 0x525c56, hemiIntensity: 1.05,
+      fogColor: 0xd6dce0, fogNear: 150, fogFar: 1100,
+      cloudCount: 12, cloudOpacity: 0.7 } },
   // CITADEL BAY: the player's harbour reference - a turquoise bay, the quay
   // and its marina along the shore, and a walled hill town with a keep
   // standing over the whole thing. Shares the Aegean route because that lap
@@ -232,6 +300,17 @@ export const LEVELS = [
     tune: {
       tunnels: { count: 1 },
       coast: { a: [176, -300], b: [206, 320], level: -2.6, floor: -11, beach: 30 },
+      // LATE AFTERNOON on the headland: the sun already round to the west and
+      // low enough to rake the cliff faces, which is the hour that makes a
+      // knotted coast road read as one — every spur throws a shadow across the
+      // next. Warm on the rock, and the water goes green where the light comes
+      // off it at an angle.
+      sunColor: 0xffd9a2, sunIntensity: 2.7, sunEl: 0.3, sunAz: 4.4,
+      skyTop: '#2f74b8', skyHorizon: '#f4dcb8', sunGlow: 0xffd49a,
+      hemiSky: 0xa8bcd0, hemiGround: 0x60604a, hemiIntensity: 0.8,
+      seaColor: 0x17707e,
+      fogColor: 0xd8cdb8, fogNear: 340, fogFar: 1900,
+      cloudCount: 7, cloudOpacity: 0.6,
     } },
   // SKETCH E: the cliff run. The sea sits close on the east — 30 u off the
   // straight rather than the 60-90 CLIFF KNOT keeps — because the drawing
@@ -257,6 +336,17 @@ export const LEVELS = [
       tunnels: { count: 1 },
       coast: { a: [128, -260], b: [140, 300], level: -3.0, floor: -13, beach: 18 },
       whaleCount: 5,
+      // HARD NOON over deep water. The drawing writes "sharp cliff NEXT TO the
+      // sea" and the whales breach out past it — both want the sun overhead
+      // and the air clear, so the drop reads as a drop and you can see far
+      // enough out to catch one. The other end of the day from CLIFF KNOT,
+      // which shares this theme and this coast.
+      sunColor: 0xfffaf0, sunIntensity: 3.3, sunEl: 0.72, sunAz: 2.1,
+      skyTop: '#0f63c0', skyHorizon: '#d8ecf4',
+      hemiSky: 0x86b4dc, hemiGround: 0x4a5c52, hemiIntensity: 0.7,
+      seaColor: 0x0d5a86,
+      fogColor: 0xcadfe8, fogNear: 520, fogFar: 2400,
+      cloudCount: 4, cloudOpacity: 0.5,
     } },
 
   // ---- THE OLIVE COAST FAMILY. Asked for directly: "Olive coast is by far
@@ -2925,8 +3015,24 @@ const THEMES = {
     // doubled frame luminance, so the walls were simply under-lit, not shadowed
     // or mis-normalled. The slot canyon is most of what you look at here, and
     // vertical faces get almost nothing but this term.
-    hemiSky: 0x8a9a5c, hemiGround: 0x5a5e46, hemiIntensity: 5.5,
-    sunColor: 0xd8e87a, sunIntensity: 3.0,               // sickly grate-light shafts
+    // THE FILL WAS DOING THE WORK OF THE ATMOSPHERE, AND IT ATE THE WALLS.
+    //
+    // This world's cliff face is stained concrete: `cliffPalette` is five
+    // greys and the generated texture measures RGB (97,103,88) at saturation
+    // 0.145 on its own canvas. On screen it was (39,61,4) at 0.979 — a flat
+    // green wash with no blue in it. Half of that was the grade pass pivoting
+    // its contrast in the wrong space (fixed in main.js); the other half was
+    // here: a 5.5 hemisphere in a saturated yellow-green, against 0.8 on every
+    // other cliff-walled world, plus a 3.0 sun in another one.
+    //
+    // The green belongs to the AIR, not to the stone. Fog, haze and sky keep
+    // their sodium-sick cast untouched; the fill is desaturated and the wall
+    // is allowed to be concrete again. Measured on the driven frame: wall
+    // saturation 0.897 -> 0.523 (the reference cliff world reads 0.384) and
+    // the road came out BRIGHTER, 68.7 -> 63.1 against a gate floor of 25 —
+    // so the original "darkest world in the game" fault stays fixed.
+    hemiSky: 0x9aa598, hemiGround: 0x5c5e54, hemiIntensity: 3.6,
+    sunColor: 0xeef2d8, sunIntensity: 2.8,               // sickly grate-light shafts
     // The sky was the other half of it. Lighting the ground does nothing for
     // the top half of a chase-camera frame, and skyTop '#05070a' is black —
     // so roughly half the screen stayed at zero however bright the road got.
@@ -3570,7 +3676,20 @@ const THEMES = {
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'medhill',
     frontage: {
-      lateral: 15.5, depth: 8, unit: 7.2, height: 9.5, run: [6, 12], rows: 6,
+      // A WALLED HILL TOWN, not the quay. See the note on the Mediterranean
+      // block below: ten coastal worlds were building the IDENTICAL street —
+      // same setback, same house width, same height, same terrace length,
+      // same depth of town — and no amount of retinting reaches that. This
+      // one is compact and tall and stacks back up the hill under the keep.
+      // Tightest street of the ten and the deepest, but not tighter than the
+      // harbour it is measured against: at `lateral: 13` the campanile — which
+      // stands at `lateral + 1.5` and rises to 2.05x the street height —
+      // measured 29.3 u tall with its face 12.1 u off the centreline, and in
+      // a chase frame that is a dark slab filling a third of the screen with
+      // the road behind it. 15/11.5 keeps the near face at 11.25 (the harbour
+      // is 11.5) and brings the tower to 23.6 u at 16.5, still the tallest
+      // and closest of any coast but no longer a wall.
+      lateral: 15, depth: 7.5, unit: 6, height: 11.5, run: [6, 14], rows: 9,
       // WARM RENDER, NOT GREY. The shared default paints a muted stone/slate
       // street, which is right for a northern old town and wrong for this
       // one: the reference quay is limewash and painted render, ochre through
@@ -3642,6 +3761,9 @@ const THEMES = {
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     elements: 'medhill',
     frontage: {
+      // THE REFERENCE STREET, and deliberately unchanged: every other coast
+      // now varies AGAINST this one. A working quay — two storeys and a loft,
+      // plain frontages, long terraces.
       lateral: 15.5, depth: 8, unit: 7.2, height: 9.5, run: [6, 12], rows: 6,
       // WARM RENDER, NOT GREY. The shared default paints a muted stone/slate
       // street, which is right for a northern old town and wrong for this
@@ -3870,11 +3992,38 @@ const THEMES = {
     road: {
       // patched tarmac (35% of the Bible surface mix) with the dirt and mud
       // that make up another 45% of it dragged across the top
-      base: '#4c4a44', mottleA: [62, 54, 42], mottleB: [110, 108, 102],
-      rut: 'rgba(46,38,26,0.5)', rutCore: 'rgba(32,26,18,0.45)', tread: 'rgba(18,14,10,0.4)',
-      stoneA: 'rgba(178,174,164,0.55)', stoneB: 'rgba(52,48,42,0.7)',
+      //
+      // THE ROAD WAS MISSED WHEN THE PALETTE CAME UP. The note above records
+      // this world being rescued from "essentially black" by lifting the
+      // TERRAIN palette and the hemisphere — and it worked, on the terrain.
+      // The carriageway was left where it was, and it is the one surface a
+      // driver has to read. Reported from a phone with a screenshot of a black
+      // strip between two lit green hedges; measured at eight fixed stations on
+      // a 390x844 viewport, road luminance out of 255:
+      //
+      //   HEDGEROW DASH   19.6 median, 11.8 at its darkest, 5 of 8 under 25
+      //   SILVERSTONE     34.8 median,  9.8 at its darkest
+      //   OULTON PARK     54.5 median, 14.1 at its darkest
+      //   every other tarmac world on the roster: 86 - 125
+      //     (TREMOLA 86.3, MONACO 106.2, GOTTHARD 110.9, FURKA 119.2, MONZA
+      //      125.3 — and those are the CONTROL, not an aspiration)
+      //
+      // Four things compounded, and no single one of them looks wrong alone:
+      // the darkest road base on the roster (#4c4a44 against pass #6f6a63 and
+      // tremola #5f5b54), a brown mottle under it, three dark overlays stacked
+      // at 0.5/0.45/0.4, and then `wet.darken` taking another third off the
+      // result — the only tarmac theme in the game that carries one.
+      //
+      // So each comes up a little rather than one being flattened: the base
+      // into the band its neighbours occupy, the mottle out of brown, the
+      // overlays softened, and the wet darkening down to `undercity`'s 0.2,
+      // which is a wet road nobody has ever called unlit. Still the greyest,
+      // least saturated carriageway in the game, which is the point of it.
+      base: '#6a655c', mottleA: [86, 80, 68], mottleB: [140, 136, 128],
+      rut: 'rgba(58,48,34,0.38)', rutCore: 'rgba(42,34,24,0.34)', tread: 'rgba(26,21,15,0.3)',
+      stoneA: 'rgba(190,186,176,0.55)', stoneB: 'rgba(62,58,50,0.7)',
       fringe: [58, 92, 40], fringeVar: [28, 38, 22],    // grass right to the edge
-      wet: { darken: 0.32, gleam: 9, pools: 5 },
+      wet: { darken: 0.2, gleam: 9, pools: 5 },
     },
     // no mountains anywhere: a low green ridge line, sunk and half-eaten by fog
     hillColor: 0x54664a, peakColor: 0x8a94a0, hillDrop: 34,
@@ -4260,13 +4409,45 @@ const THEMES = {
  *  Each names its own ELEMENT KIT (different house SHAPES, not a retint) and
  *  its own frontage tints, so a street in Liguria and a street in the Aegean
  *  cannot be mistaken for one another from the driving seat.
+ *
+ *  ...EXCEPT THAT THE STREET ITSELF WAS ONE STREET. The frontage patch used to
+ *  carry only colour, so every one of these inherited the harbour's GEOMETRY,
+ *  and so did CITADEL BAY and the three `mountainsea` worlds. Measured off the
+ *  built themes, ten coastal worlds reported the identical row:
+ *
+ *      lateral 15.5   depth 8   unit 7.2   height 9.5   run 6-12   rows 6
+ *
+ *  Same distance from the road, same house width, same height, same terrace
+ *  length before a gap, same number of ranks back. Different paint on one
+ *  building, repeated ten times. (MONACO STREETS is the control that shows
+ *  the knobs matter: 16.5 / 9 / 7.5 / 12.5 / 5-10, and nobody has ever said
+ *  Monaco looks like the Aegean.)
+ *
+ *  So each coast now gets the street form its building culture actually has,
+ *  and they differ in SEVERAL knobs at once — one number moved is a variation,
+ *  four moved is a different place:
+ *
+ *    LIGURIA    tall, narrow, stacked hard against the lane and ranked deep
+ *               up the cliff. The Cinque Terre silhouette is height and
+ *               narrowness: 5 u frontages under 15 u walls.
+ *    AEGEAN     low cubic houses with air between them — the opposite shape.
+ *               Wide units, half the height, runs of two or three so the gaps
+ *               read as lanes down to the water.
+ *    BRAVA      a seafront promenade: everything set well back behind an
+ *               esplanade, mid-rise, long blocks, shallow town.
+ *    DALMATIA   dense stone old town hard on the street, near-continuous
+ *               terraces of ten to twenty.
+ *    AZUR       villas. Few, wide, deep, detached — runs of one or two — and
+ *               set a long way back behind their gardens.
  */
 for (const [key, over] of [
   ['liguria', {
     vegetation: 'olive',
     hutGlow: 0.12,                                   // ITALY - Cinque Terre
     elements: 'liguria',
-    frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f0e4cf', plinth: '#a98a68', trim: '#f6ecd8', frame: '#3f6b46', shutter: '#3f6b46' } },
+    frontage: {
+      lateral: 12, depth: 7, unit: 5.2, height: 15, run: [8, 16], rows: 8,
+      tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f0e4cf', plinth: '#a98a68', trim: '#f6ecd8', frame: '#3f6b46', shutter: '#3f6b46' } },
     seaColor: 0x2f7fa8, sunColor: 0xffe8c0, sunIntensity: 2.7,
     skyTop: '#2f7fd1', skyHorizon: '#e8ddc6',
     terrainLow: '#7d8a4e', terrainHigh: '#a89a68',
@@ -4276,7 +4457,9 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                    // GREECE
     elements: 'aegean',
-    frontage: { tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6, face: { render: '#f7f5ef', plinth: '#e2ded4', trim: '#ffffff', frame: '#2f6fae', shutter: '#2f6fae' } },
+    frontage: {
+      lateral: 19, depth: 9.5, unit: 8.5, height: 6.5, run: [2, 4], rows: 5,
+      tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6, face: { render: '#f7f5ef', plinth: '#e2ded4', trim: '#ffffff', frame: '#2f6fae', shutter: '#2f6fae' } },
     seaColor: 0x1f7fc4, sunColor: 0xfff4d8, sunIntensity: 3.0,
     skyTop: '#2a86dc', skyHorizon: '#eaf1f4',
     terrainLow: '#9a9a6a', terrainHigh: '#c0b489',
@@ -4286,7 +4469,9 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                     // SPAIN - Costa Brava
     elements: 'andalusia',
-    frontage: { tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33, face: { render: '#f4ecda', plinth: '#c9b592', trim: '#fdf6e8', frame: '#7a5a34', shutter: '#8a5a2c' } },
+    frontage: {
+      lateral: 24, depth: 11, unit: 9, height: 11.5, run: [7, 14], rows: 4,
+      tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33, face: { render: '#f4ecda', plinth: '#c9b592', trim: '#fdf6e8', frame: '#7a5a34', shutter: '#8a5a2c' } },
     seaColor: 0x2b6f9c, sunColor: 0xffe6b4, sunIntensity: 2.9,
     skyTop: '#3182cc', skyHorizon: '#efe2c6',
     terrainLow: '#8a8a52', terrainHigh: '#c2ad78',
@@ -4296,7 +4481,9 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                  // CROATIA
     elements: 'dalmatia',
-    frontage: { tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a, face: { render: '#f0ead9', plinth: '#c2b9a2', trim: '#f8f2e4', frame: '#4a6b4a', shutter: '#4a6b4a' } },
+    frontage: {
+      lateral: 11.5, depth: 8.5, unit: 6.2, height: 11, run: [10, 20], rows: 7,
+      tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a, face: { render: '#f0ead9', plinth: '#c2b9a2', trim: '#f8f2e4', frame: '#4a6b4a', shutter: '#4a6b4a' } },
     seaColor: 0x1c86ae, sunColor: 0xfff0d4, sunIntensity: 2.8,
     skyTop: '#2f8ad4', skyHorizon: '#e6eee8',
     terrainLow: '#6f8450', terrainHigh: '#a8a276',
@@ -4306,7 +4493,9 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                      // FRANCE - Cote d'Azur
     elements: 'azur',
-    frontage: { tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52, face: { render: '#f6e7d6', plinth: '#d8c4ae', trim: '#fbf0e2', frame: '#8fb4cc', shutter: '#8fb4cc' } },
+    frontage: {
+      lateral: 26, depth: 14, unit: 13, height: 10.5, run: [1, 2], rows: 3,
+      tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52, face: { render: '#f6e7d6', plinth: '#d8c4ae', trim: '#fbf0e2', frame: '#8fb4cc', shutter: '#8fb4cc' } },
     seaColor: 0x2f74a6, sunColor: 0xffeccc, sunIntensity: 2.6,
     skyTop: '#3a86c8', skyHorizon: '#eee4d2',
     terrainLow: '#7f8a58', terrainHigh: '#b0a478',
@@ -4316,8 +4505,10 @@ for (const [key, over] of [
   THEMES[key] = {
     ...THEMES.harbor,
     ...over,
-    // the frontage override is a PATCH, not a replacement: geometry (lateral,
-    // depth, unit, height, run, seaOpen, side) stays the harbour's
+    // The frontage override is still a PATCH — `seaOpen` and `side` stay the
+    // harbour's, because "no house between the seafront road and the water"
+    // is what makes any of these read as a coast. But the STREET FORM no
+    // longer does. See the note above this loop.
     frontage: { ...THEMES.harbor.frontage, ...(over.frontage || {}) },
   };
 }
@@ -4560,6 +4751,42 @@ THEMES.mountainsea = {
   coast: { a: [255, -580], b: [285, 580], level: -11, beach: 14 },
   massif: { az: 3.14, spread: 1.9, count: 8, r0: 430, r1: 700,
     h0: 110, h1: 200, w0: 200, w1: 340 },
+  // ---- AND A COAST OF ITS OWN, because three worlds ride on this theme.
+  //
+  // It was `{...THEMES.dalmatia}` with a waterline and a massif changed, which
+  // is the exact shape SAFARI PLAINS was pulled out of `dunes` for two blocks
+  // below. Measured the same way — eight driving frames per world reduced to a
+  // 6x6x6 RGB histogram over the non-HUD frame, ranked by 1 - intersection —
+  // DALMATIA DRIVE against CLIFF KNOT came back at 0.216, the closest pair in
+  // the Mediterranean set against a median of 0.390 across its 36 pairs.
+  //
+  // The difference is in the rock. Dalmatia is white Adriatic limestone under
+  // a high clear sun: pale ground, terracotta roofs, cypress. This theme is
+  // the drawing's headland coast — a mountain on one flank and the sea on the
+  // other — so it takes SLATE. Grey-blue schist instead of limestone, a
+  // colder deeper water off a steep shore rather than a bright shelf sea,
+  // dark pine-green scrub instead of olive-silver, and a harder light with
+  // more contrast in it because the massif stands over the whole lap.
+  seaColor: 0x14607e,
+  sunColor: 0xfff4e2, sunIntensity: 3.0, sunEl: 0.5,
+  skyTop: '#1f6fb4', skyHorizon: '#cfdde4',
+  hemiSky: 0x9cbcd4, hemiGround: 0x4e5a50, hemiIntensity: 0.82,
+  fogColor: 0xc6d4d8, fogNear: 300, fogFar: 1700,
+  terrainLow: '#55684e', terrainHigh: '#8d9184',
+  terrainScree: '#6b7078', skirtColor: '#5a6068',
+  hillColor: 0x6e7a72, peakColor: 0x9aa2a4,
+  frontage: { ...THEMES.dalmatia.frontage,
+    // ...AND NOT DALMATIA'S STREET EITHER. This theme spreads from that one,
+    // so it would otherwise inherit the dense stone old town — hard on the
+    // lane, terraces of ten to twenty — which is the wrong shape entirely for
+    // a headland where the road runs between a mountain and a drop. There is
+    // no town here: a few small places set well back, in ones and twos, two
+    // ranks at most. The opposite end of the same knobs.
+    lateral: 21, depth: 7, unit: 6.8, height: 8, run: [1, 3], rows: 2,
+    tints: ['#dcd8cc', '#cfcdc4', '#e4e0d4', '#c8c6bc', '#d6d2c6'],
+    roof: 0x8f5a44,
+    face: { render: '#e2ded2', plinth: '#a8a89e', trim: '#f0ece0',
+      frame: '#3d5560', shutter: '#3d5560' } },
 };
 
 
@@ -9223,25 +9450,56 @@ export class Track {
     const CLEAR = 2.3;                 // car half-width 1.7, plus a hand's breadth
     const STEP = 0.5;
     const cap = new Float32Array(N * 2);
+    // 1 = the wall stands as the theme drew it; 0 = it opens to a berm because
+    // no setback keeps it out of a road. Smoothed below like `cap` itself.
+    const open = new Float32Array(N * 2).fill(1);
     let capped = 0, floored = 0, tightest = Infinity;
+    /** Would a face at lateral `lb` clear every leg's carriageway? Face rows
+     *  only (foot, mid-lean, rim edge) — the same three the setback governs.
+     *  Hoisted so the check can be made twice: once to CHOOSE the setback, and
+     *  again on the value actually built after smoothing. */
+    const clearFor = (j, side, lb) => {
+      const c = this.center[j], n = this.nrm[j];
+      const P = this._cliffProfile(j, side);
+      for (const r of [0, P.l1, P.l2]) {
+        const lat = lb + r;
+        const ns = this._nearestSample(c.x + n.x * lat * side, c.z + n.z * lat * side);
+        if (ns.d < this.widthAt(ns.i) + CLEAR) return false;
+      }
+      return true;
+    };
     for (let j = 0; j < N; j++) {
       const c = this.center[j], n = this.nrm[j];
       const floor = this.widthAt(j) + CLEAR;
       for (let s = 0; s < 2; s++) {
         const side = s ? -1 : 1;
         const P = this._cliffProfile(j, side);      // uncapped: `_cliffCap` is unset
-        const rows = [0, P.l1, P.l2];
-        const clearAt = (lb) => {
-          for (const r of rows) {
-            const lat = lb + r;
-            const ns = this._nearestSample(c.x + n.x * lat * side, c.z + n.z * lat * side);
-            if (ns.d < this.widthAt(ns.i) + CLEAR) return false;
-          }
-          return true;
-        };
+        const clearAt = (lb) => clearFor(j, side, lb);
         let out = P.base;
         if (!clearAt(P.base)) {                     // fast path: nearly always clear
           out = floor;
+          // A WALL THAT CANNOT GET OUT OF THE ROAD MUST STOP BEING A WALL.
+          //
+          // If even the floor does not clear, the loop below finds nothing and
+          // the face is built at the floor ANYWAY — inside somebody's
+          // carriageway. That is not hypothetical: UNDERCITY SLIPSTREAM's two
+          // legs pass about 20 u apart, so a face at its natural 11.4 u
+          // setback lands 8.6 u from the other leg's centreline, inside its
+          // 9 u half-width, and 30 of 1800 sides are built there. Measured,
+          // and the only world on the roster where it happens.
+          //
+          // A bore would be the right answer and cannot be built here:
+          // `tunnelFitAt` returns 0 at all 51 stations around both crossings
+          // (curvature 0.0378 and 0.0205 against a 0.013 limit, and a crest at
+          // 600). This world is hairpin folds end to end and a bore through a
+          // corner cuts its own mouth open.
+          //
+          // So the rock opens instead. `open` drops the wall to the same low
+          // berm the start-line gap uses, which is under the 2.5 u threshold
+          // `Vehicle` treats as solid — so the face stops blocking a road it
+          // was never meant to be in, rather than standing in it invisibly
+          // wrecking whoever drives that leg.
+          if (!clearAt(floor)) open[j * 2 + s] = 0;
           for (let lb = floor; lb <= P.base; lb += STEP) {
             if (clearAt(lb)) out = lb; else break;
           }
@@ -9263,9 +9521,140 @@ export class Track {
         cap[j * 2 + s] = out;
       }
     }
+    // ---- AND THE CAP MUST BE A SURFACE, NOT A SET OF STEPS ----------------
+    //
+    // Everything above decides each station on its own, and the ribbon is a
+    // STRIP BETWEEN CONSECUTIVE STATIONS. So where the cap engages abruptly the
+    // quad joining two neighbours is a stretched triangle. Measured on CANYON
+    // RUN's left wall:
+    //
+    //     820   base 11.3   height  5.8
+    //     821   base 37.2   height 14.4
+    //
+    // 25.9 u sideways and 8.6 u up in ONE segment. That triangle sweeps across
+    // whatever lies between its ends, and what lies between is the road: a
+    // raycast straight down from the top-down camera over station 819 hits
+    // cliff geometry 24.8 u ABOVE the tarmac. On screen it is a slab of rock
+    // lying across the middle of the frame with the road behind it, which is
+    // exactly what was reported, twice.
+    //
+    // Limit how fast the cap may open out along the lap. Only ever pulling
+    // DOWN, never pushing a wall back out, so nothing this touches can newly
+    // intrude anywhere — and floored at each station's own floor so the
+    // smoothing cannot walk a wall into its own carriageway. Circular, and
+    // both directions, or the seam at sample 0 becomes the new step.
+    const preSmooth = Float32Array.from(cap);    // what each station chose alone
+    const SLOPE = Math.max(0.6, this.segLen * 0.5);
+    for (let s = 0; s < 2; s++) {
+      const fl = (j) => this.widthAt(j) + CLEAR;
+      for (let pass = 0; pass < 2; pass++) {
+        for (let k = 0; k < N * 2; k++) {                  // forward
+          const j = k % N, i0 = (j - 1 + N) % N;
+          const lim = cap[i0 * 2 + s] + SLOPE;
+          if (cap[j * 2 + s] > lim) cap[j * 2 + s] = Math.max(fl(j), lim);
+        }
+        for (let k = N * 2 - 1; k >= 0; k--) {             // and back
+          const j = k % N, i1 = (j + 1) % N;
+          const lim = cap[i1 * 2 + s] + SLOPE;
+          if (cap[j * 2 + s] > lim) cap[j * 2 + s] = Math.max(fl(j), lim);
+        }
+      }
+    }
+    // ---- AND NOW CHECK WHAT WAS ACTUALLY BUILT --------------------------
+    //
+    // The smoothing above pulls caps IN, and the first version of it shipped
+    // with the claim that pulling in "can never newly intrude". That is
+    // FALSE, and measurably so: the cap is a distance from ITS OWN
+    // centreline, and where another leg lies on the inside of the bend,
+    // moving a wall toward its own road moves it toward that leg's road too.
+    // CANYON RUN went from 0 wall-sides inside a carriageway to 50, biting up
+    // to 8.9 u with walls 11-24 u tall — a solid wall in a road, which is
+    // worse than the slab over it that the smoothing was written to remove.
+    //
+    // So the clearance question is asked again, of the setback that will
+    // actually be built rather than of the candidate that was considered. Any
+    // face that still cannot get clear opens to a berm, which is the same
+    // answer the pre-smoothing pass gives and costs nothing where it never
+    // fires.
+    // OPENING IS THE LAST RESORT, NOT THE FIRST ANSWER. Where the smoothed
+    // setback fails, walk back OUT toward the value this station had before
+    // smoothing and take the first that clears: that keeps the wall, keeps
+    // most of the smoothing, and only gives up where nothing in the range
+    // works. Opening 50 sides on CANYON RUN to save it from 50 solid walls in
+    // a road is right; opening them when a setback two steps out would have
+    // cleared is just losing canyon.
+    for (let j = 0; j < N; j++) {
+      for (let s = 0; s < 2; s++) {
+        if (open[j * 2 + s] === 0) continue;              // already opened
+        const side = s ? -1 : 1;
+        if (clearFor(j, side, cap[j * 2 + s])) continue;  // fine as built
+        let fixed = -1;
+        for (let lb = cap[j * 2 + s] + STEP; lb <= preSmooth[j * 2 + s] + 1e-6; lb += STEP) {
+          if (clearFor(j, side, lb)) { fixed = lb; break; }
+        }
+        // ...but only if the walk back out is SHORT. Restoring a wall that
+        // needs 26 u to clear puts the step straight back — measured, station
+        // 821 on CANYON RUN went to 25.8 u again the moment the restore was
+        // unconditional, which is the exact slab this pass exists to remove.
+        // Smoothness and clearance genuinely conflict there, and the way out
+        // is that a face which can only clear by jumping must not be a face.
+        if (fixed > 0 && fixed - cap[j * 2 + s] <= SLOPE * 2) cap[j * 2 + s] = fixed;
+        else open[j * 2 + s] = 0;
+      }
+    }
+    // AND THE OPENING RAMPS TOO, for the same reason the setback does: a wall
+    // that drops to a berm for fifteen stations and springs back to full
+    // height at the sixteenth puts a stretched triangle across the road, which
+    // is the defect this whole pass exists to remove. Ramp over ~8 stations.
+    for (let s = 0; s < 2; s++) {
+      const RAMP = 1 / 8;
+      for (let pass = 0; pass < 2; pass++) {
+        for (let k = 0; k < N * 2; k++) {
+          const j = k % N, i0 = (j - 1 + N) % N;
+          const lim = open[i0 * 2 + s] + RAMP;
+          if (open[j * 2 + s] > lim) open[j * 2 + s] = lim;
+        }
+        for (let k = N * 2 - 1; k >= 0; k--) {
+          const j = k % N, i1 = (j + 1) % N;
+          const lim = open[i1 * 2 + s] + RAMP;
+          if (open[j * 2 + s] > lim) open[j * 2 + s] = lim;
+        }
+      }
+    }
+    this._cliffOpen = open;
+    // the published statistic has to describe what was BUILT, so recount after
+    // the smoothing rather than before it
+    capped = 0; floored = 0; tightest = Infinity;
+    for (let j = 0; j < N; j++) {
+      const fl = this.widthAt(j) + CLEAR;
+      for (let s = 0; s < 2; s++) {
+        const side = s ? -1 : 1;
+        const raw = this._cliffProfileBase(j, side);
+        const got = cap[j * 2 + s];
+        if (got < raw - 1e-6) {
+          capped++;
+          if (got <= fl + 1e-6) floored++;
+          if (got < tightest) tightest = got;
+        }
+      }
+    }
     this._cliffCap = cap;
     this._cliffCapped = { sides: capped, of: N * 2, floored,
       tightest: capped ? +tightest.toFixed(2) : null };
+  }
+
+  /** The wall's setback BEFORE the cap — the theme's own number.
+   *
+   *  Two callers need it and it used to be spelled out in one of them, so the
+   *  other (the census that asks "did the cap bind here?") carried a copy, and
+   *  a probe that re-derived it a third time reported 900 refusals for a world
+   *  that had just built 88 houses. One formula, every caller.
+   */
+  _cliffProfileBase(j, side) {
+    const t = (j % N) * (Math.PI * 2 / N);
+    const ph = side * 2.13;
+    return WALL_OFF + 0.65 + (this.T.cliffSetback ?? 0)
+      + 0.24 * (Math.sin(31 * t + 2.2 + ph) + 1);
   }
 
   _cliffProfile(j, side) {
@@ -9289,18 +9678,55 @@ export class Track {
       const tw = THREE.MathUtils.smoothstep(Math.sin(53 * t - 1.7 * ph), 0.78, 0.97);
       h += notch * tw * tw * 5;
     }
-    h = Math.max(1.7, h * gap);                  // low stone berm through the gap
+    // ...and the same berm where the wall had to open because no setback kept
+    // it out of a carriageway (see `_buildCliffCaps`). Guarded index: the
+    // caps are built by a pass that calls this function before `_cliffOpen`
+    // exists, and an undefined here would make every height NaN.
+    const open = this._cliffOpen
+      ? this._cliffOpen[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)] : 1;
+    // THE FLOOR SCALES WITH `open` TOO. It did not, so a face that could not
+    // get out of a road was floored at 1.7 u and left a RIDGE LYING IN THE
+    // CARRIAGEWAY — 49 sides of CANYON RUN and 30 of UNDERCITY, about a metre
+    // and a third of rock across the road. Non-solid, so you drive straight
+    // over it, which is precisely "wall needs to be removed, I can't be
+    // driving on it". A wall with nowhere to stand must go to NOTHING, not to
+    // a speed bump. `open` multiplies the floor as well now, so it does.
+    //
+    // The start-line gap is untouched: `open` is 1 there and this is exactly
+    // the old expression.
+    h = open * Math.max(1.7, h * gap);           // low stone berm through the gap
     // cliffSetback pushes the faces off the verge: the corridor becomes a
     // DEEP VALLEY with a drivable floor, not a walled slot ("don't build
     // walled track in desert - or make it look like a deep valley")
-    let base = WALL_OFF + 0.65 + (this.T.cliffSetback ?? 0)
-      + 0.24 * (Math.sin(31 * t + 2.2 + ph) + 1);
+    let base = this._cliffProfileBase(j, side);
     // …but never further out than the lap leaves room for. See _buildCliffCaps:
     // the setback is measured from THIS station and the lap comes back past it.
     // Guarded index — a negative `j % N` would read undefined and Math.min it
     // to NaN, and every NaN comparison downstream is false.
+    // A WALL THAT IS PULLED IN MUST ALSO COME DOWN.
+    //
+    // The cap moves the face sideways and never touches its height, so where
+    // it bound hard the theme's full cliff ended up standing on the kerb:
+    // measured on ROCKFALL RAVINE, a 32.5 u face at 11.3 u off the centreline
+    // wrapped round a 19 u radius corner, and on CANYON RUN 38.5 u at the same
+    // 11.3. Three times taller than it is distant, curved round the car — from
+    // the top-down camera that is not a canyon, it is a closed drum with the
+    // road invisible inside it, which is exactly what was reported. 137 such
+    // sides across four worlds (LAGUNA SECA 54, ROCKFALL 44, CORNICHE 26,
+    // CANYON RUN 13).
+    //
+    // Scale the height by how far the cap actually pulled the base in. Where
+    // it did not bind the wall is untouched, so GLACIAL PASS and UNDERCITY —
+    // whose caps never bind, or bind by a hand's breadth — do not move at all,
+    // and a slot canyon that is NATURALLY close-in keeps its full height. The
+    // floor of 0.42 stops a hairpin becoming a kerbstone: what is left is a
+    // steep bank you can see over, not a wall you are sealed inside.
     if (this._cliffCap) {
-      base = Math.min(base, this._cliffCap[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)]);
+      const capped = this._cliffCap[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)];
+      if (capped < base) {
+        h *= THREE.MathUtils.clamp(capped / base, 0.42, 1);
+        base = capped;
+      }
     }
     const l1 = 0.85 + 0.5 * Math.sin(17 * t + 0.7 - ph);   // mid-face lean
     const l2 = 2.0 + 0.85 * Math.sin(13 * t + 2.9 + ph) + 0.4 * Math.sin(47 * t - ph);
@@ -9408,6 +9834,13 @@ export class Track {
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
       map: tex, roughness: 1, side: THREE.DoubleSide, vertexColors: true,
     }));
+    // NAME IT. `road`, `road-skirt` and `oldtown-frontage` all carry names and
+    // the cliff did not, so anything looking for it had to guess — "unnamed,
+    // textured, over 2000 verts" also selects the massif and the TERRAIN, and
+    // a probe built on that guess reported CORNICHE's road as 100% hidden by
+    // cliff at a station where the road is a viaduct over open ground and
+    // there is no cliff over it at all. It was hiding the ground.
+    mesh.name = 'cliff-ribbon';
     mesh.receiveShadow = true;
     this.group.add(mesh);
   }
@@ -9535,6 +9968,23 @@ export class Track {
         if (!best || margin > best.margin) best = { px, pz, margin };
         if (margin >= 0.6) break;
       }
+      // ...AND WHERE THERE IS NOWHERE AT ALL, BUILD NOTHING.
+      //
+      // Giving up the collider stops a tower dead-stopping anyone, but it does
+      // not stop four poles standing on the tarmac, which is what MOUNTAIN TO
+      // SEA has: its start line runs alongside ANOTHER LEG of its own lap and
+      // both roads are 90 u wide, so walking out from sample 0 the nearest
+      // carriageway switches from sample 0 to 338, 336, 334, 331 — a 21 u
+      // corridor where 46.8 u is needed. Nothing clears until 122 u out, which
+      // is two and a half road-widths from the line it is meant to mark.
+      //
+      // So apply the law the census applies: a bare thing may not stand deeper
+      // than 3 u in a lane. `best.margin` is distance minus the leg cluster's
+      // 1.8 u reach minus that stretch's half-width, and a leg carries r 0.6,
+      // so its bite is -(margin) - 1.2. Past 3 u the tower is not sited badly,
+      // it is unsiteable, and the honest build is none. The banner is hung
+      // from the start line itself and is unaffected.
+      if (-best.margin - 1.2 > 3) continue;
       const bx = best.px, bz = best.pz;
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
         // and a leg reaches the GROUND under its own tower, which on a world
@@ -13031,8 +13481,12 @@ export class Track {
   _buildStreetLife() {
     const F = this.T.frontage || {};
     const SIDES = F.side ? [F.side] : [1, -1];
-    const inner = ROAD_HALF + 2.2;                       // clear of the road
-    const outer = Math.max(inner + 1.5, (F.lateral ?? 15.5) - 2.4);
+    // the pavement band is beside the KERB, and on a five-lane boulevard the
+    // kerb is 45 u out — the same reason the frontage itself vanished there
+    const KERB = this._kerbHalf();
+    const inner = KERB + 2.2;                            // clear of the road
+    const outer = Math.max(inner + 1.5,
+      (F.lateral ?? 15.5) + (KERB - ROAD_HALF) - 2.4);
     const A = propAssets();
     const awnMat = new THREE.MeshStandardMaterial({
       color: 0xffffff, vertexColors: true, roughness: 0.9, side: THREE.DoubleSide,
@@ -16510,6 +16964,13 @@ export class Track {
       tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
       ...this.T.frontage,
     };
+    // THE SETBACK IS FROM THE KERB, NOT FROM THE CENTRELINE. Every lateral
+    // below — the terrace, the ranks behind it, the tower, the arch springing
+    // line — is quoted against a normal road. On the one world with a wide
+    // one that put the whole town under the tarmac and `_clearsRoad` threw all
+    // of it away in silence. Shift the whole street out by the extra width the
+    // road carries and every consumer follows; see `_kerbHalf`.
+    F.lateral += this._kerbHalf() - ROAD_HALF;
     // THE SKYLINE MUST BE ROOFTOPS. The shared horizon builder rings every
     // world with cone hills and a farther ring of peaks. Behind an old town
     // that is a mountain range, which the region's negative list forbids
@@ -18164,6 +18625,20 @@ export class Track {
    *  It is the difference that matters on a hairpin. A block placed along one
    *  sample's normal is fine at that sample and inside the road two samples
    *  later, where the centreline has swung under it. */
+  /** Half-width of the widest carriageway this world carries.
+   *
+   *  `ROAD_HALF` is the drivable half-width of a NORMAL road, and a town's
+   *  setback is quoted against it. One world is not normal: MOUNTAIN TO SEA
+   *  asks for `roadWidth: 5`, a 45 u half-width boulevard, and every frontage
+   *  setback in the table then falls INSIDE its own carriageway. `_clearsRoad`
+   *  refused all 900 candidates and the world built a town of nothing —
+   *  measured 0 instances, with `seaOpen` refusing none of them, so the sea
+   *  was never the reason. A setback is measured from the KERB; this returns
+   *  where the kerb is. `roadWidth` is absent on 71 of 72 worlds, so this is
+   *  `ROAD_HALF` and no other street moves by a millimetre.
+   */
+  _kerbHalf() { return ROAD_HALF * (this.T.roadWidth ?? 1); }
+
   _clearsRoad(x, z, r, margin = 1.2) {
     _clearV.set(x, 0, z);
     const i = this.nearestIndex(_clearV);          // no hint: search the whole lap
@@ -18260,9 +18735,145 @@ export class Track {
     return Math.random() > THREE.MathUtils.smoothstep(this.terrainHeight(x, z), fade[0], fade[1]);
   }
 
+
+  /** THE DISTANT STAND — the mid-distance tree line, as its own method.
+   *
+   *  IT ONLY EVER RAN ON ONE KIND OF WORLD. It lived in the tail of
+   *  `_buildForest`, and `_buildForest` DISPATCHES: cactus, outback, charred,
+   *  jungle, palm, redwood, burnt and olive each `return` a specialised
+   *  builder before the generic conifer path is reached. So every world whose
+   *  trees are not plain conifers built none of it. Counted across the roster:
+   *
+   *    300 clumps   PINE VALLEY, PIKES PEAK, SPA, OUNINPOHJA, FROST PEAK,
+   *                 LOG FLUME FURY, RALLYCROSS ARENA, HEDGEROW DASH,
+   *                 DEEPWOOD TRAIL, TIMBER GORGE
+   *      0 clumps   REDWOOD RAMPAGE (792 trees), FAFE LEAP (798),
+   *                 SUZUKA (772), FOREST FIRE ESCAPE (586)
+   *
+   *  Four heavily wooded worlds with a bare mid-distance, which is exactly
+   *  what the comment below says this was built to stop.
+   *
+   *  NOT every vegetation type gets it. The clump is three welded cones — a
+   *  conifer silhouette — so it is called for the tall-forest builders and NOT
+   *  for olive, palm, cactus or outback, where a distant fir line would be a
+   *  different lie from the one it fixes.
+   *
+   *  It stays NON-COLLIDABLE and it stays far out. Measured, its nearest clump
+   *  on any world sits 282 u from the carriageway, so nothing here is a tree a
+   *  car can drive through at speed — which is the reason not to simply pull
+   *  the inner radius in when the playfield scatter thins (it does so at about
+   *  160 u, not the ~640 u the note below assumes). */
+  _buildDistantStand(m4) {
+    const T = this.T;
+    // How close a non-collidable clump may come to a carriageway. 220 u is
+    // three times the widest road on the roster and well past anywhere a car
+    // reaches without deliberately leaving the course.
+    const STAND_STANDOFF = 220;
+    // THE DISTANT STAND. Between the playfield scatter (out to ~640 u) and
+    // the horizon rings (900 u+) there was an empty ring - the mid-distance
+    // read as bare lawn on every wooded world, which is most of why the
+    // scene lacked depth.
+    //
+    // A STAND OF TREES IS NOT ONE CONE. The first cut was a single 6-sided
+    // cone per copy, 5-12 u wide and up to 21 u tall, scattered evenly and
+    // washed 40 % toward the fog: from the road that is a field of pale
+    // pyramids sitting on the grass, which is what the player photographed.
+    // Three faults, all fixed here:
+    //   - SHAPE: a clump of three offset crowns at different heights, welded
+    //     into one geometry, so the silhouette is a lumpy tree-line rather
+    //     than a triangle.
+    //   - GROUPING: clumps are drawn in GROVES of five to nine, because a
+    //     wood is a mass with edges, not evenly spaced dots.
+    //   - TONE: half the fog wash, so they read as trees in haze instead of
+    //     ghosts, and none of them stands taller than a real tree.
+    if (T.treeCount >= 150) {
+      const crown = (r, h, y, dx, dz) => new THREE.ConeGeometry(r, h, 5)
+        .translate(dx, y + h / 2, dz);
+      const bandGeo = this._bundle([
+        crown(1.00, 1.70, 0, 0, 0),
+        crown(0.78, 1.25, 0, -0.95, 0.42),
+        crown(0.66, 1.00, 0, 0.82, -0.55),
+      ]);
+      const band = new THREE.InstancedMesh(bandGeo, new THREE.MeshStandardMaterial({
+        color: 0xffffff, vertexColors: false, flatShading: true, roughness: 1,
+      }), 300);
+      const bandCol = new THREE.Color(), fogC2 = new THREE.Color(T.fogColor ?? 0xcccccc);
+      const baseC2 = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
+      const bq = new THREE.Quaternion(), bup = new THREE.Vector3(0, 1, 0);
+      let bk3 = 0;
+      for (let gv = 0; gv < 46 && bk3 < 300; gv++) {
+        const gh = (n) => { const v = Math.sin((gv + n) * 12.9898) * 43758.5453; return v - Math.floor(v); };
+        const aG = gh(0.1) * Math.PI * 2;
+        // PLACED BY DISTANCE FROM THE ROAD, NOT RADIUS FROM THE ORIGIN.
+        //
+        // It used to sit at r 640-900 from the world centre, which is only a
+        // proxy for "far from the driver" and a poor one — a lap is not a
+        // circle. Two things followed from that, measured:
+        //
+        //   THE GAP IT EXISTS TO FILL WAS NOT WHERE IT WAS LOOKING. Scatter
+        //   density falls off a cliff at about 160 u from the carriageway
+        //   (15.4 items per 10,000 u² in the 80-160 band, 1.6 beyond it), and
+        //   the stand started at 640. The 300-640 band — which is exactly what
+        //   an off-road climb photographs — got 9 items in a 440 u-wide
+        //   corridor on PINE VALLEY and nothing else.
+        //
+        //   AND ITS STANDOFF WAS LUCK. These clumps are deliberately NOT
+        //   collidable; nothing that far out is meant to be hit. Whether any
+        //   of them landed beside a carriageway depended entirely on the shape
+        //   of the lap. Measured before this change the nearest sat 282 u out,
+        //   which is fine — and nothing in the code was making it so.
+        //
+        // So the grove centre is rejection-sampled against the real distance
+        // to the road: far enough that a clump can never be a tree a car
+        // drives through, near enough to fill the band that was empty. The
+        // radius sweep stays as the candidate generator, widened inward.
+        let gx = 0, gz = 0, sited = false;
+        for (let att = 0; att < 12 && !sited; att++) {
+          const rTry = 360 + ((gh(1.7) + att * 0.19) % 1) * 540;
+          const aTry = aG + att * 0.53;
+          const cx2 = Math.cos(aTry) * rTry, cz2 = Math.sin(aTry) * rTry;
+          const dRoad = this._distToTrack(cx2, cz2);
+          if (dRoad < STAND_STANDOFF || dRoad > 1000) continue;
+          gx = cx2; gz = cz2; sited = true;
+        }
+        if (!sited) continue;
+        const n = 5 + Math.floor(gh(2.3) * 5);
+        for (let k = 0; k < n && bk3 < 300; k++) {
+          const hh = (m) => {
+            const v = Math.sin((gv * 13 + k + m) * 12.9898) * 43758.5453;
+            return v - Math.floor(v);
+          };
+          const x2 = gx + (hh(0.7) - 0.5) * 150, z2 = gz + (hh(1.9) - 0.5) * 150;
+          if (this._inWater(x2, z2)) continue;
+          // the 150 u jitter can walk a clump back toward the road the grove
+          // centre was sited clear of — check the clump itself, not the grove
+          if (this._distToTrack(x2, z2) < STAND_STANDOFF) continue;
+          const gy2 = this._seatY(x2, z2);
+          const sw2 = 4.5 + hh(2.9) * 4.5, sh2 = 5.5 + hh(4.1) * 5.5;
+          bq.setFromAxisAngle(bup, hh(5.3) * Math.PI * 2);
+          m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
+            new THREE.Vector3(sw2, sh2, sw2 * 0.9));
+          band.setMatrixAt(bk3, m4);
+          bandCol.copy(baseC2).multiplyScalar(0.72 + hh(6.7) * 0.36)
+            .lerp(fogC2, 0.12 + hh(8.3) * 0.10);
+          band.setColorAt(bk3++, bandCol);
+        }
+      }
+      band.count = bk3;
+      if (band.instanceColor) band.instanceColor.needsUpdate = true;
+      band.name = 'distant-stand';
+      this.group.add(band);
+    }
+  }
+
   _buildForest(m4) {
     const T = this.T;
     if (T.vegetation === 'none' || !T.treeCount) return;
+    // BEFORE THE DISPATCH, because every branch below it returns. See
+    // `_buildDistantStand`: it used to sit in this method's tail and so only
+    // ever ran for plain conifers.
+    const TALL = ['redwood', 'jungle', 'charred', 'burnt', undefined];
+    if (TALL.includes(T.vegetation)) this._buildDistantStand(m4);
     if (T.vegetation === 'cactus') return this._buildCacti(m4);
     if (T.vegetation === 'outback') return this._buildOutbackScrub(m4);
     if (T.vegetation === 'charred') return this._buildCharredTrees(m4);
@@ -18597,67 +19208,6 @@ export class Track {
     });
     logs.count = lk;
     let sk = 0;
-    // THE DISTANT STAND. Between the playfield scatter (out to ~640 u) and
-    // the horizon rings (900 u+) there was an empty ring - the mid-distance
-    // read as bare lawn on every wooded world, which is most of why the
-    // scene lacked depth.
-    //
-    // A STAND OF TREES IS NOT ONE CONE. The first cut was a single 6-sided
-    // cone per copy, 5-12 u wide and up to 21 u tall, scattered evenly and
-    // washed 40 % toward the fog: from the road that is a field of pale
-    // pyramids sitting on the grass, which is what the player photographed.
-    // Three faults, all fixed here:
-    //   - SHAPE: a clump of three offset crowns at different heights, welded
-    //     into one geometry, so the silhouette is a lumpy tree-line rather
-    //     than a triangle.
-    //   - GROUPING: clumps are drawn in GROVES of five to nine, because a
-    //     wood is a mass with edges, not evenly spaced dots.
-    //   - TONE: half the fog wash, so they read as trees in haze instead of
-    //     ghosts, and none of them stands taller than a real tree.
-    if (T.treeCount >= 150) {
-      const crown = (r, h, y, dx, dz) => new THREE.ConeGeometry(r, h, 5)
-        .translate(dx, y + h / 2, dz);
-      const bandGeo = this._bundle([
-        crown(1.00, 1.70, 0, 0, 0),
-        crown(0.78, 1.25, 0, -0.95, 0.42),
-        crown(0.66, 1.00, 0, 0.82, -0.55),
-      ]);
-      const band = new THREE.InstancedMesh(bandGeo, new THREE.MeshStandardMaterial({
-        color: 0xffffff, vertexColors: false, flatShading: true, roughness: 1,
-      }), 300);
-      const bandCol = new THREE.Color(), fogC2 = new THREE.Color(T.fogColor ?? 0xcccccc);
-      const baseC2 = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
-      const bq = new THREE.Quaternion(), bup = new THREE.Vector3(0, 1, 0);
-      let bk3 = 0;
-      for (let gv = 0; gv < 46 && bk3 < 300; gv++) {
-        const gh = (n) => { const v = Math.sin((gv + n) * 12.9898) * 43758.5453; return v - Math.floor(v); };
-        const aG = gh(0.1) * Math.PI * 2;
-        const rG = 640 + gh(1.7) * 260;
-        const gx = Math.cos(aG) * rG, gz = Math.sin(aG) * rG;
-        const n = 5 + Math.floor(gh(2.3) * 5);
-        for (let k = 0; k < n && bk3 < 300; k++) {
-          const hh = (m) => {
-            const v = Math.sin((gv * 13 + k + m) * 12.9898) * 43758.5453;
-            return v - Math.floor(v);
-          };
-          const x2 = gx + (hh(0.7) - 0.5) * 150, z2 = gz + (hh(1.9) - 0.5) * 150;
-          if (this._inWater(x2, z2)) continue;
-          const gy2 = this._seatY(x2, z2);
-          const sw2 = 4.5 + hh(2.9) * 4.5, sh2 = 5.5 + hh(4.1) * 5.5;
-          bq.setFromAxisAngle(bup, hh(5.3) * Math.PI * 2);
-          m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
-            new THREE.Vector3(sw2, sh2, sw2 * 0.9));
-          band.setMatrixAt(bk3, m4);
-          bandCol.copy(baseC2).multiplyScalar(0.72 + hh(6.7) * 0.36)
-            .lerp(fogC2, 0.12 + hh(8.3) * 0.10);
-          band.setColorAt(bk3++, bandCol);
-        }
-      }
-      band.count = bk3;
-      if (band.instanceColor) band.instanceColor.needsUpdate = true;
-      band.name = 'distant-stand';
-      this.group.add(band);
-    }
 
     this._scatter(STUMPS, () => this._trackSidePos(12, 34), (p) => {
       const s = 0.7 + Math.random() * 0.7;
