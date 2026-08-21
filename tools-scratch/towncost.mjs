@@ -10,9 +10,11 @@ await p.goto(`http://localhost:8901/?level=${LV}&go=1&unlockall=1`, { waitUntil:
 await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout:600000 });
 console.log(JSON.stringify(await p.evaluate(() => {
   const g = window.__game;
-  let meshes = 0, instances = 0, texBytes = 0;
+  let meshes = 0, instances = 0, texBytes = 0, sprites = 0, cloudBank = 0;
   const seen = new Set(), town = {};
   g.scene.traverse(o => {
+    if (o.isSprite) sprites++;
+    if (o.name === 'cloud-bank') cloudBank = o.count;
     if (!o.isMesh && !o.isInstancedMesh) return;
     meshes++; instances += o.count ?? 1;
     if (/oldtown|frontage|piazza/.test(o.name || '')) town[o.name] = o.count ?? 1;
@@ -26,7 +28,7 @@ console.log(JSON.stringify(await p.evaluate(() => {
       }
     }
   });
-  return { meshes, instances, textureMB: +(texBytes / 1048576).toFixed(1),
+  return { meshes, sprites, cloudBank, instances, textureMB: +(texBytes / 1048576).toFixed(1),
     townParts: Object.keys(town).length, town };
 }), null, 1));
 await b.close();

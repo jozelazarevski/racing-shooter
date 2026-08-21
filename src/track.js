@@ -4458,6 +4458,13 @@ THEMES.riviera = {
   elements: 'alassio',
   hutGlow: 0.12,
   seaColor: 0x2f7fa8,
+  // THE SKY IN THE REFERENCE IS A FACETED BANK, and it is a third of every one
+  // of those frames. Angular slabs of grey-white cloud with a lit face and a
+  // shaded one, over a cooler, deeper blue than the postcard one this world
+  // had. `cloudKind` is the only line that does it; drop it and the soft
+  // sprite field comes straight back.
+  cloudKind: 'faceted', cloudCount: 17, cloudTint: 0xf6f9fc, cloudDeep: 0x93a1b2,
+  skyTop: '#2f6ba4', skyHorizon: '#d6dee2',
   // ...and its own paint. `frontage` is the painted face the town presents to
   // the road, which is what you actually drive past in the budello. Alassio
   // sits a shade softer and pinker than Cinque Terre's saturated coral — more
@@ -6392,7 +6399,7 @@ export class Track {
     this._tunnels = [];
     if (this.T.tunnels) this._planTunnels();
 
-    this.animated = { flags: [], clouds: [], whales: [] };
+    this.animated = { flags: [], clouds: [], whales: [], cloudBank: null };
     // World-space circle colliders for on-road obstacles: [{x, z, r}].
     // Always present; [] on levels without obstacles. Consumed by car physics.
     this.obstacles = [];
@@ -10944,6 +10951,7 @@ export class Track {
     if (this.T.hollowArch) this._buildHollowArch();  // redwood drive-through trunk
     if (this.T.lamps) this._buildLamps();            // neon / undercity road lamps
     if (this.T.frontage) this._buildOldTown(m4);     // OLD TOWN street frontage + arches
+    if (this.T.frontage) this._buildTownsfolk();     // ...and the people on its pavements
     if (this.T.logYards) this._buildLogYards();      // flume timber stacks
     if (this.T.retainingWalls) this._buildRetainingWalls();   // alpine-pass parapets
     if (this.T.heroBridge) this._buildHeroBridge();           // hero rope crossing
@@ -13087,6 +13095,134 @@ export class Track {
    *  clusters of barrels, crates and coiled rope on the stone. Everything is
    *  COSMETIC and everything stays ≥ 10.8 u off the centreline (drivable
    *  half-width is 9): dressing, never an obstacle. */
+
+  /** TOWNSFOLK: the thing every reference frame has that an empty street
+   *  cannot fake. The sheet gives them a panel of their own under STREET-LEVEL
+   *  PROPS, and both Monte Carlo renders put a dozen people on the pavement
+   *  and a crowd on every balcony — a town with nobody in it reads as a film
+   *  set however good the joinery is.
+   *
+   *  THREE BOXES AND A SPHERE, and no more. At the distance a driver passes
+   *  them the content is a silhouette and a colour: something person-shaped,
+   *  person-height, in clothes that are not the wall behind it. Anything finer
+   *  is polygons at 60 mph.
+   *
+   *  IN GROUPS, NOT SCATTERED. People stand in twos and threes; one figure
+   *  every forty metres down a street is a mannequin trail.
+   *
+   *  Cosmetic and NOT registered: no solid, no prop, no score. They stand on
+   *  the footway, off the racing line, and nothing in this game is going to be
+   *  rewarded for driving at them.
+   */
+  _buildTownsfolk() {
+    const F = this.T.frontage;
+    if (!F || this.T.townsfolk === false) return;
+    const WANT = this.T.townsfolk ?? 170;
+    const legGeo = new THREE.BoxGeometry(0.34, 0.86, 0.26);
+    legGeo.translate(0, 0.43, 0);
+    const torsoGeo = new THREE.BoxGeometry(0.44, 0.62, 0.28);
+    torsoGeo.translate(0, 1.17, 0);
+    const headGeo = new THREE.SphereGeometry(0.135, 6, 5);
+    headGeo.translate(0, 1.63, 0);
+    const mk = (geo) => new THREE.InstancedMesh(geo,
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff, vertexColors: true, flatShading: true, roughness: 0.9,
+      }), WANT);
+    const legs = mk(this._white(legGeo));
+    const torsos = mk(this._white(torsoGeo));
+    const heads = mk(this._white(headGeo));
+    legs.name = 'townsfolk';
+    for (const m of [legs, torsos, heads]) m.castShadow = true;
+    const LEG = ['#2f3a4c', '#3d3a34', '#5a4636', '#2a2a2e', '#6a6255'];
+    const TOP = ['#c8443a', '#e8e2d4', '#3f6b8a', '#4a7a52', '#d8a23a', '#8a4a6a',
+      '#e0e0d8', '#2f4f6b', '#c96a3a'];
+    const SKIN = ['#d8a884', '#b07a52', '#8a5a3c', '#e8c4a0'];
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    const inner = (i) => (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 0.85;
+    const outer = (F.lateral ?? 15.5) - (F.depth ?? 8) * 0.5 - 0.55;
+    let k = 0;
+    // THE SQUARES FIRST. A knot of people on a pavement is dressing; a dozen
+    // of them round a fountain is the thing the square was built for, and it
+    // is where the reference puts nearly everyone it draws. Spread over the
+    // paving, kept a clear 4.5 u off the centrepiece so nobody stands in the
+    // basin.
+    const fwd = new THREE.Matrix4();
+    for (const pz of this._piazzas ?? []) {
+      fwd.copy(pz.inv).invert();
+      const inSq = 14 + ((Math.random() * 7) | 0);
+      // A RING ROUND THE CENTREPIECE, not a box with a hole rejected out of
+      // it. Sampling a rectangle and throwing away everything within 4.5 u of
+      // the middle discards most of a 12 u-deep square — which is why the
+      // first cut put five people in a piazza and asked for fifteen.
+      const half = Math.min(pz.hw, Math.min(-pz.x0, pz.x1)) - 1.2;
+      for (let j = 0; j < inSq && k < WANT; j++) {
+        const ang = Math.random() * Math.PI * 2;
+        const rad = 4.6 + Math.random() * Math.max(1.6, half - 4.6);
+        const lx = Math.cos(ang) * rad;
+        const lz = Math.sin(ang) * rad * 1.3;
+        if (Math.abs(lz) > pz.hw - 1.0) continue;      // and inside the paving
+        // THE PLATE IS THE FLOOR, and the transform already knows where it is:
+        // the square's matrix was composed at the paving's top surface, so the
+        // transformed point comes back AT it. Seating these on `_seatY` — the
+        // ground — buried them to the shoulders in their own square, because
+        // the plate is seated on the high corner and stands proud of the field
+        // by up to two metres.
+        _pzV.set(lx, 0, lz).applyMatrix4(fwd);
+        q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
+        m4.compose(_pzV, q, new THREE.Vector3(1, 0.92 + Math.random() * 0.17, 1));
+        legs.setMatrixAt(k, m4);
+        torsos.setMatrixAt(k, m4);
+        heads.setMatrixAt(k, m4);
+        legs.setColorAt(k, col.set(LEG[(Math.random() * LEG.length) | 0]));
+        torsos.setColorAt(k, col.set(TOP[(Math.random() * TOP.length) | 0]));
+        heads.setColorAt(k, col.set(SKIN[(Math.random() * SKIN.length) | 0]));
+        k++;
+      }
+    }
+    let guard = 0;
+    while (k < WANT && guard++ < WANT * 14) {
+      const i = (Math.random() * N) | 0;
+      if (this._circDist(i, 0) < 45) continue;         // not on the grid
+      const lo = inner(i);
+      if (outer - lo < 0.9) continue;                  // no footway to stand on
+      const side = Math.random() < 0.5 ? 1 : -1;
+      // a knot of two or three, facing roughly the same way
+      const n = 1 + ((Math.random() * 3) | 0);
+      const lat0 = lo + Math.random() * (outer - lo);
+      const yaw = this.headingAt(i) + (Math.random() - 0.5) * 1.2;
+      for (let j = 0; j < n && k < WANT; j++) {
+        const lat = Math.min(outer, Math.max(lo, lat0 + (Math.random() - 0.5) * 1.5));
+        const st = (i + ((Math.random() * 5) | 0)) % N;
+        const p = this.pointAt(st, lat * side);
+        if (this._inWater(p.x, p.z)) continue;
+        // ITS OWN CLEARANCE TEST. `_clearsRoad` refuses everything inside a
+        // square, and a square with nobody in it is the emptiest thing here —
+        // so this asks the only question that matters instead: is it off the
+        // carriageway.
+        if (this._distToTrack(p.x, p.z) - 0.3 < inner(st) - 0.2) continue;
+        const y = this._seatY(p.x, p.z);
+        if (!Number.isFinite(y)) continue;
+        q.setFromAxisAngle(up, yaw + (Math.random() - 0.5) * 0.8);
+        // a shade of height either way, or three identical people stand there
+        m4.compose(new THREE.Vector3(p.x, y, p.z), q,
+          new THREE.Vector3(1, 0.92 + Math.random() * 0.17, 1));
+        legs.setMatrixAt(k, m4);
+        torsos.setMatrixAt(k, m4);
+        heads.setMatrixAt(k, m4);
+        legs.setColorAt(k, col.set(LEG[(Math.random() * LEG.length) | 0]));
+        torsos.setColorAt(k, col.set(TOP[(Math.random() * TOP.length) | 0]));
+        heads.setColorAt(k, col.set(SKIN[(Math.random() * SKIN.length) | 0]));
+        k++;
+      }
+    }
+    if (!k) return;
+    for (const m of [legs, torsos, heads]) {
+      m.count = k;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
+    this.group.add(legs, torsos, heads);
+  }
 
   /** THE PIAZZA — a square, and the fountain in the middle of it.
    *
@@ -18448,6 +18584,18 @@ export class Track {
     // constants, far clouds sinking and fading toward the fog for recession,
     // and sun-side clouds warmed by the sunGlow knob so the sky's light
     // agrees with the shadow rig.
+    // THE FACETED BANK, which is what every one of the reference renders has
+    // over it: not soft puffs but angular slabs of cloud with a lit face and a
+    // shaded one, stacked into a ceiling. It is real geometry in ONE instanced
+    // mesh — which is also the fix the note above has been asking for since
+    // the sprite field was written, because a sprite is a draw call and this
+    // is forty clouds in one.
+    //
+    // THE FACETS ARE NOT PAINTED. They are a flat-shaded solid standing in the
+    // scene's own directional light, so the sun that lights the street lights
+    // the cloud, and the light and dark faces fall where the sun actually is.
+    // That is the whole of the look; a texture could not have done it.
+    if (T.cloudKind === 'faceted') { this._buildCloudBank(T); return; }
     const ctex = cloudTexture();
     const nClouds = Math.ceil(T.cloudCount * 1.5);
     const fogC3 = new THREE.Color(T.fogColor ?? 0xcccccc);
@@ -18475,6 +18623,93 @@ export class Track {
       this.group.add(sp);
       this.animated.clouds.push({ sprite: sp, speed: (1.5 + Math.random() * 2.5) * (1 - 0.4 * far2) });
     }
+  }
+
+  /** A LOW-POLY CLOUD: an icosahedron squashed and knocked out of true, so no
+   *  two facets catch the light alike and no silhouette repeats. Built once
+   *  and instanced; the variation is per-instance scale and yaw, which is
+   *  cheaper than four geometries and reads the same from the ground. */
+  _cloudShardGeo() {
+    if (this._shardGeo) return this._shardGeo;
+    const g = new THREE.IcosahedronGeometry(1, 1);
+    const pos = g.attributes.position;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      // squash it flat, then push each vertex out by a hash of where it is —
+      // deterministic per vertex, so the two ends of a shared edge agree and
+      // the hull stays closed
+      const n = Math.sin(v.x * 12.9898 + v.y * 78.233 + v.z * 37.719) * 43758.5453;
+      const j = 0.72 + ((n - Math.floor(n)) * 0.56);
+      v.set(v.x * j, v.y * 0.34 * j, v.z * j * 0.86);
+      // a cloud has a flatter bottom than top
+      if (v.y < 0) v.y *= 0.55;
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    g.computeVertexNormals();
+    this._shardGeo = g;
+    return g;
+  }
+
+  _buildCloudBank(T) {
+    const n = Math.max(8, Math.round((T.cloudCount ?? 14) * 2.2));
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, vertexColors: true, flatShading: true,
+      roughness: 1, metalness: 0, fog: false,
+    });
+    const mesh = new THREE.InstancedMesh(this._white(this._cloudShardGeo()), mat, n);
+    mesh.name = 'cloud-bank';
+    // NEVER A SHADOW CASTER. Forty 400 u slabs in the sun's shadow frustum
+    // would spend the whole shadow map on cloud and leave none for the town.
+    mesh.castShadow = mesh.receiveShadow = false;
+    mesh.frustumCulled = false;
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    const base = new THREE.Color(T.cloudTint !== undefined ? T.cloudTint : 0xf6f8fa);
+    const deep = new THREE.Color(T.cloudDeep ?? 0x8e9aa8);
+    const items = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.7;
+      // NOT DIRECTLY OVERHEAD. Under 600 u a 400 u slab at 250 u up hangs over
+      // the street like a lid — one of them read as a flying saucer parked
+      // above the town. The bank belongs on the horizon half of the dome.
+      const r = 620 + Math.random() * 980;
+      const far2 = (r - 620) / 980;
+      // BIG AND OVERLAPPING. A bank is a ceiling, not a scatter: at 200 u
+      // across with gaps between them these read as boulders in the sky. The
+      // far ones are bigger AND lower, so the ring closes down to the horizon
+      // the way an overcast does rather than ending in a rim of blue.
+      const sc = 230 + Math.random() * Math.random() * 420 + far2 * 160;
+      const y = 300 + Math.random() * 210 - far2 * 120;
+      // AND THEY ARE NOT WHITE. Value contrast between one slab and the next
+      // is what makes a bank read as depth instead of as polystyrene: the
+      // reference runs from near-white down to a slate that is half the
+      // brightness of the sky behind it.
+      // ...but the dark end is a SHADED CLOUD, not a thundercloud: past about
+      // three quarters of the way to `deep` a slab stops reading as lit from
+      // one side and starts reading as a hole in the sky.
+      col.copy(base).lerp(deep, Math.min(0.62, Math.random() * Math.random() * 1.15));
+      mesh.setColorAt(i, col);
+      items.push({ a, r, y, sc, yaw: Math.random() * Math.PI * 2,
+        asp: 0.5 + Math.random() * 0.5,
+        speed: (0.8 + Math.random() * 1.6) * (1 - 0.45 * far2) });
+    }
+    const place = () => {
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        q.setFromAxisAngle(up, it.yaw);
+        m4.compose(new THREE.Vector3(Math.cos(it.a) * it.r, it.y, Math.sin(it.a) * it.r),
+          q, new THREE.Vector3(it.sc, it.sc * 0.5, it.sc * it.asp));
+        mesh.setMatrixAt(i, m4);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    };
+    place();
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    this.group.add(mesh);
+    // the bank drifts by rotating the whole ring, which is one number a frame
+    // instead of forty matrix recompositions
+    this.animated.cloudBank = { mesh, items, place, drift: 0 };
   }
 
   /** Atmospheric-perspective gradient map for a horizon ring: the silhouette
@@ -22685,6 +22920,14 @@ export class Track {
     for (const c of this.animated.clouds) {
       c.sprite.position.x += c.speed * dt;
       if (c.sprite.position.x > 1100) c.sprite.position.x = -1100;
+    }
+    // the faceted bank drifts as a ring rather than as forty objects: each
+    // cloud creeps around its own circle, which from the ground is the same
+    // slow slide across the sky and costs one add per cloud
+    const CB = this.animated.cloudBank;
+    if (CB) {
+      for (const it of CB.items) it.a += (it.speed * dt) / Math.max(1, it.r);
+      CB.place();
     }
     // ONE ARC, THEN GONE. `u` runs 0..1 through the breach and the whale spends
     // the rest of the period submerged, which is what keeps a pod from reading

@@ -2109,3 +2109,78 @@ instanced mesh for the world, which is the only reason the number is seven.
 
 Gates: boot 4/4, test-carriageway green, test-buildings green, road census
 over 73/74/77/78 unchanged from baseline.
+
+## r249 — THE SKY, AND THE PEOPLE UNDER IT
+The two things left between these worlds and the reference renders, and they
+turn out to be the two biggest areas of every one of those frames.
+
+### THE FACETED CLOUD BANK
+Every reference image is roofed by angular slabs of cloud with a lit face and a
+shaded one. Ours was a field of soft round sprites, which is a different
+picture entirely.
+
+THE FACETS ARE NOT PAINTED. `_buildCloudBank` puts real geometry — a squashed,
+knocked-out-of-true icosahedron — in the scene's own directional light with
+`flatShading`, so the sun that lights the street lights the cloud and the light
+and dark faces fall where the sun actually is. No texture could have done that,
+and a billboard certainly could not.
+
+The vertex jitter is a HASH OF THE VERTEX POSITION, not `Math.random()`: the
+two ends of a shared edge have to agree or the hull opens up.
+
+IT IS ALSO CHEAPER THAN WHAT IT REPLACED. `_buildSky`'s own note has asked
+since it was written for "one InstancedMesh billboard layer, which makes the
+whole sky ONE draw" — this is that, minus the billboard. Measured on IL
+BUDELLO: 14 cloud sprites (14 draw calls) became one mesh holding 37 clouds,
+and the world's total went 1117 -> 1109 draw calls even after adding three
+more meshes of people.
+
+Three tunings, each from looking at the result:
+  - NOT DIRECTLY OVERHEAD. Under 600 u a 400 u slab at 250 u up hangs over the
+    street like a lid; one read as a flying saucer parked above the town. The
+    bank belongs on the horizon half of the dome.
+  - THE DARK END IS A SHADED CLOUD, NOT A THUNDERCLOUD. Past about three
+    quarters of the way to `cloudDeep` a slab stops reading as lit from one
+    side and starts reading as a hole in the sky.
+  - AND THE STREET STAYS SUNLIT. The references are dramatic overhead and
+    bright at ground level; the first pass at full overcast made a racing game
+    look like weather. Seventeen clouds, not twenty-six.
+
+`cloudKind: 'faceted'` is the only line that switches it. Drop it and the
+sprite field comes straight back.
+
+### TOWNSFOLK
+A town with nobody in it reads as a film set however good the joinery is. The
+sheet gives people a panel under STREET-LEVEL PROPS and both Monte Carlo
+renders put a dozen on the pavement.
+
+Three boxes and a sphere, instanced, per-instance colour, and no more: at the
+distance a driver passes them the content is a silhouette and a colour.
+Cosmetic and NOT registered — no solid, no prop, no score. They stand on the
+footway r248 built, off the racing line, and nothing in this game is going to
+be rewarded for driving at them.
+
+TWO THINGS WERE WRONG, both found by measuring rather than squinting
+(`tools-scratch/townsfolk.mjs`):
+  1. A RING, NOT A BOX WITH A HOLE IN IT. Sampling a rectangle over the square
+     and rejecting everything within 4.5 u of the fountain threw away most of a
+     12 u-deep piazza: it asked for fifteen people and placed five.
+  2. THE PLATE IS THE FLOOR. Square-goers seated on `_seatY` — the ground —
+     stood buried to the shoulders, because the paving is seated on its HIGH
+     corner and stands proud of the field by up to two metres. The square's own
+     matrix already knows where its floor is; the transformed point comes back
+     at it. Now 0 of 53 are sunk on ALASSIO and 0 of 14 on IL BUDELLO, and 0 of
+     299 people across the two worlds stand on a carriageway.
+
+### A CORRECTION TO r246
+That entry says `_clearsRoad` "exists TWICE, on Track and in flora.js, and
+flora's copy shadows the class's". The first half is true and the second is
+not: `src/world/flora.js` and `src/world/sky.js` export `floraMethods` and
+`skyMethods` and NOTHING IMPORTS THEM. They are a half-finished extraction, and
+the live code for all of it is in track.js. Both copies were edited, so the
+behaviour r246 describes is correct — but a future session looking for the
+sky or the scatter should look in track.js and nowhere else.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green, road census over
+73/74/77/78 at baseline (73's one body is the same dodecahedron at bite 1.24,
+74's floater the same metal one at 3.8, 78's four the same poles).
