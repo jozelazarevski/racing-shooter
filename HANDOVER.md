@@ -2042,3 +2042,70 @@ mergeable by material into about five.
 
 Gates: boot 4/4, test-boot 7/0, test-buildings green, test-carriageway green,
 road census over 73/74/77/78 back to the pre-r246 baseline.
+
+## r248 — HIGH DETAIL, AND WHAT IT COST
+"Add high details. Overall." A detail pass over the whole town: the facade
+painter, the roofline, and the ground between the kerb and the front door.
+
+### THE FACADE IS AUTHORED IN A 192x256 GRID, SO DO NOT MOVE THE GRID
+Every bay table, string course and sill offset in textures.js is a number in
+that space. Rescaling the canvas means rescaling all of them, and one missed
+constant is a shutter through a window. So the canvas grows and the CONTEXT is
+scaled to match — `g.scale(TH_SS, TH_SS)` and a local `w`/`h` of the authored
+size — and every existing coordinate stays valid. On a 17 u wall the old
+texels were 9 cm, coarser than the joinery drawn on them; at 1.75x the
+louvres, architraves and ironwork survive the mip chain to the end of a
+street.
+
+1.75 and not 2: this is eight facade maps a world, and the gain stops once a
+texel is finer than the beam it draws.
+
+THE GLOW MAP DOES NOT GET IT. The two meet in UV space, not in texels — a
+thing the first cut's own comment got wrong — and the glow draws soft light
+behind glass, which has no edge worth the pixels. Eight of those at 1.75x was
+2.7 MB spent blurring a blur.
+
+### WHAT THE RESOLUTION BOUGHT
+  - THE CORNICE IS A MOULDING, not a flat 9 px band: corona, dentil course,
+    bed mould, and the shadow each throws. It is the line the whole terrace is
+    read against from the far end of a street.
+  - QUOINS up both edges of every front. On a terrace the texture's edges ARE
+    the party walls, so this also gives the eye the line between one house and
+    the next — which a run of twelve identical boxes had nothing to mark.
+  - A KEYSTONE on every opening, which is the piece of an architrave the eye
+    picks out at distance.
+  - A DOWNPIPE with collars. Nothing says "built" like the one vertical on a
+    facade that is not architecture.
+
+### AND THE STREET GOT A FOOTWAY
+Between the kerb and the front door was open ground: the terrace stood on the
+same dirt the countryside is scattered on, and no amount of facade detail
+fixes a street with no pavement in it. A slab per house from the building line
+out to the road edge, a kerb course at the end of it, and a bollard every
+third house — all instanced, and all held 0.7 u clear of the driveable edge so
+none of it can ever be something you hit. The census agrees: its "road
+surfaces" suppression count went 306 -> 446 and nothing new appeared in a
+carriageway.
+
+Also: a RIDGE CAP on every roof (the gable prism met itself in a bare arris,
+and since r244 that arris is the longest single line in the frame), a POT on
+every chimney, and a VALANCE on every awning — the flap off the front edge,
+which is the only part of an awning seen straight on from a car.
+
+ONE JITTER, SHARED. The valance takes the awning's own random offset rather
+than drawing its own: two calls to `Math.random()` there and the flap belongs
+to a different shopfront from the sheet it hangs off.
+
+### THE PRICE, MEASURED
+`tools-scratch/towncost.mjs`, IL BUDELLO, before and after:
+
+    draw calls   1110  ->  1117      (+7: ridges, pots, paving, kerbs,
+                                      bollards x2, valances)
+    instances   10707  -> 13318
+    textures    17.4 MB -> 19.3 MB   (the supersample, less the glow maps)
+
+Seven draw calls and 1.9 MB for the whole pass. Every new thing is one
+instanced mesh for the world, which is the only reason the number is seven.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green, road census
+over 73/74/77/78 unchanged from baseline.

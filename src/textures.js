@@ -1932,6 +1932,18 @@ export function plankTexture() {
  *  the whole quarter. Bay layout is fixed (two windows per 6.5 m unit) so
  *  neighbouring units line up into a terrace instead of a jumble. */
 const TH_W = 192, TH_H = 256;
+/** SUPERSAMPLE. The facade is authored in a 192x256 grid — every bay table,
+ *  every string course, every sill offset in this file is a number in THAT
+ *  space — and on a 17 u wall those texels are 9 cm across, which is coarser
+ *  than the joinery drawn on them. Painting the same drawing into a canvas
+ *  TH_SS times bigger and scaling the context to match keeps every authored
+ *  coordinate valid and gives the louvres, the architrave and the ironwork
+ *  enough pixels to survive the mip chain at the far end of a street.
+ *
+ *  1.75 rather than 2: eight facade textures and eight glow maps per world,
+ *  and at 2x that is 25 MB of RGBA on a phone for a detail that stops
+ *  improving once a texel is finer than the beam it draws. */
+const TH_SS = 1.75;
 // [x, y, w, h] window bays in canvas pixels: two per storey, two upper
 // storeys. The ground floor is a shopfront and is laid out separately.
 const TH_BAYS = (() => {
@@ -2180,6 +2192,14 @@ function applyArchitrave(g, x, y, bw, bh, S) {
   g.fillRect(x - o - 2, y - o - 4, bw + o * 2 + 4, 3);        // cornice over it
   g.fillStyle = 'rgba(0,0,0,0.20)';
   g.fillRect(x - o - 2, y - o - 1, bw + o * 2 + 4, 1);        // its shadow
+  // THE KEYSTONE, which is the one piece of an architrave the eye picks out at
+  // a distance: a wedge on the centre of the head, standing above the cornice.
+  if (S.key !== false) {
+    g.fillStyle = S.trim;
+    g.fillRect(x + bw / 2 - 2.6, y - o - 6.5, 5.2, 8);
+    g.fillStyle = 'rgba(0,0,0,0.18)';
+    g.fillRect(x + bw / 2 + 2.6, y - o - 6.5, 1.2, 8);
+  }
 }
 
 /** THE WROUGHT-IRON BALCONY, painted. The sheet devotes a swatch to the
@@ -2250,11 +2270,18 @@ export function townhouseTexture(palette = {}, variant = 0, set = null) {
     // hangs a French balcony on the upper openings, `timber` is the Fachwerk
     // frame. A region picks the ones its buildings actually have.
     surround: false, jalousie: false, iron: false,
+    // ...and the finer passes: `quoins` runs a stone course up both edges,
+    // `pipe` hangs a downpipe, `dentils` is the cornice's tooth course (on by
+    // default wherever a cornice is drawn at all).
+    quoins: false, pipe: false,
     ...palette,
   };
   const VB = townhouseBays(variant, set);
   const TH_BAYS = VB.bays;
-  const t = make(TH_W, TH_H, (g, w, h) => {
+  const t = make(Math.round(TH_W * TH_SS), Math.round(TH_H * TH_SS), (g) => {
+    // paint in the authored 192x256 space; the canvas underneath is bigger
+    g.scale(TH_SS, TH_SS);
+    const w = TH_W, h = TH_H;
     g.fillStyle = P.render;
     g.fillRect(0, 0, w, h);
     // patchy limewash erosion, so a terrace of identical units is not identical
@@ -2284,9 +2311,23 @@ export function townhouseTexture(palette = {}, variant = 0, set = null) {
     // the panels the frame makes, so the timber goes down first and the sashes
     // are drawn proud of it below.
     if (P.timber) applyHalfTimber(g, w, h, VB, P.timber);
-    // cornice, string courses between storeys, and the plinth
+    // THE CORNICE IS A MOULDING, NOT A BAND. A flat 9 px stripe under the
+    // eaves is the one place every facade in the reference has three or four
+    // steps of shadow, and it is the line the whole terrace is read against
+    // from the far end of a street. Fascia, dentil course, corona, bed mould —
+    // four fills and a loop, and it is what the extra resolution bought.
     g.fillStyle = P.trim;
-    g.fillRect(0, 2, w, 9);                         // cornice
+    g.fillRect(0, 0, w, 5);                         // corona, the top slab
+    g.fillStyle = 'rgba(0,0,0,0.20)';
+    g.fillRect(0, 5, w, 1.5);
+    if (P.dentils !== false) {
+      g.fillStyle = P.trim;
+      for (let dx = 1; dx < w - 2; dx += 6) g.fillRect(dx, 6, 3.4, 5);
+      g.fillStyle = 'rgba(0,0,0,0.30)';
+      for (let dx = 1; dx < w - 2; dx += 6) g.fillRect(dx + 3.4, 6, 2.6, 5);
+    }
+    g.fillStyle = P.trim;
+    g.fillRect(0, 11, w, 4);                        // bed mould under them
     // String courses at a fixed 84 and 152 belong to the DEFAULT bay layout.
     // On a set whose storeys sit elsewhere they land through the windows — and
     // on a timbered face the rails are already the string courses, so drawing
@@ -2306,9 +2347,37 @@ export function townhouseTexture(palette = {}, variant = 0, set = null) {
       g.fillRect(0, 152, w, 4);                     // string course, 2nd floor
     }
     g.fillStyle = 'rgba(0,0,0,0.30)';
-    g.fillRect(0, 11, w, 4);
+    g.fillRect(0, 15, w, 3);                        // and the shadow it throws
     g.fillStyle = P.plinth;
     g.fillRect(0, h - 12, w, 12);                   // granite plinth at the kerb
+    // QUOINS: a course of stone blocks up each edge of the front, alternating
+    // long and short. On a terrace the texture's edges ARE the party walls, so
+    // this also gives the eye the line between one house and the next — which
+    // a run of twelve identical boxes otherwise has nothing to mark.
+    if (P.quoins) {
+      const QW = 11;
+      for (let qy = 20, n = 0; qy < h - 26; qy += 15, n++) {
+        const long = n % 2 === 0;
+        const qw = long ? QW : QW * 0.62;
+        g.fillStyle = P.trim;
+        g.fillRect(0, qy, qw, 13);
+        g.fillRect(w - qw, qy, qw, 13);
+        g.fillStyle = 'rgba(0,0,0,0.16)';           // the joint under each block
+        g.fillRect(0, qy + 13, qw, 1.6);
+        g.fillRect(w - qw, qy + 13, qw, 1.6);
+      }
+    }
+    // A DOWNPIPE, because every one of these buildings has one and nothing on
+    // a facade says "built" like the one vertical that is not architecture.
+    if (P.pipe) {
+      const px0 = P.pipe === true ? w - 17 : P.pipe;
+      g.fillStyle = 'rgba(40,36,32,0.55)';
+      g.fillRect(px0, 16, 4.5, h - 40);
+      g.fillStyle = 'rgba(255,250,238,0.18)';       // the light down one side
+      g.fillRect(px0, 16, 1.3, h - 40);
+      g.fillStyle = 'rgba(40,36,32,0.7)';           // collars
+      for (let py = 40; py < h - 44; py += 52) g.fillRect(px0 - 1.4, py, 7.3, 3);
+    }
     // the narrowest gap between two openings on this face, and the wall edge
     const SH_PIER = (() => {
       const cols = VB.xs || [];
@@ -2476,6 +2545,10 @@ export function townhouseGlowTexture(palette = {}, variant = 0, litFrac = 0.55, 
   // so passing the set to one and not the other is that bug, restaged.
   const VB = townhouseBays(variant, set);
   const BAYS = VB.bays;
+  // NO SUPERSAMPLE HERE. The two maps meet in UV space, not in texels, so the
+  // glow is free to be coarser than the facade — and it should be: it draws
+  // soft light behind glass, which has no edge worth the pixels. Eight of
+  // these per world at 1.75x was 2.7 MB spent blurring a blur.
   const t = make(TH_W, TH_H, (g, w, h) => {
     g.fillStyle = '#000000';
     g.fillRect(0, 0, w, h);

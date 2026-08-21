@@ -694,7 +694,8 @@ export const LEVELS = [
           // holes is a third of the face reading as void; a cool blue-grey
           // reads as a lit pane at the same value and lifts the whole terrace.
           frame: '#3a3630', shutter: '#2f5d3f', pane: '#3d4a5c',
-          surround: true, jalousie: { shut: 0.34 }, iron: '#241f1c' },
+          surround: true, jalousie: { shut: 0.34 }, iron: '#241f1c',
+          quoins: true, pipe: true },
       },
       // A STREET HAS NO COUNTRYSIDE IN IT. Rocks, scrub, tufts and wildflowers
       // between the kerb and the wall are what kept reading as "road through a
@@ -4305,7 +4306,7 @@ for (const [key, over] of [
     // get the same joinery as the coast: architrave, louvred shutter, iron.
     // Their ROOFS stay gable-fronted — a Cinque Terre house stands in a stack
     // up a cliff, not shoulder to shoulder along a street.
-    frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f2e8d4', plinth: '#a98a68', trim: '#f6ecd8', frame: '#34332c', shutter: '#3f6b46', pane: '#39465a', surround: true, jalousie: { shut: 0.38 }, iron: '#26221e' } },
+    frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f2e8d4', plinth: '#a98a68', trim: '#f6ecd8', frame: '#34332c', shutter: '#3f6b46', pane: '#39465a', surround: true, jalousie: { shut: 0.38 }, iron: '#26221e', quoins: true, pipe: true } },
     seaColor: 0x2f7fa8, sunColor: 0xffe8c0, sunIntensity: 2.7,
     skyTop: '#2f7fd1', skyHorizon: '#e8ddc6',
     terrainLow: '#7d8a4e', terrainHigh: '#a89a68',
@@ -4491,7 +4492,8 @@ THEMES.riviera = {
     // shade of the same yellow, whatever the palette said.
     face: { render: '#f4ead8', plinth: '#c3baa6', trim: '#f9f2e2',
       frame: '#33322c', shutter: '#3d6b47', pane: '#39465a',
-      surround: true, jalousie: { shut: 0.3 }, iron: '#26221e' },
+      surround: true, jalousie: { shut: 0.3 }, iron: '#26221e',
+      quoins: true, pipe: true },
   },
 };
 
@@ -4580,7 +4582,8 @@ THEMES.genova = {
     roof: 0xa8502c,
     face: { render: '#efe2cc', plinth: '#8e8272', trim: '#ecdcc2',
       frame: '#33322c', shutter: '#35583c', pane: '#39465a',
-      surround: true, jalousie: { shut: 0.42 }, iron: '#26221e' },
+      surround: true, jalousie: { shut: 0.42 }, iron: '#26221e',
+      quoins: true, pipe: true },
   },
 };
 
@@ -4625,7 +4628,7 @@ THEMES.sanremo = {
     roof: 0x5c6f58,
     face: { render: '#e8dfc9', plinth: '#9c9484', trim: '#efe6d2',
       frame: '#3a3a30', shutter: '#4a6b4a', pane: '#39465a',
-      surround: true, jalousie: { shut: 0.5 },
+      surround: true, jalousie: { shut: 0.5 }, pipe: true,
       boxes: { wood: '#5a4632', blooms: ['#c8402f', '#e0644a', '#d8869a', '#efe3d2'] } },
   },
 };
@@ -17276,6 +17279,16 @@ export class Track {
       // northern gable's, and the chimney has to be told the height that was
       // USED, not the one that was asked for
       const effRoofH = RIDGE_ALONG ? roofH * 0.72 : roofH;
+      if (rgK < RIDGEMAX) {
+        // the cap runs ALONG the ridge, whichever way the ridge runs
+        const rq = RIDGE_ALONG ? qr : q;
+        if (RIDGE_ALONG) qr.setFromAxisAngle(up, this.headingAt(i) + Math.PI * 0.5);
+        m4.compose(new THREE.Vector3(p.x, y + vh + effRoofH - 0.04, p.z), rq,
+          new THREE.Vector3(RIDGE_ALONG ? wAlong * 1.04 : dAcross * 1.2, 0.24, 0.46));
+        ridgeCaps.setMatrixAt(rgK, m4);
+        ridgeCol.copy(tint).multiplyScalar(0.62 + Math.random() * 0.12);
+        ridgeCaps.setColorAt(rgK++, ridgeCol);
+      }
       if (RIDGE_ALONG) {
         qr.setFromAxisAngle(up, this.headingAt(i) + Math.PI * 0.5);
         // 1.02 along the street, not 1.08: neighbours in a terrace share a
@@ -17364,6 +17377,16 @@ export class Track {
     const chims = new THREE.InstancedMesh(chimGeo, new THREE.MeshStandardMaterial({
       color: this.T.chimneyColor ?? 0x9a8d7e, flatShading: true, roughness: 0.95,
     }), CMAX);
+    // A POT ON THE STACK. The one detail that turns a grey box on a roof into a
+    // chimney, and the sheet draws it on every stack in its ROOFTOP DETAILS
+    // panel — a terracotta cylinder, two per stack, standing proud of the
+    // masonry. One instanced mesh for the world.
+    const potGeo = new THREE.CylinderGeometry(0.13, 0.16, 0.52, 6);
+    potGeo.translate(0, 0.26, 0);
+    const pots = new THREE.InstancedMesh(potGeo, new THREE.MeshStandardMaterial({
+      color: this.T.frontage?.roof ?? 0xb85a30, flatShading: true, roughness: 0.9,
+    }), CMAX * 2);
+    let pk = 0;
     let ck = 0;
     const chimOff = new THREE.Vector3();
     const chimAt = (i, side, lat, dAcross, wAlong, eaveY, roofH) => {
@@ -17390,6 +17413,15 @@ export class Track {
       m4.compose(new THREE.Vector3(p.x + chimOff.x, baseY, p.z + chimOff.z), q,
         new THREE.Vector3(1, 0.75 + Math.random() * 0.6, 1));
       chims.setMatrixAt(ck++, m4);
+      // the pots stand on the stack's own top, which moves with its scale
+      const stackTop = baseY + 1.7 * (m4.elements[5]);
+      for (const po of [-0.15, 0.15]) {
+        if (pk >= pots.count) break;
+        chimOff.set(across + po * 0.9, 0, along).applyQuaternion(q);
+        m4.compose(new THREE.Vector3(p.x + chimOff.x, stackTop - 0.06, p.z + chimOff.z),
+          q, new THREE.Vector3(1, 0.8 + Math.random() * 0.5, 1));
+        pots.setMatrixAt(pk++, m4);
+      }
     };
 
     // BALCONIES AND AWNINGS, ON THE SIDE YOU DRIVE PAST.
@@ -17427,6 +17459,95 @@ export class Track {
     let trimK = 0;
     const trimCol = new THREE.Color();
 
+    // A RIDGE IS A LINE OF TILE, NOT AN EDGE. The gable prism meets itself in a
+    // bare arris at the top, and on a terrace whose roofs now run continuously
+    // along the street (r244) that arris is the longest single line in the
+    // frame. A capping course over it — half-round in life, a thin box here —
+    // is one instanced mesh and the difference between a roof and a wedge.
+    const RIDGEMAX = 2600;
+    const ridgeCaps = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.78 }),
+      RIDGEMAX);
+    ridgeCaps.name = 'oldtown-ridges';
+    ridgeCaps.castShadow = true;
+    let rgK = 0;
+    const ridgeCol = new THREE.Color();
+
+    // THE PAVEMENT. Between the kerb and the front door there was open ground:
+    // the terrace stood on the same dirt the countryside is scattered on, and
+    // no amount of facade detail fixes a street with no footway in it. A slab
+    // per house from the building line out to the road edge, and a kerb course
+    // at the end of it — two instances a house, two draw calls for the world.
+    const PAVEMAX = 2600;
+    const paveMat = new THREE.MeshStandardMaterial({
+      color: F.pavement ?? 0xa8a08f, flatShading: true, roughness: 0.95,
+    });
+    const kerbMat2 = new THREE.MeshStandardMaterial({
+      color: F.kerbColor ?? 0x968e7f, flatShading: true, roughness: 0.92,
+    });
+    const pavements = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), paveMat, PAVEMAX);
+    const kerbs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), kerbMat2, PAVEMAX);
+    pavements.name = 'oldtown-pavement';
+    kerbs.name = 'oldtown-kerb';
+    pavements.receiveShadow = kerbs.receiveShadow = true;
+    let pvK = 0;
+
+    // BOLLARDS ON THE KERB LINE. Every one of these towns has a row of them
+    // keeping cars off the footway, and they are the small vertical rhythm a
+    // long pavement needs — a strip of flat stone reads as a ramp without
+    // them. Every third house, alternating along the run, and always at least
+    // 0.7 u clear of the driveable edge so they can never be something you
+    // hit.
+    const BOLLMAX = 900;
+    const bollMat = new THREE.MeshStandardMaterial({
+      color: 0x3a352e, roughness: 0.6, metalness: 0.3, flatShading: true,
+    });
+    const bollGeo = new THREE.CylinderGeometry(0.1, 0.14, 0.92, 8);
+    bollGeo.translate(0, 0.46, 0);
+    const bollCapGeo = new THREE.SphereGeometry(0.13, 8, 5);
+    bollCapGeo.translate(0, 0.94, 0);
+    const bollards = new THREE.InstancedMesh(bollGeo, bollMat, BOLLMAX);
+    const bollCaps = new THREE.InstancedMesh(bollCapGeo, bollMat, BOLLMAX);
+    bollards.name = 'oldtown-bollards';
+    bollards.castShadow = bollCaps.castShadow = true;
+    let bkK = 0;
+
+    /** The footway in front of one house: from its facade out to the road
+     *  edge, stopping 0.15 u short of the driveable surface so nothing here
+     *  can ever be something you hit. */
+    const paveAt = (i, side, lat, dAcross, wAlong) => {
+      if (pvK >= PAVEMAX) return;
+      const face = Math.abs(lat) - dAcross * 0.5;         // the wall, off the centreline
+      const edge = (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 0.15;
+      const depth = face - edge;
+      if (depth < 0.4) return;                            // no room for a footway
+      const mid = (face + edge) / 2;
+      const pp = this.pointAt(i, mid * Math.sign(lat) * side);
+      const py = this._seatY(pp.x, pp.z);
+      if (!Number.isFinite(py)) return;
+      q.setFromAxisAngle(up, this.headingAt(i));
+      // 0.3 thick with 0.09 of it proud: a footway is a kerb's height above
+      // the road and no more, and the census counts anything over 0.25 as a
+      // body in the carriageway if it ever strays inside the edge.
+      m4.compose(new THREE.Vector3(pp.x, py + 0.09 - 0.15, pp.z), q,
+        new THREE.Vector3(depth, 0.3, wAlong * 1.02));
+      pavements.setMatrixAt(pvK, m4);
+      const kp = this.pointAt(i, (edge + 0.22) * Math.sign(lat) * side);
+      const ky = this._seatY(kp.x, kp.z);
+      m4.compose(new THREE.Vector3(kp.x, (Number.isFinite(ky) ? ky : py) + 0.11 - 0.15, kp.z),
+        q, new THREE.Vector3(0.44, 0.34, wAlong * 1.02));
+      kerbs.setMatrixAt(pvK, m4);
+      pvK++;
+      if (pvK % 3 || bkK >= BOLLMAX) return;
+      const bp = this.pointAt(i, (edge + 0.55) * Math.sign(lat) * side);
+      const by2 = this._seatY(bp.x, bp.z);
+      if (!Number.isFinite(by2)) return;
+      m4.compose(new THREE.Vector3(bp.x, by2 + 0.1, bp.z), q, _ONE);
+      bollards.setMatrixAt(bkK, m4);
+      bollCaps.setMatrixAt(bkK++, m4);
+    };
+
     const BALC = 520;
     const slabGeo = new THREE.BoxGeometry(1, 1, 1);
     const balcMat = new THREE.MeshStandardMaterial({
@@ -17448,6 +17569,8 @@ export class Track {
     const balcSlabs = new THREE.InstancedMesh(slabGeo, balcMat, BALC);
     const balcRails = new THREE.InstancedMesh(slabGeo, railMat, BALC);
     const awnings = new THREE.InstancedMesh(slabGeo, awnMat, BALC);
+    const valances = new THREE.InstancedMesh(slabGeo, awnMat, BALC);
+    valances.name = 'frontage-valances';
     balcSlabs.name = 'frontage-balconies';
     awnings.name = 'frontage-awnings';
     for (const m of [balcSlabs, balcRails, awnings]) { m.castShadow = m.receiveShadow = true; }
@@ -17531,9 +17654,12 @@ export class Track {
       const shop = anch?.shop;
       if ((!anch || shop?.has) && Math.random() < 0.5 && awnK < BALC) {
         const AD = 1.6;                                 // awning reach
-        faceOff.set(out + proud * AD * 0.48, 0,
-          shop ? wAlong * shop.u : (Math.random() - 0.5) * wAlong * 0.25)
-          .applyQuaternion(q);
+        // ONE jitter, shared by the awning and the valance hung off it — two
+        // draws of `Math.random()` here and the flap belongs to a different
+        // shopfront from the sheet it is supposed to hang from.
+        const azOff = shop ? wAlong * shop.u : (Math.random() - 0.5) * wAlong * 0.25;
+        const awid = shop ? wAlong * shop.w * 1.08 : wAlong * 0.38;
+        faceOff.set(out + proud * AD * 0.48, 0, azOff).applyQuaternion(q);
         // AN AWNING SLOPES. Flat, it is a horizontal plate 2.9 u up and the
         // driver only ever sees its UNDERSIDE — which faces away from the sun
         // and renders black, so every shopfront on the street had a dark slab
@@ -17547,10 +17673,18 @@ export class Track {
         // halfway up the glazing of a tall house.
         const av = baseY + (shop ? vh * shop.v + 0.25 : 2.95);
         m4.compose(new THREE.Vector3(p.x + faceOff.x, av, p.z + faceOff.z),
-          qa, new THREE.Vector3(AD, 0.1, shop ? wAlong * shop.w * 1.08 : wAlong * 0.38));
+          qa, new THREE.Vector3(AD, 0.1, awid));
         awnings.setMatrixAt(awnK, m4);
         col.setHSL(0.02 + Math.random() * 0.12, 0.35, 0.44 + Math.random() * 0.16);
         awnings.setColorAt(awnK, col);
+        // THE VALANCE, the flap that hangs off the front edge. It is the only
+        // part of an awning seen straight on from a car, and without it the
+        // awning is a sheet of stripes ending in nothing.
+        faceOff.set(out + proud * AD * 0.98, 0, azOff).applyQuaternion(q);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, av - 0.56, p.z + faceOff.z),
+          qa, new THREE.Vector3(0.08, 0.46, awid));
+        valances.setMatrixAt(awnK, m4);
+        valances.setColorAt(awnK, col);
         awnK++;
       }
     };
@@ -17604,6 +17738,7 @@ export class Track {
         }
         faceAt(i, side, placed.lat, F.depth, ww, placed.y, placed.h,
           ANCH[placed.variant]);
+        paveAt(i, side, placed.lat, F.depth, ww);
         // A LANTERN ON THE BRACKET, every third house. Anchored to the FRONT
         // FACE, not the block centre — the arm only reaches 0.72 u and a
         // 8 u-deep building would have swallowed the bulb whole.
@@ -17691,15 +17826,27 @@ export class Track {
     for (let v = 0; v < SLOTS; v++) {
       if (kv[v]) this.group.add(bodySet[v], roofSet[v]);
     }
+    pots.count = pk;
+    pots.name = 'oldtown-chimneypots';
+    pots.castShadow = true;
     if (ck) this.group.add(chims);
+    if (pk) this.group.add(pots);
+    ridgeCaps.count = rgK;
+    if (ridgeCaps.instanceColor) ridgeCaps.instanceColor.needsUpdate = true;
+    if (rgK) this.group.add(ridgeCaps);
+    pavements.count = kerbs.count = pvK;
+    if (pvK) this.group.add(pavements, kerbs);
+    bollards.count = bollCaps.count = bkK;
+    if (bkK) this.group.add(bollards, bollCaps);
     balcSlabs.count = balcRails.count = balK;
-    awnings.count = awnK;
+    awnings.count = valances.count = awnK;
     if (awnings.instanceColor) awnings.instanceColor.needsUpdate = true;
+    if (valances.instanceColor) valances.instanceColor.needsUpdate = true;
     houseTrim.count = trimK;
     if (houseTrim.instanceColor) houseTrim.instanceColor.needsUpdate = true;
     if (trimK) this.group.add(houseTrim);
     if (balK) this.group.add(balcSlabs, balcRails);
-    if (awnK) this.group.add(awnings);
+    if (awnK) this.group.add(awnings, valances);
     if (lk) this.group.add(arms, bulbs);
 
     // ---- string lights over the street (night quarters only): warm bulb

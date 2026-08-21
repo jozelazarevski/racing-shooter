@@ -62,6 +62,11 @@ real time to get right and the next session should not rebuild them.
                 stands IN the square looking at its church — the only shot
                 that shows a facade, and the one that caught a door and a rose
                 window built on the wrong side of their own wall.
+- `towncost.mjs` what a town world costs: draw calls, instances and texture
+                megabytes, plus a part-by-part list of the frontage and square
+                kit. Run it stashed and unstashed around any detail pass — the
+                whole of r248 is seven draw calls and 1.9 MB, and that is only
+                knowable by measuring both ends.
 - `pzcount.mjs` draw calls and instances the squares cost, against the scene's
                 total.
 - `floaters.mjs` every solid sitting more than 2.5 u above the ground under
