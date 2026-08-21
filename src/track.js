@@ -13517,6 +13517,12 @@ export class Track {
       }
       if (!site) continue;
       const { c, yaw, y, fall, D, W } = site;
+      // WHICH WAY IS AWAY FROM THE ROAD. Hoisted to the top of the build
+      // because the terrace's colliders need it before the parapet does, and
+      // a `const` read above its declaration is a ReferenceError that takes
+      // the whole world build down with it — SANREMO STAGE stopped building
+      // at all, and the road census reported that as a SKIP.
+      const outward = Math.sign(lat0 * site.side) || 1;
       // the size the site could actually take, which keys the floor geometry
       const SZ = `${Math.round(D)}x${Math.round(W)}x${Math.round(Math.max(0.5, fall + 0.35) * 4)}`;
       _q.setFromAxisAngle(_pzUp, yaw);
@@ -13560,7 +13566,6 @@ export class Track {
       // It is also what stops a raised plate reading as a slab floating in the
       // sand — a square has an edge you can lean on. The street side stays
       // open; a piazza you cannot walk into is a plinth.
-      const outward = Math.sign(lat0 * site.side) || 1;
       // ...unless a church stands on that side, which is a better edge than a
       // parapet and cannot be walked through either
       const church = wantChurch ? this._pzChurchFits(base, outward, D, y) : null;

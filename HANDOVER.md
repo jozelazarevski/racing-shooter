@@ -2423,3 +2423,31 @@ systems this session has not touched:
     pre-existing: the same fourteen at the same bite on the pre-r252 build.
 
 Gates: boot 4/4, test-carriageway green, test-buildings green.
+
+## r254 — AND THE ONE THAT BROKE A WORLD
+r253 hardened the piazza terrace's colliders and read `outward` — which way is
+away from the road — a hundred lines above where that `const` is declared. A
+`const` read before its declaration is a ReferenceError, it fired inside
+`_buildPiazzas`, and it took the whole world build down with it: SANREMO STAGE
+stopped producing a track at all.
+
+IT WAS SHIPPED, AND BOTH GATES LET IT THROUGH.
+  - `boot.mjs` builds levels 1, 6 and 1-roam. None of them has a piazza, so
+    all four checks passed on a build that could no longer make a town.
+  - The road census reports a world that fails to build as `SKIP  SANREMO
+    STAGE` — one line, no marker, in the middle of a list of results. I read
+    past it twice and took it for machine load, because the census had been
+    slow all session.
+
+A world that does not build is the worst defect there is and it had the
+quietest possible signature. `tools-scratch/buildtime.mjs` is the answer:
+a list of levels, a short cap, and a line per world saying built or FAIL with
+the page error that caused it. It found this in one run, and it names the
+exception rather than reporting a timeout.
+
+    LV=30,34,49,50,51,52,53,54,58,73,74,75,76,77,78 node tools-scratch/buildtime.mjs
+
+All fifteen town worlds build clean with no page errors.
+
+RUN IT AFTER ANY CHANGE TO A SHARED BUILDER. `boot.mjs` covers the engine
+coming up; this covers the worlds actually coming out.

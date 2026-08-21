@@ -66,6 +66,13 @@ real time to get right and the next session should not rebuild them.
                 stands IN the square looking at its church — the only shot
                 that shows a facade, and the one that caught a door and a rose
                 window built on the wrong side of their own wall.
+- `buildtime.mjs` does each world BUILD, how long it takes, and what page
+                error stopped it. Written after r253 shipped a ReferenceError
+                that stopped SANREMO STAGE producing a track at all: boot.mjs
+                builds levels 1 and 6, neither of which has a piazza, and the
+                road census reports a world that will not build as a quiet
+                `SKIP` in the middle of its results. Run it over the town list
+                after any change to a shared builder.
 - `shadowprobe.mjs` which contact-shadow decals reach into a carriageway. Its
                 own lesson: it asked `nearestIndex` and reported zero while the
                 census reported a 4 u bite — on a stacked lap the road a decal
