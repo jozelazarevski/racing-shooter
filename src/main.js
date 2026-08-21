@@ -840,6 +840,12 @@ const saveJSON = (key, obj) => {
 // device-wide settings (ir-steer / ir-assist / ir-diff) stay shared.
 const PROFILE_KEYS = ['career', 'garage', 'cars'];
 const PROFILE_COLORS = ['#ff8c1a', '#f2c81e', '#2440b8', '#4a9ad8', '#2f9e44', '#1c1a18']; // car livery hexes
+// ...and what to CALL each of them, because a swatch cannot say its own colour
+// to anyone who cannot see it, and a hex code is not a name.
+const PROFILE_COLOR_NAMES = {
+  '#ff8c1a': 'Orange', '#f2c81e': 'Yellow', '#2440b8': 'Blue',
+  '#4a9ad8': 'Sky', '#2f9e44': 'Green', '#1c1a18': 'Black',
+};
 const MAX_PROFILES = 6;
 const CONFIRM_MS = 3000;          // how long a two-tap destructive button stays armed
 const STARTER_CAR = 'brawler';    // the free machine every career begins with
@@ -3342,8 +3348,13 @@ class Game {
         </div>
       </div>
       <div class="sk-next">${gate
+    // FOLDED, THIS LINE IS ONE LINE — `sk-next` is nowrap with an ellipsis
+    // until the key is opened, so anything that does not fit is not shortened,
+    // it is CUT. Measured at 390: the old wording needed 393 px in a 302 px
+    // box and stopped at "THE REMAINING STARS ARE", which reads as a sentence
+    // someone forgot to finish. Same meaning, inside the box.
     ? gate
-    : 'EVERY CHAPTER IS OPEN — THE REMAINING STARS ARE FOR THE RECORD'}${
+    : 'ALL CHAPTERS OPEN — STARS ARE FOR THE RECORD'}${
   partial ? ` · ${partial} WORLD${partial === 1 ? '' : 'S'} STILL HOLDING STARS` : ''}</div>`;
     // The whole box is the hit target — a 10px chevron is not a phone control.
     // Bound here rather than once at boot because this method replaces the
@@ -3481,6 +3492,9 @@ class Game {
     search.id = 'wf-search';
     search.type = 'search';
     search.placeholder = 'SEARCH WORLDS, REGIONS, ROUTES';
+    // A PLACEHOLDER IS NOT A LABEL. It disappears the moment you type, and a
+    // screen reader announces an unlabelled search box as "edit text".
+    search.setAttribute('aria-label', 'Search worlds, regions and routes');
     search.autocomplete = 'off';
     search.value = this.filters.q;
     search.addEventListener('input', () => {
@@ -3714,7 +3728,17 @@ class Game {
   _fillTopbar(c) {
     const where = document.getElementById('topbar-where');
     const stars = document.getElementById('topbar-stars');
-    if (where) where.innerHTML = `<b>CHAPTER ${c.n}</b> ${c.name}`;
+    // "CH 4", NOT "CHAPTER 4". The bar's one job is to say where you are, and
+    // it could not: measured, EVERY chapter title was ellipsised on EVERY phone
+    // width — 8 of 8 at 320, 360 and 390, 7 of 8 at 430 — because BACK, the
+    // title, the star count, the driver and the balance all share one row. At
+    // 320 the title got 67 px to say 146 px of "CHAPTER 1 FIRST LIGHT".
+    //
+    // The number is a breadcrumb; the NAME is the information, and the word
+    // "CHAPTER" is 55 px of a phone spent on a word the screen below already
+    // says. Shortening it and slimming the balance chip (see index.html) buys
+    // the name enough room to finish.
+    if (where) where.innerHTML = `<b>CH ${c.n}</b> ${c.name}`;
     if (stars) stars.textContent = `${this.chapterStars(c._k)}/${c.levels.length * 3}★`;
   }
 
@@ -5415,6 +5439,12 @@ class Game {
       const b = document.createElement('button');
       b.className = 'prof-swatch' + (c === this._newColor ? ' sel' : '');
       b.style.background = c;
+      // A BARE COLOURED CIRCLE HAS NO NAME. Six of them in a row is six
+      // controls a screen reader calls "button", and colour is the one thing
+      // it cannot read out. Name the livery and say which is chosen.
+      b.setAttribute('aria-label', `${PROFILE_COLOR_NAMES[c] ?? c} livery`);
+      b.setAttribute('aria-pressed', c === this._newColor ? 'true' : 'false');
+      b.title = `${PROFILE_COLOR_NAMES[c] ?? c} livery`;
       b.addEventListener('click', () => { this._newColor = c; this._renderSwatches(); });
       sw.appendChild(b);
     }

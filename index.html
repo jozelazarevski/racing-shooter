@@ -831,6 +831,17 @@
   /* THE BALANCE IS PINNED RIGHT and never shrinks — it is the number the whole
      garage below is spending, so it is the one thing in the bar that must not
      give way when a chapter name gets long. */
+  /* THE WORD "CREDITS" IS 55 PX OF A PHONE. The balance is a number with a
+     coin on it; the word only ever restated what the gold colour and the coin
+     already say, and it was taking the room the chapter name needed to finish
+     its sentence. Hidden under 430 px, where the bar is tightest — the coin
+     stays, so the number is never a bare figure. */
+  #topbar-cred .cr-word{display:none}
+  /* 520, not 430. At 430 the word came back before the room did and the title
+     went from 1 truncated in 8 to 3 — the word costs about 55 px and the
+     longest title needs 149, so it may only return once the bar can pay for
+     both. Measured, not guessed. */
+  @media (min-width:520px){ #topbar-cred .cr-word{display:inline} }
   #topbar-cred{flex:0 0 auto;margin-left:auto;font-family:'Baloo 2';font-weight:800;
     font-size:10px;letter-spacing:1px;color:var(--gold-dim);white-space:nowrap;
     padding:5px 9px;border-radius:8px;background:rgba(0,0,0,.4);
@@ -840,6 +851,26 @@
   /* the where-slot yields first when the bar is tight */
   #topbar .ch-here{flex:1 1 auto;min-width:0}
   #topbar .ch-here-stars{flex:0 0 auto;margin-left:0}
+  /* The smallest phones cannot buy the room with layout alone: at 320 the
+     title slot is 96 px and the longest chapter needs 142. A point of type is
+     the last thing to give, so it gives here and nowhere else. */
+  /* Letter-spacing is the cheapest room in the bar: the longest title is 22
+     characters, so a point of tracking is 11 px — more than the 9 px that
+     "CH 7 THE LONG CIRCUITS" was short by at 390. */
+  @media (max-width:429px){
+    #topbar .ch-here{letter-spacing:.3px}
+    #topbar .ch-here b{letter-spacing:1px}
+  }
+  @media (max-width:360px){
+    #topbar .ch-here{font-size:9px;letter-spacing:.2px}
+    #topbar{gap:6px}
+  }
+  /* THE STAR COUNT GIVES WAY BEFORE THE NAME DOES. On a 320 px phone the bar
+     cannot carry five things, and of the five this is the only one repeated
+     elsewhere on the same screen — the star key states the running total two
+     rows below, and every world card carries its own three. The name is not
+     repeated anywhere. */
+  @media (max-width:340px){ #topbar .ch-here-stars{display:none} }
   @media (max-width:389px){
     #topbar{gap:7px;padding-left:8px;padding-right:8px}
     #topbar-back{font-size:12px;padding:7px 10px}
@@ -2089,7 +2120,7 @@
          which is the only job it has; the full name is on the panel it
          opens. -->
     <button id="topbar-prof" title="Driver profiles" aria-label="Driver profile">P</button>
-    <div id="topbar-cred">CREDITS&nbsp;<b id="credits">0</b></div>
+    <div id="topbar-cred" title="Credits"><span class="cr-word">CREDITS&nbsp;</span>🪙&nbsp;<b id="credits">0</b></div>
   </div>
   <!-- The tagline stays: it is the one line of character on the front door,
        and it is the only thing left above the tabs now that the wordmark has
@@ -2197,7 +2228,8 @@
       <div class="set-row" id="joy-row">
         <span class="set-lbl">JOYSTICK<br><span id="joy-val">100%</span></span>
         <div id="joy-sens-wrap">
-          <input id="joy-sens" type="range" min="50" max="180" step="5" value="100">
+          <input id="joy-sens" type="range" min="50" max="180" step="5" value="100"
+            aria-label="Joystick travel for full lock">
           <div class="set-hint"><span>CALM</span><span>TWITCHY</span></div>
           <p class="set-help">How far your thumb travels for full lock. Lower means more travel and finer control;
           higher means less travel and a faster turn-in.</p>
@@ -2260,7 +2292,8 @@
     <div id="profile-list"></div>
     <div class="panel-head">NEW PROFILE</div>
     <div id="profile-create">
-      <input id="profile-name-input" maxlength="10" placeholder="NAME" autocomplete="off" spellcheck="false">
+      <input id="profile-name-input" maxlength="10" placeholder="NAME" autocomplete="off"
+        spellcheck="false" aria-label="Driver name">
       <div id="profile-swatches"></div>
       <button id="profile-create-btn" class="up-buy">CREATE</button>
     </div>
