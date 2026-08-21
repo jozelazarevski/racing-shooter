@@ -2529,3 +2529,108 @@ ones. `offenders.mjs` does the same job from the mesh side.
 
 Gates: boot 4/4, test-carriageway green, test-buildings green, and
 `buildtime.mjs` over twenty worlds — all built, no page errors.
+
+## r256 — THE BAY, AND HEADLIGHTS THAT ARE ACTUALLY LIGHTS
+Two screenshots, two asks: "make the car stand out, make lighter background"
+on the build bay, and "make the light like real car light, other cars should
+have light too" on a night race.
+
+### THE BAY WAS A DARK ROOM WITH A DARK CAR IN IT
+The garage stage lit a near-black car against a near-black floor and a wall
+too small to be one. The floor is light concrete (0x8b8073) at 90x90, the
+wall pale (0xb2a695) at 160x70 with a dado band under it, the bay lines
+brighter, and a rim light added behind the car so its shoulder line separates
+from the wall.
+
+The wedge of black down one side was NOT the shadow frustum. Widening the
+shadow camera changed nothing; hiding the wall found it in one shot — the
+floor and the wall both ENDED inside frame and the camera was looking at
+empty scene past their edges. Both were enlarged. Measure by bisection, not
+by fixing the thing that sounds most likely.
+
+### EVERY CAR NOW HAS LAMPS, AND THEY ARE ONE DRAW CALL
+`buildVoxelRacer` welds a lamp rig into every car it builds: two headlamps
+(a wide soft halo plus a small hot core), two tail clusters the same way, and
+two beams on the tarmac. It is ONE additive mesh with per-vertex colour, so
+the whole rig costs one draw call per car — six separate meshes would have
+been 48 on an eight-car grid, most of a world's budget for something nobody
+would have called scenery. NO POINT LIGHTS: this game bans per-car lights,
+and what sells a headlight from a chase camera is the lamp burning and the
+pool it lays on the road. Both are painted.
+
+`glowTexture` is opaque white at its centre, so a quad whose four UVs all sit
+at (0.5, 0.5) takes a FLAT alpha and lets vertex colour do all the shaping.
+That is the trick that lets a soft round lamp and a hard-edged beam wedge
+share one material.
+
+### WHAT THE FIRST CUT GOT WRONG, AND HOW EACH WAS CAUGHT
+**The lamps were never switched on.** `worldIsDark` and the per-frame
+`Car._syncLights` were both right, and `carLights: OFF x8` on a `#16162a`
+sky anyway. Two reasons: `_syncCarLights` read `this.rivals` and `this.traffic`,
+neither of which exists (the field is `this.enemies`), and the one
+`_applyTheme` that runs on a fresh load happens BEFORE the player and the
+enemies are constructed. The sync is now called once more right after the
+grid is built, and again on `swapPlayerCar`, which hands the player a new mesh
+with dark lamps.
+
+**The beam was a puddle parked under the nose.** One big quad with the radial
+glow stretched over it. It is a GRID now — the falloff lives in the vertex
+colours, which is the only way to get a wedge that leaves the lamp narrow,
+opens out down the road and fades at its far edge and both sides.
+
+**And the probe was lying about it.** `nightshot.mjs` invented a camera at
+6.5 up and 13 back. The game's CHASE is 11.5 up and 17 back looking 19 ahead;
+at the flatter angle the beam compressed into the car's own silhouette and
+read as a halo. The probe also floated the car 0.4 above the road — a car's
+mesh origin IS the tarmac (`pos.y = groundHeightAt`), so the beam was
+measured from the wrong height too. JUDGE A LIGHT FROM THE CAMERA THE PLAYER
+HAS.
+
+**A false read corrected.** The red bars at the tail in the first isolation
+shot were the car's OWN modelled lenses (`tailMat`, always there), not the
+new rig, because the shot kept the player's bodywork. With every other mesh
+hidden the rig turned out to be two blobs and two dots. The tail glow was
+then sized to bloom over the whole modelled cluster (x 0.66 to 1.35) instead
+of sitting beside it.
+
+`lightdiff.mjs` is the gate that settles all of this: render the frame twice,
+rig hidden then shown, and report the pixel delta and the box it falls in.
+The first cut changed 0.39% of the frame, all of it inside the car's own
+footprint. `LIFT=0.6` separates "not drawn" from "buried in the road".
+
+### A BEAM IS LIGHT, NOT BODYWORK — the bug the lights caused elsewhere
+The beams reach 19 u down the road, and they went into the car's mesh as a
+child. So `new THREE.Box3().setFromObject(car)` — which is how the garage bay
+frames its camera and how the kit-fit test measures the nose — started
+returning a box the length of a bus. The bay backed its camera off from 9.7 u
+to 27.7 u: THE CAR GOT SMALLER THE ROUND THE LIGHTS WENT IN, in the same
+screen whose report was "make the car stand out". `test-cars` caught the other
+half as a 0.09 u nose spread across eight cars, seven of which agreed exactly
+— which is the signature of one car's bodywork differing from a constant, not
+of a kit that has moved.
+
+Fixed at the source rather than at each caller: `Box3` uses a geometry's own
+`boundingBox` when it has one, so the rig publishes the BODY's box as its own
+and `frustumCulled` goes off to guarantee the shrunken box can never cull the
+beam away. Every car's overall box now equals its bodywork box again, the nose
+spread is 0, and `popCarPart` grew an explicit exclusion because the rig's
+volume is no longer large enough to be filtered out by accident.
+
+WHEN YOU ADD A CHILD THAT IS BIGGER THAN THE THING IT IS ON, GO AND LOOK AT
+WHO ASKS THAT THING HOW BIG IT IS.
+
+### AND THE BAY'S FRAMING WAS WRONG BEFORE THAT
+With the box fixed the framing multiplier was still guesswork: the small-angle
+fit in `_frameStage` is a long way out for a 6.4 m car seen from 10 m up a 3/4
+angle, because its near end projects three times the size of its far end.
+`bayfit.mjs` sweeps camera distance against the car's measured pixel box, and
+1.62 is read off that sweep — ~95% of the panel height, ~67% of its width.
+
+The bay also has no cast shadow to give, and that is geometry, not a bug: the
+key sits at (5, 9, 6) and the camera looks in from (6.4, 3.4, 7.6), nearly the
+same azimuth, so the shadow falls behind the car and the car hides all of it.
+Moving the key to throw it into view takes the light off the face the camera is
+looking at. A painted contact disc on the pivot grounds the machine without
+touching the lighting, which is what a product shot does. The shadow camera
+went back to a tight +-10 at 1024 (0.02 u/texel) now that the dark wedge it had
+been widened to +-22 for is known to have been the floor's own edge.

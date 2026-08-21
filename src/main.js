@@ -13,7 +13,7 @@ import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
   tyreClass, tyreMaxClass, tyreLevelFor, TYRE_LABEL, tyrePenalty,
-  applyUpgradeKit, buildPartIcon } from './vehicles.js';
+  applyUpgradeKit, buildPartIcon, worldIsDark } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
 import { Weapons } from './weapons.js';
@@ -21,7 +21,7 @@ import { Particles, SkidMarks } from './particles.js';
 import { Hud, fmtTime } from './hud.js';
 import { AudioEngine } from './audio.js';
 import { Input } from './input.js';
-import { glowTexture } from './textures.js';
+import { glowTexture, contactShadowTexture } from './textures.js';
 
 // EIGHT CARS ON THE GRID, NOT SIX. Reported as "it's 8 cars not 6, update
 // that across all game" — the field size leaked into a dozen literals: the
@@ -1576,6 +1576,10 @@ class Game {
     this.player = new PlayerCar(this, carEntry);
     this.enemies = [];
     for (let i = 0; i < ENEMY_COUNT; i++) this.enemies.push(new EnemyCar(this, i, ENEMY_COUNT));
+    // The first `_applyTheme` ran before any of these existed, so the opening
+    // world's headlights are switched HERE. Every later world goes through
+    // `_applyTheme` with the cars already built.
+    this._syncCarLights();
     this.weapons = new Weapons(this);
     this.hud = new Hud(this);
     this.choppers = [];
@@ -2794,8 +2798,22 @@ class Game {
    *  swapping level has to redo every one of these — a new world under the old
    *  world's fog and sun is exactly the "it still looks like the last track"
    *  bug this would otherwise ship with. */
+  /** HEADLIGHTS FOLLOW THE WORLD, and they are switched HERE because a car
+   *  can outlive a level and the player's car is built before its first one.
+   *  Called from `_applyTheme`, which every world change goes through. */
+  _syncCarLights() {
+    const dark = worldIsDark(this.track?.T ?? this.track?.theme);
+    const all = [this.player, ...(this.enemies ?? [])];
+    for (const c of all) {
+      const lt = c?.mesh?.userData?.carLights;
+      if (lt) lt.visible = dark;
+      if (c) c._litFor = this.track;
+    }
+  }
+
   _applyTheme() {
     const th = this.track.theme;
+    this._syncCarLights();
     if (th) {
       if (th.fogColor !== undefined) {
         // same near-plane pull as the track ctor (aerial layering), local only
@@ -2923,6 +2941,8 @@ class Game {
     p.mesh = mesh;
     p.catalogKey = entry.key;
     p._popped = [];
+    p._litFor = null;      // fresh mesh, fresh lamps: re-decide on the new rig
+    this._syncCarLights();
     p.maxSpeed = entry.stats.maxSpeed;
     p.accel = entry.stats.accel;
     p.grip = entry.stats.grip;
@@ -4588,9 +4608,17 @@ class Game {
     // coming down on it, and that is most of why it reads as a garage rather
     // than as a product shot. A floor, a back wall and a bay stripe are enough
     // — anything more is scenery nobody looks at behind a car they do.
+    // A DARK CAR ON A DARK FLOOR IS A SILHOUETTE. Reported directly — "make
+    // the car stand out, make lighter background" — and the numbers agreed:
+    // the bay floor was 0x2b2018 and the wall 0x241a12, both darker than the
+    // black bodywork, wings and tyres that make up most of a built car. The
+    // shop is lit concrete now, and the car sits ON it rather than in a hole.
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(46, 46),
-      new THREE.MeshStandardMaterial({ color: 0x2b2018, roughness: 0.95, metalness: 0.05 }));
+      // 90, not 46: at 46 the floor's own edge fell inside the frame on the
+      // wide side of the rig and the panel showed the empty scene past it as
+      // a dark strip down the picture
+      new THREE.PlaneGeometry(90, 90),
+      new THREE.MeshStandardMaterial({ color: 0x8b8073, roughness: 0.92, metalness: 0.05 }));
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.02;
     floor.receiveShadow = true;
@@ -4598,23 +4626,45 @@ class Game {
     // the painted bay outline the car is parked inside
     for (const sx of [-3.4, 3.4]) {
       const line = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 15),
-        new THREE.MeshBasicMaterial({ color: 0xc9922e, transparent: true, opacity: 0.5 }));
+        new THREE.MeshBasicMaterial({ color: 0xf0bb4a, transparent: true, opacity: 0.8 }));
       line.rotation.x = -Math.PI / 2;
       line.position.set(sx, 0.01, 0);
       scene.add(line);
     }
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(46, 18),
-      new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 1 }));
-    wall.position.set(0, 9, -13);
+    // THE BACK WALL IN TWO BANDS, which is what a workshop actually has and —
+    // more to the point — gives a black roofline something pale to cut against
+    // while the wheels still sit against something darker than they are.
+    // 160 x 70, not 46 x 18. The wall's job is to be BEHIND the car from every
+    // angle the bay spins to, and at the original size its top and its left
+    // edge both fell inside the frame — the panel showed the empty scene past
+    // them as a black wedge with a hard diagonal edge, which is what the "make
+    // it lighter" report was partly looking at. A backdrop with a visible edge
+    // is not a backdrop.
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(160, 70),
+      new THREE.MeshStandardMaterial({ color: 0xb2a695, roughness: 1 }));
+    wall.position.set(0, 30, -15);
     scene.add(wall);
+    const dado = new THREE.Mesh(new THREE.PlaneGeometry(160, 3.2),
+      new THREE.MeshStandardMaterial({ color: 0x6b5f52, roughness: 1 }));
+    dado.position.set(0, 1.6, -14.95);
+    scene.add(dado);
 
     scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x6a5238, 1.15));
     const key = new THREE.DirectionalLight(0xfff3d6, 2.3);
     key.position.set(5, 9, 6);
     key.castShadow = true;
-    key.shadow.mapSize.set(512, 512);   // a phone, at 30fps, behind a menu
-    key.shadow.camera.left = -8; key.shadow.camera.right = 8;
-    key.shadow.camera.top = 8; key.shadow.camera.bottom = -8;
+    // 1024 over a TIGHT frustum. The dark wedge this was widened to +-22 for
+    // turned out to be the empty scene past the floor and wall edges, not the
+    // shadow sampler — and +-22 across 512 texels is 0.17 u per texel, which
+    // on a 6 m car is no contact shadow at all, so it floated. +-10 at 1024 is
+    // 0.02 u per texel, and with the car parked at the origin the frustum
+    // border is lit, so nothing clamps into shade. It only redraws while the
+    // garage tab is open.
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.left = -10; key.shadow.camera.right = 10;
+    key.shadow.camera.top = 10; key.shadow.camera.bottom = -10;
+    key.shadow.camera.far = 40;
+    key.shadow.normalBias = 0.02;
     scene.add(key);
     const fill = new THREE.DirectionalLight(0x9fc8ff, 0.6);
     fill.position.set(-6, 4, -5);
@@ -4623,6 +4673,14 @@ class Game {
     const lamp = new THREE.PointLight(0xffcf8a, 40, 18, 2);
     lamp.position.set(0, 5.2, 1.5);
     scene.add(lamp);
+    // AND A RIM FROM BEHIND. The car shelf's still-picture rig has had one
+    // since it was written, for exactly this reason: without it the polished
+    // faces have nothing to catch and a black wing reads as a hole. The live
+    // bay never got one, and it is the one screen whose whole job is to show
+    // you a car.
+    const rim = new THREE.DirectionalLight(0xffe0b0, 1.7);
+    rim.position.set(-4, 5.5, -8);
+    scene.add(rim);
 
     const pivot = new THREE.Group();
     scene.add(pivot);
@@ -4663,9 +4721,33 @@ class Game {
     const mesh = buildCarMesh(car.spec);
     applyUpgradeKit(mesh, up, {
       engine: this.fittedPart('engine'), spoiler: this.fittedPart('spoiler') });
-    mesh.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+    // ...but NOT the lamp rig. It is additive quads, and three.js casts from
+    // the depth material regardless of blending — a beam lying on the floor
+    // would print itself back as a black strip.
+    mesh.traverse((o) => { if (o.isMesh) o.castShadow = o !== mesh.userData?.carLights; });
     st.car = mesh;
     st.pivot.add(mesh);
+    // A CONTACT SHADOW, because the key light cannot give one here. The key
+    // sits at (5, 9, 6) and the camera looks in from (6.4, 3.4, 7.6) — nearly
+    // the same azimuth — so the cast shadow falls behind the car and the car
+    // hides all of it. Moving the key to throw the shadow into view would take
+    // the light off the face the camera is looking at. A painted disc grounds
+    // the machine without touching the lighting, which is what a product shot
+    // does. It rides the pivot so it turns with the car.
+    if (!st.contact) {
+      st.contact = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({ map: contactShadowTexture(), color: 0x241c14,
+          transparent: true, opacity: 0.62, depthWrite: false }));
+      st.contact.rotation.x = -Math.PI / 2;
+      st.contact.renderOrder = 1;
+      st.pivot.add(st.contact);
+    }
+    {
+      const b = new THREE.Box3().setFromObject(mesh);
+      const sz = b.getSize(new THREE.Vector3());
+      st.contact.scale.set(sz.x * 1.35, sz.z * 1.15, 1);
+      st.contact.position.set(b.getCenter(new THREE.Vector3()).x, 0.006, 0);
+    }
     if (st.cam.aspect) this._frameStage(st);
   }
 
@@ -4680,6 +4762,10 @@ class Game {
    */
   _frameStage(st) {
     if (!st.car) return;
+    // This measures BODYWORK even though the car carries a lamp rig whose
+    // beams reach 19 u ahead: the rig reports the body's box as its own
+    // (vehicles.js, `lg.boundingBox`), so there is one place that knows the
+    // difference rather than one per caller.
     const box = new THREE.Box3().setFromObject(st.car);
     const size = box.getSize(new THREE.Vector3());
     const mid = box.getCenter(new THREE.Vector3());
@@ -4692,7 +4778,13 @@ class Game {
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * st.cam.aspect);
     const halfW = 0.5 * Math.max(size.x, size.z);      // worst case as it spins
     const halfH = 0.5 * size.y;
-    const dist = Math.max(halfW / Math.tan(hfov / 2), halfH / Math.tan(vfov / 2)) * 1.5;
+    // THE MULTIPLIER IS MEASURED, NOT DERIVED. The small-angle fit above is a
+    // long way out for a 6.4 m car seen from a 3/4 angle 10 m away — its near
+    // end projects three times the size of its far end — so `bayfit.mjs`
+    // sweeps distance against the car's actual pixel box. 1.62 puts the
+    // machine at ~90% of the panel height and ~64% of its width: bold, with
+    // enough margin that the longest silhouette the spin turns to still fits.
+    const dist = Math.max(halfW / Math.tan(hfov / 2), halfH / Math.tan(vfov / 2)) * 1.62;
     st.cam.position.set(6.4, 3.4, 7.6).normalize().multiplyScalar(dist);
     st.cam.lookAt(0, mid.y * 0.9, 0);
     st.cam.updateProjectionMatrix();
@@ -8461,6 +8553,7 @@ class Game {
     const candidates = car.mesh.children.filter((c) => {
       if (!c.visible || !c.isMesh || !c.geometry || excluded.has(c)) return false;
       if (c.material === ud.bodyMat) return false; // never shed the hull itself
+      if (c === ud.carLights) return false;        // nor the lamps, as one flying quad
       if (c.userData.vol === undefined) {
         c.geometry.computeBoundingBox();
         const s = c.geometry.boundingBox.getSize(new THREE.Vector3());

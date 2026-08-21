@@ -1,7 +1,7 @@
 // Car meshes (built from primitives), arcade physics, and rival AI.
 import * as THREE from 'three';
 import { ROAD_HALF, RIM_RADIUS, mergeBoxes } from './track.js';
-import { numberPlateTexture } from './textures.js';
+import { numberPlateTexture, glowTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
 const SPRAY_SNOW = new THREE.Color(0xf4faff); // tire spray tints (snow / wet)
@@ -897,6 +897,117 @@ export function buildVoxelRacer(spec) {
   // is FrontSide like everything else, so its faces are back-facing from in
   // there and cull, while the bonnet ahead keeps its top face pointed at the
   // eye and draws. The car can stay on screen.
+  // ---- HEADLIGHTS, TAIL LIGHTS, AND WHAT THEY THROW ON THE ROAD ----------
+  //
+  // Asked for directly: "make the light like real car light, other cars should
+  // have light too." Every car in the game drove at night with dead lamps —
+  // the only thing lighting the road ahead of the pack was a chopper's
+  // searchlight, which is what the report was actually looking at.
+  //
+  // NO LIGHT SOURCES. This game bans per-car point lights for the reason
+  // `_buildLamps` states — a night city cannot afford two hundred of them and
+  // a shader recompile per light count. What sells a headlight from a chase
+  // camera is not illumination, it is the LAMP burning and the POOL it lays on
+  // the tarmac, and both of those are painted.
+  //
+  // ONE DRAW CALL FOR ALL OF IT. Six quads — two lamps, two road pools, two
+  // tail lenses — merged into a single geometry with per-vertex colour, so the
+  // whole rig on a car is one additive mesh. Six meshes each would have been
+  // 48 draw calls on an eight-car grid, which is most of a world's budget for
+  // something nobody would have called scenery.
+  {
+    const LP = [], LU = [], LC = [];
+    const cH = new THREE.Color(0xfff0cc), cT = new THREE.Color(0xff2a14);
+    // `glowTexture` is opaque white at its centre, so a quad whose four UVs
+    // all sit at (0.5, 0.5) takes a FLAT alpha and lets vertex colour do every
+    // bit of the shaping. That one trick is what lets a soft round lamp and a
+    // hard-edged beam wedge share a single material, and so a single draw call.
+    const HOT = [0.5, 0.5];
+    const push = (P, uv, c) => { LP.push(P[0], P[1], P[2]); LU.push(uv[0], uv[1]); LC.push(c[0], c[1], c[2]); };
+    const quad = (P, UV, C) => { for (const k of [0, 1, 2, 0, 2, 3]) push(P[k], UV[k], C[k]); };
+
+    /** The lamp itself, burning: a soft blob on the plane of the panel it sits
+     *  on, painted by the glow texture's own falloff. */
+    const lamp = (cx, cy, cz, w, h, col, k) => {
+      const hw = w / 2, hh = h / 2, c = [col.r * k, col.g * k, col.b * k];
+      quad([[cx - hw, cy - hh, cz], [cx + hw, cy - hh, cz], [cx + hw, cy + hh, cz], [cx - hw, cy + hh, cz]],
+        [[0, 0], [1, 0], [1, 1], [0, 1]], [c, c, c, c]);
+    };
+
+    /** WHAT THE LAMP THROWS ON THE TARMAC, and the part a driver actually
+     *  reads. Not a blob: a wedge that leaves the lamp narrow, opens out down
+     *  the road and fades to nothing at its far edge and along both sides.
+     *  It is a small GRID because the falloff lives in the vertex colours —
+     *  the first cut of this was one big quad with the radial glow stretched
+     *  over it, and from the chase camera that reads as a puddle parked under
+     *  the nose rather than as light going anywhere. */
+    const beam = (xL, z0, len, w0, w1, col, peak) => {
+      const NL = 9, NW = 7;
+      const at = (i, j) => {
+        const t = i / NL, u = j / NW;
+        const hw = (w0 + (w1 - w0) * t) / 2;
+        const f = Math.pow(1 - t, 2.2) * Math.pow(Math.sin(Math.PI * u), 1.8) * peak;
+        return { p: [xL + (u * 2 - 1) * hw, 0.05, z0 + len * t],
+          c: [col.r * f, col.g * f, col.b * f] };
+      };
+      for (let i = 0; i < NL; i++) {
+        for (let j = 0; j < NW; j++) {
+          const a = at(i, j), b = at(i, j + 1), c = at(i + 1, j + 1), d = at(i + 1, j);
+          quad([a.p, b.p, c.p, d.p], [HOT, HOT, HOT, HOT], [a.c, b.c, c.c, d.c]);
+        }
+      }
+    };
+
+    const zF = bodyLen / 2, zR = -bodyLen / 2;
+    const tailY = baseY + bodyH * 0.55 + 0.12;
+    for (const s of [-1, 1]) {
+      // The lamp on the modelled headlamp disc, in TWO passes: a wide soft
+      // halo and a small hot core on top of it. One quad on its own paints a
+      // pale panel — an even, edge-to-edge grey that reads as a sticker. The
+      // core is what makes it burn.
+      lamp(0.9 * s, faceY, zF + 0.06, 1.5, 1.12, cH, 0.5);
+      lamp(0.9 * s, faceY, zF + 0.08, 0.62, 0.5, cH, 1.8);
+      // its wedge on the road. The pair overlap down the middle, which is what
+      // gives a hot core between the two and a soft spill outboard of them.
+      beam(1.0 * s, zF + 0.5, 19, 1.7, 7.2, cH, 0.26);
+      // Tail lens, same two passes, wide enough to bloom over the WHOLE
+      // cluster (the modelled lamps run x 0.66 to 1.35) rather than sit beside
+      // it as a dot.
+      lamp(1.05 * s, tailY, zR - 0.06, 1.7, 0.86, cT, 0.45);
+      lamp(1.05 * s, tailY, zR - 0.08, 1.05, 0.42, cT, 1.1);
+    }
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute('position', new THREE.Float32BufferAttribute(LP, 3));
+    lg.setAttribute('uv', new THREE.Float32BufferAttribute(LU, 2));
+    lg.setAttribute('color', new THREE.Float32BufferAttribute(LC, 3));
+    const lights = new THREE.Mesh(lg, new THREE.MeshBasicMaterial({
+      map: glowTexture(), vertexColors: true, transparent: true, opacity: 0.85,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+      fog: false,
+    }));
+    lights.name = 'carLights';
+    lights.renderOrder = 3;
+    // A BEAM IS LIGHT, NOT BODYWORK, and this is the line that says so to
+    // everything that asks a car how big it is. The wedges reach 19 u down the
+    // road, so a plain `Box3.setFromObject` on a car returns a box the length
+    // of a bus: the garage bay backed its camera off to 27 u and the car went
+    // SMALLER the round the lights went in, and the kit-fit test started
+    // measuring the nose against a beam. `Box3` uses a geometry's own
+    // `boundingBox` when it has one, so the rig reports the bodywork it sits
+    // on. Culling is turned off to go with it — a shrunken box must never be
+    // allowed to cull the beam away — which costs nothing on a daylight world
+    // because the whole mesh is invisible there.
+    lg.boundingBox = new THREE.Box3(
+      new THREE.Vector3(-1.6, 0, zR - 0.1), new THREE.Vector3(1.6, faceY + 0.6, zF + 0.1));
+    lg.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, faceY * 0.5, 0), bodyLen);
+    lights.frustumCulled = false;
+    // OFF UNTIL THE WORLD IS DARK. Beams in daylight are a cartoon; the game
+    // turns these on per world (see `worldIsDark`).
+    lights.visible = false;
+    g.add(lights);
+    g.userData.carLights = lights;
+  }
+
   g.userData.rig = { wheelR, wheelY, baseY, capTop,
     cabY, cabZ, cabH, cabW, cabL,
     zRear: _box.min.z, zFront: _box.max.z,
@@ -1524,10 +1635,31 @@ export function solidRadiusAt(ob, y) {
   return ob.r * ob.prof[k];
 }
 
+/** IS THIS A WORLD WITH ITS LIGHTS ON?
+ *
+ *  Not `sunIntensity` — NEON GRID EXPRESSWAY runs a 2.0 moon and a 2.8 ambient
+ *  and is the darkest world on the roster. The sky is the honest signal: a
+ *  theme paints `skyTop` for the hour it is set at, so its luminance says
+ *  night or day for every world without a new flag on any of them.
+ */
+export function worldIsDark(T) {
+  if (!T) return false;
+  if (T.dusk) return true;
+  const hex = String(T.skyTop ?? '#3a7fb8').replace('#', '');
+  const n = parseInt(hex, 16);
+  if (!Number.isFinite(n)) return false;
+  const r = ((n >> 16) & 255) / 255, g2 = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  return 0.2126 * r + 0.7152 * g2 + 0.0722 * b < 0.22;
+}
+
 export class Car {
   constructor(game, mesh, { maxSpeed = 52, accel = 34, grip = 5.2, steerRate = 2.5, driftLag = 0.22, steerTaper = 0.18 } = {}) {
     this.game = game;
     this.mesh = mesh;
+    // Lights are switched in `_syncLights`, not here: a car can be built
+    // BEFORE its world is (the player's is), so asking the track at
+    // construction gets `undefined` and every lamp stays dark on a night
+    // stage — which is exactly what the first cut of this shipped.
     // yaw -> pitch -> roll so body pitch/roll read correctly at every heading
     mesh.rotation.order = 'YXZ';
     game.scene.add(mesh);
@@ -3750,8 +3882,20 @@ export class EnemyCar extends Car {
     }
   }
 
+  /** Headlights on iff the world is dark — checked against the TRACK OBJECT,
+   *  so it is right the first frame after a level swap and free every frame
+   *  after that. Both the player and the rivals come through this class. */
+  _syncLights() {
+    const t = this.game?.track;
+    if (this._litFor === t) return;
+    this._litFor = t;
+    const lt = this.mesh?.userData?.carLights;
+    if (lt) lt.visible = worldIsDark(t?.T);
+  }
+
   update(dt) {
     const g = this.game;
+    this._syncLights();
     if (!this.alive) {
       this.respawnTimer -= dt;
       if (this.respawnTimer <= 0) this.respawn();
@@ -4590,6 +4734,7 @@ export class PlayerCar extends Car {
 
   update(dt, input) {
     const g = this.game;
+    this._syncLights();
     if (!this.alive) {
       // OUT OF HULLS: no redeploy. The three-wreck rule (main.js HULL_LIVES)
       // sets this on the wreck that ends the race, and without it the car

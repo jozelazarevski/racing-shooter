@@ -82,6 +82,41 @@ real time to get right and the next session should not rebuild them.
                 road census reports a world that will not build as a quiet
                 `SKIP` in the middle of its results. Run it over the town list
                 after any change to a shared builder.
+- `nightshot.mjs` a dark world with the car parked on the racing line and the
+                camera set to the GAME's own CHASE rig (back 17, height 11.5,
+                look 19 ahead). `CAM=front` stands up the road with the car
+                coming at you; `CAM=rear` drops low and close behind for the
+                tail lamps. Judging headlights from an invented camera is how
+                a beam the car's own roofline hides gets called fine — the
+                first cut of this probe sat at 6.5 up and reported a puddle.
+- `lightdiff.mjs` renders the same frame twice, lamp rig hidden then shown,
+                and reports the pixel delta: how many changed, by how much,
+                and the box they fall in. This is what proved the road beam
+                was contributing nothing outside the car's own footprint.
+                `LIFT=0.6` raises the rig to tell "not drawn" from "buried in
+                the road".
+- `lightiso.mjs` the rig with EVERY other mesh hidden, so where each quad
+                lands is a picture. `KEEPCAR=1` keeps the bodywork for scale;
+                `RANGE=start,count` draws one quad. It corrected a false read:
+                the red bars at the tail are the car's own modelled lenses,
+                not the rig, and the rig had to be measured without them.
+- `lightgeom.mjs` local centre, size, colour and screen position of every quad
+                on the player's rig.
+- `litworlds.mjs` one line per level: sky, dusk flag, and how many of the
+                eight cars have their lamps lit. A daylight world reading
+                `8/8 lit` is the bug it exists to catch.
+- `bayshot2.mjs` the build bay as the garage tab renders it, plus `fill` —
+                how much of the panel the car actually covers. `SPIN=rad`
+                parks the turntable. "The car is small" is a framing
+                multiplier, and a multiplier is a number.
+- `bayfit.mjs`  sweeps the bay camera's distance against the car's measured
+                pixel box. The small-angle fit in `_frameStage` is a long way
+                out at this range — near end vs far end differ by three — so
+                the multiplier is read off this, not off the algebra.
+- `nosefit.mjs` the upgrade kit's nose and tail gap per car, measured against
+                the bodywork box AND against the box including the lamp rig.
+                Written to settle whether a `test-cars` failure was the rig's
+                doing. It was.
 - `shadowprobe.mjs` which contact-shadow decals reach into a carriageway. Its
                 own lesson: it asked `nearestIndex` and reported zero while the
                 census reported a 4 u bite — on a stacked lap the road a decal
