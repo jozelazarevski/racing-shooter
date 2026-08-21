@@ -123,6 +123,9 @@ export const floraMethods = {
    *  sample's normal is fine at that sample and inside the road two samples
    *  later, where the centreline has swung under it. */
   _clearsRoad(x, z, r, margin = 1.2) {
+    // the squares are off limits to everything that scatters — same rule and
+    // same reason as the copy in track.js, which this one shadows
+    if (this._piazzas?.length && this._inPiazza(x, z, r)) return false;
     _clearV.set(x, 0, z);
     const i = this.nearestIndex(_clearV);          // no hint: search the whole lap
     const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;

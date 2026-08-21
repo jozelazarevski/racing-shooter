@@ -14,7 +14,7 @@ import {
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
   townhouseTexture, townhouseGlowTexture, roofTileTexture, ironRailTexture,
-  townhouseAnchors,
+  townhouseAnchors, piazzaTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -646,6 +646,11 @@ export const LEVELS = [
       //   height 17       tall enough to ENCLOSE. This is the number that
       //                   turns a road with houses beside it into a street.
       roadWidth: 0.55,
+      // ONE SQUARE, AND A TIGHT ONE. The budello's houses stand 6 u off the
+      // centreline, so the 17 u square the seafront gets would have its inner
+      // edge in the carriageway and be refused at every station on the lap.
+      // A lane like this opens into a slot of a piazza, not a parade ground.
+      piazza: { count: 1, depth: 12, width: 16 },
       frontage: {
         lateral: 9.6, depth: 7.0, unit: 6.4, height: 17.0, run: [10, 20], rows: 6,
         bayset: 'liguria', ridge: 'along',
@@ -4468,6 +4473,10 @@ THEMES.riviera = {
   // `bayset: 'liguria'` (see townhouseBays) is the window grid; `height` and
   // `unit` are the block it is painted on. 14 u over a 7.2 u unit is very
   // nearly 2:1, which is the sheet's own proportion.
+  // THE SQUARE, which the sheet gives a panel to and the render builds its
+  // whole foreground out of: paving, a fountain, lamps and planters, and a
+  // break in the terrace to put them in. See `_buildPiazzas`.
+  piazza: { count: 2, depth: 17, width: 23 },
   frontage: {
     lateral: 15.0, depth: 8.5, unit: 7.2, height: 14.0, run: [6, 12], rows: 5,
     bayset: 'liguria', ridge: 'along',
@@ -4559,6 +4568,7 @@ THEMES.genova = {
   skyTop: '#3a7fb8', skyHorizon: '#cdd6d4',
   splinter: [0xc86a4a, 0xb8ac96, 0x35583c],
   hutRoof: 0x9c4628,
+  piazza: { count: 2, depth: 15, width: 20, stone: 0xbfb49e, leaf: 0x44603a },
   // A WORKING HARBOUR IS THE SAME ARCHITECTURE IN DIRTIER PAINT: the same
   // architrave, the same green louvre, the same iron — over the port's reds
   // and ochres rather than the resort's yellows and pinks.
@@ -4603,11 +4613,14 @@ THEMES.sanremo = {
   // HINTERLAND: the same green louvre because it is the same region, but no
   // ironwork — a village house has a window box where a seafront terrace has
   // a balcony, and the sheet draws exactly that.
+  // ONE SQUARE UP HERE TOO — a hinterland village has a fountain in it and the
+  // sheet draws exactly that; it is just smaller than the seafront's.
+  piazza: { count: 1, depth: 14, width: 18, leaf: 0x486840 },
+  // NO `ridge: 'along'` here. Up in the hinterland the houses stand apart
+  // rather than in a terrace, and a detached village house presents its
+  // gable — which is also what keeps this world from reading as the
+  // seafront with hills behind it.
   frontage: {
-    // NO `ridge: 'along'` here. Up in the hinterland the houses stand apart
-    // rather than in a terrace, and a detached village house presents its
-    // gable — which is also what keeps this world from reading as the
-    // seafront with hills behind it.
     tints: ['#dcd2ba', '#c8bda2', '#e4dcc6', '#d0bb98', '#bfae90'],
     roof: 0x5c6f58,
     face: { render: '#e8dfc9', plinth: '#9c9484', trim: '#efe6d2',
@@ -4688,6 +4701,10 @@ export function disposeSubtree(root) {
  *  limit that makes the wall unclimbable must apply HERE and nowhere else. */
 export const RIM_RADIUS = 1620;
 const _clearV = new THREE.Vector3();   // scratch for _clearsRoad
+const _pzV = new THREE.Vector3();      // ...and for the squares (see _buildPiazzas)
+const _pzUp = new THREE.Vector3(0, 1, 0);
+const _IDQ = new THREE.Quaternion();   // identity: piazza parts are axis-aligned
+const _ONE = new THREE.Vector3(1, 1, 1);   // ...and built at their true size
 
 /** Hermite ease on an already-normalised 0..1 ramp (clamps its own ends). */
 const smoothstep01 = (t) => {
@@ -10886,7 +10903,10 @@ export class Track {
     if (this.T.quay) this._buildQuayside(m4);        // harbour: quay wall + dockside kit
     if (this.T.citadel) this._buildCitadel();        // the walled hill town
     if (this.T.quay) this._buildMarina();           // pontoons, rigged boats, rings
-    if (this.T.frontage) this._buildStreetLife();   // market stalls, produce, a fountain
+    // THE SQUARES GO IN BEFORE THE STREET WALL, because the street wall has to
+    // stop for them — see `_inPiazza`
+    if (this.T.piazza) this._buildPiazzas();        // paved square, fountain, lamps
+    if (this.T.frontage) this._buildStreetLife();   // market stalls and produce
     if (this.T.stoneBridges) this._buildStoneBridges();
     if (this._overpasses.length) this._buildOverpassDecks();
     if (this.T.japan) this._buildJapan();
@@ -13063,6 +13083,280 @@ export class Track {
    *  clusters of barrels, crates and coiled rope on the stone. Everything is
    *  COSMETIC and everything stays ≥ 10.8 u off the centreline (drivable
    *  half-width is 9): dressing, never an obstacle. */
+
+  /** THE PIAZZA — a square, and the fountain in the middle of it.
+   *
+   *  Asked for straight off the reference sheet, which gives FOUNTAIN MODULES
+   *  and STREET LAMP OPTIONS a panel each, and off the Monte Carlo render,
+   *  where the one piece of open ground in the whole frame is a paved terrace
+   *  with a fountain, four lamps and a row of planters on it.
+   *
+   *  A SQUARE IS A HOLE IN THE STREET WALL, which is the part that is not
+   *  decoration: the terrace has to STOP for it. `_inPiazza` is why this runs
+   *  before `_buildOldTown` — the frontage asks it before placing every block,
+   *  and a house that would stand in the square is refused. Without that the
+   *  fountain ends up in somebody's front room.
+   *
+   *  Everything here is off the carriageway by construction: the square's
+   *  inner edge is the pavement, and every piece of furniture on it is inset
+   *  from that edge. It is validated anyway — `_clearsRoad` on the inner
+   *  corners — because a lap that swings back on itself can put a second
+   *  stretch of road through a square that was legal against the first.
+   */
+  _buildPiazzas() {
+    const P = this.T.piazza;
+    if (!P) return;
+    const F = this.T.frontage || {};
+    const D = P.depth ?? 16, W = P.width ?? 22;       // across the road, along it
+    // the square sits where the houses would have been: inner edge at the
+    // pavement, running out past the building line
+    // 15.5 is `_buildOldTown`'s own default lateral, and the two have to agree
+    // or the square is offset from the street wall it is supposed to open in
+    const lat0 = (F.lateral ?? 15.5) + D * 0.22;
+    const want = P.count ?? 2;
+
+    // ONE DRAW CALL PER PART, NOT PER SQUARE. Every square in a world is the
+    // same size and carries the same kit, so a fountain basin is one instanced
+    // mesh with three instances in it rather than three meshes in three
+    // groups. Built as loose meshes this came to ~42 draw calls a square, and
+    // this game budgets them: the whole street frontage — hundreds of houses —
+    // costs eight.
+    const PARTS = new Map();
+    const _m = new THREE.Matrix4(), _p = new THREE.Vector3(),
+      _s = new THREE.Vector3(), _q = new THREE.Quaternion();
+    let base = new THREE.Matrix4();
+    const part = (key, geo, mat, px, py, pz) => {
+      let e = PARTS.get(key);
+      if (!e) PARTS.set(key, e = { geo, mat, list: [] });
+      _m.compose(_p.set(px, py, pz), _IDQ, _ONE);
+      _m.premultiply(base);
+      e.list.push(_m.clone());
+      return e.list[e.list.length - 1];
+    };
+
+    const paveMat = new THREE.MeshStandardMaterial({
+      map: piazzaTexture(P.paving), roughness: 0.95, envMapIntensity: 0.25,
+    });
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: P.stone ?? 0xcabfa9, flatShading: true, roughness: 0.9,
+    });
+    const kerbMat = new THREE.MeshStandardMaterial({
+      color: P.kerb ?? 0xa89d8a, flatShading: true, roughness: 0.95,
+    });
+    // WATER IS NOT GLASS. It is opaque, lit, and a shade of the sky rather
+    // than a shade of the basin — a transparent disc in a stone ring reads as
+    // an empty bowl from every angle a driver has.
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: P.water ?? 0x4f93a0, roughness: 0.22, metalness: 0.1,
+      envMapIntensity: 0.9,
+    });
+    const ironMat = new THREE.MeshStandardMaterial({
+      color: 0x2a2724, roughness: 0.6, metalness: 0.4, flatShading: true,
+    });
+    const bulbMat = new THREE.MeshBasicMaterial({ color: this.T.lamps?.color ?? 0xffc76a });
+    const leafMat = new THREE.MeshStandardMaterial({
+      color: P.leaf ?? 0x4a6b3c, flatShading: true, roughness: 0.95,
+    });
+    const trunkMat = new THREE.MeshStandardMaterial({
+      color: 0x6b563c, flatShading: true, roughness: 1,
+    });
+
+    this._piazzas = this._piazzas || [];
+    const fracs = [];
+    for (let k = 0; k < want; k++) fracs.push((0.16 + k / want) % 1);
+    for (const f0 of fracs) {
+      const want0 = (f0 * N) | 0;
+      let site = null;
+      for (let d = 0; d < 140 && !site; d += 5) {
+        for (const i of [(want0 + d) % N, (want0 - d + N) % N]) {
+          if (this._circDist(i, 0) < 60) continue;       // not over the grid
+          if (this.curvature[i] > 0.02) continue;        // a square is not on a bend
+          for (const side of [1, -1]) {
+            const c = this.pointAt(i, lat0 * side);
+            const yaw = this.headingAt(i);
+            // local +x is the road normal and +z runs along the street, and
+            // the mapping out to world is taken FROM three.js rather than
+            // rewritten by hand — which is how a mirrored sign gets into a
+            // placement and stays there
+            const at = (ax, az) => {
+              _pzV.set(ax, 0, az).applyAxisAngle(_pzUp, yaw);
+              return { x: c.x + _pzV.x, z: c.z + _pzV.z };
+            };
+            let ok = true, lo = Infinity, hi = -Infinity;
+            for (const ax of [-D / 2, 0, D / 2]) {
+              for (const az of [-W / 2, 0, W / 2]) {
+                const w = at(ax, az);
+                if (this._inWater(w.x, w.z)) { ok = false; break; }
+                // only the INNER half can foul the road; test it all anyway
+                if (!this._clearsRoad(w.x, w.z, 0.4, 0.8)) { ok = false; break; }
+                const yy = this._seatY(w.x, w.z);
+                if (!Number.isFinite(yy)) { ok = false; break; }
+                lo = Math.min(lo, yy); hi = Math.max(hi, yy);
+              }
+              if (!ok) break;
+            }
+            // A SQUARE IS FLAT. On a 2 u fall the paving either floats at one
+            // corner or buries the fountain at the other, and no amount of
+            // seating fixes a plate on a hillside.
+            if (ok && hi - lo > 1.7) ok = false;
+            if (!ok) continue;
+            // SEATED ON THE HIGH CORNER, NOT THE LOW ONE. At the low corner's
+            // height the ground rises through the paving everywhere else and
+            // the square is a slab buried in a beach — which is exactly what
+            // it looked like. The plate is then made thick enough to reach the
+            // ground at the low corner, so it reads as the raised terrace the
+            // reference has, with its kerb showing.
+            site = { i, side, c, yaw, y: hi + 0.02, fall: hi - lo };
+            break;
+          }
+          if (site) break;
+        }
+      }
+      if (!site) continue;
+      const { c, yaw, y, fall } = site;
+      _q.setFromAxisAngle(_pzUp, yaw);
+      base = new THREE.Matrix4().compose(_p.set(c.x, y, c.z), _q, _ONE);
+
+      // ---- the floor: paving, kerb, and a parapet on the three sides -------
+      const TH = Math.max(0.5, fall + 0.35);
+      part('kerb', this._pzGeo('kerb', () =>
+        new THREE.BoxGeometry(D + 0.9, TH + 0.12, W + 0.9)), kerbMat,
+      0, -(TH + 0.12) / 2 - 0.04, 0);
+      part('pave', this._pzGeo('pave', () => new THREE.BoxGeometry(D, TH, W)),
+        paveMat, 0, -TH / 2, 0);
+      // A LOW PARAPET ON THE THREE SIDES AWAY FROM THE STREET: the sheet's
+      // WALLS & BARRIERS panel, and what the render's terrace stands behind.
+      // It is also what stops a raised plate reading as a slab floating in the
+      // sand — a square has an edge you can lean on. The street side stays
+      // open; a piazza you cannot walk into is a plinth.
+      const outward = Math.sign(lat0 * site.side) || 1;
+      part('wallSide', this._pzGeo('wallSide', () =>
+        new THREE.BoxGeometry(0.36, 0.62, W)), kerbMat,
+      outward * (D / 2 - 0.18), 0.31, 0);
+      part('copeSide', this._pzGeo('copeSide', () =>
+        new THREE.BoxGeometry(0.58, 0.14, W + 0.22)), stoneMat,
+      outward * (D / 2 - 0.18), 0.69, 0);
+      for (const ez of [-(W / 2 - 0.18), W / 2 - 0.18]) {
+        part('wallEnd', this._pzGeo('wallEnd', () =>
+          new THREE.BoxGeometry(D, 0.62, 0.36)), kerbMat, 0, 0.31, ez);
+        part('copeEnd', this._pzGeo('copeEnd', () =>
+          new THREE.BoxGeometry(D + 0.22, 0.14, 0.58)), stoneMat, 0, 0.69, ez);
+      }
+
+      // ---- the fountain: octagonal basin, brimful, a bowl on a pedestal ----
+      //
+      // BUILT BIG. At a 2.4 u basin it was correct against a person and
+      // invisible against the street: these houses are 14 to 17 u, and from
+      // the far end of a square the fountain has to hold the middle of it.
+      // 6 u across the basin and 4.7 u to the top of the jet is a fountain you
+      // could sit six people round, which is what the reference draws.
+      part('basin', this._pzGeo('basin', () =>
+        new THREE.CylinderGeometry(3.15, 3.35, 1.05, 8)), stoneMat, 0, 0.62, 0);
+      // the water sits a centimetre PROUD of the rim, so the stone reads as an
+      // annulus round it; drop it inside and the basin's own solid top face
+      // hides it and the fountain is a stone drum
+      part('water', this._pzGeo('water', () =>
+        new THREE.CylinderGeometry(2.78, 2.78, 0.14, 8)), waterMat, 0, 1.2, 0);
+      part('stem', this._pzGeo('stem', () =>
+        new THREE.CylinderGeometry(0.5, 0.76, 1.9, 8)), stoneMat, 0, 2.1, 0);
+      part('bowl', this._pzGeo('bowl', () =>
+        new THREE.CylinderGeometry(1.35, 0.66, 0.42, 8)), stoneMat, 0, 3.24, 0);
+      part('brim', this._pzGeo('brim', () =>
+        new THREE.CylinderGeometry(1.2, 1.2, 0.1, 8)), waterMat, 0, 3.48, 0);
+      part('jet', this._pzGeo('jet', () =>
+        new THREE.CylinderGeometry(0.06, 0.14, 1.25, 6)), waterMat, 0, 4.12, 0);
+      this.solids.push({ x: c.x, z: c.z, r: 3.4, y: y + 0.6, mat: 'hut' });
+      this._addShadow(c.x, c.z, 4.0, y);
+
+      // ---- lamps, planters and cypresses round the edge -------------------
+      const anchored = [];                    // {m, r, shadow} in world matrices
+      const inset = 2.2;
+      const corners = [
+        [-D / 2 + inset, -W / 2 + inset], [D / 2 - inset, -W / 2 + inset],
+        [-D / 2 + inset, W / 2 - inset], [D / 2 - inset, W / 2 - inset],
+      ];
+      for (let k = 0; k < corners.length; k++) {
+        const [ax, az] = corners[k];
+        const m = part('lampPost', this._pzGeo('lampPost', () =>
+          new THREE.CylinderGeometry(0.1, 0.17, 3.7, 6)), ironMat, ax, 1.85, az);
+        // the sheet draws single, double and triple lanterns; a square gets
+        // the tall ones, which is what the render has at its corners
+        const heads = k % 2 ? [[0, 3.9, 0]] : [[0, 4.05, 0], [-0.62, 3.62, 0], [0.62, 3.62, 0]];
+        if (heads.length > 1) {
+          part('lampArm', this._pzGeo('lampArm', () =>
+            new THREE.BoxGeometry(1.4, 0.09, 0.09)), ironMat, ax, 3.62, az);
+        }
+        for (const [hx, hy, hz] of heads) {
+          part('lampGlass', this._pzGeo('lampGlass', () =>
+            new THREE.CylinderGeometry(0.2, 0.26, 0.42, 6)), bulbMat,
+          ax + hx, hy, az + hz);
+          part('lampCap', this._pzGeo('lampCap', () =>
+            new THREE.ConeGeometry(0.3, 0.24, 6)), ironMat, ax + hx, hy + 0.32, az + hz);
+        }
+        anchored.push({ m, r: 0.35, shadow: 0 });
+      }
+      // planters on the sides, a cypress in two of them: the sheet's PLANT &
+      // TREE TEMPLATES panel, and what fills a square without walling it in
+      const beds = [[-D / 2 + inset, 0], [D / 2 - inset, 0],
+        [0, -W / 2 + inset * 0.8], [0, W / 2 - inset * 0.8]];
+      for (let k = 0; k < beds.length; k++) {
+        const [ax, az] = beds[k];
+        const m = part('planter', this._pzGeo('planter', () =>
+          new THREE.BoxGeometry(1.9, 0.72, 1.9)), stoneMat, ax, 0.36, az);
+        if (k < 2) {
+          part('cypTrunk', this._pzGeo('cypTrunk', () =>
+            new THREE.CylinderGeometry(0.13, 0.19, 1.0, 5)), trunkMat, ax, 1.2, az);
+          part('cypress', this._pzGeo('cypress', () =>
+            new THREE.ConeGeometry(0.72, 4.4, 6)), leafMat, ax, 3.7, az);
+        } else {
+          part('bush', this._pzGeo('bush', () =>
+            new THREE.IcosahedronGeometry(0.85, 0)), leafMat, ax, 1.24, az);
+        }
+        anchored.push({ m, r: 1.1, shadow: 1.4 });
+      }
+      for (const a of anchored) {
+        const wx = a.m.elements[12], wz = a.m.elements[14];
+        this.solids.push({ x: wx, z: wz, r: a.r, y: y + 0.6, mat: 'hut' });
+        if (a.shadow) this._addShadow(wx, wz, a.shadow, y);
+      }
+
+      // the record the street wall reads before it builds. The INVERSE of the
+      // square's own matrix is what `_inPiazza` tests against — a hand-written
+      // rotation here and a hand-written one there is two chances to get the
+      // sign wrong and no way to notice.
+      this._piazzas.push({ inv: new THREE.Matrix4().copy(base).invert(),
+        x: c.x, z: c.z, hd: D / 2, hw: W / 2 });
+    }
+
+    for (const [key, e] of PARTS) {
+      const im = new THREE.InstancedMesh(e.geo, e.mat, e.list.length);
+      for (let k = 0; k < e.list.length; k++) im.setMatrixAt(k, e.list[k]);
+      im.name = 'piazza-' + key;
+      im.castShadow = im.receiveShadow = true;
+      this.group.add(im);
+    }
+  }
+
+  /** One geometry per part per world, memoised: every square in a world is the
+   *  same size, so the basin built for the first is the basin for all of them. */
+  _pzGeo(key, make) {
+    this._pzGeos = this._pzGeos || new Map();
+    let g = this._pzGeos.get(key);
+    if (!g) this._pzGeos.set(key, g = make());
+    return g;
+  }
+
+
+  /** Is anything of radius `r` standing in a square? The frontage asks this
+   *  for every block, which is the whole reason a piazza is an opening in the
+   *  terrace rather than a paved yard behind it. */
+  _inPiazza(x, z, r = 0) {
+    for (const p of this._piazzas ?? []) {
+      _pzV.set(x, 0, z).applyMatrix4(p.inv);         // into the square's own frame
+      if (Math.abs(_pzV.x) < p.hd + r && Math.abs(_pzV.z) < p.hw + r) return true;
+    }
+    return false;
+  }
 
   /** STREET LIFE: what makes a street look lived-in rather than built.
    *
@@ -16675,6 +16969,9 @@ export class Track {
       if (k >= MAX) return null;
       const p = this.pointAt(i, lat * side);
       const r = Math.hypot(wAlong, dAcross) / 2;
+      // A SQUARE IS A HOLE IN THE STREET WALL. The terrace stops for it, which
+      // is the difference between a piazza and a paved yard behind the houses.
+      if (this._inPiazza(p.x, p.z, r * 0.6)) return null;
       // THE QUAY IS OPEN TO THE WATER (harbour reference): no house between
       // the seafront road and the sea. Any block whose centre lands within
       // `seaOpen` units of the waterline — or in the water — is refused, so
@@ -18296,6 +18593,12 @@ export class Track {
    *  sample's normal is fine at that sample and inside the road two samples
    *  later, where the centreline has swung under it. */
   _clearsRoad(x, z, r, margin = 1.2) {
+    // THE TWO PLACES NOTHING SCATTERS INTO: the carriageway, and a square.
+    // The squares are built before the forest, the ground cover, the huts and
+    // the trackside kit, and every one of those asks this question — so this
+    // is the one place the answer has to be given. Without it a piazza grows
+    // a tree through its own fountain and a scrub bush across its paving.
+    if (this._piazzas?.length && this._inPiazza(x, z, r)) return false;
     _clearV.set(x, 0, z);
     const i = this.nearestIndex(_clearV);          // no hint: search the whole lap
     const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;

@@ -1232,6 +1232,65 @@ export function ironRailTexture(hex = '#241f1c') {
   return t;
 }
 
+/** THE PIAZZA FLOOR: big rectangular flags laid in courses, with a ring of
+ *  radial setts round the middle where the fountain stands.
+ *
+ *  It is deliberately NOT the road surface. A square in these towns is laid
+ *  in larger, flatter, more regular stone than the street that runs into it,
+ *  and it has no wheel ruts in it — reuse the carriageway texture here and
+ *  the square reads as a car park.
+ */
+export function piazzaTexture(palette = {}) {
+  const P = {
+    base: '#9c9384',
+    flags: ['#c2b8a4', '#b6ac98', '#cabfa9', '#aca290', '#bdb2a0', '#c6bca8'],
+    joint: 'rgba(104,96,84,0.8)',
+    ring: '#a89c88',
+    ...palette,
+  };
+  const t = make(512, 512, (g, w, h) => {
+    g.fillStyle = P.joint;
+    g.fillRect(0, 0, w, h);
+    // flags in courses, each course offset half a flag from the last
+    const rows = 14, cols = 9;
+    const rh = h / rows, cw = w / cols;
+    for (let r = 0; r < rows; r++) {
+      const off = (r % 2) * 0.5;
+      for (let c = -1; c <= cols; c++) {
+        const x = (c + off) * cw + 1.2, y = r * rh + 1.2;
+        g.fillStyle = P.flags[(Math.random() * P.flags.length) | 0];
+        g.fillRect(x, y, cw - 2.4, rh - 2.4);
+        g.fillStyle = 'rgba(255,250,238,0.10)';
+        g.fillRect(x, y, cw - 2.4, 1.6);            // lit top arris
+        g.fillStyle = 'rgba(30,26,22,0.10)';
+        g.fillRect(x, y + rh - 4, cw - 2.4, 1.6);
+      }
+    }
+    // THE RING ROUND THE FOUNTAIN, which is what makes a paved rectangle read
+    // as a designed square rather than a yard: two courses of setts laid to
+    // the circle, exactly the way the reference lays them.
+    const cx = w / 2, cy = h / 2;
+    for (const [rad, n, band] of [[122, 46, 15], [148, 56, 13]]) {
+      for (let k = 0; k < n; k++) {
+        const a0 = (k / n) * Math.PI * 2, a1 = ((k + 0.86) / n) * Math.PI * 2;
+        g.fillStyle = P.flags[(Math.random() * P.flags.length) | 0];
+        g.beginPath();
+        g.arc(cx, cy, rad + band, a0, a1);
+        g.arc(cx, cy, rad, a1, a0, true);
+        g.closePath();
+        g.fill();
+      }
+    }
+    g.strokeStyle = P.ring;
+    g.lineWidth = 3;
+    g.beginPath(); g.arc(cx, cy, 120, 0, 7); g.stroke();
+    g.beginPath(); g.arc(cx, cy, 164, 0, 7); g.stroke();
+    noiseOverlay(g, w, h, 0.07);
+  });
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
 export function hazardTexture() {
   const t = make(128, 64, (g, w, h) => {
     g.fillStyle = '#e8b83a';

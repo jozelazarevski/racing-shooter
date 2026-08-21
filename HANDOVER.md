@@ -1906,3 +1906,72 @@ claim its neighbour's. The number is a floor on the true figure, not a defect
 count.
 
 Gates: boot 4/4, test-boot 7/0, test-buildings green, test-carriageway green.
+
+## r246 — THE SQUARES, AND THE FOUNTAINS IN THEM
+Asked for straight off the sheet, which gives FOUNTAIN MODULES, STREET LAMP
+OPTIONS and PLANT & TREE TEMPLATES a panel each, and off the Monte Carlo
+render, whose entire foreground is a paved terrace with a fountain, lamps and
+planters on it.
+
+### A SQUARE IS A HOLE IN THE STREET WALL
+That is the part that is not decoration, and it is why `_buildPiazzas` runs
+BEFORE `_buildOldTown`: the frontage asks `_inPiazza` before placing every
+block and refuses any house that would stand in the square. Without it the
+fountain ends up in somebody's front room.
+
+The same question belongs in `_clearsRoad`, which is the choke point every
+scatter in the game already goes through — forest, ground cover, huts,
+trackside kit and props are all built after the squares and all ask it. One
+line there is the difference between a piazza and a piazza with a tree growing
+out of its fountain. (`_clearsRoad` exists TWICE, on Track and in flora.js,
+and flora's copy shadows the class's — both were changed.)
+
+### SEAT ON THE HIGH CORNER
+Seated at the LOW corner's height, the ground rises through the paving
+everywhere else: the first cut was a slab buried in a beach with a fountain
+apparently standing on sand. It seats on the HIGH corner and the plate is made
+thick enough to reach the ground at the low one, which is also how it gets the
+raised-terrace-with-a-kerb look the reference has. Sites with more than 1.7 u
+of fall across them are refused outright — no seating fixes a flat plate on a
+hillside.
+
+### BUILT BIG, OR IT IS A BIRDBATH
+A 2.4 u basin is correct against a person and invisible against a street of
+14-17 u houses. 6 u across the basin and 4.7 u to the top of the jet is a
+fountain you could sit six people round, which is what the reference draws.
+The water sits a centimetre PROUD of the rim: dropped inside, the basin's own
+solid top face hides it and the fountain is a stone drum.
+
+### ONE DRAW CALL PER PART, NOT PER SQUARE
+Every square in a world is the same size and carries the same kit, so the
+basin is one InstancedMesh with an instance per square rather than a mesh in
+each of three groups. As loose meshes it came to ~42 draw calls a square;
+instanced it is 20 for the whole world however many squares are in it
+(measured: `tools-scratch/pzcount.mjs`, 20 calls / 92 pieces / 2 squares). The
+street frontage — hundreds of houses — costs eight, and this had to be in the
+same order of magnitude.
+
+### AND NO HAND-WRITTEN ROTATIONS
+Local-to-world goes through three.js: `applyAxisAngle` for the site test, a
+composed matrix for the parts, and the INVERSE of that same matrix for
+`_inPiazza`. A rotation written out by hand at the placement end and again at
+the test end is two chances to get a sign wrong and no way to notice, which is
+how furniture ends up mirrored across a square.
+
+Tunes: `piazza: { count, depth, width }` on riviera (2 squares), genova (2)
+and IL BUDELLO (1, and smaller — a lane whose houses stand 6 u off the
+centreline cannot take the seafront's 17 u square, it would be refused at
+every station on the lap).
+
+Probes: `tools-scratch/piazza.mjs` (where they landed, how far the inner edge
+clears the road, and how many houses stand inside one — must be 0),
+`piazzashot.mjs` (the driver's view OF a square, which is not the view down
+the street that lapshot gives), `pzcount.mjs` (draw calls).
+
+Gates: boot 4/4, test-carriageway green, test-buildings green. The road
+census was run over the four square worlds BEFORE and AFTER, and comes back
+identical — same 5 bodies, same 1 floater, same worst bites, all of them
+pre-existing (four 10.8 u poles on SANREMO, a dodecahedron rock on ALASSIO).
+The only thing that moved is the solid count, which is the squares' own
+furniture registering. Running it on one build and calling it clean would not
+have told anybody anything: three of those four worlds were already dirty.

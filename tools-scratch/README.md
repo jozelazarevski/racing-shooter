@@ -53,6 +53,13 @@ real time to get right and the next session should not rebuild them.
                 which gate refused each station (start gate / gorge / curvature
                 / tunnelFitAt). Turned "asked 3, got 1" into "panorama refuses
                 212 stations as too curved against CAPE OLIVETO's 59".
+- `piazza.mjs`  where the squares landed: lap fraction, how far each inner edge
+                clears the driveable edge, and how many frontage blocks stand
+                inside one — which must be zero, because a square the terrace
+                did not stop for is a fountain in somebody's front room.
+- `piazzashot.mjs` the driver's view OF a square rather than down the street;
+                `BACK` and `UP` move the camera back and lift it.
+- `pzcount.mjs` draw calls and instances the squares cost.
 - `balconies.mjs` how many balconies and awnings sit on a storey line the
                 facade painter actually drew, against how many exist. It is
                 what turned "the balcony is all over the place" into 196/319,
