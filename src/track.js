@@ -9716,9 +9716,35 @@ export class Track {
         // and a leg reaches the GROUND under its own tower, which on a world
         // that starts on a shelf is not the road's height either
         const gy = Math.min(y0, this.terrainHeight(bx + ox, bz + oz));
-        const legH = (y0 + 10) - gy;
+        // A LEG THAT CANNOT STAND CLEAR OF THE ROAD DOES NOT COME DOWN TO THE
+        // GROUND (r253).
+        //
+        // Dropping the collider — the r167 rule the note below records — stops
+        // the tower dead-stopping a car, and that was the right call. But the
+        // POLE IS STILL THERE: an 11 u mast standing 4.2 u inside the racing
+        // line at the start of TOUR DE CORSE and SANREMO STAGE, which the road
+        // census has reported as a body on every run of this session, and
+        // which a driver still has to look through.
+        //
+        // Where there is nowhere to stand, the leg stops above the cars
+        // instead: the beam is carried from the side that DID clear and this
+        // one hangs, which is what a gantry over a road looks like anyway.
+        // 3.2 u is above the 2.4 u roof line the census measures headroom
+        // against, so what was a body in the carriageway becomes overhead.
+        const clear = this._clearsRoad(bx + ox, bz + oz, 0.6, 0.4);
+        // ...and the headroom is measured over THE ROAD THAT IS UNDER THE LEG,
+        // not over the start line. RALLYCROSS ARENA's stray leg stands where
+        // the lap comes back 2 u higher than sample 0, so a cut referenced to
+        // `y0` left it grazing that carriageway at 1.01 u — a body again, in a
+        // different class. The road under the foot is the only surface that
+        // can answer this.
+        const nearI = this.nearestIndex(_gp.set(bx + ox, 0, bz + oz));
+        const roadY = this.center[nearI]?.y ?? y0;
+        const footY = clear ? gy : Math.max(gy, Math.max(y0, roadY) + 3.2);
+        const legH = (y0 + 10) - footY;
+        if (legH <= 0.4) continue;
         const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, legH, 8), steel);
-        leg.position.set(bx + ox, gy + legH / 2, bz + oz);
+        leg.position.set(bx + ox, footY + legH / 2, bz + oz);
         leg.castShadow = true;
         this.group.add(leg);
         // AND WHERE THE TOWER HAS NOWHERE TO STAND, IT STOPS BEING SOLID.
@@ -9735,7 +9761,7 @@ export class Track {
         // you on the start straight, so a leg that cannot clear the road
         // keeps its mesh and gives up its collider. This is exactly the rule
         // the grandstand's own colliders have followed since r167.
-        if (!this._clearsRoad(bx + ox, bz + oz, 0.6, 0.4)) continue;
+        if (!clear) continue;
         this.solids.push({ x: bx + ox, z: bz + oz, r: 0.6, y: c.y, mat: 'metal' });
       }
       for (let ly = 2.5; ly <= 8.5; ly += 3) {
@@ -10188,7 +10214,14 @@ export class Track {
       // squarely in the lane. This is the third system to need the lap-wide
       // check (road cabins and props were the first two); an offset is not a
       // distance, and `_distToTrack` searches the lap.
-      if (this._distToTrack(p.x, p.z) < w + r + 1.5) return;
+      // ...and against the width of the road it is NEAREST TO, not the width
+      // of the one it was measured from. `w` is sample `i`'s half-width; the
+      // station `_distToTrack` actually finds may be another leg entirely,
+      // with a road twice as wide. `_clearsRoad` asks the nearest station's
+      // own width, which is the question the road census asks and therefore
+      // the only one worth passing. (Same defect, third system: the townsfolk
+      // had it in r249 and the gantry legs before them.)
+      if (!this._clearsRoad(p.x, p.z, r, 1.5)) return;
       if (spec.style === 'roots') {
         // gnarled redwood roots breaking the surface: 3 low half-buried ridges
         const g = new THREE.Group();
@@ -13498,13 +13531,27 @@ export class Track {
       0, -(TH + 0.12) / 2 - 0.04, 0);
       part('pave' + SZ, this._pzGeo('pave' + SZ, () => new THREE.BoxGeometry(D, TH, W)),
         paveMat, 0, -TH / 2, 0);
-      // A TERRACE IS A WALL. Up to a kerb's height the plate is something you
-      // bump over; past that it is masonry holding a square up, and a car has
-      // to be stopped by it rather than driven through it.
+      // A TERRACE IS A WALL — AND A COLLIDER IS NOT A FOOTPRINT (r253).
+      //
+      // r252 registered three solids of radius D/2 down the middle of the
+      // plate, which is the square's own size and therefore reaches back
+      // across the road it stands beside: COTE D AZUR came out with fourteen
+      // stone blockers biting 9.27 u into a 5.6 u half-width, i.e. an
+      // invisible wall across the whole carriageway. A collider describes the
+      // FACE a car can hit, not the area the thing covers.
+      //
+      // So the retaining face gets a row of small ones along the plate's
+      // road-facing edge, each set far enough in to clear the carriageway —
+      // and any that cannot clear is simply not registered, which leaves the
+      // kerb strip passable exactly as it was before the terraces existed.
       if (TH > 1.4) {
-        for (const t2 of [-0.3, 0, 0.3]) {
-          _pzV.set(0, 0, W * t2).applyMatrix4(base);
-          this.solids.push({ x: _pzV.x, z: _pzV.z, r: D * 0.5,
+        const RS = 1.5;
+        const n = Math.max(2, Math.round(W / (RS * 2.4)));
+        for (let j = 0; j < n; j++) {
+          const lz = (j / (n - 1) - 0.5) * (W - RS * 2);
+          _pzV.set(-outward * (D / 2 - RS - 0.3), 0, lz).applyMatrix4(base);
+          if (!this._clearsRoad(_pzV.x, _pzV.z, RS, 0.3)) continue;
+          this.solids.push({ x: _pzV.x, z: _pzV.z, r: RS,
             y: Math.min(y, this.terrainHeight(_pzV.x, _pzV.z)) + 0.4, mat: 'stone' });
         }
       }
@@ -15546,9 +15593,50 @@ export class Track {
       } else {
         q.identity();
       }
-      m4.compose(pos.set(s.x, y + 0.07, s.z), q, scl.set(s.r, 1, s.r));
+      // A SHADOW BELONGS TO THE GROUND IT IS ON, AND NEVER TO A ROAD (r253).
+      //
+      // On a lap that stacks — GOTTHARD CLIMB's hairpins run one above
+      // another — a decal seated under a tree on the upper shelf hangs in
+      // mid-air over the LOWER carriageway, where it reads as a dark patch
+      // floating across the road; the census scored two of them as bodies at
+      // a 4 u bite. And a decal that merely spills onto the tarmac is wrong
+      // for the same reason in a smaller way: these are fake occlusion for
+      // things standing on the GROUND, and the road has its own surface. Any
+      // shadow reaching into a carriageway is dropped.
+      // ...and the question is asked the way the census asks it: distance to
+      // the centreline POLYLINE, not to the nearest sample. On a hairpin the
+      // other leg swings underneath between two samples, and the sample-based
+      // answer missed one of the two decals on GOTTHARD outright.
+      // AND THE ROAD IT IS OVER NEED NOT BE THE NEAREST ONE.
+      //
+      // The first two cuts of this asked `nearestIndex`, which on GOTTHARD
+      // answers with the hairpin the decal is ON — while the one it hangs over
+      // is the shelf BELOW, at the same x and z and eight metres down. Asking
+      // the nearest station can never see that, and a probe built on the same
+      // question duly reported zero while the census reported a 4 u bite: the
+      // two were not asking the same thing.
+      //
+      // So walk the stations that could reach this decal at all and test each
+      // one on its own height. It is the decal's EDGE that matters, not its
+      // centre — a 6 u shadow a metre outside a carriageway still lies four
+      // metres across it — and where the road is at the decal's own level the
+      // radius is TRIMMED to the kerb instead of the whole thing dropped, so a
+      // roadside prop keeps the shadow that glues it to the ground.
+      let rr = s.r, drop = false;
+      for (let i = 0; i < N && !drop; i++) {
+        const c = this.center[i];
+        const dxz = Math.hypot(s.x - c.x, s.z - c.z);
+        const half = (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 0.4;
+        if (dxz - rr >= half) continue;                 // nowhere near this one
+        if (Math.abs(y - c.y) > 1.2) { drop = true; break; }   // another deck
+        rr = Math.min(rr, dxz - half);
+        if (rr < 0.4) drop = true;
+      }
+      if (drop) continue;
+      m4.compose(pos.set(s.x, y + 0.07, s.z), q, scl.set(rr, 1, rr));
       mesh.setMatrixAt(k++, m4);
     }
+    mesh.count = k;                    // ...so the skipped ones are not drawn
     mesh.renderOrder = 1;
     mesh.name = 'contact-shadows';
     this.group.add(mesh);

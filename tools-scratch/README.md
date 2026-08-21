@@ -66,6 +66,11 @@ real time to get right and the next session should not rebuild them.
                 stands IN the square looking at its church — the only shot
                 that shows a facade, and the one that caught a door and a rose
                 window built on the wrong side of their own wall.
+- `shadowprobe.mjs` which contact-shadow decals reach into a carriageway. Its
+                own lesson: it asked `nearestIndex` and reported zero while the
+                census reported a 4 u bite — on a stacked lap the road a decal
+                hangs OVER is not the road it is nearest to, and a probe that
+                asks the wrong question confirms the wrong answer.
 - `skyshot.mjs`  the sky, pitched up, so the frame is mostly cloud. A bank
                 tuned from a street shot is tuned on the one strip of sky a
                 building has not already covered — which is how a cloud field

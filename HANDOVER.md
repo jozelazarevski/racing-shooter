@@ -2348,3 +2348,78 @@ Gates: boot 4/4, test-carriageway green, test-buildings green. Road census run
 over 30/34/49/51/58 before and after: every floater and the one remaining body
 is pre-existing and unchanged, and Monaco's four townsfolk-in-the-road are
 gone.
+
+## r253 — THINGS STANDING IN THE ROAD
+An iteration spent on the road census's own backlog rather than on new
+geometry. Three defects it had been reporting all session, and two it reports
+that are older than this work.
+
+### THE START GANTRY'S LEGS
+`_buildStartGate` sites its scaffold towers by walking outward and scoring
+each offset, and where nothing clears — a lap that comes back past its own
+start line has no clear offset, which is TOUR DE CORSE and SANREMO STAGE — it
+takes the least-bad spot and drops the COLLIDER, per the r167 rule. That was
+right as far as it went, and it left an 11 u steel mast standing 4.2 u inside
+the racing line at the start of two worlds, which the census scored as a body
+on every run of this session.
+
+A leg that cannot stand clear of the road no longer comes down to the ground:
+it stops above the cars, the beam is carried by the side that DID clear, and
+what was a body in a carriageway becomes overhead — which is what a gantry
+over a road looks like anyway.
+
+AND THE HEADROOM IS MEASURED OVER THE ROAD UNDER THE LEG, not over the start
+line. RALLYCROSS ARENA's stray leg stands where the lap returns two metres
+higher than sample 0, and a cut referenced to `y0` left it grazing that
+carriageway at 1.01 u — a body again, in a different class.
+
+    TOUR DE CORSE   4 bodies, worst bite 4.19 u  ->  clean
+    SANREMO STAGE   4 bodies, worst bite 4.19 u  ->  clean
+    RALLYCROSS      2 bodies, worst bite 1.01 u  ->  clean
+
+### THE CONTACT SHADOWS
+GOTTHARD CLIMB had two shadow decals scoring as bodies at a 4 u bite. A
+contact shadow is fake occlusion for something standing on the GROUND; over a
+road it is a dark patch floating across the tarmac.
+
+THE ROAD IT IS OVER NEED NOT BE THE NEAREST ONE. Two cuts of this asked
+`nearestIndex`, which on Gotthard answers with the hairpin the decal is ON,
+while the one it hangs over is the shelf BELOW — same x and z, eight metres
+down. A probe built on the same question duly reported zero while the census
+reported 4 u: the two were not asking the same thing. It walks the stations
+that could reach the decal at all and tests each on its own height; where the
+road is at the decal's own level the RADIUS IS TRIMMED to the kerb instead of
+the decal dropped, so a roadside prop keeps the shadow that glues it down.
+
+A tilt cap was tried on the way — a decal following a 45-degree slope is a
+sheet standing out of the hillside — and it made the census WORSE, so it is
+not in the tree. A change that cannot be shown to be an improvement does not
+ship.
+
+    GOTTHARD CLIMB  2 bodies, worst bite 4.03 u  ->  clean
+
+### TWO HARDENINGS, BOTH MEASURED HARMLESS
+  - `_buildObstacles` compared `_distToTrack` — a lap-wide answer — against
+    the half-width at the sample the offset was measured FROM. Same defect as
+    the townsfolk in r252 and the gantry before them; it asks `_clearsRoad`
+    now. No world changed, which is the point of a hardening.
+  - r252's piazza terrace registered three colliders of radius D/2 down the
+    middle of the plate. A collider describes the FACE a car can hit, not the
+    area the thing covers, and D/2 is the square's own size — it reaches back
+    across the road. Now a row of small ones along the road-facing edge, each
+    only registered if it clears the carriageway.
+
+### AND TWO THAT ARE OLDER THAN ANY OF THIS
+Reported rather than fixed, with the evidence, because both need work in
+systems this session has not touched:
+  - CINQUE TERRE stands three element-kit boulders up to 6.28 u into a 9 u
+    half-width, plus two blockers. Confirmed pre-existing by building the
+    commit before r252 and running the same census: identical.
+  - MOUNTAIN TO SEA reports a 45 u HALF-WIDTH at sample 456. That is a 90 u
+    road, and everything within it — 72 blockers, 37 bodies — is scored
+    against it. The width profile is what wants looking at there, not the
+    scenery.
+  - COTE D AZUR's fourteen stone blockers at a 9.27 u bite are likewise
+    pre-existing: the same fourteen at the same bite on the pre-r252 build.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green.
