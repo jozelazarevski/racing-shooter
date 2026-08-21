@@ -13,6 +13,9 @@ console.log(JSON.stringify(await p.evaluate(() => {
     if (!o.name?.startsWith('piazza-')) return;
     rows.push(`${o.name}:${o.count ?? 1}`); inst += o.count ?? 1;
   });
-  return { drawCalls: rows.length, instances: inst, squares: g.track._piazzas?.length ?? 0, rows };
+  let scene = 0;
+  g.scene.traverse(o => { if (o.isMesh || o.isInstancedMesh) scene++; });
+  return { drawCalls: rows.length, instances: inst, sceneDrawCalls: scene,
+    squares: g.track._piazzas?.length ?? 0, rows };
 }), null, 1));
 await b.close();

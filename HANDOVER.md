@@ -1975,3 +1975,70 @@ pre-existing (four 10.8 u poles on SANREMO, a dodecahedron rock on ALASSIO).
 The only thing that moved is the solid count, which is the squares' own
 furniture registering. Running it on one build and calling it clean would not
 have told anybody anything: three of those four worlds were already dirty.
+
+## r247 — THE CHURCH AND THE MONUMENT
+More squares (riviera 3, genova 3, sanremo 2), and two things to put in them.
+
+### A SQUARE THAT REPEATS IS ONE SQUARE SEEN THREE TIMES
+So the centrepiece alternates: a fountain on the even ones, a MONUMENT on the
+odd — a bronze on a column on a stepped plinth, 16 u to the top of its raised
+arm. Taller than the fountain on purpose: a fountain is furniture you look
+down into and a monument is a thing you look up at, and standing a storey
+above the four-storey terrace is what makes the second square read as a
+different place rather than as the first one again. The figure is three boxes
+and a sphere — at the distance a driver reads it the silhouette is the whole
+content, and anything more is polygons nobody will see.
+
+### THE CHURCH IS THE ONE LANDMARK, SO IT IS BUILT ONCE
+On the first square that can take one. A town has one parish church, not one
+per square, and it is what the rest of the lap is oriented by.
+
+A LIGURIAN PARISH CHURCH IS A FLAT GABLED FACADE AND A SEPARATE TOWER — not a
+spire on a nave. The campanile stands apart, square in plan, with an open
+belfry stage and a low pyramid cap; getting that pairing right is most of what
+makes it read as this region.
+
+Four things were wrong on the first try, all of the same kind — building the
+right shape and then not looking at it from where the player stands:
+
+  1. STONE. It used `stoneTexture`, which is the campanile's dark rubble, and
+     19 u of it put a black cliff across the head of the square. A Ligurian
+     church is PAINTED — flat render a shade lighter than the terrace, which
+     is righter and cheaper both.
+  2. THE BELFRY was a solid dark box, which at any distance is a black cube on
+     a white tower. It is light stone now with a dark opening driven through
+     both axes: an arch on all four faces for two instances, and those
+     openings are the whole silhouette of a campanile.
+  3. THE DOOR AND THE ROSE WINDOW WERE INSIDE THE WALL. `outward` points AWAY
+     from the square, and both were placed at `+outward` — so they showed a
+     couple of centimetres on the BACK of the facade and the square looked at
+     a blank white wall. Caught by standing in the square and looking at it
+     (`piazzashot.mjs FACE=1`), which is the only shot that could have.
+  4. THE GROUND BEYOND A SQUARE IS NOT THE SQUARE'S GROUND. The flatness test
+     covers the paving; the church hangs 19 u past its far edge, which on the
+     seafront is often the top of a bank. It gets a plinth that reaches 5 u
+     down — fixed height, because every part of this kit is one memoised
+     geometry drawn at unit scale and a box buried in a hillside costs nothing
+     — and the fit test refuses a site with more than 4 u of fall.
+
+### A COLLIDER SEATS ON THE GROUND UNDER IT, NOT ON THE PLATE
+The square is seated on its HIGH corner, so a solid registered at plate height
+over ground that falls away is air — and the road census calls anything over
+2.5 u a FLOATER. The church's own solids tripped exactly that: GENOVA PORTO
+went from clean to two floaters at 3.9 u, and `tools-scratch/floaters.mjs`
+named them by radius (5.46 = CHURCH_WID * 0.52) in one run. Every piazza solid
+takes `min(plate, ground) + 0.6` now, and the census is back to baseline: 73
+clean, 77 clean, and the one floater on 74 and four bodies on 78 are the same
+pre-existing ones from before r246.
+
+Also: the nave gets THREE solids along its length rather than one round it. A
+single circle big enough to cover a 19 u building reaches back over the
+square's own paving and puts an invisible wall across it.
+
+Cost: 50 draw calls for the whole civic kit — squares, fountains, monuments,
+church and campanile — against 1056 in the scene, and it does not grow with
+the number of squares. If it ever needs to come down, the church's ~20 are
+mergeable by material into about five.
+
+Gates: boot 4/4, test-boot 7/0, test-buildings green, test-carriageway green,
+road census over 73/74/77/78 back to the pre-r246 baseline.

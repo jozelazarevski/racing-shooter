@@ -4476,7 +4476,7 @@ THEMES.riviera = {
   // THE SQUARE, which the sheet gives a panel to and the render builds its
   // whole foreground out of: paving, a fountain, lamps and planters, and a
   // break in the terrace to put them in. See `_buildPiazzas`.
-  piazza: { count: 2, depth: 17, width: 23 },
+  piazza: { count: 3, depth: 17, width: 23 },
   frontage: {
     lateral: 15.0, depth: 8.5, unit: 7.2, height: 14.0, run: [6, 12], rows: 5,
     bayset: 'liguria', ridge: 'along',
@@ -4568,7 +4568,7 @@ THEMES.genova = {
   skyTop: '#3a7fb8', skyHorizon: '#cdd6d4',
   splinter: [0xc86a4a, 0xb8ac96, 0x35583c],
   hutRoof: 0x9c4628,
-  piazza: { count: 2, depth: 15, width: 20, stone: 0xbfb49e, leaf: 0x44603a },
+  piazza: { count: 3, depth: 15, width: 20, stone: 0xbfb49e, leaf: 0x44603a },
   // A WORKING HARBOUR IS THE SAME ARCHITECTURE IN DIRTIER PAINT: the same
   // architrave, the same green louvre, the same iron — over the port's reds
   // and ochres rather than the resort's yellows and pinks.
@@ -4615,7 +4615,7 @@ THEMES.sanremo = {
   // a balcony, and the sheet draws exactly that.
   // ONE SQUARE UP HERE TOO — a hinterland village has a fountain in it and the
   // sheet draws exactly that; it is just smaller than the seafront's.
-  piazza: { count: 1, depth: 14, width: 18, leaf: 0x486840 },
+  piazza: { count: 2, depth: 14, width: 18, leaf: 0x486840 },
   // NO `ridge: 'along'` here. Up in the hinterland the houses stand apart
   // rather than in a terrace, and a detached village house presents its
   // gable — which is also what keeps this world from reading as the
@@ -4704,6 +4704,7 @@ const _clearV = new THREE.Vector3();   // scratch for _clearsRoad
 const _pzV = new THREE.Vector3();      // ...and for the squares (see _buildPiazzas)
 const _pzUp = new THREE.Vector3(0, 1, 0);
 const _IDQ = new THREE.Quaternion();   // identity: piazza parts are axis-aligned
+const CHURCH_LEN = 19, CHURCH_WID = 10.5;  // the nave, along and across (_pzChurch)
 const _ONE = new THREE.Vector3(1, 1, 1);   // ...and built at their true size
 
 /** Hermite ease on an already-normalised 0..1 ramp (clamps its own ends). */
@@ -13160,11 +13161,39 @@ export class Track {
     const trunkMat = new THREE.MeshStandardMaterial({
       color: 0x6b563c, flatShading: true, roughness: 1,
     });
+    // A LIGURIAN CHURCH IS PAINTED, NOT QUARRIED. The first cut used the
+    // campanile's `stoneTexture` map, and a dark rubble wall 20 u long put a
+    // black cliff across the head of the square — nothing like the whitewashed
+    // fronts in the sheet, and nothing like the terrace it stands in. Flat
+    // render, a shade lighter than the houses, is both righter and cheaper.
+    const churchMat = new THREE.MeshStandardMaterial({
+      color: P.church ?? 0xf2e9d8, flatShading: true,
+      roughness: 0.92, envMapIntensity: 0.3,
+    });
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: this.T.frontage?.roof ?? this.T.hutRoof ?? 0xb85a30,
+      flatShading: true, roughness: 0.8,
+    });
+    const bronzeMat = new THREE.MeshStandardMaterial({
+      color: P.bronze ?? 0x5c6b52, roughness: 0.45, metalness: 0.55,
+      flatShading: true,
+    });
+    const darkMat = new THREE.MeshStandardMaterial({
+      color: 0x241f1c, roughness: 0.85, flatShading: true,
+    });
+    const M = { stoneMat, kerbMat, waterMat, ironMat, bulbMat, leafMat, trunkMat,
+      churchMat, roofMat, bronzeMat, darkMat };
 
     this._piazzas = this._piazzas || [];
     const fracs = [];
     for (let k = 0; k < want; k++) fracs.push((0.16 + k / want) % 1);
+    let made = 0;
     for (const f0 of fracs) {
+      // THE FIRST SQUARE THAT CAN TAKE ONE GETS THE CHURCH. A town has one
+      // parish church, not one per square, and it is the landmark the rest of
+      // the lap is oriented by — so it goes on the first square built rather
+      // than on a lottery.
+      const wantChurch = P.church !== false && made === 0;
       const want0 = (f0 * N) | 0;
       let site = null;
       for (let d = 0; d < 140 && !site; d += 5) {
@@ -13230,12 +13259,17 @@ export class Track {
       // sand — a square has an edge you can lean on. The street side stays
       // open; a piazza you cannot walk into is a plinth.
       const outward = Math.sign(lat0 * site.side) || 1;
-      part('wallSide', this._pzGeo('wallSide', () =>
-        new THREE.BoxGeometry(0.36, 0.62, W)), kerbMat,
-      outward * (D / 2 - 0.18), 0.31, 0);
-      part('copeSide', this._pzGeo('copeSide', () =>
-        new THREE.BoxGeometry(0.58, 0.14, W + 0.22)), stoneMat,
-      outward * (D / 2 - 0.18), 0.69, 0);
+      // ...unless a church stands on that side, which is a better edge than a
+      // parapet and cannot be walked through either
+      const church = wantChurch ? this._pzChurchFits(base, outward, D, y) : null;
+      if (!church) {
+        part('wallSide', this._pzGeo('wallSide', () =>
+          new THREE.BoxGeometry(0.36, 0.62, W)), kerbMat,
+        outward * (D / 2 - 0.18), 0.31, 0);
+        part('copeSide', this._pzGeo('copeSide', () =>
+          new THREE.BoxGeometry(0.58, 0.14, W + 0.22)), stoneMat,
+        outward * (D / 2 - 0.18), 0.69, 0);
+      }
       for (const ez of [-(W / 2 - 0.18), W / 2 - 0.18]) {
         part('wallEnd', this._pzGeo('wallEnd', () =>
           new THREE.BoxGeometry(D, 0.62, 0.36)), kerbMat, 0, 0.31, ez);
@@ -13243,30 +13277,17 @@ export class Track {
           new THREE.BoxGeometry(D + 0.22, 0.14, 0.58)), stoneMat, 0, 0.69, ez);
       }
 
-      // ---- the fountain: octagonal basin, brimful, a bowl on a pedestal ----
+      // ---- the centrepiece: a fountain, or a monument ---------------------
       //
-      // BUILT BIG. At a 2.4 u basin it was correct against a person and
-      // invisible against the street: these houses are 14 to 17 u, and from
-      // the far end of a square the fountain has to hold the middle of it.
-      // 6 u across the basin and 4.7 u to the top of the jet is a fountain you
-      // could sit six people round, which is what the reference draws.
-      part('basin', this._pzGeo('basin', () =>
-        new THREE.CylinderGeometry(3.15, 3.35, 1.05, 8)), stoneMat, 0, 0.62, 0);
-      // the water sits a centimetre PROUD of the rim, so the stone reads as an
-      // annulus round it; drop it inside and the basin's own solid top face
-      // hides it and the fountain is a stone drum
-      part('water', this._pzGeo('water', () =>
-        new THREE.CylinderGeometry(2.78, 2.78, 0.14, 8)), waterMat, 0, 1.2, 0);
-      part('stem', this._pzGeo('stem', () =>
-        new THREE.CylinderGeometry(0.5, 0.76, 1.9, 8)), stoneMat, 0, 2.1, 0);
-      part('bowl', this._pzGeo('bowl', () =>
-        new THREE.CylinderGeometry(1.35, 0.66, 0.42, 8)), stoneMat, 0, 3.24, 0);
-      part('brim', this._pzGeo('brim', () =>
-        new THREE.CylinderGeometry(1.2, 1.2, 0.1, 8)), waterMat, 0, 3.48, 0);
-      part('jet', this._pzGeo('jet', () =>
-        new THREE.CylinderGeometry(0.06, 0.14, 1.25, 6)), waterMat, 0, 4.12, 0);
-      this.solids.push({ x: c.x, z: c.z, r: 3.4, y: y + 0.6, mat: 'hut' });
+      // A TOWN HAS BOTH, and a lap that shows the same fountain three times
+      // has one square repeated three times. Alternating them is the cheapest
+      // way to make two squares read as two places.
+      if (made % 2 === 0) this._pzFountain(part, M);
+      else this._pzMonument(part, M);
+      this.solids.push({ x: c.x, z: c.z, r: 3.4,
+        y: Math.min(y + 0.6, this.terrainHeight(c.x, c.z) + 0.6), mat: 'hut' });
       this._addShadow(c.x, c.z, 4.0, y);
+      if (church) this._pzChurch(part, M, base, outward, D, y);
 
       // ---- lamps, planters and cypresses round the edge -------------------
       const anchored = [];                    // {m, r, shadow} in world matrices
@@ -13314,9 +13335,15 @@ export class Track {
         }
         anchored.push({ m, r: 1.1, shadow: 1.4 });
       }
+      // A COLLIDER SEATS ON THE GROUND UNDER IT, NOT ON THE PLATE IT STANDS
+      // ON. The square is seated on its HIGH corner, so a lamp registered at
+      // plate height over ground that falls 1.5 u away is 2.1 u of air — and
+      // the road census calls anything over 2.5 u a FLOATER, which is exactly
+      // what the church's own solids tripped.
       for (const a of anchored) {
         const wx = a.m.elements[12], wz = a.m.elements[14];
-        this.solids.push({ x: wx, z: wz, r: a.r, y: y + 0.6, mat: 'hut' });
+        this.solids.push({ x: wx, z: wz, r: a.r,
+          y: Math.min(y + 0.6, this.terrainHeight(wx, wz) + 0.6), mat: 'hut' });
         if (a.shadow) this._addShadow(wx, wz, a.shadow, y);
       }
 
@@ -13324,8 +13351,14 @@ export class Track {
       // square's own matrix is what `_inPiazza` tests against — a hand-written
       // rotation here and a hand-written one there is two chances to get the
       // sign wrong and no way to notice.
+      // the exclusion rect is ASYMMETRIC when a church stands on the outer
+      // side: the terrace has to stop for the church too, and the church is
+      // entirely outside the paving.
       this._piazzas.push({ inv: new THREE.Matrix4().copy(base).invert(),
-        x: c.x, z: c.z, hd: D / 2, hw: W / 2 });
+        x: c.x, z: c.z, hw: W / 2,
+        x0: outward > 0 ? -D / 2 : -D / 2 - (church ? CHURCH_LEN + 3 : 0),
+        x1: outward > 0 ? D / 2 + (church ? CHURCH_LEN + 3 : 0) : D / 2 });
+      made++;
     }
 
     for (const [key, e] of PARTS) {
@@ -13335,6 +13368,229 @@ export class Track {
       im.castShadow = im.receiveShadow = true;
       this.group.add(im);
     }
+  }
+
+  /** THE FOUNTAIN, brimful, on the middle of a square.
+   *
+   *  BUILT BIG. At a 2.4 u basin it was correct against a person and invisible
+   *  against the street: these houses are 14 to 17 u, and from the far end of
+   *  a square the centrepiece has to hold the middle of it. 6 u across the
+   *  basin and 4.7 u to the top of the jet is a fountain you could sit six
+   *  people round, which is what the reference draws.
+   */
+  _pzFountain(part, M) {
+    part('basin', this._pzGeo('basin', () =>
+      new THREE.CylinderGeometry(3.15, 3.35, 1.05, 8)), M.stoneMat, 0, 0.62, 0);
+    // the water sits a centimetre PROUD of the rim, so the stone reads as an
+    // annulus round it; drop it inside and the basin's own solid top face
+    // hides it and the fountain is a stone drum
+    part('water', this._pzGeo('water', () =>
+      new THREE.CylinderGeometry(2.78, 2.78, 0.14, 8)), M.waterMat, 0, 1.2, 0);
+    part('stem', this._pzGeo('stem', () =>
+      new THREE.CylinderGeometry(0.5, 0.76, 1.9, 8)), M.stoneMat, 0, 2.1, 0);
+    part('bowl', this._pzGeo('bowl', () =>
+      new THREE.CylinderGeometry(1.35, 0.66, 0.42, 8)), M.stoneMat, 0, 3.24, 0);
+    part('brim', this._pzGeo('brim', () =>
+      new THREE.CylinderGeometry(1.2, 1.2, 0.1, 8)), M.waterMat, 0, 3.48, 0);
+    part('jet', this._pzGeo('jet', () =>
+      new THREE.CylinderGeometry(0.06, 0.14, 1.25, 6)), M.waterMat, 0, 4.12, 0);
+  }
+
+  /** THE MONUMENT: a bronze on a column on a stepped plinth — the other thing
+   *  that stands in the middle of one of these squares, and the one that gives
+   *  the town a vertical off the roofline.
+   *
+   *  IT IS TALLER THAN A FOUNTAIN ON PURPOSE. A fountain is furniture you look
+   *  down into and a monument is a thing you look up at, and 16 u — a storey
+   *  above the four-storey terrace round it — is what makes the second square
+   *  read as a different place rather than as the first one again.
+   *
+   *  The figure is three boxes and a sphere. At the distance a driver reads it
+   *  the silhouette is the whole content: something standing, one arm raised,
+   *  in metal rather than stone. Anything more is polygons nobody will see.
+   */
+  _pzMonument(part, M) {
+    part('mStep1', this._pzGeo('mStep1', () => new THREE.BoxGeometry(7, 0.45, 7)),
+      M.kerbMat, 0, 0.22, 0);
+    part('mStep2', this._pzGeo('mStep2', () => new THREE.BoxGeometry(5.4, 0.45, 5.4)),
+      M.kerbMat, 0, 0.67, 0);
+    part('mStep3', this._pzGeo('mStep3', () => new THREE.BoxGeometry(4.1, 0.5, 4.1)),
+      M.stoneMat, 0, 1.14, 0);
+    part('mDado', this._pzGeo('mDado', () => new THREE.BoxGeometry(2.6, 3.2, 2.6)),
+      M.stoneMat, 0, 3.0, 0);
+    part('mCorn', this._pzGeo('mCorn', () => new THREE.BoxGeometry(3.1, 0.32, 3.1)),
+      M.stoneMat, 0, 4.76, 0);
+    part('mCol', this._pzGeo('mCol', () =>
+      new THREE.CylinderGeometry(0.82, 0.98, 6.4, 12)), M.stoneMat, 0, 8.12, 0);
+    part('mCap', this._pzGeo('mCap', () =>
+      new THREE.CylinderGeometry(1.3, 0.95, 0.72, 12)), M.stoneMat, 0, 11.68, 0);
+    part('mLegs', this._pzGeo('mLegs', () => new THREE.BoxGeometry(0.9, 1.7, 0.72)),
+      M.bronzeMat, 0, 12.9, 0);
+    part('mTorso', this._pzGeo('mTorso', () => new THREE.BoxGeometry(1.15, 1.5, 0.82)),
+      M.bronzeMat, 0, 14.5, 0);
+    part('mHead', this._pzGeo('mHead', () => new THREE.SphereGeometry(0.42, 8, 6)),
+      M.bronzeMat, 0, 15.55, 0);
+    part('mArm', this._pzGeo('mArm', () => new THREE.BoxGeometry(0.26, 1.5, 0.26)),
+      M.bronzeMat, 0.62, 15.4, 0);
+  }
+
+  /** Would a church stand clear of the road on the outer side of this square?
+   *
+   *  It is 20 u of building hung off the far edge, so it is the one piece of
+   *  the kit that can reach back into a carriageway the square itself cleared
+   *  — on a lap that folds back on itself the other leg runs behind the
+   *  terrace. Eight points round its footprint, and any one of them in a road
+   *  means this square gets its parapet instead. */
+  _pzChurchFits(base, outward, D, y) {
+    const x0 = outward * (D / 2 - 1), x1 = outward * (D / 2 - 1 + CHURCH_LEN);
+    let lo = Infinity;
+    for (const px of [x0, (x0 + x1) / 2, x1]) {
+      for (const pz of [-CHURCH_WID / 2 - 2.6, 0, CHURCH_WID / 2 + 2.6]) {
+        _pzV.set(px, 0, pz).applyMatrix4(base);
+        if (this._inWater(_pzV.x, _pzV.z)) return null;
+        if (!this._clearsRoad(_pzV.x, _pzV.z, 0.6, 1.0)) return null;
+        const g = this._seatY(_pzV.x, _pzV.z);
+        if (!Number.isFinite(g)) return null;
+        lo = Math.min(lo, g);
+      }
+    }
+    // THE GROUND BEYOND A SQUARE IS NOT THE SQUARE'S GROUND. The flatness test
+    // covers the paving only, and a church is 19 u of building hung past its
+    // far edge — on the seafront that edge is often the top of a bank. More
+    // than 4 u of fall and no plinth saves it; below that the church gets one,
+    // which is what a real church on a slope stands on anyway.
+    const drop = y - lo;
+    if (drop > 4) return null;
+    return { drop: Math.max(0, drop) };
+  }
+
+  /** THE CHURCH, standing across the head of a square with its campanile
+   *  beside it — the landmark half the reference sheet's ROOFTOP DETAILS panel
+   *  is about, and the only thing in these towns taller than the terrace.
+   *
+   *  A LIGURIAN PARISH CHURCH IS A FLAT GABLED FACADE AND A SEPARATE TOWER.
+   *  Not a spire on a nave: the campanile stands apart, square in plan, with
+   *  an open belfry stage and a low pyramid cap. Getting that pairing right is
+   *  most of what makes it read as this region rather than as a generic church
+   *  — and the tower is what shows above the roofline from three streets away,
+   *  which is the whole point of building one.
+   *
+   *  Everything is instanced with the rest of the square kit, so a church costs
+   *  ten draw calls for the world, not ten per church.
+   */
+  _pzChurch(part, M, base, outward, D, y) {
+    const cx = outward * (D / 2 - 1 + CHURCH_LEN / 2);   // centre of the nave
+    const inner = outward * (D / 2 - 1);                 // the facade, on the square
+    const H = 9.4;                                       // eaves
+    // A PLINTH THAT REACHES DOWN PAST THE WORST DROP THE FIT TEST ALLOWS, so
+    // the church never hangs in the air off the back of a bank. Fixed height
+    // rather than sized to the fall: every part of this kit is one memoised
+    // geometry at its true size drawn at unit scale, and a box buried in a
+    // hillside costs nothing to draw and nothing to look at. `drop` only
+    // decides whether any of it SHOWS.
+    part('chPlinth', this._pzGeo('chPlinth', () =>
+      new THREE.BoxGeometry(CHURCH_LEN + 2.2, 5.0, CHURCH_WID + 2.2)), M.kerbMat,
+    cx, -2.45, 0);
+    part('chNave', this._pzGeo('chNave', () =>
+      new THREE.BoxGeometry(CHURCH_LEN, H, CHURCH_WID)), M.churchMat, cx, H / 2, 0);
+    // the roof prism's ridge runs along ITS local x, which here is the length
+    // of the nave — so the pitches fall to the two long walls, as they must
+    part('chRoof', this._pzGeo('chRoof', () => {
+      const g = gablePrismGeo().clone();
+      g.scale(CHURCH_LEN * 1.02, 3.3, CHURCH_WID * 1.12);
+      return g;
+    }), M.roofMat, cx, H, 0);
+    // THE FACADE IS A WALL, NOT THE END OF A ROOF: it stands proud of the
+    // gable behind it and above it, which is what a Ligurian church front is.
+    part('chFace', this._pzGeo('chFace', () =>
+      new THREE.BoxGeometry(0.7, H + 3.4, CHURCH_WID * 1.06)), M.churchMat,
+    inner, (H + 3.4) / 2, 0);
+    part('chPed', this._pzGeo('chPed', () =>
+      new THREE.BoxGeometry(0.9, 0.7, CHURCH_WID * 0.5)), M.stoneMat,
+    inner, H + 3.6, 0);
+    // portal and rose window, both set INTO the facade — a hair proud of it,
+    // or z-fighting picks a winner per frame
+    // MINUS outward, not plus: `outward` points AWAY from the square, so the
+    // first cut buried both the door and the rose window inside the facade and
+    // left them showing a couple of centimetres on the back — a blank white
+    // wall at the head of every square, which is what the face-on shot caught.
+    part('chDoor', this._pzGeo('chDoor', () =>
+      new THREE.BoxGeometry(0.5, 3.4, 2.0)), M.darkMat,
+    inner - outward * 0.32, 1.7, 0);
+    part('chRose', this._pzGeo('chRose', () => {
+      const g = new THREE.CylinderGeometry(1.15, 1.15, 0.4, 12);
+      g.rotateZ(Math.PI / 2);                        // face along the nave axis
+      return g;
+    }), M.darkMat, inner - outward * 0.3, 7.4, 0);
+    part('chBand', this._pzGeo('chBand', () =>
+      new THREE.BoxGeometry(0.96, 0.42, CHURCH_WID * 1.12)), M.stoneMat,
+    inner - outward * 0.12, H - 0.6, 0);
+    // a plain 13 u front is a wall; a door surround and two pilasters are what
+    // make it a FRONT, and they cost three instances
+    part('chSurround', this._pzGeo('chSurround', () =>
+      new THREE.BoxGeometry(0.42, 4.2, 3.0)), M.stoneMat,
+    inner - outward * 0.28, 2.1, 0);
+    for (const pz2 of [-CHURCH_WID * 0.44, CHURCH_WID * 0.44]) {
+      part('chPilaster', this._pzGeo('chPilaster', () =>
+        new THREE.BoxGeometry(0.4, H + 2.6, 0.9)), M.stoneMat,
+      inner - outward * 0.22, (H + 2.6) / 2, pz2);
+    }
+    part('chStep', this._pzGeo('chStep', () =>
+      new THREE.BoxGeometry(2.2, 0.28, 5.0)), M.kerbMat,
+    inner + outward * -1.0, 0.14, 0);
+    // the apse: a half-round at the far end, which is what a nave ends in
+    part('chApse', this._pzGeo('chApse', () =>
+      new THREE.CylinderGeometry(CHURCH_WID * 0.5, CHURCH_WID * 0.5, H * 0.86, 10)),
+    M.churchMat, cx + outward * (CHURCH_LEN / 2), H * 0.43, 0);
+    part('chApseCap', this._pzGeo('chApseCap', () =>
+      new THREE.ConeGeometry(CHURCH_WID * 0.54, 2.2, 10)), M.roofMat,
+    cx + outward * (CHURCH_LEN / 2), H * 0.86 + 1.1, 0);
+
+    // ---- the campanile, standing apart beside the facade ------------------
+    const tz = CHURCH_WID / 2 + 2.4;
+    const TH = 21;
+    part('chTower', this._pzGeo('chTower', () =>
+      new THREE.BoxGeometry(3.9, TH, 3.9)), M.churchMat, inner + outward * 2.4, TH / 2, tz);
+    // THE BELFRY IS AN OPEN STAGE, not a black box on a white tower — which is
+    // what a solid dark cube reads as at any distance. Light stone with a dark
+    // opening driven through both axes gives an arch on all four faces for two
+    // instances, and the openings are the whole silhouette of a campanile.
+    part('chBelfry', this._pzGeo('chBelfry', () =>
+      new THREE.BoxGeometry(4.3, 3.4, 4.3)), M.churchMat,
+    inner + outward * 2.4, TH + 1.7, tz);
+    part('chBelOpenA', this._pzGeo('chBelOpenA', () =>
+      new THREE.BoxGeometry(4.5, 2.3, 1.8)), M.darkMat,
+    inner + outward * 2.4, TH + 1.8, tz);
+    part('chBelOpenB', this._pzGeo('chBelOpenB', () =>
+      new THREE.BoxGeometry(1.8, 2.3, 4.5)), M.darkMat,
+    inner + outward * 2.4, TH + 1.8, tz);
+    part('chBelCorn', this._pzGeo('chBelCorn', () =>
+      new THREE.BoxGeometry(4.9, 0.5, 4.9)), M.stoneMat,
+    inner + outward * 2.4, TH + 3.65, tz);
+    part('chSpire', this._pzGeo('chSpire', () => {
+      const g = new THREE.ConeGeometry(3.2, 4.6, 4);
+      g.rotateY(Math.PI / 4);                        // a pyramid, not a diamond
+      return g;
+    }), M.roofMat, inner + outward * 2.4, TH + 6.2, tz);
+
+    // SOLIDS ALONG THE NAVE, NOT ONE ROUND IT. A single circle big enough to
+    // cover a 20 u building reaches back over the square's own paving and puts
+    // an invisible wall across it.
+    // ...and each one seats on the GROUND under it rather than on the square's
+    // plate: the church stands past the far edge, where the ground is often a
+    // couple of metres lower, and a collider registered at plate height there
+    // is what the road census calls a floater. Its PLINTH reaches the ground,
+    // so the ground is where the collider belongs.
+    const seat = (x, z) => Math.min(y + 0.6, this.terrainHeight(x, z) + 0.6);
+    for (const t of [-0.32, 0, 0.32]) {
+      _pzV.set(cx + outward * CHURCH_LEN * t, 0, 0).applyMatrix4(base);
+      this.solids.push({ x: _pzV.x, z: _pzV.z, r: CHURCH_WID * 0.52,
+        y: seat(_pzV.x, _pzV.z), mat: 'hut' });
+    }
+    _pzV.set(inner + outward * 2.4, 0, tz).applyMatrix4(base);
+    this.solids.push({ x: _pzV.x, z: _pzV.z, r: 2.6,
+      y: seat(_pzV.x, _pzV.z), mat: 'hut' });
+    this._addShadow(_pzV.x, _pzV.z, 3.2, y);
   }
 
   /** One geometry per part per world, memoised: every square in a world is the
@@ -13353,7 +13609,9 @@ export class Track {
   _inPiazza(x, z, r = 0) {
     for (const p of this._piazzas ?? []) {
       _pzV.set(x, 0, z).applyMatrix4(p.inv);         // into the square's own frame
-      if (Math.abs(_pzV.x) < p.hd + r && Math.abs(_pzV.z) < p.hw + r) return true;
+      if (_pzV.x > p.x0 - r && _pzV.x < p.x1 + r && Math.abs(_pzV.z) < p.hw + r) {
+        return true;
+      }
     }
     return false;
   }

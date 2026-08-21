@@ -35,7 +35,8 @@ console.log(JSON.stringify(await p.evaluate(() => {
     for (const bo of bodies) if (t._inPiazza(bo.x, bo.z, -bo.r * 0.5)) inside++;
     out.push({ f: +(bi / t.N).toFixed(3), distToCentreline: +bd.toFixed(1),
       halfWidthThere: +(t.widthAt ? t.widthAt(bi).toFixed(1) : 0),
-      innerEdgeClearOfRoad: +(bd - pz.hd - (t.widthAt ? t.widthAt(bi) : 9)).toFixed(1),
+      innerEdgeClearOfRoad: +(bd - Math.min(-pz.x0, pz.x1) - (t.widthAt ? t.widthAt(bi) : 9)).toFixed(1),
+      church: pz.x1 - pz.x0 > 30,   // the rect is extended outward for a church
       housesInsideThisAndEveryOther: inside });
   }
   return { piazzas: out, frontageBlocks: bodies.length };

@@ -58,8 +58,15 @@ real time to get right and the next session should not rebuild them.
                 inside one — which must be zero, because a square the terrace
                 did not stop for is a fountain in somebody's front room.
 - `piazzashot.mjs` the driver's view OF a square rather than down the street;
-                `BACK` and `UP` move the camera back and lift it.
-- `pzcount.mjs` draw calls and instances the squares cost.
+                `BACK` and `UP` move the camera back and lift it, and `FACE=1`
+                stands IN the square looking at its church — the only shot
+                that shows a facade, and the one that caught a door and a rose
+                window built on the wrong side of their own wall.
+- `pzcount.mjs` draw calls and instances the squares cost, against the scene's
+                total.
+- `floaters.mjs` every solid sitting more than 2.5 u above the ground under
+                it, with its radius and whether it belongs to a square — the
+                road census reports the COUNT, this says which ones and why.
 - `balconies.mjs` how many balconies and awnings sit on a storey line the
                 facade painter actually drew, against how many exist. It is
                 what turned "the balcony is all over the place" into 196/319,
