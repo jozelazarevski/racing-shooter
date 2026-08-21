@@ -2144,6 +2144,39 @@ function applyIronRail(g, x, y, bw, bh, S) {
   g.fillRect(x0, top - 1, x1 - x0, 1);
 }
 
+/** WHERE THE PAINTED FACADE PUTS ITS OPENINGS, in fractions of the block —
+ *  so anything MODELLED and hung on that face can be hung on a window rather
+ *  than at a guess.
+ *
+ *  The balconies and awnings were placed by fractions of the block instead:
+ *  a slab at 0.52 of the height and a random third of the width, an awning at
+ *  a flat 2.95 u. Nothing about those numbers knows where this variant's
+ *  storeys are, so a balcony cut across the windows of a five-storey face,
+ *  sat under the eaves of a cottage, and moved house to house — "all over the
+ *  place", and correctly so.
+ *
+ *  `v` is measured from the KERB up (0 = pavement, 1 = eaves) and `u` from the
+ *  middle of the frontage (-0.5 = one party wall, +0.5 = the other), which is
+ *  the frame a placement in metres actually wants.
+ */
+export function townhouseAnchors(variant = 0, set = null) {
+  const VB = townhouseBays(variant, set);
+  const rows = VB.rows || [];
+  const xs = VB.xs || [];
+  const bh = VB.bh ?? 40, bw = VB.bw ?? 48;
+  return {
+    // the sill of each storey, top row first — the line a balcony stands on
+    sills: rows.map((y) => 1 - (y + bh) / TH_H),
+    heads: rows.map((y) => 1 - y / TH_H),
+    bays: xs.map((x) => ({ u: (x + bw / 2) / TH_W - 0.5, w: bw / TH_W })),
+    // and the head of the shopfront, which is where an awning is fixed —
+    // `has` is false on the variants the painter gives a plain door instead,
+    // and an awning over a front door is not a thing this street has
+    shop: { has: !!VB.shop, v: 1 - TH_SHOP[1] / TH_H,
+      u: (TH_SHOP[0] + TH_SHOP[2] / 2) / TH_W - 0.5, w: TH_SHOP[2] / TH_W },
+  };
+}
+
 export function townhouseTexture(palette = {}, variant = 0, set = null) {
   const P = {
     render: '#b9ad98',            // limewashed render (tinted per instance)

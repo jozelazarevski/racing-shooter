@@ -53,6 +53,11 @@ real time to get right and the next session should not rebuild them.
                 which gate refused each station (start gate / gorge / curvature
                 / tunnelFitAt). Turned "asked 3, got 1" into "panorama refuses
                 212 stations as too curved against CAPE OLIVETO's 59".
+- `balconies.mjs` how many balconies and awnings sit on a storey line the
+                facade painter actually drew, against how many exist. It is
+                what turned "the balcony is all over the place" into 196/319,
+                and it falls back to `townhouseBays` on older builds so the
+                baseline can be measured on the commit before the fix.
 - `roadlum.mjs` the mean colour of the carriageway and of BOTH walls from the
                 driver's shot, plus how much of each is above 240. Written
                 because "the road is blown out" was wrong three times running:

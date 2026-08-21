@@ -14,6 +14,7 @@ import {
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
   townhouseTexture, townhouseGlowTexture, roofTileTexture, ironRailTexture,
+  townhouseAnchors,
 } from './textures.js';
 
 export const LEVELS = [
@@ -16791,7 +16792,8 @@ export class Track {
       // `h` is the height the block was BUILT at (the variant scales it), and
       // `rh` the height its roof was built at — anything hung off the roofline
       // has to measure from these and not from what was asked for.
-      return { solid, p, y, h, r, lat, rh: effRoofH, mesh: myMesh, roof: myRoof, idx: myIdx };
+      return { solid, p, y, h, r, lat, rh: effRoofH, variant: vi >> 1,
+        mesh: myMesh, roof: myRoof, idx: myIdx };
     };
 
     // chimney stacks: a small dark box riding most ridges. The cheapest thing
@@ -16900,7 +16902,12 @@ export class Track {
     // before the street yaw — so it leans out over the kerb on both sides
     const qa = new THREE.Quaternion();
     const fwd = new THREE.Vector3(0, 0, 1);
-    const faceAt = (i, side, lat, dAcross, wAlong, baseY, hh) => {
+    // WHAT THE FACADE UNDER IT ACTUALLY HAS: the storey lines and bay centres
+    // the texture painter used, per variant, in fractions of the block.
+    const ANCH = [];
+    for (let v = 0; v < VARIANTS; v++) ANCH.push(townhouseAnchors(v, F.bayset));
+
+    const faceAt = (i, side, lat, dAcross, wAlong, baseY, vh, anch) => {
       const p = this.pointAt(i, lat * side);
       q.setFromAxisAngle(up, this.headingAt(i));
       // local +X is the road normal, so the face the driver sees is the one
@@ -16918,28 +16925,60 @@ export class Track {
       // supposed to stand on, with clear daylight between the awning and the
       // wall. A ledge is attached to a building or it is not a ledge.
       const proud = Math.sign(out);                     // +1 if the face is +X
-      if (hh > 6.2 && balK < BALC) {
-        const by = baseY + hh * 0.52;
-        const SD = 0.85;                                // how far the slab reaches out
+      // A BALCONY BELONGS TO A WINDOW (r245).
+      //
+      // This used to be `baseY + hh * 0.52` by `wAlong * 0.42` wide with a
+      // random third of the frontage of side jitter — three numbers, none of
+      // which knows anything about the facade painted underneath. Reported as
+      // "the balcony is all over the place", and it was, in four ways at once:
+      //
+      //   - `hh` is the height the terrace ASKED for, and `put` builds the
+      //     body at `hh * [1, 0.62, 1.24, 0.94]` for its variant. So 0.52 of
+      //     it is 84% of the way up a cottage — a balcony under the gutter —
+      //     and 42% of the way up a merchant house. Same street, same call,
+      //     a different storey on every house. (Same defect the chimneys had.)
+      //   - it was never on a storey line, so on a five-storey face it cut
+      //     across the middle of a row of windows.
+      //   - it was never on a BAY, so it hung on blank wall as often as not.
+      //   - and at 0.42 of the frontage it was wider than the two windows it
+      //     was between.
+      //
+      // `anch` is where that variant's painter actually put its sills and its
+      // bays (see townhouseAnchors), so all four go away together.
+      const sills = anch?.sills ?? [];
+      const bays = anch?.bays ?? [];
+      // the storeys clear of the shopfront, which is where a balcony can be
+      const upper = [];
+      for (let r = 0; r < sills.length; r++) if (sills[r] > 0.34) upper.push(sills[r]);
+      if (vh > 6.2 && upper.length && bays.length && balK < BALC) {
+        const sv = upper[(Math.random() * upper.length) | 0];
+        const bay = bays[(Math.random() * bays.length) | 0];
+        const by = baseY + vh * sv;
+        const SD = 0.8;                                 // how far the slab reaches out
         const sx = out + proud * SD * 0.5;              // slab centred on the lip
-        const zj = (Math.random() - 0.5) * wAlong * 0.3;
+        // a balcony is a little wider than its window and no wider: 1.5 bays
+        const bwid = Math.max(1.1, wAlong * bay.w * 1.5);
+        const zj = wAlong * bay.u;
         faceOff.set(sx, 0, zj).applyQuaternion(q);
         m4.compose(new THREE.Vector3(p.x + faceOff.x, by, p.z + faceOff.z), q,
-          new THREE.Vector3(SD, 0.16, wAlong * 0.42));
+          new THREE.Vector3(SD, 0.16, bwid));
         balcSlabs.setMatrixAt(balK, m4);
         // the rail stands ON the slab's outer lip, not past it
         const rx = out + proud * (SD - 0.05);
         faceOff.set(rx, 0, zj).applyQuaternion(q);
         m4.compose(new THREE.Vector3(p.x + faceOff.x, by + 0.5, p.z + faceOff.z), q,
-          new THREE.Vector3(0.1, 0.9, wAlong * 0.42));
+          new THREE.Vector3(0.1, 0.9, bwid));
         balcRails.setMatrixAt(balK, m4);
         balK++;
       }
-      // and an awning over the ground floor on about half of them
-      if (Math.random() < 0.5 && awnK < BALC) {
+      // and an awning over the ground floor on about half of them — but only
+      // where the painter drew a SHOPFRONT to hang it over
+      const shop = anch?.shop;
+      if ((!anch || shop?.has) && Math.random() < 0.5 && awnK < BALC) {
         const AD = 1.6;                                 // awning reach
         faceOff.set(out + proud * AD * 0.48, 0,
-          (Math.random() - 0.5) * wAlong * 0.25).applyQuaternion(q);
+          shop ? wAlong * shop.u : (Math.random() - 0.5) * wAlong * 0.25)
+          .applyQuaternion(q);
         // AN AWNING SLOPES. Flat, it is a horizontal plate 2.9 u up and the
         // driver only ever sees its UNDERSIDE — which faces away from the sun
         // and renders black, so every shopfront on the street had a dark slab
@@ -16947,8 +16986,13 @@ export class Track {
         // you look at and the stripes on it are what you see.
         qa.setFromAxisAngle(fwd, -proud * 0.42);
         qa.premultiply(q);
-        m4.compose(new THREE.Vector3(p.x + faceOff.x, baseY + 2.95, p.z + faceOff.z),
-          qa, new THREE.Vector3(AD, 0.1, wAlong * 0.38));
+        // AND IT IS FIXED TO THE HEAD OF THE SHOPFRONT THAT IS PAINTED THERE,
+        // not to a flat 2.95 u: the same variant scaling that moved the
+        // balconies put this through the first-floor windows of a cottage and
+        // halfway up the glazing of a tall house.
+        const av = baseY + (shop ? vh * shop.v + 0.25 : 2.95);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, av, p.z + faceOff.z),
+          qa, new THREE.Vector3(AD, 0.1, shop ? wAlong * shop.w * 1.08 : wAlong * 0.38));
         awnings.setMatrixAt(awnK, m4);
         col.setHSL(0.02 + Math.random() * 0.12, 0.35, 0.44 + Math.random() * 0.16);
         awnings.setColorAt(awnK, col);
@@ -17003,7 +17047,8 @@ export class Track {
         if (Math.random() < 0.62) {
           chimAt(i, side, placed.lat, F.depth, ww, placed.y + placed.h, placed.rh);
         }
-        faceAt(i, side, placed.lat, F.depth, ww, placed.y, hh);
+        faceAt(i, side, placed.lat, F.depth, ww, placed.y, placed.h,
+          ANCH[placed.variant]);
         // A LANTERN ON THE BRACKET, every third house. Anchored to the FRONT
         // FACE, not the block centre — the arm only reaches 0.72 u and a
         // 8 u-deep building would have swallowed the bulb whole.

@@ -1860,3 +1860,49 @@ change for six worlds rather than a facade fix, so it was left alone
 deliberately — say the word and it is a `skyTop`/`skyHorizon` pass. The
 sheet's palms, cypresses and standing street lamps are the other half of its
 street-level panel and are flora/props work, not frontage.
+
+## r245 — A BALCONY BELONGS TO A WINDOW
+"The balcony is all over the place." It was, and it was made of three numbers
+that knew nothing about the facade painted under them: a slab at
+`baseY + hh * 0.52`, `wAlong * 0.42` wide, jittered a random third of the
+frontage sideways.
+
+### FOUR FAULTS IN ONE PLACEMENT
+  1. `hh` IS THE HEIGHT THE TERRACE ASKED FOR. `put` builds the body at
+     `hh * [1, 0.62, 1.24, 0.94]` for its variant, so 0.52 of `hh` is 84% of
+     the way up a cottage — a balcony under the gutter — and 42% of the way up
+     a merchant house. Same call, same street, a different storey on every
+     house. This is the CHIMNEY BUG AGAIN (r244): anything hung on a house has
+     to measure from what was BUILT, never from what was requested.
+  2. It was never on a storey line, so on a five-storey face it cut across the
+     middle of a row of windows.
+  3. It was never on a BAY, so it hung on blank wall as often as not.
+  4. At 0.42 of the frontage it was wider than the two windows it sat between.
+
+### THE FIX IS TO ASK THE PAINTER
+`townhouseAnchors(variant, set)` returns the sills, heads, bay centres and the
+shopfront head of a facade in FRACTIONS OF THE BLOCK — v from the kerb up, u
+from the middle of the frontage. The frontage builds one per variant and hands
+it to `faceAt`, which then puts the slab on a real sill, centres it on a real
+bay, and sizes it to one and a half bay widths.
+
+The awnings had the same disease and the same cure: a flat `baseY + 2.95`
+became the head of the shopfront that is actually painted there, and they only
+go on the variants that HAVE a shopfront — an awning over a front door is not
+a thing this street has.
+
+### MEASURED, WITH A BASELINE
+`tools-scratch/balconies.mjs` counts how many balconies and awnings sit within
+2 cm of one of the painted storey lines. Run against r244 and then against
+this build:
+
+    balconies on a painted storey   196/319  ->  311/319
+    awnings on the shopfront head    49/158  ->   89/90
+    distinct awning heights              25  ->        6
+
+The eight balconies and one awning still outside are the probe's own slack: it
+matches each to the NEAREST body, and a cottage beside a merchant house can
+claim its neighbour's. The number is a floor on the true figure, not a defect
+count.
+
+Gates: boot 4/4, test-boot 7/0, test-buildings green, test-carriageway green.
