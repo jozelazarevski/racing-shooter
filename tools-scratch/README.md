@@ -66,6 +66,15 @@ real time to get right and the next session should not rebuild them.
                 stands IN the square looking at its church — the only shot
                 that shows a facade, and the one that caught a door and a rose
                 window built on the wrong side of their own wall.
+- `whosolid.mjs` names the BUILDER behind a collider standing in the road:
+                solids carry no provenance, so it pairs each with the nearest
+                mesh and prints that mesh's parent chain. Do not make it ask
+                `_clearsRoad` — since r246 that also refuses anything inside a
+                square, and it buried four real offenders under every piazza
+                lamp on the world.
+- `offenders.mjs` the same question from the mesh side, plus the world's
+                widest half-width — which is how MOUNTAIN TO SEA's 45 u turned
+                out to be `roadWidth: 5` working exactly as asked.
 - `buildtime.mjs` does each world BUILD, how long it takes, and what page
                 error stopped it. Written after r253 shipped a ReferenceError
                 that stopped SANREMO STAGE producing a track at all: boot.mjs

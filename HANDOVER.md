@@ -2451,3 +2451,81 @@ All fifteen town worlds build clean with no page errors.
 
 RUN IT AFTER ANY CHANGE TO A SHARED BUILDER. `boot.mjs` covers the engine
 coming up; this covers the worlds actually coming out.
+
+## r255 — FIX ALL: THE ROAD CENSUS BACKLOG
+Four defects, one of them mine from two rounds ago, and the tool that found
+each of them.
+
+### THE LIGHTHOUSE WAS CHECKING THE WRONG POINT
+`_buildLighthouse` tested the MOLE'S WATERLINE ANCHOR against a coarse
+distance and then put the tower 30 u further along the normal, unchecked. On
+CINQUE TERRE that landed the tower 4.18 u inside the carriageway with a 2.7 u
+collider biting 1.95 — and the skerries poured around it went in with it. The
+anchor walks ALONG the coast until the TOWER itself clears, and the mole is not
+built until it does. The headland fallback asks `_clearsRoad` too, not just the
+coarse field.
+
+### A PREDICATE THAT WROTE THE CALLER'S SCRATCH — mine, r253
+HARBOR QUAY grew four invisible colliders on its racing line, biting up to
+10.1 u, with no mesh anywhere near them. The guard that was supposed to stop
+that ran and PASSED, and the same test on the same coordinates said "in the
+road" afterwards. Both were true:
+
+`_inPiazza` used `_pzV`, the module scratch, and it is reached through
+`_clearsRoad`, which every builder calls — usually while holding a point in
+`_pzV` that it is about to use. So the terrace's collider loop set `_pzV`,
+called the gate, and the gate quietly rewrote `_pzV` into a square's LOCAL
+frame; the solid was then registered at that local coordinate treated as
+world. The gate tested the right spot and the collider went in at the wrong
+one.
+
+`_inPiazza` has its own vector now, and the two call sites read their point
+out into locals before calling anything. A PREDICATE MUST NOT WRITE THE
+CALLER'S SCRATCH — it is called from inside expressions, by code that cannot
+see it.
+
+### THE TUNNEL WALLS WERE NEVER ASKED
+`_buildTunnel` puts a collider every 2 samples at 11.6 u either side of ITS
+centreline, unguarded. Where a bore passes near a different leg of the lap —
+COTE D AZUR does, fourteen times — that lands in the OTHER carriageway as an
+invisible wall. And MOUNTAIN TO SEA is the same defect from the other
+direction: its road is five times normal width, so a fixed 11.6 u bore is
+inside its own carriageway for the tunnel's whole length. The wall MESH stays
+either way; only the collider is dropped, which is the rule the grandstand and
+the start gantry both settled on.
+
+    COTE D AZUR      14 blockers, worst bite 9.27 u  ->  0
+    MOUNTAIN TO SEA  72 blockers                     ->  2
+
+### AND THE SEA ROCKS
+Two of CINQUE TERRE's skerries stood 6.28 u inside its shore road. A sea rock
+is in the sea, and on a coast road the sea comes close; the scatter asks
+`_clearsRoad` for the rock AND the shoulder lump beside it.
+
+### WHERE THE ROSTER STANDS
+    GOTTHARD CLIMB   clean        TOUR DE CORSE   clean
+    HARBOR QUAY      clean        CINQUE TERRE    clean
+    COTE D AZUR      clean        RALLYCROSS      clean
+(each still reports FLOATERS, and every one of those measured is a solid over
+water — a lighthouse on a mole, a massif's own 198 u collider — which is what
+that test is for and not a defect.)
+
+STILL OPEN, reported not fixed:
+  - MOUNTAIN TO SEA: 2 colliders and 37 meshes inside a carriageway that is
+    90 u wide BY REQUEST (`roadWidth: 5`). `_stoneFit` and `_trackSidePos`
+    were both already taught to scale with `widthAt` in earlier sessions; what
+    is left comes from builders that were not, and finding them is a pass on
+    that one world rather than a general fix.
+  - TREMOLA DESCENT: one contact-shadow decal at road level, 0.79 u. A flat
+    decal on the tarmac is not an obstruction.
+
+### THE TOOLS
+`tools-scratch/whosolid.mjs` is the one that broke this open: colliders carry
+no provenance, so it pairs each offending solid with the nearest MESH and
+prints that mesh's parent chain. Its own lesson is in its header — it first
+asked `_clearsRoad`, which since r246 also refuses anything inside a SQUARE,
+so it reported every piazza lamp as "in the road" and buried the four real
+ones. `offenders.mjs` does the same job from the mesh side.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green, and
+`buildtime.mjs` over twenty worlds — all built, no page errors.

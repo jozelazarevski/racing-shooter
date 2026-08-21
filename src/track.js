@@ -4795,6 +4795,14 @@ export function disposeSubtree(root) {
 export const RIM_RADIUS = 1620;
 const _clearV = new THREE.Vector3();   // scratch for _clearsRoad
 const _pzV = new THREE.Vector3();      // ...and for the squares (see _buildPiazzas)
+// A PREDICATE MUST NOT WRITE THE CALLER'S SCRATCH. `_inPiazza` is reached
+// through `_clearsRoad`, which every builder calls — usually while holding a
+// point in `_pzV` that it is about to use. Sharing one vector between the two
+// silently rewrote that point into a square's LOCAL frame and the caller then
+// used it as world coordinates. That is how r253 put four invisible colliders
+// on HARBOR QUAY's racing line: the guard tested the right spot and the solid
+// was registered at the wrong one.
+const _ipV = new THREE.Vector3();
 const _pzUp = new THREE.Vector3(0, 1, 0);
 const _IDQ = new THREE.Quaternion();   // identity: piazza parts are axis-aligned
 const CHURCH_LEN = 19, CHURCH_WID = 10.5;  // the nave, along and across (_pzChurch)
@@ -12400,8 +12408,13 @@ export class Track {
         if (Math.hypot(idu - du, idn - dn) < 40 + iw) { clear = false; break; }
       }
       if (!clear) continue;
-      srTaken.push([du, dn]);
       const sscale = 1.2 + hsh2(cand + 2.9) * 3.4;
+      // A SEA ROCK IS IN THE SEA, and on a coast road the sea comes close: two
+      // of these stood 6.28 u inside CINQUE TERRE's carriageway, which is the
+      // last road defect that world had. The shoulder lump beside it reaches
+      // 1.1 scales further out, so the clearance is asked for the pair.
+      if (!this._clearsRoad(bx, bz, sscale * 1.7, 0.6)) continue;
+      srTaken.push([du, dn]);
       iq.setFromAxisAngle(iup, hsh2(cand + 4.1) * Math.PI * 2);
       im4.compose(new THREE.Vector3(bx, y - sscale * 0.45, bz), iq,
         new THREE.Vector3(sscale, sscale * (0.8 + hsh2(cand + 5.3) * 0.7), sscale * 0.85));
@@ -13049,9 +13062,26 @@ export class Track {
     // or none at all, and the "lighthouse world" shipped without one in view).
     if (this.T.quay) {
       const lvl = C.level ?? -2;
-      const du = L * 0.95;
+      // THE TOWER IS WHAT STANDS IN THE ROAD, NOT THE ANCHOR BEHIND IT.
+      //
+      // This checked the mole's WATERLINE ANCHOR against a coarse distance
+      // and then put the lighthouse 30 u further along the normal, unchecked.
+      // On CINQUE TERRE that landed the tower 4.18 u inside the carriageway
+      // with a 2.7 u collider biting 1.95 u — and the sea rocks poured around
+      // it went in with it, which is every one of that world's road defects
+      // in one object. The anchor is walked ALONG the coast until the tower
+      // itself clears, and the mole is not built until it does.
+      let du = 0;
+      for (const f of [0.95, 0.82, 0.68, 0.55, 0.42, 0.28, 0.14]) {
+        const ax = C.a[0] + ux * (L * f), az = C.a[1] + uz * (L * f);
+        if (this._distToTrackCoarse(ax, az) <= 24) continue;
+        const tx = ax + nx * 30, tz = az + nz * 30;
+        if (!this._clearsRoad(tx, tz, 4.2, 1.5)) continue;
+        du = L * f;
+        break;
+      }
       const bx = C.a[0] + ux * du, bz = C.a[1] + uz * du;   // waterline anchor
-      if (this._distToTrackCoarse(bx, bz) > 24) {
+      if (du > 0) {
         const stone = new THREE.MeshStandardMaterial({
           color: 0x9a9282, flatShading: true, roughness: 1,
         });
@@ -13083,6 +13113,12 @@ export class Track {
       const SR = this._seaRocks;
       const put = (px, pz, sx, sy, sz, seed) => {
         if (SR.next >= SR.mesh.instanceMatrix.count) return;
+        // THE SKERRIES FOLLOW THE TOWER, AND THE TOWER IS NOT THE ONLY THING
+        // NEARBY. These are poured at fixed offsets around the lighthouse,
+        // and on CINQUE TERRE two of them ended up in the carriageway that
+        // runs along the shore behind it — the last of that world's road
+        // defects after the tower itself was resited.
+        if (!this._clearsRoad(px, pz, Math.max(sx, sz), 0.6)) return;
         SR.iq.setFromAxisAngle(SR.iup, seed * 2.39996);
         SR.im4.compose(new THREE.Vector3(px, (C.level ?? -2) - sy * 0.35, pz),
           SR.iq, new THREE.Vector3(sx, sy, sz));
@@ -13118,7 +13154,10 @@ export class Track {
       for (const du of [L * 0.92, L * 0.06, L * 0.75, L * 0.25]) {
         const x = C.a[0] + ux * du - nx * 8, z = C.a[1] + uz * du - nz * 8;
         const h = this.terrainHeight(x, z);
-        if (h > (C.level ?? -2) + 0.8 && this._distToTrackCoarse(x, z) > 22) {
+        // ...and the headland fallback asks it too: `_distToTrackCoarse` is a
+        // coarse field, `_clearsRoad` is the carriageway.
+        if (h > (C.level ?? -2) + 0.8 && this._distToTrackCoarse(x, z) > 22
+          && this._clearsRoad(x, z, 4.2, 1.5)) {
           spot = { x, z, y: h };
           break;
         }
@@ -13556,9 +13595,12 @@ export class Track {
         for (let j = 0; j < n; j++) {
           const lz = (j / (n - 1) - 0.5) * (W - RS * 2);
           _pzV.set(-outward * (D / 2 - RS - 0.3), 0, lz).applyMatrix4(base);
-          if (!this._clearsRoad(_pzV.x, _pzV.z, RS, 0.3)) continue;
-          this.solids.push({ x: _pzV.x, z: _pzV.z, r: RS,
-            y: Math.min(y, this.terrainHeight(_pzV.x, _pzV.z)) + 0.4, mat: 'stone' });
+          // read it out BEFORE the gate: a shared scratch does not survive a
+          // call, whatever that call promises
+          const sx2 = _pzV.x, sz2 = _pzV.z;
+          if (!this._clearsRoad(sx2, sz2, RS, 0.3)) continue;
+          this.solids.push({ x: sx2, z: sz2, r: RS,
+            y: Math.min(y, this.terrainHeight(sx2, sz2)) + 0.4, mat: 'stone' });
         }
       }
       // A LOW PARAPET ON THE THREE SIDES AWAY FROM THE STREET: the sheet's
@@ -13754,9 +13796,10 @@ export class Track {
     for (const px of [x0, (x0 + x1) / 2, x1]) {
       for (const pz of [-CHURCH_WID / 2 - 2.6, 0, CHURCH_WID / 2 + 2.6]) {
         _pzV.set(px, 0, pz).applyMatrix4(base);
-        if (this._inWater(_pzV.x, _pzV.z)) return null;
-        if (!this._clearsRoad(_pzV.x, _pzV.z, 0.6, 1.0)) return null;
-        const g = this._seatY(_pzV.x, _pzV.z);
+        const cx2 = _pzV.x, cz2 = _pzV.z;              // ...same rule here
+        if (this._inWater(cx2, cz2)) return null;
+        if (!this._clearsRoad(cx2, cz2, 0.6, 1.0)) return null;
+        const g = this._seatY(cx2, cz2);
         if (!Number.isFinite(g)) return null;
         lo = Math.min(lo, g);
       }
@@ -13915,8 +13958,8 @@ export class Track {
    *  terrace rather than a paved yard behind it. */
   _inPiazza(x, z, r = 0) {
     for (const p of this._piazzas ?? []) {
-      _pzV.set(x, 0, z).applyMatrix4(p.inv);         // into the square's own frame
-      if (_pzV.x > p.x0 - r && _pzV.x < p.x1 + r && Math.abs(_pzV.z) < p.hw + r) {
+      _ipV.set(x, 0, z).applyMatrix4(p.inv);         // into the square's own frame
+      if (_ipV.x > p.x0 - r && _ipV.x < p.x1 + r && Math.abs(_ipV.z) < p.hw + r) {
         return true;
       }
     }
@@ -15550,9 +15593,23 @@ export class Track {
       const i = j % N;
       const c = this.center[i], n = this.nrm[i];
       for (const side of [1, -1]) {
+        const wx = c.x + n.x * (HW - 0.5) * side, wz = c.z + n.z * (HW - 0.5) * side;
+        // A BORE WALL IS 11.6 u OFF ITS OWN CENTRELINE AND THAT SAYS NOTHING
+        // ABOUT ANOTHER LEG OF THE LAP.
+        //
+        // These went in unguarded. Where a tunnel passes close to a different
+        // stretch of road — COTE D AZUR does, fourteen times — the wall lands
+        // in THAT carriageway as an invisible collider a car hits at speed
+        // with nothing to see. The wall MESH stays either way; only the
+        // collider is dropped, which is the rule the grandstand and the start
+        // gantry have both settled on.
+        //
+        // MOUNTAIN TO SEA is the same defect from the other direction: its
+        // road is five times normal width, so a fixed 11.6 u bore is inside
+        // its own carriageway for the whole length of the tunnel.
+        if (!this._clearsRoad(wx, wz, 1.4, 0.2)) continue;
         this.solids.push({
-          x: c.x + n.x * (HW - 0.5) * side, z: c.z + n.z * (HW - 0.5) * side,
-          r: 1.4, y: this.groundHeightAt(i, 0) + 1, mat: 'stone',
+          x: wx, z: wz, r: 1.4, y: this.groundHeightAt(i, 0) + 1, mat: 'stone',
         });
       }
     }
