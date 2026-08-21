@@ -2283,3 +2283,68 @@ still eleven fewer than the sprite field it replaced.
 
 Gates: boot 4/4, test-carriageway green, test-buildings green, road census over
 73/74/77/78 at baseline.
+
+## r252 — EVERY TOWN, NOT JUST THE RIVIERA
+"Fix all cities and places that have buildings, apply the same attention to
+detail." Most of r244-r251 was already global — the pavement, kerbs, bollards,
+ridge caps, chimney pots, the shopfront, the balcony and awning anchoring, the
+townsfolk and the cornice all key off `T.frontage` and reach every town on the
+roster. What was riviera-only was the JOINERY, the roofline and the squares.
+
+Ten worlds gained them. The regional split is the point: painted surrounds,
+quoins and downpipes are ARCHITECTURE, not a region, and go nearly everywhere;
+the louvre, the ironwork and the roof orientation are regional and do not.
+
+  - MONACO STREETS was the last town still built out of grey boxes, which is
+    absurd — both renders this whole design came from are of THAT place. It
+    gets the full coast treatment plus the faceted sky, with GREY-BLUE
+    shutters rather than the coast's green, which is what the hairpin render
+    draws and the one thing keeping it from reading as another Ligurian
+    village.
+  - HARBOR QUAY and its five regional variants: surrounds, louvres, quoins,
+    downpipes and a square each.
+      AEGEAN gets NO QUOINS — a Cycladic house is one limewashed mass and
+      drawing stone blocks on it is the one detail that says "not Greece" —
+      but half its roofs go FLAT.
+      BRAVA gets the ironwork, because Andalusia is ironwork.
+      DALMATIA and AZUR run their terraces eaves-on to the street like the
+      Ligurian ones; LIGURIA and the rest keep the gable end, which is what a
+      house standing in a stack up a cliff presents.
+  - CITADEL BAY is quarried, not rendered: paler stone for the joinery, real
+    quoins, and no ironwork on a fortified town.
+  - LANTERN QUARTER gets the same care and not the same kit: surrounds, quoins
+    and pipes, but the older BOARDED shutter folded onto the pier rather than
+    the Mediterranean louvre, and its gable stays end-on to the street.
+
+### A SMALL SQUARE BEATS NO SQUARE
+LANTERN QUARTER built NOTHING and said nothing about it. The flatness gate
+refuses more than 1.7 u of fall across the paving, and that town drops 26 u
+beside its own street — `tools-scratch/pzwhy.mjs` (written for this: it re-runs
+every gate in the site search and counts which one refuses) put 350 of 481
+stations on FALL and zero anywhere on the lap. Every site is tried at full
+size, then three quarters, then three fifths, and the fall tolerance grows as
+the footprint shrinks, because a smaller square on a thicker plate is a
+RETAINING TERRACE, which is exactly what a hill town builds. Past a kerb's
+height that plate stops being something you bump over and becomes masonry, so
+it registers solids.
+
+### AND A CLEARANCE TEST THAT ASKS THE RIGHT QUESTION
+The census found three people standing in MONACO's racing line. r249's
+townsfolk compared `_distToTrack` against the width at the station they were
+SAMPLED from; the census compares it against the width at the NEAREST station,
+and on a lap that folds back the two differ by more than a pavement. It uses
+`_clearsRoad` now, which asks the nearest-station question — and whose piazza
+clause is welcome here, since people in squares are placed separately, on the
+paving. Monaco's townsfolk bodies: 4 -> 0.
+
+### A COMMENT THAT HAD BEEN LOSING AN ARGUMENT WITH ITS OWN OBJECT
+`harbor` and `citadel` each carried a paragraph titled "WARM RENDER, NOT GREY"
+arguing for a limewash palette — and eight lines below it, a SECOND `tints`
+key with the grey palette the paragraph argues against. Last key wins, so both
+quays have been building grey ever since with the reasoning sitting right
+above. One key now, and it is the warm one.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green. Road census run
+over 30/34/49/51/58 before and after: every floater and the one remaining body
+is pre-existing and unchanged, and Monaco's four townsfolk-in-the-road are
+gone.

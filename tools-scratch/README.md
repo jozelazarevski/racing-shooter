@@ -57,6 +57,10 @@ real time to get right and the next session should not rebuild them.
                 clears the driveable edge, and how many frontage blocks stand
                 inside one — which must be zero, because a square the terrace
                 did not stop for is a fountain in somebody's front room.
+- `pzwhy.mjs`   WHY a world got no square: re-runs every gate in the site
+                search and counts which one refused each station. "It built
+                none" is not a diagnosis — this turned it into "350 of 481 on
+                FALL, worst 26.6 u", which is a hill town, not a bug.
 - `piazzashot.mjs` the driver's view OF a square rather than down the street;
                 `BACK` and `UP` move the camera back and lift it, and `FACE=1`
                 stands IN the square looking at its church — the only shot

@@ -3544,10 +3544,28 @@ const THEMES = {
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     guardFence: { lateral: 12.6, color: 0xc8c8c8, max: 260 },
     elements: 'medhill',
-    // Monte Carlo apartments: cream, white, apricot - continuous frontage
+    // MONACO IS THE REFERENCE, and it was the last town still built out of
+    // grey boxes (r252). Both renders the design came from are of THIS place:
+    // ochre and cream apartment blocks with pale joinery round every opening,
+    // grey-blue louvred shutters, ironwork across the upper windows and
+    // terracotta running eaves-to-street. Everything the riviera worlds were
+    // given in r244-r251 belongs here first.
+    //
+    // The shutters are GREY-BLUE, not the coast's green: that is what the
+    // hairpin render draws, and it is the one thing that keeps this world
+    // from reading as another Ligurian village.
+    piazza: { count: 2, depth: 17, width: 22 },
+    cloudKind: 'faceted', cloudCount: 9, cloudTint: 0xdae3ec, cloudDeep: 0x76839a,
     frontage: {
-      lateral: 16.5, depth: 9, unit: 7.5, height: 12.5, run: [5, 10],
-      tints: ['#e8e0d0', '#f2ece0', '#e0c8a8', '#d8cfc0', '#e8d4c0', '#ccc4b4'],
+      lateral: 16.5, depth: 9, unit: 7.5, height: 13.5, run: [5, 10], rows: 5,
+      bayset: 'liguria', ridge: 'along', flatRoofs: 0.26,
+      tints: ['#f0e6d2', '#f6efe0', '#e8cfa8', '#e2d6c4', '#eed8bc', '#d9cdba',
+        '#f2ddb0', '#e6c9a2'],
+      roof: 0xc4603a,
+      face: { render: '#f6efe0', plinth: '#c6bdaa', trim: '#fdf8ec',
+        frame: '#33322c', shutter: '#6f8496', pane: '#39465a',
+        surround: true, jalousie: { shut: 0.3 }, iron: '#26221e',
+        quoins: true, pipe: true },
     },
     coast: { a: [-200, -338.6], b: [400, -183.8], level: -2.1, floor: -7, beach: 70 },
     seaColor: 0x2e7f9e,
@@ -3612,6 +3630,12 @@ const THEMES = {
       // street, which is right for a northern old town and wrong for this
       // one: the reference quay is limewash and painted render, ochre through
       // apricot, and that warmth is most of what makes it read as the south.
+      //
+      // AND IT WAS BEING OVERRULED BY ITS OWN OBJECT. A second `tints` key sat
+      // eight lines below this comment with the grey palette the comment
+      // argues against, and in an object literal the last key wins — so the
+      // quay has been building grey ever since, with the reasoning for warm
+      // sitting right above it. One key now.
       tints: ['#e8c99a', '#dcae7a', '#f0dcc0', '#cf9a6a', '#e6d2ad', '#c98f66'],
       // THE QUAY IS OPEN TO THE WATER. `seaOpen` rejects any frontage block
       // whose centre is within this many units of the waterline (or seaward
@@ -3619,8 +3643,14 @@ const THEMES = {
       // land side and the seaward flank is bare quay, per the player's
       // harbour reference. The back lanes, well inland, still get both sides.
       seaOpen: 24,
-      tints: ['#c9b58e', '#a8906c', '#b09a80', '#8a785e', '#c0a878', '#98826a'],
+      // STONE, NOT STUCCO: a citadel is quarried, so the joinery is a paler
+      // course of the same stone rather than paint, the quoins do real work at
+      // the corners, and there is no ironwork on a fortified town's windows.
+      face: { render: '#efe6d2', plinth: '#b0a68e', trim: '#f8f2e0',
+        frame: '#3a382f', shutter: '#6a5a44', pane: '#39465a',
+        surround: true, quoins: true, pipe: true },
     },
+    piazza: { count: 1, depth: 16, width: 21 },
     coast: { a: [-260, -75], b: [300, -63], level: -1.4, floor: -6.5, beach: 10 },
     seaColor: 0x27a3ad,          // turquoise harbour water, the reference's own
     lighthouse: true,
@@ -3684,6 +3714,12 @@ const THEMES = {
       // street, which is right for a northern old town and wrong for this
       // one: the reference quay is limewash and painted render, ochre through
       // apricot, and that warmth is most of what makes it read as the south.
+      //
+      // AND IT WAS BEING OVERRULED BY ITS OWN OBJECT. A second `tints` key sat
+      // eight lines below this comment with the grey palette the comment
+      // argues against, and in an object literal the last key wins — so the
+      // quay has been building grey ever since, with the reasoning for warm
+      // sitting right above it. One key now.
       tints: ['#e8c99a', '#dcae7a', '#f0dcc0', '#cf9a6a', '#e6d2ad', '#c98f66'],
       // THE QUAY IS OPEN TO THE WATER. `seaOpen` rejects any frontage block
       // whose centre is within this many units of the waterline (or seaward
@@ -3691,8 +3727,15 @@ const THEMES = {
       // land side and the seaward flank is bare quay, per the player's
       // harbour reference. The back lanes, well inland, still get both sides.
       seaOpen: 24,
-      tints: ['#c9b58e', '#a8906c', '#b09a80', '#8a785e', '#c0a878', '#98826a'],
+      // THE SAME JOINERY AS THE COAST WORLDS (r252). A Mediterranean quay has
+      // painted surrounds, louvred shutters and a downpipe on every house for
+      // exactly the reasons the riviera pass worked them out; the five
+      // regional variants below inherit this geometry and repaint it.
+      face: { render: '#f6ecd8', plinth: '#c4b294', trim: '#fbf3e2',
+        frame: '#33322c', shutter: '#5a6f52', pane: '#39465a',
+        surround: true, jalousie: { shut: 0.36 }, quoins: true, pipe: true },
     },
+    piazza: { count: 2, depth: 16, width: 21 },
     coast: { a: [-260, -75], b: [300, -63], level: -1.4, floor: -6.5, beach: 10 },
     seaColor: 0x4585a0,
     lighthouse: true,
@@ -3848,7 +3891,19 @@ const THEMES = {
       lateral: 17.5, depth: 8, unit: 7.0, height: 9.0,
       run: [4, 9],                                      // units per terrace block
       tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
+      // A NORTHERN OLD TOWN GETS THE SAME CARE AND NOT THE SAME KIT (r252).
+      // Painted surrounds, quoins and downpipes are architecture, not a
+      // region — but the shutter here is a BOARDED leaf folded onto the pier,
+      // which is what the older shutter path draws, and not the Mediterranean
+      // louvre. No `jalousie`, no ironwork, and the gable stays end-on to the
+      // street, which is this quarter's whole silhouette.
+      face: { render: '#e8dcc6', plinth: '#8a8078', trim: '#f2e9d6',
+        frame: '#33302a', shutter: '#5a4a3a', pane: '#39465a',
+        surround: true, quoins: true, pipe: true },
     },
+    // and a market square, which is the one thing every town of this kind is
+    // built around
+    piazza: { count: 1, depth: 16, width: 22, leaf: 0x46583a },
   },
 
   // HEDGEROW DASH: farmland lanes, per RALLY_WORLD_BIBLE 3.8. Overcast, low
@@ -4316,7 +4371,13 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                    // GREECE
     elements: 'aegean',
-    frontage: { tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6, face: { render: '#f7f5ef', plinth: '#e2ded4', trim: '#ffffff', frame: '#2f6fae', shutter: '#2f6fae' } },
+    // WHITEWASH HAS NO QUOINS. Every other town on this coast gets a stone
+    // course up its corners; a Cycladic house is one limewashed mass with the
+    // arrises rounded off, and drawing blocks on it would be the one detail
+    // that says "not Greece". The blue louvre and the FLAT ROOF do the work
+    // instead — half the houses here have no pitch at all.
+    frontage: { tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6, flatRoofs: 0.5,
+      face: { render: '#f7f5ef', plinth: '#e2ded4', trim: '#ffffff', frame: '#2f6fae', shutter: '#2f6fae', pane: '#39465a', surround: true, jalousie: { shut: 0.34 }, pipe: true } },
     seaColor: 0x1f7fc4, sunColor: 0xfff4d8, sunIntensity: 3.0,
     skyTop: '#2a86dc', skyHorizon: '#eaf1f4',
     terrainLow: '#9a9a6a', terrainHigh: '#c0b489',
@@ -4326,7 +4387,11 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                     // SPAIN - Costa Brava
     elements: 'andalusia',
-    frontage: { tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33, face: { render: '#f4ecda', plinth: '#c9b592', trim: '#fdf6e8', frame: '#7a5a34', shutter: '#8a5a2c' } },
+    // ANDALUSIA IS IRONWORK. The reja across a ground-floor window and the
+    // balcony rail above it are as much the region as the whitewash, so this
+    // is the one variant that gets the coast's iron as well as its louvre.
+    frontage: { tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33, flatRoofs: 0.16,
+      face: { render: '#f6f0e2', plinth: '#c9b592', trim: '#fdf6e8', frame: '#4a3a24', shutter: '#8a5a2c', pane: '#39465a', surround: true, jalousie: { shut: 0.42 }, iron: '#2a2622', quoins: true, pipe: true } },
     seaColor: 0x2b6f9c, sunColor: 0xffe6b4, sunIntensity: 2.9,
     skyTop: '#3182cc', skyHorizon: '#efe2c6',
     terrainLow: '#8a8a52', terrainHigh: '#c2ad78',
@@ -4336,7 +4401,11 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                  // CROATIA
     elements: 'dalmatia',
-    frontage: { tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a, face: { render: '#f0ead9', plinth: '#c2b9a2', trim: '#f8f2e4', frame: '#4a6b4a', shutter: '#4a6b4a' } },
+    // DALMATIA IS BUILT OF THE SAME WHITE LIMESTONE AS ITS CORNERS, so the
+    // quoins read as bonded stone rather than as paint, and the terraces run
+    // eaves-on to the street the way the Ligurian ones do.
+    frontage: { tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a, ridge: 'along', flatRoofs: 0.12,
+      face: { render: '#f2ecdc', plinth: '#c2b9a2', trim: '#f8f2e4', frame: '#34332c', shutter: '#4a6b4a', pane: '#39465a', surround: true, jalousie: { shut: 0.38 }, quoins: true, pipe: true } },
     seaColor: 0x1c86ae, sunColor: 0xfff0d4, sunIntensity: 2.8,
     skyTop: '#2f8ad4', skyHorizon: '#e6eee8',
     terrainLow: '#6f8450', terrainHigh: '#a8a276',
@@ -4346,7 +4415,10 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                      // FRANCE - Cote d'Azur
     elements: 'azur',
-    frontage: { tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52, face: { render: '#f6e7d6', plinth: '#d8c4ae', trim: '#fbf0e2', frame: '#8fb4cc', shutter: '#8fb4cc' } },
+    // THE COTE D'AZUR IS THE SAME BUILDING AS MONACO IN PASTEL: pale blue
+    // louvres on apricot and rose, ironwork, eaves to the street.
+    frontage: { tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52, ridge: 'along', flatRoofs: 0.2,
+      face: { render: '#f8ece0', plinth: '#d8c4ae', trim: '#fdf6ea', frame: '#33322c', shutter: '#8fb4cc', pane: '#39465a', surround: true, jalousie: { shut: 0.3 }, iron: '#26221e', quoins: true, pipe: true } },
     seaColor: 0x2f74a6, sunColor: 0xffeccc, sunIntensity: 2.6,
     skyTop: '#3a86c8', skyHorizon: '#eee4d2',
     terrainLow: '#7f8a58', terrainHigh: '#b0a478',
@@ -13207,11 +13279,15 @@ export class Track {
         const st = (i + ((Math.random() * 5) | 0)) % N;
         const p = this.pointAt(st, lat * side);
         if (this._inWater(p.x, p.z)) continue;
-        // ITS OWN CLEARANCE TEST. `_clearsRoad` refuses everything inside a
-        // square, and a square with nobody in it is the emptiest thing here —
-        // so this asks the only question that matters instead: is it off the
-        // carriageway.
-        if (this._distToTrack(p.x, p.z) - 0.3 < inner(st) - 0.2) continue;
+        // OFF THE CARRIAGEWAY, MEASURED THE WAY THE CENSUS MEASURES IT.
+        // Comparing `_distToTrack` against the width at the station a figure
+        // was SAMPLED from is not the same question as comparing it against
+        // the width at the nearest station, and on a lap that curves back the
+        // two differ by more than a pavement: MONACO STREETS put three people
+        // 0.45 u inside its own racing line that way. `_clearsRoad` asks the
+        // nearest-station question, and its piazza clause is welcome here —
+        // people in squares are placed above, on the paving.
+        if (!this._clearsRoad(p.x, p.z, 0.35, 0.5)) continue;
         const y = this._seatY(p.x, p.z);
         if (!Number.isFinite(y)) continue;
         q.setFromAxisAngle(up, yaw + (Math.random() - 0.5) * 0.8);
@@ -13258,12 +13334,19 @@ export class Track {
     const P = this.T.piazza;
     if (!P) return;
     const F = this.T.frontage || {};
-    const D = P.depth ?? 16, W = P.width ?? 22;       // across the road, along it
+    const D0 = P.depth ?? 16, W0 = P.width ?? 22;     // across the road, along it
+    // A SMALL SQUARE BEATS NO SQUARE (r252). The flatness test refuses any
+    // site with more than 1.7 u of fall across the paving, and on a hill town
+    // — LANTERN QUARTER drops 26 u beside its own street — a 16 x 22 plate
+    // never fits anywhere: it built nothing at all and said nothing about it.
+    // Every site is tried at full size first and then at three quarters and
+    // three fifths, which is what a real town does with a slope.
+    const TIERS = [1, 0.78, 0.6];
     // the square sits where the houses would have been: inner edge at the
     // pavement, running out past the building line
     // 15.5 is `_buildOldTown`'s own default lateral, and the two have to agree
     // or the square is offset from the street wall it is supposed to open in
-    const lat0 = (F.lateral ?? 15.5) + D * 0.22;
+    const lat0 = (F.lateral ?? 15.5) + D0 * 0.22;
     const want = P.count ?? 2;
 
     // ONE DRAW CALL PER PART, NOT PER SQUARE. Every square in a world is the
@@ -13351,6 +13434,8 @@ export class Track {
           if (this._circDist(i, 0) < 60) continue;       // not over the grid
           if (this.curvature[i] > 0.02) continue;        // a square is not on a bend
           for (const side of [1, -1]) {
+           for (const tier of TIERS) {
+            const D = D0 * tier, W = W0 * tier;
             const c = this.pointAt(i, lat0 * side);
             const yaw = this.headingAt(i);
             // local +x is the road normal and +z runs along the street, and
@@ -13374,10 +13459,14 @@ export class Track {
               }
               if (!ok) break;
             }
-            // A SQUARE IS FLAT. On a 2 u fall the paving either floats at one
-            // corner or buries the fountain at the other, and no amount of
-            // seating fixes a plate on a hillside.
-            if (ok && hi - lo > 1.7) ok = false;
+            // A SQUARE IS FLAT — but a hill town builds its flat ground, and
+            // this one has to as well. LANTERN QUARTER falls 26 u beside its
+            // own street: at a strict 1.7 u limit not one station on that lap
+            // could take a square at any size, and the builder said nothing.
+            // A smaller square may stand on a thicker plate, which is a
+            // RETAINING TERRACE and exactly what these towns do — so the
+            // tolerance grows as the footprint shrinks.
+            if (ok && hi - lo > 1.7 / tier ** 1.6) ok = false;
             if (!ok) continue;
             // SEATED ON THE HIGH CORNER, NOT THE LOW ONE. At the low corner's
             // height the ground rises through the paving everywhere else and
@@ -13385,24 +13474,40 @@ export class Track {
             // it looked like. The plate is then made thick enough to reach the
             // ground at the low corner, so it reads as the raised terrace the
             // reference has, with its kerb showing.
-            site = { i, side, c, yaw, y: hi + 0.02, fall: hi - lo };
+            site = { i, side, c, yaw, y: hi + 0.02, fall: hi - lo, D, W };
             break;
+           }
+           if (site) break;
           }
           if (site) break;
         }
       }
       if (!site) continue;
-      const { c, yaw, y, fall } = site;
+      const { c, yaw, y, fall, D, W } = site;
+      // the size the site could actually take, which keys the floor geometry
+      const SZ = `${Math.round(D)}x${Math.round(W)}x${Math.round(Math.max(0.5, fall + 0.35) * 4)}`;
       _q.setFromAxisAngle(_pzUp, yaw);
       base = new THREE.Matrix4().compose(_p.set(c.x, y, c.z), _q, _ONE);
 
       // ---- the floor: paving, kerb, and a parapet on the three sides -------
-      const TH = Math.max(0.5, fall + 0.35);
-      part('kerb', this._pzGeo('kerb', () =>
+      // ...and the plate's thickness is the site's own fall, so it keys the
+      // floor geometry with the size
+      const TH = Math.max(0.5, Math.round((fall + 0.35) * 4) / 4);
+      part('kerb' + SZ, this._pzGeo('kerb' + SZ, () =>
         new THREE.BoxGeometry(D + 0.9, TH + 0.12, W + 0.9)), kerbMat,
       0, -(TH + 0.12) / 2 - 0.04, 0);
-      part('pave', this._pzGeo('pave', () => new THREE.BoxGeometry(D, TH, W)),
+      part('pave' + SZ, this._pzGeo('pave' + SZ, () => new THREE.BoxGeometry(D, TH, W)),
         paveMat, 0, -TH / 2, 0);
+      // A TERRACE IS A WALL. Up to a kerb's height the plate is something you
+      // bump over; past that it is masonry holding a square up, and a car has
+      // to be stopped by it rather than driven through it.
+      if (TH > 1.4) {
+        for (const t2 of [-0.3, 0, 0.3]) {
+          _pzV.set(0, 0, W * t2).applyMatrix4(base);
+          this.solids.push({ x: _pzV.x, z: _pzV.z, r: D * 0.5,
+            y: Math.min(y, this.terrainHeight(_pzV.x, _pzV.z)) + 0.4, mat: 'stone' });
+        }
+      }
       // A LOW PARAPET ON THE THREE SIDES AWAY FROM THE STREET: the sheet's
       // WALLS & BARRIERS panel, and what the render's terrace stands behind.
       // It is also what stops a raised plate reading as a slab floating in the
@@ -13413,17 +13518,17 @@ export class Track {
       // parapet and cannot be walked through either
       const church = wantChurch ? this._pzChurchFits(base, outward, D, y) : null;
       if (!church) {
-        part('wallSide', this._pzGeo('wallSide', () =>
+        part('wallSide' + SZ, this._pzGeo('wallSide' + SZ, () =>
           new THREE.BoxGeometry(0.36, 0.62, W)), kerbMat,
         outward * (D / 2 - 0.18), 0.31, 0);
-        part('copeSide', this._pzGeo('copeSide', () =>
+        part('copeSide' + SZ, this._pzGeo('copeSide' + SZ, () =>
           new THREE.BoxGeometry(0.58, 0.14, W + 0.22)), stoneMat,
         outward * (D / 2 - 0.18), 0.69, 0);
       }
       for (const ez of [-(W / 2 - 0.18), W / 2 - 0.18]) {
-        part('wallEnd', this._pzGeo('wallEnd', () =>
+        part('wallEnd' + SZ, this._pzGeo('wallEnd' + SZ, () =>
           new THREE.BoxGeometry(D, 0.62, 0.36)), kerbMat, 0, 0.31, ez);
-        part('copeEnd', this._pzGeo('copeEnd', () =>
+        part('copeEnd' + SZ, this._pzGeo('copeEnd' + SZ, () =>
           new THREE.BoxGeometry(D + 0.22, 0.14, 0.58)), stoneMat, 0, 0.69, ez);
       }
 
