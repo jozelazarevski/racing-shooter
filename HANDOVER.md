@@ -2239,3 +2239,47 @@ cheaper one. Textures +0.3 MB for the paving map.
 Gates: boot 4/4, test-buildings green (including "every roof sits on its
 house", which the collapsed prisms had to pass), test-carriageway green, road
 census over 73/74/77/78 at baseline.
+
+## r251 — THE CLOUDS AGAIN, BECAUSE THEY LOOKED BAD
+Reported plainly and correctly. r249 gave each cloud ONE squashed icosahedron,
+and a single convex hull has one silhouette and no internal form at all: from
+the ground it is a hard-edged sheet hanging in the air. A paper cutout, or a
+boulder.
+
+### A CLOUD IS A CLUSTER, NOT A SLAB
+Two things make one read: a BUMPY TOP EDGE of overlapping lobes, and a base
+that is cut off. `_cloudClusterGeo` builds five to seven lumps in a row —
+biggest in the middle, tapering to the ends, because that profile is most of
+what makes a row of blobs read as ONE cloud rather than as a string — merges
+them into a single geometry, and cuts the bottoms off.
+
+Four things had to be got right, each found by looking at the render:
+  1. FEWER, BIGGER LOBES. Ten small lumps packed into two radii overlap so
+     heavily that what you see is the SEAMS between them: a crumpled-paper
+     interior and no clean silhouette anywhere.
+  2. HEIGHT. The first cluster spread its lumps over three radii of width with
+     0.7 of a radius of rise — a strip of foam, not a cumulus.
+  3. THE BASE IS RUMPLED, NOT PLANAR. Clamping every low vertex to y = 0 gives
+     one enormous flat polygon underneath, and from a street you look straight
+     at it — a pale sheet with a hard edge, which is the ice-floe read the
+     slabs had and the whole reason for the rebuild. The cut-off height wanders
+     with x and z instead.
+  4. THE TINT IS NOT WHITE. The renderer tone-maps at 1.46 exposure, so a
+     near-white cloud colour leaves the shader ABOVE white and every facet
+     clips to the same value — perfectly good baked shading, rendered flat.
+     Starting from a pale grey puts the whole range under the clip.
+
+### AND THERE ARE FEWER OF THEM
+The reference is a still photograph of an overcast. A bank dense enough to
+match it rings the horizon, and from a car — camera at 2.6 u looking ALONG the
+road, not up — thirty-seven clouds at a shallow angle stop being clouds and
+become a lid. Twenty distinct ones against blue is the same style and a much
+better sky to drive under. `tools-scratch/skyshot.mjs` is the shot that settles
+this: pitched up, so the frame is mostly sky. Tuning a cloud bank from a street
+shot means tuning it on the one strip a building has not already covered.
+
+Three silhouettes, one instanced mesh each, so the sky is three draw calls;
+still eleven fewer than the sprite field it replaced.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green, road census over
+73/74/77/78 at baseline.

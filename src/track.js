@@ -4463,7 +4463,18 @@ THEMES.riviera = {
   // shaded one, over a cooler, deeper blue than the postcard one this world
   // had. `cloudKind` is the only line that does it; drop it and the soft
   // sprite field comes straight back.
-  cloudKind: 'faceted', cloudCount: 17, cloudTint: 0xf6f9fc, cloudDeep: 0x93a1b2,
+  // AND THE TINT IS NOT WHITE EITHER. The renderer tone-maps at 1.46 exposure,
+  // so a near-white cloud colour comes out of the shader ABOVE white and every
+  // facet clips to the same value — which is why a bank with perfectly good
+  // baked shading still read as flat foam. Starting from a pale grey leaves
+  // the whole range under the clip and the facets come back.
+  // AND THERE ARE FEWER OF THEM THAN THE REFERENCE HAS. That image is a still
+  // photograph of an overcast; a bank dense enough to match it rings the
+  // horizon, and from a car — where the camera sits at 2.6 u and looks along
+  // the road, not up — thirty-seven clouds at a shallow angle stop being
+  // clouds and become a lid. Twenty distinct ones against blue is the same
+  // style and a better sky to drive under.
+  cloudKind: 'faceted', cloudCount: 9, cloudTint: 0xdae3ec, cloudDeep: 0x76839a,
   skyTop: '#2f6ba4', skyHorizon: '#d6dee2',
   // ...and its own paint. `frontage` is the painted face the town presents to
   // the road, which is what you actually drive past in the budello. Alassio
@@ -18654,125 +18665,193 @@ export class Track {
     }
   }
 
-  /** A LOW-POLY CLOUD: an icosahedron squashed and knocked out of true, so no
-   *  two facets catch the light alike and no silhouette repeats. Built once
-   *  and instanced; the variation is per-instance scale and yaw, which is
-   *  cheaper than four geometries and reads the same from the ground. */
-  _cloudShardGeo() {
-    if (this._shardGeo) return this._shardGeo;
-    const g = new THREE.IcosahedronGeometry(1, 1);
-    const pos = g.attributes.position;
-    const v = new THREE.Vector3();
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i);
-      // squash it flat, then push each vertex out by a hash of where it is —
-      // deterministic per vertex, so the two ends of a shared edge agree and
-      // the hull stays closed
-      const n = Math.sin(v.x * 12.9898 + v.y * 78.233 + v.z * 37.719) * 43758.5453;
-      const j = 0.72 + ((n - Math.floor(n)) * 0.56);
-      v.set(v.x * j, v.y * 0.34 * j, v.z * j * 0.86);
-      // a cloud has a flatter bottom than top
-      if (v.y < 0) v.y *= 0.55;
-      pos.setXYZ(i, v.x, v.y, v.z);
+  /** A LOW-POLY CLOUD, AND IT IS A CLUSTER, NOT A SLAB.
+   *
+   *  The first cut gave each cloud one squashed icosahedron. From the ground
+   *  that is a hard-edged sheet hanging in the air — a paper cutout, or a
+   *  boulder — because a single convex hull has one silhouette and no internal
+   *  form at all. Reported, correctly, as looking bad.
+   *
+   *  A cloud reads as a cloud because of two things: a BUMPY TOP EDGE made of
+   *  many overlapping lobes, and a FLAT BASE. So this builds eight to ten
+   *  lumps in a row, biggest in the middle and falling away at the ends,
+   *  merges them into one geometry, and then clamps every vertex at the bottom
+   *  to a single plane — which is what gives a cumulus its cut-off underside
+   *  and, incidentally, one big dark face where the shading bake wants one.
+   *
+   *  THREE VARIANTS, because one silhouette repeated thirty times across a sky
+   *  is the same failure at a different scale. Each is built once and
+   *  instanced, so the whole sky is three draw calls.
+   *
+   *  The lump layout is drawn from a SEEDED generator rather than
+   *  `Math.random()`: these are geometries, not placements, and a cloud shape
+   *  that changes every time the world rebuilds cannot be looked at twice.
+   */
+  _cloudClusterGeo(variant) {
+    this._cloudGeos = this._cloudGeos || new Map();
+    const hit = this._cloudGeos.get(variant);
+    if (hit) return hit;
+    let seed = 20260821 + variant * 7919;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    // detail 0: twenty faces a lump, which is the facet size the reference
+    // draws. Detail 1 is smoother and stops reading as low-poly at all.
+    const src = new THREE.IcosahedronGeometry(1, 0);
+    const sp = src.attributes.position.array;
+    // FEWER, BIGGER LOBES. Ten small lumps packed into two radii overlap so
+    // heavily that what you see is the SEAMS between them — a crumpled-paper
+    // interior with no clean silhouette anywhere. Five or six big ones read as
+    // the distinct billows a cloud is actually made of.
+    const LUMPS = 5 + ((rnd() * 3) | 0);
+    const out = new Float32Array(sp.length * LUMPS);
+    const lumpOf = new Float32Array((sp.length / 3) * LUMPS);
+    let o = 0, li = 0;
+    for (let i = 0; i < LUMPS; i++) {
+      const t = LUMPS < 2 ? 0 : (i / (LUMPS - 1)) * 2 - 1;   // -1..1 along the cloud
+      // biggest in the middle, tapering to the ends: that profile is most of
+      // what makes a row of blobs read as one cloud rather than as a string
+      const taper = 1 - t * t * 0.62;
+      // A CLOUD HAS HEIGHT. The first cluster spread its lumps over three
+      // radii of width and gave them 0.7 of a radius of rise, which is a strip
+      // of foam, not a cumulus: from the ground it read as torn paper laid
+      // flat. Pull the row in and grow the lumps up.
+      const s = (0.52 + rnd() * 0.24) * taper;
+      const cx = t * 0.78 + (rnd() - 0.5) * 0.14;
+      const cy = 0.46 * taper + (rnd() - 0.5) * 0.16;
+      const cz = (rnd() - 0.5) * 0.66;
+      const sy = 0.95 + rnd() * 0.5;
+      const sz = 0.82 + rnd() * 0.4;
+      const shade = (rnd() - 0.5) * 0.1;              // this lump's own value
+      for (let k = 0; k < sp.length; k += 3) {
+        out[o++] = cx + sp[k] * s;
+        out[o++] = cy + sp[k + 1] * s * sy;
+        out[o++] = cz + sp[k + 2] * s * sz;
+        lumpOf[li++] = shade;
+      }
     }
+    // THE FLAT BASE — but RUMPLED, not planar. Clamping every low vertex to
+    // y = 0 gives one enormous flat polygon underneath, and from a street you
+    // are looking straight at it: a pale sheet with a hard edge, which is the
+    // ice-floe read the slab version had and the whole reason for this rebuild.
+    // Cut them off at a height that wanders with x and z instead, so the base
+    // stays a base and still has form in it.
+    for (let k = 0; k < out.length; k += 3) {
+      const nz = Math.sin(out[k] * 5.31 + out[k + 2] * 7.77) * 0.5
+        + Math.sin(out[k] * 11.7 - out[k + 2] * 3.9) * 0.25;
+      const floor = nz * 0.09;
+      if (out[k + 1] < floor) out[k + 1] = floor;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(out, 3));
     g.computeVertexNormals();
     // BAKE THE SHADING INTO THE VERTICES, and light the bank with nothing.
     //
     // Standing these in the scene's lights was the obvious thing and it was
-    // wrong: a cloud is a big flat slab seen from BELOW, so the face the
-    // player looks at is lit by the hemisphere's GROUND colour — and on
-    // SANREMO STAGE, whose ground bounce is olive, the whole sky came out
-    // sage green. Every world would have tinted its own clouds with its own
-    // dirt.
+    // wrong: a cloud is seen from BELOW, so the face the player looks at is
+    // lit by the hemisphere light's GROUND colour — and on SANREMO STAGE,
+    // whose ground bounce is olive, the whole sky came out sage green.
     //
     // The cue that actually matters is vertical: bright tops, shaded
     // undersides, mid-tone flanks. Baked as a per-face grey it is
     // rotation-invariant (so instances can yaw freely), identical in every
-    // world, free at runtime, and it leaves the per-cloud tint to the
-    // instance colour, which multiplies it.
-    const pos2 = g.attributes.position;
+    // world, free at runtime, and it leaves the per-cloud tint to the instance
+    // colour, which multiplies it.
     const nor = g.attributes.normal;
-    const cols = new Float32Array(pos2.count * 3);
-    for (let f = 0; f < pos2.count; f += 3) {
-      // this geometry is non-indexed, so a triangle is three consecutive
-      // vertices and its normal is the one they share
+    const cols = new Float32Array(out.length);
+    for (let f = 0; f < out.length / 3; f += 3) {
       const ny = nor.getY(f);
-      // 0.52 straight down to 1.0 straight up, with a little per-face grain so
-      // two facets at the same pitch still read as two facets
-      const n2 = Math.sin(f * 0.7371) * 0.5 + 0.5;
-      const b = 0.52 + 0.48 * (ny * 0.5 + 0.5) ** 0.85 + (n2 - 0.5) * 0.06;
+      // AND THE BASE IS DARK. From a street you are looking at the UNDERSIDE
+      // of a cloud, so that is the value the sky is judged by: at 0.46 the
+      // whole bank was one flat white and the lumps had no relief at all.
+      const b = Math.max(0.3, Math.min(1,
+        0.34 + 0.66 * (ny * 0.5 + 0.5) ** 0.95 + lumpOf[f]));
       for (let k = 0; k < 3; k++) {
         cols[(f + k) * 3] = b; cols[(f + k) * 3 + 1] = b; cols[(f + k) * 3 + 2] = b;
       }
     }
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-    this._shardGeo = g;
+    src.dispose();
+    this._cloudGeos.set(variant, g);
     return g;
   }
-
   _buildCloudBank(T) {
     const n = Math.max(8, Math.round((T.cloudCount ?? 14) * 2.2));
     // UNLIT, because the shading is already in the vertices (see
-    // `_cloudShardGeo`). It is also the cheapest material there is, which for
-    // forty 400 u slabs that cover a third of the frame is worth having.
+    // `_cloudClusterGeo`). It is also the cheapest material there is, which
+    // for a bank covering a third of the frame is worth having.
     const mat = new THREE.MeshBasicMaterial({
       color: 0xffffff, vertexColors: true, fog: false,
     });
-    const mesh = new THREE.InstancedMesh(this._cloudShardGeo(), mat, n);
-    mesh.name = 'cloud-bank';
-    // NEVER A SHADOW CASTER. Forty 400 u slabs in the sun's shadow frustum
-    // would spend the whole shadow map on cloud and leave none for the town.
-    mesh.castShadow = mesh.receiveShadow = false;
-    mesh.frustumCulled = false;
+    // THREE SILHOUETTES, one mesh each. One cloud shape repeated thirty times
+    // across a sky is as obvious as one house repeated down a street.
+    const VARIANTS = 3;
+    const meshes = [];
+    for (let v = 0; v < VARIANTS; v++) {
+      const im = new THREE.InstancedMesh(this._cloudClusterGeo(v), mat,
+        Math.ceil(n / VARIANTS) + 1);
+      im.name = v ? `cloud-bank-${v}` : 'cloud-bank';
+      // NEVER A SHADOW CASTER. Thirty 400 u clouds in the sun's shadow frustum
+      // would spend the whole shadow map on sky and leave none for the town.
+      im.castShadow = im.receiveShadow = false;
+      im.frustumCulled = false;
+      meshes.push(im);
+    }
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
     const base = new THREE.Color(T.cloudTint !== undefined ? T.cloudTint : 0xf6f8fa);
     const deep = new THREE.Color(T.cloudDeep ?? 0x8e9aa8);
     const items = [];
+    const kv = new Array(VARIANTS).fill(0);
     for (let i = 0; i < n; i++) {
+      const v = i % VARIANTS;
+      const mesh = meshes[v];
+      if (kv[v] >= mesh.count) continue;
       const a = (i / n) * Math.PI * 2 + Math.random() * 0.7;
-      // NOT DIRECTLY OVERHEAD. Under 600 u a 400 u slab at 250 u up hangs over
-      // the street like a lid — one of them read as a flying saucer parked
-      // above the town. The bank belongs on the horizon half of the dome.
-      const r = 620 + Math.random() * 980;
-      const far2 = (r - 620) / 980;
-      // BIG AND OVERLAPPING. A bank is a ceiling, not a scatter: at 200 u
-      // across with gaps between them these read as boulders in the sky. The
-      // far ones are bigger AND lower, so the ring closes down to the horizon
-      // the way an overcast does rather than ending in a rim of blue.
-      const sc = 230 + Math.random() * Math.random() * 420 + far2 * 160;
-      const y = 300 + Math.random() * 210 - far2 * 120;
-      // AND THEY ARE NOT WHITE. Value contrast between one slab and the next
-      // is what makes a bank read as depth instead of as polystyrene: the
-      // reference runs from near-white down to a slate that is half the
-      // brightness of the sky behind it.
-      // ...but the dark end is a SHADED CLOUD, not a thundercloud: past about
-      // three quarters of the way to `deep` a slab stops reading as lit from
-      // one side and starts reading as a hole in the sky.
-      col.copy(base).lerp(deep, Math.min(0.62, Math.random() * Math.random() * 1.15));
-      mesh.setColorAt(i, col);
-      items.push({ a, r, y, sc, yaw: Math.random() * Math.PI * 2,
-        asp: 0.5 + Math.random() * 0.5,
+      // NOT DIRECTLY OVERHEAD. Under 600 u a 400 u cloud at 250 u up hangs
+      // over the street like a lid — one read as a flying saucer parked above
+      // the town. The bank belongs on the horizon half of the dome.
+      const r = 780 + Math.random() * 900;
+      const far2 = (r - 780) / 900;
+      // the far ones are bigger AND lower, so the ring closes down toward the
+      // horizon the way an overcast does rather than ending in a rim of blue
+      // a squared bias, so the field is mostly middling clouds with two or
+      // three heroes in it rather than twenty of one size
+      const sc = 170 + Math.random() * Math.random() * 440 + far2 * 150;
+      // spread through the height of the sky, not banded at one altitude
+      const y = 300 + Math.random() * 300 - far2 * 120;
+      // VALUE CONTRAST IS THE DEPTH. But the dark end is a SHADED cloud, not a
+      // thundercloud: past about three quarters of the way to `deep` a cloud
+      // stops reading as lit from one side and starts reading as a hole.
+      col.copy(base).lerp(deep, Math.min(0.7, Math.random() * Math.random() * 1.3));
+      mesh.setColorAt(kv[v], col);
+      items.push({ v, k: kv[v]++, a, r, y, sc,
+        yaw: Math.random() * Math.PI * 2,
+        // a cloud is wider than it is deep and much wider than it is tall
+        hgt: 0.5 + Math.random() * 0.3,
+        asp: 0.52 + Math.random() * 0.4,
         speed: (0.8 + Math.random() * 1.6) * (1 - 0.45 * far2) });
     }
     const place = () => {
-      for (let i = 0; i < items.length; i++) {
-        const it = items[i];
+      for (const it of items) {
         q.setFromAxisAngle(up, it.yaw);
         m4.compose(new THREE.Vector3(Math.cos(it.a) * it.r, it.y, Math.sin(it.a) * it.r),
-          q, new THREE.Vector3(it.sc, it.sc * 0.5, it.sc * it.asp));
-        mesh.setMatrixAt(i, m4);
+          q, new THREE.Vector3(it.sc, it.sc * it.hgt, it.sc * it.asp));
+        meshes[it.v].setMatrixAt(it.k, m4);
       }
-      mesh.instanceMatrix.needsUpdate = true;
+      for (const im of meshes) im.instanceMatrix.needsUpdate = true;
     };
     place();
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    this.group.add(mesh);
-    // the bank drifts by rotating the whole ring, which is one number a frame
-    // instead of forty matrix recompositions
-    this.animated.cloudBank = { mesh, items, place, drift: 0 };
+    for (let v = 0; v < VARIANTS; v++) {
+      meshes[v].count = kv[v];
+      if (meshes[v].instanceColor) meshes[v].instanceColor.needsUpdate = true;
+      if (kv[v]) this.group.add(meshes[v]);
+    }
+    // the bank drifts by creeping each cloud around its own circle, which is
+    // one add a cloud instead of a re-scatter
+    this.animated.cloudBank = { meshes, items, place, drift: 0 };
   }
-
   /** Atmospheric-perspective gradient map for a horizon ring: the silhouette
    *  color fades toward the fog color at the base (and desaturates for far
    *  rings) so stacked ridgelines read with real depth. */

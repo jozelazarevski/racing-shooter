@@ -62,6 +62,14 @@ real time to get right and the next session should not rebuild them.
                 stands IN the square looking at its church — the only shot
                 that shows a facade, and the one that caught a door and a rose
                 window built on the wrong side of their own wall.
+- `skyshot.mjs`  the sky, pitched up, so the frame is mostly cloud. A bank
+                tuned from a street shot is tuned on the one strip of sky a
+                building has not already covered — which is how a cloud field
+                that looked fine at eye level turned out to be a lid.
+- `skyprobe.mjs` the cloud bank the running world built: theme tint, the
+                per-instance colours it produced, material type, and the
+                renderer's tone mapping and exposure (which is what was
+                clipping the shading flat).
 - `townsfolk.mjs` how many people were placed, how many stand in a square, how
                 many are BURIED in one, and how many are on a carriageway. The
                 last three are the ones that have been wrong.
