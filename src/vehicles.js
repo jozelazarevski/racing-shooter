@@ -4795,10 +4795,22 @@ export class PlayerCar extends Car {
       const sp2 = Math.hypot(this.vel.x, this.vel.z);
       const pushing = this === g.player && controlsLive && !this.airborne
         && !bogged && input.throttle > 0.5;
+      // CLIMBING IS PROGRESS TOO, and leaving it out broke the one rule this
+      // net was written to respect. A car grinding up a steep hillside is
+      // off the road, under 4 u/s and gaining no LAP position — every clause
+      // of the no-progress test — so it was being rescued off the mountain.
+      // Measured: `test-climb`'s "a steep hillside cannot be climbed" passes on
+      // main (rose -20.3 u) and failed here (rose 14.5 u), because the rescue
+      // teleported the car and the test read the jump as a climb.
+      //
+      // Height is the other axis of getting somewhere. Gaining a metre resets
+      // the clock exactly as advancing along the lap does.
       const trk = g.track;
       if (!pushing
-          || trk._circDist(this.trackIndex, this._wedgeAnchor ?? this.trackIndex) > 3) {
+          || trk._circDist(this.trackIndex, this._wedgeAnchor ?? this.trackIndex) > 3
+          || this.pos.y - (this._wedgeAnchorY ?? this.pos.y) > 1.0) {
         this._wedgeAnchor = this.trackIndex;
+        this._wedgeAnchorY = this.pos.y;
         this._wedgeAnchorT = 0;
       } else {
         this._wedgeAnchorT = (this._wedgeAnchorT ?? 0) + dt;

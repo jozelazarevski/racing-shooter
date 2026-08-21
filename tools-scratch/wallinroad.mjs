@@ -47,7 +47,10 @@ for (const id of IDS) {
           const bite = t.widthAt(ns.i) - ns.d;
           if (bite > worst) { worst = bite; at = ns.i; }
         }
-        if (worst > 0) blocked.push({ j, side, bite: +worst.toFixed(2), victim: at, h: +P.h.toFixed(1) });
+        // HEIGHT IS THE POINT, not position. A ribbon whose face lies in a
+        // carriageway at zero height is flush ground; the same face 1.3 u
+        // proud is a ridge you drive over. Record both.
+        if (worst > 0) blocked.push({ j, side, bite: +worst.toFixed(2), victim: at, h: +P.h.toFixed(2) });
       }
     }
     const runs = [];
@@ -56,11 +59,14 @@ for (const id of IDS) {
       if (cur && q.j - cur.to <= 4) { cur.to = q.j; cur.n++; cur.bite = Math.max(cur.bite, q.bite); cur.h = Math.max(cur.h, q.h); }
       else { cur = { from: q.j, to: q.j, n: 1, bite: q.bite, h: q.h, victim: q.victim }; runs.push(cur); }
     }
+    const proud = blocked.filter((q) => q.h > 0.3);
     return { name: g.level?.name, blockedSides: blocked.length, of: N * 2,
+      proud: proud.length, maxH: blocked.length ? Math.max(...blocked.map((q) => q.h)) : 0,
       runs: runs.sort((a, x) => x.n - a.n).slice(0, 5) };
   });
   if (!r) continue;
-  console.log(`L${String(id).padStart(2)} ${String(r.name).padEnd(20)} ${String(r.blockedSides).padStart(4)}/${r.of} wall-sides inside a road`);
+  console.log(`L${String(id).padStart(2)} ${String(r.name).padEnd(20)} ${String(r.blockedSides).padStart(4)}/${r.of} wall-sides inside a road; `
+    + `${r.proud} stand proud (>0.3 u), tallest ${r.maxH} u`);
   for (const q of r.runs) console.log(`      stations ${q.from}-${q.to} (${q.n}) bite ${q.bite} u into sample ${q.victim}, wall ${q.h} u tall`);
 }
 await b.close();

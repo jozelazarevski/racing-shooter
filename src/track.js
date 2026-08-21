@@ -9684,7 +9684,17 @@ export class Track {
     // exists, and an undefined here would make every height NaN.
     const open = this._cliffOpen
       ? this._cliffOpen[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)] : 1;
-    h = Math.max(1.7, h * gap * open);           // low stone berm through the gap
+    // THE FLOOR SCALES WITH `open` TOO. It did not, so a face that could not
+    // get out of a road was floored at 1.7 u and left a RIDGE LYING IN THE
+    // CARRIAGEWAY — 49 sides of CANYON RUN and 30 of UNDERCITY, about a metre
+    // and a third of rock across the road. Non-solid, so you drive straight
+    // over it, which is precisely "wall needs to be removed, I can't be
+    // driving on it". A wall with nowhere to stand must go to NOTHING, not to
+    // a speed bump. `open` multiplies the floor as well now, so it does.
+    //
+    // The start-line gap is untouched: `open` is 1 there and this is exactly
+    // the old expression.
+    h = open * Math.max(1.7, h * gap);           // low stone berm through the gap
     // cliffSetback pushes the faces off the verge: the corridor becomes a
     // DEEP VALLEY with a drivable floor, not a walled slot ("don't build
     // walled track in desert - or make it look like a deep valley")
