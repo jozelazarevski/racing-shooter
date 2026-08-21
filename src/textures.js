@@ -1240,6 +1240,36 @@ export function ironRailTexture(hex = '#241f1c') {
  *  and it has no wheel ruts in it — reuse the carriageway texture here and
  *  the square reads as a car park.
  */
+/** THE FOOTWAY: flags laid in courses along the pavement, which is how a
+ *  pavement is laid and — usefully — how a box's UVs stretch over one. Kept
+ *  fine and near-isotropic so the stretch over a 1.6 u x 6.4 u slab reads as
+ *  courses rather than as a smear.
+ */
+export function pavingTexture(palette = {}) {
+  const P = {
+    joint: 'rgba(88,82,72,0.85)',
+    flags: ['#b3aa99', '#a89f8e', '#bcb2a1', '#9e9585', '#b0a695'],
+    ...palette,
+  };
+  const t = make(256, 256, (g, w, h) => {
+    g.fillStyle = P.joint;
+    g.fillRect(0, 0, w, h);
+    const rows = 6, cols = 3;
+    const rh = h / rows, cw = w / cols;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        g.fillStyle = P.flags[(Math.random() * P.flags.length) | 0];
+        g.fillRect(c * cw + 1.6, r * rh + 1.6, cw - 3.2, rh - 3.2);
+        g.fillStyle = 'rgba(255,250,238,0.10)';
+        g.fillRect(c * cw + 1.6, r * rh + 1.6, cw - 3.2, 1.4);
+      }
+    }
+    noiseOverlay(g, w, h, 0.09);
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
 export function piazzaTexture(palette = {}) {
   const P = {
     base: '#9c9384',
@@ -2488,23 +2518,60 @@ export function townhouseTexture(palette = {}, variant = 0, set = null) {
     // whether or not this variant draws one
     const [sx, sy, sw, sh] = TH_SHOP;
     if (VB.shop) {
-      // ground floor: a shopfront bay with a stone surround and a stall riser
+      // GROUND FLOOR, AND IT IS AT EYE LEVEL. A flat fill of the unlit-glass
+      // colour makes the one part of the building a driver passes at two
+      // metres a black hole in the wall — the whole street had a row of them.
+      // A real shopfront in daylight is a bright band at the top where the
+      // glass takes the sky, a dark room behind, something coloured on a shelf
+      // in it, and a painted fascia over the lot.
       g.fillStyle = P.plinth;
       g.fillRect(sx - 10, sy - 10, sw + 20, sh + 22);
-      g.fillStyle = P.pane;
+      const gl = g.createLinearGradient(0, sy, 0, sy + sh);
+      gl.addColorStop(0, '#cfd8e2');                 // the sky, low on the glass
+      gl.addColorStop(0.42, P.pane);
+      gl.addColorStop(1, '#15181e');                 // the back of the room
+      g.fillStyle = gl;
       g.fillRect(sx, sy, sw, sh);
+      // goods on the shelf: three blocks of colour behind the glass, which is
+      // all a shop is from a car
+      for (let k = 0; k < 3; k++) {
+        const gw = 10 + Math.random() * 16;
+        g.fillStyle = (P.goods || ['#c8623a', '#d8a23a', '#6a8a6a', '#b45a5a',
+          '#e0d6bc'])[(Math.random() * 5) | 0];
+        g.globalAlpha = 0.55;
+        g.fillRect(sx + 8 + Math.random() * (sw - gw - 16), sy + sh * 0.42,
+          gw, sh * 0.3);
+        g.globalAlpha = 1;
+      }
       g.strokeStyle = P.frame;
       g.lineWidth = 6;
       g.strokeRect(sx, sy, sw, sh);
       g.fillStyle = P.frame;
       for (let k = 1; k < 4; k++) g.fillRect(sx + (sw / 4) * k - 2, sy, 4, sh);
+      // THE FASCIA, painted, with a lighter band where the name goes. Every
+      // shop in the reference has one and it is the only saturated colour at
+      // street level.
+      const fasc = (P.fascia || ['#2f4a3a', '#5a2f2f', '#2f3f5a', '#4a3a24',
+        '#6a3a4a'])[(Math.random() * 5) | 0];
+      g.fillStyle = fasc;
+      g.fillRect(sx - 8, sy - 20, sw + 16, 14);
+      g.fillStyle = 'rgba(0,0,0,0.28)';
+      g.fillRect(sx - 8, sy - 8, sw + 16, 3);
+      g.fillStyle = 'rgba(240,232,214,0.72)';        // the lettering, as a band
+      for (let bx = sx + 6; bx < sx + sw - 10; bx += 11) {
+        g.fillRect(bx, sy - 16, 4 + Math.random() * 4, 7);
+      }
     } else {
+      // a plain front: a door, a fanlight over it, and a step
       g.fillStyle = P.plinth;
       g.fillRect(0, 216, w, h - 216);
       g.fillStyle = P.frame;
       g.fillRect(78, 194, 36, 62);
+      g.fillStyle = P.pane;
+      g.fillRect(82, 198, 28, 12);                   // fanlight
       g.fillStyle = P.trim;
       g.fillRect(74, 188, 44, 7);
+      g.fillRect(72, 250, 48, 5);                    // the step
     }
     // hanging sign on a bracket beside the shopfront — the old-town silhouette
     g.fillStyle = P.frame;

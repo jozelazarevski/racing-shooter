@@ -26,7 +26,7 @@ const out = await p.evaluate(() => {
 });
 const fs = await import('fs');
 for (const f of out) {
-  const safe = f.name.replace(/[^a-z0-9-]/gi, '_');
+  const safe = f.name.replace(/[^a-z0-9-]/gi, '_') + '-' + out.indexOf(f);
   fs.writeFileSync(`tools-scratch/tex-${safe}.png`, Buffer.from(f.url.split(',')[1], 'base64'));
   console.log(`${f.name}  count=${f.count}  ${f.w}x${f.h}  -> tex-${safe}.png`);
 }

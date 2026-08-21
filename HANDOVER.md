@@ -2184,3 +2184,58 @@ sky or the scatter should look in track.js and nowhere else.
 Gates: boot 4/4, test-carriageway green, test-buildings green, road census over
 73/74/77/78 at baseline (73's one body is the same dodecahedron at bite 1.24,
 74's floater the same metal one at 3.8, 78's four the same poles).
+
+## r250 — WHAT THE ITERATION FOUND
+Four things, one of them a real bug that only showed up on one world.
+
+### THE CLOUDS WERE TAKING THEIR COLOUR FROM THE DIRT
+SANREMO STAGE's sky came out SAGE GREEN. The cloud bank r249 built was a
+MeshStandardMaterial standing in the scene's lights — and a cloud is a big flat
+slab seen from BELOW, so the face the player looks at is lit by the hemisphere
+light's GROUND colour. Sanremo's ground bounce is olive, so its clouds were
+olive. Every world would have tinted its own sky with its own dirt, and the
+three worlds it was tuned on happened to have grey-brown ground.
+
+The fix is to light them with nothing. `_cloudShardGeo` BAKES the shading into
+a vertex-colour attribute — 0.52 straight down to 1.0 straight up, plus a
+little per-face grain — and the material is MeshBasic. That is:
+  - rotation-invariant, because it keys off the vertical only, so instances can
+    still yaw freely (a sun-direction bake could not have);
+  - identical in every world, which is the point;
+  - free at runtime, and MeshBasic is the cheapest material there is for
+    forty 400 u slabs covering a third of the frame;
+  - and it leaves the per-cloud tint to the instance colour, which multiplies
+    it, so `cloudTint`/`cloudDeep` still work.
+
+### THE SHOPFRONT WAS A BLACK HOLE AT EYE LEVEL
+The one part of a building a driver passes at two metres was a flat fill of the
+unlit-glass colour, and a street of them is a row of caves. A shopfront in
+daylight is a bright band at the top where the glass takes the sky, a dark room
+behind it, something coloured on a shelf, and a painted fascia over the lot —
+all four are painted now, and the fascia's lettering band is the only saturated
+colour at street level, which is what the reference has. The plain-front
+variant gets a fanlight and a doorstep for the same reason.
+
+### A FOOTWAY IS FLAGGED
+r248's pavement was a flat colour, which beside a cobbled road reads as poured
+concrete. `pavingTexture` goes on the same instanced box; its UVs stretch the
+courses ALONG the pavement, which is how flags are laid.
+
+### AND THE ROOFLINE STOPPED REPEATING
+Every roof was the same prism at the same pitch — a sawtooth to the vanishing
+point. `flatRoofs` gives about one house in five a flat top behind a parapet,
+which is the sheet's own corner building, and it breaks the rhythm at exactly
+the place the eye reads a street. Two more instances off the trim mesh that
+already existed, so it costs no draw call; the roof prism collapses to nothing
+and the chimney is told to stand on the deck instead of on a ridge that is not
+there.
+
+### COST
+No new meshes at all this round: the paving is a map on an existing instanced
+box, the parapets are two more instances of `frontage-trim`, the flat roof is a
+scale, the shopfront is paint, and the cloud change swapped one material for a
+cheaper one. Textures +0.3 MB for the paving map.
+
+Gates: boot 4/4, test-buildings green (including "every roof sits on its
+house", which the collapsed prisms had to pass), test-carriageway green, road
+census over 73/74/77/78 at baseline.

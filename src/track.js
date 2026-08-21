@@ -14,7 +14,7 @@ import {
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
   townhouseTexture, townhouseGlowTexture, roofTileTexture, ironRailTexture,
-  townhouseAnchors, piazzaTexture,
+  townhouseAnchors, piazzaTexture, pavingTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -653,7 +653,7 @@ export const LEVELS = [
       piazza: { count: 1, depth: 12, width: 16 },
       frontage: {
         lateral: 9.6, depth: 7.0, unit: 6.4, height: 17.0, run: [10, 20], rows: 6,
-        bayset: 'liguria', ridge: 'along',
+        bayset: 'liguria', ridge: 'along', flatRoofs: 0.18, flatRoofs: 0.2,
         // THE HOUSES ARE LIGURIAN AGAIN (r244), which is what the reference
         // sheet and both Monte Carlo renders actually show. The half-timbering
         // of r242 came from a northern street that is not in this brief at
@@ -4584,7 +4584,7 @@ THEMES.genova = {
   frontage: {
     // eaves to the street, like the rest of the coast — a port terrace is the
     // same building as a seafront one under dirtier paint
-    ridge: 'along',
+    ridge: 'along', flatRoofs: 0.22,
     tints: ['#c86a4a', '#b2543c', '#d08a56', '#9e4a34', '#c4926a', '#d9a878'],
     roof: 0xa8502c,
     face: { render: '#efe2cc', plinth: '#8e8272', trim: '#ecdcc2',
@@ -17411,11 +17411,17 @@ export class Track {
       const vh = h * [1, 0.62, 1.24, 0.94][vi >> 1];
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(dAcross, vh, wAlong));
       bm.setMatrixAt(kv[vi], m4);
+      // A FLAT-ROOFED HOUSE IN THE RUN. Every roof on this street is the same
+      // prism at the same pitch, and a terrace of them is a sawtooth repeated
+      // to the vanishing point. The reference sheet's corner building is
+      // flat-topped behind a parapet, and one in five of those breaks the
+      // rhythm at exactly the place the eye reads a street: the roofline.
+      const flat = Math.random() < (F.flatRoofs ?? 0);
       // the pitch a Ligurian pantile roof actually has is shallower than a
       // northern gable's, and the chimney has to be told the height that was
       // USED, not the one that was asked for
-      const effRoofH = RIDGE_ALONG ? roofH * 0.72 : roofH;
-      if (rgK < RIDGEMAX) {
+      const effRoofH = flat ? 0.001 : (RIDGE_ALONG ? roofH * 0.72 : roofH);
+      if (!flat && rgK < RIDGEMAX) {
         // the cap runs ALONG the ridge, whichever way the ridge runs
         const rq = RIDGE_ALONG ? qr : q;
         if (RIDGE_ALONG) qr.setFromAxisAngle(up, this.headingAt(i) + Math.PI * 0.5);
@@ -17452,6 +17458,22 @@ export class Track {
         houseTrim.setMatrixAt(trimK, m4);
         trimCol.copy(tint).multiplyScalar(1.12 + Math.random() * 0.12);
         houseTrim.setColorAt(trimK++, trimCol);
+        // ...and where the roof is flat, the parapet that hides it: a wall
+        // standing above the eaves with a coping course on top. Two more
+        // instances off the SAME trim mesh, so a flat-roofed variant costs no
+        // draw call of its own.
+        if (flat && trimK + 2 < TRIMMAX) {
+          m4.compose(new THREE.Vector3(p.x, y + vh + 0.52, p.z), q,
+            new THREE.Vector3(dAcross * 1.1, 1.04, wAlong * 1.05));
+          houseTrim.setMatrixAt(trimK, m4);
+          trimCol.copy(tint).multiplyScalar(1.02 + Math.random() * 0.1);
+          houseTrim.setColorAt(trimK++, trimCol);
+          m4.compose(new THREE.Vector3(p.x, y + vh + 1.12, p.z), q,
+            new THREE.Vector3(dAcross * 1.19, 0.22, wAlong * 1.12));
+          houseTrim.setMatrixAt(trimK, m4);
+          trimCol.copy(tint).multiplyScalar(1.2 + Math.random() * 0.12);
+          houseTrim.setColorAt(trimK++, trimCol);
+        }
         // THE JETTY (r243), WHICH IS A NORTHERN BUILDING (r244). The medieval
         // overhang belongs to the Fachwerk street the r242 reference showed
         // and to nothing on this coast: a Ligurian terrace is flush from
@@ -17496,7 +17518,9 @@ export class Track {
       // `h` is the height the block was BUILT at (the variant scales it), and
       // `rh` the height its roof was built at — anything hung off the roofline
       // has to measure from these and not from what was asked for.
-      return { solid, p, y, h, r, lat, rh: effRoofH, variant: vi >> 1,
+      // a flat roof still carries a stack, and it stands on the deck rather
+      // than on a ridge that is not there
+      return { solid, p, y, h, r, lat, rh: flat ? 1.0 : effRoofH, variant: vi >> 1,
         mesh: myMesh, roof: myRoof, idx: myIdx };
     };
 
@@ -17616,8 +17640,13 @@ export class Track {
     // per house from the building line out to the road edge, and a kerb course
     // at the end of it — two instances a house, two draw calls for the world.
     const PAVEMAX = 2600;
+    // A FOOTWAY IS FLAGGED, and a flat colour beside a cobbled road reads as
+    // poured concrete. The map goes on the box, whose UVs stretch it into
+    // courses running along the pavement — which is the way flags are laid.
+    const paveTex = pavingTexture(F.paving);
+    paveTex.repeat.set(1, 2);
     const paveMat = new THREE.MeshStandardMaterial({
-      color: F.pavement ?? 0xa8a08f, flatShading: true, roughness: 0.95,
+      map: paveTex, color: F.pavement ?? 0xd8d2c4, roughness: 0.95,
     });
     const kerbMat2 = new THREE.MeshStandardMaterial({
       color: F.kerbColor ?? 0x968e7f, flatShading: true, roughness: 0.92,
@@ -18647,17 +18676,49 @@ export class Track {
       pos.setXYZ(i, v.x, v.y, v.z);
     }
     g.computeVertexNormals();
+    // BAKE THE SHADING INTO THE VERTICES, and light the bank with nothing.
+    //
+    // Standing these in the scene's lights was the obvious thing and it was
+    // wrong: a cloud is a big flat slab seen from BELOW, so the face the
+    // player looks at is lit by the hemisphere's GROUND colour — and on
+    // SANREMO STAGE, whose ground bounce is olive, the whole sky came out
+    // sage green. Every world would have tinted its own clouds with its own
+    // dirt.
+    //
+    // The cue that actually matters is vertical: bright tops, shaded
+    // undersides, mid-tone flanks. Baked as a per-face grey it is
+    // rotation-invariant (so instances can yaw freely), identical in every
+    // world, free at runtime, and it leaves the per-cloud tint to the
+    // instance colour, which multiplies it.
+    const pos2 = g.attributes.position;
+    const nor = g.attributes.normal;
+    const cols = new Float32Array(pos2.count * 3);
+    for (let f = 0; f < pos2.count; f += 3) {
+      // this geometry is non-indexed, so a triangle is three consecutive
+      // vertices and its normal is the one they share
+      const ny = nor.getY(f);
+      // 0.52 straight down to 1.0 straight up, with a little per-face grain so
+      // two facets at the same pitch still read as two facets
+      const n2 = Math.sin(f * 0.7371) * 0.5 + 0.5;
+      const b = 0.52 + 0.48 * (ny * 0.5 + 0.5) ** 0.85 + (n2 - 0.5) * 0.06;
+      for (let k = 0; k < 3; k++) {
+        cols[(f + k) * 3] = b; cols[(f + k) * 3 + 1] = b; cols[(f + k) * 3 + 2] = b;
+      }
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     this._shardGeo = g;
     return g;
   }
 
   _buildCloudBank(T) {
     const n = Math.max(8, Math.round((T.cloudCount ?? 14) * 2.2));
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xffffff, vertexColors: true, flatShading: true,
-      roughness: 1, metalness: 0, fog: false,
+    // UNLIT, because the shading is already in the vertices (see
+    // `_cloudShardGeo`). It is also the cheapest material there is, which for
+    // forty 400 u slabs that cover a third of the frame is worth having.
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffffff, vertexColors: true, fog: false,
     });
-    const mesh = new THREE.InstancedMesh(this._white(this._cloudShardGeo()), mat, n);
+    const mesh = new THREE.InstancedMesh(this._cloudShardGeo(), mat, n);
     mesh.name = 'cloud-bank';
     // NEVER A SHADOW CASTER. Forty 400 u slabs in the sun's shadow frustum
     // would spend the whole shadow map on cloud and leave none for the town.
