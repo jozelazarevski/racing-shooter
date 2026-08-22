@@ -82,6 +82,27 @@ real time to get right and the next session should not rebuild them.
                 road census reports a world that will not build as a quiet
                 `SKIP` in the middle of its results. Run it over the town list
                 after any change to a shared builder.
+- `facadeshot.mjs` the buildings framed WHERE THEY STAND. The old-town
+                frontage does not line the whole lap — this reads every
+                `oldtown-frontage` instance's position, finds the densest ~6%
+                window and shoots from there, so a world with a fine main
+                street is not judged on an empty verge. Prints coverage:
+                COTE D AZUR 22%, CINQUE TERRE 15%, SANREMO 28%, GENOVA 22%.
+- `facadelum.mjs` what colour the walls actually COME OUT. Renders the frame
+                twice — normally, then with the frontage flat-white and
+                everything else hidden — and averages the first over the mask
+                the second draws. Reports mean, saturation and the P10/P90
+                lit-shade spread, which is the number that matters: the game
+                bottoms out at 9-15 where the reference bottoms at 68.
+- `facadetint.mjs` whether the theme's paint reaches the wall: the tints asked
+                for, the instance colours actually written, and the facade
+                texture's MODE (not its mean — a facade texture is render plus
+                black panes and iron, so its average is always a mid grey and
+                says nothing about the paint).
+- `refluma.mjs` the same luminance read taken on the REFERENCE illustration
+                itself, over the terrace, the mid-town blocks and the rampart.
+                "Too dark" is worth nothing as an opinion; this is what it is
+                compared against.
 - `nightshot.mjs` a dark world with the car parked on the racing line and the
                 camera set to the GAME's own CHASE rig (back 17, height 11.5,
                 look 19 ahead). `CAM=front` stands up the road with the car
