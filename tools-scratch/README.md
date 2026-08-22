@@ -165,6 +165,19 @@ real time to get right and the next session should not rebuild them.
 - `litworlds.mjs` one line per level: sky, dusk flag, and how many of the
                 eight cars have their lamps lit. A daylight world reading
                 `8/8 lit` is the bug it exists to catch.
+- `pageerr.mjs`  did the page even boot, and what stopped it — ten seconds,
+                one answer. RUN THIS AFTER ANY EDIT TO main.js. `node --check`
+                parses a file as a SCRIPT, so it accepts things the module
+                loader rejects: a duplicate `const` in one scope shipped past
+                a green syntax check as `Identifier 'lamp' has already been
+                declared`, and every later probe just timed out waiting for a
+                game that was never going to exist.
+- `baylamps.mjs` where the bay's coloured lamps actually land and what each
+                one contributes: screen position, in-frame flag, and the pixel
+                delta from hiding it. It found both cool lamps sitting at
+                screen x 244% and 184% — the visible slice of the bay's 160 u
+                wall is about FOURTEEN world units wide, because the camera
+                sits off to +x and looks back across the origin.
 - `baycontrast.mjs` does the bay actually contrast with the car in it? Renders
                 every car in the catalogue, stencils the car by hiding
                 everything else, and reports the gap between its BODY (car

@@ -2811,3 +2811,52 @@ ITS SILHOUETTE.
 BRAWLER's 13 is the one weak number and it is shipped as is: an orange body on
 a grey-green wall, where the hue offset carries a contrast that a luminance gap
 cannot see.
+
+## r260 — A RED LIGHT IN THE BACK
+"Make the background more eye pleasing. Like a red light or something in the
+back." The repainted room from r259 solved the contrast and left a grey box.
+
+Five painted lamps, no new light sources: a warm wash and a small additive
+core on the back wall, a cool wash beside it, and both colours pooling on the
+floor. A PointLight far enough back to wash a 160 u wall would light the car
+too and undo r259's contrast work; these paint the wall and the floor and
+nothing else, and they share `glowTexture` with the headlamps.
+
+The wall is only about a sixth of this frame — the floor is the picture — so
+the lamps that matter most are the two lying on the tarmac.
+
+### THREE THINGS MEASUREMENT CAUGHT
+**A wash paints; additive only adds.** The first cut was additive throughout,
+which fails exactly where the room is palest: adding red to a near-white wall
+makes it whiter, not redder, and a dark car's bright room came out milky pink.
+The wash is NORMAL blending now — it tints whatever the wall is — with a small
+additive core inside it as the source itself.
+
+**Both cool lamps were outside the picture.** `baylamps.mjs` projects each lamp
+into the bay camera: they sat at screen x 244% and 184%. The visible slice of
+that 160 u wall is about FOURTEEN world units, x -17.5 to -3, because the
+camera is off to +x and looks back across the origin. Their measured positions
+are in the source now, with the mapping that produced them.
+
+**And the lamps ate the contrast they were added to.** Painting a saturated red
+over a pale wall darkens it, and the pale rooms are precisely the ones a dark
+car needs: BASTION's body-to-wall gap went 71 → 39, PIT 67 → 41, CROWN 41 → 15.
+So the lamps are tuned to the room — a pale room gets a pale tint at a lighter
+touch, colouring it without spending its brightness — and a warm hull gets a
+CRIMSON warm lamp rather than an orange-red one, because a red light behind a
+red car is no light at all. Restored: BASTION 65, PIT 66, CROWN 39, and every
+light car up (SLEEK 78, DUNE 92, ALPINE 86, FLATSIX 43).
+
+BRAWLER measures 2, against 13 before the lamps. Its rendered body sits at 127
+and its background at 124, and the metric cannot see that one is orange and the
+other is grey-green under a crimson wash. The shot reads clearly; the number
+does not. Recorded rather than tuned away, because tuning the whole bay to one
+car on one blind metric is how the last three rounds went wrong.
+
+### AND THE ONE THAT COST AN HOUR
+`node --check src/main.js` PASSED on a file with two `const lamp` declarations
+in one scope, because it parses as a SCRIPT and the duplicate is a module-
+instantiation error. The page never booted, and every probe after it timed out
+waiting for `window.__game` with no error anywhere in its output. `pageerr.mjs`
+answers "did it boot, and what stopped it" in ten seconds. RUN IT AFTER EVERY
+EDIT TO main.js — `node --check` IS NOT A GATE FOR THIS FILE.

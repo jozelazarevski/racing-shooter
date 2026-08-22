@@ -4685,10 +4685,76 @@ class Game {
     rim.position.set(-4, 5.5, -8);
     scene.add(rim);
 
+    // ---- THE COLOURED LIGHT IN THE BACK ------------------------------------
+    //
+    // Asked for directly — "make the background more eye pleasing, like a red
+    // light or something in the back". The repainted room solved the contrast
+    // and left a grey box; this is what makes it a place. Two lamps washing
+    // the back wall, warm on one side and cool on the other, which is how
+    // every configurator and every real photo booth is lit: the warm one
+    // carries the eye, the cool one keeps the shadow side from going dead.
+    //
+    // ADDITIVE QUADS, NOT LIGHTS. A PointLight far enough back to wash a
+    // 160 u wall would light the car too and undo the contrast work; these
+    // paint the wall and nothing else. `glowTexture` is the same soft radial
+    // the headlamps use, and the material's colour tints it, so both lamps
+    // cost one texture between them.
+    // A WASH PAINTS, A CORE ADDS. Additive alone was the first cut and it
+    // fails exactly where the room is palest: adding red to a near-white wall
+    // makes it whiter, not redder, so a dark car's bright room came out milky
+    // pink. The wash is NORMAL blending — it TINTS the wall whatever the wall
+    // is — and a small additive core sits inside it as the source itself.
+    const backLamp = (hex, x, y, w, h, op, add = false) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ map: glowTexture(), color: hex,
+          transparent: true, opacity: op, depthWrite: false, toneMapped: false,
+          blending: add ? THREE.AdditiveBlending : THREE.NormalBlending }));
+      m.position.set(x, y, add ? -14.4 : -14.5);
+      m.renderOrder = add ? 2 : 1;
+      scene.add(m);
+      return m;
+    };
+    // POSITIONS ARE MEASURED, NOT PICKED. `baylamps.mjs` projects each lamp
+    // into the bay camera: the visible slice of a 160 u wall is about
+    // FOURTEEN world units wide, running x -17.5 to -3, because the camera
+    // sits off to +x and looks back across the origin. The first cut put the
+    // cool lamp at x +15, which is 244% of the way across the frame — it was
+    // contributing nothing but the far tail of its own falloff.
+    const warmLamp = backLamp(0xd8241a, -13, 4.2, 74, 48, 0.72);
+    const warmCore = backLamp(0xff5a2a, -13, 4.2, 26, 20, 0.5, true);
+    const coolLamp = backLamp(0x1f5fbe, -6.5, 3.0, 46, 34, 0.46);
+    // ...AND ON THE FLOOR, which is where the picture actually is. The wall is
+    // a thin band across the top of this frame — barely a sixth of it — so a
+    // lamp that only paints the wall has almost no canvas. The same two
+    // colours pool on the tarmac behind the car, under the bay lines and
+    // under the contact shadow so neither is tinted away.
+    const pool = (hex, x, z, w, d, op) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d),
+        new THREE.MeshBasicMaterial({ map: glowTexture(), color: hex,
+          transparent: true, opacity: op, depthWrite: false, toneMapped: false }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(x, 0.004, z);
+      scene.add(m);
+      return m;
+    };
+    // Same mapping on the floor: x -6 lands mid-frame, and z closer to zero
+    // walks DOWN the picture toward the camera.
+    const warmPool = pool(0xc8201a, -8, -7.5, 36, 28, 0.72);
+    const coolPool = pool(0x1f5fbe, -2.5, -5.5, 26, 22, 0.5);
+    // ...and the car has to be IN that light, or the wall is a poster hanging
+    // behind it. A dim tinted rig either side, aimed forward from the wall.
+    const warmRim = new THREE.DirectionalLight(0xff5a34, 0.85);
+    warmRim.position.set(-7, 5, -11);
+    scene.add(warmRim);
+    const coolRim = new THREE.DirectionalLight(0x4a8ee0, 0.5);
+    coolRim.position.set(8, 3.5, -10);
+    scene.add(coolRim);
+
     const pivot = new THREE.Group();
     scene.add(pivot);
     this.__stage = { cvs, r, scene, cam, pivot, spin: 0, sig: null, raf: 0, last: 0,
-      wall, floor, dado, wallTex, lines };
+      wall, floor, dado, wallTex, lines,
+      warmLamp, warmCore, coolLamp, warmPool, coolPool };
     return this.__stage;
   }
 
@@ -4748,6 +4814,14 @@ class Game {
         o.material.color.setHex(pal.lightCar ? 0xf0bb4a : 0x8a5f18);
         o.material.opacity = pal.lightCar ? 0.8 : 0.95;
       }
+      st.warmLamp.material.color.setHex(pal.warmHex);
+      st.warmCore.material.color.setHex(pal.warmHex);
+      st.coolLamp.material.color.setHex(pal.coolHex);
+      st.warmPool.material.color.setHex(pal.warmHex);
+      st.coolPool.material.color.setHex(pal.coolHex);
+      // the tick breathes AROUND these, so they are the amplitudes too
+      st.lampOp = { warm: pal.warmOp, cool: pal.coolOp,
+        warmPool: pal.warmPoolOp, coolPool: pal.coolPoolOp };
     }
     // A CONTACT SHADOW, because the key light cannot give one here. The key
     // sits at (5, 9, 6) and the camera looks in from (6.4, 3.4, 7.6) — nearly
@@ -4838,6 +4912,18 @@ class Game {
       // the light crossing the wall — slow enough that it reads as a room
       // being lit rather than as something happening
       if (st.wallTex) st.wallTex.offset.x = (st.wallTex.offset.x - dt * 0.024) % 1;
+      // the lamps breathe, on two different periods so they never pulse in
+      // step — in step reads as a fault light, out of step reads as a room
+      st.glowT = (st.glowT ?? 0) + dt;
+      const op = st.lampOp;
+      if (op) {
+        const a = Math.sin(st.glowT * 0.55), b2 = Math.sin(st.glowT * 0.38 + 2);
+        st.warmLamp.material.opacity = op.warm + a * 0.07;
+        st.warmCore.material.opacity = op.warm * 0.7 + a * 0.12;
+        st.coolLamp.material.opacity = op.cool + b2 * 0.07;
+        st.warmPool.material.opacity = op.warmPool + a * 0.06;
+        st.coolPool.material.opacity = op.coolPool + b2 * 0.05;
+      }
       const w = st.cvs.clientWidth || 300;
       const h = st.cvs.clientHeight || 190;
       if (st.w !== w || st.h !== h || st.framedFor !== st.sig) {
@@ -5162,8 +5248,25 @@ class Game {
     const h = (hsl.h + 0.36) % 1;
     const sat = 0.05 + hsl.s * 0.05;
     const mk = (l) => new THREE.Color().setHSL(h, sat, l);
+    // ---- and the coloured lamps that stand in this room --------------------
+    //
+    // A wash PAINTS, so a saturated red over a near-white wall does not just
+    // tint it, it DARKENS it — and the pale rooms are exactly the ones a dark
+    // car needs. Measured: the first cut cost BASTION 71 → 39 of body-to-wall
+    // gap and PIT 67 → 41. So a pale room gets a pale tint at a lighter touch,
+    // which colours it without spending its brightness.
+    const pale = 1 - t;                                  // 1 = the room is pale
+    const L = (a, b2) => THREE.MathUtils.lerp(a, b2, pale);
+    // A RED LIGHT BEHIND A RED CAR IS NO LIGHT AT ALL. On a warm hull the
+    // warm lamp goes crimson rather than orange-red, so the background stays
+    // a different hue family from the bodywork and the silhouette survives.
+    const warmCar = hsl.h < 0.12 || hsl.h > 0.92;
     return { wall: mk(wallL), floor: mk(wallL * 0.78), dado: mk(wallL * 0.44),
-      lightCar: t > 0.5 };
+      lightCar: t > 0.5,
+      warmHex: pale > 0.5 ? 0xff8f78 : (warmCar ? 0xc8143c : 0xd8241a),
+      coolHex: pale > 0.5 ? 0x93b8ee : 0x1f5fbe,
+      warmOp: L(0.72, 0.50), coolOp: L(0.46, 0.38),
+      warmPoolOp: L(0.72, 0.42), coolPoolOp: L(0.50, 0.32) };
   }
 
   _studioSweep() {
