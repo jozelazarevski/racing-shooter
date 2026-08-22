@@ -4624,12 +4624,14 @@ class Game {
     floor.receiveShadow = true;
     scene.add(floor);
     // the painted bay outline the car is parked inside
+    const lines = [];
     for (const sx of [-3.4, 3.4]) {
       const line = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 15),
         new THREE.MeshBasicMaterial({ color: 0xf0bb4a, transparent: true, opacity: 0.8 }));
       line.rotation.x = -Math.PI / 2;
       line.position.set(sx, 0.01, 0);
       scene.add(line);
+      lines.push(line);
     }
     // THE BACK WALL IN TWO BANDS, which is what a workshop actually has and —
     // more to the point — gives a black roofline something pale to cut against
@@ -4640,8 +4642,9 @@ class Game {
     // them as a black wedge with a hard diagonal edge, which is what the "make
     // it lighter" report was partly looking at. A backdrop with a visible edge
     // is not a backdrop.
+    const wallTex = this._bayWallTexture();
     const wall = new THREE.Mesh(new THREE.PlaneGeometry(160, 70),
-      new THREE.MeshStandardMaterial({ color: 0xb2a695, roughness: 1 }));
+      new THREE.MeshStandardMaterial({ color: 0xb2a695, roughness: 1, map: wallTex }));
     wall.position.set(0, 30, -15);
     scene.add(wall);
     const dado = new THREE.Mesh(new THREE.PlaneGeometry(160, 3.2),
@@ -4684,7 +4687,8 @@ class Game {
 
     const pivot = new THREE.Group();
     scene.add(pivot);
-    this.__stage = { cvs, r, scene, cam, pivot, spin: 0, sig: null, raf: 0, last: 0 };
+    this.__stage = { cvs, r, scene, cam, pivot, spin: 0, sig: null, raf: 0, last: 0,
+      wall, floor, dado, wallTex, lines };
     return this.__stage;
   }
 
@@ -4731,6 +4735,20 @@ class Game {
     mesh.traverse((o) => { if (o.isMesh) o.castShadow = o !== mesh.userData?.carLights; });
     st.car = mesh;
     st.pivot.add(mesh);
+    // THE ROOM IS REPAINTED FOR THE CAR. See `_bayPalette`.
+    if (st.wall) {
+      const pal = this._bayPalette(mesh.userData?.bodyMat?.color
+        ?? new THREE.Color(0x808080));
+      st.wall.material.color.copy(pal.wall);
+      st.floor.material.color.copy(pal.floor);
+      st.dado.material.color.copy(pal.dado);
+      // ...and the bay lines have to stay legible on it: gold on a pale room
+      // is nearly invisible, so they darken as the room lightens.
+      for (const o of st.lines ?? []) {
+        o.material.color.setHex(pal.lightCar ? 0xf0bb4a : 0x8a5f18);
+        o.material.opacity = pal.lightCar ? 0.8 : 0.95;
+      }
+    }
     // A CONTACT SHADOW, because the key light cannot give one here. The key
     // sits at (5, 9, 6) and the camera looks in from (6.4, 3.4, 7.6) — nearly
     // the same azimuth — so the cast shadow falls behind the car and the car
@@ -4817,6 +4835,9 @@ class Game {
       st.last = t;
       st.spin += dt * 0.42;
       st.pivot.rotation.y = st.spin;
+      // the light crossing the wall — slow enough that it reads as a room
+      // being lit rather than as something happening
+      if (st.wallTex) st.wallTex.offset.x = (st.wallTex.offset.x - dt * 0.024) % 1;
       const w = st.cvs.clientWidth || 300;
       const h = st.cvs.clientHeight || 190;
       if (st.w !== w || st.h !== h || st.framedFor !== st.sig) {
@@ -5055,6 +5076,96 @@ class Game {
    *  for whatever the exposure, and `depthWrite: false` with a renderOrder
    *  behind everything so it can never occlude the subject.
    */
+  /** THE BAY WALL'S OWN TEXTURE, and the reason it moves.
+   *
+   *  A workshop wall that never changes is a backdrop; one with light crossing
+   *  it is a room. This is a wide soft band on white — white so the material's
+   *  own `color` carries the hue, and `RepeatWrapping` so the tick can drift
+   *  the offset and walk the band across the bay. Two bands per repeat, very
+   *  low contrast: the car is the subject, and a backdrop you look AT is a
+   *  worse failure than one you look past.
+   */
+  _bayWallTexture() {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, 512, 128);
+    for (const cx of [128, 384]) {
+      const grd = g.createLinearGradient(cx - 150, 0, cx + 150, 0);
+      grd.addColorStop(0, 'rgba(255,255,255,0)');
+      grd.addColorStop(0.5, 'rgba(255,255,255,1)');
+      grd.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = '#c9c1b4';
+      g.fillRect(cx - 150, 0, 300, 128);
+      g.globalCompositeOperation = 'lighter';
+      g.fillStyle = grd;
+      g.fillRect(cx - 150, 0, 300, 128);
+      g.globalCompositeOperation = 'source-over';
+    }
+    // a slow vertical fall as well, so the band is not a flat stripe
+    const vg = g.createLinearGradient(0, 0, 0, 128);
+    vg.addColorStop(0, 'rgba(255,255,255,0.12)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.10)');
+    g.fillStyle = vg;
+    g.fillRect(0, 0, 512, 128);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(2.2, 1);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+
+  /** WHAT COLOUR THE BAY SHOULD BE FOR THIS CAR.
+   *
+   *  A dark navy machine on a mid-grey floor is the report — the two sit at
+   *  the same value and the car has no edge. So the bay is not a fixed set:
+   *  it takes its lightness FROM the car and goes the other way, and shifts
+   *  its hue away from the car's so a warm car never stands on warm concrete.
+   *  Returns wall / floor / dado, always in that light-to-dark order so the
+   *  room still reads as a room.
+   */
+  /** How dark the room goes for the brightest car, in linear lightness.
+   *
+   *  Swept in `baycontrast.mjs` against BODY brightness (car P75, not the
+   *  silhouette mean). Body-to-wall gap at 0.22 / 0.30 / 0.42:
+   *
+   *    sleek   67 / 51 / 33      dune    88 / 72 / 54
+   *    alpine  80 / 64 / 46      flatsix 35 / 18 /  0
+   *    brawler 19 / 30 / 44      crown, bastion, pit unaffected (pinned light)
+   *
+   *  0.42 makes the silver FLATSIX disappear into its own backdrop. 0.22 is
+   *  best for every light car and its only weak case is BRAWLER at 19 — an
+   *  orange body on a grey-green wall, where the hue offset carries a contrast
+   *  a luminance number cannot see.
+   */
+  BAY_DARK_END = 0.22;
+
+  _bayPalette(carColor) {
+    const hsl = { h: 0, s: 0, l: 0 };
+    carColor.getHSL(hsl);
+    // the car's own luminance, not its HSL lightness: a saturated yellow at
+    // l=0.5 is far brighter to the eye than a navy at the same l
+    const lum = 0.2126 * carColor.r + 0.7152 * carColor.g + 0.0722 * carColor.b;
+    const t = THREE.MathUtils.smoothstep(lum, 0.06, 0.5);   // 0 dark car, 1 light car
+    // Linear-space lightness — `setHSL` works in the renderer's working space,
+    // so BAY_DARK_END 0.22 lands around sRGB #7d and 0.80 around #e9. A
+    // near-white car needs a room to stand against, but the dark end stops
+    // well short of black: "not black" and "contrasting" are both in the brief
+    // and the second must not undo the first. Swept in `baycontrast.mjs`
+    // against the car's BODY brightness, not its silhouette mean — a mean that
+    // includes tyres and glass says a white car is mid-grey and sends the
+    // sweep the wrong way.
+    const wallL = THREE.MathUtils.lerp(0.80, this.BAY_DARK_END, t);
+    // push the room's hue a third of the wheel off the car's, and keep it
+    // barely saturated — this is concrete, not a colour wash
+    const h = (hsl.h + 0.36) % 1;
+    const sat = 0.05 + hsl.s * 0.05;
+    const mk = (l) => new THREE.Color().setHSL(h, sat, l);
+    return { wall: mk(wallL), floor: mk(wallL * 0.78), dado: mk(wallL * 0.44),
+      lightCar: t > 0.5 };
+  }
+
   _studioSweep() {
     const c = document.createElement('canvas');
     c.width = 4; c.height = 256;

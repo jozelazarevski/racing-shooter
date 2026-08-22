@@ -2758,3 +2758,56 @@ read as gaps; and it scored the whole `oldtown-frontage` mesh, which carries
 the five deliberately-sparse ranks BEHIND the terrace as well as the street. On
 the frontage rank alone, with column 0 as the width, the real figures are
 17-38% and the terrace mostly abuts. MEASURE THE POPULATION YOU MEAN.
+
+## r259 — A GARAGE THAT IS NOT BLACK, AND A ROOM THAT MOVES
+Two reports, one screen. "Light up all background in the garage, so it is not
+black" and then, on a navy car standing on grey concrete, "make it move
+contrasting background".
+
+### THE BAY WAS NOT THE PROBLEM
+`bayblack.mjs` reads the stage's own canvas and grids the dark pixels. The bay
+measures a mean luminance of 121 with 17% dark, and that 17% is the car's own
+tyres, glass and bumper. The CARDS were black: `_studio` renders with
+`alpha: true` and no backdrop at all, so every car and part picture was a
+cut-out floating on a near-black panel — 20-31% of each shelf icon's opaque
+pixels under luminance 34, mean 28.
+
+A cyclorama fixes all of them at once: one unlit gradient plane squared up to
+the studio's fixed three-quarter rig, 110 u across at 42 u back, which fills a
+30-degree frame from every distance the studio shoots from. Untone-mapped, so
+it is exactly the colour asked for whatever the exposure. Shelf icons go 28 →
+107 mean with no transparency left. Car shots also get a painted contact disc,
+because a car on a seamless sweep with nothing under it floats. The four
+upgrade ladders that show a glyph rather than a rendered part got the same pale
+plate in CSS — three photographs among four holes is a ragged column.
+
+### THE ROOM TAKES ITS COLOUR FROM THE CAR
+A fixed set cannot serve a navy car and a white one. `_bayPalette` reads the
+hull colour, and goes the other way: lightness interpolated against the car's
+own luminance, hue pushed a third of the wheel off the car's so a warm car
+never stands on warm concrete, saturation kept near zero because this is
+concrete and not a colour wash. The bay lines swap gold for a darker ochre when
+the room goes pale, or they vanish into it.
+
+Body-to-wall gap, per car, at the shipped setting: BASTION 71, PIT 67, CROWN
+41, ALPINE 83, DUNE 90, SLEEK 75, FLATSIX 35, BRAWLER 13.
+
+### AND THE WALL HAS LIGHT CROSSING IT
+A `RepeatWrapping` band texture on the wall, white so the material's colour
+carries the hue, with the offset walked in the turntable's own tick. Slow — a
+feature crosses the visible slice in about eight seconds. A backdrop you look
+AT is a worse failure than one you look past.
+
+### THE METRIC SENT ME THE WRONG WAY FIRST
+The dark end of the lightness ramp was tuned against the mean luminance of the
+car's pixels, and a car's pixels are half tyre and half glass: that mean says
+ALPINE, which is white, is a mid-grey at 96. Tuned on it, darkening the room
+made the measured gap SMALLER and I read that as the change being wrong. On
+body brightness (car P75) the sweep is unambiguous — 0.22 / 0.30 / 0.42 gives
+SLEEK 67/51/33, DUNE 88/72/54, ALPINE 80/64/46, FLATSIX 35/18/0. 0.42 makes the
+silver FLATSIX vanish into its own backdrop entirely. MEASURE THE SUBJECT, NOT
+ITS SILHOUETTE.
+
+BRAWLER's 13 is the one weak number and it is shipped as is: an orange body on
+a grey-green wall, where the hue offset carries a contrast that a luminance gap
+cannot see.

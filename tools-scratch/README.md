@@ -165,6 +165,26 @@ real time to get right and the next session should not rebuild them.
 - `litworlds.mjs` one line per level: sky, dusk flag, and how many of the
                 eight cars have their lamps lit. A daylight world reading
                 `8/8 lit` is the bug it exists to catch.
+- `baycontrast.mjs` does the bay actually contrast with the car in it? Renders
+                every car in the catalogue, stencils the car by hiding
+                everything else, and reports the gap between its BODY (car
+                pixel P75 — the silhouette mean is half tyre and glass, and
+                says a white car is mid-grey) and the background. Also watches
+                the wall texture's offset over real frames, because "the
+                background moves" is either in the numbers or it is a comment.
+                `SWEEP=0.22,0.30,0.42` re-runs every car at those
+                `BAY_DARK_END` values; without it, a one-pass gate.
+- `bayboth.mjs` the bay for a dark, a light and a mid car as three files. The
+                room is repainted from the car, so one screenshot proves
+                nothing.
+- `bayblack.mjs` how much of the bay canvas is black, in a 4x4 grid so the
+                answer says WHICH part is unlit, with the scene graph beside
+                it. It is what showed the bay was already fine and sent the
+                "light up the garage" report to the shelf cards instead.
+- `garageblack.mjs` the whole garage tab: the dark and transparent fraction of
+                every canvas and image on it, plus a shot of the top and of
+                the part shop. The panel scrolls, not the page — it finds the
+                element that actually overflows rather than scrolling `body`.
 - `bayshot2.mjs` the build bay as the garage tab renders it, plus `fill` —
                 how much of the panel the car actually covers. `SPIN=rad`
                 parks the turntable. "The car is small" is a framing
