@@ -5038,6 +5038,39 @@ class Game {
    *  ONCE to a data URL and then it is an `<img>` — free to scroll, free to
    *  re-layout, and gone from the GPU the moment it is drawn.
    */
+  /** THE SWEEP BEHIND EVERY STUDIO PICTURE.
+   *
+   *  Reported directly: "light up all background in the garage, so it is not
+   *  black". The build bay's own canvas measures a mean luminance of 121 and
+   *  is fine; the CARDS are the problem — the studio renders with `alpha:true`
+   *  and no backdrop at all, so every car and every part is a cut-out floating
+   *  on whatever is behind it, and behind it is a near-black panel. Measured
+   *  on the shelf: 20-31% of each icon's opaque pixels under luminance 34, on
+   *  a card darker still.
+   *
+   *  A photographer's answer, not a lighting one: a cyclorama. One unlit
+   *  gradient plane, light at the top and falling to a warmer floor tone, big
+   *  enough and far enough back to fill the frame at every distance the studio
+   *  shoots from. Unlit and untone-mapped so it is EXACTLY the colour asked
+   *  for whatever the exposure, and `depthWrite: false` with a renderOrder
+   *  behind everything so it can never occlude the subject.
+   */
+  _studioSweep() {
+    const c = document.createElement('canvas');
+    c.width = 4; c.height = 256;
+    const g = c.getContext('2d');
+    const grd = g.createLinearGradient(0, 0, 0, 256);
+    grd.addColorStop(0, '#cfc5b5');
+    grd.addColorStop(0.46, '#bcb1a0');
+    grd.addColorStop(0.72, '#a2988a');
+    grd.addColorStop(1, '#8b8175');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 4, 256);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+
   _studio(w, h, dist = 6.2) {
     let st = this.__studio;
     if (!st) {
@@ -5061,7 +5094,28 @@ class Game {
       const rim = new THREE.DirectionalLight(0xffd9a0, 1.5);
       rim.position.set(-3, 5, -7);
       scene.add(rim);
-      st = this.__studio = { r, scene, sun, cam: null };
+      // THE CYCLORAMA. Every `_shoot` uses the same three-quarter rig
+      // direction, so one plane squared up to it covers all of them: 110 u
+      // across at 42 u behind the origin fills a 30-degree frame from any
+      // distance the studio uses (the widest is the car shelf at 8.7).
+      const dir = new THREE.Vector3(5.2, 3.2, 6.2).normalize();
+      const sweep = new THREE.Mesh(new THREE.PlaneGeometry(110, 110),
+        new THREE.MeshBasicMaterial({ map: this._studioSweep(), toneMapped: false,
+          depthWrite: false }));
+      sweep.position.copy(dir).multiplyScalar(-42);
+      sweep.lookAt(dir.x * 10, dir.y * 10, dir.z * 10);
+      sweep.renderOrder = -1;
+      scene.add(sweep);
+      // ...and the shadow the sweep cannot cast. A car on a seamless
+      // background with nothing under it floats; a painted disc grounds it
+      // without a shadow map, which is the same trick the build bay uses.
+      const contact = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({ map: contactShadowTexture(), color: 0x2e261d,
+          transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false }));
+      contact.rotation.x = -Math.PI / 2;
+      contact.visible = false;
+      scene.add(contact);
+      st = this.__studio = { r, scene, sun, cam: null, sweep, contact };
     }
     st.r.setSize(w, h);
     return st;
@@ -5076,15 +5130,25 @@ class Game {
    *  framed slightly wrong and passing "6.2" for the car shelf (meaning "the
    *  old z") silently moved the camera 30% closer and cropped the cars.
    */
-  _shoot(mesh, w, h, { dist = 8.7, look = 0.55 } = {}) {
+  _shoot(mesh, w, h, { dist = 8.7, look = 0.55, ground = false } = {}) {
     const st = this._studio(w, h);
     const cam = new THREE.PerspectiveCamera(30, w / h, 0.1, 120);
     cam.position.set(5.2, 3.2, 6.2).normalize().multiplyScalar(dist);
     cam.lookAt(0, look, 0);
     st.scene.add(mesh);
+    // `ground` is for things that STAND on something — a car. A gearbox held
+    // up to the light does not get a shadow under it.
+    if (ground) {
+      const bx = new THREE.Box3().setFromObject(mesh);
+      const sz = bx.getSize(new THREE.Vector3());
+      st.contact.scale.set(sz.x * 1.3, sz.z * 1.15, 1);
+      st.contact.position.set(bx.getCenter(new THREE.Vector3()).x, bx.min.y + 0.01, 0);
+      st.contact.visible = true;
+    }
     st.r.render(st.scene, cam);
     const url = st.r.domElement.toDataURL();
     st.scene.remove(mesh);
+    st.contact.visible = false;
     return url;
   }
 
@@ -5129,7 +5193,7 @@ class Game {
     for (const car of CAR_CATALOG) {
       const mesh = buildCarMesh(car.spec);
       mesh.rotation.y = Math.PI * 0.82; // 3/4 front view
-      icons[car.key] = this._shoot(mesh, 148, 96);   // the original 8.70 rig
+      icons[car.key] = this._shoot(mesh, 148, 96, { ground: true }); // the 8.70 rig
     }
     this.__carIcons = icons;
     return icons;
