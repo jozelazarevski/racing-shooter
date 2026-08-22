@@ -2314,10 +2314,16 @@ export function townhouseTexture(palette = {}, variant = 0, set = null) {
     const w = TH_W, h = TH_H;
     g.fillStyle = P.render;
     g.fillRect(0, 0, w, h);
-    // patchy limewash erosion, so a terrace of identical units is not identical
-    for (let i = 0; i < 160; i++) {
-      const s = 4 + Math.random() * 18;
-      g.fillStyle = `rgba(${60 + Math.random() * 60 | 0},${56 + Math.random() * 50 | 0},${50 + Math.random() * 44 | 0},${0.03 + Math.random() * 0.07})`;
+    // Patchy limewash erosion. GRAIN, NOT BLOTCHES: this was 160 discs of up
+    // to 22 px radius at up to 10% alpha, painted in a 192-wide authored
+    // space — so the biggest were an ninth of the wall across and read in
+    // every town shot as soft circular damp stains, most visible on the
+    // pale renders. The variety between houses is carried by the four bay
+    // variants and the per-house tint; this only has to break the flat.
+    // Four times as many, a quarter the size, half the alpha.
+    for (let i = 0; i < 620; i++) {
+      const s = 1.6 + Math.random() * 5.4;
+      g.fillStyle = `rgba(${60 + Math.random() * 60 | 0},${56 + Math.random() * 50 | 0},${50 + Math.random() * 44 | 0},${0.015 + Math.random() * 0.035})`;
       g.beginPath();
       g.arc(Math.random() * w, Math.random() * h, s, 0, Math.PI * 2);
       g.fill();

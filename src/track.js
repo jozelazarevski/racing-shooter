@@ -4361,7 +4361,15 @@ for (const [key, over] of [
     // get the same joinery as the coast: architrave, louvred shutter, iron.
     // Their ROOFS stay gable-fronted — a Cinque Terre house stands in a stack
     // up a cliff, not shoulder to shoulder along a street.
-    frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f2e8d4', plinth: '#a98a68', trim: '#f6ecd8', frame: '#34332c', shutter: '#3f6b46', pane: '#39465a', surround: true, jalousie: { shut: 0.38 }, iron: '#26221e', quoins: true, pipe: true } },
+    // THE DARK END OF THIS LIST WAS DRAGGING THE WHOLE STREET DOWN. Measured
+    // against the reference (facade P50 124, P90 188, saturation 0.33),
+    // CINQUE TERRE came out at 66 / 103 / 0.69 — its lit walls half as bright
+    // as the reference's and twice as saturated, the darkest town on the
+    // roster by a distance. Three mid-saturated entries lifted toward the
+    // sheet's own pastels and two pale ones added, so a run is punctuated
+    // rather than uniformly deep. The district stays warmer than ALASSIO,
+    // which is the point of it; it stops being a different exposure.
+    frontage: { tints: ['#eda877', '#e8b45c', '#e0959a', '#e4c37a', '#d4948a', '#efd9a6', '#f4e6cc', '#f2ddb0'], roof: 0xb4552e, face: { render: '#f6ecdc', plinth: '#a98a68', trim: '#f6ecd8', frame: '#34332c', shutter: '#3f6b46', pane: '#39465a', surround: true, jalousie: { shut: 0.38 }, iron: '#26221e', quoins: true, pipe: true } },
     seaColor: 0x2f7fa8, sunColor: 0xffe8c0, sunIntensity: 2.7,
     skyTop: '#2f7fd1', skyHorizon: '#e8ddc6',
     terrainLow: '#7d8a4e', terrainHigh: '#a89a68',
@@ -18142,7 +18150,31 @@ export class Track {
         const i = (s * step) % N;
         // the start gate, the grid and the grandstand own this stretch
         if (this._circDist(i, 0) < 40) { run = 0; continue; }
-        if (gap > 0) { gap--; run = 0; continue; }
+        // A CARRUGIO IS A SLOT, NOT A MISSING HOUSE. The side alley between
+        // terrace runs skipped one or two whole bays, which at a 7 u unit is
+        // a hole up to twice a house wide with the verge showing through it —
+        // measured at 53-71% of neighbouring pairs across the town worlds,
+        // mean gap 14 u. That is a suburb, not a Ligurian street. The alley
+        // stays, because a streetwall with no way through it is a wall; it is
+        // BRACKETED instead, by a narrow block either side of a ~2 u slot,
+        // which is what the reference's side streets actually are.
+        if (gap > 0) {
+          if (gap === 1) {
+            const nw = F.unit * 0.34;
+            const off = Math.max(2, Math.round(step * 0.30));
+            for (const d of [-off, off]) {
+              const j = ((i + d) % N + N) % N;
+              const ah = F.height * runH * (0.88 + Math.random() * 0.1);
+              const ap = put(j, side, F.lateral + runJ, nw, F.depth * 0.92, ah,
+                1.7 + Math.random() * 0.8, tints[(Math.random() * tints.length) | 0]);
+              if (!ap) continue;
+              placedS[side].add(j);
+              faceAt(j, side, ap.lat, F.depth * 0.92, nw, ap.y, ap.h, ANCH[ap.variant]);
+              paveAt(j, side, ap.lat, F.depth * 0.92, nw);
+            }
+          }
+          gap--; run = 0; continue;
+        }
         // step the terrace back rather than break it, where the road swings in
         let placed = null;
         const tall = run > 0 && Math.random() < 0.11;    // the merchant house
@@ -18182,7 +18214,7 @@ export class Track {
           bulbs.setMatrixAt(lk++, m4);
         }
         if (++run >= want) {                       // side alley, then a new block
-          gap = 1 + ((Math.random() * 2) | 0);
+          gap = 1;                                 // ONE bay, and bracketed
           want = F.run[0] + ((Math.random() * (F.run[1] - F.run[0] + 1)) | 0);
           runH = 0.84 + Math.random() * 0.44;      // the next block, its own build
           runJ = (Math.random() - 0.5) * 1.6;

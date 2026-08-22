@@ -2699,3 +2699,62 @@ Worth writing down, because each looked right:
 CHECK THE PROBE'S ROOT BEFORE BELIEVING A BASELINE. An A/B against a pristine
 build is worth nothing if both ports serve the same tree, and it fails silently
 — the page loads, the game runs, the numbers look plausible.
+
+## r258 — THE BLOTCHES WERE THE WHOLE PROBLEM
+The building round. Three changes, two of them small, and the small one that
+turned out to be doing all the damage.
+
+### 620 SPECKS INSTEAD OF 160 STAINS
+`townhouseTexture`'s limewash erosion laid 160 discs of up to 22 px radius at
+up to 10% alpha into a 192-px-wide authored wall. The biggest were a ninth of
+the wall across, and at 1.7x total coverage they were not grain — they were
+soft circular damp stains, visible on every town render, worst on the pale
+renders. 620 discs at a quarter the radius and half the alpha.
+
+That change alone moved the facades most of the way to the reference. Measured
+through a flat-white mask of the frontage itself, at a pinned point on the lap
+(reference: P50 124, P90 188, saturation 0.33):
+
+    IL BUDELLO    sat 0.64 → 0.41   P50  78 → 124   P90 132 → 196
+    COTE D AZUR   sat 0.29 → 0.24   P50  96 → 102   P10  12 →  37
+    CINQUE TERRE  sat 0.69 → 0.66   P50  66 →  59   P90 103 → 122
+
+IL BUDELLO now sits on the reference almost exactly. THE MOTTLE WAS NOT
+COSMETIC: a wash of dark grey-brown at 1.7x coverage was dragging the whole
+palette down and desaturating it, which is why the streets read heavy and why
+the tints never looked like the tints.
+
+### CINQUE TERRE'S PALETTE
+Still the outlier after that — its lit walls half the reference's brightness
+and twice its saturation. Three mid-saturated entries in `liguria`'s tint list
+lifted toward the sheet's own pastels, two pale ones added, render nudged from
+`#f2e8d4` to `#f6ecdc`: saturation 0.66 → 0.59 and P50 59 → 81. It stays warmer
+than ALASSIO, which is the district's whole point; it stops being a different
+exposure.
+
+### A CARRUGIO IS A SLOT, NOT A MISSING HOUSE
+The side alley between terrace runs skipped one or two whole bays, which at a
+7 u unit is a hole up to twice a house wide. It is bracketed now — a narrow
+block either side of a ~2 u slot — and capped at one bay. Modest: open pairs
+27.2 → 27.2 / 17.4 → 18.9 / 38.2 → 33.2 percent, but every open gap narrower
+(mean 12.2 → 10.4, 7.3 → 6.9, 10.3 → 9.2 u) and CINQUE TERRE's P75 gap 4.6 →
+2.5. Shipped because it is an improvement on every gap measure, not because it
+is a big one.
+
+### TWO THINGS THAT LOOKED RIGHT AND WERE NOT
+**"Lift the shade floor with the hemisphere fill."** The facades bottom out at
+luminance 9-15 against the reference's 68, and hemisphere light is the obvious
+lever. Swept 1x to 3x: P10 moved 10 → 17 while P50 went 71 → 108 and the frame
+mean 96 → 126. It washes the world out and never touches the floor, because
+LIGHT MULTIPLIES ALBEDO — you cannot brighten a near-black texel by pointing
+more light at it. Paler hemisphere ground colours did the same. The floor moved
+in the end from the mottle change (COTE D AZUR P10 12 → 37), which lifted the
+albedo instead.
+
+**"53-71% of the streetwall has an open gap."** That was `frontagegaps.mjs`
+before it was right, twice over: it took `max(sx, sz)` of the instance matrix
+as the along-street width, and column 2 is the 8.5 u DEPTH, so abutting houses
+read as gaps; and it scored the whole `oldtown-frontage` mesh, which carries
+the five deliberately-sparse ranks BEHIND the terrace as well as the street. On
+the frontage rank alone, with column 0 as the width, the real figures are
+17-38% and the terrace mostly abuts. MEASURE THE POPULATION YOU MEAN.

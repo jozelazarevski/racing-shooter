@@ -106,6 +106,21 @@ real time to get right and the next session should not rebuild them.
                 the surface, and no env map is bound at all.
 - `nightroad.mjs` the road material and every light that reaches it on a dark
                 world, plus how much of the frame clips.
+- `frontagegaps.mjs` is the streetwall continuous? Projects every frontage
+                block onto the centreline and measures the along-street gap
+                between neighbours on the same side. Two traps it was written
+                wrong into first: the along-street width is COLUMN 0 of the
+                instance matrix (column 2 is the 8.5 u depth, and taking the
+                max of the two makes an abutting terrace read as gaps), and
+                `oldtown-frontage` carries the sparse back ranks as well as
+                the street, so the frontage rank has to be filtered out by
+                lateral first. Wrong both ways it reported 53-71% open; right,
+                17-38%.
+- `shadefloor.mjs` sweeps the hemisphere fill against the facade's P10/P50/P90
+                and reports the cost — road and whole-frame means — beside the
+                gain. Its lesson is a negative one: 1x to 3x moves the shade
+                floor 10 → 17 and the frame mean 96 → 126. Light multiplies
+                albedo; it cannot brighten a near-black texel.
 - `facadeshot.mjs` the buildings framed WHERE THEY STAND. The old-town
                 frontage does not line the whole lap — this reads every
                 `oldtown-frontage` instance's position, finds the densest ~6%
