@@ -82,6 +82,30 @@ real time to get right and the next session should not rebuild them.
                 road census reports a world that will not build as a quiet
                 `SKIP` in the middle of its results. Run it over the town list
                 after any change to a shared builder.
+- `beamlook.mjs` the lamp rig from EVERY camera the game has. Drives the game's
+                own `_updateCamera` per mode on a night world, then diffs the
+                frame with the rig hidden against the frame with it shown, and
+                reports what the lamps actually add. `NOFADE=1` pins the
+                material to its unfaded value for the baseline, in the same
+                frame rather than from memory; `PORTRAIT=1` uses a phone
+                viewport; `KEEPA=1` also writes the no-rig frame.
+- `wedge.mjs`   the same question as a road metric: pixels in the band ahead of
+                the nose sitting more than 22 above the road's own median.
+                Weaker than `beamlook` on a neon world, where the emissive edge
+                lines dominate the band — kept for daylight-road work.
+- `conehunt.mjs` / `conehunt2.mjs` naming an artefact painted ON the road.
+                `conehunt` rules out the shadow machinery (cast off, frustum
+                2.5x, re-bias); `conehunt2` hides one object at a time and
+                scores on the wedge metric, skipping the road itself. Scored on
+                frame-wide brightness instead, the hunt names `road` and stops,
+                because on a neon world the bright pixels ARE the road's
+                emissive lines.
+- `roadgloss.mjs` sweeps the wet road's roughness and envMapIntensity at the
+                worst point on the lap. Its lesson is a negative one: roughness
+                0.52 → 0.92 moved bright pixels 0.88% → 0.86% and only darkened
+                the surface, and no env map is bound at all.
+- `nightroad.mjs` the road material and every light that reaches it on a dark
+                world, plus how much of the frame clips.
 - `facadeshot.mjs` the buildings framed WHERE THEY STAND. The old-town
                 frontage does not line the whole lap — this reads every
                 `oldtown-frontage` instance's position, finds the densest ~6%
@@ -187,8 +211,13 @@ real time to get right and the next session should not rebuild them.
 - `keep.sh`     keeps a server alive across tool-call timeouts:
                 `setsid ./keep.sh srv.mjs 8920 &`
 
-Two rules learned the hard way, both in HANDOVER.md in full:
+Three rules learned the hard way, all in HANDOVER.md in full:
 1. Baseline against pristine `origin/main` on a second port, or you cannot tell
    a regression from a pre-existing failure.
-2. Traffic runs on its OWN requestAnimationFrame — a fixed-step `g.frame()`
+2. `srv.mjs` takes its root from `argv[3]` and DEFAULTS TO THE WORKING TREE,
+   whatever the CWD. `cd`-ing into a worktree and starting it there serves your
+   own branch on both ports — the page loads, the game runs, the numbers look
+   plausible, and the A/B is worthless. Pass the root explicitly and check with
+   `curl <port>/src/<file> | grep`.
+3. Traffic runs on its OWN requestAnimationFrame — a fixed-step `g.frame()`
    harness never drives it, and its clock runs ~1/8 real time under swiftshader.

@@ -258,6 +258,52 @@ function _wedgeGeo(w, h, d, { frontDrop = 0, frontBack = 0, backDrop = 0, backFw
   return geo;
 }
 
+/** ONE MATERIAL FOR EVERY CAR'S LAMPS.
+ *
+ *  Nothing about it varies per car, and `fadeCarLights` has to write it every
+ *  frame — eight cars meant eight identical writes and eight copies of the
+ *  same glow texture. It is a module singleton, which also means
+ *  `_dropCarMesh` must not dispose it (see the guard there).
+ */
+export const CAR_LIGHT_OPACITY = 0.85;
+let _carLightMat = null;
+export function carLightMaterial() {
+  if (_carLightMat) return _carLightMat;
+  _carLightMat = new THREE.MeshBasicMaterial({
+    map: glowTexture(), vertexColors: true, transparent: true,
+    opacity: CAR_LIGHT_OPACITY, blending: THREE.AdditiveBlending,
+    depthWrite: false, side: THREE.DoubleSide, fog: false,
+  });
+  return _carLightMat;
+}
+
+const _fadeV = new THREE.Vector3();
+/** THE BEAM IS A FLAT QUAD LYING ON THE ROAD, so how much of it the camera
+ *  sees is decided entirely by how steeply the camera looks down.
+ *
+ *  Reported from a phone on the TOP-DOWN view: a blown-out white wedge four
+ *  car-lengths long washing out the carriageway. The rig was tuned from CHASE,
+ *  where the same quad is seen at a 13 degrees grazing angle and reads as a
+ *  soft pool; from 46 u up it presents its whole area to the lens and an
+ *  additive quad over dark tarmac saturates to paper white.
+ *
+ *  Camera elevation is the whole of it — the downward component of the view
+ *  direction runs 0.03 in the driver's seat, 0.22 on CHASE, 0.56 on TRAIL and
+ *  0.82 on TOP FAR — so the fade is driven straight off that. The LAMP and
+ *  TAIL quads fade with it, which costs nothing: they are vertical, so from
+ *  overhead they are edge-on anyway, and each car's own modelled lenses (the
+ *  `tailMat` bars) are solid geometry and untouched.
+ */
+export function fadeCarLights(camera) {
+  if (!_carLightMat || !camera) return;
+  const down = Math.abs(_fadeV.set(0, 0, -1).applyQuaternion(camera.quaternion).y);
+  const k = 1 - THREE.MathUtils.smoothstep(down, 0.28, 0.74) * CAR_LIGHT_TOPDOWN_CUT;
+  _carLightMat.opacity = CAR_LIGHT_OPACITY * k;
+}
+/** How much of the beam is taken away looking straight down. Measured, not
+ *  guessed — see `tools-scratch/beamlook.mjs`. */
+export const CAR_LIGHT_TOPDOWN_CUT = 0.72;
+
 export function buildVoxelRacer(spec) {
   const { body, accent, stripe = null, number = null, style = 'crown', rims = null } = spec;
   const g = new THREE.Group();
@@ -980,11 +1026,7 @@ export function buildVoxelRacer(spec) {
     lg.setAttribute('position', new THREE.Float32BufferAttribute(LP, 3));
     lg.setAttribute('uv', new THREE.Float32BufferAttribute(LU, 2));
     lg.setAttribute('color', new THREE.Float32BufferAttribute(LC, 3));
-    const lights = new THREE.Mesh(lg, new THREE.MeshBasicMaterial({
-      map: glowTexture(), vertexColors: true, transparent: true, opacity: 0.85,
-      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-      fog: false,
-    }));
+    const lights = new THREE.Mesh(lg, carLightMaterial());
     lights.name = 'carLights';
     lights.renderOrder = 3;
     // A BEAM IS LIGHT, NOT BODYWORK, and this is the line that says so to

@@ -13,7 +13,7 @@ import { WorldEditor } from './editor.js';
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
   tyreClass, tyreMaxClass, tyreLevelFor, TYRE_LABEL, tyrePenalty,
-  applyUpgradeKit, buildPartIcon, worldIsDark } from './vehicles.js';
+  applyUpgradeKit, buildPartIcon, worldIsDark, fadeCarLights } from './vehicles.js';
 import { Chopper } from './choppers.js';
 import { GunNest, Raider } from './hostiles.js';
 import { Weapons } from './weapons.js';
@@ -4703,7 +4703,11 @@ class Game {
     const inKit = (o) => { for (let n = o; n; n = n.parent) if (n === kit) return true; return false; };
     mesh.traverse((o) => {
       if (o.geometry) o.geometry.dispose?.();
-      if (!o.material || (kit && inKit(o))) return;
+      // ...and NOT the lamp rig's material either. It is a module singleton
+      // shared by every car in the game (vehicles.js `carLightMaterial`), so
+      // disposing one bay car's copy would blank the headlights on all of
+      // them — the same trap as the upgrade kit's shared materials above.
+      if (!o.material || (kit && inKit(o)) || o === mesh.userData?.carLights) return;
       for (const m of (Array.isArray(o.material) ? o.material : [o.material])) m.dispose?.();
     });
   }
@@ -9760,6 +9764,11 @@ class Game {
       }
     }
     this.camera.rotation.z += this._camRoll + bank;
+    // THE HEADLIGHT BEAMS ARE FLAT ON THE ROAD, so what the lens sees of them
+    // depends on how steeply it looks down — and this is the one place every
+    // camera mode, the seat included, ends up. Cheap: one write to one shared
+    // material for the whole grid.
+    fadeCarLights(this.camera);
     // keep the shadow light rig centered on the player (offset = theme sun dir)
     this.moon.position.copy(p.pos).add(this._sunOffset);
     this.moon.target.position.copy(p.pos);

@@ -2634,3 +2634,68 @@ looking at. A painted contact disc on the pivot grounds the machine without
 touching the lighting, which is what a product shot does. The shadow camera
 went back to a tight +-10 at 1024 (0.02 u/texel) now that the dark wedge it had
 been widened to +-22 for is known to have been the floor's own edge.
+
+## r257 — THE BEAM FROM EVERY CAMERA, NOT JUST THE ONE I TUNED IT ON
+A phone shot of a night race: a pale wedge fanning up the carriageway from the
+car's nose, washing the road out. The rig from r256, seen from a camera it was
+never checked against.
+
+### THE FADE
+A headlight beam is a FLAT QUAD LYING ON THE ROAD, so how much of it the lens
+sees is decided entirely by how steeply the lens looks down. CHASE, the one
+view r256 was tuned from, sees it at a 13-degree grazing angle and gets a soft
+pool. TOP-DOWN sees the same quad face-on from 46 u up, and an additive quad
+over dark tarmac saturates.
+
+`fadeCarLights(camera)` takes the downward component of the view direction —
+0.03 in the seat, 0.22 on CHASE, 0.56 on TRAIL, 0.82 on TOP FAR — and smooth-
+steps 72% of the rig's opacity away between 0.28 and 0.74. Measured by
+`tools-scratch/beamlook.mjs`, which drives the GAME's own `_updateCamera` for
+each mode and diffs the frame with the rig hidden against the frame with it
+shown. What the rig ADDS, before → after:
+
+    TOP-DOWN   mean +71 → +27   peak 395 → 111
+    TOP FAR    mean +29 → +14   peak 209 →  59
+    TRAIL      mean +77 → +45   peak 607 → 320
+    CHASE / CHASE FAR / DRIVER   unchanged
+
+The lamps and tail lenses fade with the beam, and that costs nothing: they are
+vertical quads, edge-on from overhead, and each car's own modelled `tailMat`
+bars are solid geometry the fade never touches.
+
+### AND THE MATERIAL IS ONE OBJECT NOW
+The fade has to be written every frame. Nothing about the lamp material varies
+per car, so it is a module singleton (`carLightMaterial`) — one write for the
+whole grid instead of eight, and one glow texture instead of eight. `visible`
+stays per mesh, which is what the per-world switch needs. `_dropCarMesh` grew
+an exclusion to go with it: it disposes the materials of everything outside the
+upgrade kit, and disposing one bay car's copy would now blank the headlights on
+every car in the game — the same trap the kit's shared materials carry.
+
+### FOUR WRONG ANSWERS, AND WHAT KILLED EACH
+Worth writing down, because each looked right:
+
+1. **"It is the road's specular lobe."** A wet road is roughness 0.52, and the
+   comment above it records this exact failure being fixed once already. Swept
+   roughness 0.52 → 0.92 and envMapIntensity 0.75 → 0.35 at the worst point on
+   the lap: bright pixels moved from 0.88% to 0.86%. Roughness only darkened
+   the road (mean 31 → 17); it never touched the highlight. There is no env map
+   bound at all, so that lever was doing nothing whatever.
+2. **"It is the shadow frustum's edge."** The shadow camera follows the player,
+   which fits an artefact anchored to the car. Turning `moon.castShadow` off,
+   scaling the frustum 2.5x and re-biasing all left the wedge at 31528 pixels
+   against a base of 31528.
+3. **"The deployed build has it too, so it is not mine."** It does not. The
+   probe was pointed at port 8902 with a gh-pages worktree as its CWD — and
+   `srv.mjs` takes its root from `argv[3]`, defaulting to the working tree
+   whatever the CWD. Port 8902 was serving MY branch. Served properly on 8903,
+   r245 has no `carLights` and no wedge, mid-lap or on the grid.
+4. **"Hide every additive object and see what goes."** The first hunt scored on
+   frame-wide bright pixels, and on a neon world those are the road's emissive
+   edge lines — so it named `road` and stopped. Scored on the wedge itself
+   (road pixels above the road's OWN median in the band ahead of the nose) the
+   same sweep names `carLights` at 46% on the first pass.
+
+CHECK THE PROBE'S ROOT BEFORE BELIEVING A BASELINE. An A/B against a pristine
+build is worth nothing if both ports serve the same tree, and it fails silently
+— the page loads, the game runs, the numbers look plausible.
