@@ -4602,12 +4602,23 @@ class Game {
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     const scene = new THREE.Scene();
-    const cam = new THREE.PerspectiveCamera(32, 1.6, 0.1, 120);
+    // FAR 600, NOT 120. The diorama's sky dome is at 210 u and its far treeline
+    // at 150, and at a far plane of 120 both were clipped away entirely — which
+    // is what 7-9% of the bay rendering TRANSPARENT actually was, and why
+    // replacing a flat backdrop with a cylinder and then a dome moved the
+    // number not at all. Two backdrops were redesigned before the camera was
+    // asked whether it could see either of them.
+    const cam = new THREE.PerspectiveCamera(32, 1.6, 0.1, 600);
 
     // ---- THE TRAIL IN THE PINES. See `_diorama`: the bay is a place in the
     // game's own world now, not a painted room, and the repaint-for-contrast,
     // the moving wall band and the coloured back lamps went with the room.
     scene.add(this._diorama());
+    // DEPTH COMES FROM AIR. Every world in this game is fogged (`THEMES.forest`
+    // runs 320 to 1500); without it a 160 u wood is a flat wall of identical
+    // cones and the near trees read the same as the far. Scaled to the
+    // diorama and starting well beyond the car, which sits 10 u out.
+    scene.fog = new THREE.Fog(0xd2e2cc, 46, 185);
 
     // Forest light, straight off `THEMES.forest`: a warm sun a little over
     // the shoulder, a cool sky bounce, green off the ground.
@@ -5033,35 +5044,58 @@ class Game {
     let seed = 20260823;
     const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
 
-    // --- sky and the far treeline, painted into one unlit plane ------------
-    // The distant wood is drawn rather than built: at 150 u back it is a
+    // --- the sky, and the far treeline ------------------------------------
+    //
+    // A DOME, NOT A PANEL AND NOT A BAND. Measured twice: a flat plane behind
+    // the origin left 7.4% of the bay rendering TRANSPARENT — a hole in the
+    // sky with the dark panel showing through — because the camera looks in
+    // from +x +z and at 150 u back its view axis is a hundred metres off to
+    // one side. An open-topped cylinder was worse at 9.6%, since the frame
+    // reaches over its rim. A sphere seen from inside has no edge to miss.
+    const skyC = document.createElement('canvas');
+    skyC.width = 8; skyC.height = 256;
+    const s2 = skyC.getContext('2d');
+    const sky = s2.createLinearGradient(0, 0, 0, 256);
+    sky.addColorStop(0, '#2f7ac8');
+    sky.addColorStop(0.42, '#549ad8');
+    sky.addColorStop(0.74, '#9cc4de');
+    sky.addColorStop(1, '#cfe0cc');
+    s2.fillStyle = sky; s2.fillRect(0, 0, 8, 256);
+    const skyTex = new THREE.CanvasTexture(skyC);
+    skyTex.colorSpace = THREE.SRGBColorSpace;
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(210, 24, 16),
+      new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide,
+        toneMapped: false, depthWrite: false, fog: false }));
+    dome.renderOrder = -2;
+    g.add(dome);
+
+    // The far wood is DRAWN, on a ring inside the dome: at 150 u back it is a
     // silhouette and nothing more, and a hundred more cones for it would cost
     // draw calls on the phone this menu is for.
     const cv = document.createElement('canvas');
-    cv.width = 512; cv.height = 256;
+    cv.width = 1024; cv.height = 128;
     const x = cv.getContext('2d');
-    const sky = x.createLinearGradient(0, 0, 0, 190);
-    sky.addColorStop(0, '#3f8de0');
-    sky.addColorStop(0.62, '#9fc8e8');
-    sky.addColorStop(1, '#e8f0d8');
-    x.fillStyle = sky; x.fillRect(0, 0, 512, 200);
-    x.fillStyle = '#e8f0d8'; x.fillRect(0, 190, 512, 66);
-    for (const [band, col, base, hi] of [[0, '#6f9a72', 196, 22], [1, '#4a7a52', 206, 30],
-      [2, '#315c3c', 218, 38]]) {
+    x.clearRect(0, 0, 1024, 128);
+    for (const [band, col, base, hi] of [[0, '#7ea882', 74, 30], [1, '#547f5a', 92, 40],
+      [2, '#365f40', 112, 50]]) {
       x.fillStyle = col;
       x.beginPath();
-      x.moveTo(0, 256);
-      for (let px = -10; px < 522; px += 9 + band * 3) {
+      x.moveTo(0, 128);
+      for (let px = -10; px < 1034; px += 9 + band * 3) {
         const h = base - hi * (0.45 + rnd() * 0.55);
         x.lineTo(px, h); x.lineTo(px + (5 + band * 2), base);
       }
-      x.lineTo(522, 256); x.closePath(); x.fill();
+      x.lineTo(1034, 128); x.closePath(); x.fill();
     }
     const backTex = new THREE.CanvasTexture(cv);
     backTex.colorSpace = THREE.SRGBColorSpace;
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(520, 210),
-      new THREE.MeshBasicMaterial({ map: backTex, toneMapped: false, depthWrite: false }));
-    back.position.set(0, 70, -150);
+    backTex.wrapS = THREE.RepeatWrapping;
+    backTex.repeat.set(2.5, 1);
+    const back = new THREE.Mesh(
+      new THREE.CylinderGeometry(150, 150, 52, 48, 1, true),
+      new THREE.MeshBasicMaterial({ map: backTex, side: THREE.BackSide,
+        transparent: true, toneMapped: false, depthWrite: false, fog: false }));
+    back.position.set(0, 26, 0);
     back.renderOrder = -1;
     g.add(back);
 
@@ -5072,19 +5106,56 @@ class Game {
     ground.position.y = -0.02;
     ground.receiveShadow = true;
     g.add(ground);
+    // The trail is PAINTED, not a flat fill: two wheel ruts, gravel speckle and
+    // a few damp patches, on a texture that repeats down its length. A plain
+    // tan plane with a razor edge was the one thing in this picture that said
+    // "placed in a hurry".
+    const tc = document.createElement('canvas');
+    tc.width = 128; tc.height = 256;
+    const t2 = tc.getContext('2d');
+    t2.fillStyle = '#9c7a48'; t2.fillRect(0, 0, 128, 256);
+    for (const [rx, rw] of [[30, 20], [78, 20]]) {
+      const rg = t2.createLinearGradient(rx, 0, rx + rw, 0);
+      rg.addColorStop(0, 'rgba(120,92,52,0)');
+      rg.addColorStop(0.5, 'rgba(112,86,50,0.55)');
+      rg.addColorStop(1, 'rgba(120,92,52,0)');
+      t2.fillStyle = rg; t2.fillRect(rx, 0, rw, 256);
+    }
+    for (let i = 0; i < 420; i++) {                  // gravel
+      const v = 130 + (rnd() * 70 | 0);
+      t2.fillStyle = `rgba(${v},${v - 18},${v - 46},${0.2 + rnd() * 0.35})`;
+      t2.fillRect(rnd() * 128, rnd() * 256, 1 + rnd() * 2, 1 + rnd() * 2);
+    }
+    for (let i = 0; i < 14; i++) {                   // damp patches
+      t2.fillStyle = `rgba(96,74,44,${0.10 + rnd() * 0.14})`;
+      t2.beginPath();
+      t2.ellipse(rnd() * 128, rnd() * 256, 6 + rnd() * 16, 4 + rnd() * 10, rnd() * 3, 0, 6.3);
+      t2.fill();
+    }
+    const trailTex = new THREE.CanvasTexture(tc);
+    trailTex.wrapS = trailTex.wrapT = THREE.RepeatWrapping;
+    trailTex.repeat.set(1, 14);
+    trailTex.anisotropy = 4;
+    trailTex.colorSpace = THREE.SRGBColorSpace;
     const trail = new THREE.Mesh(new THREE.PlaneGeometry(10.5, 300),
-      new THREE.MeshStandardMaterial({ color: F.dirt, roughness: 1 }));
+      new THREE.MeshStandardMaterial({ map: trailTex, roughness: 1 }));
     trail.rotation.x = -Math.PI / 2;
     trail.position.set(0, 0.005, -40);
     trail.receiveShadow = true;
     g.add(trail);
-    for (const rx of [-2.9, 2.9]) {
-      const rut = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 300),
-        new THREE.MeshStandardMaterial({ color: F.rut, roughness: 1,
-          transparent: true, opacity: 0.55 }));
-      rut.rotation.x = -Math.PI / 2;
-      rut.position.set(rx, 0.012, -40);
-      g.add(rut);
+    // ...and the edge is BROKEN. A straight boundary between dirt and grass is
+    // a line no trail has: these are worn patches straddling it.
+    const scuffs = [];
+    for (let i = 0; i < 46; i++) {
+      const side = i % 2 ? 1 : -1;
+      const w = 1.4 + rnd() * 3.4, d = 1.6 + rnd() * 4;
+      const sx = side * (5.25 + (rnd() - 0.35) * 2.2);
+      const sz = -70 + rnd() * 96;
+      const q = new THREE.PlaneGeometry(w, d);
+      q.rotateX(-Math.PI / 2);
+      q.rotateY(rnd() * 3);
+      q.translate(sx, 0.008, sz);
+      scuffs.push(q);
     }
 
     // --- the pines ---------------------------------------------------------
@@ -5151,8 +5222,24 @@ class Game {
       out.computeVertexNormals();
       return out;
     };
+    // Tufts LINING THE TRAIL, not sprinkled over the field. The first cut put
+    // 150 small ones across nine metres of verge: 1800 triangles — 22% of the
+    // whole diorama's geometry — for 1.4% of the frame, because at this camera
+    // distance a 0.75 u blade is two pixels. Ninety, half again as tall, and
+    // held inside four metres of the edge where the eye is already looking.
+    const tufts = [];
+    const tuftGeo = new THREE.ConeGeometry(0.3, 1.15, 4);
+    tuftGeo.translate(0, 0.57, 0);
+    for (let i = 0; i < 90; i++) {
+      const side = i % 2 ? 1 : -1;
+      const gx = side * (5.5 + rnd() * 4.2);
+      const gz = -58 + rnd() * 82;
+      const sc = 0.9 + rnd() * 1.0;
+      put(tufts, tuftGeo, sc, sc * (0.85 + rnd() * 0.8), sc, gx, 0, gz, rnd() * 3);
+    }
     for (const [geos, col, flat] of [[trunks, F.trunk, false], [lows, F.low, true],
-      [tops, F.top, true], [rocks, F.rock, true], [bushes, F.bush, true]]) {
+      [tops, F.top, true], [rocks, F.rock, true], [bushes, F.bush, true],
+      [tufts, 0x5e8f3e, true], [scuffs, F.dirt, false]]) {
       const m = new THREE.Mesh(weld(geos),
         new THREE.MeshStandardMaterial({ color: col, roughness: 0.95, flatShading: flat }));
       m.receiveShadow = true;
@@ -5261,7 +5348,7 @@ class Game {
    */
   _shoot(mesh, w, h, { dist = 8.7, look = 0.55, ground = false } = {}) {
     const st = this._studio(w, h);
-    const cam = new THREE.PerspectiveCamera(30, w / h, 0.1, 120);
+    const cam = new THREE.PerspectiveCamera(30, w / h, 0.1, 600);  // see `_stage`
     cam.position.set(5.2, 3.2, 6.2).normalize().multiplyScalar(dist);
     cam.lookAt(0, look, 0);
     st.scene.add(mesh);

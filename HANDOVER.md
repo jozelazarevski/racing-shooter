@@ -2898,3 +2898,42 @@ A photograph on a trail wants the trail in it.
 
 Part icons keep the plain sweep. A gearbox held up to the light does not stand
 on a rally trail, and a wood behind a 40 px chip is noise.
+
+## r262 — THE FAR PLANE, AND TWO BACKDROPS REDESIGNED FOR NOTHING
+Iterating on r261's forest. The trail got a painted texture — two wheel ruts,
+gravel speckle, damp patches — and a broken edge, because a razor-straight line
+between dirt and grass is a line no trail has. The scene got FOG: every world
+in this game is fogged (`THEMES.forest` runs 320 to 1500) and without it a
+160 u wood is a flat wall of identical cones. Scaled to 46-185, starting well
+beyond the car at 10 u.
+
+### THE GRASS TUFTS, MEASURED
+`dioparts.mjs` hides each welded piece and counts the pixels that change, with
+its triangle count beside it. The first cut sprinkled 150 tufts across nine
+metres of verge: 1800 triangles — 22% of the whole diorama's geometry — for
+1.4% of the frame, because at this camera distance a 0.75 u blade is two
+pixels. Ninety, half again as tall, held within four metres of the trail edge:
+1080 triangles for 3.6%. Forty percent less geometry, two and a half times the
+effect.
+
+### AND THE ONE THAT WASTED THE ROUND
+A white wedge sat in the top corner of the bay. `bayblack.mjs` named it: 7.4%
+of the bay rendering TRANSPARENT — a hole with the dark panel showing through.
+The obvious reading is that the backdrop is too small, so:
+
+  1. the flat plane became a wrap-around CYLINDER, since the camera looks in
+     from +x +z and at 150 u back its view axis is a hundred metres off to one
+     side, so a plane centred on the origin wastes half its width. Measured
+     after: **9.6%. Worse.**
+  2. the cylinder became a sky DOME plus a separate treeline ring, because an
+     open-topped band still lets the frame reach over its rim. Measured after:
+     **9.6%. Identical, to the tenth.**
+
+A number that does not move AT ALL under two different fixes is not a tuning
+problem. The stage camera is `PerspectiveCamera(32, 1.6, 0.1, 120)` — FAR 120 —
+and the dome is at 210 with the treeline at 150. Both were clipped away
+entirely; the "far trees" visible all along were the built mask row at z -78.
+Far 600 on both stage and studio cameras: transparent 9.6% → **0**.
+
+ASK WHETHER THE CAMERA CAN SEE A THING BEFORE REDESIGNING IT. Two backdrops
+were rebuilt to fix a hole that neither of them was ever being drawn into.

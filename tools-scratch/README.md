@@ -175,6 +175,11 @@ real time to get right and the next session should not rebuild them.
 - `bayboth.mjs` the bay for a dark, a light and a mid car as three files. The
                 room is repainted from the car, so one screenshot proves
                 nothing.
+- `dioparts.mjs` what each welded piece of the garage diorama is worth: hide
+                it, count the pixels that change, and print its triangle count
+                beside them. It caught 150 grass tufts costing 1800 triangles —
+                22% of the diorama's geometry — for 1.4% of the frame, because
+                at that camera distance a 0.75 u blade is two pixels.
 - `bayblack.mjs` how much of the bay canvas is black, in a 4x4 grid so the
                 answer says WHICH part is unlit, with the scene graph beside
                 it. It is what showed the bay was already fine and sent the
@@ -243,6 +248,11 @@ real time to get right and the next session should not rebuild them.
 - `srv.mjs`     plain static server (`node srv.mjs 8920`).
 - `keep.sh`     keeps a server alive across tool-call timeouts:
                 `setsid ./keep.sh srv.mjs 8920 &`
+
+`bayblack.mjs`'s `transparentPct` is the gate for the garage backdrop: a
+diorama whose sky sits beyond the stage camera's FAR PLANE renders as a hole
+with the panel showing through, and it looks exactly like a backdrop that is
+merely too small.
 
 (`baycontrast.mjs` and `baylamps.mjs` are gone: they measured the painted
 room and its coloured lamps, and r261 replaced both with a forest.)
