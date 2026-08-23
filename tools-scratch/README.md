@@ -180,6 +180,17 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `farplane.mjs` every camera's near/far measured against the bounding sphere
+                of everything its scene draws — race, stage and studio in one
+                pass. Objects with `frustumCulled === false` are EXEMPT: the
+                particle pool parks its dead at y -9999 and draws
+                unconditionally, so its bounds sit ten thousand units out and
+                mean nothing. Run it before redesigning anything that looks
+                too small; twice now a backdrop was merely being clipped.
+- `diocost.mjs` what the garage diorama costs: geometries, materials, textures,
+                triangles, JS heap, and the wall-clock of building a SECOND
+                one. That last number is the sharing gate — 64.5 ms means each
+                scene builds its own forest, 0.1 ms means they share.
 - `bayblack.mjs` how much of the bay canvas is black, in a 4x4 grid so the
                 answer says WHICH part is unlit, with the scene graph beside
                 it. It is what showed the bay was already fine and sent the

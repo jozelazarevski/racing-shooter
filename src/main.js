@@ -5038,6 +5038,21 @@ class Game {
    *  behind the same car in two places on one screen.
    */
   _diorama() {
+    // BUILT ONCE, MOUNTED TWICE. The bay and the studio are separate scenes
+    // and a Mesh belongs to one parent, but the GEOMETRY and the MATERIALS
+    // behind it are the expensive half — four canvas textures and about seven
+    // thousand welded triangles — and those are shared. Without this the
+    // garage pays for two identical forests.
+    if (this.__dioParts) {
+      const g2 = new THREE.Group();
+      for (const [geo, mat] of this.__dioParts) {
+        const m = new THREE.Mesh(geo, mat);
+        m.receiveShadow = mat.__diorRecv !== false;
+        m.renderOrder = mat.__diorOrder ?? 0;
+        g2.add(m);
+      }
+      return g2;
+    }
     const F = { trunk: 0x6b4423, low: 0x2c6e2a, top: 0x3c8a34,
       grass: 0x4f8a35, dirt: 0x9c7a48, rut: 0x86663a, rock: 0x8d8578, bush: 0x2f7a30 };
     const g = new THREE.Group();
@@ -5245,6 +5260,14 @@ class Game {
       m.receiveShadow = true;
       g.add(m);
     }
+    // remember what was built, so the second scene mounts the same parts
+    this.__dioParts = [];
+    g.traverse((o) => {
+      if (!o.isMesh) return;
+      o.material.__diorRecv = o.receiveShadow;
+      o.material.__diorOrder = o.renderOrder;
+      this.__dioParts.push([o.geometry, o.material]);
+    });
     return g;
   }
 
@@ -5331,6 +5354,10 @@ class Game {
       const forest = this._diorama();
       forest.visible = false;
       scene.add(forest);
+      // THE SAME AIR AS THE BAY. Not only for the look — a material shared
+      // between a fogged scene and an unfogged one compiles a second program
+      // and swaps between them every time the other scene draws it.
+      scene.fog = new THREE.Fog(0xd2e2cc, 46, 185);
       st = this.__studio = { r, scene, sun, cam: null, sweep, contact, forest };
     }
     st.r.setSize(w, h);

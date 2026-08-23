@@ -2937,3 +2937,40 @@ Far 600 on both stage and studio cameras: transparent 9.6% → **0**.
 
 ASK WHETHER THE CAMERA CAN SEE A THING BEFORE REDESIGNING IT. Two backdrops
 were rebuilt to fix a hole that neither of them was ever being drawn into.
+
+## r263 — AUDIT EVERY CAMERA, THEN BUILD THE FOREST ONCE
+r262 ended on a rule: ask whether the camera can see a thing before redesigning
+it. `farplane.mjs` turns that rule into a probe. It walks every camera in the
+running game — race, stage, studio — and measures each one's near/far against
+the bounding sphere of everything its scene actually draws, so a clipped
+backdrop is a line of output instead of a round of guesswork.
+
+The first run flagged the race camera: near 0.5, far 3200, against something at
+**10 034**. It is not a bug. `src/particles.js:147` parks dead particles at
+`y = -9999` and sets `frustumCulled = false`, so the pool draws unconditionally
+and its bounding sphere sits ten thousand units out and means nothing. That
+flag is now the probe's exemption: an object that opts out of culling has opted
+out of this audit too. Stars checked by hand at r 2850 (`src/track.js:18837`),
+inside far 3200. With the exemption in, every camera comes back clean.
+
+### BUILT ONCE, MOUNTED TWICE
+The bay and the shelf-card studio are separate scenes, and a `Mesh` belongs to
+one parent, so each needed its own forest — and was building one. But the mesh
+is the cheap half. The GEOMETRY and the MATERIALS behind it are four canvas
+textures and about seven thousand welded triangles, and those are shareable.
+`_diorama()` now caches `[geometry, material]` pairs on first build and mounts
+fresh `Mesh` wrappers over them the second time; `_studio()` was given the bay's
+fog, because a material compiles a second shader program when the scene fog
+under it differs.
+
+`diocost.mjs`, before/after by `git stash`:
+
+```
+BEFORE  geometries 96  materials 45  textures 12  triangles 13113  2nd diorama 64.5 ms  mem 56.7 MB
+AFTER   geometries 85  materials 34  textures  9  triangles  7196  2nd diorama  0.1 ms  mem 54.4 MB
+```
+
+The second forest costs nothing now. Gates held: `pageerr.mjs` `game? true`,
+`bayblack.mjs` transparent 0% / mean luma 122, `boot.mjs` PASS 4/4, and the
+garage screenshots are pixel-identical — cars on the trail in the shelf cards
+and in the build bay, same as before.
