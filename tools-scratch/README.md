@@ -172,21 +172,6 @@ real time to get right and the next session should not rebuild them.
                 a green syntax check as `Identifier 'lamp' has already been
                 declared`, and every later probe just timed out waiting for a
                 game that was never going to exist.
-- `baylamps.mjs` where the bay's coloured lamps actually land and what each
-                one contributes: screen position, in-frame flag, and the pixel
-                delta from hiding it. It found both cool lamps sitting at
-                screen x 244% and 184% — the visible slice of the bay's 160 u
-                wall is about FOURTEEN world units wide, because the camera
-                sits off to +x and looks back across the origin.
-- `baycontrast.mjs` does the bay actually contrast with the car in it? Renders
-                every car in the catalogue, stencils the car by hiding
-                everything else, and reports the gap between its BODY (car
-                pixel P75 — the silhouette mean is half tyre and glass, and
-                says a white car is mid-grey) and the background. Also watches
-                the wall texture's offset over real frames, because "the
-                background moves" is either in the numbers or it is a comment.
-                `SWEEP=0.22,0.30,0.42` re-runs every car at those
-                `BAY_DARK_END` values; without it, a one-pass gate.
 - `bayboth.mjs` the bay for a dark, a light and a mid car as three files. The
                 room is repainted from the car, so one screenshot proves
                 nothing.
@@ -258,6 +243,9 @@ real time to get right and the next session should not rebuild them.
 - `srv.mjs`     plain static server (`node srv.mjs 8920`).
 - `keep.sh`     keeps a server alive across tool-call timeouts:
                 `setsid ./keep.sh srv.mjs 8920 &`
+
+(`baycontrast.mjs` and `baylamps.mjs` are gone: they measured the painted
+room and its coloured lamps, and r261 replaced both with a forest.)
 
 Three rules learned the hard way, all in HANDOVER.md in full:
 1. Baseline against pristine `origin/main` on a second port, or you cannot tell

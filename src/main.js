@@ -4604,157 +4604,37 @@ class Game {
     const scene = new THREE.Scene();
     const cam = new THREE.PerspectiveCamera(32, 1.6, 0.1, 120);
 
-    // ---- THE WORKSHOP. The mockup's car sits on a shop floor with light
-    // coming down on it, and that is most of why it reads as a garage rather
-    // than as a product shot. A floor, a back wall and a bay stripe are enough
-    // — anything more is scenery nobody looks at behind a car they do.
-    // A DARK CAR ON A DARK FLOOR IS A SILHOUETTE. Reported directly — "make
-    // the car stand out, make lighter background" — and the numbers agreed:
-    // the bay floor was 0x2b2018 and the wall 0x241a12, both darker than the
-    // black bodywork, wings and tyres that make up most of a built car. The
-    // shop is lit concrete now, and the car sits ON it rather than in a hole.
-    const floor = new THREE.Mesh(
-      // 90, not 46: at 46 the floor's own edge fell inside the frame on the
-      // wide side of the rig and the panel showed the empty scene past it as
-      // a dark strip down the picture
-      new THREE.PlaneGeometry(90, 90),
-      new THREE.MeshStandardMaterial({ color: 0x8b8073, roughness: 0.92, metalness: 0.05 }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.02;
-    floor.receiveShadow = true;
-    scene.add(floor);
-    // the painted bay outline the car is parked inside
-    const lines = [];
-    for (const sx of [-3.4, 3.4]) {
-      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 15),
-        new THREE.MeshBasicMaterial({ color: 0xf0bb4a, transparent: true, opacity: 0.8 }));
-      line.rotation.x = -Math.PI / 2;
-      line.position.set(sx, 0.01, 0);
-      scene.add(line);
-      lines.push(line);
-    }
-    // THE BACK WALL IN TWO BANDS, which is what a workshop actually has and —
-    // more to the point — gives a black roofline something pale to cut against
-    // while the wheels still sit against something darker than they are.
-    // 160 x 70, not 46 x 18. The wall's job is to be BEHIND the car from every
-    // angle the bay spins to, and at the original size its top and its left
-    // edge both fell inside the frame — the panel showed the empty scene past
-    // them as a black wedge with a hard diagonal edge, which is what the "make
-    // it lighter" report was partly looking at. A backdrop with a visible edge
-    // is not a backdrop.
-    const wallTex = this._bayWallTexture();
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(160, 70),
-      new THREE.MeshStandardMaterial({ color: 0xb2a695, roughness: 1, map: wallTex }));
-    wall.position.set(0, 30, -15);
-    scene.add(wall);
-    const dado = new THREE.Mesh(new THREE.PlaneGeometry(160, 3.2),
-      new THREE.MeshStandardMaterial({ color: 0x6b5f52, roughness: 1 }));
-    dado.position.set(0, 1.6, -14.95);
-    scene.add(dado);
+    // ---- THE TRAIL IN THE PINES. See `_diorama`: the bay is a place in the
+    // game's own world now, not a painted room, and the repaint-for-contrast,
+    // the moving wall band and the coloured back lamps went with the room.
+    scene.add(this._diorama());
 
-    scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x6a5238, 1.15));
-    const key = new THREE.DirectionalLight(0xfff3d6, 2.3);
+    // Forest light, straight off `THEMES.forest`: a warm sun a little over
+    // the shoulder, a cool sky bounce, green off the ground.
+    scene.add(new THREE.HemisphereLight(0xa8ccff, 0x4a7a34, 1.15));
+    const key = new THREE.DirectionalLight(0xfff0cc, 2.5);
     key.position.set(5, 9, 6);
     key.castShadow = true;
-    // 1024 over a TIGHT frustum. The dark wedge this was widened to +-22 for
-    // turned out to be the empty scene past the floor and wall edges, not the
-    // shadow sampler — and +-22 across 512 texels is 0.17 u per texel, which
-    // on a 6 m car is no contact shadow at all, so it floated. +-10 at 1024 is
-    // 0.02 u per texel, and with the car parked at the origin the frustum
-    // border is lit, so nothing clamps into shade. It only redraws while the
-    // garage tab is open.
+    // A TIGHT FRUSTUM ROUND THE CAR. The trail runs 300 u and the wood 160;
+    // a shadow camera that tried to cover them would have no resolution left
+    // for the one thing this screen is about. Only the car casts.
     key.shadow.mapSize.set(1024, 1024);
     key.shadow.camera.left = -10; key.shadow.camera.right = 10;
     key.shadow.camera.top = 10; key.shadow.camera.bottom = -10;
     key.shadow.camera.far = 40;
     key.shadow.normalBias = 0.02;
     scene.add(key);
-    const fill = new THREE.DirectionalLight(0x9fc8ff, 0.6);
+    const fill = new THREE.DirectionalLight(0xbcd8ff, 0.55);
     fill.position.set(-6, 4, -5);
     scene.add(fill);
-    // the shop lamp above the bay, which is what puts the warm pool on the roof
-    const lamp = new THREE.PointLight(0xffcf8a, 40, 18, 2);
-    lamp.position.set(0, 5.2, 1.5);
-    scene.add(lamp);
-    // AND A RIM FROM BEHIND. The car shelf's still-picture rig has had one
-    // since it was written, for exactly this reason: without it the polished
-    // faces have nothing to catch and a black wing reads as a hole. The live
-    // bay never got one, and it is the one screen whose whole job is to show
-    // you a car.
-    const rim = new THREE.DirectionalLight(0xffe0b0, 1.7);
+    // the rim off the trees behind, so a dark flank still has an edge
+    const rim = new THREE.DirectionalLight(0xffe0b0, 1.25);
     rim.position.set(-4, 5.5, -8);
     scene.add(rim);
 
-    // ---- THE COLOURED LIGHT IN THE BACK ------------------------------------
-    //
-    // Asked for directly — "make the background more eye pleasing, like a red
-    // light or something in the back". The repainted room solved the contrast
-    // and left a grey box; this is what makes it a place. Two lamps washing
-    // the back wall, warm on one side and cool on the other, which is how
-    // every configurator and every real photo booth is lit: the warm one
-    // carries the eye, the cool one keeps the shadow side from going dead.
-    //
-    // ADDITIVE QUADS, NOT LIGHTS. A PointLight far enough back to wash a
-    // 160 u wall would light the car too and undo the contrast work; these
-    // paint the wall and nothing else. `glowTexture` is the same soft radial
-    // the headlamps use, and the material's colour tints it, so both lamps
-    // cost one texture between them.
-    // A WASH PAINTS, A CORE ADDS. Additive alone was the first cut and it
-    // fails exactly where the room is palest: adding red to a near-white wall
-    // makes it whiter, not redder, so a dark car's bright room came out milky
-    // pink. The wash is NORMAL blending — it TINTS the wall whatever the wall
-    // is — and a small additive core sits inside it as the source itself.
-    const backLamp = (hex, x, y, w, h, op, add = false) => {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
-        new THREE.MeshBasicMaterial({ map: glowTexture(), color: hex,
-          transparent: true, opacity: op, depthWrite: false, toneMapped: false,
-          blending: add ? THREE.AdditiveBlending : THREE.NormalBlending }));
-      m.position.set(x, y, add ? -14.4 : -14.5);
-      m.renderOrder = add ? 2 : 1;
-      scene.add(m);
-      return m;
-    };
-    // POSITIONS ARE MEASURED, NOT PICKED. `baylamps.mjs` projects each lamp
-    // into the bay camera: the visible slice of a 160 u wall is about
-    // FOURTEEN world units wide, running x -17.5 to -3, because the camera
-    // sits off to +x and looks back across the origin. The first cut put the
-    // cool lamp at x +15, which is 244% of the way across the frame — it was
-    // contributing nothing but the far tail of its own falloff.
-    const warmLamp = backLamp(0xd8241a, -13, 4.2, 74, 48, 0.72);
-    const warmCore = backLamp(0xff5a2a, -13, 4.2, 26, 20, 0.5, true);
-    const coolLamp = backLamp(0x1f5fbe, -6.5, 3.0, 46, 34, 0.46);
-    // ...AND ON THE FLOOR, which is where the picture actually is. The wall is
-    // a thin band across the top of this frame — barely a sixth of it — so a
-    // lamp that only paints the wall has almost no canvas. The same two
-    // colours pool on the tarmac behind the car, under the bay lines and
-    // under the contact shadow so neither is tinted away.
-    const pool = (hex, x, z, w, d, op) => {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d),
-        new THREE.MeshBasicMaterial({ map: glowTexture(), color: hex,
-          transparent: true, opacity: op, depthWrite: false, toneMapped: false }));
-      m.rotation.x = -Math.PI / 2;
-      m.position.set(x, 0.004, z);
-      scene.add(m);
-      return m;
-    };
-    // Same mapping on the floor: x -6 lands mid-frame, and z closer to zero
-    // walks DOWN the picture toward the camera.
-    const warmPool = pool(0xc8201a, -8, -7.5, 36, 28, 0.72);
-    const coolPool = pool(0x1f5fbe, -2.5, -5.5, 26, 22, 0.5);
-    // ...and the car has to be IN that light, or the wall is a poster hanging
-    // behind it. A dim tinted rig either side, aimed forward from the wall.
-    const warmRim = new THREE.DirectionalLight(0xff5a34, 0.85);
-    warmRim.position.set(-7, 5, -11);
-    scene.add(warmRim);
-    const coolRim = new THREE.DirectionalLight(0x4a8ee0, 0.5);
-    coolRim.position.set(8, 3.5, -10);
-    scene.add(coolRim);
-
     const pivot = new THREE.Group();
     scene.add(pivot);
-    this.__stage = { cvs, r, scene, cam, pivot, spin: 0, sig: null, raf: 0, last: 0,
-      wall, floor, dado, wallTex, lines,
-      warmLamp, warmCore, coolLamp, warmPool, coolPool };
+    this.__stage = { cvs, r, scene, cam, pivot, spin: 0, sig: null, raf: 0, last: 0 };
     return this.__stage;
   }
 
@@ -4801,28 +4681,6 @@ class Game {
     mesh.traverse((o) => { if (o.isMesh) o.castShadow = o !== mesh.userData?.carLights; });
     st.car = mesh;
     st.pivot.add(mesh);
-    // THE ROOM IS REPAINTED FOR THE CAR. See `_bayPalette`.
-    if (st.wall) {
-      const pal = this._bayPalette(mesh.userData?.bodyMat?.color
-        ?? new THREE.Color(0x808080));
-      st.wall.material.color.copy(pal.wall);
-      st.floor.material.color.copy(pal.floor);
-      st.dado.material.color.copy(pal.dado);
-      // ...and the bay lines have to stay legible on it: gold on a pale room
-      // is nearly invisible, so they darken as the room lightens.
-      for (const o of st.lines ?? []) {
-        o.material.color.setHex(pal.lightCar ? 0xf0bb4a : 0x8a5f18);
-        o.material.opacity = pal.lightCar ? 0.8 : 0.95;
-      }
-      st.warmLamp.material.color.setHex(pal.warmHex);
-      st.warmCore.material.color.setHex(pal.warmHex);
-      st.coolLamp.material.color.setHex(pal.coolHex);
-      st.warmPool.material.color.setHex(pal.warmHex);
-      st.coolPool.material.color.setHex(pal.coolHex);
-      // the tick breathes AROUND these, so they are the amplitudes too
-      st.lampOp = { warm: pal.warmOp, cool: pal.coolOp,
-        warmPool: pal.warmPoolOp, coolPool: pal.coolPoolOp };
-    }
     // A CONTACT SHADOW, because the key light cannot give one here. The key
     // sits at (5, 9, 6) and the camera looks in from (6.4, 3.4, 7.6) — nearly
     // the same azimuth — so the cast shadow falls behind the car and the car
@@ -4877,10 +4735,12 @@ class Game {
     // THE MULTIPLIER IS MEASURED, NOT DERIVED. The small-angle fit above is a
     // long way out for a 6.4 m car seen from a 3/4 angle 10 m away — its near
     // end projects three times the size of its far end — so `bayfit.mjs`
-    // sweeps distance against the car's actual pixel box. 1.62 puts the
-    // machine at ~90% of the panel height and ~64% of its width: bold, with
-    // enough margin that the longest silhouette the spin turns to still fits.
-    const dist = Math.max(halfW / Math.tan(hfov / 2), halfH / Math.tan(vfov / 2)) * 1.62;
+    // sweeps distance against the car's actual pixel box.
+    //
+    // 2.0, up from the 1.62 that framed the car in a painted room. The bay is
+    // a place now, and a photograph on a rally trail wants the trail in it:
+    // at 1.62 the car sat on bare dirt with the wood cropped away above it.
+    const dist = Math.max(halfW / Math.tan(hfov / 2), halfH / Math.tan(vfov / 2)) * 2.0;
     st.cam.position.set(6.4, 3.4, 7.6).normalize().multiplyScalar(dist);
     st.cam.lookAt(0, mid.y * 0.9, 0);
     st.cam.updateProjectionMatrix();
@@ -4909,21 +4769,6 @@ class Game {
       st.last = t;
       st.spin += dt * 0.42;
       st.pivot.rotation.y = st.spin;
-      // the light crossing the wall — slow enough that it reads as a room
-      // being lit rather than as something happening
-      if (st.wallTex) st.wallTex.offset.x = (st.wallTex.offset.x - dt * 0.024) % 1;
-      // the lamps breathe, on two different periods so they never pulse in
-      // step — in step reads as a fault light, out of step reads as a room
-      st.glowT = (st.glowT ?? 0) + dt;
-      const op = st.lampOp;
-      if (op) {
-        const a = Math.sin(st.glowT * 0.55), b2 = Math.sin(st.glowT * 0.38 + 2);
-        st.warmLamp.material.opacity = op.warm + a * 0.07;
-        st.warmCore.material.opacity = op.warm * 0.7 + a * 0.12;
-        st.coolLamp.material.opacity = op.cool + b2 * 0.07;
-        st.warmPool.material.opacity = op.warmPool + a * 0.06;
-        st.coolPool.material.opacity = op.coolPool + b2 * 0.05;
-      }
       const w = st.cvs.clientWidth || 300;
       const h = st.cvs.clientHeight || 190;
       if (st.w !== w || st.h !== h || st.framedFor !== st.sig) {
@@ -5162,113 +5007,177 @@ class Game {
    *  for whatever the exposure, and `depthWrite: false` with a renderOrder
    *  behind everything so it can never occlude the subject.
    */
-  /** THE BAY WALL'S OWN TEXTURE, and the reason it moves.
+  /** THE FOREST THE CAR IS PARKED IN.
    *
-   *  A workshop wall that never changes is a backdrop; one with light crossing
-   *  it is a room. This is a wide soft band on white — white so the material's
-   *  own `color` carries the hue, and `RepeatWrapping` so the tick can drift
-   *  the offset and walk the band across the bay. Two bands per repeat, very
-   *  low contrast: the car is the subject, and a backdrop you look AT is a
-   *  worse failure than one you look past.
+   *  Asked for with a picture and "use this example 1:1": the garage's cars
+   *  stand on a rally trail in the pines, not in a studio. This replaces the
+   *  painted room of r259-r260 entirely — the repaint-for-contrast, the moving
+   *  wall band and the coloured back lamps are all gone with it, because a
+   *  photograph taken on the stage has no wall to light.
+   *
+   *  BUILT FROM THE GAME'S OWN NUMBERS. The silhouettes are `_buildTrees`'s
+   *  two-tier and three-tier pines (track.js), and every colour is lifted
+   *  straight out of `THEMES.forest` — trunk 0x6b4423, foliage 0x2c6e2a over
+   *  0x3c8a34, terrain 0x4f8a35 with 0x9c7a48 dirt, rock 0x8d8578. A backdrop
+   *  invented alongside the world it is meant to belong to is the one way this
+   *  could look wrong.
+   *
+   *  DETERMINISTIC. The shelf icons are rendered once and cached while the bay
+   *  is live, so a forest that reseeds per load would put a different wood
+   *  behind the same car in two places on one screen.
    */
-  _bayWallTexture() {
-    const c = document.createElement('canvas');
-    c.width = 512; c.height = 128;
-    const g = c.getContext('2d');
-    g.fillStyle = '#ffffff';
-    g.fillRect(0, 0, 512, 128);
-    for (const cx of [128, 384]) {
-      const grd = g.createLinearGradient(cx - 150, 0, cx + 150, 0);
-      grd.addColorStop(0, 'rgba(255,255,255,0)');
-      grd.addColorStop(0.5, 'rgba(255,255,255,1)');
-      grd.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = '#c9c1b4';
-      g.fillRect(cx - 150, 0, 300, 128);
-      g.globalCompositeOperation = 'lighter';
-      g.fillStyle = grd;
-      g.fillRect(cx - 150, 0, 300, 128);
-      g.globalCompositeOperation = 'source-over';
+  _diorama() {
+    const F = { trunk: 0x6b4423, low: 0x2c6e2a, top: 0x3c8a34,
+      grass: 0x4f8a35, dirt: 0x9c7a48, rut: 0x86663a, rock: 0x8d8578, bush: 0x2f7a30 };
+    const g = new THREE.Group();
+    let seed = 20260823;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+
+    // --- sky and the far treeline, painted into one unlit plane ------------
+    // The distant wood is drawn rather than built: at 150 u back it is a
+    // silhouette and nothing more, and a hundred more cones for it would cost
+    // draw calls on the phone this menu is for.
+    const cv = document.createElement('canvas');
+    cv.width = 512; cv.height = 256;
+    const x = cv.getContext('2d');
+    const sky = x.createLinearGradient(0, 0, 0, 190);
+    sky.addColorStop(0, '#3f8de0');
+    sky.addColorStop(0.62, '#9fc8e8');
+    sky.addColorStop(1, '#e8f0d8');
+    x.fillStyle = sky; x.fillRect(0, 0, 512, 200);
+    x.fillStyle = '#e8f0d8'; x.fillRect(0, 190, 512, 66);
+    for (const [band, col, base, hi] of [[0, '#6f9a72', 196, 22], [1, '#4a7a52', 206, 30],
+      [2, '#315c3c', 218, 38]]) {
+      x.fillStyle = col;
+      x.beginPath();
+      x.moveTo(0, 256);
+      for (let px = -10; px < 522; px += 9 + band * 3) {
+        const h = base - hi * (0.45 + rnd() * 0.55);
+        x.lineTo(px, h); x.lineTo(px + (5 + band * 2), base);
+      }
+      x.lineTo(522, 256); x.closePath(); x.fill();
     }
-    // a slow vertical fall as well, so the band is not a flat stripe
-    const vg = g.createLinearGradient(0, 0, 0, 128);
-    vg.addColorStop(0, 'rgba(255,255,255,0.12)');
-    vg.addColorStop(1, 'rgba(0,0,0,0.10)');
-    g.fillStyle = vg;
-    g.fillRect(0, 0, 512, 128);
-    const t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(2.2, 1);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
+    const backTex = new THREE.CanvasTexture(cv);
+    backTex.colorSpace = THREE.SRGBColorSpace;
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(520, 210),
+      new THREE.MeshBasicMaterial({ map: backTex, toneMapped: false, depthWrite: false }));
+    back.position.set(0, 70, -150);
+    back.renderOrder = -1;
+    g.add(back);
+
+    // --- the ground, and the trail cut through it -------------------------
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(420, 420),
+      new THREE.MeshStandardMaterial({ color: F.grass, roughness: 1 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.02;
+    ground.receiveShadow = true;
+    g.add(ground);
+    const trail = new THREE.Mesh(new THREE.PlaneGeometry(10.5, 300),
+      new THREE.MeshStandardMaterial({ color: F.dirt, roughness: 1 }));
+    trail.rotation.x = -Math.PI / 2;
+    trail.position.set(0, 0.005, -40);
+    trail.receiveShadow = true;
+    g.add(trail);
+    for (const rx of [-2.9, 2.9]) {
+      const rut = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 300),
+        new THREE.MeshStandardMaterial({ color: F.rut, roughness: 1,
+          transparent: true, opacity: 0.55 }));
+      rut.rotation.x = -Math.PI / 2;
+      rut.position.set(rx, 0.012, -40);
+      g.add(rut);
+    }
+
+    // --- the pines ---------------------------------------------------------
+    // POSITIONS ONLY, MERGED PER MATERIAL. Eighteen trees as separate meshes
+    // is fifty-four draw calls behind a menu; merged by part it is three.
+    const trunks = [], lows = [], tops = [], rocks = [], bushes = [];
+    const put = (arr, geo, sx, sy, sz, tx, ty, tz, ry = 0) => {
+      const q = geo.clone();
+      q.scale(sx, sy, sz);
+      if (ry) q.rotateY(ry);
+      q.translate(tx, ty, tz);
+      arr.push(q);
+    };
+    const trunkGeo = new THREE.CylinderGeometry(0.3, 0.52, 3.4, 6);
+    trunkGeo.translate(0, 1.7, 0);
+    const lowGeo = new THREE.ConeGeometry(2.6, 4.2, 8);
+    lowGeo.translate(0, 4.6, 0);
+    const topGeo = new THREE.ConeGeometry(1.8, 3.4, 8);
+    topGeo.translate(0, 7.2, 0);
+    for (let i = 0; i < 30; i++) {
+      const side = i % 2 ? 1 : -1;
+      const lane = 11.5 + rnd() * 24;
+      const tx = side * lane;
+      const tz = -58 + rnd() * 74;
+      const sc = 0.78 + rnd() * 0.85;
+      put(trunks, trunkGeo, sc, sc, sc, tx, 0, tz);
+      put(lows, lowGeo, sc, sc, sc, tx, 0, tz);
+      put(tops, topGeo, sc, sc, sc, tx, 0, tz);
+    }
+    // a mask row across the back, so the ground never meets the painted sky
+    for (let i = 0; i < 22; i++) {
+      const tx = -80 + i * 7.4 + rnd() * 3;
+      const sc = 1.1 + rnd() * 0.6;
+      put(trunks, trunkGeo, sc, sc, sc, tx, 0, -78 - rnd() * 12);
+      put(lows, lowGeo, sc, sc, sc, tx, 0, -78 - rnd() * 12);
+      put(tops, topGeo, sc, sc, sc, tx, 0, -78 - rnd() * 12);
+    }
+    // --- rocks and scrub along the trail edge ------------------------------
+    const rockGeo = new THREE.IcosahedronGeometry(1, 0);
+    const bushGeo = new THREE.SphereGeometry(1, 6, 4);
+    for (let i = 0; i < 16; i++) {
+      const side = i % 2 ? 1 : -1;
+      const rx = side * (6.6 + rnd() * 5);
+      const rz = -34 + rnd() * 44;
+      const sc = 0.5 + rnd() * 1.1;
+      put(rocks, rockGeo, sc * 1.3, sc * 0.72, sc * 1.1, rx, sc * 0.3, rz, rnd() * 3);
+    }
+    for (let i = 0; i < 14; i++) {
+      const side = i % 2 ? 1 : -1;
+      const bx = side * (7.5 + rnd() * 12);
+      const bz = -40 + rnd() * 50;
+      const sc = 0.8 + rnd() * 0.9;
+      put(bushes, bushGeo, sc * 1.5, sc * 0.85, sc * 1.4, bx, sc * 0.5, bz);
+    }
+    const weld = (geos) => {
+      const parts = geos.map((q) => (q.index ? q.toNonIndexed() : q));
+      let n = 0;
+      for (const q of parts) n += q.attributes.position.array.length;
+      const pos = new Float32Array(n);
+      let o = 0;
+      for (const q of parts) { pos.set(q.attributes.position.array, o); o += q.attributes.position.array.length; }
+      const out = new THREE.BufferGeometry();
+      out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      out.computeVertexNormals();
+      return out;
+    };
+    for (const [geos, col, flat] of [[trunks, F.trunk, false], [lows, F.low, true],
+      [tops, F.top, true], [rocks, F.rock, true], [bushes, F.bush, true]]) {
+      const m = new THREE.Mesh(weld(geos),
+        new THREE.MeshStandardMaterial({ color: col, roughness: 0.95, flatShading: flat }));
+      m.receiveShadow = true;
+      g.add(m);
+    }
+    return g;
   }
 
-  /** WHAT COLOUR THE BAY SHOULD BE FOR THIS CAR.
+  /** THE SWEEP BEHIND EVERY STUDIO PICTURE.
    *
-   *  A dark navy machine on a mid-grey floor is the report — the two sit at
-   *  the same value and the car has no edge. So the bay is not a fixed set:
-   *  it takes its lightness FROM the car and goes the other way, and shifts
-   *  its hue away from the car's so a warm car never stands on warm concrete.
-   *  Returns wall / floor / dado, always in that light-to-dark order so the
-   *  room still reads as a room.
+   *  Reported directly: "light up all background in the garage, so it is not
+   *  black". The build bay's own canvas measures a mean luminance of 121 and
+   *  is fine; the CARDS are the problem — the studio renders with `alpha:true`
+   *  and no backdrop at all, so every car and every part is a cut-out floating
+   *  on whatever is behind it, and behind it is a near-black panel. Measured
+   *  on the shelf: 20-31% of each icon's opaque pixels under luminance 34, on
+   *  a card darker still.
+   *
+   *  A photographer's answer, not a lighting one: a cyclorama. One unlit
+   *  gradient plane, light at the top and falling to a warmer floor tone, big
+   *  enough and far enough back to fill the frame at every distance the studio
+   *  shoots from. Unlit and untone-mapped so it is EXACTLY the colour asked
+   *  for whatever the exposure, and `depthWrite: false` with a renderOrder
+   *  behind everything so it can never occlude the subject.
    */
-  /** How dark the room goes for the brightest car, in linear lightness.
-   *
-   *  Swept in `baycontrast.mjs` against BODY brightness (car P75, not the
-   *  silhouette mean). Body-to-wall gap at 0.22 / 0.30 / 0.42:
-   *
-   *    sleek   67 / 51 / 33      dune    88 / 72 / 54
-   *    alpine  80 / 64 / 46      flatsix 35 / 18 /  0
-   *    brawler 19 / 30 / 44      crown, bastion, pit unaffected (pinned light)
-   *
-   *  0.42 makes the silver FLATSIX disappear into its own backdrop. 0.22 is
-   *  best for every light car and its only weak case is BRAWLER at 19 — an
-   *  orange body on a grey-green wall, where the hue offset carries a contrast
-   *  a luminance number cannot see.
-   */
-  BAY_DARK_END = 0.22;
-
-  _bayPalette(carColor) {
-    const hsl = { h: 0, s: 0, l: 0 };
-    carColor.getHSL(hsl);
-    // the car's own luminance, not its HSL lightness: a saturated yellow at
-    // l=0.5 is far brighter to the eye than a navy at the same l
-    const lum = 0.2126 * carColor.r + 0.7152 * carColor.g + 0.0722 * carColor.b;
-    const t = THREE.MathUtils.smoothstep(lum, 0.06, 0.5);   // 0 dark car, 1 light car
-    // Linear-space lightness — `setHSL` works in the renderer's working space,
-    // so BAY_DARK_END 0.22 lands around sRGB #7d and 0.80 around #e9. A
-    // near-white car needs a room to stand against, but the dark end stops
-    // well short of black: "not black" and "contrasting" are both in the brief
-    // and the second must not undo the first. Swept in `baycontrast.mjs`
-    // against the car's BODY brightness, not its silhouette mean — a mean that
-    // includes tyres and glass says a white car is mid-grey and sends the
-    // sweep the wrong way.
-    const wallL = THREE.MathUtils.lerp(0.80, this.BAY_DARK_END, t);
-    // push the room's hue a third of the wheel off the car's, and keep it
-    // barely saturated — this is concrete, not a colour wash
-    const h = (hsl.h + 0.36) % 1;
-    const sat = 0.05 + hsl.s * 0.05;
-    const mk = (l) => new THREE.Color().setHSL(h, sat, l);
-    // ---- and the coloured lamps that stand in this room --------------------
-    //
-    // A wash PAINTS, so a saturated red over a near-white wall does not just
-    // tint it, it DARKENS it — and the pale rooms are exactly the ones a dark
-    // car needs. Measured: the first cut cost BASTION 71 → 39 of body-to-wall
-    // gap and PIT 67 → 41. So a pale room gets a pale tint at a lighter touch,
-    // which colours it without spending its brightness.
-    const pale = 1 - t;                                  // 1 = the room is pale
-    const L = (a, b2) => THREE.MathUtils.lerp(a, b2, pale);
-    // A RED LIGHT BEHIND A RED CAR IS NO LIGHT AT ALL. On a warm hull the
-    // warm lamp goes crimson rather than orange-red, so the background stays
-    // a different hue family from the bodywork and the silhouette survives.
-    const warmCar = hsl.h < 0.12 || hsl.h > 0.92;
-    return { wall: mk(wallL), floor: mk(wallL * 0.78), dado: mk(wallL * 0.44),
-      lightCar: t > 0.5,
-      warmHex: pale > 0.5 ? 0xff8f78 : (warmCar ? 0xc8143c : 0xd8241a),
-      coolHex: pale > 0.5 ? 0x93b8ee : 0x1f5fbe,
-      warmOp: L(0.72, 0.50), coolOp: L(0.46, 0.38),
-      warmPoolOp: L(0.72, 0.42), coolPoolOp: L(0.50, 0.32) };
-  }
-
   _studioSweep() {
     const c = document.createElement('canvas');
     c.width = 4; c.height = 256;
@@ -5329,7 +5238,13 @@ class Game {
       contact.rotation.x = -Math.PI / 2;
       contact.visible = false;
       scene.add(contact);
-      st = this.__studio = { r, scene, sun, cam: null, sweep, contact };
+      // THE SAME FOREST THE BAY STANDS IN, for the CAR pictures. A part icon
+      // keeps the plain sweep — a gearbox held up to the light does not stand
+      // on a rally trail, and a wood behind a 40 px chip is noise.
+      const forest = this._diorama();
+      forest.visible = false;
+      scene.add(forest);
+      st = this.__studio = { r, scene, sun, cam: null, sweep, contact, forest };
     }
     st.r.setSize(w, h);
     return st;
@@ -5358,11 +5273,15 @@ class Game {
       st.contact.scale.set(sz.x * 1.3, sz.z * 1.15, 1);
       st.contact.position.set(bx.getCenter(new THREE.Vector3()).x, bx.min.y + 0.01, 0);
       st.contact.visible = true;
+      st.forest.visible = true;
+      st.sweep.visible = false;
     }
     st.r.render(st.scene, cam);
     const url = st.r.domElement.toDataURL();
     st.scene.remove(mesh);
     st.contact.visible = false;
+    st.forest.visible = false;
+    st.sweep.visible = true;
     return url;
   }
 

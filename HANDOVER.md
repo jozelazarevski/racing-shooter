@@ -2860,3 +2860,41 @@ instantiation error. The page never booted, and every probe after it timed out
 waiting for `window.__game` with no error anywhere in its output. `pageerr.mjs`
 answers "did it boot, and what stopped it" in ten seconds. RUN IT AFTER EVERY
 EDIT TO main.js — `node --check` IS NOT A GATE FOR THIS FILE.
+
+## r261 — THE GARAGE IS A PLACE IN THE GAME NOW
+A screenshot and four words: "use this example 1:1". The cars stand on a rally
+trail in the pines, in the shelf cards and in the build bay both.
+
+`_diorama()` builds it: painted sky with three bands of drawn treeline, a grass
+plane, a dirt trail with two ruts, fifty-two pines, sixteen rocks and fourteen
+bushes. It replaces the painted room of r259-r260 ENTIRELY — the
+repaint-for-contrast ramp, `BAY_DARK_END`, the moving wall band and the five
+coloured back lamps are all deleted, along with the two probes that measured
+them. A photograph taken on a trail has no wall to light.
+
+BUILT FROM THE GAME'S OWN NUMBERS, which is the whole of "1:1". The silhouettes
+are `_buildTrees`'s two-tier pine — trunk cylinder 0.3/0.52, cones 2.6x4.2 and
+1.8x3.4 — and every colour is lifted out of `THEMES.forest`: trunk 0x6b4423,
+foliage 0x2c6e2a under 0x3c8a34, ground 0x4f8a35, dirt 0x9c7a48, rock 0x8d8578.
+A backdrop invented alongside the world it is meant to belong to is the one way
+this could have looked wrong.
+
+Three things it is careful about:
+
+- **Deterministic.** One fixed LCG, not `Math.random`. The shelf icons are
+  rendered once and cached while the bay is live, so a forest that reseeded per
+  load would put a different wood behind the same car twice on one screen.
+- **Merged per material.** Fifty-two trees as separate meshes is 156 draw calls
+  behind a menu; welded by part it is three, plus one each for rocks and scrub.
+  The far treeline is PAINTED into the sky plane rather than built, because at
+  150 u back it is a silhouette and nothing else.
+- **Only the car casts.** The trail runs 300 u and the wood 160; a shadow
+  camera that covered them would have no resolution left for the one thing this
+  screen is about.
+
+The bay's framing multiplier went 1.62 to 2.0 with it. At 1.62 — tuned to fill
+a painted room — the car sat on bare dirt with the wood cropped away above it.
+A photograph on a trail wants the trail in it.
+
+Part icons keep the plain sweep. A gearbox held up to the light does not stand
+on a rally trail, and a wood behind a 40 px chip is noise.
