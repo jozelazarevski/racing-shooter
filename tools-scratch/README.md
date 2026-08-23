@@ -180,6 +180,14 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `dustlook.mjs` the turntable dust, PARKED. `bayshot2.mjs`'s SPIN is useless
+                for this: the next frame of the stage loop overwrites
+                `pivot.rotation.y` before the screenshot lands, so a puff
+                behind the rear wheels is never in shot. This one calls
+                `_stageRun(false)` first, then parks the pivot, then reads each
+                puff's opacity off the MATERIAL rather than recomputing the
+                curve — a probe carrying its own copy of the curve reports the
+                curve it was written against, not the one in the code.
 - `farplane.mjs` every camera's near/far measured against the bounding sphere
                 of everything its scene draws — race, stage and studio in one
                 pass. Objects with `frustumCulled === false` are EXEMPT: the

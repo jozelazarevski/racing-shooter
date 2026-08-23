@@ -2974,3 +2974,95 @@ The second forest costs nothing now. Gates held: `pageerr.mjs` `game? true`,
 `bayblack.mjs` transparent 0% / mean luma 122, `boot.mjs` PASS 4/4, and the
 garage screenshots are pixel-identical — cars on the trail in the shelf cards
 and in the build bay, same as before.
+
+## r264 — THE TRAIL, ITEM BY ITEM OFF THE REFERENCE
+A design breakdown of the Art of Rally trail arrived as a table — gravel
+surface, loose stones, motion dust, soft shadow, stacked pines, mossy roadside
+rock, dappled light — with "apply all above". Four of those the diorama already
+had (r261-263 built the painted gravel trail with its broken edge, the pines,
+the rocks, and the contact shadow under the car). This round is the other four.
+
+### LOOSE STONES: PAINTED GRAVEL IS FLAT
+The trail texture already had gravel speckled into it, and painted gravel has
+no lit edge, no shadow side, and turns with the surface instead of sitting on
+it. What makes a surface read as LOOSE is stone the key light can catch, so it
+gets geometry — squashed TETRAHEDRA and OCTAHEDRA, 4 and 8 triangles, because
+an icosahedron is 20 for a thing four pixels across.
+
+The first cut was one pale grey at 0.3 u and it read as **torn paper** scattered
+over the dirt. Two faults: gravel is not one colour, and a stone that never
+goes darker than its ground has no weight. Two tones, half the size (biggest is
+now 0.2 u — a fist beside a 4.4 u car), 150 of them held to the length of trail
+the bay camera actually frames. 752 triangles.
+
+### DAPPLED LIGHT: A GOBO, NOT A SHADOW
+Real dapple means the wood casting, and the key's shadow camera is a tight ±10
+box round the car precisely so the one thing this screen is about keeps its
+1024 px — widening it to cover a 160 u wood spends that resolution on trees.
+So the canopy is PAINTED and MULTIPLIED over the ground: white where the sun
+lands, cool grey where a branch is in the way, plus seven long soft bars for
+the trunks, which are what say the sun is low and off to one side. Multiply can
+only darken, so it can never blow out the trail.
+
+Two things it must have. `toneMapped: false`, or white stops being white and
+the whole plane reads as haze. And `fog: false` — the fog colour is 0xd2e2cc,
+which multiplies to a green-grey, so a fogged gobo TINTS the far ground
+instead of releasing it.
+
+**Two triangles, and hiding it changes 45.5% of the bay.** Best rate in the
+diorama by three orders of magnitude.
+
+It also costs a stop, which is what putting a scrim over a set does:
+`bayblack.mjs` mean luminance 122 → 106. So open up — stage exposure 1.28 →
+1.34, and 113 with the dapple in. The sky dome is `toneMapped: false` and does
+not move with the exposure; only the lit world comes back up.
+
+The shelf CARDS needed the same and are a different renderer: they came back at
+73-92 against part cards at 131-168. The compensation rides with the forest
+rather than with the renderer — `_shoot` lifts the studio to 1.42 only for
+`ground: true` and puts it back — because the part shots do not show the forest
+and must not move. Car icons 72-92 before this round → **79-100 after**, with a
+canopy shadow added.
+
+### DUST OFF THE TYRES, AND IT IS NOT A CHEAT
+The pivot turns the car at 0.42 rad/s with all four tyres planted, so they are
+scrubbing SIDEWAYS across loose gravel the whole time the screen is open. That
+throws dust. It is also the only moving thing in the picture that reports on
+the SURFACE rather than on the car, which is what dust behind a rally car is
+for. Flat-shaded icosahedra lit by the same key as everything else, so a puff
+has a bright face and a dark one and belongs to the scene.
+
+The first cut — ten puffs, 0.9 u, peak opacity 0.32 — parked what looked like a
+**boulder** against the rear tyre. One solid lump with a lit face and a dark
+one is a rock, whatever colour it is. Dust is a cluster, it is paler than the
+stone around it, and you can see through it: sixteen puffs at half the size,
+two-thirds the opacity, flattened to 0.55 in y so they hug the ground, and half
+a metre further back so they trail the wheel instead of touching it.
+
+`bayshot2.mjs`'s SPIN is useless here — the next frame of the stage loop
+overwrites `pivot.rotation.y` before the screenshot lands, so a puff behind the
+rear wheels is never in shot. `dustlook.mjs` stops the loop first.
+
+### MOSS, AND ROCKS THAT ARE ACTUALLY AT THE ROADSIDE
+The boulders sat 1.4 to 6 u off the dirt, out in the field, where a boulder is
+scenery. Brought in to straddle the 5.25 u trail edge they are what the outside
+of the corner is made of, which is the only reason a rock is interesting. The
+big ones wear moss on top — the one detail that says the rock has been there
+longer than the trail has. 240 triangles, and the weakest thing in the picture
+at 0.3% of the bay; kept because the reference names it and it is 2% of the
+geometry.
+
+### THE THIRD TIER, AND WHAT IT EXPOSED
+Two cones make a fir-shaped blob; the reference's pines are stacked skirts. A
+mid tier at 16 triangles a tree came in at **4.1% of the bay, 8.0 px/triangle**
+— five times the rate of the TOP tier it sits under, which `dioparts.mjs` then
+showed to be the worst thing in the diorama at **1.5 px/triangle**.
+
+Most of that waste was the mask row: 22 trees at z -78, behind fog, doing one
+job — stopping the ground from meeting the painted sky. The low and mid tiers
+make that silhouette; the crowns were triangles spent on nothing. Cut, 528
+triangles back, and the top tier's contribution fell 0.8% → 0.2%, which is the
+proof that the crowns nobody could see were most of what it was drawing.
+
+Net: 7196 → 8829 triangles, second diorama still 0.2 ms (the r263 sharing is
+intact), `bayblack.mjs` transparent 0%, `boot.mjs` 4/4, `farplane.mjs` clean.

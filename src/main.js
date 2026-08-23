@@ -4598,7 +4598,12 @@ class Game {
     const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: cvs });
     r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.28;
+    // 1.34, UP FROM 1.28. The canopy gobo is a multiply: it can only darken,
+    // and covering the ground with it cost the bay 16 points of mean
+    // luminance (`bayblack.mjs`: 122 -> 106) — which is exactly what putting a
+    // scrim over a set does. So open up. The sky dome is `toneMapped: false`
+    // and does not move with this; only the lit world comes back up.
+    r.toneMappingExposure = 1.34;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     const scene = new THREE.Scene();
@@ -4713,6 +4718,35 @@ class Game {
       st.contact.scale.set(sz.x * 1.35, sz.z * 1.15, 1);
       st.contact.position.set(b.getCenter(new THREE.Vector3()).x, 0.006, 0);
     }
+    // KICKED-UP DUST, and it is not a cheat. The pivot turns the car at
+    // 0.42 rad/s with all four tyres planted, so they are scrubbing SIDEWAYS
+    // across loose gravel the whole time this screen is open — which throws
+    // dust in the real world. It is also the only moving thing in the picture
+    // that reports on the SURFACE rather than on the car, which is what the
+    // dust behind a rally car is for.
+    //
+    // Polygonal, not a soft sprite: flat-shaded icosahedra, lit by the same
+    // key as everything else, so a puff has a bright face and a dark one and
+    // belongs to this scene instead of being pasted over it.
+    if (!st.dust) {
+      const geo = new THREE.IcosahedronGeometry(1, 0);
+      // SIXTEEN SMALL ONES, NOT TEN BIG ONES. The first cut peaked at 0.32
+      // opacity on a 0.9 u puff and the result sat against the rear tyre
+      // looking like a boulder someone had parked there — one solid lump with
+      // a lit face and a dark one is a ROCK, whatever colour it is. Dust is a
+      // cluster, it is paler than the stone around it, and you can see through
+      // it: half the size, two-thirds the opacity, and a good half-metre
+      // further back so it trails the wheel instead of touching it.
+      st.dust = [];
+      for (let i = 0; i < 16; i++) {
+        const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+          color: 0xd8c8ac, roughness: 1, flatShading: true,
+          transparent: true, opacity: 0, depthWrite: false }));
+        m.renderOrder = 2;                 // over the contact disc, under nothing
+        st.pivot.add(m);
+        st.dust.push({ m, t: i / 16, side: i % 2 ? 1 : -1, jx: 0, jz: 0 });
+      }
+    }
     if (st.cam.aspect) this._frameStage(st);
   }
 
@@ -4780,6 +4814,23 @@ class Game {
       st.last = t;
       st.spin += dt * 0.42;
       st.pivot.rotation.y = st.spin;
+      // the rear contact patches are fixed at (+/-1.3, -1.5) on every car in
+      // the catalogue (vehicles.js builds its wheels off that literal), so the
+      // emitters do not need to measure anything
+      for (const p of st.dust || []) {
+        p.t += dt * 0.58;
+        if (p.t >= 1) {
+          p.t -= 1;
+          p.jx = (Math.random() - 0.5) * 0.42;
+          p.jz = (Math.random() - 0.5) * 0.36;
+        }
+        const k = p.t, s = 0.085 + k * 0.30;
+        p.m.scale.set(s * 1.55, s * 0.55, s * 1.35);   // low and wide: it hugs the ground
+        p.m.position.set(p.side * (1.26 + k * 0.52) + p.jx, 0.05 + k * 0.26,
+          -1.78 + p.jz - k * 0.62);
+        p.m.rotation.set(k * 1.1, k * 1.7 * p.side, 0);
+        p.m.material.opacity = Math.sin(Math.PI * k) ** 1.4 * 0.26;
+      }
       const w = st.cvs.clientWidth || 300;
       const h = st.cvs.clientHeight || 190;
       if (st.w !== w || st.h !== h || st.framedFor !== st.sig) {
@@ -5053,8 +5104,9 @@ class Game {
       }
       return g2;
     }
-    const F = { trunk: 0x6b4423, low: 0x2c6e2a, top: 0x3c8a34,
-      grass: 0x4f8a35, dirt: 0x9c7a48, rut: 0x86663a, rock: 0x8d8578, bush: 0x2f7a30 };
+    const F = { trunk: 0x6b4423, low: 0x2c6e2a, mid: 0x347a2f, top: 0x3c8a34,
+      grass: 0x4f8a35, dirt: 0x9c7a48, rut: 0x86663a, rock: 0x8d8578, bush: 0x2f7a30,
+      moss: 0x4c7f33, stone: 0xb0a289, stoneDk: 0x82786a };
     const g = new THREE.Group();
     let seed = 20260823;
     const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
@@ -5173,10 +5225,66 @@ class Game {
       scuffs.push(q);
     }
 
+    // --- dappled light through the canopy ----------------------------------
+    // A GOBO, NOT A SHADOW. Real dapple would mean the wood casting, and the
+    // key's shadow camera is a tight +/-10 box round the car precisely so the
+    // one thing this screen is about keeps its 1024 px — widening it to cover
+    // a 160 u wood spends that resolution on trees nobody is looking at. So
+    // the canopy is painted and MULTIPLIED over the ground: white where the
+    // sun lands, cool grey where a branch is in the way. Multiply can only
+    // darken, so it can never blow out the trail, and it needs `toneMapped:
+    // false` or white stops being white and the whole plane reads as haze.
+    const dc = document.createElement('canvas');
+    dc.width = dc.height = 512;
+    const d2 = dc.getContext('2d');
+    d2.fillStyle = '#ffffff'; d2.fillRect(0, 0, 512, 512);
+    const blob = (cx, cy, r, a) => {
+      const rg = d2.createRadialGradient(cx, cy, 0, cx, cy, r);
+      rg.addColorStop(0, `rgba(122,140,150,${a})`);
+      rg.addColorStop(0.5, `rgba(154,168,176,${a * 0.6})`);
+      rg.addColorStop(1, 'rgba(255,255,255,0)');
+      d2.save();
+      d2.translate(cx, cy); d2.rotate(rnd() * 3); d2.scale(1, 0.5 + rnd() * 0.7);
+      d2.translate(-cx, -cy);
+      d2.fillStyle = rg;
+      d2.beginPath(); d2.arc(cx, cy, r, 0, 6.3); d2.fill();
+      d2.restore();
+    };
+    // kept off the border, so the plane's own rectangular edge is pure white
+    // and there is no line in the grass where the dapple stops
+    for (let i = 0; i < 19; i++) blob(70 + rnd() * 372, 70 + rnd() * 372, 34 + rnd() * 70, 0.72 + rnd() * 0.28);
+    for (let i = 0; i < 22; i++) blob(70 + rnd() * 372, 70 + rnd() * 372, 8 + rnd() * 18, 0.45 + rnd() * 0.35);
+    // ...and the long ones. A canopy throws round patches, but the TRUNKS
+    // throw bars right across the trail, and those are what tell you the sun
+    // is low and off to one side rather than straight overhead.
+    for (let i = 0; i < 7; i++) {
+      const bx = 60 + rnd() * 392, by = 60 + rnd() * 392, bl = 90 + rnd() * 150;
+      d2.save();
+      d2.translate(bx, by); d2.rotate(1.05 + (rnd() - 0.5) * 0.5);
+      const lg = d2.createLinearGradient(0, -bl / 2, 0, bl / 2);
+      lg.addColorStop(0, 'rgba(255,255,255,0)');
+      lg.addColorStop(0.5, 'rgba(128,146,156,0.62)');
+      lg.addColorStop(1, 'rgba(255,255,255,0)');
+      d2.fillStyle = lg;
+      d2.filter = 'blur(6px)';
+      d2.fillRect(-(7 + rnd() * 9), -bl / 2, 14 + rnd() * 18, bl);
+      d2.restore();
+    }
+    d2.filter = 'none';
+    const dapTex = new THREE.CanvasTexture(dc);
+    dapTex.colorSpace = THREE.SRGBColorSpace;
+    const dapple = new THREE.Mesh(new THREE.PlaneGeometry(46, 104),
+      new THREE.MeshBasicMaterial({ map: dapTex, transparent: true, fog: false,
+        blending: THREE.MultiplyBlending, depthWrite: false, toneMapped: false }));
+    dapple.rotation.x = -Math.PI / 2;
+    dapple.position.set(0, 0.014, -30);
+    g.add(dapple);
+
     // --- the pines ---------------------------------------------------------
     // POSITIONS ONLY, MERGED PER MATERIAL. Eighteen trees as separate meshes
     // is fifty-four draw calls behind a menu; merged by part it is three.
-    const trunks = [], lows = [], tops = [], rocks = [], bushes = [];
+    const trunks = [], lows = [], mids = [], tops = [], rocks = [], bushes = [],
+      moss = [], stones = [], stonesDk = [];
     const put = (arr, geo, sx, sy, sz, tx, ty, tz, ry = 0) => {
       const q = geo.clone();
       q.scale(sx, sy, sz);
@@ -5186,10 +5294,16 @@ class Game {
     };
     const trunkGeo = new THREE.CylinderGeometry(0.3, 0.52, 3.4, 6);
     trunkGeo.translate(0, 1.7, 0);
+    // THREE TIERS, NOT TWO. A pine in this style is stacked skirts, and two
+    // cones make a fir-shaped blob; the third is what turns the silhouette
+    // into something built. Measured at 16 triangles a tier — see the r264
+    // entry in HANDOVER.md for what it bought.
     const lowGeo = new THREE.ConeGeometry(2.6, 4.2, 8);
     lowGeo.translate(0, 4.6, 0);
-    const topGeo = new THREE.ConeGeometry(1.8, 3.4, 8);
-    topGeo.translate(0, 7.2, 0);
+    const midGeo = new THREE.ConeGeometry(2.15, 3.7, 8);
+    midGeo.translate(0, 6.3, 0);
+    const topGeo = new THREE.ConeGeometry(1.45, 3.0, 8);
+    topGeo.translate(0, 8.4, 0);
     for (let i = 0; i < 30; i++) {
       const side = i % 2 ? 1 : -1;
       const lane = 11.5 + rnd() * 24;
@@ -5198,6 +5312,7 @@ class Game {
       const sc = 0.78 + rnd() * 0.85;
       put(trunks, trunkGeo, sc, sc, sc, tx, 0, tz);
       put(lows, lowGeo, sc, sc, sc, tx, 0, tz);
+      put(mids, midGeo, sc, sc, sc, tx, 0, tz);
       put(tops, topGeo, sc, sc, sc, tx, 0, tz);
     }
     // a mask row across the back, so the ground never meets the painted sky
@@ -5206,17 +5321,55 @@ class Game {
       const sc = 1.1 + rnd() * 0.6;
       put(trunks, trunkGeo, sc, sc, sc, tx, 0, -78 - rnd() * 12);
       put(lows, lowGeo, sc, sc, sc, tx, 0, -78 - rnd() * 12);
-      put(tops, topGeo, sc, sc, sc, tx, 0, -78 - rnd() * 12);
+      put(mids, midGeo, sc, sc, sc, tx, 0, -78 - rnd() * 12);
+      // NO CROWN ON THE MASK ROW. `dioparts.mjs` put the top tier at 1.5
+      // pixels per triangle — the worst rate in the diorama by four times —
+      // and this row is the reason: it is 78 u back behind fog, doing one job,
+      // which is stopping the ground from meeting the painted sky. The low
+      // and mid tiers make that silhouette; the tip is 22 trees' worth of
+      // triangles spent on nothing.
     }
     // --- rocks and scrub along the trail edge ------------------------------
     const rockGeo = new THREE.IcosahedronGeometry(1, 0);
     const bushGeo = new THREE.SphereGeometry(1, 6, 4);
+    // ROADSIDE HAZARDS BELONG AT THE ROADSIDE. These sat 1.4 to 6 u off the
+    // dirt, out in the field, where a boulder is scenery. Brought in to
+    // straddle the 5.25 u trail edge they are what the outside of the corner
+    // is made of, which is the only reason a rock is interesting.
     for (let i = 0; i < 16; i++) {
       const side = i % 2 ? 1 : -1;
-      const rx = side * (6.6 + rnd() * 5);
+      const rx = side * (5.4 + rnd() * 3.6);
       const rz = -34 + rnd() * 44;
       const sc = 0.5 + rnd() * 1.1;
-      put(rocks, rockGeo, sc * 1.3, sc * 0.72, sc * 1.1, rx, sc * 0.3, rz, rnd() * 3);
+      const ry = rnd() * 3;
+      put(rocks, rockGeo, sc * 1.3, sc * 0.72, sc * 1.1, rx, sc * 0.3, rz, ry);
+      // ...and the big ones wear moss on top, which is the one detail that
+      // says the rock has been there longer than the trail has.
+      if (sc > 0.76) put(moss, rockGeo, sc * 0.98, sc * 0.19, sc * 0.8, rx, sc * 0.88, rz, ry);
+    }
+    // LOOSE STONE, WITH GEOMETRY. The trail texture already has gravel painted
+    // into it, and painted gravel is flat — no lit edge, no shadow side, and
+    // it turns with the surface instead of sitting on it. What makes a surface
+    // read as LOOSE is stone the light can catch, so this is squashed
+    // tetrahedra and octahedra: 4 and 8 triangles, because an icosahedron is
+    // 20 for a thing four pixels across. Held to the length of trail the bay
+    // camera actually frames — a pebble at z -60 is nothing but cost.
+    // TWO TONES, AND SMALLER THAN THEY LOOKED RIGHT ON PAPER. One pale grey at
+    // 0.3 u across read as torn paper scattered over the dirt: gravel is not
+    // one colour, and a stone that never goes darker than its ground has no
+    // weight. Half of them are the boulders' own grey, and the biggest is now
+    // 0.2 u — about a fist beside a 4.4 u car, which is what it should be.
+    const chipGeo = new THREE.TetrahedronGeometry(1, 0);
+    const cobbleGeo = new THREE.OctahedronGeometry(1, 0);
+    for (let i = 0; i < 150; i++) {
+      const big = i % 4 === 0;
+      // over the whole width, but banked at the verges where a tyre throws it
+      const px = rnd() < 0.58 ? (rnd() - 0.5) * 10.2
+        : (rnd() < 0.5 ? 1 : -1) * (4.9 + rnd() * 2.4);
+      const pz = -30 + rnd() * 48;
+      const sc = big ? 0.13 + rnd() * 0.075 : 0.065 + rnd() * 0.065;
+      put(rnd() < 0.5 ? stones : stonesDk, big ? cobbleGeo : chipGeo,
+        sc * 1.3, sc * 0.78, sc * 1.1, px, sc * 0.34, pz, rnd() * 3);
     }
     for (let i = 0; i < 14; i++) {
       const side = i % 2 ? 1 : -1;
@@ -5253,7 +5406,9 @@ class Game {
       put(tufts, tuftGeo, sc, sc * (0.85 + rnd() * 0.8), sc, gx, 0, gz, rnd() * 3);
     }
     for (const [geos, col, flat] of [[trunks, F.trunk, false], [lows, F.low, true],
-      [tops, F.top, true], [rocks, F.rock, true], [bushes, F.bush, true],
+      [mids, F.mid, true], [tops, F.top, true], [rocks, F.rock, true],
+      [moss, F.moss, true], [stones, F.stone, true], [stonesDk, F.stoneDk, true],
+      [bushes, F.bush, true],
       [tufts, 0x5e8f3e, true], [scuffs, F.dirt, false]]) {
       const m = new THREE.Mesh(weld(geos),
         new THREE.MeshStandardMaterial({ color: col, roughness: 0.95, flatShading: flat }));
@@ -5389,6 +5544,14 @@ class Game {
       st.contact.visible = true;
       st.forest.visible = true;
       st.sweep.visible = false;
+      // OPEN UP FOR THE GOBO, and only here. The forest carries a multiply
+      // canopy over its ground (see `_diorama`), which can only darken: with
+      // the studio left at 1.24 the car cards came back at mean luminance
+      // 73-92 against a sweep shot at 131-168, and "the cards are dark" is the
+      // exact complaint this whole ground treatment exists to answer. The
+      // PART shots do not show the forest and must not move, so the
+      // compensation rides with the forest rather than with the renderer.
+      st.r.toneMappingExposure = 1.42;
     }
     st.r.render(st.scene, cam);
     const url = st.r.domElement.toDataURL();
@@ -5396,6 +5559,7 @@ class Game {
     st.contact.visible = false;
     st.forest.visible = false;
     st.sweep.visible = true;
+    st.r.toneMappingExposure = 1.24;
     return url;
   }
 
