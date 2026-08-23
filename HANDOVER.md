@@ -3066,3 +3066,15 @@ proof that the crowns nobody could see were most of what it was drawing.
 
 Net: 7196 → 8829 triangles, second diorama still 0.2 ms (the r263 sharing is
 intact), `bayblack.mjs` transparent 0%, `boot.mjs` 4/4, `farplane.mjs` clean.
+
+### A NOTE ON THE BEFORE/AFTER
+The canopy painter draws from the diorama's own seeded `rnd()`, so adding it
+shifted every placement downstream — trees, rocks, bushes and tufts all
+re-rolled. Nothing wrong with the new layout, but it dropped a 2.5 u scrub bush
+and a boulder into the foreground, nearer the camera than the car. Bushes are
+now held to z -46..-2 and rocks to -38..+2, both behind the subject, because
+the whole job of this screen is to show you a car.
+
+`baypair.mjs` shoots the bay at a PARKED angle from a port you name, so the two
+halves of an A/B are the same picture of the same car — and prints the build
+tag it actually loaded, since srv.mjs has served one branch on both ports.

@@ -180,6 +180,15 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `baypair.mjs`  the same bay, the same PARKED turntable angle, from a port you
+                name: `node baypair.mjs 8902 out.png 2.05`. A before/after is
+                worthless if the car is at a different angle in each shot, and
+                `_stageRun` rewrites `pivot.rotation.y` every frame — so it
+                stops the loop first. It prints the build tag it actually
+                loaded, because srv.mjs has served one branch on both ports.
+- `shotcmp.mjs` screenshot a local HTML file (`node shotcmp.mjs page.html
+                out.png`). Lives here because this is where playwright-core
+                resolves from; used to compose before/after sheets.
 - `dustlook.mjs` the turntable dust, PARKED. `bayshot2.mjs`'s SPIN is useless
                 for this: the next frame of the stage loop overwrites
                 `pivot.rotation.y` before the screenshot lands, so a puff

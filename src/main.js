@@ -5339,7 +5339,7 @@ class Game {
     for (let i = 0; i < 16; i++) {
       const side = i % 2 ? 1 : -1;
       const rx = side * (5.4 + rnd() * 3.6);
-      const rz = -34 + rnd() * 44;
+      const rz = -38 + rnd() * 40;              // never in front of the car
       const sc = 0.5 + rnd() * 1.1;
       const ry = rnd() * 3;
       put(rocks, rockGeo, sc * 1.3, sc * 0.72, sc * 1.1, rx, sc * 0.3, rz, ry);
@@ -5374,7 +5374,10 @@ class Game {
     for (let i = 0; i < 14; i++) {
       const side = i % 2 ? 1 : -1;
       const bx = side * (7.5 + rnd() * 12);
-      const bz = -40 + rnd() * 50;
+      // BEHIND THE SUBJECT, ALWAYS. This ran to z +10, which is nearer the
+      // camera than the car is, and a 2.5 u scrub bush there is a green blob
+      // across the corner of a picture whose whole job is to show you a car.
+      const bz = -46 + rnd() * 44;
       const sc = 0.8 + rnd() * 0.9;
       put(bushes, bushGeo, sc * 1.5, sc * 0.85, sc * 1.4, bx, sc * 0.5, bz);
     }
