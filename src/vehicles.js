@@ -332,6 +332,21 @@ export function fadeCarLights(camera) {
  *  view rather than identical to it. */
 export const CAR_LIGHT_TOPDOWN_CUT = 0.18;
 
+/* WHY THERE IS NO `THREE.SpotLight` ANY MORE.
+ *
+ * r245 lit the night with one real spotlight on the PLAYER, plus a pair of
+ * small sphere lamps dressed onto every car. That is exactly what was
+ * photographed and reported twice as "all cars need to have headlights": the
+ * rivals had lamp dots and nothing on the road, because there was one
+ * headlight in the world and it belonged to you.
+ *
+ * Eight spotlights is not the fix — the light count is part of every
+ * material's shader cache key, so it is eight times the per-fragment cost and
+ * a full recompile on the worlds that have it. The fix is that NOBODY gets a
+ * real one: the merged rig below paints the lamp, the pool it lays on the
+ * road and the tail lenses, in a single additive draw call per car, and every
+ * car on the grid gets the same one. Equal, and cheaper than what it replaced.
+ */
 export function buildVoxelRacer(spec) {
   const { body, accent, stripe = null, number = null, style = 'crown', rims = null } = spec;
   const g = new THREE.Group();

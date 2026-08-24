@@ -8,9 +8,10 @@ import {
   // `crowdTexture` is no longer imported: the spectator stand was the only
   // consumer, and it was removed on request. The texture itself stays in
   // src/textures.js — deleting it is that file's call, not this one's.
-  grassTexture, bannerTexture, hazardTexture, awningTexture,
+  grassTexture, bannerTexture, hazardTexture, awningTexture, balconyRailTexture,
   finishBannerTexture, cliffTexture, puddleTexture, plankTexture,
-  crateTexture, coneTexture, barrelTexture, riverTexture, riverBankTexture, iglooTexture,
+  crateTexture, coneTexture, barrelTexture, reflectiveTapeTexture,
+  riverTexture, riverBankTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
   townhouseTexture, townhouseGlowTexture, roofTileTexture, ironRailTexture,
@@ -2903,6 +2904,7 @@ const THEMES = {
     sunColor: 0x8a9aff, sunIntensity: 2.0,               // cold moonlight
     skyTop: '#16162a', skyHorizon: '#5c2a86', sunGlow: 0xff40c0, skyCurve: 0.8,
     sunAz: 0.6, sunEl: 0.5, sunSprite: false, stars: true,
+    night: true,                                        // headlights on, tape on the props
     hazeColor: 0xb93ee8, hazeOpacity: 0.4,              // city glow ringing the horizon
     cloudCount: 0, cloudOpacity: 0,
     terrainLow: '#32324a', terrainHigh: '#4a4a66', terrainDirt: '#483c66',
@@ -2987,6 +2989,7 @@ const THEMES = {
     // so roughly half the screen stayed at zero however bright the road got.
     skyTop: '#222c1e', skyHorizon: '#3e4a2e', sunGlow: 0x9aa858, skyCurve: 0.8,
     sunAz: 0.4, sunEl: 0.6, sunSprite: false,
+    night: true,
     hazeColor: 0x4a5436, hazeOpacity: 0.32,
     cloudCount: 0, cloudOpacity: 0,
     terrainLow: '#4e5442', terrainHigh: '#6e745c', terrainDirt: '#5e4e36',
@@ -3794,6 +3797,7 @@ const THEMES = {
     // and raking, so the frontage on one side is lit and the other is in
     // silhouette — the "extreme local contrast" the region is graded for.
     sunColor: 0xffb45e, sunIntensity: 2.3,
+    night: true,                                        // sodium street, but still a night
     // skyCurve WELL ABOVE 1 on purpose: `mix(horizon, top, pow(smoothstep, curve))`
     // means a high exponent holds the horizon colour — which IS the fog colour —
     // far up the dome, so the roofline meets a sky of its own fog value and the
@@ -10799,6 +10803,24 @@ export class Track {
    *  most materials are shared; only theme tints (hay color, barrel wrap) vary. */
   _makeProp(type) {
     const A = propAssets();
+    // ON AN UNLIT ROAD THE PROPS ARE THE HAZARD YOU CANNOT SEE. Headlights
+    // reach maybe forty metres and spread thin at the edges; the tape on real
+    // road furniture works at any range because it throws the beam straight
+    // back. Same diffuse texture, an emissive map that is black except the
+    // bands, so a crate is still a wooden crate by day. Cached per track: one
+    // material per prop type, so this costs no draw calls at all.
+    const tape = (key, base) => {
+      this._tapeMats = this._tapeMats || {};
+      if (!this._tapeMats[key]) {
+        const m = base.clone();
+        m.emissiveMap = reflectiveTapeTexture(key);
+        m.emissive = new THREE.Color(0xffffff);
+        m.emissiveIntensity = 1.35;
+        this._tapeMats[key] = m;
+      }
+      return this._tapeMats[key];
+    };
+    const NIGHT = !!(this.T && this.T.night);
     switch (type) {
       case 'hay': {
         if (!this._hayPropMat) {
@@ -10809,14 +10831,14 @@ export class Track {
         return { mesh: m, r: 1.5 };
       }
       case 'crate': {
-        const m = new THREE.Mesh(A.geo.crate, A.mat.crate);
+        const m = new THREE.Mesh(A.geo.crate, NIGHT ? tape('crate', A.mat.crate) : A.mat.crate);
         m.castShadow = true;
         return { mesh: m, r: 1.6 };
       }
       case 'cone': {
         const g = new THREE.Group();
         g.add(new THREE.Mesh(A.geo.coneBase, A.mat.coneBase));
-        const c = new THREE.Mesh(A.geo.cone, A.mat.cone);
+        const c = new THREE.Mesh(A.geo.cone, NIGHT ? tape('cone', A.mat.cone) : A.mat.cone);
         c.castShadow = true;
         g.add(c);
         return { mesh: g, r: 1.0 };
@@ -10828,7 +10850,8 @@ export class Track {
             map: barrelTexture(pal), roughness: 0.9,
           });
         }
-        const m = new THREE.Mesh(A.geo.barrel, [this._barrelPropMat, A.mat.barrelCap, A.mat.barrelCap]);
+        const side = NIGHT ? tape('barrel', this._barrelPropMat) : this._barrelPropMat;
+        const m = new THREE.Mesh(A.geo.barrel, [side, A.mat.barrelCap, A.mat.barrelCap]);
         m.castShadow = true;
         return { mesh: m, r: 1.3 };
       }
@@ -18028,6 +18051,9 @@ export class Track {
     const valances = new THREE.InstancedMesh(slabGeo, awnMat, BALC);
     valances.name = 'frontage-valances';
     balcSlabs.name = 'frontage-balconies';
+    // NAMED, so it can be measured and hidden. Unnamed, it survived every
+    // bracket-by-hiding pass while being the thing that was actually wrong.
+    balcRails.name = 'frontage-balcony-rails';
     awnings.name = 'frontage-awnings';
     for (const m of [balcSlabs, balcRails, awnings]) { m.castShadow = m.receiveShadow = true; }
     let balK = 0, awnK = 0;
@@ -21881,7 +21907,12 @@ export class Track {
         for (let s = 0; s < stack && tk < 180; s++) {
           m4.makeTranslation(p.x + (Math.random() - 0.5) * 0.4, p.y + 0.32 + s * 0.62, p.z + (Math.random() - 0.5) * 0.4);
           tires.setMatrixAt(tk, m4);
-          tcolor.set(s === stack - 1 && Math.random() < 0.5 ? 0xd8d2c2 : 0x22201c);
+          // A TYRE WALL IS PAINTED WHITE ON AN UNLIT ROAD, for the same reason
+          // the cones carry tape: black rubber at the edge of a night circuit
+          // is a hazard you meet rather than see. Half of them by day, the
+          // whole top course after dark.
+          const cap = s === stack - 1 && (this.T.night || Math.random() < 0.5);
+          tcolor.set(cap ? (this.T.night ? 0xf2eee2 : 0xd8d2c2) : 0x22201c);
           ids.push(tk);
           tires.setColorAt(tk++, tcolor);
         }
