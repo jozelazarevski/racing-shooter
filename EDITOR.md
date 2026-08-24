@@ -163,7 +163,20 @@ account or a network.
 
 **THE DRAFT.** Work that has not been saved is written to a draft as you go,
 and offered back the next time you open the editor on that world. It is
-offered, never restored behind your back.
+offered, never restored behind your back. When cloud sync is configured
+(`db/README.md`), every draft write also marks the profile row dirty, so the
+work-in-progress reaches the database within seconds of the stroke — debounced,
+one push per burst — and a push still waiting out its debounce is flushed when
+the tab is hidden or closed, so shutting the lid cannot eat the last stroke.
+Two devices' drafts merge as documents: the newer one wins whole, never a
+splice of the two.
+
+**The save chip** in the top bar reports where the work actually is:
+`SAVING…` while a write is debounced, `DRAFT ✓` once it is on this device,
+`CLOUD ✓` once the database row has answered, and `CLOUD ✗ — WILL RETRY` when
+a push failed (it retries with backoff, and again when the network returns).
+The status line narrates the last action and the next one overwrites it; the
+chip is the one place that always answers "is my work saved?".
 
 **TEST DRIVE** applies any pending edits and drops you straight into the world
 to drive it. **CHECK** is the pass that reads the scene against the things

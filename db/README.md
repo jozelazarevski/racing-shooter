@@ -77,7 +77,12 @@ that the data at stake is rally stars.
 
 Everything under the profile's storage prefix (`ir-p<id>-*`): career results,
 stars, credits, owned cars, per-car upgrade levels, mission medals — plus the
-profile's name and colour. Device-wide settings (steering scheme, sensitivity,
+profile's name and colour. World-editor scenes live under the same prefix, so
+they travel too, and so does the editor's DRAFT: every edit marks the row
+dirty (debounced — one push per burst of strokes), so work-in-progress reaches
+the database within seconds of the stroke, and a push still inside its
+debounce window is flushed with a keepalive request when the tab hides or
+closes. Device-wide settings (steering scheme, sensitivity,
 difficulty) deliberately stay per-device: how you steer on a phone is not how
 you steer at a desk.
 
@@ -85,6 +90,8 @@ you steer at a desk.
 
 Per-world results keep the best of both sides (most stars, best place,
 highest score). Credits keep the max. Owned cars and upgrade levels union.
-Selected car and cosmetics follow the newer save. Merging A into B and B into
-A yield the same career, so the order devices come online in cannot matter —
-and importing the same code twice is a no-op.
+Selected car and cosmetics follow the newer save. Saved scenes union by name
+(same name: the newer copy wins whole), and the editor draft is a document
+too — the newer draft wins whole, never a splice of two devices' drafts.
+Merging A into B and B into A yield the same career, so the order devices
+come online in cannot matter — and importing the same code twice is a no-op.

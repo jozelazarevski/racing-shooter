@@ -135,6 +135,15 @@ export function mergeSnapshots(a, b) {
       // snapshot's copy wins whole.
       const out = { ...(newerIsB ? ka : kb), ...(newerIsB ? kb : ka) };
       keys.scenes = out;
+    } else if (base === 'scenes-draft') {
+      // THE DRAFT IS A DOCUMENT TOO — and it now reaches the row on every
+      // edit, so two devices genuinely can hold two different drafts. Left
+      // to `mergeMax` they splice: `base` is a number so the max of two
+      // world ids wins, `t` takes the newer clock, and each scene field
+      // follows whichever side is newer — a draft that was never sculpted
+      // anywhere. The draft carries its own write time; the newer document
+      // wins whole and the other is gone, which is exactly what a draft is.
+      keys[base] = ((kb?.t ?? 0) >= (ka?.t ?? 0) ? kb : ka) ?? kb ?? ka;
     } else if (base === 'cars') {
       keys.cars = mergeMax(ka, kb, newerIsB);
       // the one field where max/union is wrong: you drive ONE car, and it is
@@ -229,11 +238,17 @@ export async function cloudPull(syncId) {
   return rows[0]?.data ?? null;
 }
 
-export async function cloudPush(syncId, snap) {
+export async function cloudPush(syncId, snap, opts = {}) {
+  const body = JSON.stringify([{ id: syncId, data: snap, updated_at: new Date().toISOString() }]);
   const r = await cloudFetch('ignite_profiles', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify([{ id: syncId, data: snap, updated_at: new Date().toISOString() }]),
+    body,
+    // A push flushed on the way out of the page must survive the page: only
+    // keepalive requests do. The browser caps keepalive bodies at 64 KB, so
+    // a heavyweight snapshot goes the ordinary way and takes its chances —
+    // an oversized keepalive is REJECTED, which is strictly worse.
+    ...(opts.unload && body.length < 60000 ? { keepalive: true } : {}),
   });
   return !!(r && r.ok);
 }
@@ -249,8 +264,24 @@ export class SyncService {
     this.game = game;
     this.status = cloudConfigured() ? 'idle' : 'off';
     this._t = null;
+    this._retries = 0;
     // the save hook: main.js pings this whenever a profile key is written
     window.__igniteSyncDirty = () => this.schedulePush();
+    // A DEBOUNCED PUSH MUST NOT DIE WITH THE TAB. Four seconds is the right
+    // debounce for a burst of saves and exactly the wrong one for the last
+    // save before the lid closes: the work is on this device and nowhere
+    // else. pagehide is the one event every exit path fires (close, reload,
+    // navigate, background-on-mobile), so a pending push is flushed there,
+    // with keepalive so the request outlives the page.
+    window.addEventListener('pagehide', () => this.flushPending(true));
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this.flushPending(true);
+    });
+    // and a push that failed for want of a network fires again when the
+    // network comes back, rather than waiting for the next edit
+    window.addEventListener('online', () => {
+      if (this.status === 'error') this.schedulePush();
+    });
   }
 
   activeSyncId() {
@@ -287,19 +318,48 @@ export class SyncService {
 
   schedulePush() {
     if (!cloudConfigured()) return;
+    this._retries = 0;                 // a fresh edit gets a fresh retry budget
     clearTimeout(this._t);
-    this._t = setTimeout(() => this.pushNow(), 4000);   // settle a burst of saves
+    this._t = setTimeout(() => { this._t = null; this.pushNow(); }, 4000);   // settle a burst of saves
   }
 
-  async pushNow() {
+  /** Run a pending debounced push RIGHT NOW — the page is going away, or a
+   *  caller needs the row current. A no-op when nothing is pending, so it is
+   *  safe to call from every hide/blur without spamming the endpoint. */
+  flushPending(unload = false) {
+    if (!this._t) return;
+    clearTimeout(this._t);
+    this._t = null;
+    this.pushNow(unload);
+  }
+
+  async pushNow(unload = false) {
     if (!cloudConfigured()) return false;
     try {
       this.status = 'sync';
-      const ok = await cloudPush(this.ensureSyncId(), this.snapshot());
+      const ok = await cloudPush(this.ensureSyncId(), this.snapshot(), { unload });
       this.status = ok ? 'ok' : 'error';
+      if (ok) this._retries = 0;
+      else this._retryLater();
       return ok;
-    } catch { this.status = 'error'; return false; }
-    finally { this.game._renderSyncStatus?.(); }
+    } catch { this.status = 'error'; this._retryLater(); return false; }
+    finally {
+      this.game._renderSyncStatus?.();
+      // the editor's save chip reports the DB's answer, not this tab's hope
+      this.game.editor?._cloudState?.(this.status);
+    }
+  }
+
+  /** A failed push retries on its own — 8 s, 16 s, 32 s, then it stops and
+   *  waits for the next edit or the `online` event. Capped because an
+   *  endpoint still down after three backoffs is dead, not blinking, and
+   *  hammering it forever costs battery for nothing. localStorage still
+   *  holds everything. */
+  _retryLater() {
+    if (this._retries >= 3) return;
+    this._retries += 1;
+    clearTimeout(this._t);
+    this._t = setTimeout(() => { this._t = null; this.pushNow(); }, 8000 * 2 ** (this._retries - 1));
   }
 
   /** Boot path: pull the row, merge, push the merge back. */

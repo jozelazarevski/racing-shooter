@@ -1645,6 +1645,11 @@
   .ed-btn:active{background:#26374a}
   .ed-btn.ed-go{background:#2b6d3f;border-color:#3f9159;color:#eafff0}
   #ed-counts{font-size:10px;letter-spacing:.08em;color:#6d8299;white-space:nowrap}
+  /* the save chip: is my work on disk, and is it in the cloud row? */
+  #ed-save{font-size:10px;letter-spacing:.08em;color:#6d8299;white-space:nowrap}
+  #ed-save[data-state="draft"],#ed-save[data-state="saved"]{color:#9ec9a8}
+  #ed-save[data-state="cloud"]{color:#5fd18a}
+  #ed-save[data-state="error"]{color:#e0a34a}
   /* THE TOOL RAIL SCROLLS. It carries fourteen tools in three named groups now,
      and on a laptop in landscape the last of them used to sit below the bottom
      of the window with no way to reach it. */

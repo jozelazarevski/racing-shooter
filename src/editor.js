@@ -59,12 +59,24 @@ export class TerrainDelta {
   add(dab, dedupe = true) {
     // A stroke lays many dabs on nearly the same spot; collapsing them keeps
     // the list (and the saved scene) from growing without bound.
+    //
+    // The candidates come from the GRID, not the whole list. A mergeable dab
+    // has nearly this dab's radius and sits within 0.16 r of it, so it has
+    // registered the cell this dab's centre falls in (its cells cover its own
+    // radius, and 0.16 r is inside that for any r above ~0.6 — the brush
+    // floor is 6). Scanning every dab ever laid made each dab of a stroke
+    // cost O(scene), which is the kind of price that shows up as a stutter
+    // exactly on the heavily built worlds that need the editor most.
     if (dedupe) {
-      for (const e of this.dabs) {
-        if (e.mode === dab.mode && Math.abs(e.r - dab.r) < 0.5 && e.e === dab.e
-          && Math.hypot(e.x - dab.x, e.z - dab.z) < dab.r * 0.16) {
-          e.dh += dab.dh;
-          return e;
+      const list = this.grid.get(this._key(
+        Math.floor(dab.x / this.cell), Math.floor(dab.z / this.cell)));
+      if (list) {
+        for (const e of list) {
+          if (e.mode === dab.mode && Math.abs(e.r - dab.r) < 0.5 && e.e === dab.e
+            && Math.hypot(e.x - dab.x, e.z - dab.z) < dab.r * 0.16) {
+            e.dh += dab.dh;
+            return e;
+          }
         }
       }
     }
@@ -477,6 +489,7 @@ export class WorldEditor {
   _saveDraft() {
     clearTimeout(this._draftTimer);
     this._draftTimer = setTimeout(() => this._saveDraftNow(), 900);
+    this._saveChip('pending');
   }
 
   _saveDraftNow() {
@@ -485,6 +498,41 @@ export class WorldEditor {
       localStorage.setItem(WorldEditor._draftKey(this.game),
         JSON.stringify({ t: Date.now(), scene: this.serialize() }));
     } catch { /* private mode, or a quota that a draft has no right to fight */ }
+    // The draft key sits inside the profile prefix, so it RIDES THE SAME ROW
+    // the career does — but nothing scheduled a push for it, so an hour of
+    // unsaved sculpting existed on exactly one device until some unrelated
+    // save happened to sync. Every draft write now marks the row dirty; the
+    // sync service debounces, so a stroke costs one push, not forty.
+    this.game?.sync?.schedulePush?.();
+    this._saveChip('draft');
+  }
+
+  /** The little truth-teller in the top bar: is my work on disk, and is it in
+   *  the cloud row? The status line cannot carry this — it narrates the last
+   *  action and the next one overwrites it — so saving gets a chip of its
+   *  own. States: pending (a write is debounced), draft (on this device),
+   *  cloud (the row took it), error (the push failed; sync.js will retry). */
+  _saveChip(state) {
+    const el = this.root && this.root.querySelector('#ed-save');
+    if (!el || !this.active) return;
+    const cloud = !!this.game?.sync && this.game.sync.status !== 'off';
+    const TEXT = {
+      pending: 'SAVING…',
+      draft: cloud ? 'DRAFT ✓ · CLOUD…' : 'DRAFT ✓',
+      saved: cloud ? 'SAVED ✓ · CLOUD…' : 'SAVED ✓',
+      cloud: 'CLOUD ✓',
+      error: 'CLOUD ✗ — WILL RETRY',
+    };
+    el.textContent = TEXT[state] || '';
+    el.dataset.state = state;
+  }
+
+  /** Called by SyncService after every push attempt, so the chip reports the
+   *  DB's answer rather than this tab's hope. */
+  _cloudState(status) {
+    if (!this.active) return;
+    if (status === 'ok') this._saveChip('cloud');
+    else if (status === 'error') this._saveChip('error');
   }
 
   static draft(game) {
@@ -656,6 +704,7 @@ export class WorldEditor {
     // exit() takes the markers down, so enter() has to put them back — a
     // second visit used to open on a scene with no sign of the work in it
     this._refreshMarkers();
+    this._saveChip('');            // last session's CLOUD ✓ is not this session's
     this._offerDraft();
     this._status('EDITOR — sculpt, place, then APPLY.  ? for the key list');
   }
@@ -1377,6 +1426,11 @@ export class WorldEditor {
       // typing in a name field is typing, not a shortcut
       if (tgt && /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName) && tgt.type !== 'range') return;
       const want = WorldEditor._combo(ev);
+      // main.js's back ladder (Escape / phone back) may have consumed this
+      // exact keystroke already — its handler was bound at boot, so it runs
+      // first and delegates to backStep() below. Handling it again here would
+      // take TWO steps down the cascade for one press.
+      if (want === 'escape' && ev.defaultPrevented) return;
       for (const [, rows] of KEYS) {
         for (const [combo, , what] of rows) {
           if (combo !== want) continue;
@@ -1395,6 +1449,12 @@ export class WorldEditor {
     window.removeEventListener('keydown', this._onKey);
     this._onKey = null;
   }
+
+  /** One step up the editor's own ladder, for main.js's back navigation
+   *  (Escape, the phone's back gesture): close the shallowest thing that is
+   *  open — a modal, a half-made run, a selection — and exit only when
+   *  nothing is. The same cascade the ESC key runs. */
+  backStep() { this._hotAct('esc'); }
 
   _hotAct(act) {
     const S = this.sel;
@@ -2747,6 +2807,7 @@ export class WorldEditor {
       <div id="ed-top">
         <button class="ed-btn" data-act="exit">✕ EXIT</button>
         <span id="ed-status">EDITOR</span>
+        <span id="ed-save"></span>
         <span id="ed-counts"></span>
         <button class="ed-btn" data-act="undo" title="ctrl+Z">↶</button>
         <button class="ed-btn" data-act="redo" title="ctrl+shift+Z">↷</button>
@@ -3271,6 +3332,7 @@ export class WorldEditor {
     WorldEditor.save(trimmed, this.serialize(), this.game);
     WorldEditor.clearDraft(this.game);
     this.game._renderLevelCards?.();
+    this._saveChip('saved');
     this._status(`saved "${trimmed}" — it syncs with your profile`);
   }
 

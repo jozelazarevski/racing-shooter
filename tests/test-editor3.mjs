@@ -55,9 +55,28 @@ const R = await page.evaluate(async () => {
   ed.exit();
   g.showMenu();
   g._renderLevelCards();
-  const cardFor = (n) => [...document.querySelectorAll('#level-select .level-chip')]
+  const findChip = (n) => [...document.querySelectorAll('#level-select .level-chip')]
     .find((el) => el.querySelector('.wc-name')
       && el.querySelector('.wc-name').textContent.replace('🔒 ', '').trim() === n);
+  // CONTRACT CHANGE (chapters): the track list opens on a CHAPTER GRID and a
+  // world's card only exists inside its chapter — so finding a card means
+  // walking the chapters the way a player does, not assuming a flat list.
+  const cardFor = (n) => {
+    let hit = findChip(n);
+    if (hit) return hit;
+    g._chapterIn = null;
+    g._renderLevelCards();
+    const chNs = [...document.querySelectorAll('#level-select .chapter-card')]
+      .map((c) => c.dataset.chn);
+    for (const chn of chNs) {
+      g._chapterIn = null;
+      g._renderLevelCards();
+      document.querySelector(`#level-select .chapter-card[data-chn="${chn}"]`)?.click();
+      hit = findChip(n);
+      if (hit) return hit;
+    }
+    return null;
+  };
   // CONTRACT CHANGE (r152): a card tap no longer builds the world inside the
   // click handler — the build is deferred and coalesced so browsing does not
   // freeze the menu. _flushPick() is the same "make it real NOW" the start

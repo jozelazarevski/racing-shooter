@@ -2664,7 +2664,13 @@ class Game {
     const t = this.backTarget();
     if (!t) return false;
     switch (t.at) {
-      case 'editor': this.editor.exit(); break;
+      // ONE STEP, not the whole ladder. The editor has layers of its own —
+      // an open modal, a half-made run, a live selection — and its ESC
+      // cascade closes the shallowest one; only an editor with nothing
+      // shallower open actually exits. Calling exit() here jumped the whole
+      // ladder: Escape on the key-list modal threw you out of the editor
+      // with the modal still standing.
+      case 'editor': this.editor.backStep(); break;
       case 'results': this.showMenu(); break;
       // there is no separate resume — the pause menu is a toggle
       case 'pause': case 'racing': this.togglePause?.(); break;
@@ -2755,6 +2761,7 @@ class Game {
     document.getElementById('topbar-back')?.addEventListener('click', () => this.goBack());
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
+      if (e.defaultPrevented) return;   // someone shallower already took this one
       if (document.activeElement?.tagName === 'INPUT') return;   // fields own Escape
       if (this.goBack()) e.preventDefault();
     });

@@ -80,7 +80,13 @@ carriageway), `test-editor5.mjs` (NATURE, selection of plants/lakes/zones/road
 pins, DUPLICATE, REDO, water levels, brush shape, SNAP, scene codes, the
 draft, and CHECK), `test-warp.mjs` (MOVE ROAD cannot knot a lap: the steering
 cap sees the warp, a pull is anchored to a station, and a road move can be
-selected and deleted).
+selected and deleted), `test-draft-sync.mjs` (the draft reaches the DATABASE
+in realtime, end to end against a mocked PostgREST endpoint: a sculpt stroke
+alone lands the draft in the row, debounced rather than per-dab; a push still
+in its debounce window is flushed on pagehide; the top-bar save chip shows
+CLOUD ✓ only after the row answered; two devices' drafts merge as whole
+documents, never a spliced chimera; and stroke dedupe still collapses through
+the grid).
 
 ## Diagnostics — `tool-*.mjs`, not gates
 
@@ -102,6 +108,8 @@ assumption someone had already written down.
 | `tools-scratch/onroad.mjs` | The road and air sweeps over all 67 worlds in ONE browser session (`swapLevel`, not a reload per world: 68 reloads is 35 minutes). |
 | `tools-scratch/probe-ground.mjs` | One point, the height function taken apart term by term, beside the four mesh vertices that actually surround it. This is what identified `_tunnelRidge`'s staircase. |
 | `tool-banner-clearance.mjs` | Every sponsor board measured across its full 9 u span. The acceptance test for `_buildBanners`. Skips `kind: 'fence'` — `_buildGuardFence` shares the array and a guard rail belongs at the road edge. |
+| `tools-scratch/rng-parity.mjs` | Does the FIRST build of the page draw the same seeded stream as a rebuild? Traps every seeded-generator install, records both builds' call-site sequences and prints the first index where they part. This is the instrument that found the cold-cache determinism bug: the noise tile's 65,536 lazy dither draws (and PROP_ASSETS, and three's own Sprite-geometry lazy) were charged to the first build only, so the boot world could not be rebuilt by the editor's own APPLY. Healthy output: `divergeAt` equals both lengths. |
+| `tools-scratch/build-parity.mjs` | The cheap end-to-end form of the same law: trees in one disc beside PINE VALLEY's road at boot vs after a clean rebuild. The three numbers printed must agree. |
 
 ## Writing new checks
 

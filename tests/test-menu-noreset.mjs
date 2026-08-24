@@ -29,7 +29,25 @@ console.log('CAR SWAP:', JSON.stringify({ noReload: before.url === after.url, fr
 await page.tap('#tab-btn-race');
 await page.evaluate(() => { document.getElementById('title-screen').scrollTo(0, 500); });
 await page.waitForTimeout(200);
-await page.evaluate(() => { [...document.querySelectorAll('.level-chip')].find(c => c.textContent.includes('DUST CANYON')).click(); });
+await page.evaluate(() => {
+  // CONTRACT CHANGE (chapters): the track list opens on a CHAPTER GRID, and a
+  // world's card only exists inside its chapter — walk chapters to find it.
+  const g = window.__game;
+  const find = () => [...document.querySelectorAll('.level-chip')].find(c => c.textContent.includes('DUST CANYON'));
+  let chip = find();
+  if (!chip) {
+    for (const chn of [...document.querySelectorAll('#level-select .chapter-card')].map(c => c.dataset.chn)) {
+      g._chapterIn = null; g._renderLevelCards();
+      document.querySelector(`#level-select .chapter-card[data-chn="${chn}"]`)?.click();
+      chip = find();
+      if (chip) break;
+    }
+  }
+  // entering a chapter resets the scroll — put the "deep in the list"
+  // position back so the restore law still has something to restore
+  document.getElementById('title-screen').scrollTo(0, 500);
+  chip.click();
+});
 await page.waitForFunction(() => location.search.includes('level=2'), null, { timeout: 15000 });
 await page.waitForFunction(() => window.__game, null, { timeout: 30000 });
 await page.waitForTimeout(900);
