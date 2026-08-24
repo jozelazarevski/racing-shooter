@@ -3627,6 +3627,27 @@ export class Car {
     }
     return false;
   }
+
+  /** Headlights on iff the world is dark — checked against the TRACK OBJECT,
+   *  so it is right the first frame after a level swap and free every frame
+   *  after that.
+   *
+   *  ON `Car`, NOT ON `EnemyCar`. It was written on the rival subclass while
+   *  its own comment already said both the player and the rivals come through
+   *  it — and `PlayerCar.update` calls it on its FIRST line. So on every level
+   *  the player's update threw `_syncLights is not a function` and its whole
+   *  body was skipped. The frame loop catches and recovers, which is exactly
+   *  why nothing looked broken and `boot.mjs` stayed green: no crash, no
+   *  stack, just a car that never moved and a chase camera parked at the world
+   *  origin. Anything both subclasses call belongs on the base class.
+   */
+  _syncLights() {
+    const t = this.game?.track;
+    if (this._litFor === t) return;
+    this._litFor = t;
+    const lt = this.mesh?.userData?.carLights;
+    if (lt) lt.visible = worldIsDark(t?.T);
+  }
 }
 
 // ---------- AI racing brain ----------
@@ -3922,17 +3943,6 @@ export class EnemyCar extends Car {
         this._errArmed = true; // clean straight: armed for the next corner
       }
     }
-  }
-
-  /** Headlights on iff the world is dark — checked against the TRACK OBJECT,
-   *  so it is right the first frame after a level swap and free every frame
-   *  after that. Both the player and the rivals come through this class. */
-  _syncLights() {
-    const t = this.game?.track;
-    if (this._litFor === t) return;
-    this._litFor = t;
-    const lt = this.mesh?.userData?.carLights;
-    if (lt) lt.visible = worldIsDark(t?.T);
   }
 
   update(dt) {

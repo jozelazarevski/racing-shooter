@@ -3142,3 +3142,88 @@ the verge and grass outside the gobo is a pale flat band down one edge.
 Gates: bay mean luminance 115, transparent 0%; car icons unchanged at 79-100;
 `boot.mjs` 4/4; `farplane.mjs` clean; second diorama still free; 8829 → 8909
 triangles (the colour buffer, not geometry).
+
+## r266 — A GREEN SCREENSHOT, AND THE BUG UNDER IT
+Reported off a phone with one line: "Fix needed." NEO-KYOTO, the whole frame
+one radioactive olive.
+
+### FIRST, MEASURE THE PICTURE
+`shotcast.mjs` reads a screenshot's mean RGB. The phone frame came back at
+**(65.5, 82.5, 16.0)** — the BLUE CHANNEL ALL BUT DEAD — with green 41.7 points
+over the red/blue average. That is not a haze, it is a gamut collapse, and it
+named the world in one search: `undercity` is the only theme whose lights are
+that saturated.
+
+### AND THEN THE THING THAT WAS NOT THE COMPLAINT
+`worldcast.mjs` reproduces a world's cast from the camera it is played from.
+NEO-KYOTO measured luminance 9 with 77% of the frame black — nothing like the
+phone. Two runs with different physics returned **identical numbers to the
+decimal**, which no two runs of a moving car can. The scene graph said why:
+`camPos [0, 0, 0]`, and in the console, once a frame, swallowed —
+
+> `[frame] recovered from TypeError: this._syncLights is not a function at
+> PlayerCar.update (vehicles.js:4779)`
+
+`_syncLights` was written on `EnemyCar` while its own comment already said
+"both the player and the rivals come through this class", and `PlayerCar.update`
+calls it on its FIRST line. So on EVERY LEVEL the player's entire update threw
+and was skipped. The frame loop catches and recovers, so there was no crash, no
+stack in `pageerr.mjs`, and `boot.mjs` sat at 4/4 the whole time: no player
+physics, no player headlights, and a chase camera parked at the world origin.
+Moved to the base `Car`. Anything both subclasses call belongs there.
+
+`playermoves.mjs` is the gate that would have caught it — held throttle, then
+assert the car moves, the camera is not at the origin, and nothing was
+swallowed by the frame loop's catch. Verified by REINSTATING the fault: it
+fails with `CAM AT ORIGIN` and prints the swallowed TypeError.
+
+### THE GREEN ITSELF
+With the player driving again, the reproduction matched the phone: mean
+**(54.8, 69.3, 9.5)** against PINE VALLEY's (67.6, 84.1, 60.4).
+
+The theme comment above these constants tells the first half of the story — an
+earlier round measured `undercity` as the darkest world in the game at 7.6/255
+and fixed it. It fixed it by getting BRIGHTNESS OUT OF A SATURATED LIGHT:
+hemiSky `#8a9a5c` at intensity **5.5**, a `#d8e87a` sun at 3.0. That does not
+light a green world, it multiplies every albedo in it by green and clips the
+rest. The tell is the car — its yellow paint came out cyan-white. A car whose
+paint you cannot see is the clearest evidence a cast is broken.
+
+Light with intensity, tint with colour. The lights come most of the way back to
+neutral; the sickly cast stays where a cast belongs, in the fog, the haze and
+the materials, all untouched. `castsweep.mjs` patches the lights in the running
+scene and re-measures, five tunes in one load, because NEO-KYOTO takes ninety
+seconds to build and reloading per guess is an afternoon:
+
+```
+as-is  (54.6, 69.1,  9.2)  green+37.2  lum 61.7  dark 11.7%
+A      (42.2, 53.5, 16.1)  green+24.4  lum 48.4  dark 18.9%
+B      (42.3, 49.5, 18.6)  green+19.0  lum 45.7  dark 21.0%
+C      (51.9, 60.3, 25.8)  green+21.5  lum 56.0  dark 14.9%   <-- shipped
+D      (50.9, 63.7, 21.9)  green+27.3  lum 57.9  dark 14.1%
+```
+
+C: blue nearly tripled, green excess down to what a forest reads (PINE VALLEY
+is 20.2), and luminance held at 56 — the world stays lit, which was the whole
+point of the first fix. `hemiSky 0x929c88`, `hemiGround 0x5f6252`, hemi 4.2,
+`sunColor 0xe0e8c0`, sun 2.8.
+
+The blown-out headlight in the same screenshot needed no separate fix: an
+additive beam on a road that is already flooded has nowhere to go. At the chase
+camera in the corrected world, **0% of the frame is blown**, and the player's
+lamps are on (they could not have been before — `_syncLights` threw).
+
+### THREE PROBE FAULTS PAID FOR ALONG THE WAY
+1. `drawImage(renderer.domElement)` returns a BLANK after the frame is
+   presented — no `preserveDrawingBuffer` — and re-running `composer.render()`
+   first does not help. Every world read as (0,0,0). Screenshot through the
+   compositor instead.
+2. `input.throttle` is a GETTER with no setter (`input.js:150`). `g.input.throttle
+   = 1` silently does nothing, so the first three runs of `playermoves.mjs`
+   measured a car free-rolling and called five worlds broken. `input.analog.throttle`
+   is the settable one; with it, NEO-KYOTO drives at 27 — faster than PINE VALLEY.
+3. Frame counts are not time. "180 frames" under swiftshader is a different
+   amount of simulated time every run — the same gate passed PINE VALLEY at 172 u
+   travelled and failed it at 64 u ten minutes later. Wall-clock windows, and
+   `camToCar` is REPORTED rather than asserted: the camera lerps in from the
+   origin and a grid 264 u out is still arriving when the window shuts.

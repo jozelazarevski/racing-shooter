@@ -2963,8 +2963,25 @@ const THEMES = {
     // doubled frame luminance, so the walls were simply under-lit, not shadowed
     // or mis-normalled. The slot canyon is most of what you look at here, and
     // vertical faces get almost nothing but this term.
-    hemiSky: 0x8a9a5c, hemiGround: 0x5a5e46, hemiIntensity: 5.5,
-    sunColor: 0xd8e87a, sunIntensity: 3.0,               // sickly grate-light shafts
+    // ...and then it went too far the OTHER way. Reported off a phone: the
+    // whole world one radioactive olive. Measured at the chase camera, mean
+    // RGB (55, 69, 9) — the BLUE CHANNEL DEAD, against (68, 84, 60) for Pine
+    // Valley — and green 37 points over the red/blue average where a forest
+    // reads 20. The tell is the car: its yellow paint came out cyan-white,
+    // because a light this saturated leaves nothing for a surface colour to
+    // say.
+    //
+    // The fault was getting BRIGHTNESS out of a SATURATED light. hemiSky
+    // #8a9a5c at intensity 5.5 and a #d8e87a sun at 3.0 do not light a green
+    // world, they multiply every albedo in it by green and clip the rest.
+    // Light with intensity, tint with colour: the lights come back most of the
+    // way to neutral and the sickly cast stays where a cast belongs — in the
+    // FOG, the haze and the materials, which are untouched below.
+    // `castsweep.mjs`, five tunes in one load: blue 9.2 -> 25.8, green excess
+    // 37.2 -> 21.5, luminance 61.7 -> 56.0 (the world stays lit, which was the
+    // whole point of the first fix).
+    hemiSky: 0x929c88, hemiGround: 0x5f6252, hemiIntensity: 4.2,
+    sunColor: 0xe0e8c0, sunIntensity: 2.8,               // sickly grate-light shafts
     // The sky was the other half of it. Lighting the ground does nothing for
     // the top half of a chase-camera frame, and skyTop '#05070a' is black —
     // so roughly half the screen stayed at zero however bright the road got.

@@ -180,6 +180,30 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `playermoves.mjs` DOES THE PLAYER'S CAR DRIVE. Holds the throttle, then
+                asserts the car moves, the chase camera is not at the world
+                ORIGIN, and nothing was swallowed by the frame loop's catch.
+                It exists because `_syncLights` on the wrong class made
+                `PlayerCar.update` throw on its first line on every level, and
+                the frame loop's recovery meant no crash, no stack, and
+                `boot.mjs` green at 4/4. `camToCar` is reported, not asserted.
+- `worldcast.mjs` a world's colour cast from the camera it is played from:
+                mean RGB, green excess over the red/blue average, luminance,
+                blown and dark fractions, with the theme's own light constants
+                beside them. Reads the frame through a SCREENSHOT — the
+                renderer has no `preserveDrawingBuffer`, so drawImage off its
+                canvas returns black, and so does re-running the composer.
+- `castsweep.mjs` tune a world's lights WITHOUT RELOADING IT. Patches the
+                hemisphere and sun in the running scene, re-measures, repeats —
+                five tunes in one load, against ninety seconds a reload.
+- `shotcast.mjs` the colour cast of an image file, for matching a phone shot of
+                the deployed build against a theme in the repo.
+- `gridsit.mjs` where the car actually is at the start line versus where the
+                road is, when a level looks like it will not drive.
+- `lvlerr.mjs`  does this level build and run: page errors, console errors,
+                scene contents, camera and car positions, lights and fog. It is
+                what surfaced the once-a-frame TypeError the game recovers from
+                and never reports.
 - `flatsurf.mjs` which surface in the bay is FLATTEST. Each welded piece is
                 masked (hide it, diff), then the spread of luminance over its
                 own pixels is reported — sd and p10-p90 — beside its share of
