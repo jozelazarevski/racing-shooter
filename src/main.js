@@ -10696,13 +10696,26 @@ class Game {
    *  and input stops being read, which to a player is simply a frozen game
    *  with no way out. Catching means the renderer still draws and the pause
    *  button still works, so a bug becomes a glitch you can walk away from
-   *  instead of a dead session. Reported once, not once per frame. */
+   *  instead of a dead session.
+   *
+   *  ONCE PER DISTINCT FAULT, NOT ONCE EVER. This used to keep a single
+   *  `_frameErr` and report only if it was unset, so the FIRST throw of a
+   *  session silenced every different one after it for good — and a throw that
+   *  repeats every frame, which is the normal case, means the first one is
+   *  always already there. `_syncLights` (r266) sat in that shadow: it fired
+   *  on frame one of every level, so any second bug in the same session was
+   *  invisible, to a player and to every probe. Keyed on the message and the
+   *  top stack frame instead: each distinct fault still reports exactly once,
+   *  and a new one is never hidden by an old one. */
   frame() {
     try {
       this._frameBody();
     } catch (err) {
-      if (!this._frameErr) {
-        this._frameErr = err;
+      this._frameErrs ??= new Set();
+      const key = `${err?.message || err}@${String(err?.stack || '').split('\n')[1]?.trim() || '?'}`;
+      if (!this._frameErrs.has(key)) {
+        this._frameErrs.add(key);
+        this._frameErr ??= err;             // first one, for anything that asks
         console.error('[frame] recovered from', err);
         this.hud?.feed?.('GLITCH RECOVERED', 'bad');
       }

@@ -180,6 +180,21 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `swallowed.mjs` EVERY EXCEPTION THE FRAME LOOP IS EATING. Drives each level
+                with throttle, steering and all four weapons, and collects what
+                `Game.frame()`'s catch printed. Anything it lists is a real bug
+                the game is hiding. It THROWS if a method it means to call is
+                missing, because its first cut used five names that do not
+                exist and `?.` made every one a silent no-op — it reported
+                clean having tested nothing but driving in a straight line.
+- `carvisible.mjs` can you SEE the cars: each car masked with a key colour,
+                then every one of its pixels scored in CIE76 against the ground
+                ring around it. Report `visiblePct`, not the mean — a car
+                holding black tyres and pale bodywork averages out to the
+                colour of the road while every part of it separates cleanly,
+                and that artefact cost r267 a whole invented bug. `PLATE=off`
+                is the shape of a correct A/B: hide the thing under test, never
+                rebuild the scene without it.
 - `playermoves.mjs` DOES THE PLAYER'S CAR DRIVE. Holds the throttle, then
                 asserts the car moves, the chase camera is not at the world
                 ORIGIN, and nothing was swallowed by the frame loop's catch.

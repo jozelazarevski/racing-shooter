@@ -77,7 +77,13 @@ for (const lvl of LEVELS) {
       if (0.2126 * px[k] + 0.7152 * px[k+1] + 0.0722 * px[k+2] < 18) dark++;
     }
     r /= n; gg /= n; bl /= n;
+    // THE MINIMUM CHANNEL is the number that named NEO-KYOTO: blue at 9 out of
+    // 255 while the frame averaged 62 luminance. A world can be any colour it
+    // likes; a world with a channel on the floor has no gamut left for a
+    // surface colour to say anything with, and the tell is that the player's
+    // own car stops being the colour it is painted.
     return { mean: [r, gg, bl].map((v) => +v.toFixed(1)),
+      minChannel: +Math.min(r, gg, bl).toFixed(1),
       greenExcess: +(gg - (r + bl) / 2).toFixed(1),
       lum: +(0.2126 * r + 0.7152 * gg + 0.0722 * bl).toFixed(1),
       blownPct: +(100 * blown / n).toFixed(2), darkPct: +(100 * dark / n).toFixed(1) };

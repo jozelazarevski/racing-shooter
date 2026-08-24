@@ -3227,3 +3227,80 @@ lamps are on (they could not have been before — `_syncLights` threw).
    travelled and failed it at 64 u ten minutes later. Wall-clock windows, and
    `camToCar` is REPORTED rather than asserted: the camera lerps in from the
    origin and a grid 264 u out is still arriving when the window shuts.
+
+## r267 — A CLEAN BILL OF HEALTH, AND A PHANTOM
+r266 found `_syncLights` by accident, and the thing that made it invisible was
+the frame loop's own catch. So this round went looking for the rest of that
+class, and for whatever else the undercity green was a symptom of. One real
+fix, one clean sweep, and one bug that turned out not to exist.
+
+### THE CATCH REPORTED ONCE. EVER.
+`Game.frame()` kept a single `_frameErr` and reported only if it was unset, so
+the FIRST throw of a session silenced every DIFFERENT one after it, permanently.
+And a throw that repeats every frame — which is the normal case — means the
+first one is always already there. `_syncLights` sat in exactly that shadow: it
+fired on frame one of every level, so any second fault in the same session was
+invisible to a player and to every probe. Keyed on the message and the top
+stack frame now: each distinct fault reports exactly once, and a new one is
+never hidden behind an old one.
+
+### AND THEN NOTHING WAS HIDING
+`swallowed.mjs` drives each level for seven seconds — throttle, steering,
+cannon, missiles, mines, shockwave — and collects whatever the catch printed.
+Twelve levels across every biome: **nothing swallowed.** `_syncLights` was the
+only one of its kind.
+
+The first cut of that sweep reported clean having tested nothing. It called
+`g.fireCannon?.()`, `g.dropMine?.()` and three more names that do not exist —
+the real API is `game.weapons.fireBullet/fireMissile/dropMine/fireShockwave(car)`
+— and `?.` turned every one into a silent no-op. Same shape as r266's
+`input.throttle` getter. **A probe that cannot find its subject must SAY SO,
+not pass**: it now throws on a missing name.
+
+### THE PHANTOM, IN THREE WRONG METRICS
+The undercity green was found because a saturated light drags every albedo in
+the frame toward one hue. Does that swallow the CARS anywhere else? A static
+scan for the same signature — saturation times intensity — flagged `volcano`,
+`wildfire`, `oldtown` and `neon`, and `worldcast.mjs` gained `minChannel`, the
+number that named NEO-KYOTO (blue at 9/255). EMBER PASS came back at
+(86, 28.6, **8.6**) and FOREST FIRE ESCAPE at (95, 26.1, **11**) — worse, on
+that measure, than the undercity ever was. And looking at FOREST FIRE ESCAPE, a
+red rival on a red road looked genuinely lost.
+
+So `carvisible.mjs`: mask each car, measure its CIE76 distance from the ground
+ring around it. Three metrics before one of them was right.
+
+1. **Mask by diffing a hidden car.** Reported delta-E 1 to 4 for EVERY world,
+   PINE VALLEY included, where the car is plainly visible. A metric that cannot
+   separate a world you know works from one you suspect does not is measuring
+   noise — and it was: a threshold of 22 summed over three channels is met by
+   seven per channel, so the mask filled with antialiasing and drifting embers.
+   Key-colour masking instead, which is the ground truth `eyesweep.mjs` had to
+   learn for the same reason.
+2. **Mean car against mean ground.** Now it discriminated — and said the fire
+   worlds were fine (26 to 35) while the pale rival was at **5.8** on PINE
+   VALLEY, 6.4 on REDWOOD, 8.5 on NEO-KYOTO. Two of seven rivals are near-white
+   (DUNE `#dce8f0`, ALPINE `#f2f0e8`) and almost every ground in this game is
+   pale. That reads as a real, structural bug, so every car got a thin dark
+   ground plate — paint-independent, sized inside the wheel track so no
+   bounding box moved. It changed the number by **0.3**.
+3. **Per pixel.** A change that measures as almost nothing is usually the
+   metric, not the change (r265, the tree tints). It was. The mean of a car
+   against the mean of its ground asks whether the car matches ON AVERAGE, and
+   that is not what makes a shape visible: a car holding both black tyres and
+   pale bodywork averages out to the colour of the road while every part of it
+   separates cleanly. Score each car pixel instead:
+
+```
+                      visible%   median dE
+PINE VALLEY  rival 2    86.7       34.1     (mean-vs-mean said 5.8)
+REDWOOD      rival 2    72.8       33.1     (said 6.4)
+every car, every world  73-99      33-66
+```
+
+**There was no visibility bug.** The plate is reverted: it bought under 1.5
+points on a metric where everything already passes, and this repo does not ship
+geometry that cannot show its work — the same rule that cut the grass tufts and
+the pine crowns. The probe stays, with its three failures written into it, and
+the `PLATE=off` toggle stays as the shape of a correct A/B: hide the thing,
+never rebuild the scene without it.
