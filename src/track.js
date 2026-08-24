@@ -9819,7 +9819,17 @@ export class Track {
         if (!clear) continue;
         this.solids.push({ x: bx + ox, z: bz + oz, r: 0.6, y: c.y, mat: 'metal' });
       }
-      for (let ly = 2.5; ly <= 8.5; ly += 3) {
+      // A PLATFORM OVER SOMEONE'S ROAD IS OVERHEAD, OR IT IS A BODY. The legs
+      // already follow r253 — where the tower cannot clear the carriageway
+      // they hang above the cars instead of standing in the road — but the
+      // brace ladder still started at 2.5 u, under the 2.4 u roof line the
+      // census measures headroom against, so an uncleared tower parked a bare
+      // wooden slab at windscreen height in the lane. MOUNTAIN TO SEA's
+      // seafront apron is 45 u of drivable half-width and the walk above
+      // tops out at 29.5 u, so its towers can never clear: their lowest
+      // platform hoists out of headroom with the legs.
+      const lyFloor = best.margin >= 0.6 ? 2.5 : 3.8;
+      for (let ly = lyFloor; ly <= 8.5; ly += 3) {
         const brace = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.22, 2.1), wood);
         brace.position.set(bx, y0 + ly, bz);
         brace.castShadow = true;
