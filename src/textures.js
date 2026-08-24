@@ -2792,3 +2792,18 @@ export function roofTileTexture(base = '#8a3a2a', kind = 'pantile') {
     }
   });
 }
+
+// ---------------------------------------------------------------------------
+// PAGE-LIFETIME CACHES ARE BUILT NOW, AT MODULE LOAD — never inside a build.
+//
+// World generation seeds Math.random for the duration of Track construction
+// (rng.js), and a texture that paints lazily on the FIRST build consumes
+// seeded draws that no later build repeats: same seed, different world.
+// Measured on PINE VALLEY: the noise tile's 65,536 dither draws shifted the
+// whole scatter stream, so the forest the page booted with could not be
+// rebuilt by the editor's own APPLY — CLEAR ALL "restored" a world that had
+// never existed. Painting the shared caches here costs the same draws once,
+// from the ordinary unseeded generator, where they can shift nothing.
+// ---------------------------------------------------------------------------
+noiseTile();
+contactShadowTexture();

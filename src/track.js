@@ -23542,3 +23542,19 @@ export function withSeed(seed, fn) {
     Math.random = real;
   }
 }
+
+// ---------------------------------------------------------------------------
+// PAGE-LIFETIME CACHES ARE BUILT NOW, AT MODULE LOAD — never inside a build.
+//
+// Same law as the texture caches (see textures.js, foot of the file): world
+// generation runs on a seeded Math.random, so anything memoised across builds
+// must not lazily construct inside the FIRST build — its draws (three pulls
+// every new object's UUID from Math.random) would come out of that build's
+// stream and out of no other, and the boot world could never be rebuilt.
+// The bare Sprite warms three's OWN lazy: the shared plane geometry three
+// builds on the first Sprite the page ever constructs, which used to be a
+// cloud, mid-build.
+// ---------------------------------------------------------------------------
+gablePrismGeo();
+propAssets();
+new THREE.Sprite().material.dispose();
