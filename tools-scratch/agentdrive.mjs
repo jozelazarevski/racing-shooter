@@ -23,6 +23,8 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 800, height: 520 } });
 page.setDefaultTimeout(300000);
+// DIFF=easy|normal|hard pins the difficulty the game reads from localStorage
+if (process.env.DIFF) await page.addInitScript((d) => localStorage.setItem('ir-diff', d), process.env.DIFF);
 
 const rows = [];
 for (const id of process.argv.slice(2).map(Number)) {
