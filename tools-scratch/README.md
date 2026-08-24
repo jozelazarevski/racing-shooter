@@ -180,6 +180,18 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `landscape.mjs` does the game fill the screen, and which HUD boxes land on
+                each other, at a set of real device sizes. It measures
+                `#joy-base` (the ring you can see) and NOT `#joy-zone` (the
+                invisible 52% touch region every button is meant to sit on) —
+                counting the zone made the whole report false positives.
+- `wedgetest.mjs` can a car pinned on a barrier ever get out. It does NOT wait
+                for the rescue to fire — that needs 5 s of `dt` at 0.05 and
+                swiftshader gives two frames a second — and it does NOT pass on
+                the car having travelled, which a car steering round the
+                obstruction also does. It pins the car, injects the jitter a
+                real wall gives, and counts how often the wedge timer goes
+                BACKWARDS. That is the thing the fix changed.
 - `camoccl.mjs`  is anything between the eye and the car, every few frames of a
                 real run. A probe can `import('three')` in the page — the
                 import map applies — so this uses a real Raycaster and needs no

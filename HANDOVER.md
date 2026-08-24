@@ -3474,3 +3474,71 @@ load-bearing by accident now has the thing it guards on the other side of it.
 
 The report itself stays open and honest: I do not know what produced that
 frame, and I have written down the four things it is not.
+
+## r271 — LANDSCAPE, AND THE CAR THAT NEVER COUNTED AS STUCK
+Two, reported together off a tablet held sideways.
+
+### THE HUD WAS LAID OUT FOR A TALL SCREEN
+`landscape.mjs` measures every visible HUD box and reports the pairs that
+overlap, which turns "it looks cramped" into a list:
+
+```
+health-box x joy-base   8194 px2      the stick's ring on the hull readout
+t-unstuck  x info-box                 SOS through the CONTRACTS list
+t-unstuck  x health-box
+```
+
+Three causes, all of them the same mistake — treating landscape as portrait
+with less height:
+
+1. `#joy-zone{height:80%}` in the `max-height:560px` block. On the screen with
+   the LEAST height, the stick's zone was made TALLER. Landscape's spare room
+   is horizontal: 52% wide, 47% tall.
+2. `#t-unstuck{bottom:214px}`. On a 402-tall screen that is y=144 — straight
+   through the contracts list. Moved along the bottom edge, clear of the ring
+   and the speedo.
+3. And the one that mattered: **`base.style.top = r.height - 110`**
+   (`input.js`). The zone is anchored to the bottom, so this puts the ring's
+   centre 110 px off the floor on EVERY screen, whatever the zone's size. At
+   402 tall that is y=292, and with a 62 px radius the ring reaches 230 and
+   sits on the hull panel. Shrinking the zone did not move it — the overlap
+   came back **identical to the pixel**, which is the tell every time. Now
+   `Math.min(110, innerHeight * 0.22)`: unchanged in portrait, 88 in landscape.
+
+All three orientations: **no visible overlaps**.
+
+### AND THE GREEN BANDS
+`setSize(w, h)` writes `style.width/height` in pixels, which overrides the
+`inset:0` that is supposed to make the canvas cover the screen. Anywhere
+`innerWidth` is narrower than what the player can actually see — iOS insets the
+layout away from the notch in landscape — the page background shows through as
+a band down each edge, and that background was `#7fb85c`. `setSize(w, h,
+false)` leaves the CSS alone so the canvas covers by `inset:0`, and the page
+behind it is black, so anything left over reads as a bezel instead of a fault.
+
+### THE WEDGE NET COULD NOT SEE A CAR GRINDING ON A WALL
+Photographed: 0 km/h, lap 0 of 3, thirty-nine seconds in, last of eight, car in
+the barrier. The player DOES have a free rescue — `_wedgeT > 5` — and it never
+fired, because the test was
+
+    input.throttle > 0.5 && speed < 0.8      // and the timer reset to ZERO
+
+A car pinned on a barrier is never still. It jitters, bounces and scrubs, and
+ONE frame above 0.8 in five seconds cleared the clock. It was going nowhere and
+it never qualified as wedged. Now it is judged on DISPLACEMENT: anchor a
+position while the throttle is held, and six metres of real progress clears the
+anchor. Six metres in five seconds is 4.3 km/h, so a genuine crawl is untouched.
+
+The rescue also re-seated the car at the SAME index — the exact trap the
+rivals' pit-lift was fixed for in `EnemyCar._liftAhead`, never carried across to
+the player. Rescues that follow within 25 s now step further down the lap.
+
+`wedgetest.mjs` took three cuts to be worth anything, and the first two are
+worth recording. It first passed as soon as the car had travelled 25 u — which
+a car that simply steers around the obstruction also does, proving nothing. It
+then waited for the rescue itself and could never see it: the net needs five
+seconds of `dt`, `dt` is clamped to 0.05, and swiftshader gives about two
+frames a second — over a hundred frames of wall clock for one assertion. So it
+now tests what actually changed: pin the car, inject jitter, count how often the
+timer goes BACKWARDS. **60 frames, 0 resets, peak 3.0 s — at speeds of 1.68 to
+2.09, every one of them above the old 0.8 cut-off** that would have zeroed it.

@@ -1465,7 +1465,14 @@ class Game {
       canvas: this.canvas, antialias: true, powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.isTouch ? 1.75 : 2));
-    this.renderer.setSize(innerWidth, innerHeight);
+    // CSS OWNS THE BOX, THE RENDERER OWNS THE BUFFER. `setSize` with its
+    // default third argument writes `style.width/height` in pixels, which
+    // overrides the `inset:0` that is supposed to make the canvas cover the
+    // screen — so anywhere `innerWidth` is narrower than what the player can
+    // actually see (iOS insets the layout away from the notch in landscape),
+    // the page background shows through as a band down each edge. Reported as
+    // exactly that, a green bar on both sides. `false` leaves the CSS alone.
+    this.renderer.setSize(innerWidth, innerHeight, false);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1616,7 +1623,7 @@ class Game {
       this.baseFov = innerHeight > innerWidth ? 68 : 56; // widen for portrait phones
       this.camera.fov = this.baseFov;
       this.camera.updateProjectionMatrix();
-      this.renderer.setSize(innerWidth, innerHeight);
+      this.renderer.setSize(innerWidth, innerHeight, false);   // see the ctor
       this.composer.setSize(innerWidth, innerHeight);
       if (this.input.resetJoystick) this.input.resetJoystick();
     };

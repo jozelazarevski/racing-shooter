@@ -45,7 +45,12 @@
     --gold-dim:#c9a86a; --cream:#ffe9a8;
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{width:100%;height:100%;overflow:hidden;background:#7fb85c;
+  /* BLACK BEHIND THE CANVAS, NOT LIME. Anything the canvas does not cover —
+     an iOS landscape safe-area band, a frame during a resize — shows this
+     colour, and a bright green bar down each edge of a night race reads as a
+     broken layout. Black reads as a bezel. */
+  html{background:#000}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;
     font-family:'Baloo 2','Segoe UI',system-ui,sans-serif;color:#fff3d0;
     -webkit-user-select:none;user-select:none;touch-action:none;overscroll-behavior:none}
   #game-canvas{position:fixed;inset:0;display:block;touch-action:none}
@@ -365,7 +370,21 @@
       align-items:center}
     body.touch #speed-box{bottom:10px}
     body.touch #speedo{width:84px;height:84px}
-    #joy-zone{width:40%;height:80%}
+    /* WIDER, NOT TALLER. This said `height:80%` — on the screen with the LEAST
+       height, it grew the stick's zone vertically, which lifts its resting
+       ring up into the left-hand panel column: `landscape.mjs` measured the
+       ring overlapping HULL INTEGRITY. Landscape's spare room is horizontal,
+       so the zone takes width and gives back height. */
+    #joy-zone{width:52%;height:47%}
+    /* SOS OUT OF THE PANELS. At `bottom:214` on a 402-tall screen the button
+       lands at y=144 — straight through the CONTRACTS list and the top of the
+       hull box, which is exactly where it was photographed. The bottom-left
+       corner is below the stick's ring and clear of both. */
+    #t-unstuck{left:calc(196px + env(safe-area-inset-left));
+      bottom:calc(10px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-unstuck{left:auto;
+      right:calc(12px + env(safe-area-inset-right));
+      bottom:calc(10px + env(safe-area-inset-bottom))}
     #t-nitro{right:calc(200px + env(safe-area-inset-right));bottom:calc(42px + env(safe-area-inset-bottom))}
     #t-mine{bottom:calc(118px + env(safe-area-inset-bottom))}
     #t-shock{bottom:calc(140px + env(safe-area-inset-bottom))}
@@ -1958,7 +1977,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r270</div>
+<div id="build-tag">r271</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2285,10 +2304,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r270"></script>
+<script type="module" src="./src/main.js?v=r271"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r270"></script>
+<script src="./src/offline.js?v=r271"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r270"></script>
+<script type="module" src="./src/traffic.js?v=r271"></script>
 </body>
 </html>
