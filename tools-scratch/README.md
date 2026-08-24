@@ -180,6 +180,11 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `titlecar.mjs` is your car in the ATTRACT SHOT behind the menu: whether the
+                mesh is in the scene, visible, has a hidden ancestor, and where
+                it projects — then a screenshot with the menu chrome hidden,
+                which is the only way to see what is really behind the panel.
+                It found the car at NDC x 0.87 while every flag said "visible".
 - `landscape.mjs` does the game fill the screen, and which HUD boxes land on
                 each other, at a set of real device sizes. It measures
                 `#joy-base` (the ring you can see) and NOT `#joy-zone` (the

@@ -3542,3 +3542,23 @@ frames a second — over a hundred frames of wall clock for one assertion. So it
 now tests what actually changed: pin the car, inject jitter, count how often the
 timer goes BACKWARDS. **60 frames, 0 resets, peak 3.0 s — at speeds of 1.68 to
 2.09, every one of them above the old 0.8 cut-off** that would have zeroed it.
+
+## r272 — "CAR IS NOT VISIBLE HERE"
+Reported from the TRACKS tab. The title screen runs an attract camera behind
+the menu, and it orbited `track.center[0]` at radius 55, looking at the road's
+CENTRELINE.
+
+The player starts EIGHTH. That is the grid slot furthest from the centre —
+measured at 18.8 u off it — so the car projected to **NDC x 0.87**, hard against
+the right edge, cropped or behind the panel. `titlecar.mjs` confirmed the mesh
+was in the scene, visible, with no hidden ancestor, and simply not framed: the
+attract shot was an empty hillside with the whole eight-car field jammed into
+one corner.
+
+Orbit the CAR, at radius 26 and 11 up rather than 55 and 34, aimed 12.5 BELOW
+it so it rides high in the frame where a bottom-anchored menu leaves room.
+**NDC (0.87, -0.14) → (0.00, 0.52).**
+
+The panel still covers most of a portrait screen — that is what a full-screen
+track list does — but the car is now in the strip above it and down both edges,
+and in landscape it is plainly in shot. What it is NOT any more is absent.
