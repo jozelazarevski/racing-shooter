@@ -3382,3 +3382,46 @@ reason. Past twice the boom it snaps to where the mode says the eye belongs.
 After: camDist median **51.2** across the whole lap, max 80.3 — inside the
 leash, and two transient samples rather than a runaway. `boot.mjs` 4/4,
 `playermoves.mjs` passes CANYON RUN as well as PINE VALLEY.
+
+## r269 — "BRING BACK HEADLIGHTS FOR ALL CARS", AND WHY IT KEPT COMING BACK
+Asked a second time, which meant the first answer was wrong. It was.
+
+### WHAT IS ACTUALLY DEPLOYED
+`origin/main` is at **r245**, `gh-pages` carries `deploy: e72f52c` — main's head
+— and https://jozelazarevski.github.io/racing-shooter/ serves `build-tag r245`.
+Every round since is on `claude/design-replication-o09hkl` and has never been
+published. So the phone reports of the last several rounds are all reports
+about r245, and checking a symptom against the working tree answers a question
+nobody asked.
+
+`git show origin/main:src/vehicles.js | grep -c carLights` → **0**. The whole
+merged lamp rig does not exist there. r245 does headlights as commit 55bdd77
+describes them: "One spotlight, built ONCE at startup and left in the scene for
+the whole session" — a single `THREE.SpotLight` on `this._headlight`, attached
+to the PLAYER. One headlight in the world, and it belongs to you. That is
+exactly and completely why only the player's car throws a beam in the phone
+shots, and "bring back headlights for all cars" is a precise description of it.
+
+The per-car rig — every car carrying its own merged additive lamps, pools and
+tail lenses in one draw call — is branch work. It answers the report. It has
+simply never reached the player.
+
+### TWO REAL FAULTS FOUND WHILE LOOKING ANYWAY
+**The cache that could only cost you your headlights.** `_syncLights`
+remembered the track it had decided for and returned early ever after — so the
+decision stuck to a CAR that had since been given a different MESH, and a
+freshly built rig has its lamps off. `swapPlayerCar` knew to clear the flag by
+hand; nothing else did and nothing added later would. It was guarding one
+boolean write per car per frame, eight on a full grid. Gone.
+
+**The fade, again.** r268 took `CAR_LIGHT_TOPDOWN_CUT` from 0.72 to 0.45, and
+0.45 still halves the beam in the mode the game opens in. Halved is what "some
+cars have headlights and some don't" looks like on a phone. 0.18: top-down
+opacity 0.238 → 0.468 → **0.697**. The purist case for a deep cut — a wedge
+lying flat on the road reads as paint rather than light — loses to being asked
+twice. What survives is a gentle taper rather than a cliff.
+
+Verified with `fieldshot.mjs`, which packs the field round the player and
+shoots a named camera: NEON GRID, all eight cars `on`, every one throwing a
+visible wedge in TOP-DOWN. PINE VALLEY, all eight `OFF`, so `worldIsDark` still
+does its job and nobody drives a daylit world with the lights burning.

@@ -180,6 +180,11 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `fieldshot.mjs` the WHOLE FIELD in one frame, for judging anything per-car:
+                packs the rivals round the player and shoots a named camera
+                mode, printing each car's lamp state beside the picture. "Do
+                all the cars have headlights" should be a photograph, not an
+                argument.
 - `caproll.mjs`  the camera round a WHOLE LAP without teleporting it. Rails the
                 car one small index step a frame and samples occlusion, camera
                 distance and where the car projects. Teleporting between

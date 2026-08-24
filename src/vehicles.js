@@ -321,8 +321,16 @@ export function fadeCarLights(camera) {
  *  "some cars have headlights and some don't". The reason for the fade is
  *  real (a wedge lying flat on the road, seen from straight above, is a
  *  painted puddle rather than light), so it stays — it just may not take the
- *  read away entirely. */
-export const CAR_LIGHT_TOPDOWN_CUT = 0.45;
+ *  read away entirely.
+ *
+ *  ...AND THEN 0.18, ASKED FOR A SECOND TIME. 0.45 still halved the beam in
+ *  the mode the game opens in, and halved is what "some cars have headlights
+ *  and some don't" looks like on a phone. The purist argument for a deep cut —
+ *  that a wedge lying flat on the road, seen from above, reads as paint rather
+ *  than as light — loses to being asked twice for headlights. What survives of
+ *  it is a gentle taper: straight down is still a little softer than a chase
+ *  view rather than identical to it. */
+export const CAR_LIGHT_TOPDOWN_CUT = 0.18;
 
 export function buildVoxelRacer(spec) {
   const { body, accent, stripe = null, number = null, style = 'crown', rims = null } = spec;
@@ -3662,11 +3670,15 @@ export class Car {
    *  origin. Anything both subclasses call belongs on the base class.
    */
   _syncLights() {
-    const t = this.game?.track;
-    if (this._litFor === t) return;
-    this._litFor = t;
+    // NO CACHE. This used to remember the track it had decided for and return
+    // early on every frame after, which made the decision stick to a car that
+    // had since been given a different MESH — and a freshly built rig has its
+    // lamps OFF. `swapPlayerCar` knew to clear the flag by hand; nothing else
+    // did, and nothing added later would. The cache was guarding one boolean
+    // write per car per frame, eight on a full grid. It bought nothing and the
+    // only thing it could cost you was your headlights.
     const lt = this.mesh?.userData?.carLights;
-    if (lt) lt.visible = worldIsDark(t?.T);
+    if (lt) lt.visible = worldIsDark(this.game?.track?.T);
   }
 }
 
