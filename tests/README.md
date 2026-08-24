@@ -86,7 +86,10 @@ alone lands the draft in the row, debounced rather than per-dab; a push still
 in its debounce window is flushed on pagehide; the top-bar save chip shows
 CLOUD ✓ only after the row answered; two devices' drafts merge as whole
 documents, never a spliced chimera; and stroke dedupe still collapses through
-the grid).
+the grid), `test-palette.mjs` (every palette button builds a real thing, all
+the way down: template exists, previews the moment it is tapped, has a
+thumbnail, stamps into the rebuilt world with its collider at APPLY, and RUN
+turns a fence bay into a fence — N bays at SPACING apart).
 
 ## Diagnostics — `tool-*.mjs`, not gates
 

@@ -5726,6 +5726,162 @@ export const HOUSE_TEMPLATES = {
     ['cyl', 0, 1.50, 0.55, 1.05, 4.6, 1.05, 'trim', Math.PI / 2],
     ['cyl', 0, 2.45, 0, 1.05, 4.6, 1.05, 'trim', Math.PI / 2],
   ] },
+
+  // ---- BASIC COMPONENTS -----------------------------------------------------
+  // The pieces the editor's RUN tool was written about. EDITOR.md promises "a
+  // fence, an avenue, a village street and a line of pylons are all one
+  // gesture" — and the palette never carried a fence or a pylon to repeat.
+  // Each linear piece is sized so RUN at spacing 4 closes the row: a wall bay
+  // is 4.35 u long, a fence rail meets the next post. Solids on the thin
+  // pieces are deliberately SMALLER than the drawn length — a circle is the
+  // only collider shape a solid has, and a circle as long as the wall is an
+  // invisible wall beside it, which is worse than a clippable end.
+
+  // A drystone field wall bay with a pier — RUN it for a boundary.
+  stonewall: { r: 1.3, mat: 'stone', run: 4, uniform: true, runAlign: true, parts: [
+    // tall enough that the crest clears the terrain's own noise — a 1 u wall
+    // seated 0.25 into the ground read as a row of orphan piers
+    ['box', 0, 0, 0, 4.35, 1.5, 0.6, 'stone'],
+    ['box', 0, 1.5, 0, 4.5, 0.24, 0.78, 'trim'],             // coping course
+    ['box', -2.05, 0, 0, 0.6, 1.95, 0.9, 'stone'],           // pier
+    ['box', -2.05, 1.95, 0, 0.76, 0.18, 1.06, 'trim'],
+  ] },
+  // A post-and-two-rail paddock fence bay.
+  fencebay: { r: 1.1, run: 4, uniform: true, runAlign: true, parts: [
+    ['box', -1.95, 0, 0, 0.2, 1.3, 0.2, 'trim'],
+    ['box', 1.95, 0, 0, 0.2, 1.3, 0.2, 'trim'],
+    ['box', 0, 0, 0, 0.18, 1.15, 0.18, 'trim'],
+    ['box', 0, 0.55, 0, 4.1, 0.16, 0.09, 'trim'],
+    ['box', 0, 1.02, 0, 4.1, 0.16, 0.09, 'trim'],
+  ] },
+  // A breached wall corner with a stepped top — ruin dressing that composes
+  // with puebloRuin and CLEAR AREA into believable abandonment. All masonry
+  // 'box'/'stone' — never 'wall', whose bucket carries lit windows.
+  ruinwall: { r: 3.2, mat: 'stone', parts: [
+    ['box', -1.2, 0, -2.2, 4.4, 3.4, 0.75, 'wall2'],         // long wall, plaster remnant
+    ['box', -2.95, 0, -2.2, 1.0, 5.2, 1.0, 'stone'],         // tall broken quoin
+    ['box', -2.95, 5.2, -2.2, 1.15, 0.4, 1.15, 'trim'],      // its ragged cap
+    ['box', 0.6, 0, -2.2, 1.2, 1.7, 0.85, 'stone'],          // slumped mid course
+    ['box', 2.2, 0, -0.4, 0.8, 2.6, 3.6, 'wall2'],           // return wall
+    ['box', 2.2, 0, 1.9, 1.0, 1.2, 1.3, 'stone'],            // its broken end
+    ['box', -0.2, 1.2, -2.25, 1.3, 1.5, 0.9, 0x241c14],      // empty window
+    ['box', -0.6, 0, 0.6, 1.5, 0.9, 1.2, 'stone'],           // tumbled blocks
+    ['box', 0.9, 0, 1.6, 1.0, 0.6, 0.9, 'stone'],
+    ['cone', 1.0, 0, -1.2, 2.2, 1.2, 2.2, 'stone'],          // scree
+  ] },
+  // A round keep with a battlemented crown — the landmark for a hilltop.
+  stonetower: { r: 3.0, mat: 'stone', parts: [
+    ['cyl', 0, 0, 0, 5.2, 10.5, 5.2, 'stone'],               // shaft
+    ['cyl', 0, 0, 0, 6.0, 1.8, 6.0, 'trim'],                 // battered base
+    ['cyl', 0, 3.6, 0, 5.4, 0.35, 5.4, 'trim'],              // string courses
+    ['cyl', 0, 7.0, 0, 5.4, 0.35, 5.4, 'trim'],
+    ['cyl', 0, 10.5, 0, 6.4, 1.0, 6.4, 'trim'],              // corbelled crown
+    ['box', 0, 11.5, 0, 1.1, 1.2, 6.6, 'stone'],             // merlons, crossed
+    ['box', 0, 11.5, 0, 6.6, 1.2, 1.1, 'stone'],
+    ['box', 0, 0.3, 2.4, 1.6, 2.8, 0.7, 'trim'],             // door
+    ['box', 0, 5.0, 2.55, 0.6, 1.3, 0.4, 0x201812],          // arrow slits
+    ['box', 0, 8.4, 2.55, 0.6, 1.3, 0.4, 0x201812],
+    ['box', 2.55, 5.9, 0, 0.4, 1.3, 0.6, 0x201812],
+  ] },
+  // An open pavilion — a post ring under a cone roof, the village green
+  // centrepiece.
+  gazebo: { r: 2.4, mat: 'stone', parts: [
+    ['cyl', 0, 0, 0, 5.4, 0.5, 5.4, 'stone'],                // stepped floor
+    ['cyl', 0, 0.5, 0, 4.6, 0.35, 4.6, 'trim'],
+    ['cyl', -2.0, 0.85, 0, 0.26, 2.9, 0.26, 'trim'],         // posts
+    ['cyl', 2.0, 0.85, 0, 0.26, 2.9, 0.26, 'trim'],
+    ['cyl', 0, 0.85, -2.0, 0.26, 2.9, 0.26, 'trim'],
+    ['cyl', 0, 0.85, 2.0, 0.26, 2.9, 0.26, 'trim'],
+    ['cyl', -1.42, 0.85, -1.42, 0.26, 2.9, 0.26, 'trim'],
+    ['cyl', 1.42, 0.85, 1.42, 0.26, 2.9, 0.26, 'trim'],
+    ['cyl', 0, 3.75, 0, 5.0, 0.3, 5.0, 'trim'],              // ring beam
+    ['cone', 0, 4.05, 0, 5.6, 2.2, 5.6, 'roof'],
+    ['cyl', 0, 6.25, 0, 0.4, 0.8, 0.4, 'trim'],              // finial
+  ] },
+  // A plaza obelisk on a stepped plinth.
+  obelisk: { r: 1.3, mat: 'stone', parts: [
+    ['box', 0, 0, 0, 3.0, 0.5, 3.0, 'stone'],
+    ['box', 0, 0.5, 0, 2.2, 0.6, 2.2, 'stone'],
+    ['box', 0, 1.1, 0, 1.1, 5.6, 1.1, 'wall2'],              // shaft
+    ['box', 0, 6.7, 0, 0.8, 1.4, 0.8, 'wall2'],              // taper course
+    ['cone', 0, 8.1, 0, 0.8, 0.9, 0.8, 'trim'],              // pyramidion
+  ] },
+
+  // ---- STREET FURNITURE -----------------------------------------------------
+  // A cast lamp post — RUN it for an avenue. The head is a literal warm hex
+  // so no theme can re-tint the lamp glass to the wall colour.
+  lamppost: { r: 0.45, mat: 'metal', run: 16, uniform: true, parts: [
+    ['cyl', 0, 0, 0, 0.55, 0.5, 0.55, 'stone'],              // base
+    ['cyl', 0, 0.5, 0, 0.22, 4.1, 0.22, 'trim'],             // column
+    ['cyl', 0, 4.6, 0, 0.34, 0.18, 0.34, 'trim'],            // collar
+    ['box', 0, 4.78, 0, 0.52, 0.62, 0.52, 0xffe2a8],         // lantern
+    ['cone', 0, 5.4, 0, 0.72, 0.4, 0.72, 'trim'],            // cap
+  ] },
+  // A lattice transmission pylon — the RUN example EDITOR.md always promised.
+  // All 'stone' (grey) — a wooden-brown pylon reads as a gallows.
+  pylon: { r: 1.5, mat: 'metal', run: 42, uniform: true, parts: [
+    ['box', -1.25, 0, -1.25, 0.28, 7.0, 0.28, 'stone'],      // legs
+    ['box', 1.25, 0, -1.25, 0.28, 7.0, 0.28, 'stone'],
+    ['box', -1.25, 0, 1.25, 0.28, 7.0, 0.28, 'stone'],
+    ['box', 1.25, 0, 1.25, 0.28, 7.0, 0.28, 'stone'],
+    ['box', 0, 2.6, -1.25, 2.75, 0.16, 0.16, 'stone'],       // brace ring, waist
+    ['box', 0, 2.6, 1.25, 2.75, 0.16, 0.16, 'stone'],
+    ['box', -1.25, 2.6, 0, 0.16, 0.16, 2.75, 'stone'],
+    ['box', 1.25, 2.6, 0, 0.16, 0.16, 2.75, 'stone'],
+    ['box', 0, 5.4, -1.25, 2.75, 0.16, 0.16, 'stone'],       // brace ring, shoulder
+    ['box', 0, 5.4, 1.25, 2.75, 0.16, 0.16, 'stone'],
+    ['box', -1.25, 5.4, 0, 0.16, 0.16, 2.75, 'stone'],
+    ['box', 1.25, 5.4, 0, 0.16, 0.16, 2.75, 'stone'],
+    ['box', 0, 7.0, 0, 0.8, 5.2, 0.8, 'stone'],              // upper mast
+    ['box', 0, 8.2, 0, 7.6, 0.3, 0.42, 'stone'],             // lower crossarm
+    ['box', 0, 10.4, 0, 5.6, 0.3, 0.42, 'stone'],            // upper crossarm
+    ['cyl', -3.4, 7.5, 0, 0.18, 0.7, 0.18, 'trim'],          // insulators
+    ['cyl', 3.4, 7.5, 0, 0.18, 0.7, 0.18, 'trim'],
+    ['cyl', -2.4, 9.7, 0, 0.18, 0.7, 0.18, 'trim'],
+    ['cyl', 2.4, 9.7, 0, 0.18, 0.7, 0.18, 'trim'],
+  ] },
+  // A market stall: counter, corner posts and a canted canvas roof.
+  stall: { r: 2.2, parts: [
+    ['box', 0, 0, 0, 4.0, 1.1, 2.4, 'wall2'],                // counter
+    ['box', 0, 1.1, 0, 4.2, 0.12, 2.6, 'trim'],              // counter top
+    ['box', -1.9, 0, -1.1, 0.16, 2.9, 0.16, 'trim'],         // posts
+    ['box', 1.9, 0, -1.1, 0.16, 2.9, 0.16, 'trim'],
+    ['box', -1.9, 0, 1.1, 0.16, 2.5, 0.16, 'trim'],
+    ['box', 1.9, 0, 1.1, 0.16, 2.5, 0.16, 'trim'],
+    ['box', 0, 2.75, 0, 4.6, 0.14, 3.2, 'roof', 0.16],       // canted canvas
+    ['box', 0, 0.2, 1.35, 3.2, 0.7, 0.5, 'stone'],           // crates out front
+  ] },
+  // A two-bowl stone fountain; the water discs are literal so they stay water.
+  fountain: { r: 2.0, mat: 'stone', parts: [
+    ['cyl', 0, 0, 0, 4.4, 0.7, 4.4, 'stone'],                // basin wall
+    ['cyl', 0, 0.7, 0, 4.55, 0.18, 4.55, 'trim'],            // rim
+    ['cyl', 0, 0.5, 0, 4.0, 0.4, 4.0, 0x5fa8c8],             // water, up at the rim
+    ['cyl', 0, 0.7, 0, 0.9, 1.5, 0.9, 'wall2'],              // column
+    ['cyl', 0, 2.2, 0, 2.2, 0.3, 2.2, 'trim'],               // upper bowl
+    ['cyl', 0, 2.5, 0, 1.9, 0.16, 1.9, 0x5fa8c8],            // upper water
+    ['cyl', 0, 2.66, 0, 0.3, 0.9, 0.3, 'trim'],              // spout
+  ] },
+  // A shipping container — the literal rust-red stays whatever the theme.
+  container: { r: 3.2, mat: 'metal', parts: [
+    ['box', 0, 0, 0, 6.1, 2.6, 2.45, 0xa8402c],
+    ['box', -2.9, 0.05, 0, 0.18, 2.5, 2.55, 0x7c2c1e],       // door end
+    ['box', 3.05, 1.0, 0, 0.1, 0.5, 2.2, 0x7c2c1e],          // blank end seam
+    ['box', 0, 2.6, 0, 6.2, 0.1, 2.55, 0x7c2c1e],            // roof lip
+    ['box', 0, 0.0, 1.24, 5.9, 2.45, 0.06, 0x933726],        // ribbing hint
+    ['box', 0, 0.0, -1.24, 5.9, 2.45, 0.06, 0x933726],
+  ] },
+  // A four-leg water tower with a conical cap.
+  watertower: { r: 2.2, mat: 'metal', parts: [
+    ['cyl', -1.5, 0, -1.5, 0.24, 5.6, 0.24, 'trim'],         // legs
+    ['cyl', 1.5, 0, -1.5, 0.24, 5.6, 0.24, 'trim'],
+    ['cyl', -1.5, 0, 1.5, 0.24, 5.6, 0.24, 'trim'],
+    ['cyl', 1.5, 0, 1.5, 0.24, 5.6, 0.24, 'trim'],
+    ['box', 0, 2.6, 0, 3.4, 0.24, 3.4, 'trim'],              // brace ring
+    ['cyl', 0, 5.6, 0, 3.9, 3.0, 3.9, 'wall2'],              // tank
+    ['cyl', 0, 5.5, 0, 4.1, 0.3, 4.1, 'trim'],               // tank band
+    ['cone', 0, 8.6, 0, 4.3, 1.3, 4.3, 'roof'],
+    ['cyl', 0, 2.6, 0, 0.3, 3.2, 0.3, 'stone'],              // standpipe
+  ] },
 };
 // The cottage variants, for the builders that scatter dwellings at random.
 export const COTTAGES = ['cottageA', 'cottageB', 'cottageC',
@@ -15884,10 +16040,19 @@ export class Track {
     // property of the building rather than of its place in a queue, so the
     // preview and the rebuild agree exactly and neighbours stop restyling.
     const rnd = authored ? seededRandom(hashPlacement(type, x, z)) : Math.random;
-    const wS = 0.86 + rnd() * 0.34;
-    const dS = 0.86 + rnd() * 0.34;
-    const hS = 0.88 + rnd() * 0.34;
-    const mir = rnd() < 0.5 ? -1 : 1;
+    // `uniform` templates skip the footprint stretch and mirror: a RUN of
+    // fence bays is ONE fence, and a bay that drew a short straw leaves a gap
+    // in it — the row is the thing being built, not the bay. The weathering
+    // shade stays, so a long wall still ages unevenly along its length.
+    // The stream is DRAWN either way — a flag must not shift every later
+    // placement's look (the same law that keyed the stream to (x, z, type)).
+    const j1 = 0.86 + rnd() * 0.34, j2 = 0.86 + rnd() * 0.34;
+    const j3 = 0.88 + rnd() * 0.34, jm = rnd() < 0.5 ? -1 : 1;
+    const uni = !!T.uniform;
+    const wS = uni ? 1 : j1;
+    const dS = uni ? 1 : j2;
+    const hS = uni ? 1 : j3;
+    const mir = uni ? 1 : jm;
     const shade = 0.9 + rnd() * 0.2;
     const tinted = (c) => {
       const col = new THREE.Color(c);
@@ -15931,13 +16096,22 @@ export class Track {
       // measured. `r` is a placement radius (how much room the structure needs)
       // and is not the same as how far its widest part actually reaches, so the
       // reach is computed from the part list once and cached on the template.
-      const ext = (T._ext ??= T.parts.reduce((m2, q) => Math.max(m2,
-        Math.abs(q[1]) + q[4] / 2, Math.abs(q[3]) + q[6] / 2), 0));
-      const fr = ext * scale * Math.max(wS, dS);
+      // PER AXIS, NOT A SQUARE. The first cut used one radius for both sides,
+      // which was invisible under a house and absurd under a fence: a bay
+      // 0.16 u thin drew a 5 u square pad on any slope, and a RUN of them
+      // read as a row of slabs with sticks on top. The footprint has a width
+      // AND a depth; the plinth follows both, so a wall's footing is a curb.
+      const extX = (T._extX ??= T.parts.reduce((m2, q) => Math.max(m2,
+        Math.abs(q[1]) + q[4] / 2), 0));
+      const extZ = (T._extZ ??= T.parts.reduce((m2, q) => Math.max(m2,
+        Math.abs(q[3]) + q[6] / 2), 0));
+      const frX = extX * scale * wS, frZ = extZ * scale * dS;
       let low = y;
       for (let a2 = 0; a2 < 12; a2++) {
         const th = a2 * Math.PI / 6;
-        const g2 = this._seatY(x + Math.cos(th) * fr, z + Math.sin(th) * fr);
+        // sample the footprint's own ellipse, in its own rotation
+        const ex2 = Math.cos(th) * frX, ez2 = Math.sin(th) * frZ;
+        const g2 = this._seatY(x + ex2 * cs - ez2 * sn, z + ex2 * sn + ez2 * cs);
         if (Number.isFinite(g2) && g2 - 0.25 < low) low = g2 - 0.25;
       }
       const drop = y - low;
@@ -15946,7 +16120,7 @@ export class Track {
         // the plinth is the footprint's own size so it reads as masonry rather
         // than as a box the house is standing on.
         B.box.push({
-          x, y: low, z, sx: fr * 2.05, sy: drop + 0.4, sz: fr * 2.05,
+          x, y: low, z, sx: frX * 2.05, sy: drop + 0.4, sz: Math.max(frZ * 2.05, 0.3),
           rot, roll: 0, color: tinted(slot('stone')),
         });
       }

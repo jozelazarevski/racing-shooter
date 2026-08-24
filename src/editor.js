@@ -35,7 +35,7 @@
  */
 
 import * as THREE from 'three';
-import { LEVELS, EDIT_PROP_KINDS, ROAD_HALF, TUNNEL_SEP } from './track.js';
+import { LEVELS, EDIT_PROP_KINDS, HOUSE_TEMPLATES, ROAD_HALF, TUNNEL_SEP } from './track.js';
 
 /* ---------------------------------------------------------------------------
  * TerrainDelta — the sculpt, as a function of (x, z)
@@ -150,13 +150,27 @@ export const PALETTE = [
     ['cottageD', 'COTTAGE D'], ['cottageE', 'COTTAGE E'], ['cottageF', 'COTTAGE F'],
     ['cottageG', 'COTTAGE G'], ['cottageH', 'COTTAGE H'],
   ] },
+  { group: 'RIVIERA', items: [
+    ['ligSlender', 'TERRACE HOUSE'], ['ligTwin', 'TWIN TERRACE'],
+    ['ligCorner', 'CORNER BLOCK'], ['ligRural', 'RURAL VILLA'],
+  ] },
   { group: 'WORKING', items: [
     ['barn', 'BARN'], ['shed', 'SHED'], ['silo', 'SILO'],
     ['windmill', 'WINDMILL'], ['well', 'WELL'], ['logpile', 'LOG PILE'],
+    ['watertower', 'WATER TOWER'], ['container', 'CONTAINER'],
   ] },
   { group: 'LANDMARKS', items: [
-    ['chapel', 'CHAPEL'], ['watchtower', 'WATCHTOWER'], ['puebloRuin', 'RUIN'],
-    ['kiosk', 'KIOSK'], ['signalhut', 'SIGNAL HUT'],
+    ['chapel', 'CHAPEL'], ['watchtower', 'WATCHTOWER'], ['stonetower', 'STONE TOWER'],
+    ['puebloRuin', 'RUIN'], ['ruinwall', 'BROKEN WALL'], ['kiosk', 'KIOSK'],
+    ['signalhut', 'SIGNAL HUT'], ['gazebo', 'GAZEBO'], ['obelisk', 'OBELISK'],
+    ['fountain', 'FOUNTAIN'],
+  ] },
+  // The pieces the RUN tool was written about — EDITOR.md promises "a fence,
+  // an avenue, a village street and a line of pylons are all one gesture",
+  // and until now the palette carried neither a fence nor a pylon to repeat.
+  { group: 'STRUCTURE', items: [
+    ['stonewall', 'STONE WALL'], ['fencebay', 'FENCE'], ['lamppost', 'LAMP POST'],
+    ['pylon', 'PYLON'], ['stall', 'MARKET STALL'],
   ] },
 ];
 
@@ -1032,7 +1046,17 @@ export class WorldEditor {
     }
     const n = Math.floor(len / step) + 1;
     if (n > 120) { this._status('that run is too long — raise SPACING'); return; }
-    const ang = Math.atan2(dx, dz);          // world heading of the run
+    // Two different alignments hide in "turned to face along the run". A
+    // COTTAGE's front (local +Z) should face across the line — a street of
+    // houses fronts the street. A WALL BAY's length (local X) should lie
+    // ALONG the line, or the run comes out as a comb of crosswise slabs —
+    // measured: every bay at rot 90° to its own wall. The template says which
+    // it is (`runAlign`); a pylon keeps the facing rule so its crossarms span
+    // ACROSS the run the way wires actually hang.
+    const T = this.tool !== 'nature' && HOUSE_TEMPLATES[this.preset];
+    const ang = (T && T.runAlign)
+      ? Math.atan2(dz, dx)                   // length along the line
+      : Math.atan2(dx, dz);                  // front across the line
     const ux = dx / len, uz = dz / len;
     const nature = this.tool === 'nature';
     if (!nature && !this.preset) { this._status('pick a preset first'); return; }
@@ -1168,7 +1192,10 @@ export class WorldEditor {
       this._ghosts.add(box);
       return;
     }
-    const r = (nature ? 2.2 : 3.4) * (e.scale || 1);
+    // the ring is the TEMPLATE'S footprint, not one size for everything: a
+    // 3.4 u hoop under a 1.1 u fence bay turned every RUN into a chain of
+    // giant yellow circles that read as an error, not as markers
+    const r = (nature ? 2.2 : (HOUSE_TEMPLATES[e.preset]?.r ?? 3.4)) * (e.scale || 1);
     const m = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.5, 20),
       new THREE.MeshBasicMaterial({ color, transparent: true,
         opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
@@ -3215,7 +3242,13 @@ export class WorldEditor {
       // pick is a picture of what you get. The label stays underneath — the
       // image is `onerror`-hidden, so a missing thumbnail degrades to exactly
       // the old text button rather than to a broken-image icon.
-      el.innerHTML = PALETTE.map((g) => `<div class="ed-pgroup">${g.group}</div>`
+      // FILTERED THROUGH THE BUILDER'S OWN TABLE, the same law the nature
+      // palette has always obeyed: a preset the Track builder cannot stamp
+      // never reaches the rail (it would fall back to a logpile at APPLY,
+      // silently — the worst of the outcomes).
+      el.innerHTML = PALETTE.map((g) => ({ ...g, items: g.items.filter(([k]) => HOUSE_TEMPLATES[k]) }))
+        .filter((g) => g.items.length)
+        .map((g) => `<div class="ed-pgroup">${g.group}</div>`
         + '<div class="ed-pgrid">'
         + g.items.map(([k, label]) => `<button class="ed-preset" data-preset="${k}" title="${label}">`
           + `<img class="ed-pshot" src="assets/palette/${k}.jpg" alt="" loading="lazy"`
@@ -3228,7 +3261,16 @@ export class WorldEditor {
         this.preset = b.dataset.preset;
         el.querySelectorAll('.ed-preset').forEach((x) => x.classList.toggle('current', x === b));
         this._pickTool('place');
-        this._status(`PLACE ${this.preset} — tap the ground`);
+        // A LINEAR PIECE KNOWS ITS OWN SPACING. A wall bay closes the row at
+        // 4 u, lamp posts pace an avenue at 16, pylons stride at 42 — numbers
+        // nobody should have to know. A template that carries `run` sets the
+        // SPACING slider when it is picked; anything you dial afterwards
+        // still wins, it is a default and not a handcuff.
+        const run = HOUSE_TEMPLATES[this.preset]?.run;
+        if (run) this._setSlider('ed-spacing', run);
+        this._status(run
+          ? `PLACE ${this.preset} — tap the ground. RUN spacing set to ${run} u`
+          : `PLACE ${this.preset} — tap the ground`);
       });
     }
     const nat = this.root.querySelector('#ed-nature');
