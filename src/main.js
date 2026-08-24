@@ -10117,7 +10117,18 @@ class Game {
       if (!tk?.T?.cliffWalls || !tk.nearestIndex) return;
       const ci = tk.nearestIndex(v, p.trackIndex);
       const lat = tk.lateralOffset(v, ci);
-      const lim = 8.4;
+      // 8.4, OR CLOSER IF THE ROCK IS CLOSER. The constant on its own was a
+      // coincidence that happened to hold. The cliff foot is nominally 37 u
+      // out on CANYON RUN, but `_cliffCap` pulls it in to 11.3 wherever the
+      // lap comes back past itself — sixteen stations of that lap, measured by
+      // `cliffgap.mjs` — and this limit knew about neither number. It cleared
+      // the rock by 2.9 u for no reason anyone had checked. `track.cliffFoot`
+      // publishes the measured foot per station and per side, so the eye is
+      // bounded by the rock it is being kept out of instead of by a number
+      // that matches it today. `Math.min`, so this can only ever tighten and
+      // never let the camera further out than it already goes.
+      const foot = tk.cliffFoot?.[ci * 2 + (lat < 0 ? 1 : 0)];
+      const lim = Number.isFinite(foot) ? Math.min(8.4, foot - 2.6) : 8.4;
       if (Math.abs(lat) <= lim) return;
       const n = tk.nrm[ci];
       const over = lat - Math.sign(lat) * lim;

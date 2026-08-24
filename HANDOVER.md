@@ -3425,3 +3425,52 @@ Verified with `fieldshot.mjs`, which packs the field round the player and
 shoots a named camera: NEON GRID, all eight cars `on`, every one throwing a
 visible wedge in TOP-DOWN. PINE VALLEY, all eight `OFF`, so `worldIsDark` still
 does its job and nobody drives a daylit world with the lights burning.
+
+## r270 — THE CLIFF CAMERA I COULD NOT REPRODUCE, AND WHAT MEASURING IT FOUND
+A phone shot of CANYON RUN: half the frame one flat slab of rock, the car
+shoved into the bottom-right corner behind the buttons, 11 km/h, hull 77, 8th
+of 8. Diagnosed as the chase camera inside a cliff. Four reproductions, none of
+them it.
+
+1. **Park the car at lateral offsets 0 to 30.** Occlusion of the car's own
+   silhouette rose 8% → 33%, but the car sat at NDC x = -0.02 at EVERY offset,
+   against +0.55 in the report. The car also never actually left the road:
+   `WALL_LIMIT` snaps it back inside the barrier before the camera sees it, so
+   the poses I picked were not the state being reported.
+2. **Drive straight into the walls for forty seconds.** The car reaches 74 u
+   off the centreline — it leaves the canyon entirely — and `|ndcX|` peaks at
+   **0.23**. The camera follows it out without complaint.
+3. **Instrument the clamp.** It works: the eye pins at lateral -8.2 while the
+   car runs out to -15.4, `dist` holds 51 against a nominal 48.7, and the car
+   stays on screen throughout.
+4. **Raycast eye-to-car, every third frame, three camera modes.** A probe can
+   `import('three')` in the page — the import map applies — so this is exact
+   and needs no readback. **0 occlusions in 112 samples.** And the ray set was
+   checked rather than assumed: 988 solids kept, 65 dropped, and every dropped
+   one is haze, contact shadow, decal or car lamp.
+
+The hypothesis is dead, and the geometry says why. `_cliffRibbon`'s rows put
+the FOOT nearest the road and every row above it further out — the faces lean
+away as they rise, so there is no overhang for an eye to get behind. Rock
+nearest approach 11.05-11.3; camera bounded at 8.4.
+
+### WHAT THE MEASURING DID FIND
+`cliffgap.mjs` reads the cliff foot per station. On CANYON RUN the face is
+nominally `WALL_OFF + 0.65 + cliffSetback` = **37 u** out — and `_cliffCap`
+pulls it in to **11.3 at sixteen stations**, wherever the lap comes back past
+itself. A three-fold variation.
+
+The camera's guard is the constant `lim = 8.4`, and it reads neither number. It
+clears the rock by 2.9 u for no reason anybody had checked: change
+`cliffSetback`, change the cap, change `WALL_OFF`, and the eye starts sitting
+in stone with no test to catch it. `track.cliffFoot` now publishes the measured
+foot per station and per side, and `clampCam` takes `Math.min(8.4, foot - 2.6)`
+— so the limit can only tighten, never loosen.
+
+**It changes nothing today**: closest foot 11.05, so `foot - 2.6` = 8.45 and
+the constant still wins at every station on every cliff world. That is the
+point. A coincidence became an invariant, and the number that used to be
+load-bearing by accident now has the thing it guards on the other side of it.
+
+The report itself stays open and honest: I do not know what produced that
+frame, and I have written down the four things it is not.

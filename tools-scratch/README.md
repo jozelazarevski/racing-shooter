@@ -180,6 +180,25 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `camoccl.mjs`  is anything between the eye and the car, every few frames of a
+                real run. A probe can `import('three')` in the page — the
+                import map applies — so this uses a real Raycaster and needs no
+                screenshot readback. It prints the size of the solid set and
+                what it dropped, because the failure mode of this probe is
+                casting against a set that does not contain the thing.
+- `camtrail.mjs` per-frame camera log over a driven run: car NDC, camera and
+                car lateral offset, heights, speed, index gap. For "where does
+                the camera go wrong" when you do not know which pose to pick —
+                and posed reproductions had already failed three times.
+- `cliffgap.mjs` how close the cliff face actually comes, station by station,
+                against the constant the camera is allowed out to. It found
+                CANYON RUN's nominal 37 u face pulled in to 11.3 at sixteen
+                stations by `_cliffCap`, which the camera's `lim = 8.4` knew
+                nothing about.
+- `camstuck.mjs` how much of your own car you can see: keyed magenta once with
+                depth and once forced on top, and the ratio is the occluded
+                fraction. The watchdog tests hidden, buried and off screen —
+                not occluded — so this is the symptom it does not cover.
 - `fieldshot.mjs` the WHOLE FIELD in one frame, for judging anything per-car:
                 packs the rivals round the player and shoots a named camera
                 mode, printing each car's lamp state beside the picture. "Do

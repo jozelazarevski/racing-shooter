@@ -9393,6 +9393,24 @@ export class Track {
       tex.anisotropy = 4;
       this._cliffRibbon(1, tex);
       this._cliffRibbon(-1, tex);
+      // WHERE THE ROCK ACTUALLY IS, published for the camera.
+      //
+      // The face is nominally `WALL_OFF + 0.65 + cliffSetback` — 37 u out on
+      // CANYON RUN — but `_cliffCap` then pulls it IN wherever the lap comes
+      // back past itself, and `cliffgap.mjs` measures that cap reaching 11.3
+      // at sixteen stations of that same lap. A three-fold variation.
+      //
+      // The camera's own guard is a CONSTANT 8.4 (main.js, `clampCam`) and
+      // reads none of this. Today it holds, by 2.9 u, and it holds by luck:
+      // nothing ties the limit the eye is allowed out to to the thing it is
+      // being kept away from. Change `cliffSetback`, the cap, or `WALL_OFF`
+      // and the camera starts sitting inside rock with no test to catch it.
+      // So publish the foot per station and let the camera bound itself.
+      this.cliffFoot = new Float32Array(N * 2);
+      for (let j = 0; j < N; j++) {
+        this.cliffFoot[j * 2] = this._cliffProfile(j, 1).base;
+        this.cliffFoot[j * 2 + 1] = this._cliffProfile(j, -1).base;
+      }
       return;
     }
     // Open-world tracks: no fences anywhere. The road is fastest; drifting
