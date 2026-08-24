@@ -3474,3 +3474,114 @@ load-bearing by accident now has the thing it guards on the other side of it.
 
 The report itself stays open and honest: I do not know what produced that
 frame, and I have written down the four things it is not.
+
+## r271 — AN AGENT FINALLY DROVE EVERY WORLD, AND THE NUMBER THAT DID NOT EXIST NOW HAS A FIRST ANCHOR
+
+Asked: "can the agent drive all tracks and investigate bugs". It can, it did —
+all 78, through the same inputs a thumb has. `tools-scratch/agentdrive.mjs` is
+the driver: pure pursuit on the centreline, curvature-limited target speed,
+fed through `g.input.analog`, stepped with the fixed-delta synchronous-frame
+trick. Every harness before it teleported the player or held the throttle
+open-loop; none of them could be shot, mined, or punished for a corner taken
+badly, which turned out to be the entire story.
+
+### THE CLEAN BILL, FIRST
+Across 78 worlds driven at racing speed: **zero** page errors, zero swallowed
+frame-loop faults, zero NaN, zero under-terrain, zero stuck spots, zero
+teleport rescues. The camera held within 35 u of the car on 77 worlds (the
+r270 leash never fired). The two carry-fowards: RED CENTRE RUN showed one
+transient camera excursion to 74 u — inside the leash, unexplained, bounded —
+and CAPO MELE let the driver reach lateral 15.9 on a half-width-9 road
+(one hairpin overshoot; WALL_LIMIT should have argued sooner).
+
+### WHAT ACTUALLY BREAKS A DRIVEN LAP: NOTHING GEOMETRIC. EVERYTHING MARTIAL.
+On NORMAL, a driver that holds a competent line but never shoots, never
+dodges and never uses a pickup reaches hull 0 on ~70 of 78 worlds and burns
+all three hulls before completing lap 1 on **22** of them. `whokilled.mjs`
+(new) wraps `player.damage()` and buckets every hull point by caller:
+
+    NEON GRID    fire 309 (named rivals) + 83 mines, walls 8     — all combat
+    DUST CANYON  fire 388 + 79 mines + 109 stone                 — mostly combat
+    PINE VALLEY  stone 212 + fire 114                            — mostly corners
+
+The anonymous 38-52 hits are MINES (weapons.js:719 `onPlayerHit(dmg, null)`),
+laid on the racing line, eaten by anything that follows the racing line. The
+stone hits are the driver's own cornering: `nearsamples.mjs` shows PINE
+VALLEY's repeat offenders at samples ~93/~294 are the EDGE RAILS at |lat|
+10.8 on a half-width-9 road — the wall is where it belongs; pure pursuit
+carried ~25 u/s of normal speed into it. NOT the One Defect. No placement
+fault surfaced anywhere in the sweep.
+
+### THE A/B THAT SETTLES WHETHER THAT IS A BUG
+Same driver, same eight worst worlds, `DIFF=easy` (localStorage `ir-diff`):
+**8/8 lapped, six with zero wrecks, hull 18-81 remaining** — against 0/8 on
+normal. The difficulty ladder does its job; NORMAL is tuned on the assumption
+the player fights back. Whether that assumption should hold for the DEFAULT
+tier is a design question, now with numbers attached, not a defect. Nothing
+was tuned this round — MEASUREMENT DISCIPLINE holds.
+
+### ITEM 1, PARTIALLY PAID
+Nobody had ever measured a competent lap. Now: agent laps 26-75 s across the
+roster (full table below), and mid-race pace sampled from the same runs puts
+the agent at 0.70-0.77 laps/30 s with rivals at 0.53-0.86 on the same worlds
+— the field paces the player, as designed, and the old 0.5-0.9 laps/30 s
+figure reproduces. Grid placement starts everyone at progress ~0.9 with
+`_wraps` compensating, so raw `progress` deltas from the grid overstate rival
+pace by a whole lap; measure mid-race or not at all (agentdrive's `rival@lap`
+column suffers exactly this and is not evidence).
+
+CAVEAT, stated plainly: this is an AGENT baseline, not a human one. It brakes
+earlier than a human and never uses nitro, never fights. It is a floor with
+known biases, but it is reproducible, per-world, and it exists.
+
+    agent lap times, NORMAL, r271 tree (w = wrecks in the run; "3-wreck" =
+    race ended by the three-hull rule before lap 1):
+     1 PINE VALLEY            40.5s        w0   |        2 DUST CANYON            33.5s        w2
+     3 FROST PEAK             56.6s        w2   |        4 CANYON RUN             49.9s        w2
+     5 EMBER PASS             32.6s        w0   |        6 SUMMIT CLIMB           39.4s        w1
+     7 GLACIAL PASS           39.7s        w1   |        8 AMAZON RAPIDS          3-wreck (45.7s on easy) w3
+     9 THE DUNE SERPENT       39.4s        w2   |       10 ROCKFALL RAVINE        58.3s        w2
+    11 OASIS AMBUSH           35.7s        w2   |       12 REDWOOD RAMPAGE        50.4s        w1
+    13 LOG FLUME FURY         3-wreck      w3   |       14 FOREST FIRE ESCAPE     58.3s        w2
+    15 GLACIER'S GRIND        47.3s        w1   |       16 AVALANCHE ALLEY        69.2s        w2
+    17 NEON GRID EXPRESSWAY   3-wreck (55.4s on easy) w3   |       18 UNDERCITY SLIPSTREAM   44.8s        w1
+    19 GOTTHARD CLIMB         52.8s        w2   |       20 TREMOLA DESCENT        49.5s        w0
+    21 FURKA RIDGE            3-wreck      w3   |       22 COL DE TURINI          55s          w2
+    23 OUNINPOHJA             28.1s        w2   |       24 FAFE LEAP              31.5s        w1
+    25 PIKES PEAK             53.3s        w1   |       26 SAFARI PLAINS          38.2s        w2
+    27 CORNICHE               3-wreck (43s on easy) w3   |       28 ESTONIA CRESTS         3-wreck      w3
+    29 OLIVE COAST            3-wreck      w3   |       30 LANTERN QUARTER        3-wreck (41.5s on easy) w3
+    31 HEDGEROW DASH          43.9s        w2   |       32 RED CENTRE RUN         58.3s        w0
+    33 RED BULL RING          3-wreck      w3   |       34 MONACO STREETS         32.2s        w2
+    35 SILVERSTONE            36.2s        w0   |       36 SPA-FRANCORCHAMPS      41.2s        w2
+    37 SUZUKA                 34.4s        w2   |       38 NORDSCHLEIFE           3-wreck      w3
+    39 MONZA                  28.5s        w1   |       40 MARINA BAY             35.8s        w2
+    41 MOUNT PANORAMA         3-wreck      w3   |       42 RALLYCROSS ARENA       31.5s        w2
+    43 OULTON PARK            38.9s        w2   |       44 LAGUNA SECA            41.3s        w2
+    45 TOUR DE CORSE          75.4s        w1   |       46 VINEYARD VELOCE        53.3s        w2
+    47 DEEPWOOD TRAIL         3-wreck      w3   |       48 DOLOMITI CORSA         55.9s        w1
+    49 HARBOR QUAY            26.1s        w2   |       50 CINQUE TERRE           37.7s        w2
+    51 AEGEAN BLUE            33.4s        w2   |       52 COSTA BRAVA            3-wreck (46.9s on easy) w3
+    53 DALMATIA DRIVE         3-wreck      w3   |       54 COTE D AZUR            48.4s        w2
+    55 BRIDGE RUN             3-wreck      w3   |       56 OLIVE CROSSING         3-wreck      w3
+    57 MOUNTAIN TO SEA        52.8s        w1   |       58 CITADEL BAY            3-wreck      w3
+    59 CLIFF KNOT             48.5s        w2   |       60 SEA CLIFF RUN          3-wreck (50.8s on easy) w3
+    61 OLIVE PASS             54.5s        w3   |       62 CAPE OLIVETO           3-wreck      w3
+    63 TERRAZZA ALTA          74.1s        w0   |       64 SALINE SPRINT          27.2s        w1
+    65 GRANITE NARROWS        25.8s        w2   |       66 GLACIER COL            35.7s        w1
+    67 TIMBER GORGE           34.9s        w0   |       68 LARCH GOLD             45.6s        w1
+    69 MAPLE MILE             3-wreck      w3   |       70 HARVEST RUN            3-wreck (38.1s on easy) w3
+    71 CIDER LANE             53.1s        w2   |       72 BRACKEN MOOR           74.1s        w0
+    73 ALASSIO SEAFRONT       44.8s        w3   |       74 IL BUDELLO             31.5s        w0
+    75 PORTO MOLO             3-wreck (36.1s on easy) w3   |       76 CAPO MELE              55.1s        w1
+    77 GENOVA PORTO           38.7s        w0   |       78 SANREMO STAGE          74.8s        w0
+
+### FOR THE NEXT SESSION
+- The 14 "3-wreck" worlds not yet re-run on easy: run `DIFF=easy agentdrive`
+  before believing anything about them.
+- If the arsenal is ever taught to the agent (shoot back, dodge mines), the
+  normal-tier numbers above become the "passive floor" against which that
+  driver's survival measures what fighting back is worth.
+- `whokilled.mjs` keys damage by call stack; if main.js moves, the line
+  numbers in its output move with it — the buckets are still right, the
+  labels just need re-reading.
