@@ -35,7 +35,7 @@ for (const id of process.argv.slice(2).map(Number)) {
   try {
     await page.goto(`${BASE}/?level=${id}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 120000 });
     await page.waitForFunction(() => window.__game?.track?.center && window.__game.player, undefined, { timeout: 90000 });
-    const r = await page.evaluate(async (SIM) => {
+    const r = await page.evaluate(async ({ SIM, FIGHT }) => {
       const g = window.__game, t = g.track, p = g.player, N = t.center.length;
       g.startRace?.();
       const f = () => new Promise((r2) => requestAnimationFrame(r2));
@@ -50,9 +50,10 @@ for (const id of process.argv.slice(2).map(Number)) {
       let su = 0; for (let i = 0; i < 64; i++) { const a = t.center[(i * 37) % N], c = t.center[((i * 37) % N + 1) % N]; su += Math.hypot(c.x - a.x, c.z - a.z); }
       su = Math.max(0.5, su / 64);
       const faults = [], F = (kind, detail) => { if (faults.length < 40) faults.push({ kind, at: p.trackIndex, detail }); };
+      let lastMissile = -99;
       const t0 = g.raceTime, lap0 = p.lap ?? 0;
       let lapTime = null, lapRivalBest = null, lapDoneAt = null, teleports = 0, wrecks = 0, stuckT = 0,
-        maxCam = 0, maxLat = 0, offroadT = 0, airBig = 0, wasAir = false, minHull = p.health ?? 100;
+        maxCam = 0, maxLat = 0, camAt = -1, latAt = -1, offroadT = 0, airBig = 0, wasAir = false, minHull = p.health ?? 100;
       const frames = Math.round(SIM * 60);
       for (let k = 0; k < frames; k++) {
         const speed = p.vel.length();
@@ -67,15 +68,34 @@ for (const id of process.argv.slice(2).map(Number)) {
         g.input.analog.steer = clamp(err * 1.8, -1, 1);
         g.input.analog.throttle = speed < vmax ? 1 : 0;
         g.input.analog.brake = speed > vmax + 4 ? 1 : 0;
+        // FIGHT=1: the arsenal, worked like a thumb on Space/E — cannon at a
+        // rival roughly on the nose, a homing missile when one is lined up.
+        // The driving above is untouched; survival delta measures the guns.
+        if (FIGHT) {
+          let aim = false, lined = false;
+          for (const e2 of g.enemies) {
+            if (!e2.alive) continue;
+            const dx2 = e2.pos.x - p.pos.x, dz2 = e2.pos.z - p.pos.z, d2 = Math.hypot(dx2, dz2);
+            if (d2 > 55) continue;
+            const off = Math.abs(wrap(Math.atan2(dx2, dz2) - p.heading));
+            if (off < 0.22) aim = true;
+            if (off < 0.12 && d2 > 10 && d2 < 50) lined = true;
+          }
+          if (aim && !p.overheated && (p.rounds ?? 0) > 0) g.input.keys.add('Space');
+          else g.input.keys.delete('Space');
+          if (lined && (p.missiles ?? 0) > 0 && g.raceTime - lastMissile > 8) {
+            lastMissile = g.raceTime; g.input.pressed.add('KeyE');
+          }
+        }
         g.frame();
         // -- watch --
         if (!Number.isFinite(p.pos.x + p.pos.y + p.pos.z + p.vel.x + p.vel.y + p.vel.z)) { F('NaN', 'player state non-finite'); break; }
         const gy = t.terrainHeight(p.pos.x, p.pos.z);
         if (p.pos.y < gy - 3) F('under-terrain', `y ${p.pos.y.toFixed(1)} vs ground ${gy.toFixed(1)}`);
         const cd = Math.hypot(g.camera.position.x - p.pos.x, g.camera.position.z - p.pos.z);
-        if (cd > maxCam) maxCam = cd;
+        if (cd > maxCam) { maxCam = cd; camAt = p.trackIndex; }
         const lat = Math.abs(p.lateral ?? 0);
-        if (lat > maxLat) maxLat = lat;
+        if (lat > maxLat) { maxLat = lat; latAt = p.trackIndex; }
         if (lat > 14) offroadT += 1 / 60;
         if (p.airborne && !wasAir && (p.vy ?? 0) > 4) airBig++;
         wasAir = !!p.airborne;
@@ -107,15 +127,15 @@ for (const id of process.argv.slice(2).map(Number)) {
         rivalAtLap: lapRivalBest === null ? null : +lapRivalBest.toFixed(2),
         prog: +((p.lap ?? 0) - lap0 + (p.progress ?? 0)).toFixed(2),
         simT: +(g.raceTime - t0).toFixed(1), wrecks, teleports, airBig,
-        maxCam: +maxCam.toFixed(0), maxLat: +maxLat.toFixed(1), offroadT: +offroadT.toFixed(1),
-        minHull: +minHull.toFixed(0), state: g.state, faults,
+        maxCam: +maxCam.toFixed(0), camAt, maxLat: +maxLat.toFixed(1), latAt, offroadT: +offroadT.toFixed(1),
+        minHull: +minHull.toFixed(0), kills: g.kills ?? 0, state: g.state, faults,
       };
-    }, SIM);
+    }, { SIM, FIGHT: !!process.env.FIGHT });
     r.errors = errors.slice(0, 3); r.recovered = [...recovered].slice(0, 3);
     rows.push({ id, ...r });
     if (r.fail) { console.log(`L${id} FAIL ${r.fail}`); }
     else console.log(`L${String(id).padStart(2)} ${r.name.padEnd(22)} lap ${r.lapTime === null ? ' none' : String(r.lapTime).padStart(5)}s`
-      + `  rival@lap ${r.rivalAtLap ?? '-'}  wreck ${r.wrecks} stuck ${r.teleports} air ${r.airBig}`
+      + `  rival@lap ${r.rivalAtLap ?? '-'}  wreck ${r.wrecks} stuck ${r.teleports} air ${r.airBig} kills ${r.kills}`
       + `  cam<=${r.maxCam} lat<=${r.maxLat} hull>=${r.minHull}`
       + (r.errors.length ? `  PAGEERR ${r.errors[0]}` : '')
       + (r.recovered.length ? `  SWALLOWED ${r.recovered[0]}` : ''));
