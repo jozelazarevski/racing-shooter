@@ -3562,3 +3562,37 @@ it so it rides high in the frame where a bottom-anchored menu leaves room.
 The panel still covers most of a portrait screen — that is what a full-screen
 track list does — but the car is now in the strip above it and down both edges,
 and in landscape it is plainly in shot. What it is NOT any more is absent.
+
+## r273 — "CAMERA IS BROKEN OVERALL", AND IT WAS r271's FAULT
+It was. r271 changed `renderer.setSize(w, h)` to `setSize(w, h, false)` to stop
+it writing the canvas's CSS size, on the theory that
+`#game-canvas{position:fixed;inset:0}` would size the element instead and so
+cover an iOS safe-area band. That theory is wrong, and wrong in a way worth
+writing down:
+
+> A `<canvas>` is a REPLACED element. Its used width comes from its INTRINSIC
+> size — the `width`/`height` attributes, which are the drawing buffer — and
+> `left`/`right` do not stretch it. `inset:0` anchors it and sizes nothing.
+
+With the style write gone, the element laid itself out at buffer size in CSS
+pixels. `camsanity.mjs` measured the canvas box at **703x1529 on a 402x874
+screen**, because the touch pixel ratio is 1.75: the view was zoomed 75% and
+cropped to the top-left corner, on every touch device, in every state. Which is
+exactly what "broken overall" means — one wrong number that makes everything
+wrong at once.
+
+The style write is back. Box now equals the screen in portrait, landscape and
+desktop, title and race, with the buffer correctly 1.75x on touch.
+
+`camsanity.mjs` is the gate: it asserts the canvas BOX equals the screen, that
+the buffer shares the box's aspect (or the whole image is stretched), and that
+`camera.aspect` agrees with both. None of the existing gates could see this —
+`boot.mjs` boots, `pageerr.mjs` finds no error, `playermoves.mjs` drives — because
+nothing threw. It was a layout fact, and only a layout measurement finds it.
+
+**And the green bands are unfixed again.** The revert takes the attempted fix
+out with it; what remains from r271 is the black page background, so a band
+reads as a bezel rather than as lime. That one was never confirmed to work in
+the first place — it could not be tested here — and it broke the view for
+everyone in exchange. A blind fix for an unreproducible report, shipped without
+a gate, is worth less than nothing.

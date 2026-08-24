@@ -1465,14 +1465,18 @@ class Game {
       canvas: this.canvas, antialias: true, powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.isTouch ? 1.75 : 2));
-    // CSS OWNS THE BOX, THE RENDERER OWNS THE BUFFER. `setSize` with its
-    // default third argument writes `style.width/height` in pixels, which
-    // overrides the `inset:0` that is supposed to make the canvas cover the
-    // screen — so anywhere `innerWidth` is narrower than what the player can
-    // actually see (iOS insets the layout away from the notch in landscape),
-    // the page background shows through as a band down each edge. Reported as
-    // exactly that, a green bar on both sides. `false` leaves the CSS alone.
-    this.renderer.setSize(innerWidth, innerHeight, false);
+    // `setSize` MUST WRITE THE CSS SIZE. r271 passed `false` here to stop it
+    // doing that, on the theory that `#game-canvas{position:fixed;inset:0}`
+    // would size the element instead and cover an iOS safe-area band. It does
+    // not, and cannot: a <canvas> is a REPLACED element, so its used width
+    // comes from its intrinsic size — the width/height ATTRIBUTES, which are
+    // the drawing buffer — and `left`/`right` do not stretch it. With the
+    // style write gone the element laid itself out at buffer size in CSS
+    // pixels: measured 703x1529 on a 402x874 screen, because the touch pixel
+    // ratio is 1.75. The view was zoomed 75% and cropped to the top-left
+    // corner on every touch device, which is what "camera is broken overall"
+    // was. `camsanity.mjs` is the gate for it now.
+    this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1623,7 +1627,7 @@ class Game {
       this.baseFov = innerHeight > innerWidth ? 68 : 56; // widen for portrait phones
       this.camera.fov = this.baseFov;
       this.camera.updateProjectionMatrix();
-      this.renderer.setSize(innerWidth, innerHeight, false);   // see the ctor
+      this.renderer.setSize(innerWidth, innerHeight);          // see the ctor
       this.composer.setSize(innerWidth, innerHeight);
       if (this.input.resetJoystick) this.input.resetJoystick();
     };

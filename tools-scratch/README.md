@@ -180,6 +180,13 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `camsanity.mjs` THE GATE FOR "everything looks wrong". Asserts the canvas BOX
+                equals the screen, that the drawing buffer shares the box's
+                aspect (or the whole image is stretched), and that
+                `camera.aspect` agrees — in title and race, portrait, landscape
+                and desktop. It caught the canvas laying itself out at BUFFER
+                size, 703x1529 on a 402x874 screen. No other gate could: nothing
+                threw, the game booted and drove. It was a layout fact.
 - `titlecar.mjs` is your car in the ATTRACT SHOT behind the menu: whether the
                 mesh is in the scene, visible, has a hidden ancestor, and where
                 it projects — then a screenshot with the menu chrome hidden,
