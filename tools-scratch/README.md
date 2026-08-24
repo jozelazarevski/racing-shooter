@@ -180,6 +180,20 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `flatsurf.mjs` which surface in the bay is FLATTEST. Each welded piece is
+                masked (hide it, diff), then the spread of luminance over its
+                own pixels is reported — sd and p10-p90 — beside its share of
+                the frame. A big surface with a tiny spread is a flat fill
+                pretending to be a material. It named the pine skirts: 9.9% of
+                the bay at sd 14, the lowest of anything large.
+- `tintab.mjs`  the per-tree vertex tints, A/B'd WITHOUT MOVING A TREE — it
+                flips `material.vertexColors` on the already-built geometry,
+                because rebuilding the scene re-rolls its layout and then the
+                two halves are different forests. It reports `distinctTints`
+                first: a run where both columns match to the tenth is nearly
+                always a weld that carried ONE colour, since
+                `BufferGeometry.clone()` copies `userData` by reference and
+                `q.userData.tint = t` writes into the source geometry's object.
 - `baypair.mjs`  the same bay, the same PARKED turntable angle, from a port you
                 name: `node baypair.mjs 8902 out.png 2.05`. A before/after is
                 worthless if the car is at a different angle in each shot, and

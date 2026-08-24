@@ -3078,3 +3078,67 @@ the whole job of this screen is to show you a car.
 `baypair.mjs` shoots the bay at a PARKED angle from a port you name, so the two
 halves of an A/B are the same picture of the same car — and prints the build
 tag it actually loaded, since srv.mjs has served one branch on both ports.
+
+## r265 — THE FLATTEST THING IN THE PICTURE, AND A TINT THAT WAS NOT THERE
+"It looks a bit plain" is not a finding, so `flatsurf.mjs` makes it one: take
+each welded piece of the diorama, work out which pixels it owns (hide it, diff,
+mask), then report the SPREAD of luminance over those pixels in the real frame.
+A big surface with a tiny spread is a flat fill pretending to be a material.
+
+The answer was not the grass — the canopy gobo is painting variation onto that
+already (sd 23.3). It was the PINE SKIRTS: 9.9% of the bay at **sd 14.0**, the
+lowest spread of anything large in the frame. Fifty trees, one green.
+
+### VERTEX COLOURS, BECAUSE WELDING IS WHY THEY MATCH
+Welding by material is what keeps this menu at three draw calls for fifty
+trees, and the price has always been that every tree is the same colour. A
+colour attribute costs one buffer and no draw calls at all, so `weld()` now
+carries a per-piece tint through, and each tree gets ONE — trunk, skirt and
+crown together, because three tiers that each rolled their own are three plants
+stacked up.
+
+### AND IT DID NOTHING, TWICE
+First measurement: pine skirt sd 14 → 11.9. *Flatter.* But the tint call draws
+from the diorama's `rnd()`, so it had re-rolled every placement after it and
+the two forests were different — the same confound that had already invalidated
+the r264 before/after. So `tintab.mjs` flips `material.vertexColors` on the
+already-built geometry instead: same trees, same camera, one flag.
+
+Second measurement: **every number identical to the tenth, on all four
+meshes.** A change that measures as exactly nothing is usually not a weak
+change; it is an input that never arrived. It hadn't:
+
+> `BufferGeometry.clone()` copies `userData` BY REFERENCE. Every clone of
+> `lowGeo` shared one object with `lowGeo` itself, so `q.userData.tint = t`
+> wrote into that one object and all fifty trees read the last write.
+
+The welded buffer held **one distinct tint**. The screenshot had looked more
+varied to me and it was not; what I was reading as fifty greens was facet
+shading and fog. `q.userData = { tint }` — assign a fresh object, never write
+into the one that is there. `tintab.mjs` now reports `distinctTints` FIRST,
+because that is the check that catches this in one line.
+
+With real tints: skirts **sd 14.5 → 16.5**. Still narrow, so the range went to
+±28% value and ±17% warmth, measured again: **18.0**, and the warm spread on
+the crowns 6.5 → 8.2. A wood varies in hue more than in brightness, and the
+first range was too tight on exactly that axis.
+
+### ONE RNG STREAM PER SUBSYSTEM
+Three rounds running, an insertion re-rolled the whole forest: the gobo moved
+every tree, the tint moved them all again, and twice that turned a before/after
+into two different pictures. It also dropped a bush into the camera's lap in
+r264 and a whole pine into it here. So the single `rnd()` is now six streams —
+`rSky`, `rTrail`, `rDap`, `rTree`, `rRock`, `rScrub`. A change to the pines
+cannot move a rock, and an A/B is an A/B.
+
+With that stable, three framing fixes that were being masked by the churn: near
+pines held to z -58..-2 (they ran to +16, and a 10 u tree that close is a green
+wedge across the corner), their lane in from 11.5 to 9.6 so the wood crowds the
+trail instead of standing back from it — 8.2 was closer still and cropped every
+near crown off the top, which throws away the silhouette the third tier exists
+for — and the canopy plane out from 46 to 62, because the camera sees well past
+the verge and grass outside the gobo is a pale flat band down one edge.
+
+Gates: bay mean luminance 115, transparent 0%; car icons unchanged at 79-100;
+`boot.mjs` 4/4; `farplane.mjs` clean; second diorama still free; 8829 → 8909
+triangles (the colour buffer, not geometry).

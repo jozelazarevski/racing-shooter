@@ -5108,8 +5108,20 @@ class Game {
       grass: 0x4f8a35, dirt: 0x9c7a48, rut: 0x86663a, rock: 0x8d8578, bush: 0x2f7a30,
       moss: 0x4c7f33, stone: 0xb0a289, stoneDk: 0x82786a };
     const g = new THREE.Group();
-    let seed = 20260823;
-    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    // ONE STREAM PER SUBSYSTEM, and this is a measurement tool, not tidiness.
+    // The whole diorama used to draw from a single seeded `rnd()`, which means
+    // INSERTING a call anywhere re-rolls every placement after it: adding the
+    // canopy gobo moved every tree, rock and bush, and adding a per-tree tint
+    // moved them all again. Twice that turned a before/after into two
+    // different forests and made the numbers meaningless — and once it dropped
+    // a bush, then a pine, into the camera's lap. Separate streams mean a
+    // change to the pines cannot move a rock, and an A/B is an A/B.
+    const stream = (n) => {
+      let v = n >>> 0;
+      return () => ((v = (v * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    };
+    const rSky = stream(20260823), rTrail = stream(0x51ee11), rDap = stream(0xc0ffee),
+      rTree = stream(0x7a1115), rRock = stream(0x9b0c17), rScrub = stream(0x3ee9a2);
 
     // --- the sky, and the far treeline ------------------------------------
     //
@@ -5149,7 +5161,7 @@ class Game {
       x.beginPath();
       x.moveTo(0, 128);
       for (let px = -10; px < 1034; px += 9 + band * 3) {
-        const h = base - hi * (0.45 + rnd() * 0.55);
+        const h = base - hi * (0.45 + rSky() * 0.55);
         x.lineTo(px, h); x.lineTo(px + (5 + band * 2), base);
       }
       x.lineTo(1034, 128); x.closePath(); x.fill();
@@ -5189,14 +5201,14 @@ class Game {
       t2.fillStyle = rg; t2.fillRect(rx, 0, rw, 256);
     }
     for (let i = 0; i < 420; i++) {                  // gravel
-      const v = 130 + (rnd() * 70 | 0);
-      t2.fillStyle = `rgba(${v},${v - 18},${v - 46},${0.2 + rnd() * 0.35})`;
-      t2.fillRect(rnd() * 128, rnd() * 256, 1 + rnd() * 2, 1 + rnd() * 2);
+      const v = 130 + (rTrail() * 70 | 0);
+      t2.fillStyle = `rgba(${v},${v - 18},${v - 46},${0.2 + rTrail() * 0.35})`;
+      t2.fillRect(rTrail() * 128, rTrail() * 256, 1 + rTrail() * 2, 1 + rTrail() * 2);
     }
     for (let i = 0; i < 14; i++) {                   // damp patches
-      t2.fillStyle = `rgba(96,74,44,${0.10 + rnd() * 0.14})`;
+      t2.fillStyle = `rgba(96,74,44,${0.10 + rTrail() * 0.14})`;
       t2.beginPath();
-      t2.ellipse(rnd() * 128, rnd() * 256, 6 + rnd() * 16, 4 + rnd() * 10, rnd() * 3, 0, 6.3);
+      t2.ellipse(rTrail() * 128, rTrail() * 256, 6 + rTrail() * 16, 4 + rTrail() * 10, rTrail() * 3, 0, 6.3);
       t2.fill();
     }
     const trailTex = new THREE.CanvasTexture(tc);
@@ -5215,12 +5227,12 @@ class Game {
     const scuffs = [];
     for (let i = 0; i < 46; i++) {
       const side = i % 2 ? 1 : -1;
-      const w = 1.4 + rnd() * 3.4, d = 1.6 + rnd() * 4;
-      const sx = side * (5.25 + (rnd() - 0.35) * 2.2);
-      const sz = -70 + rnd() * 96;
+      const w = 1.4 + rTrail() * 3.4, d = 1.6 + rTrail() * 4;
+      const sx = side * (5.25 + (rTrail() - 0.35) * 2.2);
+      const sz = -70 + rTrail() * 96;
       const q = new THREE.PlaneGeometry(w, d);
       q.rotateX(-Math.PI / 2);
-      q.rotateY(rnd() * 3);
+      q.rotateY(rTrail() * 3);
       q.translate(sx, 0.008, sz);
       scuffs.push(q);
     }
@@ -5244,7 +5256,7 @@ class Game {
       rg.addColorStop(0.5, `rgba(154,168,176,${a * 0.6})`);
       rg.addColorStop(1, 'rgba(255,255,255,0)');
       d2.save();
-      d2.translate(cx, cy); d2.rotate(rnd() * 3); d2.scale(1, 0.5 + rnd() * 0.7);
+      d2.translate(cx, cy); d2.rotate(rDap() * 3); d2.scale(1, 0.5 + rDap() * 0.7);
       d2.translate(-cx, -cy);
       d2.fillStyle = rg;
       d2.beginPath(); d2.arc(cx, cy, r, 0, 6.3); d2.fill();
@@ -5252,28 +5264,31 @@ class Game {
     };
     // kept off the border, so the plane's own rectangular edge is pure white
     // and there is no line in the grass where the dapple stops
-    for (let i = 0; i < 19; i++) blob(70 + rnd() * 372, 70 + rnd() * 372, 34 + rnd() * 70, 0.72 + rnd() * 0.28);
-    for (let i = 0; i < 22; i++) blob(70 + rnd() * 372, 70 + rnd() * 372, 8 + rnd() * 18, 0.45 + rnd() * 0.35);
+    for (let i = 0; i < 19; i++) blob(70 + rDap() * 372, 70 + rDap() * 372, 34 + rDap() * 70, 0.72 + rDap() * 0.28);
+    for (let i = 0; i < 22; i++) blob(70 + rDap() * 372, 70 + rDap() * 372, 8 + rDap() * 18, 0.45 + rDap() * 0.35);
     // ...and the long ones. A canopy throws round patches, but the TRUNKS
     // throw bars right across the trail, and those are what tell you the sun
     // is low and off to one side rather than straight overhead.
     for (let i = 0; i < 7; i++) {
-      const bx = 60 + rnd() * 392, by = 60 + rnd() * 392, bl = 90 + rnd() * 150;
+      const bx = 60 + rDap() * 392, by = 60 + rDap() * 392, bl = 90 + rDap() * 150;
       d2.save();
-      d2.translate(bx, by); d2.rotate(1.05 + (rnd() - 0.5) * 0.5);
+      d2.translate(bx, by); d2.rotate(1.05 + (rDap() - 0.5) * 0.5);
       const lg = d2.createLinearGradient(0, -bl / 2, 0, bl / 2);
       lg.addColorStop(0, 'rgba(255,255,255,0)');
       lg.addColorStop(0.5, 'rgba(128,146,156,0.62)');
       lg.addColorStop(1, 'rgba(255,255,255,0)');
       d2.fillStyle = lg;
       d2.filter = 'blur(6px)';
-      d2.fillRect(-(7 + rnd() * 9), -bl / 2, 14 + rnd() * 18, bl);
+      d2.fillRect(-(7 + rDap() * 9), -bl / 2, 14 + rDap() * 18, bl);
       d2.restore();
     }
     d2.filter = 'none';
     const dapTex = new THREE.CanvasTexture(dc);
     dapTex.colorSpace = THREE.SRGBColorSpace;
-    const dapple = new THREE.Mesh(new THREE.PlaneGeometry(46, 104),
+    // 62 ACROSS, NOT 46. The bay camera sees well past the verge on the near
+    // side, and grass outside the gobo is grass with no canopy over it — a
+    // pale flat band down one edge of the frame.
+    const dapple = new THREE.Mesh(new THREE.PlaneGeometry(62, 104),
       new THREE.MeshBasicMaterial({ map: dapTex, transparent: true, fog: false,
         blending: THREE.MultiplyBlending, depthWrite: false, toneMapped: false }));
     dapple.rotation.x = -Math.PI / 2;
@@ -5285,12 +5300,39 @@ class Game {
     // is fifty-four draw calls behind a menu; merged by part it is three.
     const trunks = [], lows = [], mids = [], tops = [], rocks = [], bushes = [],
       moss = [], stones = [], stonesDk = [];
-    const put = (arr, geo, sx, sy, sz, tx, ty, tz, ry = 0) => {
+    // `tint` is a PER-PIECE MULTIPLIER carried through the weld as a vertex
+    // colour. Welding by material is what keeps this menu at three draw calls
+    // for fifty trees, and the price has always been that every tree is
+    // exactly the same green. A colour attribute costs one buffer and no draw
+    // calls at all, and it is the only way to have both.
+    const put = (arr, geo, sx, sy, sz, tx, ty, tz, ry = 0, tint = null) => {
       const q = geo.clone();
       q.scale(sx, sy, sz);
       if (ry) q.rotateY(ry);
       q.translate(tx, ty, tz);
+      // ASSIGN A FRESH OBJECT, do not write into the one that is there.
+      // `BufferGeometry.clone()` copies `userData` BY REFERENCE, so every
+      // clone of `lowGeo` shares one object with `lowGeo` itself: writing
+      // `q.userData.tint` gave all fifty trees the LAST tint assigned. The
+      // wood looked varied in the screenshot and was not — `tintab.mjs`
+      // reported the same numbers with the tints on and off, and the count of
+      // distinct tints in the welded buffer was 1.
+      q.userData = { tint };
       arr.push(q);
+    };
+    // ONE TINT PER TREE, not per tier: a trunk, a skirt and a crown that each
+    // rolled their own would be three plants stacked up. Value spread plus a
+    // warm/cool shift, because a wood varies in both.
+    const treeTint = () => {
+      // RANGE SET BY MEASUREMENT. At +/-20% value and +/-9% warmth,
+      // `tintab.mjs` put the pine skirts at luminance sd 16.5 against 14.5
+      // flat and the WARM spread at 4.3 -> 4.4, which is nothing: the tint was
+      // there but too narrow to see past the facet shading. Wider on both
+      // axes, and the warm one nearly doubled, because a wood varies in hue
+      // more than it varies in brightness.
+      const k = 0.72 + rTree() * 0.56;
+      const w = (rTree() - 0.5) * 0.34;
+      return [k * (1 + w), k, k * (1 - w * 0.9)];
     };
     const trunkGeo = new THREE.CylinderGeometry(0.3, 0.52, 3.4, 6);
     trunkGeo.translate(0, 1.7, 0);
@@ -5306,22 +5348,33 @@ class Game {
     topGeo.translate(0, 8.4, 0);
     for (let i = 0; i < 30; i++) {
       const side = i % 2 ? 1 : -1;
-      const lane = 11.5 + rnd() * 24;
+      // IN TO 9.6, from 11.5. The trail edge is at 5.25 and a skirt is 2.6
+      // across, so a tree on this lane reaches to within two metres of the
+      // dirt — which is what makes the path read as confined rather than as a
+      // clearing with a wood somewhere behind it. 8.2 was closer still and
+      // cropped every near crown off the top of the frame, which throws away
+      // the stacked silhouette the third tier exists for.
+      const lane = 9.6 + rTree() * 22;
       const tx = side * lane;
-      const tz = -58 + rnd() * 74;
-      const sc = 0.78 + rnd() * 0.85;
-      put(trunks, trunkGeo, sc, sc, sc, tx, 0, tz);
-      put(lows, lowGeo, sc, sc, sc, tx, 0, tz);
-      put(mids, midGeo, sc, sc, sc, tx, 0, tz);
-      put(tops, topGeo, sc, sc, sc, tx, 0, tz);
+      // BEHIND THE CAR, like the bushes and the rocks. This ran to z +16, and
+      // a 10 u pine that close to the camera is a green wedge across the
+      // corner of a picture whose whole job is to show you a car.
+      const tz = -58 + rTree() * 56;
+      const sc = 0.78 + rTree() * 0.85;
+      const t = treeTint();
+      put(trunks, trunkGeo, sc, sc, sc, tx, 0, tz, 0, t);
+      put(lows, lowGeo, sc, sc, sc, tx, 0, tz, 0, t);
+      put(mids, midGeo, sc, sc, sc, tx, 0, tz, 0, t);
+      put(tops, topGeo, sc, sc, sc, tx, 0, tz, 0, t);
     }
     // a mask row across the back, so the ground never meets the painted sky
     for (let i = 0; i < 22; i++) {
-      const tx = -80 + i * 7.4 + rnd() * 3;
-      const sc = 1.1 + rnd() * 0.6;
-      put(trunks, trunkGeo, sc, sc, sc, tx, 0, -78 - rnd() * 12);
-      put(lows, lowGeo, sc, sc, sc, tx, 0, -78 - rnd() * 12);
-      put(mids, midGeo, sc, sc, sc, tx, 0, -78 - rnd() * 12);
+      const tx = -80 + i * 7.4 + rTree() * 3;
+      const sc = 1.1 + rTree() * 0.6;
+      const t = treeTint();
+      put(trunks, trunkGeo, sc, sc, sc, tx, 0, -78 - rTree() * 12, 0, t);
+      put(lows, lowGeo, sc, sc, sc, tx, 0, -78 - rTree() * 12, 0, t);
+      put(mids, midGeo, sc, sc, sc, tx, 0, -78 - rTree() * 12, 0, t);
       // NO CROWN ON THE MASK ROW. `dioparts.mjs` put the top tier at 1.5
       // pixels per triangle — the worst rate in the diorama by four times —
       // and this row is the reason: it is 78 u back behind fog, doing one job,
@@ -5338,10 +5391,10 @@ class Game {
     // is made of, which is the only reason a rock is interesting.
     for (let i = 0; i < 16; i++) {
       const side = i % 2 ? 1 : -1;
-      const rx = side * (5.4 + rnd() * 3.6);
-      const rz = -38 + rnd() * 40;              // never in front of the car
-      const sc = 0.5 + rnd() * 1.1;
-      const ry = rnd() * 3;
+      const rx = side * (5.4 + rRock() * 3.6);
+      const rz = -38 + rRock() * 40;              // never in front of the car
+      const sc = 0.5 + rRock() * 1.1;
+      const ry = rRock() * 3;
       put(rocks, rockGeo, sc * 1.3, sc * 0.72, sc * 1.1, rx, sc * 0.3, rz, ry);
       // ...and the big ones wear moss on top, which is the one detail that
       // says the rock has been there longer than the trail has.
@@ -5364,32 +5417,49 @@ class Game {
     for (let i = 0; i < 150; i++) {
       const big = i % 4 === 0;
       // over the whole width, but banked at the verges where a tyre throws it
-      const px = rnd() < 0.58 ? (rnd() - 0.5) * 10.2
-        : (rnd() < 0.5 ? 1 : -1) * (4.9 + rnd() * 2.4);
-      const pz = -30 + rnd() * 48;
-      const sc = big ? 0.13 + rnd() * 0.075 : 0.065 + rnd() * 0.065;
-      put(rnd() < 0.5 ? stones : stonesDk, big ? cobbleGeo : chipGeo,
-        sc * 1.3, sc * 0.78, sc * 1.1, px, sc * 0.34, pz, rnd() * 3);
+      const px = rRock() < 0.58 ? (rRock() - 0.5) * 10.2
+        : (rRock() < 0.5 ? 1 : -1) * (4.9 + rRock() * 2.4);
+      const pz = -30 + rRock() * 48;
+      const sc = big ? 0.13 + rRock() * 0.075 : 0.065 + rRock() * 0.065;
+      put(rRock() < 0.5 ? stones : stonesDk, big ? cobbleGeo : chipGeo,
+        sc * 1.3, sc * 0.78, sc * 1.1, px, sc * 0.34, pz, rRock() * 3);
     }
     for (let i = 0; i < 14; i++) {
       const side = i % 2 ? 1 : -1;
-      const bx = side * (7.5 + rnd() * 12);
+      const bx = side * (7.5 + rScrub() * 12);
       // BEHIND THE SUBJECT, ALWAYS. This ran to z +10, which is nearer the
       // camera than the car is, and a 2.5 u scrub bush there is a green blob
       // across the corner of a picture whose whole job is to show you a car.
-      const bz = -46 + rnd() * 44;
-      const sc = 0.8 + rnd() * 0.9;
+      const bz = -46 + rScrub() * 44;
+      const sc = 0.8 + rScrub() * 0.9;
       put(bushes, bushGeo, sc * 1.5, sc * 0.85, sc * 1.4, bx, sc * 0.5, bz);
     }
     const weld = (geos) => {
-      const parts = geos.map((q) => (q.index ? q.toNonIndexed() : q));
+      // toNonIndexed() DROPS userData, so the tint has to be read off the
+      // source geometry and carried across by hand.
+      const parts = geos.map((q) => {
+        const t = q.userData.tint;
+        const r = q.index ? q.toNonIndexed() : q;
+        r.userData.tint = t;
+        return r;
+      });
       let n = 0;
       for (const q of parts) n += q.attributes.position.array.length;
       const pos = new Float32Array(n);
+      const col = parts.some((q) => q.userData.tint) ? new Float32Array(n) : null;
       let o = 0;
-      for (const q of parts) { pos.set(q.attributes.position.array, o); o += q.attributes.position.array.length; }
+      for (const q of parts) {
+        const a = q.attributes.position.array;
+        pos.set(a, o);
+        if (col) {
+          const t = q.userData.tint || [1, 1, 1];
+          for (let k = 0; k < a.length; k += 3) { col[o + k] = t[0]; col[o + k + 1] = t[1]; col[o + k + 2] = t[2]; }
+        }
+        o += a.length;
+      }
       const out = new THREE.BufferGeometry();
       out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      if (col) out.setAttribute('color', new THREE.BufferAttribute(col, 3));
       out.computeVertexNormals();
       return out;
     };
@@ -5403,18 +5473,20 @@ class Game {
     tuftGeo.translate(0, 0.57, 0);
     for (let i = 0; i < 90; i++) {
       const side = i % 2 ? 1 : -1;
-      const gx = side * (5.5 + rnd() * 4.2);
-      const gz = -58 + rnd() * 82;
-      const sc = 0.9 + rnd() * 1.0;
-      put(tufts, tuftGeo, sc, sc * (0.85 + rnd() * 0.8), sc, gx, 0, gz, rnd() * 3);
+      const gx = side * (5.5 + rScrub() * 4.2);
+      const gz = -58 + rScrub() * 82;
+      const sc = 0.9 + rScrub() * 1.0;
+      put(tufts, tuftGeo, sc, sc * (0.85 + rScrub() * 0.8), sc, gx, 0, gz, rScrub() * 3);
     }
     for (const [geos, col, flat] of [[trunks, F.trunk, false], [lows, F.low, true],
       [mids, F.mid, true], [tops, F.top, true], [rocks, F.rock, true],
       [moss, F.moss, true], [stones, F.stone, true], [stonesDk, F.stoneDk, true],
       [bushes, F.bush, true],
       [tufts, 0x5e8f3e, true], [scuffs, F.dirt, false]]) {
-      const m = new THREE.Mesh(weld(geos),
-        new THREE.MeshStandardMaterial({ color: col, roughness: 0.95, flatShading: flat }));
+      const geo = weld(geos);
+      const m = new THREE.Mesh(geo,
+        new THREE.MeshStandardMaterial({ color: col, roughness: 0.95, flatShading: flat,
+          vertexColors: !!geo.attributes.color }));
       m.receiveShadow = true;
       g.add(m);
     }
