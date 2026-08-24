@@ -10097,18 +10097,36 @@ class Game {
     // applied to the TARGET and to the LERPED position (the smoothing path
     // cuts corners on hairpins and would otherwise trail through the cliff).
     const tk = this.track;
+    //
+    // A CLAMP MAY ONLY PULL THE CAMERA IN, NEVER PUSH IT OUT. `nearestIndex`
+    // searches +-30 samples around its hint, so once the camera has drifted
+    // further than that window it resolves against the WRONG piece of track,
+    // `lateralOffset` is then measured from a centreline that is nowhere near,
+    // and this pushes the camera along a normal that points somewhere
+    // arbitrary — which makes the next frame's offset bigger still. Measured
+    // with `caproll.mjs`, railing the car round a lap: on CANYON RUN the
+    // camera-to-car distance ran 51 -> 110 -> 240 -> 372 -> 439 -> 490 and
+    // never recovered, while PINE VALLEY, whose only difference is
+    // `cliffWalls: false`, held 51.1 to 52.0 at every sample of the same lap.
+    // This branch is the only code gated on that flag.
+    //
+    // The guard is one line and it cannot be argued with: if the correction
+    // would leave the camera further from the car than it already is, it is
+    // not a correction.
     const clampCam = (v) => {
       if (!tk?.T?.cliffWalls || !tk.nearestIndex) return;
       const ci = tk.nearestIndex(v, p.trackIndex);
       const lat = tk.lateralOffset(v, ci);
       const lim = 8.4;
-      if (Math.abs(lat) > lim) {
-        const n = tk.nrm[ci];
-        const over = lat - Math.sign(lat) * lim;
-        v.x -= n.x * over;
-        v.z -= n.z * over;
-        v.y += Math.min(4, Math.abs(over) * 0.5);
-      }
+      if (Math.abs(lat) <= lim) return;
+      const n = tk.nrm[ci];
+      const over = lat - Math.sign(lat) * lim;
+      const nx = v.x - n.x * over, nz = v.z - n.z * over;
+      if (Math.hypot(nx - p.pos.x, nz - p.pos.z)
+        > Math.hypot(v.x - p.pos.x, v.z - p.pos.z)) return;
+      v.x = nx;
+      v.z = nz;
+      v.y += Math.min(4, Math.abs(over) * 0.5);
     };
     clampCam(targetPos);
     const k = 1 - Math.exp(-5.5 * dt);
@@ -10263,6 +10281,29 @@ class Game {
             cp.z -= pz * side * push;
           }
         }
+      }
+    }
+    // THE BOOM HAS A LENGTH, AND IT IS NOT NEGOTIABLE.
+    //
+    // Every guard above — the cliff clamp, the ground lift, the tunnel and
+    // deck clamps, the pine sidestep — moves the eye for a good reason, and
+    // any of them can be wrong about where it has put it. None of them checks
+    // the one thing that is always true: a chase camera is a boom of a known
+    // length, and a boom that is three times its own length from the car has
+    // failed, whatever the reason. `caproll.mjs` caught exactly that on the
+    // cliff worlds (49 u nominal, 490 u measured, never recovering).
+    //
+    // So: a leash. Past twice the boom, snap back to where the mode says the
+    // eye belongs. It costs nothing when nothing is wrong — in a healthy lap
+    // the distance never leaves 51-52 against a nominal 48.7 — and it turns
+    // any future version of that bug from a lost car into a single frame of
+    // camera movement.
+    {
+      const boom = Math.hypot(M.back + speedZoom * (M.spdBack || 0),
+        M.h + lift + speedZoom * (M.spdH || 0));
+      if (this.camPos.distanceTo(p.pos) > boom * 2) {
+        this.camPos.copy(targetPos);
+        this.camLook.copy(targetLook);
       }
     }
     this._applyCamera(dt, speedZoom, M);

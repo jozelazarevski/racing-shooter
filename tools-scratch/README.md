@@ -180,6 +180,27 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `caproll.mjs`  the camera round a WHOLE LAP without teleporting it. Rails the
+                car one small index step a frame and samples occlusion, camera
+                distance and where the car projects. Teleporting between
+                stations is what the earlier `camstuck.mjs` did and it invents
+                its own bug: a camera asked to catch up from a third of a lap
+                is not a thing a player ever does. It caught the cliff-world
+                runaway — 51 to 490 u and never recovering — against PINE
+                VALLEY holding 51-52 on the same rail.
+- `camstuck.mjs` the same idea by parking the car at fixed stations and
+                lateral offsets. Kept for the occlusion measurement (key the
+                car magenta, render with depth and without, and the ratio is
+                how much of it you can see); its station-jumping is NOT a
+                sound way to judge the camera — see `caproll.mjs`.
+- `lampcheck.mjs` which cars have a headlight rig and whether it is on, on the
+                grid and again racing, because "no lights" and "lights that
+                only arrive after the lights go green" are different bugs.
+- `beamread.mjs` how much headlight survives per camera mode: the opacity
+                `fadeCarLights` settles on, which is exact, plus a count of
+                pixels that change when every rig is hidden — and that COUNT is
+                not usable on an animated world like NEON GRID, where it is
+                mostly neon and particles. Trust the opacity.
 - `swallowed.mjs` EVERY EXCEPTION THE FRAME LOOP IS EATING. Drives each level
                 with throttle, steering and all four weapons, and collects what
                 `Game.frame()`'s catch printed. Anything it lists is a real bug

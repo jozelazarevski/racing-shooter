@@ -3304,3 +3304,81 @@ geometry that cannot show its work — the same rule that cut the grass tufts an
 the pine crowns. The probe stays, with its three failures written into it, and
 the `PLATE=off` toggle stays as the shape of a correct A/B: hide the thing,
 never rebuild the scene without it.
+
+## r268 — HEADLIGHTS ON EVERY CAR, AND A CAMERA THAT WAS LOSING THE CAR
+Two phone reports. The second one turned up something worse than either.
+
+### "ALL CARS NEED TO HAVE HEADLIGHTS" — THEY ALL DO
+`lampcheck.mjs` lists every car with whether it HAS a lamp rig and whether the
+rig is on, sampled on the grid and again racing, because "no lights" and
+"lights that only arrive after the lights go green" are different bugs. On
+NEON GRID all eight — player and every one of the seven rival styles — report
+`rig: true, on: true` in both states. They also share ONE material
+(`carLightMaterial`), so no car can be lit differently from another. There was
+nothing to fix in the cars.
+
+What differed was the CAMERA. `fadeCarLights` dims that shared material by how
+far down the camera looks, because a beam lying flat on the road seen from
+straight above is a painted puddle rather than light. `beamread.mjs` reads the
+opacity it settles on per mode:
+
+```
+TOP-DOWN  down 0.76   opacity 0.238
+TOP FAR   down 0.82   opacity 0.238
+TRAIL     down 0.55   opacity 0.461
+CHASE     down 0.23   opacity 0.850
+```
+
+Both overhead modes sat on the floor of the curve at 28% — **and TOP-DOWN is
+the camera the game starts in.** At that strength the nearest, best-angled car
+still throws a visible beam and the others do not, which reads exactly as "some
+cars have headlights and some don't". `CAR_LIGHT_TOPDOWN_CUT` 0.72 -> 0.45:
+TOP-DOWN opacity 0.238 -> 0.468, TRAIL 0.461 -> 0.607, CHASE unchanged. The
+fade stays, because the reason for it is real; it just may not take the whole
+read away.
+
+**A metric that did not work, stated as such:** `beamread.mjs` also counts the
+pixels that change when every rig is hidden, and on NEON GRID that count barely
+moved (22 338 -> 23 400 in TOP-DOWN) while the opacity doubled. The world
+animates — neon strips, holo boards, particles — and at a diff threshold that
+low the count is mostly animation. The opacity is exact and the before/after
+screenshots are plain; the pixel count is not evidence here and is not quoted
+as any.
+
+### AND THE CAMERA WAS LEAVING THE CAR BEHIND
+The other report: CANYON RUN, half the frame a flat slab of cliff, the car
+shoved into the corner behind the buttons. `_watchCarVisible` does not fire on
+that and is right not to — it tests hidden, buried and OFF SCREEN, and the car
+was none of those. It was on screen and behind a rock.
+
+Parking the car and pushing it sideways showed nothing: the lateral clamp held
+out to 30 u off the racing line and the car stayed dead centre of frame.
+Teleporting between stations showed a camera 100-180 u away, but that was the
+probe — a camera asked to catch up from a third of a lap is not a thing a
+player ever does. So `caproll.mjs` RAILS the car: one small index step a frame,
+all the way round, sampling as it goes.
+
+```
+CANYON RUN   camDist  51 -> 110 -> 240 -> 372 -> 439 -> 490, never recovering
+PINE VALLEY  camDist  51.1 to 52.0 at every sample of the same lap
+```
+
+The only difference between those two worlds on this path is `cliffWalls`, and
+the only code gated on it is `clampCam`. `nearestIndex` searches ±30 samples
+around its hint, so once the camera drifts past that window it resolves against
+the WRONG piece of track; `lateralOffset` is then measured from a centreline
+that is nowhere near, and the clamp pushes the camera along an arbitrary
+normal — which makes the next frame's offset bigger. A correction that
+compounds.
+
+Two fixes. The cause: **a clamp may only pull the camera in, never push it
+out** — one line, and it cannot be argued with. And the symptom, in the spirit
+of the watchdog above it: **the boom has a length.** Every guard in that
+function moves the eye for a good reason and any of them can be wrong about
+where it put it; none checked the one thing always true, which is that a chase
+camera three times its own boom length from the car has failed whatever the
+reason. Past twice the boom it snaps to where the mode says the eye belongs.
+
+After: camDist median **51.2** across the whole lap, max 80.3 — inside the
+leash, and two transient samples rather than a runaway. `boot.mjs` 4/4,
+`playermoves.mjs` passes CANYON RUN as well as PINE VALLEY.

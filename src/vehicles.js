@@ -301,8 +301,28 @@ export function fadeCarLights(camera) {
   _carLightMat.opacity = CAR_LIGHT_OPACITY * k;
 }
 /** How much of the beam is taken away looking straight down. Measured, not
- *  guessed — see `tools-scratch/beamlook.mjs`. */
-export const CAR_LIGHT_TOPDOWN_CUT = 0.72;
+ *  guessed — see `tools-scratch/beamlook.mjs`.
+ *
+ *  0.45, DOWN FROM 0.72, BECAUSE THE DEFAULT CAMERA IS AN OVERHEAD ONE.
+ *  Reported from a phone as "all cars need to have headlights" — and every car
+ *  had them: all eight rigs report visible on a dark world, and they share a
+ *  single material, so no car can be lit differently from another. What
+ *  differed was the CAMERA. `beamread.mjs` hides every rig and counts the
+ *  pixels that change, which is exact:
+ *
+ *      TOP-DOWN  down 0.76   opacity 0.238
+ *      TOP FAR   down 0.82   opacity 0.238
+ *      TRAIL     down 0.55   opacity 0.461
+ *      CHASE     down 0.23   opacity 0.850
+ *
+ *  The two overhead modes were sitting on the floor of the curve at 28% — and
+ *  TOP-DOWN is what the game starts in. At that strength the nearest, best-
+ *  angled car still shows a beam and the rest do not, which reads exactly as
+ *  "some cars have headlights and some don't". The reason for the fade is
+ *  real (a wedge lying flat on the road, seen from straight above, is a
+ *  painted puddle rather than light), so it stays — it just may not take the
+ *  read away entirely. */
+export const CAR_LIGHT_TOPDOWN_CUT = 0.45;
 
 export function buildVoxelRacer(spec) {
   const { body, accent, stripe = null, number = null, style = 'crown', rims = null } = spec;
