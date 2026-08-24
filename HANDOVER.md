@@ -3585,3 +3585,61 @@ known biases, but it is reproducible, per-world, and it exists.
 - `whokilled.mjs` keys damage by call stack; if main.js moves, the line
   numbers in its output move with it — the buckets are still right, the
   labels just need re-reading.
+
+## r272 — THE THREE CARRY-FORWARDS SETTLED, AND WHAT FIGHTING BACK IS WORTH
+
+### ALL 22 "3-WRECK" WORLDS LAP ON EASY. THE ROSTER HAS NO UNLAPPABLE WORLD.
+The 14 not yet re-run in r271, on `DIFF=easy`: 14/14 lapped (33.1-54.9 s),
+nine of them with ZERO wrecks — NORDSCHLEIFE hull 70 remaining, BRIDGE RUN
+62, MOUNT PANORAMA 54. With r271's eight that is 22/22: every world that
+ended a passive NORMAL run by the three-hull rule laps cleanly one tier
+down. Geometry is never the blocker; the guns are.
+
+    13 LOG FLUME 33.1s w1    21 FURKA 54.9s w1     28 ESTONIA 38.5s w0
+    29 OLIVE CST 37.2s w0    33 RB RING 35.6s w0   38 NORDSCH 33.5s w0
+    41 PANORAMA 35.7s w0     47 DEEPWOOD 44.6s w0  53 DALMATIA 37.4s w0
+    55 BRIDGE  42.4s w0      56 OLIVE X 52.0s w0   58 CITADEL 34.7s w0
+    62 CAPE OL 38.6s w1      69 MAPLE   38.5s w2
+
+### WHAT FIGHTING BACK IS WORTH: 0/8 BECOMES 5/8, ON NORMAL
+`agentdrive.mjs` grew `FIGHT=1`: hold Space when a rival sits within 55 u
+and 0.22 rad of the nose, tap E for a homing missile when one is lined up
+10-50 u out, once per 8 s. The DRIVING is unchanged — the delta is the guns.
+On the same eight worlds where the passive driver went 0/8 on NORMAL:
+
+    AMAZON RAPIDS  46.6s w1 k1     NEON GRID   54.9s w2 k7
+    LANTERN QTR    42.5s w2 k5     HARVEST RUN 36.3s w1 k2
+    PORTO MOLO     36.0s w1 k3     CORNICHE    3-wreck k5
+    COSTA BRAVA    3-wreck k2      SEA CLIFF   3-wreck k2
+
+5/8 lapped, wrecks per run 3 -> 1-2, one to seven rivals destroyed with a
+thumb-grade aim policy (no lead, no mine avoidance, no pickup use, no
+nitro). So NORMAL's assumption is now a measured statement: a driver who
+merely SHOOTS at what is in front of them survives most worlds; add the
+dodging and pickups a human actually does and the tier is honest. The three
+that still 3-wreck under a crude gunner are the sharpest combat worlds on
+the roster and the first place a difficulty pass should look — with numbers,
+not vibes.
+
+### THE TWO ODDITIES FROM r271, CLOSED
+- CAPO MELE lateral 15.9: does not reproduce (9.6 on re-run). The clamp
+  code says why it CAN happen at all: on non-cliff worlds the player is
+  deliberately unclamped — "the world is open and off-road slowness is the
+  boundary" (vehicles.js track-constraint block). A wide moment on an open
+  verge is the design working, not WALL_LIMIT failing. r271's carry-forward
+  note mis-read the rule; corrected here.
+- RED CENTRE RUN camera 74 u: reproduces exactly — at sample 6, i.e. the
+  RACE-START transient while the chase camera converges from its grid pose,
+  settling to ≤33 for the rest of the lap. Inside the r270 leash, visible
+  for under a second, on the world with the longest start straight. Benign.
+  `camAt`/`latAt` in agentdrive now locate this class of thing in one run.
+
+### FOR THE NEXT SESSION
+- CORNICHE, COSTA BRAVA, SEA CLIFF RUN: the three worlds that kill even a
+  shooting driver on NORMAL. whokilled.mjs on those three, on NORMAL, is
+  the next measurement: if it is mines-on-the-line, the mine ring's
+  visibility at racing speed is the design question; if it is missile
+  volume, the global rocket budget (g._aiRocketMin) is.
+- The FIGHT policy never dodges: teaching it to read `weapons.mines`
+  positions and offset the pursuit line ±3 u would separate "mines are
+  fair" from "mines are unavoidable on a line-width road".
