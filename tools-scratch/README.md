@@ -180,6 +180,13 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `bandscan.mjs` what the bands down the edges of a screenshot ARE: it scans in
+                from both sides for the first column that is not flat page
+                background and reports width, share and exact colour. "Safe-area
+                inset", "stale canvas width" and "letterbox" look identical at a
+                glance and have completely different fixes; the colour and the
+                symmetry tell them apart. It identified the device from the
+                arithmetic alone.
 - `gates.mjs`   EVERY GATE, ONE COMMAND, ONE EXIT CODE — run it before pushing.
                 `FAST=1` skips the slow sweeps. It exists because r271 shipped a
                 broken view past a "suite" that was three scripts somebody

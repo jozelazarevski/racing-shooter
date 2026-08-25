@@ -18,13 +18,19 @@ const check = (name, state, d) => {
   // THE BOX MUST BE THE SCREEN, and the buffer must share its aspect. Either
   // failing makes EVERYTHING look wrong at once, which is the only kind of
   // camera bug a player describes as "broken overall".
-  const boxOk = Math.abs(d.box[0] - d.viewport[0]) <= 1 && Math.abs(d.box[1] - d.viewport[1]) <= 1;
+  // THE BOX MUST COVER THE SCREEN, which is the viewport PLUS whatever the
+  // canvas was deliberately pulled out by to reach an iOS safe-area band (see
+  // the overscan note in main.js `applyViewport`). Where that is not happening
+  // — everywhere testable here — `overX` is 0 and this is the old check.
+  const boxOk = Math.abs(d.box[0] - (d.viewport[0] + 2 * d.overX)) <= 1
+    && Math.abs(d.box[1] - d.viewport[1]) <= 1;
   const ok = boxOk && Math.abs(d.stretchPct) < 1 && Math.abs(d.camAspectErrPct) < 1;
   if (!ok) bad++;
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name.padEnd(9)} ${state.padEnd(5)}`
     + ` screen ${JSON.stringify(d.viewport)} box ${JSON.stringify(d.box)}`
     + ` buffer ${JSON.stringify(d.buffer)} stretch ${d.stretchPct}%`
-    + ` camAspectErr ${d.camAspectErrPct}%${boxOk ? '' : '   BOX IS NOT THE SCREEN'}`);
+    + ` camAspErr ${d.camAspectErrPct}% screenW ${d.screenW} overX ${d.overX}`
+    + `${boxOk ? '' : '   BOX DOES NOT COVER THE SCREEN'}`);
 };
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
@@ -46,6 +52,7 @@ const probe = `(() => {
   const eye = g.camera.position, car = g.player.mesh.position;
   const v = car.clone().project(g.camera);
   return { state: g.state, viewport: [innerWidth, innerHeight],
+    screenW: screen.width, overX: Math.round(-parseFloat(c.style.left || 0)) || 0,
     box: [Math.round(r.width), Math.round(r.height)], buffer: [c.width, c.height],
     stretchPct: +(100 * (bufA / boxA - 1)).toFixed(1),
     camAspectErrPct: +(100 * (g.camera.aspect / boxA - 1)).toFixed(1),
@@ -75,6 +82,33 @@ await p.evaluate(async () => {
   for (let i = 0; i < 600 && g.state !== 'race'; i++) await f();
 });
 await sweep('RACE');
+
+// ---- THE INSET CASE, SIMULATED --------------------------------------------
+// The overscan above is a no-op on every viewport this suite can make, because
+// Playwright reports `screen.width === innerWidth`. Untested code is not a
+// fix, so make the shape iOS actually reports: a 956 pt screen with an 832 pt
+// layout viewport, which is an iPhone 16 Pro Max in landscape with its 62 pt
+// safe-area insets and `viewport-fit=cover` not taking effect. The canvas must
+// come out 956 wide, pulled 62 left, still unstretched.
+{
+  const ictx = await b.newContext({ viewport: { width: 832, height: 440 },
+    screen: { width: 956, height: 440 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
+  const ip = await ictx.newPage();
+  ip.setDefaultTimeout(600000);
+  await ip.goto('http://localhost:8901/?level=1&unlockall=1', { waitUntil:'load', timeout:600000 });
+  await ip.waitForFunction(() => window.__game?.track?.center, undefined, { timeout:600000 });
+  await ip.evaluate(async () => {
+    const f = () => new Promise((r) => requestAnimationFrame(r));
+    for (let i = 0; i < 16; i++) await f();
+  });
+  const d = await ip.evaluate(probe);
+  const ok = d.overX === 62 && Math.abs(d.box[0] - 956) <= 1 && Math.abs(d.stretchPct) < 1;
+  if (!ok) bad++;
+  console.log(`${ok ? 'PASS' : 'FAIL'} inset-sim  viewport ${JSON.stringify(d.viewport)}`
+    + ` screenW ${d.screenW} -> overX ${d.overX} box ${JSON.stringify(d.box)}`
+    + ` stretch ${d.stretchPct}%  (want overX 62, box width 956)`);
+  await ictx.close();
+}
 await b.close();
 console.log(bad ? `FAIL: ${bad} broken views` : 'PASS: every view is the size of its screen');
 process.exit(bad ? 1 : 0);

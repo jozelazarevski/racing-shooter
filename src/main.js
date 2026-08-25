@@ -1623,12 +1623,47 @@ class Game {
       this.input.bindJoystick(joyZone, document.getElementById('joy-base'), document.getElementById('joy-knob'));
     }
     const applyViewport = () => {
-      this.camera.aspect = innerWidth / innerHeight;
-      this.baseFov = innerHeight > innerWidth ? 68 : 56; // widen for portrait phones
+      // ---- REACHING INTO THE SAFE-AREA BANDS ------------------------------
+      //
+      // Reported twice: a green bar down each edge in landscape. Measured off
+      // the screenshot rather than guessed at — `bandscan.mjs` scans in from
+      // both sides for the first column that is not flat page background:
+      //
+      //     2868 px wide, left band 185, right band 186, colour #7eb75c
+      //
+      // #7eb75c is `body`'s old background exactly, and the main renderer has
+      // no `alpha`, so its canvas is OPAQUE and cannot be showing anything
+      // behind it. The canvas simply is not there. 2868/3 = 956 pt — an iPhone
+      // 16 Pro Max in landscape, whose safe-area inset is 62 pt, and 185/3 is
+      // 61.7. So the layout viewport is 832 on a 956 pt screen: `viewport-fit=
+      // cover` is in the meta, has been since r245, and is not taking effect.
+      //
+      // Nothing inside the page can be positioned into those bands... except
+      // that THE BACKGROUND IS ALREADY PAINTING THERE. The browser's page
+      // surface does span the full 956; only the CSS coordinate space is 832
+      // wide. So an element pulled left of zero and made wide enough does
+      // reach them — and `screen.width` is the one API that still reports the
+      // real screen when `innerWidth` does not.
+      //
+      // Guarded hard, because this must be a NO-OP everywhere it is not
+      // needed: touch only (on a desktop `screen.width` is the monitor, not
+      // the window), only when the screen is wider than the viewport, and only
+      // by an amount an inset could plausibly be. Vertical is deliberately
+      // left alone — in landscape the browser's own chrome makes
+      // `screen.height` meaningless.
+      const sw = window.screen?.width || 0;
+      const gap = sw - innerWidth;
+      const over = (this.isTouch && gap > 0 && gap <= 200) ? gap / 2 : 0;
+      const vw = innerWidth + over * 2, vh = innerHeight;
+      this.camera.aspect = vw / vh;
+      this.baseFov = vh > vw ? 68 : 56;                        // widen for portrait phones
       this.camera.fov = this.baseFov;
       this.camera.updateProjectionMatrix();
-      this.renderer.setSize(innerWidth, innerHeight);          // see the ctor
-      this.composer.setSize(innerWidth, innerHeight);
+      this.renderer.setSize(vw, vh);                           // see the ctor
+      this.composer.setSize(vw, vh);
+      // `setSize` has just written `style.left`-agnostic width/height; the
+      // offset has to go on afterwards or it is overwritten.
+      this.canvas.style.left = over ? `${-over}px` : '';
       if (this.input.resetJoystick) this.input.resetJoystick();
     };
     applyViewport();

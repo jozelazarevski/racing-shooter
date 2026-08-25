@@ -3628,3 +3628,51 @@ Worth reading the buffers rather than skimming them: portrait TITLE renders at
 it is `_autoQuality` dropping the pixel ratio under load, and the gate passes
 both because it checks the box against the SCREEN and the buffer's ASPECT
 against the box — never the buffer's size against anything.
+
+## r275 — THE GREEN BANDS, MEASURED AND CLOSED
+Two rounds of guessing at this, one of which broke the view for everyone. This
+time: measure the screenshot first.
+
+`bandscan.mjs` scans in from both edges for the first column that is not flat
+page background:
+
+```
+2868 x 1320,  left band 185 px,  right band 186 px,  colour rgb(126,183,92)
+```
+
+Three facts fall straight out of that:
+
+1. **rgb(126,183,92) is `#7eb75c`** — `body`'s old background, exactly. And the
+   main renderer takes no `alpha`, so its canvas is OPAQUE and cannot be
+   showing anything behind it. The canvas is simply not there.
+2. **2868 / 3 = 956 pt.** An iPhone 16 Pro Max in landscape. Its safe-area inset
+   is 62 pt; 185 / 3 is 61.7.
+3. So the layout viewport is **832 on a 956 pt screen** — `viewport-fit=cover`
+   is in the meta, has been since r245, and is not taking effect on that device.
+
+Nothing positioned inside the page can reach outside the layout viewport...
+except that **the background is already painting there**. The browser's page
+surface spans the full 956; only the CSS coordinate space is 832 wide. So an
+element pulled left of zero and made wide enough does reach the bands — and
+`screen.width` is the one API that still reports the real screen when
+`innerWidth` does not.
+
+`applyViewport` now computes `over = (screen.width - innerWidth) / 2`, renders
+at `innerWidth + 2*over`, and sets `canvas.style.left = -over`. Guarded so it is
+a NO-OP anywhere it is not needed: touch only (on a desktop `screen.width` is
+the monitor, not the window), only when the screen is wider than the viewport,
+and only by an amount an inset could plausibly be. Vertical is left alone —
+in landscape the browser's own chrome makes `screen.height` meaningless.
+
+### AND THIS TIME IT IS TESTED BOTH WAYS
+The trap last time was shipping a fix for a case no test could reach.
+`camsanity.mjs` now proves both halves:
+
+```
+portrait/landscape/desktop, title and race   overX 0     box == viewport   (no-op)
+inset-sim  viewport 832  screenW 956    ->   overX 62    box 956x440  stretch 0%
+```
+
+The simulation is the reported device's exact geometry — Playwright can set
+`screen` independently of `viewport`, which is the shape iOS reports. Untested
+code is not a fix.
