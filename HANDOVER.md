@@ -3596,3 +3596,35 @@ reads as a bezel rather than as lime. That one was never confirmed to work in
 the first place — it could not be tested here — and it broke the view for
 everyone in exchange. A blind fix for an unreproducible report, shipped without
 a gate, is worth less than nothing.
+
+
+## r274 — ONE COMMAND, EVERY GATE
+r271 shipped a view zoomed 75% and cropped to the corner on every touch device,
+and it went out past a suite that was three scripts somebody remembered to run.
+The player found it. That is a process fault, not a coding one, so:
+
+    node tools-scratch/gates.mjs        # everything
+    FAST=1 node tools-scratch/gates.mjs # skip the slow sweeps
+
+Eight gates, one exit code, run before anything is pushed. **A gate nobody runs
+is a gate that does not exist**, and neither is one that only PRINTS: three of
+them — `pageerr`, `landscape`, `bayblack` — reported in prose and could not be
+driven by a runner at all. They exit non-zero now. Adding a gate that prints
+its verdict instead of returning it is the same as not adding one.
+
+### AND THE GATE ITSELF HAD TO GET FASTER TO BE USABLE
+`camsanity.mjs` opened a fresh page per screen size. Building the track costs
+about ninety seconds under swiftshader, so three sizes meant three builds and
+the gate **timed out at ten minutes** the first time the runner called it — a
+gate that cannot finish inside its budget is another gate that does not exist.
+
+It now builds ONCE and rotates the viewport, which is both four times faster and
+a better test: a canvas that is correct on load and wrong after a rotation is
+precisely the bug it was written for. Six cases — portrait, landscape and
+desktop, title and race — all green, box equal to the screen in every one.
+
+Worth reading the buffers rather than skimming them: portrait TITLE renders at
+703x1529 and portrait RACE at 402x874 on the same screen. That is not a fault,
+it is `_autoQuality` dropping the pixel ratio under load, and the gate passes
+both because it checks the box against the SCREEN and the buffer's ASPECT
+against the box — never the buffer's size against anything.

@@ -14,5 +14,12 @@ p.on('pageerror', e => console.log('PAGEERROR: ' + e.message));
 p.on('console', m => { if (m.type() === 'error') console.log('CONSOLE: ' + m.text().slice(0,300)); });
 try { await p.goto('http://localhost:8901/?level=1', { waitUntil:'load', timeout:30000 }); } catch (e) { console.log('GOTO ' + e.message.slice(0,120)); }
 await p.waitForTimeout(4000);
-console.log('game? ' + await p.evaluate(() => !!window.__game));
+const ok = await p.evaluate(() => !!window.__game);
+console.log('game? ' + ok);
 await b.close();
+
+// EXIT CODE, NOT JUST A LINE OF TEXT. A gate that only prints cannot be run by
+// `gates.mjs`, and a gate nobody runs is a gate that does not exist — r271
+// shipped a broken view past a suite that was all green because the suite was
+// three scripts somebody remembered.
+process.exit(ok ? 0 : 1);

@@ -50,3 +50,11 @@ if (out.url) { fs.writeFileSync('tools-scratch/shot-baycanvas.png', Buffer.from(
 console.log(JSON.stringify(out, null, 1));
 if (errs.length) console.log('ERR ' + errs.slice(0, 3).join(' | '));
 await b.close();
+// THE TWO NUMBERS THIS FILE EXISTS FOR, as a pass/fail so `gates.mjs` can run
+// it: any TRANSPARENT pixel means the backdrop is not reaching the camera (a
+// hole with the panel behind it — see the far-plane round), and a mean below
+// 90 means the bay has gone dark again, which is the complaint the whole
+// forest was built to answer.
+const bad = out.transparentPct > 0.5 || out.meanLum < 90 || errs.length > 0;
+console.log(bad ? 'FAIL: bay backdrop' : 'PASS: bay lit and sealed');
+process.exit(bad ? 1 : 0);

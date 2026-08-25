@@ -180,6 +180,12 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `gates.mjs`   EVERY GATE, ONE COMMAND, ONE EXIT CODE — run it before pushing.
+                `FAST=1` skips the slow sweeps. It exists because r271 shipped a
+                broken view past a "suite" that was three scripts somebody
+                remembered. Every gate it calls MUST exit non-zero on failure;
+                adding one that only prints its verdict is the same as not
+                adding one.
 - `camsanity.mjs` THE GATE FOR "everything looks wrong". Asserts the canvas BOX
                 equals the screen, that the drawing buffer shares the box's
                 aspect (or the whole image is stretched), and that

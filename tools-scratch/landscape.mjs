@@ -17,6 +17,7 @@ const SIZES = (process.env.SIZES ?? 'iphone-landscape,phone-portrait').split(','
 }[n]));
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
+let bad = 0;
 for (const [name, w, h, dpr] of SIZES) {
   const ctx = await b.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr,
     hasTouch: true, isMobile: true });
@@ -30,7 +31,7 @@ for (const [name, w, h, dpr] of SIZES) {
     for (let i = 0; i < 600 && g.state !== 'race'; i++) await f();
     for (let i = 0; i < 40; i++) await f();
   });
-  console.log(name, JSON.stringify(await p.evaluate(() => {
+  const res = await p.evaluate(() => {
     const c = document.getElementById('game-canvas');
     const r = c.getBoundingClientRect();
     const g = window.__game;
@@ -56,8 +57,13 @@ for (const [name, w, h, dpr] of SIZES) {
       fillsWidth: Math.abs(r.width - innerWidth) < 1 && Math.abs(r.left) < 1,
       fov: +g.camera.fov.toFixed(1), aspect: +g.camera.aspect.toFixed(2),
       overlaps: hit };
-  })));
+  });
+  if (!res.fillsWidth || res.overlaps.length) bad++;
+  console.log(`${(!res.fillsWidth || res.overlaps.length) ? 'FAIL' : 'PASS'} ${name} `
+    + JSON.stringify({ canvas: res.canvasBox, fills: res.fillsWidth, overlaps: res.overlaps }));
   await p.screenshot({ path: `tools-scratch/shot-land-${name}.png` });
   await ctx.close();
 }
+console.log(bad ? `FAIL: ${bad} layout faults` : 'PASS: no visible overlaps, canvas fills');
 await b.close();
+process.exit(bad ? 0 + bad : 0);
