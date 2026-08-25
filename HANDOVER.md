@@ -3807,3 +3807,55 @@ Worth reading the buffers rather than skimming them: portrait TITLE renders at
 it is `_autoQuality` dropping the pixel ratio under load, and the gate passes
 both because it checks the box against the SCREEN and the buffer's ASPECT
 against the box — never the buffer's size against anything.
+
+## r273-line — THE PHONE SHOT ON THE BLACK APRON, AND THE EXEMPTION THAT NEVER SAID WHO IT WAS FOR
+
+A phone shot off the live r273 build: 8th of 8 at 0:16.7, 3 km/h, hull 77,
+the car parked on a green ledge above a carriageway with black nothing
+beside it, the stick at rest. World identified by texture match against
+overhead probe shots: **UNDERCITY SLIPSTREAM** — the terraced olive trench
+walls, the mottled slab roadway, the marker posts on the rims.
+
+### REPRODUCED, THEN CLOSED AT THE EXIT
+`_cliffProfile` around the start bowl reads h = 1.7 for ~40 samples on BOTH
+sides — under the clamp's 2.5 exemption, written "so free-roamers can drive
+out" and applied to everyone. A racing car carving wide off the line (or
+shoved wide — the grid is eight cars and missiles fly from the first
+seconds) left the trench at full speed. Then, with the throttle released,
+it coasts to lat 74, sinks to the apron at y −4.1, and sits for ever:
+- the wedge net anchors displacement WHILE THE THROTTLE IS HELD (r273's
+  own fix), so a player who gives up pushing is invisible to it;
+- the lost net was deliberately narrowed to broken states (under terrain,
+  NaN) because yanking wanderers back "read as the game resetting you";
+- SOS works out there — the phone player had a charge in hand, unused.
+All three of those are design decisions with reasons; the defect was the
+EXIT, so the fix is one clause: `wallHere = !prof || prof.h > 2.5 ||
+!freeRoam` — the berm exemption is now roam-only. Racers meet a visible
+knee-high stone berm as a wall; roamers still drive out over it.
+
+### MEASURED, BEFORE AND AFTER (tools-scratch/bermtest.mjs, now a gate)
+    race  carve-out at sample 10, both sides:  lat 12.6 -> 74 stranded  BEFORE
+                                               lat 9.6, held at the lim AFTER
+    roam  same manoeuvre:                      lat 42.4 out             both
+The gate pins both directions and is registered in gates.mjs. Regression
+sweep on the fix: test-invisible-walls 13/13 (the berm is visible stone —
+holding a racer at it is not an invisible wall), test-mountainrun 21/21
+(OLIVE COAST control still open), test-unstuck 9/9, test-roam all green.
+The cliffSetback valley-floor carve-out and the past-the-outer-face roam
+rule sit AFTER the changed line and are untouched: CANYON RUN and LAGUNA
+SECA racers still roam their valley floors.
+
+### FOUND RED ON THE BASE, NOT TOUCHED
+`tests/test-shortcut.mjs` fails 2/6 on PRISTINE origin/main (r273) exactly
+as on this branch: FURKA RIDGE's designed 30 u cut over the bank at sample
+170 now stops at 0.7 m/s with "HIT ROCK −59 HULL". Not this change's doing
+— reproduced identically on the untouched worktree — but it means the live
+build has lost that world's crossover cut. Whoever owns the massif/obstacle
+line should look; the failing assertion names the exact sample.
+
+### WORLD-ID PROBE
+Phone shots rarely name their world. tools-scratch/nearsamples.mjs answers
+"what stands at sample S"; this round's texture-match trick — overhead shot
+at F=0.04 of each candidate, compared against the report — identified
+UNDERCITY in two rounds of probe shots. The probe is disposable; the trick
+is worth remembering.

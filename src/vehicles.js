@@ -2327,10 +2327,21 @@ export class Car {
       if (this !== gm.player) wallHere = true; // AI safety net, all levels
       else if (cliffy) {
         // canyon: rock walls are solid — except the low berm near the start
-        // bowl, where the cliffs open up and free-roamers can drive out
+        // bowl, where the cliffs open up and free-roamers can drive out.
+        //
+        // FREE-ROAMERS. The exemption never said so, and a RACING car went
+        // through it too: UNDERCITY's start bowl runs a 1.7 u berm for ~40
+        // samples on BOTH sides, so a racer carving wide off the line — or
+        // shoved wide by the pack — left the trench entirely and rolled to a
+        // stop on the black apron, 8th of 8 at 16 s (the r273 phone shot).
+        // With the throttle released no automatic net fires out there, on
+        // purpose, so the exit is the thing to close: in a road event the
+        // berm is a wall like any other. It is visible knee-high stone, so
+        // holding a racer at it is not an invisible wall. The cliffSetback
+        // and past-the-outer-face carve-outs below still apply after this.
         const prof = t._cliffProfile ? t._cliffProfile(this.trackIndex, fside) : null;
         cliffProf = prof;
-        wallHere = !prof || prof.h > 2.5;
+        wallHere = !prof || prof.h > 2.5 || !freeRoam;
         // deep-valley worlds (cliffSetback) stand their faces well off the
         // verge: the player may roam the valley floor and only the ROCK is
         // solid - off-road slowness is the boundary in between

@@ -29,6 +29,7 @@ const GATES = [
   ['bayblack',    'garage bay lit and sealed',                      [], 600],
   ['playermoves', 'the player car actually drives',                 ['LEVELS=1'], 600],
   ['wedgetest',   'a car pinned on a wall counts as stuck',         ['LEVELS=1'], 600],
+  ['bermtest',    'start bowl holds racers, releases roamers',      [], 600],
   ['swallowed',   'nothing hidden by the frame loop catch',         ['LEVELS=1', 'MODES=race'], 600],
 ];
 const SLOW = new Set(['swallowed', 'landscape', 'camsanity']);
