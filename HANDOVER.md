@@ -3475,6 +3475,14 @@ load-bearing by accident now has the thing it guards on the other side of it.
 The report itself stays open and honest: I do not know what produced that
 frame, and I have written down the four things it is not.
 
+
+> NOTE ON NUMBERING: the two section lines below ran in PARALLEL sessions
+> and both used r271+. The AGENT-DRIVER line (driving/difficulty measurement)
+> and the MAIN line (landscape/attract/canvas fixes, deployed as build r271-r273)
+> are different work; read the titles, not the numbers.
+
+# --- AGENT-DRIVER LINE (parallel sessions) ---
+
 ## r271 — AN AGENT FINALLY DROVE EVERY WORLD, AND THE NUMBER THAT DID NOT EXIST NOW HAS A FIRST ANCHOR
 
 Asked: "can the agent drive all tracks and investigate bugs". It can, it did —
@@ -3643,3 +3651,159 @@ not vibes.
 - The FIGHT policy never dodges: teaching it to read `weapons.mines`
   positions and offset the pursuit line ±3 u would separate "mines are
   fair" from "mines are unavoidable on a line-width road".
+
+# --- MAIN LINE (deployed builds r271-r273) ---
+
+## r271 — LANDSCAPE, AND THE CAR THAT NEVER COUNTED AS STUCK
+Two, reported together off a tablet held sideways.
+
+### THE HUD WAS LAID OUT FOR A TALL SCREEN
+`landscape.mjs` measures every visible HUD box and reports the pairs that
+overlap, which turns "it looks cramped" into a list:
+
+```
+health-box x joy-base   8194 px2      the stick's ring on the hull readout
+t-unstuck  x info-box                 SOS through the CONTRACTS list
+t-unstuck  x health-box
+```
+
+Three causes, all of them the same mistake — treating landscape as portrait
+with less height:
+
+1. `#joy-zone{height:80%}` in the `max-height:560px` block. On the screen with
+   the LEAST height, the stick's zone was made TALLER. Landscape's spare room
+   is horizontal: 52% wide, 47% tall.
+2. `#t-unstuck{bottom:214px}`. On a 402-tall screen that is y=144 — straight
+   through the contracts list. Moved along the bottom edge, clear of the ring
+   and the speedo.
+3. And the one that mattered: **`base.style.top = r.height - 110`**
+   (`input.js`). The zone is anchored to the bottom, so this puts the ring's
+   centre 110 px off the floor on EVERY screen, whatever the zone's size. At
+   402 tall that is y=292, and with a 62 px radius the ring reaches 230 and
+   sits on the hull panel. Shrinking the zone did not move it — the overlap
+   came back **identical to the pixel**, which is the tell every time. Now
+   `Math.min(110, innerHeight * 0.22)`: unchanged in portrait, 88 in landscape.
+
+All three orientations: **no visible overlaps**.
+
+### AND THE GREEN BANDS
+`setSize(w, h)` writes `style.width/height` in pixels, which overrides the
+`inset:0` that is supposed to make the canvas cover the screen. Anywhere
+`innerWidth` is narrower than what the player can actually see — iOS insets the
+layout away from the notch in landscape — the page background shows through as
+a band down each edge, and that background was `#7fb85c`. `setSize(w, h,
+false)` leaves the CSS alone so the canvas covers by `inset:0`, and the page
+behind it is black, so anything left over reads as a bezel instead of a fault.
+
+### THE WEDGE NET COULD NOT SEE A CAR GRINDING ON A WALL
+Photographed: 0 km/h, lap 0 of 3, thirty-nine seconds in, last of eight, car in
+the barrier. The player DOES have a free rescue — `_wedgeT > 5` — and it never
+fired, because the test was
+
+    input.throttle > 0.5 && speed < 0.8      // and the timer reset to ZERO
+
+A car pinned on a barrier is never still. It jitters, bounces and scrubs, and
+ONE frame above 0.8 in five seconds cleared the clock. It was going nowhere and
+it never qualified as wedged. Now it is judged on DISPLACEMENT: anchor a
+position while the throttle is held, and six metres of real progress clears the
+anchor. Six metres in five seconds is 4.3 km/h, so a genuine crawl is untouched.
+
+The rescue also re-seated the car at the SAME index — the exact trap the
+rivals' pit-lift was fixed for in `EnemyCar._liftAhead`, never carried across to
+the player. Rescues that follow within 25 s now step further down the lap.
+
+`wedgetest.mjs` took three cuts to be worth anything, and the first two are
+worth recording. It first passed as soon as the car had travelled 25 u — which
+a car that simply steers around the obstruction also does, proving nothing. It
+then waited for the rescue itself and could never see it: the net needs five
+seconds of `dt`, `dt` is clamped to 0.05, and swiftshader gives about two
+frames a second — over a hundred frames of wall clock for one assertion. So it
+now tests what actually changed: pin the car, inject jitter, count how often the
+timer goes BACKWARDS. **60 frames, 0 resets, peak 3.0 s — at speeds of 1.68 to
+2.09, every one of them above the old 0.8 cut-off** that would have zeroed it.
+
+## r272 — "CAR IS NOT VISIBLE HERE"
+Reported from the TRACKS tab. The title screen runs an attract camera behind
+the menu, and it orbited `track.center[0]` at radius 55, looking at the road's
+CENTRELINE.
+
+The player starts EIGHTH. That is the grid slot furthest from the centre —
+measured at 18.8 u off it — so the car projected to **NDC x 0.87**, hard against
+the right edge, cropped or behind the panel. `titlecar.mjs` confirmed the mesh
+was in the scene, visible, with no hidden ancestor, and simply not framed: the
+attract shot was an empty hillside with the whole eight-car field jammed into
+one corner.
+
+Orbit the CAR, at radius 26 and 11 up rather than 55 and 34, aimed 12.5 BELOW
+it so it rides high in the frame where a bottom-anchored menu leaves room.
+**NDC (0.87, -0.14) → (0.00, 0.52).**
+
+The panel still covers most of a portrait screen — that is what a full-screen
+track list does — but the car is now in the strip above it and down both edges,
+and in landscape it is plainly in shot. What it is NOT any more is absent.
+
+## r273 — "CAMERA IS BROKEN OVERALL", AND IT WAS r271's FAULT
+It was. r271 changed `renderer.setSize(w, h)` to `setSize(w, h, false)` to stop
+it writing the canvas's CSS size, on the theory that
+`#game-canvas{position:fixed;inset:0}` would size the element instead and so
+cover an iOS safe-area band. That theory is wrong, and wrong in a way worth
+writing down:
+
+> A `<canvas>` is a REPLACED element. Its used width comes from its INTRINSIC
+> size — the `width`/`height` attributes, which are the drawing buffer — and
+> `left`/`right` do not stretch it. `inset:0` anchors it and sizes nothing.
+
+With the style write gone, the element laid itself out at buffer size in CSS
+pixels. `camsanity.mjs` measured the canvas box at **703x1529 on a 402x874
+screen**, because the touch pixel ratio is 1.75: the view was zoomed 75% and
+cropped to the top-left corner, on every touch device, in every state. Which is
+exactly what "broken overall" means — one wrong number that makes everything
+wrong at once.
+
+The style write is back. Box now equals the screen in portrait, landscape and
+desktop, title and race, with the buffer correctly 1.75x on touch.
+
+`camsanity.mjs` is the gate: it asserts the canvas BOX equals the screen, that
+the buffer shares the box's aspect (or the whole image is stretched), and that
+`camera.aspect` agrees with both. None of the existing gates could see this —
+`boot.mjs` boots, `pageerr.mjs` finds no error, `playermoves.mjs` drives — because
+nothing threw. It was a layout fact, and only a layout measurement finds it.
+
+**And the green bands are unfixed again.** The revert takes the attempted fix
+out with it; what remains from r271 is the black page background, so a band
+reads as a bezel rather than as lime. That one was never confirmed to work in
+the first place — it could not be tested here — and it broke the view for
+everyone in exchange. A blind fix for an unreproducible report, shipped without
+a gate, is worth less than nothing.
+
+
+## r274 — ONE COMMAND, EVERY GATE
+r271 shipped a view zoomed 75% and cropped to the corner on every touch device,
+and it went out past a suite that was three scripts somebody remembered to run.
+The player found it. That is a process fault, not a coding one, so:
+
+    node tools-scratch/gates.mjs        # everything
+    FAST=1 node tools-scratch/gates.mjs # skip the slow sweeps
+
+Eight gates, one exit code, run before anything is pushed. **A gate nobody runs
+is a gate that does not exist**, and neither is one that only PRINTS: three of
+them — `pageerr`, `landscape`, `bayblack` — reported in prose and could not be
+driven by a runner at all. They exit non-zero now. Adding a gate that prints
+its verdict instead of returning it is the same as not adding one.
+
+### AND THE GATE ITSELF HAD TO GET FASTER TO BE USABLE
+`camsanity.mjs` opened a fresh page per screen size. Building the track costs
+about ninety seconds under swiftshader, so three sizes meant three builds and
+the gate **timed out at ten minutes** the first time the runner called it — a
+gate that cannot finish inside its budget is another gate that does not exist.
+
+It now builds ONCE and rotates the viewport, which is both four times faster and
+a better test: a canvas that is correct on load and wrong after a rotation is
+precisely the bug it was written for. Six cases — portrait, landscape and
+desktop, title and race — all green, box equal to the screen in every one.
+
+Worth reading the buffers rather than skimming them: portrait TITLE renders at
+703x1529 and portrait RACE at 402x874 on the same screen. That is not a fault,
+it is `_autoQuality` dropping the pixel ratio under load, and the gate passes
+both because it checks the box against the SCREEN and the buffer's ASPECT
+against the box — never the buffer's size against anything.

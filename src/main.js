@@ -1465,6 +1465,17 @@ class Game {
       canvas: this.canvas, antialias: true, powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.isTouch ? 1.75 : 2));
+    // `setSize` MUST WRITE THE CSS SIZE. r271 passed `false` here to stop it
+    // doing that, on the theory that `#game-canvas{position:fixed;inset:0}`
+    // would size the element instead and cover an iOS safe-area band. It does
+    // not, and cannot: a <canvas> is a REPLACED element, so its used width
+    // comes from its intrinsic size — the width/height ATTRIBUTES, which are
+    // the drawing buffer — and `left`/`right` do not stretch it. With the
+    // style write gone the element laid itself out at buffer size in CSS
+    // pixels: measured 703x1529 on a 402x874 screen, because the touch pixel
+    // ratio is 1.75. The view was zoomed 75% and cropped to the top-left
+    // corner on every touch device, which is what "camera is broken overall"
+    // was. `camsanity.mjs` is the gate for it now.
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1616,7 +1627,7 @@ class Game {
       this.baseFov = innerHeight > innerWidth ? 68 : 56; // widen for portrait phones
       this.camera.fov = this.baseFov;
       this.camera.updateProjectionMatrix();
-      this.renderer.setSize(innerWidth, innerHeight);
+      this.renderer.setSize(innerWidth, innerHeight);          // see the ctor
       this.composer.setSize(innerWidth, innerHeight);
       if (this.input.resetJoystick) this.input.resetJoystick();
     };
@@ -10924,11 +10935,23 @@ class Game {
         this.state === 'race' ? this.input.throttle : 0
       );
     } else if (this.state === 'title') {
-      // idle attract camera slowly orbiting the start line
+      // IDLE ATTRACT CAMERA, ORBITING YOUR CAR — not the centreline.
+      //
+      // This orbited `track.center[0]` at radius 55 and looked at the road's
+      // centre. The player starts EIGHTH, which is the grid slot furthest from
+      // that centre: measured at 18.8 u off it, which puts the car at NDC 0.87
+      // — hard against the right edge, behind the menu or cropped away. The
+      // attract shot was an empty hillside with the whole field jammed into
+      // one corner, and it was reported as exactly that: "car is not visible
+      // here".
+      //
+      // So orbit the CAR, and closer, so it reads at this size. Aimed a little
+      // BELOW it, which lifts it into the upper part of the frame — the strip
+      // a bottom-anchored menu panel leaves free.
       const a = time * 0.12;
-      const c = this.track.center[0];
-      this.camera.position.set(c.x + Math.cos(a) * 55, 34, c.z + Math.sin(a) * 55);
-      this.camera.lookAt(c.x, 0, c.z);
+      const c = this.player?.mesh?.position ?? this.track.center[0];
+      this.camera.position.set(c.x + Math.cos(a) * 26, c.y + 11, c.z + Math.sin(a) * 26);
+      this.camera.lookAt(c.x, c.y - 12.5, c.z);
       if (this.particles.ambient && this.track.theme?.weather) {
         this.particles.ambient(new THREE.Vector3(c.x, 0, c.z), this.track.theme.weather, dt);
       }

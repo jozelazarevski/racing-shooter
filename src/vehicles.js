@@ -4922,11 +4922,33 @@ export class PlayerCar extends Car {
       // The wedge net must not fire on a car that is BOGGING: both watch for
       // held throttle and no motion at the same five seconds, and if the free
       // rescue won that race the rule above could never fire at all.
-      const wedged = this === g.player && controlsLive && !this.airborne
-        && !bogged
-        && input.throttle > 0.5
-        && Math.hypot(this.vel.x, this.vel.z) < 0.8;
-      this._wedgeT = wedged ? (this._wedgeT ?? 0) + dt : 0;
+      // JUDGE IT ON DISPLACEMENT, NOT ON THIS FRAME'S SPEED. The test used to
+      // be `speed < 0.8` and the timer reset to zero the moment it failed, so
+      // ONE frame above 0.8 in five seconds cleared it — and a car grinding on
+      // a barrier is never still: it jitters, bounces and scrubs a few
+      // centimetres each way for ever. It is going nowhere and it never
+      // qualified as wedged. Reported as a car parked in a wall at 0 km/h,
+      // lap 0 of 3, thirty-nine seconds in, last of eight.
+      //
+      // So anchor a position while the throttle is held and ask how far the
+      // car has actually got. Six metres of progress clears the anchor and
+      // starts again; less than that, held, for five seconds, is stuck —
+      // whatever the speedometer flickered to in between. Six metres in five
+      // seconds is 4.3 km/h, so a genuine crawl up a bank is never touched.
+      const trying = this === g.player && controlsLive && !this.airborne
+        && !bogged && input.throttle > 0.5;
+      if (!trying) {
+        this._wedgeT = 0;
+        this._wedgeAt = null;
+      } else {
+        if (!this._wedgeAt) this._wedgeAt = { x: this.pos.x, z: this.pos.z };
+        if (Math.hypot(this.pos.x - this._wedgeAt.x, this.pos.z - this._wedgeAt.z) > 6) {
+          this._wedgeAt = { x: this.pos.x, z: this.pos.z };
+          this._wedgeT = 0;
+        } else {
+          this._wedgeT = (this._wedgeT ?? 0) + dt;
+        }
+      }
       // UNSTUCK, ON DEMAND. The automatic nets above are deliberately slow —
       // five seconds of held throttle, because an idle car parked on a
       // mountainside must never be yanked off it. That is right for a car the
@@ -4965,7 +4987,22 @@ export class PlayerCar extends Car {
           g.audio?.pickup?.();
         }
         this.vel.set(0, 0, 0); this.vy = 0; this.airborne = false;
-        this.placeAt(this.trackIndex, 0, true);
+        this._wedgeAt = null;
+        // PAST THE TRAP, NOT BACK INTO IT — the rule the rivals' pit-lift
+        // already had (see EnemyCar `_liftAhead`) and the player's rescue did
+        // not. Re-seating at the SAME index puts a car that is pinned by
+        // something ON the road straight back against it, and the next rescue
+        // is five seconds later, for ever. Each rescue that follows closely on
+        // the last moves further down the lap; a clean minute of driving
+        // forgets it.
+        if (g.raceTime - (this._lastRescueAt ?? -99) < 25) {
+          this._rescueAhead = Math.min(40, (this._rescueAhead ?? 0) + 14);
+        } else {
+          this._rescueAhead = 0;
+        }
+        this._lastRescueAt = g.raceTime ?? 0;
+        const N = g.track.N;
+        this.placeAt((this.trackIndex + this._rescueAhead) % N, 0, true);
         this.invuln = Math.max(this.invuln, 1.5);
         g.hud.feed(spend
           ? `UNSTUCK — back on the road (${this.sos} left)`

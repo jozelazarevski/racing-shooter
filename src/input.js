@@ -65,7 +65,15 @@ export class Input {
     const rest = () => {
       const r = zone.getBoundingClientRect();
       base.style.left = Math.min(120, r.width * 0.45) + 'px';
-      base.style.top = (r.height - 110) + 'px';
+      // 110 px UP FROM THE BOTTOM, OR A FIFTH OF THE SCREEN, whichever is
+      // less. The constant is measured against the zone's own height, and the
+      // zone is anchored to the bottom, so it put the ring's centre 110 px off
+      // the floor on every screen — on a 402-tall landscape phone that is
+      // y=292, and with a 62 px radius the ring reaches up to 230 and lands on
+      // the HULL INTEGRITY panel, which is where it was photographed. Changing
+      // the ZONE's height does not move it: the first attempt at this fix
+      // shrank the zone and the overlap came back identical to the pixel.
+      base.style.top = (r.height - Math.min(110, innerHeight * 0.22)) + 'px';
       base.classList.remove('live');
       setKnob(0, 0);
     };
