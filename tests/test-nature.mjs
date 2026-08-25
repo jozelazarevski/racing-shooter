@@ -65,8 +65,21 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [13, 'LOG FLUME FURY'], [21, 'FURK
         // LOG FLUME FURY, 0 in the open river — so the rule holds everywhere it
         // is meant to, and this exception is recorded in NATURE.md rather than
         // being quietly absorbed by a loose threshold.
+        //
+        // THE EXCEPTION IS A CROSSING, SO IT IS MEASURED FROM THE CROSSING.
+        // The builder blends the wash onto the deck across a 30-46 u approach
+        // around each PLANNED ford (R.fords), and its own road-distance metric
+        // disagrees with `_distToTrackCoarse` by enough that one lifted
+        // station read as open river here: a 0.37 u climb 36.8 u from the
+        // road by this probe's ruler, 37.3 u from the ford, squarely inside
+        // the declared wash. Exempt by ford distance where the plan is
+        // available; the road-distance rule stays as the fallback.
+        const fords2 = (t._river?.fords ?? []).map((fd) => t.center[fd.i]).filter(Boolean);
+        const dFord = fords2.length
+          ? Math.min(...fords2.map((c) => Math.hypot(xs[s] - c.x, zs[s] - c.z)))
+          : Infinity;
         const df = t._distToTrackCoarse ? t._distToTrackCoarse(xs[s], zs[s]) : 999;
-        if (df < 30) { fordRises++; continue; }
+        if (dFord < 48 || df < 30) { fordRises++; continue; }
         rises++;
         if (up > worstRise) worstRise = up;
       }
@@ -100,9 +113,18 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [13, 'LOG FLUME FURY'], [21, 'FURK
     }
 
     // ---- rule 6: everything that stands, stands ON the ground -------------
-    // A record's `y` is where the thing is planted. Compare with the terrain
-    // there. Trees on the roadbed legitimately differ (the road is a shelf
-    // above raw terrain), so only sample well off the road.
+    // A record's `y` is where the thing is planted. Compare with the GROUND
+    // THE BUILDERS SEAT ON — `_seatY`, the drawn mesh where it lies below the
+    // analytic curve — not with `terrainHeight` alone. The scatter builders
+    // deliberately seat on what the player SEES (the census work: 27 u of air
+    // under a boulder whose analytic error was 0.00), so on a steep convex
+    // facet a correctly planted tree sits metres below the analytic field.
+    // This probe used to read exactly those as "buried": 47 reports across
+    // three worlds, every one of them seated to 0.00 on `_seatY`. Measuring a
+    // deliberate design against the datum it deliberately left is the
+    // signature of a stale instrument, not of a world that is wrong.
+    // Trees on the roadbed legitimately differ (the road is a shelf above raw
+    // terrain), so only sample well off the road.
     const standing = (list, label) => {
       let n = 0, floating = 0, buried = 0, worst = 0;
       for (const o of (list ?? [])) {
@@ -114,7 +136,8 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [13, 'LOG FLUME FURY'], [21, 'FURK
         if ((o.r ?? 0) > 20) continue;
         if ((t._distToTrackCoarse ? t._distToTrackCoarse(o.x, o.z) : 999) < 16) continue;
         n++;
-        const d = o.y - t.terrainHeight(o.x, o.z);
+        const seat = t._seatY ? t._seatY(o.x, o.z) : t.terrainHeight(o.x, o.z);
+        const d = o.y - seat;
         if (d > 0.6) floating++;
         if (d < -1.2) buried++;
         if (Math.abs(d) > Math.abs(worst)) worst = d;

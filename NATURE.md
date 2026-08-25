@@ -97,7 +97,7 @@ the fix had been applied to the small streams and verified on the wrong mesh.
 | 3 | Standing water is level | **UNTESTED** — no standing water exists yet; there is nothing to check | — |
 | 4 | Water finds the low ground | **UNVERIFIED** — see "rule 4" below. Not claimed either way | reported only |
 | 5 | Trunks and stems are vertical | **UNTESTED** — needs instance-matrix introspection | — |
-| 6 | Everything that stands, stands ON the ground | **CONFORMANT** — 0 floating, 0 buried across 172–440 solids and 288–308 trees per world | `tests/test-nature.mjs` |
+| 6 | Everything that stands, stands ON the ground | **CONFORMANT** — 0 floating, 0 buried, measured against `_seatY`, the ground the builders actually seat on (the drawn mesh where it runs below the analytic field). Probing `terrainHeight` alone reported 47 correctly-seated items as "buried" on steep facets — a stale instrument, not a wrong world. | `tests/test-nature.mjs` |
 | 7 | Rock falls from rock | **CONFORMANT** | RULES.md hazard rule |
 | 8 | Snow lies on up-facing surfaces | **UNTESTED** | — |
 | 9 | A vehicle sits on the surface it is on | **CONFORMANT** — pitches to road gradient (0.12–0.17 rad on a 0.22–0.29 grade) and rolls to an off-road cross-slope | `tests/test-nature.mjs` |
@@ -114,9 +114,17 @@ flow that is water running uphill, and rule 2 forbids it.
 It is allowed anyway, deliberately. The alternative is dipping the road into
 the channel at every crossing, which changes the racing line on a dozen worlds
 to satisfy a rule about scenery. Measured, the exception is exactly that narrow:
-**all** upstream rises are inside the ford band — 5 of 5 on LOG FLUME FURY,
-4 of 4 on PINE VALLEY — and **0** occur in open water. `test-nature.mjs` counts
+**all** upstream rises are inside the ford band — 4 of 4 on LOG FLUME FURY,
+3 of 3 on PINE VALLEY — and **0** occur in open water. `test-nature.mjs` counts
 ford rises separately and reports them rather than hiding them in a threshold.
+
+The band is measured **from the planned crossing** (`R.fords`), not from the
+road: the wash blends onto the deck across a 30–46 u approach around each
+ford, and the builder's own road-distance metric disagrees with the probe's
+by enough that a lifted station 37 u out read as open water. In the builder,
+the monotone pass (2c) now exempts exactly the stations the deck lift touched
+— a station raised by anything else obeys the running minimum, however close
+to a road it stands.
 
 ### Why rule 4 is unverified rather than passing or failing
 

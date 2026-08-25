@@ -17297,7 +17297,11 @@ export class Track {
       /** p0 = spur mouth, (ux,uz) = along the spur, (px,pz) = across it. */
       place: (p0, ux, uz, px, pz, len, roadY, tan) => {
         const rot = Math.atan2(ux, uz);
-        const gy = (x, z) => this.terrainHeight(x, z);
+        // _seatY, not terrainHeight: the posts stand on the hillside the
+        // player SEES, and on FURKA's steep facets the drawn chord runs
+        // 0.65 u below the analytic curve — measured as the last two
+        // floaters in tests/test-nature.mjs rule 6.
+        const gy = (x, z) => this._seatY(x, z);
         // --- cattle grid: five bars laid across the mouth ---
         for (let k = 0; k < 5; k++) {
           const f = 2.0 + k * 0.85;
@@ -22764,6 +22768,7 @@ export class Track {
       for (const c of fordPts) m = Math.min(m, Math.hypot(x - c.x, z - c.z));
       return m;
     };
+    const lifted = new Uint8Array(F.length);   // pass 2c exempts exactly these
     for (let s = 0; s < F.length; s++) {
       const f = F[s];
       const nearFord = 1 - THREE.MathUtils.smoothstep(fordDist(f.x, f.z), 30, 46);
@@ -22779,6 +22784,7 @@ export class Track {
       const heightGate = 1 - THREE.MathUtils.smoothstep(Math.abs(deck - surf[s]), 5, 10);
       const lift = (1 - THREE.MathUtils.smoothstep(f.df, 10, 26)) * nearFord * heightGate;
       if (lift <= 0) continue;
+      lifted[s] = 1;
       // Blend TO the deck, not `Math.max` toward it. Taking the max let a
       // pooled reach that already sat above the road stay there, and the wash
       // came out 1.8 u proud of the carriageway on PINE VALLEY — a wall of
@@ -22870,10 +22876,18 @@ export class Track {
     // to sit above the reach that fed it. Measured as a 0.36 u step 37 u clear
     // of the road on PINE VALLEY — small, but the rule says never. The minimum
     // now walks every station; only non-ford stations are clamped to it.
+    //
+    // AND "FORD" MEANS THE STATIONS PASS 2 ACTUALLY LIFTED, not a distance
+    // guess. The `F[s].df < 30` test used its own metric, and where it
+    // disagreed with the lift's gates a station that never received a deck
+    // lift — raised 0.37 u by 2b's containment instead — was waved through as
+    // ford wash and left standing above the reach that feeds it: the same
+    // 0.37 u step, back again, one station outside the last fix's radius.
+    // The lift itself is the exemption; everything else obeys the minimum.
     let flowMin = Infinity;
     for (let i = 0; i < F.length; i++) {
       const s = dirF > 0 ? i : F.length - 1 - i;
-      const isFord = F[s].df < 30;
+      const isFord = !!lifted[s];
       if (!isFord && surf[s] > flowMin) surf[s] = flowMin;
       else if (surf[s] < flowMin) flowMin = surf[s];
     }
