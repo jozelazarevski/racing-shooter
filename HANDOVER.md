@@ -3859,3 +3859,15 @@ Phone shots rarely name their world. tools-scratch/nearsamples.mjs answers
 at F=0.04 of each candidate, compared against the report — identified
 UNDERCITY in two rounds of probe shots. The probe is disposable; the trick
 is worth remembering.
+
+### AND THE GATE SUITE'S ONE RED, FIXED RATHER THAN STEPPED OVER
+Running the full gates.mjs for this push found `landscape` red on
+phone-portrait: speedo × joy-base, 687 px² — present on PRISTINE
+origin/main too (the r273 HUD reshuffle biased the speedo left into the
+ring's rest position on a 402-wide portrait). Split the correction between
+the two: the ring rests at 40% of the zone rather than 45% (9 px left),
+the speedo bias eases −26 → −16 px (10 px right). Both sides keep what
+they were placed for — the ring under the thumb, the dial out from under
+the 🚀 button (8 px clear, measured). landscape.mjs green in both
+orientations; the rest of the suite: pageerr, camsanity, boot, bayblack,
+playermoves, wedgetest, swallowed, bermtest — all green on this tree.

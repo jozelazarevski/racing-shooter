@@ -324,7 +324,9 @@
      left, the weapon cluster on the right, and the speedo between them. At
      96px centred it reached under the 🚀 button — the one number you steer by,
      with a thumb parked on it. Smaller, and biased into the actual gap. */
-  body.touch #speed-box{bottom:14px;left:calc(50% - 26px)}
+  /* -16px, not -26px: the other half of clearing the joystick ring (see
+     input.js rest()). Still biased left of the 🚀 button by 8px measured. */
+  body.touch #speed-box{bottom:14px;left:calc(50% - 16px)}
   body.touch #speedo{width:86px;height:86px}
   body.touch #nitro-wrap{display:none}  /* nitro lives on the ⚡ button */
   body.touch #weapon-box{display:none}  /* ammo counts live on the buttons */

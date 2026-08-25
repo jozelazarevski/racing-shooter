@@ -64,7 +64,12 @@ export class Input {
     const setKnob = (dx, dy) => { knob.style.transform = `translate(calc(${dx}px - 50%), calc(${dy}px - 50%))`; };
     const rest = () => {
       const r = zone.getBoundingClientRect();
-      base.style.left = Math.min(120, r.width * 0.45) + 'px';
+      // 0.40, not 0.45 — half of clearing the speedo. On a 402-wide portrait
+      // the ring at 45% of a 46%-wide zone reached x=145 and the speedo's
+      // left-biased dial starts at ~142: measured 687 px² of overlap by
+      // landscape.mjs, split between moving this ring 9 px left and the
+      // speedo bias 10 px right (index.html body.touch #speed-box).
+      base.style.left = Math.min(120, r.width * 0.40) + 'px';
       // 110 px UP FROM THE BOTTOM, OR A FIFTH OF THE SCREEN, whichever is
       // less. The constant is measured against the zone's own height, and the
       // zone is anchored to the bottom, so it put the ring's centre 110 px off
