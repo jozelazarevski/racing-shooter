@@ -17,7 +17,7 @@ page.setDefaultTimeout(300000);
 for (const id of process.argv.slice(2).map(Number)) {
   await page.goto(`${BASE}/?level=${id}&go=1&unlockall=1`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.__game?.track?.center && window.__game.player, undefined, { timeout: 90000 });
-  const r = await page.evaluate(async (SIM) => {
+  const r = await page.evaluate(async ({ SIM, DODGE }) => {
     const g = window.__game, t = g.track, p = g.player, N = t.center.length;
     g.startRace?.();
     const f = () => new Promise((r2) => requestAnimationFrame(r2));
@@ -47,7 +47,22 @@ for (const id of process.argv.slice(2).map(Number)) {
       const speed = p.vel.length();
       const look = Math.max(3, Math.round((9 + speed * 0.45) / su));
       const li = (p.trackIndex + look) % N;
-      const c = t.pointAt ? t.pointAt(li, 0) : t.center[li];
+      // DODGE=1: a thumb that has seen the red ring. If a live mine sits
+      // within 14 u of the path ahead, aim the pursuit point 4.5 u to the
+      // side of the road away from it — the only change is WHERE the driver
+      // looks, so the mine bucket's delta measures dodgeability itself.
+      let aimLat = 0;
+      if (DODGE) {
+        for (const m of g.weapons?.mines ?? []) {
+          const dx = m.pos.x - p.pos.x, dz = m.pos.z - p.pos.z;
+          const ahead = dx * Math.sin(p.heading) + dz * Math.cos(p.heading);
+          if (ahead < 2 || ahead > 45 || Math.hypot(dx, dz) > 45) continue;
+          const side = Math.sign(dx * Math.cos(p.heading) - dz * Math.sin(p.heading)) || 1;
+          aimLat = -side * 4.5;
+          break;
+        }
+      }
+      const c = t.pointAt ? t.pointAt(li, aimLat) : t.center[li];
       const err = wrap(Math.atan2(c.x - p.pos.x, c.z - p.pos.z) - p.heading);
       const K2 = Math.max(4, Math.round(30 / su));
       const turn = Math.abs(wrap(t.headingAt((p.trackIndex + K2) % N) - t.headingAt(p.trackIndex)));
@@ -78,7 +93,7 @@ for (const id of process.argv.slice(2).map(Number)) {
       playerRate: rate(1), bestRivalRate: rate(2), meanRivalRate: rate(3),
       buckets: Object.fromEntries(Object.entries(buckets).map(([k2, v]) => [k2, +v.toFixed(0)]).sort((a, z) => z[1] - a[1])),
       events: events.slice(0, 12) };
-  }, SIM);
+  }, { SIM, DODGE: !!process.env.DODGE });
   console.log(`\n== L${id} ${r.name} (difficulty ${r.difficulty}) wrecks ${r.wrecks} teleports ${r.teleports}`);
   console.log(`   laps/30s  player ${r.playerRate}  bestRival ${r.bestRivalRate}  meanRival ${r.meanRivalRate}`);
   console.log('   hull spent by source (pre-scale):', JSON.stringify(r.buckets));
