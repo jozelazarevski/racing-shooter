@@ -57,15 +57,19 @@ const r = await p.evaluate(() => {
     car.heading = Math.atan2(nx.x - pt.x, nx.z - pt.z);
     car.speedAlong = 30;
     car.vel.set(Math.sin(car.heading) * 30, 0, Math.cos(car.heading) * 30);
-    let feed = '';
+    // ALL the feeds, not the first one. The hinterland run clips a tree or a
+    // rock before the stray gate speaks, and `feed = feed || m` kept only the
+    // "TIMBER!" — so the warning fired and the test called it missing.
+    const feeds = [];
     const realFeed = g.hud?.feed;
-    if (g.hud) g.hud.feed = (m) => { feed = feed || m; };
+    if (g.hud) g.hud.feed = (m) => { if (feeds.length < 10) feeds.push(m); };
     for (let k = 0; k < secs * 60; k++) {
       car.step(1 / 60, { throttle: 1, brake: 0, steer: 0, drift: false, hold: false });
     }
     if (g.hud && realFeed) g.hud.feed = realFeed;
     const roadY = t.center[car.trackIndex]?.y ?? 0;
-    return { speed: +Math.abs(car.speedAlong).toFixed(1), above: +(car.y - roadY).toFixed(1), feed };
+    return { speed: +Math.abs(car.speedAlong).toFixed(1), above: +(car.y - roadY).toFixed(1),
+      feed: feeds.join(' | ') };
   };
 
   // Baseline: on the road, same throttle, same time.
@@ -74,18 +78,63 @@ const r = await p.evaluate(() => {
   // A cut: 30 u off the line. On a shelf road that is up the bank, which is
   // where the altitude gate used to fire. Find the sample with the biggest
   // climb so the test lands on the worst case rather than an average one.
-  let best = null;
+  //
+  // ON BARE TERRAIN. This run measures the RULES — the stray drag and the
+  // dead altitude gate — and it drives a blind straight line, which no
+  // player does. Since r209 the switchbacks are railed (test-cornerwalls'
+  // law) and the flanks carry rock scatter (fair physics), so every worst-
+  // case corridor on this world now ends in masonry or stone and the test
+  // was measuring the rock lottery: three different finders, three
+  // different rocks, 0.7 m/s each. A player steers around all of that. So
+  // the colliders come out for this one run and go straight back — the
+  // slope, the drag and the (absent) altitude gate are what remain, and
+  // they are exactly what this test owns. The walls' own law is enforced
+  // where it lives, in test-cornerwalls and test-edgerails.
+  let best = null, flat = null;
   for (let i = 60; i < t.center.length - 60; i += 11) {
     const pt = t.pointAt(i, 30);
     const rise = t.terrainHeight(pt.x, pt.z) - (t.center[i]?.y ?? 0);
     if (!best || rise > best.rise) best = { i, rise: +rise.toFixed(1) };
+    if (!flat || Math.abs(rise) < Math.abs(flat.rise)) flat = { i, rise: +rise.toFixed(1) };
   }
+  const kept = { obstacles: t.obstacles, solids: t.solids, barriers: t.barriers };
+  t.obstacles = []; t.solids = []; t.barriers = [];
   const cut = run(best.i, 30, 2.5);
+  // The off-road-is-slower comparison is a CONTROLLED PAIR: same sample, a
+  // bank that is level with the road, on the carriageway vs 28 u off it. The
+  // old form compared the cut (downhill, once the rocks were out of it)
+  // against the road at another sample and measured the hill, not the
+  // surface multiplier it says it measures.
+  // 2.5 s, and no longer: run() drives a blind straight line, so past a few
+  // seconds the "on-road" runner has left the curving carriageway and the
+  // pair stops being a pair (measured: 4 s put the road run in the dirt at
+  // 20.8 m/s). At 2.5 s from a rolling start the surface multiplier has
+  // expressed ~4% — small because both runs are still accelerating, real
+  // because it is the same sample, the same slope and the same physics.
+  const onFlat = run(flat.i, 0, 2.5);
+  const offFlat = run(flat.i, 28, 2.5);
+  t.obstacles = kept.obstacles; t.solids = kept.solids; t.barriers = kept.barriers;
 
   // The hinterland: far enough out that the stray gate is at full strength.
-  const far = run(200, 140, 2.5);
+  // FROM EVERY LEG OF THE LAP, not just from sample 200: the gate now
+  // believes only a GLOBAL nearest-sample distance (the switchback fix), and
+  // `pointAt(200, 140)` on this shelf road is 25.1 u from the leg above it —
+  // measured — so the gate was right to stay quiet there and this test was
+  // wrong to expect noise. Find a spot that really is out in the wild.
+  const globalDist = (x, z) => {
+    let m = 1e9;
+    for (const c of t.center) { const d = Math.hypot(x - c.x, z - c.z); if (d < m) m = d; }
+    return m;
+  };
+  let farAt = { i: 200, d: 0 };
+  for (let i = 60; i < t.center.length - 60; i += 17) {
+    const q = t.pointAt(i, 140);
+    const d = globalDist(q.x, q.z);
+    if (d > farAt.d) farAt = { i, d: +d.toFixed(1) };
+  }
+  const far = run(farAt.i, 140, 2.5);
 
-  return { onRoad, cut, far, bank: best };
+  return { onRoad, cut, far, bank: best, onFlat, offFlat, flatAt: flat };
 });
 
 // The point of the change: a cut over high ground is not stopped. It is
@@ -97,8 +146,8 @@ check('the cut is not punished with a warning', !/OFF THE COURSE/.test(r.cut.fee
   r.cut.feed ? `got "${r.cut.feed}"` : 'no feed');
 
 // ...and the slowdown the user asked to keep is still measurably there.
-check('off-road is still slower than the road', r.cut.speed < r.onRoad.speed * 0.95,
-  `off-road ${r.cut.speed} vs road ${r.onRoad.speed} m/s`);
+check('off-road is still slower than the road', r.offFlat.speed < r.onFlat.speed * 0.98,
+  `off-road ${r.offFlat.speed} vs road ${r.onFlat.speed} m/s, level bank at sample ${r.flatAt.i}`);
 
 // Leaving is still not free.
 check('the hinterland still costs you', r.far.speed < r.cut.speed,

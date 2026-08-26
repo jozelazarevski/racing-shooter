@@ -356,12 +356,17 @@
     #t-missile{right:calc(100px + env(safe-area-inset-right));width:54px;height:54px}
     #t-mine{right:calc(96px + env(safe-area-inset-right));width:54px;height:54px;
       bottom:calc(104px + env(safe-area-inset-bottom))}
-    /* At 320px the gap the speedo was biased into is no longer wide enough for
-       it: measured, the dial ran 11px under the 🚀 button. Shrink and shift it
-       further into the gap rather than move the button, which has nowhere left
-       to go without reaching FIRE. */
-    body.touch #speed-box{left:calc(50% - 38px)}
-    body.touch #speedo{width:76px;height:76px}
+    /* At these widths the bottom band cannot hold all three: ring 124 +
+       dial 76 + the 🚀 column overlap whatever the bias — measured 1018px²
+       at 360 and 1549px² at 320 once landscape.mjs learned to look. So the
+       dial leaves the thumb row entirely (the two-thumb layout's own move:
+       "the speedo sits above BRAKE") — raised clear of 🚀 and 💣, centred
+       in the gap between the ring and the mine column, and the ring gives
+       up 24px of VISUAL size (the knob's drag radius is input.js's, not
+       this rule's). Clearances at 320: ring 2px, mine 4px, 🚀 by a row. */
+    #joy-base{width:100px;height:100px;margin:-50px 0 0 -50px}
+    body.touch #speed-box{left:calc(50% - 20px);bottom:112px}
+    body.touch #speedo{width:56px;height:56px}
   }
   /* landscape phones: everything anchors to corners, panels stay top */
   @media (max-height: 560px){

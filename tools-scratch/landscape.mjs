@@ -14,6 +14,9 @@ const SIZES = (process.env.SIZES ?? 'iphone-landscape,phone-portrait').split(','
   'small-landscape': ['small-landscape', 740, 360, 3],
   'ipad-landscape': ['ipad-landscape', 1180, 820, 2],
   'phone-portrait': ['phone-portrait', 402, 874, 3],
+  // the two widths the @media (max-width:380px) rules actually serve
+  'narrow-portrait': ['narrow-portrait', 360, 740, 3],
+  'tiny-portrait': ['tiny-portrait', 320, 680, 2],
 }[n]));
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });

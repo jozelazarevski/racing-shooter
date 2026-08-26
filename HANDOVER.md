@@ -3845,13 +3845,14 @@ The cliffSetback valley-floor carve-out and the past-the-outer-face roam
 rule sit AFTER the changed line and are untouched: CANYON RUN and LAGUNA
 SECA racers still roam their valley floors.
 
-### FOUND RED ON THE BASE, NOT TOUCHED
+### FOUND RED ON THE BASE — AND THE WORLD TURNED OUT INNOCENT (fixed next round)
 `tests/test-shortcut.mjs` fails 2/6 on PRISTINE origin/main (r273) exactly
-as on this branch: FURKA RIDGE's designed 30 u cut over the bank at sample
-170 now stops at 0.7 m/s with "HIT ROCK −59 HULL". Not this change's doing
-— reproduced identically on the untouched worktree — but it means the live
-build has lost that world's crossover cut. Whoever owns the massif/obstacle
-line should look; the failing assertion names the exact sample.
+as on this branch. The follow-up (see the section below this one) proved
+the WORLD was never broken: the cut lands against r209's law-backed corner
+rails and the flanks' fair rock scatter, and the hinterland spot the test
+warns from is 25.1 u from another switchback leg — the honest global-
+distance stray gate is RIGHT to stay quiet there. The test was brittle
+three ways and is repaired; the massif/obstacle line owes nobody anything.
 
 ### WORLD-ID PROBE
 Phone shots rarely name their world. tools-scratch/nearsamples.mjs answers
@@ -3871,3 +3872,40 @@ they were placed for — the ring under the thumb, the dial out from under
 the 🚀 button (8 px clear, measured). landscape.mjs green in both
 orientations; the rest of the suite: pageerr, camsanity, boot, bayblack,
 playermoves, wedgetest, swallowed, bermtest — all green on this tree.
+
+## FIX-ALL ROUND — THE SHORTCUT TEST'S THREE BRITTLENESSES, AND THE NARROW-PORTRAIT CRUNCH
+
+### test-shortcut: 2/6 red on the live build, and every red was the test's
+Three faults, none of them the world's:
+1. **The bank-finder was magnetised to obstructions.** "Biggest terrain rise
+   at lat 30" landed on a switchback whose descent ends against the back of
+   the lower leg's stone edge rail (r209's corner-guarding law, correct),
+   and every alternative climbing corridor holds rock scatter (fair
+   physics). Three finder variants found three different rocks at 0.7 m/s
+   each. The cut run now drives BARE TERRAIN — colliders out for one run
+   and straight back — because this test owns the slope and the (dead)
+   altitude gate; the walls' law is enforced where it lives, in
+   test-cornerwalls and test-edgerails.
+2. **The hinterland spot was not in the hinterland.** `pointAt(200, 140)`
+   is 25.1 u from the switchback leg above it — measured — so the global-
+   distance stray gate (the switchback fix) rightly stayed quiet. The test
+   now searches for the lat-140 point that is genuinely remote (sample 825,
+   140 u from every leg) and the warning fires there. Feed capture also
+   kept only the FIRST message, so "TIMBER!" masked the warning that DID
+   come — it keeps them all now.
+3. **"Off-road is slower" compared a downhill cut at one sample against the
+   road at another** — it measured the hill. Now a controlled pair: same
+   sample, level bank, on the carriageway vs 28 u off it, and the window
+   stays 2.5 s because run() drives a blind straight line (at 4 s the
+   "road" runner is in the dirt — measured, 20.8 m/s). 6/6 green.
+
+### The ≤380 px portrait crunch predates everything
+landscape.mjs learned two more sizes (360×740, 320×680) and immediately
+measured what the r273-line fix could not see: speedo × joy-base 1018 px²
+at 360 and 1549 px² at 320 — an OLD latent fault, present long before the
+r273 HUD pass, the bottom band simply cannot hold ring 124 + dial 76 + the
+🚀 column at those widths. The dial now leaves the thumb row on ≤380
+(the two-thumb layout's own precedent: "the speedo sits above BRAKE") —
+bottom:112, centred in the ring↔mine gap, 56 px; the ring gives up 24 px
+of visual size (knob drag radius is input.js's and untouched). All four
+gated sizes green, no overlaps.
