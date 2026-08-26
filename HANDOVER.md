@@ -3909,3 +3909,16 @@ r273 HUD pass, the bottom band simply cannot hold ring 124 + dial 76 + the
 bottom:112, centred in the ring↔mine gap, 56 px; the ring gives up 24 px
 of visual size (knob drag radius is input.js's and untouched). All four
 gated sizes green, no overlaps.
+
+### MINES ARE DODGEABLE — MEASURED, SO THE QUESTION IS CLOSED
+whokilled DODGE=1 on the three worlds that kill even a shooting driver
+(NORMAL, 100 s each): reacting to the mine's red ring drops the mine
+bucket 155 -> 41 on CORNICHE and 152 -> 31 on SEA CLIFF RUN (COSTA BRAVA
+43 -> 78 is lay-pattern noise — rivals mine differently every run). So the
+mine system passes the fairness test: visible, avoidable, priced. What the
+crude 4.5 u swerve buys instead is wall contact on narrow roads (SEA CLIFF
+solid-crash bucket 228 in the dodge run) — a human modulates where pure
+pursuit cannot. VERDICT: no defect in any of the three; they are the
+roster's hardest because rival fire volume compounds with narrow geometry,
+and any change there is difficulty tuning, which stays a design decision.
+The numbers to tune against are all above.
