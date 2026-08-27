@@ -2,7 +2,7 @@
  * playwright-core resolves from. */
 import { chromium } from 'playwright-core';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args:['--no-sandbox'] });
-const p = await (await b.newContext({ viewport:{width:960,height:240}, deviceScaleFactor:2 })).newPage();
+const p = await (await b.newContext({ viewport:{width:1200,height:790}, deviceScaleFactor:2 })).newPage();
 await p.goto('file://' + process.argv[2], { waitUntil:'load' });
 await p.screenshot({ path: process.argv[3], fullPage: true });
 await b.close();

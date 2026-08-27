@@ -5158,7 +5158,7 @@ class Game {
     }
     const F = { trunk: 0x6b4423, low: 0x2c6e2a, mid: 0x347a2f, top: 0x3c8a34,
       grass: 0x4f8a35, dirt: 0x9c7a48, rut: 0x86663a, rock: 0x8d8578, bush: 0x2f7a30,
-      moss: 0x4c7f33, stone: 0xb0a289, stoneDk: 0x82786a };
+      moss: 0x4c7f33 };
     const g = new THREE.Group();
     // ONE STREAM PER SUBSYSTEM, and this is a measurement tool, not tidiness.
     // The whole diorama used to draw from a single seeded `rnd()`, which means
@@ -5351,7 +5351,7 @@ class Game {
     // POSITIONS ONLY, MERGED PER MATERIAL. Eighteen trees as separate meshes
     // is fifty-four draw calls behind a menu; merged by part it is three.
     const trunks = [], lows = [], mids = [], tops = [], rocks = [], bushes = [],
-      moss = [], stones = [], stonesDk = [];
+      moss = [];
     // `tint` is a PER-PIECE MULTIPLIER carried through the weld as a vertex
     // colour. Welding by material is what keeps this menu at three draw calls
     // for fifty trees, and the price has always been that every tree is
@@ -5452,30 +5452,20 @@ class Game {
       // says the rock has been there longer than the trail has.
       if (sc > 0.76) put(moss, rockGeo, sc * 0.98, sc * 0.19, sc * 0.8, rx, sc * 0.88, rz, ry);
     }
-    // LOOSE STONE, WITH GEOMETRY. The trail texture already has gravel painted
-    // into it, and painted gravel is flat — no lit edge, no shadow side, and
-    // it turns with the surface instead of sitting on it. What makes a surface
-    // read as LOOSE is stone the light can catch, so this is squashed
-    // tetrahedra and octahedra: 4 and 8 triangles, because an icosahedron is
-    // 20 for a thing four pixels across. Held to the length of trail the bay
-    // camera actually frames — a pebble at z -60 is nothing but cost.
-    // TWO TONES, AND SMALLER THAN THEY LOOKED RIGHT ON PAPER. One pale grey at
-    // 0.3 u across read as torn paper scattered over the dirt: gravel is not
-    // one colour, and a stone that never goes darker than its ground has no
-    // weight. Half of them are the boulders' own grey, and the biggest is now
-    // 0.2 u — about a fist beside a 4.4 u car, which is what it should be.
-    const chipGeo = new THREE.TetrahedronGeometry(1, 0);
-    const cobbleGeo = new THREE.OctahedronGeometry(1, 0);
-    for (let i = 0; i < 150; i++) {
-      const big = i % 4 === 0;
-      // over the whole width, but banked at the verges where a tyre throws it
-      const px = rRock() < 0.58 ? (rRock() - 0.5) * 10.2
-        : (rRock() < 0.5 ? 1 : -1) * (4.9 + rRock() * 2.4);
-      const pz = -30 + rRock() * 48;
-      const sc = big ? 0.13 + rRock() * 0.075 : 0.065 + rRock() * 0.065;
-      put(rRock() < 0.5 ? stones : stonesDk, big ? cobbleGeo : chipGeo,
-        sc * 1.3, sc * 0.78, sc * 1.1, px, sc * 0.34, pz, rRock() * 3);
-    }
+    // NO LOOSE STONE. r264 scattered 150 squashed tetrahedra and octahedra on
+    // the trail so the surface would have something the key light could catch,
+    // on the argument that painted gravel is flat. At the size these are
+    // actually seen — a shelf card is 148 px wide — four and eight-sided
+    // solids do not read as gravel at all. They read as tiny white PYRAMIDS
+    // dotted over the grass, which is what they were reported as, and the
+    // shape is unmistakable once you zoom one up.
+    //
+    // `dioparts.mjs` had already put them at 0.9% of the bay for 752 triangles
+    // — 3.0 pixels a triangle, the second-weakest thing in the diorama — so
+    // they were marginal on the numbers before they were wrong on the eye.
+    // Gone. The trail texture keeps its painted gravel, speckle and damp
+    // patches, which is what carries "loose surface" from any distance the
+    // game actually shows it from.
     for (let i = 0; i < 14; i++) {
       const side = i % 2 ? 1 : -1;
       const bx = side * (7.5 + rScrub() * 12);
@@ -5532,8 +5522,7 @@ class Game {
     }
     for (const [geos, col, flat] of [[trunks, F.trunk, false], [lows, F.low, true],
       [mids, F.mid, true], [tops, F.top, true], [rocks, F.rock, true],
-      [moss, F.moss, true], [stones, F.stone, true], [stonesDk, F.stoneDk, true],
-      [bushes, F.bush, true],
+      [moss, F.moss, true], [bushes, F.bush, true],
       [tufts, 0x5e8f3e, true], [scuffs, F.dirt, false]]) {
       const geo = weld(geos);
       const m = new THREE.Mesh(geo,

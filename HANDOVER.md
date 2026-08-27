@@ -3720,3 +3720,31 @@ moved the same constant showed the back of the car.
 
 Gates: `pageerr`, `bayblack` (the studio shares the bay's diorama) and `boot`
 4/4 all green.
+
+## r277 — THE PYRAMIDS COME OUT
+Reported in three words, no picture: "remove the piramids". Two things in this
+game are literally pyramids — the diorama's loose stones (squashed
+TETRAHEDRA and octahedra) and its grass tufts (four-sided cones) — so before
+removing anything, zoom the thing the report was most likely looking at. A car
+shelf card blown up four times settles it: scattered over the grass and the
+dirt band are small pale solids with a flat base and a clean apex. Little white
+pyramids. They are r264's stones.
+
+They were justified at the time and the argument still reads well — painted
+gravel is flat, stone the key light can catch is what makes a surface read as
+loose. What that argument missed is the SIZE these are ever seen at. A shelf
+card is 148 px wide. At that scale a four-sided solid does not read as gravel;
+it reads as a triangle someone left on the lawn.
+
+The numbers had already said so quietly: `dioparts.mjs` put them at 0.9% of the
+bay for 752 triangles — 3.0 pixels a triangle, the second-weakest thing in the
+whole diorama. Marginal on the measurement before they were wrong to the eye.
+Out: 8909 → **8157 triangles**, and the trail keeps its painted gravel, speckle
+and damp patches, which is what carries "loose surface" from any distance the
+game actually shows it from.
+
+The moss, the boulders and the three-tier pines stay — those are rocks and
+trees, not pyramids, and they earn their triangles.
+
+Gates: `pageerr`, `bayblack` lit and sealed, `boot` 4/4, second diorama still
+free at 0.1 ms.
