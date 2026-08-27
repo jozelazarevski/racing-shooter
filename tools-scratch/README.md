@@ -408,6 +408,48 @@ real time to get right and the next session should not rebuild them.
                 fixed, which had been in every seafront shot since r238.
 - `lightprobe.mjs` the lights, the tone mapping and the road material the
                 running world actually has, when a tune edit seems not to land.
+- `lapshots.mjs` eight CHASE-camera stations round one lap onto a contact
+                sheet - the cheap way to go looking for a reported shape when
+                the report has no station in it.
+- `spikes.mjs`  terrain needles: the biggest rise between two samples a fixed
+                baseline apart, per level. Clean on the alpine chapter, which is
+                how the search moved off the terrain and onto the massif.
+- `pixat.mjs`   the colour under a given pixel of a saved frame. Sampling the
+                reported slab at #8a9a84 is what identified it as `hillColor`,
+                and `hillColor` is what the massif lerps its foot towards.
+
+(`bigtrans.mjs` and `nearbig.mjs` are gone, and why is worth a line: the first
+projected bounding-box corners without checking they were IN FRONT of the
+camera - `project()` on a point behind it returns garbage, and it reported 1600%
+coverage. The second called the world's enclosing shells - the r9000 skirt, the
+haze bands - "overlapping the road", which they do, by design, because they
+enclose everything.)
+
+- `massifloom.mjs` how many DEGREES of sky the nearest massif cone fills from
+                each road station. The builder's own clearance rule is a
+                footprint rule, so it can pass while a 258 u mountain stands 42 u
+                off the centreline; this is the angle, which is what the driver
+                sees.
+- `massifshape.mjs` every massif cone's width, height, aspect and flank
+                distance. Catches the other half: the shrink-to-fit path used to
+                narrow `w` and leave `h`, which makes needles.
+- `loomsweep.mjs` `massifloom`'s pass/fail across every level that builds a
+                massif, guarding BOTH directions - no cone may lean over a road,
+                and the ring may not lose cones to the fix.
+- `shrinkpath.mjs` `_buildMassif`'s "eight passes could not find room" branch,
+                forced. Point it at a tree whose massif spec plants the cones ON
+                the road (see r278 in HANDOVER) and it checks the build raises
+                no error, every instance was written, and nothing came out a
+                needle. The branch never runs on the shipped roster, which is
+                precisely why it is where a mistake hides.
+- `loomshot.mjs` measures the worst station then parks there and photographs it,
+                so the number and the picture are the same event
+                (`LEVEL=66 STATION=895 TAG=-x`).
+- `whatsinfront.mjs` names the thing filling the frame by elimination: hides one
+                scene child at a time, diffs the pixels, then descends into the
+                winner. Sanity-check its answer - at L67 station 450 it
+                correctly named `tunnel`, which is why that shot was dark, and
+                a station picked by eye is easily inside one.
 - `srv.mjs`     plain static server (`node srv.mjs 8920`).
 - `keep.sh`     keeps a server alive across tool-call timeouts:
                 `setsid ./keep.sh srv.mjs 8920 &`

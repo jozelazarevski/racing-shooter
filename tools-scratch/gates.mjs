@@ -30,8 +30,9 @@ const GATES = [
   ['playermoves', 'the player car actually drives',                 ['LEVELS=1'], 600],
   ['wedgetest',   'a car pinned on a wall counts as stuck',         ['LEVELS=1'], 600],
   ['swallowed',   'nothing hidden by the frame loop catch',         ['LEVELS=1', 'MODES=race'], 600],
+  ['loomsweep',   'no massif cone leans over a road',                [], 3600],
 ];
-const SLOW = new Set(['swallowed', 'landscape', 'camsanity']);
+const SLOW = new Set(['swallowed', 'landscape', 'camsanity', 'loomsweep']);
 const run = (name, env, secs) => new Promise((res) => {
   const e = { ...process.env };
   for (const kv of env) { const i = kv.indexOf('='); e[kv.slice(0, i)] = kv.slice(i + 1); }

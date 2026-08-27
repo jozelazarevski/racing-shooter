@@ -3748,3 +3748,61 @@ trees, not pyramids, and they earn their triangles.
 
 Gates: `pageerr`, `bayblack` lit and sealed, `boot` 4/4, second diorama still
 free at 0.1 ms.
+
+## r278 — THE MOUNTAIN LEANING ON THE CAR
+A screenshot with no words: an alpine meadow, chalets on the far slope, the car
+crawling at 8 km/h, and a huge pale grey-green faceted mass filling the left
+half of the frame. Blown up four times it resolves into a CONE seen from its
+own foot — the near base vertex at the driver's feet, two ridge lines running
+away up and out of frame, the scatter rocks of the hillside sitting along the
+right silhouette. The faces sample at #8a9a84, which is `furka`'s `hillColor`,
+which is what `_buildMassif` lerps the bottom third of every cone towards.
+
+It is a massif cone, and it passed every check the builder has.
+
+WHY IT PASSED. `_buildMassif` walks a cone away from the road until
+
+    d >= w / 2 + roadWidth + 24
+
+which is a FOOTPRINT rule. It buys exactly one thing: you cannot drive into the
+rock. It says nothing at all about what the rock looks like from the seat.
+Measured on GLACIER COL (`massifloom.mjs`, new): all 16 cones satisfied it, and
+one of them stood with its flank 42 u from the centreline and 258 u of mountain
+above that flank — **81 degrees of sky**. Every one of the 16 was over 25
+degrees; 100 % of the lap's stations had a mountain over 40 degrees somewhere in
+view. GRANITE NARROWS measured 83 %, TIMBER GORGE 79 %.
+
+So the clearance now takes the taller of two rules — the footprint one, and a
+flank standing back `LOOM = 1.15` times the cone's own height, which caps it at
+about 41 degrees:
+
+    d >= w / 2 + max(roadWidth + 24, h * LOOM)
+
+On GLACIER COL all 16 cones survive at full size and every one of them now
+measures 40 degrees or less: they simply walked outward along the ring, which
+had the room all along. Nothing shrank and nothing was dropped.
+
+THE OTHER HALF, found on the way. When eight passes cannot find room the
+builder shrinks to fit, and the old line shrank `w` and left `h` alone. That
+turns the one cone the lap encircles into a needle — the exact fault the
+horizon ring was widened to cure ("no real mountain is twice as tall as it is
+broad", r-whenever, three thousand lines further down this file). It now solves
+for the single scale that satisfies both rules and applies it to the whole
+form, so a squeezed peak is a smaller mountain instead of a spike. Shrinking `h`
+also shrinks what the loom rule asks for, so it converges in one step.
+
+A NEAR MISS WORTH RECORDING. The scale was first written `const k = ...` inside
+the shrink block — and `k` is the instance loop's own counter, three lines above
+`rock.setMatrixAt(k, m4)`. The drop path would have written instance 0.37.
+Caught by reading the diff, not by a gate; there is no gate that would have.
+
+AND A FALSE LEAD, also worth recording. Before measuring anything I photographed
+eight stations of the lap looking for the shape, and station N/2 came back
+swallowed by a dark mass with a pale slab in it — looked like a hit.
+`whatsinfront.mjs` (new: hide each scene child, diff the pixels, descend into
+the winner) named it `tunnel`, at 74 %. The car was parked inside a bore. A
+station picked by eye is easily inside one, and a dark frame is not the bright
+frame that was reported.
+
+Gates: `loomsweep.mjs` (new) over every level that builds a massif — no cone
+leans over a road anywhere on the roster, and no ring lost a cone to the fix.

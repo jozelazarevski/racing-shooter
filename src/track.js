@@ -12898,7 +12898,9 @@ export class Track {
       const t = M.count > 1 ? k / (M.count - 1) : 0.5;
       const a = M.az + (t - 0.5) * M.spread + (Math.random() - 0.5) * 0.1;
       const r = M.r0 + Math.random() * (M.r1 - M.r0);
-      const h = M.h0 + Math.random() * (M.h1 - M.h0);
+      // `h` is mutable because the shrink-to-fit below scales the whole form,
+      // not just its base — see there
+      let h = M.h0 + Math.random() * (M.h1 - M.h0);
       let w = M.w0 + Math.random() * (M.w1 - M.w0);
       let x = Math.cos(a) * r, z = Math.sin(a) * r;
       // "the dry inland range standing behind the terraces" — INLAND. On a
@@ -12925,7 +12927,20 @@ export class Track {
       // away from whatever road sample it is closest to, which is the
       // shortest way clear; a few passes because stepping off one leg of a
       // lap can walk onto another.
-      const clearance = (i) => w * 0.5 + (this.widthAt?.(i) ?? 9) + 24;
+      //
+      // AND IT MUST NOT LEAN OVER IT EITHER. Footprint clearance only buys
+      // "you cannot drive into the rock"; it says nothing about what the rock
+      // looks like from the driver's seat. Measured on GLACIER COL: every one
+      // of the 16 cones passed the footprint rule, and one of them stood with
+      // its flank 42 u from the centreline and 258 u of mountain above it —
+      // 81 degrees of sky, a pale faceted slab filling half the frame, which
+      // is what got photographed and reported. All 16 were over 25 degrees.
+      // A mountain reads as a mountain when you look UP at it, not when it
+      // leans on you, so the clearance takes the taller of the two rules:
+      // footprint, and a flank standing back `LOOM` times its own height.
+      const LOOM = 1.15;                              // <= ~41 degrees of sky
+      const clearance = (i) => w * 0.5
+        + Math.max((this.widthAt?.(i) ?? 9) + 24, h * LOOM);
       for (let pass = 0; pass < 8; pass++) {
         const s = this._nearestSample(x, z);
         const need = clearance(s.i);
@@ -12945,7 +12960,19 @@ export class Track {
       // of sight and register nothing.
       const fin = this._nearestSample(x, z);
       if (fin.d < clearance(fin.i)) {
-        w = Math.max(0, (fin.d - (this.widthAt?.(fin.i) ?? 9) - 24) * 2);
+        // IN PROPORTION. This used to shrink `w` and leave `h` alone, which
+        // turns the one cone that could not find room into a needle — the
+        // exact "no real mountain is twice as tall as it is broad" fault the
+        // horizon ring was widened to cure. Solve for the single scale that
+        // satisfies both rules at once and apply it to the whole form, so a
+        // squeezed peak is a smaller mountain rather than a spike. Shrinking
+        // `h` also shrinks what the loom rule asks for, so this converges in
+        // one step instead of chasing itself.
+        const road = (this.widthAt?.(fin.i) ?? 9) + 24;
+        const fit = Math.max(0, Math.min(
+          (fin.d - road) / (w * 0.5),
+          fin.d / (w * 0.5 + h * LOOM)));
+        w *= fit; h *= fit;
         if (w < 30) {
           m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
           rock.setMatrixAt(k, m4);
