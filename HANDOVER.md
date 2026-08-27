@@ -3804,5 +3804,33 @@ the winner) named it `tunnel`, at 74 %. The car was parked inside a bore. A
 station picked by eye is easily inside one, and a dark frame is not the bright
 frame that was reported.
 
+AND THE SHRINK BRANCH TURNS OUT TO BE UNREACHABLE. `shrinkpath.mjs` exists to
+run it on purpose, and it took three cuts to get an answer worth having:
+
+ 1. Cones planted at r 40-60 with w 400. They came back at the requested
+    400 x 400 and the probe said PASS. The walk had simply pushed them outward
+    THROUGH the lap and out the far side, where the clearance is satisfied.
+ 2. `shrank` added as the gate on the gate, and the spec raised to 2000 so the
+    clearance could not be met anywhere. It reported 72 of 88 cones shrunk —
+    for a massif that has 16. The solids filter ("base no wider than `w1`")
+    stops separating massif cones from skyline ones the moment `w1` is a big
+    number, so it was counting the horizon rings.
+ 3. Reading the named InstancedMesh's own matrices. `shrank: 0`. Even at a
+    clearance of 3300 u, EVERY cone escapes.
+
+Which is the real finding: nothing bounds the walk's step (`need - d + 4`), so
+a cone can always leave the world rather than shrink. The branch is dead code
+on today's roster. The proportional shrink is still the right code to have
+there — and the `const h` it assigned to would have thrown the moment anything
+did reach it — but this round did not exercise it, and saying otherwise would
+be the third wrong measurement in a row.
+
+The flip side of an unbounded step is a cone shoved past the skyline, leaving a
+hole where a mountain should be. `conering.mjs` (new) measures it: on the
+alpine chapter, which has the largest specs and so the largest shoves, L65
+asked r 340-600 and got 422-587, L66 asked 400-700 and got 497-697, L67 asked
+380-640 and got 454-618. Every cone still stands in its own ring.
+
 Gates: `loomsweep.mjs` (new) over every level that builds a massif — no cone
 leans over a road anywhere on the roster, and no ring lost a cone to the fix.
+`conering.mjs` (new) over the same set — no cone walked out of the world.

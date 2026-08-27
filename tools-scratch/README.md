@@ -436,12 +436,19 @@ enclose everything.)
 - `loomsweep.mjs` `massifloom`'s pass/fail across every level that builds a
                 massif, guarding BOTH directions - no cone may lean over a road,
                 and the ring may not lose cones to the fix.
+- `conering.mjs` where each massif cone ENDED UP, against the r0..r1 its spec
+                asked for. Nothing bounds the walk's step, so a bigger clearance
+                is a bigger shove and a cone can be pushed past the skyline,
+                leaving a hole where a mountain should be. Companion gate to
+                `loomsweep`: that one stops the wall, this one stops the hole.
 - `shrinkpath.mjs` `_buildMassif`'s "eight passes could not find room" branch,
                 forced. Point it at a tree whose massif spec plants the cones ON
                 the road (see r278 in HANDOVER) and it checks the build raises
                 no error, every instance was written, and nothing came out a
-                needle. The branch never runs on the shipped roster, which is
-                precisely why it is where a mistake hides.
+                needle. AS OF r278 IT REPORTS THAT THE BRANCH CANNOT BE
+                REACHED: nothing bounds the walk's step, so a cone always
+                escapes rather than shrink. Keep it — the day something bounds
+                that walk, this is the probe that says so.
 - `loomshot.mjs` measures the worst station then parks there and photographs it,
                 so the number and the picture are the same event
                 (`LEVEL=66 STATION=895 TAG=-x`).
