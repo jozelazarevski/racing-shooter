@@ -34,23 +34,33 @@ p.on('pageerror', (e) => errs.push(String(e)));
 p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
 await p.goto(`http://localhost:${PORT}/?level=${LV}&go=1&unlockall=1`, { waitUntil:'load', timeout:600000 });
 await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout:600000 });
-const r = await p.evaluate(() => {
-  const t = window.__game.track;
+const r = await p.evaluate(async () => {
+  const THREE = await import('three');
+  const t = window.__game.track, M = t.T.massif;
+  // THE INSTANCE MATRICES, NOT `solids`. The second cut of this probe filtered
+  // the solids list by "base no wider than M.w1", which separates massif cones
+  // from skyline ones only while w1 is a normal number - and forcing this
+  // branch needs w1 in the thousands, at which point the filter matches
+  // everything and `shrank` counts the skyline rings. The named InstancedMesh
+  // has exactly the massif's own cones in it and nothing else.
   const mesh = t.group.children.find((o) => o.name === 'massif');
-  const cones = (t.solids || []).filter((s) => s.prof && s.h > 20);
-  const M = t.T.massif;
-  // the massif's own cones, not the skyline rings: nothing else is ever asked
-  // for a base this wide
-  const mine = cones.filter((s) => s.r / 0.48 <= M.w1 + 1);
-  const rows = mine.map((s) => ({ w: +(s.r / 0.48).toFixed(0), h: +s.h.toFixed(0),
-    asp: +(s.h / (s.r / 0.48)).toFixed(2) }));
-  return { want: M.count, drawn: mesh ? mesh.count : -1,
+  if (!mesh) return { want: M.count, drawn: -1, rows: [] };
+  const m = new THREE.Matrix4(), pos = new THREE.Vector3();
+  const q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  const rows = [];
+  for (let i = 0; i < mesh.count; i++) {
+    mesh.getMatrixAt(i, m);
+    m.decompose(pos, q, sc);
+    rows.push({ w: +sc.x.toFixed(0), h: +sc.y.toFixed(0),
+      asp: +(sc.y / Math.max(1e-6, sc.x)).toFixed(2), dropped: pos.y < -9999 });
+  }
+  return { want: M.count, drawn: mesh.count,
     asked: `${M.w0}-${M.w1} wide, ${M.h0}-${M.h1} tall`,
-    // anything below the smallest requested base went through the branch
-    shrank: rows.filter((o) => o.w < M.w0 - 1).length, kept: rows.length, rows };
+    shrank: rows.filter((o) => !o.dropped && o.w < M.w0 - 1).length,
+    dropped: rows.filter((o) => o.dropped).length, rows };
 });
 console.log(JSON.stringify({ ...r, rows: r.rows.slice(0, 6) }, null, 1));
-const fat = r.rows.filter((o) => o.asp > 2);
+const fat = r.rows.filter((o) => !o.dropped && o.asp > 2);
 const bad = errs.length || r.drawn !== r.want || fat.length || !r.shrank;
 if (errs.length) console.log('errors:', errs.slice(0, 3));
 if (fat.length) console.log('needles:', fat);
