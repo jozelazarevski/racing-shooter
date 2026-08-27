@@ -5,10 +5,21 @@
  * put the new scale in a `const k` that shadowed the instance loop's counter,
  * and scaled a `const h`. Neither shows up unless the branch executes.
  *
- * Point this at a tree whose massif spec makes the branch unavoidable (cones
- * planted ON the road, taller than they are wide) and it checks three things:
- * the build raises no error, whatever survives keeps a mountain's proportions,
- * and nothing was written to a fractional instance index.
+ * Point this at a tree whose massif spec makes the branch unavoidable and it
+ * checks four things: the branch ACTUALLY RAN, the build raised no error, every
+ * instance was written, and whatever survives keeps a mountain's proportions.
+ *
+ * THE FIRST CUT PASSED WITHOUT TESTING ANYTHING, which is the whole reason the
+ * first check exists. Planting the cones at r 40-60 with w 400 is not enough:
+ * the walk simply pushes them outward THROUGH the lap and out the far side,
+ * where the clearance is satisfied and the shrink never runs. They came back at
+ * the requested 400 x 400 and the probe said PASS. To force the branch the
+ * clearance has to be unsatisfiable ANYWHERE in the world - a height and width
+ * in the thousands - so there is nowhere left to walk to.
+ *
+ * `shrank` is therefore the gate on the gate: a cone still at its requested
+ * size did not go through the branch, and a run where none did is a run that
+ * measured nothing.
  *
  *   PORT=8902 LEVEL=66 node shrinkpath.mjs
  */
@@ -27,15 +38,24 @@ const r = await p.evaluate(() => {
   const t = window.__game.track;
   const mesh = t.group.children.find((o) => o.name === 'massif');
   const cones = (t.solids || []).filter((s) => s.prof && s.h > 20);
-  const rows = cones.map((s) => ({ w: +(s.r / 0.48).toFixed(0), h: +s.h.toFixed(0),
+  const M = t.T.massif;
+  // the massif's own cones, not the skyline rings: nothing else is ever asked
+  // for a base this wide
+  const mine = cones.filter((s) => s.r / 0.48 <= M.w1 + 1);
+  const rows = mine.map((s) => ({ w: +(s.r / 0.48).toFixed(0), h: +s.h.toFixed(0),
     asp: +(s.h / (s.r / 0.48)).toFixed(2) }));
-  return { want: t.T.massif.count, drawn: mesh ? mesh.count : -1, kept: rows.length, rows };
+  return { want: M.count, drawn: mesh ? mesh.count : -1,
+    asked: `${M.w0}-${M.w1} wide, ${M.h0}-${M.h1} tall`,
+    // anything below the smallest requested base went through the branch
+    shrank: rows.filter((o) => o.w < M.w0 - 1).length, kept: rows.length, rows };
 });
-console.log(JSON.stringify(r, null, 1));
+console.log(JSON.stringify({ ...r, rows: r.rows.slice(0, 6) }, null, 1));
 const fat = r.rows.filter((o) => o.asp > 2);
-const bad = errs.length || r.drawn !== r.want || fat.length;
+const bad = errs.length || r.drawn !== r.want || fat.length || !r.shrank;
 if (errs.length) console.log('errors:', errs.slice(0, 3));
 if (fat.length) console.log('needles:', fat);
-console.log(bad ? 'FAIL: the shrink branch is not clean' : 'PASS: shrink branch builds, no needles');
+if (!r.shrank) console.log('the shrink branch NEVER RAN — this run measured nothing');
+console.log(bad ? 'FAIL: the shrink branch is not clean'
+  : `PASS: ${r.shrank} cone(s) through the shrink branch, no needles`);
 await b.close();
 process.exit(bad ? 1 : 0);
