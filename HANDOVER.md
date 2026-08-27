@@ -3676,3 +3676,47 @@ inset-sim  viewport 832  screenW 956    ->   overX 62    box 956x440  stretch 0%
 The simulation is the reported device's exact geometry — Playwright can set
 `screen` independently of `viewport`, which is the shape iOS reports. Untested
 code is not a fix.
+
+## r276 — THE SHELF ICONS, FRAMED FROM THE CAR
+Reported with a photograph of the car shelf: "this is broken". The cards were
+cropping their cars and no two of them agreed.
+
+`_shoot` framed with a **constant**: `dist = 8.7`, look pinned at y 0.55. At 30
+degrees that leaves 2.33 u of half-height above the aim, and BRAWLER measures
+**3.46 u tall**. The number was right for whatever the cars were the day it was
+typed, and nothing has told it since that they grew roof racks. Meanwhile the
+build bay ten lines away has carried a comment for rounds saying FRAME THE CAR
+FROM THE CAR — the icons never got it.
+
+### THREE THINGS, IN THE ORDER THEY WERE FOUND
+1. **Derived distance is not enough.** Fitting the bounding box by trigonometry
+   got the roof in and then clipped the WHEELS off the bottom: a car seen at
+   three-quarters has its nearest bottom corner projecting lower than any
+   formula on the box's extents predicts. `_fitDist` projects the eight corners
+   and scales the distance by however far the worst one lands outside the
+   frame, three passes. Measured, not derived — the same lesson `_frameStage`
+   already paid for.
+2. **Aiming at the box centre made the picture worse.** The whole car fitted
+   and the background became a wall of trail, because a 3.5 u car's centre puts
+   the horizon at the top of the frame. Half way between the old fixed 0.55 and
+   the centre keeps the three-quarter look-down that puts grass and a diagonal
+   of dirt behind the car.
+3. **One rig for the whole row.** Fitting each card on its own zooms each car
+   differently AND lands each on a different patch of diorama — measured side
+   by side, one card on grass and the next against a beige panel. `_carIcons`
+   now fits every car, takes the furthest, and shoots all eight from that one
+   distance and one aim. The odd card out disappeared with it: the per-car aim
+   was tilting the lens just enough to swing a pine trunk through one frame.
+
+Backing off to fit the tallest car put the eye at about fourteen units, past
+where the diorama's near pines start at lane 9.6. Lifting the rig to look over
+them was tried and is worse — from up there the trail reads as a vertical band
+with the car pasted on it. Swinging the AZIMUTH toward the trail's own axis
+keeps the camera over the dirt, out of the tree lane, and keeps the low
+three-quarter. `SHOT_RIG` / `SHOT_RIG_GROUND` are named for it, and the car's
+own yaw is now DERIVED from the rig — `Math.PI * 0.82` was a three-quarter
+front view of the eye that existed when it was written, and the moment the eye
+moved the same constant showed the back of the car.
+
+Gates: `pageerr`, `bayblack` (the studio shares the bay's diorama) and `boot`
+4/4 all green.

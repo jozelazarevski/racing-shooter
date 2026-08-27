@@ -314,6 +314,12 @@ const FILTER_GROUPS = [
 // away, so the car sat dead centre with half the screen showing tarmac
 // already driven, and the start gantry filling the rest. Pushed well out, the
 // car sits low in frame and the corner arrives on screen before you reach it.
+// The studio's eye directions. `SHOT_RIG` is the three-quarter view every part
+// icon has always used against the cyclorama; `SHOT_RIG_GROUND` is the same
+// azimuth lifted, for subjects standing in the diorama — see `_shoot`.
+const SHOT_RIG = new THREE.Vector3(5.2, 3.2, 6.2);
+const SHOT_RIG_GROUND = new THREE.Vector3(3.9, 3.3, 7.4);
+
 const CAM_MODES = [
   { name: 'TOP-DOWN',  back: 16, h: 46, look: 22, lookH: 0,   spdBack: 6, spdH: 10, steer: 1, roadYaw: true },
   { name: 'TOP FAR',   back: 20, h: 72, look: 30, lookH: 0,   spdBack: 4, spdH: 10, steer: 1, roadYaw: true },
@@ -5649,11 +5655,86 @@ class Game {
    *  framed slightly wrong and passing "6.2" for the car shelf (meaning "the
    *  old z") silently moved the camera 30% closer and cropped the cars.
    */
-  _shoot(mesh, w, h, { dist = 8.7, look = 0.55, ground = false } = {}) {
+  /** HOW FAR BACK THIS BOX HAS TO SIT TO FIT THE FRAME — measured, not derived.
+   *
+   *  Trigonometry on the bounding box gets this wrong and `_frameStage` has
+   *  said so for rounds: a car seen at three-quarters has its near end
+   *  projecting far larger than its far end, so the half-width you compute
+   *  from the box is not the half-width that lands on the canvas. Deriving it
+   *  fitted the roof and then clipped the wheels off the bottom, because the
+   *  nearest bottom corner projects lower than any formula on the box's
+   *  extents predicts.
+   *
+   *  So project the eight corners and ask the projection. Three passes is
+   *  plenty — each one scales the distance by however far outside the target
+   *  frame the worst corner landed, and the error falls off geometrically.
+   *  0.86 leaves a small, even margin all round.
+   */
+  _fitDist(bx, cam, aim, target = 0.86, rig = SHOT_RIG) {
+    const dir = rig.clone().normalize();
+    const look = new THREE.Vector3(0, aim, 0);
+    const corners = [];
+    for (const x of [bx.min.x, bx.max.x]) for (const y of [bx.min.y, bx.max.y])
+      for (const z of [bx.min.z, bx.max.z]) corners.push(new THREE.Vector3(x, y, z));
+    let d = Math.max(6, bx.getSize(new THREE.Vector3()).length());
+    for (let i = 0; i < 3; i++) {
+      cam.position.copy(dir).multiplyScalar(d);
+      cam.lookAt(look);
+      cam.updateMatrixWorld(true);
+      cam.updateProjectionMatrix();
+      let worst = 0;
+      for (const c of corners) {
+        const v = c.clone().project(cam);
+        worst = Math.max(worst, Math.abs(v.x), Math.abs(v.y));
+      }
+      if (!Number.isFinite(worst) || worst <= 1e-3) break;
+      d *= worst / target;
+    }
+    return d;
+  }
+
+  _shoot(mesh, w, h, { dist, look, ground = false } = {}) {
     const st = this._studio(w, h);
     const cam = new THREE.PerspectiveCamera(30, w / h, 0.1, 600);  // see `_stage`
-    cam.position.set(5.2, 3.2, 6.2).normalize().multiplyScalar(dist);
-    cam.lookAt(0, look, 0);
+    // FRAME THE SUBJECT FROM THE SUBJECT — the same rule `_frameStage` already
+    // states for the build bay, and the one the shelf icons never got.
+    //
+    // `dist` was a constant 8.7 with the look point pinned at y 0.55. At 30
+    // degrees that leaves 2.33 u of half-height, and BRAWLER measures 3.46 u
+    // tall: the icon cut the car off, which is how it was reported. The number
+    // was presumably right for whatever the cars were the day it was written,
+    // and nothing has told it since that they grew roof racks.
+    //
+    // Measured instead: fit the bounding box to the tighter of the two fields
+    // of view, worst-case width being the diagonal because these are shot at
+    // three-quarters, and look at the box's own centre rather than at a fixed
+    // height. An explicit `dist`/`look` still wins — the PART icons pass their
+    // own, and those are framed against a sweep, not standing on ground.
+    const bx = new THREE.Box3().setFromObject(mesh);
+    const sz = bx.getSize(new THREE.Vector3());
+    const mid = bx.getCenter(new THREE.Vector3());
+    const vfov = (30 * Math.PI) / 180;
+    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * (w / h));
+    // The look point is NOT the box centre. Aiming at the middle of a car that
+    // is 3.5 u tall lifts the horizon most of the way up the frame and the
+    // background becomes a wall of trail — rendered and looked at: the whole
+    // car fitted, and the picture was worse. Half way between the old fixed
+    // 0.55 and the centre keeps the original three-quarter look-down, which is
+    // what puts grass and a diagonal of dirt behind the car.
+    const aim = look ?? (0.55 + (mid.y - 0.55) * 0.5);
+    // A DIFFERENT AZIMUTH FOR ANYTHING STANDING ON THE GROUND — not a higher
+    // one. Fitting the tallest car pushes the lens back to about fourteen
+    // units, past where the diorama's near pines start (lane 9.6), and a trunk
+    // came through the frame and across one car's nose. Lifting the eye to
+    // look over them was tried and is worse: from up there the trail reads as
+    // a vertical band with the car pasted on it. Swinging the azimuth toward
+    // the trail's own axis instead keeps the camera over the dirt and out of
+    // the tree lane, and keeps the low three-quarter that made these read as
+    // photographs. A part held up to a sweep keeps the original rig.
+    const rig = ground ? SHOT_RIG_GROUND : SHOT_RIG;
+    const fit = dist ?? this._fitDist(bx, cam, aim, 0.86, rig);
+    cam.position.copy(rig).normalize().multiplyScalar(fit);
+    cam.lookAt(0, aim, 0);
     st.scene.add(mesh);
     // `ground` is for things that STAND on something — a car. A gearbox held
     // up to the light does not get a shadow under it.
@@ -5721,11 +5802,44 @@ class Game {
 
   _carIcons() {
     if (this.__carIcons) return this.__carIcons;
-    const icons = {};
-    for (const car of CAR_CATALOG) {
+    // ONE DISTANCE FOR THE WHOLE SHELF. Fitting each car on its own is right
+    // for one picture and wrong for a ROW of them: the catalogue runs from a
+    // 2.47 u saloon to a 3.46 u truck with a roof rack, so per-car fitting
+    // zooms each card differently and — because the eye moves with the
+    // camera — lands each one on a different part of the trail. Measured
+    // side by side: one card on grass, the next against a wall of dirt.
+    // Fit them all, take the furthest, shoot every card from there. The big
+    // machines fill their cards and the small ones sit in more scenery, which
+    // is the truth about them anyway.
+    // THE CAR'S ANGLE IS DERIVED FROM THE RIG, not written down beside it.
+    // `Math.PI * 0.82` was a three-quarter FRONT view of the eye that existed
+    // when it was typed; move the eye and the same constant shows you the back
+    // of the car, which is what happened the moment the ground rig swung along
+    // the trail. Hold the offset between the two instead and the pose survives
+    // the next time the camera moves.
+    const FRONT_OFF = Math.PI * 0.82 - Math.atan2(SHOT_RIG.x, SHOT_RIG.z);
+    const yaw = Math.atan2(SHOT_RIG_GROUND.x, SHOT_RIG_GROUND.z) + FRONT_OFF;
+    const built = CAR_CATALOG.map((car) => {
       const mesh = buildCarMesh(car.spec);
-      mesh.rotation.y = Math.PI * 0.82; // 3/4 front view
-      icons[car.key] = this._shoot(mesh, 148, 96, { ground: true }); // the 8.70 rig
+      mesh.rotation.y = yaw;            // three-quarter front, from wherever the eye is
+      return { car, mesh };
+    });
+    // ONE AIM AS WELL AS ONE DISTANCE. Leaving `_shoot` to pick the look point
+    // per car makes each card a slightly different camera — the aim follows the
+    // box centre, which runs from 1.24 on a saloon to 1.73 on the truck — and
+    // a row of cards shot from eight slightly different eyes lands each car on
+    // a different patch of the diorama. One rig for the row.
+    const probe = new THREE.PerspectiveCamera(30, 148 / 96, 0.1, 600);
+    const boxes = built.map(({ mesh }) => new THREE.Box3().setFromObject(mesh));
+    const tall = boxes.reduce((a, b2) => (b2.max.y > a.max.y ? b2 : a));
+    const look = 0.55 + (tall.getCenter(new THREE.Vector3()).y - 0.55) * 0.5;
+    let dist = 0;
+    for (const bx of boxes) {
+      dist = Math.max(dist, this._fitDist(bx, probe, look, 0.86, SHOT_RIG_GROUND));
+    }
+    const icons = {};
+    for (const { car, mesh } of built) {
+      icons[car.key] = this._shoot(mesh, 148, 96, { ground: true, dist, look });
     }
     this.__carIcons = icons;
     return icons;
