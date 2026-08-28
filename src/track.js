@@ -11997,8 +11997,41 @@ export class Track {
     const step = Math.max(2, Math.round((S.bay || 6.2) / this.segLen));
     const bayLen = step * this.segLen * 1.08;
     const bankGeo = this._bankPrismGeo();
-    const hedgeGeo = new THREE.BoxGeometry(1, 1, 1);
+    // A HEDGE IS NOT A BOX. Photographed on OULTON PARK: the run read as a row
+    // of butter-yellow slabs — a unit box per bay, flat-shaded, one scalar of
+    // tone. A flailed hedge is a block in SILHOUETTE, but its faces are made
+    // of clumps: so the box is subdivided and every vertex is pushed out by a
+    // seeded hash (deterministic — a rebuild is the same hedge), the crown
+    // more than the flanks, and painted per-vertex — lit crown fading to a
+    // shadowed base, the same trick the massif uses to stop eight cones
+    // reading as one flat wall. Still one geometry, still one InstancedMesh,
+    // still one draw call: the cost is vertices, 8 -> ~150 per bay.
+    const hedgeGeo = new THREE.BoxGeometry(1, 1, 1, 4, 2, 6);
     hedgeGeo.translate(0, 0.5, 0);
+    {
+      const pos = hedgeGeo.attributes.position;
+      const hcols = new Float32Array(pos.count * 3);
+      const hash = (a, b2, c) => {
+        const v = Math.sin(a * 12.9898 + b2 * 78.233 + c * 37.719) * 43758.5453;
+        return v - Math.floor(v);
+      };
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+        const n = hash(x * 7, y * 5, z * 9) - 0.5;
+        // the crown billows, the flanks ripple, the base stays put so the
+        // hedge still sits down onto its bank without a gap
+        pos.setX(i, x + n * 0.22 * y);
+        pos.setY(i, y + (y > 0.9 ? (hash(z * 11, x * 3, 1) - 0.35) * 0.30 : 0));
+        pos.setZ(i, z + (hash(y * 13, z * 5, x * 2) - 0.5) * 0.10);
+        // per-vertex light: crown 1.0 down to 0.55 at the base, with clump
+        // mottle on top of the ramp so a face is foliage rather than paint
+        const t = 0.55 + 0.45 * Math.min(1, pos.getY(i))
+          + (hash(x * 17, y * 19, z * 23) - 0.5) * 0.22;
+        hcols[i * 3] = hcols[i * 3 + 1] = hcols[i * 3 + 2] = Math.max(0.3, t);
+      }
+      hedgeGeo.setAttribute('color', new THREE.BufferAttribute(hcols, 3));
+      hedgeGeo.computeVertexNormals();
+    }
     const banks = new THREE.InstancedMesh(
       bankGeo,
       new THREE.MeshStandardMaterial({
@@ -12010,7 +12043,8 @@ export class Track {
     const hedges = new THREE.InstancedMesh(
       hedgeGeo,
       new THREE.MeshStandardMaterial({
-        color: 0xffffff, flatShading: true, roughness: 1, envMapIntensity: 0.25,
+        color: 0xffffff, vertexColors: true, flatShading: true, roughness: 1,
+        envMapIntensity: 0.25,
       }),
       MAX
     );
@@ -12068,8 +12102,18 @@ export class Track {
         m4.compose(new THREE.Vector3(p.x, base + h * 0.92, p.z), q,
           new THREE.Vector3(W * 0.8, hh, bayLen * 1.02));
         hedges.setMatrixAt(k, m4);
-        leaf.setHSL(F.h + Math.random() * F.hVar, F.s + Math.random() * F.sVar,
-          Math.max(0.10, F.l - 0.06 + Math.random() * F.lVar));
+        // A HEDGE IS NOT THE CANOPY. This borrowed the foliage palette raw,
+        // which is right on green farmland and wrong the moment a tune moves
+        // the trees: OULTON PARK's autumn foliage (h 0.07, s 0.62, l 0.36) put
+        // BUTTER-YELLOW slabs down both verges, photographed and reported as
+        // walls needing fixing. Flailed hawthorn holds browner and darker than
+        // whatever the trees are doing: hue pulled a quarter toward moss
+        // (0.22), saturation and lightness cut, so an autumn hedge reads as
+        // russet-brown under copper trees and a summer hedge stays hedge-green.
+        leaf.setHSL(
+          (F.h + Math.random() * F.hVar) * 0.75 + 0.22 * 0.25,
+          (F.s + Math.random() * F.sVar) * 0.72,
+          Math.max(0.10, (F.l - 0.06 + Math.random() * F.lVar) * 0.66));
         hedges.setColorAt(k, leaf);
         this.solids.push({ x: p.x, z: p.z, r: W / 2, y: base + h * 0.5, mat: 'bank' });
         k++;

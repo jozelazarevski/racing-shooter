@@ -15,7 +15,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 420, height: 760 } });
 p.setDefaultTimeout(600000);
-await p.goto(`http://localhost:8901/?level=${LV}&go=1&unlockall=1`, { waitUntil:'load', timeout:600000 });
+await p.goto(`http://localhost:${process.env.PORT ?? 8901}/?level=${LV}&go=1&unlockall=1`, { waitUntil:'load', timeout:600000 });
 await p.waitForFunction(() => window.__game?.track?.center && window.__game.player, undefined, { timeout:600000 });
 const worst = await p.evaluate(() => {
   const t = window.__game.track;
