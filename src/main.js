@@ -9738,6 +9738,18 @@ class Game {
   }
 
   startRace() {
+    // DEBUG TELL: which world is this frame from. Every screenshot report so
+    // far has had to be attributed by its palette, its contract slate or its
+    // camera height — one was chased across four wrong levels before its
+    // contracts gave it away. The build tag already survives every screenshot,
+    // so the stage rides with it.
+    {
+      const bt = document.getElementById('build-tag');
+      if (bt) {
+        bt.dataset.rev ??= bt.textContent;
+        bt.textContent = `${bt.dataset.rev} · ${this.level?.name ?? '?'}`;
+      }
+    }
     this._menuIdle();      // the shop floor stops turning the moment you leave it
     this._flushPick?.();   // a tapped card whose build hasn't run yet — build it now
     // NO GATE — A WARNING WITH A NUMBER ON IT. The start line used to refuse
@@ -10293,7 +10305,7 @@ class Game {
       const road = this.track.headingAt(p.trackIndex);
       if (Number.isFinite(road)) {
         const cur = this._camYaw ?? road;
-        this._camYaw = cur + wrap(road - cur) * Math.min(1, 3.6 * dt);
+        this._camYaw = cur + wrap(road - cur) * (1 - Math.exp(-5.0 * (this._camDt ?? dt)));
         fwd = new THREE.Vector3(Math.sin(this._camYaw), 0, Math.cos(this._camYaw));
       }
     } else if (M.chase) {
@@ -10302,10 +10314,15 @@ class Game {
       const sp = Math.hypot(p.vel.x, p.vel.z);
       if (sp > 5) yaw += wrap(Math.atan2(p.vel.x, p.vel.z) - yaw) * 0.4; // look where you're going
       const cur = this._camYaw ?? yaw;
-      // 4.5 tracked the car closely enough that the view still whipped on a
-      // flick. Slower: the camera lags turn-in slightly, so you see the CAR
-      // rotate against a steady world instead of the world rotating around you.
-      this._camYaw = cur + wrap(yaw - cur) * Math.min(1, 3.6 * dt);
+      // 4.5 linear tracked the car closely enough that the view still whipped
+      // on a flick, and 3.6 cured that — at 60 fps. On CLAMPED dt the factor
+      // decays with frame rate (see _camDt above), and at phone frame rates
+      // the cure became "the camera still shows the side of the car in a
+      // turn". 5.0 exponential on wall time sits just above the old 60 fps
+      // response and, crucially, STAYS there when the frame rate halves; the
+      // travel-direction blend above is what keeps a flick from whipping the
+      // view, not sheer sluggishness.
+      this._camYaw = cur + wrap(yaw - cur) * (1 - Math.exp(-5.0 * (this._camDt ?? dt)));
       fwd = new THREE.Vector3(Math.sin(this._camYaw), 0, Math.cos(this._camYaw));
     }
     // Cliff worlds are a special case for any LOW view. `clampCam` below already
@@ -10369,7 +10386,7 @@ class Game {
       v.y += Math.min(4, Math.abs(over) * 0.5);
     };
     clampCam(targetPos);
-    const k = 1 - Math.exp(-5.5 * dt);
+    const k = 1 - Math.exp(-5.5 * (this._camDt ?? dt));
     this.camPos.lerp(targetPos, k);
     this.camLook.lerp(targetLook, k);
     clampCam(this.camPos);
@@ -11006,7 +11023,19 @@ class Game {
   }
 
   _frameBody() {
-    let dt = Math.min(this.clock.getDelta(), 0.05);
+    const dtRaw = this.clock.getDelta();
+    let dt = Math.min(dtRaw, 0.05);
+    // THE CAMERA RUNS ON WALL TIME. The sim dt is clamped to 0.05 so physics
+    // cannot explode on a hitch — but every camera smoothing term also ran on
+    // the clamped value, which means the slower the phone renders, the slower
+    // the view pans: at 12 fps a frame is 0.083 s and the camera was fed 0.05,
+    // so it turned at 60% of real speed exactly when the machine was already
+    // struggling. Reported as "delayed response in the turns — I can turn and
+    // the camera still shows the side. Hard to drive." The camera gets its own
+    // dt, bounded loosely (a one-second hitch must not whip the view round),
+    // and the smoothing below uses exponential form so the response per
+    // SECOND is the same at any frame rate.
+    this._camDt = Math.min(dtRaw, 0.12);
     const time = this.clock.elapsedTime;
     // THE EDITOR OWNS THE FRAME. It drives its own camera and renders
     // straight (no composer, no post) so a sculpt reads as geometry rather
