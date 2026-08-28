@@ -19550,7 +19550,12 @@ export class Track {
         }
         const form = set[(gi + (Math.random() * 1.4 | 0)) % set.length];
         const mesh = per[form];
-        const band = 0.55 + Math.random() * 0.75;          // this range's height
+        // this range's height. It was 0.55-1.30 - one range 2.4 times the
+        // height of the next - and stacked on the within-range span below
+        // that put a factor of 2.3 to 3.8 between the tallest and shortest
+        // form in a single ring. Neighbours that different cannot join into
+        // a crest; the tall one just stands against sky on its own.
+        const band = 0.75 + Math.random() * 0.45;
         const n = 3 + (Math.random() * 4 | 0);
         for (let k = 0; k < n && mesh.count < mesh.instanceMatrix.count; k++) {
           const a = aC + (k - n / 2) * (0.16 + Math.random() * 0.10);
@@ -19562,7 +19567,13 @@ export class Track {
           // a ridge lies ALONG the range, so it is turned to face the middle
           const yaw = form === 'ridge' ? a + Math.PI / 2 + (Math.random() - 0.5) * 0.3
             : Math.random() * Math.PI;
-          const zs = 0.5 + Math.random() * 0.7;
+          // DEPTH IS ALSO A WIDTH. Every form but the ridge is turned on Y at
+          // random, so whichever of its two horizontal axes happens to face
+          // the camera IS its silhouette width - and at 0.5 this quietly
+          // handed back half of whatever `w` had just been widened to. The
+          // floor is 0.82: still a footprint that is not a circle, never a
+          // blade.
+          const zs = 0.82 + Math.random() * 0.46;
           m4.makeRotationY(yaw);
           m4.scale(new THREE.Vector3(w, h, w * zs));
           m4.setPosition(px, h / 2 + seat(px, pz), pz);
@@ -19601,8 +19612,33 @@ export class Track {
     // 500 u and more. Widened, and the height spans pulled in a little; the
     // forms in a group now overlap into a continuous crest instead of
     // standing apart like a picket fence.
-    place(near, 9, 900, 140, 60, 80, 200, 190, 0.82);
-    place(far, 8, 1120, 160, 140, 130, 260, 220, 0.76);
+    //
+    // ...AND THAT WIDENING STOPPED SHORT OF THE RULE IT QUOTES. Measured again
+    // with tools-scratch/skyteeth.mjs - hide everything but these two rings,
+    // render a 360 deg panorama from the driver's eye, and take the top-most
+    // lit pixel in each column as the skyline - on FURKA RIDGE, CAPE OLIVETO
+    // and GLACIER COL:
+    //   - the FAR ring still stood at h/width 0.61 median and 0.90 at p90:
+    //     186 u of height on a 310 u footprint, against the "250 high spreads
+    //     500" this comment already states. Only the NEAR ring (0.31-0.39)
+    //     ever got the widening it describes.
+    //   - only 0.43 of a far mountain's own height cleared the near ring, and
+    //     a tenth of the compass had it buried outright. The top third of ANY
+    //     mountain is a triangle, so a ring you are shown the top third of is
+    //     a row of triangles however broad its base is.
+    //   - the silhouette itself came out at 0.53 aspect median and 1.18 at p90
+    //     - prominence over width at half prominence, both in degrees - with
+    //     27 separate peaks round the compass. That is a serration, not a
+    //     range, and it is what the photograph shows.
+    // So the far ring is the one that moves: 360-660 u wide carrying 135-195 u
+    // of height, which is 0.33 aspect and inside the rule at last, and the
+    // near ring drops to 48-84 u so it reads as foothills and lets two thirds
+    // of the far ring stand clear instead of half. The near ring also goes out
+    // to 930 u, because widening it to 240-450 u would otherwise push its
+    // inner flank in to 675 u - inside the 705 u the old numbers left clear of
+    // the drivable massif.
+    place(near, 9, 930, 140, 48, 36, 240, 210, 0.82);
+    place(far, 8, 1120, 160, 135, 60, 360, 300, 0.76);
     let mi = 0;
     for (const mesh of meshes) {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
