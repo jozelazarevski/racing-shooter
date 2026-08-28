@@ -22,7 +22,12 @@ const r = await p.evaluate(async () => {
   for (let i = 0; i < 900 && g.state !== 'race'; i++) await f();
   for (let i = 0; i < 12 && g.camMode !== 4; i++) g.cycleCamera();
   if (g.camMode !== 4) throw new Error('driver mode never reached');
-  for (let i = 0; i < 16; i++) { if (g.input?.analog) g.input.analog.throttle = 0.6; await f(); }
+  // PIN THE CAR. The first run let it roll between grabs, so every removal
+  // diffed ~50% of the lower half — the WORLD had moved, and the numbers
+  // measured motion smear, not the candidate. Zero velocity before every
+  // grab; the seat camera then holds still and a diff is the removal alone.
+  const pin = () => { pl.vel.set(0, 0, 0); pl.vy = 0; };
+  for (let i = 0; i < 10; i++) { pin(); await f(); }
   const cv = g.renderer.domElement;
   const off = document.createElement('canvas');
   off.width = 160; off.height = Math.round(160 * cv.height / cv.width);
@@ -34,7 +39,7 @@ const r = await p.evaluate(async () => {
     for (let i = half; i < d.length; i += 4) { t++;
       if (d[i] + d[i + 1] + d[i + 2] < 60) n++; }
     return n / t; };
-  await f();
+  pin(); await f();
   const base = grab();
   const cands = [
     ['carMesh', pl.mesh],
@@ -46,7 +51,7 @@ const r = await p.evaluate(async () => {
   for (const [name, o] of cands) {
     if (!o) { rows.push({ name, missing: true }); continue; }
     const was = o.visible; o.visible = false;
-    await f(); await f();
+    pin(); await f(); pin(); await f();
     const d = grab();
     let diff = 0, t = 0;
     for (let i = half; i < d.length; i += 4) { t++;
