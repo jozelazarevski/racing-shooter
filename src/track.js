@@ -23290,7 +23290,8 @@ export class Track {
     // colour the water would actually mirror at these grazing angles), pulled
     // 45% toward white so the texture's own shading still reads. Blue worlds
     // stay blue — their horizons are blue.
-    const skyTint = new THREE.Color(this.T.skyHorizon ?? '#bcd6e8').lerp(new THREE.Color(1, 1, 1), 0.45);
+    // less white-lerp now that the map is neutral — the tint IS the colour
+    const skyTint = new THREE.Color(this.T.skyHorizon ?? '#bcd6e8').lerp(new THREE.Color(1, 1, 1), 0.2);
     const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({
       map: waterTex, color: skyTint, roughness: 0.18, metalness: 0.06, side: THREE.DoubleSide,
       transparent: true, opacity: 0.82, vertexColors: true, depthWrite: false,

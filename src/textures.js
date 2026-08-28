@@ -1787,11 +1787,20 @@ export function barrelTexture(palette = {}) {
  *  both v edges plus drifting foam flecks. u repeats down the river's length. */
 export function riverTexture() {
   const t = make(256, 128, (g, w, h) => {
-    // deep-to-shallow blue across the width
+    // NEAR-NEUTRAL, because the WORLD supplies the colour. This was a
+    // saturated blue gradient, and the theme tint applied over it in
+    // _buildRiver could not undo that: a material colour MULTIPLIES the map,
+    // so a warm horizon over strong blue just gives darker blue — rendered
+    // and compared at OULTON PARK's ford, the tinted after-shot was
+    // indistinguishable from the before. Same rule the undercity lighting
+    // learned: light with intensity, tint with colour. The map now carries
+    // only VALUE — a cool silver-grey with the same deep-to-shallow shape —
+    // and the skyHorizon tint turns it into that world's water: warm haze at
+    // OULTON, alpine blue under a blue sky, sodium-green in the undercity.
     const grd = g.createLinearGradient(0, 0, 0, h);
-    grd.addColorStop(0, '#2e7ab8');
-    grd.addColorStop(0.5, '#1f5f9e');
-    grd.addColorStop(1, '#2e7ab8');
+    grd.addColorStop(0, '#aab4bc');
+    grd.addColorStop(0.5, '#8794a0');
+    grd.addColorStop(1, '#aab4bc');
     g.fillStyle = grd;
     g.fillRect(0, 0, w, h);
     // cyan current streaks along the flow
