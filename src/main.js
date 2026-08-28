@@ -315,10 +315,12 @@ const FILTER_GROUPS = [
 // already driven, and the start gantry filling the rest. Pushed well out, the
 // car sits low in frame and the corner arrives on screen before you reach it.
 // The studio's eye directions. `SHOT_RIG` is the three-quarter view every part
-// icon has always used against the cyclorama; `SHOT_RIG_GROUND` is the same
-// azimuth lifted, for subjects standing in the diorama — see `_shoot`.
+// icon has always used against the cyclorama; `SHOT_RIG_GROUND` is a wider
+// azimuth and a LOWER eye, for subjects standing in the diorama — it has to
+// leave the horizon inside the frame, which a part held up to a sweep does
+// not care about. See `_shoot` for what was measured.
 const SHOT_RIG = new THREE.Vector3(5.2, 3.2, 6.2);
-const SHOT_RIG_GROUND = new THREE.Vector3(3.9, 3.3, 7.4);
+const SHOT_RIG_GROUND = new THREE.Vector3(8.0, 2.5, 3.2);
 
 const CAM_MODES = [
   { name: 'TOP-DOWN',  back: 16, h: 46, look: 22, lookH: 0,   spdBack: 6, spdH: 10, steer: 1, roadYaw: true },
@@ -5726,10 +5728,46 @@ class Game {
     // units, past where the diorama's near pines start (lane 9.6), and a trunk
     // came through the frame and across one car's nose. Lifting the eye to
     // look over them was tried and is worse: from up there the trail reads as
-    // a vertical band with the car pasted on it. Swinging the azimuth toward
-    // the trail's own axis instead keeps the camera over the dirt and out of
-    // the tree lane, and keeps the low three-quarter that made these read as
-    // photographs. A part held up to a sweep keeps the original rig.
+    // a vertical band with the car pasted on it. A part held up to a sweep
+    // keeps the original rig.
+    //
+    // ...AND A LOWER ONE, BECAUSE THE HORIZON WAS OFF THE TOP OF THE FRAME.
+    // Measured at the framing the shelf ships — `_carIcons` picks one distance
+    // and one aim for the whole row, so these are the row's numbers, not one
+    // car's. At (3.9, 3.3, 7.4) the lens sat 15.9 u out and 5.84 up, aiming at
+    // 1.14: 17.6 degrees below horizontal against a 15 degree half-FOV. The
+    // horizon therefore sat at clip-space y tan(17.6)/tan(15) = 1.19 — ABOVE
+    // THE TOP EDGE. Every pixel of every card was ground by construction: 0%
+    // of the frame above the horizon, and the sky dome and the painted far
+    // treeline each measuring 0% of it, whatever the diorama put behind the
+    // car. Restoring the diorama's dropped transforms (r279) gave those cards
+    // a real wood again, and it was still a wood photographed from above with
+    // nothing to stand it against.
+    //
+    // NEITHER AIM NOR PITCH ALONE FIXES IT. Raising the aim is self-cancelling:
+    // `_fitDist` pushes the lens back as the aim rises and the eye goes up with
+    // it. Walked at this rig, the aim has to reach the tallest car's own
+    // ROOFLINE before the horizon comes down to 0.91, and even the box centre
+    // only moves it 1.19 -> 1.08 — still off the top, and it has already pushed
+    // the lens from 15.9 u to 17.8. Flattening the pitch on its own is the
+    // vertical-band failure above, because at 27.8 degrees the lens is looking
+    // down the trail's own axis. The two together work: swing the azimuth
+    // ACROSS the trail, so a flat pitch lays the dirt over the frame instead of
+    // down it. At 68 degrees off the axis and 16 of elevation the lens sits
+    // 12.1 u out and 3.37 up — 10.9 degrees of pitch, horizon at 0.72 with 14%
+    // of the frame above it, and the painted far treeline, which no card had
+    // ever shown a pixel of, measuring 9.8%. Trail across the bottom, verge,
+    // treeline, wood: the shape of a photograph rather than a plan of one.
+    //
+    // THE TREE LANE IS STILL CLEAR, and that is what stopped the swing at 68
+    // rather than carrying it round to where more of the sky is. Ray-sampled
+    // over the projected box of EVERY car in the catalogue — a trunk that
+    // misses the saloon can still cross the truck — nothing in the wood is
+    // nearer the lens than the car is, on all eight. Swing further and it comes
+    // back: at 94 degrees the scrub takes 2% of the tallest car's samples, and
+    // by 112 something is in front of ALL of them. `_fitDist` still fits the
+    // tallest roof rack; the worst projected corner over the eight is 0.86, the
+    // same margin the row had before.
     const rig = ground ? SHOT_RIG_GROUND : SHOT_RIG;
     const fit = dist ?? this._fitDist(bx, cam, aim, 0.86, rig);
     cam.position.copy(rig).normalize().multiplyScalar(fit);

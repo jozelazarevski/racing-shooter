@@ -1,3 +1,18 @@
+/* WITHDRAWN — THIS PROBE'S RENDERS DID NOT SHOW WHAT IT CLAIMED.
+ *
+ * `_shoot` reads the module-scope `SHOT_RIG_GROUND` directly and takes only
+ * `dist` and `look` from a caller. The rig vectors swept below therefore never
+ * reached the camera: every render in the resulting contact sheet was the
+ * SHIPPED azimuth at a different zoom, labelled with an azimuth it did not
+ * have. The horizon arithmetic printed alongside was computed independently and
+ * is sound; the pictures were not evidence for it.
+ *
+ * To try a rig you must WRITE the constant and reload — see `rigdrive.sh` and
+ * `rigmeas.mjs`, which reads the rig back out of the served `/src/main.js` and
+ * throws if it is not there, so its arithmetic and its picture cannot disagree.
+ *
+ * Kept only as the record of the mistake.
+ */
 /* CANDIDATE ICON RIGS, RENDERED SIDE BY SIDE, WITH THE HORIZON AS A NUMBER.
  *
  * A shelf icon is 82% flat green because the camera tilts 16.5 degrees down

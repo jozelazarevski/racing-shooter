@@ -20,7 +20,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 430, height: 900 } });
 p.setDefaultTimeout(600000);
-await p.goto('http://localhost:8901/?level=1&unlockall=1', { waitUntil:'load', timeout:600000 });
+await p.goto('http://localhost:8916/?level=1&unlockall=1', { waitUntil:'load', timeout:600000 });
 await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout:600000 });
 const out = await p.evaluate(async (car) => {
   const g = window.__game;
@@ -31,7 +31,7 @@ const out = await p.evaluate(async (car) => {
   const entry = mod.CAR_CATALOG.find((c) => c.key === car) ?? mod.CAR_CATALOG[0];
   const shoot = () => {
     const mesh = mod.buildCarMesh(entry.spec);
-    mesh.rotation.y = g._iconYaw ?? 0;
+    mesh.rotation.y = Math.atan2(3.9, 7.4) + (Math.PI * 0.82 - Math.atan2(5.2, 6.2));  // `_carIcons`' own yaw
     return g._shoot(mesh, W, H, { ground: true });
   };
   // `_shoot` hides the forest again on the way out, so reach it once and keep it
@@ -58,12 +58,9 @@ const out = await p.evaluate(async (car) => {
 // diff off-thread: decode each data URL and compare
 const diffs = await p.evaluate(async ([shots, W, H]) => {
   const load = (u) => new Promise((r) => { const i = new Image(); i.onload = () => r(i); i.src = u; });
-  // SIZE THE CANVAS FROM THE IMAGE, NOT FROM THE REQUEST. The studio renderer
-  // runs at a pixel ratio of 2, so a 592 x 384 shot comes back from
-  // `toDataURL` as 1184 x 768. Sizing this canvas to the REQUESTED width and
-  // drawing at 0,0 cropped every comparison to the top-left QUADRANT — a
-  // quarter of the frame, reported as the frame. Every share this probe
-  // printed before this line was a quadrant share.
+  // AT THE IMAGE'S OWN SIZE. The studio renders at a pixel ratio, so the data
+  // URL comes back larger than the size asked for, and a canvas sized from
+  // the request measures only the top-left quadrant.
   const px = (img) => { const c = document.createElement('canvas');
     c.width = img.naturalWidth; c.height = img.naturalHeight;
     c.getContext('2d').drawImage(img, 0, 0);
