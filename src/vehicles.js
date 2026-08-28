@@ -477,8 +477,14 @@ export function buildVoxelRacer(spec) {
     // the picture rather than as the inside of a car. A real dash top is matte
     // mid-grey that catches the sky, so these sit at roughly the road's own
     // brightness and the lower frame becomes part of the car.
-    const inner = mat(0x4a463f, { roughness: 0.92, metalness: 0.02 });
-    const trim = mat(0x5d564c, { roughness: 0.8, metalness: 0.08 });
+    // BRIGHT ENOUGH TO READ AS FURNITURE. Painted magenta by a probe, the
+    // dash showed as a full-width slab of the lower frame; at 0x4a463f under
+    // a cabin that gets mostly hemisphere light it rendered as silhouette —
+    // the driver's-view report's black band was one part this, one part the
+    // car's own shadow on the road (handled in _driverCamera). Two steps
+    // lighter keeps it obviously interior, stops it reading as a hole.
+    const inner = mat(0x6b6155, { roughness: 0.9, metalness: 0.02 });
+    const trim = mat(0x82786a, { roughness: 0.78, metalness: 0.08 });
     const cockpit = new THREE.Group();
     cockpit.name = 'cockpit';
     const put = (w, h, d, m, x, y, z, rx = 0) => {
@@ -530,7 +536,9 @@ export function buildVoxelRacer(spec) {
     // measured filling the bottom 26% of the frame, against 20% at 2.1 with a
     // clear band of road under it. A shallow surface seen edge-on is all
     // thickness and no surface.
-    const AHEAD = 2.1;
+    const AHEAD = 2.5;   // pushed from 2.1: same trade of angle for distance
+                         // that took it from 1.15 to 2.1, one step further —
+                         // the slab was landing mid-frame, not the bottom fifth
     // dash top edge at ~atan(0.72/2.1) = 19 degrees below the axis, plus the
     // camera's own pitch, which puts it in the bottom fifth.
     put(cabW * 1.05, 0.16, 0.40, inner, 0, eyeY - 0.72, eyeZ + AHEAD, -0.16);
@@ -883,6 +891,10 @@ export function buildVoxelRacer(spec) {
     ao.rotation.x = -Math.PI / 2;
     ao.position.y = 0.03;
     ao.renderOrder = 1;
+    // published so the driver's seat can hide it: from inside the car the
+    // blob is a black pool you carry around on the road ahead — see
+    // _driverCamera
+    g.userData.aoBlob = ao;
     g.add(ao);
   }
 

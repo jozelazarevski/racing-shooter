@@ -10280,6 +10280,11 @@ class Game {
     if (this._dWasDriver) {
       this._dWasDriver = false;
       if (p.mesh) p.mesh.visible = p.alive;
+      // the shadow comes back with the outside view — see the seat's entry
+      for (const o of this._dCasters ?? []) o.castShadow = true;
+      this._dCasters = [];
+      const blob = p.mesh?.userData?.aoBlob;
+      if (blob) blob.visible = this._dBlobWas ?? true;
       // and the brand comes back the moment you are outside the car again,
       // while the interior goes away — it would show through the windows
       for (const d of p.mesh?.userData?.outwardDecals ?? []) d.visible = true;
@@ -10667,6 +10672,19 @@ class Game {
       this._dWasDriver = true;
       this._dYaw = undefined; this._dSpd = undefined;
       this._dSurge = 0; this._dLean = 0;
+      // THE SEAT DOES NOT CARRY ITS OWN SHADOW. Raycast + paint-probe on the
+      // reported black band: the pixels under the dash were ROAD, 5-6 u
+      // ahead, near-black — the car's cast shadow plus the AO blob, lying
+      // exactly where the seat looks whenever the sun is behind you. From
+      // inside the car neither is ever seen AS a shadow, only as a dark hole
+      // the view drags along the carriageway. Off for the seat, restored on
+      // leave; the list is cached so leaving restores exactly what cast.
+      this._dCasters = [];
+      p.mesh?.traverse((o) => {
+        if (o.castShadow) { this._dCasters.push(o); o.castShadow = false; }
+      });
+      const blob = p.mesh?.userData?.aoBlob;
+      if (blob) { this._dBlobWas = blob.visible; blob.visible = false; }
     }
     // THE CAR STAYS ON SCREEN. It used to be hidden here, and the reasoning
     // was sound for the eye it had: the first cut seated the head at

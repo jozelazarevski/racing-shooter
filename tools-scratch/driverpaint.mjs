@@ -19,6 +19,10 @@ await p.evaluate(async () => {
   for (let i = 0; i < 900 && g.state !== 'race'; i++) await f();
   for (let i = 0; i < 12 && g.camMode !== 4; i++) g.cycleCamera();
   if (g.camMode !== 4) throw new Error('driver mode never reached');
+  if (process.env.CLEAN) {
+    for (let i = 0; i < 8; i++) { pl.vel.set(0, 0, 0); await f(); }
+    return;
+  }
   const ud = pl.mesh.userData;
   const tint = (o, hex) => o?.traverse?.((m) => {
     if (!m.isMesh || !m.material) return;
@@ -34,6 +38,6 @@ await p.evaluate(async () => {
   });
   for (let i = 0; i < 8; i++) { pl.vel.set(0, 0, 0); await f(); }
 });
-await p.screenshot({ path: 'tools-scratch/shot-driverpaint.png' });
-console.log('wrote tools-scratch/shot-driverpaint.png');
+await p.screenshot({ path: process.env.CLEAN ? 'tools-scratch/shot-driver-after.png' : 'tools-scratch/shot-driverpaint.png' });
+console.log('wrote', process.env.CLEAN ? 'shot-driver-after.png' : 'shot-driverpaint.png');
 await b.close();
