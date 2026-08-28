@@ -12646,6 +12646,71 @@ export class Track {
     return c.getHex();
   }
 
+  /** THE ALBEDO THE GROUND ACTUALLY RENDERS AT (x, z).
+   *
+   *  The terrain material carries the ground TEXTURE and per-vertex colours
+   *  at once, so what reaches the screen is `ground.base x terrain ramp`
+   *  multiplied in linear space - the outback theme's note spells this out
+   *  and calls it measured. Anything that has to MATCH the ground therefore
+   *  has to match that PRODUCT; matching either half alone lands somewhere
+   *  the ground never goes.
+   *
+   *  Follows `_buildGround`'s own paint: the terrainLow -> terrainHigh height
+   *  ramp, the valley-shading multiply that rides on the same t, and the mean
+   *  of the per-vertex facet wobble. The dirt sinusoid, the coastal sand ring
+   *  and the gorge strata are deliberately left out - they are local
+   *  sprinkles over the field, not the tone of it. */
+  _groundTone(x, z) {
+    const T = this.T;
+    const t = THREE.MathUtils.clamp((this._terrainMeshHeight(x, z) + 2) / 7, 0, 1);
+    const c = new THREE.Color(T.terrainLow).lerp(new THREE.Color(T.terrainHigh), t);
+    c.multiplyScalar((0.93 + 0.07 * t) * 0.985);   // valley shading x mean facet wobble
+    if (T.ground && T.ground.base) c.multiply(new THREE.Color(T.ground.base));
+    return c;
+  }
+
+  /** The tone a massif foot has to reach: the mean of `_groundTone` over the
+   *  ring the cones are about to be planted on, lifted half way to the
+   *  theme's hill tone in brightness.
+   *
+   *  SAMPLED, NOT ASSUMED, because the ring sits at r 340-720 where
+   *  `_highland` has already lifted the ground several units up the
+   *  terrainLow -> terrainHigh ramp. The ground at a cone's foot is NOT
+   *  terrainLow; on the alpine themes it is most of the way to terrainHigh,
+   *  and on the flat-by-design worlds it is not. Sea-side samples are dropped
+   *  on coast worlds for the same reason `_buildMassif` reflects its cones
+   *  inland: there is no ground out there to match.
+   *
+   *  AND A FLANK IS NOT A FIELD, which is why the brightness is only met half
+   *  way. The ground is a near-horizontal surface facing the sun; a cone's
+   *  foot is a steep face that is not, and the renderer shades it as such.
+   *  Handing the foot the ground's albedo outright is the physically honest
+   *  answer and it measures worse: on GRANITE NARROWS and CAPE OLIVETO, where
+   *  the flat ground is far more strongly lit than any flank, the foot came
+   *  out L* 24-29 below the meadow it stands in - a dark skirt round every
+   *  mountain, a new seam in place of the old one. Colour from the ground,
+   *  brightness half way to the hill tone the theme already declares: over
+   *  four themes and eight cones that is the setting that closes the worst
+   *  seam without opening another. */
+  _massifFootTone(M) {
+    const acc = new THREE.Color(0, 0, 0);
+    const beach = this.T.coast ? (this.T.coast.beach ?? 60) : 0;
+    let n = 0;
+    for (let i = 0; i < 7; i++) {
+      const a = M.az + (i / 6 - 0.5) * M.spread;
+      for (const r of [M.r0, (M.r0 + M.r1) * 0.5, M.r1]) {
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        if (this.T.coast && this._coastSide(x, z) > -beach) continue;
+        acc.add(this._groundTone(x, z)); n++;
+      }
+    }
+    if (n) acc.multiplyScalar(1 / n); else acc.copy(this._groundTone(0, 0));
+    const Y = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;   // linear luminance
+    const y = Y(acc);
+    if (y < 1e-4) return acc;
+    return acc.multiplyScalar((y + Y(new THREE.Color(this.T.hillColor ?? 0x6e8a5c))) / (2 * y));
+  }
+
   /** THE CRAG GEOMETRY: a mountain, not a traffic cone.
    *
    *  The massif was ConeGeometry(1, 1, 6) - six sides, ONE height segment -
@@ -12656,8 +12721,11 @@ export class Track {
    *  the base cap move together and nothing cracks), which breaks the
    *  silhouette into crags. ~110 faces, built once, instanced per peak.
    *
-   *  And COLOUR, baked per face: the foot blends into the theme's own hill
-   *  tone so the range grows out of the land instead of being parked on it;
+   *  And COLOUR, baked per face: the foot blends into the tone the GROUND
+   *  around the ring is actually painted in - ground texture times terrain
+   *  ramp, sampled where the cones stand, at a brightness a steep face can
+   *  carry - so the range grows out of the land instead of being parked on
+   *  it;
    *  the body carries alternating strata bands warmed and cooled off the base
    *  rock; the crest lightens, or turns to snow on worlds that cap their
    *  boulders; and every facet gets its own tone wobble so the faces read as
@@ -12878,7 +12946,32 @@ export class Track {
     const cols = new Float32Array(pos.count * 3);
     const rockA = new THREE.Color(M.color ?? this._massifRock());
     const rockB = rockA.clone().offsetHSL(0.015, 0.05, -0.045);   // warm stratum
-    const foot = new THREE.Color(this.T.hillColor ?? 0x6e8a5c);
+    // THE FOOT GROWS OUT OF THE LAND THAT IS ACTUALLY THERE.
+    //
+    // This blended toward `T.hillColor`, and `hillColor` is the palette entry
+    // for the HORIZON hill rings - it is not the ground the cone is standing
+    // in, and nothing ever made it agree with that ground. Worse, it compared
+    // a bare vertex colour against a surface that renders as vertex colour
+    // TIMES the ground texture, so even a theme whose hillColor happens to
+    // sit near its terrain ramp still met the meadow a whole multiply too
+    // light. Measured across the cone/ground silhouette with
+    // tools-scratch/massifseam.mjs - hide the mesh named 'massif', diff the
+    // two frames so the cone pixels are known rather than guessed, then take
+    // a band of rock and a band of ground either side of the bottom edge -
+    // the step read dE 30.6 on FURKA RIDGE, where the colour half of it alone
+    // was dC 22.5: a drawn outline, not a foot. The other three themes
+    // measured came in at dE 10-22, so this is not one bad palette entry -
+    // it is the worst case of a rule that was aimed at the wrong thing.
+    //
+    // `_massifFootTone` samples the product the ground really paints, around
+    // the ring these cones are planted on, and keeps hillColor only as the
+    // brightness anchor a steep flank needs - see there. Theme-general by
+    // construction: nothing here reads a theme name, and a world whose hill
+    // tone already sat on its ground barely moves. Measured after, over the
+    // same eight cones: FURKA RIDGE 30.6 -> 14.5 and 31.0 -> 15.1 dE, with
+    // the colour half of it (dC) halved, 22.5 -> 11.4; TIMBER GORGE, whose
+    // hill tone was already close, holds at 11.6 and 10.3.
+    const foot = this._massifFootTone(M);
     const snow = !!(this.T.rockSnowCap || this.T.treeSnowCap);
     const crest = snow ? new THREE.Color(0xf2f6fa)
       : rockA.clone().offsetHSL(0, -0.04, 0.10);
@@ -12892,8 +12985,15 @@ export class Track {
         (pos.getY(f) + pos.getY(f + 1) + pos.getY(f + 2)) / 3 + 0.5, 0, 1);
       // strata bands off the base rock, alternating by height
       tmp.copy((Math.floor(hf * 7) % 2) ? rockB : rockA);
-      // the foot grows out of the land
-      if (hf < 0.34) tmp.lerp(foot, (1 - hf / 0.34) * 0.7);
+      // ...and it has to do the growing WHERE THE GROUND IS. Each instance is
+      // seated `h * 0.2` INTO the terrain (see the `y` below), so hf 0..0.2 is
+      // buried and a ramp that started at the geometric base had already
+      // spent two thirds of itself underground: at the visible ground line it
+      // was down to 0.29 of its strength, which is why the blend never read
+      // as an apron. Run it over the apron the player can see instead - full
+      // at the contact line, gone a fifth of the height above it.
+      const apron = THREE.MathUtils.clamp((0.40 - hf) / 0.20, 0, 1);
+      if (apron > 0) tmp.lerp(foot, apron * 0.7);
       // the crest lightens - or snows
       if (hf > 0.72) tmp.lerp(crest, ((hf - 0.72) / 0.28) * (snow ? 0.95 : 0.6));
       // per-facet tone, so faces read as rock instead of upholstery
