@@ -471,10 +471,29 @@ enclose everything.)
                 forced. Point it at a tree whose massif spec plants the cones ON
                 the road (see r278 in HANDOVER) and it checks the build raises
                 no error, every instance was written, and nothing came out a
-                needle. AS OF r278 IT REPORTS THAT THE BRANCH CANNOT BE
-                REACHED: nothing bounds the walk's step, so a cone always
-                escapes rather than shrink. Keep it — the day something bounds
-                that walk, this is the probe that says so.
+                needle. r278 recorded that the branch COULD NOT BE REACHED —
+                nothing bounded the walk's step, so a cone always escaped
+                rather than shrink. The walk is now bounded to `r1 * 1.35`, and
+                on the same fixture (16 cones, w and h 2000, planted on GLACIER
+                COL's lap) it reports 16 of 16 through the branch at aspect 1,
+                none dropped. This is the probe that says so.
+- `massifframe.mjs` the mountain ring in a RACE frame. Reads the live instance
+                matrices, picks the station/cone pair that subtends the largest
+                angle, parks the car there with the race running and aims the
+                game's own camera at that cone. A ring has no useful centroid —
+                `spread: 6.0` puts cones all the way round, so their mean is the
+                world origin and a camera aimed at it photographs the lap. Fails
+                loudly on no mesh, no surviving cone, or a race that never
+                starts (`PORT=8914 LEVEL=66 TAG=-after`).
+- `massifwho.mjs` whether a level asks for a massif AND whether the mesh exists.
+                `conering` and `loomsweep` are both silent when the named
+                InstancedMesh is missing, and silence there reads as clean —
+                this tells the two apart. It is how L32 RED CENTRE RUN was found
+                to carry an outback massif spec (7 cones at r 460-720) and build
+                no `massif` mesh at all, which neither gate can see.
+- `lapextent.mjs` how far from the world centre the lap itself runs, per level.
+                Needed to choose an "ON the road" ring for `shrinkpath`'s
+                fixture: GLACIER COL's lap only reaches 271 u.
 - `loomshot.mjs` measures the worst station then parks there and photographs it,
                 so the number and the picture are the same event
                 (`LEVEL=66 STATION=895 TAG=-x`).

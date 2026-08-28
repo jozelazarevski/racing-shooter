@@ -6,17 +6,19 @@
  *   LEVELS=1,2,... node loomsweep.mjs      (default: every level)
  */
 import { chromium } from 'playwright-core';
+const PORT = process.env.PORT ?? 8901;   // a worktree gets its own server
+
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport: { width: 320, height: 480 } });
 p.setDefaultTimeout(600000);
-await p.goto('http://localhost:8901/?level=1&go=1&unlockall=1', { waitUntil:'load', timeout:600000 });
+await p.goto(`http://localhost:${PORT}/?level=1&go=1&unlockall=1`, { waitUntil:'load', timeout:600000 });
 await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout:600000 });
 const levels = process.env.LEVELS ? process.env.LEVELS.split(',').map(Number)
   : await p.evaluate(async () => (await import('./src/track.js')).LEVELS.map((l) => l.id));
 let bad = [];
 for (const lv of levels) {
-  await p.goto(`http://localhost:8901/?level=${lv}&go=1&unlockall=1`, { waitUntil:'load', timeout:600000 });
+  await p.goto(`http://localhost:${PORT}/?level=${lv}&go=1&unlockall=1`, { waitUntil:'load', timeout:600000 });
   await p.waitForFunction(() => window.__game?.track?.center, undefined, { timeout:600000 });
   const r = await p.evaluate(() => {
     const t = window.__game.track, M = t.T?.massif;

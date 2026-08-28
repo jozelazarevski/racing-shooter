@@ -12941,6 +12941,40 @@ export class Track {
       const LOOM = 1.15;                              // <= ~41 degrees of sky
       const clearance = (i) => w * 0.5
         + Math.max((this.widthAt?.(i) ?? 9) + 24, h * LOOM);
+      // AND THE WALK HAS TO STOP AT THE EDGE OF THE RANGE. Nothing bounded
+      // `need - s.d + 4`, and `need` scales with the cone, so a clearance the
+      // world cannot offer ANYWHERE never fell through to the shrink below —
+      // it launched the peak instead. Measured with GLACIER COL's own spec
+      // rewritten to 16 cones of w 2000 h 2000 (3300 u of clearance) planted
+      // on its lap, which only reaches 271 u from the world centre: all 16
+      // walked out to r 3426-3556 — past the skyline rings at 900 and past
+      // RIM_RADIUS, the headwall that closes the world at 1620 — and arrived
+      // at the asked 2000 x 2000 with `shrinkpath` reporting `shrank: 0`. The
+      // shrink-to-fit written for exactly this case had never once executed.
+      //
+      // The spec already says where its mountains live, so bound the walk in
+      // the spec's own terms: the ring r0..r1. The AZIMUTH each pass reaches
+      // is kept — sliding a cone around the ring is what finds room on a lap
+      // that bends, and none of that is touched — and only the radius is
+      // pinned back into the band.
+      //
+      // OUT TO `r1 * 1.35`, NOT TO r1. The walk already carries cones past
+      // their own rim on worlds that are correct today: measured over the ten
+      // shipped worlds that build a massif, L19 620 -> 670, L20 640 -> 685,
+      // L48 660 -> 776, L62 640 -> 729 and worst FURKA RIDGE 660 -> 809, which
+      // is 1.23 x r1. Pinning at r1 would shrink mountains that are standing
+      // properly. 1.35 clears every measured one by 10 % or more, and still
+      // sits inside `conering`'s own 1.4 x r1 "flung" line, so the bound can
+      // never itself dig the hole that gate exists to catch. Inward, r0 as it
+      // stands: no cone on the roster finishes inside its own r0 (nearest is
+      // CAPE OLIVETO, 437 against 360). Both ends are widened to wherever the
+      // cone stood when the walk began, so the coast reflection above is never
+      // undone by the clamp.
+      //
+      // A cone that still cannot find room now falls through to the shrink,
+      // which is where "no room" was always meant to land.
+      const rWalk = Math.hypot(x, z) || M.r0;     // after any coast reflection
+      const rIn = Math.min(M.r0, rWalk), rOut = Math.max(M.r1 * 1.35, rWalk);
       for (let pass = 0; pass < 8; pass++) {
         const s = this._nearestSample(x, z);
         const need = clearance(s.i);
@@ -12953,6 +12987,13 @@ export class Track {
           ox = x / rr; oz = z / rr;
         } else { ox /= ol; oz /= ol; }
         x += ox * (need - s.d + 4); z += oz * (need - s.d + 4);
+        const rn = Math.hypot(x, z);
+        if (rn < 1e-3) {                 // stepped onto the world's own centre
+          x = Math.cos(a) * rIn; z = Math.sin(a) * rIn;
+        } else {
+          const rc = Math.min(rOut, Math.max(rIn, rn));
+          if (rc !== rn) { x *= rc / rn; z *= rc / rn; }
+        }
       }
       // Still crowding the road after eight passes means the lap encircles
       // this spot. Shrink to fit rather than shove a peak to the far horizon;
