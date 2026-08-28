@@ -3025,6 +3025,24 @@ const THEMES = {
     elev: { amp: 5, ph: [0.8, 2.3, 4.9] },
     rampMaxCurv: 0.022, padMaxCurv: 0.0075, boardMaxCurv: 0.02,
     cliffWalls: true,
+    // THE WALLS STOOD ON THE VERGE. `_cliffProfile` places the face at
+    // `WALL_OFF + 0.65 + (cliffSetback ?? 0)` — and this theme never set the
+    // setback, so its 18 u concrete faces rose 11.05 u from the centreline on
+    // a road whose drivable half is 9 and whose chase camera is allowed out to
+    // 8.4. That is 2.6 u of air between the lens and an 18 u wall: reported
+    // twice from a phone as a frame two-thirds filled with banded green
+    // concrete, the road a sliver, the car pressed into the face ("needs wall
+    // fixing"; the earlier unattributed slot-canyon frame carried this level's
+    // own contract slate). CANYON RUN sets 26 and ROCKFALL RAVINE 22 for the
+    // same builder; those were the two the r270 camera work was tuned on,
+    // which is why they never showed it.
+    //
+    // 12, not canyon's 26: this world is a sewer main and the slot is its
+    // identity. At 12 the face stands 23 u out — the wall top subtends ~38
+    // degrees from the centreline, still a corridor — and the camera at its
+    // 8.4 u limit gets 14.6 u of air instead of 2.6, which is the difference
+    // between driving a slot and being shown its wallpaper.
+    cliffSetback: 12,
     cliffPalette: {                                     // stained tunnel concrete
       bands: ['#6e7466', '#5c6256', '#7c8272', '#545a4c', '#666c5e'],
       seam: 'rgba(20,24,18,0.6)',
