@@ -9842,8 +9842,12 @@ class Game {
     if (p.lap > this.lapsTotal) { this.finishRace(); return; }
     const lapTime = this.raceTime - p.lapStart;
     p.lapStart = this.raceTime;
-    if (p.lap > 2 || (p.lap === 2)) {
+    if (p.lap >= 2) {
+      // announce only a lap that BEAT one, not the first timed lap of the
+      // race — lap 2's time is always "the best so far" and saying so is noise
+      const beat = Number.isFinite(p.bestLap) && lapTime < p.bestLap;
       if (lapTime < p.bestLap) p.bestLap = lapTime;
+      if (beat) this.hud.feed(`★ BEST LAP — ${fmtTime(lapTime)}`, 'good');
     }
     this.score += 500;
     this.audio.lap();
@@ -9972,6 +9976,20 @@ class Game {
     this.state = 'finished';
     this.player.finished = true;
     const rank = this.playerRank;
+    // THE LINE DESERVES A MOMENT. Crossing it used to be 1.6 silent seconds
+    // and then a form: no banner, no beat, nothing on the track — the game's
+    // biggest event presented smaller than a sideswipe (crashDrama gives a
+    // wall tap slow-mo and a flash). So: the placing announced in the same
+    // centre pop the countdown uses, a short slow beat — hitStop WITHOUT the
+    // damage flash, this is not a crash — and, for a podium, confetti raining
+    // over the car for the whole gap before the results card (see _festT in
+    // the update loop). The gap itself stretches to 2.6 s on a podium so the
+    // moment is watchable; a mid-field finish keeps the brisk 1.6.
+    this.hud.centerMsg(rank === 1 ? 'YOU WIN!' : `FINISH — ${ordinal(rank)}`);
+    this.hitStop = Math.max(this.hitStop, 0.38);
+    this.fovKick = Math.max(this.fovKick ?? 0, 0.5);
+    this._festT = rank <= 3 ? 2.4 : 0;
+    if (rank <= 3) this.particles.confetti(this.player.pos, 40);
     // The finish bonus was a six-entry table for a six-car grid, so with eight
     // on the line 7th and 8th both fell through to a flat 100. The old table
     // was very close to a geometric decay from 2000 to 150 — 2000·0.075^r fits
@@ -10060,9 +10078,22 @@ class Game {
     // say "this race opened a chapter" — a star total cannot, now that the
     // gate is a fraction of one chapter rather than a price per world.
     const chapBefore = this.currentChapter();
+    // THE LAP RECORD IS PART OF THE RECORD. The PACE NOTE job ("set a lap
+    // under your own best") gates on `career.finished[id].bestLap` — and this
+    // write never stored it, so the one job whose target is the player's own
+    // history could never be posted, on any world, since the day it was
+    // written. Stored rounded to a tenth, 0 meaning "no lap yet" (Infinity
+    // does not survive JSON).
+    const lapRec = Math.min(prev?.bestLap || Infinity,
+      Number.isFinite(this.player.bestLap) ? this.player.bestLap : Infinity);
+    if ((prev?.bestLap || 0) > 0 && lapRec < prev.bestLap) {
+      this.hud.feed(`★ LAP RECORD — ${fmtTime(lapRec)}`, 'good');
+      document.getElementById('r-best').textContent += '  ★ RECORD';
+    }
     this.career.finished[this.level.id] = {
       place: Math.min(rank, prev?.place ?? 99),
       bestScore: Math.max(earned, prev?.bestScore ?? 0),
+      bestLap: Number.isFinite(lapRec) ? Math.round(lapRec * 10) / 10 : 0,
       stars: bestStars,
     };
     saveJSON(this._pkey('career'), this.career);
@@ -10073,7 +10104,8 @@ class Game {
     if ((!prev || prev.place > 3) && rank <= 3 && hasNext) {
       this.hud.feed(`${LEVELS[this.levelIndex + 1].name} UNLOCKED`, 'good');
     }
-    this.hud.centerMsg('FINISH');
+    // (the placing banner at the top of this function is the centre pop now —
+    // a plain 'FINISH' here overwrote it the same frame it was shown)
     this.audio.lap();
     document.querySelector('#results .game-sub').textContent = `${this.level.name} COMPLETE`;
     // _raceOver relabels this button to RESTART TRACK; a real finish is a race
@@ -10096,7 +10128,7 @@ class Game {
       document.getElementById('results').classList.remove('hidden');
       this.hud.hide();
       document.getElementById('touch-ui').classList.remove('on');
-    }, 1600);
+    }, rank <= 3 ? 2600 : 1600);
   }
 
   /** The star panel on the results screen: which of the five you took, what
@@ -11089,6 +11121,15 @@ class Game {
         }
       }
       if (this.state === 'race' || this.state === 'finished') {
+        // THE PODIUM MOMENT. `_festT` is set by finishRace for a top-three
+        // place and burns down here, raining confetti over the car during the
+        // beat between the line and the results card. Rate-not-burst so the
+        // pieces hang in the air the whole window instead of one puff that has
+        // faded before the eye finds it.
+        if (this._festT > 0) {
+          this._festT -= dt;
+          if (Math.random() < 0.5) this.particles.confetti(this.player.pos, 7);
+        }
         this.weapons.update(dt);
         this._carCollisions();
         this._updateBoostPads();

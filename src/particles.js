@@ -544,6 +544,24 @@ export class Particles {
       { drag: 0.9, grav: 2.6, shrink: 0.05, alpha: 0.95 });
   }
 
+  /** CONFETTI over a podium finish. Bright saturated pieces thrown UP from
+   *  around `p`, then falling slow under heavy drag — the celebration is the
+   *  hang, not the launch. Colours are fixed festival tones, deliberately NOT
+   *  the theme palette: confetti that matches the world disappears into it.
+   */
+  confetti(p, count = 26) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 1 + Math.random() * 4.5;
+      _amb.setHSL(Math.random(), 0.85, 0.6);
+      this.spawn(
+        p.x + Math.cos(a) * r, p.y + 2.5 + Math.random() * 3.5, p.z + Math.sin(a) * r,
+        (Math.random() - 0.5) * 5, 5.5 + Math.random() * 5, (Math.random() - 0.5) * 5,
+        _amb, 0.5 + Math.random() * 0.4, 2.2 + Math.random() * 1.2,
+        { drag: 1.4, grav: 5, shrink: 0.05, alpha: 1 });
+    }
+  }
+
   /** Engine-bay damage smoke. severity 0..1: gray puffs -> thick dark smoke + fire flickers. */
   damageSmoke(p, severity = 0.5) {
     const dark = severity > 0.5;

@@ -30,9 +30,13 @@ for (const lv of (process.env.LEVELS ?? '68,72').split(',')) {
     t.group.traverse((o) => {
       if (o.isInstancedMesh && /tree|trunk|foliage|canopy/i.test(o.name || '')) trees += o.count;
     });
-    // the particle pool's own live count — no name guessing
-    const live = () => g.particles?.live ?? g.particles?._live ?? g.particles?.count ?? -1;
-    if (live() < 0) throw new Error('cannot read the particle pool');
+    // the pool is a ring buffer with no live counter — a particle is live
+    // while its life is positive, so count that directly
+    const lifeArr = g.particles?.life;
+    if (!lifeArr?.length) throw new Error('cannot read the particle pool');
+    const live = () => { let n = 0;
+      for (let i = 0; i < lifeArr.length; i++) if (lifeArr[i] > 0) n++;
+      return n; };
     // STANDING STILL: ambient leaf fall only
     for (let i = 0; i < 40; i++) {
       if (g.input?.analog) { g.input.analog.throttle = 0; g.input.analog.steer = 0; }
