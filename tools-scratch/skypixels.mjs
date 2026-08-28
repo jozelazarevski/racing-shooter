@@ -58,9 +58,26 @@ for (const lv of (process.env.LEVELS ?? '62,65,66,67').split(',')) {
     const cx = off.getContext('2d');
     const grab = () => { cx.drawImage(cv, 0, 0, off.width, off.height);
       return cx.getImageData(0, 0, off.width, off.height).data; };
+    // A BORE IS NOT THIS BUG. Inside a tunnel the sky is 0% by design, and a
+    // search for "least sky" will find one every time — the first run of this
+    // probe returned CAPE OLIVETO station 257 at 0.0%, photographed it, and the
+    // picture was the inside of a tunnel with its exit lit up ahead. Skip any
+    // station the track's own `tunnelAt` claims, plus a margin either side for
+    // the approach cutting.
+    const bore = (i) => {
+      for (let k = -14; k <= 14; k++) {
+        const j = ((i + k) % t.N + t.N) % t.N;
+        if (t.tunnelAt?.(t.pointAt(j, 0), j, 6)) return true;
+      }
+      return false;
+    };
     const rows = [];
+    let skipped = 0;
     for (let s = 0; s < nSt; s++) {
-      const idx = Math.floor((s / nSt) * t.N);
+      let idx = Math.floor((s / nSt) * t.N);
+      let guard = 0;
+      while (bore(idx) && guard++ < 60) { idx = (idx + 7) % t.N; skipped++; }
+      if (bore(idx)) continue;
       for (let i = 0; i < 14; i++) {
         const c = t.pointAt(idx, 0);
         pl.heading = t.headingAt(idx); pl.pos.x = c.x; pl.pos.z = c.z;
@@ -86,9 +103,10 @@ for (const lv of (process.env.LEVELS ?? '62,65,66,67').split(',')) {
       rows.push({ idx, sky: +(100 * same / (full.length / 4)).toFixed(1) });
     }
     rows.sort((a, c) => a.sky - c.sky);
-    return { N: t.N, rows };
+    if (!rows.length) throw new Error('every station sampled was inside a bore');
+    return { N: t.N, rows, skipped };
   }, [+(process.env.STATIONS ?? 16), +(process.env.CAM ?? 3)]);
-  console.log(`L${lv} (N=${r.N})  least sky: `
+  console.log(`L${lv} (N=${r.N}, ${r.skipped} bore steps)  least sky: `
     + r.rows.slice(0, 5).map((o) => `st${o.idx}=${o.sky}%`).join('  ')
     + `  |  most: ${r.rows[r.rows.length - 1].sky}%`);
 }
