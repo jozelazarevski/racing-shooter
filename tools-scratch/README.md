@@ -425,6 +425,32 @@ coverage. The second called the world's enclosing shells - the r9000 skirt, the
 haze bands - "overlapping the road", which they do, by design, because they
 enclose everything.)
 
+- `iconparts.mjs` what is actually IN a car shelf icon: shoots it at 4x through
+                the game's own `_shoot`, then hides one child of the diorama at
+                a time and re-shoots. It is what found r279 — one 4-vertex quad
+                owning 82% of the frame and every tree, rock and bush at 0.0%.
+                `dioparts` cannot stand in for it: that measures the BAY, which
+                is a different camera at a different distance.
+- `iconrig.mjs` / `iconflat.mjs` the icon camera's own position, aim and pitch,
+                and every forest part's LOCAL ROTATION beside its WORLD BOX.
+                The pair exists because those two disagreed, and the
+                disagreement was the bug: `_diorama`'s second mount rebuilt
+                meshes from geometry alone and dropped their transforms.
+- `iconaim.mjs` / `iconaim2.mjs` candidate icon rigs rendered as a contact
+                sheet with the horizon's clip-space position printed on each.
+                `hNdc >= 1` means the horizon is off the top of the frame and
+                the shot CANNOT show a skyline — the shipped rig is 1.13.
+- `iconwho.mjs` geometry type, local rotation, material colour and blending for
+                every diorama part, plus the icon re-shot with each of the
+                first few hidden. Names a part when a diff says "this one" and
+                the index alone is not enough.
+- `shelfshot.mjs` the garage tab at phone width, so the icons get judged at the
+                148 px they are drawn at rather than the 4x a probe prefers.
+- `wallshare.mjs` how much of a race frame is wall within 45 u, and how much is
+                sky, over a driven lap. The wall number counts the road and so
+                runs ~50% everywhere; SKY is the column that ranks enclosure —
+                L4 and L10 at 22%, CAPE OLIVETO 11%, GRANITE NARROWS 10%,
+                GLACIER COL 3%.
 - `massifloom.mjs` how many DEGREES of sky the nearest massif cone fills from
                 each road station. The builder's own clearance rule is a
                 footprint rule, so it can pass while a 258 u mountain stands 42 u

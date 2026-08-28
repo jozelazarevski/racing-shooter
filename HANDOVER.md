@@ -3834,3 +3834,63 @@ asked r 340-600 and got 422-587, L66 asked 400-700 and got 497-697, L67 asked
 Gates: `loomsweep.mjs` (new) over every level that builds a massif — no cone
 leans over a road anywhere on the roster, and no ring lost a cone to the fix.
 `conering.mjs` (new) over the same set — no cone walked out of the world.
+
+## r279 — THE CARDS WERE A CAR ON A GREEN SCREEN, AND THEY LITERALLY WERE
+Reported with a screenshot of the car shelf: each card is a vehicle pasted on a
+flat green field with a brown smear behind it and the tan trail sliced into two
+corner wedges. r276 framed these icons from the car and r264-r277 built the
+rally-trail diorama they are shot against, so "the background is doing nothing"
+should not have been possible.
+
+`iconparts.mjs` (new: shoot the icon at 4x through the game's own `_shoot`,
+then hide one child of the forest at a time and re-shoot) put a number on it.
+ONE 4-VERTEX QUAD OWNED 82.4% OF THE ICON. Every tree, every rock, every bush,
+the dapple gobo, the trail — all 0.0%. The diorama was not weak in the frame,
+it was ABSENT from it.
+
+The quad measured 420 x 420 x 0 in world space: an UPRIGHT plane standing at
+the origin, in `#4f8a35`, which is `F.grass`. But `_diorama` plainly writes
+`ground.rotation.x = -Math.PI / 2`. Three readings, no two agreeing, and the
+next hour went on probe archaeology — two probes disagreeing about the same
+object because one of them had asked `_studio()` for a different size. They
+had not; the studio is cached and both got the same scene. The disagreement was
+real and the source was innocent, because the object being measured was never
+the object the source built.
+
+BUILT ONCE, MOUNTED TWICE — AND THE SECOND MOUNT DROPPED EVERY TRANSFORM.
+`_diorama` cached `[geometry, material]` pairs in `__dioParts` and remounted
+them as `new THREE.Mesh(geo, mat)`, carrying `receiveShadow` and `renderOrder`
+across and nothing else. Most of the diorama is welded, so most of it has its
+placement baked into its vertices and survived. Five things do not:
+
+  - the ground plane lost `rotation.x = -PI/2` and stood UP as a 420 x 420
+    green wall through the origin — the green screen, exactly,
+  - the painted far treeline lost `position.y = 26` and sank into the floor,
+  - the trail, the dapple gobo and the dome lost theirs with them.
+
+The bay takes the first mount and the studio takes the second, so the bay
+looked right and every card was shot against a wall. `bayblack` could not catch
+it: it asks whether the backdrop is lit and sealed, and a green wall is both.
+
+The fix is to cache the GROUP and hand out `Object3D.clone()`. Clone copies
+transforms, `visible`, `receiveShadow` and `renderOrder`, and shares geometry
+and material by reference — which is the entire saving the parts list was
+after, without the part it got wrong. Every caller gets a clone, the first
+included, so no one holds the template and one mount cannot hide the other by
+toggling `visible`.
+
+After: ground 43.9% (as a FLOOR), dapple gobo 24.6%, bushes 12.1%, rocks 7.5%,
+tufts 5.1%, trunks 3.6%, trail 3.5%. The card is a photograph of a car on a
+rally trail, which is what the last thirteen rounds were building.
+
+WHAT THE DETOUR WAS WORTH KEEPING. Before the cause was found, `iconaim.mjs`
+swept the rig looking for a framing that would show the wood, and its finding
+stands on its own: the shipped icon camera tilts 16.8 degrees down against a
+15 degree half-FOV, so the horizon sits at ndc 1.13 — OFF THE TOP OF THE FRAME.
+Raising the aim barely moves it, because `_fitDist` pushes the lens back as the
+aim rises and lifts the eye by almost as much. That was true before this fix
+and is still true after: the icons show no sky. It is survivable now that the
+ground is a floor with a wood standing on it, and it is the thing to reach for
+if these ever want a skyline.
+
+Gates: `iconparts` on the shelf rig.

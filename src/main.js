@@ -5146,16 +5146,30 @@ class Game {
     // behind it are the expensive half — four canvas textures and about seven
     // thousand welded triangles — and those are shared. Without this the
     // garage pays for two identical forests.
-    if (this.__dioParts) {
-      const g2 = new THREE.Group();
-      for (const [geo, mat] of this.__dioParts) {
-        const m = new THREE.Mesh(geo, mat);
-        m.receiveShadow = mat.__diorRecv !== false;
-        m.renderOrder = mat.__diorOrder ?? 0;
-        g2.add(m);
-      }
-      return g2;
-    }
+    //
+    // IT MUST BE A CLONE, NOT A PARTS LIST. This used to keep `[geometry,
+    // material]` pairs and remount them as `new THREE.Mesh(geo, mat)`, which
+    // silently DROPPED every transform that lives on the Object3D instead of
+    // in the vertices. Most of this diorama is welded, so most of it survived
+    // that and the loss was invisible in the bay — but five things carry their
+    // placement on the mesh, and all five broke in the second mount:
+    //
+    //   - the ground plane lost `rotation.x = -PI/2` and stood UP as a
+    //     420 x 420 green wall through the origin,
+    //   - the painted far treeline lost `position.y = 26` and sank into it,
+    //   - the trail, the dapple gobo and the dome lost theirs with them.
+    //
+    // The studio takes the second mount, so that wall is what every car shelf
+    // icon was shot against: measured at 82% of the frame, with every tree,
+    // rock and bush in the diorama contributing 0%. Reported as cards that
+    // look like a car on a green screen, and that is exactly what they were.
+    //
+    // `Object3D.clone()` copies transforms, `visible`, `receiveShadow` and
+    // `renderOrder`, and shares geometry and material BY REFERENCE — which is
+    // the whole saving the parts list was after, without the part it got
+    // wrong. Every caller gets a clone, including the first, so no one holds
+    // the template and one mount cannot hide the other by toggling `visible`.
+    if (this.__dio) return this.__dio.clone();
     const F = { trunk: 0x6b4423, low: 0x2c6e2a, mid: 0x347a2f, top: 0x3c8a34,
       grass: 0x4f8a35, dirt: 0x9c7a48, rut: 0x86663a, rock: 0x8d8578, bush: 0x2f7a30,
       moss: 0x4c7f33 };
@@ -5531,15 +5545,11 @@ class Game {
       m.receiveShadow = true;
       g.add(m);
     }
-    // remember what was built, so the second scene mounts the same parts
-    this.__dioParts = [];
-    g.traverse((o) => {
-      if (!o.isMesh) return;
-      o.material.__diorRecv = o.receiveShadow;
-      o.material.__diorOrder = o.renderOrder;
-      this.__dioParts.push([o.geometry, o.material]);
-    });
-    return g;
+    // remember what was built, so the second scene mounts the same forest —
+    // see the note at the top of this method for why this is the whole group
+    // and not a list of its geometries
+    this.__dio = g;
+    return g.clone();
   }
 
   /** THE SWEEP BEHIND EVERY STUDIO PICTURE.
