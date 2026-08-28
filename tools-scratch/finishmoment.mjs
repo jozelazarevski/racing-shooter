@@ -23,40 +23,33 @@ const r1 = await p.evaluate(async () => {
   for (let i = 0; i < 900 && g.state !== 'race'; i++) await f();
   if (g.state !== 'race') throw new Error('race never started');
   for (const e of g.enemies ?? []) { e.lap = 1; e.trackIndex = 0; }   // player wins
+  // ARM THE WALL-CLOCK CHECKS BEFORE THE FRAME CHECKS. Under swiftshader a
+  // rAF frame is ~500 ms, so "wait 10 frames then look" is five SECONDS of
+  // wall time — the first cut of this probe read the results card after both
+  // timer windows had passed and called the stretched window a failure.
+  // setTimeout shares the clock finishRace's own setTimeout runs on, so these
+  // two reads land inside and after the 2.6 s window regardless of frame rate.
+  const timing = { at1p9: null, at3p4: null };
+  const hidden = () => document.getElementById('results').classList.contains('hidden');
+  setTimeout(() => { timing.at1p9 = hidden(); }, 1900);
+  const done = new Promise((res) => setTimeout(() => { timing.at3p4 = hidden(); res(); }, 3400));
   pl.lap = g.lapsTotal + 1;              // the real onLap branch calls finishRace
   g.onPlayerLap();
-  if (g.state !== 'finished') {
-    // fall back to the direct call if the lap hook is named differently —
-    // but SAY so, because then the lap path went untested
-    g.finishRace();
-    if (g.state !== 'finished') throw new Error('finishRace did not finish the race');
-    console.warn('lap hook not found; called finishRace directly');
-  }
-  const banner = document.getElementById(
-    [...document.querySelectorAll('[id]')].find((el) => el.classList?.contains('pop'))?.id ?? '') ;
-  const center = document.querySelector('.center-msg, #center-msg');
+  if (g.state !== 'finished') throw new Error('the lap path did not finish the race');
+  const center = document.querySelector('#center-msg');
   const life = g.particles.life;
   const live0 = [...life].filter((v) => v > 0).length;
-  for (let i = 0; i < 10; i++) await f();
+  for (let i = 0; i < 4; i++) await f();
   const live1 = [...life].filter((v) => v > 0).length;
+  await done;
   return { rank: g.playerRank, fest: +(g._festT ?? 0).toFixed(2),
-    hitStop: +g.hitStop.toFixed(2),
-    centerText: (center?.textContent ?? banner?.textContent ?? '').trim(),
-    live0, live1,
-    resultsHidden: document.getElementById('results').classList.contains('hidden') };
+    centerText: (center?.textContent ?? '').trim(), live0, live1,
+    hiddenAt1p9: timing.at1p9, hiddenAt3p4: timing.at3p4 };
 });
 console.log(JSON.stringify(r1));
 await p.screenshot({ path: 'tools-scratch/shot-finish-moment.png' });
-const r2 = await p.evaluate(async () => {
-  await new Promise((r) => setTimeout(r, 1900));
-  const midHidden = document.getElementById('results').classList.contains('hidden');
-  await new Promise((r) => setTimeout(r, 1100));
-  return { hiddenAt1p9: midHidden,
-    hiddenAt3s: document.getElementById('results').classList.contains('hidden') };
-});
-console.log(JSON.stringify(r2));
-const ok = r1.rank === 1 && r1.fest > 0 && r1.live1 > r1.live0 + 20
-  && r2.hiddenAt1p9 && !r2.hiddenAt3s;
+const ok = r1.rank === 1 && /WIN/.test(r1.centerText) && r1.live1 > r1.live0 + 20
+  && r1.hiddenAt1p9 === true && r1.hiddenAt3p4 === false;
 console.log(ok ? 'PASS: banner, confetti and the stretched podium window all ran'
   : 'FAIL: some part of the moment did not run');
 await b.close();
