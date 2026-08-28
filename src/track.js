@@ -23272,12 +23272,28 @@ export class Track {
       // Fade the last stretch of each tail to nothing. The reach now runs well
       // past the fog, but a hard-edged rectangle of water is the exact thing
       // that reads as "the river stops here" if one ever does come into view.
-      (f) => Math.min(smoothstep01(f.t / 0.06), smoothstep01((1 - f.t) / 0.06)),
+      //
+      // ...AND THE EDGES GO SOFT TOO. Photographed at OULTON PARK's ford: the
+      // water met the land as a razor line, a sheet of plastic laid on the
+      // field. The helper already hands the column index over, and columns 0
+      // and 3 ARE the banks — thinning to 0.35 there lets the bed and bank
+      // show through the margin, which is what a real water's edge is.
+      (f, c, C) => Math.min(smoothstep01(f.t / 0.06), smoothstep01((1 - f.t) / 0.06))
+        * (c === 0 || c === C - 1 ? 0.35 : 1),
       wf,
     );
+    // WATER WEARS THE WORLD'S SKY. The texture is one saturated mid-blue for
+    // every world, and at OULTON PARK's ford it read as poured plastic — the
+    // only pure blue in a frame of copper and haze, exactly the fault the
+    // hedge had with the foliage palette. A river is mostly reflected sky, so
+    // the material tint comes from the theme's own horizon (skyHorizon, the
+    // colour the water would actually mirror at these grazing angles), pulled
+    // 45% toward white so the texture's own shading still reads. Blue worlds
+    // stay blue — their horizons are blue.
+    const skyTint = new THREE.Color(this.T.skyHorizon ?? '#bcd6e8').lerp(new THREE.Color(1, 1, 1), 0.45);
     const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({
-      map: waterTex, roughness: 0.18, metalness: 0.06, side: THREE.DoubleSide,
-      transparent: true, opacity: 0.9, vertexColors: true, depthWrite: false,
+      map: waterTex, color: skyTint, roughness: 0.18, metalness: 0.06, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.82, vertexColors: true, depthWrite: false,
     }));
     water.name = 'river-water';
     water.renderOrder = 1;

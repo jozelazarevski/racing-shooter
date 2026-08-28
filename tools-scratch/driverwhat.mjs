@@ -39,6 +39,28 @@ const r = await p.evaluate(async () => {
     for (let i = half; i < d.length; i += 4) { t++;
       if (d[i] + d[i + 1] + d[i + 2] < 60) n++; }
     return n / t; };
+  // NOISE FLOOR OR NOTHING. The pinned run still reported 59-87% diffs for
+  // EVERY candidate — including a hood part that is already invisible in the
+  // seat, whose removal cannot change one pixel. Something global was moving
+  // between grabs (the head surge decaying, clouds, any time-based material),
+  // so the frame must first be proven STILL: two grabs with nothing changed
+  // must differ under 2% before any candidate is measured, and the control is
+  // reported so a noisy run reads as noisy instead of as findings.
+  const rawDiff = (a, d) => { let n = 0, t = 0;
+    for (let i = half; i < d.length; i += 4) { t++;
+      if (Math.abs(d[i] - a[i]) + Math.abs(d[i + 1] - a[i + 1])
+        + Math.abs(d[i + 2] - a[i + 2]) > 18) n++; }
+    return 100 * n / t; };
+  let control = 100, settle = 0;
+  let g0 = grab();
+  for (; settle < 40 && control > 2; settle++) {
+    pin(); await f();
+    const g1 = grab();
+    control = rawDiff(g0, g1);
+    g0 = g1;
+  }
+  if (control > 2) throw new Error(
+    'frame never went still: control diff ' + control.toFixed(1) + '% after ' + settle + ' frames');
   pin(); await f();
   const base = grab();
   const cands = [
@@ -62,7 +84,8 @@ const r = await p.evaluate(async () => {
   }
   await f();
   const rig = pl.mesh?.userData?.rig ?? null;
-  return { darkLower: +(100 * darkShare(base)).toFixed(1),
+  return { control: +control.toFixed(2), settleFrames: settle,
+    darkLower: +(100 * darkShare(base)).toFixed(1),
     eye: g.camera.position.toArray().map((v) => +v.toFixed(2)),
     carY: +pl.pos.y.toFixed(2), heading: +pl.heading.toFixed(2),
     camYaw: +Math.atan2(g.camera.getWorldDirection(new (Object.getPrototypeOf(g.camera.position).constructor)()).x,
