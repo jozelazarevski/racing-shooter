@@ -9569,7 +9569,27 @@ export class Track {
     // Guarded index — a negative `j % N` would read undefined and Math.min it
     // to NaN, and every NaN comparison downstream is false.
     if (this._cliffCap) {
-      base = Math.min(base, this._cliffCap[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)]);
+      const cap = this._cliffCap[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)];
+      if (cap < base) {
+        // A PINCHED WALL YIELDS HEIGHT, NOT JUST GROUND. The cap pulls the
+        // face in wherever the lap comes back past itself — to 11.3 u on
+        // sixteen stations of CANYON RUN, and across long stretches of LAGUNA
+        // SECA's corkscrew — and the wall kept its FULL height there: a 30 u
+        // face 2.9 u from the camera's own clamp limit. Photographed on
+        // r281 · LAGUNA SECA as a frame that is nothing but banded rock, the
+        // car invisible inside it. A wall standing where the cap bites is a
+        // leg pinched against its own neighbour, and what that looks like in
+        // a real doubled-back canyon is a LOW SPINE between the two roads —
+        // so the height falls with the squeeze: full height where the cap
+        // just grazes, down to the 1.7 u berm floor where the face is pulled
+        // right to the verge. You see the next leg over it, which is also
+        // the honest geometry.
+        const nominal = WALL_OFF + 0.65 + (this.T.cliffSetback ?? 0);
+        const squeeze = THREE.MathUtils.clamp(
+          (cap - (WALL_OFF + 1.4)) / Math.max(1, nominal - (WALL_OFF + 1.4)), 0, 1);
+        h = Math.max(1.7, h * squeeze * squeeze);
+        base = cap;
+      }
     }
     const l1 = 0.85 + 0.5 * Math.sin(17 * t + 0.7 - ph);   // mid-face lean
     const l2 = 2.0 + 0.85 * Math.sin(13 * t + 2.9 + ph) + 0.4 * Math.sin(47 * t - ph);

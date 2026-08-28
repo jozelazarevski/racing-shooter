@@ -33,7 +33,13 @@ const worst = await p.evaluate(() => {
   }
   return best;
 });
-if (process.env.STATION) worst.i = +process.env.STATION;
+if (process.env.STATION) {
+  const st = +process.env.STATION;
+  // an absolute index, never a fraction — 0.35 once indexed center[0.35] and
+  // crashed both halves of an A/B
+  if (!Number.isInteger(st) || st < 0) throw new Error('STATION must be a whole station index, got ' + process.env.STATION);
+  worst.i = st;
+}
 console.log(JSON.stringify(worst));
 await p.evaluate(async ([idx, cam]) => {
   const g = window.__game, t = g.track, pl = g.player;
