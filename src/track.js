@@ -162,6 +162,13 @@ export const LEVELS = [
     cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
   { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
     cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0,
+      // HALF THE WALLS, asked for directly off a screenshot: the farmland
+      // hedge ran both verges nearly unbroken and this is a PARK, not a
+      // sunken lane. coverage 0.5 opens roughly every other field-length of
+      // verge (see _buildHedgeBanks); the tune merge is shallow, so the whole
+      // spec is restated with the theme's own numbers.
+      hedgeBanks: { lateral: 13.6, bankH: 1.9, bankW: 2.4, hedgeH: 2.3, bay: 6.2,
+        max: 640, coverage: 0.5 },
       // AUTUMN: copper woods under a low golden sun
       foliageLow: 0x9a5a20, foliageTop: 0xc8842c,
       foliage: { h: 0.07, hVar: 0.04, s: 0.62, sVar: 0.15, l: 0.36, lVar: 0.12 },
@@ -12062,9 +12069,22 @@ export class Track {
     // never going to touch.
     const verge = [...this.props, ...this.tireStacks].filter(
       (v) => Math.abs(this._distToTrack(v.x, v.z) - LAT) < W * 0.5 + (v.r ?? 1.2));
+    // COVERAGE, IN SECTIONS. `coverage: 0.5` on a level's spec keeps roughly
+    // half the run — dropped as whole ~9-bay sections (about 60 u of verge at
+    // a time), never as alternating bays: a hedge with every other bay missing
+    // is picket teeth, a hedge that comes and goes by the field is how a real
+    // parkland circuit is walled. Seeded on the section index so the same
+    // world always opens the same fields. Both sides drop together — a section
+    // hedged on one side only reads as a mistake, not a field.
+    const cov = S.coverage ?? 1;
+    const secHash = (n) => {
+      const v = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+      return v - Math.floor(v);
+    };
     let k = 0, bay = 0;
     for (let i = 0; i < N && k < MAX; i += step) {
       if (this._circDist(i, 0) < 34) continue;                    // start grid + gate
+      if (cov < 1 && secHash(Math.floor(i / (step * 9))) > cov) continue;
       if (this._nearGorge(i, 40)) continue;
       // streams wash across the lane; the bank opens for them on both sides
       if (this.fords.some((f) => this._circDist(i, f.i) < f.half / this.segLen + 5)) continue;
