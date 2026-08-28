@@ -497,6 +497,42 @@ enclose everything.)
 - `loomshot.mjs` measures the worst station then parks there and photographs it,
                 so the number and the picture are the same event
                 (`LEVEL=66 STATION=895 TAG=-x`).
+- `glacierloom.mjs` the same two numbers for the GLACIER, per slab: the gap
+                from the drawn flank to the nearest centreline sample, and the
+                degrees of sky the slab's top subtends there. It reads the
+                InstancedMesh named `glacier` and its geometry — those slabs
+                are NOT in `solids`, so a probe reading that roster finds no
+                glacier at all and reports clean. FAILS LOUDLY when it cannot
+                find the mesh. FURKA RIDGE 197 u / 12.4 deg, GLACIER COL
+                330 u / 25.8 deg.
+- `glacierforce.mjs` the glacier's clearance walk, FORCED. The tongue is
+                nowhere near either furka lap, so the walk never runs there and
+                a green run against the roster proves nothing (the `shrinkpath`
+                lesson). This translates the whole centreline onto the tongue's
+                wedge, rebuilds the sample grid, calls `_buildGlacier` again and
+                reads the new matrices. `walked` is the gate on the gate.
+- `glacshot.mjs` measures the worst slab that is actually AHEAD of the car, then
+                parks at that station and photographs it (`LEVEL=66 TAG=-before`),
+                and reports what SHARE of that frame the ice draws — hide the
+                mesh, render again, diff — because "no slab leans over the road"
+                is also what deleting the glacier would report. Render through
+                `g.composer`, not `renderer.render`: the latter leaves the last
+                pass's target bound, nothing reaches the default framebuffer and
+                readPixels hands back the same stale bytes twice (0.00%). And
+                pick the station with the CAMERA's half-angle (~18 deg
+                horizontal on a portrait 56 deg vertical fov), not a roomy
+                cone: at 45 deg "ahead" every slab projected past ndc x = 2.4,
+                off the side of the picture, and the pale ice in that frame was
+                the horizon ring, not the glacier at all.
+- `glacpix.mjs`  settles "is the ice actually in this frame" three ways at one
+                station: readPixels after a composer render (is the buffer even
+                populated), the instance matrices projected through the live
+                camera (how many slabs land inside the frustum, and where), and
+                a screenshot with the mesh hidden written beside the normal one.
+- `roadreach.mjs` how far the lap gets from the WORLD ORIGIN, overall and inside
+                the wedge the glacier's ring occupies. The glacier is placed in
+                origin coordinates, so whether it clears the road is a fact
+                about the route: FURKA RIDGE reaches r 318, GLACIER COL r 271.
 - `whatsinfront.mjs` names the thing filling the frame by elimination: hides one
                 scene child at a time, diffs the pixels, then descends into the
                 winner. Sanity-check its answer - at L67 station 450 it

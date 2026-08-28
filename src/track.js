@@ -12851,6 +12851,25 @@ export class Track {
     return mx.map((v) => v / base);
   }
 
+  /** How far out is this form DRAWN, scaled by `sx` and `sz`?
+   *
+   *  A crag is not a unit cylinder: `_mountainGeo` stretches the footprint
+   *  (`elong`) and the crag jitter pushes it further, so this geometry reaches
+   *  0.72 of the scale it is composed with, not the 0.5 a box would. Anything
+   *  that has to stand a form CLEAR of something else needs the drawn number,
+   *  and like `_formProfile` it is read off the geometry rather than assumed —
+   *  no formula describes a heightfield with spurs and gullies. Yaw does not
+   *  enter it: a rotation about y cannot change a distance from the axis. */
+  _flankRadius(geo, sx, sz) {
+    const p = geo.attributes.position;
+    let mx = 0;
+    for (let i = 0; i < p.count; i++) {
+      const r = Math.hypot(p.getX(i) * sx, p.getZ(i) * sz);
+      if (r > mx) mx = r;
+    }
+    return mx;
+  }
+
   _buildMassif(m4) {
     const M = this.T.massif;
     const geo = this._cragGeo();
@@ -13081,16 +13100,129 @@ export class Track {
     const col = new THREE.Color();
     // the tongue pours down a north-west flank towards the road
     const a0 = -2.25;
+    // AND THE ICE MUST NOT STAND ON THE ROAD EITHER — the massif's rule, in
+    // the massif's terms: clearance is the taller of a FOOTPRINT (the drawn
+    // flank, plus the carriageway and 24 u) and a LOOM (a flank standing back
+    // `LOOM` times what it rears above the road). This ring is struck from
+    // the WORLD ORIGIN at a fixed azimuth and never asks where the lap went,
+    // which is exactly the blindness that planted a massif cone across 62
+    // stations of carriageway on FURKA RIDGE. A slab is worse when it happens:
+    // 210 u wide, and nothing pushes it into `solids`, so the car drives
+    // through the ice rather than into it.
+    //
+    // MEASURED FIRST, on both levels the theme reaches (`glacierloom`, which
+    // reads the instance matrices — a probe that reads `solids` finds no
+    // glacier at all and reports clean). FURKA RIDGE: closest flank 197 u
+    // clear, worst slab 12.4 degrees of sky. GLACIER COL: 330 u, 25.8 degrees.
+    // Neither is anywhere near the massif's 41 degree limit, so THIS RULE
+    // MOVES NOTHING ON THE SHIPPED ROSTER and is recorded as a guard, not as a
+    // repair. What it guards is real: that clearance is an accident of two
+    // route tables. The ring is struck in ORIGIN coordinates, so whether it
+    // clears the lap is a fact about the ROUTE, and the editor's LOOK wears a
+    // whole theme — `glacier: true` with it — on any route in the game.
+    // Measured (`roadreach`): FURKA RIDGE's lap reaches r 318 from the origin
+    // and GLACIER COL's r 271, against a near ice edge at r 560 - 152 = 408.
+    // Ninety units on the bigger of the two, held by nothing at all.
+    const LOOM = 1.15;                                 // <= ~41 degrees of sky
+    // Where this form's crest sits inside the composed slab, read off the
+    // geometry: the mesh is anchored at 0.32 h (see the note by `gy` below)
+    // and reaches `gTop` of its own scale above its centre, so the ice tops
+    // out at ground + h * CREST.
+    let gTop = 0;
+    {
+      const py = geo.attributes.position;
+      for (let i = 0; i < py.count; i++) if (py.getY(i) > gTop) gTop = py.getY(i);
+    }
+    const CREST = 0.32 + gTop;
     for (let k = 0; k < 14; k++) {
       const t = k / 13;
       const r = 560 + t * 320;
       const a = a0 + (t - 0.5) * 0.34 + (k % 2 ? 0.05 : -0.05);
-      const w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
+      let w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
       q.setFromAxisAngle(up, a + 1.2);
-      const gx = Math.cos(a) * r, gz = Math.sin(a) * r;
+      let gx = Math.cos(a) * r, gz = Math.sin(a) * r;
+      // The massif spends `w * 0.5` here, which is what a BOX would reach.
+      // This form reaches 0.72 of its scale and the slab is scaled unevenly
+      // (w by d), so the flank is measured rather than halved — on the widest
+      // slab that is 152 u of ice against the 105 the massif's arithmetic
+      // would have claimed, and the difference is all road.
+      let flank = this._flankRadius(geo, w, d);
+      // THE STATION IT CROWDS WORST, AND THE HEIGHT ABOVE THAT ROAD. Two
+      // departures from the massif's loop. Transcribed literally it left one
+      // slab standing at 41.7 degrees while reporting its own clearance
+      // satisfied — caught by `glacierforce`, which drives the lap under the
+      // ice on purpose, because nothing on the shipped roster executes this
+      // code and an unexecuted branch is where the mistake lives (that is the
+      // `shrinkpath` lesson, and it cost r278 two of them).
+      //   - The loom is measured against `h`, the form's own height, and ice
+      //     does not stand on the carriageway's datum. Out on the ring the
+      //     ground is already above the road, and that rise is sky over the
+      //     driver exactly as the slab's own height is: 27 u of it in the
+      //     forced case, which is the whole 41.7.
+      //   - And the walk steps away from the NEAREST sample, which need not be
+      //     the station that sees the most sky — a farther one, lower in the
+      //     valley, can beat it. Scanning the lap for the worst offender is
+      //     what makes "no station sees more than 41 degrees" a property of
+      //     the loop instead of a hope. It costs one pass over 900 samples per
+      //     slab at build time, and everywhere on the roster that pass finds
+      //     nothing and the walk exits on it.
+      const crowd = () => {
+        const cy = this.terrainHeight(gx, gz) + h * CREST;
+        let bi = -1, over = 0, bd = 0;
+        for (let i = 0; i < this.N; i++) {
+          const c = this.center[i];
+          const dd = Math.hypot(gx - c.x, gz - c.z);
+          const need = flank
+            + Math.max((this.widthAt?.(i) ?? 9) + 24, (cy - c.y) * LOOM);
+          if (need - dd > over) { over = need - dd; bi = i; bd = dd; }
+        }
+        return { i: bi, over, d: bd };
+      };
+      // Walk it out of the way, away from the station it crowds worst, which
+      // is the shortest way clear; a few passes because stepping off one leg
+      // of a lap can walk onto another.
+      for (let pass = 0; pass < 8; pass++) {
+        const s = crowd();
+        if (s.i < 0) break;                       // clear of every station
+        const c = this.center[s.i];
+        let ox = gx - c.x, oz = gz - c.z;
+        const ol = Math.hypot(ox, oz);
+        if (ol < 1e-3) {                 // dead centre: leave along the ring
+          const rr = Math.hypot(gx, gz) || 1;
+          ox = gx / rr; oz = gz / rr;
+        } else { ox /= ol; oz /= ol; }
+        gx += ox * (s.over + 4); gz += oz * (s.over + 4);
+      }
+      // Still crowding after eight passes means the lap encircles this spot.
+      // Shrink IN PROPORTION — one scale for the whole slab, so a squeezed
+      // step of the icefall is a smaller step and not a shard — solving both
+      // rules at the binding station at once. The ground it stands on does
+      // NOT shrink with it, which is why the rise carries its own term. A
+      // couple of rounds because satisfying one station can hand the job to
+      // another; below a slab's worth of ice it is a chip on a hillside, so
+      // drop it out of sight rather than leave litter on the skyline.
+      let gone = false;
+      for (let s = 0; s < 3 && !gone; s++) {
+        const fin = crowd();
+        if (fin.i < 0) break;
+        const c = this.center[fin.i];
+        const road = (this.widthAt?.(fin.i) ?? 9) + 24;
+        const rise = this.terrainHeight(gx, gz) - c.y;
+        const fit = Math.max(0, Math.min(
+          (fin.d - road) / flank,
+          (fin.d - rise * LOOM) / (flank + h * CREST * LOOM)));
+        w *= fit; d *= fit; h *= fit; flank *= fit;
+        gone = w < 40;
+      }
+      if (gone) {
+        m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
+        slabs.setMatrixAt(k, m4);
+        continue;
+      }
       // seated ON the ground it stands on — the old constant-datum placement
       // buried most of each slab wherever the valley floor dropped, and what
-      // poked out was the boxy top
+      // poked out was the boxy top. Read AFTER the walk: the ground under
+      // where it ended up is the only ground it can stand on.
       const gy = this.terrainHeight(gx, gz);
       // the crag geometry is CENTRED (the massif composes it at y + h/2); the
       // box it replaces had its base at the origin — anchor accordingly, or
