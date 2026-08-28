@@ -35,12 +35,14 @@ const worst = await p.evaluate(() => {
 });
 if (process.env.STATION) worst.i = +process.env.STATION;
 console.log(JSON.stringify(worst));
-await p.evaluate(async (idx) => {
+await p.evaluate(async ([idx, cam]) => {
   const g = window.__game, t = g.track, pl = g.player;
   g.startRace?.();
   const f = () => new Promise((r) => requestAnimationFrame(r));
   for (let i = 0; i < 600 && g.state !== 'race'; i++) await f();
-  while (g.camMode !== 3) g.cycleCamera();
+  const want = cam;
+  for (let i = 0; i < 12 && g.camMode !== want; i++) g.cycleCamera();
+  if (g.camMode !== want) throw new Error('camera mode never reached');
   for (let i = 0; i < 30; i++) {
     const c = t.pointAt(idx, 0);
     pl.heading = t.headingAt(idx); pl.pos.x = c.x; pl.pos.z = c.z;
@@ -48,7 +50,7 @@ await p.evaluate(async (idx) => {
     pl.trackIndex = idx; pl.vel.copy(pl.forward).multiplyScalar(14); pl.vy = 0; pl.airborne = false;
     await f();
   }
-}, worst.i);
+}, [worst.i, +(process.env.CAM ?? 3)]);
 writeFileSync(`tools-scratch/shot-loom${LV}${process.env.TAG ?? ''}.png`, await p.screenshot());
 console.log(`wrote tools-scratch/shot-loom${LV}${process.env.TAG ?? ''}.png`);
 await b.close();
