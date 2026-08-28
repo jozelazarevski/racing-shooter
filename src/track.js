@@ -4239,15 +4239,25 @@ const THEMES = {
       fringe: [150, 100, 44], fringeVar: [44, 34, 20],
     },
     hillColor: 0x6a5a30, peakColor: 0x8a7a52,
-    treeCount: 950, trunkColor: 0x5a4028,
+    // A THICK WOOD, asked for directly. 950 over a 10.4-52 belt is a wood you
+    // see THROUGH — the eye finds the field beyond it between the trunks, and
+    // a copper canopy only reads as a season when it closes over the road.
+    // 1650 on a belt that starts 0.9 u nearer the verge and runs half as deep
+    // again puts trunks at every depth instead of one screen of them, so the
+    // far ones fill the gaps the near ones leave. Density, not distance: the
+    // belt is deliberately NOT pushed further out, because a wood you cannot
+    // reach the edge of is what "thick" means here.
+    treeCount: 1650, trunkColor: 0x5a4028,
     foliageLow: 0x9a4a1c, foliageTop: 0xd8922c,
     // amber centre, wide hue band: 0.055 -> 0.125 is rust through to gold, and
     // the species shifts push birch past that and larch back under it
     foliage: { h: 0.055, hVar: 0.07, s: 0.72, sVar: 0.14, l: 0.40, lVar: 0.13 },
     treeSnowCap: false,
-    treeBelt: [10.4, 52],
+    treeBelt: [9.5, 78],
     tuftCount: 720, grass: { bladeA: '#9a7a3a', bladeB: '#c8a656' },
-    bushCount: 420, bushColor: 0x8a4a22,
+    // undergrowth to match — bare trunks over clean ground is a plantation,
+    // and the thing being asked for is a wood
+    bushCount: 760, bushColor: 0x8a4a22,
     bush: { h: 0.06, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.3, lVar: 0.1 },
     rockCount: 220, pebbleCount: 250, rockColor: 0x6e6658, rockSnowCap: false,
     flowerCount: 120, flowerColors: ['#c8442a', '#e8a83a', '#f0e0c0'],   // hips and haws
@@ -4338,6 +4348,9 @@ const THEMES = {
       fringe: [128, 92, 46], fringeVar: [36, 28, 18],
     },
     hillColor: 0x5a4a34, peakColor: 0x807868,
+    // NOT thickened with the wood: this is a bracken moor and its whole point
+    // is that you can see across it. The leaf fall below carries the season
+    // here instead.
     treeCount: 260, trunkColor: 0x4a3826,                // barely wooded
     foliageLow: 0x8a4a1c, foliageTop: 0xc07c28,
     foliage: { h: 0.045, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.34, lVar: 0.1 },
