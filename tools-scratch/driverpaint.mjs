@@ -12,14 +12,15 @@ p.setDefaultTimeout(600000);
 await p.goto(`http://localhost:${PORT}/?level=${process.env.LEVEL ?? 1}&go=1&unlockall=1`,
   { waitUntil:'load', timeout:600000 });
 await p.waitForFunction(() => window.__game?.track?.center && window.__game.player, undefined, { timeout:600000 });
-await p.evaluate(async () => {
+await p.evaluate(async (clean) => {
   const g = window.__game, pl = g.player;
   g.startRace?.();
   const f = () => new Promise((r) => requestAnimationFrame(r));
   for (let i = 0; i < 900 && g.state !== 'race'; i++) await f();
   for (let i = 0; i < 12 && g.camMode !== 4; i++) g.cycleCamera();
   if (g.camMode !== 4) throw new Error('driver mode never reached');
-  if (process.env.CLEAN) {
+  // `clean` rides in as an argument — the page has no `process`
+  if (clean) {
     for (let i = 0; i < 8; i++) { pl.vel.set(0, 0, 0); await f(); }
     return;
   }
@@ -37,7 +38,7 @@ await p.evaluate(async () => {
     tint(c, 0x00ffff);                               // everything else -> cyan
   });
   for (let i = 0; i < 8; i++) { pl.vel.set(0, 0, 0); await f(); }
-});
+}, !!process.env.CLEAN);
 await p.screenshot({ path: process.env.CLEAN ? 'tools-scratch/shot-driver-after.png' : 'tools-scratch/shot-driverpaint.png' });
 console.log('wrote', process.env.CLEAN ? 'shot-driver-after.png' : 'shot-driverpaint.png');
 await b.close();
