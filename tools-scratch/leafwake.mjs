@@ -23,9 +23,17 @@ for (const [lv, expectWake] of [[68, true], [1, false]]) {
     for (let i = 0; i < 900 && g.state !== 'race'; i++) await f();
     if (g.state !== 'race') throw new Error('race never started');
     if (typeof g.particles.leafKick !== 'function') throw new Error('leafKick missing');
+    // ATTRIBUTE THE CALLS. The first run flagged 40 calls while the player
+    // stood still — the AI grid was driving through the litter beside it, and
+    // their wakes are supposed to fire. Count only kicks whose spawn point is
+    // within 4 u of the PLAYER.
     let calls = 0;
     const orig = g.particles.leafKick.bind(g.particles);
-    g.particles.leafKick = (...a) => { calls++; return orig(...a); };
+    g.particles.leafKick = (...a) => {
+      const fp = a[0];
+      if (fp && Math.hypot(fp.x - pl.pos.x, fp.z - pl.pos.z) < 4) calls++;
+      return orig(...a);
+    };
     // standing still: the wake must be silent
     for (let i = 0; i < 30; i++) { pl.vel.set(0, 0, 0); await f(); }
     const still = calls; calls = 0;
