@@ -7208,6 +7208,20 @@ class Game {
       this.worldLayer.add(spr);
       this.roamStars.push({ x, z, y, spr, got: false });
     }
+    // THE SUMMIT STAR. A goat peak is a destination, and a destination pays:
+    // one big star on the crown, worth four ordinary finds. Roam only — a
+    // mission's stars are its own economy.
+    const G = t._goat;
+    if (G && !mission) {
+      const y = t.terrainHeight(G.x, G.z);
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glow, color: 0xfff1b8, transparent: true, opacity: 0.98,
+        blending: THREE.AdditiveBlending, depthWrite: false }));
+      spr.scale.set(8, 8, 1);
+      spr.position.set(G.x, y + 3.2, G.z);
+      this.worldLayer.add(spr);
+      this.roamStars.push({ x: G.x, z: G.z, y, spr, got: false, summit: true });
+    }
   }
 
   /** Squared distance from (px,pz) to the segment (ax,az)–(bx,bz). Pickups use
@@ -7245,6 +7259,15 @@ class Game {
         s.got = true;
         this.scene.remove(s.spr);
         if (this.missionMode) { this._missionEvent('star', s); continue; } // [MISSIONS]
+        if (s.summit) {
+          this.score += 600;
+          this.hud.centerMsg('⛰ SUMMIT!');
+          this.hud.feed(`⛰ SUMMIT OF ${this.level?.name ?? 'THE PEAK'}  +600`, 'good');
+          this.style?.(120, 'SUMMIT');
+          this.buzz([40, 40, 40, 40, 80]);
+          this.particles.pickupBurst(new THREE.Vector3(s.x, s.y + 2.5, s.z), new THREE.Color(0xfff1b8));
+          continue;
+        }
         this.score += 150;
         this.hud.feed('⭐ TREASURE STAR  +150', 'good');
         this.buzz([25, 30, 45]);

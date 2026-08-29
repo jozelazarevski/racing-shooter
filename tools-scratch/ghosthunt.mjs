@@ -75,6 +75,7 @@ const rows = await page.evaluate(async (only) => {
         const x = pos.x + (o.isInstancedMesh ? 0 : 0), z = pos.z;
         const r = Math.hypot(x, z);
         if (r > 1600 || pos.y < -500) continue;             // behind the rim / parked offstage
+        if (t._inWater?.(x, z)) continue;                   // the sea is the drown system's boundary, not ours
         const gy = t.terrainHeight(x, z);
         const topY = pos.y + (bb.max.y * scl.y);
         if (gy > topY - 3) continue;                        // terrain rises to meet it

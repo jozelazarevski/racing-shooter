@@ -62,7 +62,7 @@ const rows = await page.evaluate(async () => {
         const d = Math.hypot(c.x - s.x, c.z - s.z);
         const rr = s.r + 1.8 + (t.widthAt?.(i) ?? 7) * 0.8;
         if (d >= rr) continue;
-        if (c.y > s.y + s.h) continue; // no lower gate: a mountain has no underside (vehicles.js solids gate)
+        if (c.y < s.y - Math.max(3, Math.min(30, s.h * 0.35)) || c.y > s.y + s.h) continue; // scaled lower pad, mirrors the vehicles.js solids gate
         stations++;
         if (d < minD) { minD = d; atY = c.y; }
       }

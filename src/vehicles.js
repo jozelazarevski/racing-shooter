@@ -1912,8 +1912,17 @@ export class Car {
     // down and is one frame stale, which at 60 Hz is 17 ms and nothing here
     // changes that fast. On the course, in free roam, and for every AI car it
     // is 0, so this is exactly 1 and no rival is ever touched.
-    const climbAuth = ((this._strayed ?? 0) > 0 && terrGrade > OFF_CLIMB)
-      ? Math.max(0, 1 - (terrGrade - OFF_CLIMB) / OFF_FADE) : 1;
+    // ...and the GOAT PEAK is closed outright in a road event. Its route is
+    // BUILT of flats that reset the grade fade — that is what makes it
+    // climbable in roam — so a racer could stair-climb the spiral 46 u in
+    // 30 s past a fade that never saw a slope (measured, test-goat law 1).
+    // Off the course AND on the peak, the engine simply gives nothing;
+    // plain roam publishes _strayed = 0 and never enters this branch.
+    const onGoatRace = (this._strayed ?? 0) > 0
+      && this.game.track?._nearGoat?.(this.pos.x, this.pos.z, 26);
+    const climbAuth = onGoatRace ? 0
+      : ((this._strayed ?? 0) > 0 && terrGrade > OFF_CLIMB)
+        ? Math.max(0, 1 - (terrGrade - OFF_CLIMB) / OFF_FADE) : 1;
 
     // surface conditions: snow and rain-wet worlds drive differently — less
     // brake bite, wheelspin on throttle, and a much earlier, longer slide.
@@ -2592,20 +2601,25 @@ export class Car {
         // rock under a flyover that window is the point.
         if (ob.y !== undefined) {
           if (ob.h !== undefined) {
-            // ...AND A MOUNTAIN HAS NO UNDERSIDE. The lower pad was −3 u,
-            // but a mountain's seat is sampled at the CENTRE of a 100-300 u
-            // footprint, and on sloping ground the flank foot runs 10-30 u
-            // lower — so a car approaching from downhill sat below the pad
-            // and the whole collider was skipped. Measured on SUMMIT CLIMB
-            // in roam: car at y 23.1, 111 u from a horizon hill seated at
-            // y 30 whose radius at that height is 164 — inside the rock,
-            // gate said "under it, ignore". Fifty units of drawn mountain
-            // overhead and the car still climbing terrain noise, reported
-            // as "climbing and sinking in mountains". Nothing legitimate
-            // ever drives BENEATH a seated mountain (bores go through
-            // `_tunnelRidge` terrain, not through these solids), so the
-            // only lower gate a height-carrying solid needs is none.
-            if (this.pos.y > ob.y + ob.h) continue;
+            // ...AND A MOUNTAIN HAS NO UNDERSIDE — IN PROPORTION. The lower
+            // pad was a flat −3 u, but a mountain's seat is sampled at the
+            // CENTRE of a 100-300 u footprint, and on sloping ground the
+            // flank foot runs 10-30 u lower — so a car approaching from
+            // downhill sat below the pad and the whole collider was skipped.
+            // Measured on SUMMIT CLIMB in roam: car at y 23.1, 111 u from a
+            // horizon hill seated at y 30 whose radius at that height is 164
+            // — inside the rock, gate said "under it, ignore". Fifty units
+            // of drawn mountain overhead, reported as "climbing and sinking
+            // in mountains".
+            //
+            // The tolerance scales with the mass, because the seat-vs-flank
+            // error scales with the footprint, which scales with the height:
+            // a 150 u hill earns the full 30 u; a knee-high scatter rock
+            // keeps its old −3, so a verge boulder does not start shoving
+            // cars that ride the roadbed above its toe (GLACIER COL's
+            // grounded-step law caught exactly that at a flat pad of none).
+            if (this.pos.y < ob.y - Math.max(3, Math.min(30, ob.h * 0.35))
+              || this.pos.y > ob.y + ob.h) continue;
           } else if (Math.abs(this.pos.y - ob.y) > 6) continue;
         }
         const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
@@ -3054,6 +3068,16 @@ export class Car {
       if (strayed > 0) {
         const over = Math.min(1, strayed / 30);
         this.vel.multiplyScalar(Math.max(0, 1 - over * 1.2 * dt));
+        // THE PEAK IS CLOSED ON RACE DAY. The goat route's shelves defeat
+        // the climb-authority fade by design — each flat resets the throttle
+        // — so in a road event a racer could stair-climb the spiral 46 u in
+        // 30 s (measured, test-goat law 1). This drag only exists inside
+        // this `strayed > 0` branch, and plain roam publishes _strayed = 0,
+        // so the mountain stays fully climbable in the mode it was built
+        // for and becomes a hill of treacle in a race.
+        if (t._nearGoat?.(this.pos.x, this.pos.z, 26)) {
+          this.vel.multiplyScalar(Math.max(0, 1 - 2.5 * dt));
+        }
         if (over > 0.5 && !this._steepFed) {
           this._steepFed = 1.8;
           this.game.hud?.feed?.('OFF THE COURSE — TURN BACK', 'bad');
@@ -3202,6 +3226,39 @@ export class Car {
       // gap the proportional ease is already inside the cap, so ordinary
       // rolling ground drives exactly as before.
       const lift = VY_CAP * dt;
+      // GROUND RISING FASTER THAN THE CAR CAN CLIMB IS A WALL, NOT A FLOOR.
+      // The lift cap above stops teleport-jumps, but it also means a car
+      // driven at a FACE-steep slope outruns its own y-follow and passes
+      // horizontally INSIDE the terrain — measured on the goat dome's fall
+      // line: 29 u buried at 26 u/s, the whole "driving inside the mountain"
+      // class, on ground with no collider to say no. So when the gap has
+      // opened AND the ground here is genuinely face-steep, the into-slope
+      // velocity dies (tangential motion survives — you can turn along the
+      // face, you cannot pass through it). A SHELF-EDGE discontinuity keeps
+      // its old behaviour on purpose: the terrain beside a floating roadbed
+      // is near-flat, so its local gradient never trips this, and the
+      // capped ease still lifts a returning car onto the road it can see.
+      // ...AND ONLY OUT WHERE MOUNTAINS LIVE. test-goat's header warns that
+      // no law here may be a gradient test, because the steepest ground in
+      // the game is the VERGE — and this law, applied there, braked the
+      // rejoin scramble to 17% of speed kept (floor 35%, measured on its
+      // banks at grades 0.64-1.06). A rejoin bank is a moment, 12-40 u off
+      // the carriageway; a face you can pass inside of is a mountain,
+      // hundreds out. Sixty units of lateral is the fence between them.
+      const gap = gY - this.y;
+      if (gap > 2.5 && Math.abs(this.lateral ?? 0) > 60 && t.terrainHeight) {
+        const E = 2.2;
+        const dhdx = (t.terrainHeight(this.pos.x + E, this.pos.z)
+          - t.terrainHeight(this.pos.x - E, this.pos.z)) / (2 * E);
+        const dhdz = (t.terrainHeight(this.pos.x, this.pos.z + E)
+          - t.terrainHeight(this.pos.x, this.pos.z - E)) / (2 * E);
+        const gm2 = Math.hypot(dhdx, dhdz);
+        if (gm2 > 0.9) {
+          const gx2 = dhdx / gm2, gz2 = dhdz / gm2;
+          const vin = this.vel.x * gx2 + this.vel.z * gz2;
+          if (vin > 0) { this.vel.x -= gx2 * vin; this.vel.z -= gz2 * vin; }
+        }
+      }
       this.y += THREE.MathUtils.clamp((gY - this.y) * Math.min(1, 12 * dt), -lift, lift);
       this._climbRate = 0;
       this._lastGY = this.y;

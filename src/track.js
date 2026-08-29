@@ -7341,6 +7341,112 @@ export class Track {
    *  fixed. The radial ramp contributes ~10% and the ridge octaves ~5% on top,
    *  so the steepest ground is around 15% — a real climb that a car pulls up
    *  with speed in hand, rather than a wall. */
+  /** THE GOAT PEAK — a mountain you can actually climb to the top of.
+   *
+   *  `_highland` gave free roam real climbable ground, but no DESTINATION:
+   *  every tall dramatic mountain on the roster is scenery with a collider,
+   *  a wall you stop at. Asked for directly: "what you'd love is mountains
+   *  you can actually climb to the top of". So one true summit per world
+   *  that has real ground (the `_highland` opt-in), built the only honest
+   *  way this codebase knows: as TERRAIN, in BOTH height functions, so the
+   *  drawn mountain and the one you drive on are the same object and the
+   *  sinking class of bug cannot exist on it by construction.
+   *
+   *  THE DOME IS THE WALL, THE ROUTE IS THE DOOR. The dome runs smoothstep
+   *  flanks that peak near 120% grade — unclimbable, the rim-wall's own
+   *  trick: the mountain stops you with steepness you can see, never with a
+   *  collider. Carved into the flank is a goat route: 1.5 turns of spiral
+   *  shelf, ~16 u wide, whose height at every point is the dome's own height
+   *  at that spiral radius — so the carve always cuts INTO the hill and
+   *  never juts a causeway out of it. Along-path grade tops out ~21% at
+   *  mid-climb and eases to 0 at both ends; the summit is the smoothstep's
+   *  own flat crown. Nothing about it needs a collider, a clamp, or a
+   *  special case in the car.
+   *
+   *  PLACED at r 660-740 — beyond every road (none reaches past ~320),
+   *  inside the drawn-mesh near patch (edge + blend ≤ 896 < the 900 far
+   *  switch), clear of the sea, and clear of the river's valley (the water's
+   *  one way out stays open). Scenery builders that reach this ring skip
+   *  the peak's footprint via `_nearGoat` — a mountain with a mesa parked
+   *  on its route is not a route. */
+  _buildGoatPeak() {
+    this._goat = null;
+    const T = this.T;
+    const scale = T.highland !== undefined ? T.highland : (T.relief === 0 ? 0 : 1);
+    if (!scale || T.goatPeak === false) return;
+    const R = 130, H = 108;
+    let best = null;
+    // each world starts its bearing scan somewhere of its own, so the roster
+    // does not put every peak due south of the start line on ties
+    const az0scan = ((this.level?.id ?? 0) * 0.61) % (Math.PI * 2);
+    for (let a = 0; a < 44; a++) {
+      const az = az0scan + (a / 44) * Math.PI * 2;
+      for (const r of [660, 700, 740]) {
+        const x = Math.cos(az) * r, z = Math.sin(az) * r;
+        if (T.coast && this._coastSide(x, z) > -((T.coast.beach ?? 60) + R + 10)) continue;
+        const rv = this._river ? this._riverValley(x, z) : 1;
+        if (rv < 0.9) continue;
+        const s = this._nearestSample(x, z);
+        if (s.d < R + 40) continue;
+        const score = s.d + rv * 20;
+        if (!best || score > best.score) best = { x, z, score };
+      }
+    }
+    if (!best) return;
+    // the spiral, foot to crown, starting on the face that greets a driver
+    // arriving from the world's middle
+    const pts = [];
+    const turns = 1.5, segs = 64, az0 = Math.atan2(best.z, best.x);
+    for (let i = 0; i <= segs; i++) {
+      const u = i / segs;
+      const rr = R * (1 - 0.90 * u);
+      const th = az0 + Math.PI + u * turns * Math.PI * 2;
+      pts.push([best.x + Math.cos(th) * rr, best.z + Math.sin(th) * rr, u]);
+    }
+    this._goat = { x: best.x, z: best.z, R, H, pts };
+  }
+
+  /** Scenery keep-out for the peak and its route. */
+  _nearGoat(x, z, pad) {
+    const G = this._goat;
+    return !!G && Math.hypot(x - G.x, z - G.z) < G.R + (pad ?? 0);
+  }
+
+  /** The peak's contribution to the ground at (x, z) — dome, with the goat
+   *  route carved in. Lives in terrainHeight AND _terrainMeshHeight. */
+  _goatH(x, z) {
+    const G = this._goat;
+    if (!G) return 0;
+    const dx = x - G.x, dz = z - G.z;
+    const d2 = dx * dx + dz * dz;
+    const REACH = G.R + 26;
+    if (d2 > REACH * REACH) return 0;
+    const d = Math.sqrt(d2);
+    const u0 = Math.max(0, Math.min(1, 1 - d / G.R));
+    const dome = G.H * u0 * u0 * (3 - 2 * u0);
+    // nearest point on the spiral, projected onto its segments (the
+    // staircase lesson from _tunnelRidge: project onto the LINE, never
+    // snap to a vertex)
+    let bd2 = Infinity, bu = 0;
+    const P = G.pts;
+    for (let k = 0; k + 1 < P.length; k++) {
+      const ax = P[k][0], az = P[k][1], bx = P[k + 1][0], bz = P[k + 1][1];
+      const vx = bx - ax, vz = bz - az;
+      const l2 = vx * vx + vz * vz || 1;
+      let s = ((x - ax) * vx + (z - az) * vz) / l2;
+      s = s < 0 ? 0 : s > 1 ? 1 : s;
+      const px = ax + vx * s, pz = az + vz * s;
+      const dd = (x - px) * (x - px) + (z - pz) * (z - pz);
+      if (dd < bd2) { bd2 = dd; bu = P[k][2] + (P[k + 1][2] - P[k][2]) * s; }
+    }
+    const bd = Math.sqrt(bd2);
+    // the shelf sits at the dome's own height at the spiral's radius there
+    const lu = 0.90 * bu;
+    const ledge = G.H * lu * lu * (3 - 2 * lu);
+    const mask = 1 - smoothstep01((bd - 9) / 11);
+    return dome + (ledge - dome) * mask;
+  }
+
   _highland(x, z) {
     const scale = this.T.highland !== undefined ? this.T.highland
       : (this.T.relief === 0 ? 0 : 1);       // flat-by-design worlds opt out
@@ -8954,6 +9060,7 @@ export class Track {
     // the delta speaks; the ramp between matches the corridor blend's reach.
     if (this._delta) h += this._delta.at(x, z) * smoothstep01((nd - 10) / 60);
     if (this._citMound) h += this._citMoundH(x, z);
+    if (this._goat) h += this._goatH(x, z);  // the goat peak lives in BOTH ground functions
     if (nd <= 27) {
       const clamp = this._roadClampY(x, z, bi, nd);
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
@@ -9197,6 +9304,7 @@ export class Track {
     // numbers agreed with each other and disagreed with the picture; the
     // picture was right.
     if (this._citMound) h += this._citMoundH(x, z);
+    if (this._goat) h += this._goatH(x, z);  // the goat peak lives in BOTH ground functions
     // same fade as terrainHeight — see the note there; these two must agree
     if (this._delta) h += this._delta.at(x, z) * smoothstep01((d - 10) / 60);
     if (d <= 27) {
@@ -11092,6 +11200,10 @@ export class Track {
 
   // ---------- environment ----------
   _buildEnvironment() {
+    // BEFORE the terrain mesh: the goat peak is a TERRAIN term (like the
+    // citadel mound), and every builder after this seats on the ground it
+    // shapes — the mesh, the scatter, the horizon rings all see one world.
+    this._buildGoatPeak();
     this._buildTerrain();
     this._buildSky();
     const m4 = new THREE.Matrix4();
@@ -12939,6 +13051,21 @@ export class Track {
         } else { ox /= ol; oz /= ol; }
         x += ox * (need - s.d + 4); z += oz * (need - s.d + 4);
       }
+      // ...and never on the goat peak: a scenery cone (and its solid) parked
+      // on the climbable mountain is a wall across the route. WALKED aside,
+      // not dropped — dropping one changed which fall lines exist and pushed
+      // GRANITE NARROWS' best off-course climb from under test-goat's 30 u
+      // pin to 30.3 (measured): the cone was part of the world that law was
+      // pinned against, so it keeps existing, just elsewhere.
+      for (let pass = 0; pass < 6; pass++) {
+        const G = this._goat;
+        if (!G) break;
+        const gd = Math.hypot(x - G.x, z - G.z);
+        const need2 = G.R + w * 0.5 + 12;
+        if (gd >= need2) break;
+        const ox = (x - G.x) / (gd || 1), oz = (z - G.z) / (gd || 1);
+        x += ox * (need2 - gd + 4); z += oz * (need2 - gd + 4);
+      }
       // Still crowding the road after eight passes means the lap encircles
       // this spot. Shrink to fit rather than shove a peak to the far horizon;
       // below a real mountain's worth of base it is a boulder, so drop it out
@@ -13026,6 +13153,11 @@ export class Track {
       const w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
       q.setFromAxisAngle(up, a + 1.2);
       const gx = Math.cos(a) * r, gz = Math.sin(a) * r;
+      if (this._nearGoat(gx, gz, Math.max(w, d) * 0.5)) {  // ice off the climbable peak
+        m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
+        slabs.setMatrixAt(k, m4);
+        continue;
+      }
       // seated ON the ground it stands on — the old constant-datum placement
       // buried most of each slab wherever the valley floor dropped, and what
       // poked out was the boxy top
@@ -19369,6 +19501,7 @@ export class Track {
           const w = wMin + Math.random() * wSpan;
           const px = Math.cos(a) * r, pz = Math.sin(a) * r;
           if (inSea(px, pz, w)) continue;
+          if (this._nearGoat(px, pz, w * 0.6)) continue;  // the climbable peak keeps its sky
           // a ridge lies ALONG the range, so it is turned to face the middle
           const yaw = form === 'ridge' ? a + Math.PI / 2 + (Math.random() - 0.5) * 0.3
             : Math.random() * Math.PI;
@@ -19472,6 +19605,7 @@ export class Track {
    *  instead of pointy cone hills — the serpent-back dune skyline. */
   _buildDuneHorizon(m4) {
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const duneProf = this._formProfile(new THREE.ConeGeometry(1, 1, 10));
     const rings = [
       { count: 28, r0: 720, rv: 130, w0: 240, wv: 190, h0: 34, hv: 32,
         map: this._horizonGrad(this.T.hillColor, 0.5, 0.1) },
@@ -19491,12 +19625,24 @@ export class Track {
         const h = R.h0 + Math.random() * R.hv;
         q.setFromAxisAngle(up, Math.random() * Math.PI);
         const dx = Math.cos(a) * r, dz = Math.sin(a) * r;
+        if (this._nearGoat(dx, dz, w * 0.5)) {           // not on the climbable peak
+          m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
+          mesh.setMatrixAt(i, m4);
+          continue;
+        }
         m4.compose(
           new THREE.Vector3(dx, h / 2 - 6 + this._highland(dx, dz), dz),
           q,
           new THREE.Vector3(w, h, w * (0.4 + Math.random() * 0.3))  // long wind-carved ridges
         );
         mesh.setMatrixAt(i, m4);
+        // THE DUNES ARE SOLID TOO (law of solidity, ghosthunt r-round): these
+        // ridges stand 34-114 u tall from r 720, well inside the rim, and a
+        // car drove straight through them. Long axis at the cone rule's 0.48.
+        this.solids.push({
+          x: dx, z: dz, r: w * 0.48,
+          y: this._highland(dx, dz) - 6 + 2, h, mat: 'stone', prof: duneProf,
+        });
       }
       this.group.add(mesh);
     }
@@ -19528,12 +19674,24 @@ export class Track {
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     let k = 0;
     const put = (x, z, w, h) => {
+      if (this._nearGoat(x, z, w)) {                    // not on the climbable peak
+        m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
+        towers.setMatrixAt(k++, m4);
+        return;
+      }
       q.setFromAxisAngle(up, Math.random() * Math.PI);
       m4.compose(
         new THREE.Vector3(x, -4 + this._highland(x, z), z), q,
         new THREE.Vector3(w, h, w * (0.6 + Math.random() * 0.8))
       );
       towers.setMatrixAt(k++, m4);
+      // A SKYSCRAPER IS SOLID (law of solidity, ghosthunt r-round): these
+      // stand to 320 u tall from r 260, and a car drove through them like
+      // holograms. The footprint is a yawed w × w·(0.6-1.4) box; the circle
+      // takes the long half-axis, concrete rules.
+      // prof [1]: a box does not taper — its drawn cross-section is its base
+      // the whole way up, and saying so keeps the one-rule law auditable
+      this.solids.push({ x, z, r: w * 0.7, y: -4 + this._highland(x, z) + 1, h, mat: 'stone', prof: [1] });
     };
     for (let i = 0; i < 42; i++) {
       const a = (i / 42) * Math.PI * 2 + Math.random() * 0.12;
@@ -20214,6 +20372,7 @@ export class Track {
           };
           const x2 = gx + (hh(0.7) - 0.5) * 150, z2 = gz + (hh(1.9) - 0.5) * 150;
           if (this._inWater(x2, z2)) continue;
+          if (this._nearGoat(x2, z2, 12)) continue;   // no groves on the goat route
           const gy2 = this._seatY(x2, z2);
           const sw2 = 4.5 + hh(2.9) * 4.5, sh2 = 5.5 + hh(4.1) * 5.5;
           bq.setFromAxisAngle(bup, hh(5.3) * Math.PI * 2);

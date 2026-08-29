@@ -36,7 +36,7 @@ const R = await page.evaluate(async () => {
           const dx = px - s.x, dz = pz - s.z;
           if (dx * dx + dz * dz >= rr * rr) continue;
           if (s.y !== undefined) {
-            if (s.h !== undefined) { if (py > s.y + s.h) continue; } // matches the no-underside solids gate
+            if (s.h !== undefined) { if (py < s.y - Math.max(3, Math.min(30, s.h * 0.35)) || py > s.y + s.h) continue; } // scaled lower pad, mirrors the vehicles.js solids gate
             else if (Math.abs(py - s.y) > 6) continue;
           }
           const key = `solid:${s.mat ?? s.kind ?? '?'}`;

@@ -66,7 +66,7 @@ const sweep = await page.evaluate(async () => {
       const c = t.center[i];
       const half = (t.widthAt?.(i) ?? 7) + 1.8;   // + the car's own body radius
       for (const s of big) {
-        if (c.y > s.y + s.h) continue; // no lower gate: a mountain has no underside (vehicles.js solids gate)
+        if (c.y < s.y - Math.max(3, Math.min(30, s.h * 0.35)) || c.y > s.y + s.h) continue; // scaled lower pad, mirrors the vehicles.js solids gate
         // the collider's radius AT THE ROAD'S HEIGHT, which is what bites
         let rEff = s.r;
         if (s.prof) {

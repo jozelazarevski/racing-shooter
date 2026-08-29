@@ -3970,3 +3970,77 @@ still the point). Six test/tool mirrors of the gate updated to match.
 - PIKES PEAK spawns-in-roam showed a 10-13 u settle transient when
   teleported by probes; players do not teleport, but the probe should
   place-and-settle before measuring.
+
+## GOAT PEAKS — MOUNTAINS YOU CLIMB TO THE TOP OF, AND THE WALL LAW THAT CAME OUT OF BUILDING THEM
+
+Asked for in as many words: "mountains you can actually climb to the top
+of... Do it. Love the idea." Done, the only honest way this codebase knows:
+as TERRAIN, in both height functions, so drawn-vs-driven divergence cannot
+exist on it by construction.
+
+### THE FEATURE
+Every world with real ground (`_highland` on) grows ONE summit: a 108 u
+smoothstep dome at r 660-740 — beyond every road, inside the drawn-mesh
+near patch, clear of sea and river, each world on its own bearing. The
+flanks peak ~120% grade: unclimbable, the rim wall's own honesty. Carved
+into them, a goat route — 1.5 turns of spiral shelf ~18 u wide whose height
+at every point is the dome's own height at that radius (the carve cuts IN,
+never juts out), along-path grade easing 0 → ~21% → 0. At the crown, a
+summit star worth four ordinary finds (+600, "⛰ SUMMIT!"). Scenery
+builders keep off it: massif cones WALK aside (not dropped — dropping one
+moved GRANITE NARROWS' pinned fall-line number), horizon/dune/city/glacier
+instances skip, groves skip.
+
+`tests/test-goatpeak.mjs` is the gate: pure-pursue the route's own points,
+PASS = summit reached, star present, on-shelf agreement held. Seven worlds
+climb in ~26.4 s each; LANTERN QUARTER (flat by design) reports ABSENT.
+
+### THE PEAK IS CLOSED ON RACE DAY
+The route is BUILT of flats, and flats reset the climb-authority fade — a
+racer could stair-climb the spiral 46 u in 30 s past a fade that never saw
+a slope (test-goat law 1, measured). Off the course AND on the peak the
+engine now gives nothing (`climbAuth = 0` via `_nearGoat`), plus a treacle
+drag in the stray branch. Roam publishes `_strayed = 0` and never feels
+either. SUMMIT CLIMB's law-1 number came back under its ceiling.
+
+### GROUND RISING FASTER THAN YOU CAN CLIMB IS A WALL, NOT A FLOOR
+Building the dome exposed a hole older than the dome: at face-steep TERRAIN
+(no collider to say no) a fast car outruns the 11 u/s y-follow and passes
+horizontally inside the ground — 29 u deep on the dome's fall line,
+measured, the whole "driving inside the mountain" class on analytic ground.
+Now, when the gap has opened (>2.5 u) and the local gradient is face-steep
+(>0.9) and the car is far off-road (|lateral| > 60 — because test-goat's
+header is RIGHT that the verge is the steepest ground in the game and no
+law here may brake the rejoin scramble), the into-slope velocity dies;
+tangential motion survives. Fall-line ram: 29.5 u buried → 2.35. Rejoin
+banks, shelf-edge returns, crests: untouched, and test-goat's rejoin law,
+test-sinking and test-climb all green.
+
+### SOLIDITY, FINISHED FOR EVERYTHING REACHABLE
+ghosthunt found three more ghost classes beyond the glacier and groves:
+DUNE SERPENT's wind-carved ridges (to 114 u, r 720+), NEON GRID and MARINA
+BAY's skyscrapers (to 320 u, mid towers from r 260), all drivable-through.
+All solid now — dunes stone with the cone profile, towers stone with
+prof [1] (a box does not taper, and saying so keeps the invisible-walls
+cross-section law auditable at 13/13). The census's only remaining flags
+stand IN THE SEA (offshore rocks, whales) — the drown system's boundary,
+not ours — and the probe now says so itself.
+
+### REFINEMENTS THAT CAME FROM CHASING GHOSTS THAT WEREN'T MINE
+test-goat's GRANITE 30.3 and GLACIER COL 0.3 reds reproduce byte-identical
+on PRISTINE origin/main — pre-existing, like test-shortcut's were, and this
+branch passes one MORE law than base (CANYON RUN's start-point law). Two
+changes made while wrongly assuming blame survive on their own merits: the
+no-underside pad now scales with the mass (max(3, min(30, h·0.35)) — a
+mountain earns 30 u of seat tolerance, a verge boulder keeps −3 and never
+shoves a car riding the roadbed above its toe), and goat-adjacent massif
+cones relocate instead of vanishing. Six test mirrors carry the same
+formula.
+
+### FOR THE NEXT SESSION
+- The dunes could be TERRAIN someday (climbable sand, the goat treatment) —
+  they are solid walls today, which is correct but not yet delightful.
+- The two base reds above belong to whoever owns test-goat's pins; both
+  values are printed and stable.
+- A goat peak screenshot lives in the session record; fieldshot-class tools
+  can frame it from the route for a store shot.
