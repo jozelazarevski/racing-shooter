@@ -13850,7 +13850,13 @@ export class Track {
       }
     }
     let guard = 0;
-    while (k < WANT && guard++ < WANT * 14) {
+    // 28 tries per figure, doubled when the inner margin moved to 1.6: on
+    // IL BUDELLO the legal band between the margin and the frontages is thin,
+    // and at 14 tries the loop exhausted its budget at 77 of 170 placed — the
+    // street read as half-emptied. The budget is attempts, not geometry;
+    // spending more of it is how a narrow town keeps its crowd without anyone
+    // standing back in the door's swing.
+    while (k < WANT && guard++ < WANT * 28) {
       const i = (Math.random() * N) | 0;
       if (this._circDist(i, 0) < 45) continue;         // not on the grid
       const lo = inner(i);
