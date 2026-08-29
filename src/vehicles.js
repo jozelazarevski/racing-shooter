@@ -2592,7 +2592,20 @@ export class Car {
         // rock under a flyover that window is the point.
         if (ob.y !== undefined) {
           if (ob.h !== undefined) {
-            if (this.pos.y < ob.y - 3 || this.pos.y > ob.y + ob.h) continue;
+            // ...AND A MOUNTAIN HAS NO UNDERSIDE. The lower pad was −3 u,
+            // but a mountain's seat is sampled at the CENTRE of a 100-300 u
+            // footprint, and on sloping ground the flank foot runs 10-30 u
+            // lower — so a car approaching from downhill sat below the pad
+            // and the whole collider was skipped. Measured on SUMMIT CLIMB
+            // in roam: car at y 23.1, 111 u from a horizon hill seated at
+            // y 30 whose radius at that height is 164 — inside the rock,
+            // gate said "under it, ignore". Fifty units of drawn mountain
+            // overhead and the car still climbing terrain noise, reported
+            // as "climbing and sinking in mountains". Nothing legitimate
+            // ever drives BENEATH a seated mountain (bores go through
+            // `_tunnelRidge` terrain, not through these solids), so the
+            // only lower gate a height-carrying solid needs is none.
+            if (this.pos.y > ob.y + ob.h) continue;
           } else if (Math.abs(this.pos.y - ob.y) > 6) continue;
         }
         const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));

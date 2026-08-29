@@ -43,7 +43,7 @@ const res = await page.evaluate(async (WORLD) => {
         }
         if ((px - s.x) ** 2 + (pz - s.z) ** 2 >= rr * rr) continue;
         if (s.y !== undefined) {
-          if (s.h !== undefined) { if (py < s.y - 3 || py > s.y + s.h) continue; }
+          if (s.h !== undefined) { if (py > s.y + s.h) continue; } // matches the no-underside solids gate
           else if (Math.abs(py - s.y) > 6) continue;
         }
         bump(`solid ${s.x.toFixed(0)},${s.z.toFixed(0)}`,

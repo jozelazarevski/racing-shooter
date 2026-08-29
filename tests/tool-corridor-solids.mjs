@@ -64,7 +64,7 @@ const rows = await page.evaluate(async () => {
       // read as blocking the road when nothing can ever touch them.
       const roadY = t.center[bi].y;
       const reachable = s.y === undefined ? true
-        : s.h !== undefined ? (roadY >= s.y - 3 && roadY <= s.y + s.h)
+        : s.h !== undefined ? (roadY <= s.y + s.h)
           : Math.abs(roadY - s.y) <= 6;
       if (!reachable) continue;
       hits.push({ r: +s.r.toFixed(1), mat: s.mat, h: s.h,
