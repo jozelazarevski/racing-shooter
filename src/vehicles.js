@@ -2105,6 +2105,12 @@ export class Car {
     // handling raises the slip onset slightly — fewer accidental breakaways,
     // but the threshold stays low enough that committed cornering still drifts
     let slipTarget = THREE.MathUtils.clamp((cornerLoad - (0.28 + 0.05 * hnd) * sGrip) * 1.7, 0, 1);
+    // ...and the lateral-acceleration law feeds it too: demand past the
+    // tyre's budget IS a slide, whatever the steer fraction was (one frame
+    // stale, which at 60 Hz is nothing)
+    if ((this._overGrip ?? 0) > 0.12) {
+      slipTarget = Math.max(slipTarget, Math.min(1, this._overGrip * 1.2));
+    }
     if (inputs.drift) slipTarget = 1; // handbrake forces a full slide
     const slipRate = slipTarget > this.slip ? 7 : 3.2; // break loose fast, recover smoothly
     this.slip += (slipTarget - this.slip) * Math.min(1, slipRate * dt);
@@ -2112,10 +2118,16 @@ export class Car {
     // moving, which is what makes a wing a TRADE: it costs top speed outright
     // and pays it back only in the fast corners. At a standstill a GT wing does
     // nothing at all; flat out it is worth 40% more grip than no wing.
-    let grip = this.grip * (1 + 0.08 * hnd) * (1 - 0.78 * this.slip) * sGrip * (this.gripBoost || 1)
+    // THE TYRE'S BUDGET, SEPARATED FROM ITS COLLAPSE. Everything the surface
+    // and the car contribute — compound, handling, boost, wing, a wet ford, a
+    // loose landing — makes the BUDGET; the slip collapse and the handbrake
+    // are what happens once the budget is spent, and they apply only to the
+    // scrub rate below. (Same products as before, reordered: multiplication
+    // commutes, the scrub rate is bit-identical.) The budget also prices the
+    // new lateral-acceleration law further down.
+    let gripBudget = this.grip * (1 + 0.08 * hnd) * sGrip * (this.gripBoost || 1)
       * (1 + (this.downforce || 0) * speedN);
-    if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
-    if (this.landGrip > 0) { this.landGrip -= dt; grip *= 0.4; } // loose for ~0.4s after landing
+    if (this.landGrip > 0) { this.landGrip -= dt; gripBudget *= 0.4; } // loose for ~0.4s after landing
     // ---- river-fords: wet tires. Ford crossings set _wetT=3.5 with a gentle
     // ≈0.8 grip factor fading linearly back to 1; plain puddles keep their
     // short sharp 0.75 slick (_wetMax stays 0 for those).
@@ -2125,7 +2137,7 @@ export class Car {
     // so it lands one frame later — which is the right side of the boundary.
     if (this._fordNow > 0) {
       this._fordNow -= dt;
-      grip *= 0.42;
+      gripBudget *= 0.42;
     }
     // AFTER: wet tyres, fading. Was a 20% loss at most, which nobody could feel
     // — the HUD said WET TIRES and the car drove exactly as before. Deeper now,
@@ -2136,17 +2148,29 @@ export class Car {
       if ((this._wetMax ?? 0) > 1) {
         const skill = this === this.game.player ? (this.offroadSkill ?? 0.7) : 0.7;
         const loss = 0.46 * (1 - 0.42 * skill);
-        grip *= 1 - loss * Math.max(0, this._wetT) / this._wetMax;
+        gripBudget *= 1 - loss * Math.max(0, this._wetT) / this._wetMax;
       } else {
-        grip *= 0.75;
+        gripBudget *= 0.75;
       }
       if (this._wetT <= 0) this._wetMax = 0;
     }
+    this._gripBudget = gripBudget;
+    let grip = gripBudget * (1 - 0.78 * this.slip);
+    if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
     // opt-in grip instrument (headless): set __game.__gripProbe = {} to read
     // the lateral grip the player is actually running (wet-tire verification)
     if (this.game.__gripProbe && this === this.game.player) this.game.__gripProbe.grip = grip;
     const vlBefore = vl;
-    vl -= vl * Math.min(1, grip * dt);
+    // ...AND SLIDING FRICTION HAS A CEILING TOO. The scrub was vl·grip —
+    // proportional, unbounded — so the bigger the slide, the harder the
+    // tyres pulled, and a car 80° sideways at 180 km/h was hauled back onto
+    // its heading at 1.4 rad/s (measured): the drift state existed and the
+    // trajectory ignored it. A sliding tyre is kinetic friction: force
+    // capped near the same budget that broke it loose (a touch above, so
+    // recovery beats breakaway and the slide never oscillates). Small
+    // corrections sit below the cap and keep today's proportional feel.
+    const aScrub = Math.min(Math.abs(vl) * grip, 4.4 * gripBudget);
+    vl -= Math.sign(vl) * Math.min(Math.abs(vl), aScrub * dt);
     // drift reward: convert a slice of the scrubbed-off slide back into forward speed
     if (this.slip > 0.4) vf = Math.min(topSpeed, vf + Math.abs(vlBefore - vl) * 0.35 * (vf >= 0 ? 1 : -1));
 
@@ -2216,7 +2240,37 @@ export class Car {
     // While gripped the velocity turns with the car (arcade rails). While slipping
     // it lags the yaw: part of the turn spills forward speed into lateral slide,
     // so hard cornering at speed visibly breaks the rear loose.
-    const lag = this.airborne ? 0 : this.slip * this.driftLag;
+    //
+    // A TYRE HAS A BUDGET, AND THE RAILS WERE IGNORING IT. The lag above
+    // capped at slip·driftLag ≈ 0.22, so even in a "full slide" 78% of the
+    // yaw still rotated the velocity directly — measured with cornergrip.mjs:
+    // a 16.5 u radius circle held at 180 km/h, 151 u/s² of lateral grip,
+    // fifteen g. Reported as exactly that: "I can turn sharp curves with
+    // 180 km/h. That illogical. I have to drift and loose control."
+    //
+    // The budget is the one the rival planner has always driven within —
+    // paceEstimate's vGrip = sqrt(SLIDE·grip/k), i.e. a_lat ≤ 4·grip — so
+    // pricing the player's yaw against 4·gripBudget makes the field's
+    // physics and the player's the same physics. Demand under budget is
+    // untouched: ordinary driving stays on its rails. Demand past it spills
+    // the EXCESS share of the turn into slide instead of trajectory: the
+    // nose comes round, the car keeps going, and you are drifting — or, far
+    // past it, losing control. PLAYER ONLY: the AI already obeys the number
+    // by planning, and must keep its 8/8-alive record.
+    let over = 0;
+    if (this === this.game.player && !this.airborne && dt > 0) {
+      // the WHOLE velocity vector, not the forward component: |vf| collapses
+      // exactly when the car goes sideways, and pricing demand on it handed
+      // the rails back mid-slide — an accidental auto-catch at 70° of drift
+      const aDemand = Math.hypot(vf, vl) * Math.abs(dTheta) / dt;
+      const aMax = 4.0 * (this._gripBudget ?? this.grip);
+      over = aMax > 0 ? THREE.MathUtils.clamp((aDemand - aMax) / aMax, 0, 1) : 0;
+    }
+    this._overGrip = over;
+    const lag = this.airborne ? 0 : Math.min(1, this.slip * this.driftLag + over * 0.9);
+    if (this.game.__gripProbe && this === this.game.player) {
+      Object.assign(this.game.__gripProbe, { over, lag, dTheta, vf: +vf.toFixed(1), vl: +vl.toFixed(1) });
+    }
     if (lag > 0) {
       const nvf = vf + vl * dTheta * lag;
       vl -= vf * dTheta * lag;

@@ -4044,3 +4044,60 @@ formula.
   values are printed and stable.
 - A goat peak screenshot lives in the session record; fieldshot-class tools
   can frame it from the route for a store shot.
+
+## THE GRIP BUDGET — "I CAN TURN SHARP CURVES WITH 180 KM/H. THAT ILLOGICAL."
+
+He could. cornergrip.mjs (new, kept): full lock at 180 km/h held a 16.5 u
+radius circle at 151 u/s² of lateral acceleration — FIFTEEN G — while full
+throttle built speed mid-circle. The cause, in the code's own comment:
+"while gripped the velocity turns with the car (arcade rails)", and the
+slide lag capped at slip·driftLag ≈ 0.22, so even a "full slide" kept 78%
+of the yaw rotating the trajectory directly.
+
+### THREE CHANGES, ONE NUMBER
+The number is the one the RIVAL PLANNER always drove within — paceEstimate
+prices corners at a_lat ≤ SLIDE·grip = 4·grip — so the player's tyres now
+obey the same physics as the field's plans. Player only: the AI already
+obeys by planning and keeps its 8/8-alive record.
+1. **Demand vs budget.** Yaw demand |v|·yawRate past 4·gripBudget spills
+   the EXCESS share of the turn into slide instead of trajectory (lag → 1).
+   Priced on the whole velocity vector — pricing |vf| handed the rails back
+   mid-slide at 70° of drift, an accidental auto-catch, measured and fixed.
+2. **Kinetic friction has a ceiling.** The scrub was vl·grip, proportional
+   and unbounded: a car 80° sideways was hauled back onto heading at
+   1.4 rad/s, so the drift state existed and the trajectory ignored it.
+   Capped at 4.4·gripBudget — a touch above static so recovery beats
+   breakaway. Small corrections sit under the cap: parking-speed feel
+   untouched.
+3. **The budget is its own quantity** — every surface/car factor (compound,
+   wing, wet ford, loose landing) WITHOUT the slip collapse, which now
+   applies only to the scrub. Same products, reordered; scrub bit-identical
+   before slip.
+
+### BEFORE AND AFTER (full lock, 3 s, flat ground)
+    180 km/h:  entry radius 16.5 u, aLat 151, exits at 167 km/h   BEFORE
+               entry radius ~54 u, drift peak 91°, exits at 72    AFTER
+    to hold a 30 u sharp curve now needs ≤ ~90 km/h; above that you are
+    drifting, and far above it you are a passenger. 60 km/h full lock
+    still bites (entry aLat ~21 = the budget, as it should).
+
+### WHAT IT COSTS ON TRACK, MEASURED
+agentdrive's planner re-priced from 34 to 15 (~75% of budget — a driver
+keeps margin; the bot at 100% slid into PINE VALLEY's rails, which is now
+a thing that happens, as requested). Laps: PINE VALLEY 40.5 → 54.5 s,
+MONACO 32.2 → 38.9, OUNINPOHJA 28.1 → 29.7 — the tighter the world, the
+more the budget costs, and one slide-wreck a lap is the new price of
+overdriving. RIVALS ARE UNCHANGED, so normal difficulty is now harder on
+tight circuits: the r271/r272 pace tables are the baseline to re-tune
+aiSpeed/aiCorner against IF play says so — that is a design pass, not this
+one. Gates: test-goat 25/26 (GLACIER COL's grounded-step red HEALED by
+this round's caps; GRANITE 30.3 is base-red), test-tyres 27/28 (its one
+red is a UI card, red on base too), playermoves, boot, goatpeak all green.
+
+### THE KNOBS, FOR TUNING BY FEEL
+    4.0  the static budget (×gripBudget) — lower = earlier breakaway
+    4.4  the kinetic ceiling — gap above 4.0 is how firmly a slide catches
+    0.9  the spill share at full over-budget
+    0.12/1.2  the slip-feed threshold and gain
+All in vehicles.js, each at its comment. The A/B instrument is
+tools-scratch/cornergrip.mjs; run it before touching any of them.

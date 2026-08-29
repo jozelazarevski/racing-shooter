@@ -66,7 +66,7 @@ for (const id of process.argv.slice(2).map(Number)) {
       const err = wrap(Math.atan2(c.x - p.pos.x, c.z - p.pos.z) - p.heading);
       const K2 = Math.max(4, Math.round(30 / su));
       const turn = Math.abs(wrap(t.headingAt((p.trackIndex + K2) % N) - t.headingAt(p.trackIndex)));
-      const vmax = clamp(Math.sqrt(34 * (30 / Math.max(0.06, turn))), 15, 60);
+      const vmax = clamp(Math.sqrt(15 * (30 / Math.max(0.06, turn))), 14, 60); // 15 = ~75% of the 4·grip budget: a driver keeps margin, a bot at 100% slides into the rails
       g.input.analog.steer = clamp(err * 1.8, -1, 1);
       g.input.analog.throttle = speed < vmax ? 1 : 0;
       g.input.analog.brake = speed > vmax + 4 ? 1 : 0;
