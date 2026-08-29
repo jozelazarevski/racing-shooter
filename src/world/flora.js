@@ -1,3 +1,9 @@
+// DEAD COPY — NOTHING IMPORTS THIS FILE. The live code is in src/track.js
+// (and friends); this directory is an abandoned split that has already
+// drifted (this sky.js is missing the horizon-solids fix, its _buildMassif
+// registers no colliders). Editing here changes nothing in the game and
+// reading here misleads — it cost the mountain-sinking investigation an
+// hour. Verified dead by import grep across src/, tests/, index.html.
 // Everything that grows, and the rules for where it may stand.
 //
 // Two halves that belong together: the PLACEMENT helpers (_scatter,

@@ -13011,6 +13011,12 @@ export class Track {
     const slabs = new THREE.InstancedMesh(geo, ice, 14);
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const col = new THREE.Color();
+    // THE ICE IS SOLID. "Well outside the drivable world" was never true —
+    // the rim wall stands at 1620 and the tongue pours from r 560, so a
+    // roamer drives straight into (and through) a hundred-unit ice slab.
+    // Same law as the massif cones and the horizon rings: the collider is
+    // the mountain, long axis, profile-tapered, solid over its full height.
+    const prof = this._formProfile(geo);
     // the tongue pours down a north-west flank towards the road
     const a0 = -2.25;
     for (let k = 0; k < 14; k++) {
@@ -13034,6 +13040,10 @@ export class Track {
       slabs.setMatrixAt(k, m4);
       col.setRGB(0.78 + t * 0.14, 0.88 + t * 0.1, 1.0).multiplyScalar(0.7 + Math.random() * 0.3);
       slabs.setColorAt(k, col);
+      this.solids.push({
+        x: gx, z: gz, r: Math.max(w, d) * 0.48,
+        y: gy - h * 0.18 + 2, h, mat: 'stone', prof,
+      });
     }
     slabs.name = 'glacier';
     this.group.add(slabs);
@@ -20210,6 +20220,14 @@ export class Track {
           m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
             new THREE.Vector3(sw2, sh2, sw2 * 0.9));
           band.setMatrixAt(bk3, m4);
+          // A WOOD IS A MASS, NOT A DECAL. These clumps stand 9-19 u tall in
+          // the 640-900 u ring — reachable ground, and a car drove through
+          // them like fog (ghosthunt.mjs). Wood, not stone: ramming a grove
+          // sheds splinters and costs like hitting a hut, because that is
+          // what hitting trees is. Radius covers the main crown; the skirt
+          // crowns stay forgiving.
+          this.solids.push({ x: x2, z: z2, r: sw2 * 0.95,
+            y: gy2 - 0.4, h: sh2 * 1.8, mat: 'hut' });
           bandCol.copy(baseC2).multiplyScalar(0.72 + hh(6.7) * 0.36)
             .lerp(fogC2, 0.12 + hh(8.3) * 0.10);
           band.setColorAt(bk3++, bandCol);
