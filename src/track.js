@@ -13754,12 +13754,40 @@ export class Track {
     const F = this.T.frontage;
     if (!F || this.T.townsfolk === false) return;
     const WANT = this.T.townsfolk ?? 170;
-    const legGeo = new THREE.BoxGeometry(0.34, 0.86, 0.26);
-    legGeo.translate(0, 0.43, 0);
-    const torsoGeo = new THREE.BoxGeometry(0.44, 0.62, 0.28);
-    torsoGeo.translate(0, 1.17, 0);
+    // A PERSON-SHAPE, NOT A TOTEM. Photographed on IL BUDELLO and reported
+    // ("people design can be a bit better"): one leg-box under one torso-box
+    // under a sphere reads as a painted bollard, because the three tells of a
+    // human silhouette are all missing — daylight between the legs, arms
+    // hanging outside the torso line, and a neck's gap under the head. All
+    // three are cheap: the legs become two boxes with a gap, the torso grows
+    // two hanging arms (merged into the same geometry, so the mesh count and
+    // the draw calls do not move), and the head lifts 5 cm clear of the
+    // shoulders. Arms wear the torso colour — sleeves — and the merge is six
+    // lines because vehicles.js keeps its own `mergeGeos` unexported and a
+    // person is not a car part.
+    const merge = (geos) => {
+      const parts = geos.map((g2) => (g2.index ? g2.toNonIndexed() : g2));
+      let n = 0;
+      for (const g2 of parts) n += g2.attributes.position.array.length;
+      const pos = new Float32Array(n);
+      let o = 0;
+      for (const g2 of parts) { pos.set(g2.attributes.position.array, o); o += g2.attributes.position.array.length; }
+      const out = new THREE.BufferGeometry();
+      out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      out.computeVertexNormals();
+      return out;
+    };
+    const leg = (sx) => { const g2 = new THREE.BoxGeometry(0.14, 0.86, 0.22);
+      g2.translate(sx, 0.43, 0); return g2; };
+    const legGeo = merge([leg(-0.10), leg(0.10)]);
+    const arm = (sx) => { const g2 = new THREE.BoxGeometry(0.10, 0.52, 0.12);
+      g2.translate(sx, 1.20, 0); return g2; };
+    const torsoGeo = merge([
+      (() => { const g2 = new THREE.BoxGeometry(0.42, 0.60, 0.26); g2.translate(0, 1.18, 0); return g2; })(),
+      arm(-0.27), arm(0.27),
+    ]);
     const headGeo = new THREE.SphereGeometry(0.135, 6, 5);
-    headGeo.translate(0, 1.63, 0);
+    headGeo.translate(0, 1.68, 0);
     const mk = (geo) => new THREE.InstancedMesh(geo,
       new THREE.MeshStandardMaterial({
         color: 0xffffff, vertexColors: true, flatShading: true, roughness: 0.9,
@@ -13775,7 +13803,12 @@ export class Track {
     const SKIN = ['#d8a884', '#b07a52', '#8a5a3c', '#e8c4a0'];
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
-    const inner = (i) => (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 0.85;
+    // "ALSO MOVE THEM OUT OF THE WAY" — same report. 0.85 u past the drivable
+    // edge is inside a door's swing; a racing line brushing the verge put the
+    // camera almost through them. 1.6 puts the nearest bystander a car-width
+    // clear of the edge, and the outer bound is untouched so the footway they
+    // stand on is simply used further out.
+    const inner = (i) => (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 1.6;
     const outer = (F.lateral ?? 15.5) - (F.depth ?? 8) * 0.5 - 0.55;
     let k = 0;
     // THE SQUARES FIRST. A knot of people on a pavement is dressing; a dozen
@@ -13840,7 +13873,7 @@ export class Track {
         // 0.45 u inside its own racing line that way. `_clearsRoad` asks the
         // nearest-station question, and its piazza clause is welcome here —
         // people in squares are placed above, on the paving.
-        if (!this._clearsRoad(p.x, p.z, 0.35, 0.5)) continue;
+        if (!this._clearsRoad(p.x, p.z, 0.45, 1.2)) continue;
         const y = this._seatY(p.x, p.z);
         if (!Number.isFinite(y)) continue;
         q.setFromAxisAngle(up, yaw + (Math.random() - 0.5) * 0.8);
