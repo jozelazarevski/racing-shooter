@@ -3922,3 +3922,51 @@ pursuit cannot. VERDICT: no defect in any of the three; they are the
 roster's hardest because rival fire volume compounds with narrow geometry,
 and any change there is difficulty tuning, which stays a design decision.
 The numbers to tune against are all above.
+
+## FREE-RIDING ROUND — "CLIMBING AND SINKING IN MOUNTAINS", FOUND AND CLOSED AT THE GATE
+
+The report, verbatim: "Still I'm climbing and sinking in mountains. The
+game is not ultimate free riding world matured enough." Reproduced first
+try with `tools-scratch/mountainsink.mjs` (new, kept): drive up a slope in
+roam logging physics sink AND visual sink (raycast against the drawn
+world). SUMMIT CLIMB: the car ran with **50 u of drawn mountain overhead**
+while physics said surface — inside a horizon hill, climbing terrain
+noise. That is the complaint, measured.
+
+### THE GATE, NOT THE MOUNTAIN
+The hill's collider was there and correct — r148/r-era work made horizon
+rings solid, height-profiled, all of it fine. What failed was the height
+gate in the player-vs-solids sweep: `pos.y < ob.y - 3 → skip`. A
+mountain's seat is sampled at the CENTRE of a 100-300 u footprint; on
+sloping ground the flank foot runs 10-30 u lower, so a car approaching
+from downhill sat below the pad and the entire collider was skipped —
+measured: car y 23.1, 111 u from a hill seated at y 30 with radius 164 at
+that height. Inside the rock, gate says "under it".
+
+Nothing legitimate drives BENEATH a seated mountain (bores go through
+`_tunnelRidge`, which lives in both height fields), so a height-carrying
+solid now has NO lower gate — solid at any height below its top. The
+±6 window stays for h-less solids (the knee-high rock under a flyover is
+still the point). Six test/tool mirrors of the gate updated to match.
+
+### VERIFIED, EACH DIRECTION
+- mountainsink re-run: the car STOPS at the flank, wheels on grass
+  (side-on screenshot taken), physics sink 0.02, v 19 -> 1.7 grinding.
+- test-invisible-walls 13/13, test-mountainrun 21/21 with updated mirrors.
+- Six mountain worlds re-raced (6/21/25/19/48/66): lap times at their
+  r271 baselines (GOTTHARD identical to the decimal), zero stuck spots,
+  lateral maxima normal — the widened gate does not trap the racing line.
+- tool-corridor-blockers full-roster census: no mountain-flank blockers
+  anywhere. Its 2/78 finding (CLIFF KNOT, SEA CLIFF RUN) is small r≈0.6
+  rocks near a vertically separated leg — h-less, knockable, untouched by
+  this change, pre-existing; noted for whoever owns rock scatter.
+
+### WHAT "MATURED FREE RIDING" STILL WANTS (measured, not done)
+- Off-road pace retention is 0.55-1.0 by car stat — the boundary is soft
+  by design, so roaming is fast; fine. The massif skirts are now solid
+  walls past the drivable foot. If mountains should ever be CLIMBABLE
+  (goat routes to peaks), that is terrainHeight work, not collider work,
+  and it is a design decision with MAX_GRADE 0.45 already in place.
+- PIKES PEAK spawns-in-roam showed a 10-13 u settle transient when
+  teleported by probes; players do not teleport, but the probe should
+  place-and-settle before measuring.
