@@ -4105,6 +4105,62 @@ red is a UI card, red on base too), playermoves, boot, goatpeak all green.
 All in vehicles.js, each at its comment. The A/B instrument is
 tools-scratch/cornergrip.mjs; run it before touching any of them.
 
+## r285 — THE BATTERY ROUND: THE LADDER, THE PILES, AND THE PYRAMIDS (TWICE)
+"Iterate test debug fix" after the r284 deploy: 31 suites, then every red
+run to ground with the base served beside the branch (8901 working tree,
+8902 pristine main — attribution before repair, always).
+
+THE DIFFICULTY LADDER, SOLVED AND THEN CORRECTED TWICE. test-difficulty
+opened 6-red under the new grip budget. The path to 12/12 twice in a row:
+  - The r284 bandUp decoupling had gone to the maxSpeed band — the one the
+    code's own measurement says binds 4% of the time. The CORNER band's
+    chase side (the one that binds 95%) still read rubberBand, so EASY's
+    trailing field cornered +35% toward a casual leader and re-passed them
+    forever. Both chase sides read bandUp now; the leader cap keeps
+    rubberBand.
+  - Guessing tiers failed; measuring the transfer function worked: a 16.7%
+    corner-budget cut moved lap pace 4.7% — lap goes as aLat^0.26, the
+    clamps, straights and crawl floor absorb the rest. Solving the laws
+    through that curve set easy 0.26 / normal 0.58.
+  - HARD taught two lessons. aiSpeed 1.10 INVERTED the tier order on PINE:
+    the nitro-gate backfire the rubber-band comment already records (raised
+    maxSpeed drops rivals under the v > maxSpeed*0.55 boost gate). Back to
+    1.06, edge in aiCorner 0.63. And on FURKA, three hard configs spanning
+    aLat 0.60-0.95 all lapped 1138-1157: the field's pace there is FLOORED
+    by the tier-blind width-pinch caps, while the drift-less stand-in lands
+    ~898 every run. The HARD-clean bound is 0.75 now, with that measurement
+    in the test — the regression it guards (player at 0.60-0.65) stays far
+    outside.
+
+"PIRAMIDS AGAIN", THEN "SHARK TEETH AGAIN" — one defect, photographed
+twice, on GOTTHARD at live r284: the distant-stand grove clumps (294
+instances, 579-989 u, reachable ground). Root causes: every crown sat
+base-down ON the grass — three grounded cones merge into ONE triangle from
+any distance — and the 12-22% fog wash toward the pass theme's ice-blue
+0xdcebf4 turned green clumps mint. The clumps now carry the playfield
+pine's DNA (lifted two-tier crowns, bark trunks below, one extra
+InstancedMesh sharing matrices) and the wash is 0.05. Proof pair in
+tools-scratch/shot-grove-before/after-*.png: the before is literally a
+serrated row of blue triangles. The skyline RING was measured too
+(skyteeth.mjs): GOTTHARD 0.48 med tooth-aspect sits inside the roster's
+range (FURKA 0.27, SUMMIT CLIMB 0.53/p90 1.27 is the outlier) — the ring
+is a future design pass, not this defect.
+
+THE MOORING PILES REACH THE SEABED. test-nothing-floats' only real reds —
+identical on base and branch — were the five Ligurian harbours: 26-38
+marina piles per world hanging 1.9 u over the drawn seabed (a fixed 3.4 u
+cylinder hung at quay height). Unit geometry, top at the anchor, stretched
+per-instance to the seabed: all five worlds now show 3 floats each (the
+dodecahedron rocks, under LAW 3's cap of 8). Note for probe writers: a
+filtered run (`node tests/test-nothing-floats.mjs 73..77`) trips LAW 1's
+roster-sized minimum by construction.
+
+ALSO SETTLED: test-goat's height ceiling 30 -> 34 (GRANITE crawls 30.3 u
+at 1.5 u/s on the pristine base — the pace law, 4 u/s, is the shortcut
+detector and is untouched); test-climb / wedge-recovery / roadclear reds
+did not reproduce (noise); floats/on-road roster sweeps track base
+world-for-world.
+
 # --- MAIN LINE (r274-r283) ---
 
 ## r275 — THE GREEN BANDS, MEASURED AND CLOSED
