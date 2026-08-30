@@ -121,9 +121,17 @@ const DIFFS = {
   // HARD's best lap within a clean drifting player's 0.80 reach (was 0.74-
   // 0.76) and let a 75%-throttle casual actually hold P1 on EASY (was
   // re-passed on FURKA by 15%).
-  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.74, aiCorner: 0.34, aiAggression: 0.65, rubberBand: 1.25, bandUp: 0.25 },
-  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 0.97, aiCorner: 0.78, aiAggression: 1.0,  rubberBand: 0.95, bandUp: 0.70 },
-  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.06, aiCorner: 0.90, aiAggression: 1.4,  rubberBand: 0.15 },
+  // ...solved rather than nudged (r285): the measured dilution between the
+  // corner budget and LAP pace is lap ∝ aLat^0.26 (clamps, straights and the
+  // crawl floor absorb the rest), so the laws' targets convert directly:
+  // HARD's best lap inside a clean player's 0.80 with margin, NORMAL a real
+  // step below HARD, EASY beaten by a 75%-throttle casual on FURKA's narrow
+  // laps too, not just PINE's. HARD rivals now plan 19-37 u/s² — the same
+  // neighbourhood a drifting player actually sustains, which is the first
+  // time the villain obeys the physics it sells.
+  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.74, aiCorner: 0.26, aiAggression: 0.65, rubberBand: 1.25, bandUp: 0.25 },
+  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 0.97, aiCorner: 0.62, aiAggression: 1.0,  rubberBand: 0.95, bandUp: 0.70 },
+  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.06, aiCorner: 0.68, aiAggression: 1.4,  rubberBand: 0.15 },
 };
 
 const UPGRADES = [
