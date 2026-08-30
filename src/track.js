@@ -13488,11 +13488,15 @@ export class Track {
       const a = a0 + (t - 0.5) * 0.34 + (k % 2 ? 0.05 : -0.05);
       let w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
       q.setFromAxisAngle(up, a + 1.2);
-<<<<<<< HEAD
-      const gx = Math.cos(a) * r, gz = Math.sin(a) * r;
-      if (this._nearGoat(gx, gz, Math.max(w, d) * 0.5)) {  // ice off the climbable peak
-=======
       let gx = Math.cos(a) * r, gz = Math.sin(a) * r;
+      // ice off the climbable peak: the goat route must stay open (merge of
+      // the goat-peak line with r278's measured glacier walk — the walk
+      // handles the ROAD, this handles the mountain)
+      if (this._nearGoat(gx, gz, Math.max(w, d) * 0.5)) {
+        m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
+        slabs.setMatrixAt(k, m4);
+        continue;
+      }
       // The massif spends `w * 0.5` here, which is what a BOX would reach.
       // This form reaches 0.72 of its scale and the slab is scaled unevenly
       // (w by d), so the flank is measured rather than halved — on the widest
@@ -13567,7 +13571,6 @@ export class Track {
         gone = w < 40;
       }
       if (gone) {
->>>>>>> origin/main
         m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
         slabs.setMatrixAt(k, m4);
         continue;
@@ -13587,8 +13590,11 @@ export class Track {
       slabs.setMatrixAt(k, m4);
       col.setRGB(0.78 + t * 0.14, 0.88 + t * 0.1, 1.0).multiplyScalar(0.7 + Math.random() * 0.3);
       slabs.setColorAt(k, col);
+      // `flank` is r278's measured reach of this form at this scale (0.72,
+      // not the box's 0.48) and it already shrank with any fit pass — the
+      // collider is the ice that is actually drawn
       this.solids.push({
-        x: gx, z: gz, r: Math.max(w, d) * 0.48,
+        x: gx, z: gz, r: flank,
         y: gy - h * 0.18 + 2, h, mat: 'stone', prof,
       });
     }

@@ -3808,7 +3808,9 @@ it is `_autoQuality` dropping the pixel ratio under load, and the gate passes
 both because it checks the box against the SCREEN and the buffer's ASPECT
 against the box — never the buffer's size against anything.
 
-<<<<<<< HEAD
+
+# --- AGENT-DRIVER LINE (continued) ---
+
 ## r273-line — THE PHONE SHOT ON THE BLACK APRON, AND THE EXEMPTION THAT NEVER SAID WHO IT WAS FOR
 
 A phone shot off the live r273 build: 8th of 8 at 0:16.7, 3 km/h, hull 77,
@@ -4102,7 +4104,9 @@ red is a UI card, red on base too), playermoves, boot, goatpeak all green.
     0.12/1.2  the slip-feed threshold and gain
 All in vehicles.js, each at its comment. The A/B instrument is
 tools-scratch/cornergrip.mjs; run it before touching any of them.
-=======
+
+# --- MAIN LINE (r274-r283) ---
+
 ## r275 — THE GREEN BANDS, MEASURED AND CLOSED
 Two rounds of guessing at this, one of which broke the view for everyone. This
 time: measure the screenshot first.
@@ -4368,4 +4372,3 @@ ground is a floor with a wood standing on it, and it is the thing to reach for
 if these ever want a skyline.
 
 Gates: `iconparts` on the shelf rig.
->>>>>>> origin/main
