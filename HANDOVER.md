@@ -4161,6 +4161,26 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r286 — THE STANDING START OBEYS THE TYRE
+"Driving needs fixing from Start", minutes after r285 went live. Measured
+before touching anything (tools-scratch/launchtest.mjs, branch AND the
+r283 worktree): 0-100 km/h in 0.92 s, IDENTICAL on both — accel*punch
+puts ~53 u/s² straight into velocity, no traction anywhere in the
+longitudinal path. r284 taught the LATERAL tyre a budget and left the
+drive wheels exempt from it.
+
+The fix mirrors the lateral law where wheelspin lives: drive force caps
+at 2.8*gripBudget at standstill and the cap fades out by ~60% of
+SHOWROOM speed (up there a real car is power-limited, which is what the
+fade models — and it is what keeps the mid-range tune and the top speed
+untouched). The overdrive feeds `_spinFeed` into the slip law, so a
+launch is slip 0.6 through first gear — the tail wags, the tyres spin,
+and 0-100 lands at 2.05 s (0-60 1.27, 0-160 3.6): supercar, not
+teleporter. Validated after: difficulty 12/12, climb, goat 26/26,
+unstuck 9/9, wedge 4/4 — the cap costs nothing downstream (climbs get
+the SAFE direction: less uphill thrust, and every goat law was already
+judging pace, not power).
+
 # --- MAIN LINE (r274-r283) ---
 
 ## r275 — THE GREEN BANDS, MEASURED AND CLOSED
