@@ -1,7 +1,7 @@
 // Car meshes (built from primitives), arcade physics, and rival AI.
 import * as THREE from 'three';
 import { ROAD_HALF, RIM_RADIUS, mergeBoxes } from './track.js';
-import { numberPlateTexture } from './textures.js';
+import { numberPlateTexture, glowTexture } from './textures.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
 const SPRAY_SNOW = new THREE.Color(0xf4faff); // tire spray tints (snow / wet)
@@ -69,6 +69,7 @@ const VY_CAP = 11;
 const SCORCH = new THREE.Color(0x1c1a18); // damage tint target
 const _hitNormal = new THREE.Vector3(); // scratch: obstacle bounce normal
 const _splash = new THREE.Vector3();    // scratch: puddle splash spawn point
+const _leafBack = new THREE.Vector3();  // scratch: -forward, for the leaf wake
 const _obPos = new THREE.Vector3();     // scratch: obstacle/puddle track projection (AI)
 const _shove = new THREE.Vector3();     // scratch: ram-contact push direction
 
@@ -258,6 +259,95 @@ function _wedgeGeo(w, h, d, { frontDrop = 0, frontBack = 0, backDrop = 0, backFw
   return geo;
 }
 
+/** ONE MATERIAL FOR EVERY CAR'S LAMPS.
+ *
+ *  Nothing about it varies per car, and `fadeCarLights` has to write it every
+ *  frame — eight cars meant eight identical writes and eight copies of the
+ *  same glow texture. It is a module singleton, which also means
+ *  `_dropCarMesh` must not dispose it (see the guard there).
+ */
+export const CAR_LIGHT_OPACITY = 0.85;
+let _carLightMat = null;
+export function carLightMaterial() {
+  if (_carLightMat) return _carLightMat;
+  _carLightMat = new THREE.MeshBasicMaterial({
+    map: glowTexture(), vertexColors: true, transparent: true,
+    opacity: CAR_LIGHT_OPACITY, blending: THREE.AdditiveBlending,
+    depthWrite: false, side: THREE.DoubleSide, fog: false,
+  });
+  return _carLightMat;
+}
+
+const _fadeV = new THREE.Vector3();
+/** THE BEAM IS A FLAT QUAD LYING ON THE ROAD, so how much of it the camera
+ *  sees is decided entirely by how steeply the camera looks down.
+ *
+ *  Reported from a phone on the TOP-DOWN view: a blown-out white wedge four
+ *  car-lengths long washing out the carriageway. The rig was tuned from CHASE,
+ *  where the same quad is seen at a 13 degrees grazing angle and reads as a
+ *  soft pool; from 46 u up it presents its whole area to the lens and an
+ *  additive quad over dark tarmac saturates to paper white.
+ *
+ *  Camera elevation is the whole of it — the downward component of the view
+ *  direction runs 0.03 in the driver's seat, 0.22 on CHASE, 0.56 on TRAIL and
+ *  0.82 on TOP FAR — so the fade is driven straight off that. The LAMP and
+ *  TAIL quads fade with it, which costs nothing: they are vertical, so from
+ *  overhead they are edge-on anyway, and each car's own modelled lenses (the
+ *  `tailMat` bars) are solid geometry and untouched.
+ */
+export function fadeCarLights(camera) {
+  if (!_carLightMat || !camera) return;
+  const down = Math.abs(_fadeV.set(0, 0, -1).applyQuaternion(camera.quaternion).y);
+  const k = 1 - THREE.MathUtils.smoothstep(down, 0.28, 0.74) * CAR_LIGHT_TOPDOWN_CUT;
+  _carLightMat.opacity = CAR_LIGHT_OPACITY * k;
+}
+/** How much of the beam is taken away looking straight down. Measured, not
+ *  guessed — see `tools-scratch/beamlook.mjs`.
+ *
+ *  0.45, DOWN FROM 0.72, BECAUSE THE DEFAULT CAMERA IS AN OVERHEAD ONE.
+ *  Reported from a phone as "all cars need to have headlights" — and every car
+ *  had them: all eight rigs report visible on a dark world, and they share a
+ *  single material, so no car can be lit differently from another. What
+ *  differed was the CAMERA. `beamread.mjs` hides every rig and counts the
+ *  pixels that change, which is exact:
+ *
+ *      TOP-DOWN  down 0.76   opacity 0.238
+ *      TOP FAR   down 0.82   opacity 0.238
+ *      TRAIL     down 0.55   opacity 0.461
+ *      CHASE     down 0.23   opacity 0.850
+ *
+ *  The two overhead modes were sitting on the floor of the curve at 28% — and
+ *  TOP-DOWN is what the game starts in. At that strength the nearest, best-
+ *  angled car still shows a beam and the rest do not, which reads exactly as
+ *  "some cars have headlights and some don't". The reason for the fade is
+ *  real (a wedge lying flat on the road, seen from straight above, is a
+ *  painted puddle rather than light), so it stays — it just may not take the
+ *  read away entirely.
+ *
+ *  ...AND THEN 0.18, ASKED FOR A SECOND TIME. 0.45 still halved the beam in
+ *  the mode the game opens in, and halved is what "some cars have headlights
+ *  and some don't" looks like on a phone. The purist argument for a deep cut —
+ *  that a wedge lying flat on the road, seen from above, reads as paint rather
+ *  than as light — loses to being asked twice for headlights. What survives of
+ *  it is a gentle taper: straight down is still a little softer than a chase
+ *  view rather than identical to it. */
+export const CAR_LIGHT_TOPDOWN_CUT = 0.18;
+
+/* WHY THERE IS NO `THREE.SpotLight` ANY MORE.
+ *
+ * r245 lit the night with one real spotlight on the PLAYER, plus a pair of
+ * small sphere lamps dressed onto every car. That is exactly what was
+ * photographed and reported twice as "all cars need to have headlights": the
+ * rivals had lamp dots and nothing on the road, because there was one
+ * headlight in the world and it belonged to you.
+ *
+ * Eight spotlights is not the fix — the light count is part of every
+ * material's shader cache key, so it is eight times the per-fragment cost and
+ * a full recompile on the worlds that have it. The fix is that NOBODY gets a
+ * real one: the merged rig below paints the lamp, the pool it lays on the
+ * road and the tail lenses, in a single additive draw call per car, and every
+ * car on the grid gets the same one. Equal, and cheaper than what it replaced.
+ */
 export function buildVoxelRacer(spec) {
   const { body, accent, stripe = null, number = null, style = 'crown', rims = null } = spec;
   const g = new THREE.Group();
@@ -387,8 +477,14 @@ export function buildVoxelRacer(spec) {
     // the picture rather than as the inside of a car. A real dash top is matte
     // mid-grey that catches the sky, so these sit at roughly the road's own
     // brightness and the lower frame becomes part of the car.
-    const inner = mat(0x4a463f, { roughness: 0.92, metalness: 0.02 });
-    const trim = mat(0x5d564c, { roughness: 0.8, metalness: 0.08 });
+    // BRIGHT ENOUGH TO READ AS FURNITURE. Painted magenta by a probe, the
+    // dash showed as a full-width slab of the lower frame; at 0x4a463f under
+    // a cabin that gets mostly hemisphere light it rendered as silhouette —
+    // the driver's-view report's black band was one part this, one part the
+    // car's own shadow on the road (handled in _driverCamera). Two steps
+    // lighter keeps it obviously interior, stops it reading as a hole.
+    const inner = mat(0x6b6155, { roughness: 0.9, metalness: 0.02 });
+    const trim = mat(0x82786a, { roughness: 0.78, metalness: 0.08 });
     const cockpit = new THREE.Group();
     cockpit.name = 'cockpit';
     const put = (w, h, d, m, x, y, z, rx = 0) => {
@@ -440,7 +536,9 @@ export function buildVoxelRacer(spec) {
     // measured filling the bottom 26% of the frame, against 20% at 2.1 with a
     // clear band of road under it. A shallow surface seen edge-on is all
     // thickness and no surface.
-    const AHEAD = 2.1;
+    const AHEAD = 2.5;   // pushed from 2.1: same trade of angle for distance
+                         // that took it from 1.15 to 2.1, one step further —
+                         // the slab was landing mid-frame, not the bottom fifth
     // dash top edge at ~atan(0.72/2.1) = 19 degrees below the axis, plus the
     // camera's own pitch, which puts it in the bottom fifth.
     put(cabW * 1.05, 0.16, 0.40, inner, 0, eyeY - 0.72, eyeZ + AHEAD, -0.16);
@@ -793,6 +891,10 @@ export function buildVoxelRacer(spec) {
     ao.rotation.x = -Math.PI / 2;
     ao.position.y = 0.03;
     ao.renderOrder = 1;
+    // published so the driver's seat can hide it: from inside the car the
+    // blob is a black pool you carry around on the road ahead — see
+    // _driverCamera
+    g.userData.aoBlob = ao;
     g.add(ao);
   }
 
@@ -839,7 +941,24 @@ export function buildVoxelRacer(spec) {
   // a hub boss is the whole upgrade - about 100 triangles a car.
   //
   // The BODIES stay faceted on purpose: this is a voxel racer.
-  const WSEG = 14;
+  // WHEELS ARE ROUND, AND 14 SIDES IS NOT. Reported as tyres that "seem to be
+  // elliptical instead of round", and the geometry says so before any render
+  // does: a regular N-gon measures 2r vertex-to-vertex and 2r*cos(PI/N) across
+  // the flats, so at N = 14 its own bounding box is 1/cos(PI/14) = 1.026 out of
+  // round. Measured on every car in the catalogue at 1.026 exactly.
+  //
+  // 2.6% would be nothing on a prop. It is not nothing here: the wheels are
+  // the roundest thing the eye expects in a frame full of deliberate facets,
+  // they sit dead centre of every shelf card and every chase view, and the
+  // long axis lands wherever the wheel happens to have stopped spinning — so
+  // it reads as an egg that rotates. 24 sides puts it at 1.0086, under a
+  // percent, with facets 15 degrees apart.
+  //
+  // The triangle budget this was traded against is real but small: a tyre and
+  // its rim go from 84 to 144 and from 84 to 144 triangles, about 480 a car,
+  // ~3.8k over a full grid of eight. The forests it was protecting run tens of
+  // thousands.
+  const WSEG = 24;
   const tireGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.55, WSEG);
   tireGeo.rotateZ(Math.PI / 2);
   const rimGeo = mergeGeos([
@@ -897,6 +1016,113 @@ export function buildVoxelRacer(spec) {
   // is FrontSide like everything else, so its faces are back-facing from in
   // there and cull, while the bonnet ahead keeps its top face pointed at the
   // eye and draws. The car can stay on screen.
+  // ---- HEADLIGHTS, TAIL LIGHTS, AND WHAT THEY THROW ON THE ROAD ----------
+  //
+  // Asked for directly: "make the light like real car light, other cars should
+  // have light too." Every car in the game drove at night with dead lamps —
+  // the only thing lighting the road ahead of the pack was a chopper's
+  // searchlight, which is what the report was actually looking at.
+  //
+  // NO LIGHT SOURCES. This game bans per-car point lights for the reason
+  // `_buildLamps` states — a night city cannot afford two hundred of them and
+  // a shader recompile per light count. What sells a headlight from a chase
+  // camera is not illumination, it is the LAMP burning and the POOL it lays on
+  // the tarmac, and both of those are painted.
+  //
+  // ONE DRAW CALL FOR ALL OF IT. Six quads — two lamps, two road pools, two
+  // tail lenses — merged into a single geometry with per-vertex colour, so the
+  // whole rig on a car is one additive mesh. Six meshes each would have been
+  // 48 draw calls on an eight-car grid, which is most of a world's budget for
+  // something nobody would have called scenery.
+  {
+    const LP = [], LU = [], LC = [];
+    const cH = new THREE.Color(0xfff0cc), cT = new THREE.Color(0xff2a14);
+    // `glowTexture` is opaque white at its centre, so a quad whose four UVs
+    // all sit at (0.5, 0.5) takes a FLAT alpha and lets vertex colour do every
+    // bit of the shaping. That one trick is what lets a soft round lamp and a
+    // hard-edged beam wedge share a single material, and so a single draw call.
+    const HOT = [0.5, 0.5];
+    const push = (P, uv, c) => { LP.push(P[0], P[1], P[2]); LU.push(uv[0], uv[1]); LC.push(c[0], c[1], c[2]); };
+    const quad = (P, UV, C) => { for (const k of [0, 1, 2, 0, 2, 3]) push(P[k], UV[k], C[k]); };
+
+    /** The lamp itself, burning: a soft blob on the plane of the panel it sits
+     *  on, painted by the glow texture's own falloff. */
+    const lamp = (cx, cy, cz, w, h, col, k) => {
+      const hw = w / 2, hh = h / 2, c = [col.r * k, col.g * k, col.b * k];
+      quad([[cx - hw, cy - hh, cz], [cx + hw, cy - hh, cz], [cx + hw, cy + hh, cz], [cx - hw, cy + hh, cz]],
+        [[0, 0], [1, 0], [1, 1], [0, 1]], [c, c, c, c]);
+    };
+
+    /** WHAT THE LAMP THROWS ON THE TARMAC, and the part a driver actually
+     *  reads. Not a blob: a wedge that leaves the lamp narrow, opens out down
+     *  the road and fades to nothing at its far edge and along both sides.
+     *  It is a small GRID because the falloff lives in the vertex colours —
+     *  the first cut of this was one big quad with the radial glow stretched
+     *  over it, and from the chase camera that reads as a puddle parked under
+     *  the nose rather than as light going anywhere. */
+    const beam = (xL, z0, len, w0, w1, col, peak) => {
+      const NL = 9, NW = 7;
+      const at = (i, j) => {
+        const t = i / NL, u = j / NW;
+        const hw = (w0 + (w1 - w0) * t) / 2;
+        const f = Math.pow(1 - t, 2.2) * Math.pow(Math.sin(Math.PI * u), 1.8) * peak;
+        return { p: [xL + (u * 2 - 1) * hw, 0.05, z0 + len * t],
+          c: [col.r * f, col.g * f, col.b * f] };
+      };
+      for (let i = 0; i < NL; i++) {
+        for (let j = 0; j < NW; j++) {
+          const a = at(i, j), b = at(i, j + 1), c = at(i + 1, j + 1), d = at(i + 1, j);
+          quad([a.p, b.p, c.p, d.p], [HOT, HOT, HOT, HOT], [a.c, b.c, c.c, d.c]);
+        }
+      }
+    };
+
+    const zF = bodyLen / 2, zR = -bodyLen / 2;
+    const tailY = baseY + bodyH * 0.55 + 0.12;
+    for (const s of [-1, 1]) {
+      // The lamp on the modelled headlamp disc, in TWO passes: a wide soft
+      // halo and a small hot core on top of it. One quad on its own paints a
+      // pale panel — an even, edge-to-edge grey that reads as a sticker. The
+      // core is what makes it burn.
+      lamp(0.9 * s, faceY, zF + 0.06, 1.5, 1.12, cH, 0.5);
+      lamp(0.9 * s, faceY, zF + 0.08, 0.62, 0.5, cH, 1.8);
+      // its wedge on the road. The pair overlap down the middle, which is what
+      // gives a hot core between the two and a soft spill outboard of them.
+      beam(1.0 * s, zF + 0.5, 19, 1.7, 7.2, cH, 0.26);
+      // Tail lens, same two passes, wide enough to bloom over the WHOLE
+      // cluster (the modelled lamps run x 0.66 to 1.35) rather than sit beside
+      // it as a dot.
+      lamp(1.05 * s, tailY, zR - 0.06, 1.7, 0.86, cT, 0.45);
+      lamp(1.05 * s, tailY, zR - 0.08, 1.05, 0.42, cT, 1.1);
+    }
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute('position', new THREE.Float32BufferAttribute(LP, 3));
+    lg.setAttribute('uv', new THREE.Float32BufferAttribute(LU, 2));
+    lg.setAttribute('color', new THREE.Float32BufferAttribute(LC, 3));
+    const lights = new THREE.Mesh(lg, carLightMaterial());
+    lights.name = 'carLights';
+    lights.renderOrder = 3;
+    // A BEAM IS LIGHT, NOT BODYWORK, and this is the line that says so to
+    // everything that asks a car how big it is. The wedges reach 19 u down the
+    // road, so a plain `Box3.setFromObject` on a car returns a box the length
+    // of a bus: the garage bay backed its camera off to 27 u and the car went
+    // SMALLER the round the lights went in, and the kit-fit test started
+    // measuring the nose against a beam. `Box3` uses a geometry's own
+    // `boundingBox` when it has one, so the rig reports the bodywork it sits
+    // on. Culling is turned off to go with it — a shrunken box must never be
+    // allowed to cull the beam away — which costs nothing on a daylight world
+    // because the whole mesh is invisible there.
+    lg.boundingBox = new THREE.Box3(
+      new THREE.Vector3(-1.6, 0, zR - 0.1), new THREE.Vector3(1.6, faceY + 0.6, zF + 0.1));
+    lg.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, faceY * 0.5, 0), bodyLen);
+    lights.frustumCulled = false;
+    // OFF UNTIL THE WORLD IS DARK. Beams in daylight are a cartoon; the game
+    // turns these on per world (see `worldIsDark`).
+    lights.visible = false;
+    g.add(lights);
+    g.userData.carLights = lights;
+  }
+
   g.userData.rig = { wheelR, wheelY, baseY, capTop,
     cabY, cabZ, cabH, cabW, cabL,
     zRear: _box.min.z, zFront: _box.max.z,
@@ -1440,9 +1666,21 @@ export function applyUpgradeKit(group, up = {}, parts = null) {
   }
   // TIRES — fatter rubber. Scaling the EXISTING wheels rather than adding new
   // ones keeps the spin and steer bindings in userData intact.
+  //
+  // FATTER IS ONE AXIS, AND IT IS X. The tyre cylinder is built about Y and
+  // then `rotateZ(PI/2)`, so its AXLE runs along X and the round part of it
+  // lies in the Y-Z plane. This used to scale (wf, 1, wf) — the axle, which is
+  // right, AND Z, which is one of the two circular axes, while leaving Y at 1.
+  // That is an ellipse by construction, and a big one: measured 1.19 out of
+  // round at tires 2 and 1.374 at tires 4, on top of the polygon error above.
+  // Every upgraded car in the game had visibly oval wheels.
+  //
+  // Scaling X alone widens the tread — 0.55 to 0.64 and 0.74 — which is what
+  // "fatter rubber" means, and leaves the ride height and the roofline the
+  // drowning rule reads from exactly where they were.
   const tir = lv('tires');
   const wf = tir >= 4 ? 1.34 : tir >= 2 ? 1.16 : 1;
-  for (const w of group.userData.wheels ?? []) w.scale.set(wf, 1, wf);
+  for (const w of group.userData.wheels ?? []) w.scale.set(wf, 1, 1);
   // MUD FLAPS behind the rear wheels — a rally tell, and the last thing in
   // shot when the car is throwing a rooster tail at the camera.
   if (tir >= 3) {
@@ -1524,10 +1762,31 @@ export function solidRadiusAt(ob, y) {
   return ob.r * ob.prof[k];
 }
 
+/** IS THIS A WORLD WITH ITS LIGHTS ON?
+ *
+ *  Not `sunIntensity` — NEON GRID EXPRESSWAY runs a 2.0 moon and a 2.8 ambient
+ *  and is the darkest world on the roster. The sky is the honest signal: a
+ *  theme paints `skyTop` for the hour it is set at, so its luminance says
+ *  night or day for every world without a new flag on any of them.
+ */
+export function worldIsDark(T) {
+  if (!T) return false;
+  if (T.dusk) return true;
+  const hex = String(T.skyTop ?? '#3a7fb8').replace('#', '');
+  const n = parseInt(hex, 16);
+  if (!Number.isFinite(n)) return false;
+  const r = ((n >> 16) & 255) / 255, g2 = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  return 0.2126 * r + 0.7152 * g2 + 0.0722 * b < 0.22;
+}
+
 export class Car {
   constructor(game, mesh, { maxSpeed = 52, accel = 34, grip = 5.2, steerRate = 2.5, driftLag = 0.22, steerTaper = 0.18 } = {}) {
     this.game = game;
     this.mesh = mesh;
+    // Lights are switched in `_syncLights`, not here: a car can be built
+    // BEFORE its world is (the player's is), so asking the track at
+    // construction gets `undefined` and every lamp stays dark on a night
+    // stage — which is exactly what the first cut of this shipped.
     // yaw -> pitch -> roll so body pitch/roll read correctly at every heading
     mesh.rotation.order = 'YXZ';
     game.scene.add(mesh);
@@ -1695,8 +1954,17 @@ export class Car {
     // down and is one frame stale, which at 60 Hz is 17 ms and nothing here
     // changes that fast. On the course, in free roam, and for every AI car it
     // is 0, so this is exactly 1 and no rival is ever touched.
-    const climbAuth = ((this._strayed ?? 0) > 0 && terrGrade > OFF_CLIMB)
-      ? Math.max(0, 1 - (terrGrade - OFF_CLIMB) / OFF_FADE) : 1;
+    // ...and the GOAT PEAK is closed outright in a road event. Its route is
+    // BUILT of flats that reset the grade fade — that is what makes it
+    // climbable in roam — so a racer could stair-climb the spiral 46 u in
+    // 30 s past a fade that never saw a slope (measured, test-goat law 1).
+    // Off the course AND on the peak, the engine simply gives nothing;
+    // plain roam publishes _strayed = 0 and never enters this branch.
+    const onGoatRace = (this._strayed ?? 0) > 0
+      && this.game.track?._nearGoat?.(this.pos.x, this.pos.z, 26);
+    const climbAuth = onGoatRace ? 0
+      : ((this._strayed ?? 0) > 0 && terrGrade > OFF_CLIMB)
+        ? Math.max(0, 1 - (terrGrade - OFF_CLIMB) / OFF_FADE) : 1;
 
     // surface conditions: snow and rain-wet worlds drive differently — less
     // brake bite, wheelspin on throttle, and a much earlier, longer slide.
@@ -1879,6 +2147,12 @@ export class Car {
     // handling raises the slip onset slightly — fewer accidental breakaways,
     // but the threshold stays low enough that committed cornering still drifts
     let slipTarget = THREE.MathUtils.clamp((cornerLoad - (0.28 + 0.05 * hnd) * sGrip) * 1.7, 0, 1);
+    // ...and the lateral-acceleration law feeds it too: demand past the
+    // tyre's budget IS a slide, whatever the steer fraction was (one frame
+    // stale, which at 60 Hz is nothing)
+    if ((this._overGrip ?? 0) > 0.12) {
+      slipTarget = Math.max(slipTarget, Math.min(1, this._overGrip * 1.2));
+    }
     if (inputs.drift) slipTarget = 1; // handbrake forces a full slide
     const slipRate = slipTarget > this.slip ? 7 : 3.2; // break loose fast, recover smoothly
     this.slip += (slipTarget - this.slip) * Math.min(1, slipRate * dt);
@@ -1886,10 +2160,16 @@ export class Car {
     // moving, which is what makes a wing a TRADE: it costs top speed outright
     // and pays it back only in the fast corners. At a standstill a GT wing does
     // nothing at all; flat out it is worth 40% more grip than no wing.
-    let grip = this.grip * (1 + 0.08 * hnd) * (1 - 0.78 * this.slip) * sGrip * (this.gripBoost || 1)
+    // THE TYRE'S BUDGET, SEPARATED FROM ITS COLLAPSE. Everything the surface
+    // and the car contribute — compound, handling, boost, wing, a wet ford, a
+    // loose landing — makes the BUDGET; the slip collapse and the handbrake
+    // are what happens once the budget is spent, and they apply only to the
+    // scrub rate below. (Same products as before, reordered: multiplication
+    // commutes, the scrub rate is bit-identical.) The budget also prices the
+    // new lateral-acceleration law further down.
+    let gripBudget = this.grip * (1 + 0.08 * hnd) * sGrip * (this.gripBoost || 1)
       * (1 + (this.downforce || 0) * speedN);
-    if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
-    if (this.landGrip > 0) { this.landGrip -= dt; grip *= 0.4; } // loose for ~0.4s after landing
+    if (this.landGrip > 0) { this.landGrip -= dt; gripBudget *= 0.4; } // loose for ~0.4s after landing
     // ---- river-fords: wet tires. Ford crossings set _wetT=3.5 with a gentle
     // ≈0.8 grip factor fading linearly back to 1; plain puddles keep their
     // short sharp 0.75 slick (_wetMax stays 0 for those).
@@ -1899,7 +2179,7 @@ export class Car {
     // so it lands one frame later — which is the right side of the boundary.
     if (this._fordNow > 0) {
       this._fordNow -= dt;
-      grip *= 0.42;
+      gripBudget *= 0.42;
     }
     // AFTER: wet tyres, fading. Was a 20% loss at most, which nobody could feel
     // — the HUD said WET TIRES and the car drove exactly as before. Deeper now,
@@ -1910,17 +2190,29 @@ export class Car {
       if ((this._wetMax ?? 0) > 1) {
         const skill = this === this.game.player ? (this.offroadSkill ?? 0.7) : 0.7;
         const loss = 0.46 * (1 - 0.42 * skill);
-        grip *= 1 - loss * Math.max(0, this._wetT) / this._wetMax;
+        gripBudget *= 1 - loss * Math.max(0, this._wetT) / this._wetMax;
       } else {
-        grip *= 0.75;
+        gripBudget *= 0.75;
       }
       if (this._wetT <= 0) this._wetMax = 0;
     }
+    this._gripBudget = gripBudget;
+    let grip = gripBudget * (1 - 0.78 * this.slip);
+    if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
     // opt-in grip instrument (headless): set __game.__gripProbe = {} to read
     // the lateral grip the player is actually running (wet-tire verification)
     if (this.game.__gripProbe && this === this.game.player) this.game.__gripProbe.grip = grip;
     const vlBefore = vl;
-    vl -= vl * Math.min(1, grip * dt);
+    // ...AND SLIDING FRICTION HAS A CEILING TOO. The scrub was vl·grip —
+    // proportional, unbounded — so the bigger the slide, the harder the
+    // tyres pulled, and a car 80° sideways at 180 km/h was hauled back onto
+    // its heading at 1.4 rad/s (measured): the drift state existed and the
+    // trajectory ignored it. A sliding tyre is kinetic friction: force
+    // capped near the same budget that broke it loose (a touch above, so
+    // recovery beats breakaway and the slide never oscillates). Small
+    // corrections sit below the cap and keep today's proportional feel.
+    const aScrub = Math.min(Math.abs(vl) * grip, 4.4 * gripBudget);
+    vl -= Math.sign(vl) * Math.min(Math.abs(vl), aScrub * dt);
     // drift reward: convert a slice of the scrubbed-off slide back into forward speed
     if (this.slip > 0.4) vf = Math.min(topSpeed, vf + Math.abs(vlBefore - vl) * 0.35 * (vf >= 0 ? 1 : -1));
 
@@ -1990,7 +2282,37 @@ export class Car {
     // While gripped the velocity turns with the car (arcade rails). While slipping
     // it lags the yaw: part of the turn spills forward speed into lateral slide,
     // so hard cornering at speed visibly breaks the rear loose.
-    const lag = this.airborne ? 0 : this.slip * this.driftLag;
+    //
+    // A TYRE HAS A BUDGET, AND THE RAILS WERE IGNORING IT. The lag above
+    // capped at slip·driftLag ≈ 0.22, so even in a "full slide" 78% of the
+    // yaw still rotated the velocity directly — measured with cornergrip.mjs:
+    // a 16.5 u radius circle held at 180 km/h, 151 u/s² of lateral grip,
+    // fifteen g. Reported as exactly that: "I can turn sharp curves with
+    // 180 km/h. That illogical. I have to drift and loose control."
+    //
+    // The budget is the one the rival planner has always driven within —
+    // paceEstimate's vGrip = sqrt(SLIDE·grip/k), i.e. a_lat ≤ 4·grip — so
+    // pricing the player's yaw against 4·gripBudget makes the field's
+    // physics and the player's the same physics. Demand under budget is
+    // untouched: ordinary driving stays on its rails. Demand past it spills
+    // the EXCESS share of the turn into slide instead of trajectory: the
+    // nose comes round, the car keeps going, and you are drifting — or, far
+    // past it, losing control. PLAYER ONLY: the AI already obeys the number
+    // by planning, and must keep its 8/8-alive record.
+    let over = 0;
+    if (this === this.game.player && !this.airborne && dt > 0) {
+      // the WHOLE velocity vector, not the forward component: |vf| collapses
+      // exactly when the car goes sideways, and pricing demand on it handed
+      // the rails back mid-slide — an accidental auto-catch at 70° of drift
+      const aDemand = Math.hypot(vf, vl) * Math.abs(dTheta) / dt;
+      const aMax = 4.0 * (this._gripBudget ?? this.grip);
+      over = aMax > 0 ? THREE.MathUtils.clamp((aDemand - aMax) / aMax, 0, 1) : 0;
+    }
+    this._overGrip = over;
+    const lag = this.airborne ? 0 : Math.min(1, this.slip * this.driftLag + over * 0.9);
+    if (this.game.__gripProbe && this === this.game.player) {
+      Object.assign(this.game.__gripProbe, { over, lag, dTheta, vf: +vf.toFixed(1), vl: +vl.toFixed(1) });
+    }
     if (lag > 0) {
       const nvf = vf + vl * dTheta * lag;
       vl -= vf * dTheta * lag;
@@ -2058,6 +2380,28 @@ export class Car {
       }
     }
 
+    // ---- leaf litter kicked up on a shedding world ----
+    // Gated on the theme's own weather rather than a new flag: a world that is
+    // dropping leaves out of its canopy is a world with leaves on the road,
+    // and there is no case where one is true and the other is not. Same
+    // distance cull and the same speed floor as the dust above, so an autumn
+    // grid costs no more than any other one at range.
+    const wx = gm.track?.theme?.weather;
+    if (this.alive && !this.airborne && sp > 9 && wx?.type === 'leaves' && gm.player) {
+      const isPlayer = this === gm.player;
+      if (isPlayer || this.pos.distanceToSquared(gm.player.pos) < 10000) {
+        // thicker than dust, because litter is what the season IS — but only
+        // while actually moving through it, so a stopped car sits in silence
+        const dens = (isPlayer ? 0.85 : 0.4) * (0.25 + 0.75 * speedN);
+        if (Math.random() < dens) {
+          _leafBack.copy(nf).multiplyScalar(-1);
+          const front = this.pos.clone().addScaledVector(nf, 1.35);
+          front.y = this.y + 0.05;
+          gm.particles.leafKick(front, _leafBack, ns, speedN, wx.color);
+        }
+      }
+    }
+
     // ---- rubber on the road: skid marks while sliding hard ----
     if (this.alive && !this.airborne && Math.abs(vl) > 6 && sp > 12 && gm.skids) {
       this._skidClock = (this._skidClock ?? 0) - dt;
@@ -2110,10 +2454,21 @@ export class Car {
       if (this !== gm.player) wallHere = true; // AI safety net, all levels
       else if (cliffy) {
         // canyon: rock walls are solid — except the low berm near the start
-        // bowl, where the cliffs open up and free-roamers can drive out
+        // bowl, where the cliffs open up and free-roamers can drive out.
+        //
+        // FREE-ROAMERS. The exemption never said so, and a RACING car went
+        // through it too: UNDERCITY's start bowl runs a 1.7 u berm for ~40
+        // samples on BOTH sides, so a racer carving wide off the line — or
+        // shoved wide by the pack — left the trench entirely and rolled to a
+        // stop on the black apron, 8th of 8 at 16 s (the r273 phone shot).
+        // With the throttle released no automatic net fires out there, on
+        // purpose, so the exit is the thing to close: in a road event the
+        // berm is a wall like any other. It is visible knee-high stone, so
+        // holding a racer at it is not an invisible wall. The cliffSetback
+        // and past-the-outer-face carve-outs below still apply after this.
         const prof = t._cliffProfile ? t._cliffProfile(this.trackIndex, fside) : null;
         cliffProf = prof;
-        wallHere = !prof || prof.h > 2.5;
+        wallHere = !prof || prof.h > 2.5 || !freeRoam;
         // deep-valley worlds (cliffSetback) stand their faces well off the
         // verge: the player may roam the valley floor and only the ROCK is
         // solid - off-road slowness is the boundary in between
@@ -2364,7 +2719,32 @@ export class Car {
         // rock under a flyover that window is the point.
         if (ob.y !== undefined) {
           if (ob.h !== undefined) {
-            if (this.pos.y < ob.y - 3 || this.pos.y > ob.y + ob.h) continue;
+            // ...AND A MOUNTAIN HAS NO UNDERSIDE — IN PROPORTION. The lower
+            // pad was a flat −3 u, but a mountain's seat is sampled at the
+            // CENTRE of a 100-300 u footprint, and on sloping ground the
+            // flank foot runs 10-30 u lower — so a car approaching from
+            // downhill sat below the pad and the whole collider was skipped.
+            // Measured on SUMMIT CLIMB in roam: car at y 23.1, 111 u from a
+            // horizon hill seated at y 30 whose radius at that height is 164
+            // — inside the rock, gate said "under it, ignore". Fifty units
+            // of drawn mountain overhead, reported as "climbing and sinking
+            // in mountains".
+            //
+            // The rule is BINARY, not scaled. A first cut scaled the pad
+            // with height (h·0.35, capped 30) and FURKA's valleys promptly
+            // put a ramming car 30+ u below a cone's seat and inside it
+            // (invisible-walls' massif-ram law). A mountain has NO
+            // underside, full stop — and "mountain" is tall OR WIDE: a
+            // fit-shrunken ice chip is 15 u low but 40 u across, seated at
+            // its centre, and a car at its downhill toe sat 3 u under that
+            // seat and clipped 5.4 u inside (same law, measured — the
+            // height test alone let it through twice, byte-identical).
+            // Only genuinely small furniture keeps the old −3, so a verge
+            // boulder still does not shove cars riding the roadbed above
+            // its toe (GLACIER COL's grounded-step law owns that case).
+            if (ob.h > 20 || (ob.r ?? 0) > 10
+              ? this.pos.y > ob.y + ob.h
+              : (this.pos.y < ob.y - 3 || this.pos.y > ob.y + ob.h)) continue;
           } else if (Math.abs(this.pos.y - ob.y) > 6) continue;
         }
         const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
@@ -2813,6 +3193,16 @@ export class Car {
       if (strayed > 0) {
         const over = Math.min(1, strayed / 30);
         this.vel.multiplyScalar(Math.max(0, 1 - over * 1.2 * dt));
+        // THE PEAK IS CLOSED ON RACE DAY. The goat route's shelves defeat
+        // the climb-authority fade by design — each flat resets the throttle
+        // — so in a road event a racer could stair-climb the spiral 46 u in
+        // 30 s (measured, test-goat law 1). This drag only exists inside
+        // this `strayed > 0` branch, and plain roam publishes _strayed = 0,
+        // so the mountain stays fully climbable in the mode it was built
+        // for and becomes a hill of treacle in a race.
+        if (t._nearGoat?.(this.pos.x, this.pos.z, 26)) {
+          this.vel.multiplyScalar(Math.max(0, 1 - 2.5 * dt));
+        }
         if (over > 0.5 && !this._steepFed) {
           this._steepFed = 1.8;
           this.game.hud?.feed?.('OFF THE COURSE — TURN BACK', 'bad');
@@ -2961,6 +3351,39 @@ export class Car {
       // gap the proportional ease is already inside the cap, so ordinary
       // rolling ground drives exactly as before.
       const lift = VY_CAP * dt;
+      // GROUND RISING FASTER THAN THE CAR CAN CLIMB IS A WALL, NOT A FLOOR.
+      // The lift cap above stops teleport-jumps, but it also means a car
+      // driven at a FACE-steep slope outruns its own y-follow and passes
+      // horizontally INSIDE the terrain — measured on the goat dome's fall
+      // line: 29 u buried at 26 u/s, the whole "driving inside the mountain"
+      // class, on ground with no collider to say no. So when the gap has
+      // opened AND the ground here is genuinely face-steep, the into-slope
+      // velocity dies (tangential motion survives — you can turn along the
+      // face, you cannot pass through it). A SHELF-EDGE discontinuity keeps
+      // its old behaviour on purpose: the terrain beside a floating roadbed
+      // is near-flat, so its local gradient never trips this, and the
+      // capped ease still lifts a returning car onto the road it can see.
+      // ...AND ONLY OUT WHERE MOUNTAINS LIVE. test-goat's header warns that
+      // no law here may be a gradient test, because the steepest ground in
+      // the game is the VERGE — and this law, applied there, braked the
+      // rejoin scramble to 17% of speed kept (floor 35%, measured on its
+      // banks at grades 0.64-1.06). A rejoin bank is a moment, 12-40 u off
+      // the carriageway; a face you can pass inside of is a mountain,
+      // hundreds out. Sixty units of lateral is the fence between them.
+      const gap = gY - this.y;
+      if (gap > 2.5 && Math.abs(this.lateral ?? 0) > 60 && t.terrainHeight) {
+        const E = 2.2;
+        const dhdx = (t.terrainHeight(this.pos.x + E, this.pos.z)
+          - t.terrainHeight(this.pos.x - E, this.pos.z)) / (2 * E);
+        const dhdz = (t.terrainHeight(this.pos.x, this.pos.z + E)
+          - t.terrainHeight(this.pos.x, this.pos.z - E)) / (2 * E);
+        const gm2 = Math.hypot(dhdx, dhdz);
+        if (gm2 > 0.9) {
+          const gx2 = dhdx / gm2, gz2 = dhdz / gm2;
+          const vin = this.vel.x * gx2 + this.vel.z * gz2;
+          if (vin > 0) { this.vel.x -= gx2 * vin; this.vel.z -= gz2 * vin; }
+        }
+      }
       this.y += THREE.MathUtils.clamp((gY - this.y) * Math.min(1, 12 * dt), -lift, lift);
       this._climbRate = 0;
       this._lastGY = this.y;
@@ -3453,6 +3876,31 @@ export class Car {
     }
     return false;
   }
+
+  /** Headlights on iff the world is dark — checked against the TRACK OBJECT,
+   *  so it is right the first frame after a level swap and free every frame
+   *  after that.
+   *
+   *  ON `Car`, NOT ON `EnemyCar`. It was written on the rival subclass while
+   *  its own comment already said both the player and the rivals come through
+   *  it — and `PlayerCar.update` calls it on its FIRST line. So on every level
+   *  the player's update threw `_syncLights is not a function` and its whole
+   *  body was skipped. The frame loop catches and recovers, which is exactly
+   *  why nothing looked broken and `boot.mjs` stayed green: no crash, no
+   *  stack, just a car that never moved and a chase camera parked at the world
+   *  origin. Anything both subclasses call belongs on the base class.
+   */
+  _syncLights() {
+    // NO CACHE. This used to remember the track it had decided for and return
+    // early on every frame after, which made the decision stick to a car that
+    // had since been given a different MESH — and a freshly built rig has its
+    // lamps OFF. `swapPlayerCar` knew to clear the flag by hand; nothing else
+    // did, and nothing added later would. The cache was guarding one boolean
+    // write per car per frame, eight on a full grid. It bought nothing and the
+    // only thing it could cost you was your headlights.
+    const lt = this.mesh?.userData?.carLights;
+    if (lt) lt.visible = worldIsDark(this.game?.track?.T);
+  }
 }
 
 // ---------- AI racing brain ----------
@@ -3752,6 +4200,7 @@ export class EnemyCar extends Car {
 
   update(dt) {
     const g = this.game;
+    this._syncLights();
     if (!this.alive) {
       this.respawnTimer -= dt;
       if (this.respawnTimer <= 0) this.respawn();
@@ -4590,6 +5039,7 @@ export class PlayerCar extends Car {
 
   update(dt, input) {
     const g = this.game;
+    this._syncLights();
     if (!this.alive) {
       // OUT OF HULLS: no redeploy. The three-wreck rule (main.js HULL_LIVES)
       // sets this on the wreck that ends the race, and without it the car
@@ -4678,11 +5128,33 @@ export class PlayerCar extends Car {
       // The wedge net must not fire on a car that is BOGGING: both watch for
       // held throttle and no motion at the same five seconds, and if the free
       // rescue won that race the rule above could never fire at all.
-      const wedged = this === g.player && controlsLive && !this.airborne
-        && !bogged
-        && input.throttle > 0.5
-        && Math.hypot(this.vel.x, this.vel.z) < 0.8;
-      this._wedgeT = wedged ? (this._wedgeT ?? 0) + dt : 0;
+      // JUDGE IT ON DISPLACEMENT, NOT ON THIS FRAME'S SPEED. The test used to
+      // be `speed < 0.8` and the timer reset to zero the moment it failed, so
+      // ONE frame above 0.8 in five seconds cleared it — and a car grinding on
+      // a barrier is never still: it jitters, bounces and scrubs a few
+      // centimetres each way for ever. It is going nowhere and it never
+      // qualified as wedged. Reported as a car parked in a wall at 0 km/h,
+      // lap 0 of 3, thirty-nine seconds in, last of eight.
+      //
+      // So anchor a position while the throttle is held and ask how far the
+      // car has actually got. Six metres of progress clears the anchor and
+      // starts again; less than that, held, for five seconds, is stuck —
+      // whatever the speedometer flickered to in between. Six metres in five
+      // seconds is 4.3 km/h, so a genuine crawl up a bank is never touched.
+      const trying = this === g.player && controlsLive && !this.airborne
+        && !bogged && input.throttle > 0.5;
+      if (!trying) {
+        this._wedgeT = 0;
+        this._wedgeAt = null;
+      } else {
+        if (!this._wedgeAt) this._wedgeAt = { x: this.pos.x, z: this.pos.z };
+        if (Math.hypot(this.pos.x - this._wedgeAt.x, this.pos.z - this._wedgeAt.z) > 6) {
+          this._wedgeAt = { x: this.pos.x, z: this.pos.z };
+          this._wedgeT = 0;
+        } else {
+          this._wedgeT = (this._wedgeT ?? 0) + dt;
+        }
+      }
       // UNSTUCK, ON DEMAND. The automatic nets above are deliberately slow —
       // five seconds of held throttle, because an idle car parked on a
       // mountainside must never be yanked off it. That is right for a car the
@@ -4721,7 +5193,22 @@ export class PlayerCar extends Car {
           g.audio?.pickup?.();
         }
         this.vel.set(0, 0, 0); this.vy = 0; this.airborne = false;
-        this.placeAt(this.trackIndex, 0, true);
+        this._wedgeAt = null;
+        // PAST THE TRAP, NOT BACK INTO IT — the rule the rivals' pit-lift
+        // already had (see EnemyCar `_liftAhead`) and the player's rescue did
+        // not. Re-seating at the SAME index puts a car that is pinned by
+        // something ON the road straight back against it, and the next rescue
+        // is five seconds later, for ever. Each rescue that follows closely on
+        // the last moves further down the lap; a clean minute of driving
+        // forgets it.
+        if (g.raceTime - (this._lastRescueAt ?? -99) < 25) {
+          this._rescueAhead = Math.min(40, (this._rescueAhead ?? 0) + 14);
+        } else {
+          this._rescueAhead = 0;
+        }
+        this._lastRescueAt = g.raceTime ?? 0;
+        const N = g.track.N;
+        this.placeAt((this.trackIndex + this._rescueAhead) % N, 0, true);
         this.invuln = Math.max(this.invuln, 1.5);
         g.hud.feed(spend
           ? `UNSTUCK — back on the road (${this.sos} left)`

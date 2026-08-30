@@ -45,9 +45,20 @@
     --gold-dim:#c9a86a; --cream:#ffe9a8;
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{width:100%;height:100%;overflow:hidden;background:#7fb85c;
+  /* BLACK BEHIND THE CANVAS, NOT LIME. Anything the canvas does not cover —
+     an iOS landscape safe-area band, a frame during a resize — shows this
+     colour, and a bright green bar down each edge of a night race reads as a
+     broken layout. Black reads as a bezel. */
+  html{background:#000}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;
     font-family:'Baloo 2','Segoe UI',system-ui,sans-serif;color:#fff3d0;
     -webkit-user-select:none;user-select:none;touch-action:none;overscroll-behavior:none}
+  /* `inset:0` is kept for the top-left anchor ONLY. It does not size this
+     element: a <canvas> is a replaced element, so its used width is its
+     intrinsic width — the width/height attributes, i.e. the drawing buffer —
+     and left/right cannot stretch it. The renderer's `setSize` writes the CSS
+     box in pixels and that is what covers the screen; see the note at
+     `renderer.setSize` in main.js for what happened when it stopped. */
   #game-canvas{position:fixed;inset:0;display:block;touch-action:none}
   .titlefont{font-family:'Luckiest Guy','Baloo 2',sans-serif}
 
@@ -258,9 +269,14 @@
   body.two-thumb #t-right{right:calc(16px + env(safe-area-inset-right));
     bottom:calc(24px + env(safe-area-inset-bottom));width:100px;height:100px;font-size:34px;
     background:rgba(38,26,12,.62)}
-  body.two-thumb #t-brake{left:calc(50% - 42px);
-    bottom:calc(20px + env(safe-area-inset-bottom));width:84px;height:84px;font-size:12px;
-    background:rgba(150,45,30,.62)}
+  /* BRAKE IS OUT, DRIFT SITS IN ITS PLACE — asked for off a screenshot of
+     this scheme ("take out brake, change it with drift"). The centre slot is
+     the one either thumb reaches, and in a scheme whose throttle is held open
+     the drift/handbrake is the control that earns it; ArrowDown on a keyboard
+     still brakes, this only retires the touch button. */
+  body.two-thumb #t-brake{display:none}
+  body.two-thumb #t-drift{left:calc(50% - 42px);right:auto;
+    bottom:calc(20px + env(safe-area-inset-bottom));width:84px;height:84px;font-size:14px}
   /* weapons lift clear into a band above the driving row */
   body.two-thumb #t-fire{right:calc(16px + env(safe-area-inset-right));
     bottom:calc(140px + env(safe-area-inset-bottom));width:86px;height:86px}
@@ -270,16 +286,17 @@
     bottom:calc(238px + env(safe-area-inset-bottom))}
   body.two-thumb #t-nitro{right:calc(108px + env(safe-area-inset-right));
     bottom:calc(288px + env(safe-area-inset-bottom))}
-  body.two-thumb #t-drift{left:calc(20px + env(safe-area-inset-left));right:auto;
-    bottom:calc(140px + env(safe-area-inset-bottom))}
+  /* drift's old left-band slot is gone with it; SHOCK drops into the reachable
+     height drift vacated */
   body.two-thumb #t-shock{left:calc(20px + env(safe-area-inset-left));right:auto;
-    bottom:calc(216px + env(safe-area-inset-bottom))}
+    bottom:calc(140px + env(safe-area-inset-bottom))}
   /* the speedo sits above BRAKE rather than under a thumb */
   body.two-thumb.touch #speed-box{bottom:calc(112px + env(safe-area-inset-bottom));left:50%}
   @media (max-height:560px){
     body.two-thumb #t-left,body.two-thumb #t-right{width:86px;height:86px;
       bottom:calc(18px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-brake{width:72px;height:72px;left:calc(50% - 36px)}
+    body.two-thumb #t-drift{width:72px;height:72px;left:calc(50% - 36px);
+      bottom:calc(18px + env(safe-area-inset-bottom))}
     body.two-thumb #t-fire{bottom:calc(118px + env(safe-area-inset-bottom))}
     body.two-thumb #t-missile{right:calc(112px + env(safe-area-inset-right));
       bottom:calc(126px + env(safe-area-inset-bottom))}
@@ -287,8 +304,7 @@
       bottom:calc(120px + env(safe-area-inset-bottom))}
     body.two-thumb #t-nitro{right:calc(184px + env(safe-area-inset-right));
       bottom:calc(24px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-drift{bottom:calc(118px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-shock{bottom:calc(186px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-shock{bottom:calc(118px + env(safe-area-inset-bottom))}
     body.two-thumb.touch #speed-box{bottom:calc(96px + env(safe-area-inset-bottom))}
   }
 
@@ -313,7 +329,9 @@
      left, the weapon cluster on the right, and the speedo between them. At
      96px centred it reached under the 🚀 button — the one number you steer by,
      with a thumb parked on it. Smaller, and biased into the actual gap. */
-  body.touch #speed-box{bottom:14px;left:calc(50% - 26px)}
+  /* -16px, not -26px: the other half of clearing the joystick ring (see
+     input.js rest()). Still biased left of the 🚀 button by 8px measured. */
+  body.touch #speed-box{bottom:14px;left:calc(50% - 16px)}
   body.touch #speedo{width:86px;height:86px}
   body.touch #nitro-wrap{display:none}  /* nitro lives on the ⚡ button */
   body.touch #weapon-box{display:none}  /* ammo counts live on the buttons */
@@ -343,12 +361,17 @@
     #t-missile{right:calc(100px + env(safe-area-inset-right));width:54px;height:54px}
     #t-mine{right:calc(96px + env(safe-area-inset-right));width:54px;height:54px;
       bottom:calc(104px + env(safe-area-inset-bottom))}
-    /* At 320px the gap the speedo was biased into is no longer wide enough for
-       it: measured, the dial ran 11px under the 🚀 button. Shrink and shift it
-       further into the gap rather than move the button, which has nowhere left
-       to go without reaching FIRE. */
-    body.touch #speed-box{left:calc(50% - 38px)}
-    body.touch #speedo{width:76px;height:76px}
+    /* At these widths the bottom band cannot hold all three: ring 124 +
+       dial 76 + the 🚀 column overlap whatever the bias — measured 1018px²
+       at 360 and 1549px² at 320 once landscape.mjs learned to look. So the
+       dial leaves the thumb row entirely (the two-thumb layout's own move:
+       "the speedo sits above BRAKE") — raised clear of 🚀 and 💣, centred
+       in the gap between the ring and the mine column, and the ring gives
+       up 24px of VISUAL size (the knob's drag radius is input.js's, not
+       this rule's). Clearances at 320: ring 2px, mine 4px, 🚀 by a row. */
+    #joy-base{width:100px;height:100px;margin:-50px 0 0 -50px}
+    body.touch #speed-box{left:calc(50% - 20px);bottom:112px}
+    body.touch #speedo{width:56px;height:56px}
   }
   /* landscape phones: everything anchors to corners, panels stay top */
   @media (max-height: 560px){
@@ -365,7 +388,21 @@
       align-items:center}
     body.touch #speed-box{bottom:10px}
     body.touch #speedo{width:84px;height:84px}
-    #joy-zone{width:40%;height:80%}
+    /* WIDER, NOT TALLER. This said `height:80%` — on the screen with the LEAST
+       height, it grew the stick's zone vertically, which lifts its resting
+       ring up into the left-hand panel column: `landscape.mjs` measured the
+       ring overlapping HULL INTEGRITY. Landscape's spare room is horizontal,
+       so the zone takes width and gives back height. */
+    #joy-zone{width:52%;height:47%}
+    /* SOS OUT OF THE PANELS. At `bottom:214` on a 402-tall screen the button
+       lands at y=144 — straight through the CONTRACTS list and the top of the
+       hull box, which is exactly where it was photographed. The bottom-left
+       corner is below the stick's ring and clear of both. */
+    #t-unstuck{left:calc(196px + env(safe-area-inset-left));
+      bottom:calc(10px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-unstuck{left:auto;
+      right:calc(12px + env(safe-area-inset-right));
+      bottom:calc(10px + env(safe-area-inset-bottom))}
     #t-nitro{right:calc(200px + env(safe-area-inset-right));bottom:calc(42px + env(safe-area-inset-bottom))}
     #t-mine{bottom:calc(118px + env(safe-area-inset-bottom))}
     #t-shock{bottom:calc(140px + env(safe-area-inset-bottom))}
@@ -1331,9 +1368,16 @@
     border:1px solid var(--line-soft);background:rgba(38,26,12,.4)}
   .up-card.maxed{opacity:.72}
   .up-card{grid-template-columns:46px 1fr auto}
-  .up-card .uc-ic{font-size:17px;text-align:center;line-height:1}
-  .up-card .uc-ic img{width:100%;height:auto;display:block;
-    filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+  /* ONE COLUMN, ONE MATERIAL. Three of these ladders show a rendered part and
+     the rest show a glyph, and since the studio grew a lit backdrop the
+     rendered ones are pale plates while the glyphs sat on the dark card —
+     a ragged column. The glyph gets the same plate. */
+  .up-card .uc-ic{font-size:17px;text-align:center;line-height:1;
+    background:#b8ad9c;border-radius:3px;padding:6px 0;
+    box-shadow:inset 0 -8px 12px -8px rgba(0,0,0,.35)}
+  .up-card .uc-ic img{width:100%;height:auto;display:block;padding:0;
+    background:none;border-radius:3px}
+  .up-card .uc-ic:has(img){padding:0;box-shadow:none}
   .up-card .uc-main{min-width:0;display:flex;flex-direction:column;gap:2px}
   .up-card .uc-nm{font-family:'Luckiest Guy';font-size:10.5px;letter-spacing:.6px;
     color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1385,7 +1429,8 @@
   .car-card{pointer-events:auto;cursor:pointer;flex:0 0 140px;width:140px;text-align:center;
     padding:10px;border-radius:var(--r-md);border:2px solid var(--line);
     background:rgba(38,26,12,.6);-webkit-tap-highlight-color:transparent}
-  .car-card .car-icon{width:96px;height:62px;object-fit:contain;display:block;margin:0 auto 4px;
+  .car-card .car-icon{width:96px;height:62px;object-fit:cover;display:block;margin:0 auto 4px;
+    border-radius:4px;
     filter:drop-shadow(0 4px 6px rgba(0,0,0,.45))}
   .car-card.locked .car-icon{filter:grayscale(.85) brightness(.75)}
   .car-card .cname{font-family:'Luckiest Guy';font-size:12px;letter-spacing:1px;color:var(--cream)}
@@ -1950,7 +1995,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r245</div>
+<div id="build-tag">r284</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2277,10 +2322,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r245"></script>
+<script type="module" src="./src/main.js?v=r284"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r245"></script>
+<script src="./src/offline.js?v=r284"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r245"></script>
+<script type="module" src="./src/traffic.js?v=r284"></script>
 </body>
 </html>

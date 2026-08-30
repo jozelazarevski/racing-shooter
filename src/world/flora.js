@@ -1,3 +1,9 @@
+// DEAD COPY — NOTHING IMPORTS THIS FILE. The live code is in src/track.js
+// (and friends); this directory is an abandoned split that has already
+// drifted (this sky.js is missing the horizon-solids fix, its _buildMassif
+// registers no colliders). Editing here changes nothing in the game and
+// reading here misleads — it cost the mountain-sinking investigation an
+// hour. Verified dead by import grep across src/, tests/, index.html.
 // Everything that grows, and the rules for where it may stand.
 //
 // Two halves that belong together: the PLACEMENT helpers (_scatter,
@@ -123,6 +129,9 @@ export const floraMethods = {
    *  sample's normal is fine at that sample and inside the road two samples
    *  later, where the centreline has swung under it. */
   _clearsRoad(x, z, r, margin = 1.2) {
+    // the squares are off limits to everything that scatters — same rule and
+    // same reason as the copy in track.js, which this one shadows
+    if (this._piazzas?.length && this._inPiazza(x, z, r)) return false;
     _clearV.set(x, 0, z);
     const i = this.nearestIndex(_clearV);          // no hint: search the whole lap
     const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;

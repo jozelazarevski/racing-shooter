@@ -36,7 +36,7 @@ const R = await page.evaluate(async () => {
           const dx = px - s.x, dz = pz - s.z;
           if (dx * dx + dz * dz >= rr * rr) continue;
           if (s.y !== undefined) {
-            if (s.h !== undefined) { if (py < s.y - 3 || py > s.y + s.h) continue; }
+            if (s.h !== undefined) { if (s.h > 20 || (s.r ?? 0) > 10 ? py > s.y + s.h : (py < s.y - 3 || py > s.y + s.h)) continue; } // tall-or-wide underside rule, mirrors the vehicles.js solids gate
             else if (Math.abs(py - s.y) > 6) continue;
           }
           const key = `solid:${s.mat ?? s.kind ?? '?'}`;

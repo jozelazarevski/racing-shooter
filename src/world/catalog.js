@@ -1,3 +1,9 @@
+// DEAD COPY — NOTHING IMPORTS THIS FILE. The live code is in src/track.js
+// (and friends); this directory is an abandoned split that has already
+// drifted (this sky.js is missing the horizon-solids fix, its _buildMassif
+// registers no colliders). Editing here changes nothing in the game and
+// reading here misleads — it cost the mountain-sinking investigation an
+// hour. Verified dead by import grep across src/, tests/, index.html.
 // The buildable-world catalog: destructible prop specs, house and
 // cottage templates, per-region element kits, flora mixes, sponsor
 // boards and the shared prop geometry/material cache. Data plus the

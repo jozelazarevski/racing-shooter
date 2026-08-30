@@ -1,3 +1,9 @@
+// DEAD COPY — NOTHING IMPORTS THIS FILE. The live code is in src/track.js
+// (and friends); this directory is an abandoned split that has already
+// drifted (this sky.js is missing the horizon-solids fix, its _buildMassif
+// registers no colliders). Editing here changes nothing in the game and
+// reading here misleads — it cost the mountain-sinking investigation an
+// hour. Verified dead by import grep across src/, tests/, index.html.
 // The career roster: one entry per world — id, name, theme, route,
 // difficulty tuning and unlock order. Pure data: no three.js, no DOM.
 // Split from track.js (r128) so the roster can be read and edited

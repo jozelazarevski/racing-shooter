@@ -74,7 +74,12 @@ const BURST_BUDGET = 620;
 // ---- ambient weather (cached colors + per-type spawn rates, spawns/second) ----
 const LEAF_ALT = new THREE.Color('#c9a83a');   // dry-yellow leaf variant
 const EMBER_HOT = new THREE.Color('#ffc94e');  // bright flicker variant
-const AMBIENT_RATES = { snow: 150, leaves: 14, sand: 70, dust: 70, embers: 45, rain: 230 };
+// `leaves` was 14 a second against snow's 150 — "occasional leaves", which is
+// a detail you notice rather than weather you drive through. A shedding wood
+// asked for a LEAF FALL, so it goes to 48: still a twentieth of rain and a
+// third of snow, because a leaf is large, slow and lives four times as long as
+// a flake, and the same count on screen costs far more of the frame.
+const AMBIENT_RATES = { snow: 150, leaves: 48, sand: 70, dust: 70, embers: 45, rain: 230 };
 // phones get a leaner ambient budget — same look, less overdraw
 const MOBILE_AMBIENT = (matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in globalThis) ? 0.5 : 1;
 const MOBILE_BURST = MOBILE_AMBIENT < 1 ? 0.6 : 1; // prop-burst count scale on phones
@@ -501,6 +506,62 @@ export class Particles {
       { drag: 2.2, shrink: 0.15 });
   }
 
+  /** LEAF LITTER THROWN UP BY A CAR — "the effect of driving through them".
+   *
+   *  The ambient `leaves` weather drops leaves out of the canopy and the car
+   *  drives past underneath, which is a backdrop rather than a thing you are
+   *  doing. This is the other half: the litter already lying on the road,
+   *  disturbed by the machine going through it.
+   *
+   *  It is NOT dust with a leaf colour, and the difference is all in how it
+   *  moves. Dust is a puff that rises and stalls; a leaf is light, so the car
+   *  throws it BACKWARDS along its own heading at a good fraction of its
+   *  speed, it barely falls (`grav` well under the dust's), and it keeps
+   *  flying (`drag` low) so it tumbles out behind rather than dropping on the
+   *  spot. Leaves also do not shrink to nothing — a leaf stays leaf-sized and
+   *  simply fades — so `shrink` is near zero where dust runs 0.15.
+   *
+   *  `back` is the car's -forward, `side` its right; both unit. `speedN` is
+   *  0..1 of top speed and scales how hard the litter is flung.
+   */
+  leafKick(p, back, side, speedN, color) {
+    if (this._leafHex !== color) {
+      this._leafHex = color;
+      this._leafCol = this._leafCol || new THREE.Color();
+      this._leafCol.set(color ?? 0xd8863a);
+    }
+    _amb.copy(this._leafCol).lerp(LEAF_ALT, Math.random() * 0.8);
+    const lat = (Math.random() - 0.5) * 2;
+    const fling = 5 + speedN * 16;
+    this.spawn(
+      p.x + side.x * lat * 0.9, p.y + 0.12 + Math.random() * 0.25, p.z + side.z * lat * 0.9,
+      back.x * fling + side.x * lat * 3.4 + (Math.random() - 0.5) * 1.5,
+      1.6 + Math.random() * 2.2 + speedN * 2.4,
+      back.z * fling + side.z * lat * 3.4 + (Math.random() - 0.5) * 1.5,
+      _amb,
+      0.7 + Math.random() * 0.5,
+      0.8 + Math.random() * 0.7 + speedN * 0.5,
+      { drag: 0.9, grav: 2.6, shrink: 0.05, alpha: 0.95 });
+  }
+
+  /** CONFETTI over a podium finish. Bright saturated pieces thrown UP from
+   *  around `p`, then falling slow under heavy drag — the celebration is the
+   *  hang, not the launch. Colours are fixed festival tones, deliberately NOT
+   *  the theme palette: confetti that matches the world disappears into it.
+   */
+  confetti(p, count = 26) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 1 + Math.random() * 4.5;
+      _amb.setHSL(Math.random(), 0.85, 0.6);
+      this.spawn(
+        p.x + Math.cos(a) * r, p.y + 2.5 + Math.random() * 3.5, p.z + Math.sin(a) * r,
+        (Math.random() - 0.5) * 5, 5.5 + Math.random() * 5, (Math.random() - 0.5) * 5,
+        _amb, 0.5 + Math.random() * 0.4, 2.2 + Math.random() * 1.2,
+        { drag: 1.4, grav: 5, shrink: 0.05, alpha: 1 });
+    }
+  }
+
   /** Engine-bay damage smoke. severity 0..1: gray puffs -> thick dark smoke + fire flickers. */
   damageSmoke(p, severity = 0.5) {
     const dark = severity > 0.5;
@@ -606,13 +667,17 @@ export class Particles {
           break;
         }
         case 'leaves': {
-          // occasional leaves: slow fall, strong sideways flutter
-          const r = 45 * Math.sqrt(Math.random());
+          // OUT OF THE CANOPY, not out of thin air. These used to spawn 6-14 u
+          // up, which is inside the tree crowns on a wooded world and below
+          // them on an open one, so leaves appeared in mid-air a car length
+          // ahead. 11-25 u starts them at or above the crowns on every autumn
+          // theme, and the wider column keeps the edge of the fall off screen.
+          const r = 62 * Math.sqrt(Math.random());
           _amb.copy(base).lerp(LEAF_ALT, Math.random() * 0.7);
           this.spawn(
-            center.x + Math.cos(a) * r, center.y + 6 + Math.random() * 8, center.z + Math.sin(a) * r,
+            center.x + Math.cos(a) * r, center.y + 11 + Math.random() * 14, center.z + Math.sin(a) * r,
             (Math.random() - 0.5) * 9, -1.6 - Math.random() * 1.4, (Math.random() - 0.5) * 9,
-            _amb, 1.0 + Math.random() * 0.6, 2.8 + Math.random() * 1.6,
+            _amb, 1.0 + Math.random() * 0.6, 4.6 + Math.random() * 2.2,
             { drag: 0.45, grav: 1.2, shrink: 0.9, alpha: 0.95 });
           break;
         }

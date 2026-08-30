@@ -1,3 +1,9 @@
+// DEAD COPY — NOTHING IMPORTS THIS FILE. The live code is in src/track.js
+// (and friends); this directory is an abandoned split that has already
+// drifted (this sky.js is missing the horizon-solids fix, its _buildMassif
+// registers no colliders). Editing here changes nothing in the game and
+// reading here misleads — it cost the mountain-sinking investigation an
+// hour. Verified dead by import grep across src/, tests/, index.html.
 // Every color and density knob per theme — terrain palettes, sky, fog,
 // flora counts, weather, elevation profiles. Pure data: `fogColor…
 // sunIntensity` are exposed to main.js via `track.theme`; the rest is

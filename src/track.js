@@ -14,7 +14,8 @@ import {
   riverTexture, riverBankTexture, iglooTexture,
   sunTexture, hazeTexture, roadNeonEmissiveTexture, towerTexture,
   contactShadowTexture, horizonTexture, stoneTexture, junctionTexture,
-  townhouseTexture, townhouseGlowTexture, roofTileTexture,
+  townhouseTexture, townhouseGlowTexture, roofTileTexture, ironRailTexture,
+  townhouseAnchors, piazzaTexture, pavingTexture,
 } from './textures.js';
 
 export const LEVELS = [
@@ -161,6 +162,13 @@ export const LEVELS = [
     cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
   { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
     cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0,
+      // HALF THE WALLS, asked for directly off a screenshot: the farmland
+      // hedge ran both verges nearly unbroken and this is a PARK, not a
+      // sunken lane. coverage 0.5 opens roughly every other field-length of
+      // verge (see _buildHedgeBanks); the tune merge is shallow, so the whole
+      // spec is restated with the theme's own numbers.
+      hedgeBanks: { lateral: 13.6, bankH: 1.9, bankW: 2.4, hedgeH: 2.3, bay: 6.2,
+        max: 640, coverage: 0.5 },
       // AUTUMN: copper woods under a low golden sun
       foliageLow: 0x9a5a20, foliageTop: 0xc8842c,
       foliage: { h: 0.07, hVar: 0.04, s: 0.62, sVar: 0.15, l: 0.36, lVar: 0.12 },
@@ -646,57 +654,81 @@ export const LEVELS = [
       //   height 17       tall enough to ENCLOSE. This is the number that
       //                   turns a road with houses beside it into a street.
       roadWidth: 0.55,
+      // ONE SQUARE, AND A TIGHT ONE. The budello's houses stand 6 u off the
+      // centreline, so the 17 u square the seafront gets would have its inner
+      // edge in the carriageway and be refused at every station on the lap.
+      // A lane like this opens into a slot of a piazza, not a parade ground.
+      piazza: { count: 1, depth: 12, width: 16 },
       frontage: {
         lateral: 9.6, depth: 7.0, unit: 6.4, height: 17.0, run: [10, 20], rows: 6,
-        bayset: 'liguria',
-        // THE HOUSES ARE HALF-TIMBERED NOW (r242), which is what the second
-        // reference is actually about. Everything here serves that:
-        //   tints    warm rust, brick red, tan and cream — the INFILL between
-        //            the beams, not the whole wall. The grey taupe of r241 was
-        //            read from the first image's shadowed side and it kills a
-        //            timbered facade, which needs the panel to be lighter than
-        //            the frame or the pattern vanishes.
-        //   timber   the frame itself: oiled oak, near-black at distance.
-        //   boxes    a flower box under nearly every upper window — most of the
-        //            colour in that street comes from them.
-        // TINTS MULTIPLY THE WHOLE FACE, so they are the INFILL colour and they
-        // have to stay LIGHT. The first cut used the reference's rust and
-        // brick reds here and the result was dark-on-dark: a near-black timber
-        // frame over a dark red panel, with the pattern invisible. On a
-        // timbered building the panel is limewash and the frame is the dark
-        // thing — the contrast IS the style, so the reds live in the ROOFS and
-        // the deepest tint here is still lighter than the beams.
-        tints: ['#f6e8c6', '#f0d9ac', '#e8c795', '#faf0d8', '#eccfa4',
-          '#e3bd8c', '#f2e2be', '#dcb684'],
-        roof: 0xb5563a,
-        face: { render: '#f2e6d0', plinth: '#8a7259', trim: '#fbf3e2',
+        bayset: 'liguria', ridge: 'along', flatRoofs: 0.18, flatRoofs: 0.2,
+        // THE HOUSES ARE LIGURIAN AGAIN (r244), which is what the reference
+        // sheet and both Monte Carlo renders actually show. The half-timbering
+        // of r242 came from a northern street that is not in this brief at
+        // all: a Fachwerk frame here was the single largest thing making the
+        // budello read brown and German instead of painted and Italian. The
+        // frame is gone from this world (the code stays in townhouseTexture
+        // for the wine-region kit, which really is timbered), and what takes
+        // its place is the three features the sheet gives a panel each:
+        //
+        //   tints      THE FACADE STUCCO PALETTE, straight off the sheet:
+        //              yellow, ochre, pink, stucco red, deep red, sage. These
+        //              MULTIPLY the render, so this list IS the street's
+        //              colour and it is the reason a Ligurian terrace never
+        //              reads as one building repeated.
+        //   surround   the pale architrave and cornice around every opening.
+        //              A strong ochre wall with dark holes in it is a warehouse;
+        //              the same wall with white joinery drawn round each window
+        //              is the terrace in the first render.
+        //   jalousie   dark green louvred shutters, a third of them shut. The
+        //              green-on-ochre pairing is what says RIVIERA at a
+        //              distance no moulding survives.
+        //   iron       a French balcony across most upper openings, which that
+        //              terrace has on nearly every window.
+        //
+        // No flower boxes on this world: they hang at exactly the height the
+        // balcony rail does, and the two together turned the openings to mush.
+        // They stay on the hinterland worlds, which have no ironwork.
+        // WEIGHTED PALE. The tint list is sampled uniformly, so a palette with
+        // three dark swatches in eight builds a street that is three-eighths
+        // dark — and the reference terrace is overwhelmingly yellow, ochre and
+        // cream with the deep red as PUNCTUATION, one corner building in a
+        // block. The pale entries repeat; the reds appear once each.
+        tints: ['#f2d67a', '#f6dc8c', '#e8b45c', '#eec98a', '#f4e8d2',
+          '#f8eeda', '#eaa9a4', '#e2a06a', '#b9c4a4', '#d0685c', '#c2604e'],
+        roof: 0xc4603a,
+        face: { render: '#f4ead8', plinth: '#b7ae9c', trim: '#fdf7ea',
           // GLASS CATCHES THE SKY. #232830 is a hole in the wall, and fifteen
           // holes is a third of the face reading as void; a cool blue-grey
           // reads as a lit pane at the same value and lifts the whole terrace.
-          frame: '#4a3323', shutter: '#7a3f2a', pane: '#3d4a5c',
-          timber: { beam: '#6b4630' },
-          boxes: { wood: '#6b4630', blooms: ['#c8402f', '#e0644a', '#d8869a', '#f0e2d0'] } },
+          frame: '#3a3630', shutter: '#2f5d3f', pane: '#3d4a5c',
+          surround: true, jalousie: { shut: 0.34 }, iron: '#241f1c',
+          quoins: true, pipe: true },
       },
       // A STREET HAS NO COUNTRYSIDE IN IT. Rocks, scrub, tufts and wildflowers
       // between the kerb and the wall are what kept reading as "road through a
       // field" no matter what the buildings did.
       rockCount: 0, pebbleCount: 0, bushCount: 0, tuftCount: 0, flowerCount: 0,
       hutCount: 8, hutZone: [0, 1], treeCount: 26,
-      // paved to the building line, and the street itself is setts with a
-      // tram line in it — see TOWN_ROAD
+      // paved to the building line, and the street itself is setts — see
+      // TOWN_ROAD. NO TRAM (r244): the rails came off the northern reference
+      // and there is not a metre of tramway anywhere in the Ligurian sheet or
+      // in either Monte Carlo render. Two tan stripes down the middle of the
+      // road were the second-biggest northern tell after the timber.
       road: {
-        base: '#8e8a82', mottleA: [128, 124, 116], mottleB: [176, 172, 163],
+        base: '#7b756a', mottleA: [110, 104, 94], mottleB: [150, 143, 130],
         rut: 'rgba(70,68,63,0.32)', rutCore: 'rgba(52,50,46,0.3)', tread: 'rgba(30,29,26,0.3)',
-        stoneA: 'rgba(206,202,192,0.5)', stoneB: 'rgba(84,81,76,0.55)',
-        fringe: [150, 146, 136], fringeVar: [26, 25, 22],
+        stoneA: 'rgba(190,184,170,0.5)', stoneB: 'rgba(76,72,66,0.55)',
+        // the pavement in both Monte Carlo renders is a warm red-brown flag, not
+    // grey concrete, and it is the strip right beside the racing line
+    fringe: [148, 126, 110], fringeVar: [24, 20, 18],
         ruts: false,
         cobbles: {
-          stones: ['#c9c5bc', '#b6b1a7', '#d2ccc0', '#a9a49b', '#c3bcc2', '#dad4c8',
-            '#b0aca6', '#cfc8b8'],
-          mortar: 'rgba(96,92,85,0.85)', lip: 'rgba(255,252,244,0.2)',
+          stones: ['#928878', '#827a6a', '#9c9280', '#786f61', '#8a8070', '#a09682',
+            '#7d7466', '#948a7a'],
+          mortar: 'rgba(88,80,70,0.85)', lip: 'rgba(255,250,238,0.16)',
           rows: 20, per: 26,
         },
-        rails: { gauge: 3.4 },
       },
       terrainLow: '#6b6a62', terrainHigh: '#8e8b80', terrainDirt: '#7c7970',
       terrainScree: '#9a978c', skirtColor: '#8a8880',
@@ -712,7 +744,22 @@ export const LEVELS = [
       // frame went to mud once the buildings grew to 17 u and started
       // shadowing each other. The bounce off pale render is what lights a
       // street like this, so the ambient carries it rather than the key.
-      hemiIntensity: 1.15, sunIntensity: 2.7,
+      // AND THE STREET IS LIT BY THE AMBIENT, WHICH IS MEASURABLE (r244).
+      // `tools-scratch/roadlum.mjs` prints the mean colour of the carriageway
+      // and of both walls from the driver's shot, and it says two things that
+      // guessing said wrong:
+      //   - the paving was never blown out. 0% of it is above 240 at any
+      //     setting tried and it sits at a mean 158 — it just LOOKS white in a
+      //     900 px screenshot beside a shaded wall sitting at 67. Three passes
+      //     of darkening the sett palette moved the TEXTURE every time
+      //     (tools-scratch/roadtex.mjs proves it) and the render barely at all.
+      //   - the key barely reaches the walls in a lane this narrow. Between
+      //     2.4 and 3.0 the shaded wall does not move one unit and the sunlit
+      //     one moves two; everything that extra sun touches is the road,
+      //     which is already the brightest thing in the frame. So it comes
+      //     DOWN, and the ambient — which IS what lights the facades here —
+      //     stays at the 1.15 that keeps them out of the mud.
+      hemiIntensity: 1.15, sunIntensity: 2.4,
       elev: { amp: 5, ph: [1.1, 2.4, 0.6] },
     } },
 
@@ -2925,8 +2972,25 @@ const THEMES = {
     // doubled frame luminance, so the walls were simply under-lit, not shadowed
     // or mis-normalled. The slot canyon is most of what you look at here, and
     // vertical faces get almost nothing but this term.
-    hemiSky: 0x8a9a5c, hemiGround: 0x5a5e46, hemiIntensity: 5.5,
-    sunColor: 0xd8e87a, sunIntensity: 3.0,               // sickly grate-light shafts
+    // ...and then it went too far the OTHER way. Reported off a phone: the
+    // whole world one radioactive olive. Measured at the chase camera, mean
+    // RGB (55, 69, 9) — the BLUE CHANNEL DEAD, against (68, 84, 60) for Pine
+    // Valley — and green 37 points over the red/blue average where a forest
+    // reads 20. The tell is the car: its yellow paint came out cyan-white,
+    // because a light this saturated leaves nothing for a surface colour to
+    // say.
+    //
+    // The fault was getting BRIGHTNESS out of a SATURATED light. hemiSky
+    // #8a9a5c at intensity 5.5 and a #d8e87a sun at 3.0 do not light a green
+    // world, they multiply every albedo in it by green and clip the rest.
+    // Light with intensity, tint with colour: the lights come back most of the
+    // way to neutral and the sickly cast stays where a cast belongs — in the
+    // FOG, the haze and the materials, which are untouched below.
+    // `castsweep.mjs`, five tunes in one load: blue 9.2 -> 25.8, green excess
+    // 37.2 -> 21.5, luminance 61.7 -> 56.0 (the world stays lit, which was the
+    // whole point of the first fix).
+    hemiSky: 0x929c88, hemiGround: 0x5f6252, hemiIntensity: 4.2,
+    sunColor: 0xe0e8c0, sunIntensity: 2.8,               // sickly grate-light shafts
     // The sky was the other half of it. Lighting the ground does nothing for
     // the top half of a chase-camera frame, and skyTop '#05070a' is black —
     // so roughly half the screen stayed at zero however bright the road got.
@@ -2968,6 +3032,24 @@ const THEMES = {
     elev: { amp: 5, ph: [0.8, 2.3, 4.9] },
     rampMaxCurv: 0.022, padMaxCurv: 0.0075, boardMaxCurv: 0.02,
     cliffWalls: true,
+    // THE WALLS STOOD ON THE VERGE. `_cliffProfile` places the face at
+    // `WALL_OFF + 0.65 + (cliffSetback ?? 0)` — and this theme never set the
+    // setback, so its 18 u concrete faces rose 11.05 u from the centreline on
+    // a road whose drivable half is 9 and whose chase camera is allowed out to
+    // 8.4. That is 2.6 u of air between the lens and an 18 u wall: reported
+    // twice from a phone as a frame two-thirds filled with banded green
+    // concrete, the road a sliver, the car pressed into the face ("needs wall
+    // fixing"; the earlier unattributed slot-canyon frame carried this level's
+    // own contract slate). CANYON RUN sets 26 and ROCKFALL RAVINE 22 for the
+    // same builder; those were the two the r270 camera work was tuned on,
+    // which is why they never showed it.
+    //
+    // 12, not canyon's 26: this world is a sewer main and the slot is its
+    // identity. At 12 the face stands 23 u out — the wall top subtends ~38
+    // degrees from the centreline, still a corridor — and the camera at its
+    // 8.4 u limit gets 14.6 u of air instead of 2.6, which is the difference
+    // between driving a slot and being shown its wallpaper.
+    cliffSetback: 12,
     cliffPalette: {                                     // stained tunnel concrete
       bands: ['#6e7466', '#5c6256', '#7c8272', '#545a4c', '#666c5e'],
       seam: 'rgba(20,24,18,0.6)',
@@ -3507,10 +3589,28 @@ const THEMES = {
     rampMaxCurv: 0.02, padMaxCurv: 0.006, boardMaxCurv: 0.018,
     guardFence: { lateral: 12.6, color: 0xc8c8c8, max: 260 },
     elements: 'medhill',
-    // Monte Carlo apartments: cream, white, apricot - continuous frontage
+    // MONACO IS THE REFERENCE, and it was the last town still built out of
+    // grey boxes (r252). Both renders the design came from are of THIS place:
+    // ochre and cream apartment blocks with pale joinery round every opening,
+    // grey-blue louvred shutters, ironwork across the upper windows and
+    // terracotta running eaves-to-street. Everything the riviera worlds were
+    // given in r244-r251 belongs here first.
+    //
+    // The shutters are GREY-BLUE, not the coast's green: that is what the
+    // hairpin render draws, and it is the one thing that keeps this world
+    // from reading as another Ligurian village.
+    piazza: { count: 2, depth: 17, width: 22 },
+    cloudKind: 'faceted', cloudCount: 9, cloudTint: 0xdae3ec, cloudDeep: 0x76839a,
     frontage: {
-      lateral: 16.5, depth: 9, unit: 7.5, height: 12.5, run: [5, 10],
-      tints: ['#e8e0d0', '#f2ece0', '#e0c8a8', '#d8cfc0', '#e8d4c0', '#ccc4b4'],
+      lateral: 16.5, depth: 9, unit: 7.5, height: 13.5, run: [5, 10], rows: 5,
+      bayset: 'liguria', ridge: 'along', flatRoofs: 0.26,
+      tints: ['#f0e6d2', '#f6efe0', '#e8cfa8', '#e2d6c4', '#eed8bc', '#d9cdba',
+        '#f2ddb0', '#e6c9a2'],
+      roof: 0xc4603a,
+      face: { render: '#f6efe0', plinth: '#c6bdaa', trim: '#fdf8ec',
+        frame: '#33322c', shutter: '#6f8496', pane: '#39465a',
+        surround: true, jalousie: { shut: 0.3 }, iron: '#26221e',
+        quoins: true, pipe: true },
     },
     coast: { a: [-200, -338.6], b: [400, -183.8], level: -2.1, floor: -7, beach: 70 },
     seaColor: 0x2e7f9e,
@@ -3575,6 +3675,12 @@ const THEMES = {
       // street, which is right for a northern old town and wrong for this
       // one: the reference quay is limewash and painted render, ochre through
       // apricot, and that warmth is most of what makes it read as the south.
+      //
+      // AND IT WAS BEING OVERRULED BY ITS OWN OBJECT. A second `tints` key sat
+      // eight lines below this comment with the grey palette the comment
+      // argues against, and in an object literal the last key wins — so the
+      // quay has been building grey ever since, with the reasoning for warm
+      // sitting right above it. One key now.
       tints: ['#e8c99a', '#dcae7a', '#f0dcc0', '#cf9a6a', '#e6d2ad', '#c98f66'],
       // THE QUAY IS OPEN TO THE WATER. `seaOpen` rejects any frontage block
       // whose centre is within this many units of the waterline (or seaward
@@ -3582,8 +3688,14 @@ const THEMES = {
       // land side and the seaward flank is bare quay, per the player's
       // harbour reference. The back lanes, well inland, still get both sides.
       seaOpen: 24,
-      tints: ['#c9b58e', '#a8906c', '#b09a80', '#8a785e', '#c0a878', '#98826a'],
+      // STONE, NOT STUCCO: a citadel is quarried, so the joinery is a paler
+      // course of the same stone rather than paint, the quoins do real work at
+      // the corners, and there is no ironwork on a fortified town's windows.
+      face: { render: '#efe6d2', plinth: '#b0a68e', trim: '#f8f2e0',
+        frame: '#3a382f', shutter: '#6a5a44', pane: '#39465a',
+        surround: true, quoins: true, pipe: true },
     },
+    piazza: { count: 1, depth: 16, width: 21 },
     coast: { a: [-260, -75], b: [300, -63], level: -1.4, floor: -6.5, beach: 10 },
     seaColor: 0x27a3ad,          // turquoise harbour water, the reference's own
     lighthouse: true,
@@ -3647,6 +3759,12 @@ const THEMES = {
       // street, which is right for a northern old town and wrong for this
       // one: the reference quay is limewash and painted render, ochre through
       // apricot, and that warmth is most of what makes it read as the south.
+      //
+      // AND IT WAS BEING OVERRULED BY ITS OWN OBJECT. A second `tints` key sat
+      // eight lines below this comment with the grey palette the comment
+      // argues against, and in an object literal the last key wins — so the
+      // quay has been building grey ever since, with the reasoning for warm
+      // sitting right above it. One key now.
       tints: ['#e8c99a', '#dcae7a', '#f0dcc0', '#cf9a6a', '#e6d2ad', '#c98f66'],
       // THE QUAY IS OPEN TO THE WATER. `seaOpen` rejects any frontage block
       // whose centre is within this many units of the waterline (or seaward
@@ -3654,8 +3772,15 @@ const THEMES = {
       // land side and the seaward flank is bare quay, per the player's
       // harbour reference. The back lanes, well inland, still get both sides.
       seaOpen: 24,
-      tints: ['#c9b58e', '#a8906c', '#b09a80', '#8a785e', '#c0a878', '#98826a'],
+      // THE SAME JOINERY AS THE COAST WORLDS (r252). A Mediterranean quay has
+      // painted surrounds, louvred shutters and a downpipe on every house for
+      // exactly the reasons the riviera pass worked them out; the five
+      // regional variants below inherit this geometry and repaint it.
+      face: { render: '#f6ecd8', plinth: '#c4b294', trim: '#fbf3e2',
+        frame: '#33322c', shutter: '#5a6f52', pane: '#39465a',
+        surround: true, jalousie: { shut: 0.36 }, quoins: true, pipe: true },
     },
+    piazza: { count: 2, depth: 16, width: 21 },
     coast: { a: [-260, -75], b: [300, -63], level: -1.4, floor: -6.5, beach: 10 },
     seaColor: 0x4585a0,
     lighthouse: true,
@@ -3812,7 +3937,19 @@ const THEMES = {
       lateral: 17.5, depth: 8, unit: 7.0, height: 9.0,
       run: [4, 9],                                      // units per terrace block
       tints: ['#c9b58e', '#a89c92', '#b09088', '#9aa0a4', '#c0a878', '#8e9298'],
+      // A NORTHERN OLD TOWN GETS THE SAME CARE AND NOT THE SAME KIT (r252).
+      // Painted surrounds, quoins and downpipes are architecture, not a
+      // region — but the shutter here is a BOARDED leaf folded onto the pier,
+      // which is what the older shutter path draws, and not the Mediterranean
+      // louvre. No `jalousie`, no ironwork, and the gable stays end-on to the
+      // street, which is this quarter's whole silhouette.
+      face: { render: '#e8dcc6', plinth: '#8a8078', trim: '#f2e9d6',
+        frame: '#33302a', shutter: '#5a4a3a', pane: '#39465a',
+        surround: true, quoins: true, pipe: true },
     },
+    // and a market square, which is the one thing every town of this kind is
+    // built around
+    piazza: { count: 1, depth: 16, width: 22, leaf: 0x46583a },
   },
 
   // HEDGEROW DASH: farmland lanes, per RALLY_WORLD_BIBLE 3.8. Overcast, low
@@ -4127,15 +4264,25 @@ const THEMES = {
       fringe: [150, 100, 44], fringeVar: [44, 34, 20],
     },
     hillColor: 0x6a5a30, peakColor: 0x8a7a52,
-    treeCount: 950, trunkColor: 0x5a4028,
+    // A THICK WOOD, asked for directly. 950 over a 10.4-52 belt is a wood you
+    // see THROUGH — the eye finds the field beyond it between the trunks, and
+    // a copper canopy only reads as a season when it closes over the road.
+    // 1650 on a belt that starts 0.9 u nearer the verge and runs half as deep
+    // again puts trunks at every depth instead of one screen of them, so the
+    // far ones fill the gaps the near ones leave. Density, not distance: the
+    // belt is deliberately NOT pushed further out, because a wood you cannot
+    // reach the edge of is what "thick" means here.
+    treeCount: 1650, trunkColor: 0x5a4028,
     foliageLow: 0x9a4a1c, foliageTop: 0xd8922c,
     // amber centre, wide hue band: 0.055 -> 0.125 is rust through to gold, and
     // the species shifts push birch past that and larch back under it
     foliage: { h: 0.055, hVar: 0.07, s: 0.72, sVar: 0.14, l: 0.40, lVar: 0.13 },
     treeSnowCap: false,
-    treeBelt: [10.4, 52],
+    treeBelt: [9.5, 78],
     tuftCount: 720, grass: { bladeA: '#9a7a3a', bladeB: '#c8a656' },
-    bushCount: 420, bushColor: 0x8a4a22,
+    // undergrowth to match — bare trunks over clean ground is a plantation,
+    // and the thing being asked for is a wood
+    bushCount: 760, bushColor: 0x8a4a22,
     bush: { h: 0.06, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.3, lVar: 0.1 },
     rockCount: 220, pebbleCount: 250, rockColor: 0x6e6658, rockSnowCap: false,
     flowerCount: 120, flowerColors: ['#c8442a', '#e8a83a', '#f0e0c0'],   // hips and haws
@@ -4226,6 +4373,9 @@ const THEMES = {
       fringe: [128, 92, 46], fringeVar: [36, 28, 18],
     },
     hillColor: 0x5a4a34, peakColor: 0x807868,
+    // NOT thickened with the wood: this is a bracken moor and its whole point
+    // is that you can see across it. The leaf fall below carries the season
+    // here instead.
     treeCount: 260, trunkColor: 0x4a3826,                // barely wooded
     foliageLow: 0x8a4a1c, foliageTop: 0xc07c28,
     foliage: { h: 0.045, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.34, lVar: 0.1 },
@@ -4266,7 +4416,19 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                   // ITALY - Cinque Terre
     elements: 'liguria',
-    frontage: { tints: ['#e98d5a', '#e8b45c', '#d9686a', '#e4c37a', '#c9705a', '#efd9a6'], roof: 0xb4552e, face: { render: '#f0e4cf', plinth: '#a98a68', trim: '#f6ecd8', frame: '#3f6b46', shutter: '#3f6b46' } },
+    // The sheet is titled THE LIGURIAN VILLAGE BUILDER, so the village worlds
+    // get the same joinery as the coast: architrave, louvred shutter, iron.
+    // Their ROOFS stay gable-fronted — a Cinque Terre house stands in a stack
+    // up a cliff, not shoulder to shoulder along a street.
+    // THE DARK END OF THIS LIST WAS DRAGGING THE WHOLE STREET DOWN. Measured
+    // against the reference (facade P50 124, P90 188, saturation 0.33),
+    // CINQUE TERRE came out at 66 / 103 / 0.69 — its lit walls half as bright
+    // as the reference's and twice as saturated, the darkest town on the
+    // roster by a distance. Three mid-saturated entries lifted toward the
+    // sheet's own pastels and two pale ones added, so a run is punctuated
+    // rather than uniformly deep. The district stays warmer than ALASSIO,
+    // which is the point of it; it stops being a different exposure.
+    frontage: { tints: ['#eda877', '#e8b45c', '#e0959a', '#e4c37a', '#d4948a', '#efd9a6', '#f4e6cc', '#f2ddb0'], roof: 0xb4552e, face: { render: '#f6ecdc', plinth: '#a98a68', trim: '#f6ecd8', frame: '#34332c', shutter: '#3f6b46', pane: '#39465a', surround: true, jalousie: { shut: 0.38 }, iron: '#26221e', quoins: true, pipe: true } },
     seaColor: 0x2f7fa8, sunColor: 0xffe8c0, sunIntensity: 2.7,
     skyTop: '#2f7fd1', skyHorizon: '#e8ddc6',
     terrainLow: '#7d8a4e', terrainHigh: '#a89a68',
@@ -4276,7 +4438,13 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                    // GREECE
     elements: 'aegean',
-    frontage: { tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6, face: { render: '#f7f5ef', plinth: '#e2ded4', trim: '#ffffff', frame: '#2f6fae', shutter: '#2f6fae' } },
+    // WHITEWASH HAS NO QUOINS. Every other town on this coast gets a stone
+    // course up its corners; a Cycladic house is one limewashed mass with the
+    // arrises rounded off, and drawing blocks on it would be the one detail
+    // that says "not Greece". The blue louvre and the FLAT ROOF do the work
+    // instead — half the houses here have no pitch at all.
+    frontage: { tints: ['#f6f4ee', '#efece2', '#f8f6f2', '#e9e6dc', '#f2efe6'], roof: 0x3f86c6, flatRoofs: 0.5,
+      face: { render: '#f7f5ef', plinth: '#e2ded4', trim: '#ffffff', frame: '#2f6fae', shutter: '#2f6fae', pane: '#39465a', surround: true, jalousie: { shut: 0.34 }, pipe: true } },
     seaColor: 0x1f7fc4, sunColor: 0xfff4d8, sunIntensity: 3.0,
     skyTop: '#2a86dc', skyHorizon: '#eaf1f4',
     terrainLow: '#9a9a6a', terrainHigh: '#c0b489',
@@ -4286,7 +4454,11 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                     // SPAIN - Costa Brava
     elements: 'andalusia',
-    frontage: { tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33, face: { render: '#f4ecda', plinth: '#c9b592', trim: '#fdf6e8', frame: '#7a5a34', shutter: '#8a5a2c' } },
+    // ANDALUSIA IS IRONWORK. The reja across a ground-floor window and the
+    // balcony rail above it are as much the region as the whitewash, so this
+    // is the one variant that gets the coast's iron as well as its louvre.
+    frontage: { tints: ['#f4ecdc', '#eed8a8', '#e8c88c', '#f6f0e4', '#dcb87a'], roof: 0xb85c33, flatRoofs: 0.16,
+      face: { render: '#f6f0e2', plinth: '#c9b592', trim: '#fdf6e8', frame: '#4a3a24', shutter: '#8a5a2c', pane: '#39465a', surround: true, jalousie: { shut: 0.42 }, iron: '#2a2622', quoins: true, pipe: true } },
     seaColor: 0x2b6f9c, sunColor: 0xffe6b4, sunIntensity: 2.9,
     skyTop: '#3182cc', skyHorizon: '#efe2c6',
     terrainLow: '#8a8a52', terrainHigh: '#c2ad78',
@@ -4296,7 +4468,11 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                  // CROATIA
     elements: 'dalmatia',
-    frontage: { tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a, face: { render: '#f0ead9', plinth: '#c2b9a2', trim: '#f8f2e4', frame: '#4a6b4a', shutter: '#4a6b4a' } },
+    // DALMATIA IS BUILT OF THE SAME WHITE LIMESTONE AS ITS CORNERS, so the
+    // quoins read as bonded stone rather than as paint, and the terraces run
+    // eaves-on to the street the way the Ligurian ones do.
+    frontage: { tints: ['#e9e2d0', '#dfd6c2', '#f0ebdc', '#d8cfba', '#e6dcc6'], roof: 0xc0603a, ridge: 'along', flatRoofs: 0.12,
+      face: { render: '#f2ecdc', plinth: '#c2b9a2', trim: '#f8f2e4', frame: '#34332c', shutter: '#4a6b4a', pane: '#39465a', surround: true, jalousie: { shut: 0.38 }, quoins: true, pipe: true } },
     seaColor: 0x1c86ae, sunColor: 0xfff0d4, sunIntensity: 2.8,
     skyTop: '#2f8ad4', skyHorizon: '#e6eee8',
     terrainLow: '#6f8450', terrainHigh: '#a8a276',
@@ -4306,7 +4482,10 @@ for (const [key, over] of [
     vegetation: 'olive',
     hutGlow: 0.12,                                      // FRANCE - Cote d'Azur
     elements: 'azur',
-    frontage: { tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52, face: { render: '#f6e7d6', plinth: '#d8c4ae', trim: '#fbf0e2', frame: '#8fb4cc', shutter: '#8fb4cc' } },
+    // THE COTE D'AZUR IS THE SAME BUILDING AS MONACO IN PASTEL: pale blue
+    // louvres on apricot and rose, ironwork, eaves to the street.
+    frontage: { tints: ['#f3d9c4', '#efc9b0', '#e8c8cf', '#dcd2e2', '#f6ead6', '#e9d3a8'], roof: 0xc07a52, ridge: 'along', flatRoofs: 0.2,
+      face: { render: '#f8ece0', plinth: '#d8c4ae', trim: '#fdf6ea', frame: '#33322c', shutter: '#8fb4cc', pane: '#39465a', surround: true, jalousie: { shut: 0.3 }, iron: '#26221e', quoins: true, pipe: true } },
     seaColor: 0x2f74a6, sunColor: 0xffeccc, sunIntensity: 2.6,
     skyTop: '#3a86c8', skyHorizon: '#eee4d2',
     terrainLow: '#7f8a58', terrainHigh: '#b0a478',
@@ -4418,6 +4597,24 @@ THEMES.riviera = {
   elements: 'alassio',
   hutGlow: 0.12,
   seaColor: 0x2f7fa8,
+  // THE SKY IN THE REFERENCE IS A FACETED BANK, and it is a third of every one
+  // of those frames. Angular slabs of grey-white cloud with a lit face and a
+  // shaded one, over a cooler, deeper blue than the postcard one this world
+  // had. `cloudKind` is the only line that does it; drop it and the soft
+  // sprite field comes straight back.
+  // AND THE TINT IS NOT WHITE EITHER. The renderer tone-maps at 1.46 exposure,
+  // so a near-white cloud colour comes out of the shader ABOVE white and every
+  // facet clips to the same value — which is why a bank with perfectly good
+  // baked shading still read as flat foam. Starting from a pale grey leaves
+  // the whole range under the clip and the facets come back.
+  // AND THERE ARE FEWER OF THEM THAN THE REFERENCE HAS. That image is a still
+  // photograph of an overcast; a bank dense enough to match it rings the
+  // horizon, and from a car — where the camera sits at 2.6 u and looks along
+  // the road, not up — thirty-seven clouds at a shallow angle stop being
+  // clouds and become a lid. Twenty distinct ones against blue is the same
+  // style and a better sky to drive under.
+  cloudKind: 'faceted', cloudCount: 9, cloudTint: 0xdae3ec, cloudDeep: 0x76839a,
+  skyTop: '#2f6ba4', skyHorizon: '#d6dee2',
   // ...and its own paint. `frontage` is the painted face the town presents to
   // the road, which is what you actually drive past in the budello. Alassio
   // sits a shade softer and pinker than Cinque Terre's saturated coral — more
@@ -4434,13 +4631,26 @@ THEMES.riviera = {
   // `bayset: 'liguria'` (see townhouseBays) is the window grid; `height` and
   // `unit` are the block it is painted on. 14 u over a 7.2 u unit is very
   // nearly 2:1, which is the sheet's own proportion.
+  // THE SQUARE, which the sheet gives a panel to and the render builds its
+  // whole foreground out of: paving, a fountain, lamps and planters, and a
+  // break in the terrace to put them in. See `_buildPiazzas`.
+  piazza: { count: 3, depth: 17, width: 23 },
   frontage: {
     lateral: 15.0, depth: 8.5, unit: 7.2, height: 14.0, run: [6, 12], rows: 5,
-    bayset: 'liguria',
-    tints: ['#f0d98a', '#e8b45c', '#e8a2a6', '#c4655a', '#f4e6cc', '#bccbb0', '#e2ac7c'],
-    roof: 0xb85a30,
-    face: { render: '#ecd79b', plinth: '#cfc3a4', trim: '#f6efdd',
-      frame: '#2b2b26', shutter: '#3d6b47', pane: '#1b2028' },
+    bayset: 'liguria', ridge: 'along',
+    // THE SHEET'S OWN STUCCO PALETTE — yellow, ochre, pink, stucco red, cream,
+    // sage — and it multiplies a near-white render, so the tint IS the paint.
+    tints: ['#f0d98a', '#f4e2a2', '#e8b45c', '#e8a2a6', '#c4655a', '#f4e6cc',
+      '#f8f0dc', '#bccbb0', '#e2ac7c'],
+    roof: 0xc4603a,
+    // WHITE JOINERY ROUND EVERY OPENING, GREEN LOUVRES IN IT, IRON ACROSS IT
+    // (r244). The render goes near-white so the tints carry the colour: at
+    // #ecd79b the wall was yellow BEFORE the tint and every house came out a
+    // shade of the same yellow, whatever the palette said.
+    face: { render: '#f4ead8', plinth: '#c3baa6', trim: '#f9f2e2',
+      frame: '#33322c', shutter: '#3d6b47', pane: '#39465a',
+      surround: true, jalousie: { shut: 0.3 }, iron: '#26221e',
+      quoins: true, pipe: true },
   },
 };
 
@@ -4454,25 +4664,32 @@ THEMES.riviera = {
 // frame from a chase camera, and a sand-coloured one puts the town in a desert.
 // THE STREET SURFACE, from the reference image (r241). It is ~40% of that
 // frame and it was the biggest single thing still wrong: mine was speckle
-// noise on grey, and theirs is LARGE irregular setts in pale greys, beiges
-// and a faint lilac, with a tram line bedded in tan running down it.
+// noise on grey, and theirs is LARGE irregular setts in warm stone — beige
+// and buff with grey in it. (r244: the tram line that came with the northern
+// reference is gone, and the lilac in the palette with it.)
 //
 // `rows`/`per` set the sett SIZE: 22 u of road across 26 stones is ~0.85 u
 // each — roughly a dinner plate, which is what the reference shows and about
 // twice the Tremola hand-laid sett.
 const TOWN_ROAD = {
-  base: '#8e8a82', mottleA: [128, 124, 116], mottleB: [176, 172, 163],
+  base: '#7b756a', mottleA: [110, 104, 94], mottleB: [150, 143, 130],
   rut: 'rgba(70,68,63,0.32)', rutCore: 'rgba(52,50,46,0.3)', tread: 'rgba(30,29,26,0.3)',
-  stoneA: 'rgba(206,202,192,0.5)', stoneB: 'rgba(84,81,76,0.55)',
-  fringe: [150, 146, 136], fringeVar: [26, 25, 22],
+  stoneA: 'rgba(190,184,170,0.5)', stoneB: 'rgba(76,72,66,0.55)',
+  // the pavement in both Monte Carlo renders is a warm red-brown flag, not
+    // grey concrete, and it is the strip right beside the racing line
+    fringe: [148, 126, 110], fringeVar: [24, 20, 18],
   ruts: false,                       // setts do not rut
   cobbles: {
-    stones: ['#c9c5bc', '#b6b1a7', '#d2ccc0', '#a9a49b', '#c3bcc2', '#dad4c8',
-      '#b0aca6', '#cfc8b8'],
-    mortar: 'rgba(96,92,85,0.85)', lip: 'rgba(255,252,244,0.2)',
+    // WARMER THAN r241's. That grey-lilac was read off a northern reference;
+    // the sheet's paving and both Monte Carlo renders are a warm stone —
+    // beige and buff with the grey in it, not the other way round.
+    stones: ['#928878', '#827a6a', '#9c9280', '#786f61', '#8a8070', '#a09682',
+      '#7d7466', '#948a7a'],
+    mortar: 'rgba(88,80,70,0.85)', lip: 'rgba(255,250,238,0.16)',
     rows: 20, per: 26,               // ~0.85 u setts, twice Tremola's
   },
-  rails: { gauge: 3.4 },
+  // NO TRAM RAILS (r244). They were the right call for the Hanseatic street
+  // of r241 and there is no tramway in any of the Ligurian references.
 };
 
 const TOWN_GROUND = {
@@ -4510,11 +4727,20 @@ THEMES.genova = {
   skyTop: '#3a7fb8', skyHorizon: '#cdd6d4',
   splinter: [0xc86a4a, 0xb8ac96, 0x35583c],
   hutRoof: 0x9c4628,
+  piazza: { count: 3, depth: 15, width: 20, stone: 0xbfb49e, leaf: 0x44603a },
+  // A WORKING HARBOUR IS THE SAME ARCHITECTURE IN DIRTIER PAINT: the same
+  // architrave, the same green louvre, the same iron — over the port's reds
+  // and ochres rather than the resort's yellows and pinks.
   frontage: {
+    // eaves to the street, like the rest of the coast — a port terrace is the
+    // same building as a seafront one under dirtier paint
+    ridge: 'along', flatRoofs: 0.22,
     tints: ['#c86a4a', '#b2543c', '#d08a56', '#9e4a34', '#c4926a', '#d9a878'],
-    roof: 0x9c4628,
-    face: { render: '#d9b894', plinth: '#8e8272', trim: '#e8d6bc',
-      frame: '#35583c', shutter: '#35583c' },
+    roof: 0xa8502c,
+    face: { render: '#efe2cc', plinth: '#8e8272', trim: '#ecdcc2',
+      frame: '#33322c', shutter: '#35583c', pane: '#39465a',
+      surround: true, jalousie: { shut: 0.42 }, iron: '#26221e',
+      quoins: true, pipe: true },
   },
 };
 
@@ -4544,11 +4770,23 @@ THEMES.sanremo = {
   splinter: [0xdcd2ba, 0xa8a294, 0x5c6f58],
   hutRoof: 0x5c6f58,
   weather: { type: 'dust', color: 0xd0c8ac, rate: 22 },
+  // HINTERLAND: the same green louvre because it is the same region, but no
+  // ironwork — a village house has a window box where a seafront terrace has
+  // a balcony, and the sheet draws exactly that.
+  // ONE SQUARE UP HERE TOO — a hinterland village has a fountain in it and the
+  // sheet draws exactly that; it is just smaller than the seafront's.
+  piazza: { count: 2, depth: 14, width: 18, leaf: 0x486840 },
+  // NO `ridge: 'along'` here. Up in the hinterland the houses stand apart
+  // rather than in a terrace, and a detached village house presents its
+  // gable — which is also what keeps this world from reading as the
+  // seafront with hills behind it.
   frontage: {
     tints: ['#dcd2ba', '#c8bda2', '#e4dcc6', '#d0bb98', '#bfae90'],
     roof: 0x5c6f58,
-    face: { render: '#e0d6bf', plinth: '#9c9484', trim: '#efe6d2',
-      frame: '#4a6b4a', shutter: '#4a6b4a' },
+    face: { render: '#e8dfc9', plinth: '#9c9484', trim: '#efe6d2',
+      frame: '#3a3a30', shutter: '#4a6b4a', pane: '#39465a',
+      surround: true, jalousie: { shut: 0.5 }, pipe: true,
+      boxes: { wood: '#5a4632', blooms: ['#c8402f', '#e0644a', '#d8869a', '#efe3d2'] } },
   },
 };
 
@@ -4623,6 +4861,19 @@ export function disposeSubtree(root) {
  *  limit that makes the wall unclimbable must apply HERE and nowhere else. */
 export const RIM_RADIUS = 1620;
 const _clearV = new THREE.Vector3();   // scratch for _clearsRoad
+const _pzV = new THREE.Vector3();      // ...and for the squares (see _buildPiazzas)
+// A PREDICATE MUST NOT WRITE THE CALLER'S SCRATCH. `_inPiazza` is reached
+// through `_clearsRoad`, which every builder calls — usually while holding a
+// point in `_pzV` that it is about to use. Sharing one vector between the two
+// silently rewrote that point into a square's LOCAL frame and the caller then
+// used it as world coordinates. That is how r253 put four invisible colliders
+// on HARBOR QUAY's racing line: the guard tested the right spot and the solid
+// was registered at the wrong one.
+const _ipV = new THREE.Vector3();
+const _pzUp = new THREE.Vector3(0, 1, 0);
+const _IDQ = new THREE.Quaternion();   // identity: piazza parts are axis-aligned
+const CHURCH_LEN = 19, CHURCH_WID = 10.5;  // the nave, along and across (_pzChurch)
+const _ONE = new THREE.Vector3(1, 1, 1);   // ...and built at their true size
 
 /** Hermite ease on an already-normalised 0..1 ramp (clamps its own ends). */
 const smoothstep01 = (t) => {
@@ -6306,7 +6557,7 @@ export class Track {
     this._tunnels = [];
     if (this.T.tunnels) this._planTunnels();
 
-    this.animated = { flags: [], clouds: [], whales: [] };
+    this.animated = { flags: [], clouds: [], whales: [], cloudBank: null };
     // World-space circle colliders for on-road obstacles: [{x, z, r}].
     // Always present; [] on levels without obstacles. Consumed by car physics.
     this.obstacles = [];
@@ -7128,6 +7379,112 @@ export class Track {
    *  fixed. The radial ramp contributes ~10% and the ridge octaves ~5% on top,
    *  so the steepest ground is around 15% — a real climb that a car pulls up
    *  with speed in hand, rather than a wall. */
+  /** THE GOAT PEAK — a mountain you can actually climb to the top of.
+   *
+   *  `_highland` gave free roam real climbable ground, but no DESTINATION:
+   *  every tall dramatic mountain on the roster is scenery with a collider,
+   *  a wall you stop at. Asked for directly: "what you'd love is mountains
+   *  you can actually climb to the top of". So one true summit per world
+   *  that has real ground (the `_highland` opt-in), built the only honest
+   *  way this codebase knows: as TERRAIN, in BOTH height functions, so the
+   *  drawn mountain and the one you drive on are the same object and the
+   *  sinking class of bug cannot exist on it by construction.
+   *
+   *  THE DOME IS THE WALL, THE ROUTE IS THE DOOR. The dome runs smoothstep
+   *  flanks that peak near 120% grade — unclimbable, the rim-wall's own
+   *  trick: the mountain stops you with steepness you can see, never with a
+   *  collider. Carved into the flank is a goat route: 1.5 turns of spiral
+   *  shelf, ~16 u wide, whose height at every point is the dome's own height
+   *  at that spiral radius — so the carve always cuts INTO the hill and
+   *  never juts a causeway out of it. Along-path grade tops out ~21% at
+   *  mid-climb and eases to 0 at both ends; the summit is the smoothstep's
+   *  own flat crown. Nothing about it needs a collider, a clamp, or a
+   *  special case in the car.
+   *
+   *  PLACED at r 660-740 — beyond every road (none reaches past ~320),
+   *  inside the drawn-mesh near patch (edge + blend ≤ 896 < the 900 far
+   *  switch), clear of the sea, and clear of the river's valley (the water's
+   *  one way out stays open). Scenery builders that reach this ring skip
+   *  the peak's footprint via `_nearGoat` — a mountain with a mesa parked
+   *  on its route is not a route. */
+  _buildGoatPeak() {
+    this._goat = null;
+    const T = this.T;
+    const scale = T.highland !== undefined ? T.highland : (T.relief === 0 ? 0 : 1);
+    if (!scale || T.goatPeak === false) return;
+    const R = 130, H = 108;
+    let best = null;
+    // each world starts its bearing scan somewhere of its own, so the roster
+    // does not put every peak due south of the start line on ties
+    const az0scan = ((this.level?.id ?? 0) * 0.61) % (Math.PI * 2);
+    for (let a = 0; a < 44; a++) {
+      const az = az0scan + (a / 44) * Math.PI * 2;
+      for (const r of [660, 700, 740]) {
+        const x = Math.cos(az) * r, z = Math.sin(az) * r;
+        if (T.coast && this._coastSide(x, z) > -((T.coast.beach ?? 60) + R + 10)) continue;
+        const rv = this._river ? this._riverValley(x, z) : 1;
+        if (rv < 0.9) continue;
+        const s = this._nearestSample(x, z);
+        if (s.d < R + 40) continue;
+        const score = s.d + rv * 20;
+        if (!best || score > best.score) best = { x, z, score };
+      }
+    }
+    if (!best) return;
+    // the spiral, foot to crown, starting on the face that greets a driver
+    // arriving from the world's middle
+    const pts = [];
+    const turns = 1.5, segs = 64, az0 = Math.atan2(best.z, best.x);
+    for (let i = 0; i <= segs; i++) {
+      const u = i / segs;
+      const rr = R * (1 - 0.90 * u);
+      const th = az0 + Math.PI + u * turns * Math.PI * 2;
+      pts.push([best.x + Math.cos(th) * rr, best.z + Math.sin(th) * rr, u]);
+    }
+    this._goat = { x: best.x, z: best.z, R, H, pts };
+  }
+
+  /** Scenery keep-out for the peak and its route. */
+  _nearGoat(x, z, pad) {
+    const G = this._goat;
+    return !!G && Math.hypot(x - G.x, z - G.z) < G.R + (pad ?? 0);
+  }
+
+  /** The peak's contribution to the ground at (x, z) — dome, with the goat
+   *  route carved in. Lives in terrainHeight AND _terrainMeshHeight. */
+  _goatH(x, z) {
+    const G = this._goat;
+    if (!G) return 0;
+    const dx = x - G.x, dz = z - G.z;
+    const d2 = dx * dx + dz * dz;
+    const REACH = G.R + 26;
+    if (d2 > REACH * REACH) return 0;
+    const d = Math.sqrt(d2);
+    const u0 = Math.max(0, Math.min(1, 1 - d / G.R));
+    const dome = G.H * u0 * u0 * (3 - 2 * u0);
+    // nearest point on the spiral, projected onto its segments (the
+    // staircase lesson from _tunnelRidge: project onto the LINE, never
+    // snap to a vertex)
+    let bd2 = Infinity, bu = 0;
+    const P = G.pts;
+    for (let k = 0; k + 1 < P.length; k++) {
+      const ax = P[k][0], az = P[k][1], bx = P[k + 1][0], bz = P[k + 1][1];
+      const vx = bx - ax, vz = bz - az;
+      const l2 = vx * vx + vz * vz || 1;
+      let s = ((x - ax) * vx + (z - az) * vz) / l2;
+      s = s < 0 ? 0 : s > 1 ? 1 : s;
+      const px = ax + vx * s, pz = az + vz * s;
+      const dd = (x - px) * (x - px) + (z - pz) * (z - pz);
+      if (dd < bd2) { bd2 = dd; bu = P[k][2] + (P[k + 1][2] - P[k][2]) * s; }
+    }
+    const bd = Math.sqrt(bd2);
+    // the shelf sits at the dome's own height at the spiral's radius there
+    const lu = 0.90 * bu;
+    const ledge = G.H * lu * lu * (3 - 2 * lu);
+    const mask = 1 - smoothstep01((bd - 9) / 11);
+    return dome + (ledge - dome) * mask;
+  }
+
   _highland(x, z) {
     const scale = this.T.highland !== undefined ? this.T.highland
       : (this.T.relief === 0 ? 0 : 1);       // flat-by-design worlds opt out
@@ -8741,6 +9098,7 @@ export class Track {
     // the delta speaks; the ramp between matches the corridor blend's reach.
     if (this._delta) h += this._delta.at(x, z) * smoothstep01((nd - 10) / 60);
     if (this._citMound) h += this._citMoundH(x, z);
+    if (this._goat) h += this._goatH(x, z);  // the goat peak lives in BOTH ground functions
     if (nd <= 27) {
       const clamp = this._roadClampY(x, z, bi, nd);
       if (clamp < Infinity) h = Math.min(h, clamp - 0.45);
@@ -8984,6 +9342,7 @@ export class Track {
     // numbers agreed with each other and disagreed with the picture; the
     // picture was right.
     if (this._citMound) h += this._citMoundH(x, z);
+    if (this._goat) h += this._goatH(x, z);  // the goat peak lives in BOTH ground functions
     // same fade as terrainHeight — see the note there; these two must agree
     if (this._delta) h += this._delta.at(x, z) * smoothstep01((d - 10) / 60);
     if (d <= 27) {
@@ -9180,6 +9539,24 @@ export class Track {
       tex.anisotropy = 4;
       this._cliffRibbon(1, tex);
       this._cliffRibbon(-1, tex);
+      // WHERE THE ROCK ACTUALLY IS, published for the camera.
+      //
+      // The face is nominally `WALL_OFF + 0.65 + cliffSetback` — 37 u out on
+      // CANYON RUN — but `_cliffCap` then pulls it IN wherever the lap comes
+      // back past itself, and `cliffgap.mjs` measures that cap reaching 11.3
+      // at sixteen stations of that same lap. A three-fold variation.
+      //
+      // The camera's own guard is a CONSTANT 8.4 (main.js, `clampCam`) and
+      // reads none of this. Today it holds, by 2.9 u, and it holds by luck:
+      // nothing ties the limit the eye is allowed out to to the thing it is
+      // being kept away from. Change `cliffSetback`, the cap, or `WALL_OFF`
+      // and the camera starts sitting inside rock with no test to catch it.
+      // So publish the foot per station and let the camera bound itself.
+      this.cliffFoot = new Float32Array(N * 2);
+      for (let j = 0; j < N; j++) {
+        this.cliffFoot[j * 2] = this._cliffProfile(j, 1).base;
+        this.cliffFoot[j * 2 + 1] = this._cliffProfile(j, -1).base;
+      }
       return;
     }
     // Open-world tracks: no fences anywhere. The road is fastest; drifting
@@ -9300,7 +9677,27 @@ export class Track {
     // Guarded index — a negative `j % N` would read undefined and Math.min it
     // to NaN, and every NaN comparison downstream is false.
     if (this._cliffCap) {
-      base = Math.min(base, this._cliffCap[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)]);
+      const cap = this._cliffCap[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)];
+      if (cap < base) {
+        // A PINCHED WALL YIELDS HEIGHT, NOT JUST GROUND. The cap pulls the
+        // face in wherever the lap comes back past itself — to 11.3 u on
+        // sixteen stations of CANYON RUN, and across long stretches of LAGUNA
+        // SECA's corkscrew — and the wall kept its FULL height there: a 30 u
+        // face 2.9 u from the camera's own clamp limit. Photographed on
+        // r281 · LAGUNA SECA as a frame that is nothing but banded rock, the
+        // car invisible inside it. A wall standing where the cap bites is a
+        // leg pinched against its own neighbour, and what that looks like in
+        // a real doubled-back canyon is a LOW SPINE between the two roads —
+        // so the height falls with the squeeze: full height where the cap
+        // just grazes, down to the 1.7 u berm floor where the face is pulled
+        // right to the verge. You see the next leg over it, which is also
+        // the honest geometry.
+        const nominal = WALL_OFF + 0.65 + (this.T.cliffSetback ?? 0);
+        const squeeze = THREE.MathUtils.clamp(
+          (cap - (WALL_OFF + 1.4)) / Math.max(1, nominal - (WALL_OFF + 1.4)), 0, 1);
+        h = Math.max(1.7, h * squeeze * squeeze);
+        base = cap;
+      }
     }
     const l1 = 0.85 + 0.5 * Math.sin(17 * t + 0.7 - ph);   // mid-face lean
     const l2 = 2.0 + 0.85 * Math.sin(13 * t + 2.9 + ph) + 0.4 * Math.sin(47 * t - ph);
@@ -9540,9 +9937,35 @@ export class Track {
         // and a leg reaches the GROUND under its own tower, which on a world
         // that starts on a shelf is not the road's height either
         const gy = Math.min(y0, this.terrainHeight(bx + ox, bz + oz));
-        const legH = (y0 + 10) - gy;
+        // A LEG THAT CANNOT STAND CLEAR OF THE ROAD DOES NOT COME DOWN TO THE
+        // GROUND (r253).
+        //
+        // Dropping the collider — the r167 rule the note below records — stops
+        // the tower dead-stopping a car, and that was the right call. But the
+        // POLE IS STILL THERE: an 11 u mast standing 4.2 u inside the racing
+        // line at the start of TOUR DE CORSE and SANREMO STAGE, which the road
+        // census has reported as a body on every run of this session, and
+        // which a driver still has to look through.
+        //
+        // Where there is nowhere to stand, the leg stops above the cars
+        // instead: the beam is carried from the side that DID clear and this
+        // one hangs, which is what a gantry over a road looks like anyway.
+        // 3.2 u is above the 2.4 u roof line the census measures headroom
+        // against, so what was a body in the carriageway becomes overhead.
+        const clear = this._clearsRoad(bx + ox, bz + oz, 0.6, 0.4);
+        // ...and the headroom is measured over THE ROAD THAT IS UNDER THE LEG,
+        // not over the start line. RALLYCROSS ARENA's stray leg stands where
+        // the lap comes back 2 u higher than sample 0, so a cut referenced to
+        // `y0` left it grazing that carriageway at 1.01 u — a body again, in a
+        // different class. The road under the foot is the only surface that
+        // can answer this.
+        const nearI = this.nearestIndex(_gp.set(bx + ox, 0, bz + oz));
+        const roadY = this.center[nearI]?.y ?? y0;
+        const footY = clear ? gy : Math.max(gy, Math.max(y0, roadY) + 3.2);
+        const legH = (y0 + 10) - footY;
+        if (legH <= 0.4) continue;
         const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, legH, 8), steel);
-        leg.position.set(bx + ox, gy + legH / 2, bz + oz);
+        leg.position.set(bx + ox, footY + legH / 2, bz + oz);
         leg.castShadow = true;
         this.group.add(leg);
         // AND WHERE THE TOWER HAS NOWHERE TO STAND, IT STOPS BEING SOLID.
@@ -9559,7 +9982,7 @@ export class Track {
         // you on the start straight, so a leg that cannot clear the road
         // keeps its mesh and gives up its collider. This is exactly the rule
         // the grandstand's own colliders have followed since r167.
-        if (!this._clearsRoad(bx + ox, bz + oz, 0.6, 0.4)) continue;
+        if (!clear) continue;
         this.solids.push({ x: bx + ox, z: bz + oz, r: 0.6, y: c.y, mat: 'metal' });
       }
       for (let ly = 2.5; ly <= 8.5; ly += 3) {
@@ -10012,7 +10435,14 @@ export class Track {
       // squarely in the lane. This is the third system to need the lap-wide
       // check (road cabins and props were the first two); an offset is not a
       // distance, and `_distToTrack` searches the lap.
-      if (this._distToTrack(p.x, p.z) < w + r + 1.5) return;
+      // ...and against the width of the road it is NEAREST TO, not the width
+      // of the one it was measured from. `w` is sample `i`'s half-width; the
+      // station `_distToTrack` actually finds may be another leg entirely,
+      // with a road twice as wide. `_clearsRoad` asks the nearest station's
+      // own width, which is the question the road census asks and therefore
+      // the only one worth passing. (Same defect, third system: the townsfolk
+      // had it in r249 and the gantry legs before them.)
+      if (!this._clearsRoad(p.x, p.z, r, 1.5)) return;
       if (spec.style === 'roots') {
         // gnarled redwood roots breaking the surface: 3 low half-buried ridges
         const g = new THREE.Group();
@@ -10828,6 +11258,10 @@ export class Track {
 
   // ---------- environment ----------
   _buildEnvironment() {
+    // BEFORE the terrain mesh: the goat peak is a TERRAIN term (like the
+    // citadel mound), and every builder after this seats on the ground it
+    // shapes — the mesh, the scatter, the horizon rings all see one world.
+    this._buildGoatPeak();
     this._buildTerrain();
     this._buildSky();
     const m4 = new THREE.Matrix4();
@@ -10840,7 +11274,10 @@ export class Track {
     if (this.T.quay) this._buildQuayside(m4);        // harbour: quay wall + dockside kit
     if (this.T.citadel) this._buildCitadel();        // the walled hill town
     if (this.T.quay) this._buildMarina();           // pontoons, rigged boats, rings
-    if (this.T.frontage) this._buildStreetLife();   // market stalls, produce, a fountain
+    // THE SQUARES GO IN BEFORE THE STREET WALL, because the street wall has to
+    // stop for them — see `_inPiazza`
+    if (this.T.piazza) this._buildPiazzas();        // paved square, fountain, lamps
+    if (this.T.frontage) this._buildStreetLife();   // market stalls and produce
     if (this.T.stoneBridges) this._buildStoneBridges();
     if (this._overpasses.length) this._buildOverpassDecks();
     if (this.T.japan) this._buildJapan();
@@ -10874,6 +11311,7 @@ export class Track {
     if (this.T.hollowArch) this._buildHollowArch();  // redwood drive-through trunk
     if (this.T.lamps) this._buildLamps();            // neon / undercity road lamps
     if (this.T.frontage) this._buildOldTown(m4);     // OLD TOWN street frontage + arches
+    if (this.T.frontage) this._buildTownsfolk();     // ...and the people on its pavements
     if (this.T.logYards) this._buildLogYards();      // flume timber stacks
     if (this.T.retainingWalls) this._buildRetainingWalls();   // alpine-pass parapets
     if (this.T.heroBridge) this._buildHeroBridge();           // hero rope crossing
@@ -11698,8 +12136,41 @@ export class Track {
     const step = Math.max(2, Math.round((S.bay || 6.2) / this.segLen));
     const bayLen = step * this.segLen * 1.08;
     const bankGeo = this._bankPrismGeo();
-    const hedgeGeo = new THREE.BoxGeometry(1, 1, 1);
+    // A HEDGE IS NOT A BOX. Photographed on OULTON PARK: the run read as a row
+    // of butter-yellow slabs — a unit box per bay, flat-shaded, one scalar of
+    // tone. A flailed hedge is a block in SILHOUETTE, but its faces are made
+    // of clumps: so the box is subdivided and every vertex is pushed out by a
+    // seeded hash (deterministic — a rebuild is the same hedge), the crown
+    // more than the flanks, and painted per-vertex — lit crown fading to a
+    // shadowed base, the same trick the massif uses to stop eight cones
+    // reading as one flat wall. Still one geometry, still one InstancedMesh,
+    // still one draw call: the cost is vertices, 8 -> ~150 per bay.
+    const hedgeGeo = new THREE.BoxGeometry(1, 1, 1, 4, 2, 6);
     hedgeGeo.translate(0, 0.5, 0);
+    {
+      const pos = hedgeGeo.attributes.position;
+      const hcols = new Float32Array(pos.count * 3);
+      const hash = (a, b2, c) => {
+        const v = Math.sin(a * 12.9898 + b2 * 78.233 + c * 37.719) * 43758.5453;
+        return v - Math.floor(v);
+      };
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+        const n = hash(x * 7, y * 5, z * 9) - 0.5;
+        // the crown billows, the flanks ripple, the base stays put so the
+        // hedge still sits down onto its bank without a gap
+        pos.setX(i, x + n * 0.22 * y);
+        pos.setY(i, y + (y > 0.9 ? (hash(z * 11, x * 3, 1) - 0.35) * 0.30 : 0));
+        pos.setZ(i, z + (hash(y * 13, z * 5, x * 2) - 0.5) * 0.10);
+        // per-vertex light: crown 1.0 down to 0.55 at the base, with clump
+        // mottle on top of the ramp so a face is foliage rather than paint
+        const t = 0.55 + 0.45 * Math.min(1, pos.getY(i))
+          + (hash(x * 17, y * 19, z * 23) - 0.5) * 0.22;
+        hcols[i * 3] = hcols[i * 3 + 1] = hcols[i * 3 + 2] = Math.max(0.3, t);
+      }
+      hedgeGeo.setAttribute('color', new THREE.BufferAttribute(hcols, 3));
+      hedgeGeo.computeVertexNormals();
+    }
     const banks = new THREE.InstancedMesh(
       bankGeo,
       new THREE.MeshStandardMaterial({
@@ -11711,7 +12182,8 @@ export class Track {
     const hedges = new THREE.InstancedMesh(
       hedgeGeo,
       new THREE.MeshStandardMaterial({
-        color: 0xffffff, flatShading: true, roughness: 1, envMapIntensity: 0.25,
+        color: 0xffffff, vertexColors: true, flatShading: true, roughness: 1,
+        envMapIntensity: 0.25,
       }),
       MAX
     );
@@ -11729,9 +12201,22 @@ export class Track {
     // never going to touch.
     const verge = [...this.props, ...this.tireStacks].filter(
       (v) => Math.abs(this._distToTrack(v.x, v.z) - LAT) < W * 0.5 + (v.r ?? 1.2));
+    // COVERAGE, IN SECTIONS. `coverage: 0.5` on a level's spec keeps roughly
+    // half the run — dropped as whole ~9-bay sections (about 60 u of verge at
+    // a time), never as alternating bays: a hedge with every other bay missing
+    // is picket teeth, a hedge that comes and goes by the field is how a real
+    // parkland circuit is walled. Seeded on the section index so the same
+    // world always opens the same fields. Both sides drop together — a section
+    // hedged on one side only reads as a mistake, not a field.
+    const cov = S.coverage ?? 1;
+    const secHash = (n) => {
+      const v = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+      return v - Math.floor(v);
+    };
     let k = 0, bay = 0;
     for (let i = 0; i < N && k < MAX; i += step) {
       if (this._circDist(i, 0) < 34) continue;                    // start grid + gate
+      if (cov < 1 && secHash(Math.floor(i / (step * 9))) > cov) continue;
       if (this._nearGorge(i, 40)) continue;
       // streams wash across the lane; the bank opens for them on both sides
       if (this.fords.some((f) => this._circDist(i, f.i) < f.half / this.segLen + 5)) continue;
@@ -11769,8 +12254,18 @@ export class Track {
         m4.compose(new THREE.Vector3(p.x, base + h * 0.92, p.z), q,
           new THREE.Vector3(W * 0.8, hh, bayLen * 1.02));
         hedges.setMatrixAt(k, m4);
-        leaf.setHSL(F.h + Math.random() * F.hVar, F.s + Math.random() * F.sVar,
-          Math.max(0.10, F.l - 0.06 + Math.random() * F.lVar));
+        // A HEDGE IS NOT THE CANOPY. This borrowed the foliage palette raw,
+        // which is right on green farmland and wrong the moment a tune moves
+        // the trees: OULTON PARK's autumn foliage (h 0.07, s 0.62, l 0.36) put
+        // BUTTER-YELLOW slabs down both verges, photographed and reported as
+        // walls needing fixing. Flailed hawthorn holds browner and darker than
+        // whatever the trees are doing: hue pulled a quarter toward moss
+        // (0.22), saturation and lightness cut, so an autumn hedge reads as
+        // russet-brown under copper trees and a summer hedge stays hedge-green.
+        leaf.setHSL(
+          (F.h + Math.random() * F.hVar) * 0.75 + 0.22 * 0.25,
+          (F.s + Math.random() * F.sVar) * 0.72,
+          Math.max(0.10, (F.l - 0.06 + Math.random() * F.lVar) * 0.66));
         hedges.setColorAt(k, leaf);
         this.solids.push({ x: p.x, z: p.z, r: W / 2, y: base + h * 0.5, mat: 'bank' });
         k++;
@@ -12206,8 +12701,13 @@ export class Track {
         if (Math.hypot(idu - du, idn - dn) < 40 + iw) { clear = false; break; }
       }
       if (!clear) continue;
-      srTaken.push([du, dn]);
       const sscale = 1.2 + hsh2(cand + 2.9) * 3.4;
+      // A SEA ROCK IS IN THE SEA, and on a coast road the sea comes close: two
+      // of these stood 6.28 u inside CINQUE TERRE's carriageway, which is the
+      // last road defect that world had. The shoulder lump beside it reaches
+      // 1.1 scales further out, so the clearance is asked for the pair.
+      if (!this._clearsRoad(bx, bz, sscale * 1.7, 0.6)) continue;
+      srTaken.push([du, dn]);
       iq.setFromAxisAngle(iup, hsh2(cand + 4.1) * Math.PI * 2);
       im4.compose(new THREE.Vector3(bx, y - sscale * 0.45, bz), iq,
         new THREE.Vector3(sscale, sscale * (0.8 + hsh2(cand + 5.3) * 0.7), sscale * 0.85));
@@ -12373,6 +12873,71 @@ export class Track {
     return c.getHex();
   }
 
+  /** THE ALBEDO THE GROUND ACTUALLY RENDERS AT (x, z).
+   *
+   *  The terrain material carries the ground TEXTURE and per-vertex colours
+   *  at once, so what reaches the screen is `ground.base x terrain ramp`
+   *  multiplied in linear space - the outback theme's note spells this out
+   *  and calls it measured. Anything that has to MATCH the ground therefore
+   *  has to match that PRODUCT; matching either half alone lands somewhere
+   *  the ground never goes.
+   *
+   *  Follows `_buildGround`'s own paint: the terrainLow -> terrainHigh height
+   *  ramp, the valley-shading multiply that rides on the same t, and the mean
+   *  of the per-vertex facet wobble. The dirt sinusoid, the coastal sand ring
+   *  and the gorge strata are deliberately left out - they are local
+   *  sprinkles over the field, not the tone of it. */
+  _groundTone(x, z) {
+    const T = this.T;
+    const t = THREE.MathUtils.clamp((this._terrainMeshHeight(x, z) + 2) / 7, 0, 1);
+    const c = new THREE.Color(T.terrainLow).lerp(new THREE.Color(T.terrainHigh), t);
+    c.multiplyScalar((0.93 + 0.07 * t) * 0.985);   // valley shading x mean facet wobble
+    if (T.ground && T.ground.base) c.multiply(new THREE.Color(T.ground.base));
+    return c;
+  }
+
+  /** The tone a massif foot has to reach: the mean of `_groundTone` over the
+   *  ring the cones are about to be planted on, lifted half way to the
+   *  theme's hill tone in brightness.
+   *
+   *  SAMPLED, NOT ASSUMED, because the ring sits at r 340-720 where
+   *  `_highland` has already lifted the ground several units up the
+   *  terrainLow -> terrainHigh ramp. The ground at a cone's foot is NOT
+   *  terrainLow; on the alpine themes it is most of the way to terrainHigh,
+   *  and on the flat-by-design worlds it is not. Sea-side samples are dropped
+   *  on coast worlds for the same reason `_buildMassif` reflects its cones
+   *  inland: there is no ground out there to match.
+   *
+   *  AND A FLANK IS NOT A FIELD, which is why the brightness is only met half
+   *  way. The ground is a near-horizontal surface facing the sun; a cone's
+   *  foot is a steep face that is not, and the renderer shades it as such.
+   *  Handing the foot the ground's albedo outright is the physically honest
+   *  answer and it measures worse: on GRANITE NARROWS and CAPE OLIVETO, where
+   *  the flat ground is far more strongly lit than any flank, the foot came
+   *  out L* 24-29 below the meadow it stands in - a dark skirt round every
+   *  mountain, a new seam in place of the old one. Colour from the ground,
+   *  brightness half way to the hill tone the theme already declares: over
+   *  four themes and eight cones that is the setting that closes the worst
+   *  seam without opening another. */
+  _massifFootTone(M) {
+    const acc = new THREE.Color(0, 0, 0);
+    const beach = this.T.coast ? (this.T.coast.beach ?? 60) : 0;
+    let n = 0;
+    for (let i = 0; i < 7; i++) {
+      const a = M.az + (i / 6 - 0.5) * M.spread;
+      for (const r of [M.r0, (M.r0 + M.r1) * 0.5, M.r1]) {
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        if (this.T.coast && this._coastSide(x, z) > -beach) continue;
+        acc.add(this._groundTone(x, z)); n++;
+      }
+    }
+    if (n) acc.multiplyScalar(1 / n); else acc.copy(this._groundTone(0, 0));
+    const Y = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;   // linear luminance
+    const y = Y(acc);
+    if (y < 1e-4) return acc;
+    return acc.multiplyScalar((y + Y(new THREE.Color(this.T.hillColor ?? 0x6e8a5c))) / (2 * y));
+  }
+
   /** THE CRAG GEOMETRY: a mountain, not a traffic cone.
    *
    *  The massif was ConeGeometry(1, 1, 6) - six sides, ONE height segment -
@@ -12383,8 +12948,11 @@ export class Track {
    *  the base cap move together and nothing cracks), which breaks the
    *  silhouette into crags. ~110 faces, built once, instanced per peak.
    *
-   *  And COLOUR, baked per face: the foot blends into the theme's own hill
-   *  tone so the range grows out of the land instead of being parked on it;
+   *  And COLOUR, baked per face: the foot blends into the tone the GROUND
+   *  around the ring is actually painted in - ground texture times terrain
+   *  ramp, sampled where the cones stand, at a brightness a steep face can
+   *  carry - so the range grows out of the land instead of being parked on
+   *  it;
    *  the body carries alternating strata bands warmed and cooled off the base
    *  rock; the crest lightens, or turns to snow on worlds that cap their
    *  boulders; and every facet gets its own tone wobble so the faces read as
@@ -12578,6 +13146,25 @@ export class Track {
     return mx.map((v) => v / base);
   }
 
+  /** How far out is this form DRAWN, scaled by `sx` and `sz`?
+   *
+   *  A crag is not a unit cylinder: `_mountainGeo` stretches the footprint
+   *  (`elong`) and the crag jitter pushes it further, so this geometry reaches
+   *  0.72 of the scale it is composed with, not the 0.5 a box would. Anything
+   *  that has to stand a form CLEAR of something else needs the drawn number,
+   *  and like `_formProfile` it is read off the geometry rather than assumed —
+   *  no formula describes a heightfield with spurs and gullies. Yaw does not
+   *  enter it: a rotation about y cannot change a distance from the axis. */
+  _flankRadius(geo, sx, sz) {
+    const p = geo.attributes.position;
+    let mx = 0;
+    for (let i = 0; i < p.count; i++) {
+      const r = Math.hypot(p.getX(i) * sx, p.getZ(i) * sz);
+      if (r > mx) mx = r;
+    }
+    return mx;
+  }
+
   _buildMassif(m4) {
     const M = this.T.massif;
     const geo = this._cragGeo();
@@ -12586,7 +13173,32 @@ export class Track {
     const cols = new Float32Array(pos.count * 3);
     const rockA = new THREE.Color(M.color ?? this._massifRock());
     const rockB = rockA.clone().offsetHSL(0.015, 0.05, -0.045);   // warm stratum
-    const foot = new THREE.Color(this.T.hillColor ?? 0x6e8a5c);
+    // THE FOOT GROWS OUT OF THE LAND THAT IS ACTUALLY THERE.
+    //
+    // This blended toward `T.hillColor`, and `hillColor` is the palette entry
+    // for the HORIZON hill rings - it is not the ground the cone is standing
+    // in, and nothing ever made it agree with that ground. Worse, it compared
+    // a bare vertex colour against a surface that renders as vertex colour
+    // TIMES the ground texture, so even a theme whose hillColor happens to
+    // sit near its terrain ramp still met the meadow a whole multiply too
+    // light. Measured across the cone/ground silhouette with
+    // tools-scratch/massifseam.mjs - hide the mesh named 'massif', diff the
+    // two frames so the cone pixels are known rather than guessed, then take
+    // a band of rock and a band of ground either side of the bottom edge -
+    // the step read dE 30.6 on FURKA RIDGE, where the colour half of it alone
+    // was dC 22.5: a drawn outline, not a foot. The other three themes
+    // measured came in at dE 10-22, so this is not one bad palette entry -
+    // it is the worst case of a rule that was aimed at the wrong thing.
+    //
+    // `_massifFootTone` samples the product the ground really paints, around
+    // the ring these cones are planted on, and keeps hillColor only as the
+    // brightness anchor a steep flank needs - see there. Theme-general by
+    // construction: nothing here reads a theme name, and a world whose hill
+    // tone already sat on its ground barely moves. Measured after, over the
+    // same eight cones: FURKA RIDGE 30.6 -> 14.5 and 31.0 -> 15.1 dE, with
+    // the colour half of it (dC) halved, 22.5 -> 11.4; TIMBER GORGE, whose
+    // hill tone was already close, holds at 11.6 and 10.3.
+    const foot = this._massifFootTone(M);
     const snow = !!(this.T.rockSnowCap || this.T.treeSnowCap);
     const crest = snow ? new THREE.Color(0xf2f6fa)
       : rockA.clone().offsetHSL(0, -0.04, 0.10);
@@ -12600,8 +13212,15 @@ export class Track {
         (pos.getY(f) + pos.getY(f + 1) + pos.getY(f + 2)) / 3 + 0.5, 0, 1);
       // strata bands off the base rock, alternating by height
       tmp.copy((Math.floor(hf * 7) % 2) ? rockB : rockA);
-      // the foot grows out of the land
-      if (hf < 0.34) tmp.lerp(foot, (1 - hf / 0.34) * 0.7);
+      // ...and it has to do the growing WHERE THE GROUND IS. Each instance is
+      // seated `h * 0.2` INTO the terrain (see the `y` below), so hf 0..0.2 is
+      // buried and a ramp that started at the geometric base had already
+      // spent two thirds of itself underground: at the visible ground line it
+      // was down to 0.29 of its strength, which is why the blend never read
+      // as an apron. Run it over the apron the player can see instead - full
+      // at the contact line, gone a fifth of the height above it.
+      const apron = THREE.MathUtils.clamp((0.40 - hf) / 0.20, 0, 1);
+      if (apron > 0) tmp.lerp(foot, apron * 0.7);
       // the crest lightens - or snows
       if (hf > 0.72) tmp.lerp(crest, ((hf - 0.72) / 0.28) * (snow ? 0.95 : 0.6));
       // per-facet tone, so faces read as rock instead of upholstery
@@ -12625,7 +13244,9 @@ export class Track {
       const t = M.count > 1 ? k / (M.count - 1) : 0.5;
       const a = M.az + (t - 0.5) * M.spread + (Math.random() - 0.5) * 0.1;
       const r = M.r0 + Math.random() * (M.r1 - M.r0);
-      const h = M.h0 + Math.random() * (M.h1 - M.h0);
+      // `h` is mutable because the shrink-to-fit below scales the whole form,
+      // not just its base — see there
+      let h = M.h0 + Math.random() * (M.h1 - M.h0);
       let w = M.w0 + Math.random() * (M.w1 - M.w0);
       let x = Math.cos(a) * r, z = Math.sin(a) * r;
       // "the dry inland range standing behind the terraces" — INLAND. On a
@@ -12652,7 +13273,54 @@ export class Track {
       // away from whatever road sample it is closest to, which is the
       // shortest way clear; a few passes because stepping off one leg of a
       // lap can walk onto another.
-      const clearance = (i) => w * 0.5 + (this.widthAt?.(i) ?? 9) + 24;
+      //
+      // AND IT MUST NOT LEAN OVER IT EITHER. Footprint clearance only buys
+      // "you cannot drive into the rock"; it says nothing about what the rock
+      // looks like from the driver's seat. Measured on GLACIER COL: every one
+      // of the 16 cones passed the footprint rule, and one of them stood with
+      // its flank 42 u from the centreline and 258 u of mountain above it —
+      // 81 degrees of sky, a pale faceted slab filling half the frame, which
+      // is what got photographed and reported. All 16 were over 25 degrees.
+      // A mountain reads as a mountain when you look UP at it, not when it
+      // leans on you, so the clearance takes the taller of the two rules:
+      // footprint, and a flank standing back `LOOM` times its own height.
+      const LOOM = 1.15;                              // <= ~41 degrees of sky
+      const clearance = (i) => w * 0.5
+        + Math.max((this.widthAt?.(i) ?? 9) + 24, h * LOOM);
+      // AND THE WALK HAS TO STOP AT THE EDGE OF THE RANGE. Nothing bounded
+      // `need - s.d + 4`, and `need` scales with the cone, so a clearance the
+      // world cannot offer ANYWHERE never fell through to the shrink below —
+      // it launched the peak instead. Measured with GLACIER COL's own spec
+      // rewritten to 16 cones of w 2000 h 2000 (3300 u of clearance) planted
+      // on its lap, which only reaches 271 u from the world centre: all 16
+      // walked out to r 3426-3556 — past the skyline rings at 900 and past
+      // RIM_RADIUS, the headwall that closes the world at 1620 — and arrived
+      // at the asked 2000 x 2000 with `shrinkpath` reporting `shrank: 0`. The
+      // shrink-to-fit written for exactly this case had never once executed.
+      //
+      // The spec already says where its mountains live, so bound the walk in
+      // the spec's own terms: the ring r0..r1. The AZIMUTH each pass reaches
+      // is kept — sliding a cone around the ring is what finds room on a lap
+      // that bends, and none of that is touched — and only the radius is
+      // pinned back into the band.
+      //
+      // OUT TO `r1 * 1.35`, NOT TO r1. The walk already carries cones past
+      // their own rim on worlds that are correct today: measured over the ten
+      // shipped worlds that build a massif, L19 620 -> 670, L20 640 -> 685,
+      // L48 660 -> 776, L62 640 -> 729 and worst FURKA RIDGE 660 -> 809, which
+      // is 1.23 x r1. Pinning at r1 would shrink mountains that are standing
+      // properly. 1.35 clears every measured one by 10 % or more, and still
+      // sits inside `conering`'s own 1.4 x r1 "flung" line, so the bound can
+      // never itself dig the hole that gate exists to catch. Inward, r0 as it
+      // stands: no cone on the roster finishes inside its own r0 (nearest is
+      // CAPE OLIVETO, 437 against 360). Both ends are widened to wherever the
+      // cone stood when the walk began, so the coast reflection above is never
+      // undone by the clamp.
+      //
+      // A cone that still cannot find room now falls through to the shrink,
+      // which is where "no room" was always meant to land.
+      const rWalk = Math.hypot(x, z) || M.r0;     // after any coast reflection
+      const rIn = Math.min(M.r0, rWalk), rOut = Math.max(M.r1 * 1.35, rWalk);
       for (let pass = 0; pass < 8; pass++) {
         const s = this._nearestSample(x, z);
         const need = clearance(s.i);
@@ -12665,6 +13333,28 @@ export class Track {
           ox = x / rr; oz = z / rr;
         } else { ox /= ol; oz /= ol; }
         x += ox * (need - s.d + 4); z += oz * (need - s.d + 4);
+        const rn = Math.hypot(x, z);
+        if (rn < 1e-3) {                 // stepped onto the world's own centre
+          x = Math.cos(a) * rIn; z = Math.sin(a) * rIn;
+        } else {
+          const rc = Math.min(rOut, Math.max(rIn, rn));
+          if (rc !== rn) { x *= rc / rn; z *= rc / rn; }
+        }
+      }
+      // ...and never on the goat peak: a scenery cone (and its solid) parked
+      // on the climbable mountain is a wall across the route. WALKED aside,
+      // not dropped — dropping one changed which fall lines exist and pushed
+      // GRANITE NARROWS' best off-course climb from under test-goat's 30 u
+      // pin to 30.3 (measured): the cone was part of the world that law was
+      // pinned against, so it keeps existing, just elsewhere.
+      for (let pass = 0; pass < 6; pass++) {
+        const G = this._goat;
+        if (!G) break;
+        const gd = Math.hypot(x - G.x, z - G.z);
+        const need2 = G.R + w * 0.5 + 12;
+        if (gd >= need2) break;
+        const ox = (x - G.x) / (gd || 1), oz = (z - G.z) / (gd || 1);
+        x += ox * (need2 - gd + 4); z += oz * (need2 - gd + 4);
       }
       // Still crowding the road after eight passes means the lap encircles
       // this spot. Shrink to fit rather than shove a peak to the far horizon;
@@ -12672,7 +13362,19 @@ export class Track {
       // of sight and register nothing.
       const fin = this._nearestSample(x, z);
       if (fin.d < clearance(fin.i)) {
-        w = Math.max(0, (fin.d - (this.widthAt?.(fin.i) ?? 9) - 24) * 2);
+        // IN PROPORTION. This used to shrink `w` and leave `h` alone, which
+        // turns the one cone that could not find room into a needle — the
+        // exact "no real mountain is twice as tall as it is broad" fault the
+        // horizon ring was widened to cure. Solve for the single scale that
+        // satisfies both rules at once and apply it to the whole form, so a
+        // squeezed peak is a smaller mountain rather than a spike. Shrinking
+        // `h` also shrinks what the loom rule asks for, so this converges in
+        // one step instead of chasing itself.
+        const road = (this.widthAt?.(fin.i) ?? 9) + 24;
+        const fit = Math.max(0, Math.min(
+          (fin.d - road) / (w * 0.5),
+          fin.d / (w * 0.5 + h * LOOM)));
+        w *= fit; h *= fit;
         if (w < 30) {
           m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
           rock.setMatrixAt(k, m4);
@@ -12738,18 +13440,145 @@ export class Track {
     const slabs = new THREE.InstancedMesh(geo, ice, 14);
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const col = new THREE.Color();
+    // THE ICE IS SOLID. "Well outside the drivable world" was never true —
+    // the rim wall stands at 1620 and the tongue pours from r 560, so a
+    // roamer drives straight into (and through) a hundred-unit ice slab.
+    // Same law as the massif cones and the horizon rings: the collider is
+    // the mountain, long axis, profile-tapered, solid over its full height.
+    const prof = this._formProfile(geo);
     // the tongue pours down a north-west flank towards the road
     const a0 = -2.25;
+    // AND THE ICE MUST NOT STAND ON THE ROAD EITHER — the massif's rule, in
+    // the massif's terms: clearance is the taller of a FOOTPRINT (the drawn
+    // flank, plus the carriageway and 24 u) and a LOOM (a flank standing back
+    // `LOOM` times what it rears above the road). This ring is struck from
+    // the WORLD ORIGIN at a fixed azimuth and never asks where the lap went,
+    // which is exactly the blindness that planted a massif cone across 62
+    // stations of carriageway on FURKA RIDGE. A slab is worse when it happens:
+    // 210 u wide, and nothing pushes it into `solids`, so the car drives
+    // through the ice rather than into it.
+    //
+    // MEASURED FIRST, on both levels the theme reaches (`glacierloom`, which
+    // reads the instance matrices — a probe that reads `solids` finds no
+    // glacier at all and reports clean). FURKA RIDGE: closest flank 197 u
+    // clear, worst slab 12.4 degrees of sky. GLACIER COL: 330 u, 25.8 degrees.
+    // Neither is anywhere near the massif's 41 degree limit, so THIS RULE
+    // MOVES NOTHING ON THE SHIPPED ROSTER and is recorded as a guard, not as a
+    // repair. What it guards is real: that clearance is an accident of two
+    // route tables. The ring is struck in ORIGIN coordinates, so whether it
+    // clears the lap is a fact about the ROUTE, and the editor's LOOK wears a
+    // whole theme — `glacier: true` with it — on any route in the game.
+    // Measured (`roadreach`): FURKA RIDGE's lap reaches r 318 from the origin
+    // and GLACIER COL's r 271, against a near ice edge at r 560 - 152 = 408.
+    // Ninety units on the bigger of the two, held by nothing at all.
+    const LOOM = 1.15;                                 // <= ~41 degrees of sky
+    // Where this form's crest sits inside the composed slab, read off the
+    // geometry: the mesh is anchored at 0.32 h (see the note by `gy` below)
+    // and reaches `gTop` of its own scale above its centre, so the ice tops
+    // out at ground + h * CREST.
+    let gTop = 0;
+    {
+      const py = geo.attributes.position;
+      for (let i = 0; i < py.count; i++) if (py.getY(i) > gTop) gTop = py.getY(i);
+    }
+    const CREST = 0.32 + gTop;
     for (let k = 0; k < 14; k++) {
       const t = k / 13;
       const r = 560 + t * 320;
       const a = a0 + (t - 0.5) * 0.34 + (k % 2 ? 0.05 : -0.05);
-      const w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
+      let w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
       q.setFromAxisAngle(up, a + 1.2);
-      const gx = Math.cos(a) * r, gz = Math.sin(a) * r;
+      let gx = Math.cos(a) * r, gz = Math.sin(a) * r;
+      // ice off the climbable peak: the goat route must stay open (merge of
+      // the goat-peak line with r278's measured glacier walk — the walk
+      // handles the ROAD, this handles the mountain)
+      if (this._nearGoat(gx, gz, Math.max(w, d) * 0.5)) {
+        m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
+        slabs.setMatrixAt(k, m4);
+        continue;
+      }
+      // The massif spends `w * 0.5` here, which is what a BOX would reach.
+      // This form reaches 0.72 of its scale and the slab is scaled unevenly
+      // (w by d), so the flank is measured rather than halved — on the widest
+      // slab that is 152 u of ice against the 105 the massif's arithmetic
+      // would have claimed, and the difference is all road.
+      let flank = this._flankRadius(geo, w, d);
+      // THE STATION IT CROWDS WORST, AND THE HEIGHT ABOVE THAT ROAD. Two
+      // departures from the massif's loop. Transcribed literally it left one
+      // slab standing at 41.7 degrees while reporting its own clearance
+      // satisfied — caught by `glacierforce`, which drives the lap under the
+      // ice on purpose, because nothing on the shipped roster executes this
+      // code and an unexecuted branch is where the mistake lives (that is the
+      // `shrinkpath` lesson, and it cost r278 two of them).
+      //   - The loom is measured against `h`, the form's own height, and ice
+      //     does not stand on the carriageway's datum. Out on the ring the
+      //     ground is already above the road, and that rise is sky over the
+      //     driver exactly as the slab's own height is: 27 u of it in the
+      //     forced case, which is the whole 41.7.
+      //   - And the walk steps away from the NEAREST sample, which need not be
+      //     the station that sees the most sky — a farther one, lower in the
+      //     valley, can beat it. Scanning the lap for the worst offender is
+      //     what makes "no station sees more than 41 degrees" a property of
+      //     the loop instead of a hope. It costs one pass over 900 samples per
+      //     slab at build time, and everywhere on the roster that pass finds
+      //     nothing and the walk exits on it.
+      const crowd = () => {
+        const cy = this.terrainHeight(gx, gz) + h * CREST;
+        let bi = -1, over = 0, bd = 0;
+        for (let i = 0; i < this.N; i++) {
+          const c = this.center[i];
+          const dd = Math.hypot(gx - c.x, gz - c.z);
+          const need = flank
+            + Math.max((this.widthAt?.(i) ?? 9) + 24, (cy - c.y) * LOOM);
+          if (need - dd > over) { over = need - dd; bi = i; bd = dd; }
+        }
+        return { i: bi, over, d: bd };
+      };
+      // Walk it out of the way, away from the station it crowds worst, which
+      // is the shortest way clear; a few passes because stepping off one leg
+      // of a lap can walk onto another.
+      for (let pass = 0; pass < 8; pass++) {
+        const s = crowd();
+        if (s.i < 0) break;                       // clear of every station
+        const c = this.center[s.i];
+        let ox = gx - c.x, oz = gz - c.z;
+        const ol = Math.hypot(ox, oz);
+        if (ol < 1e-3) {                 // dead centre: leave along the ring
+          const rr = Math.hypot(gx, gz) || 1;
+          ox = gx / rr; oz = gz / rr;
+        } else { ox /= ol; oz /= ol; }
+        gx += ox * (s.over + 4); gz += oz * (s.over + 4);
+      }
+      // Still crowding after eight passes means the lap encircles this spot.
+      // Shrink IN PROPORTION — one scale for the whole slab, so a squeezed
+      // step of the icefall is a smaller step and not a shard — solving both
+      // rules at the binding station at once. The ground it stands on does
+      // NOT shrink with it, which is why the rise carries its own term. A
+      // couple of rounds because satisfying one station can hand the job to
+      // another; below a slab's worth of ice it is a chip on a hillside, so
+      // drop it out of sight rather than leave litter on the skyline.
+      let gone = false;
+      for (let s = 0; s < 3 && !gone; s++) {
+        const fin = crowd();
+        if (fin.i < 0) break;
+        const c = this.center[fin.i];
+        const road = (this.widthAt?.(fin.i) ?? 9) + 24;
+        const rise = this.terrainHeight(gx, gz) - c.y;
+        const fit = Math.max(0, Math.min(
+          (fin.d - road) / flank,
+          (fin.d - rise * LOOM) / (flank + h * CREST * LOOM)));
+        w *= fit; d *= fit; h *= fit; flank *= fit;
+        gone = w < 40;
+      }
+      if (gone) {
+        m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
+        slabs.setMatrixAt(k, m4);
+        continue;
+      }
       // seated ON the ground it stands on — the old constant-datum placement
       // buried most of each slab wherever the valley floor dropped, and what
-      // poked out was the boxy top
+      // poked out was the boxy top. Read AFTER the walk: the ground under
+      // where it ended up is the only ground it can stand on.
       const gy = this.terrainHeight(gx, gz);
       // the crag geometry is CENTRED (the massif composes it at y + h/2); the
       // box it replaces had its base at the origin — anchor accordingly, or
@@ -12761,6 +13590,13 @@ export class Track {
       slabs.setMatrixAt(k, m4);
       col.setRGB(0.78 + t * 0.14, 0.88 + t * 0.1, 1.0).multiplyScalar(0.7 + Math.random() * 0.3);
       slabs.setColorAt(k, col);
+      // `flank` is r278's measured reach of this form at this scale (0.72,
+      // not the box's 0.48) and it already shrank with any fit pass — the
+      // collider is the ice that is actually drawn
+      this.solids.push({
+        x: gx, z: gz, r: flank,
+        y: gy - h * 0.18 + 2, h, mat: 'stone', prof,
+      });
     }
     slabs.name = 'glacier';
     this.group.add(slabs);
@@ -12855,9 +13691,26 @@ export class Track {
     // or none at all, and the "lighthouse world" shipped without one in view).
     if (this.T.quay) {
       const lvl = C.level ?? -2;
-      const du = L * 0.95;
+      // THE TOWER IS WHAT STANDS IN THE ROAD, NOT THE ANCHOR BEHIND IT.
+      //
+      // This checked the mole's WATERLINE ANCHOR against a coarse distance
+      // and then put the lighthouse 30 u further along the normal, unchecked.
+      // On CINQUE TERRE that landed the tower 4.18 u inside the carriageway
+      // with a 2.7 u collider biting 1.95 u — and the sea rocks poured around
+      // it went in with it, which is every one of that world's road defects
+      // in one object. The anchor is walked ALONG the coast until the tower
+      // itself clears, and the mole is not built until it does.
+      let du = 0;
+      for (const f of [0.95, 0.82, 0.68, 0.55, 0.42, 0.28, 0.14]) {
+        const ax = C.a[0] + ux * (L * f), az = C.a[1] + uz * (L * f);
+        if (this._distToTrackCoarse(ax, az) <= 24) continue;
+        const tx = ax + nx * 30, tz = az + nz * 30;
+        if (!this._clearsRoad(tx, tz, 4.2, 1.5)) continue;
+        du = L * f;
+        break;
+      }
       const bx = C.a[0] + ux * du, bz = C.a[1] + uz * du;   // waterline anchor
-      if (this._distToTrackCoarse(bx, bz) > 24) {
+      if (du > 0) {
         const stone = new THREE.MeshStandardMaterial({
           color: 0x9a9282, flatShading: true, roughness: 1,
         });
@@ -12889,6 +13742,12 @@ export class Track {
       const SR = this._seaRocks;
       const put = (px, pz, sx, sy, sz, seed) => {
         if (SR.next >= SR.mesh.instanceMatrix.count) return;
+        // THE SKERRIES FOLLOW THE TOWER, AND THE TOWER IS NOT THE ONLY THING
+        // NEARBY. These are poured at fixed offsets around the lighthouse,
+        // and on CINQUE TERRE two of them ended up in the carriageway that
+        // runs along the shore behind it — the last of that world's road
+        // defects after the tower itself was resited.
+        if (!this._clearsRoad(px, pz, Math.max(sx, sz), 0.6)) return;
         SR.iq.setFromAxisAngle(SR.iup, seed * 2.39996);
         SR.im4.compose(new THREE.Vector3(px, (C.level ?? -2) - sy * 0.35, pz),
           SR.iq, new THREE.Vector3(sx, sy, sz));
@@ -12924,7 +13783,10 @@ export class Track {
       for (const du of [L * 0.92, L * 0.06, L * 0.75, L * 0.25]) {
         const x = C.a[0] + ux * du - nx * 8, z = C.a[1] + uz * du - nz * 8;
         const h = this.terrainHeight(x, z);
-        if (h > (C.level ?? -2) + 0.8 && this._distToTrackCoarse(x, z) > 22) {
+        // ...and the headland fallback asks it too: `_distToTrackCoarse` is a
+        // coarse field, `_clearsRoad` is the carriageway.
+        if (h > (C.level ?? -2) + 0.8 && this._distToTrackCoarse(x, z) > 22
+          && this._clearsRoad(x, z, 4.2, 1.5)) {
           spot = { x, z, y: h };
           break;
         }
@@ -13017,6 +13879,760 @@ export class Track {
    *  clusters of barrels, crates and coiled rope on the stone. Everything is
    *  COSMETIC and everything stays ≥ 10.8 u off the centreline (drivable
    *  half-width is 9): dressing, never an obstacle. */
+
+  /** TOWNSFOLK: the thing every reference frame has that an empty street
+   *  cannot fake. The sheet gives them a panel of their own under STREET-LEVEL
+   *  PROPS, and both Monte Carlo renders put a dozen people on the pavement
+   *  and a crowd on every balcony — a town with nobody in it reads as a film
+   *  set however good the joinery is.
+   *
+   *  THREE BOXES AND A SPHERE, and no more. At the distance a driver passes
+   *  them the content is a silhouette and a colour: something person-shaped,
+   *  person-height, in clothes that are not the wall behind it. Anything finer
+   *  is polygons at 60 mph.
+   *
+   *  IN GROUPS, NOT SCATTERED. People stand in twos and threes; one figure
+   *  every forty metres down a street is a mannequin trail.
+   *
+   *  Cosmetic and NOT registered: no solid, no prop, no score. They stand on
+   *  the footway, off the racing line, and nothing in this game is going to be
+   *  rewarded for driving at them.
+   */
+  _buildTownsfolk() {
+    const F = this.T.frontage;
+    if (!F || this.T.townsfolk === false) return;
+    const WANT = this.T.townsfolk ?? 170;
+    // A PERSON-SHAPE, NOT A TOTEM. Photographed on IL BUDELLO and reported
+    // ("people design can be a bit better"): one leg-box under one torso-box
+    // under a sphere reads as a painted bollard, because the three tells of a
+    // human silhouette are all missing — daylight between the legs, arms
+    // hanging outside the torso line, and a neck's gap under the head. All
+    // three are cheap: the legs become two boxes with a gap, the torso grows
+    // two hanging arms (merged into the same geometry, so the mesh count and
+    // the draw calls do not move), and the head lifts 5 cm clear of the
+    // shoulders. Arms wear the torso colour — sleeves — and the merge is six
+    // lines because vehicles.js keeps its own `mergeGeos` unexported and a
+    // person is not a car part.
+    const merge = (geos) => {
+      const parts = geos.map((g2) => (g2.index ? g2.toNonIndexed() : g2));
+      let n = 0;
+      for (const g2 of parts) n += g2.attributes.position.array.length;
+      const pos = new Float32Array(n);
+      let o = 0;
+      for (const g2 of parts) { pos.set(g2.attributes.position.array, o); o += g2.attributes.position.array.length; }
+      const out = new THREE.BufferGeometry();
+      out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      out.computeVertexNormals();
+      return out;
+    };
+    const leg = (sx) => { const g2 = new THREE.BoxGeometry(0.14, 0.86, 0.22);
+      g2.translate(sx, 0.43, 0); return g2; };
+    const legGeo = merge([leg(-0.10), leg(0.10)]);
+    const arm = (sx) => { const g2 = new THREE.BoxGeometry(0.10, 0.52, 0.12);
+      g2.translate(sx, 1.20, 0); return g2; };
+    const torsoGeo = merge([
+      (() => { const g2 = new THREE.BoxGeometry(0.42, 0.60, 0.26); g2.translate(0, 1.18, 0); return g2; })(),
+      arm(-0.27), arm(0.27),
+    ]);
+    const headGeo = new THREE.SphereGeometry(0.135, 6, 5);
+    headGeo.translate(0, 1.68, 0);
+    const mk = (geo) => new THREE.InstancedMesh(geo,
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff, vertexColors: true, flatShading: true, roughness: 0.9,
+      }), WANT);
+    const legs = mk(this._white(legGeo));
+    const torsos = mk(this._white(torsoGeo));
+    const heads = mk(this._white(headGeo));
+    legs.name = 'townsfolk';
+    for (const m of [legs, torsos, heads]) m.castShadow = true;
+    const LEG = ['#2f3a4c', '#3d3a34', '#5a4636', '#2a2a2e', '#6a6255'];
+    const TOP = ['#c8443a', '#e8e2d4', '#3f6b8a', '#4a7a52', '#d8a23a', '#8a4a6a',
+      '#e0e0d8', '#2f4f6b', '#c96a3a'];
+    const SKIN = ['#d8a884', '#b07a52', '#8a5a3c', '#e8c4a0'];
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    // "ALSO MOVE THEM OUT OF THE WAY" — same report. 0.85 u past the drivable
+    // edge is inside a door's swing; a racing line brushing the verge put the
+    // camera almost through them. 1.6 puts the nearest bystander a car-width
+    // clear of the edge, and the outer bound is untouched so the footway they
+    // stand on is simply used further out.
+    const inner = (i) => (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 1.6;
+    const outer = (F.lateral ?? 15.5) - (F.depth ?? 8) * 0.5 - 0.55;
+    let k = 0;
+    // THE SQUARES FIRST. A knot of people on a pavement is dressing; a dozen
+    // of them round a fountain is the thing the square was built for, and it
+    // is where the reference puts nearly everyone it draws. Spread over the
+    // paving, kept a clear 4.5 u off the centrepiece so nobody stands in the
+    // basin.
+    const fwd = new THREE.Matrix4();
+    for (const pz of this._piazzas ?? []) {
+      fwd.copy(pz.inv).invert();
+      const inSq = 14 + ((Math.random() * 7) | 0);
+      // A RING ROUND THE CENTREPIECE, not a box with a hole rejected out of
+      // it. Sampling a rectangle and throwing away everything within 4.5 u of
+      // the middle discards most of a 12 u-deep square — which is why the
+      // first cut put five people in a piazza and asked for fifteen.
+      const half = Math.min(pz.hw, Math.min(-pz.x0, pz.x1)) - 1.2;
+      for (let j = 0; j < inSq && k < WANT; j++) {
+        const ang = Math.random() * Math.PI * 2;
+        const rad = 4.6 + Math.random() * Math.max(1.6, half - 4.6);
+        const lx = Math.cos(ang) * rad;
+        const lz = Math.sin(ang) * rad * 1.3;
+        if (Math.abs(lz) > pz.hw - 1.0) continue;      // and inside the paving
+        // THE PLATE IS THE FLOOR, and the transform already knows where it is:
+        // the square's matrix was composed at the paving's top surface, so the
+        // transformed point comes back AT it. Seating these on `_seatY` — the
+        // ground — buried them to the shoulders in their own square, because
+        // the plate is seated on the high corner and stands proud of the field
+        // by up to two metres.
+        _pzV.set(lx, 0, lz).applyMatrix4(fwd);
+        q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
+        m4.compose(_pzV, q, new THREE.Vector3(1, 0.92 + Math.random() * 0.17, 1));
+        legs.setMatrixAt(k, m4);
+        torsos.setMatrixAt(k, m4);
+        heads.setMatrixAt(k, m4);
+        legs.setColorAt(k, col.set(LEG[(Math.random() * LEG.length) | 0]));
+        torsos.setColorAt(k, col.set(TOP[(Math.random() * TOP.length) | 0]));
+        heads.setColorAt(k, col.set(SKIN[(Math.random() * SKIN.length) | 0]));
+        k++;
+      }
+    }
+    let guard = 0;
+    // 28 tries per figure, doubled when the inner margin moved to 1.6: on
+    // IL BUDELLO the legal band between the margin and the frontages is thin,
+    // and at 14 tries the loop exhausted its budget at 77 of 170 placed — the
+    // street read as half-emptied. The budget is attempts, not geometry;
+    // spending more of it is how a narrow town keeps its crowd without anyone
+    // standing back in the door's swing.
+    while (k < WANT && guard++ < WANT * 28) {
+      const i = (Math.random() * N) | 0;
+      if (this._circDist(i, 0) < 45) continue;         // not on the grid
+      const lo = inner(i);
+      if (outer - lo < 0.9) continue;                  // no footway to stand on
+      const side = Math.random() < 0.5 ? 1 : -1;
+      // a knot of two or three, facing roughly the same way
+      const n = 1 + ((Math.random() * 3) | 0);
+      const lat0 = lo + Math.random() * (outer - lo);
+      const yaw = this.headingAt(i) + (Math.random() - 0.5) * 1.2;
+      for (let j = 0; j < n && k < WANT; j++) {
+        const lat = Math.min(outer, Math.max(lo, lat0 + (Math.random() - 0.5) * 1.5));
+        const st = (i + ((Math.random() * 5) | 0)) % N;
+        const p = this.pointAt(st, lat * side);
+        if (this._inWater(p.x, p.z)) continue;
+        // OFF THE CARRIAGEWAY, MEASURED THE WAY THE CENSUS MEASURES IT.
+        // Comparing `_distToTrack` against the width at the station a figure
+        // was SAMPLED from is not the same question as comparing it against
+        // the width at the nearest station, and on a lap that curves back the
+        // two differ by more than a pavement: MONACO STREETS put three people
+        // 0.45 u inside its own racing line that way. `_clearsRoad` asks the
+        // nearest-station question, and its piazza clause is welcome here —
+        // people in squares are placed above, on the paving.
+        if (!this._clearsRoad(p.x, p.z, 0.45, 1.2)) continue;
+        const y = this._seatY(p.x, p.z);
+        if (!Number.isFinite(y)) continue;
+        q.setFromAxisAngle(up, yaw + (Math.random() - 0.5) * 0.8);
+        // a shade of height either way, or three identical people stand there
+        m4.compose(new THREE.Vector3(p.x, y, p.z), q,
+          new THREE.Vector3(1, 0.92 + Math.random() * 0.17, 1));
+        legs.setMatrixAt(k, m4);
+        torsos.setMatrixAt(k, m4);
+        heads.setMatrixAt(k, m4);
+        legs.setColorAt(k, col.set(LEG[(Math.random() * LEG.length) | 0]));
+        torsos.setColorAt(k, col.set(TOP[(Math.random() * TOP.length) | 0]));
+        heads.setColorAt(k, col.set(SKIN[(Math.random() * SKIN.length) | 0]));
+        k++;
+      }
+    }
+    if (!k) return;
+    for (const m of [legs, torsos, heads]) {
+      m.count = k;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
+    this.group.add(legs, torsos, heads);
+  }
+
+  /** THE PIAZZA — a square, and the fountain in the middle of it.
+   *
+   *  Asked for straight off the reference sheet, which gives FOUNTAIN MODULES
+   *  and STREET LAMP OPTIONS a panel each, and off the Monte Carlo render,
+   *  where the one piece of open ground in the whole frame is a paved terrace
+   *  with a fountain, four lamps and a row of planters on it.
+   *
+   *  A SQUARE IS A HOLE IN THE STREET WALL, which is the part that is not
+   *  decoration: the terrace has to STOP for it. `_inPiazza` is why this runs
+   *  before `_buildOldTown` — the frontage asks it before placing every block,
+   *  and a house that would stand in the square is refused. Without that the
+   *  fountain ends up in somebody's front room.
+   *
+   *  Everything here is off the carriageway by construction: the square's
+   *  inner edge is the pavement, and every piece of furniture on it is inset
+   *  from that edge. It is validated anyway — `_clearsRoad` on the inner
+   *  corners — because a lap that swings back on itself can put a second
+   *  stretch of road through a square that was legal against the first.
+   */
+  _buildPiazzas() {
+    const P = this.T.piazza;
+    if (!P) return;
+    const F = this.T.frontage || {};
+    const D0 = P.depth ?? 16, W0 = P.width ?? 22;     // across the road, along it
+    // A SMALL SQUARE BEATS NO SQUARE (r252). The flatness test refuses any
+    // site with more than 1.7 u of fall across the paving, and on a hill town
+    // — LANTERN QUARTER drops 26 u beside its own street — a 16 x 22 plate
+    // never fits anywhere: it built nothing at all and said nothing about it.
+    // Every site is tried at full size first and then at three quarters and
+    // three fifths, which is what a real town does with a slope.
+    const TIERS = [1, 0.78, 0.6];
+    // the square sits where the houses would have been: inner edge at the
+    // pavement, running out past the building line
+    // 15.5 is `_buildOldTown`'s own default lateral, and the two have to agree
+    // or the square is offset from the street wall it is supposed to open in
+    const lat0 = (F.lateral ?? 15.5) + D0 * 0.22;
+    const want = P.count ?? 2;
+
+    // ONE DRAW CALL PER PART, NOT PER SQUARE. Every square in a world is the
+    // same size and carries the same kit, so a fountain basin is one instanced
+    // mesh with three instances in it rather than three meshes in three
+    // groups. Built as loose meshes this came to ~42 draw calls a square, and
+    // this game budgets them: the whole street frontage — hundreds of houses —
+    // costs eight.
+    const PARTS = new Map();
+    const _m = new THREE.Matrix4(), _p = new THREE.Vector3(),
+      _s = new THREE.Vector3(), _q = new THREE.Quaternion();
+    let base = new THREE.Matrix4();
+    const part = (key, geo, mat, px, py, pz) => {
+      let e = PARTS.get(key);
+      if (!e) PARTS.set(key, e = { geo, mat, list: [] });
+      _m.compose(_p.set(px, py, pz), _IDQ, _ONE);
+      _m.premultiply(base);
+      e.list.push(_m.clone());
+      return e.list[e.list.length - 1];
+    };
+
+    const paveMat = new THREE.MeshStandardMaterial({
+      map: piazzaTexture(P.paving), roughness: 0.95, envMapIntensity: 0.25,
+    });
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: P.stone ?? 0xcabfa9, flatShading: true, roughness: 0.9,
+    });
+    const kerbMat = new THREE.MeshStandardMaterial({
+      color: P.kerb ?? 0xa89d8a, flatShading: true, roughness: 0.95,
+    });
+    // WATER IS NOT GLASS. It is opaque, lit, and a shade of the sky rather
+    // than a shade of the basin — a transparent disc in a stone ring reads as
+    // an empty bowl from every angle a driver has.
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: P.water ?? 0x4f93a0, roughness: 0.22, metalness: 0.1,
+      envMapIntensity: 0.9,
+    });
+    const ironMat = new THREE.MeshStandardMaterial({
+      color: 0x2a2724, roughness: 0.6, metalness: 0.4, flatShading: true,
+    });
+    const bulbMat = new THREE.MeshBasicMaterial({ color: this.T.lamps?.color ?? 0xffc76a });
+    const leafMat = new THREE.MeshStandardMaterial({
+      color: P.leaf ?? 0x4a6b3c, flatShading: true, roughness: 0.95,
+    });
+    const trunkMat = new THREE.MeshStandardMaterial({
+      color: 0x6b563c, flatShading: true, roughness: 1,
+    });
+    // A LIGURIAN CHURCH IS PAINTED, NOT QUARRIED. The first cut used the
+    // campanile's `stoneTexture` map, and a dark rubble wall 20 u long put a
+    // black cliff across the head of the square — nothing like the whitewashed
+    // fronts in the sheet, and nothing like the terrace it stands in. Flat
+    // render, a shade lighter than the houses, is both righter and cheaper.
+    const churchMat = new THREE.MeshStandardMaterial({
+      color: P.church ?? 0xf2e9d8, flatShading: true,
+      roughness: 0.92, envMapIntensity: 0.3,
+    });
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: this.T.frontage?.roof ?? this.T.hutRoof ?? 0xb85a30,
+      flatShading: true, roughness: 0.8,
+    });
+    const bronzeMat = new THREE.MeshStandardMaterial({
+      color: P.bronze ?? 0x5c6b52, roughness: 0.45, metalness: 0.55,
+      flatShading: true,
+    });
+    const darkMat = new THREE.MeshStandardMaterial({
+      color: 0x241f1c, roughness: 0.85, flatShading: true,
+    });
+    const M = { stoneMat, kerbMat, waterMat, ironMat, bulbMat, leafMat, trunkMat,
+      churchMat, roofMat, bronzeMat, darkMat };
+
+    this._piazzas = this._piazzas || [];
+    const fracs = [];
+    for (let k = 0; k < want; k++) fracs.push((0.16 + k / want) % 1);
+    let made = 0;
+    for (const f0 of fracs) {
+      // THE FIRST SQUARE THAT CAN TAKE ONE GETS THE CHURCH. A town has one
+      // parish church, not one per square, and it is the landmark the rest of
+      // the lap is oriented by — so it goes on the first square built rather
+      // than on a lottery.
+      const wantChurch = P.church !== false && made === 0;
+      const want0 = (f0 * N) | 0;
+      let site = null;
+      for (let d = 0; d < 140 && !site; d += 5) {
+        for (const i of [(want0 + d) % N, (want0 - d + N) % N]) {
+          if (this._circDist(i, 0) < 60) continue;       // not over the grid
+          if (this.curvature[i] > 0.02) continue;        // a square is not on a bend
+          for (const side of [1, -1]) {
+           for (const tier of TIERS) {
+            const D = D0 * tier, W = W0 * tier;
+            const c = this.pointAt(i, lat0 * side);
+            const yaw = this.headingAt(i);
+            // local +x is the road normal and +z runs along the street, and
+            // the mapping out to world is taken FROM three.js rather than
+            // rewritten by hand — which is how a mirrored sign gets into a
+            // placement and stays there
+            const at = (ax, az) => {
+              _pzV.set(ax, 0, az).applyAxisAngle(_pzUp, yaw);
+              return { x: c.x + _pzV.x, z: c.z + _pzV.z };
+            };
+            let ok = true, lo = Infinity, hi = -Infinity;
+            for (const ax of [-D / 2, 0, D / 2]) {
+              for (const az of [-W / 2, 0, W / 2]) {
+                const w = at(ax, az);
+                if (this._inWater(w.x, w.z)) { ok = false; break; }
+                // only the INNER half can foul the road; test it all anyway
+                if (!this._clearsRoad(w.x, w.z, 0.4, 0.8)) { ok = false; break; }
+                const yy = this._seatY(w.x, w.z);
+                if (!Number.isFinite(yy)) { ok = false; break; }
+                lo = Math.min(lo, yy); hi = Math.max(hi, yy);
+              }
+              if (!ok) break;
+            }
+            // A SQUARE IS FLAT — but a hill town builds its flat ground, and
+            // this one has to as well. LANTERN QUARTER falls 26 u beside its
+            // own street: at a strict 1.7 u limit not one station on that lap
+            // could take a square at any size, and the builder said nothing.
+            // A smaller square may stand on a thicker plate, which is a
+            // RETAINING TERRACE and exactly what these towns do — so the
+            // tolerance grows as the footprint shrinks.
+            if (ok && hi - lo > 1.7 / tier ** 1.6) ok = false;
+            if (!ok) continue;
+            // SEATED ON THE HIGH CORNER, NOT THE LOW ONE. At the low corner's
+            // height the ground rises through the paving everywhere else and
+            // the square is a slab buried in a beach — which is exactly what
+            // it looked like. The plate is then made thick enough to reach the
+            // ground at the low corner, so it reads as the raised terrace the
+            // reference has, with its kerb showing.
+            site = { i, side, c, yaw, y: hi + 0.02, fall: hi - lo, D, W };
+            break;
+           }
+           if (site) break;
+          }
+          if (site) break;
+        }
+      }
+      if (!site) continue;
+      const { c, yaw, y, fall, D, W } = site;
+      // WHICH WAY IS AWAY FROM THE ROAD. Hoisted to the top of the build
+      // because the terrace's colliders need it before the parapet does, and
+      // a `const` read above its declaration is a ReferenceError that takes
+      // the whole world build down with it — SANREMO STAGE stopped building
+      // at all, and the road census reported that as a SKIP.
+      const outward = Math.sign(lat0 * site.side) || 1;
+      // the size the site could actually take, which keys the floor geometry
+      const SZ = `${Math.round(D)}x${Math.round(W)}x${Math.round(Math.max(0.5, fall + 0.35) * 4)}`;
+      _q.setFromAxisAngle(_pzUp, yaw);
+      base = new THREE.Matrix4().compose(_p.set(c.x, y, c.z), _q, _ONE);
+
+      // ---- the floor: paving, kerb, and a parapet on the three sides -------
+      // ...and the plate's thickness is the site's own fall, so it keys the
+      // floor geometry with the size
+      const TH = Math.max(0.5, Math.round((fall + 0.35) * 4) / 4);
+      part('kerb' + SZ, this._pzGeo('kerb' + SZ, () =>
+        new THREE.BoxGeometry(D + 0.9, TH + 0.12, W + 0.9)), kerbMat,
+      0, -(TH + 0.12) / 2 - 0.04, 0);
+      part('pave' + SZ, this._pzGeo('pave' + SZ, () => new THREE.BoxGeometry(D, TH, W)),
+        paveMat, 0, -TH / 2, 0);
+      // A TERRACE IS A WALL — AND A COLLIDER IS NOT A FOOTPRINT (r253).
+      //
+      // r252 registered three solids of radius D/2 down the middle of the
+      // plate, which is the square's own size and therefore reaches back
+      // across the road it stands beside: COTE D AZUR came out with fourteen
+      // stone blockers biting 9.27 u into a 5.6 u half-width, i.e. an
+      // invisible wall across the whole carriageway. A collider describes the
+      // FACE a car can hit, not the area the thing covers.
+      //
+      // So the retaining face gets a row of small ones along the plate's
+      // road-facing edge, each set far enough in to clear the carriageway —
+      // and any that cannot clear is simply not registered, which leaves the
+      // kerb strip passable exactly as it was before the terraces existed.
+      if (TH > 1.4) {
+        const RS = 1.5;
+        const n = Math.max(2, Math.round(W / (RS * 2.4)));
+        for (let j = 0; j < n; j++) {
+          const lz = (j / (n - 1) - 0.5) * (W - RS * 2);
+          _pzV.set(-outward * (D / 2 - RS - 0.3), 0, lz).applyMatrix4(base);
+          // read it out BEFORE the gate: a shared scratch does not survive a
+          // call, whatever that call promises
+          const sx2 = _pzV.x, sz2 = _pzV.z;
+          if (!this._clearsRoad(sx2, sz2, RS, 0.3)) continue;
+          this.solids.push({ x: sx2, z: sz2, r: RS,
+            y: Math.min(y, this.terrainHeight(sx2, sz2)) + 0.4, mat: 'stone' });
+        }
+      }
+      // A LOW PARAPET ON THE THREE SIDES AWAY FROM THE STREET: the sheet's
+      // WALLS & BARRIERS panel, and what the render's terrace stands behind.
+      // It is also what stops a raised plate reading as a slab floating in the
+      // sand — a square has an edge you can lean on. The street side stays
+      // open; a piazza you cannot walk into is a plinth.
+      // ...unless a church stands on that side, which is a better edge than a
+      // parapet and cannot be walked through either
+      const church = wantChurch ? this._pzChurchFits(base, outward, D, y) : null;
+      if (!church) {
+        part('wallSide' + SZ, this._pzGeo('wallSide' + SZ, () =>
+          new THREE.BoxGeometry(0.36, 0.62, W)), kerbMat,
+        outward * (D / 2 - 0.18), 0.31, 0);
+        part('copeSide' + SZ, this._pzGeo('copeSide' + SZ, () =>
+          new THREE.BoxGeometry(0.58, 0.14, W + 0.22)), stoneMat,
+        outward * (D / 2 - 0.18), 0.69, 0);
+      }
+      for (const ez of [-(W / 2 - 0.18), W / 2 - 0.18]) {
+        part('wallEnd' + SZ, this._pzGeo('wallEnd' + SZ, () =>
+          new THREE.BoxGeometry(D, 0.62, 0.36)), kerbMat, 0, 0.31, ez);
+        part('copeEnd' + SZ, this._pzGeo('copeEnd' + SZ, () =>
+          new THREE.BoxGeometry(D + 0.22, 0.14, 0.58)), stoneMat, 0, 0.69, ez);
+      }
+
+      // ---- the centrepiece: a fountain, or a monument ---------------------
+      //
+      // A TOWN HAS BOTH, and a lap that shows the same fountain three times
+      // has one square repeated three times. Alternating them is the cheapest
+      // way to make two squares read as two places.
+      if (made % 2 === 0) this._pzFountain(part, M);
+      else this._pzMonument(part, M);
+      this.solids.push({ x: c.x, z: c.z, r: 3.4,
+        y: Math.min(y + 0.6, this.terrainHeight(c.x, c.z) + 0.6), mat: 'hut' });
+      this._addShadow(c.x, c.z, 4.0, y);
+      if (church) this._pzChurch(part, M, base, outward, D, y);
+
+      // ---- lamps, planters and cypresses round the edge -------------------
+      const anchored = [];                    // {m, r, shadow} in world matrices
+      const inset = 2.2;
+      const corners = [
+        [-D / 2 + inset, -W / 2 + inset], [D / 2 - inset, -W / 2 + inset],
+        [-D / 2 + inset, W / 2 - inset], [D / 2 - inset, W / 2 - inset],
+      ];
+      for (let k = 0; k < corners.length; k++) {
+        const [ax, az] = corners[k];
+        const m = part('lampPost', this._pzGeo('lampPost', () =>
+          new THREE.CylinderGeometry(0.1, 0.17, 3.7, 6)), ironMat, ax, 1.85, az);
+        // the sheet draws single, double and triple lanterns; a square gets
+        // the tall ones, which is what the render has at its corners
+        const heads = k % 2 ? [[0, 3.9, 0]] : [[0, 4.05, 0], [-0.62, 3.62, 0], [0.62, 3.62, 0]];
+        if (heads.length > 1) {
+          part('lampArm', this._pzGeo('lampArm', () =>
+            new THREE.BoxGeometry(1.4, 0.09, 0.09)), ironMat, ax, 3.62, az);
+        }
+        for (const [hx, hy, hz] of heads) {
+          part('lampGlass', this._pzGeo('lampGlass', () =>
+            new THREE.CylinderGeometry(0.2, 0.26, 0.42, 6)), bulbMat,
+          ax + hx, hy, az + hz);
+          part('lampCap', this._pzGeo('lampCap', () =>
+            new THREE.ConeGeometry(0.3, 0.24, 6)), ironMat, ax + hx, hy + 0.32, az + hz);
+        }
+        anchored.push({ m, r: 0.35, shadow: 0 });
+      }
+      // planters on the sides, a cypress in two of them: the sheet's PLANT &
+      // TREE TEMPLATES panel, and what fills a square without walling it in
+      const beds = [[-D / 2 + inset, 0], [D / 2 - inset, 0],
+        [0, -W / 2 + inset * 0.8], [0, W / 2 - inset * 0.8]];
+      for (let k = 0; k < beds.length; k++) {
+        const [ax, az] = beds[k];
+        const m = part('planter', this._pzGeo('planter', () =>
+          new THREE.BoxGeometry(1.9, 0.72, 1.9)), stoneMat, ax, 0.36, az);
+        if (k < 2) {
+          part('cypTrunk', this._pzGeo('cypTrunk', () =>
+            new THREE.CylinderGeometry(0.13, 0.19, 1.0, 5)), trunkMat, ax, 1.2, az);
+          part('cypress', this._pzGeo('cypress', () =>
+            new THREE.ConeGeometry(0.72, 4.4, 6)), leafMat, ax, 3.7, az);
+        } else {
+          part('bush', this._pzGeo('bush', () =>
+            new THREE.IcosahedronGeometry(0.85, 0)), leafMat, ax, 1.24, az);
+        }
+        anchored.push({ m, r: 1.1, shadow: 1.4 });
+      }
+      // A COLLIDER SEATS ON THE GROUND UNDER IT, NOT ON THE PLATE IT STANDS
+      // ON. The square is seated on its HIGH corner, so a lamp registered at
+      // plate height over ground that falls 1.5 u away is 2.1 u of air — and
+      // the road census calls anything over 2.5 u a FLOATER, which is exactly
+      // what the church's own solids tripped.
+      for (const a of anchored) {
+        const wx = a.m.elements[12], wz = a.m.elements[14];
+        this.solids.push({ x: wx, z: wz, r: a.r,
+          y: Math.min(y + 0.6, this.terrainHeight(wx, wz) + 0.6), mat: 'hut' });
+        if (a.shadow) this._addShadow(wx, wz, a.shadow, y);
+      }
+
+      // the record the street wall reads before it builds. The INVERSE of the
+      // square's own matrix is what `_inPiazza` tests against — a hand-written
+      // rotation here and a hand-written one there is two chances to get the
+      // sign wrong and no way to notice.
+      // the exclusion rect is ASYMMETRIC when a church stands on the outer
+      // side: the terrace has to stop for the church too, and the church is
+      // entirely outside the paving.
+      this._piazzas.push({ inv: new THREE.Matrix4().copy(base).invert(),
+        x: c.x, z: c.z, hw: W / 2,
+        x0: outward > 0 ? -D / 2 : -D / 2 - (church ? CHURCH_LEN + 3 : 0),
+        x1: outward > 0 ? D / 2 + (church ? CHURCH_LEN + 3 : 0) : D / 2 });
+      made++;
+    }
+
+    for (const [key, e] of PARTS) {
+      const im = new THREE.InstancedMesh(e.geo, e.mat, e.list.length);
+      for (let k = 0; k < e.list.length; k++) im.setMatrixAt(k, e.list[k]);
+      im.name = 'piazza-' + key;
+      im.castShadow = im.receiveShadow = true;
+      this.group.add(im);
+    }
+  }
+
+  /** THE FOUNTAIN, brimful, on the middle of a square.
+   *
+   *  BUILT BIG. At a 2.4 u basin it was correct against a person and invisible
+   *  against the street: these houses are 14 to 17 u, and from the far end of
+   *  a square the centrepiece has to hold the middle of it. 6 u across the
+   *  basin and 4.7 u to the top of the jet is a fountain you could sit six
+   *  people round, which is what the reference draws.
+   */
+  _pzFountain(part, M) {
+    part('basin', this._pzGeo('basin', () =>
+      new THREE.CylinderGeometry(3.15, 3.35, 1.05, 8)), M.stoneMat, 0, 0.62, 0);
+    // the water sits a centimetre PROUD of the rim, so the stone reads as an
+    // annulus round it; drop it inside and the basin's own solid top face
+    // hides it and the fountain is a stone drum
+    part('water', this._pzGeo('water', () =>
+      new THREE.CylinderGeometry(2.78, 2.78, 0.14, 8)), M.waterMat, 0, 1.2, 0);
+    part('stem', this._pzGeo('stem', () =>
+      new THREE.CylinderGeometry(0.5, 0.76, 1.9, 8)), M.stoneMat, 0, 2.1, 0);
+    part('bowl', this._pzGeo('bowl', () =>
+      new THREE.CylinderGeometry(1.35, 0.66, 0.42, 8)), M.stoneMat, 0, 3.24, 0);
+    part('brim', this._pzGeo('brim', () =>
+      new THREE.CylinderGeometry(1.2, 1.2, 0.1, 8)), M.waterMat, 0, 3.48, 0);
+    part('jet', this._pzGeo('jet', () =>
+      new THREE.CylinderGeometry(0.06, 0.14, 1.25, 6)), M.waterMat, 0, 4.12, 0);
+  }
+
+  /** THE MONUMENT: a bronze on a column on a stepped plinth — the other thing
+   *  that stands in the middle of one of these squares, and the one that gives
+   *  the town a vertical off the roofline.
+   *
+   *  IT IS TALLER THAN A FOUNTAIN ON PURPOSE. A fountain is furniture you look
+   *  down into and a monument is a thing you look up at, and 16 u — a storey
+   *  above the four-storey terrace round it — is what makes the second square
+   *  read as a different place rather than as the first one again.
+   *
+   *  The figure is three boxes and a sphere. At the distance a driver reads it
+   *  the silhouette is the whole content: something standing, one arm raised,
+   *  in metal rather than stone. Anything more is polygons nobody will see.
+   */
+  _pzMonument(part, M) {
+    part('mStep1', this._pzGeo('mStep1', () => new THREE.BoxGeometry(7, 0.45, 7)),
+      M.kerbMat, 0, 0.22, 0);
+    part('mStep2', this._pzGeo('mStep2', () => new THREE.BoxGeometry(5.4, 0.45, 5.4)),
+      M.kerbMat, 0, 0.67, 0);
+    part('mStep3', this._pzGeo('mStep3', () => new THREE.BoxGeometry(4.1, 0.5, 4.1)),
+      M.stoneMat, 0, 1.14, 0);
+    part('mDado', this._pzGeo('mDado', () => new THREE.BoxGeometry(2.6, 3.2, 2.6)),
+      M.stoneMat, 0, 3.0, 0);
+    part('mCorn', this._pzGeo('mCorn', () => new THREE.BoxGeometry(3.1, 0.32, 3.1)),
+      M.stoneMat, 0, 4.76, 0);
+    part('mCol', this._pzGeo('mCol', () =>
+      new THREE.CylinderGeometry(0.82, 0.98, 6.4, 12)), M.stoneMat, 0, 8.12, 0);
+    part('mCap', this._pzGeo('mCap', () =>
+      new THREE.CylinderGeometry(1.3, 0.95, 0.72, 12)), M.stoneMat, 0, 11.68, 0);
+    part('mLegs', this._pzGeo('mLegs', () => new THREE.BoxGeometry(0.9, 1.7, 0.72)),
+      M.bronzeMat, 0, 12.9, 0);
+    part('mTorso', this._pzGeo('mTorso', () => new THREE.BoxGeometry(1.15, 1.5, 0.82)),
+      M.bronzeMat, 0, 14.5, 0);
+    part('mHead', this._pzGeo('mHead', () => new THREE.SphereGeometry(0.42, 8, 6)),
+      M.bronzeMat, 0, 15.55, 0);
+    part('mArm', this._pzGeo('mArm', () => new THREE.BoxGeometry(0.26, 1.5, 0.26)),
+      M.bronzeMat, 0.62, 15.4, 0);
+  }
+
+  /** Would a church stand clear of the road on the outer side of this square?
+   *
+   *  It is 20 u of building hung off the far edge, so it is the one piece of
+   *  the kit that can reach back into a carriageway the square itself cleared
+   *  — on a lap that folds back on itself the other leg runs behind the
+   *  terrace. Eight points round its footprint, and any one of them in a road
+   *  means this square gets its parapet instead. */
+  _pzChurchFits(base, outward, D, y) {
+    const x0 = outward * (D / 2 - 1), x1 = outward * (D / 2 - 1 + CHURCH_LEN);
+    let lo = Infinity;
+    for (const px of [x0, (x0 + x1) / 2, x1]) {
+      for (const pz of [-CHURCH_WID / 2 - 2.6, 0, CHURCH_WID / 2 + 2.6]) {
+        _pzV.set(px, 0, pz).applyMatrix4(base);
+        const cx2 = _pzV.x, cz2 = _pzV.z;              // ...same rule here
+        if (this._inWater(cx2, cz2)) return null;
+        if (!this._clearsRoad(cx2, cz2, 0.6, 1.0)) return null;
+        const g = this._seatY(cx2, cz2);
+        if (!Number.isFinite(g)) return null;
+        lo = Math.min(lo, g);
+      }
+    }
+    // THE GROUND BEYOND A SQUARE IS NOT THE SQUARE'S GROUND. The flatness test
+    // covers the paving only, and a church is 19 u of building hung past its
+    // far edge — on the seafront that edge is often the top of a bank. More
+    // than 4 u of fall and no plinth saves it; below that the church gets one,
+    // which is what a real church on a slope stands on anyway.
+    const drop = y - lo;
+    if (drop > 4) return null;
+    return { drop: Math.max(0, drop) };
+  }
+
+  /** THE CHURCH, standing across the head of a square with its campanile
+   *  beside it — the landmark half the reference sheet's ROOFTOP DETAILS panel
+   *  is about, and the only thing in these towns taller than the terrace.
+   *
+   *  A LIGURIAN PARISH CHURCH IS A FLAT GABLED FACADE AND A SEPARATE TOWER.
+   *  Not a spire on a nave: the campanile stands apart, square in plan, with
+   *  an open belfry stage and a low pyramid cap. Getting that pairing right is
+   *  most of what makes it read as this region rather than as a generic church
+   *  — and the tower is what shows above the roofline from three streets away,
+   *  which is the whole point of building one.
+   *
+   *  Everything is instanced with the rest of the square kit, so a church costs
+   *  ten draw calls for the world, not ten per church.
+   */
+  _pzChurch(part, M, base, outward, D, y) {
+    const cx = outward * (D / 2 - 1 + CHURCH_LEN / 2);   // centre of the nave
+    const inner = outward * (D / 2 - 1);                 // the facade, on the square
+    const H = 9.4;                                       // eaves
+    // A PLINTH THAT REACHES DOWN PAST THE WORST DROP THE FIT TEST ALLOWS, so
+    // the church never hangs in the air off the back of a bank. Fixed height
+    // rather than sized to the fall: every part of this kit is one memoised
+    // geometry at its true size drawn at unit scale, and a box buried in a
+    // hillside costs nothing to draw and nothing to look at. `drop` only
+    // decides whether any of it SHOWS.
+    part('chPlinth', this._pzGeo('chPlinth', () =>
+      new THREE.BoxGeometry(CHURCH_LEN + 2.2, 5.0, CHURCH_WID + 2.2)), M.kerbMat,
+    cx, -2.45, 0);
+    part('chNave', this._pzGeo('chNave', () =>
+      new THREE.BoxGeometry(CHURCH_LEN, H, CHURCH_WID)), M.churchMat, cx, H / 2, 0);
+    // the roof prism's ridge runs along ITS local x, which here is the length
+    // of the nave — so the pitches fall to the two long walls, as they must
+    part('chRoof', this._pzGeo('chRoof', () => {
+      const g = gablePrismGeo().clone();
+      g.scale(CHURCH_LEN * 1.02, 3.3, CHURCH_WID * 1.12);
+      return g;
+    }), M.roofMat, cx, H, 0);
+    // THE FACADE IS A WALL, NOT THE END OF A ROOF: it stands proud of the
+    // gable behind it and above it, which is what a Ligurian church front is.
+    part('chFace', this._pzGeo('chFace', () =>
+      new THREE.BoxGeometry(0.7, H + 3.4, CHURCH_WID * 1.06)), M.churchMat,
+    inner, (H + 3.4) / 2, 0);
+    part('chPed', this._pzGeo('chPed', () =>
+      new THREE.BoxGeometry(0.9, 0.7, CHURCH_WID * 0.5)), M.stoneMat,
+    inner, H + 3.6, 0);
+    // portal and rose window, both set INTO the facade — a hair proud of it,
+    // or z-fighting picks a winner per frame
+    // MINUS outward, not plus: `outward` points AWAY from the square, so the
+    // first cut buried both the door and the rose window inside the facade and
+    // left them showing a couple of centimetres on the back — a blank white
+    // wall at the head of every square, which is what the face-on shot caught.
+    part('chDoor', this._pzGeo('chDoor', () =>
+      new THREE.BoxGeometry(0.5, 3.4, 2.0)), M.darkMat,
+    inner - outward * 0.32, 1.7, 0);
+    part('chRose', this._pzGeo('chRose', () => {
+      const g = new THREE.CylinderGeometry(1.15, 1.15, 0.4, 12);
+      g.rotateZ(Math.PI / 2);                        // face along the nave axis
+      return g;
+    }), M.darkMat, inner - outward * 0.3, 7.4, 0);
+    part('chBand', this._pzGeo('chBand', () =>
+      new THREE.BoxGeometry(0.96, 0.42, CHURCH_WID * 1.12)), M.stoneMat,
+    inner - outward * 0.12, H - 0.6, 0);
+    // a plain 13 u front is a wall; a door surround and two pilasters are what
+    // make it a FRONT, and they cost three instances
+    part('chSurround', this._pzGeo('chSurround', () =>
+      new THREE.BoxGeometry(0.42, 4.2, 3.0)), M.stoneMat,
+    inner - outward * 0.28, 2.1, 0);
+    for (const pz2 of [-CHURCH_WID * 0.44, CHURCH_WID * 0.44]) {
+      part('chPilaster', this._pzGeo('chPilaster', () =>
+        new THREE.BoxGeometry(0.4, H + 2.6, 0.9)), M.stoneMat,
+      inner - outward * 0.22, (H + 2.6) / 2, pz2);
+    }
+    part('chStep', this._pzGeo('chStep', () =>
+      new THREE.BoxGeometry(2.2, 0.28, 5.0)), M.kerbMat,
+    inner + outward * -1.0, 0.14, 0);
+    // the apse: a half-round at the far end, which is what a nave ends in
+    part('chApse', this._pzGeo('chApse', () =>
+      new THREE.CylinderGeometry(CHURCH_WID * 0.5, CHURCH_WID * 0.5, H * 0.86, 10)),
+    M.churchMat, cx + outward * (CHURCH_LEN / 2), H * 0.43, 0);
+    part('chApseCap', this._pzGeo('chApseCap', () =>
+      new THREE.ConeGeometry(CHURCH_WID * 0.54, 2.2, 10)), M.roofMat,
+    cx + outward * (CHURCH_LEN / 2), H * 0.86 + 1.1, 0);
+
+    // ---- the campanile, standing apart beside the facade ------------------
+    const tz = CHURCH_WID / 2 + 2.4;
+    const TH = 21;
+    part('chTower', this._pzGeo('chTower', () =>
+      new THREE.BoxGeometry(3.9, TH, 3.9)), M.churchMat, inner + outward * 2.4, TH / 2, tz);
+    // THE BELFRY IS AN OPEN STAGE, not a black box on a white tower — which is
+    // what a solid dark cube reads as at any distance. Light stone with a dark
+    // opening driven through both axes gives an arch on all four faces for two
+    // instances, and the openings are the whole silhouette of a campanile.
+    part('chBelfry', this._pzGeo('chBelfry', () =>
+      new THREE.BoxGeometry(4.3, 3.4, 4.3)), M.churchMat,
+    inner + outward * 2.4, TH + 1.7, tz);
+    part('chBelOpenA', this._pzGeo('chBelOpenA', () =>
+      new THREE.BoxGeometry(4.5, 2.3, 1.8)), M.darkMat,
+    inner + outward * 2.4, TH + 1.8, tz);
+    part('chBelOpenB', this._pzGeo('chBelOpenB', () =>
+      new THREE.BoxGeometry(1.8, 2.3, 4.5)), M.darkMat,
+    inner + outward * 2.4, TH + 1.8, tz);
+    part('chBelCorn', this._pzGeo('chBelCorn', () =>
+      new THREE.BoxGeometry(4.9, 0.5, 4.9)), M.stoneMat,
+    inner + outward * 2.4, TH + 3.65, tz);
+    part('chSpire', this._pzGeo('chSpire', () => {
+      const g = new THREE.ConeGeometry(3.2, 4.6, 4);
+      g.rotateY(Math.PI / 4);                        // a pyramid, not a diamond
+      return g;
+    }), M.roofMat, inner + outward * 2.4, TH + 6.2, tz);
+
+    // SOLIDS ALONG THE NAVE, NOT ONE ROUND IT. A single circle big enough to
+    // cover a 20 u building reaches back over the square's own paving and puts
+    // an invisible wall across it.
+    // ...and each one seats on the GROUND under it rather than on the square's
+    // plate: the church stands past the far edge, where the ground is often a
+    // couple of metres lower, and a collider registered at plate height there
+    // is what the road census calls a floater. Its PLINTH reaches the ground,
+    // so the ground is where the collider belongs.
+    const seat = (x, z) => Math.min(y + 0.6, this.terrainHeight(x, z) + 0.6);
+    for (const t of [-0.32, 0, 0.32]) {
+      _pzV.set(cx + outward * CHURCH_LEN * t, 0, 0).applyMatrix4(base);
+      this.solids.push({ x: _pzV.x, z: _pzV.z, r: CHURCH_WID * 0.52,
+        y: seat(_pzV.x, _pzV.z), mat: 'hut' });
+    }
+    _pzV.set(inner + outward * 2.4, 0, tz).applyMatrix4(base);
+    this.solids.push({ x: _pzV.x, z: _pzV.z, r: 2.6,
+      y: seat(_pzV.x, _pzV.z), mat: 'hut' });
+    this._addShadow(_pzV.x, _pzV.z, 3.2, y);
+  }
+
+  /** One geometry per part per world, memoised: every square in a world is the
+   *  same size, so the basin built for the first is the basin for all of them. */
+  _pzGeo(key, make) {
+    this._pzGeos = this._pzGeos || new Map();
+    let g = this._pzGeos.get(key);
+    if (!g) this._pzGeos.set(key, g = make());
+    return g;
+  }
+
+
+  /** Is anything of radius `r` standing in a square? The frontage asks this
+   *  for every block, which is the whole reason a piazza is an opening in the
+   *  terrace rather than a paved yard behind it. */
+  _inPiazza(x, z, r = 0) {
+    for (const p of this._piazzas ?? []) {
+      _ipV.set(x, 0, z).applyMatrix4(p.inv);         // into the square's own frame
+      if (_ipV.x > p.x0 - r && _ipV.x < p.x1 + r && Math.abs(_ipV.z) < p.hw + r) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /** STREET LIFE: what makes a street look lived-in rather than built.
    *
@@ -14645,9 +16261,23 @@ export class Track {
       const i = j % N;
       const c = this.center[i], n = this.nrm[i];
       for (const side of [1, -1]) {
+        const wx = c.x + n.x * (HW - 0.5) * side, wz = c.z + n.z * (HW - 0.5) * side;
+        // A BORE WALL IS 11.6 u OFF ITS OWN CENTRELINE AND THAT SAYS NOTHING
+        // ABOUT ANOTHER LEG OF THE LAP.
+        //
+        // These went in unguarded. Where a tunnel passes close to a different
+        // stretch of road — COTE D AZUR does, fourteen times — the wall lands
+        // in THAT carriageway as an invisible collider a car hits at speed
+        // with nothing to see. The wall MESH stays either way; only the
+        // collider is dropped, which is the rule the grandstand and the start
+        // gantry have both settled on.
+        //
+        // MOUNTAIN TO SEA is the same defect from the other direction: its
+        // road is five times normal width, so a fixed 11.6 u bore is inside
+        // its own carriageway for the whole length of the tunnel.
+        if (!this._clearsRoad(wx, wz, 1.4, 0.2)) continue;
         this.solids.push({
-          x: c.x + n.x * (HW - 0.5) * side, z: c.z + n.z * (HW - 0.5) * side,
-          r: 1.4, y: this.groundHeightAt(i, 0) + 1, mat: 'stone',
+          x: wx, z: wz, r: 1.4, y: this.groundHeightAt(i, 0) + 1, mat: 'stone',
         });
       }
     }
@@ -14693,9 +16323,50 @@ export class Track {
       } else {
         q.identity();
       }
-      m4.compose(pos.set(s.x, y + 0.07, s.z), q, scl.set(s.r, 1, s.r));
+      // A SHADOW BELONGS TO THE GROUND IT IS ON, AND NEVER TO A ROAD (r253).
+      //
+      // On a lap that stacks — GOTTHARD CLIMB's hairpins run one above
+      // another — a decal seated under a tree on the upper shelf hangs in
+      // mid-air over the LOWER carriageway, where it reads as a dark patch
+      // floating across the road; the census scored two of them as bodies at
+      // a 4 u bite. And a decal that merely spills onto the tarmac is wrong
+      // for the same reason in a smaller way: these are fake occlusion for
+      // things standing on the GROUND, and the road has its own surface. Any
+      // shadow reaching into a carriageway is dropped.
+      // ...and the question is asked the way the census asks it: distance to
+      // the centreline POLYLINE, not to the nearest sample. On a hairpin the
+      // other leg swings underneath between two samples, and the sample-based
+      // answer missed one of the two decals on GOTTHARD outright.
+      // AND THE ROAD IT IS OVER NEED NOT BE THE NEAREST ONE.
+      //
+      // The first two cuts of this asked `nearestIndex`, which on GOTTHARD
+      // answers with the hairpin the decal is ON — while the one it hangs over
+      // is the shelf BELOW, at the same x and z and eight metres down. Asking
+      // the nearest station can never see that, and a probe built on the same
+      // question duly reported zero while the census reported a 4 u bite: the
+      // two were not asking the same thing.
+      //
+      // So walk the stations that could reach this decal at all and test each
+      // one on its own height. It is the decal's EDGE that matters, not its
+      // centre — a 6 u shadow a metre outside a carriageway still lies four
+      // metres across it — and where the road is at the decal's own level the
+      // radius is TRIMMED to the kerb instead of the whole thing dropped, so a
+      // roadside prop keeps the shadow that glues it to the ground.
+      let rr = s.r, drop = false;
+      for (let i = 0; i < N && !drop; i++) {
+        const c = this.center[i];
+        const dxz = Math.hypot(s.x - c.x, s.z - c.z);
+        const half = (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 0.4;
+        if (dxz - rr >= half) continue;                 // nowhere near this one
+        if (Math.abs(y - c.y) > 1.2) { drop = true; break; }   // another deck
+        rr = Math.min(rr, dxz - half);
+        if (rr < 0.4) drop = true;
+      }
+      if (drop) continue;
+      m4.compose(pos.set(s.x, y + 0.07, s.z), q, scl.set(rr, 1, rr));
       mesh.setMatrixAt(k++, m4);
     }
+    mesh.count = k;                    // ...so the skipped ones are not drawn
     mesh.renderOrder = 1;
     mesh.name = 'contact-shadows';
     this.group.add(mesh);
@@ -16616,6 +18287,9 @@ export class Track {
     let lk = 0;
 
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    // eaves to the street rather than the gable end — see `put`
+    const RIDGE_ALONG = F.ridge === 'along';
+    const qr = new THREE.Quaternion();
     const col = new THREE.Color();
     const tints = F.tints.map((c) => new THREE.Color(c));
     let k = 0;
@@ -16626,6 +18300,9 @@ export class Track {
       if (k >= MAX) return null;
       const p = this.pointAt(i, lat * side);
       const r = Math.hypot(wAlong, dAcross) / 2;
+      // A SQUARE IS A HOLE IN THE STREET WALL. The terrace stops for it, which
+      // is the difference between a piazza and a paved yard behind the houses.
+      if (this._inPiazza(p.x, p.z, r * 0.6)) return null;
       // THE QUAY IS OPEN TO THE WATER (harbour reference): no house between
       // the seafront road and the sea. Any block whose centre lands within
       // `seaOpen` units of the waterline — or in the water — is refused, so
@@ -16647,9 +18324,19 @@ export class Track {
       const sy = this._seatY(p.x, p.z);
       const y = (Number.isFinite(sy) ? sy : this.terrainHeight(p.x, p.z)) - 0.5;
       q.setFromAxisAngle(up, this.headingAt(i));
-      // local +X is the road normal and local +Z runs along the street, so the
-      // GABLE END faces the road: the Baltic gable-fronted terrace, and the
-      // one roof orientation that still reads as separate houses in a row
+      // local +X is the road normal and local +Z runs along the street, so by
+      // default the GABLE END faces the road: the Baltic gable-fronted
+      // terrace, and the one roof orientation that still reads as separate
+      // houses in a row.
+      //
+      // THE RIVIERA IS THE OTHER ONE (r244). Every roof in the Ligurian sheet
+      // and in both Monte Carlo renders runs its RIDGE ALONG THE STREET and
+      // presents its eaves and gutter to the road — the terrace is capped by
+      // one continuous line of pantile, not by a sawtooth of gable ends. That
+      // sawtooth was the loudest northern thing left in the silhouette after
+      // the timber came off, and it is a rotation, not a model: turn the prism
+      // a quarter turn and the span it pitches over becomes the depth of the
+      // block instead of its frontage, so the scale swaps with it.
       const vi = pickSlot();
       const bm = bodySet[vi], rm = roofSet[vi];
       if (kv[vi] >= bm.count) return null;
@@ -16658,8 +18345,39 @@ export class Track {
       const vh = h * [1, 0.62, 1.24, 0.94][vi >> 1];
       m4.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(dAcross, vh, wAlong));
       bm.setMatrixAt(kv[vi], m4);
-      m4.compose(new THREE.Vector3(p.x, y + vh, p.z), q,
-        new THREE.Vector3(dAcross * 1.16, roofH, wAlong * 1.08));
+      // A FLAT-ROOFED HOUSE IN THE RUN. Every roof on this street is the same
+      // prism at the same pitch, and a terrace of them is a sawtooth repeated
+      // to the vanishing point. The reference sheet's corner building is
+      // flat-topped behind a parapet, and one in five of those breaks the
+      // rhythm at exactly the place the eye reads a street: the roofline.
+      const flat = Math.random() < (F.flatRoofs ?? 0);
+      // the pitch a Ligurian pantile roof actually has is shallower than a
+      // northern gable's, and the chimney has to be told the height that was
+      // USED, not the one that was asked for
+      const effRoofH = flat ? 0.001 : (RIDGE_ALONG ? roofH * 0.72 : roofH);
+      if (!flat && rgK < RIDGEMAX) {
+        // the cap runs ALONG the ridge, whichever way the ridge runs
+        const rq = RIDGE_ALONG ? qr : q;
+        if (RIDGE_ALONG) qr.setFromAxisAngle(up, this.headingAt(i) + Math.PI * 0.5);
+        m4.compose(new THREE.Vector3(p.x, y + vh + effRoofH - 0.04, p.z), rq,
+          new THREE.Vector3(RIDGE_ALONG ? wAlong * 1.04 : dAcross * 1.2, 0.24, 0.46));
+        ridgeCaps.setMatrixAt(rgK, m4);
+        ridgeCol.copy(tint).multiplyScalar(0.62 + Math.random() * 0.12);
+        ridgeCaps.setColorAt(rgK++, ridgeCol);
+      }
+      if (RIDGE_ALONG) {
+        qr.setFromAxisAngle(up, this.headingAt(i) + Math.PI * 0.5);
+        // 1.02 along the street, not 1.08: neighbours in a terrace share a
+        // party wall and their roofs meet on it — an oversail at that end is
+        // two roofs growing through each other. The oversail that matters is
+        // the one over the FACE, and it is what throws the eaves shadow the
+        // reference has under every gutter.
+        m4.compose(new THREE.Vector3(p.x, y + vh, p.z), qr,
+          new THREE.Vector3(wAlong * 1.02, effRoofH, dAcross * 1.18));
+      } else {
+        m4.compose(new THREE.Vector3(p.x, y + vh, p.z), q,
+          new THREE.Vector3(dAcross * 1.16, roofH, wAlong * 1.08));
+      }
       rm.setMatrixAt(kv[vi], m4);
       if (trimK + 2 < TRIMMAX) {
         // plinth: a course at the kerb, a touch proud of the wall
@@ -16674,9 +18392,30 @@ export class Track {
         houseTrim.setMatrixAt(trimK, m4);
         trimCol.copy(tint).multiplyScalar(1.12 + Math.random() * 0.12);
         houseTrim.setColorAt(trimK++, trimCol);
-        // THE JETTY (r243). In the reference the upper storeys stand PROUD of
-        // the ground floor — the medieval overhang — and that step is a big
-        // part of the silhouette from the street.
+        // ...and where the roof is flat, the parapet that hides it: a wall
+        // standing above the eaves with a coping course on top. Two more
+        // instances off the SAME trim mesh, so a flat-roofed variant costs no
+        // draw call of its own.
+        if (flat && trimK + 2 < TRIMMAX) {
+          m4.compose(new THREE.Vector3(p.x, y + vh + 0.52, p.z), q,
+            new THREE.Vector3(dAcross * 1.1, 1.04, wAlong * 1.05));
+          houseTrim.setMatrixAt(trimK, m4);
+          trimCol.copy(tint).multiplyScalar(1.02 + Math.random() * 0.1);
+          houseTrim.setColorAt(trimK++, trimCol);
+          m4.compose(new THREE.Vector3(p.x, y + vh + 1.12, p.z), q,
+            new THREE.Vector3(dAcross * 1.19, 0.22, wAlong * 1.12));
+          houseTrim.setMatrixAt(trimK, m4);
+          trimCol.copy(tint).multiplyScalar(1.2 + Math.random() * 0.12);
+          houseTrim.setColorAt(trimK++, trimCol);
+        }
+        // THE JETTY (r243), WHICH IS A NORTHERN BUILDING (r244). The medieval
+        // overhang belongs to the Fachwerk street the r242 reference showed
+        // and to nothing on this coast: a Ligurian terrace is flush from
+        // pavement to cornice, and running a proud band across every facade at
+        // first-floor level was reading as a shelf bolted to the front of the
+        // town. Opt-in per frontage now, and the riviera does not opt in.
+        //
+        // Where it IS wanted, the note from r243 still holds:
         //
         // A true overhang wants a second body per house. This is one course
         // instead: a band at the first-floor line, wider across the street
@@ -16693,11 +18432,13 @@ export class Track {
         // limewash as the wall above it; the dark underside is a lighting
         // result, and the renderer already gives it for nothing, because the
         // soffit points at the ground.
-        m4.compose(new THREE.Vector3(p.x, y + vh * 0.34, p.z), q,
-          new THREE.Vector3(dAcross * 1.16, 0.34, wAlong * 1.04));
-        houseTrim.setMatrixAt(trimK, m4);
-        trimCol.copy(tint).multiplyScalar(0.94 + Math.random() * 0.1);
-        houseTrim.setColorAt(trimK++, trimCol);
+        if (F.jetty) {
+          m4.compose(new THREE.Vector3(p.x, y + vh * 0.34, p.z), q,
+            new THREE.Vector3(dAcross * 1.16, 0.34, wAlong * 1.04));
+          houseTrim.setMatrixAt(trimK, m4);
+          trimCol.copy(tint).multiplyScalar(0.94 + Math.random() * 0.1);
+          houseTrim.setColorAt(trimK++, trimCol);
+        }
       }
       col.copy(tint).multiplyScalar(0.86 + Math.random() * 0.26);
       bm.setColorAt(kv[vi], col);
@@ -16708,7 +18449,13 @@ export class Track {
       h = vh;
       const solid = { x: p.x, z: p.z, r, y: y + 0.6, mat: 'hut' };
       this.solids.push(solid);
-      return { solid, p, y, h, r, lat, mesh: myMesh, roof: myRoof, idx: myIdx };
+      // `h` is the height the block was BUILT at (the variant scales it), and
+      // `rh` the height its roof was built at — anything hung off the roofline
+      // has to measure from these and not from what was asked for.
+      // a flat roof still carries a stack, and it stands on the deck rather
+      // than on a ridge that is not there
+      return { solid, p, y, h, r, lat, rh: flat ? 1.0 : effRoofH, variant: vi >> 1,
+        mesh: myMesh, roof: myRoof, idx: myIdx };
     };
 
     // chimney stacks: a small dark box riding most ridges. The cheapest thing
@@ -16717,9 +18464,23 @@ export class Track {
     const CMAX = 640;
     const chimGeo = new THREE.BoxGeometry(0.62, 1.7, 0.62);
     chimGeo.translate(0, 0.85, 0);
+    // A CHIMNEY IS RENDERED MASONRY, not a black box. At 0x4c4642 every stack
+    // on the street read as a dark bar against the sky — which is what makes
+    // one look like it is floating even when it is sitting on its tiles. The
+    // sheet draws them as the wall's own stone with a terracotta pot.
     const chims = new THREE.InstancedMesh(chimGeo, new THREE.MeshStandardMaterial({
-      color: 0x4c4642, flatShading: true, roughness: 0.95,
+      color: this.T.chimneyColor ?? 0x9a8d7e, flatShading: true, roughness: 0.95,
     }), CMAX);
+    // A POT ON THE STACK. The one detail that turns a grey box on a roof into a
+    // chimney, and the sheet draws it on every stack in its ROOFTOP DETAILS
+    // panel — a terracotta cylinder, two per stack, standing proud of the
+    // masonry. One instanced mesh for the world.
+    const potGeo = new THREE.CylinderGeometry(0.13, 0.16, 0.52, 6);
+    potGeo.translate(0, 0.26, 0);
+    const pots = new THREE.InstancedMesh(potGeo, new THREE.MeshStandardMaterial({
+      color: this.T.frontage?.roof ?? 0xb85a30, flatShading: true, roughness: 0.9,
+    }), CMAX * 2);
+    let pk = 0;
     let ck = 0;
     const chimOff = new THREE.Vector3();
     const chimAt = (i, side, lat, dAcross, wAlong, eaveY, roofH) => {
@@ -16746,6 +18507,15 @@ export class Track {
       m4.compose(new THREE.Vector3(p.x + chimOff.x, baseY, p.z + chimOff.z), q,
         new THREE.Vector3(1, 0.75 + Math.random() * 0.6, 1));
       chims.setMatrixAt(ck++, m4);
+      // the pots stand on the stack's own top, which moves with its scale
+      const stackTop = baseY + 1.7 * (m4.elements[5]);
+      for (const po of [-0.15, 0.15]) {
+        if (pk >= pots.count) break;
+        chimOff.set(across + po * 0.9, 0, along).applyQuaternion(q);
+        m4.compose(new THREE.Vector3(p.x + chimOff.x, stackTop - 0.06, p.z + chimOff.z),
+          q, new THREE.Vector3(1, 0.8 + Math.random() * 0.5, 1));
+        pots.setMatrixAt(pk++, m4);
+      }
     };
 
     // BALCONIES AND AWNINGS, ON THE SIDE YOU DRIVE PAST.
@@ -16783,19 +18553,114 @@ export class Track {
     let trimK = 0;
     const trimCol = new THREE.Color();
 
+    // A RIDGE IS A LINE OF TILE, NOT AN EDGE. The gable prism meets itself in a
+    // bare arris at the top, and on a terrace whose roofs now run continuously
+    // along the street (r244) that arris is the longest single line in the
+    // frame. A capping course over it — half-round in life, a thin box here —
+    // is one instanced mesh and the difference between a roof and a wedge.
+    const RIDGEMAX = 2600;
+    const ridgeCaps = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.78 }),
+      RIDGEMAX);
+    ridgeCaps.name = 'oldtown-ridges';
+    ridgeCaps.castShadow = true;
+    let rgK = 0;
+    const ridgeCol = new THREE.Color();
+
+    // THE PAVEMENT. Between the kerb and the front door there was open ground:
+    // the terrace stood on the same dirt the countryside is scattered on, and
+    // no amount of facade detail fixes a street with no footway in it. A slab
+    // per house from the building line out to the road edge, and a kerb course
+    // at the end of it — two instances a house, two draw calls for the world.
+    const PAVEMAX = 2600;
+    // A FOOTWAY IS FLAGGED, and a flat colour beside a cobbled road reads as
+    // poured concrete. The map goes on the box, whose UVs stretch it into
+    // courses running along the pavement — which is the way flags are laid.
+    const paveTex = pavingTexture(F.paving);
+    paveTex.repeat.set(1, 2);
+    const paveMat = new THREE.MeshStandardMaterial({
+      map: paveTex, color: F.pavement ?? 0xd8d2c4, roughness: 0.95,
+    });
+    const kerbMat2 = new THREE.MeshStandardMaterial({
+      color: F.kerbColor ?? 0x968e7f, flatShading: true, roughness: 0.92,
+    });
+    const pavements = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), paveMat, PAVEMAX);
+    const kerbs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), kerbMat2, PAVEMAX);
+    pavements.name = 'oldtown-pavement';
+    kerbs.name = 'oldtown-kerb';
+    pavements.receiveShadow = kerbs.receiveShadow = true;
+    let pvK = 0;
+
+    // BOLLARDS ON THE KERB LINE. Every one of these towns has a row of them
+    // keeping cars off the footway, and they are the small vertical rhythm a
+    // long pavement needs — a strip of flat stone reads as a ramp without
+    // them. Every third house, alternating along the run, and always at least
+    // 0.7 u clear of the driveable edge so they can never be something you
+    // hit.
+    const BOLLMAX = 900;
+    const bollMat = new THREE.MeshStandardMaterial({
+      color: 0x3a352e, roughness: 0.6, metalness: 0.3, flatShading: true,
+    });
+    const bollGeo = new THREE.CylinderGeometry(0.1, 0.14, 0.92, 8);
+    bollGeo.translate(0, 0.46, 0);
+    const bollCapGeo = new THREE.SphereGeometry(0.13, 8, 5);
+    bollCapGeo.translate(0, 0.94, 0);
+    const bollards = new THREE.InstancedMesh(bollGeo, bollMat, BOLLMAX);
+    const bollCaps = new THREE.InstancedMesh(bollCapGeo, bollMat, BOLLMAX);
+    bollards.name = 'oldtown-bollards';
+    bollards.castShadow = bollCaps.castShadow = true;
+    let bkK = 0;
+
+    /** The footway in front of one house: from its facade out to the road
+     *  edge, stopping 0.15 u short of the driveable surface so nothing here
+     *  can ever be something you hit. */
+    const paveAt = (i, side, lat, dAcross, wAlong) => {
+      if (pvK >= PAVEMAX) return;
+      const face = Math.abs(lat) - dAcross * 0.5;         // the wall, off the centreline
+      const edge = (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 0.15;
+      const depth = face - edge;
+      if (depth < 0.4) return;                            // no room for a footway
+      const mid = (face + edge) / 2;
+      const pp = this.pointAt(i, mid * Math.sign(lat) * side);
+      const py = this._seatY(pp.x, pp.z);
+      if (!Number.isFinite(py)) return;
+      q.setFromAxisAngle(up, this.headingAt(i));
+      // 0.3 thick with 0.09 of it proud: a footway is a kerb's height above
+      // the road and no more, and the census counts anything over 0.25 as a
+      // body in the carriageway if it ever strays inside the edge.
+      m4.compose(new THREE.Vector3(pp.x, py + 0.09 - 0.15, pp.z), q,
+        new THREE.Vector3(depth, 0.3, wAlong * 1.02));
+      pavements.setMatrixAt(pvK, m4);
+      const kp = this.pointAt(i, (edge + 0.22) * Math.sign(lat) * side);
+      const ky = this._seatY(kp.x, kp.z);
+      m4.compose(new THREE.Vector3(kp.x, (Number.isFinite(ky) ? ky : py) + 0.11 - 0.15, kp.z),
+        q, new THREE.Vector3(0.44, 0.34, wAlong * 1.02));
+      kerbs.setMatrixAt(pvK, m4);
+      pvK++;
+      if (pvK % 3 || bkK >= BOLLMAX) return;
+      const bp = this.pointAt(i, (edge + 0.55) * Math.sign(lat) * side);
+      const by2 = this._seatY(bp.x, bp.z);
+      if (!Number.isFinite(by2)) return;
+      m4.compose(new THREE.Vector3(bp.x, by2 + 0.1, bp.z), q, _ONE);
+      bollards.setMatrixAt(bkK, m4);
+      bollCaps.setMatrixAt(bkK++, m4);
+    };
+
     const BALC = 520;
     const slabGeo = new THREE.BoxGeometry(1, 1, 1);
     const balcMat = new THREE.MeshStandardMaterial({
       color: 0xb9b0a0, flatShading: true, roughness: 0.9, envMapIntensity: 0.35,
     });
-    // BALUSTERS, NOT A PARAPET. A solid box in 0x3a3630 read as a black slab
-    // over every shopfront; alpha-tested ironwork lets the wall through and
-    // costs the same one draw call.
-    const railTex = balconyRailTexture();
+    // WROUGHT IRON, NOT A PARAPET. A solid 10 cm box painted near-black reads
+    // as a dark dash on every balcony in the street; the alpha-cut baluster
+    // map (see ironRailTexture) puts daylight back between the bars, which is
+    // most of what says "iron balcony" from a car.
+    const railTex = ironRailTexture();
     railTex.repeat.set(3, 1);
     const railMat = new THREE.MeshStandardMaterial({
-      map: railTex, color: 0x8e968c, transparent: true, alphaTest: 0.5,
-      side: THREE.DoubleSide, roughness: 0.6, metalness: 0.4,
+      map: railTex, color: 0x3a3630, transparent: false, alphaTest: 0.5,
+      side: THREE.DoubleSide, flatShading: true, roughness: 0.7, metalness: 0.35,
     });
     const awnMat = new THREE.MeshStandardMaterial({
       map: awningTexture(), roughness: 0.92, side: THREE.DoubleSide,
@@ -16803,6 +18668,8 @@ export class Track {
     const balcSlabs = new THREE.InstancedMesh(slabGeo, balcMat, BALC);
     const balcRails = new THREE.InstancedMesh(slabGeo, railMat, BALC);
     const awnings = new THREE.InstancedMesh(slabGeo, awnMat, BALC);
+    const valances = new THREE.InstancedMesh(slabGeo, awnMat, BALC);
+    valances.name = 'frontage-valances';
     balcSlabs.name = 'frontage-balconies';
     // NAMED, so it can be measured and hidden. Unnamed, it survived every
     // bracket-by-hiding pass while being the thing that was actually wrong.
@@ -16815,7 +18682,12 @@ export class Track {
     // before the street yaw — so it leans out over the kerb on both sides
     const qa = new THREE.Quaternion();
     const fwd = new THREE.Vector3(0, 0, 1);
-    const faceAt = (i, side, lat, dAcross, wAlong, baseY, hh) => {
+    // WHAT THE FACADE UNDER IT ACTUALLY HAS: the storey lines and bay centres
+    // the texture painter used, per variant, in fractions of the block.
+    const ANCH = [];
+    for (let v = 0; v < VARIANTS; v++) ANCH.push(townhouseAnchors(v, F.bayset));
+
+    const faceAt = (i, side, lat, dAcross, wAlong, baseY, vh, anch) => {
       const p = this.pointAt(i, lat * side);
       q.setFromAxisAngle(up, this.headingAt(i));
       // local +X is the road normal, so the face the driver sees is the one
@@ -16833,28 +18705,63 @@ export class Track {
       // supposed to stand on, with clear daylight between the awning and the
       // wall. A ledge is attached to a building or it is not a ledge.
       const proud = Math.sign(out);                     // +1 if the face is +X
-      if (hh > 6.2 && balK < BALC) {
-        const by = baseY + hh * 0.52;
-        const SD = 0.85;                                // how far the slab reaches out
+      // A BALCONY BELONGS TO A WINDOW (r245).
+      //
+      // This used to be `baseY + hh * 0.52` by `wAlong * 0.42` wide with a
+      // random third of the frontage of side jitter — three numbers, none of
+      // which knows anything about the facade painted underneath. Reported as
+      // "the balcony is all over the place", and it was, in four ways at once:
+      //
+      //   - `hh` is the height the terrace ASKED for, and `put` builds the
+      //     body at `hh * [1, 0.62, 1.24, 0.94]` for its variant. So 0.52 of
+      //     it is 84% of the way up a cottage — a balcony under the gutter —
+      //     and 42% of the way up a merchant house. Same street, same call,
+      //     a different storey on every house. (Same defect the chimneys had.)
+      //   - it was never on a storey line, so on a five-storey face it cut
+      //     across the middle of a row of windows.
+      //   - it was never on a BAY, so it hung on blank wall as often as not.
+      //   - and at 0.42 of the frontage it was wider than the two windows it
+      //     was between.
+      //
+      // `anch` is where that variant's painter actually put its sills and its
+      // bays (see townhouseAnchors), so all four go away together.
+      const sills = anch?.sills ?? [];
+      const bays = anch?.bays ?? [];
+      // the storeys clear of the shopfront, which is where a balcony can be
+      const upper = [];
+      for (let r = 0; r < sills.length; r++) if (sills[r] > 0.34) upper.push(sills[r]);
+      if (vh > 6.2 && upper.length && bays.length && balK < BALC) {
+        const sv = upper[(Math.random() * upper.length) | 0];
+        const bay = bays[(Math.random() * bays.length) | 0];
+        const by = baseY + vh * sv;
+        const SD = 0.8;                                 // how far the slab reaches out
         const sx = out + proud * SD * 0.5;              // slab centred on the lip
-        const zj = (Math.random() - 0.5) * wAlong * 0.3;
+        // a balcony is a little wider than its window and no wider: 1.5 bays
+        const bwid = Math.max(1.1, wAlong * bay.w * 1.5);
+        const zj = wAlong * bay.u;
         faceOff.set(sx, 0, zj).applyQuaternion(q);
         m4.compose(new THREE.Vector3(p.x + faceOff.x, by, p.z + faceOff.z), q,
-          new THREE.Vector3(SD, 0.16, wAlong * 0.42));
+          new THREE.Vector3(SD, 0.16, bwid));
         balcSlabs.setMatrixAt(balK, m4);
         // the rail stands ON the slab's outer lip, not past it
         const rx = out + proud * (SD - 0.05);
         faceOff.set(rx, 0, zj).applyQuaternion(q);
-        m4.compose(new THREE.Vector3(p.x + faceOff.x, by + 0.34, p.z + faceOff.z), q,
-          new THREE.Vector3(0.06, 0.62, wAlong * 0.42));
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, by + 0.5, p.z + faceOff.z), q,
+          new THREE.Vector3(0.1, 0.9, bwid));
         balcRails.setMatrixAt(balK, m4);
         balK++;
       }
-      // and an awning over the ground floor on about half of them
-      if (Math.random() < 0.5 && awnK < BALC) {
+      // and an awning over the ground floor on about half of them — but only
+      // where the painter drew a SHOPFRONT to hang it over
+      const shop = anch?.shop;
+      if ((!anch || shop?.has) && Math.random() < 0.5 && awnK < BALC) {
         const AD = 1.6;                                 // awning reach
-        faceOff.set(out + proud * AD * 0.48, 0,
-          (Math.random() - 0.5) * wAlong * 0.25).applyQuaternion(q);
+        // ONE jitter, shared by the awning and the valance hung off it — two
+        // draws of `Math.random()` here and the flap belongs to a different
+        // shopfront from the sheet it is supposed to hang from.
+        const azOff = shop ? wAlong * shop.u : (Math.random() - 0.5) * wAlong * 0.25;
+        const awid = shop ? wAlong * shop.w * 1.08 : wAlong * 0.38;
+        faceOff.set(out + proud * AD * 0.48, 0, azOff).applyQuaternion(q);
         // AN AWNING SLOPES. Flat, it is a horizontal plate 2.9 u up and the
         // driver only ever sees its UNDERSIDE — which faces away from the sun
         // and renders black, so every shopfront on the street had a dark slab
@@ -16862,11 +18769,24 @@ export class Track {
         // you look at and the stripes on it are what you see.
         qa.setFromAxisAngle(fwd, -proud * 0.42);
         qa.premultiply(q);
-        m4.compose(new THREE.Vector3(p.x + faceOff.x, baseY + 2.95, p.z + faceOff.z),
-          qa, new THREE.Vector3(AD, 0.1, wAlong * 0.38));
+        // AND IT IS FIXED TO THE HEAD OF THE SHOPFRONT THAT IS PAINTED THERE,
+        // not to a flat 2.95 u: the same variant scaling that moved the
+        // balconies put this through the first-floor windows of a cottage and
+        // halfway up the glazing of a tall house.
+        const av = baseY + (shop ? vh * shop.v + 0.25 : 2.95);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, av, p.z + faceOff.z),
+          qa, new THREE.Vector3(AD, 0.1, awid));
         awnings.setMatrixAt(awnK, m4);
         col.setHSL(0.02 + Math.random() * 0.12, 0.35, 0.44 + Math.random() * 0.16);
         awnings.setColorAt(awnK, col);
+        // THE VALANCE, the flap that hangs off the front edge. It is the only
+        // part of an awning seen straight on from a car, and without it the
+        // awning is a sheet of stripes ending in nothing.
+        faceOff.set(out + proud * AD * 0.98, 0, azOff).applyQuaternion(q);
+        m4.compose(new THREE.Vector3(p.x + faceOff.x, av - 0.56, p.z + faceOff.z),
+          qa, new THREE.Vector3(0.08, 0.46, awid));
+        valances.setMatrixAt(awnK, m4);
+        valances.setColorAt(awnK, col);
         awnK++;
       }
     };
@@ -16893,7 +18813,31 @@ export class Track {
         const i = (s * step) % N;
         // the start gate, the grid and the grandstand own this stretch
         if (this._circDist(i, 0) < 40) { run = 0; continue; }
-        if (gap > 0) { gap--; run = 0; continue; }
+        // A CARRUGIO IS A SLOT, NOT A MISSING HOUSE. The side alley between
+        // terrace runs skipped one or two whole bays, which at a 7 u unit is
+        // a hole up to twice a house wide with the verge showing through it —
+        // measured at 53-71% of neighbouring pairs across the town worlds,
+        // mean gap 14 u. That is a suburb, not a Ligurian street. The alley
+        // stays, because a streetwall with no way through it is a wall; it is
+        // BRACKETED instead, by a narrow block either side of a ~2 u slot,
+        // which is what the reference's side streets actually are.
+        if (gap > 0) {
+          if (gap === 1) {
+            const nw = F.unit * 0.34;
+            const off = Math.max(2, Math.round(step * 0.30));
+            for (const d of [-off, off]) {
+              const j = ((i + d) % N + N) % N;
+              const ah = F.height * runH * (0.88 + Math.random() * 0.1);
+              const ap = put(j, side, F.lateral + runJ, nw, F.depth * 0.92, ah,
+                1.7 + Math.random() * 0.8, tints[(Math.random() * tints.length) | 0]);
+              if (!ap) continue;
+              placedS[side].add(j);
+              faceAt(j, side, ap.lat, F.depth * 0.92, nw, ap.y, ap.h, ANCH[ap.variant]);
+              paveAt(j, side, ap.lat, F.depth * 0.92, nw);
+            }
+          }
+          gap--; run = 0; continue;
+        }
         // step the terrace back rather than break it, where the road swings in
         let placed = null;
         const tall = run > 0 && Math.random() < 0.11;    // the merchant house
@@ -16907,17 +18851,20 @@ export class Track {
         }
         if (!placed) { run = 0; continue; }
         placedS[side].add(i);
-        // `placed.h`, NOT `hh`. `put` scales the requested height by the
-        // variant's own storey count — 0.62 for the low one, 1.24 for the tall
-        // — and hands the real height back precisely so that anything hung on
-        // the building can find it. Both of these read the request instead, so
-        // on a low variant the stack was placed a third of a storey above its
-        // own roof and stood in the sky with nothing under it, and the balcony
-        // and awning went up the wall with it.
+        // A CHIMNEY FLOATED OVER EVERY COTTAGE IN THE GAME, and it predates
+        // this round: the eaves were handed in as `placed.y + hh`, the height
+        // the terrace ASKED for, while `put` builds the body at
+        // `hh * [1, 0.62, 1.24, 0.94][variant]`. On the cottage — the variant
+        // weighted heaviest, so most of the street — that is 38% of the wall
+        // height of clear sky between the roof and its stack, which from the
+        // road reads as a dark box hanging over the town. `placed.h` is what
+        // was built, and `placed.rh` the roof that went on it.
         if (Math.random() < 0.62) {
-          chimAt(i, side, placed.lat, F.depth, ww, placed.y + placed.h, roofH);
+          chimAt(i, side, placed.lat, F.depth, ww, placed.y + placed.h, placed.rh);
         }
-        faceAt(i, side, placed.lat, F.depth, ww, placed.y, placed.h);
+        faceAt(i, side, placed.lat, F.depth, ww, placed.y, placed.h,
+          ANCH[placed.variant]);
+        paveAt(i, side, placed.lat, F.depth, ww);
         // A LANTERN ON THE BRACKET, every third house. Anchored to the FRONT
         // FACE, not the block centre — the arm only reaches 0.72 u and a
         // 8 u-deep building would have swallowed the bulb whole.
@@ -16930,7 +18877,7 @@ export class Track {
           bulbs.setMatrixAt(lk++, m4);
         }
         if (++run >= want) {                       // side alley, then a new block
-          gap = 1 + ((Math.random() * 2) | 0);
+          gap = 1;                                 // ONE bay, and bracketed
           want = F.run[0] + ((Math.random() * (F.run[1] - F.run[0] + 1)) | 0);
           runH = 0.84 + Math.random() * 0.44;      // the next block, its own build
           runJ = (Math.random() - 0.5) * 1.6;
@@ -17005,15 +18952,27 @@ export class Track {
     for (let v = 0; v < SLOTS; v++) {
       if (kv[v]) this.group.add(bodySet[v], roofSet[v]);
     }
+    pots.count = pk;
+    pots.name = 'oldtown-chimneypots';
+    pots.castShadow = true;
     if (ck) this.group.add(chims);
+    if (pk) this.group.add(pots);
+    ridgeCaps.count = rgK;
+    if (ridgeCaps.instanceColor) ridgeCaps.instanceColor.needsUpdate = true;
+    if (rgK) this.group.add(ridgeCaps);
+    pavements.count = kerbs.count = pvK;
+    if (pvK) this.group.add(pavements, kerbs);
+    bollards.count = bollCaps.count = bkK;
+    if (bkK) this.group.add(bollards, bollCaps);
     balcSlabs.count = balcRails.count = balK;
-    awnings.count = awnK;
+    awnings.count = valances.count = awnK;
     if (awnings.instanceColor) awnings.instanceColor.needsUpdate = true;
+    if (valances.instanceColor) valances.instanceColor.needsUpdate = true;
     houseTrim.count = trimK;
     if (houseTrim.instanceColor) houseTrim.instanceColor.needsUpdate = true;
     if (trimK) this.group.add(houseTrim);
     if (balK) this.group.add(balcSlabs, balcRails);
-    if (awnK) this.group.add(awnings);
+    if (awnK) this.group.add(awnings, valances);
     if (lk) this.group.add(arms, bulbs);
 
     // ---- string lights over the street (night quarters only): warm bulb
@@ -17615,6 +19574,18 @@ export class Track {
     // constants, far clouds sinking and fading toward the fog for recession,
     // and sun-side clouds warmed by the sunGlow knob so the sky's light
     // agrees with the shadow rig.
+    // THE FACETED BANK, which is what every one of the reference renders has
+    // over it: not soft puffs but angular slabs of cloud with a lit face and a
+    // shaded one, stacked into a ceiling. It is real geometry in ONE instanced
+    // mesh — which is also the fix the note above has been asking for since
+    // the sprite field was written, because a sprite is a draw call and this
+    // is forty clouds in one.
+    //
+    // THE FACETS ARE NOT PAINTED. They are a flat-shaded solid standing in the
+    // scene's own directional light, so the sun that lights the street lights
+    // the cloud, and the light and dark faces fall where the sun actually is.
+    // That is the whole of the look; a texture could not have done it.
+    if (T.cloudKind === 'faceted') { this._buildCloudBank(T); return; }
     const ctex = cloudTexture();
     const nClouds = Math.ceil(T.cloudCount * 1.5);
     const fogC3 = new THREE.Color(T.fogColor ?? 0xcccccc);
@@ -17644,6 +19615,193 @@ export class Track {
     }
   }
 
+  /** A LOW-POLY CLOUD, AND IT IS A CLUSTER, NOT A SLAB.
+   *
+   *  The first cut gave each cloud one squashed icosahedron. From the ground
+   *  that is a hard-edged sheet hanging in the air — a paper cutout, or a
+   *  boulder — because a single convex hull has one silhouette and no internal
+   *  form at all. Reported, correctly, as looking bad.
+   *
+   *  A cloud reads as a cloud because of two things: a BUMPY TOP EDGE made of
+   *  many overlapping lobes, and a FLAT BASE. So this builds eight to ten
+   *  lumps in a row, biggest in the middle and falling away at the ends,
+   *  merges them into one geometry, and then clamps every vertex at the bottom
+   *  to a single plane — which is what gives a cumulus its cut-off underside
+   *  and, incidentally, one big dark face where the shading bake wants one.
+   *
+   *  THREE VARIANTS, because one silhouette repeated thirty times across a sky
+   *  is the same failure at a different scale. Each is built once and
+   *  instanced, so the whole sky is three draw calls.
+   *
+   *  The lump layout is drawn from a SEEDED generator rather than
+   *  `Math.random()`: these are geometries, not placements, and a cloud shape
+   *  that changes every time the world rebuilds cannot be looked at twice.
+   */
+  _cloudClusterGeo(variant) {
+    this._cloudGeos = this._cloudGeos || new Map();
+    const hit = this._cloudGeos.get(variant);
+    if (hit) return hit;
+    let seed = 20260821 + variant * 7919;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    // detail 0: twenty faces a lump, which is the facet size the reference
+    // draws. Detail 1 is smoother and stops reading as low-poly at all.
+    const src = new THREE.IcosahedronGeometry(1, 0);
+    const sp = src.attributes.position.array;
+    // FEWER, BIGGER LOBES. Ten small lumps packed into two radii overlap so
+    // heavily that what you see is the SEAMS between them — a crumpled-paper
+    // interior with no clean silhouette anywhere. Five or six big ones read as
+    // the distinct billows a cloud is actually made of.
+    const LUMPS = 5 + ((rnd() * 3) | 0);
+    const out = new Float32Array(sp.length * LUMPS);
+    const lumpOf = new Float32Array((sp.length / 3) * LUMPS);
+    let o = 0, li = 0;
+    for (let i = 0; i < LUMPS; i++) {
+      const t = LUMPS < 2 ? 0 : (i / (LUMPS - 1)) * 2 - 1;   // -1..1 along the cloud
+      // biggest in the middle, tapering to the ends: that profile is most of
+      // what makes a row of blobs read as one cloud rather than as a string
+      const taper = 1 - t * t * 0.62;
+      // A CLOUD HAS HEIGHT. The first cluster spread its lumps over three
+      // radii of width and gave them 0.7 of a radius of rise, which is a strip
+      // of foam, not a cumulus: from the ground it read as torn paper laid
+      // flat. Pull the row in and grow the lumps up.
+      const s = (0.52 + rnd() * 0.24) * taper;
+      const cx = t * 0.78 + (rnd() - 0.5) * 0.14;
+      const cy = 0.46 * taper + (rnd() - 0.5) * 0.16;
+      const cz = (rnd() - 0.5) * 0.66;
+      const sy = 0.95 + rnd() * 0.5;
+      const sz = 0.82 + rnd() * 0.4;
+      const shade = (rnd() - 0.5) * 0.1;              // this lump's own value
+      for (let k = 0; k < sp.length; k += 3) {
+        out[o++] = cx + sp[k] * s;
+        out[o++] = cy + sp[k + 1] * s * sy;
+        out[o++] = cz + sp[k + 2] * s * sz;
+        lumpOf[li++] = shade;
+      }
+    }
+    // THE FLAT BASE — but RUMPLED, not planar. Clamping every low vertex to
+    // y = 0 gives one enormous flat polygon underneath, and from a street you
+    // are looking straight at it: a pale sheet with a hard edge, which is the
+    // ice-floe read the slab version had and the whole reason for this rebuild.
+    // Cut them off at a height that wanders with x and z instead, so the base
+    // stays a base and still has form in it.
+    for (let k = 0; k < out.length; k += 3) {
+      const nz = Math.sin(out[k] * 5.31 + out[k + 2] * 7.77) * 0.5
+        + Math.sin(out[k] * 11.7 - out[k + 2] * 3.9) * 0.25;
+      const floor = nz * 0.09;
+      if (out[k + 1] < floor) out[k + 1] = floor;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(out, 3));
+    g.computeVertexNormals();
+    // BAKE THE SHADING INTO THE VERTICES, and light the bank with nothing.
+    //
+    // Standing these in the scene's lights was the obvious thing and it was
+    // wrong: a cloud is seen from BELOW, so the face the player looks at is
+    // lit by the hemisphere light's GROUND colour — and on SANREMO STAGE,
+    // whose ground bounce is olive, the whole sky came out sage green.
+    //
+    // The cue that actually matters is vertical: bright tops, shaded
+    // undersides, mid-tone flanks. Baked as a per-face grey it is
+    // rotation-invariant (so instances can yaw freely), identical in every
+    // world, free at runtime, and it leaves the per-cloud tint to the instance
+    // colour, which multiplies it.
+    const nor = g.attributes.normal;
+    const cols = new Float32Array(out.length);
+    for (let f = 0; f < out.length / 3; f += 3) {
+      const ny = nor.getY(f);
+      // AND THE BASE IS DARK. From a street you are looking at the UNDERSIDE
+      // of a cloud, so that is the value the sky is judged by: at 0.46 the
+      // whole bank was one flat white and the lumps had no relief at all.
+      const b = Math.max(0.3, Math.min(1,
+        0.34 + 0.66 * (ny * 0.5 + 0.5) ** 0.95 + lumpOf[f]));
+      for (let k = 0; k < 3; k++) {
+        cols[(f + k) * 3] = b; cols[(f + k) * 3 + 1] = b; cols[(f + k) * 3 + 2] = b;
+      }
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    src.dispose();
+    this._cloudGeos.set(variant, g);
+    return g;
+  }
+  _buildCloudBank(T) {
+    const n = Math.max(8, Math.round((T.cloudCount ?? 14) * 2.2));
+    // UNLIT, because the shading is already in the vertices (see
+    // `_cloudClusterGeo`). It is also the cheapest material there is, which
+    // for a bank covering a third of the frame is worth having.
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffffff, vertexColors: true, fog: false,
+    });
+    // THREE SILHOUETTES, one mesh each. One cloud shape repeated thirty times
+    // across a sky is as obvious as one house repeated down a street.
+    const VARIANTS = 3;
+    const meshes = [];
+    for (let v = 0; v < VARIANTS; v++) {
+      const im = new THREE.InstancedMesh(this._cloudClusterGeo(v), mat,
+        Math.ceil(n / VARIANTS) + 1);
+      im.name = v ? `cloud-bank-${v}` : 'cloud-bank';
+      // NEVER A SHADOW CASTER. Thirty 400 u clouds in the sun's shadow frustum
+      // would spend the whole shadow map on sky and leave none for the town.
+      im.castShadow = im.receiveShadow = false;
+      im.frustumCulled = false;
+      meshes.push(im);
+    }
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    const base = new THREE.Color(T.cloudTint !== undefined ? T.cloudTint : 0xf6f8fa);
+    const deep = new THREE.Color(T.cloudDeep ?? 0x8e9aa8);
+    const items = [];
+    const kv = new Array(VARIANTS).fill(0);
+    for (let i = 0; i < n; i++) {
+      const v = i % VARIANTS;
+      const mesh = meshes[v];
+      if (kv[v] >= mesh.count) continue;
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.7;
+      // NOT DIRECTLY OVERHEAD. Under 600 u a 400 u cloud at 250 u up hangs
+      // over the street like a lid — one read as a flying saucer parked above
+      // the town. The bank belongs on the horizon half of the dome.
+      const r = 780 + Math.random() * 900;
+      const far2 = (r - 780) / 900;
+      // the far ones are bigger AND lower, so the ring closes down toward the
+      // horizon the way an overcast does rather than ending in a rim of blue
+      // a squared bias, so the field is mostly middling clouds with two or
+      // three heroes in it rather than twenty of one size
+      const sc = 170 + Math.random() * Math.random() * 440 + far2 * 150;
+      // spread through the height of the sky, not banded at one altitude
+      const y = 300 + Math.random() * 300 - far2 * 120;
+      // VALUE CONTRAST IS THE DEPTH. But the dark end is a SHADED cloud, not a
+      // thundercloud: past about three quarters of the way to `deep` a cloud
+      // stops reading as lit from one side and starts reading as a hole.
+      col.copy(base).lerp(deep, Math.min(0.7, Math.random() * Math.random() * 1.3));
+      mesh.setColorAt(kv[v], col);
+      items.push({ v, k: kv[v]++, a, r, y, sc,
+        yaw: Math.random() * Math.PI * 2,
+        // a cloud is wider than it is deep and much wider than it is tall
+        hgt: 0.5 + Math.random() * 0.3,
+        asp: 0.52 + Math.random() * 0.4,
+        speed: (0.8 + Math.random() * 1.6) * (1 - 0.45 * far2) });
+    }
+    const place = () => {
+      for (const it of items) {
+        q.setFromAxisAngle(up, it.yaw);
+        m4.compose(new THREE.Vector3(Math.cos(it.a) * it.r, it.y, Math.sin(it.a) * it.r),
+          q, new THREE.Vector3(it.sc, it.sc * it.hgt, it.sc * it.asp));
+        meshes[it.v].setMatrixAt(it.k, m4);
+      }
+      for (const im of meshes) im.instanceMatrix.needsUpdate = true;
+    };
+    place();
+    for (let v = 0; v < VARIANTS; v++) {
+      meshes[v].count = kv[v];
+      if (meshes[v].instanceColor) meshes[v].instanceColor.needsUpdate = true;
+      if (kv[v]) this.group.add(meshes[v]);
+    }
+    // the bank drifts by creeping each cloud around its own circle, which is
+    // one add a cloud instead of a re-scatter
+    this.animated.cloudBank = { meshes, items, place, drift: 0 };
+  }
   /** Atmospheric-perspective gradient map for a horizon ring: the silhouette
    *  color fades toward the fog color at the base (and desaturates for far
    *  rings) so stacked ridgelines read with real depth. */
@@ -17794,7 +19952,12 @@ export class Track {
         }
         const form = set[(gi + (Math.random() * 1.4 | 0)) % set.length];
         const mesh = per[form];
-        const band = 0.55 + Math.random() * 0.75;          // this range's height
+        // this range's height. It was 0.55-1.30 - one range 2.4 times the
+        // height of the next - and stacked on the within-range span below
+        // that put a factor of 2.3 to 3.8 between the tallest and shortest
+        // form in a single ring. Neighbours that different cannot join into
+        // a crest; the tall one just stands against sky on its own.
+        const band = 0.75 + Math.random() * 0.45;
         const n = 3 + (Math.random() * 4 | 0);
         for (let k = 0; k < n && mesh.count < mesh.instanceMatrix.count; k++) {
           const a = aC + (k - n / 2) * (0.16 + Math.random() * 0.10);
@@ -17803,10 +19966,17 @@ export class Track {
           const w = wMin + Math.random() * wSpan;
           const px = Math.cos(a) * r, pz = Math.sin(a) * r;
           if (inSea(px, pz, w)) continue;
+          if (this._nearGoat(px, pz, w * 0.6)) continue;  // the climbable peak keeps its sky
           // a ridge lies ALONG the range, so it is turned to face the middle
           const yaw = form === 'ridge' ? a + Math.PI / 2 + (Math.random() - 0.5) * 0.3
             : Math.random() * Math.PI;
-          const zs = 0.5 + Math.random() * 0.7;
+          // DEPTH IS ALSO A WIDTH. Every form but the ridge is turned on Y at
+          // random, so whichever of its two horizontal axes happens to face
+          // the camera IS its silhouette width - and at 0.5 this quietly
+          // handed back half of whatever `w` had just been widened to. The
+          // floor is 0.82: still a footprint that is not a circle, never a
+          // blade.
+          const zs = 0.82 + Math.random() * 0.46;
           m4.makeRotationY(yaw);
           m4.scale(new THREE.Vector3(w, h, w * zs));
           m4.setPosition(px, h / 2 + seat(px, pz), pz);
@@ -17845,8 +20015,33 @@ export class Track {
     // 500 u and more. Widened, and the height spans pulled in a little; the
     // forms in a group now overlap into a continuous crest instead of
     // standing apart like a picket fence.
-    place(near, 9, 900, 140, 60, 80, 200, 190, 0.82);
-    place(far, 8, 1120, 160, 140, 130, 260, 220, 0.76);
+    //
+    // ...AND THAT WIDENING STOPPED SHORT OF THE RULE IT QUOTES. Measured again
+    // with tools-scratch/skyteeth.mjs - hide everything but these two rings,
+    // render a 360 deg panorama from the driver's eye, and take the top-most
+    // lit pixel in each column as the skyline - on FURKA RIDGE, CAPE OLIVETO
+    // and GLACIER COL:
+    //   - the FAR ring still stood at h/width 0.61 median and 0.90 at p90:
+    //     186 u of height on a 310 u footprint, against the "250 high spreads
+    //     500" this comment already states. Only the NEAR ring (0.31-0.39)
+    //     ever got the widening it describes.
+    //   - only 0.43 of a far mountain's own height cleared the near ring, and
+    //     a tenth of the compass had it buried outright. The top third of ANY
+    //     mountain is a triangle, so a ring you are shown the top third of is
+    //     a row of triangles however broad its base is.
+    //   - the silhouette itself came out at 0.53 aspect median and 1.18 at p90
+    //     - prominence over width at half prominence, both in degrees - with
+    //     27 separate peaks round the compass. That is a serration, not a
+    //     range, and it is what the photograph shows.
+    // So the far ring is the one that moves: 360-660 u wide carrying 135-195 u
+    // of height, which is 0.33 aspect and inside the rule at last, and the
+    // near ring drops to 48-84 u so it reads as foothills and lets two thirds
+    // of the far ring stand clear instead of half. The near ring also goes out
+    // to 930 u, because widening it to 240-450 u would otherwise push its
+    // inner flank in to 675 u - inside the 705 u the old numbers left clear of
+    // the drivable massif.
+    place(near, 9, 930, 140, 48, 36, 240, 210, 0.82);
+    place(far, 8, 1120, 160, 135, 60, 360, 300, 0.76);
     let mi = 0;
     for (const mesh of meshes) {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -17906,6 +20101,7 @@ export class Track {
    *  instead of pointy cone hills — the serpent-back dune skyline. */
   _buildDuneHorizon(m4) {
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    const duneProf = this._formProfile(new THREE.ConeGeometry(1, 1, 10));
     const rings = [
       { count: 28, r0: 720, rv: 130, w0: 240, wv: 190, h0: 34, hv: 32,
         map: this._horizonGrad(this.T.hillColor, 0.5, 0.1) },
@@ -17925,12 +20121,24 @@ export class Track {
         const h = R.h0 + Math.random() * R.hv;
         q.setFromAxisAngle(up, Math.random() * Math.PI);
         const dx = Math.cos(a) * r, dz = Math.sin(a) * r;
+        if (this._nearGoat(dx, dz, w * 0.5)) {           // not on the climbable peak
+          m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
+          mesh.setMatrixAt(i, m4);
+          continue;
+        }
         m4.compose(
           new THREE.Vector3(dx, h / 2 - 6 + this._highland(dx, dz), dz),
           q,
           new THREE.Vector3(w, h, w * (0.4 + Math.random() * 0.3))  // long wind-carved ridges
         );
         mesh.setMatrixAt(i, m4);
+        // THE DUNES ARE SOLID TOO (law of solidity, ghosthunt r-round): these
+        // ridges stand 34-114 u tall from r 720, well inside the rim, and a
+        // car drove straight through them. Long axis at the cone rule's 0.48.
+        this.solids.push({
+          x: dx, z: dz, r: w * 0.48,
+          y: this._highland(dx, dz) - 6 + 2, h, mat: 'stone', prof: duneProf,
+        });
       }
       this.group.add(mesh);
     }
@@ -17962,12 +20170,24 @@ export class Track {
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     let k = 0;
     const put = (x, z, w, h) => {
+      if (this._nearGoat(x, z, w)) {                    // not on the climbable peak
+        m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
+        towers.setMatrixAt(k++, m4);
+        return;
+      }
       q.setFromAxisAngle(up, Math.random() * Math.PI);
       m4.compose(
         new THREE.Vector3(x, -4 + this._highland(x, z), z), q,
         new THREE.Vector3(w, h, w * (0.6 + Math.random() * 0.8))
       );
       towers.setMatrixAt(k++, m4);
+      // A SKYSCRAPER IS SOLID (law of solidity, ghosthunt r-round): these
+      // stand to 320 u tall from r 260, and a car drove through them like
+      // holograms. The footprint is a yawed w × w·(0.6-1.4) box; the circle
+      // takes the long half-axis, concrete rules.
+      // prof [1]: a box does not taper — its drawn cross-section is its base
+      // the whole way up, and saying so keeps the one-rule law auditable
+      this.solids.push({ x, z, r: w * 0.7, y: -4 + this._highland(x, z) + 1, h, mat: 'stone', prof: [1] });
     };
     for (let i = 0; i < 42; i++) {
       const a = (i / 42) * Math.PI * 2 + Math.random() * 0.12;
@@ -18165,6 +20385,12 @@ export class Track {
    *  sample's normal is fine at that sample and inside the road two samples
    *  later, where the centreline has swung under it. */
   _clearsRoad(x, z, r, margin = 1.2) {
+    // THE TWO PLACES NOTHING SCATTERS INTO: the carriageway, and a square.
+    // The squares are built before the forest, the ground cover, the huts and
+    // the trackside kit, and every one of those asks this question — so this
+    // is the one place the answer has to be given. Without it a piazza grows
+    // a tree through its own fountain and a scrub bush across its paving.
+    if (this._piazzas?.length && this._inPiazza(x, z, r)) return false;
     _clearV.set(x, 0, z);
     const i = this.nearestIndex(_clearV);          // no hint: search the whole lap
     const half = this.widthAt ? this.widthAt(i) : ROAD_HALF;
@@ -18642,12 +20868,21 @@ export class Track {
           };
           const x2 = gx + (hh(0.7) - 0.5) * 150, z2 = gz + (hh(1.9) - 0.5) * 150;
           if (this._inWater(x2, z2)) continue;
+          if (this._nearGoat(x2, z2, 12)) continue;   // no groves on the goat route
           const gy2 = this._seatY(x2, z2);
           const sw2 = 4.5 + hh(2.9) * 4.5, sh2 = 5.5 + hh(4.1) * 5.5;
           bq.setFromAxisAngle(bup, hh(5.3) * Math.PI * 2);
           m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
             new THREE.Vector3(sw2, sh2, sw2 * 0.9));
           band.setMatrixAt(bk3, m4);
+          // A WOOD IS A MASS, NOT A DECAL. These clumps stand 9-19 u tall in
+          // the 640-900 u ring — reachable ground, and a car drove through
+          // them like fog (ghosthunt.mjs). Wood, not stone: ramming a grove
+          // sheds splinters and costs like hitting a hut, because that is
+          // what hitting trees is. Radius covers the main crown; the skirt
+          // crowns stay forgiving.
+          this.solids.push({ x: x2, z: z2, r: sw2 * 0.95,
+            y: gy2 - 0.4, h: sh2 * 1.8, mat: 'hut' });
           bandCol.copy(baseC2).multiplyScalar(0.72 + hh(6.7) * 0.36)
             .lerp(fogC2, 0.12 + hh(8.3) * 0.10);
           band.setColorAt(bk3++, bandCol);
@@ -21259,12 +23494,29 @@ export class Track {
       // Fade the last stretch of each tail to nothing. The reach now runs well
       // past the fog, but a hard-edged rectangle of water is the exact thing
       // that reads as "the river stops here" if one ever does come into view.
-      (f) => Math.min(smoothstep01(f.t / 0.06), smoothstep01((1 - f.t) / 0.06)),
+      //
+      // ...AND THE EDGES GO SOFT TOO. Photographed at OULTON PARK's ford: the
+      // water met the land as a razor line, a sheet of plastic laid on the
+      // field. The helper already hands the column index over, and columns 0
+      // and 3 ARE the banks — thinning to 0.35 there lets the bed and bank
+      // show through the margin, which is what a real water's edge is.
+      (f, c, C) => Math.min(smoothstep01(f.t / 0.06), smoothstep01((1 - f.t) / 0.06))
+        * (c === 0 || c === C - 1 ? 0.35 : 1),
       wf,
     );
+    // WATER WEARS THE WORLD'S SKY. The texture is one saturated mid-blue for
+    // every world, and at OULTON PARK's ford it read as poured plastic — the
+    // only pure blue in a frame of copper and haze, exactly the fault the
+    // hedge had with the foliage palette. A river is mostly reflected sky, so
+    // the material tint comes from the theme's own horizon (skyHorizon, the
+    // colour the water would actually mirror at these grazing angles), pulled
+    // 45% toward white so the texture's own shading still reads. Blue worlds
+    // stay blue — their horizons are blue.
+    // less white-lerp now that the map is neutral — the tint IS the colour
+    const skyTint = new THREE.Color(this.T.skyHorizon ?? '#bcd6e8').lerp(new THREE.Color(1, 1, 1), 0.2);
     const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({
-      map: waterTex, roughness: 0.18, metalness: 0.06, side: THREE.DoubleSide,
-      transparent: true, opacity: 0.9, vertexColors: true, depthWrite: false,
+      map: waterTex, color: skyTint, roughness: 0.18, metalness: 0.06, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.82, vertexColors: true, depthWrite: false,
     }));
     water.name = 'river-water';
     water.renderOrder = 1;
@@ -21851,6 +24103,14 @@ export class Track {
     for (const c of this.animated.clouds) {
       c.sprite.position.x += c.speed * dt;
       if (c.sprite.position.x > 1100) c.sprite.position.x = -1100;
+    }
+    // the faceted bank drifts as a ring rather than as forty objects: each
+    // cloud creeps around its own circle, which from the ground is the same
+    // slow slide across the sky and costs one add per cloud
+    const CB = this.animated.cloudBank;
+    if (CB) {
+      for (const it of CB.items) it.a += (it.speed * dt) / Math.max(1, it.r);
+      CB.place();
     }
     // ONE ARC, THEN GONE. `u` runs 0..1 through the breach and the whale spends
     // the rest of the period submerged, which is what keeps a pod from reading

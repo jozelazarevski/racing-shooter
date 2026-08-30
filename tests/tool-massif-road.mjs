@@ -62,7 +62,7 @@ const rows = await page.evaluate(async () => {
         const d = Math.hypot(c.x - s.x, c.z - s.z);
         const rr = s.r + 1.8 + (t.widthAt?.(i) ?? 7) * 0.8;
         if (d >= rr) continue;
-        if (c.y < s.y - 3 || c.y > s.y + s.h) continue;
+        if (s.h > 20 || (s.r ?? 0) > 10 ? c.y > s.y + s.h : (c.y < s.y - 3 || c.y > s.y + s.h)) continue; // tall-or-wide underside rule, mirrors the vehicles.js solids gate
         stations++;
         if (d < minD) { minD = d; atY = c.y; }
       }

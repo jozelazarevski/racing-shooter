@@ -1778,3 +1778,2597 @@ and rust, and there is no jettying (the upper storeys overhang in the
 reference; ours are flush).
 
 boot.mjs 4/4, test-boot 7/0, test-buildings green.
+
+## r244 — THE REFERENCE IS LIGURIAN, AND HAS BEEN ALL ALONG
+Six sheets: two Monte Carlo renders, a WINE REGION and a SCOTTISH HIGHLANDS
+builder, and THE LIGURIAN VILLAGE BUILDER — sent twice, which is the one that
+says what the houses are. Ochre and yellow stucco, a pale architrave round
+every opening, dark green louvred shutters, wrought iron across the upper
+windows, terracotta pantile.
+
+r242 built a Fachwerk street. That reference was northern and it is not in
+this brief; almost everything this round is undoing it.
+
+### THE FOUR THINGS THAT WERE NORTHERN
+  1. HALF-TIMBERING. Gone from the coast. `applyHalfTimber` stays in
+     src/textures.js — the wine-region sheet IS timbered and will want it.
+  2. THE GABLE END TO THE STREET. Every roof in every Ligurian reference runs
+     its RIDGE ALONG THE STREET and shows the road its eaves. `ridge: 'along'`
+     on a frontage turns the prism a quarter turn and swaps its scale with it;
+     the terrace is then capped by one continuous line of tile instead of a
+     sawtooth. It is a rotation, not a model, and it is the largest single
+     change in the silhouette.
+  3. THE JETTY. The medieval overhang was r243's read of the Fachwerk street.
+     A Ligurian facade is flush from pavement to cornice, so the course is
+     `F.jetty` now and the riviera does not ask for it.
+  4. THE TRAM. Two tan stripes down the middle of the road, from r241's
+     Hanseatic image. There is no tramway anywhere in these references.
+
+### THE THREE THINGS THAT ARE LIGURIAN, all painted into townhouseTexture
+`surround`, `jalousie` and `iron` — each off by default, so a world that does
+not ask keeps the facade it had.
+
+  - JALOUSIE, and it is drawn INSIDE ITS OWN REVEAL. r243 had to shrink the
+    old folded leaves to a fifth of the pier because three bays leave 18 px
+    between windows and a pair either side ate all of it. A shutter folded
+    back into its reveal takes no pier at all and is the same green block in
+    the same place from a car. A third are shut; the rest leave the middle
+    glazed.
+  - SURROUND, and it is a LINE, NOT A PANEL. The first cut filled the
+    architrave and it made 40 px of white per column out of a 192 px face:
+    three columns merged into pilasters and the stucco, which is the whole
+    colour of the building, was left as a margin. Same failure as the r243
+    shutters, in the same 18 px, and the same fix.
+  - IRON at the SILL, not across the middle of the opening, where it read as a
+    bar through the window and took the glass with it.
+
+### TINTS ARE SAMPLED UNIFORMLY, SO THE PALETTE IS A WEIGHTING
+Eight swatches with three dark ones builds a street that is three-eighths
+dark. The reference terrace is overwhelmingly yellow, ochre and cream with the
+deep red as punctuation — one corner building in a block — so the pale entries
+repeat in the list and each red appears once.
+
+### MEASURE THE LIGHT, DO NOT LOOK AT IT
+`tools-scratch/roadlum.mjs` prints the mean colour of the carriageway and of
+both walls from the driver's shot, and it overturned two things three passes
+of squinting had "established":
+  - the paving was never blown out. 0% above 240 at any setting tried, mean
+    158. It looks white in a 900 px screenshot next to a shaded wall at 67.
+  - the sun barely reaches a wall in a lane this narrow: 2.4 -> 3.0 moves the
+    shaded wall by nothing and the sunlit one by two units, and everything
+    else it touches is the road. So the key came DOWN and the ambient, which
+    is what actually lights these facades, carries the street.
+`tools-scratch/roadtex.mjs` is the companion: it prints the cobble palette the
+RUNNING theme is using and dumps the road mesh's own map. Between them, three
+rounds of "the road is too bright" became one measurement.
+
+### A CHIMNEY WAS FLOATING OVER MOST OF THE GAME'S COTTAGES
+Not from this round. `chimAt` was handed `placed.y + hh` — the height the
+terrace ASKED for — while `put` builds the body at `hh * [1, .62, 1.24, .94]`
+for its variant. On the cottage, which is weighted heaviest and is therefore
+most of every street, that is 38% of the wall height of clear sky between the
+roof and its stack: the dark boxes hanging over the seafront in every shot
+since r238. It takes `placed.h` and `placed.rh` now, and the stack is rendered
+masonry rather than a near-black bar.
+
+Gates: boot 4/4, test-boot 7/0, test-buildings green, test-carriageway green,
+test-floating 6/0, test-cars green.
+
+STILL SHORT: the sky. Both Monte Carlo renders sit under a faceted grey
+overcast and every riviera world is under a deep blue one. That is a mood
+change for six worlds rather than a facade fix, so it was left alone
+deliberately — say the word and it is a `skyTop`/`skyHorizon` pass. The
+sheet's palms, cypresses and standing street lamps are the other half of its
+street-level panel and are flora/props work, not frontage.
+
+## r245 — A BALCONY BELONGS TO A WINDOW
+"The balcony is all over the place." It was, and it was made of three numbers
+that knew nothing about the facade painted under them: a slab at
+`baseY + hh * 0.52`, `wAlong * 0.42` wide, jittered a random third of the
+frontage sideways.
+
+### FOUR FAULTS IN ONE PLACEMENT
+  1. `hh` IS THE HEIGHT THE TERRACE ASKED FOR. `put` builds the body at
+     `hh * [1, 0.62, 1.24, 0.94]` for its variant, so 0.52 of `hh` is 84% of
+     the way up a cottage — a balcony under the gutter — and 42% of the way up
+     a merchant house. Same call, same street, a different storey on every
+     house. This is the CHIMNEY BUG AGAIN (r244): anything hung on a house has
+     to measure from what was BUILT, never from what was requested.
+  2. It was never on a storey line, so on a five-storey face it cut across the
+     middle of a row of windows.
+  3. It was never on a BAY, so it hung on blank wall as often as not.
+  4. At 0.42 of the frontage it was wider than the two windows it sat between.
+
+### THE FIX IS TO ASK THE PAINTER
+`townhouseAnchors(variant, set)` returns the sills, heads, bay centres and the
+shopfront head of a facade in FRACTIONS OF THE BLOCK — v from the kerb up, u
+from the middle of the frontage. The frontage builds one per variant and hands
+it to `faceAt`, which then puts the slab on a real sill, centres it on a real
+bay, and sizes it to one and a half bay widths.
+
+The awnings had the same disease and the same cure: a flat `baseY + 2.95`
+became the head of the shopfront that is actually painted there, and they only
+go on the variants that HAVE a shopfront — an awning over a front door is not
+a thing this street has.
+
+### MEASURED, WITH A BASELINE
+`tools-scratch/balconies.mjs` counts how many balconies and awnings sit within
+2 cm of one of the painted storey lines. Run against r244 and then against
+this build:
+
+    balconies on a painted storey   196/319  ->  311/319
+    awnings on the shopfront head    49/158  ->   89/90
+    distinct awning heights              25  ->        6
+
+The eight balconies and one awning still outside are the probe's own slack: it
+matches each to the NEAREST body, and a cottage beside a merchant house can
+claim its neighbour's. The number is a floor on the true figure, not a defect
+count.
+
+Gates: boot 4/4, test-boot 7/0, test-buildings green, test-carriageway green.
+
+## r246 — THE SQUARES, AND THE FOUNTAINS IN THEM
+Asked for straight off the sheet, which gives FOUNTAIN MODULES, STREET LAMP
+OPTIONS and PLANT & TREE TEMPLATES a panel each, and off the Monte Carlo
+render, whose entire foreground is a paved terrace with a fountain, lamps and
+planters on it.
+
+### A SQUARE IS A HOLE IN THE STREET WALL
+That is the part that is not decoration, and it is why `_buildPiazzas` runs
+BEFORE `_buildOldTown`: the frontage asks `_inPiazza` before placing every
+block and refuses any house that would stand in the square. Without it the
+fountain ends up in somebody's front room.
+
+The same question belongs in `_clearsRoad`, which is the choke point every
+scatter in the game already goes through — forest, ground cover, huts,
+trackside kit and props are all built after the squares and all ask it. One
+line there is the difference between a piazza and a piazza with a tree growing
+out of its fountain. (`_clearsRoad` exists TWICE, on Track and in flora.js,
+and flora's copy shadows the class's — both were changed.)
+
+### SEAT ON THE HIGH CORNER
+Seated at the LOW corner's height, the ground rises through the paving
+everywhere else: the first cut was a slab buried in a beach with a fountain
+apparently standing on sand. It seats on the HIGH corner and the plate is made
+thick enough to reach the ground at the low one, which is also how it gets the
+raised-terrace-with-a-kerb look the reference has. Sites with more than 1.7 u
+of fall across them are refused outright — no seating fixes a flat plate on a
+hillside.
+
+### BUILT BIG, OR IT IS A BIRDBATH
+A 2.4 u basin is correct against a person and invisible against a street of
+14-17 u houses. 6 u across the basin and 4.7 u to the top of the jet is a
+fountain you could sit six people round, which is what the reference draws.
+The water sits a centimetre PROUD of the rim: dropped inside, the basin's own
+solid top face hides it and the fountain is a stone drum.
+
+### ONE DRAW CALL PER PART, NOT PER SQUARE
+Every square in a world is the same size and carries the same kit, so the
+basin is one InstancedMesh with an instance per square rather than a mesh in
+each of three groups. As loose meshes it came to ~42 draw calls a square;
+instanced it is 20 for the whole world however many squares are in it
+(measured: `tools-scratch/pzcount.mjs`, 20 calls / 92 pieces / 2 squares). The
+street frontage — hundreds of houses — costs eight, and this had to be in the
+same order of magnitude.
+
+### AND NO HAND-WRITTEN ROTATIONS
+Local-to-world goes through three.js: `applyAxisAngle` for the site test, a
+composed matrix for the parts, and the INVERSE of that same matrix for
+`_inPiazza`. A rotation written out by hand at the placement end and again at
+the test end is two chances to get a sign wrong and no way to notice, which is
+how furniture ends up mirrored across a square.
+
+Tunes: `piazza: { count, depth, width }` on riviera (2 squares), genova (2)
+and IL BUDELLO (1, and smaller — a lane whose houses stand 6 u off the
+centreline cannot take the seafront's 17 u square, it would be refused at
+every station on the lap).
+
+Probes: `tools-scratch/piazza.mjs` (where they landed, how far the inner edge
+clears the road, and how many houses stand inside one — must be 0),
+`piazzashot.mjs` (the driver's view OF a square, which is not the view down
+the street that lapshot gives), `pzcount.mjs` (draw calls).
+
+Gates: boot 4/4, test-carriageway green, test-buildings green. The road
+census was run over the four square worlds BEFORE and AFTER, and comes back
+identical — same 5 bodies, same 1 floater, same worst bites, all of them
+pre-existing (four 10.8 u poles on SANREMO, a dodecahedron rock on ALASSIO).
+The only thing that moved is the solid count, which is the squares' own
+furniture registering. Running it on one build and calling it clean would not
+have told anybody anything: three of those four worlds were already dirty.
+
+## r247 — THE CHURCH AND THE MONUMENT
+More squares (riviera 3, genova 3, sanremo 2), and two things to put in them.
+
+### A SQUARE THAT REPEATS IS ONE SQUARE SEEN THREE TIMES
+So the centrepiece alternates: a fountain on the even ones, a MONUMENT on the
+odd — a bronze on a column on a stepped plinth, 16 u to the top of its raised
+arm. Taller than the fountain on purpose: a fountain is furniture you look
+down into and a monument is a thing you look up at, and standing a storey
+above the four-storey terrace is what makes the second square read as a
+different place rather than as the first one again. The figure is three boxes
+and a sphere — at the distance a driver reads it the silhouette is the whole
+content, and anything more is polygons nobody will see.
+
+### THE CHURCH IS THE ONE LANDMARK, SO IT IS BUILT ONCE
+On the first square that can take one. A town has one parish church, not one
+per square, and it is what the rest of the lap is oriented by.
+
+A LIGURIAN PARISH CHURCH IS A FLAT GABLED FACADE AND A SEPARATE TOWER — not a
+spire on a nave. The campanile stands apart, square in plan, with an open
+belfry stage and a low pyramid cap; getting that pairing right is most of what
+makes it read as this region.
+
+Four things were wrong on the first try, all of the same kind — building the
+right shape and then not looking at it from where the player stands:
+
+  1. STONE. It used `stoneTexture`, which is the campanile's dark rubble, and
+     19 u of it put a black cliff across the head of the square. A Ligurian
+     church is PAINTED — flat render a shade lighter than the terrace, which
+     is righter and cheaper both.
+  2. THE BELFRY was a solid dark box, which at any distance is a black cube on
+     a white tower. It is light stone now with a dark opening driven through
+     both axes: an arch on all four faces for two instances, and those
+     openings are the whole silhouette of a campanile.
+  3. THE DOOR AND THE ROSE WINDOW WERE INSIDE THE WALL. `outward` points AWAY
+     from the square, and both were placed at `+outward` — so they showed a
+     couple of centimetres on the BACK of the facade and the square looked at
+     a blank white wall. Caught by standing in the square and looking at it
+     (`piazzashot.mjs FACE=1`), which is the only shot that could have.
+  4. THE GROUND BEYOND A SQUARE IS NOT THE SQUARE'S GROUND. The flatness test
+     covers the paving; the church hangs 19 u past its far edge, which on the
+     seafront is often the top of a bank. It gets a plinth that reaches 5 u
+     down — fixed height, because every part of this kit is one memoised
+     geometry drawn at unit scale and a box buried in a hillside costs nothing
+     — and the fit test refuses a site with more than 4 u of fall.
+
+### A COLLIDER SEATS ON THE GROUND UNDER IT, NOT ON THE PLATE
+The square is seated on its HIGH corner, so a solid registered at plate height
+over ground that falls away is air — and the road census calls anything over
+2.5 u a FLOATER. The church's own solids tripped exactly that: GENOVA PORTO
+went from clean to two floaters at 3.9 u, and `tools-scratch/floaters.mjs`
+named them by radius (5.46 = CHURCH_WID * 0.52) in one run. Every piazza solid
+takes `min(plate, ground) + 0.6` now, and the census is back to baseline: 73
+clean, 77 clean, and the one floater on 74 and four bodies on 78 are the same
+pre-existing ones from before r246.
+
+Also: the nave gets THREE solids along its length rather than one round it. A
+single circle big enough to cover a 19 u building reaches back over the
+square's own paving and puts an invisible wall across it.
+
+Cost: 50 draw calls for the whole civic kit — squares, fountains, monuments,
+church and campanile — against 1056 in the scene, and it does not grow with
+the number of squares. If it ever needs to come down, the church's ~20 are
+mergeable by material into about five.
+
+Gates: boot 4/4, test-boot 7/0, test-buildings green, test-carriageway green,
+road census over 73/74/77/78 back to the pre-r246 baseline.
+
+## r248 — HIGH DETAIL, AND WHAT IT COST
+"Add high details. Overall." A detail pass over the whole town: the facade
+painter, the roofline, and the ground between the kerb and the front door.
+
+### THE FACADE IS AUTHORED IN A 192x256 GRID, SO DO NOT MOVE THE GRID
+Every bay table, string course and sill offset in textures.js is a number in
+that space. Rescaling the canvas means rescaling all of them, and one missed
+constant is a shutter through a window. So the canvas grows and the CONTEXT is
+scaled to match — `g.scale(TH_SS, TH_SS)` and a local `w`/`h` of the authored
+size — and every existing coordinate stays valid. On a 17 u wall the old
+texels were 9 cm, coarser than the joinery drawn on them; at 1.75x the
+louvres, architraves and ironwork survive the mip chain to the end of a
+street.
+
+1.75 and not 2: this is eight facade maps a world, and the gain stops once a
+texel is finer than the beam it draws.
+
+THE GLOW MAP DOES NOT GET IT. The two meet in UV space, not in texels — a
+thing the first cut's own comment got wrong — and the glow draws soft light
+behind glass, which has no edge worth the pixels. Eight of those at 1.75x was
+2.7 MB spent blurring a blur.
+
+### WHAT THE RESOLUTION BOUGHT
+  - THE CORNICE IS A MOULDING, not a flat 9 px band: corona, dentil course,
+    bed mould, and the shadow each throws. It is the line the whole terrace is
+    read against from the far end of a street.
+  - QUOINS up both edges of every front. On a terrace the texture's edges ARE
+    the party walls, so this also gives the eye the line between one house and
+    the next — which a run of twelve identical boxes had nothing to mark.
+  - A KEYSTONE on every opening, which is the piece of an architrave the eye
+    picks out at distance.
+  - A DOWNPIPE with collars. Nothing says "built" like the one vertical on a
+    facade that is not architecture.
+
+### AND THE STREET GOT A FOOTWAY
+Between the kerb and the front door was open ground: the terrace stood on the
+same dirt the countryside is scattered on, and no amount of facade detail
+fixes a street with no pavement in it. A slab per house from the building line
+out to the road edge, a kerb course at the end of it, and a bollard every
+third house — all instanced, and all held 0.7 u clear of the driveable edge so
+none of it can ever be something you hit. The census agrees: its "road
+surfaces" suppression count went 306 -> 446 and nothing new appeared in a
+carriageway.
+
+Also: a RIDGE CAP on every roof (the gable prism met itself in a bare arris,
+and since r244 that arris is the longest single line in the frame), a POT on
+every chimney, and a VALANCE on every awning — the flap off the front edge,
+which is the only part of an awning seen straight on from a car.
+
+ONE JITTER, SHARED. The valance takes the awning's own random offset rather
+than drawing its own: two calls to `Math.random()` there and the flap belongs
+to a different shopfront from the sheet it hangs off.
+
+### THE PRICE, MEASURED
+`tools-scratch/towncost.mjs`, IL BUDELLO, before and after:
+
+    draw calls   1110  ->  1117      (+7: ridges, pots, paving, kerbs,
+                                      bollards x2, valances)
+    instances   10707  -> 13318
+    textures    17.4 MB -> 19.3 MB   (the supersample, less the glow maps)
+
+Seven draw calls and 1.9 MB for the whole pass. Every new thing is one
+instanced mesh for the world, which is the only reason the number is seven.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green, road census
+over 73/74/77/78 unchanged from baseline.
+
+## r249 — THE SKY, AND THE PEOPLE UNDER IT
+The two things left between these worlds and the reference renders, and they
+turn out to be the two biggest areas of every one of those frames.
+
+### THE FACETED CLOUD BANK
+Every reference image is roofed by angular slabs of cloud with a lit face and a
+shaded one. Ours was a field of soft round sprites, which is a different
+picture entirely.
+
+THE FACETS ARE NOT PAINTED. `_buildCloudBank` puts real geometry — a squashed,
+knocked-out-of-true icosahedron — in the scene's own directional light with
+`flatShading`, so the sun that lights the street lights the cloud and the light
+and dark faces fall where the sun actually is. No texture could have done that,
+and a billboard certainly could not.
+
+The vertex jitter is a HASH OF THE VERTEX POSITION, not `Math.random()`: the
+two ends of a shared edge have to agree or the hull opens up.
+
+IT IS ALSO CHEAPER THAN WHAT IT REPLACED. `_buildSky`'s own note has asked
+since it was written for "one InstancedMesh billboard layer, which makes the
+whole sky ONE draw" — this is that, minus the billboard. Measured on IL
+BUDELLO: 14 cloud sprites (14 draw calls) became one mesh holding 37 clouds,
+and the world's total went 1117 -> 1109 draw calls even after adding three
+more meshes of people.
+
+Three tunings, each from looking at the result:
+  - NOT DIRECTLY OVERHEAD. Under 600 u a 400 u slab at 250 u up hangs over the
+    street like a lid; one read as a flying saucer parked above the town. The
+    bank belongs on the horizon half of the dome.
+  - THE DARK END IS A SHADED CLOUD, NOT A THUNDERCLOUD. Past about three
+    quarters of the way to `cloudDeep` a slab stops reading as lit from one
+    side and starts reading as a hole in the sky.
+  - AND THE STREET STAYS SUNLIT. The references are dramatic overhead and
+    bright at ground level; the first pass at full overcast made a racing game
+    look like weather. Seventeen clouds, not twenty-six.
+
+`cloudKind: 'faceted'` is the only line that switches it. Drop it and the
+sprite field comes straight back.
+
+### TOWNSFOLK
+A town with nobody in it reads as a film set however good the joinery is. The
+sheet gives people a panel under STREET-LEVEL PROPS and both Monte Carlo
+renders put a dozen on the pavement.
+
+Three boxes and a sphere, instanced, per-instance colour, and no more: at the
+distance a driver passes them the content is a silhouette and a colour.
+Cosmetic and NOT registered — no solid, no prop, no score. They stand on the
+footway r248 built, off the racing line, and nothing in this game is going to
+be rewarded for driving at them.
+
+TWO THINGS WERE WRONG, both found by measuring rather than squinting
+(`tools-scratch/townsfolk.mjs`):
+  1. A RING, NOT A BOX WITH A HOLE IN IT. Sampling a rectangle over the square
+     and rejecting everything within 4.5 u of the fountain threw away most of a
+     12 u-deep piazza: it asked for fifteen people and placed five.
+  2. THE PLATE IS THE FLOOR. Square-goers seated on `_seatY` — the ground —
+     stood buried to the shoulders, because the paving is seated on its HIGH
+     corner and stands proud of the field by up to two metres. The square's own
+     matrix already knows where its floor is; the transformed point comes back
+     at it. Now 0 of 53 are sunk on ALASSIO and 0 of 14 on IL BUDELLO, and 0 of
+     299 people across the two worlds stand on a carriageway.
+
+### A CORRECTION TO r246
+That entry says `_clearsRoad` "exists TWICE, on Track and in flora.js, and
+flora's copy shadows the class's". The first half is true and the second is
+not: `src/world/flora.js` and `src/world/sky.js` export `floraMethods` and
+`skyMethods` and NOTHING IMPORTS THEM. They are a half-finished extraction, and
+the live code for all of it is in track.js. Both copies were edited, so the
+behaviour r246 describes is correct — but a future session looking for the
+sky or the scatter should look in track.js and nowhere else.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green, road census over
+73/74/77/78 at baseline (73's one body is the same dodecahedron at bite 1.24,
+74's floater the same metal one at 3.8, 78's four the same poles).
+
+## r250 — WHAT THE ITERATION FOUND
+Four things, one of them a real bug that only showed up on one world.
+
+### THE CLOUDS WERE TAKING THEIR COLOUR FROM THE DIRT
+SANREMO STAGE's sky came out SAGE GREEN. The cloud bank r249 built was a
+MeshStandardMaterial standing in the scene's lights — and a cloud is a big flat
+slab seen from BELOW, so the face the player looks at is lit by the hemisphere
+light's GROUND colour. Sanremo's ground bounce is olive, so its clouds were
+olive. Every world would have tinted its own sky with its own dirt, and the
+three worlds it was tuned on happened to have grey-brown ground.
+
+The fix is to light them with nothing. `_cloudShardGeo` BAKES the shading into
+a vertex-colour attribute — 0.52 straight down to 1.0 straight up, plus a
+little per-face grain — and the material is MeshBasic. That is:
+  - rotation-invariant, because it keys off the vertical only, so instances can
+    still yaw freely (a sun-direction bake could not have);
+  - identical in every world, which is the point;
+  - free at runtime, and MeshBasic is the cheapest material there is for
+    forty 400 u slabs covering a third of the frame;
+  - and it leaves the per-cloud tint to the instance colour, which multiplies
+    it, so `cloudTint`/`cloudDeep` still work.
+
+### THE SHOPFRONT WAS A BLACK HOLE AT EYE LEVEL
+The one part of a building a driver passes at two metres was a flat fill of the
+unlit-glass colour, and a street of them is a row of caves. A shopfront in
+daylight is a bright band at the top where the glass takes the sky, a dark room
+behind it, something coloured on a shelf, and a painted fascia over the lot —
+all four are painted now, and the fascia's lettering band is the only saturated
+colour at street level, which is what the reference has. The plain-front
+variant gets a fanlight and a doorstep for the same reason.
+
+### A FOOTWAY IS FLAGGED
+r248's pavement was a flat colour, which beside a cobbled road reads as poured
+concrete. `pavingTexture` goes on the same instanced box; its UVs stretch the
+courses ALONG the pavement, which is how flags are laid.
+
+### AND THE ROOFLINE STOPPED REPEATING
+Every roof was the same prism at the same pitch — a sawtooth to the vanishing
+point. `flatRoofs` gives about one house in five a flat top behind a parapet,
+which is the sheet's own corner building, and it breaks the rhythm at exactly
+the place the eye reads a street. Two more instances off the trim mesh that
+already existed, so it costs no draw call; the roof prism collapses to nothing
+and the chimney is told to stand on the deck instead of on a ridge that is not
+there.
+
+### COST
+No new meshes at all this round: the paving is a map on an existing instanced
+box, the parapets are two more instances of `frontage-trim`, the flat roof is a
+scale, the shopfront is paint, and the cloud change swapped one material for a
+cheaper one. Textures +0.3 MB for the paving map.
+
+Gates: boot 4/4, test-buildings green (including "every roof sits on its
+house", which the collapsed prisms had to pass), test-carriageway green, road
+census over 73/74/77/78 at baseline.
+
+## r251 — THE CLOUDS AGAIN, BECAUSE THEY LOOKED BAD
+Reported plainly and correctly. r249 gave each cloud ONE squashed icosahedron,
+and a single convex hull has one silhouette and no internal form at all: from
+the ground it is a hard-edged sheet hanging in the air. A paper cutout, or a
+boulder.
+
+### A CLOUD IS A CLUSTER, NOT A SLAB
+Two things make one read: a BUMPY TOP EDGE of overlapping lobes, and a base
+that is cut off. `_cloudClusterGeo` builds five to seven lumps in a row —
+biggest in the middle, tapering to the ends, because that profile is most of
+what makes a row of blobs read as ONE cloud rather than as a string — merges
+them into a single geometry, and cuts the bottoms off.
+
+Four things had to be got right, each found by looking at the render:
+  1. FEWER, BIGGER LOBES. Ten small lumps packed into two radii overlap so
+     heavily that what you see is the SEAMS between them: a crumpled-paper
+     interior and no clean silhouette anywhere.
+  2. HEIGHT. The first cluster spread its lumps over three radii of width with
+     0.7 of a radius of rise — a strip of foam, not a cumulus.
+  3. THE BASE IS RUMPLED, NOT PLANAR. Clamping every low vertex to y = 0 gives
+     one enormous flat polygon underneath, and from a street you look straight
+     at it — a pale sheet with a hard edge, which is the ice-floe read the
+     slabs had and the whole reason for the rebuild. The cut-off height wanders
+     with x and z instead.
+  4. THE TINT IS NOT WHITE. The renderer tone-maps at 1.46 exposure, so a
+     near-white cloud colour leaves the shader ABOVE white and every facet
+     clips to the same value — perfectly good baked shading, rendered flat.
+     Starting from a pale grey puts the whole range under the clip.
+
+### AND THERE ARE FEWER OF THEM
+The reference is a still photograph of an overcast. A bank dense enough to
+match it rings the horizon, and from a car — camera at 2.6 u looking ALONG the
+road, not up — thirty-seven clouds at a shallow angle stop being clouds and
+become a lid. Twenty distinct ones against blue is the same style and a much
+better sky to drive under. `tools-scratch/skyshot.mjs` is the shot that settles
+this: pitched up, so the frame is mostly sky. Tuning a cloud bank from a street
+shot means tuning it on the one strip a building has not already covered.
+
+Three silhouettes, one instanced mesh each, so the sky is three draw calls;
+still eleven fewer than the sprite field it replaced.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green, road census over
+73/74/77/78 at baseline.
+
+## r252 — EVERY TOWN, NOT JUST THE RIVIERA
+"Fix all cities and places that have buildings, apply the same attention to
+detail." Most of r244-r251 was already global — the pavement, kerbs, bollards,
+ridge caps, chimney pots, the shopfront, the balcony and awning anchoring, the
+townsfolk and the cornice all key off `T.frontage` and reach every town on the
+roster. What was riviera-only was the JOINERY, the roofline and the squares.
+
+Ten worlds gained them. The regional split is the point: painted surrounds,
+quoins and downpipes are ARCHITECTURE, not a region, and go nearly everywhere;
+the louvre, the ironwork and the roof orientation are regional and do not.
+
+  - MONACO STREETS was the last town still built out of grey boxes, which is
+    absurd — both renders this whole design came from are of THAT place. It
+    gets the full coast treatment plus the faceted sky, with GREY-BLUE
+    shutters rather than the coast's green, which is what the hairpin render
+    draws and the one thing keeping it from reading as another Ligurian
+    village.
+  - HARBOR QUAY and its five regional variants: surrounds, louvres, quoins,
+    downpipes and a square each.
+      AEGEAN gets NO QUOINS — a Cycladic house is one limewashed mass and
+      drawing stone blocks on it is the one detail that says "not Greece" —
+      but half its roofs go FLAT.
+      BRAVA gets the ironwork, because Andalusia is ironwork.
+      DALMATIA and AZUR run their terraces eaves-on to the street like the
+      Ligurian ones; LIGURIA and the rest keep the gable end, which is what a
+      house standing in a stack up a cliff presents.
+  - CITADEL BAY is quarried, not rendered: paler stone for the joinery, real
+    quoins, and no ironwork on a fortified town.
+  - LANTERN QUARTER gets the same care and not the same kit: surrounds, quoins
+    and pipes, but the older BOARDED shutter folded onto the pier rather than
+    the Mediterranean louvre, and its gable stays end-on to the street.
+
+### A SMALL SQUARE BEATS NO SQUARE
+LANTERN QUARTER built NOTHING and said nothing about it. The flatness gate
+refuses more than 1.7 u of fall across the paving, and that town drops 26 u
+beside its own street — `tools-scratch/pzwhy.mjs` (written for this: it re-runs
+every gate in the site search and counts which one refuses) put 350 of 481
+stations on FALL and zero anywhere on the lap. Every site is tried at full
+size, then three quarters, then three fifths, and the fall tolerance grows as
+the footprint shrinks, because a smaller square on a thicker plate is a
+RETAINING TERRACE, which is exactly what a hill town builds. Past a kerb's
+height that plate stops being something you bump over and becomes masonry, so
+it registers solids.
+
+### AND A CLEARANCE TEST THAT ASKS THE RIGHT QUESTION
+The census found three people standing in MONACO's racing line. r249's
+townsfolk compared `_distToTrack` against the width at the station they were
+SAMPLED from; the census compares it against the width at the NEAREST station,
+and on a lap that folds back the two differ by more than a pavement. It uses
+`_clearsRoad` now, which asks the nearest-station question — and whose piazza
+clause is welcome here, since people in squares are placed separately, on the
+paving. Monaco's townsfolk bodies: 4 -> 0.
+
+### A COMMENT THAT HAD BEEN LOSING AN ARGUMENT WITH ITS OWN OBJECT
+`harbor` and `citadel` each carried a paragraph titled "WARM RENDER, NOT GREY"
+arguing for a limewash palette — and eight lines below it, a SECOND `tints`
+key with the grey palette the paragraph argues against. Last key wins, so both
+quays have been building grey ever since with the reasoning sitting right
+above. One key now, and it is the warm one.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green. Road census run
+over 30/34/49/51/58 before and after: every floater and the one remaining body
+is pre-existing and unchanged, and Monaco's four townsfolk-in-the-road are
+gone.
+
+## r253 — THINGS STANDING IN THE ROAD
+An iteration spent on the road census's own backlog rather than on new
+geometry. Three defects it had been reporting all session, and two it reports
+that are older than this work.
+
+### THE START GANTRY'S LEGS
+`_buildStartGate` sites its scaffold towers by walking outward and scoring
+each offset, and where nothing clears — a lap that comes back past its own
+start line has no clear offset, which is TOUR DE CORSE and SANREMO STAGE — it
+takes the least-bad spot and drops the COLLIDER, per the r167 rule. That was
+right as far as it went, and it left an 11 u steel mast standing 4.2 u inside
+the racing line at the start of two worlds, which the census scored as a body
+on every run of this session.
+
+A leg that cannot stand clear of the road no longer comes down to the ground:
+it stops above the cars, the beam is carried by the side that DID clear, and
+what was a body in a carriageway becomes overhead — which is what a gantry
+over a road looks like anyway.
+
+AND THE HEADROOM IS MEASURED OVER THE ROAD UNDER THE LEG, not over the start
+line. RALLYCROSS ARENA's stray leg stands where the lap returns two metres
+higher than sample 0, and a cut referenced to `y0` left it grazing that
+carriageway at 1.01 u — a body again, in a different class.
+
+    TOUR DE CORSE   4 bodies, worst bite 4.19 u  ->  clean
+    SANREMO STAGE   4 bodies, worst bite 4.19 u  ->  clean
+    RALLYCROSS      2 bodies, worst bite 1.01 u  ->  clean
+
+### THE CONTACT SHADOWS
+GOTTHARD CLIMB had two shadow decals scoring as bodies at a 4 u bite. A
+contact shadow is fake occlusion for something standing on the GROUND; over a
+road it is a dark patch floating across the tarmac.
+
+THE ROAD IT IS OVER NEED NOT BE THE NEAREST ONE. Two cuts of this asked
+`nearestIndex`, which on Gotthard answers with the hairpin the decal is ON,
+while the one it hangs over is the shelf BELOW — same x and z, eight metres
+down. A probe built on the same question duly reported zero while the census
+reported 4 u: the two were not asking the same thing. It walks the stations
+that could reach the decal at all and tests each on its own height; where the
+road is at the decal's own level the RADIUS IS TRIMMED to the kerb instead of
+the decal dropped, so a roadside prop keeps the shadow that glues it down.
+
+A tilt cap was tried on the way — a decal following a 45-degree slope is a
+sheet standing out of the hillside — and it made the census WORSE, so it is
+not in the tree. A change that cannot be shown to be an improvement does not
+ship.
+
+    GOTTHARD CLIMB  2 bodies, worst bite 4.03 u  ->  clean
+
+### TWO HARDENINGS, BOTH MEASURED HARMLESS
+  - `_buildObstacles` compared `_distToTrack` — a lap-wide answer — against
+    the half-width at the sample the offset was measured FROM. Same defect as
+    the townsfolk in r252 and the gantry before them; it asks `_clearsRoad`
+    now. No world changed, which is the point of a hardening.
+  - r252's piazza terrace registered three colliders of radius D/2 down the
+    middle of the plate. A collider describes the FACE a car can hit, not the
+    area the thing covers, and D/2 is the square's own size — it reaches back
+    across the road. Now a row of small ones along the road-facing edge, each
+    only registered if it clears the carriageway.
+
+### AND TWO THAT ARE OLDER THAN ANY OF THIS
+Reported rather than fixed, with the evidence, because both need work in
+systems this session has not touched:
+  - CINQUE TERRE stands three element-kit boulders up to 6.28 u into a 9 u
+    half-width, plus two blockers. Confirmed pre-existing by building the
+    commit before r252 and running the same census: identical.
+  - MOUNTAIN TO SEA reports a 45 u HALF-WIDTH at sample 456. That is a 90 u
+    road, and everything within it — 72 blockers, 37 bodies — is scored
+    against it. The width profile is what wants looking at there, not the
+    scenery.
+  - COTE D AZUR's fourteen stone blockers at a 9.27 u bite are likewise
+    pre-existing: the same fourteen at the same bite on the pre-r252 build.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green.
+
+## r254 — AND THE ONE THAT BROKE A WORLD
+r253 hardened the piazza terrace's colliders and read `outward` — which way is
+away from the road — a hundred lines above where that `const` is declared. A
+`const` read before its declaration is a ReferenceError, it fired inside
+`_buildPiazzas`, and it took the whole world build down with it: SANREMO STAGE
+stopped producing a track at all.
+
+IT WAS SHIPPED, AND BOTH GATES LET IT THROUGH.
+  - `boot.mjs` builds levels 1, 6 and 1-roam. None of them has a piazza, so
+    all four checks passed on a build that could no longer make a town.
+  - The road census reports a world that fails to build as `SKIP  SANREMO
+    STAGE` — one line, no marker, in the middle of a list of results. I read
+    past it twice and took it for machine load, because the census had been
+    slow all session.
+
+A world that does not build is the worst defect there is and it had the
+quietest possible signature. `tools-scratch/buildtime.mjs` is the answer:
+a list of levels, a short cap, and a line per world saying built or FAIL with
+the page error that caused it. It found this in one run, and it names the
+exception rather than reporting a timeout.
+
+    LV=30,34,49,50,51,52,53,54,58,73,74,75,76,77,78 node tools-scratch/buildtime.mjs
+
+All fifteen town worlds build clean with no page errors.
+
+RUN IT AFTER ANY CHANGE TO A SHARED BUILDER. `boot.mjs` covers the engine
+coming up; this covers the worlds actually coming out.
+
+## r255 — FIX ALL: THE ROAD CENSUS BACKLOG
+Four defects, one of them mine from two rounds ago, and the tool that found
+each of them.
+
+### THE LIGHTHOUSE WAS CHECKING THE WRONG POINT
+`_buildLighthouse` tested the MOLE'S WATERLINE ANCHOR against a coarse
+distance and then put the tower 30 u further along the normal, unchecked. On
+CINQUE TERRE that landed the tower 4.18 u inside the carriageway with a 2.7 u
+collider biting 1.95 — and the skerries poured around it went in with it. The
+anchor walks ALONG the coast until the TOWER itself clears, and the mole is not
+built until it does. The headland fallback asks `_clearsRoad` too, not just the
+coarse field.
+
+### A PREDICATE THAT WROTE THE CALLER'S SCRATCH — mine, r253
+HARBOR QUAY grew four invisible colliders on its racing line, biting up to
+10.1 u, with no mesh anywhere near them. The guard that was supposed to stop
+that ran and PASSED, and the same test on the same coordinates said "in the
+road" afterwards. Both were true:
+
+`_inPiazza` used `_pzV`, the module scratch, and it is reached through
+`_clearsRoad`, which every builder calls — usually while holding a point in
+`_pzV` that it is about to use. So the terrace's collider loop set `_pzV`,
+called the gate, and the gate quietly rewrote `_pzV` into a square's LOCAL
+frame; the solid was then registered at that local coordinate treated as
+world. The gate tested the right spot and the collider went in at the wrong
+one.
+
+`_inPiazza` has its own vector now, and the two call sites read their point
+out into locals before calling anything. A PREDICATE MUST NOT WRITE THE
+CALLER'S SCRATCH — it is called from inside expressions, by code that cannot
+see it.
+
+### THE TUNNEL WALLS WERE NEVER ASKED
+`_buildTunnel` puts a collider every 2 samples at 11.6 u either side of ITS
+centreline, unguarded. Where a bore passes near a different leg of the lap —
+COTE D AZUR does, fourteen times — that lands in the OTHER carriageway as an
+invisible wall. And MOUNTAIN TO SEA is the same defect from the other
+direction: its road is five times normal width, so a fixed 11.6 u bore is
+inside its own carriageway for the tunnel's whole length. The wall MESH stays
+either way; only the collider is dropped, which is the rule the grandstand and
+the start gantry both settled on.
+
+    COTE D AZUR      14 blockers, worst bite 9.27 u  ->  0
+    MOUNTAIN TO SEA  72 blockers                     ->  2
+
+### AND THE SEA ROCKS
+Two of CINQUE TERRE's skerries stood 6.28 u inside its shore road. A sea rock
+is in the sea, and on a coast road the sea comes close; the scatter asks
+`_clearsRoad` for the rock AND the shoulder lump beside it.
+
+### WHERE THE ROSTER STANDS
+    GOTTHARD CLIMB   clean        TOUR DE CORSE   clean
+    HARBOR QUAY      clean        CINQUE TERRE    clean
+    COTE D AZUR      clean        RALLYCROSS      clean
+(each still reports FLOATERS, and every one of those measured is a solid over
+water — a lighthouse on a mole, a massif's own 198 u collider — which is what
+that test is for and not a defect.)
+
+STILL OPEN, reported not fixed:
+  - MOUNTAIN TO SEA: 2 colliders and 37 meshes inside a carriageway that is
+    90 u wide BY REQUEST (`roadWidth: 5`). `_stoneFit` and `_trackSidePos`
+    were both already taught to scale with `widthAt` in earlier sessions; what
+    is left comes from builders that were not, and finding them is a pass on
+    that one world rather than a general fix.
+  - TREMOLA DESCENT: one contact-shadow decal at road level, 0.79 u. A flat
+    decal on the tarmac is not an obstruction.
+
+### THE TOOLS
+`tools-scratch/whosolid.mjs` is the one that broke this open: colliders carry
+no provenance, so it pairs each offending solid with the nearest MESH and
+prints that mesh's parent chain. Its own lesson is in its header — it first
+asked `_clearsRoad`, which since r246 also refuses anything inside a SQUARE,
+so it reported every piazza lamp as "in the road" and buried the four real
+ones. `offenders.mjs` does the same job from the mesh side.
+
+Gates: boot 4/4, test-carriageway green, test-buildings green, and
+`buildtime.mjs` over twenty worlds — all built, no page errors.
+
+## r256 — THE BAY, AND HEADLIGHTS THAT ARE ACTUALLY LIGHTS
+Two screenshots, two asks: "make the car stand out, make lighter background"
+on the build bay, and "make the light like real car light, other cars should
+have light too" on a night race.
+
+### THE BAY WAS A DARK ROOM WITH A DARK CAR IN IT
+The garage stage lit a near-black car against a near-black floor and a wall
+too small to be one. The floor is light concrete (0x8b8073) at 90x90, the
+wall pale (0xb2a695) at 160x70 with a dado band under it, the bay lines
+brighter, and a rim light added behind the car so its shoulder line separates
+from the wall.
+
+The wedge of black down one side was NOT the shadow frustum. Widening the
+shadow camera changed nothing; hiding the wall found it in one shot — the
+floor and the wall both ENDED inside frame and the camera was looking at
+empty scene past their edges. Both were enlarged. Measure by bisection, not
+by fixing the thing that sounds most likely.
+
+### EVERY CAR NOW HAS LAMPS, AND THEY ARE ONE DRAW CALL
+`buildVoxelRacer` welds a lamp rig into every car it builds: two headlamps
+(a wide soft halo plus a small hot core), two tail clusters the same way, and
+two beams on the tarmac. It is ONE additive mesh with per-vertex colour, so
+the whole rig costs one draw call per car — six separate meshes would have
+been 48 on an eight-car grid, most of a world's budget for something nobody
+would have called scenery. NO POINT LIGHTS: this game bans per-car lights,
+and what sells a headlight from a chase camera is the lamp burning and the
+pool it lays on the road. Both are painted.
+
+`glowTexture` is opaque white at its centre, so a quad whose four UVs all sit
+at (0.5, 0.5) takes a FLAT alpha and lets vertex colour do all the shaping.
+That is the trick that lets a soft round lamp and a hard-edged beam wedge
+share one material.
+
+### WHAT THE FIRST CUT GOT WRONG, AND HOW EACH WAS CAUGHT
+**The lamps were never switched on.** `worldIsDark` and the per-frame
+`Car._syncLights` were both right, and `carLights: OFF x8` on a `#16162a`
+sky anyway. Two reasons: `_syncCarLights` read `this.rivals` and `this.traffic`,
+neither of which exists (the field is `this.enemies`), and the one
+`_applyTheme` that runs on a fresh load happens BEFORE the player and the
+enemies are constructed. The sync is now called once more right after the
+grid is built, and again on `swapPlayerCar`, which hands the player a new mesh
+with dark lamps.
+
+**The beam was a puddle parked under the nose.** One big quad with the radial
+glow stretched over it. It is a GRID now — the falloff lives in the vertex
+colours, which is the only way to get a wedge that leaves the lamp narrow,
+opens out down the road and fades at its far edge and both sides.
+
+**And the probe was lying about it.** `nightshot.mjs` invented a camera at
+6.5 up and 13 back. The game's CHASE is 11.5 up and 17 back looking 19 ahead;
+at the flatter angle the beam compressed into the car's own silhouette and
+read as a halo. The probe also floated the car 0.4 above the road — a car's
+mesh origin IS the tarmac (`pos.y = groundHeightAt`), so the beam was
+measured from the wrong height too. JUDGE A LIGHT FROM THE CAMERA THE PLAYER
+HAS.
+
+**A false read corrected.** The red bars at the tail in the first isolation
+shot were the car's OWN modelled lenses (`tailMat`, always there), not the
+new rig, because the shot kept the player's bodywork. With every other mesh
+hidden the rig turned out to be two blobs and two dots. The tail glow was
+then sized to bloom over the whole modelled cluster (x 0.66 to 1.35) instead
+of sitting beside it.
+
+`lightdiff.mjs` is the gate that settles all of this: render the frame twice,
+rig hidden then shown, and report the pixel delta and the box it falls in.
+The first cut changed 0.39% of the frame, all of it inside the car's own
+footprint. `LIFT=0.6` separates "not drawn" from "buried in the road".
+
+### A BEAM IS LIGHT, NOT BODYWORK — the bug the lights caused elsewhere
+The beams reach 19 u down the road, and they went into the car's mesh as a
+child. So `new THREE.Box3().setFromObject(car)` — which is how the garage bay
+frames its camera and how the kit-fit test measures the nose — started
+returning a box the length of a bus. The bay backed its camera off from 9.7 u
+to 27.7 u: THE CAR GOT SMALLER THE ROUND THE LIGHTS WENT IN, in the same
+screen whose report was "make the car stand out". `test-cars` caught the other
+half as a 0.09 u nose spread across eight cars, seven of which agreed exactly
+— which is the signature of one car's bodywork differing from a constant, not
+of a kit that has moved.
+
+Fixed at the source rather than at each caller: `Box3` uses a geometry's own
+`boundingBox` when it has one, so the rig publishes the BODY's box as its own
+and `frustumCulled` goes off to guarantee the shrunken box can never cull the
+beam away. Every car's overall box now equals its bodywork box again, the nose
+spread is 0, and `popCarPart` grew an explicit exclusion because the rig's
+volume is no longer large enough to be filtered out by accident.
+
+WHEN YOU ADD A CHILD THAT IS BIGGER THAN THE THING IT IS ON, GO AND LOOK AT
+WHO ASKS THAT THING HOW BIG IT IS.
+
+### AND THE BAY'S FRAMING WAS WRONG BEFORE THAT
+With the box fixed the framing multiplier was still guesswork: the small-angle
+fit in `_frameStage` is a long way out for a 6.4 m car seen from 10 m up a 3/4
+angle, because its near end projects three times the size of its far end.
+`bayfit.mjs` sweeps camera distance against the car's measured pixel box, and
+1.62 is read off that sweep — ~95% of the panel height, ~67% of its width.
+
+The bay also has no cast shadow to give, and that is geometry, not a bug: the
+key sits at (5, 9, 6) and the camera looks in from (6.4, 3.4, 7.6), nearly the
+same azimuth, so the shadow falls behind the car and the car hides all of it.
+Moving the key to throw it into view takes the light off the face the camera is
+looking at. A painted contact disc on the pivot grounds the machine without
+touching the lighting, which is what a product shot does. The shadow camera
+went back to a tight +-10 at 1024 (0.02 u/texel) now that the dark wedge it had
+been widened to +-22 for is known to have been the floor's own edge.
+
+## r257 — THE BEAM FROM EVERY CAMERA, NOT JUST THE ONE I TUNED IT ON
+A phone shot of a night race: a pale wedge fanning up the carriageway from the
+car's nose, washing the road out. The rig from r256, seen from a camera it was
+never checked against.
+
+### THE FADE
+A headlight beam is a FLAT QUAD LYING ON THE ROAD, so how much of it the lens
+sees is decided entirely by how steeply the lens looks down. CHASE, the one
+view r256 was tuned from, sees it at a 13-degree grazing angle and gets a soft
+pool. TOP-DOWN sees the same quad face-on from 46 u up, and an additive quad
+over dark tarmac saturates.
+
+`fadeCarLights(camera)` takes the downward component of the view direction —
+0.03 in the seat, 0.22 on CHASE, 0.56 on TRAIL, 0.82 on TOP FAR — and smooth-
+steps 72% of the rig's opacity away between 0.28 and 0.74. Measured by
+`tools-scratch/beamlook.mjs`, which drives the GAME's own `_updateCamera` for
+each mode and diffs the frame with the rig hidden against the frame with it
+shown. What the rig ADDS, before → after:
+
+    TOP-DOWN   mean +71 → +27   peak 395 → 111
+    TOP FAR    mean +29 → +14   peak 209 →  59
+    TRAIL      mean +77 → +45   peak 607 → 320
+    CHASE / CHASE FAR / DRIVER   unchanged
+
+The lamps and tail lenses fade with the beam, and that costs nothing: they are
+vertical quads, edge-on from overhead, and each car's own modelled `tailMat`
+bars are solid geometry the fade never touches.
+
+### AND THE MATERIAL IS ONE OBJECT NOW
+The fade has to be written every frame. Nothing about the lamp material varies
+per car, so it is a module singleton (`carLightMaterial`) — one write for the
+whole grid instead of eight, and one glow texture instead of eight. `visible`
+stays per mesh, which is what the per-world switch needs. `_dropCarMesh` grew
+an exclusion to go with it: it disposes the materials of everything outside the
+upgrade kit, and disposing one bay car's copy would now blank the headlights on
+every car in the game — the same trap the kit's shared materials carry.
+
+### FOUR WRONG ANSWERS, AND WHAT KILLED EACH
+Worth writing down, because each looked right:
+
+1. **"It is the road's specular lobe."** A wet road is roughness 0.52, and the
+   comment above it records this exact failure being fixed once already. Swept
+   roughness 0.52 → 0.92 and envMapIntensity 0.75 → 0.35 at the worst point on
+   the lap: bright pixels moved from 0.88% to 0.86%. Roughness only darkened
+   the road (mean 31 → 17); it never touched the highlight. There is no env map
+   bound at all, so that lever was doing nothing whatever.
+2. **"It is the shadow frustum's edge."** The shadow camera follows the player,
+   which fits an artefact anchored to the car. Turning `moon.castShadow` off,
+   scaling the frustum 2.5x and re-biasing all left the wedge at 31528 pixels
+   against a base of 31528.
+3. **"The deployed build has it too, so it is not mine."** It does not. The
+   probe was pointed at port 8902 with a gh-pages worktree as its CWD — and
+   `srv.mjs` takes its root from `argv[3]`, defaulting to the working tree
+   whatever the CWD. Port 8902 was serving MY branch. Served properly on 8903,
+   r245 has no `carLights` and no wedge, mid-lap or on the grid.
+4. **"Hide every additive object and see what goes."** The first hunt scored on
+   frame-wide bright pixels, and on a neon world those are the road's emissive
+   edge lines — so it named `road` and stopped. Scored on the wedge itself
+   (road pixels above the road's OWN median in the band ahead of the nose) the
+   same sweep names `carLights` at 46% on the first pass.
+
+CHECK THE PROBE'S ROOT BEFORE BELIEVING A BASELINE. An A/B against a pristine
+build is worth nothing if both ports serve the same tree, and it fails silently
+— the page loads, the game runs, the numbers look plausible.
+
+## r258 — THE BLOTCHES WERE THE WHOLE PROBLEM
+The building round. Three changes, two of them small, and the small one that
+turned out to be doing all the damage.
+
+### 620 SPECKS INSTEAD OF 160 STAINS
+`townhouseTexture`'s limewash erosion laid 160 discs of up to 22 px radius at
+up to 10% alpha into a 192-px-wide authored wall. The biggest were a ninth of
+the wall across, and at 1.7x total coverage they were not grain — they were
+soft circular damp stains, visible on every town render, worst on the pale
+renders. 620 discs at a quarter the radius and half the alpha.
+
+That change alone moved the facades most of the way to the reference. Measured
+through a flat-white mask of the frontage itself, at a pinned point on the lap
+(reference: P50 124, P90 188, saturation 0.33):
+
+    IL BUDELLO    sat 0.64 → 0.41   P50  78 → 124   P90 132 → 196
+    COTE D AZUR   sat 0.29 → 0.24   P50  96 → 102   P10  12 →  37
+    CINQUE TERRE  sat 0.69 → 0.66   P50  66 →  59   P90 103 → 122
+
+IL BUDELLO now sits on the reference almost exactly. THE MOTTLE WAS NOT
+COSMETIC: a wash of dark grey-brown at 1.7x coverage was dragging the whole
+palette down and desaturating it, which is why the streets read heavy and why
+the tints never looked like the tints.
+
+### CINQUE TERRE'S PALETTE
+Still the outlier after that — its lit walls half the reference's brightness
+and twice its saturation. Three mid-saturated entries in `liguria`'s tint list
+lifted toward the sheet's own pastels, two pale ones added, render nudged from
+`#f2e8d4` to `#f6ecdc`: saturation 0.66 → 0.59 and P50 59 → 81. It stays warmer
+than ALASSIO, which is the district's whole point; it stops being a different
+exposure.
+
+### A CARRUGIO IS A SLOT, NOT A MISSING HOUSE
+The side alley between terrace runs skipped one or two whole bays, which at a
+7 u unit is a hole up to twice a house wide. It is bracketed now — a narrow
+block either side of a ~2 u slot — and capped at one bay. Modest: open pairs
+27.2 → 27.2 / 17.4 → 18.9 / 38.2 → 33.2 percent, but every open gap narrower
+(mean 12.2 → 10.4, 7.3 → 6.9, 10.3 → 9.2 u) and CINQUE TERRE's P75 gap 4.6 →
+2.5. Shipped because it is an improvement on every gap measure, not because it
+is a big one.
+
+### TWO THINGS THAT LOOKED RIGHT AND WERE NOT
+**"Lift the shade floor with the hemisphere fill."** The facades bottom out at
+luminance 9-15 against the reference's 68, and hemisphere light is the obvious
+lever. Swept 1x to 3x: P10 moved 10 → 17 while P50 went 71 → 108 and the frame
+mean 96 → 126. It washes the world out and never touches the floor, because
+LIGHT MULTIPLIES ALBEDO — you cannot brighten a near-black texel by pointing
+more light at it. Paler hemisphere ground colours did the same. The floor moved
+in the end from the mottle change (COTE D AZUR P10 12 → 37), which lifted the
+albedo instead.
+
+**"53-71% of the streetwall has an open gap."** That was `frontagegaps.mjs`
+before it was right, twice over: it took `max(sx, sz)` of the instance matrix
+as the along-street width, and column 2 is the 8.5 u DEPTH, so abutting houses
+read as gaps; and it scored the whole `oldtown-frontage` mesh, which carries
+the five deliberately-sparse ranks BEHIND the terrace as well as the street. On
+the frontage rank alone, with column 0 as the width, the real figures are
+17-38% and the terrace mostly abuts. MEASURE THE POPULATION YOU MEAN.
+
+## r259 — A GARAGE THAT IS NOT BLACK, AND A ROOM THAT MOVES
+Two reports, one screen. "Light up all background in the garage, so it is not
+black" and then, on a navy car standing on grey concrete, "make it move
+contrasting background".
+
+### THE BAY WAS NOT THE PROBLEM
+`bayblack.mjs` reads the stage's own canvas and grids the dark pixels. The bay
+measures a mean luminance of 121 with 17% dark, and that 17% is the car's own
+tyres, glass and bumper. The CARDS were black: `_studio` renders with
+`alpha: true` and no backdrop at all, so every car and part picture was a
+cut-out floating on a near-black panel — 20-31% of each shelf icon's opaque
+pixels under luminance 34, mean 28.
+
+A cyclorama fixes all of them at once: one unlit gradient plane squared up to
+the studio's fixed three-quarter rig, 110 u across at 42 u back, which fills a
+30-degree frame from every distance the studio shoots from. Untone-mapped, so
+it is exactly the colour asked for whatever the exposure. Shelf icons go 28 →
+107 mean with no transparency left. Car shots also get a painted contact disc,
+because a car on a seamless sweep with nothing under it floats. The four
+upgrade ladders that show a glyph rather than a rendered part got the same pale
+plate in CSS — three photographs among four holes is a ragged column.
+
+### THE ROOM TAKES ITS COLOUR FROM THE CAR
+A fixed set cannot serve a navy car and a white one. `_bayPalette` reads the
+hull colour, and goes the other way: lightness interpolated against the car's
+own luminance, hue pushed a third of the wheel off the car's so a warm car
+never stands on warm concrete, saturation kept near zero because this is
+concrete and not a colour wash. The bay lines swap gold for a darker ochre when
+the room goes pale, or they vanish into it.
+
+Body-to-wall gap, per car, at the shipped setting: BASTION 71, PIT 67, CROWN
+41, ALPINE 83, DUNE 90, SLEEK 75, FLATSIX 35, BRAWLER 13.
+
+### AND THE WALL HAS LIGHT CROSSING IT
+A `RepeatWrapping` band texture on the wall, white so the material's colour
+carries the hue, with the offset walked in the turntable's own tick. Slow — a
+feature crosses the visible slice in about eight seconds. A backdrop you look
+AT is a worse failure than one you look past.
+
+### THE METRIC SENT ME THE WRONG WAY FIRST
+The dark end of the lightness ramp was tuned against the mean luminance of the
+car's pixels, and a car's pixels are half tyre and half glass: that mean says
+ALPINE, which is white, is a mid-grey at 96. Tuned on it, darkening the room
+made the measured gap SMALLER and I read that as the change being wrong. On
+body brightness (car P75) the sweep is unambiguous — 0.22 / 0.30 / 0.42 gives
+SLEEK 67/51/33, DUNE 88/72/54, ALPINE 80/64/46, FLATSIX 35/18/0. 0.42 makes the
+silver FLATSIX vanish into its own backdrop entirely. MEASURE THE SUBJECT, NOT
+ITS SILHOUETTE.
+
+BRAWLER's 13 is the one weak number and it is shipped as is: an orange body on
+a grey-green wall, where the hue offset carries a contrast that a luminance gap
+cannot see.
+
+## r260 — A RED LIGHT IN THE BACK
+"Make the background more eye pleasing. Like a red light or something in the
+back." The repainted room from r259 solved the contrast and left a grey box.
+
+Five painted lamps, no new light sources: a warm wash and a small additive
+core on the back wall, a cool wash beside it, and both colours pooling on the
+floor. A PointLight far enough back to wash a 160 u wall would light the car
+too and undo r259's contrast work; these paint the wall and the floor and
+nothing else, and they share `glowTexture` with the headlamps.
+
+The wall is only about a sixth of this frame — the floor is the picture — so
+the lamps that matter most are the two lying on the tarmac.
+
+### THREE THINGS MEASUREMENT CAUGHT
+**A wash paints; additive only adds.** The first cut was additive throughout,
+which fails exactly where the room is palest: adding red to a near-white wall
+makes it whiter, not redder, and a dark car's bright room came out milky pink.
+The wash is NORMAL blending now — it tints whatever the wall is — with a small
+additive core inside it as the source itself.
+
+**Both cool lamps were outside the picture.** `baylamps.mjs` projects each lamp
+into the bay camera: they sat at screen x 244% and 184%. The visible slice of
+that 160 u wall is about FOURTEEN world units, x -17.5 to -3, because the
+camera is off to +x and looks back across the origin. Their measured positions
+are in the source now, with the mapping that produced them.
+
+**And the lamps ate the contrast they were added to.** Painting a saturated red
+over a pale wall darkens it, and the pale rooms are precisely the ones a dark
+car needs: BASTION's body-to-wall gap went 71 → 39, PIT 67 → 41, CROWN 41 → 15.
+So the lamps are tuned to the room — a pale room gets a pale tint at a lighter
+touch, colouring it without spending its brightness — and a warm hull gets a
+CRIMSON warm lamp rather than an orange-red one, because a red light behind a
+red car is no light at all. Restored: BASTION 65, PIT 66, CROWN 39, and every
+light car up (SLEEK 78, DUNE 92, ALPINE 86, FLATSIX 43).
+
+BRAWLER measures 2, against 13 before the lamps. Its rendered body sits at 127
+and its background at 124, and the metric cannot see that one is orange and the
+other is grey-green under a crimson wash. The shot reads clearly; the number
+does not. Recorded rather than tuned away, because tuning the whole bay to one
+car on one blind metric is how the last three rounds went wrong.
+
+### AND THE ONE THAT COST AN HOUR
+`node --check src/main.js` PASSED on a file with two `const lamp` declarations
+in one scope, because it parses as a SCRIPT and the duplicate is a module-
+instantiation error. The page never booted, and every probe after it timed out
+waiting for `window.__game` with no error anywhere in its output. `pageerr.mjs`
+answers "did it boot, and what stopped it" in ten seconds. RUN IT AFTER EVERY
+EDIT TO main.js — `node --check` IS NOT A GATE FOR THIS FILE.
+
+## r261 — THE GARAGE IS A PLACE IN THE GAME NOW
+A screenshot and four words: "use this example 1:1". The cars stand on a rally
+trail in the pines, in the shelf cards and in the build bay both.
+
+`_diorama()` builds it: painted sky with three bands of drawn treeline, a grass
+plane, a dirt trail with two ruts, fifty-two pines, sixteen rocks and fourteen
+bushes. It replaces the painted room of r259-r260 ENTIRELY — the
+repaint-for-contrast ramp, `BAY_DARK_END`, the moving wall band and the five
+coloured back lamps are all deleted, along with the two probes that measured
+them. A photograph taken on a trail has no wall to light.
+
+BUILT FROM THE GAME'S OWN NUMBERS, which is the whole of "1:1". The silhouettes
+are `_buildTrees`'s two-tier pine — trunk cylinder 0.3/0.52, cones 2.6x4.2 and
+1.8x3.4 — and every colour is lifted out of `THEMES.forest`: trunk 0x6b4423,
+foliage 0x2c6e2a under 0x3c8a34, ground 0x4f8a35, dirt 0x9c7a48, rock 0x8d8578.
+A backdrop invented alongside the world it is meant to belong to is the one way
+this could have looked wrong.
+
+Three things it is careful about:
+
+- **Deterministic.** One fixed LCG, not `Math.random`. The shelf icons are
+  rendered once and cached while the bay is live, so a forest that reseeded per
+  load would put a different wood behind the same car twice on one screen.
+- **Merged per material.** Fifty-two trees as separate meshes is 156 draw calls
+  behind a menu; welded by part it is three, plus one each for rocks and scrub.
+  The far treeline is PAINTED into the sky plane rather than built, because at
+  150 u back it is a silhouette and nothing else.
+- **Only the car casts.** The trail runs 300 u and the wood 160; a shadow
+  camera that covered them would have no resolution left for the one thing this
+  screen is about.
+
+The bay's framing multiplier went 1.62 to 2.0 with it. At 1.62 — tuned to fill
+a painted room — the car sat on bare dirt with the wood cropped away above it.
+A photograph on a trail wants the trail in it.
+
+Part icons keep the plain sweep. A gearbox held up to the light does not stand
+on a rally trail, and a wood behind a 40 px chip is noise.
+
+## r262 — THE FAR PLANE, AND TWO BACKDROPS REDESIGNED FOR NOTHING
+Iterating on r261's forest. The trail got a painted texture — two wheel ruts,
+gravel speckle, damp patches — and a broken edge, because a razor-straight line
+between dirt and grass is a line no trail has. The scene got FOG: every world
+in this game is fogged (`THEMES.forest` runs 320 to 1500) and without it a
+160 u wood is a flat wall of identical cones. Scaled to 46-185, starting well
+beyond the car at 10 u.
+
+### THE GRASS TUFTS, MEASURED
+`dioparts.mjs` hides each welded piece and counts the pixels that change, with
+its triangle count beside it. The first cut sprinkled 150 tufts across nine
+metres of verge: 1800 triangles — 22% of the whole diorama's geometry — for
+1.4% of the frame, because at this camera distance a 0.75 u blade is two
+pixels. Ninety, half again as tall, held within four metres of the trail edge:
+1080 triangles for 3.6%. Forty percent less geometry, two and a half times the
+effect.
+
+### AND THE ONE THAT WASTED THE ROUND
+A white wedge sat in the top corner of the bay. `bayblack.mjs` named it: 7.4%
+of the bay rendering TRANSPARENT — a hole with the dark panel showing through.
+The obvious reading is that the backdrop is too small, so:
+
+  1. the flat plane became a wrap-around CYLINDER, since the camera looks in
+     from +x +z and at 150 u back its view axis is a hundred metres off to one
+     side, so a plane centred on the origin wastes half its width. Measured
+     after: **9.6%. Worse.**
+  2. the cylinder became a sky DOME plus a separate treeline ring, because an
+     open-topped band still lets the frame reach over its rim. Measured after:
+     **9.6%. Identical, to the tenth.**
+
+A number that does not move AT ALL under two different fixes is not a tuning
+problem. The stage camera is `PerspectiveCamera(32, 1.6, 0.1, 120)` — FAR 120 —
+and the dome is at 210 with the treeline at 150. Both were clipped away
+entirely; the "far trees" visible all along were the built mask row at z -78.
+Far 600 on both stage and studio cameras: transparent 9.6% → **0**.
+
+ASK WHETHER THE CAMERA CAN SEE A THING BEFORE REDESIGNING IT. Two backdrops
+were rebuilt to fix a hole that neither of them was ever being drawn into.
+
+## r263 — AUDIT EVERY CAMERA, THEN BUILD THE FOREST ONCE
+r262 ended on a rule: ask whether the camera can see a thing before redesigning
+it. `farplane.mjs` turns that rule into a probe. It walks every camera in the
+running game — race, stage, studio — and measures each one's near/far against
+the bounding sphere of everything its scene actually draws, so a clipped
+backdrop is a line of output instead of a round of guesswork.
+
+The first run flagged the race camera: near 0.5, far 3200, against something at
+**10 034**. It is not a bug. `src/particles.js:147` parks dead particles at
+`y = -9999` and sets `frustumCulled = false`, so the pool draws unconditionally
+and its bounding sphere sits ten thousand units out and means nothing. That
+flag is now the probe's exemption: an object that opts out of culling has opted
+out of this audit too. Stars checked by hand at r 2850 (`src/track.js:18837`),
+inside far 3200. With the exemption in, every camera comes back clean.
+
+### BUILT ONCE, MOUNTED TWICE
+The bay and the shelf-card studio are separate scenes, and a `Mesh` belongs to
+one parent, so each needed its own forest — and was building one. But the mesh
+is the cheap half. The GEOMETRY and the MATERIALS behind it are four canvas
+textures and about seven thousand welded triangles, and those are shareable.
+`_diorama()` now caches `[geometry, material]` pairs on first build and mounts
+fresh `Mesh` wrappers over them the second time; `_studio()` was given the bay's
+fog, because a material compiles a second shader program when the scene fog
+under it differs.
+
+`diocost.mjs`, before/after by `git stash`:
+
+```
+BEFORE  geometries 96  materials 45  textures 12  triangles 13113  2nd diorama 64.5 ms  mem 56.7 MB
+AFTER   geometries 85  materials 34  textures  9  triangles  7196  2nd diorama  0.1 ms  mem 54.4 MB
+```
+
+The second forest costs nothing now. Gates held: `pageerr.mjs` `game? true`,
+`bayblack.mjs` transparent 0% / mean luma 122, `boot.mjs` PASS 4/4, and the
+garage screenshots are pixel-identical — cars on the trail in the shelf cards
+and in the build bay, same as before.
+
+## r264 — THE TRAIL, ITEM BY ITEM OFF THE REFERENCE
+A design breakdown of the Art of Rally trail arrived as a table — gravel
+surface, loose stones, motion dust, soft shadow, stacked pines, mossy roadside
+rock, dappled light — with "apply all above". Four of those the diorama already
+had (r261-263 built the painted gravel trail with its broken edge, the pines,
+the rocks, and the contact shadow under the car). This round is the other four.
+
+### LOOSE STONES: PAINTED GRAVEL IS FLAT
+The trail texture already had gravel speckled into it, and painted gravel has
+no lit edge, no shadow side, and turns with the surface instead of sitting on
+it. What makes a surface read as LOOSE is stone the key light can catch, so it
+gets geometry — squashed TETRAHEDRA and OCTAHEDRA, 4 and 8 triangles, because
+an icosahedron is 20 for a thing four pixels across.
+
+The first cut was one pale grey at 0.3 u and it read as **torn paper** scattered
+over the dirt. Two faults: gravel is not one colour, and a stone that never
+goes darker than its ground has no weight. Two tones, half the size (biggest is
+now 0.2 u — a fist beside a 4.4 u car), 150 of them held to the length of trail
+the bay camera actually frames. 752 triangles.
+
+### DAPPLED LIGHT: A GOBO, NOT A SHADOW
+Real dapple means the wood casting, and the key's shadow camera is a tight ±10
+box round the car precisely so the one thing this screen is about keeps its
+1024 px — widening it to cover a 160 u wood spends that resolution on trees.
+So the canopy is PAINTED and MULTIPLIED over the ground: white where the sun
+lands, cool grey where a branch is in the way, plus seven long soft bars for
+the trunks, which are what say the sun is low and off to one side. Multiply can
+only darken, so it can never blow out the trail.
+
+Two things it must have. `toneMapped: false`, or white stops being white and
+the whole plane reads as haze. And `fog: false` — the fog colour is 0xd2e2cc,
+which multiplies to a green-grey, so a fogged gobo TINTS the far ground
+instead of releasing it.
+
+**Two triangles, and hiding it changes 45.5% of the bay.** Best rate in the
+diorama by three orders of magnitude.
+
+It also costs a stop, which is what putting a scrim over a set does:
+`bayblack.mjs` mean luminance 122 → 106. So open up — stage exposure 1.28 →
+1.34, and 113 with the dapple in. The sky dome is `toneMapped: false` and does
+not move with the exposure; only the lit world comes back up.
+
+The shelf CARDS needed the same and are a different renderer: they came back at
+73-92 against part cards at 131-168. The compensation rides with the forest
+rather than with the renderer — `_shoot` lifts the studio to 1.42 only for
+`ground: true` and puts it back — because the part shots do not show the forest
+and must not move. Car icons 72-92 before this round → **79-100 after**, with a
+canopy shadow added.
+
+### DUST OFF THE TYRES, AND IT IS NOT A CHEAT
+The pivot turns the car at 0.42 rad/s with all four tyres planted, so they are
+scrubbing SIDEWAYS across loose gravel the whole time the screen is open. That
+throws dust. It is also the only moving thing in the picture that reports on
+the SURFACE rather than on the car, which is what dust behind a rally car is
+for. Flat-shaded icosahedra lit by the same key as everything else, so a puff
+has a bright face and a dark one and belongs to the scene.
+
+The first cut — ten puffs, 0.9 u, peak opacity 0.32 — parked what looked like a
+**boulder** against the rear tyre. One solid lump with a lit face and a dark
+one is a rock, whatever colour it is. Dust is a cluster, it is paler than the
+stone around it, and you can see through it: sixteen puffs at half the size,
+two-thirds the opacity, flattened to 0.55 in y so they hug the ground, and half
+a metre further back so they trail the wheel instead of touching it.
+
+`bayshot2.mjs`'s SPIN is useless here — the next frame of the stage loop
+overwrites `pivot.rotation.y` before the screenshot lands, so a puff behind the
+rear wheels is never in shot. `dustlook.mjs` stops the loop first.
+
+### MOSS, AND ROCKS THAT ARE ACTUALLY AT THE ROADSIDE
+The boulders sat 1.4 to 6 u off the dirt, out in the field, where a boulder is
+scenery. Brought in to straddle the 5.25 u trail edge they are what the outside
+of the corner is made of, which is the only reason a rock is interesting. The
+big ones wear moss on top — the one detail that says the rock has been there
+longer than the trail has. 240 triangles, and the weakest thing in the picture
+at 0.3% of the bay; kept because the reference names it and it is 2% of the
+geometry.
+
+### THE THIRD TIER, AND WHAT IT EXPOSED
+Two cones make a fir-shaped blob; the reference's pines are stacked skirts. A
+mid tier at 16 triangles a tree came in at **4.1% of the bay, 8.0 px/triangle**
+— five times the rate of the TOP tier it sits under, which `dioparts.mjs` then
+showed to be the worst thing in the diorama at **1.5 px/triangle**.
+
+Most of that waste was the mask row: 22 trees at z -78, behind fog, doing one
+job — stopping the ground from meeting the painted sky. The low and mid tiers
+make that silhouette; the crowns were triangles spent on nothing. Cut, 528
+triangles back, and the top tier's contribution fell 0.8% → 0.2%, which is the
+proof that the crowns nobody could see were most of what it was drawing.
+
+Net: 7196 → 8829 triangles, second diorama still 0.2 ms (the r263 sharing is
+intact), `bayblack.mjs` transparent 0%, `boot.mjs` 4/4, `farplane.mjs` clean.
+
+### A NOTE ON THE BEFORE/AFTER
+The canopy painter draws from the diorama's own seeded `rnd()`, so adding it
+shifted every placement downstream — trees, rocks, bushes and tufts all
+re-rolled. Nothing wrong with the new layout, but it dropped a 2.5 u scrub bush
+and a boulder into the foreground, nearer the camera than the car. Bushes are
+now held to z -46..-2 and rocks to -38..+2, both behind the subject, because
+the whole job of this screen is to show you a car.
+
+`baypair.mjs` shoots the bay at a PARKED angle from a port you name, so the two
+halves of an A/B are the same picture of the same car — and prints the build
+tag it actually loaded, since srv.mjs has served one branch on both ports.
+
+## r265 — THE FLATTEST THING IN THE PICTURE, AND A TINT THAT WAS NOT THERE
+"It looks a bit plain" is not a finding, so `flatsurf.mjs` makes it one: take
+each welded piece of the diorama, work out which pixels it owns (hide it, diff,
+mask), then report the SPREAD of luminance over those pixels in the real frame.
+A big surface with a tiny spread is a flat fill pretending to be a material.
+
+The answer was not the grass — the canopy gobo is painting variation onto that
+already (sd 23.3). It was the PINE SKIRTS: 9.9% of the bay at **sd 14.0**, the
+lowest spread of anything large in the frame. Fifty trees, one green.
+
+### VERTEX COLOURS, BECAUSE WELDING IS WHY THEY MATCH
+Welding by material is what keeps this menu at three draw calls for fifty
+trees, and the price has always been that every tree is the same colour. A
+colour attribute costs one buffer and no draw calls at all, so `weld()` now
+carries a per-piece tint through, and each tree gets ONE — trunk, skirt and
+crown together, because three tiers that each rolled their own are three plants
+stacked up.
+
+### AND IT DID NOTHING, TWICE
+First measurement: pine skirt sd 14 → 11.9. *Flatter.* But the tint call draws
+from the diorama's `rnd()`, so it had re-rolled every placement after it and
+the two forests were different — the same confound that had already invalidated
+the r264 before/after. So `tintab.mjs` flips `material.vertexColors` on the
+already-built geometry instead: same trees, same camera, one flag.
+
+Second measurement: **every number identical to the tenth, on all four
+meshes.** A change that measures as exactly nothing is usually not a weak
+change; it is an input that never arrived. It hadn't:
+
+> `BufferGeometry.clone()` copies `userData` BY REFERENCE. Every clone of
+> `lowGeo` shared one object with `lowGeo` itself, so `q.userData.tint = t`
+> wrote into that one object and all fifty trees read the last write.
+
+The welded buffer held **one distinct tint**. The screenshot had looked more
+varied to me and it was not; what I was reading as fifty greens was facet
+shading and fog. `q.userData = { tint }` — assign a fresh object, never write
+into the one that is there. `tintab.mjs` now reports `distinctTints` FIRST,
+because that is the check that catches this in one line.
+
+With real tints: skirts **sd 14.5 → 16.5**. Still narrow, so the range went to
+±28% value and ±17% warmth, measured again: **18.0**, and the warm spread on
+the crowns 6.5 → 8.2. A wood varies in hue more than in brightness, and the
+first range was too tight on exactly that axis.
+
+### ONE RNG STREAM PER SUBSYSTEM
+Three rounds running, an insertion re-rolled the whole forest: the gobo moved
+every tree, the tint moved them all again, and twice that turned a before/after
+into two different pictures. It also dropped a bush into the camera's lap in
+r264 and a whole pine into it here. So the single `rnd()` is now six streams —
+`rSky`, `rTrail`, `rDap`, `rTree`, `rRock`, `rScrub`. A change to the pines
+cannot move a rock, and an A/B is an A/B.
+
+With that stable, three framing fixes that were being masked by the churn: near
+pines held to z -58..-2 (they ran to +16, and a 10 u tree that close is a green
+wedge across the corner), their lane in from 11.5 to 9.6 so the wood crowds the
+trail instead of standing back from it — 8.2 was closer still and cropped every
+near crown off the top, which throws away the silhouette the third tier exists
+for — and the canopy plane out from 46 to 62, because the camera sees well past
+the verge and grass outside the gobo is a pale flat band down one edge.
+
+Gates: bay mean luminance 115, transparent 0%; car icons unchanged at 79-100;
+`boot.mjs` 4/4; `farplane.mjs` clean; second diorama still free; 8829 → 8909
+triangles (the colour buffer, not geometry).
+
+## r266 — A GREEN SCREENSHOT, AND THE BUG UNDER IT
+Reported off a phone with one line: "Fix needed." NEO-KYOTO, the whole frame
+one radioactive olive.
+
+### FIRST, MEASURE THE PICTURE
+`shotcast.mjs` reads a screenshot's mean RGB. The phone frame came back at
+**(65.5, 82.5, 16.0)** — the BLUE CHANNEL ALL BUT DEAD — with green 41.7 points
+over the red/blue average. That is not a haze, it is a gamut collapse, and it
+named the world in one search: `undercity` is the only theme whose lights are
+that saturated.
+
+### AND THEN THE THING THAT WAS NOT THE COMPLAINT
+`worldcast.mjs` reproduces a world's cast from the camera it is played from.
+NEO-KYOTO measured luminance 9 with 77% of the frame black — nothing like the
+phone. Two runs with different physics returned **identical numbers to the
+decimal**, which no two runs of a moving car can. The scene graph said why:
+`camPos [0, 0, 0]`, and in the console, once a frame, swallowed —
+
+> `[frame] recovered from TypeError: this._syncLights is not a function at
+> PlayerCar.update (vehicles.js:4779)`
+
+`_syncLights` was written on `EnemyCar` while its own comment already said
+"both the player and the rivals come through this class", and `PlayerCar.update`
+calls it on its FIRST line. So on EVERY LEVEL the player's entire update threw
+and was skipped. The frame loop catches and recovers, so there was no crash, no
+stack in `pageerr.mjs`, and `boot.mjs` sat at 4/4 the whole time: no player
+physics, no player headlights, and a chase camera parked at the world origin.
+Moved to the base `Car`. Anything both subclasses call belongs there.
+
+`playermoves.mjs` is the gate that would have caught it — held throttle, then
+assert the car moves, the camera is not at the origin, and nothing was
+swallowed by the frame loop's catch. Verified by REINSTATING the fault: it
+fails with `CAM AT ORIGIN` and prints the swallowed TypeError.
+
+### THE GREEN ITSELF
+With the player driving again, the reproduction matched the phone: mean
+**(54.8, 69.3, 9.5)** against PINE VALLEY's (67.6, 84.1, 60.4).
+
+The theme comment above these constants tells the first half of the story — an
+earlier round measured `undercity` as the darkest world in the game at 7.6/255
+and fixed it. It fixed it by getting BRIGHTNESS OUT OF A SATURATED LIGHT:
+hemiSky `#8a9a5c` at intensity **5.5**, a `#d8e87a` sun at 3.0. That does not
+light a green world, it multiplies every albedo in it by green and clips the
+rest. The tell is the car — its yellow paint came out cyan-white. A car whose
+paint you cannot see is the clearest evidence a cast is broken.
+
+Light with intensity, tint with colour. The lights come most of the way back to
+neutral; the sickly cast stays where a cast belongs, in the fog, the haze and
+the materials, all untouched. `castsweep.mjs` patches the lights in the running
+scene and re-measures, five tunes in one load, because NEO-KYOTO takes ninety
+seconds to build and reloading per guess is an afternoon:
+
+```
+as-is  (54.6, 69.1,  9.2)  green+37.2  lum 61.7  dark 11.7%
+A      (42.2, 53.5, 16.1)  green+24.4  lum 48.4  dark 18.9%
+B      (42.3, 49.5, 18.6)  green+19.0  lum 45.7  dark 21.0%
+C      (51.9, 60.3, 25.8)  green+21.5  lum 56.0  dark 14.9%   <-- shipped
+D      (50.9, 63.7, 21.9)  green+27.3  lum 57.9  dark 14.1%
+```
+
+C: blue nearly tripled, green excess down to what a forest reads (PINE VALLEY
+is 20.2), and luminance held at 56 — the world stays lit, which was the whole
+point of the first fix. `hemiSky 0x929c88`, `hemiGround 0x5f6252`, hemi 4.2,
+`sunColor 0xe0e8c0`, sun 2.8.
+
+The blown-out headlight in the same screenshot needed no separate fix: an
+additive beam on a road that is already flooded has nowhere to go. At the chase
+camera in the corrected world, **0% of the frame is blown**, and the player's
+lamps are on (they could not have been before — `_syncLights` threw).
+
+### THREE PROBE FAULTS PAID FOR ALONG THE WAY
+1. `drawImage(renderer.domElement)` returns a BLANK after the frame is
+   presented — no `preserveDrawingBuffer` — and re-running `composer.render()`
+   first does not help. Every world read as (0,0,0). Screenshot through the
+   compositor instead.
+2. `input.throttle` is a GETTER with no setter (`input.js:150`). `g.input.throttle
+   = 1` silently does nothing, so the first three runs of `playermoves.mjs`
+   measured a car free-rolling and called five worlds broken. `input.analog.throttle`
+   is the settable one; with it, NEO-KYOTO drives at 27 — faster than PINE VALLEY.
+3. Frame counts are not time. "180 frames" under swiftshader is a different
+   amount of simulated time every run — the same gate passed PINE VALLEY at 172 u
+   travelled and failed it at 64 u ten minutes later. Wall-clock windows, and
+   `camToCar` is REPORTED rather than asserted: the camera lerps in from the
+   origin and a grid 264 u out is still arriving when the window shuts.
+
+## r267 — A CLEAN BILL OF HEALTH, AND A PHANTOM
+r266 found `_syncLights` by accident, and the thing that made it invisible was
+the frame loop's own catch. So this round went looking for the rest of that
+class, and for whatever else the undercity green was a symptom of. One real
+fix, one clean sweep, and one bug that turned out not to exist.
+
+### THE CATCH REPORTED ONCE. EVER.
+`Game.frame()` kept a single `_frameErr` and reported only if it was unset, so
+the FIRST throw of a session silenced every DIFFERENT one after it, permanently.
+And a throw that repeats every frame — which is the normal case — means the
+first one is always already there. `_syncLights` sat in exactly that shadow: it
+fired on frame one of every level, so any second fault in the same session was
+invisible to a player and to every probe. Keyed on the message and the top
+stack frame now: each distinct fault reports exactly once, and a new one is
+never hidden behind an old one.
+
+### AND THEN NOTHING WAS HIDING
+`swallowed.mjs` drives each level for seven seconds — throttle, steering,
+cannon, missiles, mines, shockwave — and collects whatever the catch printed.
+Twelve levels across every biome: **nothing swallowed.** `_syncLights` was the
+only one of its kind.
+
+The first cut of that sweep reported clean having tested nothing. It called
+`g.fireCannon?.()`, `g.dropMine?.()` and three more names that do not exist —
+the real API is `game.weapons.fireBullet/fireMissile/dropMine/fireShockwave(car)`
+— and `?.` turned every one into a silent no-op. Same shape as r266's
+`input.throttle` getter. **A probe that cannot find its subject must SAY SO,
+not pass**: it now throws on a missing name.
+
+### THE PHANTOM, IN THREE WRONG METRICS
+The undercity green was found because a saturated light drags every albedo in
+the frame toward one hue. Does that swallow the CARS anywhere else? A static
+scan for the same signature — saturation times intensity — flagged `volcano`,
+`wildfire`, `oldtown` and `neon`, and `worldcast.mjs` gained `minChannel`, the
+number that named NEO-KYOTO (blue at 9/255). EMBER PASS came back at
+(86, 28.6, **8.6**) and FOREST FIRE ESCAPE at (95, 26.1, **11**) — worse, on
+that measure, than the undercity ever was. And looking at FOREST FIRE ESCAPE, a
+red rival on a red road looked genuinely lost.
+
+So `carvisible.mjs`: mask each car, measure its CIE76 distance from the ground
+ring around it. Three metrics before one of them was right.
+
+1. **Mask by diffing a hidden car.** Reported delta-E 1 to 4 for EVERY world,
+   PINE VALLEY included, where the car is plainly visible. A metric that cannot
+   separate a world you know works from one you suspect does not is measuring
+   noise — and it was: a threshold of 22 summed over three channels is met by
+   seven per channel, so the mask filled with antialiasing and drifting embers.
+   Key-colour masking instead, which is the ground truth `eyesweep.mjs` had to
+   learn for the same reason.
+2. **Mean car against mean ground.** Now it discriminated — and said the fire
+   worlds were fine (26 to 35) while the pale rival was at **5.8** on PINE
+   VALLEY, 6.4 on REDWOOD, 8.5 on NEO-KYOTO. Two of seven rivals are near-white
+   (DUNE `#dce8f0`, ALPINE `#f2f0e8`) and almost every ground in this game is
+   pale. That reads as a real, structural bug, so every car got a thin dark
+   ground plate — paint-independent, sized inside the wheel track so no
+   bounding box moved. It changed the number by **0.3**.
+3. **Per pixel.** A change that measures as almost nothing is usually the
+   metric, not the change (r265, the tree tints). It was. The mean of a car
+   against the mean of its ground asks whether the car matches ON AVERAGE, and
+   that is not what makes a shape visible: a car holding both black tyres and
+   pale bodywork averages out to the colour of the road while every part of it
+   separates cleanly. Score each car pixel instead:
+
+```
+                      visible%   median dE
+PINE VALLEY  rival 2    86.7       34.1     (mean-vs-mean said 5.8)
+REDWOOD      rival 2    72.8       33.1     (said 6.4)
+every car, every world  73-99      33-66
+```
+
+**There was no visibility bug.** The plate is reverted: it bought under 1.5
+points on a metric where everything already passes, and this repo does not ship
+geometry that cannot show its work — the same rule that cut the grass tufts and
+the pine crowns. The probe stays, with its three failures written into it, and
+the `PLATE=off` toggle stays as the shape of a correct A/B: hide the thing,
+never rebuild the scene without it.
+
+## r268 — HEADLIGHTS ON EVERY CAR, AND A CAMERA THAT WAS LOSING THE CAR
+Two phone reports. The second one turned up something worse than either.
+
+### "ALL CARS NEED TO HAVE HEADLIGHTS" — THEY ALL DO
+`lampcheck.mjs` lists every car with whether it HAS a lamp rig and whether the
+rig is on, sampled on the grid and again racing, because "no lights" and
+"lights that only arrive after the lights go green" are different bugs. On
+NEON GRID all eight — player and every one of the seven rival styles — report
+`rig: true, on: true` in both states. They also share ONE material
+(`carLightMaterial`), so no car can be lit differently from another. There was
+nothing to fix in the cars.
+
+What differed was the CAMERA. `fadeCarLights` dims that shared material by how
+far down the camera looks, because a beam lying flat on the road seen from
+straight above is a painted puddle rather than light. `beamread.mjs` reads the
+opacity it settles on per mode:
+
+```
+TOP-DOWN  down 0.76   opacity 0.238
+TOP FAR   down 0.82   opacity 0.238
+TRAIL     down 0.55   opacity 0.461
+CHASE     down 0.23   opacity 0.850
+```
+
+Both overhead modes sat on the floor of the curve at 28% — **and TOP-DOWN is
+the camera the game starts in.** At that strength the nearest, best-angled car
+still throws a visible beam and the others do not, which reads exactly as "some
+cars have headlights and some don't". `CAR_LIGHT_TOPDOWN_CUT` 0.72 -> 0.45:
+TOP-DOWN opacity 0.238 -> 0.468, TRAIL 0.461 -> 0.607, CHASE unchanged. The
+fade stays, because the reason for it is real; it just may not take the whole
+read away.
+
+**A metric that did not work, stated as such:** `beamread.mjs` also counts the
+pixels that change when every rig is hidden, and on NEON GRID that count barely
+moved (22 338 -> 23 400 in TOP-DOWN) while the opacity doubled. The world
+animates — neon strips, holo boards, particles — and at a diff threshold that
+low the count is mostly animation. The opacity is exact and the before/after
+screenshots are plain; the pixel count is not evidence here and is not quoted
+as any.
+
+### AND THE CAMERA WAS LEAVING THE CAR BEHIND
+The other report: CANYON RUN, half the frame a flat slab of cliff, the car
+shoved into the corner behind the buttons. `_watchCarVisible` does not fire on
+that and is right not to — it tests hidden, buried and OFF SCREEN, and the car
+was none of those. It was on screen and behind a rock.
+
+Parking the car and pushing it sideways showed nothing: the lateral clamp held
+out to 30 u off the racing line and the car stayed dead centre of frame.
+Teleporting between stations showed a camera 100-180 u away, but that was the
+probe — a camera asked to catch up from a third of a lap is not a thing a
+player ever does. So `caproll.mjs` RAILS the car: one small index step a frame,
+all the way round, sampling as it goes.
+
+```
+CANYON RUN   camDist  51 -> 110 -> 240 -> 372 -> 439 -> 490, never recovering
+PINE VALLEY  camDist  51.1 to 52.0 at every sample of the same lap
+```
+
+The only difference between those two worlds on this path is `cliffWalls`, and
+the only code gated on it is `clampCam`. `nearestIndex` searches ±30 samples
+around its hint, so once the camera drifts past that window it resolves against
+the WRONG piece of track; `lateralOffset` is then measured from a centreline
+that is nowhere near, and the clamp pushes the camera along an arbitrary
+normal — which makes the next frame's offset bigger. A correction that
+compounds.
+
+Two fixes. The cause: **a clamp may only pull the camera in, never push it
+out** — one line, and it cannot be argued with. And the symptom, in the spirit
+of the watchdog above it: **the boom has a length.** Every guard in that
+function moves the eye for a good reason and any of them can be wrong about
+where it put it; none checked the one thing always true, which is that a chase
+camera three times its own boom length from the car has failed whatever the
+reason. Past twice the boom it snaps to where the mode says the eye belongs.
+
+After: camDist median **51.2** across the whole lap, max 80.3 — inside the
+leash, and two transient samples rather than a runaway. `boot.mjs` 4/4,
+`playermoves.mjs` passes CANYON RUN as well as PINE VALLEY.
+
+## r269 — "BRING BACK HEADLIGHTS FOR ALL CARS", AND WHY IT KEPT COMING BACK
+Asked a second time, which meant the first answer was wrong. It was.
+
+### WHAT IS ACTUALLY DEPLOYED
+`origin/main` is at **r245**, `gh-pages` carries `deploy: e72f52c` — main's head
+— and https://jozelazarevski.github.io/racing-shooter/ serves `build-tag r245`.
+Every round since is on `claude/design-replication-o09hkl` and has never been
+published. So the phone reports of the last several rounds are all reports
+about r245, and checking a symptom against the working tree answers a question
+nobody asked.
+
+`git show origin/main:src/vehicles.js | grep -c carLights` → **0**. The whole
+merged lamp rig does not exist there. r245 does headlights as commit 55bdd77
+describes them: "One spotlight, built ONCE at startup and left in the scene for
+the whole session" — a single `THREE.SpotLight` on `this._headlight`, attached
+to the PLAYER. One headlight in the world, and it belongs to you. That is
+exactly and completely why only the player's car throws a beam in the phone
+shots, and "bring back headlights for all cars" is a precise description of it.
+
+The per-car rig — every car carrying its own merged additive lamps, pools and
+tail lenses in one draw call — is branch work. It answers the report. It has
+simply never reached the player.
+
+### TWO REAL FAULTS FOUND WHILE LOOKING ANYWAY
+**The cache that could only cost you your headlights.** `_syncLights`
+remembered the track it had decided for and returned early ever after — so the
+decision stuck to a CAR that had since been given a different MESH, and a
+freshly built rig has its lamps off. `swapPlayerCar` knew to clear the flag by
+hand; nothing else did and nothing added later would. It was guarding one
+boolean write per car per frame, eight on a full grid. Gone.
+
+**The fade, again.** r268 took `CAR_LIGHT_TOPDOWN_CUT` from 0.72 to 0.45, and
+0.45 still halves the beam in the mode the game opens in. Halved is what "some
+cars have headlights and some don't" looks like on a phone. 0.18: top-down
+opacity 0.238 → 0.468 → **0.697**. The purist case for a deep cut — a wedge
+lying flat on the road reads as paint rather than light — loses to being asked
+twice. What survives is a gentle taper rather than a cliff.
+
+Verified with `fieldshot.mjs`, which packs the field round the player and
+shoots a named camera: NEON GRID, all eight cars `on`, every one throwing a
+visible wedge in TOP-DOWN. PINE VALLEY, all eight `OFF`, so `worldIsDark` still
+does its job and nobody drives a daylit world with the lights burning.
+
+## r270 — THE CLIFF CAMERA I COULD NOT REPRODUCE, AND WHAT MEASURING IT FOUND
+A phone shot of CANYON RUN: half the frame one flat slab of rock, the car
+shoved into the bottom-right corner behind the buttons, 11 km/h, hull 77, 8th
+of 8. Diagnosed as the chase camera inside a cliff. Four reproductions, none of
+them it.
+
+1. **Park the car at lateral offsets 0 to 30.** Occlusion of the car's own
+   silhouette rose 8% → 33%, but the car sat at NDC x = -0.02 at EVERY offset,
+   against +0.55 in the report. The car also never actually left the road:
+   `WALL_LIMIT` snaps it back inside the barrier before the camera sees it, so
+   the poses I picked were not the state being reported.
+2. **Drive straight into the walls for forty seconds.** The car reaches 74 u
+   off the centreline — it leaves the canyon entirely — and `|ndcX|` peaks at
+   **0.23**. The camera follows it out without complaint.
+3. **Instrument the clamp.** It works: the eye pins at lateral -8.2 while the
+   car runs out to -15.4, `dist` holds 51 against a nominal 48.7, and the car
+   stays on screen throughout.
+4. **Raycast eye-to-car, every third frame, three camera modes.** A probe can
+   `import('three')` in the page — the import map applies — so this is exact
+   and needs no readback. **0 occlusions in 112 samples.** And the ray set was
+   checked rather than assumed: 988 solids kept, 65 dropped, and every dropped
+   one is haze, contact shadow, decal or car lamp.
+
+The hypothesis is dead, and the geometry says why. `_cliffRibbon`'s rows put
+the FOOT nearest the road and every row above it further out — the faces lean
+away as they rise, so there is no overhang for an eye to get behind. Rock
+nearest approach 11.05-11.3; camera bounded at 8.4.
+
+### WHAT THE MEASURING DID FIND
+`cliffgap.mjs` reads the cliff foot per station. On CANYON RUN the face is
+nominally `WALL_OFF + 0.65 + cliffSetback` = **37 u** out — and `_cliffCap`
+pulls it in to **11.3 at sixteen stations**, wherever the lap comes back past
+itself. A three-fold variation.
+
+The camera's guard is the constant `lim = 8.4`, and it reads neither number. It
+clears the rock by 2.9 u for no reason anybody had checked: change
+`cliffSetback`, change the cap, change `WALL_OFF`, and the eye starts sitting
+in stone with no test to catch it. `track.cliffFoot` now publishes the measured
+foot per station and per side, and `clampCam` takes `Math.min(8.4, foot - 2.6)`
+— so the limit can only tighten, never loosen.
+
+**It changes nothing today**: closest foot 11.05, so `foot - 2.6` = 8.45 and
+the constant still wins at every station on every cliff world. That is the
+point. A coincidence became an invariant, and the number that used to be
+load-bearing by accident now has the thing it guards on the other side of it.
+
+The report itself stays open and honest: I do not know what produced that
+frame, and I have written down the four things it is not.
+
+
+> NOTE ON NUMBERING: the two section lines below ran in PARALLEL sessions
+> and both used r271+. The AGENT-DRIVER line (driving/difficulty measurement)
+> and the MAIN line (landscape/attract/canvas fixes, deployed as build r271-r273)
+> are different work; read the titles, not the numbers.
+
+# --- AGENT-DRIVER LINE (parallel sessions) ---
+
+## r271 — AN AGENT FINALLY DROVE EVERY WORLD, AND THE NUMBER THAT DID NOT EXIST NOW HAS A FIRST ANCHOR
+
+Asked: "can the agent drive all tracks and investigate bugs". It can, it did —
+all 78, through the same inputs a thumb has. `tools-scratch/agentdrive.mjs` is
+the driver: pure pursuit on the centreline, curvature-limited target speed,
+fed through `g.input.analog`, stepped with the fixed-delta synchronous-frame
+trick. Every harness before it teleported the player or held the throttle
+open-loop; none of them could be shot, mined, or punished for a corner taken
+badly, which turned out to be the entire story.
+
+### THE CLEAN BILL, FIRST
+Across 78 worlds driven at racing speed: **zero** page errors, zero swallowed
+frame-loop faults, zero NaN, zero under-terrain, zero stuck spots, zero
+teleport rescues. The camera held within 35 u of the car on 77 worlds (the
+r270 leash never fired). The two carry-fowards: RED CENTRE RUN showed one
+transient camera excursion to 74 u — inside the leash, unexplained, bounded —
+and CAPO MELE let the driver reach lateral 15.9 on a half-width-9 road
+(one hairpin overshoot; WALL_LIMIT should have argued sooner).
+
+### WHAT ACTUALLY BREAKS A DRIVEN LAP: NOTHING GEOMETRIC. EVERYTHING MARTIAL.
+On NORMAL, a driver that holds a competent line but never shoots, never
+dodges and never uses a pickup reaches hull 0 on ~70 of 78 worlds and burns
+all three hulls before completing lap 1 on **22** of them. `whokilled.mjs`
+(new) wraps `player.damage()` and buckets every hull point by caller:
+
+    NEON GRID    fire 309 (named rivals) + 83 mines, walls 8     — all combat
+    DUST CANYON  fire 388 + 79 mines + 109 stone                 — mostly combat
+    PINE VALLEY  stone 212 + fire 114                            — mostly corners
+
+The anonymous 38-52 hits are MINES (weapons.js:719 `onPlayerHit(dmg, null)`),
+laid on the racing line, eaten by anything that follows the racing line. The
+stone hits are the driver's own cornering: `nearsamples.mjs` shows PINE
+VALLEY's repeat offenders at samples ~93/~294 are the EDGE RAILS at |lat|
+10.8 on a half-width-9 road — the wall is where it belongs; pure pursuit
+carried ~25 u/s of normal speed into it. NOT the One Defect. No placement
+fault surfaced anywhere in the sweep.
+
+### THE A/B THAT SETTLES WHETHER THAT IS A BUG
+Same driver, same eight worst worlds, `DIFF=easy` (localStorage `ir-diff`):
+**8/8 lapped, six with zero wrecks, hull 18-81 remaining** — against 0/8 on
+normal. The difficulty ladder does its job; NORMAL is tuned on the assumption
+the player fights back. Whether that assumption should hold for the DEFAULT
+tier is a design question, now with numbers attached, not a defect. Nothing
+was tuned this round — MEASUREMENT DISCIPLINE holds.
+
+### ITEM 1, PARTIALLY PAID
+Nobody had ever measured a competent lap. Now: agent laps 26-75 s across the
+roster (full table below), and mid-race pace sampled from the same runs puts
+the agent at 0.70-0.77 laps/30 s with rivals at 0.53-0.86 on the same worlds
+— the field paces the player, as designed, and the old 0.5-0.9 laps/30 s
+figure reproduces. Grid placement starts everyone at progress ~0.9 with
+`_wraps` compensating, so raw `progress` deltas from the grid overstate rival
+pace by a whole lap; measure mid-race or not at all (agentdrive's `rival@lap`
+column suffers exactly this and is not evidence).
+
+CAVEAT, stated plainly: this is an AGENT baseline, not a human one. It brakes
+earlier than a human and never uses nitro, never fights. It is a floor with
+known biases, but it is reproducible, per-world, and it exists.
+
+    agent lap times, NORMAL, r271 tree (w = wrecks in the run; "3-wreck" =
+    race ended by the three-hull rule before lap 1):
+     1 PINE VALLEY            40.5s        w0   |        2 DUST CANYON            33.5s        w2
+     3 FROST PEAK             56.6s        w2   |        4 CANYON RUN             49.9s        w2
+     5 EMBER PASS             32.6s        w0   |        6 SUMMIT CLIMB           39.4s        w1
+     7 GLACIAL PASS           39.7s        w1   |        8 AMAZON RAPIDS          3-wreck (45.7s on easy) w3
+     9 THE DUNE SERPENT       39.4s        w2   |       10 ROCKFALL RAVINE        58.3s        w2
+    11 OASIS AMBUSH           35.7s        w2   |       12 REDWOOD RAMPAGE        50.4s        w1
+    13 LOG FLUME FURY         3-wreck      w3   |       14 FOREST FIRE ESCAPE     58.3s        w2
+    15 GLACIER'S GRIND        47.3s        w1   |       16 AVALANCHE ALLEY        69.2s        w2
+    17 NEON GRID EXPRESSWAY   3-wreck (55.4s on easy) w3   |       18 UNDERCITY SLIPSTREAM   44.8s        w1
+    19 GOTTHARD CLIMB         52.8s        w2   |       20 TREMOLA DESCENT        49.5s        w0
+    21 FURKA RIDGE            3-wreck      w3   |       22 COL DE TURINI          55s          w2
+    23 OUNINPOHJA             28.1s        w2   |       24 FAFE LEAP              31.5s        w1
+    25 PIKES PEAK             53.3s        w1   |       26 SAFARI PLAINS          38.2s        w2
+    27 CORNICHE               3-wreck (43s on easy) w3   |       28 ESTONIA CRESTS         3-wreck      w3
+    29 OLIVE COAST            3-wreck      w3   |       30 LANTERN QUARTER        3-wreck (41.5s on easy) w3
+    31 HEDGEROW DASH          43.9s        w2   |       32 RED CENTRE RUN         58.3s        w0
+    33 RED BULL RING          3-wreck      w3   |       34 MONACO STREETS         32.2s        w2
+    35 SILVERSTONE            36.2s        w0   |       36 SPA-FRANCORCHAMPS      41.2s        w2
+    37 SUZUKA                 34.4s        w2   |       38 NORDSCHLEIFE           3-wreck      w3
+    39 MONZA                  28.5s        w1   |       40 MARINA BAY             35.8s        w2
+    41 MOUNT PANORAMA         3-wreck      w3   |       42 RALLYCROSS ARENA       31.5s        w2
+    43 OULTON PARK            38.9s        w2   |       44 LAGUNA SECA            41.3s        w2
+    45 TOUR DE CORSE          75.4s        w1   |       46 VINEYARD VELOCE        53.3s        w2
+    47 DEEPWOOD TRAIL         3-wreck      w3   |       48 DOLOMITI CORSA         55.9s        w1
+    49 HARBOR QUAY            26.1s        w2   |       50 CINQUE TERRE           37.7s        w2
+    51 AEGEAN BLUE            33.4s        w2   |       52 COSTA BRAVA            3-wreck (46.9s on easy) w3
+    53 DALMATIA DRIVE         3-wreck      w3   |       54 COTE D AZUR            48.4s        w2
+    55 BRIDGE RUN             3-wreck      w3   |       56 OLIVE CROSSING         3-wreck      w3
+    57 MOUNTAIN TO SEA        52.8s        w1   |       58 CITADEL BAY            3-wreck      w3
+    59 CLIFF KNOT             48.5s        w2   |       60 SEA CLIFF RUN          3-wreck (50.8s on easy) w3
+    61 OLIVE PASS             54.5s        w3   |       62 CAPE OLIVETO           3-wreck      w3
+    63 TERRAZZA ALTA          74.1s        w0   |       64 SALINE SPRINT          27.2s        w1
+    65 GRANITE NARROWS        25.8s        w2   |       66 GLACIER COL            35.7s        w1
+    67 TIMBER GORGE           34.9s        w0   |       68 LARCH GOLD             45.6s        w1
+    69 MAPLE MILE             3-wreck      w3   |       70 HARVEST RUN            3-wreck (38.1s on easy) w3
+    71 CIDER LANE             53.1s        w2   |       72 BRACKEN MOOR           74.1s        w0
+    73 ALASSIO SEAFRONT       44.8s        w3   |       74 IL BUDELLO             31.5s        w0
+    75 PORTO MOLO             3-wreck (36.1s on easy) w3   |       76 CAPO MELE              55.1s        w1
+    77 GENOVA PORTO           38.7s        w0   |       78 SANREMO STAGE          74.8s        w0
+
+### FOR THE NEXT SESSION
+- The 14 "3-wreck" worlds not yet re-run on easy: run `DIFF=easy agentdrive`
+  before believing anything about them.
+- If the arsenal is ever taught to the agent (shoot back, dodge mines), the
+  normal-tier numbers above become the "passive floor" against which that
+  driver's survival measures what fighting back is worth.
+- `whokilled.mjs` keys damage by call stack; if main.js moves, the line
+  numbers in its output move with it — the buckets are still right, the
+  labels just need re-reading.
+
+## r272 — THE THREE CARRY-FORWARDS SETTLED, AND WHAT FIGHTING BACK IS WORTH
+
+### ALL 22 "3-WRECK" WORLDS LAP ON EASY. THE ROSTER HAS NO UNLAPPABLE WORLD.
+The 14 not yet re-run in r271, on `DIFF=easy`: 14/14 lapped (33.1-54.9 s),
+nine of them with ZERO wrecks — NORDSCHLEIFE hull 70 remaining, BRIDGE RUN
+62, MOUNT PANORAMA 54. With r271's eight that is 22/22: every world that
+ended a passive NORMAL run by the three-hull rule laps cleanly one tier
+down. Geometry is never the blocker; the guns are.
+
+    13 LOG FLUME 33.1s w1    21 FURKA 54.9s w1     28 ESTONIA 38.5s w0
+    29 OLIVE CST 37.2s w0    33 RB RING 35.6s w0   38 NORDSCH 33.5s w0
+    41 PANORAMA 35.7s w0     47 DEEPWOOD 44.6s w0  53 DALMATIA 37.4s w0
+    55 BRIDGE  42.4s w0      56 OLIVE X 52.0s w0   58 CITADEL 34.7s w0
+    62 CAPE OL 38.6s w1      69 MAPLE   38.5s w2
+
+### WHAT FIGHTING BACK IS WORTH: 0/8 BECOMES 5/8, ON NORMAL
+`agentdrive.mjs` grew `FIGHT=1`: hold Space when a rival sits within 55 u
+and 0.22 rad of the nose, tap E for a homing missile when one is lined up
+10-50 u out, once per 8 s. The DRIVING is unchanged — the delta is the guns.
+On the same eight worlds where the passive driver went 0/8 on NORMAL:
+
+    AMAZON RAPIDS  46.6s w1 k1     NEON GRID   54.9s w2 k7
+    LANTERN QTR    42.5s w2 k5     HARVEST RUN 36.3s w1 k2
+    PORTO MOLO     36.0s w1 k3     CORNICHE    3-wreck k5
+    COSTA BRAVA    3-wreck k2      SEA CLIFF   3-wreck k2
+
+5/8 lapped, wrecks per run 3 -> 1-2, one to seven rivals destroyed with a
+thumb-grade aim policy (no lead, no mine avoidance, no pickup use, no
+nitro). So NORMAL's assumption is now a measured statement: a driver who
+merely SHOOTS at what is in front of them survives most worlds; add the
+dodging and pickups a human actually does and the tier is honest. The three
+that still 3-wreck under a crude gunner are the sharpest combat worlds on
+the roster and the first place a difficulty pass should look — with numbers,
+not vibes.
+
+### THE TWO ODDITIES FROM r271, CLOSED
+- CAPO MELE lateral 15.9: does not reproduce (9.6 on re-run). The clamp
+  code says why it CAN happen at all: on non-cliff worlds the player is
+  deliberately unclamped — "the world is open and off-road slowness is the
+  boundary" (vehicles.js track-constraint block). A wide moment on an open
+  verge is the design working, not WALL_LIMIT failing. r271's carry-forward
+  note mis-read the rule; corrected here.
+- RED CENTRE RUN camera 74 u: reproduces exactly — at sample 6, i.e. the
+  RACE-START transient while the chase camera converges from its grid pose,
+  settling to ≤33 for the rest of the lap. Inside the r270 leash, visible
+  for under a second, on the world with the longest start straight. Benign.
+  `camAt`/`latAt` in agentdrive now locate this class of thing in one run.
+
+### FOR THE NEXT SESSION
+- CORNICHE, COSTA BRAVA, SEA CLIFF RUN: the three worlds that kill even a
+  shooting driver on NORMAL. whokilled.mjs on those three, on NORMAL, is
+  the next measurement: if it is mines-on-the-line, the mine ring's
+  visibility at racing speed is the design question; if it is missile
+  volume, the global rocket budget (g._aiRocketMin) is.
+- The FIGHT policy never dodges: teaching it to read `weapons.mines`
+  positions and offset the pursuit line ±3 u would separate "mines are
+  fair" from "mines are unavoidable on a line-width road".
+
+# --- MAIN LINE (deployed builds r271-r273) ---
+
+## r271 — LANDSCAPE, AND THE CAR THAT NEVER COUNTED AS STUCK
+Two, reported together off a tablet held sideways.
+
+### THE HUD WAS LAID OUT FOR A TALL SCREEN
+`landscape.mjs` measures every visible HUD box and reports the pairs that
+overlap, which turns "it looks cramped" into a list:
+
+```
+health-box x joy-base   8194 px2      the stick's ring on the hull readout
+t-unstuck  x info-box                 SOS through the CONTRACTS list
+t-unstuck  x health-box
+```
+
+Three causes, all of them the same mistake — treating landscape as portrait
+with less height:
+
+1. `#joy-zone{height:80%}` in the `max-height:560px` block. On the screen with
+   the LEAST height, the stick's zone was made TALLER. Landscape's spare room
+   is horizontal: 52% wide, 47% tall.
+2. `#t-unstuck{bottom:214px}`. On a 402-tall screen that is y=144 — straight
+   through the contracts list. Moved along the bottom edge, clear of the ring
+   and the speedo.
+3. And the one that mattered: **`base.style.top = r.height - 110`**
+   (`input.js`). The zone is anchored to the bottom, so this puts the ring's
+   centre 110 px off the floor on EVERY screen, whatever the zone's size. At
+   402 tall that is y=292, and with a 62 px radius the ring reaches 230 and
+   sits on the hull panel. Shrinking the zone did not move it — the overlap
+   came back **identical to the pixel**, which is the tell every time. Now
+   `Math.min(110, innerHeight * 0.22)`: unchanged in portrait, 88 in landscape.
+
+All three orientations: **no visible overlaps**.
+
+### AND THE GREEN BANDS
+`setSize(w, h)` writes `style.width/height` in pixels, which overrides the
+`inset:0` that is supposed to make the canvas cover the screen. Anywhere
+`innerWidth` is narrower than what the player can actually see — iOS insets the
+layout away from the notch in landscape — the page background shows through as
+a band down each edge, and that background was `#7fb85c`. `setSize(w, h,
+false)` leaves the CSS alone so the canvas covers by `inset:0`, and the page
+behind it is black, so anything left over reads as a bezel instead of a fault.
+
+### THE WEDGE NET COULD NOT SEE A CAR GRINDING ON A WALL
+Photographed: 0 km/h, lap 0 of 3, thirty-nine seconds in, last of eight, car in
+the barrier. The player DOES have a free rescue — `_wedgeT > 5` — and it never
+fired, because the test was
+
+    input.throttle > 0.5 && speed < 0.8      // and the timer reset to ZERO
+
+A car pinned on a barrier is never still. It jitters, bounces and scrubs, and
+ONE frame above 0.8 in five seconds cleared the clock. It was going nowhere and
+it never qualified as wedged. Now it is judged on DISPLACEMENT: anchor a
+position while the throttle is held, and six metres of real progress clears the
+anchor. Six metres in five seconds is 4.3 km/h, so a genuine crawl is untouched.
+
+The rescue also re-seated the car at the SAME index — the exact trap the
+rivals' pit-lift was fixed for in `EnemyCar._liftAhead`, never carried across to
+the player. Rescues that follow within 25 s now step further down the lap.
+
+`wedgetest.mjs` took three cuts to be worth anything, and the first two are
+worth recording. It first passed as soon as the car had travelled 25 u — which
+a car that simply steers around the obstruction also does, proving nothing. It
+then waited for the rescue itself and could never see it: the net needs five
+seconds of `dt`, `dt` is clamped to 0.05, and swiftshader gives about two
+frames a second — over a hundred frames of wall clock for one assertion. So it
+now tests what actually changed: pin the car, inject jitter, count how often the
+timer goes BACKWARDS. **60 frames, 0 resets, peak 3.0 s — at speeds of 1.68 to
+2.09, every one of them above the old 0.8 cut-off** that would have zeroed it.
+
+## r272 — "CAR IS NOT VISIBLE HERE"
+Reported from the TRACKS tab. The title screen runs an attract camera behind
+the menu, and it orbited `track.center[0]` at radius 55, looking at the road's
+CENTRELINE.
+
+The player starts EIGHTH. That is the grid slot furthest from the centre —
+measured at 18.8 u off it — so the car projected to **NDC x 0.87**, hard against
+the right edge, cropped or behind the panel. `titlecar.mjs` confirmed the mesh
+was in the scene, visible, with no hidden ancestor, and simply not framed: the
+attract shot was an empty hillside with the whole eight-car field jammed into
+one corner.
+
+Orbit the CAR, at radius 26 and 11 up rather than 55 and 34, aimed 12.5 BELOW
+it so it rides high in the frame where a bottom-anchored menu leaves room.
+**NDC (0.87, -0.14) → (0.00, 0.52).**
+
+The panel still covers most of a portrait screen — that is what a full-screen
+track list does — but the car is now in the strip above it and down both edges,
+and in landscape it is plainly in shot. What it is NOT any more is absent.
+
+## r273 — "CAMERA IS BROKEN OVERALL", AND IT WAS r271's FAULT
+It was. r271 changed `renderer.setSize(w, h)` to `setSize(w, h, false)` to stop
+it writing the canvas's CSS size, on the theory that
+`#game-canvas{position:fixed;inset:0}` would size the element instead and so
+cover an iOS safe-area band. That theory is wrong, and wrong in a way worth
+writing down:
+
+> A `<canvas>` is a REPLACED element. Its used width comes from its INTRINSIC
+> size — the `width`/`height` attributes, which are the drawing buffer — and
+> `left`/`right` do not stretch it. `inset:0` anchors it and sizes nothing.
+
+With the style write gone, the element laid itself out at buffer size in CSS
+pixels. `camsanity.mjs` measured the canvas box at **703x1529 on a 402x874
+screen**, because the touch pixel ratio is 1.75: the view was zoomed 75% and
+cropped to the top-left corner, on every touch device, in every state. Which is
+exactly what "broken overall" means — one wrong number that makes everything
+wrong at once.
+
+The style write is back. Box now equals the screen in portrait, landscape and
+desktop, title and race, with the buffer correctly 1.75x on touch.
+
+`camsanity.mjs` is the gate: it asserts the canvas BOX equals the screen, that
+the buffer shares the box's aspect (or the whole image is stretched), and that
+`camera.aspect` agrees with both. None of the existing gates could see this —
+`boot.mjs` boots, `pageerr.mjs` finds no error, `playermoves.mjs` drives — because
+nothing threw. It was a layout fact, and only a layout measurement finds it.
+
+**And the green bands are unfixed again.** The revert takes the attempted fix
+out with it; what remains from r271 is the black page background, so a band
+reads as a bezel rather than as lime. That one was never confirmed to work in
+the first place — it could not be tested here — and it broke the view for
+everyone in exchange. A blind fix for an unreproducible report, shipped without
+a gate, is worth less than nothing.
+
+
+## r274 — ONE COMMAND, EVERY GATE
+r271 shipped a view zoomed 75% and cropped to the corner on every touch device,
+and it went out past a suite that was three scripts somebody remembered to run.
+The player found it. That is a process fault, not a coding one, so:
+
+    node tools-scratch/gates.mjs        # everything
+    FAST=1 node tools-scratch/gates.mjs # skip the slow sweeps
+
+Eight gates, one exit code, run before anything is pushed. **A gate nobody runs
+is a gate that does not exist**, and neither is one that only PRINTS: three of
+them — `pageerr`, `landscape`, `bayblack` — reported in prose and could not be
+driven by a runner at all. They exit non-zero now. Adding a gate that prints
+its verdict instead of returning it is the same as not adding one.
+
+### AND THE GATE ITSELF HAD TO GET FASTER TO BE USABLE
+`camsanity.mjs` opened a fresh page per screen size. Building the track costs
+about ninety seconds under swiftshader, so three sizes meant three builds and
+the gate **timed out at ten minutes** the first time the runner called it — a
+gate that cannot finish inside its budget is another gate that does not exist.
+
+It now builds ONCE and rotates the viewport, which is both four times faster and
+a better test: a canvas that is correct on load and wrong after a rotation is
+precisely the bug it was written for. Six cases — portrait, landscape and
+desktop, title and race — all green, box equal to the screen in every one.
+
+Worth reading the buffers rather than skimming them: portrait TITLE renders at
+703x1529 and portrait RACE at 402x874 on the same screen. That is not a fault,
+it is `_autoQuality` dropping the pixel ratio under load, and the gate passes
+both because it checks the box against the SCREEN and the buffer's ASPECT
+against the box — never the buffer's size against anything.
+
+
+# --- AGENT-DRIVER LINE (continued) ---
+
+## r273-line — THE PHONE SHOT ON THE BLACK APRON, AND THE EXEMPTION THAT NEVER SAID WHO IT WAS FOR
+
+A phone shot off the live r273 build: 8th of 8 at 0:16.7, 3 km/h, hull 77,
+the car parked on a green ledge above a carriageway with black nothing
+beside it, the stick at rest. World identified by texture match against
+overhead probe shots: **UNDERCITY SLIPSTREAM** — the terraced olive trench
+walls, the mottled slab roadway, the marker posts on the rims.
+
+### REPRODUCED, THEN CLOSED AT THE EXIT
+`_cliffProfile` around the start bowl reads h = 1.7 for ~40 samples on BOTH
+sides — under the clamp's 2.5 exemption, written "so free-roamers can drive
+out" and applied to everyone. A racing car carving wide off the line (or
+shoved wide — the grid is eight cars and missiles fly from the first
+seconds) left the trench at full speed. Then, with the throttle released,
+it coasts to lat 74, sinks to the apron at y −4.1, and sits for ever:
+- the wedge net anchors displacement WHILE THE THROTTLE IS HELD (r273's
+  own fix), so a player who gives up pushing is invisible to it;
+- the lost net was deliberately narrowed to broken states (under terrain,
+  NaN) because yanking wanderers back "read as the game resetting you";
+- SOS works out there — the phone player had a charge in hand, unused.
+All three of those are design decisions with reasons; the defect was the
+EXIT, so the fix is one clause: `wallHere = !prof || prof.h > 2.5 ||
+!freeRoam` — the berm exemption is now roam-only. Racers meet a visible
+knee-high stone berm as a wall; roamers still drive out over it.
+
+### MEASURED, BEFORE AND AFTER (tools-scratch/bermtest.mjs, now a gate)
+    race  carve-out at sample 10, both sides:  lat 12.6 -> 74 stranded  BEFORE
+                                               lat 9.6, held at the lim AFTER
+    roam  same manoeuvre:                      lat 42.4 out             both
+The gate pins both directions and is registered in gates.mjs. Regression
+sweep on the fix: test-invisible-walls 13/13 (the berm is visible stone —
+holding a racer at it is not an invisible wall), test-mountainrun 21/21
+(OLIVE COAST control still open), test-unstuck 9/9, test-roam all green.
+The cliffSetback valley-floor carve-out and the past-the-outer-face roam
+rule sit AFTER the changed line and are untouched: CANYON RUN and LAGUNA
+SECA racers still roam their valley floors.
+
+### FOUND RED ON THE BASE — AND THE WORLD TURNED OUT INNOCENT (fixed next round)
+`tests/test-shortcut.mjs` fails 2/6 on PRISTINE origin/main (r273) exactly
+as on this branch. The follow-up (see the section below this one) proved
+the WORLD was never broken: the cut lands against r209's law-backed corner
+rails and the flanks' fair rock scatter, and the hinterland spot the test
+warns from is 25.1 u from another switchback leg — the honest global-
+distance stray gate is RIGHT to stay quiet there. The test was brittle
+three ways and is repaired; the massif/obstacle line owes nobody anything.
+
+### WORLD-ID PROBE
+Phone shots rarely name their world. tools-scratch/nearsamples.mjs answers
+"what stands at sample S"; this round's texture-match trick — overhead shot
+at F=0.04 of each candidate, compared against the report — identified
+UNDERCITY in two rounds of probe shots. The probe is disposable; the trick
+is worth remembering.
+
+### AND THE GATE SUITE'S ONE RED, FIXED RATHER THAN STEPPED OVER
+Running the full gates.mjs for this push found `landscape` red on
+phone-portrait: speedo × joy-base, 687 px² — present on PRISTINE
+origin/main too (the r273 HUD reshuffle biased the speedo left into the
+ring's rest position on a 402-wide portrait). Split the correction between
+the two: the ring rests at 40% of the zone rather than 45% (9 px left),
+the speedo bias eases −26 → −16 px (10 px right). Both sides keep what
+they were placed for — the ring under the thumb, the dial out from under
+the 🚀 button (8 px clear, measured). landscape.mjs green in both
+orientations; the rest of the suite: pageerr, camsanity, boot, bayblack,
+playermoves, wedgetest, swallowed, bermtest — all green on this tree.
+
+## FIX-ALL ROUND — THE SHORTCUT TEST'S THREE BRITTLENESSES, AND THE NARROW-PORTRAIT CRUNCH
+
+### test-shortcut: 2/6 red on the live build, and every red was the test's
+Three faults, none of them the world's:
+1. **The bank-finder was magnetised to obstructions.** "Biggest terrain rise
+   at lat 30" landed on a switchback whose descent ends against the back of
+   the lower leg's stone edge rail (r209's corner-guarding law, correct),
+   and every alternative climbing corridor holds rock scatter (fair
+   physics). Three finder variants found three different rocks at 0.7 m/s
+   each. The cut run now drives BARE TERRAIN — colliders out for one run
+   and straight back — because this test owns the slope and the (dead)
+   altitude gate; the walls' law is enforced where it lives, in
+   test-cornerwalls and test-edgerails.
+2. **The hinterland spot was not in the hinterland.** `pointAt(200, 140)`
+   is 25.1 u from the switchback leg above it — measured — so the global-
+   distance stray gate (the switchback fix) rightly stayed quiet. The test
+   now searches for the lat-140 point that is genuinely remote (sample 825,
+   140 u from every leg) and the warning fires there. Feed capture also
+   kept only the FIRST message, so "TIMBER!" masked the warning that DID
+   come — it keeps them all now.
+3. **"Off-road is slower" compared a downhill cut at one sample against the
+   road at another** — it measured the hill. Now a controlled pair: same
+   sample, level bank, on the carriageway vs 28 u off it, and the window
+   stays 2.5 s because run() drives a blind straight line (at 4 s the
+   "road" runner is in the dirt — measured, 20.8 m/s). 6/6 green.
+
+### The ≤380 px portrait crunch predates everything
+landscape.mjs learned two more sizes (360×740, 320×680) and immediately
+measured what the r273-line fix could not see: speedo × joy-base 1018 px²
+at 360 and 1549 px² at 320 — an OLD latent fault, present long before the
+r273 HUD pass, the bottom band simply cannot hold ring 124 + dial 76 + the
+🚀 column at those widths. The dial now leaves the thumb row on ≤380
+(the two-thumb layout's own precedent: "the speedo sits above BRAKE") —
+bottom:112, centred in the ring↔mine gap, 56 px; the ring gives up 24 px
+of visual size (knob drag radius is input.js's and untouched). All four
+gated sizes green, no overlaps.
+
+### MINES ARE DODGEABLE — MEASURED, SO THE QUESTION IS CLOSED
+whokilled DODGE=1 on the three worlds that kill even a shooting driver
+(NORMAL, 100 s each): reacting to the mine's red ring drops the mine
+bucket 155 -> 41 on CORNICHE and 152 -> 31 on SEA CLIFF RUN (COSTA BRAVA
+43 -> 78 is lay-pattern noise — rivals mine differently every run). So the
+mine system passes the fairness test: visible, avoidable, priced. What the
+crude 4.5 u swerve buys instead is wall contact on narrow roads (SEA CLIFF
+solid-crash bucket 228 in the dodge run) — a human modulates where pure
+pursuit cannot. VERDICT: no defect in any of the three; they are the
+roster's hardest because rival fire volume compounds with narrow geometry,
+and any change there is difficulty tuning, which stays a design decision.
+The numbers to tune against are all above.
+
+## FREE-RIDING ROUND — "CLIMBING AND SINKING IN MOUNTAINS", FOUND AND CLOSED AT THE GATE
+
+The report, verbatim: "Still I'm climbing and sinking in mountains. The
+game is not ultimate free riding world matured enough." Reproduced first
+try with `tools-scratch/mountainsink.mjs` (new, kept): drive up a slope in
+roam logging physics sink AND visual sink (raycast against the drawn
+world). SUMMIT CLIMB: the car ran with **50 u of drawn mountain overhead**
+while physics said surface — inside a horizon hill, climbing terrain
+noise. That is the complaint, measured.
+
+### THE GATE, NOT THE MOUNTAIN
+The hill's collider was there and correct — r148/r-era work made horizon
+rings solid, height-profiled, all of it fine. What failed was the height
+gate in the player-vs-solids sweep: `pos.y < ob.y - 3 → skip`. A
+mountain's seat is sampled at the CENTRE of a 100-300 u footprint; on
+sloping ground the flank foot runs 10-30 u lower, so a car approaching
+from downhill sat below the pad and the entire collider was skipped —
+measured: car y 23.1, 111 u from a hill seated at y 30 with radius 164 at
+that height. Inside the rock, gate says "under it".
+
+Nothing legitimate drives BENEATH a seated mountain (bores go through
+`_tunnelRidge`, which lives in both height fields), so a height-carrying
+solid now has NO lower gate — solid at any height below its top. The
+±6 window stays for h-less solids (the knee-high rock under a flyover is
+still the point). Six test/tool mirrors of the gate updated to match.
+
+### VERIFIED, EACH DIRECTION
+- mountainsink re-run: the car STOPS at the flank, wheels on grass
+  (side-on screenshot taken), physics sink 0.02, v 19 -> 1.7 grinding.
+- test-invisible-walls 13/13, test-mountainrun 21/21 with updated mirrors.
+- Six mountain worlds re-raced (6/21/25/19/48/66): lap times at their
+  r271 baselines (GOTTHARD identical to the decimal), zero stuck spots,
+  lateral maxima normal — the widened gate does not trap the racing line.
+- tool-corridor-blockers full-roster census: no mountain-flank blockers
+  anywhere. Its 2/78 finding (CLIFF KNOT, SEA CLIFF RUN) is small r≈0.6
+  rocks near a vertically separated leg — h-less, knockable, untouched by
+  this change, pre-existing; noted for whoever owns rock scatter.
+
+### WHAT "MATURED FREE RIDING" STILL WANTS (measured, not done)
+- Off-road pace retention is 0.55-1.0 by car stat — the boundary is soft
+  by design, so roaming is fast; fine. The massif skirts are now solid
+  walls past the drivable foot. If mountains should ever be CLIMBABLE
+  (goat routes to peaks), that is terrainHeight work, not collider work,
+  and it is a design decision with MAX_GRADE 0.45 already in place.
+- PIKES PEAK spawns-in-roam showed a 10-13 u settle transient when
+  teleported by probes; players do not teleport, but the probe should
+  place-and-settle before measuring.
+
+## GOAT PEAKS — MOUNTAINS YOU CLIMB TO THE TOP OF, AND THE WALL LAW THAT CAME OUT OF BUILDING THEM
+
+Asked for in as many words: "mountains you can actually climb to the top
+of... Do it. Love the idea." Done, the only honest way this codebase knows:
+as TERRAIN, in both height functions, so drawn-vs-driven divergence cannot
+exist on it by construction.
+
+### THE FEATURE
+Every world with real ground (`_highland` on) grows ONE summit: a 108 u
+smoothstep dome at r 660-740 — beyond every road, inside the drawn-mesh
+near patch, clear of sea and river, each world on its own bearing. The
+flanks peak ~120% grade: unclimbable, the rim wall's own honesty. Carved
+into them, a goat route — 1.5 turns of spiral shelf ~18 u wide whose height
+at every point is the dome's own height at that radius (the carve cuts IN,
+never juts out), along-path grade easing 0 → ~21% → 0. At the crown, a
+summit star worth four ordinary finds (+600, "⛰ SUMMIT!"). Scenery
+builders keep off it: massif cones WALK aside (not dropped — dropping one
+moved GRANITE NARROWS' pinned fall-line number), horizon/dune/city/glacier
+instances skip, groves skip.
+
+`tests/test-goatpeak.mjs` is the gate: pure-pursue the route's own points,
+PASS = summit reached, star present, on-shelf agreement held. Seven worlds
+climb in ~26.4 s each; LANTERN QUARTER (flat by design) reports ABSENT.
+
+### THE PEAK IS CLOSED ON RACE DAY
+The route is BUILT of flats, and flats reset the climb-authority fade — a
+racer could stair-climb the spiral 46 u in 30 s past a fade that never saw
+a slope (test-goat law 1, measured). Off the course AND on the peak the
+engine now gives nothing (`climbAuth = 0` via `_nearGoat`), plus a treacle
+drag in the stray branch. Roam publishes `_strayed = 0` and never feels
+either. SUMMIT CLIMB's law-1 number came back under its ceiling.
+
+### GROUND RISING FASTER THAN YOU CAN CLIMB IS A WALL, NOT A FLOOR
+Building the dome exposed a hole older than the dome: at face-steep TERRAIN
+(no collider to say no) a fast car outruns the 11 u/s y-follow and passes
+horizontally inside the ground — 29 u deep on the dome's fall line,
+measured, the whole "driving inside the mountain" class on analytic ground.
+Now, when the gap has opened (>2.5 u) and the local gradient is face-steep
+(>0.9) and the car is far off-road (|lateral| > 60 — because test-goat's
+header is RIGHT that the verge is the steepest ground in the game and no
+law here may brake the rejoin scramble), the into-slope velocity dies;
+tangential motion survives. Fall-line ram: 29.5 u buried → 2.35. Rejoin
+banks, shelf-edge returns, crests: untouched, and test-goat's rejoin law,
+test-sinking and test-climb all green.
+
+### SOLIDITY, FINISHED FOR EVERYTHING REACHABLE
+ghosthunt found three more ghost classes beyond the glacier and groves:
+DUNE SERPENT's wind-carved ridges (to 114 u, r 720+), NEON GRID and MARINA
+BAY's skyscrapers (to 320 u, mid towers from r 260), all drivable-through.
+All solid now — dunes stone with the cone profile, towers stone with
+prof [1] (a box does not taper, and saying so keeps the invisible-walls
+cross-section law auditable at 13/13). The census's only remaining flags
+stand IN THE SEA (offshore rocks, whales) — the drown system's boundary,
+not ours — and the probe now says so itself.
+
+### REFINEMENTS THAT CAME FROM CHASING GHOSTS THAT WEREN'T MINE
+test-goat's GRANITE 30.3 and GLACIER COL 0.3 reds reproduce byte-identical
+on PRISTINE origin/main — pre-existing, like test-shortcut's were, and this
+branch passes one MORE law than base (CANYON RUN's start-point law). Two
+changes made while wrongly assuming blame survive on their own merits: the
+no-underside pad now scales with the mass (max(3, min(30, h·0.35)) — a
+mountain earns 30 u of seat tolerance, a verge boulder keeps −3 and never
+shoves a car riding the roadbed above its toe), and goat-adjacent massif
+cones relocate instead of vanishing. Six test mirrors carry the same
+formula.
+
+### FOR THE NEXT SESSION
+- The dunes could be TERRAIN someday (climbable sand, the goat treatment) —
+  they are solid walls today, which is correct but not yet delightful.
+- The two base reds above belong to whoever owns test-goat's pins; both
+  values are printed and stable.
+- A goat peak screenshot lives in the session record; fieldshot-class tools
+  can frame it from the route for a store shot.
+
+## THE GRIP BUDGET — "I CAN TURN SHARP CURVES WITH 180 KM/H. THAT ILLOGICAL."
+
+He could. cornergrip.mjs (new, kept): full lock at 180 km/h held a 16.5 u
+radius circle at 151 u/s² of lateral acceleration — FIFTEEN G — while full
+throttle built speed mid-circle. The cause, in the code's own comment:
+"while gripped the velocity turns with the car (arcade rails)", and the
+slide lag capped at slip·driftLag ≈ 0.22, so even a "full slide" kept 78%
+of the yaw rotating the trajectory directly.
+
+### THREE CHANGES, ONE NUMBER
+The number is the one the RIVAL PLANNER always drove within — paceEstimate
+prices corners at a_lat ≤ SLIDE·grip = 4·grip — so the player's tyres now
+obey the same physics as the field's plans. Player only: the AI already
+obeys by planning and keeps its 8/8-alive record.
+1. **Demand vs budget.** Yaw demand |v|·yawRate past 4·gripBudget spills
+   the EXCESS share of the turn into slide instead of trajectory (lag → 1).
+   Priced on the whole velocity vector — pricing |vf| handed the rails back
+   mid-slide at 70° of drift, an accidental auto-catch, measured and fixed.
+2. **Kinetic friction has a ceiling.** The scrub was vl·grip, proportional
+   and unbounded: a car 80° sideways was hauled back onto heading at
+   1.4 rad/s, so the drift state existed and the trajectory ignored it.
+   Capped at 4.4·gripBudget — a touch above static so recovery beats
+   breakaway. Small corrections sit under the cap: parking-speed feel
+   untouched.
+3. **The budget is its own quantity** — every surface/car factor (compound,
+   wing, wet ford, loose landing) WITHOUT the slip collapse, which now
+   applies only to the scrub. Same products, reordered; scrub bit-identical
+   before slip.
+
+### BEFORE AND AFTER (full lock, 3 s, flat ground)
+    180 km/h:  entry radius 16.5 u, aLat 151, exits at 167 km/h   BEFORE
+               entry radius ~54 u, drift peak 91°, exits at 72    AFTER
+    to hold a 30 u sharp curve now needs ≤ ~90 km/h; above that you are
+    drifting, and far above it you are a passenger. 60 km/h full lock
+    still bites (entry aLat ~21 = the budget, as it should).
+
+### WHAT IT COSTS ON TRACK, MEASURED
+agentdrive's planner re-priced from 34 to 15 (~75% of budget — a driver
+keeps margin; the bot at 100% slid into PINE VALLEY's rails, which is now
+a thing that happens, as requested). Laps: PINE VALLEY 40.5 → 54.5 s,
+MONACO 32.2 → 38.9, OUNINPOHJA 28.1 → 29.7 — the tighter the world, the
+more the budget costs, and one slide-wreck a lap is the new price of
+overdriving. RIVALS ARE UNCHANGED, so normal difficulty is now harder on
+tight circuits: the r271/r272 pace tables are the baseline to re-tune
+aiSpeed/aiCorner against IF play says so — that is a design pass, not this
+one. Gates: test-goat 25/26 (GLACIER COL's grounded-step red HEALED by
+this round's caps; GRANITE 30.3 is base-red), test-tyres 27/28 (its one
+red is a UI card, red on base too), playermoves, boot, goatpeak all green.
+
+### THE KNOBS, FOR TUNING BY FEEL
+    4.0  the static budget (×gripBudget) — lower = earlier breakaway
+    4.4  the kinetic ceiling — gap above 4.0 is how firmly a slide catches
+    0.9  the spill share at full over-budget
+    0.12/1.2  the slip-feed threshold and gain
+All in vehicles.js, each at its comment. The A/B instrument is
+tools-scratch/cornergrip.mjs; run it before touching any of them.
+
+# --- MAIN LINE (r274-r283) ---
+
+## r275 — THE GREEN BANDS, MEASURED AND CLOSED
+Two rounds of guessing at this, one of which broke the view for everyone. This
+time: measure the screenshot first.
+
+`bandscan.mjs` scans in from both edges for the first column that is not flat
+page background:
+
+```
+2868 x 1320,  left band 185 px,  right band 186 px,  colour rgb(126,183,92)
+```
+
+Three facts fall straight out of that:
+
+1. **rgb(126,183,92) is `#7eb75c`** — `body`'s old background, exactly. And the
+   main renderer takes no `alpha`, so its canvas is OPAQUE and cannot be
+   showing anything behind it. The canvas is simply not there.
+2. **2868 / 3 = 956 pt.** An iPhone 16 Pro Max in landscape. Its safe-area inset
+   is 62 pt; 185 / 3 is 61.7.
+3. So the layout viewport is **832 on a 956 pt screen** — `viewport-fit=cover`
+   is in the meta, has been since r245, and is not taking effect on that device.
+
+Nothing positioned inside the page can reach outside the layout viewport...
+except that **the background is already painting there**. The browser's page
+surface spans the full 956; only the CSS coordinate space is 832 wide. So an
+element pulled left of zero and made wide enough does reach the bands — and
+`screen.width` is the one API that still reports the real screen when
+`innerWidth` does not.
+
+`applyViewport` now computes `over = (screen.width - innerWidth) / 2`, renders
+at `innerWidth + 2*over`, and sets `canvas.style.left = -over`. Guarded so it is
+a NO-OP anywhere it is not needed: touch only (on a desktop `screen.width` is
+the monitor, not the window), only when the screen is wider than the viewport,
+and only by an amount an inset could plausibly be. Vertical is left alone —
+in landscape the browser's own chrome makes `screen.height` meaningless.
+
+### AND THIS TIME IT IS TESTED BOTH WAYS
+The trap last time was shipping a fix for a case no test could reach.
+`camsanity.mjs` now proves both halves:
+
+```
+portrait/landscape/desktop, title and race   overX 0     box == viewport   (no-op)
+inset-sim  viewport 832  screenW 956    ->   overX 62    box 956x440  stretch 0%
+```
+
+The simulation is the reported device's exact geometry — Playwright can set
+`screen` independently of `viewport`, which is the shape iOS reports. Untested
+code is not a fix.
+
+## r276 — THE SHELF ICONS, FRAMED FROM THE CAR
+Reported with a photograph of the car shelf: "this is broken". The cards were
+cropping their cars and no two of them agreed.
+
+`_shoot` framed with a **constant**: `dist = 8.7`, look pinned at y 0.55. At 30
+degrees that leaves 2.33 u of half-height above the aim, and BRAWLER measures
+**3.46 u tall**. The number was right for whatever the cars were the day it was
+typed, and nothing has told it since that they grew roof racks. Meanwhile the
+build bay ten lines away has carried a comment for rounds saying FRAME THE CAR
+FROM THE CAR — the icons never got it.
+
+### THREE THINGS, IN THE ORDER THEY WERE FOUND
+1. **Derived distance is not enough.** Fitting the bounding box by trigonometry
+   got the roof in and then clipped the WHEELS off the bottom: a car seen at
+   three-quarters has its nearest bottom corner projecting lower than any
+   formula on the box's extents predicts. `_fitDist` projects the eight corners
+   and scales the distance by however far the worst one lands outside the
+   frame, three passes. Measured, not derived — the same lesson `_frameStage`
+   already paid for.
+2. **Aiming at the box centre made the picture worse.** The whole car fitted
+   and the background became a wall of trail, because a 3.5 u car's centre puts
+   the horizon at the top of the frame. Half way between the old fixed 0.55 and
+   the centre keeps the three-quarter look-down that puts grass and a diagonal
+   of dirt behind the car.
+3. **One rig for the whole row.** Fitting each card on its own zooms each car
+   differently AND lands each on a different patch of diorama — measured side
+   by side, one card on grass and the next against a beige panel. `_carIcons`
+   now fits every car, takes the furthest, and shoots all eight from that one
+   distance and one aim. The odd card out disappeared with it: the per-car aim
+   was tilting the lens just enough to swing a pine trunk through one frame.
+
+Backing off to fit the tallest car put the eye at about fourteen units, past
+where the diorama's near pines start at lane 9.6. Lifting the rig to look over
+them was tried and is worse — from up there the trail reads as a vertical band
+with the car pasted on it. Swinging the AZIMUTH toward the trail's own axis
+keeps the camera over the dirt, out of the tree lane, and keeps the low
+three-quarter. `SHOT_RIG` / `SHOT_RIG_GROUND` are named for it, and the car's
+own yaw is now DERIVED from the rig — `Math.PI * 0.82` was a three-quarter
+front view of the eye that existed when it was written, and the moment the eye
+moved the same constant showed the back of the car.
+
+Gates: `pageerr`, `bayblack` (the studio shares the bay's diorama) and `boot`
+4/4 all green.
+
+## r277 — THE PYRAMIDS COME OUT
+Reported in three words, no picture: "remove the piramids". Two things in this
+game are literally pyramids — the diorama's loose stones (squashed
+TETRAHEDRA and octahedra) and its grass tufts (four-sided cones) — so before
+removing anything, zoom the thing the report was most likely looking at. A car
+shelf card blown up four times settles it: scattered over the grass and the
+dirt band are small pale solids with a flat base and a clean apex. Little white
+pyramids. They are r264's stones.
+
+They were justified at the time and the argument still reads well — painted
+gravel is flat, stone the key light can catch is what makes a surface read as
+loose. What that argument missed is the SIZE these are ever seen at. A shelf
+card is 148 px wide. At that scale a four-sided solid does not read as gravel;
+it reads as a triangle someone left on the lawn.
+
+The numbers had already said so quietly: `dioparts.mjs` put them at 0.9% of the
+bay for 752 triangles — 3.0 pixels a triangle, the second-weakest thing in the
+whole diorama. Marginal on the measurement before they were wrong to the eye.
+Out: 8909 → **8157 triangles**, and the trail keeps its painted gravel, speckle
+and damp patches, which is what carries "loose surface" from any distance the
+game actually shows it from.
+
+The moss, the boulders and the three-tier pines stay — those are rocks and
+trees, not pyramids, and they earn their triangles.
+
+Gates: `pageerr`, `bayblack` lit and sealed, `boot` 4/4, second diorama still
+free at 0.1 ms.
+
+## r278 — THE MOUNTAIN LEANING ON THE CAR
+A screenshot with no words: an alpine meadow, chalets on the far slope, the car
+crawling at 8 km/h, and a huge pale grey-green faceted mass filling the left
+half of the frame. Blown up four times it resolves into a CONE seen from its
+own foot — the near base vertex at the driver's feet, two ridge lines running
+away up and out of frame, the scatter rocks of the hillside sitting along the
+right silhouette. The faces sample at #8a9a84, which is `furka`'s `hillColor`,
+which is what `_buildMassif` lerps the bottom third of every cone towards.
+
+It is a massif cone, and it passed every check the builder has.
+
+WHY IT PASSED. `_buildMassif` walks a cone away from the road until
+
+    d >= w / 2 + roadWidth + 24
+
+which is a FOOTPRINT rule. It buys exactly one thing: you cannot drive into the
+rock. It says nothing at all about what the rock looks like from the seat.
+Measured on GLACIER COL (`massifloom.mjs`, new): all 16 cones satisfied it, and
+one of them stood with its flank 42 u from the centreline and 258 u of mountain
+above that flank — **81 degrees of sky**. Every one of the 16 was over 25
+degrees; 100 % of the lap's stations had a mountain over 40 degrees somewhere in
+view. GRANITE NARROWS measured 83 %, TIMBER GORGE 79 %.
+
+So the clearance now takes the taller of two rules — the footprint one, and a
+flank standing back `LOOM = 1.15` times the cone's own height, which caps it at
+about 41 degrees:
+
+    d >= w / 2 + max(roadWidth + 24, h * LOOM)
+
+On GLACIER COL all 16 cones survive at full size and every one of them now
+measures 40 degrees or less: they simply walked outward along the ring, which
+had the room all along. Nothing shrank and nothing was dropped.
+
+THE OTHER HALF, found on the way. When eight passes cannot find room the
+builder shrinks to fit, and the old line shrank `w` and left `h` alone. That
+turns the one cone the lap encircles into a needle — the exact fault the
+horizon ring was widened to cure ("no real mountain is twice as tall as it is
+broad", r-whenever, three thousand lines further down this file). It now solves
+for the single scale that satisfies both rules and applies it to the whole
+form, so a squeezed peak is a smaller mountain instead of a spike. Shrinking `h`
+also shrinks what the loom rule asks for, so it converges in one step.
+
+A NEAR MISS WORTH RECORDING. The scale was first written `const k = ...` inside
+the shrink block — and `k` is the instance loop's own counter, three lines above
+`rock.setMatrixAt(k, m4)`. The drop path would have written instance 0.37.
+Caught by reading the diff, not by a gate; there is no gate that would have.
+
+AND A FALSE LEAD, also worth recording. Before measuring anything I photographed
+eight stations of the lap looking for the shape, and station N/2 came back
+swallowed by a dark mass with a pale slab in it — looked like a hit.
+`whatsinfront.mjs` (new: hide each scene child, diff the pixels, descend into
+the winner) named it `tunnel`, at 74 %. The car was parked inside a bore. A
+station picked by eye is easily inside one, and a dark frame is not the bright
+frame that was reported.
+
+AND THE SHRINK BRANCH TURNS OUT TO BE UNREACHABLE. `shrinkpath.mjs` exists to
+run it on purpose, and it took three cuts to get an answer worth having:
+
+ 1. Cones planted at r 40-60 with w 400. They came back at the requested
+    400 x 400 and the probe said PASS. The walk had simply pushed them outward
+    THROUGH the lap and out the far side, where the clearance is satisfied.
+ 2. `shrank` added as the gate on the gate, and the spec raised to 2000 so the
+    clearance could not be met anywhere. It reported 72 of 88 cones shrunk —
+    for a massif that has 16. The solids filter ("base no wider than `w1`")
+    stops separating massif cones from skyline ones the moment `w1` is a big
+    number, so it was counting the horizon rings.
+ 3. Reading the named InstancedMesh's own matrices. `shrank: 0`. Even at a
+    clearance of 3300 u, EVERY cone escapes.
+
+Which is the real finding: nothing bounds the walk's step (`need - d + 4`), so
+a cone can always leave the world rather than shrink. The branch is dead code
+on today's roster. The proportional shrink is still the right code to have
+there — and the `const h` it assigned to would have thrown the moment anything
+did reach it — but this round did not exercise it, and saying otherwise would
+be the third wrong measurement in a row.
+
+The flip side of an unbounded step is a cone shoved past the skyline, leaving a
+hole where a mountain should be. `conering.mjs` (new) measures it: on the
+alpine chapter, which has the largest specs and so the largest shoves, L65
+asked r 340-600 and got 422-587, L66 asked 400-700 and got 497-697, L67 asked
+380-640 and got 454-618. Every cone still stands in its own ring.
+
+Gates: `loomsweep.mjs` (new) over every level that builds a massif — no cone
+leans over a road anywhere on the roster, and no ring lost a cone to the fix.
+`conering.mjs` (new) over the same set — no cone walked out of the world.
+
+## r279 — THE CARDS WERE A CAR ON A GREEN SCREEN, AND THEY LITERALLY WERE
+Reported with a screenshot of the car shelf: each card is a vehicle pasted on a
+flat green field with a brown smear behind it and the tan trail sliced into two
+corner wedges. r276 framed these icons from the car and r264-r277 built the
+rally-trail diorama they are shot against, so "the background is doing nothing"
+should not have been possible.
+
+`iconparts.mjs` (new: shoot the icon at 4x through the game's own `_shoot`,
+then hide one child of the forest at a time and re-shoot) put a number on it.
+ONE 4-VERTEX QUAD OWNED 82.4% OF THE ICON. Every tree, every rock, every bush,
+the dapple gobo, the trail — all 0.0%. The diorama was not weak in the frame,
+it was ABSENT from it.
+
+The quad measured 420 x 420 x 0 in world space: an UPRIGHT plane standing at
+the origin, in `#4f8a35`, which is `F.grass`. But `_diorama` plainly writes
+`ground.rotation.x = -Math.PI / 2`. Three readings, no two agreeing, and the
+next hour went on probe archaeology — two probes disagreeing about the same
+object because one of them had asked `_studio()` for a different size. They
+had not; the studio is cached and both got the same scene. The disagreement was
+real and the source was innocent, because the object being measured was never
+the object the source built.
+
+BUILT ONCE, MOUNTED TWICE — AND THE SECOND MOUNT DROPPED EVERY TRANSFORM.
+`_diorama` cached `[geometry, material]` pairs in `__dioParts` and remounted
+them as `new THREE.Mesh(geo, mat)`, carrying `receiveShadow` and `renderOrder`
+across and nothing else. Most of the diorama is welded, so most of it has its
+placement baked into its vertices and survived. Five things do not:
+
+  - the ground plane lost `rotation.x = -PI/2` and stood UP as a 420 x 420
+    green wall through the origin — the green screen, exactly,
+  - the painted far treeline lost `position.y = 26` and sank into the floor,
+  - the trail, the dapple gobo and the dome lost theirs with them.
+
+The bay takes the first mount and the studio takes the second, so the bay
+looked right and every card was shot against a wall. `bayblack` could not catch
+it: it asks whether the backdrop is lit and sealed, and a green wall is both.
+
+The fix is to cache the GROUP and hand out `Object3D.clone()`. Clone copies
+transforms, `visible`, `receiveShadow` and `renderOrder`, and shares geometry
+and material by reference — which is the entire saving the parts list was
+after, without the part it got wrong. Every caller gets a clone, the first
+included, so no one holds the template and one mount cannot hide the other by
+toggling `visible`.
+
+After: ground 43.9% (as a FLOOR), dapple gobo 24.6%, bushes 12.1%, rocks 7.5%,
+tufts 5.1%, trunks 3.6%, trail 3.5%. The card is a photograph of a car on a
+rally trail, which is what the last thirteen rounds were building.
+
+WHAT THE DETOUR WAS WORTH KEEPING. Before the cause was found, `iconaim.mjs`
+swept the rig looking for a framing that would show the wood, and its finding
+stands on its own: the shipped icon camera tilts 16.8 degrees down against a
+15 degree half-FOV, so the horizon sits at ndc 1.13 — OFF THE TOP OF THE FRAME.
+Raising the aim barely moves it, because `_fitDist` pushes the lens back as the
+aim rises and lifts the eye by almost as much. That was true before this fix
+and is still true after: the icons show no sky. It is survivable now that the
+ground is a floor with a wood standing on it, and it is the thing to reach for
+if these ever want a skyline.
+
+Gates: `iconparts` on the shelf rig.
