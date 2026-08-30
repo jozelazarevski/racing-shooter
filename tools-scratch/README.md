@@ -180,6 +180,13 @@ real time to get right and the next session should not rebuild them.
                 beside them. It caught 150 grass tufts costing 1800 triangles —
                 22% of the diorama's geometry — for 1.4% of the frame, because
                 at that camera distance a 0.75 u blade is two pixels.
+- `bandscan.mjs` what the bands down the edges of a screenshot ARE: it scans in
+                from both sides for the first column that is not flat page
+                background and reports width, share and exact colour. "Safe-area
+                inset", "stale canvas width" and "letterbox" look identical at a
+                glance and have completely different fixes; the colour and the
+                symmetry tell them apart. It identified the device from the
+                arithmetic alone.
 - `gates.mjs`   EVERY GATE, ONE COMMAND, ONE EXIT CODE — run it before pushing.
                 `FAST=1` skips the slow sweeps. It exists because r271 shipped a
                 broken view past a "suite" that was three scripts somebody
@@ -401,6 +408,136 @@ real time to get right and the next session should not rebuild them.
                 fixed, which had been in every seafront shot since r238.
 - `lightprobe.mjs` the lights, the tone mapping and the road material the
                 running world actually has, when a tune edit seems not to land.
+- `lapshots.mjs` eight CHASE-camera stations round one lap onto a contact
+                sheet - the cheap way to go looking for a reported shape when
+                the report has no station in it.
+- `spikes.mjs`  terrain needles: the biggest rise between two samples a fixed
+                baseline apart, per level. Clean on the alpine chapter, which is
+                how the search moved off the terrain and onto the massif.
+- `pixat.mjs`   the colour under a given pixel of a saved frame. Sampling the
+                reported slab at #8a9a84 is what identified it as `hillColor`,
+                and `hillColor` is what the massif lerps its foot towards.
+
+(`bigtrans.mjs` and `nearbig.mjs` are gone, and why is worth a line: the first
+projected bounding-box corners without checking they were IN FRONT of the
+camera - `project()` on a point behind it returns garbage, and it reported 1600%
+coverage. The second called the world's enclosing shells - the r9000 skirt, the
+haze bands - "overlapping the road", which they do, by design, because they
+enclose everything.)
+
+- `iconparts.mjs` what is actually IN a car shelf icon: shoots it at 4x through
+                the game's own `_shoot`, then hides one child of the diorama at
+                a time and re-shoots. It is what found r279 — one 4-vertex quad
+                owning 82% of the frame and every tree, rock and bush at 0.0%.
+                `dioparts` cannot stand in for it: that measures the BAY, which
+                is a different camera at a different distance.
+- `iconrig.mjs` / `iconflat.mjs` the icon camera's own position, aim and pitch,
+                and every forest part's LOCAL ROTATION beside its WORLD BOX.
+                The pair exists because those two disagreed, and the
+                disagreement was the bug: `_diorama`'s second mount rebuilt
+                meshes from geometry alone and dropped their transforms.
+- `iconaim.mjs` / `iconaim2.mjs` candidate icon rigs rendered as a contact
+                sheet with the horizon's clip-space position printed on each.
+                `hNdc >= 1` means the horizon is off the top of the frame and
+                the shot CANNOT show a skyline — the shipped rig is 1.13.
+- `iconwho.mjs` geometry type, local rotation, material colour and blending for
+                every diorama part, plus the icon re-shot with each of the
+                first few hidden. Names a part when a diff says "this one" and
+                the index alone is not enough.
+- `shelfshot.mjs` the garage tab at phone width, so the icons get judged at the
+                148 px they are drawn at rather than the 4x a probe prefers.
+- `wallshare.mjs` how much of a race frame is wall within 45 u, and how much is
+                sky, over a driven lap. The wall number counts the road and so
+                runs ~50% everywhere; SKY is the column that ranks enclosure —
+                L4 and L10 at 22%, CAPE OLIVETO 11%, GRANITE NARROWS 10%,
+                GLACIER COL 3%.
+- `massifloom.mjs` how many DEGREES of sky the nearest massif cone fills from
+                each road station. The builder's own clearance rule is a
+                footprint rule, so it can pass while a 258 u mountain stands 42 u
+                off the centreline; this is the angle, which is what the driver
+                sees.
+- `massifshape.mjs` every massif cone's width, height, aspect and flank
+                distance. Catches the other half: the shrink-to-fit path used to
+                narrow `w` and leave `h`, which makes needles.
+- `loomsweep.mjs` `massifloom`'s pass/fail across every level that builds a
+                massif, guarding BOTH directions - no cone may lean over a road,
+                and the ring may not lose cones to the fix.
+- `conering.mjs` where each massif cone ENDED UP, against the r0..r1 its spec
+                asked for. Nothing bounds the walk's step, so a bigger clearance
+                is a bigger shove and a cone can be pushed past the skyline,
+                leaving a hole where a mountain should be. Companion gate to
+                `loomsweep`: that one stops the wall, this one stops the hole.
+- `shrinkpath.mjs` `_buildMassif`'s "eight passes could not find room" branch,
+                forced. Point it at a tree whose massif spec plants the cones ON
+                the road (see r278 in HANDOVER) and it checks the build raises
+                no error, every instance was written, and nothing came out a
+                needle. r278 recorded that the branch COULD NOT BE REACHED —
+                nothing bounded the walk's step, so a cone always escaped
+                rather than shrink. The walk is now bounded to `r1 * 1.35`, and
+                on the same fixture (16 cones, w and h 2000, planted on GLACIER
+                COL's lap) it reports 16 of 16 through the branch at aspect 1,
+                none dropped. This is the probe that says so.
+- `massifframe.mjs` the mountain ring in a RACE frame. Reads the live instance
+                matrices, picks the station/cone pair that subtends the largest
+                angle, parks the car there with the race running and aims the
+                game's own camera at that cone. A ring has no useful centroid —
+                `spread: 6.0` puts cones all the way round, so their mean is the
+                world origin and a camera aimed at it photographs the lap. Fails
+                loudly on no mesh, no surviving cone, or a race that never
+                starts (`PORT=8914 LEVEL=66 TAG=-after`).
+- `massifwho.mjs` whether a level asks for a massif AND whether the mesh exists.
+                `conering` and `loomsweep` are both silent when the named
+                InstancedMesh is missing, and silence there reads as clean —
+                this tells the two apart. It is how L32 RED CENTRE RUN was found
+                to carry an outback massif spec (7 cones at r 460-720) and build
+                no `massif` mesh at all, which neither gate can see.
+- `lapextent.mjs` how far from the world centre the lap itself runs, per level.
+                Needed to choose an "ON the road" ring for `shrinkpath`'s
+                fixture: GLACIER COL's lap only reaches 271 u.
+- `loomshot.mjs` measures the worst station then parks there and photographs it,
+                so the number and the picture are the same event
+                (`LEVEL=66 STATION=895 TAG=-x`).
+- `glacierloom.mjs` the same two numbers for the GLACIER, per slab: the gap
+                from the drawn flank to the nearest centreline sample, and the
+                degrees of sky the slab's top subtends there. It reads the
+                InstancedMesh named `glacier` and its geometry — those slabs
+                are NOT in `solids`, so a probe reading that roster finds no
+                glacier at all and reports clean. FAILS LOUDLY when it cannot
+                find the mesh. FURKA RIDGE 197 u / 12.4 deg, GLACIER COL
+                330 u / 25.8 deg.
+- `glacierforce.mjs` the glacier's clearance walk, FORCED. The tongue is
+                nowhere near either furka lap, so the walk never runs there and
+                a green run against the roster proves nothing (the `shrinkpath`
+                lesson). This translates the whole centreline onto the tongue's
+                wedge, rebuilds the sample grid, calls `_buildGlacier` again and
+                reads the new matrices. `walked` is the gate on the gate.
+- `glacshot.mjs` measures the worst slab that is actually AHEAD of the car, then
+                parks at that station and photographs it (`LEVEL=66 TAG=-before`),
+                and reports what SHARE of that frame the ice draws — hide the
+                mesh, render again, diff — because "no slab leans over the road"
+                is also what deleting the glacier would report. Render through
+                `g.composer`, not `renderer.render`: the latter leaves the last
+                pass's target bound, nothing reaches the default framebuffer and
+                readPixels hands back the same stale bytes twice (0.00%). And
+                pick the station with the CAMERA's half-angle (~18 deg
+                horizontal on a portrait 56 deg vertical fov), not a roomy
+                cone: at 45 deg "ahead" every slab projected past ndc x = 2.4,
+                off the side of the picture, and the pale ice in that frame was
+                the horizon ring, not the glacier at all.
+- `glacpix.mjs`  settles "is the ice actually in this frame" three ways at one
+                station: readPixels after a composer render (is the buffer even
+                populated), the instance matrices projected through the live
+                camera (how many slabs land inside the frustum, and where), and
+                a screenshot with the mesh hidden written beside the normal one.
+- `roadreach.mjs` how far the lap gets from the WORLD ORIGIN, overall and inside
+                the wedge the glacier's ring occupies. The glacier is placed in
+                origin coordinates, so whether it clears the road is a fact
+                about the route: FURKA RIDGE reaches r 318, GLACIER COL r 271.
+- `whatsinfront.mjs` names the thing filling the frame by elimination: hides one
+                scene child at a time, diffs the pixels, then descends into the
+                winner. Sanity-check its answer - at L67 station 450 it
+                correctly named `tunnel`, which is why that shot was dark, and
+                a station picked by eye is easily inside one.
 - `srv.mjs`     plain static server (`node srv.mjs 8920`).
 - `keep.sh`     keeps a server alive across tool-call timeouts:
                 `setsid ./keep.sh srv.mjs 8920 &`

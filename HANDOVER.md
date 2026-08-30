@@ -3808,6 +3808,7 @@ it is `_autoQuality` dropping the pixel ratio under load, and the gate passes
 both because it checks the box against the SCREEN and the buffer's ASPECT
 against the box — never the buffer's size against anything.
 
+<<<<<<< HEAD
 ## r273-line — THE PHONE SHOT ON THE BLACK APRON, AND THE EXEMPTION THAT NEVER SAID WHO IT WAS FOR
 
 A phone shot off the live r273 build: 8th of 8 at 0:16.7, 3 km/h, hull 77,
@@ -4101,3 +4102,270 @@ red is a UI card, red on base too), playermoves, boot, goatpeak all green.
     0.12/1.2  the slip-feed threshold and gain
 All in vehicles.js, each at its comment. The A/B instrument is
 tools-scratch/cornergrip.mjs; run it before touching any of them.
+=======
+## r275 — THE GREEN BANDS, MEASURED AND CLOSED
+Two rounds of guessing at this, one of which broke the view for everyone. This
+time: measure the screenshot first.
+
+`bandscan.mjs` scans in from both edges for the first column that is not flat
+page background:
+
+```
+2868 x 1320,  left band 185 px,  right band 186 px,  colour rgb(126,183,92)
+```
+
+Three facts fall straight out of that:
+
+1. **rgb(126,183,92) is `#7eb75c`** — `body`'s old background, exactly. And the
+   main renderer takes no `alpha`, so its canvas is OPAQUE and cannot be
+   showing anything behind it. The canvas is simply not there.
+2. **2868 / 3 = 956 pt.** An iPhone 16 Pro Max in landscape. Its safe-area inset
+   is 62 pt; 185 / 3 is 61.7.
+3. So the layout viewport is **832 on a 956 pt screen** — `viewport-fit=cover`
+   is in the meta, has been since r245, and is not taking effect on that device.
+
+Nothing positioned inside the page can reach outside the layout viewport...
+except that **the background is already painting there**. The browser's page
+surface spans the full 956; only the CSS coordinate space is 832 wide. So an
+element pulled left of zero and made wide enough does reach the bands — and
+`screen.width` is the one API that still reports the real screen when
+`innerWidth` does not.
+
+`applyViewport` now computes `over = (screen.width - innerWidth) / 2`, renders
+at `innerWidth + 2*over`, and sets `canvas.style.left = -over`. Guarded so it is
+a NO-OP anywhere it is not needed: touch only (on a desktop `screen.width` is
+the monitor, not the window), only when the screen is wider than the viewport,
+and only by an amount an inset could plausibly be. Vertical is left alone —
+in landscape the browser's own chrome makes `screen.height` meaningless.
+
+### AND THIS TIME IT IS TESTED BOTH WAYS
+The trap last time was shipping a fix for a case no test could reach.
+`camsanity.mjs` now proves both halves:
+
+```
+portrait/landscape/desktop, title and race   overX 0     box == viewport   (no-op)
+inset-sim  viewport 832  screenW 956    ->   overX 62    box 956x440  stretch 0%
+```
+
+The simulation is the reported device's exact geometry — Playwright can set
+`screen` independently of `viewport`, which is the shape iOS reports. Untested
+code is not a fix.
+
+## r276 — THE SHELF ICONS, FRAMED FROM THE CAR
+Reported with a photograph of the car shelf: "this is broken". The cards were
+cropping their cars and no two of them agreed.
+
+`_shoot` framed with a **constant**: `dist = 8.7`, look pinned at y 0.55. At 30
+degrees that leaves 2.33 u of half-height above the aim, and BRAWLER measures
+**3.46 u tall**. The number was right for whatever the cars were the day it was
+typed, and nothing has told it since that they grew roof racks. Meanwhile the
+build bay ten lines away has carried a comment for rounds saying FRAME THE CAR
+FROM THE CAR — the icons never got it.
+
+### THREE THINGS, IN THE ORDER THEY WERE FOUND
+1. **Derived distance is not enough.** Fitting the bounding box by trigonometry
+   got the roof in and then clipped the WHEELS off the bottom: a car seen at
+   three-quarters has its nearest bottom corner projecting lower than any
+   formula on the box's extents predicts. `_fitDist` projects the eight corners
+   and scales the distance by however far the worst one lands outside the
+   frame, three passes. Measured, not derived — the same lesson `_frameStage`
+   already paid for.
+2. **Aiming at the box centre made the picture worse.** The whole car fitted
+   and the background became a wall of trail, because a 3.5 u car's centre puts
+   the horizon at the top of the frame. Half way between the old fixed 0.55 and
+   the centre keeps the three-quarter look-down that puts grass and a diagonal
+   of dirt behind the car.
+3. **One rig for the whole row.** Fitting each card on its own zooms each car
+   differently AND lands each on a different patch of diorama — measured side
+   by side, one card on grass and the next against a beige panel. `_carIcons`
+   now fits every car, takes the furthest, and shoots all eight from that one
+   distance and one aim. The odd card out disappeared with it: the per-car aim
+   was tilting the lens just enough to swing a pine trunk through one frame.
+
+Backing off to fit the tallest car put the eye at about fourteen units, past
+where the diorama's near pines start at lane 9.6. Lifting the rig to look over
+them was tried and is worse — from up there the trail reads as a vertical band
+with the car pasted on it. Swinging the AZIMUTH toward the trail's own axis
+keeps the camera over the dirt, out of the tree lane, and keeps the low
+three-quarter. `SHOT_RIG` / `SHOT_RIG_GROUND` are named for it, and the car's
+own yaw is now DERIVED from the rig — `Math.PI * 0.82` was a three-quarter
+front view of the eye that existed when it was written, and the moment the eye
+moved the same constant showed the back of the car.
+
+Gates: `pageerr`, `bayblack` (the studio shares the bay's diorama) and `boot`
+4/4 all green.
+
+## r277 — THE PYRAMIDS COME OUT
+Reported in three words, no picture: "remove the piramids". Two things in this
+game are literally pyramids — the diorama's loose stones (squashed
+TETRAHEDRA and octahedra) and its grass tufts (four-sided cones) — so before
+removing anything, zoom the thing the report was most likely looking at. A car
+shelf card blown up four times settles it: scattered over the grass and the
+dirt band are small pale solids with a flat base and a clean apex. Little white
+pyramids. They are r264's stones.
+
+They were justified at the time and the argument still reads well — painted
+gravel is flat, stone the key light can catch is what makes a surface read as
+loose. What that argument missed is the SIZE these are ever seen at. A shelf
+card is 148 px wide. At that scale a four-sided solid does not read as gravel;
+it reads as a triangle someone left on the lawn.
+
+The numbers had already said so quietly: `dioparts.mjs` put them at 0.9% of the
+bay for 752 triangles — 3.0 pixels a triangle, the second-weakest thing in the
+whole diorama. Marginal on the measurement before they were wrong to the eye.
+Out: 8909 → **8157 triangles**, and the trail keeps its painted gravel, speckle
+and damp patches, which is what carries "loose surface" from any distance the
+game actually shows it from.
+
+The moss, the boulders and the three-tier pines stay — those are rocks and
+trees, not pyramids, and they earn their triangles.
+
+Gates: `pageerr`, `bayblack` lit and sealed, `boot` 4/4, second diorama still
+free at 0.1 ms.
+
+## r278 — THE MOUNTAIN LEANING ON THE CAR
+A screenshot with no words: an alpine meadow, chalets on the far slope, the car
+crawling at 8 km/h, and a huge pale grey-green faceted mass filling the left
+half of the frame. Blown up four times it resolves into a CONE seen from its
+own foot — the near base vertex at the driver's feet, two ridge lines running
+away up and out of frame, the scatter rocks of the hillside sitting along the
+right silhouette. The faces sample at #8a9a84, which is `furka`'s `hillColor`,
+which is what `_buildMassif` lerps the bottom third of every cone towards.
+
+It is a massif cone, and it passed every check the builder has.
+
+WHY IT PASSED. `_buildMassif` walks a cone away from the road until
+
+    d >= w / 2 + roadWidth + 24
+
+which is a FOOTPRINT rule. It buys exactly one thing: you cannot drive into the
+rock. It says nothing at all about what the rock looks like from the seat.
+Measured on GLACIER COL (`massifloom.mjs`, new): all 16 cones satisfied it, and
+one of them stood with its flank 42 u from the centreline and 258 u of mountain
+above that flank — **81 degrees of sky**. Every one of the 16 was over 25
+degrees; 100 % of the lap's stations had a mountain over 40 degrees somewhere in
+view. GRANITE NARROWS measured 83 %, TIMBER GORGE 79 %.
+
+So the clearance now takes the taller of two rules — the footprint one, and a
+flank standing back `LOOM = 1.15` times the cone's own height, which caps it at
+about 41 degrees:
+
+    d >= w / 2 + max(roadWidth + 24, h * LOOM)
+
+On GLACIER COL all 16 cones survive at full size and every one of them now
+measures 40 degrees or less: they simply walked outward along the ring, which
+had the room all along. Nothing shrank and nothing was dropped.
+
+THE OTHER HALF, found on the way. When eight passes cannot find room the
+builder shrinks to fit, and the old line shrank `w` and left `h` alone. That
+turns the one cone the lap encircles into a needle — the exact fault the
+horizon ring was widened to cure ("no real mountain is twice as tall as it is
+broad", r-whenever, three thousand lines further down this file). It now solves
+for the single scale that satisfies both rules and applies it to the whole
+form, so a squeezed peak is a smaller mountain instead of a spike. Shrinking `h`
+also shrinks what the loom rule asks for, so it converges in one step.
+
+A NEAR MISS WORTH RECORDING. The scale was first written `const k = ...` inside
+the shrink block — and `k` is the instance loop's own counter, three lines above
+`rock.setMatrixAt(k, m4)`. The drop path would have written instance 0.37.
+Caught by reading the diff, not by a gate; there is no gate that would have.
+
+AND A FALSE LEAD, also worth recording. Before measuring anything I photographed
+eight stations of the lap looking for the shape, and station N/2 came back
+swallowed by a dark mass with a pale slab in it — looked like a hit.
+`whatsinfront.mjs` (new: hide each scene child, diff the pixels, descend into
+the winner) named it `tunnel`, at 74 %. The car was parked inside a bore. A
+station picked by eye is easily inside one, and a dark frame is not the bright
+frame that was reported.
+
+AND THE SHRINK BRANCH TURNS OUT TO BE UNREACHABLE. `shrinkpath.mjs` exists to
+run it on purpose, and it took three cuts to get an answer worth having:
+
+ 1. Cones planted at r 40-60 with w 400. They came back at the requested
+    400 x 400 and the probe said PASS. The walk had simply pushed them outward
+    THROUGH the lap and out the far side, where the clearance is satisfied.
+ 2. `shrank` added as the gate on the gate, and the spec raised to 2000 so the
+    clearance could not be met anywhere. It reported 72 of 88 cones shrunk —
+    for a massif that has 16. The solids filter ("base no wider than `w1`")
+    stops separating massif cones from skyline ones the moment `w1` is a big
+    number, so it was counting the horizon rings.
+ 3. Reading the named InstancedMesh's own matrices. `shrank: 0`. Even at a
+    clearance of 3300 u, EVERY cone escapes.
+
+Which is the real finding: nothing bounds the walk's step (`need - d + 4`), so
+a cone can always leave the world rather than shrink. The branch is dead code
+on today's roster. The proportional shrink is still the right code to have
+there — and the `const h` it assigned to would have thrown the moment anything
+did reach it — but this round did not exercise it, and saying otherwise would
+be the third wrong measurement in a row.
+
+The flip side of an unbounded step is a cone shoved past the skyline, leaving a
+hole where a mountain should be. `conering.mjs` (new) measures it: on the
+alpine chapter, which has the largest specs and so the largest shoves, L65
+asked r 340-600 and got 422-587, L66 asked 400-700 and got 497-697, L67 asked
+380-640 and got 454-618. Every cone still stands in its own ring.
+
+Gates: `loomsweep.mjs` (new) over every level that builds a massif — no cone
+leans over a road anywhere on the roster, and no ring lost a cone to the fix.
+`conering.mjs` (new) over the same set — no cone walked out of the world.
+
+## r279 — THE CARDS WERE A CAR ON A GREEN SCREEN, AND THEY LITERALLY WERE
+Reported with a screenshot of the car shelf: each card is a vehicle pasted on a
+flat green field with a brown smear behind it and the tan trail sliced into two
+corner wedges. r276 framed these icons from the car and r264-r277 built the
+rally-trail diorama they are shot against, so "the background is doing nothing"
+should not have been possible.
+
+`iconparts.mjs` (new: shoot the icon at 4x through the game's own `_shoot`,
+then hide one child of the forest at a time and re-shoot) put a number on it.
+ONE 4-VERTEX QUAD OWNED 82.4% OF THE ICON. Every tree, every rock, every bush,
+the dapple gobo, the trail — all 0.0%. The diorama was not weak in the frame,
+it was ABSENT from it.
+
+The quad measured 420 x 420 x 0 in world space: an UPRIGHT plane standing at
+the origin, in `#4f8a35`, which is `F.grass`. But `_diorama` plainly writes
+`ground.rotation.x = -Math.PI / 2`. Three readings, no two agreeing, and the
+next hour went on probe archaeology — two probes disagreeing about the same
+object because one of them had asked `_studio()` for a different size. They
+had not; the studio is cached and both got the same scene. The disagreement was
+real and the source was innocent, because the object being measured was never
+the object the source built.
+
+BUILT ONCE, MOUNTED TWICE — AND THE SECOND MOUNT DROPPED EVERY TRANSFORM.
+`_diorama` cached `[geometry, material]` pairs in `__dioParts` and remounted
+them as `new THREE.Mesh(geo, mat)`, carrying `receiveShadow` and `renderOrder`
+across and nothing else. Most of the diorama is welded, so most of it has its
+placement baked into its vertices and survived. Five things do not:
+
+  - the ground plane lost `rotation.x = -PI/2` and stood UP as a 420 x 420
+    green wall through the origin — the green screen, exactly,
+  - the painted far treeline lost `position.y = 26` and sank into the floor,
+  - the trail, the dapple gobo and the dome lost theirs with them.
+
+The bay takes the first mount and the studio takes the second, so the bay
+looked right and every card was shot against a wall. `bayblack` could not catch
+it: it asks whether the backdrop is lit and sealed, and a green wall is both.
+
+The fix is to cache the GROUP and hand out `Object3D.clone()`. Clone copies
+transforms, `visible`, `receiveShadow` and `renderOrder`, and shares geometry
+and material by reference — which is the entire saving the parts list was
+after, without the part it got wrong. Every caller gets a clone, the first
+included, so no one holds the template and one mount cannot hide the other by
+toggling `visible`.
+
+After: ground 43.9% (as a FLOOR), dapple gobo 24.6%, bushes 12.1%, rocks 7.5%,
+tufts 5.1%, trunks 3.6%, trail 3.5%. The card is a photograph of a car on a
+rally trail, which is what the last thirteen rounds were building.
+
+WHAT THE DETOUR WAS WORTH KEEPING. Before the cause was found, `iconaim.mjs`
+swept the rig looking for a framing that would show the wood, and its finding
+stands on its own: the shipped icon camera tilts 16.8 degrees down against a
+15 degree half-FOV, so the horizon sits at ndc 1.13 — OFF THE TOP OF THE FRAME.
+Raising the aim barely moves it, because `_fitDist` pushes the lens back as the
+aim rises and lifts the eye by almost as much. That was true before this fix
+and is still true after: the icons show no sky. It is survivable now that the
+ground is a floor with a wood standing on it, and it is the thing to reach for
+if these ever want a skyline.
+
+Gates: `iconparts` on the shelf rig.
+>>>>>>> origin/main

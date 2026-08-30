@@ -162,6 +162,13 @@ export const LEVELS = [
     cost: 14, fresh: true, tune: { elev: { amp: 3, ph: [1.3, 2.2, 0.9] }, rampCount: 4 } },
   { id: 43, name: 'OULTON PARK', theme: 'farmland', route: 'oulton', region: 'GRAND CIRCUITS',
     cost: 15, fresh: true, tune: { elev: { amp: 4, ph: [0.6, 1.5, 2.4] }, rampCount: 0,
+      // HALF THE WALLS, asked for directly off a screenshot: the farmland
+      // hedge ran both verges nearly unbroken and this is a PARK, not a
+      // sunken lane. coverage 0.5 opens roughly every other field-length of
+      // verge (see _buildHedgeBanks); the tune merge is shallow, so the whole
+      // spec is restated with the theme's own numbers.
+      hedgeBanks: { lateral: 13.6, bankH: 1.9, bankW: 2.4, hedgeH: 2.3, bay: 6.2,
+        max: 640, coverage: 0.5 },
       // AUTUMN: copper woods under a low golden sun
       foliageLow: 0x9a5a20, foliageTop: 0xc8842c,
       foliage: { h: 0.07, hVar: 0.04, s: 0.62, sVar: 0.15, l: 0.36, lVar: 0.12 },
@@ -3025,6 +3032,24 @@ const THEMES = {
     elev: { amp: 5, ph: [0.8, 2.3, 4.9] },
     rampMaxCurv: 0.022, padMaxCurv: 0.0075, boardMaxCurv: 0.02,
     cliffWalls: true,
+    // THE WALLS STOOD ON THE VERGE. `_cliffProfile` places the face at
+    // `WALL_OFF + 0.65 + (cliffSetback ?? 0)` — and this theme never set the
+    // setback, so its 18 u concrete faces rose 11.05 u from the centreline on
+    // a road whose drivable half is 9 and whose chase camera is allowed out to
+    // 8.4. That is 2.6 u of air between the lens and an 18 u wall: reported
+    // twice from a phone as a frame two-thirds filled with banded green
+    // concrete, the road a sliver, the car pressed into the face ("needs wall
+    // fixing"; the earlier unattributed slot-canyon frame carried this level's
+    // own contract slate). CANYON RUN sets 26 and ROCKFALL RAVINE 22 for the
+    // same builder; those were the two the r270 camera work was tuned on,
+    // which is why they never showed it.
+    //
+    // 12, not canyon's 26: this world is a sewer main and the slot is its
+    // identity. At 12 the face stands 23 u out — the wall top subtends ~38
+    // degrees from the centreline, still a corridor — and the camera at its
+    // 8.4 u limit gets 14.6 u of air instead of 2.6, which is the difference
+    // between driving a slot and being shown its wallpaper.
+    cliffSetback: 12,
     cliffPalette: {                                     // stained tunnel concrete
       bands: ['#6e7466', '#5c6256', '#7c8272', '#545a4c', '#666c5e'],
       seam: 'rgba(20,24,18,0.6)',
@@ -4239,15 +4264,25 @@ const THEMES = {
       fringe: [150, 100, 44], fringeVar: [44, 34, 20],
     },
     hillColor: 0x6a5a30, peakColor: 0x8a7a52,
-    treeCount: 950, trunkColor: 0x5a4028,
+    // A THICK WOOD, asked for directly. 950 over a 10.4-52 belt is a wood you
+    // see THROUGH — the eye finds the field beyond it between the trunks, and
+    // a copper canopy only reads as a season when it closes over the road.
+    // 1650 on a belt that starts 0.9 u nearer the verge and runs half as deep
+    // again puts trunks at every depth instead of one screen of them, so the
+    // far ones fill the gaps the near ones leave. Density, not distance: the
+    // belt is deliberately NOT pushed further out, because a wood you cannot
+    // reach the edge of is what "thick" means here.
+    treeCount: 1650, trunkColor: 0x5a4028,
     foliageLow: 0x9a4a1c, foliageTop: 0xd8922c,
     // amber centre, wide hue band: 0.055 -> 0.125 is rust through to gold, and
     // the species shifts push birch past that and larch back under it
     foliage: { h: 0.055, hVar: 0.07, s: 0.72, sVar: 0.14, l: 0.40, lVar: 0.13 },
     treeSnowCap: false,
-    treeBelt: [10.4, 52],
+    treeBelt: [9.5, 78],
     tuftCount: 720, grass: { bladeA: '#9a7a3a', bladeB: '#c8a656' },
-    bushCount: 420, bushColor: 0x8a4a22,
+    // undergrowth to match — bare trunks over clean ground is a plantation,
+    // and the thing being asked for is a wood
+    bushCount: 760, bushColor: 0x8a4a22,
     bush: { h: 0.06, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.3, lVar: 0.1 },
     rockCount: 220, pebbleCount: 250, rockColor: 0x6e6658, rockSnowCap: false,
     flowerCount: 120, flowerColors: ['#c8442a', '#e8a83a', '#f0e0c0'],   // hips and haws
@@ -4338,6 +4373,9 @@ const THEMES = {
       fringe: [128, 92, 46], fringeVar: [36, 28, 18],
     },
     hillColor: 0x5a4a34, peakColor: 0x807868,
+    // NOT thickened with the wood: this is a bracken moor and its whole point
+    // is that you can see across it. The leaf fall below carries the season
+    // here instead.
     treeCount: 260, trunkColor: 0x4a3826,                // barely wooded
     foliageLow: 0x8a4a1c, foliageTop: 0xc07c28,
     foliage: { h: 0.045, hVar: 0.05, s: 0.6, sVar: 0.12, l: 0.34, lVar: 0.1 },
@@ -9639,7 +9677,27 @@ export class Track {
     // Guarded index — a negative `j % N` would read undefined and Math.min it
     // to NaN, and every NaN comparison downstream is false.
     if (this._cliffCap) {
-      base = Math.min(base, this._cliffCap[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)]);
+      const cap = this._cliffCap[(((j % N) + N) % N) * 2 + (side < 0 ? 1 : 0)];
+      if (cap < base) {
+        // A PINCHED WALL YIELDS HEIGHT, NOT JUST GROUND. The cap pulls the
+        // face in wherever the lap comes back past itself — to 11.3 u on
+        // sixteen stations of CANYON RUN, and across long stretches of LAGUNA
+        // SECA's corkscrew — and the wall kept its FULL height there: a 30 u
+        // face 2.9 u from the camera's own clamp limit. Photographed on
+        // r281 · LAGUNA SECA as a frame that is nothing but banded rock, the
+        // car invisible inside it. A wall standing where the cap bites is a
+        // leg pinched against its own neighbour, and what that looks like in
+        // a real doubled-back canyon is a LOW SPINE between the two roads —
+        // so the height falls with the squeeze: full height where the cap
+        // just grazes, down to the 1.7 u berm floor where the face is pulled
+        // right to the verge. You see the next leg over it, which is also
+        // the honest geometry.
+        const nominal = WALL_OFF + 0.65 + (this.T.cliffSetback ?? 0);
+        const squeeze = THREE.MathUtils.clamp(
+          (cap - (WALL_OFF + 1.4)) / Math.max(1, nominal - (WALL_OFF + 1.4)), 0, 1);
+        h = Math.max(1.7, h * squeeze * squeeze);
+        base = cap;
+      }
     }
     const l1 = 0.85 + 0.5 * Math.sin(17 * t + 0.7 - ph);   // mid-face lean
     const l2 = 2.0 + 0.85 * Math.sin(13 * t + 2.9 + ph) + 0.4 * Math.sin(47 * t - ph);
@@ -12078,8 +12136,41 @@ export class Track {
     const step = Math.max(2, Math.round((S.bay || 6.2) / this.segLen));
     const bayLen = step * this.segLen * 1.08;
     const bankGeo = this._bankPrismGeo();
-    const hedgeGeo = new THREE.BoxGeometry(1, 1, 1);
+    // A HEDGE IS NOT A BOX. Photographed on OULTON PARK: the run read as a row
+    // of butter-yellow slabs — a unit box per bay, flat-shaded, one scalar of
+    // tone. A flailed hedge is a block in SILHOUETTE, but its faces are made
+    // of clumps: so the box is subdivided and every vertex is pushed out by a
+    // seeded hash (deterministic — a rebuild is the same hedge), the crown
+    // more than the flanks, and painted per-vertex — lit crown fading to a
+    // shadowed base, the same trick the massif uses to stop eight cones
+    // reading as one flat wall. Still one geometry, still one InstancedMesh,
+    // still one draw call: the cost is vertices, 8 -> ~150 per bay.
+    const hedgeGeo = new THREE.BoxGeometry(1, 1, 1, 4, 2, 6);
     hedgeGeo.translate(0, 0.5, 0);
+    {
+      const pos = hedgeGeo.attributes.position;
+      const hcols = new Float32Array(pos.count * 3);
+      const hash = (a, b2, c) => {
+        const v = Math.sin(a * 12.9898 + b2 * 78.233 + c * 37.719) * 43758.5453;
+        return v - Math.floor(v);
+      };
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+        const n = hash(x * 7, y * 5, z * 9) - 0.5;
+        // the crown billows, the flanks ripple, the base stays put so the
+        // hedge still sits down onto its bank without a gap
+        pos.setX(i, x + n * 0.22 * y);
+        pos.setY(i, y + (y > 0.9 ? (hash(z * 11, x * 3, 1) - 0.35) * 0.30 : 0));
+        pos.setZ(i, z + (hash(y * 13, z * 5, x * 2) - 0.5) * 0.10);
+        // per-vertex light: crown 1.0 down to 0.55 at the base, with clump
+        // mottle on top of the ramp so a face is foliage rather than paint
+        const t = 0.55 + 0.45 * Math.min(1, pos.getY(i))
+          + (hash(x * 17, y * 19, z * 23) - 0.5) * 0.22;
+        hcols[i * 3] = hcols[i * 3 + 1] = hcols[i * 3 + 2] = Math.max(0.3, t);
+      }
+      hedgeGeo.setAttribute('color', new THREE.BufferAttribute(hcols, 3));
+      hedgeGeo.computeVertexNormals();
+    }
     const banks = new THREE.InstancedMesh(
       bankGeo,
       new THREE.MeshStandardMaterial({
@@ -12091,7 +12182,8 @@ export class Track {
     const hedges = new THREE.InstancedMesh(
       hedgeGeo,
       new THREE.MeshStandardMaterial({
-        color: 0xffffff, flatShading: true, roughness: 1, envMapIntensity: 0.25,
+        color: 0xffffff, vertexColors: true, flatShading: true, roughness: 1,
+        envMapIntensity: 0.25,
       }),
       MAX
     );
@@ -12109,9 +12201,22 @@ export class Track {
     // never going to touch.
     const verge = [...this.props, ...this.tireStacks].filter(
       (v) => Math.abs(this._distToTrack(v.x, v.z) - LAT) < W * 0.5 + (v.r ?? 1.2));
+    // COVERAGE, IN SECTIONS. `coverage: 0.5` on a level's spec keeps roughly
+    // half the run — dropped as whole ~9-bay sections (about 60 u of verge at
+    // a time), never as alternating bays: a hedge with every other bay missing
+    // is picket teeth, a hedge that comes and goes by the field is how a real
+    // parkland circuit is walled. Seeded on the section index so the same
+    // world always opens the same fields. Both sides drop together — a section
+    // hedged on one side only reads as a mistake, not a field.
+    const cov = S.coverage ?? 1;
+    const secHash = (n) => {
+      const v = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+      return v - Math.floor(v);
+    };
     let k = 0, bay = 0;
     for (let i = 0; i < N && k < MAX; i += step) {
       if (this._circDist(i, 0) < 34) continue;                    // start grid + gate
+      if (cov < 1 && secHash(Math.floor(i / (step * 9))) > cov) continue;
       if (this._nearGorge(i, 40)) continue;
       // streams wash across the lane; the bank opens for them on both sides
       if (this.fords.some((f) => this._circDist(i, f.i) < f.half / this.segLen + 5)) continue;
@@ -12149,8 +12254,18 @@ export class Track {
         m4.compose(new THREE.Vector3(p.x, base + h * 0.92, p.z), q,
           new THREE.Vector3(W * 0.8, hh, bayLen * 1.02));
         hedges.setMatrixAt(k, m4);
-        leaf.setHSL(F.h + Math.random() * F.hVar, F.s + Math.random() * F.sVar,
-          Math.max(0.10, F.l - 0.06 + Math.random() * F.lVar));
+        // A HEDGE IS NOT THE CANOPY. This borrowed the foliage palette raw,
+        // which is right on green farmland and wrong the moment a tune moves
+        // the trees: OULTON PARK's autumn foliage (h 0.07, s 0.62, l 0.36) put
+        // BUTTER-YELLOW slabs down both verges, photographed and reported as
+        // walls needing fixing. Flailed hawthorn holds browner and darker than
+        // whatever the trees are doing: hue pulled a quarter toward moss
+        // (0.22), saturation and lightness cut, so an autumn hedge reads as
+        // russet-brown under copper trees and a summer hedge stays hedge-green.
+        leaf.setHSL(
+          (F.h + Math.random() * F.hVar) * 0.75 + 0.22 * 0.25,
+          (F.s + Math.random() * F.sVar) * 0.72,
+          Math.max(0.10, (F.l - 0.06 + Math.random() * F.lVar) * 0.66));
         hedges.setColorAt(k, leaf);
         this.solids.push({ x: p.x, z: p.z, r: W / 2, y: base + h * 0.5, mat: 'bank' });
         k++;
@@ -12758,6 +12873,71 @@ export class Track {
     return c.getHex();
   }
 
+  /** THE ALBEDO THE GROUND ACTUALLY RENDERS AT (x, z).
+   *
+   *  The terrain material carries the ground TEXTURE and per-vertex colours
+   *  at once, so what reaches the screen is `ground.base x terrain ramp`
+   *  multiplied in linear space - the outback theme's note spells this out
+   *  and calls it measured. Anything that has to MATCH the ground therefore
+   *  has to match that PRODUCT; matching either half alone lands somewhere
+   *  the ground never goes.
+   *
+   *  Follows `_buildGround`'s own paint: the terrainLow -> terrainHigh height
+   *  ramp, the valley-shading multiply that rides on the same t, and the mean
+   *  of the per-vertex facet wobble. The dirt sinusoid, the coastal sand ring
+   *  and the gorge strata are deliberately left out - they are local
+   *  sprinkles over the field, not the tone of it. */
+  _groundTone(x, z) {
+    const T = this.T;
+    const t = THREE.MathUtils.clamp((this._terrainMeshHeight(x, z) + 2) / 7, 0, 1);
+    const c = new THREE.Color(T.terrainLow).lerp(new THREE.Color(T.terrainHigh), t);
+    c.multiplyScalar((0.93 + 0.07 * t) * 0.985);   // valley shading x mean facet wobble
+    if (T.ground && T.ground.base) c.multiply(new THREE.Color(T.ground.base));
+    return c;
+  }
+
+  /** The tone a massif foot has to reach: the mean of `_groundTone` over the
+   *  ring the cones are about to be planted on, lifted half way to the
+   *  theme's hill tone in brightness.
+   *
+   *  SAMPLED, NOT ASSUMED, because the ring sits at r 340-720 where
+   *  `_highland` has already lifted the ground several units up the
+   *  terrainLow -> terrainHigh ramp. The ground at a cone's foot is NOT
+   *  terrainLow; on the alpine themes it is most of the way to terrainHigh,
+   *  and on the flat-by-design worlds it is not. Sea-side samples are dropped
+   *  on coast worlds for the same reason `_buildMassif` reflects its cones
+   *  inland: there is no ground out there to match.
+   *
+   *  AND A FLANK IS NOT A FIELD, which is why the brightness is only met half
+   *  way. The ground is a near-horizontal surface facing the sun; a cone's
+   *  foot is a steep face that is not, and the renderer shades it as such.
+   *  Handing the foot the ground's albedo outright is the physically honest
+   *  answer and it measures worse: on GRANITE NARROWS and CAPE OLIVETO, where
+   *  the flat ground is far more strongly lit than any flank, the foot came
+   *  out L* 24-29 below the meadow it stands in - a dark skirt round every
+   *  mountain, a new seam in place of the old one. Colour from the ground,
+   *  brightness half way to the hill tone the theme already declares: over
+   *  four themes and eight cones that is the setting that closes the worst
+   *  seam without opening another. */
+  _massifFootTone(M) {
+    const acc = new THREE.Color(0, 0, 0);
+    const beach = this.T.coast ? (this.T.coast.beach ?? 60) : 0;
+    let n = 0;
+    for (let i = 0; i < 7; i++) {
+      const a = M.az + (i / 6 - 0.5) * M.spread;
+      for (const r of [M.r0, (M.r0 + M.r1) * 0.5, M.r1]) {
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        if (this.T.coast && this._coastSide(x, z) > -beach) continue;
+        acc.add(this._groundTone(x, z)); n++;
+      }
+    }
+    if (n) acc.multiplyScalar(1 / n); else acc.copy(this._groundTone(0, 0));
+    const Y = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;   // linear luminance
+    const y = Y(acc);
+    if (y < 1e-4) return acc;
+    return acc.multiplyScalar((y + Y(new THREE.Color(this.T.hillColor ?? 0x6e8a5c))) / (2 * y));
+  }
+
   /** THE CRAG GEOMETRY: a mountain, not a traffic cone.
    *
    *  The massif was ConeGeometry(1, 1, 6) - six sides, ONE height segment -
@@ -12768,8 +12948,11 @@ export class Track {
    *  the base cap move together and nothing cracks), which breaks the
    *  silhouette into crags. ~110 faces, built once, instanced per peak.
    *
-   *  And COLOUR, baked per face: the foot blends into the theme's own hill
-   *  tone so the range grows out of the land instead of being parked on it;
+   *  And COLOUR, baked per face: the foot blends into the tone the GROUND
+   *  around the ring is actually painted in - ground texture times terrain
+   *  ramp, sampled where the cones stand, at a brightness a steep face can
+   *  carry - so the range grows out of the land instead of being parked on
+   *  it;
    *  the body carries alternating strata bands warmed and cooled off the base
    *  rock; the crest lightens, or turns to snow on worlds that cap their
    *  boulders; and every facet gets its own tone wobble so the faces read as
@@ -12963,6 +13146,25 @@ export class Track {
     return mx.map((v) => v / base);
   }
 
+  /** How far out is this form DRAWN, scaled by `sx` and `sz`?
+   *
+   *  A crag is not a unit cylinder: `_mountainGeo` stretches the footprint
+   *  (`elong`) and the crag jitter pushes it further, so this geometry reaches
+   *  0.72 of the scale it is composed with, not the 0.5 a box would. Anything
+   *  that has to stand a form CLEAR of something else needs the drawn number,
+   *  and like `_formProfile` it is read off the geometry rather than assumed —
+   *  no formula describes a heightfield with spurs and gullies. Yaw does not
+   *  enter it: a rotation about y cannot change a distance from the axis. */
+  _flankRadius(geo, sx, sz) {
+    const p = geo.attributes.position;
+    let mx = 0;
+    for (let i = 0; i < p.count; i++) {
+      const r = Math.hypot(p.getX(i) * sx, p.getZ(i) * sz);
+      if (r > mx) mx = r;
+    }
+    return mx;
+  }
+
   _buildMassif(m4) {
     const M = this.T.massif;
     const geo = this._cragGeo();
@@ -12971,7 +13173,32 @@ export class Track {
     const cols = new Float32Array(pos.count * 3);
     const rockA = new THREE.Color(M.color ?? this._massifRock());
     const rockB = rockA.clone().offsetHSL(0.015, 0.05, -0.045);   // warm stratum
-    const foot = new THREE.Color(this.T.hillColor ?? 0x6e8a5c);
+    // THE FOOT GROWS OUT OF THE LAND THAT IS ACTUALLY THERE.
+    //
+    // This blended toward `T.hillColor`, and `hillColor` is the palette entry
+    // for the HORIZON hill rings - it is not the ground the cone is standing
+    // in, and nothing ever made it agree with that ground. Worse, it compared
+    // a bare vertex colour against a surface that renders as vertex colour
+    // TIMES the ground texture, so even a theme whose hillColor happens to
+    // sit near its terrain ramp still met the meadow a whole multiply too
+    // light. Measured across the cone/ground silhouette with
+    // tools-scratch/massifseam.mjs - hide the mesh named 'massif', diff the
+    // two frames so the cone pixels are known rather than guessed, then take
+    // a band of rock and a band of ground either side of the bottom edge -
+    // the step read dE 30.6 on FURKA RIDGE, where the colour half of it alone
+    // was dC 22.5: a drawn outline, not a foot. The other three themes
+    // measured came in at dE 10-22, so this is not one bad palette entry -
+    // it is the worst case of a rule that was aimed at the wrong thing.
+    //
+    // `_massifFootTone` samples the product the ground really paints, around
+    // the ring these cones are planted on, and keeps hillColor only as the
+    // brightness anchor a steep flank needs - see there. Theme-general by
+    // construction: nothing here reads a theme name, and a world whose hill
+    // tone already sat on its ground barely moves. Measured after, over the
+    // same eight cones: FURKA RIDGE 30.6 -> 14.5 and 31.0 -> 15.1 dE, with
+    // the colour half of it (dC) halved, 22.5 -> 11.4; TIMBER GORGE, whose
+    // hill tone was already close, holds at 11.6 and 10.3.
+    const foot = this._massifFootTone(M);
     const snow = !!(this.T.rockSnowCap || this.T.treeSnowCap);
     const crest = snow ? new THREE.Color(0xf2f6fa)
       : rockA.clone().offsetHSL(0, -0.04, 0.10);
@@ -12985,8 +13212,15 @@ export class Track {
         (pos.getY(f) + pos.getY(f + 1) + pos.getY(f + 2)) / 3 + 0.5, 0, 1);
       // strata bands off the base rock, alternating by height
       tmp.copy((Math.floor(hf * 7) % 2) ? rockB : rockA);
-      // the foot grows out of the land
-      if (hf < 0.34) tmp.lerp(foot, (1 - hf / 0.34) * 0.7);
+      // ...and it has to do the growing WHERE THE GROUND IS. Each instance is
+      // seated `h * 0.2` INTO the terrain (see the `y` below), so hf 0..0.2 is
+      // buried and a ramp that started at the geometric base had already
+      // spent two thirds of itself underground: at the visible ground line it
+      // was down to 0.29 of its strength, which is why the blend never read
+      // as an apron. Run it over the apron the player can see instead - full
+      // at the contact line, gone a fifth of the height above it.
+      const apron = THREE.MathUtils.clamp((0.40 - hf) / 0.20, 0, 1);
+      if (apron > 0) tmp.lerp(foot, apron * 0.7);
       // the crest lightens - or snows
       if (hf > 0.72) tmp.lerp(crest, ((hf - 0.72) / 0.28) * (snow ? 0.95 : 0.6));
       // per-facet tone, so faces read as rock instead of upholstery
@@ -13010,7 +13244,9 @@ export class Track {
       const t = M.count > 1 ? k / (M.count - 1) : 0.5;
       const a = M.az + (t - 0.5) * M.spread + (Math.random() - 0.5) * 0.1;
       const r = M.r0 + Math.random() * (M.r1 - M.r0);
-      const h = M.h0 + Math.random() * (M.h1 - M.h0);
+      // `h` is mutable because the shrink-to-fit below scales the whole form,
+      // not just its base — see there
+      let h = M.h0 + Math.random() * (M.h1 - M.h0);
       let w = M.w0 + Math.random() * (M.w1 - M.w0);
       let x = Math.cos(a) * r, z = Math.sin(a) * r;
       // "the dry inland range standing behind the terraces" — INLAND. On a
@@ -13037,7 +13273,54 @@ export class Track {
       // away from whatever road sample it is closest to, which is the
       // shortest way clear; a few passes because stepping off one leg of a
       // lap can walk onto another.
-      const clearance = (i) => w * 0.5 + (this.widthAt?.(i) ?? 9) + 24;
+      //
+      // AND IT MUST NOT LEAN OVER IT EITHER. Footprint clearance only buys
+      // "you cannot drive into the rock"; it says nothing about what the rock
+      // looks like from the driver's seat. Measured on GLACIER COL: every one
+      // of the 16 cones passed the footprint rule, and one of them stood with
+      // its flank 42 u from the centreline and 258 u of mountain above it —
+      // 81 degrees of sky, a pale faceted slab filling half the frame, which
+      // is what got photographed and reported. All 16 were over 25 degrees.
+      // A mountain reads as a mountain when you look UP at it, not when it
+      // leans on you, so the clearance takes the taller of the two rules:
+      // footprint, and a flank standing back `LOOM` times its own height.
+      const LOOM = 1.15;                              // <= ~41 degrees of sky
+      const clearance = (i) => w * 0.5
+        + Math.max((this.widthAt?.(i) ?? 9) + 24, h * LOOM);
+      // AND THE WALK HAS TO STOP AT THE EDGE OF THE RANGE. Nothing bounded
+      // `need - s.d + 4`, and `need` scales with the cone, so a clearance the
+      // world cannot offer ANYWHERE never fell through to the shrink below —
+      // it launched the peak instead. Measured with GLACIER COL's own spec
+      // rewritten to 16 cones of w 2000 h 2000 (3300 u of clearance) planted
+      // on its lap, which only reaches 271 u from the world centre: all 16
+      // walked out to r 3426-3556 — past the skyline rings at 900 and past
+      // RIM_RADIUS, the headwall that closes the world at 1620 — and arrived
+      // at the asked 2000 x 2000 with `shrinkpath` reporting `shrank: 0`. The
+      // shrink-to-fit written for exactly this case had never once executed.
+      //
+      // The spec already says where its mountains live, so bound the walk in
+      // the spec's own terms: the ring r0..r1. The AZIMUTH each pass reaches
+      // is kept — sliding a cone around the ring is what finds room on a lap
+      // that bends, and none of that is touched — and only the radius is
+      // pinned back into the band.
+      //
+      // OUT TO `r1 * 1.35`, NOT TO r1. The walk already carries cones past
+      // their own rim on worlds that are correct today: measured over the ten
+      // shipped worlds that build a massif, L19 620 -> 670, L20 640 -> 685,
+      // L48 660 -> 776, L62 640 -> 729 and worst FURKA RIDGE 660 -> 809, which
+      // is 1.23 x r1. Pinning at r1 would shrink mountains that are standing
+      // properly. 1.35 clears every measured one by 10 % or more, and still
+      // sits inside `conering`'s own 1.4 x r1 "flung" line, so the bound can
+      // never itself dig the hole that gate exists to catch. Inward, r0 as it
+      // stands: no cone on the roster finishes inside its own r0 (nearest is
+      // CAPE OLIVETO, 437 against 360). Both ends are widened to wherever the
+      // cone stood when the walk began, so the coast reflection above is never
+      // undone by the clamp.
+      //
+      // A cone that still cannot find room now falls through to the shrink,
+      // which is where "no room" was always meant to land.
+      const rWalk = Math.hypot(x, z) || M.r0;     // after any coast reflection
+      const rIn = Math.min(M.r0, rWalk), rOut = Math.max(M.r1 * 1.35, rWalk);
       for (let pass = 0; pass < 8; pass++) {
         const s = this._nearestSample(x, z);
         const need = clearance(s.i);
@@ -13050,6 +13333,13 @@ export class Track {
           ox = x / rr; oz = z / rr;
         } else { ox /= ol; oz /= ol; }
         x += ox * (need - s.d + 4); z += oz * (need - s.d + 4);
+        const rn = Math.hypot(x, z);
+        if (rn < 1e-3) {                 // stepped onto the world's own centre
+          x = Math.cos(a) * rIn; z = Math.sin(a) * rIn;
+        } else {
+          const rc = Math.min(rOut, Math.max(rIn, rn));
+          if (rc !== rn) { x *= rc / rn; z *= rc / rn; }
+        }
       }
       // ...and never on the goat peak: a scenery cone (and its solid) parked
       // on the climbable mountain is a wall across the route. WALKED aside,
@@ -13072,7 +13362,19 @@ export class Track {
       // of sight and register nothing.
       const fin = this._nearestSample(x, z);
       if (fin.d < clearance(fin.i)) {
-        w = Math.max(0, (fin.d - (this.widthAt?.(fin.i) ?? 9) - 24) * 2);
+        // IN PROPORTION. This used to shrink `w` and leave `h` alone, which
+        // turns the one cone that could not find room into a needle — the
+        // exact "no real mountain is twice as tall as it is broad" fault the
+        // horizon ring was widened to cure. Solve for the single scale that
+        // satisfies both rules at once and apply it to the whole form, so a
+        // squeezed peak is a smaller mountain rather than a spike. Shrinking
+        // `h` also shrinks what the loom rule asks for, so this converges in
+        // one step instead of chasing itself.
+        const road = (this.widthAt?.(fin.i) ?? 9) + 24;
+        const fit = Math.max(0, Math.min(
+          (fin.d - road) / (w * 0.5),
+          fin.d / (w * 0.5 + h * LOOM)));
+        w *= fit; h *= fit;
         if (w < 30) {
           m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
           rock.setMatrixAt(k, m4);
@@ -13146,21 +13448,134 @@ export class Track {
     const prof = this._formProfile(geo);
     // the tongue pours down a north-west flank towards the road
     const a0 = -2.25;
+    // AND THE ICE MUST NOT STAND ON THE ROAD EITHER — the massif's rule, in
+    // the massif's terms: clearance is the taller of a FOOTPRINT (the drawn
+    // flank, plus the carriageway and 24 u) and a LOOM (a flank standing back
+    // `LOOM` times what it rears above the road). This ring is struck from
+    // the WORLD ORIGIN at a fixed azimuth and never asks where the lap went,
+    // which is exactly the blindness that planted a massif cone across 62
+    // stations of carriageway on FURKA RIDGE. A slab is worse when it happens:
+    // 210 u wide, and nothing pushes it into `solids`, so the car drives
+    // through the ice rather than into it.
+    //
+    // MEASURED FIRST, on both levels the theme reaches (`glacierloom`, which
+    // reads the instance matrices — a probe that reads `solids` finds no
+    // glacier at all and reports clean). FURKA RIDGE: closest flank 197 u
+    // clear, worst slab 12.4 degrees of sky. GLACIER COL: 330 u, 25.8 degrees.
+    // Neither is anywhere near the massif's 41 degree limit, so THIS RULE
+    // MOVES NOTHING ON THE SHIPPED ROSTER and is recorded as a guard, not as a
+    // repair. What it guards is real: that clearance is an accident of two
+    // route tables. The ring is struck in ORIGIN coordinates, so whether it
+    // clears the lap is a fact about the ROUTE, and the editor's LOOK wears a
+    // whole theme — `glacier: true` with it — on any route in the game.
+    // Measured (`roadreach`): FURKA RIDGE's lap reaches r 318 from the origin
+    // and GLACIER COL's r 271, against a near ice edge at r 560 - 152 = 408.
+    // Ninety units on the bigger of the two, held by nothing at all.
+    const LOOM = 1.15;                                 // <= ~41 degrees of sky
+    // Where this form's crest sits inside the composed slab, read off the
+    // geometry: the mesh is anchored at 0.32 h (see the note by `gy` below)
+    // and reaches `gTop` of its own scale above its centre, so the ice tops
+    // out at ground + h * CREST.
+    let gTop = 0;
+    {
+      const py = geo.attributes.position;
+      for (let i = 0; i < py.count; i++) if (py.getY(i) > gTop) gTop = py.getY(i);
+    }
+    const CREST = 0.32 + gTop;
     for (let k = 0; k < 14; k++) {
       const t = k / 13;
       const r = 560 + t * 320;
       const a = a0 + (t - 0.5) * 0.34 + (k % 2 ? 0.05 : -0.05);
-      const w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
+      let w = 210 - t * 90, d = 130 - t * 40, h = 26 + t * 96;
       q.setFromAxisAngle(up, a + 1.2);
+<<<<<<< HEAD
       const gx = Math.cos(a) * r, gz = Math.sin(a) * r;
       if (this._nearGoat(gx, gz, Math.max(w, d) * 0.5)) {  // ice off the climbable peak
+=======
+      let gx = Math.cos(a) * r, gz = Math.sin(a) * r;
+      // The massif spends `w * 0.5` here, which is what a BOX would reach.
+      // This form reaches 0.72 of its scale and the slab is scaled unevenly
+      // (w by d), so the flank is measured rather than halved — on the widest
+      // slab that is 152 u of ice against the 105 the massif's arithmetic
+      // would have claimed, and the difference is all road.
+      let flank = this._flankRadius(geo, w, d);
+      // THE STATION IT CROWDS WORST, AND THE HEIGHT ABOVE THAT ROAD. Two
+      // departures from the massif's loop. Transcribed literally it left one
+      // slab standing at 41.7 degrees while reporting its own clearance
+      // satisfied — caught by `glacierforce`, which drives the lap under the
+      // ice on purpose, because nothing on the shipped roster executes this
+      // code and an unexecuted branch is where the mistake lives (that is the
+      // `shrinkpath` lesson, and it cost r278 two of them).
+      //   - The loom is measured against `h`, the form's own height, and ice
+      //     does not stand on the carriageway's datum. Out on the ring the
+      //     ground is already above the road, and that rise is sky over the
+      //     driver exactly as the slab's own height is: 27 u of it in the
+      //     forced case, which is the whole 41.7.
+      //   - And the walk steps away from the NEAREST sample, which need not be
+      //     the station that sees the most sky — a farther one, lower in the
+      //     valley, can beat it. Scanning the lap for the worst offender is
+      //     what makes "no station sees more than 41 degrees" a property of
+      //     the loop instead of a hope. It costs one pass over 900 samples per
+      //     slab at build time, and everywhere on the roster that pass finds
+      //     nothing and the walk exits on it.
+      const crowd = () => {
+        const cy = this.terrainHeight(gx, gz) + h * CREST;
+        let bi = -1, over = 0, bd = 0;
+        for (let i = 0; i < this.N; i++) {
+          const c = this.center[i];
+          const dd = Math.hypot(gx - c.x, gz - c.z);
+          const need = flank
+            + Math.max((this.widthAt?.(i) ?? 9) + 24, (cy - c.y) * LOOM);
+          if (need - dd > over) { over = need - dd; bi = i; bd = dd; }
+        }
+        return { i: bi, over, d: bd };
+      };
+      // Walk it out of the way, away from the station it crowds worst, which
+      // is the shortest way clear; a few passes because stepping off one leg
+      // of a lap can walk onto another.
+      for (let pass = 0; pass < 8; pass++) {
+        const s = crowd();
+        if (s.i < 0) break;                       // clear of every station
+        const c = this.center[s.i];
+        let ox = gx - c.x, oz = gz - c.z;
+        const ol = Math.hypot(ox, oz);
+        if (ol < 1e-3) {                 // dead centre: leave along the ring
+          const rr = Math.hypot(gx, gz) || 1;
+          ox = gx / rr; oz = gz / rr;
+        } else { ox /= ol; oz /= ol; }
+        gx += ox * (s.over + 4); gz += oz * (s.over + 4);
+      }
+      // Still crowding after eight passes means the lap encircles this spot.
+      // Shrink IN PROPORTION — one scale for the whole slab, so a squeezed
+      // step of the icefall is a smaller step and not a shard — solving both
+      // rules at the binding station at once. The ground it stands on does
+      // NOT shrink with it, which is why the rise carries its own term. A
+      // couple of rounds because satisfying one station can hand the job to
+      // another; below a slab's worth of ice it is a chip on a hillside, so
+      // drop it out of sight rather than leave litter on the skyline.
+      let gone = false;
+      for (let s = 0; s < 3 && !gone; s++) {
+        const fin = crowd();
+        if (fin.i < 0) break;
+        const c = this.center[fin.i];
+        const road = (this.widthAt?.(fin.i) ?? 9) + 24;
+        const rise = this.terrainHeight(gx, gz) - c.y;
+        const fit = Math.max(0, Math.min(
+          (fin.d - road) / flank,
+          (fin.d - rise * LOOM) / (flank + h * CREST * LOOM)));
+        w *= fit; d *= fit; h *= fit; flank *= fit;
+        gone = w < 40;
+      }
+      if (gone) {
+>>>>>>> origin/main
         m4.compose(new THREE.Vector3(0, -99999, 0), q, new THREE.Vector3(1, 1, 1));
         slabs.setMatrixAt(k, m4);
         continue;
       }
       // seated ON the ground it stands on — the old constant-datum placement
       // buried most of each slab wherever the valley floor dropped, and what
-      // poked out was the boxy top
+      // poked out was the boxy top. Read AFTER the walk: the ground under
+      // where it ended up is the only ground it can stand on.
       const gy = this.terrainHeight(gx, gz);
       // the crag geometry is CENTRED (the massif composes it at y + h/2); the
       // box it replaces had its base at the origin — anchor accordingly, or
@@ -13481,12 +13896,40 @@ export class Track {
     const F = this.T.frontage;
     if (!F || this.T.townsfolk === false) return;
     const WANT = this.T.townsfolk ?? 170;
-    const legGeo = new THREE.BoxGeometry(0.34, 0.86, 0.26);
-    legGeo.translate(0, 0.43, 0);
-    const torsoGeo = new THREE.BoxGeometry(0.44, 0.62, 0.28);
-    torsoGeo.translate(0, 1.17, 0);
+    // A PERSON-SHAPE, NOT A TOTEM. Photographed on IL BUDELLO and reported
+    // ("people design can be a bit better"): one leg-box under one torso-box
+    // under a sphere reads as a painted bollard, because the three tells of a
+    // human silhouette are all missing — daylight between the legs, arms
+    // hanging outside the torso line, and a neck's gap under the head. All
+    // three are cheap: the legs become two boxes with a gap, the torso grows
+    // two hanging arms (merged into the same geometry, so the mesh count and
+    // the draw calls do not move), and the head lifts 5 cm clear of the
+    // shoulders. Arms wear the torso colour — sleeves — and the merge is six
+    // lines because vehicles.js keeps its own `mergeGeos` unexported and a
+    // person is not a car part.
+    const merge = (geos) => {
+      const parts = geos.map((g2) => (g2.index ? g2.toNonIndexed() : g2));
+      let n = 0;
+      for (const g2 of parts) n += g2.attributes.position.array.length;
+      const pos = new Float32Array(n);
+      let o = 0;
+      for (const g2 of parts) { pos.set(g2.attributes.position.array, o); o += g2.attributes.position.array.length; }
+      const out = new THREE.BufferGeometry();
+      out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      out.computeVertexNormals();
+      return out;
+    };
+    const leg = (sx) => { const g2 = new THREE.BoxGeometry(0.14, 0.86, 0.22);
+      g2.translate(sx, 0.43, 0); return g2; };
+    const legGeo = merge([leg(-0.10), leg(0.10)]);
+    const arm = (sx) => { const g2 = new THREE.BoxGeometry(0.10, 0.52, 0.12);
+      g2.translate(sx, 1.20, 0); return g2; };
+    const torsoGeo = merge([
+      (() => { const g2 = new THREE.BoxGeometry(0.42, 0.60, 0.26); g2.translate(0, 1.18, 0); return g2; })(),
+      arm(-0.27), arm(0.27),
+    ]);
     const headGeo = new THREE.SphereGeometry(0.135, 6, 5);
-    headGeo.translate(0, 1.63, 0);
+    headGeo.translate(0, 1.68, 0);
     const mk = (geo) => new THREE.InstancedMesh(geo,
       new THREE.MeshStandardMaterial({
         color: 0xffffff, vertexColors: true, flatShading: true, roughness: 0.9,
@@ -13502,7 +13945,12 @@ export class Track {
     const SKIN = ['#d8a884', '#b07a52', '#8a5a3c', '#e8c4a0'];
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
-    const inner = (i) => (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 0.85;
+    // "ALSO MOVE THEM OUT OF THE WAY" — same report. 0.85 u past the drivable
+    // edge is inside a door's swing; a racing line brushing the verge put the
+    // camera almost through them. 1.6 puts the nearest bystander a car-width
+    // clear of the edge, and the outer bound is untouched so the footway they
+    // stand on is simply used further out.
+    const inner = (i) => (this.widthAt ? this.widthAt(i) : ROAD_HALF) + 1.6;
     const outer = (F.lateral ?? 15.5) - (F.depth ?? 8) * 0.5 - 0.55;
     let k = 0;
     // THE SQUARES FIRST. A knot of people on a pavement is dressing; a dozen
@@ -13544,7 +13992,13 @@ export class Track {
       }
     }
     let guard = 0;
-    while (k < WANT && guard++ < WANT * 14) {
+    // 28 tries per figure, doubled when the inner margin moved to 1.6: on
+    // IL BUDELLO the legal band between the margin and the frontages is thin,
+    // and at 14 tries the loop exhausted its budget at 77 of 170 placed — the
+    // street read as half-emptied. The budget is attempts, not geometry;
+    // spending more of it is how a narrow town keeps its crowd without anyone
+    // standing back in the door's swing.
+    while (k < WANT && guard++ < WANT * 28) {
       const i = (Math.random() * N) | 0;
       if (this._circDist(i, 0) < 45) continue;         // not on the grid
       const lo = inner(i);
@@ -13567,7 +14021,7 @@ export class Track {
         // 0.45 u inside its own racing line that way. `_clearsRoad` asks the
         // nearest-station question, and its piazza clause is welcome here —
         // people in squares are placed above, on the paving.
-        if (!this._clearsRoad(p.x, p.z, 0.35, 0.5)) continue;
+        if (!this._clearsRoad(p.x, p.z, 0.45, 1.2)) continue;
         const y = this._seatY(p.x, p.z);
         if (!Number.isFinite(y)) continue;
         q.setFromAxisAngle(up, yaw + (Math.random() - 0.5) * 0.8);
@@ -19492,7 +19946,12 @@ export class Track {
         }
         const form = set[(gi + (Math.random() * 1.4 | 0)) % set.length];
         const mesh = per[form];
-        const band = 0.55 + Math.random() * 0.75;          // this range's height
+        // this range's height. It was 0.55-1.30 - one range 2.4 times the
+        // height of the next - and stacked on the within-range span below
+        // that put a factor of 2.3 to 3.8 between the tallest and shortest
+        // form in a single ring. Neighbours that different cannot join into
+        // a crest; the tall one just stands against sky on its own.
+        const band = 0.75 + Math.random() * 0.45;
         const n = 3 + (Math.random() * 4 | 0);
         for (let k = 0; k < n && mesh.count < mesh.instanceMatrix.count; k++) {
           const a = aC + (k - n / 2) * (0.16 + Math.random() * 0.10);
@@ -19505,7 +19964,13 @@ export class Track {
           // a ridge lies ALONG the range, so it is turned to face the middle
           const yaw = form === 'ridge' ? a + Math.PI / 2 + (Math.random() - 0.5) * 0.3
             : Math.random() * Math.PI;
-          const zs = 0.5 + Math.random() * 0.7;
+          // DEPTH IS ALSO A WIDTH. Every form but the ridge is turned on Y at
+          // random, so whichever of its two horizontal axes happens to face
+          // the camera IS its silhouette width - and at 0.5 this quietly
+          // handed back half of whatever `w` had just been widened to. The
+          // floor is 0.82: still a footprint that is not a circle, never a
+          // blade.
+          const zs = 0.82 + Math.random() * 0.46;
           m4.makeRotationY(yaw);
           m4.scale(new THREE.Vector3(w, h, w * zs));
           m4.setPosition(px, h / 2 + seat(px, pz), pz);
@@ -19544,8 +20009,33 @@ export class Track {
     // 500 u and more. Widened, and the height spans pulled in a little; the
     // forms in a group now overlap into a continuous crest instead of
     // standing apart like a picket fence.
-    place(near, 9, 900, 140, 60, 80, 200, 190, 0.82);
-    place(far, 8, 1120, 160, 140, 130, 260, 220, 0.76);
+    //
+    // ...AND THAT WIDENING STOPPED SHORT OF THE RULE IT QUOTES. Measured again
+    // with tools-scratch/skyteeth.mjs - hide everything but these two rings,
+    // render a 360 deg panorama from the driver's eye, and take the top-most
+    // lit pixel in each column as the skyline - on FURKA RIDGE, CAPE OLIVETO
+    // and GLACIER COL:
+    //   - the FAR ring still stood at h/width 0.61 median and 0.90 at p90:
+    //     186 u of height on a 310 u footprint, against the "250 high spreads
+    //     500" this comment already states. Only the NEAR ring (0.31-0.39)
+    //     ever got the widening it describes.
+    //   - only 0.43 of a far mountain's own height cleared the near ring, and
+    //     a tenth of the compass had it buried outright. The top third of ANY
+    //     mountain is a triangle, so a ring you are shown the top third of is
+    //     a row of triangles however broad its base is.
+    //   - the silhouette itself came out at 0.53 aspect median and 1.18 at p90
+    //     - prominence over width at half prominence, both in degrees - with
+    //     27 separate peaks round the compass. That is a serration, not a
+    //     range, and it is what the photograph shows.
+    // So the far ring is the one that moves: 360-660 u wide carrying 135-195 u
+    // of height, which is 0.33 aspect and inside the rule at last, and the
+    // near ring drops to 48-84 u so it reads as foothills and lets two thirds
+    // of the far ring stand clear instead of half. The near ring also goes out
+    // to 930 u, because widening it to 240-450 u would otherwise push its
+    // inner flank in to 675 u - inside the 705 u the old numbers left clear of
+    // the drivable massif.
+    place(near, 9, 930, 140, 48, 36, 240, 210, 0.82);
+    place(far, 8, 1120, 160, 135, 60, 360, 300, 0.76);
     let mi = 0;
     for (const mesh of meshes) {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -22998,12 +23488,29 @@ export class Track {
       // Fade the last stretch of each tail to nothing. The reach now runs well
       // past the fog, but a hard-edged rectangle of water is the exact thing
       // that reads as "the river stops here" if one ever does come into view.
-      (f) => Math.min(smoothstep01(f.t / 0.06), smoothstep01((1 - f.t) / 0.06)),
+      //
+      // ...AND THE EDGES GO SOFT TOO. Photographed at OULTON PARK's ford: the
+      // water met the land as a razor line, a sheet of plastic laid on the
+      // field. The helper already hands the column index over, and columns 0
+      // and 3 ARE the banks — thinning to 0.35 there lets the bed and bank
+      // show through the margin, which is what a real water's edge is.
+      (f, c, C) => Math.min(smoothstep01(f.t / 0.06), smoothstep01((1 - f.t) / 0.06))
+        * (c === 0 || c === C - 1 ? 0.35 : 1),
       wf,
     );
+    // WATER WEARS THE WORLD'S SKY. The texture is one saturated mid-blue for
+    // every world, and at OULTON PARK's ford it read as poured plastic — the
+    // only pure blue in a frame of copper and haze, exactly the fault the
+    // hedge had with the foliage palette. A river is mostly reflected sky, so
+    // the material tint comes from the theme's own horizon (skyHorizon, the
+    // colour the water would actually mirror at these grazing angles), pulled
+    // 45% toward white so the texture's own shading still reads. Blue worlds
+    // stay blue — their horizons are blue.
+    // less white-lerp now that the map is neutral — the tint IS the colour
+    const skyTint = new THREE.Color(this.T.skyHorizon ?? '#bcd6e8').lerp(new THREE.Color(1, 1, 1), 0.2);
     const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({
-      map: waterTex, roughness: 0.18, metalness: 0.06, side: THREE.DoubleSide,
-      transparent: true, opacity: 0.9, vertexColors: true, depthWrite: false,
+      map: waterTex, color: skyTint, roughness: 0.18, metalness: 0.06, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.82, vertexColors: true, depthWrite: false,
     }));
     water.name = 'river-water';
     water.renderOrder = 1;

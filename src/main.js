@@ -314,6 +314,14 @@ const FILTER_GROUPS = [
 // away, so the car sat dead centre with half the screen showing tarmac
 // already driven, and the start gantry filling the rest. Pushed well out, the
 // car sits low in frame and the corner arrives on screen before you reach it.
+// The studio's eye directions. `SHOT_RIG` is the three-quarter view every part
+// icon has always used against the cyclorama; `SHOT_RIG_GROUND` is a wider
+// azimuth and a LOWER eye, for subjects standing in the diorama — it has to
+// leave the horizon inside the frame, which a part held up to a sweep does
+// not care about. See `_shoot` for what was measured.
+const SHOT_RIG = new THREE.Vector3(5.2, 3.2, 6.2);
+const SHOT_RIG_GROUND = new THREE.Vector3(8.0, 2.5, 3.2);
+
 const CAM_MODES = [
   { name: 'TOP-DOWN',  back: 16, h: 46, look: 22, lookH: 0,   spdBack: 6, spdH: 10, steer: 1, roadYaw: true },
   { name: 'TOP FAR',   back: 20, h: 72, look: 30, lookH: 0,   spdBack: 4, spdH: 10, steer: 1, roadYaw: true },
@@ -1623,12 +1631,47 @@ class Game {
       this.input.bindJoystick(joyZone, document.getElementById('joy-base'), document.getElementById('joy-knob'));
     }
     const applyViewport = () => {
-      this.camera.aspect = innerWidth / innerHeight;
-      this.baseFov = innerHeight > innerWidth ? 68 : 56; // widen for portrait phones
+      // ---- REACHING INTO THE SAFE-AREA BANDS ------------------------------
+      //
+      // Reported twice: a green bar down each edge in landscape. Measured off
+      // the screenshot rather than guessed at — `bandscan.mjs` scans in from
+      // both sides for the first column that is not flat page background:
+      //
+      //     2868 px wide, left band 185, right band 186, colour #7eb75c
+      //
+      // #7eb75c is `body`'s old background exactly, and the main renderer has
+      // no `alpha`, so its canvas is OPAQUE and cannot be showing anything
+      // behind it. The canvas simply is not there. 2868/3 = 956 pt — an iPhone
+      // 16 Pro Max in landscape, whose safe-area inset is 62 pt, and 185/3 is
+      // 61.7. So the layout viewport is 832 on a 956 pt screen: `viewport-fit=
+      // cover` is in the meta, has been since r245, and is not taking effect.
+      //
+      // Nothing inside the page can be positioned into those bands... except
+      // that THE BACKGROUND IS ALREADY PAINTING THERE. The browser's page
+      // surface does span the full 956; only the CSS coordinate space is 832
+      // wide. So an element pulled left of zero and made wide enough does
+      // reach them — and `screen.width` is the one API that still reports the
+      // real screen when `innerWidth` does not.
+      //
+      // Guarded hard, because this must be a NO-OP everywhere it is not
+      // needed: touch only (on a desktop `screen.width` is the monitor, not
+      // the window), only when the screen is wider than the viewport, and only
+      // by an amount an inset could plausibly be. Vertical is deliberately
+      // left alone — in landscape the browser's own chrome makes
+      // `screen.height` meaningless.
+      const sw = window.screen?.width || 0;
+      const gap = sw - innerWidth;
+      const over = (this.isTouch && gap > 0 && gap <= 200) ? gap / 2 : 0;
+      const vw = innerWidth + over * 2, vh = innerHeight;
+      this.camera.aspect = vw / vh;
+      this.baseFov = vh > vw ? 68 : 56;                        // widen for portrait phones
       this.camera.fov = this.baseFov;
       this.camera.updateProjectionMatrix();
-      this.renderer.setSize(innerWidth, innerHeight);          // see the ctor
-      this.composer.setSize(innerWidth, innerHeight);
+      this.renderer.setSize(vw, vh);                           // see the ctor
+      this.composer.setSize(vw, vh);
+      // `setSize` has just written `style.left`-agnostic width/height; the
+      // offset has to go on afterwards or it is overwritten.
+      this.canvas.style.left = over ? `${-over}px` : '';
       if (this.input.resetJoystick) this.input.resetJoystick();
     };
     applyViewport();
@@ -5105,19 +5148,33 @@ class Game {
     // behind it are the expensive half — four canvas textures and about seven
     // thousand welded triangles — and those are shared. Without this the
     // garage pays for two identical forests.
-    if (this.__dioParts) {
-      const g2 = new THREE.Group();
-      for (const [geo, mat] of this.__dioParts) {
-        const m = new THREE.Mesh(geo, mat);
-        m.receiveShadow = mat.__diorRecv !== false;
-        m.renderOrder = mat.__diorOrder ?? 0;
-        g2.add(m);
-      }
-      return g2;
-    }
+    //
+    // IT MUST BE A CLONE, NOT A PARTS LIST. This used to keep `[geometry,
+    // material]` pairs and remount them as `new THREE.Mesh(geo, mat)`, which
+    // silently DROPPED every transform that lives on the Object3D instead of
+    // in the vertices. Most of this diorama is welded, so most of it survived
+    // that and the loss was invisible in the bay — but five things carry their
+    // placement on the mesh, and all five broke in the second mount:
+    //
+    //   - the ground plane lost `rotation.x = -PI/2` and stood UP as a
+    //     420 x 420 green wall through the origin,
+    //   - the painted far treeline lost `position.y = 26` and sank into it,
+    //   - the trail, the dapple gobo and the dome lost theirs with them.
+    //
+    // The studio takes the second mount, so that wall is what every car shelf
+    // icon was shot against: measured at 82% of the frame, with every tree,
+    // rock and bush in the diorama contributing 0%. Reported as cards that
+    // look like a car on a green screen, and that is exactly what they were.
+    //
+    // `Object3D.clone()` copies transforms, `visible`, `receiveShadow` and
+    // `renderOrder`, and shares geometry and material BY REFERENCE — which is
+    // the whole saving the parts list was after, without the part it got
+    // wrong. Every caller gets a clone, including the first, so no one holds
+    // the template and one mount cannot hide the other by toggling `visible`.
+    if (this.__dio) return this.__dio.clone();
     const F = { trunk: 0x6b4423, low: 0x2c6e2a, mid: 0x347a2f, top: 0x3c8a34,
       grass: 0x4f8a35, dirt: 0x9c7a48, rut: 0x86663a, rock: 0x8d8578, bush: 0x2f7a30,
-      moss: 0x4c7f33, stone: 0xb0a289, stoneDk: 0x82786a };
+      moss: 0x4c7f33 };
     const g = new THREE.Group();
     // ONE STREAM PER SUBSYSTEM, and this is a measurement tool, not tidiness.
     // The whole diorama used to draw from a single seeded `rnd()`, which means
@@ -5310,7 +5367,7 @@ class Game {
     // POSITIONS ONLY, MERGED PER MATERIAL. Eighteen trees as separate meshes
     // is fifty-four draw calls behind a menu; merged by part it is three.
     const trunks = [], lows = [], mids = [], tops = [], rocks = [], bushes = [],
-      moss = [], stones = [], stonesDk = [];
+      moss = [];
     // `tint` is a PER-PIECE MULTIPLIER carried through the weld as a vertex
     // colour. Welding by material is what keeps this menu at three draw calls
     // for fifty trees, and the price has always been that every tree is
@@ -5411,30 +5468,20 @@ class Game {
       // says the rock has been there longer than the trail has.
       if (sc > 0.76) put(moss, rockGeo, sc * 0.98, sc * 0.19, sc * 0.8, rx, sc * 0.88, rz, ry);
     }
-    // LOOSE STONE, WITH GEOMETRY. The trail texture already has gravel painted
-    // into it, and painted gravel is flat — no lit edge, no shadow side, and
-    // it turns with the surface instead of sitting on it. What makes a surface
-    // read as LOOSE is stone the light can catch, so this is squashed
-    // tetrahedra and octahedra: 4 and 8 triangles, because an icosahedron is
-    // 20 for a thing four pixels across. Held to the length of trail the bay
-    // camera actually frames — a pebble at z -60 is nothing but cost.
-    // TWO TONES, AND SMALLER THAN THEY LOOKED RIGHT ON PAPER. One pale grey at
-    // 0.3 u across read as torn paper scattered over the dirt: gravel is not
-    // one colour, and a stone that never goes darker than its ground has no
-    // weight. Half of them are the boulders' own grey, and the biggest is now
-    // 0.2 u — about a fist beside a 4.4 u car, which is what it should be.
-    const chipGeo = new THREE.TetrahedronGeometry(1, 0);
-    const cobbleGeo = new THREE.OctahedronGeometry(1, 0);
-    for (let i = 0; i < 150; i++) {
-      const big = i % 4 === 0;
-      // over the whole width, but banked at the verges where a tyre throws it
-      const px = rRock() < 0.58 ? (rRock() - 0.5) * 10.2
-        : (rRock() < 0.5 ? 1 : -1) * (4.9 + rRock() * 2.4);
-      const pz = -30 + rRock() * 48;
-      const sc = big ? 0.13 + rRock() * 0.075 : 0.065 + rRock() * 0.065;
-      put(rRock() < 0.5 ? stones : stonesDk, big ? cobbleGeo : chipGeo,
-        sc * 1.3, sc * 0.78, sc * 1.1, px, sc * 0.34, pz, rRock() * 3);
-    }
+    // NO LOOSE STONE. r264 scattered 150 squashed tetrahedra and octahedra on
+    // the trail so the surface would have something the key light could catch,
+    // on the argument that painted gravel is flat. At the size these are
+    // actually seen — a shelf card is 148 px wide — four and eight-sided
+    // solids do not read as gravel at all. They read as tiny white PYRAMIDS
+    // dotted over the grass, which is what they were reported as, and the
+    // shape is unmistakable once you zoom one up.
+    //
+    // `dioparts.mjs` had already put them at 0.9% of the bay for 752 triangles
+    // — 3.0 pixels a triangle, the second-weakest thing in the diorama — so
+    // they were marginal on the numbers before they were wrong on the eye.
+    // Gone. The trail texture keeps its painted gravel, speckle and damp
+    // patches, which is what carries "loose surface" from any distance the
+    // game actually shows it from.
     for (let i = 0; i < 14; i++) {
       const side = i % 2 ? 1 : -1;
       const bx = side * (7.5 + rScrub() * 12);
@@ -5491,8 +5538,7 @@ class Game {
     }
     for (const [geos, col, flat] of [[trunks, F.trunk, false], [lows, F.low, true],
       [mids, F.mid, true], [tops, F.top, true], [rocks, F.rock, true],
-      [moss, F.moss, true], [stones, F.stone, true], [stonesDk, F.stoneDk, true],
-      [bushes, F.bush, true],
+      [moss, F.moss, true], [bushes, F.bush, true],
       [tufts, 0x5e8f3e, true], [scuffs, F.dirt, false]]) {
       const geo = weld(geos);
       const m = new THREE.Mesh(geo,
@@ -5501,15 +5547,11 @@ class Game {
       m.receiveShadow = true;
       g.add(m);
     }
-    // remember what was built, so the second scene mounts the same parts
-    this.__dioParts = [];
-    g.traverse((o) => {
-      if (!o.isMesh) return;
-      o.material.__diorRecv = o.receiveShadow;
-      o.material.__diorOrder = o.renderOrder;
-      this.__dioParts.push([o.geometry, o.material]);
-    });
-    return g;
+    // remember what was built, so the second scene mounts the same forest —
+    // see the note at the top of this method for why this is the whole group
+    // and not a list of its geometries
+    this.__dio = g;
+    return g.clone();
   }
 
   /** THE SWEEP BEHIND EVERY STUDIO PICTURE.
@@ -5614,11 +5656,122 @@ class Game {
    *  framed slightly wrong and passing "6.2" for the car shelf (meaning "the
    *  old z") silently moved the camera 30% closer and cropped the cars.
    */
-  _shoot(mesh, w, h, { dist = 8.7, look = 0.55, ground = false } = {}) {
+  /** HOW FAR BACK THIS BOX HAS TO SIT TO FIT THE FRAME — measured, not derived.
+   *
+   *  Trigonometry on the bounding box gets this wrong and `_frameStage` has
+   *  said so for rounds: a car seen at three-quarters has its near end
+   *  projecting far larger than its far end, so the half-width you compute
+   *  from the box is not the half-width that lands on the canvas. Deriving it
+   *  fitted the roof and then clipped the wheels off the bottom, because the
+   *  nearest bottom corner projects lower than any formula on the box's
+   *  extents predicts.
+   *
+   *  So project the eight corners and ask the projection. Three passes is
+   *  plenty — each one scales the distance by however far outside the target
+   *  frame the worst corner landed, and the error falls off geometrically.
+   *  0.86 leaves a small, even margin all round.
+   */
+  _fitDist(bx, cam, aim, target = 0.86, rig = SHOT_RIG) {
+    const dir = rig.clone().normalize();
+    const look = new THREE.Vector3(0, aim, 0);
+    const corners = [];
+    for (const x of [bx.min.x, bx.max.x]) for (const y of [bx.min.y, bx.max.y])
+      for (const z of [bx.min.z, bx.max.z]) corners.push(new THREE.Vector3(x, y, z));
+    let d = Math.max(6, bx.getSize(new THREE.Vector3()).length());
+    for (let i = 0; i < 3; i++) {
+      cam.position.copy(dir).multiplyScalar(d);
+      cam.lookAt(look);
+      cam.updateMatrixWorld(true);
+      cam.updateProjectionMatrix();
+      let worst = 0;
+      for (const c of corners) {
+        const v = c.clone().project(cam);
+        worst = Math.max(worst, Math.abs(v.x), Math.abs(v.y));
+      }
+      if (!Number.isFinite(worst) || worst <= 1e-3) break;
+      d *= worst / target;
+    }
+    return d;
+  }
+
+  _shoot(mesh, w, h, { dist, look, ground = false } = {}) {
     const st = this._studio(w, h);
     const cam = new THREE.PerspectiveCamera(30, w / h, 0.1, 600);  // see `_stage`
-    cam.position.set(5.2, 3.2, 6.2).normalize().multiplyScalar(dist);
-    cam.lookAt(0, look, 0);
+    // FRAME THE SUBJECT FROM THE SUBJECT — the same rule `_frameStage` already
+    // states for the build bay, and the one the shelf icons never got.
+    //
+    // `dist` was a constant 8.7 with the look point pinned at y 0.55. At 30
+    // degrees that leaves 2.33 u of half-height, and BRAWLER measures 3.46 u
+    // tall: the icon cut the car off, which is how it was reported. The number
+    // was presumably right for whatever the cars were the day it was written,
+    // and nothing has told it since that they grew roof racks.
+    //
+    // Measured instead: fit the bounding box to the tighter of the two fields
+    // of view, worst-case width being the diagonal because these are shot at
+    // three-quarters, and look at the box's own centre rather than at a fixed
+    // height. An explicit `dist`/`look` still wins — the PART icons pass their
+    // own, and those are framed against a sweep, not standing on ground.
+    const bx = new THREE.Box3().setFromObject(mesh);
+    const sz = bx.getSize(new THREE.Vector3());
+    const mid = bx.getCenter(new THREE.Vector3());
+    const vfov = (30 * Math.PI) / 180;
+    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * (w / h));
+    // The look point is NOT the box centre. Aiming at the middle of a car that
+    // is 3.5 u tall lifts the horizon most of the way up the frame and the
+    // background becomes a wall of trail — rendered and looked at: the whole
+    // car fitted, and the picture was worse. Half way between the old fixed
+    // 0.55 and the centre keeps the original three-quarter look-down, which is
+    // what puts grass and a diagonal of dirt behind the car.
+    const aim = look ?? (0.55 + (mid.y - 0.55) * 0.5);
+    // A DIFFERENT AZIMUTH FOR ANYTHING STANDING ON THE GROUND — not a higher
+    // one. Fitting the tallest car pushes the lens back to about fourteen
+    // units, past where the diorama's near pines start (lane 9.6), and a trunk
+    // came through the frame and across one car's nose. Lifting the eye to
+    // look over them was tried and is worse: from up there the trail reads as
+    // a vertical band with the car pasted on it. A part held up to a sweep
+    // keeps the original rig.
+    //
+    // ...AND A LOWER ONE, BECAUSE THE HORIZON WAS OFF THE TOP OF THE FRAME.
+    // Measured at the framing the shelf ships — `_carIcons` picks one distance
+    // and one aim for the whole row, so these are the row's numbers, not one
+    // car's. At (3.9, 3.3, 7.4) the lens sat 15.9 u out and 5.84 up, aiming at
+    // 1.14: 17.6 degrees below horizontal against a 15 degree half-FOV. The
+    // horizon therefore sat at clip-space y tan(17.6)/tan(15) = 1.19 — ABOVE
+    // THE TOP EDGE. Every pixel of every card was ground by construction: 0%
+    // of the frame above the horizon, and the sky dome and the painted far
+    // treeline each measuring 0% of it, whatever the diorama put behind the
+    // car. Restoring the diorama's dropped transforms (r279) gave those cards
+    // a real wood again, and it was still a wood photographed from above with
+    // nothing to stand it against.
+    //
+    // NEITHER AIM NOR PITCH ALONE FIXES IT. Raising the aim is self-cancelling:
+    // `_fitDist` pushes the lens back as the aim rises and the eye goes up with
+    // it. Walked at this rig, the aim has to reach the tallest car's own
+    // ROOFLINE before the horizon comes down to 0.91, and even the box centre
+    // only moves it 1.19 -> 1.08 — still off the top, and it has already pushed
+    // the lens from 15.9 u to 17.8. Flattening the pitch on its own is the
+    // vertical-band failure above, because at 27.8 degrees the lens is looking
+    // down the trail's own axis. The two together work: swing the azimuth
+    // ACROSS the trail, so a flat pitch lays the dirt over the frame instead of
+    // down it. At 68 degrees off the axis and 16 of elevation the lens sits
+    // 12.1 u out and 3.37 up — 10.9 degrees of pitch, horizon at 0.72 with 14%
+    // of the frame above it, and the painted far treeline, which no card had
+    // ever shown a pixel of, measuring 9.8%. Trail across the bottom, verge,
+    // treeline, wood: the shape of a photograph rather than a plan of one.
+    //
+    // THE TREE LANE IS STILL CLEAR, and that is what stopped the swing at 68
+    // rather than carrying it round to where more of the sky is. Ray-sampled
+    // over the projected box of EVERY car in the catalogue — a trunk that
+    // misses the saloon can still cross the truck — nothing in the wood is
+    // nearer the lens than the car is, on all eight. Swing further and it comes
+    // back: at 94 degrees the scrub takes 2% of the tallest car's samples, and
+    // by 112 something is in front of ALL of them. `_fitDist` still fits the
+    // tallest roof rack; the worst projected corner over the eight is 0.86, the
+    // same margin the row had before.
+    const rig = ground ? SHOT_RIG_GROUND : SHOT_RIG;
+    const fit = dist ?? this._fitDist(bx, cam, aim, 0.86, rig);
+    cam.position.copy(rig).normalize().multiplyScalar(fit);
+    cam.lookAt(0, aim, 0);
     st.scene.add(mesh);
     // `ground` is for things that STAND on something — a car. A gearbox held
     // up to the light does not get a shadow under it.
@@ -5686,11 +5839,44 @@ class Game {
 
   _carIcons() {
     if (this.__carIcons) return this.__carIcons;
-    const icons = {};
-    for (const car of CAR_CATALOG) {
+    // ONE DISTANCE FOR THE WHOLE SHELF. Fitting each car on its own is right
+    // for one picture and wrong for a ROW of them: the catalogue runs from a
+    // 2.47 u saloon to a 3.46 u truck with a roof rack, so per-car fitting
+    // zooms each card differently and — because the eye moves with the
+    // camera — lands each one on a different part of the trail. Measured
+    // side by side: one card on grass, the next against a wall of dirt.
+    // Fit them all, take the furthest, shoot every card from there. The big
+    // machines fill their cards and the small ones sit in more scenery, which
+    // is the truth about them anyway.
+    // THE CAR'S ANGLE IS DERIVED FROM THE RIG, not written down beside it.
+    // `Math.PI * 0.82` was a three-quarter FRONT view of the eye that existed
+    // when it was typed; move the eye and the same constant shows you the back
+    // of the car, which is what happened the moment the ground rig swung along
+    // the trail. Hold the offset between the two instead and the pose survives
+    // the next time the camera moves.
+    const FRONT_OFF = Math.PI * 0.82 - Math.atan2(SHOT_RIG.x, SHOT_RIG.z);
+    const yaw = Math.atan2(SHOT_RIG_GROUND.x, SHOT_RIG_GROUND.z) + FRONT_OFF;
+    const built = CAR_CATALOG.map((car) => {
       const mesh = buildCarMesh(car.spec);
-      mesh.rotation.y = Math.PI * 0.82; // 3/4 front view
-      icons[car.key] = this._shoot(mesh, 148, 96, { ground: true }); // the 8.70 rig
+      mesh.rotation.y = yaw;            // three-quarter front, from wherever the eye is
+      return { car, mesh };
+    });
+    // ONE AIM AS WELL AS ONE DISTANCE. Leaving `_shoot` to pick the look point
+    // per car makes each card a slightly different camera — the aim follows the
+    // box centre, which runs from 1.24 on a saloon to 1.73 on the truck — and
+    // a row of cards shot from eight slightly different eyes lands each car on
+    // a different patch of the diorama. One rig for the row.
+    const probe = new THREE.PerspectiveCamera(30, 148 / 96, 0.1, 600);
+    const boxes = built.map(({ mesh }) => new THREE.Box3().setFromObject(mesh));
+    const tall = boxes.reduce((a, b2) => (b2.max.y > a.max.y ? b2 : a));
+    const look = 0.55 + (tall.getCenter(new THREE.Vector3()).y - 0.55) * 0.5;
+    let dist = 0;
+    for (const bx of boxes) {
+      dist = Math.max(dist, this._fitDist(bx, probe, look, 0.86, SHOT_RIG_GROUND));
+    }
+    const icons = {};
+    for (const { car, mesh } of built) {
+      icons[car.key] = this._shoot(mesh, 148, 96, { ground: true, dist, look });
     }
     this.__carIcons = icons;
     return icons;
@@ -9575,6 +9761,18 @@ class Game {
   }
 
   startRace() {
+    // DEBUG TELL: which world is this frame from. Every screenshot report so
+    // far has had to be attributed by its palette, its contract slate or its
+    // camera height — one was chased across four wrong levels before its
+    // contracts gave it away. The build tag already survives every screenshot,
+    // so the stage rides with it.
+    {
+      const bt = document.getElementById('build-tag');
+      if (bt) {
+        bt.dataset.rev ??= bt.textContent;
+        bt.textContent = `${bt.dataset.rev} · ${this.level?.name ?? '?'}`;
+      }
+    }
     this._menuIdle();      // the shop floor stops turning the moment you leave it
     this._flushPick?.();   // a tapped card whose build hasn't run yet — build it now
     // NO GATE — A WARNING WITH A NUMBER ON IT. The start line used to refuse
@@ -9679,8 +9877,12 @@ class Game {
     if (p.lap > this.lapsTotal) { this.finishRace(); return; }
     const lapTime = this.raceTime - p.lapStart;
     p.lapStart = this.raceTime;
-    if (p.lap > 2 || (p.lap === 2)) {
+    if (p.lap >= 2) {
+      // announce only a lap that BEAT one, not the first timed lap of the
+      // race — lap 2's time is always "the best so far" and saying so is noise
+      const beat = Number.isFinite(p.bestLap) && lapTime < p.bestLap;
       if (lapTime < p.bestLap) p.bestLap = lapTime;
+      if (beat) this.hud.feed(`★ BEST LAP — ${fmtTime(lapTime)}`, 'good');
     }
     this.score += 500;
     this.audio.lap();
@@ -9809,6 +10011,20 @@ class Game {
     this.state = 'finished';
     this.player.finished = true;
     const rank = this.playerRank;
+    // THE LINE DESERVES A MOMENT. Crossing it used to be 1.6 silent seconds
+    // and then a form: no banner, no beat, nothing on the track — the game's
+    // biggest event presented smaller than a sideswipe (crashDrama gives a
+    // wall tap slow-mo and a flash). So: the placing announced in the same
+    // centre pop the countdown uses, a short slow beat — hitStop WITHOUT the
+    // damage flash, this is not a crash — and, for a podium, confetti raining
+    // over the car for the whole gap before the results card (see _festT in
+    // the update loop). The gap itself stretches to 2.6 s on a podium so the
+    // moment is watchable; a mid-field finish keeps the brisk 1.6.
+    this.hud.centerMsg(rank === 1 ? 'YOU WIN!' : `FINISH — ${ordinal(rank)}`);
+    this.hitStop = Math.max(this.hitStop, 0.38);
+    this.fovKick = Math.max(this.fovKick ?? 0, 0.5);
+    this._festT = rank <= 3 ? 2.4 : 0;
+    if (rank <= 3) this.particles.confetti(this.player.pos, 40);
     // The finish bonus was a six-entry table for a six-car grid, so with eight
     // on the line 7th and 8th both fell through to a flat 100. The old table
     // was very close to a geometric decay from 2000 to 150 — 2000·0.075^r fits
@@ -9897,9 +10113,22 @@ class Game {
     // say "this race opened a chapter" — a star total cannot, now that the
     // gate is a fraction of one chapter rather than a price per world.
     const chapBefore = this.currentChapter();
+    // THE LAP RECORD IS PART OF THE RECORD. The PACE NOTE job ("set a lap
+    // under your own best") gates on `career.finished[id].bestLap` — and this
+    // write never stored it, so the one job whose target is the player's own
+    // history could never be posted, on any world, since the day it was
+    // written. Stored rounded to a tenth, 0 meaning "no lap yet" (Infinity
+    // does not survive JSON).
+    const lapRec = Math.min(prev?.bestLap || Infinity,
+      Number.isFinite(this.player.bestLap) ? this.player.bestLap : Infinity);
+    if ((prev?.bestLap || 0) > 0 && lapRec < prev.bestLap) {
+      this.hud.feed(`★ LAP RECORD — ${fmtTime(lapRec)}`, 'good');
+      document.getElementById('r-best').textContent += '  ★ RECORD';
+    }
     this.career.finished[this.level.id] = {
       place: Math.min(rank, prev?.place ?? 99),
       bestScore: Math.max(earned, prev?.bestScore ?? 0),
+      bestLap: Number.isFinite(lapRec) ? Math.round(lapRec * 10) / 10 : 0,
       stars: bestStars,
     };
     saveJSON(this._pkey('career'), this.career);
@@ -9910,7 +10139,8 @@ class Game {
     if ((!prev || prev.place > 3) && rank <= 3 && hasNext) {
       this.hud.feed(`${LEVELS[this.levelIndex + 1].name} UNLOCKED`, 'good');
     }
-    this.hud.centerMsg('FINISH');
+    // (the placing banner at the top of this function is the centre pop now —
+    // a plain 'FINISH' here overwrote it the same frame it was shown)
     this.audio.lap();
     document.querySelector('#results .game-sub').textContent = `${this.level.name} COMPLETE`;
     // _raceOver relabels this button to RESTART TRACK; a real finish is a race
@@ -9933,7 +10163,7 @@ class Game {
       document.getElementById('results').classList.remove('hidden');
       this.hud.hide();
       document.getElementById('touch-ui').classList.remove('on');
-    }, 1600);
+    }, rank <= 3 ? 2600 : 1600);
   }
 
   /** The star panel on the results screen: which of the five you took, what
@@ -10073,6 +10303,11 @@ class Game {
     if (this._dWasDriver) {
       this._dWasDriver = false;
       if (p.mesh) p.mesh.visible = p.alive;
+      // the shadow comes back with the outside view — see the seat's entry
+      for (const o of this._dCasters ?? []) o.castShadow = true;
+      this._dCasters = [];
+      const blob = p.mesh?.userData?.aoBlob;
+      if (blob) blob.visible = this._dBlobWas ?? true;
       // and the brand comes back the moment you are outside the car again,
       // while the interior goes away — it would show through the windows
       for (const d of p.mesh?.userData?.outwardDecals ?? []) d.visible = true;
@@ -10098,7 +10333,7 @@ class Game {
       const road = this.track.headingAt(p.trackIndex);
       if (Number.isFinite(road)) {
         const cur = this._camYaw ?? road;
-        this._camYaw = cur + wrap(road - cur) * Math.min(1, 3.6 * dt);
+        this._camYaw = cur + wrap(road - cur) * (1 - Math.exp(-5.0 * (this._camDt ?? dt)));
         fwd = new THREE.Vector3(Math.sin(this._camYaw), 0, Math.cos(this._camYaw));
       }
     } else if (M.chase) {
@@ -10107,10 +10342,15 @@ class Game {
       const sp = Math.hypot(p.vel.x, p.vel.z);
       if (sp > 5) yaw += wrap(Math.atan2(p.vel.x, p.vel.z) - yaw) * 0.4; // look where you're going
       const cur = this._camYaw ?? yaw;
-      // 4.5 tracked the car closely enough that the view still whipped on a
-      // flick. Slower: the camera lags turn-in slightly, so you see the CAR
-      // rotate against a steady world instead of the world rotating around you.
-      this._camYaw = cur + wrap(yaw - cur) * Math.min(1, 3.6 * dt);
+      // 4.5 linear tracked the car closely enough that the view still whipped
+      // on a flick, and 3.6 cured that — at 60 fps. On CLAMPED dt the factor
+      // decays with frame rate (see _camDt above), and at phone frame rates
+      // the cure became "the camera still shows the side of the car in a
+      // turn". 5.0 exponential on wall time sits just above the old 60 fps
+      // response and, crucially, STAYS there when the frame rate halves; the
+      // travel-direction blend above is what keeps a flick from whipping the
+      // view, not sheer sluggishness.
+      this._camYaw = cur + wrap(yaw - cur) * (1 - Math.exp(-5.0 * (this._camDt ?? dt)));
       fwd = new THREE.Vector3(Math.sin(this._camYaw), 0, Math.cos(this._camYaw));
     }
     // Cliff worlds are a special case for any LOW view. `clampCam` below already
@@ -10174,7 +10414,7 @@ class Game {
       v.y += Math.min(4, Math.abs(over) * 0.5);
     };
     clampCam(targetPos);
-    const k = 1 - Math.exp(-5.5 * dt);
+    const k = 1 - Math.exp(-5.5 * (this._camDt ?? dt));
     this.camPos.lerp(targetPos, k);
     this.camLook.lerp(targetLook, k);
     clampCam(this.camPos);
@@ -10455,6 +10695,19 @@ class Game {
       this._dWasDriver = true;
       this._dYaw = undefined; this._dSpd = undefined;
       this._dSurge = 0; this._dLean = 0;
+      // THE SEAT DOES NOT CARRY ITS OWN SHADOW. Raycast + paint-probe on the
+      // reported black band: the pixels under the dash were ROAD, 5-6 u
+      // ahead, near-black — the car's cast shadow plus the AO blob, lying
+      // exactly where the seat looks whenever the sun is behind you. From
+      // inside the car neither is ever seen AS a shadow, only as a dark hole
+      // the view drags along the carriageway. Off for the seat, restored on
+      // leave; the list is cached so leaving restores exactly what cast.
+      this._dCasters = [];
+      p.mesh?.traverse((o) => {
+        if (o.castShadow) { this._dCasters.push(o); o.castShadow = false; }
+      });
+      const blob = p.mesh?.userData?.aoBlob;
+      if (blob) { this._dBlobWas = blob.visible; blob.visible = false; }
     }
     // THE CAR STAYS ON SCREEN. It used to be hidden here, and the reasoning
     // was sound for the eye it had: the first cut seated the head at
@@ -10811,7 +11064,19 @@ class Game {
   }
 
   _frameBody() {
-    let dt = Math.min(this.clock.getDelta(), 0.05);
+    const dtRaw = this.clock.getDelta();
+    let dt = Math.min(dtRaw, 0.05);
+    // THE CAMERA RUNS ON WALL TIME. The sim dt is clamped to 0.05 so physics
+    // cannot explode on a hitch — but every camera smoothing term also ran on
+    // the clamped value, which means the slower the phone renders, the slower
+    // the view pans: at 12 fps a frame is 0.083 s and the camera was fed 0.05,
+    // so it turned at 60% of real speed exactly when the machine was already
+    // struggling. Reported as "delayed response in the turns — I can turn and
+    // the camera still shows the side. Hard to drive." The camera gets its own
+    // dt, bounded loosely (a one-second hitch must not whip the view round),
+    // and the smoothing below uses exponential form so the response per
+    // SECOND is the same at any frame rate.
+    this._camDt = Math.min(dtRaw, 0.12);
     const time = this.clock.elapsedTime;
     // THE EDITOR OWNS THE FRAME. It drives its own camera and renders
     // straight (no composer, no post) so a sculpt reads as geometry rather
@@ -10926,6 +11191,15 @@ class Game {
         }
       }
       if (this.state === 'race' || this.state === 'finished') {
+        // THE PODIUM MOMENT. `_festT` is set by finishRace for a top-three
+        // place and burns down here, raining confetti over the car during the
+        // beat between the line and the results card. Rate-not-burst so the
+        // pieces hang in the air the whole window instead of one puff that has
+        // faded before the eye finds it.
+        if (this._festT > 0) {
+          this._festT -= dt;
+          if (Math.random() < 0.5) this.particles.confetti(this.player.pos, 7);
+        }
         this.weapons.update(dt);
         this._carCollisions();
         this._updateBoostPads();

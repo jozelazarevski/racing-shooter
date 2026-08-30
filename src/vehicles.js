@@ -69,6 +69,7 @@ const VY_CAP = 11;
 const SCORCH = new THREE.Color(0x1c1a18); // damage tint target
 const _hitNormal = new THREE.Vector3(); // scratch: obstacle bounce normal
 const _splash = new THREE.Vector3();    // scratch: puddle splash spawn point
+const _leafBack = new THREE.Vector3();  // scratch: -forward, for the leaf wake
 const _obPos = new THREE.Vector3();     // scratch: obstacle/puddle track projection (AI)
 const _shove = new THREE.Vector3();     // scratch: ram-contact push direction
 
@@ -476,8 +477,14 @@ export function buildVoxelRacer(spec) {
     // the picture rather than as the inside of a car. A real dash top is matte
     // mid-grey that catches the sky, so these sit at roughly the road's own
     // brightness and the lower frame becomes part of the car.
-    const inner = mat(0x4a463f, { roughness: 0.92, metalness: 0.02 });
-    const trim = mat(0x5d564c, { roughness: 0.8, metalness: 0.08 });
+    // BRIGHT ENOUGH TO READ AS FURNITURE. Painted magenta by a probe, the
+    // dash showed as a full-width slab of the lower frame; at 0x4a463f under
+    // a cabin that gets mostly hemisphere light it rendered as silhouette —
+    // the driver's-view report's black band was one part this, one part the
+    // car's own shadow on the road (handled in _driverCamera). Two steps
+    // lighter keeps it obviously interior, stops it reading as a hole.
+    const inner = mat(0x6b6155, { roughness: 0.9, metalness: 0.02 });
+    const trim = mat(0x82786a, { roughness: 0.78, metalness: 0.08 });
     const cockpit = new THREE.Group();
     cockpit.name = 'cockpit';
     const put = (w, h, d, m, x, y, z, rx = 0) => {
@@ -529,7 +536,9 @@ export function buildVoxelRacer(spec) {
     // measured filling the bottom 26% of the frame, against 20% at 2.1 with a
     // clear band of road under it. A shallow surface seen edge-on is all
     // thickness and no surface.
-    const AHEAD = 2.1;
+    const AHEAD = 2.5;   // pushed from 2.1: same trade of angle for distance
+                         // that took it from 1.15 to 2.1, one step further —
+                         // the slab was landing mid-frame, not the bottom fifth
     // dash top edge at ~atan(0.72/2.1) = 19 degrees below the axis, plus the
     // camera's own pitch, which puts it in the bottom fifth.
     put(cabW * 1.05, 0.16, 0.40, inner, 0, eyeY - 0.72, eyeZ + AHEAD, -0.16);
@@ -882,6 +891,10 @@ export function buildVoxelRacer(spec) {
     ao.rotation.x = -Math.PI / 2;
     ao.position.y = 0.03;
     ao.renderOrder = 1;
+    // published so the driver's seat can hide it: from inside the car the
+    // blob is a black pool you carry around on the road ahead — see
+    // _driverCamera
+    g.userData.aoBlob = ao;
     g.add(ao);
   }
 
@@ -928,7 +941,24 @@ export function buildVoxelRacer(spec) {
   // a hub boss is the whole upgrade - about 100 triangles a car.
   //
   // The BODIES stay faceted on purpose: this is a voxel racer.
-  const WSEG = 14;
+  // WHEELS ARE ROUND, AND 14 SIDES IS NOT. Reported as tyres that "seem to be
+  // elliptical instead of round", and the geometry says so before any render
+  // does: a regular N-gon measures 2r vertex-to-vertex and 2r*cos(PI/N) across
+  // the flats, so at N = 14 its own bounding box is 1/cos(PI/14) = 1.026 out of
+  // round. Measured on every car in the catalogue at 1.026 exactly.
+  //
+  // 2.6% would be nothing on a prop. It is not nothing here: the wheels are
+  // the roundest thing the eye expects in a frame full of deliberate facets,
+  // they sit dead centre of every shelf card and every chase view, and the
+  // long axis lands wherever the wheel happens to have stopped spinning — so
+  // it reads as an egg that rotates. 24 sides puts it at 1.0086, under a
+  // percent, with facets 15 degrees apart.
+  //
+  // The triangle budget this was traded against is real but small: a tyre and
+  // its rim go from 84 to 144 and from 84 to 144 triangles, about 480 a car,
+  // ~3.8k over a full grid of eight. The forests it was protecting run tens of
+  // thousands.
+  const WSEG = 24;
   const tireGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.55, WSEG);
   tireGeo.rotateZ(Math.PI / 2);
   const rimGeo = mergeGeos([
@@ -1636,9 +1666,21 @@ export function applyUpgradeKit(group, up = {}, parts = null) {
   }
   // TIRES — fatter rubber. Scaling the EXISTING wheels rather than adding new
   // ones keeps the spin and steer bindings in userData intact.
+  //
+  // FATTER IS ONE AXIS, AND IT IS X. The tyre cylinder is built about Y and
+  // then `rotateZ(PI/2)`, so its AXLE runs along X and the round part of it
+  // lies in the Y-Z plane. This used to scale (wf, 1, wf) — the axle, which is
+  // right, AND Z, which is one of the two circular axes, while leaving Y at 1.
+  // That is an ellipse by construction, and a big one: measured 1.19 out of
+  // round at tires 2 and 1.374 at tires 4, on top of the polygon error above.
+  // Every upgraded car in the game had visibly oval wheels.
+  //
+  // Scaling X alone widens the tread — 0.55 to 0.64 and 0.74 — which is what
+  // "fatter rubber" means, and leaves the ride height and the roofline the
+  // drowning rule reads from exactly where they were.
   const tir = lv('tires');
   const wf = tir >= 4 ? 1.34 : tir >= 2 ? 1.16 : 1;
-  for (const w of group.userData.wheels ?? []) w.scale.set(wf, 1, wf);
+  for (const w of group.userData.wheels ?? []) w.scale.set(wf, 1, 1);
   // MUD FLAPS behind the rear wheels — a rally tell, and the last thing in
   // shot when the car is throwing a rooster tail at the camera.
   if (tir >= 3) {
@@ -2334,6 +2376,28 @@ export class Car {
             wp2.y = this.y + 0.1;
             gm.particles.dust(wp2, speedN);
           }
+        }
+      }
+    }
+
+    // ---- leaf litter kicked up on a shedding world ----
+    // Gated on the theme's own weather rather than a new flag: a world that is
+    // dropping leaves out of its canopy is a world with leaves on the road,
+    // and there is no case where one is true and the other is not. Same
+    // distance cull and the same speed floor as the dust above, so an autumn
+    // grid costs no more than any other one at range.
+    const wx = gm.track?.theme?.weather;
+    if (this.alive && !this.airborne && sp > 9 && wx?.type === 'leaves' && gm.player) {
+      const isPlayer = this === gm.player;
+      if (isPlayer || this.pos.distanceToSquared(gm.player.pos) < 10000) {
+        // thicker than dust, because litter is what the season IS — but only
+        // while actually moving through it, so a stopped car sits in silence
+        const dens = (isPlayer ? 0.85 : 0.4) * (0.25 + 0.75 * speedN);
+        if (Math.random() < dens) {
+          _leafBack.copy(nf).multiplyScalar(-1);
+          const front = this.pos.clone().addScaledVector(nf, 1.35);
+          front.y = this.y + 0.05;
+          gm.particles.leafKick(front, _leafBack, ns, speedN, wx.color);
         }
       }
     }

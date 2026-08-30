@@ -269,9 +269,14 @@
   body.two-thumb #t-right{right:calc(16px + env(safe-area-inset-right));
     bottom:calc(24px + env(safe-area-inset-bottom));width:100px;height:100px;font-size:34px;
     background:rgba(38,26,12,.62)}
-  body.two-thumb #t-brake{left:calc(50% - 42px);
-    bottom:calc(20px + env(safe-area-inset-bottom));width:84px;height:84px;font-size:12px;
-    background:rgba(150,45,30,.62)}
+  /* BRAKE IS OUT, DRIFT SITS IN ITS PLACE — asked for off a screenshot of
+     this scheme ("take out brake, change it with drift"). The centre slot is
+     the one either thumb reaches, and in a scheme whose throttle is held open
+     the drift/handbrake is the control that earns it; ArrowDown on a keyboard
+     still brakes, this only retires the touch button. */
+  body.two-thumb #t-brake{display:none}
+  body.two-thumb #t-drift{left:calc(50% - 42px);right:auto;
+    bottom:calc(20px + env(safe-area-inset-bottom));width:84px;height:84px;font-size:14px}
   /* weapons lift clear into a band above the driving row */
   body.two-thumb #t-fire{right:calc(16px + env(safe-area-inset-right));
     bottom:calc(140px + env(safe-area-inset-bottom));width:86px;height:86px}
@@ -281,16 +286,17 @@
     bottom:calc(238px + env(safe-area-inset-bottom))}
   body.two-thumb #t-nitro{right:calc(108px + env(safe-area-inset-right));
     bottom:calc(288px + env(safe-area-inset-bottom))}
-  body.two-thumb #t-drift{left:calc(20px + env(safe-area-inset-left));right:auto;
-    bottom:calc(140px + env(safe-area-inset-bottom))}
+  /* drift's old left-band slot is gone with it; SHOCK drops into the reachable
+     height drift vacated */
   body.two-thumb #t-shock{left:calc(20px + env(safe-area-inset-left));right:auto;
-    bottom:calc(216px + env(safe-area-inset-bottom))}
+    bottom:calc(140px + env(safe-area-inset-bottom))}
   /* the speedo sits above BRAKE rather than under a thumb */
   body.two-thumb.touch #speed-box{bottom:calc(112px + env(safe-area-inset-bottom));left:50%}
   @media (max-height:560px){
     body.two-thumb #t-left,body.two-thumb #t-right{width:86px;height:86px;
       bottom:calc(18px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-brake{width:72px;height:72px;left:calc(50% - 36px)}
+    body.two-thumb #t-drift{width:72px;height:72px;left:calc(50% - 36px);
+      bottom:calc(18px + env(safe-area-inset-bottom))}
     body.two-thumb #t-fire{bottom:calc(118px + env(safe-area-inset-bottom))}
     body.two-thumb #t-missile{right:calc(112px + env(safe-area-inset-right));
       bottom:calc(126px + env(safe-area-inset-bottom))}
@@ -298,8 +304,7 @@
       bottom:calc(120px + env(safe-area-inset-bottom))}
     body.two-thumb #t-nitro{right:calc(184px + env(safe-area-inset-right));
       bottom:calc(24px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-drift{bottom:calc(118px + env(safe-area-inset-bottom))}
-    body.two-thumb #t-shock{bottom:calc(186px + env(safe-area-inset-bottom))}
+    body.two-thumb #t-shock{bottom:calc(118px + env(safe-area-inset-bottom))}
     body.two-thumb.touch #speed-box{bottom:calc(96px + env(safe-area-inset-bottom))}
   }
 
@@ -1990,7 +1995,7 @@
 </div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r273</div>
+<div id="build-tag">r283</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2317,10 +2322,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r273"></script>
+<script type="module" src="./src/main.js?v=r283"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r273"></script>
+<script src="./src/offline.js?v=r283"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r273"></script>
+<script type="module" src="./src/traffic.js?v=r283"></script>
 </body>
 </html>
