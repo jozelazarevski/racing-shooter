@@ -20860,16 +20860,34 @@ export class Track {
     //   - TONE: half the fog wash, so they read as trees in haze instead of
     //     ghosts, and none of them stands taller than a real tree.
     if (T.treeCount >= 150) {
+      // "PIRAMIDS AGAIN" (r285, GOTTHARD screenshot): the clump-of-three fix
+      // still read as pale triangles, for two reasons this rework removes.
+      // GROUNDED CROWNS: every cone's base sat ON the grass, and three
+      // ground-based cones overlap into ONE triangle from any distance — the
+      // playfield pines never get reported because their crowns FLOAT on a
+      // trunk. So each clump tree is now two lifted tiers with a bark trunk
+      // below, same DNA as the trees nobody photographs. TEAL: the 12-22%
+      // fog wash toward 0xdcebf4 tinted them mint; these stand on REACHABLE
+      // ground (640-900 u, inside the rim), where the haze shader already
+      // fades true distance — so the wash drops to a trace.
       const crown = (r, h, y, dx, dz) => new THREE.ConeGeometry(r, h, 5)
         .translate(dx, y + h / 2, dz);
       const bandGeo = this._bundle([
-        crown(1.00, 1.70, 0, 0, 0),
-        crown(0.78, 1.25, 0, -0.95, 0.42),
-        crown(0.66, 1.00, 0, 0.82, -0.55),
+        crown(1.00, 1.00, 0.35, 0, 0),        // main tree, lower tier
+        crown(0.62, 0.62, 1.08, 0, 0),        //  ...upper tier to 1.70
+        crown(0.78, 0.85, 0.30, -0.95, 0.42), // skirt trees, lifted too
+        crown(0.66, 0.72, 0.26, 0.82, -0.55),
       ]);
       const band = new THREE.InstancedMesh(bandGeo, new THREE.MeshStandardMaterial({
         color: 0xffffff, vertexColors: false, flatShading: true, roughness: 1,
       }), 300);
+      const bTrunk = (r, h, dx, dz) => new THREE.CylinderGeometry(r * 0.6, r, h, 6)
+        .translate(dx, h / 2 - 0.02, dz);
+      const bandTrunks = new THREE.InstancedMesh(this._bundle([
+        bTrunk(0.075, 0.55, 0, 0),
+        bTrunk(0.062, 0.46, -0.95, 0.42),
+        bTrunk(0.055, 0.40, 0.82, -0.55),
+      ]), barkMat, 300);
       const bandCol = new THREE.Color(), fogC2 = new THREE.Color(T.fogColor ?? 0xcccccc);
       const baseC2 = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
       const bq = new THREE.Quaternion(), bup = new THREE.Vector3(0, 1, 0);
@@ -20894,6 +20912,7 @@ export class Track {
           m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
             new THREE.Vector3(sw2, sh2, sw2 * 0.9));
           band.setMatrixAt(bk3, m4);
+          bandTrunks.setMatrixAt(bk3, m4);
           // A WOOD IS A MASS, NOT A DECAL. These clumps stand 9-19 u tall in
           // the 640-900 u ring — reachable ground, and a car drove through
           // them like fog (ghosthunt.mjs). Wood, not stone: ramming a grove
@@ -20903,14 +20922,16 @@ export class Track {
           this.solids.push({ x: x2, z: z2, r: sw2 * 0.95,
             y: gy2 - 0.4, h: sh2 * 1.8, mat: 'hut' });
           bandCol.copy(baseC2).multiplyScalar(0.72 + hh(6.7) * 0.36)
-            .lerp(fogC2, 0.12 + hh(8.3) * 0.10);
+            .lerp(fogC2, 0.05);
           band.setColorAt(bk3++, bandCol);
         }
       }
       band.count = bk3;
+      bandTrunks.count = bk3;
       if (band.instanceColor) band.instanceColor.needsUpdate = true;
       band.name = 'distant-stand';
-      this.group.add(band);
+      bandTrunks.name = 'distant-stand-trunks';
+      this.group.add(band, bandTrunks);
     }
 
     this._scatter(STUMPS, () => this._trackSidePos(12, 34), (p) => {

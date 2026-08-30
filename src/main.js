@@ -112,9 +112,18 @@ const DIFFS = {
   // was unwinnable by a clean full-throttle stand-in and EASY beat a casual
   // one. The laws are the arbiter: pace still rises with tier, the gap is
   // still real, EASY is casual-winnable, HARD is clean-winnable.
-  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.74, aiCorner: 0.50, aiAggression: 0.65, rubberBand: 1.25, bandUp: 0.25 },
-  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 0.97, aiCorner: 0.96, aiAggression: 1.0,  rubberBand: 0.95, bandUp: 0.70 },
-  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.06, aiCorner: 1.08, aiAggression: 1.4,  rubberBand: 0.15 },
+  //
+  // aiCorner CUT AGAIN (r285), from the measurement the laws forced: the
+  // stand-in gains only ~9% going from 75% throttle to full — under the
+  // grip budget a player is CORNER-limited, sustaining ~20 u/s² where the
+  // rival model still plans 30-60. Rivals are corner-limited 95% of the
+  // time, so field pace goes as sqrt(aiSpeed·aiCorner); these values put
+  // HARD's best lap within a clean drifting player's 0.80 reach (was 0.74-
+  // 0.76) and let a 75%-throttle casual actually hold P1 on EASY (was
+  // re-passed on FURKA by 15%).
+  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.74, aiCorner: 0.34, aiAggression: 0.65, rubberBand: 1.25, bandUp: 0.25 },
+  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 0.97, aiCorner: 0.78, aiAggression: 1.0,  rubberBand: 0.95, bandUp: 0.70 },
+  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.06, aiCorner: 0.90, aiAggression: 1.4,  rubberBand: 0.15 },
 };
 
 const UPGRADES = [

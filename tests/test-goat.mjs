@@ -181,7 +181,12 @@ const CLIMB_RIG = ({ secs, roam }) => {
 // Height ceiling 30 u; pace ceiling 4 u/s. Measured on the tree as it stands
 // with the probe in `scratchpad/terrain/verify.mjs`: 39.9 u at 6.7 u/s. On the
 // same probe with the proposed patch: 28.6 u at 1.0 u/s.
-const GOAT_CEIL = 30;
+// ...then 34, because GRANITE NARROWS measures 30.3 u at 1.5 u/s on the
+// PRISTINE base — a half-minute crawl in the graded struggle zone, the rally
+// scramble test-climb's own law budgets for, brushing a ceiling set at
+// exactly the patch's 28.6 + noise. The PACE ceiling is the shortcut law
+// (the defect signature was 70-74 u at 19-26 u/s) and it keeps its 4.
+const GOAT_CEIL = 34;
 const GOAT_PACE = 4;
 // GOATWORLDS=66 baselines a world on a tree without editing this file — the
 // point being that a "was" figure has to be MEASURED on a defective tree, and
