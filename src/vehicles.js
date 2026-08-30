@@ -2730,14 +2730,21 @@ export class Car {
             // of drawn mountain overhead, reported as "climbing and sinking
             // in mountains".
             //
-            // The tolerance scales with the mass, because the seat-vs-flank
-            // error scales with the footprint, which scales with the height:
-            // a 150 u hill earns the full 30 u; a knee-high scatter rock
-            // keeps its old −3, so a verge boulder does not start shoving
-            // cars that ride the roadbed above its toe (GLACIER COL's
-            // grounded-step law caught exactly that at a flat pad of none).
-            if (this.pos.y < ob.y - Math.max(3, Math.min(30, ob.h * 0.35))
-              || this.pos.y > ob.y + ob.h) continue;
+            // The rule is BINARY, not scaled. A first cut scaled the pad
+            // with height (h·0.35, capped 30) and FURKA's valleys promptly
+            // put a ramming car 30+ u below a cone's seat and inside it
+            // (invisible-walls' massif-ram law). A mountain has NO
+            // underside, full stop — and "mountain" is tall OR WIDE: a
+            // fit-shrunken ice chip is 15 u low but 40 u across, seated at
+            // its centre, and a car at its downhill toe sat 3 u under that
+            // seat and clipped 5.4 u inside (same law, measured — the
+            // height test alone let it through twice, byte-identical).
+            // Only genuinely small furniture keeps the old −3, so a verge
+            // boulder still does not shove cars riding the roadbed above
+            // its toe (GLACIER COL's grounded-step law owns that case).
+            if (ob.h > 20 || (ob.r ?? 0) > 10
+              ? this.pos.y > ob.y + ob.h
+              : (this.pos.y < ob.y - 3 || this.pos.y > ob.y + ob.h)) continue;
           } else if (Math.abs(this.pos.y - ob.y) > 6) continue;
         }
         const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));

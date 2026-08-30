@@ -66,7 +66,7 @@ const sweep = await page.evaluate(async () => {
       const c = t.center[i];
       const half = (t.widthAt?.(i) ?? 7) + 1.8;   // + the car's own body radius
       for (const s of big) {
-        if (c.y < s.y - Math.max(3, Math.min(30, s.h * 0.35)) || c.y > s.y + s.h) continue; // scaled lower pad, mirrors the vehicles.js solids gate
+        if (s.h > 20 || (s.r ?? 0) > 10 ? c.y > s.y + s.h : (c.y < s.y - 3 || c.y > s.y + s.h)) continue; // tall-or-wide underside rule, mirrors the vehicles.js solids gate
         // the collider's radius AT THE ROAD'S HEIGHT, which is what bites
         let rEff = s.r;
         if (s.prof) {
@@ -178,8 +178,20 @@ const ram = await page.evaluate(async () => {
         ? c.r * c.prof[Math.min(c.prof.length - 1, Math.max(0, Math.floor(f * c.prof.length)))]
         : c.r;
       const depth = rEff - Math.hypot(p.pos.x - c.x, p.pos.z - c.z);
+      // STOPPED ON A SIBLING IS STOPPED. The glacier's slabs overlap into a
+      // continuous crest on purpose (r278), and once each slab carries its
+      // own collider a ram at slab A parks on slab B's surface — which can
+      // lie inside A's footprint. Measured on FURKA: 5.4 u "inside" A while
+      // held at exactly B's radius + the car pad. The law is "colliders
+      // cannot be passed", and resting against one is the law working.
+      const { solidRadiusAt: rAt } = await import('./src/vehicles.js');
+      const onSibling = (t.solids ?? []).some((s) => {
+        if (!s.prof || s === c) return false;
+        const d2 = Math.hypot(p.pos.x - s.x, p.pos.z - s.z);
+        return Math.abs(d2 - (rAt(s, p.pos.y) + 1.8)) < 2.5;
+      });
       runs++;
-      if (depth > 3) { entered++; worst = Math.max(worst, depth); }
+      if (depth > 3 && !onSibling) { entered++; worst = Math.max(worst, depth); }
     }
     p.invuln = 0; g.state = 'title';
     out.push({ name, runs, entered, worst: +worst.toFixed(1) });

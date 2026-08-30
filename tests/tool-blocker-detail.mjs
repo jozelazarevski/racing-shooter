@@ -43,7 +43,7 @@ const res = await page.evaluate(async (WORLD) => {
         }
         if ((px - s.x) ** 2 + (pz - s.z) ** 2 >= rr * rr) continue;
         if (s.y !== undefined) {
-          if (s.h !== undefined) { if (py < s.y - Math.max(3, Math.min(30, s.h * 0.35)) || py > s.y + s.h) continue; } // scaled lower pad, mirrors the vehicles.js solids gate
+          if (s.h !== undefined) { if (s.h > 20 || (s.r ?? 0) > 10 ? py > s.y + s.h : (py < s.y - 3 || py > s.y + s.h)) continue; } // tall-or-wide underside rule, mirrors the vehicles.js solids gate
           else if (Math.abs(py - s.y) > 6) continue;
         }
         bump(`solid ${s.x.toFixed(0)},${s.z.toFixed(0)}`,
