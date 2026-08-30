@@ -4234,7 +4234,12 @@ export class EnemyCar extends Car {
     // ---- rubber band: help when behind, cap when far ahead (both scale with D.rubberBand)
     const gap = g.player.progress - this.progress; // > 0: this car is behind the player
     let band = 1;
-    if (gap > 0.02) band = 1 + 0.30 * D.rubberBand * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1);
+    // `bandUp` decouples the CHASE from the CAP (r284): one knob scaled
+    // both, so EASY's generous leader-cap (rubberBand 1.25) also handed
+    // trailing rivals +37% toward the player — and a casual leader was
+    // re-passed forever by a field rubber-banding onto their tail. The cap
+    // keeps rubberBand; the chase reads bandUp where a tier provides it.
+    if (gap > 0.02) band = 1 + 0.30 * (D.bandUp ?? D.rubberBand) * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1);
     else if (gap < -0.06) band = 1 - 0.12 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1);
     // pace parity vs the garage: a maxed ENGINE (+20% player top speed) turned
     // NORMAL into a parade. Rivals bring +2% per player engine level (cap
@@ -4272,8 +4277,12 @@ export class EnemyCar extends Car {
     // It does now. The correction is adaptive by construction: worth nothing
     // when the player is struggling, growing with how far they actually run
     // away — which is the property the band was written to have and did not.
+    // The chase side reads `bandUp` here too (r284): this is the band that
+    // actually binds — rivals are corner-limited 95% of the time — so leaving
+    // it on rubberBand kept EASY's +35% catch-up cornering alive after the
+    // maxSpeed band was decoupled, and the casual leader was still re-passed.
     this._cornerBand = gap > 0.02
-      ? 1 + 0.28 * D.rubberBand * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1)
+      ? 1 + 0.28 * (D.bandUp ?? D.rubberBand) * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1)
       : gap < -0.06
         ? 1 - 0.14 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1)
         : 1;

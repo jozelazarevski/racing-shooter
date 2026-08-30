@@ -106,9 +106,15 @@ const DIFFS = {
   // anyone who drifts well, still ahead of anyone who doesn't. HARD keeps a
   // visible edge (1.15, plus its aiSpeed) as the arcade villain rather than
   // the old 1.60, which was sixty percent past a law of nature.
-  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.90, aiCorner: 0.85, aiAggression: 0.65, rubberBand: 1.25 },
-  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 1.0,  aiCorner: 1.00, aiAggression: 1.0,  rubberBand: 0.95 },
-  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.15, aiCorner: 1.15, aiAggression: 1.4,  rubberBand: 0.15 },
+  // ...and re-tuned against test-difficulty's five laws once corners
+  // stopped being free: the old tiers were priced for a player who railed
+  // every bend at any speed, and with that cheat gone HARD at aiSpeed 1.15
+  // was unwinnable by a clean full-throttle stand-in and EASY beat a casual
+  // one. The laws are the arbiter: pace still rises with tier, the gap is
+  // still real, EASY is casual-winnable, HARD is clean-winnable.
+  easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.74, aiCorner: 0.50, aiAggression: 0.65, rubberBand: 1.25, bandUp: 0.25 },
+  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 0.97, aiCorner: 0.96, aiAggression: 1.0,  rubberBand: 0.95, bandUp: 0.70 },
+  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.06, aiCorner: 1.08, aiAggression: 1.4,  rubberBand: 0.15 },
 };
 
 const UPGRADES = [
