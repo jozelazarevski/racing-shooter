@@ -20850,97 +20850,17 @@ export class Track {
     });
     logs.count = lk;
     let sk = 0;
-    // THE DISTANT STAND. Between the playfield scatter (out to ~640 u) and
-    // the horizon rings (900 u+) there was an empty ring - the mid-distance
-    // read as bare lawn on every wooded world, which is most of why the
-    // scene lacked depth.
-    //
-    // A STAND OF TREES IS NOT ONE CONE. The first cut was a single 6-sided
-    // cone per copy, 5-12 u wide and up to 21 u tall, scattered evenly and
-    // washed 40 % toward the fog: from the road that is a field of pale
-    // pyramids sitting on the grass, which is what the player photographed.
-    // Three faults, all fixed here:
-    //   - SHAPE: a clump of three offset crowns at different heights, welded
-    //     into one geometry, so the silhouette is a lumpy tree-line rather
-    //     than a triangle.
-    //   - GROUPING: clumps are drawn in GROVES of five to nine, because a
-    //     wood is a mass with edges, not evenly spaced dots.
-    //   - TONE: half the fog wash, so they read as trees in haze instead of
-    //     ghosts, and none of them stands taller than a real tree.
-    if (T.treeCount >= 150) {
-      // "PIRAMIDS AGAIN" (r285, GOTTHARD screenshot): the clump-of-three fix
-      // still read as pale triangles, for two reasons this rework removes.
-      // GROUNDED CROWNS: every cone's base sat ON the grass, and three
-      // ground-based cones overlap into ONE triangle from any distance — the
-      // playfield pines never get reported because their crowns FLOAT on a
-      // trunk. So each clump tree is now two lifted tiers with a bark trunk
-      // below, same DNA as the trees nobody photographs. TEAL: the 12-22%
-      // fog wash toward 0xdcebf4 tinted them mint; these stand on REACHABLE
-      // ground (640-900 u, inside the rim), where the haze shader already
-      // fades true distance — so the wash drops to a trace.
-      const crown = (r, h, y, dx, dz) => new THREE.ConeGeometry(r, h, 5)
-        .translate(dx, y + h / 2, dz);
-      const bandGeo = this._bundle([
-        crown(1.00, 1.00, 0.35, 0, 0),        // main tree, lower tier
-        crown(0.62, 0.62, 1.08, 0, 0),        //  ...upper tier to 1.70
-        crown(0.78, 0.85, 0.30, -0.95, 0.42), // skirt trees, lifted too
-        crown(0.66, 0.72, 0.26, 0.82, -0.55),
-      ]);
-      const band = new THREE.InstancedMesh(bandGeo, new THREE.MeshStandardMaterial({
-        color: 0xffffff, vertexColors: false, flatShading: true, roughness: 1,
-      }), 300);
-      const bTrunk = (r, h, dx, dz) => new THREE.CylinderGeometry(r * 0.6, r, h, 6)
-        .translate(dx, h / 2 - 0.02, dz);
-      const bandTrunks = new THREE.InstancedMesh(this._bundle([
-        bTrunk(0.075, 0.55, 0, 0),
-        bTrunk(0.062, 0.46, -0.95, 0.42),
-        bTrunk(0.055, 0.40, 0.82, -0.55),
-      ]), barkMat, 300);
-      const bandCol = new THREE.Color(), fogC2 = new THREE.Color(T.fogColor ?? 0xcccccc);
-      const baseC2 = new THREE.Color(T.foliageLow ?? 0x2c6e2a);
-      const bq = new THREE.Quaternion(), bup = new THREE.Vector3(0, 1, 0);
-      let bk3 = 0;
-      for (let gv = 0; gv < 46 && bk3 < 300; gv++) {
-        const gh = (n) => { const v = Math.sin((gv + n) * 12.9898) * 43758.5453; return v - Math.floor(v); };
-        const aG = gh(0.1) * Math.PI * 2;
-        const rG = 640 + gh(1.7) * 260;
-        const gx = Math.cos(aG) * rG, gz = Math.sin(aG) * rG;
-        const n = 5 + Math.floor(gh(2.3) * 5);
-        for (let k = 0; k < n && bk3 < 300; k++) {
-          const hh = (m) => {
-            const v = Math.sin((gv * 13 + k + m) * 12.9898) * 43758.5453;
-            return v - Math.floor(v);
-          };
-          const x2 = gx + (hh(0.7) - 0.5) * 150, z2 = gz + (hh(1.9) - 0.5) * 150;
-          if (this._inWater(x2, z2)) continue;
-          if (this._nearGoat(x2, z2, 12)) continue;   // no groves on the goat route
-          const gy2 = this._seatY(x2, z2);
-          const sw2 = 4.5 + hh(2.9) * 4.5, sh2 = 5.5 + hh(4.1) * 5.5;
-          bq.setFromAxisAngle(bup, hh(5.3) * Math.PI * 2);
-          m4.compose(new THREE.Vector3(x2, gy2 - 0.4, z2), bq,
-            new THREE.Vector3(sw2, sh2, sw2 * 0.9));
-          band.setMatrixAt(bk3, m4);
-          bandTrunks.setMatrixAt(bk3, m4);
-          // A WOOD IS A MASS, NOT A DECAL. These clumps stand 9-19 u tall in
-          // the 640-900 u ring — reachable ground, and a car drove through
-          // them like fog (ghosthunt.mjs). Wood, not stone: ramming a grove
-          // sheds splinters and costs like hitting a hut, because that is
-          // what hitting trees is. Radius covers the main crown; the skirt
-          // crowns stay forgiving.
-          this.solids.push({ x: x2, z: z2, r: sw2 * 0.95,
-            y: gy2 - 0.4, h: sh2 * 1.8, mat: 'hut' });
-          bandCol.copy(baseC2).multiplyScalar(0.72 + hh(6.7) * 0.36)
-            .lerp(fogC2, 0.05);
-          band.setColorAt(bk3++, bandCol);
-        }
-      }
-      band.count = bk3;
-      bandTrunks.count = bk3;
-      if (band.instanceColor) band.instanceColor.needsUpdate = true;
-      band.name = 'distant-stand';
-      bandTrunks.name = 'distant-stand-trunks';
-      this.group.add(band, bandTrunks);
-    }
+    // THE DISTANT STAND IS GONE (r287): "do a full swipe and erase them".
+    // Between the playfield scatter and the horizon rings there was a band of
+    // grove clumps at 640-900 u. Built as single fog-washed cones, they were
+    // photographed as "little white pyramids"; rebuilt as three welded crowns,
+    // photographed again; rebuilt as lifted tiers with bark trunks, and the
+    // player asked for a full sweep and ERASURE the same day. Three shapes,
+    // three reports: the mid-distance clump reads as a triangle at the range
+    // the game shows it from, whatever we weld it out of. r277 set the
+    // precedent (the diorama stones came OUT); the stands follow it. Their
+    // hut-solids leave with them — a collider for a mesh that is not there is
+    // the inverse of the Law of Solidity.
 
     this._scatter(STUMPS, () => this._trackSidePos(12, 34), (p) => {
       const s = 0.7 + Math.random() * 0.7;
