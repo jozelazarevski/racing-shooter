@@ -4161,6 +4161,29 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r287 — THE STANDS COME OUT. ALL OF THEM.
+"Do a full swipe and erase them", the same day the reworked stands went
+live. Three shapes, three photographs: single fog-washed cones ("little
+white pyramids"), welded crown clumps ("piramids again"), lifted tiers
+with bark trunks ("shark teeth again"). The lesson is not another weld:
+at 300-600 u — the range the game actually shows them from — a
+mid-distance clump reads as a triangle whatever it is built out of.
+r277's precedent applies (the diorama stones came OUT); the distant-stand
+band, its trunks and its hut-solids leave together, because a collider
+for a mesh that is not there is the inverse of the Law of Solidity.
+
+THE FULL SWEEP: tools-scratch/pyramidsweep.mjs — every cone-family mesh
+>= 5 u on reachable ground (r < 1600), paired against trunk cylinders
+within 2 u; a trunkless cone is a pyramid to the player whatever the
+builder called it. Ten themed worlds: eight CLEAN, and the only flags are
+the oldtown campaniles' spire caps — a bell-tower roof on a masonry
+tower, flagged only because the probe pairs against CYLINDERS and a
+campanile is a box. Church spires stay.
+
+Proof: tools-scratch/shot-grove-erased.png — the exact spot the user
+photographed is open meadow; `distant-stand` absent from the scene
+graph; ghosthunt 0 uncovered masses on GOTTHARD.
+
 ## r286 — THE STANDING START OBEYS THE TYRE
 "Driving needs fixing from Start", minutes after r285 went live. Measured
 before touching anything (tools-scratch/launchtest.mjs, branch AND the
