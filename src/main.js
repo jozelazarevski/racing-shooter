@@ -98,9 +98,17 @@ const ordinal = (n) => {
 // grip budget and is what actually makes a tier faster, because corners are
 // where the time is.
 const DIFFS = {
+  // aiCorner AFTER THE GRIP BUDGET (r284): the player's tyres now obey
+  // a_lat <= 4·grip, so a tier that plans corners far above 1.0 is a field
+  // openly exempt from physics the player can feel. Measured with whokilled
+  // on the new physics, NORMAL at 1.10 ran rivals 20-27% faster than a
+  // 75%-margin driver; at 1.00 the field corners AT the limit — beatable by
+  // anyone who drifts well, still ahead of anyone who doesn't. HARD keeps a
+  // visible edge (1.15, plus its aiSpeed) as the arcade villain rather than
+  // the old 1.60, which was sixty percent past a law of nature.
   easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.90, aiCorner: 0.85, aiAggression: 0.65, rubberBand: 1.25 },
-  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 1.0,  aiCorner: 1.10, aiAggression: 1.0,  rubberBand: 0.95 },
-  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.15, aiCorner: 1.60, aiAggression: 1.4,  rubberBand: 0.15 },
+  normal: { id: 'normal', label: 'NORMAL', aiSpeed: 1.0,  aiCorner: 1.00, aiAggression: 1.0,  rubberBand: 0.95 },
+  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.15, aiCorner: 1.15, aiAggression: 1.4,  rubberBand: 0.15 },
 };
 
 const UPGRADES = [

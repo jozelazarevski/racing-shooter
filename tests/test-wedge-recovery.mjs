@@ -153,12 +153,26 @@ const r = await page.evaluate(async () => {
   const parkedRescues = rescues;
 
   // ---- and normal racing must never trip it --------------------------------
+  // RACING, WITH HANDS ON THE WHEEL. This used to pin the throttle and never
+  // steer, which was "normal" only while nothing could stop a car: under the
+  // r284 grip budget and the steep-terrain wall the blind runner leaves the
+  // road at the first corner, parks against a mountain face at full
+  // throttle, and is rescued — the net doing its job, failing a law that
+  // meant "progress never trips the rescue". So the runner now steers at
+  // the road like any driver, and the law asserts what it always meant.
   p.placeAt(0, 0, true);
   p.vel.set(0, 0, 0); p._wedgeT = 0;
   hold(1);
   rescues = 0;
   let maxWedgeT = 0;
+  const t2 = g.track, N2 = t2.center.length;
   for (let f = 0; f < 1800; f++) {           // 30 game-seconds of driving
+    const li = (p.trackIndex + 8) % N2;
+    const c2 = t2.center[li];
+    let err = Math.atan2(c2.x - p.pos.x, c2.z - p.pos.z) - p.heading;
+    while (err > Math.PI) err -= 2 * Math.PI;
+    while (err < -Math.PI) err += 2 * Math.PI;
+    g.input.analog.steer = Math.max(-1, Math.min(1, err * 1.6));
     g._frameBody();
     maxWedgeT = Math.max(maxWedgeT, p._wedgeT ?? 0);
     if (f % 120 === 0) await new Promise((rs) => setTimeout(rs, 0));

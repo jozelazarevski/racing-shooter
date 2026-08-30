@@ -9933,6 +9933,17 @@ export class Track {
         if (margin >= 0.6) break;
       }
       const bx = best.px, bz = best.pz;
+      // THE BRACES LEARN WHAT THE LEGS LEARNED (r253): where the lap curls
+      // back past its own start line, the road under the tower is not the
+      // road the heights were chosen against. MOUNTAIN TO SEA brings a lane
+      // under this scaffold and the lowest brace hung at windshield height
+      // over it — flagged bare-in-lane by test-roadclear. The whole wooden
+      // stack (braces, cabin, flag — and the legs reach up to meet it) lifts
+      // until the lowest brace clears the highest carriageway beneath the
+      // tower by the legs' own 3.2 u.
+      const bri2 = this.nearestIndex(_gp.set(bx, 0, bz));
+      const brRoadY2 = this.center[bri2]?.y ?? y0;
+      const towerLift = Math.max(0, (Math.max(y0, brRoadY2) + 3.2) - (y0 + 2.5) + 0.11);
       for (const [ox, oz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) {
         // and a leg reaches the GROUND under its own tower, which on a world
         // that starts on a shelf is not the road's height either
@@ -9962,7 +9973,7 @@ export class Track {
         const nearI = this.nearestIndex(_gp.set(bx + ox, 0, bz + oz));
         const roadY = this.center[nearI]?.y ?? y0;
         const footY = clear ? gy : Math.max(gy, Math.max(y0, roadY) + 3.2);
-        const legH = (y0 + 10) - footY;
+        const legH = (y0 + 10 + towerLift) - footY;
         if (legH <= 0.4) continue;
         const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, legH, 8), steel);
         leg.position.set(bx + ox, footY + legH / 2, bz + oz);
@@ -9985,19 +9996,27 @@ export class Track {
         if (!clear) continue;
         this.solids.push({ x: bx + ox, z: bz + oz, r: 0.6, y: c.y, mat: 'metal' });
       }
+      // THE BRACES LEARN WHAT THE LEGS LEARNED (r253): where the lap curls
+      // back past its own start line, the road under the tower is not the
+      // road the heights were chosen against. MOUNTAIN TO SEA brings a lane
+      // 20+ u under this scaffold and the lowest brace hung at windshield
+      // height over it — flagged bare-in-lane by test-roadclear. The whole
+      // wooden stack now lifts until the lowest brace clears the highest
+      // carriageway beneath it by the legs' own 3.2 u.
+
       for (let ly = 2.5; ly <= 8.5; ly += 3) {
         const brace = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.22, 2.1), wood);
-        brace.position.set(bx, y0 + ly, bz);
+        brace.position.set(bx, y0 + ly + towerLift, bz);
         brace.castShadow = true;
         this.group.add(brace);
       }
       const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.7, 2.6), wood);
-      cabin.position.set(bx, y0 + 10, bz);
+      cabin.position.set(bx, y0 + 10 + towerLift, bz);
       cabin.castShadow = true;
       this.group.add(cabin);
       this._addShadow(bx, bz, 2.6, c.y);        // grounds the gantry legs
       // waving checkered flags on the towers
-      this._checkerFlag(bx, y0 + 11.8, bz);
+      this._checkerFlag(bx, y0 + 11.8 + towerLift, bz);
     }
     const banner = new THREE.Mesh(
       new THREE.BoxGeometry(26, 2.4, 0.5),

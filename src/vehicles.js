@@ -3229,7 +3229,24 @@ export class Car {
       const AHEAD = 6;
       const ax = this.pos.x + Math.sin(this.heading) * AHEAD;
       const az = this.pos.z + Math.cos(this.heading) * AHEAD;
-      const grade = (t.terrainHeight(ax, az) - gY) / AHEAD;
+      let grade = (t.terrainHeight(ax, az) - gY) / AHEAD;
+      // RIPPLE-PROOF, OUT WHERE MOUNTAINS LIVE. One sample 6 u ahead
+      // flickers under MAX_GRADE on ridged steeps, and in those gaps the
+      // engine (34 u/s²) out-pulls the slope term (16·grade) — measured:
+      // 15-20 u of height banked on ~100% grades in roam, the traction
+      // limit asleep half the time. Far off-road the LOCAL gradient
+      // magnitude joins the vote, so a face is a face whatever the next
+      // ripple says. Near the road (|lateral| ≤ 60) nothing changes: a
+      // rejoin bank is crossed on momentum through a moment of scrub, and
+      // test-goat's rejoin law pins that at 35% speed kept.
+      if (Math.abs(this.lateral ?? 0) > 60) {
+        const E2 = 2.2;
+        const ddx = (t.terrainHeight(this.pos.x + E2, this.pos.z)
+          - t.terrainHeight(this.pos.x - E2, this.pos.z)) / (2 * E2);
+        const ddz = (t.terrainHeight(this.pos.x, this.pos.z + E2)
+          - t.terrainHeight(this.pos.x, this.pos.z - E2)) / (2 * E2);
+        grade = Math.max(grade, Math.hypot(ddx, ddz));
+      }
       if (grade > MAX_GRADE) {
         const over = Math.min(1, (grade - MAX_GRADE) / 0.55);
         // speedAlong is derived from vel, so scrub the velocity itself. Hard
