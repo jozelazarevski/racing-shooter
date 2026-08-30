@@ -2066,7 +2066,23 @@ export class Car {
         // not in the standing start.
         const ref = (this.baseMaxSpeed ?? this.maxSpeed) * 0.5;
         const punch = 1 + 0.55 * (1 - THREE.MathUtils.clamp(Math.abs(vf) / ref, 0, 1));
-        vf += this.accel * punch * sTract * inputs.throttle * climbAuth * dt;
+        // THE STANDING START OBEYS THE TYRE TOO (r286, "driving needs fixing
+        // from start"). accel * punch is ~53 m/s² off the line — 0-100 in
+        // 0.92 s, measured identical back to r283 — while the same tyre's
+        // LATERAL law caps at 4·grip. Drive force now meets the traction
+        // budget where wheelspin lives: capped hard at standstill, the cap
+        // fading out by ~60% of showroom speed so the mid-range tune and top
+        // speed are untouched (at speed a real car is power-limited anyway,
+        // which is what the fade models). The overdrive feeds `_spinFeed`
+        // into the slip law below — launch wheelspin wags the tail instead
+        // of teleporting the car to 100.
+        const wantA = this.accel * punch * sTract * inputs.throttle * climbAuth;
+        const tractA = 2.8 * (this._gripBudget ?? this.grip);
+        const capBlend = THREE.MathUtils.clamp(1 - Math.abs(vf) / (ref * 1.2), 0, 1);
+        const driveA = wantA > tractA ? tractA + (wantA - tractA) * (1 - capBlend) : wantA;
+        this._spinFeed = wantA > tractA * 1.05
+          ? Math.min(0.6, (wantA / tractA - 1) * 0.45 * capBlend) : 0;
+        vf += driveA * dt;
         this.reverseTimer = 0;
       }
       if (inputs.brake > 0.05) {
@@ -2153,6 +2169,8 @@ export class Car {
     if ((this._overGrip ?? 0) > 0.12) {
       slipTarget = Math.max(slipTarget, Math.min(1, this._overGrip * 1.2));
     }
+    // launch wheelspin: overdriven tyres off the line shimmy the tail
+    if ((this._spinFeed ?? 0) > 0) slipTarget = Math.max(slipTarget, this._spinFeed);
     if (inputs.drift) slipTarget = 1; // handbrake forces a full slide
     const slipRate = slipTarget > this.slip ? 7 : 3.2; // break loose fast, recover smoothly
     this.slip += (slipTarget - this.slip) * Math.min(1, slipRate * dt);
