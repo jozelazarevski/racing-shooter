@@ -130,7 +130,15 @@ const shove = await page.evaluate(async () => {
     }
     p.invuln = 0; g.state = 'title';
     worst.sort((a, b) => a.went - b.went);
-    out.push({ name, stations: worst.length, pinned: worst.filter((w) => w.went < 12).length,
+    // The floor is 6, down from 12 (r287): the 12 was calibrated when a
+    // standing start put ~53 u/s² straight into velocity and open road
+    // carried 40 u in the two-second window. The launch now obeys the tyre
+    // (2.8*gripBudget off the line), so a legitimate steep-uphill hill
+    // start measures 9-15 u — FURKA #500 at 9.7 u is a car reaching ~35
+    // km/h up a mountain grade, not a car against a wall. A WALL still
+    // pins where the car stands: 0-3 u. The gap between 3 and 6 is the
+    // margin, and it is a wall this law has actually caught before.
+    out.push({ name, stations: worst.length, pinned: worst.filter((w) => w.went < 6).length,
       worst: worst.slice(0, 4) });
   }
   return out;
