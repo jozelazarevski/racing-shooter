@@ -129,15 +129,14 @@ const DIFFS = {
   // laps too, not just PINE's. HARD rivals now plan 19-37 u/s² — the same
   // neighbourhood a drifting player actually sustains, which is the first
   // time the villain obeys the physics it sells.
-  // HARD is the TOP-SPEED villain now, not the cornering one: above ~0.65
-  // of the corner budget the width-pinch caps (tier-blind) bind on open
-  // worlds and normal ties hard dead equal, while on twisty worlds the
-  // crawl floor holds hard's lap up past what a clean player can reach. So
-  // hard's edge lives in aiSpeed (straights, which do scale) and its
-  // cornering sits just over normal's — physical, beatable, still ahead.
+  // HARD's edge lives in aiCorner a notch over NORMAL's, and aiSpeed stays
+  // at 1.06: 1.10 was tried and INVERTED the tier order on PINE — the
+  // backfire this file already recorded once, where a raised maxSpeed drops
+  // rivals under the `v > maxSpeed*0.55` nitro gate and they boost half as
+  // often. The knob that reads fastest makes the field slower.
   easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.74, aiCorner: 0.26, aiAggression: 0.65, rubberBand: 1.25, bandUp: 0.25 },
   normal: { id: 'normal', label: 'NORMAL', aiSpeed: 0.97, aiCorner: 0.58, aiAggression: 1.0,  rubberBand: 0.95, bandUp: 0.70 },
-  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.10, aiCorner: 0.55, aiAggression: 1.4,  rubberBand: 0.15 },
+  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.06, aiCorner: 0.63, aiAggression: 1.4,  rubberBand: 0.15 },
 };
 
 const UPGRADES = [
