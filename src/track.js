@@ -15045,8 +15045,13 @@ export class Track {
     // which was survivable at five fingers and is not at thirty-one.
     const fingers = new THREE.InstancedMesh(new THREE.BoxGeometry(FLEN, 0.5, 2.2),
       timber, FINGERS);
+    // A MOORING PILE REACHES THE BOTTOM. The old 3.4 u cylinder hung at quay
+    // height and its foot stopped ~1.9 u above the drawn seabed — 26-38
+    // floating posts per harbour world in test-nothing-floats' census. Unit
+    // geometry with the TOP at the origin, stretched per-instance down to
+    // the seabed it actually stands on.
     const posts = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.22, 0.26, 3.4, 6), pile, FINGERS * 3);
+      new THREE.CylinderGeometry(0.22, 0.26, 1, 6).translate(0, -0.5, 0), pile, FINGERS * 3);
     const fm = new THREE.Matrix4(), fq = new THREE.Quaternion();
     const fup = new THREE.Vector3(0, 1, 0), fone = new THREE.Vector3(1, 1, 1);
     fq.setFromAxisAngle(fup, yaw);
@@ -15062,7 +15067,10 @@ export class Track {
         if (f < B.n) fingerAt.push({ du: du + PITCH / 2, dn: B.dn });
         for (let k = 0; k < 3; k++) {
           const pp = at(du, B.dn + 2 + k * (FLEN / 2.6));
-          fm.compose(new THREE.Vector3(pp.x, y - 0.9, pp.z), fq, fone);
+          const pTop = y + 0.8;                              // peeks over the deck, as before
+          const pLen = Math.max(1.2, pTop - (this.terrainHeight(pp.x, pp.z) - 0.5));
+          fm.compose(new THREE.Vector3(pp.x, pTop, pp.z), fq,
+            new THREE.Vector3(1, pLen, 1));
           posts.setMatrixAt(fpk++, fm);
         }
       }
