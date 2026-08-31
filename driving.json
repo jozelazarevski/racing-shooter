@@ -14,7 +14,7 @@
   "csAssistSlipMin": 0.22,
   "spinSlipAngle": 1.13,
   "yawRMin": 4.0,
-  "yawCapLo": 1.25,
-  "yawCapHi": 1.10,
+  "yawCapLo": 1.45,
+  "yawCapHi": 1.15,
   "reverseAccel": 5.0
 }

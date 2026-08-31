@@ -44,9 +44,14 @@ export const DRIVING = {
   spinSlipAngle: 1.13,       // rad (~65°): past this, assist off — the spin is earned
 
   // §5-equivalent — the yaw caps (this engine steers in yaw-rate space).
+  // 1.45 mid-range (r294, "impossible to steer in this curve at this
+  // speed", IL BUDELLO at 99): at 1.25 an old-town corner (R~30) was
+  // unmakeable even with a lift. At 1.45, flat-out still runs wide — the
+  // drift promise — but lifting to ~85 km/h turns R27 and makes it. The
+  // churn stays bounded because a corner is 1-2 s, not a held circle.
   yawRMin: 4.0,              // turning-circle radius floor, u
-  yawCapLo: 1.25,             // × budget allowance in the mid-range
-  yawCapHi: 1.10,            // × budget allowance at top speed
+  yawCapLo: 1.45,             // × budget allowance in the mid-range
+  yawCapHi: 1.15,            // × budget allowance at top speed
   reverseAccel: 5.0,         // §6 reverse: a manoeuvre, not a launch
 };
 
