@@ -368,8 +368,8 @@ const SHOT_RIG = new THREE.Vector3(5.2, 3.2, 6.2);
 const SHOT_RIG_GROUND = new THREE.Vector3(8.0, 2.5, 3.2);
 
 const CAM_MODES = [
-  { name: 'TOP-DOWN',  back: 16, h: 46, look: 22, lookH: 0,   spdBack: 6, spdH: 10, steer: 1, roadYaw: true },
-  { name: 'TOP FAR',   back: 20, h: 72, look: 30, lookH: 0,   spdBack: 4, spdH: 10, steer: 1, roadYaw: true },
+  { name: 'TOP-DOWN',  back: 16, h: 46, look: 22, lookH: 0,   spdBack: 8, spdH: 16, steer: 1, roadYaw: true },   // PATCH_02 §3.9: 1.35x at top speed
+  { name: 'TOP FAR',   back: 20, h: 72, look: 30, lookH: 0,   spdBack: 6, spdH: 24, steer: 1, roadYaw: true },
   // CHASE sat at h 7.5 / back 13 / look 10 — down at bumper height and close
   // enough that the car filled the screen, so you could not see far enough up
   // the road to place the next corner ("super hard to drive in this camera
@@ -6418,6 +6418,7 @@ class Game {
       }
       p.core.rotation.y += dt * 2.2;
       p.core.position.y = 1.4 + Math.sin(time * 2.5 + p.index) * 0.25;
+      if ((this.player._noPickupT ?? 0) > 0) continue;   // PATCH_02 §3.7: no rescue loot
       if (this.player.alive && this.player.pos.distanceToSquared(p.pos) < 8.5) {
         p.active = false;
         p.mesh.visible = false;
@@ -6440,8 +6441,19 @@ class Game {
           pl.rounds = Math.min(pl.maxRounds, (pl.rounds ?? 0) + belt);
           this.hud.feed(`+2 MISSILES · +${belt} ROUNDS`, 'good');
         } else if (p.type === 'nitro') {
-          pl.nitro = Math.min(1, pl.nitro + 0.45 * (pl.nitroRate || 1));
-          this.hud.feed('+NITRO CHARGE', 'good');
+          // PATCH_02 §3.7: NITRO IS A RATION, NOT A ROAD SURFACE. The
+          // recording shows a can every 4-6 s and the car boosting half the
+          // lap — the drivetrain never mattered. Two charges per lap; a can
+          // past the ration pays score only.
+          if ((pl._nitroLap ?? 0) !== pl.lap) { pl._nitroLap = pl.lap; pl._nitroTaken = 0; }
+          if ((pl._nitroTaken ?? 0) < 2) {
+            pl._nitroTaken = (pl._nitroTaken ?? 0) + 1;
+            pl.nitro = Math.min(1, pl.nitro + 0.45 * (pl.nitroRate || 1));
+            this.hud.feed('+NITRO CHARGE', 'good');
+          } else {
+            this.score += 100;
+            this.hud.feed('NITRO RATIONED — +100 PTS', 'info');
+          }
         } else if (p.type === 'shield') {
           pl.invuln = Math.max(pl.invuln, 4);
           this.hud.feed('SHIELD — 4s INVULNERABLE', 'good');
@@ -9188,6 +9200,10 @@ class Game {
     // ANGLE: punting a stone square-on costs the full figure; catching one with
     // the corner of the bumper flicks it away and barely marks you.
     const glance = square < 0.55;
+    // RALLY_PATCH_02 §3.2: glancing contact under ~20° (square < 0.34) MUST
+    // cost 0 hull — a 199 km/h wall scrape is paint, not 76 hull. Sparks and
+    // sound still fire; only the damage line is forgiven.
+    const scrapeFree = square < 0.34;
     const angleMul = 0.45 + 0.55 * THREE.MathUtils.clamp(square, 0, 1);
     // damage: real, but a fraction of what the same stone cost as a wall
     // THROUGH damage(), NOT STRAIGHT INTO health. This was the one damage path
@@ -9245,6 +9261,7 @@ class Game {
    *  'hut'   — heavy: the building shrugs, sheds planks/dust, hurts a lot.
    *  'metal' — firm: the old fence-post feel — sparks and moderate damage. */
   onSolidCrash(ob, car, impact, nx, nz, square = 1) {
+    car._wallTouchT = 0.3;   // PATCH_02 §3.6
     const n = new THREE.Vector3(nx, 0, nz);
     // ---- ANGLE OF ATTACK. `square` is the share of the car's speed aimed into
     // the surface: 1 = dead-on, 0 = running parallel to it. A sideswipe and a
@@ -9286,7 +9303,10 @@ class Game {
       // contact). Squared, a touch costs almost nothing and a real hit is
       // unchanged: the constant is set so a full-speed head-on lands exactly
       // where it did before.
-      dmg = impact > 6 ? Math.min(85 * heft, (impact - 6) ** 2 * 0.175 * heft) * angleMul : 0;
+      // cap 45 (RALLY_PATCH_02 P2.3): a head-on at 100 km/h costs the cap,
+      // not 76-85 — two touches must not wreck a 108-hull car.
+      dmg = impact > 6 && !scrapeFree
+        ? Math.min(45 * heft, (impact - 6) ** 2 * 0.175 * heft) * angleMul : 0;
       if (dmg > 0) {
         this.particles.splinters(car.pos, dir, [0x8a8378, 0x55504a], Math.min(1, impact / 20));
         this.particles.debris(car.pos, Math.min(8, 2 + (impact / 4 | 0)));
@@ -9305,7 +9325,7 @@ class Game {
         if (dmg >= 18) { if (glance) this.glanceDrama(); else this.crashDrama(); }
       }
     } else if (mat === 'hut') {
-      dmg = impact > 6 ? Math.min(50, (impact - 6) ** 2 * 0.11) * angleMul : 0;
+      dmg = impact > 6 && !scrapeFree ? Math.min(45, (impact - 6) ** 2 * 0.11) * angleMul : 0;
       if (dmg > 0) {
         // the building crashes big: planks burst off the wall + a dust cloud
         const cols = [0x8a6a42, this.track.T?.hutRoof ?? 0x6a4a2a];
@@ -9343,6 +9363,15 @@ class Game {
       } else if (car === this.player && impact > 12) {
         this.shake = Math.min(1, this.shake + 0.08);
       }
+    }
+    // RALLY_PATCH_02 §3.2: at most 60 hull per rolling second from the
+    // static world — grinding along a canyon must cost speed, not the race.
+    if (dmg > 0 && car === this.player) {
+      const now = this.raceTime ?? 0;
+      if (now - (car._wdmgAt ?? -9) > 1) { car._wdmgAt = now; car._wdmgSum = 0; }
+      const room = Math.max(0, 60 - (car._wdmgSum ?? 0));
+      dmg = Math.min(dmg, room);
+      car._wdmgSum = (car._wdmgSum ?? 0) + dmg;
     }
     if (dmg > 0) car.damage(dmg, null);
     if (car === this.player) this.audio.scrape();
@@ -9437,7 +9466,14 @@ class Game {
     this.particles.splinters(at, n, [0x2a5a30, 0x6a4a2a], Math.min(1, impact / 14));
     this.particles.debris(at, Math.min(5, 2 + (impact / 6 | 0)));
     this.particles.driftSmoke(car.pos);
-    const dmg = impact > 5 ? Math.min(35, (impact - 5) * 1.8) : 0;
+    let dmg = impact > 5 ? Math.min(35, (impact - 5) * 1.8) : 0;
+    // trees draw on the same 60/s world-damage budget as stone (PATCH_02 §3.2)
+    if (dmg > 0 && car === this.player) {
+      const now = this.raceTime ?? 0;
+      if (now - (car._wdmgAt ?? -9) > 1) { car._wdmgAt = now; car._wdmgSum = 0; }
+      dmg = Math.min(dmg, Math.max(0, 60 - (car._wdmgSum ?? 0)));
+      car._wdmgSum = (car._wdmgSum ?? 0) + dmg;
+    }
     if (dmg > 0) car.damage(dmg, null);
     if (car === this.player) {
       this.audio.scrape();
@@ -9861,6 +9897,12 @@ class Game {
     this.player.outOfHulls = false;
     this.state = 'countdown';
     this.countdown = 3.6;
+    // PATCH_02 §3.1: NOBODY DIES ON THE GRID. The recording lost 26 hull
+    // before the car ever moved. Every car is invulnerable and weapon-locked
+    // from grid spawn to GO + 1.5 s; rivals may not make the player their
+    // target until GO + 4 (see aiCanTarget).
+    this.player.invuln = Math.max(this.player.invuln ?? 0, this.countdown + 1.5);
+    for (const e of this.enemies ?? []) e.invuln = Math.max(e.invuln ?? 0, this.countdown + 1.5);
     this._lastCount = 4;
     this.player.lapStart = 0;
     this.hud.feed(`${this.level.name} — LEVEL ${this.level.id}`, 'info');
@@ -10269,6 +10311,24 @@ class Game {
     this.playerRank = rank;
   }
 
+  /** PATCH_02 §3.1 + §3.3: the AGGRO TICKET OFFICE. No rival may make the
+   *  player its target before GO + 4 s; after that at most ONE rival holds a
+   *  ticket in the first 20 s and two thereafter. Tickets expire 1.5 s after
+   *  the holder stops asking, so pressure rotates instead of piling. */
+  aiCanTarget(rival) {
+    if (this.state !== 'race' || this.raceTime < 4) return false;
+    const now = this.raceTime;
+    this._aggro = (this._aggro ?? []).filter((a) => a.until > now && a.r.alive);
+    const mine = this._aggro.find((a) => a.r === rival);
+    if (mine) { mine.until = now + 1.5; return true; }
+    const cap = now < 20 ? 1 : 2;
+    if (this._aggro.length < cap) {
+      this._aggro.push({ r: rival, until: now + 1.5 });
+      return true;
+    }
+    return false;
+  }
+
   // ---------- car vs car pushes ----------
   _carCollisions() {
     const cars = [this.player, ...this.enemies].filter((c) => c.alive);
@@ -10293,8 +10353,10 @@ class Game {
                          && (b._crashT ?? -9) < this.raceTime - 0.5) {
             a._crashT = b._crashT = this.raceTime;
             const dmg = Math.min(20, (impact - 9) * 0.6);
-            a.damage(dmg, b);
-            b.damage(dmg, a);
+            // PATCH_02 §3.3: a rival ramming the PLAYER costs at most 8 —
+            // the pack must pressure with position, not delete a hull.
+            a.damage(a === this.player && b !== this.player ? Math.min(8, dmg) : dmg, b);
+            b.damage(b === this.player && a !== this.player ? Math.min(8, dmg) : dmg, a);
             const mid = a.pos.clone().add(b.pos).multiplyScalar(0.5);
             this.particles.debris(mid, 3);
             if (a === this.player || b === this.player) {
@@ -10313,7 +10375,19 @@ class Game {
   // ---------- camera ----------
   _updateCamera(dt) {
     const p = this.player;
-    const speedZoom = Math.min(1, Math.abs(p.speedAlong) / p.maxSpeed);
+    // PATCH_02 §3.9: the zoom EASES over ~400 ms so the eye reads the
+    // change as acceleration, not a cut — and the speed-lines overlay
+    // fades in past 150 km/h.
+    const speedZoomRaw = Math.min(1, Math.abs(p.speedAlong) / p.maxSpeed);
+    this._camSpd = (this._camSpd ?? 0) + (speedZoomRaw - (this._camSpd ?? 0)) * Math.min(1, dt / 0.4);
+    const speedZoom = this._camSpd;
+    {
+      const sl = document.getElementById('speed-lines');
+      if (sl) {
+        const kmh = Math.abs(p.speedAlong) * 3.6;
+        sl.style.opacity = kmh > 150 ? Math.min(0.45, (kmh - 150) / 110).toFixed(2) : '0';
+      }
+    }
     const M = CAM_MODES[this.camMode] || CAM_MODES[0];
     // THE DRIVER'S VIEW IS NOT A SHORT BOOM. Everything below this line exists
     // to place a camera some distance behind the car and keep the line between
