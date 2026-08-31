@@ -86,15 +86,30 @@ const run = async (page, diff, skill) => page.evaluate(({ diff, skill }) => {
     // finishes P8 on EASY — measuring its own missing brake foot rather
     // than the tiers. It slows toward what the budget allows, at a margin
     // its own skill sets; rivals manage theirs through their planner.
+    // ...over a BRAKING HORIZON, not one window (r291): the single 24 u
+    // look was sized when brakes pulled 6.4g and 9 u shed race pace. At
+    // the real-world 1.5g cap the same shed takes ~41 u, the stand-in saw
+    // PINE's first hard corner too late, wrecked, and scored 132 of 904 —
+    // measuring its own horizon rather than the tiers. Same shape as the
+    // rivals' planner: for each corner ahead, allowed-now = the corner's
+    // speed grown by v² = vmax² + 2·a·d at a = 12 (under the 14.7 cap for
+    // margin), take the minimum.
     const K2 = Math.max(4, Math.round(24 / su));
-    let turn2 = t.headingAt((i + K2) % N) - t.headingAt(i);
-    while (turn2 > Math.PI) turn2 -= 2 * Math.PI;
-    while (turn2 < -Math.PI) turn2 += 2 * Math.PI;
-    const vmax2 = Math.sqrt(15 * (24 / Math.max(0.06, Math.abs(turn2)))) * (0.72 + 0.22 * skill);
     const sp2 = Math.hypot(car.vel.x, car.vel.z);
+    let vAllow = 1e9;
+    const horizon = Math.max(K2, Math.round((24 + (sp2 * sp2) / 24) / su));
+    for (let kk = 0; kk <= horizon; kk += 2) {
+      const j = (i + kk) % N;
+      let tn = t.headingAt((j + K2) % N) - t.headingAt(j);
+      while (tn > Math.PI) tn -= 2 * Math.PI;
+      while (tn < -Math.PI) tn += 2 * Math.PI;
+      const vm = Math.sqrt(15 * (24 / Math.max(0.06, Math.abs(tn)))) * (0.72 + 0.22 * skill);
+      const vHere = kk === 0 ? vm : Math.sqrt(vm * vm + 2 * 12 * kk * su);
+      if (vHere < vAllow) vAllow = vHere;
+    }
     const prevIdx = car.trackIndex;
-    car.step(dt, { throttle: sp2 > vmax2 ? 0 : skill * lift,
-      brake: sp2 > vmax2 + 4 ? 0.8 : 0,
+    car.step(dt, { throttle: sp2 > vAllow ? 0 : skill * lift,
+      brake: sp2 > vAllow + 3 ? 0.9 : 0,
       steer: Math.max(-1, Math.min(1, a * 1.8)), drift: false, hold: false });
     // THE PLAYER HAS TO LAP TOO. Without this the stand-in's `_wraps` stays 0
     // while the rivals' rises, so once they complete a lap
