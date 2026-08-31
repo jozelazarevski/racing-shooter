@@ -2155,7 +2155,15 @@ export class Car {
     // (~0.4g at 100 km/h tapering as speed falls) — lift-and-coast glides,
     // and slowing for a corner is the BRAKE's job, which just learned its
     // own real-world cap.
-    const dragK = inputs.throttle > 0.05 ? 0.55 : 0.14;
+    // 0.50 under power, not 0.55 (r291): the 0.40 "sliding" discount used
+    // to apply most of every lap while ambient slip was high, so the whole
+    // roster's pace was quietly tuned around an average drag near 0.50.
+    // When the planted pass took the ambient slide away, everything got
+    // ~13% slower under power at once — the difficulty stand-in AND its
+    // rivals together, PINE's crests to 1 launch, GLACIER COL's control
+    // from 6 to 1. This restores the average the tuning assumed; the top
+    // speed itself is clamped at vCap, so only mid-range punch returns.
+    const dragK = inputs.throttle > 0.05 ? 0.50 : 0.14;
     vf -= vf * ((sliding ? Math.min(0.40, dragK) : dragK) + (offRoad ? 0.35 : 0)) * dt;
     // Slope-aware speed ceiling, matched to the grade/drag equilibrium: a
     // downhill grade EXTENDS top speed proportionally (never past topSpeed *
