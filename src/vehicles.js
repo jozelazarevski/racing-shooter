@@ -1953,10 +1953,24 @@ export class Car {
       const v2h = this.vel.x * this.vel.x + this.vel.z * this.vel.z;
       if (v2h > 1 && tk?.terrainHeight) {
         const inv = 1 / Math.sqrt(v2h), LOOK = 4;
+        const h0 = tk.terrainHeight(this.pos.x, this.pos.z);
         terrGrade = THREE.MathUtils.clamp(
           (tk.terrainHeight(this.pos.x + this.vel.x * inv * LOOK,
-            this.pos.z + this.vel.z * inv * LOOK)
-            - tk.terrainHeight(this.pos.x, this.pos.z)) / LOOK, -1.2, 1.2);
+            this.pos.z + this.vel.z * inv * LOOK) - h0) / LOOK, -1.2, 1.2);
+        // …and far off-road, gravity prices the FACE, not the tread (r293):
+        // the ridged octaves hand every steep face a staircase, the 4 u look
+        // reads the flat tread between risers, and once GRADE went physical
+        // (9.8, sized for the spec engine) the car could WALK up a 100%+
+        // face at 3.4 u/s — drive on the treads, y-follow up the risers.
+        // A 14 u baseline reads through the ripples to the slope that is
+        // actually being climbed. Inside 60 u of the road nothing changes:
+        // the rejoin banks are moments, not faces (test-goat's own fence).
+        if (Math.abs(this.lateral ?? 0) > 60) {
+          const FAR = 14;
+          const faceGrade = (tk.terrainHeight(this.pos.x + this.vel.x * inv * FAR,
+            this.pos.z + this.vel.z * inv * FAR) - h0) / FAR;
+          terrGrade = Math.max(terrGrade, THREE.MathUtils.clamp(faceGrade, -1.2, 1.2));
+        }
       }
     }
     // See OFF_CLIMB. `_strayed` is published by the off-course rule further
