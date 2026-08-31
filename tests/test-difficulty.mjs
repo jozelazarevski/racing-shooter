@@ -103,7 +103,13 @@ const run = async (page, diff, skill) => page.evaluate(({ diff, skill }) => {
       let tn = t.headingAt((j + K2) % N) - t.headingAt(j);
       while (tn > Math.PI) tn -= 2 * Math.PI;
       while (tn < -Math.PI) tn += 2 * Math.PI;
-      const vm = Math.sqrt(15 * (24 / Math.max(0.06, Math.abs(tn)))) * (0.72 + 0.22 * skill);
+      // 0.84 + 0.10·skill, flattened from 0.72 + 0.22 (r291): "casual" is
+      // DEFINED by this law as 75% throttle — charging skill again at every
+      // apex, compounded by the horizon's minimum, made the casual 25%
+      // slower than the expert on hairpin worlds (623 on FURKA against a
+      // historic ~790) and the law measured the margin model, not the tier.
+      // The expert keeps 0.94 exactly.
+      const vm = Math.sqrt(15 * (24 / Math.max(0.06, Math.abs(tn)))) * (0.84 + 0.10 * skill);
       const vHere = kk === 0 ? vm : Math.sqrt(vm * vm + 2 * 12 * kk * su);
       if (vHere < vAllow) vAllow = vHere;
     }
