@@ -11180,6 +11180,7 @@ class Game {
         this.startScore = this.score; // credits are earned on top of any carried score
         this.hud.centerMsg('GO!');
         this.track.setLights('green');
+        this._lightsLive = true;
         const surf = this.track.T?.surface;
         if (surf === 'snow') this.hud.feed('SNOW ROAD — LOW GRIP, LONG SLIDES', 'info');
         else if (surf === 'wet') this.hud.feed('WET ROAD — SLICK UNDER BRAKING', 'info');
@@ -11191,6 +11192,12 @@ class Game {
 
     if (this.state !== 'paused' && this.state !== 'title') {
       if (this.state === 'race') this.raceTime += dt;
+      // the start gantry goes DARK once the race is running (r294: it held
+      // green through every lap crossing — a start state, not a race state)
+      if (this.state === 'race' && this._lightsLive && this.raceTime > 2.5) {
+        this.track.setLights('off');
+        this._lightsLive = false;
+      }
       // pit-crew recovery: leave the wall alone for 5s and the hull patches
       // itself back up to 60% — mistakes cost position, not the whole race
       const pl = this.player;

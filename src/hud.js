@@ -392,5 +392,15 @@ export class Hud {
     el.classList.remove('pop');
     void el.offsetWidth; // restart animation
     el.classList.add('pop');
+    // BELT AND BRACES (r294, "GO" still on screen at 0:42.5): the fade is a
+    // CSS animation, and a HIDDEN page freezes compositor animations — the
+    // pause/resume banner popped while iOS was mid-background-switch stayed
+    // at full opacity for the whole lap. A real setTimeout fires on return
+    // from background whatever the compositor did; it only clears the text
+    // it set, so a newer message is never stomped.
+    clearTimeout(this._centerClear);
+    this._centerClear = setTimeout(() => {
+      if (el.textContent === text) { el.classList.remove('pop'); el.textContent = ''; }
+    }, 2600);
   }
 }
