@@ -2280,15 +2280,7 @@ export class Car {
     // cliff walls) could only be held at 14 km/h, where the car had 30% of its
     // lock. A standing floor fixes hairpins everywhere without touching a single
     // track's geometry; the speed term still adds on top of it.
-    // ...but the floor STARTS AT THE WHEELS, not at zero (r288, "car is
-    // turning in place without any speed — that's not real"): a car yaws at
-    // v/wheelbase · tan(lock), so at a standstill it cannot yaw at all, and
-    // the standing floor let it pivot like a tank. The floor now ramps in
-    // over the first 2.5 u/s (~9 km/h) — at ROCKFALL's measured 14 km/h
-    // hairpin crawl it is already fully present, so the trap this floor was
-    // built against stays fixed, and a parked car stays parked.
-    const creep = THREE.MathUtils.clamp(sp / 2.5, 0, 1);
-    const rise = (0.45 + 0.55 * THREE.MathUtils.clamp(sp / 13, 0, 1)) * creep;
+    const rise = 0.45 + 0.55 * THREE.MathUtils.clamp(sp / 13, 0, 1);
     const taper = 1 - this.steerTaper * THREE.MathUtils.clamp((sp - this.maxSpeed * 0.6) / (this.maxSpeed * 0.55), 0, 1);
     let authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
     // A rally car CAN rotate a little in the air — inertia, and a stab of
@@ -2300,6 +2292,27 @@ export class Car {
     const dir = vf >= 0 ? 1 : -1;
     const stripSteer = this.stripLock ? this.stripLock.steerMul : 1;
     let dTheta = steer * this.steerRate * sense * camMul * authority * stripSteer * dir * dt;
+    // A CAR TURNS ON A CIRCLE, NOT ON ITS AXIS (r290, "I can rotate it 360
+    // on 11 kph almost at its axis"). The kinematic bound every real car
+    // obeys: yaw rate <= v / R_min — the wheels have to ROLL around the
+    // turning circle, so at 11 km/h the tightest legal spin is ~44 deg/s
+    // sweeping a 4 m circle, translating the whole way. The r288 creep ramp
+    // was a crude cut of this; the bound itself replaces it (at a standstill
+    // it is zero, so the parked-pivot fix is contained in it). Sliding
+    // relaxes it — a handbrake swing genuinely rotates a car faster than
+    // its wheels roll — scaling with slip up to ~2.5x. Above ~36 km/h the
+    // bound is looser than steerRate and changes nothing.
+    if (!this.airborne) {
+      // ...and the slide relaxation is EARNED WITH SPEED: full lock at a
+      // crawl builds slip too (the slip machine is generous), and an
+      // ungated 1.5x reopened the cap to 82 deg/s at 11 km/h — a 2.1 m
+      // circle, half a real car's tightest. A handbrake swing rotates a
+      // car because road speed carries yaw momentum; below ~22 km/h there
+      // is none to spend, so the relaxation fades in from 6 to 12 u/s.
+      const slideRelax = 1.5 * this.slip * THREE.MathUtils.clamp((sp - 6) / 6, 0, 1);
+      const yawCap = (sp / 4.0) * (1 + slideRelax) * dt;
+      dTheta = THREE.MathUtils.clamp(dTheta, -yawCap, yawCap);
+    }
     // DRIVING AID: a gentle nudge back toward the road's direction when the
     // player isn't actively steering. It never fights your input and never
     // steers for you — it just stops the car wandering, which is what makes
