@@ -213,6 +213,19 @@
      with a FUNCTION COLOUR on the ring and label so the pair a thumb needs
      mid-corner (BRAKE red, DRIFT cyan) reads without looking. Pressed
      state brightens the glass toward its own ring colour. */
+
+  /* PATCH_02 §3.9: SPEED LINES — thin streaks at the frame edges past 150
+     km/h, opacity driven per-frame from the camera update. Pure CSS motion,
+     zero canvas cost on phones. */
+  #speed-lines{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0;
+    transition:opacity .25s;
+    background:
+      repeating-linear-gradient(175deg, transparent 0 46px, rgba(255,255,255,.28) 46px 48px),
+      repeating-linear-gradient(185deg, transparent 0 52px, rgba(255,255,255,.22) 52px 54px);
+    -webkit-mask-image:radial-gradient(ellipse 60% 55% at 50% 45%, transparent 58%, #000 92%);
+    mask-image:radial-gradient(ellipse 60% 55% at 50% 45%, transparent 58%, #000 92%);
+    animation:speedrush .28s linear infinite}
+  @keyframes speedrush{from{background-position:0 0,0 0}to{background-position:0 96px,0 106px}}
   .tbtn{pointer-events:auto;position:absolute;border:2px solid rgba(255,255,255,.30);border-radius:50%;
     background:rgba(12,16,24,.55);color:#f2f6fa;font-family:'Luckiest Guy';
     display:flex;align-items:center;justify-content:center;
@@ -2013,9 +2026,10 @@
   <button id="cam-btn" class="icon-btn" title="Camera view">📷</button>
   <button id="pause-btn" class="icon-btn" title="Pause">⏸</button>
 </div>
+<div id="speed-lines"></div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r294</div>
+<div id="build-tag">r295</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2290,6 +2304,9 @@
     <div class="pm-group">
       <button id="pm-restart" class="btn secondary">RESTART</button>
       <button id="pm-exit" class="btn secondary">EXIT TO MENU</button>
+      <!-- RALLY_PATCH_02 fix 0: the telemetry dump, one tap from any race.
+           "The next check must be a log, not a recording." -->
+      <button id="pm-copylog" class="btn secondary">COPY RACE LOG 📋</button>
     </div>
   </div>
 </div>
@@ -2342,10 +2359,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r294"></script>
+<script type="module" src="./src/main.js?v=r295"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r294"></script>
+<script src="./src/offline.js?v=r295"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r294"></script>
+<script type="module" src="./src/traffic.js?v=r295"></script>
 </body>
 </html>

@@ -16,7 +16,7 @@
  * CACHE is bumped by the release version. Bump it whenever ?v= in index.html
  * is bumped, or phones will keep serving the previous build forever.
  */
-const CACHE = 'ignite-rally-r294';
+const CACHE = 'ignite-rally-r295';
 
 // ---- CORE vs EXTRA ---------------------------------------------------------
 // CORE is everything the game needs to RUN with the radio off: the shell, the
@@ -35,6 +35,7 @@ const CORE = [
   './src/offline.js',
   './src/driving.js',
   './driving.json',
+  './src/telemetry.js',
   './src/traffic.js',
   './src/main.js',
   './src/audio.js',

@@ -16,5 +16,34 @@
   "yawRMin": 4.0,
   "yawCapLo": 1.45,
   "yawCapHi": 1.15,
-  "reverseAccel": 5.0
+  "reverseAccel": 5.0,
+  "patch02": {
+    "gridLaunchInvulnS": 1.5,
+    "rivalTargetDelayS": 4.0,
+    "contactDamageK": 0.9,
+    "contactDamageThresholdMs": 5.0,
+    "contactGlanceSquare": 0.34,
+    "contactDamageCapPerHit": 45,
+    "contactDamageCapPerSec": 60,
+    "rivalRamCapPerHit": 8,
+    "playerTargetTokensEarly": 1,
+    "playerTargetTokensLate": 2,
+    "playerTargetEarlyUntilS": 20,
+    "targetTokenRotateS": 6,
+    "rubberbandMaxPct": 8,
+    "offmeshAutoReturnS": 2.0,
+    "landingAssistMs": 300,
+    "landingYawClampDps": 60,
+    "wallEscapeMaxKmh": 30,
+    "wallEscapeMinAngleDeg": 45,
+    "nitroPickupsPerLap": 2,
+    "nitroBonusKmh": 40,
+    "camHeightMaxMul": 1.35,
+    "camEaseMs": 400,
+    "speedLinesFromKmh": 150
+  },
+  "patch02b": {
+    "propShoveRadiusU": 1.15,
+    "camClearanceM": 2.2
+  }
 }

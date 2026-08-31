@@ -2098,7 +2098,13 @@ export class Car {
       if (on && !this._draftOn) this.game.style?.(25, 'SLIPSTREAM');
       this._draftOn = on;
     }
-    const topSpeed = this.maxSpeed * (boosting ? 1.4 : 1) * offMult * (this._draftOn ? 1.12 : 1);
+    // PATCH_02 §3.7: nitro adds at most +40 km/h (11.1 u/s) over the top
+    // speed — the old 1.4x handed +80 on a fast car and made the drivetrain
+    // irrelevant for half a lap.
+    const nitroCapMul = boosting
+      ? Math.min(1.4, (this.maxSpeed + ((window.__DRIVING?.patch02?.nitroBonusKmh ?? 40) / 3.6)) / this.maxSpeed)
+      : 1;
+    const topSpeed = this.maxSpeed * nitroCapMul * offMult * (this._draftOn ? 1.12 : 1);
 
     // ---- longitudinal ----
     if (inputs.hold) {
@@ -2471,6 +2477,34 @@ export class Car {
       // (~65°) it stops helping: the player crossed the line; the game lets
       // them spin. This is what makes "recoverable from a full 90° slide
       // with counter-steer within 0.6 s" hold for thumbs on a phone.
+      // PATCH_02 §3.5: LANDING ASSIST — for 300 ms after touchdown the car
+      // keeps its feet: yaw rate clamped to ~60 deg/s and the airborne
+      // sideways velocity blended out hard (80% per 100 ms), so a jump
+      // landed with the nose 45 deg off does not skate into the wall on a
+      // camera that rotates with the car.
+      if ((this._landT ?? 0) > 0) {
+        this._landT -= dt;
+        if (inputs.drift) this._landT = 0;   // P2.7b: handbrake keeps the slide
+        else {
+          dTheta = THREE.MathUtils.clamp(dTheta, -1.05 * dt, 1.05 * dt);
+          vl *= Math.pow(0.2, dt / 0.1);
+        }
+      }
+      // PATCH_02 §3.6: WALL ESCAPE — nose planted on a wall under 30 km/h
+      // with the road behind you was three seconds of grinding. While the
+      // player is asking (steer or reverse), the car gets real yaw authority
+      // toward the road tangent; escape completes inside 1.5 s.
+      if (this === this.game.player && sp < 8.4 && (this._wallTouchT ?? 0) > 0
+          && (Math.abs(steer) > 0.3 || inputs.brake > 0.5)) {
+        const roadH = this.game.track?.headingAt?.(this.trackIndex);
+        if (roadH !== undefined) {
+          let dh6 = roadH - this.heading;
+          while (dh6 > Math.PI) dh6 -= 2 * Math.PI;
+          while (dh6 < -Math.PI) dh6 += 2 * Math.PI;
+          if (Math.abs(dh6) > 0.79) dTheta += Math.sign(dh6) * 2.2 * dt;
+        }
+      }
+      if ((this._wallTouchT ?? 0) > 0) this._wallTouchT -= dt;
       const beta = Math.atan2(Math.abs(vl), Math.max(0.5, Math.abs(vf)));
       if (this.slip > DRIVING.csAssistSlipMin && beta < DRIVING.spinSlipAngle && !inputs.drift) {
         // sign: +dTheta with steer + leaves velocity on the vl<0 side (this
@@ -2985,7 +3019,8 @@ export class Car {
         // the thing that reads as unfair — it should cost you paint and speed,
         // then go tumbling. Anything 1.15 u and up is a real boulder and still
         // wins, and below walking pace nothing shifts at all.
-        if (ob.mat === 'stone' && !ob.knocked && (ob.r ?? 9) < 1.15
+        if (ob.mat === 'stone' && !ob.knocked
+            && (ob.r ?? 9) < (window.__DRIVING?.patch02b?.propShoveRadiusU ?? 1.15)
             && Math.abs(this.speedAlong) > 8 && gm.knockStone) {
           gm.knockStone(ob, this, Math.abs(this.speedAlong), -nx, -nz, square);
           continue;                       // no push-out — you go through it
@@ -3027,7 +3062,8 @@ export class Car {
         // wins, and below walking pace nothing shifts at all.
         const vn = this.vel.x * nx + this.vel.z * nz;
         const square = THREE.MathUtils.clamp(-vn / Math.max(3, Math.hypot(this.vel.x, this.vel.z)), 0, 1);
-        if (ob.mat === 'stone' && !ob.knocked && (ob.r ?? 9) < 1.15
+        if (ob.mat === 'stone' && !ob.knocked
+            && (ob.r ?? 9) < (window.__DRIVING?.patch02b?.propShoveRadiusU ?? 1.15)
             && Math.abs(this.speedAlong) > 8 && gm.knockStone) {
           gm.knockStone(ob, this, Math.abs(this.speedAlong), -nx, -nz, square);
           continue;                       // no push-out — you go through it
@@ -3050,7 +3086,11 @@ export class Car {
         const rr = st.r + 1.6;
         if (dx * dx + dz * dz >= rr * rr) continue;
         if (Math.abs(this.pos.y - (st.y ?? 0)) > 4) continue;
-        if (Math.abs(this.speedAlong) > 6) gm.onTireSmash?.(st, this);
+        // planar speed, not along-track speed (the tree path's lesson): a
+        // stack sits at the ROADSIDE, so the car that hits one is usually
+        // moving ACROSS the track — speedAlong read ~0 there and the stack
+        // stood like a bollard at any angle but dead ahead
+        if (Math.hypot(this.vel.x, this.vel.z) > 6) gm.onTireSmash?.(st, this);
         else {
           const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
           this.pos.x = st.x + (dx / d) * rr;
@@ -3156,11 +3196,17 @@ export class Car {
           this.pos.z = tr.z + nz * rr;
           const vn = this.vel.x * nx + this.vel.z * nz;
           if (vn < 0) {
+            // PATCH_02 v1.2 (fix 2 re-open): trees are PROPS and MUST route
+            // through the same angle-of-attack rule as stone — recording B
+            // paid 33 hull for a 145 km/h brush past a trunk. Compute the
+            // share of speed into the trunk BEFORE the bounce edits vel.
+            const square = THREE.MathUtils.clamp(
+              -vn / Math.max(3, Math.hypot(this.vel.x, this.vel.z)), 0, 1);
             this.vel.x -= nx * vn * 1.05;
             this.vel.z -= nz * vn * 1.05;
             if (!yields && this.wallGrind <= 0) {
-              this.wallGrind = 0.18;
-              gm.onTreeCrash?.(tr, this, Math.abs(vn), nx, nz);
+              this.wallGrind = square < 0.55 ? 0.55 : 0.18;
+              gm.onTreeCrash?.(tr, this, Math.abs(vn), nx, nz, square);
             }
           }
         }
@@ -3547,6 +3593,7 @@ export class Car {
       if (ch && this.y < ch.deckY - 3) this.intoChasm(ch.exit);
     }
     if (this._steepFed > 0) this._steepFed = Math.max(0, this._steepFed - dt);
+    if ((this._noPickupT ?? 0) > 0) this._noPickupT -= dt;
     if (this.airborne) {
       this.vy -= 26 * dt;
       this.y += this.vy * dt;
@@ -3558,6 +3605,8 @@ export class Car {
         this._impactVy = this.vy;   // captured for onLand - the price of the drop
         this.vy = 0;
         this.airborne = false;
+        this._landT = 0.30;   // PATCH_02 §3.5: 300 ms of touchdown discipline
+        if (this === this.game.player) this.game.telemetry?.log('airborne', { enter: false, vertSpeed: +this._impactVy.toFixed(1) });
         this._lastGY = gY;
         // CLEAR THE CLIMB RATE. Landing used to leave it holding the launch
         // value (~11); the next grounded frame then measured its acceleration
@@ -3956,6 +4005,7 @@ export class Car {
 
   onWallHit(normal, impact) {
     const g = this.game;
+    this._wallTouchT = 0.3;   // PATCH_02 §3.6: the escape torque's licence
     if (impact > 3) {
       g.particles.sparks(this.pos, normal, Math.min(20, 4 + impact));
       if (this === g.player) g.audio.scrape();
@@ -3977,12 +4027,21 @@ export class Car {
     }
   }
 
-  damage(amount, attacker = null) {
+  damage(amount, attacker = null, raw = false) {
     if (!this.alive || this.invuln > 0) return false;
     // survivability: the player's hull takes reduced damage below HARD —
     // crashes still cost (feeds/parts/drama fire off the same events), but
-    // a couple of mistakes shouldn't end the race
-    if (this === this.game.player) {
+    // a couple of mistakes shouldn't end the race.
+    //
+    // `raw` (PATCH_02 §3.2): world-contact damage arrives PRE-BUDGETED — the
+    // linear law, the glance forgiveness, the 45/hit and 60/s caps ARE the
+    // survivability design for scenery, and the patch's worked figures
+    // (20 hull for a 100 km/h head-on, 45 cap, hard) are what the player
+    // must actually see. Scaling them again — by difficulty OR by the car's
+    // plating (measured 1.02 on the stock ride, which pushed the 45 cap to
+    // 45.9) — made every acceptance number a fiction. Combat damage keeps
+    // both multipliers; scenery is the same rock for everyone.
+    if (this === this.game.player && !raw) {
       const id = this.game.difficulty?.id;
       amount *= id === 'easy' ? 0.45 : id === 'hard' ? 0.85 : 0.62;
       amount *= this.plating ?? 1; // hull plating is a car property
@@ -4095,7 +4154,10 @@ export class Car {
     for (let k = 0; k < LAP_GATES.length; k++) {
       const a = LAP_GATES[k];
       if (f < a || f > a + 0.14) continue;
-      if (k === 0 || (this._cpMask & (1 << (k - 1)))) this._cpMask |= 1 << k;
+      if (k === 0 || (this._cpMask & (1 << (k - 1)))) {
+        this._cpMask |= 1 << k;
+        if (k === 0) this._everCP1 = true;   // PATCH_02 §3.8: arms the line
+      }
     }
     if (this.trackIndex > n * 0.4 && this.trackIndex < n * 0.6) this._midCP = true;
     if (prevIndex > n * 0.85 && this.trackIndex < n * 0.15) {
@@ -4105,7 +4167,13 @@ export class Car {
       // the driver is told WHY the lap did not count instead of watching the
       // counter silently refuse to move.
       if (this._midCP === false || (this._cpMask & ALL) !== ALL) {
-        this._missedCP = true;
+        // PATCH_02 §3.8: the grid sits BEHIND the line, so the first crossing
+        // 3 s after GO always evaluated as a cut lap and shouted CHECKPOINT
+        // MISSED at a player who missed nothing. The line is inert until
+        // checkpoint 1 has been passed at least once.
+        if (this._everCP1) this._missedCP = true;
+        if (this === this.game.player) this.game.telemetry?.log('lapTrigger',
+          { checkpointsPassed: [0,1,2,3].filter(k => this._cpMask & (1 << k)).length, counted: false });
         this._cpMask = 0;
         this._midCP = false;
         return false;
@@ -4467,7 +4535,10 @@ export class EnemyCar extends Car {
     // trailing rivals +37% toward the player — and a casual leader was
     // re-passed forever by a field rubber-banding onto their tail. The cap
     // keeps rubberBand; the chase reads bandUp where a tier provides it.
-    if (gap > 0.02) band = 1 + 0.30 * (D.bandUp ?? D.rubberBand) * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1);
+    // PATCH_02 §3.3: the catch-up bonus is capped at +8% — the pack locked
+    // four-wide on the recording's player for eight seconds because the band
+    // could hand trailing rivals up to +21%.
+    if (gap > 0.02) band = Math.min(1.08, 1 + 0.30 * (D.bandUp ?? D.rubberBand) * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1));
     else if (gap < -0.06) band = 1 - 0.12 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1);
     // pace parity vs the garage: a maxed ENGINE (+20% player top speed) turned
     // NORMAL into a parade. Rivals bring +2% per player engine level (cap
@@ -4510,7 +4581,7 @@ export class EnemyCar extends Car {
     // it on rubberBand kept EASY's +35% catch-up cornering alive after the
     // maxSpeed band was decoupled, and the casual leader was still re-passed.
     this._cornerBand = gap > 0.02
-      ? 1 + 0.28 * (D.bandUp ?? D.rubberBand) * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1)
+      ? Math.min(1.08, 1 + 0.28 * (D.bandUp ?? D.rubberBand) * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1))
       : gap < -0.06
         ? 1 - 0.14 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1)
         : 1;
@@ -4928,7 +4999,7 @@ export class EnemyCar extends Car {
     // take shots at the player when lined up (rate scales with aggression + difficulty)
     const toPlayer = g.player.pos.clone().sub(this.pos);
     const dist = toPlayer.length();
-    if (g.player.alive && dist < 70 && this.fireCooldown <= 0) {
+    if (g.player.alive && dist < 70 && this.fireCooldown <= 0 && g.aiCanTarget?.(this)) {
       const angle = Math.abs(Math.atan2(toPlayer.x, toPlayer.z) - this.heading);
       const norm = Math.min(angle, Math.PI * 2 - angle);
       if (norm < 0.32) {
@@ -4946,6 +5017,7 @@ export class EnemyCar extends Car {
     this.mineCooldown -= dt;
     if (this.mineCooldown <= 0 && g.player.alive) {
       if (alongP < -6 && alongP > -18 && Math.abs(acrossP) < 3.5
+          && g.aiCanTarget?.(this)
           && Math.random() < dt * 1.5 * this.aggression * D.aiAggression) {
         this.mineCooldown = 6 + Math.random() * 4;
         g.weapons.dropMine(this);
@@ -5022,7 +5094,7 @@ export class EnemyCar extends Car {
       if (oldCarrier && oldWindow) fp.oldShot = (fp.oldShot ?? 0) + 1;
       if (mRangeOk && mConeOk) fp.newShot = (fp.newShot ?? 0) + 1;
     }
-    if (mCdOk && mDiffOk && mPackOk && mRangeOk && mConeOk) {
+    if (mCdOk && mDiffOk && mPackOk && mRangeOk && mConeOk && g.aiCanTarget?.(this)) {
       // front-runners reload faster; everyone can pull the trigger. Kept short
       // (the pack budget is the real rate limit) so a long reload can't swallow
       // the one window a chaser gets.
@@ -5329,6 +5401,30 @@ export class PlayerCar extends Car {
       const lost = this.y < groundY - 6
         || !Number.isFinite(this.pos.x) || !Number.isFinite(this.y);
       this._lostT = lost ? (this._lostT ?? 0) + dt : 0;
+      // PATCH_02 §3.4: ON TOP OF THE CANYON IS OFF THE COURSE. The stray rule
+      // measures XZ only, so a car thrown onto the rim DIRECTLY ABOVE the lap
+      // read as on-course and cruised the cliff tops at 199 for six seconds.
+      // Grounded, 12 u above the tracked road, with NO road at our own height
+      // within reach (stacked decks and overpasses are legal), for 2 s -> the
+      // same free auto-return the lost net uses. Race only: in roam the high
+      // ground is the destination (goat peaks), never a fault.
+      let cliffTop = false;
+      if (!g.freeRoam && !this.airborne && this === g.player) {
+        const t4 = g.track, N4 = t4.center.length;
+        const ci4 = t4.center[this.trackIndex];
+        if (ci4 && this.y - ci4.y > 12
+            && Math.hypot(this.pos.x - ci4.x, this.pos.z - ci4.z) < 70) {
+          cliffTop = true;
+          for (let q = -90; q <= 90; q += 3) {
+            const cq = t4.center[(this.trackIndex + q + N4) % N4];
+            if (Math.hypot(cq.x - this.pos.x, cq.z - this.pos.z) < 30
+                && Math.abs(cq.y - this.y) < 6) { cliffTop = false; break; }
+          }
+        }
+      }
+      if (cliffTop && !(this._cliffT > 0)) g.telemetry?.log('offmesh', { enter: true, speed: Math.round(Math.hypot(this.vel.x, this.vel.z)) });
+      else if (!cliffTop && (this._cliffT ?? 0) > 0) g.telemetry?.log('offmesh', { enter: false });
+      this._cliffT = cliffTop ? (this._cliffT ?? 0) + dt : 0;
       // WEDGED IS NOT WANDERING. The net above deliberately lets a player
       // drive anywhere — but a car photographed parked on a gorge face at
       // 0 km/h with the throttle held ("I still see this") is not exploring,
@@ -5449,8 +5545,9 @@ export class PlayerCar extends Car {
         g.hud.feed((this.sos ?? 0) <= 0 ? 'NO RECOVERY CHARGES LEFT'
           : `UNSTUCK RECHARGING — ${Math.ceil(this.unstuckCool)}s`, 'bad');
       }
-      if (this._lostT > 2.5 || this._wedgeT > 5 || spend) {
+      if (this._lostT > 2.5 || (this._cliffT ?? 0) > 2 || this._wedgeT > 5 || spend) {
         this._lostT = 0;
+        this._cliffT = 0;
         this._wedgeT = 0;
         this._bogT = 0;      // a rescue is a successful trial: the clock resets
         if (spend) {
@@ -5476,6 +5573,12 @@ export class PlayerCar extends Car {
         const N = g.track.N;
         this.placeAt((this.trackIndex + this._rescueAhead) % N, 0, true);
         this.invuln = Math.max(this.invuln, 1.5);
+        // PATCH_02 §3.7: a rescue must not hand out nitro — the respawn point
+        // kept landing ON a pickup and the recording shows 0-188 in 2 s off
+        // an Unstuck. Pickups are deaf to this car for a moment.
+        this._noPickupT = 1.5;
+        g.telemetry?.log('unstuck', { reason: spend ? 'player' : 'auto',
+          remaining: this.sos ?? 0 });
         g.hud.feed(spend
           ? `UNSTUCK — back on the road (${this.sos} left)`
           : 'RECOVERED', 'info');

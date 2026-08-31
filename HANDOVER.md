@@ -4161,6 +4161,114 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r295 — RALLY_PATCH_02 v1.1: THE RACE FIXED AROUND THE CAR
+The user handed a second normative patch (RALLY_PATCH_02.md, v1.1
+superseding v1.0 in full), nine race-loop fixes derived frame-by-frame
+from a 136 s Canyon Run recording — the car's physics was signed off in
+r293/r294; this round is everything AROUND it. All nine landed, plus the
+patch's fix 0, which it calls the gate for the rest:
+  - TELEMETRY (src/telemetry.js): a 4000-event ring buffer stamped with
+    race time and lap — damage, offmesh, airborne, nitro, unstuck,
+    rivalTarget, lapTrigger, startLights. `window.__rally.dump()` gives
+    JSONL; the pause menu grew COPY RACE LOG (labels itself with the
+    outcome — a denied clipboard is not a silent nothing). "The video
+    analysis cost more than the fixes will; the next check must be a
+    log, not a recording."
+  - CONTACT DAMAGE IS A LAW NOW, and it is `raw`: linear in closing
+    speed (K 0.9 over a 5 m/s threshold), 45/hit and 60/s caps, glancing
+    contact under square 0.34 free. The worked figures — 20 hull for a
+    100 km/h head-on, the cap only at 200 — are what the player must
+    actually SEE, so the world-contact path skips damage()'s difficulty
+    scale AND the car's plating (measured: plating 1.02 pushed the 45
+    cap to 45.9; scaled, normal saw 13 where the patch says 20). Combat
+    damage keeps both multipliers; scenery is the same rock for
+    everyone. NOTE the patch's own glance-angle line has its geometry
+    inverted (it would zero head-ons and contradict its P2.3) — the
+    acceptance tests are the authority, hence square < sin(20°) ≈ 0.34.
+  - The grid is safe (all cars invulnerable to GO+1.5), the aggro
+    ticket office rotates (1 token to 20 s then 2, 6 s non-renewing
+    leases, nobody targets the player before 4 s), rival rams cap at 8,
+    band chase caps at 1.08 both in speed and corner bands, nitro is
+    rationed (2 pickups/lap, over-ration pays 100 pts, +40 km/h bonus
+    cap) and a rescue is deaf to pickups for 1.5 s — the recording shows
+    0-188 in 2 s off an Unstuck.
+  - The canyon rim is OFF the course: grounded 12 u above the tracked
+    road with no road at your own height for 2 s = the same free
+    auto-return as the lost net. Landing assist (300 ms yaw clamp)
+    yields to a held handbrake — a jump landed mid-drift keeps its
+    slide. Wall escape torques the nose toward the tangent below
+    30 km/h past 45°. The first lap-line crossing is inert and silent.
+  - Camera: speed zoom eased over 400 ms (was instant), speed lines
+    from 150 km/h (CSS overlay, no GL cost), gantry dark 2.5 s in.
+All §7 constants live in DRIVING.patch02 (src/driving.js), mirrored in
+the shipped driving.json — loadDrivingOverrides grew a nested merge so
+one overridden key no longer wipes the block. tests/test-patch02.mjs
+holds ten gates (P2.0-P2.10 as they map to this engine; P2.5/7/9/11
+need the recorded-input rig, filed with the suite-redesign task).
+TRAPS for the next rig-writer, both paid for here: the rescue nets live
+in update() AFTER step(), and step() re-glues a grounded car to the
+ground IT resolves — stage a rim perch and step collapses it before the
+net ever runs (stub step; the net is the thing under test). And P2.8's
+escape hands off at wallEscapeMinAngleDeg 45° BY DESIGN — gate the
+hand-off, not zero.
+
+MID-ROUND the user posted v1.2 (supersedes 1.1): a second recording,
+r294 Glacier Col, three hulls lost in 157 s with ZERO rival contact —
+every point of damage from rocks, trees and props. Landed on top of the
+v1.1 work:
+  - Fix 2 RE-OPENED and closed: trees had NO angle term at all —
+    onTreeCrash took no square, so a 145 km/h brush past a trunk paid
+    like a head-on (recording B: −33, −35). The call site now computes
+    the share of speed into the trunk BEFORE the bounce edits vel, and
+    the tree pays the SAME linear law as stone (glance under 0.34 free,
+    K 0.9 over the 5 m/s threshold, the 45 cap). One law, every static
+    thing.
+  - Fix 10 (prop tiers): a knockable stone (r < 1.15 u — this engine's
+    mass class is radius) SHOVES free: zero hull, speed scrub is the
+    price, the feed reads as the award it is (SMASHED! +20, was "ROCK
+    SHUNTED −N HULL" in 'bad' red). Saplings likewise dropped their
+    4-hull sting. Boulders 1.15 u+ stay static and pay the law.
+  - Fixes 11/12/13 investigated and found ALREADY HELD on this branch —
+    probed on Glacier Col: every car spawns on the spline at heading
+    offset 0° (lat 3.6 u), lap starts at 1, rank orders by continuous
+    progress (_wraps + index/N), 7 rivals alive on mesh at GO+10, and
+    the camera has carried a 7-step sightline probe + never-underground
+    clamp since the r270s (recording B's "VIEW RESET (buried)" is the
+    CAR under terrain — the watchdog working, not the camera failing).
+    The acceptance tests now PIN all of it: P2.12-P2.17 in
+    tests/test-patch02.mjs, parameterized by LVL (run 4 and 66 — the
+    v1.2 ship gate wants both stages). 16/16 on each.
+  - patch02b block (driving.js + driving.json) carries only the keys
+    the engine READS — camClearanceM 2.2 (wired into the camera floor;
+    stricter than the spec's 1.5, kept) and propShoveRadiusU 1.15
+    (wired into both knockStone gates). spawnBehindLineM isn't wired
+    (the grid already seats on the spline); stuckDetectS /
+    lowSpeedTorqueMul belong to fix 14, NEXT build per the rollout,
+    with P2.18/P2.19.
+DEFERRED from v1.2: fix 14 (2.5 s stuck detect + low-speed torque —
+note it will collide with test-wedge-recovery's "five-second mark"
+gate, renegotiate both together) and the whole RALLY_HUD_REVIEW.md
+rebuild (task #27) — Section 4 of that doc is normative for the next
+HUD build: band layout, hull presentation, three toast lanes, H1-H8.
+
+THE BATTERY'S TAIL taught its own lesson: test-rules had sat at 7/12
+and test-nature at 7 reds, and every one reproduced IDENTICALLY on the
+pristine r294 base — nothing this round's. Of the rules five, three
+were expectations the patch has since outlawed (">=28 hull after
+difficulty scale" is exactly what §3.2 forbids; a grind ALONG a wall
+now costs 0 BY LAW) — rewritten to the law. Two were broken probes: the
+shortcut check staged only _midCP against a lap gate that grew ordered
+_cpMask quarters and _everCP1 years of revisions ago, and the tire
+check aimed a fixed heading down a cambered verge (missed by 3.8 u
+against a 2.7 u trigger) from a 10 u run-up that headless real-time
+cannot cover. One REAL game bug fell out of that autopsy: the stack's
+burst gate read `speedAlong` — along-TRACK speed — so a car leaving
+the road square into a roadside stack read ~0 and the stack stood like
+a bollard at any angle but dead ahead. Planar speed now, the tree
+path's own lesson. test-rules is 12/12 — first full green in memory.
+test-nature's buried trees/solids (PINE 15+8, FLUME 9+1, FURKA 11+9,
+worst −6.2 u) are pre-existing seating debt, filed as task #28.
+
 ## r294 — LIVE-PLAY ROUND ON THE SPEC CAR: FIVE REPORTS, FIVE CLOSES
   - "Impossible to steer in this curve at this speed" (IL BUDELLO, 99):
     mid-range yaw cap 1.25 -> 1.45. Flat-out still runs wide — the drift

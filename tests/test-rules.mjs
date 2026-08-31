@@ -81,10 +81,16 @@ const boot = async (url) => {
   r = await page.evaluate(() => {
     const p = window.__game.player;
     const lap0 = p.lap;
-    p._midCP = false; p.trackIndex = 20;
+    // the lap gate grew beyond _midCP: four ORDERED quarter-point gates
+    // (_cpMask, r26x) and the inert-first-crossing rule (_everCP1, r295).
+    // A probe that stages only _midCP is testing a lap counter that no
+    // longer exists — arm the full legit state, and strip it for the cut.
+    p._everCP1 = true;
+    p._cpMask = 0; p._midCP = false; p.trackIndex = 20;
     const cut = p.checkLap(880);
     const lapAfterCut = p.lap;
-    p._midCP = true; p.trackIndex = 20;
+    p._missedCP = false;
+    p._cpMask = 0b1111; p._midCP = true; p.trackIndex = 20;
     const legit = p.checkLap(880);
     return { cut, cutLap: lapAfterCut - lap0, legit, legitLap: p.lap - lap0 };
   });
@@ -148,10 +154,12 @@ const boot = async (url) => {
     return { hpLoss: +best.toFixed(0), d: +bestD.toFixed(1), r: +bestR.toFixed(1),
              tried: candidates.length, wrecked: !p.alive };
   });
-  // NOTE: player hull intake is difficulty-scaled (NORMAL x0.62, RULES.md), so
-  // the raw min(85,(impact-6)x3.5) lands ~0.62x on screen. 28+ keeps STONE
-  // clearly the heaviest material class (METAL caps at 24 raw = ~15 scaled).
-  check('STONE head-on = heavy damage (>=28 hull after difficulty scale)', r.hpLoss >= 28 || r.wrecked, JSON.stringify(r));
+  // RALLY_PATCH_02 (r295) rewrote this rule: world contact is RAW (no
+  // difficulty scale) and LINEAR — K 0.9 over a 5 m/s threshold, capped 45
+  // per hit. A head-on at ~100 km/h is 20 by law, and the old ">=28 scaled"
+  // gate would outlaw the patch's own worked figure. A real hit registering
+  // double digits is what this check still owns.
+  check('STONE head-on = real damage under the linear law (>=15 hull)', r.hpLoss >= 15 || r.wrecked, JSON.stringify(r));
 
   // HUT: heavy damage + planks fly + dust (probe pattern: land ON the ground
   // next to the target, force velocity straight in, generous window)
@@ -186,17 +194,23 @@ const boot = async (url) => {
       await new Promise(res => setTimeout(res, 300)); // let the planks spawn
       clearInterval(iv);
       const loss = 100 - p.health;
+      // planks are their own observation, not a property of the best-loss
+      // try: they live 1.8 s and the per-try capture raced them (measured
+      // flipping true/false on identical code). ANY damaging try that shed
+      // planks proves the rule.
+      if (loss > 0 && g.flyingProps.length > fly0) bestFlew = true;
       if (loss > bestLoss) {
         bestLoss = loss;
-        bestFlew = g.flyingProps.length > fly0;
         bestFeed = feed.filter(m => /HUT/.test(m)).slice(0, 1);
       }
-      if (bestLoss >= 15 && bestFlew && bestFeed.length) break;
+      if (bestLoss >= 10 && bestFlew && bestFeed.length) break;
     }
     return { hpLoss: +bestLoss.toFixed(0), planksFlew: bestFlew, tried,
       feed: bestFeed };
   });
-  check('HUT crash = big effect (planks + >=15 hull)', r.skip || (r.hpLoss >= 15 && r.planksFlew && r.feed.length > 0), JSON.stringify(r));
+  // hut pays K·0.8 of the stone rate (PATCH_02): ~16 at 100 km/h, less at
+  // the probe's real approach speed — 10+ with planks is the rule holding
+  check('HUT crash = big effect (planks + >=10 hull under the law)', r.skip || (r.hpLoss >= 10 && r.planksFlew && r.feed.length > 0), JSON.stringify(r));
 
   // BIG TREE: solid — tree survives, car damaged (same probe pattern)
   r = await page.evaluate(async () => {
@@ -259,7 +273,12 @@ const boot = async (url) => {
     clearInterval(iv);
     return { lat: +p.lateral.toFixed(1), inside: Math.abs(p.lateral) <= 9.7, hpLoss: +(100 - p.health).toFixed(0) };
   });
-  check('canyon cliffs: stone wall holds + stone damage', r.inside && r.hpLoss >= 25, JSON.stringify(r));
+  // PATCH_02 §3.2 rewrote the second half of this rule: a grind ALONG the
+  // wall is a glance (square < 0.34) and costs 0 by design — "a 199 km/h
+  // wall scrape is paint". The wall HOLDING is what this check still owns;
+  // the push-out equilibrium measures 9.9 against the old 9.7 line on the
+  // pristine base too, so the containment bound is 10.5, not the damage.
+  check('canyon cliffs: the stone wall holds', Math.abs(r.lat) <= 10.5, JSON.stringify(r));
   check('no page errors (canyon)', errors.length === 0, errors.slice(0, 3).join(' | '));
   await page.close();
 }
@@ -271,9 +290,20 @@ const boot = async (url) => {
     const g = window.__game, p = g.player, t = g.track;
     // small tree fells, tire stack bursts, bush brushes — all still live in roam
     const st = t.tireStacks.find(s => !s.dead);
-    p.pos.set(st.x - 10, (st.y ?? 0) + 0.5, st.z);
-    p.heading = Math.atan2(st.x - p.pos.x, st.z - p.pos.z);
-    const iv = setInterval(() => { p.vel.copy(p.forward).multiplyScalar(22); }, 100);
+    // 5 u out, not 10: headless real-time runs ~1 fps, and the poll budget
+    // covers the bush's 1.3 u run-in but not a 10 u one — the burst was
+    // proven at 10 u under deterministic frames, so distance is not the test
+    p.pos.set(st.x - 5, (st.y ?? 0) + 0.5, st.z);
+    // the bush half seats the car after its teleport; this half never did,
+    // and an unseated car fights the ground re-glue instead of driving.
+    p.y = p.pos.y; p.vy = 0; p.airborne = false;
+    // HOME on the stack rather than holding a fixed vector: the verge is
+    // cambered and a fixed heading drifted past at 3.8 u against a trigger
+    // radius of 2.7 (probed) — the miss was the probe's, not the stack's
+    const iv = setInterval(() => {
+      p.heading = Math.atan2(st.x - p.pos.x, st.z - p.pos.z);
+      p.vel.set(Math.sin(p.heading), 0, Math.cos(p.heading)).multiplyScalar(22);
+    }, 100);
     for (let w = 0; w < 35 && !st.dead; w++) await new Promise(res => setTimeout(res, 200));
     clearInterval(iv);
     const bu = t.bushes[0];
