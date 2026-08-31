@@ -1948,6 +1948,33 @@ export class Car {
     // counterpart of `slopeAt`, which only knows about the road. Computed once
     // and used twice below — by the grade force and by the climb authority.
     let terrGrade = 0;
+    // THE WILDS FLAG (r293): three laws — the face-grade baseline, the
+    // ripple-proof MAX_GRADE and the steep-terrain wall — used to gate on
+    // |lateral| > 60, the TRACKED projection, which UNDER-reads true
+    // remoteness near switchback stacks (a car past a segment's end
+    // projects to almost nothing — the same lesson the stray rule and
+    // test-climb's scan both learned). Cheap two-step, per the stray
+    // rule's own pattern: distance to the tracked SAMPLE is an upper
+    // bound on nearest-road distance, so ≤ 60 skips the sweep (verges
+    // never pay); only genuine wilds run the global confirm.
+    this._wilds = false;
+    if (offRoad && !this.airborne) {
+      const tk0 = this.game.track;
+      if (Math.abs(this.lateral ?? 0) > 60) this._wilds = true;
+      else if (tk0?.center) {
+        const ci0 = tk0.center[this.trackIndex];
+        if (ci0 && Math.hypot(this.pos.x - ci0.x, this.pos.z - ci0.z) > 60) {
+          let bd = 1e9;
+          for (let q = 0; q < tk0.center.length; q += 3) {
+            const cq = tk0.center[q];
+            const dq = (cq.x - this.pos.x) * (cq.x - this.pos.x)
+              + (cq.z - this.pos.z) * (cq.z - this.pos.z);
+            if (dq < bd) bd = dq;
+          }
+          this._wilds = bd > 3600;
+        }
+      }
+    }
     if (offRoad && !this.airborne) {
       const tk = this.game.track;
       const v2h = this.vel.x * this.vel.x + this.vel.z * this.vel.z;
@@ -1965,7 +1992,7 @@ export class Car {
         // A 14 u baseline reads through the ripples to the slope that is
         // actually being climbed. Inside 60 u of the road nothing changes:
         // the rejoin banks are moments, not faces (test-goat's own fence).
-        if (Math.abs(this.lateral ?? 0) > 60) {
+        if (this._wilds) {
           const FAR = 14;
           const faceGrade = (tk.terrainHeight(this.pos.x + this.vel.x * inv * FAR,
             this.pos.z + this.vel.z * inv * FAR) - h0) / FAR;
@@ -3440,7 +3467,7 @@ export class Car {
       // ripple says. Near the road (|lateral| ≤ 60) nothing changes: a
       // rejoin bank is crossed on momentum through a moment of scrub, and
       // test-goat's rejoin law pins that at 35% speed kept.
-      if (Math.abs(this.lateral ?? 0) > 60) {
+      if (this._wilds) {
         const E2 = 2.2;
         const ddx = (t.terrainHeight(this.pos.x + E2, this.pos.z)
           - t.terrainHeight(this.pos.x - E2, this.pos.z)) / (2 * E2);
@@ -3589,7 +3616,7 @@ export class Car {
       // the carriageway; a face you can pass inside of is a mountain,
       // hundreds out. Sixty units of lateral is the fence between them.
       const gap = gY - this.y;
-      if (gap > 2.5 && Math.abs(this.lateral ?? 0) > 60 && t.terrainHeight) {
+      if (gap > 2.5 && this._wilds && t.terrainHeight) {
         const E = 2.2;
         const dhdx = (t.terrainHeight(this.pos.x + E, this.pos.z)
           - t.terrainHeight(this.pos.x - E, this.pos.z)) / (2 * E);
