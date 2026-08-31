@@ -2212,14 +2212,14 @@ export class Car {
     // ...and the lateral-acceleration law feeds it too: demand past the
     // tyre's budget IS a slide, whatever the steer fraction was (one frame
     // stale, which at 60 Hz is nothing)
-    // gate 0.22, up from 0.12 (r291): the yaw cap's steady state is 0.15
-    // over budget BY DESIGN (the 1.15 arcade allowance), and a gate below
-    // it meant every capped corner at speed trickled slip forever — the
-    // "slipping and skimming" report. The dead zone covers the cap; slip
-    // starts where demand genuinely escapes it (handbrake relax, transients,
-    // full lock).
-    if ((this._overGrip ?? 0) > 0.22) {
-      slipTarget = Math.max(slipTarget, Math.min(1, (this._overGrip - 0.10) * 1.2));
+    // The dead zone TRACKS the speed-shaped yaw cap (r292): steering held
+    // at the cap sits (capM - 1) over budget BY DESIGN, and a fixed gate
+    // below that re-created the perpetual trickle at whatever speed the
+    // cap was generous. Slip starts where demand genuinely escapes the
+    // cap (handbrake relax, transients, full lock at speed).
+    const feedGate = ((this._yawCapM ?? 1.15) - 1) + 0.07;
+    if ((this._overGrip ?? 0) > feedGate) {
+      slipTarget = Math.max(slipTarget, Math.min(1, (this._overGrip - feedGate + 0.12) * 1.2));
     }
     // launch wheelspin: overdriven tyres off the line shimmy the tail
     if ((this._spinFeed ?? 0) > 0) slipTarget = Math.max(slipTarget, this._spinFeed);
@@ -2373,7 +2373,18 @@ export class Car {
       // MILD, self-limiting slide (over ~0.15, grip trimmed, no spiral)
       // — the drift feel without the ice, on geometry that expects it.
       const aMax = 4.0 * (this._gripBudget ?? this.grip);
-      const yawCap = Math.min(sp / 4.0, 1.15 * aMax / Math.max(sp, 0.1))
+      // ...and the allowance is SPEED-SHAPED (r292, "turning is super hard
+      // on high speeds, but good and easy on slow"): a flat 1.15 put the
+      // minimum radius at 64 m by 108 km/h — real, and miserable on roads
+      // drawn for an arcade car. The mid-range now opens to 1.6x budget
+      // (42 m at 108) and tapers to the honest 1.15 by ~180 km/h, so the
+      // r284 promise stands exactly where it was made: sharp curves AT
+      // SPEED still demand the brake or the handbrake. `_yawCapM` is
+      // exported so the slip feed's dead zone can track this cap — extra
+      // mid-range yaw must not read as a perpetual slide.
+      const capM = 1.15 + 0.45 * THREE.MathUtils.clamp((50 - sp) / 25, 0, 1);
+      this._yawCapM = capM;
+      const yawCap = Math.min(sp / 4.0, capM * aMax / Math.max(sp, 0.1))
         * (1 + slideRelax) * dt;
       dTheta = THREE.MathUtils.clamp(dTheta, -yawCap, yawCap);
     }
