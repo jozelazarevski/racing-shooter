@@ -133,9 +133,22 @@
   // busiest stretch of the whole boot.
   const bootOffline = () => {
     paint('arming', '✈ STORING…', 'Storing the game for offline play');
-    navigator.serviceWorker.register('./sw.js').then((reg) => {
+    // updateViaCache 'none' (r289): GitHub Pages serves sw.js with a ten-
+    // minute max-age, and without this flag the browser's HTTP cache hands
+    // BACK the old worker when we ask for the new one — which is how a
+    // player can hard-refresh right after a deploy and still get the
+    // previous build ("I see no change", three times in one day). The
+    // worker script itself now always comes from the network.
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
       // ask the browser to go and look, rather than waiting for it to decide
       reg.update?.();
+      // ...and look again every time the player comes BACK to the tab: a
+      // phone tab that stays open never navigates, and navigation was the
+      // only other trigger. Returning from the home screen now picks up a
+      // deploy within one reload instead of never.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update?.();
+      });
       const poll = () => ask(reg.active || navigator.serviceWorker.controller);
       poll();
       // installing on a first visit: re-ask as it progresses, then stop

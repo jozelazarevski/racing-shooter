@@ -4161,6 +4161,23 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r289 — "I SEE NO CHANGE": THE UPDATE PATH ITSELF WAS THE BUG
+Third time in one day a deploy was live on the server (curl said so) and
+the phone still played the old build. Two holes in the update path, both
+in how the service worker gets REPLACED rather than in what it caches:
+  - GitHub Pages serves sw.js with max-age=600, and register() without
+    `updateViaCache: 'none'` lets the browser's HTTP cache answer the
+    update check — a hard refresh inside those ten minutes fetches the
+    NEW page's request for the worker and gets the OLD worker back.
+  - The only other update trigger is a NAVIGATION, and a phone tab
+    returning from the home screen never navigates. reg.update() now
+    also fires on visibilitychange → visible, so coming back to the tab
+    is enough; the existing controllerchange → idle-reload chain does
+    the rest.
+Verified headless: registration active with the new options, no page
+errors. What a player does now: come back to the tab, wait a breath,
+the game reloads itself at the menu with the new tag in the corner.
+
 ## r288 — THE WHOLE CAR IN ONE WORLD: THE REAL-DRIVING AUDIT
 "Make sure driving is aligning real world driving." Not a bug report — a
 standard. So the round opens with an instrument, not a patch:
