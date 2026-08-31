@@ -4161,6 +4161,37 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r300 — "THE HUD IS TERRIBLE": THE LADDER BECOMES A QUAD
+A live two-thumb portrait screenshot (MAPLE MILE) showed what every suite
+had missed: the weapon buttons stacked diagonally up the right edge into
+the play band — shock and the glaring nitro arc at 55-62% beside the car,
+the hull bar floating mid-road, SOS adrift at 65%, the speed number
+buried under the left pedal. WHY the suites missed it: test-mobile-hud
+only ever measured ONE-THUMB. A suite that skips a whole scheme agrees
+with itself — it now runs both schemes at every size (six combos).
+The layout, both schemes identical (H5):
+  - FIRE (80) holds the right edge at b132; the four secondaries are a
+    tight 46px 2x2 QUAD beside it (nitro+shock bottom row, missile+mine
+    top). Everything inside the controls band.
+  - UNSTUCK left:16/b170 — between the one-thumb ring (top ≈674 @844)
+    and the two-thumb pedal (720), no scheme override anywhere (a stale
+    two-thumb pin was still in the band block; H5 caught it).
+  - Hull spans the measured free middle (x80-216-from-right on touch),
+    with a nowrap guard on its label row.
+  - The speed number's third home is the one that measured clean: under
+    the progress strip, top-left — bottom-left sat beneath the two-thumb
+    pedal, the hull row's sliver sat on UNSTUCK. Rally speed belongs by
+    the clocks anyway.
+  - Landscape (max-height 560): the quad flattens to ONE row along the
+    right edge (y 58-70%, in-band at last), hull compacts (the
+    compaction rules live at the SHEET'S END — an earlier touch rule
+    out-ordered them at equal specificity, twice), pedals 62px at b8.
+Gates: test-mobile-hud 24/24 across six size/scheme combos,
+test-hudreview 13/13. ATTRIBUTED, NOT OURS: test-economy "maxing a car"
+and both test-feats card reds reproduce identically on the pristine
+r294 base — pre-existing debt, noted here so nobody re-attributes them
+to the score realignment.
+
 ## r299 — CORRIDOR STEP 3: EVERY PROP KNOWS ITS CLASS AND KEEPS ITS DISTANCE
 The user's own live race log forced the order of work: two near-head-on
 tree strikes inside nine seconds (square 0.88 and 0.97, 13 hull by t=9)

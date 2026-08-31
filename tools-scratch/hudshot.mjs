@@ -2,8 +2,9 @@ import { chromium } from 'playwright-core';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 const p = await ctx.newPage();
-await p.goto('http://localhost:8901/?level=4&go=1&unlockall=1', { waitUntil: 'load', timeout: 300000 });
+await p.goto('http://localhost:8901/?level=69&go=1&unlockall=1', { waitUntil: 'load', timeout: 300000 });
 await p.waitForFunction(() => window.__game?.player, undefined, { timeout: 300000 });
+await p.evaluate(() => document.body.classList.add('two-thumb'));
 await p.evaluate(() => {
   const g = window.__game;
   g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
@@ -16,6 +17,6 @@ await p.evaluate(() => {
   g.frame();
 });
 await p.evaluate(() => { window.__game.composer.render = window.__game.composer.constructor.prototype.render.bind(window.__game.composer); window.__game.frame(); });
-await p.screenshot({ path: 'tools-scratch/hudshot.png' });
+await p.screenshot({ path: 'tools-scratch/hudshot2.png' });
 await b.close();
 console.log('shot saved');
