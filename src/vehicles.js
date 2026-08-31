@@ -2086,7 +2086,14 @@ export class Car {
         this.reverseTimer = 0;
       }
       if (inputs.brake > 0.05) {
-        const decel = this.accel * 1.6 * sBrake * inputs.brake * dt;
+        // BRAKES OBEY THE TYRE TOO (r288, "make sure driving is aligning
+        // real world driving"). accel*1.6 stopped the car from 100 km/h in
+        // 6.4 m at 6.4g — a wall, not a brake; the best road car does ~1.1g
+        // and a race car with wings ~1.5-2g. All four tyres brake, so the
+        // cap sits above the drive cap (2.8) at 4.2*gripBudget ≈ 1.5g:
+        // 100-0 in ~27 m. Surface still bites through gripBudget AND sBrake.
+        const decel = Math.min(this.accel * 1.6 * sBrake,
+          4.2 * (this._gripBudget ?? this.grip)) * inputs.brake * dt;
         if (vf > 1) {
           vf = Math.max(0, vf - decel); // braking can stop the car, never push it backwards
           this.reverseTimer = 0;
@@ -2101,7 +2108,11 @@ export class Car {
             && (reverseActive || Math.abs(vf) < 1);
           this.reverseTimer = deliberate ? this.reverseTimer + dt : 0;
           if (this.reverseTimer >= 0.45) {
-            vf -= this.accel * 0.5 * inputs.brake * dt; // reverse gear engaged
+            // reverse is a manoeuvre, not a launch: 17 m/s² backwards hit
+            // 20 km/h in a third of a second. 5 m/s² is a brisk real-world
+            // reverse (~1.1 s to 20) and still strong enough to back out of
+            // a wedge on a slope (test-unstuck holds the proof).
+            vf -= Math.min(this.accel * 0.5, 5.0) * inputs.brake * dt; // reverse gear engaged
           } else if (vf > 0) {
             vf = Math.max(0, vf - decel); // settle to exactly 0 — no sign flip, ever
           } else if (vf < 0) {
@@ -2129,7 +2140,17 @@ export class Car {
       if (slope !== 0) vf -= GRADE * slope * dt;
     }
     // drag (eased while drifting: slides keep speed; rough going adds a bit off-road)
-    vf -= vf * ((sliding ? 0.40 : 0.55) + (offRoad ? 0.35 : 0)) * dt;
+    // TWO DRAGS, NOT ONE (r288): the 0.55/s coefficient is really the
+    // hidden top-speed governor — thrust equals drag at ~62 u/s — and it
+    // stays, but only UNDER POWER, where it is invisible. On a lifted
+    // throttle the same 0.55 cost 1.5g at speed (measured 0.80g mean over a
+    // 3 s coast from 100), which is a hard brake in a real car; a real lift
+    // is engine braking at ~0.1-0.2g. Closed throttle now coasts at 0.14/s
+    // (~0.4g at 100 km/h tapering as speed falls) — lift-and-coast glides,
+    // and slowing for a corner is the BRAKE's job, which just learned its
+    // own real-world cap.
+    const dragK = inputs.throttle > 0.05 ? 0.55 : 0.14;
+    vf -= vf * ((sliding ? Math.min(0.40, dragK) : dragK) + (offRoad ? 0.35 : 0)) * dt;
     // Slope-aware speed ceiling, matched to the grade/drag equilibrium: a
     // downhill grade EXTENDS top speed proportionally (never past topSpeed *
     // DOWNHILL_CAP) and an uphill grade lowers it, so the engine's surplus
@@ -4589,7 +4610,11 @@ export class EnemyCar extends Car {
     // stuck frames, no damage and slip still at 0.05 — it was free.
     const aLat = (26 + 26 * this.cornerSkill) * D.aiSpeed * (D.aiCorner ?? 1) * (this._cornerBand ?? 1);
     const sqA = Math.sqrt(aLat);
-    const DECEL = 26;
+    // 15, down from 26 (r288): the player's brake learned its real-world cap
+    // (~1.5g = 14.7 u/s²), and a field that PLANS 2.65g stops would outbrake
+    // every human into every corner by physics the player no longer has.
+    // Rivals drive in the same world now.
+    const DECEL = 15;
     let vAllowed = this.maxSpeed * (this._draftOn ? 1.12 : 1); // draft window open
     for (let k = 0; k <= 90; k += 5) {
       const j = (this.trackIndex + k) % t.N;
