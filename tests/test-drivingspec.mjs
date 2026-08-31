@@ -108,15 +108,14 @@ const r4 = await p.evaluate(() => {
   };
   c.alive = true; c.health = 100; c.airborne = false; c.vy = 0;
   placeAt(10, 30);
-  const anchor = t.pointAt(10, 0);
   let vTop = 0;
   for (let k = 0; k < 2400; k++) {
-    // steer 0, hop back by DISTANCE: the first cut respawned by station
-    // window, which put a right-angle city corner inside the loop and
-    // measured the corner (159) instead of the engine (~200).
-    if (Math.hypot(c.pos.x - anchor.x, c.pos.z - anchor.z) > 180) {
-      placeAt(10, Math.hypot(c.vel.x, c.vel.z));
-    }
+    // steer 0, hop back on a TIMER: distance- and station-triggered hops
+    // both let the car reach the next city corner first (off the road at
+    // the block end, off-road drag capped the climb at 147-159). 1.5 s at
+    // top speed is ≤81 u of travel — always inside the block — and each
+    // hop carries the speed, so the run is one endless straight.
+    if (k > 0 && k % 90 === 0) placeAt(10, Math.hypot(c.vel.x, c.vel.z));
     c.step(1 / 60, { throttle: 1, brake: 0, steer: 0, drift: false, hold: false });
     vTop = Math.max(vTop, Math.hypot(c.vel.x, c.vel.z) * 3.6);
   }
