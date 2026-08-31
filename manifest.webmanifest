@@ -4,8 +4,8 @@
   "description": "Voxel combat racing — if you can't race them, shoot them. Plays fully offline.",
   "start_url": "./index.html",
   "scope": "./",
-  "display": "fullscreen",
-  "orientation": "landscape",
+  "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#2b1c0e",
   "theme_color": "#ffd400",
   "icons": [

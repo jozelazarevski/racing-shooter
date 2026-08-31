@@ -4161,6 +4161,65 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r296 — RALLY_HUD_REVIEW: THE HUD SHOWS THE RIGHT THING IN THE RIGHT PLACE
+The user posted a full in-race HUD review (RALLY_HUD_REVIEW.md, Section 4
+normative and binding). Verdict adopted wholesale: "Hull is the only stat
+that decides whether the race continues, and it sits in a small bar
+top-left under a contracts list nobody reads at speed." The band law now
+rules the screen — status 0-10%, danger lane 10-18%, play 18-70%,
+controls 70-100% — as a labelled CSS block that deliberately sits LAST in
+the sheet and wins the cascade over every older placement.
+  - THE CAR ANCHOR (H1, the big one): every non-driver camera parked the
+    car at 68-79% of the screen, directly under the weapon cluster. The
+    anchor is now 52-58%, and the numbers are MEASURED, not styled —
+    CAM_MODES' look/lookH binary-searched per mode against the projected
+    car position on a 390x844 portrait viewport (anchortune.mjs), then
+    baked. The COST is look-ahead: the aim point rides near the car now.
+    test-camera's "frames road ahead" floors dropped from >8 u to >0.5 u
+    (sign, not depth, is the property left to defend) — if live play
+    reports blind corners, the tension between H1 and look-ahead is THE
+    open design question, and the review chose H1.
+  - HULL heads the controls band: 60% wide centred (desktop), the
+    measured free middle between the button columns on touch. Watched off
+    the NUMBER in hud.update — no damage path can forget to announce
+    itself: bar flash 120 ms, vignette scaled by the hit over 20, a
+    floating −N spawned AT THE CAR, 2 Hz pulse under 25.
+  - THREE TOAST LANES ROUTED BY REGEX in hud.feed (danger: HULL/
+    MISSILE/WRONG WAY, red, centred, ONE, 1.2 s preempting; chatter:
+    "NAME: ", LOCKED, DEPLOYED, grey, one; progress: the gold rest, max
+    2). NOTHING toasts from grid to GO+3 s — the surface warning waits
+    out the window, the contract toasts are gone outright (contracts
+    render in the PAUSE MENU now, same #contracts id, same setContracts).
+  - FIELD AWARENESS: the standings list became a progress strip (eight
+    dots by continuous progress, player gold, 40% wide in the status
+    band) and pooled edge arrows point at off-screen rivals within 40 u
+    and at missiles hunting the player. Speed is an 18px NUMBER
+    bottom-left; the gauge canvas is display:none (drawSpeedo skips when
+    hidden). Combo is a chip beside the score (display:none until .on —
+    invisible-but-inflating pushed the score box into the pause button).
+    Camera toggle lives in pause only. Nitro face is the flame + arc;
+    FIRE's bare "90" (the review's "unlabelled number") became a badge.
+  - H5 UNIFIED THE CLUSTER: the weapon buttons and UNSTUCK used to
+    rearrange when the control scheme toggled (shock changed SIDES).
+    One address both schemes now — the two-thumb slots promoted — and
+    the short-screen (max-height 560) rows are scheme-agnostic too. The
+    second 560 media block's per-scheme shuffles are deleted; only
+    steering differs per scheme.
+  - Manifest display: standalone, orientation: portrait (was fullscreen/
+    landscape — every recording is portrait Safari); offline.js offers
+    Add-to-Home-Screen ONCE on the second browser-tab launch (Chrome
+    prompt / iOS Share instruction), dismiss remembered forever.
+COMPROMISES, screenshot-checked: shock's inner-column slot still rises to
+~56% beside the car on tall portraits (five buttons + pedals cannot all
+fit under 70% at these sizes; the translucent glass makes it livable) and
+the nitro arc was swapped to the bezel edge for exactly that reason. The
+perf "AUTO QUALITY" toast still uses its own pre-band placement.
+Gates: tests/test-hudreview.mjs H1-H6+H8 (13/13; H7 is a device property
+— the manifest carries it), test-mobile-hud 15/15 across four sizes
+(hull/feed/cluster collisions all re-measured), test-camera 7/7,
+test-boot 7/7, patch02 16/16. The one live-feedback risk to watch: the
+shorter look-ahead at speed.
+
 ## r295 — RALLY_PATCH_02 v1.1: THE RACE FIXED AROUND THE CAR
 The user handed a second normative patch (RALLY_PATCH_02.md, v1.1
 superseding v1.0 in full), nine race-loop fixes derived frame-by-frame

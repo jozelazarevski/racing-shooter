@@ -54,9 +54,12 @@ const SIZES = [
 // omits the buttons is a list that agrees with itself. (That third button, the
 // driver's-view 👁, has since been removed and the seat is a stop on the 📷
 // cycle; the two that remain stay listed, because the lesson is the omission.)
-const IDS = ['race-info', 'health-box', 'score-box', 'speed-box', 'feed', 'weapon-box',
+// r296 (HUD_REVIEW §4): speed-box became the speed-num corner number, the
+// camera button moved into the pause menu, and the progress strip and
+// UNSTUCK joined the measured set.
+const IDS = ['race-info', 'health-box', 'score-box', 'speed-num', 'feed', 'weapon-box',
              't-fire', 't-missile', 't-mine', 't-shock', 't-nitro', 't-drift', 't-brake',
-             'cam-btn', 'pause-btn'];
+             't-unstuck', 'progress-strip', 'pause-btn'];
 
 for (const [w, h, tag] of SIZES) {
   const ctx = await browser.newContext({
@@ -71,7 +74,9 @@ for (const [w, h, tag] of SIZES) {
   // Race state, so the contracts list is populated — the whole point. Then a
   // full feed, because the feed grows with messages and that is what pushed it
   // into the controls at 320px.
-  await p.evaluate(() => { window.__game.state = 'race'; });
+  // raceTime past the GO+3 window, or the review's toast suppression (H4)
+  // swallows the probe messages and the feed reports "not measured"
+  await p.evaluate(() => { window.__game.state = 'race'; window.__game.raceTime = 10; });
   // SETTLE FIRST, THEN FILL THE FEED — in that order, and the order is the
   // whole point. A feed message removes itself after 3.3 s, and these six were
   // pushed BEFORE a six-frame settle: on a desktop that is 100 ms and on

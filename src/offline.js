@@ -164,6 +164,49 @@
     });
   };
 
+  // RALLY_HUD_REVIEW §4, "Standalone": browser chrome eats 15% of the display
+  // (finding 3.11), and the game is fully installable — the manifest, icons
+  // and safe-area work all exist. What was missing is the ASK. On the SECOND
+  // launch (a returning player, not a first impression) in a browser tab,
+  // offer once: the captured install prompt where the platform provides one
+  // (Chrome/Edge), the Share → Add to Home Screen instruction on iOS, which
+  // has never had a prompt API. Dismiss is remembered forever.
+  let deferredInstall = null;
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; });
+  const offerInstall = () => {
+    try {
+      const standalone = window.matchMedia?.('(display-mode: standalone)').matches
+        || navigator.standalone === true;
+      if (standalone || localStorage.getItem('ir-a2hs') === 'no') return;
+      const launches = 1 + (+localStorage.getItem('ir-launches') || 0);
+      localStorage.setItem('ir-launches', String(launches));
+      if (launches < 2) return;
+      const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (!ios && !deferredInstall) return;   // no path to install here
+      const bar = document.createElement('div');
+      bar.id = 'a2hs-bar';
+      bar.style.cssText = 'position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));'
+        + 'transform:translateX(-50%);z-index:60;background:rgba(12,16,24,.92);color:#fff8e0;'
+        + 'border:2px solid rgba(255,212,0,.6);border-radius:12px;padding:10px 14px;'
+        + 'font:700 13px "Baloo 2",Arial,sans-serif;display:flex;gap:12px;align-items:center;max-width:92vw';
+      bar.innerHTML = ios
+        ? '<span>Full screen, no browser bars: <b>Share&nbsp;→ Add to Home Screen</b></span>'
+        : '<span>Play full screen, offline too</span><button id="a2hs-go" style="all:unset;cursor:pointer;background:#ffd400;color:#1a1208;border-radius:8px;padding:6px 12px;font-weight:800">INSTALL</button>';
+      const x = document.createElement('button');
+      x.textContent = '✕';
+      x.style.cssText = 'all:unset;cursor:pointer;color:#c9b490;padding:2px 6px';
+      x.onclick = () => { localStorage.setItem('ir-a2hs', 'no'); bar.remove(); };
+      bar.appendChild(x);
+      document.body.appendChild(bar);
+      bar.querySelector('#a2hs-go')?.addEventListener('click', async () => {
+        bar.remove();
+        try { await deferredInstall?.prompt?.(); } catch { /* declined */ }
+        localStorage.setItem('ir-a2hs', 'no');
+      });
+      setTimeout(() => bar.remove(), 14000);  // never nags past its moment
+    } catch { /* storage blocked: never break the game for a banner */ }
+  };
+
   window.addEventListener('load', () => {
     // give the world build the main thread first; 2.5 s is the backstop for
     // browsers without requestIdleCallback (Safari, which is most phones here)
@@ -172,5 +215,6 @@
     } else {
       setTimeout(bootOffline, 2500);
     }
+    setTimeout(offerInstall, 6000);   // after the menu settles, never over it
   });
 })();
