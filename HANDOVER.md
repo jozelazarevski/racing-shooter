@@ -4161,6 +4161,25 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r291 — THE LAST TRICKLE: SPEED NO LONGER LEAKS INTO SLIP
+"Driving is better. However after some speed starts slipping and
+skimming the road." Measured (tools-scratch/skim.mjs), two mechanisms,
+both at the seams of r290's own design:
+  - The counter-steer detector was OPENING THE RELAX FOR ORDINARY
+    CORNERING: in any corner the slide direction opposes the steer BY
+    CONSTRUCTION, so the detector read every bend as a counter-steer
+    and a gentle 0.35 steer at 180 km/h spiralled to slip 0.96 and a
+    spin. The wide relax is HANDBRAKE-ONLY now; recovering an
+    unintended slide is the grip catch's job at capped yaw.
+  - The slip feed's gate (0.12) sat BELOW the yaw cap's designed
+    steady state (0.15 over budget — the 1.15 arcade allowance), so
+    every capped corner at speed trickled slip forever. The gate is
+    0.22 with a dead zone over the cap.
+After: gentle steer at 180 holds with slip 0 (over 0.16, inside the
+dead zone); a corner-managed lap's mean slip fell 0.28 -> 0.11; road
+contact max gap 0.06 u with zero airborne flickers — the "skimming"
+was the sliding, not the suspension. Turning circle untouched.
+
 ## r290 — THE PLANTED PASS: SLIDES ARE EARNED, NOT AMBIENT
 Four live reports inside an hour, all one disease: "small turn and it
 turns so much, like a speed boat", "spinning like crazy", "pinball",

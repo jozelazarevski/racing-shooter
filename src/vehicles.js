@@ -2198,8 +2198,14 @@ export class Car {
     // ...and the lateral-acceleration law feeds it too: demand past the
     // tyre's budget IS a slide, whatever the steer fraction was (one frame
     // stale, which at 60 Hz is nothing)
-    if ((this._overGrip ?? 0) > 0.12) {
-      slipTarget = Math.max(slipTarget, Math.min(1, this._overGrip * 1.2));
+    // gate 0.22, up from 0.12 (r291): the yaw cap's steady state is 0.15
+    // over budget BY DESIGN (the 1.15 arcade allowance), and a gate below
+    // it meant every capped corner at speed trickled slip forever — the
+    // "slipping and skimming" report. The dead zone covers the cap; slip
+    // starts where demand genuinely escapes it (handbrake relax, transients,
+    // full lock).
+    if ((this._overGrip ?? 0) > 0.22) {
+      slipTarget = Math.max(slipTarget, Math.min(1, (this._overGrip - 0.10) * 1.2));
     }
     // launch wheelspin: overdriven tyres off the line shimmy the tail
     if ((this._spinFeed ?? 0) > 0) slipTarget = Math.max(slipTarget, this._spinFeed);
@@ -2324,14 +2330,14 @@ export class Car {
       // circle, half a real car's tightest. A handbrake swing rotates a
       // car because road speed carries yaw momentum; below ~22 km/h there
       // is none to spend, so the relaxation fades in from 6 to 12 u/s.
-      // ...and it opens for COUNTER-STEER and the HANDBRAKE, not for
-      // steering deeper into the slide: an unconditional relax was a
-      // feedback loop (slip opens the cap -> more yaw -> more demand ->
-      // more slip) that kept every slide alive as long as the stick was
-      // held — the "spinning like crazy". Steering into the slide keeps
-      // only a sliver.
-      const counterSteer = Math.abs(vl) > 1 && Math.sign(steer) !== Math.sign(vl);
-      const relaxGain = (inputs.drift || counterSteer) ? 1.5 : 0.25;
+      // ...and it opens for the HANDBRAKE ONLY (r291, "after some speed
+      // starts slipping"): a counter-steer detector was tried and opened
+      // the relax for ORDINARY cornering instead — in any corner the slide
+      // direction opposes the steer by construction, so gentle 0.35 steer
+      // at 180 km/h spiralled to slip 0.96 and a spin. Recovery from an
+      // unintended slide is the grip catch's job, at capped yaw; the wide
+      // allowance belongs to the one input that ASKS for rotation.
+      const relaxGain = inputs.drift ? 1.5 : 0.25;
       const slideRelax = relaxGain * this.slip * THREE.MathUtils.clamp((sp - 6) / 6, 0, 1);
       // THE SECOND BRANCH OF THE BICYCLE (r290, "on small turn it turns so
       // much, like a speed boat... now it's driving like it's on ice"):
