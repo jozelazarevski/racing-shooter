@@ -2098,7 +2098,13 @@ export class Car {
       if (on && !this._draftOn) this.game.style?.(25, 'SLIPSTREAM');
       this._draftOn = on;
     }
-    const topSpeed = this.maxSpeed * (boosting ? 1.4 : 1) * offMult * (this._draftOn ? 1.12 : 1);
+    // PATCH_02 §3.7: nitro adds at most +40 km/h (11.1 u/s) over the top
+    // speed — the old 1.4x handed +80 on a fast car and made the drivetrain
+    // irrelevant for half a lap.
+    const nitroCapMul = boosting
+      ? Math.min(1.4, (this.maxSpeed + ((window.__DRIVING?.patch02?.nitroBonusKmh ?? 40) / 3.6)) / this.maxSpeed)
+      : 1;
+    const topSpeed = this.maxSpeed * nitroCapMul * offMult * (this._draftOn ? 1.12 : 1);
 
     // ---- longitudinal ----
     if (inputs.hold) {
@@ -2478,8 +2484,11 @@ export class Car {
       // camera that rotates with the car.
       if ((this._landT ?? 0) > 0) {
         this._landT -= dt;
-        dTheta = THREE.MathUtils.clamp(dTheta, -1.05 * dt, 1.05 * dt);
-        vl *= Math.pow(0.2, dt / 0.1);
+        if (inputs.drift) this._landT = 0;   // P2.7b: handbrake keeps the slide
+        else {
+          dTheta = THREE.MathUtils.clamp(dTheta, -1.05 * dt, 1.05 * dt);
+          vl *= Math.pow(0.2, dt / 0.1);
+        }
       }
       // PATCH_02 §3.6: WALL ESCAPE — nose planted on a wall under 30 km/h
       // with the road behind you was three seconds of grinding. While the
@@ -3585,6 +3594,7 @@ export class Car {
         this.vy = 0;
         this.airborne = false;
         this._landT = 0.30;   // PATCH_02 §3.5: 300 ms of touchdown discipline
+        if (this === this.game.player) this.game.telemetry?.log('airborne', { enter: false, vertSpeed: +this._impactVy.toFixed(1) });
         this._lastGY = gY;
         // CLEAR THE CLIMB RATE. Landing used to leave it holding the launch
         // value (~11); the next grounded frame then measured its acceleration
@@ -4005,12 +4015,21 @@ export class Car {
     }
   }
 
-  damage(amount, attacker = null) {
+  damage(amount, attacker = null, raw = false) {
     if (!this.alive || this.invuln > 0) return false;
     // survivability: the player's hull takes reduced damage below HARD —
     // crashes still cost (feeds/parts/drama fire off the same events), but
-    // a couple of mistakes shouldn't end the race
-    if (this === this.game.player) {
+    // a couple of mistakes shouldn't end the race.
+    //
+    // `raw` (PATCH_02 §3.2): world-contact damage arrives PRE-BUDGETED — the
+    // linear law, the glance forgiveness, the 45/hit and 60/s caps ARE the
+    // survivability design for scenery, and the patch's worked figures
+    // (20 hull for a 100 km/h head-on, 45 cap, hard) are what the player
+    // must actually see. Scaling them again — by difficulty OR by the car's
+    // plating (measured 1.02 on the stock ride, which pushed the 45 cap to
+    // 45.9) — made every acceptance number a fiction. Combat damage keeps
+    // both multipliers; scenery is the same rock for everyone.
+    if (this === this.game.player && !raw) {
       const id = this.game.difficulty?.id;
       amount *= id === 'easy' ? 0.45 : id === 'hard' ? 0.85 : 0.62;
       amount *= this.plating ?? 1; // hull plating is a car property
@@ -4141,6 +4160,8 @@ export class Car {
         // MISSED at a player who missed nothing. The line is inert until
         // checkpoint 1 has been passed at least once.
         if (this._everCP1) this._missedCP = true;
+        if (this === this.game.player) this.game.telemetry?.log('lapTrigger',
+          { checkpointsPassed: [0,1,2,3].filter(k => this._cpMask & (1 << k)).length, counted: false });
         this._cpMask = 0;
         this._midCP = false;
         return false;
@@ -5389,6 +5410,8 @@ export class PlayerCar extends Car {
           }
         }
       }
+      if (cliffTop && !(this._cliffT > 0)) g.telemetry?.log('offmesh', { enter: true, speed: Math.round(Math.hypot(this.vel.x, this.vel.z)) });
+      else if (!cliffTop && (this._cliffT ?? 0) > 0) g.telemetry?.log('offmesh', { enter: false });
       this._cliffT = cliffTop ? (this._cliffT ?? 0) + dt : 0;
       // WEDGED IS NOT WANDERING. The net above deliberately lets a player
       // drive anywhere — but a car photographed parked on a gorge face at
@@ -5542,6 +5565,8 @@ export class PlayerCar extends Car {
         // kept landing ON a pickup and the recording shows 0-188 in 2 s off
         // an Unstuck. Pickups are deaf to this car for a moment.
         this._noPickupT = 1.5;
+        g.telemetry?.log('unstuck', { reason: spend ? 'player' : 'auto',
+          remaining: this.sos ?? 0 });
         g.hud.feed(spend
           ? `UNSTUCK — back on the road (${this.sos} left)`
           : 'RECOVERED', 'info');

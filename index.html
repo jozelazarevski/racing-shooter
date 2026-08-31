@@ -2029,7 +2029,7 @@
 <div id="speed-lines"></div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r294</div>
+<div id="build-tag">r295</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2304,6 +2304,9 @@
     <div class="pm-group">
       <button id="pm-restart" class="btn secondary">RESTART</button>
       <button id="pm-exit" class="btn secondary">EXIT TO MENU</button>
+      <!-- RALLY_PATCH_02 fix 0: the telemetry dump, one tap from any race.
+           "The next check must be a log, not a recording." -->
+      <button id="pm-copylog" class="btn secondary">COPY RACE LOG 📋</button>
     </div>
   </div>
 </div>
@@ -2356,10 +2359,10 @@
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r294"></script>
+<script type="module" src="./src/main.js?v=r295"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r294"></script>
+<script src="./src/offline.js?v=r295"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r294"></script>
+<script type="module" src="./src/traffic.js?v=r295"></script>
 </body>
 </html>

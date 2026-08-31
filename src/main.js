@@ -11,6 +11,7 @@ import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
   CHAPTERS, CHAPTER_GATE, chapterSpans } from './track.js';
 import { WorldEditor } from './editor.js';
 import { loadDrivingOverrides } from './driving.js';
+import { installRally } from './telemetry.js';
 // RALLY_DRIVING.md §13: driving.json overrides load at boot, fire-and-forget
 // — no file shipped means the defaults in driving.js ARE the tune.
 loadDrivingOverrides();
@@ -1646,6 +1647,7 @@ class Game {
     this._syncCarLights();
     this.weapons = new Weapons(this);
     this.hud = new Hud(this);
+    installRally(this);   // PATCH_02 fix 0: the race log
     this.choppers = [];
     // ground enemies — gun nests dug in beside the road, raiders that hunt
     this.hostiles = [];
@@ -2058,6 +2060,23 @@ class Game {
     document.getElementById('pm-exit').addEventListener('click', () => {
       if (this.freeRoam) this.bankRoamCredits();
       this.showMenu();
+    });
+    // RALLY_PATCH_02 fix 0 — the race log, one tap from the pause menu. The
+    // clipboard is the transport (on iOS the paste target is the share
+    // sheet); the button labels itself with the outcome so a failed
+    // clipboard permission is not a silent nothing.
+    document.getElementById('pm-copylog')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      const text = window.__rally?.dump?.() ?? '';
+      let ok = false;
+      try { await navigator.clipboard.writeText(text || '(race log empty)'); ok = true; }
+      catch { /* clipboard denied — fall through to the label */ }
+      const n = this.telemetry?.n ?? 0;
+      btn.textContent = ok
+        ? `COPIED ${n} EVENT${n === 1 ? '' : 'S'} ✓`
+        : 'CLIPBOARD BLOCKED ✗';
+      clearTimeout(this._copylogT);
+      this._copylogT = setTimeout(() => { btn.textContent = 'COPY RACE LOG 📋'; }, 2200);
     });
 
     // next-level chaining from the results screen
@@ -6446,9 +6465,10 @@ class Game {
           // lap — the drivetrain never mattered. Two charges per lap; a can
           // past the ration pays score only.
           if ((pl._nitroLap ?? 0) !== pl.lap) { pl._nitroLap = pl.lap; pl._nitroTaken = 0; }
-          if ((pl._nitroTaken ?? 0) < 2) {
+          if ((pl._nitroTaken ?? 0) < (window.__DRIVING?.patch02?.nitroPickupsPerLap ?? 2)) {
             pl._nitroTaken = (pl._nitroTaken ?? 0) + 1;
             pl.nitro = Math.min(1, pl.nitro + 0.45 * (pl.nitroRate || 1));
+            this.telemetry?.log('nitro', { reason: 'pickup', taken: pl._nitroTaken });
             this.hud.feed('+NITRO CHARGE', 'good');
           } else {
             this.score += 100;
@@ -9203,7 +9223,7 @@ class Game {
     // RALLY_PATCH_02 §3.2: glancing contact under ~20° (square < 0.34) MUST
     // cost 0 hull — a 199 km/h wall scrape is paint, not 76 hull. Sparks and
     // sound still fire; only the damage line is forgiven.
-    const scrapeFree = square < 0.34;
+    const scrapeFree = square < (window.__DRIVING?.patch02?.contactGlanceSquare ?? 0.34);
     const angleMul = 0.45 + 0.55 * THREE.MathUtils.clamp(square, 0, 1);
     // damage: real, but a fraction of what the same stone cost as a wall
     // THROUGH damage(), NOT STRAIGHT INTO health. This was the one damage path
@@ -9270,6 +9290,10 @@ class Game {
     // They are not the same thing. A brush costs paint and lets you carry your
     // speed through; a square hit stops the car.
     const glance = square < 0.55;
+    // RALLY_PATCH_02 §3.2: glancing contact under ~20° (square < 0.34) MUST
+    // cost 0 hull — a 199 km/h wall scrape is paint, not 76 hull. Sparks and
+    // sound still fire; only the damage line is forgiven.
+    const scrapeFree = square < (window.__DRIVING?.patch02?.contactGlanceSquare ?? 0.34);
     // Hull taper. Dead-on (square = 1) is EXACTLY the old figure, so nothing at
     // the heavy end of the model moves; a pure brush pays about half.
     const angleMul = 0.45 + 0.55 * THREE.MathUtils.clamp(square, 0, 1);
@@ -9303,10 +9327,17 @@ class Game {
       // contact). Squared, a touch costs almost nothing and a real hit is
       // unchanged: the constant is set so a full-speed head-on lands exactly
       // where it did before.
-      // cap 45 (RALLY_PATCH_02 P2.3): a head-on at 100 km/h costs the cap,
-      // not 76-85 — two touches must not wreck a 108-hull car.
-      dmg = impact > 6 && !scrapeFree
-        ? Math.min(45 * heft, (impact - 6) ** 2 * 0.175 * heft) * angleMul : 0;
+      // LINEAR IN CLOSING SPEED (PATCH_02 v1.1, which corrected its own
+      // P2.3): dmg = K·max(0, vN − threshold), so a head-on at 100 km/h is
+      // 20 ± 2 and only a 200 km/h head-on reaches the 45 cap. The old
+      // quadratic was this game's guess at the same intent; the spec's
+      // worked values are now consistent, so the spec wins. `heft` still
+      // discounts kerb stones — a knee-high rock is not a cliff.
+      const P2 = window.__DRIVING?.patch02 ?? {};
+      dmg = !scrapeFree
+        ? Math.min((P2.contactDamageCapPerHit ?? 45) * heft,
+            (P2.contactDamageK ?? 0.9) * Math.max(0, impact - (P2.contactDamageThresholdMs ?? 5)) * heft)
+        : 0;
       if (dmg > 0) {
         this.particles.splinters(car.pos, dir, [0x8a8378, 0x55504a], Math.min(1, impact / 20));
         this.particles.debris(car.pos, Math.min(8, 2 + (impact / 4 | 0)));
@@ -9325,7 +9356,11 @@ class Game {
         if (dmg >= 18) { if (glance) this.glanceDrama(); else this.crashDrama(); }
       }
     } else if (mat === 'hut') {
-      dmg = impact > 6 && !scrapeFree ? Math.min(45, (impact - 6) ** 2 * 0.11) * angleMul : 0;
+      const P2h = window.__DRIVING?.patch02 ?? {};
+      dmg = !scrapeFree
+        ? Math.min(P2h.contactDamageCapPerHit ?? 45,
+            (P2h.contactDamageK ?? 0.9) * 0.8 * Math.max(0, impact - (P2h.contactDamageThresholdMs ?? 5)))
+        : 0;
       if (dmg > 0) {
         // the building crashes big: planks burst off the wall + a dust cloud
         const cols = [0x8a6a42, this.track.T?.hutRoof ?? 0x6a4a2a];
@@ -9373,7 +9408,12 @@ class Game {
       dmg = Math.min(dmg, room);
       car._wdmgSum = (car._wdmgSum ?? 0) + dmg;
     }
-    if (dmg > 0) car.damage(dmg, null);
+    if (dmg > 0) car.damage(dmg, null, true);  // raw: the contact law IS the budget
+    if (car === this.player && dmg > 0) {
+      this.telemetry?.log('damage', { src: mat === 'stone' ? 'rock' : 'wall',
+        amount: +dmg.toFixed(1), vNormal: +impact.toFixed(1),
+        square: +square.toFixed(2), hullAfter: Math.round(car.health) });
+    }
     if (car === this.player) this.audio.scrape();
   }
 
@@ -9474,7 +9514,7 @@ class Game {
       dmg = Math.min(dmg, Math.max(0, 60 - (car._wdmgSum ?? 0)));
       car._wdmgSum = (car._wdmgSum ?? 0) + dmg;
     }
-    if (dmg > 0) car.damage(dmg, null);
+    if (dmg > 0) car.damage(dmg, null, true);  // raw: the contact law IS the budget
     if (car === this.player) {
       this.audio.scrape();
       if (dmg >= 8) this.hud.feed(`HIT A TREE  −${Math.round(dmg)} HULL`, 'bad');
@@ -10311,19 +10351,24 @@ class Game {
     this.playerRank = rank;
   }
 
-  /** PATCH_02 §3.1 + §3.3: the AGGRO TICKET OFFICE. No rival may make the
-   *  player its target before GO + 4 s; after that at most ONE rival holds a
-   *  ticket in the first 20 s and two thereafter. Tickets expire 1.5 s after
-   *  the holder stops asking, so pressure rotates instead of piling. */
+  /** PATCH_02 §3.1 + §3.3 (v1.1): the AGGRO TICKET OFFICE. No rival may make
+   *  the player its target before GO + 4 s; after that at most ONE rival holds
+   *  a ticket in the first 20 s and two thereafter. A ticket is a 6 s lease
+   *  that is NEVER renewed by use — it lapses and someone else gets a turn,
+   *  so pressure rotates instead of piling. */
   aiCanTarget(rival) {
-    if (this.state !== 'race' || this.raceTime < 4) return false;
+    if (this.state !== 'race') return false;
     const now = this.raceTime;
     this._aggro = (this._aggro ?? []).filter((a) => a.until > now && a.r.alive);
+    const P2 = window.__DRIVING?.patch02 ?? {};
+    if (now < (P2.rivalTargetDelayS ?? 4)) return false;
     const mine = this._aggro.find((a) => a.r === rival);
-    if (mine) { mine.until = now + 1.5; return true; }
-    const cap = now < 20 ? 1 : 2;
+    if (mine) return true;   // v1.1: tokens ROTATE — a lease is 6 s, never renewed on use
+    const cap = now < (P2.playerTargetEarlyUntilS ?? 20)
+      ? (P2.playerTargetTokensEarly ?? 1) : (P2.playerTargetTokensLate ?? 2);
     if (this._aggro.length < cap) {
-      this._aggro.push({ r: rival, until: now + 1.5 });
+      this._aggro.push({ r: rival, until: now + (P2.targetTokenRotateS ?? 6) });
+      this.telemetry?.log('rivalTarget', { rivalId: rival.name ?? 'rival', acquire: true });
       return true;
     }
     return false;
@@ -11255,6 +11300,7 @@ class Game {
         this.hud.centerMsg('GO!');
         this.track.setLights('green');
         this._lightsLive = true;
+        this.telemetry?.log('startLights', { state: 'green' });
         const surf = this.track.T?.surface;
         if (surf === 'snow') this.hud.feed('SNOW ROAD — LOW GRIP, LONG SLIDES', 'info');
         else if (surf === 'wet') this.hud.feed('WET ROAD — SLICK UNDER BRAKING', 'info');
