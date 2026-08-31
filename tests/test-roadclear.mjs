@@ -44,8 +44,8 @@ const CURATED = [
   [7, 'GLACIAL PASS'],       // hoardings; the bore the reach fix rescued
   [28, 'ESTONIA CRESTS'],    // 6.5 u fallen logs across the line
   [32, 'RED CENTRE RUN'],    // start line at y = -3.99
-  [34, 'MONACO STREETS'],    // hoarding posts from a second leg
-  [37, 'SUZUKA'],            // 14 corridor pines; start line at y = 7.87
+  [34, 'PRINCIPALITY STREETS'],    // hoarding posts from a second leg
+  [37, 'CROSSOVER RING'],            // 14 corridor pines; start line at y = 7.87
   [54, 'COTE D AZUR'],       // sea foam, the overlay rule
   [55, 'BRIDGE RUN'],        // hoarding over a second leg
   [57, 'MOUNTAIN TO SEA'],   // two stacked-road stretches

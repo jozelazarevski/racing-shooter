@@ -4161,6 +4161,58 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r302 — CLAUDE.md v1.2 §3.5 + THE PORSCHE GAUGE: ERASE THE GUIDANCE, KEEP THE DIAL
+The user posted CLAUDE.md v1.2 (supersedes PATCH_02 v1.4 and CORRIDOR
+v2.1 — retired) and three direct asks: remove the yellow line, hull
+top-left, bring back the speed gauge with revs and gears "like Porsche".
+
+§3.5 WAYFINDING: NONE — and it voids r301's own gate arrow. Deleted, not
+hidden (§0.2 "delete means delete"): the route RIBBON (mesh, material,
+opacity loop — route.js keeps only data: gates, step(), kindAtIndex),
+the GATE ARROW, the yellow RIVAL edge arrows, the WRONG WAY banner AND
+its detection flag, and `ribbonNearM` (a key nothing reads is a config
+that lies). The ONE arrow that survives is the missile threat warning —
+combat information, not guidance; test-hudreview H6 is REVERSED to pin
+both halves. NEW test-overlays.mjs is Q16 as a render-pass assert: off
+course, wrong way, mid-grace — zero overlays, and the route still gates.
+The missed-gate grace-and-return (3.2/3.6) is unchanged and silent.
+
+HULL TOP-LEFT (user): stacked under race-info off the MEASURED --info-h
+(contracts grow it mid-race) with a 62px floor so it clears the phone
+progress strip at top:48. Fixed 220px width — the 60% band bar is gone.
+
+THE GAUGE (user, "like Porsche"): #speed-box was still in the tree
+behind display:none since r296 — un-hidden, and drawSpeedo rebuilt as a
+911-style CENTRAL TACH: rpm arc with a painted redline zone (7200 of
+8000), x1000 numerals, digital km/h inside the dial, gear digit under
+it (N/R/1-6). The physics has no gearbox, so revs and gears are
+PRESENTATION ONLY, derived in Hud.GEARBOX (six ratios over the speed
+range, sawtooth rpm, nitro pins past the redline, needle inertia) —
+they must never leak into physics, AI or telemetry. Redrawn at 30 Hz,
+not per-rAF: the per-frame 300px canvas repaint measurably starved
+swiftshader frames (the mobile suite's feed probe caught it — messages
+expired before measurement). Homes: desktop bottom-centre 132px; touch
+86px at the old between-the-thumbs slot; TWO-THUMB rides at bottom:98px
+centre-60px — measured against BRAKE's ring (top y=748) and the 💥
+column (x=180, y=658), 2px clear of both at 390x844.
+
+NAMING (§6.5): SPA-FRANCORCHAMPS → ARDENNES SWEEP, SILVERSTONE →
+AERODROME CIRCUIT, MONACO STREETS → PRINCIPALITY STREETS, SUZUKA →
+CROSSOVER RING (display names in track.js AND world/levels.js — the
+list is duplicated). DEBT: the internal route keys ('spa',
+'silverstone', 'monaco', 'suzuka') and the monteCarlo theme name still
+carry the marks in code; a Q18 string scan of stage data would see
+them. Renaming keys touches the circuits tables — its own round.
+
+Gates: test-overlays NEW 7/7, test-mobile-hud 24/24 (both schemes, six
+combos), test-hudreview 15/15 (H6 reversed + two r302 checks),
+test-shortcut 6/6 (hinterland now asserts SILENCE — r301's arrow check
+was its one red), test-patch13 16/16, route/tyres/newworlds/filters
+green after the rename sweep. Screenshots verified desktop + two-thumb.
+NOT this round (spec is explicit, §0.1 one system per build): §4 feel
+pass, §5 AI rework, §3.3 surface bounds, 6.1 position hysteresis, 6.3
+driver's-view removal — the spec's build order queues them.
+
 ## r301 — v1.3 CLOSED + CORRIDOR STEP 4: THE GAME STOPS SCOLDING AND STARTS HELPING
 PATCH_02 v1.3 (recording C, Maple Mile) plus the corridor's recovery step,
 one round because they are one idea: every "you did it wrong" message is

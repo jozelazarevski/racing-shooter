@@ -224,7 +224,7 @@ ok(R.impossible === 0 && /NO WORLD MATCHES/.test(R.impossibleMsg),
   'an impossible combination says so instead of looking broken', R.impossibleMsg);
 ok(R.afterClear === R.total && R.afterClearMsg === `${R.total} WORLDS`,
   'CLEAR puts every world back', `${R.afterClear} / ${R.afterClearMsg}`);
-ok(R.spa.length === 1 && R.spa[0] === 'SPA-FRANCORCHAMPS',
+ok(R.spa.length === 1 && R.spa[0] === 'ARDENNES SWEEP',
   'search finds a world by its route key, not just its name', R.spa.join('|'));
 ok(R.searchNight.length === R.times.NIGHT,
   'search finds worlds by a facet word with no chip touched', R.searchNight.join('|'));

@@ -43,8 +43,8 @@ const R = await page.evaluate(async () => {
   out.unmapped = unmapped;
   // the classification must not just track `loose`, which conflates wet
   const byName = (n) => T.surfaceClass(T.LEVELS.find((l) => l.name === n));
-  out.spaSealed = byName('SPA-FRANCORCHAMPS') === T.SEALED;
-  out.silverstoneSealed = byName('SILVERSTONE') === T.SEALED;
+  out.spaSealed = byName('ARDENNES SWEEP') === T.SEALED;
+  out.silverstoneSealed = byName('AERODROME CIRCUIT') === T.SEALED;
   out.duneLoose = byName('THE DUNE SERPENT') === T.LOOSE;
   out.dustLoose = byName('DUST CANYON') === T.LOOSE;
   out.frostIce = byName('FROST PEAK') === T.ICE;

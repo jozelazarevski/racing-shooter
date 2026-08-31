@@ -21,14 +21,14 @@ export class Hud {
       missiles: $('missile-icons'), mines: $('mine-icons'), shock: $('shock-status'),
       rounds: $('round-count'), sos: $('sos-count'),
       nitro: $('nitro-fill'), feed: $('feed'), center: $('center-msg'),
-      wrongWay: $('wrong-way'), vignette: $('damage-vignette'),
+      vignette: $('damage-vignette'),
       // touch button badges
       bMissile: $('b-missile'), bMine: $('b-mine'), bShock: $('b-shock'),
       tUnstuck: $('t-unstuck'), bUnstuck: $('b-unstuck'),
       tFire: $('t-fire'), tShock: $('t-shock'), tNitro: $('t-nitro'),
       bRounds: $('b-rounds'),
       // RALLY_HUD_REVIEW §4 additions
-      speedNum: $('speed-num'), danger: $('danger-lane'), chatter: $('chatter'),
+      danger: $('danger-lane'), chatter: $('chatter'),
       strip: $('progress-strip'), floats: $('dmg-floats'), arrows: $('edge-arrows'),
       healthBox: $('health-box'),
     };
@@ -101,14 +101,55 @@ export class Hud {
   // HARD RULE (user): NO MINIMAPS — ever. Do not reintroduce a map overlay
   // in any form; the road, the HUD arrows and the standings carry the info.
 
-  // ---------- circular speedometer ----------
-  drawSpeedo(kmh, boosting) {
+  // ---------- the gauge (r302, user ask): "like Porsche" ----------
+  // One central dial, and it is the REV COUNTER — the 911 instrument
+  // discipline: the tach is the hero, speed is digits inside it, the gear
+  // sits under the digits. The physics has no gearbox (speedAlong is the
+  // model), so revs and gears are PRESENTATION, derived here and nowhere
+  // else: a close-ratio six-speed mapped over the speed range, sawtooth
+  // rpm inside each gear. Nothing reads these numbers back — they must
+  // never leak into physics, AI or telemetry.
+  static get GEARBOX() {
+    return { tops: [42, 74, 108, 144, 182, 236],  // km/h at redline per gear
+      idle: 900, launch: 1400, redline: 7200, max: 8000 };
+  }
+
+  /** Presentation drivetrain: gear label + smoothed rpm from speed/intent. */
+  _drivetrain(kmh, p, dt) {
+    const GB = Hud.GEARBOX;
+    const throttle = this.game.input?.throttle ?? 0;
+    let gear, rpm;
+    if (p.speedAlong < -0.8) {                       // backing up
+      gear = 'R';
+      rpm = GB.launch + (kmh / 30) * 2600;
+    } else if (kmh < 3 && Math.abs(p.speedAlong) < 1) {
+      gear = throttle > 0.2 ? '1' : 'N';             // clutch in, maybe revving
+      rpm = GB.idle + throttle * 2400;
+    } else {
+      let gi = GB.tops.findIndex((t) => kmh <= t);
+      if (gi < 0) gi = GB.tops.length - 1;
+      gear = String(gi + 1);
+      const lo = gi > 0 ? GB.tops[gi - 1] : 0;
+      rpm = GB.launch + ((kmh - lo) / (GB.tops[gi] - lo)) * (GB.redline - GB.launch);
+    }
+    if (p.boostTimer > 0) rpm = GB.redline + 400;    // nitro pins it past the line
+    rpm = Math.max(GB.idle, Math.min(GB.max, rpm));
+    // needle inertia — a real tach swings, it does not teleport
+    this._rpm = (this._rpm ?? GB.idle) + (rpm - (this._rpm ?? GB.idle))
+      * Math.min(1, (dt || 1 / 60) * 14);
+    return { gear, rpm: this._rpm };
+  }
+
+  drawSpeedo(kmh, p, dt) {
     const c = this.spCtx;
     const W = this.speedo.width, H = this.speedo.height;
     const cx = W / 2, cy = H / 2, R = W * 0.42;
-    const MAX = 240;
+    const GB = Hud.GEARBOX;
+    const { gear, rpm } = this._drivetrain(kmh, p, dt);
+    const boosting = p.boostTimer > 0;
     const a0 = Math.PI * 0.75, sweep = Math.PI * 1.5;
-    const frac = Math.min(1, kmh / MAX);
+    const frac = Math.min(1, rpm / GB.max);
+    const redFrac = GB.redline / GB.max;
     c.clearRect(0, 0, W, H);
 
     // dial face
@@ -120,71 +161,88 @@ export class Hud {
     c.strokeStyle = 'rgba(255,212,0,0.5)';
     c.stroke();
 
-    // track arc
+    // rev track, with the redline zone painted on the dial itself
     c.lineWidth = W * 0.055;
-    c.lineCap = 'round';
+    c.lineCap = 'butt';
     c.beginPath();
-    c.arc(cx, cy, R * 0.86, a0, a0 + sweep);
+    c.arc(cx, cy, R * 0.86, a0, a0 + sweep * redFrac);
     c.strokeStyle = 'rgba(255,255,255,0.12)';
     c.stroke();
-    // speed arc, green → amber → red (drawn as segments for consistent color stops)
+    c.beginPath();
+    c.arc(cx, cy, R * 0.86, a0 + sweep * redFrac, a0 + sweep);
+    c.strokeStyle = 'rgba(232,64,42,0.4)';
+    c.stroke();
+    // live rev arc
     if (frac > 0.003) {
-      const SEGS = 24;
-      for (let s = 0; s < SEGS * frac; s++) {
-        const f0 = s / SEGS, f1 = Math.min(frac, (s + 0.85) / SEGS);
-        const t = f0;
-        const col = t < 0.55 ? '#4dd06a' : t < 0.8 ? '#ffd400' : '#e8402a';
+      c.beginPath();
+      c.arc(cx, cy, R * 0.86, a0, a0 + sweep * Math.min(frac, redFrac));
+      c.strokeStyle = boosting ? '#7fd4ff' : '#ffd400';
+      c.stroke();
+      if (frac > redFrac) {
         c.beginPath();
-        c.arc(cx, cy, R * 0.86, a0 + sweep * f0, a0 + sweep * f1);
-        c.strokeStyle = boosting ? '#7fd4ff' : col;
+        c.arc(cx, cy, R * 0.86, a0 + sweep * redFrac, a0 + sweep * frac);
+        c.strokeStyle = '#e8402a';
         c.stroke();
       }
     }
-    // ticks
-    c.lineWidth = W * 0.012;
-    c.strokeStyle = 'rgba(255,255,255,0.6)';
-    for (let v = 0; v <= MAX; v += 40) {
-      const a = a0 + sweep * (v / MAX);
+    // ticks every 1000 rpm, numerals every 2000 (x1000, tach convention)
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    for (let v = 0; v <= GB.max; v += 1000) {
+      const a = a0 + sweep * (v / GB.max);
+      const major = v % 2000 === 0;
+      c.lineWidth = W * (major ? 0.014 : 0.008);
+      c.strokeStyle = v >= GB.redline ? 'rgba(232,64,42,0.9)' : 'rgba(255,255,255,0.6)';
       c.beginPath();
-      c.moveTo(cx + Math.cos(a) * R * 0.68, cy + Math.sin(a) * R * 0.68);
-      c.lineTo(cx + Math.cos(a) * R * 0.6, cy + Math.sin(a) * R * 0.6);
+      c.moveTo(cx + Math.cos(a) * R * 0.72, cy + Math.sin(a) * R * 0.72);
+      c.lineTo(cx + Math.cos(a) * R * (major ? 0.62 : 0.66), cy + Math.sin(a) * R * (major ? 0.62 : 0.66));
       c.stroke();
+      if (major) {
+        c.fillStyle = v >= GB.redline ? '#e8402a' : 'rgba(255,248,224,0.85)';
+        c.font = `700 ${W * 0.065}px Arial`;
+        c.fillText(String(v / 1000), cx + Math.cos(a) * R * 0.52, cy + Math.sin(a) * R * 0.52);
+      }
     }
     // needle
     const na = a0 + sweep * frac;
-    c.lineWidth = W * 0.03;
+    c.lineWidth = W * 0.025;
     c.lineCap = 'round';
-    c.strokeStyle = boosting ? '#7fd4ff' : '#ffd400';
+    c.strokeStyle = boosting ? '#7fd4ff' : frac > redFrac ? '#e8402a' : '#ffd400';
     c.beginPath();
     c.moveTo(cx - Math.cos(na) * R * 0.1, cy - Math.sin(na) * R * 0.1);
-    c.lineTo(cx + Math.cos(na) * R * 0.62, cy + Math.sin(na) * R * 0.62);
+    c.lineTo(cx + Math.cos(na) * R * 0.68, cy + Math.sin(na) * R * 0.68);
     c.stroke();
     c.beginPath();
-    c.arc(cx, cy, W * 0.035, 0, Math.PI * 2);
+    c.arc(cx, cy, W * 0.03, 0, Math.PI * 2);
     c.fillStyle = '#ffd400';
     c.fill();
-    // digital readout
-    c.fillStyle = '#fff8e0';
-    c.font = `900 ${W * 0.21}px "Luckiest Guy", Arial`;
-    c.textAlign = 'center';
-    c.fillText(String(kmh), cx, cy + R * 0.62);
+    // digital speed inside the tach, gear under it — the 911 read order
+    c.fillStyle = boosting ? '#7fd4ff' : '#fff8e0';
+    c.font = `900 ${W * 0.19}px "Luckiest Guy", Arial`;
+    c.fillText(String(kmh), cx, cy + R * 0.42);
     c.fillStyle = 'rgba(232,201,135,0.9)';
-    c.font = `700 ${W * 0.075}px Arial`;
-    c.fillText('KM/H', cx, cy + R * 0.82);
+    c.font = `700 ${W * 0.06}px Arial`;
+    c.fillText('KM/H', cx, cy + R * 0.6);
+    c.fillStyle = gear === 'N' ? 'rgba(200,194,180,0.9)' : '#ffd400';
+    c.font = `900 ${W * 0.105}px "Luckiest Guy", Arial`;
+    c.fillText(gear, cx, cy + R * 0.82);
+    this._lastGear = gear;                            // probe-visible state
   }
 
   // ---------- per-frame update ----------
   update(dt) {
     const g = this.game, p = g.player;
     const kmh = Math.round(Math.abs(p.speedAlong) * 3.1);
-    // §4: speed is a NUMBER in the corner. The gauge canvas is display:none;
-    // drawing to a hidden canvas is pure waste, so it only renders if some
-    // stylesheet ever shows it again.
-    if (this.el.speedNum) {
-      this.el.speedNum.firstChild.textContent = String(kmh);
-      this.el.speedNum.classList.toggle('boosting', p.boostTimer > 0);
+    // r302 (user): the gauge is BACK — the corner number is deleted, the
+    // dial carries speed, revs and gear. Porsche discipline: the tach is
+    // the hero, speed is digits inside it. Redrawn at ~30 Hz, not per
+    // frame: a 300px canvas repaint per rAF is real money on the phones
+    // this dial exists for, and no needle needs 60.
+    this._gaugeT = (this._gaugeT ?? 1) + dt;
+    if (this.speedo.offsetParent && this._gaugeT >= 1 / 30) {
+      this.drawSpeedo(kmh, p, this._gaugeT);
+      this._gaugeT = 0;
     }
-    if (this.speedo.offsetParent) this.drawSpeedo(kmh, p.boostTimer > 0);
     this.el.lap.textContent = Math.min(p.lap, g.lapsTotal);
     this.el.lapsTotal.textContent = g.lapsTotal;
     this.el.time.textContent = fmtTime(g.raceTime);
@@ -388,59 +446,24 @@ export class Hud {
       if (this.el.bRounds) this.el.bRounds.textContent = String(rd);
     }
 
-    // CORRIDOR §8 (r301): the WRONG WAY banner is deleted — heading away
-    // from the race is signalled by the gate arrow turning red (below).
-    // The detection survives as the flag the arrow reads.
-    const t = g.track;
-    const tangent = t.tan[p.trackIndex];
-    const onCircuit = !g.freeRoam || !!g.mission?.def.circuit; // [MISSIONS] some missions race the circuit
-    this._wrongWay = g.state === 'race' && p.alive && onCircuit &&
-      p.speedAlong > 6 && (p.forward.dot(tangent) < -0.35);
-    this.el.wrongWay.style.display = 'none';
-
+    // CLAUDE.md v1.2 §3.5 (r302): WRONG WAY is gone — banner, flag and
+    // detection alike. Off course is handled silently by the route's own
+    // grace-and-return; the world is the only guidance.
     this.vignetteLevel = Math.max(0, this.vignetteLevel - dt * 1.8);
     this.el.vignette.style.opacity = Math.min(1, this.vignetteLevel);
 
     if (this.el.arrows && g.state === 'race') this._edgeArrows();
   }
 
-  /** §4 FIELD AWARENESS, the other half: a rival within 40 u but off-screen,
-   *  or a missile hunting the player, gets an arrow at the play-band edge
-   *  pointing at it. Pooled nodes; at most six, nearest first. */
+  /** THREAT warnings only (r302). §3.5 erased every wayfinding overlay —
+   *  the r301 gate arrow and the yellow rival arrows are deleted, render
+   *  call and all. What remains is the one arrow that is not guidance: a
+   *  missile hunting the player, which is combat information the race
+   *  cannot fairly withhold. Pooled nodes; at most six. */
   _edgeArrows() {
     const g = this.game, p = g.player;
     const pool = this._arrowPool;
     let n = 0;
-    // ---- §8 WAYFINDING: the NEXT GATE arrow. Shown when the player has
-    // wandered past ribbonNearM, is heading the wrong way (red), or is in
-    // the missed-gate grace (red). This is what replaced WRONG WAY and
-    // CHECKPOINT MISSED: a direction, not a scolding. ----
-    const gate = g.route?.gates?.[p._nextGate ?? 0];
-    if (gate && g.state === 'race') {
-      const lat = Math.abs(g.track.lateralOffset(p.pos, p.trackIndex));
-      const near = window.__DRIVING?.route?.ribbonNearM ?? 15;
-      const urgent = this._wrongWay || (g._gateMissT ?? 0) > 0;
-      if (lat > near || urgent) {
-        let a = this._gateArrow;
-        if (!a) {
-          a = this._gateArrow = document.createElement('div');
-          a.className = 'earrow gatearrow';
-          a.textContent = '➤';
-          this.el.arrows.appendChild(a);
-        }
-        const v = (this._gv ??= p.mesh.position.clone());
-        v.set(gate.x, gate.y, gate.z).project(g.camera);
-        let { x, y } = v;
-        if (v.z > 1) { x = -x; y = -y; }
-        const left = Math.min(92, Math.max(8, (x + 1) * 50));
-        const top = Math.min(64, Math.max(22, (1 - (y + 1) / 2) * 100));
-        a.style.left = left + '%';
-        a.style.top = top + '%';
-        a.style.transform = `translate(-50%,-50%) rotate(${Math.atan2(top - 43, left - 50)}rad) scale(1.35)`;
-        a.classList.toggle('missile', urgent);   // the red/pulse styling
-        a.style.display = 'block';
-      } else if (this._gateArrow) this._gateArrow.style.display = 'none';
-    } else if (this._gateArrow) this._gateArrow.style.display = 'none';
     const place = (pos, missile) => {
       if (n >= 6 || !pos) return;
       const v = (this._av ??= p.mesh.position.clone());
@@ -459,13 +482,9 @@ export class Hud {
       a.style.display = 'block';
       n++;
     };
-    const near = g.enemies
-      .filter((e) => e.alive && e.pos.distanceTo(p.pos) < 40)
-      .sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos));
     for (const m of (g.weapons?.missiles ?? [])) {
       if (m.active && m.target === p) place(m.mesh?.position ?? m.pos, true);
     }
-    for (const e of near) place(e.mesh?.position ?? e.pos, false);
     for (let k = n; k < pool.length; k++) pool[k].style.display = 'none';
   }
 

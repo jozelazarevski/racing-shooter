@@ -63,8 +63,10 @@ const SIZES = [
 // cycle; the two that remain stay listed, because the lesson is the omission.)
 // r296 (HUD_REVIEW §4): speed-box became the speed-num corner number, the
 // camera button moved into the pause menu, and the progress strip and
-// UNSTUCK joined the measured set.
-const IDS = ['race-info', 'health-box', 'score-box', 'speed-num', 'feed', 'weapon-box',
+// UNSTUCK joined the measured set. r302 reversed the speed change on the
+// user's ask: the GAUGE is back (speed-box, bottom-centre, with revs and
+// gear) and the corner number is deleted; hull moved top-left.
+const IDS = ['race-info', 'health-box', 'score-box', 'speed-box', 'feed', 'weapon-box',
              't-fire', 't-missile', 't-mine', 't-shock', 't-nitro', 't-drift', 't-brake',
              't-unstuck', 'progress-strip', 'pause-btn'];
 

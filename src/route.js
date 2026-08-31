@@ -6,13 +6,12 @@
  * defines what counts as racing), and the ROAD (a fast surface — the best
  * line most of the time, never the only line).
  *
- * BUILD ORDER STEP 1 (§16): gate data, per-stage layouts, ribbon, telemetry —
+ * BUILD ORDER STEP 1 (§16): gate data, per-stage layouts, telemetry —
  * and NO RULE CHANGES. The route runs in SHADOW MODE: it observes every car,
  * logs gate passes and misses, and decides nothing. Laps are still counted by
  * the old checkpoint mask until step 4 hands the job over. R1/R2 gate this
  * step in tests/test-route.mjs.
  */
-import * as THREE from 'three';
 import { ROAD_HALF } from './track.js';
 import { DRIVING } from './driving.js';
 
@@ -123,46 +122,8 @@ export class Route {
     return { passed: true, id: g.id, lateral: +lateral.toFixed(1), kind: g.kind };
   }
 
-  /** §4.3 THE RIBBON: a translucent strip on the ground from gate to gate.
-   *  In step 1 no designed cuts exist yet, so the intended line IS the road
-   *  and the ribbon rides the whole spline — chunking per gate arrives with
-   *  the cuts in step 5. A hint only: no collision, no rule attached. */
-  buildRibbon() {
-    const t = this.track, N = t.center.length;
-    const HALF = 0.6, LIFT = 0.14;
-    const pos = new Float32Array((N + 1) * 2 * 3);
-    for (let i = 0; i <= N; i++) {
-      const k = i % N, c = t.center[k], n = t.nrm[k];
-      const y = c.y + LIFT;
-      pos.set([c.x - n.x * HALF, y, c.z - n.z * HALF,
-        c.x + n.x * HALF, y, c.z + n.z * HALF], i * 6);
-    }
-    const idx = [];
-    for (let i = 0; i < N; i++) {
-      const a = i * 2;
-      idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setIndex(idx);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffd400, transparent: true, opacity: 0.3,
-      depthWrite: false, side: THREE.DoubleSide,
-    });
-    this.ribbon = new THREE.Mesh(geo, mat);
-    this.ribbon.renderOrder = 2;
-    this.ribbon.name = 'route-ribbon';
-    return this.ribbon;
-  }
-
-  /** §4.3 opacity: 30% when the car is ON the line, 80% when it has wandered
-   *  more than ribbonNearM — the hint gets louder as it gets more needed. */
-  updateRibbon(playerPos, trackIndex) {
-    if (!this.ribbon) return;
-    const near = DRIVING.route?.ribbonNearM ?? 15;
-    const lat = Math.abs(this.track.lateralOffset(playerPos, trackIndex));
-    const want = lat > near ? 0.8 : 0.3;
-    const m = this.ribbon.material;
-    m.opacity += (want - m.opacity) * 0.08;
-  }
+  // CLAUDE.md v1.2 §3.5 (r302): the yellow ribbon is ERASED — mesh, material
+  // and opacity loop all deleted, not hidden. The course polyline survives
+  // only as this class's DATA (gates, step(), kindAtIndex) for AI, recovery
+  // and telemetry. Nothing renders it, and nothing may again.
 }

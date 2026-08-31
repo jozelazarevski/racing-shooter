@@ -10386,15 +10386,11 @@ class Game {
     this.playerRank = rank;
   }
 
-  /** CORRIDOR step 1 — build the route and its ribbon for this world. The
-   *  ribbon mesh rides the track's own group so a level teardown takes it
-   *  along; the Route object itself is pure data + math. */
+  /** CORRIDOR step 1 — build the route for this world. Pure data + math:
+   *  CLAUDE.md v1.2 §3.5 erased the ribbon, so the course polyline is never
+   *  rendered — gates, AI and telemetry are its only consumers. */
   _buildRoute() {
     this.route = new Route(this.track, this.level?.id);
-    const rb = this.route.buildRibbon();
-    this.track.group?.add?.(rb) ?? this.scene.add(rb);
-    // the ribbon is a RACE hint: roam and missions drive anywhere on purpose
-    rb.visible = !this.freeRoam && !this.missionMode;
   }
 
   /** CORRIDOR steps 1+4 — the route observes every car, and since r301 it
@@ -10436,7 +10432,6 @@ class Game {
         this.returnToGate(pl, gate.id, 'missed');
       }
     } else this._gateMissT = 0;
-    this.route.updateRibbon(pl.pos, pl.trackIndex);
   }
 
   /** CORRIDOR §10 — ONE return function. Free, instant, never a resource:

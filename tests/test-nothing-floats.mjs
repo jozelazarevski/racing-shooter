@@ -117,7 +117,7 @@ const KNOWN = {
   'BRIDGE RUN': { max: 50, gap: 14.5, why: 'the same parapet blocks, worst 13.52 u' },
   'OLIVE CROSSING': { max: 10, gap: 16, why: 'the same parapet blocks, worst 15.25 u — the roster maximum' },
   'MOUNTAIN TO SEA': { max: 15, gap: 11.5, why: 'roadWidth 5: 10 left, worst 10.86 u' },
-  'MONACO STREETS': { max: 50, gap: 12.5, why: 'oldtown frontage on a stepped hillside datum, worst 11.84 u' },
+  'PRINCIPALITY STREETS': { max: 50, gap: 12.5, why: 'oldtown frontage on a stepped hillside datum, worst 11.84 u' },
   'RED CENTRE RUN': { max: 20, gap: 12.5, why: 'pylon crossarms and rail blocks, worst 11.92 u' },
   // MEDITERRANEAN TERRACE COPING, a 3.4 x 0.05 x 0.32 u strip on the wall it
   // caps — the wall is one long Buffer mesh the column grid cannot stamp.
