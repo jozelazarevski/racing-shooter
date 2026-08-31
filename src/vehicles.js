@@ -11,7 +11,15 @@ const SPRAY_SNOW = new THREE.Color(0xf4faff); // tire spray tints (snow / wet)
 const BOG_WRECK_S = 5;
 const SPRAY_WET = new THREE.Color(0x9dbcd2);
 const FORD_FOAM = new THREE.Color(0xeef7fb); // ---- river-fords: bow-wave white
-const GRADE = 16;   // grade force: vf -= GRADE * slope * dt while grounded on-road
+// 9.8, down from 16 (r293): GRADE is gravity's slope component and 16 was
+// arcade-inflated to be felt against a 34-strength engine. The spec engine
+// drives at ~6.6, and at GRADE 16 a 0.28-slope massif ramp — the free-roam
+// mountain the goat-peaks feature exists for — cost more than the car had
+// (+4.6 u in 4.5 s against test-goat's floor of 25). Physical gravity keeps
+// every law's shape: moderate grades climb slowly, grades past ~0.67 out-
+// pull the engine entirely, and the MAX_GRADE traction fade still owns the
+// band between.
+const GRADE = 9.8; // grade force: vf -= GRADE * slope * dt while grounded on-road
 const DOWNHILL_CAP = 1.12; // downhill overspeed ceiling (× topSpeed)
 // Steepest ground a car can still pull itself up. The drivable massif peaks
 // near 24%, so this leaves all of it alone and only ever engages on the border

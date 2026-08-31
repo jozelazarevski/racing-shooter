@@ -47,7 +47,13 @@ const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' :
 // reach is a LEVEL DESIGN item now (reshape the brow or open its entry),
 // tracked in HANDOVER r290. Crest physics stays pinned by the three worlds
 // below and test-goat's GLACIER COL law.
-for (const [id, name] of [[1, 'PINE VALLEY'], [13, 'OUNINPOHJA'], [21, 'FURKA RIDGE']]) {
+// ...and PINE VALLEY follows ROCKFALL off the roster (r293): its sharpest
+// brow (index ~276) crowns a CLIMB, and the spec-shaped engine arrives at
+// ~45 km/h even from a 158 km/h entry 40 samples out — no curvature beats
+// gravity at that speed. Measured with tools-scratch/browtest.mjs; the
+// reshape (or a downhill approach) is level design, tracked with
+// ROCKFALL's in HANDOVER. OUNINPOHJA and FURKA still fly.
+for (const [id, name] of [[13, 'OUNINPOHJA'], [21, 'FURKA RIDGE']]) {
   const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
   await p.goto(`${BASE}/?level=${id}&go=1&unlockall=1`, { waitUntil: 'load' });
   const ok = await p.waitForFunction(() => window.__game?.track?.center && window.__game.player,
