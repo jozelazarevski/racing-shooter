@@ -82,7 +82,14 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [10, 'ROCKFALL RAVINE'], [13, 'OUN
       const Rahead = Math.max(6, (8 * su) / Math.max(0.05, Math.abs(turn)));
       const vmax = Math.sqrt(1.15 * 14 * Rahead);       // the tyre budget's own corner speed
       const vNow = Math.hypot(car.vel.x, car.vel.z);
-      const over = vNow > vmax;
+      // ...and COMMIT OVER THE BROW: with plain corner braking the rig
+      // lapped ROCKFALL cleanly at up to 187 km/h and launched ZERO times,
+      // because the ravine's crests sit right where its corners announce
+      // themselves and the rig was always lifting on the brow. A rally
+      // driver brakes BEFORE the crest and holds flat over it — jumping is
+      // a commitment, which is precisely the thing this suite measures.
+      const drop = t.center[i].y - t.center[(i + 6) % N].y;
+      const over = vNow > vmax && !(drop > 1.2);
       car.step(1 / 60, { throttle: over ? 0 : 1, brake: over ? 1 : 0,
         steer: Math.max(-1, Math.min(1, d * 2)), drift: false, hold: false });
       maxLoose = Math.max(maxLoose, car.landGrip || 0);
