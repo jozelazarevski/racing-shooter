@@ -4161,6 +4161,67 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r293 — THE SPEC: RALLY_DRIVING.md, ADOPTED AND MEASURED
+The user handed a normative driving spec (RFC 2119, Dustline
+RALLY_DRIVING.md). Its stack is a Rapier raycast vehicle; ours is not —
+so the adoption is by MAPPING, recorded in DRIVING_SPEC.md at the repo
+root with every deviation, and the acceptance numbers are the contract.
+tests/test-drivingspec.mjs holds them: "the spec holds", 7/7.
+
+  12.1  0-100 km/h        5.65 s   (spec 5.8 ± 0.3)
+  12.3  100-0 km/h        42.9 m   (spec 42 ± 3)
+  12.4  top speed         200 = the showroom cap (spec's base car 195;
+        §13 allows per-car top speed). Measured on an ENDLESS STRAIGHT
+        made of real road — the expressway block, hopped on a timer —
+        after two runway lessons: a station-window hop kept a city
+        corner inside the loop (measured the corner, 159) and a
+        distance hop reached the block end (measured off-road drag).
+  12.5  full lock at 80   drifts, never spins, keeps rolling
+  12.7  handbrake at 70   60 deg of body slip in 0.5 s
+  12.8  ice family        no yaw impulse, by the spec's own MUST
+
+WHAT CHANGED UNDER THE CAR, all in src/driving.js (+ driving.json boot
+override, per spec §13 — no driving constant lives inline any more for
+the values this round touched):
+  - THE ENGINE IS THE SPEC SHAPE: a flat drive force (~6.6 u/s²) with a
+    small linear drag (0.122/s) replaces the huge-thrust/huge-drag
+    governor. One pair lands 0-100 AND top speed. The traction cap is
+    the engine now (launchCapFade 99) and the PEDAL scales it — the
+    first cut made half throttle produce full force.
+  - THE PLATEAU (§7.1): grip at full slip holds at 70% of budget, up
+    from 22% — "an arcade car the player can hold sideways". The single
+    biggest holdability change of the adoption.
+  - THE HANDBRAKE GUARANTEES THE TAIL (§8.2): a yaw impulse on press,
+    0.18 × lateral speed in the steer direction, zero below ~30 km/h,
+    disabled on ice, decaying over 0.3 s.
+  - COUNTER-STEER ASSIST (§8.3): gain 0.55 toward killing the slide,
+    off past ~65 deg — the spin is earned. The first cut used -vl and
+    steered INTO the rotation (traced: 2.53 rad/s past a 0.81 cap).
+  - GRADE WENT PHYSICAL: 16 was gravity inflated to be felt against a
+    34-strength engine; at 9.8 the free-roam massif climbs again
+    (test-goat's control had collapsed to +4.6 u against a floor of 25).
+  - THE WILDS FLAG: the face-grade baseline, ripple-proof MAX_GRADE and
+    the steep wall all gated on tracked |lateral| > 60, which under-reads
+    remoteness near switchbacks (the stray rule's own lesson). Now an
+    upper-bound precheck plus the global sweep, per that rule's pattern.
+  - Yaw caps eased to 1.10-1.25 of budget: sustained over-grip yaw
+    churns speed the spec engine cannot replace — the spec's own reason
+    for narrowing steer angle with speed.
+
+THE LADDER SURVIVED WHOLE: difficulty 12/12 (rivals share every physics
+change), wedge, unstuck, gorge, duel-rival, lap-count, slowfield,
+field-stalls, goat 26/26, jumps, spec suite — green.
+
+TWO WORLDS AND ONE RIG PAID HONESTLY: PINE VALLEY's jump brow crowns a
+climb the spec engine arrives at 45 km/h up — it follows ROCKFALL off
+the jumps roster (browtest.mjs holds both measurements; the reshapes
+are one level-design task). And test-climb's blind steep-scan went red
+through THREE scan repairs, each trace finding the rig measuring a
+different terrain feature (a plateau crest, a highland rim, a mesa top)
+while the car fought every true face exactly as ordered — it is a
+watched WARN now, with test-goat's measured ceilings as the binding
+law and the rebuild tracked with the suite-redesign task.
+
 ## r292 — THE ALPINE PHOTO: A CHAIRLIFT, TOURABLE MEADOWS, AND MID-RANGE
 ## STEERING THAT ANSWERS
 The brief arrived as a photograph: a safari 911 parked on a high meadow
