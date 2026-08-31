@@ -2080,8 +2080,14 @@ export class Car {
         const tractA = 2.8 * (this._gripBudget ?? this.grip);
         const capBlend = THREE.MathUtils.clamp(1 - Math.abs(vf) / (ref * 1.2), 0, 1);
         const driveA = wantA > tractA ? tractA + (wantA - tractA) * (1 - capBlend) : wantA;
+        // wheelspin is a FIRST-GEAR event: this feed once faded with
+        // capBlend (gone only by 120 km/h), so ordinary mid-speed cruising
+        // read as perpetual wheelspin — slip 0.3 at 60 km/h, most of the
+        // "driving like it's on ice" report. It fades out by 36 km/h now,
+        // where a real car's engine stops out-torquing its tyres.
+        const launchness = THREE.MathUtils.clamp(1 - Math.abs(vf) / 10, 0, 1);
         this._spinFeed = wantA > tractA * 1.05
-          ? Math.min(0.6, (wantA / tractA - 1) * 0.45 * capBlend) : 0;
+          ? Math.min(0.6, (wantA / tractA - 1) * 0.45 * launchness) : 0;
         vf += driveA * dt;
         this.reverseTimer = 0;
       }
@@ -2183,7 +2189,12 @@ export class Car {
     const cornerLoad = Math.abs(steer) * speedN;
     // handling raises the slip onset slightly — fewer accidental breakaways,
     // but the threshold stays low enough that committed cornering still drifts
-    let slipTarget = THREE.MathUtils.clamp((cornerLoad - (0.28 + 0.05 * hnd) * sGrip) * 1.7, 0, 1);
+    // 0.55, up from 0.28 (r290): this heuristic predates the physics. With
+    // the over-budget law and the yaw cap doing the real work, an onset at
+    // 0.28 started a slide on EVERY substantial input above ~60 km/h — most
+    // of the reported ice. It keeps only its edge case now: full lock at
+    // high speed strains the rear even inside the budget.
+    let slipTarget = THREE.MathUtils.clamp((cornerLoad - (0.55 + 0.05 * hnd) * sGrip) * 1.4, 0, 1);
     // ...and the lateral-acceleration law feeds it too: demand past the
     // tyre's budget IS a slide, whatever the steer fraction was (one frame
     // stale, which at 60 Hz is nothing)
@@ -2282,7 +2293,11 @@ export class Car {
     // track's geometry; the speed term still adds on top of it.
     const rise = 0.45 + 0.55 * THREE.MathUtils.clamp(sp / 13, 0, 1);
     const taper = 1 - this.steerTaper * THREE.MathUtils.clamp((sp - this.maxSpeed * 0.6) / (this.maxSpeed * 0.55), 0, 1);
-    let authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
+    // 0.15, down from 0.35 (r290): the mid-slide bonus amplified yaw exactly
+    // when the car was already rotating — the "speed boat". Counter-steer
+    // keeps a modest edge; the slideRelax on the yaw cap below is the real
+    // mid-slide allowance now.
+    let authority = rise * taper * (1 + 0.15 * this.slip);
     // A rally car CAN rotate a little in the air — inertia, and a stab of
     // throttle against the driveline — so this is not zero. It is small enough
     // that it reads as tidying the car up for the landing rather than as
@@ -2309,8 +2324,30 @@ export class Car {
       // circle, half a real car's tightest. A handbrake swing rotates a
       // car because road speed carries yaw momentum; below ~22 km/h there
       // is none to spend, so the relaxation fades in from 6 to 12 u/s.
-      const slideRelax = 1.5 * this.slip * THREE.MathUtils.clamp((sp - 6) / 6, 0, 1);
-      const yawCap = (sp / 4.0) * (1 + slideRelax) * dt;
+      // ...and it opens for COUNTER-STEER and the HANDBRAKE, not for
+      // steering deeper into the slide: an unconditional relax was a
+      // feedback loop (slip opens the cap -> more yaw -> more demand ->
+      // more slip) that kept every slide alive as long as the stick was
+      // held — the "spinning like crazy". Steering into the slide keeps
+      // only a sliver.
+      const counterSteer = Math.abs(vl) > 1 && Math.sign(steer) !== Math.sign(vl);
+      const relaxGain = (inputs.drift || counterSteer) ? 1.5 : 0.25;
+      const slideRelax = relaxGain * this.slip * THREE.MathUtils.clamp((sp - 6) / 6, 0, 1);
+      // THE SECOND BRANCH OF THE BICYCLE (r290, "on small turn it turns so
+      // much, like a speed boat... now it's driving like it's on ice"):
+      // at speed the bound is the TYRE, omega <= a_max / v. steerRate 2.5
+      // was sized for the old rail grip, so once the budget landed, every
+      // ordinary input commanded 2-3x the yaw the tyres could deliver, the
+      // over-budget law read it as a slide, and the whole game iced over —
+      // grip cut, lag spill, boat. Capped at 92% of the budget, a clean
+      // input holds a clean 1.4g arc with ZERO slide; steering harder just
+      // understeers wide, which is what a real car does — and the way
+      // through a tight corner at speed is the brake or the handbrake,
+      // which is the drift promise kept honestly. The relaxation opens the
+      // cap mid-slide so counter-steer and held drifts still work.
+      const aMax = 4.0 * (this._gripBudget ?? this.grip);
+      const yawCap = Math.min(sp / 4.0, 0.92 * aMax / Math.max(sp, 0.1))
+        * (1 + slideRelax) * dt;
       dTheta = THREE.MathUtils.clamp(dTheta, -yawCap, yawCap);
     }
     // DRIVING AID: a gentle nudge back toward the road's direction when the
