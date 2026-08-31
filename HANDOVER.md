@@ -4180,7 +4180,10 @@ outlive the 3.3 s toast lifetime between fill and measure; 24/24
 twice. ATTRIBUTED, NOT OURS: test-tyres "the track card carries
 the demand and the fix" reproduces identically on an r301 worktree
 with r301's own suite — pre-existing, filed with the economy/feats
-reds. Tag r303.
+reds. Likewise test-newworlds "appended at the END of the array"
+(tail 73-78): the r294 base clone fails it with the SAME message
+under its OWN r294 suite — the suite's NEW table simply predates the
+RIVIERA batch; roster-order redesign is its own small round. Tag r303.
 
 ## r302 — CLAUDE.md v1.2 §3.5 + THE PORSCHE GAUGE: ERASE THE GUIDANCE, KEEP THE DIAL
 The user posted CLAUDE.md v1.2 (supersedes PATCH_02 v1.4 and CORRIDOR
