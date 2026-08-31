@@ -62,6 +62,14 @@ const r = await p.evaluate(() => {
       // grade ground, so the scan was magnetised to exactly the one slope
       // this law must not measure. Same exclusion the rim gate already gets.
       if (t._nearGoat?.(x, z, 30)) continue;
+      // ...and off the SLAB FIELDS (r293): the massif mesas are solid, their
+      // tops are stand-able surfaces (Law of Solidity), and a stepped flank
+      // is a staircase of slab tops a car can ratchet up at a crawl. Traced:
+      // the "steep face" rose 22.7 u in the first FRAME — the car snapping
+      // onto a mesa top, not terrain. This law is about the GROUND; big
+      // solids are furniture.
+      if ((t.solids ?? []).some((s) => (s.h > 12 || (s.r ?? 0) > 10)
+        && Math.hypot(x - s.x, z - s.z) < (s.r ?? 0) + 30)) continue;
       // TRUE distance to the whole lap, not the tracked-index lateral: near a
       // switchback the tracker's leg is not the nearest leg, and a "remote"
       // spot 40 u from another leg keeps its engine (strayed 0) while a real
