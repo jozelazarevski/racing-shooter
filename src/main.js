@@ -10,6 +10,10 @@ import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
   HOUSE_TEMPLATES, worldFacets, surfaceClass, surfaceSlick, SURFACE_LABEL, TYRE_NAME,
   CHAPTERS, CHAPTER_GATE, chapterSpans } from './track.js';
 import { WorldEditor } from './editor.js';
+import { loadDrivingOverrides } from './driving.js';
+// RALLY_DRIVING.md §13: driving.json overrides load at boot, fire-and-forget
+// — no file shipped means the defaults in driving.js ARE the tune.
+loadDrivingOverrides();
 import { SyncService, encodeSyncCode, decodeSyncCode, cloudConfigured, mergeSnapshots } from './sync.js';
 import { PlayerCar, EnemyCar, CAR_CATALOG, buildCarMesh,
   tyreClass, tyreMaxClass, tyreLevelFor, TYRE_LABEL, tyrePenalty,

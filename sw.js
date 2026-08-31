@@ -33,6 +33,8 @@ const CORE = [
   './index.html',
   './manifest.webmanifest',
   './src/offline.js',
+  './src/driving.js',
+  './driving.json',
   './src/traffic.js',
   './src/main.js',
   './src/audio.js',

@@ -1,0 +1,20 @@
+{
+  "launchTraction": 1.89,
+  "launchCapFade": 99,
+  "dragPower": 0.122,
+  "dragCoast": 0.14,
+  "dragOffRoad": 0.35,
+  "dragOffRoadRoam": 0.16,
+  "brakeCap": 2.6,
+  "hbYawImpulse": 0.18,
+  "hbMinSpeed": 8.4,
+  "hbIceDisabled": true,
+  "slipGripFloor": 0.70,
+  "csAssistGain": 0.55,
+  "csAssistSlipMin": 0.22,
+  "spinSlipAngle": 1.13,
+  "yawRMin": 4.0,
+  "yawCapLo": 1.25,
+  "yawCapHi": 1.10,
+  "reverseAccel": 5.0
+}

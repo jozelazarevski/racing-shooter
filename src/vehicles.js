@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { ROAD_HALF, RIM_RADIUS, mergeBoxes } from './track.js';
 import { numberPlateTexture, glowTexture } from './textures.js';
+import { DRIVING } from './driving.js';
 
 const WALL_LIMIT = ROAD_HALF + 0.55; // barrier clamp for car center
 const SPRAY_SNOW = new THREE.Color(0xf4faff); // tire spray tints (snow / wet)
@@ -2077,8 +2078,14 @@ export class Car {
         // into the slip law below — launch wheelspin wags the tail instead
         // of teleporting the car to 100.
         const wantA = this.accel * punch * sTract * inputs.throttle * climbAuth;
-        const tractA = 2.8 * (this._gripBudget ?? this.grip);
-        const capBlend = THREE.MathUtils.clamp(1 - Math.abs(vf) / (ref * 1.2), 0, 1);
+        // …scaled by the PEDAL (r293): with launchCapFade at 99 the traction
+        // cap IS the engine (RALLY_DRIVING.md shape — flat force, small
+        // drag), and an unscaled cap made half throttle produce full force.
+        // The pedal now scales the cap, so partial throttle is partial
+        // drive, like an engine and unlike a cliff.
+        const tractA = DRIVING.launchTraction * (this._gripBudget ?? this.grip)
+          * Math.max(0.1, inputs.throttle);
+        const capBlend = THREE.MathUtils.clamp(1 - Math.abs(vf) / (ref * DRIVING.launchCapFade), 0, 1);
         const driveA = wantA > tractA ? tractA + (wantA - tractA) * (1 - capBlend) : wantA;
         // wheelspin is a FIRST-GEAR event: this feed once faded with
         // capBlend (gone only by 120 km/h), so ordinary mid-speed cruising
@@ -2099,7 +2106,7 @@ export class Car {
         // cap sits above the drive cap (2.8) at 4.2*gripBudget ≈ 1.5g:
         // 100-0 in ~27 m. Surface still bites through gripBudget AND sBrake.
         const decel = Math.min(this.accel * 1.6 * sBrake,
-          4.2 * (this._gripBudget ?? this.grip)) * inputs.brake * dt;
+          DRIVING.brakeCap * (this._gripBudget ?? this.grip)) * inputs.brake * dt;
         if (vf > 1) {
           vf = Math.max(0, vf - decel); // braking can stop the car, never push it backwards
           this.reverseTimer = 0;
@@ -2118,7 +2125,7 @@ export class Car {
             // 20 km/h in a third of a second. 5 m/s² is a brisk real-world
             // reverse (~1.1 s to 20) and still strong enough to back out of
             // a wedge on a slope (test-unstuck holds the proof).
-            vf -= Math.min(this.accel * 0.5, 5.0) * inputs.brake * dt; // reverse gear engaged
+            vf -= Math.min(this.accel * 0.5, DRIVING.reverseAccel) * inputs.brake * dt; // reverse gear engaged
           } else if (vf > 0) {
             vf = Math.max(0, vf - decel); // settle to exactly 0 — no sign flip, ever
           } else if (vf < 0) {
@@ -2163,13 +2170,13 @@ export class Car {
     // rivals together, PINE's crests to 1 launch, GLACIER COL's control
     // from 6 to 1. This restores the average the tuning assumed; the top
     // speed itself is clamped at vCap, so only mid-range punch returns.
-    const dragK = inputs.throttle > 0.05 ? 0.50 : 0.14;
+    const dragK = inputs.throttle > 0.05 ? DRIVING.dragPower : DRIVING.dragCoast;
     // MEADOW TOURING (r292, from the player's alpine photo): in FREE ROAM
     // the off-road drag halves — a safari car wandering a high meadow
     // should tour, not wade. RACING keeps the full 0.35: the off-road
     // penalty is load-bearing there (shortcuts, rejoin discipline, every
     // corner-cut law), and all of those gates run in race mode.
-    const offDrag = offRoad ? (this.game.freeRoam ? 0.16 : 0.35) : 0;
+    const offDrag = offRoad ? (this.game.freeRoam ? DRIVING.dragOffRoadRoam : DRIVING.dragOffRoad) : 0;
     vf -= vf * ((sliding ? Math.min(0.40, dragK) : dragK) + offDrag) * dt;
     // Slope-aware speed ceiling, matched to the grade/drag equilibrium: a
     // downhill grade EXTENDS top speed proportionally (never past topSpeed *
@@ -2267,7 +2274,11 @@ export class Car {
       if (this._wetT <= 0) this._wetMax = 0;
     }
     this._gripBudget = gripBudget;
-    let grip = gripBudget * (1 - 0.78 * this.slip);
+    // RALLY_DRIVING.md 7.1 (r293): grip at full slip holds at the PLATEAU,
+    // not a 22% collapse — "a car that keeps 70% is an arcade car the
+    // player can hold sideways". This is the single biggest holdability
+    // change of the spec adoption.
+    let grip = gripBudget * (1 - (1 - DRIVING.slipGripFloor) * this.slip);
     if (inputs.drift) grip = Math.min(grip, this.grip * 0.22);
     // opt-in grip instrument (headless): set __game.__gripProbe = {} to read
     // the lateral grip the player is actually running (wet-tire verification)
@@ -2382,11 +2393,44 @@ export class Car {
       // SPEED still demand the brake or the handbrake. `_yawCapM` is
       // exported so the slip feed's dead zone can track this cap — extra
       // mid-range yaw must not read as a perpetual slide.
-      const capM = 1.15 + 0.45 * THREE.MathUtils.clamp((50 - sp) / 25, 0, 1);
+      const capM = DRIVING.yawCapHi + (DRIVING.yawCapLo - DRIVING.yawCapHi)
+        * THREE.MathUtils.clamp((50 - sp) / 25, 0, 1);
       this._yawCapM = capM;
-      const yawCap = Math.min(sp / 4.0, capM * aMax / Math.max(sp, 0.1))
+      const yawCap = Math.min(sp / DRIVING.yawRMin, capM * aMax / Math.max(sp, 0.1))
         * (1 + slideRelax) * dt;
       dTheta = THREE.MathUtils.clamp(dTheta, -yawCap, yawCap);
+      // RALLY_DRIVING.md §8.2 (r293): THE HANDBRAKE GUARANTEES THE TAIL.
+      // A yaw impulse on PRESS — 0.18 × current lateral speed, in the steer
+      // direction — scaled to zero below ~30 km/h and disabled on the ice
+      // family, decaying over ~0.3 s. This is the spec's own "arcade cheat
+      // that guarantees the tail steps out when the player asks".
+      const onIce = this.game.track?.T?.surface === 'snow';
+      if (inputs.drift && !this._hbHeld && sp > 2 && !(DRIVING.hbIceDisabled && onIce)) {
+        const latMag = Math.max(2.5, Math.min(20, Math.abs(vl) + sp * 0.25));
+        const dirK = steer !== 0 ? Math.sign(steer) : (vl !== 0 ? -Math.sign(vl) : 1);
+        this._hbKick = DRIVING.hbYawImpulse * latMag * dirK
+          * THREE.MathUtils.clamp(sp / DRIVING.hbMinSpeed, 0, 1);
+      }
+      this._hbHeld = !!inputs.drift;
+      if (this._hbKick) {
+        dTheta += this._hbKick * dt;
+        this._hbKick *= Math.max(0, 1 - 3.3 * dt);
+        if (Math.abs(this._hbKick) < 0.05) this._hbKick = 0;
+      }
+      // §8.3: COUNTER-STEER ASSIST — past the slip threshold the car adds
+      // yaw toward killing the slide (gain 0.55), and past the spin angle
+      // (~65°) it stops helping: the player crossed the line; the game lets
+      // them spin. This is what makes "recoverable from a full 90° slide
+      // with counter-steer within 0.6 s" hold for thumbs on a phone.
+      const beta = Math.atan2(Math.abs(vl), Math.max(0.5, Math.abs(vf)));
+      if (this.slip > DRIVING.csAssistSlipMin && beta < DRIVING.spinSlipAngle && !inputs.drift) {
+        // sign: +dTheta with steer + leaves velocity on the vl<0 side (this
+        // engine's right-vector convention), so re-aligning the nose to the
+        // velocity is atan2(vl, vf) — the first cut used -vl and steered
+        // INTO the rotation, measured as a 2.53 rad/s spike past a 0.81 cap.
+        const align = Math.atan2(vl, Math.max(3, Math.abs(vf)));
+        dTheta += THREE.MathUtils.clamp(DRIVING.csAssistGain * align * 2.0, -1.4, 1.4) * dt;
+      }
     }
     // DRIVING AID: a gentle nudge back toward the road's direction when the
     // player isn't actively steering. It never fights your input and never
