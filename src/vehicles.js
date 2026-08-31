@@ -5406,7 +5406,15 @@ export class PlayerCar extends Car {
         this._wedgeAt = null;
       } else {
         if (!this._wedgeAt) this._wedgeAt = { x: this.pos.x, z: this.pos.z };
-        if (Math.hypot(this.pos.x - this._wedgeAt.x, this.pos.z - this._wedgeAt.z) > 6) {
+        // 12 m OFF THE COURSE, 6 m otherwise (r294, "gets stuck here" — IL
+        // BUDELLO, pinned by a building at 3-8 km/h): the spec engine
+        // grinds against obstacles at speeds just over the old 6 m line
+        // (4.3 km/h), going nowhere for ever. When the race itself is
+        // shouting OFF THE COURSE the player is somewhere the stage does
+        // not want them — rescue generously there. Roam and on-course keep
+        // the tight line, so a genuine mountain crawl is never yanked.
+        const wedgeClear = (this._strayed ?? 0) > 0 ? 12 : 6;
+        if (Math.hypot(this.pos.x - this._wedgeAt.x, this.pos.z - this._wedgeAt.z) > wedgeClear) {
           this._wedgeAt = { x: this.pos.x, z: this.pos.z };
           this._wedgeT = 0;
         } else {
