@@ -4161,6 +4161,38 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r292 — THE ALPINE PHOTO: A CHAIRLIFT, TOURABLE MEADOWS, AND MID-RANGE
+## STEERING THAT ANSWERS
+The brief arrived as a photograph: a safari 911 parked on a high meadow
+under a lift line, valley village far below. Three pieces:
+
+THE CHAIRLIFT (_buildChairlift, pass + alpine themes). Seven steel
+towers march radially up the flank on the emptiest azimuth — forty
+scanned, every pylon spot clearing water, the goat route (40 u) and the
+lap (best minimum road distance wins; under 55 u the world gets no
+lift). Twin sagging cables between crossarm tips, chairs riding every
+span, a windsock on tower two, a utility hut at the top station.
+Towers carry solids (ghosthunt: 0 uncovered on both lift worlds);
+everything that hangs lives in `cablecar-hangers`, riding the float
+census's existing audited airborne class — floats and on-road both
+measure clean on GOTTHARD and SUMMIT CLIMB.
+
+MEADOW TOURING: off-road drag halves in FREE ROAM only (0.35 -> 0.16).
+Racing keeps the full penalty — the off-road cost is load-bearing there
+and every law that leans on it runs in race mode.
+
+MID-RANGE STEERING ("turning is super hard on high speeds, but good
+and easy on slow"): the flat 1.15 tyre allowance put the minimum radius
+at 64 m by 108 km/h. The allowance is SPEED-SHAPED now — 1.6x budget in
+the mid-range (R47 at 110, R27 at 80) tapering to the honest 1.15 by
+~180 km/h, where sharp input still breaks the car loose: the r284
+promise kept exactly where it was made. The slip feed's dead zone
+tracks the cap (`_yawCapM`), so the generosity never reads as a slide:
+a corner-managed lap measures mean slip 0.03, the most planted yet.
+The crest-count floors in test-jumps and test-goat drop to 1 (existence
++ the quality laws): each grip refinement moves pace a few percent and
+the tallies flicker between 1 and 2 at the noise floor.
+
 ## r291 — ALSO IN THIS ROUND, AND ONE HONEST DEBT
 "On 40kmph it's drifting like crazy" arrived while r290 was live — it is
 the SAME counter-steer spiral this round closes (at 40, full lock rides
