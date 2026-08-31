@@ -108,14 +108,16 @@ const r4 = await p.evaluate(() => {
   };
   c.alive = true; c.health = 100; c.airborne = false; c.vy = 0;
   placeAt(10, 30);
+  const anchor = t.pointAt(10, 0);
   let vTop = 0;
   for (let k = 0; k < 2400; k++) {
-    const i = c.trackIndex;
-    if (((i - 10 + N) % N) > 50) placeAt(10, Math.hypot(c.vel.x, c.vel.z));
-    const aim = t.center[(c.trackIndex + 8) % N];
-    let d = Math.atan2(aim.x - c.pos.x, aim.z - c.pos.z) - c.heading;
-    while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
-    c.step(1 / 60, { throttle: 1, brake: 0, steer: Math.max(-1, Math.min(1, d * 2)), drift: false, hold: false });
+    // steer 0, hop back by DISTANCE: the first cut respawned by station
+    // window, which put a right-angle city corner inside the loop and
+    // measured the corner (159) instead of the engine (~200).
+    if (Math.hypot(c.pos.x - anchor.x, c.pos.z - anchor.z) > 180) {
+      placeAt(10, Math.hypot(c.vel.x, c.vel.z));
+    }
+    c.step(1 / 60, { throttle: 1, brake: 0, steer: 0, drift: false, hold: false });
     vTop = Math.max(vTop, Math.hypot(c.vel.x, c.vel.z) * 3.6);
   }
   return { vTop: Math.round(vTop), vCap: Math.round((c.maxSpeed ?? 55) * 3.6) };
