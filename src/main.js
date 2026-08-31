@@ -9197,7 +9197,8 @@ class Game {
       cactus ? [0x4a7a3c, 0x9ac878] : [0x6a4a2a, 0x3e5e30], cactus ? 0.95 : 0.6);
     if (car) car.vel.multiplyScalar(0.82); // trees don't stop you, but they cost real speed
     if (car === this.player) {
-      this.player.damage(4, null);
+      // fix 10: a sapling is a light prop — the speed scrub above is the whole
+      // price. (Charged 4 hull before; "TIMBER! +15" read as an award that hurt.)
       this.buzz(18);
       this.shake = Math.min(1, this.shake + 0.15);
     }
@@ -9220,28 +9221,14 @@ class Game {
     // ANGLE: punting a stone square-on costs the full figure; catching one with
     // the corner of the bumper flicks it away and barely marks you.
     const glance = square < 0.55;
-    // RALLY_PATCH_02 §3.2: glancing contact under ~20° (square < 0.34) MUST
-    // cost 0 hull — a 199 km/h wall scrape is paint, not 76 hull. Sparks and
-    // sound still fire; only the damage line is forgiven.
-    const scrapeFree = square < (window.__DRIVING?.patch02?.contactGlanceSquare ?? 0.34);
-    const angleMul = 0.45 + 0.55 * THREE.MathUtils.clamp(square, 0, 1);
-    // damage: real, but a fraction of what the same stone cost as a wall
-    // THROUGH damage(), NOT STRAIGHT INTO health. This was the one damage path
-    // in the game that wrote the hull directly, and everything damage() does
-    // was therefore skipped: hull plating, the part that pops off at 66% and
-    // 33%, the `_lastHurt` stamp, and — the bad one — the `health <= 0` wreck
-    // check. Measured: a player on 6 hull took one stone shunt and ended on
-    // { health: 0, alive: true, destroyCalled: false }. Still driving, no husk,
-    // no respawn. And because `_lastHurt` was never stamped, the 5-second
-    // pit-crew timer was already satisfied, so the wreck immediately began
-    // healing itself back up from zero.
-    //
-    // damage() applies the difficulty scale itself, so the manual hullMul that
-    // used to be here is gone rather than being applied twice.
-    const before = car.health;
-    car.damage(Math.max(3, (impact - 9) * 0.9 * heft) * angleMul, null);
-    const dmg = before - car.health;      // what it actually cost, post-scaling
-    // …and the speed it takes with it answers the angle too
+    // PATCH_02 v1.2 fix 10 (prop tiers): a knockable stone is a light prop —
+    // it SHOVES, it does not bill. Hull cost is 0; the price is the speed it
+    // scrubs (angle-scaled below) plus the moment of shake. Boulders 1.15 u
+    // and up never reach this path — they are static and pay the full
+    // contact law in onSolidCrash. (The old line here charged
+    // max(3,(impact−9)·0.9·heft) and made a kerb stone a wall with extra
+    // steps; recording B lost three hulls to trackside furniture.)
+    // …the speed it takes answers the angle too
     car.vel.multiplyScalar(1 - 0.12 * heft * (0.3 + 0.7 * square));
     const at = new THREE.Vector3(ob.x, (ob.y ?? car.pos.y) + 0.4, ob.z);
     this.particles.splinters(at, new THREE.Vector3(dx, 0.3, dz), [0x8a8378, 0x55504a], 0.7);
@@ -9253,8 +9240,9 @@ class Game {
       this.buzz(glance ? 14 : 30);
       this.score += 20;
       this.styleBump?.();
-      this.hud.feed(glance ? `ROCK FLICKED  −${Math.round(dmg)} HULL`
-        : `ROCK SHUNTED  −${Math.round(dmg)} HULL`, 'bad');
+      // an award, not a bill — fix 10 made this a SMASHED, and the feed
+      // must read like one or the player still thinks they got hurt
+      this.hud.feed(glance ? 'ROCK FLICKED ASIDE  +20' : 'SMASHED!  ROCK  +20', 'good');
     }
     // Hand it to the roller. Snapping the instance to its final spot in one
     // frame was a teleport — the rock appeared to vanish and reappear, which is
@@ -9499,14 +9487,23 @@ class Game {
   }
 
   /** Rammed a BIG tree: the tree wins. Needle shower, real trunk damage. */
-  onTreeCrash(tr, car, impact, nx, nz) {
+  onTreeCrash(tr, car, impact, nx, nz, square = 1) {
     const n = new THREE.Vector3(nx, 0, nz);
     const at = new THREE.Vector3(tr.x, (tr.y ?? 0) + 2.2, tr.z);
     // canopy sheds needles + a couple of cones/branches
     this.particles.splinters(at, n, [0x2a5a30, 0x6a4a2a], Math.min(1, impact / 14));
     this.particles.debris(at, Math.min(5, 2 + (impact / 6 | 0)));
     this.particles.driftSmoke(car.pos);
-    let dmg = impact > 5 ? Math.min(35, (impact - 5) * 1.8) : 0;
+    // PATCH_02 v1.2: the ONE contact law, trees included — glancing contact
+    // under square 0.34 is bark and paint; a real hit pays the linear rate
+    // to the same 45 cap the rocks answer to. (Was (impact−5)·1.8 cap 35
+    // with no angle term at all: recording B's 145 km/h brush cost 33.)
+    const P2t = window.__DRIVING?.patch02 ?? {};
+    const scrapeFree = square < (P2t.contactGlanceSquare ?? 0.34);
+    let dmg = !scrapeFree
+      ? Math.min(P2t.contactDamageCapPerHit ?? 45,
+          (P2t.contactDamageK ?? 0.9) * Math.max(0, impact - (P2t.contactDamageThresholdMs ?? 5)))
+      : 0;
     // trees draw on the same 60/s world-damage budget as stone (PATCH_02 §3.2)
     if (dmg > 0 && car === this.player) {
       const now = this.raceTime ?? 0;
@@ -9515,6 +9512,11 @@ class Game {
       car._wdmgSum = (car._wdmgSum ?? 0) + dmg;
     }
     if (dmg > 0) car.damage(dmg, null, true);  // raw: the contact law IS the budget
+    if (car === this.player && dmg > 0) {
+      this.telemetry?.log('damage', { src: 'tree', amount: +dmg.toFixed(1),
+        vNormal: +impact.toFixed(1), square: +square.toFixed(2),
+        hullAfter: Math.round(car.health) });
+    }
     if (car === this.player) {
       this.audio.scrape();
       if (dmg >= 8) this.hud.feed(`HIT A TREE  −${Math.round(dmg)} HULL`, 'bad');
@@ -10663,8 +10665,10 @@ class Game {
         if (gh > sy) lift = Math.max(lift, (gh - sy) / (1 - f));
       }
       if (lift > 0) cp.y += Math.min(lift, 18);
-      // ...and never underground wherever it ended up
-      const gCam = tk.terrainHeight(cp.x, cp.z) + 2.2;
+      // ...and never underground wherever it ended up (PATCH_02 v1.2 fix 13
+      // names this clearance; 2.2 is this engine's measured-good value)
+      const gCam = tk.terrainHeight(cp.x, cp.z)
+        + (window.__DRIVING?.patch02b?.camClearanceM ?? 2.2);
       if (cp.y < gCam) cp.y = gCam;
 
       // A CAMERA HIGH ENOUGH TO CLEAR THE HILL IS NOT A CAMERA ANY MORE.

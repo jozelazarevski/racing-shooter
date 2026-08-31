@@ -3019,7 +3019,8 @@ export class Car {
         // the thing that reads as unfair — it should cost you paint and speed,
         // then go tumbling. Anything 1.15 u and up is a real boulder and still
         // wins, and below walking pace nothing shifts at all.
-        if (ob.mat === 'stone' && !ob.knocked && (ob.r ?? 9) < 1.15
+        if (ob.mat === 'stone' && !ob.knocked
+            && (ob.r ?? 9) < (window.__DRIVING?.patch02b?.propShoveRadiusU ?? 1.15)
             && Math.abs(this.speedAlong) > 8 && gm.knockStone) {
           gm.knockStone(ob, this, Math.abs(this.speedAlong), -nx, -nz, square);
           continue;                       // no push-out — you go through it
@@ -3061,7 +3062,8 @@ export class Car {
         // wins, and below walking pace nothing shifts at all.
         const vn = this.vel.x * nx + this.vel.z * nz;
         const square = THREE.MathUtils.clamp(-vn / Math.max(3, Math.hypot(this.vel.x, this.vel.z)), 0, 1);
-        if (ob.mat === 'stone' && !ob.knocked && (ob.r ?? 9) < 1.15
+        if (ob.mat === 'stone' && !ob.knocked
+            && (ob.r ?? 9) < (window.__DRIVING?.patch02b?.propShoveRadiusU ?? 1.15)
             && Math.abs(this.speedAlong) > 8 && gm.knockStone) {
           gm.knockStone(ob, this, Math.abs(this.speedAlong), -nx, -nz, square);
           continue;                       // no push-out — you go through it
@@ -3190,11 +3192,17 @@ export class Car {
           this.pos.z = tr.z + nz * rr;
           const vn = this.vel.x * nx + this.vel.z * nz;
           if (vn < 0) {
+            // PATCH_02 v1.2 (fix 2 re-open): trees are PROPS and MUST route
+            // through the same angle-of-attack rule as stone — recording B
+            // paid 33 hull for a 145 km/h brush past a trunk. Compute the
+            // share of speed into the trunk BEFORE the bounce edits vel.
+            const square = THREE.MathUtils.clamp(
+              -vn / Math.max(3, Math.hypot(this.vel.x, this.vel.z)), 0, 1);
             this.vel.x -= nx * vn * 1.05;
             this.vel.z -= nz * vn * 1.05;
             if (!yields && this.wallGrind <= 0) {
-              this.wallGrind = 0.18;
-              gm.onTreeCrash?.(tr, this, Math.abs(vn), nx, nz);
+              this.wallGrind = square < 0.55 ? 0.55 : 0.18;
+              gm.onTreeCrash?.(tr, this, Math.abs(vn), nx, nz, square);
             }
           }
         }

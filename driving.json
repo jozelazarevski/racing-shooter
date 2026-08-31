@@ -41,5 +41,9 @@
     "camHeightMaxMul": 1.35,
     "camEaseMs": 400,
     "speedLinesFromKmh": 150
+  },
+  "patch02b": {
+    "propShoveRadiusU": 1.15,
+    "camClearanceM": 2.2
   }
 }

@@ -4212,6 +4212,45 @@ net ever runs (stub step; the net is the thing under test). And P2.8's
 escape hands off at wallEscapeMinAngleDeg 45° BY DESIGN — gate the
 hand-off, not zero.
 
+MID-ROUND the user posted v1.2 (supersedes 1.1): a second recording,
+r294 Glacier Col, three hulls lost in 157 s with ZERO rival contact —
+every point of damage from rocks, trees and props. Landed on top of the
+v1.1 work:
+  - Fix 2 RE-OPENED and closed: trees had NO angle term at all —
+    onTreeCrash took no square, so a 145 km/h brush past a trunk paid
+    like a head-on (recording B: −33, −35). The call site now computes
+    the share of speed into the trunk BEFORE the bounce edits vel, and
+    the tree pays the SAME linear law as stone (glance under 0.34 free,
+    K 0.9 over the 5 m/s threshold, the 45 cap). One law, every static
+    thing.
+  - Fix 10 (prop tiers): a knockable stone (r < 1.15 u — this engine's
+    mass class is radius) SHOVES free: zero hull, speed scrub is the
+    price, the feed reads as the award it is (SMASHED! +20, was "ROCK
+    SHUNTED −N HULL" in 'bad' red). Saplings likewise dropped their
+    4-hull sting. Boulders 1.15 u+ stay static and pay the law.
+  - Fixes 11/12/13 investigated and found ALREADY HELD on this branch —
+    probed on Glacier Col: every car spawns on the spline at heading
+    offset 0° (lat 3.6 u), lap starts at 1, rank orders by continuous
+    progress (_wraps + index/N), 7 rivals alive on mesh at GO+10, and
+    the camera has carried a 7-step sightline probe + never-underground
+    clamp since the r270s (recording B's "VIEW RESET (buried)" is the
+    CAR under terrain — the watchdog working, not the camera failing).
+    The acceptance tests now PIN all of it: P2.12-P2.17 in
+    tests/test-patch02.mjs, parameterized by LVL (run 4 and 66 — the
+    v1.2 ship gate wants both stages). 16/16 on each.
+  - patch02b block (driving.js + driving.json) carries only the keys
+    the engine READS — camClearanceM 2.2 (wired into the camera floor;
+    stricter than the spec's 1.5, kept) and propShoveRadiusU 1.15
+    (wired into both knockStone gates). spawnBehindLineM isn't wired
+    (the grid already seats on the spline); stuckDetectS /
+    lowSpeedTorqueMul belong to fix 14, NEXT build per the rollout,
+    with P2.18/P2.19.
+DEFERRED from v1.2: fix 14 (2.5 s stuck detect + low-speed torque —
+note it will collide with test-wedge-recovery's "five-second mark"
+gate, renegotiate both together) and the whole RALLY_HUD_REVIEW.md
+rebuild (task #27) — Section 4 of that doc is normative for the next
+HUD build: band layout, hull presentation, three toast lanes, H1-H8.
+
 ## r294 — LIVE-PLAY ROUND ON THE SPEC CAR: FIVE REPORTS, FIVE CLOSES
   - "Impossible to steer in this curve at this speed" (IL BUDELLO, 99):
     mid-range yaw cap 1.25 -> 1.45. Flat-out still runs wide — the drift

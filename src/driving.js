@@ -85,6 +85,22 @@ export const DRIVING = {
     camEaseMs: 400,
     speedLinesFromKmh: 150,
   },
+
+  // RALLY_PATCH_02 v1.2 §9 — recording B (Glacier Col) constants. Only the
+  // keys this engine actually READS live here; a key nothing reads is a
+  // config that lies. Deviations from the patch's names/values:
+  //   propShoveMaxKg 200  -> propShoveRadiusU 1.15 (props carry no mass;
+  //                          the knockable-stone class is radius-based)
+  //   camClearanceM 1.5   -> 2.2 (this engine's measured-good clearance —
+  //                          stricter than the spec's floor, kept)
+  //   spawnBehindLineM    -> not wired: the grid already places every car
+  //                          on the spline at tangent (probed on Glacier
+  //                          Col: lateral 3.6 u, heading offset 0°)
+  //   stuckDetectS / lowSpeedTorqueMul -> fix 14, next build per rollout
+  patch02b: {
+    propShoveRadiusU: 1.15,
+    camClearanceM: 2.2,
+  },
 };
 
 /** Boot override — main.js calls this once; failures are silent by design
