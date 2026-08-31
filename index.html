@@ -199,10 +199,8 @@
      part of the camera"), which also gives ⏸ its old slot back at 124px and
      removes the landscape squeeze that pushed it into the 💥 button. */
   #pause-btn{top:124px;right:12px}
-  #wrong-way{position:absolute;top:18%;left:50%;transform:translateX(-50%);
-    font-family:'Luckiest Guy';font-size:26px;color:#ff4a2e;
-    text-shadow:2px 2px 0 var(--ink);letter-spacing:4px;display:none;
-    animation:blink .6s steps(2) infinite;white-space:nowrap}
+  /* (r302 §3.5: the WRONG WAY banner is deleted — element, style and
+     detection all gone; off course is handled silently by the route) */
   @keyframes blink{50%{opacity:.25}}
 
   /* ---------- TOUCH CONTROLS ---------- */
@@ -370,6 +368,16 @@
      input.js rest()). Still biased left of the 🚀 button by 8px measured. */
   body.touch #speed-box{bottom:14px;left:calc(50% - 16px)}
   body.touch #speedo{width:86px;height:86px}
+  /* two-thumb parks BRAKE/DRIFT dead centre at the bottom edge (62px at b8),
+     which is exactly the gauge's one-thumb slot — measured on the r302
+     screenshot with the dial half-buried under the pedals. It rides above
+     the pedal row there, still centred, still under the weapon quad's row. */
+  /* measured at 390x844: BRAKE's ring tops out at y=748 and the 💥 column
+     starts at x=180/y=658, so the dial rides at y 660-746, x 92-178 —
+     2px clear of both. The -60px is the CENTRE bias (base rule carries
+     translateX(-50%)). */
+  body.two-thumb #speed-box{bottom:calc(98px + env(safe-area-inset-bottom));
+    left:calc(50% - 60px)}
   body.touch #nitro-wrap{display:none}  /* nitro lives on the ⚡ button */
   body.touch #weapon-box{display:none}  /* ammo counts live on the buttons */
   /* Stacked off the MEASURED height of the panel above (see hud.js
@@ -428,7 +436,11 @@
        band block's edge columns and its own max-height rows already clear a
        390px-tall screen, and every scheme-specific shuffle this block used
        to do broke the cluster's muscle memory on rotation */
-    #pause-btn{top:60px;right:calc(12px + env(safe-area-inset-right))}
+    /* landscape stacks the two icon buttons tight under the score box —
+       r303: with 📷 back on the HUD they must not share the 60px row
+       (measured 46x36 overlap when pause alone held it) */
+    #cam-btn{top:60px;right:calc(12px + env(safe-area-inset-right))}
+    #pause-btn{top:112px;right:calc(12px + env(safe-area-inset-right))}
   }
 
   /* ---------- SCREENS ---------- */
@@ -1943,7 +1955,6 @@ body.hud-rows #standings{display:block}
   background:rgba(40,8,4,.72);border:1px solid rgba(255,98,82,.65);border-radius:8px;
   padding:6px 14px;text-shadow:1px 1px 0 #000;animation:dpop .18s ease-out}
 @keyframes dpop{from{transform:scale(1.25);opacity:0}to{transform:scale(1);opacity:1}}
-#wrong-way{top:12%;z-index:13}
 
 /* ---- PLAY BAND: countdown/banner centred, edge arrows live here ---- */
 #center-msg{top:40%;font-size:clamp(44px,9vw,64px)}
@@ -1952,21 +1963,16 @@ body.hud-rows #standings{display:block}
   color:#ffd400;text-shadow:0 0 6px #000;transform:translate(-50%,-50%)}
 #edge-arrows .earrow.missile{color:#ff6252;animation:combopulse .3s infinite alternate}
 
-/* ---- CONTROLS BAND: hull first ---- */
-#health-box{bottom:auto;top:70.5%;left:50%;transform:translateX(-50%);width:60%;
-  max-width:560px;padding:5px 10px}
-/* on touch the band's edges belong to the buttons (UNSTUCK ends at x=72,
-   the quad starts 210px from the right edge), so the bar takes the measured
-   free middle instead of a blind 60% — the 60% spanned straight through
-   FIRE and the missile column on a 390px portrait */
-body.touch #health-box{left:80px;right:216px;width:auto;max-width:none;transform:none}
-/* the speed number lives under the progress strip, top-left — its two
-   previous homes both failed a measurement: bottom-left sat under the
-   two-thumb pedal (screenshot, r300), the hull row's sliver sat on UNSTUCK
-   (suite). The status corner is empty in every layout and rally speed
-   belongs beside the clocks anyway. */
-body.touch #speed-num{bottom:auto;top:calc(64px + env(safe-area-inset-top));
-  left:calc(14px + env(safe-area-inset-left));font-size:16px}
+/* ---- HULL: top-left, under the clocks (r302, user ask) ---- */
+/* Stacked off race-info's MEASURED height (--info-h, see hud.js
+   _watchLeftColumn) because the contracts list grows it mid-race — the
+   exact trap the old fixed top:96px fell into. Fixed compact width: the
+   60%-band bar this replaces spanned the play band's middle. */
+#health-box{bottom:auto;left:calc(12px + env(safe-area-inset-left));right:auto;
+  width:220px;max-width:46vw;transform:none;padding:5px 10px;
+  /* below race-info's MEASURED height AND below the progress strip's 62px
+     floor (the strip rides at top:48 on phones) — whichever is lower */
+  top:calc(max(20px + var(--info-h, 46px), 62px) + env(safe-area-inset-top))}
 #health-box .bar-label{display:flex;gap:8px;align-items:baseline;font-size:12px;
   white-space:nowrap;overflow:hidden}
 #health-box .bar{height:1.4vh;min-height:9px}
@@ -1981,13 +1987,9 @@ body.touch #speed-num{bottom:auto;top:calc(64px + env(safe-area-inset-top));
 @keyframes dfloat{from{transform:translate(-50%,-50%);opacity:1}
   to{transform:translate(-50%,-220%);opacity:0}}
 
-/* ---- speed: a number in the corner, not a gauge in the prime slot ---- */
-#speed-box{display:none}
-#speed-num{position:absolute;left:calc(12px + env(safe-area-inset-left));
-  bottom:calc(30px + env(safe-area-inset-bottom));z-index:9;pointer-events:none;  /* clear of the build tag */
-  font-family:'Luckiest Guy';font-size:18px;color:#fff8e0;text-shadow:2px 2px 0 #000}
-#speed-num small{font-size:12px;color:#e8c987;font-family:Arial,sans-serif;font-weight:700}
-#speed-num.boosting{color:#7fd4ff}
+/* ---- the gauge is BACK (r302, user ask): the corner number is deleted,
+   the dial carries speed, revs and gear from its old bottom-centre home —
+   the one slot the pedals and the weapon quad both already avoid ---- */
 
 /* ---- TOAST LANES right: progress (gold, 20-30%) + chatter (grey, 62-68%) ---- */
 #feed{top:21%;right:12px;z-index:9}
@@ -2007,7 +2009,7 @@ body.touch #feed{right:184px}
 
 /* the desktop weapon panel stays; on touch it is hidden as before */
 @media (max-width:900px){
-  #health-box{width:72%}
+  #health-box{width:200px}
   #race-info{gap:7px;padding:4px 9px}
   #race-info .pos{font-size:17px}
   #race-info .lap,#race-info .time{font-size:12px}
@@ -2119,8 +2121,6 @@ body.touch #feed{right:184px}
       <div id="nitro-bar"><div id="nitro-fill"></div></div>
     </div>
   </div>
-  <!-- §4: speed is a number, not a gauge — read once per corner at most -->
-  <div id="speed-num">0<small> KM/H</small></div>
   <div id="edge-arrows"></div>
   <div id="chatter"></div>
 
@@ -2136,15 +2136,19 @@ body.touch #feed{right:184px}
 
   <div id="feed"></div>
   <div id="center-msg" class="titlefont"></div>
-  <div id="wrong-way">▼ WRONG WAY ▼</div>
   <!-- §4: the camera toggle moved into the pause menu — next to pause it was
        a mis-tap at speed (A 1:16). Only pause stays on the HUD. -->
+  <!-- r303 (user): the camera button is BACK on the HUD. r296 moved the
+       cycle into the pause menu as a mis-tap risk beside ⏸; the user wants
+       one-tap camera switching, and its 70px slot has sat empty since —
+       pm-camera stays too, for the player who paused to look for it. -->
+  <button id="cam-btn" class="icon-btn" title="Camera">📷</button>
   <button id="pause-btn" class="icon-btn" title="Pause">⏸</button>
 </div>
 <div id="speed-lines"></div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r300</div>
+<div id="build-tag">r303</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2479,10 +2483,10 @@ body.touch #feed{right:184px}
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r300"></script>
+<script type="module" src="./src/main.js?v=r303"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r300"></script>
+<script src="./src/offline.js?v=r303"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r300"></script>
+<script type="module" src="./src/traffic.js?v=r303"></script>
 </body>
 </html>

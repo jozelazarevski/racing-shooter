@@ -4161,6 +4161,149 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r303 — THE CAMERA BUTTON COMES BACK
+User ask, one line. r296 had folded the 📷 cycle into the pause menu
+("beside pause it was a mis-tap at speed") and its 70px top-right slot
+has sat empty since — the stale CSS and the defensive `?.` listener
+were both still in the tree, so the restore is the element plus a
+stopPropagation (a camera tap must never also steer). pm-camera stays
+for the player who pauses to look for it; the driver's seat remains a
+stop on the cycle. Probed: cycles 0→1→2, (332,70)-(378,116) at 390px,
+no pause-button clash; cam-btn joins test-mobile-hud's measured set
+(the omission lesson from the pause/shock overlap is written above the
+IDS list) — which immediately earned its keep: LANDSCAPE moves pause
+to top:60, the exact slot 📷 reclaims, a measured 46x36 overlap; the
+landscape block now stacks 📷 at 60 and ⏸ at 112. Also killed for
+good: the suite's feed-expiry flake — the fill now happens INSIDE the
+measuring evaluate (DOM is synchronous), so no swiftshader frame can
+outlive the 3.3 s toast lifetime between fill and measure; 24/24
+twice. ATTRIBUTED, NOT OURS: test-tyres "the track card carries
+the demand and the fix" reproduces identically on an r301 worktree
+with r301's own suite — pre-existing, filed with the economy/feats
+reds. Tag r303.
+
+## r302 — CLAUDE.md v1.2 §3.5 + THE PORSCHE GAUGE: ERASE THE GUIDANCE, KEEP THE DIAL
+The user posted CLAUDE.md v1.2 (supersedes PATCH_02 v1.4 and CORRIDOR
+v2.1 — retired) and three direct asks: remove the yellow line, hull
+top-left, bring back the speed gauge with revs and gears "like Porsche".
+
+§3.5 WAYFINDING: NONE — and it voids r301's own gate arrow. Deleted, not
+hidden (§0.2 "delete means delete"): the route RIBBON (mesh, material,
+opacity loop — route.js keeps only data: gates, step(), kindAtIndex),
+the GATE ARROW, the yellow RIVAL edge arrows, the WRONG WAY banner AND
+its detection flag, and `ribbonNearM` (a key nothing reads is a config
+that lies). The ONE arrow that survives is the missile threat warning —
+combat information, not guidance; test-hudreview H6 is REVERSED to pin
+both halves. NEW test-overlays.mjs is Q16 as a render-pass assert: off
+course, wrong way, mid-grace — zero overlays, and the route still gates.
+The missed-gate grace-and-return (3.2/3.6) is unchanged and silent.
+
+HULL TOP-LEFT (user): stacked under race-info off the MEASURED --info-h
+(contracts grow it mid-race) with a 62px floor so it clears the phone
+progress strip at top:48. Fixed 220px width — the 60% band bar is gone.
+
+THE GAUGE (user, "like Porsche"): #speed-box was still in the tree
+behind display:none since r296 — un-hidden, and drawSpeedo rebuilt as a
+911-style CENTRAL TACH: rpm arc with a painted redline zone (7200 of
+8000), x1000 numerals, digital km/h inside the dial, gear digit under
+it (N/R/1-6). The physics has no gearbox, so revs and gears are
+PRESENTATION ONLY, derived in Hud.GEARBOX (six ratios over the speed
+range, sawtooth rpm, nitro pins past the redline, needle inertia) —
+they must never leak into physics, AI or telemetry. Redrawn at 30 Hz,
+not per-rAF: the per-frame 300px canvas repaint measurably starved
+swiftshader frames (the mobile suite's feed probe caught it — messages
+expired before measurement). Homes: desktop bottom-centre 132px; touch
+86px at the old between-the-thumbs slot; TWO-THUMB rides at bottom:98px
+centre-60px — measured against BRAKE's ring (top y=748) and the 💥
+column (x=180, y=658), 2px clear of both at 390x844.
+
+NAMING (§6.5): SPA-FRANCORCHAMPS → ARDENNES SWEEP, SILVERSTONE →
+AERODROME CIRCUIT, MONACO STREETS → PRINCIPALITY STREETS, SUZUKA →
+CROSSOVER RING (display names in track.js AND world/levels.js — the
+list is duplicated). DEBT: the internal route keys ('spa',
+'silverstone', 'monaco', 'suzuka') and the monteCarlo theme name still
+carry the marks in code; a Q18 string scan of stage data would see
+them. Renaming keys touches the circuits tables — its own round.
+
+Gates: test-overlays NEW 7/7, test-mobile-hud 24/24 (both schemes, six
+combos), test-hudreview 15/15 (H6 reversed + two r302 checks),
+test-shortcut 6/6 (hinterland now asserts SILENCE — r301's arrow check
+was its one red), test-patch13 16/16, route/tyres/newworlds/filters
+green after the rename sweep. Screenshots verified desktop + two-thumb.
+NOT this round (spec is explicit, §0.1 one system per build): §4 feel
+pass, §5 AI rework, §3.3 surface bounds, 6.1 position hysteresis, 6.3
+driver's-view removal — the spec's build order queues them.
+
+## r301 — v1.3 CLOSED + CORRIDOR STEP 4: THE GAME STOPS SCOLDING AND STARTS HELPING
+PATCH_02 v1.3 (recording C, Maple Mile) plus the corridor's recovery step,
+one round because they are one idea: every "you did it wrong" message is
+replaced by the game just putting you back.
+
+FIX 8, ROOT CAUSE AT LAST: `_everCP1` — the flag that arms the lap line
+after the first checkpoint — was set in checkLap and NEVER cleared, so it
+survived into every later race of the session. Race one silent, race two
+onward shouted at the grid crossing; that is why the recordings (B at
+0:06, C at 0:06) kept catching it and a fresh boot never did. resetRace
+now clears every lap-gate flag (`_everCP1/_cpMask/_midCP/_missedCP/
+_wraps`) on every car. The marquee itself is gone anyway (§8, below), but
+a stale flag would still have refused the lap COUNT — the flag is the fix,
+the silence is a bonus.
+
+FIX 15, ATTRIBUTED BEFORE FIXED — measure first paid again: traffic.js
+NEVER BUILDS on autumnwood (not in RURAL), so recording C's "large blue
+trucks on the grid" cannot have been traffic. The r301 grid census at GO:
+three rivals at 7-14 u, zero props, zero traffic, and the player hits
+59 km/h by GO+2 s — the launch complaint does not reproduce on r301 (the
+v1.2 grid-launch invuln + aggro delay likely retired it). The spec's law
+is still worth having where shuttles DO exist: crossroad spawns now skip
+any junction within 60 m of center[0]. No stage naturally has one (probed:
+closest junction 85-168 u across five stages), so the acceptance PLANTS a
+junction on Pine Valley's grid, forces the rebuild tick, and asserts it
+gets no vehicle.
+
+FIX 16, TWO HALVES: (a) tyre stacks within 80 m of the lap boundary and
+inside widthAt+6 are culled by the density pass (`gateClear` in
+_densityReport — 7 went on Maple Mile); (b) the rubber-band CHASE (both
+the maxSpeed band and `_cornerBand`) stands down while a rival's lapF is
+>0.88 or <0.06 — convergence is the band's whole design, and at the one
+funnel every lap it timed the pack's arrival onto the player (recording C:
+2nd to 7th to wrecked-at-the-gantry in 8 s, every lap). The leader CAP
+stays on; `_nearLine` is the flag.
+
+FIX 17: on dusk/night palettes (T.dusk, or skyTop luminance < 0.22)
+the density pass brightens obstacle materials once — color x1.15,
+emissive +0.03 (`_darkLift`). Shared instanced materials, so it must run
+exactly once; the flag guards it.
+
+CORRIDOR STEP 4 — RECOVERY IS FREE AND UNIFIED (§10, §8): the unstuck
+ration is DELETED. `sos` charges are not consulted, no counter decrements,
+the only throttle is a 1.5 s re-arm (playerResetDelayS); the wedge net
+fires at stuckDetectS 2.5 s (was 5 — recording B sat wedged 8 s waiting).
+R11 verbatim in test-unstuck: 20 presses, 20 returns. A rescue clamps its
+forward escalation to short of the owed gate (`_rescueAhead` vs gate.si),
+so a hop can never cross a gate the miss logic would yank it back through.
+NEW: missed-gate return — _stepRoute watches the player's owed gate; once
+it is behind by more than half a lap for missedGateGraceS (4 s), ONE
+returnToGate(car, id, 'missed') re-seats returnAheadM before the gate at
+returnSpeedKmh with 1.5 s invuln and pickup-deafness, telemetry `return`.
+TOASTS DELETED (§8): CHECKPOINT MISSED (marquee + feed), UNSTUCK,
+RECOVERED, OFF THE COURSE — TURN BACK, WRONG WAY banner (detection kept
+as `hud._wrongWay`), VIEW RESET. The replacement signal is the GATE ARROW
+in #edge-arrows: shown when lateral > ribbonNearM, or wrong-way, or a
+missed-gate grace is running. The SOS pill now reads READY / `↻ N.Ns`.
+
+DEBT LOGGED HERE ON PURPOSE: the RECOVERY BEACON shop line now sells
+nothing (garage round to retire it); recording-based rigs measuring the
+old 5 s wedge or 30 s ration are all retimed (test-wedge-recovery,
+test-unstuck rewritten; test-shortcut's hinterland check now asserts the
+arrow, not the scolding).
+
+Gates: test-patch13 NEW 16/16 (fixes 8/15/16/17 + R9 grace/return/
+re-cross on recording C's own stage), test-unstuck 11/11 rewritten,
+test-wedge-recovery 4/4 retimed to 2.5 s, plus the standing battery
+(patch02 both stages, route, corridor2/3, shortcut, goat, mobile-hud,
+hudreview, drivingspec).
+
 ## r300 — "THE HUD IS TERRIBLE": THE LADDER BECOMES A QUAD
 A live two-thumb portrait screenshot (MAPLE MILE) showed what every suite
 had missed: the weapon buttons stacked diagonally up the right edge into

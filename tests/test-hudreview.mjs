@@ -5,8 +5,12 @@
  *   H3  three damage events in 1 s -> danger lane shows ONE; others empty
  *   H4  grid to GO+3 s: zero toasts; countdown centred and >=44px
  *   H5  one-thumb <-> two-thumb: weapon cluster + UNSTUCK do not move
- *   H6  rival 30 u behind, off-screen -> edge arrow visible
+ *   H6  REVERSED by CLAUDE.md v1.2 §3.5 (r302): rival arrows are ERASED —
+ *       a rival behind shows NOTHING; only a missile hunting the player
+ *       still gets its threat arrow (combat information, not wayfinding)
  *   H8  no in-race text under 12 px (computed, visible HUD only)
+ *   r302 additions: hull top-left under the clocks; the Porsche gauge
+ *   renders (tach + digital speed + gear) from its bottom-centre home
  *
  * H7 (standalone viewport) is a device property — the manifest carries
  * display:standalone; headless cannot measure a home-screen launch.
@@ -140,7 +144,7 @@ const h5 = await p.evaluate(() => {
 check('H5  weapon cluster and UNSTUCK hold their ground across schemes',
   h5.moved.length === 0, h5.moved.length ? `moved: ${h5.moved.join(', ')}` : '');
 
-// ---- H6: off-screen rival within 40 u gets an edge arrow -------------------
+// ---- H6 (reversed, §3.5): rivals get NO arrow; a hunting missile does -----
 const h6 = await p.evaluate(() => {
   const g = window.__game, c = g.player;
   g.camMode = 0; g.state = 'race';
@@ -150,11 +154,51 @@ const h6 = await p.evaluate(() => {
   e.pos.set(c.pos.x - Math.sin(c.heading) * 30, c.pos.y, c.pos.z - Math.cos(c.heading) * 30);
   e.mesh.position.copy(e.pos);
   g.hud._edgeArrows();
-  const vis = [...document.querySelectorAll('#edge-arrows .earrow')]
+  const count = () => [...document.querySelectorAll('#edge-arrows .earrow')]
     .filter((a) => a.style.display !== 'none').length;
-  return { vis };
+  const rivalArrows = count();
+  // now a missile locked on the player, far enough behind to be off-screen
+  // (the arrow only exists for threats the camera cannot show)
+  const fake = { active: true, target: c,
+    pos: c.pos.clone().add({ x: -Math.sin(c.heading) * 45, y: 0, z: -Math.cos(c.heading) * 45 }) };
+  g.weapons = g.weapons ?? {};
+  const kept = g.weapons.missiles;
+  g.weapons.missiles = [fake];
+  g.hud._edgeArrows();
+  const missileArrows = count();
+  g.weapons.missiles = kept ?? [];
+  g.hud._edgeArrows();
+  return { rivalArrows, missileArrows };
 });
-check('H6  a rival 30 u behind shows an edge arrow', h6.vis >= 1, `${h6.vis} arrows`);
+check('H6  a rival behind shows NOTHING — wayfinding and rival arrows are erased',
+  h6.rivalArrows === 0, `${h6.rivalArrows} arrows`);
+check('H6  a missile hunting the player still gets its threat arrow',
+  h6.missileArrows >= 1, `${h6.missileArrows} arrows`);
+
+// ---- r302: hull top-left, gauge bottom-centre ------------------------------
+const r302 = await p.evaluate(() => {
+  const hull = document.getElementById('health-box').getBoundingClientRect();
+  const info = document.getElementById('race-info').getBoundingClientRect();
+  const box = document.getElementById('speed-box');
+  const cs = getComputedStyle(box);
+  const r = box.getBoundingClientRect();
+  const g = window.__game;
+  g.hud.update(1 / 60);                      // one draw so the gear latches
+  return {
+    hullLeft: hull.left, hullTop: hull.top, hullBottom: hull.bottom,
+    infoBottom: info.bottom, vh: innerHeight, vw: innerWidth,
+    gaugeShown: cs.display !== 'none' && r.width > 0,
+    gaugeCentered: Math.abs((r.left + r.right) / 2 - innerWidth / 2) < innerWidth * 0.2,
+    gaugeBottom: r.top > innerHeight * 0.6,
+    gear: g.hud._lastGear ?? null,
+  };
+});
+check('r302  the hull sits top-left, stacked under the clocks',
+  r302.hullLeft < 60 && r302.hullTop >= r302.infoBottom && r302.hullBottom < r302.vh * 0.45,
+  `left=${Math.round(r302.hullLeft)}, top=${Math.round(r302.hullTop)} (race-info ends ${Math.round(r302.infoBottom)})`);
+check('r302  the gauge is back: visible, bottom-centre, and it knows its gear',
+  r302.gaugeShown && r302.gaugeCentered && r302.gaugeBottom && r302.gear !== null,
+  `shown=${r302.gaugeShown}, centred=${r302.gaugeCentered}, low=${r302.gaugeBottom}, gear=${r302.gear}`);
 
 // ---- H8: the typography floor ----------------------------------------------
 const h8 = await p.evaluate(() => {

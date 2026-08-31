@@ -138,15 +138,15 @@ export const LEVELS = [
   // region, laddered so the collection spans a career.
   { id: 33, name: 'RED BULL RING', theme: 'alpine', route: 'rbring', region: 'GRAND CIRCUITS',
     cost: 5, fresh: true, tune: { elev: { amp: 7, ph: [1.2, 2.4, 0.6] }, rampCount: 0 } },
-  { id: 34, name: 'MONACO STREETS', theme: 'monteCarlo', route: 'monaco', region: 'GRAND CIRCUITS',
+  { id: 34, name: 'PRINCIPALITY STREETS', theme: 'monteCarlo', route: 'monaco', region: 'GRAND CIRCUITS',
     cost: 6, fresh: true, tune: { tunnels: { count: 1 }, elev: { amp: 5, ph: [0.8, 1.9, 2.7] }, rampCount: 0 } },
-  { id: 35, name: 'SILVERSTONE', theme: 'farmland', route: 'silverstone', region: 'GRAND CIRCUITS',
+  { id: 35, name: 'AERODROME CIRCUIT', theme: 'farmland', route: 'silverstone', region: 'GRAND CIRCUITS',
     cost: 7, fresh: true, tune: { // OVERCAST: flat grey racing light, no hard sun
       sunColor: 0xe8e8e8, sunIntensity: 1.7, hemiIntensity: 1.05,
       skyTop: '#7a8a9a', skyHorizon: '#d8dde2', fogColor: 0xd0d6da, cloudCount: 22, cloudOpacity: 1, elev: { amp: 2, ph: [1, 2, 3] }, rampCount: 0 } },
-  { id: 36, name: 'SPA-FRANCORCHAMPS', theme: 'forest', route: 'spa', region: 'GRAND CIRCUITS',
+  { id: 36, name: 'ARDENNES SWEEP', theme: 'forest', route: 'spa', region: 'GRAND CIRCUITS',
     cost: 8, fresh: true, tune: { elev: { amp: 9, ph: [2.1, 0.7, 1.4] }, rampCount: 0 } },
-  { id: 37, name: 'SUZUKA', theme: 'redwood', route: 'suzuka', region: 'GRAND CIRCUITS',
+  { id: 37, name: 'CROSSOVER RING', theme: 'redwood', route: 'suzuka', region: 'GRAND CIRCUITS',
     cost: 9, fresh: true, tune: { japan: { torii: 5, pagodas: 3 }, elev: { amp: 4, ph: [1.6, 2.8, 0.3] }, rampCount: 0 } },
   { id: 38, name: 'NORDSCHLEIFE', theme: 'forest', route: 'nordschleife', region: 'GRAND CIRCUITS',
     cost: 10, fresh: true, tune: { elev: { amp: 8, ph: [0.4, 1.8, 2.9] }, rampCount: 0 } },
@@ -22695,6 +22695,55 @@ export class Track {
         // ghost rock.
         culled.unculled = (culled.unculled ?? 0) + 1;
       }
+    }
+    // PATCH_02 v1.3 fix 16: the finish gate is FULL road width — decorative
+    // narrowing moves at least 80 m from it. Recording C's tyre-stack
+    // chicane at the gantry turned every lap boundary into a demolition
+    // derby (the whole pack arrives together — see the band's lap-boundary
+    // switch-off in vehicles.js for the other half). Tyre stacks carry
+    // instance ids, so the cull is honest: visual and collision go together.
+    // PATCH_02 v1.3 fix 17: on dusk/night palettes, obstacles get a
+    // readability lift — the prop rule "obstacles are the darkest tone"
+    // collapses when the whole stage is dark (Maple Mile: the drop edge
+    // read as road shoulder). Materials are SHARED per instanced family,
+    // so brightening once through any member lifts every obstacle of that
+    // type. (Local luminance check, not vehicles.worldIsDark — importing
+    // vehicles from track would close an import cycle.)
+    const hex = String(this.T?.skyTop ?? '#3a7fb8').replace('#', '');
+    const sky = parseInt(hex, 16);
+    const lum = Number.isFinite(sky)
+      ? (0.299 * ((sky >> 16) & 255) + 0.587 * ((sky >> 8) & 255) + 0.114 * (sky & 255)) / 255
+      : 0.5;
+    if ((this.T?.dusk || lum < 0.22) && !this._darkLift) {
+      this._darkLift = true;
+      const done = new Set();
+      const lift = (mat) => {
+        if (!mat || done.has(mat)) return;
+        done.add(mat);
+        mat.color?.multiplyScalar?.(1.15);
+        if (mat.emissive) mat.emissive.addScalar(0.03);
+      };
+      for (const item of consider) {
+        if (item.tree) for (const part of item.tree.parts ?? []) lift(part.material);
+        else if (item.solid?.im) lift(item.solid.im.material);
+      }
+    }
+    const gateSamples = Math.max(4, Math.round(80 / sampleLen));
+    for (const st of this.tireStacks ?? []) {
+      if (st.dead || st.culled) continue;
+      const gi = this.nearestIndex(st, null);
+      const near = Math.min(gi, N - gi) <= gateSamples;
+      if (!near) continue;
+      const cc = this.center[gi];
+      if (Math.hypot(st.x - cc.x, st.z - cc.z)
+          > (this.widthAt?.(gi) ?? ROAD_HALF) + 6) continue;
+      st.culled = true; st.dead = true;
+      if (this._tireMesh && st.ids) {
+        _m4.makeScale(0, 0, 0);
+        for (const id of st.ids) this._tireMesh.setMatrixAt(id, _m4);
+        this._tireMesh.instanceMatrix.needsUpdate = true;
+      }
+      culled.gateClear = (culled.gateClear ?? 0) + 1;
     }
     this._densityReport = culled;
     return culled;

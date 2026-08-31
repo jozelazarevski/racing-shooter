@@ -1772,9 +1772,11 @@ class Game {
       this.showMenu('garage');
     });
 
-    // pause button (HUD_REVIEW §4: the camera toggle moved into the pause
-    // menu — beside pause it was a mis-tap at speed; pm-camera owns it now)
-    document.getElementById('cam-btn')?.addEventListener('click', () => this.cycleCamera());
+    // camera cycle: on the HUD again (r303, user ask) AND in the pause menu
+    document.getElementById('cam-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();               // a camera tap must never also steer
+      this.cycleCamera();
+    });
     document.getElementById('pause-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       this.togglePause();
@@ -9847,6 +9849,18 @@ class Game {
     this.player.health = this.player.maxHealth;
     this.player.alive = true;
     this.player.mesh.visible = true;
+    // PATCH_02 v1.3 fix 8 RE-OPEN, root cause found: `_everCP1` — the flag
+    // that arms the line after the first checkpoint — was set in checkLap
+    // and NEVER cleared, so it survived into every subsequent race of the
+    // session. Race one was silent; race two onward shouted CHECKPOINT
+    // MISSED at the grid crossing, which is why the recordings kept
+    // catching it (B at 0:06, C at 0:06 — never the session's first race,
+    // never reproducible on a fresh boot). Every lap-gate flag resets with
+    // the race now, on every car.
+    for (const c of [this.player, ...this.enemies]) {
+      c._everCP1 = false; c._cpMask = 0; c._midCP = false;
+      c._missedCP = false; c._wraps = 0;
+    }
     // A RACE STARTS WITH FULL RACKS — capacity is bought once in the garage,
     // not refilled with credits between rounds. applyUpgrades() below sets the
     // maxima; these are filled from them a few lines later, once it has run.
@@ -10374,21 +10388,18 @@ class Game {
     this.playerRank = rank;
   }
 
-  /** CORRIDOR step 1 — build the route and its ribbon for this world. The
-   *  ribbon mesh rides the track's own group so a level teardown takes it
-   *  along; the Route object itself is pure data + math. */
+  /** CORRIDOR step 1 — build the route for this world. Pure data + math:
+   *  CLAUDE.md v1.2 §3.5 erased the ribbon, so the course polyline is never
+   *  rendered — gates, AI and telemetry are its only consumers. */
   _buildRoute() {
     this.route = new Route(this.track, this.level?.id);
-    const rb = this.route.buildRibbon();
-    this.track.group?.add?.(rb) ?? this.scene.add(rb);
-    // the ribbon is a RACE hint: roam and missions drive anywhere on purpose
-    rb.visible = !this.freeRoam && !this.missionMode;
   }
 
-  /** CORRIDOR step 1 — SHADOW MODE observation. Every car is stepped through
-   *  the gate model each race frame; the player's crossings go to telemetry.
-   *  NOTHING here decides anything yet: laps, misses and returns stay with
-   *  the old machinery until build-order step 4 hands them over. */
+  /** CORRIDOR steps 1+4 — the route observes every car, and since r301 it
+   *  also OWNS the miss: a player who leaves the next gate behind gets the
+   *  arrow for missedGateGraceS (a near-miss stays recoverable by driving),
+   *  then returnToGate. Laps are still counted by the checkpoint mask —
+   *  the return makes cut laps physically rare instead of scolded. */
   _stepRoute() {
     if (!this.route || this.freeRoam || this.missionMode) return;
     // CORRIDOR §6: the obstacle ration runs ONCE per build, on the first
@@ -10408,7 +10419,47 @@ class Game {
           lateralM: ev.lateral, section: ev.kind });
       }
     }
-    this.route.updateRibbon(this.player.pos, this.player.trackIndex);
+    // §4.4 the missed-gate grace: the next gate sitting BEHIND the car
+    // (forward route-distance past half a lap) means it was left behind
+    const pl = this.player, N = this.track.center.length;
+    const gate = this.route.gates[pl._nextGate ?? 0];
+    const dt = 1 / 60;
+    if (pl.alive && this.state === 'race' && gate) {
+      const ahead = (gate.si - pl.trackIndex + N) % N;
+      const overshot = ahead > N * 0.5;
+      this._gateMissT = overshot ? (this._gateMissT ?? 0) + dt : 0;
+      const RT = window.__DRIVING?.route ?? {};
+      if (this._gateMissT > (RT.missedGateGraceS ?? 4)) {
+        this._gateMissT = 0;
+        this.returnToGate(pl, gate.id, 'missed');
+      }
+    } else this._gateMissT = 0;
+  }
+
+  /** CORRIDOR §10 — ONE return function. Free, instant, never a resource:
+   *  the car re-enters `returnAheadM` before the gate on its heading at
+   *  `returnSpeedKmh`, still owing the gate. */
+  returnToGate(car, gateId, reason) {
+    const gt = this.route?.gates?.[gateId];
+    if (!gt) return;
+    const N = this.track.center.length;
+    const sampleLen = Math.max(1, Math.hypot(
+      this.track.center[1].x - this.track.center[0].x,
+      this.track.center[1].z - this.track.center[0].z));
+    const RT = window.__DRIVING?.route ?? {};
+    const back = Math.max(1, Math.round((RT.returnAheadM ?? 6) / sampleLen));
+    car._nextGate = gateId;                  // the gate is still owed
+    car._gateAlong = undefined;
+    car.placeAt((gt.si - back + N) % N, 0, true);
+    const sp = (RT.returnSpeedKmh ?? 40) / 3.6;
+    car.vel.set(Math.sin(car.heading), 0, Math.cos(car.heading)).multiplyScalar(sp);
+    car.vy = 0; car.airborne = false;
+    car.invuln = Math.max(car.invuln ?? 0, 1.5);
+    car._noPickupT = 1.5;                    // a return never grants nitro
+    if (car === this.player) {
+      this.telemetry?.log('return', { reason, gateId });
+    }
+    // no toast — §8: the fade-and-reappear IS the message
   }
 
   /** PATCH_02 §3.1 + §3.3 (v1.1): the AGGRO TICKET OFFICE. No rival may make
@@ -11245,7 +11296,7 @@ class Game {
     const f = p.forward;
     this.camPos.set(p.pos.x - f.x * M.back, p.y + M.h, p.pos.z - f.z * M.back);
     this.camLook.set(p.pos.x + f.x * M.look, p.y + (M.lookH || 0), p.pos.z + f.z * M.look);
-    this.hud?.feed?.(`VIEW RESET (${why})`, 'info');
+    // r301: no VIEW RESET toast (§8) — the re-seat is self-evident
     console.warn('[watchdog] car not visible:', why, {
       y: +p.y.toFixed(2), groundY: +gy.toFixed(2), camMode: this.camMode,
       cam: [Math.round(this.camera.position.x), Math.round(this.camera.position.y),

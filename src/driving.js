@@ -104,7 +104,7 @@ export const DRIVING = {
 
   // RALLY_CORRIDOR_REFACTOR v2.0 §14 — the route constants, complete as the
   // spec ships them. This is a STAGED build (§16): step 1 reads streetPadM /
-  // trailPadM / openMinHalfWidthM / ribbonNearM; the rest go live with their
+  // trailPadM / openMinHalfWidthM; the rest go live with their
   // build steps (slope and surfaces in step 2, prop masses in 3, returns and
   // recovery in 4, cuts and rivals in 5-6). They are declared now because
   // the spec is the authority on their values, and each step wiring one in
@@ -132,7 +132,9 @@ export const DRIVING = {
     upsideDownS: 2.0,
     playerResetDelayS: 1.5,
     camClearanceM: 1.5,
-    ribbonNearM: 15,
+    // ribbonNearM is GONE (r302): the ribbon and the gate arrow it fed are
+    // erased under CLAUDE.md v1.2 §3.5 — a key nothing reads is a config
+    // that lies.
   },
 };
 

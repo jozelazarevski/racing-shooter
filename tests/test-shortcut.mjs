@@ -69,7 +69,14 @@ const r = await p.evaluate(() => {
     if (g.hud && realFeed) g.hud.feed = realFeed;
     const roadY = t.center[car.trackIndex]?.y ?? 0;
     return { speed: +Math.abs(car.speedAlong).toFixed(1), above: +(car.y - roadY).toFixed(1),
-      feed: feeds.join(' | ') };
+      feed: feeds.join(' | '),
+      // r302 (§3.5): NOTHING signals the wild — no scolding, no arrow.
+      // Capture any wayfinding node that dares exist.
+      arrow: (() => {
+        try { g.hud._edgeArrows?.(); } catch { /* headless quirks */ }
+        const a = document.querySelector('.gatearrow');
+        return !!a && a.style.display !== 'none';
+      })() };
   };
 
   // Baseline: on the road, same throttle, same time.
@@ -152,8 +159,12 @@ check('off-road is still slower than the road', r.offFlat.speed < r.onFlat.speed
 // Leaving is still not free.
 check('the hinterland still costs you', r.far.speed < r.cut.speed,
   `140 u out: ${r.far.speed} vs 30 u out: ${r.cut.speed} m/s`);
-check('the hinterland still warns you', /OFF THE COURSE/.test(r.far.feed),
-  r.far.feed || 'no feed');
+// r302 (CLAUDE.md v1.2 §3.5): the wild is SILENT. The r301 gate arrow is
+// erased along with the scolding it replaced — off course is handled by
+// the route's own grace-and-return, with no on-screen indicator at all.
+check('the hinterland is silent — no scolding, no arrow, no banner',
+  r.far.arrow === false && !/OFF THE COURSE|WRONG WAY|TURN BACK/.test(r.far.feed),
+  `arrow=${r.far.arrow}${r.far.feed ? `, feed "${r.far.feed}"` : ''}`);
 
 // The rim wall is a separate rule and must survive all of this. It only
 // engages PAST RIM_RADIUS (1620), so start just outside it — an earlier draft
