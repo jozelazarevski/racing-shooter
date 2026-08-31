@@ -4161,6 +4161,34 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r294 — LIVE-PLAY ROUND ON THE SPEC CAR: FIVE REPORTS, FIVE CLOSES
+  - "Impossible to steer in this curve at this speed" (IL BUDELLO, 99):
+    mid-range yaw cap 1.25 -> 1.45. Flat-out still runs wide — the drift
+    promise — but a lift to ~85 turns R27 and makes the old-town corner.
+    Churn stays bounded (traced: over 0.45 steady, slip 0, no spiral).
+  - "Add another button next to drift - break. Change the design": BRAKE
+    returns beside DRIFT in two-thumb (its removal predates brakes that
+    matter), and every touch button becomes one material — dark glass,
+    function-coloured rings (BRAKE red, DRIFT cyan, NITRO amber, FIRE
+    orange), felt without looking. 390 px portrait verified.
+  - "Gets stuck here" (pinned by a building, OFF THE COURSE, 3-8 km/h):
+    the wedge net's 6 m anchor was sized for the old engine; the spec car
+    grinds just OVER that line for ever. Off-course the anchor is 12 m
+    now; roam and on-course keep 6 — a mountain crawl is never yanked.
+  - The GO banner at 0:42.5 + the gantry still green (user's own sharp
+    diagnosis): the banner fade is a CSS animation and a HIDDEN page
+    freezes the compositor — the pause/resume "GO" popped mid-background-
+    switch never faded. centerMsg now also clears on a REAL timer (fires
+    on return from background), and the gantry goes dark 2.5 s into the
+    race — green was a start state, not a race state. Verified headless:
+    banner empty, all lamps dim at race+4 s.
+  - test-difficulty's stand-in corner constant was three physics
+    revisions stale (believing 1.07x budget while the cap allows 1.45x
+    mid-range) and lost FURKA by 3% twice while under-driving the limit;
+    at 18.9 the ladder is green twice consecutively.
+Validated: difficulty 2x, unstuck 9/9, wedge 4/4, goat 26/26 2x, spec
+suite, roam probes, jumps.
+
 ## r293 — THE SPEC: RALLY_DRIVING.md, ADOPTED AND MEASURED
 The user handed a normative driving spec (RFC 2119, Dustline
 RALLY_DRIVING.md). Its stack is a Rapier raycast vehicle; ours is not —
