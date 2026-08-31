@@ -3544,16 +3544,10 @@ export class Car {
         if (t._nearGoat?.(this.pos.x, this.pos.z, 26)) {
           this.vel.multiplyScalar(Math.max(0, 1 - 2.5 * dt));
         }
-        // the warning stays until step 4's wayfinding replaces it. (`over`
-        // died with the drag above and its dangling reference threw a
-        // ReferenceError HERE on every strayed frame, which the frame
-        // loop's catch swallowed — silently skipping everything below this
-        // line in step(). Caught by test-shortcut's "no feed".)
-        const warn = Math.min(1, strayed / 30);
-        if (warn > 0.5 && !this._steepFed) {
-          this._steepFed = 1.8;
-          this.game.hud?.feed?.('OFF THE COURSE — TURN BACK', 'bad');
-        }
+        // r301: the OFF THE COURSE feed is gone with the other scoldings —
+        // §8's gate arrow (red past the grace) is the live signal now.
+        // (History: a dangling `over` here once threw a swallowed
+        // ReferenceError per strayed frame — test-shortcut caught it.)
       }
     }
     // NO ALTITUDE GATE.
@@ -4611,8 +4605,18 @@ export class EnemyCar extends Car {
     // PATCH_02 §3.3: the catch-up bonus is capped at +8% — the pack locked
     // four-wide on the recording's player for eight seconds because the band
     // could hand trailing rivals up to +21%.
-    if (gap > 0.02) band = Math.min(1.08, 1 + 0.30 * (D.bandUp ?? D.rubberBand) * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1));
+    // PATCH_02 v1.3 fix 16: the CHASE half of the band switches off near the
+    // lap boundary. Convergence is the band's whole design — and at the one
+    // place every lap where the field must funnel through a gate, it timed
+    // the pack's arrival to the player's (recording C: 2nd at 0:56, 7th by
+    // 1:02, wrecked at the gantry pillar at 1:04, EVERY lap). ~10 s of race
+    // line each side of the gate is band-free; the leader CAP stays on.
+    const Nb = t.center.length;
+    const lapF = this.trackIndex / Nb;
+    const nearLine = lapF > 0.88 || lapF < 0.06;
+    if (gap > 0.02 && !nearLine) band = Math.min(1.08, 1 + 0.30 * (D.bandUp ?? D.rubberBand) * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1));
     else if (gap < -0.06) band = 1 - 0.12 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1);
+    this._nearLine = nearLine;
     // pace parity vs the garage: a maxed ENGINE (+20% player top speed) turned
     // NORMAL into a parade. Rivals bring +2% per player engine level (cap
     // +10%) on NORMAL/HARD; EASY keeps its gentler pack untouched so a casual
@@ -4653,7 +4657,7 @@ export class EnemyCar extends Car {
     // actually binds — rivals are corner-limited 95% of the time — so leaving
     // it on rubberBand kept EASY's +35% catch-up cornering alive after the
     // maxSpeed band was decoupled, and the casual leader was still re-passed.
-    this._cornerBand = gap > 0.02
+    this._cornerBand = gap > 0.02 && !this._nearLine
       ? Math.min(1.08, 1 + 0.28 * (D.bandUp ?? D.rubberBand) * THREE.MathUtils.clamp((gap - 0.02) / 0.10, 0, 1))
       : gap < -0.06
         ? 1 - 0.14 * D.rubberBand * THREE.MathUtils.clamp((-gap - 0.06) / 0.15, 0, 1)
@@ -5609,23 +5613,28 @@ export class PlayerCar extends Car {
       // the snow, it quietly cancelled the bog rule. A stock car carries ONE
       // charge; the RECOVERY BEACON line sells up to four. The 30 s cooldown
       // stays on top, so two charges are not two rescues in the same corner.
+      // CORRIDOR §10 (r301): RECOVERY IS FREE. No counter, no charge, no
+      // 30 s tax — a reset costs the stop and the 1.5 s re-arm, nothing
+      // else. The ration existed to stop rescue-as-shortcut; the corridor's
+      // answer is that a return puts you BACK, not FORWARD, so there is
+      // nothing to farm. The RECOVERY BEACON shop line keeps selling
+      // nothing until the garage round retires it (noted in HANDOVER).
+      // The stuck net fires at stuckDetectS (2.5 s, PATCH_02 fix 14) —
+      // recording B sat wedged for 8 seconds waiting for the old 5.
       this.unstuckCool = Math.max(0, (this.unstuckCool ?? 0) - dt);
       const called = this === g.player && controlsLive
         && (input.justPressed?.('KeyR') || this._unstuckReq);
       this._unstuckReq = false;
-      const spend = called && this.unstuckCool <= 0 && (this.sos ?? 0) > 0;
-      if (called && !spend) {
-        g.hud.feed((this.sos ?? 0) <= 0 ? 'NO RECOVERY CHARGES LEFT'
-          : `UNSTUCK RECHARGING — ${Math.ceil(this.unstuckCool)}s`, 'bad');
-      }
-      if (this._lostT > 2.5 || (this._cliffT ?? 0) > 2 || this._wedgeT > 5 || spend) {
+      const spend = called && this.unstuckCool <= 0;
+      const RT4 = DRIVING.route ?? {};
+      if (this._lostT > 2.5 || (this._cliffT ?? 0) > 2
+          || this._wedgeT > (RT4.stuckDetectS ?? 2.5) || spend) {
         this._lostT = 0;
         this._cliffT = 0;
         this._wedgeT = 0;
         this._bogT = 0;      // a rescue is a successful trial: the clock resets
         if (spend) {
-          this.unstuckCool = 30;
-          this.sos = Math.max(0, (this.sos ?? 0) - 1);
+          this.unstuckCool = RT4.playerResetDelayS ?? 1.5;
           g.audio?.pickup?.();
         }
         this.vel.set(0, 0, 0); this.vy = 0; this.airborne = false;
@@ -5644,32 +5653,35 @@ export class PlayerCar extends Car {
         }
         this._lastRescueAt = g.raceTime ?? 0;
         const N = g.track.N;
-        this.placeAt((this.trackIndex + this._rescueAhead) % N, 0, true);
+        // …but never past the gate still owed (r301): the rescue-forward
+        // escalation predates the route, and a hop across the next gate
+        // would hand the miss logic a car to yank straight back
+        let aheadStep = this._rescueAhead;
+        const owed = g.route?.gates?.[this._nextGate ?? 0];
+        if (owed) {
+          const gap = (owed.si - this.trackIndex + N) % N;
+          aheadStep = Math.min(aheadStep, Math.max(0, gap - 4));
+        }
+        this.placeAt((this.trackIndex + aheadStep) % N, 0, true);
         this.invuln = Math.max(this.invuln, 1.5);
         // PATCH_02 §3.7: a rescue must not hand out nitro — the respawn point
         // kept landing ON a pickup and the recording shows 0-188 in 2 s off
         // an Unstuck. Pickups are deaf to this car for a moment.
         this._noPickupT = 1.5;
-        g.telemetry?.log('unstuck', { reason: spend ? 'player' : 'auto',
-          remaining: this.sos ?? 0 });
-        g.hud.feed(spend
-          ? `UNSTUCK — back on the road (${this.sos} left)`
-          : 'RECOVERED', 'info');
+        g.telemetry?.log('unstuck', { reason: spend ? 'player' : 'auto' });
+        // no toast: §8 deletes UNSTUCK and RECOVERED — the reset IS the
+        // feedback, and a message on top of a teleport is noise
       }
     }
 
     if (this.checkLap(prevIndex) && controlsLive) g.onPlayerLap();
-    // A REFUSED LAP HAS TO SAY SO. Crossing the line and watching the counter
-    // not move is indistinguishable from a bug — the driver has no way to know
-    // a gate was missed, or which. Tell them at the line, once per crossing.
-    if (this._missedCP) {
-      this._missedCP = false;
-      if (controlsLive && this === g.player) {
-        g.hud?.centerMsg?.('CHECKPOINT MISSED — LAP NOT COUNTED');
-        g.hud?.feed?.('YOU MUST PASS EVERY CHECKPOINT', 'warn');
-        g.buzz?.(40);
-      }
-    }
+    // CORRIDOR §8 (r301): CHECKPOINT MISSED is deleted — v1.3 measured its
+    // marquee variant as "more intrusive than the toast it replaced". The
+    // wayfinding arrow to the next gate is the live signal now, and the
+    // missed-gate RETURN (main._stepRoute) is what actually prevents cut
+    // laps instead of scolding them at the line. `_missedCP` still clears
+    // (and telemetry still records the refused crossing).
+    if (this._missedCP) this._missedCP = false;
 
     // cannon heat
     if (this.heat > 0) this.heat = Math.max(0, this.heat - dt * (this.overheated ? 0.35 : 0.5));

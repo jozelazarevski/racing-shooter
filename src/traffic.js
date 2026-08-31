@@ -443,8 +443,16 @@ function install(game) {
     try {
       const crs = Array.isArray(trk.crossroads) ? trk.crossroads : [];
       let made = 0;
+      // PATCH_02 v1.3 fix 15: traffic never spawns within 60 m of the start
+      // gate. Attribution note: recording C's "trucks on the grid" was on
+      // MAPLE MILE, where this module never builds (autumnwood is not
+      // RURAL) — those were the rival grid. The law still belongs here:
+      // road vehicles already spawn at f 0.16+, so a junction near the
+      // line was the one hole a shuttle could park in.
+      const c0 = trk.center[0];
       for (const cr of crs) {
         if (made >= 2) break;
+        if (Math.hypot((cr?.x ?? 1e9) - c0.x, (cr?.z ?? 1e9) - c0.z) < 60) continue;
         const route = makeRoute(trk, cr);
         if (!route) continue;
         const ent = makeVehicle(made === 0 ? 'tractor' : 'van', tint, tintDark);

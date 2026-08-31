@@ -4161,6 +4161,76 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r301 — v1.3 CLOSED + CORRIDOR STEP 4: THE GAME STOPS SCOLDING AND STARTS HELPING
+PATCH_02 v1.3 (recording C, Maple Mile) plus the corridor's recovery step,
+one round because they are one idea: every "you did it wrong" message is
+replaced by the game just putting you back.
+
+FIX 8, ROOT CAUSE AT LAST: `_everCP1` — the flag that arms the lap line
+after the first checkpoint — was set in checkLap and NEVER cleared, so it
+survived into every later race of the session. Race one silent, race two
+onward shouted at the grid crossing; that is why the recordings (B at
+0:06, C at 0:06) kept catching it and a fresh boot never did. resetRace
+now clears every lap-gate flag (`_everCP1/_cpMask/_midCP/_missedCP/
+_wraps`) on every car. The marquee itself is gone anyway (§8, below), but
+a stale flag would still have refused the lap COUNT — the flag is the fix,
+the silence is a bonus.
+
+FIX 15, ATTRIBUTED BEFORE FIXED — measure first paid again: traffic.js
+NEVER BUILDS on autumnwood (not in RURAL), so recording C's "large blue
+trucks on the grid" cannot have been traffic. The r301 grid census at GO:
+three rivals at 7-14 u, zero props, zero traffic, and the player hits
+59 km/h by GO+2 s — the launch complaint does not reproduce on r301 (the
+v1.2 grid-launch invuln + aggro delay likely retired it). The spec's law
+is still worth having where shuttles DO exist: crossroad spawns now skip
+any junction within 60 m of center[0]. No stage naturally has one (probed:
+closest junction 85-168 u across five stages), so the acceptance PLANTS a
+junction on Pine Valley's grid, forces the rebuild tick, and asserts it
+gets no vehicle.
+
+FIX 16, TWO HALVES: (a) tyre stacks within 80 m of the lap boundary and
+inside widthAt+6 are culled by the density pass (`gateClear` in
+_densityReport — 7 went on Maple Mile); (b) the rubber-band CHASE (both
+the maxSpeed band and `_cornerBand`) stands down while a rival's lapF is
+>0.88 or <0.06 — convergence is the band's whole design, and at the one
+funnel every lap it timed the pack's arrival onto the player (recording C:
+2nd to 7th to wrecked-at-the-gantry in 8 s, every lap). The leader CAP
+stays on; `_nearLine` is the flag.
+
+FIX 17: on dusk/night palettes (T.dusk, or skyTop luminance < 0.22)
+the density pass brightens obstacle materials once — color x1.15,
+emissive +0.03 (`_darkLift`). Shared instanced materials, so it must run
+exactly once; the flag guards it.
+
+CORRIDOR STEP 4 — RECOVERY IS FREE AND UNIFIED (§10, §8): the unstuck
+ration is DELETED. `sos` charges are not consulted, no counter decrements,
+the only throttle is a 1.5 s re-arm (playerResetDelayS); the wedge net
+fires at stuckDetectS 2.5 s (was 5 — recording B sat wedged 8 s waiting).
+R11 verbatim in test-unstuck: 20 presses, 20 returns. A rescue clamps its
+forward escalation to short of the owed gate (`_rescueAhead` vs gate.si),
+so a hop can never cross a gate the miss logic would yank it back through.
+NEW: missed-gate return — _stepRoute watches the player's owed gate; once
+it is behind by more than half a lap for missedGateGraceS (4 s), ONE
+returnToGate(car, id, 'missed') re-seats returnAheadM before the gate at
+returnSpeedKmh with 1.5 s invuln and pickup-deafness, telemetry `return`.
+TOASTS DELETED (§8): CHECKPOINT MISSED (marquee + feed), UNSTUCK,
+RECOVERED, OFF THE COURSE — TURN BACK, WRONG WAY banner (detection kept
+as `hud._wrongWay`), VIEW RESET. The replacement signal is the GATE ARROW
+in #edge-arrows: shown when lateral > ribbonNearM, or wrong-way, or a
+missed-gate grace is running. The SOS pill now reads READY / `↻ N.Ns`.
+
+DEBT LOGGED HERE ON PURPOSE: the RECOVERY BEACON shop line now sells
+nothing (garage round to retire it); recording-based rigs measuring the
+old 5 s wedge or 30 s ration are all retimed (test-wedge-recovery,
+test-unstuck rewritten; test-shortcut's hinterland check now asserts the
+arrow, not the scolding).
+
+Gates: test-patch13 NEW 16/16 (fixes 8/15/16/17 + R9 grace/return/
+re-cross on recording C's own stage), test-unstuck 11/11 rewritten,
+test-wedge-recovery 4/4 retimed to 2.5 s, plus the standing battery
+(patch02 both stages, route, corridor2/3, shortcut, goat, mobile-hud,
+hudreview, drivingspec).
+
 ## r300 — "THE HUD IS TERRIBLE": THE LADDER BECOMES A QUAD
 A live two-thumb portrait screenshot (MAPLE MILE) showed what every suite
 had missed: the weapon buttons stacked diagonally up the right edge into

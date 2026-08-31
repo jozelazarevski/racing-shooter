@@ -1,18 +1,19 @@
-/* AN UNSTUCK BUTTON, AND IT COSTS YOU 30 SECONDS.
+/* AN UNSTUCK BUTTON, AND IT IS FREE.
  *
- * Asked for: "add another button for unstuck when I am stuck; needs to reset
- * 30s after usage."
+ * History, because the law reversed and the reversal is the point. The button
+ * was asked for with a 30 s cooldown ("needs to reset 30s after usage"), and
+ * r173 added a per-race charge on top so a long stage could not farm it. The
+ * CORRIDOR refactor (§10) deletes the whole economy: a reset puts you BACK on
+ * the line, not forward past anything, so there is nothing left to farm and
+ * nothing worth rationing. What remains is a 1.5 s re-arm
+ * (playerResetDelayS) so a held key cannot machine-gun the teleport.
  *
- * The automatic rescue nets are deliberately slow — five seconds of HELD
- * throttle before the wedge net fires — because an idle car parked on a
- * mountainside must never be yanked off it. That is right for a car the game
- * can tell is stuck, and useless for the case the player can see and it
- * cannot: nose-in against a rock, rolled into a ditch, pointing at a wall
- * with the road behind. Hence a button.
+ * The acceptance is R11, verbatim: "Press RESET 20 times in a row → 20
+ * returns, no counter decrements, ~1.5 s delay each." And §8 deletes the
+ * UNSTUCK/RECOVERED toasts — the reset is the feedback — so this suite
+ * counts telemetry `unstuck` events, never feed text.
  *
- * It fires the SAME recovery the nets fire, so a hand-called rescue can never
- * behave differently from an automatic one, and it goes on a 30 s cooldown —
- * free and instant it would simply be a faster line through every corner.
+ *   node tests/test-unstuck.mjs
  */
 import { chromium } from 'playwright-core';
 
@@ -39,52 +40,74 @@ const wired = await page.evaluate(() => {
   return { exists: !!b, key: b?.dataset.key, badge: !!document.getElementById('b-unstuck') };
 });
 ok(wired.exists && wired.key === 'KeyR' && wired.badge,
-  'the button exists, carries a key, and has a cooldown badge', JSON.stringify(wired));
+  'the button exists, carries a key, and has a re-arm badge', JSON.stringify(wired));
 
 const R = await page.evaluate(async () => {
   const g = window.__game, p = g.player, t = g.track;
-  const frame = () => new Promise((r) => requestAnimationFrame(r));
+  // fixed step, no rendering — wall-clock frames would make the twenty-press
+  // ladder a thirty-second test and a flaky one
+  if (g.composer) g.composer.render = () => {};
+  let elapsed = g.clock.elapsedTime;
+  g.clock = { getDelta: () => { elapsed += 1 / 60; return 1 / 60; },
+    get elapsedTime() { return elapsed; } };
+
+  let rescues = 0;
+  const realLog = g.telemetry.log.bind(g.telemetry);
+  g.telemetry.log = (kind, data) => { if (kind === 'unstuck') rescues++; return realLog(kind, data); };
+
+  const frames = (n) => { for (let i = 0; i < n; i++) g._frameBody(); };
   // strand the car well off the road, stationary — the shape of being stuck
-  const park = async () => {
+  const park = () => {
     const c = t.center[(p.trackIndex + 40) % t.N];
     const n = t.nrm[(p.trackIndex + 40) % t.N];
     p.pos.set(c.x + n.x * 34, c.y + 3, c.z + n.z * 34);
     p.vel.set(0, 0, 0); p.vy = 0;
-    for (let i = 0; i < 3; i++) await frame();
+    p._wedgeT = 0; p._lostT = 0; p._cliffT = 0;
+    frames(3);
   };
   const offRoad = () => Math.abs(p.lateral ?? 0);
 
   p.unstuckCool = 0;
-  await park();
+  park();
   const strandedLat = offRoad();
 
   // press it — one frame is enough, it is an edge-triggered request
   p._unstuckReq = true;
-  for (let i = 0; i < 4; i++) await frame();
+  frames(4);
   const afterLat = offRoad();
   const coolAfter = p.unstuckCool;
+  const sosAfter = p.sos;   // the ration is dead: nothing may decrement
 
-  // ...and it is now spent: a second press must NOT rescue
-  await park();
+  // ...a press DURING the re-arm does nothing (the machine-gun guard)
+  park();
   const strandedAgain = offRoad();
   p._unstuckReq = true;
-  for (let i = 0; i < 4; i++) await frame();
+  frames(4);
   const stillStranded = offRoad();
   const coolStill = p.unstuckCool;
 
-  // It recharges — and since r173 it also needs a CHARGE, which the first
-  // rescue spent. A cooldown alone made the rescue an unlimited resource on a
-  // long stage (wait thirty seconds, forever), which quietly cancelled r172's
-  // bog rule; test-arsenal pins the "spent is spent" half of that. What this
-  // asserts is the other half: with both a charge and a cooled timer, the
-  // button behaves exactly as it always did.
-  p.unstuckCool = 0;
-  p.sos = Math.max(1, p.sos ?? 0);
+  // ...and once the 1.5 s re-arm lapses it simply works again — no charge,
+  // no counter, nothing to hand back. sos is forced to 0 to prove the old
+  // ration is not consulted.
+  p.sos = 0;
+  frames(95);               // ~1.58 game-seconds
   p._unstuckReq = true;
-  for (let i = 0; i < 4; i++) await frame();
+  frames(4);
   const rescuedAgain = offRoad();
 
-  return { strandedLat, afterLat, coolAfter, strandedAgain, stillStranded, coolStill, rescuedAgain };
+  // R11: twenty consecutive resets, ~1.5 s apart, all honoured
+  let returns = 0;
+  for (let k = 0; k < 20; k++) {
+    park();
+    const before = rescues;
+    frames(95);             // let the previous re-arm lapse
+    p._unstuckReq = true;
+    frames(4);
+    if (rescues > before && offRoad() < 3) returns++;
+  }
+
+  return { strandedLat, afterLat, coolAfter, sosAfter, strandedAgain,
+    stillStranded, coolStill, rescuedAgain, returns, rescues };
 });
 
 console.log(`  stranded ${R.strandedLat.toFixed(1)} u off the road → ${R.afterLat.toFixed(1)} u after the call`);
@@ -92,25 +115,30 @@ console.log(`  stranded ${R.strandedLat.toFixed(1)} u off the road → ${R.after
 ok(R.strandedLat > 20, 'setup: the car really was stranded well off the road',
   `${R.strandedLat.toFixed(1)} u`);
 ok(R.afterLat < 3, 'pressing it puts the car back on the road', `${R.afterLat.toFixed(1)} u`);
-ok(Math.abs(R.coolAfter - 30) < 1.5, 'and starts a 30 s cooldown', `${R.coolAfter.toFixed(1)} s`);
+ok(R.coolAfter > 0.5 && R.coolAfter <= 1.6,
+  'and starts the 1.5 s re-arm — not the old 30 s ration', `${R.coolAfter.toFixed(2)} s`);
+ok(R.sosAfter === undefined || R.sosAfter >= 1,
+  'no counter decrements — the rescue is free (§10)', `sos=${R.sosAfter}`);
 ok(R.strandedAgain > 20 && R.stillStranded > 20,
-  'a second press while recharging does NOT rescue — the cooldown is real',
+  'a press during the re-arm does NOT rescue — the delay is real',
   `${R.stillStranded.toFixed(1)} u`);
-ok(R.coolStill > 0 && R.coolStill <= 30,
-  'and a refused press does not top the cooldown back up', `${R.coolStill.toFixed(1)} s`);
-ok(R.rescuedAgain < 3, 'once recharged AND with a charge in hand it works again',
-  `${R.rescuedAgain.toFixed(1)} u`);
+ok(R.coolStill > 0 && R.coolStill <= 1.6,
+  'and a refused press does not top the re-arm back up', `${R.coolStill.toFixed(2)} s`);
+ok(R.rescuedAgain < 3,
+  'once re-armed it works again with NO charge in hand — unlimited, as §10 says',
+  `${R.rescuedAgain.toFixed(1)} u with sos=0`);
+ok(R.returns === 20,
+  'R11: press RESET 20 times in a row → 20 returns, ~1.5 s delay each',
+  `${R.returns}/20 honoured (${R.rescues} unstuck events total)`);
 
-// a fresh race hands it back — BOTH halves of it, since r173
+// a fresh race still hands the button back armed
 const fresh = await page.evaluate(() => {
   const g = window.__game;
-  g.player.unstuckCool = 30;
-  g.player.sos = 0;
+  g.player.unstuckCool = 1.5;
   g.startRace?.();
-  return { cool: g.player.unstuckCool, sos: g.player.sos };
+  return { cool: g.player.unstuckCool };
 });
-ok(fresh.cool === 0 && fresh.sos >= 1,
-  'every race starts with the rescue in hand — cooled AND recharged', JSON.stringify(fresh));
+ok(fresh.cool === 0, 'every race starts with the rescue armed', JSON.stringify(fresh));
 ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join('\n'));
 
 await browser.close();

@@ -12,9 +12,14 @@
  * around. The game was still running; the player simply could not play it.
  *
  * The tell is the INPUT, not the position: full throttle and no motion,
- * sustained for five seconds. That cannot happen while driving, and it cannot
- * be triggered by parking somewhere scenic — an idle car is never touched,
- * whatever it is parked on.
+ * sustained for stuckDetectS (2.5 s — PATCH_02 fix 14 halved the original
+ * five after recording B sat wedged for 8 seconds waiting for it). That
+ * cannot happen while driving, and it cannot be triggered by parking
+ * somewhere scenic — an idle car is never touched, whatever it is parked on.
+ *
+ * r301: the RECOVERED toast is deleted (CORRIDOR §8 — the reset IS the
+ * feedback), so rescues are counted off the telemetry `unstuck` event, which
+ * is the log the patch says every future check reads instead of a recording.
  *
  * Both directions are checked, because a rescue that fires during normal
  * racing is worse than the softlock it fixes.
@@ -97,8 +102,8 @@ const r = await page.evaluate(async () => {
   const face = Math.atan2(-(big.x - spot.x), -(big.z - spot.z));
 
   let rescues = 0;
-  const realFeed = g.hud.feed.bind(g.hud);
-  g.hud.feed = (msg, kind) => { if (msg === 'RECOVERED') rescues++; return realFeed(msg, kind); };
+  const realLog = g.telemetry.log.bind(g.telemetry);
+  g.telemetry.log = (kind, data) => { if (kind === 'unstuck') rescues++; return realLog(kind, data); };
 
   const place = () => {
     const p = g.player;
@@ -107,7 +112,7 @@ const r = await page.evaluate(async () => {
     p.pos.set(spot.x, spot.y, spot.z);
     p.y = spot.y; p.vel.set(0, 0, 0); p.speed = 0; p.airborne = false;
     p.heading = face;
-    p._wedgeT = 0; p._lostT = 0;
+    p._wedgeT = 0; p._lostT = 0; p._cliffT = 0;
   };
 
   // PINNED: the physics resolves to no motion, however hard the car pushes.
@@ -204,13 +209,13 @@ const r = await page.evaluate(async () => {
 if (r.none) { ok(false, 'the world has a big stone solid to wedge against'); }
 else {
   console.log(`${r.world}: pinned nose-first against a ${r.rockR} u stone solid`);
-  ok(r.recoveredAt >= 4.5 && r.recoveredAt <= 8,
-    'a car wedged at full throttle is rescued at the five-second mark',
-    `RECOVERED fired at ${r.recoveredAt}s`);
+  ok(r.recoveredAt >= 2 && r.recoveredAt <= 4.5,
+    'a car wedged at full throttle is rescued at the 2.5 s mark (stuckDetectS)',
+    `unstuck fired at ${r.recoveredAt}s`);
   ok(r.parkedRescues === 0,
     'a car PARKED in the same impossible spot is left alone — sightseeing is not a fault',
     `${r.parkedRescues} rescues in 15 s with the throttle released`);
-  ok(r.raceRescues === 0 && r.maxWedgeT < 5,
+  ok(r.raceRescues === 0 && r.maxWedgeT < 2.5,
     'normal racing never trips the rescue',
     `30 s of driving: ${r.raceRescues} rescues, longest stall ${r.maxWedgeT}s, ending at ${r.drove} u/s`);
 }

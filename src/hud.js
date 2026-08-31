@@ -339,11 +339,11 @@ export class Hud {
       this.el.rounds.classList.toggle('out', rd <= 0);
     }
     if (this.el.sos) {
-      const n = p.sos ?? 0;
-      this.el.sos.textContent = n > 0
-        ? '🆘'.repeat(n) + (p.unstuckCool > 0 ? ` ${Math.ceil(p.unstuckCool)}s` : '')
-        : 'SPENT';
-      this.el.sos.classList.toggle('out', n <= 0);
+      // CORRIDOR §10 (r301): recovery is free and unlimited — no counter,
+      // no SPENT. The only state worth showing is the 1.5 s re-arm.
+      this.el.sos.textContent = p.unstuckCool > 0
+        ? `↻ ${p.unstuckCool.toFixed(1)}s` : 'READY';
+      this.el.sos.classList.remove('out');
     }
     if (p.shockCooldown <= 0) {
       this.el.shock.textContent = 'READY';
@@ -369,11 +369,11 @@ export class Hud {
       // number is currently stopping you: the seconds while it recharges, the
       // charges left when it is ready, and a struck-through face at zero.
       if (this.el.tUnstuck) {
-        const cool = p.unstuckCool ?? 0, left = p.sos ?? 0;
-        const dead = left <= 0;
-        this.el.tUnstuck.classList.toggle('cooling', cool > 0 || dead);
-        this.el.bUnstuck.style.display = 'flex';
-        this.el.bUnstuck.textContent = dead ? '0' : cool > 0 ? Math.ceil(cool) : left;
+        // free and unlimited (§10): the badge only ever shows the re-arm
+        const cool = p.unstuckCool ?? 0;
+        this.el.tUnstuck.classList.toggle('cooling', cool > 0);
+        this.el.bUnstuck.style.display = cool > 0 ? 'flex' : 'none';
+        if (cool > 0) this.el.bUnstuck.textContent = Math.ceil(cool);
       }
       const nf = Math.round(p.nitro * 100);
       this.el.tNitro.style.background =
@@ -388,13 +388,15 @@ export class Hud {
       if (this.el.bRounds) this.el.bRounds.textContent = String(rd);
     }
 
-    // wrong-way detection
+    // CORRIDOR §8 (r301): the WRONG WAY banner is deleted — heading away
+    // from the race is signalled by the gate arrow turning red (below).
+    // The detection survives as the flag the arrow reads.
     const t = g.track;
     const tangent = t.tan[p.trackIndex];
     const onCircuit = !g.freeRoam || !!g.mission?.def.circuit; // [MISSIONS] some missions race the circuit
-    const wrongWay = g.state === 'race' && p.alive && onCircuit &&
+    this._wrongWay = g.state === 'race' && p.alive && onCircuit &&
       p.speedAlong > 6 && (p.forward.dot(tangent) < -0.35);
-    this.el.wrongWay.style.display = wrongWay ? 'block' : 'none';
+    this.el.wrongWay.style.display = 'none';
 
     this.vignetteLevel = Math.max(0, this.vignetteLevel - dt * 1.8);
     this.el.vignette.style.opacity = Math.min(1, this.vignetteLevel);
@@ -409,6 +411,36 @@ export class Hud {
     const g = this.game, p = g.player;
     const pool = this._arrowPool;
     let n = 0;
+    // ---- §8 WAYFINDING: the NEXT GATE arrow. Shown when the player has
+    // wandered past ribbonNearM, is heading the wrong way (red), or is in
+    // the missed-gate grace (red). This is what replaced WRONG WAY and
+    // CHECKPOINT MISSED: a direction, not a scolding. ----
+    const gate = g.route?.gates?.[p._nextGate ?? 0];
+    if (gate && g.state === 'race') {
+      const lat = Math.abs(g.track.lateralOffset(p.pos, p.trackIndex));
+      const near = window.__DRIVING?.route?.ribbonNearM ?? 15;
+      const urgent = this._wrongWay || (g._gateMissT ?? 0) > 0;
+      if (lat > near || urgent) {
+        let a = this._gateArrow;
+        if (!a) {
+          a = this._gateArrow = document.createElement('div');
+          a.className = 'earrow gatearrow';
+          a.textContent = '➤';
+          this.el.arrows.appendChild(a);
+        }
+        const v = (this._gv ??= p.mesh.position.clone());
+        v.set(gate.x, gate.y, gate.z).project(g.camera);
+        let { x, y } = v;
+        if (v.z > 1) { x = -x; y = -y; }
+        const left = Math.min(92, Math.max(8, (x + 1) * 50));
+        const top = Math.min(64, Math.max(22, (1 - (y + 1) / 2) * 100));
+        a.style.left = left + '%';
+        a.style.top = top + '%';
+        a.style.transform = `translate(-50%,-50%) rotate(${Math.atan2(top - 43, left - 50)}rad) scale(1.35)`;
+        a.classList.toggle('missile', urgent);   // the red/pulse styling
+        a.style.display = 'block';
+      } else if (this._gateArrow) this._gateArrow.style.display = 'none';
+    } else if (this._gateArrow) this._gateArrow.style.display = 'none';
     const place = (pos, missile) => {
       if (n >= 6 || !pos) return;
       const v = (this._av ??= p.mesh.position.clone());

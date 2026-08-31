@@ -22696,6 +22696,55 @@ export class Track {
         culled.unculled = (culled.unculled ?? 0) + 1;
       }
     }
+    // PATCH_02 v1.3 fix 16: the finish gate is FULL road width — decorative
+    // narrowing moves at least 80 m from it. Recording C's tyre-stack
+    // chicane at the gantry turned every lap boundary into a demolition
+    // derby (the whole pack arrives together — see the band's lap-boundary
+    // switch-off in vehicles.js for the other half). Tyre stacks carry
+    // instance ids, so the cull is honest: visual and collision go together.
+    // PATCH_02 v1.3 fix 17: on dusk/night palettes, obstacles get a
+    // readability lift — the prop rule "obstacles are the darkest tone"
+    // collapses when the whole stage is dark (Maple Mile: the drop edge
+    // read as road shoulder). Materials are SHARED per instanced family,
+    // so brightening once through any member lifts every obstacle of that
+    // type. (Local luminance check, not vehicles.worldIsDark — importing
+    // vehicles from track would close an import cycle.)
+    const hex = String(this.T?.skyTop ?? '#3a7fb8').replace('#', '');
+    const sky = parseInt(hex, 16);
+    const lum = Number.isFinite(sky)
+      ? (0.299 * ((sky >> 16) & 255) + 0.587 * ((sky >> 8) & 255) + 0.114 * (sky & 255)) / 255
+      : 0.5;
+    if ((this.T?.dusk || lum < 0.22) && !this._darkLift) {
+      this._darkLift = true;
+      const done = new Set();
+      const lift = (mat) => {
+        if (!mat || done.has(mat)) return;
+        done.add(mat);
+        mat.color?.multiplyScalar?.(1.15);
+        if (mat.emissive) mat.emissive.addScalar(0.03);
+      };
+      for (const item of consider) {
+        if (item.tree) for (const part of item.tree.parts ?? []) lift(part.material);
+        else if (item.solid?.im) lift(item.solid.im.material);
+      }
+    }
+    const gateSamples = Math.max(4, Math.round(80 / sampleLen));
+    for (const st of this.tireStacks ?? []) {
+      if (st.dead || st.culled) continue;
+      const gi = this.nearestIndex(st, null);
+      const near = Math.min(gi, N - gi) <= gateSamples;
+      if (!near) continue;
+      const cc = this.center[gi];
+      if (Math.hypot(st.x - cc.x, st.z - cc.z)
+          > (this.widthAt?.(gi) ?? ROAD_HALF) + 6) continue;
+      st.culled = true; st.dead = true;
+      if (this._tireMesh && st.ids) {
+        _m4.makeScale(0, 0, 0);
+        for (const id of st.ids) this._tireMesh.setMatrixAt(id, _m4);
+        this._tireMesh.instanceMatrix.needsUpdate = true;
+      }
+      culled.gateClear = (culled.gateClear ?? 0) + 1;
+    }
     this._densityReport = culled;
     return culled;
   }

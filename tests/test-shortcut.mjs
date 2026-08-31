@@ -69,7 +69,13 @@ const r = await p.evaluate(() => {
     if (g.hud && realFeed) g.hud.feed = realFeed;
     const roadY = t.center[car.trackIndex]?.y ?? 0;
     return { speed: +Math.abs(car.speedAlong).toFixed(1), above: +(car.y - roadY).toFixed(1),
-      feed: feeds.join(' | ') };
+      feed: feeds.join(' | '),
+      // r301: the scolding feed became the §8 gate arrow — capture its state
+      arrow: (() => {
+        try { g.hud._edgeArrows?.(); } catch { /* headless quirks */ }
+        const a = document.querySelector('.gatearrow');
+        return !!a && a.style.display !== 'none';
+      })() };
   };
 
   // Baseline: on the road, same throttle, same time.
@@ -152,8 +158,12 @@ check('off-road is still slower than the road', r.offFlat.speed < r.onFlat.speed
 // Leaving is still not free.
 check('the hinterland still costs you', r.far.speed < r.cut.speed,
   `140 u out: ${r.far.speed} vs 30 u out: ${r.cut.speed} m/s`);
-check('the hinterland still warns you', /OFF THE COURSE/.test(r.far.feed),
-  r.far.feed || 'no feed');
+// r301 (CORRIDOR §8): the OFF THE COURSE scolding is deleted — the signal
+// out in the wild is the GATE ARROW, pointing at the way back instead of
+// complaining about the way out.
+check('the hinterland shows the way back (gate arrow, no scolding)',
+  r.far.arrow === true && !/OFF THE COURSE/.test(r.far.feed),
+  `arrow=${r.far.arrow}${r.far.feed ? `, feed "${r.far.feed}"` : ''}`);
 
 // The rim wall is a separate rule and must survive all of this. It only
 // engages PAST RIM_RADIUS (1620), so start just outside it — an earlier draft
