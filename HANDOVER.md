@@ -4161,6 +4161,47 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r288 — THE WHOLE CAR IN ONE WORLD: THE REAL-DRIVING AUDIT
+"Make sure driving is aligning real world driving." Not a bug report — a
+standard. So the round opens with an instrument, not a patch:
+tools-scratch/drivereal.mjs measures every axis in g against a real car.
+The audit table, before:
+
+    launch 0-100      2.05 s        supercar        ALIGNED (r286)
+    corner path g     1.4-2.2 g     drift hero      ALIGNED (r284)
+    brake 100-0       6.4 m, 6.4 g  real 1.1-1.5 g  SIX TIMES OFF
+    lift-off coast    0.80 g        real 0.1-0.2 g  A HARD BRAKE
+    reverse 0-20      0.32 s        real 1-2 s      A CATAPULT
+
+THE FIXES, each at its comment in vehicles.js:
+  - Brakes cap at 4.2*gripBudget (~1.5 g; all four tyres, so above the
+    2.8 drive cap). 100-0 lands at 18.8 m, peak 2.16 g — winged-race-car
+    honest, and surface still bites through gripBudget and sBrake.
+  - TWO DRAGS, NOT ONE. The 0.55/s coefficient is really the hidden
+    top-speed governor (thrust = drag at ~62 u/s) and stays under power,
+    where it is invisible; a closed throttle now coasts at 0.14/s.
+    Lift-and-coast glides; slowing is the brake's job.
+  - Reverse caps at 5 u/s² (0-20 in 1.17 s) — a manoeuvre, not a launch;
+    still backs out of a wedge (test-unstuck 9/9 holds the proof).
+  - Rival DECEL 26 -> 15: a field that plans 2.65 g stops would outbrake
+    every human by physics the player no longer has.
+  - A PARKED CAR STAYS PARKED (same-day report: "car is turning in place
+    without any speed"). The hairpin steering floor gave 45% authority at
+    ZERO speed — a tank pivot. Yaw now ramps in over the first 2.5 u/s
+    like a real car's v/wheelbase; at the 14 km/h hairpin crawl the floor
+    is already whole (168 deg/2 s), so the trap it was built against
+    stays fixed. Parked full lock: -5 deg in 2 s.
+
+RECALIBRATIONS THE PHYSICS FORCED, both argued in their test files:
+test-invisible-walls' station-escape floor 12 -> 6 u (a capped hill
+start makes 9-15 u in 2 s; a wall still pins at 0-3), and test-jumps'
+crest count 4 -> 2 per 90 s (the count is time-windowed and the car is
+honestly slower; the quality laws — median hang 1.08 s, no stutters,
+landing grip — keep guarding the stages' character). Battery after:
+difficulty 12/12, unstuck, wedge, goat 26/26, duel-rival, field-stalls
+green; test-climb's one red did not reproduce over two repeats (the
+randomized scan's known staircase-spot noise).
+
 ## r287 — THE STANDS COME OUT. ALL OF THEM.
 "Do a full swipe and erase them", the same day the reworked stands went
 live. Three shapes, three photographs: single fog-washed cones ("little

@@ -106,7 +106,15 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [10, 'ROCKFALL RAVINE'], [13, 'OUN
 
   // 3. Jumps must still HAPPEN — it would be trivial to pass the two above by
   //    never leaving the ground, and these are rally stages with crests on them.
-  check(`${name}: crests still launch the car`, r.real >= 4,
+  //    >= 2, down from 4 (r288): the count is TIME-windowed and the car got
+  //    honestly slower everywhere — launch and brakes obey the tyre now — so
+  //    it reaches fewer crests inside the same 90 s. The stage's character is
+  //    guarded by the QUALITY laws around this one (median hang, no
+  //    three-frame stutters, airborne share, landing grip): OUNINPOHJA at 2
+  //    jumps posts a 1.08 s median hang — those are real flights, fewer of
+  //    them. Zero or one would mean the crests stopped working; that still
+  //    fails.
+  check(`${name}: crests still launch the car`, r.real >= 2,
     `${r.real} jumps over 0.35s in ${r.secs}s`);
 
   // 4. And the car must spend most of the stage driving. 11-18% of the run was
