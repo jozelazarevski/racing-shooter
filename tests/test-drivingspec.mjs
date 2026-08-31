@@ -94,14 +94,25 @@ await p.waitForFunction(() => window.__game?.track?.center && window.__game.play
 const r4 = await p.evaluate(() => {
   const g = window.__game, t = g.track, c = g.player;
   g.state = 'race'; g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
-  const N = t.center.length, pt = t.pointAt(10, 0);
+  // THE FLAT PLANE, EMULATED: no lap on the roster holds a 30 s straight
+  // (the exponential approach to the drag equilibrium has tau ~8 s), so
+  // the run drives the expressway's straight and LOOPS back to its start
+  // with speed preserved — the spec's endless test plane, made of real
+  // road. The relocation carries |v| onto the new heading; nothing else.
+  const N = t.center.length;
+  const placeAt = (idx, speed) => {
+    const pt2 = t.pointAt(idx, 0);
+    c.pos.set(pt2.x, t.groundHeightAt(idx, 0) + 0.3, pt2.z); c.y = c.pos.y;
+    c.trackIndex = idx; c.lateral = 0; c.heading = t.headingAt(idx);
+    c.vel.set(Math.sin(c.heading), 0, Math.cos(c.heading)).multiplyScalar(speed);
+  };
   c.alive = true; c.health = 100; c.airborne = false; c.vy = 0;
-  c.pos.set(pt.x, t.groundHeightAt(10, 0) + 0.3, pt.z); c.y = c.pos.y;
-  c.trackIndex = 10; c.lateral = 0; c.heading = t.headingAt(10);
-  c.vel.set(Math.sin(c.heading), 0, Math.cos(c.heading)).multiplyScalar(30);
+  placeAt(10, 30);
   let vTop = 0;
-  for (let k = 0; k < 1800; k++) {
-    const i = c.trackIndex, aim = t.center[(i + 8) % N];
+  for (let k = 0; k < 2400; k++) {
+    const i = c.trackIndex;
+    if (((i - 10 + N) % N) > 50) placeAt(10, Math.hypot(c.vel.x, c.vel.z));
+    const aim = t.center[(c.trackIndex + 8) % N];
     let d = Math.atan2(aim.x - c.pos.x, aim.z - c.pos.z) - c.heading;
     while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
     c.step(1 / 60, { throttle: 1, brake: 0, steer: Math.max(-1, Math.min(1, d * 2)), drift: false, hold: false });
