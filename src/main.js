@@ -136,7 +136,12 @@ const DIFFS = {
   // often. The knob that reads fastest makes the field slower.
   easy:   { id: 'easy',   label: 'EASY',   aiSpeed: 0.74, aiCorner: 0.26, aiAggression: 0.65, rubberBand: 1.25, bandUp: 0.25 },
   normal: { id: 'normal', label: 'NORMAL', aiSpeed: 0.97, aiCorner: 0.58, aiAggression: 1.0,  rubberBand: 0.95, bandUp: 0.70 },
-  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.06, aiCorner: 0.63, aiAggression: 1.4,  rubberBand: 0.15 },
+  // hard aiCorner 0.65 (r291): the drag restore lifted absolute speeds and
+  // the tier-blind pinch caps bind sooner, compressing normal and hard to a
+  // 3-point coin flip on open worlds (1212 vs 1209 measured). Two points of
+  // corner budget give HARD back a real edge without re-crossing the
+  // clean-winnable bound.
+  hard:   { id: 'hard',   label: 'HARD',   aiSpeed: 1.06, aiCorner: 0.65, aiAggression: 1.4,  rubberBand: 0.15 },
 };
 
 const UPGRADES = [
