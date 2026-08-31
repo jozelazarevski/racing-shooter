@@ -26,12 +26,20 @@ export class Hud {
       bMissile: $('b-missile'), bMine: $('b-mine'), bShock: $('b-shock'),
       tUnstuck: $('t-unstuck'), bUnstuck: $('b-unstuck'),
       tFire: $('t-fire'), tShock: $('t-shock'), tNitro: $('t-nitro'),
+      bRounds: $('b-rounds'),
+      // RALLY_HUD_REVIEW §4 additions
+      speedNum: $('speed-num'), danger: $('danger-lane'), chatter: $('chatter'),
+      strip: $('progress-strip'), floats: $('dmg-floats'), arrows: $('edge-arrows'),
+      healthBox: $('health-box'),
     };
     this.speedo = $('speedo');
     this.spCtx = this.speedo.getContext('2d');
     this.vignetteLevel = 0;
     this._standingsHtml = '';
     this._standingsTimer = 0;
+    this._lastHealth = null;
+    this._stripKey = '';
+    this._arrowPool = [];
     this._watchLeftColumn();
   }
 
@@ -169,7 +177,14 @@ export class Hud {
   update(dt) {
     const g = this.game, p = g.player;
     const kmh = Math.round(Math.abs(p.speedAlong) * 3.1);
-    this.drawSpeedo(kmh, p.boostTimer > 0);
+    // §4: speed is a NUMBER in the corner. The gauge canvas is display:none;
+    // drawing to a hidden canvas is pure waste, so it only renders if some
+    // stylesheet ever shows it again.
+    if (this.el.speedNum) {
+      this.el.speedNum.firstChild.textContent = String(kmh);
+      this.el.speedNum.classList.toggle('boosting', p.boostTimer > 0);
+    }
+    if (this.speedo.offsetParent) this.drawSpeedo(kmh, p.boostTimer > 0);
     this.el.lap.textContent = Math.min(p.lap, g.lapsTotal);
     this.el.lapsTotal.textContent = g.lapsTotal;
     this.el.time.textContent = fmtTime(g.raceTime);
@@ -235,19 +250,26 @@ export class Hud {
       this.el.racerCount.textContent = 1 + g.enemies.length;
     }
 
-    // standings (rebuilt at 2 Hz)
+    // §4 FIELD AWARENESS: the standings LIST became a progress strip — all
+    // eight cars as dots by continuous progress, player highlighted. The
+    // review's finding 3.8 was a race spent 8th of 8 with no way to know
+    // whether the field was ahead, behind, or missing. Missions and roam
+    // keep the text rows (their slot carries objectives, not a field).
+    document.body.classList.toggle('hud-rows', !!(g.missionMode || g.freeRoam));
     this._standingsTimer -= dt;
-    if (!g.freeRoam && this._standingsTimer <= 0) {
-      this._standingsTimer = 0.5;
-      const order = [g.player, ...g.enemies].sort((a, b) => b.progress - a.progress);
-      const html = order.map((c, i) =>
-        `<div class="srow${c === g.player ? ' me' : ''}${c.alive ? '' : ' dead'}">${i + 1}. ${c.name}</div>`
-      ).join('');
-      if (html !== this._standingsHtml) {
-        this._standingsHtml = html;
-        this.el.standings.innerHTML = html;
-      }
+    if (!g.freeRoam && !g.missionMode && this.el.strip && this._standingsTimer <= 0) {
+      this._standingsTimer = 0.25;
+      const cars = [g.player, ...g.enemies];
+      let lo = Infinity, hi = -Infinity;
+      for (const c of cars) { lo = Math.min(lo, c.progress); hi = Math.max(hi, c.progress); }
+      const span = Math.max(0.05, hi - lo);
+      const html = cars.map((c) => {
+        const f = Math.round(((c.progress - lo) / span) * 92 + 2);
+        return `<i class="${c === g.player ? 'me' : ''}${c.alive ? '' : ' dead'}" style="left:${f}%"></i>`;
+      }).join('');
+      if (html !== this._stripKey) { this._stripKey = html; this.el.strip.innerHTML = html; }
     }
+    if (this.el.strip) this.el.strip.style.display = (g.missionMode || g.freeRoam) ? 'none' : '';
 
     const hp = Math.max(0, Math.round(p.health));
     this.el.health.style.width = hp + '%';
@@ -255,6 +277,37 @@ export class Hud {
     this.el.health.style.background = hp > 50
       ? 'linear-gradient(90deg,#2fb84a,#7de08a)'
       : hp > 25 ? 'linear-gradient(90deg,#ffb52e,#ffe86b)' : 'linear-gradient(90deg,#e8402a,#ff8b3b)';
+    // §4 HULL PRESENTATION, watched off the NUMBER so no damage path can
+    // forget to announce itself: bar flash (120 ms), edge vignette scaled by
+    // the size of the hit over 20, a floating number spawned AT THE CAR (the
+    // one place the eyes are), and a 2 Hz pulse below 25.
+    if (this._lastHealth === null || p.health > this._lastHealth) this._lastHealth = p.health;
+    const drop = this._lastHealth - p.health;
+    if (drop >= 1 && p.alive) {
+      const hb = this.el.healthBox;
+      if (hb) {
+        hb.classList.remove('hit'); void hb.offsetWidth; hb.classList.add('hit');
+        clearTimeout(this._hitT);
+        this._hitT = setTimeout(() => hb.classList.remove('hit'), 120);
+      }
+      this.vignetteLevel = Math.min(1.2, this.vignetteLevel
+        + Math.min(1, 0.25 + Math.max(0, drop - 20) * 0.03));
+      if (this.el.floats && p.mesh) {
+        const v = (this._pv ??= p.mesh.position.clone());
+        v.copy(p.mesh.position).project(g.camera);
+        if (v.z < 1) {
+          const d = document.createElement('div');
+          d.className = 'dfloat';
+          d.textContent = `−${Math.round(drop)}`;
+          d.style.left = `${(v.x + 1) * 50}%`;
+          d.style.top = `${(1 - (v.y + 1) / 2) * 100}%`;
+          this.el.floats.appendChild(d);
+          setTimeout(() => d.remove(), 750);
+        }
+      }
+    }
+    this._lastHealth = p.health;
+    this.el.healthBox?.classList.toggle('pulse', hp < 25 && hp > 0 && p.alive);
     // HULLS, NOT WRECKS. A rising count of things that had already gone wrong
     // told you nothing about what you had left; three-strikes needs the number
     // you are about to run out of, and it needs to be alarming before it is
@@ -325,12 +378,14 @@ export class Hud {
       const nf = Math.round(p.nitro * 100);
       this.el.tNitro.style.background =
         `conic-gradient(rgba(127,212,255,${p.boostTimer > 0 ? 1 : 0.8}) ${nf}%, rgba(38,26,12,.6) 0)`;
-      // The fire button carries the magazine, because on a phone the weapon
-      // panel is hidden entirely and this is the only place it can be read.
+      // The fire button carries the magazine ON A BADGE now — its face as a
+      // bare number was the review's "unlabelled number in a brown circle".
+      // The face only changes state words (DRY/HOT), never counts.
       const rd = p.rounds ?? 0;
       this.el.tFire.classList.toggle('hot', p.overheated);
       this.el.tFire.classList.toggle('dry', rd <= 0);
-      this.el.tFire.textContent = rd <= 0 ? 'DRY' : p.overheated ? 'HOT!' : String(rd);
+      this.el.tFire.firstChild.textContent = rd <= 0 ? 'DRY' : p.overheated ? 'HOT!' : 'FIRE';
+      if (this.el.bRounds) this.el.bRounds.textContent = String(rd);
     }
 
     // wrong-way detection
@@ -344,6 +399,42 @@ export class Hud {
     this.vignetteLevel = Math.max(0, this.vignetteLevel - dt * 1.8);
     this.el.vignette.style.opacity = Math.min(1, this.vignetteLevel);
 
+    if (this.el.arrows && g.state === 'race') this._edgeArrows();
+  }
+
+  /** §4 FIELD AWARENESS, the other half: a rival within 40 u but off-screen,
+   *  or a missile hunting the player, gets an arrow at the play-band edge
+   *  pointing at it. Pooled nodes; at most six, nearest first. */
+  _edgeArrows() {
+    const g = this.game, p = g.player;
+    const pool = this._arrowPool;
+    let n = 0;
+    const place = (pos, missile) => {
+      if (n >= 6 || !pos) return;
+      const v = (this._av ??= p.mesh.position.clone());
+      v.copy(pos).project(g.camera);
+      let { x, y } = v;
+      if (v.z > 1) { x = -x; y = -y; }             // behind the camera: flip
+      if (v.z < 1 && Math.abs(x) < 1 && Math.abs(y) < 1) return; // on screen
+      let a = pool[n];
+      if (!a) { a = document.createElement('div'); a.className = 'earrow'; a.textContent = '➤'; this.el.arrows.appendChild(a); pool.push(a); }
+      const left = Math.min(94, Math.max(6, (x + 1) * 50));
+      const top = Math.min(66, Math.max(20, (1 - (y + 1) / 2) * 100));
+      a.style.left = left + '%';
+      a.style.top = top + '%';
+      a.style.transform = `translate(-50%,-50%) rotate(${Math.atan2(top - 43, left - 50)}rad)`;
+      a.classList.toggle('missile', !!missile);
+      a.style.display = 'block';
+      n++;
+    };
+    const near = g.enemies
+      .filter((e) => e.alive && e.pos.distanceTo(p.pos) < 40)
+      .sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos));
+    for (const m of (g.weapons?.missiles ?? [])) {
+      if (m.active && m.target === p) place(m.mesh?.position ?? m.pos, true);
+    }
+    for (const e of near) place(e.mesh?.position ?? e.pos, false);
+    for (let k = n; k < pool.length; k++) pool[k].style.display = 'none';
   }
 
   /** Race-contracts readout under the standings: three compact rows, ✓ when
@@ -369,21 +460,59 @@ export class Hud {
 
   damageFlash(strength = 0.7) { this.vignetteLevel = Math.min(1.2, this.vignetteLevel + strength); }
 
+  /** §4 TOAST LANES. One lane became three, because danger, progress and
+   *  chatter were visually identical (finding 3.3 — SIDESWIPED ROCK −12
+   *  stacked between "DUNE: see ya!" and MINE DEPLOYED, same place, same
+   *  style). Routing keys off what the message IS:
+   *    danger   — hull loss, incoming fire, wrong way. Centred, red, ONE at
+   *               a time, the latest preempts.
+   *    chatter  — rival lines and weapon-state noise. Small, grey, one.
+   *    progress — everything gold: laps, pickups, feats, credits.
+   *  And NOTHING shows from the grid to GO + 3 s (finding 3.4: seven toasts
+   *  in four seconds around the countdown) — the countdown owns the screen.
+   */
   feed(text, kind = 'info') {
+    const g = this.game;
+    if (g && (g.state === 'countdown'
+      || (g.state === 'race' && (g.raceTime ?? 9) < 3))) return;
+    const danger = kind === 'bad' && /HULL|MISSILE|INCOMING|WRONG WAY|WRECKED|DESTROYED/.test(text);
+    if (danger) return this.dangerMsg(text);
+    if (/^[A-Z]+: |LOCKED|DEPLOYED|see ya|MAGAZINE|OUT OF AMMO|RACK EMPTY/.test(text)) {
+      return this.chatterMsg(text);
+    }
     const div = document.createElement('div');
     div.className = `feed-msg ${kind}`;
     div.textContent = text;
     this.el.feed.appendChild(div);
-    // FIVE MESSAGES DO NOT FIT ON A SMALL PHONE. The cap used to be a flat 5,
-    // which is about 160px of stacked rows — fine on a desktop, but on a
-    // 320x568 screen the feed hangs off the bottom of its own space and the
-    // last rows land on the DRIFT and FIRE buttons. Since the feed's top is
-    // itself measured now (see _watchLeftColumn), the number of rows that fit
-    // is a measurement too: the room between the feed and the topmost touch
-    // control. Oldest rows go first, so the newest message is always the one
-    // that survives.
-    while (this.el.feed.children.length > this._feedRows()) this.el.feed.firstChild.remove();
-    setTimeout(() => div.remove(), 3300);
+    // the progress lane holds at most two (its cap used to be measured
+    // against the touch controls; the band layout fixes its room at 20-30%)
+    while (this.el.feed.children.length > 2) this.el.feed.firstChild.remove();
+    setTimeout(() => div.remove(), 1600);
+  }
+
+  /** The danger lane: one message, 1.2 s, the latest wins. */
+  dangerMsg(text) {
+    const el = this.el.danger;
+    if (!el) return;
+    el.innerHTML = '';
+    const d = document.createElement('div');
+    d.className = 'dmsg';
+    d.textContent = text;
+    el.appendChild(d);
+    clearTimeout(this._dangerT);
+    this._dangerT = setTimeout(() => { if (d.parentNode) d.remove(); }, 1200);
+  }
+
+  chatterMsg(text) {
+    const el = this.el.chatter;
+    if (!el) return;
+    el.innerHTML = '';
+    const c = document.createElement('div');
+    c.className = 'cmsg';
+    c.textContent = text;
+    el.appendChild(c);
+    clearTimeout(this._chatterT);
+    this._chatterT = setTimeout(() => { if (c.parentNode) c.remove(); }, 1200);
   }
 
   centerMsg(text) {

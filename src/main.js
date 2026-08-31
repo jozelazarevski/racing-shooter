@@ -368,9 +368,17 @@ const FILTER_GROUPS = [
 const SHOT_RIG = new THREE.Vector3(5.2, 3.2, 6.2);
 const SHOT_RIG_GROUND = new THREE.Vector3(8.0, 2.5, 3.2);
 
+// RALLY_HUD_REVIEW §4 (r296): the CAR ANCHOR sits at 52-58% of viewport
+// height in every non-driver mode, so the car can never ride under the
+// controls band (it used to sit at 68-79% — directly beneath the weapon
+// cluster, finding 3.1). `look`/`lookH` below are MEASURED, not styled:
+// binary-searched per mode against the projected car position on a 390x844
+// portrait viewport (tools-scratch/anchortune.mjs), then baked. The cost is
+// look-ahead — the aim point rides much nearer the car — which the high
+// camera angle absorbs; the H1 gate in test-hudreview holds the band.
 const CAM_MODES = [
-  { name: 'TOP-DOWN',  back: 16, h: 46, look: 22, lookH: 0,   spdBack: 8, spdH: 16, steer: 1, roadYaw: true },   // PATCH_02 §3.9: 1.35x at top speed
-  { name: 'TOP FAR',   back: 20, h: 72, look: 30, lookH: 0,   spdBack: 6, spdH: 24, steer: 1, roadYaw: true },
+  { name: 'TOP-DOWN',  back: 16, h: 46, look: 4,  lookH: 0,   spdBack: 8, spdH: 16, steer: 1, roadYaw: true },   // PATCH_02 §3.9: 1.35x at top speed
+  { name: 'TOP FAR',   back: 20, h: 72, look: 5.5, lookH: 0,  spdBack: 6, spdH: 24, steer: 1, roadYaw: true },
   // CHASE sat at h 7.5 / back 13 / look 10 — down at bumper height and close
   // enough that the car filled the screen, so you could not see far enough up
   // the road to place the next corner ("super hard to drive in this camera
@@ -384,11 +392,11 @@ const CAM_MODES = [
   // cast shadow, and roughly doubles the car on screen. `chase: true` matters
   // here: at this height the view is close enough that the raw-heading camera
   // whips on every steering flick, so it takes the damped travel-direction yaw.
-  { name: 'TRAIL',     back: 21, h: 26,   look: 15, lookH: 1.6, spdBack: 5, spdH: 6, chase: true, steer: 0.9, cliffLift: 11 },
-  { name: 'CHASE',     back: 17, h: 11.5, look: 19, lookH: 3.2, spdBack: 4, spdH: 2, chase: true, steer: 0.76 },
+  { name: 'TRAIL',     back: 21, h: 26,   look: 2.5, lookH: 1.6, spdBack: 5, spdH: 6, chase: true, steer: 0.9, cliffLift: 11 },
+  { name: 'CHASE',     back: 17, h: 11.5, look: 4,  lookH: 0.1, spdBack: 4, spdH: 2, chase: true, steer: 0.76 },
   { name: 'DRIVER', driver: true, back: -0.42, h: 2.30, look: 34, lookH: 1.15,
     steer: 0.70, fov: 6, spdFov: 11 },
-  { name: 'CHASE FAR', back: 26, h: 17,   look: 22, lookH: 3.4, spdBack: 4, spdH: 2, chase: true, steer: 0.84 },
+  { name: 'CHASE FAR', back: 26, h: 17,   look: 4,  lookH: 0.35, spdBack: 4, spdH: 2, chase: true, steer: 0.84 },
   // DRIVER'S VIEW — the eye where the driver's head is, riding the car rather
   // than a boom behind it. It is LAST in the list on purpose: every mode above
   // it is a variation on "watch your car", this one is not, and the cycle
@@ -1762,8 +1770,9 @@ class Game {
       this.showMenu('garage');
     });
 
-    // camera + pause buttons (work with mouse and touch)
-    document.getElementById('cam-btn').addEventListener('click', () => this.cycleCamera());
+    // pause button (HUD_REVIEW §4: the camera toggle moved into the pause
+    // menu — beside pause it was a mis-tap at speed; pm-camera owns it now)
+    document.getElementById('cam-btn')?.addEventListener('click', () => this.cycleCamera());
     document.getElementById('pause-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       this.togglePause();
@@ -2161,6 +2170,11 @@ class Game {
    *  list — `test-camera` did, BY INDEX, so moving DRIVER up the cycle would
    *  have had it testing the seat while calling it CHASE FAR. */
   static get CAM_NAMES() { return CAM_MODES.map((m) => m.name); }
+
+  /** The mode table itself, published for the HUD-review anchor gate (H1):
+   *  the car anchor is a measured property of these numbers, and the rig
+   *  that holds it to the 52-58% band needs to read and probe them. */
+  static get CAM_MODES() { return CAM_MODES; }
 
   static get DRIVER_MODE() {
     const i = CAM_MODES.findIndex((m) => m.driver);
@@ -11305,11 +11319,17 @@ class Game {
         this.track.setLights('green');
         this._lightsLive = true;
         this.telemetry?.log('startLights', { state: 'green' });
+        // HUD_REVIEW §4: nothing toasts until GO + 3 s — the countdown owns
+        // the screen. The surface warning waits out the window (it matters
+        // for the first corner, which comes later than 3 s); the contract
+        // toasts are gone outright — contracts read from the pause menu now.
         const surf = this.track.T?.surface;
-        if (surf === 'snow') this.hud.feed('SNOW ROAD — LOW GRIP, LONG SLIDES', 'info');
-        else if (surf === 'wet') this.hud.feed('WET ROAD — SLICK UNDER BRAKING', 'info');
-        for (const c of this.contracts ?? []) {
-          this.hud.feed(`◇ ${c.label}: ${c.desc(c.need)}  +${c.pay} CR`, 'info');
+        if (surf === 'snow' || surf === 'wet') {
+          setTimeout(() => {
+            if (this.state !== 'race') return;
+            this.hud.feed(surf === 'snow' ? 'SNOW ROAD — LOW GRIP, LONG SLIDES'
+              : 'WET ROAD — SLICK UNDER BRAKING', 'info');
+          }, 3200);
         }
       }
     }

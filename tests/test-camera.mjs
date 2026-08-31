@@ -111,10 +111,15 @@ ok(top.every((r) => r.swungView < r.swungCar * 0.5),
 ok(chase.some((r) => r.swungView > 4),
   'the chase views still follow where the car is going — the road view did not leak into them',
   JSON.stringify(chase.map((r) => [r.name, r.swungView])));
-ok(top.every((r) => r.aheadRoad > 8),
+// RALLY_HUD_REVIEW §4 (r296) shrank the look-ahead ON PURPOSE: the deep aim
+// point was what parked the car at 68-79% of the screen, under the weapon
+// cluster. The anchor now sits at 52-58% (H1 in test-hudreview owns that
+// band), so the lead is small — the property THIS gate still defends is its
+// SIGN: the camera aims ahead, never behind.
+ok(top.every((r) => r.aheadRoad > 0.5),
   'the overhead views frame road AHEAD along the lap, not the tarmac behind it',
   JSON.stringify(top.map((r) => [r.name, r.aheadRoad])));
-ok(chase.every((r) => r.aheadCar > 8),
+ok(chase.every((r) => r.aheadCar > 0.5),
   'and the chase views frame road ahead of the CAR, which is what they follow',
   JSON.stringify(chase.map((r) => [r.name, r.aheadCar])));
 ok(R.every((r) => r.dist > 5 && r.dist < 140),
