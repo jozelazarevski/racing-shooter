@@ -3121,6 +3121,7 @@ const THEMES = {
     obstacleSpec: { count: 3, style: 'boulder', downhill: true }, puddleCount: 2,
     elements: 'alpine',
     snowPatches: { count: 70, minY: 28 },                // altitude snowfields
+    chairlift: true,                                     // the lift line up the flank (r292)
     // the mountain the road climbs into, standing beyond the summit shelf
     massif: { az: 1.45, spread: 1.7, count: 9, r0: 380, r1: 620,
       h0: 130, h1: 260, w0: 190, w1: 340 },
@@ -3252,6 +3253,7 @@ const THEMES = {
     snowPatches: { count: 60, minY: 24 },               // summit fields only
     glacier: true,
     passHotel: true,
+    chairlift: true,                                    // the lift line up the flank (r292)
     // hero crossing: a rope suspension bridge over a red-rock river gorge on
     // the valley run-in (the straightest window in that stretch of the lap)
     heroBridge: { at: [0.82, 0.92], half: 26, len: 230, depth: 30, skew: 0 },
@@ -13621,6 +13623,138 @@ export class Track {
     this.group.add(slabs);
   }
 
+  /** THE CHAIRLIFT (r292) — the alpine-touring moment from the player's
+   *  photo: a safari car parked on a high meadow under a lift line, pylons
+   *  marching up the flank, the valley village far below. A line of steel
+   *  towers climbs radially from mid-slope to a high shoulder, twin sagging
+   *  cables between crossarm tips, chairs hanging along each span, a
+   *  windsock on the second tower and a utility hut at the top station.
+   *
+   *  PLACEMENT is scanned, not guessed: forty azimuths, every pylon spot
+   *  must clear water, the goat route (40 u) and the lap (the line with the
+   *  BEST minimum global road distance wins; under 55 u the world gets no
+   *  lift). Towers carry solids (ghosthunt's law); everything that HANGS
+   *  lives in a group named `cablecar-hangers`, which rides the float
+   *  census's existing audited airborne class (`cablecar|cable` prefixes in
+   *  test-nothing-floats' AIRBORNE and ghosthunt's EXEMPT). */
+  _buildChairlift(m4) {
+    const N = this.center.length;
+    const roadDist = (x, z) => {
+      let bd = 1e9;
+      for (let i = 0; i < N; i += 3) {
+        const c = this.center[i], d = (c.x - x) * (c.x - x) + (c.z - z) * (c.z - z);
+        if (d < bd) bd = d;
+      }
+      return Math.sqrt(bd);
+    };
+    const id = this.level?.id ?? 0;
+    const R0 = 430, R1 = 830, NP = 7;
+    let best = null;
+    for (let s = 0; s < 40; s++) {
+      const az = (id * 0.73 + s * 0.157) % (Math.PI * 2);
+      let minD = 1e9, okLine = true;
+      for (let k = 0; k < NP; k++) {
+        const r = R0 + (R1 - R0) * k / (NP - 1);
+        const x = Math.cos(az) * r, z = Math.sin(az) * r;
+        if (this._inWater?.(x, z)) { okLine = false; break; }
+        if (this._nearGoat?.(x, z, 40)) { okLine = false; break; }
+        minD = Math.min(minD, roadDist(x, z));
+      }
+      if (!okLine) continue;
+      if (!best || minD > best.minD) best = { az, minD };
+    }
+    if (!best || best.minD < 55) return;
+    const az = best.az, dirX = Math.cos(az), dirZ = Math.sin(az);
+    const perpX = -Math.sin(az), perpZ = Math.cos(az);
+
+    const towers = new THREE.Group(); towers.name = 'chairlift-towers';
+    const hangers = new THREE.Group(); hangers.name = 'cablecar-hangers';
+    const steel = new THREE.MeshStandardMaterial({ color: 0x4a4238, roughness: 0.85, flatShading: true });
+    const cableM = new THREE.MeshStandardMaterial({ color: 0x33363b, roughness: 0.6 });
+    const chairM = new THREE.MeshStandardMaterial({ color: 0x2e3236, roughness: 0.8, flatShading: true });
+    const seatM = new THREE.MeshStandardMaterial({ color: 0x5b6470, roughness: 0.9, flatShading: true });
+    const colG = new THREE.BoxGeometry(1.1, 1, 1.1);
+    const armG = new THREE.BoxGeometry(7.4, 0.55, 0.9);
+    const tops = [];
+    for (let k = 0; k < NP; k++) {
+      const r = R0 + (R1 - R0) * k / (NP - 1);
+      const x = dirX * r, z = dirZ * r;
+      const gy = this.terrainHeight(x, z);
+      const th = 12 + k * 0.9;
+      const col = new THREE.Mesh(colG, steel);
+      col.position.set(x, gy + th / 2, z);
+      col.scale.y = th;
+      col.castShadow = true;
+      const arm = new THREE.Mesh(armG, steel);
+      arm.position.set(x, gy + th, z);
+      arm.rotation.y = Math.atan2(dirX, dirZ);      // crossarm perpendicular to the line
+      arm.castShadow = true;
+      towers.add(col, arm);
+      this.solids.push({ x, z, r: 1.5, y: gy, h: th + 1, mat: 'metal' });
+      tops.push({ x, y: gy + th, z });
+    }
+    // windsock on tower 2 — the detail that says WIND lives up here
+    {
+      const t2 = tops[1];
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.2, 6), cableM);
+      mast.position.set(t2.x, t2.y + 1.6, t2.z);
+      const sock = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.6, 6),
+        new THREE.MeshStandardMaterial({ color: 0xd84b2a, roughness: 0.8, flatShading: true }));
+      sock.position.set(t2.x + 0.9, t2.y + 3.0, t2.z);
+      sock.rotation.z = Math.PI / 2;
+      towers.add(mast, sock);
+    }
+    // the utility hut at the top station (the photo's little box by the mast)
+    {
+      const tt = tops[NP - 1];
+      const hx = tt.x + perpX * 9, hz = tt.z + perpZ * 9;
+      const hy = this.terrainHeight(hx, hz);
+      const hut = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.2, 3.4),
+        new THREE.MeshStandardMaterial({ color: 0xb9b3a6, roughness: 0.95, flatShading: true }));
+      hut.position.set(hx, hy + 1.6, hz);
+      hut.castShadow = true;
+      towers.add(hut);
+      this.solids.push({ x: hx, z: hz, r: 2.6, y: hy, h: 3.4, mat: 'stone' });
+    }
+    // twin cables, sagging per span, and the chairs that ride them
+    const segG = new THREE.CylinderGeometry(0.07, 0.07, 1, 5);
+    const up = new THREE.Vector3(0, 1, 0), tmp = new THREE.Vector3();
+    const seg = (ax, ay, azz, bx, by, bz) => {
+      const m = new THREE.Mesh(segG, cableM);
+      m.position.set((ax + bx) / 2, (ay + by) / 2, (azz + bz) / 2);
+      m.scale.y = Math.hypot(bx - ax, by - ay, bz - azz);
+      m.quaternion.setFromUnitVectors(up, tmp.set(bx - ax, by - ay, bz - azz).normalize());
+      hangers.add(m);
+    };
+    const barG = new THREE.CylinderGeometry(0.05, 0.05, 2.0, 5);
+    const seatG = new THREE.BoxGeometry(1.35, 0.35, 0.55);
+    const backG = new THREE.BoxGeometry(1.35, 0.85, 0.14);
+    for (let k = 0; k < NP - 1; k++) {
+      for (const s of [-1, 1]) {
+        const A = { x: tops[k].x + perpX * s * 3.1, y: tops[k].y, z: tops[k].z + perpZ * s * 3.1 };
+        const B = { x: tops[k + 1].x + perpX * s * 3.1, y: tops[k + 1].y, z: tops[k + 1].z + perpZ * s * 3.1 };
+        const M = { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 - 1.8, z: (A.z + B.z) / 2 };
+        seg(A.x, A.y, A.z, M.x, M.y, M.z);
+        seg(M.x, M.y, M.z, B.x, B.y, B.z);
+        for (const u of [0.3, 0.7]) {
+          // point on the sagged line: lerp minus the parabola's dip
+          const px = A.x + (B.x - A.x) * u, pz = A.z + (B.z - A.z) * u;
+          const py = A.y + (B.y - A.y) * u - 1.8 * 4 * u * (1 - u);
+          const bar = new THREE.Mesh(barG, chairM);
+          bar.position.set(px, py - 1.0, pz);
+          const st = new THREE.Mesh(seatG, seatM);
+          st.position.set(px, py - 2.0, pz);
+          st.rotation.y = Math.atan2(perpX, perpZ);
+          const bk = new THREE.Mesh(backG, chairM);
+          bk.position.set(px - dirX * 0.3, py - 1.6, pz - dirZ * 0.3);
+          bk.rotation.y = Math.atan2(perpX, perpZ);
+          hangers.add(bar, st, bk);
+        }
+      }
+    }
+    this.group.add(towers, hangers);
+  }
+
   /** THE PASS HOTEL — the Belvédère moment from the player's photo: a tall
    *  gabled hotel standing alone on the outside of a mid-climb hairpin, the
    *  serpentine wrapping around it. Placed at the tightest corner in the
@@ -20080,6 +20214,7 @@ export class Track {
     if (T.massif) this._buildMassif(m4);
     if (T.glacier) this._buildGlacier(m4);
     if (T.passHotel) this._buildPassHotel(m4);
+    if (T.chairlift) this._buildChairlift(m4);
   }
 
   /** Add flat-topped stratified mesas (3 stacked shrinking slabs each) for

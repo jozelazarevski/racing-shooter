@@ -2164,7 +2164,13 @@ export class Car {
     // from 6 to 1. This restores the average the tuning assumed; the top
     // speed itself is clamped at vCap, so only mid-range punch returns.
     const dragK = inputs.throttle > 0.05 ? 0.50 : 0.14;
-    vf -= vf * ((sliding ? Math.min(0.40, dragK) : dragK) + (offRoad ? 0.35 : 0)) * dt;
+    // MEADOW TOURING (r292, from the player's alpine photo): in FREE ROAM
+    // the off-road drag halves — a safari car wandering a high meadow
+    // should tour, not wade. RACING keeps the full 0.35: the off-road
+    // penalty is load-bearing there (shortcuts, rejoin discipline, every
+    // corner-cut law), and all of those gates run in race mode.
+    const offDrag = offRoad ? (this.game.freeRoam ? 0.16 : 0.35) : 0;
+    vf -= vf * ((sliding ? Math.min(0.40, dragK) : dragK) + offDrag) * dt;
     // Slope-aware speed ceiling, matched to the grade/drag equilibrium: a
     // downhill grade EXTENDS top speed proportionally (never past topSpeed *
     // DOWNHILL_CAP) and an uphill grade lowers it, so the engine's surplus
