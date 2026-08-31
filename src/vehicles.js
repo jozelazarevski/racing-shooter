@@ -2345,8 +2345,15 @@ export class Car {
       // through a tight corner at speed is the brake or the handbrake,
       // which is the drift promise kept honestly. The relaxation opens the
       // cap mid-slide so counter-steer and held drifts still work.
+      // 1.15, not 0.92 (measured the same day): the tyre-exact bound made
+      // every mountain switchback a braking event and the whole rig fleet
+      // — jump rig 0 hops, wedge runner tripping rescues, cut lines
+      // washing 47 u wide — said the tracks were drawn for more grip than
+      // a real car has. 15% past budget lets a hard corner develop a
+      // MILD, self-limiting slide (over ~0.15, grip trimmed, no spiral)
+      // — the drift feel without the ice, on geometry that expects it.
       const aMax = 4.0 * (this._gripBudget ?? this.grip);
-      const yawCap = Math.min(sp / 4.0, 0.92 * aMax / Math.max(sp, 0.1))
+      const yawCap = Math.min(sp / 4.0, 1.15 * aMax / Math.max(sp, 0.1))
         * (1 + slideRelax) * dt;
       dTheta = THREE.MathUtils.clamp(dTheta, -yawCap, yawCap);
     }
