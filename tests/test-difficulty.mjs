@@ -109,7 +109,12 @@ const run = async (page, diff, skill) => page.evaluate(({ diff, skill }) => {
       // slower than the expert on hairpin worlds (623 on FURKA against a
       // historic ~790) and the law measured the margin model, not the tier.
       // The expert keeps 0.94 exactly.
-      const vm = Math.sqrt(15 * (24 / Math.max(0.06, Math.abs(tn)))) * (0.84 + 0.10 * skill);
+      // 18.9, up from 15 (r294): the corner constant is the tyre budget the
+      // stand-in BELIEVES in, and it was three physics revisions stale —
+      // the mid-range yaw cap now allows ~1.35-1.45x budget, real players
+      // corner there, rivals' planners exploit it, and a stand-in stuck at
+      // 1.07x lost FURKA by 3% twice in a row while driving under the limit.
+      const vm = Math.sqrt(18.9 * (24 / Math.max(0.06, Math.abs(tn)))) * (0.84 + 0.10 * skill);
       const vHere = kk === 0 ? vm : Math.sqrt(vm * vm + 2 * 12 * kk * su);
       if (vHere < vAllow) vAllow = vHere;
     }
