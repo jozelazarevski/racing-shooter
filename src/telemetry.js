@@ -8,6 +8,8 @@
  *
  * Event kinds (PATCH_02 §3 fix 0): damage, offmesh, airborne, nitro,
  * unstuck, rivalTarget, lapTrigger, startLights.
+ * CORRIDOR v2.0 §15 adds: gate {id, passed, lateralM, kind} (step 1);
+ * return / cut / slope / prop arrive with their build steps.
  */
 const CAP = 4000;
 
@@ -21,8 +23,10 @@ export class Telemetry {
 
   log(kind, data) {
     const g = this.game;
+    // the stamp spreads LAST: a data payload carrying its own `kind` (the
+    // gate events carry the SECTION kind) must never rename the event
     this.buf[this.head] = {
-      t: +((g.raceTime ?? 0).toFixed(2)), lap: g.player?.lap ?? 0, kind, ...data,
+      t: +((g.raceTime ?? 0).toFixed(2)), lap: g.player?.lap ?? 0, ...data, kind,
     };
     this.head = (this.head + 1) % CAP;
     if (this.n < CAP) this.n++;

@@ -12,6 +12,7 @@ import { Track, LEVELS, circuitPoints, disposeSubtree, withSeed, seedForLevel,
 import { WorldEditor } from './editor.js';
 import { loadDrivingOverrides } from './driving.js';
 import { installRally } from './telemetry.js';
+import { Route } from './route.js';
 // RALLY_DRIVING.md §13: driving.json overrides load at boot, fire-and-forget
 // — no file shipped means the defaults in driving.js ARE the tune.
 loadDrivingOverrides();
@@ -1633,6 +1634,7 @@ class Game {
     this.track = withSeed(this.worldSeed,
       () => new Track(this.scene, this.level, this.editScene));
     this._applyTheme();
+    this._buildRoute();   // CORRIDOR: the race's own structure, shadow mode
     this.particles = new Particles(this.scene);
     this.particles.setTheme?.(this.level?.theme); // smashed barrels shed the theme's own stave/hoop colours
     this.skids = new SkidMarks(this.scene);
@@ -2378,6 +2380,7 @@ class Game {
     this.track = withSeed(this.worldSeed,
       () => new Track(this.scene, this.level, this.editScene));
     this._applyTheme();
+    this._buildRoute();   // CORRIDOR: rebuilt with the world it threads
     this._applyTyreClass();          // a new world can be a new tyre demand
     this.particles?.setTheme?.(this.level.theme);
 
@@ -9959,6 +9962,8 @@ class Game {
     // target until GO + 4 (see aiCanTarget).
     this.player.invuln = Math.max(this.player.invuln ?? 0, this.countdown + 1.5);
     for (const e of this.enemies ?? []) e.invuln = Math.max(e.invuln ?? 0, this.countdown + 1.5);
+    // CORRIDOR: arm every car at gate 0 (the line) — shadow counters only
+    if (this.route) for (const c of [this.player, ...this.enemies]) this.route.reset(c);
     this._lastCount = 4;
     this.player.lapStart = 0;
     this.hud.feed(`${this.level.name} — LEVEL ${this.level.id}`, 'info');
@@ -10365,6 +10370,34 @@ class Game {
     let rank = 1;
     for (const e of this.enemies) if (e.progress > this.player.progress) rank++;
     this.playerRank = rank;
+  }
+
+  /** CORRIDOR step 1 — build the route and its ribbon for this world. The
+   *  ribbon mesh rides the track's own group so a level teardown takes it
+   *  along; the Route object itself is pure data + math. */
+  _buildRoute() {
+    this.route = new Route(this.track, this.level?.id);
+    const rb = this.route.buildRibbon();
+    this.track.group?.add?.(rb) ?? this.scene.add(rb);
+    // the ribbon is a RACE hint: roam and missions drive anywhere on purpose
+    rb.visible = !this.freeRoam && !this.missionMode;
+  }
+
+  /** CORRIDOR step 1 — SHADOW MODE observation. Every car is stepped through
+   *  the gate model each race frame; the player's crossings go to telemetry.
+   *  NOTHING here decides anything yet: laps, misses and returns stay with
+   *  the old machinery until build-order step 4 hands them over. */
+  _stepRoute() {
+    if (!this.route || this.freeRoam || this.missionMode) return;
+    for (const car of [this.player, ...this.enemies]) {
+      if (!car.alive) continue;
+      const ev = this.route.step(car);
+      if (ev && car === this.player) {
+        this.telemetry?.log('gate', { id: ev.id, passed: ev.passed,
+          lateralM: ev.lateral, section: ev.kind });
+      }
+    }
+    this.route.updateRibbon(this.player.pos, this.player.trackIndex);
   }
 
   /** PATCH_02 §3.1 + §3.3 (v1.1): the AGGRO TICKET OFFICE. No rival may make
@@ -11412,6 +11445,7 @@ class Game {
         this._updateRoamStars(time);
         this._updateLivestock(dt, time);
         this._updateMission(dt); // [MISSIONS]
+        this._stepRoute();       // CORRIDOR step 1: shadow observation only
       }
       if (this.freeRoam) this.playerRank = 1;
       else this._updateRank();

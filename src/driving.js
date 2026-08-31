@@ -101,6 +101,39 @@ export const DRIVING = {
     propShoveRadiusU: 1.15,
     camClearanceM: 2.2,
   },
+
+  // RALLY_CORRIDOR_REFACTOR v2.0 §14 — the route constants, complete as the
+  // spec ships them. This is a STAGED build (§16): step 1 reads streetPadM /
+  // trailPadM / openMinHalfWidthM / ribbonNearM; the rest go live with their
+  // build steps (slope and surfaces in step 2, prop masses in 3, returns and
+  // recovery in 4, cuts and rivals in 5-6). They are declared now because
+  // the spec is the authority on their values, and each step wiring one in
+  // must not also be the round that invents its number.
+  route: {
+    streetPadM: 2,
+    trailPadM: 12,
+    openMinHalfWidthM: 30,
+    openMaxHalfWidthM: 60,
+    missedGateGraceS: 4.0,
+    returnAheadM: 6,
+    returnSpeedKmh: 40,
+    maxClimbDeg: 35,
+    fatalDropM: 12,
+    waterDepthM: 1.2,
+    smashMaxKg: 80,
+    shoveMaxKg: 600,
+    obstacleMinHeightM: 1.6,
+    obstacleExclusionM: 4,
+    obstacleDensityPer20m: 1,
+    rivalCutChance: 0.3,
+    rivalLateralNoiseTrailM: 4,
+    rivalLateralNoiseOpenM: 12,
+    stuckDetectS: 2.5,
+    upsideDownS: 2.0,
+    playerResetDelayS: 1.5,
+    camClearanceM: 1.5,
+    ribbonNearM: 15,
+  },
 };
 
 /** Boot override — main.js calls this once; failures are silent by design
