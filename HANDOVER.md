@@ -4161,6 +4161,46 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r297 — CORRIDOR v2.0 STEP 1: THE RACE GETS ITS OWN STRUCTURE (SHADOW)
+The user posted RALLY_CORRIDOR_REFACTOR.md v2.0 — the biggest doc yet, a
+seven-step build order that separates WORLD (all drivable), ROUTE (an
+ordered list of gates that defines what counts as racing) and ROAD (the
+fast line, never the only line). It supersedes PATCH_02 fixes 4, 11, 13,
+14 and the rotation half of 6, and at step 4 it will retire the rescue
+nets, the SOS counter, the _cpMask lap gating and five toasts wholesale.
+Step 1 is deliberately inert: gate data, ribbon, telemetry, NO RULE
+CHANGES.
+  - src/route.js: Route with §13 layouts for Canyon Run (3 street/4
+    trail/5 open), Glacier Col (4/6/2), Il Budello (5/3/1) — sequences
+    obey the §4.2 pacing rule — and a derived default (2/6/2 over 10
+    gates) for the other ~80 worlds until they are authored. Step 1
+    distributes gates EVENLY along the spline; step 3 re-authors the
+    named stages against their real bridges/gantries/villages.
+  - Pass detection is a plane crossing within halfWidth (street = road
+    +2, trail = road +12, open = 30), with a ±30 u near-plane window so
+    teleports and rescues never read as crossings, and a ±10 u vertical
+    bound so a deck or plateau above a gate does not trip it. A crossing
+    OUTSIDE the width does not advance and the plane re-arms behind it —
+    driving back through counts (R2).
+  - SHADOW MODE: _stepRoute observes every car per race frame, keeps
+    per-car _nextGate/_routeLaps, logs the player's crossings as `gate`
+    telemetry — and decides NOTHING. The old lap machinery still owns
+    laps (pinned by the R1 "no rule changed" check).
+  - The ribbon is a 1.2 u strip riding the whole spline (no cuts exist
+    yet — step 5 will bend it), 30% opacity on the line, 80% when the
+    player strays past ribbonNearM. It lives in the track's group, so a
+    level teardown takes it along; hidden in roam and missions.
+  - DRIVING.route + driving.json carry the COMPLETE §14 constants block,
+    declared now so the step that wires each key in is never also the
+    round that invents its number.
+  - TRAP paid for here: Telemetry.log stamped `kind` BEFORE spreading
+    the payload, so any event whose data carried its own `kind` (gate
+    events carry the section kind) silently renamed the whole event —
+    the stamp now spreads last, and the gate payload says `section`.
+tests/test-route.mjs holds R1/R2 plus the layout-count and pacing
+invariants: 21/21 on stages 4, 66, 74. NEXT: step 2 (slope grip,
+splat-map surfaces, spawn from gate — R3-R6), then the §16 order.
+
 ## r296 — RALLY_HUD_REVIEW: THE HUD SHOWS THE RIGHT THING IN THE RIGHT PLACE
 The user posted a full in-race HUD review (RALLY_HUD_REVIEW.md, Section 4
 normative and binding). Verdict adopted wholesale: "Hull is the only stat

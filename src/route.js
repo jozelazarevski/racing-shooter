@@ -1,0 +1,137 @@
+/* RALLY_CORRIDOR_REFACTOR v2.0 — the ROUTE.
+ *
+ * "The world MUST stay drivable... The race is a list of gates through it."
+ * Three things that used to be one thing come apart here: the WORLD (terrain,
+ * all of it drivable), the ROUTE (this file: an ordered list of gates that
+ * defines what counts as racing), and the ROAD (a fast surface — the best
+ * line most of the time, never the only line).
+ *
+ * BUILD ORDER STEP 1 (§16): gate data, per-stage layouts, ribbon, telemetry —
+ * and NO RULE CHANGES. The route runs in SHADOW MODE: it observes every car,
+ * logs gate passes and misses, and decides nothing. Laps are still counted by
+ * the old checkpoint mask until step 4 hands the job over. R1/R2 gate this
+ * step in tests/test-route.mjs.
+ */
+import * as THREE from 'three';
+import { ROAD_HALF } from './track.js';
+import { DRIVING } from './driving.js';
+
+/* §13 stage layouts — section-kind SEQUENCES per lap, in lap order starting
+ * at the start/finish line. Step 1 distributes them EVENLY along the spline;
+ * step 3 re-authors the three named stages against their real features (the
+ * bridge, the gantry, the narrows, the village). Counts are the table's:
+ * Canyon Run 3 street + 4 trail + 5 open, Glacier Col 4+6+2, Il Budello
+ * 5+3+1 — and every sequence obeys the §4.2 pacing rule (≤3 consecutive
+ * street, ≤2 consecutive open, at least one of each kind per lap). */
+const LAYOUTS = {
+  4:  ['street', 'open', 'open', 'trail', 'open', 'trail', 'street', 'trail',
+    'open', 'trail', 'open', 'street'],                       // CANYON RUN
+  66: ['street', 'street', 'trail', 'trail', 'open', 'trail', 'street',
+    'trail', 'trail', 'open', 'trail', 'street'],             // GLACIER COL
+  74: ['street', 'street', 'street', 'trail', 'open', 'trail', 'street',
+    'trail', 'street'],                                       // IL BUDELLO
+};
+// every other stage gets a derived default until it is authored: mostly
+// trail, the line at the gantry a street gate, two opens for breathing room
+const DEFAULT_LAYOUT = ['street', 'trail', 'trail', 'open', 'trail',
+  'trail', 'open', 'trail', 'trail', 'street'];
+
+export class Route {
+  constructor(track, levelId) {
+    this.track = track;
+    const R = DRIVING.route ?? {};
+    const kinds = LAYOUTS[levelId] ?? DEFAULT_LAYOUT;
+    const N = track.center.length;
+    this.gates = kinds.map((kind, i) => {
+      const si = Math.round((i * N) / kinds.length) % N;
+      const c = track.center[si], t = track.tan[si], n = track.nrm[si];
+      const roadHalf = track.widthAt?.(si) ?? ROAD_HALF;
+      const halfWidth = kind === 'street' ? roadHalf + (R.streetPadM ?? 2)
+        : kind === 'trail' ? roadHalf + (R.trailPadM ?? 12)
+          : (R.openMinHalfWidthM ?? 30);
+      return {
+        id: i, kind, si, halfWidth,
+        x: c.x, y: c.y, z: c.z,
+        hx: t.x, hz: t.z,             // direction of travel through the gate
+        nx: n.x, nz: n.z,             // lateral axis for the width test
+      };
+    });
+  }
+
+  /** Arm a car at the grid: gate 0 (the line) is next, nothing crossed. */
+  reset(car) {
+    car._nextGate = 0;
+    car._gateAlong = undefined;
+    car._routeLaps = 0;
+  }
+
+  /** SHADOW-MODE observation, one car, one frame. Returns null most frames;
+   *  {passed, id, lateral, kind} when the car crosses the next gate's plane.
+   *  A crossing OUTSIDE halfWidth does not advance — the plane re-arms once
+   *  the car is back behind it, so driving back through the gate counts
+   *  (§17 R2). Teleports (rescues, placeAt) are ignored via the near-plane
+   *  window: only a crossing that starts within 30 u of the plane is real. */
+  step(car) {
+    const g = this.gates[car._nextGate ?? 0];
+    if (!g) return null;
+    const dx = car.pos.x - g.x, dz = car.pos.z - g.z;
+    const along = dx * g.hx + dz * g.hz;
+    const prev = car._gateAlong;
+    car._gateAlong = along;
+    if (prev === undefined) return null;
+    if (!(prev < 0 && along >= 0)) return null;          // no plane crossing
+    if (prev < -30 || along > 30) return null;           // a teleport, not a drive
+    if (Math.abs(car.y - g.y) > 10) return null;         // a deck or plateau ABOVE the gate
+    const lateral = Math.abs(dx * g.nx + dz * g.nz);
+    if (lateral > g.halfWidth) {
+      return { passed: false, id: g.id, lateral: +lateral.toFixed(1), kind: g.kind };
+    }
+    car._nextGate = (g.id + 1) % this.gates.length;
+    car._gateAlong = undefined;                          // re-arm on the next gate
+    if (car._nextGate === 0) car._routeLaps = (car._routeLaps ?? 0) + 1;
+    return { passed: true, id: g.id, lateral: +lateral.toFixed(1), kind: g.kind };
+  }
+
+  /** §4.3 THE RIBBON: a translucent strip on the ground from gate to gate.
+   *  In step 1 no designed cuts exist yet, so the intended line IS the road
+   *  and the ribbon rides the whole spline — chunking per gate arrives with
+   *  the cuts in step 5. A hint only: no collision, no rule attached. */
+  buildRibbon() {
+    const t = this.track, N = t.center.length;
+    const HALF = 0.6, LIFT = 0.14;
+    const pos = new Float32Array((N + 1) * 2 * 3);
+    for (let i = 0; i <= N; i++) {
+      const k = i % N, c = t.center[k], n = t.nrm[k];
+      const y = c.y + LIFT;
+      pos.set([c.x - n.x * HALF, y, c.z - n.z * HALF,
+        c.x + n.x * HALF, y, c.z + n.z * HALF], i * 6);
+    }
+    const idx = [];
+    for (let i = 0; i < N; i++) {
+      const a = i * 2;
+      idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffd400, transparent: true, opacity: 0.3,
+      depthWrite: false, side: THREE.DoubleSide,
+    });
+    this.ribbon = new THREE.Mesh(geo, mat);
+    this.ribbon.renderOrder = 2;
+    this.ribbon.name = 'route-ribbon';
+    return this.ribbon;
+  }
+
+  /** §4.3 opacity: 30% when the car is ON the line, 80% when it has wandered
+   *  more than ribbonNearM — the hint gets louder as it gets more needed. */
+  updateRibbon(playerPos, trackIndex) {
+    if (!this.ribbon) return;
+    const near = DRIVING.route?.ribbonNearM ?? 15;
+    const lat = Math.abs(this.track.lateralOffset(playerPos, trackIndex));
+    const want = lat > near ? 0.8 : 0.3;
+    const m = this.ribbon.material;
+    m.opacity += (want - m.opacity) * 0.08;
+  }
+}

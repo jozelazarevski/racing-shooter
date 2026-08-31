@@ -45,5 +45,30 @@
   "patch02b": {
     "propShoveRadiusU": 1.15,
     "camClearanceM": 2.2
+  },
+  "route": {
+    "streetPadM": 2,
+    "trailPadM": 12,
+    "openMinHalfWidthM": 30,
+    "openMaxHalfWidthM": 60,
+    "missedGateGraceS": 4.0,
+    "returnAheadM": 6,
+    "returnSpeedKmh": 40,
+    "maxClimbDeg": 35,
+    "fatalDropM": 12,
+    "waterDepthM": 1.2,
+    "smashMaxKg": 80,
+    "shoveMaxKg": 600,
+    "obstacleMinHeightM": 1.6,
+    "obstacleExclusionM": 4,
+    "obstacleDensityPer20m": 1,
+    "rivalCutChance": 0.3,
+    "rivalLateralNoiseTrailM": 4,
+    "rivalLateralNoiseOpenM": 12,
+    "stuckDetectS": 2.5,
+    "upsideDownS": 2.0,
+    "playerResetDelayS": 1.5,
+    "camClearanceM": 1.5,
+    "ribbonNearM": 15
   }
 }
