@@ -3086,7 +3086,11 @@ export class Car {
         const rr = st.r + 1.6;
         if (dx * dx + dz * dz >= rr * rr) continue;
         if (Math.abs(this.pos.y - (st.y ?? 0)) > 4) continue;
-        if (Math.abs(this.speedAlong) > 6) gm.onTireSmash?.(st, this);
+        // planar speed, not along-track speed (the tree path's lesson): a
+        // stack sits at the ROADSIDE, so the car that hits one is usually
+        // moving ACROSS the track — speedAlong read ~0 there and the stack
+        // stood like a bollard at any angle but dead ahead
+        if (Math.hypot(this.vel.x, this.vel.z) > 6) gm.onTireSmash?.(st, this);
         else {
           const d = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
           this.pos.x = st.x + (dx / d) * rr;

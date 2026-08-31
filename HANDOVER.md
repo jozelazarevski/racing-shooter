@@ -4251,6 +4251,24 @@ gate, renegotiate both together) and the whole RALLY_HUD_REVIEW.md
 rebuild (task #27) — Section 4 of that doc is normative for the next
 HUD build: band layout, hull presentation, three toast lanes, H1-H8.
 
+THE BATTERY'S TAIL taught its own lesson: test-rules had sat at 7/12
+and test-nature at 7 reds, and every one reproduced IDENTICALLY on the
+pristine r294 base — nothing this round's. Of the rules five, three
+were expectations the patch has since outlawed (">=28 hull after
+difficulty scale" is exactly what §3.2 forbids; a grind ALONG a wall
+now costs 0 BY LAW) — rewritten to the law. Two were broken probes: the
+shortcut check staged only _midCP against a lap gate that grew ordered
+_cpMask quarters and _everCP1 years of revisions ago, and the tire
+check aimed a fixed heading down a cambered verge (missed by 3.8 u
+against a 2.7 u trigger) from a 10 u run-up that headless real-time
+cannot cover. One REAL game bug fell out of that autopsy: the stack's
+burst gate read `speedAlong` — along-TRACK speed — so a car leaving
+the road square into a roadside stack read ~0 and the stack stood like
+a bollard at any angle but dead ahead. Planar speed now, the tree
+path's own lesson. test-rules is 12/12 — first full green in memory.
+test-nature's buried trees/solids (PINE 15+8, FLUME 9+1, FURKA 11+9,
+worst −6.2 u) are pre-existing seating debt, filed as task #28.
+
 ## r294 — LIVE-PLAY ROUND ON THE SPEC CAR: FIVE REPORTS, FIVE CLOSES
   - "Impossible to steer in this curve at this speed" (IL BUDELLO, 99):
     mid-range yaw cap 1.25 -> 1.45. Flat-out still runs wide — the drift
