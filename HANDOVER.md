@@ -4161,6 +4161,54 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r290 — THE PLANTED PASS: SLIDES ARE EARNED, NOT AMBIENT
+Four live reports inside an hour, all one disease: "small turn and it
+turns so much, like a speed boat", "spinning like crazy", "pinball",
+"driving like it's on ice" — plus, from the same seat, "I can rotate it
+360 on 11 kph almost at its axis". The r284 grip budget priced slides
+but never bounded what the STEERING may ask for, so every ordinary
+input silently over-demanded, the over-budget law read it as a slide,
+and the whole game iced over.
+
+THE BICYCLE, BOTH BRANCHES. Commanded yaw is now bounded by
+min(v/R_min, 1.15·aMax/v):
+  - v/R_min (4 u) is the turning circle — at 11 km/h the tightest legal
+    turn is 44 deg/s sweeping an 8 m circle, translating the whole way.
+    No pirouette; a parked car stays parked (the r288 creep ramp is
+    subsumed).
+  - 1.15·aMax/v is the tyre — an ordinary input holds a clean arc AT
+    the limit (traced: 45 straight frames of 1.3 g at 100 km/h, slip 0),
+    a hard one develops a MILD, self-limiting slide. 0.92 (tyre-exact)
+    was tried first and the whole rig fleet said the tracks were drawn
+    for more grip than a real car has: jump rig 0 hops, wedge runner
+    tripping rescues, cut lines washing 47 u wide.
+  - The relaxation opens for COUNTER-STEER and the HANDBRAKE, not for
+    steering deeper into the slide — an unconditional relax was a
+    feedback loop that kept every slide alive ("spinning like crazy").
+AND THE AMBIENT SLIP SOURCES CLOSED: the launch wheelspin feed fades by
+36 km/h instead of 120 (cruising at 60 read as perpetual wheelspin —
+most of the ice); the pre-physics slip heuristic moves its onset from
+0.28 to 0.55 (it fired on every substantial input above 60 km/h); the
+mid-slide steering bonus drops 0.35 -> 0.15 (the boat).
+
+THE RIGS LEARN TO DRIVE. Under the yaw budget a throttle-pinned runner
+crashes instead of measuring (FURKA: 75 of 90 s wedged at 1 km/h, "0
+hops" measuring its own crash). The jump rig and the wedge runner brake
+for the corner the road announces and COMMIT over the brow — braking
+belongs before the crest. test-goat's step law gates off-road at
+SHELF_REACH (17) where terrain actually takes over, not at carriageway
+width, so roadbed seam residue stops being charged to terrain-follow.
+
+ROCKFALL RAVINE'S JUMP IS A LEVEL-DESIGN ITEM NOW, measured, not
+shrugged: its brow still flies (the pristine base does 0.92 s at 184
+km/h) but the corner feeding it caps an honest approach at ~130, where
+the brow can't beat gravity. A jump that needs rail grip to reach comes
+off the jumps roster; the reshape is tracked.
+
+Battery at close: difficulty 12/12, wedge 4/4, goat 26/26, unstuck,
+duel-rival 11/11, gorge 28/28, cornerwalls 40/40, obstacles, climb,
+jumps (three-world roster) green.
+
 ## r289 — "I SEE NO CHANGE": THE UPDATE PATH ITSELF WAS THE BUG
 Third time in one day a deploy was live on the server (curl said so) and
 the phone still played the old build. Two holes in the update path, both

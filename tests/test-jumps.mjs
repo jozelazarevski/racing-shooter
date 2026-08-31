@@ -38,7 +38,16 @@ const browser = await chromium.launch({
 let fail = 0;
 const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? '  ' + d : ''}`); };
 
-for (const [id, name] of [[1, 'PINE VALLEY'], [10, 'ROCKFALL RAVINE'], [13, 'OUNINPOHJA'], [21, 'FURKA RIDGE']]) {
+// ROCKFALL RAVINE is OFF the roster (r290), and the reason is a measurement,
+// not a shrug: its brow (index ~118) still launches — the PRISTINE base
+// flies it for 0.92 s at 184 km/h — but the corner feeding it caps an
+// honest-tyred approach at ~130 km/h (the base railed that corner at 186
+// with lateral 0.3; the branch car washes to lateral 31), and at 130 the
+// brow's curvature cannot beat gravity. A jump that requires rail grip to
+// reach is a LEVEL DESIGN item now (reshape the brow or open its entry),
+// tracked in HANDOVER r290. Crest physics stays pinned by the three worlds
+// below and test-goat's GLACIER COL law.
+for (const [id, name] of [[1, 'PINE VALLEY'], [13, 'OUNINPOHJA'], [21, 'FURKA RIDGE']]) {
   const p = await browser.newPage({ viewport: { width: 640, height: 400 } });
   await p.goto(`${BASE}/?level=${id}&go=1&unlockall=1`, { waitUntil: 'load' });
   const ok = await p.waitForFunction(() => window.__game?.track?.center && window.__game.player,
