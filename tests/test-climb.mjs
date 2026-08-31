@@ -86,6 +86,14 @@ const r = await p.evaluate(() => {
       const ux = gx / grade, uz = gz / grade;
       const g2 = (t.terrainHeight(x + ux * 8, z + uz * 8) - t.terrainHeight(x, z)) / 8;
       if (g2 < gLo || g2 > gHi) continue;
+      // ...and the face must be TALL (r293): an 8 u sustain check kept
+      // finding faces that CREST 12-15 u up onto rolling plateaus, and the
+      // steep law then measured plateau driving as "climbing" (traced: the
+      // car fought the face exactly as the physics says — 8.2 -> 5.5 u/s,
+      // slip 0.6 — then topped out and accelerated on the flat). A face
+      // worth the universal promise keeps rising for 25 u of fall line.
+      const g3 = (t.terrainHeight(x + ux * 25, z + uz * 25) - t.terrainHeight(x, z)) / 25;
+      if (g3 < gLo * 0.7) continue;
       return { x, z, ux, uz, grade: +grade.toFixed(2) };
     }
     return null;
