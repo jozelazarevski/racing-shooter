@@ -4161,6 +4161,27 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r303 — THE CAMERA BUTTON COMES BACK
+User ask, one line. r296 had folded the 📷 cycle into the pause menu
+("beside pause it was a mis-tap at speed") and its 70px top-right slot
+has sat empty since — the stale CSS and the defensive `?.` listener
+were both still in the tree, so the restore is the element plus a
+stopPropagation (a camera tap must never also steer). pm-camera stays
+for the player who pauses to look for it; the driver's seat remains a
+stop on the cycle. Probed: cycles 0→1→2, (332,70)-(378,116) at 390px,
+no pause-button clash; cam-btn joins test-mobile-hud's measured set
+(the omission lesson from the pause/shock overlap is written above the
+IDS list) — which immediately earned its keep: LANDSCAPE moves pause
+to top:60, the exact slot 📷 reclaims, a measured 46x36 overlap; the
+landscape block now stacks 📷 at 60 and ⏸ at 112. Also killed for
+good: the suite's feed-expiry flake — the fill now happens INSIDE the
+measuring evaluate (DOM is synchronous), so no swiftshader frame can
+outlive the 3.3 s toast lifetime between fill and measure; 24/24
+twice. ATTRIBUTED, NOT OURS: test-tyres "the track card carries
+the demand and the fix" reproduces identically on an r301 worktree
+with r301's own suite — pre-existing, filed with the economy/feats
+reds. Tag r303.
+
 ## r302 — CLAUDE.md v1.2 §3.5 + THE PORSCHE GAUGE: ERASE THE GUIDANCE, KEEP THE DIAL
 The user posted CLAUDE.md v1.2 (supersedes PATCH_02 v1.4 and CORRIDOR
 v2.1 — retired) and three direct asks: remove the yellow line, hull

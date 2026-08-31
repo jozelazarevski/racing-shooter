@@ -68,7 +68,7 @@ const SIZES = [
 // gear) and the corner number is deleted; hull moved top-left.
 const IDS = ['race-info', 'health-box', 'score-box', 'speed-box', 'feed', 'weapon-box',
              't-fire', 't-missile', 't-mine', 't-shock', 't-nitro', 't-drift', 't-brake',
-             't-unstuck', 'progress-strip', 'pause-btn'];
+             't-unstuck', 'progress-strip', 'pause-btn', 'cam-btn'];
 
 for (const [w, h, tag, scheme] of SIZES) {
   const ctx = await browser.newContext({
@@ -99,12 +99,15 @@ for (const [w, h, tag, scheme] of SIZES) {
   // lifetime cannot expire underneath the assertion however slow the renderer
   // is. The messages are still real ones through the real `hud.feed`.
   for (let f = 0; f < 6; f++) await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
-  await p.evaluate(() => {
-    for (let i = 0; i < 6; i++) window.__game.hud.feed(`TEST MESSAGE ${i} — LONGER TEXT`, 'info');
-  });
-  await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
 
   const r = await p.evaluate((IDS) => {
+    // The feed is filled HERE, inside the measuring evaluate — the DOM is
+    // synchronous, so nothing can expire between the append and the
+    // getBoundingClientRect below. The previous shape (fill, await one
+    // rAF, measure) died whenever a single swiftshader frame outlived the
+    // 3.3 s toast lifetime — r302's gauge repaint made that a regular
+    // event before the 30 Hz throttle, and the flake outlived the fix.
+    for (let i = 0; i < 6; i++) window.__game.hud.feed(`TEST MESSAGE ${i} — LONGER TEXT`, 'info');
     const boxes = [];
     for (const id of IDS) {
       const e = document.getElementById(id);

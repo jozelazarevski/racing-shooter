@@ -1772,9 +1772,11 @@ class Game {
       this.showMenu('garage');
     });
 
-    // pause button (HUD_REVIEW §4: the camera toggle moved into the pause
-    // menu — beside pause it was a mis-tap at speed; pm-camera owns it now)
-    document.getElementById('cam-btn')?.addEventListener('click', () => this.cycleCamera());
+    // camera cycle: on the HUD again (r303, user ask) AND in the pause menu
+    document.getElementById('cam-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();               // a camera tap must never also steer
+      this.cycleCamera();
+    });
     document.getElementById('pause-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       this.togglePause();

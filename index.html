@@ -436,7 +436,11 @@
        band block's edge columns and its own max-height rows already clear a
        390px-tall screen, and every scheme-specific shuffle this block used
        to do broke the cluster's muscle memory on rotation */
-    #pause-btn{top:60px;right:calc(12px + env(safe-area-inset-right))}
+    /* landscape stacks the two icon buttons tight under the score box —
+       r303: with 📷 back on the HUD they must not share the 60px row
+       (measured 46x36 overlap when pause alone held it) */
+    #cam-btn{top:60px;right:calc(12px + env(safe-area-inset-right))}
+    #pause-btn{top:112px;right:calc(12px + env(safe-area-inset-right))}
   }
 
   /* ---------- SCREENS ---------- */
@@ -2134,12 +2138,17 @@ body.touch #feed{right:184px}
   <div id="center-msg" class="titlefont"></div>
   <!-- §4: the camera toggle moved into the pause menu — next to pause it was
        a mis-tap at speed (A 1:16). Only pause stays on the HUD. -->
+  <!-- r303 (user): the camera button is BACK on the HUD. r296 moved the
+       cycle into the pause menu as a mis-tap risk beside ⏸; the user wants
+       one-tap camera switching, and its 70px slot has sat empty since —
+       pm-camera stays too, for the player who paused to look for it. -->
+  <button id="cam-btn" class="icon-btn" title="Camera">📷</button>
   <button id="pause-btn" class="icon-btn" title="Pause">⏸</button>
 </div>
 <div id="speed-lines"></div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r302</div>
+<div id="build-tag">r303</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2474,10 +2483,10 @@ body.touch #feed{right:184px}
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r302"></script>
+<script type="module" src="./src/main.js?v=r303"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r302"></script>
+<script src="./src/offline.js?v=r303"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r302"></script>
+<script type="module" src="./src/traffic.js?v=r303"></script>
 </body>
 </html>
