@@ -4161,6 +4161,58 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r298 — CORRIDOR STEP 2: THE WORLD CONTAINS THE CAR BECAUSE IT IS PHYSICAL
+Build-order step 2: slope grip, surfaces, spawn — and the deletion of two
+invisible forces the corridor outlaws. The load-bearing finds:
+  - THE CRAWL THAT CLIMBED EVERYTHING: terrGrade only sampled when
+    v² > 1, so a car under 1 u/s read grade 0, felt NO gravity, got its
+    drive back and crept up a 55° plane at 1 u/s FOREVER (measured,
+    slopeprobe.mjs — recording A's wall climb had a quiet accomplice all
+    along). At a crawl the grade now reads along the HEADING; a parked
+    car on a face feels the face.
+  - §5.1 SLOPE LAW: drive authority fades 31.5°→35° and is zero past
+    maxClimbDeg — measured: 25° climbs at 7.5 u/s, 30° climbs, 35°+
+    takes only the entry momentum and slides back, hull 0. Grip pays
+    μ·cos(slope). The μ table is offMult's old constant wearing its true
+    name: grass floor 0.55 exactly as §7.2 ships it, the OFF-ROAD stat
+    buying it back — and it now prices GRIP off-road, not just drag and
+    top speed (a desert cut used to corner like a road).
+  - TWO INVISIBLE FORCES DELETED: the strayed deep-sand drag (1.2/s
+    velocity bleed past 70 u — "a physics costume") and the generic
+    off-course climb-authority fade (drive gone by grade 0.23 whenever
+    strayed). Off the course you now pay μ, cos, the 35° ceiling and
+    off-road drag — the same laws as everyone everywhere. Lap integrity
+    never depended on either (the checkpoint mask refuses cut laps);
+    the LEAVING backstop becomes the missed-gate return at step 4. The
+    goat peak stays closed on race day (onGoatRace), and the goat
+    doctrine moved: GOAT_PACE 4→6 with the old defect signature (19-26
+    u/s) still the canary — a sub-ceiling hill in a race is now a
+    priced line, not a crime.
+  - test-goat's roam flank control was measuring the SURFACE TABLE
+    after the law landed (grass μ 0.55 caps sustained climbing at
+    atan 0.55 ≈ 29° — the spec's own numbers collide with its own R4 at
+    30° on grass): regrounded on a synthetic 25° plane. R4 itself runs
+    a μ=1 car for the same reason — it tests the slope law, R5 tests
+    the surface.
+  - RIG TRAPS, all paid for in tests/test-corridor2.mjs: a synthetic
+    ramp at x=3000 fights the WORLD RIM (1620); at x=1100 it sat ON
+    Glacier's road; on Canyon it rammed a massif-cone solid and billed
+    35 hull of "slope damage" that was really a rock. The rig now FINDS
+    open ground (farthest point from any road sample, in-rim) and
+    stashes solids/trees — props are §6's law, the slope is §5.1's.
+    One recorded wart: a throttle-held car can end PARKED mid-face on a
+    55° plane after its momentum spends (hop-cycle equilibrium; Canyon
+    measured it, Glacier slid clean back). Step 4's stuck return is the
+    designed collector; the law holds either way (late gain < 0).
+  - §12 spawn and §5.2 splat maps are ADAPTATIONS, documented in the
+    rigs: the grid already derives from the spline behind gate 0 (no
+    stored transforms — R6 pins every car on-road at tangent), and the
+    surface "map" is the road/off-road split plus theme (two honest
+    surfaces, not a painted texture).
+Gates: test-corridor2 R3-R6 green on stages 4 and 66. Kill volumes
+(§5.3) and everything return-shaped wait for step 4 with the unified
+returnToGate.
+
 ## r297 — CORRIDOR v2.0 STEP 1: THE RACE GETS ITS OWN STRUCTURE (SHADOW)
 The user posted RALLY_CORRIDOR_REFACTOR.md v2.0 — the biggest doc yet, a
 seven-step build order that separates WORLD (all drivable), ROUTE (an

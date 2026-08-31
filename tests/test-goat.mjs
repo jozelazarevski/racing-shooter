@@ -187,7 +187,14 @@ const CLIMB_RIG = ({ secs, roam }) => {
 // exactly the patch's 28.6 + noise. The PACE ceiling is the shortcut law
 // (the defect signature was 70-74 u at 19-26 u/s) and it keeps its 4.
 const GOAT_CEIL = 34;
-const GOAT_PACE = 4;
+// 6, not 4 (CORRIDOR §3.3, r298): the doctrine changed under this law. A
+// sub-ceiling hill is now legitimately drivable in a race — cuts are the
+// POINT of the drivable world — and its price is μ, cos(slope) and drag,
+// not an invisible authority tax (deleted with the strayed drag). Measured
+// 4.8 u/s on SUMMIT's legal grades under the physical pricing; the ceiling
+// stays a canary — the old defect signature was 19-26 u/s, and a return to
+// double digits means the surface/slope pricing has come off.
+const GOAT_PACE = 6;
 // GOATWORLDS=66 baselines a world on a tree without editing this file — the
 // point being that a "was" figure has to be MEASURED on a defective tree, and
 // editing the list to do that is how a baseline ends up being a guess.
@@ -209,14 +216,40 @@ for (const [id, was] of GOAT_LIST) {
 
 // ---- LAW 2 — THE MOUNTAIN IS STILL A MOUNTAIN (control) ------------------
 // Free roam is exempt from the off-course rule ON PURPOSE: out there the world
-// is the point. If this fails, the fix has taken `_highland` away from the
-// mode it was built for — and law 1 above is passing because the probe cannot
-// climb anything at all.
+// is the point. If this fails, roam climbing itself is broken — and law 1
+// above is passing because the probe cannot climb anything at all.
+//
+// REGROUNDED FOR CORRIDOR §5.1 (r298): the old control drove the open massif
+// flank and demanded 25 u banked — but the flank runs past the μ ceiling
+// (off-road grass μ 0.55 physically caps sustained climbing at ~29°, the
+// spec's OWN §5.2 numbers), so what it measured after the slope law landed
+// was the surface table, not roam authority. The control now drives a
+// synthetic 25° plane — a LEGAL grade everywhere under the law — and roam
+// must still bank real height on it. The goat spirals (law: summitable)
+// keep their own gates; the flank belongs to the mountains now.
 if (await load(6)) {
-  const r = await page.evaluate(CLIMB_RIG, { secs: 30, roam: true });
-  ok(r.best.gain >= 25,
-    `${r.name} FREE ROAM (control): the massif still climbs, +${r.best.gain} u in ${r.best.t} s (floor 25)`,
-    `held ${r.best.sp} u/s`);
+  const r = await page.evaluate(() => {
+    const g = window.__game, c = g.player, t = g.track;
+    g.clock.getDelta = () => 1 / 60; if (g.composer) g.composer.render = () => {};
+    g.freeRoam = true; g.state = 'race';
+    const thReal = t.terrainHeight.bind(t);
+    const sol = t.solids, trs = t.trees;
+    t.solids = []; t.trees = [];
+    const X0 = 118, Z0 = -1345, slope = Math.tan(25 * Math.PI / 180);
+    t.terrainHeight = (x) => Math.max(0, (x - X0) * slope);
+    c.alive = true; c.health = 100; c.airborne = false; c.vy = 0;
+    c.pos.set(X0 - 20, 0.3, Z0); c.y = 0.3; c.heading = Math.PI / 2;
+    c.vel.set(8, 0, 0);
+    for (let k = 0; k < 1800 && (c.pos.x - X0) * slope < 40; k++) {
+      c.step(1 / 60, { throttle: 1, brake: 0, steer: 0, drift: false });
+    }
+    const gain = Math.max(0, (c.pos.x - X0) * slope);
+    t.terrainHeight = thReal; t.solids = sol; t.trees = trs;
+    return { name: g.level?.name, gain: +gain.toFixed(1) };
+  });
+  ok(r.gain >= 25,
+    `${r.name} FREE ROAM (control): a legal 25° grade still climbs, +${r.gain} u in 30 s (floor 25)`,
+    'roam drive authority is broken if a sub-ceiling slope will not climb');
 }
 
 // ---- LAW 3 — THE REJOIN BANK (control) ----------------------------------
