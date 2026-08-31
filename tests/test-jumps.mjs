@@ -66,7 +66,25 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [10, 'ROCKFALL RAVINE'], [13, 'OUN
       let d = Math.atan2(aim.x - car.pos.x, aim.z - car.pos.z) - car.heading;
       while (d > Math.PI) d -= 2 * Math.PI;
       while (d < -Math.PI) d += 2 * Math.PI;
-      car.step(1 / 60, { throttle: 1, brake: 0, steer: Math.max(-1, Math.min(1, d * 2)), drift: false, hold: false });
+      // CORNER MANAGEMENT (r290): under the yaw budget a throttle-pinned
+      // runner sails off FURKA's first tight corner and spends 75 of 90
+      // seconds wedged in the mountainside at 1 km/h — 0 hops, measuring
+      // its own crash instead of the crests. A rally driver brakes for the
+      // corner and commits over the brow; the rig now does the one and only
+      // thing that models. Same lesson test-difficulty's stand-in learned.
+      const jA = (i + 6) % N, jB = (i + 14) % N;
+      const hA = Math.atan2(t.center[jA].x - t.center[i].x, t.center[jA].z - t.center[i].z);
+      const hB = Math.atan2(t.center[jB].x - t.center[jA].x, t.center[jB].z - t.center[jA].z);
+      let turn = hB - hA;
+      while (turn > Math.PI) turn -= 2 * Math.PI;
+      while (turn < -Math.PI) turn += 2 * Math.PI;
+      const su = t.segLen ?? 4;
+      const Rahead = Math.max(6, (8 * su) / Math.max(0.05, Math.abs(turn)));
+      const vmax = Math.sqrt(1.15 * 14 * Rahead);       // the tyre budget's own corner speed
+      const vNow = Math.hypot(car.vel.x, car.vel.z);
+      const over = vNow > vmax;
+      car.step(1 / 60, { throttle: over ? 0 : 1, brake: over ? 1 : 0,
+        steer: Math.max(-1, Math.min(1, d * 2)), drift: false, hold: false });
       maxLoose = Math.max(maxLoose, car.landGrip || 0);
       if (car.airborne) { air += 1 / 60; wasAir = true; }
       else if (wasAir) { dur.push(air); air = 0; wasAir = false; }

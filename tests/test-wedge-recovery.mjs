@@ -173,6 +173,22 @@ const r = await page.evaluate(async () => {
     while (err > Math.PI) err -= 2 * Math.PI;
     while (err < -Math.PI) err += 2 * Math.PI;
     g.input.analog.steer = Math.max(-1, Math.min(1, err * 1.6));
+    // ...and feet on the pedals too (r290): under the yaw budget a pinned
+    // throttle still exits the road at speed once per lap somewhere, and a
+    // 5 s off-road stall is exactly what the rescue is FOR — the law kept
+    // failing on the net doing its job. Brake for the corner the road
+    // ahead announces, like every driver and every other rig now does.
+    const jA = (p.trackIndex + 6) % N2, jB = (p.trackIndex + 14) % N2;
+    const hA = Math.atan2(t2.center[jA].x - t2.center[p.trackIndex].x, t2.center[jA].z - t2.center[p.trackIndex].z);
+    const hB = Math.atan2(t2.center[jB].x - t2.center[jA].x, t2.center[jB].z - t2.center[jA].z);
+    let trn = hB - hA;
+    while (trn > Math.PI) trn -= 2 * Math.PI;
+    while (trn < -Math.PI) trn += 2 * Math.PI;
+    const R2 = Math.max(6, (8 * (t2.segLen ?? 4)) / Math.max(0.05, Math.abs(trn)));
+    const vmax2 = Math.sqrt(1.15 * 14 * R2);
+    const vNow2 = Math.hypot(p.vel.x, p.vel.z);
+    g.input.analog.throttle = vNow2 > vmax2 ? 0 : 1;
+    g.input.analog.brake = vNow2 > vmax2 ? 1 : 0;
     g._frameBody();
     maxWedgeT = Math.max(maxWedgeT, p._wedgeT ?? 0);
     if (f % 120 === 0) await new Promise((rs) => setTimeout(rs, 0));

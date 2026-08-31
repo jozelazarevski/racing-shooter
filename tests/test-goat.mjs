@@ -373,8 +373,14 @@ for (const [id, was] of [[6, 4.2], [21, 6.2], [22, 5.0], [66, 1.4]]) {
         // ON the road `this.y = gY` is a different assignment with a different
         // height source, whose own residual step measures 0.7 u and belongs to
         // whoever owns `groundHeightAtPos`, not to this law.
-        const half = (t.widthAt ? t.widthAt(p.trackIndex) : 10.8) + 1;
-        if (!air && !prevAir && Math.abs(p.lateral) > half && Math.abs(dy) > STEP_CAP) {
+        // > 17, not carriageway width (r290): the physics holds the car on
+        // the ROADBED out to SHELF_REACH = 16, so between the carriageway
+        // edge (~10) and 16 the height source is still roadY — whose own
+        // residual step this law's comment already disowns. Measuring that
+        // band charged roadbed seams (1.3 u at lateral 10.1 on FURKA) to
+        // the terrain-follow law. Off-road, for THIS law, starts where the
+        // terrain actually takes over.
+        if (!air && !prevAir && Math.abs(p.lateral) > 17 && Math.abs(dy) > STEP_CAP) {
           over++;
           if (Math.abs(dy) > Math.abs(worst)) { worst = dy; worstLat = p.lateral; }
         }
