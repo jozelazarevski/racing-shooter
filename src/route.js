@@ -36,6 +36,29 @@ const LAYOUTS = {
 const DEFAULT_LAYOUT = ['street', 'trail', 'trail', 'open', 'trail',
   'trail', 'open', 'trail', 'trail', 'street'];
 
+/* §6 PROP CLASSES — every placed prop answers to one of three words.
+ * This is the classifier the validator test and the density pass share;
+ * the mass table maps onto what the engine already stores:
+ *   smash    — yields on contact, 0 hull, scored. Saplings, cacti, snags
+ *              (tree records that yield), plus crates/cones/barrels/tire
+ *              stacks/hay, which ride the props system.
+ *   shove    — pushed aside, 0 hull, no score. Knockable stones under the
+ *              shove radius (the engine's mass class is radius).
+ *   obstacle — static, pays the fix-2 contact law. Grown trees, boulders,
+ *              huts, metal posts, everything with a wall's job.
+ */
+export function propClassOf(p) {
+  if (p.parts || p.kind !== undefined || p.s !== undefined) {   // a tree record
+    const grown = (p.s ?? 1) >= 1.0 && p.kind !== 'cactus' && p.kind !== 'snag';
+    return (p.solid === true || grown) ? 'obstacle' : 'smash';
+  }
+  if (p.mat === 'stone') {
+    const shoveR = DRIVING.patch02b?.propShoveRadiusU ?? 1.15;
+    return (p.r ?? 9) < shoveR ? 'shove' : 'obstacle';
+  }
+  return 'obstacle';                                            // metal, hut, cliff
+}
+
 export class Route {
   constructor(track, levelId) {
     this.track = track;
@@ -56,6 +79,14 @@ export class Route {
         nx: n.x, nz: n.z,             // lateral axis for the width test
       };
     });
+  }
+
+  /** The SECTION kind at a spline index: the section from gate k to k+1
+   *  carries gate k's kind. Before gate 0, the lap's last section wraps. */
+  kindAtIndex(i) {
+    const gs = this.gates;
+    for (let k = gs.length - 1; k >= 0; k--) if (i >= gs[k].si) return gs[k].kind;
+    return gs[gs.length - 1].kind;
   }
 
   /** Arm a car at the grid: gate 0 (the line) is next, nothing crossed. */

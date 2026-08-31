@@ -9219,9 +9219,10 @@ class Game {
       this.buzz(18);
       this.shake = Math.min(1, this.shake + 0.15);
     }
-    this.score += 15;
+    // CORRIDOR §6: the smash class pays 25 and feeds Demolition contracts
+    this.score += 25;
     if (car === this.player) this.styleBump();
-    if (Math.random() < 0.3) this.hud.feed(cactus ? 'CACTUS SHREDDED  +15' : 'TIMBER!  +15', 'good');
+    if (Math.random() < 0.3) this.hud.feed(cactus ? 'CACTUS SHREDDED  +25' : 'TIMBER!  +25', 'good');
   }
 
   /** A small stone shunted out of the way: it costs you speed and paint, then
@@ -9255,11 +9256,12 @@ class Game {
     this.shake = Math.min(1, (this.shake ?? 0) + (glance ? 0.05 : 0.12));
     if (car === this.player) {
       this.buzz(glance ? 14 : 30);
-      this.score += 20;
-      this.styleBump?.();
-      // an award, not a bill — fix 10 made this a SMASHED, and the feed
-      // must read like one or the player still thinks they got hurt
-      this.hud.feed(glance ? 'ROCK FLICKED ASIDE  +20' : 'SMASHED!  ROCK  +20', 'good');
+      // CORRIDOR §6 refiled this rock: a knockable stone is the SHOVE class
+      // — pushed aside, 0 hull, NO score (v1.2 fix 10 said award Smashed;
+      // the corridor's prop table is newer and says shove pays nothing —
+      // the smash class and its +25 belong to things that BREAK). The feed
+      // stays so the shove reads as the free event it is.
+      this.hud.feed(glance ? 'ROCK FLICKED ASIDE' : 'ROCK SHOVED CLEAR', 'info');
     }
     // Hand it to the roller. Snapping the instance to its final spot in one
     // frame was a teleport — the rock appeared to vanish and reappear, which is
@@ -10389,6 +10391,15 @@ class Game {
    *  the old machinery until build-order step 4 hands them over. */
   _stepRoute() {
     if (!this.route || this.freeRoam || this.missionMode) return;
+    // CORRIDOR §6: the obstacle ration runs ONCE per build, on the first
+    // race frame — at _buildRoute time the prop lists are still filling
+    // (measured: the pass saw 1 of Canyon's 62 corridor obstacles from the
+    // constructor), and racing is where the corridor exists. Roam keeps
+    // the full scenery on purpose: out there the world is the point.
+    if (!this.track._densityDone) {
+      this.track._densityDone = true;
+      this.track.applyRouteDensity?.(this.route);
+    }
     for (const car of [this.player, ...this.enemies]) {
       if (!car.alive) continue;
       const ev = this.route.step(car);

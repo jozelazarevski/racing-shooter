@@ -4161,6 +4161,43 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r299 — CORRIDOR STEP 3: EVERY PROP KNOWS ITS CLASS AND KEEPS ITS DISTANCE
+The user's own live race log forced the order of work: two near-head-on
+tree strikes inside nine seconds (square 0.88 and 0.97, 13 hull by t=9)
+— obstacles standing in the route corridor, §6's case in one dump.
+  - propClassOf (route.js): smash / shove / obstacle from the fields the
+    engine already stores. V1 audits every standing prop on a stage into
+    exactly one class (Canyon 175/32/291, Glacier 346/126/1002, zero
+    unclassed). Scores aligned to the §6 table: the SMASH class pays 25
+    (TIMBER!, cacti — was 15); the SHOVE class pays NOTHING (v1.2 fix 10
+    briefly awarded rocks a Smashed; the corridor's newer prop table
+    reserves scoring for things that break — P2.13 updated).
+  - THE DENSITY PASS (track.applyRouteDensity): within the exclusion of
+    the road edge on non-street sections obstacles are culled; in the
+    12 u band past it, one per 20 m. INSTANCE-HONEST: a tree goes
+    visual-and-collider together (zeroed parts + culled flag —
+    restoreSmashed learned to skip culled trees, or it resurrected
+    colliders with no visuals); a solid is culled only when it carries
+    im/inst handles. Glacier's corridor lost 21 obstacles. Runs ONCE on
+    the first race frame (racing is where the corridor exists; roam
+    keeps full scenery on purpose).
+  - THE DEBT, MEASURED AND PINNED: 62 (Canyon) + 48 (Glacier) corridor
+    boulders are merged-geometry rock lines — bare {x,z,r,y,mat}
+    records, no handles — and culling their colliders would leave drawn
+    rock you drive through (the Law of Solidity inverted). They stand,
+    counted, with baselines pinned in test-corridor3 V2; the real fix is
+    the feature-aware re-author (street gates where the canyon walls
+    actually are, task #31). Note the deeper point found here: the §13
+    layouts distribute gates EVENLY, but Canyon's rock-lined stretches
+    should BE its street sections — gate placement wants geography.
+  - A REAL BREAKAGE CAUGHT BY A TEST DOING ITS JOB: the r298 drag
+    deletion left a dangling `over` reference that threw a swallowed
+    ReferenceError on every strayed frame — silently skipping the rest
+    of step() (ground follow, collisions, lap checks) for any off-course
+    car. test-shortcut's "no feed" was the only visible symptom. The
+    frame loop's catch-and-recover giveth and it taketh away.
+Gates: test-corridor3 (V1, V2, R7, R8) 14/14 on stages 4 and 66.
+
 ## r298 — CORRIDOR STEP 2: THE WORLD CONTAINS THE CAR BECAUSE IT IS PHYSICAL
 Build-order step 2: slope grip, surfaces, spawn — and the deletion of two
 invisible forces the corridor outlaws. The load-bearing finds:

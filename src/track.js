@@ -22593,6 +22593,11 @@ export class Track {
     }
     for (const tr of this.trees ?? []) {
       if (!tr.dead) continue;
+      // CORRIDOR §6: a density-culled tree stays culled. Without this guard
+      // the restore set dead=false on a tree whose instances were zeroed
+      // WITHOUT an m0 capture — resurrecting its collider with no visual,
+      // which is the Law of Solidity inverted.
+      if (tr.culled) continue;
       for (const part of tr.parts ?? []) {
         const m = part.m0 && part.m0[tr.id];
         if (!m) continue;
@@ -22604,6 +22609,95 @@ export class Track {
       trees++;
     }
     return { buildings, trees };
+  }
+
+  /** CORRIDOR §6 DENSITY RULE — obstacles are rationed around the route.
+   *  Within `obstacleExclusionM` of the road EDGE, obstacles are forbidden
+   *  except on street sections (real walls belong there); within a 12 u band
+   *  past that, at most one obstacle per 20 m of route. The live log that
+   *  forced this showed two near-head-on tree strikes in the first nine
+   *  seconds of a race — obstacles standing inside the corridor.
+   *
+   *  Adaptation of the spec's metres-from-ribbon: measured from the road
+   *  EDGE (widthAt), because this game's carriageway half-width (9 u) is
+   *  wider than the spec's whole exclusion zone.
+   *
+   *  Culling is INSTANCE-HONEST: a tree is removed visual-and-collider
+   *  together (zeroed parts + dead + culled); a solid is only culled when it
+   *  carries instance handles — a drawn boulder must never lose its collider
+   *  and stand as a ghost, so handle-less solids are left standing and the
+   *  validator reports them instead. Deterministic: iteration order is the
+   *  build's own. */
+  applyRouteDensity(route) {
+    const R = (typeof window !== 'undefined' && window.__DRIVING?.route) || {};
+    const EXCL = R.obstacleExclusionM ?? 4;
+    const BAND = 12;
+    const PER = R.obstacleDensityPer20m ?? 1;
+    const N = this.center.length;
+    const sampleLen = Math.max(1, Math.hypot(
+      this.center[1].x - this.center[0].x, this.center[1].z - this.center[0].z));
+    const win = Math.max(1, Math.round(20 / sampleLen));
+    const buckets = new Map();
+    const culled = { trees: 0, solids: 0, kept: 0 };
+    const consider = [];
+    for (const tr of this.trees ?? []) {
+      if (tr.dead || tr.culled) continue;
+      const grown = (tr.s ?? 1) >= 1.0 && tr.kind !== 'cactus' && tr.kind !== 'snag';
+      if (tr.solid === true || grown) consider.push({ tree: tr, x: tr.x, z: tr.z });
+    }
+    for (const ob of this.solids ?? []) {
+      if (ob.culled || !(ob.r > 0)) continue;
+      // verge boulders only: the shove class is exempt (it yields), and the
+      // huge radii are massif cones / cliff anchors that live far out
+      if (ob.mat === 'stone' && ob.r >= 1.15 && ob.r <= 8) {
+        consider.push({ solid: ob, x: ob.x, z: ob.z });
+      }
+    }
+    for (const item of consider) {
+      const gi = this.nearestIndex ? this.nearestIndex(item, null) : 0;
+      const c = this.center[gi];
+      const d = Math.hypot(item.x - c.x, item.z - c.z)
+        - (this.widthAt?.(gi) ?? ROAD_HALF);
+      if (d >= BAND) continue;
+      if (route.kindAtIndex(gi) === 'street') continue;
+      let cull = d < EXCL;
+      if (!cull) {
+        const key = Math.floor(gi / win);
+        const n = buckets.get(key) ?? 0;
+        if (n >= PER) cull = true;
+        else buckets.set(key, n + 1);
+      }
+      if (!cull) { culled.kept++; continue; }
+      if (item.tree) {
+        const tr = item.tree;
+        tr.culled = true; tr.dead = true;
+        _m4.makeScale(0, 0, 0);
+        for (const part of tr.parts ?? []) {
+          part.setMatrixAt(tr.id, _m4);
+          part.instanceMatrix.needsUpdate = true;
+        }
+        culled.trees++;
+      } else if (item.solid.im && item.solid.inst !== undefined
+          && item.solid.im.setMatrixAt) {
+        const ob = item.solid;
+        _m4.makeScale(0, 0, 0);
+        ob.im.setMatrixAt(ob.inst, _m4);
+        ob.im.instanceMatrix.needsUpdate = true;
+        ob.r = 0; ob.culled = true;
+        culled.solids++;
+      }
+      else {
+        // a handle-less solid stands: its visual is merged geometry (bare
+        // {x,z,r,y,mat} record), so culling the collider would leave a
+        // drawn boulder you drive through — the Law of Solidity inverted.
+        // COUNTED as debt: these are the canyon rock lines, and the real
+        // fix is feature-aware street sections (the §16 re-author), not a
+        // ghost rock.
+        culled.unculled = (culled.unculled ?? 0) + 1;
+      }
+    }
+    this._densityReport = culled;
+    return culled;
   }
 
   /** Glacial dwellings: white ice-block domes (half-sunk spheres) with a short

@@ -3544,7 +3544,13 @@ export class Car {
         if (t._nearGoat?.(this.pos.x, this.pos.z, 26)) {
           this.vel.multiplyScalar(Math.max(0, 1 - 2.5 * dt));
         }
-        if (over > 0.5 && !this._steepFed) {
+        // the warning stays until step 4's wayfinding replaces it. (`over`
+        // died with the drag above and its dangling reference threw a
+        // ReferenceError HERE on every strayed frame, which the frame
+        // loop's catch swallowed — silently skipping everything below this
+        // line in step(). Caught by test-shortcut's "no feed".)
+        const warn = Math.min(1, strayed / 30);
+        if (warn > 0.5 && !this._steepFed) {
           this._steepFed = 1.8;
           this.game.hud?.feed?.('OFF THE COURSE — TURN BACK', 'bad');
         }
