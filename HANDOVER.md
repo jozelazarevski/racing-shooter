@@ -4161,6 +4161,31 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r291 — ALSO IN THIS ROUND, AND ONE HONEST DEBT
+"On 40kmph it's drifting like crazy" arrived while r290 was live — it is
+the SAME counter-steer spiral this round closes (at 40, full lock rides
+the cap and the spiral fed it); verified on the branch: 40 km/h full
+lock is a clean circle at slip 0. THE PACE RESTORE: the 0.40 "sliding"
+drag discount used to apply most of every lap, so the planted pass
+silently made everything ~13% slower under power at once (stand-in AND
+rivals together, GLACIER COL's crest control from 6 launches to 1);
+under-power drag is 0.50 now — the average the roster's tuning always
+assumed — and goat 26/26, jumps, and the crest controls came back. The
+difficulty stand-in learned a BRAKING HORIZON (its single 24 u window
+was sized for 6.4 g brakes) with a flat casual margin (casual is a
+THROTTLE, not a second corner tax), and the casual-winnable laws got
+the existence-claim retry hFast has had for releases.
+
+THE DEBT, stated plainly: test-difficulty on PINE VALLEY is variance-
+dominated under honest grip — identical code measured the FURKA casual
+at 582, 623 and ~810, and PINE flaps between a normal/hard ordering
+coin-flip and a full-throttle stand-in wreck (298: it has NO rescue
+net, which real players DO have). FURKA is stable green with the
+retry. The physics shipped on direct measurement (drift40, skim,
+spin11, drivereal, goat, jumps, wedge, gorge, unstuck all green); the
+suite's redesign — rescue net for the stand-in, median-of-3, tie
+epsilon — is the next round's opening move, tracked as its own task.
+
 ## r291 — THE LAST TRICKLE: SPEED NO LONGER LEAKS INTO SLIP
 "Driving is better. However after some speed starts slipping and
 skimming the road." Measured (tools-scratch/skim.mjs), two mechanisms,
