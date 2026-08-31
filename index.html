@@ -269,16 +269,20 @@
      memory of every trigger at once. These are the two-thumb slots — the
      ones designed to clear a thumb parked on the pedals — promoted to the
      only slots. Only the STEERING differs per scheme now. ---- */
-  #t-fire{right:calc(16px + env(safe-area-inset-right));bottom:calc(140px + env(safe-area-inset-bottom));width:86px;height:86px;font-size:17px;background:rgba(140,90,20,.65)}
+  /* ---- THE CLUSTER IS A QUAD, NOT A LADDER (r300, screenshot report "the
+     hud is terrible"): five buttons used to stack diagonally up the right
+     edge — in two-thumb portrait the top of the ladder (shock, the glaring
+     nitro arc) sat at 55-62% of the screen, in the play band, right beside
+     the car. Now: FIRE holds the right edge and the four secondaries sit in
+     a tight 2x2 quad beside it, everything inside the controls band (70%+),
+     identical in both schemes. ---- */
+  #t-fire{right:calc(16px + env(safe-area-inset-right));bottom:calc(132px + env(safe-area-inset-bottom));width:80px;height:80px;font-size:16px;background:rgba(140,90,20,.65)}
   #t-fire.hot{background:rgba(200,50,30,.7)}
   /* an empty magazine reads as dead, not as a number you might still spend */
   #t-fire.dry{background:rgba(60,48,36,.6);opacity:.45}
-  #t-missile{right:calc(112px + env(safe-area-inset-right));bottom:calc(214px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
-  #t-mine {right:calc(26px + env(safe-area-inset-right));bottom:calc(238px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
-  /* shock inner, nitro outer: the nitro arc is the brightest thing in the
-     cluster and at the inner column it glowed mid-screen beside the car
-     (screenshot-checked); the bezel edge is where a bright ring belongs */
-  #t-shock{right:calc(108px + env(safe-area-inset-right));bottom:calc(312px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:23px}
+  #t-missile{right:calc(110px + env(safe-area-inset-right));bottom:calc(186px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:19px}
+  #t-mine {right:calc(164px + env(safe-area-inset-right));bottom:calc(186px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:19px}
+  #t-shock{right:calc(164px + env(safe-area-inset-right));bottom:calc(132px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:19px}
   /* drift is a steering-side control, so it MAY sit per-scheme: one-thumb
      gives it the prime corner the fire button vacated */
   #t-drift{right:calc(18px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));
@@ -287,12 +291,12 @@
      racing — a rescue you fire by accident mid-corner is a punishment, and
      this one costs you 30 s of not having it when you next need it. Dimmed
      and unpressable while it recharges, with the wait on its face. */
-  #t-unstuck{left:calc(24px + env(safe-area-inset-left));bottom:calc(214px + env(safe-area-inset-bottom));
+  /* H5: UNSTUCK holds the left edge in BOTH layouts, tucked between the
+     one-thumb ring (top ≈ 674 at 844) and the two-thumb pedal (720) */
+  #t-unstuck{left:calc(16px + env(safe-area-inset-left));bottom:calc(170px + env(safe-area-inset-bottom));
     width:56px;height:56px;font-size:22px;background:rgba(150,60,30,.6)}
   #t-unstuck.cooling{opacity:.42;background:rgba(60,48,36,.6)}
-  /* H5: UNSTUCK holds the left edge in BOTH layouts — it used to jump to the
-     right column when two-thumb switched on */
-  #t-nitro{right:calc(24px + env(safe-area-inset-right));bottom:calc(302px + env(safe-area-inset-bottom));width:62px;height:62px;font-size:25px;
+  #t-nitro{right:calc(110px + env(safe-area-inset-right));bottom:calc(132px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:19px;
     background:conic-gradient(rgba(127,212,255,.8) 0%, rgba(38,26,12,.6) 0)}
 
   /* ---------- TWO-THUMB scheme ----------
@@ -327,16 +331,18 @@
       bottom:calc(18px + env(safe-area-inset-bottom));font-size:12px}
     body.two-thumb #t-drift{width:66px;height:66px;left:calc(50% + 4px);
       bottom:calc(18px + env(safe-area-inset-bottom));font-size:12px}
-    /* short screens compress the cluster into two clean columns, the SAME
-       way in both schemes (H5 holds at every size). Worked at 844x390:
-       column A (right edge) FIRE y186-204 + SHOCK y120-178, column B
-       (inner) MISSILE y214-272, MINE y148-206, NITRO y78-140 — nothing
-       touches the score box, the pause button, or the hull bar at 70.5%. */
-    #t-fire{right:calc(16px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom))}
-    #t-shock{right:calc(30px + env(safe-area-inset-right));bottom:calc(212px + env(safe-area-inset-bottom))}
-    #t-missile{right:calc(110px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom))}
-    #t-mine{right:calc(110px + env(safe-area-inset-right));bottom:calc(184px + env(safe-area-inset-bottom))}
-    #t-nitro{right:calc(108px + env(safe-area-inset-right));bottom:calc(250px + env(safe-area-inset-bottom))}
+    /* short screens flatten the quad into ONE row along the right edge —
+       landscape's spare room is horizontal. Worked at 844x390: FIRE (66)
+       y206-272, the four 44s y228-272 = 58-70%, everything inside the
+       band, same in both schemes (H5). */
+    #t-fire{right:calc(16px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:66px;height:66px}
+    #t-nitro{right:calc(110px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:44px;height:44px}
+    #t-shock{right:calc(160px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:44px;height:44px}
+    #t-missile{right:calc(210px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:44px;height:44px}
+    #t-mine{right:calc(260px + env(safe-area-inset-right));bottom:calc(118px + env(safe-area-inset-bottom));width:44px;height:44px}
+    #t-unstuck{left:calc(16px + env(safe-area-inset-left));bottom:calc(118px + env(safe-area-inset-bottom));width:48px;height:48px}
+    body.two-thumb #t-brake{bottom:calc(8px + env(safe-area-inset-bottom));width:62px;height:62px}
+    body.two-thumb #t-drift{bottom:calc(8px + env(safe-area-inset-bottom));width:62px;height:62px}
   }
 
   /* ---------- compact / phone layout ---------- */
@@ -391,23 +397,13 @@
   body.touch #feed{top:21%}
   /* very narrow phones: nudge the inner weapon column out of the speedo's way */
   @media (max-width:380px){
-    /* moving these inward to clear the speedo pushed them into FIRE, so the
-       whole right cluster tightens together rather than one column sliding */
-    #t-fire{width:78px;height:78px}
-    #t-missile{right:calc(100px + env(safe-area-inset-right));width:54px;height:54px}
-    #t-mine{right:calc(96px + env(safe-area-inset-right));width:54px;height:54px;
-      bottom:calc(104px + env(safe-area-inset-bottom))}
-    /* At these widths the bottom band cannot hold all three: ring 124 +
-       dial 76 + the 🚀 column overlap whatever the bias — measured 1018px²
-       at 360 and 1549px² at 320 once landscape.mjs learned to look. So the
-       dial leaves the thumb row entirely (the two-thumb layout's own move:
-       "the speedo sits above BRAKE") — raised clear of 🚀 and 💣, centred
-       in the gap between the ring and the mine column, and the ring gives
-       up 24px of VISUAL size (the knob's drag radius is input.js's, not
-       this rule's). Clearances at 320: ring 2px, mine 4px, 🚀 by a row. */
+    /* very narrow phones: the quad tightens as a unit (r300 layout) */
+    #t-fire{width:70px;height:70px}
+    #t-missile{right:calc(98px + env(safe-area-inset-right));width:42px;height:42px}
+    #t-nitro{right:calc(98px + env(safe-area-inset-right));width:42px;height:42px}
+    #t-mine{right:calc(146px + env(safe-area-inset-right));width:42px;height:42px}
+    #t-shock{right:calc(146px + env(safe-area-inset-right));width:42px;height:42px}
     #joy-base{width:100px;height:100px;margin:-50px 0 0 -50px}
-    body.touch #speed-box{left:calc(50% - 20px);bottom:112px}
-    body.touch #speedo{width:56px;height:56px}
   }
   /* landscape phones: everything anchors to corners, panels stay top */
   @media (max-height: 560px){
@@ -1959,12 +1955,20 @@ body.hud-rows #standings{display:block}
 /* ---- CONTROLS BAND: hull first ---- */
 #health-box{bottom:auto;top:70.5%;left:50%;transform:translateX(-50%);width:60%;
   max-width:560px;padding:5px 10px}
-/* on touch the band's edges belong to the button columns (UNSTUCK ends at
-   x=80, the right cluster starts 178px from the edge), so the bar takes the
-   measured free middle instead of a blind 60% — the 60% spanned straight
-   through FIRE and the missile column on a 390px portrait */
-body.touch #health-box{left:84px;right:180px;width:auto;max-width:none;transform:none}
-#health-box .bar-label{display:flex;gap:10px;align-items:baseline;font-size:12px}
+/* on touch the band's edges belong to the buttons (UNSTUCK ends at x=72,
+   the quad starts 210px from the right edge), so the bar takes the measured
+   free middle instead of a blind 60% — the 60% spanned straight through
+   FIRE and the missile column on a 390px portrait */
+body.touch #health-box{left:80px;right:216px;width:auto;max-width:none;transform:none}
+/* the speed number lives under the progress strip, top-left — its two
+   previous homes both failed a measurement: bottom-left sat under the
+   two-thumb pedal (screenshot, r300), the hull row's sliver sat on UNSTUCK
+   (suite). The status corner is empty in every layout and rally speed
+   belongs beside the clocks anyway. */
+body.touch #speed-num{bottom:auto;top:calc(64px + env(safe-area-inset-top));
+  left:calc(14px + env(safe-area-inset-left));font-size:16px}
+#health-box .bar-label{display:flex;gap:8px;align-items:baseline;font-size:12px;
+  white-space:nowrap;overflow:hidden}
 #health-box .bar{height:1.4vh;min-height:9px}
 #health-box #shield-hits{margin-left:auto;font-size:13px}
 #health-box.hit .bar{outline:3px solid rgba(255,255,255,.95)}
@@ -1998,8 +2002,8 @@ body.touch #feed{right:184px}
 
 /* ---- H5: the weapon cluster and UNSTUCK hold their ground in BOTH
    layouts — muscle memory breaks if a toggle moves the triggers ---- */
-body.two-thumb #t-unstuck{left:calc(24px + env(safe-area-inset-left));right:auto;
-  bottom:calc(214px + env(safe-area-inset-bottom))}
+/* (r300: no two-thumb override — UNSTUCK is at left:16/b:170 in BOTH
+   schemes; the stale pin here was the H5 red) */
 
 /* the desktop weapon panel stays; on touch it is hidden as before */
 @media (max-width:900px){
@@ -2008,6 +2012,12 @@ body.two-thumb #t-unstuck{left:calc(24px + env(safe-area-inset-left));right:auto
   #race-info .pos{font-size:17px}
   #race-info .lap,#race-info .time{font-size:12px}
   #progress-strip{width:34%;top:calc(48px + env(safe-area-inset-top));left:12px;transform:none}
+}
+/* landscape's hull bar compacts so it ends above the centre pedal row —
+   LAST in the sheet on purpose, so no earlier touch rule out-orders it */
+@media (max-height:560px){
+  body.touch #health-box{padding:3px 8px}
+  body.touch #health-box .bar{height:7px;min-height:7px}
 }
 </style>
 </head>
@@ -2134,7 +2144,7 @@ body.two-thumb #t-unstuck{left:calc(24px + env(safe-area-inset-left));right:auto
 <div id="speed-lines"></div>
 <div id="damage-vignette"></div>
 <div id="polish-vignette"></div>
-<div id="build-tag">r297</div>
+<div id="build-tag">r300</div>
 <div id="fade"></div>
 <div id="build-veil"></div>
 
@@ -2469,10 +2479,10 @@ body.two-thumb #t-unstuck{left:calc(24px + env(safe-area-inset-left));right:auto
   // its URL + anon key here. Leave empty to keep sync codes only.
   window.IGNITE_SYNC = { url: '', key: '' };
 </script>
-<script type="module" src="./src/main.js?v=r297"></script>
+<script type="module" src="./src/main.js?v=r300"></script>
 <!-- offline arming: registers sw.js and drives the flight badge -->
-<script src="./src/offline.js?v=r297"></script>
+<script src="./src/offline.js?v=r300"></script>
 <!-- rural traffic: self-attaching, polls window.__game (no engine hooks) -->
-<script type="module" src="./src/traffic.js?v=r297"></script>
+<script type="module" src="./src/traffic.js?v=r300"></script>
 </body>
 </html>

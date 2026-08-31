@@ -4161,6 +4161,126 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r300 — "THE HUD IS TERRIBLE": THE LADDER BECOMES A QUAD
+A live two-thumb portrait screenshot (MAPLE MILE) showed what every suite
+had missed: the weapon buttons stacked diagonally up the right edge into
+the play band — shock and the glaring nitro arc at 55-62% beside the car,
+the hull bar floating mid-road, SOS adrift at 65%, the speed number
+buried under the left pedal. WHY the suites missed it: test-mobile-hud
+only ever measured ONE-THUMB. A suite that skips a whole scheme agrees
+with itself — it now runs both schemes at every size (six combos).
+The layout, both schemes identical (H5):
+  - FIRE (80) holds the right edge at b132; the four secondaries are a
+    tight 46px 2x2 QUAD beside it (nitro+shock bottom row, missile+mine
+    top). Everything inside the controls band.
+  - UNSTUCK left:16/b170 — between the one-thumb ring (top ≈674 @844)
+    and the two-thumb pedal (720), no scheme override anywhere (a stale
+    two-thumb pin was still in the band block; H5 caught it).
+  - Hull spans the measured free middle (x80-216-from-right on touch),
+    with a nowrap guard on its label row.
+  - The speed number's third home is the one that measured clean: under
+    the progress strip, top-left — bottom-left sat beneath the two-thumb
+    pedal, the hull row's sliver sat on UNSTUCK. Rally speed belongs by
+    the clocks anyway.
+  - Landscape (max-height 560): the quad flattens to ONE row along the
+    right edge (y 58-70%, in-band at last), hull compacts (the
+    compaction rules live at the SHEET'S END — an earlier touch rule
+    out-ordered them at equal specificity, twice), pedals 62px at b8.
+Gates: test-mobile-hud 24/24 across six size/scheme combos,
+test-hudreview 13/13. ATTRIBUTED, NOT OURS: test-economy "maxing a car"
+and both test-feats card reds reproduce identically on the pristine
+r294 base — pre-existing debt, noted here so nobody re-attributes them
+to the score realignment.
+
+## r299 — CORRIDOR STEP 3: EVERY PROP KNOWS ITS CLASS AND KEEPS ITS DISTANCE
+The user's own live race log forced the order of work: two near-head-on
+tree strikes inside nine seconds (square 0.88 and 0.97, 13 hull by t=9)
+— obstacles standing in the route corridor, §6's case in one dump.
+  - propClassOf (route.js): smash / shove / obstacle from the fields the
+    engine already stores. V1 audits every standing prop on a stage into
+    exactly one class (Canyon 175/32/291, Glacier 346/126/1002, zero
+    unclassed). Scores aligned to the §6 table: the SMASH class pays 25
+    (TIMBER!, cacti — was 15); the SHOVE class pays NOTHING (v1.2 fix 10
+    briefly awarded rocks a Smashed; the corridor's newer prop table
+    reserves scoring for things that break — P2.13 updated).
+  - THE DENSITY PASS (track.applyRouteDensity): within the exclusion of
+    the road edge on non-street sections obstacles are culled; in the
+    12 u band past it, one per 20 m. INSTANCE-HONEST: a tree goes
+    visual-and-collider together (zeroed parts + culled flag —
+    restoreSmashed learned to skip culled trees, or it resurrected
+    colliders with no visuals); a solid is culled only when it carries
+    im/inst handles. Glacier's corridor lost 21 obstacles. Runs ONCE on
+    the first race frame (racing is where the corridor exists; roam
+    keeps full scenery on purpose).
+  - THE DEBT, MEASURED AND PINNED: 62 (Canyon) + 48 (Glacier) corridor
+    boulders are merged-geometry rock lines — bare {x,z,r,y,mat}
+    records, no handles — and culling their colliders would leave drawn
+    rock you drive through (the Law of Solidity inverted). They stand,
+    counted, with baselines pinned in test-corridor3 V2; the real fix is
+    the feature-aware re-author (street gates where the canyon walls
+    actually are, task #31). Note the deeper point found here: the §13
+    layouts distribute gates EVENLY, but Canyon's rock-lined stretches
+    should BE its street sections — gate placement wants geography.
+  - A REAL BREAKAGE CAUGHT BY A TEST DOING ITS JOB: the r298 drag
+    deletion left a dangling `over` reference that threw a swallowed
+    ReferenceError on every strayed frame — silently skipping the rest
+    of step() (ground follow, collisions, lap checks) for any off-course
+    car. test-shortcut's "no feed" was the only visible symptom. The
+    frame loop's catch-and-recover giveth and it taketh away.
+Gates: test-corridor3 (V1, V2, R7, R8) 14/14 on stages 4 and 66.
+
+## r298 — CORRIDOR STEP 2: THE WORLD CONTAINS THE CAR BECAUSE IT IS PHYSICAL
+Build-order step 2: slope grip, surfaces, spawn — and the deletion of two
+invisible forces the corridor outlaws. The load-bearing finds:
+  - THE CRAWL THAT CLIMBED EVERYTHING: terrGrade only sampled when
+    v² > 1, so a car under 1 u/s read grade 0, felt NO gravity, got its
+    drive back and crept up a 55° plane at 1 u/s FOREVER (measured,
+    slopeprobe.mjs — recording A's wall climb had a quiet accomplice all
+    along). At a crawl the grade now reads along the HEADING; a parked
+    car on a face feels the face.
+  - §5.1 SLOPE LAW: drive authority fades 31.5°→35° and is zero past
+    maxClimbDeg — measured: 25° climbs at 7.5 u/s, 30° climbs, 35°+
+    takes only the entry momentum and slides back, hull 0. Grip pays
+    μ·cos(slope). The μ table is offMult's old constant wearing its true
+    name: grass floor 0.55 exactly as §7.2 ships it, the OFF-ROAD stat
+    buying it back — and it now prices GRIP off-road, not just drag and
+    top speed (a desert cut used to corner like a road).
+  - TWO INVISIBLE FORCES DELETED: the strayed deep-sand drag (1.2/s
+    velocity bleed past 70 u — "a physics costume") and the generic
+    off-course climb-authority fade (drive gone by grade 0.23 whenever
+    strayed). Off the course you now pay μ, cos, the 35° ceiling and
+    off-road drag — the same laws as everyone everywhere. Lap integrity
+    never depended on either (the checkpoint mask refuses cut laps);
+    the LEAVING backstop becomes the missed-gate return at step 4. The
+    goat peak stays closed on race day (onGoatRace), and the goat
+    doctrine moved: GOAT_PACE 4→6 with the old defect signature (19-26
+    u/s) still the canary — a sub-ceiling hill in a race is now a
+    priced line, not a crime.
+  - test-goat's roam flank control was measuring the SURFACE TABLE
+    after the law landed (grass μ 0.55 caps sustained climbing at
+    atan 0.55 ≈ 29° — the spec's own numbers collide with its own R4 at
+    30° on grass): regrounded on a synthetic 25° plane. R4 itself runs
+    a μ=1 car for the same reason — it tests the slope law, R5 tests
+    the surface.
+  - RIG TRAPS, all paid for in tests/test-corridor2.mjs: a synthetic
+    ramp at x=3000 fights the WORLD RIM (1620); at x=1100 it sat ON
+    Glacier's road; on Canyon it rammed a massif-cone solid and billed
+    35 hull of "slope damage" that was really a rock. The rig now FINDS
+    open ground (farthest point from any road sample, in-rim) and
+    stashes solids/trees — props are §6's law, the slope is §5.1's.
+    One recorded wart: a throttle-held car can end PARKED mid-face on a
+    55° plane after its momentum spends (hop-cycle equilibrium; Canyon
+    measured it, Glacier slid clean back). Step 4's stuck return is the
+    designed collector; the law holds either way (late gain < 0).
+  - §12 spawn and §5.2 splat maps are ADAPTATIONS, documented in the
+    rigs: the grid already derives from the spline behind gate 0 (no
+    stored transforms — R6 pins every car on-road at tangent), and the
+    surface "map" is the road/off-road split plus theme (two honest
+    surfaces, not a painted texture).
+Gates: test-corridor2 R3-R6 green on stages 4 and 66. Kill volumes
+(§5.3) and everything return-shaped wait for step 4 with the unified
+returnToGate.
+
 ## r297 — CORRIDOR v2.0 STEP 1: THE RACE GETS ITS OWN STRUCTURE (SHADOW)
 The user posted RALLY_CORRIDOR_REFACTOR.md v2.0 — the biggest doc yet, a
 seven-step build order that separates WORLD (all drivable), ROUTE (an

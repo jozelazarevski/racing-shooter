@@ -34,12 +34,19 @@ const browser = await chromium.launch({
 let fail = 0;
 const check = (n, ok, d = '') => { if (!ok) fail++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? '  ' + d : ''}`); };
 
-// Small-to-typical, portrait and landscape. 320x568 is the smallest screen
-// worth supporting and is where the layout runs out of room first.
+// Small-to-typical, portrait and landscape, BOTH control schemes. 320x568 is
+// the smallest screen worth supporting and is where the layout runs out of
+// room first. The fourth field is the scheme: the r296 rebuild shipped a
+// two-thumb portrait ladder that climbed into the play band and nothing here
+// noticed, because the suite only ever measured one-thumb ("the hud is
+// terrible", screenshot, r300) — a suite that skips a whole scheme agrees
+// with itself.
 const SIZES = [
   [390, 844, 'iPhone portrait'],
+  [390, 844, 'iPhone portrait two-thumb', 'two'],
   [360, 800, 'Android portrait'],
   [844, 390, 'iPhone landscape'],
+  [844, 390, 'iPhone landscape two-thumb', 'two'],
   [320, 568, 'small portrait'],
 ];
 
@@ -61,7 +68,7 @@ const IDS = ['race-info', 'health-box', 'score-box', 'speed-num', 'feed', 'weapo
              't-fire', 't-missile', 't-mine', 't-shock', 't-nitro', 't-drift', 't-brake',
              't-unstuck', 'progress-strip', 'pause-btn'];
 
-for (const [w, h, tag] of SIZES) {
+for (const [w, h, tag, scheme] of SIZES) {
   const ctx = await browser.newContext({
     viewport: { width: w, height: h }, hasTouch: true, isMobile: true, deviceScaleFactor: 2,
   });
@@ -70,6 +77,7 @@ for (const [w, h, tag] of SIZES) {
   const ok = await p.waitForFunction(() => window.__game?.track?.center && window.__game.player,
     undefined, { timeout: 300000 }).then(() => 1).catch(() => 0);
   if (!ok) { console.log(`SKIP  ${tag}`); await ctx.close(); continue; }
+  if (scheme === 'two') await p.evaluate(() => document.body.classList.add('two-thumb'));
 
   // Race state, so the contracts list is populated — the whole point. Then a
   // full feed, because the feed grows with messages and that is what pushed it
@@ -128,10 +136,12 @@ for (const [w, h, tag] of SIZES) {
   // Two elements are legitimately absent mid-race and are named here with the
   // reason; anything else missing means the gate stopped watching something.
   // Measured at 844x390: 15 ids, 13 boxes, and these are the two.
-  const EXPECT_ABSENT = {
-    'weapon-box': 'hidden until a weapon is held',
-    't-brake': 'hidden — the brake pedal is not in the touch cluster on this layout',
-  };
+  const EXPECT_ABSENT = scheme === 'two'
+    ? { 'weapon-box': 'hidden until a weapon is held' }   // two-thumb HAS the brake pedal
+    : {
+      'weapon-box': 'hidden until a weapon is held',
+      't-brake': 'hidden — the brake pedal is not in the touch cluster on this layout',
+    };
   const unexpected = r.skipped.filter((id) => !(id in EXPECT_ABSENT));
   check(`${tag}: every element the player must press was actually measured`,
     unexpected.length === 0,

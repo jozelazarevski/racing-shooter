@@ -133,12 +133,14 @@ const r = await p.evaluate(() => {
   g.onTreeCrash(trunk, c, 27.8, 1, 0, 1.0);
   out.p212 = { glanceLoss: +glanceLoss.toFixed(1), headOnLoss: +(100 - c.health).toFixed(1) };
 
-  // P2.13 — a knockable stone SHOVES free: no hull, score awarded, rock retired
+  // P2.13 — a knockable stone SHOVES free: no hull, rock retired. CORRIDOR
+  // §6 refiled the class: shove pays NO score (that was v1.2's Smashed
+  // award; the newer prop table reserves scoring for things that break).
   const pebble = { x: c.pos.x + 3, z: c.pos.z, y: c.pos.y, r: 0.8, mat: 'stone' };
   c.health = 100; const score13 = g.score;
   g.knockStone(pebble, c, 20, 1, 0, 1.0);
   out.p213 = { loss: +(100 - c.health).toFixed(1), knocked: !!pebble.knocked,
-    scored: g.score > score13 };
+    scored: g.score !== score13 };
 
   // P2.7b — landing assist yields to the handbrake: a jump landed with drift
   // held keeps its slide (the assist timer is cancelled, lateral vel intact)
@@ -251,8 +253,8 @@ check('P2.3b a head-on at 200 km/h hits the 45 cap exactly',
 check('P2.12 a tree answers to the same law: brush free, head-on 20 ± 2',
   r.p212.glanceLoss === 0 && Math.abs(r.p212.headOnLoss - 20) <= 2,
   `brush ${r.p212.glanceLoss}, head-on ${r.p212.headOnLoss}`);
-check('P2.13 a knockable stone shoves free and pays the player',
-  r.p213.loss === 0 && r.p213.knocked && r.p213.scored,
+check('P2.13 a knockable stone shoves free — no hull, no score (§6 shove)',
+  r.p213.loss === 0 && r.p213.knocked && !r.p213.scored,
   `lost ${r.p213.loss}, knocked=${r.p213.knocked}, scored=${r.p213.scored}`);
 check('P2.17 the camera never dips under terrain + clearance',
   r.p217.worstClearance >= r.p217.need,

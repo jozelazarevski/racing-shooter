@@ -1978,12 +1978,21 @@ export class Car {
     if (offRoad && !this.airborne) {
       const tk = this.game.track;
       const v2h = this.vel.x * this.vel.x + this.vel.z * this.vel.z;
-      if (v2h > 1 && tk?.terrainHeight) {
-        const inv = 1 / Math.sqrt(v2h), LOOK = 4;
+      if (tk?.terrainHeight) {
+        // Below walking pace the velocity direction is noise, and the old
+        // `v2h > 1` guard simply skipped the sample — so a car crawling up
+        // a 55° face read grade 0, felt NO gravity, got its drive back and
+        // CREPT to any summit at 1 u/s (measured, slopeprobe.mjs — the
+        // recording-A wall climb's quiet enabler). The car still FACES
+        // somewhere: at a crawl the grade reads along the heading.
+        const slow = v2h <= 1;
+        const dirx = slow ? Math.sin(this.heading) : this.vel.x / Math.sqrt(v2h);
+        const dirz = slow ? Math.cos(this.heading) : this.vel.z / Math.sqrt(v2h);
+        const LOOK = 4;
         const h0 = tk.terrainHeight(this.pos.x, this.pos.z);
         terrGrade = THREE.MathUtils.clamp(
-          (tk.terrainHeight(this.pos.x + this.vel.x * inv * LOOK,
-            this.pos.z + this.vel.z * inv * LOOK) - h0) / LOOK, -1.2, 1.2);
+          (tk.terrainHeight(this.pos.x + dirx * LOOK,
+            this.pos.z + dirz * LOOK) - h0) / LOOK, -1.2, 1.2);
         // …and far off-road, gravity prices the FACE, not the tread (r293):
         // the ridged octaves hand every steep face a staircase, the 4 u look
         // reads the flat tread between risers, and once GRADE went physical
@@ -1992,10 +2001,14 @@ export class Car {
         // A 14 u baseline reads through the ripples to the slope that is
         // actually being climbed. Inside 60 u of the road nothing changes:
         // the rejoin banks are moments, not faces (test-goat's own fence).
+        // the TREAD grade survives separately: the goat route's slope law
+        // (below) reads it, because the carved spiral IS the designed
+        // sub-35° line and the face average misreads its stairs
+        this._treadGrade = terrGrade;
         if (this._wilds) {
           const FAR = 14;
-          const faceGrade = (tk.terrainHeight(this.pos.x + this.vel.x * inv * FAR,
-            this.pos.z + this.vel.z * inv * FAR) - h0) / FAR;
+          const faceGrade = (tk.terrainHeight(this.pos.x + dirx * FAR,
+            this.pos.z + dirz * FAR) - h0) / FAR;
           terrGrade = Math.max(terrGrade, THREE.MathUtils.clamp(faceGrade, -1.2, 1.2));
         }
       }
@@ -2012,9 +2025,49 @@ export class Car {
     // plain roam publishes _strayed = 0 and never enters this branch.
     const onGoatRace = (this._strayed ?? 0) > 0
       && this.game.track?._nearGoat?.(this.pos.x, this.pos.z, 26);
-    const climbAuth = onGoatRace ? 0
-      : ((this._strayed ?? 0) > 0 && terrGrade > OFF_CLIMB)
-        ? Math.max(0, 1 - (terrGrade - OFF_CLIMB) / OFF_FADE) : 1;
+    // CORRIDOR §3.3 (r298) RETIRED the generic off-course climb fade that
+    // lived here (drive authority gone by grade 0.03+0.20 whenever
+    // _strayed > 0): "Off-road cost is physical. Surface μ, rolling drag,
+    // slope and props. No timers that slow the car, no caps, no invisible
+    // forces." A racer taking a hill cut now pays μ, cos(slope) and the
+    // 35° ceiling below — the same laws as everyone everywhere — instead
+    // of an invisible authority tax. The goat peak stays closed on race
+    // day (its stair-step route defeats any grade law by design).
+    const climbAuth = onGoatRace ? 0 : 1;
+
+    // CORRIDOR §5.1 — THE SLOPE LAW, everywhere, every mode. Below
+    // maxClimbDeg (35°) every hill in every stage is climbable, WHICH IS
+    // THE POINT; at 35° the drive authority is zero, the existing GRADE
+    // gravity wins, and the car slides back to the floor. No wall needed —
+    // this is what retires the recording-A wall climb (55-65°, driven at
+    // speed, then six seconds on the plateau). Measured before this law:
+    // the tyre CREPT UP a 55° plane at 1 u/s forever (slopeprobe.mjs).
+    // The fade runs 31.5°→35° so the ceiling is a boundary, not a cliff
+    // edge in the maths. The goat spiral reads its TREAD grade in roam —
+    // the carved route is the designed line and the face average misreads
+    // its stairs; in a race the goat is already closed (onGoatRace).
+    const RT = DRIVING.route ?? {};
+    const maxClimbTan = Math.tan((RT.maxClimbDeg ?? 35) * Math.PI / 180);
+    const nearGoatRoam = !((this._strayed ?? 0) > 0)
+      && this.game.track?._nearGoat?.(this.pos.x, this.pos.z, 26);
+    const authGrade = nearGoatRoam ? (this._treadGrade ?? terrGrade) : terrGrade;
+    const slopeAuth = authGrade <= maxClimbTan * 0.9 ? 1
+      : THREE.MathUtils.clamp(
+        1 - (authGrade - maxClimbTan * 0.9) / (maxClimbTan * 0.1), 0, 1);
+    // …and the tyre itself loses the slope's cosine (§5.1 μ·cos): modest
+    // below the ceiling (cos 35° = 0.82), honest on a real face
+    this._slopeCos = offRoad ? 1 / Math.sqrt(1 + terrGrade * terrGrade) : 1;
+    // §15 slope telemetry: any contact above 30°, throttled to 1/s —
+    // `progress: true` above 35° is the tuning loop's definition of a
+    // physics bug, so the flight recorder must be able to convict us
+    this._slopeLogT = Math.max(0, (this._slopeLogT ?? 0) - dt);
+    if (this === this.game.player && terrGrade > 0.577 && this._slopeLogT <= 0) {
+      this._slopeLogT = 1;
+      this.game.telemetry?.log('slope', {
+        deg: Math.round(Math.atan(terrGrade) * 180 / Math.PI),
+        progress: Math.hypot(this.vel.x, this.vel.z) > 0.5 && (this.speedAlong ?? 0) > -0.5,
+      });
+    }
 
     // surface conditions: snow and rain-wet worlds drive differently — less
     // brake bite, wheelspin on throttle, and a much earlier, longer slide.
@@ -2150,7 +2203,7 @@ export class Car {
         const launchness = THREE.MathUtils.clamp(1 - Math.abs(vf) / 10, 0, 1);
         this._spinFeed = wantA > tractA * 1.05
           ? Math.min(0.6, (wantA / tractA - 1) * 0.45 * launchness) : 0;
-        vf += driveA * dt;
+        vf += driveA * slopeAuth * dt;   // CORRIDOR §5.1: no drive past 35°
         this.reverseTimer = 0;
       }
       if (inputs.brake > 0.05) {
@@ -2301,6 +2354,12 @@ export class Car {
     // new lateral-acceleration law further down.
     let gripBudget = this.grip * (1 + 0.08 * hnd) * sGrip * (this.gripBoost || 1)
       * (1 + (this.downforce || 0) * speedN);
+    // CORRIDOR §5.1 + §5.2: off the road the tyre pays the SURFACE (offMult
+    // is the spec's μ table in car form — 0.55 grass floor, the OFF-ROAD
+    // stat buying it back) and the slope's cosine. Off-road cost was drag
+    // and top speed only; grip stayed tarmac-grade on dirt, which is why a
+    // desert cut cornered like a road.
+    if (offRoad) gripBudget *= offMult * (this._slopeCos ?? 1);
     if (this.landGrip > 0) { this.landGrip -= dt; gripBudget *= 0.4; } // loose for ~0.4s after landing
     // ---- river-fords: wet tires. Ford crossings set _wetT=3.5 with a gentle
     // ≈0.8 grip factor fading linearly back to 1; plain puddles keep their
@@ -3465,8 +3524,16 @@ export class Car {
       // frame and cannot afford this global search a second time.
       this._strayed = strayed;
       if (strayed > 0) {
-        const over = Math.min(1, strayed / 30);
-        this.vel.multiplyScalar(Math.max(0, 1 - over * 1.2 * dt));
+        // CORRIDOR §3.3 (r298): the deep-sand drag that lived here — a
+        // 1.2/s velocity bleed on anything past 70 u — was an invisible
+        // force wearing a physics costume, and it is exactly what the
+        // refactor deletes ("no timers that slow the car, no caps, no
+        // invisible forces"). Leaving the course is now priced by μ, slope
+        // and drag like everywhere else; the LEAVING backstop becomes the
+        // missed-gate return at build step 4, and lap integrity never
+        // depended on this (the checkpoint mask refuses cut laps).
+        // `_strayed` still publishes: the wedge net's 12 m line and the
+        // goat closure below read it.
         // THE PEAK IS CLOSED ON RACE DAY. The goat route's shelves defeat
         // the climb-authority fade by design — each flat resets the throttle
         // — so in a road event a racer could stair-climb the spiral 46 u in
@@ -3477,7 +3544,13 @@ export class Car {
         if (t._nearGoat?.(this.pos.x, this.pos.z, 26)) {
           this.vel.multiplyScalar(Math.max(0, 1 - 2.5 * dt));
         }
-        if (over > 0.5 && !this._steepFed) {
+        // the warning stays until step 4's wayfinding replaces it. (`over`
+        // died with the drag above and its dangling reference threw a
+        // ReferenceError HERE on every strayed frame, which the frame
+        // loop's catch swallowed — silently skipping everything below this
+        // line in step(). Caught by test-shortcut's "no feed".)
+        const warn = Math.min(1, strayed / 30);
+        if (warn > 0.5 && !this._steepFed) {
           this._steepFed = 1.8;
           this.game.hud?.feed?.('OFF THE COURSE — TURN BACK', 'bad');
         }
