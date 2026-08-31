@@ -2280,7 +2280,15 @@ export class Car {
     // cliff walls) could only be held at 14 km/h, where the car had 30% of its
     // lock. A standing floor fixes hairpins everywhere without touching a single
     // track's geometry; the speed term still adds on top of it.
-    const rise = 0.45 + 0.55 * THREE.MathUtils.clamp(sp / 13, 0, 1);
+    // ...but the floor STARTS AT THE WHEELS, not at zero (r288, "car is
+    // turning in place without any speed — that's not real"): a car yaws at
+    // v/wheelbase · tan(lock), so at a standstill it cannot yaw at all, and
+    // the standing floor let it pivot like a tank. The floor now ramps in
+    // over the first 2.5 u/s (~9 km/h) — at ROCKFALL's measured 14 km/h
+    // hairpin crawl it is already fully present, so the trap this floor was
+    // built against stays fixed, and a parked car stays parked.
+    const creep = THREE.MathUtils.clamp(sp / 2.5, 0, 1);
+    const rise = (0.45 + 0.55 * THREE.MathUtils.clamp(sp / 13, 0, 1)) * creep;
     const taper = 1 - this.steerTaper * THREE.MathUtils.clamp((sp - this.maxSpeed * 0.6) / (this.maxSpeed * 0.55), 0, 1);
     let authority = rise * taper * (1 + 0.35 * this.slip); // extra yaw mid-slide for counter-steer
     // A rally car CAN rotate a little in the air — inertia, and a stab of
