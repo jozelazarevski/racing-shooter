@@ -48,7 +48,15 @@ for (const [id, name] of [[21, 'FURKA RIDGE'], [22, 'COL DE TURINI'], [25, 'PIKE
         for (let k = 0; k < 30; k++) {
           car.step(1 / 60, { throttle: 0, brake: 0, steer: 0, drift: false, hold: false });
         }
-        const below = road - car.y;
+        // Where two legs of a pass overlap (a switchback), the tracker is
+        // free to re-track the parked car onto the NEARER leg and stand it
+        // on THAT deck — measured on FURKA sample 349: parked from leg 349
+        // (deck 25.96), settled on leg 342's deck at exactly its height,
+        // grounded, vy 0. That is a car standing on a road, not sinking
+        // (attributed r319). So the law is: below BOTH decks is falling
+        // through the world; on either one is fine.
+        const roadNow = t.groundHeightAt(car.trackIndex, car.lateral);
+        const below = Math.min(road - car.y, roadNow - car.y);
         if (below > worstBelow) { worstBelow = below; at = i; atLat = lat; }
       }
     }

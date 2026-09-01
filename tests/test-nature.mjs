@@ -100,9 +100,16 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [13, 'LOG FLUME FURY'], [21, 'FURK
     }
 
     // ---- rule 6: everything that stands, stands ON the ground -------------
-    // A record's `y` is where the thing is planted. Compare with the terrain
-    // there. Trees on the roadbed legitimately differ (the road is a shelf
-    // above raw terrain), so only sample well off the road.
+    // A record's `y` is where the thing is planted. Compare with the GROUND
+    // THE PLAYER SEES — which, since the r286 seating fix, is the LOWER of
+    // the analytic curve and the drawn 10 u mesh chord (`_seatY`: "rule 6 is
+    // about the picture, and the picture is the mesh"). Measuring against
+    // the analytic curve alone re-reported every correctly-seated prop in
+    // steep terrain as buried: on FURKA/PINE/FLUME, 91 of 101 flags sat
+    // EXACTLY on `_drawnGroundY` with the deliberate 0.25 u root sink
+    // (attributed r319 — the reds were the test's datum, not the world).
+    // Trees on the roadbed legitimately differ (the road is a shelf above
+    // raw terrain), so only sample well off the road.
     const standing = (list, label) => {
       let n = 0, floating = 0, buried = 0, worst = 0;
       for (const o of (list ?? [])) {
@@ -114,7 +121,10 @@ for (const [id, name] of [[1, 'PINE VALLEY'], [13, 'LOG FLUME FURY'], [21, 'FURK
         if ((o.r ?? 0) > 20) continue;
         if ((t._distToTrackCoarse ? t._distToTrackCoarse(o.x, o.z) : 999) < 16) continue;
         n++;
-        const d = o.y - t.terrainHeight(o.x, o.z);
+        const a = t.terrainHeight(o.x, o.z);
+        const dg = t._drawnGroundY ? t._drawnGroundY(o.x, o.z) : null;
+        const seen = dg === null ? a : Math.min(a, dg);
+        const d = o.y - seen;
         if (d > 0.6) floating++;
         if (d < -1.2) buried++;
         if (Math.abs(d) > Math.abs(worst)) worst = d;
