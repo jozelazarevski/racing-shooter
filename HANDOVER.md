@@ -4161,6 +4161,34 @@ detector and is untouched); test-climb / wedge-recovery / roadclear reds
 did not reproduce (noise); floats/on-road roster sweeps track base
 world-for-world.
 
+## r324 — A RESTARTED CAR STANDS STILL
+
+Owner: "When car restarts after selecting goes straight to nitro. Should
+be stopped." Measured, two causes, both real:
+- THE WRECK RESPAWN CARRIED THE BURNING BOOST THROUGH DEATH. Nothing on
+  the death/respawn path touched `boostTimer`: die mid-nitro and the car
+  came back with 3.0 s still lit — probe showed boost 3.0 on the far
+  side of a wreck — surging off the mark with the flame on.
+- EVERY RECOVERY HANDED OUT 40 KM/H. `returnToGate` (SOS, stuck, missed
+  gate, falls; player and rivals alike) set the car moving at
+  `returnSpeedKmh 40`, and under touch auto-throttle that read as an
+  instant nitro launch.
+
+The fix sits at the one chokepoint every restart shares: `placeAt` now
+zeroes `boostTimer` (respawn, rescue, returnToGate, resetRace and the
+rival pit-lift all funnel through it), and `returnSpeedKmh` is 0 — the
+car re-enters ON the tangent, standing. Recorded as CLAUDE.md 3.6b, an
+OWNER OVERRIDE of §3.6's 40 km/h and P5's >= 35 km/h clause (the
+heading-on-tangent clause of P5 stands); the constant stays a
+driving.json knob per the spec's own rule.
+
+tests/test-restart-stopped.mjs, 4 checks: a wreck mid-boost respawns
+standing with the boost dead; returnToGate leaves the car stopped on
+the tangent; the grid is clean after selecting a different machine.
+Gates: unstuck 11/11, cliff 7/7, difficulty green, patch13 16/16 on a
+solo run (its two blips under parallel gate load were the catalogued
+traffic-spawn placement flake).
+
 ## r323 — THE HOOD PLATE COMES OFF
 
 Owner, with a marked-up zoom of the turntable: "Remove this ugly plate

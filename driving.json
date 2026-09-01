@@ -62,7 +62,7 @@
     "openMaxHalfWidthM": 60,
     "missedGateGraceS": 4.0,
     "returnAheadM": 6,
-    "returnSpeedKmh": 40,
+    "returnSpeedKmh": 0,
     "maxClimbDeg": 35,
     "fatalDropM": 12,
     "waterDepthM": 1.2,
